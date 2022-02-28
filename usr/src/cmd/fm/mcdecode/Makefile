@@ -11,12 +11,14 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2022 Oxide Computer Company
 #
 
 include ../../Makefile.cmd
 include ../../Makefile.ctf
 
-SRCS += mcdecode.c imc_decode.o imc_dump.o
+SRCS += mcdecode.c imc_decode.c imc_dump.c
+SRCS += zen_fabric_utils.c zen_umc_decode.c zen_umc_dump.c bitext.o
 OBJS = $(SRCS:%.c=%.o)
 
 PROG = mcdecode
@@ -27,6 +29,7 @@ ROOTPROG = $(ROOTLIBFMD)/$(PROG)
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I$(SRC)/uts/intel/io/imc
+CPPFLAGS += -I$(SRC)/uts/intel/io/amdzen -I$(SRC)/uts/intel
 LDLIBS += -lnvpair
 
 CSTD = $(CSTD_GNU99)
@@ -41,7 +44,15 @@ $(PROG): $(OBJS)
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
+%.o: $(SRC)/common/bitext/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
 %.o: $(SRC)/common/mc/imc/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/mc/zen_umc/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 

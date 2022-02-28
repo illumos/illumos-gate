@@ -29,6 +29,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Peter Tribble.
 # Copyright 2015, Joyent, Inc. All rights reserved.
+# Copyright 2022 Oxide Computer Company
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -89,6 +90,7 @@ CHKHDRS=			\
 	auxv_SPARC.h		\
 	avl.h			\
 	avl_impl.h		\
+	bitext.h		\
 	bitmap.h		\
 	bitset.h		\
 	bl.h			\

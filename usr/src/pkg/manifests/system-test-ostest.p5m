@@ -15,6 +15,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+# Copyright 2022 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/ostest@$(PKGVERS)
@@ -157,6 +158,7 @@ file path=opt/os-tests/tests/uccid/yk-poll mode=0555
 file path=opt/os-tests/tests/uccid/yk-readonly mode=0555
 file path=opt/os-tests/tests/writev.32 mode=0555
 file path=opt/os-tests/tests/writev.64 mode=0555
+file path=opt/os-tests/tests/zen_umc_test mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 depend type=require fmri=developer/dtrace

@@ -16,6 +16,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 RackTop Systems, Inc.
+# Copyright 2022 Oxide Computer Company
 #
 
 file path=usr/share/man/man9f/ASSERT.9f
@@ -187,6 +188,15 @@ file path=usr/share/man/man9f/biomodified.9f
 file path=usr/share/man/man9f/bioreset.9f
 file path=usr/share/man/man9f/biosize.9f
 file path=usr/share/man/man9f/biowait.9f
+file path=usr/share/man/man9f/bitdel64.9f
+link path=usr/share/man/man9f/bitset16.9f target=bitset64.9f
+link path=usr/share/man/man9f/bitset32.9f target=bitset64.9f
+file path=usr/share/man/man9f/bitset64.9f
+link path=usr/share/man/man9f/bitset8.9f target=bitset64.9f
+link path=usr/share/man/man9f/bitx16.9f target=bitx64.9f
+link path=usr/share/man/man9f/bitx32.9f target=bitx64.9f
+file path=usr/share/man/man9f/bitx64.9f
+link path=usr/share/man/man9f/bitx8.9f target=bitx64.9f
 file path=usr/share/man/man9f/bp_copyin.9f
 file path=usr/share/man/man9f/bp_copyout.9f
 file path=usr/share/man/man9f/bp_mapin.9f

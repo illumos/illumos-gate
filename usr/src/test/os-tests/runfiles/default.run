@@ -14,6 +14,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+# Copyright 2022 Oxide Computer Company
 #
 
 [DEFAULT]
@@ -133,3 +134,5 @@ tests = ['stackalign.32', 'stackalign.64']
 user = root
 pre = core_prereqs
 tests = ['coretests']
+
+[/opt/os-tests/tests/zen_umc_test]

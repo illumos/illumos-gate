@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _AMDZEN_H
@@ -22,6 +22,9 @@
 #include <sys/pci.h>
 #include <sys/taskq.h>
 #include <sys/bitmap.h>
+#include <sys/amdzen/df.h>
+
+#include "amdzen_client.h"
 
 /*
  * This header describes properties of the data fabric and our internal state
@@ -50,144 +53,6 @@ extern "C" {
  * fabric.
  */
 #define	AMDZEN_MAX_DF_FUNCS	0x8
-
-
-/*
- * Registers in the data fabric space that we care about for the purposes of the
- * nexus driver understanding itself.
- */
-
-/*
- * This set of registers provides us access to the count of instances in the
- * data fabric and then a number of different pieces of information about them
- * like their type. Note, these registers require indirect access because the
- * information cannot be broadcast.
- */
-#define	AMDZEN_DF_F0_FBICNT	0x40
-#define	AMDZEN_DF_F0_FBICNT_COUNT(x)	BITX(x, 7, 0)
-#define	AMDZEN_DF_F0_FBIINFO0	0x44
-#define	AMDZEN_DF_F0_FBIINFO0_TYPE(x)		BITX(x, 3, 0)
-typedef enum {
-	AMDZEN_DF_TYPE_CCM = 0,
-	AMDZEN_DF_TYPE_GCM,
-	AMDZEN_DF_TYPE_NCM,
-	AMDZEN_DF_TYPE_IOMS,
-	AMDZEN_DF_TYPE_CS,
-	AMDZEN_DF_TYPE_TCDX,
-	AMDZEN_DF_TYPE_PIE,
-	AMDZEN_DF_TYPE_SPF,
-	AMDZEN_DF_TYPE_LLC,
-	AMDZEN_DF_TYPE_CAKE
-} amdzen_df_type_t;
-#define	AMDZEN_DF_F0_FBIINFO0_SDP_WIDTH(x)	BITX(x, 5, 4)
-typedef enum {
-	AMDZEN_DF_SDP_W_64 = 0,
-	AMDZEN_DF_SDP_W_128,
-	AMDZEN_DF_SDP_W_256,
-	AMDZEN_DF_SDP_W_512
-} amdzen_df_sdp_width_t;
-#define	AMDZEN_DF_F0_FBIINFO0_ENABLED(x)	BITX(x, 6, 6)
-#define	AMDZEN_DF_F0_FBIINFO0_FTI_WIDTH(x)	BITX(x, 9, 8)
-typedef enum {
-	AMDZEN_DF_FTI_W_64 = 0,
-	AMDZEN_DF_FTI_W_128,
-	AMDZEN_DF_FTI_W_256,
-	AMDZEN_DF_FTI_W_512
-} amdzen_df_fti_width_t;
-#define	AMDZEN_DF_F0_FBIINFO0_SDP_PCOUNT(x)	BITX(x, 13, 12)
-#define	AMDZEN_DF_F0_FBIINFO0_FTI_PCOUNT(x)	BITX(x, 18, 16)
-#define	AMDZEN_DF_F0_FBIINFO0_HAS_MCA(x)	BITX(x, 23, 23)
-#define	AMDZEN_DF_F0_FBIINFO0_SUBTYPE(x)	BITX(x, 26, 24)
-#define	AMDZEN_DF_SUBTYPE_NONE	0
-typedef enum {
-	AMDZEN_DF_CAKE_SUBTYPE_GMI = 1,
-	AMDZEN_DF_CAKE_SUBTYPE_xGMI = 2
-} amdzen_df_cake_subtype_t;
-
-typedef enum {
-	AMDZEN_DF_IOM_SUBTYPE_IOHUB = 1,
-} amdzen_df_iom_subtype_t;
-
-typedef enum {
-	AMDZEN_DF_CS_SUBTYPE_UMC = 1,
-	AMDZEN_DF_CS_SUBTYPE_CCIX = 2
-} amdzen_df_cs_subtype_t;
-
-#define	AMDZEN_DF_F0_FBIINFO1	0x48
-#define	AMDZEN_DF_F0_FBIINFO1_FTI0_NINSTID(x)	BITX(x, 7, 0)
-#define	AMDZEN_DF_F0_FBIINFO1_FTI1_NINSTID(x)	BITX(x, 15, 8)
-#define	AMDZEN_DF_F0_FBIINFO1_FTI2_NINSTID(x)	BITX(x, 23, 16)
-#define	AMDZEN_DF_F0_FBIINFO1_FTI3_NINSTID(x)	BITX(x, 31, 24)
-#define	AMDZEN_DF_F0_FBIINFO2	0x4c
-#define	AMDZEN_DF_F0_FBIINFO2_FTI4_NINSTID(x)	BITX(x, 7, 0)
-#define	AMDZEN_DF_F0_FBIINFO2_FTI5_NINSTID(x)	BITX(x, 15, 8)
-#define	AMDZEN_DF_F0_FBIINFO3	0x50
-#define	AMDZEN_DF_F0_FBIINFO3_INSTID(x)		BITX(x, 7, 0)
-#define	AMDZEN_DF_F0_FBIINFO3_FABID(x)		BITX(x, 13, 8)
-
-/*
- * This register contains the information about the configuration of PCIe buses.
- * We care about finding which one has our BUS A, which is required to map it to
- * the northbridge.
- */
-#define	AMDZEN_DF_F0_CFG_ADDR_CTL	0x84
-#define	AMDZEN_DF_F0_CFG_ADDR_CTL_BUS_NUM(x)	BITX(x, 7, 0)
-
-/*
- * Registers that describe how the system is actually put together.
- */
-#define	AMDZEN_DF_F1_SYSCFG	0x200
-#define	AMDZEN_DF_F1_SYSCFG_DIE_PRESENT(X)	BITX(x, 7, 0)
-#define	AMDZEN_DF_F1_SYSCFG_DIE_TYPE(x)		BITX(x, 18, 11)
-#define	AMDZEN_DF_F1_SYSCFG_MYDIE_TYPE(x)	BITX(x, 24, 23)
-typedef enum {
-	AMDZEN_DF_DIE_TYPE_CPU	= 0,
-	AMDZEN_DF_DIE_TYPE_APU,
-	AMDZEN_DF_DIE_TYPE_dGPU
-} amdzen_df_die_type_t;
-#define	AMDZEN_DF_F1_SYSCFG_OTHERDIE_TYPE(x)	BITX(x, 26, 25)
-#define	AMDZEN_DF_F1_SYSCFG_OTHERSOCK(x)	BITX(x, 27, 27)
-#define	AMDZEN_DF_F1_SYSCFG_NODEID(x)		BITX(x, 30, 28)
-
-#define	AMDZEN_DF_F1_FIDMASK0	0x208
-#define	AMDZEN_DF_F1_FIDMASK0_COMP_MASK(x)	BITX(x, 9, 0)
-#define	AMDZEN_DF_F1_FIDMASK0_NODE_MASK(x)	BITX(x, 25, 16)
-#define	AMDZEN_DF_F1_FIDMASK1	0x20C
-#define	AMDZEN_DF_F1_FIDMASK1_NODE_SHIFT(x)	BITX(x, 3, 0)
-#define	AMDZEN_DF_F1_FIDMASK1_SKT_SHIFT(x)	BITX(x, 9, 8)
-#define	AMDZEN_DF_F1_FIDMASK1_DIE_MASK(x)	BITX(x, 18, 16)
-#define	AMDZEN_DF_F1_FIDMASK1_SKT_MASK(x)	BITX(x, 26, 24)
-
-/*
- * These two registers define information about the PSP and SMU on local and
- * remote dies (from the context of the DF instance). The bits are the same.
- */
-#define	AMDZEN_DF_F1_PSPSMU_LOCAL	0x268
-#define	AMDZEN_DF_F1_PSPSMU_REMOTE	0x268
-#define	AMDZEN_DF_F1_PSPSMU_SMU_VALID(x)	BITX(x, 0, 0)
-#define	AMDZEN_DF_F1_PSPSMU_SMU_UNITID(x)	BITX(x, 6, 1)
-#define	AMDZEN_DF_F1_PSPSMU_SMU_COMPID(x)	BITX(x, 15, 8)
-#define	AMDZEN_DF_F1_PSPSMU_PSP_VALID(x)	BITX(x, 16, 16)
-#define	AMDZEN_DF_F1_PSPSMU_PSP_UNITID(x)	BITX(x, 22, 17)
-#define	AMDZEN_DF_F1_PSPSMU_PSP_COMPID(x)	BITX(x, 31, 24)
-
-#define	AMDZEN_DF_F1_CAKE_ENCR		0x2cc
-
-/*
- * These registers are used to define Indirect Access, commonly known as FICAA
- * and FICAD for the system. While there are multiple copies of the indirect
- * access registers in device 4, we're only allowed access to one set of those
- * (which are the ones present here). Specifically the OS is given access to set
- * 3.
- */
-#define	AMDZEN_DF_F4_FICAA	0x5c
-#define	AMDZEN_DF_F4_FICAA_TARG_INST	(1 << 0)
-#define	AMDZEN_DF_F4_FICAA_SET_REG(x)	((x) & 0x3fc)
-#define	AMDZEN_DF_F4_FICAA_SET_FUNC(x)	(((x) & 0x7) << 11)
-#define	AMDZEN_DF_F4_FICAA_SET_64B	(1 << 14)
-#define	AMDZEN_DF_F4_FICAA_SET_INST(x)	(((x) & 0xff) << 16)
-#define	AMDZEN_DF_F4_FICAD_LO	0x98
-#define	AMDZEN_DF_F4_FICAD_HI	0x9c
 
 /*
  * Northbridge registers that are relevant for the nexus, mostly for SMN.
@@ -229,26 +94,19 @@ typedef enum  {
 typedef struct {
 	uint8_t adfe_drvid;
 	amdzen_df_ent_flags_t adfe_flags;
-	amdzen_df_type_t adfe_type;
+	df_type_t adfe_type;
 	uint8_t adfe_subtype;
 	uint8_t adfe_fabric_id;
 	uint8_t adfe_inst_id;
-	amdzen_df_sdp_width_t adfe_sdp_width;
-	amdzen_df_fti_width_t adfe_fti_width;
-	uint8_t adfe_sdp_count;
-	uint8_t adfe_fti_count;
 	uint32_t adfe_info0;
 	uint32_t adfe_info1;
 	uint32_t adfe_info2;
 	uint32_t adfe_info3;
-	uint32_t adfe_syscfg;
-	uint32_t adfe_mask0;
-	uint32_t adfe_mask1;
 } amdzen_df_ent_t;
 
 typedef enum {
 	AMDZEN_DF_F_VALID		= 1 << 0,
-	AMDZEN_DF_F_FOUND_NB		= 1 << 1
+	AMDZEN_DF_F_FOUND_NB		= 1 << 1,
 } amdzen_df_flags_t;
 
 typedef struct {
@@ -256,12 +114,17 @@ typedef struct {
 	uint_t		adf_nb_busno;
 	amdzen_stub_t	*adf_funcs[AMDZEN_MAX_DF_FUNCS];
 	amdzen_stub_t	*adf_nb;
+	uint8_t		adf_major;
+	uint8_t		adf_minor;
 	uint_t		adf_nents;
+	df_rev_t	adf_rev;
 	amdzen_df_ent_t	*adf_ents;
 	uint32_t	adf_nodeid;
 	uint32_t	adf_syscfg;
 	uint32_t	adf_mask0;
 	uint32_t	adf_mask1;
+	uint32_t	adf_mask2;
+	df_fabric_decomp_t	adf_decomp;
 } amdzen_df_t;
 
 typedef enum {
@@ -295,7 +158,8 @@ typedef struct amdzen {
 typedef enum {
 	AMDZEN_C_SMNTEMP = 1,
 	AMDZEN_C_USMN,
-	AMDZEN_C_ZEN_UDF
+	AMDZEN_C_ZEN_UDF,
+	AMDZEN_C_ZEN_UMC
 } amdzen_child_t;
 
 /*

@@ -1,0 +1,120 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd April 12, 2022
+.Dt BITX64 9F
+.Os
+.Sh NAME
+.Nm bitx8 ,
+.Nm bitx16 ,
+.Nm bitx32 ,
+.Nm bitx64
+.Nd extract bits from an integer
+.Sh SYNOPSIS
+.In sys/bitext.h
+.Ft uint8_t
+.Fo bitx8
+.Fa "uint8_t value"
+.Fa "uint_t high"
+.Fa "uint_t low"
+.Fc
+.Ft uint16_t
+.Fo bitx16
+.Fa "uint16_t value"
+.Fa "uint_t high"
+.Fa "uint_t low"
+.Fc
+.Ft uint32_t
+.Fo bitx32
+.Fa "uint32_t value"
+.Fa "uint_t high"
+.Fa "uint_t low"
+.Fc
+.Ft uint64_t
+.Fo bitx64
+.Fa "uint64_t value"
+.Fa "uint_t high"
+.Fa "uint_t low"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa value
+An integer to extract a value from.
+.It Fa high
+The high end, inclusive, of the bit range to extract from
+.Fa value .
+.It Fa low
+The low end, inclusive, of the bit range to extract from
+.Fa value .
+.El
+.Sh DESCRIPTION
+The
+.Fn bitx8 ,
+.Fn bitx16 ,
+.Fn bitx32 ,
+and
+.Fn bitx64
+functions are used to extract a range of bits from on an 8, 16, 32, and
+64-bit value respectively.
+These functions are all implementations of a classical application of a
+bitwise-AND of a mask and a logical right shift.
+More specifically, the arguments
+.Fa high
+and
+.Fa low
+describe an inclusive range of bits
+.Po
+.Pf [ Fa low ,
+.Fa high ]
+.Pc
+to extract from
+.Fa value .
+The extracted bits are all shifted right such that the resulting value
+starts at bit 0
+.Po that is, shifted over by
+.Fa low
+.Pc .
+.Pp
+Each of the variants here operates on a specifically sized integer.
+.Fa high
+and
+.Fa low
+must fit within the bit range that the integer implies.
+For example, the valid range for
+.Fa bitx32
+is from 0 to 31.
+.Fa high
+must not be less than
+.Fa low .
+.Sh CONTEXT
+These functions may be called in all contexts,
+.Sy user ,
+.Sy kernel ,
+and
+.Sy interrupt .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn bitx8 ,
+.Fn bitx16 ,
+.Fn bitx32 ,
+and
+.Fn bitx64
+functions all return the indicated portion of
+.Fa val .
+.Sh SEE ALSO
+.Xr bitdel64 9F ,
+.Xr bitset64 9F

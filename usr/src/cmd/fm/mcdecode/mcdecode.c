@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -28,9 +29,11 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <libnvpair.h>
+#include <sys/sysmacros.h>
 
 #include <sys/mc.h>
 #include "imc.h"
+#include "zen_umc.h"
 
 #define	MCDECODE_USAGE	2
 
@@ -39,27 +42,135 @@
  */
 #define	MCDECODE_WRITE	(1024 * 32)
 
+typedef struct mc_backend {
+	const char *mcb_name;
+	void *(*mcb_init)(nvlist_t *, const char *);
+	void (*mcb_decode_pa)(void *, uint64_t);
+} mc_backend_t;
+
+static const mc_backend_t *mc_cur_backend = NULL;
+
 static void
 mcdecode_usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: mcdecode [-f infile] [-d address | -w outfile] device\n"
+	    "Usage: mcdecode -d address -f infile | device\n"
+	    "       mcdecode -w outfile device\n"
 	    "\n"
-	    "\t-d  decode physical address to the correspond dimm\n"
+	    "\t-d  decode physical address to the corresponding dimm\n"
 	    "\t-f  use decoder image from infile\n"
 	    "\t-w  write decoder snapshot state to the specified file\n");
 	exit(MCDECODE_USAGE);
 }
 
+static void *
+mcb_imc_init(nvlist_t *nvl, const char *file)
+{
+	imc_t *imc;
+
+	imc = calloc(1, sizeof (*imc));
+	if (imc == NULL) {
+		errx(EXIT_FAILURE, "failed to allocate memory for imc_t");
+	}
+
+	if (!imc_restore_decoder(nvl, imc)) {
+		errx(EXIT_FAILURE, "failed to restore memory "
+		    "controller snapshot in %s", file);
+	}
+
+	return (imc);
+}
+
 static void
-mcdecode_from_file(const char *file, uint64_t pa)
+mcb_imc_decode_pa(void *arg, uint64_t pa)
+{
+	const imc_t *imc = arg;
+	imc_decode_state_t dec;
+
+	bzero(&dec, sizeof (dec));
+	if (!imc_decode_pa(imc, pa, &dec)) {
+		errx(EXIT_FAILURE, "failed to decode address 0x%" PRIx64
+		    " -- 0x%x, 0x%" PRIx64, pa, dec.ids_fail,
+		    dec.ids_fail_data);
+	}
+
+	(void) printf("Decoded physical address 0x%" PRIx64 "\n"
+	    "\tchip:\t\t\t%u\n"
+	    "\tmemory controller:\t%u\n"
+	    "\tchannel:\t\t%u\n"
+	    "\tdimm:\t\t\t%u\n"
+	    "\trank:\t\t\t%u\n",
+	    pa, dec.ids_nodeid, dec.ids_tadid, dec.ids_channelid,
+	    dec.ids_dimmid, dec.ids_rankid);
+}
+
+static void *
+mcb_umc_init(nvlist_t *nvl, const char *file)
+{
+	zen_umc_t *umc;
+
+	umc = calloc(1, sizeof (*umc));
+	if (umc == NULL) {
+		errx(EXIT_FAILURE, "failed to allocate memory for zen_umc_t");
+	}
+
+	if (!zen_umc_restore_decoder(nvl, umc)) {
+		errx(EXIT_FAILURE, "failed to restore memory "
+		    "controller snapshot in %s", file);
+	}
+
+	return (umc);
+}
+
+
+static void
+mcb_umc_decode_pa(void *arg, uint64_t pa)
+{
+	zen_umc_t *umc = arg;
+	zen_umc_decoder_t dec;
+	uint32_t sock, die, comp;
+
+	bzero(&dec, sizeof (dec));
+	if (!zen_umc_decode_pa(umc, pa, &dec)) {
+		errx(EXIT_FAILURE, "failed to decode address 0x%" PRIx64
+		    " -- 0x%x, 0x%" PRIx64, pa, dec.dec_fail,
+		    dec.dec_fail_data);
+	}
+
+	zen_fabric_id_decompose(&umc->umc_decomp, dec.dec_targ_fabid, &sock,
+	    &die, &comp);
+	(void) printf("Decoded physical address 0x%" PRIx64 "\n"
+	    "\tsocket:\t\t\t%u\n"
+	    "\tdie:\t\t\t%u\n"
+	    "\tchannel:\t\t%u\n"
+	    "\tchannel address\t\t0x%" PRIx64 "\n"
+	    "\tdimm:\t\t\t%u\n"
+	    "\trow:\t\t\t0x%x\n"
+	    "\tcol:\t\t\t0x%x\n"
+	    "\tbank:\t\t\t0x%x\n"
+	    "\tbank group:\t\t0x%x\n"
+	    "\trank mult:\t\t0x%x\n"
+	    "\tchip-select:\t\t0x%x\n"
+	    "\tsub-channel:\t\t0x%x\n",
+	    pa, sock, die, dec.dec_umc_chan->chan_logid, dec.dec_norm_addr,
+	    dec.dec_dimm->ud_dimmno, dec.dec_dimm_row, dec.dec_dimm_col,
+	    dec.dec_dimm_bank, dec.dec_dimm_bank_group, dec.dec_dimm_rm,
+	    dec.dec_dimm_csno, dec.dec_dimm_subchan);
+
+}
+
+static const mc_backend_t mc_backends[] = {
+	{ "imc", mcb_imc_init, mcb_imc_decode_pa },
+	{ "zen_umc", mcb_umc_init, mcb_umc_decode_pa, }
+};
+
+static void *
+mcdecode_from_file(const char *file)
 {
 	int fd, ret;
 	struct stat st;
 	void *addr;
 	nvlist_t *nvl;
-	imc_t imc;
-	imc_decode_state_t dec;
 	char *driver;
 
 	if ((fd = open(file, O_RDONLY)) < 0) {
@@ -93,31 +204,18 @@ mcdecode_from_file(const char *file, uint64_t pa)
 		    file);
 	}
 
-	if (strcmp(driver, "imc") != 0) {
-		errx(EXIT_FAILURE, "unknown driver dump source %s\n", driver);
+	for (uint_t i = 0; i < ARRAY_SIZE(mc_backends); i++) {
+		if (strcmp(driver, mc_backends[i].mcb_name) == 0) {
+			void *data;
+
+			mc_cur_backend = &mc_backends[i];
+			data = mc_cur_backend->mcb_init(nvl, file);
+			nvlist_free(nvl);
+			return (data);
+		}
 	}
 
-	if (!imc_restore_decoder(nvl, &imc)) {
-		errx(EXIT_FAILURE, "failed to restore memory controller "
-		    "snapshot in %s", file);
-	}
-
-	bzero(&dec, sizeof (dec));
-
-	if (!imc_decode_pa(&imc, pa, &dec)) {
-		errx(EXIT_FAILURE, "failed to decode address 0x%" PRIx64, pa);
-	}
-
-	(void) printf("Decoded physical address 0x%" PRIx64 "\n"
-	    "\tchip:\t\t\t%u\n"
-	    "\tmemory controller:\t%u\n"
-	    "\tchannel:\t\t%u\n"
-	    "\tdimm:\t\t\t%u\n"
-	    "\trank:\t\t\t%u\n",
-	    pa, dec.ids_nodeid, dec.ids_tadid, dec.ids_channelid,
-	    dec.ids_dimmid, dec.ids_rankid);
-
-	nvlist_free(nvl);
+	errx(EXIT_FAILURE, "unknown driver dump source %s\n", driver);
 }
 
 static void
@@ -145,12 +243,44 @@ mcdecode_pa(const char *device, uint64_t pa)
 
 	(void) printf("Decoded physical address 0x%" PRIx64 "\n"
 	    "\tchip:\t\t\t%u\n"
+	    "\tdie:\t\t\t%u\n"
 	    "\tmemory controller:\t%u\n"
 	    "\tchannel:\t\t%u\n"
-	    "\tdimm:\t\t\t%u\n"
-	    "\trank:\t\t\t%u\n",
-	    pa, ioc.mcei_chip, ioc.mcei_mc, ioc.mcei_chan, ioc.mcei_dimm,
-	    ioc.mcei_rank);
+	    "\tchannel address\t\t0x%" PRIx64"\n"
+	    "\tdimm:\t\t\t%u\n",
+	    pa, ioc.mcei_chip, ioc.mcei_die, ioc.mcei_mc, ioc.mcei_chan,
+	    ioc.mcei_chan_addr, ioc.mcei_dimm);
+	if (ioc.mcei_rank != UINT8_MAX) {
+		(void) printf("\trank:\t\t\t%u\n", ioc.mcei_rank);
+	}
+
+	if (ioc.mcei_row != UINT32_MAX) {
+		(void) printf("\trow:\t\t\t0x%x\n", ioc.mcei_row);
+	}
+
+	if (ioc.mcei_column != UINT32_MAX) {
+		(void) printf("\tcol:\t\t\t0x%x\n", ioc.mcei_column);
+	}
+
+	if (ioc.mcei_bank != UINT8_MAX) {
+		(void) printf("\tbank:\t\t\t0x%x\n", ioc.mcei_bank);
+	}
+
+	if (ioc.mcei_bank_group != UINT8_MAX) {
+		(void) printf("\tbank group:\t\t0x%x\n", ioc.mcei_bank_group);
+	}
+
+	if (ioc.mcei_rm != UINT8_MAX) {
+		(void) printf("\trank mult:\t\t0x%x\n", ioc.mcei_rm);
+	}
+
+	if (ioc.mcei_cs != UINT8_MAX) {
+		(void) printf("\tchip-select:\t\t0x%x\n", ioc.mcei_cs);
+	}
+
+	if (ioc.mcei_subchan != UINT8_MAX) {
+		(void) printf("\tsub-channel:\t\t0x%x\n", ioc.mcei_subchan);
+	}
 
 	(void) close(fd);
 }
@@ -217,6 +347,7 @@ main(int argc, char *argv[])
 	uint64_t pa = UINT64_MAX;
 	const char *outfile = NULL;
 	const char *infile = NULL;
+	void *backend;
 
 	while ((c = getopt(argc, argv, "d:f:w:")) != -1) {
 		char *eptr;
@@ -270,15 +401,17 @@ main(int argc, char *argv[])
 		errx(EXIT_FAILURE, "missing device argument");
 	}
 
-
-	if (pa != UINT64_MAX) {
-		if (infile != NULL) {
-			mcdecode_from_file(infile, pa);
-		} else {
+	if (infile == NULL) {
+		if (pa != UINT64_MAX) {
 			mcdecode_pa(argv[0], pa);
+		} else {
+			mcdecode_dump(argv[0], outfile);
 		}
-	} else {
-		mcdecode_dump(argv[0], outfile);
+
+		return (0);
 	}
+
+	backend = mcdecode_from_file(infile);
+	mc_cur_backend->mcb_decode_pa(backend, pa);
 	return (0);
 }

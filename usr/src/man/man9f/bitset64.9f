@@ -1,0 +1,186 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd April 12, 2022
+.Dt BITSET64 9F
+.Os
+.Sh NAME
+.Nm bitset8 ,
+.Nm bitset16 ,
+.Nm bitset32 ,
+.Nm bitset64
+.Nd set bitfield values in an integer
+.Sh SYNOPSIS
+.In sys/bitext.h
+.Ft uint8_t
+.Fo bitset8
+.Fa "uint8_t base"
+.Fa "uint_t high"
+.Fa "uint_t low"
+.Fa "uint8_t value"
+.Fc
+.Ft uint16_t
+.Fo bitset16
+.Fa "uint16_t base"
+.Fa "uint_t high"
+.Fa "uint_t low"
+.Fa "uint16_t value"
+.Fc
+.Ft uint32_t
+.Fo bitset32
+.Fa "uint32_t base"
+.Fa "uint_t high"
+.Fa "uint_t low"
+.Fa "uint32_t value"
+.Fc
+.Ft uint64_t
+.Fo bitset64
+.Fa "uint64_t base"
+.Fa "uint_t high"
+.Fa "uint_t low"
+.Fa "uint64_t value"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa base
+The starting integer that will have a value ORed into it.
+.It Fa high
+The high end, inclusive, of the bit range to insert
+.Fa value
+into
+.Fa base .
+.It Fa low
+The low end, inclusive, of the bit range to extract from
+.Fa value .
+.It Fa value
+A value to insert into
+.Fa base .
+.El
+.Sh DESCRIPTION
+The
+.Fn bitset8 ,
+.Fn bitset16 ,
+.Fn bitset32 ,
+and
+.Fn bitset64
+functions are used to logically bitwise-OR in the integer
+.Fa value
+into a specified bit position in
+.Fa base .
+Effectively, the function zeros out the bit range in
+.Fa base ,
+described by
+.Fa high
+and
+.Fa low
+and then performs a bitwise-OR of
+.Fa base
+which has been adjusted to start at
+.Fa low .
+.Pp
+The
+.Fa high
+and
+.Fa low
+arguments describe an inclusive bit range
+.Po
+.Pf [ Fa low ,
+.Fa high ]
+.Pc
+which describes where
+.Fa value
+should be inserted.
+It is illegal
+for
+.Fa low
+to be greater than
+.Fa high ,
+for
+.Fa low
+or
+.Fa high
+to exceed the integer's bit range
+.Po
+e.g. neither can be greater than 7 for
+.Fn bitset8
+.Pc ,
+and
+.Fa value
+must not exceed the described bit range.
+That is, if
+.Fa high
+was 2
+and
+.Fa low
+was 1,
+.Fa value
+could not be larger than a 2-bit value.
+.Pp
+Note, these functions do not modify either
+.Fa base
+or
+.Fa value .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn bitset8 ,
+.Fn bitset16 ,
+.Fn bitset32 ,
+and
+.Fn bitset64
+functions all return a new value that has first cleared the specified
+bit range from
+.Fa base
+and then replaced it with
+.Fa value .
+.Sh EXAMPLES
+.Sy Example 1 -
+Using the
+.Fn bitset32
+function to build up a register value.
+.Pp
+A common use case for these functions is to help deal with registers
+that are defined as a series of bit values.
+The following example shows a register's bit definitions and then how
+they are used to construct a value to write.
+.Bd -literal
+/*
+ * This represents a token register definition. It is normally a
+ * uint32_t.
+ */
+#define	DF_IO_BASE_V2_SET_BASE(r, v)	bitx32(r, 24, 12, v)
+#define	DF_IO_BASE_V2_SET_IE(r, v)	bitset32(r, 5, 5, v)
+#define	DF_IO_BASE_V2_SET_WE(r, v)	bitset32(r, 1, 1, v)
+#define	DF_IO_BASE_V2_SET_RE(r, v)	bitset32(r, 0, 0, v)
+
+void
+setup_register(uint32_t base)
+{
+	uint32_t reg = 0;
+
+	/*
+	 * Set read enable, write enable, and the base. Then write the
+	 * hardware register.
+	 */
+	reg = DF_IO_BASE_V2_SET_RE(reg, 1);
+	reg = DF_IO_BASE_V2_SET_WE(reg, 1);
+	reg = DF_IO_BASE_V2_SET_BASE(reg, base);
+	write_register(XXX, reg);
+}
+.Ed
+.Sh SEE ALSO
+.Xr bitdel64 9F ,
+.Xr bitx64 9F

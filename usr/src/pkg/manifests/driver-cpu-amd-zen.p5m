@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2021 Oxide Computer Company
+# Copyright 2022 Oxide Computer Company
 #
 
 <include global_zone_only_component>
@@ -24,6 +24,7 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/amdzen group=sys
 file path=kernel/drv/$(ARCH64)/amdzen_stub group=sys
+file path=kernel/drv/$(ARCH64)/zen_umc group=sys
 file path=kernel/drv/amdzen.conf group=sys
 dir  path=usr/share/man
 dir  path=usr/share/man/man4d
@@ -104,4 +105,5 @@ driver name=amdzen_stub \
     alias=pci1022,166f,p \
     alias=pci1022,1670,p \
     alias=pci1022,1671,p
+driver name=zen_umc
 license lic_CDDL license=lic_CDDL

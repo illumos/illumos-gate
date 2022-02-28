@@ -29,6 +29,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 Oxide Computer company
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -702,6 +703,7 @@ file path=usr/include/sys/av/iec61883.h
 file path=usr/include/sys/avintr.h
 file path=usr/include/sys/avl.h
 file path=usr/include/sys/avl_impl.h
+file path=usr/include/sys/bitext.h
 file path=usr/include/sys/bitmap.h
 file path=usr/include/sys/bitset.h
 file path=usr/include/sys/bl.h
