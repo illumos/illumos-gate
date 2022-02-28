@@ -22,6 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -66,6 +67,19 @@
 
 int priv_debug = 0;
 int priv_basic_test = -1;
+
+/*
+ * Unlinking or creating new hard links to directories was historically allowed
+ * in some file systems; e.g., UFS allows root users to do it, at the cost of
+ * almost certain file system corruption that will require fsck to fix.
+ *
+ * Most modern operating systems and file systems (e.g., ZFS) do not allow this
+ * behaviour anymore, and we have elected to stamp it out entirely for
+ * compatibility and safety reasons.  An attempt to unlink a directory will
+ * fail with EPERM, as described in the standard.  During this transition, one
+ * can turn the behaviour back on, at their own risk, with this tuneable:
+ */
+int priv_allow_linkdir = 0;
 
 /*
  * This file contains the majority of the policy routines.
@@ -895,6 +909,23 @@ secpolicy_fs_config(const cred_t *cr, const vfs_t *vfsp)
 int
 secpolicy_fs_linkdir(const cred_t *cr, const vfs_t *vfsp)
 {
+	if (priv_allow_linkdir == 0) {
+		/*
+		 * By default, this policy check will now always return EPERM
+		 * unless overridden.
+		 *
+		 * We do so without triggering auditing or allowing privilege
+		 * debugging for two reasons: first, we intend eventually to
+		 * deprecate the PRIV_SYS_LINKDIR privilege entirely and remove
+		 * the use of this policy check from the file systems; second,
+		 * for privilege debugging in particular, because it would be
+		 * confusing to report an unlink() failure as the result of a
+		 * missing privilege when in fact we are simply no longer
+		 * allowing the operation at all.
+		 */
+		return (EPERM);
+	}
+
 	return (PRIV_POLICY(cr, PRIV_SYS_LINKDIR, B_FALSE, EPERM, NULL));
 }
 
