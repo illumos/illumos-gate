@@ -80,7 +80,7 @@ struct vrtc {
 	struct mtx	mtx;
 	struct callout	callout;
 	uint_t		addr;		/* RTC register to read or write */
-	sbintime_t	base_uptime;
+	hrtime_t	base_uptime;
 	time_t		base_rtctime;
 	struct rtcdev	rtcdev;
 };
@@ -147,23 +147,24 @@ update_enabled(struct vrtc *vrtc)
 }
 
 static time_t
-vrtc_curtime(struct vrtc *vrtc, sbintime_t *basetime)
+vrtc_curtime(struct vrtc *vrtc, hrtime_t *basetime)
 {
-	sbintime_t now, delta;
-	time_t t, secs;
+	time_t t = vrtc->base_rtctime;
+	hrtime_t base = vrtc->base_uptime;
 
 	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
 
-	t = vrtc->base_rtctime;
-	*basetime = vrtc->base_uptime;
 	if (update_enabled(vrtc)) {
-		now = sbinuptime();
-		delta = now - vrtc->base_uptime;
-		KASSERT(delta >= 0, ("vrtc_curtime: uptime went backwards: "
-		    "%lx to %lx", vrtc->base_uptime, now));
-		secs = delta / SBT_1S;
-		t += secs;
-		*basetime += secs * SBT_1S;
+		const hrtime_t delta = gethrtime() - vrtc->base_uptime;
+		const time_t sec = delta / NANOSEC;
+
+		ASSERT3S(delta, >=, 0);
+
+		t += sec;
+		base += sec * NANOSEC;
+	}
+	if (basetime != NULL) {
+		*basetime = base;
 	}
 	return (t);
 }
@@ -389,7 +390,7 @@ fail:
 }
 
 static int
-vrtc_time_update(struct vrtc *vrtc, time_t newtime, sbintime_t newbase)
+vrtc_time_update(struct vrtc *vrtc, time_t newtime, hrtime_t newbase)
 {
 	struct rtcdev *rtc;
 	time_t oldtime;
@@ -463,28 +464,26 @@ vrtc_time_update(struct vrtc *vrtc, time_t newtime, sbintime_t newbase)
 	return (0);
 }
 
-static sbintime_t
+static hrtime_t
 vrtc_freq(struct vrtc *vrtc)
 {
-	int ratesel;
-
-	static sbintime_t pf[16] = {
+	const hrtime_t rate_freq[16] = {
 		0,
-		SBT_1S / 256,
-		SBT_1S / 128,
-		SBT_1S / 8192,
-		SBT_1S / 4096,
-		SBT_1S / 2048,
-		SBT_1S / 1024,
-		SBT_1S / 512,
-		SBT_1S / 256,
-		SBT_1S / 128,
-		SBT_1S / 64,
-		SBT_1S / 32,
-		SBT_1S / 16,
-		SBT_1S / 8,
-		SBT_1S / 4,
-		SBT_1S / 2,
+		NANOSEC / 256,
+		NANOSEC / 128,
+		NANOSEC / 8192,
+		NANOSEC / 4096,
+		NANOSEC / 2048,
+		NANOSEC / 1024,
+		NANOSEC / 512,
+		NANOSEC / 256,
+		NANOSEC / 128,
+		NANOSEC / 64,
+		NANOSEC / 32,
+		NANOSEC / 16,
+		NANOSEC / 8,
+		NANOSEC / 4,
+		NANOSEC / 2,
 	};
 
 	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
@@ -497,32 +496,32 @@ vrtc_freq(struct vrtc *vrtc)
 	 * the update interrupt.
 	 */
 	if (pintr_enabled(vrtc) && divider_enabled(vrtc->rtcdev.reg_a)) {
-		ratesel = vrtc->rtcdev.reg_a & 0xf;
-		return (pf[ratesel]);
+		uint_t sel = vrtc->rtcdev.reg_a & 0xf;
+		return (rate_freq[sel]);
 	} else if (aintr_enabled(vrtc) && update_enabled(vrtc)) {
-		return (SBT_1S);
+		return (NANOSEC);
 	} else if (uintr_enabled(vrtc) && update_enabled(vrtc)) {
-		return (SBT_1S);
+		return (NANOSEC);
 	} else {
 		return (0);
 	}
 }
 
 static void
-vrtc_callout_reset(struct vrtc *vrtc, sbintime_t freqsbt)
+vrtc_callout_reset(struct vrtc *vrtc, hrtime_t freqhrt)
 {
 
 	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
 
-	if (freqsbt == 0) {
+	if (freqhrt == 0) {
 		if (callout_active(&vrtc->callout)) {
 			VM_CTR0(vrtc->vm, "RTC callout stopped");
 			callout_stop(&vrtc->callout);
 		}
 		return;
 	}
-	VM_CTR1(vrtc->vm, "RTC callout frequency %d hz", SBT_1S / freqsbt);
-	callout_reset_sbt(&vrtc->callout, freqsbt, 0, vrtc_callout_handler,
+	VM_CTR1(vrtc->vm, "RTC callout frequency %d hz", NANOSEC / freqhrt);
+	callout_reset_hrtime(&vrtc->callout, freqhrt, vrtc_callout_handler,
 	    vrtc, 0);
 }
 
@@ -530,7 +529,6 @@ static void
 vrtc_callout_handler(void *arg)
 {
 	struct vrtc *vrtc = arg;
-	sbintime_t freqsbt, basetime;
 	time_t rtctime;
 	int error;
 
@@ -552,28 +550,30 @@ vrtc_callout_handler(void *arg)
 		vrtc_set_reg_c(vrtc, vrtc->rtcdev.reg_c | RTCIR_PERIOD);
 
 	if (aintr_enabled(vrtc) || uintr_enabled(vrtc)) {
+		hrtime_t basetime;
+
 		rtctime = vrtc_curtime(vrtc, &basetime);
 		error = vrtc_time_update(vrtc, rtctime, basetime);
 		KASSERT(error == 0, ("%s: vrtc_time_update error %d",
 		    __func__, error));
 	}
 
-	freqsbt = vrtc_freq(vrtc);
-	KASSERT(freqsbt != 0, ("%s: vrtc frequency cannot be zero", __func__));
-	vrtc_callout_reset(vrtc, freqsbt);
+	hrtime_t freqhrt = vrtc_freq(vrtc);
+	KASSERT(freqhrt != 0, ("%s: vrtc frequency cannot be zero", __func__));
+	vrtc_callout_reset(vrtc, freqhrt);
 done:
 	VRTC_UNLOCK(vrtc);
 }
 
 static __inline void
-vrtc_callout_check(struct vrtc *vrtc, sbintime_t freq)
+vrtc_callout_check(struct vrtc *vrtc, hrtime_t freqhrt)
 {
 	int active;
 
 	active = callout_active(&vrtc->callout) ? 1 : 0;
-	KASSERT((freq == 0 && !active) || (freq != 0 && active),
-	    ("vrtc callout %s with frequency %lx",
-	    active ? "active" : "inactive", freq));
+	KASSERT((freqhrt == 0 && !active) || (freqhrt != 0 && active),
+	    ("vrtc callout %s with frequency %llx",
+	    active ? "active" : "inactive", NANOSEC / freqhrt));
 }
 
 static void
@@ -618,7 +618,7 @@ static int
 vrtc_set_reg_b(struct vrtc *vrtc, uint8_t newval)
 {
 	struct rtcdev *rtc;
-	sbintime_t oldfreq, newfreq, basetime;
+	hrtime_t oldfreq, newfreq;
 	time_t curtime, rtctime;
 	int error;
 	uint8_t oldval, changed;
@@ -637,9 +637,11 @@ vrtc_set_reg_b(struct vrtc *vrtc, uint8_t newval)
 	}
 
 	if (changed & RTCSB_HALT) {
+		hrtime_t basetime;
+
 		if ((newval & RTCSB_HALT) == 0) {
 			rtctime = rtc_to_secs(vrtc);
-			basetime = sbinuptime();
+			basetime = gethrtime();
 			if (rtctime == VRTC_BROKEN_TIME) {
 				if (rtc_flag_broken_time)
 					return (-1);
@@ -693,7 +695,7 @@ vrtc_set_reg_b(struct vrtc *vrtc, uint8_t newval)
 static void
 vrtc_set_reg_a(struct vrtc *vrtc, uint8_t newval)
 {
-	sbintime_t oldfreq, newfreq;
+	hrtime_t oldfreq, newfreq;
 	uint8_t oldval, changed;
 
 	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
@@ -712,7 +714,7 @@ vrtc_set_reg_a(struct vrtc *vrtc, uint8_t newval)
 		 * maintain the illusion that the RTC date/time was frozen
 		 * while the dividers were disabled.
 		 */
-		vrtc->base_uptime = sbinuptime();
+		vrtc->base_uptime = gethrtime();
 		VM_CTR2(vrtc->vm, "RTC divider out of reset at %lx/%lx",
 		    vrtc->base_rtctime, vrtc->base_uptime);
 	} else {
@@ -744,7 +746,7 @@ vrtc_set_time(struct vm *vm, time_t secs)
 
 	vrtc = vm_rtc(vm);
 	VRTC_LOCK(vrtc);
-	error = vrtc_time_update(vrtc, secs, sbinuptime());
+	error = vrtc_time_update(vrtc, secs, gethrtime());
 	VRTC_UNLOCK(vrtc);
 
 	if (error) {
@@ -761,12 +763,11 @@ time_t
 vrtc_get_time(struct vm *vm)
 {
 	struct vrtc *vrtc;
-	sbintime_t basetime;
 	time_t t;
 
 	vrtc = vm_rtc(vm);
 	VRTC_LOCK(vrtc);
-	t = vrtc_curtime(vrtc, &basetime);
+	t = vrtc_curtime(vrtc, NULL);
 	VRTC_UNLOCK(vrtc);
 
 	return (t);
@@ -803,7 +804,6 @@ int
 vrtc_nvram_read(struct vm *vm, int offset, uint8_t *retval)
 {
 	struct vrtc *vrtc;
-	sbintime_t basetime;
 	time_t curtime;
 	uint8_t *ptr;
 
@@ -820,7 +820,7 @@ vrtc_nvram_read(struct vm *vm, int offset, uint8_t *retval)
 	 * Update RTC date/time fields if necessary.
 	 */
 	if (offset < 10 || offset == RTC_CENTURY) {
-		curtime = vrtc_curtime(vrtc, &basetime);
+		curtime = vrtc_curtime(vrtc, NULL);
 		secs_to_rtc(curtime, vrtc, 0);
 	}
 
@@ -858,7 +858,7 @@ vrtc_data_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
 {
 	struct vrtc *vrtc = arg;
 	struct rtcdev *rtc = &vrtc->rtcdev;
-	sbintime_t basetime;
+	hrtime_t basetime;
 	time_t curtime;
 	int error, offset;
 
@@ -936,7 +936,7 @@ vrtc_data_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
 		 */
 		if (offset == RTC_CENTURY && !rtc_halted(vrtc)) {
 			curtime = rtc_to_secs(vrtc);
-			error = vrtc_time_update(vrtc, curtime, sbinuptime());
+			error = vrtc_time_update(vrtc, curtime, gethrtime());
 			KASSERT(!error, ("vrtc_time_update error %d", error));
 			if (curtime == VRTC_BROKEN_TIME && rtc_flag_broken_time)
 				error = -1;
@@ -990,7 +990,7 @@ vrtc_init(struct vm *vm)
 
 	VRTC_LOCK(vrtc);
 	vrtc->base_rtctime = VRTC_BROKEN_TIME;
-	vrtc_time_update(vrtc, curtime, sbinuptime());
+	vrtc_time_update(vrtc, curtime, gethrtime());
 	secs_to_rtc(curtime, vrtc, 0);
 	VRTC_UNLOCK(vrtc);
 

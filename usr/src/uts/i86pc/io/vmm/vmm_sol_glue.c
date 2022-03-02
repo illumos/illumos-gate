@@ -349,19 +349,10 @@ vmm_glue_callout_init(struct callout *c, int mpsafe)
 	mutex_exit(&cpu_lock);
 }
 
-static __inline hrtime_t
-sbttohrtime(sbintime_t sbt)
+void
+callout_reset_hrtime(struct callout *c, hrtime_t target, void (*func)(void *),
+    void *arg, int flags)
 {
-	return (((sbt >> 32) * NANOSEC) +
-	    (((uint64_t)NANOSEC * (uint32_t)sbt) >> 32));
-}
-
-int
-vmm_glue_callout_reset_sbt(struct callout *c, sbintime_t sbt, sbintime_t pr,
-    void (*func)(void *), void *arg, int flags)
-{
-	hrtime_t target = sbttohrtime(sbt);
-
 	ASSERT(c->c_cyc_id != CYCLIC_NONE);
 
 	if ((flags & C_ABSOLUTE) == 0) {
@@ -372,8 +363,6 @@ vmm_glue_callout_reset_sbt(struct callout *c, sbintime_t sbt, sbintime_t pr,
 	c->c_arg = arg;
 	c->c_target = target;
 	cyclic_reprogram(c->c_cyc_id, target);
-
-	return (0);
 }
 
 int
@@ -408,6 +397,34 @@ vmm_glue_callout_localize(struct callout *c)
 	cyclic_move_here(c->c_cyc_id);
 	mutex_exit(&cpu_lock);
 }
+
+/*
+ * Given an interval (in ns) and a frequency (in hz), calculate the number of
+ * "ticks" at that frequency which cover the interval.
+ */
+uint64_t
+hrt_freq_count(hrtime_t interval, uint32_t freq)
+{
+	ASSERT3S(interval, >=, 0);
+	const uint64_t sec = interval / NANOSEC;
+	const uint64_t nsec = interval % NANOSEC;
+
+	return ((sec * freq) + ((nsec * freq) / NANOSEC));
+}
+
+/*
+ * Given a frequency (in hz) and number of "ticks", calculate the interval
+ * (in ns) which would be covered by those ticks.
+ */
+hrtime_t
+hrt_freq_interval(uint32_t freq, uint64_t count)
+{
+	const uint64_t sec = count / freq;
+	const uint64_t frac = count % freq;
+
+	return ((NANOSEC * sec) + ((frac * NANOSEC) / freq));
+}
+
 
 uint_t	cpu_high;		/* Highest arg to CPUID */
 uint_t	cpu_exthigh;		/* Highest arg to extended CPUID */

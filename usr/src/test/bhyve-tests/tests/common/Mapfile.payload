@@ -1,0 +1,49 @@
+#
+# CDDL HEADER START
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2022 Oxide Computer Company
+#
+
+$mapfile_version 2
+
+# The .eh_frame data was ending up in front of the .text segment, causing issues
+# when the guest attempted to start its payload
+NULL_SEGMENT discard {
+	ASSIGN_SECTION eh_discard {
+		IS_NAME = .eh_frame;
+	};
+};
+
+LOAD_SEGMENT payload {
+	FLAGS = READ WRITE EXECUTE;
+	VADDR = 0x800000;
+	PADDR = 0x800000;
+	ALIGN = 0x1000;
+
+	# Make sure that payload_start.s`_start is the first thing in .text segment,
+	# since when we "boot", that is where we want to begin running.
+	ASSIGN_SECTION is_start_text {
+		IS_NAME = .text;
+		FILE_BASENAME = payload_start.o;
+	};
+	ASSIGN_SECTION is_text {
+		IS_NAME = .text;
+	};
+	ASSIGN_SECTION is_alloc {
+		FLAGS = ALLOC;
+	};
+	IS_ORDER = is_start_text is_text is_alloc;
+};

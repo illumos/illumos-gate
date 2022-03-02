@@ -90,8 +90,9 @@ struct channel {
 	bool		ol_sel;		/* read MSB from output latch */
 	bool		fr_sel;		/* read MSB from free-running timer */
 
-	struct bintime	load_bt;	/* time when counter was loaded */
-	struct bintime	callout_bt;	/* target time */
+	hrtime_t	time_loaded;	/* time when counter was loaded */
+	hrtime_t	time_target;	/* target time */
+	uint64_t	total_target;
 
 	struct callout	callout;
 	struct vatpit_callout_arg callout_arg;
@@ -101,8 +102,6 @@ struct vatpit {
 	struct vm	*vm;
 	struct mtx	mtx;
 
-	struct bintime	freq_bt;
-
 	struct channel	channel[3];
 };
 
@@ -111,16 +110,9 @@ static void pit_timer_start_cntr0(struct vatpit *vatpit);
 static uint64_t
 vatpit_delta_ticks(struct vatpit *vatpit, struct channel *c)
 {
-	struct bintime delta;
-	uint64_t result;
+	const hrtime_t delta = gethrtime() - c->time_loaded;
 
-	binuptime(&delta);
-	bintime_sub(&delta, &c->load_bt);
-
-	result = delta.sec * PIT_8254_FREQ;
-	result += delta.frac / vatpit->freq_bt.frac;
-
-	return (result);
+	return (hrt_freq_count(delta, PIT_8254_FREQ));
 }
 
 static int
@@ -183,32 +175,32 @@ done:
 static void
 pit_timer_start_cntr0(struct vatpit *vatpit)
 {
-	struct channel *c;
-	struct bintime now, delta;
-	sbintime_t precision;
+	struct channel *c = &vatpit->channel[0];
 
-	c = &vatpit->channel[0];
-	if (c->initial != 0) {
-		delta.sec = 0;
-		delta.frac = vatpit->freq_bt.frac * c->initial;
-		bintime_add(&c->callout_bt, &delta);
-		precision = bttosbt(delta) >> tc_precexp;
-
-		/*
-		 * Reset 'callout_bt' if the time that the callout
-		 * was supposed to fire is more than 'c->initial'
-		 * ticks in the past.
-		 */
-		binuptime(&now);
-		if (BINTIME_CMP(&c->callout_bt, <, &now)) {
-			c->callout_bt = now;
-			bintime_add(&c->callout_bt, &delta);
-		}
-
-		callout_reset_sbt(&c->callout, bttosbt(c->callout_bt),
-		    precision, vatpit_callout_handler, &c->callout_arg,
-		    C_ABSOLUTE);
+	if (c->initial == 0) {
+		return;
 	}
+
+	c->total_target += c->initial;
+	c->time_target = c->time_loaded +
+	    hrt_freq_interval(PIT_8254_FREQ, c->total_target);
+
+	/*
+	 * If we are more than 'c->initial' ticks behind, reset the timer base
+	 * to fire at the next 'c->initial' interval boundary.
+	 */
+	hrtime_t now = gethrtime();
+	if (c->time_target < now) {
+		const uint64_t ticks_behind =
+		    hrt_freq_count(c->time_target - now, PIT_8254_FREQ);
+
+		c->total_target += roundup(ticks_behind, c->initial);
+		c->time_target = c->time_loaded +
+		    hrt_freq_interval(PIT_8254_FREQ, c->total_target);
+	}
+
+	callout_reset_hrtime(&c->callout, c->time_target,
+	    vatpit_callout_handler, &c->callout_arg, C_ABSOLUTE);
 }
 
 static uint16_t
@@ -223,15 +215,14 @@ pit_update_counter(struct vatpit *vatpit, struct channel *c, bool latch)
 
 	if (c->initial == 0) {
 		/*
-		 * This is possibly an o/s bug - reading the value of
-		 * the timer without having set up the initial value.
+		 * This is possibly an OS bug - reading the value of the timer
+		 * without having set up the initial value.
 		 *
-		 * The original user-space version of this code set
-		 * the timer to 100hz in this condition; do the same
-		 * here.
+		 * The original user-space version of this code set the timer to
+		 * 100hz in this condition; do the same here.
 		 */
 		c->initial = TIMER_DIV(PIT_8254_FREQ, 100);
-		binuptime(&c->load_bt);
+		c->time_loaded = gethrtime();
 		c->reg_status &= ~TIMER_STS_NULLCNT;
 	}
 
@@ -419,10 +410,11 @@ vatpit_handler(void *arg, bool in, uint16_t port, uint8_t bytes, uint32_t *eax)
 			c->reg_status &= ~TIMER_STS_NULLCNT;
 			c->fr_sel = false;
 			c->initial = c->reg_cr[0] | (uint16_t)c->reg_cr[1] << 8;
-			binuptime(&c->load_bt);
+			c->time_loaded = gethrtime();
 			/* Start an interval timer for channel 0 */
 			if (port == TIMER_CNTR0) {
-				c->callout_bt = c->load_bt;
+				c->time_target = c->time_loaded;
+				c->total_target = 0;
 				pit_timer_start_cntr0(vatpit);
 			}
 			if (c->initial == 0)
@@ -464,8 +456,6 @@ vatpit_init(struct vm *vm)
 	vatpit->vm = vm;
 
 	mtx_init(&vatpit->mtx, "vatpit lock", NULL, MTX_SPIN);
-
-	FREQ2BT(PIT_8254_FREQ, &vatpit->freq_bt);
 
 	for (i = 0; i < 3; i++) {
 		callout_init(&vatpit->channel[i].callout, 1);
