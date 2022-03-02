@@ -42,6 +42,8 @@ struct nvme_process_arg {
 	char *npa_nsid;
 	int npa_found;
 	boolean_t npa_isns;
+	boolean_t npa_ignored;
+	boolean_t npa_interactive;
 	const nvmeadm_cmd_t *npa_cmd;
 	di_node_t npa_node;
 	di_minor_t npa_minor;
@@ -114,6 +116,7 @@ extern boolean_t nvme_detach(int);
 extern boolean_t nvme_attach(int);
 extern boolean_t nvme_firmware_load(int, void *, size_t, offset_t, uint16_t *);
 extern boolean_t nvme_firmware_commit(int, int, int, uint16_t *);
+extern boolean_t nvme_is_ignored_ns(int);
 
 /*
  * ofmt related

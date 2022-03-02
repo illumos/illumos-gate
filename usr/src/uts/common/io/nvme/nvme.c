@@ -4662,7 +4662,7 @@ nvme_ioctl_get_features(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 				return (EINVAL);
 			}
 		} else if (res != 0) {
-			return (EINVAL);
+			return (ENOTSUP);
 		}
 		break;
 
@@ -4777,7 +4777,7 @@ nvme_ioctl_format(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	 * Check whether the FORMAT NVM command is supported.
 	 */
 	if (nvme->n_idctl->id_oacs.oa_format == 0)
-		return (EINVAL);
+		return (ENOTSUP);
 
 	/*
 	 * Don't allow format or secure erase of individual namespace if that
@@ -4908,6 +4908,9 @@ nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
 		return (EPERM);
 
+	if (nvme->n_idctl->id_oacs.oa_firmware == 0)
+		return (ENOTSUP);
+
 	if (nsid != 0)
 		return (EINVAL);
 
@@ -4988,6 +4991,9 @@ nvme_ioctl_firmware_commit(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 
 	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
 		return (EPERM);
+
+	if (nvme->n_idctl->id_oacs.oa_firmware == 0)
+		return (ENOTSUP);
 
 	if (nsid != 0)
 		return (EINVAL);
@@ -5266,6 +5272,26 @@ out:
 }
 
 static int
+nvme_ioctl_is_ignored_ns(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
+    cred_t *cred_p)
+{
+	_NOTE(ARGUNUSED(cred_p));
+
+	if ((mode & FREAD) == 0)
+		return (EPERM);
+
+	if (nsid == 0)
+		return (EINVAL);
+
+	if (nvme->n_ns[nsid - 1].ns_ignore)
+		nioc->n_arg = 1;
+	else
+		nioc->n_arg = 0;
+
+	return (0);
+}
+
+static int
 nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
     int *rval_p)
 {
@@ -5292,7 +5318,8 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		nvme_ioctl_attach,
 		nvme_ioctl_firmware_download,
 		nvme_ioctl_firmware_commit,
-		nvme_ioctl_passthru
+		nvme_ioctl_passthru,
+		nvme_ioctl_is_ignored_ns
 	};
 
 	if (nvme == NULL)

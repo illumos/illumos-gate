@@ -38,6 +38,10 @@
  */
 
 /*
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  *	diff - differential file comparison
  *
  *	Uses an algorithm  which finds
@@ -232,7 +236,7 @@ main(int argc, char **argv)
 
 	diffargv = argv;
 	whichtemp = 0;
-	while ((flag = getopt(argc, argv, "bitwcuefhnlrsC:D:S:U:")) != EOF) {
+	while ((flag = getopt(argc, argv, "bitwcuefhnlqrsC:D:S:U:")) != EOF) {
 		switch (flag) {
 		case 'D':
 			opt = D_IFDEF;
@@ -292,6 +296,10 @@ main(int argc, char **argv)
 
 		case 'n':
 			opt = D_NREVERSE;
+			break;
+
+		case 'q':
+			qflag = 1;
 			break;
 
 		case 'r':
@@ -457,6 +465,13 @@ notsame:
 			done();
 		}
 		(void) printf(gettext("Binary files %s and %s differ\n"),
+		    file1, file2);
+		(void) fclose(input[0]);
+		(void) fclose(input[1]);
+		done();
+	}
+	if (qflag) {
+		(void) printf(gettext("Files %s and %s differ\n"),
 		    file1, file2);
 		(void) fclose(input[0]);
 		(void) fclose(input[1]);
@@ -1796,7 +1811,7 @@ useless(char *cp)
 		if (cp[1] == '.' && cp[2] == '\0')
 			return (1);	/* directory ".." */
 	}
-	if (start && strcmp(start, cp) > 0)
+	if (strcmp(start, cp) > 0)
 		return (1);
 	return (0);
 }
@@ -2041,11 +2056,11 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-	    "usage: diff [-bitw] [-c | -e | -f | -h | -n | -u] file1 "
+	    "usage: diff [-biqtw] [-c | -e | -f | -h | -n | -u] file1 "
 	    "file2\n"
-	    "       diff [-bitw] [-C number | -U number] file1 file2\n"
-	    "       diff [-bitw] [-D string] file1 file2\n"
-	    "       diff [-bitw] [-c | -e | -f | -h | -n | -u] [-l] [-r] "
+	    "       diff [-biqtw] [-C number | -U number] file1 file2\n"
+	    "       diff [-biqtw] [-D string] file1 file2\n"
+	    "       diff [-biqtw] [-c | -e | -f | -h | -n | -u] [-l] [-r] "
 	    "[-s] [-S name] directory1 directory2\n"));
 	status = 2;
 	done();

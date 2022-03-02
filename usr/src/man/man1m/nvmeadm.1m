@@ -390,6 +390,9 @@ currently opened.
 The detached state will not persist across reboots or reloads of the
 .Xr nvme 7D
 driver.
+.Pp
+It is not an error to detach a namespace that is already detached, any such
+request will be silently ignored.
 .It Xo
 .Nm
 .Cm attach
@@ -403,6 +406,9 @@ previous
 .Nm
 .Cm detach
 command.
+.Pp
+It is not an error to attach a namespace that is already attached, any such
+request will be silently ignored.
 .It Xo
 .Nm
 .Cm list-firmware

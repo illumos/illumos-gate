@@ -54,7 +54,8 @@ extern "C" {
 #define	NVME_IOC_FIRMWARE_DOWNLOAD	(NVME_IOC | 11)
 #define	NVME_IOC_FIRMWARE_COMMIT	(NVME_IOC | 12)
 #define	NVME_IOC_PASSTHRU		(NVME_IOC | 13)
-#define	NVME_IOC_MAX			NVME_IOC_PASSTHRU
+#define	NVME_IOC_IS_IGNORED_NS		(NVME_IOC | 14)
+#define	NVME_IOC_MAX			NVME_IOC_IS_IGNORED_NS
 
 #define	IS_NVME_IOC(x)			((x) > NVME_IOC && (x) <= NVME_IOC_MAX)
 #define	NVME_IOC_CMD(x)			((x) & 0xff)

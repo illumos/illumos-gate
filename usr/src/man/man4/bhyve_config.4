@@ -23,9 +23,9 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+.\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd September 25, 2021
+.Dd February 26, 2022
 .Dt BHYVE_CONFIG 4
 .Os
 .Sh NAME
@@ -123,7 +123,9 @@ If no suffix is given, the value is assumed to be in mebibytes.
 .It Va memory.wired Ta bool Ta false Ta
 Wire guest memory.
 .It Va acpi_tables Ta bool Ta false Ta
-Generate ACPI tables.
+Generate ACPI tables; these tables are
+.Em not
+used on illumos.
 .It Va destroy_on_poweroff Ta bool Ta false Ta
 Destroy the VM on guest-initiated power-off.
 .It Va gdb.address Ta string Ta localhost Ta
