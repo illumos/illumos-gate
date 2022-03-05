@@ -23,6 +23,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -571,8 +572,6 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 
 	err = dls_devnet_create(vnic->vn_mh, vnic->vn_id, crgetzoneid(credp));
 	if (err != 0) {
-		VERIFY(is_anchor || mac_margin_remove(vnic->vn_lower_mh,
-		    vnic->vn_margin) == 0);
 		if (!is_anchor) {
 			VERIFY(mac_mtu_remove(vnic->vn_lower_mh,
 			    vnic->vn_mtu) == 0);
