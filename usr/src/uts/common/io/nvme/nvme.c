@@ -2923,6 +2923,44 @@ nvme_prepare_devid(nvme_t *nvme, uint32_t nsid)
 	    nvme->n_idctl->id_vid, model, serial, nsid);
 }
 
+static boolean_t
+nvme_allocated_ns(nvme_namespace_t *ns)
+{
+	nvme_t *nvme = ns->ns_nvme;
+
+	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+
+	/*
+	 * Since we don't know any better, we assume all namespaces to be
+	 * allocated.
+	 */
+	return (B_TRUE);
+}
+
+static boolean_t
+nvme_active_ns(nvme_namespace_t *ns)
+{
+	nvme_t *nvme = ns->ns_nvme;
+	boolean_t ret = B_FALSE;
+	uint64_t *ptr;
+
+	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+
+	/*
+	 * Check whether the IDENTIFY NAMESPACE data is zero-filled.
+	 */
+	for (ptr = (uint64_t *)ns->ns_idns;
+	    ptr != (uint64_t *)(ns->ns_idns + 1);
+	    ptr++) {
+		if (*ptr != 0) {
+			ret = B_TRUE;
+			break;
+		}
+	}
+
+	return (ret);
+}
+
 static int
 nvme_init_ns(nvme_t *nvme, int nsid)
 {
@@ -2946,6 +2984,12 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 
 	ns->ns_idns = idns;
 	ns->ns_id = nsid;
+
+	was_ignored = ns->ns_ignore;
+
+	ns->ns_allocated = nvme_allocated_ns(ns);
+	ns->ns_active = nvme_active_ns(ns);
+
 	ns->ns_block_count = idns->id_nsize;
 	ns->ns_block_size =
 	    1 << idns->id_lbaf[idns->id_flbas.lba_format].lbaf_lbads;
@@ -3410,7 +3454,7 @@ nvme_init(nvme_t *nvme)
 	nvme->n_progress_supported = B_TRUE;
 
 	/*
-	 * Identify Namespaces
+	 * Get number of supported namespaces and allocate namespace array.
 	 */
 	nvme->n_namespace_count = nvme->n_idctl->id_nn;
 
@@ -4884,6 +4928,9 @@ nvme_ioctl_get_logpage(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	if ((mode & FREAD) == 0)
 		return (EPERM);
 
+	if (nsid > 0 && !NVME_NSID2NS(nvme, nsid)->ns_active)
+		return (EINVAL);
+
 	switch (nioc->n_arg) {
 	case NVME_LOGPAGE_ERROR:
 		if (nsid != 0)
@@ -4948,6 +4995,9 @@ nvme_ioctl_get_features(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 
 	if ((mode & FREAD) == 0)
 		return (EPERM);
+
+	if (nsid > 0 && !NVME_NSID2NS(nvme, nsid)->ns_active)
+		return (EINVAL);
 
 	if ((nioc->n_arg >> 32) > 0xff)
 		return (EINVAL);
@@ -5099,8 +5149,12 @@ nvme_ioctl_format(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nm->nm_oexcl != curthread)
 		return (EACCES);
 
-	if (nsid != 0 && NVME_NSID2NS(nvme, nsid)->ns_attached)
-		return (EBUSY);
+	if (nsid != 0) {
+		if (NVME_NSID2NS(nvme, nsid)->ns_attached)
+			return (EBUSY);
+		else if (!NVME_NSID2NS(nvme, nsid)->ns_active)
+			return (EINVAL);
+	}
 
 	frmt.r = nioc->n_arg & 0xffffffff;
 
@@ -5597,10 +5651,11 @@ out:
 }
 
 static int
-nvme_ioctl_is_ignored_ns(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
+nvme_ioctl_ns_state(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
     cred_t *cred_p)
 {
 	_NOTE(ARGUNUSED(cred_p));
+	nvme_namespace_t *ns = NVME_NSID2NS(nvme, nsid);
 
 	if ((mode & FREAD) == 0)
 		return (EPERM);
@@ -5608,10 +5663,23 @@ nvme_ioctl_is_ignored_ns(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nsid == 0)
 		return (EINVAL);
 
-	if (NVME_NSID2NS(nvme, nsid)->ns_ignore)
-		nioc->n_arg = 1;
-	else
-		nioc->n_arg = 0;
+	nioc->n_arg = 0;
+
+	mutex_enter(&nvme->n_mgmt_mutex);
+
+	if (ns->ns_allocated)
+		nioc->n_arg |= NVME_NS_STATE_ALLOCATED;
+
+	if (ns->ns_active)
+		nioc->n_arg |= NVME_NS_STATE_ACTIVE;
+
+	if (ns->ns_attached)
+		nioc->n_arg |= NVME_NS_STATE_ATTACHED;
+
+	if (ns->ns_ignore)
+		nioc->n_arg |= NVME_NS_STATE_IGNORED;
+
+	mutex_exit(&nvme->n_mgmt_mutex);
 
 	return (0);
 }
@@ -5644,7 +5712,7 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		nvme_ioctl_firmware_download,
 		nvme_ioctl_firmware_commit,
 		nvme_ioctl_passthru,
-		nvme_ioctl_is_ignored_ns
+		nvme_ioctl_ns_state
 	};
 
 	if (nvme == NULL)

@@ -222,22 +222,23 @@ nvme_firmware_commit(int fd, int slot, int action, uint16_t *sc)
 	return (rv);
 }
 
-boolean_t
-nvme_is_ignored_ns(int fd)
+uint32_t
+nvme_namespace_state(int fd)
 {
-	boolean_t ret;
 	uint64_t res = 0;
 
 	/*
-	 * The ioctl shouldn't fail. If it does, we treat it the same as if the
-	 * namespace was ignored.
+	 * Ask the driver for the namespace state.
 	 */
-	ret = nvme_ioctl(fd, NVME_IOC_IS_IGNORED_NS, NULL, NULL, 0, &res);
+	if (nvme_ioctl(fd, NVME_IOC_NS_STATE, NULL, NULL, 0, &res)) {
+		return (res);
+	}
 
-	if (ret)
-		ret = (res == 0) ? B_FALSE : B_TRUE;
-
-	return (ret);
+	/*
+	 * We're only here if the ioctl failed, which it really shouldnt. If so,
+	 * we treat this the same as if the namespace was ignored.
+	 */
+	return (NVME_NS_STATE_IGNORED);
 }
 
 int

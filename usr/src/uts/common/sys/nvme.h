@@ -54,8 +54,8 @@ extern "C" {
 #define	NVME_IOC_FIRMWARE_DOWNLOAD	(NVME_IOC | 11)
 #define	NVME_IOC_FIRMWARE_COMMIT	(NVME_IOC | 12)
 #define	NVME_IOC_PASSTHRU		(NVME_IOC | 13)
-#define	NVME_IOC_IS_IGNORED_NS		(NVME_IOC | 14)
-#define	NVME_IOC_MAX			NVME_IOC_IS_IGNORED_NS
+#define	NVME_IOC_NS_STATE		(NVME_IOC | 14)
+#define	NVME_IOC_MAX			NVME_IOC_NS_STATE
 
 #define	IS_NVME_IOC(x)			((x) > NVME_IOC && (x) <= NVME_IOC_MAX)
 #define	NVME_IOC_CMD(x)			((x) & 0xff)
@@ -1028,6 +1028,30 @@ typedef struct {
 	uintptr32_t npc_buf;	/* I/O source or destination */
 } nvme_passthru_cmd32_t;
 #endif
+
+/*
+ * NVME namespace state flags for NVME_IOC_NS_STATE ioctl
+ *
+ * The values are defined entirely by the driver. Some states correspond to
+ * namespace states described by the NVMe specification r1.3 section 6.1, others
+ * are specific to the implementation of this driver.
+ *
+ * The states are as follows:
+ * - ALLOCATED: the namespace exists in the controller as per the NVMe spec
+ * - ACTIVE: the namespace exists and is attached to this controller as per the
+ *   NVMe spec. Any namespace that is ACTIVE is also ALLOCATED. This must not be
+ *   confused with the ATTACHED state.
+ * - ATTACHED: the driver has attached a blkdev(4D) instance to this namespace.
+ *   This state can be changed by userspace with the ioctls NVME_IOC_ATTACH and
+ *   NVME_IOC_DETACH. A namespace can only be ATTACHED when it is not IGNORED.
+ * - IGNORED: the driver ignores this namespace, it never attaches a blkdev(4D).
+ *   Namespaces are IGNORED when they are not ACTIVE, or if they are ACTIVE but
+ *   have certain properties that the driver cannot handle.
+ */
+#define	NVME_NS_STATE_ALLOCATED		0x1
+#define	NVME_NS_STATE_ACTIVE		0x2
+#define	NVME_NS_STATE_ATTACHED		0x4
+#define	NVME_NS_STATE_IGNORED		0x8
 
 #ifdef __cplusplus
 }
