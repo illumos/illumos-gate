@@ -20,15 +20,12 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent, Inc.
  */
 
 /*
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
- */
-
-/*
+ * Copyright 2017 Joyent, Inc.
  * Copyright 2020 Peter Tribble.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <unistd.h>
@@ -459,6 +456,9 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_BAD_ENCAP:
 		s = "invalid encapsulation protocol";
 		break;
+	case DLADM_STATUS_ADDRNOTAVAIL:
+		s = "can't assign requested address";
+		break;
 	default:
 		s = "<unknown error>";
 		break;
@@ -509,6 +509,8 @@ dladm_errno2status(int err)
 		return (DLADM_STATUS_FLOW_IDENTICAL);
 	case EADDRINUSE:
 		return (DLADM_STATUS_ADDRINUSE);
+	case EADDRNOTAVAIL:
+		return (DLADM_STATUS_ADDRNOTAVAIL);
 	default:
 		return (DLADM_STATUS_FAILED);
 	}

@@ -7259,7 +7259,7 @@ enum fw_port_mdi32 {
     (((x) >> S_FW_PORT_CAP32_MDI) & M_FW_PORT_CAP32_MDI)
 
 #define S_FW_PORT_CAP32_FEC	23
-#define M_FW_PORT_CAP32_FEC	0x5f
+#define M_FW_PORT_CAP32_FEC	0x1f
 #define V_FW_PORT_CAP32_FEC(x)	((x) << S_FW_PORT_CAP32_FEC)
 #define G_FW_PORT_CAP32_FEC(x) \
     (((x) >> S_FW_PORT_CAP32_FEC) & M_FW_PORT_CAP32_FEC)
