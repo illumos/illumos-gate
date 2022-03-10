@@ -26,7 +26,6 @@
 # common rules for $SRC/cmd/fwflash
 
 CERRWARN +=		-_gcc=-Wno-parentheses
-CERRWARN +=		$(CNOWARN_UNINIT)
 CERRWARN +=		-_gcc=-Wno-address
 
 # not linted
@@ -94,7 +93,7 @@ $(ROOTUSRSBIN)/%:	%
 
 $(POFILE): $(POFILES)
 	$(RM) $@
-	cat $(POFILES) >$@		
+	cat $(POFILES) >$@
 
 LINTFLAGS += -D_POSIX_PTHREAD_SEMANTICS -erroff=E_CONSTANT_CONDITION \
 	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
