@@ -162,7 +162,7 @@ typedef struct smb_kmod_cfg {
 	uint32_t skc_max_protocol;	/* SMB_VERS_... */
 	uint32_t skc_min_protocol;	/* SMB_VERS_... */
 	smb_cfg_val_t skc_encrypt; /* EncryptData and RejectUnencryptedAccess */
-	uint16_t skc_encrypt_cipher;	/* 3.1.1 encryption cipher */
+	uint32_t skc_encrypt_ciphers;	/* 3.1.1 encryption ciphers */
 	uint32_t skc_execflags;
 	uint32_t skc_negtok_len;
 	smb_version_t skc_version;
@@ -247,8 +247,8 @@ const char *smbnative_lm_str(smb_version_t *);
 /*
  * SMB 3.x encryption ciphers bits.
  */
-#define	SMB3_ALL_CIPHERS	((1 << (SMB3_CIPHER_MAX)) - 1)
 #define	SMB3_CIPHER_BIT(c)	(1 << ((c) - 1))
+#define	SMB3_CIPHER_FLAGS_ALL	((1 << (SMB3_CIPHER_MAX)) - 1)
 
 #define	SMB3_CIPHER_FLAG_AES128_CCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES128_CCM)
 #define	SMB3_CIPHER_FLAG_AES128_GCM	SMB3_CIPHER_BIT(SMB3_CIPHER_AES128_GCM)

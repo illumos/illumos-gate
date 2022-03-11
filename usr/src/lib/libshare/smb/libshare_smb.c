@@ -87,6 +87,7 @@ static int cmd_validator(int, char *);
 static int disposition_validator(int, char *);
 static int protocol_validator(int, char *);
 static int require_validator(int, char *);
+static int ciphers_validator(int, char *);
 
 static int smb_enable_resource(sa_resource_t);
 static int smb_disable_resource(sa_resource_t);
@@ -896,6 +897,8 @@ struct smb_proto_option_defs {
 	{ SMB_CI_MAX_PROTOCOL, 0, MAX_VALUE_BUFLEN, protocol_validator,
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_ENCRYPT, 0, MAX_VALUE_BUFLEN, require_validator,
+	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_ENCRYPT_CIPHERS, 0, MAX_VALUE_BUFLEN, ciphers_validator,
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_BYPASS_TRAVERSE_CHECKING, 0, 0, true_false_validator,
 	    SMB_REFRESH_REFRESH },
@@ -2424,6 +2427,24 @@ protocol_validator(int index, char *value)
 		    opt->smb_index);
 		return (SA_BAD_VALUE);
 	}
+
+	return (SA_OK);
+}
+
+/*ARGSUSED*/
+static int
+ciphers_validator(int index, char *value)
+{
+
+	if (value == NULL)
+		return (SA_BAD_VALUE);
+
+	/* Allow setting back to empty (use defaults) */
+	if (*value == '\0')
+		return (SA_OK);
+
+	if (smb_convert_encrypt_ciphers(value) <= 0)
+		return (SA_BAD_VALUE);
 
 	return (SA_OK);
 }

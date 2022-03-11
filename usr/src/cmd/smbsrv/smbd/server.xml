@@ -237,7 +237,7 @@ file.
 			value='' override='true'/>
 		<propval name='encrypt' type='astring'
 			value='disabled' override='true'/>
-		<propval name='encrypt_cipher' type='astring'
+		<propval name='encrypt_ciphers' type='astring'
 			value='' override='true'/>
 		<propval name='initial_credits' type='integer'
 			value='20' override='true'/>
