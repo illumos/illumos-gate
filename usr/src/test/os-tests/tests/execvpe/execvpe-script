@@ -1,0 +1,37 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2024 Oxide Computer Company
+#
+
+#
+# This file does not have a #! and that must be kept that way. The point of this
+# is for testing execvpe() which falls back to treating a file as the standard
+# in to a shell when the system call fails with ENOEXEC.
+#
+
+if [[ -z "$PATH" ]]; then
+	printf "environment missing \$PATH!\n"
+	exit 1
+fi
+
+if [[ -z "$EXECVPE_TEST" ]]; then
+	printf "environment missing \$EXECVPE_TEST!\n"
+	exit 1
+fi
+
+if [[ "$EXECVPE_TEST" != "Keep it secret, keep it safe!" ]]; then
+	printf "execvpe wrapper did not set the secret phrase!\n"
+	exit 1
+fi
+
+exit 0

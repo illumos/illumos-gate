@@ -180,3 +180,6 @@ tests = [ 'bad_xregs.32', 'bad_xregs.64', 'mdb_xregs', 'proc_writes',
 
 [/opt/os-tests/tests/ilstr]
 tests = ['ilstr_basic.32', 'ilstr_basic.64']
+
+[/opt/os-tests/tests/execve]
+tests = ['execvpe-test.32', 'execvpe-test.64']

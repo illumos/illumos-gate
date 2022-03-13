@@ -47,7 +47,7 @@
 .\" Copyright 2015, Joyent, Inc.
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd January 12, 2024
+.Dd February 3, 2024
 .Dt EXEC 2
 .Os
 .Sh NAME
@@ -58,6 +58,7 @@
 .Nm execv ,
 .Nm execve ,
 .Nm execvp ,
+.Nm execvpe ,
 .Nm fexecve
 .Nd execute a file
 .Sh SYNOPSIS
@@ -99,6 +100,12 @@
 .Fo execvp
 .Fa "const char *file"
 .Fa "char *const argv[]"
+.Fc
+.Ft int
+.Fo execvpe
+.Fa "const char *file"
+.Fa "char *const argv[]"
+.Fa "char *const envp[]"
 .Fc
 .Ft int
 .Fo fexecve
@@ -217,9 +224,10 @@ see
 .Pc .
 The environment is supplied typically by the shell.
 If the process image file is not a valid executable object file,
-.Fn execlp
+.Fn execlp ,
+.Fn execvp ,
 and
-.Fn execvp
+.Fn execvpe
 use the contents of that file as standard input to the shell.
 In this case, the shell becomes the new process image.
 The standard to which the caller conforms determines which shell is used.
@@ -750,9 +758,10 @@ A component of the new process path of the file prefix is not a directory.
 The
 .Nm
 functions, except for
-.Fn execlp
-and
+.Fn execlp ,
 .Fn execvp ,
+and
+.Fn execvpe ,
 will fail if:
 .Bl -tag -width Ds
 .It Er ENOEXEC
