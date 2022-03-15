@@ -26,8 +26,6 @@
 #ifndef	_RTC_H
 #define	_RTC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Global include file for the runtime configuration support.
  */
@@ -148,7 +146,7 @@ typedef struct {
 #define	RTC_OBJ_NOEXIST	0x0004		/* object does not exist */
 #define	RTC_OBJ_EXEC	0x0008		/* object identifies executable */
 #define	RTC_OBJ_ALTER	0x0010		/* object has an alternate */
-#define	RTC_OBJ_DUMP	0x0020		/* alternate created by dldump(3x) */
+#define	RTC_OBJ_DUMP	0x0020		/* alternate created by dldump(3C) */
 #define	RTC_OBJ_REALPTH	0x0040		/* object identifies real path */
 #define	RTC_OBJ_NOALTER	0x0080		/* object can't have an alternate */
 #define	RTC_OBJ_GROUP	0x0100		/* object was expanded as a group */

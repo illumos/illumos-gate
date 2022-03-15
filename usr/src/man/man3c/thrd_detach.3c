@@ -54,5 +54,5 @@ indicating that an error has occurred.
 .Xr pthread_detach 3C ,
 .Xr thrd_create 3C ,
 .Xr thrd_join 3C ,
-.Xr attributes 5 ,
-.Xr threads 5
+.Xr attributes 7 ,
+.Xr threads 7

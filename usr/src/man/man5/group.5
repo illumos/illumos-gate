@@ -1,0 +1,168 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH GROUP 5 "Feb 25, 2017"
+.SH NAME
+group \- group file
+.SH DESCRIPTION
+.LP
+The \fBgroup\fR file is a local source of group information. The \fBgroup\fR
+file can be used in conjunction with other group sources, including the
+\fBNIS\fR maps \fBgroup.byname\fR and \fBgroup.bygid\fR, or group information
+stored on an LDAP server. Programs use the
+\fBgetgrnam\fR(3C) routines to access this information.
+.sp
+.LP
+The \fBgroup\fR file contains a one-line entry for each group recognized by the
+system, of the form:
+.sp
+.LP
+\fIgroupname\fR:\fIpassword\fR: \fIgid\fR:\fIuser-list\fR
+.sp
+.LP
+where
+.sp
+.ne 2
+.na
+\fB\fIgroupname\fR\fR
+.ad
+.RS 13n
+The name of the group. A string consisting of lower case alphabetic characters
+and numeric characters. Neither a colon (\fB:\fR) nor a NEWLINE can be part of
+a \fIgroupname\fR. The string must be less than \fBMAXGLEN-1\fR, usually
+\fB8\fR, characters long.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIgid\fR\fR
+.ad
+.RS 13n
+The group's unique numerical ID (GID) within the system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIuser-list\fR\fR
+.ad
+.RS 13n
+A comma-separated list of users allowed in the group.
+.RE
+
+.sp
+.LP
+The maximum value of the \fIgid\fR field is 2147483647. To maximize
+interoperability and compatibility, administrators are recommended to assign
+groups using the range of GIDs below 60000 where possible.
+.sp
+.LP
+If the password field is empty, no password is demanded. During user
+identification and authentication, the supplementary group access list is
+initialized sequentially from information in this file. If a user is in more
+groups than the system is configured for, \fB{NGROUPS_MAX}\fR, a warning will
+be given and subsequent group specifications will be ignored.
+.sp
+.LP
+Malformed entries cause routines that read this file to halt, in which case
+group assignments specified further along are never made. To prevent this from
+happening, use \fBgrpck\fR(1B) to check the \fB/etc/group\fR database from time
+to time.
+.sp
+.LP
+If the number of characters in an entry exceeds 2047, group maintenance
+commands, such as \fBgroupdel\fR(8) and \fBgroupmod\fR(8), fail.
+.sp
+.LP
+Previous releases used a group entry beginning with a `\fB+\fR' (plus sign) or
+`\fB\(mi\fR\&' (minus sign) to selectively incorporate entries from a naming
+service source (for example, an NIS map or data from an LDAP server) for group.
+If still required, this is supported by specifying \fBgroup:compat\fR in
+\fBnsswitch.conf\fR(5). The \fBcompat\fR source may not be supported in future
+releases. Possible sources are \fBfiles\fR followed by \fBldap\fR.
+This has the effect of incorporating information from an LDAP
+server after the \fBgroup\fR file.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample \fBgroup\fR File.
+.sp
+.LP
+The following is an example of a \fBgroup\fR file:
+
+.sp
+.in +2
+.nf
+\fBroot::0:root
+stooges:q.mJzTnu8icF.:10:larry,moe,curly\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and the sample group entry from \fBnsswitch.conf\fR:
+
+.sp
+.in +2
+.nf
+\fBgroup: files ldap\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+With these entries, the group \fBstooges\fR will have members \fBlarry\fR,
+\fBmoe\fR, and \fBcurly\fR, and all groups listed on the LDAP server are
+effectively incorporated after the entry for \fBstooges\fR.
+
+.sp
+.LP
+If the \fBgroup\fR file was:
+
+.sp
+.in +2
+.nf
+root::0:root
+stooges:q.mJzTnu8icF.:10:larry,moe,curly
++:
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+and the group entry from \fBnsswitch.conf\fR:
+
+.sp
+.in +2
+.nf
+\fBgroup: compat\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+all the groups listed in the \fBNIS\fR \fBgroup.bygid\fR and \fBgroup.byname\fR
+maps would be effectively incorporated after the entry for stooges.
+
+.SH SEE ALSO
+.LP
+.BR groups (1),
+.BR newgrp (1),
+.BR grpck (1B),
+.BR getgrnam (3C),
+.BR initgroups (3C),
+.BR unistd.h (3HEAD),
+.BR nsswitch.conf (5),
+.BR groupadd (8),
+.BR groupdel (8),
+.BR groupmod (8)
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR

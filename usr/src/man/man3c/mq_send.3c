@@ -219,7 +219,7 @@ the timeout expired before the message could be added to the queue.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -238,9 +238,13 @@ Standard	See below.
 
 .sp
 .LP
-For \fBmq_send()\fR and \fBmq_timedsend()\fR, see \fBstandards\fR(5).
+For \fBmq_send()\fR and \fBmq_timedsend()\fR, see \fBstandards\fR(7).
 .SH SEE ALSO
 .LP
-\fBsysconf\fR(3C), \fBmqueue.h\fR(3HEAD), \fBmq_open\fR(3C),
-\fBmq_receive\fR(3C), \fBmq_setattr\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR mq_open (3C),
+.BR mq_receive (3C),
+.BR mq_setattr (3C),
+.BR sysconf (3C),
+.BR mqueue.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

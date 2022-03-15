@@ -70,7 +70,9 @@ cmn_err(CE_NOTE,"Driver Started.  Major# = %d,
 .SH SEE ALSO
 .sp
 .LP
-\fBcmn_err\fR(9F), \fBgetminor\fR(9F), \fBmakedevice\fR(9F)
+.BR cmn_err (9F),
+.BR getminor (9F),
+.BR makedevice (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

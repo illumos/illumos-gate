@@ -1,0 +1,206 @@
+'\" te
+.\"  Copyright 1989 AT&T All Rights Reserved. Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PRTVTOC 8 "Apr 14, 2020"
+.SH NAME
+prtvtoc \- report information about a disk geometry and partitioning
+.SH SYNOPSIS
+.nf
+\fBprtvtoc\fR [\fB-fhs\fR] [\fB-t\fR \fIvfstab\fR] [\fB-m\fR \fImnttab\fR] \fIdevice\fR
+.fi
+
+.SH DESCRIPTION
+The \fBprtvtoc\fR command allows the contents of the label to be viewed. The
+command can be used only by the super-user.
+.sp
+.LP
+The \fIdevice\fR name can be the file name of a raw device in the form of
+\fB/dev/rdsk/c*t*d*s2\fR or can be the file name of a block device in the form
+of \fB/dev/dsk/c*t*d*s2\fR.
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 13n
+Report on the disk free space, including the starting block address of the free
+space, number of blocks, and unused partitions.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 13n
+Omit the headers from the normal output.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fI mnttab\fR\fR
+.ad
+.RS 13n
+Use \fImnttab\fR as the list of mounted filesystems, in place of
+\fB/etc/mnttab\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 13n
+Omit all headers but the column header from the normal output.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fI vfstab\fR\fR
+.ad
+.RS 13n
+Use \fIvfstab\fR as the list of filesystem defaults, in place of
+\fB/etc/vfstab\fR.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRUsing the \fBprtvtoc\fR Command
+.sp
+.LP
+The following example uses the \fBprtvtoc\fR command on a 424-megabyte hard
+disk:
+
+.sp
+.in +2
+.nf
+example# prtvtoc /dev/rdsk/c0t3d0s2
+* /dev/rdsk/c0t3d0s2 partition map
+*
+* Dimensions:
+*         512 bytes/sector
+*          80 sectors/track
+*           9 tracks/cylinder
+*         720 sectors/cylinder
+*        2500 cylinders
+*        1151 accessible cylinders
+*
+* Flags:
+*   1: unmountable
+*  10: read-only
+*                            First       Sector      Last
+* Partition  Tag  Flags      Sector       Count      Sector  Mount Directory
+       0       2     00          0       76320       76319   /
+       1       3     01      76320      132480      208799
+       2       5     00          0      828720      828719
+       5       6     00     208800      131760      340559   /opt
+       6       4     00     340560      447120      787679   /usr
+       7       8     00     787680       41040      828719   /export/home
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The data in the \fBTag\fR column above indicates the type of partition, as
+follows:
+
+.sp
+
+.sp
+.TS
+c c
+l l .
+\fIName\fR	\fINumber\fR
+UNASSIGNED	0x00
+BOOT	0x01
+ROOT	0x02
+SWAP	0x03
+USR	0x04
+BACKUP	0x05
+STAND	0x06
+VAR	0x07
+HOME	0x08
+ALTSCTR	0x09
+CACHE	0x0a
+RESERVED	0x0b
+.TE
+
+.sp
+.LP
+The data in the \fBFlags\fR column above indicates how the partition is to be
+mounted, as follows:
+
+.sp
+
+.sp
+.TS
+l l
+l l .
+\fIName\fR	\fINumber\fR
+MOUNTABLE, READ AND WRITE	0x00
+NOT MOUNTABLE	0x01
+MOUNTABLE, READ ONLY	0x10
+.TE
+
+.LP
+\fBExample 2 \fRUsing the \fBprtvtoc\fR Command with the \fB-f\fR Option
+.sp
+.LP
+The following example uses the \fBprtvtoc\fR command with the \fB-f\fR option
+on a 424-megabyte hard disk:
+
+.sp
+.in +2
+.nf
+example# prtvtoc \fB-f\fR /dev/rdsk/c0t3d0s2
+FREE_START=0 FREE_SIZE=0 FREE_COUNT=0 FREE_PART=34
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRUsing the \fBprtvtoc\fR Command on a Disk Over One Terabyte
+.sp
+.LP
+The following example uses uses the \fBprtvtoc\fR command on a disk over one
+terabyte:.
+
+.sp
+.in +2
+.nf
+example# prtvtoc /dev/rdsk/c1t1d0s2
+* /dev/rdsk/c1t1d0s2 partition map
+*
+* Dimensions:
+*         512 bytes/sector
+*  3187630080 sectors
+*  3187630013 accessible sectors
+*
+* Flags:
+*   1: unmountable
+*  10: read-only
+*
+*                           First       Sector        Last
+* Partition  Tag  Flags     Sector       Count      Sector  Mount Directory
+       0      2    00          34      262144      262177
+       1      3    01      262178      262144      524321
+       6      4    00      524322  3187089340  3187613661
+       8     11    00  3187613662       16384   318763004
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.BR attributes (7),
+.BR devinfo (8),
+.BR fmthard (8),
+.BR format (8),
+.BR mount (8)
+.SH WARNINGS
+The \fBmount\fR command does not check the "not mountable" bit.

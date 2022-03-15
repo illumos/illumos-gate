@@ -44,7 +44,7 @@ user access and accounting information
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -60,4 +60,7 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBgetutent\fR(3C), \fBttyname\fR(3C), \fButmpx\fR(4), \fBattributes\fR(5)
+.BR getutent (3C),
+.BR ttyname (3C),
+.BR utmpx (5),
+.BR attributes (7)

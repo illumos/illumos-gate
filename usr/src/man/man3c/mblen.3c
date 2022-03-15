@@ -106,7 +106,7 @@ Invalid character sequence is detected.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -132,5 +132,5 @@ function is Uncommitted.
 .SH SEE ALSO
 .LP
 \fBmbstowcs\fR(3C), \fBmbtowc\fR(3C), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C),
-\fBwcstombs\fR(3C), \fBwctomb\fR(3C), \fBuselocale\fR(3C) \fBattributes\fR(5),
-\fBstandards\fR(5)
+\fBwcstombs\fR(3C), \fBwctomb\fR(3C), \fBuselocale\fR(3C) \fBattributes\fR(7),
+.BR standards (7)

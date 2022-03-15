@@ -34,7 +34,7 @@
 
 #
 # DESCRIPTION:
-# Ensure that the fsdb(1M) utility fails on a ZFS file system.
+# Ensure that the fsdb(8) utility fails on a ZFS file system.
 #
 # STRATEGY:
 # 1. Populate a ZFS directory with a number of files.
@@ -51,7 +51,7 @@ function cleanup
 
 log_onexit cleanup
 
-log_assert "Ensure that the fsdb(1M) utility fails on a ZFS file system."
+log_assert "Ensure that the fsdb(8) utility fails on a ZFS file system."
 
 populate_dir $NUM_FILES
 inode_num=`ls -li $TESTDIR/$TESTFILE.0 | awk '{print $1}'`
@@ -60,4 +60,4 @@ inode_num=`ls -li $TESTDIR/$TESTFILE.0 | awk '{print $1}'`
 
 log_mustnot echo ":inode $inode_num" | fsdb /dev/rdsk/${DISK}s0
 
-log_pass "fsdb(1M) returned an error as expected."
+log_pass "fsdb(8) returned an error as expected."

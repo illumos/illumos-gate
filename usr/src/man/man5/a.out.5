@@ -1,0 +1,111 @@
+'\" te
+.\" Copyright 1989 AT&T Copyright
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH A.OUT 5 "Aug 24, 2009"
+.SH NAME
+a.out \- Executable and Linking Format (ELF) files
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <elf.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The file name \fBa.out\fR is the default output file name from the link editor,
+\fBld\fR(1). The link editor will make an \fBa.out\fR executable if there were
+no errors in linking. The output file of the assembler, \fBas\fR(1), also
+follows the format of the \fBa.out\fR file although its default file name is
+different.
+.sp
+.LP
+Programs that manipulate ELF files may use the library that \fBelf\fR(3ELF)
+describes. An overview of the file format follows. For more complete
+information, see the references given below.
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+Linking View	Execution View
+_
+ELF header	ELF header
+_
+Program header table	Program header table
+\fIoptional\fR
+_
+Section 1	Segment 1
+_
+\&...
+_
+Section \fIn\fR	Segment 2
+_
+\&...
+_
+\&...	\&...
+_
+Section header table	Section header table
+	\fIoptional\fR
+.TE
+
+.sp
+.LP
+An ELF header resides at the beginning and holds a ``road map'' describing the
+file's organization. Sections hold the bulk of object file information for the
+linking view: instructions, data, symbol table, relocation information, and so
+on. Segments hold the object file information for the program execution view.
+As shown, a segment may contain one or more sections.
+.sp
+.LP
+A program header table, if present, tells the system how to create a process
+image. Files used to build a process image (execute a program) must have a
+program header table; relocatable files do not need one. A section header table
+contains information describing the file's sections. Every section has an entry
+in the table; each entry gives information such as the section name, the
+section size, etc. Files used during linking must have a section header table;
+other object files may or may not have one.
+.sp
+.LP
+Although the figure shows the program header table immediately after the ELF
+header, and the section header table following the sections, actual files may
+differ. Moreover, sections and segments have no specified order. Only the ELF
+header has a fixed position in the file.
+.sp
+.LP
+When an \fBa.out\fR file is loaded into memory for execution, three logical
+segments are set up: the text segment, the data segment (initialized data
+followed by uninitialized, the latter actually being initialized to all 0's),
+and a stack. The text segment is not writable by the program; if other
+processes are executing the same \fBa.out\fR file, the processes will share a
+single text segment.
+.sp
+.LP
+The data segment starts at the next maximal page boundary past the last text
+address. If the system supports more than one page size, the ``maximal page''
+is the largest supported size. When the process image is created, the part of
+the file holding the end of text and the beginning of data may appear twice.
+The duplicated chunk of text that appears at the beginning of data is never
+executed; it is duplicated so that the operating system may bring in pieces of
+the file in multiples of the actual page size without having to realign the
+beginning of the data section to a page boundary. Therefore, the first data
+address is the sum of the next maximal page boundary past the end of text plus
+the remainder of the last text address divided by the maximal page size. If the
+last text address is a multiple of the maximal page size, no duplication is
+necessary. The stack is automatically extended as required. The data segment is
+extended as requested by the \fBbrk\fR(2) system call.
+.SH SEE ALSO
+.sp
+.LP
+.BR as (1),
+.BR ld (1),
+.BR brk (2),
+.BR elf (3ELF)
+.sp
+.LP
+\fIANSI C Programmer's Guide\fR

@@ -24,8 +24,6 @@
 
  CDDL HEADER END
 
-    ident	"%Z%%M%	%I%	%E% SMI"
-
     NOTE:  This service manifest is not editable; its contents will
     be overwritten by package or patch operations, including
     operating system upgrade.  Make customizations in a different
@@ -99,10 +97,10 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='powerd' section='1M' manpath='/usr/share/man' />
-			<manpage title='pmconfig' section='1M' manpath='/usr/share/man' />
-			<manpage title='dtpower' section='1M' manpath='/usr/share/man' />
-			<manpage title='power.conf' section='4' manpath='/usr/share/man' />
+			<manpage title='powerd' section='8' manpath='/usr/share/man' />
+			<manpage title='pmconfig' section='8' manpath='/usr/share/man' />
+			<manpage title='dtpower' section='8' manpath='/usr/share/man' />
+			<manpage title='power.conf' section='5' manpath='/usr/share/man' />
 		</documentation>
 	</template>
 </service>

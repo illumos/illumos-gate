@@ -5,7 +5,7 @@
 
 #
 # Project.pm provides the bootstrap for the Sun::Solaris::Project module, and
-# also functions for reading, validating and writing out project(4) format
+# also functions for reading, validating and writing out project(5) format
 # files.
 #
 ################################################################################
@@ -132,7 +132,7 @@ sub projf_combine_errors
 #
 # projf_read(filename, flags)
 #
-# Reads and parses a project(4) file, and returns a list of projent hashes.
+# Reads and parses a project(5) file, and returns a list of projent hashes.
 #
 # Inputs:
 #	filename - file to read
@@ -979,7 +979,7 @@ sub projent_attribute2string
 
 #
 # Converts a ref to a projent hash (as returned by projent_parse()) to
-# a project(4) database entry line.
+# a project(5) database entry line.
 #
 sub projent_2string
 {

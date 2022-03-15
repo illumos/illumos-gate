@@ -148,8 +148,10 @@ be called from user, interrupt, or kernel context when using the \fBLBOLT\fR or
 \fBTIME\fR argument.
 .SH SEE ALSO
 .LP
-\fBddi_get_lbolt\fR(9F), \fBddi_get_pid\fR(9F), \fBddi_get_time\fR(9F),
-\fBbuf\fR(9S)
+.BR ddi_get_lbolt (9F),
+.BR ddi_get_pid (9F),
+.BR ddi_get_time (9F),
+.BR buf (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

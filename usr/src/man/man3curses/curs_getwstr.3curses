@@ -71,7 +71,7 @@ other than \fBERR\fR upon successful completion.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -87,7 +87,9 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBcurses\fR(3CURSES), \fBgetwch\fR(3CURSES), \fBattributes\fR(5)
+.BR curses (3CURSES),
+.BR getwch (3CURSES),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

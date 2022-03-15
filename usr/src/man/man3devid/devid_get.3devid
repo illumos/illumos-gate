@@ -467,5 +467,5 @@ devid_free_nmlist(list);
 .Sh SEE ALSO
 .Xr free 3C ,
 .Xr libdevid 3LIB ,
-.Xr attributes 5 ,
+.Xr attributes 7 ,
 .Xr ddi_devid_compare 9F

@@ -34,7 +34,7 @@
 is a replacement for
 .I bfu
 used to update a system with the latest set of IPS packages for the ON
-(OS/Net) consolidation of Solaris, using beadm(1M) to create a new Boot
+(OS/Net) consolidation of Solaris, using beadm(8) to create a new Boot
 Environment (BE) and pkg(1) to update the image.
 .SH OPTIONS
 .LP
@@ -103,7 +103,7 @@ differently from bfu.  First, as noted above, onu creates a new BE, rather
 than updating an existing BE in-place.  Second, onu will not install packages
 that are older than what is already installed in the source BE.  Third,
 conflicts in system configuration files are automatically resolved according
-to the files' "preserve" attribute, as described in pkg(5).
+to the files' "preserve" attribute, as described in pkg(7).
 .LP
 If the
 .B -d
@@ -162,6 +162,6 @@ If the -U option is not provided, and this variable is set, it will be
 used as the publisher name for the packaging repository.  If -U is not
 provided and this variable is not set, on-nightly will be used.
 .SH SEE ALSO
-.BR beadm "(1M), "
-.BR pkg "(1), "
-.BR pkg "(5) "
+.BR beadm (8),
+.BR pkg (1),
+.BR pkg (7)

@@ -30,7 +30,7 @@ effective properties. The effective properties of a service are its directly
 attached properties. The effective properties of a service instance are the
 union of properties in the composed view of its \fBrunning\fR snapshot and the
 properties in nonpersistent property groups in the composed view of the
-instance's directly attached properties. See \fBsmf\fR(5) for an explanation of
+instance's directly attached properties. See \fBsmf\fR(7) for an explanation of
 property composition. If the \fBrunning\fR snapshot does not exist then the
 instance's directly attached properties are used instead.
 .SS "Output Format"
@@ -168,7 +168,7 @@ message is printed and no action is taken. The -C option is implied.
 .ad
 .RS 14n
 Uses properties from the service or instance in the specified \fIzone\fR.
-This option is only applicable from the global zone, see \fBzones\fR(5).
+This option is only applicable from the global zone, see \fBzones\fR(7).
 
 .SH OPERANDS
 The following operands are supported:
@@ -227,7 +227,7 @@ other permanent tools. If an abbreviation matches multiple instances,
 .ad
 .RS 11n
 A glob pattern which is matched against the FMRIs of services and instances in
-the repository. See \fBfnmatch\fR(5). If a pattern matches multiple services or
+the repository. See \fBfnmatch\fR(7). If a pattern matches multiple services or
 instances, \fBsvcprop\fR acts on each service or instance.
 .RE
 
@@ -390,7 +390,15 @@ Invalid command line options were specified.
 .RE
 
 .SH SEE ALSO
-\fBsvcs\fR(1), \fBinetd\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
-\fBsvc.startd\fR(1M), \fBservice_bundle\fR(4), \fBattributes\fR(5),
-\fBfnmatch\fR(5), \fBsmf\fR(5), \fBsmf_method\fR(5), \fBsmf_security\fR(5),
-\fBzones\fR(5)
+.BR svcs (1),
+.BR service_bundle (5),
+.BR attributes (7),
+.BR fnmatch (7),
+.BR smf (7),
+.BR smf_method (7),
+.BR smf_security (7),
+.BR zones (7),
+.BR inetd (8),
+.BR svc.startd (8),
+.BR svcadm (8),
+.BR svccfg (8)

@@ -227,7 +227,7 @@ used on smaller disks. The application should attempt the \fBread_vtoc()\fR or
 \fBwrite_vtoc()\fR call, check for an error of \fBVT_ENOTSUP\fR, then call the
 analogous EFI function.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -243,6 +243,12 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-\fBfmthard\fR(1M), \fBformat\fR(1M), \fBprtvtoc\fR(1M), \fBioctl\fR(2),
-\fBopen\fR(2), \fBlibefi\fR(3LIB), \fBread_vtoc\fR(3EXT), \fBattributes\fR(5),
-\fBdkio\fR(7I)
+.BR ioctl (2),
+.BR open (2),
+.BR read_vtoc (3EXT),
+.BR libefi (3LIB),
+.BR dkio (4I),
+.BR attributes (7),
+.BR fmthard (8),
+.BR format (8),
+.BR prtvtoc (8)

@@ -243,4 +243,4 @@ The resulting value is stored in the character string pointed to by
 .Xr gettimeofday 3C ,
 .Xr printf 3C ,
 .Xr libuuid 3LIB ,
-.Xr attributes 5
+.Xr attributes 7

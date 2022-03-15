@@ -42,7 +42,7 @@ the system is successfully suspended, the resume operation always succeed
 barring external influences such as hardware reconfiguration or the like.
 .sp
 .LP
-In case of shutdown, the system responds as if \fBpoweroff\fR(1M) was
+In case of shutdown, the system responds as if \fBpoweroff\fR(8) was
 performed.
 .sp
 .LP
@@ -68,7 +68,7 @@ Connect to the X server specified by \fIdisplayname\fR.
 \fB\fB-f\fR\fR
 .ad
 .RS 6n
-Force suspend. Causes a \fBpoweroff\fR(1M) to occur if the suspend fails.
+Force suspend. Causes a \fBpoweroff\fR(8) to occur if the suspend fails.
 System state are not be saved, and a normal boot follows.
 .RE
 
@@ -103,7 +103,7 @@ at resume time.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -119,5 +119,9 @@ Interface Stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBhalt\fR(1M), \fBpowerd\fR(1M), \fBpoweroff\fR(1M), \fBshutdown\fR(1M),
-\fBattributes\fR(5), \fBcpr\fR(7)
+.BR cpr (4),
+.BR attributes (7),
+.BR halt (8),
+.BR powerd (8),
+.BR poweroff (8),
+.BR shutdown (8)

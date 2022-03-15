@@ -157,7 +157,7 @@ to disallow access to them system-wide.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -175,9 +175,15 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBprocessor_bind\fR(2), \fBcpc\fR(3CPC), \fBcpc_bind_cpu\fR(3CPC),
-\fBcpc_bind_event\fR(3CPC), \fBcpc_set_sample\fR(3CPC), \fBcpc_unbind\fR(3CPC),
-\fBlibcpc\fR(3LIB), \fBthr_create\fR(3C), \fBattributes\fR(5)
+.BR processor_bind (2),
+.BR thr_create (3C),
+.BR cpc (3CPC),
+.BR cpc_bind_cpu (3CPC),
+.BR cpc_bind_event (3CPC),
+.BR cpc_set_sample (3CPC),
+.BR cpc_unbind (3CPC),
+.BR libcpc (3LIB),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

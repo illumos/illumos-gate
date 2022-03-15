@@ -28,7 +28,7 @@ taking place, unless the device driver returns \fBDDI_SUCCESS\fR when its
 .sp
 .LP
 The presence of \fBno-involuntary-power-cycles\fR does not prevent the system
-from being powered off due to a \fBhalt\fR(1M) or \fBuadmin\fR(1M) invocation,
+from being powered off due to a \fBhalt\fR(8) or \fBuadmin\fR(8) invocation,
 except for CPR suspend.
 .sp
 .LP
@@ -76,7 +76,7 @@ xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -92,8 +92,11 @@ Interface stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5), \fBpm\fR(7D), \fBattach\fR(9E), \fBdetach\fR(9E),
-\fBddi_prop_create\fR(9F)
+.BR pm (4D),
+.BR attributes (7),
+.BR attach (9E),
+.BR detach (9E),
+.BR ddi_prop_create (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

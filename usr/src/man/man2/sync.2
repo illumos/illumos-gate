@@ -28,12 +28,12 @@ returning.
 .sp
 .LP
 The \fBsync()\fR function should be used by applications that examine a file
-system, such as \fBfsck\fR(1M), and \fBdf\fR(1M), and is mandatory before
+system, such as \fBfsck\fR(8), and \fBdf\fR(8), and is mandatory before
 rebooting.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -49,5 +49,8 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBdf\fR(1M), \fBfsck\fR(1M), \fBfsync\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR fsync (3C),
+.BR attributes (7),
+.BR standards (7),
+.BR df (8),
+.BR fsck (8)

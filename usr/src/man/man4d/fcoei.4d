@@ -1,0 +1,67 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following
+.\" below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH FCOEI 4D "Jan 10, 2020"
+.SH NAME
+fcoei \- Fibre Channel Over Ethernet Initiator Mode Driver
+.SH SYNOPSIS
+.in +2
+.nf
+fcoei@port,0
+.fi
+.in -2
+
+.SH DESCRIPTION
+The \fBfcoei\fR driver is a pseudo device driver which encapsulates the raw
+Fibre Channel frames into FCoE ethernet frames, or decapsulates FC frames from
+FCoE ethernet frames. The supported FC frames include extended/basic link
+services, common transport frames and initiator mode FCP frames.
+.sp
+.LP
+The \fBfcoei\fR driver interfaces with the Sun Fibre Channel port driver,
+\fBfp\fR(4D), and the FCoE transport driver, \fBfcoe\fR(4D).
+.SH FILES
+.ne 2
+.na
+\fB/kernel/drv/amd64/fcoei\fR
+.ad
+.RS 27n
+Device driver (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB/kernel/drv/sparcv9/fcoei\fR
+.ad
+.RS 27n
+Device driver (SPARC)
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for a description of the following attribute:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86
+.TE
+
+.SH SEE ALSO
+.BR fcoe (4D),
+.BR fcoet (4D),
+.BR fp (4D),
+.BR driver.conf (5),
+.BR attributes (7)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIANSI X3.269-1996, Fibre Channel Protocol for SCSI (FCP)\fR

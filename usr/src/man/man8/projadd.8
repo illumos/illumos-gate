@@ -1,0 +1,314 @@
+'\" te
+.\" Copyright (c) 2018 Peter Tribble.
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PROJADD 8 "Jan 7, 2018"
+.SH NAME
+projadd \- administer a new project on the system
+.SH SYNOPSIS
+.LP
+.nf
+\fBprojadd\fR [\fB-n\fR] [\fB-f\fR \fIfilename\fR] [\fB-p\fR \fIprojid\fR [\fB-o\fR]] [\fB-c\fR \fIcomment\fR]
+     [\fB-U\fR \fIuser\fR[,\fIuser\fR]...] [\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...]
+     [\fB-K\fR \fIname\fR[=\fIvalue\fR[,\fIvalue\fR]...]]... \fIproject\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBprojadd\fR adds a new project entry to the \fB/etc/project\fR file. If the
+files backend is being used for the project database, the new project is
+available for use immediately upon the completion of the \fBprojadd\fR command.
+.SH OPTIONS
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-c\fR \fIcomment\fR\fR
+.ad
+.RS 29n
+Add a project comment. Comments are stored in the project's entry in the
+\fB/etc/project\fR file. Generally, comments contain a short description of the
+project and are used as the field for the project's full name.
+.sp
+Specify \fIcomment\fR as a text string. \fIcomment\fR cannot contain a colon
+(\fB:\fR) or NEWLINE.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fIfilename\fR\fR
+.ad
+.RS 29n
+Specify the project file to modify. If no \fIfilename\fR is specified, the
+system project file, \fB/etc/project\fR, is modified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...\fR
+.ad
+.RS 29n
+Specify a group list for the project.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-K\fR \fIname\fR[=\fIvalue\fR[,\fIvalue\fR]...]\fR
+.ad
+.RS 29n
+Specify an attribute list for the project. Multiple \fB-K\fR options can be
+specified to set values on multiple keys, such as:
+.sp
+.in +2
+.nf
+-K \fIkey1\fR=\fIvalue1\fR -K "\fIkey2\fR=(\fIvalue2a\fR),(\fIvalue2b\fR)"
+.fi
+.in -2
+
+Resource control attributes use parentheses to specify values for a key.
+Because many user shells interpret parentheses as special characters, it is
+best to enclose an argument to \fB-K\fR that contains parentheses with double
+quotes, as shown above and in EXAMPLES, below. See \fBresource_controls\fR(7)
+for a description of the resource controls you can specify for a project.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.RS 29n
+Syntax check. Check the format of the existing system project file and
+modifications only. The contents of the existing project file, such as user
+names, group names, and resources that are specified in the project attributes
+are not checked.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR\fR
+.ad
+.RS 29n
+This option allows the project ID specified by the \fB-p\fR option to be
+non-unique within the project file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIprojid\fR\fR
+.ad
+.RS 29n
+Set the project \fBID\fR of the new project.
+.sp
+Specify \fIprojid\fR as a non-negative decimal integer below \fBUID_MAX\fR as
+defined in \fBlimits.h\fR. \fIprojid\fR defaults to the next available unique
+number above the highest number currently assigned. For example, if
+\fIprojid\fRs \fB100\fR, \fB105\fR, and \fB200\fR are assigned, the next
+default \fIprojid\fR is \fB201\fR. \fIprojid\fRs between \fB0\fR-\fB99\fR are
+reserved.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-U\fR \fIuser\fR[,\fIuser\fR]...\fR
+.ad
+.RS 29n
+Specify a user list for the project.
+.RE
+
+.SH OPERANDS
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIproject\fR\fR
+.ad
+.RS 11n
+The name of the project to create. The \fIproject\fR operand is a string
+consisting of characters from the set of alphabetic characters, numeric
+characters, underline (_), and hyphen (-). The period ('.') is reserved for
+projects with special meaning to the operating system. The first character of
+the project name must be a letter. An error message is displayed if these
+restrictions are not met.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1\fR Adding a Project
+.sp
+.LP
+The following command creates the project \fBsalesaudit\fR and sets the
+resource controls specified as arguments to the \fB-K\fR option.
+
+.sp
+.in +2
+.nf
+projadd -p 111 -G sales,finance -c "Auditing Project" \e
+   -K "rcap.max-rss=10GB" \e
+   -K "process.max-file-size=(priv,50MB,deny)" \e
+   -K "task.max-lwps=(priv,100,deny)" salesaudit
+.fi
+.in -2
+
+.sp
+.LP
+This command would produce the following entry in \fB/etc/project\fR:
+
+.sp
+.in +2
+.nf
+salesaudit:111:Auditing Project::sales,finance: \e
+process.max-file-size=(priv,52428800,deny); \e
+rcap.max-rss=10737418240;task.max-lwps=(priv,100,deny)
+.fi
+.in -2
+
+.sp
+.LP
+Note that the preceding would appear as one line in \fB/etc/project\fR.
+
+.sp
+.LP
+Comparing the \fBprojadd\fR command and resulting output in \fB/etc/project\fR,
+note the effect of the scaling factor in the resource cap
+(\fBrcap.max-rss=10GB\fR) and the resource control
+(\fBprocess.max-file-size=(priv,50MB,deny)\fR). Modifiers, such as B, KB, and
+MB, and scaling factors are specified in \fBresource_controls\fR(7).
+
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 6n
+The command syntax was invalid. A usage message for \fBprojadd\fR is displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 6n
+An invalid argument was provided to an option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 6n
+The \fIprojid\fR given with the \fB-p\fR option is already in use.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB5\fR\fR
+.ad
+.RS 6n
+The project files contain an error. See \fBproject\fR(5).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB6\fR\fR
+.ad
+.RS 6n
+The project to be added, group, user, or resource does not exist.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB9\fR\fR
+.ad
+.RS 6n
+The project is already in use.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB10\fR\fR
+.ad
+.RS 6n
+Cannot update the \fB/etc/project\fR file.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/project\fR\fR
+.ad
+.RS 16n
+System project file
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	See below.
+.TE
+
+.sp
+.LP
+Invocation is evolving. Human readable output is unstable.
+.SH SEE ALSO
+.LP
+.BR projects (1),
+.BR project (5),
+.BR attributes (7),
+.BR resource_controls (7),
+.BR groupadd (8),
+.BR groupdel (8),
+.BR groupmod (8),
+.BR grpck (8),
+.BR projdel (8),
+.BR projmod (8),
+.BR useradd (8),
+.BR userdel (8),
+.BR usermod (8)
+.SH NOTES
+.LP
+In case of an error, \fBprojadd\fR prints an error message and exits with a
+non-zero status.
+.sp
+.LP
+\fBprojadd\fR adds a project definition only on the local system. If a network
+name service is being used to supplement the local
+\fB/etc/project\fR file with additional entries, \fBprojadd\fR cannot change
+information supplied by the network name service.

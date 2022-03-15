@@ -125,7 +125,7 @@ extern Dl_amd64_unwindinfo  *dlamd64getunwind(void *, Dl_amd64_unwindinfo *);
 #endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 
 /*
- * Valid values for handle argument to dlsym(3x).
+ * Valid values for handle argument to dlsym(3C).
  */
 #define	RTLD_NEXT		(void *)-1	/* look in `next' dependency */
 #define	RTLD_DEFAULT		(void *)-2	/* look up symbol from scope */

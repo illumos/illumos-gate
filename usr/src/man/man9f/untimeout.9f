@@ -122,8 +122,11 @@ xxcheckcond(struct xxstate *xsp)
 .SH SEE ALSO
 .sp
 .LP
-\fBopen\fR(9E), \fBcv_signal\fR(9F), \fBcv_wait_sig\fR(9F), \fBdelay\fR(9F),
-\fBtimeout\fR(9F)
+.BR open (9E),
+.BR cv_signal (9F),
+.BR cv_wait_sig (9F),
+.BR delay (9F),
+.BR timeout (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -374,7 +374,7 @@ apd_alloc(const char *ap_id, cfga_flags_t flags, char **errstring,
 }
 
 /*
- * The type field is defined to be parsable by cfgadm(1M): It
+ * The type field is defined to be parsable by cfgadm(8): It
  * must not contain white space characters. This function
  * converts white space to underscore.
  */

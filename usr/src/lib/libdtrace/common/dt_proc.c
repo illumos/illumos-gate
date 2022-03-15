@@ -34,7 +34,7 @@
  * This file provides a set of routines that permit libdtrace and its clients
  * to create and grab process handles using libproc, and to share these handles
  * between library mechanisms that need libproc access, such as ustack(), and
- * client mechanisms that need libproc access, such as dtrace(1M) -c and -p.
+ * client mechanisms that need libproc access, such as dtrace(8) -c and -p.
  * The library provides several mechanisms in the libproc control layer:
  *
  * Reference Counting: The library code and client code can independently grab

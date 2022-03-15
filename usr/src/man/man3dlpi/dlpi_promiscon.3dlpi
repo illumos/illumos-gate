@@ -38,7 +38,7 @@
 .Sh DESCRIPTION
 .Fn dlpi_promiscon
 enables promiscuous mode on a
-.Xr dlpi 7P
+.Xr dlpi 4P
 link instance associated with a DLPI handle
 .Fa dh ,
 at the specified
@@ -52,7 +52,7 @@ This operation can be performed in any DLPI state of a handle.
 .Pp
 .Fn dlpi_promiscoff
 disables promiscuous mode on a
-.Xr dlpi 7P
+.Xr dlpi 4P
 link instance associated with DLPI handle
 .Fa dh ,
 at the specified level.
@@ -107,5 +107,5 @@ Operation timed out
 .Sy Safe
 .Sh SEE ALSO
 .Xr libdlpi 3LIB ,
-.Xr attributes 5 ,
-.Xr dlpi 7P
+.Xr dlpi 4P ,
+.Xr attributes 7

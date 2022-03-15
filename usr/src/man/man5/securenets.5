@@ -1,0 +1,177 @@
+'\" te
+.\" Copyright (C) 2000, Sun Microsystems,
+.\" Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SECURENETS 5 "May 16, 2020"
+.SH NAME
+securenets \- configuration file for NIS security
+.SH SYNOPSIS
+.nf
+\fB/var/yp/securenets\fR
+.fi
+
+.SH DESCRIPTION
+The  \fB/var/yp/securenets\fR file defines the networks or hosts which are
+allowed access to information by the Network Information Service ("\fBNIS\fR").
+.sp
+.LP
+The format of the file is as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Lines beginning with the ``#'' character are treated as comments.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Otherwise, each line contains two fields separated by white space.  The first
+field is a netmask, the second a network.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The netmask field may be either \fB255.255.255.255\fR (IPv4),
+\fBffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff\fR (IPv6) , or the string ``host''
+indicating that the second field is a specific host to be allowed access.
+.RE
+.sp
+.LP
+Both \fBypserv\fR(8) and \fBypxfrd\fR(8) use the \fB/var/yp/securenets\fR
+file.  The file is read when the  \fBypserv\fR(8) and \fBypxfrd\fR(8) daemons
+begin. If \fB/var/yp/securenets\fR is present, \fBypserv\fR(8) and
+\fBypxfrd\fR(8) respond only to \fBIP\fR addresses in the range given. In
+order for a change in the \fB/var/yp/securenets\fR file to take effect, you
+must kill and restart any active daemons using \fBypstop\fR(8) and
+\fBypstart\fR(8).
+.sp
+.LP
+An important thing to note for all the examples below is that the server must
+be allowed to access itself. You accomplish this either by the server being
+part of a subnet that is allowed to access the server, or by adding an
+individual entry, as the following:
+.sp
+.in +2
+.nf
+hosts 127.0.0.1
+.fi
+.in -2
+.sp
+
+.SH EXAMPLES
+\fBExample 1 \fRAccess for Individual Entries
+.sp
+.LP
+If individual machines are to be give access, the entry could be:
+
+.sp
+.in +2
+.nf
+255.255.255.255	192.9.1.20
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+host	192.0.1.20
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRAccess for a Class C Network
+.sp
+.LP
+If access is to be given to an entire class C network, the entry could be:
+
+.sp
+.in +2
+.nf
+255.255.255.0	192.9.1.0
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRAccess for a Class B Network
+.sp
+.LP
+The entry for access to a class B network could be:
+
+.sp
+.in +2
+.nf
+255.255.0.0	9.9.0.0
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRAccess for an Individual IPv6 Address
+.sp
+.LP
+Similarly, to allow access for an individual IPv6 address:
+
+.sp
+.in +2
+.nf
+ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff  fec0::111:abba:ace0:fba5e:1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+
+.sp
+.in +2
+.nf
+host  fec0::111:abba:ace0:fba5e:1
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRAccess for all IPv6 Addresses Starting with fe80
+.sp
+.LP
+To allow access for all IPv6 addresses starting with fe80:
+
+.sp
+.in +2
+.nf
+ffff::  fe80::
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/var/yp/securenets\fR\fR
+.ad
+.RS 22n
+Configuration file for \fBNIS\fR security.
+.RE
+
+.SH SEE ALSO
+.BR ypserv (8),
+.BR ypstart (8),
+.BR ypstop (8),
+.BR ypxfrd (8)
+.SH NOTES
+The Network Information Service (NIS) was formerly known as Sun Yellow Pages
+(YP).  The functionality of the two remains the same; only the name has
+changed. The name Yellow Pages is a registered trademark in the United Kingdom
+of British Telecommunications plc, and may not be used without permission.

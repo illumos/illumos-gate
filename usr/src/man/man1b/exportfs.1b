@@ -24,8 +24,8 @@ With no options or arguments, \fBexportfs\fR invokes \fBshare\fR to print out
 the list of all currently shared \fBNFS\fR filesystems.
 .sp
 .LP
-\fBexportfs\fR is the BSD/Compatibility Package command of \fBshare\fR(1M) and
-\fBunshare\fR(1M). Use  \fBshare\fR(1M)/ \fBunshare\fR(1M) whenever possible.
+\fBexportfs\fR is the BSD/Compatibility Package command of \fBshare\fR(8) and
+\fBunshare\fR(8). Use  \fBshare\fR(8)/ \fBunshare\fR(8) whenever possible.
 .SH OPTIONS
 .sp
 .ne 2
@@ -33,8 +33,8 @@ the list of all currently shared \fBNFS\fR filesystems.
 \fB\fB-a\fR\fR
 .ad
 .RS 14n
-Invokes \fBshareall\fR(1M), or if \fB-u\fR is specified, invokes
-\fBunshareall\fR(1M).
+Invokes \fBshareall\fR(8), or if \fB-u\fR is specified, invokes
+\fBunshareall\fR(8).
 .RE
 
 .sp
@@ -52,7 +52,7 @@ Ignore options in \fB/etc/dfs/dfstab\fR.
 \fB\fB-u\fR\fR
 .ad
 .RS 14n
-Invokes \fBunshare\fR(1M) on \fIpathname\fR.
+Invokes \fBunshare\fR(8) on \fIpathname\fR.
 .RE
 
 .sp
@@ -72,12 +72,15 @@ Verbose.
 .RS 14n
 Specify a comma-separated list of optional characteristics for the filesystems
 being exported. \fBexportfs\fR translates \fIoptions\fR to
-\fBshare\fR-equivalent options. (see \fBshare\fR(1M) for information about
+\fBshare\fR-equivalent options. (see \fBshare\fR(8) for information about
 individual options).
 .RE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBshare\fR(1M), \fBshareall\fR(1M), \fBunshare\fR(1M), \fBunshareall\fR(1M),
-\fBattributes\fR(5)
+.BR attributes (7),
+.BR share (8),
+.BR shareall (8),
+.BR unshare (8),
+.BR unshareall (8)

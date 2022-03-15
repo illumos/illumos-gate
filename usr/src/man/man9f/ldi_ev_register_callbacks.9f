@@ -511,5 +511,7 @@ dgrd_finalize(ldi_handle_t lh, ldi_ev_cookie_t off_cookie,
 .in -2
 
 .SH SEE ALSO
-\fBldi_ev_finalize\fR(9F), \fBldi_ev_get_cookie\fR(9F),
-\fBldi_ev_notify\fR(9F), \fBldi_ev_remove_callbacks\fR(9F)
+.BR ldi_ev_finalize (9F),
+.BR ldi_ev_get_cookie (9F),
+.BR ldi_ev_notify (9F),
+.BR ldi_ev_remove_callbacks (9F)

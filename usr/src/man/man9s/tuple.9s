@@ -213,14 +213,22 @@ the \fBDesiredTuple\fR field is returned.
 .RE
 
 .SH SEE ALSO
-\fBcsx_GetFirstTuple\fR(9F), \fBcsx_GetTupleData\fR(9F),
-\fBcsx_ParseTuple\fR(9F), \fBcsx_Parse_CISTPL_BATTERY\fR(9F),
-\fBcsx_Parse_CISTPL_BYTEORDER\fR(9F), \fBcsx_Parse_CISTPL_CFTABLE_ENTRY\fR(9F),
-\fBcsx_Parse_CISTPL_CONFIG\fR(9F), \fBcsx_Parse_CISTPL_DATE\fR(9F),
-\fBcsx_Parse_CISTPL_DEVICE\fR(9F), \fBcsx_Parse_CISTPL_FUNCE\fR(9F),
-\fBcsx_Parse_CISTPL_FUNCID\fR(9F), \fBcsx_Parse_CISTPL_JEDEC_C\fR(9F),
-\fBcsx_Parse_CISTPL_MANFID\fR(9F), \fBcsx_Parse_CISTPL_SPCL\fR(9F),
-\fBcsx_Parse_CISTPL_VERS_1\fR(9F), \fBcsx_Parse_CISTPL_VERS_2\fR(9F)
+.BR csx_GetFirstTuple (9F),
+.BR csx_GetTupleData (9F),
+.BR csx_ParseTuple (9F),
+.BR csx_Parse_CISTPL_BATTERY (9F),
+.BR csx_Parse_CISTPL_BYTEORDER (9F),
+.BR csx_Parse_CISTPL_CFTABLE_ENTRY (9F),
+.BR csx_Parse_CISTPL_CONFIG (9F),
+.BR csx_Parse_CISTPL_DATE (9F),
+.BR csx_Parse_CISTPL_DEVICE (9F),
+.BR csx_Parse_CISTPL_FUNCE (9F),
+.BR csx_Parse_CISTPL_FUNCID (9F),
+.BR csx_Parse_CISTPL_JEDEC_C (9F),
+.BR csx_Parse_CISTPL_MANFID (9F),
+.BR csx_Parse_CISTPL_SPCL (9F),
+.BR csx_Parse_CISTPL_VERS_1 (9F),
+.BR csx_Parse_CISTPL_VERS_2 (9F)
 .sp
 .LP
 \fIPC Card 95 Standard\fR,  PCMCIA/JEIDA

@@ -45,7 +45,7 @@ depends on it.
 2. Running this Unit Test Suite
 
 The pre-requisites for running the this Unit Test Suite are:
-	- A non-root user with the ability to sudo(1M) to root without a
+	- A non-root user with the ability to sudo(8) to root without a
 	  password or the root user must run the test.
 	    (The samlogon test requires a user with 'solaris.smf.read.smb'
 	    authorization, such as root.)

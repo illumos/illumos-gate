@@ -1,0 +1,142 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH VR 4D "May 5, 2009"
+.SH NAME
+vr \- driver for VIA Rhine fast Ethernet controllers
+.SH DESCRIPTION
+.sp
+.LP
+The \fBvr\fR Fast Ethernet driver is GLD based and supporting the VIA Rhine
+family of Fast Ethernet adapters:
+.sp
+.in +2
+.nf
+pci1106,3043 VIA VT86C100A Fast Ethernet
+pci1106,3065 VT6102 VIA Rhine II
+pci1106,3106 VT6105 VIA Rhine III
+pci1106,3053 VT6105 VIA Rhine III Management Adapter
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBvr\fR driver supports IEEE 802.3 auto-negotiation, flow control and VLAN
+tagging.
+.SS "Configuration"
+.sp
+.LP
+The default configuration is \fBautonegotiation\fR with bidirectional flow
+control. The advertised capabilities for \fBautonegotiation\fR are based on the
+capabilities of the PHY.
+.sp
+.LP
+You can set the capabilities advertised by the \fBvr\fR controlled device using
+\fBdladm\fR(8). The driver supports a number of parameters, the names of which
+begin with \fBen_\fR (enabled). Each of these boolean parameters determines if
+the device advertises that mode of operation when the hardware supports it.
+.sp
+.LP
+The \fBadv_autoneg_cap\fR parameter controls whether auto-negotiation is
+performed. If \fBadv_autoneg_cap\fR is 0, the driver selects the speed/duplex
+combination from the first non-zero parameter from this list:
+.sp
+.in +2
+.nf
+en_100fdx_cap     100Mbps full duplex
+en_100hdx_cap     100Mbps half duplex
+en_10fdx_cap      10Mbps full duplex
+en_10hdx_cap      10Mbps half duplex
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+All capabilities default to enabled. Changing any capability parameter causes
+the link to go down while the link partners renegotiate the link using the
+newly changed capabilities.
+.SS "Limitations"
+.sp
+.LP
+The \fBvr\fR driver does not support asymmetric \fBflowcontrol\fR. VT86C100A
+and Rhine II adapters are not capable of transmitting \fBflowcontrol\fR
+messages
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/vr\fR\fR
+.ad
+.RS 26n
+Special character device
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/vr\fR\fR
+.ad
+.RS 26n
+32-bit device driver (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/vr\fR\fR
+.ad
+.RS 26n
+64-bit device driver (SPARC)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/vr\fR\fR
+.ad
+.RS 26n
+64-bit device driver (x86)
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR streamio (4I),
+.BR dlpi (4P),
+.BR driver.conf (5),
+.BR attributes (7),
+.BR ieee802.3 (7),
+.BR dladm (8),
+.BR netstat (8)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programmer's Guide\fR
+.sp
+.LP
+\fINetwork Interfaces Programmer's Guide\fR
+.sp
+.LP
+\fIIEEE 802.3ae Specification - 2002\fR

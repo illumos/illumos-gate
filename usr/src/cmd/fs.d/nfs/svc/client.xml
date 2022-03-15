@@ -136,7 +136,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='mount_nfs' section='1M'
+			<manpage title='mount_nfs' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

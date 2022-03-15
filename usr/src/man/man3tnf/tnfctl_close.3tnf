@@ -101,7 +101,7 @@ An internal error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -117,7 +117,13 @@ MT Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBprex\fR(1), \fBprun\fR(1), \fBTNF_PROBE\fR(3TNF), \fBlibtnfctl\fR(3TNF),
-\fBtnfctl_exec_open\fR(3TNF), \fBtnfctl_indirect_open\fR(3TNF),
-\fBtnfctl_kernel_open\fR(3TNF), \fBtnfctl_pid_open\fR(3TNF),
-\fBtracing\fR(3TNF), \fBattributes\fR(5)
+.BR prex (1),
+.BR prun (1),
+.BR TNF_PROBE (3TNF),
+.BR libtnfctl (3TNF),
+.BR tnfctl_exec_open (3TNF),
+.BR tnfctl_indirect_open (3TNF),
+.BR tnfctl_kernel_open (3TNF),
+.BR tnfctl_pid_open (3TNF),
+.BR tracing (3TNF),
+.BR attributes (7)

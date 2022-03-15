@@ -76,7 +76,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='ldmad' section='1M'
+			<manpage title='ldmad' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

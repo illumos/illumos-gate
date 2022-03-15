@@ -65,7 +65,7 @@ extern "C" {
  * Input buffer size limits maximum line length for both file parsing and
  * interactive mode. 4K chars should be enough even for broad commands and
  * all possible key lenghts of today's symmetric ciphers entered via
- * ipseckey(1M) which has the most bifurcated grammar from all IPsec commands.
+ * ipseckey(8) which has the most bifurcated grammar from all IPsec commands.
  */
 #define	IBUF_SIZE	4096
 
@@ -128,7 +128,7 @@ typedef struct keywdtab {
  * when a program needs to exit because of an error. These exit_types
  * are used in macros, defined later in this file, which call ipsecutil_exit().
  * What happens when ipsecutil_exit() may differ if the command was started
- * on the command line or via smf(5), See ipsecutil_exit() source for details.
+ * on the command line or via smf(7), See ipsecutil_exit() source for details.
  *
  * Note: The calling function should decide what "debug mode" is before calling
  * ipsecutil_exit() with DEBUG_FATAL.
@@ -138,10 +138,10 @@ typedef enum exit_type {
 	SERVICE_DEGRADE,	/* A hint that service should be degraded. */
 	SERVICE_BADPERM,	/* A Permission error occured. */
 	SERVICE_BADCONF,	/* Misconfiguration. */
-	SERVICE_MAINTAIN,	/* smf(5) to put service in maintenance mode. */
-	SERVICE_DISABLE,	/* Tell smf(5) to disable me. */
+	SERVICE_MAINTAIN,	/* smf(7) to put service in maintenance mode. */
+	SERVICE_DISABLE,	/* Tell smf(7) to disable me. */
 	SERVICE_FATAL,		/* Whatever happened is not fixable. */
-	SERVICE_RESTART,	/* Tell smf(5) to restart the service. */
+	SERVICE_RESTART,	/* Tell smf(7) to restart the service. */
 	DEBUG_FATAL		/* Exit in debug mode. */
 } exit_type_t;
 

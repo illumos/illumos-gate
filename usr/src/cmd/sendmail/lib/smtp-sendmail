@@ -82,7 +82,7 @@ case "$1" in
 	# "s1:c1.1,c1.2        s2:c2.1 s3:c3.1,c3.2,c3.3"
 	# i.e., white-space separated groups of server:client where
 	# client can be one or more comma-separated names; N.B. that
-	# the :client part is optional; see etrn(1M) for details.
+	# the :client part is optional; see etrn(8) for details.
 	# server is the name of the server to prod; a mail queue run
 	# is requested for each client name.  This is comparable to
 	# running "/usr/lib/sendmail -qRclient" on the host server.

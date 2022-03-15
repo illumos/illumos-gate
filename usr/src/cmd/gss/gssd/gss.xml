@@ -93,7 +93,7 @@
 		<propval name='endpoint_type' type='astring' value='tli' />
 		<propval name='name' type='astring' value='100234' />
 		<propval name='proto' type='astring' value='ticotsord' />
-        	<propval name='isrpc' type='boolean' value='true' />
+		<propval name='isrpc' type='boolean' value='true' />
 		<propval name='rpc_low_version' type='integer' value='1' />
 		<propval name='rpc_high_version' type='integer' value='1' />
 		<propval name='wait' type='boolean' value='true' />
@@ -108,7 +108,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='gssd' section='1M'
+			<manpage title='gssd' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

@@ -141,7 +141,7 @@ _file_put_printer(const char *file, const ns_printer_t *printer)
 		(void) fprintf(ofp,
 	"#\n#\tIf you hand edit this file, comments and structure may change.\n"
 	"#\tThe preferred method of modifying this file is through the use of\n"
-	"#\tlpset(1M)\n#\n");
+	"#\tlpset(8)\n#\n");
 
 	/*
 	 * Handle the special case of lpset -x all

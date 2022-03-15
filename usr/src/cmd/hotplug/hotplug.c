@@ -1208,7 +1208,7 @@ print_error(int error)
 		(void) fprintf(stderr,
 		    gettext("ERROR: there are no connections to display.\n"));
 		(void) fprintf(stderr,
-		    gettext("(See hotplug(1m) for more information.)\n"));
+		    gettext("(See hotplug(8) for more information.)\n"));
 		break;
 	case ENXIO:
 		(void) fprintf(stderr,

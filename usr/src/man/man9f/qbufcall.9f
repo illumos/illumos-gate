@@ -93,8 +93,12 @@ is returned.
 The \fBqbufcall()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-\fBallocb\fR(9F), \fBmt-streams\fR(9F), \fBqprocson\fR(9F), \fBqtimeout\fR(9F),
-\fBqunbufcall\fR(9F), \fBquntimeout\fR(9F)
+.BR allocb (9F),
+.BR mt-streams (9F),
+.BR qprocson (9F),
+.BR qtimeout (9F),
+.BR qunbufcall (9F),
+.BR quntimeout (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

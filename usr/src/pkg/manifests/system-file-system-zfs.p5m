@@ -137,14 +137,14 @@ file path=usr/sbin/zdb mode=0555
 link path=usr/sbin/zfs target=../../sbin/zfs
 link path=usr/sbin/zpool target=../../sbin/zpool
 file path=usr/sbin/zstreamdump mode=0555
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/zdb.1m
-file path=usr/share/man/man1m/zfs-program.1m
-file path=usr/share/man/man1m/zfs.1m
-file path=usr/share/man/man1m/zpool.1m
-file path=usr/share/man/man1m/zstreamdump.1m
-file path=usr/share/man/man1m/ztest.1m
-file path=usr/share/man/man5/zpool-features.5
+file path=usr/share/man/man7/zpool-features.7
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/zdb.8
+file path=usr/share/man/man8/zfs-program.8
+file path=usr/share/man/man8/zfs.8
+file path=usr/share/man/man8/zpool.8
+file path=usr/share/man/man8/zstreamdump.8
+file path=usr/share/man/man8/ztest.8
 driver name=zfs perms="* 0600 root sys" perms="zfs 0666 root sys"
 legacy pkg=SUNWzfskr desc="ZFS kernel root components" name="ZFS Kernel (Root)"
 legacy pkg=SUNWzfsr desc="ZFS root components" name="ZFS (Root)"

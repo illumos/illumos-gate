@@ -123,7 +123,7 @@ static int smbadm_user_delete(int, char **);
 static int smbadm_user_disable(int, char **);
 static int smbadm_user_enable(int, char **);
 
-/* Please keep the order consistent with smbadm(1M) man page */
+/* Please keep the order consistent with smbadm(8) man page */
 static smbadm_cmdinfo_t smbadm_cmdtable[] =
 {
 	{ "create",		smbadm_group_create,	HELP_CREATE,

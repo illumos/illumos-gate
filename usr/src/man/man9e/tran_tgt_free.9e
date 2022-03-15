@@ -69,8 +69,12 @@ should release any resources allocated during its \fBtran_tgt_init()\fR or
 \fBtran_tgt_probe()\fR initialization performed for this target device
 instance.
 .SH SEE ALSO
-\fBattach\fR(9E), \fBdetach\fR(9E), \fBtran_tgt_init\fR(9E),
-\fBtran_tgt_probe\fR(9E), \fBscsi_device\fR(9S), \fBscsi_hba_tran\fR(9S)
+.BR attach (9E),
+.BR detach (9E),
+.BR tran_tgt_init (9E),
+.BR tran_tgt_probe (9E),
+.BR scsi_device (9S),
+.BR scsi_hba_tran (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -141,7 +141,7 @@ locale database directory for \fIlocale\fR
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -162,10 +162,20 @@ MT-Level	MT-Safe with exceptions
 .sp
 .LP
 \fBlocale\fR(1), \fBctype\fR(3C), \fBgetdate\fR(3C) \fBgettext\fR(3C),
-\fBgettxt\fR(3C), \fBisdigit\fR(3C), \fBlibc\fR(3LIB), \fBlocaleconv\fR(3C),
-\fBmbtowc\fR(3C), \fBstrcoll\fR(3C), \fBstrftime\fR(3C), \fBstrptime\fR(3C)
-\fBstrxfrm\fR(3C) \fBtolower\fR(3C), \fBwctomb\fR(3C), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBlocale\fR(5), \fBstandards\fR(5)
+.BR gettxt (3C),
+.BR isdigit (3C),
+.BR libc (3LIB),
+.BR localeconv (3C),
+.BR mbtowc (3C),
+.BR strcoll (3C),
+.BR strftime (3C),
+.BR strptime (3C)
+\fBstrxfrm\fR(3C) \fBtolower\fR(3C),
+.BR wctomb (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR locale (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP

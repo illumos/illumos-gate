@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 #include <sys/callb.h>
 #include <sys/fcntl.h>
@@ -53,7 +51,7 @@ static void		logit_flush(void *);
  * NL7C reuses the NCA logging scheme, the directory "/var/nca" contains
  * the symlink "current" to 1 of up to 16 NCA BLF logging files, by default
  * a single logging file "log", optionally paths of up to 16 log files can
- * be specified via ncalogd.conf(4), note that these log files need not be
+ * be specified via ncalogd.conf(5), note that these log files need not be
  * in the "/var/nca" directory.
  *
  * NL7C reuses the NCA logging APIs defined in <inet/nca/ncalogd.h>, at

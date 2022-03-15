@@ -1,0 +1,234 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SMF_SECURITY 7 "May 13, 2017"
+.SH NAME
+smf_security \- service management facility security behavior
+.SH DESCRIPTION
+.LP
+The configuration subsystem for the service management facility, \fBsmf\fR(7),
+requires privilege to modify the configuration of a service. Privileges are
+granted to a user by associating the authorizations described below to the user
+through \fBuser_attr\fR(5) and \fBprof_attr\fR(5). See \fBrbac\fR(7).
+.sp
+.LP
+The following authorization is used to manipulate services and service
+instances.
+.sp
+.ne 2
+.na
+\fB\fBsolaris.smf.modify\fR\fR
+.ad
+.RS 22n
+Authorized to add, delete, or modify services, service instances, or their
+properties, and to read protected property values.
+.RE
+
+.SS "Property Group Authorizations"
+.LP
+The \fBsmf\fR(7) configuration subsystem associates properties with each
+service and service instance. Related properties are grouped. Groups can
+represent an execution method, credential information, application data, or
+restarter state. The ability to create or modify property groups can cause
+\fBsmf\fR(7) components to perform actions that can require operating system
+privilege. Accordingly, the framework requires appropriate authorization to
+manipulate property groups.
+.sp
+.LP
+Each property group has a type corresponding to its purpose. The core property
+group types are \fBmethod\fR, \fBdependency\fR, \fBapplication\fR, and
+\fBframework\fR. Additional property group types can be introduced, provided
+they conform to the extended naming convention in \fBsmf\fR(7). The following
+basic authorizations, however, apply only to the core property group types:
+.sp
+.ne 2
+.na
+\fB\fBsolaris.smf.modify.method\fR\fR
+.ad
+.sp .6
+.RS 4n
+Authorized to change values or create, delete, or modify a property group of
+type \fBmethod\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsolaris.smf.modify.dependency\fR\fR
+.ad
+.sp .6
+.RS 4n
+Authorized to change values or create, delete, or modify a property group of
+type \fBdependency\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsolaris.smf.modify.application\fR\fR
+.ad
+.sp .6
+.RS 4n
+Authorized to change values, read protected values, and create, delete, or
+modify a property group of type application.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsolaris.smf.modify.framework\fR\fR
+.ad
+.sp .6
+.RS 4n
+Authorized to change values or create, delete, or modify a property group of
+type \fBframework\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsolaris.smf.modify\fR\fR
+.ad
+.sp .6
+.RS 4n
+Authorized to add, delete, or modify services, service instances, or their
+properties, and to read protected property values.
+.RE
+
+.sp
+.LP
+Property group-specific authorization can be specified by properties contained
+in the property group.
+.sp
+.ne 2
+.na
+\fB\fBmodify_authorization\fR\fR
+.ad
+.RS 24n
+Authorizations allow the addition, deletion, or modification of properties
+within the property group, and the retrieval of property values from the
+property group if protected.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBvalue_authorization\fR\fR
+.ad
+.RS 24n
+Authorizations allow changing the values of any property of the property group
+except \fBmodify_authorization\fR, and the retrieval of any property values
+except modify_authorization from the property group if protected.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBread_authorization\fR\fR
+.ad
+.RS 24n
+Authorizations allow the retrieval of property values within the property
+group. The presence of a string-valued property with this name identifies the
+containing property group as protected. This property has no effect on property
+groups of types other than application. See \fBProtected Property Groups\fR.
+.RE
+
+.sp
+.LP
+The above authorization properties are only used if they have type
+\fBastring\fR. If an instance property group does not have one of the
+properties, but the instance's service has a property group of the same name
+with the property, its values are used.
+.SS "Protected Property Groups"
+.LP
+Normally, all property values in the repository can be read by any user without
+explicit authorization. Property groups of non-framework types can be used to
+store properties with values that require protection. They must not be revealed
+except upon proper authorization. A property group's status as protected is
+indicated by the presence of a string-valued \fBread_authorization\fR property.
+If this property is present, the values of all properties in the property group
+is retrievable only as described in \fBProperty Group Authorizations\fR.
+.sp
+.LP
+Administrative domains with policies that prohibit backup of data considered
+sensitive should exclude the SMF repository databases from their backups. In
+the face of such a policy, non-protected property values can be backed up by
+using the \fBsvccfg\fR(8) archive command to create an archive of the
+repository without protected property values.
+.SS "Service Action Authorization"
+.LP
+Certain actions on service instances can result in service interruption or
+deactivation. These actions require an authorization to ensure that any denial
+of service is a deliberate administrative action. Such actions include a
+request for execution of the refresh or restart methods, or placement of a
+service instance in the maintenance or other non-operational state. The
+following authorization allows such actions to be requested:
+.sp
+.ne 2
+.na
+\fB\fBsolaris.smf.manage\fR\fR
+.ad
+.RS 22n
+Authorized to request restart, refresh, or other state modification of any
+service instance.
+.RE
+
+.sp
+.LP
+In addition, the \fBgeneral/action_authorization\fR property can specify
+additional authorizations that permit service actions to be requested for that
+service instance. The \fBsolaris.smf.manage\fR authorization is required to
+modify this property.
+.SS "Defined Rights Profiles"
+.LP
+Two rights profiles are included that offer grouped authorizations for
+manipulating typical \fBsmf\fR(7) operations.
+.sp
+.ne 2
+.na
+\fBService Management\fR
+.ad
+.RS 22n
+A service manager can manipulate any service in the repository in any way. It
+corresponds to the \fBsolaris.smf.manage\fR and \fBsolaris.smf.modify\fR
+authorizations.
+.RE
+
+.sp
+.ne 2
+.na
+\fBService Operator\fR
+.ad
+.RS 22n
+A service operator has the ability to enable or disable any service instance on
+the system, as well as request that its restart or refresh method be executed.
+It corresponds to the \fBsolaris.smf.manage\fR and
+\fBsolaris.smf.modify.framework\fR authorizations.
+.sp
+Sites can define additional rights profiles customized to their needs.
+.RE
+
+.SS "Remote Repository Modification"
+.LP
+Remote repository servers can deny modification attempts due to additional
+privilege checks. See NOTES.
+.SH SEE ALSO
+.LP
+.BR auths (1),
+.BR profiles (1),
+.BR prof_attr (5),
+.BR user_attr (5),
+.BR rbac (7),
+.BR smf (7),
+.BR svccfg (8)
+.SH NOTES
+.LP
+The present version of \fBsmf\fR(7) does not support remote repositories.
+.sp
+.LP
+When a service is configured to be started as root but with privileges
+different from \fBlimit_privileges\fR, the resulting process is privilege
+aware.  This can be surprising to developers who expect \fBseteuid(<non-zero
+UID>)\fR to reduce privileges to basic or less.

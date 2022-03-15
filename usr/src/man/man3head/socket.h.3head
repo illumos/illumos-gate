@@ -712,7 +712,7 @@ in \fBread\fR(2). The \fImsg_accrights\fR parameter specifies the buffer in
 which access rights sent along with the message are received. The
 \fImsg_accrightslen\fR specifies the length of the buffer.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -726,18 +726,43 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-\fBaccept\fR(3SOCKET), \fBaccept\fR(3XNET), \fBbind\fR(3SOCKET),
-\fBbind\fR(3XNET), \fBconnect\fR(3SOCKET), \fBconnect\fR(3XNET),
-\fBgetpeername\fR(3SOCKET), \fBgetpeername\fR(3XNET), \fBgetpeerucred\fR(3C),
-\fBgetsockname\fR(3SOCKET), \fBgetsockname\fR(3XNET),
-\fBgetsockopt\fR(3SOCKET), \fBgetsockopt\fR(3XNET), \fBlibsocket\fR(3LIB),
-\fBlisten\fR(3SOCKET), \fBlisten\fR(3XNET), \fBrecv\fR(3SOCKET),
-\fBrecv\fR(3XNET), \fBrecvfrom\fR(3SOCKET), \fBrecvfrom\fR(3XNET),
-\fBrecvmsg\fR(3SOCKET), \fBrecvmsg\fR(3XNET), \fBsend\fR(3SOCKET),
-\fBsend\fR(3XNET), \fBsendmsg\fR(3SOCKET), \fBsendmsg\fR(3XNET),
-\fBsendto\fR(3SOCKET), \fBsendto\fR(3XNET), \fBsetsockopt\fR(3SOCKET),
-\fBsetsockopt\fR(3XNET), \fBshutdown\fR(3SOCKET), \fBshutdown\fR(3XNET),
-\fBsockaddr\fR(3SOCKET),
-\fBsocket\fR(3SOCKET), \fBsocket\fR(3XNET), \fBsocketpair\fR(3SOCKET),
-\fBsocketpair\fR(3XNET), \fBucred_get\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR getpeerucred (3C),
+.BR ucred_get (3C),
+.BR libsocket (3LIB),
+.BR accept (3SOCKET),
+.BR bind (3SOCKET),
+.BR connect (3SOCKET),
+.BR getpeername (3SOCKET),
+.BR getsockname (3SOCKET),
+.BR getsockopt (3SOCKET),
+.BR listen (3SOCKET),
+.BR recv (3SOCKET),
+.BR recvfrom (3SOCKET),
+.BR recvmsg (3SOCKET),
+.BR send (3SOCKET),
+.BR sendmsg (3SOCKET),
+.BR sendto (3SOCKET),
+.BR setsockopt (3SOCKET),
+.BR shutdown (3SOCKET),
+.BR sockaddr (3SOCKET),
+.BR socket (3SOCKET),
+.BR socketpair (3SOCKET),
+.BR accept (3XNET),
+.BR bind (3XNET),
+.BR connect (3XNET),
+.BR getpeername (3XNET),
+.BR getsockname (3XNET),
+.BR getsockopt (3XNET),
+.BR listen (3XNET),
+.BR recv (3XNET),
+.BR recvfrom (3XNET),
+.BR recvmsg (3XNET),
+.BR send (3XNET),
+.BR sendmsg (3XNET),
+.BR sendto (3XNET),
+.BR setsockopt (3XNET),
+.BR shutdown (3XNET),
+.BR socket (3XNET),
+.BR socketpair (3XNET),
+.BR attributes (7),
+.BR standards (7)

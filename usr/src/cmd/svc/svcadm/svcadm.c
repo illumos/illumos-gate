@@ -167,7 +167,7 @@ usage()
 	"\t%1$s clear [<service> ...]\t\t- clear maintenance state\n"
 	"\t%1$s milestone [-d] <milestone>\t- advance to a service milestone\n"
 	"\n\t"
-	"Services can be specified using an FMRI, abbreviation, or fnmatch(5)\n"
+	"Services can be specified using an FMRI, abbreviation, or fnmatch(7)\n"
 	"\tpattern, as shown in these examples for svc:/network/smtp:sendmail\n"
 	"\n"
 	"\t%1$s <cmd> svc:/network/smtp:sendmail\n"

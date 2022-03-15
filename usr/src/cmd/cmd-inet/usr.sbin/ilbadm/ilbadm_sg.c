@@ -467,7 +467,7 @@ ilbadm_create_servergroup(int argc, char *argv[])
 	if (optind >= argc) {
 		ilbadm_err(gettext("missing mandatory arguments - please refer"
 		    " to 'create-servergroup' subcommand"
-		    "  description in ilbadm(1M)"));
+		    "  description in ilbadm(8)"));
 		rc = ILBADM_LIBERR;
 		goto out;
 	}
@@ -546,7 +546,7 @@ ilbadm_add_server_to_group(int argc, char **argv)
 
 	if (optind >= argc) {
 		ilbadm_err(gettext("missing mandatory arguments - please refer"
-		    " to 'add-server' subcommand description in ilbadm(1M)"));
+		    " to 'add-server' subcommand description in ilbadm(8)"));
 		rc = ILBADM_LIBERR;
 		goto out;
 	}

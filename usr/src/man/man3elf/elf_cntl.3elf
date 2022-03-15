@@ -66,7 +66,7 @@ If \fBelf_cntl()\fR succeeds, it returns \fB0\fR. Otherwise \fIelf\fR was
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -84,8 +84,12 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBelf\fR(3ELF), \fBelf_begin\fR(3ELF), \fBelf_getdata\fR(3ELF),
-\fBelf_rawfile\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.BR elf (3ELF),
+.BR elf_begin (3ELF),
+.BR elf_getdata (3ELF),
+.BR elf_rawfile (3ELF),
+.BR libelf (3LIB),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

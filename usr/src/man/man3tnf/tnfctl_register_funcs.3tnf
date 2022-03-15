@@ -55,7 +55,7 @@ An internal error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -71,10 +71,16 @@ MT Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBprex\fR(1), \fBTNF_PROBE\fR(3TNF), \fBdlclose\fR(3C), \fBdlopen\fR(3C),
-\fBlibtnfctl\fR(3TNF), \fBtnfctl_close\fR(3TNF),
-\fBtnfctl_probe_state_get\fR(3TNF), \fBtracing\fR(3TNF),
-\fBtnf_kernel_probes\fR(4), \fBattributes\fR(5)
+.BR prex (1),
+.BR dlclose (3C),
+.BR dlopen (3C),
+.BR TNF_PROBE (3TNF),
+.BR libtnfctl (3TNF),
+.BR tnfctl_close (3TNF),
+.BR tnfctl_probe_state_get (3TNF),
+.BR tracing (3TNF),
+.BR tnf_kernel_probes (5),
+.BR attributes (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

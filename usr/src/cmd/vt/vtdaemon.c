@@ -26,7 +26,7 @@
 /*
  * vtdaemon is responsible for the session secure switch via hotkeys.
  *
- * vtdaemon itself, like ttymon(1M), is also running on a virtual
+ * vtdaemon itself, like ttymon(8), is also running on a virtual
  * console device (/dev/vt/1), and provides a text console session
  * for password input and authentication. The /dev/vt/1 special text
  * console is reserved and end users cannot switch to it via hotkeys.

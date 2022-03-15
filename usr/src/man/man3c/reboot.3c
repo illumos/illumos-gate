@@ -27,7 +27,7 @@ by a bitwise-inclusive-OR of flags from the following list:
 .ad
 .RS 15n
 The machine is rebooted from the root filesystem on the default boot device.
-This is the default behavior. See \fBboot\fR(1M) and \fBkernel\fR(1M).
+This is the default behavior. See \fBboot\fR(8) and \fBkernel\fR(8).
 .RE
 
 .sp
@@ -57,7 +57,7 @@ for pathnames during the bootstrap.
 .ad
 .RS 15n
 The system is forced to panic immediately without any further processing and a
-crash dump is written to the dump device (see \fBdumpadm\fR(1M)) before
+crash dump is written to the dump device (see \fBdumpadm\fR(8)) before
 rebooting.
 .RE
 
@@ -89,5 +89,11 @@ the calling process.
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(1M), \fBboot\fR(1M), \fBdumpadm\fR(1M), \fBhalt\fR(1M),
-\fBinit\fR(1M), \fBkernel\fR(1M), \fBreboot\fR(1M), \fBuadmin\fR(2)
+.BR uadmin (2),
+.BR Intro (8),
+.BR boot (8),
+.BR dumpadm (8),
+.BR halt (8),
+.BR init (8),
+.BR kernel (8),
+.BR reboot (8)

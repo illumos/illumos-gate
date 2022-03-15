@@ -383,7 +383,7 @@ specify the buffer format.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -399,9 +399,15 @@ MT Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBt_connect\fR(3NSL), \fBt_getinfo\fR(3NSL), \fBt_getstate\fR(3NSL),
-\fBt_listen\fR(3NSL), \fBt_open\fR(3NSL), \fBt_optmgmt\fR(3NSL),
-\fBt_rcvconnect\fR(3NSL), \fBt_snddis\fR(3NSL), \fBattributes\fR(5)
+.BR t_connect (3NSL),
+.BR t_getinfo (3NSL),
+.BR t_getstate (3NSL),
+.BR t_listen (3NSL),
+.BR t_open (3NSL),
+.BR t_optmgmt (3NSL),
+.BR t_rcvconnect (3NSL),
+.BR t_snddis (3NSL),
+.BR attributes (7)
 .SH WARNINGS
 .sp
 .LP

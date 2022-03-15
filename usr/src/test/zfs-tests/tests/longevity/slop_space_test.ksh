@@ -169,7 +169,7 @@ do
 	# properties in one zfs command and reducing
 	# the overhead caused by the number of times
 	# we wait for a txg to sync (e.g. equal to the
-	# number of times we execute zfs(1m))
+	# number of times we execute zfs(8))
 	#
 	PROPERTIES=""
 	for j in {1..100}

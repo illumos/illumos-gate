@@ -19,14 +19,14 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
 NOTE: This directory contains legacy initialization and termination
 scripts for managing services.  The preferred method of service
 management is via the Service Management Facility; to read more about
-SMF, consult smf(5).
+SMF, consult smf(7).
 
 File names in rc?.d directories are of the form [SK]nn<init.d filename>
 where 'S' means start this job, 'K' means kill this job, and 'nn' is the
@@ -44,7 +44,7 @@ be sourced, allowing scripts to modify the environment of other scripts
 executed later.  This behavior is no longer supported; for altering the
 environment in which services are run, refer to the SMF documentation.
 
-Legacy services are reported by the default svcs(1m) output, and (where
+Legacy services are reported by the default svcs(1) output, and (where
 appropriate) the utility's '-p' option.  This reporting assumes a
 behavior as described above, such that each 'S' script has a suitable
 matching 'K' script, and they are both hard linked to a script in

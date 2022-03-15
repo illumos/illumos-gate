@@ -85,8 +85,12 @@ Note: No value is returned from the called function.
 The \fBqtimeout()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-\fBdrv_usectohz\fR(9F), \fBmt-streams\fR(9F), \fBqbufcall\fR(9F),
-\fBqprocson\fR(9F), \fBqunbufcall\fR(9F), \fBquntimeout\fR(9F)
+.BR drv_usectohz (9F),
+.BR mt-streams (9F),
+.BR qbufcall (9F),
+.BR qprocson (9F),
+.BR qunbufcall (9F),
+.BR quntimeout (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

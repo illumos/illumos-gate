@@ -16,7 +16,7 @@
  */
 
 /*
- * This implements psrinfo(1M), a utility to report various information
+ * This implements psrinfo(8), a utility to report various information
  * about processors, cores, and threads (virtual cpus).  This is mostly
  * intended for human consumption - this utility doesn't do much more than
  * simply process kstats for human readability.

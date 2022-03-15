@@ -61,7 +61,7 @@ it does.
 These functions behave similar to both the POSIX threads and illumos threads;
 however, they have slightly different call signatures and return values.
 For more information, see
-.Xr threads 5 .
+.Xr threads 7 .
 Importantly, they do not allow for inter-process synchronization.
 .Ss Creating and Destroy Condition Variables
 The function
@@ -183,5 +183,5 @@ is returned to indicate an error.
 .Xr cond_timedwait 3C ,
 .Xr cond_wait 3C ,
 .Xr threads.h 3HEAD ,
-.Xr attributes 5 ,
-.Xr threads 5
+.Xr attributes 7 ,
+.Xr threads 7

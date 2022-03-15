@@ -52,12 +52,12 @@ authentication. Encryption of the network session traffic is also possible. The
 specific options: \fB-a\fR, \fB-PN\fR or \fB-PO\fR, \fB-x\fR, \fB-f\fR or
 \fB-F\fR, and \fB-k\fR \fIrealm\fR. Some of these options (\fB-a\fR, \fB-x\fR,
 \fB-PN\fR or \fB-PO\fR, and \fB-f\fR or \fB-F\fR) can also be specified in the
-\fB[appdefaults]\fR section of \fBkrb5.conf\fR(4). The usage of these options
+\fB[appdefaults]\fR section of \fBkrb5.conf\fR(5). The usage of these options
 and the expected behavior is discussed in the OPTIONS section below. If
 Kerberos authentication is used, authorization to the account is controlled by
-rules in \fBkrb5_auth_rules\fR(5). If this authorization fails, fallback to
+rules in \fBkrb5_auth_rules\fR(7). If this authorization fails, fallback to
 normal \fBrsh\fR using \fBrhosts\fR occurs only if the \fB-PO\fR option is used
-explicitly on the command line or is specified in \fBkrb5.conf\fR(4). Also, the
+explicitly on the command line or is specified in \fBkrb5.conf\fR(5). Also, the
 \fB-PN\fR or \fB-PO\fR, \fB-x\fR, \fB-f\fR or \fB-F\fR, and \fB-k\fR
 \fIrealm\fR options are just supersets of the \fB-a\fR option.
 .sp
@@ -91,7 +91,7 @@ The following options are supported:
 .ad
 .RS 15n
 Explicitly enable Kerberos authentication and trusts the \fB\&.k5login\fR file
-for access-control. If the authorization check by \fBin.rshd\fR(1M) on the
+for access-control. If the authorization check by \fBin.rshd\fR(8) on the
 server-side succeeds and if the \fB\&.k5login\fR file permits access, the user
 is allowed to carry out the command.
 .RE
@@ -135,7 +135,7 @@ the \fB-f\fR option.
 .ad
 .RS 15n
 Causes \fBrsh\fR to obtain tickets for the remote host in \fIrealm\fR instead
-of the remote host's realm as determined by \fBkrb5.conf\fR(4).
+of the remote host's realm as determined by \fBkrb5.conf\fR(5).
 .RE
 
 .sp
@@ -145,7 +145,7 @@ of the remote host's realm as determined by \fBkrb5.conf\fR(4).
 .ad
 .RS 15n
 This option explicitly disables Kerberos authentication. It can be used to
-override the \fBautologin\fR variable in \fBkrb5.conf\fR(4).
+override the \fBautologin\fR variable in \fBkrb5.conf\fR(5).
 .RE
 
 .sp
@@ -187,7 +187,7 @@ Explicitly request new (\fB-PN\fR) or old (\fB-PO\fR) version of the Kerberos
 "\fBrcmd\fR" protocol. The new protocol avoids many security problems prevalent
 in the old one and is regarded much more secure, but is not interoperable with
 older (MIT/SEAM) servers. The new protocol is used by default, unless
-explicitly specified using these options or through \fBkrb5.conf\fR(4). If
+explicitly specified using these options or through \fBkrb5.conf\fR(5). If
 Kerberos authorization fails when using the old "\fBrcmd\fR" protocol, there is
 fallback to regular, non-kerberized \fBrsh\fR. This is not the case when the
 new, more secure "\fBrcmd\fR" protocol is used.
@@ -218,12 +218,12 @@ The command to be executed on the specified \fIhostname\fR.
 .RE
 
 .SH USAGE
-See \fBlargefile\fR(5) for the description of the behavior of \fBrsh\fR and
+See \fBlargefile\fR(7) for the description of the behavior of \fBrsh\fR and
 \fBremsh\fR when encountering files greater than or equal to 2 Gbyte ( 2^31
 bytes).
 .sp
 .LP
-The \fBrsh\fR and \fBremsh\fR commands are IPv6-enabled. See \fBip6\fR(7P).
+The \fBrsh\fR and \fBremsh\fR commands are IPv6-enabled. See \fBip6\fR(4P).
 \fBIPv6\fR is not currently supported with Kerberos V5 authentication.
 .sp
 .LP
@@ -381,7 +381,7 @@ Kerberos configuration file
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -395,10 +395,18 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-\fBrlogin\fR(1), \fBssh\fR(1), \fBtelnet\fR(1), \fBvi\fR(1),
-\fBin.rshd\fR(1M), \fBhosts\fR(4), \fBhosts.equiv\fR(4), \fBkrb5.conf\fR(4),
-\fBattributes\fR(5), \fBkrb5_auth_rules\fR(5), \fBlargefile\fR(5),
-\fBip6\fR(7P)
+.BR rlogin (1),
+.BR ssh (1),
+.BR telnet (1),
+.BR vi (1),
+.BR ip6 (4P),
+.BR hosts (5),
+.BR hosts.equiv (5),
+.BR krb5.conf (5),
+.BR attributes (7),
+.BR krb5_auth_rules (7),
+.BR largefile (7),
+.BR in.rshd (8)
 .SH NOTES
 When a system is listed in \fBhosts.equiv\fR, its security must be as good as
 local security. One insecure system listed in \fBhosts.equiv\fR can compromise

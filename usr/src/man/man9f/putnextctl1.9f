@@ -71,7 +71,7 @@ that dereferencing \fIq\fR through its \fBq_next\fR field and then invoking
 .sp
 .LP
 The \fBputnextctl1()\fR function should always be used in preference to
-\fBputctl1\fR(9F)
+.BR putctl1 (9F)
 .SH RETURN VALUES
 .sp
 .LP
@@ -90,8 +90,11 @@ See the \fBputnextctl\fR(9F) function page for an example of
 .SH SEE ALSO
 .sp
 .LP
-\fBput\fR(9E), \fBallocb\fR(9F), \fBdatamsg\fR(9F), \fBputctl1\fR(9F),
-\fBputnextctl\fR(9F)
+.BR put (9E),
+.BR allocb (9F),
+.BR datamsg (9F),
+.BR putctl1 (9F),
+.BR putnextctl (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

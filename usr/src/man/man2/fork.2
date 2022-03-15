@@ -240,7 +240,7 @@ process flags (see \fBgetpflags\fR(2))
 .TP
 .ie t \(bu
 .el o
-active contract templates (see \fBcontract\fR(4))
+active contract templates (see \fBcontract\fR(5))
 .RE
 .sp
 .LP
@@ -248,7 +248,7 @@ Scheduling priority and any per-process scheduling parameters that are specific
 to a given scheduling class might or might not be inherited according to the
 policy of that particular class (see \fBpriocntl\fR(2)). The child process
 might or might not be in the same process contract as the parent (see
-\fBprocess\fR(4)). The child process differs from the parent process in the
+\fBprocess\fR(5)). The child process differs from the parent process in the
 following ways:
 .RS +4
 .TP
@@ -339,7 +339,7 @@ inherited by the child.
 .TP
 .ie t \(bu
 .el o
-The child process holds no contracts (see \fBcontract\fR(4)).
+The child process holds no contracts (see \fBcontract\fR(5)).
 .RE
 .sp
 .LP
@@ -425,7 +425,7 @@ child. The application should use \fBpthread_atfork\fR(3C) to ensure safety
 with respect to this deadlock. Should there be any outstanding mutexes
 throughout the process, the application should call \fBpthread_atfork()\fR to
 wait for and acquire those mutexes prior to calling \fBfork()\fR,
-\fBfork1()\fR, or \fBforkx()\fR. See  "MT-Level" on the \fBattributes\fR(5)
+\fBfork1()\fR, or \fBforkx()\fR. See  "MT-Level" on the \fBattributes\fR(7)
 manual page.
 .sp
 .LP
@@ -435,8 +435,8 @@ interfaces provided by \fBlibc\fR are safe to use in a child process following
 a \fBfork()\fR, except when \fBfork()\fR is executed within a signal handler.
 .sp
 .LP
-The POSIX standard (see \fBstandards\fR(5)) requires fork to be
-Async-Signal-Safe (see \fBattributes\fR(5)). This cannot be made to happen with
+The POSIX standard (see \fBstandards\fR(7)) requires fork to be
+Async-Signal-Safe (see \fBattributes\fR(7)). This cannot be made to happen with
 fork handlers in place, because they acquire locks. To be in nominal
 compliance, no fork handlers are called when \fBfork()\fR is executed within a
 signal context.  This leaves the child process in a questionable state with
@@ -502,7 +502,7 @@ The \fIflags\fR argument is invalid.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -521,7 +521,7 @@ Standard	See below.
 
 .sp
 .LP
-For \fBfork()\fR, see \fBstandards\fR(5).
+For \fBfork()\fR, see \fBstandards\fR(7).
 .SH SEE ALSO
 .LP
 \fBalarm\fR(2), \fBexec\fR(2), \fBexit\fR(2), \fBfcntl\fR(2),
@@ -530,8 +530,13 @@ For \fBfork()\fR, see \fBstandards\fR(5).
 \fBtimes\fR(2), \fBumask\fR(2), \fBwaitid\fR(2), \fBdoor_create\fR(3C),
 \fBexit\fR(3C), \fBplock\fR(3C), \fBpthread_atfork\fR(3C),
 \fBpthread_create\fR(3C), \fBsignal\fR(3C), \fBsystem\fR(3C),
-\fBthr_create\fR(3C) \fBtimer_create\fR(3C), \fBwait\fR(3C), \fBcontract\fR(4),
-\fBprocess\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5), \fBstandards\fR(5)
+\fBthr_create\fR(3C) \fBtimer_create\fR(3C),
+.BR wait (3C),
+.BR contract (5),
+.BR process (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR standards (7)
 .SH NOTES
 .LP
 An application should call \fB_exit()\fR rather than \fBexit\fR(3C) if it

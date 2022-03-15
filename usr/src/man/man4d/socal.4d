@@ -1,0 +1,227 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SOCAL 4D "May 9, 1997"
+.SH NAME
+socal \- Serial Optical Controller for Fibre Channel Arbitrated Loop (SOC+)
+device driver
+.SH SYNOPSIS
+.LP
+.nf
+\fBsocal@\fIsbus-slot\fR,0\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The Fibre Channel Host Bus Adapter is an SBus card which implements two full
+duplex Fibre Channel interfaces.  Each Fibre Channel interface can connect to a
+Fibre Channel Arbitrated Loop (FC-AL).
+.sp
+.LP
+The  \fBsocal\fR device driver is a nexus driver and implements portions of the
+FC-2 and FC-4 layers of FC-AL.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/socal\fR\fR
+.ad
+.RS 21n
+ELF Kernel Module
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR sf (4D),
+.BR ssd (4D),
+.BR sbus (5)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIANSI X3.230-1994, Fibre Channel Physical and Signalling Interface (FC-PH)\fR
+.sp
+.LP
+\fIANSI X3.272-1996, Fibre Channel Arbitrated Loop (FC-AL)\fR
+.sp
+.LP
+\fIFibre Channel Private Loop SCSI Direct Attach (FC-PLDA)\fR
+.SH DIAGNOSTICS
+.sp
+.LP
+The messages described below  may appear on system console in addition to being
+logged.
+.sp
+.LP
+On the console, these messages are preceded by:
+.sp
+.in +2
+.nf
+\fBsocal\fR\fI%d\fR\fB: port \fR\fI%a\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where  \fI%d\fR is the instance number of the  \fBsocal\fR controller and
+\fI%a\fR is the port on the host adapter.
+.sp
+.ne 2
+.na
+\fBFibre Channel Loop is ONLINE\fR
+.ad
+.sp .6
+.RS 4n
+The Fibre Channel loop is now online.
+.RE
+
+.sp
+.ne 2
+.na
+\fBFibre Channel Loop is OFFLINE\fR
+.ad
+.sp .6
+.RS 4n
+The Fibre Channel loop is now offline.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: device in slave-only slot.\fR
+.ad
+.sp .6
+.RS 4n
+Move soc+ card to another slot.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: bad soft state.\fR
+.ad
+.sp .6
+.RS 4n
+Driver did not attach, devices will be inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: unable to alloc xport struct.\fR
+.ad
+.sp .6
+.RS 4n
+Driver did not attach, devices will be inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: unable to map eeprom\fR
+.ad
+.sp .6
+.RS 4n
+Driver was unable to map device memory; check for bad hardware.  Driver did not
+attach to device, devices will be inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: unable to map XRAM\fR
+.ad
+.sp .6
+.RS 4n
+Driver was unable to map device memory; check for bad hardware.  Driver did
+not attach to device, devices will be inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: unable to map registers\fR
+.ad
+.sp .6
+.RS 4n
+Driver was unable to map device registers; check for bad hardware.  Driver  did
+not attach to device, devices will be inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: unable to access status register\fR
+.ad
+.sp .6
+.RS 4n
+Driver was unable to map device registers; check for bad hardware.  Driver  did
+not attach to device, devices will be inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: unable to install interrupt handler\fR
+.ad
+.sp .6
+.RS 4n
+Driver was not able to add the interrupt routine to the kernel.  Driver  did
+not attach to device, devices will be inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: unable to access host adapter XRAM\fR
+.ad
+.sp .6
+.RS 4n
+Driver was unable to access device RAM; check for bad hardware.  Driver  did
+not attach to device, devices will be inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: unable to write host adapter XRAM\fR
+.ad
+.sp .6
+.RS 4n
+Driver was unable to write device RAM; check for bad hardware.  Driver  did not
+attach to device, devices will be inaccessible.
+.RE
+
+.sp
+.ne 2
+.na
+\fBattach failed: read/write mismatch in XRAM\fR
+.ad
+.sp .6
+.RS 4n
+Driver was unable to verify device RAM; check for bad hardware.  Driver  did
+not attach to device, devices will be inaccessible.
+.RE
+

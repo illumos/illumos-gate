@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/vr group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/vr.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/vr.4d
 driver name=vr perms="* 0666 root sys" \
     alias=pci1106,3043 \
     alias=pci1106,3053 \

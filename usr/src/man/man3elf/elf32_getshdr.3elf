@@ -75,7 +75,7 @@ file's \fBELF\fR header before creating sections.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -93,5 +93,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBelf\fR(3ELF), \fBelf_flagdata\fR(3ELF), \fBelf_getscn\fR(3ELF),
-\fBelf_strptr\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.BR elf (3ELF),
+.BR elf_flagdata (3ELF),
+.BR elf_getscn (3ELF),
+.BR elf_strptr (3ELF),
+.BR libelf (3LIB),
+.BR attributes (7)

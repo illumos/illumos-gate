@@ -91,7 +91,7 @@ defined in \fB<unistd.h>\fR, for both SPARC and x86:
 If \fB_LFS64_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
 of initial options to be given to the \fBcc\fR and \fBc89\fR utilities to build
 an application using the Large File Summit transitional compilation environment
-(see \fBlfcompile64\fR(5)).
+(see \fBlfcompile64\fR(7)).
 .RE
 
 .sp
@@ -104,7 +104,7 @@ an application using the Large File Summit transitional compilation environment
 If \fB_LFS64_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
 of final options to be given to the \fBcc\fR and \fBc89\fR utilities to build
 an application using the Large File Summit transitional compilation environment
-(see \fBlfcompile64\fR(5)).
+(see \fBlfcompile64\fR(7)).
 .RE
 
 .sp
@@ -117,7 +117,7 @@ an application using the Large File Summit transitional compilation environment
 If \fB_LFS64_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
 of libraries to be given to the \fBcc\fR and \fBc89\fR utilities to build an
 application using the Large File Summit transitional compilation environment
-(see \fBlfcompile64\fR(5)).
+(see \fBlfcompile64\fR(7)).
 .RE
 
 .sp
@@ -130,7 +130,7 @@ application using the Large File Summit transitional compilation environment
 If \fB_LFS64_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
 of options to be given to the \fBlint\fR utility to check application source
 using the Large File Summit transitional compilation environment (see
-\fBlfcompile64\fR(5)).
+\fBlfcompile64\fR(7)).
 .RE
 
 .sp
@@ -143,7 +143,7 @@ using the Large File Summit transitional compilation environment (see
 If \fB_LFS_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
 of initial options to be given to the \fBcc\fR and \fBc89\fR utilities to build
 an application using the Large File Summit large file compilation environment
-for 32-bit applications (see \fBlfcompile\fR(5)).
+for 32-bit applications (see \fBlfcompile\fR(7)).
 .RE
 
 .sp
@@ -156,7 +156,7 @@ for 32-bit applications (see \fBlfcompile\fR(5)).
 If \fB_LFS_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
 of final options to be given to the \fBcc\fR and \fBc89\fR utilities to build
 an application using the Large File Summit large file compilation environment
-for 32-bit applications (see \fBlfcompile\fR(5)).
+for 32-bit applications (see \fBlfcompile\fR(7)).
 .RE
 
 .sp
@@ -169,7 +169,7 @@ for 32-bit applications (see \fBlfcompile\fR(5)).
 If \fB_LFS_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
 of libraries to be given to the \fBcc\fR and \fBc89\fR utilities to build an
 application using the Large File Summit large file compilation environment for
-32-bit applications (see \fBlfcompile\fR(5)).
+32-bit applications (see \fBlfcompile\fR(7)).
 .RE
 
 .sp
@@ -182,7 +182,7 @@ application using the Large File Summit large file compilation environment for
 If \fB_LFS_LARGEFILE\fR is defined in \fB<unistd.h>\fR, this value is the set
 of options to be given to the \fBlint\fR utility to check application source
 using the Large File Summit large file compilation environment for 32-bit
-applications (see \fBlfcompile\fR(5)).
+applications (see \fBlfcompile\fR(7)).
 .RE
 
 .sp
@@ -631,7 +631,7 @@ The value of the \fIname\fR argument is invalid.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -649,5 +649,9 @@ MT-Level	Mt-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpathconf\fR(2), \fBsysconf\fR(3C), \fBattributes\fR(5), \fBlfcompile\fR(5),
-\fBlfcompile64\fR(5), \fBstandards\fR(5)
+.BR pathconf (2),
+.BR sysconf (3C),
+.BR attributes (7),
+.BR lfcompile (7),
+.BR lfcompile64 (7),
+.BR standards (7)

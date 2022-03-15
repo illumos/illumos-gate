@@ -2253,7 +2253,7 @@ print_defaults(char *label, char *description, char *unit,
  * two ike_defaults_t's, the first contains the hard coded defaults, the second
  * contains the actual values used. If these differ, then the defaults have been
  * changed via a config file entry. Note that "-" indicates this default
- * is not tunable via ike.config(4) or is system wide tunable.
+ * is not tunable via ike.config(5) or is system wide tunable.
  */
 static void
 do_print_defaults(ike_defaults_t *dp)

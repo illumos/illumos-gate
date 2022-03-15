@@ -26,7 +26,7 @@ This function is obsolete. The management of removable media by the Volume
 Management feature, including \fBvold\fR, has been replaced by software that
 supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
 through the HAL APIs, which are documented on the HAL web site. See
-\fBhal\fR(5). The return value of this function is undefined.
+\fBhal\fR(7). The return value of this function is undefined.
 .sp
 .LP
 The  \fBvolmgt_acquire()\fR routine reserves the removable media device
@@ -173,7 +173,7 @@ if (override) {
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -191,8 +191,11 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBfree\fR(3C), \fBmalloc\fR(3C), \fBvolmgt_release\fR(3VOLMGT),
-\fBattributes\fR(5), \fBhal\fR(5)
+.BR free (3C),
+.BR malloc (3C),
+.BR volmgt_release (3VOLMGT),
+.BR attributes (7),
+.BR hal (7)
 .SH NOTES
 .sp
 .LP

@@ -76,8 +76,12 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBallocb\fR(9F), \fBbufcall\fR(9F), \fBesballoc\fR(9F), \fBtimeout\fR(9F),
-\fBdatab\fR(9S), \fBunbufcall\fR(9F)
+.BR allocb (9F),
+.BR bufcall (9F),
+.BR esballoc (9F),
+.BR timeout (9F),
+.BR unbufcall (9F),
+.BR datab (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR \fISTREAMS Programming Guide\fR

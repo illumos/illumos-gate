@@ -76,7 +76,7 @@ A \fBsyslog\fR(3C) style format string.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -94,7 +94,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsasl_errdetail\fR(3SASL), \fBsyslog\fR(3C), \fBattributes\fR(5)
+.BR syslog (3C),
+.BR sasl_errdetail (3SASL),
+.BR attributes (7)
 .sp
 .LP
 Whistler, K. and Adams, G. \fIRFC 2482, Language Tagging in Unicode Plain

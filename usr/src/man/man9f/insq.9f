@@ -127,7 +127,9 @@ by using STREAMS functions or by implementing your own locking.
 .SH SEE ALSO
 .sp
 .LP
-\fBputq\fR(9F), \fBrmvq\fR(9F), \fBmsgb\fR(9S)
+.BR putq (9F),
+.BR rmvq (9F),
+.BR msgb (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -52,7 +52,8 @@ space and no mapping is performed.
 .SH SEE ALSO
 .sp
 .LP
-\fBbp_mapout\fR(9F), \fBbuf\fR(9S)
+.BR bp_mapout (9F),
+.BR buf (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

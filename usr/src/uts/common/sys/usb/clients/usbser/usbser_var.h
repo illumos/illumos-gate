@@ -171,7 +171,7 @@ _NOTE(LOCK_ORDER(usbser_state::us_mutex usbser_port::port_mutex))
  *
  * [2] tty mode open may be blocked waiting for carrier.
  *     if dial-out mode open happens at this time, it is allowed
- *     for it to overtake the port; from zs(7D) man page:
+ *     for it to overtake the port; from zs(4D) man page:
  *
  *	 This allows a modem to be attached to  /dev/term/[n]
  *	 and used for dial-in (by enabling the line for login in /etc/inittab)

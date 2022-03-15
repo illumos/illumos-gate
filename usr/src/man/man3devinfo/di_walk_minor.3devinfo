@@ -115,7 +115,7 @@ Invalid argument.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -131,9 +131,11 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBdladm\fR(1M), \fBdi_minor_nodetype\fR(3DEVINFO), dlpi_walk(3DLPI),
-\fBlibdevinfo\fR(3LIB), \fBattributes\fR(5), \fBfilesystem\fR(5),
-\fBddi_create_minor_node\fR(9F)
+\fBdladm\fR(8), \fBdi_minor_nodetype\fR(3DEVINFO), dlpi_walk(3DLPI),
+.BR libdevinfo (3LIB),
+.BR attributes (7),
+.BR filesystem (7),
+.BR ddi_create_minor_node (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
@@ -149,5 +151,5 @@ networking devices (the objects displayed in the \fBDEVICE\fR field by
 displayed by \fBdladm\fR \fBshow-link\fR). Datalink interfaces are represented
 as the set of DLPI device nodes that applications can open by using
 \fBdlpi_open\fR(3DLPI) or by opening DLPI nodes out of the \fB/dev/net\fR
-filesystem (see \fBfilesystem\fR(5)). The \fBdlpi_walk\fR(3DLPI) function is
+filesystem (see \fBfilesystem\fR(7)). The \fBdlpi_walk\fR(3DLPI) function is
 the proper function to walk these nodes.

@@ -48,7 +48,7 @@ Displays and controls probes in running software. See prex(1).
 A set of probes built into the Solaris kernel which capture information about
 system calls, multithreading, page faults, swapping, memory management, and
 I/O. You can use these probes to obtain detailed traces of kernel activity
-under your application workloads. See  \fBtnf_kernel_probes\fR(4).
+under your application workloads. See  \fBtnf_kernel_probes\fR(5).
 .RE
 
 .sp
@@ -286,7 +286,7 @@ variety of other tasks.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -302,7 +302,12 @@ MT Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBprex\fR(1), \fBtnfdump\fR(1), \fBtnfxtract\fR(1),
-\fBTNF_DECLARE_RECORD\fR(3TNF), \fBTNF_PROBE\fR(3TNF), \fBlibtnfctl\fR(3TNF),
-\fBtnf_process_disable\fR(3TNF), \fBtnf_kernel_probes\fR(4),
-\fBattributes\fR(5)
+.BR prex (1),
+.BR tnfdump (1),
+.BR tnfxtract (1),
+.BR TNF_DECLARE_RECORD (3TNF),
+.BR TNF_PROBE (3TNF),
+.BR libtnfctl (3TNF),
+.BR tnf_process_disable (3TNF),
+.BR tnf_kernel_probes (5),
+.BR attributes (7)

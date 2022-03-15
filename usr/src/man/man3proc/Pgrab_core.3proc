@@ -46,7 +46,7 @@ however, all of the functions that iterate or query state will work.
 These functions work on all illumos core files and the core files of some other
 operating systems.
 See both
-.Xr core 4
+.Xr core 5
 and the
 .Em Core Files
 section of
@@ -195,4 +195,4 @@ indicates the system failure.
 .Xr Pfree 3PROC ,
 .Xr Pgrab_error 3PROC ,
 .Xr Prelease 3PROC ,
-.Xr core 4
+.Xr core 5

@@ -50,7 +50,7 @@ ilbadm_errstr(ilbadm_status_t rc)
 	case ILBADM_ENOMEM:
 		return (gettext("memory allocation failure"));
 	case ILBADM_EINVAL:
-		return (gettext("invalid value  - refer to ilbadm(1M)"));
+		return (gettext("invalid value  - refer to ilbadm(8)"));
 	case ILBADM_HCPRINT:
 		return (gettext("failed to print healthcheck values"));
 	case ILBADM_INVAL_AF:
@@ -63,7 +63,7 @@ ilbadm_errstr(ilbadm_status_t rc)
 		return (gettext("address is invalid"));
 	case ILBADM_INVAL_ARGS:
 		return (gettext("invalid/incompatible keywords - refer to"
-		    " ilbadm(1M)"));
+		    " ilbadm(8)"));
 	case ILBADM_ENOSGNAME:
 		return (gettext("servergroup name missing"));
 	case ILBADM_ENORULE:
@@ -83,21 +83,21 @@ ilbadm_errstr(ilbadm_status_t rc)
 		return (gettext("operation type is invalid"));
 	case ILBADM_INVAL_KEYWORD:
 		return (gettext("keyword is invalid - please refer"
-		    " to ilbadm(1M)"));
+		    " to ilbadm(8)"));
 	case ILBADM_ASSIGNREQ:
 		return (gettext("assignment '=' missing"));
 	case ILBADM_NORECURSIVE:
 		return (gettext("recursive import not allowed"));
 	case ILBADM_INVAL_COMMAND:
 		return (gettext("subcommand is invalid - please refer"
-		    " to ilbadm(1M)"));
+		    " to ilbadm(8)"));
 	case ILBADM_ENOPROXY:
 		return (gettext("proxy-src is missing"));
 	case ILBADM_INVAL_PROXY:
 		return (gettext("proxy-src not allowed"));
 	case ILBADM_ENOOPTION:
 		return (gettext("mandatory argument(s) missing - refer"
-		    " to ilbadm(1M)"));
+		    " to ilbadm(8)"));
 	case ILBADM_TOOMANYIPADDR:
 		return (gettext("address range contains more than 255"
 		    " IP addresses"));
@@ -105,7 +105,7 @@ ilbadm_errstr(ilbadm_status_t rc)
 		return (gettext("could not export servergroup because"
 		    " of lack of space"));
 	case ILBADM_INVAL_SYNTAX:
-		return (gettext("syntax failure - refer to ilbadm(1M)"));
+		return (gettext("syntax failure - refer to ilbadm(8)"));
 	case ILBADM_NOKEYWORD_VAL:
 		return (gettext("missing value"));
 	case ILBADM_LIBERR:

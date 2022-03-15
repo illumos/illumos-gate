@@ -32,7 +32,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * PROGRAM: fdisk(1M)
+ * PROGRAM: fdisk(8)
  * This program reads the partition table on the specified device and
  * also reads the drive parameters. The user can perform various
  * operations from a supplied menu or from the command line. Diagnostic
@@ -102,7 +102,7 @@
 #define	VTOC_RWERR	3	/* couldn't read or write VTOC */
 
 /*
- * Support for fdisk(1M) on the SPARC platform
+ * Support for fdisk(8) on the SPARC platform
  *	In order to convert little endian values to big endian for SPARC,
  *	byte/short and long values must be swapped.
  *	These swapping macros will be used to access information in the

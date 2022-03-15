@@ -85,7 +85,7 @@ initial network services
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='ifconfig' section='1M'
+			<manpage title='ifconfig' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

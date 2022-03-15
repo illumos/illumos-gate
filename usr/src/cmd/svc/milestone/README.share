@@ -24,21 +24,21 @@ Use is subject to license terms.
 
 /lib/svc/share/README
 
-smf(5):  Notes on maintenance mode and recovery
+smf(7):  Notes on maintenance mode and recovery
 
 Failures that bring the system to maintenance mode may include hardware
 or critical software failures.  The procedures below are given so that
 some software repairs can be made; the recommended exit approach once a
 repair has been made is to reboot the system.  The system can be brought
-to maintenance mode deliberately via the '-s' option to boot(1M), or via
-the 's' option to init(1M).
+to maintenance mode deliberately via the '-s' option to boot(8), or via
+the 's' option to init(8).
 
-In failure scenarios, smf(5) may or may not be running, depending on
-which component has failed.  If smf(5) is running, and the /usr
-filesystem is reachable, then the usual svcadm(1M) invocations to clear
+In failure scenarios, smf(7) may or may not be running, depending on
+which component has failed.  If smf(7) is running, and the /usr
+filesystem is reachable, then the usual svcadm(8) invocations to clear
 maintenance state and restart services instances can be used.
 Otherwise, the following instructions describe the direct execution of
-service methods, so that capabilities that svc.startd(1M) would normally
+service methods, so that capabilities that svc.startd(8) would normally
 start automatically can be started manually.  In the case that the
 document recommends an invocation like
 
@@ -85,13 +85,13 @@ to directly execute the corresponding service methods
 # /lib/svc/method/fs-minimal
 
 to mount the various filesystems.  In the case that these methods fail,
-a direct invocation of mount(1M), and potentially fsck(1M), should be
+a direct invocation of mount(8), and potentially fsck(8), should be
 attempted for file systems required for recovery purposes.
 
 /lib/svc/method/fs-usr attempts to remount the root file system
 read-write, such that persistent changes can be made to the system's
 configuration.  If this method is failing, one can directly remount
-using the mount(1M) command via
+using the mount(8) command via
 
 # /sbin/mount -o rw,remount /
 
@@ -99,44 +99,44 @@ using the mount(1M) command via
 private use.  It may prove a useful location to create mount points if
 the root file system cannot be remounted read-write.
 
-3.  Failure to run svc.configd(1M).
+3.  Failure to run svc.configd(8).
 
-svc.configd(1M) will give detailed instructions for recovery if the
-corruption is detected in the repository.  If svc.configd(1M) cannot be
+svc.configd(8) will give detailed instructions for recovery if the
+corruption is detected in the repository.  If svc.configd(8) cannot be
 run because of missing or corrupt library components, then the affected
 components will need to be replaced.  Components could be copied from a
 CD-ROM or DVD-ROM, or from another system.
 
-4.  Failure to run svc.startd(1M).
+4.  Failure to run svc.startd(8).
 
-If the inittab(4) line to invoke svc.startd(1M) is missing or incorrect,
+If the inittab(5) line to invoke svc.startd(8) is missing or incorrect,
 it will need to be restored.  A valid entry is
 
 smf::sysinit:/lib/svc/bin/svc.startd    >/dev/msglog 2<>/dev/msglog </dev/console
 
-If svc.startd(1M) cannot be run because of missing or corrupt library
+If svc.startd(8) cannot be run because of missing or corrupt library
 components, then the affected components will need to be replaced, as
-for svc.configd(1M) above.
+for svc.configd(8) above.
 
 5.  Activating basic networking configuration.
 
-If svc.startd(1M) did not execute successfully, it may also be necessary
+If svc.startd(8) did not execute successfully, it may also be necessary
 to activate network interfaces manually, such that other hosts can be
 contacted.  The service methods can be invoked directly as
 
 # /lib/svc/method/net-loopback
 # /lib/svc/method/net-physical
 
-If these methods fail, a direct invocation of ifconfig(1M) can be
+If these methods fail, a direct invocation of ifconfig(8) can be
 attempted.
 
-In some scenarios, one may be able to use routeadm(1M) to activate more
+In some scenarios, one may be able to use routeadm(8) to activate more
 dynamic route management functionality; restoring the default dynamic
 routing behaviour can be done using the '-u' option.  (Invoking routeadm
 with no arguments will display which commands must be accessible for the
 current routing configuration to be invoked.)  Otherwise, once
 interfaces are up, a default route can be manually added using the
-route(1M) command.  On typical IPv4 networks, this invocation would be
+route(8) command.  On typical IPv4 networks, this invocation would be
 
 # /sbin/route add net default _gateway_IP_
 

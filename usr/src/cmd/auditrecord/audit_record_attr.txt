@@ -119,7 +119,7 @@ user=head:subj:insert:ret
 #
 # Constraints - the string length; bear in mind, that any annotation of
 # primitives below longer than is specified, will be silently truncated
-# to given/defined amount of characters in the auditrecord(1M) runtime:
+# to given/defined amount of characters in the auditrecord(8) runtime:
 #
 #     primitive <= max (non-truncated) string length
 #	case	<= unlimited; if necessary, text continues on a new line
@@ -2321,7 +2321,7 @@ label=AUE_modify_user
 label=AUE_mountd_mount
   title=mountd: NFS mount
   program=/usr/lib/nfs/mountd
-  see=mountd(1M)
+  see=mountd(8)
   format=text1:path2
     comment=remote client hostname:
     comment=mount dir
@@ -2346,7 +2346,7 @@ label=AUE_reboot_solaris
   title=reboot
   format=user
 # See audit_reboot.c
-#	header,61,2,reboot(1m),,Fri Nov 09 13:52:34 2001, + 726 msec
+#	header,61,2,reboot(8),,Fri Nov 09 13:52:34 2001, + 726 msec
 #	subject,tuser1,root,other,root,other,10422,497,0 0 tmach2
 #	return,success,0
 

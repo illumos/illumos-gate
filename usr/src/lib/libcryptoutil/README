@@ -105,7 +105,7 @@ Consumers:
 	command line args to mech numbers.  They will need to
 	add the "CKM_" prefix before calling pkc11_str2mech()
 
-	cryptoadm(1m) for output to user, and for storing in pkcs11.conf
+	cryptoadm(8) for output to user, and for storing in pkcs11.conf
 	file.
 
 	Debug code.
@@ -114,7 +114,7 @@ Consumers:
 
 The "pkcs11.conf" configuration file parsing code and data structures are
 shared between:
-	cryptoadm(1m), libpkcs11(3crypto).
+	cryptoadm(8), libpkcs11(3crypto).
 
 2.3.1 Data Structures:
 

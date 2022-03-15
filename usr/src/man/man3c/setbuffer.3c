@@ -62,9 +62,16 @@ The \fBsetlinebuf()\fR function returns no useful value.
 .SH SEE ALSO
 .sp
 .LP
-\fBmalloc\fR(3C), \fBfclose\fR(3C), \fBfopen\fR(3C), \fBfread\fR(3C),
-\fBgetc\fR(3C), \fBprintf\fR(3C), \fBputc\fR(3C), \fBputs\fR(3C),
-\fBsetbuf\fR(3C), \fBsetvbuf\fR(3C)
+.BR fclose (3C),
+.BR fopen (3C),
+.BR fread (3C),
+.BR getc (3C),
+.BR malloc (3C),
+.BR printf (3C),
+.BR putc (3C),
+.BR puts (3C),
+.BR setbuf (3C),
+.BR setvbuf (3C)
 .SH NOTES
 .sp
 .LP

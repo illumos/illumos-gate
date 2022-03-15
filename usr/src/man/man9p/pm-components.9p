@@ -45,7 +45,7 @@ after the property has been interpreted will not be recognized.
 manageable components and describes the Power Management model implemented by
 the device driver. The existence of \fBpm-components\fR also indicates to the
 framework that device is ready for Power Management if automatic device Power
-Management is enabled. See \fBpower.conf\fR(4).
+Management is enabled. See \fBpower.conf\fR(5).
 .sp
 .LP
 The \fBpm-component\fR property syntax is:
@@ -134,7 +134,7 @@ pm-components="NAME=Frame Buffer", "0=Off"
 .sp
 
 .SH ATTRIBUTES
-See attributes(5) for descriptions of the following attributes:
+See attributes(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -148,9 +148,13 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBpower.conf\fR(4), \fBpm\fR(7D), \fBattach\fR(9E), \fBdetach\fR(9E),
-\fBddi_prop_update_string_array\fR(9F), \fBpm_busy_component\fR(9F),
-\fBpm_idle_component\fR(9F)
+.BR pm (4D),
+.BR power.conf (5),
+.BR attach (9E),
+.BR detach (9E),
+.BR ddi_prop_update_string_array (9F),
+.BR pm_busy_component (9F),
+.BR pm_idle_component (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

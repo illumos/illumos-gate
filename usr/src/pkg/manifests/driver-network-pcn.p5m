@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/pcn group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/pcn.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/pcn.4d
 driver name=pcn perms="* 0666 root sys" clone_perms="pcn 0666 root sys" \
     alias=pci1022,2000 \
     alias=pci103c,104c

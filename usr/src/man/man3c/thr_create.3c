@@ -393,7 +393,7 @@ error = thr_create(NULL, 0, do_func, NULL, 0, &tid);
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -409,10 +409,19 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBexit\fR(2), \fBgetrlimit\fR(2), \fBmmap\fR(2), \fBexit\fR(3C),
-\fBsleep\fR(3C), \fBthr_exit\fR(3C), \fBthr_join\fR(3C),
-\fBthr_min_stack\fR(3C), \fBthr_setconcurrency\fR(3C), \fBthr_suspend\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5), \fBthreads\fR(5)
+.BR exit (2),
+.BR getrlimit (2),
+.BR mmap (2),
+.BR exit (3C),
+.BR sleep (3C),
+.BR thr_exit (3C),
+.BR thr_join (3C),
+.BR thr_min_stack (3C),
+.BR thr_setconcurrency (3C),
+.BR thr_suspend (3C),
+.BR attributes (7),
+.BR standards (7),
+.BR threads (7)
 .SH NOTES
 .sp
 .LP

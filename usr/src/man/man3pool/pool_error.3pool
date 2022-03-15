@@ -144,7 +144,7 @@ The specified error value is not defined by the pools error facility.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -162,4 +162,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBerrno\fR(3C), \fBlibpool\fR(3LIB), \fBattributes\fR(5)
+.BR errno (3C),
+.BR libpool (3LIB),
+.BR attributes (7)

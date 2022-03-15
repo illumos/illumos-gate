@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * RCM module providing support for swap areas
  * during reconfiguration operations.
@@ -323,7 +321,7 @@ swap_remove(rcm_handle_t *hdl, char *rsrcname, id_t id, uint_t flags,
 
 /*
  * Delete all swap areas for swap file.
- * Invoke swap(1M) instead of swapctl(2) to
+ * Invoke swap(8) instead of swapctl(2) to
  * handle relocation of dump device.
  * If dump device is configured, fail if
  * unable to relocate dump.
@@ -345,7 +343,7 @@ swap_delete(swap_file_t *sf, char **errstr)
 		have_dump = 0;
 
 	for (sa = sf->areas; sa != NULL; sa = sa->next) {
-		/* swap(1M) is not idempotent */
+		/* swap(8) is not idempotent */
 		if (sa->cache_flags & SWAP_CACHE_OFFLINED) {
 			continue;
 		}
@@ -399,7 +397,7 @@ out:
 }
 
 /*
- * Invoke swap(1M) to add each registered swap area.
+ * Invoke swap(8) to add each registered swap area.
  *
  * Call with cache_lock held.
  */
@@ -413,7 +411,7 @@ swap_add(swap_file_t *sf, char **errstr)
 	int		rv = RCM_SUCCESS;
 
 	for (sa = sf->areas; sa != NULL; sa = sa->next) {
-		/* swap(1M) is not idempotent */
+		/* swap(8) is not idempotent */
 		if (!(sa->cache_flags & SWAP_CACHE_OFFLINED)) {
 			continue;
 		}

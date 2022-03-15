@@ -42,8 +42,8 @@
 	<single_instance />
 
 	<!--
-		The dumpadm(1M) service reconfigures the kernel's dump settings
-		from /etc/dumpadm.conf and then invokes savecore(1M) to locate
+		The dumpadm(8) service reconfigures the kernel's dump settings
+		from /etc/dumpadm.conf and then invokes savecore(8) to locate
 		and retrieve any saved crash dumps.  It therefore needs to have
 		local filesystems mounted, and must also have an *optional*
 		dependency on nfs.client and autofs in case dumpadm -s has been
@@ -107,7 +107,7 @@
 		<documentation>
 			<manpage
 				title='dumpadm'
-				section='1M'
+				section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

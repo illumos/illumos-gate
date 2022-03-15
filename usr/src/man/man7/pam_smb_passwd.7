@@ -1,0 +1,190 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PAM_SMB_PASSWD 7 "Apr 29, 2008"
+.SH NAME
+pam_smb_passwd \- SMB password management module
+.SH SYNOPSIS
+.LP
+.nf
+\fBpam_smb_passwd.so.1\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpam_smb_passwd\fR module enhances the PAM password management stack.
+This functionality supports the changing or adding of SMB passwords for local
+Solaris users. The Solaris CIFS server uses SMB passwords to authenticate
+connected Solaris users. This module includes the \fBpam_sm_chauthtok\fR(3PAM)
+function.
+.sp
+.LP
+The \fBpam_sm_chauthtok()\fR function accepts the following flags:
+.sp
+.ne 2
+.na
+\fB\fBPAM_PRELIM_CHECK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Always returns \fBPAM_IGNORE\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SILENT\fR\fR
+.ad
+.sp .6
+.RS 4n
+Suppresses messages.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_UPDATE_AUTHTOK\fR\fR
+.ad
+.sp .6
+.RS 4n
+Updates or creates a new \fBCIFS\fR local \fBLM\fR/\fBNTLM\fR hash for the user
+that is specified in \fBPAM_USER\fR by using the authentication information
+found in \fBPAM_AUTHTOK\fR. The \fBLM\fR hash is only created if the
+\fBsmbd/lmauth_level\fR property value of the \fBsmb/server\fR service is set
+to 3 or less. \fBPAM_IGNORE\fR is returned if the user is not in the local
+\fB/etc/passwd\fR repository.
+.RE
+
+.sp
+.LP
+The following options can be passed to the \fBpam_smb_passwd\fR module:
+.sp
+.ne 2
+.na
+\fB\fBdebug\fR\fR
+.ad
+.sp .6
+.RS 4n
+Produces \fBsyslog\fR(3C) debugging information at the \fBLOG_AUTH\fR or
+\fBLOG_DEBUG\fR level.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnowarn\fR\fR
+.ad
+.sp .6
+.RS 4n
+Suppresses warning messages.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/var/smb/smbpasswd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Stores SMB passwords for Solaris users.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+Upon successful completion of \fBpam_sm_chauthtok()\fR, \fBPAM_SUCCESS\fR is
+returned. The following error codes are returned upon error:
+.sp
+.ne 2
+.na
+\fB\fBPAM_AUTHTOK_ERR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Authentication token manipulation error
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_AUTHTOK_LOCK_BUSY\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBSMB\fR password file is locked
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_PERM_DENIED\fR\fR
+.ad
+.sp .6
+.RS 4n
+Permissions are insufficient for accessing the \fBSMB\fR password file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SYSTEM_ERR\fR\fR
+.ad
+.sp .6
+.RS 4n
+System error
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.sp .6
+.RS 4n
+User is unknown
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See the \fBattributes\fR(7) man page for descriptions of the following
+attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+_
+MT Level	MT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR syslog (3C),
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_chauthtok (3PAM),
+.BR pam_sm (3PAM),
+.BR pam_sm_chauthtok (3PAM),
+.BR pam.conf (5),
+.BR attributes (7),
+.BR smbd (8)
+.SH NOTES
+.sp
+.LP
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe \fBonly\fR if each thread
+within the multi-threaded application uses its own PAM handle.
+.sp
+.LP
+The \fBpam_smb_passwd.so.1\fR module should be stacked following all password
+qualification modules in the \fBPAM\fR password stack.

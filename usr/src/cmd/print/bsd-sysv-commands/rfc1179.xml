@@ -37,7 +37,7 @@
     type='service'
     version='1'>
 
-    	<create_default_instance enabled='false' />
+	<create_default_instance enabled='false' />
 
 	<restarter>
 		<service_fmri value='svc:/network/inetd:default' />
@@ -100,7 +100,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='in.lpd' section='1M'
+			<manpage title='in.lpd' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

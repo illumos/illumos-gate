@@ -119,8 +119,13 @@ Memory cannot be allocated by \fBddi_umem_alloc()\fR because
 can be called from user and kernel context only. \fBddi_umem_free()\fR can be
 called from any context.
 .SH SEE ALSO
-\fBdevmap\fR(9E), \fBcondvar\fR(9F), \fBdevmap_umem_setup\fR(9F),
-\fBkmem_alloc\fR(9F), \fBmutex\fR(9F), \fBrwlock\fR(9F), \fBsemaphore\fR(9F)
+.BR devmap (9E),
+.BR condvar (9F),
+.BR devmap_umem_setup (9F),
+.BR kmem_alloc (9F),
+.BR mutex (9F),
+.BR rwlock (9F),
+.BR semaphore (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

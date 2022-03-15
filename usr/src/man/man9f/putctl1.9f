@@ -78,8 +78,11 @@ See the \fBputctl\fR(9F) function page for an example of \fBputctl1()\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBput\fR(9E), \fBallocb\fR(9F), \fBdatamsg\fR(9F), \fBputctl\fR(9F),
-\fBputnextctl1\fR(9F)
+.BR put (9E),
+.BR allocb (9F),
+.BR datamsg (9F),
+.BR putctl (9F),
+.BR putnextctl1 (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -77,16 +77,16 @@ Indicates that the locale should be processed based in the values in the
 environment. See
 .BR setlocale (3C)
 and
-.BR environ (5)
+.BR environ (7)
 for more information.
 .LP
 The value of
 .I category_mask
 is a bitwise-inclusive or of the following macros which correspond to categories
 as defined in
-.BR locale (5)
+.BR locale (7)
 and
-.BR environ (5):
+.BR environ (7):
 .TP
 .B LC_CTYPE_MASK
 Character classification and case conversion.
@@ -187,5 +187,5 @@ MT-Level	Safe
 .BR locale (1),
 .BR setlocale (3C),
 .BR uselocale (3C),
-.BR environ (5),
-.BR locale (5)
+.BR environ (7),
+.BR locale (7)

@@ -115,7 +115,7 @@ extern "C" {
 
 /*
  * Scheme to store the instance number and the slice number in the minor number.
- * (NOTE: Uses the same format and definitions as the sd(7D) driver)
+ * (NOTE: Uses the same format and definitions as the sd(4D) driver)
  */
 #define	VD_MAKE_DEV(instance, minor)	((instance << VDCUNIT_SHIFT) | minor)
 
@@ -365,7 +365,7 @@ typedef struct vdc {
 	clock_t		failfast_interval;	/* interval in microsecs */
 
 	/*
-	 * kstats used to store I/O statistics consumed by iostat(1M).
+	 * kstats used to store I/O statistics consumed by iostat(8).
 	 * These are protected by the lock mutex.
 	 */
 	kstat_t		*io_stats;

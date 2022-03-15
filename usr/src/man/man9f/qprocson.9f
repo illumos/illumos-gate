@@ -70,9 +70,16 @@ These routines can be called from user, interrupt, or kernel context.
 .SH SEE ALSO
 .sp
 .LP
-\fBclose\fR(9E), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E), \fBput\fR(9F),
-\fBputnext\fR(9F), \fBqbufcall\fR(9F), \fBqtimeout\fR(9F), \fBqwait\fR(9F),
-\fBqwait_sig\fR(9F)
+.BR close (9E),
+.BR open (9E),
+.BR put (9E),
+.BR srv (9E),
+.BR put (9F),
+.BR putnext (9F),
+.BR qbufcall (9F),
+.BR qtimeout (9F),
+.BR qwait (9F),
+.BR qwait_sig (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -30,7 +30,7 @@ import java.util.*;
 import java.util.logging.*;
 
 /**
- * Emulates {@code dtrace(1M)} using the Java DTrace API.
+ * Emulates {@code dtrace(8)} using the Java DTrace API.
  */
 public class JDTrace {
     static Logger logger = Logger.getLogger(JDTrace.class.getName());

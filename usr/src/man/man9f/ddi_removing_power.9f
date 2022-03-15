@@ -89,7 +89,7 @@ int
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -103,7 +103,10 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBcpr\fR(7), \fBattach\fR(9E), \fBdetach\fR(9E)
+.BR cpr (4),
+.BR attributes (7),
+.BR attach (9E),
+.BR detach (9E)
 .sp
 .LP
 \fIWriting Device Drivers\fR

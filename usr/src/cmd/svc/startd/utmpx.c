@@ -31,7 +31,7 @@
 /*
  * utmpx.c - utmpx utility routines
  *
- * Since svc.startd(1M) places utmpx records for its launched instances, it must
+ * Since svc.startd(8) places utmpx records for its launched instances, it must
  * also mark them as dead once completed.
  */
 

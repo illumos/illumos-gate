@@ -133,8 +133,10 @@ None.
 \fBkstat_named_init()\fR and \fBkstat_named_setstr()\fR can be called from user
 or kernel context.
 .SH SEE ALSO
-\fBkstat_create\fR(9F), \fBkstat_install\fR(9F), \fBkstat\fR(9S),
-\fBkstat_named\fR(9S)
+.BR kstat_create (9F),
+.BR kstat_install (9F),
+.BR kstat (9S),
+.BR kstat_named (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

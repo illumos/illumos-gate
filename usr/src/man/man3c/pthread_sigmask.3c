@@ -331,7 +331,7 @@ thread can be used by passing the argument \fBTHR_DAEMON\fR to
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -349,18 +349,28 @@ MT-Level	MT-Safe and Async-Signal-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsigaction\fR(2), \fBsigprocmask\fR(2), \fBsigwait\fR(2),
-\fBcond_wait\fR(3C), \fBpthread_cancel\fR(3C), \fBpthread_create\fR(3C),
-\fBpthread_join\fR(3C), \fBpthread_self\fR(3C), \fBsigaddset\fR(3C),
-\fBsigemptyset\fR(3C), \fBsigsetops\fR(3C), \fBsleep\fR(3C),
-\fBattributes\fR(5), \fBcancellation\fR(5), \fBstandards\fR(5)
+.BR sigaction (2),
+.BR sigprocmask (2),
+.BR sigwait (2),
+.BR cond_wait (3C),
+.BR pthread_cancel (3C),
+.BR pthread_create (3C),
+.BR pthread_join (3C),
+.BR pthread_self (3C),
+.BR sigaddset (3C),
+.BR sigemptyset (3C),
+.BR sigsetops (3C),
+.BR sleep (3C),
+.BR attributes (7),
+.BR cancellation (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP
 It is not possible to block signals that cannot be caught or ignored (see
 \fBsigaction\fR(2)). It is also not possible to block or unblock
 \fBSIGCANCEL\fR, as \fBSIGCANCEL\fR is reserved for the implementation of POSIX
-thread cancellation (see \fBpthread_cancel\fR(3C) and \fBcancellation\fR(5)).
+thread cancellation (see \fBpthread_cancel\fR(3C) and \fBcancellation\fR(7)).
 This restriction is quietly enforced by the standard C library.
 .sp
 .LP

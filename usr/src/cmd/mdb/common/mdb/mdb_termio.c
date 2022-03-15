@@ -45,7 +45,7 @@
  * response to editing commands.
  *
  * The terminal backend is also responsible for maintaining and manipulating
- * the settings (see stty(1) and termio(7I)) associated with the terminal.
+ * the settings (see stty(1) and termio(4I)) associated with the terminal.
  * The debugger makes use of four distinct sets of terminal attributes:
  *
  * (1) the settings used by the debugger's parent process (tio_ptios),
@@ -834,7 +834,7 @@ termio_resume_tty(termio_data_t *td, struct termios *iosp)
 		warn("failed to reset terminal attributes");
 
 	/*
-	 * Compute the terminal speed as described in termio(7I), and then
+	 * Compute the terminal speed as described in termio(4I), and then
 	 * look up the corresponding microseconds-per-char in our table.
 	 */
 	if (ntios->c_cflag & CBAUDEXT)
@@ -926,7 +926,7 @@ termio_delay(termio_data_t *td, uint_t usec)
 }
 
 /*
- * Parse the terminfo(4) padding sequence "$<...>" and delay for the specified
+ * Parse the terminfo(5) padding sequence "$<...>" and delay for the specified
  * amount of time by sending pad characters to the terminal.
  */
 static const char *
@@ -1020,7 +1020,7 @@ termio_puts(termio_data_t *td, const char *s, uint_t lines)
 /*
  * Print a padded escape sequence string to the terminal.  The caller specifies
  * the string 's' and a count of the affected lines.  If the string contains an
- * embedded delay sequence delimited by "$<>" (see terminfo(4)), appropriate
+ * embedded delay sequence delimited by "$<>" (see terminfo(5)), appropriate
  * padding will be included in the output.  We determine whether or not padding
  * is required during initialization, and set tio_putp to the proper subroutine.
  */
@@ -1476,7 +1476,7 @@ termio_setup_attrs(termio_data_t *td, const char *name)
 	 * While "xenl" doesn't dictate our TIO_AUTOWRAP setting, it does have
 	 * a subtle impact on the way we process input:  in addition to its
 	 * eponymous behavior of eating newlines, "xenl" denotes a second,
-	 * entirely orthogonal idiosyncracy.  As terminfo(4) tells it: "Those
+	 * entirely orthogonal idiosyncracy.  As terminfo(5) tells it: "Those
 	 * terminals whose cursor remains on the right-most column until
 	 * another character has been received, rather than wrapping
 	 * immediately upon receiving the right- most character, such as the

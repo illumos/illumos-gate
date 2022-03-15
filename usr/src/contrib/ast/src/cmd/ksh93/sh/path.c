@@ -121,7 +121,7 @@ static pid_t path_pfexecve(Shell_t *shp,const char *path, char *argv[],char *con
 	/* system call so we can save us to call access(2) first */
 
 	/* we can exec the command directly instead of via pfexec(1) if */
-	/* there is a matching entry without attributes in exec_attr(4) */
+	/* there is a matching entry without attributes in exec_attr(5) */
 	if(!path_xattr(shp,path,resolvedpath))
 		return(execve(path, argv, envp));
 	--argv;

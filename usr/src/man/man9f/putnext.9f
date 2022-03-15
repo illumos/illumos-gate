@@ -62,7 +62,10 @@ See \fBallocb\fR(9F) for an example of using \fBputnext()\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBput\fR(9E), \fBallocb\fR(9F), \fBput\fR(9F), \fBqprocson\fR(9F)
+.BR put (9E),
+.BR allocb (9F),
+.BR put (9F),
+.BR qprocson (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

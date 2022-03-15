@@ -140,7 +140,7 @@ be denied access to \fBat\fR. If neither file exists, only a user with the
 .sp
 .LP
 \fBcron\fR and \fBat\fR jobs are not be executed if the user's account is
-locked. Only accounts which are not locked as defined in \fBshadow\fR(4) will
+locked. Only accounts which are not locked as defined in \fBshadow\fR(5) will
 have their job or process executed.
 .SS "batch"
 .sp
@@ -175,7 +175,7 @@ are respectively equivalent to:
 where queue \fBb\fR is a special \fBat\fR queue, specifically for batch jobs.
 Batch jobs are submitted to the batch queue for immediate execution. Execution
 of submitted jobs can be delayed by limits on the number of jobs allowed to run
-concurrently. See \fBqueuedefs\fR(4).
+concurrently. See \fBqueuedefs\fR(5).
 .SH OPTIONS
 .sp
 .LP
@@ -562,7 +562,7 @@ diff file1 file2 2>&1 >outfile | mailx mygroup
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBat\fR and \fBbatch\fR: \fBLANG\fR,
 \fBLC_ALL\fR, \fBLC_CTYPE\fR,  \fBLC_MESSAGES\fR,  \fBNLSPATH\fR, and
 \fBLC_TIME\fR.
@@ -655,7 +655,7 @@ names of users, one per line, who are denied access to the \fBat\fR and
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/at"
 .sp
 
@@ -719,14 +719,27 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBauths\fR(1), \fBcrontab\fR(1), \fBcsh\fR(1), \fBdate\fR(1), \fBksh\fR(1),
-\fBsh\fR(1), \fBtouch\fR(1), \fBulimit\fR(1), \fBumask\fR(1), \fBcron\fR(1M),
-\fBgetdate\fR(3C), \fBauth_attr\fR(4), \fBshadow\fR(4), \fBqueuedefs\fR(4),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR auths (1),
+.BR crontab (1),
+.BR csh (1),
+.BR date (1),
+.BR ksh (1),
+.BR sh (1),
+.BR touch (1),
+.BR ulimit (1),
+.BR umask (1),
+.BR getdate (3C),
+.BR auth_attr (5),
+.BR queuedefs (5),
+.BR shadow (5),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7),
+.BR cron (8)
 .SH NOTES
 .sp
 .LP
-Regardless of queue used, \fBcron\fR(1M) has a limit of 100 jobs in execution
+Regardless of queue used, \fBcron\fR(8) has a limit of 100 jobs in execution
 at any time.
 .sp
 .LP

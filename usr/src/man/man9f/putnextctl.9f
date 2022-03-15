@@ -59,7 +59,7 @@ dereferencing \fIq\fR through its \fBq_next\fR field and then invoking
 .sp
 .LP
 The \fBputnextctl()\fR function should always be used in preference to
-\fBputctl\fR(9F)
+.BR putctl (9F)
 .SH RETURN VALUES
 .sp
 .LP
@@ -109,8 +109,11 @@ is detected,  \fBcmn_err\fR(9F) panics the system (line 18).
 .SH SEE ALSO
 .sp
 .LP
-\fBput\fR(9E), \fBcmn_err\fR(9F), \fBdatamsg\fR(9F), \fBputctl\fR(9F),
-\fBputnextctl1\fR(9F)
+.BR put (9E),
+.BR cmn_err (9F),
+.BR datamsg (9F),
+.BR putctl (9F),
+.BR putnextctl1 (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

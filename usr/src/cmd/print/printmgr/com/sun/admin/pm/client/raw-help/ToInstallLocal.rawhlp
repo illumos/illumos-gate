@@ -113,7 +113,7 @@ If you want to restrict its use to individual users, enter a user name
 in the text field below the list and click Add. Other legal constructs
 are system-name!login-ID (user "login-ID" on system "system-name"),
 system-name!all (all users on system "system-name"), and all!login-ID
-(user "login-ID" on all systems). Use the lpadmin(1M) command to deny
+(user "login-ID" on all systems). Use the lpadmin(8) command to deny
 access to users. 
 
 <p>

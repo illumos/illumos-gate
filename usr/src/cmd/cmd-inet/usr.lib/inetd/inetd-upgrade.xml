@@ -23,8 +23,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -101,7 +99,7 @@ inetd-upgrade handles the upgrade of old inetd.conf entries to SMF service insta
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='inetd' section='1M'
+			<manpage title='inetd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

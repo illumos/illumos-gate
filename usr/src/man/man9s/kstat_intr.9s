@@ -107,7 +107,7 @@ Multiple service interrupt
 .RE
 
 .SH SEE ALSO
-\fBkstat\fR(9S)
+.BR kstat (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

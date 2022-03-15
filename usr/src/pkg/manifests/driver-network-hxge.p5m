@@ -42,8 +42,8 @@ file path=kernel/drv/$(ARCH64)/hxge group=sys
 file path=kernel/drv/hxge.conf group=sys \
     original_name=SUNWhxge:kernel/drv/hxge.conf preserve=renamenew
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/hxge.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/hxge.4d
 $(i386_ONLY)driver name=hxge perms="* 0600 root sys" alias=pci108e,aaaa
 $(sparc_ONLY)driver name=hxge perms="* 0600 root sys" alias=pciex108e,aaaa
 legacy pkg=SUNWhxge desc="SUN 10Gb hxge Ethernet Network Adapter Driver" \

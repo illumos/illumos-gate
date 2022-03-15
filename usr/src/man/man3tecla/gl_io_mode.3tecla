@@ -525,7 +525,7 @@ key for the specified interval, so if the interval is long and the user keeps
 typing, \fBgl_get_line()\fR might not return for a while. There is no guarantee
 that it will return in the time specified.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -541,6 +541,10 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBcpl_complete_word\fR(3TECLA), \fBef_expand_file\fR(3TECLA),
-\fBgl_get_line\fR(3TECLA), \fBlibtecla\fR(3LIB), \fBpca_lookup_file\fR(3TECLA),
-\fBattributes\fR(5), \fBtecla\fR(5)
+.BR libtecla (3LIB),
+.BR cpl_complete_word (3TECLA),
+.BR ef_expand_file (3TECLA),
+.BR gl_get_line (3TECLA),
+.BR pca_lookup_file (3TECLA),
+.BR attributes (7),
+.BR tecla (7)

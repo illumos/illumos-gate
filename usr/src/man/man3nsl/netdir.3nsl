@@ -61,7 +61,7 @@ The \fBnetdir\fR functions provide a generic interface for name-to-address
 mapping that will work with all transport protocols. This interface provides a
 generic way for programs to convert transport specific addresses into common
 structures and back again. The \fBnetconfig\fR structure, described on the
-\fBnetconfig\fR(4) manual page, identifies the transport.
+\fBnetconfig\fR(5) manual page, identifies the transport.
 .sp
 .LP
 The \fBnetdir_getbyname()\fR function maps the machine name and service name in
@@ -309,7 +309,7 @@ data.
 The \fBnetdir_getbyname()\fR, \fBnetdir_getbyaddr()\fR, and \fBnetdir_options()\fR
 functions return \fB0\fR on success and a non-zero value on failure.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -323,5 +323,8 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBgethostname\fR(3C), \fBgetnetconfig\fR(3NSL), \fBgetnetpath\fR(3NSL),
-\fBnetconfig\fR(4), \fBattributes\fR(5)
+.BR gethostname (3C),
+.BR getnetconfig (3NSL),
+.BR getnetpath (3NSL),
+.BR netconfig (5),
+.BR attributes (7)

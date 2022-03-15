@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <pwd.h>
 #include <locale.h>
 #include <syslog.h>
@@ -38,7 +35,7 @@ extern uint_t kwarn_del_warning(char *);
 
 /*
  * Store the forwarded creds in the user's local ccache and register
- * w/ktkt_warnd(1M).
+ * w/ktkt_warnd(8).
  */
 krb5_error_code
 store_forw_creds(krb5_context context,
@@ -86,7 +83,7 @@ store_forw_creds(krb5_context context,
 	if ((retval = krb5_cc_close(context, *ccache)) != 0)
 		goto cleanup;
 
-	/* Register with ktkt_warnd(1M) */
+	/* Register with ktkt_warnd(8) */
 	if ((retval = krb5_unparse_name(context, (*creds)->client,
 	    &client_name)) != 0)
 		goto cleanup;
@@ -94,7 +91,7 @@ store_forw_creds(krb5_context context,
 	if (kwarn_add_warning(client_name, (*creds)->times.endtime) != 0) {
 		syslog(LOG_AUTH|LOG_NOTICE,
 		    "store_forw_creds: kwarn_add_warning"
-		    " failed: ktkt_warnd(1M) down? ");
+		    " failed: ktkt_warnd(8) down? ");
 	}
 	free(client_name);
 	client_name = NULL;

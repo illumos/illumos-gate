@@ -2134,7 +2134,7 @@ __td_thr_validate(const td_thrhandle_t *th_p)
 
 /*
  * Get a thread's private binding to a given thread specific
- * data(TSD) key(see thr_getspecific(3T).  If the thread doesn't
+ * data(TSD) key(see thr_getspecific(3C).  If the thread doesn't
  * have a binding for a particular key, then NULL is returned.
  */
 #pragma weak td_thr_tsd = __td_thr_tsd

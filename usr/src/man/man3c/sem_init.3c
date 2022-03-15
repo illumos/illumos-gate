@@ -141,7 +141,7 @@ The process lacks the appropriate privileges to initialize the semaphore.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -155,11 +155,15 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBsem_destroy\fR(3C), \fBsem_open\fR(3C), \fBsem_post\fR(3C),
-\fBsem_wait\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR sem_destroy (3C),
+.BR sem_open (3C),
+.BR sem_post (3C),
+.BR sem_wait (3C),
+.BR attributes (7),
+.BR standards (7)

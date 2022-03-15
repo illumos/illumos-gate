@@ -69,4 +69,7 @@ User's profile file
 .SH SEE ALSO
 .sp
 .LP
-\fBcsh\fR(1), \fBmail\fR(1), \fBsh\fR(1), \fBattributes\fR(5)
+.BR csh (1),
+.BR mail (1),
+.BR sh (1),
+.BR attributes (7)

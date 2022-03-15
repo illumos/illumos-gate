@@ -23,7 +23,7 @@
 #
 # /etc/user_attr
 #
-# user attributes. see user_attr(4)
+# user attributes. see user_attr(5)
 #
 #
 adm::::profiles=Log Management

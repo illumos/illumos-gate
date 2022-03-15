@@ -54,7 +54,7 @@ until a call to \fBsasl_dispose\fR(3SASL) on the \fBsasl_conn_t\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -72,6 +72,8 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsasl_dispose\fR(3SASL), \fBsasl_errors\fR(3SASL),
-\fBsasl_server_new\fR(3SASL), \fBsasl_server_start\fR(3SASL),
-\fBattributes\fR(5)
+.BR sasl_dispose (3SASL),
+.BR sasl_errors (3SASL),
+.BR sasl_server_new (3SASL),
+.BR sasl_server_start (3SASL),
+.BR attributes (7)

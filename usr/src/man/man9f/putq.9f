@@ -68,7 +68,10 @@ See the \fBdatamsg\fR(9F) function page for an example of \fBputq()\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBdatamsg\fR(9F), \fBputbq\fR(9F), \fBqenable\fR(9F), \fBrmvq\fR(9F)
+.BR datamsg (9F),
+.BR putbq (9F),
+.BR qenable (9F),
+.BR rmvq (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

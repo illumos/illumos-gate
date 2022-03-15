@@ -140,7 +140,7 @@ Except for \fBcurs_set()\fR, these routines always return \fBOK\fR.
 \fBcurs_set()\fR returns the previous cursor state, or \fBERR\fR if the
 requested \fIvisibility\fR is not supported.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -154,9 +154,13 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-\fBcurs_initscr\fR(3CURSES), \fBcurs_outopts\fR(3CURSES),
-\fBcurs_refresh\fR(3CURSES), \fBcurs_scr_dump\fR(3CURSES),
-\fBcurs_slk\fR(3CURSES), \fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.BR curs_initscr (3CURSES),
+.BR curs_outopts (3CURSES),
+.BR curs_refresh (3CURSES),
+.BR curs_scr_dump (3CURSES),
+.BR curs_slk (3CURSES),
+.BR curses (3CURSES),
+.BR attributes (7)
 .SH NOTES
 The header <\fBcurses.h\fR> automatically includes the headers  <\fBstdio.h\fR>
 and <\fBunctrl.h\fR>.

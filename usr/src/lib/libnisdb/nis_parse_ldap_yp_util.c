@@ -1196,7 +1196,7 @@ getfullmapname(char **mapname, const char *domainname)
  * existing fqdn table mapping structure results. That would be the
  * case when a full qualified domain specific attribute was present.
  *
- * Note that per NISLDAPmapping(4) such an attribute MUST be listed
+ * Note that per NISLDAPmapping(5) such an attribute MUST be listed
  * in the mapping file BEFORE its non-fqdn counterpart.
  *
  * RETURNS:	0 normal exit, 1 if an existing structure found, -1 for all

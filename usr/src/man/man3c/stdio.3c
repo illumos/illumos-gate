@@ -116,7 +116,7 @@ than 255 files may be opened using \fBfopen()\fR, and only file descriptors 0
 through 255 can be used in a stream. This restriction only holds for the 32-bit
 compilation environment. The 64-bit environment may use more streams and the use
 of more than 255 may be enabled in a 32-bit environment through the use of
-\fBextendedFILE\fR(5).
+\fBextendedFILE\fR(7).
 .sp
 .LP
 The functions and constants mentioned in the entries of section 3S of this
@@ -337,6 +337,12 @@ error conditions.
 \fBferror\fR(3C), \fBfmemopen\fR(3C), \fBfopen\fR(3C), \fBfread\fR(3C),
 \fBfseek\fR(3C), \fBflockfile\fR(3C), \fBgetc\fR(3C), \fBgets\fR(3C),
 \fBopen_memstream(3C)\fR, \fBopen_wmemstream(3C(\fR, \fBpopen\fR(3C),
-\fBprintf\fR(3C), \fBputc\fR(3C), \fBputs\fR(3C), \fBscanf\fR(3C),
-\fBsetbuf\fR(3C), \fBsystem\fR(3C), \fBtmpfile\fR(3C), \fBtmpnam\fR(3C),
-\fBungetc\fR(3C)
+.BR printf (3C),
+.BR putc (3C),
+.BR puts (3C),
+.BR scanf (3C),
+.BR setbuf (3C),
+.BR system (3C),
+.BR tmpfile (3C),
+.BR tmpnam (3C),
+.BR ungetc (3C)

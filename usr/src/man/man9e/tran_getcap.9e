@@ -104,8 +104,12 @@ the capability, and  \fB\(mi1\fR if the capability was not defined.
 \fBtran_getcap()\fR must return the current value of a capability or
 \fB\(mi1\fR if the capability was not defined.
 .SH SEE ALSO
-\fBattach\fR(9E), \fBscsi_hba_attach\fR(9F), \fBscsi_hba_lookup_capstr\fR(9F),
-\fBscsi_ifgetcap\fR(9F), \fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S)
+.BR attach (9E),
+.BR scsi_hba_attach (9F),
+.BR scsi_hba_lookup_capstr (9F),
+.BR scsi_ifgetcap (9F),
+.BR scsi_address (9S),
+.BR scsi_hba_tran (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

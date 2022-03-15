@@ -108,11 +108,11 @@ See \fBddi_model_convert_from\fR(9F) for more information.
 .SH STREAM IOCTLS
 .sp
 .LP
-For a general description of streams ioctls see \fBstreamio\fR(7I).
+For a general description of streams ioctls see \fBstreamio\fR(4I).
 \fBldi_ioctl()\fR supports a number of streams ioctls, using layered handles in
 the place of file descriptors. When issuing streams ioctls the \fBFKIOCTL\fR
 parameter should be specified. The possible return values for supported ioctl
-commands are also documented in \fBstreamio\fR(7I).
+commands are also documented in \fBstreamio\fR(4I).
 .sp
 .LP
 The following streams ioctls are supported:
@@ -122,7 +122,7 @@ The following streams ioctls are supported:
 \fBI_PLINK\fR
 .ad
 .RS 13n
-Behaves as documented in \fBstreamio\fR(7I). The layered handle \fIlh\fR should
+Behaves as documented in \fBstreamio\fR(4I). The layered handle \fIlh\fR should
 point to the streams multiplexer. The \fIarg\fR parameter should point to a
 layered handle for another streams driver.
 .RE
@@ -133,7 +133,7 @@ layered handle for another streams driver.
 \fBI_UNPLINK\fR
 .ad
 .RS 13n
-Behaves as documented in \fBstreamio\fR(7I)).  The layered handle \fIlh\fR
+Behaves as documented in \fBstreamio\fR(4I)).  The layered handle \fIlh\fR
 should point to the streams multiplexer. The \fIarg\fR parameter is the
 multiplexor ID number returned by \fBI_PLINK\fR when the streams were linked.
 .RE
@@ -170,4 +170,5 @@ These functions can be called from user or kernel context.
 .SH SEE ALSO
 .sp
 .LP
-\fBstreamio\fR(7I), \fBddi_model_convert_from\fR(9F)
+.BR streamio (4I),
+.BR ddi_model_convert_from (9F)

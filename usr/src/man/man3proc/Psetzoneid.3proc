@@ -54,7 +54,7 @@ which will cause the process to terminate if the process that holds
 .Fa P
 unexpectedly terminates.
 See
-.Xr proc 4
+.Xr proc 5
 for more information on the
 .Sy PR_KLC
 flag.
@@ -78,7 +78,7 @@ is set.
 For a full list of possible errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Psetzoneid
@@ -101,6 +101,6 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4 ,
-.Xr privileges 5 ,
-.Xr zones 5
+.Xr proc 5 ,
+.Xr privileges 7 ,
+.Xr zones 7

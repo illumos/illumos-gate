@@ -49,9 +49,9 @@ Pointer to a \fBscsi_device\fR(9S) structure of the target.
 
 .SH DESCRIPTION
 The \fBscsi_get_device_type_string()\fR function looks up the \fIprop_name\fR
-property, which can be specified in the HBA's \fBdriver.conf\fR(4)file. This
+property, which can be specified in the HBA's \fBdriver.conf\fR(5)file. This
 property allows specification of per-device-type information. The syntax for
-\fIprop_name\fR in a \fBdriver.conf\fR(4) file is:
+\fIprop_name\fR in a \fBdriver.conf\fR(5) file is:
 .sp
 .LP
 The formal syntax is:
@@ -116,7 +116,7 @@ kmem_free(info, strlen(info) + 1);
 .SH CONTEXT
 This function can be called from kernel or interrupt context.
 .SH SEE ALSO
-\fBdriver.conf\fR(4)
+.BR driver.conf (5)
 .sp
 .LP
 \fIWriting Device Drivers \fR

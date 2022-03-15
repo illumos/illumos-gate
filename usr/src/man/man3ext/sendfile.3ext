@@ -142,7 +142,7 @@ A signal was caught during the write operation and no data was transferred.
 .SH USAGE
 .LP
 The \fBsendfile()\fR function has a transitional interface for 64-bit file
-offsets. See \fBlf64\fR(5).
+offsets. See \fBlf64\fR(7).
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRSending a Buffer Over a Socket
@@ -250,7 +250,7 @@ while (len > 0) {
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -267,5 +267,9 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBopen\fR(2), \fBlibsendfile\fR(3LIB), \fBsendfilev\fR(3EXT),
-\fBsocket\fR(3SOCKET), \fBattributes\fR(5), \fBlf64\fR(5)
+.BR open (2),
+.BR sendfilev (3EXT),
+.BR libsendfile (3LIB),
+.BR socket (3SOCKET),
+.BR attributes (7),
+.BR lf64 (7)

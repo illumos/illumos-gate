@@ -134,9 +134,16 @@ xxrput(qp, mp)
 .in -2
 
 .SH SEE ALSO
-\fBclose\fR(9E), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E),
-\fBcondvar\fR(9F), \fBddi_can_receive_sig\fR(9F), \fBmt-streams\fR(9F),
-\fBqbufcall\fR(9F), \fBqprocson\fR(9F), \fBqtimeout\fR(9F)
+.BR close (9E),
+.BR open (9E),
+.BR put (9E),
+.BR srv (9E),
+.BR condvar (9F),
+.BR ddi_can_receive_sig (9F),
+.BR mt-streams (9F),
+.BR qbufcall (9F),
+.BR qprocson (9F),
+.BR qtimeout (9F)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

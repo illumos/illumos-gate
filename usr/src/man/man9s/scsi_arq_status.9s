@@ -66,8 +66,10 @@ request sense command.
 \fBsts_sensedata\fR contains the actual sense data if the request sense command
 completed normally.
 .SH SEE ALSO
-\fBscsi_ifgetcap\fR(9F), \fBscsi_init_pkt\fR(9F),
-\fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.BR scsi_ifgetcap (9F),
+.BR scsi_init_pkt (9F),
+.BR scsi_extended_sense (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

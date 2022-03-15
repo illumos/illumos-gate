@@ -230,7 +230,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		 * Allocate a polldat_t structure per fd
 		 * The use of the polldat_t structure to cache file descriptors
 		 * is required to be able to share the pollwakeup() function
-		 * with poll(2) and devpoll(7d).
+		 * with poll(2) and devpoll(4D).
 		 */
 		pfd = kmem_zalloc(sizeof (portfd_t), KM_SLEEP);
 		pdp = PFTOD(pfd);

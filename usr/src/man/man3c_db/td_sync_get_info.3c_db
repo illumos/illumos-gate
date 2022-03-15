@@ -300,7 +300,7 @@ A libc_db-internal error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -317,4 +317,4 @@ MT-Level	Safe
 .sp
 .LP
 \fBlibc_db\fR(3LIB), \fBmutex_init\fR(3C), \fBtd_ta_map_addr2sync\fR(3C_DB),
-\fBtd_ta_sync_iter\fR(3C_DB), \fBtd_ta_thr_iter\fR(3C_DB), \fBattributes\fR(5)
+\fBtd_ta_sync_iter\fR(3C_DB), \fBtd_ta_thr_iter\fR(3C_DB), \fBattributes\fR(7)

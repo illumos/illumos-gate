@@ -303,7 +303,8 @@ No \fBPCMCIA\fR hardware installed.
 .SH CONTEXT
 This function may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_DeregisterClient\fR(9F), \fBcsx_RequestSocketMask\fR(9F)
+.BR csx_DeregisterClient (9F),
+.BR csx_RequestSocketMask (9F)
 .sp
 .LP
 \fIPC Card 95 Standard\fR, PCMCIA/JEIDA

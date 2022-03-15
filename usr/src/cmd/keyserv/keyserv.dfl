@@ -1,4 +1,3 @@
-#ident	"%Z%%M%	%I%	%E% SMI"
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -25,10 +24,10 @@
 #
 # /etc/default/keyserv
 #
-# keyserv default settings processed via keyserv(1M).
+# keyserv default settings processed via keyserv(8).
 #
 # ENABLE_NOBODY_KEYS affects whether default keys for nobody are used, see
-# keyserv(1M) for details.  The default value is "YES".  A value of "NO"
+# keyserv(8) for details.  The default value is "YES".  A value of "NO"
 # (any case) results in disabling of these keys; any other value is
 # ignored.
 #

@@ -39,8 +39,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/usbsksp group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/usbsksp.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/usbsksp.4d
 driver name=usbsksp perms="* 0666 root sys" \
     alias=usb6cd,11a \
     alias=usb6cd,121 \

@@ -161,7 +161,7 @@ the close operation will not cause the \fBposix_spawn()\fR or
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -175,13 +175,17 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBclose\fR(2), \fBdup\fR(2), \fBopen\fR(2), \fBposix_spawn\fR(3C),
-\fBposix_spawn_file_actions_adddup2\fR(3C),
-\fBposix_spawn_file_actions_destroy\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR close (2),
+.BR dup (2),
+.BR open (2),
+.BR posix_spawn (3C),
+.BR posix_spawn_file_actions_adddup2 (3C),
+.BR posix_spawn_file_actions_destroy (3C),
+.BR attributes (7),
+.BR standards (7)

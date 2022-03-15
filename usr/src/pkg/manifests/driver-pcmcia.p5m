@@ -42,9 +42,9 @@ file path=kernel/drv/$(ARCH64)/pcic group=sys
 file path=kernel/drv/$(ARCH64)/pcs group=sys
 file path=kernel/drv/pcic.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/pcic.7d
-file path=usr/share/man/man7d/pcmcia.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/pcic.4d
+file path=usr/share/man/man4d/pcmcia.4d
 driver name=pcic class=pcmcia \
     alias=pciclass,060500 \
     alias=pciclass,060700

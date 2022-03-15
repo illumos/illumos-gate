@@ -63,7 +63,7 @@ When a pseudo-terminal manager device is opened, whether through
 or
 .Xr open 2
 on a
-.Xr ptm 7D
+.Xr ptm 4D
 device, the subsidiary device begins operation in a locked state.
 The
 .Fn unlockpt
@@ -106,6 +106,6 @@ argument is not associated with a pseudo-terminal manager device.
 .Xr grantpt 3C ,
 .Xr posix_openpt 3C ,
 .Xr ptsname 3C ,
-.Xr attributes 5 ,
-.Xr standards 5 ,
-.Xr ptm 7D
+.Xr ptm 4D ,
+.Xr attributes 7 ,
+.Xr standards 7

@@ -88,12 +88,12 @@
 			<manpage title='allocate' section='1' manpath='/usr/share/man' />
 			<manpage title='deallocate' section='1' manpath='/usr/share/man' />
 			<manpage title='list_devices' section='1' manpath='/usr/share/man' />
-			<manpage title='device_allocate' section='1M' manpath='/usr/share/man' />
-			<manpage title='mkdevalloc' section='1M' manpath='/usr/share/man' />
-			<manpage title='mkdevmaps' section='1M' manpath='/usr/share/man' />
-			<manpage title='dminfo' section='1M' manpath='/usr/share/man' />
-			<manpage title='device_maps' section='4' manpath='/usr/share/man' />
-			<manpage title='device_allocate' section='4' manpath='/usr/share/man' />
+			<manpage title='device_allocate' section='8' manpath='/usr/share/man' />
+			<manpage title='mkdevalloc' section='8' manpath='/usr/share/man' />
+			<manpage title='mkdevmaps' section='8' manpath='/usr/share/man' />
+			<manpage title='dminfo' section='8' manpath='/usr/share/man' />
+			<manpage title='device_maps' section='5' manpath='/usr/share/man' />
+			<manpage title='device_allocate' section='5' manpath='/usr/share/man' />
 		</documentation>
 	</template>
 </service>

@@ -34,12 +34,12 @@ session can be kerberized using any of the following Kerberos specific options:
 \fB-A\fR, \fB-PN\fR or \fB-PO\fR, \fB-x\fR, \fB-f\fR or \fB-F\fR, and \fB-k\fR
 \fIrealm\fR. Some of these options (\fB-A\fR, \fB-x\fR, \fB-PN\fR or \fB-PO\fR,
 and \fB-f\fR or \fB-F\fR) can also be specified in the \fB[appdefaults]\fR
-section of \fBkrb5.conf\fR(4). The usage of these options and the expected
+section of \fBkrb5.conf\fR(5). The usage of these options and the expected
 behavior is discussed in the OPTIONS section below. If Kerberos authentication
 is used, authorization to the account is controlled through rules in
-\fBkrb5_auth_rules\fR(5). If this authorization fails, fallback to normal
+\fBkrb5_auth_rules\fR(7). If this authorization fails, fallback to normal
 \fBrlogin\fR using \fBrhosts\fR occurs only if the \fB-PO\fR option is used
-explicitly on the command line or is specified in \fBkrb5.conf\fR(4). Also
+explicitly on the command line or is specified in \fBkrb5.conf\fR(5). Also
 notice that the \fB-PN\fR or \fB-PO\fR, \fB-x\fR, \fB-f\fR or \fB-F\fR, and
 \fB-k\fR \fIrealm\fR options are just supersets of the \fB-A\fR option.
 .sp
@@ -79,7 +79,7 @@ username.
 .ad
 .RS 15n
 Explicitly enables Kerberos authentication and trusts the \fB\&.k5login\fR file
-for access-control. If the authorization check by \fBin.rlogind\fR(1M) on the
+for access-control. If the authorization check by \fBin.rlogind\fR(8) on the
 server-side succeeds and if the \fB\&.k5login\fR file permits access, the user
 is allowed to login without supplying a password.
 .RE
@@ -141,7 +141,7 @@ This option is mutually exclusive with the \fB-f\fR option.
 .ad
 .RS 15n
 Causes \fBrlogin\fR to obtain tickets for the remote host in \fIrealm\fR
-instead of the remote host's realm as determined by \fBkrb5.conf\fR(4).
+instead of the remote host's realm as determined by \fBkrb5.conf\fR(5).
 .RE
 
 .sp
@@ -151,7 +151,7 @@ instead of the remote host's realm as determined by \fBkrb5.conf\fR(4).
 .ad
 .RS 15n
 This option explicitly disables Kerberos authentication. It can be used to
-override the \fBautologin\fR variable in \fBkrb5.conf\fR(4).
+override the \fBautologin\fR variable in \fBkrb5.conf\fR(5).
 .RE
 
 .sp
@@ -188,7 +188,7 @@ Kerberos `\fBrcmd\fR' protocol. The new protocol avoids many security problems
 prevalent in the old one and is considered much more secure, but is not
 interoperable with older (MIT/SEAM) servers. The new protocol is used by
 default, unless explicitly specified using these options or by using
-\fBkrb5.conf\fR(4). If Kerberos authorization fails when using the old
+\fBkrb5.conf\fR(5). If Kerberos authorization fails when using the old
 `\fBrcmd\fR' protocol, there is fallback to regular, non-kerberized
 \fBrlogin\fR. This is not the case when the new, more secure `\fBrcmd\fR'
 protocol is used.
@@ -355,9 +355,16 @@ Hosts database.
 .RE
 
 .SH SEE ALSO
-\fBrsh\fR(1), \fBstty\fR(1), \fBtty\fR(1), \fBin.rlogind\fR(1M),
-\fBhosts\fR(4), \fBhosts.equiv\fR(4), \fBkrb5.conf\fR(4), \fBnologin\fR(4),
-\fBattributes\fR(5), \fBkrb5_auth_rules\fR(5)
+.BR rsh (1),
+.BR stty (1),
+.BR tty (1),
+.BR hosts (5),
+.BR hosts.equiv (5),
+.BR krb5.conf (5),
+.BR nologin (5),
+.BR attributes (7),
+.BR krb5_auth_rules (7),
+.BR in.rlogind (8)
 .SH DIAGNOSTICS
 The following message indicates that the machine is in the process of being
 shut down and logins have been disabled:

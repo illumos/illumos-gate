@@ -135,7 +135,7 @@ example% \fBdu\fR
 .LP
 If any of the \fBLC_*\fR variables, that is, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
 \fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR (see
-\fBenviron\fR(5)), are not set in the environment, the operational behavior of
+\fBenviron\fR(7)), are not set in the environment, the operational behavior of
 \fBdu\fR for each corresponding locale category is determined by the value of
 the \fBLANG\fR environment variable. If \fBLC_ALL\fR is set, its contents are
 used to override both the \fBLANG\fR and the other \fBLC_*\fR variables. If
@@ -170,8 +170,12 @@ default form found in the program itself (in most cases, U.S. English).
 .SH SEE ALSO
 .sp
 .LP
-\fBpwd\fR(1), \fBdf\fR(1M), \fBdu\fR(1), \fBquot\fR(1M), \fBattributes\fR(5),
-\fBenviron\fR(5)
+.BR du (1),
+.BR pwd (1),
+.BR attributes (7),
+.BR environ (7),
+.BR df (8),
+.BR quot (8)
 .SH NOTES
 .sp
 .LP

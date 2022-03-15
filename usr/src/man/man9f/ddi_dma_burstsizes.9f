@@ -42,7 +42,8 @@ to device's own limitations.
 .SH CONTEXT
 This function can be called from user or interrupt context.
 .SH SEE ALSO
-\fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_attr\fR(9S)
+.BR ddi_dma_alloc_handle (9F),
+.BR ddi_dma_attr (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

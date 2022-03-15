@@ -222,5 +222,5 @@ and
 .Xr timer_settime 3C ,
 .Xr timespec_get 3C ,
 .Xr types.h 3HEAD ,
-.Xr attributes 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr standards 7

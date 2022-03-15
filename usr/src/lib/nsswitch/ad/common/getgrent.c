@@ -96,7 +96,7 @@ getbynam(ad_backend_ptr be, void *a)
 		return ((nss_status_t)NSS_NOTFOUND);
 	}
 
-	/* Create group(4) style string */
+	/* Create group(5) style string */
 	if (update_buffer(be, argp, name, dname, gid) < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
@@ -137,12 +137,12 @@ getbygid(ad_backend_ptr be, void *a)
 
 	/*
 	 * NULL winname implies a local SID or unresolvable SID both of
-	 * which cannot be used to generated group(4) entry
+	 * which cannot be used to generated group(5) entry
 	 */
 	if (winname == NULL)
 		goto out;
 
-	/* Create group(4) style string */
+	/* Create group(5) style string */
 	if (update_buffer(be, argp, winname, windomain, argp->key.gid) < 0)
 		goto out;
 

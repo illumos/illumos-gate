@@ -107,7 +107,7 @@
 These routines implement
 .St -p1003.2
 regular expressions; see
-.Xr regex 5 .
+.Xr regex 7 .
 The
 .Fn regcomp
 function compiles an RE written as a string into an internal form,
@@ -171,7 +171,7 @@ may not be used in the same call to
 .It Dv REG_ICASE
 Compile for matching that ignores upper/lower case distinctions.
 See
-.Xr regex 5 .
+.Xr regex 7 .
 .It Dv REG_NOSUB
 Compile for matching that need only report success or failure,
 not what was matched.
@@ -323,7 +323,7 @@ match before the string.
 .El
 .Pp
 See
-.Xr regex 5
+.Xr regex 7
 for a discussion of what is matched in situations where an RE or a portion
 thereof could match any of several substrings of
 .Fa string .
@@ -750,9 +750,9 @@ function can be used safely in a multithreaded application as long as
 .Xr setlocale 3C
 is not being called to change the locale.
 .Sh SEE ALSO
-.Xr attributes 5 ,
-.Xr regex 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr regex 7 ,
+.Xr standards 7
 .Pp
 .St -p1003.2 ,
 sections 2.8

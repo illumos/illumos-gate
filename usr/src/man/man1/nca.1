@@ -60,7 +60,7 @@ Services\fR
 .sp
 .LP
 When native \fBPF_NCA\fR socket support does not exist in the web server, the
-\fBncad_addr\fR(4) interface must be used to provide NCA support in that web
+\fBncad_addr\fR(5) interface must be used to provide NCA support in that web
 server.
 .sp
 .LP
@@ -69,7 +69,7 @@ processes while running \fBNCA\fR might cause undesirable behavior.
 .sp
 .LP
 \fBNCA\fR supports the logging of in-kernel cache hits. See
-\fBncalogd.conf\fR(4). \fBNCA\fR stores logs in a binary format. Use the
+\fBncalogd.conf\fR(5). \fBNCA\fR stores logs in a binary format. Use the
 \fBncab2clf\fR(1) utility to convert the log from a binary format to the Common
 Log File format.
 .SH FILES
@@ -131,7 +131,7 @@ match with entries in \fB/etc/hostname.{}{0-9}\fR for \fBNCA\fR to function.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -147,14 +147,30 @@ Interface Stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBncab2clf\fR(1), \fBncakmod\fR(1), \fBclose\fR(2), \fBread\fR(2),
-\fBwrite\fR(2), \fBsendfilev\fR(3EXT), \fBaccept\fR(3SOCKET),
-\fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET), \fBdoor_bind\fR(3C),
-\fBdoor_call\fR(3C), \fBdoor_create\fR(3C), \fBgetsockopt\fR(3SOCKET),
-\fBlisten\fR(3SOCKET), \fBsetsockopt\fR(3SOCKET), \fBshutdown\fR(3SOCKET),
-\fBsocket.h\fR(3HEAD), \fBsocket\fR(3SOCKET), \fBncad_addr\fR(4),
-\fBnca.if\fR(4), \fBncakmod.conf\fR(4), \fBncaport.conf\fR(4),
-\fBncalogd.conf\fR(4), \fBattributes\fR(5)
+.BR ncab2clf (1),
+.BR ncakmod (1),
+.BR close (2),
+.BR read (2),
+.BR write (2),
+.BR door_bind (3C),
+.BR door_call (3C),
+.BR door_create (3C),
+.BR sendfilev (3EXT),
+.BR socket.h (3HEAD),
+.BR accept (3SOCKET),
+.BR bind (3SOCKET),
+.BR connect (3SOCKET),
+.BR getsockopt (3SOCKET),
+.BR listen (3SOCKET),
+.BR setsockopt (3SOCKET),
+.BR shutdown (3SOCKET),
+.BR socket (3SOCKET),
+.BR nca.if (5),
+.BR ncad_addr (5),
+.BR ncakmod.conf (5),
+.BR ncalogd.conf (5),
+.BR ncaport.conf (5),
+.BR attributes (7)
 .sp
 .LP
 \fISystem Administration Guide: IP Services\fR

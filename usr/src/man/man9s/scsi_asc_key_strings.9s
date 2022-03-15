@@ -33,7 +33,7 @@ message           Points to the NULL terminated ASCII string
 .in -2
 
 .SH SEE ALSO
-\fBscsi_vu_errmsg\fR(9F)
+.BR scsi_vu_errmsg (9F)
 .sp
 .LP
 \fIANSI Small Computer System Interface-2 (SCSI-2)\fR

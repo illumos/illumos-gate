@@ -23,7 +23,6 @@
 -- Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
 -- Use is subject to license terms.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=AddPrinterFailed -->
 
@@ -40,7 +39,7 @@ or underscores. A printer name can be a maximum of 14 characters long.
 Display the Command-Line Console to help pinpoint where the error
 may have occurred. Choose Show Command-Line Console from the Print
 Manager menu to display the Command-Line Console. See the man
-page for lpadmin(1M) for more information. 
+page for lpadmin(8) for more information. 
 
 <p>
 

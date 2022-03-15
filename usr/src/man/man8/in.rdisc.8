@@ -1,0 +1,196 @@
+'\" te
+.\" Copyright (c) 2004 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IN.RDISC 8 "Nov 9, 2006"
+.SH NAME
+in.rdisc, rdisc \- network router discovery daemon
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/in.rdisc\fR  [\fB-a\fR] [\fB-f\fR] [\fB-s\fR] [\fIsend-address\fR] [\fIreceive-address\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/sbin/in.rdisc\fR  \fB-r\fR [\fB-p\fR \fIpreference\fR] [\fB-T\fR \fIinterval\fR]
+ [\fIsend-address\fR] [\fIreceive-address\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBin.rdisc\fR remains part of the software distribution of the Solaris
+Operating Environment. It is, however, not used by default. \fBin.routed\fR(8)
+includes the functionality provided by \fBin.rdisc\fR. See \fBrouteadm\fR(8)
+for details of how to specify the IPV4 routing daemon.
+.sp
+.LP
+\fBin.rdisc\fR implements the \fBICMP\fR router discovery protocol. The first
+form of the command is used on hosts and the second form is used on routers.
+.sp
+.LP
+\fBin.rdisc\fR can be invoked in either the first form (host mode) or second
+form (router mode).
+.sp
+.LP
+On a host, \fBin.rdisc\fR populates the network routing tables with default
+routes. On a router, advertises the router to all the hosts.
+.sp
+.LP
+\fBin.rdisc\fR is managed by the service management facility (SMF), by means of
+the service identifier:
+.sp
+.in +2
+.nf
+svc:/network/routing/rdisc:default
+.fi
+.in -2
+.sp
+
+.SS "Host (First Form)"
+.sp
+.LP
+On a host, \fBin.rdisc\fR listens on the \fBALL_HOSTS\fR (224.0.0.1) multicast
+address for \fBROUTER_ADVERTISE\fR messages from routers. The received messages
+are handled by first ignoring those listed router addresses with which the host
+does not share a network. Among the remaining addresses, the ones with the
+highest preference are selected as default routers and a default route is
+entered in the kernel routing table for each one of them.
+.sp
+.LP
+Optionally, \fBin.rdisc\fR can avoid waiting for routers to announce themselves
+by sending out a few \fBROUTER_SOLICITATION\fR messages to the
+\fBALL_ROUTERS\fR (224.0.0.2) multicast address when it is started.
+.sp
+.LP
+A timer is associated with each router address. The address will no longer be
+considered for inclusion in the routing tables if the timer expires before a
+new \fIadvertise\fR message is received from the router. The address will also
+be excluded from consideration if the host receives an \fIadvertise\fR message
+with the preference being maximally negative or with a lifetime of zero.
+.SS "Router (Second Form)"
+.sp
+.LP
+When \fBin.rdisc\fR is started on a router, it uses the \fBSIOCGIFCONF\fR
+\fBioctl\fR(2) to find the interfaces configured into the system and it starts
+listening on the \fBALL_ROUTERS\fR multicast address on all the interfaces that
+support multicast. It sends out \fIadvertise\fR messages to the \fBALL_HOSTS\fR
+multicast address advertising all its \fBIP\fR addresses. A few initial
+\fIadvertise\fR messages are sent out during the first 30 seconds and after
+that it will transmit \fIadvertise\fR messages approximately every 600 seconds.
+.sp
+.LP
+When \fBin.rdisc\fR receives a \fIsolicitation\fR message, it sends an
+\fIadvertise\fR message to the host that sent the \fIsolicitation\fR message.
+.sp
+.LP
+When \fBin.rdisc\fR is terminated by a signal, it sends out an \fIadvertise\fR
+message with the preference being maximally negative.
+.SH OPTIONS
+.sp
+.LP
+Supported options and equivalent SMF service properties are listed below. SMF
+service properties are set using a command of the form:
+.sp
+.in +2
+.nf
+# \fBrouteadm -m rdisc:default \fIkey\fR=\fIvalue\fR\fR
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fB\fB-a\fR\fR
+.ad
+.RS 17n
+Accept all routers independent of the preference they have in their
+\fIadvertise\fR messages. Normally, \fBin.rdisc\fR only accepts (and enters in
+the kernel routing tables) the router or routers with the highest preference.
+Use of this option is equivalent to setting the \fBaccept_all\fR property to
+true.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 17n
+Run \fBin.rdisc\fR forever even if no routers are found. Normally,
+\fBin.rdisc\fR gives up if it has not received any \fIadvertise\fR message
+after soliciting three times, in which case it exits with a non-zero exit code.
+If \fB-f\fR is not specified in the first form then \fB-s\fR must be specified.
+For SMF execution, this option is required.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fR
+.ad
+.RS 17n
+Act as a router, rather than a host. Use of this option is equivalent to
+setting the \fBact_as_router\fR property to true.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 17n
+Send three \fIsolicitation\fR messages initially to quickly discover the
+routers when the system is booted. When \fB-s\fR is specified, \fBin.rdisc\fR
+exits with a non-zero exit code if it can not find any routers. This can be
+overridden with the \fB-f\fR option. This option is not compatible with SMF
+execution and is not supported for the \fBrdisc\fR service.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIpreference\fR\fR
+.ad
+.RS 17n
+Set the preference transmitted in the \fIsolicitation\fR messages. The default
+is zero. Use of this option is equivalent to setting the \fBpreference\fR
+property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-T\fR \fIinterval\fR\fR
+.ad
+.RS 17n
+Set the interval between transmitting the \fIadvertise\fR messages. The default
+time is 600 seconds. Use of this option is equivalent to setting the
+\fBtransmit_interval\fR property.
+.RE
+
+.sp
+.LP
+The \fBsend-address\fR and \fBreceive-address\fR daemon options  can be set by
+means of the \fBsend_address\fR and \fBreceive_address\fR properties.
+.SH SEE ALSO
+.sp
+.LP
+.BR ioctl (2),
+.BR icmp (4P),
+.BR inet (4P),
+.BR gateways (5),
+.BR attributes (7),
+.BR smf (7),
+.BR in.routed (8),
+.BR routeadm (8),
+.BR svcadm (8)
+.sp
+.LP
+Deering, S.E., editor, \fIICMP Router Discovery Messages\fR, \fBRFC\fR 1256,
+Network Information Center, SRI International, Menlo Park, California,
+September 1991.

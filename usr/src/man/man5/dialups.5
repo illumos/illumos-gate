@@ -1,0 +1,92 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DIALUPS 5 "May 4, 1994"
+.SH NAME
+dialups \- list of terminal devices requiring a dial-up password
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/dialups\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBdialups\fR is an  \fBASCII\fR file which contains a list of terminal devices
+that require a dial-up password. A dial-up password is an additional password
+required of users who access the computer through a modem or dial-up port.  The
+correct password must be entered before the user is granted access to the
+computer. The set of ports that require a dial-up password are  listed in the
+\fBdialups\fR file.
+.sp
+.LP
+Each entry in the \fBdialups\fR file is a single line of the form:
+.sp
+.in +2
+.nf
+\fIterminal-device\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where
+.sp
+.ne 2
+.na
+\fB\fIterminal-device\fR\fR
+.ad
+.RS 19n
+The full path name of the terminal device that will require a dial-up password
+for users accessing the computer through a modem or dial-up port.
+.RE
+
+.sp
+.LP
+The \fBdialups\fR file should be owned by the \fBroot\fR user and the
+\fBroot\fR group.  The file should have read and write permissions for the
+owner (\fBroot\fR) only.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample \fBdialups\fR file.
+.sp
+.LP
+Here is a sample \fBdialups\fR file:
+
+.sp
+.in +2
+.nf
+/dev/term/a
+/dev/term/b
+/dev/term/c
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/d_passwd\fR\fR
+.ad
+.RS 17n
+dial-up password file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/dialups\fR\fR
+.ad
+.RS 17n
+list of dial-up ports requiring dial-up passwords
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR d_passwd (5)

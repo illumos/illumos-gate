@@ -70,7 +70,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -86,4 +86,8 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBpvs\fR(1), \fBIntro\fR(3), \fBexp\fR(3M), \fBmp\fR(3MP), \fBattributes\fR(5)
+.BR pvs (1),
+.BR Intro (3),
+.BR exp (3M),
+.BR mp (3MP),
+.BR attributes (7)

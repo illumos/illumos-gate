@@ -70,8 +70,11 @@ If the queue is full.
 .SH SEE ALSO
 .sp
 .LP
-\fBbcanput\fR(9F), \fBbcanputnext\fR(9F), \fBcanputnext\fR(9F),
-\fBputbq\fR(9F), \fBputnext\fR(9F)
+.BR bcanput (9F),
+.BR bcanputnext (9F),
+.BR canputnext (9F),
+.BR putbq (9F),
+.BR putnext (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

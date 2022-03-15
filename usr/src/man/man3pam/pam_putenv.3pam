@@ -121,7 +121,7 @@ Permission denied.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -139,8 +139,12 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBdlopen\fR(3C), \fBpam\fR(3PAM), \fBpam_getenv\fR(3PAM),
-\fBpam_getenvlist\fR(3PAM), \fBlibpam\fR(3LIB), \fBattributes\fR(5)
+.BR dlopen (3C),
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_getenv (3PAM),
+.BR pam_getenvlist (3PAM),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

@@ -56,7 +56,7 @@ The \fBmin()\fR function can be called from user, interrupt, or kernel context.
 .SH SEE ALSO
 .sp
 .LP
-\fBmax\fR(9F)
+.BR max (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

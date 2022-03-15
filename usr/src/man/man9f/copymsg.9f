@@ -94,7 +94,9 @@ message is returned (line 21).
 .SH SEE ALSO
 .sp
 .LP
-\fBallocb\fR(9F), \fBcopyb\fR(9F), \fBmsgb\fR(9S)
+.BR allocb (9F),
+.BR copyb (9F),
+.BR msgb (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

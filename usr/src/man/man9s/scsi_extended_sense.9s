@@ -273,7 +273,7 @@ that has failed.
 valid bit (bit 7) is \fB1\fR. This field is reserved for sense keys not defined
 above.
 .SH SEE ALSO
-\fBscsi_device\fR(9S)
+.BR scsi_device (9S)
 .sp
 .LP
 \fIANSI Small Computer System Interface-2 (SCSI-2)\fR

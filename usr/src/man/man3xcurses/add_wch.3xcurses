@@ -122,7 +122,7 @@ None.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -140,8 +140,18 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBattr_off\fR(3XCURSES), \fBbkgrndset\fR(3XCURSES), \fBcurses\fR(3XCURSES),
-\fBdoupdate\fR(3XCURSES), \fBin_wch\fR(3XCURSES), \fBins_wch\fR(3XCURSES),
-\fBlibcurses\fR(3XCURSES), \fBnl\fR(3XCURSES), \fBprintw\fR(3XCURSES),
-\fBscrollok\fR(3XCURSES), \fBscrl\fR(3XCURSES), \fBsetscrreg\fR(3XCURSES),
-\fBterminfo\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR attr_off (3XCURSES),
+.BR bkgrndset (3XCURSES),
+.BR curses (3XCURSES),
+.BR doupdate (3XCURSES),
+.BR in_wch (3XCURSES),
+.BR ins_wch (3XCURSES),
+.BR libcurses (3XCURSES),
+.BR nl (3XCURSES),
+.BR printw (3XCURSES),
+.BR scrl (3XCURSES),
+.BR scrollok (3XCURSES),
+.BR setscrreg (3XCURSES),
+.BR terminfo (5),
+.BR attributes (7),
+.BR standards (7)

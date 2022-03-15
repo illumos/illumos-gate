@@ -363,7 +363,7 @@ the latter case it is allowed to return \fBDAT_INVALID_PARAMETER\fR when a
 mismatch is detected. Provider must allocate resources to satisfy the
 combination of these two EP attributes for local RDMA Read DTOs.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -379,6 +379,9 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBdat_ep_create\fR(3DAT), \fBdat_srq_create\fR(3DAT),
-\fBdat_srq_free\fR(3DAT), \fBdat_srq_query\fR(3DAT), \fBlibdat\fR(3LIB),
-\fBattributes\fR(5)
+.BR dat_ep_create (3DAT),
+.BR dat_srq_create (3DAT),
+.BR dat_srq_free (3DAT),
+.BR dat_srq_query (3DAT),
+.BR libdat (3LIB),
+.BR attributes (7)

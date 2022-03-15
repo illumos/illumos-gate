@@ -570,7 +570,7 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 	/*
 	 * Step 2: AF_INET, v4 lookup. Since we're going to search the
 	 * ipnodes (v6) path first, we need to treat this as a v4mapped
-	 * address. nscd(1m) caches v4 from ipnodes as mapped v6's. The
+	 * address. nscd(8) caches v4 from ipnodes as mapped v6's. The
 	 * switch backend knows to lookup v4's (not v4mapped) from the
 	 * name services.
 	 */

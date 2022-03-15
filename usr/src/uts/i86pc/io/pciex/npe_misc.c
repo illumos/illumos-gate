@@ -25,7 +25,7 @@
  */
 
 /*
- *	Library file that has miscellaneous support for npe(7d)
+ *	Library file that has miscellaneous support for npe(4D)
  */
 
 #include <sys/conf.h>

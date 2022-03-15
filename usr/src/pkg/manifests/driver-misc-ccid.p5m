@@ -48,9 +48,9 @@ dir  path=usr/sbin variant.opensolaris.zone=global
 file path=usr/sbin/ccidadm mode=0555 variant.opensolaris.zone=global
 dir  path=usr/share
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m variant.opensolaris.zone=global
-file path=usr/share/man/man1m/ccidadm.1m variant.opensolaris.zone=global
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/ccid.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/ccid.4d
+dir  path=usr/share/man/man8 variant.opensolaris.zone=global
+file path=usr/share/man/man8/ccidadm.8 variant.opensolaris.zone=global
 driver name=ccid perms="* 0600 root sys" class=misc alias=usbif,classb
 license lic_CDDL license=lic_CDDL

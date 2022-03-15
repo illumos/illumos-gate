@@ -50,7 +50,7 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -63,5 +63,8 @@ MT-Level	Mt-Safe
 .TE
 
 .SH SEE ALSO
-\fBpvs\fR(1), \fBcfgadm\fR(1M), \fBIntro\fR(3), \fBconfig_admin\fR(3CFGADM),
-\fBattributes\fR(5)
+.BR pvs (1),
+.BR Intro (3),
+.BR config_admin (3CFGADM),
+.BR attributes (7),
+.BR cfgadm (8)

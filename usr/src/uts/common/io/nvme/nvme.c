@@ -107,7 +107,7 @@
  * For each NVMe device the driver exposes one minor node for the controller and
  * one minor node for each namespace. The only operations supported by those
  * minor nodes are open(9E), close(9E), and ioctl(9E). This serves as the
- * interface for the nvmeadm(1M) utility.
+ * interface for the nvmeadm(8) utility.
  *
  *
  * Blkdev Interface:

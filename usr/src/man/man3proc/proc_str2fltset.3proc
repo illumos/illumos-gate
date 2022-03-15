@@ -122,4 +122,4 @@ contains an unrecognized set name.
 .Xr proc_str2sys 3PROC ,
 .Xr proc_sysname 3PROC ,
 .Xr proc_sysset2str 3PROC ,
-.Xr proc 4
+.Xr proc 5

@@ -112,7 +112,7 @@ The following operands are supported:
 .ad
 .RS 12n
 Indicates the capability attribute from the \fBterminfo\fR database. See
-\fBterminfo\fR(4) for a complete list of capabilities and the \fIcapname\fR
+\fBterminfo\fR(5) for a complete list of capabilities and the \fIcapname\fR
 associated with each.
 .sp
 The following strings will be supported as operands by the implementation in
@@ -183,7 +183,7 @@ to \fBinit\fR.
 If the \fBterminfo\fR database is present and an entry for the user's terminal
 exists (see \fB-T\fR\fItype\fR above), then the long name of the terminal will
 be put out. The long name is the last name in the first line of the terminal's
-description in the \fBterminfo\fR database (see \fBterm\fR(5)).
+description in the \fBterminfo\fR database (see \fBterm\fR(7)).
 .RE
 
 .RE
@@ -207,7 +207,7 @@ the attribute as a number.
 This example initializes the terminal according to the type of terminal in the
 environment variable \fBTERM\fR. This command should be included in
 everyone's .profile after the environment variable \fBTERM\fR has been exported, as
-illustrated on the \fBprofile\fR(4) manual page.
+illustrated on the \fBprofile\fR(5) manual page.
 
 .sp
 .in +2
@@ -373,7 +373,7 @@ example% \fBtput -S <<!
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBtput\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
@@ -531,7 +531,7 @@ database. For instance, \fBtput\fR \fB-T450\fR lines and \fBtput\fR
 .RS 4n
 Tab settings for some terminals, in a format appropriate to be output to the
 terminal (escape sequences that set margins and tabs). For more information,
-see the "Tabs and Initialization" section of \fBterminfo\fR(4)
+see the "Tabs and Initialization" section of \fBterminfo\fR(5)
 .RE
 
 .sp
@@ -547,7 +547,7 @@ compiled terminal description database
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -563,6 +563,14 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBclear\fR(1), \fBsh\fR(1), \fBstty\fR(1), \fBtabs\fR(1),
-\fBcurses\fR(3CURSES), \fBprofile\fR(4), \fBterminfo\fR(4),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5), \fBterm\fR(5)
+.BR clear (1),
+.BR sh (1),
+.BR stty (1),
+.BR tabs (1),
+.BR curses (3CURSES),
+.BR profile (5),
+.BR terminfo (5),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7),
+.BR term (7)

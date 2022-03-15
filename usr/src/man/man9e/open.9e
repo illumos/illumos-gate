@@ -305,10 +305,21 @@ The \fBopen()\fR function should return \fB0\fR for success, or the appropriate
 error number.
 .SH SEE ALSO
 .LP
-\fBclose\fR(2), \fBexit\fR(2), \fBmmap\fR(2), \fBmount\fR(2), \fBmunmap\fR(2),
-\fBopen\fR(2), \fBIntro\fR(9E), \fBattach\fR(9E), \fBclose\fR(9E),
-\fBddi_create_minor_node\fR(9F), \fBgetmajor\fR(9F), \fBgetminor\fR(9F),
-\fBmakedevice\fR(9F), \fBnulldev\fR(9F), \fBcb_ops\fR(9S)
+.BR close (2),
+.BR exit (2),
+.BR mmap (2),
+.BR mount (2),
+.BR munmap (2),
+.BR open (2),
+.BR Intro (9E),
+.BR attach (9E),
+.BR close (9E),
+.BR ddi_create_minor_node (9F),
+.BR getmajor (9F),
+.BR getminor (9F),
+.BR makedevice (9F),
+.BR nulldev (9F),
+.BR cb_ops (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

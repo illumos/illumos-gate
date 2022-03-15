@@ -92,7 +92,7 @@ Service manifests for the FCoE initiator configuration
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='fcadm' section='1M'
+			<manpage title='fcadm' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

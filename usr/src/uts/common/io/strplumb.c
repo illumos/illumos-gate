@@ -348,12 +348,12 @@ strplumb_dev(ldi_ident_t li)
 	 * permanently linked under UDP.  One stream consists of the
 	 * ARP-[ifname] combination, while the other consists of IP-[ifname].
 	 *
-	 * We pin underneath UDP here to match what is done in ifconfig(1m);
+	 * We pin underneath UDP here to match what is done in ifconfig(8);
 	 * otherwise, ifconfig will be unable to unplumb the stream (the major
 	 * number and mux id must both match for a successful I_PUNLINK).
 	 *
 	 * There are subtleties in the plumbing which make it essential to
-	 * follow the logic used in ifconfig(1m) very closely.
+	 * follow the logic used in ifconfig(8) very closely.
 	 */
 
 	/*

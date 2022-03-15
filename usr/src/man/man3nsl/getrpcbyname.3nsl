@@ -60,7 +60,7 @@ getrpcent_r, setrpcent, endrpcent \- get RPC entry
 .LP
 These functions are used to obtain entries for RPC (Remote Procedure Call)
 services.  An entry may come from any of the sources for \fBrpc\fR specified in
-the \fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(4)).
+the \fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(5)).
 .sp
 .LP
 \fBgetrpcbyname()\fR searches for an entry with the RPC service name specified
@@ -184,7 +184,7 @@ result. See \fBIntro\fR(2) for the proper usage and interpretation of
 \fB/etc/nsswitch.conf\fR
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -201,8 +201,11 @@ T}
 
 .SH SEE ALSO
 .LP
-\fBrpcinfo\fR(1M), \fBrpc\fR(3NSL), \fBnsswitch.conf\fR(4), \fBrpc\fR(4),
-\fBattributes\fR(5)
+.BR rpc (3NSL),
+.BR nsswitch.conf (5),
+.BR rpc (5),
+.BR attributes (7),
+.BR rpcinfo (8)
 .SH WARNINGS
 .LP
 The reentrant interfaces \fBgetrpcbyname_r()\fR, \fBgetrpcbynumber_r()\fR, and
@@ -217,4 +220,4 @@ Multithreaded Applications\fR, for information about the use of the
 .LP
 Use of the enumeration interfaces \fBgetrpcent()\fR and \fBgetrpcent_r()\fR is
 discouraged; enumeration may not be supported for all database sources.  The
-semantics of enumeration are discussed further in \fBnsswitch.conf\fR(4).
+semantics of enumeration are discussed further in \fBnsswitch.conf\fR(5).

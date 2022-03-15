@@ -70,7 +70,7 @@ occurred, or \fINULL\fR, if there was an error retrieving it.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -88,7 +88,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsasl_errors\fR(3SASL), \fBsasl_seterror\fR(3SASL), \fBattributes\fR(5)
+.BR sasl_errors (3SASL),
+.BR sasl_seterror (3SASL),
+.BR attributes (7)
 .sp
 .LP
 Alvestrand, H. \fIRFC 1766, Tags for the Identification of Languages\fR.

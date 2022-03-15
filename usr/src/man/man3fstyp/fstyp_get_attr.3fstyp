@@ -52,7 +52,7 @@ generic and are returned when appropriate for a particular file system type:
 .RS 4n
 Attribute for which \fBtrue\fR and \fBfalse\fR values are allowed. A
 \fBfalse\fR value is returned if the file system is damaged or if the file
-system is not cleanly unmounted. In the latter case, \fBfsck\fR(1M) is required
+system is not cleanly unmounted. In the latter case, \fBfsck\fR(8) is required
 before the file system can be mounted.
 .RE
 
@@ -97,7 +97,7 @@ The \fBfstyp_get_attr()\fR function returns \fB0\fR on success and an error
 value on failure. See \fBfstyp_strerror\fR(3FSTYP).
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -114,5 +114,8 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBfstyp_ident\fR(3FSTYP), \fBfstyp_mod_init\fR(3FSTYP),
-\fBfstyp_strerror\fR(3FSTYP), \fBlibfstyp\fR(3LIB), \fBattributes\fR(5)
+.BR fstyp_ident (3FSTYP),
+.BR fstyp_mod_init (3FSTYP),
+.BR fstyp_strerror (3FSTYP),
+.BR libfstyp (3LIB),
+.BR attributes (7)

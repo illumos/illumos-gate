@@ -71,7 +71,7 @@
  *
  * ipd has two different entry points, one is administrative, the other is the
  * data path. The administrative path is accessed by a userland component called
- * ipdadm(1M). It communicates to the kernel component via ioctls to /dev/ipd.
+ * ipdadm(8). It communicates to the kernel component via ioctls to /dev/ipd.
  * If the administrative path enables a specific zone, then the data path will
  * become active for that zone. Any packet that leaves that zone's IP stack or
  * is going to enter it, comes through the callback specified in the hook_t(9S)

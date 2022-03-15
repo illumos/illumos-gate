@@ -27,7 +27,6 @@
 # All rights reserved.
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 vfstab=${vfstab:=/etc/vfstab}
 
@@ -43,7 +42,7 @@ vfstab=${vfstab:=/etc/vfstab}
 #       fsckdev		raw device
 #       mountp		mount point (must match $1, if found)
 #       fstype		file system type
-#       fsckpass	fsck(1M) pass number
+#       fsckpass	fsck(8) pass number
 #       automnt		automount flag (yes or no)
 #       mntopts		file system-specific mount options.
 #
@@ -307,7 +306,7 @@ mounted() {
 #   to our service log.
 #
 # Arguments:
-#   $opts	- options for mount(1M)				[optional]
+#   $opts	- options for mount(8)				[optional]
 #   $path	- mount point
 #   $type	- file system type				[optional]
 #   $fsopts	- file system specific options (-o)		[optional]
@@ -315,7 +314,7 @@ mounted() {
 #
 # Return codes:
 #   0		- success.
-#   otherwise	- error code returned by mount(1M).
+#   otherwise	- error code returned by mount(8).
 #
 mountfs() {
 	opts="$1"

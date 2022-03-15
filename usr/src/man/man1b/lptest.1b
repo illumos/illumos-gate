@@ -68,4 +68,4 @@ An error occurred.
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5)
+.BR attributes (7)

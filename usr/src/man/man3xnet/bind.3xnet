@@ -328,7 +328,7 @@ There were insufficient STREAMS resources for the operation to complete.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -345,7 +345,11 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBsockaddr\fR(3SOCKET),
-\fBconnect\fR(3XNET), \fBgetsockname\fR(3XNET), \fBlisten\fR(3XNET),
-\fBsocket\fR(3XNET), \fBattributes\fR(5), \fBprivileges\fR(5),
-\fBstandards\fR(5)
+.BR sockaddr (3SOCKET),
+.BR connect (3XNET),
+.BR getsockname (3XNET),
+.BR listen (3XNET),
+.BR socket (3XNET),
+.BR attributes (7),
+.BR privileges (7),
+.BR standards (7)

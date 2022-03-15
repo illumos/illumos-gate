@@ -60,9 +60,14 @@ be an error.
 .SH SEE ALSO
 .sp
 .LP
-\fBioctl\fR(9E), \fBread\fR(9E), \fBwrite\fR(9E), \fBbiodone\fR(9F),
-\fBbioerror\fR(9F), \fBbuf\fR(9S), \fBcb_ops\fR(9S),
-\fBkmem_cache_create\fR(9F)
+.BR ioctl (9E),
+.BR read (9E),
+.BR write (9E),
+.BR biodone (9F),
+.BR bioerror (9F),
+.BR kmem_cache_create (9F),
+.BR buf (9S),
+.BR cb_ops (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

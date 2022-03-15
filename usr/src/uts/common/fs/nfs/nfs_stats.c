@@ -34,7 +34,7 @@
 
 /*
  * Key to retrieve per-zone data corresponding to NFS kstats consumed by
- * nfsstat(1m).
+ * nfsstat(8).
  */
 zone_key_t nfsstat_zone_key;
 

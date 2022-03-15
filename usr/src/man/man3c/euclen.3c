@@ -55,7 +55,7 @@ These functions can be used safely in multithreaded applications, as long as
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -71,4 +71,6 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBgetwidth\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5)
+.BR getwidth (3C),
+.BR setlocale (3C),
+.BR attributes (7)

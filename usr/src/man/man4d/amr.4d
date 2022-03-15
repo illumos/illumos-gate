@@ -1,0 +1,81 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH AMR 4D "Apr 20, 2005"
+.SH NAME
+amr \- SCSI HBA driver for Dell PERC 3/DC, 4/SC, 4/DC and 4/DI
+.SH DESCRIPTION
+.sp
+.LP
+The \fBamr\fR plain \fBSCSI\fR host bus adapter driver is a SCSA-compliant
+nexus driver that supports the Dell PERC 3DC/4SC/4DC/4Di RAID devices.
+.sp
+.LP
+The \fBamr\fR driver ports from FreeBSD and only supports basic RAID disk I/O
+functions.
+.SH DRIVER CONFIGURATION
+.sp
+.LP
+There are no user configurable parameters available. Please configure your
+hardware through BIOS.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amr\fR\fR
+.ad
+.RS 25n
+32-bit ELF kernel module.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/amr\fR\fR
+.ad
+.RS 25n
+64-bit kernel module (x86 only).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amr.conf\fR\fR
+.ad
+.RS 25n
+Driver configuration file (contains no user-configurable options).
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR lsimega (4D),
+.BR attributes (7),
+.BR prtconf (8),
+.BR scsi_hba_attach_setup (9F),
+.BR scsi_sync_pkt (9F),
+.BR scsi_transport (9F),
+.BR scsi_device (9S),
+.BR scsi_inquiry (9S),
+.BR scsi_pkt (9S)
+.sp
+.LP
+\fISmall Computer System Interface-2 (SCSI-2)\fR

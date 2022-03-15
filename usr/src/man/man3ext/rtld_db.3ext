@@ -100,7 +100,7 @@ documented in \fBps_pread\fR(3PROC) and \fBproc_service\fR(3PROC).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -118,8 +118,12 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBld.so.1\fR(1), \fBlibc_db\fR(3LIB), \fBlibrtld_db\fR(3LIB),
-\fBproc_service\fR(3PROC), \fBps_pread\fR(3PROC), \fBattributes\fR(5)
+.BR ld.so.1 (1),
+.BR libc_db (3LIB),
+.BR librtld_db (3LIB),
+.BR proc_service (3PROC),
+.BR ps_pread (3PROC),
+.BR attributes (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

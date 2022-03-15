@@ -28,7 +28,7 @@
  *
  * The Solaris VFS layer presents extended file attributes using a special
  * "XATTR" directory under files or directories that have extended file
- * attributes.  See fsattr(5) for background.
+ * attributes.  See fsattr(7) for background.
  *
  * This design avoids the need for a separate set of VFS or vnode functions
  * for operating on XATTR objects.  File system implementations that support

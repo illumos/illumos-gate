@@ -64,7 +64,7 @@ third argument with varying type are passed to the device file designated by
 .sp
 .LP
 For streams files, specific functions are performed by the \fBioctl()\fR
-function as described in \fBstreamio\fR(7I).
+function as described in \fBstreamio\fR(4I).
 .sp
 .LP
 The \fIfildes\fR argument is an open file descriptor that refers to a device.
@@ -78,7 +78,7 @@ to a device-specific data structure.
 .LP
 In addition to device-specific and streams functions, generic functions are
 provided by more than one device driver (for example, the general terminal
-interface or disk interfaces.)  See \fBtermio\fR(7I)), \fBdkio\fR(7I), etc..
+interface or disk interfaces.)  See \fBtermio\fR(4I)), \fBdkio\fR(4I), etc..
 .SH RETURN VALUES
 Upon successful completion, the value returned depends upon the device control
 function, but must be a non-negative integer.  Otherwise, \fB\(mi1\fR is
@@ -195,9 +195,9 @@ corresponding device driver does not support the \fBioctl()\fR function.
 
 .sp
 .LP
-Streams errors are described in \fBstreamio\fR(7I).
+Streams errors are described in \fBstreamio\fR(4I).
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -211,4 +211,7 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBstandards\fR(5), \fBstreamio\fR(7I), \fBtermio\fR(7I)
+.BR streamio (4I),
+.BR termio (4I),
+.BR attributes (7),
+.BR standards (7)

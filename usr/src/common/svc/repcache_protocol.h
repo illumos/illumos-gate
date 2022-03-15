@@ -34,7 +34,7 @@
  * 1. Introduction
  * ---------------
  * This header file defines the private protocols between libscf(3lib) and
- * svc.configd(1m).  There are two separate protocols:
+ * svc.configd(8).  There are two separate protocols:
  *
  * 1.	The 'global' protocol, accessible via an fattach(3C)ed door located
  *	at REPOSITORY_DOOR_NAME.
@@ -50,7 +50,7 @@
  * 1.	If libscf(3lib) recieves an EINTR from door_call(), it doesn't know
  *      whether or not the server recieved (and is processing) its request.
  *
- * 2.	When svc.configd(1M) calls door_return(), the client may have already
+ * 2.	When svc.configd(8) calls door_return(), the client may have already
  *	received an EINTR, aborting its door_call().  In this case, the
  *	returned values are dropped on the floor.
  *

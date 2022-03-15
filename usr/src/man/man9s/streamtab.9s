@@ -46,7 +46,7 @@ struct qinit    *st_muxwinit;  /* lower write QUEUE*/
 .SH SEE ALSO
 .sp
 .LP
-\fBqinit\fR(9S)
+.BR qinit (9S)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

@@ -196,7 +196,7 @@ get_ecpp_status(int fd)
 }
 
 /*
- * For prnio(7I) - generic printer interface
+ * For prnio(4I) - generic printer interface
  */
 int
 is_a_prnio(int fd)

@@ -25,7 +25,7 @@ the configuration scripts contained in the files
 \fB</etc/saf/\fR\fIpmtag\fR\fB/_config>\fR, \fB</etc/saf/_sysconfig>\fR, and
 \fB</etc/saf/\fR\fIpmtag\fR/\fIsvctag>\fR, where  \fIpmtag\fR specifies the tag
 associated with the port monitor, and \fIsvctag\fR specifies the service tag
-associated with a given service.   See \fBpmadm\fR(1M) and \fBsacadm\fR(1M).
+associated with a given service.   See \fBpmadm\fR(8) and \fBsacadm\fR(8).
 .sp
 .LP
 \fBscript\fR is the name of the configuration script; \fIfildes\fR is a file
@@ -151,7 +151,7 @@ established should \fInot\fR be started.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -167,7 +167,10 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBsh\fR(1), \fBpmadm\fR(1M), \fBsacadm\fR(1M), \fBattributes\fR(5)
+.BR sh (1),
+.BR attributes (7),
+.BR pmadm (8),
+.BR sacadm (8)
 .SH NOTES
 .sp
 .LP

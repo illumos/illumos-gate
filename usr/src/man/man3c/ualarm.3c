@@ -110,13 +110,13 @@ family of functions.
 .Xr timer_create 3C ,
 .Xr usleep 3C ,
 .Xr unistd.h 3HEAD ,
-.Xr standards 5
+.Xr standards 7
 .Sh STANDARDS
 The
 .Fn ualarm
 function is available in the following compilation environments.
 See
-.Xr standards 5 .
+.Xr standards 7 .
 .Lp
 .Bl -bullet -compact
 .\".It

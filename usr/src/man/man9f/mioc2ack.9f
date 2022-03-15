@@ -71,7 +71,9 @@ None.
 .SH CONTEXT
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-\fBmiocack\fR(9F), \fBmiocnak\fR(9F), \fBiocblk\fR(9S)
+.BR miocack (9F),
+.BR miocnak (9F),
+.BR iocblk (9S)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

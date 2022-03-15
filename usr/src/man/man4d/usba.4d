@@ -1,0 +1,144 @@
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2020 Peter Tribble.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd Jan 10, 2020
+.Dt USBA 4D
+.Os
+.Sh NAME
+.Nm usba ,
+.Nm usb
+.Nd illumos USB Architecture (USBA)
+.Sh DESCRIPTION
+USB provides a low-cost means for attaching peripheral devices, including
+mass-storage devices, keyboards, mice, and printers, to a system.
+For complete information on the USB architecture, visit the USB website at
+http://www.usb.org.
+.Pp
+USBA supports 126 hot-pluggable USB devices per USB bus.
+The maximum data transfer rate is 5 Gbits (SuperSpeed USB 3.0), 480 Mbits (high
+speed USB 2.0), 12 Mbits (full speed USB 1.x), or 1.5 Mbits (low speed USB 1.x).
+.Pp
+USBA adheres to the
+.Em Universal Serial Bus 3.0
+specification and provides a transport layer abstraction to USB client
+drivers.
+.Pp
+For information on how to write USB client drivers, see
+.Em Writing Device Drivers .
+For the latest information on writing USB drivers, visit
+.Em http://illumos.org/books/wdd .
+For a complete list of USBA interfaces, see
+.Xr Intro 9F
+or
+.Xr Intro 9S .
+.Pp
+Devices without a driver may be able to leverage libusb.
+.Sh FILES
+Listed below are drivers and modules which either utilize or are utilized by
+USBA.
+.Bl -column -offset indent ".Pa /kernel/drv/[sparcv9|amd64]/usbser_edge" "Edgeport USB to serial port"
+.It Em Client Driver Ta Em Function/Device
+.It Ta
+.It Pa /kernel/drv/[sparcv9|amd64]/hid Ta HID class
+.It Pa /kernel/drv/[sparcv9|amd64]/hubd Ta hub class
+.It Pa /kernel/drv/[sparcv9|amd64]/scsa2usb Ta mass storage class
+.It Pa /kernel/drv/[sparcv9|amd64]/usbprn Ta printer class
+.It Pa /kernel/drv/[sparcv9|amd64]/usb_as Ta audio streaming class
+.It Pa /kernel/drv/[sparcv9|amd64]/usb_ac Ta audio control class
+.It Pa /kernel/drv/[sparcv9|amd64]/usbvc Ta video class
+.It Pa /kernel/drv/[sparcv9|amd64]/usb_mid Ta multi-interface device
+.It Pa /kernel/drv/[sparcv9|amd64]/usb_ia Ta interface-association driver
+.It Pa /kernel/drv/[sparcv9|amd64]/usbser_edge Ta Edgeport USB to serial port
+.It Pa /kernel/drv/[sparcv9|amd64]/usbsksp Ta Keyspan USB to serial port
+.It Pa /kernel/drv/[sparcv9|amd64]/usbsprl Ta pl2303 USB to serial port
+.It Pa /kernel/drv/[sparcv9|amd64]/usbsacm Ta CDC ACM class to serial port
+.It Pa /kernel/drv/[sparcv9|amd64]/ugen Ta generic USB driver
+.El
+.Bl -column -offset indent ".Pa /kernel/strmod/[sparcv9|amd64/]usb_ah" "Function/Device"
+.It Ta
+.It Em Client Streams Modules Ta Em Function/Device
+.It Ta
+.It Pa /kernel/strmod/[sparcv9|amd64]/usbkbm Ta Keyboard
+.It Pa /kernel/strmod/[sparcv9|amd64]/usbms Ta Mouse
+.It Pa /kernel/strmod/[sparcv9|amd64]/usb_ah Ta Audio HID
+.El
+.Bl -column -offset indent ".Em Host Controller Interface Drivers" "Extensible HCI"
+.It Em Host Controller Interface Drivers Ta Em Device
+.It Ta
+.It Pa /kernel/drv/amd64/xhci Ta Extensible HCI
+.It Pa /kernel/drv/[sparcv9|amd64]/ehci Ta Enhanced HCI
+.It Pa /kernel/drv/[sparcv9|amd64]/ohci Ta Open HCI
+.It Pa /kernel/drv/[sparcv9|amd64]/uhci Ta Universal HCI
+.El
+.Sh DIAGNOSTICS
+The messages described below may appear on the system console as well as being
+logged.
+All  messages are formatted in the following manner:
+.Bl -tag -width Sy -offset 2n
+.It WARNING: Error message...
+.El
+.Bl -tag -width Sy -offset 2n
+.It Sy no driver found for device <device_name> (interface <number> node
+name=<node_name>)
+The installed software does not contain a supported driver for this
+hardware.
+<number> is the interface number.
+<name> is either the device path name or the device name.
+.It Sy Draining callbacks timed out!
+An internal error occurred.
+Please reboot your system.
+If this problem persists, contact your system vendor.
+.El
+.Pp
+The following messages may be logged into the system log.
+They are formatted in the following manner:
+.Bd -literal -offset 2n
+<device path><usba<instance number>): message...
+.Ed
+.Bl -tag -width Sy -offset 2n
+.It Sy Incorrect USB driver version for <n.m> .
+Driver is incompatible with USBA framework.
+.El
+.Sh SEE ALSO
+.Xr ehci 4D ,
+.Xr hid 4D ,
+.Xr hubd 4D ,
+.Xr ohci 4D ,
+.Xr scsa2usb 4D ,
+.Xr ugen 4D ,
+.Xr uhci 4D ,
+.Xr usb_ac 4D ,
+.Xr usb_as 4D ,
+.Xr usb_ia 4D ,
+.Xr usb_mid 4D ,
+.Xr usbprn 4D ,
+.Xr usbsacm 4D ,
+.Xr usbser_edge 4D ,
+.Xr usbsksp 4D ,
+.Xr usbsprl 4D ,
+.Xr usbvc 4D ,
+.Xr virtualkm 4D ,
+.Xr xhci 4D ,
+.Xr attributes 7 ,
+.Xr cfgadm_usb 8 ,
+.Xr Intro 9F ,
+.Xr Intro 9S
+.Pp
+.Rs
+.%T Writing Device Drivers
+.Re
+.Rs
+.%T Universal Serial Bus Specification 3.0
+.Re
+.Rs
+.%T Interface Association Descriptor Engineering Change Notice (ECN)
+.Re
+.Rs
+.%T System Administration Guide: Basic Administration
+.Re
+.Sh NOTES
+Booting from USB mass-storage devices is not supported on SPARC, but is
+supported on X86.

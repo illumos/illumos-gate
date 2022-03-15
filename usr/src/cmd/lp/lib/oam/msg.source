@@ -19,8 +19,6 @@
  * CDDL HEADER END
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -344,7 +342,7 @@ E_FL_BADTEMPLATE
 	"There appears to be an incomplete option\ntemplate. This can be caused by a double\ncomma in the option list. Resubmit the\nentire input."
 E_FL_BADKEY
 	"Unrecognized keyword in option template."
-	"Resubmit the entire input. Check the\nlpfilter(1M) manual page for the list of\nvalid keywords."
+	"Resubmit the entire input. Check the\nlpfilter(8) manual page for the list of\nvalid keywords."
 E_FL_BADPATT
 	"Missing pattern in option template."
 	"Resubmit the entire input; make sure all\noption templates include a keyword,\npattern, and replacement:\nkeyword pattern = replacement\n(e.g. MODES * = -m *)."

@@ -70,7 +70,7 @@ This function may be called from user or kernel context.
 .SH SEE ALSO
 .sp
 .LP
-\fBldi_open_by_name\fR(9F)
+.BR ldi_open_by_name (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

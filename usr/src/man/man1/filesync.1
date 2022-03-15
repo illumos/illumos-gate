@@ -41,7 +41,7 @@ There are two forms of the \fBfilesync\fR command. The first form of
 reconciles differences between the files and systems specified in the
 \fB$HOME/.packingrules\fR file. \fB$HOME/.packingrules\fR is a packing rules
 list for \fBfilesync\fR and contains a list of files to
-be kept synchronized. See \fBpackingrules\fR(4).
+be kept synchronized. See \fBpackingrules\fR(5).
 .sp
 .LP
 The second form of \fBfilesync\fR copies specific files from a directory on the
@@ -110,7 +110,7 @@ conflicts remain.
 .LP
 The packing rules file \fB$HOME/.packingrules\fR contains a list of files to be
 kept synchronized. The syntax of this file is described in
-\fBpackingrules\fR(4).
+\fBpackingrules\fR(5).
 .LP
 The \fB$HOME/.packingrules\fR file is automatically created if users invoke
 \fBfilesync\fR with filename arguments. By using \fBfilesync\fR options, users
@@ -594,4 +594,5 @@ baseline summary file
 
 .SH SEE ALSO
 .LP
-\fBpackingrules\fR(4), \fBattributes\fR(5)
+.BR packingrules (5),
+.BR attributes (7)

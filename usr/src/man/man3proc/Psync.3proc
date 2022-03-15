@@ -78,4 +78,4 @@ in
 .Xr Psignal 3PROC ,
 .Xr Psysentry 3PROC ,
 .Xr Psysexit 3PROC ,
-.Xr proc 4
+.Xr proc 5

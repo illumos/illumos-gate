@@ -64,7 +64,7 @@ Service manifests for SRP Target Port Provider
 			/>
 		</method_context>
 	</exec_method>
-        
+
 	<exec_method
 		type='method'
 		name='stop'
@@ -93,7 +93,7 @@ Service manifests for SRP Target Port Provider
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='srpt' section='7D'
+			<manpage title='srpt' section='4D'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

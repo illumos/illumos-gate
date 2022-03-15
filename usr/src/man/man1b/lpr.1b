@@ -22,8 +22,8 @@ input.
 .sp
 .LP
 The print client commands locate destination information using the "printers"
-database in the name service switch. See \fBnsswitch.conf\fR(4),
-\fBprinters\fR(4), and \fBprinters.conf\fR(4) for details.
+database in the name service switch. See \fBnsswitch.conf\fR(5),
+\fBprinters\fR(5), and \fBprinters.conf\fR(5) for details.
 .sp
 .LP
 Print requests with more than 52 \fIfile\fRs specified is truncated to 52 files
@@ -102,9 +102,9 @@ is sent upon normal completion of a print request.
 .sp .6
 .RS 4n
 Prints \fIfile\fR on a specific printer or class of printers (see
-\fBlpadmin\fR(1M)). Specify \fIdestination\fR using atomic, URI-style
+\fBlpadmin\fR(8)). Specify \fIdestination\fR using atomic, URI-style
 (\fIscheme\fR\fB://\fR\fBendpoint\fR), or POSIX-style
-(\fIserver\fR\fB:\fR\fIdestination\fR) names. See \fBprinters.conf\fR(4) for
+(\fIserver\fR\fB:\fR\fIdestination\fR) names. See \fBprinters.conf\fR(5) for
 information regarding destination names.
 .RE
 
@@ -287,7 +287,7 @@ The name of the file to be printed. Specify \fIfile\fR as a pathname. If
 
 .SH USAGE
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBlpr\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBlpr\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH EXIT STATUS
 .LP
@@ -348,7 +348,7 @@ NIS version of \fB/etc/printers.conf\fR
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -365,11 +365,23 @@ CSI	Enabled. See NOTES
 
 .SH SEE ALSO
 .LP
-\fBhostname\fR(1), \fBlp\fR(1), \fBlpc\fR(1B), \fBlpq\fR(1B), \fBlprm\fR(1B),
-\fBlpstat\fR(1), \fBmail\fR(1), \fBplot\fR(1B), \fBpr\fR(1), \fBtroff\fR(1),
-\fBlpadmin\fR(1M), \fBnsswitch.conf\fR(4), \fBprinters\fR(4),
-\fBprinters.conf\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5),
-\fBstandards\fR(5)
+.BR hostname (1),
+.BR lp (1),
+.BR lpstat (1),
+.BR mail (1),
+.BR pr (1),
+.BR troff (1),
+.BR lpc (1B),
+.BR lpq (1B),
+.BR lprm (1B),
+.BR plot (1B),
+.BR nsswitch.conf (5),
+.BR printers (5),
+.BR printers.conf (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR standards (7),
+.BR lpadmin (8)
 .SH DIAGNOSTICS
 .ne 2
 .na

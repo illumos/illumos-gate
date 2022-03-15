@@ -99,8 +99,11 @@ Comparative features of the various allocation libraries can be found in the
 .SH SEE ALSO
 .sp
 .LP
-\fBbrk\fR(2), \fBmalloc\fR(3C), \fBmalloc\fR(3MALLOC),
-\fBmapmalloc\fR(3MALLOC), \fBumem_alloc\fR(3MALLOC)
+.BR brk (2),
+.BR malloc (3C),
+.BR malloc (3MALLOC),
+.BR mapmalloc (3MALLOC),
+.BR umem_alloc (3MALLOC)
 .SH WARNINGS
 .sp
 .LP

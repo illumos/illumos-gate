@@ -71,7 +71,7 @@ Processes may be stopped with
 The
 .Sy prxregset_t
 structure is described in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 One may not set the register values of a process that is not an active
 process, e.g. a process handle that refers to a file or a core file.
@@ -92,7 +92,7 @@ is set to indicate the error.
 For a full list of possible errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Plwp_getxregs
@@ -141,4 +141,4 @@ in
 .Xr Plwp_setfpregs 3PROC ,
 .Xr Plwp_setregs 3PROC ,
 .Xr Pstop 3PROC ,
-.Xr proc 4
+.Xr proc 5

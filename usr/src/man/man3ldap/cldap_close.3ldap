@@ -36,7 +36,7 @@ The LDAP pointer returned by a previous call to \fBcldap_open\fR(3LDAP).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -51,5 +51,7 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBcldap_open\fR(3LDAP), \fBcldap_search_s\fR(3LDAP),
-\fBcldap_setretryinfo\fR(3LDAP)
+.BR cldap_open (3LDAP),
+.BR cldap_search_s (3LDAP),
+.BR cldap_setretryinfo (3LDAP),
+.BR ldap (3LDAP)

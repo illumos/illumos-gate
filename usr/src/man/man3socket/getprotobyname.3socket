@@ -75,10 +75,10 @@ each return a protocol entry.
 .sp
 .LP
 The entry may come from one of the following sources: the protocols file (see
-\fBprotocols\fR(4)), the \fBNIS\fR maps ``protocols.byname'' and
+\fBprotocols\fR(5)), the \fBNIS\fR maps ``protocols.byname'' and
 ``protocols.bynumber''. The sources and
 their lookup order are specified in the \fB/etc/nsswitch.conf\fR file (see
-\fBnsswitch.conf\fR(4) for details). Some name services such as NIS will return
+\fBnsswitch.conf\fR(5) for details). Some name services such as NIS will return
 only one name for a host, whereas others such as DNS will return all
 aliases.
 .sp
@@ -169,7 +169,7 @@ the result.
 \fB/etc/nsswitch.conf\fR
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -184,8 +184,11 @@ MT-Level	See \fBNOTES\fR below.
 
 .SH SEE ALSO
 .LP
-\fBIntro\fR(3), \fBnsswitch.conf\fR(4), \fBprotocols\fR(4),
-\fBattributes\fR(5), \fBnetdb.h\fR(3HEAD)
+.BR Intro (3),
+.BR netdb.h (3HEAD),
+.BR nsswitch.conf (5),
+.BR protocols (5),
+.BR attributes (7)
 .SH NOTES
 .LP
 Although \fBgetprotobyname_r()\fR, \fBgetprotobynumber_r()\fR, and
@@ -218,7 +221,7 @@ Use of \fBgetprotoent_r()\fR and \fBgetprotoent()\fR is discouraged;
 enumeration is well-defined for the protocols file and is supported (albeit
 inefficiently) for \fBNIS\fR but in general may not be
 well-defined.  The semantics of enumeration are discussed in
-\fBnsswitch.conf\fR(4).
+\fBnsswitch.conf\fR(5).
 .SH BUGS
 .LP
 Only the Internet protocols are currently understood.

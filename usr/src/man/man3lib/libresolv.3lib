@@ -106,7 +106,7 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -122,4 +122,7 @@ MT-Level	See \fBresolver\fR(3RESOLV)
 .TE
 
 .SH SEE ALSO
-\fBpvs\fR(1), \fBIntro\fR(3), \fBresolver\fR(3RESOLV), \fBattributes\fR(5)
+.BR pvs (1),
+.BR Intro (3),
+.BR resolver (3RESOLV),
+.BR attributes (7)

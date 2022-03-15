@@ -41,7 +41,7 @@ static char		*usb_get_devicepath(const char *);
 
 /*
  * This file contains the entry points to the plugin as defined in the
- * config_admin(3X) man page.
+ * config_admin(3CFGADM) man page.
  */
 
 /*

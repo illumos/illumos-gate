@@ -50,7 +50,7 @@ int       sa_flags;
 .sp
 .LP
 The storage occupied by \fBsa_handler\fR and \fBsa_sigaction\fR may overlap,
-and a standard-conforming application (see \fBstandards\fR(5)) must not use
+and a standard-conforming application (see \fBstandards\fR(7)) must not use
 both simultaneously.
 .sp
 .LP
@@ -190,7 +190,7 @@ is equal to \fBSIGWAITING\fR, \fBSIGCANCEL\fR, or \fBSIGLWP\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -204,19 +204,38 @@ Interface Stability	Committed
 _
 MT-Level	Async-Signal-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBkill\fR(1), \fBIntro\fR(2), \fBexit\fR(2), \fBfcntl\fR(2), \fBgetmsg\fR(2),
-\fBioctl\fR(2), \fBkill\fR(2), \fBpause\fR(2), \fBputmsg\fR(2), \fBread\fR(2),
-\fBsigaltstack\fR(2), \fBsigprocmask\fR(2), \fBsigsend\fR(2),
-\fBsigsuspend\fR(2), \fBwaitid\fR(2), \fBwrite\fR(2), \fBrecv\fR(3SOCKET),
-\fBsend\fR(3SOCKET), \fBsiginfo.h\fR(3HEAD), \fBsignal\fR(3C),
-\fBsignal.h\fR(3HEAD), \fBsigsetops\fR(3C), \fBucontext.h\fR(3HEAD),
-\fBwait\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR kill (1),
+.BR Intro (2),
+.BR exit (2),
+.BR fcntl (2),
+.BR getmsg (2),
+.BR ioctl (2),
+.BR kill (2),
+.BR pause (2),
+.BR putmsg (2),
+.BR read (2),
+.BR sigaltstack (2),
+.BR sigprocmask (2),
+.BR sigsend (2),
+.BR sigsuspend (2),
+.BR waitid (2),
+.BR write (2),
+.BR signal (3C),
+.BR sigsetops (3C),
+.BR wait (3C),
+.BR siginfo.h (3HEAD),
+.BR signal.h (3HEAD),
+.BR ucontext.h (3HEAD),
+.BR recv (3SOCKET),
+.BR send (3SOCKET),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP

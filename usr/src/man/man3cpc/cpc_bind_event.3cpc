@@ -288,7 +288,7 @@ samples than just print them out.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -306,10 +306,17 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBcpustat\fR(1M), \fBcputrack\fR(1), \fBwrite\fR(2), \fBcpc\fR(3CPC),
-\fBcpc_access\fR(3CPC), \fBcpc_bind_curlwp\fR(3CPC),
-\fBcpc_set_sample\fR(3CPC), \fBcpc_strtoevent\fR(3CPC), \fBcpc_unbind\fR(3CPC),
-\fBlibcpc\fR(3LIB), \fBattributes\fR(5)
+.BR cputrack (1),
+.BR write (2),
+.BR cpc (3CPC),
+.BR cpc_access (3CPC),
+.BR cpc_bind_curlwp (3CPC),
+.BR cpc_set_sample (3CPC),
+.BR cpc_strtoevent (3CPC),
+.BR cpc_unbind (3CPC),
+.BR libcpc (3LIB),
+.BR attributes (7),
+.BR cpustat (8)
 .SH NOTES
 .sp
 .LP

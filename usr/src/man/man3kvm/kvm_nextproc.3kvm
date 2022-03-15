@@ -73,7 +73,7 @@ The \fBkvm_setproc()\fR function returns 0 on success and \(mi1 on failure.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -91,5 +91,7 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBkvm_getu\fR(3KVM), \fBkvm_open\fR(3KVM), \fBkvm_kread\fR(3KVM),
-\fBattributes\fR(5)
+.BR kvm_getu (3KVM),
+.BR kvm_kread (3KVM),
+.BR kvm_open (3KVM),
+.BR attributes (7)

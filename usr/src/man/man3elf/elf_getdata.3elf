@@ -286,7 +286,7 @@ table, and \fBdata->d_size\fR holds the string table's size in bytes.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -304,9 +304,19 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBelf\fR(3ELF), \fBelf32_getehdr\fR(3ELF), \fBelf64_getehdr\fR(3ELF),
-\fBelf32_getshdr\fR(3ELF), \fBelf64_getshdr\fR(3ELF),
-\fBelf32_xlatetof\fR(3ELF), \fBelf64_xlatetof\fR(3ELF), \fBelf_cntl\fR(3ELF),
-\fBelf_fill\fR(3ELF), \fBelf_flagdata\fR(3ELF), \fBelf_getscn\fR(3ELF),
-\fBelf_rawfile\fR(3ELF), \fBelf_strptr\fR(3ELF), \fBelf_version\fR(3ELF),
-\fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.BR elf (3ELF),
+.BR elf32_getehdr (3ELF),
+.BR elf32_getshdr (3ELF),
+.BR elf32_xlatetof (3ELF),
+.BR elf64_getehdr (3ELF),
+.BR elf64_getshdr (3ELF),
+.BR elf64_xlatetof (3ELF),
+.BR elf_cntl (3ELF),
+.BR elf_fill (3ELF),
+.BR elf_flagdata (3ELF),
+.BR elf_getscn (3ELF),
+.BR elf_rawfile (3ELF),
+.BR elf_strptr (3ELF),
+.BR elf_version (3ELF),
+.BR libelf (3LIB),
+.BR attributes (7)

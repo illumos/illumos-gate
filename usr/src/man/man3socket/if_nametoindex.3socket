@@ -147,7 +147,7 @@ pointer that was returned by \fBif_nameindex()\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -162,5 +162,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBifconfig\fR(1M), \fBif_nametoindex\fR(3XNET), \fBattributes\fR(5),
-\fBif\fR(7P)
+.BR if_nametoindex (3XNET),
+.BR if (4P),
+.BR attributes (7),
+.BR ifconfig (8)

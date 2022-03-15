@@ -686,7 +686,7 @@ main(int argc, char *argv[])
 
 		/*
 		 * Same as pkgadd: Identify a file or directory which
-		 * contains output from a previous pkgask(1M)
+		 * contains output from a previous pkgask(8)
 		 * session. This file supplies the interaction responses
 		 * that would be requested by the package in interactive
 		 * mode. response must be a full pathname.

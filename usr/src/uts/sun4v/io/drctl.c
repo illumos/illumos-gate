@@ -445,7 +445,7 @@ drctl_config_init(int cmd, int flags, drctl_rsrc_t *res,
 	    "reconfiguration daemon.\n";
 	static char drd_msg  [] = "Cannot communicate with reconfiguration "
 	    "daemon (drd) in target domain.\n"
-	    "drd(1M) SMF service may not be enabled.\n";
+	    "drd(8) SMF service may not be enabled.\n";
 	static char busy_msg [] = "Busy executing earlier command; "
 	    "please try again later.\n";
 	size_t rq_size;

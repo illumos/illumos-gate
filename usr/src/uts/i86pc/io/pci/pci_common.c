@@ -24,7 +24,7 @@
  */
 
 /*
- *	File that has code which is common between pci(7d) and npe(7d)
+ *	File that has code which is common between pci(4D) and npe(4D)
  *	It shares the following:
  *	- interrupt code
  *	- pci_tools ioctl code

@@ -41,7 +41,8 @@ The only member exposed to drivers is the \fBvalue\fR member. This field is a
 union of several data types. The driver must specify which type it will use in
 the call to \fBkstat_named_init()\fR.
 .SH SEE ALSO
-\fBkstat_create\fR(9F), \fBkstat_named_init\fR(9F)
+.BR kstat_create (9F),
+.BR kstat_named_init (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

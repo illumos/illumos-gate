@@ -147,7 +147,7 @@ does not have an equivalent \fBisw*(\|)\fR function.
 .SH ATTRIBUTES
 .LP
 See
-.BR attributes (5)
+.BR attributes (7)
 for descriptions of the following attributes:
 .TS
 box;
@@ -169,5 +169,5 @@ MT-Level	MT-Safe
 .BR setlocale (3C),
 .BR uselocale (3C),
 .BR wctype (3C),
-.BR attributes (5),
-.BR standards (5)
+.BR attributes (7),
+.BR standards (7)

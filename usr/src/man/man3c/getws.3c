@@ -59,7 +59,7 @@ call to \fBungetc\fR(3C) or \fBungetwc\fR(3C).
 Upon successful completion, \fBgetws()\fR and \fBfgetws()\fR return \fIws\fR.
 If the stream is at end-of-file, the end-of-file indicator for the stream is
 set and \fBfgetws()\fR returns a null pointer. For standard-conforming (see
-\fBstandards\fR(5)) applications, if the end-of-file indicator for the stream
+\fBstandards\fR(7)) applications, if the end-of-file indicator for the stream
 is set, \fBfgetws()\fR returns a null pointer whether or not the stream is at
 end-of-file. If a read error occurs, the error indicator for the stream is set
 and \fBfgetws()\fR returns a null pointer and sets \fBerrno\fR to indicate the
@@ -71,7 +71,7 @@ See \fBfgetwc\fR(3C) for the conditions that will cause \fBfgetws()\fR to fail.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -89,6 +89,13 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBferror\fR(3C), \fBfgetwc\fR(3C), \fBfread\fR(3C), \fBgetwc\fR(3C),
-\fBputws\fR(3C), \fBscanf\fR(3C), \fBungetc\fR(3C),
-\fBungetwc\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR ferror (3C),
+.BR fgetwc (3C),
+.BR fread (3C),
+.BR getwc (3C),
+.BR putws (3C),
+.BR scanf (3C),
+.BR ungetc (3C),
+.BR ungetwc (3C),
+.BR attributes (7),
+.BR standards (7)

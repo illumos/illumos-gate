@@ -115,8 +115,8 @@ return \fBDDI_FAILURE\fR if the driver is not detaching at the time of the
 call.
 .sp
 .LP
-If automatic Power Management is disabled (see \fBdtpower\fR(1M) and
-\fBpower.conf\fR(4)), \fBpm_lower_power\fR(9F) returns \fBDDI_SUCCESS\fR
+If automatic Power Management is disabled (see \fBdtpower\fR(8) and
+\fBpower.conf\fR(5)), \fBpm_lower_power\fR(9F) returns \fBDDI_SUCCESS\fR
 without changing the power level of the component. Otherwise, when
 \fBpm_lower_power\fR(9F) returns with success, the \fIcomponent \fR is
 guaranteed to be at most at the requested power level. Since the actual device
@@ -258,7 +258,7 @@ xxdisk_power(dev_info *dip, int comp, int level)
 .SH CONTEXT
 These functions can be called from user or kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attribute:
+See \fBattributes\fR(7) for a description of the following attribute:
 .sp
 
 .sp
@@ -272,9 +272,15 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBpower.conf\fR(4), \fBpm\fR(7D), \fBattach\fR(9E), \fBdetach\fR(9E),
-\fBpower\fR(9E), \fBpm_busy_component\fR(9F), \fBpm_idle_component\fR(9F),
-\fBpm\fR(9P), \fBpm-components\fR(9P)
+.BR pm (4D),
+.BR power.conf (5),
+.BR attach (9E),
+.BR detach (9E),
+.BR power (9E),
+.BR pm_busy_component (9F),
+.BR pm_idle_component (9F),
+.BR pm (9P),
+.BR pm-components (9P)
 .sp
 .LP
 \fIWriting Device Drivers\fR

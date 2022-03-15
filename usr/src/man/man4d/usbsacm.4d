@@ -1,0 +1,301 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH USBSACM 4D "Aug 13, 2021"
+.SH NAME
+usbsacm \- USB communication device class ACM driver
+.SH SYNOPSIS
+.LP
+.nf
+#include <sys/termio.h>
+
+usbsacm@unit
+.fi
+
+.LP
+.nf
+
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBusbsacm\fR driver is a loadable STREAMS and USBA (Solaris USB
+architecture)-compliant client driver that provides basic asynchronous
+communication support for USB modems and ISDN terminal adapters that conform to
+the \fIUniversal Serial Bus Communication Device Class Abstract Control Model
+(USB CDC ACM)\fR specification. You can download the \fIUSB CDC\fR
+specification from the USB website at
+\fIhttp://www.usb.org/developers/devclass_docs/usbcdc11.pdf\fR. Supported
+devices include mobile phones and PCMCIA cards which provide modem function by
+the usb cable. Serial device streams are built with appropriate modules that
+are pushed atop the usbsacm driver by the \fBautopush\fR(8) facility.
+.sp
+.LP
+The \fBusbsacm\fR module supports the \fBtermio\fR(4I) device control functions
+specified by flags in the c_cflag word of termios structure, and by the IGNBRK,
+IGNPAR, PARMRK and INPCK flags in the c_iflag word of the termios structure.
+All other \fBtermio\fR(4I) functions must be performed by STREAMS modules
+pushed atop the driver. When a device is opened, the \fBldterm\fR(4M) and
+\fBttcompat\fR(4M) STREAMS modules are automatically pushed on top of the
+stream, providing the standard \fBtermio\fR(4I) interface.
+.sp
+.LP
+You use device logical names /dev/term/[\fI0-9\fR]* to access the serial ports.
+These names are typically used to provide a logical access point for a dial-in
+line that is used with a modem. You can use \fBpppd\fR(8) to transmit
+datagrams over these serial ports.
+.sp
+.LP
+A special feature (controlled by the minor device number) is available that
+enables a single tty line to be connected to a modem and used for incoming and
+outgoing calls. By accessing through device logical name /dev/cua/[\fI0-9\fR]*,
+you can open a port without the carrier detect signal being asserted, either
+through hardware or an equivalent software mechanism. These devices are
+commonly known  as 'dial-out' lines.
+.sp
+.LP
+Unlike onboard serial ports, the \fBusbsacm\fR ports cannot serve as a local
+serial console.
+.SH APPLICATION PROGRAMMING INTERFACE
+.sp
+.LP
+A dial-in line can  be  opened  only  if  the corresponding dial-out  line is
+closed. A blocking /dev/term open waits until the /dev/cua line is closed
+(which drops Data Terminal Ready, after which Carrier Detect usually drops as
+well) and carrier is detected again.  A non-blocking  /dev/term open returns an
+error if the /dev/cua is open.
+.sp
+.LP
+If the /dev/term line is opened successfully  (usually  only when  carrier is
+recognized on the modem), the corresponding      /dev/cua line cannot be
+opened. This allows a modem and port to  be  used  for dial-in (by enabling the
+line for login in \fB/etc/inittab\fR) or dial-out (by \fBtip\fR(1) or
+\fBuucp\fR(1C)) as \fB/dev/cua0\fR when no one is logged in on the line.
+.sp
+.LP
+Device hot-removal  is functionally equivalent to a modem disconnect event, as
+defined in \fBtermio\fR(4I).
+.SH IOCTLS
+.sp
+.LP
+The  \fBusbsacm\fR driver supports the standard set of \fBtermio\fR(4I) ioctl
+calls.
+.sp
+.LP
+The input and output line speeds may be set to any of the following baud rates:
+75, 150, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200, 38400, 57600, 115200,
+230400, 460800, 921600, 1000000, 1152000, 1500000, 2000000, 2500000, 3000000,
+3500000, or 4000000. The speeds cannot be set independently. For example, when
+the output speed is set, the input speed is automatically set to the same
+speed.
+.SH ERRORS
+.sp
+.LP
+An \fBopen()\fR fails under the following conditions:
+.sp
+.ne 2
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 9n
+The unit being opened does not exist.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+The /dev/cua (dial-out) device is being opened  while the /dev/term (dial-in
+device) is open, or the dial-in device is being opened with a no-delay open
+while the dial-out device is open.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+The unit has been marked as exclusive-use by another process with a
+\fBTIOCEXCL\fR \fBioctl()\fR call.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 9n
+USB device I/O error.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/usbsacm\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit ELF kernel module. (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/usbsacm\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit ELF kernel module. (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/usbsacm\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit ELF kernel module. (SPARC)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/cua/[0-9]\fR\fR
+.ad
+.sp .6
+.RS 4n
+dial-out tty lines
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/term/[0-9]\fR\fR
+.ad
+.sp .6
+.RS 4n
+dial-in tty lines
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	 SPARC, x86 PCI-based systems
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR strconf (1),
+.BR tip (1),
+.BR uucp (1C),
+.BR ioctl (2),
+.BR open (2),
+.BR termios (3C),
+.BR usba (4D),
+.BR termio (4I),
+.BR ldterm (4M),
+.BR ttcompat (4M),
+.BR attributes (7),
+.BR autopush (8),
+.BR pppd (8)
+.SH DIAGNOSTICS
+.sp
+.LP
+In addition to being logged, the following messages may appear on the system
+console. All messages are formatted in the     following manner:
+.sp
+.in +2
+.nf
+Warning: <device path> (usbsacm<instance num>):Error Message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBDevice was disconnected while open. Data may have been lost.\fR
+.ad
+.sp .6
+.RS 4n
+The device has been hot-removed or powered off while it was open and a possible
+data transfer was in progress. The job may be aborted.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDevice is not identical to the previous one on this port. Please disconnect
+and reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+The device was hot-removed while open. A new device was hot-inserted which is
+not identical to the original device. Please disconnect the device and
+reconnect the original device to the same port.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDevice has been reconnected, but data may have been lost.\fR
+.ad
+.sp .6
+.RS 4n
+The device that was hot-removed from its USB port has been re-inserted again
+to the same port. It is available for access but data from a previous transfer
+may be lost.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCannot access <device>. Please reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+This device has been disconnected because a device other than the original one
+has been inserted. The driver informs you of this fact by displaying the name
+of the original device.
+.RE
+
+.sp
+.LP
+The following messages may be logged into the system log. They are formatted in
+the following manner:
+.sp
+.in +2
+.nf
+<device path><usbsacm<instance number>): message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBInput overrun.\fR
+.ad
+.RS 18n
+Data was lost.
+.RE
+

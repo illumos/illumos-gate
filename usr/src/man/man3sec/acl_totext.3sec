@@ -734,7 +734,7 @@ owner@:----------c---:------allow,user:tom:r-------------:f-i---:deny
 .sp
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -750,5 +750,10 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBls\fR(1), \fBtar\fR(1), \fBacl\fR(2), \fBmalloc\fR(3C),
-\fBaclfromtext\fR(3SEC), \fBacl\fR(5), \fBattributes\fR(5)
+.BR ls (1),
+.BR tar (1),
+.BR acl (2),
+.BR malloc (3C),
+.BR aclfromtext (3SEC),
+.BR acl (7),
+.BR attributes (7)

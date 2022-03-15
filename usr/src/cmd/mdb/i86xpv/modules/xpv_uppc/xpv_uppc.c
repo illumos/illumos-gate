@@ -286,7 +286,7 @@ ec_interrupt_dump(int i)
 
 /*
  * uppc_interrupt_dump:
- *	Dump uppc(7d) interrupt information.
+ *	Dump uppc(4D) interrupt information.
  */
 /* ARGSUSED */
 int
@@ -308,8 +308,8 @@ xen_uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 		return (DCMD_ERR);
 
 	/*
-	 * By default, on all x86 systems ::interrupts from xen_uppc(7d) gets
-	 * loaded first. For APIC systems the ::interrupts from xpv_psm(7d)
+	 * By default, on all x86 systems ::interrupts from xen_uppc(4D) gets
+	 * loaded first. For APIC systems the ::interrupts from xpv_psm(4D)
 	 * ought to be executed. Confusion stems as both modules export the
 	 * same dcmd.
 	 */
@@ -407,8 +407,8 @@ evtchns_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 
 	/*
-	 * By default, on all x86 systems ::evtchns from xen_uppc(7d) gets
-	 * loaded first. For APIC systems the ::evtchns from xpv_psm(7d)
+	 * By default, on all x86 systems ::evtchns from xen_uppc(4D) gets
+	 * loaded first. For APIC systems the ::evtchns from xpv_psm(4D)
 	 * ought to be executed. Confusion stems as both modules export the
 	 * same dcmd.
 	 */

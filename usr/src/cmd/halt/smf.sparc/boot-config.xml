@@ -97,7 +97,7 @@
 		<propval name='value_authorization' type='astring'
 		    value='solaris.system.shutdown' />
 		<propval name='uadmin_boot_archive_sync' type='boolean'
-		    value='false' />	
+		    value='false' />
 	</property_group>
 
 	<property_group name='fastreboot_blacklist' type='application'>
@@ -128,9 +128,9 @@ Apply the configuration defined in this service by uploading the configuration t
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='reboot' section='1M'
+			<manpage title='reboot' section='8'
 			    manpath='/usr/share/man' />
-			<manpage title='init' section='1M'
+			<manpage title='init' section='8'
 			    manpath='/usr/share/man' />
 			<manpage title='uadmin' section='2'
 			    manpath='/usr/share/man' />
@@ -158,7 +158,7 @@ Parameters for controlling the reboot behavior.
 			</common_name>
 			<description>
 			    <loctext xml:lang='C'>
-When set to true, reboot(1M) and init(1M) 6 will call uadmin(2) with AD_FASTREOOT, which will bypass firmware.
+When set to true, reboot(8) and init(8) 6 will call uadmin(2) with AD_FASTREOOT, which will bypass firmware.
 			    </loctext>
 			</description>
 		    </prop_pattern>

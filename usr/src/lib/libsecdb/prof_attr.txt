@@ -24,7 +24,7 @@
 #
 # /etc/security/prof_attr
 #
-# profiles attributes. see prof_attr(4)
+# profiles attributes. see prof_attr(5)
 #
 All:::Execute any command as the user or role:help=RtAll.html
 Audit Configuration:::Configure Solaris Audit:auths=solaris.smf.value.audit;help=RtAuditCfg.html

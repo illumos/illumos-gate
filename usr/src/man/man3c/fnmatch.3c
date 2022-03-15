@@ -64,7 +64,7 @@
 The
 .Fn fnmatch
 function matches patterns as described on the
-.Xr fnmatch 5
+.Xr fnmatch 7
 manual page
 .Po with the exceptions noted in the
 .Sx STANDARDS
@@ -236,9 +236,9 @@ is not being called to change the locale.
 .Xr glob 3C ,
 .Xr setlocale 3C ,
 .Xr wordexp 3C ,
-.Xr attributes 5 ,
-.Xr fnmatch 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr fnmatch 7 ,
+.Xr standards 7
 .Sh STANDARDS
 The current implementation of the
 .Fn fnmatch

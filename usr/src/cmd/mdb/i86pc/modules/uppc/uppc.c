@@ -57,7 +57,7 @@ interrupt_print_bus(uintptr_t dip_addr)
 
 /*
  * uppc_interrupt_dump:
- *	Dump uppc(7d) interrupt information.
+ *	Dump uppc(4D) interrupt information.
  */
 /* ARGSUSED */
 int

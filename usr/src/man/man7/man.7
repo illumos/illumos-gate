@@ -1,0 +1,265 @@
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Copyright (c) 1995, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd "Feb 18, 2015"
+.Dt MAN 7
+.Os
+.Sh NAME
+.Nm man
+.Nd macros to format Reference Manual pages
+.Sh SYNOPSIS
+.Nm mandoc
+.Fl T Ar man
+.Ar
+.Nm nroff
+.Fl man
+.Ar
+.Nm troff
+.Fl man
+.Ar
+.Sh DESCRIPTION
+These macros are used to lay out the reference pages in this manual.
+Note: if
+.Ar file
+contains format input for a preprocessor, the commands shown
+above must be piped through the appropriate preprocessor.
+This is handled automatically by the
+.Xr man 1
+command.
+See the
+.Sx Conventions
+section.
+.Lp
+Any text argument
+.Ar t
+may be zero to six words.
+Quotes may be used to include SPACE characters in a
+.Qq word .
+If
+.Ar text
+is empty, the special
+treatment is applied to the next input line with text to be printed.
+In this way
+.Nm \&.I
+may be used to italicize a whole line, or
+.Nm \&.SB
+may be used to make small bold letters.
+.Lp
+A prevailing indent distance is remembered between successive indented
+paragraphs, and is reset to default value upon reaching a non-indented
+paragraph.
+Default units for indents
+.Nm i
+are ens.
+.Lp
+Type font and size are reset to default values before each paragraph, and after
+processing font and size setting macros.
+.Pp
+These strings are predefined by
+.Nm -man :
+.Bl -tag -width Ds
+.It Nm \e*R
+.Sq \(rg ,
+.Sq (Reg)
+in
+.Nm nroff .
+.It Nm \e*S
+Change to default type size.
+.El
+.Sh "Requests"
+* n.t.l. = next text line; p.i. = prevailing indent
+.Bl -column ".TH n s d f m" "Cause " "t=n.t.l.*" "Explanation " -offset Ds
+.It Sy Request	Sy Cause	Sy "If No"	Sy Explanation
+.It ""	Sy Break 	Sy "Argument"	""
+.It Nm \&.B Ar "t"	no 	Ar t Ns =n.t.l.*	Text is in bold font.
+.It Nm \&.BI Ar t	no	Ar t Ns =n.t.l.	Join words, alternating bold and italic.
+.It Nm \&.BR Ar t	no	Ar t Ns =n.t.l.	Join words, alternating bold and roman.
+.It Nm \&.DT	no	Li \&.5i 1i...	Restore default tabs.
+.It Nm \&.HP Ar i	yes	Ar i Ns =p.i.*	"Begin paragraph with hanging indent. Set prevailing indent to" Ar i .
+.It Nm \&.I Ar t	no	Ar t Ns =n.t.l.	Text is italic.
+.It Nm \&.IB Ar t	no	Ar t Ns =n.t.l.	Join words, altenrating italic and bold.
+.It Nm \&.IP Ar x Ar i	yes	Ar x Ns =""	Same as
+.Nm \&.TP
+with tag
+.Ar x .
+.It Nm \&.IR Ar t	no	Ar t Ns =n.t.l.	Join words, alternating italic and roman.
+.It Nm \&.IX Ar t	no	-	Index macro, not used (obsolete).
+.It Nm \&.LP	yes	-	Begin left-aligned paragraph. Set prevailing indent to .5i.
+.It Nm \&.P	yes	-	Same as
+.Nm \&.LP .
+.It Nm \&.PD Ar d	no	Ar d Ns =.4v	Set vertical distance between paragraphs.
+.It Nm \&.PP	yes	-	Same as
+.Nm \&.LP .
+.It Nm \&.RE	yes	-	End of relative indent. Restores prevailing indent.
+.It Nm \&.RB Ar t	no	Ar t Ns =n.t.l.	Join words, alternating roman and bold.
+.It Nm \&.RI Ar t	no	Ar t Ns =n.t.l.	Join words, alternating roman and italic.
+.It Nm \&.RS Ar i	yes	Ar i Ns =p.i.	Start relative indent, increase indent by Ar i .
+Sets prevailing indent to .5i for nested indents.
+.It Nm \&.SB Ar t	no	-	Reduce size of text by 1 point, make text bold.
+.It Nm \&.SH Ar t	yes	-	Section Heading.
+.It Nm \&.SM Ar t	no	Ar t Ns =n.t.l.	Reduce size of text by 1 point.
+.It Nm \&.SS Ar t	yes	Ar t Ns =n.t.l.	Section Subheading.
+.It Nm \&.TH Ar n s d f m	yes	-	Begin reference page Ar n , No of section Ar s ; Ar d No is the date of the most recent change.  If present, Ar f No is the left page footer; Ar m No is the main page (center) header.  Sets prevailing indent and tabs to .5i.
+.It Nm \&.TP Ar i	yes	Ar i Ns =p.i.	Begin indented paragraph, with the tag given on the next text line. Set prevailing indent to
+.Ar i .
+.It Nm \&.TX Ar t p	no	-	Resolve the title abbreviation Ar t ; No join to punctuation mark (or text) Ar p .
+.El
+.Ss "Conventions"
+When formatting a manual page,
+.Nm
+examines the first line to determine
+whether it requires special processing.
+For example a first line consisting of:
+.Lp
+.Dl \&'\e" t
+.Lp
+indicates that the manual page must be run through the
+.Xr tbl 1
+preprocessor.
+.Lp
+A typical manual page for a command or function is laid out as follows:
+.Bl -tag -width ".SH RETURN VALUES"
+.
+.It Nm \&.TH Ar title Op "1-9"
+.
+The name of the command or function, which serves as the title of the manual
+page.
+This is followed by the number of the section in which it appears.
+.
+.It Nm \&.SH NAME
+.
+The name, or list of names, by which the command is called, followed by a dash
+and then a one-line summary of the action performed.
+All in roman font, this section contains no
+.Xr troff 1
+commands or escapes, and no macro requests.
+It is used to generate the database used by the
+.Xr whatis 1
+command.
+.
+.It Nm \&.SH SYNOPSIS
+.Bl -tag -width "Functions:"
+.It Sy Commands:
+The syntax of the command and its arguments, as typed on the command line.
+When in boldface, a word must be typed exactly as printed.
+When in italics, a word can be replaced with an argument that you supply.
+References to bold or italicized items are not capitalized in other sections,
+even when they begin a sentence.
+.Lp
+Syntactic symbols appear in roman face:
+.Bl -tag -width "   "
+.It Op " "
+An argument, when surrounded by brackets is optional.
+.It |
+Arguments separated by a vertical bar are exclusive.
+You can supply only one item from such a list.
+.It \&.\|.\|.
+Arguments followed by an ellipsis can be repeated.
+When an ellipsis follows a bracketed set, the expression within the brackets can
+be repeated.
+.El
+.It Sy Functions:
+If required, the data declaration, or
+.Li #include
+directive, is shown first,
+followed by the  function declaration.
+Otherwise, the function declaration is shown.
+.El
+.
+.It Nm \&.SH DESCRIPTION
+.
+A narrative overview of the command or function's external behavior.
+This includes how it interacts with files or data, and how it handles the
+standard input, standard output and standard error.
+Internals and implementation details are normally omitted.
+This section attempts to provide a succinct overview in answer to the question,
+"what does it do?"
+.Lp
+Literal text from the synopsis appears in constant width, as do literal
+filenames and references to items that appear elsewhere in the  reference
+manuals.
+Arguments are italicized.
+.Lp
+If a command interprets either subcommands or an input grammar, its command
+interface or input grammar is normally described in a
+.Nm USAGE
+section, which follows the
+.Nm OPTIONS
+section.
+The
+.Nm DESCRIPTION
+section only
+describes the behavior of the command itself, not that of subcommands.
+.
+.It Nm \&.SH OPTIONS
+.
+The list of options along with a description of how each affects the command's
+operation.
+.
+.It Nm \&.SH RETURN VALUES
+.
+A list of the values the library routine will return to the calling  program
+and the conditions that cause these values to be returned.
+.
+.It Nm \&.SH EXIT STATUS
+.
+A list of the values the utility will return to the calling  program or shell,
+and the conditions that cause these values to be  returned.
+.
+.It Nm \&.SH FILES
+.
+A list of files associated with the command or function.
+.
+.It Nm \&.SH SEE ALSO
+.
+A comma-separated list of related manual pages, followed by references to other
+published materials.
+.
+.It Nm \&.SH DIAGNOSTICS
+.
+A list of diagnostic messages and an explanation of each.
+.
+.It Nm \&.SH BUGS
+.
+A description of limitations, known defects, and possible problems associated
+with the command or function.
+.El
+.Sh FILES
+.Pa /usr/share/man/whatis
+.Sh NOTES
+The
+.Nm
+package should not be used for new documentation.
+The
+.Xr mdoc 7 ,
+package is preferred, as it uses semantic markup rather than physical markup.
+.Sh CODE SET INDEPENDENCE
+When processed with
+.Xr mandoc 1 ,
+this package is Code Set Independent.
+However, when processed with legacy tools such as
+.Xr nroff 1
+and
+.Xr troff 1 ,
+the use of multi-byte characters may not be supported.
+.Sh INTERFACE STABILITY
+.Sy Obsolete Committed .
+The
+.Xr mdoc 7
+package should be used instead.
+.Sh SEE ALSO
+.Xr eqn 1 ,
+.Xr man 1 ,
+.Xr mandoc 1 ,
+.Xr nroff 1 ,
+.Xr tbl 1 ,
+.Xr troff 1 ,
+.Xr whatis 1 ,
+.Xr mdoc 7
+.Rs
+.%A Dale Dougherty and Tim O'Reilly
+.%B Unix Text Processing
+.Re

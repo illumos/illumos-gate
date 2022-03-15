@@ -60,7 +60,7 @@ unless \fB-a\fR is also specified.
 .SH USAGE
 .sp
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBtouch\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBtouch\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH EXIT STATUS
 .sp
@@ -88,4 +88,6 @@ could not be successfully modified.
 .SH SEE ALSO
 .sp
 .LP
-\fBtouch\fR(1), \fBattributes\fR(5), \fBlargefile\fR(5)
+.BR touch (1),
+.BR attributes (7),
+.BR largefile (7)

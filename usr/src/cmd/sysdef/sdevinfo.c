@@ -23,8 +23,6 @@
  * Copyright (c) 1990 - 1997, Sun Microsystems, Inc.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * For machines that support the openprom, fetch and print the list
  * of devices that the kernel has fetched from the prom or conjured up.
@@ -103,7 +101,7 @@ dump_node(di_node_t node, void *arg)
 			}
 		} else {
 			/*
-			 * prtconf(1M) compatible..
+			 * prtconf(8) compatible..
 			 */
 			(void) printf("%s", di_node_name(node));
 			if (di_instance(node) >= 0)

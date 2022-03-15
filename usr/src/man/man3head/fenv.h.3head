@@ -235,7 +235,7 @@ must contain an appropriately placed invocation as follows:
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -249,8 +249,16 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-\fBfeclearexcept\fR(3M), \fBfegetenv\fR(3M), \fBfegetexceptflag\fR(3M),
-\fBfegetround\fR(3M), \fBfeholdexcept\fR(3M), \fBferaiseexcept\fR(3M),
-\fBfesetenv\fR(3M), \fBfesetexceptflag\fR(3M), \fBfesetround\fR(3M),
-\fBfetestexcept\fR(3M), \fBfeupdateenv\fR(3M), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR feclearexcept (3M),
+.BR fegetenv (3M),
+.BR fegetexceptflag (3M),
+.BR fegetround (3M),
+.BR feholdexcept (3M),
+.BR feraiseexcept (3M),
+.BR fesetenv (3M),
+.BR fesetexceptflag (3M),
+.BR fesetround (3M),
+.BR fetestexcept (3M),
+.BR feupdateenv (3M),
+.BR attributes (7),
+.BR standards (7)

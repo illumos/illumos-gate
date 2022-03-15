@@ -77,7 +77,9 @@ module-specific data structure for the minor device.
 .SH SEE ALSO
 .sp
 .LP
-\fBclose\fR(9E), \fBOTHERQ\fR(9F), \fBRD\fR(9F)
+.BR close (9E),
+.BR OTHERQ (9F),
+.BR RD (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

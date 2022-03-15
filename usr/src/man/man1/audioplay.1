@@ -102,7 +102,7 @@ variable is consulted (see below).
 .RE
 
 .SH USAGE
-See \fBlargefile\fR(5) for the description of the behavior of \fBaudioplay\fR
+See \fBlargefile\fR(7) for the description of the behavior of \fBaudioplay\fR
 when encountering files greater than or equal to 2 Gbyte (2^31 bytes).
 .SH ENVIRONMENT VARIABLES
 .ne 2
@@ -127,8 +127,10 @@ set, only the current directory is searched.
 .RE
 
 .SH SEE ALSO
-\fBaudioconvert\fR(1), \fBaudiorecord\fR(1),
-\fBlargefile\fR(5), \fBaudio\fR(7I)
+.BR audioconvert (1),
+.BR audiorecord (1),
+.BR audio (4I),
+.BR largefile (7)
 .SH BUGS
 \fBaudioplay\fR currently supports a limited set of audio format conversions.
 If the audio file is not in a format supported by the audio device, it must

@@ -1,0 +1,127 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH UUCHECK 8 "May 18, 1993"
+.SH NAME
+uucheck \- check the uucp directories and permissions file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/uucp/uucheck\fR [\fB-v\fR] [\fB-x\fR \fIdebug-level\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBuucheck\fR checks for the presence of the \fBuucp\fR system required files
+and directories. \fBuucheck\fR also does error checking of the
+\fBPermissions\fR file (\fB/etc/uucp/Permissions\fR).
+.sp
+.LP
+\fBuucheck\fR is executed during package installation. \fBuucheck\fR can only
+be used by the super-user or \fBuucp\fR.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.RS 18n
+Give a detailed (verbose) explanation of how the  \fBuucp\fR programs will
+interpret the \fBPermissions\fR file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-x\fR\fI debug-level\fR\fR
+.ad
+.RS 18n
+Produce debugging output on the standard output. \fIdebug-level\fR is a number
+from \fB0\fR to \fB9\fR.  Higher numbers give more detailed debugging
+information.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/uucp/Devices\fR\fR
+.ad
+.RS 27n
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/uucp/Limits\fR\fR
+.ad
+.RS 27n
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/uucp/Permissions\fR\fR
+.ad
+.RS 27n
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/uucp/Systems\fR\fR
+.ad
+.RS 27n
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/spool/locks/*\fR\fR
+.ad
+.RS 27n
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/spool/uucp/*\fR\fR
+.ad
+.RS 27n
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/spool/uucppublic/*\fR\fR
+.ad
+.RS 27n
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR uucp (1C),
+.BR uustat (1C),
+.BR uux (1C),
+.BR attributes (7),
+.BR uucico (8),
+.BR uusched (8)
+.SH BUGS
+.sp
+.LP
+The program does not check file/directory modes or some errors in the
+\fBPermissions\fR file such as duplicate login or machine name.

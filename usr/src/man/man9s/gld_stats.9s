@@ -17,10 +17,10 @@ illumos architecture specific (illumos DDI).
 The Generic LAN Driver (GLD) statistics (\fBgld_stats\fR) structure is used to
 communicate statistics and state information from a GLD-based driver to GLD
 when returning from a driver's \fBgldm_get_stats()\fR routine as discussed in
-\fBgld\fR(9E) and \fBgld\fR(7D). The members of this structure, filled in by
+\fBgld\fR(9E) and \fBgld\fR(4D). The members of this structure, filled in by
 the GLD-based driver, are used when GLD reports the statistics. In the tables
 below, the name of the statistics variable reported by GLD is noted in the
-comments. See \fBgld\fR(7D) for a more detailed description of the meaning of
+comments. See \fBgld\fR(4D) for a more detailed description of the meaning of
 each statistic.
 .sp
 .LP
@@ -160,7 +160,10 @@ also be specified.
 .RE
 
 .SH SEE ALSO
-\fBgld\fR(7D), \fBgld\fR(9F), \fBgld\fR(9E), \fBgld_mac_info\fR(9S)
+.BR gld (4D),
+.BR gld (9E),
+.BR gld (9F),
+.BR gld_mac_info (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

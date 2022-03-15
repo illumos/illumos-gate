@@ -38,7 +38,8 @@ caching  on the handle.
 \fBddi_dma_free_handle()\fR can be called from user, kernel, or interrupt
 context.
 .SH SEE ALSO
-\fBddi_dma_alloc_handle\fR(9F), \fBddi_dma_unbind_handle\fR(9F)
+.BR ddi_dma_alloc_handle (9F),
+.BR ddi_dma_unbind_handle (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

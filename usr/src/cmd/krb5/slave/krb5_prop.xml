@@ -4,8 +4,6 @@
 	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
-	pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -20,7 +18,7 @@
 		the old mode of nonincremental
 			passively receives full propagations from the master KDC
 
-	refer to kdc.conf(4) to configure incremental or nonincremental modes
+	refer to kdc.conf(5) to configure incremental or nonincremental modes
 -->
 
 <service_bundle type='manifest' name='SUNWkdcr:kpropd'>
@@ -50,7 +48,7 @@
 				user='root'
 				group='other'
 				privileges='basic,!file_link_any,!proc_info,!proc_session,net_privaddr'
-			/>	
+			/>
 		</method_context>
 	</exec_method>
 
@@ -69,7 +67,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='kpropd' section='1M'
+			<manpage title='kpropd' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

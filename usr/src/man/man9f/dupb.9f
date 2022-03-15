@@ -160,8 +160,11 @@ the new message block (line 34) and pass it along (line 35).
 .in -2
 
 .SH SEE ALSO
-\fBsrv\fR(9E), \fBcopyb\fR(9F), \fBqbufcall\fR(9F), \fBdatab\fR(9S),
-\fBmsgb\fR(9S)
+.BR srv (9E),
+.BR copyb (9F),
+.BR qbufcall (9F),
+.BR datab (9S),
+.BR msgb (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR \fISTREAMS Programming Guide\fR

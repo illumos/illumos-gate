@@ -19,21 +19,21 @@ chkey \- change user's secure RPC key pair
 \fBchkey\fR is used to change a user's secure \fBRPC\fR public key and secret
 key pair. \fBchkey\fR prompts for the old secure-rpc password and verifies that
 it is correct by decrypting the secret key. If the user has not already used
-\fBkeylogin\fR(1) to decrypt and store the secret key with \fBkeyserv\fR(1M),
-\fBchkey\fR registers the secret key with the local \fBkeyserv\fR(1M) daemon.
+\fBkeylogin\fR(1) to decrypt and store the secret key with \fBkeyserv\fR(8),
+\fBchkey\fR registers the secret key with the local \fBkeyserv\fR(8) daemon.
 If the secure-rpc password does not match the login password, \fBchkey\fR
 prompts for the login password. \fBchkey\fR uses the login password to encrypt
 the user's secret Diffie-Hellman (192 bit) cryptographic key.
 .sp
 .LP
 \fBchkey\fR ensures that the login password and the secure-rpc  password(s) are
-kept the same, thus enabling password shadowing. See \fBshadow\fR(4).
+kept the same, thus enabling password shadowing. See \fBshadow\fR(5).
 .sp
 .LP
 The key pair can be stored in the  \fB/etc/publickey\fR file (see
-\fBpublickey\fR(4)) or the \fBNIS\fR \fBpublickey\fR map.
+\fBpublickey\fR(5)) or the \fBNIS\fR \fBpublickey\fR map.
 If a new secret key is generated, it will be
-registered with the local \fBkeyserv\fR(1M) daemon.
+registered with the local \fBkeyserv\fR(8) daemon.
 .sp
 .LP
 Keys for specific mechanisms can be changed or reencrypted using the \fB-m\fR
@@ -43,7 +43,7 @@ options can be used to change one or more keys.
 .LP
 If the source of the  \fBpublickey\fR is not specified with the \fB-s\fR
 option,  \fBchkey\fR consults the  \fBpublickey\fR entry in the name service
-switch configuration file.  See \fBnsswitch.conf\fR(4). If the  \fBpublickey\fR
+switch configuration file.  See \fBnsswitch.conf\fR(5). If the  \fBpublickey\fR
 entry specifies one and only one source, then \fBchkey\fR will change the key
 in the specified name service. However, if multiple name services are listed,
 \fBchkey\fR can not decide which source to update and will display an error
@@ -121,6 +121,11 @@ Changes or re-encrypt the secret key for the specified mechanism.
 
 .SH SEE ALSO
 .LP
-\fBkeylogin\fR(1), \fBkeylogout\fR(1), \fBkeyserv\fR(1M), \fBnewkey\fR(1M),
-\fBnsswitch.conf\fR(4),
-\fBpublickey\fR(4), \fBshadow\fR(4), \fBattributes\fR(5)
+.BR keylogin (1),
+.BR keylogout (1),
+.BR nsswitch.conf (5),
+.BR publickey (5),
+.BR shadow (5),
+.BR attributes (7),
+.BR keyserv (8),
+.BR newkey (8)

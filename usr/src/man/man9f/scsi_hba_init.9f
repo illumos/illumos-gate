@@ -56,8 +56,13 @@ should return the value returned by \fBscsi_hba_init()\fR.
 \fBscsi_hba_init()\fR and \fBscsi_hba_fini()\fR should be called from
 \fB_init\fR(9E) or \fB_fini\fR(9E), respectively.
 .SH SEE ALSO
-\fB_fini\fR(9E), \fB_init\fR(9E), \fBmod_install\fR(9F), \fBmod_remove\fR(9F),
-\fBscsi_pktalloc\fR(9F), \fBscsi_pktfree\fR(9F), \fBscsi_hba_tran\fR(9S)
+.BR _fini (9E),
+.BR _init (9E),
+.BR mod_install (9F),
+.BR mod_remove (9F),
+.BR scsi_pktalloc (9F),
+.BR scsi_pktfree (9F),
+.BR scsi_hba_tran (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

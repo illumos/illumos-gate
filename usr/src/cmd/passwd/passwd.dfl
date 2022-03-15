@@ -1,4 +1,3 @@
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -42,13 +41,13 @@ PASSLENGTH=6
 # The maximum value of HISTORY is 26.
 #
 # This flag is only enforced for user accounts defined in the
-# local passwd(4)/shadow(4) files.
+# local passwd(5)/shadow(5) files.
 #
 #HISTORY=0
 #
 # Password complexity tunables.  The values listed are the defaults
 # which are compatible with previous releases of passwd.
-# See passwd(1) and pam_authtok_check(5) for use warnings and
+# See passwd(1) and pam_authtok_check(7) for use warnings and
 # discussion of the use of these options.
 #
 #MINDIFF=3
@@ -64,8 +63,8 @@ PASSLENGTH=6
 # 
 # passwd performs dictionary lookups if DICTIONLIST or DICTIONDBDIR
 # is defined. If the password database does not yet exist, it is
-# created by passwd. See passwd(1), pam_authtok_check(5) and
-# mkpwdict(1M) for more information.
+# created by passwd. See passwd(1), pam_authtok_check(7) and
+# mkpwdict(8) for more information.
 #
 #DICTIONLIST=
 #DICTIONDBDIR=/var/passwd

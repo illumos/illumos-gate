@@ -145,7 +145,7 @@ I/O noncoherent cache will be flushed.
 CPU noncoherent cache will be invalidated.
 .RE
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -161,4 +161,6 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-\fBdat_lmr_sync_rdma_read\fR(3DAT), \fBlibdat\fR(3LIB), \fBattributes\fR(5)
+.BR dat_lmr_sync_rdma_read (3DAT),
+.BR libdat (3LIB),
+.BR attributes (7)

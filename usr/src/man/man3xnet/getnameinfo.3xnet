@@ -218,7 +218,7 @@ performs a lookup as if the socket address structure contains the IPv4 address
 "1.2.3.4".
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -235,10 +235,13 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBsockaddr\fR(3SOCKET),
-\fBgai_strerror\fR(3XNET), \fBgetaddrinfo\fR(3XNET),
-\fBgetservbyname\fR(3XNET), \fBsocket\fR(3XNET), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR sockaddr (3SOCKET),
+.BR gai_strerror (3XNET),
+.BR getaddrinfo (3XNET),
+.BR getservbyname (3XNET),
+.BR socket (3XNET),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .LP
 The IPv6 unspecified address ("::") and the IPv6 loopback address ("::1") are

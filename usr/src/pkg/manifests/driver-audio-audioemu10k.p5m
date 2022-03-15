@@ -43,8 +43,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/audioemu10k group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/audioemu10k.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/audioemu10k.4d
 driver name=audioemu10k \
     alias=pci1102,2 \
     alias=pci1102,4 \

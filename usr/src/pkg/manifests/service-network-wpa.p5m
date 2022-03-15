@@ -38,8 +38,8 @@ dir  path=usr group=sys
 dir  path=usr/lib
 dir  path=usr/lib/inet
 file path=usr/lib/inet/wpad mode=0555
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/wpad.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/wpad.8
 legacy pkg=SUNWwpar \
     desc="The service implements the IEEE802.11i (WPA/WPA2) specification." \
     name="Wireless WPA Supplicant, (Root)"

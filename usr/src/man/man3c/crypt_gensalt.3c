@@ -23,7 +23,7 @@ The \fBcrypt_gensalt()\fR function generates the salt string required by
 .LP
 If \fIoldsalt\fR is \fINULL\fR, \fBcrypt_gensalt()\fR uses the algorithm
 defined by \fBCRYPT_DEFAULT\fR in \fB/etc/security/policy.conf\fR. See
-\fBpolicy.conf\fR(4).
+\fBpolicy.conf\fR(5).
 .sp
 .LP
 If \fIoldsalt\fR is non-null, \fBcrypt_gensalt()\fR determines if the algorithm
@@ -88,7 +88,7 @@ call \fBcrypt_gensalt()\fR directly but should instead call the appropriate
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -106,7 +106,14 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpasswd\fR(1), \fBcrypt\fR(3C), \fBcrypt_genhash_impl\fR(3C),
-\fBcrypt_gensalt_impl\fR(3C), \fBgetpassphrase\fR(3C), \fBmalloc\fR(3C),
-\fBpam\fR(3PAM), \fBcrypt.conf\fR(4), \fBpasswd\fR(4), \fBpolicy.conf\fR(4),
-\fBattributes\fR(5)
+.BR passwd (1),
+.BR crypt (3C),
+.BR crypt_genhash_impl (3C),
+.BR crypt_gensalt_impl (3C),
+.BR getpassphrase (3C),
+.BR malloc (3C),
+.BR pam (3PAM),
+.BR crypt.conf (5),
+.BR passwd (5),
+.BR policy.conf (5),
+.BR attributes (7)

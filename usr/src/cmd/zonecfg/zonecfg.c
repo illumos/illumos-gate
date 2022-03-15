@@ -1117,7 +1117,7 @@ usage(boolean_t verbose, uint_t flags)
 			    cmd_to_str(CMD_REMOVE), pt_to_str(PT_OPTIONS),
 			    gettext("<file-system options>"));
 			(void) fprintf(fp, gettext("Consult the file-system "
-			    "specific manual page, such as mount_ufs(1M), "
+			    "specific manual page, such as mount_ufs(8), "
 			    "for\ndetails about file-system options.  Note "
 			    "that any file-system options with an\nembedded "
 			    "'=' character must be enclosed in double quotes, "
@@ -1145,7 +1145,7 @@ usage(boolean_t verbose, uint_t flags)
 			    pt_to_str(PT_GNIC), gettext("<global zone NIC>"));
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_VLANID), gettext("<vlan ID>"));
-			(void) fprintf(fp, gettext("See ifconfig(1M) for "
+			(void) fprintf(fp, gettext("See ifconfig(8) for "
 			    "details of the <interface> string.\n"));
 			(void) fprintf(fp, gettext("%s %s is valid "
 			    "if the %s property is set to %s, otherwise it "
@@ -4554,7 +4554,7 @@ valid_fs_type(const char *type)
 	    strcmp(type, ".") == 0 || strcmp(type, "..") == 0)
 		return (B_FALSE);
 	/*
-	 * More detailed verification happens later by zoneadm(1m).
+	 * More detailed verification happens later by zoneadm(8).
 	 */
 	return (B_TRUE);
 }
@@ -6456,7 +6456,7 @@ brand_verify(zone_dochandle_t handle)
 }
 
 /*
- * Track the network interfaces listed in zonecfg(1m) in a linked list
+ * Track the network interfaces listed in zonecfg(8) in a linked list
  * so that we can later check that defrouter is specified for an exclusive IP
  * zone if and only if at least one allowed-address has been specified.
  */

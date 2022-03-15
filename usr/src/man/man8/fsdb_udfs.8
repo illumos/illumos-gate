@@ -1,0 +1,1006 @@
+'\" te
+.\"  Copyright (c) 1999 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH FSDB_UDFS 8 "August 29, 2021"
+.SH NAME
+fsdb_udfs \- udfs file system debugger
+.SH SYNOPSIS
+.nf
+\fBfsdb \fR [\fB-F\fR] udfs [\fIgeneric_option\fR] [\fB-o \fR\fIspecific_option\fR] \fIspecial\fR
+.fi
+
+.SH DESCRIPTION
+The \fBfsdb_udfs\fR command is an interactive tool that can be used to patch up
+a damaged \fBudfs\fR file system. \fBfsdb_udfs\fR has conversions to translate
+block and i-numbers into their corresponding disk addresses. Mnemonic offsets
+to access different parts of an inode are also included. Mnemonic offsets
+greatly simplify the process of correcting control block entries or descending
+the file system tree.
+.sp
+.LP
+\fBfsdb\fR contains several error-checking routines to verify inode and block
+addresses. These can be disabled if necessary by invoking \fBfsdb\fR with the
+\fB-o\fR option or by using the \fBo\fR command.
+.sp
+.LP
+\fBfsdb\fR reads one block at a time, and therefore works with raw as well as
+block \fBI/O\fR devices. A buffer management routine is used to retain commonly
+used blocks of data in order to reduce the number of read system calls. All
+assignment operations result in an immediate write-through of the corresponding
+block. In order to modify any portion of the disk, \fBfsdb\fR must be invoked
+with the \fB-w\fR option.
+.sp
+.LP
+Wherever possible, \fBadb\fR-like syntax has been adopted to promote the use of
+\fBfsdb\fR through familiarity.
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIspecific_option\fR\fR
+.ad
+.RS 22n
+Specify \fBudfs\fR file system specific options in a comma-separated list with
+no intervening spaces. The following specific options are supported:
+.sp
+.ne 2
+.na
+\fBo\fR
+.ad
+.RS 12n
+Override some error conditions.
+.RE
+
+.sp
+.ne 2
+.na
+\fBp=\fIstring\fR\fR
+.ad
+.RS 12n
+Set prompt to \fIstring\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBw\fR
+.ad
+.RS 12n
+Open for write.
+.RE
+
+.sp
+.ne 2
+.na
+\fB?\fR
+.ad
+.RS 12n
+Display usage.
+.RE
+
+.RE
+
+.SH USAGE
+Numbers are considered hexadecimal by default. The user has control over how
+data is to be displayed or accepted. The \fBbase\fR command displays or sets
+the input and output base. Once set, all input defaults to this base and all
+output displays in this base. The base can be overridden temporarily for input
+by preceding hexadecimal numbers by \fB0x\fR, preceding decimal numbers with a
+\fB0t\fR, or octal numbers with a \fB0\fR. Hexadecimal numbers beginning with
+\fBa\fR-\fBf\fR or \fBA\fR-\fBF\fR must be preceded with a \fB0x\fR to
+distinguish them from commands.
+.sp
+.LP
+Disk addressing by \fBfsdb\fR is at the byte level. However, \fBfsdb\fR offers
+many commands to convert a desired inode, directory entry, block, and so forth,
+to a byte address. After the address has been calculated, \fBfsdb\fR records
+the result in the current address (\fBdot\fR).
+.sp
+.LP
+Several global values are maintained by \fBfsdb\fR\fB\fR:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Current base (referred to as \fBbase\fR)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Current address (referred to as \fBdot\fR)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Current inode (referred to as \fBinode\fR)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Current count (referred to as \fBcount\fR)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Current type (referred to as \fBtype\fR)
+.RE
+.sp
+.LP
+Most commands use the preset value of \fBdot\fR in their execution. For
+example,
+.sp
+.in +2
+.nf
+ > 2:inode
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+first sets the value of dot (\fB\&.\fR) to \fB2\fR, colon (\fB:\fR), signifies
+the start of a command, and the \fBinode\fR command sets \fBinode\fR to
+\fB2\fR. A count is specified after a comma (\fB,\fR). Once set, count remains
+at this value until a new command is encountered that resets the value back to
+\fB1\fR (the default).
+.sp
+.LP
+So, if
+.sp
+.in +2
+.nf
+> 2000,400/X
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+is entered, \fB400\fR hex longs are listed from \fB2000\fR, and when completed,
+the value of dot is \fB 2000 + 400 * sizeof\fR (long). If a RETURN is then
+entered, the output routine uses the current values of \fBdot\fR, \fBcount\fR,
+and \fBtype\fR and displays \fB400 \fRmore hex longs. An asterisk (\fB*\fR)
+causes the entire block to be displayed. An example showing several commands
+and the use of RETURN would be:
+.sp
+.in +2
+.nf
+> 2:ino; 0:dir?d
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+> 2:ino; 0:db:block?d
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The two examples are synonymous for getting to the first directory entry of the
+root of the file system. Once there, subsequently entering a RETURN, plus
+(\fB+\fR), or minus (\fB-\fR)  advances to subsequent entries. Notice that
+.sp
+.in +2
+.nf
+> 2:inode; :ls
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+> :ls /
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+is again synonymous.
+.SS "Expressions"
+The following symbols are recognized by \fBfsdb\fR:
+.sp
+.ne 2
+.na
+\fBRETURN\fR
+.ad
+.RS 13n
+Update the value of dot by the current value of \fItype\fR and \fIdisplay\fR
+using the current value of \fIcount\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fI#\fR\fR
+.ad
+.RS 13n
+Update the value of dot by specifying a numeric expression. Specify numeric
+expressions using addition, subtraction, multiplication, and division
+operators ( \fB+\fR, \fB-\fR, \fB*\fR, and \fB%\fR). Numeric expressions are
+evaluated from left to right and can use parentheses. After evaluation, the
+value of dot is updated.
+.RE
+
+.sp
+.ne 2
+.na
+\fB, \fIcount\fR\fR
+.ad
+.RS 13n
+Update the count indicator. The global value of \fIcount\fR is updated to
+\fIcount\fR. The value of \fIcount\fR remains until a new command is run. A
+\fIcount\fR specifier of \fB*\fR attempts to show a blocks's worth of
+information. The default for \fIcount\fR is \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB? \fI f\fR\fR
+.ad
+.RS 13n
+Display in structured style with format specifier \fBf\fR. See \fBFormatted
+Output\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB/ \fIf\fR\fR
+.ad
+.RS 13n
+Display in unstructured style with format specifier \fBf\fR. See \fBFormatted
+Output\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\&.\fR
+.ad
+.RS 13n
+Display the value of dot.
+.RE
+
+.sp
+.ne 2
+.na
+\fB+\fIe\fR\fR
+.ad
+.RS 13n
+Increment the value of dot by the expression \fIe\fR. The amount actually
+incremented is dependent on the size of type: \fBdot = dot + \fR\fIe \fR\fB*
+\fR\fBsizeof\fR (\fItype\fR) The default for \fIe\fR is \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\(mi\fIe\fR\fR
+.ad
+.RS 13n
+Decrement the value of dot by the expression \fIe \fR. See \fB+\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB*\fIe\fR\fR
+.ad
+.RS 13n
+Multiply the value of dot by the expression \fIe\fR. Multiplication and
+division don't use \fItype\fR. In the above calculation of dot, consider the
+\fBsizeof\fR (\fItype\fR) to be \fB1\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB%\fIe\fR\fR
+.ad
+.RS 13n
+Divide the value of dot by the expression \fIe\fR. See \fB*\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB< \fIname\fR\fR
+.ad
+.RS 13n
+Restore an address saved in register \fIname\fR. \fIname\fR must be a single
+letter or digit.
+.RE
+
+.sp
+.ne 2
+.na
+\fB> \fIname\fR\fR
+.ad
+.RS 13n
+Save an address in register \fIname\fR. \fIname\fR must be a single letter or
+digit.
+.RE
+
+.sp
+.ne 2
+.na
+\fB= \fIf\fR\fR
+.ad
+.RS 13n
+Display indicator. If \fIf\fR is a legitimate format specifier (see
+\fBFormatted Output\fR), then the value of dot is displayed using format
+specifier \fIf\fR. Otherwise, assignment is assumed. See \fB= [s] [e]\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB= [\fIs\fR] [\fIe\fR]\fR
+.ad
+.RS 13n
+Change the value of dot using an assignment indicator. The address pointed to
+by dot has its contents changed to the value of the expression \fIe\fR or to
+the \fBASCII\fR representation of the quoted (\fB"\fR) string \fIs\fR. This can
+be useful for changing directory names or \fBASCII\fR file information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB=+ \fIe\fR\fR
+.ad
+.RS 13n
+Change the value of dot using an incremental assignment. The address pointed to
+by dot has its contents incremented by expression \fIe\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB=- e\fR
+.ad
+.RS 13n
+Change the value of dot using a decremental assignment. Decrement the contents
+of the address pointed to by dot by expression \fIe\fR.
+.RE
+
+.SS "Commands"
+A command must be prefixed by a colon (\fB:\fR). Only enough letters of the
+command to uniquely distinguish it are needed. Multiple commands can be entered
+on one line by  separating them by a SPACE, TAB, or semicolon (\fB;\fR).
+.sp
+.LP
+To view a potentially unmounted disk in a reasonable manner, \fBfsdb\fR
+supports the \fBcd\fR, \fBpwd\fR, \fBls\fR, and \fBfind\fR commands. The
+functionality of each of these commands basically matches that of its UNIX
+counterpart. See \fBcd\fR(1), \fBpwd\fR(1), \fBls\fR(1), and \fBfind\fR(1) for
+details. The \fB*\fR, \fB,\fR, \fB?\fR, and \fB-\fR wildcard characters are
+also supported.
+.sp
+.LP
+The following commands are supported:
+.sp
+.ne 2
+.na
+\fBbase[=\fIb\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Display or set the base. All input and output is governed by the current base.
+Without the \fB=\fR \fIb\fR, displays the current base. Otherwise, sets the
+current base to \fIb\fR. Base is interpreted using the old value of base, so to
+ensure correctness use the \fB0\fR, \fB0t\fR, or \fB0x\fR prefix when changing
+the base. The default for base is hexadecimal.
+.RE
+
+.sp
+.ne 2
+.na
+\fBblock\fR
+.ad
+.sp .6
+.RS 4n
+Convert the value of dot to a block address.
+.RE
+
+.sp
+.ne 2
+.na
+\fBcd [\fIdir\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Change the current directory to directory  \fIdir\fR. The current values of
+inode and dot are also updated. If \fBdir\fR is not specified, changes
+directories to inode 2, root (\fB/\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fBdirectory\fR
+.ad
+.sp .6
+.RS 4n
+If the current inode is a directory, converts the value of dot to a directory
+slot offset in that directory, and dot now points to this entry.
+.RE
+
+.sp
+.ne 2
+.na
+\fBfile\fR
+.ad
+.sp .6
+.RS 4n
+Set the value of dot as a relative block count from the beginning of the file.
+The value of dot is updated to the first byte of  this block.
+.RE
+
+.sp
+.ne 2
+.na
+\fBfind \fIdir\fR [\fB-name\fR \fIn\fR] | [\fB-inum\fR\fI i\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Find files by name or i-number. Recursively searches directory \fIdir\fR and
+below for file names whose i-number matches \fBi\fR or whose name matches
+pattern \fIn\fR. Only one of the two options (\fB-name\fR or \fB-inum\fR) can
+be used at one time. The find \fB-print\fR is not necessary or accepted.
+.RE
+
+.sp
+.ne 2
+.na
+\fBfill=\fIp\fR\fR
+.ad
+.sp .6
+.RS 4n
+Fill an area of disk with pattern \fIp\fR. The area of disk is delimited by dot
+and count.
+.RE
+
+.sp
+.ne 2
+.na
+\fBinode\fR
+.ad
+.sp .6
+.RS 4n
+Convert the value of dot to an inode address. If successful, the current value
+of inode is updated as well as the value of dot. As a convenient shorthand, if
+\fB:inode\fR appears at the beginning of the line, the value of dot is set to
+the current inode and that inode is displayed in inode format.
+.RE
+
+.sp
+.ne 2
+.na
+\fBls [ \fB-R\fR ] [\fB-l\fR ] \fIpat1\fR \fIpat2\fR...\fR
+.ad
+.sp .6
+.RS 4n
+List directories or files. If no file is specified, the current directory is
+assumed. Either or both of the options can be used (but, if used, must be
+specified before the filename specifiers). Wild card characters are available
+and multiple arguments are acceptable. The long listing shows only the i-number
+and the name; use the inode command with \fB?i\fR to get more information.
+.RE
+
+.sp
+.ne 2
+.na
+\fBoverride\fR
+.ad
+.sp .6
+.RS 4n
+Toggle the value of override. Some error conditions might be overridden if
+override is toggled to \fBon\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBprompt "\fIp\fR"\fR
+.ad
+.sp .6
+.RS 4n
+Change the \fBfsdb\fR prompt to \fIp\fR. \fIp\fR must be enclosed in quotes.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpwd\fR
+.ad
+.sp .6
+.RS 4n
+Display the current working directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBquit\fR
+.ad
+.sp .6
+.RS 4n
+Quit \fBfsdb\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtag\fR
+.ad
+.sp .6
+.RS 4n
+Convert the value of dot and if this is a valid tag, print the volume structure
+according to the tag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB!\fR
+.ad
+.sp .6
+.RS 4n
+Escape to the shell.
+.RE
+
+.SS "Inode Commands"
+In addition to the above commands, several other commands deal with inode
+fields and operate directly on the current inode (they still require the colon
+(\fB:\fR). They can be used to more easily display or change the particular
+fields. The value of dot is only used by the \fB:db\fR and \fB:ib\fR commands.
+Upon completion of the command, the value of dot is changed so that it points
+to that particular field. For example,
+.sp
+.in +2
+.nf
+> :ln=+1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+increments the link count of the current inode and sets the value of dot to the
+address of the link count field.
+.sp
+.LP
+The following inode commands are supported:
+.sp
+.ne 2
+.na
+\fBat\fR
+.ad
+.RS 8n
+Access time
+.RE
+
+.sp
+.ne 2
+.na
+\fBbs\fR
+.ad
+.RS 8n
+Block size
+.RE
+
+.sp
+.ne 2
+.na
+\fBct\fR
+.ad
+.RS 8n
+Creation time
+.RE
+
+.sp
+.ne 2
+.na
+\fBgid\fR
+.ad
+.RS 8n
+Group id
+.RE
+
+.sp
+.ne 2
+.na
+\fBln\fR
+.ad
+.RS 8n
+Link number
+.RE
+
+.sp
+.ne 2
+.na
+\fBmt\fR
+.ad
+.RS 8n
+Modification time
+.RE
+
+.sp
+.ne 2
+.na
+\fBmd\fR
+.ad
+.RS 8n
+Mode
+.RE
+
+.sp
+.ne 2
+.na
+\fBmaj\fR
+.ad
+.RS 8n
+Major device number
+.RE
+
+.sp
+.ne 2
+.na
+\fBmin\fR
+.ad
+.RS 8n
+Minor device number
+.RE
+
+.sp
+.ne 2
+.na
+\fBnm\fR
+.ad
+.RS 8n
+This command actually operates on the directory name field. Once      poised at
+the desired directory entry (using the \fBdirectory\fR command), this command
+allows you to change or display the directory name. For example,
+.sp
+.in +2
+.nf
+ > 7:dir:nm="foo"
+.fi
+.in -2
+.sp
+
+gets the \fB7\fRth directory entry of the current inode and changes its name to
+\fBfoo\fR. Directory names cannot be made larger than the field allows. If an
+attempt is made to make a directory name larger than the field allows, the
+string is truncated to fit and a warning message is displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsz\fR
+.ad
+.RS 8n
+File size
+.RE
+
+.sp
+.ne 2
+.na
+\fBuid\fR
+.ad
+.RS 8n
+User \fBID\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBuniq\fR
+.ad
+.RS 8n
+Unique \fBID\fR
+.RE
+
+.SS "Formatted Output"
+Formatted output comes in two styles and many format types. The two styles of
+formatted output are: structured and unstructured. Structured output is used to
+display inodes, directories, and so forth. Unstructured output displays raw
+data.
+.sp
+.LP
+Format specifiers are preceded by the slash (\fB/\fR) or question mark
+(\fB?\fR) character. \fItype\fR is updated as necessary upon completion.
+.sp
+.LP
+The following format specifiers are preceded by the \fB?\fR character:
+.sp
+.ne 2
+.na
+\fBi\fR
+.ad
+.RS 5n
+Display as inodes in the current base.
+.RE
+
+.sp
+.ne 2
+.na
+\fBd\fR
+.ad
+.RS 5n
+Display as directories in the current base.
+.RE
+
+.sp
+.LP
+The following format specifiers are preceded by the \fB/\fR character:
+.sp
+.ne 2
+.na
+\fBb\fR
+.ad
+.RS 9n
+Display as bytes in the current base.
+.RE
+
+.sp
+.ne 2
+.na
+\fBc\fR
+.ad
+.RS 9n
+Display as characters.
+.RE
+
+.sp
+.ne 2
+.na
+\fBo | O\fR
+.ad
+.RS 9n
+Display as octal shorts or longs.
+.RE
+
+.sp
+.ne 2
+.na
+\fBd | D\fR
+.ad
+.RS 9n
+Display as decimal shorts or longs.
+.RE
+
+.sp
+.ne 2
+.na
+\fBx | X\fR
+.ad
+.RS 9n
+Display as hexadecimal shorts or longs.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRUsing fsdb as a calculator for complex arithmetic
+.sp
+.LP
+The following command displays \fB2010\fR in decimal format, and is an example
+of using \fBfsdb\fR as a calculator for complex arithmetic.
+
+.sp
+.in +2
+.nf
+> 2000+400%(20+20)=D
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRUsing fsdb to display an i-number in inode format
+.sp
+.LP
+The following command displays the i-number \fB386\fR in inode format.\fB386\fR
+becomes the current inode.
+
+.sp
+.in +2
+.nf
+> 386:ino?i
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRUsing fsdb to change the link count
+.sp
+.LP
+The following command changes the link count for the current inode to \fB4\fR.
+
+.sp
+.in +2
+.nf
+> :ln=4
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRUsing fsdb to increment the link count
+.sp
+.LP
+The following command increments the link count by \fB1\fR.
+
+.sp
+.in +2
+.nf
+> :ln=+1
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRUsing fsdb to display the creation time as a hexadecimal long
+.sp
+.LP
+The following command displays the creation time as a hexadecimal long.
+
+.sp
+.in +2
+.nf
+> :ct=X
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRUsing fsdb to display the modification time in time format
+.sp
+.LP
+The following command displays the modification time in time format.
+
+.sp
+.in +2
+.nf
+> :mt=t
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 7 \fRUsing fsdb to display in ASCII
+.sp
+.LP
+The following command displays, in \fBASCII\fR, block \fB0\fR of the file
+associated with the current inode.
+
+.sp
+.in +2
+.nf
+> 0:file/c
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 8 \fRUsing fsdb to display the directory entries for the root inode
+.sp
+.LP
+The following command displays the first block's directory entries for the root
+inode of this file system. This command stops prematurely if the \fBEOF\fR is
+reached.
+
+.sp
+.in +2
+.nf
+> 2:ino,*?d
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 9 \fRUsing fsdb to change the current inode
+.sp
+.LP
+ The following command changes the current inode to that associated with the
+\fB5\fRth directory entry (numbered from \fB0\fR) of the current inode. The
+first logical block of the file is then displayed in \fBASCII\fR.
+
+.sp
+.in +2
+.nf
+> 5:dir:inode; 0:file,*/c
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 10 \fRUsing fsdb to change the i-number
+.sp
+.LP
+ The following command changes the i-number for the \fB7\fRth directory slot in
+the root directory to \fB3\fR.
+
+.sp
+.in +2
+.nf
+> 2:inode; 7:dir=3
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 11 \fRUsing fsdb to change the name field
+.sp
+.LP
+The following command changes the \fIname\fR field in the directory slot to
+\fBname\fR.
+
+.sp
+.in +2
+.nf
+ > 7:dir:nm="name"
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 12 \fRUsing fsdb to display the a block
+.sp
+.LP
+The following command displays the \fB3\fRrd block of the current inode as
+directory entries.
+
+.LP
+\fBExample 13 \fRUsing fsdb to set the contents of address
+.sp
+.LP
+The following command sets the contents of address \fB2050\fR to
+\fB0xffffffff\fR. \fB0xffffffff\fR can be truncated, depending on the current
+type.
+
+.sp
+.in +2
+.nf
+> 2050=0xffff
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 14 \fRUsing fsdb to place an ASCII string at an address
+.sp
+.LP
+The following command places the \fBASCII\fR string \fBthis is some text\fR at
+address \fB1c92434\fR.
+
+.sp
+.in +2
+.nf
+> 1c92434="this is some text"
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+\fBclri\fR(8), \fBfsck_udfs\fR(8), \fBdir\fR(5),  \fBattributes\fR(7)

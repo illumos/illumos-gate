@@ -33,7 +33,7 @@ The \fBDNSServiceReconfirmRecord()\fR function returns
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -53,4 +53,4 @@ MT-Level	Safe
 .LP
 \fBDNSServiceBrowse\fR(3DNS_SD), \fBDNSServiceQueryRecord\fR(3DNS_SD),
 \fBDNSServiceRegister\fR(3DNS_SD), \fBDNSServiceResolve\fR(3DNS_SD),
-\fBattributes\fR(5)
+.BR attributes (7)

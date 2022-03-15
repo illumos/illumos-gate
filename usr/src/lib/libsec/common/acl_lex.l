@@ -397,7 +397,7 @@ INHERIT_STR [fdinFSI-]+
 				    dgettext(TEXT_DOMAIN,
 				    "The ',' is not a valid permission field "
 				    "separator.\nThe comma is used to separate "
-				    "access control entries.\nSee acl(5) for "
+				    "access control entries.\nSee acl(7) for "
 				    "examples of specifying ACL entries.\n"));
 				yylval.val = EACL_PERM_MASK_ERROR;
 				return (ERROR);
@@ -630,7 +630,7 @@ INHERIT_STR [fdinFSI-]+
 				    dgettext(TEXT_DOMAIN,
 				    "The ',' is not a valid inheritance field "
 				    "separator.\nThe comma is used to separate "
-				    "access control entries.\nSee acl(5) for "
+				    "access control entries.\nSee acl(7) for "
 				    "examples of specifying ACL entries.\n"));
 				yylval.val = EACL_INVALID_ACCESS_TYPE;
 				return (ERROR);

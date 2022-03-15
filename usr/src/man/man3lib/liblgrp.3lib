@@ -65,7 +65,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -83,9 +83,19 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(3), \fBlgrp_affinity_get\fR(3LGRP), \fBlgrp_children\fR(3LGRP),
-\fBlgrp_cookie_stale\fR(3LGRP), \fBlgrp_cpus\fR(3LGRP), \fBlgrp_fini\fR(3LGRP),
-\fBlgrp_home\fR(3LGRP), \fBlgrp_init\fR(3LGRP), \fBlgrp_latency\fR(3LGRP),
-\fBlgrp_mem_size\fR(3LGRP), \fBlgrp_nlgrps\fR(3LGRP),
-\fBlgrp_parents\fR(3LGRP), \fBlgrp_root\fR(3LGRP), \fBlgrp_version\fR(3LGRP),
-\fBlgrp_view\fR(3LGRP), \fBattributes\fR(5)
+.BR Intro (3),
+.BR lgrp_affinity_get (3LGRP),
+.BR lgrp_children (3LGRP),
+.BR lgrp_cookie_stale (3LGRP),
+.BR lgrp_cpus (3LGRP),
+.BR lgrp_fini (3LGRP),
+.BR lgrp_home (3LGRP),
+.BR lgrp_init (3LGRP),
+.BR lgrp_latency (3LGRP),
+.BR lgrp_mem_size (3LGRP),
+.BR lgrp_nlgrps (3LGRP),
+.BR lgrp_parents (3LGRP),
+.BR lgrp_root (3LGRP),
+.BR lgrp_version (3LGRP),
+.BR lgrp_view (3LGRP),
+.BR attributes (7)

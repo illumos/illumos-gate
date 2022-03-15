@@ -110,7 +110,7 @@ Insufficient memory exists to add to the spawn file actions object.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -128,5 +128,8 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBclose\fR(2), \fBclosefrom\fR(3C), \fBposix_spawn\fR(3C),
-\fBposix_spawn_file_actions_addclose\fR(3C), \fBattributes\fR(5)
+.BR close (2),
+.BR closefrom (3C),
+.BR posix_spawn (3C),
+.BR posix_spawn_file_actions_addclose (3C),
+.BR attributes (7)

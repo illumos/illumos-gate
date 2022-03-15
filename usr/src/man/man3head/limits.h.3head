@@ -716,7 +716,7 @@ The resolution of the \fBCLOCK_REALTIME\fR clock, in nanoseconds.
 The symbolic constants in the following list are symbolic names for the most
 restrictive value for certain features on an implementation conforming to
 various POSIX and Single Unix Specification requirements. See
-\fBstandards\fR(5).
+\fBstandards\fR(7).
 .sp
 .ne 2
 .na
@@ -1594,4 +1594,7 @@ Default process priority.
 .SH SEE ALSO
 .sp
 .LP
-\fBfpathconf\fR(2), \fBpathconf\fR(2), \fBsysconf\fR(3C), \fBstandards\fR(5)
+.BR fpathconf (2),
+.BR pathconf (2),
+.BR sysconf (3C),
+.BR standards (7)

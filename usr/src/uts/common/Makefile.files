@@ -2335,13 +2335,13 @@ BNX_OBJS += \
 	bnx_lm_send.o
 
 #
-# mlxcx(7D)
+# mlxcx(4D)
 #
 MLXCX_OBJS +=	mlxcx.o mlxcx_dma.o mlxcx_cmd.o mlxcx_intr.o mlxcx_gld.o \
 		mlxcx_ring.o mlxcx_sensor.o
 
 #
-# ena(7D)
+# ena(4D)
 #
 ENA_OBJS +=	ena.o ena_admin.o ena_dma.o ena_gld.o ena_hw.o ena_intr.o \
 		ena_stats.o ena_tx.o ena_rx.o

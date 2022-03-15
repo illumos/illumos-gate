@@ -39,7 +39,7 @@ idle, the \fIidle_time\fR is not displayed.
 .sp
 .LP
 A remote host will only respond if it is running the \fBrusersd\fR daemon,
-which may be started up from \fBinetd\fR(1M) or \fBlisten\fR(1M).
+which may be started up from \fBinetd\fR(8) or \fBlisten\fR(8).
 .sp
 .LP
 In the absence of a name service, such as LDAP or NIS, \fBrusers\fR displays
@@ -93,5 +93,9 @@ Sort by number of users.
 .SH SEE ALSO
 .sp
 .LP
-\fBwho\fR(1), \fBinetd\fR(1M), \fBlisten\fR(1M), \fBpmadm\fR(1M),
-\fBsacadm\fR(1M), \fBattributes\fR(5)
+.BR who (1),
+.BR attributes (7),
+.BR inetd (8),
+.BR listen (8),
+.BR pmadm (8),
+.BR sacadm (8)

@@ -348,8 +348,11 @@ int	options[4];
 .in -2
 
 .SH SEE ALSO
-\fBexecve\fR(2), \fBattach\fR(9E), \fBddi_prop_lookup\fR(9F),
-\fBddi_prop_remove\fR(9F), \fBmakedevice\fR(9F)
+.BR execve (2),
+.BR attach (9E),
+.BR ddi_prop_lookup (9F),
+.BR ddi_prop_remove (9F),
+.BR makedevice (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

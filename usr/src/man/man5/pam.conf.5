@@ -1,0 +1,478 @@
+'\" te
+.\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PAM.CONF 5 "Mar 4, 2017"
+.SH NAME
+pam.conf \- configuration file for pluggable authentication modules
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/pam.conf\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBpam.conf\fR is the configuration file for the Pluggable Authentication
+Module architecture, or \fBPAM\fR. A \fBPAM\fR module provides functionality
+for one or more of four possible services: authentication, account management,
+session management, and password management.
+.sp
+.ne 2
+.na
+\fBauthentication service module\fR
+.ad
+.sp .6
+.RS 4n
+Provides functionality to authenticate a user and set up user credentials.
+.RE
+
+.sp
+.ne 2
+.na
+\fBaccount management module\fR
+.ad
+.sp .6
+.RS 4n
+Provides functionality to determine if the current user's account is valid.
+This includes checking for password and account expiration, as well as
+verifying access hour restrictions.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsession management module\fR
+.ad
+.sp .6
+.RS 4n
+Provides functionality to set up and terminate login sessions.
+.RE
+
+.sp
+.ne 2
+.na
+\fBpassword management module\fR
+.ad
+.sp .6
+.RS 4n
+Provides functionality to change a user's authentication token or password.
+.RE
+
+.sp
+.LP
+Each of the four service modules can be implemented as a shared library object
+which can be referenced in the \fBpam.conf\fR configuration file.
+.SS "Simplified pam.conf Configuration File"
+.LP
+The \fBpam.conf\fR file contains a listing of services. Each service is paired
+with a corresponding service module. When a service is requested, its
+associated module is invoked. Each entry may be a maximum of 256 characters,
+including the end of line, and has the following format:
+.sp
+.in +2
+.nf
+\fIservice_name module_type control_flag module_path options\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The following is an example of a \fBpam.conf\fR configuration file with support
+for authentication, account management, session management and password
+management modules (See the \fBpam.conf\fR file that is shipped with your
+system for the contents of this file):
+.sp
+.in +2
+.nf
+login   auth requisite          pam_authtok_get.so.1
+login   auth required           pam_dhkeys.so.1
+login   auth required           pam_unix_auth.so.1
+login   auth required           pam_dial_auth.so.1
+
+other   account requisite       pam_roles.so.1
+other   account required        pam_unix_account.so.1
+
+other   session required        pam_unix_session.so.1
+
+other   password required       pam_dhkeys.so.1
+other   password requisite      pam_authtok_get.so.1
+other   password requisite      pam_authtok_check.so.1
+other   password required       pam_authtok_store.so.1
+.fi
+.in -2
+
+.sp
+.LP
+\fIservice_name\fR denotes the service (for example, \fBlogin\fR,
+\fBdtlogin\fR, or \fBrlogin\fR).
+.sp
+.LP
+The keyword, "\fBother\fR," indicates the module that all other applications
+which have not been specified should use. The "\fBother\fR" keyword can also be
+used if all services of the same \fImodule_type\fR have the same requirements.
+.sp
+.LP
+In the example, since all of the services use the same session module, they
+could have been replaced by a single \fBother\fR line.
+.sp
+.LP
+\fImodule_type\fR denotes the service module type: authentication (\fBauth\fR),
+account management (\fBaccount\fR), session management (\fBsession\fR), or
+password management (\fBpassword\fR).
+.sp
+.LP
+The \fIcontrol_flag\fR field determines the behavior of stacking.
+.sp
+.LP
+The \fImodule_path\fR field specifies the relative pathname to a shared library
+object, or an included \fBPAM\fR configuration file, which implements the
+service functionality. If the pathname is not absolute, shared library objects
+are assumed to be relative to \fB/usr/lib/security/$ISA/\fR, and included
+\fBPAM\fR configuration files are assumed to be relative to
+\fB/usr/lib/security/\fR.
+.sp
+.LP
+The \fBISA\fR token is replaced by an implementation defined directory name
+which defines the path relative to the calling program's instruction set
+architecture.
+.sp
+.LP
+The \fIoptions\fR field is used by the \fBPAM\fR framework layer to pass module
+specific options to the modules. It is up to the module to parse and interpret
+the options.
+.sp
+.LP
+This field can be used by the modules to turn on debugging or to pass any
+module specific parameters such as a \fBTIMEOUT\fR value. The options supported
+by the modules are documented in their respective manual pages.
+.SS "Integrating Multiple Authentication Services With Stacking"
+.LP
+When a \fIservice_name\fR of the same \fImodule_type\fR is defined more than
+once, the service is said to be stacked. Each module referenced in the
+\fImodule_path\fR for that service is then processed in the order that it
+occurs in the configuration file. The \fIcontrol_flag\fR field specifies the
+continuation and failure semantics of the modules, and can contain one of the
+following values:
+.sp
+.ne 2
+.na
+\fB\fBbinding\fR\fR
+.ad
+.RS 14n
+If the service module returns success and no preceding \fBrequired\fR modules
+returned failures, immediately return success without calling any subsequent
+modules. If a failure is returned, treat the failure as a \fBrequired\fR module
+failure, and continue to process the \fBPAM\fR stack.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinclude\fR\fR
+.ad
+.RS 14n
+Process the  lines from the \fBPAM\fR configuration file that is specified in
+the \fImodule_path\fR at this point in the \fBPAM\fR stack. The ``\fBother\fR''
+keyword is used if the specified service_name is not found. 32 levels of
+included \fBPAM\fR configuration files are supported. Any options are ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBoptional\fR\fR
+.ad
+.RS 14n
+If the service module returns success, record the success, and continue to
+process the \fBPAM\fR stack. If a failure is returned, and it is the first
+\fBoptional\fR module failure, save the failure code as an \fBoptional\fR
+failure. Continue to process the \fBPAM\fR stack.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrequired\fR\fR
+.ad
+.RS 14n
+If the service module returns success, record the success, and continue to
+process the \fBPAM\fR stack. If a failure is returned, and it is the first
+\fBrequired\fR failure, save the failure code as a \fBrequired\fR failure.
+Continue to process the \fBPAM\fR stack.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrequisite\fR\fR
+.ad
+.RS 14n
+If the service module returns success, record the success, and continue to
+process the \fBPAM\fR stack. If a failure is returned, immediately return the
+first non-optional failure value recorded without calling any subsequent
+modules. That is, return this failure unless a previous required service module
+failed. If a previous required service module failed, then return the first of
+those values.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsufficient\fR\fR
+.ad
+.RS 14n
+If the service module return success and no preceding required modules returned
+failures, immediately return success without calling any subsequent modules. If
+a failure is returned, treat the failure as an optional module failure, and
+continue to process the \fBPAM\fR stack.
+.RE
+
+.sp
+.LP
+If the \fBPAM\fR stack runs to completion, that is, neither a \fBrequisite\fR
+module failed, nor a \fBbinding\fR or \fBsufficient\fR module success stops it,
+success is returned if no required modules failed and at least one required,
+requisite, optional module succeeded. If no module succeeded and a required or
+binding module failed, the first of those errors is returned. If no required or
+binding module failed and an optional module failed, the first of the option
+module errors is returned. If no module in the stack succeeded or failed, that
+is, all modules returned an ignore status, a default error based on module
+type, for example, "User account expired," is returned.
+.sp
+.LP
+All errors in \fBpam.conf\fR entries are logged to \fBsyslog\fR as
+\fBLOG_AUTH\fR | \fBLOG_ERR\fR errors. The use of a service with an error noted
+in the \fBpam.conf\fR entry for that service will fail. The system
+administrator will need to correct the noted errors before that service may be
+used. If no services are available or the \fBpam.conf\fR file is missing, the
+system administrator may enter system maintenance mode to correct or restore
+the file.
+.sp
+.LP
+The following is a sample configuration file that stacks the \fBsu\fR,
+\fBlogin\fR, and \fBrlogin\fR services.
+.sp
+.in +2
+.nf
+su     auth required       pam_inhouse.so.1
+su     auth requisite      pam_authtok_get.so.1
+su     auth required       pam_dhkeys.so.1
+su     auth required       pam_unix_auth.so.1
+
+login   auth requisite     pam_authtok_get.so.1
+login   auth required      pam_dhkeys.so.1
+login   auth required      pam_unix_auth.so.1
+login   auth required      pam_dial_auth.so.1
+login   auth optional      pam_inhouse.so.1
+
+rlogin  auth sufficient    pam_rhosts_auth.so.1
+rlogin  auth requisite     pam_authtok_get.so.1
+rlogin  auth required      pam_dhkeys.so.1
+rlogin  auth required      pam_unix_auth.so.1
+.fi
+.in -2
+
+.sp
+.LP
+In the case of \fBsu\fR, the user is authenticated by the \fBinhouse\fR and
+\fBauthtok_get\fR, \fBdhkeys\fR, and \fBunix_auth\fR authentication modules.
+Because the \fBinhouse\fR and the other authentication modules are
+\fBrequired\fR and \fBrequisite\fR, respectively, an error is returned back to
+the application if any module fails. In addition, if the \fBrequisite\fR
+authentication (\fBpam_authtok_get\fR authentication) fails, the other
+authentication modules are never invoked, and the error is returned immediately
+back to the application.
+.sp
+.LP
+In the case of \fBlogin\fR, the \fBrequired\fR keyword for \fIcontrol_flag\fR
+requires that the user be allowed to login only if the user is authenticated by
+all the service modules. If \fBpam_unix_auth\fR authentication fails, control
+continues to proceed down the stack, and the \fBinhouse\fR authentication
+module is invoked. \fBinhouse\fR authentication is optional by virtue of the
+optional keyword in the \fIcontrol_flag\fR field. The user can still log in
+even if \fBinhouse\fR authentication fails, assuming the modules stacked above
+succeeded.
+.sp
+.LP
+In the case of \fBrlogin\fR, the \fBsufficient\fR keyword for
+\fIcontrol_flag\fR specifies that if the \fBrhosts\fR authentication check
+succeeds, then \fBPAM\fR should return success to \fBrlogin\fR and \fBrlogin\fR
+should not prompt the user for a password. The other authentication modules,
+which are in the stack, will only be invoked if the \fBrhosts\fR check fails.
+This gives the system administrator the flexibility to determine if
+\fBrhosts\fR alone is sufficient enough to authenticate a remote user.
+.sp
+.LP
+Some modules return \fBPAM_IGNORE\fR in certain situations. In these cases the
+\fBPAM\fR framework ignores the entire entry in \fBpam.conf\fR regardless of
+whether or not it is \fBbinding\fR, \fBrequisite\fR, \fBrequired\fR,
+\fBoptional\fR, or \fBsufficient\fR.
+.SS "Utilities and Files"
+.LP
+The specific service names and module types for each service should be
+documented in the man page for that service. For instance, the \fBsshd\fR(8)
+man page lists all of the \fBPAM\fR service names and module types for the
+\fBsshd\fR command.
+.sp
+.LP
+The \fBPAM\fR configuration file does not dictate either the name or the
+location of the service specific modules. The convention, however, is the
+following:
+.sp
+.ne 2
+.na
+\fB\fBpam_module_name.so.x\fR\fR
+.ad
+.RS 29n
+File that implements various function of specific authentication services. As
+the relative pathname specified, \fB/usr/lib/security/$ISA\fR is prepended to
+it.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/pam.conf\fR\fR
+.ad
+.RS 29n
+Configuration file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/$ISA/libpam.so.1\fR\fR
+.ad
+.RS 29n
+File that implements the \fBPAM\fR framework library
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing the include control flag
+.sp
+.LP
+The following example collects the common Unix modules into a single file to be
+included as needed in the example of a \fBpam.conf\fR file. The common Unix
+module file is named \fBunix_common\fR and consists of:
+
+.sp
+.in +2
+.nf
+OTHER   auth requisite          pam_authtok_get.so.1
+OTHER   auth required           pam_dhkeys.so.1
+OTHER   auth required           pam_unix_auth.so.1
+OTHER   auth required           pam_unix_cred.so.1
+OTHER   account requisite       pam_roles.so.1
+OTHER   account required        pam_unix_account.so.1
+OTHER   session required        pam_unix_session.so.1
+OTHER   password required       pam_dhkeys.so.1
+OTHER   password requisite      pam_authtok_get.so.1
+OTHER   password requisite      pam_authtok_check.so.1
+OTHER   password required       pam_authtok_store.so.1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The \fBpam.conf\fR file and consists of:
+
+.sp
+.in +2
+.nf
+# Authentication management
+#
+# login service (explicit because of pam_dial_auth)
+#
+login   auth include            unix_common
+login   auth required           pam_dial_auth.so.1
+#
+# rlogin service (explicit because of pam_rhost_auth)
+#
+rlogin  auth sufficient         pam_rhosts_auth.so.1
+rlogin  auth include            unix_common
+#
+# Default definitions for Authentication management
+# Used when service name is not explicitly mentioned
+#
+OTHER   auth include            unix_common
+#
+# Default definition for Account management
+# Used when service name is not explicitly mentioned
+#
+OTHER   account include	     unix_common
+#
+# Default definition for Session management
+# Used when service name is not explicitly mentioned
+#
+OTHER   session include         unix_common
+#
+# Default definition for  Password management
+# Used when service name is not explicitly mentioned
+#
+OTHER   password include        unix_common
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	See Below.
+.TE
+
+.sp
+.LP
+The format is Stable. The contents has no stability attributes.
+.SH SEE ALSO
+.LP
+.BR login (1),
+.BR passwd (1),
+.BR syslog (3C),
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR attributes (7),
+.BR environ (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_dhkeys (7),
+.BR pam_krb5 (7),
+.BR pam_passwd_auth (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7),
+.BR in.rlogind (8),
+.BR in.rshd (8),
+.BR in.telnetd (8),
+.BR in.uucpd (8),
+.BR init (8),
+.BR sac (8),
+.BR su (8),
+.BR ttymon (8)
+.SH NOTES
+.LP
+The \fBpam_unix\fR module is no longer supported. Similar functionality is
+provided by \fBpam_authtok_check\fR(7), \fBpam_authtok_get\fR(7),
+\fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), \fBpam_passwd_auth\fR(7),
+\fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7), and
+\fBpam_unix_session\fR(7).
+.sp
+.LP
+With the removal of the \fBpam_unix\fR module, the SunOS delivered PAM service
+modules no longer need or support the "\fBuse_first_pass\fR" or
+"\fBtry_first_pass\fR" options. This functionality is provided by stacking
+\fBpam_authtok_get\fR(7) above a module that requires a password.

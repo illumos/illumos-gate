@@ -102,9 +102,9 @@
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='in.talkd' section='1M'
+			<manpage title='in.talkd' section='8'
 				manpath='/usr/share/man' />
-			<manpage title='talkd' section='1M'
+			<manpage title='talkd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

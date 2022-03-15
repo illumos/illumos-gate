@@ -1,0 +1,805 @@
+'\" te
+.\"  Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH FD 4D "Mar 2, 2007"
+.SH NAME
+fd, fdc \- drivers for floppy disks and floppy disk controllers
+.SH SYNOPSIS
+.SS "SPARC"
+.LP
+.nf
+\fB/dev/diskette0\fR
+.fi
+
+.LP
+.nf
+\fB/dev/rdiskette0\fR
+.fi
+
+.SS "x86"
+.LP
+.nf
+\fB/dev/diskette[0-1]\fR
+.fi
+
+.LP
+.nf
+\fB/dev/rdiskette[0-1]\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBfd\fR and \fBfdc\fR drivers provide the interfaces to floppy disks using
+the Intel 8272, Intel 82077, NEC 765, or compatible disk controllers on x86
+based systems.
+.sp
+.LP
+The default partitions for the floppy driver are:
+.sp
+.ne 2
+.na
+\fBa\fR
+.ad
+.RS 5n
+All cylinders except the last
+.RE
+
+.sp
+.ne 2
+.na
+\fBb\fR
+.ad
+.RS 5n
+Only the last cylinder
+.RE
+
+.sp
+.ne 2
+.na
+\fBc\fR
+.ad
+.RS 5n
+Entire diskette
+.RE
+
+.sp
+.LP
+The \fBfd\fR driver autosenses the density of the diskette.
+.sp
+.LP
+When the floppy is first opened the driver looks for a SunOS label in logical
+block 0 of the diskette. If attempts to read the SunOS label fail, the open
+will fail. If block 0 is read successfully but a SunOS label is not found,
+auto-sensed geometry and default partitioning are assumed.
+.sp
+.LP
+The \fBfd\fR driver supports both block and raw interfaces.
+.sp
+.LP
+The block files (\fB/dev/diskette*\fR) access the diskette using the system's
+normal buffering mechanism and may be read and written without regard to
+physical diskette records.
+.sp
+.LP
+There is also a raw (\fB/dev/rdiskette*\fR) interface that provides for direct
+transmission between the diskette and the user's read or write buffer. A single
+\fBread\fR(2) or \fBwrite\fR(2) call usually results in one I/O operation;
+therefore raw I/O is considerably more efficient when larger blocking factors
+are used. A blocking factor of no less than 8 Kbytes is recommended. See the
+Notes section, below, for information on the number of sectors per track.
+.SS "3.5" Diskettes"
+.sp
+.LP
+For 3.5" double-sided diskettes, the following densities are supported:
+.SS "SPARC"
+.sp
+.ne 2
+.na
+\fB1.7 Mbyte density\fR
+.ad
+.RS 21n
+80 cylinders, 21 sectors per track, 1.7 Mbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fBhigh density\fR
+.ad
+.RS 21n
+80 cylinders, 18 sectors per track, 1.44 Mbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fBdouble density\fR
+.ad
+.RS 21n
+80 cylinders, 9 sectors per track, 720 Kbyte capacity
+.RE
+
+.SS "x86"
+.sp
+.ne 2
+.na
+\fBextended density\fR
+.ad
+.RS 21n
+80 cylinders, 36 sectors per track, 2.88 Mbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fB1.7 Mbyte density\fR
+.ad
+.RS 21n
+80 cylinders, 21 sectors per track, 1.7 Mbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fBhigh density\fR
+.ad
+.RS 21n
+80 cylinders, 18 sectors per track, 1.44 Mbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fBdouble density\fR
+.ad
+.RS 21n
+80 cylinders, 9 sectors per track, 760 Kbyte capacity
+.RE
+
+.SS "5.25" Diskettes"
+.sp
+.LP
+For 5.25" double-sided diskettes on x86 platforms, the densities listed below
+are supported:
+.SS "SPARC"
+.sp
+.LP
+5.25" diskettes are not supported on SPARC platforms.
+.SS "x86"
+.sp
+.ne 2
+.na
+\fBhigh density\fR
+.ad
+.RS 18n
+80 cylinders, 15 sectors per track, 1.2 Mbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fBdouble density\fR
+.ad
+.RS 18n
+40 cylinders, 9 sectors per track, 360 Kbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fBdouble density\fR
+.ad
+.RS 18n
+40 cylinders, 8 sectors per track, 320 Kbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fBquad density\fR
+.ad
+.RS 18n
+80 cylinders, 9 sectors per track, 720 Kbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fBdouble density\fR
+.ad
+.RS 18n
+40 cylinders, 16 sectors per track (256 bytes per sector), 320 Kbyte capacity
+.RE
+
+.sp
+.ne 2
+.na
+\fBdouble density\fR
+.ad
+.RS 18n
+40 cylinders, 4 sectors per track (1024 bytes per sector), 320 Kbyte capacity
+.RE
+
+.SH ERRORS
+.sp
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+During opening, the partition has been opened for exclusive access and another
+process wants to open the partition. Once open, this error is returned if the
+floppy disk driver attempted to pass a command to the floppy disk controller
+when the controller was busy handling another command. In this case, the
+application should try the operation again.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+An invalid address was specified in an ioctl command (see \fBfdio\fR(4I)).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+The number of bytes read or written is not a multiple of the diskette's sector
+size. This error is also returned when an unsupported command is specified
+using the \fBFDIOCMD\fR ioctl command (see \fBfdio\fR(4I)).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+During opening, the diskette does not have a label or there is no diskette in
+the drive. Once open, this error is returned if the requested I/O transfer
+could not be completed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENOSPC\fR\fR
+.ad
+.RS 10n
+An attempt was made to write past the end of the diskette.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENOTTY\fR\fR
+.ad
+.RS 10n
+The floppy disk driver does not support the requested ioctl functions (see
+\fBfdio\fR(4I)).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+The floppy disk device does not exist or the device is not ready.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 10n
+The floppy disk device is opened for write access and the diskette in the drive
+is write protected.
+.RE
+
+.SS "x86 Only"
+.sp
+.ne 2
+.na
+\fB\fBENOSYS\fR\fR
+.ad
+.RS 10n
+The floppy disk device does not support the requested ioctl function (
+\fBFDEJECT\fR).
+.RE
+
+.SH X86 CONFIGURATION
+.sp
+.LP
+The driver attempts to initialize itself using the information found in the
+configuration file, \fB/platform/i86pc/kernel/drv/fd.conf\fR.
+.sp
+.in +2
+.nf
+name="fd"  parent="fdc"  unit=0;
+name="fd"  parent="fdc"  unit=1;
+.fi
+.in -2
+
+.SH FILES
+.SS "SPARC"
+.sp
+.ne 2
+.na
+\fB\fB/platform/sun4u/kernel/drv/fd\fR\fR
+.ad
+.sp .6
+.RS 4n
+driver module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/include/sys/fdreg.h\fR\fR
+.ad
+.sp .6
+.RS 4n
+structs and definitions for Intel 82072 and 82077 controllers
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/include/sys/fdvar.h\fR\fR
+.ad
+.sp .6
+.RS 4n
+structs and definitions for floppy drivers
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/diskette\fR\fR
+.ad
+.sp .6
+.RS 4n
+device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/diskette0\fR\fR
+.ad
+.sp .6
+.RS 4n
+device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdiskette\fR\fR
+.ad
+.sp .6
+.RS 4n
+raw device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdiskette0\fR\fR
+.ad
+.sp .6
+.RS 4n
+raw device file
+.RE
+
+.SS "For ucb Compatibility"
+.sp
+.ne 2
+.na
+\fB\fB/dev/fd0[a-c]\fR\fR
+.ad
+.RS 24n
+block file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rfd0[a-c]\fR\fR
+.ad
+.RS 24n
+raw file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/diskette0\fR\fR
+.ad
+.RS 24n
+directory containing volume management character device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdiskette0\fR\fR
+.ad
+.RS 24n
+directory containing the volume management raw character device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/aliases/floppy0\fR\fR
+.ad
+.RS 24n
+symbolic link to the entry in \fB/dev/rdiskette0\fR
+.RE
+
+.SS "x86"
+.sp
+.ne 2
+.na
+\fB\fB/platform/i86pc/kernel/drv/fd\fR\fR
+.ad
+.sp .6
+.RS 4n
+driver module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/platform/i86pc/kernel/drv/fd.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+configuration file for floppy driver
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/platform/i86pc/kernel/drv/fdc\fR\fR
+.ad
+.sp .6
+.RS 4n
+floppy-controller driver module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/platform/i86pc/kernel/drv/fdc.con\fRf\fR
+.ad
+.sp .6
+.RS 4n
+configuration file for the floppy-controller
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/include/sys/fdc.h\fR\fR
+.ad
+.sp .6
+.RS 4n
+structs and definitions for x86 floppy devices
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/include/sys/fdmedia.h\fR\fR
+.ad
+.sp .6
+.RS 4n
+structs and definitions for x86 floppy media
+.RE
+
+.SS "x86 First Drive"
+.sp
+.ne 2
+.na
+\fB\fB/dev/diskette\fR\fR
+.ad
+.RS 19n
+device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/diskette0\fR\fR
+.ad
+.RS 19n
+device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdiskette\fR\fR
+.ad
+.RS 19n
+raw device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdiskette0\fR\fR
+.ad
+.RS 19n
+raw device file
+.RE
+
+.SS "For ucb Compatibility"
+.sp
+.ne 2
+.na
+\fB\fB/dev/fd0[a-c]\fR\fR
+.ad
+.RS 24n
+block file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rfd0[a-c]\fR\fR
+.ad
+.RS 24n
+raw file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/diskette0\fR\fR
+.ad
+.RS 24n
+directory containing volume management character device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdiskette0\fR\fR
+.ad
+.RS 24n
+directory containing the volume management raw character device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/aliases/floppy0\fR\fR
+.ad
+.RS 24n
+symbolic link to the entry in /dev/rdiskette0
+.RE
+
+.SS "x86 Second Drive"
+.sp
+.ne 2
+.na
+\fB\fB/dev/diskette1\fR\fR
+.ad
+.RS 19n
+device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdiskette1\fR\fR
+.ad
+.RS 19n
+raw device file
+.RE
+
+.SS "For ucb Compatibility"
+.sp
+.ne 2
+.na
+\fB\fB/dev/fd1[a-c]\fR\fR
+.ad
+.RS 24n
+block file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rfd1[a-c]\fR\fR
+.ad
+.RS 24n
+raw file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/diskette1\fR\fR
+.ad
+.RS 24n
+directory containing volume management character device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rdiskette1\fR\fR
+.ad
+.RS 24n
+directory containing the volume management raw character device file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/aliases/floppy1\fR\fR
+.ad
+.RS 24n
+symbolic link to the entry in \fB/dev/rdiskette1\fR
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBfdformat\fR(1), \fBdd\fR(8), \fBdrvconfig\fR(8), \fBread\fR(2),
+\fBwrite\fR(2), \fBdriver.conf\fR(5), \fBdkio\fR(4I) \fBfdio\fR(4I)
+.SH DIAGNOSTICS
+.SS "All Platforms"
+.sp
+.ne 2
+.na
+\fB\fBfd<n>: <command name> failed (<sr1> <sr2> <sr3>)\fR\fR
+.ad
+.sp .6
+.RS 4n
+The <command name> failed after several retries on drive <n>. The three hex
+values in parenthesis are the contents of status register 0, status register 1,
+and status register 2 of the Intel 8272, the Intel 82072, and the Intel 82077
+Floppy Disk Controller on completion of the command, as documented in the data
+sheet for that part. This error message is usually followed by one of the
+following, interpreting the bits of the status register:
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBnot writable\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBcrc error blk <block number>\fR
+.sp
+There was a data error on <block number>.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBbad format\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBtimeout\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBdrive not ready\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBunformatted diskette or no diskette in drive\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBblock <block number> is past the end!\fR
+.sp
+\fB(nblk=<total number of blocks>)\fR
+.sp
+The operation tried to access a block number that is greater than the total
+number of blocks.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBb_bcount 0x<op_size> not % 0x<sect_size>\fR
+.sp
+The size of an operation is not a multiple of the sector size.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBoverrun/underrun\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfd<\fR\fIn\fR\fB>:\fR\fR
+.ad
+.RS 10n
+\fBhost bus error\fR. There was a hardware error on a system bus.
+.RE
+
+.RE
+
+.SS "SPARC Only"
+.sp
+.LP
+Overrun/underrun errors occur when accessing a diskette while the system is
+heavily loaded. Decrease the load on the system and retry the diskette access.
+.SH NOTES
+.sp
+.LP
+3.5" high density diskettes have 18 sectors per track and 5.25" high density
+diskettes have 15 sectors per track. They can cross a track (though not a
+cylinder) boundary without losing data, so when using \fBdd\fR(8) or
+\fBread\fR(2)/\fBwrite\fR(2) calls to or from the raw diskette, you should
+specify \fBbs=18k\fR or multiples thereof for 3.5" diskettes, and \fBbs=15k\fR
+or multiples thereof for 5.25" diskettes.
+.sp
+.LP
+The SPARC \fBfd\fR driver is \fInot\fR an unloadable module.
+.sp
+.LP
+Under Solaris (x86 Edition), the configuration of the floppy drives is
+specified in \fBCMOS\fR configuration memory. Use the \fBBIOS\fR setup program
+for the system to define the diskette size and density/capacity for each
+installed drive. Note that \fBMS-DOS\fR may operate the floppy drives
+correctly, even though the \fBCMOS\fR configuration may be in error. Solaris
+(x86 Edition) relies on the \fBCMOS\fR configuration to be accurate.

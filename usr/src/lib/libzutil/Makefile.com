@@ -23,7 +23,7 @@ OBJECTS=			\
 
 include ../../Makefile.lib
 
-# libzutil must be installed in the root filesystem for mount(1M)
+# libzutil must be installed in the root filesystem for mount(8)
 include ../../Makefile.rootfs
 
 LIBS=	$(DYNLIB)

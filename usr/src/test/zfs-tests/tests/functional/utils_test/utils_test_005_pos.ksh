@@ -34,11 +34,11 @@
 
 #
 # DESCRIPTION:
-# Ensure that the ff(1M) utility fails on a ZFS file system.
+# Ensure that the ff(8) utility fails on a ZFS file system.
 #
 # STRATEGY:
 # 1. Populate a ZFS file system with some files.
-# 2. Run ff(1M) against the device.
+# 2. Run ff(8) against the device.
 # 3. Ensure it fails.
 #
 
@@ -51,10 +51,10 @@ function cleanup
 
 log_onexit cleanup
 
-log_assert "Ensure that the ff(1M) utility fails on a ZFS file system."
+log_assert "Ensure that the ff(8) utility fails on a ZFS file system."
 
 populate_dir $NUM_FILES
 
 log_mustnot ff -F zfs /dev/rdsk/${DISK}s0
 
-log_pass "ff(1M) returned an error as expected."
+log_pass "ff(8) returned an error as expected."

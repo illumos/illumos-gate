@@ -102,7 +102,9 @@ An error occurred while trying to write to the location.
 .SH CONTEXT
 These functions can be called from user, interrupt, or kernel context.
 .SH SEE ALSO
-\fBattach\fR(9E), \fBprobe\fR(9E), \fBddi_peek\fR(9F)
+.BR attach (9E),
+.BR probe (9E),
+.BR ddi_peek (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

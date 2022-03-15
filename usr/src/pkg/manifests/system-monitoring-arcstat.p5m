@@ -22,6 +22,6 @@ dir  path=usr/bin
 file path=usr/bin/arcstat mode=0555
 dir  path=usr/share
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/arcstat.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/arcstat.8
 license lic_CDDL license=lic_CDDL

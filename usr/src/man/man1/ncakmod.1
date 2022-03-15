@@ -28,7 +28,7 @@ kernel module will be activated for all physical interfaces listed in the
 .nf
 To stop NCA, please set the status configuration parameter
 to disable in ncakmod.conf and then reboot your system. See
-the ncakmod.conf(4) manual page for more information.
+the ncakmod.conf(5) manual page for more information.
 .fi
 .in -2
 .sp
@@ -36,7 +36,7 @@ the ncakmod.conf(4) manual page for more information.
 .sp
 .LP
 Note that in order to properly stop \fBNCA\fR on your system, you must first
-edit the \fBncakmod.conf\fR(4) file and set the status field to "disable," then
+edit the \fBncakmod.conf\fR(5) file and set the status field to "disable," then
 reboot your system.
 .SH OPTIONS
 .sp
@@ -94,7 +94,7 @@ Specifies configuration options for the NCA kernel module.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -110,5 +110,10 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBnca\fR(1), \fBncab2clf\fR(1), \fBncad_addr\fR(4), \fBnca.if\fR(4),
-\fBncakmod.conf\fR(4), \fBncalogd.conf\fR(4), \fBattributes\fR(5)
+.BR nca (1),
+.BR ncab2clf (1),
+.BR nca.if (5),
+.BR ncad_addr (5),
+.BR ncakmod.conf (5),
+.BR ncalogd.conf (5),
+.BR attributes (7)

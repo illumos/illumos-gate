@@ -147,5 +147,6 @@ widget_finalize(ldi_handle_t lh, ldi_ev_cookie_t foo_cookie,
 .in -2
 
 .SH SEE ALSO
-\fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F),
-\fBldi_ev_remove_callbacks\fR(9F)
+.BR ldi_ev_get_cookie (9F),
+.BR ldi_ev_register_callbacks (9F),
+.BR ldi_ev_remove_callbacks (9F)

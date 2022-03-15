@@ -33,8 +33,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mailx -- a modified version of a University of California at Berkeley
  *	mail program
@@ -44,7 +42,7 @@
  */
 
 /*#define	USG	1 */		/* System V */
-#define	USG_TTY	1			/* termio(7) */
+#define	USG_TTY	1			/* termio(4I) */
 
 #include "def.h"
 #include "glob.h"

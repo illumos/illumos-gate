@@ -93,7 +93,7 @@ the device to memory and block incoming or existing requests until
 .LP
 If the device is used to store file systems, then after \fBDDI_SUSPEND\fR is
 issued, the device should still honor \fBdump\fR(9E) requests as this entry
-point may be used by suspend-resume operation (see \fBcpr\fR(7)) to save state
+point may be used by suspend-resume operation (see \fBcpr\fR(4)) to save state
 file. It must do this, however, without disturbing the saved hardware state of
 the device.
 .sp
@@ -135,7 +135,7 @@ unchanged.
 .SH CONTEXT
 This function is called from user context only.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -149,10 +149,20 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBcpr\fR(7), \fBpm\fR(7D), \fBpm\fR(9P), \fBpm-components\fR(9P),
-\fBattach\fR(9E), \fBdump\fR(9E), \fBopen\fR(9E), \fBpower\fR(9E),
-\fBddi_add_intr\fR(9F), \fBddi_dev_is_needed\fR(9F), \fBddi_map_regs\fR(9F),
-\fBkmem_free\fR(9F), \fBpm_raise_power\fR(9F), \fBtimeout\fR(9F)
+.BR cpr (4),
+.BR pm (4D),
+.BR attach (9E),
+.BR dump (9E),
+.BR open (9E),
+.BR power (9E),
+.BR ddi_add_intr (9F),
+.BR ddi_dev_is_needed (9F),
+.BR ddi_map_regs (9F),
+.BR kmem_free (9F),
+.BR pm_raise_power (9F),
+.BR timeout (9F),
+.BR pm (9P),
+.BR pm-components (9P)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -394,4 +394,4 @@ then the functions are
 .Xr uselocale 3C ,
 .Xr wcrtomb 3C ,
 .Xr uchar.h 3HEAD ,
-.Xr environ 5
+.Xr environ 7

@@ -54,7 +54,7 @@ extern void vfs_mnttab_readop(void);
  * mntfs provides two methods of reading the in-kernel mnttab, i.e. the state of
  * the mounted resources: the read-only file /etc/mnttab, and a collection of
  * ioctl() commands. Most of these interfaces are public and are described in
- * mnttab(4). Three private ioctl() commands, MNTIOC_GETMNTENT,
+ * mnttab(5). Three private ioctl() commands, MNTIOC_GETMNTENT,
  * MNTIOC_GETEXTMNTENT and MNTIOC_GETMNTANY, provide for the getmntent(3C)
  * family of functions, allowing them to support white space in mount names.
  *
@@ -1039,7 +1039,7 @@ mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			/*
 			 * The mntnode already has at least one snapshot from
 			 * which to take the size; the user will understand from
-			 * mnttab(4) that the current size of the in-kernel
+			 * mnttab(5) that the current size of the in-kernel
 			 * mnttab is irrelevant.
 			 */
 			size = rsnapp->mnts_nmnts ? rsnapp->mnts_text_size :
@@ -1186,7 +1186,7 @@ mntinactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
  * has a special meaning for /etc/mnttab: it forces mntfs to refresh the
  * snapshot at the next ioctl().
  *
- * mnttab(4) explains that "the snapshot...is taken any time a read(2) is
+ * mnttab(5) explains that "the snapshot...is taken any time a read(2) is
  * performed at offset 0". We therefore ignore the read snapshot here.
  */
 /* ARGSUSED */

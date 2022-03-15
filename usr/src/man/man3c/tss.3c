@@ -153,4 +153,4 @@ is returned.
 .Xr pthread_key_create 3C ,
 .Xr pthread_key_delete 3C ,
 .Xr pthread_setspecific 3C ,
-.Xr attributes 5
+.Xr attributes 7

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,10 +37,10 @@
 
 
 /*
- * kssladm(1M)
+ * kssladm(8)
  *
  * Command to manage the entries in kernel SSL proxy table. This is
- * a private command called indirectly from ksslcfg(1M).
+ * a private command called indirectly from ksslcfg(8).
  */
 
 boolean_t verbose = B_FALSE;

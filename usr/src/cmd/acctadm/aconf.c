@@ -136,7 +136,7 @@ aconf_setup(const char *fmri)
 	/*
 	 * Net/Flow accounting is not available in non-global zones and
 	 * the service instance should therefore never be 'enabled' in
-	 * non-global zones.  This is enforced by acctadm(1M), but there is
+	 * non-global zones.  This is enforced by acctadm(8), but there is
 	 * nothing that prevents someone from calling svcadm enable directly,
 	 * so we handle that case here by disabling the instance.
 	 */

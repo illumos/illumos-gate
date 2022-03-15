@@ -150,8 +150,8 @@ to 32-bits here but will be fully represented in the string.
 .LP
 The messages can be retrieved with the \fBgetmsg\fR(2) system call. The
 \fIflags\fR argument specifies the type of the message and where it is to be
-sent. \fBstrace\fR(1M) receives messages from the \fBlog\fR driver and sends
-them to the standard output. \fBstrerr\fR(1M) receives error messages from the
+sent. \fBstrace\fR(8) receives messages from the \fBlog\fR driver and sends
+them to the standard output. \fBstrerr\fR(8) receives error messages from the
 \fBlog\fR driver and appends them to a file called
 \fB/var/adm/streams/error.\fR\fImm-dd\fR, where \fImm-dd\fR identifies the date
 of the error message.
@@ -159,7 +159,7 @@ of the error message.
 .sp
 .LP
 The \fBstrlog()\fR function returns \fB0\fR if it fails to submit the message
-to the \fBlog\fR(7D) driver and \fB1\fR otherwise.
+to the \fBlog\fR(4D) driver and \fB1\fR otherwise.
 .SH CONTEXT
 .sp
 .LP
@@ -173,15 +173,18 @@ context.
 .ad
 .sp .6
 .RS 4n
-Error messages dated \fImm-dd\fR appended by \fBstrerr\fR(1M) from the
+Error messages dated \fImm-dd\fR appended by \fBstrerr\fR(8) from the
 \fBlog\fR driver
 .RE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBstrace\fR(1M), \fBstrerr\fR(1M), \fBgetmsg\fR(2), \fBlog\fR(7D),
-\fBmodule_info\fR(9S)
+.BR getmsg (2),
+.BR log (4D),
+.BR strace (8),
+.BR strerr (8),
+.BR module_info (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

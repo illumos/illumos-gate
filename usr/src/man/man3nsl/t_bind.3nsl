@@ -128,9 +128,9 @@ specifies the number of bytes in the address, and
 .Sy buf
 points to the address buffer.
 For
-.Xr tcp 7P
+.Xr tcp 4P
 and
-.Xr udp 7P
+.Xr udp 4P
 transports,
 .Sy buf
 points to a
@@ -415,7 +415,7 @@ Safe
 .Xr t_connect 3NSL ,
 .Xr t_unbind 3NSL ,
 .Xr sockaddr 3SOCKET ,
-.Xr attributes 5
+.Xr attributes 7
 .Sh WARNINGS
 The requirement that the value of
 .Sy qlen

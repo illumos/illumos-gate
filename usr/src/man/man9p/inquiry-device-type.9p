@@ -42,7 +42,7 @@ serial number. The serial number is typically obtained from the \fBEVPD\fR
 .SH SEE ALSO
 .sp
 .LP
-\fBscsi_inquiry\fR(9S)
+.BR scsi_inquiry (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

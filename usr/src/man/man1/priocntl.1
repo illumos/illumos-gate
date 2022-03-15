@@ -567,7 +567,7 @@ real-time, the associated parameter is unaffected. If an option is omitted when
 changing the class of a process to real-time from some other class, the
 associated parameter is set to a default value. The default value for
 \fIrtpri\fR is \fB0\fR and the default for time quantum is dependent on the
-value of \fIrtpri\fR and on the system configuration; see \fBrt_dptbl\fR(4).
+value of \fIrtpri\fR and on the system configuration; see \fBrt_dptbl\fR(5).
 .sp
 .LP
 When using the \fB-t\fR \fItqntm\fR option, you can optionally specify a
@@ -816,7 +816,7 @@ the class of a process to fixed-priority from some other class, the associated
 parameter is set to a default value. The default value for \fIfxuprilim\fR is
 \fB0\fR. The default for \fIfxupri\fR is to set it equal to the \fIfxuprilim\fR
 value which is being set. The default for time quantum is dependent on the
-\fIfxupri\fR and on the system configuration. See \fBfx_dptbl\fR(4).
+\fIfxupri\fR and on the system configuration. See \fBfx_dptbl\fR(5).
 .sp
 .LP
 The time quantum of processes in the fixed-priority class      can be changed
@@ -972,7 +972,7 @@ Command could not be executed at the specified priority.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -987,9 +987,19 @@ CSI	Enabled
 
 .SH SEE ALSO
 .LP
-\fBkill\fR(1), \fBnice\fR(1), \fBps\fR(1), \fBdispadmin\fR(1M), \fBexec\fR(2),
-\fBfork\fR(2), \fBpriocntl\fR(2), \fBfx_dptbl\fR(4), \fBprocess\fR(4),
-\fBrt_dptbl\fR(4), \fBattributes\fR(5), \fBzones\fR(5), \fBFSS\fR(7)
+.BR kill (1),
+.BR nice (1),
+.BR ps (1),
+.BR exec (2),
+.BR fork (2),
+.BR priocntl (2),
+.BR FSS (4),
+.BR fx_dptbl (5),
+.BR process (5),
+.BR rt_dptbl (5),
+.BR attributes (7),
+.BR zones (7),
+.BR dispadmin (8)
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR

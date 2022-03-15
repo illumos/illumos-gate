@@ -1,0 +1,308 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH USBSKSP 4D "May 13, 2017"
+.SH NAME
+usbsksp \- Keyspan USB to serial converter driver
+.SH SYNOPSIS
+.LP
+.nf
+#include <fcntl.h>
+.fi
+
+.LP
+.nf
+#include <sys/termio.h>
+.fi
+
+.LP
+.nf
+usbskpsp@unit
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBusbsksp\fR driver is a loadable \fBSTREAMS\fR and \fBUSBA\fR (Solaris
+USB architecture) compliant client driver that provides basic asynchronous
+communication support for Keyspan USB-to-serial converters. The \fBusbsksp\fR
+driver supports the Keyspan USA19HS, USA49WG and USA49WLC models. By default,
+the USA19HS and USA49WG models are compatible with the \fBusbsksp\fR driver and
+no configuration or installation steps are required.  (The USA49WG model is a
+USB 2.0 device conforming to \fIUniversal Serial Bus Specification 2.0\fR and
+the USB 2.0 host controller is required to support the USA49WG model. Note that
+the USA49WG is not compatible with USB 1.1 host controllers). The Keyspan
+USA49WLC model requires a firmware package that is no longer publicly available.
+Serial device streams are built with appropriate modules that are pushed atop
+the \fBusbsksp\fR driver by the \fBautopush\fR(8) facility.
+.sp
+.LP
+The \fBusbsksp\fR module supports the \fBtermio\fR(4I) device control functions
+specified by flags in the \fBc_cflag\fR word of the termios structure, and by
+the IGNBRK, IGNPAR, PARMRK and INPCK flags in the \fBc_iflag\fR word of the
+termios structure. All other \fBtermio\fR(4I) functions must be performed by
+\fBSTREAMS\fR modules pushed atop the driver. When a device is opened, the
+\fBldterm\fR(4M) and \fBttcompat\fR(4M) \fBSTREAMS\fR modules are
+automatically pushed on top of the stream, providing the standard
+\fBtermio\fR(4I) interface.
+.sp
+.LP
+Use device logical names \fB/dev/term/[0-9]\fR* to access the serial ports.
+These names are typically used to provide a logical access point for a dial-in
+line that is used with a modem.
+.sp
+.LP
+A special feature (controlled by the minor device number) is available that
+enables a single tty line to be connected to a modem and used for incoming and
+outgoing calls. By accessing through device logical name \fB/dev/cua/[0-9]\fR*,
+you can open a port without the carrier detect signal being asserted, either
+through hardware or an equivalent software mechanism. These devices are
+commonly known as 'dial-out' lines.
+.sp
+.LP
+Unlike onboard serial ports, the \fBusbsksp\fR ports cannot serve as a local
+serial console.
+.SH APPLICATION PROGRAMMING INTERFACE
+.LP
+A dial-in line can be opened only if the corresponding dial-out line is closed.
+A blocking \fB/dev/term\fR open waits until the \fB/dev/cua\fR line is closed
+(which drops Data Terminal Ready, after which Carrier Detect usually drops as
+well) and carrier is detected again.  A non-blocking \fB/dev/term\fR open
+returns an error if the \fB/dev/cua\fR is open.
+.sp
+.LP
+If the \fB/dev/term\fR line is opened successfully (usually only when
+carrier is recognized on the modem), the corresponding \fB/dev/cua\fR line
+cannot be opened. This allows a modem and port to be used for dial-in (by
+enabling the line for login in \fB/etc/inittab\fR) or dial-out (by
+\fBtip\fR(1), or \fBuucp\fR(1C)) when no one is logged in on the line.
+.sp
+.LP
+Device hot-removal is functionally equivalent to a modem disconnect event, as
+defined in \fBtermio\fR(4I).
+.SH IOCTLS
+.LP
+The \fBusbsksp\fR driver supports the standard set of \fBtermio\fR(4I) ioctl
+calls.
+.sp
+.LP
+Input and output line speeds can be set to the following baud rates: 0, 50,
+75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200, 38400,
+57600, 115200, or 230400.  Input and output line speeds cannot be set
+independently. For example, when the output speed is set, the input speed is
+automatically set to the same speed.
+.SH ERRORS
+.LP
+An \fBopen()\fR fails under the following conditions:
+.sp
+.ne 2
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 9n
+The unit being opened does not exist.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+The \fB/dev/cua\fR (dial-out) device is being opened while the \fB/dev/term\fR
+(dial-in device) is open, or the dial-in device is being opened with a no-delay
+open while the dial-out device is open.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 9n
+The unit has been marked as exclusive-use by another process with a TIOCEXCL
+ioctl() call.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 9n
+USB device I/O error.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/kernel/drv/usbsksp\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit x86 ELF kernel module.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/usbsksp\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit x86 ELF kernel module.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/usbsksp\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit SPARC ELF kernel module.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/cua/[0-9]*\fR\fR
+.ad
+.sp .6
+.RS 4n
+dial-out tty lines.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/term/[0-9]*\fR\fR
+.ad
+.sp .6
+.RS 4n
+dial-in tty lines.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86, PCI-based systems
+.TE
+
+.SH SEE ALSO
+.LP
+.BR strconf (1),
+.BR tip (1),
+.BR uucp (1C),
+.BR ioctl (2),
+.BR open (2),
+.BR termios (3C),
+.BR usba (4D),
+.BR termio (4I),
+.BR ldterm (4M),
+.BR ttcompat (4M),
+.BR attributes (7),
+.BR autopush (8)
+.SH DIAGNOSTICS
+.LP
+In addition to being logged, the following messages may appear on the system
+console. All messages are formatted in the following manner:
+.sp
+.in +2
+.nf
+Warning: <device path> (usbsksp<instance num>): Error Message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBDevice was disconnected while open. Data may have been lost.\fR
+.ad
+.sp .6
+.RS 4n
+The device has been hot-removed or powered off while it was open and a possible
+data transfer was in progress. The job may be aborted.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDevice is not identical to the previous one on this port. Please disconnect
+and reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+The device was hot-removed while open. A new device was hot-inserted which is
+not identical to the original device. Please disconnect the device and
+reconnect the original device to the same port.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDevice has been reconnected, but data may have been lost.\fR
+.ad
+.sp .6
+.RS 4n
+The device that was hot-removed from its USB port has been re-inserted again to
+the same port. It is available for access but data from a previous transfer
+may be lost.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCannot access <\fR\fIdevice\fR\fB>. Please reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+This device has been disconnected because a device other than the original one
+has been inserted. The driver informs you of this fact by displaying the name
+of the original device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBNo valid firmware available for Keyspan usa49wlc usb-to-serial adapter.
+Please download it from Keyspan website and install it.\fR
+.ad
+.sp .6
+.RS 4n
+By default, only an empty firmware package is installed for the usa49wlc model.
+You will need to obtain a copy of the SUNWukspfw package and install it.
+.RE
+
+.sp
+.LP
+The following messages may be logged into the system log. They are formatted in
+the following manner:
+.sp
+.in +2
+.nf
+<device path><usbsksp<instance number>): message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBInput overrun\fR
+.ad
+.RS 17n
+Data was lost.
+.RE
+

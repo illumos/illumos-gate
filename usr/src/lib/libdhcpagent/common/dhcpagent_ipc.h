@@ -159,7 +159,7 @@ extern int		dhcp_ipc_getinfo(dhcp_optnum_t *, DHCP_OPT **, int32_t);
 
 /*
  * private dhcpagent ipc "server side" functions -- these are only for
- * use by dhcpagent(1M) and are subject to change.
+ * use by dhcpagent(8) and are subject to change.
  */
 
 extern int		dhcp_ipc_init(int *);

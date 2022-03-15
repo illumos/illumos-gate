@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains all authentication-related functionality for
  * SLP. Two interfaces are exported:
@@ -41,7 +39,7 @@
  * sun.net.slp.authBackend; the value of this property should contain
  * either the name of a shared object which implements the necessary
  * interfaces, or a full or relative path to such an object. This value
- * will be passed to dlopen(3X) to resolve the symbols.
+ * will be passed to dlopen(3C) to resolve the symbols.
  *
  * The shared object must implement the following AMI interfaces:
  *

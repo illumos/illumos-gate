@@ -100,4 +100,4 @@ in
 .Sh SEE ALSO
 .Xr upanic 3C ,
 .Xr libproc 3LIB ,
-.Xr core 4
+.Xr core 5

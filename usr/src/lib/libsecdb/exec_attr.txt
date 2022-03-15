@@ -23,7 +23,7 @@
 #
 # /etc/security/exec_attr
 #
-# execution attributes for profiles. see exec_attr(4)
+# execution attributes for profiles. see exec_attr(5)
 #
 #
 All:suser:cmd:::*:

@@ -93,7 +93,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='netcfgd' section='1M'
+			<manpage title='netcfgd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

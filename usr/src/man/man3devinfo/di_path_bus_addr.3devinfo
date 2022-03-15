@@ -135,7 +135,7 @@ I/O operations.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -153,12 +153,18 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdi_bus_addr\fR(3DEVINFO), \fBdi_devfs_path\fR(3DEVINFO),
-\fBdi_init\fR(3DEVINFO), \fBdi_instance\fR(3DEVINFO),
-\fBdi_node_name\fR(3DEVINFO), \fBdi_path_client_next_path\fR(3DEVINFO),
-\fBdi_path_prop_next\fR(3DEVINFO), \fBdi_path_prop_bytes\fR(3DEVINFO),
-\fBdi_path_prop_lookup_bytes\fR(3DEVINFO), \fBdi_path_prop_next\fR(3DEVINFO),
-\fBlibdevinfo\fR(3LIB), \fBattributes\fR(5)
+.BR di_bus_addr (3DEVINFO),
+.BR di_devfs_path (3DEVINFO),
+.BR di_init (3DEVINFO),
+.BR di_instance (3DEVINFO),
+.BR di_node_name (3DEVINFO),
+.BR di_path_client_next_path (3DEVINFO),
+.BR di_path_prop_bytes (3DEVINFO),
+.BR di_path_prop_lookup_bytes (3DEVINFO),
+.BR di_path_prop_next (3DEVINFO),
+.BR di_path_prop_next (3DEVINFO),
+.BR libdevinfo (3LIB),
+.BR attributes (7)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -76,7 +76,7 @@ errors are delivered to the callback.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -94,4 +94,4 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBDNSServiceRefDeallocate\fR(3DNS_SD), \fBattributes\fR(5)
+\fBDNSServiceRefDeallocate\fR(3DNS_SD), \fBattributes\fR(7)

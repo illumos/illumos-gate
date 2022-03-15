@@ -92,7 +92,7 @@
  *          +------------------------------+
  *
  * The MDB execution control model is based upon the synchronous debugging
- * model exported by Solaris proc(4).  A target program is set running or the
+ * model exported by Solaris proc(5).  A target program is set running or the
  * debugger is attached to a running target.  On ISTOP (stop on event of
  * interest), one target thread is selected as the representative.  The
  * algorithm for selecting the representative is target-specific, but we assume

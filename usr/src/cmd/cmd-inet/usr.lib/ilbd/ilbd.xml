@@ -103,9 +103,9 @@
 		</loctext>
 	</common_name>
 	<documentation>
-		<manpage title='ilbd' section='1M'
+		<manpage title='ilbd' section='8'
 			manpath='/usr/share/man' />
-		<manpage title='ilbadm' section='1M'
+		<manpage title='ilbadm' section='8'
 			manpath='/usr/share/man' />
 	</documentation>
 

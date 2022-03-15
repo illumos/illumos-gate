@@ -983,7 +983,7 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 			 */
 			if (!(vfsp->vfs_flag & VFS_RDONLY)) {
 				cmn_err(CE_WARN, "Error accessing ufs "
-				    "log for %s; Please run fsck(1M)", path);
+				    "log for %s; Please run fsck(8)", path);
 				goto out;
 			}
 		}

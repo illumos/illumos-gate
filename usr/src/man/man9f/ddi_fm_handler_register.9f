@@ -127,7 +127,7 @@ access or \fBDMA\fR handles.
 .LP
 For each error detected, the driver must formulate and post an error report via
 \fBddi_fm_ereport_post()\fR for problem analysis by the illumos Fault Manager
-\fBfmd\fR(1M).
+\fBfmd\fR(8).
 .sp
 .LP
 For a \fBPCI\fR, \fBPCI/X\fR, or \fBPCI Express\fR leaf device, the
@@ -173,7 +173,7 @@ functions must be called from kernel context in an \fBattach\fR(9E) or
 \fIerror_handler\fR, callback can be called from kernel, interrupt, or high
 level interrupt context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -187,9 +187,16 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBfmd\fR(1M), \fBattributes\fR(5), \fBattach\fR(9E), \fBdetach\fR(9E),
-\fBddi_fm_ereport_post\fR(9F), \fBddi_fm_init\fR(9F), \fBddi_get8\fR(9F),
-\fBddi_put8\fR(9F), \fBpci_ereport_post\fR(9F), \fBddi_fm_error\fR(9S)
+.BR attributes (7),
+.BR fmd (8),
+.BR attach (9E),
+.BR detach (9E),
+.BR ddi_fm_ereport_post (9F),
+.BR ddi_fm_init (9F),
+.BR ddi_get8 (9F),
+.BR ddi_put8 (9F),
+.BR pci_ereport_post (9F),
+.BR ddi_fm_error (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

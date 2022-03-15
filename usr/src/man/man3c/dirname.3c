@@ -139,7 +139,7 @@ of the directory where \fBbasename(\fR\fIpath\fR\fB)\fR is found.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -157,5 +157,8 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBbasename\fR(1), \fBchdir\fR(2), \fBbasename\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR basename (1),
+.BR chdir (2),
+.BR basename (3C),
+.BR attributes (7),
+.BR standards (7)

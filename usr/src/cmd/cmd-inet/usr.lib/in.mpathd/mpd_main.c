@@ -2120,7 +2120,7 @@ main(int argc, char *argv[])
 
 	/*
 	 * If we're operating in "adopt" mode and no interfaces need to be
-	 * tracked, shut down (ifconfig(1M) will restart us on demand if
+	 * tracked, shut down (ifconfig(8) will restart us on demand if
 	 * interfaces are subsequently put into multipathing groups).
 	 */
 	if (adopt && phyint_instances == NULL)

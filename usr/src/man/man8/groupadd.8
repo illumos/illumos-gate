@@ -1,0 +1,158 @@
+'\" te
+.\" Copyright (c) 2018 Peter Tribble.
+.\"  Copyright 1989 AT&T  Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH GROUPADD 8 "Jan 7, 2018"
+.SH NAME
+groupadd \- add (create) a new group definition on the system
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/groupadd\fR [\fB-g\fR \fIgid\fR [\fB-o\fR]] \fIgroup\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBgroupadd\fR command creates a new group definition on the system by
+adding the appropriate entry to the \fB/etc/group\fR file.
+.SH OPTIONS
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-g\fR \fIgid\fR\fR
+.ad
+.RS 10n
+Assigns the group id \fIgid\fR for the new group. This group id must be a
+non-negative decimal integer below \fBMAXUID\fR as defined in
+\fB<sys/param.h>\fR. The group \fBID\fR defaults to the next
+available (unique) number above the highest number currently assigned. For
+example, if groups \fB100\fR, \fB105\fR, and \fB200\fR are assigned as
+groups, the next default group number will be \fB201\fR. (Group \fBIDs\fR from
+\fB0\fR\(mi\fB99\fR are reserved for future applications.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR\fR
+.ad
+.RS 10n
+Allows the \fIgid\fR to be duplicated (non-unique).
+.RE
+
+.SH OPERANDS
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIgroup\fR\fR
+.ad
+.RS 9n
+A string consisting of characters from the set of lower case alphabetic
+characters and numeric characters. A warning message will be written if the
+string exceeds \fBMAXGLEN,\fR which is usually set at eight characters. The
+\fIgroup\fR field must contain at least one character; it accepts lower case or
+numeric characters or a combination of both, and must not contain a colon
+(\fB:\fR) or \fBNEWLINE.\fR
+.RE
+
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+Successful completion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 6n
+Invalid command syntax. A usage message for the \fBgroupadd\fR command is
+displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3\fR\fR
+.ad
+.RS 6n
+An invalid argument was provided to an option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB4\fR\fR
+.ad
+.RS 6n
+The \fIgid\fR is not unique (when \fB-o\fR option is not used).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB9\fR\fR
+.ad
+.RS 6n
+The \fIgroup\fR is not unique.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB10\fR\fR
+.ad
+.RS 6n
+The \fB/etc/group\fR file cannot be updated.
+.RE
+
+.SH FILES
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB/etc/group\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fB/usr/include/userdefs.h\fR
+.RE
+.SH SEE ALSO
+.LP
+.BR group (5),
+.BR attributes (7),
+.BR groupdel (8),
+.BR groupmod (8),
+.BR grpck (8),
+.BR logins (8),
+.BR pwck (8),
+.BR useradd (8),
+.BR userdel (8),
+.BR usermod (8)
+.SH NOTES
+.LP
+\fBgroupadd\fR only adds a group definition to the local system. If a network
+name service is being used to supplement the
+local \fB/etc/group\fR file with additional entries, \fBgroupadd\fR cannot
+change information supplied by the network name service. However,
+\fBgroupadd\fR will verify the uniqueness of group name and group \fBID\fR
+against the external name service.
+.sp
+.LP
+If the number of characters in a \fBgroup\fR entry exceeds 2047, group
+maintenance commands, such as \fBgroupdel\fR(8) and \fBgroupmod\fR(8), fail.

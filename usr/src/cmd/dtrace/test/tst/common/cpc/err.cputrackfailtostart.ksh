@@ -25,7 +25,7 @@
 # Use is subject to license terms.
 
 #
-# This script ensures that cputrack(1M) will fail to start when the cpc
+# This script ensures that cputrack(8) will fail to start when the cpc
 # provider has active enablings.
 #
 # The script will fail if:

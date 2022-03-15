@@ -35,7 +35,7 @@ When available, the meta slot is always the first slot provided by
 The meta slot feature can be configured either system-wide or by individual
 users.
 System-wide configuration for meta slot features is done with the
-.Xr cryptoadm 1M
+.Xr cryptoadm 8
 utility.
 User configuration for meta slot features is performed with environment
 variables.
@@ -44,7 +44,7 @@ By default, the following is the system-wide configuration for meta slot.
 Meta slot is enabled.
 Meta slot provides token-based object support with the Software RSA PKCS#11
 softtoken
-.Pq Xr pkcs11_softtoken 5 .
+.Pq Xr pkcs11_softtoken 7 .
 Meta slot is
 allowed to move sensitive token objects to other slots if that is necessary to
 perform an operation.
@@ -93,7 +93,7 @@ All of its functionality can be used with the meta slot.
 .Lp
 This library filters the list of mechanisms available from plug-ins based on
 the policy set by
-.Xr cryptoadm 1M .
+.Xr cryptoadm 8 .
 .Lp
 This library provides entry points for all PKCS#11 v2.40 functions.
 See the PKCS#11 v2.40 specifications at
@@ -105,9 +105,9 @@ by the
 .Sy pkcs11conf
 class action
 script during execution of
-.Xr pkgadd 1M .
+.Xr pkgadd 8 .
 The available mechanisms are administered by the
-.Xr cryptoadm 1M
+.Xr cryptoadm 8
 utility.
 .Lp
 Plug-ins must have all of their library dependencies specified, including
@@ -199,7 +199,7 @@ shared object
 .El
 .Sh ATTRIBUTES
 See
-.Xr attributes 5
+.Xr attributes 7
 for descriptions of the following attributes:
 .Sh INTERFACE STABILITY
 .Sy Committed
@@ -209,14 +209,14 @@ The PKCS#11 Standard functions are MT-Safe with exceptions.
 See Section 2.5.3 of PKCS#11 Cryptographic Token Usage Guide v2.40 and
 Section 5.1.5 of PKCS#11 Cryptographic Token Interface Base Standard v2.40
 .Sh SEE ALSO
-.Xr cryptoadm 1M ,
-.Xr pkgadd 1M ,
 .Xr Intro 3 ,
 .Xr syslog 3C ,
 .Xr SUNW_C_GetMechSession 3EXT ,
-.Xr attributes 5  ,
-.Xr pkcs11_kernel 5 ,
-.Xr pkcs11_softtoken 5
+.Xr attributes 7  ,
+.Xr pkcs11_kernel 7 ,
+.Xr pkcs11_softtoken 7 ,
+.Xr cryptoadm 8 ,
+.Xr pkgadd 8
 .Rs
 .%T "PKCS#11 Cryptographic Token Interface Base Specification v2.40 Plus Errata 01"
 .%U http://docs.oasis-open.org/pkcs11/pkcs11-base/v2.40/errata01/os/pkcs11-base-v2.40-errata01-os.html

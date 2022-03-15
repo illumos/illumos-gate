@@ -822,4 +822,4 @@ See
 .Xr chdir 2 ,
 .Xr stat 2 ,
 .Xr qsort 3C ,
-.Xr attributes 5
+.Xr attributes 7

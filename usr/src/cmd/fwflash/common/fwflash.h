@@ -72,7 +72,7 @@ struct fw_plugin {
 	 *
 	 * eg  /usr/lib/fwflash/identify/ses.so
 	 * is the identification plugin for devices attached to
-	 * the host using the ses(7D) driver.
+	 * the host using the ses(4D) driver.
 	 */
 	char *filename;
 
@@ -140,7 +140,7 @@ struct pluginlist {
 	 *
 	 * eg  /usr/lib/fwflash/identify/ses.so
 	 * is the identification plugin for devices attached to
-	 * the host using the ses(7D) driver.
+	 * the host using the ses(4D) driver.
 	 */
 	char *filename;
 
@@ -218,7 +218,7 @@ struct devicelist {
 	struct vpr *ident;
 
 	/*
-	 * In the original fwflash(1M), it was possible to select a
+	 * In the original fwflash(8), it was possible to select a
 	 * device for flashing by using an index number called a
 	 * dev_num. We retain that concept for pluggable fwflash, with
 	 * the following change - whenever our identification plugin has
@@ -240,7 +240,7 @@ struct devicelist {
 	/*
 	 * Pointer to the plugin needed to flash this device, and
 	 * to use for printing appropriate device-specific information
-	 * as required by the "-l" option to fwflash(1M).
+	 * as required by the "-l" option to fwflash(8).
 	 */
 	struct fw_plugin *plugin;
 

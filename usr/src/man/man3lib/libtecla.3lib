@@ -128,7 +128,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -145,7 +145,12 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBenhance\fR(1), \fBIntro\fR(3), \fBcpl_complete_word\fR(3TECLA),
-\fBef_expand_file\fR(3TECLA), \fBgl_get_line\fR(3TECLA),
-\fBgl_io_mode\fR(3TECLA), \fBpca_lookup_file\fR(3TECLA), \fBattributes\fR(5),
-\fBtecla\fR(5)
+.BR enhance (1),
+.BR Intro (3),
+.BR cpl_complete_word (3TECLA),
+.BR ef_expand_file (3TECLA),
+.BR gl_get_line (3TECLA),
+.BR gl_io_mode (3TECLA),
+.BR pca_lookup_file (3TECLA),
+.BR attributes (7),
+.BR tecla (7)

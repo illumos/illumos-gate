@@ -65,8 +65,10 @@ if (ksp) {
 .in -2
 
 .SH SEE ALSO
-\fBkstat_create\fR(9F), \fBkstat_delete\fR(9F), \fBkstat_named_init\fR(9F),
-\fBkstat\fR(9S)
+.BR kstat_create (9F),
+.BR kstat_delete (9F),
+.BR kstat_named_init (9F),
+.BR kstat (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

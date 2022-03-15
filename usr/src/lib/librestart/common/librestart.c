@@ -2755,7 +2755,7 @@ out:
  *
  * If no method_context is defined, original init context is provided, where
  * the working directory is '/', and uid/gid are 0/0.  But if a method_context
- * is defined at any level the smf_method(5) method_context defaults are used.
+ * is defined at any level the smf_method(7) method_context defaults are used.
  *
  * Return an error message structure containing the error message
  * with context, and the error so the caller can make a decision

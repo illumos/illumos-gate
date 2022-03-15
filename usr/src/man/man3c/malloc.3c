@@ -434,7 +434,7 @@ functions are
 .Xr libumem 3LIB ,
 .Xr umem_alloc 3MALLOC ,
 .Xr watchmalloc 3MALLOC ,
-.Xr attributes 5
+.Xr attributes 7
 .Sh WARNINGS
 Undefined results will occur if the size requested for a block of memory
 exceeds the maximum size of a process's heap, which can be obtained with

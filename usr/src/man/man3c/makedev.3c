@@ -88,7 +88,7 @@ The \fIdevice\fR argument is \fBNODEV\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -104,4 +104,6 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBmknod\fR(2), \fBstat\fR(2), \fBattributes\fR(5)
+.BR mknod (2),
+.BR stat (2),
+.BR attributes (7)

@@ -147,7 +147,7 @@ struct ifnet {
 #define	IFF_IPV4	0x0001000000	/* IPv4 interface */
 #define	IFF_IPV6	0x0002000000	/* IPv6 interface */
 #define	IFF_NOACCEPT	0x0004000000	/* no-accept mode VRRP ill */
-#define	IFF_NOFAILOVER	0x0008000000	/* in.mpathd(1M) test address */
+#define	IFF_NOFAILOVER	0x0008000000	/* in.mpathd(8) test address */
 
 #define	IFF_FAILED	0x0010000000	/* Interface has failed */
 #define	IFF_STANDBY	0x0020000000	/* Interface is a hot-spare */

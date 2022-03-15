@@ -45,7 +45,7 @@ It must be released with a call to
 The definition of the
 .Sy prsecflags_t
 structure is documented in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Psecflags_free
@@ -75,5 +75,5 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4 ,
-.Xr security-flags 5
+.Xr proc 5 ,
+.Xr security-flags 7

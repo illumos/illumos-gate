@@ -134,7 +134,8 @@ No notification request was registered.
 The \fBscsi_reset_notify()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-\fBscsi_address\fR(9S), \fBscsi_ifgetcap\fR(9F)
+.BR scsi_ifgetcap (9F),
+.BR scsi_address (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

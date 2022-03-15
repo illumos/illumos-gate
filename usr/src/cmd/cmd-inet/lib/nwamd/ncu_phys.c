@@ -978,7 +978,7 @@ find_best_wlan_cb(nwam_known_wlan_handle_t kwh, void *data)
 	 * If we're >= scan level, don't pick another Known WLAN if still
 	 * connected (even if a Known WLAN with higher priority is available).
 	 * If the user wants to connect to a different Known WLAN, it can be
-	 * done from the GUI or select-wifi subcommand of nwamadm(1M).
+	 * done from the GUI or select-wifi subcommand of nwamadm(8).
 	 */
 	if (curr_strength >= wireless_scan_level &&
 	    link->nwamd_link_wifi_connected) {

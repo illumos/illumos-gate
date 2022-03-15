@@ -56,7 +56,7 @@ ibtl_ibnex_callback_t	ibtl_ibnex_callback_routine = NULL;
  *			IBTL_IBNEX_UNCFG_CLNTS_FLAG - Build a NVLIST containing
  *						clients' devpaths and their
  *						AP_IDs. (-x unconfig_clients)
- *	callback	- Callback function to get ap_id from ib(7d)
+ *	callback	- Callback function to get ap_id from ib(4D)
  * Output:
  *	buffer		- The information is returned in this buffer
  *      bufsiz		- The size of the information buffer
@@ -519,7 +519,7 @@ ibt_reprobe_dev(dev_info_t *dip)
  *	else IBT_NO_HCAS_AVAILABLE.
  *
  *	For IOC/Pseudo devices check if the given pdip is that of
- *	the ib(7d) nexus or that of the eoib(7d) nexus. If yes
+ *	the ib(4D) nexus or that of the eoib(4D) nexus. If yes
  *	return IBT_SUCCESS, else IBT_NO_HCAS_AVAILABLE.
  */
 ibt_status_t

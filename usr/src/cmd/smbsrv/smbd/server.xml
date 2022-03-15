@@ -280,7 +280,7 @@ file.
 			<loctext xml:lang='C'> smbd daemon</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='smbd' section='1M'
+			<manpage title='smbd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

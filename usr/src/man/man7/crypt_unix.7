@@ -1,0 +1,73 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH CRYPT_UNIX 7 "Aug 6, 2003"
+.SH NAME
+crypt_unix \- traditional UNIX crypt algorithm
+.SH DESCRIPTION
+.sp
+.LP
+The \fBcrypt_unix\fR algorithm is the traditional UNIX crypt algorithm. It is
+not considered sufficiently secure for current systems and is provided for
+backwards compatibility. The \fBcrypt_sunmd5\fR(7), \fBcrypt_bsdmd5\fR(7), or
+\fBcrypt_bsdbf\fR(7) algorithm should be used instead.
+.sp
+.LP
+The algorithm identifier for \fBpolicy.conf\fR(5) is \fB__unix__\fR. There is
+no entry in \fBcrypt.conf\fR(5) for this algorithm.
+.sp
+.LP
+The \fBcrypt_unix\fR algorithm is internal to \fBlibc\fR and provides the
+string encoding function used by \fBcrypt\fR(3C) when the first character of
+the salt is not a "$".
+.sp
+.LP
+This algorithm is based on a one-way encryption algorithm with variations
+intended (among other things) to frustrate use of hardware implementations of a
+key search.  Only the first eight characters of the key passed to \fBcrypt()\fR
+are used with this algorithm; the rest are silently ignored. The salt is a
+two-character string chosen from the set [a-zA-Z0-9./].  This string is used to
+perturb the hashing algorithm in one of 4096 different ways.
+.sp
+.LP
+The maximum password length for \fBcrypt_unix\fR is 8 characters.
+.SH USAGE
+.sp
+.LP
+The return value of the \fBcrypt_unix\fR algorithm might not be portable among
+standard-conforming systems. See \fBstandards\fR(7).
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+MT-Level	Safe
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR passwd (1),
+.BR crypt (3C),
+.BR crypt_genhash_impl (3C),
+.BR crypt_gensalt (3C),
+.BR crypt_gensalt_impl (3C),
+.BR getpassphrase (3C),
+.BR crypt.conf (5),
+.BR passwd (5),
+.BR policy.conf (5),
+.BR attributes (7),
+.BR crypt_bsdbf (7),
+.BR crypt_bsdmd5 (7),
+.BR crypt_sunmd5 (7),
+.BR standards (7)

@@ -223,7 +223,7 @@ changing permissions on a file.
 The {\fBPRIV_FILE_SETID\fR} privilege overrides constraints on ownership when
 adding the setuid or setgid bits to an executable file or a directory.  When
 adding the setuid bit to a root owned executable, additional restrictions
-apply. See \fBprivileges\fR(5).
+apply. See \fBprivileges\fR(7).
 .RE
 
 .sp
@@ -521,7 +521,7 @@ one whose meaning cannot be represented in the file's mode field alone. The new
 ACL mask permissions  might change the effective permissions for additional
 users and groups that have ACL entries on the file.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -537,10 +537,23 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-\fBchmod\fR(1), \fBchown\fR(2), \fBcreat\fR(2), \fBfcntl\fR(2), \fBmknod\fR(2),
-\fBopen\fR(2), \fBread\fR(2), \fBrename\fR(2), \fBstat\fR(2), \fBwrite\fR(2),
-\fBfattach\fR(3C), \fBmkfifo\fR(3C), \fBstat.h\fR(3HEAD), \fBattributes\fR(5),
-\fBprivileges\fR(5), \fBstandards\fR(5)
+.LP
+.BR chmod (1),
+.BR chown (2),
+.BR creat (2),
+.BR fcntl (2),
+.BR mknod (2),
+.BR open (2),
+.BR read (2),
+.BR rename (2),
+.BR stat (2),
+.BR write (2),
+.BR fattach (3C),
+.BR mkfifo (3C),
+.BR stat.h (3HEAD),
+.BR attributes (7),
+.BR privileges (7),
+.BR standards (7)
 .sp
 .LP
 \fIProgramming Interfaces Guide\fR

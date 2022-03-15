@@ -29,7 +29,7 @@
 #endif
 
 /*
- * Declarations used for communication between nvmeadm(1M) and nvme(7D)
+ * Declarations used for communication between nvmeadm(8) and nvme(4D)
  */
 
 #ifdef __cplusplus

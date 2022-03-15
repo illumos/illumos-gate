@@ -89,10 +89,10 @@ file path=usr/lib/libpri.so.1
 dir  path=usr/lib/rcm
 dir  path=usr/lib/rcm/scripts
 file path=usr/lib/rcm/scripts/SUNW,vdevices.pl mode=0555
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/drd.1m
-file path=usr/share/man/man1m/ldmad.1m
-file path=usr/share/man/man1m/vntsd.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/drd.8
+file path=usr/share/man/man8/ldmad.8
+file path=usr/share/man/man8/vntsd.8
 driver name=cnex alias=SUNW,sun4v-channel-devices
 driver name=drctl
 driver name=ds_pri

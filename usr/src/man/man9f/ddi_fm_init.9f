@@ -104,12 +104,12 @@ properties:
 and
 .Sy fm-dmachk-capable .
 The current supported fault management capability levels are observable via
-.Xr prtconf 1M .
+.Xr prtconf 8 .
 .Pp
 A driver can support the administrative selection of fault management
 capabilities by exporting and setting a fault management capability level
 property in its
-.Xr driver.conf 4
+.Xr driver.conf 5
 file to the values described above.
 The
 .Sy fm_capable
@@ -154,8 +154,8 @@ If no capabilities are in use then
 .Vt DDI_FM_NOT_CAPABLE
 is returned.
 .Sh SEE ALSO
-.Xr prtconf 1M ,
-.Xr driver.conf 4 ,
+.Xr driver.conf 5 ,
+.Xr prtconf 8 ,
 .Xr attach 9E ,
 .Xr detach 9E
 .Pp

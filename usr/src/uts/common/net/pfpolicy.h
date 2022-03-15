@@ -326,8 +326,8 @@ struct spd_attribute
 };
 
 /*
- * These flags are used by the kernel algorithm structures and by ipsecalgs(1m).
- * ALG_FLAG_KERNELCHECKED is used by ipsecalgs(1m) to tag ipsecalgent_t as
+ * These flags are used by the kernel algorithm structures and by ipsecalgs(8).
+ * ALG_FLAG_KERNELCHECKED is used by ipsecalgs(8) to tag ipsecalgent_t as
  * kernel verified. ALG_FLAG_VALID is only meaningful if set by the kernel.
  */
 #define	ALG_FLAG_VALID		0x01

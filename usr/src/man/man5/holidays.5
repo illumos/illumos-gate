@@ -1,0 +1,94 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH HOLIDAYS 5 "Aug 18, 2008"
+.SH NAME
+holidays \- prime/nonprime table for the accounting system
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/acct/holidays\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fB/etc/acct/holidays\fR file specifies prime time hours and holidays.
+Holidays and weekends are considered non-prime time hours.
+.sp
+.LP
+\fB/etc/acct/holidays\fR is used by the accounting system.
+.sp
+.LP
+All lines beginning with an \fB*\fR are comments.
+.sp
+.LP
+The \fB/etc/acct/holidays\fR file consists of two sections. The first
+non-comment line defines the current year and the start time of prime and
+non-prime time hours, in the form of:
+.sp
+.in +2
+.nf
+\fIcurrent_year\fR \fIprime_start\fR \fInon_prime_start\fR
+.fi
+.in -2
+
+.sp
+.LP
+Specify \fIprime_start\fR and \fInon_prime_start\fR times in the range of
+\fB0000\fR to \fB2400\fR.
+.sp
+.LP
+The remaining non-comment lines define the holidays in the form of:
+.sp
+.in +2
+.nf
+\fImonth/day\fR \fIcompany_holiday\fR
+.fi
+.in -2
+
+.sp
+.LP
+Of these two fields, only the \fImonth/day\fR is actually used by the
+accounting system programs.
+.sp
+.LP
+The \fB/etc/acct/holidays\fR file must be updated every year.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAn Example of the \fB/etc/acct/holidays\fR File
+.sp
+.LP
+The following is an example of the \fB/etc/acct/holidays\fR file:
+
+.sp
+.in +2
+.nf
+* Prime/Nonprime Table for the accounting system
+*
+* Curr     Prime     Non-Prime
+* Year     Start     Start
+*
+  1991     0830     1800
+*
+* only the first column (month/day) is significant.
+*
+* month/day    Company Holiday
+*
+  1/1          New Years Day
+  5/30         Memorial Day
+  7/4          Indep. Day
+  9/5          Labor Day
+  11/24        Thanksgiving Day
+  11/25        day after Thanksgiving
+  12/25        Christmas
+  12/26        day after Christmas
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+.BR acct (8)

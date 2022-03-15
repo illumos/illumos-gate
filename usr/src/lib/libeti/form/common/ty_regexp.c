@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* SVr4.0 1.2 */
-
 /*LINTLIBRARY*/
 
 #include <sys/types.h>
@@ -42,7 +40,7 @@
  *	usage:
  *		set_field_type(f, TYPE_REGEXP, expression);
  *
- *		char * expression;	regular expression REGCMP(3X)
+ *		char * expression;	regular expression regcmp(3C)
  */
 extern char *libform_regcmp(char *, char *);
 extern char *libform_regex(char *, char *, char *);

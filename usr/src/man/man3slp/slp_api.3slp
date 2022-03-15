@@ -60,7 +60,7 @@ consists of a backslash followed by the two hexadecimal digits encoding the
 byte. An example is "\fB\e2c\fR" for the byte \fB0x2c\fR. Clients handle opaque
 processing themselves, since the algorithm is relatively simple and uniform.
 .SS "System Properties"
-The system properties established in \fBslp.conf\fR(4), the configuration file,
+The system properties established in \fBslp.conf\fR(5), the configuration file,
 are accessible through the \fBSLPGetProperty()\fR and \fBSLPSetProperty()\fR
 functions. The \fBSLPSetProperty()\fR function modifies properties only in the
 running process, not in the configuration file. Errors are checked when the
@@ -161,7 +161,7 @@ replies has been collected and returned.
 .RE
 
 .SS "Configuration Files"
-The \fBAPI\fR library reads \fBslp.conf\fR(4), the default configuration file,
+The \fBAPI\fR library reads \fBslp.conf\fR(5), the default configuration file,
 to obtain the operating parameters. You can specify the location of this file
 with the \fBSLP_CONF_FILE\fR environment variable. If you do not set this
 variable, or the file it refers to is invalid, the \fBAPI\fR will use the
@@ -915,7 +915,7 @@ free memory
 .SH ENVIRONMENT VARIABLES
 When \fBSLP_CONF_FILE\fR is set, use this file for configuration.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -931,7 +931,10 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBslpd\fR(1M), \fBslp.conf\fR(4), \fBslpd.reg\fR(4), \fBattributes\fR(5)
+.BR slp.conf (5),
+.BR slpd.reg (5),
+.BR attributes (7),
+.BR slpd (8)
 .sp
 .LP
 \fISystem Administration Guide: Network Services\fR

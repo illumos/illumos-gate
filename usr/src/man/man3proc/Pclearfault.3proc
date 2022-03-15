@@ -37,7 +37,7 @@ due to a hardware exception, identifying a problem with the running process.
 Hardware faults include things like executing illegal instructions, encountering
 a breakpoint, and arithmetic exceptions.
 Faults are discussed further in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Pclearfault
@@ -79,7 +79,7 @@ and no faults are cleared.
 For a full list of possible errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Sh INTERFACE STABILITY
 .Sy Uncommitted
 .Sh MT-LEVEL
@@ -89,4 +89,4 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

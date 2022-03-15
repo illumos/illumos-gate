@@ -1,0 +1,191 @@
+'\" te
+.\"  All Rights Reserved.  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DNET 4D "Oct 20, 2000"
+.SH NAME
+dnet \- Ethernet driver for DEC 21040, 21041, 21140 Ethernet cards
+.SH SYNOPSIS
+.LP
+.nf
+\fB/kernel/drv/dnet\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBdnet\fR Ethernet driver is a multithreaded, loadable, clonable,
+\fBSTREAMS GLD\fR driver. Multiple controllers installed within the system are
+supported by the driver. The \fBdnet\fR driver functions include controller
+initialization, frame transmit and receive, functional addresses, promiscuous
+and multicast support, and error recovery and reporting.
+.SH APPLICATION PROGRAMMING INTERFACE
+.sp
+.LP
+The cloning character-special device, \fB/dev/dnet\fR, is used to access all
+DEC 21040/21041/21140 devices installed in the system.
+.sp
+.LP
+The \fBdnet\fR driver is dependent on \fB/kernel/misc/gld\fR, a loadable kernel
+module that provides the \fBdnet\fR driver with the \fBDLPI\fR and
+\fBSTREAMS\fR functionality required of a \fBLAN\fR driver.  See \fBgld\fR(4D)
+for more details on the primitives supported by the driver.
+.sp
+.LP
+The device is initialized on the first attach and de-initialized (stopped) on
+the last detach.
+.sp
+.LP
+The values returned by the driver in the \fBDL_INFO_ACK\fR primitive in
+response to a \fBDL_INFO_REQ\fR from the user are as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The maximum \fBSDU\fR is \fB1500\fR (\fBETHERMTU\fR - defined in
+<\fBsys/ethernet.h\fR>).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The minimum \fBSDU\fR is \fB0\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBDLSAP\fR address length is \fB8\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBMAC\fR type is \fBDL_ETHER\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBsap\fR length value is \fB\(mi2\fR, meaning the physical address
+component is followed immediately by a 2-byte \fBsap\fR component within the
+\fBDLSAP\fR address.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The broadcast address value is the Ethernet/IEEE broadcast address
+(\fBFF:FF:FF:FF:FF:FF\fR).
+.RE
+.sp
+.LP
+Once in the \fBDL_ATTACHED\fR state, the user must send a \fBDL_BIND_REQ\fR to
+associate a particular Service Access Point (SAP) with the stream.
+.SH PRECONFIGURATION
+.sp
+.LP
+The PCI configuration process varies from system to system. Follow the
+instructions provided by the vendor.
+.SS "Known Problems and Limitations"
+.RS +4
+.TP
+.ie t \(bu
+.el o
+On multiport cards (exception: Osicom (Rockwell) RNS2340), the first port is
+the top port. (On the Osicom RNS2340, the first port is the bottom port.)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the  \fBdnet\fR driver fails to determine the correct speed and duplex mode
+resulting in a corresponding drop in performance, set the speed and duplex mode
+using the \fBdnet.conf\fR file.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBdnet\fR driver incorrectly counts carrier lost or no carrier errors
+while in full-duplex mode. There is no carrier signal present when in
+full-duplex mode and it should not be counted as an error.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Version 4 SROM formats are not supported.
+.RE
+.SH CONFIGURATION
+.sp
+.LP
+The \fB/kernel/drv/dnet.conf\fR file supports the following options:
+.sp
+.ne 2
+.na
+\fB\fBfull-duplex\fR\fR
+.ad
+.RS 15n
+For full duplex operation use \fBfull-duplex=1\fR, for half duplex use
+\fBfull-duplex=0\fR. Half-duplex operation gives better results on older 10mbit
+networks.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBspeed\fR\fR
+.ad
+.RS 15n
+For 10mbit operation use \fBspeed=10\fR, for 100mbit operation use
+\fBspeed=100\fR. Certain 21140 based cards will operate at either speed. Use
+the speed property to override the 100mbit default in this case.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/dnet\fR\fR
+.ad
+.RS 25n
+character special device
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/dnet.conf\fR\fR
+.ad
+.RS 25n
+\fBdnet\fR configuration file
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+\fBattributes\fR(7), \fBdlpi\fR(4P), \fBgld\fR(4D) \fBstreamio\fR(4I)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+ \fISTREAMS Programming Guide\fR

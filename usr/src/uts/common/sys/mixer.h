@@ -81,7 +81,7 @@ struct am_control {
 	audio_info_t	dev_info;
 
 	/*
-	 * The mixer(7I) manual page shows an example of using the ch_open[]
+	 * The mixer(4I) manual page shows an example of using the ch_open[]
 	 * array. Each element that is set to 0 represents a channel which
 	 * isn't allocated, and non-zero elements represent a channel that is
 	 * alloacted. This size of this array may change, depending on the
@@ -111,7 +111,7 @@ struct am_sample_rates {
 
 	/*
 	 * Set this number to the number of sample rates to request. The
-	 * mixer(7I) manual page shows an example of using this structure.
+	 * mixer(4I) manual page shows an example of using this structure.
 	 * When AUDIO_MIXER_GET_SAMPLE_RATES returns the number of samples
 	 * available is set. This may be more or less than the number requested.
 	 * If more that only the requested number of samples is arctually
@@ -121,7 +121,7 @@ struct am_sample_rates {
 
 	/*
 	 * Variable size array for the supported sample rates. See the example
-	 * in the mixer(7I) manual page for how to use this array.
+	 * in the mixer(4I) manual page for how to use this array.
 	 */
 	uint_t		samp_rates[1];
 };

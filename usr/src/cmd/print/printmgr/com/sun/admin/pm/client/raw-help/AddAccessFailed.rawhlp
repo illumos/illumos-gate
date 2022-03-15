@@ -23,7 +23,6 @@
 -- Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
 -- Use is subject to license terms.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=AddAccessFailed -->
 
@@ -33,7 +32,7 @@
 
 You must enter a printer name and a printer server name; the printer
 server must be a remote server (not the current server). See the man
-page for lpadmin(1M) for more information. 
+page for lpadmin(8) for more information. 
 
 <p>
 

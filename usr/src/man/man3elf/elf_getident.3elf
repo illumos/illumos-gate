@@ -164,7 +164,7 @@ Upon successful completion, the \fBelf_getphnum()\fR, \fBelf_getshnum()\fR, and
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -188,9 +188,15 @@ The \fBelf_getident()\fR, \fBelf_getphdrnum()\fR, \fBelf_getshdrnum()\fR, and
 .SH SEE ALSO
 .sp
 .LP
-\fBelf\fR(3ELF), \fBelf32_getehdr\fR(3ELF), \fBelf_begin\fR(3ELF),
-\fBelf_kind\fR(3ELF), \fBelf_newscn\fR(3ELF), \fBelf_rawfile\fR(3ELF),
-\fBelf_update\fR(3ELF), \fBlibelf\fR(3LIB), \fBattributes\fR(5)
+.BR elf (3ELF),
+.BR elf32_getehdr (3ELF),
+.BR elf_begin (3ELF),
+.BR elf_kind (3ELF),
+.BR elf_newscn (3ELF),
+.BR elf_rawfile (3ELF),
+.BR elf_update (3ELF),
+.BR libelf (3LIB),
+.BR attributes (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

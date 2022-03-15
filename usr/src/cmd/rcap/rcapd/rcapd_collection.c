@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -34,7 +32,7 @@
 /*
  * An abstract "collection" of processes.  Multiple types of collections can
  * exist, one of which is selected at run-time.  Currently, the only one
- * defined corresponds to project(4)s.
+ * defined corresponds to project(5)s.
  */
 
 #define	MAX(x, y) (((x) > (y)) ? (x) : (y))

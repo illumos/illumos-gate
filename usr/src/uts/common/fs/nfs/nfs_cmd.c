@@ -138,7 +138,7 @@ retry:
 	if (dh == NULL) {
 		/*
 		 * The rendezvous point has not been established yet !
-		 * This could mean that either mountd(1m) has not yet
+		 * This could mean that either mountd(8) has not yet
 		 * been started or that _this_ routine nuked the door
 		 * handle after receiving an EINTR for a REVOKED door.
 		 *
@@ -176,8 +176,8 @@ retry:
 				/*
 				 * The server barfed and revoked
 				 * the (existing) door on us; we
-				 * want to wait to give smf(5) a
-				 * chance to restart mountd(1m)
+				 * want to wait to give smf(7) a
+				 * chance to restart mountd(8)
 				 * and establish a new door handle.
 				 */
 				mutex_enter(&ncg->nfscmd_lock);

@@ -45,8 +45,8 @@ dir  path=usr/lib/devfsadm group=sys
 dir  path=usr/lib/devfsadm/linkmod group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_dcam1394_link.so group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/dcam1394.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/dcam1394.4d
 legacy pkg=SUNWfwdcu desc="Sun IEEE1394 Video Conferencing support" \
     name="Sun IEEE1394 Video Conferencing Support (Usr)"
 license cr_Sun license=cr_Sun

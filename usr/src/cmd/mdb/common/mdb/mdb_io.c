@@ -1168,8 +1168,8 @@ iob_getvar(const char *s, size_t len)
 /*
  * The iob_doprnt function forms the main engine of the debugger's output
  * formatting capabilities.  Note that this is NOT exactly compatible with
- * the printf(3S) family, nor is it intended to be so.  We support some
- * extensions and format characters not supported by printf(3S), and we
+ * the printf(3C) family, nor is it intended to be so.  We support some
+ * extensions and format characters not supported by printf(3C), and we
  * explicitly do NOT provide support for %C, %S, %ws (wide-character strings),
  * do NOT provide for the complete functionality of %f, %e, %E, %g, %G
  * (alternate double formats), and do NOT support %.x (precision specification).

@@ -575,7 +575,7 @@ check_ipaddr(char *addr, char **newaddr)
 }
 
 /*
- * Verifies that project name meets the restrictions defined by project(4).
+ * Verifies that project name meets the restrictions defined by project(5).
  */
 static int
 check_projname(char *addr)
@@ -2357,7 +2357,7 @@ genent_publickey(char *line, int (*cback)())
 		 * {DES} and {DH192-0} means same thing.
 		 * However, nisplus uses "DES" and ldap uses "DH192-0"
 		 * internally.
-		 * See newkey(1M), __nis_mechalias2authtype() which is
+		 * See newkey(8), __nis_mechalias2authtype() which is
 		 * called by __nis_keyalg2authtype() and getkey_ldap_g()
 		 */
 		(void) strlcpy(auth_type, "DH192-0", BUFSIZ+1);

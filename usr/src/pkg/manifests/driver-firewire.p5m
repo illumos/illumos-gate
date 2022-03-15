@@ -44,11 +44,11 @@ dir  path=kernel/misc group=sys
 dir  path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/s1394 group=sys mode=0755
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-link path=usr/share/man/man7d/1394.7d target=ieee1394.7d
-link path=usr/share/man/man7d/firewire.7d target=ieee1394.7d
-file path=usr/share/man/man7d/hci1394.7d
-file path=usr/share/man/man7d/ieee1394.7d
+dir  path=usr/share/man/man4d
+link path=usr/share/man/man4d/1394.4d target=ieee1394.4d
+link path=usr/share/man/man4d/firewire.4d target=ieee1394.4d
+file path=usr/share/man/man4d/hci1394.4d
+file path=usr/share/man/man4d/ieee1394.4d
 driver name=hci1394 perms="* 0600 root sys" alias=pciclass,0c0010
 legacy pkg=SUNW1394 desc="IEEE1394 Framework and OpenHCI Driver" \
     name="Sun IEEE1394 Framework"

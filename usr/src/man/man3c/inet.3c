@@ -422,9 +422,9 @@ functions are
 .Xr gethostbyname 3NSL ,
 .Xr getipnodebyname 3SOCKET ,
 .Xr getnetbyname 3SOCKET ,
-.Xr hosts 4 ,
-.Xr networks 4 ,
-.Xr attributes 5
+.Xr hosts 5 ,
+.Xr networks 5 ,
+.Xr attributes 7
 .Sh NOTES
 The return value from
 .Fn inet_ntoa

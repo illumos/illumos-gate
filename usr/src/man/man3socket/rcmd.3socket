@@ -65,7 +65,7 @@ clients that request as service with \fBrcmd\fR.
 .sp
 .LP
 All of these functions are present in the same file and are used by the
-\fBin.rshd\fR(1M) server among others.
+\fBin.rshd\fR(8) server among others.
 .sp
 .LP
 The \fBrcmd()\fR and \fBrcmd_af()\fR functions look up the host \fI*ahost\fR
@@ -89,7 +89,7 @@ arbitrary signals to the remote process, other than possibly sending
 out-of-band data.
 .sp
 .LP
-The protocol is described in detail in \fBin.rshd\fR(1M).
+The protocol is described in detail in \fBin.rshd\fR(8).
 .sp
 .LP
 The \fBrresvport()\fR and \fBrresvport_af()\fR functions are used to obtain a
@@ -148,7 +148,7 @@ user's trusted hosts and users
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -168,6 +168,12 @@ should be called only from the main thread.
 .SH SEE ALSO
 .sp
 .LP
-\fBrlogin\fR(1), \fBrsh\fR(1), \fBin.rexecd\fR(1M), \fBin.rshd\fR(1M),
-\fBIntro\fR(2), \fBgetaddrinfo\fR(3SOCKET), \fBgethostbyname\fR(3NSL),
-\fBrexec\fR(3SOCKET), \fBattributes\fR(5)
+.BR rlogin (1),
+.BR rsh (1),
+.BR Intro (2),
+.BR gethostbyname (3NSL),
+.BR getaddrinfo (3SOCKET),
+.BR rexec (3SOCKET),
+.BR attributes (7),
+.BR in.rexecd (8),
+.BR in.rshd (8)

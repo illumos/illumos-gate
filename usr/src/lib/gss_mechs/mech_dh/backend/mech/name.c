@@ -27,8 +27,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dh_gssapi.h"
 #include <pwd.h>
 #include <string.h>
@@ -260,7 +258,7 @@ do_username_nametype(OM_uint32 *minor, char *uname, gss_name_t *output)
 		}
 		/*
 		 * If node is null, assume local host. If domain is
-		 * null assume local domain. See host2netname(3N)
+		 * null assume local domain. See host2netname(3NSL)
 		 */
 		if (!host2netname(netname, node,  domain)) {
 			*minor = DH_NETNAME_FAILURE;
@@ -281,7 +279,7 @@ do_username_nametype(OM_uint32 *minor, char *uname, gss_name_t *output)
 		return (GSS_S_FAILURE);
 	}
 
-	/* If domain is null assume local domain. See user2netname(3N) */
+	/* If domain is null assume local domain. See user2netname(3NSL) */
 	if (!user2netname(netname, pwd.pw_uid, domain)) {
 		*minor = DH_NETNAME_FAILURE;
 		free(user);

@@ -1,0 +1,223 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
+.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH LFCOMPILE 7 "Aug 24, 2009"
+.SH NAME
+lfcompile \- large file compilation environment for 32-bit applications
+.SH DESCRIPTION
+.sp
+.LP
+All 64-bit applications can manipulate large files by default. The methods
+described on this page allow 32-bit applications to manipulate large files.
+.sp
+.LP
+In the large file compilation environment, source interfaces are bound to
+appropriate 64-bit functions, structures, and types.  Compiling in this
+environment allows 32-bit applications to access files whose size is greater
+than or equal to 2 Gbyte ( 2^31 bytes).
+.sp
+.LP
+Each interface named \fIxxx\fR\fB()\fR that needs to access 64-bit entities to
+access large files maps to a \fIxxx\fR\fB64()\fR call in the resulting binary.
+All relevant data types are defined to be of correct size (for example,
+\fBoff_t\fR has a typedef definition for a 64-bit entity).
+.sp
+.LP
+An application compiled in this environment is able to use the
+\fIxxx\fR\fB()\fR source interfaces to access both large and small files,
+rather than having to explicitly utilize the transitional \fIxxx\fR\fB64()\fR
+interface calls to access large files. See the \fBlfcompile64\fR(7) manual page
+for information regarding the transitional compilation environment.
+.sp
+.LP
+Applications can be compiled in the large file compilation environment by using
+the following methods:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Use the \fBgetconf\fR(1) utility with one or more of the arguments listed in
+the table below. This method is recommended for portable applications.
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+\fBargument\fR	\fBpurpose\fR
+_
+\fBLFS_CFLAGS\fR	T{
+obtain compilation flags necessary to enable the large file compilation environment
+T}
+\fBLFS_LDFLAGS\fR	obtain link editor options
+\fBLFS_LIBS\fR	obtain link library names
+\fBLFS_LINTFLAGS\fR	obtain lint options
+.TE
+
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Set the compile-time flag \fB_FILE_OFFSET_BITS\fR to 64 before including any
+headers. Applications may combine objects produced in the large file
+compilation environment with objects produced in the transitional compilation
+environment, but must be careful with respect to interoperability between those
+objects. Applications should not declare global variables of types whose sizes
+change between  compilation environments.
+.RE
+.SS "Access to Additional Large File Interfaces"
+.sp
+.LP
+The \fBfseek()\fR and \fBftell()\fR functions \fIdo not\fR map to functions
+named \fBfseek64()\fR and \fBftell64()\fR; rather, the large file additions
+\fBfseeko()\fR and \fBftello()\fR, have functionality identical to
+\fBfseek()\fR and \fBftell()\fR and \fIdo\fR map to the 64-bit functions
+\fBfseeko64()\fR and \fBftello64()\fR. Applications wishing to access large
+files should use \fBfseeko()\fR and \fBftello()\fR in place of \fBfseek()\fR
+and \fBftell()\fR. See the \fBfseek\fR(3C) and \fBftell\fR(3C) manual pages for
+information about  \fBfseeko()\fR and \fBftello()\fR.
+.sp
+.LP
+Applications wishing to access  \fBfseeko()\fR and \fBftello()\fR as well as
+the POSIX and X/Open specification-conforming interfaces should define the
+macro \fB_LARGEFILE_SOURCE\fR to be 1 and set whichever feature test macros are
+appropriate to obtain the desired environment (see \fBstandards\fR(7)).
+.SH EXAMPLES
+.sp
+.LP
+In the following examples, the large file compilation environment is accessed
+by invoking the \fBgetconf\fR utility with one of the arguments listed in the
+table above. The additional large file interfaces are accessed by specifying
+\fB-D_LARGEFILE_SOURCE\fR\&.
+.sp
+.LP
+The examples that use the form of command substitution specifying the command
+within parentheses preceded by a dollar sign can be executed only in a
+POSIX-conforming shell such as the Korn Shell (see \fBksh\fR(1)). In a shell
+that is not POSIX-conforming, such as the Bourne Shell (see \fBsh\fR(1)) and
+the C Shell (see \fBcsh\fR(1)), the \fBgetconf\fR calls must be enclosed within
+grave accent marks, as shown in the second example.
+.LP
+\fBExample 1 \fRCompile a program with a "large" \fBoff_t\fR that uses
+\fBfseeko()\fR, \fBftello()\fR, and \fByacc\fR.
+.sp
+.LP
+The following example compiles a program with a "large"  \fBoff_t\fR and uses
+\fBfseeko()\fR, \fBftello()\fR, and \fByacc\fR(1).
+
+.sp
+.in +2
+.nf
+$ c89 -D_LARGEFILE_SOURCE                \e
+      -D_FILE_OFFSET_BITS=64 -o foo      \e
+      $(getconf LFS_CFLAGS) y.tab.c b.o  \e
+      $(getconf LFS_LDFLAGS)             \e
+      -ly $(getconf LFS_LIBS)
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRCompile a program with a "large" \fBoff_t\fR that does not use
+\fBfseeko()\fR and \fBftello()\fR and has no application specific libraries.
+.sp
+.in +2
+.nf
+% c89 -D_FILE_OFFSET_BITS=64     \e
+      \(gagetconf LFS_CFLAGS\(ga a.c   \e
+      \(gagetconf LFS_LDFLAGS\(ga      \e
+      \(gagetconf LFS_LIBS\(ga         \e
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRCompile a program with a "default" \fBoff_t\fR that uses
+\fBfseeko()\fR and \fBftello()\fR.
+.sp
+.in +2
+.nf
+$ c89 -D_LARGEFILE_SOURCE  a.c
+.fi
+.in -2
+
+.SH SEE ALSO
+.sp
+.LP
+.BR csh (1),
+.BR getconf (1),
+.BR ksh (1),
+.BR sh (1),
+.BR yacc (1),
+.BR fseek (3C),
+.BR ftell (3C),
+.BR lf64 (7),
+.BR lfcompile64 (7),
+.BR standards (7)
+.SH NOTES
+.sp
+.LP
+Certain system-specific or non-portable interfaces are not usable in the large
+file compilation environment. Known cases are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Kernel data structures read from \fB/dev/kmem\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Interfaces in the kernel virtual memory library, \fB-lkvm\fR\&.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Interfaces in the \fBELF\fR access library, \fB-lelf\fR\&.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Interfaces to \fB/proc\fR defined in <\fBprocfs.h\fR>.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBustat\fR(2) system call.
+.RE
+.sp
+.LP
+Programs that use these interfaces should not be compiled in the large file
+compilation environment.  As a partial safeguard against making this mistake,
+including either of the <\fBlibelf.h\fR> or <\fBsys/procfs.h\fR> header files
+will induce a compilation error when the large file compilation environment is
+enabled.
+.sp
+.LP
+In general, caution should be exercised when using any separately-compiled
+library whose interfaces include data items of type \fBoff_t\fR or the other
+redefined types either directly or indirectly, such as with '\fBstruct
+stat\fR'. (The redefined types are \fBoff_t\fR, \fBrlim_t\fR, \fBino_t\fR,
+\fBblkcnt_t\fR, \fBfsblkcnt_t\fR, and \fBfsfilcnt_t\fR.) For the large file
+compilation environment to work correctly with such a library, the library
+interfaces must include the appropriate \fIxxx\fR\fB64()\fR binary entry points
+and must have them mapped to the corresponding primary functions when
+\fB_FILE_OFFSET_BITS\fR is set to 64.
+.sp
+.LP
+Care should be exercised using any of the \fBprintf()\fR or \fBscanf()\fR
+routines on variables of the types mentioned above.  In the large file
+compilation environment, these variables should be printed or scanned using
+\fBlong long\fR formats.
+.SH BUGS
+.sp
+.LP
+Symbolic formats analogous to those found in \fB<sys/int_fmtio.h>\fR do not
+exist for printing or scanning variables of the types that are redefined in the
+large file compilation environment.

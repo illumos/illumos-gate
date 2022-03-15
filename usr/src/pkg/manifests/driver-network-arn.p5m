@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/arn group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/arn.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/arn.4d
 driver name=arn perms="* 0666 root sys" clone_perms="arn 0666 root sys" \
     alias=pciex168c,2a \
     alias=pciex168c,2b

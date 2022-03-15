@@ -84,7 +84,7 @@ in the C locale. In all locales, they return a pointer to an
 empty string if \fIitem\fR contains an invalid setting.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .TS
 box;
 c | c
@@ -100,9 +100,13 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
-\fBlanginfo.h\fR(3HEAD), \fBnl_types.h\fR(3HEAD),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR langinfo.h (3HEAD),
+.BR nl_types.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)
 .SH WARNINGS
 .LP
 The array pointed to by the return value should not be modified by the program.

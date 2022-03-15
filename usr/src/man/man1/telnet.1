@@ -176,7 +176,7 @@ Forwards a forwardable copy of the local credentials to the remote system.
 .RS 4n
 If Kerberos authentication is being used, requests that \fBtelnet\fR obtain
 tickets for the remote host in \fIrealm\fR instead of the remote host's default
-realm as determined in \fBkrb5.conf\fR(4).
+realm as determined in \fBkrb5.conf\fR(5).
 .RE
 
 .sp
@@ -325,9 +325,9 @@ Lists the current status of the various types of authentication.
 .RS 4n
 Open a connection to the named host. If no port number is specified,
 \fBtelnet\fR will attempt to contact a \fBTELNET\fR server at the default port.
-The host specification may be either a host name (see \fBhosts\fR(4)) or an
-Internet address specified in the "dot notation" (see \fBinet\fR(7P) or
-\fBinet6\fR(7P)). If the \fIhost\fR is specified as \fI@hop1@hop2@host\fR, the
+The host specification may be either a host name (see \fBhosts\fR(5)) or an
+Internet address specified in the "dot notation" (see \fBinet\fR(4P) or
+\fBinet6\fR(4P)). If the \fIhost\fR is specified as \fI@hop1@hop2@host\fR, the
 connection goes through hosts \fIhop1\fR and \fIhop2\fR, using loose source
 routing to end at \fIhost\fR. The \fB@\fR symbol is required as a separator
 between the hosts specified. If a leading \fB!\fR is used with IPv4, the
@@ -1508,9 +1508,17 @@ session
 .SH SEE ALSO
 .sp
 .LP
-\fBrlogin\fR(1), \fBsh\fR(1), \fBstty\fR(1), \fBgetlogin\fR(3C),
-\fBhosts\fR(4), \fBkrb5.conf\fR(4), \fBnologin\fR(4), \fBtelnetrc\fR(4),
-\fBattributes\fR(5), \fBinet\fR(7P), \fBinet6\fR(7P)
+.BR rlogin (1),
+.BR sh (1),
+.BR stty (1),
+.BR getlogin (3C),
+.BR inet (4P),
+.BR inet6 (4P),
+.BR hosts (5),
+.BR krb5.conf (5),
+.BR nologin (5),
+.BR telnetrc (5),
+.BR attributes (7)
 .SH DIAGNOSTICS
 .sp
 .ne 2

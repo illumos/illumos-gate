@@ -11,7 +11,7 @@ xprt_unregister \- library routines for registering servers
 .SH DESCRIPTION
 .LP
 These routines are a part of the \fBRPC\fR library which allows the \fBRPC\fR
-servers to register themselves with \fBrpcbind()\fR (see  \fBrpcbind\fR(1M)),
+servers to register themselves with \fBrpcbind()\fR (see  \fBrpcbind\fR(8)),
 and associate the given program and version number with the dispatch function.
 When the RPC server receives a RPC request, the library invokes the dispatch
 routine with the appropriate arguments.
@@ -60,7 +60,7 @@ netconfig *\fInetconf\fR);\fR
 Associates \fIprognum\fR and \fIversnum\fR with the service dispatch procedure,
 \fIdispatch\fR. If \fInetconf\fR is \fINULL\fR, the service is not registered
 with the \fBrpcbind\fR service.  For example, if a service has already been
-registered using some other means, such as \fBinetd\fR (see  \fBinetd\fR(1M)),
+registered using some other means, such as \fBinetd\fR (see  \fBinetd\fR(8)),
 it will not need to be registered again. If \fInetconf\fR is non-zero, then a
 mapping of the triple [\fIprognum\fR, \fI versnum\fR, \fInetconf\fR->\fI]\fR to
 \fIxprt\fR-> \fIxp_ltaddr\fR is established with the local \fBrpcbind\fR
@@ -140,7 +140,7 @@ routine.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -155,6 +155,12 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBinetd\fR(1M), \fBrpcbind\fR(1M), \fBrpc\fR(3NSL), \fBrpc_svc_calls\fR(3NSL),
-\fBrpc_svc_create\fR(3NSL), \fBrpc_svc_err\fR(3NSL), \fBrpcbind\fR(3NSL),
-\fBselect\fR(3C), \fBattributes\fR(5)
+.BR select (3C),
+.BR rpc (3NSL),
+.BR rpc_svc_calls (3NSL),
+.BR rpc_svc_create (3NSL),
+.BR rpc_svc_err (3NSL),
+.BR rpcbind (3NSL),
+.BR attributes (7),
+.BR inetd (8),
+.BR rpcbind (8)

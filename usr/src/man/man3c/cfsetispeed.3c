@@ -124,6 +124,6 @@ Async-Signal-Safe
 .Sh SEE ALSO
 .Xr cfgetispeed 3C ,
 .Xr tcsetattr 3C ,
-.Xr attributes 5 ,
-.Xr standards 5 ,
-.Xr termio 7I
+.Xr termio 4I ,
+.Xr attributes 7 ,
+.Xr standards 7

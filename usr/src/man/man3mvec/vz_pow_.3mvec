@@ -75,7 +75,7 @@ exceptions and/or deliver different results from \fBcpow()\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -94,4 +94,5 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBcpow\fR(3M), \fBattributes\fR(5)
+.BR cpow (3M),
+.BR attributes (7)

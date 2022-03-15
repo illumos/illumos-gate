@@ -72,7 +72,7 @@ of the pseudo-terminal manager device; e.g., by calling
 or by performing an
 .Xr open 2
 of the
-.Xr ptm 7D
+.Xr ptm 4D
 device.
 .Pp
 The user ID owner of the subsidiary device is set to the real user ID of the
@@ -113,6 +113,6 @@ The corresponding pseudo-terminal subsidiary device could not be accessed.
 .Xr posix_openpt 3C ,
 .Xr ptsname 3C ,
 .Xr unlockpt 3C ,
-.Xr attributes 5 ,
-.Xr standards 5 ,
-.Xr ptm 7D
+.Xr ptm 4D ,
+.Xr attributes 7 ,
+.Xr standards 7

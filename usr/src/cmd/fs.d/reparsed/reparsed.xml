@@ -62,7 +62,7 @@
 	    grouping='require_all'
 	    restart_on='error'
 	    type='service'>
-	    	<service_fmri value='svc:/system/filesystem/minimal' />
+		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
 	<exec_method
@@ -99,7 +99,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='reparsed' section='1M'
+			<manpage title='reparsed' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

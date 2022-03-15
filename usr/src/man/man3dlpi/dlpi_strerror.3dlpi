@@ -37,7 +37,7 @@ the error code is unknown, the string "Unknown DLPI error" is returned.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -55,4 +55,5 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibdlpi\fR(3LIB), \fBattributes\fR(5)
+.BR libdlpi (3LIB),
+.BR attributes (7)

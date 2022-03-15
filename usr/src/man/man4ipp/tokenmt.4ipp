@@ -1,0 +1,171 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TOKENMT 4IPP "April 9, 2016"
+.SH NAME
+tokenmt \- Single and Two Rate Three Conformance Level Meter
+.SH DESCRIPTION
+.LP
+The \fBtokenmt\fR module can be configured as a Single or a Two Rate meter.
+Packets are deemed to belong to one of the three levels - Red, Yellow or Green
+- depending on the configured rate(s) and the burst sizes. When configured as a
+Single Rate meter, \fBtokenmt\fR can operate with just the Green and Red
+levels.
+.sp
+.LP
+Configuration parameters for \fBtokenmt\fR correspond to definitions in \fIRFC-
+2697\fR and \fIRFC- 2698\fR as follows:
+.sp
+.LP
+Configuring \fBtokenmt\fR as a Single Rate meter (from \fIRFC- 2697\fR):
+.br
+.in +2
+committed_rate - CIR
+.in -2
+.br
+.in +2
+committed_burst - CBS
+.in -2
+.br
+.in +2
+peak_burst - EBS
+.in -2
+.sp
+.LP
+(thus 'peak_burst' for a single rate meter is actually the 'excess  burst' in
+the RFC. However, throughout the text the parameter name "peak burst" is used.)
+.sp
+.LP
+Configuring tokenmt as a Two Rate meter (from \fIRFC- 2698\fR):
+.br
+.in +2
+committed_rate - CIR
+.in -2
+.br
+.in +2
+peak_rate - PIR
+.in -2
+.br
+.in +2
+committed_burst - CBS
+.in -2
+.br
+.in +2
+peak_burst - PBS
+.in -2
+.sp
+.LP
+The meter is implemented using token buckets C and P, which initially hold
+tokens equivalent to committed and peak burst sizes (bits) respectively. When a
+packet of size \fI B\fR bits arrive at time \fI t\fR, the following occurs:
+.sp
+.in +2
+.nf
+When operating as a Single Rate meter, the outcome (level)
+is decided as follows:
+        - Update tokens in C and P
+              o Compute no. of tokens accumulated since the
+                last time packet was seen at the committed rate as
+                T(t) = committed rate * (t - t')
+                (where t' is the time the last packet was seen)
+              o Add T tokens to C up to a maximum of committed burst
+                size. Add remaining tokens ((C+T) - Committed Burst),
+                if any, to P, to a maximum of peak burst size.
+        - Decide outcome
+              o If not color aware
+                      o If B <= C, outcome is GREEN and C -= B.
+                      o Else, if B <= P, outcome is YELLOW and P -= B.
+                      o Else, outcome is Red.
+              o Else,
+                      o obtain DSCP from packet
+                      o obtain color from color_map, color_map[DSCP]
+                      o if (color is GREEN) and (B <= C), outcome is
+                        GREEN and C -= B.
+                      o Else, if (color is GREEN or YELLOW) and
+                        (B <= P), outcome is YELLOW and  P -= B.
+                      o Else, outcome is RED.
+     Note that if peak_burst and yellow_next_actions are
+     not specified (that is, a single rate meter with two
+     outcomes), the outcome is never YELLOW.
+.fi
+.in -2
+
+.sp
+.LP
+When operating as a Two Rate meter, the outcome (level) is decided as follows:
+.sp
+.in +2
+.nf
+- Update tokens in C and P
+                  o Compute no. of tokens accumulated since the last time a
+                    packet was seen at the committed and peak rates as
+                    Tc(t) = committed rate * (t - t')
+                    Tp(t) = peak rate * (t - t')
+                    (where t' is the time the last packet was seen)
+                  o Add Tc to C up to a maximum of committed burst size
+                  o Add Tp to P up to a maximum of peak burst size
+             - Decide outcome
+                  o If not color aware
+                        o If B > P, outcome is RED.
+                        o Else, if B > C, outcome is YELLOW and P -= B
+                        o Else, outcome is GREEN and C -= B & P -= B
+                  o Else,
+                        o obtain DSCP from packet
+                        o obtain color from color_map, color_map[DSCP]
+                        o if (color is RED) or (B > P), outcome is RED
+                        o Else, if (color is YELLOW) or (B > C),
+                          outcome is YELLOW and P -= B
+                        o Else, outcome is GREEN and C -= B & P -= B
+.fi
+.in -2
+
+.SH STATISTICS
+.LP
+The \fBtokenmt\fR module exports the following statistics through \fBkstat\fR:
+.sp
+.LP
+Global statistics:
+.sp
+.in +2
+.nf
+module: tokenmt                          instance: <action id>
+  name: tokenmt statistics               class <action name>
+        epackets                         <number of packets in error>
+        green_bits                       <number of bits in green>
+        green_packets                    <number of packets in green>
+        red_bits                         <number of bits in red>
+        red_packets                      <number of packets in red>
+        yellow_bits                      <number of bits in yellow>
+        yellow packets                   <number of packets in yellow>
+.fi
+.in -2
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/kernel/ipp/sparcv9/tokenmt\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit module (SPARC only.)
+.RE
+
+.SH SEE ALSO
+.LP
+.BR dlcosmk (4IPP),
+.BR dscpmk (4IPP),
+.BR flowacct (4IPP),
+.BR ipgpc (4IPP),
+.BR ipqos (4IPP),
+.BR tswtclmt (4IPP),
+.BR ipqosconf (8)
+.sp
+.LP
+\fIRFC 2697, A Single Rate Three Color Marker\fR J. Heinanen, R. Guerin \(em
+The Internet Society, 1999
+.sp
+.LP
+\fIRFC 2698, A Two Rate Three Color Marker\fR J. Heinanen, R. Guerin \(em The
+Internet Society, 1999

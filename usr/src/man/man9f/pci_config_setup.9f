@@ -75,7 +75,7 @@ These functions are specific to \fBPCI \fRbus device drivers. For drivers using
 these functions,  a single source to support devices with multiple bus versions
 may not be easy to maintain.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -89,7 +89,7 @@ Architecture	PCI Local Bus
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5)
+.BR attributes (7)
 .sp
 .LP
 \fIIEEE 1275 PCI Bus Binding\fR

@@ -96,7 +96,7 @@ detect errors should clear \fBerrno\fR, then call \fBrewind()\fR, and if
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -114,4 +114,6 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBfseek\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR fseek (3C),
+.BR attributes (7),
+.BR standards (7)

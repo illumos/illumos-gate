@@ -56,7 +56,7 @@
  *
  *	Error reports resulting from hardware component specific and common IO
  *	fault and driver defects must be accompanied by an Eversholt fault
- *	tree (.eft) by the Solaris fault manager (fmd(1M)) for
+ *	tree (.eft) by the Solaris fault manager (fmd(8)) for
  *	diagnosis.
  *
  * DDI_FM_ERRCB_CAPABLE
@@ -466,7 +466,7 @@ out:	if (ereport && (nva == NULL))
 
 /*
  * Generate an error report for consumption by the Solaris Fault Manager,
- * fmd(1M).  Valid ereport classes are defined in /usr/include/sys/fm/io.
+ * fmd(8).  Valid ereport classes are defined in /usr/include/sys/fm/io.
  *
  * The ENA should be set if this error is a result of an error status
  * returned from ddi_dma_err_check() or ddi_acc_err_check().  Otherwise,

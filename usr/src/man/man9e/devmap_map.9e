@@ -180,7 +180,9 @@ xxdevmap_map(devmap_cookie_t dhp, dev_t dev, uint_t flags, \e
 .in -2
 
 .SH SEE ALSO
-\fBdevmap_unmap\fR(9E), \fBdevmap_unload\fR(9F), \fBdevmap_callback_ctl\fR(9S)
+.BR devmap_unmap (9E),
+.BR devmap_unload (9F),
+.BR devmap_callback_ctl (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

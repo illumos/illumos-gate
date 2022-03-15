@@ -105,7 +105,7 @@
 		<documentation>
 			<manpage
 			    title='fmd'
-			    section='1M'
+			    section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

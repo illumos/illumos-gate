@@ -177,7 +177,7 @@ Refer to the RETURN VALUES section on \fBpam\fR(3PAM).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -195,10 +195,16 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBlibpam\fR(3LIB), \fBpam\fR(3PAM), \fBpam_acct_mgmt\fR(3PAM),
-\fBpam_authenticate\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
-\fBpam_open_session\fR(3PAM), \fBpam_setcred\fR(3PAM),
-\fBpam_set_data\fR(3PAM), \fBpam_strerror\fR(3PAM), \fBattributes\fR(5)
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_acct_mgmt (3PAM),
+.BR pam_authenticate (3PAM),
+.BR pam_chauthtok (3PAM),
+.BR pam_open_session (3PAM),
+.BR pam_set_data (3PAM),
+.BR pam_setcred (3PAM),
+.BR pam_strerror (3PAM),
+.BR attributes (7)
 .sp
 .LP
 \fISolaris Security for Developers Guide\fR

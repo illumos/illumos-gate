@@ -47,7 +47,7 @@
 #include <sys/wait.h>
 
 #define	SMF_RST	"/etc/svc/volatile/resetting"
-#define	RETRY_COUNT 15	/* number of 1 sec retries for audit(1M) to complete */
+#define	RETRY_COUNT 15	/* number of 1 sec retries for audit(8) to complete */
 
 static const char *Usage = "Usage: %s cmd fcn [mdep]\n";
 
@@ -411,7 +411,7 @@ change_audit_file(void)
 		int	retries = RETRY_COUNT;
 
 		/*
-		 * Wait for audit(1M) -n process to complete
+		 * Wait for audit(8) -n process to complete
 		 *
 		 */
 		do {

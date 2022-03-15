@@ -1,0 +1,155 @@
+'\" te
+.\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PAM_PASSWD_AUTH 7 "Aug 10, 2002"
+.SH NAME
+pam_passwd_auth \- authentication module for password
+.SH SYNOPSIS
+.LP
+.nf
+\fBpam_passwd_auth.so.1\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpam_passwd_auth\fR provides authentication functionality to the password
+service as implemented by \fBpasswd\fR(1). It differs from the standard
+\fBPAM\fR authentication modules in its prompting behavior. It should be the
+first module on the password service authentication stack.
+.sp
+.LP
+The name of the user whose password attributes are to be updated must be
+present in the \fBPAM_USER\fR item. This can be accomplished due to a previous
+call to \fBpam_start\fR(3PAM), or explicitly set by \fBpam_set_item\fR(3PAM).
+Based on the current user-id and the repository that is to by updated, the
+module determines whether a password is necessary for a successful update of
+the password repository, and if so, which password is required.
+.sp
+.LP
+The following options can be passed to the module:
+.sp
+.ne 2
+.na
+\fB\fBdebug\fR\fR
+.ad
+.RS 17n
+\fBsyslog\fR(3C) debugging information at the \fBLOG_DEBUG\fR level
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnowarn\fR\fR
+.ad
+.RS 17n
+Turn off warning messages
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBserver_policy\fR\fR
+.ad
+.RS 17n
+If the account authority for the user, as specified by \fBPAM_USER\fR, is a
+server, do not apply the Unix policy from the passwd entry in the name service
+switch.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+The following error codes are returned:
+.sp
+.ne 2
+.na
+\fB\fBPAM_BUF_ERR\fR\fR
+.ad
+.RS 18n
+Memory buffer error
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 18n
+Ignore module, not participating in result
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SUCCESS\fR\fR
+.ad
+.RS 18n
+Successfully obtains authentication token
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SYSTEM_ERR\fR\fR
+.ad
+.RS 18n
+System error
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+_
+MT Level	MT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR passwd (1),
+.BR syslog (3C),
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_authenticate (3PAM),
+.BR pam_set_item (3PAM),
+.BR pam_start (3PAM),
+.BR pam.conf (5),
+.BR attributes (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_dhkeys (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7)
+.SH NOTES
+.sp
+.LP
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multi-threaded application uses its own PAM handle.
+.sp
+.LP
+This module relies on the value of the current real \fBUID\fR, this module is
+only safe for MT-applications that don't change \fBUID\fRs during the call to
+\fBpam_authenticate\fR(3PAM).
+.sp
+.LP
+The \fBpam_unix\fR(7) module is no longer supported. Similar functionality is
+provided by \fBpam_authtok_check\fR(7), \fBpam_authtok_get\fR(7),
+\fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), \fBpam_passwd_auth\fR(7),
+\fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7), and
+\fBpam_unix_session\fR(7).

@@ -124,7 +124,7 @@ cat >console-login.xml <<EOF
 
 	<!-- these are passed to ttymon in the method script.
 	     note that value_authorization is not passed to ttymon
-	     and it's for smf_security(5).
+	     and it's for smf_security(7).
 	-->
 	<property_group name='ttymon' type='application'>
 		<propval name='value_authorization' type='astring'
@@ -239,7 +239,7 @@ Console login
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='ttymon' section='1M'
+			<manpage title='ttymon' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 

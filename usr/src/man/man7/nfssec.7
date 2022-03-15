@@ -1,0 +1,147 @@
+'\" te
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NFSSEC 7 "Nov 20, 2014"
+.SH NAME
+nfssec \- overview of NFS security modes
+.SH DESCRIPTION
+.LP
+The \fBmount_nfs\fR(8) and \fBshare_nfs\fR(8) commands each provide a way to
+specify the security mode to be used on an \fBNFS\fR file system through the
+\fBsec=\fR\fImode\fR option. \fImode\fR can be \fBsys\fR, \fBdh\fR, \fBkrb5\fR,
+\fBkrb5i\fR, \fBkrb5p\fR, or \fBnone\fR. These security modes can also be added
+to the automount maps. Note that \fBmount_nfs\fR(8) and \fBautomount\fR(8) do
+not support \fBsec=none\fR at this time. \fBmount_nfs\fR(8) allows you to
+specify a single security mode; \fBshare_nfs\fR(8) allows you to specify
+multiple modes (or \fBnone\fR). With multiple modes, an NFS client can choose
+any of the modes in the list.
+.sp
+.LP
+The \fBsec=\fR\fImode\fR option on the \fBshare_nfs\fR(8) command line
+establishes the security mode of \fBNFS\fR servers. If the \fBNFS\fR connection
+uses the \fBNFS\fR Version 3 protocol, the \fBNFS\fR clients must query the
+server for the appropriate \fImode\fR to use. If the \fBNFS\fR connection uses
+the \fBNFS\fR Version 2 protocol, then the \fBNFS\fR client uses the default
+security mode, which is currently \fBsys\fR. \fBNFS\fR clients may force the
+use of a specific security mode by specifying the \fBsec=\fR\fImode\fR option
+on the command line. However, if the file system on the server is not shared
+with that security mode, the client may be denied access.
+.sp
+.LP
+If the \fBNFS\fR client wants to authenticate the \fBNFS\fR server using a
+particular (stronger) security mode, the client wants to specify the security
+mode to be used, even if the connection uses the \fBNFS\fR Version 3 protocol.
+This guarantees that an attacker masquerading as the server does not compromise
+the client.
+.sp
+.LP
+The \fBNFS\fR security modes are described below. Of these, the \fBkrb5\fR,
+\fBkrb5i\fR, \fBkrb5p\fR modes use the Kerberos V5 protocol for authenticating
+and protecting the shared filesystems. Before these can be used, the system
+must be configured to be part of a Kerberos realm. See \fBkerberos\fR(7).
+.sp
+.ne 2
+.na
+\fB\fBsys\fR\fR
+.ad
+.RS 9n
+Use \fBAUTH_SYS\fR authentication. The user's UNIX user-id and group-ids are
+passed in the clear on the network, unauthenticated by the \fBNFS\fR server.
+This is the simplest security method and requires no additional administration.
+It is the default used by Solaris \fBNFS\fR Version 2 clients and Solaris
+\fBNFS\fR servers.
+.sp
+According to the ONC RPC specification (RFC 5531), \fBAUTH_SYS\fR
+authentication supports up to 16 groups for a user only.  To workaround this
+limitation, in the case where the \fBNFS\fR client supplied 16 groups in
+\fBAUTH_SYS\fR and \fBNGROUPS_MAX\fR is more than 16, the \fBNFS\fR server
+will lookup the user's groups on the server instead of relying on the list of
+groups provided by the \fBNFS\fR client via \fBAUTH_SYS\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdh\fR\fR
+.ad
+.RS 9n
+Use a Diffie-Hellman public key system (\fBAUTH_DES\fR, which is referred to as
+\fBAUTH_DH\fR in the forthcoming Internet \fBRFC).\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkrb5\fR\fR
+.ad
+.RS 9n
+Use Kerberos V5 protocol to authenticate users before granting access to the
+shared filesystem.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkrb5i\fR\fR
+.ad
+.RS 9n
+Use Kerberos V5 authentication with integrity checking (checksums) to verify
+that the data has not been tampered with.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkrb5p\fR\fR
+.ad
+.RS 9n
+User Kerberos V5 authentication, integrity checksums, and privacy protection
+(encryption) on the shared filesystem. This provides the most secure filesystem
+sharing, as all traffic is encrypted. It should be noted that performance might
+suffer on some systems when using \fBkrb5p\fR, depending on the computational
+intensity of the encryption algorithm and the amount of data being transferred.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnone\fR\fR
+.ad
+.RS 9n
+Use null authentication (\fBAUTH_NONE\fR). \fBNFS\fR clients using
+\fBAUTH_NONE\fR have no identity and are mapped to the anonymous user
+\fBnobody\fR by \fBNFS\fR servers. A client using a security mode other than
+the one with which a Solaris \fBNFS\fR server shares the file system has its
+security mode mapped to \fBAUTH_NONE.\fR In this case, if the file system is
+shared with \fBsec=none,\fR users from the client are mapped to the
+anonymous user. The \fBNFS\fR security mode \fBnone\fR is supported by
+\fBshare_nfs\fR(8), but not by \fBmount_nfs\fR(8) or \fBautomount\fR(8).
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/nfssec.conf\fR\fR
+.ad
+.RS 20n
+\fBNFS\fR security service configuration file
+.RE
+
+.SH SEE ALSO
+.LP
+.BR rpc_clnt_auth (3NSL),
+.BR secure_rpc (3NSL),
+.BR nfssec.conf (5),
+.BR attributes (7),
+.BR kerberos (7),
+.BR automount (8),
+.BR kclient (8),
+.BR mount_nfs (8),
+.BR share_nfs (8)
+.SH NOTES
+.LP
+\fB/etc/nfssec.conf\fR lists the \fBNFS\fR security services. Do not edit this
+file. It is not intended to be user-configurable. See \fBkclient\fR(8).

@@ -108,7 +108,7 @@ The following operands are supported:
 .RS 11n
 The project to which resource usage by the created task should be charged. The
 requested project must be defined in the project databases defined in
-\fBnsswitch.conf\fR(4).
+\fBnsswitch.conf\fR(5).
 .RE
 
 .sp
@@ -226,6 +226,14 @@ Process information and control files.
 .SH SEE ALSO
 .sp
 .LP
-\fBproc\fR(1), \fBid\fR(1M), \fBpoolbind\fR(1M), \fBexecvp\fR(2),
-\fBsetrctl\fR(2), \fBsettaskid\fR(2), \fBsetproject\fR(3PROJECT),
-\fBnsswitch.conf\fR(4), \fBproc\fR(4), \fBproject\fR(4), \fBattributes\fR(5)
+.BR proc (1),
+.BR execvp (2),
+.BR setrctl (2),
+.BR settaskid (2),
+.BR setproject (3PROJECT),
+.BR nsswitch.conf (5),
+.BR proc (5),
+.BR project (5),
+.BR attributes (7),
+.BR id (8),
+.BR poolbind (8)

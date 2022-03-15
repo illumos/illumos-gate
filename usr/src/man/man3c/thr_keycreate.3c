@@ -259,7 +259,7 @@ cleanup(void *v) {
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -277,8 +277,10 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpthread_once\fR(3C), \fBthr_exit\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR pthread_once (3C),
+.BR thr_exit (3C),
+.BR attributes (7),
+.BR standards (7)
 .SH WARNINGS
 .sp
 .LP

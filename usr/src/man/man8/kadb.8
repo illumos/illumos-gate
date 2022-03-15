@@ -1,0 +1,127 @@
+'\" te
+.\"  Copyright (c) 2001 Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH KADB 8 "Dec 9, 2017"
+.SH NAME
+kadb \- a kernel debugger
+.SH SYNOPSIS
+.SS "SPARC"
+.LP
+.nf
+\fBok\fR boot \fIdevice_specifier\fR kadb [\fB-d\fR] [\fIboot-flags\fR]
+.fi
+
+.SS "x86"
+.LP
+.nf
+\fBselect\fR (b)oot or (i)nterpreter: b kadb [\fB-d\fR] [\fIboot-flags\fR]
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBkadb\fR, an interactive kernel debugger, has been replaced by \fBkmdb\fR(1).
+For backwards compatibility, the methods used to load \fBkadb\fR will be
+interpreted as requests to load \fBkmdb\fR(1). Unlike with the compatibility
+link from \fBadb\fR(1) to \fBmdb\fR(1), \fBkmdb\fR(1) will always load in its
+native user interface mode, regardless of the name used to load it.
+.sp
+.LP
+\fBkmdb\fR(1) is based on \fBmdb\fR(1), and thus shares \fBmdb\fR's user
+interface style and feature set. The \fBmdb\fR(1) man page describes the
+features and operation of \fBmdb\fR. The \fBkmdb\fR(1) man page describes the
+differences between \fBmdb\fR and \fBkmdb\fR. This man page describes the major
+changes and incompatibilities between \fBkadb\fR and \fBkmdb\fR.
+.sp
+.LP
+Consult the \fIModular Debugger Guide\fR for a detailed description of
+both \fBmdb\fR and \fBkmdb\fR.
+.SS "Major changes"
+.LP
+This section briefly lists the major differences between \fBkadb\fR and
+\fBkmdb\fR. It is not intended to be exhaustive.
+.sp
+.ne 2
+.na
+\fBDebugger Loading and Unloading\fR
+.ad
+.sp .6
+.RS 4n
+\fBkmdb\fR(1) may be loaded at boot, as with \fBkadb\fR. It may also be loaded
+after boot, thus allowing for kernel debugging and execution control without
+requiring a system reboot. If \fBkmdb\fR(1) is loaded after boot, it may be
+unloaded.
+.RE
+
+.sp
+.ne 2
+.na
+\fBmdb Feature Set\fR
+.ad
+.sp .6
+.RS 4n
+The features introduced by \fBmdb\fR(1), including access to kernel type data,
+debugger commands (dcmds), debugger modules (dmods), and enhanced execution
+control facilities, are available under \fBkmdb\fR(1). Support for changing the
+representative CPU (:x) is available for both SPARC and x86. Furthermore, full
+execution-control facilities are available after the representative CPU has
+been changed.
+.RE
+
+.SS "Significant Incompatibilities"
+.LP
+This section lists the significant features that have changed incompatibly
+between \fBkadb\fR and \fBkmdb\fR(1). It is not intended to be exhaustive. All
+\fBkmdb\fR(1) commands referenced here are fully described in the \fBkmdb\fR(1)
+man page. A description as well as examples can be found in the \fIModular
+Debugger Guide\fR.
+.sp
+.ne 2
+.na
+\fBDeferred Breakpoints\fR
+.ad
+.sp .6
+.RS 4n
+The kadb-style "module#symbol:b" syntax is not supported under \fBkmdb\fR(1).
+Instead, use "::bp module`symbol".
+.RE
+
+.sp
+.ne 2
+.na
+\fBWatchpoints\fR
+.ad
+.sp .6
+.RS 4n
+The ::wp dcmd is the preferred way to set watchpoint with \fBkmdb\fR. Various
+options are available to control the type of watchpoint set, including \fB-p\fR
+for physical watchpoints (SPARC only), and \fB-i\fR for I/O port watchpoints
+(x86 only). $l is not supported, therefore, the watchpoint size must be
+specified for each watchpoint created.
+.RE
+
+.sp
+.ne 2
+.na
+\fBAccess to I/O Ports (x86 only)\fR
+.ad
+.sp .6
+.RS 4n
+The commands used to access I/O ports under \fBkadb\fR have been replaced with
+the ::in and ::out dcmds. These two dcmds allow both read and write of all I/O
+port sizes supported by \fBkadb\fR.
+.RE
+
+.SH SEE ALSO
+.LP
+.BR adb (1),
+.BR kmdb (1),
+.BR mdb (1),
+.BR attributes (7)
+.sp
+.LP
+\fIModular Debugger Guide\fR:
+.sp
+.LP
+https://illumos.org/books/mdb/

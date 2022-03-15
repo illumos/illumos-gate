@@ -30,7 +30,7 @@ specified major revision of the GNU MO file format.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -46,4 +46,5 @@ Interface Stability	Uncommitted
 .SH SEE ALSO
 .sp
 .LP
-\fBgettext\fR(3C), \fBattributes\fR(5)
+.BR gettext (3C),
+.BR attributes (7)

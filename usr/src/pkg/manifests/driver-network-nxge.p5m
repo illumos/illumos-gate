@@ -60,8 +60,8 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/drv/nxge.conf group=sys \
     original_name=SUNWnxge:platform/sun4v/kernel/drv/nxge.conf \
     preserve=renamenew
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/nxge.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/nxge.4d
 $(sparc_ONLY)driver name=nxge perms="* 0600 root sys" \
     alias=SUNW,niusl \
     alias=SUNW,niusl-kt \

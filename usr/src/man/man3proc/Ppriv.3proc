@@ -45,7 +45,7 @@ It must be released with a call to
 The definition of the
 .Sy prpriv_t
 structure is documented in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Ppriv_free
@@ -75,5 +75,5 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4 ,
-.Xr privileges 5
+.Xr proc 5 ,
+.Xr privileges 7

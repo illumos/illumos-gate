@@ -214,9 +214,13 @@ pkstat_t   *ksp;
 .in -2
 
 .SH SEE ALSO
-\fBkstat\fR(3KSTAT), \fBddi_get_instance\fR(9F), \fBkstat_delete\fR(9F),
-\fBkstat_install\fR(9F), \fBkstat_named_init\fR(9F), \fBkstat\fR(9S),
-\fBkstat_named\fR(9S)
+.BR kstat (3KSTAT),
+.BR ddi_get_instance (9F),
+.BR kstat_delete (9F),
+.BR kstat_install (9F),
+.BR kstat_named_init (9F),
+.BR kstat (9S),
+.BR kstat_named (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

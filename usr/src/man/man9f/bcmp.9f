@@ -67,7 +67,7 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBstrcmp\fR(9F)
+.BR strcmp (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

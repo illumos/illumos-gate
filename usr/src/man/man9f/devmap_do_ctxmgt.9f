@@ -202,8 +202,9 @@ xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
 .in -2
 
 .SH SEE ALSO
-\fBdevmap_access\fR(9E), \fBdevmap_contextmgt\fR(9E),
-\fBdevmap_default_access\fR(9F)
+.BR devmap_access (9E),
+.BR devmap_contextmgt (9E),
+.BR devmap_default_access (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -40,7 +40,7 @@ For more information on watchpoints and the
 structure, see the
 .Sy PCWATCH
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 The watched area will persist until a subsequent call to
 .Xr Pdelwapt 3PROC .
 .Pp
@@ -63,7 +63,7 @@ is set.
 For a full list of possible errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Psetwapt
@@ -83,4 +83,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Pdelwapt 3PROC ,
-.Xr proc 4
+.Xr proc 5

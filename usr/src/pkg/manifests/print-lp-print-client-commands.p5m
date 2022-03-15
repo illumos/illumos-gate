@@ -69,12 +69,12 @@ link path=usr/share/man/man1/disable.1 target=enable.1
 file path=usr/share/man/man1/enable.1
 file path=usr/share/man/man1/lp.1
 file path=usr/share/man/man1/lpstat.1
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/accept.1m
-file path=usr/share/man/man1m/lpadmin.1m
-file path=usr/share/man/man1m/lpmove.1m
-file path=usr/share/man/man1m/print-service.1m
-link path=usr/share/man/man1m/reject.1m target=accept.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/accept.8
+file path=usr/share/man/man8/lpadmin.8
+file path=usr/share/man/man8/lpmove.8
+file path=usr/share/man/man8/print-service.8
+link path=usr/share/man/man8/reject.8 target=accept.8
 legacy pkg=SUNWpcu \
     desc="client configuration files and utilities for the print service" \
     name="Solaris Print - Client, (usr)" version=13.1,REV=2009.11.11

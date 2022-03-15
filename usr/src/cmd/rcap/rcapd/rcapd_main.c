@@ -25,12 +25,12 @@
 
 /*
  * rcapd is a long-running daemon enforcing project-based resource caps (see
- * rcapd(1M)).  Each instance of a process aggregate (project or, generically,
+ * rcapd(8)).  Each instance of a process aggregate (project or, generically,
  * "collection") may have a memory cap.  A single thread monitors the resource
  * utilization of capped collections, enforces caps when they are exceeded (and
  * other conditions are met), and incorporates changes in configuration or
  * caps.  Each of these actions occurs not more frequently than the rate
- * specified with rcapadm(1M).
+ * specified with rcapadm(8).
  */
 
 #include <sys/priocntl.h>

@@ -832,7 +832,7 @@ check_domain(int sighup)
 }
 
 /*
- * Need to be able to open the DIAG_FILE before nfsmapid(1m)
+ * Need to be able to open the DIAG_FILE before nfsmapid(8)
  * releases it's root priviledges. The DIAG_FILE then remains
  * open for the duration of this nfsmapid instance via n4_fd.
  */
@@ -880,7 +880,7 @@ update_diag_file(char *new)
 
 /*
  * Callback function for libmapid. This will be called
- * by the lib, everytime the nfsmapid(1m) domain changes.
+ * by the lib, everytime the nfsmapid(8) domain changes.
  */
 void *
 cb_update_domain(void *arg)

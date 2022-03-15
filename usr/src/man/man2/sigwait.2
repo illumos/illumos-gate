@@ -31,7 +31,7 @@ the calling thread. If no signal in \fIset\fR is pending, \fBsigwait()\fR
 blocks until a signal in \fIset\fR becomes pending. The selected signal is
 cleared from the set of signals pending on the calling thread and the number of
 the signal is returned, or in the standard-conforming version (see
-\fBstandards\fR(5)) placed in \fIsig\fR. The selection of a signal in \fIset\fR
+\fBstandards\fR(7)) placed in \fIsig\fR. The selection of a signal in \fIset\fR
 is independent of the signal mask of the calling thread. This means a thread
 can synchronously wait for signals that are being blocked by the signal mask of
 the calling thread \&. To ensure that only the caller receives the signals
@@ -199,7 +199,7 @@ sigint(void *arg)
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -213,16 +213,22 @@ Interface Stability	Committed
 _
 MT-Level	Async-Signal-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBsigaction\fR(2), \fBsigpending\fR(2), \fBsigprocmask\fR(2),
-\fBsigsuspend\fR(2), \fBpthread_create\fR(3C), \fBpthread_kill\fR(3C),
-\fBpthread_sigmask\fR(3C), \fBsignal.h\fR(3HEAD), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR sigaction (2),
+.BR sigpending (2),
+.BR sigprocmask (2),
+.BR sigsuspend (2),
+.BR pthread_create (3C),
+.BR pthread_kill (3C),
+.BR pthread_sigmask (3C),
+.BR signal.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP

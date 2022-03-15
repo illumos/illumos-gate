@@ -659,7 +659,7 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 	iinfo->arg1 = arg1;
 	iinfo->arg2 = arg2;
 
-	/* save data for DTrace probes used by intrstat(1m) */
+	/* save data for DTrace probes used by intrstat(8) */
 	iinfo->dip = cldcp->dip;
 	iinfo->id = cldcp->id;
 

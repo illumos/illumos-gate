@@ -23,8 +23,6 @@
 
  CDDL HEADER END
 
-        ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -78,7 +76,7 @@
 			value='solaris.smf.manage.routing' />
 	</property_group>
 
-	<!-- Properties in this group are used by routeadm (1M) -->
+	<!-- Properties in this group are used by routeadm(8) -->
 	<property_group name='routeadm' type='application'>
 		<stability value='Unstable' />
 		<!--
@@ -96,7 +94,7 @@
 	</property_group>
 
 
-	<!-- Properties in this group are modifiable via routeadm (1M) -->
+	<!-- Properties in this group are modifiable via routeadm(8) -->
 	<property_group name='routing' type='application'>
 		<stability value='Evolving' />
 
@@ -121,7 +119,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='in.ndpd' section='1M'
+			<manpage title='in.ndpd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

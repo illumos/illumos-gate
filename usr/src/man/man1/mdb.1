@@ -1900,7 +1900,7 @@ itself. \fBmdb\fR can only perform a context switch when examining a crash dump
 if the dump contains the physical memory pages of the specified user process
 (as opposed to just kernel pages). The kernel crash dump facility can be
 configured to dump all pages or the pages of the current user process using
-\fBdumpadm\fR(1M). The \fB::status\fR dcmd can be used to display the contents
+\fBdumpadm\fR(8). The \fB::status\fR dcmd can be used to display the contents
 of the current crash dump.
 .sp
 When the user requests a context switch from the kernel target, \fBmdb\fR
@@ -4274,7 +4274,7 @@ present in the current directory.
 .LP
 \fBmdb\fR processes all input files (including scripts, object files, core
 files, and raw data files) in a large file aware fashion. See
-\fBlargefile\fR(5) for more information about the processing of large files,
+\fBlargefile\fR(7) for more information about the processing of large files,
 which are files greater than or equal to 2 Gbytes (2^31 bytes).
 .SH EXIT STATUS
 .LP
@@ -4419,7 +4419,7 @@ information in a core file or crash dump, or from the current machine as if by
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -4434,14 +4434,38 @@ Interface Stability	Evolving
 
 .SH SEE ALSO
 .LP
-\fBadb\fR(1), \fBgcore\fR(1), \fBproc\fR(1), \fBpgrep\fR(1),
-\fBps\fR(1), \fBstty\fR(1), \fBtruss\fR(1), \fBuname\fR(1), \fBcoreadm\fR(1M),
-\fBdumpadm\fR(1M), \fBlargefile\fR(5), \fBsavecore\fR(1M), \fBexec\fR(2),
-\fBfork\fR(2), \fB_lwp_self\fR(2), \fBpipe\fR(2), \fBvfork\fR(2),
-\fBdlopen\fR(3C), \fBelf\fR(3ELF), \fBlibc_db\fR(3LIB), \fBlibkvm\fR(3LIB),
-\fBlibthread\fR(3LIB), \fBsignal\fR(3C), \fBsignal.h\fR(3HEAD),
-\fBthr_self\fR(3C), \fBcore\fR(4), \fBproc\fR(4), \fBattributes\fR(5),
-\fBlargefile\fR(5), \fBthreads\fR(5), \fBksyms\fR(7D), \fBmem\fR(7D)
+.BR adb (1),
+.BR gcore (1),
+.BR pgrep (1),
+.BR proc (1),
+.BR ps (1),
+.BR stty (1),
+.BR truss (1),
+.BR uname (1),
+.BR _lwp_self (2),
+.BR exec (2),
+.BR fork (2),
+.BR pipe (2),
+.BR vfork (2),
+.BR dlopen (3C),
+.BR signal (3C),
+.BR thr_self (3C),
+.BR elf (3ELF),
+.BR signal.h (3HEAD),
+.BR libc_db (3LIB),
+.BR libkvm (3LIB),
+.BR libthread (3LIB),
+.BR ksyms (4D),
+.BR mem (4D),
+.BR core (5),
+.BR proc (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR largefile (7),
+.BR threads (7),
+.BR coreadm (8),
+.BR dumpadm (8),
+.BR savecore (8)
 .sp
 .LP
 \fILinker and Libraries Guide\fR
@@ -4480,7 +4504,7 @@ is not present in those core files, the symbol information might not match the
 data present in the process at the time it dumped core. In releases later than
 Solaris 9, text sections and read-only data are included in core files by
 default. Users can configure their processes to exclude that information from
-core files using \fBcoreadm\fR(1M). Thus, the information presented by
+core files using \fBcoreadm\fR(8). Thus, the information presented by
 \fBmdb\fR for those core files can not match the data that was present at the
 time the process dumped core. Core files from x86 systems can not be
 examined on SPARC systems, and vice-versa.

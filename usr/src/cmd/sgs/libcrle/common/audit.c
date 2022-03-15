@@ -56,7 +56,7 @@
  *		process (used for CRLE_AUD_DEPENDS and CRLE_AUD_DUMP).
  *
  * CRLE_FLAGS 	this signals CRLE_AUD_DLDUMP mode, and indicates the required
- *		flags for the dldump(3x) calls.
+ *		flags for the dldump(3C) calls.
  */
 
 static int	auflag;

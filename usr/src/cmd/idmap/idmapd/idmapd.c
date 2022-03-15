@@ -25,7 +25,7 @@
 
 
 /*
- * main() of idmapd(1M)
+ * main() of idmapd(8)
  */
 
 #include "idmapd.h"

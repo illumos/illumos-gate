@@ -62,6 +62,6 @@ No errors are defined.
 .Xr getenv 3C ,
 .Xr setenv 3C ,
 .Xr unsetenv 3C ,
-.Xr attributes 5 ,
-.Xr environ 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr environ 7 ,
+.Xr standards 7

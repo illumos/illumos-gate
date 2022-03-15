@@ -53,7 +53,7 @@ corresponding to \fIdip\fR.
 The \fBddi_get_instance()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-\fBpath_to_inst\fR(4)
+.BR path_to_inst (5)
 .sp
 .LP
 \fIWriting Device Drivers\fR

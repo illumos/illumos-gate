@@ -1,0 +1,714 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PAM_KRB5 7 "Apr 8, 2008"
+.SH NAME
+pam_krb5 \- authentication, account, session, and password management PAM
+modules for Kerberos V5
+.SH SYNOPSIS
+.LP
+.nf
+/usr/lib/security/pam_krb5.so.1
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The Kerberos V5 service module for \fBPAM\fR provides functionality for all
+four \fBPAM\fR modules: authentication, account management, session management,
+and password management. The service module is a shared object that can be
+dynamically loaded to provide the necessary functionality upon demand. Its path
+is specified in the \fBPAM\fR configuration file.
+.SS "Kerberos Authentication Module"
+.sp
+.LP
+The Kerberos V5 authentication component provides functions to verify the
+identity of a user, \fBpam_sm_authenticate()\fR, and to manage the Kerberos
+credentials cache, \fBpam_sm_setcred()\fR.
+.sp
+.LP
+\fBpam_sm_authenticate()\fR authenticates a user principal through the Kerberos
+authentication service. If the authentication request is successful, the
+authentication service sends a ticket-granting ticket (\fBTGT\fR) back to the
+service module, which then verifies that the \fBTGT\fR came from a valid Key
+Distribution Center (\fBKDC\fR) by attempting to get a service ticket for the
+local host service. For this to succeed, the local host's keytab file
+(\fB/etc/krb5/krb5.keytab\fR) must contain the entry for the local host
+service. For example, in the file \fBhost/\fIhostname.com\fR@\fIREALM\fR\fR,
+\fIhostname.com\fR is the fully qualified local hostname and \fIREALM\fR is the
+default realm of the local host as defined in \fB/etc/krb5/krb5.conf\fR. If the
+host entry is not found in the keytab file, the authentication fails.
+Administrators may optionally disable this "strict" verification by setting
+"\fBverify_ap_req_nofail = false\fR" in \fB/etc/krb5/krb5.conf\fR. See
+\fBkrb5.conf\fR(5) for more details on this option. This allows \fBTGT\fR
+verification to succeed in the absence of a keytab host principal entry.
+.sp
+.LP
+\fBpam_sm_authenticate\fR(3PAM) may be passed the following flag:
+.sp
+.ne 2
+.na
+\fB\fBPAM_DISALLOW_NULL_AUTHTOK\fR\fR
+.ad
+.sp .6
+.RS 4n
+This flag is ignored. The Kerberos authentication mechanism will not allow an
+empty password string by default.
+.RE
+
+.sp
+.LP
+\fBpam_sm_setcred()\fR creates and modifies the user's credential cache. This
+function initializes the user's credential cache, if it does not already exist,
+and stores the initial credentials for later use by Kerberized network
+applications. The following flags may be set in the flags field. They are best
+described by their effect on the user's credential cache.
+.sp
+.ne 2
+.na
+\fB\fBPAM_ESTABLISH_CRED\fR\fR
+.ad
+.sp .6
+.RS 4n
+Stores the initial credentials in the user's credential cache so that the user
+may access Kerberos network services. If a successful authentication pass was
+made, the new credentials are stored in the credential cache, overwriting any
+existing credentials that were previously stored. If an unsuccessful
+authentication pass was made, PAM_CRED_UNAVAIL is returned.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_DELETE_CRED\fR\fR
+.ad
+.sp .6
+.RS 4n
+This flag has no effect on the credential cache and always returns
+\fBPAM_SUCCESS\fR. The credential cache is not deleted because there is no
+accurate method to determine if the credentials are needed by another process.
+The credential cache may be deleted with the \fBkdestroy\fR(1) command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_REINITIALIZE_CRED\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deletes the user's existing credential cache, if it exists, and creates a new
+credential cache. The new credentials are stored in the new cache and the
+user's ticket lifetime and renewable life time values are reset.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_REFRESH_CRED\fR\fR
+.ad
+.sp .6
+.RS 4n
+Does not require a previous authentication pass, but if a successful one is
+made, the new credentials are stored in the credential cache. If a previous
+authentication pass was not made or was unsuccessful, an attempt to renew the
+existing credentials is made. Note that this function fails if the user's
+renewable ticket lifetime is expired.
+.RE
+
+.sp
+.LP
+The following options can be passed to the Kerberos V5 authentication module:
+.sp
+.ne 2
+.na
+\fB\fBdebug\fR\fR
+.ad
+.RS 10n
+Provides \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnowarn\fR\fR
+.ad
+.RS 10n
+Turns off warning messages.
+.RE
+
+.SS "Kerberos V5 Account Management Module"
+.sp
+.LP
+The Kerberos account management component provides a function to perform
+account management, \fBpam_sm_acct_mgmt()\fR. This function checks to see if
+the \fBpam_krb5\fR authentication module has noted that the user's password has
+not expired. The following options may be passed in to the Kerberos V5 account
+management module:
+.sp
+.ne 2
+.na
+\fBdebug\fR
+.ad
+.RS 10n
+Provides \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level
+.RE
+
+.sp
+.ne 2
+.na
+\fBnowarn\fR
+.ad
+.RS 10n
+Turns off warning messages. Also, does not query KDC for impending password
+expiration information used to warn the user.
+.RE
+
+.SS "Kerberos V5 Session Management Module"
+.sp
+.LP
+The Kerberos V5 session management component provides functions to initiate
+\fBpam_sm_open_session()\fR and terminate \fBpam_sm_close_session()\fR Kerberos
+sessions. For Kerberos V5, both \fBpam_sm_open_session\fR and
+\fBpam_sm_close_session()\fR are null functions, returning \fBPAM_IGNORE\fR.
+.SS "Kerberos V5 Password Management Module"
+.sp
+.LP
+The Kerberos V5 password management component provides a function to change
+passwords, \fBpam_sm_chauthtok()\fR, in the Key Distribution Center (\fBKDC\fR)
+database. The following flags may be passed to \fBpam_sm_chauthtok\fR(3PAM):
+.sp
+.ne 2
+.na
+\fB\fBPAM_CHANGE_EXPIRED_AUTHTOK\fR\fR
+.ad
+.sp .6
+.RS 4n
+The password service should only update the user's Kerberos password if it is
+expired. Otherwise, this function returns \fBPAM_IGNORE\fR. The default
+behaviour is to always change the user's Kerberos password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_PRELIM_CHECK\fR\fR
+.ad
+.sp .6
+.RS 4n
+This is a null function that always returns \fBPAM_IGNORE\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_UPDATE_AUTHTOK\fR\fR
+.ad
+.sp .6
+.RS 4n
+This flag is necessary to change the user's Kerberos password. If this flag is
+not set, \fBpam_krb5\fR returns \fBPAM_SYSTEM_ERR\fR.
+.RE
+
+.sp
+.LP
+The following option can be passed to the Kerberos V5 password module:
+.sp
+.ne 2
+.na
+\fB\fBdebug\fR\fR
+.ad
+.RS 9n
+Provides \fBsyslog\fR(3C) debugging information at \fBLOG_DEBUG\fR level.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+The following error codes are returned for \fBpam_sm_authenticate()\fR:
+.sp
+.ne 2
+.na
+\fB\fBPAM_AUTH_ERR\fR\fR
+.ad
+.RS 20n
+Authentication failure
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_BUF_ERR\fR\fR
+.ad
+.RS 20n
+Memory buffer error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 20n
+The user is "\fBroot\fR" and the root key exists in the default keytab.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SUCCESS\fR\fR
+.ad
+.RS 20n
+Successfully obtained Kerberos credentials .
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SYSTEM_ERR\fR\fR
+.ad
+.RS 20n
+System error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 20n
+An unknown Kerberos principal was requested.
+.RE
+
+.sp
+.LP
+The following error codes are returned for \fBpam_sm_setcred()\fR:
+.sp
+.ne 2
+.na
+\fB\fBPAM_AUTH_ERR\fR\fR
+.ad
+.RS 18n
+Authentication failure.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_BUF_ERR\fR\fR
+.ad
+.RS 18n
+Memory buffer error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 18n
+The user is "\fBroot\fR" and the root key exists in the default keytab.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SYSTEM_ERR\fR\fR
+.ad
+.RS 18n
+System error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SUCCESS\fR\fR
+.ad
+.RS 18n
+Successfully modified the Kerberos credential cache.
+.RE
+
+.sp
+.LP
+The following error codes are returned for \fBpam_sm_acct_mgmt()\fR:
+.sp
+.ne 2
+.na
+\fB\fBPAM_AUTH_ERR\fR\fR
+.ad
+.RS 24n
+Authentication failure.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 24n
+Kerberos service module \fBpam_sm_authenticate()\fR was never called, or the
+user is "\fBroot\fR" and the root key exists in the default keytab.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_NEW_AUTHTOK_REQD\fR\fR
+.ad
+.RS 24n
+Obtain new authentication token from the user.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SERVICE_ERR\fR\fR
+.ad
+.RS 24n
+Error in underlying service module.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SUCCESS\fR\fR
+.ad
+.RS 24n
+Kerberos principal account is valid.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SYSTEM_ERR\fR\fR
+.ad
+.RS 24n
+System error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 24n
+An unknown Kerberos principal was requested.
+.RE
+
+.sp
+.LP
+The following error code is returned for \fBpam_sm_open_session()\fR and
+\fBpam_sm_close_session()\fR:
+.sp
+.ne 2
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 14n
+These two functions are null functions in \fBpam_krb5\fR:
+.RE
+
+.sp
+.LP
+The following error codes are returned for \fBpam_sm_chauthtok()\fR:
+.sp
+.ne 2
+.na
+\fB\fBPAM_AUTH_ERR\fR\fR
+.ad
+.RS 24n
+Authentication failure.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 24n
+The user has not been authenticated by Kerberos service module
+\fBpam_sm_authenticate()\fR, or the user is "\fBroot\fR" and the root key
+exists in the default keytab.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_NEW_AUTHTOK_REQD\fR\fR
+.ad
+.RS 24n
+User's Kerberos password has expired.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SERVICE_ERR\fR\fR
+.ad
+.RS 24n
+Error in module. At least one input parameter is missing.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SYSTEM_ERR\fR\fR
+.ad
+.RS 24n
+System error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 24n
+An unknown Kerberos principal was requested.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SUCCESS\fR\fR
+.ad
+.RS 24n
+Successfully changed the user's Kerberos password.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRAuthenticate Users Through Kerberos as First Choice
+.sp
+.LP
+The following is an excerpt of a sample \fBpam.conf\fR configuration file that
+authenticates users through the Kerberos authentication service and
+authenticates through the Unix login only if the Kerberos authentication fails.
+This arrangement is helpful when a majority of the users are networked by means
+of Kerberos and when there are only a few non-Kerberos type user accounts, such
+as root. The service illustrated below is for \fBdtlogin\fR.
+
+.sp
+.in +2
+.nf
+dtlogin auth requisite          pam_smartcard.so.1
+dtlogin auth requisite          pam_authtok_get.so.1
+dtlogin auth required           pam_dhkeys.so.1
+dtlogin auth required           pam_unix_cred.so.1
+dtlogin auth sufficient         pam_krb5.so.1
+dtlogin auth required           pam_unix_auth.so.1
+.fi
+.in -2
+
+.sp
+.LP
+Note that these changes should not be made to the existing \fBkrlogin\fR,
+\fBkrsh\fR, and \fBktelnet\fR service entries. Those services require Kerberos
+authentication, so using a seemingly sufficient control flag would not provide
+the necessary functionality for privacy and integrity. There should be no need
+to change those entries.
+
+.sp
+.LP
+The following entries check for password expiration when dealing with Kerberos
+and Unix password aging policies:
+
+.sp
+.in +2
+.nf
+other   account requisite       pam_roles.so.1
+other   account required        pam_unix_account.so.1
+other   account required        pam_krb5.so.1
+.fi
+.in -2
+
+.sp
+.LP
+The following entries would change the Kerberos password of the user and
+continue to change the Unix login password only if the Kerberos password change
+had failed:
+
+.sp
+.in +2
+.nf
+other   password required       pam_dhkeys.so.1
+other   password requisite      pam_authtok_get.so.1
+other   password requisite      pam_authtok_check.so.1
+other   password sufficient     pam_krb5.so.1
+other   password required       pam_authtok_store.so.1
+.fi
+.in -2
+
+.sp
+.LP
+When changing Kerberos based user's password, use \fBkpasswd\fR(1). When
+changing a non-Kerberos user's password, it is recommended that the repository
+is specified (\fB-r\fR) with the \fBpasswd\fR(1) command.
+
+.LP
+\fBExample 2 \fRAuthenticate Users Through Kerberos Only
+.sp
+.LP
+The following example allows authentication only to users that have
+Kerberos-based accounts.
+
+.sp
+.in +2
+.nf
+dtlogin auth requisite          pam_smartcard.so.1
+dtlogin auth requisite          pam_authtok_get.so.1
+dtlogin auth required           pam_dhkeys.so.1
+dtlogin auth required           pam_unix_cred.so.1
+dtlogin auth binding            pam_krb5.so.1
+dtlogin auth required           pam_unix_auth.so.1
+.fi
+.in -2
+
+.sp
+.LP
+Typically, you would have another service specified in the \fBpam.conf\fR file
+that would allow local users, such as database, web server, system
+administrator accounts, to log in to the host machine. For example, the service
+name "login" could be used for these users. Note that these users should not
+belong to any roles.
+
+.sp
+.LP
+The rest of the module types look similar to that shown in the previous
+example:
+
+.sp
+.in +2
+.nf
+other   account requisite       pam_roles.so.1
+other   account required        pam_unix_account.so.1
+other   account required        pam_krb5.so.1
+.fi
+.in -2
+
+.sp
+.LP
+With binding specified in the following, it is important that non-Kerberos
+users specify the repository in which they reside using the \fB-r\fR option
+with the \fBpasswd\fR(1) command. This configuration is also based on the
+assumptions that:
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Kerberos users maintain only their Kerberos passwords;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+changing their Unix password is not necessary, given that they are
+authenticated only through their Kerberos passwords when logging in.
+.RE
+.sp
+.in +2
+.nf
+other   password required       pam_dhkeys.so.1
+other   password requisite      pam_authtok_get.so.1
+other   password requisite      pam_authtok_check.so.1
+other   password binding        pam_krb5.so.1
+other   password required       pam_authtok_store.so.1
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRAuthenticate Through Kerberos Optionally
+.sp
+.LP
+This configuration is helpful when the majority of users are non-Kerberos users
+and would like to authenticate through Kerberos if they happened to exist in
+the Kerberos database. The effect of this is similar to users voluntarily
+executing \fBkinit\fR(1) after they have successfully logged in:
+
+.sp
+.in +2
+.nf
+dtlogin auth requisite          pam_smartcard.so.1
+dtlogin auth requisite          pam_authtok_get.so.1
+dtlogin auth required           pam_dhkeys.so.1
+dtlogin auth required           pam_unix_cred.so.1
+dtlogin auth required           pam_unix_auth.so.1
+dtlogin auth optional           pam_krb5.so.1
+.fi
+.in -2
+
+.sp
+.LP
+The rest of the configuration is as follows:
+
+.sp
+.in +2
+.nf
+other   account requisite       pam_roles.so.1
+other   account required        pam_unix_account.so.1
+other   account required        pam_krb5.so.1
+
+other   password required       pam_dhkeys.so.1
+other   password requisite      pam_authtok_get.so.1
+other   password requisite      pam_authtok_check.so.1
+other   password required       pam_authtok_store.so.1
+other   password optional       pam_krb5.so.1
+.fi
+.in -2
+
+.sp
+.LP
+Non-Kerberos users should specify their respective repositories by using the
+\fB-r\fR option when changing their password with the \fBpasswd\fR(1) command.
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR kdestroy (1),
+.BR kinit (1),
+.BR kpasswd (1),
+.BR passwd (1),
+.BR syslog (3C),
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_sm (3PAM),
+.BR pam_sm_acct_mgmt (3PAM),
+.BR pam_sm_authenticate (3PAM),
+.BR pam_sm_chauthtok (3PAM),
+.BR pam_sm_close_session (3PAM),
+.BR pam_sm_open_session (3PAM),
+.BR pam_sm_setcred (3PAM),
+.BR pam.conf (5),
+.BR attributes (7),
+.BR kerberos (7),
+.BR krb5envvar (7),
+.BR ktkt_warnd (8)
+.SH NOTES
+.sp
+.LP
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multi-threaded application uses its own \fBPAM\fR handle.
+.sp
+.LP
+On successful acquisition of initial credentials (ticket-granting ticket),
+\fBktkt_warnd\fR(8) will be notified, to alert the user when the initial
+credentials are about to expire.

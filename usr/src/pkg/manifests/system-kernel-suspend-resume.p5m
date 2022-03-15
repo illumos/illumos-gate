@@ -58,8 +58,8 @@ $(sparc_ONLY)dir path=platform/sun4u/kernel/misc/$(ARCH64) group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/cpr group=sys \
     mode=0755
 dir  path=usr/share/man
-dir  path=usr/share/man/man7
-file path=usr/share/man/man7/cpr.7
+dir  path=usr/share/man/man4
+file path=usr/share/man/man4/cpr.4
 $(i386_ONLY)driver name=srn
 $(i386_ONLY)legacy pkg=SUNWcpr.i arch=$(ARCH).i86pc \
     desc="Suspend, Resume package" name="Suspend, Resume package"

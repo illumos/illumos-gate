@@ -243,7 +243,7 @@ other end of the pipe is closed.
 The \fIfildes\fR argument refers to a streams-based pipe and the other end of
 the pipe is closed.  A \fBSIGPIPE\fR signal is generated for the calling
 thread. This error condition occurs only with SUS-conforming applications. See
-\fBstandards\fR(5).
+\fBstandards\fR(7).
 .RE
 
 .sp
@@ -281,7 +281,7 @@ The \fIflags\fR argument is set to \fBMSG_HIPRI\fR and \fIband\fR is non-zero.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -297,8 +297,13 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(2), \fBgetmsg\fR(2), \fBpoll\fR(2), \fBread\fR(2), \fBwrite\fR(2),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR Intro (2),
+.BR getmsg (2),
+.BR poll (2),
+.BR read (2),
+.BR write (2),
+.BR attributes (7),
+.BR standards (7)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

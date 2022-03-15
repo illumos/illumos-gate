@@ -147,7 +147,7 @@ dirs=$@
 
 #
 # Get the canonical path to the workspace.  This allows xref to work
-# even in the presence of lofs(7FS).
+# even in the presence of lofs(4FS).
 #
 cd $CODEMGR_WS
 CODEMGR_WS=`/bin/pwd`
@@ -202,7 +202,7 @@ for dir in $dirs; do
 
 	#
 	# NOTE: we cannot use $PWD because it will mislead in the presence
-	# of lofs(7FS).
+	# of lofs(4FS).
 	#
 	cd $dir || fail "cannot change to directory $dir"
 	pwd=`/bin/pwd`

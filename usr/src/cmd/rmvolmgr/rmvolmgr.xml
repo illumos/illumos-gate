@@ -100,7 +100,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='rmvolmgr' section='1M' manpath='/usr/man' />
+			<manpage title='rmvolmgr' section='8' manpath='/usr/man' />
 		</documentation>
 	</template>
 

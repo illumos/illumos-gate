@@ -220,7 +220,7 @@ Memory sizes are scaled to the unit of measure that yields an integer from
 \fB0\fR to \fB1023\fR unless the \fB-u\fR option is specified as well. The
 fractional part of the number is only displayed for values less than \fB10\fR.
 This behavior is similar to using the \fB-h\fR option of \fBls\fR(1) or
-\fBdf\fR(1M) to display a human readable format.
+\fBdf\fR(8) to display a human readable format.
 .sp
 This is the default.
 .RE
@@ -286,7 +286,7 @@ Specify memory units. Units should be b, k, m, g, t, p, or e for bytes,
 kilobytes, megabytes, gigabytes, terabytes, petabytes, or exabytes
 respectively. The fractional part of the number is only displayed for values
 less than 10. This behavior is similar to using the \fB-h\fR option of
-\fBls\fR(1) or \fBdf\fR(1M) to display a human readable format.
+\fBls\fR(1) or \fBdf\fR(8) to display a human readable format.
 .RE
 
 .SH OPERANDS
@@ -541,7 +541,7 @@ Invalid syntax.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -559,6 +559,14 @@ Interface Stability	See below.
 The human readable output is Unstable.
 .SH SEE ALSO
 .LP
-\fBls\fR(1), \fBplgrp\fR(1), \fBpmap\fR(1), \fBproc\fR(1), \fBps\fR(1),
-\fBdf\fR(1M), \fBprstat\fR(1M), \fBlgrp_init\fR(3LGRP), \fBliblgrp\fR(3LIB),
-\fBproc\fR(4), \fBattributes\fR(5)
+.BR ls (1),
+.BR plgrp (1),
+.BR pmap (1),
+.BR proc (1),
+.BR ps (1),
+.BR lgrp_init (3LGRP),
+.BR liblgrp (3LIB),
+.BR proc (5),
+.BR attributes (7),
+.BR df (8),
+.BR prstat (8)

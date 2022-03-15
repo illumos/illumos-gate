@@ -311,7 +311,7 @@ disable_kef_hardware(char *provname, boolean_t rndflag, boolean_t allflag,
 	 * kCF treats random as an internal mechanism. So, we need to
 	 * filter it from the mechanism list here, if we are NOT disabling
 	 * or enabling the random feature. Note that we map random feature at
-	 * cryptoadm(1M) level to the "random" mechanism in kCF.
+	 * cryptoadm(8) level to the "random" mechanism in kCF.
 	 */
 	if (!rndflag) {
 		(void) filter_mechlist(&dislist, RANDOM);
@@ -459,7 +459,7 @@ disable_kef_software(char *provname, boolean_t rndflag, boolean_t allflag,
 	 * kCF treats random as an internal mechanism. So, we need to
 	 * filter it from the mechanism list here, if we are NOT disabling
 	 * or enabling the random feature. Note that we map random feature at
-	 * cryptoadm(1M) level to the "random" mechanism in kCF.
+	 * cryptoadm(8) level to the "random" mechanism in kCF.
 	 */
 	if (!rndflag) {
 		(void) filter_mechlist(&infolist, RANDOM);
@@ -574,7 +574,7 @@ enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
 	 * kCF treats random as an internal mechanism. So, we need to
 	 * filter it from the mechanism list here, if we are NOT disabling
 	 * or enabling the random feature. Note that we map random feature at
-	 * cryptoadm(1M) level to the "random" mechanism in kCF.
+	 * cryptoadm(8) level to the "random" mechanism in kCF.
 	 */
 	if (!rndflag) {
 		redo_flag = filter_mechlist(&pent->dislist, RANDOM);

@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/bfe group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/bfe.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/bfe.4d
 driver name=bfe \
     alias=pci14e4,170c \
     alias=pci14e4,4401 \

@@ -1591,7 +1591,7 @@ ldl_seterror(ml_unit_t *ul, char *why)
 	cmn_err(CE_WARN, "%s", why);
 	cmn_err(CE_WARN, "ufs log for %s changed state to Error",
 	    ul->un_ufsvfs->vfs_fs->fs_fsmnt);
-	cmn_err(CE_WARN, "Please umount(1M) %s and run fsck(1M)",
+	cmn_err(CE_WARN, "Please umount(8) %s and run fsck(8)",
 	    ul->un_ufsvfs->vfs_fs->fs_fsmnt);
 
 	/*

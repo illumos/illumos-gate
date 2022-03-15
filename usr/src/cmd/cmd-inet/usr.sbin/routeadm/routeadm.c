@@ -249,7 +249,7 @@
 #define	RA_SVC_FLAG_IPV6_ROUTING	0x2
 
 #define	RA_SMF_UPGRADE_FILE		"/var/svc/profile/upgrade"
-#define	RA_SMF_UPGRADE_MSG		" # added by routeadm(1M)"
+#define	RA_SMF_UPGRADE_MSG		" # added by routeadm(8)"
 #define	RA_CONF_FILE			"/etc/inet/routing.conf"
 #define	RA_CONF_FILE_OLD		"/etc/inet/routing.conf.old"
 #define	RA_MAX_CONF_LINE		256

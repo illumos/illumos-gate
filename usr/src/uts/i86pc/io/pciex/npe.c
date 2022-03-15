@@ -33,7 +33,7 @@
  *	npe (Nexus PCIe driver): Host to PCI-Express local bus driver
  *
  *	npe serves as the driver for PCIe Root Complexes and as the nexus driver
- *	for PCIe devices. See also: npe(7D). For more information about hotplug,
+ *	for PCIe devices. See also: npe(4D). For more information about hotplug,
  *	see the big theory statement at uts/common/os/ddi_hp_impl.c.
  *
  *

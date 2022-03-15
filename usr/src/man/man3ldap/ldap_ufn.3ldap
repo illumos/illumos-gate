@@ -79,7 +79,7 @@ first", "ufn intermediate", and "ufn last".
 .sp
 .LP
 The \fBldap_ufn_setfilter()\fR function is used to set the
-\fBldapfilter.conf\fR(4) file for use with the \fBldap_init_getfilter\fR(3LDAP)
+\fBldapfilter.conf\fR(5) file for use with the \fBldap_init_getfilter\fR(3LDAP)
 function to \fIfname\fR.
 .sp
 .LP
@@ -98,7 +98,7 @@ actually be a pointer to a struct timeval. This is so \fBldap_ufn_timeout()\fR
 can be used as a cancelproc in the above functions.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -112,9 +112,13 @@ Interface Stability	Evolving
 
 .SH SEE ALSO
 .LP
-\fBgettimeofday\fR(3C), \fBldap\fR(3LDAP), \fBldap_search\fR(3LDAP),
-\fBldap_getfilter\fR(3LDAP), \fBldapfilter.conf\fR(4), \fBldap_error\fR(3LDAP),
-\fBattributes\fR(5)
+.BR gettimeofday (3C),
+.BR ldap (3LDAP),
+.BR ldap_error (3LDAP),
+.BR ldap_getfilter (3LDAP),
+.BR ldap_search (3LDAP),
+.BR ldapfilter.conf (5),
+.BR attributes (7)
 .SH NOTES
 .LP
 These functions may allocates memory.  Return values are contained in

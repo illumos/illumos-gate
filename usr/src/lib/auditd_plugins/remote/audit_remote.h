@@ -75,7 +75,7 @@ struct hostlist_s {
 	hostlist_t	*next_host;
 	struct hostent	*host;
 	in_port_t	port;		/* TCP port number */
-	gss_OID		mech;		/* GSS mechanism - see mech(4) */
+	gss_OID		mech;		/* GSS mechanism - see mech(5) */
 };
 
 /* transq_t - single, already sent token in the transmit queue. */

@@ -110,7 +110,7 @@ Inclusion of the <\fBwctype.h\fR> header can make visible all symbols from the
 headers <\fBctype.h\fR>, <\fBstdarg.h\fR>, <\fBstddef.h\fR>, <\fBstdio.h\fR>,
 <\fBstdlib.h\fR>, <\fBstring.h\fR>, <\fBtime.h\fR>, and <\fBwchar.h\fR>.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -124,9 +124,20 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-\fBiswalpha\fR(3C), \fBiswctype\fR(3C), \fBlocale.h\fR(3HEAD),
-\fBsetlocale\fR(3C), \fBstdarg\fR(3EXT), \fBstddef.h\fR(3HEAD),
-\fBstdio.h\fR(3HEAD), \fBstdlib.h\fR(3HEAD), \fBstring.h\fR(3HEAD),
-\fBtime.h\fR(3HEAD), \fBtowctrans\fR(3C), \fBtowlower\fR(3C),
-\fBtowupper\fR(3C), \fBwctrans\fR(3C), \fBwctype\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR iswalpha (3C),
+.BR iswctype (3C),
+.BR setlocale (3C),
+.BR towctrans (3C),
+.BR towlower (3C),
+.BR towupper (3C),
+.BR wctrans (3C),
+.BR wctype (3C),
+.BR stdarg (3EXT),
+.BR locale.h (3HEAD),
+.BR stddef.h (3HEAD),
+.BR stdio.h (3HEAD),
+.BR stdlib.h (3HEAD),
+.BR string.h (3HEAD),
+.BR time.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

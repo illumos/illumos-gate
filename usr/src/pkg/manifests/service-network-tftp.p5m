@@ -42,9 +42,9 @@ dir  path=usr/sbin
 file path=usr/sbin/in.tftpd mode=0555
 dir  path=usr/share/man/man1
 file path=usr/share/man/man1/tftp.1
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/in.tftpd.1m
-link path=usr/share/man/man1m/tftpd.1m target=in.tftpd.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/in.tftpd.8
+link path=usr/share/man/man8/tftpd.8 target=in.tftpd.8
 legacy pkg=SUNWtftp desc="Trivial File Transfer Server" \
     name="Trivial File Transfer Server"
 legacy pkg=SUNWtftpr desc="Trivial File Transfer Server (Root)" \

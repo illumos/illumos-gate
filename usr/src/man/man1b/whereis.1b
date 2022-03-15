@@ -170,7 +170,8 @@ example% \fBwhereis -u -M /usr/share/man/man1 -S /usr/src/cmd -f *\fR
 .SH SEE ALSO
 .sp
 .LP
-\fBchdir\fR(2), \fBattributes\fR(5)
+.BR chdir (2),
+.BR attributes (7)
 .SH BUGS
 .sp
 .LP

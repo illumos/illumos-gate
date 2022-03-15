@@ -268,7 +268,7 @@ The call did not complete successfully.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -283,6 +283,10 @@ MT-Level	Safe
 
 .SH SEE ALSO
 \fBlibc_db\fR(3LIB), \fBtd_ta_thr_iter\fR(3C_DB),
-\fBtd_thr_dbsuspend\fR(3C_DB), \fBthr_create\fR(3C), \fBthr_getprio\fR(3C),
-\fBthr_join\fR(3C), \fBthr_sigsetmask\fR(3C), \fBthr_suspend\fR(3C),
-\fBattributes\fR(5), \fBthreads\fR(5)
+\fBtd_thr_dbsuspend\fR(3C_DB), \fBthr_create\fR(3C),
+.BR thr_getprio (3C),
+.BR thr_join (3C),
+.BR thr_sigsetmask (3C),
+.BR thr_suspend (3C),
+.BR attributes (7),
+.BR threads (7)

@@ -26,9 +26,9 @@ file path=kernel/drv/$(ARCH64)/amdzen group=sys
 file path=kernel/drv/$(ARCH64)/amdzen_stub group=sys
 file path=kernel/drv/amdzen.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/amdzen.7d
-link path=usr/share/man/man7d/amdzen_stub.7d target=amdzen.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/amdzen.4d
+link path=usr/share/man/man4d/amdzen_stub.4d target=amdzen.4d
 driver name=amdzen
 #
 # 1440-1447: f17h m70-7fh, f19h m20-2f df

@@ -78,7 +78,7 @@ implementation-defined conversion is performed on this character.
 .sp
 .LP
 The list of supported conversions and the locations of the associated
-conversion tables are provided in the \fBiconv\fR(5) manual page.
+conversion tables are provided in the \fBiconv\fR(7) manual page.
 .SH OPTIONS
 .sp
 .LP
@@ -126,7 +126,7 @@ character. It is interpreted as the name of one of the codeset descriptions.
 .ad
 .RS 12n
 The \fIfrommap\fR option-argument must contain a slash character. It is
-interpreted as the pathname of a charmap file as defined in \fBcharmap\fR(5).
+interpreted as the pathname of a charmap file as defined in \fBcharmap\fR(7).
 If the pathname does not represent a valid, readable charmap file, the results
 are undefined.
 .RE
@@ -186,7 +186,7 @@ It is interpreted as the name of one of the codeset descriptions.
 .ad
 .RS 10n
 The \fItomap\fR option-argument must contain a slash character. It is
-interpreted as the pathname of a charmap file as defined in \fBcharmap\fR(5).
+interpreted as the pathname of a charmap file as defined in \fBcharmap\fR(7).
 If the pathname does not represent a valid, readable charmap file, the results
 are undefined.
 .RE
@@ -232,7 +232,7 @@ example% \fBiconv -f 8859 -t 646fr mail1 > mail.local\fR
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBiconv\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
@@ -270,7 +270,7 @@ list of conversions supported by conversion tables
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -286,8 +286,14 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBiconv\fR(3C), \fBiconv_open\fR(3C), \fBattributes\fR(5), \fBcharmap\fR(5),
-\fBenviron\fR(5), \fBiconv\fR(5), \fBiconv_unicode\fR(5), \fBstandards\fR(5)
+.BR iconv (3C),
+.BR iconv_open (3C),
+.BR attributes (7),
+.BR charmap (7),
+.BR environ (7),
+.BR iconv (7),
+.BR iconv_unicode (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP
@@ -303,4 +309,4 @@ When \fIfromcode\fR or \fItocode\fR is specified for the codeset conversion,
 \fBiconv\fR uses the \fBiconv_open\fR(3C) function. If \fBiconv_open\fR(3C)
 fails to open the specified codeset conversion, \fBiconv\fR searches for an
 appropriate conversion table. As for the supported codeset conversion by
-\fBiconv_open\fR(3C), please refer to \fBiconv\fR(5) and \fBiconv_locale\fR(5).
+\fBiconv_open\fR(3C), please refer to \fBiconv\fR(7) and \fBiconv_locale\fR(7).

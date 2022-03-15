@@ -15,7 +15,7 @@ c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
 .SH DESCRIPTION
 Functions in this library provide common elementary mathematical functions and
 floating point environment routines defined by System V, ANSI C, POSIX, and so
-on. See \fBstandards\fR(5). Additional functions in this library provide
+on. See \fBstandards\fR(7). Additional functions in this library provide
 extended support for handling floating point exceptions.
 .SH INTERFACES
 The shared object \fBlibm.so.2\fR provides the public interfaces defined below.
@@ -648,7 +648,7 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -668,5 +668,8 @@ As described on the \fBlgamma\fR(3M) manual page, \fBgamma()\fR and
 \fBlgamma()\fR and their \fBfloat\fR and \fBlong double\fR counterparts are
 Unsafe. All other functions in \fBlibm.so.2\fR are MT-Safe.
 .SH SEE ALSO
-\fBIntro\fR(3), \fBlgamma\fR(3M), \fBmath.h\fR(3HEAD), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR Intro (3),
+.BR math.h (3HEAD),
+.BR lgamma (3M),
+.BR attributes (7),
+.BR standards (7)

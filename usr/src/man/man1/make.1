@@ -446,7 +446,7 @@ When \fBmake\fR first starts, it reads the \fBMAKEFLAGS\fR environment variable
 to obtain any of the following options specified present in its value: \fB-C\fR,
 \fB-d\fR, \fB-D\fR, \fB-e\fR, \fB-i\fR, \fB-k\fR, \fB-n\fR, \fB-p\fR, \fB-q\fR,
 \fB-r\fR, \fB-s\fR, \fB-S\fR, or \fB-t\fR. Due to the implementation of POSIX.2
-(see \fBPOSIX.2\fR(5), the \fBMAKEFLAGS\fR values contains a leading \fB\(mi\fR
+(see \fBPOSIX.2\fR(7), the \fBMAKEFLAGS\fR values contains a leading \fB\(mi\fR
 character. The \fBmake\fR utility then reads the command line for additional
 options, which also take effect.
 .sp
@@ -2353,7 +2353,7 @@ a.o  b.o:  incl.h
 
 .SH ENVIRONMENT VARIABLES
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBmake\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 
@@ -2611,7 +2611,7 @@ state file in the local directory
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/xpg4/bin/make"
 .TS
 box;
@@ -2621,15 +2621,27 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .LP
-\fBar\fR(1), \fBarch\fR(1), \fBcd\fR(1), \fBcpp\fR(1), \fBlex\fR(1),
-\fBmach\fR(1), \fBsccs-get\fR(1), \fBsh\fR(1), \fBsysV-make\fR(1),
-\fByacc\fR(1), \fBwordexp\fR(3C), \fBpasswd\fR(4), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBPOSIX.2\fR(5), \fBstandards\fR(5)
+.BR ar (1),
+.BR arch (1),
+.BR cd (1),
+.BR cpp (1),
+.BR lex (1),
+.BR mach (1),
+.BR sccs-get (1),
+.BR sh (1),
+.BR sysV-make (1),
+.BR yacc (1),
+.BR wordexp (3C),
+.BR passwd (5),
+.BR POSIX.2 (7),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .sp
 .LP
 \fISolaris Advanced User\&'s Guide\fR

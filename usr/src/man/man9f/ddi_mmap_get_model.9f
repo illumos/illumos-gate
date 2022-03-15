@@ -102,7 +102,8 @@ xxmmap(dev_t dev, off_t off, int prot) {
 .in -2
 
 .SH SEE ALSO
-\fBmmap\fR(9E), \fBddi_model_convert_from\fR(9F)
+.BR mmap (9E),
+.BR ddi_model_convert_from (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

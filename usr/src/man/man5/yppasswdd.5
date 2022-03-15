@@ -1,0 +1,61 @@
+'\" te
+.\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH YPPASSWDD 5 "Nov 8, 2001"
+.SH NAME
+yppasswdd \- configuration file for rpc.yppasswdd (NIS password daemon)
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/default/yppasswdd\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fByppasswdd\fR file contains a parameter that modifies the behavior of the
+\fBrpc.yppasswdd\fR(8) daemon.
+.sp
+.LP
+The \fByppasswdd\fR file contains a single parameter:
+.sp
+.in +2
+.nf
+#check_restricted_shell_name=1
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+By default in the current release, this line in \fByppasswdd\fR is commented
+out. If you uncomment the line, when a user attempts to change his default
+shell using \fB`passwd -r nis -e`\fR (see \fBpasswd\fR(1)),  the
+\fBrpc.yppasswdd\fR daemon checks whether the name of the user's current shell
+begins with an 'r'. \fBrpc.yppasswdd\fR considers any  shell whose name begins
+with an 'r' (for example, \fBrcsh\fR) to be a restricted shell. If a user's
+shell does begin with 'r', his attempt to change from the default shell will
+fail.
+.sp
+.LP
+If the line in the \fByppasswdd\fR file is commented out (the default), the
+\fBrpc.yppasswdd\fR daemon does not perform the restricted shell check.
+.sp
+.LP
+The \fByppasswdd\fR file is editable only by root or a member of the sys group.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/default/yppasswdd\fR\fR
+.ad
+.RS 26n
+configuration file for \fBrpc.yppasswdd\fR daemon
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR rpc.yppasswdd (8)

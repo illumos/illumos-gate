@@ -34,7 +34,7 @@ be manually ejected.
 Do not physically eject media from a device that contains mounted file systems.
 \fBeject\fR automatically searches for any mounted file systems that reside on
 the device, and attempts to umount them prior to ejecting the media. See
-\fBmount\fR(1M). If the unmount operation fails, \fBeject\fR prints a warning
+\fBmount\fR(8). If the unmount operation fails, \fBeject\fR prints a warning
 message and exits. The \fB-f\fR option can be used to specify an eject even if
 the device contains mounted partitions.
 .sp
@@ -226,5 +226,8 @@ default \fBCD-ROM\fR file (deprecated)
 .SH SEE ALSO
 .sp
 .LP
-\fBvolcheck\fR(1), \fBmount\fR(1M), \fBrmmount\fR(1M), \fBioctl\fR(2),
-\fBattributes\fR(5)
+.BR volcheck (1),
+.BR ioctl (2),
+.BR attributes (7),
+.BR mount (8),
+.BR rmmount (8)

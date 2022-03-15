@@ -36,7 +36,7 @@ to the new path name of the file.
 .sp
 .LP
 The \fBrenameat()\fR function renames an entry in a directory, possibly moving
-the entry into a different directory.  See \fBfsattr\fR(5). If the \fIold\fR
+the entry into a different directory.  See \fBfsattr\fR(7). If the \fIold\fR
 argument is an absolute path, the \fIfromfd\fR is ignored.  Otherwise it is
 resolved relative to the \fIfromfd\fR argument rather than the current working
 directory.  Similarly, if the \fInew\fR argument is not absolute, it is
@@ -339,7 +339,7 @@ an attribute file as a regular file.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -353,12 +353,16 @@ Interface Stability	Committed
 _
 MT-Level	Async-Signal-Safe
 _
-Standard	For \fBrename()\fR, see \fBstandards\fR(5).
+Standard	For \fBrename()\fR, see \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
-\fBchmod\fR(2), \fBlink\fR(2), \fBunlink\fR(2), \fBattributes\fR(5),
-\fBfsattr\fR(5), \fBstandards\fR(5)
+.BR chmod (2),
+.BR link (2),
+.BR unlink (2),
+.BR attributes (7),
+.BR fsattr (7),
+.BR standards (7)
 .SH NOTES
 The system can deadlock if there is a loop in the file system graph. Such a
 loop can occur if there is an entry in directory \fBa\fR, \fBa/name1\fR, that

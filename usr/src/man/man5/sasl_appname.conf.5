@@ -1,0 +1,170 @@
+'\" te
+.\" Copyright (C) 1998-2003, Carnegie Mellon Univeristy.  All Rights Reserved.
+.\" Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SASL_APPNAME.CONF 5 "Oct 14, 2003"
+.SH NAME
+sasl_appname.conf \- SASL options and configuration file
+.SH SYNOPSIS
+.LP
+.nf
+/etc/sasl/\fIappname\fR\fB\&.conf\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fB/etc/sasl/\fIappname\fR.conf\fR file is a user-supplied configuration
+file that supports user set options for server applications.
+.sp
+.LP
+You can modify the behavior of \fBlibsasl\fR and its plug-ins for server
+applications by specifying option values in \fB/etc/sasl/\fIappname\fR.conf\fR
+file, where \fIappname\fR is the application defined name of the application.
+For \fBsendmail\fR, the file would be \fB/etc/sasl/Sendmail.conf\fR. See your
+application documentation for information on the application name.
+.sp
+.LP
+Options that you set in a \fB\fIappname\fR.conf\fR file do not override SASL
+options specified by the application itself.
+.sp
+.LP
+The format for each option setting is:
+.sp
+.in +2
+.nf
+option_name:value.
+.fi
+.in -2
+
+.sp
+.LP
+You can comment lines in the file by using a leading #.
+.sp
+.LP
+The SASL library supports the following options for server applications:
+.sp
+.ne 2
+.na
+\fB\fBauto_transition\fR\fR
+.ad
+.RS 25n
+When set to \fByes\fR, plain users and login plug-ins are automatically
+transitioned to other mechanisms when they do a successful plaintext
+authentication. The default value for \fBauto_transition\fR is \fBno\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBauxprop_plugin\fR\fR
+.ad
+.RS 25n
+A space-separated list of names of auxiliary property plug-ins to use. By
+default, SASL will use or query all available auxiliary property plug-ins.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcanon_user_plugin\fR\fR
+.ad
+.RS 25n
+The name of the canonical user plug-in to use. By default, the value of
+\fBcanon_user_plugin\fR is \fBINTERNAL\fR, to indicated the use of built-in
+plug-ins..
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlog_level\fR\fR
+.ad
+.RS 25n
+An integer value for the desired level of logging for a server, as defined in
+<\fBsasl.h\fR>. This sets the \fBlog_level\fR in the \fBsasl_server_params_t
+struct\fR in \fB/usr/include/sasl/saslplug.h\fR. The default value for
+\fBlog_level\fR is \fB1\fR to indicate \fBSASL_LOG_ERR\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmech_list\fR\fR
+.ad
+.RS 25n
+Whitespace separated list of SASL mechanisms to allow, for example,
+\fBDIGEST-MD5 GSSAPI\fR. The \fBmech_list\fR option is used to restrict the
+mechanisms to a subset of the installed plug-ins. By default, SASL will use all
+available mechanisms.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpw_check\fR\fR
+.ad
+.RS 25n
+Whitespace separated list of mechanisms used to verify passwords that are used
+by \fBsasl_checkpass\fR(3SASL). The default value for \fBpw_check\fR is
+\fBauxprop\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreauth_timeout\fR\fR
+.ad
+.RS 25n
+This SASL option is used by the server DIGEST-MD5 plug-in. The value of
+\fBreauth_timeout\fR is the length in time (in minutes) that authentication
+information will be cached for a fast reauthorization. A value of 0 will
+disable reauthorization. The default value of \fBreauth_timeout\fR is 1440 (24
+hours).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBserver_load_mech_list\fR\fR
+.ad
+.RS 25n
+A space separated list of mechanisms to load. If in the process of loading
+server plug-ns no desired mechanisms are included in the plug-in, the plug-in
+will be unloaded. By default, SASL loads all server plug-ins.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBuser_authid\fR\fR
+.ad
+.RS 25n
+If the value of \fBuser_authid\fR is \fByes\fR, then the GSSAPI will acquire
+the client credentials rather than use the default credentials when it creates
+the GSS client security context. The default value of \fBuser_authid\fR is
+\fBno\fR, whereby SASL uses the default client Kerberos identity.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR attributes (7)

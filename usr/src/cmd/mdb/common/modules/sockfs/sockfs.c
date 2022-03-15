@@ -143,7 +143,7 @@ sockparams_help(void)
 	mdb_printf("Print sockparams information for a give sockparams ptr.\n"
 	    "Without the address, list available sockparams. Default "
 	    "behavior is to list only entries that were installed by the "
-	    "admin (via soconfig(1M)).\n\n"
+	    "admin (via soconfig(8)).\n\n"
 	    "Options:\n"
 	    "	-e:\t\tlist ephemeral sockparams\n"
 	    "	-E:\t\tonly list ephemeral sockparams\n");

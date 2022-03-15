@@ -85,16 +85,16 @@
 	<stability value='Evolving' />
 
 	<template>
-	    	<common_name>
-		    	<loctext xml:lang='C'>
+		<common_name>
+			<loctext xml:lang='C'>
 				Solaris Fault Manager notification parameters
 			</loctext>
 		</common_name>
 
 		<documentation>
-		    	<manpage
+			<manpage
 			    title='smf'
-			    section='5'
+			    section='7'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

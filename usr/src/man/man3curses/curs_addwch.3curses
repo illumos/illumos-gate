@@ -150,7 +150,7 @@ All routines return the integer \fBERR\fR upon failure and an integer value
 other than \fBERR\fR upon successful completion, unless otherwise noted in the
 preceding routine descriptions.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -164,10 +164,17 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-\fBputwchar\fR(3C), \fBclrtoeol\fR(3CURSES), \fBcurses\fR(3CURSES),
-\fBcurs_attr\fR(3CURSES), \fBcurs_inwch\fR(3CURSES),
-\fBcurs_outopts\fR(3CURSES), \fBrefresh\fR(3CURSES), \fBstandout\fR(3CURSES),
-\fBwinwch\fR(3CURSES), \fBwrefresh\fR(3CURSES), \fBattributes\fR(5)
+.BR putwchar (3C),
+.BR clrtoeol (3CURSES),
+.BR curs_attr (3CURSES),
+.BR curs_inwch (3CURSES),
+.BR curs_outopts (3CURSES),
+.BR curses (3CURSES),
+.BR refresh (3CURSES),
+.BR standout (3CURSES),
+.BR winwch (3CURSES),
+.BR wrefresh (3CURSES),
+.BR attributes (7)
 .SH NOTES
 The header file <\fBcurses.h\fR> automatically includes the header files
 <\fBstdio.h\fR>, <\fBunctrl.h\fR> and <\fBwidec.h\fR>.

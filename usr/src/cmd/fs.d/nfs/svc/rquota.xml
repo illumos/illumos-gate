@@ -121,7 +121,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='rquotad' section='1M'
+			<manpage title='rquotad' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

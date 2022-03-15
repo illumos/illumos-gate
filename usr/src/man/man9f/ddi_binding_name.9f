@@ -45,7 +45,7 @@ a driver to a device.
 \fBddi_binding_name()\fR and \fBddi_get_name()\fR can be called from user,
 kernel, or interrupt context.
 .SH SEE ALSO
-\fBddi_node_name\fR(9F)
+.BR ddi_node_name (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

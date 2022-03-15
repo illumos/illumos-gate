@@ -1,0 +1,322 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2014 Gary Mills
+.\" Copyright (c) 2018 Peter Tribble
+.\"
+.Dd June 17, 2021
+.Dt GETENT 8
+.Os
+.Sh NAME
+.Nm getent
+.Nd get entries from administrative database
+.Sh SYNOPSIS
+.Nm
+.Ar database
+.Oo Ar key Oc Ns ...
+.Sh DESCRIPTION
+.Nm
+gets a list of entries from the administrative database specified by
+.Ar database .
+The information generally comes from one or more of the sources that are
+specified for the
+.Ar database
+in
+.Pa /etc/nsswitch.conf .
+.Pp
+.Ar database
+is the name of the database to be examined.
+This can be
+.Cm passwd ,
+.Cm shadow ,
+.Cm group ,
+.Cm hosts ,
+.Cm ipnodes ,
+.Cm services ,
+.Cm protocols ,
+.Cm ethers ,
+.Cm project ,
+.Cm networks ,
+.Cm netmasks ,
+.Cm auth_attr ,
+.Cm exec_attr ,
+.Cm prof_attr ,
+.Cm user_attr ,
+or
+.Cm netgroup .
+For each of these databases,
+.Nm
+uses the appropriate library routines described in
+.Xr getpwnam 3C ,
+.Xr getspnam 3C ,
+.Xr getgrnam 3C ,
+.Xr getnetgrent 3C ,
+.Xr gethostbyaddr 3NSL ,
+.Xr gethostbyname 3NSL ,
+.Xr getipnodebyaddr 3SOCKET ,
+.Xr getipnodebyname 3SOCKET ,
+.Xr getservbyname 3SOCKET ,
+.Xr getprotobyname 3SOCKET ,
+.Xr ethers 3SOCKET ,
+.Xr getprojbyname 3PROJECT ,
+.Xr getnetbyname 3SOCKET ,
+.Xr getauthattr 3SECDB ,
+.Xr getexecattr 3SECDB ,
+.Xr getprofattr 3SECDB ,
+and
+.Xr getuserattr 3SECDB
+respectively.
+.Pp
+Each
+.Ar key
+must be in a format appropriate for searching on the respective database.
+For example, it can be a username or numeric-uid for
+.Cm passwd ;
+hostname or IP address for
+.Cm hosts ;
+or service, service/protocol, port, or port/proto for
+.Cm services .
+.Pp
+.Nm
+prints out the database entries that match each of the supplied keys, one per
+line, in the format of the matching administrative file:
+.Xr passwd 5 ,
+.Xr shadow 5 ,
+.Xr group 5 ,
+.Xr project 5 ,
+.Xr hosts 5 ,
+.Xr services 5 ,
+.Xr protocols 5 ,
+.Xr ethers 5 ,
+.Xr netgroup 5 ,
+.Xr networks 5 ,
+.Xr netmasks 5 ,
+.Xr auth_attr 5 ,
+.Xr exec_attr 5 ,
+.Xr prof_attr 5 ,
+or
+.Xr user_attr 5 .
+If no key is given, all entries returned by the corresponding enumeration
+library routine, for example,
+.Xr getpwent 3C
+or
+.Xr gethostent 3NSL ,
+are printed.
+Enumeration is not supported on
+.Cm ipnodes ,
+.Cm ethers ,
+.Cm netgroup ,
+or
+.Cm netmasks .
+.Ss Key Interpretation for passwd, group, netgroup, and user_attr Databases
+When
+.Nm
+is invoked with
+.Ar database
+set to
+.Cm passwd ,
+each key value is processed as follows:
+.Bl -bullet
+.It
+If the key value consists only of numeric characters,
+.Nm
+assumes that the key value is a numeric user ID and searches the
+.Cm passwd
+database for a matching user ID.
+.It
+If the user ID is not found in the
+.Cm passwd
+database or if the key value contains any non-numeric characters,
+.Nm
+assumes the key value is a user name and searches the
+.Cm passwd
+database for a matching user name.
+.El
+.Pp
+When
+.Nm
+is invoked with
+.Ar database
+set to
+.Cm group ,
+each key value is processed as follows:
+.Bl -bullet
+.It
+If the key value consists only of numeric characters,
+.Nm
+assumes that the key value is a numeric group ID and searches the
+.Cm group
+database for a matching group ID.
+.It
+If the group ID is not found in the
+.Cm group
+database or if the key value contains any non-numeric characters,
+.Nm
+assumes the key value is a group name and searches the
+.Cm group
+database for a matching group name.
+.El
+.Pp
+When
+.Nm
+is invoked with
+.Ar database
+set to
+.Cm netgroup ,
+only a single lookup key is supported, which must be in the following format:
+.Bd -ragged -offset Ds
+.Ar netgroup Oo Ar host Ar user Ar domain Oc
+.Ed
+.Pp
+Specifying only the
+.Ar netgroup
+name will result in entries from the selected netgroup being displayed as
+string triples
+.Pq hostname, username, domain ,
+in a format compatible with
+.Xr netgroup 5 .
+.Pp
+Specifying the
+.Ar netgroup
+along with
+.Ar host ,
+.Ar user
+and
+.Ar domain
+will filter the netgroup display based on these entries.
+An asterisk
+.Pq \&*
+can be used as a wildcard for the
+.Ar host ,
+.Ar user
+or
+.Ar domain
+fields.
+.Pp
+Since the
+.Cm netgroup
+database does not support enumeration, a lookup key must always be specified.
+.Pp
+When
+.Nm
+is invoked with
+.Ar database
+set to
+.Cm user_attr ,
+each key value is processed as follows:
+.Bl -bullet
+.It
+If the key value consists only of numeric characters,
+.Nm
+assumes that the key value is a numeric user ID and searches the
+.Cm passwd
+database for a matching user name, which is then used as the key for
+.Cm user_attr .
+.It
+If the user ID is not found in the
+.Cm passwd
+database or if the key value contains any non-numeric characters,
+.Nm
+assumes the key value is a user name and searches the
+.Cm user_attr
+database for a matching entry.
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /etc/nsswitch.conf
+name service switch configuration file
+.It Pa /etc/passwd
+password file
+.It Pa /etc/shadow
+shadowed password file
+.It Pa /etc/group
+group file
+.It Pa /etc/inet/hosts
+IPv4 and IPv6 host name database
+.It Pa /etc/services
+Internet services and aliases
+.It Pa /etc/project
+project file
+.It Pa /etc/protocols
+protocol name database
+.It Pa /etc/ethers
+Ethernet address to hostname database or domain
+.It Pa /etc/networks
+network name database
+.It Pa /etc/netmasks
+network mask database
+.It Pa /etc/netgroup
+network group database
+.It Pa /etc/user_attr
+extended user attributes database
+.It Pa /etc/security/auth_attr
+authorization description database
+.It Pa /etc/security/exec_attr
+execution profiles database
+.It Pa /etc/security/prof_attr
+profile description database
+.El
+.Sh EXIT STATUS
+The following exit values are returned:
+.Pp
+.Bl -tag -width Ds -compact
+.It Sy 0
+Successful completion.
+.It Sy 1
+Command syntax was incorrect, an invalid option was used, or an internal error
+occurred.
+.It Sy 2
+At least one of the specified entry names was not found in the database.
+.It Sy 3
+There is no support for enumeration on this database.
+.El
+.Sh SEE ALSO
+.Xr getgrnam 3C ,
+.Xr getnetgrent 3C ,
+.Xr getpwnam 3C ,
+.Xr getspnam 3C ,
+.Xr gethostbyaddr 3NSL ,
+.Xr gethostbyname 3NSL ,
+.Xr gethostent 3NSL ,
+.Xr getprojbyname 3PROJECT ,
+.Xr getauthattr 3SECDB ,
+.Xr getexecattr 3SECDB ,
+.Xr getprofattr 3SECDB ,
+.Xr getuserattr 3SECDB ,
+.Xr ethers 3SOCKET ,
+.Xr getipnodebyaddr 3SOCKET ,
+.Xr getipnodebyname 3SOCKET ,
+.Xr getnetbyname 3SOCKET ,
+.Xr getprotobyname 3SOCKET ,
+.Xr getservbyname 3SOCKET ,
+.Xr auth_attr 5 ,
+.Xr ethers 5 ,
+.Xr exec_attr 5 ,
+.Xr group 5 ,
+.Xr hosts 5 ,
+.Xr netmasks 5 ,
+.Xr networks 5 ,
+.Xr nsswitch.conf 5 ,
+.Xr passwd 5 ,
+.Xr prof_attr 5 ,
+.Xr project 5 ,
+.Xr protocols 5 ,
+.Xr services 5 ,
+.Xr shadow 5 ,
+.Xr user_attr 5 ,
+.Xr attributes 7

@@ -84,7 +84,7 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -102,7 +102,9 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBIntro\fR(3), \fBlibtsnet\fR(3LIB), \fBattributes\fR(5)
+.BR Intro (3),
+.BR libtsnet (3LIB),
+.BR attributes (7)
 .SH NOTES
 The functionality described on this manual page is available only if the system
 has been configured with Trusted Extensions.

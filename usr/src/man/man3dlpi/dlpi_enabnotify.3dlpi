@@ -27,7 +27,7 @@ dlpi_enabnotify \- enable DLPI notification
 .LP
 The \fBdlpi_enabnotify()\fR function enables a notification callback for the
 set of events specified in \fInotes\fR, which must be one or more (by a logical
-OR operation) of the DLPI notifications documented in \fBdlpi\fR(7P).   The
+OR operation) of the DLPI notifications documented in \fBdlpi\fR(4P).   The
 callback function \fIfuncp\fR is registered with the DLPI handle \fIdh\fR and
 is invoked when \fIdh\fR receives notification for any of the specified event
 types. Upon success, \fIid\fR contains the identifier associated with the
@@ -184,7 +184,7 @@ The DLPI operation failed.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -202,5 +202,8 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdlpi_disabnotify\fR(3DLPI), \fBdlpi_recv\fR(3DLPI), \fBlibdlpi\fR(3LIB),
-\fBattributes\fR(5), \fBdlpi\fR(7P)
+.BR dlpi_disabnotify (3DLPI),
+.BR dlpi_recv (3DLPI),
+.BR libdlpi (3LIB),
+.BR dlpi (4P),
+.BR attributes (7)

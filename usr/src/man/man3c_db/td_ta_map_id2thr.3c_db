@@ -95,7 +95,7 @@ The call did not complete successfully.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -111,5 +111,7 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibc_db\fR(3LIB), \fBthr_create\fR(3C), \fBthr_self\fR(3C),
-\fBattributes\fR(5)
+.BR thr_create (3C),
+.BR thr_self (3C),
+.BR libc_db (3LIB),
+.BR attributes (7)

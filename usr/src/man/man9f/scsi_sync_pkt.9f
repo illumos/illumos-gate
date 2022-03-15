@@ -51,8 +51,12 @@ the packet but before accessing the data in memory.
 The \fBscsi_sync_pkt()\fR function may be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-\fBtran_sync_pkt\fR(9E), \fBddi_dma_sync\fR(9F), \fBscsi_destroy_pkt\fR(9F),
-\fBscsi_init_pkt\fR(9F), \fBscsi_transport\fR(9F), \fBscsi_pkt\fR(9S)
+.BR tran_sync_pkt (9E),
+.BR ddi_dma_sync (9F),
+.BR scsi_destroy_pkt (9F),
+.BR scsi_init_pkt (9F),
+.BR scsi_transport (9F),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

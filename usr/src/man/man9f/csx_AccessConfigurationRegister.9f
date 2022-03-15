@@ -178,8 +178,10 @@ No \fBPCMCIA \fRhardware installed.
 .SH CONTEXT
 This function may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_ParseTuple\fR(9F), \fBcsx_RegisterClient\fR(9F),
-\fBcsx_RequestConfiguration\fR(9F), \fBcsx_ResetFunction\fR(9F)
+.BR csx_ParseTuple (9F),
+.BR csx_RegisterClient (9F),
+.BR csx_RequestConfiguration (9F),
+.BR csx_ResetFunction (9F)
 .sp
 .LP
 \fIPCCard 95 Standard, PCMCIA/JEIDA\fR

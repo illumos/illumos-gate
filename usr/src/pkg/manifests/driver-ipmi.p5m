@@ -36,8 +36,8 @@ file path=usr/kernel/drv/amd64/ipmi
 file path=usr/kernel/drv/ipmi.conf
 dir  path=usr/share
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/ipmi.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/ipmi.4d
 driver name=ipmi perms="* 0600 root sys"
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/intel/io/ipmi/THIRDPARTYLICENSE \

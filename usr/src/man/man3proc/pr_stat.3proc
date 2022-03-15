@@ -150,7 +150,7 @@ and
 respectively; however, rather than having the stat information be subject to the
 data model of the target process, they always provide 64-bit stat information.
 See
-.Xr lf64 5
+.Xr lf64 7
 for more information.
 .Sh RETURN VALUES
 Upon successful completion, the
@@ -192,5 +192,5 @@ in
 .Sh SEE ALSO
 .Xr stat 2 ,
 .Xr libproc 3LIB ,
-.Xr proc 4 ,
-.Xr lf64 5
+.Xr proc 5 ,
+.Xr lf64 7

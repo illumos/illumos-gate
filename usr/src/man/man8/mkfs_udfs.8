@@ -1,0 +1,189 @@
+'\" te
+.\"  Copyright (c) 2000 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MKFS_UDFS 8 "Nov 17, 2000"
+.SH NAME
+mkfs_udfs \- construct a udfs file system
+.SH SYNOPSIS
+.LP
+.nf
+\fBmkfs\fR \fB-F udfs\fR [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR] \fIraw_device_file\fR
+     [\fIsize\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+This is the universal disk format file system (\fBudfs\fR) -specific module of
+the \fBmkfs\fR command. \fBmkfs\fR constructs a \fBudfs\fR file system with a
+root directory.
+.SH OPTIONS
+.sp
+.LP
+See \fBmkfs\fR(8) for the list of supported \fIgeneric_options\fR.
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIspecific_options\fR\fR
+.ad
+.RS 23n
+Specify a \fBudfs\fR-specific option. Specify \fBudfs\fR file system specific
+options in a comma-separated list with no intervening spaces. If invalid
+options are specified, a warning message is printed and the invalid options are
+ignored.
+.sp
+The following \fIspecific_options\fR are available:
+.sp
+.ne 2
+.na
+\fBN\fR
+.ad
+.RS 16n
+Print the file system parameters without actually creating the file system.
+.RE
+
+.sp
+.ne 2
+.na
+\fBlabel=\fIstring\fR\fR
+.ad
+.RS 16n
+Specify the label to be written into the volume header structures. Specify
+\fIstring\fR as the name of the label. If \fIstring\fR is not specified, a
+default \fIstring\fR is generated in the form of \fB*NoLabel*\fR.
+.RE
+
+.RE
+
+.SH OPERANDS
+.sp
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIraw_device_file\fR\fR
+.ad
+.RS 19n
+ Specify the disk partition on which to write.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 19n
+Specify the number of 512-byte blocks in the file system.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR attributes (7),
+.BR fsck (8),
+.BR mkfs (8)
+.SH DIAGNOSTICS
+.sp
+.in +2
+.nf
+not currently a valid file system
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The specified device does not contain a valid \fBudfs\fR file system.
+.sp
+.in +2
+.nf
+Invalid size: larger than the partition size
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Number of blocks given as parameter to create the file system is larger than
+the size of the device specified.
+.sp
+.in +2
+.nf
+is mounted can't mkfs
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Device is in use, cannot create file system when the device is in use.
+.sp
+.in +2
+.nf
+preposterous size
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Negative size parameter provided is invalid.
+.sp
+.in +2
+.nf
+sector size must be between 512, 8192 bytes
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Sector size given is not in the valid range.
+.sp
+.in +2
+.nf
+Volume integrity sequence descriptors too long
+File set descriptor too long.
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Not enough space to create volume integrity sequence or file set descriptor.
+.sp
+.in +2
+.nf
+mkfs: argument out of range
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+One of the arguments is out of range.
+.sp
+.in +2
+.nf
+mkfs: bad numeric arg
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+One of the arguments is potentially a bad numeric.
+.SH NOTES
+.sp
+.LP
+You can use \fBlofiadm\fR to create a file that appears to a \fBmkfs\fR command
+(for example, \fBmkfs_pcfs\fR or \fBmkfs_ufs\fR) as a raw device. You can then
+use a \fBmkfs\fR command to create a file system on that device. See
+\fBlofiadm\fR(8) for examples of creating a UFS and a PC (FAT) file system on
+a device created by \fBlofiadm\fR.

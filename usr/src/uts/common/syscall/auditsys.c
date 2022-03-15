@@ -429,7 +429,7 @@ getpolicy(caddr_t data)
  * by the value of the global zone's flags at the time the
  * local zone is created.
  *
- * While auditconfig(1M) allows setting and unsetting policies one bit
+ * While auditconfig(8) allows setting and unsetting policies one bit
  * at a time, the mask passed in from auditconfig() is created by a
  * syscall to getpolicy and then modified based on the auditconfig()
  * cmd line, so the input policy value is used to replace the existing

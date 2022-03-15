@@ -100,7 +100,7 @@ If no match is found, \fBpathname()\fR returns a null pointer, \fB((char *)
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -116,8 +116,13 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsh\fR(1), \fBtest\fR(1), \fBaccess\fR(2), \fBmknod\fR(2), \fBstat\fR(2),
-\fBgetenv\fR(3C), \fBattributes\fR(5)
+.BR sh (1),
+.BR test (1),
+.BR access (2),
+.BR mknod (2),
+.BR stat (2),
+.BR getenv (3C),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

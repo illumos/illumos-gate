@@ -276,7 +276,7 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	 *	On hypervisors, we reboot very quickly..  Perhaps panic
 	 *	should only attempt to recover by rebooting if,
 	 *	say, we were able to mount the root filesystem,
-	 *	or if we successfully launched init(1m).
+	 *	or if we successfully launched init(8).
 	 */
 	if (panicstr && proc_init == NULL)
 		(void) HYPERVISOR_shutdown(SHUTDOWN_poweroff);

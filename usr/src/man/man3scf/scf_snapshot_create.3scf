@@ -55,7 +55,7 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.
 .LP
 A snapshot is an unchanging picture of the full set of property groups
 associated with an instance. Snapshots are automatically created and managed by
-the Service Management Facility. See \fBsmf\fR(5).
+the Service Management Facility. See \fBsmf\fR(7).
 .sp
 .LP
 A snapshot consists of a set of snaplevels, each of which holds copies of the
@@ -276,7 +276,7 @@ The \fBscf_instance_get_snapshot()\fR function will fail if:
 .ad
 .sp .6
 .RS 4n
-The storage mechanism that the repository server (\fBsvc.configd\fR(1M))
+The storage mechanism that the repository server (\fBsvc.configd\fR(8))
 chose for the operation denied access.
 .RE
 
@@ -375,7 +375,7 @@ The instance is not set.
 The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -392,6 +392,9 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF),
-\fBscf_iter_instance_snapshots\fR(3SCF),
-\fBscf_snapshot_get_base_snaplevel\fR(3SCF), \fBattributes\fR(5), \fBsmf\fR(5)
+.BR libscf (3LIB),
+.BR scf_error (3SCF),
+.BR scf_iter_instance_snapshots (3SCF),
+.BR scf_snapshot_get_base_snaplevel (3SCF),
+.BR attributes (7),
+.BR smf (7)

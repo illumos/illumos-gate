@@ -155,7 +155,7 @@ hardware-specific manner.
 .sp
 .LP
 The \fBlibcfgadm\fR library is used to provide the services of the
-\fBcfgadm\fR(1M) command. The hardware-specific libraries are located in
+\fBcfgadm\fR(8) command. The hardware-specific libraries are located in
 \fB/usr/platform/${machine}/lib/cfgadm\fR,
 \fB/usr/platform/${arch}/lib/cfgadm\fR, and \fB/usr/lib/cfgadm\fR. The
 hardware-specific library names are derived from the driver name or from class
@@ -633,7 +633,7 @@ attachment point whose condition fails the hardware dependent test.
 .SH ATTRIBUTES
 .sp
 .LP
-See  \fBattributes\fR(5) for descriptions of the following attributes:
+See  \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -649,10 +649,18 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBcfgadm\fR(1M), \fBdevinfo\fR(1M), \fBdlopen\fR(3C), \fBdlsym\fR(3C),
-\fBfree\fR(3C), \fBgetsubopt\fR(3C), \fBmalloc\fR(3C), \fBqsort\fR(3C),
-\fBsetlocale\fR(3C), \fBstrcmp\fR(3C), \fBlibcfgadm\fR(3LIB),
-\fBattributes\fR(5)
+.BR dlopen (3C),
+.BR dlsym (3C),
+.BR free (3C),
+.BR getsubopt (3C),
+.BR malloc (3C),
+.BR qsort (3C),
+.BR setlocale (3C),
+.BR strcmp (3C),
+.BR libcfgadm (3LIB),
+.BR attributes (7),
+.BR cfgadm (8),
+.BR devinfo (8)
 .SH NOTES
 .sp
 .LP

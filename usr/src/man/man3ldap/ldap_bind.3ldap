@@ -222,7 +222,7 @@ credentials are returned, the result parameter is set to \fINULL\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -240,5 +240,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBldap_error\fR(3LDAP), \fBldap_open\fR(3LDAP),
-\fBldap_result\fR(3LDAP), \fBlibsasl\fR(3LIB), \fBattributes\fR(5)
+.BR ldap (3LDAP),
+.BR ldap_error (3LDAP),
+.BR ldap_open (3LDAP),
+.BR ldap_result (3LDAP),
+.BR libsasl (3LIB),
+.BR attributes (7)

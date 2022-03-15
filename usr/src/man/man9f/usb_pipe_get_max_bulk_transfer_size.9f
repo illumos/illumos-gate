@@ -94,7 +94,7 @@ May be called from user, kernel or interrupt context.
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -110,5 +110,7 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBusb_pipe_bulk_xfer\fR(9F), \fBusb_alloc_request\fR(9F),
-\fBusb_bulk_request\fR(9S)
+.BR attributes (7),
+.BR usb_alloc_request (9F),
+.BR usb_pipe_bulk_xfer (9F),
+.BR usb_bulk_request (9S)

@@ -50,7 +50,7 @@ extern "C" {
     sizeof (struct ieee80211_llc))
 
 enum wifi_stat {
-	/* statistics described in ieee802.11(5) */
+	/* statistics described in ieee802.11(7) */
 	WIFI_STAT_TX_FRAGS = MACTYPE_STAT_MIN,
 	WIFI_STAT_MCAST_TX,
 	WIFI_STAT_TX_FAILED,

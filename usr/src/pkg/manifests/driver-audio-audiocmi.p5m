@@ -39,8 +39,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/audiocmi group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/audiocmi.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/audiocmi.4d
 driver name=audiocmi \
     alias=pci13f6,100 \
     alias=pci13f6,101 \

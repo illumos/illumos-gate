@@ -192,7 +192,7 @@ code upon successful completion.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -208,8 +208,11 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBcurs_inopts\fR(3CURSES), \fBcurs_move\fR(3CURSES),
-\fBcurs_refresh\fR(3CURSES), \fBcurses\fR(3CURSES), \fBattributes\fR(5)
+.BR curs_inopts (3CURSES),
+.BR curs_move (3CURSES),
+.BR curs_refresh (3CURSES),
+.BR curses (3CURSES),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

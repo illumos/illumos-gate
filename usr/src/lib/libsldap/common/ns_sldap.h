@@ -582,7 +582,7 @@ typedef struct ns_standalone_conf {
  * and naming context. During all further operations on behalf
  * of the application requested a standalone schema libsldap will use
  * the information obtained by __ns_ldap_initStandalone() instead of
- * door_call(3C)ing ldap_cachemgr(1M).
+ * door_call(3C)ing ldap_cachemgr(8).
  *
  * conf
  * 	A structure describing where and in which way to obtain all the

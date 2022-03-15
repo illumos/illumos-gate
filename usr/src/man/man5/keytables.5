@@ -1,0 +1,964 @@
+'\" te
+.\"  Copyright (c) 2003 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH KEYTABLES 5 "Feb 18, 2003"
+.SH NAME
+keytables \- keyboard table descriptions for loadkeys and dumpkeys
+.SH DESCRIPTION
+.sp
+.LP
+These files are used by \fBloadkeys\fR(1) to modify the translation tables used
+by the keyboard streams module and generated from those translation tables. See
+\fBloadkeys\fR(1).
+.sp
+.LP
+Any line in the file beginning with \fB#\fR is a comment, and is ignored.
+\fB#\fR is treated specially only at the beginning of a line.
+.sp
+.LP
+Other lines specify the values to load into the tables for a particular
+keystation.  The format is either:
+.sp
+.in +2
+.nf
+\fBkey\fR \fInumber list_of_entries\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+\fBswap\fR \fInumber1\fR \fBwith\fR \fInumber2\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or
+.sp
+.in +2
+.nf
+\fBkey\fR \fInumber1\fR \fBsame as\fR \fInumber2\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+or a blank line, which is ignored.
+.sp
+.in +2
+.nf
+\fBkey\fR \fInumber list_of_entries\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+sets the entries for keystation \fInumber\fR from the list given.  An entry in
+that list is of the form
+.sp
+.in +2
+.nf
+\fItablename\fR \fIcode\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fItablename\fR is the name of a particular translation table, or
+\fBall\fR. The translation tables are:
+.sp
+.ne 2
+.na
+\fB\fBbase\fR\fR
+.ad
+.RS 9n
+entry when no shifts are active
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshift\fR\fR
+.ad
+.RS 9n
+entry when "Shift" key is down
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcaps\fR\fR
+.ad
+.RS 9n
+entry when "Caps Lock" is in effect
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBctrl\fR\fR
+.ad
+.RS 9n
+entry when "Control" is down
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBaltg\fR\fR
+.ad
+.RS 9n
+entry when "Alt Graph" is down
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnuml\fR\fR
+.ad
+.RS 9n
+entry when "Num Lock" is in effect
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBup\fR\fR
+.ad
+.RS 9n
+entry when a key goes up
+.RE
+
+.sp
+.LP
+All tables other than \fBup\fR refer to the action generated when a key goes
+down.  Entries in the \fBup\fR table are used only for shift keys, since the
+shift in question goes away when the key goes up, except for keys such as "Caps
+Lock" or "Num Lock"; the keyboard streams module makes the key look as if it
+were a latching key.
+.sp
+.LP
+A table name of \fBall\fR indicates that the entry for all tables should be set
+to the specified value, with the following exception: for entries with a value
+other than \fBhole\fR, the entry for the \fBnuml\fR table should be set to
+\fBnonl\fR, and the entry for the \fBup\fR table should be set to \fBnop\fR.
+.sp
+.LP
+The \fIcode\fR specifies the effect of the key in question when the specified
+shift key is down. A \fIcode\fR consists of either:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A character, which indicates that the key should generate the given character.
+The character can either be a single character, a single character preceded by
+\fB^\fR which refers to a "control character" (for instance, \fB^c\fR is
+control-C), or a C-style character constant enclosed in single quote characters
+(\fB\&'\fR), which can be expressed with C-style escape sequences such as \er
+for \fBRETURN\fR or \e000 for the null character.  Note that the single
+character may be any character in an 8-bit character set, such as ISO 8859/1.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A string, consisting of a list of characters enclosed in double quote
+characters (\fB"\fR). Note that the use of the double quote character means
+that a \fIcode\fR of double quote must be enclosed in single quotes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+One of the following expressions:
+.RS
+
+.sp
+.ne 2
+.na
+\fB\fBshiftkeys+leftshift\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the left-hand "Shift" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshiftkeys+rightshift\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the right-hand "Shift" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshiftkeys+leftctrl\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the left-hand "Control" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshiftkeys+rightctrl\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the right-hand "Control" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshiftkeys+alt\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "Alt" shift key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshiftkeys+altgraph\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "Alt Graph" shift key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshiftkeys+capslock\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "Caps Lock" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshiftkeys+shiftlock\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "Shift Lock" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshiftkeys+numlock\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "Num Lock" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbuckybits+systembit\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "Stop" key in SunView; this is normally the L1 key, or the
+SETUP key on the VT100 keyboard
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbuckybits+metabit\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "meta" key. That is, the "Left" or "Right" key on a Sun-2
+or Sun-3 keyboard or the "diamond" key on a Sun-4 keyboard
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcompose\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "Compose" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBctrlq\fR\fR
+.ad
+.sp .6
+.RS 4n
+on the "VT100" keyboard, the key is to transmit the control-Q character (this
+would be the entry for the "Q" key in the \fBctrl\fR table)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBctrls\fR\fR
+.ad
+.sp .6
+.RS 4n
+on the "VT100" keyboard, the key is to transmit the control-S character (this
+would be the entry for the "S" key in the \fBctrl\fR table)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnoscroll\fR\fR
+.ad
+.sp .6
+.RS 4n
+on the "VT100" keyboard, the key is to be the "No Scroll" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstring+uparrow\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "up arrow" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstring+downarrow\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "down arrow" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstring+leftarrow\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "left arrow" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstring+rightarrow\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "right arrow" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstring+homearrow\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "home" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfa_acute\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the acute accent "floating accent" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfa_cedilla\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the cedilla "floating accent" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfa_cflex\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the circumflex "floating accent" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfa_grave\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the grave accent "floating accent" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfa_tilde\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the tilde "floating accent" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfa_umlaut\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the umlaut "floating accent" key
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnonl\fR\fR
+.ad
+.sp .6
+.RS 4n
+this is used only in the Num Lock table; the key is not to be affected by the
+state of Num Lock
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad0\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "0" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad1\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "1" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad2\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "2" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad3\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "3" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad4\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "4" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad5\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "5" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad6\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "6" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad7\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "7" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad8\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "8" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpad9\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "9" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpaddot\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "." key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpadenter\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "Enter" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpadplus\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "+" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpadminus\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "\(mi" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpadstar\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "*" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpadslash\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "/" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpadequal\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "=" key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpadsep\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "," (separator) key on the numeric keypad
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlf(\fIn\fR)\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the left-hand function key \fIn\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrf(\fIn\fR)\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the right-hand function key \fIn\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtf(\fIn\fR)\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the top function key \fIn\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbf(\fIn\fR)\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to be the "bottom" function key \fIn\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnop\fR\fR
+.ad
+.sp .6
+.RS 4n
+the key is to do nothing
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBerror\fR\fR
+.ad
+.sp .6
+.RS 4n
+this code indicates an internal error; to be used only for keystation 126, and
+must be used there
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBidle\fR\fR
+.ad
+.sp .6
+.RS 4n
+this code indicates that the keyboard is idle (that is, has no keys down); to
+be used only for all entries other than the \fBnuml\fR and \fBup\fR table
+entries for keystation 127, and must be used there
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBoops\fR\fR
+.ad
+.sp .6
+.RS 4n
+this key exists, but its action is not defined; it has the same effect as
+\fBnop\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreset\fR\fR
+.ad
+.sp .6
+.RS 4n
+this code indicates that the keyboard has just been reset; to be used only for
+the \fBup\fR table entry for keystation 127, and must be used there.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBswap\fR \fInumber1\fR with \fInumber2\fR\fR
+.ad
+.sp .6
+.RS 4n
+exchanges the entries for keystations \fInumber1\fR and \fInumber2\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkey \fInumber1\fR\fR same as \fInumber2\fR\fR
+.ad
+.sp .6
+.RS 4n
+sets the entries for keystation \fInumber1\fR to be the same as those for
+keystation \fInumber2\fR. If the file does not specify entries for keystation
+\fInumber2\fR, the entries currently in the translation table are used; if the
+file does specify entries for keystation \fInumber2\fR, those entries are used.
+.RE
+
+.RE
+
+.RE
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRExample of setting multiple keystations.
+.sp
+.LP
+The following entry sets keystation 15 to be a "hole" (that is, an entry
+indicating that there is no keystation 15); sets keystation 30 to do nothing
+when Alt Graph is down, generate "!" when Shift is down, and generate "1" under
+all other circumstances; and sets keystation 76 to be the left-hand Control
+key.
+
+.sp
+.in +2
+.nf
+key 15   all hole
+key 30   base 1 shift ! caps 1 ctrl 1 altg nop
+key 76   all shiftkeys+leftctrl up shiftkeys+leftctrl
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRExchange DELETE and BACKSPACE keys
+.sp
+.LP
+The following entry exchanges the Delete and Back Space keys on the Type 4
+keyboard:
+
+.sp
+.in +2
+.nf
+swap 43 with 66
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Keystation 43 is normally the Back Space key, and keystation 66 is normally the
+Delete key.
+
+.LP
+\fBExample 3 \fRDisable CAPS LOCK key
+.sp
+.LP
+The following entry disables the Caps Lock key on the Type 3 and U.S. Type 4
+keyboards:
+
+.sp
+.in +2
+.nf
+key 119 all nop
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRStandard translation tables for the U.S. Type 4 keyboard
+.sp
+.LP
+The following specifies the standard translation tables for the U.S. Type 4
+keyboard:
+
+.sp
+.in +2
+.nf
+key 0    all hole
+key 1    all buckybits+systembit up buckybits+systembit
+key 2    all hole
+key 3    all lf(2)
+key 4    all hole
+key 5    all tf(1)
+key 6    all tf(2)
+key 7    all tf(10)
+key 8    all tf(3)
+key 9    all tf(11)
+key 10   all tf(4)
+key 11   all tf(12)
+key 12   all tf(5)
+key 13   all shiftkeys+altgraph up shiftkeys+altgraph
+key 14   all tf(6)
+key 15   all hole
+key 16   all tf(7)
+key 17   all tf(8)
+key 18   all tf(9)
+key 19   all shiftkeys+alt up shiftkeys+alt
+key 20   all hole
+key 21   all rf(1)
+key 22   all rf(2)
+key 23   all rf(3)
+key 24   all hole
+key 25   all lf(3)
+key 26   all lf(4)
+key 27   all hole
+key 28   all hole
+key 29   all ^[
+key 30   base 1 shift ! caps 1 ctrl 1 altg nop
+key 31   base 2 shift @ caps 2 ctrl ^@ altg nop
+key 32   base 3 shift # caps 3 ctrl 3 altg nop
+key 33   base 4 shift $ caps 4 ctrl 4 altg nop
+key 34   base 5 shift % caps 5 ctrl 5 altg nop
+key 35   base 6 shift ^ caps 6 ctrl ^^ altg nop
+key 36   base 7 shift & caps 7 ctrl 7 altg nop
+key 37   base 8 shift * caps 8 ctrl 8 altg nop
+key 38   base 9 shift ( caps 9 ctrl 9 altg nop
+key 39   base 0 shift ) caps 0 ctrl 0 altg nop
+key 40   base - shift _ caps - ctrl ^_ altg nop
+key 41   base = shift + caps = ctrl = altg nop
+key 42   base ` shift ~ caps ` ctrl ^^ altg nop
+key 43   all '\eb'
+key 44   all hole
+key 45   all rf(4) numl padequal
+key 46   all rf(5) numl padslash
+key 47   all rf(6) numl padstar
+key 48   all bf(13)
+key 49   all lf(5)
+key 50   all bf(10) numl padequal
+key 51   all lf(6)
+key 52   all hole
+key 53   all '\et'
+key 54   base q shift Q caps Q ctrl ^Q altg nop
+key 55   base w shift W caps W ctrl ^W altg nop
+key 56   base e shift E caps E ctrl ^E altg nop
+key 57   base r shift R caps R ctrl ^R altg nop
+key 58   base t shift T caps T ctrl ^T altg nop
+key 59   base y shift Y caps Y ctrl ^Y altg nop
+key 60   base u shift U caps U ctrl ^U altg nop
+key 61   base i shift I caps I ctrl '\et' altg nop
+key 62   base o shift O caps O ctrl ^O altg nop
+key 63   base p shift P caps P ctrl ^P altg nop
+key 64   base [ shift { caps [ ctrl ^[ altg nop
+key 65   base ] shift } caps ] ctrl ^] altg nop
+key 66   all '\e177'
+key 67   all compose
+key 68   all rf(7) numl pad7
+key 69   all rf(8) numl pad8
+key 70   all rf(9) numl pad9
+key 71   all bf(15) numl padminus
+key 72   all lf(7)
+key 73   all lf(8)
+key 74   all hole
+key 75   all hole
+key 76   all shiftkeys+leftctrl up shiftkeys+leftctrl
+key 77   base a shift A caps A ctrl ^A altg nop
+key 78   base s shift S caps S ctrl ^S altg nop
+key 79   base d shift D caps D ctrl ^D altg nop
+key 80   base f shift F caps F ctrl ^F altg nop
+key 81   base g shift G caps G ctrl ^G altg nop
+key 82   base h shift H caps H ctrl '\eb' altg nop
+key 83   base j shift J caps J ctrl '\en' altg nop
+key 84   base k shift K caps K ctrl '\ev' altg nop
+key 85   base l shift L caps L ctrl ^L altg nop
+key 86   base ; shift : caps ; ctrl ; altg nop
+key 87   base '\e'' shift '"' caps '\e'' ctrl '\e'' altg nop
+key 88   base '\e\e' shift | caps '\e\e' ctrl ^\e altg nop
+key 89   all '\er'
+key 90   all bf(11) numl padenter
+key 91   all rf(10) numl pad4
+key 92   all rf(11) numl pad5
+key 93   all rf(12) numl pad6
+key 94   all bf(8) numl pad0
+key 95   all lf(9)
+key 96   all hole
+key 97   all lf(10)
+key 98   all shiftkeys+numlock
+key 99   all shiftkeys+leftshift up shiftkeys+leftshift
+key 100  base z shift Z caps Z ctrl ^Z altg nop
+key 101  base x shift X caps X ctrl ^X altg nop
+key 102  base c shift C caps C ctrl ^C altg nop
+key 103  base v shift V caps V ctrl ^V altg nop
+key 104  base b shift B caps B ctrl ^B altg nop
+key 105  base n shift N caps N ctrl ^N altg nop
+key 106  base m shift M caps M ctrl '\er' altg nop
+key 107  base , shift < caps , ctrl , altg nop
+key 108  base . shift > caps . ctrl . altg nop
+key 109  base / shift ? caps / ctrl ^_ altg nop
+key 110  all shiftkeys+rightshift up shiftkeys+rightshift
+key 111  all '\en'
+key 112  all rf(13) numl pad1
+key 113  all rf(14) numl pad2
+key 114  all rf(15) numl pad3
+key 115  all hole
+key 116  all hole
+key 117  all hole
+key 118  all lf(16)
+key 119  all shiftkeys+capslock
+key 120  all buckybits+metabit up buckybits+metabit
+key 121  base ' ' shift ' ' caps ' ' ctrl ^@ altg ' '
+key 122  all buckybits+metabit up buckybits+metabit
+key 123  all hole
+key 124  all hole
+key 125  all bf(14) numl padplus
+key 126  all error numl error up hole
+key 127  all idle numl idle up reset
+.fi
+.in -2
+.sp
+
+.SH SEE ALSO
+.sp
+.LP
+.BR loadkeys (1)

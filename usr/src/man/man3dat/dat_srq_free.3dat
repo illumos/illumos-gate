@@ -76,7 +76,7 @@ destroyed object.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -94,6 +94,10 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBdat_srq_create\fR(3DAT), \fBdat_srq_post_recv\fR(3DAT),
-\fBdat_srq_query\fR(3DAT), \fBdat_srq_resize\fR(3DAT),
-\fBdat_srq_set_lw\fR(3DAT), \fBlibdat\fR(3LIB), \fBattributes\fR(5)
+.BR dat_srq_create (3DAT),
+.BR dat_srq_post_recv (3DAT),
+.BR dat_srq_query (3DAT),
+.BR dat_srq_resize (3DAT),
+.BR dat_srq_set_lw (3DAT),
+.BR libdat (3LIB),
+.BR attributes (7)

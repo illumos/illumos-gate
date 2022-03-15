@@ -399,7 +399,7 @@ while (cond == FALSE) {
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -413,9 +413,16 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBfork\fR(2), \fBmmap\fR(2), \fBsetitimer\fR(2), \fBshmop\fR(2),
-\fBmutex_init\fR(3C), \fBsignal\fR(3C), \fBattributes\fR(5),
-\fBcondition\fR(5), \fBmutex\fR(5), \fBstandards\fR(5)
+.BR fork (2),
+.BR mmap (2),
+.BR setitimer (2),
+.BR shmop (2),
+.BR mutex_init (3C),
+.BR signal (3C),
+.BR attributes (7),
+.BR condition (7),
+.BR mutex (7),
+.BR standards (7)
 .SH NOTES
 If more than one thread is blocked on a condition variable, the order in which
 threads are unblocked is determined by the scheduling policy. When each thread,

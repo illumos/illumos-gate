@@ -30,7 +30,7 @@
  * drivers that participate in the DDI UFM subsystem on a per-instance basis
  * via ddi_ufm_handle_t structures (see ddi_ufm_impl.h).  This is known as the
  * UFM handle.  The UFM handle contains a pointer to the driver's UFM ops,
- * which the ufm(7D) pseudo driver uses to invoke the UFM entry points in
+ * which the ufm(4D) pseudo driver uses to invoke the UFM entry points in
  * response to DDI UFM ioctls.  Additionally, the DDI UFM subsystem uses the
  * handle to maintain cached UFM image and slot data.
  *

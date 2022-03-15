@@ -134,4 +134,4 @@ in
 .Sh SEE ALSO
 .Xr getzoneidbyname 3C ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

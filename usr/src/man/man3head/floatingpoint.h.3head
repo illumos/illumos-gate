@@ -213,6 +213,10 @@ numbers, infinities, or NaNs.
 .SH SEE ALSO
 .sp
 .LP
-\fBabort\fR(3C), \fBdecimal_to_floating\fR(3C), \fBeconvert\fR(3C),
-\fBfloating_to_decimal\fR(3C), \fBsigfpe\fR(3C), \fBstring_to_decimal\fR(3C),
-\fBstrtod\fR(3C)
+.BR abort (3C),
+.BR decimal_to_floating (3C),
+.BR econvert (3C),
+.BR floating_to_decimal (3C),
+.BR sigfpe (3C),
+.BR string_to_decimal (3C),
+.BR strtod (3C)

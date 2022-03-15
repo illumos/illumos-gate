@@ -76,7 +76,7 @@ the \fB-l\fR option provides a list of CD or DVD writers.
 .sp
 .LP
 For instructions on adding a USB-mass-storage-class-compliant CD-RW or DVD-RW
-device to your system, see \fBscsa2usb\fR(7D).
+device to your system, see \fBscsa2usb\fR(4D).
 .SS "Creating Data CDs"
 .LP
 When creating data CDs, \fBcdrw\fR uses the Track-At-Once mode of writing. Use
@@ -591,9 +591,14 @@ example% \fBmkisofs -o /tmp/image2 -r -C 0,173464 -M \e
 
 .SH SEE ALSO
 .LP
-\fBaudioconvert\fR(1), \fBpriocntl\fR(1), \fBpolicy.conf\fR(4),
-\fBattributes\fR(5), \fBrbac\fR(5), \fBscsa2usb\fR(7D), \fBsd\fR(7D),
-\fBmkisofs\fR(8)
+.BR audioconvert (1),
+.BR priocntl (1),
+.BR scsa2usb (4D),
+.BR sd (4D),
+.BR policy.conf (5),
+.BR attributes (7),
+.BR rbac (7),
+.BR mkisofs (8)
 .sp
 .LP
 \fISystem Administration Guide: Devices and File Systems\fR
@@ -623,7 +628,7 @@ the \fB-p\fR option. Some commercially available drives handle the drive speed
 setting command differently, so use this option judiciously.
 .sp
 .LP
-The \fBcdrw\fR command uses \fBrbac\fR(5) to control user access to the
+The \fBcdrw\fR command uses \fBrbac\fR(7) to control user access to the
 devices. By default, \fBcdrw\fR is accessible to all users but can be
 restricted to individual users. Refer to the \fISystem Administration Guide:
 Devices and File Systems\fR for more information.
@@ -638,4 +643,4 @@ The user must be logged onto the console. \fB/dev/console\fR is also correct.
 Previously, users could log in remotely, for example, by using \fBtelnet\fR or
 \fBssh\fR, and be able to burn CDs. This would work unless the administrator
 had changed the default configuration to deny \fBsolaris.device.cdrw\fR
-authorization. See \fBpolicy.conf\fR(4).
+authorization. See \fBpolicy.conf\fR(5).

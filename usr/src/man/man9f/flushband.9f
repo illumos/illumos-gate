@@ -83,7 +83,7 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBflushq\fR(9F)
+.BR flushq (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR \fISTREAMS Programming Guide\fR

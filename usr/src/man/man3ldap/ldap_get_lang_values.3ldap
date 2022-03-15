@@ -72,7 +72,7 @@ the appropriate error code in the LDAP structure.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -88,6 +88,9 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBldap_first_attribute\fR(3LDAP), \fBldap_first_attribute\fR(3LDAP),
-\fBldap_get_values\fR(3LDAP), \fBldap_result\fR(3LDAP),
-\fBldap_search\fR(3LDAP), \fBattributes\fR(5)
+.BR ldap_first_attribute (3LDAP),
+.BR ldap_first_attribute (3LDAP),
+.BR ldap_get_values (3LDAP),
+.BR ldap_result (3LDAP),
+.BR ldap_search (3LDAP),
+.BR attributes (7)

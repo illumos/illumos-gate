@@ -89,7 +89,7 @@
 #define	MAXLINELEN		1024
 #define	SMF_UPGRADE_FILE		"/var/svc/profile/upgrade"
 #define	SMF_UPGRADEDATALINK_FILE	"/var/svc/profile/upgrade_datalink"
-#define	SMF_DLADM_UPGRADE_MSG		" # added by dladm(1M)"
+#define	SMF_DLADM_UPGRADE_MSG		" # added by dladm(8)"
 #define	DLADM_DEFAULT_COL	80
 
 /*
@@ -2096,7 +2096,7 @@ done:
 	if (status != DLADM_STATUS_OK) {
 		if (status == DLADM_STATUS_NONOTIF) {
 			die("not all links have link up/down detection; must "
-			    "use -f (see dladm(1M))");
+			    "use -f (see dladm(8))");
 		} else {
 			die_dlerr(status, "create operation failed");
 		}
@@ -2262,7 +2262,7 @@ done:
 			    "match");
 		} else if (status == DLADM_STATUS_NONOTIF) {
 			die("not all links have link up/down detection; must "
-			    "use -f (see dladm(1M))");
+			    "use -f (see dladm(8))");
 		} else {
 			die_dlerr(status, "add operation failed");
 		}
@@ -2564,12 +2564,12 @@ do_create_vlan(int argc, char *argv[], const char *use)
 
 	case DLADM_STATUS_NOTSUP:
 		die("VLAN over '%s' may require lowered MTU; must use -f (see "
-		    "dladm(1M))", link);
+		    "dladm(8))", link);
 		break;
 
 	case DLADM_STATUS_LINKBUSY:
 		die("VLAN over '%s' may not use default_tag ID "
-		    "(see dladm(1M))", link);
+		    "(see dladm(8))", link);
 		break;
 
 	default:
@@ -4938,7 +4938,7 @@ do_create_vnic(int argc, char *argv[], const char *use)
 
 	case DLADM_STATUS_LINKBUSY:
 		die("VLAN over '%s' may not use default_tag ID "
-		    "(see dladm(1M))", devname);
+		    "(see dladm(8))", devname);
 		break;
 
 	default:

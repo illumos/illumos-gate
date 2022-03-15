@@ -353,7 +353,7 @@ _InitRemoteFstypes(void)
 	}
 
 	/*
-	 * Read the remote file system type database; from fstypes(4):
+	 * Read the remote file system type database; from fstypes(5):
 	 *
 	 * fstypes resides in directory /etc/dfs and lists distributed file
 	 * system utilities packages installed on the system. For each installed

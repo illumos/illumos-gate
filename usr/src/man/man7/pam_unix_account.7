@@ -1,0 +1,177 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc.
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PAM_UNIX_ACCOUNT 7 "Feb 14, 2005"
+.SH NAME
+pam_unix_account \- PAM account management module for UNIX
+.SH SYNOPSIS
+.LP
+.nf
+\fBpam_unix_account.so.1\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBpam_unix_account\fR module implements \fBpam_sm_acct_mgmt()\fR, which
+provides functionality to the \fBPAM\fR account management stack. The module
+provides functions to validate that the user's account is not locked or expired
+and that the user's password does not need to be changed. The module retrieves
+account information from the configured databases in \fBnsswitch.conf\fR(5).
+.sp
+.LP
+The following options can be passed to the module:
+.sp
+.ne 2
+.na
+\fB\fBdebug\fR\fR
+.ad
+.RS 17n
+\fBsyslog\fR(3C) debugging information at the \fBLOG_DEBUG\fR level
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnowarn\fR\fR
+.ad
+.RS 17n
+Turn off warning messages
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBserver_policy\fR\fR
+.ad
+.RS 17n
+If the account authority for the user, as specified by \fBPAM_USER\fR, is a
+server, do not apply the Unix policy from the passwd entry in the name service
+switch.
+.RE
+
+.SH ERRORS
+.sp
+.LP
+The following values are returned:
+.sp
+.ne 2
+.na
+\fB\fBPAM_UNIX_ACCOUNT\fR\fR
+.ad
+.RS 24n
+User account has expired
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_AUTHTOK_EXPIRED\fR\fR
+.ad
+.RS 24n
+Password expired and no longer usable
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_BUF_ERR\fR\fR
+.ad
+.RS 24n
+Memory buffer error
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_IGNORE\fR\fR
+.ad
+.RS 24n
+Ignore module, not participating in result
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_NEW_AUTHTOK_REQD\fR\fR
+.ad
+.RS 24n
+Obtain new authentication token from the user
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_PERM_DENIED\fR\fR
+.ad
+.RS 24n
+The account is locked or has been inactive for too long
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SERVICE_ERR\fR\fR
+.ad
+.RS 24n
+Error in underlying service module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_SUCCESS\fR\fR
+.ad
+.RS 24n
+The account is valid for use at this time
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPAM_USER_UNKNOWN\fR\fR
+.ad
+.RS 24n
+No account is present for the user
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+_
+MT Level	MT-Safe with exceptions
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR syslog (3C),
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_authenticate (3PAM),
+.BR nsswitch.conf (5),
+.BR pam.conf (5),
+.BR attributes (7)
+.SH NOTES
+.sp
+.LP
+The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
+multi-threaded application uses its own PAM handle.
+.sp
+.LP
+Attempts to validate locked accounts are logged via \fBsyslog\fR(3C) to the
+\fBLOG_AUTH\fR facility with a \fBLOG_NOTICE\fR severity.

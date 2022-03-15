@@ -1,0 +1,95 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TTYSRCH 5 "Feb 23, 1994"
+.SH NAME
+ttysrch \- directory search list for ttyname
+.SH DESCRIPTION
+.sp
+.LP
+\fBttysrch\fR is an optional file that is used by the \fBttyname\fR library
+routine. This file contains the names of directories in \fB/dev\fR that contain
+terminal and terminal-related device files. The purpose of this file is to
+improve the performance of \fBttyname\fR by indicating which subdirectories in
+\fB/dev\fR contain terminal-related device files and should be searched first.
+These subdirectory names must appear on separate lines and must begin with
+\fB/dev\fR. Those path names that do not begin with \fB/dev\fR will be ignored
+and a warning will be sent to the console. Blank lines (lines containing only
+white space) and lines beginning with the comment character "#" will be
+ignored. For each file listed (except for the special entry \fB/dev\fR),
+\fBttyname\fR will recursively search through subdirectories looking for a
+match. If \fB/dev\fR appears in the \fBttysrch\fR file, the \fB/dev\fR
+directory itself will be searched but there will not be a recursive search
+through its subdirectories.
+.sp
+.LP
+When \fBttyname\fR searches through the device files, it tries to find a file
+whose major/minor device number, file system identifier, and inode number match
+that of the file descriptor it was given as an argument. If a match is not
+found, it will settle for a match of just major/minor device and file system
+identifier, if one can be found. However, if the file descriptor is associated
+with a cloned device, this algorithm does not work efficiently because the
+inode number  of the device file associated with a clonable device will never
+match the inode number of the file descriptor that was returned by the open of
+that clonable device. To help with these situations, entries can be put into
+the \fB/etc/ttysrch\fR file to improve performance when cloned devices are used
+as terminals  on a system (for example, for remote login). However, this is
+only useful if the minor devices related to a cloned device are put into a
+subdirectory. (It is important to note that device files need not exist for
+cloned devices and if that is the case, \fBttyname\fR will eventually fail.) An
+optional second field is used in the \fB/etc/ttysrch\fR file to indicate the
+matching criteria. This field is separated by white space (any combination of
+blanks or tabs). The letter \fBM\fR means major/minor device number, \fBF\fR
+means file system identifier, and \fBI\fR means inode number. If this field is
+not specified for an entry, the default is \fBMFI\fR which means try to match
+on all three. For cloned devices the field should be \fBMF\fR, which indicates
+that it is not necessary to match on the inode number.
+.sp
+.LP
+Without the \fB/etc/ttysrch\fR file, \fBttyname\fR will search the \fB/dev\fR
+directory by first looking in the directories \fB/dev/term\fR, \fB/dev/pts\fR,
+and \fB/dev/xt\fR. If a system has terminal devices installed in directories
+other than these, it may help performance if the \fBttysrch\fR file is created
+and contains that list of directories.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample display of \fB/etc/ttysrch\fR command.
+.sp
+.LP
+A sample \fB/etc/ttysrch\fR file follows:
+
+.sp
+.in +2
+.nf
+/dev/term     MFI
+/dev/pts      MFI
+/dev/xt       MFI
+/dev/slan     MF
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+This file tells  \fBttyname\fR that it should first search through those
+directories listed  and that when searching through the \fB/dev/slan\fR
+directory, if a file is encountered whose major/minor devices and file system
+identifier match that of the file descriptor argument to \fBttyname\fR, this
+device name should be considered a match.
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/ttysrch\fR\fR
+.ad
+.RS 16n
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR ttyname (3C)

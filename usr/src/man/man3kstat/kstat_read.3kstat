@@ -126,5 +126,5 @@ was not asserted in the effective privilege set.
 .Xr kstat_chain_update 3KSTAT ,
 .Xr kstat_lookup 3KSTAT ,
 .Xr kstat_open 3KSTAT ,
-.Xr attributes 5 ,
-.Xr privileges 5
+.Xr attributes 7 ,
+.Xr privileges 7

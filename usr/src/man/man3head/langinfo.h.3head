@@ -204,7 +204,7 @@ used to access information corresponding to \fBRADIXCHAR\fR, \fBTHOUSEP\fR, and
 \fBCRNCYSTR\fR.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -219,6 +219,11 @@ Interface Stability	Standard
 
 .SH SEE ALSO
 .LP
-\fBmkmsgs\fR(1), \fBlocaleconv\fR(3C), \fBnl_langinfo\fR(3C),
-\fBnl_types.h\fR(3HEAD), \fBsetlocale\fR(3C), \fBstrftime\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR mkmsgs (1),
+.BR localeconv (3C),
+.BR nl_langinfo (3C),
+.BR setlocale (3C),
+.BR strftime (3C),
+.BR nl_types.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

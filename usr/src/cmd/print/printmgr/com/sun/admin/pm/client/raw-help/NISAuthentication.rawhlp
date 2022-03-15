@@ -59,7 +59,7 @@ Manager to update printer information in the NIS name service:
 
 - If your network is set up with NIS master and slave servers, 
 the NIS slaves may not see the updated printer information 
-until the NIS slaves are updated. See ypmake(1M) for more
+until the NIS slaves are updated. See ypmake(8) for more
 information.
 
 <p>

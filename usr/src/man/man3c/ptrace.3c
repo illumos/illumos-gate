@@ -176,7 +176,7 @@ The \fIrequest\fR argument is an illegal number.
 .ad
 .RS 9n
 The calling process does not have appropriate privileges to control the calling
-process. See \fBproc\fR(4).
+process. See \fBproc\fR(5).
 .RE
 
 .sp
@@ -199,12 +199,12 @@ The \fBptrace()\fR function is available only with the 32-bit version of
 The \fB/proc\fR debugging interfaces should be used instead of \fBptrace()\fR,
 which provides quite limited debugger support and is itself implemented using
 the \fB/proc\fR interfaces. There is no actual \fBptrace()\fR system call in
-the kernel. See \fBproc\fR(4) for descriptions of the \fB/proc\fR debugging
+the kernel. See \fBproc\fR(5) for descriptions of the \fB/proc\fR debugging
 interfaces.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -222,5 +222,11 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBexec\fR(2), \fBexit\fR(2), \fBlibc\fR(3LIB), \fBsignal\fR(3C),
-\fBsignal.h\fR(3HEAD), \fBwait\fR(3C), \fBproc\fR(4), \fBattributes\fR(5)
+.BR exec (2),
+.BR exit (2),
+.BR signal (3C),
+.BR wait (3C),
+.BR signal.h (3HEAD),
+.BR libc (3LIB),
+.BR proc (5),
+.BR attributes (7)

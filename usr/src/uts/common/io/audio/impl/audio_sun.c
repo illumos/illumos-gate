@@ -23,7 +23,7 @@
  */
 
 /*
- * Sun audio(7I) and mixer(7I) personality.
+ * Sun audio(4I) and mixer(4I) personality.
  *
  * There are some "undocumented" details of how legacy Sun audio
  * interfaces work.  The following "rules" were derived from reading the
@@ -251,7 +251,7 @@ devaudio_proc_alloc(audio_client_t *c)
 	info = &proc->p_info;
 
 	/*
-	 * audio(7I) says: Upon the initial open() of the audio
+	 * audio(4I) says: Upon the initial open() of the audio
 	 * device, the driver resets the data format of the device to
 	 * the default state of 8-bit, 8Khz, mono u-Law data.
 	 */

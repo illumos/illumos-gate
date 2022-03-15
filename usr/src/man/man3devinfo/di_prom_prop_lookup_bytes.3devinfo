@@ -123,7 +123,7 @@ The property does not exist.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -141,8 +141,11 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBdi_init\fR(3DEVINFO), \fBdi_prom_prop_next\fR(3DEVINFO),
-\fBlibdevinfo\fR(3LIB), \fBattributes\fR(5), \fBopenprom\fR(7D)
+.BR di_init (3DEVINFO),
+.BR di_prom_prop_next (3DEVINFO),
+.BR libdevinfo (3LIB),
+.BR openprom (4D),
+.BR attributes (7)
 .sp
 .LP
 \fIWriting Device Drivers\fR

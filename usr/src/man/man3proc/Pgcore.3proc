@@ -46,7 +46,7 @@ wide variety of tools and libraries including
 .Xr pstack 1 ,
 and more.
 For details on the core file format, see
-.Xr core 4 .
+.Xr core 5 .
 .Pp
 .Fn Pfgcore
 writes the core to the file represented by the open descriptor
@@ -107,8 +107,8 @@ See
 in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
-.Xr coreadm 1M ,
 .Xr libproc 3LIB ,
 .Xr Pstop 3PROC ,
-.Xr core 4 ,
-.Xr proc 4
+.Xr core 5 ,
+.Xr proc 5 ,
+.Xr coreadm 8

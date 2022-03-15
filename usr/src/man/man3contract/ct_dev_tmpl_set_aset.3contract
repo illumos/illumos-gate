@@ -119,7 +119,7 @@ a pointer to a \fIuint_t\fR variable for receiving the current setting of the
 .SH DESCRIPTION
 .LP
 These functions read and write device contract terms and operate on device
-contract template file descriptors obtained from the \fBcontract\fR(4)
+contract template file descriptors obtained from the \fBcontract\fR(5)
 filesystem (ctfs).
 .sp
 .LP
@@ -246,7 +246,7 @@ The supplied buffer is too small.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -263,5 +263,8 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBlibcontract\fR(3LIB), \fBcontract\fR(4), \fBdevices\fR(4),
-\fBattributes\fR(5), \fBlfcompile\fR(5)
+.BR libcontract (3LIB),
+.BR contract (5),
+.BR devices (5),
+.BR attributes (7),
+.BR lfcompile (7)

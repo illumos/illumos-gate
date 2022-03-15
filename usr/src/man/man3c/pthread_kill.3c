@@ -99,7 +99,7 @@ The value of the \fIsig\fR argument is an invalid or unsupported signal number.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -117,5 +117,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBkill\fR(1), \fBpthread_self\fR(3C), \fBpthread_sigmask\fR(3C),
-\fBraise\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR kill (1),
+.BR pthread_self (3C),
+.BR pthread_sigmask (3C),
+.BR raise (3C),
+.BR attributes (7),
+.BR standards (7)

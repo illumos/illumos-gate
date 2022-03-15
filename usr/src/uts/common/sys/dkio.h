@@ -88,7 +88,7 @@ struct dk_cinfo {
 #define	DKC_PCMCIA_MEM	21	/* PCMCIA memory disk-like type (Obsolete) */
 #define	DKC_PCMCIA_ATA	22	/* PCMCIA AT Attached type */
 #define	DKC_VBD		23	/* virtual block device */
-#define	DKC_BLKDEV	24	/* generic block device (see blkdev(7d)) */
+#define	DKC_BLKDEV	24	/* generic block device (see blkdev(4D)) */
 
 /*
  * Sun reserves up through 1023

@@ -230,7 +230,7 @@ hardware error.
 .RE
 
 .SH ATTRIBUTES
-See attributes(5) for descriptions of the following attributes:
+See attributes(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -246,8 +246,12 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBusb_alloc_request\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
-\fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),
-\fBusb_pipe_isoc_xfer\fR(9F), \fBusb_bulk_request\fR(9S),
-\fBusb_ctrl_request\fR(9S), \fBusb_intr_request\fR(9S),
-\fBusb_isoc_request\fR(9S)
+.BR usb_alloc_request (9F),
+.BR usb_pipe_bulk_xfer (9F),
+.BR usb_pipe_ctrl_xfer (9F),
+.BR usb_pipe_intr_xfer (9F),
+.BR usb_pipe_isoc_xfer (9F),
+.BR usb_bulk_request (9S),
+.BR usb_ctrl_request (9S),
+.BR usb_intr_request (9S),
+.BR usb_isoc_request (9S)

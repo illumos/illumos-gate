@@ -21,7 +21,7 @@ its parent. The exit status is reaped by way of the \fBwait\fR(3C),
 system operation, zombies can occur, but are typically short-lived. This can
 happen if a parent exits without having reaped the exit status of some or all
 of its children. In that case, those children are reparented to \fBPID 1\fR.
-See \fBinit\fR(1M), which periodically reaps such processes.
+See \fBinit\fR(8), which periodically reaps such processes.
 .sp
 .LP
 An irresponsible parent process can not exit for a very long time and thus
@@ -41,7 +41,7 @@ process which might soon be reaped by the parent, if:
 .TP
 .ie t \(bu
 .el o
-The process is a child of \fBinit\fR(1M).
+The process is a child of \fBinit\fR(8).
 .RE
 .RS +4
 .TP
@@ -116,8 +116,13 @@ Failure, such as no such process, permission denied, or invalid option.
 .SH SEE ALSO
 .sp
 .LP
-\fBproc\fR(1), \fBinit\fR(1M), \fBwaitid\fR(2), \fBwait\fR(3C),
-\fBwaitpid\fR(3C), \fBproc\fR(4), \fBattributes\fR(5)
+.BR proc (1),
+.BR waitid (2),
+.BR wait (3C),
+.BR waitpid (3C),
+.BR proc (5),
+.BR attributes (7),
+.BR init (8)
 .SH WARNINGS
 .sp
 .LP

@@ -135,7 +135,7 @@ open_package_datastream(int a_argc, char **a_argv, char *a_spoolDir,
 		 * _getvol verifies that the specified device is accessible and
 		 * that a volume of the appropriate medium has been inserted.
 		 * _getvol is in libadm.h - delivered by ON as part of SUNWcsl
-		 * is somewhat analagous to getvol(1M) - args are:
+		 * is somewhat analagous to getvol(8) - args are:
 		 *  - char *device
 		 *  - char *label
 		 *  - int options

@@ -202,8 +202,11 @@ No \fBPCMCIA \fRhardware installed.
 .SH CONTEXT
 These functions may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_GetTupleData\fR(9F), \fBcsx_ParseTuple\fR(9F),
-\fBcsx_RegisterClient\fR(9F), \fBcsx_ValidateCIS\fR(9F), \fBtuple\fR(9S)
+.BR csx_GetTupleData (9F),
+.BR csx_ParseTuple (9F),
+.BR csx_RegisterClient (9F),
+.BR csx_ValidateCIS (9F),
+.BR tuple (9S)
 .sp
 .LP
 \fIPC Card \fR\fI95Standard,\fR PCMCIA/JEIDA

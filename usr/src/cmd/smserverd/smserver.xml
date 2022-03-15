@@ -103,7 +103,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='rpc.smserverd' section='1M'
+			<manpage title='rpc.smserverd' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

@@ -49,7 +49,7 @@ The device has no interrupt specifications.
 The \fBddi_dev_nintrs()\fR function can be called from user, interrupt, or
 kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -63,8 +63,12 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-\fBisa\fR(4), \fBsbus\fR(4), \fBddi_add_intr\fR(9F), \fBddi_dev_nregs\fR(9F),
-\fBddi_dev_regsize\fR(9F), \fBIntro\fR(9F)
+.BR isa (5),
+.BR sbus (5),
+.BR Intro (9F),
+.BR ddi_add_intr (9F),
+.BR ddi_dev_nregs (9F),
+.BR ddi_dev_regsize (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

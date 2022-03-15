@@ -42,7 +42,7 @@ Refer to \fBopen\fR(2).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -60,4 +60,6 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBopen\fR(2), \fBattributes\fR(5), \fBfsattr\fR(5)
+.BR open (2),
+.BR attributes (7),
+.BR fsattr (7)

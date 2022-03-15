@@ -154,8 +154,13 @@ int             (*devo_quiesce)(dev_info_t *dip);
 .in -2
 
 .SH SEE ALSO
-\fBattach\fR(9E), \fBdetach\fR(9E), \fBgetinfo\fR(9E), \fBprobe\fR(9E),
-\fBpower\fR(9E), \fBquiesce\fR(9E), \fBnodev\fR(9F)
+.BR attach (9E),
+.BR detach (9E),
+.BR getinfo (9E),
+.BR power (9E),
+.BR probe (9E),
+.BR quiesce (9E),
+.BR nodev (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

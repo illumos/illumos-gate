@@ -44,4 +44,5 @@ None.
 .SH CONTEXT
 This function can be called from user and kernel contexts only.
 .SH SEE ALSO
-\fBldi_ev_get_cookie\fR(9F), \fBldi_ev_register_callbacks\fR(9F)
+.BR ldi_ev_get_cookie (9F),
+.BR ldi_ev_register_callbacks (9F)

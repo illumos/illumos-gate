@@ -1,0 +1,750 @@
+.\"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
+.\" permission to reproduce portions of its copyrighted documentation.
+.\" Original documentation from The Open Group can be obtained online at
+.\" http://www.opengroup.org/bookstore/.
+.\"
+.\" The Institute of Electrical and Electronics Engineers and The Open
+.\" Group, have given us permission to reprint portions of their
+.\" documentation.
+.\"
+.\" In the following statement, the phrase ``this text'' refers to portions
+.\" of the system documentation.
+.\"
+.\" Portions of this text are reprinted and reproduced in electronic form
+.\" in the SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition,
+.\" Standard for Information Technology -- Portable Operating System
+.\" Interface (POSIX), The Open Group Base Specifications Issue 6,
+.\" Copyright (C) 2001-2004 by the Institute of Electrical and Electronics
+.\" Engineers, Inc and The Open Group.  In the event of any discrepancy
+.\" between these versions and the original IEEE and The Open Group
+.\" Standard, the original IEEE and The Open Group Standard is the referee
+.\" document.  The original Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
+.\"
+.\" This notice shall appear on any product containing this material.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\"
+.TH REGEXP 7 "May 20, 2002"
+.SH NAME
+regexp, compile, step, advance \- simple regular expression compile and match
+routines
+.SH SYNOPSIS
+.LP
+.nf
+#define INIT \fIdeclarations\fR
+#define GETC(void) \fIgetc code\fR
+#define PEEKC(void) \fIpeekc code\fR
+#define UNGETC(void) \fIungetc code\fR
+#define RETURN(\fIptr\fR) \fIreturn code\fR
+#define ERROR(\fIval\fR) \fIerror code\fR
+
+extern char *\fIloc1\fR, *\fIloc2\fR, *\fIlocs\fR;
+
+#include <regexp.h>
+
+\fBchar *\fR\fBcompile\fR(\fBchar *\fR\fIinstring\fR, \fBchar *\fR\fIexpbuf\fR, \fBconst char *\fR\fIendfug\fR, \fBint\fR \fIeof\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBstep\fR(\fBconst char *\fR\fIstring\fR, \fBconst char *\fR\fIexpbuf\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBadvance\fR(\fBconst char *\fR\fIstring\fR, \fBconst char *\fR\fIexpbuf\fR);
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Regular Expressions (REs) provide a mechanism to select specific strings from a
+set of character strings. The Simple Regular Expressions described below differ
+from the  Internationalized Regular Expressions described on the
+\fBregex\fR(7) manual page in the following ways:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+only Basic Regular Expressions are supported
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the Internationalization features\(emcharacter class, equivalence class, and
+multi-character collation\(emare not supported.
+.RE
+.sp
+.LP
+The functions \fBstep()\fR, \fBadvance()\fR, and \fBcompile()\fR are general
+purpose regular expression matching routines to be used in programs that
+perform regular expression matching. These functions are defined by the
+\fB<regexp.h>\fR header.
+.sp
+.LP
+The functions \fBstep()\fR and \fBadvance()\fR do pattern matching given a
+character string and a compiled regular expression as input.
+.sp
+.LP
+The function \fBcompile()\fR takes as input a regular expression as defined
+below and produces a compiled expression that can be used with \fBstep()\fR or
+\fBadvance()\fR.
+.SS "Basic Regular Expressions"
+.sp
+.LP
+A regular expression specifies a set of character strings. A member of this set
+of strings is said to be matched by the regular expression. Some characters
+have special meaning when used in a regular expression; other characters stand
+for themselves.
+.sp
+.LP
+The following \fIone-character\fR \fIRE\fRs match a \fIsingle\fR character:
+.sp
+.ne 2
+.na
+\fB1.1\fR
+.ad
+.RS 7n
+An ordinary character ( \fInot\fR one of those discussed in 1.2 below) is a
+one-character RE that matches itself.
+.RE
+
+.sp
+.ne 2
+.na
+\fB1.2\fR
+.ad
+.RS 7n
+A backslash (\fB\|\e\fR\|) followed by any special character is a one-character
+RE that matches the special character itself. The special characters are:
+.sp
+.ne 2
+.na
+\fBa.\fR
+.ad
+.RS 6n
+\fB\&.\fR, \fB*\fR, \fB[\fR\|, and \fB\e\fR (period, asterisk, left square
+bracket, and backslash, respectively), which are always special, \fIexcept\fR
+when they appear within square brackets (\fB[\|]\fR; see 1.4 below).
+.RE
+
+.sp
+.ne 2
+.na
+\fBb.\fR
+.ad
+.RS 6n
+^ (caret or circumflex), which is special at the \fIbeginning\fR of an
+\fIentire\fR RE (see 4.1 and 4.3 below), or when it immediately follows the
+left of a pair of square brackets (\fB[\|]\fR) (see 1.4 below).
+.RE
+
+.sp
+.ne 2
+.na
+\fBc.\fR
+.ad
+.RS 6n
+\fB$\fR (dollar sign), which is special at the \fBend\fR of an \fIentire\fR RE
+(see 4.2 below).
+.RE
+
+.sp
+.ne 2
+.na
+\fBd.\fR
+.ad
+.RS 6n
+The character used to bound (that is, delimit) an entire RE, which is special
+for that RE (for example, see how slash (\fB/\fR) is used in the \fBg\fR
+command, below.)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB1.3\fR
+.ad
+.RS 7n
+A period (\fB\&.\fR) is a one-character RE that matches any character except
+new-line.
+.RE
+
+.sp
+.ne 2
+.na
+\fB1.4\fR
+.ad
+.RS 7n
+A non-empty string of characters enclosed in square brackets (\fB[\|]\fR) is a
+one-character RE that matches \fIany one\fR character in that string. If,
+however, the first character of the string is a circumflex (^), the
+one-character RE matches any character \fIexcept\fR new-line and the remaining
+characters in the string. The ^ has this special meaning \fIonly\fR if it
+occurs first in the string. The minus (\fB-\fR) may be used to indicate a range
+of consecutive characters; for example, \fB[0-9]\fR is equivalent to
+\fB[0123456789]\fR. The \fB-\fR loses this special meaning if it occurs first
+(after an initial ^, if any) or last in the string. The right square bracket
+(\fB]\fR) does not terminate such a string when it is the first character
+within it (after an initial ^, if any); for example, \fB[\|]a-f]\fR matches
+either a right square bracket (\fB]\fR) or one of the \fBASCII\fR letters
+\fBa\fR through \fBf\fR inclusive. The four characters listed in 1.2.a above
+stand for themselves within such a string of characters.
+.RE
+
+.sp
+.LP
+The following rules may be used to construct REs from one-character REs:
+.sp
+.ne 2
+.na
+\fB2.1\fR
+.ad
+.RS 7n
+A one-character RE is a RE that matches whatever the one-character RE matches.
+.RE
+
+.sp
+.ne 2
+.na
+\fB2.2\fR
+.ad
+.RS 7n
+A one-character RE followed by an asterisk (\fB*\fR) is a RE that matches
+\fB0\fR or more occurrences of the one-character RE. If there is any choice,
+the longest leftmost string that permits a match is chosen.
+.RE
+
+.sp
+.ne 2
+.na
+\fB2.3\fR
+.ad
+.RS 7n
+A one-character RE followed by \fB\e{\fR\fIm\fR\fB\e}\fR,
+\fB\e{\fR\fIm,\fR\fB\e}\fR, or \fB\e{\fR\fIm,n\fR\fB\e}\fR is a RE that matches
+a \fIrange\fR of occurrences of the one-character RE. The values of \fIm\fR and
+\fIn\fR must be non-negative integers less than 256; \fB\e{\fR\fIm\fR\fB\e}\fR
+matches \fIexactly\fR \fIm\fR occurrences; \fB\e{\fR\fIm,\fR\fB\e}\fR matches
+\fIat least\fR \fIm\fR occurrences; \fB\e{\fR\fIm,n\fR\fB\e}\fR matches \fIany
+number\fR of occurrences \fIbetween\fR \fIm\fR and \fIn\fR inclusive. Whenever
+a choice exists, the RE matches as many occurrences as possible.
+.RE
+
+.sp
+.ne 2
+.na
+\fB2.4\fR
+.ad
+.RS 7n
+The concatenation of REs is a RE that matches the concatenation of the strings
+matched by each component of the RE.
+.RE
+
+.sp
+.ne 2
+.na
+\fB2.5\fR
+.ad
+.RS 7n
+A RE enclosed between the character sequences \fB\e\|(\fR and \fB\e\|)\fR is a
+RE that matches whatever the unadorned RE matches.
+.RE
+
+.sp
+.ne 2
+.na
+\fB2.6\fR
+.ad
+.RS 7n
+The expression \fB\e\|\fR\fIn\fR matches the same string of characters as was
+matched by an expression enclosed between \fB\e\|(\fR and \fB\e\|)\fR
+\fIearlier\fR in the same RE. Here \fIn\fR is a digit; the sub-expression
+specified is that beginning with the \fIn\fR-th occurrence of \fB\|\e\|(\fR
+counting from the left. For example, the expression
+^\|\fB\e\|(\|.\|*\|\e\|)\|\e\|1\|$\fR matches a line consisting of two repeated
+appearances of the same string.
+.RE
+
+.sp
+.LP
+An RE may be constrained to match words.
+.sp
+.ne 2
+.na
+\fB3.1\fR
+.ad
+.RS 7n
+\fB\e\|<\fR constrains a RE to match the beginning of a string or to follow a
+character that is not a digit, underscore, or letter. The first character
+matching the RE must be a digit, underscore, or letter.
+.RE
+
+.sp
+.ne 2
+.na
+\fB3.2\fR
+.ad
+.RS 7n
+\fB\e\|>\fR constrains a RE to match the end of a string or to precede a
+character that is not a digit, underscore, or letter.
+.RE
+
+.sp
+.LP
+An \fIentire\fR \fIRE\fR may be constrained to match only an initial segment or
+final segment of a line (or both).
+.sp
+.ne 2
+.na
+\fB4.1\fR
+.ad
+.RS 7n
+A circumflex (^) at the beginning of an entire RE constrains that RE to match
+an \fIinitial\fR segment of a line.
+.RE
+
+.sp
+.ne 2
+.na
+\fB4.2\fR
+.ad
+.RS 7n
+A dollar sign (\fB$\fR) at the end of an entire RE constrains that RE to match
+a \fIfinal\fR segment of a line.
+.RE
+
+.sp
+.ne 2
+.na
+\fB4.3\fR
+.ad
+.RS 7n
+The construction ^\fIentire RE\fR\|\fB$\fR constrains the entire RE to match
+the entire line.
+.RE
+
+.sp
+.LP
+The null RE (for example, \fB//\|\fR) is equivalent to the last RE encountered.
+.SS "Addressing with REs"
+.sp
+.LP
+Addresses are constructed as follows:
+.RS +4
+.TP
+1.
+The character "\fB\&.\fR" addresses the current line.
+.RE
+.RS +4
+.TP
+2.
+The character "\fB$\fR" addresses the last line of the buffer.
+.RE
+.RS +4
+.TP
+3.
+A decimal number \fIn\fR addresses the \fIn\fR-th line of the buffer.
+.RE
+.RS +4
+.TP
+4.
+\fI\&'x\fR addresses the line marked with the mark name character \fIx\fR,
+which must be an ASCII lower-case letter (\fBa\fR-\fBz\fR). Lines are marked
+with the \fBk\fR command described below.
+.RE
+.RS +4
+.TP
+5.
+A RE enclosed by slashes (\fB/\fR) addresses the first line found by
+searching \fIforward\fR from the line \fIfollowing\fR the current line toward
+the end of the buffer and stopping at the first line containing a string
+matching the RE. If necessary, the search wraps around to the beginning of the
+buffer and continues up to and including the current line, so that the entire
+buffer is searched.
+.RE
+.RS +4
+.TP
+6.
+A RE enclosed in question marks (\fB?\fR) addresses the first line found by
+searching \fIbackward\fR from the line \fIpreceding\fR the current line toward
+the beginning of the buffer and stopping at the first line containing a string
+matching the RE. If necessary, the search wraps around to the end of the buffer
+and continues up to and including the current line.
+.RE
+.RS +4
+.TP
+7.
+An address followed by a plus sign (\fB+\fR) or a minus sign (\fB-\fR)
+followed by a decimal number specifies that address plus (respectively minus)
+the indicated number of lines. A shorthand for .+5 is .5.
+.RE
+.RS +4
+.TP
+8.
+If an address begins with \fB+\fR or \fB-\fR, the addition or subtraction is
+taken with respect to the current line; for example, \fB-5\fR is understood to
+mean \fB\&.-5\fR.
+.RE
+.RS +4
+.TP
+9.
+If an address ends with \fB+\fR or \fB-\fR, then 1 is added to or subtracted
+from the address, respectively. As a consequence of this rule and of Rule 8,
+immediately above, the address \fB-\fR refers to the line preceding the current
+line. (To maintain compatibility with earlier versions of the editor, the
+character ^ in addresses is entirely equivalent to \fB-\fR\&.) Moreover,
+trailing \fB+\fR and \fB-\fR characters have a cumulative effect, so \fB--\fR
+refers to the current line less 2.
+.RE
+.RS +4
+.TP
+10.
+For convenience, a comma (\fB,\fR) stands for the address pair \fB1,$\fR,
+while a semicolon (\fB;\fR) stands for the pair \fB\&.,$\fR.
+.RE
+.SS "Characters With Special Meaning"
+.sp
+.LP
+Characters that have special meaning except when they appear within square
+brackets (\fB[\|]\fR) or are preceded by \fB\e\fR are:  \fB\&.\fR, \fB*\fR,
+\fB[\|\fR, \fB\e\fR\|. Other special characters, such as \fB$\fR have special
+meaning in more restricted contexts.
+.sp
+.LP
+The character \fB^\fR at the beginning of an expression permits a successful
+match only immediately after a newline, and the character \fB$\fR at the end of
+an expression requires a trailing newline.
+.sp
+.LP
+Two characters have special meaning only when used within square brackets. The
+character \fB-\fR denotes a range, \fB[\|\fR\fIc\fR\fB-\fR\fIc\fR\fB]\fR,
+unless it is just after the open bracket or before the closing bracket,
+\fB[\|-\fR\fIc\fR\fB]\fR or \fB[\|\fR\fIc\fR\fB-]\fR in which case it has no
+special meaning. When used within brackets, the character \fB^\fR has the
+meaning \fIcomplement of\fR if it immediately follows the open bracket
+(example: \fB[^\fR\fIc\fR\fB]\|\fR); elsewhere between brackets (example:
+\fB[\fR\fIc\fR\fB^]\|\fR) it stands for the ordinary character \fB^\fR.
+.sp
+.LP
+The special meaning of the \fB\e\fR operator can be escaped only by preceding
+it with another \fB\e\fR\|, for example \fB\e\e\fR\|.
+.SS "Macros"
+.sp
+.LP
+Programs must have the following five macros declared before the \fB#include
+<regexp.h>\fR statement. These macros are used by the \fBcompile()\fR routine.
+The macros \fBGETC\fR, \fBPEEKC\fR, and \fBUNGETC\fR operate on the regular
+expression given as input to \fBcompile()\fR.
+.sp
+.ne 2
+.na
+\fB\fBGETC\fR\fR
+.ad
+.RS 15n
+This macro returns the value of the next character (byte) in the regular
+expression pattern. Successive calls to  \fBGETC\fR should return successive
+characters of the regular expression.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPEEKC\fR\fR
+.ad
+.RS 15n
+This macro returns the next character (byte) in the regular expression.
+Immediately successive calls to  \fBPEEKC\fR should return the same character,
+which should also be the next character returned by \fBGETC\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBUNGETC\fR\fR
+.ad
+.RS 15n
+This macro causes the argument \fBc\fR to be returned by the next call to
+\fBGETC\fR and \fBPEEKC\fR. No more than one character of pushback is ever
+needed and this character is guaranteed to be the last character read by
+\fBGETC\fR. The return value of the macro \fBUNGETC(c)\fR is always ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBRETURN(\fR\fIptr\fR\fB)\fR\fR
+.ad
+.RS 15n
+This macro is used on normal exit of the \fBcompile()\fR routine. The value of
+the argument \fIptr\fR is a pointer to the character after the last character
+of the compiled regular expression. This is useful to programs which have
+memory allocation to manage.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBERROR(\fR\fIval\fR\fB)\fR\fR
+.ad
+.RS 15n
+This macro is the abnormal return from the \fBcompile()\fR routine. The
+argument \fIval\fR is an error number (see \fBERRORS\fR below for meanings).
+This call should never return.
+.RE
+
+.SS "\fBcompile()\fR"
+.sp
+.LP
+The syntax of the \fBcompile()\fR routine is as follows:
+.sp
+.in +2
+.nf
+\fBcompile(\fR\fIinstring\fR\fB,\fR \fIexpbuf\fR\fB,\fR \fIendbuf\fR\fB,\fR \fIeof\fR\fB)\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The first parameter, \fIinstring\fR, is never used explicitly by the
+\fBcompile()\fR routine but is useful for programs that pass down different
+pointers to input characters. It is sometimes used in the \fBINIT\fR
+declaration (see below). Programs which call functions to input characters or
+have characters in an external array can pass down a value of \fB(char *)0\fR
+for this parameter.
+.sp
+.LP
+The next parameter, \fIexpbuf\fR, is a character pointer. It points to the
+place where the compiled regular expression will be placed.
+.sp
+.LP
+The parameter \fIendbuf\fR is one more than the highest address where the
+compiled regular expression may be placed. If the compiled expression cannot
+fit in \fB(endbuf-expbuf)\fR bytes, a call to \fBERROR(50)\fR is made.
+.sp
+.LP
+The parameter \fIeof\fR is the character which marks the end of the regular
+expression. This character is usually a \fB/\fR.
+.sp
+.LP
+Each program that includes the \fB<regexp.h>\fR header file must have a
+\fB#define\fR statement for \fBINIT\fR. It is used for dependent declarations
+and initializations. Most often it is used to set a register variable to point
+to the beginning of the regular expression so that this register variable can
+be used in the declarations for \fBGETC\fR, \fBPEEKC\fR, and \fBUNGETC\fR.
+Otherwise it can be used to declare external variables that might be used by
+\fBGETC\fR, \fBPEEKC\fR and \fBUNGETC\fR. (See \fBEXAMPLES\fR below.)
+.SS "step(\|), advance(\|)"
+.sp
+.LP
+The first parameter to the \fBstep()\fR and \fBadvance()\fR functions is a
+pointer to a string of characters to be checked for a match. This string should
+be null terminated.
+.sp
+.LP
+The second parameter, \fIexpbuf\fR, is the compiled regular expression which
+was obtained by a call to the function \fBcompile()\fR.
+.sp
+.LP
+The function \fBstep()\fR returns non-zero if some substring of \fIstring\fR
+matches the regular expression in \fIexpbuf\fR and  \fB0\fR if there is no
+match. If there is a match, two external character pointers are set as a side
+effect to the call to \fBstep()\fR. The variable \fBloc1\fR points to the first
+character that matched the regular expression; the variable \fBloc2\fR points
+to the character after the last character that matches the regular expression.
+Thus if the regular expression matches the entire input string, \fBloc1\fR will
+point to the first character of \fIstring\fR and \fBloc2\fR will point to the
+null at the end of \fIstring\fR.
+.sp
+.LP
+The function \fBadvance()\fR returns non-zero if the initial substring of
+\fIstring\fR matches the regular expression in \fIexpbuf\fR. If there is a
+match, an external character pointer, \fBloc2\fR, is set as a side effect. The
+variable \fBloc2\fR points to the next character in \fIstring\fR after the last
+character that matched.
+.sp
+.LP
+When \fBadvance()\fR encounters a \fB*\fR or \fB\e{ \e}\fR sequence in the
+regular expression, it will advance its pointer to the string to be matched as
+far as possible and will recursively call itself trying to match the rest of
+the string to the rest of the regular expression. As long as there is no match,
+\fBadvance()\fR will back up along the string until it finds a match or reaches
+the point in the string that initially matched the  \fB*\fR or \fB\e{ \e}\fR\&.
+It is sometimes desirable to stop this backing up before the initial point in
+the string is reached. If the external character pointer \fBlocs\fR is equal to
+the point in the string at sometime during the backing up process,
+\fBadvance()\fR will break out of the loop that backs up and will return zero.
+.sp
+.LP
+The external variables \fBcircf\fR, \fBsed\fR, and \fBnbra\fR are reserved.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRUsing Regular Expression Macros and Calls
+.sp
+.LP
+The following is an example of how the regular expression macros and calls
+might be defined by an application program:
+
+.sp
+.in +2
+.nf
+#define INIT       register char *sp = instring;
+#define GETC()     (*sp++)
+#define PEEKC()    (*sp)
+#define UNGETC(c)  (--sp)
+#define RETURN(c)  return;
+#define ERROR(c)   regerr()
+
+#include <regexp.h>
+\&...
+      (void) compile(*argv, expbuf, &expbuf[ESIZE],'\e0');
+\&...
+      if (step(linebuf, expbuf))
+                        succeed;
+.fi
+.in -2
+.sp
+
+.SH DIAGNOSTICS
+.sp
+.LP
+The function \fBcompile()\fR uses the macro \fBRETURN\fR on success and the
+macro \fBERROR\fR on failure (see above). The functions \fBstep()\fR and
+\fBadvance()\fR return non-zero on a successful match and zero if there is no
+match. Errors are:
+.sp
+.ne 2
+.na
+\fB11\fR
+.ad
+.RS 6n
+range endpoint too large.
+.RE
+
+.sp
+.ne 2
+.na
+\fB16\fR
+.ad
+.RS 6n
+bad number.
+.RE
+
+.sp
+.ne 2
+.na
+\fB25\fR
+.ad
+.RS 6n
+\fB\e\fR \fIdigit\fR out of range.
+.RE
+
+.sp
+.ne 2
+.na
+\fB36\fR
+.ad
+.RS 6n
+illegal or missing delimiter.
+.RE
+
+.sp
+.ne 2
+.na
+\fB41\fR
+.ad
+.RS 6n
+no remembered search string.
+.RE
+
+.sp
+.ne 2
+.na
+\fB42\fR
+.ad
+.RS 6n
+\fB\e( \e)\fR imbalance.
+.RE
+
+.sp
+.ne 2
+.na
+\fB43\fR
+.ad
+.RS 6n
+too many \fB\e(\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB44\fR
+.ad
+.RS 6n
+more than 2 numbers given in \fB\e{ \e}\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB45\fR
+.ad
+.RS 6n
+\fB}\fR expected after \fB\e\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB46\fR
+.ad
+.RS 6n
+first number exceeds second in \fB\e{ \e}\fR\&.
+.RE
+
+.sp
+.ne 2
+.na
+\fB49\fR
+.ad
+.RS 6n
+\fB[ ]\fR imbalance.
+.RE
+
+.sp
+.ne 2
+.na
+\fB50\fR
+.ad
+.RS 6n
+regular expression overflow.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR regex (7)

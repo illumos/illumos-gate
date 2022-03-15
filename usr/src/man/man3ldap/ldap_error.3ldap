@@ -581,7 +581,7 @@ servers that the client can hop through to retrieve data.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -599,4 +599,4 @@ Interface Stability	Committed
 \fBldap_result\fR(3LDAP), \fBldap_parse_extended_result\fR(3LDAP),
 \fBldap_parse_result\fR(3LDAP), \fBldap_parse_sasl_bind_result\fR(3LDAP),
 \fBldap_search\fR(3LDAP), \fBmalloc\fR(3C), \fBperror\fR(3C) ,
-\fBattributes\fR(5)
+.BR attributes (7)

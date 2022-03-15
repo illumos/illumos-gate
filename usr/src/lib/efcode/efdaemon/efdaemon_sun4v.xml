@@ -23,8 +23,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -72,7 +70,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='efdaemon' section='1M' manpath='/usr/share/man' />
+			<manpage title='efdaemon' section='8' manpath='/usr/share/man' />
 		</documentation>
 	</template>
 

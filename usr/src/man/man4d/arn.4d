@@ -1,0 +1,78 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ARN 4D "Aug 24, 2009"
+.SH NAME
+arn \- Atheros AR9280/9281/9285 IEEE802.11 a/b/g/n wireless network device
+.SH DESCRIPTION
+.sp
+.LP
+The \fBarn\fR IEEE802.11 a/b/g/n wireless driver is a loadable, clonable,
+GLDv3-based STREAMS driver supporting Atheros AR9280/9281/9285 IEEE802.11
+a/b/g/n wireless network device.
+.SS "Configuration"
+.sp
+.LP
+The \fBarn\fR driver performs auto-negotiation to determine the data rate and
+mode. The driver supports only BSS networks (also known as \fBap\fR or
+\fBinfrastructure\fR networks) and \fBopen\fR(or \fBopen-system\fR)  or
+\fBshared system\fR authentication. For wireless security, WEP encryption,
+WPA-PSK, and WPA2-PSK are currently supported. Configuration and administration
+tasks can be performed with the \fBdladm\fR(8) and \fBwificonfig\fR(8)
+utilities.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/arn\fR\fR
+.ad
+.RS 25n
+Special character device
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/arn\fR\fR
+.ad
+.RS 25n
+32-bit ELF kernel module (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/arn\fR\fR
+.ad
+.RS 25n
+64-bit ELF kernel driver module (x86)
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR gld (4D),
+.BR dlpi (4P),
+.BR attributes (7),
+.BR dladm (8),
+.BR wificonfig (8)

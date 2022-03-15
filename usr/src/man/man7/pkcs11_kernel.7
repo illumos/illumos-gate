@@ -1,0 +1,114 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PKCS11_KERNEL 7 "Oct 27, 2005"
+.SH NAME
+pkcs11_kernel \- PKCS#11 interface to Kernel Cryptographic Framework
+.SH SYNOPSIS
+.LP
+.nf
+/usr/lib/security/pkcs11_kernel.so
+/usr/lib/security/64/pkcs11_kernel.so
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpkcs11_kernel.so\fR object implements the RSA PKCS#11 v2.20
+specification by using a private interface to communicate with the Kernel
+Cryptographic Framework.
+.sp
+.LP
+Each unique hardware provider is represented by a PKCS#11 slot. In a system
+with no hardware Kernel Cryptographic Framework providers, this PKCS#11 library
+presents no slots.
+.sp
+.LP
+The PKCS#11 mechanisms provided by this library is determined by the available
+hardware providers.
+.sp
+.LP
+Application developers should link to \fBlibpkcs11.so\fR rather than link
+directly to \fBpkcs11_kernel.so\fR. See \fBlibpkcs11\fR(3LIB).
+.sp
+.LP
+All of the Standard PKCS#11 functions listed on \fBlibpkcs11\fR(3LIB) are
+implemented except for the following:
+.sp
+.in +2
+.nf
+C_DecryptDigestUpdate
+C_DecryptVerifyUpdate
+C_DigestEncryptUpdate
+C_GetOperationState
+C_InitToken
+C_InitPIN
+C_SetOperationState
+C_SignEncryptUpdate
+C_WaitForSlotEvent
+.fi
+.in -2
+
+.sp
+.LP
+A call to these functions returns \fBCKR_FUNCTION_NOT_SUPPORTED\fR.
+.sp
+.LP
+Buffers cannot be greater than 2 megabytes. For example, \fBC_Encrypt()\fR can
+be called with a 2 megabyte buffer of plaintext and a 2 megabyte buffer for the
+ciphertext.
+.sp
+.LP
+The maximum number of object handles that can be returned by a call to
+\fBC_FindObjects()\fR is 512.
+.sp
+.LP
+The maximum amount of kernel memory that can be used for crypto operations is
+limited by the \fBproject.max-crypto-memory\fR resource control. Allocations in
+the kernel for buffers and session-related structures are charged against this
+resource control.
+.SH RETURN VALUES
+.sp
+.LP
+The return values of each of the implemented functions are defined and listed
+in the RSA PKCS#11 v2.20 specification. See http://www.rsasecurity.com.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Standard: PKCS#11 v2.20
+_
+MT-Level	T{
+MT-Safe with exceptions. See section 6.5.2 of RSA PKCS#11 v2.20
+T}
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR libpkcs11 (3LIB),
+.BR attributes (7),
+.BR pkcs11_softtoken (7),
+.BR cryptoadm (8),
+.BR rctladm (8)
+.sp
+.LP
+RSA PKCS#11 v2.20 http://www.rsasecurity.com
+.SH NOTES
+.sp
+.LP
+Applications that have an open session to a PKCS#11 slot make the corresponding
+hardware provider driver not unloadable. An administrator must close the
+applications that have an PKCS#11 session open to the hardware provider to make
+the driver unloadable.

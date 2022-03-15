@@ -105,7 +105,7 @@ correspond to a valid character.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -123,5 +123,10 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBread\fR(2), \fBfseek\fR(3C), \fBfsetpos\fR(3C), \fBrewind\fR(3C),
-\fBsetbuf\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR read (2),
+.BR fseek (3C),
+.BR fsetpos (3C),
+.BR rewind (3C),
+.BR setbuf (3C),
+.BR attributes (7),
+.BR standards (7)

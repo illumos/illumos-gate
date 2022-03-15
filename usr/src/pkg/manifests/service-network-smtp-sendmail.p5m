@@ -208,23 +208,23 @@ file path=usr/share/man/man1/mconnect.1
 file path=usr/share/man/man1/praliases.1
 file path=usr/share/man/man1/sendmail-mailq.1
 file path=usr/share/man/man1/vacation.1
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/check-hostname.1m
-file path=usr/share/man/man1m/check-permissions.1m
-file path=usr/share/man/man1m/editmap.1m
-file path=usr/share/man/man1m/etrn.1m
-file path=usr/share/man/man1m/makemap.1m
-file path=usr/share/man/man1m/newaliases.1m
-file path=usr/share/man/man1m/sendmail.1m
-file path=usr/share/man/man1m/smrsh.1m
-dir  path=usr/share/man/man4
-link path=usr/share/man/man4/addresses.4 target=aliases.4
-file path=usr/share/man/man4/alias.4
-file path=usr/share/man/man4/aliases.4
-link path=usr/share/man/man4/forward.4 target=aliases.4
-file path=usr/share/man/man4/sendmail.4
-link path=usr/share/man/man4/sendmail.cf.4 target=sendmail.4
-link path=usr/share/man/man4/submit.cf.4 target=sendmail.4
+dir  path=usr/share/man/man5
+link path=usr/share/man/man5/addresses.5 target=aliases.5
+file path=usr/share/man/man5/alias.5
+file path=usr/share/man/man5/aliases.5
+link path=usr/share/man/man5/forward.5 target=aliases.5
+file path=usr/share/man/man5/sendmail.5
+link path=usr/share/man/man5/sendmail.cf.5 target=sendmail.5
+link path=usr/share/man/man5/submit.cf.5 target=sendmail.5
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/check-hostname.8
+file path=usr/share/man/man8/check-permissions.8
+file path=usr/share/man/man8/editmap.8
+file path=usr/share/man/man8/etrn.8
+file path=usr/share/man/man8/makemap.8
+file path=usr/share/man/man8/newaliases.8
+file path=usr/share/man/man8/sendmail.8
+file path=usr/share/man/man8/smrsh.8
 dir  path=var group=sys
 dir  path=var/adm group=sys mode=0775
 dir  path=var/adm/sm.bin group=sys

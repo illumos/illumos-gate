@@ -1,0 +1,600 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SSD 4D "September 12, 2020"
+.SH NAME
+ssd \- Fibre Channel Arbitrated Loop disk device driver
+.SH SYNOPSIS
+.nf
+\fBssd@\fR\fIport\fR\fB,\fR\fItarget\fR\fB:\fR\fIpartition\fR
+.fi
+
+.SH DESCRIPTION
+ The \fBssd\fR driver supports Fibre Channel disk devices.
+.sp
+.LP
+The specific type of each disk is determined by the \fBSCSI\fR inquiry command
+and reading the volume label stored on block 0 of the drive. The volume label
+describes the disk geometry and partitioning; it must be present or the disk
+cannot be mounted by the system.
+.sp
+.LP
+The block-files access the disk using the system's normal buffering mechanism
+and are read and written without regard to physical disk records. A "raw"
+interface provides for direct transmission between the disk and the read or
+write buffer. A single read or write call usually results in one I/O operation;
+raw I/O is therefore more efficient when many bytes are transmitted. Block file
+names are found in \fB/dev/dsk\fR; the names of the raw files are found in
+\fB/dev/rdsk\fR.
+.sp
+.LP
+I/O requests (such as \fBlseek\fR(2)) to the \fBSCSI\fR disk must have an
+offset that is a multiple of 512 bytes (\fBDEV_BSIZE\fR), or the driver returns
+an \fBEINVAL\fR error. If the transfer length is not a multiple of 512 bytes,
+the transfer count is rounded up by the driver.
+.sp
+.LP
+Partition 0 is normally used for the root file system on a disk, with partition
+1 as a paging area (for example, \fBswap\fR). Partition 2 is used to back up
+the entire disk. Partition 2 normally maps the entire disk and may also be used
+as the mount point for secondary disks in the system. The rest of the disk is
+normally partition 6. For the primary disk, the user file system is located
+here.
+.sp
+.LP
+The device has associated error statistics. These must include counters for
+hard errors, soft errors and transport errors. Other data may be implemented as
+required.
+.SH DEVICE STATISTICS SUPPORT
+The device maintains I/O statistics for the device and for partitions allocated
+for that device. For each device/partition, the  driver accumulates reads,
+writes, bytes read, and bytes written. The driver also initiates hi-resolution
+time stamps at queue entry and exit points to enable monitoring of residence
+time and cumulative residence-length product for each queue.
+.sp
+.LP
+Not all device drivers make per-partition IO statistics available for
+reporting. \fBssd\fR and \fBsd\fR(4D) per-partition statistics are  enabled by
+default but may be disabled in their configuration files.
+.SH IOCTLS
+Refer to  \fBdkio\fR(4I).
+.SH ERRORS
+.ne 2
+.na
+\fB\fBEACCES\fR\fR
+.ad
+.RS 10n
+Permission denied.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEBUSY\fR\fR
+.ad
+.RS 10n
+The partition was opened exclusively by another thread.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 10n
+The argument was a bad address.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 10n
+Invalid argument.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEIO\fR\fR
+.ad
+.RS 10n
+An I/O error occurred.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENOTTY\fR\fR
+.ad
+.RS 10n
+The device does not support the requested ioctl function.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENXIO\fR\fR
+.ad
+.RS 10n
+When returned during  \fBopen\fR(2), this error indicates the device does not
+exist.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEROFS\fR\fR
+.ad
+.RS 10n
+The device is a read-only device.
+.RE
+
+.SH CONFIGURATION
+You configure the \fBssd\fR driver by defining  properties in the
+\fBssd.conf\fR file. The \fBssd\fR driver supports the following properties:
+.sp
+.ne 2
+.na
+\fB\fBenable-partition-kstats\fR\fR
+.ad
+.RS 27n
+The default value is 1, which causes partition IO statistics to be maintained.
+Set this value to zero to prevent the driver from recording partition
+statistics. This slightly reduces the CPU overhead for IO, minimizes the amount
+of \fBsar\fR(1) data collected and makes these statistics unavailable for
+reporting by \fBiostat\fR(8) even though the \fB-p\fR/\fB-P\fR option is
+specified.  Regardless of this setting, disk IO statistics are always
+maintained.
+.RE
+
+.sp
+.LP
+In addition to the above properties, some device-specific tunables can be
+configured in \fBssd.conf\fR using the 'ssd-config-list' global property. The
+value of this property is a list of duplets. The formal syntax is:
+.sp
+.in +2
+.nf
+ssd-config-list =	<duplet> [, <duplet> ]* ;
+
+where
+
+<duplet>:=        "<vid+pid>" , "<tunable-list>"
+
+and
+
+<tunable-list>:=   <tunable>  [, <tunable> ]*;
+<tunable> =        <name> : <value>
+
+The <vid+pid> is the string that is returned by the target device
+on a SCSI inquiry command.
+
+The <tunable-list> contains one or more tunables to apply to
+all target devices with the specified <vid+pid>.
+
+Each <tunable> is a <name> : <value> pair. Supported
+tunable names are:
+
+   delay-busy:	when busy, nsecs of delay before retry.
+
+   retries-timeout:	retries to perform on an IO timeout.
+.fi
+.in -2
+
+.SH EXAMPLES
+.in +2
+.nf
+The following is an example of a global ssd-config-list property:
+
+   ssd-config-list =
+      "SUN     T4", "delay-busy:600, retries-timeout:6",
+      "SUN     StorEdge_3510", "retries-timeout:3";
+.fi
+.in -2
+
+.SH FILES
+.ne 2
+.na
+\fBssd.conf\fR
+.ad
+.RS 22n
+Driver configuration file
+.RE
+
+.sp
+.ne 2
+.na
+\fB/dev/dsk/c\fIn\fR\fBt\fR\fIn\fR\fBd\fR\fIn\fR\fBs\fR\fIn\fR\fR
+.ad
+.RS 22n
+block files
+.RE
+
+.sp
+.ne 2
+.na
+\fB/dev/rdsk/c\fIn\fR\fBt\fR\fIn\fR\fBd\fR\fIn\fR\fBs\fR\fIn\fR\fR
+.ad
+.RS 22n
+raw files
+.RE
+
+.sp
+.ne 2
+.na
+\fBc\fIn\fR\fR
+.ad
+.RS 22n
+is the controller number on the system.
+.RE
+
+.sp
+.ne 2
+.na
+\fBt\fIn\fR\fR
+.ad
+.RS 22n
+7-bit disk loop identifier, such as switch setting
+.RE
+
+.sp
+.ne 2
+.na
+\fBd\fIn\fR\fR
+.ad
+.RS 22n
+SCSI lun  \fIn\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBs\fR\fIn\fR\fR
+.ad
+.RS 22n
+partition \fIn\fR (0-7)
+.RE
+
+.SH SEE ALSO
+.BR sar (1),
+.BR ioctl (2),
+.BR lseek (2),
+.BR open (2),
+.BR read (2),
+.BR write (2),
+.BR cdio (4I),
+.BR dkio (4I),
+.BR driver.conf (5),
+.BR scsi (5),
+.BR format (8),
+.BR iostat (8)
+.sp
+.LP
+\fIANSI Small Computer System Interface-2 (SCSI-2)\fR
+.sp
+.LP
+\fIANSI X3.272-1996, Fibre Channel Arbitrated Loop (FC-AL)\fR
+.sp
+.LP
+\fIFibre Channel - Private Loop SCSI Direct Attach (FC-PLDA)\fR
+.SH DIAGNOSTICS
+.in +2
+.nf
+Error for command '<command name>' Error Level: Fatal Requested Block <n>,
+Error  Block: <m>, Sense Key: <sense key name>, Vendor '<vendor name>':
+ASC = 0x<a> (<ASC name>), ASCQ = 0x<b>, FRU = 0x<c>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The command indicated by <command name> failed. The Requested Block is the
+block where the transfer started and the Error Block is the block that caused
+the error. Sense Key, ASC, and ASCQ information is returned by the target in
+response to a request sense command.
+.sp
+.in +2
+.nf
+Check Condition on REQUEST SENSE
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A REQUEST SENSE command completed with a check condition. The original command
+will be retried a number of times.
+.sp
+.in +2
+.nf
+Label says <m> blocks Drive says <\fIn\fR> blocks
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+There is a discrepancy between the label and what the drive returned on the
+READ CAPACITY command.
+.sp
+.in +2
+.nf
+Not enough sense information
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The request sense data was less than expected.
+.sp
+.in +2
+.nf
+Request Sense couldn't get sense data
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The REQUEST SENSE command did not transfer any data.
+.sp
+.in +2
+.nf
+Reservation Conflict
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The drive was reserved by another initiator.
+.sp
+.in +2
+.nf
+SCSI transport failed: reason 'xxxx' : {retrying|giving up}
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The host adapter has failed to transport a command to the target for the
+reason stated. The driver will either retry the command or, ultimately, give
+up.
+.sp
+.in +2
+.nf
+Unhandled Sense Key <\fIn\fR>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The REQUEST SENSE data included an invalid sense key.
+.sp
+.in +2
+.nf
+Unit not Ready. Additional sense code 0x<\fIn\fR>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The drive is not ready.
+.sp
+.in +2
+.nf
+corrupt label - bad geometry
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The disk label is corrupted.
+.sp
+.in +2
+.nf
+corrupt label - label checksum failed
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The disk label is corrupted.
+.sp
+.in +2
+.nf
+corrupt label - wrong magic number
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The disk label is corrupted.
+.sp
+.in +2
+.nf
+device busy too long
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The drive returned busy during a number of retries.
+.sp
+.in +2
+.nf
+disk not responding to selection
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The drive was probably powered down or died.
+.sp
+.in +2
+.nf
+i/o to invalid geometry
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The geometry of the drive could not be established.
+.sp
+.in +2
+.nf
+incomplete read/write - retrying/giving up
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+There was a residue after the command completed normally.
+.sp
+.in +2
+.nf
+logical unit not ready
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The drive is not ready.
+.sp
+.in +2
+.nf
+no bp for disk label
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A bp with consistent memory could not be allocated.
+.sp
+.in +2
+.nf
+no mem for property
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Free memory pool exhausted.
+.sp
+.in +2
+.nf
+no memory for disk label
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Free memory pool exhausted.
+.sp
+.in +2
+.nf
+no resources for dumping
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A packet could not be allocated during dumping.
+.sp
+.in +2
+.nf
+offline
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Drive went offline; probably powered down.
+.sp
+.in +2
+.nf
+requeue of command fails<\fIn\fR>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Driver attempted to retry a command and experienced a transport error.
+.sp
+.in +2
+.nf
+ssdrestart transport failed <\fIn\fR>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Driver attempted to retry a command and experienced a transport error.
+.sp
+.in +2
+.nf
+transfer length not modulo <\fIn\fR>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Illegal request size.
+.sp
+.in +2
+.nf
+transport rejected <\fIn\fR>
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Host adapter driver was unable to accept a command.
+.sp
+.in +2
+.nf
+unable to read label
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Failure to read disk label.
+.sp
+.in +2
+.nf
+unit does not respond to selection
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Drive went offline; probably powered down.

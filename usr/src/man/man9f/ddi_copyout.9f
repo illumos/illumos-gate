@@ -171,8 +171,12 @@ specified argument contains an invalid address, an error code is returned.
 .in -2
 
 .SH SEE ALSO
-\fBioctl\fR(9E), \fBbcopy\fR(9F), \fBcopyin\fR(9F), \fBcopyout\fR(9F),
-\fBddi_copyin\fR(9F), \fBuiomove\fR(9F)
+.BR ioctl (9E),
+.BR bcopy (9F),
+.BR copyin (9F),
+.BR copyout (9F),
+.BR ddi_copyin (9F),
+.BR uiomove (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -1,0 +1,428 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH BART_RULES 5 "Sep 9, 2003"
+.SH NAME
+bart_rules \- bart rules file
+.SH DESCRIPTION
+.sp
+.LP
+The \fBbart_rules\fR file is a text file that is used by the \fBbart\fR(8)
+command. The rules file determines which files to validate and which file
+attributes of those files to ignore.
+.sp
+.LP
+Some lines are ignored by the manifest comparison tool. Ignored lines include
+blank lines, lines that consist only of white space, and comments that begin
+with \fB#\fR.
+.sp
+.LP
+The rules file supports three directives: \fBCHECK\fR, \fBIGNORE\fR, and a
+\fIsubtree\fR directive, which is an absolute path name and optional pattern
+matching modifiers. Each \fBCHECK\fR, \fBIGNORE\fR, and \fIsubtree\fR directive
+must be on a separate line. Bart supports continuation of long lines using a
+backslash (\fB\e\fR). The rules file uses the directives to create logical
+blocks.
+.SS "Syntax"
+.sp
+.LP
+The syntax for the rules file is as follows:
+.sp
+.in +2
+.nf
+[IGNORE \fIattribute\fR...]*
+[CHECK] [\fIattribute\fR...]*
+
+\fIsubtree1\fR [\fIpattern\fR...]*
+[IGNORE \fIattribute\fR...]*
+[CHECK] [\fIattribute\fR...]*
+
+\fIsubtree2\fR [\fIpattern\fR...]*
+\fIsubtree3\fR [\fIpattern\fR...]*
+\fIsubtree4\fR [\fIpattern\fR...]*
+[IGNORE \fIattribute\fR...]*
+[CHECK] [\fIattribute\fR...]*
+\&...
+.fi
+.in -2
+
+.SS "Rule Blocks"
+.sp
+.LP
+Rule blocks are composed of statements that are created by using directives and
+arguments.
+.sp
+.LP
+There are three types of blocks:
+.sp
+.ne 2
+.na
+\fBGlobal Block\fR
+.ad
+.RS 16n
+The first block in the file. The block is considered ``global'' if it specifies
+\fBCHECK\fR and \fBIGNORE\fR statements, but no previous subtree statement. A
+global block pertains to all subsequent blocks.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLocal block\fR
+.ad
+.RS 16n
+A block that specifies \fBCHECK\fR and \fBIGNORE\fR statements as well as a
+subtree directive. The rules in this block pertain to files and directories
+found in the specified subtree.
+.RE
+
+.sp
+.ne 2
+.na
+\fBHeir block\fR
+.ad
+.RS 16n
+A block that contains a null \fBCHECK\fR statement, no arguments. This block
+inherits the global \fBCHECK\fR statements and \fBIGNORE\fR statements.
+.RE
+
+.sp
+.LP
+The order in which \fBCHECK\fR and \fBIGNORE\fR statements appear in blocks is
+important. The \fBbart\fR command processes \fBCHECK\fR and \fBIGNORE\fR
+statements in the order in which they are read, with later statements
+overriding earlier statements.
+.sp
+.LP
+Subtree specifications must appear one per line. Each specification must begin
+with an absolute path name. Optionally, each specification can be followed by
+pattern-matching arguments.
+.sp
+.LP
+When a file system being tracked belongs to more than one subtree directive,
+\fBbart\fR performs the following resolution steps:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Applies the \fBCHECK\fR and \fBIGNORE\fR statements set in the global block.
+Note that all \fBCHECK\fR and \fBIGNORE\fR statements are processed in order.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Finds the last subtree directive that matches the file.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Processes the \fBCHECK\fR and \fBIGNORE\fR statements that belong to the last
+matching subtree directive. These statements are processed in the order in
+which they are read, overriding global settings.
+.RE
+.SS "Pattern Matching Statements"
+.sp
+.LP
+There are two types of pattern matching statements
+.sp
+.ne 2
+.na
+\fBAND\fR
+.ad
+.RS 7n
+For a given subtree directive, all pattern matching statements are logically
+ANDed with the subtree. Patterns have the following syntax:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Wildcards are permitted for both the subtree and pattern matching statements.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The exclamation point (\fB!\fR) character represents logical NOT.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A pattern that terminates with a slash is a subtree. The absence of a slash
+indicates that the pattern is not a directory. The subtree itself does not
+require an end slash.
+.RE
+For example, the following subtree example includes the contents of
+\fB/home/nickiso/src\fR except for object files, core files, and all of the
+SCCS subtrees. Note that directory names that terminate with \fB\&.o\fR and
+directories named \fBcore\fR are \fBnot\fR excluded because the patterns
+specified do not terminate with \fB/\fR.
+.sp
+.in +2
+.nf
+/home/nickiso/src !*.o !core !SCCS/
+CHECK  all
+.fi
+.in -2
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBOR\fR
+.ad
+.RS 7n
+Group multiple subtree directives together. Such subtree directives are
+logically ORed together.
+.sp
+.in +2
+.nf
+/home/nickiso/src !*.o !core
+/home/nickiso/Mail
+/home/nickiso/docs *.sdw
+CHECK   all
+IGNORE  mtime lnmtime dirmtime
+.fi
+.in -2
+
+The files included in the previous example are as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Everything under \fB/home/nickiso/src\fR except for \fB*.o\fR and \fBcore\fR
+files
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Everything under \fB/home/nickiso/Mail\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All files under \fB/home/nickiso/docs\fR that end in \fB*.sdw\fR
+.RE
+For these files, all attributes are checked except for modification times.
+.RE
+
+.SS "File Attributes"
+.sp
+.LP
+The \fBbart\fR command uses \fBCHECK\fR and \fBIGNORE\fR statements to define
+which attributes to track or ignore. Each attribute has an associated keyword.
+.sp
+.LP
+The attribute keywords are as follows:
+.sp
+.ne 2
+.na
+\fBacl\fR
+.ad
+.RS 12n
+ACL attributes for the file. For a file with ACL attributes, this field
+contains the output from \fBacltotext()\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBall\fR
+.ad
+.RS 12n
+All attributes.
+.RE
+
+.sp
+.ne 2
+.na
+\fBcontents\fR
+.ad
+.RS 12n
+Checksum value of the file. This attribute is only specified for regular files.
+If you turn off context checking or if checksums cannot be computed, the value
+of this field is \fB-\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdest\fR
+.ad
+.RS 12n
+Destination of a symbolic link.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdevnode\fR
+.ad
+.RS 12n
+Value of the device node. This attribute is for character device files and
+block device files only.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdirmtime\fR
+.ad
+.RS 12n
+Modification time in seconds since 00:00:00 UTC, January 1, 1970 for
+directories.
+.RE
+
+.sp
+.ne 2
+.na
+\fBgid\fR
+.ad
+.RS 12n
+Numerical group ID of the owner of this entry.
+.RE
+
+.sp
+.ne 2
+.na
+\fBlnmtime\fR
+.ad
+.RS 12n
+Creation time for links.
+.RE
+
+.sp
+.ne 2
+.na
+\fBmode\fR
+.ad
+.RS 12n
+Octal number that represents the permissions of the file.
+.RE
+
+.sp
+.ne 2
+.na
+\fBmtime\fR
+.ad
+.RS 12n
+Modification time in seconds since 00:00:00 UTC, January 1, 1970 for files.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsize\fR
+.ad
+.RS 12n
+File size in bytes.
+.RE
+
+.sp
+.ne 2
+.na
+\fBtype\fR
+.ad
+.RS 12n
+Type of file.
+.RE
+
+.sp
+.ne 2
+.na
+\fBuid\fR
+.ad
+.RS 12n
+Numerical user ID of the owner of this entry.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample Rules File
+.sp
+.LP
+The following is a sample rules file:
+
+.sp
+.in +2
+.nf
+# Global rules, track everything except dirmtime.
+CHECK   all
+IGNORE  dirmtime
+
+# The files in /data* are expected to change, so don't bother
+# tracking the attributes expected to change.
+# Furthermore, by specifying ``IGNORE contents,'' you save
+# time and resources.
+/data*
+IGNORE  contents mtime size
+
+/home/nickiso f* bar/
+IGNORE  acl
+
+# For /usr, apply the global rules.
+/usr
+CHECK
+
+# Note: Since /usr/tmp follows the /usr block, the /usr/tmp
+# subtree is subjected to the ``IGNORE all.''
+/usr/tmp
+/home/nickiso *.o
+/home/nickiso core
+/home/nickiso/proto
+IGNORE  all
+.fi
+.in -2
+
+.sp
+.LP
+The following files are cataloged based on the sample rules file:
+
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All attributes, except for \fBdirmtime\fR, \fBmtime\fR, \fBsize\fR, and
+\fBcontents\fR, are tracked for files under the \fB/data*\fR subtrees.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Files under the \fB/usr\fR subtree, except for \fB/usr/tmp\fR, are cataloged by
+using the global rules.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fB/home/nickiso/foo.c\fR file exists, its attributes, except for
+\fBacl\fR and \fBdirmtime\fR, are cataloged.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+All \fB\&.o\fR and \fBcore\fR files under \fB/home/nickiso\fR, as well as the
+\fB/home/nickiso/proto\fR and \fB/usr/tmp\fR subtrees, are ignored.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If the \fB/home/nickiso/bar/foo.o\fR file exists, it is ignored because it is
+subject to the last block.
+.RE
+.SH SEE ALSO
+.sp
+.LP
+.BR bart_manifest (5),
+.BR attributes (7),
+.BR bart (8)

@@ -118,4 +118,4 @@ function was interrupted by a signal.
 .Xr fdopendir 3C ,
 .Xr opendir 3C ,
 .Xr readdir 3C ,
-.Xr attributes 5
+.Xr attributes 7

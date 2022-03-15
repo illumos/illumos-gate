@@ -166,7 +166,7 @@ outside of the \fBRPC\fR subsystem.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -181,5 +181,9 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBmalloc\fR(3C), \fBrpc\fR(3NSL), \fBxdr_complex\fR(3NSL),
-\fBxdr_create\fR(3NSL), \fBxdr_simple\fR(3NSL), \fBattributes\fR(5)
+.BR malloc (3C),
+.BR rpc (3NSL),
+.BR xdr_complex (3NSL),
+.BR xdr_create (3NSL),
+.BR xdr_simple (3NSL),
+.BR attributes (7)

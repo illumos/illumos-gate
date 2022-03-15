@@ -40,7 +40,7 @@ whether a thread is in a range.
 A thread range is a series of one or more series of range identifiers
 which describe a collection of threads.
 These are often used by programs such as
-.Xr pbind 1M ,
+.Xr pbind 8 ,
 .Xr pstack 1 ,
 .Xr prun 1 ,
 .Xr pstop 1 ,
@@ -118,4 +118,4 @@ is returned to indicate that the set is invalid.
 .Sy MT-Safe
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

@@ -58,7 +58,7 @@ The
 .Sy prmap_t
 structure provides information such as the size, offset, and object of
 the mapping and is defined in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The pointer to the data returned by the library will only be valid for
 as long as the handle
@@ -130,4 +130,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Prelease 3PROC ,
-.Xr proc 4
+.Xr proc 5

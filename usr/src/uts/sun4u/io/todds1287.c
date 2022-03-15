@@ -46,7 +46,7 @@
  *	and held for 4 seconds for the power to go off, otherwise
  *	a momentarily press will delay the power-off for 21 seconds.
  *
- *	PSARC/1999/393 describes the pbio(7I) interface.
+ *	PSARC/1999/393 describes the pbio(4I) interface.
  */
 
 #include <sys/types.h>

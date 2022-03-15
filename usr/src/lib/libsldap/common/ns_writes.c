@@ -1262,7 +1262,7 @@ __ns_ldap_is_shadow_update_enabled(void)
  * to modify. When the Native LDAP client is configured with 'shadow update
  * enabled', Shadowshadow(4) entries can only be modified by privileged users.
  * Such users use the NS_LDAP_UPDATE_SHADOW flag to indicate the call is
- * for such a shadow(4) update, which would be forwarded to ldap_cachemgr
+ * for such a shadow(5) update, which would be forwarded to ldap_cachemgr
  * for performing the LDAP modify operation. ldap_cachemgr would call
  * this function again and use the special service NS_ADMIN_SHADOW_UPDATE
  * to identify itself, so that admin credential would be obtained and

@@ -94,13 +94,13 @@ file path=usr/share/man/man1/klist.1
 file path=usr/share/man/man1/kpasswd.1
 file path=usr/share/man/man1/krb5-config.1
 file path=usr/share/man/man1/ktutil.1
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/ktkt_warnd.1m
 dir  path=usr/share/man/man3lib
 file path=usr/share/man/man3lib/libkrb5.3lib
-dir  path=usr/share/man/man5
-file path=usr/share/man/man5/pam_krb5.5
-file path=usr/share/man/man5/pam_krb5_migrate.5
+dir  path=usr/share/man/man7
+file path=usr/share/man/man7/pam_krb5.7
+file path=usr/share/man/man7/pam_krb5_migrate.7
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/ktkt_warnd.8
 dir  path=var group=sys
 dir  path=var/krb5 group=sys
 dir  path=var/krb5/rcache group=sys mode=1777

@@ -213,9 +213,9 @@ and the corresponding representation.
 Example 1 shows how to prepare an IPv4 socket and deal with
 network byte-order.
 See
-.Xr inet 7P
+.Xr inet 4P
 and
-.Xr ip 7P
+.Xr ip 4P
 for more information on IPv4, socket options, etc.
 .Ss struct sockaddr_in6
 The
@@ -293,9 +293,9 @@ calls.
 Example 2 shows how to prepare an IPv6 socket.
 For more information on
 IPv6, please see
-.Xr inet6 7P
+.Xr inet6 4P
 and
-.Xr ip6 7P .
+.Xr ip6 4P .
 .Ss struct sockaddr_un
 The
 .Sy sockaddr_un
@@ -328,7 +328,7 @@ The
 .Sy sockaddr_dl
 structure is used to describe a layer 2 link-level address.
 This is used as part of various socket ioctls, such as those for
-.Xr arp 7P .
+.Xr arp 4P .
 The structure has the following members:
 .Bd -literal -offset indent
 ushort_t	sdl_family;	/* address family */
@@ -350,7 +350,7 @@ is non-zero this refers to the interface identifier that corresponds to
 the
 .Sy struct sockaddr_dl .
 This identifier is the same identifier that's shown by tools like
-.Xr ifconfig 1M
+.Xr ifconfig 8
 and used in the SIOC* set of socket ioctls.
 The member
 .Em sdl_type
@@ -435,7 +435,7 @@ The member
 .Em sll_ifindex
 is the interface's index.
 It is used as an identifier in various ioctls and included in the output of
-.Xr ifconfig 1M .
+.Xr ifconfig 8 .
 When calling
 .Xr bind 3SOCKET
 it should be filled in with the index that corresponds to the interface
@@ -462,7 +462,7 @@ promiscuous mode.
 The member
 .Em sll_hatype
 contains the hardware type as defined by
-.Xr arp 7P .
+.Xr arp 4P .
 The list of types can be found in
 .In net/if_arp.h .
 The member
@@ -580,8 +580,8 @@ main(void)
 .Xr bind 3SOCKET ,
 .Xr connect 3SOCKET ,
 .Xr socket 3SOCKET ,
-.Xr arp 7P ,
-.Xr inet 7P ,
-.Xr inet6 7P ,
-.Xr ip 7P ,
-.Xr ip6 7P
+.Xr arp 4P ,
+.Xr inet 4P ,
+.Xr inet6 4P ,
+.Xr ip 4P ,
+.Xr ip6 4P

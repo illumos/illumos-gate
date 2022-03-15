@@ -87,9 +87,14 @@ Wait indefinitely for resources.
 .RE
 
 .SH SEE ALSO
-\fBattach\fR(9E), \fBprobe\fR(9E), \fBtran_tgt_free\fR(9E),
-\fBtran_tgt_init\fR(9E), \fBscsi_hba_probe\fR(9F), \fBscsi_probe\fR(9F),
-\fBscsi_device\fR(9S), \fBscsi_hba_tran\fR(9S)
+.BR attach (9E),
+.BR probe (9E),
+.BR tran_tgt_free (9E),
+.BR tran_tgt_init (9E),
+.BR scsi_hba_probe (9F),
+.BR scsi_probe (9F),
+.BR scsi_device (9S),
+.BR scsi_hba_tran (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

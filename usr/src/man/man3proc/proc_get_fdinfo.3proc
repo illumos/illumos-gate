@@ -48,7 +48,7 @@ structure.
 The definition of the
 .Vt prfdinfo_t
 structure may be found in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The caller must free the returned memory by calling the
 .Fn proc_fdinfo_free
@@ -97,4 +97,4 @@ is not properly terminated.
 .Sy MT-Safe
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

@@ -33,7 +33,7 @@ GREP=/usr/bin/grep
 
 #
 # This is a temporary service to allow addition (only) to /etc/logadm.conf
-# It is temporary in the sense that logadm(1M) should have its configuration
+# It is temporary in the sense that logadm(8) should have its configuration
 # migrated to SMF in the future.
 #
 

@@ -203,7 +203,7 @@ create_legacy_loc () {
 		done
 	fi
 
-	# Gather LDAP info via ldapclient(1M).
+	# Gather LDAP info via ldapclient(8).
 	if [ -f /var/ldap/ldap_client_file ]; then
 		copy_to_legacy /var/ldap/ldap_client_file
 		NAMESERVICES="${NAMESERVICES}ldap,"
@@ -350,7 +350,7 @@ revert_to_legacy_loc () {
 	        $SVCADM enable dns/client
 	fi
 
-	# set /etc/defaultdomain and domainname(1M)
+	# set /etc/defaultdomain and domainname(8)
 	DEFAULT_DOMAIN=`nwam_get_loc_prop Legacy default-domain`
 	if [ -n "$DEFAULT_DOMAIN" ]; then
 		$DOMAINNAME $DEFAULT_DOMAIN
@@ -526,7 +526,7 @@ case "$1" in
 
 		#
 		# Upgrade handling. The upgrade file consists of a series
-		# of dladm(1M) commands. Note that after we are done, we
+		# of dladm(8) commands. Note that after we are done, we
 		# cannot rename the upgrade script file as the file system
 		# is still read-only at this point. Defer this to the
 		# manifest-import service.

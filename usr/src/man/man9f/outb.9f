@@ -76,7 +76,7 @@ bits, and 32 bits of data respectively, writing the data specified by
 .SH CONTEXT
 These functions may be called from user, interrupt, or kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -92,8 +92,12 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-\fBisa\fR(4), \fBattributes\fR(5), \fBddi_put8\fR(9F), \fBddi_put16\fR(9F),
-\fBddi_put32\fR(9F), \fBinb\fR(9F)
+.BR isa (5),
+.BR attributes (7),
+.BR ddi_put16 (9F),
+.BR ddi_put32 (9F),
+.BR ddi_put8 (9F),
+.BR inb (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

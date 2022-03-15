@@ -1,0 +1,412 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (C) 2005, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH IN.TELNETD 8 "February 5, 2022"
+.SH NAME
+in.telnetd, telnetd \- DARPA TELNET protocol server
+.SH SYNOPSIS
+.nf
+\fB/usr/sbin/in.telnetd\fR [\fB-a\fR \fIauthmode\fR] [\fB-EXUh\fR] [\fB-s\fR \fItos\fR]
+     [\fB-S\fR \fIkeytab\fR] [\fB-M\fR \fIrealm\fR]
+.fi
+
+.SH DESCRIPTION
+\fBin.telnetd\fR is a server that supports the \fBDARPA\fR standard
+\fBTELNET\fR virtual terminal protocol. \fBin.telnetd\fR is normally invoked in
+the internet server (see \fBinetd\fR(8)), for requests to connect to the
+\fBTELNET\fR port as indicated by the \fB/etc/services\fR file (see
+\fBservices\fR(5)).
+.sp
+.LP
+\fBin.telnetd\fR operates by allocating a pseudo-terminal device for a client,
+then creating a login process which has the subsidiary side of the
+pseudo-terminal as its standard input, output, and error. \fBin.telnetd\fR
+manipulates the manager side of the pseudo-terminal, implementing the
+\fBTELNET\fR protocol and passing characters between the remote client and the
+login process.
+.sp
+.LP
+When a \fBTELNET\fR session starts up, \fBin.telnetd\fR sends \fBTELNET\fR
+options to the client side indicating a willingness to do \fIremote\fR
+\fBecho\fR of characters, and to \fIsuppress\fR \fIgo\fR \fIahead\fR. The
+pseudo-terminal allocated to the client is configured to operate in "cooked"
+mode, and with \fBXTABS\fR, \fBICRNL\fR and \fBONLCR\fR enabled. See
+\fBtermio\fR(4I).
+.sp
+.LP
+\fBin.telnetd\fR is willing to do: \fIecho\fR, \fIbinary\fR, \fIsuppress\fR
+\fIgo\fR \fIahead\fR, and \fItiming\fR \fImark\fR. \fBin.telnetd\fR is willing
+to have the remote client do: \fIbinary\fR, \fIterminal\fR \fItype\fR,
+\fIterminal\fR \fIsize\fR, \fIlogout\fR \fIoption\fR, and \fIsuppress\fR
+\fIgo\fR \fIahead\fR.
+.sp
+.LP
+\fBin.telnetd\fR also allows environment variables to be passed, provided that
+the client negotiates this during the initial option negotiation. The
+\fBDISPLAY\fR environment variable may be sent this way, either by the
+\fBTELNET\fR general environment passing methods, or by means of the
+\fBXDISPLOC\fR \fBTELNET\fR option. \fBDISPLAY\fR can be passed in the
+environment option during the same negotiation where \fBXDISPLOC\fR is used.
+Note that if you use both methods, use the same value for both. Otherwise, the
+results may be unpredictable.
+.sp
+.LP
+These options are specified in Internet standards \fIRFC 1096\fR, \fIRFC
+1408\fR, \fIRFC 1510\fR, \fIRFC 1571\fR, \fIRFC 2941\fR, \fIRFC 2942\fR, \fIRFC
+2946\fR, and \fIRFC 1572\fR. The following Informational draft is also
+supported: \fIRFC 2952\fR.
+.sp
+.LP
+The banner printed by \fBin.telnetd\fR is configurable. The default is (more or
+less) equivalent to `\fBuname\fR \fB-sr\fR` and will be used if no banner is
+set in \fB/etc/default/telnetd\fR. To set the banner, add a line of the form
+.sp
+.in +2
+.nf
+BANNER="..."
+.fi
+.in -2
+
+.sp
+.LP
+to \fB/etc/default/telnetd\fR. Nonempty banner strings are fed to shells for
+evaluation. The default banner may be obtained by
+.sp
+.in +2
+.nf
+BANNER="\e\er\e\en\e\er\e\en`uname -s` `uname -r`\e\er\e\en\e\er\e\en"
+.fi
+.in -2
+
+.sp
+.LP
+and no banner will be printed if \fB/etc/default/telnetd\fR contains
+.sp
+.in +2
+.nf
+BANNER=""
+.fi
+.in -2
+
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-a\fR \fIauthmode\fR\fR
+.ad
+.RS 15n
+This option may be used for specifying what mode should be used for
+authentication. There are several valid values for \fIauthmode\fR:
+.sp
+.ne 2
+.na
+\fB\fBvalid\fR\fR
+.ad
+.RS 9n
+Only allows connections when the remote user can provide valid authentication
+information to identify the remote user, and is allowed access to the specified
+account without providing a password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBuser\fR\fR
+.ad
+.RS 9n
+Only allows connections when the remote user can provide valid authentication
+information to identify the remote user. The \fBlogin\fR(1) command will
+provide any additional user verification needed if the remote user is not
+allowed automatic access to the specified account.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnone\fR\fR
+.ad
+.RS 9n
+This is the default state. Authentication information is not required. If no or
+insufficient authentication information is provided, then the \fBlogin\fR(1)
+program provides the necessary user verification.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBoff\fR\fR
+.ad
+.RS 9n
+This disables the authentication code. All user verification happens through
+the \fBlogin\fR(1) program.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-E\fR\fR
+.ad
+.RS 15n
+Disables encryption support negotiation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 15n
+Disables displaying host specific information before login has been completed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-M\fR \fIrealm\fR\fR
+.ad
+.RS 15n
+Uses the indicated Kerberos V5 realm. By default, the daemon will determine its
+realm from the settings in the \fBkrb5.conf\fR(5) file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR \fItos\fR\fR
+.ad
+.RS 15n
+Sets the \fBIP\fR \fBTOS\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-S\fR \fIkeytab\fR\fR
+.ad
+.RS 15n
+Sets the \fBKRB5\fR keytab file to use. The \fB/etc/krb5/krb5.keytab\fR file is
+used by default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-U\fR\fR
+.ad
+.RS 15n
+Refuses connections that cannot be mapped to a name through the
+\fBgetnameinfo\fR(3SOCKET) function.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-X\fR\fR
+.ad
+.RS 15n
+Disables Kerberos V5 authentication support negotiation.
+.RE
+
+.SH USAGE
+\fBtelnetd\fR and \fBin.telnetd\fR are IPv6-enabled. See \fBip6\fR(4P).
+.SH SECURITY
+\fBin.telnetd\fR can authenticate using Kerberos V5 authentication,
+\fBpam\fR(3PAM), or both. By default, the telnet server will accept valid
+Kerberos V5 authentication credentials from a \fBtelnet\fR client that supports
+Kerberos. \fBin.telnetd\fR can also support an encrypted session from such a
+client if the client requests it.
+.sp
+.LP
+The \fBtelnet\fR protocol only uses single DES for session
+protection\(emclients request service tickets with single DES session keys. The
+KDC must know that host service principals that offer the \fBtelnet\fR service
+support single DES, which, in practice, means that such principals must have
+single DES keys in the KDC database.
+.sp
+.LP
+In order for Kerberos authentication to work, a \fBhost/\fR\fI<FQDN>\fR
+Kerberos principal must exist for each Fully Qualified Domain Name associated
+with the \fBtelnetd\fR server. Each of these \fBhost/\fR\fI<FQDN>\fR principals
+must have a \fBkeytab\fR entry in the \fB/etc/krb5/krb5.keytab\fR file on the
+\fBtelnetd\fR server. An example principal might be:
+.sp
+.LP
+\fBhost/bigmachine.eng.example.com\fR
+.sp
+.LP
+See \fBkadmin\fR(8) for instructions on adding a principal to a
+\fBkrb5.keytab\fR file. See \fI\fR for a discussion of Kerberos
+authentication.
+.sp
+.LP
+\fBin.telnetd\fR uses \fBpam\fR(3PAM) for authentication, account management,
+session management, and password management. The \fBPAM\fR configuration
+policy, listed through \fB/etc/pam.conf\fR, specifies the modules to be used
+for \fBin.telnetd\fR. Here is a partial \fBpam.conf\fR file with entries for
+the \fBtelnet\fR command using the UNIX authentication, account management,
+session management, and password management modules.
+.sp
+.in +2
+.nf
+telnet  auth requisite          pam_authtok_get.so.1
+telnet  auth required           pam_dhkeys.so.1
+telnet  auth required           pam_unix_auth.so.1
+
+telnet  account requisite       pam_roles.so.1
+telnet  account required        pam_projects.so.1
+telnet  account required        pam_unix_account.so.1
+
+telnet  session required        pam_unix_session.so.1
+
+telnet  password required       pam_dhkeys.so.1
+telnet  password requisite      pam_authtok_get.so.1
+telnet  password requisite      pam_authtok_check.so.1
+telnet  password required       pam_authtok_store.so.1
+.fi
+.in -2
+
+.sp
+.LP
+If there are no entries for the \fBtelnet\fR service, then the entries for the
+"other" service will be used. If multiple authentication modules are listed,
+then the user may be prompted for multiple passwords.
+.sp
+.LP
+For a Kerberized telnet service, the correct \fBPAM\fR service name is
+\fBktelnet\fR.
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/default/telnetd\fR\fR
+.ad
+.RS 24n
+
+.RE
+
+.SH SEE ALSO
+.BR login (1),
+.BR svcs (1),
+.BR telnet (1),
+.BR pam (3PAM),
+.BR getnameinfo (3SOCKET),
+.BR termio (4I),
+.BR ip6 (4P),
+.BR issue (5),
+.BR krb5.conf (5),
+.BR pam.conf (5),
+.BR services (5),
+.BR attributes (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_dhkeys (7),
+.BR pam_passwd_auth (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7),
+.BR smf (7),
+.BR inetadm (8),
+.BR inetd (8),
+.BR kadmin (8),
+.BR svcadm (8)
+.sp
+.LP
+\fI\fR
+.sp
+.LP
+Alexander, S. \fIRFC 1572, TELNET Environment Option\fR. Network Information
+Center, SRI International, Menlo Park, Calif., January 1994.
+.sp
+.LP
+Borman, Dave. \fIRFC 1408, TELNET Environment Option\fR. Network Information
+Center, SRI International, Menlo Park, Calif., January 1993.
+.sp
+.LP
+Borman, Dave. \fIRFC 1571, TELNET Environment Option Interoperability
+Issues\fR. Network Information Center, SRI International, Menlo Park, Calif.,
+January 1994.
+.sp
+.LP
+Crispin, Mark. \fIRFC 727, TELNET Logout Option\fR. Network Information Center,
+SRI International, Menlo Park, Calif., April 1977.
+.sp
+.LP
+Marcy, G. \fIRFC 1096, TELNET X Display Location Option\fR. Network Information
+Center, SRI International, Menlo Park, Calif., March 1989.
+.sp
+.LP
+Postel, Jon, and Joyce Reynolds. \fIRFC 854, TELNET Protocol Specification\fR.
+Network Information Center, SRI International, Menlo Park, Calif., May 1983.
+.sp
+.LP
+Waitzman, D. \fIRFC 1073, TELNET Window Size Option\fR. Network Information
+Center, SRI International, Menlo Park, Calif., October 1988.
+.sp
+.LP
+Kohl, J., Neuman, C., \fIThe Kerberos Network Authentication Service (V5), RFC
+1510\fR. September 1993.
+.sp
+.LP
+Ts'o, T. and J. Altman, \fITelnet Authentication Option, RFC 2941\fR. September
+2000.
+.sp
+.LP
+Ts'o, T., \fITelnet Authentication: Kerberos Version 5, RFC 2942\fR. September
+2000.
+.sp
+.LP
+Ts'o, T., \fITelnet Data Encryption Option, RFC 2946\fR. September 2000.
+.sp
+.LP
+Ts'o, T., \fITelnet Encryption: DES 64 bit Cipher Feedback, RFC 2952\fR.
+September 2000.
+.SH NOTES
+Some \fBTELNET\fR commands are only partially implemented.
+.sp
+.LP
+Binary mode has no common interpretation except between similar operating
+systems.
+.sp
+.LP
+The terminal type name received from the remote client is converted to lower
+case.
+.sp
+.LP
+The \fIpacket\fR interface to the pseudo-terminal should be used for more
+intelligent flushing of input and output queues.
+.sp
+.LP
+\fBin.telnetd\fR never sends \fBTELNET\fR \fIgo\fR \fIahead\fR commands.
+.sp
+.LP
+The \fBpam_unix\fR(7) module is no longer supported.. Similar functionality is
+provided by \fBpam_authtok_check\fR(7), \fBpam_authtok_get\fR(7),
+\fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), \fBpam_passwd_auth\fR(7),
+\fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7), and
+\fBpam_unix_session\fR(7).
+.sp
+.LP
+The \fBin.telnetd\fR service is managed by the service management facility,
+\fBsmf\fR(7), under the service identifier:
+.sp
+.in +2
+.nf
+svc:/network/telnet
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(8). Responsibility for
+initiating and restarting this service is delegated to \fBinetd\fR(8). Use
+\fBinetadm\fR(8) to make configuration changes and to view configuration
+information for this service. The service's status can be queried using the
+\fBsvcs\fR(1) command.

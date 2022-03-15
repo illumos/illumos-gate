@@ -34,7 +34,7 @@ Only display headers for mail sent by  \fIsender\fR.
 .SH USAGE
 .sp
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBfrom\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBfrom\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH FILES
 .sp
@@ -49,4 +49,7 @@ encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH SEE ALSO
 .sp
 .LP
-\fBbiff\fR(1B), \fBmail\fR(1B), \fBattributes\fR(5), \fBlargefile\fR(5)
+.BR biff (1B),
+.BR mail (1B),
+.BR attributes (7),
+.BR largefile (7)

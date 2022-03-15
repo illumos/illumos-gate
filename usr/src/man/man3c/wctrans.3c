@@ -136,5 +136,5 @@ MT-Level	MT-Safe
 .BR setlocale (3C),
 .BR towlower (3C),
 .BR towupper (3C),
-.BR environ (5),
-.BR locale (5)
+.BR environ (7),
+.BR locale (7)

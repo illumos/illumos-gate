@@ -70,8 +70,8 @@ any login \fIname\fR.
 When used to change a password, \fBpasswd\fR prompts everyone for their old
 password, if any. It then prompts for the new password twice. When the old
 password is entered, \fBpasswd\fR checks to see if it has aged sufficiently. If
-\fBaging\fR is insufficient, \fBpasswd\fR terminates; see \fBpwconv\fR(1M)
-and \fBshadow\fR(4) for additional information.
+\fBaging\fR is insufficient, \fBpasswd\fR terminates; see \fBpwconv\fR(8)
+and \fBshadow\fR(5) for additional information.
 .sp
 .LP
 The \fBpwconv\fR command creates and updates \fB/etc/shadow\fR with information
@@ -96,7 +96,7 @@ Passwords must be constructed to meet the following requirements:
 Each password must have \fBPASSLENGTH\fR characters, where \fBPASSLENGTH\fR is
 defined in \fB/etc/default/passwd\fR and is set to \fB6\fR. Setting
 \fBPASSLENGTH\fR to more than eight characters requires configuring
-\fBpolicy.conf\fR(4) with an algorithm that supports greater than eight
+\fBpolicy.conf\fR(5) with an algorithm that supports greater than eight
 characters.
 .RE
 .RS +4
@@ -172,7 +172,7 @@ update the password of an AD user, use the \fBkpasswd\fR(1) command.
 .sp
 .LP
 The administrator configured for updating LDAP shadow
-information can change any password attributes. See \fBldapclient\fR(1M).
+information can change any password attributes. See \fBldapclient\fR(8).
 .sp
 .LP
 When a user has a password stored in one of the name services as well as a
@@ -182,7 +182,7 @@ to have different passwords in the name service and local files entry. Use
 .sp
 .LP
 In the \fBfiles\fR case, super-users (for instance, real and effective uid
-equal to \fB0\fR, see \fBid\fR(1M) and \fBsu\fR(1M)) can change any password.
+equal to \fB0\fR, see \fBid\fR(8) and \fBsu\fR(8)) can change any password.
 Hence, \fBpasswd\fR does not prompt privileged users for the old password.
 Privileged users are not forced to comply with password aging and password
 construction requirements. A privileged user can create a null password by
@@ -199,7 +199,7 @@ comply with password construction requirements.
 .sp
 .LP
 Normally, \fBpasswd\fR entered with no arguments changes the password of the
-current user. When a user logs in and then invokes \fBsu\fR(1M) to become
+current user. When a user logs in and then invokes \fBsu\fR(8) to become
 superuser or another user, \fBpasswd\fR changes the original user's password,
 not the password of the superuser or the new user.
 .sp
@@ -338,7 +338,7 @@ authentication and password for password change.
 .LP
 Locking an account (\fB-l\fR option) does not allow its use for password based
 login or delayed execution (such as \fBat\fR(1), \fBbatch\fR(1), or
-\fBcron\fR(1M)). The \fB-N\fR option can be used to disallow password based
+\fBcron\fR(8)). The \fB-N\fR option can be used to disallow password based
 login, while continuing to allow delayed execution.
 .SH OPTIONS
 .LP
@@ -573,7 +573,7 @@ User login name.
 .LP
 If any of the \fBLC_*\fR variables, that is, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
 \fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR (see
-\fBenviron\fR(5)), are not set in the environment, the operational behavior of
+\fBenviron\fR(7)), are not set in the environment, the operational behavior of
 \fBpasswd\fR for each corresponding locale category is determined by the value
 of the \fBLANG\fR environment variable. If \fBLC_ALL\fR is set, its contents
 are used to override both the \fBLANG\fR and the other \fBLC_*\fR variables. If
@@ -745,7 +745,7 @@ to determine whether a password is based on a dictionary word.
 If neither \fBDICTIONLIST\fR nor \fBDICTIONDBDIR\fR is specified, the system
 does not perform a dictionary check.
 .sp
-To pre-build the dictionary database, see \fBmkpwdict\fR(1M).
+To pre-build the dictionary database, see \fBmkpwdict\fR(8).
 .RE
 
 .sp
@@ -760,7 +760,7 @@ password history of all users to be discarded at the next password change by
 any user. The default is not to define the \fBHISTORY\fR flag. The maximum
 value is \fB26.\fR Currently, this functionality is enforced only for user
 accounts defined in the \fBfiles\fR name service (local
-\fBpasswd\fR(4)/\fBshadow\fR(4)).
+\fBpasswd\fR(5)/\fBshadow\fR(5)).
 .RE
 
 .sp
@@ -944,7 +944,7 @@ Shell database.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -964,24 +964,52 @@ Interface Stability	See below.
 The human readable output is Uncommitted. The options are Committed.
 .SH SEE ALSO
 .LP
-\fBat\fR(1), \fBbatch\fR(1), \fBfinger\fR(1), \fBkpasswd\fR(1), \fBlogin\fR(1),
-\fBcron\fR(1M), \fBdomainname\fR(1M), \fBeeprom\fR(1M),
-\fBid\fR(1M), \fBldapclient\fR(1M), \fBmkpwdict\fR(1M), \fBpassmgmt\fR(1M),
-\fBpwconv\fR(1M), \fBsu\fR(1M), \fBuseradd\fR(1M), \fBuserdel\fR(1M),
-\fBusermod\fR(1M), \fBcrypt\fR(3C), \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C),
-\fBgetusershell\fR(3C), \fBpam\fR(3PAM),
-\fBloginlog\fR(4), \fBnsswitch.conf\fR(4), \fBpam.conf\fR(4), \fBpasswd\fR(4),
-\fBpolicy.conf\fR(4), \fBshadow\fR(4), \fBshells\fR(4), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
-\fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_ldap\fR(5),
-\fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5)
+.BR at (1),
+.BR batch (1),
+.BR finger (1),
+.BR kpasswd (1),
+.BR login (1),
+.BR crypt (3C),
+.BR getpwnam (3C),
+.BR getspnam (3C),
+.BR getusershell (3C),
+.BR pam (3PAM),
+.BR loginlog (5),
+.BR nsswitch.conf (5),
+.BR pam.conf (5),
+.BR passwd (5),
+.BR policy.conf (5),
+.BR shadow (5),
+.BR shells (5),
+.BR attributes (7),
+.BR environ (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_dhkeys (7),
+.BR pam_ldap (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7),
+.BR cron (8),
+.BR domainname (8),
+.BR eeprom (8),
+.BR id (8),
+.BR ldapclient (8),
+.BR mkpwdict (8),
+.BR passmgmt (8),
+.BR pwconv (8),
+.BR su (8),
+.BR useradd (8),
+.BR userdel (8),
+.BR usermod (8)
 .SH NOTES
 .LP
-The \fBpam_unix\fR(5) module is no longer supported. Similar functionality is
-provided by \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),
-\fBpam_unix_session\fR(5), \fBpam_authtok_check\fR(5),
-\fBpam_authtok_get\fR(5), \fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), and
-\fBpam_passwd_auth\fR(5).
+The \fBpam_unix\fR(7) module is no longer supported. Similar functionality is
+provided by \fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7),
+\fBpam_unix_session\fR(7), \fBpam_authtok_check\fR(7),
+\fBpam_authtok_get\fR(7), \fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), and
+\fBpam_passwd_auth\fR(7).
 .sp
 .LP
 The \fByppasswd\fR command is a wrapper around \fBpasswd\fR. Use of

@@ -262,8 +262,11 @@ respective routine.
 .SH SEE ALSO
 .sp
 .LP
-\fBmmap\fR(2), \fBdevmap\fR(9E), \fBdevmap_setup\fR(9F),
-\fBddi_devmap_segmap\fR(9F), \fBddi_device_acc_attr\fR(9S)
+.BR mmap (2),
+.BR devmap (9E),
+.BR ddi_devmap_segmap (9F),
+.BR devmap_setup (9F),
+.BR ddi_device_acc_attr (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

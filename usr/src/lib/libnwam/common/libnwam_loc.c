@@ -84,7 +84,7 @@ struct nwam_prop_table_entry loc_prop_table_entries[] = {
 	{NWAM_LOC_PROP_NAMESERVICES_CONFIG_FILE, NWAM_VALUE_TYPE_STRING,
 	    B_FALSE, 0, 1, nwam_valid_file,
 	    "specifies path to configuration file for name services switch "
-	    "for this location - see nsswitch.conf(4)",
+	    "for this location - see nsswitch.conf(5)",
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 	{NWAM_LOC_PROP_DNS_NAMESERVICE_CONFIGSRC, NWAM_VALUE_TYPE_UINT64,
 	    B_FALSE, 0, NWAM_MAX_NUM_VALUES, valid_configsrc,
@@ -123,7 +123,7 @@ struct nwam_prop_table_entry loc_prop_table_entries[] = {
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 	{NWAM_LOC_PROP_DEFAULT_DOMAIN, NWAM_VALUE_TYPE_STRING, B_FALSE, 0, 1,
 	    nwam_valid_domain,
-	    "specifies the domainname(1M) to be set for this location",
+	    "specifies the domainname(8) to be set for this location",
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 	{NWAM_LOC_PROP_NFSV4_DOMAIN, NWAM_VALUE_TYPE_STRING, B_FALSE, 0, 1,
 	    nwam_valid_domain,
@@ -131,7 +131,7 @@ struct nwam_prop_table_entry loc_prop_table_entries[] = {
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 	{NWAM_LOC_PROP_IPFILTER_CONFIG_FILE, NWAM_VALUE_TYPE_STRING, B_FALSE,
 	    0, 1, nwam_valid_file,
-	    "specifies an absolute path to an ipf.conf(4) file for this "
+	    "specifies an absolute path to an ipf.conf(5) file for this "
 	    "location",
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 	{NWAM_LOC_PROP_IPFILTER_V6_CONFIG_FILE, NWAM_VALUE_TYPE_STRING,
@@ -141,23 +141,23 @@ struct nwam_prop_table_entry loc_prop_table_entries[] = {
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 	{NWAM_LOC_PROP_IPNAT_CONFIG_FILE, NWAM_VALUE_TYPE_STRING, B_FALSE, 0,
 	    1, nwam_valid_file,
-	    "specifies an absolute path to an ipnat.conf(4) file for this "
+	    "specifies an absolute path to an ipnat.conf(5) file for this "
 	    "location",
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 	{NWAM_LOC_PROP_IPPOOL_CONFIG_FILE, NWAM_VALUE_TYPE_STRING, B_FALSE, 0,
 	    1, nwam_valid_file,
-	    "specifies an absolute path to an ippool.conf(4) file for this "
+	    "specifies an absolute path to an ippool.conf(5) file for this "
 	    "location",
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 	{NWAM_LOC_PROP_IKE_CONFIG_FILE, NWAM_VALUE_TYPE_STRING, B_FALSE, 0, 1,
 	    nwam_valid_file,
 	    "specifies an absolute path to an ike config file "
-	    "(see ike.config(4))",
+	    "(see ike.config(5))",
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 	{NWAM_LOC_PROP_IPSECPOLICY_CONFIG_FILE, NWAM_VALUE_TYPE_STRING,
 	    B_FALSE, 0, 1, nwam_valid_file,
 	    "specifies an absolute path to an IPsec policy configuration file "
-	    "(see ipsecconf(1M)",
+	    "(see ipsecconf(8)",
 	    NWAM_TYPE_ANY, NWAM_CLASS_ANY},
 };
 

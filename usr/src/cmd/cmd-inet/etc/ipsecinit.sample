@@ -1,6 +1,4 @@
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -72,9 +70,9 @@
 #
 # WARNING:	This file is read before default routes are established, and
 #		before any naming services have been started.  The
-#		ipsecconf(1M) command attempts to resolve names, but it will
+#		ipsecconf(8) command attempts to resolve names, but it will
 #		fail unless the machine uses files, or DNS and the DNS server
-#		is reachable via routing information before ipsecconf(1m)
+#		is reachable via routing information before ipsecconf(8)
 #		invocation.  (E.g. the DNS server is on-subnet, or DHCP
 #		has loaded up the default router already.)
 #

@@ -70,7 +70,7 @@ of the extended character set whose  character representation is a single byte
 when in the initial shift state.
 .LP
 The behavior of \fBwctob()\fR is affected by the \fBLC_CTYPE\fR category of the
-current locale.  See \fBenviron\fR(5)
+current locale.  See \fBenviron\fR(7)
 .LP
 The function \fBwctob_l()\fR behaves identically to \fBwctob()\fR, except
 instead of operating in the current locale, it operates in the locale
@@ -85,7 +85,7 @@ the single-byte representation of that character.
 No errors are defined.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .TS
 box;
 c | c
@@ -102,5 +102,10 @@ The \fBwctob()\fR function is Standard.  The \fBwctob_l()\fR function
 is Uncommitted.
 .SH SEE ALSO
 .LP
-\fBbtowc\fR(3C), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR btowc (3C),
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)

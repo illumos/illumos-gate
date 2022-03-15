@@ -118,7 +118,7 @@ the given callback function is already registered.
 .SH CONTEXT
 These functions may be called from user or kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -132,4 +132,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBnet_protocol_lookup\fR(9F)
+.BR attributes (7),
+.BR net_protocol_lookup (9F)

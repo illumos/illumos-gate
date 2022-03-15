@@ -82,5 +82,5 @@ and
 .Xr inet.h 3HEAD ,
 .Xr gethostent 3NSL ,
 .Xr getservent 3SOCKET ,
-.Xr attributes 5 ,
-.Xr byteorder 5
+.Xr attributes 7 ,
+.Xr byteorder 7

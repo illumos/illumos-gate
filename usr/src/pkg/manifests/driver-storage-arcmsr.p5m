@@ -41,8 +41,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/arcmsr group=sys
 file path=kernel/drv/arcmsr.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/arcmsr.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/arcmsr.4d
 driver name=arcmsr perms="* 0600 root sys" class=scsi \
     alias=pci17d3,1110 \
     alias=pci17d3,1120 \

@@ -107,7 +107,9 @@ xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 .in -2
 
 .SH SEE ALSO
-\fBioctl\fR(9E), \fBmmap\fR(9E), \fBddi_mmap_get_model\fR(9F)
+.BR ioctl (9E),
+.BR mmap (9E),
+.BR ddi_mmap_get_model (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

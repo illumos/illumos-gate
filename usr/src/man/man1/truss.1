@@ -27,7 +27,7 @@ call arguments are displayed symbolically when possible using defines from
 relevant system headers. For any path name pointer argument, the pointed-to
 string is displayed. Error returns are reported using the error code names
 described in \fBIntro\fR(3). If, in the case of an error, the kernel reports a
-missing privilege, a privilege name as described in \fBprivileges\fR(5) is
+missing privilege, a privilege name as described in \fBprivileges\fR(7) is
 reported in square brackets (\fB[ ]\fR) after the error code name.
 .sp
 .LP
@@ -585,7 +585,7 @@ example$ \fBtruss -u a.out -u ld:: -u :: ...\fR
 .sp
 .LP
 The following example verbosely traces the system call activity of process #1,
-\fBinit\fR(1M) (if you are a privileged user):
+\fBinit\fR(8) (if you are a privileged user):
 
 .sp
 .in +2
@@ -610,11 +610,28 @@ Process files
 
 .SH SEE ALSO
 .LP
-\fBdate\fR(1), \fBfind\fR(1), \fBproc\fR(1), \fBps\fR(1), \fBsh\fR(1),
-\fBspell\fR(1), \fBinit\fR(1M), \fBIntro\fR(3), \fBexec\fR(2), \fBfork\fR(2),
-\fBlseek\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBtime\fR(2), \fBvfork\fR(2),
-\fBwrite\fR(2), \fBctime\fR(3C), \fBsignal.h\fR(3HEAD), \fBproc\fR(4),
-\fBattributes\fR(5), \fBprivileges\fR(5), \fBthreads\fR(5)
+.BR date (1),
+.BR find (1),
+.BR proc (1),
+.BR ps (1),
+.BR sh (1),
+.BR spell (1),
+.BR exec (2),
+.BR fork (2),
+.BR lseek (2),
+.BR open (2),
+.BR read (2),
+.BR time (2),
+.BR vfork (2),
+.BR write (2),
+.BR Intro (3),
+.BR ctime (3C),
+.BR signal.h (3HEAD),
+.BR proc (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR threads (7),
+.BR init (8)
 .sp
 .LP
 \fIman pages section 2: System Calls\fR
@@ -643,7 +660,7 @@ independently of \fBtruss\fR, from the point of the \fBexec()\fR.
 To avoid collisions with other controlling processes, \fBtruss\fR does not
 trace a process that it detects is being controlled by another process via the
 \fB/proc\fR interface. This allows \fBtruss\fR to be applied to
-\fBproc\fR(4)-based debuggers as well as to another instance of itself.
+\fBproc\fR(5)-based debuggers as well as to another instance of itself.
 .sp
 .LP
 The trace output contains tab characters under the assumption that standard tab

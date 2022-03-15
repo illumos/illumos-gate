@@ -23,7 +23,7 @@ pam_sm_acct_mgmt \- service provider implementation for pam_acct_mgmt
 .sp
 .LP
 In response to a call to \fBpam_acct_mgmt\fR(3PAM), the  \fBPAM\fR framework
-calls \fBpam_sm_acct_mgmt()\fR from the modules listed in the \fBpam.conf\fR(4)
+calls \fBpam_sm_acct_mgmt()\fR from the modules listed in the \fBpam.conf\fR(5)
 file. The account management provider supplies the back-end functionality for
 this interface function. Applications should not call this  \fBAPI\fR directly.
 .sp
@@ -57,7 +57,7 @@ user has a null authentication token.
 .sp
 .LP
 The \fIargc\fR argument represents the number of module options passed in from
-the configuration file \fBpam.conf\fR(4). \fIargv\fR specifies the module
+the configuration file \fBpam.conf\fR(5). \fIargv\fR specifies the module
 options, which are interpreted and processed by the account management service.
 Please refer to the specific module man pages for the various available
 \fIoptions\fR. If an unknown option is passed to the module, an error should be
@@ -122,7 +122,7 @@ Ignore underlying account module regardless of whether the control flag is
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -140,9 +140,14 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBpam\fR(3PAM), \fBpam_acct_mgmt\fR(3PAM), \fBpam_set_data\fR(3PAM),
-\fBpam_start\fR(3PAM), \fBsyslog\fR(3C), \fBlibpam\fR(3LIB), \fBpam.conf\fR(4),
-\fBattributes\fR(5)
+.BR syslog (3C),
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_acct_mgmt (3PAM),
+.BR pam_set_data (3PAM),
+.BR pam_start (3PAM),
+.BR pam.conf (5),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

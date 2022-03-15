@@ -1211,7 +1211,7 @@ page_retire_check_pp(page_t *pp, uint64_t *errors)
 	}
 
 	/*
-	 * We have magically arranged the bit values returned to fmd(1M)
+	 * We have magically arranged the bit values returned to fmd(8)
 	 * to line up with the FMA, MCE, and UE bits of the page_t.
 	 */
 	if (errors) {

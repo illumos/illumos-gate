@@ -233,7 +233,7 @@ If geometry is not relevant or appropriate for the target disk,
 defined. For example, if the \fBHBA\fR BIOS supports Logical Block Addressing
 for the target disk, \fBscsi_ifgetcap()\fR returns \fB-1\fR. Attempts to
 retrieve the "virtual geometry" from the target driver, such as the
-\fBDKIOCG_VIRTGEOM\fR ioctl, will fail. See \fBdkio\fR(7I) for more information
+\fBDKIOCG_VIRTGEOM\fR ioctl, will fail. See \fBdkio\fR(4I) for more information
 about \fBDKIOCG_VIRTGEOM\fR.
 .RE
 
@@ -399,7 +399,7 @@ if (scsi_ifsetcap(&devp->sd_address, "tagged-qing", 1, 1) == 1) {
 .SH CONTEXT
 These functions can be called from user, interrupt, or kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -413,9 +413,13 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBtran_reset\fR(9E), \fBscsi_hba_lookup_capstr\fR(9F), \fBscsi_reset\fR(9F),
-\fBscsi_reset_notify\fR(9F), \fBddi_dma_attr\fR(9S),
-\fBscsi_address\fR(9S), \fBscsi_arq_status\fR(9S)
+.BR tran_reset (9E),
+.BR scsi_hba_lookup_capstr (9F),
+.BR scsi_reset (9F),
+.BR scsi_reset_notify (9F),
+.BR ddi_dma_attr (9S),
+.BR scsi_address (9S),
+.BR scsi_arq_status (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

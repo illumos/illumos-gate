@@ -31,7 +31,7 @@ import java.beans.*;
 /**
  * Triplet of attributes consisting of two stability levels and a
  * dependency class.  Attributes may vary independently.  They use
- * labels described in the {@code attributes(5)} man page to help set
+ * labels described in the {@code attributes(7)} man page to help set
  * expectations for what kinds of changes might occur in different kinds
  * of future releases.  The D compiler includes features to dynamically
  * compute the stability levels of D programs you create.  For more
@@ -227,7 +227,7 @@ public final class InterfaceAttributes implements Serializable {
 	UNKNOWN("Unknown"),
 	/**
 	 * The interface is specific to the CPU model of the current
-	 * system.  You can use the {@code psrinfo(1M)} utility's {@code
+	 * system.  You can use the {@code psrinfo(8)} utility's {@code
 	 * -v} option to display the current CPU model and
 	 * implementation names.  Interfaces with CPU model dependencies
 	 * might not be available on other CPU implementations, even if

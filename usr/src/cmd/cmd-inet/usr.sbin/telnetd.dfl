@@ -1,4 +1,3 @@
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -25,10 +24,10 @@
 #
 # /etc/default/telnetd
 #
-# telnetd default settings processed via telnetd(1M).
+# telnetd default settings processed via telnetd(8).
 #
 # BANNER defines the connection banner which is displayed before the
-# telnet login prompt, see telnetd(1M) for details.  The following
+# telnet login prompt, see telnetd(8) for details.  The following
 # commented line shows the default value.
 #
 #BANNER="\\r\\n\\r\\n`uname -s` `uname -r`\\r\\n\\r\\n"

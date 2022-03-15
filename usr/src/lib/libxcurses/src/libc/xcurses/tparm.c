@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * tparm.c
  *
@@ -42,8 +40,8 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/tparm.c 1.2 1995/08/31 
 #endif
 
 /*l
- * Substitute the given parameters into the given string by the 
- * following rules (taken from terminfo(5)):
+ * Substitute the given parameters into the given string by the
+ * following rules (taken from terminfo(7)):
  *
  * Cursor addressing and other strings  requiring  parameters
  * in the terminal are described by a parameterized string
@@ -54,14 +52,14 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/tparm.c 1.2 1995/08/31 
  * screen visible to the user, not to any  unseen  memory.)  If
  * the terminal has memory relative cursor addressing, that can
  * be indicated by
- * 
+ *
  * The parameter mechanism uses  a  stack  and  special  %
  * codes  to manipulate it.  Typically a sequence will push one
  * of the parameters onto the stack and then print it  in  some
  * format.  Often more complex operations are necessary.
- * 
+ *
  *      The % encodings have the following meanings:
- * 
+ *
  *      %%        outputs `%'
  *      %d        print pop() like %d in printf()
  *      %2d       print pop() like %2d in printf()
@@ -70,25 +68,25 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/tparm.c 1.2 1995/08/31 
  *      %03d      print pop() like %03d in printf()
  *      %c        print pop() like %c in printf()
  *      %s        print pop() like %s in printf()
- * 
+ *
  *      %p[1-9]   push ith parm
  *      %P[a-z]   set variable [a-z] to pop()
  *      %g[a-z]   get variable [a-z] and push it
  *      %'c'      push char constant c
  *      %{nn}     push integer constant nn
- * 
+ *
  *      %+ %- %* %/ %m
  *                arithmetic (%m is mod): push(pop() op pop())
  *      %& %| %^  bit operations: push(pop() op pop())
  *      %= %> %<  logical operations: push(pop() op pop())
  *      %! %~     unary operations push(op pop())
  *      %i        add 1 to first two parms (for ANSI terminals)
- * 
+ *
  *      %? expr %t thenpart %e elsepart %;
  *                if-then-else, %e elsepart is optional.
  *                else-if's are possible ala Algol 68:
  *                %? c1 %t b1 %e c2 %t b2 %e c3 %t b3 %e c4 %t b4 %e b5 %;
- * 
+ *
  * For those of the above operators which are binary and not commutative,
  * the stack works in the usual way, with
  * 		%gx %gy %m
@@ -136,7 +134,7 @@ long p1, p2, p3, p4, p5, p6, p7, p8, p9;
 	char *bufptr = buffer;
 
 #ifdef STDARG_VERSION
-	/* We've had too many problems porting this particular module 
+	/* We've had too many problems porting this particular module
 	 * to different compilers and machines, in particular RISC,
 	 * that we can't make clever assumptions about how variable
 	 * arguments might be handled.  The best solution is the
@@ -186,7 +184,7 @@ long p1, p2, p3, p4, p5, p6, p7, p8, p9;
 				break;
 			case '0':
 				len = -(*++string - '0');
-				if ((len == (char)-2 || len == (char)-3) 
+				if ((len == (char)-2 || len == (char)-3)
 				&& *++string == 'd')
 					bufptr += sprintf(
 						bufptr, "%0*ld", len, npop()
@@ -321,7 +319,7 @@ long p1, p2, p3, p4, p5, p6, p7, p8, p9;
 			    if (x) {
 				/* do nothing; keep executing */
 			    } else {
-				/* scan forward for %e or %; at 
+				/* scan forward for %e or %; at
 				 * level zero */
 				string++;
 				level = 0;

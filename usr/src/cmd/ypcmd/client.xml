@@ -98,7 +98,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='ypstart' section='1M'
+			<manpage title='ypstart' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

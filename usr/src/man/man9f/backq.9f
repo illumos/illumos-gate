@@ -54,7 +54,7 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBqueue\fR(9S)
+.BR queue (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -455,7 +455,7 @@ typedef struct zfs_cmd {
 	uint64_t	zc_history_len;
 	uint64_t	zc_history_offset;
 	uint64_t	zc_obj;
-	uint64_t	zc_iflags;		/* internal to zfs(7fs) */
+	uint64_t	zc_iflags;		/* internal to zfs(4FS) */
 	zfs_share_t	zc_share;
 	dmu_objset_stats_t zc_objset_stats;
 	dmu_replay_record_t zc_begin_record;

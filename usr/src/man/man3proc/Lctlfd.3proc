@@ -55,4 +55,4 @@ in
 .Xr libproc 3LIB ,
 .Xr Lfree 3PROC ,
 .Xr Lgrab 3PROC ,
-.Xr proc 4
+.Xr proc 5

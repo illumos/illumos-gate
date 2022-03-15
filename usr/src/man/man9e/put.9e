@@ -110,9 +110,16 @@ Ignored.
 \fBput()\fR routines do not have user context.
 .SH SEE ALSO
 .LP
-\fBsrv\fR(9E), \fBputctl\fR(9F), \fBputctl1\fR(9F), \fBputnext\fR(9F),
-\fBputnextctl\fR(9F), \fBputnextctl1\fR(9F), \fBputq\fR(9F), \fBqreply\fR(9F),
-\fBqueue\fR(9S), \fBstreamtab\fR(9S)
+.BR srv (9E),
+.BR putctl (9F),
+.BR putctl1 (9F),
+.BR putnext (9F),
+.BR putnextctl (9F),
+.BR putnextctl1 (9F),
+.BR putq (9F),
+.BR qreply (9F),
+.BR queue (9S),
+.BR streamtab (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

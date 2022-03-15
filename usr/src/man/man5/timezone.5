@@ -1,0 +1,65 @@
+'\" te
+.\"  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TIMEZONE 5 "November 22, 2021"
+.SH NAME
+timezone \- default timezone data base
+.SH SYNOPSIS
+.nf
+\fB/etc/timezone\fR
+.fi
+
+.SH DESCRIPTION
+The timezone file contains information regarding the default timezone for each
+host in a domain. Alternatively, a single default line for the entire domain
+may be specified. Each entry has the format:
+.sp
+.in +2
+.nf
+\fITimezone-name    official-host-or-domain-name\fR
+.fi
+.in -2
+
+.sp
+.LP
+Items are separated by any number of blanks and/or TAB characters. A `#'
+indicates the beginning of a comment; characters up to the end of the line are
+not interpreted by routines which search the file. The timezone is a pathname
+relative to the directory \fB/usr/share/lib/zoneinfo\fR.
+.sp
+.LP
+This file is not actually referenced by any system software; it is merely used
+as a source file to construct the \fBNIS\fR \fBtimezone.byname\fR map, which
+was used by the installer in older releases of Solaris.
+.sp
+.LP
+The \fBtimezone\fR file does not set the timezone environment variable
+\fBTZ\fR. See \fBTIMEZONE\fR(5) for information to set the \fBTZ\fR environment
+variable.
+.SH EXAMPLES
+\fBExample 1 \fRTypical timezone line
+.sp
+.LP
+Here is a typical line from the \fB/etc/timezone\fR file:
+
+.sp
+.in +2
+.nf
+US/Eastern          East.Example.COM #Host on East Coast
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/timezone\fR\fR
+.ad
+.RS 17n
+
+.RE
+
+.SH SEE ALSO
+.BR TIMEZONE (5)

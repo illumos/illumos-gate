@@ -1,0 +1,586 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NETCONFIG 5 "Nov 18, 2003"
+.SH NAME
+netconfig \- network configuration database
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/netconfig\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The network configuration database, \fB/etc/netconfig\fR, is a system file used
+to store information about networks that are connected to the system. The
+\fBnetconfig\fR database and the routines that access it (see
+\fBgetnetconfig\fR(3NSL)) are part of the Network Selection component. The
+Network Selection component also includes \fBgetnetpath\fR(3NSL) routines to
+provide application-specific network search paths. These routines access the
+\fBnetconfig\fR database based on the environment variable \fBNETPATH\fR. See
+\fBenviron\fR(7).
+.sp
+.LP
+\fBnetconfig\fR contains an entry for each network available on the system.
+Entries are separated by newlines. Fields are separated by whitespace and occur
+in the order in which they are described below. Whitespace can be embedded as
+``\fB\e\fR\fIblank\fR'' or ``\fB\e\fR\fItab\fR''. Backslashes may be embedded
+as ``\fB\e\e\fR\&''. Lines in \fB/etc/netconfig\fR that begin with a \fB#\fR
+(hash) in column 1 are treated as comments.
+.sp
+.LP
+Each of the valid lines in the \fBnetconfig\fR database correspond to an
+available transport. Each entry is of the form:
+.sp
+.in +2
+.nf
+network ID  semantics  flag  protocol-family \e
+ protocol-name  network-device  translation-libraries
+.fi
+.in -2
+
+.sp
+.ne 2
+.na
+\fB\fInetwork ID\fR\fR
+.ad
+.RS 25n
+A string used to uniquely identify a network. \fInetwork ID\fR consists of
+non-null characters, and has a length of at least 1. No maximum length is
+specified. This namespace is locally significant and the local system
+administrator is the naming authority. All \fInetwork ID\fRs on a system must
+be unique.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIsemantics\fR\fR
+.ad
+.RS 25n
+The \fIsemantics\fR field is a string identifying the ``semantics'' of the
+network, that is, the set of services it supports, by identifying the service
+interface it provides. The \fIsemantics\fR field is mandatory. The following
+semantics are recognized.
+.sp
+.ne 2
+.na
+\fB\fBtpi_clts\fR\fR
+.ad
+.RS 16n
+Transport Provider Interface, connectionless
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtpi_cots\fR\fR
+.ad
+.RS 16n
+Transport Provider Interface, connection oriented
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtpi_cots_ord\fR\fR
+.ad
+.RS 16n
+Transport Provider Interface, connection oriented, supports orderly release.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIflag\fR\fR
+.ad
+.RS 25n
+The \fIflag\fR field records certain two-valued (``true'' and ``false'')
+attributes of networks. \fIflag\fR is a string composed of a combination of
+characters, each of which indicates the value of the corresponding attribute.
+If the character is present, the attribute is ``true.'' If the character is
+absent, the attribute is ``false.'' ``\fB-\fR'' indicates that none of the
+attributes are present. Only one character is currently recognized:
+.sp
+.ne 2
+.na
+\fB\fBv\fR\fR
+.ad
+.RS 5n
+Visible (``default'') network. Used when the environment variable \fBNETPATH\fR
+is unset.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIprotocol family\fR\fR
+.ad
+.RS 25n
+The \fIprotocol family\fR and \fIprotocol name\fR fields are provided for
+protocol-specific applications. The \fIprotocol family\fR field contains a
+string that identifies a protocol family. The \fIprotocol family\fR identifier
+follows the same rules as those for \fInetwork ID\fRs; the string consists of
+non-null characters, it has a length of at least \fB1\fR, and there is no
+maximum length specified. A ``\fB\(mi\fR\&'' in the \fIprotocol family\fR field
+indicates that no protocol family identifier applies (the network is
+experimental). The following are examples:
+.sp
+.ne 2
+.na
+\fB\fBloopback\fR\fR
+.ad
+.RS 13n
+Loopback (local to host).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinet\fR\fR
+.ad
+.RS 13n
+Internetwork: UDP, TCP, and the like.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinet6\fR\fR
+.ad
+.RS 13n
+Internetwork over IPv6: UDP, TCP, and the like.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBimplink\fR\fR
+.ad
+.RS 13n
+ARPANET imp addresses
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpup\fR\fR
+.ad
+.RS 13n
+PUP protocols: for example, BSP
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBchaos\fR\fR
+.ad
+.RS 13n
+MIT CHAOS protocols
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBns\fR\fR
+.ad
+.RS 13n
+XEROX NS protocols
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnbs\fR\fR
+.ad
+.RS 13n
+NBS protocols
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBecma\fR\fR
+.ad
+.RS 13n
+European Computer Manufacturers Association
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdatakit\fR\fR
+.ad
+.RS 13n
+DATAKIT protocols
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBccitt\fR\fR
+.ad
+.RS 13n
+CCITT protocols, X.25, and the like.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsna\fR\fR
+.ad
+.RS 13n
+IBM SNA
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdecnet\fR\fR
+.ad
+.RS 13n
+DECNET
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdli\fR\fR
+.ad
+.RS 13n
+Direct data link interface
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlat\fR\fR
+.ad
+.RS 13n
+LAT
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBhylink\fR\fR
+.ad
+.RS 13n
+NSC Hyperchannel
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBappletalk\fR\fR
+.ad
+.RS 13n
+Apple Talk
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnit\fR\fR
+.ad
+.RS 13n
+Network Interface Tap
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBieee802\fR\fR
+.ad
+.RS 13n
+IEEE 802.2; also ISO 8802
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBosi\fR\fR
+.ad
+.RS 13n
+Umbrella for all families used by OSI (for example, protosw lookup)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBx25\fR\fR
+.ad
+.RS 13n
+CCITT X.25 in particular
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBosinet\fR\fR
+.ad
+.RS 13n
+AFI = 47, IDI = 4
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBgosip\fR\fR
+.ad
+.RS 13n
+U.S. Government OSI
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIprotocol name\fR\fR
+.ad
+.RS 25n
+The \fIprotocol name\fR field contains a string that identifies a protocol. The
+\fIprotocol name\fR identifier follows the same rules as those for \fInetwork
+ID\fRs; that is, the string consists of non-NULL characters, it has a length of
+at least \fB1\fR, and there is no maximum length specified. A ``\fB\(mi\fR\&''
+indicates that none of the names listed apply. The following protocol names are
+recognized.
+.sp
+.ne 2
+.na
+\fB\fBtcp\fR\fR
+.ad
+.RS 8n
+Transmission Control Protocol
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBudp\fR\fR
+.ad
+.RS 8n
+User Datagram Protocol
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBicmp\fR\fR
+.ad
+.RS 8n
+Internet Control Message Protocol
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fInetwork device\fR\fR
+.ad
+.RS 25n
+The \fInetwork device\fR is the full pathname of the device used to connect to
+the transport provider. Typically, this device will be in the \fB/dev\fR
+directory. The \fInetwork device\fR must be specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fItranslation libraries\fR\fR
+.ad
+.RS 25n
+The \fIname-to-address translation libraries\fR support a ``directory service''
+(a name-to-address mapping service) for the network. A ``\fB\(mi\fR\&'' in this
+field indicates the absence of any \fItranslation libraries\fR. This has a
+special meaning for networks of the protocol family \fBinet :\fR its
+name-to-address mapping is provided by the name service switch based on the
+entries for \fBhosts\fR and \fBservices\fR in \fBnsswitch.conf\fR(5). For
+networks of other families, a ``\fB\(mi\fR\&'' indicates non-functional
+name-to-address mapping. Otherwise, this field consists of a comma-separated
+list of pathnames to dynamically linked libraries. The pathname of the library
+can be either absolute or relative. See \fBdlopen\fR(3C).
+.RE
+
+.sp
+.LP
+Each field corresponds to an element in the \fBstruct netconfig\fR structure.
+\fBstruct netconfig\fR and the identifiers described on this manual page are
+defined in <\fBnetconfig.h\fR>. This structure includes the following members:
+.sp
+.ne 2
+.na
+\fB\fBchar *\fR\fInc_netid\fR\fR
+.ad
+.RS 30n
+Network ID, including \fBNULL\fR terminator.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBunsigned long\fR \fInc_semantics\fR\fR
+.ad
+.RS 30n
+Semantics.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBunsigned long\fR \fInc_flag\fR\fR
+.ad
+.RS 30n
+Flags.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBchar *\fR\fInc_protofmly\fR\fR
+.ad
+.RS 30n
+Protocol family.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBchar *\fR\fInc_proto\fR\fR
+.ad
+.RS 30n
+Protocol name.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBchar *\fR\fInc_device\fR\fR
+.ad
+.RS 30n
+Full pathname of the network device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBunsigned long\fR \fInc_nlookups\fR\fR
+.ad
+.RS 30n
+Number of directory lookup libraries.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBchar **\fR\fInc_lookups\fR\fR
+.ad
+.RS 30n
+Names of the name-to-address translation libraries.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBunsigned long\fR \fInc_unused[9]\fR\fR
+.ad
+.RS 30n
+Reserved for future expansion.
+.RE
+
+.sp
+.LP
+The \fInc_semantics\fR field takes the following values, corresponding to the
+semantics identified above:
+.br
+.in +2
+\fBNC_TPI_CLTS\fR
+.in -2
+.br
+.in +2
+\fBNC_TPI_COTS\fR
+.in -2
+.br
+.in +2
+\fBNC_TPI_COTS_ORD\fR
+.in -2
+.sp
+.LP
+The \fInc_flag\fR field is a bitfield. The following bit, corresponding to the
+attribute identified above, is currently recognized. \fBNC_NOFLAG\fR indicates
+the absence of any attributes.
+.sp
+.in +2
+.nf
+\fBNC_VISIBLE\fR
+.fi
+.in -2
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA Sample \fBnetconfig\fR File
+.sp
+.LP
+Below is a sample \fBnetconfig\fR file:
+
+.sp
+.in +2
+.nf
+#
+#  The "Network Configuration" File.
+#
+# Each entry is of the form:
+#
+#   <networkid> <semantics> <flags> <protofamily> <protoname> <device>
+#         <nametoaddrlibs>
+#
+# The "-" in <nametoaddrlibs> for inet family transports indicates
+# redirection to the name service switch policies for "hosts" and
+# "services". The "-" may be replaced by nametoaddr libraries that
+# comply with the SVr4 specs, in which case the name service switch
+# will not be used for netdir_getbyname, netdir_getbyaddr,
+# gethostbyname, gethostbyaddr, getservbyname, and getservbyport.
+# There are no nametoaddr_libs for the inet family in Solaris anymore.
+#
+udp6       tpi_clts      v   inet6   udp    /dev/udp6       -
+tcp6       tpi_cots_ord  v   inet6   tcp    /dev/tcp6       -
+udp        tpi_clts      v   inet    udp    /dev/udp        -
+tcp        tpi_cots_ord  v   inet    tcp    /dev/tcp        -
+rawip      tpi_raw       -   inet    -      /dev/rawip      -
+ticlts     tpi_clts      v   loopback -      /dev/ticlts     straddr.so
+ticotsord  tpi_cots_ord  v   loopback -      /dev/ticotsord  straddr.so
+ticots     tpi_cots      v   loopback -      /dev/ticots     straddr.so
+.fi
+.in -2
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB<\fBnetconfig.h\fR>\fR
+.ad
+.RS 17n
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR dlopen (3C),
+.BR getnetconfig (3NSL),
+.BR getnetpath (3NSL),
+.BR nsswitch.conf (5)
+.sp
+.LP
+\fISystem Administration Guide: IP Services\fR

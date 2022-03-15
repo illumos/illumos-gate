@@ -26,9 +26,9 @@ file path=kernel/drv/$(ARCH64)/imc group=sys
 file path=kernel/drv/$(ARCH64)/imcstub group=sys
 file path=kernel/drv/imc.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/imc.7d
-file path=usr/share/man/man7d/imcstub.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/imc.4d
+file path=usr/share/man/man4d/imcstub.4d
 driver name=imc
 driver name=imcstub \
     alias=pci8086,e1e,p \

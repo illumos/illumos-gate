@@ -25,14 +25,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION:
  * Destructive actions may never be speculative.
  *
  * SECTION: Speculative Tracing/Using a Speculation
- * SECTION: dtrace(1M) Utility/ -w option
+ * SECTION: dtrace(8) Utility/ -w option
  */
 #pragma D option quiet
 

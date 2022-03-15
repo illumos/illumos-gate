@@ -1065,12 +1065,12 @@ dm_get_usage_string(char *what, char *how, char **usage_string)
 	if (strcmp(what, DM_USE_MOUNT) == 0) {
 		if (strcmp(how, "swap") == 0) {
 			*usage_string = dgettext(TEXT_DOMAIN,
-			    "%s is currently used by swap. Please see swap(1M)."
+			    "%s is currently used by swap. Please see swap(8)."
 			    "\n");
 		} else {
 			*usage_string = dgettext(TEXT_DOMAIN,
 			    "%s is currently mounted on %s."
-			    " Please see umount(1M).\n");
+			    " Please see umount(8).\n");
 		}
 	} else if (strcmp(what, DM_USE_VFSTAB) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
@@ -1084,28 +1084,28 @@ dm_get_usage_string(char *what, char *how, char **usage_string)
 		    "%s is part of VxVM volume %s.\n");
 	} else if (strcmp(what, DM_USE_LU) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
-		    "%s is in use for live upgrade %s. Please see ludelete(1M)."
+		    "%s is in use for live upgrade %s. Please see ludelete(8)."
 		    "\n");
 	} else if (strcmp(what, DM_USE_DUMP) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
-		    "%s is in use by %s. Please see dumpadm(1M)."
+		    "%s is in use by %s. Please see dumpadm(8)."
 		    "\n");
 	} else if (strcmp(what, DM_USE_EXPORTED_ZPOOL) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
 		    "%s is part of exported or potentially active ZFS pool %s. "
-		    "Please see zpool(1M).\n");
+		    "Please see zpool(8).\n");
 	} else if (strcmp(what, DM_USE_ACTIVE_ZPOOL) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
-		    "%s is part of active ZFS pool %s. Please see zpool(1M)."
+		    "%s is part of active ZFS pool %s. Please see zpool(8)."
 		    "\n");
 	} else if (strcmp(what, DM_USE_SPARE_ZPOOL) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
 		    "%s is reserved as a hot spare for ZFS pool %s.  Please "
-		    "see zpool(1M).\n");
+		    "see zpool(8).\n");
 	} else if (strcmp(what, DM_USE_L2CACHE_ZPOOL) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
 		    "%s is in use as a cache device for ZFS pool %s.  "
-		    "Please see zpool(1M).\n");
+		    "Please see zpool(8).\n");
 	}
 }
 void

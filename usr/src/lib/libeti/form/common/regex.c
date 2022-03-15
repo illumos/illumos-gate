@@ -38,7 +38,7 @@
 #include "utility.h"
 
 /*
- *	this code was taken from REGCMP(3X)
+ *	this code was taken from regcmp(3C)
  */
 /*VARARGS*/
 /*ARGSUSED*/

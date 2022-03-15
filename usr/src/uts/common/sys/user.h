@@ -197,7 +197,7 @@ typedef struct {		/* kernel syscall set type */
  * for the portions of the kernel that care about aux vectors.
  *
  * Applications that need to know how many aux vectors the kernel
- * supplies should use the proc(4) interface to read /proc/PID/auxv.
+ * supplies should use the proc(5) interface to read /proc/PID/auxv.
  *
  * This value should not be changed in a patch.
  */

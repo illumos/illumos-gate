@@ -28,8 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/proc.h>
 #include <sys/priocntl.h>
 #include <sys/class.h>
@@ -41,7 +39,7 @@
 /*
  * The purpose of this file is to allow a user to make their own
  * ts_dptbl. The contents of this file should be included in the
- * ts_dptbl(4) man page with proper instructions for making
+ * ts_dptbl(5) man page with proper instructions for making
  * and replacing the TS_DPTBL.kmod in modules/sched. This was the
  * only way to provide functionality equivalent to the mkboot/cunix
  * method in SVr4 without having the utilities mkboot/cunix in

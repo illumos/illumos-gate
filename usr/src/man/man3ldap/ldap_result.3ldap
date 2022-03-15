@@ -96,7 +96,7 @@ specified timeout was exceeded.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -112,7 +112,7 @@ Interface Stability	Committed
 .sp
 .LP
 \fBselect\fR(1), \fBldap\fR(3LDAP), \fBldap_search\fR(3LDAP) ,
-\fBattributes\fR(5)
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

@@ -64,7 +64,7 @@ argument,
 the
 .Sy prmap_t
 structure defined from
-.Xr proc 4 ,
+.Xr proc 5 ,
 and a name of the mapping.
 The way that the name is obtained varies based on whether one calls
 .Fn Pmapping_iter
@@ -162,4 +162,4 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

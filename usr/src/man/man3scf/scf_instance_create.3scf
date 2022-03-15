@@ -87,7 +87,7 @@ of the property groups necessary to run the instance. See
 
 .sp
 .LP
-See \fBsmf\fR(5) for information about instances.
+See \fBsmf\fR(7) for information about instances.
 .sp
 .LP
 An \fBscf_instance_t\fR is an opaque handle that can be set to a single
@@ -300,7 +300,7 @@ The \fBscf_service_get_instance()\fR function will fail if:
 \fB\fBSCF_ERROR_BACKEND_ACCESS\fR\fR
 .ad
 .RS 28n
-The  storage  mechanism  that  the   repository server (\fBsvc.configd\fR(1M))
+The  storage  mechanism  that  the   repository server (\fBsvc.configd\fR(8))
 chose for the operation denied access.
 .RE
 
@@ -457,7 +457,7 @@ The server does not have adequate resources for a new instance handle.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -475,10 +475,15 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF), \fBscf_iter_instance_pgs\fR(3SCF),
-\fBscf_iter_instance_pgs_typed\fR(3SCF),
-\fBscf_iter_instance_snapshots\fR(3SCF), \fBscf_pg_create\fR(3SCF),
-\fBscf_snapshot_create\fR(3SCF), \fBattributes\fR(5), \fBsmf\fR(5)
+.BR libscf (3LIB),
+.BR scf_error (3SCF),
+.BR scf_iter_instance_pgs (3SCF),
+.BR scf_iter_instance_pgs_typed (3SCF),
+.BR scf_iter_instance_snapshots (3SCF),
+.BR scf_pg_create (3SCF),
+.BR scf_snapshot_create (3SCF),
+.BR attributes (7),
+.BR smf (7)
 .SH NOTES
 .sp
 .LP

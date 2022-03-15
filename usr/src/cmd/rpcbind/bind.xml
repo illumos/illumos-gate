@@ -3,24 +3,24 @@
 
 <!--
     CDDL HEADER START
-   
+
     The contents of this file are subject to the terms of the
     Common Development and Distribution License (the "License").
     You may not use this file except in compliance with the License.
-   
+
     You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
     or http://www.opensolaris.org/os/licensing.
     See the License for the specific language governing permissions
     and limitations under the License.
-   
+
     When distributing Covered Code, include this CDDL HEADER in each
     file and include the License file at usr/src/OPENSOLARIS.LICENSE.
     If applicable, add the following below this CDDL HEADER, with the
     fields enclosed by brackets "[]" replaced with your own identifying
     information: Portions Copyright [yyyy] [name of copyright owner]
-   
+
     CDDL HEADER END
-   
+
     Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
     Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
     Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
@@ -42,7 +42,7 @@
     type='service'
     version='1'>
 
-    	<create_default_instance enabled='true' />
+	<create_default_instance enabled='true' />
 
 	<single_instance />
 
@@ -55,7 +55,7 @@
 	</dependency>
 
 	<!--
-		rpcbind(1M) depends on multicast routes installed by the
+		rpcbind(8) depends on multicast routes installed by the
 		routing-setup service, and should be started after any IPsec
 		policy is configured and TCP ndd tunables are set (both
 		currently carried out by network/initial).
@@ -113,14 +113,14 @@
 	</exec_method>
 
 	<property_group name='config' type='application' >
-		<!-- default property settings for rpcbind(1M). -->
+		<!-- default property settings for rpcbind(8). -->
 
 		<!-- enable_tcpwrappers affects the wrapping of rpcbind,
-		     see rpcbind(1M) and tcpd(1M) for details.
+		     see rpcbind(8) and tcpd(8) for details.
 		     The default value is 'false'.
 		     A values of 'true' results in wrapping all UDP/TCP
 		     calls to the portmapper with libwrap. Note that
-		     rpcbind(1M) will not resolve or lookup names while
+		     rpcbind(8) will not resolve or lookup names while
 		     doing tcp wrapper processing.
 		-->
 		<propval
@@ -213,7 +213,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='rpcbind' section='1M'
+			<manpage title='rpcbind' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

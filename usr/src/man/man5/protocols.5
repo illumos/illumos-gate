@@ -1,0 +1,100 @@
+'\" te
+.\"  Copyright 1989 AT&T
+.\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PROTOCOLS 5 "Feb 25, 2017"
+.SH NAME
+protocols \- protocol name database
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/inet/protocols\fR
+.fi
+
+.LP
+.nf
+\fB/etc/protocols\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBprotocols\fR file  is a local source of information regarding the known
+protocols used in the \fBDARPA\fR Internet. The protocols file can be used in
+conjunction with or instead of other protocols sources, including the \fBNIS\fR
+maps "protocols.byname" and "protocols.bynumber". Programs use the
+\fBgetprotobyname\fR(3SOCKET) routine to access this information.
+.sp
+.LP
+The \fBprotocols\fR file has one line for each protocol. The line has the
+following format:
+.sp
+.in +2
+.nf
+\fIofficial-protocol-name\fR \fIprotocol-number\fR \fIaliases\fR
+.fi
+.in -2
+
+.sp
+.LP
+Items are separated by any number of blanks and/or TAB characters. A `\fB#\fR'
+indicates the beginning of a comment; characters up to the end of the line are
+not interpreted by routines which search the file. Protocol names may contain
+any printable character other than a field delimiter, NEWLINE, or comment
+character.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA Sample Database
+.sp
+.LP
+The following is a sample database:
+
+.sp
+.in +2
+.nf
+#
+# Internet (IP) protocols
+#
+ip          0   IP          # internet protocol, pseudo protocol number
+icmp        1   ICMP        # internet control message protocol
+ggp         3   GGP         # gateway-gateway protocol
+tcp         6   TCP         # transmission control protocol
+egp         8   EGP         # exterior gateway protocol
+pup         12  PUP         # PARC universal packet protocol
+udp         17  UDP         # user datagram protocol
+
+#
+# Internet (IPv6) extension headers
+#
+hopopt      0   HOPOPT      # Hop-by-hop options for IPv6
+ipv6        41  IPv6        # IPv6 in IP encapsulation
+ipv6-route  43  IPv6-Route  # Routing header for IPv6
+ipv6-frag   44  IPv6-Frag   # Fragment header for IPv6
+esp         50  ESP         # Encap Security Payload for IPv6
+ah          51  AH          # Authentication Header for IPv6
+ipv6-icmp   58  IPv6-ICMP   # IPv6 internet control message protocol
+ipv6-nonxt  59  IPv6-NoNxt  # No next header extension header for IPv6
+ipv6-opts   60  IPv6-Opts   # Destination Options for IPv6
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/nsswitch.conf\fR\fR
+.ad
+.RS 22n
+configuration file for name-service switch
+.RE
+
+.SH SEE ALSO
+.LP
+.BR getprotobyname (3SOCKET),
+.BR nsswitch.conf (5)
+.SH NOTES
+.LP
+\fB/etc/inet/protocols\fR is the official SVR4 name of the \fBprotocols\fR
+file.  The symbolic link \fB/etc/protocols\fR exists for \fBBSD\fR
+compatibility.

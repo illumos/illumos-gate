@@ -29,8 +29,6 @@
 #ifndef _TZFILE_H
 #define	_TZFILE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * A part of this file comes from public domain source, so
  * clarified as of June 5, 1996 by Arthur David Olson
@@ -45,7 +43,7 @@
  * future releases.
  */
 
-/* For further information, see ctime(3C) and zic(1M) man pages. */
+/* For further information, see ctime(3C) and zic(8) man pages. */
 
 /*
  * This file is in the public domain, so clarified as of

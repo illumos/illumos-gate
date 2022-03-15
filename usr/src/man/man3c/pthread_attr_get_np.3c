@@ -195,5 +195,5 @@ No thread could be found corresponding to the specified thread ID,
 .Xr pthread_detach 3C ,
 .Xr pthread_getschedparam 3C ,
 .Xr pthread_setschedparam 3C ,
-.Xr attributes 5 ,
-.Xr threads 5
+.Xr attributes 7 ,
+.Xr threads 7

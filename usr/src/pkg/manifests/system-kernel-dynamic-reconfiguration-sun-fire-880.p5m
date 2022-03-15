@@ -53,8 +53,8 @@ dir  path=usr/platform/SUNW,Sun-Fire-V890 group=sys
 dir  path=usr/platform/SUNW,Sun-Fire-V890/lib
 link path=usr/platform/SUNW,Sun-Fire-V890/lib/sf880drd \
     target=../../SUNW,Sun-Fire-880/lib/sf880drd
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/sf880drd.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/sf880drd.8
 legacy pkg=SUNWsfdr.u arch=$(ARCH).sun4u desc="Sun Fire 880 DR Daemon" \
     name="Sun Fire 880 DR Daemon"
 legacy pkg=SUNWsfdrr.u arch=$(ARCH).sun4u \

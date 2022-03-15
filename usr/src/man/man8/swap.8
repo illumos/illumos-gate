@@ -1,0 +1,314 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SWAP 8 "June 13, 2021"
+.SH NAME
+swap \- swap administrative interface
+.SH SYNOPSIS
+.nf
+\fB/usr/sbin/swap\fR \fB-a\fR \fIswapname\fR [\fIswaplow\fR] [\fIswaplen\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/sbin/swap\fR \fB-d\fR \fIswapname\fR [\fIswaplow\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/sbin/swap\fR \fB-l\fR [\fB-h\fR | \fB-k\fR]
+.fi
+
+.LP
+.nf
+\fB/usr/sbin/swap\fR \fB-s\fR [\fB-h\fR]
+.fi
+
+.SH DESCRIPTION
+The \fBswap\fR utility provides a method of adding, deleting, and monitoring
+the system swap areas used by the memory manager.
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-a\fR \fIswapname\fR [\fIswaplow\fR] [\fIswaplen\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Add the specified swap area. This option can only be used by the superuser or
+by one who has assumed the Primary Administrator role. \fIswapname\fR is the
+name of the swap area or regular file. For example, on system running a UFS
+root file system, specify a slice, such as \fB/dev/dsk/c0t0d0s1\fR, or a
+regular file for a swap area. On a system running a ZFS file system, specify a
+ZFS volume, such as \fB/dev/zvol/dsk/rpool/swap\fR, for a swap area. Using a
+regular file for swap is not supported on a ZFS file system. In addition, you
+cannot use the same ZFS volume for both the swap area and a dump device when
+the system is running a ZFS root file system.
+.sp
+\fIswaplow\fR is the offset in 512-byte blocks into the file where the swap
+area should begin. \fIswaplen\fR is the desired length of the swap area in
+512-byte blocks. The value of \fIswaplen\fR can not be less than \fB16\fR. For
+example, if \fIn\fR blocks are specified, then (\fIn\fR-1) blocks would be the
+actual swap length. \fIswaplen\fR must be at least one page in length. The size
+of a page of memory can be determined by using the \fBpagesize\fR command. See
+\fBpagesize\fR(1). Since the first page of a swap file is automatically
+skipped, and a swap file needs to be at least one page in length, the minimum
+size should be a multiple of 2 pagesize bytes. The size of a page of memory is
+machine-dependent.
+.sp
+\fIswaplow\fR + \fIswaplen\fR must be less than or equal to the size of the
+swap file. If \fIswaplen\fR is not specified, an area will be added starting at
+\fIswaplow\fR and extending to the end of the designated file. If neither
+\fIswaplow\fR nor \fIswaplen\fR are specified, the whole file will be used
+except for the first page. Swap areas are normally added automatically during
+system startup by the \fB/sbin/swapadd\fR script. This script adds all swap
+areas which have been specified in the \fB/etc/vfstab\fR file; for the syntax
+of these specifications, see \fBvfstab\fR(5).
+.sp
+To use an \fBNFS\fR or local file system \fIswapname\fR, you should first
+create a file using \fBmkfile\fR(8). A local file system swap file can now be
+added to the running system by just running the \fBswap\fR \fB-a\fR command.
+For \fBNFS\fR mounted swap files, the server needs to export the file. Do this
+by performing the following steps:
+.RS +4
+.TP
+1.
+Add the following line to \fB/etc/dfs/dfstab\fR:
+.sp
+.in +2
+.nf
+share -F nfs -o \e
+rw=\fIclientname\fR,root=\fIclientname path-to-swap-file\fR
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+2.
+Run \fBshareall\fR(8).
+.RE
+.RS +4
+.TP
+3.
+Have the client add the following line to \fB/etc/vfstab\fR:
+.sp
+.in +2
+.nf
+\fIserver\fR:\fIpath-to-swap-file\fR -  \fIlocal-path-to-swap-file\fR nfs \e
+     -\|-\|- \fIlocal-path-to-swap-file\fR -\|- swap -\|-\|-
+.fi
+.in -2
+
+.RE
+.RS +4
+.TP
+4.
+Have the client run \fBmount\fR:
+.sp
+.in +2
+.nf
+# mount \fIlocal-path-to-swap-file\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RS +4
+.TP
+5.
+The client can then run \fBswap\fR \fB-a\fR to add the swap space:
+.sp
+.in +2
+.nf
+# swap -a \fIlocal-path-to-swap-file\fR
+.fi
+.in -2
+.sp
+
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR \fIswapname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Delete the specified swap area. This option can only be used by the super-user.
+\fIswapname\fR is the name of the swap file: for example,
+\fB/dev/dsk/c0t0d0s1\fR or a regular file. \fIswaplow\fR is the offset in
+512-byte blocks into the swap area to be deleted. If \fIswaplow\fR is not
+specified, the area will be deleted starting at the second page. When the
+command completes, swap blocks can no longer be allocated from this area and
+all swap blocks previously in use in this swap area have been moved to other
+swap areas.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-h\fR\fR
+.ad
+.sp .6
+.RS 4n
+All sizes are scaled to a human readable format. Scaling is done by
+repetitively dividing by 1024.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write the files sizes in units of 1024 bytes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR\fR
+.ad
+.sp .6
+.RS 4n
+List the status of all the swap areas. The output has five columns:
+.sp
+.ne 2
+.na
+\fB\fBpath\fR\fR
+.ad
+.sp .6
+.RS 4n
+The path name for the swap area.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdev\fR\fR
+.ad
+.sp .6
+.RS 4n
+The major/minor device number in decimal if it is a block special device;
+zeroes otherwise.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBswaplo\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIswaplow\fR value for the area in 512-byte blocks.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBblocks\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fIswaplen\fR value for the area in 512-byte blocks.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfree\fR\fR
+.ad
+.sp .6
+.RS 4n
+The number of 512-byte blocks in this area that are not currently allocated.
+.RE
+
+The list does not include swap space in the form of physical memory because
+this space is not associated with a particular swap area.
+.sp
+If \fBswap\fR \fB-l\fR is run while \fIswapname\fR is in the process of being
+deleted (by \fBswap\fR \fB-d\fR), the string \fBINDEL\fR will appear in a sixth
+column of the swap stats.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print summary information about total swap space usage and availability:
+.sp
+.ne 2
+.na
+\fB\fBallocated\fR\fR
+.ad
+.sp .6
+.RS 4n
+The total amount of swap space in bytes currently allocated for use as backing
+store.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreserved\fR\fR
+.ad
+.sp .6
+.RS 4n
+The total amount of swap space in bytes not currently allocated, but claimed by
+memory mappings for possible future use.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBused\fR\fR
+.ad
+.sp .6
+.RS 4n
+The total amount of swap space in bytes that is either allocated or reserved.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBavailable\fR\fR
+.ad
+.sp .6
+.RS 4n
+The total swap space in bytes that is currently available for future
+reservation and allocation.
+.RE
+
+These numbers include swap space from all configured swap areas as listed by
+the \fB-l\fR option, as well as swap space in the form of physical memory.
+.RE
+
+.SH USAGE
+A block device up to 2^63 \(mi1 bytes can be fully utilized for swap.
+.SH ENVIRONMENT VARIABLES
+See \fBenviron\fR(7) for descriptions of the following environment variables
+that affect the execution of \fBswap\fR: \fBLC_CTYPE\fR and \fBLC_MESSAGE\fR.
+.SH SEE ALSO
+.BR pagesize (1),
+.BR getpagesize (3C),
+.BR vfstab (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR mkfile (8),
+.BR shareall (8)
+.SH NOTES
+For information about setting up a swap area with \fBZFS\fR, see the \fIZFS
+Administration Guide\fR.
+.SH WARNINGS
+No check is done to determine if a swap area being added overlaps with an
+existing file system.

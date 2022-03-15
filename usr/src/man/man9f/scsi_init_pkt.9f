@@ -357,9 +357,13 @@ my_pkt = scsi_init_pkt(&devp->sd_address, NULL, bp, CDB_GROUP0,
 .in -2
 
 .SH SEE ALSO
-\fBscsi_alloc_consistent_buf\fR(9F), \fBscsi_destroy_pkt\fR(9F),
-\fBscsi_dmaget\fR(9F), \fBscsi_pktalloc\fR(9F), \fBbuf\fR(9S),
-\fBscsi_address\fR(9S), \fBscsi_pkt\fR(9S)
+.BR scsi_alloc_consistent_buf (9F),
+.BR scsi_destroy_pkt (9F),
+.BR scsi_dmaget (9F),
+.BR scsi_pktalloc (9F),
+.BR buf (9S),
+.BR scsi_address (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

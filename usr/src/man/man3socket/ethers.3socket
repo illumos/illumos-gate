@@ -88,14 +88,14 @@ do the mapping, both these functions may lookup one or more of the following
 sources: the ethers file and the \fBNIS\fR maps \fBethers.byname\fR and
 \fBethers.byaddr\fR. The sources and
 their lookup order are specified in the  \fB/etc/nsswitch.conf\fR file. See
-\fBnsswitch.conf\fR(4) for details.
+\fBnsswitch.conf\fR(5) for details.
 .sp
 .LP
 The function  \fBether_line()\fR scans a line, pointed to by \fIl\fR, and sets
 the hostname and the Ethernet number, pointed to by \fIe\fR. The string pointed
 to by hostname must be long enough to hold the hostname and a  \fINULL\fR
 character.  The function returns zero upon success and non-zero upon failure.
-The format of the scanned line is described by  \fBethers\fR(4).
+The format of the scanned line is described by  \fBethers\fR(5).
 .SH FILES
 .ne 2
 .na
@@ -116,7 +116,7 @@ configuration file for the name service switch
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -131,4 +131,6 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBethers\fR(4), \fBnsswitch.conf\fR(4), \fBattributes\fR(5)
+.BR ethers (5),
+.BR nsswitch.conf (5),
+.BR attributes (7)

@@ -67,7 +67,7 @@ cc [ \fIflag\fR... ] \fIfile\fR... \(milproject [ \fIlibrary\fR... ]
 .LP
 These functions are used to obtain entries describing user projects. Entries
 can come from any of the sources for a project specified in the
-\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(4)).
+\fB/etc/nsswitch.conf\fR file (see \fBnsswitch.conf\fR(5)).
 .sp
 .LP
 The \fBsetprojent()\fR, \fBgetprojent()\fR, and \fBendprojent()\fR functions
@@ -137,7 +137,7 @@ returns the project ID if the requested entry is found; otherwise it returns
 .LP
 The \fBfgetprojent()\fR function, unlike the other functions described above,
 does not use \fBnsswitch.conf\fR; it reads and parses the next line from the
-stream \fIf\fR, which is assumed to have the format of the \fBproject\fR(4)
+stream \fIf\fR, which is assumed to have the format of the \fBproject\fR(5)
 file. This function returns the same values as \fBgetprojent()\fR.
 .sp
 .LP
@@ -263,7 +263,7 @@ the data to be referenced by the resulting \fBproject\fR structure.
 .sp
 .LP
 These functions can also fail if the name service switch does not specify valid
-\fBproject\fR(4) name service sources. In the case of an incompletely
+\fBproject\fR(5) name service sources. In the case of an incompletely
 configured name service switch configuration, \fBgetprojbyid()\fR and other
 functions can return error values other than those documented above. These
 conditions usually occur when the \fBnsswitch.conf\fR file indicates that one
@@ -278,10 +278,10 @@ Multithreaded Applications.
 Use of the enumeration interface \fBgetprojent()\fR is discouraged. Enumeration
 is supported for the project file, NIS, and LDAP but in general is not
 efficient. The semantics of enumeration are discussed further in
-\fBnsswitch.conf\fR(4).
+\fBnsswitch.conf\fR(5).
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -298,6 +298,10 @@ MT-Level	See Description.
 
 .SH SEE ALSO
 .LP
-\fBIntro\fR(3), \fBlibproject\fR(3LIB), \fBproject_walk\fR(3PROJECT),
-\fBsysconf\fR(3C), \fBnsswitch.conf\fR(4), \fBproject\fR(4),
-\fBattributes\fR(5)
+.BR Intro (3),
+.BR sysconf (3C),
+.BR libproject (3LIB),
+.BR project_walk (3PROJECT),
+.BR nsswitch.conf (5),
+.BR project (5),
+.BR attributes (7)

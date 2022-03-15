@@ -118,7 +118,8 @@ locale.
 \fB/etc/magic\fR
 .SH SEE ALSO
 .LP
-\fBmagic\fR(4), \fBattributes\fR(5)
+.BR magic (5),
+.BR attributes (7)
 .SH BUGS
 .LP
 \fBfile\fR often makes mistakes.  In particular, it often suggests that command

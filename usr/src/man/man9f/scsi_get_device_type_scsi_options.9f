@@ -49,7 +49,7 @@ Value returned if no match is found.
 .SH DESCRIPTION
 The \fBscsi_get_device_type_scsi_options()\fR function looks up the property
 \fBdevice-type-scsi-options-list\fR, which can be specified in the HBA's
-\fBdriver.conf\fR(4) file. This property allows specification of
+\fBdriver.conf\fR(5) file. This property allows specification of
 \fBscsi-options\fR on a per-device-type basis.
 .sp
 .LP

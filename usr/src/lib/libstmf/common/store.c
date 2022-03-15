@@ -40,7 +40,7 @@
 
 /*
  * This file's functions are responsible for all store and retrieve operations
- * against the STMF smf(5) database. The following shows the currently defined
+ * against the STMF smf(7) database. The following shows the currently defined
  * schema for the STMF database:
  *
  * Description of property groups for service: svc:/system/stmf

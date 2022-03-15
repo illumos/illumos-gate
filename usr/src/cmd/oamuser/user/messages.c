@@ -68,7 +68,7 @@ char *errmsgs[] = {
 	"ERROR: Unable to %s: %s.\n",
 	"ERROR: %s is not a full path name.  Choose another.\n",
 	"ERROR: %s is the primary group name.  Choose another.\n",
-	"ERROR: Inconsistent password files.  See pwconv(1M).\n",
+	"ERROR: Inconsistent password files.  See pwconv(8).\n",
 	"ERROR: %s is not a local user.\n",
 	"ERROR: Permission denied.\n",
 	"WARNING: Group entry exceeds 2048 char: /etc/group entry truncated.\n",

@@ -111,7 +111,7 @@ sfxge_pci_init(sfxge_t *sp)
 	 * resources. Each element contains a 5-tuple of 32bit values,
 	 * where the first 32bit value contains the bus/dev/fn slot
 	 * information.
-	 * See pci(4) and the definition of "struct pci_phys_spec" in sys/pci.h
+	 * See pci(5) and the definition of "struct pci_phys_spec" in sys/pci.h
 	 */
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, sp->s_dip,
 	    DDI_PROP_DONTPASS, "reg", (int **)&pci_regs, &pci_nregs) !=

@@ -240,7 +240,7 @@ typedef struct FALERT {
 although a common cause is that the printer's buffer capacity\n\
 was exceeded. Using XON/XOFF flow control, adding carriage-return\n\
 delays, or lowering the baud rate may fix the problem.\n\
-See stty(1) and lpadmin(1M) man-pages for help in doing this.\n"
+See stty(1) and lpadmin(8) man-pages for help in doing this.\n"
 
 #define	PIPE_FAULT \
 "The output ``port'', a FIFO, was closed before all output was written.\n"
@@ -266,7 +266,7 @@ See stty(1) and lpadmin(1M) man-pages for help in doing this.\n"
 #define	LP_EKEYWORD	12
 #define	LP_EPATTERN	13
 #define	LP_ERESULT	14
-#define	LP_EREGEX	15  /* and see extern int regerrno, regexpr(3G) */
+#define	LP_EREGEX	15  /* and see extern int regerrno, regexpr(3GEN) */
 #define	LP_ENOMEM	99
 
 extern int		lp_errno;

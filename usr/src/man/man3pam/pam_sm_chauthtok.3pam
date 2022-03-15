@@ -21,7 +21,7 @@ pam_sm_chauthtok \- service provider implementation for pam_chauthtok
 .sp
 .LP
 In response to a call to \fBpam_chauthtok()\fR the \fBPAM\fR framework calls
-pam_sm_chauthtok(3PAM) from the modules listed in the \fBpam.conf\fR(4) file.
+pam_sm_chauthtok(3PAM) from the modules listed in the \fBpam.conf\fR(5) file.
 The password management provider supplies the back-end functionality for this
 interface function.
 .sp
@@ -93,7 +93,7 @@ accordance with the authentication scheme configured within the system.
 .sp
 .LP
 The \fIargc\fR argument represents the number of module options passed in from
-the configuration file \fBpam.conf\fR(4). The \fIargv\fR argument specifies the
+the configuration file \fBpam.conf\fR(5). The \fIargv\fR argument specifies the
 module options, which are interpreted and processed by the password management
 service. Please refer to the specific module man pages for the various
 available \fIoptions\fR.
@@ -180,7 +180,7 @@ Preliminary check by password service failed.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -198,9 +198,15 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBping\fR(1M), \fBpam\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
-\fBpam_get_data\fR(3PAM), \fBpam_get_item\fR(3PAM), \fBpam_set_data\fR(3PAM),
-\fBlibpam\fR(3LIB), \fBpam.conf\fR(4), \fBattributes\fR(5)
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_chauthtok (3PAM),
+.BR pam_get_data (3PAM),
+.BR pam_get_item (3PAM),
+.BR pam_set_data (3PAM),
+.BR pam.conf (5),
+.BR attributes (7),
+.BR ping (8)
 .SH NOTES
 .sp
 .LP

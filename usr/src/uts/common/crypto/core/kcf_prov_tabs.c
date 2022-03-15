@@ -62,7 +62,7 @@
  * which triggers the removal of the prov_tab entry.
  * It also calls kcf_remove_mech_provider().
  *
- * prov_tab entries are not updated from kcf.conf or by cryptoadm(1M).
+ * prov_tab entries are not updated from kcf.conf or by cryptoadm(8).
  */
 static kcf_provider_desc_t **prov_tab = NULL;
 kmutex_t prov_tab_mutex; /* ensure exclusive access to the table */
@@ -662,7 +662,7 @@ out:
 
 /*
  * Returns an array of hardware provider descriptors. This routine
- * used by cryptoadm(1M). A REFHOLD is done on each descriptor before
+ * used by cryptoadm(8). A REFHOLD is done on each descriptor before
  * the array is returned. The entire table can be freed by calling
  * kcf_free_provider_tab().
  *

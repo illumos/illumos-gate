@@ -38,7 +38,7 @@ extern "C" {
 
 /*
  * Definitions for the VM implementation of watchpoints.
- * See proc(4) and <sys/procfs.h> for definitions of the user interface.
+ * See proc(5) and <sys/procfs.h> for definitions of the user interface.
  */
 
 /*

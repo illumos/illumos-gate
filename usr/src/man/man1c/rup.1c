@@ -33,7 +33,7 @@ queries the list of specified hosts.
 .sp
 .LP
 A remote host will only respond if it is running the \fBrstatd\fR daemon, which
-is normally started up from \fBinetd\fR(1M).
+is normally started up from \fBinetd\fR(8).
 .SH OPTIONS
 .sp
 .ne 2
@@ -65,7 +65,9 @@ Sort the display by up time.
 .SH SEE ALSO
 .sp
 .LP
-\fBruptime\fR(1), \fBinetd\fR(1M), \fBattributes\fR(5)
+.BR ruptime (1),
+.BR attributes (7),
+.BR inetd (8)
 .SH BUGS
 .sp
 .LP

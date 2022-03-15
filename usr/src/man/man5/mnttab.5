@@ -1,0 +1,248 @@
+'\" te
+.\" Copyright (c) 2003 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MNTTAB 5 "Sep 8, 2015"
+.SH NAME
+mnttab \- mounted file system table
+.SH DESCRIPTION
+.LP
+The file \fB/etc/mnttab\fR is really a file system that provides read-only
+access to the table of mounted file systems for the current host.
+\fB/etc/mnttab\fR is read by programs using the routines described in
+\fBgetmntent\fR(3C). Mounting a file system adds an entry to this table.
+Unmounting removes an entry from this table. Remounting a file system causes
+the information in the mounted file system table to be updated to reflect any
+changes caused by the remount. The list is maintained by the kernel in order of
+mount time. That is, the first mounted file system is first in the list and the
+most recently mounted file system is last. When mounted on a mount point the
+file system appears as a regular file containing the current \fBmnttab\fR
+information.
+.LP
+Each entry is a line of fields separated by TABs in the form:
+.sp
+.in +2
+.nf
+\fIspecial   mount_point   fstype   options   time\fR
+.fi
+.in -2
+
+.LP
+where:
+.sp
+.ne 2
+.na
+\fB\fIspecial\fR\fR
+.ad
+.RS 15n
+The name of the resource that has been mounted.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fImount_point\fR\fR
+.ad
+.RS 15n
+The pathname of the directory on which the filesystem is mounted.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIfstype\fR\fR
+.ad
+.RS 15n
+The file system type of the mounted file system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIoptions\fR\fR
+.ad
+.RS 15n
+The mount options. See respective mount file system man page in the See Also
+section below.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fItime\fR\fR
+.ad
+.RS 15n
+The time at which the file system was mounted.
+.RE
+
+.LP
+Examples of entries for the \fIspecial\fR field include the pathname of a
+block-special device, the name of a remote file system in the form of
+\fIhost:pathname\fR, or the name of a \fBswap file\fR, for example, a file made
+with \fBmkfile\fR(8).
+.SH IOCTLS
+.LP
+The following \fBioctl\fR(2) calls are supported:
+.sp
+.ne 2
+.na
+\fB\fBMNTIOC_NMNTS\fR\fR
+.ad
+.RS 21n
+Returns the count of mounted resources in the current snapshot in the
+\fBuint32_t\fR pointed to by \fIarg\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMNTIOC_GETDEVLIST\fR\fR
+.ad
+.RS 21n
+Returns an array of \fBuint32_t\fR's that is twice as long as the length
+returned by \fBMNTIOC_NMNTS\fR. Each pair of numbers is the major and minor
+device number for the file system at the corresponding  line in the current
+\fB/etc/mnttab\fR snapshot. \fIarg\fR points to the memory buffer to receive
+the device number information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMNTIOC_SETTAG\fR\fR
+.ad
+.RS 21n
+Sets a tag word into the options list for a mounted file system. A tag is a
+notation that will appear in the options string of a mounted file system but it
+is not recognized or interpreted by the file system code. \fIarg\fR points to a
+filled in \fBmnttagdesc\fR structure, as shown in the following example:
+.sp
+.in +2
+.nf
+uint_t  mtd_major;  /* major number for mounted fs */
+uint_t  mtd_minor;  /* minor number for mounted fs */
+char    *mtd_mntpt; /* mount point of file system */
+char    *mtd_tag;   /* tag to set/clear */
+.fi
+.in -2
+
+If the tag already exists then it is marked as set but not re-added. Tags can
+be at most \fBMAX_MNTOPT_TAG\fR long.
+.sp
+Use of this ioctl is restricted to processes with the \fB{PRIV_SYS_MOUNT}\fR
+privilege.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMNTIOC_CLRTAG\fR\fR
+.ad
+.RS 21n
+Marks a tag in the options list for a mounted file system as not set. \fIarg\fR
+points to the same structure as \fBMNTIOC_SETTAG\fR, which identifies the file
+system and tag to be cleared.
+.sp
+Use of this ioctl is restricted to processes with the \fB{PRIV_SYS_MOUNT}\fR
+privilege.
+.RE
+
+.SH ERRORS
+.ne 2
+.na
+\fB\fBEFAULT\fR\fR
+.ad
+.RS 16n
+The arg pointer in an \fBMNTIOC_ ioctl\fR call pointed to an inaccessible
+memory location or a character pointer in a \fBmnttagdesc\fR structure pointed
+to an inaccessible memory location.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEINVAL\fR\fR
+.ad
+.RS 16n
+The tag specified in a \fBMNTIOC_SETTAG\fR call already exists as a file system
+option, or the tag specified in a \fBMNTIOC_CLRTAG\fR call does not exist.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENAMETOOLONG\fR\fR
+.ad
+.RS 16n
+The tag specified in a \fBMNTIOC_SETTAG\fR call is too long or the tag would
+make the total length of the option string for the mounted file system too
+long.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBEPERM\fR\fR
+.ad
+.RS 16n
+The calling process does not have \fB{PRIV_SYS_MOUNT}\fR privilege and either a
+\fBMNTIOC_SETTAG\fR or \fBMNTIOC_CLRTAG\fR call was made.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/mnttab\fR\fR
+.ad
+.RS 28n
+Usual mount point for \fBmnttab\fR file system
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/include/sys/mntio.h\fR\fR
+.ad
+.RS 28n
+Header file that contains \fBIOCTL\fR definitions
+.RE
+
+.SH SEE ALSO
+.LP
+.BR ioctl (2),
+.BR poll (2),
+.BR read (2),
+.BR stat (2),
+.BR getmntent (3C),
+.BR mkfile (8),
+.BR mount (8),
+.BR mount_hsfs (8),
+.BR mount_nfs (8),
+.BR mount_pcfs (8),
+.BR mount_ufs (8)
+.SH WARNINGS
+.LP
+The \fBmnttab\fR file system provides the previously undocumented
+\fBdev=\fR\fIxxx\fR option in the option string for each mounted file system.
+This is provided for legacy applications that might have been using the
+\fBdev=information\fR option.
+.LP
+Using \fBdev=\fR\fIoption\fR in applications is strongly discouraged. The
+device number string represents a 32-bit quantity and might not contain correct
+information in 64-bit environments.
+.LP
+Applications requiring device number information for mounted file systems
+should use the \fBgetextmntent\fR(3C) interface, which functions properly in
+either 32- or 64-bit environments.
+.SH NOTES
+.LP
+The snapshot of the \fBmnttab\fR information is taken any time a \fBread\fR(2)
+is performed at offset \fB0\fR (the beginning) of the \fBmnttab\fR file. The
+file modification time returned by \fBstat\fR(2) for the \fBmnttab\fR file is
+the time of the last change to mounted file system information. A \fBpoll\fR(2)
+system call requesting a \fBPOLLRDBAND\fR event can be used to block and wait
+for the system's mounted file system information to be different from the most
+recent snapshot since the \fBmnttab\fR file was opened.

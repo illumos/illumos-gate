@@ -87,7 +87,7 @@ indicate the specific failure that occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -106,4 +106,4 @@ MT-Level	Safe
 .sp
 .LP
 \fBDNSServiceBrowse\fR(3DNS_SD), \fBDNSServiceRegister\fR(3DNS_SD),
-\fBDNSServiceResolve\fR(3DNS_SD), \fBattributes\fR(5)
+\fBDNSServiceResolve\fR(3DNS_SD), \fBattributes\fR(7)

@@ -200,7 +200,7 @@ contribute to the decision being made by the \fBPAM\fR framework.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -218,16 +218,30 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBpam\fR(3PAM), \fBpam_authenticate\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
-\fBpam_get_user\fR(3PAM), \fBpam_open_session\fR(3PAM),
-\fBpam_setcred\fR(3PAM), \fBpam_set_item\fR(3PAM),
-\fBpam_sm_authenticate\fR(3PAM), \fBpam_sm_chauthtok\fR(3PAM),
-\fBpam_sm_open_session\fR(3PAM), \fBpam_sm_setcred\fR(3PAM),
-\fBpam_start\fR(3PAM), \fBpam_strerror\fR(3PAM), \fBsyslog\fR(3C),
-\fBpam.conf\fR(4), \fBattributes\fR(5), \fBpam_authtok_check\fR(5),
-\fBpam_authtok_get\fR(5), \fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5),
-\fBpam_passwd_auth\fR(5), \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),
-\fBpam_unix_session\fR(5)
+.BR syslog (3C),
+.BR pam (3PAM),
+.BR pam_authenticate (3PAM),
+.BR pam_chauthtok (3PAM),
+.BR pam_get_user (3PAM),
+.BR pam_open_session (3PAM),
+.BR pam_set_item (3PAM),
+.BR pam_setcred (3PAM),
+.BR pam_sm_authenticate (3PAM),
+.BR pam_sm_chauthtok (3PAM),
+.BR pam_sm_open_session (3PAM),
+.BR pam_sm_setcred (3PAM),
+.BR pam_start (3PAM),
+.BR pam_strerror (3PAM),
+.BR pam.conf (5),
+.BR attributes (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_dhkeys (7),
+.BR pam_passwd_auth (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7)
 .SH NOTES
 .sp
 .LP

@@ -1,0 +1,166 @@
+'\" te
+.\" Copyright (c) 2005, Sun Microsystems All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH XGE 4D "Oct 3, 2005"
+.SH NAME
+xge \- Neterion Xframe 10Gigabit Ethernet Network Adapter driver
+.SH SYNOPSIS
+.LP
+.nf
+/dev/xge
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBxge\fR 10 Gigabit Ethernet  driver is a multi-threaded, loadable,
+clonable, GLD-based STREAMS driver supporting  the Data Link Provider
+Interface, \fBdlpi\fR(4P), on S2IO Xframe 10-Gigabit Ethernet Network Adapter.
+.sp
+.LP
+The \fBxge\fR driver functions includes controller initialization, frame
+transmit and receive, promiscuous and multicast support, TCP and UDP checksum
+offload (IPv4 and IPv6), 9622-byte jumbo frame, and error recovery and
+reporting.
+.sp
+.LP
+The \fBxge\fR driver and hardware support the 10GBase-SR/W, LR/W, and ER/W
+\fI802.3\fR physical layer.
+.SH APPLICATION PROGRAMMING INTERFACE
+.sp
+.LP
+The cloning,  character-special device \fB/dev/xge\fR is used to access all
+Xframe devices installed within the system.
+.sp
+.LP
+The \fBxge\fR driver is managed by the \fBdladm\fR(8) command line utility,
+which allows VLANs to be defined on top of xge  instances and for \fBxge\fR
+instances to be aggregated. See \fBdladm\fR(8) for more details.
+.sp
+.LP
+The values returned by the driver in the DL_INFO_ACK primitive in response to
+the DL_INFO_REQ are as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum SDU is \fB9600\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum SDU is \fB0\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDSLAP\fR address length is \fB8\fR bytes.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBMAC\fR type is \fBDL_ETHER.\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSAP\fR length value is  -2 meaning the physical address component is
+followed immediately by a 2-byte sap component within the DLSAP address.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Broadcast address value is Ethernet/IEEE  broadcast address
+(FF:FF:FF:FF:FF:FF).
+.RE
+.SH CONFIGURATION
+.sp
+.LP
+By default, the \fBxge\fR driver works without any configuration file.
+.sp
+.LP
+You can check the running-time status of a device  instance using
+\fBndd\fR(8). Currently, the driver provides an interface to print all
+hardware statistics.
+.sp
+.LP
+For example, to print statistics of device xge0:
+.sp
+.in +2
+.nf
+     #ndd /dev/xge0 stats
+     tmac_data_octets 772
+     tmac_frms 15
+     tmac_drop_frms 0
+     tmac_bcst_frms 6
+     tmac_mcst_frms 6
+
+     ...
+
+     rmac_vld_frms 13
+     rmac_fcs_err_frms 0
+     rmac_drop_frms 0
+     rmac_vld_bcst_frms 7
+     rmac_vld_mcst_frms 11
+     rmac_out_rng_len_err_frms 0
+     rmac_in_rng_len_err_frms 0
+     rmac_long_frms 0
+
+     ...
+
+     not_traffic_intr_cnt 242673
+     traffic_intr_cnt 28
+
+     ...
+.fi
+.in -2
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/xge\fR \fR
+.ad
+.RS 13n
+\fBxge\fR special character device
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+l l
+l l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR streamio (4I),
+.BR dlpi (4P),
+.BR attributes (7),
+.BR dladm (8),
+.BR ndd (8)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fISTREAMS Programming Guide\fR
+.sp
+.LP
+\fINetwork Interfaces Programmer's Guide\fR

@@ -197,4 +197,4 @@ in
 .Xr elf 3ELF ,
 .Xr gelf 3ELF ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

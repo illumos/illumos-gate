@@ -128,8 +128,8 @@
 	<instance name='default' enabled='false'>
 
 	<!--
-	  System-wide audit preselection flags - see auditconfig(1M)
-	  and audit_flags(5).
+	  System-wide audit preselection flags - see auditconfig(8)
+	  and audit_flags(7).
 
 	  The 'flags' property is the system-wide default set of
 	  audit classes that is combined with the per-user audit
@@ -152,10 +152,10 @@
 	</property_group>
 
 	<!--
-	  Audit Queue Control Properties - see auditconfig(1M)
+	  Audit Queue Control Properties - see auditconfig(8)
 
 	    Note, that the default value for all the queue control
-	    configuration parameters is 0, which makes auditd(1M) to
+	    configuration parameters is 0, which makes auditd(8) to
 	    use current active system parameters.
 	-->
 	<property_group name='queuectrl' type='application' >
@@ -174,10 +174,10 @@
 	</property_group>
 
 	<!--
-	  Audit Policies - see auditconfig(1M)
+	  Audit Policies - see auditconfig(8)
 
 	    Note, that "all" and "none" policies available as a
-	    auditconfig(1M) policy flags actually means a full/empty set
+	    auditconfig(8) policy flags actually means a full/empty set
 	    of other policy flags. Thus they are not configurable in the
 	    auditd service manifest, but set all the policies to true
 	    (all) or false (none).
@@ -217,8 +217,8 @@
 
 	<!--
 	  Plugins to configure where to send the audit trail - see
-	  auditconfig(1M), audit_binfile(5), audit_remote(5),
-	  audit_syslog(5)
+	  auditconfig(8), audit_binfile(7), audit_remote(7),
+	  audit_syslog(7)
 
 	  Each plugin type property group has properties:
 
@@ -315,25 +315,25 @@
 		</common_name>
 		<documentation>
 			<manpage title='auditd'
-				section='1M'
+				section='8'
 				manpath='/usr/share/man'/>
 			<manpage title='audit'
-				section='1M'
+				section='8'
 				manpath='/usr/share/man'/>
 			<manpage title='auditconfig'
-				section='1M'
+				section='8'
 				manpath='/usr/share/man'/>
 			<manpage title='audit_flags'
-				section='5'
+				section='7'
 				manpath='/usr/share/man'/>
 			<manpage title='audit_binfile'
-				section='5'
+				section='7'
 				manpath='/usr/share/man'/>
 			<manpage title='audit_syslog'
-				section='5'
+				section='7'
 				manpath='/usr/share/man'/>
 			<manpage title='audit_remote'
-				section='5'
+				section='7'
 				manpath='/usr/share/man'/>
 	         </documentation>
 	</template>

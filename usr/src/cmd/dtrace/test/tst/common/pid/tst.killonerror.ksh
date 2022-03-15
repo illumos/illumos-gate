@@ -33,7 +33,7 @@ fi
 dtrace=$1
 
 #
-# Make sure we kill a process if the dtrace(1M) command fails.
+# Make sure we kill a process if the dtrace(8) command fails.
 #
 
 rc=`$dtrace -c date -n jarod 2>/dev/null | /usr/bin/wc -l`

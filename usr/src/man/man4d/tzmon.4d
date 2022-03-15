@@ -1,0 +1,57 @@
+'\" te
+.\" Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TZMON 4D "Oct 31, 2006"
+.SH NAME
+tzmon \- ACPI Thermal Zone Monitor
+.SH DESCRIPTION
+.sp
+.LP
+The \fBtzmon\fR is a pseudo driver that serves as an ACPI thermal zone monitor.
+Thermal zones are logical regions  within a computer system for which ACPI
+performs temperature monitoring and control functions. The number of thermal
+zones on a system with ACPI support varies. For example, some systems may have
+one or more thermal zones, while others may have none. See the \fIAdvanced
+Configuration and Power Interface Specification, (ACPI) Version 3.0A\fR, for
+more details.
+.sp
+.LP
+The \fBtzmon\fR handles thermal Zone events from ACPI and polls the temperature
+for each zone exposed  by the ACPI implementation. If threshold temperatures
+are reached, \fBtzmon\fR takes appropriate action.  For example, if the
+temperature is sufficiently high and the ACPI implementation supports it,
+\fBtzmon\fR initiates system shutdown.
+.sp
+.LP
+Note that by default,  system temperature control functions are usually
+performed by the BIOS and may supersede \fBtzmon\fR functions, depending on the
+BIOS implementation. Also, many ACPI implementations expose no thermal zones
+and in these cases, \fBtzmon\fR performs no functions.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture 	x86/x64 only
+_
+Interface stability 	Private
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR attributes (7)
+.sp
+.LP
+\fIAdvanced Configuration and Power Interface Specification, (ACPI), Version
+3.0A.\fR

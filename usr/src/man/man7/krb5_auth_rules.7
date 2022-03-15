@@ -1,0 +1,129 @@
+'\" te
+.\"  Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH KRB5_AUTH_RULES 7 "November 22, 2021"
+.SH NAME
+krb5_auth_rules \- overview of Kerberos V5 authorization
+.SH DESCRIPTION
+When kerberized versions of the \fBftp\fR, \fBrdist\fR, \fBrcp\fR,
+\fBrlogin\fR, \fBrsh\fR, \fBtelnet\fR, or \fBssh\fR clients are used to connect
+to a server, the identity of the originating user must be authenticated to the
+Kerberos V5 authentication system. Account access can then be authorized if
+appropriate entries exist in the \fB~/.k5login\fR file, the \fBgsscred\fR
+table, or if the default GSS/Kerberos authentication rules successfully map the
+Kerberos principal name to Unix login name.
+.sp
+.LP
+To avoid security problems, the \fB~/.k5login\fR file must be owned by the
+remote user on the server the client is attempting to access. The file should
+contain a private authorization list comprised of Kerberos principal names of
+the form \fIprincipal/instance\fR@\fIrealm\fR. The \fI/instance\fR variable is
+optional in Kerberos principal names. For example, different principal names
+such as \fBjdb@ENG.EXAMPLE.COM\fR and \fBjdb/happy.eng.example.com@ENG.EXAMPLE.COM\fR
+would each be legal, though not equivalent, Kerberos principals. The client is
+granted access if the \fB~/.k5login\fR file is located in the login directory
+of the remote user account and if the originating user can be authenticated to
+one of the principals named in the file. See \fBkadm5.acl\fR(5) for more
+information on Kerberos principal names.
+.sp
+.LP
+When no \fB~/.k5login\fR file is found in the remote user's login account, the
+Kerberos V5 principal name associated with the originating user is checked
+against the \fBgsscred\fR table. If a \fBgsscred\fR table exists and the
+principal name is matched in the table, access is granted if the Unix user ID
+listed in the table corresponds to the user account the client is attempting to
+access. If the Unix user ID does not match, access is denied. See
+\fBgsscred\fR(8).
+.sp
+.LP
+For example, an originating user listed in the \fBgsscred\fR table with the
+principal name \fBjdb@ENG.EXAMPLE.COM\fR and the \fBuid\fR \fB23154\fR is granted
+access to the \fBjdb-user\fR account if \fB23154\fR is also the \fBuid\fR of
+\fBjdb-user\fR listed in the user account database. See \fBpasswd\fR(5).
+.sp
+.LP
+Finally, if there is no \fB~/.k5login\fR file and the Kerberos V5 identity of
+the originating user is not in the \fBgsscred\fR table, or if the \fBgsscred\fR
+table does not exist, the client is granted access to the account under the
+following conditions (default GSS/Kerberos auth rules):
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The user part of the authenticated principal name is the same as the Unix
+account name specified by the client.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The realm part of the client and server are the same, unless the
+\fBkrb5.conf\fR(5) \fIauth_to_local_realm\fR parameter is used to create
+equivalence.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The Unix account name exists on the server.
+.RE
+.sp
+.LP
+For example, if the originating user has the principal name
+\fBjdb@ENG.EXAMPLE.COM\fR and if the server is in realm \fBSALES.EXAMPLE.COM\fR, the
+client would be denied access even if \fBjdb\fR is a valid account name on the
+server. This is because the realms \fBSALES.EXAMPLE.COM\fR and \fBENG.EXAMPLE.COM\fR
+differ.
+.sp
+.LP
+The \fBkrb5.conf\fR(5) \fIauth_to_local_realm\fR parameter also affects
+authorization. Non-default realms can be equated with the default realm for
+authenticated \fBname-to-local name\fR mapping.
+.SH FILES
+.ne 2
+.na
+\fB\fB~/.k5login\fR\fR
+.ad
+.RS 15n
+Per user-account authorization file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/passwd\fR\fR
+.ad
+.RS 15n
+System account file. This information may also be in a directory service. See
+\fBpasswd\fR(5).
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.BR ftp (1),
+.BR rcp (1),
+.BR rdist (1),
+.BR rlogin (1),
+.BR rsh (1),
+.BR telnet (1),
+.BR kadm5.acl (5),
+.BR krb5.conf (5),
+.BR passwd (5),
+.BR attributes (7),
+.BR gss_auth_rules (7),
+.BR gsscred (8)

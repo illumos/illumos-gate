@@ -19,14 +19,14 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
 NOTE: This directory contains legacy initialization and termination
 scripts for managing services.  The preferred method of service
 management is via the Service Management Facility; to read more about
-SMF, consult smf(5).
+SMF, consult smf(7).
 
 For a general discussion of the mechanism used to invoke these scripts
 see the file /etc/init.d/README.

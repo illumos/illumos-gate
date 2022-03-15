@@ -67,7 +67,7 @@ the entire string will be added.
 All routines return the integer \fBERR\fR upon failure and an integer value
 other than \fBERR\fR upon successful completion.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -81,7 +81,9 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-\fBcurses\fR(3CURSES), \fBwaddwch\fR(3CURSES), \fBattributes\fR(5)
+.BR curses (3CURSES),
+.BR waddwch (3CURSES),
+.BR attributes (7)
 .SH NOTES
 The header file <\fBcurses.h\fR> automatically includes the header files
 <\fBstdio.h\fR>, <\fBnctrl.h\fR> and <\fBwidec.h\fR>.

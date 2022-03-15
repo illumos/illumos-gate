@@ -43,7 +43,7 @@ For more information on the behavior of the signal tracing flags, including
 which signals may be traced this way, see the
 .Sy PCSTRACE
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fa set
@@ -69,4 +69,4 @@ in
 .Xr signal.h 3HEAD ,
 .Xr libproc 3LIB ,
 .Xr Psignal 3PROC ,
-.Xr proc 4
+.Xr proc 5

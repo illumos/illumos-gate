@@ -10,7 +10,7 @@ attach/detach behavior
 .SH DESCRIPTION
 .sp
 .LP
-Solaris device drivers are attached by  \fBdevfsadm\fR(1M) and by the kernel in
+Solaris device drivers are attached by  \fBdevfsadm\fR(8) and by the kernel in
 response to \fBopen\fR(2) requests from applications. Drivers not currently in
 use can be detached when the system experiences memory pressure. The
 \fBddi-forceattach\fR and \fBddi-no-autodetach\fR properties can be used to
@@ -18,13 +18,13 @@ customize driver attach/detach behavior.
 .sp
 .LP
 The \fBddi-forceattach\fR is an integer property, to be set globally by means
-of the \fBdriver.conf\fR(4) file. Drivers with this property set to 1 are
+of the \fBdriver.conf\fR(5) file. Drivers with this property set to 1 are
 loaded and attached to all possible instances during system startup. The driver
 will not be auto-detached due to system memory pressure.
 .sp
 .LP
 The \fBddi-no-autodetach\fR is an integer property to be set globally by means
-of the \fBdriver.conf\fR(4) file or created dynamically by the driver on a
+of the \fBdriver.conf\fR(5) file or created dynamically by the driver on a
 per-instance basis with  \fBddi_prop_update_int\fR(9F). When this property is
 set to 1, the kernel will not auto-detach driver due to system memory pressure.
 .sp
@@ -32,12 +32,12 @@ set to 1, the kernel will not auto-detach driver due to system memory pressure.
 Note that \fBddi-forceattach\fR implies \fBddi-no-autodetach\fR. Setting either
 property to a non-integer value or an integer value not equal to 1 produces
 undefined results. These properties do not prevent driver detaching in response
-to reconfiguration requests, such as executing commands \fBcfgadm\fR(1M),
-\fBmodunload\fR(1M), \fBrem_drv\fR(1M), and \fBupdate_drv\fR(1M).
+to reconfiguration requests, such as executing commands \fBcfgadm\fR(8),
+\fBmodunload\fR(8), \fBrem_drv\fR(8), and \fBupdate_drv\fR(8).
 .SH SEE ALSO
 .sp
 .LP
-\fBdriver.conf\fR(4)
+.BR driver.conf (5)
 .sp
 .LP
 \fIWriting Device Drivers\fR

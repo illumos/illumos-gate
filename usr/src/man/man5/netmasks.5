@@ -1,0 +1,134 @@
+'\" te
+.\"  Copyright 1996 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NETMASKS 5 "Jan 7, 1997"
+.SH NAME
+netmasks \- network mask database
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/inet/netmasks\fR
+.fi
+
+.LP
+.nf
+\fB/etc/netmasks\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBnetmasks\fR file contains network masks used to implement \fBIP\fR
+subnetting. It supports both standard subnetting as specified in \fIRFC-950\fR
+and variable length subnetting as specified in \fIRFC-1519\fR. When using
+standard subnetting there should be a single line for each network that is
+subnetted in this file with the network number, any number of \fBSPACE\fR or
+\fBTAB\fR characters, and the network mask to use on that network. Network
+numbers and masks may be specified in the conventional \fBIP\fR `.' (dot)
+notation (like \fBIP\fR host addresses, but with zeroes for the host part).
+For example,
+.sp
+.ne 2
+.na
+\fB\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+128.32.0.0    255.255.255.0
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.LP
+can be used to specify that the Class B network 128.32.0.0 should have eight
+bits of subnet field and eight bits of host field, in addition to the standard
+sixteen bits in the network field.
+.sp
+.LP
+When using variable length subnetting, the format is identical. However, there
+should be a line for each subnet with the  first field being the subnet and the
+second field being the netmask that applies to that subnet. The users of the
+database, such as \fBifconfig\fR(8), perform a lookup to find the longest
+possible matching mask. It is possible to combine the  \fIRFC-950\fR and
+\fIRFC-1519\fR form of subnet masks in the netmasks file. For example,
+.sp
+.ne 2
+.na
+\fB\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+128.32.0.0	255.255.255.0
+128.32.27.0	255.255.255.240
+128.32.27.16	255.255.255.240
+128.32.27.32	255.255.255.240
+128.32.27.48	255.255.255.240
+128.32.27.64	255.255.255.240
+128.32.27.80	255.255.255.240
+128.32.27.96	255.255.255.240
+128.32.27.112	255.255.255.240
+128.32.27.128	255.255.255.240
+128.32.27.144	255.255.255.240
+128.32.27.160	255.255.255.240
+128.32.27.176	255.255.255.240
+128.32.27.192	255.255.255.240
+128.32.27.208	255.255.255.240
+128.32.27.224	255.255.255.240
+128.32.27.240	255.255.255.240
+128.32.64.0	255.255.255.192
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.LP
+can be used to specify different netmasks in different parts of the 128.32.0.0
+Class B network number. Addresses 128.32.27.0 through 128.32.27.255 have a
+subnet mask with 28 bits in the combined network and subnet fields  (often
+referred to as the subnet field) and 4 bits in the host field.  Furthermore,
+addresses 128.32.64.0 through 128.32.64.63 have a 26 bits in the subnet field.
+Finally, all other addresses in the range 128.32.0.0 through 128.32.255.255
+have a 24 bit subnet field.
+.sp
+.LP
+Invalid entries are ignored.
+.SH SEE ALSO
+.sp
+.LP
+.BR inet (4P),
+.BR ifconfig (8)
+.sp
+.LP
+Postel, Jon, and Mogul, Jeff, \fIInternet Standard Subnetting Procedure\fR,
+\fBRFC\fR 950, Network Information Center, \fBSRI\fR International, Menlo Park,
+Calif., August 1985.
+.sp
+.LP
+V. Fuller, T. Li, J. Yu, K. Varadhan, \fIClassless Inter-Domain  Routing
+(CIDR): an Address Assignment and Aggregation Strategy\fR, \fBRFC\fR 1519,
+Network Information Center, \fBSRI\fR International, Menlo Park, Calif.,
+September 1993.
+.sp
+.LP
+T. Pummill, B. Manning, \fIVariable Length Subnet Table For IPv4\fR, \fBRFC\fR
+1878, Network Information Center, \fBSRI\fR International, Menlo Park, Calif.,
+December 1995.
+.SH NOTES
+.sp
+.LP
+\fB/etc/inet/netmasks\fR is the official SVr4 name of the \fBnetmasks\fR file.
+The symbolic link \fB/etc/netmasks\fR exists for \fBBSD\fR compatibility.

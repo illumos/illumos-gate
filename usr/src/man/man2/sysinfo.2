@@ -23,7 +23,7 @@ system on which the process is executing into the buffer pointed to by
 available. The \fIcount\fR parameter indicates the size of the buffer.
 .sp
 .LP
-The POSIX P1003.1 interface (see \fBstandards\fR(5)) \fBsysconf\fR(3C) provides
+The POSIX P1003.1 interface (see \fBstandards\fR(7)) \fBsysconf\fR(3C) provides
 a similar class of configuration information, but returns an integer rather
 than a string.
 .sp
@@ -206,7 +206,7 @@ Programs compiled for an instruction set that does not appear in the list will
 most likely experience performance degradation or not run at all on this
 machine.
 .sp
-The instruction set names known to the system are listed in \fBisalist\fR(5);
+The instruction set names known to the system are listed in \fBisalist\fR(7);
 these names might not match predefined names or compiler options in the C
 language compilation system.
 .sp
@@ -292,8 +292,8 @@ of the calling process.
 .RS 4n
 Copy into the array pointed to by \fIbuf\fR an ASCII string consisting of the
 ASCII hexadecimal encoding of the name of the interface configured by
-\fBboot\fR(1M) followed by the DHCPACK reply from the server. This command is
-intended for use only by the \fBdhcpagent\fR(1M) DHCP client daemon for the
+\fBboot\fR(8) followed by the DHCPACK reply from the server. This command is
+intended for use only by the \fBdhcpagent\fR(8) DHCP client daemon for the
 purpose of adopting the DHCP maintenance of the interface configured by
 \fBboot\fR.
 .RE
@@ -354,9 +354,17 @@ A good estimation for \fIcount\fR is 257, which is likely to cover all strings
 returned by this interface in typical installations.
 .SH SEE ALSO
 .LP
-\fBboot\fR(1M), \fBdhcpagent\fR(1M), \fBgetisax\fR(2), \fBuname\fR(2),
-\fBgethostid\fR(3C), \fBgethostname\fR(3C), \fBsysconf\fR(3C),
-\fBisalist\fR(5), \fBprivileges\fR(5), \fBstandards\fR(5), \fBzones\fR(5)
+.BR getisax (2),
+.BR uname (2),
+.BR gethostid (3C),
+.BR gethostname (3C),
+.BR sysconf (3C),
+.BR isalist (7),
+.BR privileges (7),
+.BR standards (7),
+.BR zones (7),
+.BR boot (8),
+.BR dhcpagent (8)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

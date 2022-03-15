@@ -68,7 +68,7 @@ cryptodebug(const char *fmt, ...)
 /*
  * cryptoerror
  *
- * This is intended to be used both by interactive commands like cryptoadm(1m)
+ * This is intended to be used both by interactive commands like cryptoadm(8)
  * digest(1) etc, and by libraries libpkcs11, libelfsign etc.
  *
  * A library probably wants most (all?) of its errors going to syslog but

@@ -42,8 +42,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/rum group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/rum.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/rum.4d
 driver name=rum perms="* 0666 root sys" clone_perms="rum 0666 root sys" \
     alias=usb7d1,3c03 \
     alias=usb7d1,3c04 \

@@ -1,0 +1,56 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PRIV_NAMES 5 "Nov 24, 2003"
+.SH NAME
+priv_names \- privilege definition file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/security/priv_names\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBpriv_names\fR file, located in \fB/etc/security\fR, defines the
+privileges with which a process can be associated. See \fBprivileges\fR(7) for
+the privilege definitions. In that man page, privileges correspond to privilege
+names in \fBpriv_names\fR as shown in the following examples:
+.sp
+
+.sp
+.TS
+c c
+l l .
+name in privileges(7)	Name in \fBpriv_names\fR
+_
+\fBPRIV_FILE_CHOWN\fR	\fBfile_chown\fR
+\fBPRIV_FILE_CHOWN_SELF\fR	\fBfile_chown_self\fR
+\fBPRIV_FILE_DAC_EXECUTE\fR	\fBfile_dac_execute\fR
+.TE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR ppriv (1),
+.BR attributes (7),
+.BR privileges (7)

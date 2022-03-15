@@ -81,7 +81,7 @@ Note that \fBused\fR+\fBavail\fR is less than the amount of space in the file
 system (kbytes); this is because the system reserves a fraction of the space in
 the file system to allow its file system allocation routines to work well. The
 amount reserved is typically about 10%; this can be adjusted using \fBtunefs\fR
-(see \fBtunefs\fR(1M)). When all the space on a file system except for this
+(see \fBtunefs\fR(8)). When all the space on a file system except for this
 reserve is in use, only the super-user can allocate new files and data blocks
 to existing files. When a file system is overallocated in this way, \fBdf\fR
 can report that the file system is more than 100% utilized.
@@ -108,5 +108,8 @@ List of default parameters for each file system
 .SH SEE ALSO
 .sp
 .LP
-\fBdu\fR(1), \fBquot\fR(1M), \fBtunefs\fR(1M), \fBmnttab\fR(4),
-\fBattributes\fR(5)
+.BR du (1),
+.BR mnttab (5),
+.BR attributes (7),
+.BR quot (8),
+.BR tunefs (8)

@@ -567,7 +567,7 @@ Protocol mismatch.
 .SS "\fBinetd\fR Capabilities"
 .sp
 .LP
-One of the possible uses is to create simple services by using \fBinetd\fR(1M).
+One of the possible uses is to create simple services by using \fBinetd\fR(8).
 .sp
 .LP
 The following example creates a redirect from TCP port 8080 to port 80 on host
@@ -619,10 +619,10 @@ also needs the \fBnet_bindmlp\fR privilege.
 .sp
 .LP
 Privileges can be assigned to the user or role directly, by specifying them in
-the account's default privilege set in \fBuser_attr\fR(4). However, this means
+the account's default privilege set in \fBuser_attr\fR(5). However, this means
 that any application that this user or role starts have these additional
-privileges. To only grant the \fBprivileges\fR(5) when \fBnc\fR is invoked, the
-recommended approach is to create and assign an \fBrbac\fR(5) rights profile.
+privileges. To only grant the \fBprivileges\fR(7) when \fBnc\fR is invoked, the
+recommended approach is to create and assign an \fBrbac\fR(7) rights profile.
 See \fBEXAMPLES\fR for additional information.
 .SH EXAMPLES
 .LP
@@ -730,7 +730,7 @@ $ nc -l 127.0.0.1 2222
 .LP
 Connect to port \fB42\fR of \fBhost.example.com\fR using an HTTP proxy at
 \fB10.2.3.4\fR, port \fB8080\fR. This example could also be used by
-\fBssh\fR(1). See the \fBProxyCommand\fR directive in \fBssh_config\fR(4) for
+\fBssh\fR(1). See the \fBProxyCommand\fR directive in \fBssh_config\fR(5) for
 more information.
 
 .sp
@@ -789,7 +789,7 @@ Netcat privileged:::Allow nc to bind to privileged ports:help=None.html
 
 .sp
 .LP
-Assigning this rights profile using \fBuser_attr\fR(4) permits the user or role
+Assigning this rights profile using \fBuser_attr\fR(5) permits the user or role
 to run \fBnc\fR allowing it to listen on any port. To permit a user or role to
 use \fBnc\fR only to listen on specific ports a wrapper script should be
 specified in the rights profiles:
@@ -837,7 +837,7 @@ neither does invoking the script without using \fBpfexec\fR or a profile shell.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -861,10 +861,23 @@ Uncommitted.
 .SH SEE ALSO
 .sp
 .LP
-\fBcat\fR(1), \fBpfcsh\fR(1), \fBpfexec\fR(1), \fBpfksh\fR(1), \fBpfsh\fR(1),
-\fBppriv\fR(1), \fBsed\fR(1), \fBssh\fR(1), \fBtelnet\fR(1), \fBinetadm\fR(1M),
-\fBinetconv\fR(1M), \fBinetd\fR(1M), \fBssh_config\fR(4), \fBuser_attr\fR(4),
-\fBattributes\fR(5), \fBprivileges\fR(5), \fBrbac\fR(5)
+.BR cat (1),
+.BR pfcsh (1),
+.BR pfexec (1),
+.BR pfksh (1),
+.BR pfsh (1),
+.BR ppriv (1),
+.BR sed (1),
+.BR ssh (1),
+.BR telnet (1),
+.BR ssh_config (5),
+.BR user_attr (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR rbac (7),
+.BR inetadm (8),
+.BR inetconv (8),
+.BR inetd (8)
 .SH AUTHORS
 .sp
 .LP

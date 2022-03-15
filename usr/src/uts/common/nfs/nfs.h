@@ -1031,7 +1031,7 @@ extern void		(*nfs_srv_quiesce_func)(void);
 extern int		(*nfs_srv_dss_func)(char *, size_t);
 
 /*
- * Per-zone stats as consumed by nfsstat(1m)
+ * Per-zone stats as consumed by nfsstat(8)
  */
 struct nfs_version_stats {
 	kstat_named_t	*aclreqcnt_ptr;		/* nfs_acl:0:aclreqcnt_v? */

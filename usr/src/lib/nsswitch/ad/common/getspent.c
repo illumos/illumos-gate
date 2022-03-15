@@ -105,7 +105,7 @@ getbynam(ad_backend_ptr be, void *a)
 		return ((nss_status_t)NSS_NOTFOUND);
 	}
 
-	/* Create shadow(4) style string */
+	/* Create shadow(5) style string */
 	if (update_buffer(be, argp, name, dname) < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 

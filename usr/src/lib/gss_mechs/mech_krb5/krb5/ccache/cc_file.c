@@ -1622,7 +1622,7 @@ krb5_fcc_initialize(krb5_context context, krb5_ccache id, krb5_principal princ)
 
      /*
       * SUN14resync
-      * This is not needed and can cause problems with ktkt_warnd(1M)
+      * This is not needed and can cause problems with ktkt_warnd(8)
       * because it does tricks with getuid and if we enable this fchmod
       * we get EPERM [file_owner] failures on fchmod.
       */

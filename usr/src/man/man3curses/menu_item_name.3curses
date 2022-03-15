@@ -38,7 +38,7 @@ These routines return \fBNULL\fR on error.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -54,8 +54,10 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBcurses\fR(3CURSES), \fBmenus\fR(3CURSES), \fBmenu_new\fR(3CURSES),
-\fBattributes\fR(5)
+.BR curses (3CURSES),
+.BR menu_new (3CURSES),
+.BR menus (3CURSES),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

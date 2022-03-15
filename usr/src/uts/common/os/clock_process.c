@@ -18,7 +18,7 @@
  * clock. This clock is weakly defined by POSIX as "The identifier of the
  * CPU-time clock associated with the process making a clock() or timer*()
  * function call". We interpret that as including LMS_USER, LMS_SYSTEM, and
- * LMS_TRAP microstates. This is similar to what we do in proc(4) for the
+ * LMS_TRAP microstates. This is similar to what we do in proc(5) for the
  * lwpstatus_t and the prstatus_t.
  *
  * At this time, we only provide the ability to read the current time (e.g.

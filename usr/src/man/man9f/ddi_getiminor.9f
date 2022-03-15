@@ -51,7 +51,7 @@ differ in a clustered system.
 .LP
 For certain bus types, you can call this \fBDDI\fR function from a
 high-interrupt context.  These types include \fBISA\fR and SBus buses.  See
-\fBsysbus\fR(4), \fBisa\fR(4), and \fBsbus\fR(4) for details.
+\fBsysbus\fR(5), \fBisa\fR(5), and \fBsbus\fR(5) for details.
 .SH CONTEXT
 .sp
 .LP
@@ -64,7 +64,7 @@ invalid.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -80,8 +80,10 @@ Stability Level	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5), \fBgetmajor\fR(9F), \fBgetminor\fR(9F),
-\fBmakedevice\fR(9F)
+.BR attributes (7),
+.BR getmajor (9F),
+.BR getminor (9F),
+.BR makedevice (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

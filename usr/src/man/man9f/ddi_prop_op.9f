@@ -298,7 +298,7 @@ These functions can be called from user, interrupt, or kernel context, provided
 \fBDDI_PROP_CANSLEEP\fR is not set; if it is set, they cannot be called from
 interrupt context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -314,8 +314,12 @@ T}
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBddi_prop_create\fR(9F), \fBddi_prop_get_int\fR(9F),
-\fBddi_prop_lookup\fR(9F), \fBkmem_alloc\fR(9F), \fBkmem_free\fR(9F)
+.BR attributes (7),
+.BR ddi_prop_create (9F),
+.BR ddi_prop_get_int (9F),
+.BR ddi_prop_lookup (9F),
+.BR kmem_alloc (9F),
+.BR kmem_free (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

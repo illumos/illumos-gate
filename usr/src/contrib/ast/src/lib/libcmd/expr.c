@@ -107,7 +107,7 @@ USAGE_LICENSE
 	"[+2?Invalid expressions.]"
 	"[+>2?An error occurred.]"
 	"}"
-"[+SEE ALSO?\bregcomp\b(5), \bgrep\b(1), \bsh\b(1)]"
+"[+SEE ALSO?\bregex\b(5), \bgrep\b(1), \bsh\b(1)]"
 ;
 
 #include	<cmd.h>

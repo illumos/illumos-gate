@@ -113,7 +113,7 @@ All of these functions may be macros.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -131,7 +131,13 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBaddch\fR(3XCURSES), \fBaddnstr\fR(3XCURSES), \fBattr_get\fR(3XCURSES),
-\fBbkgdset\fR(3XCURSES), \fBcurses\fR(3XCURSES), \fBinit_color\fR(3XCURSES),
-\fBlibcurses\fR(3XCURSES), \fBstart_color\fR(3XCURSES), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR addch (3XCURSES),
+.BR addnstr (3XCURSES),
+.BR attr_get (3XCURSES),
+.BR bkgdset (3XCURSES),
+.BR curses (3XCURSES),
+.BR init_color (3XCURSES),
+.BR libcurses (3XCURSES),
+.BR start_color (3XCURSES),
+.BR attributes (7),
+.BR standards (7)

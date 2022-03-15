@@ -200,7 +200,7 @@ get_acl_info(char *filep, aclent_t **aclpp)
 			(void) fprintf(stderr,
 			    gettext("File system doesn't support aclent_t "
 			    "style ACL's.\n"
-			    "See acl(5) for more information on "
+			    "See acl(7) for more information on "
 			    "POSIX-draft ACL support.\n"));
 			return (-1);
 		}

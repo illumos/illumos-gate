@@ -131,8 +131,8 @@ if [ $retv -eq $UFS_MKFS_NOTENOUGHSPACE ]; then
 	done
 	echo \
 "\nThe incremental grow has successfully completed, but since the first growth \
-attempt failed (see output from first mkfs(1M) run), the filesystem is still \
-locked and needs to be checked with fsck(1M).\n\
+attempt failed (see output from first mkfs(8) run), the filesystem is still \
+locked and needs to be checked with fsck(8).\n\
 Please run \`fsck -F ufs $raw_special' and then unlock the filesystem \
 with \`lockfs -u $mount_pt'." | fmt;
 

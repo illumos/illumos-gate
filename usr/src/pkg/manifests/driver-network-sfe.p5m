@@ -41,8 +41,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/sfe group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/sfe.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/sfe.4d
 driver name=sfe perms="* 0666 root root" \
     alias=pci100b,20 \
     alias=pci1039,900 \

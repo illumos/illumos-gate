@@ -88,7 +88,7 @@ attach time.
 Firmware images reside in sub-directories, one for each driver, in the
 namespace "firmware" in the system default module search path as
 described in
-.Xr system 4 .
+.Xr system 5 .
 .sp
 The following functions are provided by the
 .Nm
@@ -149,4 +149,4 @@ will always return zero.
 .Sh INTERFACE STABILITY
 .Sy Committed
 .Sh SEE ALSO
-.Xr system 4
+.Xr system 5

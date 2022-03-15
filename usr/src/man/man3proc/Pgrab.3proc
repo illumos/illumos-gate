@@ -156,7 +156,7 @@ For more details on the security and programming considerations, please see the
 section
 .Sy PROGRAMMING NOTES
 in
-.Xr proc 4 .
+.Xr proc 5 .
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Pgrab

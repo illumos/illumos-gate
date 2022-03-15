@@ -3229,7 +3229,7 @@ scsi_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		    (bus_state == BUS_QUIESCED))
 			rv = EALREADY;
 		else if (tran->tran_quiesce == NULL)
-			rv = ENOTSUP; /* man ioctl(7I) says ENOTTY */
+			rv = ENOTSUP; /* man ioctl(2) says ENOTTY */
 		else if (tran->tran_quiesce(self) != 0)
 			rv = EIO;
 		else if (ndi_set_bus_state(self, BUS_QUIESCED) != NDI_SUCCESS)
@@ -3241,7 +3241,7 @@ scsi_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		    (bus_state == BUS_ACTIVE))
 			rv = EALREADY;
 		else if (tran->tran_unquiesce == NULL)
-			rv = ENOTSUP; /* man ioctl(7I) says ENOTTY */
+			rv = ENOTSUP; /* man ioctl(2) says ENOTTY */
 		else if (tran->tran_unquiesce(self) != 0)
 			rv = EIO;
 		else if (ndi_set_bus_state(self, BUS_ACTIVE) != NDI_SUCCESS)
@@ -3250,7 +3250,7 @@ scsi_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	case DEVCTL_BUS_RESET:
 		if (tran->tran_bus_reset == NULL)
-			rv = ENOTSUP; /* man ioctl(7I) says ENOTTY */
+			rv = ENOTSUP; /* man ioctl(2) says ENOTTY */
 		else if (tran->tran_bus_reset(self, RESET_BUS) != 1)
 			rv = EIO;
 		break;
@@ -3261,7 +3261,7 @@ scsi_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			break;		/* reset all worked */
 		}
 		if (tran->tran_bus_reset == NULL) {
-			rv = ENOTSUP; /* man ioctl(7I) says ENOTTY */
+			rv = ENOTSUP; /* man ioctl(2) says ENOTTY */
 			break;
 		}
 		if (tran->tran_bus_reset(self, RESET_BUS) != 1)
@@ -3917,7 +3917,7 @@ scsi_hba_ident_nodename_compatible_get(struct scsi_inquiry *inq,
 	csp = compatp;
 	p = (char *)(compatp + NCOMPAT);
 
-	/* ( 0) driver (optional, not documented in scsi(4)) */
+	/* ( 0) driver (optional, not documented in scsi(5)) */
 	if (compat0) {
 		*csp++ = p;
 		(void) snprintf(p, tlen, "%s", compat0);
@@ -4006,7 +4006,7 @@ scsi_hba_ident_nodename_compatible_get(struct scsi_inquiry *inq,
 		tlen -= len;
 	}
 
-	/* (8.5) scsa,DD.bB (not documented in scsi(4)) */
+	/* (8.5) scsa,DD.bB (not documented in scsi(5)) */
 	if (binding_set) {
 		*csp++ = p;
 		(void) snprintf(p, tlen, "scsa,%02x.b%s",
@@ -7819,7 +7819,7 @@ scsi_hba_bus_config_spi(dev_info_t *self, uint_t flags,
 		 * Static driver.conf file enumeration:
 		 *
 		 * Force reprobe for BUS_CONFIG_ONE or when manually
-		 * reconfiguring via devfsadm(1m) to emulate deferred attach.
+		 * reconfiguring via devfsadm(8) to emulate deferred attach.
 		 * Reprobe only discovers driver.conf enumerated nodes, more
 		 * dynamic implementations probably require their own
 		 * bus_config.

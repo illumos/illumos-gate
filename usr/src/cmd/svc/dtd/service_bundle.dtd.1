@@ -34,7 +34,7 @@
   XInclude support
 
     A series of service bundles may be composed via the xi:include tag.
-    smf(5) tools enforce that all bundles be of the same type.
+    smf(7) tools enforce that all bundles be of the same type.
 -->
 
 <!--
@@ -67,7 +67,7 @@
   stability
 
     This element associates an SMI stability level with the parent
-    element.  See attributes(5) for an explanation of interface
+    element.  See attributes(7) for an explanation of interface
     stability levels.
 
     Its attribute is
@@ -529,7 +529,7 @@
 
 	resource_pool The resource pool name to launch the method on.
 		":default" can be used as a token to indicate use of the
-		pool specified in the project(4) entry given in the
+		pool specified in the project(5) entry given in the
 		"project" attribute above.
 -->
 <!ELEMENT method_context
@@ -562,7 +562,7 @@
 		instance of this service is delegated.
 
 	exec	The string identifying the action to take.  For
-		svc.startd(1M), this is a string suitable to pass to
+		svc.startd(8), this is a string suitable to pass to
 		exec(2).
 
 	timeout_seconds [integer] Duration, in seconds, to wait for this
@@ -668,7 +668,7 @@
     Its sole attribute is
 
 	xml:lang The name of the locale, in the form accepted by LC_ALL,
-		etc.  See locale(5).
+		etc.  See locale(7).
 -->
 <!ELEMENT loctext
         (#PCDATA) >
@@ -1017,7 +1017,7 @@
     element, a set of dependencies on other services, potentially
     customized methods or configuration data, an optional method
     context, and a pointer to its restarter.  (If no restarter is
-    specified, the master restarter, svc.startd(1M), is assumed to be
+    specified, the master restarter, svc.startd(8), is assumed to be
     responsible for the service.)
 
     Its attributes are

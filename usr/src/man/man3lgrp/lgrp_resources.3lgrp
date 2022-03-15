@@ -72,7 +72,7 @@ The specified lgroup ID was not found.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -90,5 +90,8 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlgrp_children\fR(3LGRP), \fBlgrp_init\fR(3LGRP), \fBlgrp_parents\fR(3LGRP),
-\fBliblgrp\fR(3LIB), \fBattributes\fR(5)
+.BR lgrp_children (3LGRP),
+.BR lgrp_init (3LGRP),
+.BR lgrp_parents (3LGRP),
+.BR liblgrp (3LIB),
+.BR attributes (7)

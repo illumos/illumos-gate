@@ -28,12 +28,11 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # "Run Commands" executed when the system is changing to init state 1
 
 if [ -z "$SMF_RESTARTER" ]; then
-	echo "Cannot be run outside smf(5)"
+	echo "Cannot be run outside smf(7)"
 	exit 1
 fi
 

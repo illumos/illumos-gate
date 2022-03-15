@@ -27,7 +27,7 @@ The \fBacl_free()\fR function does not return a value.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -45,4 +45,6 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBacl_get\fR(3SEC), \fBacl\fR(5), \fBattributes\fR(5)
+.BR acl_get (3SEC),
+.BR acl (7),
+.BR attributes (7)

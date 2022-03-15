@@ -939,7 +939,7 @@ trace_prt(int id, char *fmt, ...)
 }
 
 /*
- * Extract the isalist(5) for userland from the kernel.
+ * Extract the isalist(7) for userland from the kernel.
  */
 static char *
 isalist(void)

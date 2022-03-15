@@ -64,7 +64,8 @@ The device has no registers.
 The \fBddi_dev_nregs()\fR function can be called from user, interrupt, or
 kernel context.
 .SH SEE ALSO
-\fBddi_dev_nintrs\fR(9F), \fBddi_dev_regsize\fR(9F)
+.BR ddi_dev_nintrs (9F),
+.BR ddi_dev_regsize (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

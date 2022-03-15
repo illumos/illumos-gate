@@ -77,7 +77,7 @@ exact.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -96,5 +96,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlog\fR(3M), \fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M),
-\fBattributes\fR(5)
+.BR feclearexcept (3M),
+.BR fetestexcept (3M),
+.BR log (3M),
+.BR attributes (7)

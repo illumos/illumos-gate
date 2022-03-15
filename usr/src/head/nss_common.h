@@ -46,7 +46,7 @@ extern "C" {
  * The name-service switch
  * -----------------------
  *
- * From nsswitch.conf(4):
+ * From nsswitch.conf(5):
  *
  *	    The operating system uses a number of "databases" of information
  *	    about hosts, users (passwd/shadow), groups and so forth.  Data for
@@ -203,7 +203,7 @@ extern "C" {
  * Backend routines return the following status codes to the switch engine:
  *
  * SUCCESS, UNAVAIL, NOTFOUND, TRYAGAIN (these are the same codes that may
- * be specified in the config information;  see nsswitch.conf(4))
+ * be specified in the config information;  see nsswitch.conf(5))
  *
  * The remaining conditions/errors are internally generated and if
  * necessary are translated, as to one of the above external errors,

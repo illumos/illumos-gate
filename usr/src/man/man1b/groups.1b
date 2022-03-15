@@ -43,7 +43,8 @@ the file.
 .SH SEE ALSO
 .sp
 .LP
-\fBgetgroups\fR(2), \fBattributes\fR(5)
+.BR getgroups (2),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

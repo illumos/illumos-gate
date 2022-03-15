@@ -39,7 +39,7 @@
 /*
  * The purpose of this file is to allow a user to make their own
  * rt_dptbl. The contents of this file should be included in the
- * rt_dptbl(4) man page with proper instructions for making
+ * rt_dptbl(5) man page with proper instructions for making
  * and replacing the RT_DPTBL.kmod in modules/sched. This was the
  * only way to provide functionality equivalent to the mkboot/cunix
  * method in SVr4 without having the utilities mkboot/cunix in

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * FMD Log File Subsystem
  *
@@ -619,10 +617,10 @@ fmd_log_append(fmd_log_t *lp, fmd_event_t *e, fmd_case_t *cp)
 	 * Before writing the record, check to see if this would cause the free
 	 * space in the filesystem to drop below our minfree threshold.  If so,
 	 * don't bother attempting the write and instead pretend it failed.  As
-	 * fmd(1M) runs as root, it will be able to access the space "reserved"
+	 * fmd(8) runs as root, it will be able to access the space "reserved"
 	 * for root, and therefore can run the system of out of disk space in a
 	 * heavy error load situation, violating the basic design principle of
-	 * fmd(1M) that we don't want to make a bad situation even worse.
+	 * fmd(8) that we don't want to make a bad situation even worse.
 	 */
 	(void) pthread_mutex_lock(&lp->log_lock);
 
@@ -1006,7 +1004,7 @@ fmd_log_update(fmd_log_t *lp)
 
 /*
  * Rotate the specified log by renaming its underlying file to a staging file
- * that can be handed off to logadm(1M) or an administrator script.  If the
+ * that can be handed off to logadm(8) or an administrator script.  If the
  * rename succeeds, open a new log file using the old path and return it.
  * Note that we are relying our caller to use some higher-level mechanism to
  * ensure that fmd_log_rotate() cannot be called while other threads are

@@ -102,11 +102,11 @@ property. \fBDI_PROM_PROP_NIL\fR is returned if no additional properties exist.
 .SH ERRORS
 .sp
 .LP
-See \fBopenprom\fR(7D) for a description of possible errors.
+See \fBopenprom\fR(4D) for a description of possible errors.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -124,7 +124,8 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBattributes\fR(5), \fBopenprom\fR(7D)
+.BR openprom (4D),
+.BR attributes (7)
 .sp
 .LP
 \fIWriting Device Drivers\fR

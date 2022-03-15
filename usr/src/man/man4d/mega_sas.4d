@@ -1,0 +1,107 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MEGA_SAS 4D "Aug 14, 2008"
+.SH NAME
+mega_sas \- SCSI HBA driver for LSI MegaRAID SAS controller
+.SH DESCRIPTION
+.sp
+.LP
+The \fBmega_sas\fR MegaRAID controller host bus adapter driver  is a
+SCSA-compliant  nexus  driver that supports the Dell PERC 5/E, 5/i, 6/E and 6/i
+RAID controllers, the IBM ServeRAID-MR10k SAS/SATA  controller and  the LSI
+MegaRAID SAS/SATA 8308ELP, 8344ELP, 84016E, 8408ELP, 8480ELP, 8704ELP, 8704EM2,
+8708ELP, 8708EM2, 8880EM2 and 8888ELP series of controllers.
+.sp
+.LP
+Supported RAID features include RAID levels 0, 1, 5, and 6, RAID spans 10, 50
+and 60, online capacity expansion (OCE), online RAID level migration (RLM),
+auto resume after loss of  system power during arrays, array rebuild or
+reconstruction (RLM) and configurable stripe size up to 1MB. Additional
+supported RAID features include check consistency for background data
+integrity, patrol read for media scanning and repairing, 64 logical drive
+support, up to 64TB LUN support, automatic rebuild and global and dedicated hot
+spare support.
+.SH CONFIGURATION
+.sp
+.LP
+The \fBmega_sas.conf\fR file contains no user configurable parameters. Please
+configure your hardware through the related BIOS utility or the MegaCli
+configuration utility. If  you  want to install to a drive attached to a
+mega_sas HBA, you should create the virtual drive first from the BIOS before
+running the Solaris install. You can obtain the MegaCli utility from the LSI
+website.
+.sp
+.LP
+The \fBmega_sas\fR device can support up to  64 virtual disks. Note that BIOS
+numbers the virtual disks as 1 through 64, however in the Solaris operating
+environment virtual disks are numbered from 0 to 63.  Also note that SAS and
+SATA drives cannot be configured into the same virtual disk.
+.SH KNOWN PROBLEMS AND LIMITATIONS
+.sp
+.LP
+The \fBmega_sas\fR driver does not support the LSI MegaRAID SAS 8204ELP,
+8204XLP, 8208ELP, and 8208XLP controllers.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/mega_sas\fR\fR
+.ad
+.RS 30n
+32-bit ELF kernel module. (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/mega_sas\fR\fR
+.ad
+.RS 30n
+64-bit kernel   module. (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/mega_sas.conf\fR\fR
+.ad
+.RS 30n
+Driver configuration file (contains no user-configurable options).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86-based systems
+_
+Interface stability	Uncommitted
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR sata (4D),
+.BR attributes (7),
+.BR prtconf (8),
+.BR scsi_hba_attach_setup (9F),
+.BR scsi_sync_pkt (9F),
+.BR scsi_transport (9F),
+.BR scsi_device (9S),
+.BR scsi_inquiry (9S),
+.BR scsi_pkt (9S)
+.sp
+.LP
+\fISmall Computer System Interface-2 (SCSI-2)\fR

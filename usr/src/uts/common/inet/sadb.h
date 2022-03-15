@@ -73,12 +73,12 @@ typedef struct ipsa_cm_mech_s {
  * initialize the Block Cipher, is made up of a Counter and a Salt.
  * The Counter is fixed at 64 bits and is incremented for each packet.
  * The Salt value can be any whole byte value upto 64 bits. This is
- * algorithm mode specific and can be configured with ipsecalgs(1m).
+ * algorithm mode specific and can be configured with ipsecalgs(8).
  *
  * We only support whole byte salt lengths, this is because the salt is
- * stored in an array of uint8_t's. This is enforced by ipsecalgs(1m)
+ * stored in an array of uint8_t's. This is enforced by ipsecalgs(8)
  * which configures the salt length as a number of bytes. Checks are
- * made to ensure the salt length defined in ipsecalgs(1m) fits in
+ * made to ensure the salt length defined in ipsecalgs(8) fits in
  * the ipsec_nonce_t.
  *
  * The Salt value remains constant for the life of the SA, the Salt is

@@ -101,8 +101,11 @@ For \fBSCSI_RESET_CANCEL\fR requests,  \fBtran_reset_notify()\fR must return
 \fBDDI_SUCCESS\fR if the notification request has been canceled, and
 \fBDDI_FAILURE\fR otherwise.
 .SH SEE ALSO
-\fBattach\fR(9E), \fBscsi_ifgetcap\fR(9F), \fBscsi_reset_notify\fR(9F),
-\fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S)
+.BR attach (9E),
+.BR scsi_ifgetcap (9F),
+.BR scsi_reset_notify (9F),
+.BR scsi_address (9S),
+.BR scsi_hba_tran (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

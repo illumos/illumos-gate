@@ -33,7 +33,7 @@
  * Most modern x86 systems support a System Management BIOS, which is a memory
  * buffer filled in by the BIOS at boot time that describes the hardware.  This
  * data format is described by DMTF specification DSP0134 (see http://dmtf.org)
- * This file implements a rudimentary prtdiag(1M) display using the SMBIOS.
+ * This file implements a rudimentary prtdiag(8) display using the SMBIOS.
  * Access to the data is provided by libsmbios: see <sys/smbios.h> for info.
  *
  * NOTE: It is important to understand that x86 hardware varies extremely
@@ -44,7 +44,7 @@
  * file should not be extended to report every SMBIOS tidbit or structure in
  * the spec unless we have good reason to believe it tends to be reliable.
  *
- * Similarly, the prtdiag(1M) utility itself should not be used to spit out
+ * Similarly, the prtdiag(8) utility itself should not be used to spit out
  * every possible bit of x86 configuration data from every possible source;
  * otherwise this code will become an unmaintainable and untestable disaster.
  * Extensions to prtdiag should prefer to use more stable kernel mechanisms
@@ -52,7 +52,7 @@
  * and should generally limit themselves to commonly needed h/w data.  As such,
  * extensions to x86 prtdiag should focus on integration with the device tree.
  *
- * The prtdiag(1M) utility is for service personnel and system administrators:
+ * The prtdiag(8) utility is for service personnel and system administrators:
  * it is not your personal ACPI disassembler or CPUID decoder ring.  The
  * complete SMBIOS data is available from smbdump(1), and other specialized
  * tools can be created to display the state of other x86 features, especially

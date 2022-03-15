@@ -1385,7 +1385,7 @@ init_vendor_macros(e)
 #define LA_DGUX		9	/* special DGUX implementation */
 #define LA_HPUX		10	/* special HPUX implementation */
 #define LA_IRIX6	11	/* special IRIX 6.2 implementation */
-#define LA_KSTAT	12	/* special Solaris kstat(3k) implementation */
+#define LA_KSTAT	12	/* special Solaris kstat(3KSTAT) implementation */
 #define LA_DEVSHORT	13	/* read short from a device */
 #define LA_ALPHAOSF	14	/* Digital UNIX (OSF/1 on Alpha) table() call */
 #define LA_PSET		15	/* Solaris per-processor-set load average */
@@ -6436,4 +6436,3 @@ char	*FFRCompileOptions[] =
 #endif /* _FFR_USE_SETLOGIN */
 	NULL
 };
-

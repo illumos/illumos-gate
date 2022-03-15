@@ -162,7 +162,7 @@ void error(char *function_name, char *format, \&.\|.\|.)
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -185,15 +185,18 @@ All of these functions can be used safely in multithreaded applications, as
 long as \fBsetlocale\fR(3C) is not being called to change the locale.
 .sp
 .LP
-See \fBstandards\fR(5) for the standards conformance of \fBvprintf()\fR,
+See \fBstandards\fR(7) for the standards conformance of \fBvprintf()\fR,
 \fBvfprintf()\fR, \fBvsprintf()\fR, and \fBvsnprintf()\fR. The
 \fBvasprintf()\fR function is modeled on the one that appears in the FreeBSD,
 NetBSD, and GNU C libraries.
 .SH SEE ALSO
 .sp
 .LP
-\fBprintf\fR(3C), \fBattributes\fR(5), \fBstdarg\fR(3EXT), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR printf (3C),
+.BR stdarg (3EXT),
+.BR attributes (7),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP

@@ -1,0 +1,265 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH RCAPADM 8 "Mar 5, 2017"
+.SH NAME
+rcapadm \- configure resource capping daemon
+.SH SYNOPSIS
+.LP
+.nf
+\fBrcapadm\fR
+.fi
+
+.LP
+.nf
+\fBrcapadm\fR [ [\fB-n\fR] \fB-E\fR | \fB-D\fR]
+     [\fB-i\fR \fIinterval=value\fR,...,\fIinterval=value\fR] [\fB-c\fR \fIpercent\fR]
+     [\fB-z\fR \fIzonename\fR \fB-m\fR \fImaxvalue\fR]
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBrcapadm\fR command allows a user with the privileges described below to
+configure various attributes of the resource capping daemon. If used without
+arguments, \fBrcapadm\fR displays the current status of the resource capping
+daemon if it has been configured. See \fBrcapd\fR(8) for more information.
+.sp
+.LP
+In the current release of the Solaris operating environment, \fBrcapadm\fR is
+available to users with all privileges and to users who have the Process
+Management profile in their list of profiles. The System Administrator role
+includes the Process Management profile.
+.SH OPTIONS
+.ne 2
+.na
+\fB\fB-c\fR \fIpercent\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set the minimum physical memory utilization for memory cap enforcement. Caps
+will not be enforced until the physical memory available to processes is low.
+The \fIpercent\fR value should be in the range 0 to 100. The minimum (and
+default) value is \fB0\fR, which means that memory caps are always enforced.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-D\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable the resource capping daemon so that it will not be started when the
+system is booted. Also stop the resource capping daemon now, if the \fB-n\fR
+option is not specified and it is currently running.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-E\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable the resource capping daemon so that it will be started each time the
+system is booted. Also start the resource capping daemon now, if the \fB-n\fR
+option is not specified and it is not currently running.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-i\fR \fIinterval=value\fR,...,\fIinterval=value\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set intervals for various periodic operations performed by \fBrcapd\fR. All
+intervals are specified in seconds. You can set the following intervals:
+.sp
+.ne 2
+.na
+\fB\fBscan\fR\fR
+.ad
+.RS 10n
+The interval at which \fBrcapd\fR scans for new processes. The default scan
+interval is every 15 seconds. The minimum value is 1 second.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsample\fR\fR
+.ad
+.RS 10n
+The interval of process resident set size sampling. The default sample interval
+is every 5 seconds. The minimum value is 1 second.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreport\fR\fR
+.ad
+.RS 10n
+The interval at which various paging statistics are updated by \fBrcapd\fR, in
+seconds. These statistics can be viewed by using \fBrcapstat\fR(1). The
+default reporting interval is every 5 seconds. When the interval is set to
+\fB0\fR, statistics will not be updated.
+.LP
+Note -
+.sp
+.RS 2
+Paging refers to the act of relocating portions of memory, called pages, to or
+from physical memory. \fBrcapd\fR pages out the most infrequently used pages.
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBconfig\fR\fR
+.ad
+.RS 10n
+The reconfiguration interval, in seconds. At each reconfiguration event,
+\fBrcapd\fR checks its configuration file for updates, and scans the project
+databases for new project caps. The default reconfiguration interval is every
+60 seconds. The minimum interval is \fB0\fR. When the interval is set to
+\fB0\fR, no periodic reconfiguration occurs, although the running daemon can
+still be reconfigured by sending it \fBSIGHUP\fR.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR \fImaxvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used in conjunction with the \fB-z\fR option. Specifies a value for
+\fBrcap.max-rss\fR, a dynamically-set cap on the usage of physical memory for
+the zone specified by \fB-z\fR. You can apply a scale (\fBK\fR, \fBM\fR,
+\fBG\fR, \fBT\fR) to the value you specify. \fBK\fR means kilobyte; \fBM\fR,
+megabyte; \fBG\fR, gigabyte; and \fBT\fR, terabyte. For example, \fB100M\fR is
+100 megabytes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not affect the running state of the resource capping daemon when enabling or
+disabling it.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used in conjunction with the \fB-m\fR option. Specifies the zone for which you
+are dynamically specifying a cap on physical memory usage (using \fB-m\fR).
+.RE
+
+.LP
+Note -
+.sp
+.RS 2
+To set a persistent cap on memory usage within a zone, use \fBzonecfg\fR(8).
+.RE
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRConfiguring the Resource Capping Daemon with Immediate
+Enforcement
+.sp
+.LP
+#
+.BI "rcapadm -E -i scan=" 15 ,sample= 5 ,report= 5 ,config= 60 " -c 0"
+
+.LP
+\fBExample 2 \fRSpecifying a Resource Cap for a Zone
+.sp
+.LP
+The command shown below specifies the maximum amount of memory that can be
+consumed by a specified zone. Note that this value lasts only until the next
+reboot. To set a persistent cap, use \fBzonecfg\fR(8).
+
+.sp
+.in +2
+.nf
+# \fBrcapadm -z testzone -m 512M\fR
+.fi
+.in -2
+.sp
+
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 5n
+Successful completion. The modifications to the current configuration were
+valid and made successfully.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 5n
+An error occurred. A fatal error occurred either in obtaining or modifying the
+resource capping configuration.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 5n
+Invalid command-line options were specified.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.sp
+.LP
+The \fB-z\fR and \fB-m\fR options are committed interfaces.
+.SH SEE ALSO
+.LP
+.BR rcapstat (1),
+.BR project (5),
+.BR attributes (7),
+.BR zones (7),
+.BR rcapd (8),
+.BR zonecfg (8)
+.sp
+.LP
+"Physical Memory Control Using the Resource Capping Daemon" in \fISystem
+Administration Guide: Solaris Containers-Resource Management, and Solaris
+Zones\fR

@@ -42,8 +42,8 @@ file path=kernel/drv/$(ARCH64)/e1000g group=sys
 file path=kernel/drv/e1000g.conf group=sys \
     original_name=SUNWintgige:kernel/drv/e1000g.conf preserve=renamenew
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/e1000g.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/e1000g.4d
 driver name=e1000g perms="* 0666 root sys" clone_perms="e1000g 0666 root sys" \
     alias=pci8086,d4c,p \
     alias=pci8086,d4d,p \

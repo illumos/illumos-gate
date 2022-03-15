@@ -1,0 +1,180 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH FMD 8 "Nov 26, 2017"
+.SH NAME
+fmd \- fault manager daemon
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/fm/fmd/fmd\fR [\fB-V\fR] [\fB-f\fR \fIfile\fR] [\fB-o\fR \fIopt\fR=\fIval\fR] [\fB-R\fR \fIdir\fR]
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBfmd\fR is a daemon that runs in the background on each system.
+\fBfmd\fR receives telemetry information relating to problems detected by the
+system software, diagnoses these problems, and initiates proactive self-healing
+activities such as disabling faulty components. When appropriate, the fault
+manager also sends a message to the \fBsyslogd\fR(8) service to notify an
+administrator that a problem has been detected. The message directs
+administrators to a knowledge article on http://illumos.org/msg/, which
+explains more about the problem impact and appropriate responses.
+.sp
+.LP
+Each problem diagnosed by the fault manager is assigned a Universal Unique
+Identifier (\fBUUID\fR). The \fBUUID\fR uniquely identifies this particular
+problem across any set of systems. The \fBfmdump\fR(8) utility can be used to
+view the list of problems diagnosed by the fault manager, along with their
+\fBUUID\fRs and knowledge article message identifiers. The \fBfmadm\fR(8)
+utility can be used to view the resources on the system believed to be faulty.
+The \fBfmstat\fR(8) utility can be used to report statistics kept by the fault
+manager. The fault manager is started automatically when the operating system
+boots, so it is not necessary to use the \fBfmd\fR command directly.
+.SH OPTIONS
+.LP
+The following options are supported
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fIfile\fR\fR
+.ad
+.RS 16n
+Read the specified configuration \fIfile\fR prior to searching for any of the
+default fault manager configuration files.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIopt\fR\fB=\fR\fIvalue\fR\fR
+.ad
+.RS 16n
+Set the specified fault manager option to the specified value. Fault manager
+options are currently a Private interface; see \fBattributes\fR(7) for
+information about Private interfaces.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR \fIdir\fR\fR
+.ad
+.RS 16n
+Use the specified root directory for all pathnames evaluated by the fault
+manager, instead of the default root (\fB/\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 16n
+Print the fault manager's version to stdout and exit.
+.RE
+
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 6n
+Successful completion
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.RS 6n
+An error occurred which prevented the fault manager from initializing, such as
+failure to open the telemetry transport.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 6n
+Invalid command-line options were specified.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/fm/fmd\fR \fR
+.ad
+.RS 20n
+Fault manager configuration directory
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/usr/lib/fm/fmd\fR \fR
+.ad
+.RS 20n
+Fault manager library directory
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/fm/fmd\fR\fR
+.ad
+.RS 20n
+Fault manager log directory
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.LP
+.BR svcs (1),
+.BR attributes (7),
+.BR smf (7),
+.BR fmadm (8),
+.BR fmdump (8),
+.BR fmstat (8),
+.BR syslogd (8)
+.sp
+.LP
+http://illumos.org/msg/
+.SH NOTES
+.LP
+The Fault Manager is managed by the service management facility, \fBsmf\fR(7),
+under the service identifier:
+.sp
+.in +2
+.nf
+ svc:/system/fmd:default
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The service's status can be queried using the \fBsvcs\fR(1) command.
+Administrators should not disable the Fault Manager service.

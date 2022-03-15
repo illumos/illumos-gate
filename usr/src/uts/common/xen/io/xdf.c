@@ -2532,7 +2532,7 @@ xdf_ioctl_eject(xdf_t *vdp)
  * Watch for media state changes.  This can be an insertion of a device
  * (triggered by a 'xm block-configure' request in another domain) or
  * the ejection of a device (triggered by a local "eject" operation).
- * For a full description of the DKIOCSTATE ioctl behavior see dkio(7I).
+ * For a full description of the DKIOCSTATE ioctl behavior see dkio(4I).
  */
 static int
 xdf_dkstate(xdf_t *vdp, enum dkio_state mstate)
@@ -3609,7 +3609,7 @@ done:
 	    HVMPV_XDF_VERS);
 #endif /* XPV_HVM_DRIVER */
 
-	/* Create kstat for iostat(1M) */
+	/* Create kstat for iostat(8) */
 	if (xdf_kstat_create(dip) != 0) {
 		cmn_err(CE_WARN, "xdf@%s: failed to create kstat",
 		    ddi_get_name_addr(dip));

@@ -107,15 +107,15 @@ dbmerge() {
 #
 	$sed_cmd -e '/^# \/etc\/security\/exec_attr/d' -e '/^#$/d' \
 		-e '/^# execution attributes for profiles./d' \
-		-e '/^# See exec_attr(4)/d' \
+		-e '/^# See exec_attr([45])/d' \
 		-e '/^# \/etc\/user_attr/d' \
-		-e '/^# user attributes. see user_attr(4)/d' \
+		-e '/^# user attributes. see user_attr([45])/d' \
 		-e '/^# \/etc\/security\/prof_attr/d' \
-		-e '/^# profiles attributes. see prof_attr(4)/d' \
-		-e '/^# See prof_attr(4)/d' \
+		-e '/^# profiles attributes. see prof_attr([45])/d' \
+		-e '/^# See prof_attr([45])/d' \
 		-e '/^# \/etc\/security\/auth_attr/d' \
-		-e '/^# authorizations. see auth_attr(4)/d' \
-		-e '/^# authorization attributes. see auth_attr(4)/d' \
+		-e '/^# authorizations. see auth_attr([45])/d' \
+		-e '/^# authorization attributes. see auth_attr([45])/d' \
 		    $4.old > $4.$$
 	$mv_cmd $4.$$ $4.old
 #

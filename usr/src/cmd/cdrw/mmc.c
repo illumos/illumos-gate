@@ -672,7 +672,7 @@ read_format_capacity(int fd, uint_t *bsize)
 }
 
 /*
- * Used to reset the device. Since, sd(7D) requires a
+ * Used to reset the device. Since, sd(4D) requires a
  * command to be issued when resetting a device we will
  * issue an innocuous command. The command chosen for this
  * purpose is the TEST UNIT READY (TUR) command. We also do
@@ -692,7 +692,7 @@ reset_dev(int fd)
 	 */
 	scmd = get_uscsi_cmd();
 
-	/* Tell sd(7D) to do a silent reset of the device. */
+	/* Tell sd(4D) to do a silent reset of the device. */
 	scmd->uscsi_flags = USCSI_SILENT | USCSI_RESET;
 
 	scmd->uscsi_timeout = DEFAULT_SCSI_TIMEOUT;

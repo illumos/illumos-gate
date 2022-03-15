@@ -53,7 +53,7 @@ behavior of \fBgetloadavg()\fR is equivalent to that of
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -69,5 +69,9 @@ MT-Level	Async-Signal-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBuptime\fR(1), \fBw\fR(1), \fBpooladm\fR(1M), \fBKstat\fR(3PERL),
-\fBpset_getloadavg\fR(3C), \fBstandards\fR(5)
+.BR uptime (1),
+.BR w (1),
+.BR pset_getloadavg (3C),
+.BR Kstat (3PERL),
+.BR standards (7),
+.BR pooladm (8)

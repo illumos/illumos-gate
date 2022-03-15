@@ -29,8 +29,8 @@
 /*
  * Console support for zones requires a significant infrastructure.  The
  * core pieces are contained in this file, but other portions of note
- * are in the zlogin(1M) command, the zcons(7D) driver, and in the
- * devfsadm(1M) misc_link generator.
+ * are in the zlogin(1) command, the zcons(4D) driver, and in the
+ * devfsadm(8) misc_link generator.
  *
  * Care is taken to make the console behave in an "intuitive" fashion for
  * administrators.  Essentially, we try as much as possible to mimic the
@@ -71,7 +71,7 @@
  *   to online new instances of zcons as needed.  Care is taken to
  *   prune and manage these appropriately; see init_console_dev() and
  *   destroy_console_dev().  The end result is the creation of the
- *   zcons(7D) instance and an open file descriptor to the manager side.
+ *   zcons(4D) instance and an open file descriptor to the manager side.
  *   zcons instances are associated with zones via their zonename device
  *   property.  This the console instance to persist across reboots,
  *   and while the zone is halted.

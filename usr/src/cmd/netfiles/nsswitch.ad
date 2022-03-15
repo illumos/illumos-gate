@@ -29,10 +29,10 @@
 # uses Microsoft's Active Directory (AD) for passwd and group; DNS for
 # hosts lookups; and files for the remaining databases.
 #
-# AD name service currently only supports passwd(4) and group(4)
+# AD name service currently only supports passwd(5) and group(5)
 # databases.
 #
-# Other name service databases such as audit_user(4) and user_attr(4)
+# Other name service databases such as audit_user(5) and user_attr(5)
 # that follow passwd entry in nsswitch.conf are not supported by AD.
 # If the AD backend is processed (based on the configuration) it will
 # return NOT FOUND for these databases.

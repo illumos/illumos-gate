@@ -174,7 +174,7 @@ File system name length exceeds system limit.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -192,4 +192,6 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBfstyp_init\fR(3FSTYP), \fBlibfstyp\fR(3LIB), \fBattributes\fR(5)
+.BR fstyp_init (3FSTYP),
+.BR libfstyp (3LIB),
+.BR attributes (7)

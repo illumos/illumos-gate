@@ -138,7 +138,7 @@ int AuthenticateMsg(unsigned char *auth_buffer, unsigned
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -156,7 +156,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibmd5\fR(3LIB)
+.BR libmd5 (3LIB)
 .sp
 .LP
 Rivest, R., The MD5 Message-Digest Algorithm, RFC 1321, April 1992.

@@ -142,7 +142,7 @@ int	rechoose_interval = RECHOOSE_INTERVAL;
 hrtime_t nosteal_nsec = NOSTEAL_UNINITIALIZED;
 extern void cmp_set_nosteal_interval(void);
 
-id_t	defaultcid;	/* system "default" class; see dispadmin(1M) */
+id_t	defaultcid;	/* system "default" class; see dispadmin(8) */
 
 disp_lock_t	transition_lock;	/* lock on transitioning threads */
 disp_lock_t	stop_lock;		/* lock on stopped threads */
@@ -290,7 +290,7 @@ dispinit(void)
 
 	/*
 	 * Get the default class ID; this may be later modified via
-	 * dispadmin(1M).  This will load the class (normally TS) and that will
+	 * dispadmin(8).  This will load the class (normally TS) and that will
 	 * call disp_add(), which is why we had to drop cpu_lock first.
 	 */
 	if (getcid(defaultclass, &defaultcid) != 0) {

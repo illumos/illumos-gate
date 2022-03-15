@@ -34,5 +34,5 @@ threads with the same or greater priority to run.
 .Sy MT-Safe
 .Sh SEE ALSO
 .Xr yield 2 ,
-.Xr attributes 5 ,
-.Xr threads 5
+.Xr attributes 7 ,
+.Xr threads 7

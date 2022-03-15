@@ -1,0 +1,454 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MOUNT 8 "Sep 8, 2015"
+.SH NAME
+mount, umount \- mount or unmount file systems and remote resources
+.SH SYNOPSIS
+.LP
+.nf
+\fBmount\fR [\fB-p\fR | \fB-v\fR]
+.fi
+
+.LP
+.nf
+\fBmount\fR [\fB-F\fR \fIFSType\fR] [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR]
+     [\fB-O\fR] \fIspecial\fR | \fImount_point\fR
+.fi
+
+.LP
+.nf
+\fBmount\fR [\fB-F\fR \fIFSType\fR] [\fIgeneric_options\fR] [\fB-o\fR \fIspecific_options\fR]
+     [\fB-O\fR] \fIspecial\fR \fImount_point\fR
+.fi
+
+.LP
+.nf
+\fBmount\fR \fB-a\fR [\fB-F\fR \fIFSType\fR] [\fB-V\fR] [\fIcurrent_options\fR]
+     [\fB-o\fR \fIspecific_options\fR] [\fImount_points...\fR]
+.fi
+
+.LP
+.nf
+\fBumount\fR [\fB-f\fR] [\fB-V\fR] [\fB-o\fR \fIspecific_options\fR] \fIspecial\fR | \fImount_point\fR
+.fi
+
+.LP
+.nf
+\fBumount\fR \fB-a\fR [\fB-f\fR] [\fB-V\fR] [\fB-o\fR \fIspecific_options\fR] [\fImount_points...\fR]
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBmount\fR attaches a file system to the file system hierarchy at the
+\fImount_point\fR, which is the pathname of a directory. If \fImount_point\fR
+has any contents prior to the \fBmount\fR operation, these are hidden until the
+file system is unmounted.
+.LP
+\fBumount\fR unmounts a currently mounted file system, which may be specified
+either as a \fImount_point\fR or as \fIspecial\fR, the device on which the file
+system resides.
+.LP
+The table of currently mounted file systems can be found by examining the
+mounted file system information file. This is provided by a file system that is
+usually mounted on \fB/etc/mnttab\fR. The mounted file system information is
+described in \fBmnttab\fR(5). Mounting a file system adds an entry to the mount
+table; a \fBumount\fR removes an entry from the table.
+.LP
+When invoked with both the \fIspecial\fR and \fImount_point\fR arguments and
+the \fB-F\fR option, \fBmount\fR validates all arguments except for
+\fIspecial\fR and invokes the appropriate \fIFSType\fR-specific \fBmount\fR
+module. If invoked with no arguments, \fBmount\fR lists all the mounted file
+systems recorded in the mount table, \fB/etc/mnttab\fR. If invoked with a
+partial argument list (with only one of \fIspecial\fR or \fImount_point\fR, or
+with both \fIspecial\fR or \fImount_point\fR specified but not \fIFSType\fR),
+\fBmount\fR will search \fB/etc/vfstab\fR for an entry that will supply the
+missing arguments. If no entry is found, and the special argument starts with
+\fB/\fR, the default local file system type specified in \fB/etc/default/fs\fR
+will be used. Otherwise the default remote file system type will be used. The
+default remote file system type is determined by the first entry in the
+\fB/etc/dfs/fstypes\fR file. After filling in missing arguments, \fBmount\fR
+will invoke the \fIFSType\fR-specific \fBmount\fR module.
+.LP
+For file system types that support it, a file can be mounted directly as a file
+system by specifying the full path to the file as the special argument.  In
+such a case, the \fBnosuid\fR option is enforced. If specific file system
+support for such loopback file mounts is not present, you can still use
+\fBlofiadm\fR(8) to mount a file system image. In this case, no special
+options are enforced.
+.LP
+Only a user with sufficient privilege (at least \fBPRIV_SYS_MOUNT\fR) can mount
+or unmount file systems using \fBmount\fR and \fBumount\fR. However, any user
+can use \fBmount\fR to list mounted file systems and resources.
+.SH OPTIONS
+.ne 2
+.na
+\fB\fB-F\fR \fIFSType\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used to specify the \fIFSType\fR on which to operate. The \fIFSType\fR must be
+specified or must be determinable from \fB/etc/vfstab\fR, or by consulting
+\fB/etc/default/fs\fR or \fB/etc/dfs/fstypes\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-a\fR [ \fImount_points\fR... ]\fR
+.ad
+.sp .6
+.RS 4n
+Perform mount or umount operations in parallel, when possible.
+.sp
+If mount points are not specified, \fBmount\fR will mount all file systems
+whose \fB/etc/vfstab\fR "mount at boot" field is \fByes\fR. If mount points are
+specified, then \fB/etc/vfstab\fR "mount at boot" field will be ignored.
+.sp
+If mount points are specified, \fBumount\fR will only \fBumount\fR those mount
+points. If none is specified, then \fBumount\fR will attempt to \fBunmount\fR
+all file systems in \fB/etc/mnttab\fR, with the exception of certain system
+required file systems: \fB/\fR, \fB/usr\fR, \fB/var\fR, \fB/var/adm\fR,
+\fB/var/run\fR, \fB/proc\fR, \fB/dev/fd\fR and \fB/tmp\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR\fR
+.ad
+.sp .6
+.RS 4n
+Forcibly unmount a file system.
+.sp
+Without this option, \fBumount\fR does not allow a file system to be unmounted
+if a file on the file system is busy. Using this option can cause data loss for
+open files; programs which access files after the file system has been
+unmounted will get an error (\fBEIO\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print the list of mounted file systems in the \fB/etc/vfstab\fR format. Must be
+the only option specified. See \fBBUGS\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print the list of mounted file systems in verbose format. Must be the only
+option specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-V\fR\fR
+.ad
+.sp .6
+.RS 4n
+Echo the complete command line, but do not execute the command. \fBumount\fR
+generates a command line by using the options and arguments provided by the
+user and adding to them information derived from \fB/etc/mnttab\fR. This option
+should be used to verify and validate the command line.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIgeneric_options\fR\fR
+.ad
+.sp .6
+.RS 4n
+Options that are commonly supported by most \fIFSType\fR-specific command
+modules. The following options are available:
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mount the file system without making an entry in \fB/etc/mnttab\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-g\fR\fR
+.ad
+.sp .6
+.RS 4n
+Globally mount the file system. On a clustered system, this globally mounts the
+file system on all nodes of the cluster. On a non-clustered system this has no
+effect.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-o\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify \fIFSType\fR-specific options in a comma separated (without spaces)
+list of suboptions and keyword-attribute pairs for interpretation by the
+\fIFSType\fR-specific module of the command. (See \fBmount_ufs\fR(8).) When
+you use \fB-o\fR with a file system that has an entry in \fB/etc/vfstab\fR, any
+\fBmount\fR options entered for that file system in \fB/etc/vfstab\fR are
+ignored.
+.sp
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fBdevices | nodevices\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow or disallow the opening of device-special files. The default is
+\fBdevices\fR.
+.sp
+If you use \fBnosuid\fR in conjunction with \fBdevices\fR, the behavior is
+equivalent to that of \fBnosuid\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBexec | noexec\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow or disallow executing programs in the file system. Allow or disallow
+\fBmmap\fR(2) with \fBPROT_EXEC\fR for files within the file system. The
+default is \fBexec\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBloop\fR\fR
+.ad
+.sp .6
+.RS 4n
+Ignored for compatibility.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnbmand | nonbmand\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow or disallow non-blocking mandatory locking semantics on this file system.
+Non-blocking mandatory locking is disallowed by default.
+.sp
+If the file system is mounted with the \fBnbmand\fR option, then applications
+can use the \fBfcntl\fR(2) interface to place non-blocking mandatory locks on
+files and the system enforces those semantics. If you enable this option, it
+can cause standards conformant applications to see unexpected errors.
+.sp
+To avoid the possibility of obtaining mandatory locks on system files, do not
+use the \fBnbmand\fR option with the following file systems:
+.sp
+.in +2
+.nf
+/
+/usr
+/etc
+/var
+/proc
+/dev
+/devices
+/system/contract
+/system/object
+/etc/mnttab
+/etc/dfs/sharetab
+.fi
+.in -2
+.sp
+
+Do not use the \fBremount\fR option to change the \fBnbmand\fR disposition of
+the file system. The \fBnbmand\fR option is mutually exclusive of the global
+option. See \fB-g\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBro | rw\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify read-only or read-write. The default is \fBrw\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsetuid | nosetuid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow or disallow \fBsetuid\fR or \fBsetgid\fR execution. The default is
+\fBsetuid\fR.
+.sp
+If you specify \fBsetuid\fR in conjunction with \fBnosuid\fR, the behavior is
+the same as \fBnosuid\fR.
+.sp
+\fBnosuid\fR is equivalent to \fBnosetuid\fR and \fBnodevices\fR. When
+\fBsuid\fR or \fBnosuid\fR is combined with \fBsetuid\fR or \fBnosetuid\fR and
+\fBdevices\fR or \fBnodevices\fR, the most restrictive options take effect.
+.sp
+This option is highly recommended whenever the file system is shared by way of
+NFS with the \fBroot=\fR option. Without it, NFS clients could add \fBsetuid\fR
+programs to the server or create devices that could open security holes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsuid | nosuid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow or disallow \fBsetuid\fR or \fBsetgid\fR execution. The default is
+\fBsuid\fR. This option also allows or disallows opening any device-special
+entries that appear within the filesystem.
+.sp
+\fBnosuid\fR is equivalent to \fBnosetuid\fR and \fBnodevices\fR. When
+\fBsuid\fR or \fBnosuid\fR is combined with \fBsetuid\fR or \fBnosetuid\fR and
+\fBdevices\fR or \fBnodevices\fR, the most restrictive options take effect.
+.sp
+This option is highly recommended whenever the file system is shared using NFS
+with the \fBroot=\fIoption\fR\fR, because, without it, NFS clients could add
+\fBsetuid\fR programs to the server, or create devices that could open security
+holes.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-O\fR\fR
+.ad
+.sp .6
+.RS 4n
+Overlay mount. Allow the file system to be mounted over an existing mount
+point, making the underlying file system inaccessible. If a mount is attempted
+on a pre-existing mount point without setting this flag, the mount will fail,
+producing the error "device busy".
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fR
+.ad
+.sp .6
+.RS 4n
+Mount the file system read-only.
+.RE
+
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRMounting and Unmounting a DVD Image Directly
+.sp
+.LP
+The following commands mount and unmount a DVD image.
+
+.sp
+.in +2
+.nf
+# \fBmount -F hsfs /images/solaris.iso /mnt/solaris-image\fR
+# \fBumount /mnt/solaris-image\fR
+.fi
+.in -2
+.sp
+
+.SH USAGE
+.LP
+See \fBlargefile\fR(7) for the description of the behavior of \fBmount\fR and
+\fBumount\fR when encountering files greater than or equal to 2 Gbyte ( 2^31
+bytes).
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/mnttab\fR\fR
+.ad
+.sp .6
+.RS 4n
+Table of mounted file systems.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/default/fs\fR\fR
+.ad
+.sp .6
+.RS 4n
+Default local file system type. Default values can be set for the following
+flags in \fB/etc/default/fs\fR. For example: \fBLOCAL=ufs\fR
+.sp
+.ne 2
+.na
+\fB\fBLOCAL:\fR\fR
+.ad
+.sp .6
+.RS 4n
+The default partition for a command if no \fIFSType\fR is specified.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/vfstab\fR\fR
+.ad
+.sp .6
+.RS 4n
+List of default parameters for each file system.
+.RE
+
+.SH SEE ALSO
+.LP
+\fBlofiadm\fR(8), \fBmount_hsfs\fR(8), \fBmount_nfs\fR(8),
+\fBmount_pcfs\fR(8),  \fBfcntl\fR(2),
+.BR mmap (2),
+.BR lofs (4FS),
+.BR pcfs (4FS),
+.BR mnttab (5),
+.BR vfstab (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR privileges (7),
+.BR mount_smbfs (8),
+.BR mount_tmpfs (8),
+.BR mount_udfs (8),
+.BR mount_ufs (8),
+.BR mountall (8),
+.BR umountall (8)
+.SH NOTES
+.LP
+If the directory on which a file system is to be mounted is a symbolic link,
+the file system is mounted on the directory to which the symbolic link refers,
+rather than on top of the symbolic link itself.

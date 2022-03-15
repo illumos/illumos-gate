@@ -104,13 +104,13 @@
 	<stability value='Evolving' />
 
 	<template>
-	    	<common_name>
-		    	<loctext xml:lang='C'>
+		<common_name>
+			<loctext xml:lang='C'>
 				Solaris SNMP Event Notification Agent
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='snmp-notify' section='1M'
+			<manpage title='snmp-notify' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 		<pg_pattern name='config' type='application' target='this'
@@ -135,7 +135,7 @@ The root directory that will be used for all pathnames evaluated by snmp-notify
 				<visibility value='readwrite'/>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
-		</pg_pattern>	 
+		</pg_pattern>
 	</template>
 </service>
 

@@ -37,11 +37,11 @@ The updated privilege set has restrictions on what it may change for a
 process which are documented in the
 .Sy PCSPRIV
 section of
-.Xr proc 4 .
+.Xr proc 5 .
 In addition, the definition of the
 .Sy prpriv_t
 structure is described in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The current privilege set for the process may be obtained through a call
 to
@@ -65,7 +65,7 @@ is set to indicate the error.
 For a full list of possible errors see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Psetpriv
@@ -85,5 +85,5 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Ppriv 3PROC ,
-.Xr proc 4 ,
-.Xr privileges 5
+.Xr proc 5 ,
+.Xr privileges 7

@@ -24,7 +24,7 @@
 #
 # DO NOT EDIT OR PARSE THIS FILE!
 #
-# Use the ipsecalgs(1m) command to change the contents of this file.
+# Use the ipsecalgs(8) command to change the contents of this file.
 # The algorithm descriptions contained in this file are synchronised to the
 # kernel with ipsecalgs -s, the kernel validates the entries at this point.
 

@@ -156,7 +156,7 @@
  *	interested on.
  *	The internal pollwakeup() function is used by all the file
  *	systems --which are supporting the VOP_POLL() interface- to notify
- *	the upper layer (poll(2), devpoll(7d) and now event ports) about
+ *	the upper layer (poll(2), devpoll(4D) and now event ports) about
  *	the event triggered (see valid events in poll(2)).
  *	The pollwakeup() function forwards the event to the layer registered
  *	to receive the current event.

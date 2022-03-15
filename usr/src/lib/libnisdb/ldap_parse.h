@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_LDAP_PARSE_H
 #define	_LDAP_PARSE_H
 
@@ -301,7 +299,7 @@ typedef struct __nis_mapping_item_struct {
  * __nis_mapping_item_t's are shortened to just the item name.
  *
  * (1)	String value consisting of the string "{crypt}" followed by the
- *	value of the 'passwd' column. The NIS+LDAPmapping(4) representation
+ *	value of the 'passwd' column. The NIS+LDAPmapping(5) representation
  *	is
  *		("{crypt}%s", passwd)
  *	and the element.print contains

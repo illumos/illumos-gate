@@ -395,7 +395,7 @@ UX:test: INFO: test facility enabled
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -411,6 +411,12 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBaddsev\fR(3C), \fBgettxt\fR(3C), \fBpfmt\fR(3C), \fBprintf\fR(3C),
-\fBsetcat\fR(3C), \fBsetlabel\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
-\fBenviron\fR(5)
+.BR addsev (3C),
+.BR gettxt (3C),
+.BR pfmt (3C),
+.BR printf (3C),
+.BR setcat (3C),
+.BR setlabel (3C),
+.BR setlocale (3C),
+.BR attributes (7),
+.BR environ (7)

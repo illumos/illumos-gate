@@ -86,7 +86,7 @@ If you have used \fBed\fR you find that, in addition to having all of the
 useful on \fBCRT\fR terminals. Intelligent terminals and high speed terminals
 are very pleasant to use with \fBvi\fR. Generally, the \fBex\fR editor uses far
 more of the capabilities of terminals than \fBed\fR does, and uses the terminal
-capability data base (see \fBterminfo\fR(4)) and the type of the terminal you
+capability data base (see \fBterminfo\fR(5)) and the type of the terminal you
 are using from the environment variable \fBTERM\fR to determine how to drive
 your terminal efficiently. The editor makes use of features such as insert and
 delete character and line in its \fBvisual\fR command (which can be abbreviated
@@ -700,7 +700,7 @@ l l .
 .SH ENVIRONMENT VARIABLES
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBex\fR: \fBHOME\fR, \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBNLSPATH\fR, \fBPATH\fR,
 \fBSHELL\fR, and \fBTERM\fR.
@@ -841,7 +841,7 @@ editor startup file
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/ex"
 .sp
 
@@ -887,9 +887,18 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBed\fR(1), \fBedit\fR(1), \fBgrep\fR(1), \fBsed\fR(1), \fBsort\fR(1),
-\fBvi\fR(1), \fBcurses\fR(3CURSES), \fBterm\fR(4), \fBterminfo\fR(4),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR ed (1),
+.BR edit (1),
+.BR grep (1),
+.BR sed (1),
+.BR sort (1),
+.BR vi (1),
+.BR curses (3CURSES),
+.BR term (5),
+.BR terminfo (5),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .sp
 .LP
 \fISolaris Advanced User\&'s Guide\fR

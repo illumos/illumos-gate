@@ -1,0 +1,847 @@
+'\" te
+.\" Copyright (c) 2020 Peter Tribble.
+.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ACL 7 "Feb 8, 2020"
+.SH NAME
+acl \- Access Control Lists
+.SH DESCRIPTION
+Access control lists (ACLs) are discretionary access control mechanisms that
+grant and deny access to files and directories. Two different ACL models are
+supported in this release: POSIX-draft ACLs and NFSv4 ACLs.
+.sp
+.LP
+The older, POSIX-draft model is supported by the UFS file system. This model is
+based on a withdrawn ACL POSIX specification that was never standardized. It
+was subsequently withdrawn by the POSIX committee.
+.sp
+.LP
+The other model is based on the standards of the NFSv4 working group and is an
+approved standard from the Internet Engineering Task Force (IETF). The ZFS file
+system uses the NFSv4 model, and provides richer semantics and finer grained
+permission capabilities than the POSIX-draft model.
+.SS "POSIX-draft ACLs"
+POSIX-draft ACLs provide an alternative security mechanism to basic UNIX file
+permissions. Their purpose is to further restrict access
+to files and directories or to extend permissions to a particular user. ACLs
+can be used to change the permissions for the standard owner, group and other
+class bits of a file's mode. ACLs can give additional users and groups access
+to the file. A directory can also have a special kind of ACL called a
+\fBdefault\fR ACL, which defines ACL entries to be inherited by descendents of
+the directory. POSIX-draft ACLs have an ACL entry called \fBmask\fR. The mask
+defines the maximum permissions that can be granted to additional user and
+group entries. Whenever a file is created or its mode is changed by
+\fBchmod\fR(1) or \fBchmod\fR(2), the mask is recomputed. It is recomputed to
+be the group permission defined in the mode passed to \fBchmod\fR(2).
+.sp
+.LP
+The POSIX-draft ACL model uses the standard \fBrwx\fR model of traditional UNIX
+permissions.
+.sp
+.LP
+An ACL is represented as follows:
+.sp
+.in +2
+.nf
+\fIacl_entry\fR[,\fIacl_entry\fR]...
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Each \fIacl_entry\fR contains one ACL entry. An ACL entry is represented by two
+or three colon-separated(\fB:\fR) fields.
+.sp
+.ne 2
+.na
+\fB\fIuser\fR:[\fIuid\fR]:\fIperms\fR\fR
+.ad
+.RS 21n
+If \fIuid\fR blank, it represents the file owner.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIgroup\fR:[\fIgid\fR]:\fIperms\fR\fR
+.ad
+.RS 21n
+If \fIgid\fR is blank, it represents the owning group.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIother\fR:\fIperms\fR\fR
+.ad
+.RS 21n
+Represents the file other class.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fImask\fR:\fIperms\fR\fR
+.ad
+.RS 21n
+Defines the \fBMAX\fR permission to hand out.
+.RE
+
+.sp
+.LP
+For example to give user \fBjoe\fR read and write permissions, the ACL entry is
+specified as:
+.sp
+.in +2
+.nf
+user:joe:rw-
+.fi
+.in -2
+.sp
+
+.SS "NFSv4 ACLs"
+The NFSv4 ACL model is based loosely on the Windows NT ACL model. NFSv4 ACLs
+provide a much richer ACL model than POSIX-draft ACLs.
+.sp
+.LP
+The major differences between NFSv4 and POSIX-draft ACLs are as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+NFSv4 ACLs provide finer grained permissions than the \fBrwx\fR model.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+NFSv4 ACLs allow for both \fBALLOW\fR and \fBDENY\fR entries.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+NFSv4 ACLs provide a rich set of inheritance semantics. POSIX ACLs also have
+inheritance, but with the NFSv4 model you can control the following inheritance
+features:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Whether inheritance cascades to both files and directories or only to files or
+directories.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+In the case of directories, you can indicate whether inheritance is applied to
+the directory itself, to just one level of subdirectories, or cascades to all
+subdirectories of the directory.
+.RE
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+NFSv4 ACLs provide a mechanism for hooking into a system's audit trail.
+Currently, illumos does not support this mechanism.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+NFSv4 ACLs enable administrators to specify the order in which ACL entries are
+checked. With POSIX-draft ACLs the file system reorders ACL entries into a well
+defined, strict access, checking order.
+.RE
+.sp
+.LP
+POSIX-draft ACL semantics can be achieved with NFSv4 ACLs. However, only some
+NFSv4 ACLs can be translated to equivalent POSIX-draft ACLs.
+.sp
+.LP
+Permissions can be specified in three different \fBchmod\fR ACL formats:
+verbose, compact, or positional. The verbose format uses words to indicate that
+the permissions are separated with a forward slash (\fB/\fR) character. Compact
+format uses the permission letters and positional format uses the permission
+letters or the hyphen (\fB-\fR) to identify no permissions.
+.sp
+.LP
+The permissions for verbose mode and their abbreviated form in parentheses for
+compact and positional mode are described as follows:
+.sp
+.ne 2
+.na
+\fBread_data (\fBr\fR)\fR
+.ad
+.RS 24n
+Permission to read the data of the file
+.RE
+
+.sp
+.ne 2
+.na
+\fBlist_directory (\fBr\fR)\fR
+.ad
+.RS 24n
+Permission to list the contents of a directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBwrite_data (\fBw\fR)\fR
+.ad
+.RS 24n
+Permission to modify a file's data anywhere in the file's offset range. This
+includes the ability to grow the file or write to any arbitrary offset.
+.RE
+
+.sp
+.ne 2
+.na
+\fBadd_file (\fBw\fR)\fR
+.ad
+.RS 24n
+Permission to add a new file to a directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBappend_data (\fBp\fR)\fR
+.ad
+.RS 24n
+The ability to modify the file's data, but only starting at EOF. Currently,
+this permission is not supported.
+.RE
+
+.sp
+.ne 2
+.na
+\fBadd_subdirectory (\fBp\fR)\fR
+.ad
+.RS 24n
+Permission to create a subdirectory to a directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBread_xattr (\fBR\fR)\fR
+.ad
+.RS 24n
+The ability to read the extended attributes of a file or do a lookup in the
+extended attributes directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBwrite_xattr (\fBW\fR)\fR
+.ad
+.RS 24n
+The ability to create extended attributes or write to the extended attributes
+directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBexecute (\fBx\fR)\fR
+.ad
+.RS 24n
+Permission to execute a file.
+.RE
+
+.sp
+.ne 2
+.na
+\fBread_attributes (\fBa\fR)\fR
+.ad
+.RS 24n
+The ability to read basic attributes (non-ACLs) of a file. Basic attributes are
+considered to be the stat level attributes. Allowing this access mask bit means
+that the entity can execute \fBls\fR(1) and \fBstat\fR(2).
+.RE
+
+.sp
+.ne 2
+.na
+\fBwrite_attributes (\fBA\fR)\fR
+.ad
+.RS 24n
+Permission to change the times associated with a file or directory to an
+arbitrary value.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdelete (\fBd\fR)\fR
+.ad
+.RS 24n
+Permission to delete the file.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdelete_child (\fBD\fR)\fR
+.ad
+.RS 24n
+Permission to delete a file within a directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBread_acl (\fBc\fR)\fR
+.ad
+.RS 24n
+Permission to read the ACL.
+.RE
+
+.sp
+.ne 2
+.na
+\fBwrite_acl (\fBC\fR)\fR
+.ad
+.RS 24n
+Permission to write the ACL or the ability to execute \fBchmod\fR(1) or
+\fBsetfacl\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fBwrite_owner (\fBo\fR)\fR
+.ad
+.RS 24n
+Permission to change the owner or the ability to execute \fBchown\fR(1) or
+\fBchgrp\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fBsynchronize (\fBs\fR)\fR
+.ad
+.RS 24n
+Permission to access a file locally at the server with synchronous reads and
+writes. Currently, this permission is not supported.
+.RE
+
+.sp
+.LP
+The following inheritance flags are supported by NFSv4 ACLs:
+.sp
+.ne 2
+.na
+\fBfile_inherit (\fBf\fR)\fR
+.ad
+.RS 26n
+Inherit to all newly created files in a directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBdir_inherit (\fBd\fR)\fR
+.ad
+.RS 26n
+Inherit to all newly created directories in a directory.
+.RE
+
+.sp
+.ne 2
+.na
+\fBinherit_only (\fBi\fR)\fR
+.ad
+.RS 26n
+Placed on a directory, but does not apply to the directory itself, only to
+newly created files and directories. This flag requires file_inherit
+and/or dir_inherit to indicate what to inherit.
+.RE
+
+.sp
+.ne 2
+.na
+\fBno_propagate (\fBn\fR)\fR
+.ad
+.RS 26n
+Placed on directories and indicates that ACL entries should only be inherited
+one level of the tree. This flag requires file_inherit and/or dir_inherit to
+indicate what to inherit.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsuccessful_access (\fBS\fR)\fR
+.ad
+.RS 26n
+Indicates whether an alarm or audit record should be initiated upon successful
+accesses. Used with audit/alarm ACE types.
+.RE
+
+.sp
+.ne 2
+.na
+\fBfailed_access (\fBF\fR)\fR
+.ad
+.RS 26n
+Indicates whether an alarm or audit record should be initiated when access
+fails. Used with audit/alarm ACE types.
+.RE
+
+.sp
+.ne 2
+.na
+\fBinherited (\fBI\fR)\fR
+.ad
+.RS 26n
+ACE was inherited.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-\fR\fR
+.ad
+.RS 26n
+No permission granted.
+.RE
+
+.sp
+.LP
+An NFSv4 ACL is expressed using the following syntax:
+.sp
+.in +2
+.nf
+\fIacl_entry\fR[,\fIacl_entry\fR]...
+
+    owner@:<perms>[:inheritance flags]:<allow|deny>
+    group@:<perms>[:inheritance flags]:<allow|deny>
+    everyone@:<perms>[:inheritance flags]:<allow|deny>
+    user:<username>:<perms>[:inheritance flags]:<allow|deny>
+    usersid:<sid string>:<perms>[:inheritance flags]:<allow|deny>
+    group:<groupname>:<perms>[:inheritance flags]:<allow|deny>
+    groupsid:<sid string>:<perms>[:inheritance flags]:<allow|deny>
+    sid:<sid string>:<perms>[:inheritance flags]:<allow|deny>
+.fi
+.in -2
+
+.sp
+.ne 2
+.na
+\fBowner@\fR
+.ad
+.RS 10n
+File owner
+.RE
+
+.sp
+.ne 2
+.na
+\fBgroup@\fR
+.ad
+.RS 10n
+Group owner
+.RE
+
+.sp
+.ne 2
+.na
+\fBuser\fR
+.ad
+.RS 10n
+Permissions for a specific user
+.RE
+
+.sp
+.ne 2
+.na
+\fBgroup\fR
+.ad
+.RS 10n
+Permissions for a specific group
+.RE
+
+.sp
+.LP
+Permission and inheritance flags are separated by a \fB/\fR character.
+.sp
+.LP
+ACL specification examples:
+.sp
+.in +2
+.nf
+user:fred:read_data/write_data/read_attributes:file_inherit:allow
+owner@:read_data:allow,group@:read_data:allow,user:tom:read_data:deny
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Using the compact ACL format, permissions are specified by using 14 unique
+letters to indicate permissions.
+.sp
+.LP
+Using the positional ACL format, permissions are specified as positional
+arguments similar to the \fBls -V\fR format. The hyphen (\fB-\fR), which
+indicates that no permission is granted at that position, can be omitted and
+only the required letters have to be specified.
+.sp
+.LP
+The letters above are listed in the order they would be specified in positional
+notation.
+.sp
+.LP
+With these letters you can specify permissions in the following equivalent
+ways.
+.sp
+.in +2
+.nf
+user:fred:rw------R------:file_inherit:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Or you can remove the \fB-\fR and scrunch it together.
+.sp
+.in +2
+.nf
+user:fred:rwR:file_inherit:allow
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The inheritance flags can also be specified in a more compact manner, as
+follows:
+.sp
+.in +2
+.nf
+user:fred:rwR:f:allow
+user:fred:rwR:f------:allow
+.fi
+.in -2
+.sp
+
+.SS "Shell-level API"
+Several utilities support the manipulation of ACLs. The following
+utilities accommodate both ACL models:
+.sp
+.ne 2
+.na
+\fB\fBchmod\fR\fR
+.ad
+.RS 12n
+The \fBchmod\fR utility has been enhanced to allow for the setting and deleting
+of ACLs. This is achieved by extending the symbolic-mode argument to support
+ACL manipulation. See \fBchmod\fR(1) for details.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcompress\fR\fR
+.ad
+.RS 12n
+When a file is compressed any ACL associated with the original file is
+preserved with the compressed file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcp\fR\fR
+.ad
+.RS 12n
+By default, \fBcp\fR ignores ACLs, unless the \fB-p\fR option is specified.
+When \fB-p\fR is specified the owner and group id, permission modes,
+modification and access times, ACLs, and extended attributes if applicable are
+preserved.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcpio\fR\fR
+.ad
+.RS 12n
+ACLs are preserved when the \fB-P\fR option is specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfind\fR\fR
+.ad
+.RS 12n
+Find locates files with ACLs when the \fB-acl\fR flag is specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBls\fR\fR
+.ad
+.RS 12n
+By default \fBls\fR does not display ACL information. When the \fB-v\fR option
+is specified, a file's ACL is displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmv\fR\fR
+.ad
+.RS 12n
+When a file is moved, all attributes are carried along with the renamed file.
+When a file is moved across a file system boundary, the ACLs are replicated. If
+the ACL information cannot be replicated, the move fails and the source file is
+not removed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpack\fR\fR
+.ad
+.RS 12n
+When a file is packed, any ACL associated with the original file is preserved
+with the packed file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrcp\fR\fR
+.ad
+.RS 12n
+\fBrcp\fR has been enhanced to support copying. A file's ACL is only preserved
+when the remote host supports ACLs.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtar\fR\fR
+.ad
+.RS 12n
+ACLs are preserved when the \fB-p\fR option is specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBunpack\fR\fR
+.ad
+.RS 12n
+When a file with an ACL is unpacked, the unpacked file retains the ACL
+information.
+.RE
+
+.SS "Application-level API"
+The primary interfaces required to access file system ACLs at the programmatic
+level are the \fBacl_get()\fR and \fBacl_set()\fR functions. These functions
+support both POSIX-draft ACLs and NFSv4 ACLs.
+.SS "Retrieving a file's ACL"
+.in +2
+.nf
+int acl_get(const char *path, int flag, acl_t **aclp);
+int facl_get(int fd, int flag, acl_t **aclp);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBacl_get\fR(3SEC) and \fBfacl_get\fR(3SEC) functions retrieve an ACL on
+a file whose name is given by path or referenced by the open file descriptor
+fd. The flag argument specifies whether a trivial ACL should be retrieved. When
+the flag argument equals \fBACL_NO_TRIVIAL\fR only ACLs that are not
+trivial are retrieved. The ACL is returned in the \fBaclp\fR argument.
+.SS "Freeing ACL structure"
+.in +2
+.nf
+void acl_free(acl_t *aclp);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBacl_free()\fR function frees up memory allocated for the argument
+\fBaclp\fR.
+.SS "Setting an ACL on a file"
+.in +2
+.nf
+int acl_set(const char *path, acl_t *aclp);
+int facl_set(int fd, acl_t *aclp);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBacl_set\fR(3SEC) and \fBfacl_get\fR(3SEC) functions are used for setting
+an ACL on a file whose name is given by path or referenced by the open file
+descriptor \fBfd\fR. The \fBaclp\fR argument specifies the ACL to set. The
+\fBacl_set\fR(3SEC) function translates a POSIX-draft ACL into a NFSv4 ACL when
+the target file system supports NFSv4 ACLs. No translation is performed when
+trying to set an NFSv4 ACL on a POSIX-draft ACL supported file system.
+.SS "Determining an ACL's trivialness"
+.in +2
+.nf
+int acl_trivial(const char *path);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBacl_trivial()\fR function is used to determine whether a file has a
+trivial ACL.
+.SS "Removing all ACLs from a file"
+.in +2
+.nf
+int acl_strip(const char *path, uid_t uid, gid_t gid, mode_t mode);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBacl_strip()\fR function removes all ACLs from a file and replaces them
+with a trivial ACL based off of the passed in argument mode. After replacing
+the ACL the owner and group of the file are set to the values specified in the
+uid and gid parameters.
+.SS "Converting ACLs to/from external representation"
+.in +2
+.nf
+int acl_fromtext(const char *path, acl_t **aclp);
+char *acl_totext(acl_t *aclp, int flags);
+.fi
+.in -2
+
+.sp
+.LP
+The \fBacl_totext()\fR function converts an internal ACL representation pointed
+to by aclp into an external representation. See \fBDESCRIPTION\fR for details
+about external representation.
+.sp
+.LP
+The \fBacl_fromtext()\fR function converts an external representation into an
+internal representation. See \fBDESCRIPTION\fR for details about external
+representation.
+.SH EXAMPLES
+The following examples demonstrate how the API can be used to perform basic
+operations on ACLs.
+.LP
+\fBExample 1 \fRRetrieving and Setting an ACL
+.sp
+.LP
+Use the following to retrieve an ACL and set it on another file:
+
+.sp
+.in +2
+.nf
+error = acl_get("file", ACL_NO_TRIVIAL, &aclp);
+
+if (error == 0 && aclp != NULL) {
+.in +8
+error = acl_set("file2", aclp);
+acl_free(aclp);
+.in -8
+}
+\&...
+.fi
+.in -2
+
+.LP
+\fBExample 2 \fRRetrieving and Setting Any ACLs
+.sp
+.LP
+Use the following to retrieve any ACL, including trivial ACLs, and set it on
+another file:
+
+.sp
+.in +2
+.nf
+error = acl_get("file3", 0, &aclp);
+if (error == 0) {
+.in +8
+error = acl_set("file4", aclp);
+acl_free(aclp);
+.in -8
+}
+\&...
+.fi
+.in -2
+
+.LP
+\fBExample 3 \fRDetermining if a File has a Trivial ACL
+.sp
+.LP
+Use the following to determine if a file has a trivial ACL:
+
+.sp
+.in +2
+.nf
+char *file = "file5";
+istrivial = acl_trivial(file);
+
+if (istrivial == 0)
+.in +8
+printf("file %s has a trivial ACL\en", file);
+.in -8
+else
+.in +8
+printf("file %s has a NON-trivial ACL\en", file);
+.in -8
+\&...
+.fi
+.in -2
+
+.LP
+\fBExample 4 \fRRemoving all ACLs from a File
+.sp
+.LP
+Use the following to remove all ACLs from a file, and set a new mode, owner,
+and group:
+
+.sp
+.in +2
+.nf
+error = acl_strip("file", 10, 100, 0644);
+\&...
+.fi
+.in -2
+
+.SH SEE ALSO
+.BR chgrp (1),
+.BR chmod (1),
+.BR chown (1),
+.BR cp (1),
+.BR cpio (1),
+.BR find (1),
+.BR ls (1),
+.BR mv (1),
+.BR setfacl (1),
+.BR tar (1),
+.BR acl (2),
+.BR chmod (2),
+.BR stat (2),
+.BR acl_free (3SEC),
+.BR acl_fromtext (3SEC),
+.BR acl_get (3SEC),
+.BR acl_strip (3SEC),
+.BR acl_trivial (3SEC),
+.BR aclsort (3SEC)

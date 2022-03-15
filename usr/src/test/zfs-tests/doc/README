@@ -52,7 +52,7 @@ The pre-requisites for running the ZFS Test Suite are:
 	  - Use the '-a' option to the zfstest script and all unused disks on
 	    the system are eligible. With '-a' specified, $DISKS is ignored.
 	- A non-root user with the full set of basic privileges and the ability
-	  to sudo(1M) to root without a password to run the test.
+	  to sudo(8) to root without a password to run the test.
 	- Specify any pools you wish to preserve as a space delimited list in
 	  the $KEEP variable. The root pool is added automatically.
 

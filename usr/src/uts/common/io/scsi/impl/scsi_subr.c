@@ -2502,7 +2502,7 @@ scsi_uscsi_pktinit(struct uscsi_cmd *uscmd, struct scsi_pkt *pkt)
 	    (uscmd->uscsi_path_instance != 0)) {
 		/*
 		 * Check to make sure the scsi_pkt was allocated correctly
-		 * before transferring uscsi(7i) path_instance to scsi_pkt(9S).
+		 * before transferring uscsi(4I) path_instance to scsi_pkt(9S).
 		 */
 		if (scsi_pkt_allocated_correctly(pkt)) {
 			/* set pkt_path_instance and flag. */
@@ -2547,7 +2547,7 @@ scsi_uscsi_pktfini(struct scsi_pkt *pkt, struct uscsi_cmd *uscmd)
 {
 	/*
 	 * Check to make sure the scsi_pkt was allocated correctly before
-	 * transferring scsi_pkt(9S) path_instance to uscsi(7i).
+	 * transferring scsi_pkt(9S) path_instance to uscsi(4I).
 	 */
 	if (!scsi_pkt_allocated_correctly(pkt)) {
 		uscmd->uscsi_path_instance = 0;

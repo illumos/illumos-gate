@@ -1,0 +1,949 @@
+'\" te
+.\"  Copyright 1999 Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TNF_KERNEL_PROBES 5 "June 20, 2021"
+.SH NAME
+tnf_kernel_probes \- TNF kernel probes
+.SH DESCRIPTION
+The set of probes (trace instrumentation points) available in the standard
+kernel.  The probes log trace data to a kernel trace buffer in Trace Normal
+Form  (TNF).  Kernel probes are controlled by \fBprex\fR(1). A snapshot of the
+kernel trace buffer can be made using \fBtnfxtract\fR(1) and examined using
+\fBtnfdump\fR(1).
+.sp
+.LP
+Each probe has a \fIname\fR and is associated with a set of symbolic
+\fIkeys\fR, or \fIcategories\fR. These are used to select and control probes
+from \fBprex\fR(1). A probe that is enabled for tracing generates a  \fBTNF\fR
+record, called an \fIevent record\fR. An event record contains two common
+members and may contain other probe-specific data members.
+.SS "Common Members"
+.in +2
+.nf
+\fBtnf_probe_event\fR    \fItag\fR
+\fBtnf_time_delta\fR     \fItime_delta\fR
+.fi
+.in -2
+
+.sp
+.ne 2
+.na
+\fB\fItag\fR\fR
+.ad
+.RS 14n
+Encodes  \fBTNF\fR references to two other records:
+.sp
+.ne 2
+.na
+\fB\fItag\fR\fR
+.ad
+.RS 12n
+Describes the layout of the event record.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIschedule\fR\fR
+.ad
+.RS 12n
+Identifies the writing thread and also contains a 64-bit base time in
+nanoseconds.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fItime_delta\fR\fR
+.ad
+.RS 14n
+A 32-bit time offset from the base time; the sum of the two times is the actual
+time of the event.
+.RE
+
+.SS "Threads"
+.SS "\fBthread_create\fR"
+.in +2
+.nf
+\fBtnf_kthread_id\fR    \fItid\fR
+\fBtnf_pid\fR           \fIpid\fR
+\fBtnf_symbol\fR        \fIstart_pc\fR
+.fi
+.in -2
+
+.sp
+.LP
+Thread creation event.
+.sp
+.ne 2
+.na
+\fB\fItid\fR\fR
+.ad
+.RS 12n
+The thread identifier for the new thread.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpid\fR\fR
+.ad
+.RS 12n
+The process identifier for the new thread.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIstart_pc\fR\fR
+.ad
+.RS 12n
+The kernel address of its start routine.
+.RE
+
+.SS "\fBthread_state\fR"
+.in +2
+.nf
+\fBtnf_kthread_id\fR    \fItid\fR
+\fBtnf_microstate\fR    \fIstate\fR
+.fi
+.in -2
+
+.sp
+.LP
+Thread microstate transition events.
+.sp
+.ne 2
+.na
+\fB\fItid\fR\fR
+.ad
+.RS 9n
+Optional; if it is absent, the event is for the writing thread, otherwise the
+event is for the specified thread.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIstate\fR\fR
+.ad
+.RS 9n
+Indicates the thread state:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Running in user mode.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Running in system mode.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Asleep waiting for a user-mode lock.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Asleep on a kernel object.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Runnable (waiting for a cpu).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Stopped.
+.RE
+The values of this member are defined in <\fBsys/msacct.h\fR>. Note that to
+reduce trace output, transitions between the \fIsystem\fR and \fIuser\fR
+microstates that are induced by system calls are not traced.  This  information
+is implicit in the system call entry and exit events.
+.RE
+
+.SS "thread_exit"
+Thread termination event for writing thread.  This probe has no data members
+other than the common members.
+.SS "Scheduling"
+\fB\fR
+.SS "thread_queue"
+.in +2
+.nf
+\fBtnf_kthread_id\fR    \fItid\fR
+\fBtnf_cpuid\fR         \fIcpuid\fR
+\fBtnf_long\fR          \fIpriority\fR
+\fBtnf_ulong\fR         \fIqueue_length\fR
+.fi
+.in -2
+
+.sp
+.LP
+Thread scheduling events.  These are triggered when a runnable thread is placed
+on a dispatch queue.
+.sp
+.ne 2
+.na
+\fB\fIcpuid\fR\fR
+.ad
+.RS 16n
+Specifies the cpu to which the queue is attached.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpriority\fR\fR
+.ad
+.RS 16n
+The (global) dispatch priority of the thread.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIqueue_length\fR\fR
+.ad
+.RS 16n
+The current length of the cpu's dispatch queue.
+.RE
+
+.SS "Blocking"
+.SS "\fBthread_block\fR"
+.in +2
+.nf
+\fBtnf_opaque\fR     \fIreason\fR
+\fBtnf_symbols\fR    \fIstack\fR
+.fi
+.in -2
+
+.sp
+.LP
+Thread blockage event.  This probe captures a partial stack backtrace when the
+current thread blocks.
+.sp
+.ne 2
+.na
+\fB\fIreason\fR\fR
+.ad
+.RS 11n
+The address of the object on which the thread is blocking.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIsymbols\fR\fR
+.ad
+.RS 11n
+References a \fBTNF\fR array of kernel addresses representing the PCs on the
+stack at the time the thread blocks.
+.RE
+
+.SS "System Calls"
+.SS "\fBsyscall_start\fR"
+.in +2
+.nf
+\fBtnf_sysnum\fR    \fIsysnum\fR
+.fi
+.in -2
+
+.sp
+.LP
+System call entry event.
+.sp
+.ne 2
+.na
+\fB\fIsysnum\fR\fR
+.ad
+.RS 10n
+The system call number.  The writing thread implicitly enters the \fIsystem\fR
+microstate with this event.
+.RE
+
+.SS "\fBsyscall_end\fR"
+.in +2
+.nf
+\fBtnf_long\fR    \fIrval1\fR
+\fBtnf_long\fR    \fIrval2\fR
+\fBtnf_long\fR    \fIerrno\fR
+.fi
+.in -2
+
+.sp
+.LP
+System call exit event.
+.sp
+.ne 2
+.na
+\fB\fIrval1\fR and \fIrval2\fR\fR
+.ad
+.RS 19n
+The two return values of the system call
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIerrno\fR\fR
+.ad
+.RS 19n
+The error return.
+.RE
+
+.sp
+.LP
+The writing thread implicitly enters the \fIuser\fR microstate with this event.
+.SS "Page Faults"
+.SS "\fBaddress_fault\fR"
+.in +2
+.nf
+\fBtnf_opaque\fR      \fIaddress\fR
+\fBtnf_fault_type\fR  \fIfault_type\fR
+\fBtnf_seg_access\fR  \fIaccess\fR
+.fi
+.in -2
+
+.sp
+.LP
+Address-space fault event.
+.sp
+.ne 2
+.na
+\fB\fIaddress\fR\fR
+.ad
+.RS 14n
+Gives the faulting virtual address.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIfault_type\fR\fR
+.ad
+.RS 14n
+Gives the fault type: invalid page, protection fault, software requested
+locking or unlocking.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIaccess\fR\fR
+.ad
+.RS 14n
+Gives the desired access protection: read, write, execute or create. The values
+for these two members are defined in <\fBvm/seg_enum.h\fR>.
+.RE
+
+.SS "\fBmajor_fault\fR"
+.in +2
+.nf
+\fBtnf_opaque\fR    \fIvnode\fR
+\fBtnf_offset\fR    \fIoffset\fR
+.fi
+.in -2
+
+.sp
+.LP
+Major page fault event.  The faulting page is mapped to the file given by the
+\fIvnode\fR member, at the given \fIoffset\fR into the file.  (The faulting
+virtual address is in the most recent \fBaddress_fault\fR event for the writing
+thread.)
+.SS "\fBanon_private\fR"
+.in +2
+.nf
+\fBtnf_opaque\fR    \fIaddress\fR
+.fi
+.in -2
+
+.sp
+.LP
+Copy-on-write page fault event.
+.sp
+.ne 2
+.na
+\fB\fIaddress\fR\fR
+.ad
+.RS 11n
+The virtual address at which the new page is mapped.
+.RE
+
+.SS "\fBanon_zero\fR"
+.in +2
+.nf
+\fBtnf_opaque\fR    \fIaddress\fR
+.fi
+.in -2
+
+.sp
+.LP
+Zero-fill page fault event.
+.sp
+.ne 2
+.na
+\fB\fIaddress\fR\fR
+.ad
+.RS 11n
+The virtual address at which the new page is mapped.
+.RE
+
+.SS "\fBpage_unmap\fR"
+.in +2
+.nf
+\fBtnf_opaque\fR    \fIvnode\fR
+\fBtnf_offset\fR    \fIoffset\fR
+.fi
+.in -2
+
+.sp
+.LP
+Page unmapping event.  This probe marks the unmapping of a file system page
+from the system.
+.sp
+.ne 2
+.na
+\fB\fIvnode\fR and \fIoffset\fR\fR
+.ad
+.RS 20n
+Identifies the file and offset of the page being unmapped.
+.RE
+
+.SS "Pageins and Pageouts"
+.SS "\fBpagein\fR"
+.in +2
+.nf
+\fBtnf_opaque\fR    \fIvnode\fR
+\fBtnf_offset\fR    \fIoffset\fR
+\fBtnf_size\fR      \fIsize\fR
+.fi
+.in -2
+
+.sp
+.LP
+Pagein start event.  This event signals the initiation of pagein I/O.
+.sp
+.ne 2
+.na
+\fB\fIvnode\fR and \fIoffset\fR\fR
+.ad
+.RS 18n
+Identifies the file and offset to be paged in.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 18n
+Specifies the number of bytes to be paged in.
+.RE
+
+.SS "\fBpageout\fR"
+.in +2
+.nf
+\fBtnf_opaque\fR    \fIvnode\fR
+\fBtnf_ulong\fR     \fIpages_pageout\fR
+\fBtnf_ulong\fR     \fIpages_freed\fR
+\fBtnf_ulong\fR     \fIpages_reclaimed\fR
+.fi
+.in -2
+
+.sp
+.LP
+Pageout completion event.  This event signals the completion of pageout I/O.
+.sp
+.ne 2
+.na
+\fB\fIvnode\fR\fR
+.ad
+.RS 19n
+Identifies the file of the pageout request.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpages_pageout\fR\fR
+.ad
+.RS 19n
+The number of pages written out.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpages_freed\fR\fR
+.ad
+.RS 19n
+The number of pages freed after being written out.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpages_reclaimed\fR\fR
+.ad
+.RS 19n
+The number of pages reclaimed after being written out.
+.RE
+
+.SS "Page Daemon (Page Stealer)"
+.SS "\fBpageout_scan_start\fR"
+.in +2
+.nf
+\fBtnf_ulong\fR    \fIpages_free\fR
+\fBtnf_ulong\fR    \fIpages_needed\fR
+.fi
+.in -2
+
+.sp
+.LP
+Page daemon scan start event.  This event signals the beginning of one
+iteration of the page daemon.
+.sp
+.ne 2
+.na
+\fB\fIpages_free\fR\fR
+.ad
+.RS 16n
+The number of free pages in the system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpages_needed\fR\fR
+.ad
+.RS 16n
+The number of pages desired free.
+.RE
+
+.SS "\fBpageout_scan_end\fR"
+.in +2
+.nf
+\fBtnf_ulong\fR    \fIpages_free\fR
+\fBtnf_ulong\fR    \fIpages_scanned\fR
+.fi
+.in -2
+
+.sp
+.LP
+Page daemon scan end event.  This event signals the end of one iteration of the
+page daemon.
+.sp
+.ne 2
+.na
+\fB\fIpages_free\fR\fR
+.ad
+.RS 17n
+The number of free pages in the system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpages_scanned\fR\fR
+.ad
+.RS 17n
+The number of pages examined by the page daemon.  (Potentially more pages will
+be freed when any queued pageout requests complete.)
+.RE
+
+.SS "Swapper"
+.SS "\fBswapout_process\fR"
+.in +2
+.nf
+\fBtnf_pid\fR      \fIpid\fR
+\fBtnf_ulong\fR    \fIpage_count\fR
+.fi
+.in -2
+
+.sp
+.LP
+Address space swapout event.  This event marks the swapping out of a process
+address space.
+.sp
+.ne 2
+.na
+\fB\fIpid\fR\fR
+.ad
+.RS 14n
+Identifies the process.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpage_count\fR\fR
+.ad
+.RS 14n
+Reports the number of pages either freed or queued for pageout.
+.RE
+
+.SS "\fBswapout_lwp\fR"
+.in +2
+.nf
+\fBtnf_pid\fR         \fIpid\fR
+\fBtnf_lwpid\fR       \fIlwpid\fR
+\fBtnf_kthread_id\fR  \fItid\fR
+\fBtnf_ulong\fR       \fIpage_count\fR
+.fi
+.in -2
+
+.sp
+.LP
+Light-weight process swapout event.  This event marks the swapping out of an
+\fBLWP\fR and its stack.
+.sp
+.ne 2
+.na
+\fB\fIpid\fR\fR
+.ad
+.RS 14n
+The  \fBLWP's\fR process identifier
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIlwpid\fR\fR
+.ad
+.RS 14n
+The \fBLWP\fR identifier
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fItid\fR \fImember\fR\fR
+.ad
+.RS 14n
+The \fBLWP's\fR kernel thread identifier.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpage_count\fR\fR
+.ad
+.RS 14n
+The number of pages swapped out.
+.RE
+
+.SS "\fBswapin_lwp\fR"
+.in +2
+.nf
+\fBtnf_pid\fR         \fIpid\fR
+\fBtnf_lwpid\fR       \fIlwpid\fR
+\fBtnf_kthread_id\fR  \fItid\fR
+\fBtnf_ulong\fR       \fIpage_count\fR
+.fi
+.in -2
+
+.sp
+.LP
+Light-weight process swapin event.  This event marks the swapping in of an
+\fBLWP\fR and its stack.
+.sp
+.ne 2
+.na
+\fB\fIpid\fR\fR
+.ad
+.RS 14n
+The \fBLWP's\fR process identifier.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIlwpid\fR\fR
+.ad
+.RS 14n
+The \fBLWP\fR identifier.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fItid\fR\fR
+.ad
+.RS 14n
+The \fBLWP's\fR kernel thread identifier.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIpage_count\fR\fR
+.ad
+.RS 14n
+The number of pages swapped in.
+.RE
+
+.SS "Local I/O"
+.SS "\fBstrategy\fR"
+.in +2
+.nf
+\fBtnf_device\fR      \fIdevice\fR
+\fBtnf_diskaddr\fR    \fIblock\fR
+\fBtnf_size\fR        \fIsize\fR
+\fBtnf_opaque\fR      \fIbuf\fR
+\fBtnf_bioflags\fR   \fI flags\fR
+.fi
+.in -2
+
+.sp
+.LP
+Block I/O strategy event.  This event marks a call to the \fBstrategy\fR(9E)
+function of a block device driver.
+.sp
+.ne 2
+.na
+\fB\fIdevice\fR\fR
+.ad
+.RS 10n
+Contains the major and minor numbers of the device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIblock\fR\fR
+.ad
+.RS 10n
+The logical block number to be accessed on the device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 10n
+The size of the I/O request.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIbuf\fR\fR
+.ad
+.RS 10n
+The kernel address of the \fBbuf\fR(9S) structure associated with the transfer.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIflags\fR\fR
+.ad
+.RS 10n
+The \fBbuf\fR(9S) flags associated with the transfer.
+.RE
+
+.SS "\fBbiodone\fR"
+.in +2
+.nf
+\fBtnf_device\fR     \fIdevice\fR
+\fBtnf_diskaddr\fR   \fIblock\fR
+\fBtnf_opaque\fR     \fIbuf\fR
+.fi
+.in -2
+
+.sp
+.LP
+Buffered I/O completion event.  This event marks calls to the \fBbiodone\fR(9F)
+function.
+.sp
+.ne 2
+.na
+\fB\fIdevice\fR\fR
+.ad
+.RS 10n
+Contains the major and minor numbers of the device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIblock\fR\fR
+.ad
+.RS 10n
+The logical block number accessed on the device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIbuf\fR\fR
+.ad
+.RS 10n
+The kernel address of the \fBbuf\fR(9S) structure associated with the transfer.
+.RE
+
+.SS "\fBphysio_start\fR"
+.in +2
+.nf
+\fBtnf_device\fR     \fIdevice\fR
+\fBtnf_offset\fR     \fIoffset\fR
+\fBtnf_size\fR       \fIsize\fR
+\fBtnf_bioflags\fR   \fIrw\fR
+.fi
+.in -2
+
+.sp
+.LP
+Raw I/O start event.  This event marks entry into the \fBphysio\fR(9F)
+function which performs unbuffered I/O.
+.sp
+.ne 2
+.na
+\fB\fIdevice\fR\fR
+.ad
+.RS 10n
+Contains the major and minor numbers of the device of the transfer.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIoffset\fR\fR
+.ad
+.RS 10n
+The logical offset on the device for the transfer.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 10n
+The number of bytes to be transferred.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIrw\fR\fR
+.ad
+.RS 10n
+The direction of the transfer: read or write (see \fBbuf\fR(9S)).
+.RE
+
+.SS "\fBphysio_end\fR"
+.in +2
+.nf
+\fBtnf_device\fR    \fIdevice\fR
+.fi
+.in -2
+
+.sp
+.LP
+Raw I/O end event.  This event marks exit from the \fBphysio\fR(9F) function.
+.sp
+.ne 2
+.na
+\fB\fIdevice\fR\fR
+.ad
+.RS 10n
+The major and minor numbers of the device of the transfer.
+.RE
+
+.SH USAGE
+Use the \fBprex\fR utility to control kernel probes. The standard \fBprex\fR
+commands to list and manipulate probes are available to you, along with
+commands to set up and manage kernel tracing.
+.sp
+.LP
+Kernel probes write trace records into a kernel trace buffer. You must copy the
+buffer into a TNF file for post-processing; use the \fBtnfxtract\fR utility for
+this.
+.sp
+.LP
+You use the \fBtnfdump\fR utility to examine a kernel trace file. This is
+exactly the same as examining a user-level trace file.
+.sp
+.LP
+The steps you typically follow to take a kernel trace are:
+.RS +4
+.TP
+1.
+Become superuser (\fBsu\fR).
+.RE
+.RS +4
+.TP
+2.
+Allocate a kernel trace buffer of the desired size (\fBprex\fR).
+.RE
+.RS +4
+.TP
+3.
+Select the probes you want to trace and enable (\fBprex\fR).
+.RE
+.RS +4
+.TP
+4.
+Turn kernel tracing on (\fBprex\fR).
+.RE
+.RS +4
+.TP
+5.
+Run your application.
+.RE
+.RS +4
+.TP
+6.
+Turn kernel tracing off (\fBprex\fR).
+.RE
+.RS +4
+.TP
+7.
+Extract the kernel trace buffer (\fBtnfxtract\fR).
+.RE
+.RS +4
+.TP
+8.
+Disable all probes (\fBprex\fR).
+.RE
+.RS +4
+.TP
+9.
+Deallocate the kernel trace buffer (\fBprex\fR).
+.RE
+.RS +4
+.TP
+10.
+Examine the trace file (\fBtnfdump\fR).
+.RE
+.sp
+.LP
+A convenient way to follow these steps is to use two shell windows; run an
+interactive \fBprex\fR session in one, and run your application and
+\fBtnfxtract\fR in the other.
+.SH SEE ALSO
+.BR prex (1),
+.BR tnfdump (1),
+.BR tnfxtract (1),
+.BR TNF_PROBE (3TNF),
+.BR libtnfctl (3TNF),
+.BR tracing (3TNF),
+.BR strategy (9E),
+.BR biodone (9F),
+.BR physio (9F),
+.BR buf (9S)

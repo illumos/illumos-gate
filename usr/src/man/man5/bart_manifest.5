@@ -1,0 +1,309 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH BART_MANIFEST 5 "December 28, 2020"
+.SH NAME
+bart_manifest \- system audit manifest file
+.SH DESCRIPTION
+The \fBbart\fR(8) command generates a manifest that describes the contents of
+a managed host. A manifest consists of a header and entries. Each entry
+represents a single file. Entries are sorted in ascending order by file name.
+Any nonstandard file names, such as those that contain embedded newline or tab
+characters, have the special characters quoted prior to being sorted. See
+\fBQuoting Syntax\fR.
+.sp
+.LP
+Lines that begin with \fB!\fR supply metadata about the manifest. The manifest
+version line indicates the manifest specification version. The date line shows
+the date on which the manifest was created, in \fBdate\fR(1) form.
+.sp
+.LP
+Some lines are ignored by the manifest comparison tool. Ignored lines include
+blank lines, lines that consist only of white space, and comments that begin
+with \fB#\fR.
+.sp
+.LP
+In addition to metadata lines, the header contains the format comment block.
+This comment block lists the attributes reported for each file type.
+.sp
+.LP
+To see the format of a manifest file, see \fBEXAMPLES\fR.
+.SS "Manifest File Entries"
+Each manifest file entry is a single line of one of the following forms,
+depending on the file type:
+.sp
+.in +2
+.nf
+\fIfname\fR D \fIsize mode acl dirmtime uid gid\fR
+\fIfname\fR P \fIsize mode acl mtime uid gid\fR
+\fIfname\fR S \fIsize mode acl mtime uid gid\fR
+\fIfname\fR F \fIsize mode acl mtime uid gid contents\fR
+\fIfname\fR L \fIsize mode acl lnmtime uid gid dest\fR
+\fIfname\fR B \fIsize mode acl mtime uid gid devnode\fR
+\fIfname\fR C \fIsize mode acl mtime uid gid devnode\fR
+.fi
+.in -2
+
+.sp
+.LP
+The fields of the manifest file entries are described as follows:
+.sp
+.ne 2
+.na
+\fB\fIfname\fR\fR
+.ad
+.RS 12n
+Name of the file. To prevent parsing problems that are caused by special
+characters embedded in file names, file names are encoded as described in
+Quoting Syntax.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fItype\fR\fR
+.ad
+.RS 12n
+Type of file.
+.sp
+Possible values for \fItype\fR are as follows:
+.sp
+.ne 2
+.na
+\fBB\fR
+.ad
+.RS 5n
+Block device node
+.RE
+
+.sp
+.ne 2
+.na
+\fBC\fR
+.ad
+.RS 5n
+Character device node
+.RE
+
+.sp
+.ne 2
+.na
+\fBD\fR
+.ad
+.RS 5n
+Directory
+.RE
+
+.sp
+.ne 2
+.na
+\fBF\fR
+.ad
+.RS 5n
+File
+.RE
+
+.sp
+.ne 2
+.na
+\fBL\fR
+.ad
+.RS 5n
+Symbolic link
+.RE
+
+.sp
+.ne 2
+.na
+\fBP\fR
+.ad
+.RS 5n
+Pipe
+.RE
+
+.sp
+.ne 2
+.na
+\fBS\fR
+.ad
+.RS 5n
+Socket
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIsize\fR\fR
+.ad
+.RS 12n
+File size in bytes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fImode\fR\fR
+.ad
+.RS 12n
+Octal number that represents the permissions of the file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIacl\fR\fR
+.ad
+.RS 12n
+ACL attributes for the file. For a file with ACL attributes, this field
+contains the output from \fBacltotext()\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIuid\fR\fR
+.ad
+.RS 12n
+Numerical user ID of the owner of this entry.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIgid\fR\fR
+.ad
+.RS 12n
+Numerical group ID of the owner of this entry.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdirmtime\fR\fR
+.ad
+.RS 12n
+Modification time in seconds since 00:00:00 UTC, January 1, 1970 for
+directories.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIlnmtime\fR\fR
+.ad
+.RS 12n
+Creation time for links.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fImtime\fR\fR
+.ad
+.RS 12n
+Modification time in seconds since 00:00:00 UTC, January 1, 1970 for files.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIcontents\fR\fR
+.ad
+.RS 12n
+Checksum value of the file. This attribute is only specified for regular files.
+If you turn off context checking or if checksums cannot be computed, the value
+of this field is \fB-\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdest\fR\fR
+.ad
+.RS 12n
+Destination of a symbolic link.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdevnode\fR\fR
+.ad
+.RS 12n
+Value of the device node. This attribute is for character device files and
+block device files only.
+.RE
+
+.SS "Quoting Syntax"
+The rules file supports a quoting syntax for representing nonstandard file
+names.
+.sp
+.LP
+When generating a manifest for file names that contain embedded TAB, SPACE, or
+NEWLINE characters, the special characters are encoded in their octal forms.
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+Input Character	Quoted Character
+_
+SPACE	\eSPACE
+_
+TAB	\eTAB
+_
+NEWLINE	\eNEWLINE
+_
+?	\e?
+_
+[	\e[
+_
+*	\e*
+.TE
+
+.SH EXAMPLES
+\fBExample 1 \fRSample Manifest File
+.sp
+.LP
+The following is a sample system manifest file. The file entries are sorted by
+the encoded versions of the file names to correctly handle special characters.
+
+.sp
+.in +2
+.nf
+! Version 1.0
+! Mon Feb 11 10:55:30 2002
+# Format:
+# fname D size mode acl dirmtime uid gid
+# fname P size mode acl mtime uid gid
+# fname S size mode acl mtime uid gid
+# fname F size mode acl mtime uid gid contents
+# fname L size mode acl lnmtime uid gid dest
+# fname B size mode acl mtime uid gid devnode
+# fname C size mode acl mtime uid gid devnode
+/etc D 3584 40755 user::rwx,group::r-x,mask::r-x,other::r-x,
+     3c6803d7 0 3
+/etc/.login F 524 100644 user::rw-,group::r--,mask::r--,other::r--,
+     3c165878 0 3 27b53d5c3e844af3306f1f12b330b318
+/etc/.pwd.lock F 0 100600 user::rw-,group::---,mask::---,other::---,
+     3c166121 0 0 d41d8cd98f00b204e9800998ecf8427e
+/etc/.syslog_door L 20 120777 user::rw-,group::r--,mask::
+     rwx,other::r--,3c6803d5 0 0 /var/run/syslog_door
+/etc/autopush L 16 120777 user::r-x,group::r-x,mask::r-x,other::r-x,
+     3c165863 0 0 ../sbin/autopush
+/etc/cron.d/FIFO P 0 10600 user::rw-,group::---,mask::---,other::---,
+     3c6803d5 0 0
+.fi
+.in -2
+
+.SH SEE ALSO
+.BR date (1),
+.BR bart_rules (5),
+.BR attributes (7),
+.BR bart (8)

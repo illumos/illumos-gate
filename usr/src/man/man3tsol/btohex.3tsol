@@ -110,7 +110,7 @@ translation, or \fB(char *)0\fR if the parameter is not of the required type.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -140,8 +140,12 @@ multithreaded applications.
 .SH SEE ALSO
 .sp
 .LP
-\fBatohexlabel\fR(1M), \fBhextoalabel\fR(1M), \fBlabel_to_str\fR(3TSOL),
-\fBlibtsol\fR(3LIB), \fBattributes\fR(5), \fBlabels\fR(5)
+.BR libtsol (3LIB),
+.BR label_to_str (3TSOL),
+.BR attributes (7),
+.BR labels (7),
+.BR atohexlabel (8),
+.BR hextoalabel (8)
 .SH NOTES
 .sp
 .LP

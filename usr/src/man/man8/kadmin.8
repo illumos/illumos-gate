@@ -1,0 +1,1518 @@
+'\" te
+.\" Copyright 1989 by the Massachusetts Institute of Technology. Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH KADMIN 8 "November 22, 2021"
+.SH NAME
+kadmin, kadmin.local \- Kerberos database administration program
+.SH SYNOPSIS
+.nf
+\fB/usr/sbin/kadmin\fR [\fB-r\fR \fIrealm\fR] [\fB-p\fR \fIprincipal\fR] [\fB-q\fR \fIquery\fR]
+ [\fB-s\fR \fIadmin_server\fR [\fI:port\fR]] [ [\fB-c\fR \fIcredential_cache\fR]
+ | [\fB-k\fR [\fB-t\fR \fIkeytab\fR]] | [\fB-w\fR \fIpassword\fR]] [\fB-x\fR \fIdb_args\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/sbin/kadmin.local\fR [\fB-r\fR \fIrealm\fR] [\fB-p\fR \fIprincipal\fR]
+ [\fB-q\fR \fIquery\fR] [\fB-d\fR \fIdbname\fR] [\fB-e\fR "\fIenc:salt...\fR"] [\fB-m\fR] [\fB-D\fR]
+.fi
+
+.SH DESCRIPTION
+\fBkadmin\fR and \fBkadmin.local\fR are interactive command-line interfaces to
+the Kerberos V5 administration system. They provide for the maintenance of
+Kerberos principals, policies, and service key tables (keytabs). \fBkadmin\fR
+and \fBkadmin.local\fR provide identical functionality; the difference is that
+\fBkadmin.local\fR can run only on the master KDC and does not use Kerberos
+authentication.
+.sp
+.LP
+Except as explicitly noted otherwise, this man page uses \fBkadmin\fR to refer
+to both versions.
+.sp
+.LP
+By default, both versions of \fBkadmin\fR attempt to determine your user name
+and perform operations on behalf of your "\fIusername\fR/\fIadmin\fR" instance.
+Operations performed are subject to privileges granted or denied to this user
+instance by the Kerberos ACL file (see \fBkadm5.acl\fR(5)). You may perform
+administration as another user instance by using the \fB-p\fR option.
+.sp
+.LP
+The remote version, \fBkadmin\fR, uses Kerberos authentication and an encrypted
+RPC to operate securely from anywhere on the network. It normally prompts for a
+password and authenticates the user to the Kerberos administration server,
+\fBkadmind\fR, whose service principal is \fBkadmin/\fR\fIfqdn\fR. Some options
+specific to the remote version permit the password prompt to be bypassed. The
+\fB-c\fR option searches the named credentials cache for a valid ticket for the
+\fBkadmin/\fR\fIfqdn\fR service and uses it to authenticate the user to the
+Kerberos admin server without a password. The \fB-k\fR option searches a keytab
+for a credential to authenticate to the \fBkadmin/\fR\fIfqdn\fR service, and
+again no password is collected. If \fBkadmin\fR has collected a password, it
+requests a \fBkadmin/\fR\fIfqdn\fR Kerberos service ticket from the KDC, and
+uses that service ticket to interact with \fBkadmind\fR.
+.sp
+.LP
+The local version, \fBkadmin.local\fR, must be run with an effective UID of
+root, and normally uses a key from the \fB/var/krb5/.k5.\fR\fIrealm\fR stash
+file (see \fBkdb5_util\fR(8)) to decrypt information from the database rather
+than prompting for a password. The \fB-m\fR option will bypass the
+\fB\&.k5.\fR\fIrealm\fR stash file and prompt for the master password.
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-c\fR \fIcredentials_cache\fR\fR
+.ad
+.sp .6
+.RS 4n
+Search \fIcredentials_cache\fR for a service ticket for the
+\fBkadmin/\fR\fIfqdn\fR service; it can be acquired with the \fBkinit\fR(1)
+program. If this option is not specified, \fBkadmin\fR requests a new service
+ticket from the KDC, and stores it in its own temporary credentials cache.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR \fIdbname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify a non-standard database name. [Local only]
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-D\fR\fR
+.ad
+.sp .6
+.RS 4n
+Turn on debug mode. [Local only]
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR \fI"enc:salt ..."\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify a different encryption type and/or key salt. [Local only]
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR [\fB-t\fR \fIkeytab\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Use the default keytab (\fB-k\fR) or a specific keytab (\fB-t\fR \fIkeytab\fR)
+to decrypt the KDC response instead of prompting for a password. In this case,
+the default principal will be \fBhost\fR/\fBhostname\fR. This is primarily used
+for keytab maintenance.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fR
+.ad
+.sp .6
+.RS 4n
+Accept the database master password from the keyboard rather than using the
+\fB/var/krb5/.k5.\fIrealm\fR\fR stash file. [Local only]
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIprincipal\fR\fR
+.ad
+.sp .6
+.RS 4n
+Authenticate \fIprincipal\fR to the \fBkadmin/\fR\fIfqdn\fR service. Otherwise,
+\fBkadmin\fR will append \fB/admin\fR to the primary principal name of the
+default credentials cache, the value of the \fBUSER\fR environment variable, or
+the username as obtained with \fBgetpwuid\fR, in that order of preference.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-q\fR \fIquery\fR\fR
+.ad
+.sp .6
+.RS 4n
+Pass \fIquery\fR directly to \fBkadmin\fR, which will perform \fIquery\fR and
+then exit. This can be useful for writing scripts.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR \fIrealm\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fIrealm\fR as the default database realm.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR \fIadmin_server\fR[\fI:port\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Administer the specified \fIadmin\fR server at the specified port number
+(\fIport\fR). This can be useful in administering a realm not known to your
+client.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-w\fR \fIpassword\fR\fR
+.ad
+.sp .6
+.RS 4n
+Use \fIpassword\fR instead of prompting for one. Note that placing the password
+for a Kerberos principal with administration access into a shell script can be
+dangerous if unauthorized users gain read access to the script or can read
+arguments of this command through \fBps\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-x\fR \fIdb_args\fR\fR
+.ad
+.sp .6
+.RS 4n
+Pass database-specific arguments to \fBkadmin\fR. Supported arguments are for
+LDAP and the \fBBerkeley-db2\fR plug-in. These arguments are:
+.sp
+.ne 2
+.na
+\fB\fBbinddn\fR=\fIbinddn\fR\fR
+.ad
+.sp .6
+.RS 4n
+LDAP simple bind DN for authorization on the directory server. Overrides the
+\fBldap_kadmind_dn\fR parameter setting in \fBkrb5.conf\fR(5).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbindpwd\fR=\fIbindpwd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Bind password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdbname\fR=\fIname\fR\fR
+.ad
+.sp .6
+.RS 4n
+For the \fBBerkeley-db2\fR plug-in, specifies a name for the Kerberos database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnconns\fR=\fInum\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum number of server connections.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBport\fR=\fInum\fR\fR
+.ad
+.sp .6
+.RS 4n
+Directory server connection port.
+.RE
+
+.RE
+
+.SH COMMANDS
+.ne 2
+.na
+\fB\fBlist_requests\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists all the commands available for \fBkadmin\fR. Aliased by \fBlr\fR and
+\fB?\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBget_privs\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists the current Kerberos administration privileges (ACLs) for the principal
+that is currently running \fBkadmin\fR. The privileges are based on the
+\fB/etc/krb5/kadm5.acl\fR file on the master KDC. Aliased by \fBgetprivs\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fBadd_principal\fR \fB[\fIoptions\fR]\fR \fB\fInewprinc\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Creates a new principal, \fInewprinc\fR, prompting twice for a password. If the
+\fB-policy\fR option is not specified and a policy named \fBdefault\fR exists,
+then the \fBdefault\fR policy is assigned to the principal; note that the
+assignment of the \fBdefault\fR policy occurs automatically only when a
+principal is first created, so the \fBdefault\fR policy must already exist for
+the assignment to occur. The automatic assignment of the \fBdefault\fR policy
+can be suppressed with the \fB-clearpolicy\fR option. This command requires the
+\fBadd\fR privilege. Aliased by \fBaddprinc\fR and \fBank\fR. The options are:
+.sp
+.ne 2
+.na
+\fB\fB-expire\fR \fIexpdate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Expiration date of the principal. See the \fBTime\fR \fBFormats\fR section for
+the valid absolute time formats that you can specify for \fIexpdate\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-pwexpire\fR \fIpwexpdate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Password expiration date. See the \fBTime\fR \fBFormats\fR section for the
+valid absolute time formats that you can specify for \fIpwexpdate\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-maxlife\fR \fImaxlife\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum ticket life for the principal. See the \fBTime\fR \fBFormats\fR section
+for the valid time duration formats that you can specify for \fImaxlife\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-maxrenewlife\fR \fImaxrenewlife\fR\fR
+.ad
+.sp .6
+.RS 4n
+Maximum renewable life of tickets for the principal. See the \fBTime\fR
+\fBFormats\fR section for the valid time duration formats that you can specify
+for \fImaxrenewlife\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-kvno\fR \fIkvno\fR\fR
+.ad
+.sp .6
+.RS 4n
+Explicitly set the key version number.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-policy\fR \fIpolicy\fR\fR
+.ad
+.sp .6
+.RS 4n
+Policy used by the principal. If both the \fB-policy\fR and \fB-clearpolicy\fR
+options are not specified, the \fBdefault\fR policy is used if it exists;
+otherwise, the principal will have no policy. Also note that the password and
+principal name must be different when you add a new principal with a specific
+policy or the \fBdefault\fR policy.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-clearpolicy\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB-clearpolicy\fR prevents the \fBdefault\fR policy from being assigned when
+\fB-policy\fR is not specified. This option has no effect if the \fBdefault\fR
+policy does not exist.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBallow_postdated\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB-allow_postdated\fR prohibits the principal from obtaining postdated
+tickets. (Sets the \fBKRB5_KDB_DISALLOW_POSTDATED\fR flag.)
+\fB+allow_postdated\fR clears this flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBallow_forwardable\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB-allow_forwardable\fR prohibits the principal from obtaining forwardable
+tickets. (Sets the \fBKRB5_KDB_DISALLOW_FORWARDABLE\fR flag.)
+\fB+allow_forwardable\fR clears this flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBallow_renewable\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB-allow_renewable\fR prohibits the principal from obtaining renewable
+tickets. (Sets the \fBKRB5_KDB_DISALLOW_RENEWABLE\fR flag.)
+\fB+allow_renewable\fR clears this flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBallow_proxiable\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB-allow_proxiable\fR prohibits the principal from obtaining proxiable
+tickets. (Sets the \fBKRB5_KDB_DISALLOW_PROXIABLE\fR flag.)
+\fB+allow_proxiable\fR clears this flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBallow_dup_skey\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB-allow_dup_skey\fR disables user-to-user authentication for the principal by
+prohibiting this principal from obtaining a session key for another user. (Sets
+the \fBKRB5_KDB_DISALLOW_DUP_SKEY\fR flag.) \fB+allow_dup_skey\fR clears this
+flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBrequires_preauth\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB+requires_preauth\fR requires the principal to preauthenticate before being
+allowed to \fBkinit\fR. (Sets the \fBKRB5_KDB_REQUIRES_PRE_AUTH\fR flag.)
+\fB-requires_preauth\fR clears this flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBrequires_hwauth\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB+requires_hwauth\fR requires the principal to preauthenticate using a
+hardware device before being allowed to kinit. (Sets the
+\fBKRB5_KDB_REQUIRES_HW_AUTH\fR flag.) \fB-requires_hwauth\fR clears this flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBallow_svr\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB-allow_svr\fR prohibits the issuance of service tickets for the principal.
+(Sets the \fBKRB5_KDB_DISALLOW_SVR\fR flag.) \fB+allow_svr\fR clears this flag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBallow_tgs_req\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB-allow_tgs_req\fR specifies that a Ticket-Granting Service (TGS) request for
+a service ticket for the principal is not permitted. This option is useless for
+most things. \fB+allow_tgs_req\fR clears this flag. The default is
+\fB+allow_tgs_req\fR. In effect, \fB-allow_tgs_req\fR sets the
+\fBKRB5_KDB_DISALLOW_TGT_BASED\fR flag on the principal in the database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBallow_tix\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB-allow_tix\fR forbids the issuance of any tickets for the principal.
+\fB+allow_tix\fR clears this flag. The default is \fB+allow_tix\fR. In effect,
+\fB-allow_tix\fR sets the \fBKRB5_KDB_DISALLOW_ALL_TIX\fR flag on the principal
+in the database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBneedchange\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB+needchange\fR sets a flag in attributes field to force a password change;
+\fB-needchange\fR clears it. The default is \fB-needchange\fR\&. In effect,
+\fB+needchange\fR sets the \fBKRB5_KDB_REQUIRES_PWCHANGE\fR flag on the
+principal in the database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fB-\fR|\fB+\fR}\fBpassword_changing_service\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fB+password_changing_service\fR sets a flag in the attributes field marking
+this as a password change service principal (useless for most things).
+\fB-password_changing_service\fR clears the flag. This flag intentionally has a
+long name. The default is \fB-password_changing_service\fR\&. In effect,
+\fB+password_changing_service\fR sets the \fBKRB5_KDB_PWCHANGE_SERVICE\fR flag
+on the principal in the database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-randkey\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the key of the principal to a random value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-pw\fR \fB\fIpassword\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the key of the principal to the specified string and does not prompt for a
+password. Note that using this option in a shell script can be dangerous if
+unauthorized users gain read access to the script.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR "enc:salt ..."\fR
+.ad
+.sp .6
+.RS 4n
+Override the list of enctype:salttype pairs given in \fBkdc.conf\fR(5) for
+setting the key of the principal. The quotes are necessary if there are
+multiple enctype:salttype pairs. One key for each similar enctype and same
+salttype will be created and the first one listed will be used. For example, in
+a list of two similar enctypes with the same salt, "des-cbc-crc:normal
+des-cbc-md5:normal", one key will be created and it will be of type
+des-cbc-crc:normal.
+.RE
+
+.sp
+.ne 2
+.na
+\fBExample:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBaddprinc tlyu/admin\fR
+WARNING: no policy specified for "tlyu/admin@EXAMPLE.COM";
+defaulting to no policy.
+Enter password for principal tlyu/admin@EXAMPLE.COM:
+Re-enter password for principal tlyu/admin@EXAMPLE.COM:
+Principal "tlyu/admin@EXAMPLE.COM" created.
+kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBErrors:\fR
+.ad
+.sp .6
+.RS 4n
+\fBKADM5_AUTH_ADD\fR (requires \fBadd\fR privilege)
+.sp
+\fBKADM5_BAD_MASK\fR (should not happen)
+.sp
+\fBKADM5_DUP\fR (principal exists already)
+.sp
+\fBKADM5_UNK_POLICY\fR (policy does not exist)
+.sp
+\fBKADM5_PASS_Q_*\fR (password quality violations)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdelete_principal\fR [\fB-force\fR] \fIprincipal\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deletes the specified principal from the database. This command prompts for
+deletion, unless the \fB-force\fR option is given. This command requires the
+\fBdelete\fR privilege. Aliased by \fBdelprinc\fR.
+.sp
+.ne 2
+.na
+\fBExample:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBdelprinc mwm_user\fR
+Are you sure you want to delete the principal
+"mwm_user@EXAMPLE.COM"? (yes/no): \fByes\fR
+Principal "mwm_user@EXAMPLE.COM" deleted.
+Make sure that you have removed this principal from
+all kadmind ACLs before reusing.
+kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBErrors:\fR
+.ad
+.sp .6
+.RS 4n
+\fBKADM5_AUTH_DELETE\fR (requires \fBdelete\fR privilege)
+.sp
+\fBKADM5_UNK_PRINC\fR (principal does not exist)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmodify_principal\fR [\fIoptions\fR] \fIprincipal\fR\fR
+.ad
+.sp .6
+.RS 4n
+Modifies the specified principal, changing the fields as specified. The options
+are as above for \fBadd_principal\fR, except that password changing is
+forbidden by this command. In addition, the option \fB-clearpolicy\fR will
+clear the current policy of a principal. This command requires the \fBmodify\fR
+privilege. Aliased by \fBmodprinc\fR.
+.sp
+.ne 2
+.na
+\fBErrors:\fR
+.ad
+.sp .6
+.RS 4n
+\fBKADM5_AUTH_MODIFY\fR (requires \fBmodify\fR privilege)
+.sp
+\fBKADM5_UNK_PRINC\fR (principal does not exist)
+.sp
+\fBKADM5_UNK_POLICY\fR (policy does not exist)
+.sp
+\fBKADM5_BAD_MASK\fR (should not happen)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBchange_password\fR [\fIoptions\fR] \fIprincipal\fR\fR
+.ad
+.sp .6
+.RS 4n
+Changes the password of \fIprincipal\fR. Prompts for a new password if neither
+\fB-randkey\fR or \fB-pw\fR is specified. Requires the \fBchangepw\fR
+privilege, or that the principal that is running the program to be the same as
+the one changed. Aliased by \fBcpw\fR. The following options are available:
+.sp
+.ne 2
+.na
+\fB\fB-randkey\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the key of the principal to a random value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-pw\fR \fIpassword\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the password to the specified string. Not recommended.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR "enc:salt ..."\fR
+.ad
+.sp .6
+.RS 4n
+Override the list of enctype:salttype pairs given in \fBkdc.conf\fR(5) for
+setting the key of the principal. The quotes are necessary if there are
+multiple enctype:salttype pairs. For each key, the first matching similar
+enctype and same salttype in the list will be used to set the new key(s).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-keepold\fR\fR
+.ad
+.sp .6
+.RS 4n
+Keeps the previous kvno's keys around. There is no easy way to delete the old
+keys, and this flag is usually not necessary except perhaps for TGS keys as it
+will allow existing valid TGTs to continue to work.
+.RE
+
+.sp
+.ne 2
+.na
+\fBExample:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBcpw systest\fR
+Enter password for principal systest@EXAMPLE.COM:
+Re-enter password for principal systest@EXAMPLE.COM:
+Password for systest@EXAMPLE.COM changed.
+kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBErrors:\fR
+.ad
+.sp .6
+.RS 4n
+\fBKADM5_AUTH_MODIFY\fR (requires the \fBmodify\fR privilege)
+.sp
+\fBKADM5_UNK_PRINC\fR (principal does not exist)
+.sp
+\fBKADM5_PASS_Q_*\fR (password policy violation errors)
+.sp
+\fBKADM5_PASS_REUSE\fR (password is in principal's password history)
+.sp
+\fBKADM5_PASS_TOOSOON\fR (current password minimum life not expired)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBget_principal\fR [\fB-terse\fR] \fIprincipal\fR\fR
+.ad
+.sp .6
+.RS 4n
+Gets the attributes of \fIprincipal\fR. Requires the \fBinquire\fR privilege,
+or that the principal that is running the program to be the same as the one
+being listed. With the \fB-terse\fR option, outputs fields as quoted
+tab-separated strings. Aliased by \fBgetprinc\fR.
+.sp
+.ne 2
+.na
+\fBExamples:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBgetprinc tlyu/admin\fR
+Principal: tlyu/admin@EXAMPLE.COM
+Expiration date: [never]
+Last password change: Thu Jan 03 12:17:46 CET 2008
+Password expiration date: [none]
+Maximum ticket life: 24855 days 03:14:07
+Maximum renewable life: 24855 days 03:14:07
+Last modified: Thu Jan 03 12:17:46 CET 2008 (root/admin@EXAMPLE.COM)
+Last successful authentication: [never]
+Last failed authentication: [never]
+Failed password attempts: 0
+Number of keys: 5
+Key: vno 2, AES-256 CTS mode with 96-bit SHA-1 HMAC, no salt
+Key: vno 2, AES-128 CTS mode with 96-bit SHA-1 HMAC, no salt
+Key: vno 2, Triple DES cbc mode with HMAC/sha1, no salt
+Key: vno 2, ArcFour with HMAC/md5, no salt
+Key: vno 2, DES cbc mode with RSA-MD5, no salt
+Attributes: REQUIRES_PRE_AUTH
+Policy: [none]
+kadmin: \fBgetprinc -terse tlyu/admin\fR
+"tlyu/admin@EXAMPLE.COM"   0       1199359066      0       2147483647
+"root/admin@EXAMPLE.COM"   1199359066      128     2       0       "[none]"       21474836
+47      0       0       0       5       1       2       18      0       1      2
+17      0       1       2       16      0       1       2       23      0      12
+       3       0
+kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBErrors:\fR
+.ad
+.sp .6
+.RS 4n
+\fBKADM5_AUTH_GET\fR (requires the get [inquire] privilege)
+.sp
+\fBKADM5_UNK_PRINC\fR (principal does not exist)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlist_principals\fR [\fIexpression\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Retrieves all or some principal names. \fIexpression\fR is a shell-style glob
+expression that can contain the wild-card characters ?, *, and []'s. All
+principal names matching the expression are printed. If no expression is
+provided, all principal names are printed. If the expression does not contain
+an "@" character, an "@" character followed by the local realm is appended to
+the expression. Requires the \fBlist\fR privilege. Aliased by \fBlistprincs\fR,
+\fBget_principals\fR, and \fBgetprincs\fR.
+.sp
+.ne 2
+.na
+\fBExamples:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBlistprincs test*\fR
+test3@EXAMPLE.COM
+test2@EXAMPLE.COM
+test1@EXAMPLE.COM
+testuser@EXAMPLE.COM
+kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadd_policy\fR [\fIoptions\fR] \fIpolicy\fR\fR
+.ad
+.sp .6
+.RS 4n
+Adds the named policy to the policy database. Requires the \fBadd\fR privilege.
+Aliased by \fBaddpol\fR. The following options are available:
+.sp
+.ne 2
+.na
+\fB\fB-maxlife\fR \fImaxlife\fR\fR
+.ad
+.sp .6
+.RS 4n
+sets the maximum lifetime of a password. See the \fBTime\fR \fBFormats\fR
+section for the valid time duration formats that you can specify for
+\fImaxlife\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-minlife\fR \fIminlife\fR\fR
+.ad
+.sp .6
+.RS 4n
+sets the minimum lifetime of a password. See the \fBTime\fR \fBFormats\fR
+section for the valid time duration formats that you can specify for
+\fIminlife\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-minlength\fR \fIlength\fR\fR
+.ad
+.sp .6
+.RS 4n
+sets the minimum length of a password.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-minclasses\fR \fInumber\fR\fR
+.ad
+.sp .6
+.RS 4n
+sets the minimum number of character classes allowed in a password. The valid
+values are:
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+only letters (himom)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.sp .6
+.RS 4n
+both letters and numbers (hi2mom)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3\fR\fR
+.ad
+.sp .6
+.RS 4n
+letters, numbers, and punctuation (hi2mom!)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-history\fR \fInumber\fR\fR
+.ad
+.sp .6
+.RS 4n
+sets the number of past keys kept for a principal.
+.RE
+
+.sp
+.ne 2
+.na
+\fBErrors:\fR
+.ad
+.sp .6
+.RS 4n
+\fBKADM5_AUTH_ADD\fR (requires the \fBadd\fR privilege)
+.sp
+\fBKADM5_DUP\fR (policy already exists)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdelete_policy\fR \fB[-force]\fR \fIpolicy\fR\fR
+.ad
+.sp .6
+.RS 4n
+Deletes the named policy. Unless the \fB-force\fR option is specified, prompts
+for confirmation before deletion. The command will fail if the policy is in use
+by any principals. Requires the \fBdelete\fR privilege. Aliased by
+\fBdelpol\fR.
+.sp
+.ne 2
+.na
+\fBExample:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBdel_policy guests\fR
+Are you sure you want to delete the
+policy "guests"? (yes/no): \fByes\fR
+Policy "guests" deleted.
+kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBErrors:\fR
+.ad
+.sp .6
+.RS 4n
+\fBKADM5_AUTH_DELETE\fR (requires the delete privilege)
+.sp
+\fBKADM5_UNK_POLICY\fR (policy does not exist)
+.sp
+\fBKADM5_POLICY_REF\fR (reference count on policy is not zero)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fBmodify_policy\fR \fB[\fIoptions\fR]\fR \fB\fIpolicy\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Modifies the named policy. Options are as above for \fBadd_policy\fR. Requires
+the \fBmodify\fR privilege. Aliased by \fBmodpol\fR.
+.sp
+.ne 2
+.na
+\fBErrors:\fR
+.ad
+.sp .6
+.RS 4n
+\fBKADM5_AUTH_MODIFY\fR (requires the \fBmodify\fR privilege)
+.sp
+\fBKADM5_UNK_POLICY\fR (policy does not exist)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBget_policy\fR [\fB-terse\fR] \fIpolicy\fR\fR
+.ad
+.sp .6
+.RS 4n
+Displays the values of the named policy. Requires the \fBinquire\fR privilege.
+With the \fB-terse\fR flag, outputs the fields as quoted strings separated by
+tabs. Aliased by \fBgetpol\fR.
+.sp
+.ne 2
+.na
+\fBExamples:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBget_policy admin\fR
+Policy: admin
+Maximum password life: 180 days 00:00:00
+Minimum password life: 00:00:00
+Minimum password length: 6
+Minimum number of password character classes: 2
+Number of old keys kept: 5
+Reference count: 17
+kadmin: \fBget_policy -terse\fR
+admin admin	15552000	0	6	2	5	17
+kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.ne 2
+.na
+\fBErrors:\fR
+.ad
+.sp .6
+.RS 4n
+\fBKADM5_AUTH_GET\fR (requires the \fBget\fR privilege)
+.sp
+\fBKADM5_UNK_POLICY\fR (policy does not exist)
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlist_policies\fR [\fIexpression\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Retrieves all or some policy names. \fIexpression\fR is a shell-style glob
+expression that can contain the wild-card characters ?, *, and []'s. All policy
+names matching the expression are printed. If no expression is provided, all
+existing policy names are printed. Requires the \fBlist\fR privilege. Aliased
+by \fBlistpols\fR, \fBget_policies\fR, and \fBgetpols\fR.
+.sp
+.ne 2
+.na
+\fBExamples:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBlistpols\fR
+test-pol dict-only once-a-min test-pol-nopw
+kadmin: \fBlistpols t*\fR
+test-pol test-pol-nopw kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBktadd\fR [\fB-k\fR \fIkeytab\fR] [\fB-q\fR] [\fB-e\fR
+\fB\fIenctype\fR:salt\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Adds a principal or all principals matching \fIprinc-exp\fR to a keytab,
+randomizing each principal's key in the process.
+.sp
+\fBktadd\fR requires the \fBinquire\fR and \fBchangepw\fR privileges. An entry
+for each of the principal's unique encryption types is added, ignoring multiple
+keys with the same encryption type but different \fBsalt\fR types. If the
+\fB-k\fR argument is not specified, the default keytab file,
+\fB/etc/krb5/krb5.keytab\fR, is used.
+.sp
+The "\fB-e\fR \fB\fIenctype\fR:salt\fR" option overrides the list of
+\fIenctypes\fR given in \fBkrb5.conf\fR(5), in the \fBpermitted_enctypes\fR
+parameter. If "\fB-e\fR \fB\fIenctype\fR:salt\fR" is not used and
+\fBpermitted_enctypes\fR is not defined in \fBkrb5.conf\fR(5), a key for each
+\fIenctype\fR supported by the system on which \fBkadmin\fR is run will be
+created and added to the \fBkeytab\fR. Restricting the \fIenctypes\fR of keys
+in the \fBkeytab\fR is useful when the system for which keys are being created
+does not support the same set of \fIenctypes\fR as the KDC. Note that
+\fBktadd\fR modifies the \fIenctype\fR of the keys in the principal database as
+well.
+.sp
+If the \fB-q\fR option is specified, less status information is displayed.
+Aliased by \fBxst\fR. The \fB-glob\fR option requires the \fBlist\fR privilege.
+Also, note that if you use \fB-glob\fR to create a keytab, you need to remove
+\fB/etc/krb5/kadm5.keytab\fR and create it again if you want to use \fB-p\fR
+\fB*/admin\fR with \fBkadmin\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBprinc-exp\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fIprinc-exp\fR follows the same rules described for the \fBlist_principals\fR
+command.
+.sp
+.ne 2
+.na
+\fBExample:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBktadd -k /tmp/new-keytab nfs/chicago\fR
+Entry for principal nfs/chicago with kvno 2,
+encryption type DES-CBC-CRC added to keytab
+WRFILE:/tmp/new-keytab.
+kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBktremove\fR [\fB-k\fR \fIkeytab\fR] [\fB-q\fR] \fIprincipal\fR
+[\fIkvno\fR | \fBall\fR | \fBold\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Removes entries for the specified principal from a keytab. Requires no
+privileges, since this does not require database access. If \fBall\fR is
+specified, all entries for that principal are removed; if \fBold\fR is
+specified, all entries for that principal except those with the highest kvno
+are removed. Otherwise, the value specified is parsed as an integer, and all
+entries whose \fBkvno\fR match that integer are removed. If the \fB-k\fR
+argument is not specified, the default keytab file,
+\fB/etc/krb5/krb5.keytab\fR, is used. If the \fB-q\fR option is specified, less
+status information is displayed. Aliased by \fBktrem\fR.
+.sp
+.ne 2
+.na
+\fBExample:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBktremove -k /tmp/new-keytab nfs/chicago\fR
+Entry for principal nfs/chicago with kvno 2
+removed from keytab
+WRFILE:/tmp/new-keytab.
+kadmin:
+.fi
+.in -2
+.sp
+
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBquit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Quits \fBkadmin\fR. Aliased by \fBexit\fR and \fBq\fR.
+.RE
+
+.SS "Time Formats"
+Various commands in \fBkadmin\fR can take a variety of time formats, specifying
+time durations or absolute times. The \fBkadmin\fR option variables
+\fImaxrenewlife\fR, \fImaxlife\fR, and \fIminlife\fR are time durations,
+whereas \fIexpdate\fR and \fIpwexpdate\fR are absolute times.
+.sp
+.ne 2
+.na
+\fBExamples:\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.in +2
+.nf
+kadmin: \fBmodprinc -expire "12/31 7pm" jdb\fR
+kadmin: \fBmodprinc -maxrenewlife "2 fortnight" jdb\fR
+kadmin: \fBmodprinc -pwexpire "this sunday" jdb\fR
+kadmin: \fBmodprinc -expire never jdb\fR
+kadmin: \fBmodprinc -maxlife "7:00:00pm tomorrow" jdb\fR
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.LP
+Note that times which do not have the "ago" specifier default to being absolute
+times, unless they appear in a field where a duration is expected. In that
+case, the time specifier will be interpreted as relative. Specifying "ago" in a
+duration can result in unexpected behavior.
+.sp
+.LP
+The following time formats and units can be combined to specify a time. The
+time and date format examples are based on the date and time of July 2, 1999,
+1:35:30 p.m.
+.sp
+
+.sp
+.TS
+box;
+l l
+l l .
+\fBTime Format\fR	\fBExamples\fR
+\fIhh\fR[:\fImm\fR][:\fIss\fR][am/pm/a.m./p.m.]	1p.m., 1:35, 1:35:30pm
+.TE
+
+.sp
+
+.sp
+.TS
+l l
+l l .
+\fBVariable\fR	\fBDescription\fR
+\fIhh\fR	T{
+hour (12-hour clock, leading zero permitted but not required)
+T}
+\fImm\fR	minutes
+\fIss\fR	seconds
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+l l
+l l .
+\fBDate Format\fR	\fBExamples\fR
+\fImm\fR/\fBdd\fR[/\fIyy\fR]	07/02, 07/02/99
+\fIyyyy\fR-\fImm\fR-\fBdd\fR	1999-07-02
+\fBdd\fR-\fImonth\fR-\fIyyyy\fR	02-July-1999
+\fImonth\fR [,\fIyyyy\fR]	Jul 02, July 02,1999
+\fBdd\fR \fImonth\fR[ \fIyyyy\fR]	02 JULY, 02 july 1999
+.TE
+
+.sp
+
+.sp
+.TS
+l l
+l l .
+\fBVariable\fR	\fBDescription\fR
+\fBdd\fR	day
+\fImm\fR	month
+\fIyy\fR	T{
+year within century (00-38 is 2000 to 2038; 70-99 is 1970 to 1999)
+T}
+\fIyyyy\fR	year including century
+\fImonth\fR	locale's full or abbreviated month name
+.TE
+
+.sp
+
+.sp
+.TS
+box;
+l l
+l l .
+\fBTime Units\fR	\fBExamples\fR
+[+|- \fI#\fR] year	"-2 year"
+[+|- \fI#\fR] month	"2 months"
+[+|- \fI#\fR] fortnight
+[+|- \fI#\fR] week
+[+|- \fI#\fR] day
+[+|- \fI#\fR] hour
+[+|- \fI#\fR] minute
+[+|- \fI#\fR] min
+[+|- \fI#\fR] second
+[+|- \fI#\fR] sec
+tomorrow
+yesterday
+today
+now
+this	"this year"
+last	"last saturday"
+next	"next month"
+sunday
+monday
+tuesday
+wednesday
+thursday
+friday
+saturday
+never
+.TE
+
+.sp
+.LP
+You can also use the following time modifiers: \fBfirst\fR, \fBsecond\fR,
+\fBthird\fR, \fBfourth\fR, \fBfifth\fR, \fBsixth\fR, \fBseventh\fR,
+\fBeighth\fR, \fBninth\fR, \fBtenth\fR, \fBeleventh\fR, \fBtwelfth\fR, and
+\fBago\fR.
+.SH ENVIRONMENT VARIABLES
+See \fBenviron\fR(7) for descriptions of the following environment variables
+that affect the execution of \fBkadmin\fR:
+.sp
+.ne 2
+.na
+\fB\fBPAGER\fR\fR
+.ad
+.sp .6
+.RS 4n
+The command to use as a filter for paging output. This can also be used to
+specify options. The default is \fBmore\fR(1).
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/var/krb5/principal\fR\fR
+.ad
+.sp .6
+.RS 4n
+Kerberos principal database.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/principal.ulog\fR\fR
+.ad
+.sp .6
+.RS 4n
+The update log file for incremental propagation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/principal.kadm5\fR\fR
+.ad
+.sp .6
+.RS 4n
+Kerberos administrative database. Contains policy information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/principal.kadm5.lock\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lock file for the Kerberos administrative database. This file works backwards
+from most other lock files (that is, \fBkadmin\fR will exit with an error if
+this file does \fInot\fR exist).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/krb5/kadm5.dict\fR\fR
+.ad
+.sp .6
+.RS 4n
+Dictionary of strings explicitly disallowed as passwords.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/krb5/kadm5.acl\fR\fR
+.ad
+.sp .6
+.RS 4n
+List of principals and their \fBkadmin\fR administrative privileges.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/krb5/kadm5.keytab\fR\fR
+.ad
+.sp .6
+.RS 4n
+Keytab for \fBkadmind\fR principals: \fBkadmin\fR/\fIfqdn\fR,
+\fBchangepw\fR/\fIfqdn\fR, and \fBkadmin\fR/\fBchangepw\fR.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.BR kpasswd (1),
+.BR more (1),
+.BR kadm5.acl (5),
+.BR kdc.conf (5),
+.BR krb5.conf (5),
+.BR attributes (7),
+.BR environ (7),
+.BR kerberos (7),
+.BR krb5envvar (7),
+.BR kadmind (8),
+.BR kdb5_ldap_util (8),
+.BR kdb5_util (8),
+.BR kproplog (8)
+.SH HISTORY
+The \fBkadmin\fR program was originally written by Tom Yu at MIT, as an
+interface to the OpenVision Kerberos administration program.
+.SH DIAGNOSTICS
+The \fBkadmin\fR command is currently incompatible with the MIT \fBkadmind\fR
+daemon interface, so you cannot use this command to administer an MIT-based
+Kerberos database. However, clients running the Solaris implementation of
+Kerberos can still use an MIT-based KDC.

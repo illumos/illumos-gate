@@ -104,7 +104,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='dcs' section='1M'
+			<manpage title='dcs' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

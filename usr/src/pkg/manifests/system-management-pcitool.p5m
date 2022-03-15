@@ -41,8 +41,8 @@ dir  path=usr/sbin
 file path=usr/sbin/pcitool mode=0555
 dir  path=usr/share
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/pcitool.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/pcitool.8
 legacy pkg=SUNWio-tools \
     desc="Administrative tools to modify the pci/pcie fabric" \
     name="Administrative tools to modify the pci/pcie fabric"

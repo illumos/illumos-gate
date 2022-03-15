@@ -99,7 +99,8 @@ xx_event(event_t event, int priority, event_callback_args_t *eca)
 .in -2
 
 .SH SEE ALSO
-\fBcsx_event_handler\fR(9E), \fBcsx_Error2Text\fR(9F)
+.BR csx_event_handler (9E),
+.BR csx_Error2Text (9F)
 .sp
 .LP
 \fIPC Card  95 Standard, PCMCIA/JEIDA\fR

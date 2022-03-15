@@ -1,0 +1,46 @@
+'\" te
+.\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH FTP 5 "Oct 22, 2002"
+.SH NAME
+ftp \- FTP client configuration file
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/default/ftp\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+Use the \fBftp\fR file to configure the behavior of the FTP client. Lines that
+begin with a hash symbol ("# ") are treated as comment  lines and are ignored.
+.SS "Behavior Directives"
+.sp
+.LP
+The \fBftp\fR file supports the following behavior directives:
+.sp
+.ne 2
+.na
+\fB\fBFTP_LS_SENDS_NLST=yes | no\fR\fR
+.ad
+.RS 30n
+The \fBls\fR command of the ftp client sends an \fBNLST\fR to the FTP Server by
+default. Several non-Solaris clients send \fBLIST\fR instead. In order to make
+the Solaris \fBftp\fR client send \fBLIST\fR when the \fBls\fR command is
+issued, set \fBFTP_LS_SENDS_NLST\fR to \fBno\fR. The value of
+\fBFTP_LS_SENDS_NLST\fR is \fByes\fR by default.
+.RE
+
+.sp
+.LP
+If the user sets a value for \fBFTP_LS_SENDS_NLST\fR in the user's environment,
+this value will override any \fBFTP_LS_SENDS_NLST\fR directive that is
+specified in \fB/etc/default/ftp\fR.
+.SH SEE ALSO
+.sp
+.LP
+.BR ftp (1),
+.BR attributes (7)

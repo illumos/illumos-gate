@@ -222,8 +222,9 @@ No \fBPCMCIA \fRhardware installed.
 .SH CONTEXT
 These functions may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_RegisterClient\fR(9F), \fBddi_create_minor_node\fR(9F),
-\fBddi_remove_minor_node\fR(9F)
+.BR csx_RegisterClient (9F),
+.BR ddi_create_minor_node (9F),
+.BR ddi_remove_minor_node (9F)
 .sp
 .LP
 \fIPC Card 95 Standard, PCMCIA/JEIDA\fR

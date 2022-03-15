@@ -61,7 +61,7 @@ The buffer may be modified even if an error is returned.
 For a full list of possible errors also see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Plwp_getname
@@ -92,4 +92,4 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

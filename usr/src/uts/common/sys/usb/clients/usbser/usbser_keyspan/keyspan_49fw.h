@@ -32,7 +32,7 @@
 
 /*
  * For the 4-port Keyspan usb-to-serial adapter (usa49wlc) support
- * in the usbsksp(7D) driver, users can download a firmware package
+ * in the usbsksp(4D) driver, users can download a firmware package
  * from the Keyspan website (http://www.keyspan.com).
  * Please contact Keyspan technical support for questions regarding
  * firmware source access.
@@ -45,7 +45,7 @@
  * $ cd usr/src/uts/intel/usbs49_fw
  * $ make install
  *
- * See usbsksp(7D) for details on using the Solaris USB keyspan
+ * See usbsksp(4D) for details on using the Solaris USB keyspan
  * driver.
  */
 

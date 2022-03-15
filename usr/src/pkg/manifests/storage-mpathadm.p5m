@@ -39,8 +39,8 @@ set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
 dir  path=usr/sbin
 file path=usr/sbin/mpathadm mode=0555
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/mpathadm.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/mpathadm.8
 legacy pkg=SUNWmpathadm \
     desc="Path Administration Utility for a Solaris Multipathing device" \
     name="Solaris Multipathing CLI"

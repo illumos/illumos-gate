@@ -22,7 +22,7 @@
  *
  * The ZCP interface allows various ZFS commands and operations ZFS
  * administrative operations (e.g. creating and destroying snapshots, typically
- * performed via an ioctl to /dev/zfs by the zfs(1M) command and
+ * performed via an ioctl to /dev/zfs by the zfs(8) command and
  * libzfs/libzfs_core) to be run * programmatically as a Lua script.  A ZCP
  * script is run as a dsl_sync_task and fully executed during one transaction
  * group sync.  This ensures that no other changes can be written concurrently
@@ -86,7 +86,7 @@
  * longjumps out of the script execution with luaL_error() and returns with the
  * error.
  *
- * See zfs-program(1M) for more information on high level usage.
+ * See zfs-program(8) for more information on high level usage.
  */
 
 #include "lua.h"

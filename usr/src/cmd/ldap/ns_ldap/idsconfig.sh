@@ -56,7 +56,7 @@ EOF
 
 Note: idsconfig has created entries for VLV indexes. 
 
-      For DS5.x, use the directoryserver(1m) script on ${IDS_SERVER}
+      For DS5.x, use the directoryserver(8) script on ${IDS_SERVER}
       to stop the server.  Then, using directoryserver, follow the
       directoryserver examples below to create the actual VLV indexes.
 
@@ -266,7 +266,7 @@ EOF
 
 HELP - Name of the configuration profile with which the clients will be
        configured. A directory server can store various profiles for multiple 
-       groups of clients.  The initialization tool, (ldapclient(1M)), assumes 
+       groups of clients.  The initialization tool, (ldapclient(8)), assumes 
        "default" unless another is specified.
 
 EOF
@@ -347,7 +347,7 @@ EOF
     ;;
     keyserv_help) cat <<EOF
 
-HELP - The authentication method(s) to be used by newkey(1M) and chkey(1)
+HELP - The authentication method(s) to be used by newkey(8) and chkey(1)
        when contacting the directory server.  This is a ordered list and
        if provided will override the default authentication method
        parameter.
@@ -428,7 +428,7 @@ HELP - Using Service Search Descriptors (SSD), you can override the
        used to override the default search base DN, the default search
        scope, and the default search filter to be used for directory
        lookups.  SSD are supported for all services (databases)
-       defined in nsswitch.conf(4).  The default base DN is defined
+       defined in nsswitch.conf(5).  The default base DN is defined
        in ldap(1).
 
        Note: SSD are powerful tools in defining configuration profiles
@@ -472,12 +472,12 @@ EOF
 HELP - Enter 'y' to set up the LDAP server for shadow update.
        The setup will add an administrator identity/credential
        and modify the necessary access controls for the client
-       to update shadow(4) data on the LDAP server. If sasl/GSSAPI
+       to update shadow(5) data on the LDAP server. If sasl/GSSAPI
        is in use, the Kerberos host principal will be used as the
        administrator identity.
 
        Shadow data is used for password aging and account locking.
-       Please refer to the shadow(4) manual page for details.
+       Please refer to the shadow(5) manual page for details.
 
 EOF
     ;;
@@ -485,10 +485,10 @@ EOF
 
 HELP - Start the setup to add an administrator identity/credential
        and to modify access controls for the client to update
-       shadow(4) data on the LDAP server.
+       shadow(5) data on the LDAP server.
 
        Shadow data is used for password aging and account locking.
-       Please refer to the shadow(4) manual page for details.
+       Please refer to the shadow(5) manual page for details.
 
 EOF
     ;;
@@ -496,11 +496,11 @@ EOF
 
 HELP - A profile with a 'sasl/GSSAPI' authentication method and a 'self'
        credential level is detected, enter 'y' to modify the necessary
-       access controls for allowing the client to update shadow(4) data
+       access controls for allowing the client to update shadow(5) data
        on the LDAP server.
 
        Shadow data is used for password aging and account locking.
-       Please refer to the shadow(4) manual page for details.
+       Please refer to the shadow(5) manual page for details.
 
 EOF
     ;;
@@ -5230,7 +5230,7 @@ cleanup()
 # This script assumes that the iPlanet Directory Server (iDS) is 
 # installed and that setup has been run.  This script takes the 
 # iDS server from that point and sets up the infrastructure for
-# LDAP Naming Services.  After running this script, ldapaddent(1M)
+# LDAP Naming Services.  After running this script, ldapaddent(8)
 # or some other tools can be used to populate data.
 
 # Initialize the variables that need to be set to NULL, or some 

@@ -44,12 +44,12 @@ dir  path=lib/svc/manifest/network group=sys
 dir  path=lib/svc/manifest/network/rpc group=sys
 file path=lib/svc/manifest/network/rpc/gss.xml group=sys mode=0444
 dir  path=usr/share/man
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/gsscred.conf.4
-file path=usr/share/man/man4/mech.4
-link path=usr/share/man/man4/qop.4 target=mech.4
 dir  path=usr/share/man/man5
-file path=usr/share/man/man5/gss_auth_rules.5
+file path=usr/share/man/man5/gsscred.conf.5
+file path=usr/share/man/man5/mech.5
+link path=usr/share/man/man5/qop.5 target=mech.5
+dir  path=usr/share/man/man7
+file path=usr/share/man/man7/gss_auth_rules.7
 legacy pkg=SUNWgssc \
     desc="Generic Security Service Application Program Interface, Version 2 - config" \
     name="GSSAPI CONFIG V2"

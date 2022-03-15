@@ -33,7 +33,7 @@ The \fIoldsalt\fR and \fIuserinfo\fR arguments are passed unchanged from
 .LP
 The \fIparams\fR argument is an \fIargv\fR-like null terminated vector of type
 \fBchar *\fR. The first element of \fIparams\fR represents the mechanism token
-name from \fBcrypt.conf\fR(4). The remaining elements of \fIparams\fR represent
+name from \fBcrypt.conf\fR(5). The remaining elements of \fIparams\fR represent
 strings of the form <\fBparameter\fR>[=<\fBvalue\fR>] to allow passing in
 additional information from the \fBcrypt.conf\fR entry, such as specifying
 rounds information "\fBrounds=4096\fR".
@@ -82,7 +82,7 @@ There is insufficient memory to perform hashing.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -100,6 +100,11 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpasswd\fR(1), \fBcrypt\fR(3C), \fBcrypt_genhash_impl\fR(3C),
-\fBcrypt_gensalt\fR(3C), \fBgetpassphrase\fR(3C), \fBcrypt.conf\fR(4),
-\fBpasswd\fR(4), \fBattributes\fR(5)
+.BR passwd (1),
+.BR crypt (3C),
+.BR crypt_genhash_impl (3C),
+.BR crypt_gensalt (3C),
+.BR getpassphrase (3C),
+.BR crypt.conf (5),
+.BR passwd (5),
+.BR attributes (7)

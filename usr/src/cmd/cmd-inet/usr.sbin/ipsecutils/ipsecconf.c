@@ -1341,7 +1341,7 @@ main(int argc, char *argv[])
 	boolean_t replace_policy = B_FALSE;
 
 	char *smf_warning = gettext(
-	    "\n\tIPsec policy should be managed using smf(5). Modifying\n"
+	    "\n\tIPsec policy should be managed using smf(7). Modifying\n"
 	    "\tthe IPsec policy from the command line while the 'policy'\n"
 	    "\tservice is enabled could result in an inconsistent\n"
 	    "\tsecurity policy.\n\n");
@@ -5247,7 +5247,7 @@ ipsec_conf_add(boolean_t just_check, boolean_t smf_managed, boolean_t replace)
 
 	/*
 	 * Treat the non-existence of a policy file as a special
-	 * case when ipsecconf is being managed by smf(5).
+	 * case when ipsecconf is being managed by smf(7).
 	 * The assumption is the administrator has not yet
 	 * created a policy file, this should not force the service
 	 * into maintenance mode.

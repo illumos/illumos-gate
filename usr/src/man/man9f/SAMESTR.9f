@@ -53,7 +53,7 @@ The \fBSAMESTR()\fR function can be called from user, interrupt, context.
 .SH SEE ALSO
 .sp
 .LP
-\fBOTHERQ\fR(9F)
+.BR OTHERQ (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

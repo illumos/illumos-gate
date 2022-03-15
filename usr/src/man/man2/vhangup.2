@@ -16,7 +16,7 @@ vhangup \- virtually "hangup" the current controlling terminal
 .sp
 .LP
 The \fBvhangup()\fR function is used by the initialization process
-\fBinit\fR(1M) (among others) to ensure that users are given "clean" terminals
+\fBinit\fR(8) (among others) to ensure that users are given "clean" terminals
 at login by revoking access of the previous users' processes to the terminal.
 To effect this, \fBvhangup()\fR searches the system tables for references to
 the controlling terminal of the invoking process and revokes access permissions
@@ -27,7 +27,7 @@ controlling terminal.
 .SH SEE ALSO
 .sp
 .LP
-\fBinit\fR(1M)
+.BR init (8)
 .SH BUGS
 .sp
 .LP

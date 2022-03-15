@@ -1,0 +1,228 @@
+'\" te
+.\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TTYADM 8 "Sep 14, 1992"
+.SH NAME
+ttyadm \- format and output port monitor-specific information
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/ttyadm\fR [\fB-b\fR] [\fB-c\fR] [\fB-h\fR] [\fB-I\fR] [\fB-r\fR \fIcount\fR] [\fB-i\fR \fImsg\fR]
+     [\fB-m\fR \fImodules\fR] [\fB-p\fR \fIprompt\fR] [\fB-t\fR \fItimeout\fR] [\fB-S\fR y | n]
+     [\fB-T\fR \fItermtype\fR] \fB-d\fR \fIdevice\fR \fB-l\fR \fIttylabel\fR \fB-s\fR \fIservice\fR
+.fi
+
+.LP
+.nf
+\fB/usr/sbin/ttyadm\fR \fB-V\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fBttyadm\fR command is an administrative command that formats
+\fBttymon\fR(8)-specific information and writes it to standard output. The
+Service Access Facility (SAF) requires each port monitor to provide such a
+command. Note that the port monitor administrative file is updated by the
+Service Access Controller's administrative commands, \fBsacadm\fR(8) and
+\fBpmadm\fR(8). \fBttyadm\fR provides a means of presenting formatted port
+monitor-specific (\fBttymon\fR-specific) data to these commands.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-b\fR\fR
+.ad
+.RS 15n
+Set the ``bi-directional port'' flag. When this flag is set, the line can be
+used in both directions. \fBttymon\fR will allow users to connect to the
+service associated with the port, but if the port is free, \fBuucico\fR(8),
+\fBcu\fR(1C), or \fBct\fR(1C) can use it for dialing out.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-c\fR\fR
+.ad
+.RS 15n
+Set the connect-on-carrier flag for the port. If the \fB-c\fR flag is set,
+\fBttymon\fR will invoke the port's associated service immediately when a
+connect indication is received (that is, no prompt is printed and no baud-rate
+searching is done).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR\fI device\fR\fR
+.ad
+.RS 15n
+\fIdevice\fR is the full pathname of the device file for the TTY port.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 15n
+Set the hangup flag for the port. If the \fB-h\fR flag is not set, \fBttymon\fR
+will force a hangup on the line by setting the speed to \fB0\fR before setting
+the speed to the default or specified value.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-i\fR\fI message\fR\fR
+.ad
+.RS 15n
+Specify the inactive (disabled) response message. This message will be sent to
+the TTY port if the port is disabled or the \fBttymon\fR monitoring the port is
+disabled.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-I\fR\fR
+.ad
+.RS 15n
+Initialize only.  If the \fB-I\fR option is used, \fBttymon\fR will invoke the
+service only once.  This can be used to configure a particular device without
+actually monitoring it, as with software carrier.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR\fI ttylabel\fR\fR
+.ad
+.RS 15n
+Specify which \fIttylabel\fR in the \fB/etc/ttydefs\fR file to use as the
+starting point when searching for the proper baud rate.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fI modules\fR\fR
+.ad
+.RS 15n
+Specify a list of pushable STREAMS modules. The modules will be pushed in the
+order in which they are specified before the service is invoked. \fImodules\fR
+must be a comma-separated list of modules, with no white space included. Any
+modules currently on the stream will be popped before these  modules are
+pushed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fI prompt\fR\fR
+.ad
+.RS 15n
+Specify the prompt message, for example, ``\fBlogin:\fR''.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR\fI count\fR\fR
+.ad
+.RS 15n
+When the \fB-r\fR option is invoked, \fBttymon\fR will wait until it receives
+data from the port before it displays a prompt. If \fIcount\fR is \fB0\fR,
+\fBttymon\fR will wait until it receives any character. If \fIcount\fR is
+greater than \fB0\fR, \fBttymon\fR will wait until \fIcount\fR newlines have
+been received.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fI service\fR\fR
+.ad
+.RS 15n
+\fIservice\fR is the full pathname of the service to be invoked when a
+connection request is received. If arguments are required, the command and its
+arguments must be enclosed in double quotes (" ").
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-S\fR \fBy|n\fR\fR
+.ad
+.RS 15n
+Set the software carrier value.  \fBy\fR will turn software carrier on. \fBn\fR
+will turn software carrier off.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fI timeout\fR\fR
+.ad
+.RS 15n
+Specify that \fBttymon\fR should close a port if the open on the port succeeds,
+and no input data is received in \fItimeout\fR seconds.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-T\fR\fI termtype\fR\fR
+.ad
+.RS 15n
+Set the terminal type.  The \fBTERM\fR environment variable will be set to
+\fItermtype\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-V\fR\fR
+.ad
+.RS 15n
+Display the version number of the current \fB/usr/lib/saf/ttymon\fR command.
+.RE
+
+.SH OUTPUT
+.sp
+.LP
+If successful, \fBttyadm\fR will generate the requested information, write it
+to  standard output, and exit with a status of \fB0\fR. If \fBttyadm\fR is
+invoked with an invalid number of arguments or invalid arguments, or if an
+incomplete option is specified, an error message will be written to standard
+error and \fBttymon\fR will exit with a non-zero status.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/ttydefs\fR\fR
+.ad
+.RS 16n
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR ct (1C),
+.BR cu (1C),
+.BR attributes (7),
+.BR pmadm (8),
+.BR sacadm (8),
+.BR ttymon (8),
+.BR uucico (8)
+.sp
+.LP
+\fI\fR

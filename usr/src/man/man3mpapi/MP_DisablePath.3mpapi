@@ -113,7 +113,7 @@ The operation is successful.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -133,7 +133,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibMPAPI\fR(3LIB), \fBMP_EnablePath\fR(3MPAPI), \fBattributes\fR(5)
+.BR libMPAPI (3LIB),
+.BR MP_EnablePath (3MPAPI),
+.BR attributes (7)
 .sp
 .LP
 \fIMultipath Management API Version 1.0\fR

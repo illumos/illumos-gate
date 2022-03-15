@@ -718,7 +718,7 @@ separator value, though, this will be set to the empty string (\fB""\fR).
 
 .SS "Regular Expressions"
 The \fBawk\fR utility makes use of the extended regular expression notation
-(see \fBregex\fR(5)) except that it allows the use of C-language conventions to
+(see \fBregex\fR(7)) except that it allows the use of C-language conventions to
 escape special characters within the EREs, namely \fB\e\e\fR, \fB\ea\fR,
 \fB\eb\fR, \fB\ef\fR, \fB\en\fR, \fB\er\fR, \fB\et\fR, \fB\ev\fR, and those
 specified in the following table.  These escape sequences are recognized both
@@ -1494,7 +1494,7 @@ rather than an explicit operator, it is often necessary to use parentheses to
 enforce the proper evaluation precedence.
 .sp
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBawk\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBawk\fR when
 encountering files greater than or equal to 2 Gbyte (2^31 bytes).
 
 .SH EXAMPLES
@@ -1776,7 +1776,7 @@ then the command line
 prints the file \fBinput\fR, filling in page numbers starting at 5.
 
 .SH ENVIRONMENT VARIABLES
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect execution: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
 \fBNLSPATH\fR.
 .sp
@@ -1818,10 +1818,20 @@ The exit status can be altered within the program by using an \fBexit\fR
 expression.
 
 .SH SEE ALSO
-\fBed\fR(1), \fBegrep\fR(1), \fBgrep\fR(1), \fBlex\fR(1), \fBoawk\fR(1),
-\fBsed\fR(1), \fBpopen\fR(3C), \fBprintf\fR(3C), \fBsystem\fR(3C),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBregex\fR(5),
-\fBXPG4\fR(5)
+.BR ed (1),
+.BR egrep (1),
+.BR grep (1),
+.BR lex (1),
+.BR oawk (1),
+.BR sed (1),
+.BR popen (3C),
+.BR printf (3C),
+.BR system (3C),
+.BR XPG4 (7),
+.BR attributes (7),
+.BR environ (7),
+.BR largefile (7),
+.BR regex (7)
 .sp
 .LP
 Aho, A. V., B. W. Kernighan, and P. J. Weinberger, \fIThe AWK Programming

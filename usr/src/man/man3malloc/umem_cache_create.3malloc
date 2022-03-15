@@ -542,7 +542,7 @@ umem_cache_free(my_obj_8k_cache, my_obj_8k);
 See the \fBEXAMPLES\fR section of \fBumem_alloc\fR(3MALLOC) for examples
 involving the \fBUMEM_NOFAIL\fR flag.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -558,9 +558,15 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBsetcontext\fR(2), \fBatexit\fR(3C), \fBlibumem\fR(3LIB), \fBlongjmp\fR(3C),
-\fBswapcontext\fR(3C), \fBthr_exit\fR(3C), \fBumem_alloc\fR(3MALLOC),
-\fBumem_debug\fR(3MALLOC), \fBattributes\fR(5)
+.BR setcontext (2),
+.BR atexit (3C),
+.BR longjmp (3C),
+.BR swapcontext (3C),
+.BR thr_exit (3C),
+.BR libumem (3LIB),
+.BR umem_alloc (3MALLOC),
+.BR umem_debug (3MALLOC),
+.BR attributes (7)
 .sp
 .LP
 Bonwick, Jeff, "The Slab Allocator: An Object-Caching Kernel Memory Allocator",

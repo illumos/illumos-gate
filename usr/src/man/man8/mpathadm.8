@@ -1,0 +1,713 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH MPATHADM 8 "September 12, 2020"
+.SH NAME
+mpathadm \- multipath discovery and administration
+.SH SYNOPSIS
+.nf
+\fBmpathadm\fR \fIsubcommand\fR \fIdirect-object\fR [\fIoptions\fR] [\fIoperand\fR]
+.fi
+
+.SH DESCRIPTION
+The \fBmpathadm\fR command enables multipathing discovery and management. The
+\fBmpathadm\fR command is implemented as a set of subcommands, many with their
+own options, that are described in the section for that subcommand. Options not
+associated with a particular subcommand are described under OPTIONS. The
+\fBmpathadm\fR subcommands operate on a \fIdirect-object\fR. These are
+described in this section for each subcommand. The \fIdirect-objects\fR,
+\fIinitiator-port\fR, \fItarget-port\fR, and \fIlogical-unit\fR in the
+subcommands are consistent with SCSI standard definitions.
+.sp
+.LP
+The \fBmpathadm\fR command supports the following subcommands, which are
+described in detail in subsections that follow.
+.sp
+.ne 2
+.na
+\fB\fBlist\fR\fR
+.ad
+.RS 12n
+Display a list of discovered instances for a given object.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshow\fR\fR
+.ad
+.RS 12n
+Display information about a given object instance.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmodify\fR\fR
+.ad
+.RS 12n
+Modify properties of an object.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBenable\fR\fR
+.ad
+.RS 12n
+Enable an object.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdisable\fR\fR
+.ad
+.RS 12n
+Disable an object.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfailover\fR\fR
+.ad
+.RS 12n
+Cause target port group failover for a logical-unit.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBoverride\fR\fR
+.ad
+.RS 12n
+Set a path to be used over other paths on a logical-unit.
+.RE
+
+.sp
+.LP
+The \fBmpathadm\fR subcommands operate on a \fIdirect-object\fR. These are
+described in this section for each subcommand.
+.SS "list Subcommand"
+The syntax for the \fBlist\fR subcommand is:
+.sp
+.in +2
+.nf
+# mpathadm list \fIdirect-object\fR [\fIoperands\fR...]
+.fi
+.in -2
+
+.sp
+.LP
+The \fBlist\fR subcommand displays data for following direct-objects:
+.sp
+.ne 2
+.na
+\fB\fBmpath-support\fR [\fImpath-support-name\fR, ...]\fR
+.ad
+.sp .6
+.RS 4n
+List the multipathing support that can be administered by this CLI. This
+presents itself in the form of a library name registered through the MPAPI
+framework. If no mpath-support name \fImpath-support-name\fR is specified, all
+registered multipathing support libraries will be displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinitiator-port\fR [\fIinitiator-port-name\fR, ...]\fR
+.ad
+.sp .6
+.RS 4n
+List the initiator ports that are discovered on this system. If no
+\fIinitiator-port-name\fR is specified, all discovered initiator ports are
+displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fBlogical-unit\fR | \fBlu\fR} [\fIoptions\fR]
+[\fIlogical-unit-name\fR, ...]\fR
+.ad
+.sp .6
+.RS 4n
+List the information on multipath logical units. If no \fIlogical-unit-name\fR
+is specified, all discovered logical-units will be displayed.
+.sp
+Options for \fBlist logical-unit\fR are as follows:
+.sp
+.ne 2
+.na
+\fB\fB-n\fR, \fB-\fR\fB-name\fR \fIname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the logical unit name that is associated with the given name string.
+This name can be extracted from the output of the \fBmpathadm\fR \fBshow lu\fR
+command.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR, \fB-\fR\fB-target-port\fR \fItarget-port-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Return the list of logical units names that are associated with the given
+\fItarget-port-name\fR.
+.RE
+
+.RE
+
+.SS "\fBshow\fR Subcommand"
+The syntax for the \fBshow\fR subcommand is:
+.sp
+.in +2
+.nf
+# mpathadm show \fIdirect-object\fR [\fIoperands\fR...]
+.fi
+.in -2
+
+.sp
+.LP
+The \fBshow\fR subcommand displays detailed information for following the
+direct-objects:
+.sp
+.ne 2
+.na
+\fB\fBmpath-support\fR [\fImpath-support-name\fR, ...]\fR
+.ad
+.sp .6
+.RS 4n
+Show the detailed information on the given \fImpath-support-name\fR if the name
+exists. If the given \fImpath-support-name\fR supports only a limited set of
+device products, the list of device products will be listed as part of the
+output.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBinitiator-port\fR
+\fIinitiator-port-name\fR[,\fIinitiator-port-name\fR, ...]\fR
+.ad
+.sp .6
+.RS 4n
+Show the detailed information for the given \fIinitiator-port-name\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fBlogical-unit\fR | \fBlu\fR} [\fIlogical-unit-name\fR, ...]\fR
+.ad
+.sp .6
+.RS 4n
+Display the detailed information on multipath logical unit(s), including path
+and target port group information. Note that the name property in the logical
+unit information represents the identifier for this LUN, derived from the
+hardware, and used by this system. If the name is derived from SCSI Inquiry
+Vital Product Data (VPD) page 83h, the name type property represents an
+associated identifier type defined by the SCSI standards.
+.RE
+
+.SS "\fBmodify\fR Subcommand"
+The syntax for the \fBmodify\fR subcommand is:
+.sp
+.in +2
+.nf
+# mpathadm modify \fIdirect-object\fR [\fIoptions\fR] [\fIoperands\fR...]
+.fi
+.in -2
+
+.sp
+.LP
+The \fBmodify\fR subcommand modifies characteristics of the following
+direct-objects:
+.sp
+.ne 2
+.na
+\fB\fBmpath-support\fR [\fIoptions\fR] \fImpath-support-name\fR, ...\fR
+.ad
+.sp .6
+.RS 4n
+Configuration management of an \fImpath-support\fR. Options to modify
+mpath-support are as follows:
+.sp
+.ne 2
+.na
+\fB\fB-a\fR, \fB-\fR\fB-autofailback\fR on | off\fR
+.ad
+.sp .6
+.RS 4n
+Set \fBautofailback\fR. Applicable only when mpath-support provides auto
+failback support.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR, \fB-\fR\fB-autoprobe\fR on | off\fR
+.ad
+.sp .6
+.RS 4n
+Set \fBautoprobing\fR. Applicable only when mpath-support provides auto probing
+support.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-b\fR, \fB-\fR\fB-loadbalance\fR loadbalance-type\fR
+.ad
+.sp .6
+.RS 4n
+Change the default load balance type. The \fBloadbalance\fR type is one of the
+supported types listed in the \fBshow mpath-support\fR output.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB{\fBlogical-unit\fR | \fBlu\fR} [\fIoptions\fR]
+\fIlogical-unit-name\fR, ...\fR
+.ad
+.sp .6
+.RS 4n
+Configuration management of a logical unit. Options to modify
+\fBlogical-unit\fR are as follows:
+.sp
+.ne 2
+.na
+\fB\fB-a\fR, \fB-\fR\fB-autofailback\fR on | off\fR
+.ad
+.sp .6
+.RS 4n
+Set \fBautofailback\fR. Applicable only when \fBmpath-support\fR provides auto
+failback support
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR, \fB-\fR\fB-autoprobe\fR on | off\fR
+.ad
+.sp .6
+.RS 4n
+Set \fBautoprobing\fR. Applicable only when \fBmpath-support\fR provides auto
+probing support.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-b\fR, \fB-\fR\fB-loadbalance\fR loadbalance-type\fR
+.ad
+.sp .6
+.RS 4n
+Set load balance type for the logical unit. Applicable only when load balance
+configuration is supported at the logical unit level.
+.RE
+
+.RE
+
+.SS "\fBenable\fR Subcommand"
+The syntax for the \fBenable\fR subcommand is:
+.sp
+.in +2
+.nf
+# mpathadm disable [\fIoptions\fR]
+.fi
+.in -2
+
+.sp
+.LP
+The \fBenable\fR subcommand supports the following direct-objects to be
+enabled:
+.sp
+.ne 2
+.na
+\fB\fBpath\fR \fB-i\fR \fIinitiator-port-name\fR \fB-t\fR
+\fItarget-port-name\fR\fR
+.ad
+.br
+.na
+\fB\fB-l\fR \fIlogical-unit-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+The path that consists of the specified initiator port, target port, and
+logical unit will be enabled.
+.RE
+
+.SS "\fBdisable\fR Subcommand"
+The syntax for the \fBdisable\fR subcommand is:
+.sp
+.in +2
+.nf
+# mpathadm disable [\fIoptions\fR]
+.fi
+.in -2
+
+.sp
+.LP
+The \fBdisable\fR subcommand supports the following direct-objects to be
+disabled:
+.sp
+.ne 2
+.na
+\fB\fBpath\fR \fB-i\fR \fIinitiator-port-name\fR \fB-t\fR
+\fItarget-port-name\fR\fR
+.ad
+.br
+.na
+\fB\fB-l\fR \fIlogical-unit-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+The path that consists of the specified initiator port, target port, and
+logical unit will be disabled.
+.RE
+
+.SS "\fBfailover\fR Subcommand"
+The syntax for the \fBfailover\fR subcommand is:
+.sp
+.in +2
+.nf
+# mpathadm failover \fIdirect-object\fR [\fIoperand\fR]
+.fi
+.in -2
+
+.sp
+.LP
+The \fBfailover\fR subcommand supports failover for the following
+direct-objects:
+.sp
+.ne 2
+.na
+\fB{\fBlogical-unit\fR | \fBlu\fR} \fIlogical-unit-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+The target port group will failover when the given logical-unit is asymmetric
+and supports explicit state change. The currently active target port group will
+be changed to the standby state and the standby target port group will be
+active.
+.RE
+
+.SS "\fBoverride\fR Subcommand"
+The syntax for the \fBoverride\fR subcommand is:
+.sp
+.in +2
+.nf
+# mpathadm override [\fIoptions\fR]
+.fi
+.in -2
+
+.sp
+.LP
+The \fBoverride\fR subcommand controls whether or not the following
+direct-objects override another:
+.sp
+.ne 2
+.na
+\fBpath {\fB-i\fR \fIinitiator-port-name\fR \fB-t\fR \fItarget-port-name\fR |
+\fB-c\fR}\fR
+.ad
+.br
+.na
+\fB\fB-l\fR \fIlogical-unit-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Cause a path that consists of the specified initiator port, target port, and
+logical unit to override other paths on the logical unit. Once a path overrides
+other paths, the mpath-support uses only that path regardless of any other path
+selection configuration. The \fB-c\fR option cancels the setting. The path that
+consists of the specified initiator port, target port, and logical unit will be
+disabled.
+.sp
+Options for override path are as follows:
+.sp
+.ne 2
+.na
+\fB\fB-i\fR, \fB-\fR\fB-initiator-port\fR \fIinitiator-port-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represent the initiator port element of a path. Options \fB-t\fR and \fB-l\fR
+must also be included.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR, \fB-\fR\fB-target-port\fR \fItarget-port-name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represent the target port element of a path. Options \fB-i\fR and \fB-l\fR must
+also be included.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR, \fB-\fR\fB-logical-unit\fR \fIlogical-unit\fR\fR
+.ad
+.sp .6
+.RS 4n
+Represent the logical unit element of a path. Options \fB-i\fR and \fB-t\fR
+must also be included.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-c\fR, \fB-\fR\fB-cancel\fR\fR
+.ad
+.sp .6
+.RS 4n
+Cancels overriding setting for the given logical unit. Option \fB-l\fR must
+also be included.
+.RE
+
+.RE
+
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-V\fR, \fB-\fR\fB-version\fR\fR
+.ad
+.RS 17n
+Display the version information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-?\fR, \fB-\fR\fB-help\fR\fR
+.ad
+.RS 17n
+Display context help. Can be used following an \fBmpathadm\fR command with no
+arguments, following a subcommand, or following a subcommand direct-object
+combination. Responds with help information appropriate for your entry. For
+example, if you enter:
+.sp
+.in +2
+.nf
+# \fBmpathadm add mpath-support-help\fR
+.fi
+.in -2
+.sp
+
+\&... \fBmpathadm\fR responds with a display of the options available for that
+combination of subcommand and direct-object.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRObtaining a List of Multipathing Support
+.sp
+.LP
+The following command uses the \fBlist\fR subcommand to list all currently
+registered \fBmpath-support\fR libraries.
+
+.sp
+.in +2
+.nf
+# \fBmpathadm list mpath-support\fR
+mpath-support: libmpscsi_vhci.so
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRDisplaying the Properties of a Particular Multipathing Support
+.sp
+.LP
+The following command uses the \fBshow\fR subcommand to display the properties
+for a currently registered \fBmpath-support\fR library.
+
+.sp
+.in +2
+.nf
+# \fBmpathadm show mpath-support libmpscsi_vhci.so\fR
+mpath-support:	libmpscsi_vhci.so
+       Vendor:  Sun Microsystems
+       Driver Name:  scsi_vhci
+       Default Load Balance:  round-robin
+       Supported Load Balance Types:
+              round-robin
+	      logical-block
+Allows To Activate Target Port Group Access:  yes
+Allows Path Override:  no
+Supported Auto Failback Config:	 1
+Auto Failback:	on
+Failback Polling Rate (current/max):  0/0
+Supported Auto Probing Config:	0
+Auto Probing:  NA
+Probing Polling Rate (current/max):  NA/NA
+Supported Devices:
+       Vendor:	 SUN
+       Product:  T300
+       Revision:
+       Supported Load Balance Types:
+              round-robin
+       Vendor:	 SUN
+       Product:  T4
+       Revision:
+       Supported Load Balance Types:
+              round-robin
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRObtaining a List of Initiator Ports Discovered Through the
+\fBmpath-support\fR Libraries
+.sp
+.LP
+The following command uses the \fBlist initiator-port\fR subcommand to display
+a list of initiator ports discovered by the currently registered
+\fBmpath-support\fR libraries.
+
+.sp
+.in +2
+.nf
+# \fBmpathadm list initiator-port\fR
+Initiator-Port: iqn.1986-03.com.sun:01:080020b7ac2b.437a3b3e,4000002a0000
+Initiator-Port: 2000000173018713
+Initiator-Port: 2000000173818713
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRDisplaying the Properties of a Particular Initiator Port
+.sp
+.LP
+The following command uses the \fBshow initiator-port\fR subcommand to display
+the properties of a particular initiator port discovered using the \fBlist
+initiator-port\fR subcommand in an example above.
+
+.sp
+.in +2
+.nf
+# \fBmpathadm show initiator-port 2000000173018713\fR
+initiator-port:	 2000000173018713
+        Transport Type:	 Fibre Channel
+        OS device File:	 devices/pci@1f,4000/pci@2/SUNW,qlca@5/fp@0,0:fc
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRDisplaying the Properties of a Particular Logical Unit
+.sp
+.LP
+The following command uses the \fBshow logical-unit\fR subcommand to display
+the properties of the logical unit with the specified name.
+
+.sp
+.in +2
+.nf
+# \fBmpathadm show lu /dev/rdsk/c4t60003BA27D2120004204AC2B000DAB00d0s2\fR
+Logical Unit: /dev/rdsk/c4t60003BA27D2120004204AC2B000DAB00d0s2
+	       mpath-support libmpscsi_vhci.so
+	       Vendor: SUN
+	       Product: T4
+	       Revision: 0301
+	Name Type: SCSI Inquiry VPD Page 83 type 3
+	Name: 60003ba27d2120004204ac2b000dab00
+	Asymmetric: yes
+	Current Load Balance: round-robin
+	Logical Unit Group ID: NA
+	Auto Failback: on
+	Auto Probing: NA
+
+Paths:
+	Initiator Port Name: 2000000173818713
+	Target Port Name: 20030003ba27d212
+	Override Path: NA
+	Path State: OK
+	Disabled: no
+
+	Initiator Port Name: 2000000173018713
+	Target Port Name: 20030003ba27d095
+	Override Path: NA
+	Path State: OK
+	Disabled: no
+
+Target Port Group:
+	ID: 2
+	Explicit Failover: yes
+	Access State: standby
+	Target Ports:
+			Name: 20030003ba27d212
+		   Relative ID: 0
+
+	ID: 5
+	Explicit Failover: yes
+	Access State: active
+	Target Ports
+			Name: 20030003ba27d095
+		   Relative ID: 0
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fREnabling a Path
+.sp
+.LP
+The following command uses the \fBenable path\fR subcommand to enable the path
+with the specified initiator port, target port, and logical unit.
+
+.sp
+.in +2
+.nf
+# \fBmpathadm enable path -i 2000000173018713 -t 20030003ba27d095	 \e
+-l /dev/rdsk/c4t60003BA27D2120004204AC2B000DAB00d0s2\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 7 \fRModifying \fBmpath-support\fR To Turn On \fBautofailback\fR
+.sp
+.in +2
+.nf
+# \fBmpathadm modify mpath-support -a on libmpscsi_vhci.so\fR
+.fi
+.in -2
+.sp
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.BR libMPAPI (3LIB),
+.BR exec_attr (5),
+.BR attributes (7),
+.BR stmsboot (8)

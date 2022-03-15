@@ -28,6 +28,6 @@ set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
 dir  path=usr/bin
 file path=usr/bin/diskinfo mode=0555
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/diskinfo.1m mode=0444
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/diskinfo.8 mode=0444
 license lic_CDDL license=lic_CDDL

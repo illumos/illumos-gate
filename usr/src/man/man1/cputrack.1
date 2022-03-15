@@ -210,7 +210,7 @@ timebase as \fBgethrtime\fR(3C).
 The \fBcputrack\fR utility attaches performance counter context to each process
 that it examines. The presence of this context allows the performance counters
 to be multiplexed between different processes on the system, but it cannot be
-used at the same time as the \fBcpustat\fR(1M) utility.
+used at the same time as the \fBcpustat\fR(8) utility.
 .sp
 .LP
 Once an instance of the \fBcpustat\fR utility is running, further attempts to
@@ -244,7 +244,7 @@ performance counter values for each LWP, some of the events that can be counted
 will inevitably be impacted by other activities occurring on the system,
 particularly for limited resources that are shared between processes (for
 example, cache miss rates). For such events, it may also be interesting to
-observe overall system behavior with \fBcpustat\fR(1M).
+observe overall system behavior with \fBcpustat\fR(8).
 .sp
 .LP
 For the \fB-T\fR \fIinterval\fR option, if \fIinterval\fR is specified as zero,
@@ -364,7 +364,7 @@ example% \fBcputrack -c ITLB_reference,emask=1 date\fR
 
 .SH WARNINGS
 .LP
-By running any instance of the \fBcpustat\fR(1M) utility, all existing
+By running any instance of the \fBcpustat\fR(8) utility, all existing
 performance counter context is forcibly invalidated across the machine. This
 may in turn cause all invocations of the \fBcputrack\fR command to exit
 prematurely with unspecified errors.
@@ -391,7 +391,7 @@ If a short interval is requested, \fBcputrack\fR may not be able to keep up
 with the desired sample rate. In this case, some samples may be dropped.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -405,9 +405,24 @@ Interface Stability	Evolving
 
 .SH SEE ALSO
 .LP
-\fBnawk\fR(1), \fBperl\fR(1), \fBproc\fR(1), \fBtruss\fR(1), \fBprstat\fR(1M),
-\fBcpustat\fR(1M), \fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2),
-\fBsetuid\fR(2), \fBvfork\fR(2), \fBgethrtime\fR(3C), \fBstrtoll\fR(3C),
-\fBcpc\fR(3CPC), \fBcpc_bind_pctx\fR(3CPC), \fBcpc_enable\fR(3CPC),
-\fBcpc_open\fR(3CPC), \fBlibcpc\fR(3LIB), \fBlibpctx\fR(3LIB), \fBproc\fR(4),
-\fBattributes\fR(5)
+.BR nawk (1),
+.BR perl (1),
+.BR proc (1),
+.BR truss (1),
+.BR exec (2),
+.BR exit (2),
+.BR fork (2),
+.BR setuid (2),
+.BR vfork (2),
+.BR gethrtime (3C),
+.BR strtoll (3C),
+.BR cpc (3CPC),
+.BR cpc_bind_pctx (3CPC),
+.BR cpc_enable (3CPC),
+.BR cpc_open (3CPC),
+.BR libcpc (3LIB),
+.BR libpctx (3LIB),
+.BR proc (5),
+.BR attributes (7),
+.BR cpustat (8),
+.BR prstat (8)

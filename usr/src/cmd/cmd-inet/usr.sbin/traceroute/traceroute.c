@@ -1299,7 +1299,7 @@ setup_socket(struct pr_set *pr, int packet_len)
 	 * or whether ICMP will be used instead of UDP.
 	 *
 	 * For historical reasons, the datagrams sent out by
-	 * traceroute(1M) do not have the "don't fragment" flag set.  For
+	 * traceroute(8) do not have the "don't fragment" flag set.  For
 	 * this reason as well as the ability to set the Loose Source and
 	 * Record Route (LSRR) option, a raw IP socket will be used for
 	 * IPv4 when run in the global zone.  Otherwise, the actual

@@ -65,7 +65,7 @@ to calling any of the other functions except  \fBldap_build_filter\fR.
 .LP
 \fBldap_init_getfilter()\fR takes a file name as its only argument.  The
 contents of the file must be a valid LDAP filter configuration file (see
-\fBldapfilter.conf\fR(4)). If the file is successfully read, a pointer to an
+\fBldapfilter.conf\fR(5)). If the file is successfully read, a pointer to an
 \fBLDAPFiltDesc\fR is returned.  This is an opaque object that is passed in
 subsequent get filter calls.
 .sp
@@ -73,7 +73,7 @@ subsequent get filter calls.
 \fBldap_init_getfilter_buf()\fR reads from \fIbuf\fR, whose length is
 \fIbuflen\fR, the LDAP filter configuration information. \fIbuf\fR must point
 to the contents of a valid LDAP filter configuration file. See
-\fBldapfilter.conf\fR(4). If the filter configuration information is
+\fBldapfilter.conf\fR(5). If the filter configuration information is
 successfully read, a pointer to an  \fBLDAPFiltDesc\fR is returned.  This is an
 opaque object that is passed in subsequent get filter calls.
 .sp
@@ -111,7 +111,7 @@ A pattern for the desired filter is passed in \fIpattern.\fR Where the string
 %a appears in the pattern it is replaced with \fIattr.\fR \fIprefix\fR is
 pre-pended to the resulting filter, and \fIsuffix\fR is appended.  Either can
 be NULL , in which case they are not used. \fIvalue\fR and \fIvalwords\fR are
-used when the string %v appears in \fIpattern.\fR See  \fBldapfilter.conf\fR(4)
+used when the string %v appears in \fIpattern.\fR See  \fBldapfilter.conf\fR(5)
 for a description of how %v is handled.
 .SH ERRORS
 .sp
@@ -133,7 +133,7 @@ LDAP filtering routine configuration file.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -148,7 +148,9 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBldapfilter.conf\fR(4), \fBattributes\fR(5)
+.BR ldap (3LDAP),
+.BR ldapfilter.conf (5),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

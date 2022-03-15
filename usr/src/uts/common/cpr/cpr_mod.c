@@ -131,7 +131,7 @@ cpr(int fcn, void *mdep)
 	static const char noswapstr[] = "reusable statefile requires "
 	    "that no swap area be configured.\n";
 	static const char blockstr[] = "reusable statefile must be "
-	    "a block device.  See power.conf(4) and pmconfig(1M).\n";
+	    "a block device.  See power.conf(5) and pmconfig(8).\n";
 	static const char normalfmt[] = "cannot run normal "
 	    "checkpoint/resume when in reusable statefile mode. "
 	    "use uadmin A_FREEZE AD_REUSEFINI (uadmin %d %d) "

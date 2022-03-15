@@ -33,7 +33,7 @@ by \fIRFC 1779, A String Representation of Distinguished Names\fR.
 .SS "Retransmission Algorithm"
 .sp
 .LP
-\fBcldap_search_s()\fR operates using the CLDAP protocol over \fBudp\fR(7P).
+\fBcldap_search_s()\fR operates using the CLDAP protocol over \fBudp\fR(4P).
 Since UDP is a non-reliable protocol, a retry mechanism is used to increase
 reliability. The \fBcldap_setretryinfo\fR(3LDAP) function can be used to set
 two retry parameters:  \fItries\fR, a count of the number of times to send a
@@ -126,7 +126,7 @@ more information.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -141,6 +141,11 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBldap_error\fR(3LDAP), \fBldap_search_s\fR(3LDAP),
-\fBcldap_open\fR(3LDAP), \fBcldap_setretryinfo\fR(3LDAP),
-\fBcldap_close\fR(3LDAP), \fBattributes\fR(5), \fBudp\fR(7P)
+.BR cldap_close (3LDAP),
+.BR cldap_open (3LDAP),
+.BR cldap_setretryinfo (3LDAP),
+.BR ldap (3LDAP),
+.BR ldap_error (3LDAP),
+.BR ldap_search_s (3LDAP),
+.BR udp (4P),
+.BR attributes (7)

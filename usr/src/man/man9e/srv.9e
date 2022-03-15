@@ -150,9 +150,18 @@ If the message cannot be passed, put it back on the queue with
 Ignored.
 .SH SEE ALSO
 .LP
-\fBput\fR(9E), \fBbcanput\fR(9F), \fBbcanputnext\fR(9F), \fBcanput\fR(9F),
-\fBcanputnext\fR(9F), \fBgetq\fR(9F), \fBnulldev\fR(9F), \fBputbq\fR(9F),
-\fBputnext\fR(9F), \fBputq\fR(9F), \fBqinit\fR(9S), \fBqueue\fR(9S)
+.BR put (9E),
+.BR bcanput (9F),
+.BR bcanputnext (9F),
+.BR canput (9F),
+.BR canputnext (9F),
+.BR getq (9F),
+.BR nulldev (9F),
+.BR putbq (9F),
+.BR putnext (9F),
+.BR putq (9F),
+.BR qinit (9S),
+.BR queue (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

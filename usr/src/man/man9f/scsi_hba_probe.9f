@@ -47,7 +47,9 @@ See \fBscsi_probe\fR(9F) for the return values from \fBscsi_hba_probe()\fR.
 \fBscsi_hba_probe()\fR should only be called from the \fBHBA\fR's
 \fBtran_tgt_probe\fR(9E) entry point.
 .SH SEE ALSO
-\fBtran_tgt_probe\fR(9E), \fBscsi_probe\fR(9F), \fBscsi_device\fR(9S)
+.BR tran_tgt_probe (9E),
+.BR scsi_probe (9F),
+.BR scsi_device (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

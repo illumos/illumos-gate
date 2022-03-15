@@ -257,7 +257,7 @@ When \fIucred\fR is no longer needed, a credential allocated by
 \fBsvc_getcallerucred()\fR should be freed with \fBucred_free\fR(3C).
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of attribute types and values.
+See \fBattributes\fR(7) for descriptions of attribute types and values.
 .sp
 
 .sp
@@ -281,7 +281,14 @@ the Automatic or the User MT mode. The \fBsvc_getreq_common()\fR,
 multithreaded applications and should be called only from the main thread.
 .SH SEE ALSO
 .LP
-\fBrpcgen\fR(1), \fBpoll\fR(2), \fBgetpeerucred\fR(3C), \fBrpc\fR(3NSL),
-\fBrpc_control\fR(3NSL), \fBrpc_svc_create\fR(3NSL), \fBrpc_svc_err\fR(3NSL),
-\fBrpc_svc_reg\fR(3NSL), \fBselect\fR(3C), \fBucred_free\fR(3C),
-\fBattributes\fR(5)
+.BR rpcgen (1),
+.BR poll (2),
+.BR getpeerucred (3C),
+.BR select (3C),
+.BR ucred_free (3C),
+.BR rpc (3NSL),
+.BR rpc_control (3NSL),
+.BR rpc_svc_create (3NSL),
+.BR rpc_svc_err (3NSL),
+.BR rpc_svc_reg (3NSL),
+.BR attributes (7)

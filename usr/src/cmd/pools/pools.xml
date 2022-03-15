@@ -23,8 +23,6 @@
     Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
-    ident	"%Z%%M%	%I%	%E% SMI"
-
     NOTE:  This service manifest is not editable; its contents will
     be overwritten by package or patch operations, including
     operating system upgrade.  Make customizations in a different
@@ -94,10 +92,10 @@
 		</common_name>
 		<documentation>
 			<manpage title='libpool' section='3LIB' manpath='/usr/share/man' />
-			<manpage title='pooladm' section='1M' manpath='/usr/share/man' />
-			<manpage title='poolbind' section='1M' manpath='/usr/share/man' />
-			<manpage title='poolcfg' section='1M' manpath='/usr/share/man' />
-			<manpage title='poolstat' section='1M' manpath='/usr/share/man' />
+			<manpage title='pooladm' section='8' manpath='/usr/share/man' />
+			<manpage title='poolbind' section='8' manpath='/usr/share/man' />
+			<manpage title='poolcfg' section='8' manpath='/usr/share/man' />
+			<manpage title='poolstat' section='8' manpath='/usr/share/man' />
 		</documentation>
 	</template>
 </service>

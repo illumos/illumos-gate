@@ -39,7 +39,7 @@
 # STRATEGY:
 #	1. Create filesystems with copies set as 2,3 respectively;
 #	2. Copy specified size data into each filesystem;
-#	3. Verify that the space is charged as expected with zfs list, ls -s, df(1m),
+#	3. Verify that the space is charged as expected with zfs list, ls -s, df(8),
 #	   du(1) commands;
 #
 
@@ -87,7 +87,7 @@ for val in 1 2 3; do
 	check_used $used $val
 done
 
-log_note "Verify df(1M) can corectly display the space charged."
+log_note "Verify df(8) can corectly display the space charged."
 for val in 1 2 3; do
 	used=`df -F zfs -h /$TESTPOOL/fs_$val/$FILE | grep $TESTPOOL/fs_$val \
 		| awk '{print $3}'`

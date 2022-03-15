@@ -126,9 +126,9 @@ files=\fIdevice-list\fR
 .sp
 
 where \fIdevice-attributes\fR is the contents of the \fBreserved1\fR field of
-\fBdevice_allocate\fR(4). The field is colon (\fB:\fR) separated.)
+\fBdevice_allocate\fR(5). The field is colon (\fB:\fR) separated.)
 .sp
-See \fBdevice_allocate\fR(4) for a description of these attributes and their
+See \fBdevice_allocate\fR(5) for a description of these attributes and their
 format.
 .sp
 The \fB-a\fR output has the following keys:
@@ -139,7 +139,7 @@ The \fB-a\fR output has the following keys:
 .ad
 .RS 10n
 Specifies the list of authorizations. The value is \fBauths\fR is described in
-\fBdevice_allocate\fR(4).
+\fBdevice_allocate\fR(5).
 .RE
 
 .sp
@@ -149,7 +149,7 @@ Specifies the list of authorizations. The value is \fBauths\fR is described in
 .ad
 .RS 10n
 Specifies the device cleaning script. The value is \fBdevice-exec\fR as
-described in \fBdevice_allocate\fR(4).
+described in \fBdevice_allocate\fR(5).
 .RE
 
 .sp
@@ -159,7 +159,7 @@ described in \fBdevice_allocate\fR(4).
 .ad
 .RS 10n
 Specifies the device name. The value is \fBdevice-name\fR as described in
-\fBdevice_allocate\fR(4).
+\fBdevice_allocate\fR(5).
 .RE
 
 .sp
@@ -169,7 +169,7 @@ Specifies the device name. The value is \fBdevice-name\fR as described in
 .ad
 .RS 10n
 Specifies the device file paths. The value is \fBdevice-list\fR as described in
-\fBdevice_maps\fR(4).
+\fBdevice_maps\fR(5).
 .RE
 
 .sp
@@ -179,7 +179,7 @@ Specifies the device file paths. The value is \fBdevice-list\fR as described in
 .ad
 .RS 10n
 Specifies the device type. The value is \fBdevice-type\fR as described in
-\fBdevice_allocate\fR(4).
+\fBdevice_allocate\fR(5).
 .RE
 
 .RE
@@ -327,7 +327,7 @@ An error occurred.
 \fB/usr/security/lib/*\fR
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -347,14 +347,19 @@ The invocation is Uncommitted. The options are Uncommitted. The output from the
 Not-an-Interface.
 .SH SEE ALSO
 .LP
-\fBallocate\fR(1), \fBdeallocate\fR(1), \fBdminfo\fR(1M),
-\fBmkdevalloc\fR(1M), \fBmkdevmaps\fR(1M), \fBdevice_allocate\fR(4),
-\fBdevice_maps\fR(4), \fBattributes\fR(5)
+.BR allocate (1),
+.BR deallocate (1),
+.BR device_allocate (5),
+.BR device_maps (5),
+.BR attributes (7),
+.BR dminfo (8),
+.BR mkdevalloc (8),
+.BR mkdevmaps (8)
 .SH NOTES
 .LP
 On systems configured with Trusted Extensions, the functionality is enabled by
 default.
 .sp
 .LP
-\fB/etc/security/dev\fR, \fBmkdevalloc\fR(1M), and \fBmkdevmaps\fR(1M) might
+\fB/etc/security/dev\fR, \fBmkdevalloc\fR(8), and \fBmkdevmaps\fR(8) might
 not be supported in a future release of the Solaris Operating Environment.

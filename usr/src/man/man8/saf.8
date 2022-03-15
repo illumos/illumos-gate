@@ -1,0 +1,1516 @@
+'\" te
+.\"  Copyright (c) 1998, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SAF 8 "Jul 30, 1998"
+.SH NAME
+saf \- Service Access Facility
+.SH DESCRIPTION
+.sp
+.LP
+The \fBSAF\fR generalizes the procedures for service access so that login
+access on the local system and network access to local services are managed in
+similar ways. Under the \fBSAF,\fR systems may access services using a variety
+of port monitors, including ttymon, the listener, and port monitors written
+expressly for a user's application. The manner in which a port monitor observes
+and manages access ports is specific to the port monitor and not to any
+component of the \fBSAF.\fR Users may therefore extend their systems by
+developing and installing their own port monitors. One of the important
+features of the \fBSAF\fR is that it can be extended in this way by users.
+.sp
+.LP
+Relative to the \fBSAF,\fR a service is a process that is started. There are no
+restrictions on the functions a service may provide. The \fBSAF\fR consists of
+a controlling process, the service access controller (SAC), and two
+administrative levels corresponding to two levels in the supporting directory
+structure. The top administrative level is concerned with port monitor
+administration, the lower level with service administration. The \fBSAC\fR is
+documented in the \fBsac\fR(8) man page. The administrative levels and
+associated utilities are documented in the \fISystem Administration Guide -
+Volume II\fR. The requirements for writing port monitors and the functions a
+port monitor must perform to run under the \fBSAF\fR and the \fBSAC\fR are
+documented here.
+.SS "Port Monitors"
+.sp
+.LP
+A port monitor is a process that is responsible for monitoring a set of
+homogeneous, incoming ports on a machine. A port monitor's major purpose is to
+detect incoming service requests and to dispatch them appropriately.
+.sp
+.LP
+A port is an externally seen access point on a system. A port may be an address
+on a network (TSAP or PSAP), a hardwired terminal line, an incoming phone line,
+etc. The definition of what constitutes a port is strictly a function of the
+port monitor itself.
+.sp
+.LP
+A port monitor performs certain basic functions. Some of these are required to
+conform to the \fBSAF;\fR others may be specified by the requirements and
+design of the port monitor itself. Port monitors have two main functions:
+managing ports and monitoring ports for indications of activity.
+.sp
+.ne 2
+.na
+\fBPort Management\fR
+.ad
+.RS 23n
+The first function of a port monitor is to manage a port. The actual details of
+how a port is managed are defined by the person who defines the port monitor. A
+port monitor is not restricted to handling a single port; it may handle
+multiple ports simultaneously.
+.sp
+Some examples of port management are setting the line speed on incoming phone
+connections, binding an appropriate network address, reinitializing the port
+when the service terminates, outputting a prompt, etc.
+.RE
+
+.sp
+.ne 2
+.na
+\fBActivity Monitoring\fR
+.ad
+.RS 23n
+The second function of a port monitor is to monitor the port or ports for which
+it is responsible for indications of activity. Two types of activity may be
+detected.
+.sp
+The first is an indication to the port monitor to take some port
+monitor-specific action. Pressing the break key to indicate that the line speed
+should be cycled is an example of a port monitor activity. Not all port
+monitors need to recognize and respond to the same indications. The indication
+used to attract the attention of the port monitor is defined by the person who
+defines the port monitor.
+.sp
+The second is an incoming service request. When a service request is received,
+a port monitor must be able to determine which service is being requested from
+the port on which the request is received. The same service may be available on
+more than one port.
+.RE
+
+.SS "Other Port Monitor Functions"
+.sp
+.LP
+This section briefly describes other port monitor functions.
+.sp
+.ne 2
+.na
+\fBRestricting Access to the System\fR
+.ad
+.sp .6
+.RS 4n
+A port monitor must be able to restrict access to the system without disturbing
+services that are still running. In order to do this, a port monitor must
+maintain two internal states: enabled and disabled. The port monitor starts in
+the state indicated by the \fBISTATE\fR environment variable provided by the
+\fBsac.\fR See sac(8) for details. Enabling or disabling a port monitor
+affects all ports for which the port monitor is responsible. If a port monitor
+is responsible for a single port, only that port will be affected. If a port
+monitor is responsible for multiple ports, the entire collection of ports will
+be affected. Enabling or disabling a port monitor is a dynamic operation: it
+causes the port monitor to change its internal state. The effect does not
+persist across new invocations of the port monitor. Enabling or disabling an
+individual port, however, is a static operation: it causes a change to an
+administrative file. The effect of this change will persist across new
+invocations of the port monitor.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCreating \fButmpx\fR Entries\fR
+.ad
+.sp .6
+.RS 4n
+Port monitors are responsible for creating \fButmpx\fR entries with the type
+field set to USER_PROCESS for services they start. If this action has been
+specified, by using the \fB-fu\fR option in the \fBpmadm\fR command line that
+added the service, these \fButmpx\fR entries may in turn be modified by the
+service. When the service terminates, the \fButmpx\fR entry must be set to
+DEAD_PROCESS.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPort Monitor Process IDs and Lock Files\fR
+.ad
+.sp .6
+.RS 4n
+When a port monitor starts, it writes its process id into a file named
+\fB_pid\fR in the current directory and places an advisory lock on the file.
+.RE
+
+.sp
+.ne 2
+.na
+\fBChanging the Service Environment: Running\fR
+.ad
+.sp .6
+.RS 4n
+\fBdoconfig\fR(3NSL) Before invoking the service designated in the port monitor
+administrative file, \fB_pmtab\fR, a port monitor must arrange for the
+per-service configuration script to be run, if one exists, by calling the
+library function \fBdoconfig\fR(3NSL). Because the per-service configuration
+script may specify the execution of restricted commands, as well as for other
+security reasons, port monitors are invoked with root permissions. The details
+of how services are invoked are specified by the person who defines the port
+monitor.
+.RE
+
+.sp
+.ne 2
+.na
+\fBTerminating a Port Monitor\fR
+.ad
+.sp .6
+.RS 4n
+A port monitor must terminate itself gracefully on receipt of the signal
+\fBSIGTERM.\fR The termination sequence is the following:
+.RS +4
+.TP
+1.
+The port monitor enters the stopping state; no further service requests are
+accepted.
+.RE
+.RS +4
+.TP
+2.
+Any attempt to re-enable the port monitor will be ignored.
+.RE
+.RS +4
+.TP
+3.
+The port monitor yields control of all ports for which it is responsible. It
+must be possible for a new instantiation of the port monitor to start correctly
+while a previous instantiation is stopping.
+.RE
+.RS +4
+.TP
+4.
+The advisory lock on the process id file is released. Once this lock is
+released, the contents of the process id file are undefined and a new
+invocation of the port monitor may be started.
+.RE
+.RE
+
+.SS "SAF Files"
+.sp
+.LP
+This section briefly covers the files used by the \fBSAF.\fR
+.sp
+.ne 2
+.na
+\fBThe Port Monitor Administrative File\fR
+.ad
+.sp .6
+.RS 4n
+A port monitor's current directory contains an administrative file named
+\fB_pmtab\fR; \fB_pmtab\fR is maintained by the \fBpmadm\fR command in
+conjunction with a port monitor-specific administrative command.
+.sp
+The port monitor administrative command for a listen port monitor is
+\fBnlsadmin\fR(8); the port monitor administrative command for ttymon is
+\fBttyadm\fR(8). Any port monitor written by a user must be provided with an
+administrative command specific to that port monitor to perform similar
+functions.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPer-Service Configuration Files\fR
+.ad
+.sp .6
+.RS 4n
+A port monitor's current directory also contains the per-service configuration
+scripts, if they exist. The names of the per-service configuration scripts
+correspond to the service tags in the \fB_pmtab\fR file.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPrivate Port Monitor Files\fR
+.ad
+.sp .6
+.RS 4n
+A port monitor may create private files in the directory
+\fB/var/saf/\fR\fItag\fR, where \fItag\fR is the name of the port monitor.
+Examples of private files are log files or temporary files.
+.RE
+
+.SS "The SAC/Port Monitor Interface"
+.sp
+.LP
+The \fBSAC\fR creates two environment variables for each port monitor it
+starts:\fBPMTAG\fR and \fBISTATE\fR.
+.sp
+.LP
+This variable is set to a unique port monitor tag by the \fBSAC.\fR The port
+monitor uses this tag to identify itself in response to \fBsac\fR messages.
+\fBISTATE\fR is used to indicate to the port monitor what its initial internal
+state should be. \fBISTATE\fR is set to "enabled" or "disabled" to indicate
+that the port monitor is to start in the enabled or disabled state
+respectively.
+.sp
+.LP
+The \fBSAC\fR performs a periodic sanity poll of the port monitors. The
+\fBSAC\fR communicates with port monitors through FIFOs. A port monitor should
+open _pmpipe, in the current directory, to receive messages from the \fBSAC\fR
+and \fB\&../_sacpipe\fR to send return messages to the \fBSAC.\fR
+.SS "Message Formats"
+.sp
+.LP
+This section describes the messages that may be sent from the \fBSAC\fR to a
+port monitor (\fBsac\fR messages), and from a port monitor to the \fBSAC\fR
+(port monitor messages). These messages are sent through FIFOs and are in the
+form of C structures.
+.sp
+.ne 2
+.na
+\fB\fBsac\fR Messages\fR
+.ad
+.RS 16n
+The format of messages from the \fBSAC\fR is defined by the structure
+\fBsacmsg\fR:
+.sp
+.in +2
+.nf
+struct sacmsg
+{
+	int sc_size; /* size of optional data portion */
+	char sc_type; /* type of message */
+};
+.fi
+.in -2
+.sp
+
+.RE
+
+.sp
+.LP
+The \fBSAC\fR may send four types of messages to port monitors. The type of
+message is indicated by setting the \fBsc_type\fR field of the \fBsacmsg\fR
+structure to one of the following:
+.sp
+.ne 2
+.na
+\fBSC_STATUS\|\fR
+.ad
+.RS 15n
+status request
+.RE
+
+.sp
+.ne 2
+.na
+\fBSC_ENABLE\|\fR
+.ad
+.RS 15n
+enable message
+.RE
+
+.sp
+.ne 2
+.na
+\fBSC_DISABLE\fR
+.ad
+.RS 15n
+disable message
+.RE
+
+.sp
+.ne 2
+.na
+\fBSC_READDB\|\fR
+.ad
+.RS 15n
+message indicating that the port monitor's _pmtab file should be read
+.RE
+
+.sp
+.LP
+The \fBsc_size\fR field indicates the size of the optional data part of the
+message. See "Message Classes." For Solaris, \fBsc_size\fR should always be set
+to 0. A port monitor must respond to every message sent by the \fBsac.\fR
+.SS "Port Monitor Messages"
+.sp
+.LP
+The format of messages from a port monitor to the \fBSAC\fR is defined by the
+structure \fBpmmsg\fR:
+.sp
+.in +2
+.nf
+struct pmmsg {
+	char pm_type;                /* type of message */
+	unchar_t pm_state;           /* current state of port monitor */
+	char pm_maxclass;            /* maximum message class this port
+ 			                       monitor understands */
+	char pm_tag[PMTAGSIZE + 1];  /* port monitor's tag */
+	int pm_size;                 /* size of optional data portion */
+};
+.fi
+.in -2
+
+.sp
+.LP
+Port monitors may send two types of messages to the \fBSAC.\fR The type of
+message is indicated by setting the \fBpm_type\fR field of the \fBpmmsg\fR
+structure to one of the following:
+.sp
+.ne 2
+.na
+\fBPM_STATUS\fR
+.ad
+.RS 14n
+state information
+.RE
+
+.sp
+.ne 2
+.na
+\fBPM_UNKNOWN\fR
+.ad
+.RS 14n
+negative acknowledgment
+.RE
+
+.sp
+.LP
+For both types of messages, the \fBpm_tag\fR field is set to the port monitor's
+tag and the \fBpm_state\fR field is set to the port monitor's current state.
+Valid states are:
+.sp
+.ne 2
+.na
+\fBPM_STARTING\fR
+.ad
+.RS 15n
+starting
+.RE
+
+.sp
+.ne 2
+.na
+\fBPM_ENABLED\fR
+.ad
+.RS 15n
+enabled
+.RE
+
+.sp
+.ne 2
+.na
+\fBPM_DISABLED\fR
+.ad
+.RS 15n
+disabled
+.RE
+
+.sp
+.ne 2
+.na
+\fBPM_STOPPING\fR
+.ad
+.RS 15n
+stopping
+.RE
+
+.sp
+.LP
+The current state reflects any changes caused by the last message from the
+\fBSAC.\fR The status message is the normal return message. The negative
+acknowledgment should be sent only when the message received is not understood.
+\fBpm_size\fR indicates the size of the optional data part of the message.
+\fBpm_maxclass\fR is used to specify a message class. Both are discussed under
+"Message Classes." In Solaris, always set \fBpm_maxclass\fR to 1 and
+\fBsc_size\fR to 0. Port monitors may never initiate messages; they may only
+respond to messages that they receive.
+.SS "Message Classes"
+.sp
+.LP
+The concept of message class has been included to accommodate possible
+\fBSAF\fR extensions. The messages described above are all class 1 messages.
+None of these messages contains a variable data portion; all pertinent
+information is contained in the message header. If new messages are added to
+the protocol, they will be defined as new message classes (for example, class
+2). The first message the \fBSAC\fR sends to a port monitor will always be a
+class 1 message. Since all port monitors, by definition, understand class 1
+messages, the first message the \fBSAC\fR sends is guaranteed to be understood.
+In its response to the \fBSAC,\fR the port monitor sets the \fBpm_maxclass\fR
+field to the maximum message class number for that port monitor. The \fBSAC\fR
+will not send messages to a port monitor from a class with a larger number than
+the value of \fBpm_maxclass\fR. Requests that require messages of a higher
+class than the port monitor can understand will fail. For Solaris, always set
+\fBpm_maxclass\fR to 1.
+.sp
+.LP
+For any given port monitor, messages of class \fBpm_maxclass\fR and messages of
+all classes with values lower than \fBpm_maxclass\fR are valid. Thus, if the
+\fBpm_maxclass\fR field is set to 3, the port monitor understands messages of
+classes 1, 2, and 3. Port monitors may not generate messages; they may only
+respond to messages. A port monitor's response must be of the same class as the
+originating message. Since only the \fBSAC\fR can generate messages, this
+protocol will function even if the port monitor is capable of dealing with
+messages of a higher class than the \fBSAC\fR can generate. \fBpm_size\fR (an
+element of the pmmsg structure) and \fBsc_size\fR (an element of the
+\fBsacmsg\fR structure) indicate the size of the optional data part of the
+message. The format of this part of the message is undefined. Its definition is
+inherent in the type of message. For Solaris, always set both \fBsc_size\fR and
+\fBpm_size\fR to \fB0\fR.
+.SS "Administrative Interface"
+.sp
+.LP
+This section discusses the port monitor administrative files available under
+the \fBSAC.\fR
+.SS "The SAC Administrative File _sactab"
+.sp
+.LP
+The service access controller's administrative file contains information about
+all the port monitors for which the \fBSAC\fR is responsible. This file exists
+on the delivered system. Initially, it is empty except for a single comment
+line that contains the version number of the \fBSAC.\fR Port monitors are added
+to the system by making entries in the \fBSAC's\fR administrative file. These
+entries should be made using the administrative command \fBsacadm\fR(8) with a
+\fB-a\fR option. \fBsacadm\fR(8) is also used to remove entries from the
+\fBSAC's\fR administrative file. Each entry in the \fBSAC's\fR administrative
+file contains the following information.
+.sp
+.ne 2
+.na
+\fB\fBPMTAG\fR\fR
+.ad
+.RS 11n
+A unique tag that identifies a particular port monitor. The system
+administrator is responsible for naming a port monitor. This tag is then used
+by the \fBSAC\fR to identify the port  monitor for all administrative purposes.
+\fBPMTAG\fR may consist of up to 14 alphanumeric characters.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPMTYPE\fR\fR
+.ad
+.RS 11n
+The type of the port monitor. In addition to its unique tag, each port monitor
+has a type designator. The type designator identifies a group of port monitors
+that are different invocations of the same entity. ttymon and listen are
+examples of valid port monitor types. The type designator is used to facilitate
+the administration of groups of related port monitors. Without a type
+designator, the system administrator has no way of knowing which port monitor
+tags correspond to port monitors of the same type. \fBPMTYPE\fR may consist of
+up to 14 alphanumeric characters.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBFLGS\fR\fR
+.ad
+.RS 11n
+The flags that are currently defined are:
+.sp
+.ne 2
+.na
+\fBd\fR
+.ad
+.RS 5n
+When started, do not enable the port monitor.
+.RE
+
+.sp
+.ne 2
+.na
+\fBx\fR
+.ad
+.RS 5n
+Do not start the port monitor.
+.RE
+
+If no flag is specified, the default action is taken. By default a port monitor
+is started and enabled.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBRCNT\fR\fR
+.ad
+.RS 11n
+The number of times a port monitor may fail before being placed in a failed
+state. Once a port monitor enters the failed state, the \fBSAC\fR will not try
+to restart it. If a count is not specified when the entry is created, this
+field is set to 0. A restart count of 0 indicates that the port monitor is not
+to be restarted when it fails.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCOMMAND\fR\fR
+.ad
+.RS 11n
+A string representing the command that will start the port monitor. The first
+component of the string, the command itself, must be a full path name.
+.RE
+
+.SS "The Port Monitor Administrative File _pmtab"
+.sp
+.LP
+Each port monitor will have two directories for its exclusive use. The current
+directory will contain files defined by the \fBSAF\fR (\fB_pmtab\fR,
+\fB_pid\fR) and the per-service configuration scripts, if they exist. The
+directory \fB/var/saf/\fR\fIpmtag,\fR where \fIpmtag\fR is the tag of the port
+monitor, is available for the port monitor's private files. Each port monitor
+has its own administrative file. The \fBpmadm\fR(8) command should be used to
+add, remove, or modify service entries in this file. Each time a change is made
+using \fBpmadm\fR(8), the corresponding port monitor rereads its
+administrative file. Each entry in a port monitor's administrative file defines
+how the port monitor treats a specific port and what service is to be invoked
+on that port. Some fields must be present for all types of port monitors. Each
+entry must include a service tag to identify the service uniquely and an
+identity to be assigned to the service when it is started (for example, root).
+.sp
+.LP
+The combination of a service tag and a port monitor tag uniquely define an
+instance of a service. The same service tag may be used to identify a service
+under a different port monitor. The record must also contain port monitor
+specific data (for example, for a ttymon port monitor, this will include the
+prompt string which is meaningful to ttymon). Each type of port monitor must
+provide a command that takes the necessary port monitor-specific data as
+arguments and outputs these data in a form suitable for storage in the file.
+The \fBttyadm\fR(8) command does this for ttymon and \fBnlsadmin\fR(8) does
+it for listen. For a user-defined port monitor, a similar administrative
+command must also be supplied. Each service entry in the port monitor
+administrative file must have the following format and contain the information
+listed below:
+.sp
+.in +2
+.nf
+svctag:flgs:id:reserved:reserved:reserved:pmspecific# comment
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBSVCTAG\fR is a unique tag that identifies a service. This tag is unique only
+for the port monitor through which the service is available. Other port
+monitors may offer the same or other services with the same tag. A service
+requires both a port monitor tag and a service tag to identify it uniquely.
+\fBSVCTAG\fR may consist of up to 14 alphanumeric characters. The service
+entries are defined as:
+.sp
+.ne 2
+.na
+\fB\fBFLGS\fR\fR
+.ad
+.RS 14n
+Flags with the following meanings may currently be included in this field:
+.sp
+.ne 2
+.na
+\fBx\fR
+.ad
+.RS 5n
+Do not enable this port. By default the port is enabled.
+.RE
+
+.sp
+.ne 2
+.na
+\fBu\fR
+.ad
+.RS 5n
+Create a utmpx entry for this service. By default no utmpx entry is created
+for the service.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBID\fR\fR
+.ad
+.RS 14n
+The identity under which the service is to be started. The identity has the
+form of a login name as it appears in \fB/etc/passwd\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBPMSPECIFIC\fR\fR
+.ad
+.RS 14n
+Examples of port monitor information are addresses, the name of a process to
+execute, or the name of a STREAMS-based pipe to pass a connection through. This
+information will vary to meet the needs of each different type of port monitor.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCOMMENT\fR\fR
+.ad
+.RS 14n
+A comment associated with the service entry. Port monitors may ignore the
+\fIu\fR flag if creating a utmpx entry for the service is not appropriate to
+the manner in which the service is to be invoked. Some services may not start
+properly unless utmpx entries have been created for them (for example, login).
+Each port monitor administrative file must contain one special comment of the
+form:
+.sp
+# VERSION=value
+.sp
+where \fIvalue\fR is an integer that represents the port monitor's version
+number. The version number defines the format of the port monitor
+administrative file. This comment line is created automatically when a port
+monitor is added to the system. It appears on a line by itself, before the
+service entries.
+.RE
+
+.SS "Monitor-Specific Administrative Command"
+.sp
+.LP
+Previously, two pieces of information included in the \fB_pmtab\fR file were
+described: the port monitor's version number and the port monitor part of the
+service entries in the port monitor's \fB_pmtab\fR file. When a new port
+monitor is added, the version number must be known so that the \fB_pmtab\fR
+file can be correctly initialized. When a new service is added, the port
+monitor part of the \fB_pmtab\fR entry must be formatted correctly. Each port
+monitor must have an administrative command to perform these two tasks. The
+person who defines the port monitor must also define such an administrative
+command and its input options. When the command is invoked with these options,
+the information required for the port monitor part of the service entry must be
+correctly formatted for inclusion in the port monitor's \fB_pmtab\fR file and
+must be written to the standard output. To request the version number the
+command must be invoked with a \fB-V\fR option; when it is invoked in this way,
+the port monitor's current version number must be written to the standard
+output. If the command fails for any reason during the execution of either of
+these tasks, no data should be written to standard output.
+.SS "The Port Monitor/Service Interface"
+.sp
+.LP
+The interface between a port monitor and a service is determined solely by the
+service. Two mechanisms for invoking a service are presented here as examples.
+.sp
+.ne 2
+.na
+\fBNew Service Invocations\fR
+.ad
+.sp .6
+.RS 4n
+The first interface is for services that are started anew with each request.
+This interface requires the port monitor to first \fBfork\fR(2) a child
+process. The child will eventually become the designated service by performing
+an \fBexec\fR(1). Before the \fBexec\fR(1) happens, the port monitor may take
+some port monitor-specific action; however, one action that must occur is the
+interpretation of the per-service configuration script, if one is present. This
+is done by calling the library routine \fBdoconfig\fR(3NSL).
+.RE
+
+.sp
+.ne 2
+.na
+\fBStanding Service Invocations\fR
+.ad
+.sp .6
+.RS 4n
+The second interface is for invocations of services that are actively running.
+To use this interface, a service must have one end of a stream pipe open and be
+prepared to receive connections through it.
+.RE
+
+.SS "Port Monitor Requirements"
+.sp
+.LP
+To implement a port monitor, several generic requirements must be met. This
+section summarizes these requirements. In addition to the port monitor itself,
+an administrative command must be supplied.
+.sp
+.ne 2
+.na
+\fBInitial Environment\fR
+.ad
+.RS 23n
+When a port monitor is started, it expects an initial execution environment in
+which:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+It has no file descriptors open
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+It cannot be a process group leader
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+It has an entry in \fB/etc/utmpx\fR of type LOGIN_PROCESS
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An environment variable, \fBISTATE,\fR is set to "enabled" or "disabled" to
+indicate the port monitor's correct initial state
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+An environment variable, \fBPMTAG,\fR is set to the port monitor's assigned tag
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The directory that contains the port monitor's administrative files is its
+current directory
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+pThe port monitor is able to create private files in the directory
+\fB/var/saf/\fR\fItag\fR, where \fItag\fR is the port monitor's tag
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The port monitor is running with user id 0 (root)
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fBImportant Files\fR
+.ad
+.RS 23n
+Relative to its current directory, the following key files exist for a port
+monitor.
+.sp
+.ne 2
+.na
+\fB\fB_config\fR\fR
+.ad
+.RS 17n
+The port monitor's configuration script. The port monitor configuration script
+is run by the SAC. The \fBSAC\fR is started by \fBinit\fR(8) as a result of an
+entry in \fB/etc/inittab\fR that calls \fBsac\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB_pid\fR\fR
+.ad
+.RS 17n
+The file into which the port monitor writes its process id.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB_pmtab\fR\fR
+.ad
+.RS 17n
+The port monitor's administrative file. This file contains information about
+the ports and services for which the port monitor is responsible.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB_pmpipe\fR\fR
+.ad
+.RS 17n
+The\fB FIFO\fR through which the port monitor will receive messages from the
+\fBSAC.\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsvctag\fR\fR
+.ad
+.RS 17n
+The per-service configuration script for the service with the tag \fIsvctag\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&../_sacpipe\fR\fR
+.ad
+.RS 17n
+The \fBFIFO\fR through which the port monitor will send messages to
+\fBsac\fR(8).
+.RE
+
+.RE
+
+.SS "Port Monitor Responsibilities"
+.sp
+.LP
+A port monitor is responsible for performing the following tasks in addition to
+its port monitor function:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Write its process id into the file \fB_pid\fR and place an advisory lock on the
+file
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Terminate gracefully on receipt of the signal SIGTERM
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Follow the protocol for message exchange with the \fBSAC\fR
+.RE
+.sp
+.LP
+A port monitor must perform the following tasks during service invocation:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Create a \fButmpx\fR entry if the requested service has the \fBu\fR flag set in
+\fB_pmtab\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Port monitors may ignore this flag if creating a \fButmpx\fR entry for the
+service does not make sense because of the manner in which the service is to be
+invoked. On the other hand, some services may not start properly unless utmpx
+entries have been created for them.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Interpret the per-service configuration script for the requested service, if it
+exists, by calling the \fBdoconfig\fR(3NSL) library routine
+.RE
+.SS "Configuration Files and Scripts"
+.sp
+.LP
+The library routine \fBdoconfig\fR(3NSL), defined in \fBlibnsl.so\fR,
+interprets the configuration scripts contained in the files
+\fB/etc/saf/_sysconfig\fR (the per-system configuration file), and
+\fB/etc/saf/\fR\fIpmtag\fR\fB/_config\fR (per-port monitor configuration
+files); and in \fB/etc/saf/\fR\fIpmtag\fR\fB/svctag\fR (per-service
+configuration files). Its syntax is:
+.sp
+.in +2
+.nf
+#include <sac.h>
+	int doconfig (int fd, char *script, long rflag);
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+\fBscript\fR is the name of the configuration script; \fIfd\fR is a file
+descriptor that designates the stream to which stream manipulation operations
+are to be applied; \fIrflag\fR is a bitmask that indicates the mode in which
+script is to be interpreted. \fIrflag\fR may take two values, \fBNORUN\fR and
+\fBNOASSIGN,\fR which may be or'd. If \fIrflag\fR is zero, all commands in the
+configuration script are eligible to be interpreted. If \fIrflag\fR has the
+\fBNOASSIGN\fR bit set, the assign command is considered illegal and will
+generate an error return. If \fIrflag\fR has the \fBNORUN\fR bit set, the run
+and runwait commands are considered illegal and will generate error returns. If
+a command in the script fails, the interpretation of the script ceases at that
+point and a positive integer is returned; this number indicates which line in
+the script failed. If a system error occurs, a value of \(mi1 is returned. If a
+script fails, the process whose environment was being established should not be
+started. In the example, \fBdoconfig\fR(3NSL) is used to interpret a
+per-service configuration script.
+.sp
+.in +2
+.nf
+\|.\|.\|.
+		if ((i = doconfig (fd, svctag, 0)) != 0){
+		error ("doconfig failed on line %d of script %s",i,svctag);
+	}
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBThe Per-System Configuration File\fR
+.ad
+.sp .6
+.RS 4n
+The per-system configuration file, \fB/etc/saf/_sysconfig\fR, is delivered
+empty. It may be used to customize the environment for all services on the
+system by writing a command script in the interpreted language described in
+this chapter and on the \fBdoconfig\fR(3NSL) manpage. When the \fBSAC\fR is
+started, it calls the \fBdoconfig\fR(3NSL) function to interpret the per-system
+configuration script. The \fBSAC\fR is started when the system enters multiuser
+mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPer-Port Monitor Configuration Files\fR
+.ad
+.sp .6
+.RS 4n
+Per-port monitor configuration scripts
+(\fB/etc/saf/\fR\fIpmtag\fR\fB/_config)\fR are optional. They allow the user to
+customize the environment for any given port monitor and for the services that
+are available through the ports for which that port monitor is responsible.
+Per-port monitor configuration scripts are written in the same language used
+for per-system configuration scripts. The per-port monitor configuration script
+is interpreted when the port monitor is started. The port monitor is started by
+the \fBSAC\fR after the \fBSAC\fR has itself been started and after it has run
+its own configuration script, \fB/etc/saf/_sysconfig\fR. The per-port monitor
+configuration script may override defaults provided by the per-system
+configuration script.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPer-Service Configuration Files\fR
+.ad
+.sp .6
+.RS 4n
+Per-service configuration files allow the user to customize the environment for
+a specific service. For example, a service may require special privileges that
+are not available to the general user. Using the language described in the
+\fBdoconfig\fR(3NSL) manpage, you can write a script that will grant or limit
+such special privileges to a particular service offered through a particular
+port monitor. The per-service configuration may override defaults provided by
+higher-level configuration scripts. For example, the per-service configuration
+script may specify a set of STREAMS modules other than the default set.
+.RE
+
+.SS "The Configuration Language"
+.sp
+.LP
+The language in which configuration scripts are written consists of a sequence
+of commands, each of which is interpreted separately. The following reserved
+keywords are defined: \fBassign\fR, \fBpush\fR, \fBpop\fR, \fBrunwait\fR, and
+\fBrun\fR. The comment character is #. Blank lines are not significant. No line
+in a command script may exceed 1024 characters.
+.sp
+.ne 2
+.na
+\fB\fBassign\fR \fIvariable\fR=\fIvalue\fR\fR
+.ad
+.sp .6
+.RS 4n
+Used to define environment variables; \fIvariable\fR is the name of the
+environment variable and \fIvalue\fR is the value to be assigned to it. The
+value assigned must be a string constant; no form of parameter substitution is
+available. \fIvalue\fR may be quoted. The quoting rules are those used by the
+shell for defining environment variables. \fBassign\fR will fail if space
+cannot be allocated for the new variable or if any part of the specification is
+invalid.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpush\fR \fImodule1\fR[,\fImodule2, module3\fR, ...]\fR
+.ad
+.sp .6
+.RS 4n
+Used to push STREAMS modules onto the stream designated by \fBfd\fR;
+\fImodule1\fR is the name of the first module to be pushed, \fImodule2\fR is
+the name of the second module to be pushed, and so on. The command will fail if
+any of the named modules cannot be pushed. If a module cannot be pushed, the
+subsequent modules on the same command line will be ignored and modules that
+have already been pushed will be popped.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpop\fR [\fImodule\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Used to pop STREAMS modules off the designated stream. If \fBpop\fR is invoked
+with no arguments, the top module on the stream is popped. If an argument is
+given, modules will be popped one at a time until the named module is at the
+top of the stream. If the named module is not on the designated stream, the
+stream is left as it was and the command fails. If \fImodule\fR is the special
+keyword \fBALL\fR, then all modules on the stream will be popped. Only modules
+above the topmost driver are affected.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrunwait\fR \fBcommand\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBrunwait\fR command runs a command and waits for it to complete;
+\fBcommand\fR is the path name of the command to be run. The command is run
+with \fB/bin/sh\fR \fB-c\fR prepended to it; shell scripts may thus be executed
+from configuration scripts. The \fBrunwait\fR command will fail if command
+cannot be found or cannot be executed, or if \fBcommand\fR exits with a nonzero
+status.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrun\fR \fBcommand\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBrun\fR command is identical to \fBrunwait\fR except that it does not
+wait for command to complete; \fBcommand\fR is the path name of the command to
+be run.  \fBrun\fR will not fail unless it is unable to create achild process
+to execute the command. Although they are syntactically indistinguishable, some
+of the commands available to \fBrun\fR and \fBrunwait\fR are interpreter
+built-in commands. Interpreter built-ins are used when it is necessary to alter
+the state of a process within the context of that process. The \fBdoconfig\fR
+interpreter built-in commands are similar to the shell special commands and,
+like these, they do not spawn another process for execution. See the
+\fBsh\fR(1) man page. The initial set of built-in commands is: \fBcd\fR,
+\fBulimit\fR, \fBumask\fR.
+.RE
+
+.SS "Sample Port Monitor Code"
+.sp
+.LP
+This example shows an example of a "null" port monitor that simply responds to
+messages from the \fBSAC.\fR
+.sp
+.in +2
+.nf
+># include <stdlib.h>
+# include <stdio.h>
+# include <unistd.h>
+# include <fcntl.h>
+# include <signal.h>
+# include <sac.h>
+
+char Scratch[BUFSIZ]; /* scratch buffer */
+char Tag[PMTAGSIZE + 1]; /* port monitor's tag */
+FILE *Fp; /* file pointer for log file */
+FILE *Tfp; /* file pointer for pid file */
+char State; /* portmonitor's current state*/
+
+main(argc, argv)
+	int argc;
+	char *argv[];
+{
+	char *istate;
+	strcpy(Tag, getenv("PMTAG"));
+/*
+ * open up a log file in port monitor's private directory
+ */
+	sprintf(Scratch, "/var/saf/%s/log", Tag);
+	Fp = fopen(Scratch, "a+");
+	if (Fp == (FILE *)NULL)
+		exit(1);
+	log(Fp, "starting");
+/*
+ * retrieve initial state (either "enabled" or "disabled") and set
+ * State accordingly
+ */
+	istate = getenv("ISTATE");
+	sprintf(Scratch, "ISTATE is %s", istate);
+	log(Fp, Scratch);
+	if (!strcmp(istate, "enabled"))
+		State = PM_ENABLED;
+	else if (!strcmp(istate, "disabled"))
+		State = PM_DISABLED;
+	else {
+		log(Fp, "invalid initial state");
+		exit(1);
+	}
+	sprintf(Scratch, "PMTAG is %s", Tag);
+	log(Fp, Scratch);
+/*
+ * set up pid file and lock it to indicate that we are active
+ */
+	Tfp = fopen("_pid", "w");
+	if (Tfp == (FILE *)NULL) {
+		log(Fp, "couldn't open pid file");
+		exit(1);
+	}
+	if (lockf(fileno(Tfp), F_TEST, 0) < 0) {
+		log(Fp, "pid file already locked");
+		exit(1);
+	}
+
+	log(Fp, "locking file");
+	if (lockf(fileno(Tfp), F_LOCK, 0) < 0) {
+		log(Fp, "lock failed");
+		exit(1);
+	}
+	fprintf(Tfp, "%d", getpid());
+	fflush(Tfp);
+
+/*
+ * handle poll messages from the sac ... this function never returns
+ */
+	handlepoll();
+	pause();
+	fclose(Tfp);
+	fclose(Fp);
+}
+
+handlepoll()
+{
+	int pfd; /* file descriptor for incoming pipe */
+	int sfd; /* file descriptor for outgoing pipe */
+	struct sacmsg sacmsg; /* incoming message */
+	struct pmmsg pmmsg; /* outgoing message */
+/*
+ * open pipe for incoming messages from the sac
+ */
+	pfd = open("_pmpipe", O_RDONLY|O_NONBLOCK);
+	if (pfd < 0) {
+		log(Fp, "_pmpipe open failed");
+		exit(1);
+	}
+/*
+ * open pipe for outgoing messages to the sac
+ */
+	sfd = open("../_sacpipe", O_WRONLY);
+	if (sfd < 0) {
+		log(Fp, "_sacpipe open failed");
+		exit(1);
+	}
+/*
+ * start to build a return message; we only support class 1 messages
+ */
+	strcpy(pmmsg.pm_tag, Tag);
+	pmmsg.pm_size = 0;
+	pmmsg.pm_maxclass = 1;
+/*
+ * keep responding to messages from the sac
+ */
+ 	for (;;) {
+ 		if (read(pfd, &sacmsg, sizeof(sacmsg)) != sizeof(sacmsg)) {
+ 			log(Fp, "_pmpipe read failed");
+ 			exit(1);
+ 		}
+/*
+ * determine the message type and respond appropriately
+ */
+ 		switch (sacmsg.sc_type) {
+ 			case SC_STATUS:
+ 				log(Fp, "Got SC_STATUS message");
+ 				pmmsg.pm_type = PM_STATUS;
+ 				pmmsg.pm_state = State;
+ 				break;
+ 			case SC_ENABLE:
+ 				/*note internal state change below*/
+ 				log(Fp, "Got SC_ENABLE message");
+ 				pmmsg.pm_type = PM_STATUS;
+ 				State = PM_ENABLED;
+ 				pmmsg.pm_state = State;
+ 				break;
+ 			case SC_DISABLE:
+ 				/*note internal state change below*/
+ 				log(Fp, "Got SC_DISABLE message");
+ 				pmmsg.pm_type = PM_STATUS;
+ 				State = PM_DISABLED;
+ 				pmmsg.pm_state = State;
+ 				break;
+ 			case SC_READDB:
+ 				/*
+				 * if this were a fully functional port
+				 * monitor it would read _pmtab here
+				 * and take appropriate action
+				 */
+ 				log(Fp, "Got SC_READDB message");
+ 				pmmsg.pm_type = PM_STATUS;
+ 				pmmsg.pm_state = State;
+ 				break;
+ 			default:
+ 				sprintf(Scratch, "Got unknown message <%d>",
+ 				sacmsg.sc_type);
+ 				log(Fp, Scratch);
+ 				pmmsg.pm_type = PM_UNKNOWN;
+ 				pmmsg.pm_state = State;
+ 				break;
+ 		}
+/*
+ * send back a response to the poll
+ * indicating current state
+ */
+ 		if (write(sfd, &pmmsg, sizeof(pmmsg)) != sizeof(pmmsg))
+ 			log(Fp, "sanity response failed");
+ 	}
+}
+/*
+ * general logging function
+ */
+log(fp, msg)
+	FILE *fp;
+	char *msg;
+{
+	fprintf(fp, "%d; %s\en", getpid(), msg);
+	fflush(fp);
+}
+.fi
+.in -2
+.sp
+
+.SS "The sac.h Header File"
+.sp
+.LP
+The following example shows the sac.h header file.
+.sp
+.in +2
+.nf
+/* length in bytes of a utmpx id */
+# define IDLEN 4
+/* wild character for utmpx ids */
+# define SC_WILDC 0xff
+/* max len in bytes for port monitor tag */
+# define PMTAGSIZE 14
+/*
+ * values for rflag in doconfig()
+ */
+/* don't allow assign operations */
+# define NOASSIGN 0x1
+/* don't allow run or runwait operations */
+# define NORUN 0x2
+/*
+ * message to SAC (header only). This header is forever fixed. The
+ * size field (pm_size) defines the size of the data portion of the
+ * message, which follows the header. The form of this optional data
+ * portion is defined strictly by the message type (pm_type).
+ */
+struct pmmsg {
+	char pm_type;               /* type of message */
+	unchar_t pm_state;            /* current state of pm */
+	char pm_maxclass;           /* max message class this port monitor
+					                understands */
+	char pm_tag[PMTAGSIZE + 1]; /* pm's tag */
+	int pm_size;                /* size of opt data portion */
+};
+/*
+ * pm_type values
+ */
+# define PM_STATUS 1 /* status response */
+# define PM_UNKNOWN 2 /* unknown message was received */
+/*
+ * pm_state values
+ */
+/*
+ * Class 1 responses
+ */
+# define PM_STARTING 1   /* monitor in starting state */
+# define PM_ENABLED 2    /* monitor in enabled state */
+# define PM_DISABLED 3   /* monitor in disabled state */
+# define PM_STOPPING 4   /* monitor in stopping state */
+/*
+ * message to port monitor
+ */
+struct sacmsg {
+	int sc_size;         /* size of optional data portion */
+	char sc_type;        /* type of message */
+};
+/*
+ * sc_type values
+ * These represent commands that the SAC sends to a port monitor.
+ * These commands are divided into "classes" for extensibility. Each
+ * subsequent "class" is a superset of the previous "classes" plus
+ * the new commands defined within that "class". The header for all
+ * commands is identical; however, a command may be defined such that
+ * an optional data portion may be sent in addition to the header.
+ * The format of this optional data piece is self-defining based on
+ * the command. The first message sent by the SAC
+ * will always be a class 1 message. The port monitor response
+ * indicates the maximum class that it is able to understand. Another
+ * note is that port monitors should only respond to a message with
+ * an equivalent class response (i.e. a class 1 command causes a
+ * class 1 response).
+ */
+/*
+ * Class 1 commands (currently, there are only class 1 commands)
+ */
+# define SC_STATUS 1    /* status request *
+# define SC_ENABLE 2    /* enable request */
+# define SC_DISABLE 3   /* disable request */
+# define SC_READDB 4    /* read pmtab request */
+/*
+ * `errno' values for Saferrno, note that Saferrno is used by both
+ * pmadm and sacadm and these values are shared between them
+ */
+# define E_BADARGS 1   /* bad args/ill-formed cmd line */
+# define E_NOPRIV 2    /* user not priv for operation */
+# define E_SAFERR 3    /* generic SAF error */
+# define E_SYSERR 4    /* system error */
+# define E_NOEXIST 5   /* invalid specification */
+# define E_DUP 6       /* entry already exists */
+# define E_PMRUN 7     /* port monitor is running */
+# define E_PMNOTRUN 8  /* port monitor is not running */
+# define E_RECOVER 9
+   /* in recovery */
+.fi
+.in -2
+.sp
+
+.SS "Directory Structure"
+.sp
+.LP
+This section gives a description of the \fBSAF\fR files and directories.
+.sp
+.ne 2
+.na
+\fB\fB/etc/saf/_sysconfig\fR\fR
+.ad
+.RS 28n
+The per-system configuration script.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/saf/_sactab\fR\fR
+.ad
+.RS 28n
+The \fBSAC's\fR administrative file. Contains information about the port
+monitors for which the SAC is responsible.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/saf/\fR\fIpmtag\fR\fR
+.ad
+.RS 28n
+The home directory for port monitor \fIpmtag\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/saf/\fR\fIpmtag\fR\fB/_config\fR\fR
+.ad
+.RS 28n
+The per-port monitor configuration script for port monitor pmtag.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/saf/\fR\fIpmtag\fR\fB/_pmtab\fR\fR
+.ad
+.RS 28n
+Port monitor pmtag's administrative file. Contains information about the
+services for which \fIpmtag\fR is responsible.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/saf/\fR\fIpmtag\fR\fB/\fR\fIsvctag\fR\fR
+.ad
+.RS 28n
+The file in which the per-service configuration script for service \fIsvctag\fR
+(available through port monitor  \fBpmtag\fR) is placed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/saf/\fR\fIpmtag\fR\fB/_pid\fR\fR
+.ad
+.RS 28n
+The file in which a port monitor writes its process id in the current directory
+and places an advisory lock on the file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/saf/\fR \fBpmtag\fR \fB/_pmpipe\fR\fR
+.ad
+.RS 28n
+The file in which the port monitor receives messages from the \fBSAC\fR and
+\fB\&../_sacpipe\fR and sends return messages to the \fBSAC.\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/saf/_log\fR\fR
+.ad
+.RS 28n
+The \fBSAC's\fR log file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/saf/\fR\fIpmtag\fR\fR
+.ad
+.RS 28n
+The directory for files created by port monitor \fIpmtag,\fR for example its
+log file.
+.RE
+
+.SH LIST OF COMMANDS
+.sp
+.LP
+The following administrative commands relate to \fBSAF.\fR
+.sp
+.ne 2
+.na
+\fB\fBsacadm\fR(8)\fR
+.ad
+.RS 14n
+port monitor administrative command
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpmadm\fR(8)\fR
+.ad
+.RS 14n
+service administration command
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR exec (1),
+.BR sh (1),
+.BR fork (2),
+.BR doconfig (3NSL),
+.BR attributes (7),
+.BR init (8),
+.BR nlsadmin (8),
+.BR pmadm (8),
+.BR sac (8),
+.BR sacadm (8),
+.BR ttyadm (8)

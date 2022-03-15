@@ -143,7 +143,7 @@ extern const char *fmev_strerror(fmev_err_t);
  * Subscribe to FMA protocol events published by the fault management
  * daemon, receiving a callback for each matching event.
  *
- * This is a Committed interface (see attributes(5) for a definition).
+ * This is a Committed interface (see attributes(7) for a definition).
  */
 
 /*

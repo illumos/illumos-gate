@@ -112,7 +112,10 @@ for drivers.
 .SH SEE ALSO
 .sp
 .LP
-\fBflushband\fR(9F), \fBfreemsg\fR(9F), \fBputq\fR(9F), \fBqreply\fR(9F)
+.BR flushband (9F),
+.BR freemsg (9F),
+.BR putq (9F),
+.BR qreply (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR \fISTREAMS Programming Guide\fR

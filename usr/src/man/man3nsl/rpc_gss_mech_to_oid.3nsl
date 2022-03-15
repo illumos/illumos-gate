@@ -104,7 +104,7 @@ File containing valid QOP values
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -120,7 +120,13 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBrpc\fR(3NSL), \fBrpc_gss_get_error\fR(3NSL), \fBrpc_gss_get_mechanisms\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBmech\fR(4), \fBqop\fR(4), \fBattributes\fR(5)
+.BR rpc (3NSL),
+.BR rpc_gss_get_error (3NSL),
+.BR rpc_gss_get_mechanisms (3NSL),
+.BR rpcsec_gss (3NSL),
+.BR mech (5),
+.BR qop (5),
+.BR attributes (7)
 .sp
 .LP
 \fIONC+ Developer\&'s Guide\fR

@@ -1,0 +1,71 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH CRYPTO_CERTS 5 "Feb 23, 2007"
+.SH NAME
+crypto_certs \- directory for certificate files for Solaris Cryptographic
+Framework
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/crypto/certs/CA\fR
+.fi
+
+.LP
+.nf
+\fB/etc/crypto/certs/SUNWobjectCA\fR
+.fi
+
+.LP
+.nf
+\fB/etc/crypto/certs/*\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The \fB/etc/crypto/certs\fR directory contains ASN.1 BER or PEM encoded
+certificate files for use by the Solaris Cryptographic Framework.
+.sp
+.LP
+A default installation contains root anchors and signing certificates. The
+\fBCA\fR and \fBSUNWobjectCA\fR certificates are the trust anchors for all
+other certificates. Other certificates contain the certificates used to sign
+and verify the Solaris user and kernel cryptographic plug-ins
+.sp
+.LP
+Additional signing certificates may be installed by third-party cryptographic
+providers. They should either be copied to \fB/etc/crypto/certs\fR or included
+in the package that delivers the provider.
+.sp
+.LP
+Only certificates that are issued by the \fBCA\fR or \fBSUNWobjectCA\fR
+certificates and include the organization unit "Solaris Cryptographic
+Framework" in their subject distinguished names are accepted by the Solaris
+Cryptographic Framework. This restriction is in place due to US Export Law on
+the export of open cryptographic interfaces at the time of shipping this
+revision of the product.
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR elfsign (1),
+.BR libpkcs11 (3LIB),
+.BR attributes (7)

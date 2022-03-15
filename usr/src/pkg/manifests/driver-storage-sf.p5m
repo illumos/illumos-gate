@@ -42,8 +42,8 @@ dir  path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
 file path=platform/sun4u/kernel/drv/$(ARCH64)/sf group=sys
 file path=platform/sun4u/kernel/drv/sf.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/sf.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/sf.4d
 driver name=sf
 legacy pkg=SUNWluxd.u arch=$(ARCH).sun4u \
     desc="Sun Enterprise Network Array sf Device Driver" \

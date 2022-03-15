@@ -80,7 +80,7 @@ char            *inet_ntoa(struct in_addr);
 .LP
 For applications that do not require standard-conforming behavior (those that
 use the socket interfaces described in section 3N of the reference manual; see
-\fBIntro\fR(3) and \fBstandards\fR(5)), the following may be declared as
+\fBIntro\fR(3) and \fBstandards\fR(7)), the following may be declared as
 functions, or defined as macros, or both:
 .sp
 .in +2
@@ -96,7 +96,7 @@ uint16_t    ntohs(uint16_t);
 .LP
 For applications that require standard-conforming behavior (those that use the
 socket interfaces described in section 3XN of the reference manual; see
-\fBIntro\fR(3) and \fBstandards\fR(5)), the following may be declared as
+\fBIntro\fR(3) and \fBstandards\fR(7)), the following may be declared as
 functions, or defined as macros, or both:
 .sp
 .in +2
@@ -110,7 +110,7 @@ in_port_t    ntohs(in_port_t);
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -125,6 +125,10 @@ Interface Stability	Standard
 
 .SH SEE ALSO
 .LP
-\fBIntro\fR(3), \fBhtonl\fR(3C),
-\fBinet_addr\fR(3C), \fBinet_addr\fR(3XNET), \fBin.h\fR(3HEAD),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR Intro (3),
+.BR htonl (3C),
+.BR inet_addr (3C),
+.BR in.h (3HEAD),
+.BR inet_addr (3XNET),
+.BR attributes (7),
+.BR standards (7)

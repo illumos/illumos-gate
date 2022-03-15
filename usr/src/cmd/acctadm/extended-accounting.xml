@@ -28,7 +28,7 @@
 	operating system upgrade.  Make customizations in a different
 	file.
 
-	NOTE: Do NOT edit the 'config' properties directly, use acctadm(1M)
+	NOTE: Do NOT edit the 'config' properties directly, use acctadm(8)
 	instead.
 
 	Service manifest for extended accounting.
@@ -84,17 +84,17 @@
 			<propval name='untracked' type='astring'
 				value='extended' />
 		</property_group>
-		
+
 		<template>
 			<common_name>
 				<loctext xml:lang='C'>
 					configure flow extended accounting
 				</loctext>
 			</common_name>
-	
+
 			<documentation>
 				<manpage
-					title='acctadm' section='1M'
+					title='acctadm' section='8'
 					manpath='/usr/share/man' />
 			</documentation>
 		</template>
@@ -121,17 +121,17 @@
 			<propval name='untracked' type='astring'
 				value='extended,host' />
 		</property_group>
-	
+
 		<template>
 			<common_name>
 				<loctext xml:lang='C'>
 					configure process extended accounting
 				</loctext>
 			</common_name>
-	
+
 			<documentation>
 				<manpage
-					title='acctadm' section='1M'
+					title='acctadm' section='8'
 					manpath='/usr/share/man' />
 			</documentation>
 		</template>
@@ -158,17 +158,17 @@
 			<propval name='untracked' type='astring'
 				value='extended' />
 		</property_group>
-		
+
 		<template>
 			<common_name>
 				<loctext xml:lang='C'>
 					configure task extended accounting
 				</loctext>
 			</common_name>
-	
+
 			<documentation>
 				<manpage
-					title='acctadm' section='1M'
+					title='acctadm' section='8'
 					manpath='/usr/share/man' />
 			</documentation>
 		</template>
@@ -195,22 +195,22 @@
 			<propval name='untracked' type='astring'
 				value='extended' />
 		</property_group>
-		
+
 		<template>
 			<common_name>
 				<loctext xml:lang='C'>
 					configure net extended accounting
 				</loctext>
 			</common_name>
-	
+
 			<documentation>
 				<manpage
-					title='acctadm' section='1M'
+					title='acctadm' section='8'
 					manpath='/usr/share/man' />
 			</documentation>
 		</template>
 	</instance>
-	
+
 	<stability value='Unstable' />
 </service>
 

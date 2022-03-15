@@ -26,9 +26,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "symint.h"
 
 #include <stdio.h>
@@ -48,8 +45,8 @@
 
 /*
  * _err_exit(format_s, va_alist)
- * format_s	- printf(3S) arg string.
- * va_alist	- var_args(3?) printf() arguments.
+ * format_s	- printf(3C) arg string.
+ * va_alist	- varargs(3EXT) printf() arguments.
  *
  * does not return - prints message and calls exit(3).
  *

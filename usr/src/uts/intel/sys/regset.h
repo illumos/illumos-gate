@@ -193,8 +193,8 @@ typedef struct dbregset {
  *
  * Note that the ucontext_t actually describes the general register in terms
  * of the gregset_t data type, as described in this file.  Note also
- * that the core file content is defined by core(4) in terms of data types
- * defined by procfs -- see proc(4).
+ * that the core file content is defined by core(5) in terms of data types
+ * defined by procfs -- see proc(5).
  */
 #if defined(__i386) && \
 	(!defined(_KERNEL) && !defined(_XPG4_2) || defined(__EXTENSIONS__))

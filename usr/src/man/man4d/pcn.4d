@@ -1,0 +1,163 @@
+'\" te
+.\" Copyright 2011 Jason King.  All rights reserved.
+.\" Copyright (c) 2001-2007 by Garrett D'Amore.
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions are met:
+.\" 1. Redistributions of source code must retain the above copyright notice,
+.\"    this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright notice,
+.\"    this list of conditions and the following disclaimer in the documentation
+.\"    and/or other materials provided with the distribution.
+.\" 3. Neither the name of the author nor the names of any co-contributors may
+.\"    be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS
+.\" ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+.\" TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+.\" PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+.\" CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+.\" EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+.\" PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+.\" OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+.\" WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+.\" OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+.\" ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+.\" Portions Copyright (c) 2007 by Sun Microsystems, Inc.  All Rights Reserved.
+
+.TH "PCN" "4D" "Jan 10, 2020"
+.
+.SH "NAME"
+\fBpcn\fR \- PCnet Ethernet device driver
+.SH "SYNOPSIS"
+.nf
+\fB/dev/pcn\fR
+.fi
+
+.SH "DESCRIPTION"
+The \fBpcn\fR driver is a multi\-threaded, loadable, clonable GLDv3\-based
+STREAMS driver supporting the Data Link Provider Interface \fBdlpi\fR(4P) for
+the AMD PCnet family of Ethernet controllers.
+.SH "APPLICATION PROGRAMMING INTERFACE"
+The \fBpcn\fR driver can be used as either a "style 1" or a "style 2" Data Link
+Service Provider. Physical points of attachment (PPAs) are interpreted as the
+instance number of the \fBpcn\fR controller as assigned by the
+operating environment.
+.sp
+.LP
+The values returned by the driver in the \fBDL_INFO_ACK\fR response are:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Maximum SDU is 1500.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Minimum SDU is 0.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The dlsap address length is 8.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+MAC type is \fBDL_ETHER\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+SAP length is \-2. The 6\-byte physical address is immediately followed by a
+2\-byte SAP.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Service mode is \fBDL_CLDLS\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The broadcast address is the 6\-byte Ethernet broadcast address
+(\fBff:ff:ff:ff:ff:ff\fR).
+.SH "CONFIGURATION"
+The \fBpcn\fR driver performs auto-negotiation to select the link speed and
+mode.  Link speed may be 100Mbps full\-duplex, 100Mbps half\-duplex,
+10Mbps full\-duplex, or 10Mbps half\-duplex, depending on the hardware
+adapter type.  See the \fIIEEE802.3\fR standard for more information.
+.sp
+.LP
+The capabilities advertised by the \fBpcn\fR device can be set using
+\fBdladm\fR(8).  The driver supports a number of parameters whose names
+begin with \fBen_\fR (see below).  Each of these parameters contains a
+boolean value that determines if the device advertises that mode of
+operations.  The \fBadv_autoneg_cap\fR parameter controls whether
+auto-negotiation is performed.  If \fBadv_autoneg_cap\fR is set to 0, the
+driver forces the mode of operation selected by the first non-zero
+parameter in priority order as shown below:
+.sp
+.in +2
+.nf
+                            (highest priority/greatest throughput)
+        en_100fdx_cap           100Mbps full duplex
+        en_10fdx_cap            10Mbps full duplex
+                         (lowest priority/least throughput)
+.fi
+.in -2
+
+.sp
+.LP
+All capabilities default to enabled.  Note that changing any capability
+parameter causes the link to go down while the link partners renegotiate
+the link speed/duplex using the newly changed capabilities.
+.SH "ATTRIBUTES"
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+_
+Interface Stability	Committed
+.TE
+
+.SH "FILES"
+.ne 2
+.na
+\fB/dev/pcn\fR
+.ad
+.sp .6
+.RS 4n
+Special character device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB/kernel/drv/amd64/pcn\fR
+.ad
+.sp .6
+.RS 4n
+Device driver (x86)
+.RE
+
+.SH "SEE ALSO"
+.BR streamio (4I),
+.BR dlpi (4P),
+.BR attributes (7)
+.sp
+.LP
+\fIIEEE 802.3\fR \(em Institute of Electrical and Electronics Engineers, 2002

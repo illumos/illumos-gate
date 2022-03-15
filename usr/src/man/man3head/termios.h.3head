@@ -53,7 +53,7 @@ termios.h, termios \- define values for termios
 
 .SH DESCRIPTION
 The <\fBtermios.h\fR> header contains the definitions used by the terminal I/O
-interfaces. See \fBtermios\fR(3C) and \fBtermio\fR(7I) for an overview of the
+interfaces. See \fBtermios\fR(3C) and \fBtermio\fR(4I) for an overview of the
 terminal interface.
 .SS "The termios Structure"
 The following data types are defined through \fBtypedef\fR:
@@ -955,7 +955,7 @@ Restart output.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -969,7 +969,16 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-\fBgetconf\fR(1), \fBcfgetispeed\fR(3C), \fBcfsetispeed\fR(3C),
-\fBconfstr\fR(3C), \fBtcdrain\fR(3C), \fBtcflow\fR(3C), \fBtcflush\fR(3C),
-\fBtcgetattr\fR(3C), \fBtcgetsid\fR(3C), \fBtcsendbreak\fR(3C),
-\fBtcsetattr\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR getconf (1),
+.BR cfgetispeed (3C),
+.BR cfsetispeed (3C),
+.BR confstr (3C),
+.BR tcdrain (3C),
+.BR tcflow (3C),
+.BR tcflush (3C),
+.BR tcgetattr (3C),
+.BR tcgetsid (3C),
+.BR tcsendbreak (3C),
+.BR tcsetattr (3C),
+.BR attributes (7),
+.BR standards (7)

@@ -27,8 +27,6 @@
 #ifndef _SYS_FXPRIOCNTL_H
 #define	_SYS_FXPRIOCNTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/thread.h>
 
@@ -68,7 +66,7 @@ typedef struct fxinfo {
 
 
 /*
- * The following is used by the dispadmin(1M) command for
+ * The following is used by the dispadmin(8) command for
  * scheduler administration and is not for general use.
  */
 

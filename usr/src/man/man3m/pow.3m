@@ -113,7 +113,7 @@ If \fIx\fR or \fIy\fR is a NaN, a NaN is returned unless:
 .el o
 If \fIx\fR is +1 and \fIy\fR is NaN and the application was compiled with the
 \fBc99\fR compiler driver and is therefore SUSv3-conforming (see
-\fBstandards\fR(5)), 1.0 is returned.
+\fBstandards\fR(7)), 1.0 is returned.
 .RE
 .RS +4
 .TP
@@ -133,7 +133,7 @@ For \fIy\fR > 0 and not an odd integer, if \fIx\fR is \(+-0, +0 is returned.
 If \fIx\fR is \(+-1 and \fIy\fR is \(+-Inf, and the application was compiled
 with the \fBcc\fR compiler driver, NaN is returned. If, however, the
 application was compiled with the \fBc99\fR compiler driver and is therefore
-SUSv3-conforming (see \fBstandards\fR(5)), 1.0 is returned.
+SUSv3-conforming (see \fBstandards\fR(7)), 1.0 is returned.
 .sp
 .LP
 For |\fIx\fR| < 1, if \fIy\fR is \(miInf, +Inf is returned.
@@ -248,7 +248,7 @@ return, if \fBerrno\fR is non-zero, an error has occurred. The \fBpowf()\fR and
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -267,9 +267,14 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBexp\fR(3M), \fBfeclearexcept\fR(3M), \fBfetestexcept\fR(3M),
-\fBisnan\fR(3M), \fBmath.h\fR(3HEAD), \fBmatherr\fR(3M), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR math.h (3HEAD),
+.BR exp (3M),
+.BR feclearexcept (3M),
+.BR fetestexcept (3M),
+.BR isnan (3M),
+.BR matherr (3M),
+.BR attributes (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP

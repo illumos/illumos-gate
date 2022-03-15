@@ -73,7 +73,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -88,6 +88,13 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpvs\fR(1), \fBIntro\fR(2), \fBIntro\fR(3), \fBaiocancel\fR(3C),
-\fBaioread\fR(3C), \fBaiowait\fR(3C), \fBaiowrite\fR(3C), \fBaio.h\fR(3HEAD),
-\fBlibc\fR(3LIB), \fBattributes\fR(5)
+.BR pvs (1),
+.BR Intro (2),
+.BR Intro (3),
+.BR aiocancel (3C),
+.BR aioread (3C),
+.BR aiowait (3C),
+.BR aiowrite (3C),
+.BR aio.h (3HEAD),
+.BR libc (3LIB),
+.BR attributes (7)

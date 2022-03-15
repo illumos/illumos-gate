@@ -64,8 +64,10 @@ Successfully filled in the number of  \fBDMA\fR windows.
 .SH CONTEXT
 \fBddi_dma_numwin()\fR can be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-\fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
-\fBddi_dma_buf_bind_handle\fR(9F), \fBddi_dma_unbind_handle\fR(9F)
+.BR ddi_dma_addr_bind_handle (9F),
+.BR ddi_dma_alloc_handle (9F),
+.BR ddi_dma_buf_bind_handle (9F),
+.BR ddi_dma_unbind_handle (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

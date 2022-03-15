@@ -65,9 +65,15 @@ replacement for a direct call to a put procedure.
 .SH SEE ALSO
 .sp
 .LP
-\fBput\fR(9E), \fBfreezestr\fR(9F), \fBputctl\fR(9F), \fBputctl1\fR(9F),
-\fBputnext\fR(9F), \fBputnextctl\fR(9F), \fBputnextctl1\fR(9F),
-\fBqprocson\fR(9F), \fBqreply\fR(9F)
+.BR put (9E),
+.BR freezestr (9F),
+.BR putctl (9F),
+.BR putctl1 (9F),
+.BR putnext (9F),
+.BR putnextctl (9F),
+.BR putnextctl1 (9F),
+.BR qprocson (9F),
+.BR qreply (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

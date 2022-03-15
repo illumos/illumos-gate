@@ -22,15 +22,14 @@
 # Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Example configuration file for SLP. This file lists and explains
 # each property you can set for SLP. No properties are acutally set,
 # so uncomment and edit any properties you wish to change. The
-# file /etc/inet/slp.conf must exist in order for slpd(1m) to start,
+# file /etc/inet/slp.conf must exist in order for slpd(8) to start,
 # so copy this file to /etc/inet/slp.conf to enable SLP. See
-# slp.conf(4), slpd(1m), or RFC 2614 for more information.
+# slp.conf(5), slpd(8), or RFC 2614 for more information.
 #
 
 # Specifies if slpd should act as a DA. Default is false.

@@ -14,7 +14,7 @@
  */
 
 /*
- * fwflash(1M) backend for UFMs.
+ * fwflash(8) backend for UFMs.
  */
 
 #include <libdevinfo.h>

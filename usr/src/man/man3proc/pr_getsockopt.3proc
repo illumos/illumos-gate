@@ -105,4 +105,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr getsockopt 3SOCKET ,
-.Xr proc 4
+.Xr proc 5

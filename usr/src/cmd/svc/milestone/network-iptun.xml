@@ -85,7 +85,7 @@
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='dladm' section='1M'
+			<manpage title='dladm' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

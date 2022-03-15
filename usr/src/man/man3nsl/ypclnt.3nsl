@@ -80,7 +80,7 @@ interface
 This package of functions provides an interface to \fBNIS\fR, Network
 Information Service Version 2, formerly referred to as \fBYP\fR.
 For commands used to access \fBNIS\fR from a
-client machine, see \fBypbind\fR(1M), \fBypwhich\fR(1), \fBypmatch\fR(1), and
+client machine, see \fBypbind\fR(8), \fBypwhich\fR(1), \fBypmatch\fR(1), and
 \fBypcat\fR(1). The package can be loaded from the standard library,
 \fB/usr/lib/libnsl.so.1\fR.
 .sp
@@ -133,8 +133,8 @@ per-node resources used to bind it.
 .sp
 If an RPC failure results upon use of a binding, that domain will be unbound
 automatically. At that point, the \fBypclnt()\fR layer will retry a few more
-times or until the operation succeeds, provided that \fBrpcbind\fR(1M) and
-\fBypbind\fR(1M) are running, and either:
+times or until the operation succeeds, provided that \fBrpcbind\fR(8) and
+\fBypbind\fR(8) are running, and either:
 .RS +4
 .TP
 .ie t \(bu
@@ -506,7 +506,7 @@ Cannot communicate with \fBypserv\fR.
 \fB/usr/lib/libnsl.so.1\fR
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -521,6 +521,13 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBypcat\fR(1), \fBypmatch\fR(1), \fBypwhich\fR(1),
-\fBrpcbind\fR(1M), \fBypbind\fR(1M), \fBypserv\fR(1M),
-\fBsysinfo\fR(2), \fBmalloc\fR(3C), \fBypfiles\fR(4), \fBattributes\fR(5)
+.BR ypcat (1),
+.BR ypmatch (1),
+.BR ypwhich (1),
+.BR sysinfo (2),
+.BR malloc (3C),
+.BR ypfiles (5),
+.BR attributes (7),
+.BR rpcbind (8),
+.BR ypbind (8),
+.BR ypserv (8)

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -117,7 +115,7 @@ return_property(int prom_fd, const char *prop)
 
 /*
  * sanitize_class_id(): translates the class id into a canonical format,
- *			so that it can be used easily with dhcptab(4).
+ *			so that it can be used easily with dhcptab(5).
  *
  *   input: char *: the class id to canonicalize
  *  output: void

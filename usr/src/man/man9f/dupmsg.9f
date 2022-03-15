@@ -58,7 +58,10 @@ See \fBcopyb\fR(9F) for an example using \fBdupmsg()\fR.
 .SH SEE ALSO
 .sp
 .LP
-\fBcopyb\fR(9F), \fBcopymsg\fR(9F), \fBdupb\fR(9F), \fBdatab\fR(9S)
+.BR copyb (9F),
+.BR copymsg (9F),
+.BR dupb (9F),
+.BR datab (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -50,4 +50,4 @@ if the same value for
 is passed in from multiple threads.
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

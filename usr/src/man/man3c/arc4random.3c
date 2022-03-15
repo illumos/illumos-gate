@@ -59,7 +59,7 @@ consumption because the other interfaces are deficient in either
 quality, portability, standardization, or availability.
 These functions can be called in almost all coding environments,
 including
-.Xr pthreads 5
+.Xr pthreads 7
 and
 .Xr chroot 2 .
 .Pp

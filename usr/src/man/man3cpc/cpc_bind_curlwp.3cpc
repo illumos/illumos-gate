@@ -241,7 +241,7 @@ the example makes use of two counters to measure external cache references and
 external cache hits. These options are only appropriate  for UltraSPARC
 processors. By setting the EVENT0 and EVENT1 environment variables to other
 strings (a list of which can be obtained from the \fB-h\fR option of the
-\fBcpustat\fR(1M) or \fBcputrack\fR(1) utilities), other events can be counted.
+\fBcpustat\fR(8) or \fBcputrack\fR(1) utilities), other events can be counted.
 The \fBerror()\fR routine is assumed to be a user-provided routine analogous to
 the familiar \fBprintf\fR(3C) function from the C library that also performs an
 \fBexit\fR(2) after printing the message.
@@ -423,7 +423,7 @@ library and creates a set:
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -441,9 +441,14 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBcpustat\fR(1M), \fBcputrack\fR(1), \fBpsrinfo\fR(1M),
-\fBprocessor_bind\fR(2), \fBcpc_seterrhndlr\fR(3CPC),
-\fBcpc_set_sample\fR(3CPC), \fBlibcpc\fR(3LIB), \fBattributes\fR(5)
+.BR cputrack (1),
+.BR processor_bind (2),
+.BR cpc_set_sample (3CPC),
+.BR cpc_seterrhndlr (3CPC),
+.BR libcpc (3LIB),
+.BR attributes (7),
+.BR cpustat (8),
+.BR psrinfo (8)
 .SH NOTES
 .sp
 .LP
@@ -524,7 +529,7 @@ hardware counters per physical processor. To use \fBcpc_bind_curlwp()\fR or
 \fBcpc_bind_pctx()\fR to measure per-\fBLWP\fR events on a system with Pentium
 4 HT processors, a system administrator must first take processors in the
 system offline until each physical processor has only one hardware thread
-online (See the \fB-p\fR option to \fBpsrinfo\fR(1M)). If a second hardware
+online (See the \fB-p\fR option to \fBpsrinfo\fR(8)). If a second hardware
 thread is brought online, all per-\fBLWP\fR bound contexts will be invalidated
 and any attempt to sample or bind a CPC set will return \fBEAGAIN\fR.
 .sp

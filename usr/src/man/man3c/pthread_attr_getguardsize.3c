@@ -165,7 +165,7 @@ The parameter \fIguardsize\fR contains an invalid value.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -183,5 +183,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBsysconf\fR(3C), \fBpthread_attr_init\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR pthread_attr_init (3C),
+.BR sysconf (3C),
+.BR attributes (7),
+.BR standards (7)

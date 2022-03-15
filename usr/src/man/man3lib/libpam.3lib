@@ -95,7 +95,7 @@ sample \fBPAM\fR module
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -111,11 +111,20 @@ MT Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBpvs\fR(1),  \fBIntro\fR(3),  \fBpam\fR(3PAM), \fBpam.conf\fR(4),
-\fBattributes\fR(5), \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
-\fBpam_authtok_store\fR(5), \fBpam_dial_auth\fR(5), \fBpam_dhkeys\fR(5),
-\fBpam_passwd_auth\fR(5), \fBpam_rhosts_auth\fR(5), \fBpam_sample\fR(5),
-\fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5)
+\fBpvs\fR(1),  \fBIntro\fR(3),  \fBpam\fR(3PAM),
+.BR pam.conf (5),
+.BR attributes (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_dhkeys (7),
+.BR pam_dial_auth (7),
+.BR pam_passwd_auth (7),
+.BR pam_rhosts_auth (7),
+.BR pam_sample (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7)
 .SH NOTES
 .sp
 .LP
@@ -123,8 +132,8 @@ The functions in \fBlibpam\fR are MT-Safe only if each thread within the
 multithreaded application uses its own \fBPAM\fR handle.
 .sp
 .LP
-The \fBpam_unix\fR(5) module is no longer supported. Similar functionality is
-provided by \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
-\fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_passwd_auth\fR(5),
-\fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5), and
-\fBpam_unix_session\fR(5).
+The \fBpam_unix\fR(7) module is no longer supported. Similar functionality is
+provided by \fBpam_authtok_check\fR(7), \fBpam_authtok_get\fR(7),
+\fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), \fBpam_passwd_auth\fR(7),
+\fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7), and
+\fBpam_unix_session\fR(7).

@@ -486,7 +486,7 @@ The value of the \fIname\fR argument is invalid.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -502,12 +502,18 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe, Async-Signal-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
-\fBpooladm\fR(1M), \fBzoneadm\fR(1M), \fBfpathconf\fR(2), \fBseteuid\fR(2),
-\fBsetrlimit\fR(2), \fBconfstr\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR fpathconf (2),
+.BR seteuid (2),
+.BR setrlimit (2),
+.BR confstr (3C),
+.BR attributes (7),
+.BR standards (7),
+.BR pooladm (8),
+.BR zoneadm (8)
 .SH NOTES
 A call to \fBsetrlimit()\fR can cause the value of \fBOPEN_MAX\fR to change.
 .sp

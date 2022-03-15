@@ -105,8 +105,11 @@ failures is incremented (lines 12, 17). If an invalid message type is detected,
 .SH SEE ALSO
 .sp
 .LP
-\fBput\fR(9E), \fBcmn_err\fR(9F), \fBdatamsg\fR(9F), \fBputctl1\fR(9F),
-\fBputnextctl\fR(9F)
+.BR put (9E),
+.BR cmn_err (9F),
+.BR datamsg (9F),
+.BR putctl1 (9F),
+.BR putnextctl (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

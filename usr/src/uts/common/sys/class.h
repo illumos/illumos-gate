@@ -130,7 +130,7 @@ extern int	loaded_classes;	/* number of classes loaded */
 extern pri_t	minclsyspri;
 extern id_t	syscid;		/* system scheduling class ID */
 extern id_t	sysdccid;	/* system duty-cycle scheduling class ID */
-extern id_t	defaultcid;	/* "default" class id; see dispadmin(1M) */
+extern id_t	defaultcid;	/* "default" class id; see dispadmin(8) */
 
 extern int	alloc_cid(char *, id_t *);
 extern int	scheduler_load(char *, sclass_t *);

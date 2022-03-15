@@ -718,7 +718,7 @@ getarg(char *arg)
  *
  *	Assumes that message has already been gettext()'d. It would be
  *	nice if we could just do the gettext() here, but we can't, since
- *	since xgettext(1M) wouldn't be able to pick up our error message.
+ *	since xgettext(1) wouldn't be able to pick up our error message.
  */
 /* PRINTFLIKE1 */
 static void

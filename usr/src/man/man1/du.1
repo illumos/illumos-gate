@@ -239,11 +239,11 @@ The output from \fBdu\fR consists of the amount of the space allocated to a
 file and the name of the file.
 .SH USAGE
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBdu\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBdu\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH ENVIRONMENT VARIABLES
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBdu\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
@@ -267,7 +267,7 @@ An error occurred.
 .RE
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/du"
 
 .TS
@@ -296,8 +296,13 @@ Interface Stability	Standard
 
 .SH SEE ALSO
 .LP
-\fBls\fR(1), \fBstat\fR(2), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBfsattr\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
+.BR ls (1),
+.BR stat (2),
+.BR attributes (7),
+.BR environ (7),
+.BR fsattr (7),
+.BR largefile (7),
+.BR standards (7)
 .LP
 \fISystem Administration Guide: Basic Administration\fR
 .SH NOTES

@@ -63,7 +63,7 @@ a filter on \fB/lib/64/libc.so.1\fR
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -79,5 +79,8 @@ MT-Level	Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBpvs\fR(1), \fBIntro\fR(3), \fBgettext\fR(3C), \fBlibc\fR(3LIB),
-\fBattributes\fR(5)
+.BR pvs (1),
+.BR Intro (3),
+.BR gettext (3C),
+.BR libc (3LIB),
+.BR attributes (7)

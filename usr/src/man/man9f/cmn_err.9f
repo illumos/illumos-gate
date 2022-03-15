@@ -110,7 +110,7 @@ but includes an additional argument:
 .It Fa zoneid
 Zone to which log messages should be directed.
 See
-.Xr zones 5 .
+.Xr zones 7 .
 .El
 .Ss Fn vzcmn_err
 The
@@ -122,7 +122,7 @@ but includes an additional argument:
 .It Fa zoneid
 Zone to which log messages should be directed.
 See
-.Xr zones 5 .
+.Xr zones 7 .
 .El
 .Sh DESCRIPTION
 .Ss Fn cmn_err
@@ -200,14 +200,14 @@ is also
 the message is always sent to the system log, but is only written to the console
 when the system has been booted in verbose mode.
 See
-.Xr kernel 1M .
+.Xr kernel 8 .
 If neither condition is met, the
 .Qq Sy \&?
 character has no effect and is simply ignored.
 .El
 .Pp
 Refer to
-.Xr syslogd 1M
+.Xr syslogd 8
 to determine where the system log is written.
 .Pp
 The
@@ -274,7 +274,7 @@ Using
 will cause messages to be sent to the log associated with the specified local
 zone rather than the log in the global zone.
 This is accomplished by the message being received and processed by the
-.Xr syslogd 1M
+.Xr syslogd 8
 process running in the specified zone instead of the one running in the global
 zone.
 You can retrieve a process zone ID from its credential structure using
@@ -415,9 +415,9 @@ zcmn_err(crgetzoneid(ddi_get_cred()), CE_NOTE, "out of processes");
 .Ed
 .El
 .Sh SEE ALSO
-.Xr dmesg 1M ,
-.Xr kernel 1M ,
-.Xr zones 5 ,
+.Xr zones 7 ,
+.Xr dmesg 8 ,
+.Xr kernel 8 ,
 .Xr ddi_binding_name 9F ,
 .Xr ddi_cred 9F ,
 .Xr ddi_driver_name 9F ,

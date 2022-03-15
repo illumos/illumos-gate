@@ -19,19 +19,19 @@ pkgmk \- produce an installable package
 .sp
 .LP
 The \fBpkgmk\fR utility produces an installable package to be used as input to
-the \fBpkgadd\fR(1M) command. The package contents is in directory structure
+the \fBpkgadd\fR(8) command. The package contents is in directory structure
 format.
 .sp
 .LP
-The command uses the package \fBprototype\fR(4) file as input and creates a
-\fBpkgmap\fR(4) file. The contents for each entry in the \fBprototype\fR file
+The command uses the package \fBprototype\fR(5) file as input and creates a
+\fBpkgmap\fR(5) file. The contents for each entry in the \fBprototype\fR file
 is copied to the appropriate output location. Information concerning the
 contents (checksum, file size, modification date) is computed and stored in the
 \fBpkgmap\fR file, along with attribute information specified in the
 \fBprototype\fR file.
 .sp
 .LP
-\fBpkgmk\fR searches for the files listed in the \fBprototype\fR(4) file as
+\fBpkgmk\fR searches for the files listed in the \fBprototype\fR(5) file as
 described in the following conditions. \fBNote:\fR If a prototype file contains
 the explicit location of the file to include in the package, then the following
 search explanations do not apply.
@@ -39,15 +39,15 @@ search explanations do not apply.
 .TP
 1.
 If neither \fB-b\fR nor \fB-r\fR options are specified, the file name
-component of each file path listed in the \fBprototype\fR(4) file is expected
-to be found in the same directory as the \fBprototype\fR(4) file
+component of each file path listed in the \fBprototype\fR(5) file is expected
+to be found in the same directory as the \fBprototype\fR(5) file
 .RE
 .RS +4
 .TP
 2.
 If \fB-b\fR is specified as a relative path (without a leading "\fB/\fR"),
 then \fIbase_src_dir\fR is prepended to the relative file paths from the
-\fBprototype\fR(4) file. The resulting path is searched for in the
+\fBprototype\fR(5) file. The resulting path is searched for in the
 \fIroot_path\fR directories. If a \fIroot_path\fR is not specified, it defaults
 to "\fB/\fR".
 .RE
@@ -56,14 +56,14 @@ to "\fB/\fR".
 3.
 If \fB-b\fR is specified as an absolute path (with a leading "\fB/\fR"),
 then \fIbase_src_dir\fR is prepended to the relative paths from the
-\fBprototype\fR(4) file and the result is the location of the file.
+\fBprototype\fR(5) file and the result is the location of the file.
 \fIroot_path\fR is \fBnot\fR searched.
 .RE
 .RS +4
 .TP
 4.
 If \fB-r\fR is specified, then full file paths are used from the
-\fBprototype\fR(4) file. Relative paths have \fIbase_src_dir\fR prepended. If
+\fBprototype\fR(5) file. Relative paths have \fIbase_src_dir\fR prepended. If
 \fIbase_src_dir\fR is not specified, it defaults to \fB""\fR. The resulting
 path is searched for in each directory of the \fIroot_path\fR.
 .RE
@@ -75,9 +75,9 @@ If you created your prototype file using \fB"pkgproto a/relative/path"\fRor
 \fBpkgmk\fR can correctly locate your source files.
 .sp
 .LP
-Package commands, including \fBpkgmk\fR, are \fBlargefile\fR(5)-aware. They
+Package commands, including \fBpkgmk\fR, are \fBlargefile\fR(7)-aware. They
 handle files larger than 2 GB in the same way they handle smaller files. In
-their current implementations, \fBpkgadd\fR(1M), \fBpkgtrans\fR(1) and other
+their current implementations, \fBpkgadd\fR(8), \fBpkgtrans\fR(1) and other
 package commands can process a datastream of  up to 4 GB.
 .SH OPTIONS
 .sp
@@ -89,7 +89,7 @@ The following options are supported:
 \fB\fB-a\fR \fIarch\fR\fR
 .ad
 .RS 19n
-Overrides the architecture information provided in the \fBpkginfo\fR(4) file
+Overrides the architecture information provided in the \fBpkginfo\fR(5) file
 with \fIarch\fR.
 .RE
 
@@ -135,7 +135,7 @@ Uses the file \fIprototype\fR as input to the command. The default
 .RS 19n
 Specifies the maximum size in 512 byte blocks of the output device as
 \fBlimit\fR. By default, if the output file is a directory or a mountable
-device, \fBpkgmk\fR employs the \fBdf\fR(1M) command to dynamically calculate
+device, \fBpkgmk\fR employs the \fBdf\fR(8) command to dynamically calculate
 the amount of available space on the output device. This option is useful in
 conjunction with \fBpkgtrans\fR(1) to create a package with a datastream
 format.
@@ -157,7 +157,7 @@ exists.
 \fB\fB-p\fR \fIpstamp\fR\fR
 .ad
 .RS 19n
-Overrides the production stamp definition in the \fBpkginfo\fR(4) file with
+Overrides the production stamp definition in the \fBpkginfo\fR(5) file with
 \fIpstamp\fR.
 .RE
 
@@ -180,7 +180,7 @@ specified, look for the leaf filename in the current directory.
 \fB\fB-v\fR \fIversion\fR\fR
 .ad
 .RS 19n
-Overrides the version information provided in the \fBpkginfo\fR(4) file with
+Overrides the version information provided in the \fBpkginfo\fR(5) file with
 \fIversion\fR.
 .RE
 
@@ -191,7 +191,7 @@ Overrides the version information provided in the \fBpkginfo\fR(4) file with
 .ad
 .RS 19n
 Places the indicated variable in the packaging environment. (See
-\fBprototype\fR(4) for definitions of variable specifications.)
+\fBprototype\fR(5) for definitions of variable specifications.)
 .RE
 
 .SH OPERANDS
@@ -237,9 +237,17 @@ An error occurred.
 .SH SEE ALSO
 .sp
 .LP
-\fBpkgparam\fR(1), \fBpkgproto\fR(1), \fBpkgtrans\fR(1), \fBuname\fR(1),
-\fBdf\fR(1M), \fBpkgadd\fR(1M), \fBpkginfo\fR(4), \fBpkgmap\fR(4),
-\fBprototype\fR(4), \fBattributes\fR(5), \fBlargefile\fR(5)
+.BR pkgparam (1),
+.BR pkgproto (1),
+.BR pkgtrans (1),
+.BR uname (1),
+.BR pkginfo (5),
+.BR pkgmap (5),
+.BR prototype (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR df (8),
+.BR pkgadd (8)
 .sp
 .LP
 \fIApplication Packaging Developer\&'s Guide\fR
@@ -247,18 +255,18 @@ An error occurred.
 .sp
 .LP
 Architecture information is provided on the command line with the \fB-a\fR
-option or in the \fBprototype\fR(4) file. If no architecture information is
+option or in the \fBprototype\fR(5) file. If no architecture information is
 supplied, \fBpkgmk\fR uses the output of \fBuname\fR \fB-m\fR (see
 \fBuname\fR(1)).
 .sp
 .LP
 Version information is provided on the command line with the \fB-v\fR option or
-in the \fBpkginfo\fR(4) file. If no version information is supplied, a default
+in the \fBpkginfo\fR(5) file. If no version information is supplied, a default
 based on the current date is provided.
 .sp
 .LP
 Command line definitions for both architecture and version override the
-\fBprototype\fR(4) definitions.
+\fBprototype\fR(5) definitions.
 .sp
 .LP
 \fBpkgmk\fR fails if one of the following invalid combinations of zone-related
@@ -283,4 +291,4 @@ The package contains a request script and \fBSUNW_PKG_THISZONE\fR set to
 .RE
 .sp
 .LP
-For additional information regarding these parameters, see \fBpkginfo\fR(4).
+For additional information regarding these parameters, see \fBpkginfo\fR(5).

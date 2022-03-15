@@ -17,11 +17,11 @@ keylogin \- decrypt and store secret key with keyserv
 .LP
 The \fBkeylogin\fR command prompts for a password, and uses it to decrypt the
 user's secret key. The key can be found in the \fB/etc/publickey\fR file (see
-\fBpublickey\fR(4)) or the  NIS map ``publickey.byname''
+\fBpublickey\fR(5)) or the  NIS map ``publickey.byname''
 in the user's home domain. The sources and their lookup order
-are specified in the \fB/etc/nsswitch.conf\fR file. See \fBnsswitch.conf\fR(4).
+are specified in the \fB/etc/nsswitch.conf\fR file. See \fBnsswitch.conf\fR(5).
 Once decrypted, the user's secret key is stored by the local key server
-process, \fBkeyserv\fR(1M). This stored key is used when issuing requests to
+process, \fBkeyserv\fR(8). This stored key is used when issuing requests to
 any secure RPC services, such as \fBNFS\fR. The program
 \fBkeylogout\fR(1) can be used to delete the key stored by \fBkeyserv\fR
 \fB\&.\fR
@@ -29,7 +29,7 @@ any secure RPC services, such as \fBNFS\fR. The program
 .LP
 \fBkeylogin\fR fails if it cannot get the caller's key, or the password given
 is incorrect. For a new user or host, a new key can be added using
-\fBnewkey\fR(1M).
+\fBnewkey\fR(8).
 .SH OPTIONS
 .LP
 The following options are supported:
@@ -43,7 +43,7 @@ Update the \fB/etc/.rootkey\fR file. This file holds the unencrypted secret key
 of the superuser. Only the superuser can use this option. It is used so that
 processes running as superuser can issue authenticated requests without
 requiring that the administrator explicitly run \fBkeylogin\fR as superuser at
-system startup time. See \fBkeyserv\fR(1M). The \fB-r\fR option should be used
+system startup time. See \fBkeyserv\fR(8). The \fB-r\fR option should be used
 by the administrator when the host's entry in the publickey database has
 changed, and the \fB/etc/.rootkey\fR file has become out-of-date with  respect
 to the actual key pair stored in the publickey database. The permissions on the
@@ -62,6 +62,11 @@ superuser's secret key
 
 .SH SEE ALSO
 .LP
-\fBchkey\fR(1), \fBkeylogout\fR(1), \fBlogin\fR(1), \fBkeyserv\fR(1M),
-\fBnewkey\fR(1M), \fBnsswitch.conf\fR(4), \fBpublickey\fR(4),
-\fBattributes\fR(5)
+.BR chkey (1),
+.BR keylogout (1),
+.BR login (1),
+.BR nsswitch.conf (5),
+.BR publickey (5),
+.BR attributes (7),
+.BR keyserv (8),
+.BR newkey (8)

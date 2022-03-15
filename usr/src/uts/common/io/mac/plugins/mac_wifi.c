@@ -44,7 +44,7 @@ static uint8_t wifi_ietfmagic[]	= { 0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00 };
 static uint8_t wifi_ieeemagic[]	= { 0xaa, 0xaa, 0x03, 0x00, 0x00, 0xf8 };
 
 static mac_stat_info_t wifi_stats[] = {
-	/* statistics described in ieee802.11(5) */
+	/* statistics described in ieee802.11(7) */
 { WIFI_STAT_TX_FRAGS, 		"tx_frags",		KSTAT_DATA_UINT32, 0 },
 { WIFI_STAT_MCAST_TX,		"mcast_tx",		KSTAT_DATA_UINT32, 0 },
 { WIFI_STAT_TX_FAILED,		"tx_failed",		KSTAT_DATA_UINT32, 0 },

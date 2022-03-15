@@ -41,7 +41,7 @@ For more information on faults and the
 structure see the
 .Sy PCSFAULT
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 The current fault set for the process may be obtained through the
 .Xr Pfault 3PROC
 function.
@@ -59,4 +59,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Pfault 3PROC ,
-.Xr proc 4
+.Xr proc 5

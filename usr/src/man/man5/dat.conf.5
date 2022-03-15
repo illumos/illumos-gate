@@ -1,0 +1,195 @@
+'\" te
+.\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DAT.CONF 5 "Jun 18, 2004"
+.SH NAME
+dat.conf \- DAT static registry
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/dat/dat.conf\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The DAT static registry, \fB/etc/dat/dat.conf\fR is a system-wide data resource
+maintained by the system administrative command \fBdatadm\fR(8).
+.sp
+.LP
+\fB/etc/dat/dat.conf\fR contains a list of interface adapters supported by
+uDAPL service providers. An interface adapter on Infiniband (IB) corresponds to
+an IPoIB device instance, for example, \fBibd0\fR. An IPoIB device name
+represents an IP interface plumbed by \fBifconfig\fR(8) on an IB
+partition/Host Channel Adapter port combination.
+.sp
+.LP
+Each entry in the DAT static registry is a single line that contains eight
+fields. Fields are separated by a SPACE. Lines that begin with a pound sign
+(\fB#\fR) are considered comments. All characters that follow the \fB#\fR are
+ignored. Enclose Solaris specific strings (\fISolaris_specific_string\fR) and
+service provider's instance data (\fIservice _provider_instance_data\fR) in
+quotes.
+.sp
+.LP
+The following shows the order of the fields in a \fBdat.conf\fR entry:
+.sp
+.in +2
+.nf
+"\fIinterface_adapter_name\fR" "\fIAPI_version\fR" "\fIthreadsafe\fR | \fInonthreadsafe\fR" \e
+"\fIdefault\fR | \fInondefault\fR" "\fIservice_provider_library_pathname\fR" \e
+"\fIservice_provider_version\fR" "\fIservice _provider_instance_data\fR"\e
+"\fISolaris_specific_string\fR"
+.fi
+.in -2
+
+.sp
+.LP
+The fields are defined as follows:
+.sp
+.ne 2
+.na
+\fB\fIinterface_adapter_name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the Interface Adapter (IA) name. In IB, this is the IPoIB device
+instance name, for example, \fBibd0\fR. This represents an IP interface plumbed
+on an IB partition/port combination of the HCA.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIAPI_version\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the API version of the service provide library: For example,
+\fB"u"major.minor\fR is \fBu1.2\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIthreadsafe\fR | \fInonthreadsafe\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a threadsafe or non-threadsafe library.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIdefault\fR | \fInondefault\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a default or non-default version of library. A service provider can
+offer several versions of the library. If so, one version is designated as
+\fBdefault\fR with the rest as \fBnondefault\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIservice_provider_library_pathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the pathname of the library image.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIservice_provider_version\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the version of the service provider. By convention, specify the
+company stock symbol as the service provider, followed by major and minor
+version numbers, for example, \fBSUNW1.0\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIservice _provider_instance_data\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the service provider instance data.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fISolaris_specific_string\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a platform specific string, for example, the device name in the
+\fBservice_provider.conf\fR file.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSample \fBdat.conf\fR File
+.sp
+.LP
+The following \fBdat.conf\fR file shows a \fBuDAPL 1.2\fR service provider for
+\fBtavor, udapl_tavor.so.1\fR supporting two interfaces, \fBibd0\fR and
+\fBibd1\fR:
+
+.sp
+.in +2
+.nf
+#
+# dat.conf for uDAPL 1.2
+#
+ibd0 u1.2 nonthreadsafe default udapl_tavor.so.1 SUNW.1.0 ""
+"driver_name=tavor"
+ibd1 u1.2 nonthreadsafe default udapl_tavor.so.1 SUNW.1.0 ""
+"driver_name=tavor"
+.fi
+.in -2
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Standard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR libdat (3LIB),
+.BR service_provider.conf (5),
+.BR attributes (7),
+.BR datadm (8),
+.BR ifconfig (8)
+.SH NOTES
+.sp
+.LP
+An empty \fBdat.conf\fR is created during the package \fBSUNWudaplr\fR
+installation if no file is present beforehand. Entries in the file are added or
+removed by running \fBdatadm\fR(8).
+.sp
+.LP
+The content of the platform specific string does not constitute an API. It is
+generated by \fBdatadm\fR(8) and might have a different content or
+interpretation in a future release.

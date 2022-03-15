@@ -203,12 +203,28 @@ However, checking \fBq_next\fR for NULL can be used to distinguish a module
 from a driver in code shared by both.
 .RE
 .SH SEE ALSO
-\fBclose\fR(9E), \fBopen\fR(9E), \fBbcanput\fR(9F), \fBcanput\fR(9F),
-\fBgetq\fR(9F), \fBinsq\fR(9F), \fBmod_install\fR(9F), \fBput\fR(9F),
-\fBputbq\fR(9F), \fBputctl\fR(9F), \fBputctl1\fR(9F), \fBputnext\fR(9F),
-\fBputq\fR(9F), \fBqprocsoff\fR(9F), \fBqprocson\fR(9F), \fBrmvq\fR(9F),
-\fBstrqget\fR(9F), \fBstrqset\fR(9F), \fBmodule_info\fR(9S), \fBmsgb\fR(9S),
-\fBqinit\fR(9S), \fBstreamtab\fR(9S)
+.BR close (9E),
+.BR open (9E),
+.BR bcanput (9F),
+.BR canput (9F),
+.BR getq (9F),
+.BR insq (9F),
+.BR mod_install (9F),
+.BR put (9F),
+.BR putbq (9F),
+.BR putctl (9F),
+.BR putctl1 (9F),
+.BR putnext (9F),
+.BR putq (9F),
+.BR qprocsoff (9F),
+.BR qprocson (9F),
+.BR rmvq (9F),
+.BR strqget (9F),
+.BR strqset (9F),
+.BR module_info (9S),
+.BR msgb (9S),
+.BR qinit (9S),
+.BR streamtab (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

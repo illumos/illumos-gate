@@ -4,8 +4,6 @@
 	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -61,7 +59,7 @@
 			Kerberos administration daemon </loctext>
 		</common_name>
 		<documentation>
-			<manpage title='kadmind' section='1M'
+			<manpage title='kadmind' section='8'
 			    manpath='/usr/share/man' />
 		</documentation>
         </template>

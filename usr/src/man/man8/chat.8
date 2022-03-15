@@ -1,0 +1,749 @@
+'\" te
+.\" This manual page is based on documentation obtained from Karl Fox.
+.\" Portions Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH CHAT 8 "August 29, 2021"
+.SH NAME
+chat \- automated conversational exchange tool
+.SH SYNOPSIS
+.nf
+\fBchat\fR [\fIoptions\fR] \fIscript\fR
+.fi
+
+.SH DESCRIPTION
+The \fBchat\fR program implements a conversational text-based exchange between
+the computer and any serial device, including (but not limited to) a modem, an
+ISDN TA, and the remote peer itself, establishing a connection between the
+Point-To-Point Protocol daemon (\fBpppd\fR) and the remote \fBpppd\fR process.
+.SH OPTIONS
+The  \fBchat\fR command supports the following options:
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fI<chat file>\fR\fR
+.ad
+.RS 23n
+Read the \fBchat\fR script from the  \fBchat\fR file. This option is mutually
+exclusive with the  \fBchat\fR script parameters. You must have \fBread\fR
+access to use the file. Multiple lines are permitted in the file. Use the space
+or horizontal tab characters to separate the strings.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR \fB\fI<timeout>\fR\fR \fR
+.ad
+.RS 23n
+Set the timeout for the expected string to be received. If the string is not
+received within the time limit, the reply string is not sent. If specified,
+a 'subexpect' (alternate reply) string can be sent. Otherwise, if no alternate
+reply strings remain, the \fBchat\fR script fails. A failed script will cause
+the  \fBchat\fR program to terminate with a non-zero error code.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR \fB\fI<report file> \fR\fR \fR
+.ad
+.RS 23n
+Set the file for output of the report strings. If you use the keyword
+\fBREPORT\fR, the resulting strings are written to this file. If  the \fB-r\fR
+option is not used and you use the \fBREPORT\fR keyword, the  \fBstderr\fR file
+is used for the report strings.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR \fR
+.ad
+.RS 23n
+Start with the echo option turned on. You turn echo on or off at specific
+points in the \fBchat\fR script using the \fBECHO\fR keyword. When echoing is
+enabled, all output from the modem is echoed to \fBstderr\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-E\fR \fR
+.ad
+.RS 23n
+Enables environment variable substitution within \fBchat\fR scripts using the
+standard \fI$xxx\fR syntax.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR \fR
+.ad
+.RS 23n
+Request that the \fBchat\fR script execute in a verbose mode. The  \fBchat\fR
+program logs the execution state of the \fBchat\fR script as well as all text
+received from the modem and output strings sent to the modem. The default is to
+log through \fBsyslog\fR(3C) with facility \fBlocal\fR2; the logging method is
+alterable using the \fB-S\fR and \fB-s\fR options.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-V\fR \fR
+.ad
+.RS 23n
+Request that the  \fBchat\fR script be executed in a \fBstderr\fR verbose mode.
+The \fBchat\fR program logs all text received from the modem and output strings
+sent to the modem to \fBstderr\fR. \fBstderr\fR is usually the local console at
+the station running the  \fBchat\fR or \fBpppd\fR program.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fR
+.ad
+.RS 23n
+Use \fBstderr\fR.  Log messages from \fB-v\fR and error messages are sent to
+\fBstderr\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 23n
+Do not use syslog.  By default, error messages are set to syslog. This option
+prevents log messages from \fB-v\fR and error messages from being sent to
+syslog.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-T\fR \fB\fI<phone number>\fR\fR\fR
+.ad
+.RS 23n
+Pass in an arbitrary string (usually a telephone number) that will be
+substituted for the \fB\eT\fR substitution metacharacter in a send string.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-U\fR \fB\fI<phone number 2>\fR\fR\fR
+.ad
+.RS 23n
+Pass in a second string (usually a telephone number) that will be substituted
+for the \fB\eU\fR substitution metacharacter in a send string. This is useful
+when dialing an ISDN terminal adapter that requires two numbers.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBscript\fR \fR
+.ad
+.RS 23n
+If the script is not specified in a file with the \fB-f\fR option, the script
+is included as parameters to the \fBchat\fR program.
+.RE
+
+.SH EXTENDED DESCRIPTION
+.SS "Chat Script"
+The \fBchat\fR script defines communications. A script consists of one or more
+"expect-send" pairs of strings separated by spaces, with an optional
+"subexpect-subsend" string pair, separated by a dash (as in the following
+example:)
+.sp
+.LP
+ogin:-BREAK-ogin: ppp ssword: hello2u2
+.sp
+.LP
+The example indicates that the \fBchat\fR program should expect the string
+"ogin:". If it fails to receive a login prompt within the time interval
+allotted, it sends a break sequence to the remote and then expects the string
+"ogin:". If the first "ogin:" is received, the break sequence is not generated.
+.sp
+.LP
+Upon receiving the login prompt, the  \fBchat\fR program sends the string "ppp"
+and then expects the prompt "ssword:". When the password prompt is received, it
+sends the password hello2u2.
+.sp
+.LP
+A carriage return is normally sent following the reply string. It is not
+expected in the "expect" string unless it is specifically requested by using
+the \fB\er\fR character sequence.
+.sp
+.LP
+The expect sequence should contain only what is needed to identify the received
+data. Because it's stored on a disk file, it should not contain variable
+information. Generally it is not acceptable to look for time strings, network
+identification strings, or other variable pieces of data as an expect string.
+.sp
+.LP
+To correct for characters that are corrupted during the initial sequence, look
+for the string "ogin:" rather than "login:". The leading "l" character may be
+received in error, creating problems in finding the string. For this reason,
+scripts look for "ogin:" rather than "login:" and "ssword:" rather than
+"password:".
+.sp
+.LP
+An example of a simple script follows:
+.sp
+.in +2
+.nf
+ogin: ppp ssword: hello2u2
+.fi
+.in -2
+
+.sp
+.LP
+The example can be interpreted as: expect ogin:, send ppp, expect ...ssword:,
+send hello2u2.
+.sp
+.LP
+When login to a remote peer is necessary, simple scripts are rare. At minimum,
+you should include sub-expect sequences in case the original string is not
+received. For example, consider the following script:
+.sp
+.in +2
+.nf
+ogin:--ogin: ppp ssword: hello2u2
+.fi
+.in -2
+
+.sp
+.LP
+This script is more effective than the simple one used earlier. The string
+looks for the same login prompt; however, if one is not received, a single
+return sequence is sent and then the script looks for login: again. If line
+noise obscures the first login prompt, send the empty line to generate a login
+prompt again.
+.SS "Comments"
+Comments can be embedded in the \fBchat\fR script. Comment lines are ignored by
+the chat program. A comment starts with the hash ("#") character in column one.
+If a \fB#\fR character is expected as the first character of the expect
+sequence, quote the expect string. If you want to wait for a prompt that starts
+with a \fB#\fR character, write something like this:
+.sp
+.in +2
+.nf
+# Now wait for the prompt and send logout string
+\&'# ' logout
+.fi
+.in -2
+
+.SS "Sending Data From A File"
+If the string to send begins with an at sign ("@"), the remainder of the string
+is interpreted as the name of the file that contains the string. If the last
+character of the data read is a newline, it is removed. The file can be a named
+pipe (or fifo) instead of a regular file. This enables \fBchat\fR to
+communicate with another program, for example, a program to prompt the user and
+receive a password typed in.
+.SS "Abort "
+Many modems report the status of a call as a string. These status strings are
+often "CONNECTED" or "NO CARRIER" or "BUSY." If the modem fails to connect to
+the remote, you can terminate the script. Abort strings may be specified in the
+script using the ABORT sequence. For example:
+.sp
+.in +2
+.nf
+ABORT BUSY ABORT 'NO CARRIER' '' ATZ OK ATDT5551212 CONNECT
+.fi
+.in -2
+
+.sp
+.LP
+This sequence expects nothing and sends the string ATZ. The expected response
+is the string OK. When OK is received, the string ATDT5551212 dials the
+telephone. The expected string is CONNECT. If CONNECT is received, the
+remainder of the script is executed. When the modem finds a busy telephone, it
+sends the string BUSY, causing the string to match the abort character
+sequence. The script fails because it found a match to the abort string. If the
+NO CARRIER string is received, it aborts for the same reason.
+.SS "Clr_Abort "
+The CLR_ABORT sequence clears previously set ABORT strings. ABORT strings are
+kept in an array of a pre-determined size; CLR_ABORT reclaims the space for
+cleared entries, enabling new strings to use that space.
+.SS "Say "
+The SAY string enables the script to send strings to a user at a terminal via
+standard error. If \fBchat\fR is being run by \fBpppd\fR and \fBpppd\fR is
+running as a daemon (detached from its controlling terminal), standard error is
+normally redirected to the \fB/etc/ppp/connect-errors\fR file.
+.sp
+.LP
+SAY strings must be enclosed in single or double quotes. If carriage return and
+line feed are required for the output, you must explicitly add them to your
+string.
+.sp
+.LP
+The SAY string can provide progress messages to users even with "ECHO OFF." For
+example, add a line similar to the following to the script:
+.sp
+.in +2
+.nf
+ABORT BUSY
+ECHO OFF
+SAY "Dialing your ISP...\en"
+\&'' ATDT5551212
+TIMEOUT 120
+SAY "Waiting up to 2 minutes for connection ..."
+CONNECT ''
+SAY "Connected, now logging in ...\en"
+ogin: account
+ssword: pass
+$ \ec
+SAY "Logged in OK ... \en"
+.fi
+.in -2
+
+.sp
+.LP
+This sequence hides script detail while presenting the SAY string to the user.
+In this case, you will see:
+.sp
+.in +2
+.nf
+Dialing your ISP...
+Waiting up to 2 minutes for connection...Connected, now logging in...
+Logged in OK ...
+.fi
+.in -2
+
+.SS "Report"
+REPORT is similar to the ABORT string. With REPORT, however, strings and all
+characters to the next control character (such as a carriage return), are
+written to the report file.
+.sp
+.LP
+REPORT strings can be used to isolate a modem's transmission rate from its
+CONNECT string and return the value to the \fBchat\fR user. Analysis of the
+REPORT string logic occurs in conjunction with other string processing, such as
+looking for the expect string. It's possible to use the same string for a
+REPORT and ABORT sequence, but probably not useful.
+.sp
+.LP
+Report strings may be specified in the script using the REPORT sequence. For
+example:
+.sp
+.in +2
+.nf
+REPORT CONNECT
+ABORT BUSY
+ATDT5551212 CONNECT
+ogin: account
+.fi
+.in -2
+
+.sp
+.LP
+The above sequence expects nothing, then sends the string ATDT5551212 to dial
+the telephone. The expected string is CONNECT. If CONNECT is received, the
+remainder of the script is executed. In addition, the program writes the string
+CONNECT to the report file (specified by \fB-r\fR) in addition to any
+characters that follow.
+.SS "Clr_Report"
+CLR_REPORT clears previously set REPORT strings. REPORT strings are kept in an
+array of a pre-determined size; CLR_REPORT reclaims the space for cleared
+entries so that new strings can use that space.
+.SS "Echo"
+ECHO determines if modem output is echoed to \fBstderr\fR. This option may be
+set with the \fB-e\fR option, but can also be controlled by the ECHO keyword.
+The "expect-send" pair  ECHO ON enables echoing, and ECHO OFF disables it. With
+ECHO, you can select which parts of the conversation should be visible. In the
+following script:
+.sp
+.in +2
+.nf
+ABORT   'BUSY'
+ABORT   'NO CARRIER'
+""    AT&F
+OK\er\en  ATD1234567
+\er\en    \ec
+ECHO    ON
+CONNECT \ec
+ogin:   account
+.fi
+.in -2
+
+.sp
+.LP
+All output resulting from modem configuration and dialing is not visible, but
+output is echoed beginning with the CONNECT (or BUSY) message.
+.SS "Hangup"
+The HANGUP option determines if a modem hangup is considered as an error.
+HANGUP is useful for dialing systems that hang up and call your system back.
+HANGUP can be ON or OFF. When HANGUP is set to OFF and the modem hangs up (for
+example, following the first stage of logging in to a callback system),
+\fBchat\fR continues running the script (for example, waiting for the incoming
+call and second stage login prompt). When the incoming call is connected, use
+the HANGUP ON string to reinstall normal hang up signal behavior. An example of
+a simple script follows:
+.sp
+.in +2
+.nf
+ABORT   'BUSY'
+ ""  AT&F
+ OK\er\en  ATD1234567
+ \er\en    \ec
+ CONNECT \ec
+ 'Callback login:' call_back_ID
+ HANGUP OFF
+ ABORT "Bad Login"
+ 'Callback Password:' Call_back_password
+ TIMEOUT 120
+ CONNECT \ec
+ HANGUP ON
+ ABORT "NO CARRIER"
+ ogin:--BREAK--ogin: real_account
+.fi
+.in -2
+
+.SS "Timeout"
+The initial timeout value is 45 seconds. Use the \fB-t\fR parameter to change
+the initial timeout value.
+.sp
+.LP
+To change the timeout value for the next expect string, the following example
+can be used:
+.sp
+.in +2
+.nf
+\&''"AT&F
+ OK ATDT5551212
+ CONNECT \ec
+ TIMEOUT 10
+ ogin:--ogin: username
+ TIMEOUT 5
+ assword: hello2u2
+.fi
+.in -2
+
+.sp
+.LP
+The example changes the timeout to ten seconds when it expects the login:
+prompt. The timeout is changed to five seconds when it looks for the password
+prompt.
+.sp
+.LP
+Once changed, the timeout value remains in effect until it is changed again.
+.SS " EOT"
+The EOT special reply string instructs the \fBchat\fR program to send an EOT
+character to the remote. This is equivalent to using ^D\ec as the reply string.
+The EOT string normally indicates the end-of-file character sequence. A return
+character is not sent following the EOT. The EOT sequence can embedded into the
+send string using the sequence ^D.
+.SS " BREAK"
+The BREAK special reply string sends a break condition. The break is a special
+transmitter signal. Many UNIX systems handle break by cycling through available
+bit rates, and sending break is often needed when the remote system does not
+support autobaud. BREAK is equivalent to using \eK\ec as the reply string.
+You embed the break sequence into the send string using the \eK sequence.
+.SS "Escape Sequences"
+Expect and reply strings can contain escape sequences. Reply strings accept all
+escape sequences, while expect strings accept most sequences. A list of escape
+sequences is presented below. Sequences that are not accepted by expect strings
+are indicated.
+.sp
+.ne 2
+.na
+\fB\fB\&''\fR \fR
+.ad
+.RS 10n
+Expects or sends a null string. If you send a null string, \fBchat\fR sends
+the return character.  If you expect a null string, \fBchat\fR proceeds to the
+reply string without waiting.  This sequence can be a pair of apostrophes or
+quote mark characters.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\eb\fR \fR
+.ad
+.RS 10n
+Represents a backspace character.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\ec\fR \fR
+.ad
+.RS 10n
+Suppresses the newline at the end of the reply string. This is the only method
+to send a string without a trailing return character. This sequence must be at
+the end of the send string. For example, the sequence hello\ec will simply send
+the characters h, e, l, l, o. (Not valid  in expect.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\ed\fR \fR
+.ad
+.RS 10n
+Delay for one second. The program uses \fBsleep\fR(1) which delays to a maximum
+of one second.  (Not valid  in expect.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\eK\fR \fR
+.ad
+.RS 10n
+Insert a BREAK.  (Not valid  in expect.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\en\fR \fR
+.ad
+.RS 10n
+Send a newline or linefeed character.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\eN\fR \fR
+.ad
+.RS 10n
+Send a null character. The same sequence may be represented by \e0.  (Not valid
+in expect.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\ep\fR \fR
+.ad
+.RS 10n
+Pause for 1/10th of a second.  (Not valid  in expect.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\eq\fR \fR
+.ad
+.RS 10n
+Suppress writing the string to syslog.  The string ?????? is written to the log
+in its place. (Not valid  in expect.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\er\fR \fR
+.ad
+.RS 10n
+Send or expect a carriage return.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\es\fR \fR
+.ad
+.RS 10n
+Represents a space character in the string. Can be used when it is not
+desirable to quote the strings which contains spaces. The sequence 'HI\ TIM'
+and HI\esTIM are the same.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\et\fR \fR
+.ad
+.RS 10n
+Send or expect a tab character.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\eT\fR \fR
+.ad
+.RS 10n
+Send the phone number string as specified with the \fB-T\fR option.  (Not valid
+in expect.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\eU\fR \fR
+.ad
+.RS 10n
+Send the phone number 2 string as specified with the \fB-U\fR option. (Not
+valid  in expect.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\e\e\fR \fR
+.ad
+.RS 10n
+Send or expect a backslash character.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\eddd\fR \fR
+.ad
+.RS 10n
+Collapse the octal digits (ddd) into a single ASCII character and send that
+character. (\e000 is not valid in an expect string.)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB^C\fR \fR
+.ad
+.RS 10n
+Substitute the sequence with the control character represented by C. For
+example, the character DC1 (17) is shown as ^Q. (Some characters are not valid
+in expect.)
+.RE
+
+.SH ENVIRONMENT VARIABLES
+Environment variables are available within \fBchat\fR scripts if the \fB-E\fR
+option is specified on the command line. The metacharacter \fB$\fR introduces
+the name of the environment variable to substitute. If the substitution fails
+because the requested environment variable is not set, nothing is replaced for
+the variable.
+.SH EXIT STATUS
+The \fBchat\fR program terminates with the following completion codes:
+.sp
+.ne 2
+.na
+\fB\fB0\fR \fR
+.ad
+.RS 10n
+Normal program termination. Indicates that the script was executed without
+error to normal conclusion.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR \fR
+.ad
+.RS 10n
+One or more of the parameters are invalid or an expect string was too large for
+the internal buffers. Indicates that the program was not properly executed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR \fR
+.ad
+.RS 10n
+An error occurred during the execution of the program. This may be due to a
+read or write operation failing or \fBchat\fR receiving a signal such as
+SIGINT.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3\fR \fR
+.ad
+.RS 10n
+A timeout event occurred when there was an expect string without having a
+"-subsend" string. This indicates that you may not have programmed the script
+correctly for the condition or that an unexpected event occurred and the
+expected string could not be found.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB4\fR \fR
+.ad
+.RS 10n
+The first string marked as an ABORT condition occurred.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB5\fR \fR
+.ad
+.RS 10n
+The second string marked as an ABORT condition occurred.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB6\fR \fR
+.ad
+.RS 10n
+The third string marked as an ABORT  condition occurred.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB7\fR \fR
+.ad
+.RS 10n
+The fourth string marked as an ABORT condition occurred.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\&...\fR \fR
+.ad
+.RS 10n
+The other termination codes are also strings marked as an ABORT condition.
+.RE
+
+.sp
+.LP
+To determine which event terminated the script, use the termination code. It is
+possible to decide if the string "BUSY" was received from the modem versus "NO
+DIALTONE." While the first event may be retried, the second probably will not
+succeed during a retry.
+.SH ATTRIBUTES
+See \fBattributes\fR(7)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.BR sleep (1),
+.BR uucp (1C),
+.BR syslog (3C),
+.BR attributes (7),
+.BR pppd (8),
+.BR uucico (8)
+.sp
+.LP
+Additional information on \fBchat\fR scripts are available with UUCP
+documentation. The  \fBchat\fR script format was taken from scripts used by the
+\fBuucico\fR program.

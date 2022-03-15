@@ -98,7 +98,7 @@ to indicate the error.
 For a full list of possible errors also see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4
+.Xr proc 5
 and
 the
 .Sy ERRORS
@@ -114,4 +114,4 @@ in
 .Sh SEE ALSO
 .Xr pread 2 ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

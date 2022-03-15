@@ -57,7 +57,9 @@ Pointer to the driver's \fBdev_ops\fR(9S) structure.
 .RE
 
 .SH SEE ALSO
-\fBadd_drv\fR(1M), \fBdev_ops\fR(9S), \fBmodlinkage\fR(9S)
+.BR add_drv (8),
+.BR dev_ops (9S),
+.BR modlinkage (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

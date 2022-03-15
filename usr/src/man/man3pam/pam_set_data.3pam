@@ -76,7 +76,7 @@ No module specific data is present.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -94,7 +94,10 @@ MT-Level	MT-Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBpam\fR(3PAM), \fBpam_end\fR(3PAM), \fBlibpam\fR(3LIB), \fBattributes\fR(5)
+.BR libpam (3LIB),
+.BR pam (3PAM),
+.BR pam_end (3PAM),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

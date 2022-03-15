@@ -193,7 +193,7 @@ than \fIn\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -211,6 +211,10 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBdat_ep_create\fR(3DAT), \fBdat_srq_create\fR(3DAT),
-\fBdat_srq_free\fR(3DAT), \fBdat_srq_query\fR(3DAT),
-\fBdat_ep_set_watermark\fR(3DAT), \fBlibdat\fR(3LIB), \fBattributes\fR(5)
+.BR dat_ep_create (3DAT),
+.BR dat_ep_set_watermark (3DAT),
+.BR dat_srq_create (3DAT),
+.BR dat_srq_free (3DAT),
+.BR dat_srq_query (3DAT),
+.BR libdat (3LIB),
+.BR attributes (7)

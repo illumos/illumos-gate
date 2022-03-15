@@ -121,7 +121,7 @@ static diskaddr_t	lastlba = 0;	/* last LBA on 64-bit VTOC */
 static char	*uboot = "boot";
 
 #elif defined(i386)
-/* use installboot(1M) to install boot blocks */
+/* use installboot(8) to install boot blocks */
 static char *uboot = "";
 #else
 #error No platform defined.
@@ -168,7 +168,7 @@ main(int argc, char **argv)
 		case 'b':
 			(void) fprintf(stderr,
 			    "fmthard: -p and -b no longer supported."
-			    " Use installboot(1M) to install boot blocks\n");
+			    " Use installboot(8) to install boot blocks\n");
 			break;
 #endif	/* defined(i386) */
 

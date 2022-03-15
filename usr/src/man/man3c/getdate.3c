@@ -138,7 +138,7 @@ Locale's appropriate date and time representation.
 .RS 6n
 Century number (the year divided by 100 and truncated to an integer as a
 decimal number [1,99]); single digits are preceded by 0; see
-\fBstandards\fR(5). If used without the \fB%y\fR specifier, this format
+\fBstandards\fR(7). If used without the \fB%y\fR specifier, this format
 specifier will assume the current year offset in whichever century is
 specified. The only valid years are between 1902-2037.
 .RE
@@ -817,7 +817,7 @@ _
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -837,5 +837,11 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBctype\fR(3C), \fBmktime\fR(3C), \fBsetlocale\fR(3C), \fBstrftime\fR(3C),
-\fBstrptime\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR ctype (3C),
+.BR mktime (3C),
+.BR setlocale (3C),
+.BR strftime (3C),
+.BR strptime (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)

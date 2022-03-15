@@ -41,8 +41,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/ntxn group=sys
 file path=kernel/drv/ntxn.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/ntxn.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/ntxn.4d
 driver name=ntxn \
     alias=pci4040,1 \
     alias=pci4040,2 \

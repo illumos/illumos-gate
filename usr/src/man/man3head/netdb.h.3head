@@ -159,7 +159,7 @@ Inclusion of the <\fBnetdb.h\fR> header may also make visible all symbols from
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -175,7 +175,15 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBIntro\fR(3), \fBendhostent\fR(3NSL), \fBendhostent\fR(3XNET),
-\fBendnetent\fR(3SOCKET), \fBendnetent\fR(3XNET), \fBendprotoent\fR(3SOCKET),
-\fBendprotoent\fR(3XNET), \fBendservent\fR(3SOCKET), \fBendservent\fR(3XNET),
-\fBin.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR Intro (3),
+.BR in.h (3HEAD),
+.BR endhostent (3NSL),
+.BR endnetent (3SOCKET),
+.BR endprotoent (3SOCKET),
+.BR endservent (3SOCKET),
+.BR endhostent (3XNET),
+.BR endnetent (3XNET),
+.BR endprotoent (3XNET),
+.BR endservent (3XNET),
+.BR attributes (7),
+.BR standards (7)

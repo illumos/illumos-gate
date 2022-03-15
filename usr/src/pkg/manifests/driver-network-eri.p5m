@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/eri group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/eri.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/eri.4d
 driver name=eri clone_perms="eri 0666 root sys" alias=pci108e,1101
 legacy pkg=SUNWerid desc="Sun RIO 10/100 Mb Ethernet Drivers" \
     name="Sun RIO 10/100 Mb Ethernet Drivers"

@@ -86,7 +86,7 @@ These functions can be called from user or kernel context. These functions may
 also be called from interrupt context, providing they are not the first Power
 Management function called by the driver.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -100,9 +100,14 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBpower.conf\fR(4), \fBpm\fR(7D), \fBattach\fR(9E), \fBdetach\fR(9E),
-\fBpower\fR(9E), \fBpm_raise_power\fR(9F), \fBpm\fR(9P),
-\fBpm-components\fR(9P)
+.BR pm (4D),
+.BR power.conf (5),
+.BR attach (9E),
+.BR detach (9E),
+.BR power (9E),
+.BR pm_raise_power (9F),
+.BR pm (9P),
+.BR pm-components (9P)
 .sp
 .LP
 \fIWriting Device Drivers\fR

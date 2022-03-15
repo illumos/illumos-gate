@@ -282,7 +282,7 @@ uint32_t vnet_mac_open_retries = 100;
 static char macaddr_propname[] = "local-mac-address";
 
 /*
- * This is the string displayed by modinfo(1m).
+ * This is the string displayed by modinfo(8).
  */
 static char vnet_ident[] = "vnet driver";
 extern struct mod_ops mod_driverops;

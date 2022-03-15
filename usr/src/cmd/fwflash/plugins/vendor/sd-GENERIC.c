@@ -15,9 +15,9 @@
 
 /*
  * This is a general firmware flash plugin that does basic verification for
- * devices backed by sd(7D).
+ * devices backed by sd(4D).
  *
- * The sd(7D) target for firmware flashing uses the general SCSI WRITE BUFFER
+ * The sd(4D) target for firmware flashing uses the general SCSI WRITE BUFFER
  * options with various modes to instruct the drive to download and install
  * microcode (what SPC-3 calls firmware). To verify that something fits, we can
  * use the READ BUFFER command with mode 03h to indicate that we want to

@@ -163,11 +163,11 @@ operation, which can be retrieved using \fBaio_error\fR(3C).
 .sp
 .LP
 The \fBaio_fsync()\fR function has a transitional interface for 64-bit file
-offsets.  See \fBlf64\fR(5).
+offsets.  See \fBlf64\fR(7).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -181,13 +181,23 @@ Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBfcntl\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),
-\fBaio_error\fR(3C), \fBaio_return\fR(3C), \fBaio.h\fR(3HEAD),
-\fBfcntl.h\fR(3HEAD), \fBfdatasync\fR(3C), \fBfsync\fR(3C),
-\fBsignal.h\fR(3HEAD), \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)
+.BR fcntl (2),
+.BR open (2),
+.BR read (2),
+.BR write (2),
+.BR aio_error (3C),
+.BR aio_return (3C),
+.BR fdatasync (3C),
+.BR fsync (3C),
+.BR aio.h (3HEAD),
+.BR fcntl.h (3HEAD),
+.BR signal.h (3HEAD),
+.BR attributes (7),
+.BR lf64 (7),
+.BR standards (7)

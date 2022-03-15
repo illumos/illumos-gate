@@ -31,7 +31,7 @@
  * group identifies a service, named in the form 'rc2_d_S10foo'.
  *
  * Each group has the following properties: name, the script name
- * displayed by svcs(1m); state_timestamp; contract, contract ID;
+ * displayed by svcs(1); state_timestamp; contract, contract ID;
  * inode, the inode of the script; and suffix, the suffix of the
  * script name, e.g. 'foo'.
  *
@@ -818,7 +818,7 @@ main(int argc, char *argv[], char *envp[])
 	/* Make sure we were run by svc.startd. */
 	if ((restarter = getenv("SMF_RESTARTER")) == NULL ||
 	    strcmp(restarter, SCF_SERVICE_STARTD) != 0)
-		uu_die(gettext("invocation outside smf(5) inappropriate\n"));
+		uu_die(gettext("invocation outside smf(7) inappropriate\n"));
 
 	while ((o = getopt(argc, argv, "s")) != -1) {
 		switch (o) {

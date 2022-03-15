@@ -1,0 +1,211 @@
+'\" te
+.\" Copyright (c) 1983 Eric P. Allman
+.\" Copyright (c) 1988, 1993 The Regents of the University of California.  All rights reserved.
+.\" Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 1. Redistributions of source code must retain the above copyright    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright    notice, this list of conditions and the following disclaimer in the    documentation and/or other materials provided with the distribution. 3. All advertising materials mentioning features or use of this software    must display
+.\" the following acknowledgement: This product includes software developed by the University of California, Berkeley and its contributors. 4. Neither the name of the University nor the names of its contributors    may be used to endorse or promote products derived from this software    without specific
+.\" prior written permission.  THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
+.\" CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+.\" IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.\" Copyright (c) 1998-2006, 2008 Sendmail, Inc. and its suppliers.  All rights reserved.
+.\" The following license terms and conditions apply, unless a different license is obtained from Sendmail, Inc., 6425 Christie Ave, Fourth Floor, Emeryville, CA 94608, USA, or by electronic mail at license@sendmail.com.  License Terms:  Use, Modification and Redistribution
+.\" (including distribution of any modified or derived work) in source and binary forms is permitted only if each of the following conditions is met:  1. Redistributions qualify as "freeware" or "Open Source Software" under    one of the following terms:     (a) Redistributions are made at no charge
+.\" beyond the reasonable cost of        materials and delivery.     (b) Redistributions are accompanied by a copy of the Source Code or by an        irrevocable offer to provide a copy of the Source Code for up to three       years at the cost of materials and delivery.  Such redistributions
+.\"    must allow further use, modification, and redistribution of the Source       Code under substantially the same terms as this license.  For the        purposes of redistribution "Source Code" means the complete compilable       and linkable source code of sendmail including all modifications.
+.\"  2. Redistributions of source code must retain the copyright notices as they    appear in each source code file, these license terms, and the    disclaimer/limitation of liability set forth as paragraph 6 below.  3. Redistributions in binary form must reproduce the Copyright Notice,    these license
+.\" terms, and the disclaimer/limitation of liability set    forth as paragraph 6 below, in the documentation and/or other materials    provided with the distribution.  For the purposes of binary distribution    the "Copyright Notice" refers to the following language:    "Copyright (c) 1998-2004 Sendmail,
+.\" Inc.  All rights reserved."  4. Neither the name of Sendmail, Inc. nor the University of California nor    the names of their contributors may be used to endorse or promote    products derived from this software without specific prior written    permission.  The name "sendmail" is a trademark
+.\" of Sendmail, Inc.  5. All redistributions must comply with the conditions imposed by the    University of California on certain embedded code, whose copyright    notice and conditions for redistribution are as follows:     (a) Copyright (c) 1988, 1993 The Regents of the University of        California.
+.\"  All rights reserved.     (b) Redistribution and use in source and binary forms, with or without        modification, are permitted provided that the following conditions        are met:        (i)   Redistributions of source code must retain the above copyright             notice, this list of
+.\" conditions and the following disclaimer.        (ii)  Redistributions in binary form must reproduce the above             copyright notice, this list of conditions and the following             disclaimer in the documentation and/or other materials provided             with the distribution.
+.\"       (iii) Neither the name of the University nor the names of its             contributors may be used to endorse or promote products derived             from this software without specific prior written permission. 6. Disclaimer/Limitation of Liability: THIS SOFTWARE IS PROVIDED BY    SENDMAIL,
+.\" INC. AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED    WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF    MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN    NO EVENT SHALL SENDMAIL, INC., THE REGENTS OF THE UNIVERSITY OF    CALIFORNIA OR CONTRIBUTORS
+.\" BE LIABLE FOR ANY DIRECT, INDIRECT,    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT    NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF    USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON    ANY THEORY OF LIABILITY, WHETHER
+.\" IN CONTRACT, STRICT LIABILITY, OR TORT    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF    THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+.\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2019 Peter Tribble.
+.TH EDITMAP 8 "Jan 21, 2019"
+.SH NAME
+editmap \- query and edit single records in database maps for sendmail
+.SH SYNOPSIS
+.LP
+.nf
+\fBeditmap\fR \fB-C\fR \fIfile\fR [\fB-N\fR] [\fB-f\fR] [\fB-q\fR | \fB-u\fR | \fB-x\fR] \fImaptype\fR \fImapname\fR \fIkey\fR
+     ["\fIvalue\fR"]...
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBeditmap\fR command queries or edits one record in a database maps used
+by the keyed map lookups in \fBsendmail\fR(8). Arguments are passed on the
+command line and output (for queries) is directed to standard output.
+.sp
+.LP
+Depending on how it is compiled, \fBeditmap\fR handles up to three different
+database formats, selected using the \fImaptype\fR parameter. See
+\fBOPERANDS\fR.
+.sp
+.LP
+If the \fBTrustedUser\fR option is set in the \fBsendmail\fR configuration
+file and \fBeditmap\fR is invoked as root, the generated files are owned by the
+specified \fBTrustedUser\fR.
+.SH OPTIONS
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB-C\fR \fIfile\fR
+.ad
+.RS 11n
+Use the specified \fBsendmail\fR configuration file (\fIfile\fR) to look up the
+\fBTrustedUser\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-f\fR
+.ad
+.RS 11n
+Disable the folding of all upper case letters in the key to lower case.
+Normally, all upper case letters in the key are folded to lower case. This is
+intended to mesh with the \fB-f\fR flag in the \fBK\fR line in
+\fBsendmail.cf\fR. The value is never case folded.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-N\fR
+.ad
+.RS 11n
+Include the null byte that terminates strings in the map (for alias maps).
+.RE
+
+.sp
+.ne 2
+.na
+\fB-q\fR
+.ad
+.RS 11n
+Query the map for the specified key. If found, print value to standard output
+and exit with \fB0\fR. If not found then print an error message to \fBstdout\fR
+and exit with \fBEX_UNAVAILABLE\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-u\fR
+.ad
+.RS 11n
+Update the record for the specified key with the specified value or inserts a
+new record if one doesn't exist. Exits with \fB0\fR on success or
+\fBEX_IOERR\fR on failure.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-x\fR
+.ad
+.RS 11n
+Delete the specified key from the map. Exits with \fB0\fR on success or
+\fBEX_IOERR\fR on failure.
+.RE
+
+.SH OPERANDS
+.LP
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fIkey\fR
+.ad
+.RS 12n
+The left hand side of a record.
+.sp
+Each record is of the form:
+.sp
+.in +2
+.nf
+\fIkey\fR \fIvalue\fR
+.fi
+.in -2
+.sp
+
+\fIkey\fR and \fIvalue\fR are separated by white space.
+.RE
+
+.sp
+.ne 2
+.na
+\fImapname\fR
+.ad
+.RS 12n
+File name of the database map being created.
+.RE
+
+.sp
+.ne 2
+.na
+\fImaptype\fR
+.ad
+.RS 12n
+Specifies the database format. The following \fImaptype\fR parameters are
+available:
+.sp
+.ne 2
+.na
+\fBdbm\fR
+.ad
+.RS 10n
+Specifies \fBDBM\fR format maps.
+.RE
+
+.sp
+.ne 2
+.na
+\fBbtree\fR
+.ad
+.RS 10n
+Specifies B-Tree format maps.
+.RE
+
+.sp
+.ne 2
+.na
+\fBhash\fR
+.ad
+.RS 10n
+Specifies hash format maps.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fIvalue\fR
+.ad
+.RS 12n
+The right hand side of a record.
+.sp
+Each record is of the form:
+.sp
+.in +2
+.nf
+\fIkey\fR \fIvalue\fR
+.fi
+.in -2
+.sp
+
+\fIkey\fR and \fIvalue\fR are separated by white space.
+.RE
+
+.SH SEE ALSO
+.LP
+.BR attributes (7),
+.BR makemap (8),
+.BR sendmail (8)

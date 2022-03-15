@@ -466,7 +466,7 @@ TO FIX: refer to manual   UX:cat:001
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -484,5 +484,9 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBfmtmsg\fR(1), \fBaddseverity\fR(3C), \fBgettxt\fR(3C), \fBprintf\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR fmtmsg (1),
+.BR addseverity (3C),
+.BR gettxt (3C),
+.BR printf (3C),
+.BR attributes (7),
+.BR standards (7)

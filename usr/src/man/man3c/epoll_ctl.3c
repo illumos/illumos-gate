@@ -30,7 +30,7 @@ Valid values for \fIop\fR:
 \fBEPOLL_CTL_ADD\fR
 .ad
 .RS 12n
-For the \fBepoll\fR(5) instance specified by \fIepfd\fR,
+For the \fBepoll\fR(7) instance specified by \fIepfd\fR,
 associate the file descriptor specified by \fIfd\fR with the event specified
 by \fIevent\fR.
 .RE
@@ -41,7 +41,7 @@ by \fIevent\fR.
 \fBEPOLL_CTL_DEL\fR
 .ad
 .RS 12n
-For the \fBepoll\fR(5) instance specified by \fIepfd\fR,
+For the \fBepoll\fR(7) instance specified by \fIepfd\fR,
 remove all event associations for the file descriptor specified by \fIfd\fR.
 \fIevent\fR is ignored, and may be NULL.
 .RE
@@ -52,7 +52,7 @@ remove all event associations for the file descriptor specified by \fIfd\fR.
 \fBEPOLL_CTL_MOD\fR
 .ad
 .RS 12n
-For the \fBepoll\fR(5) instance specified by \fIepfd\fR, modify the event
+For the \fBepoll\fR(7) instance specified by \fIepfd\fR, modify the event
 association for the file descriptor specified by \fIfd\fR to be that
 specified by \fIevent\fR.
 
@@ -238,7 +238,7 @@ it has no meaning and is ignored.
 .ad
 .RS 14n
 Sets the specified event to be in one-shot mode, whereby the event association
-with the \fBepoll\fR(5) instance specified by \fIepfd\fR is removed atomically
+with the \fBepoll\fR(7) instance specified by \fIepfd\fR is removed atomically
 as the event is returned via \fBepoll_wait\fR(3C).  Use of this mode allows
 for resolution of some of the
 races inherent in multithreaded use of \fBepoll_wait\fR(3C).
@@ -291,7 +291,7 @@ The memory associated with \fIevent\fR was not mapped.
 .RS 10n
 The operation specified was \fBEPOLL_CTL_ADD\fR and the specified file
 descriptor is already associated with an event for the specified
-\fBepoll\fR(5) instance.
+\fBepoll\fR(7) instance.
 .RE
 
 .sp
@@ -302,18 +302,21 @@ descriptor is already associated with an event for the specified
 .RS 10n
 The operation specified was \fBEPOLL_CTL_MOD\fR or \fBEPOLL_CTL_DEL\fR and
 the specified file descriptor is not associated with an event for the
-specified \fBepoll\fR(5) instance.
+specified \fBepoll\fR(7) instance.
 .RE
 
 .sp
 .SH NOTES
-The \fBepoll\fR(5) facility is implemented for purposes of offering
+The \fBepoll\fR(7) facility is implemented for purposes of offering
 compatibility for Linux-borne applications; native
 applications should continue to prefer using event ports via the
 \fBport_create\fR(3C), \fBport_associate\fR(3C) and \fBport_get\fR(3C)
-interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
+interfaces.  See \fBepoll\fR(7) for compatibility details and restrictions.
 
 .SH SEE ALSO
-\fBepoll_create\fR(3C), \fBepoll_wait\fR(3C),
-\fBport_create\fR(3C), \fBport_associate\fR(3C), \fBport_get\fR(3C),
-\fBepoll\fR(5)
+.BR epoll_create (3C),
+.BR epoll_wait (3C),
+.BR port_associate (3C),
+.BR port_create (3C),
+.BR port_get (3C),
+.BR epoll (7)

@@ -102,7 +102,7 @@ main(int argc, char **argv)
 
 	/*
 	 * Take special note that "getuid()" is called here.  This call is used
-	 * rather than app_krb5_user_uid(), to ensure gssd(1M) is running as
+	 * rather than app_krb5_user_uid(), to ensure gssd(8) is running as
 	 * root.
 	 */
 #ifdef DEBUG

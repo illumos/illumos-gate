@@ -30,7 +30,7 @@
  *
  *    Implements all the routines necessary for setting up, querying, and
  *    (later) tearing down all the kstats necessary for implementing to
- *    the interfaces necessary to provide busstat(1M) access.
+ *    the interfaces necessary to provide busstat(8) access.
  */
 
 #include <sys/types.h>

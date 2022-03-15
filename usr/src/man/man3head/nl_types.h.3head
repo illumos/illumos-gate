@@ -77,5 +77,8 @@ Maximum size of a message.
 .SH SEE ALSO
 .sp
 .LP
-\fBgencat\fR(1), \fBcatgets\fR(3C), \fBcatopen\fR(3C), \fBnl_langinfo\fR(3C),
-\fBlanginfo.h\fR(3HEAD)
+.BR gencat (1),
+.BR catgets (3C),
+.BR catopen (3C),
+.BR nl_langinfo (3C),
+.BR langinfo.h (3HEAD)

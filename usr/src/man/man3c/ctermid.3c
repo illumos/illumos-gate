@@ -59,7 +59,7 @@ applications.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -79,4 +79,5 @@ T}
 .SH SEE ALSO
 .sp
 .LP
-\fBttyname\fR(3C), \fBattributes\fR(5)
+.BR ttyname (3C),
+.BR attributes (7)

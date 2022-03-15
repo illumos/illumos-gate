@@ -1,0 +1,96 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH GROUPDEL 8 "Jan 7, 2018"
+.SH NAME
+groupdel \- delete a group definition from the system
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/groupdel\fR \fIgroup\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBgroupdel\fR utility deletes a group definition from the system. It
+deletes the appropriate entry from the \fB/etc/group\fR file.
+.SH OPERANDS
+.ne 2
+.na
+\fB\fIgroup\fR\fR
+.ad
+.RS 9n
+An existing group name to be deleted.
+.RE
+
+.SH EXIT STATUS
+.LP
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+Success.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.RS 6n
+Invalid command syntax. A usage message for the \fBgroupdel\fR command is
+displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB6\fR\fR
+.ad
+.RS 6n
+\fIgroup\fR does not exist.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB10\fR\fR
+.ad
+.RS 6n
+Cannot update the \fB/etc/group\fR file.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/group\fR\fR
+.ad
+.RS 14n
+system file containing group definitions
+.RE
+
+.SH SEE ALSO
+.LP
+.BR attributes (7),
+.BR groupadd (8),
+.BR groupmod (8),
+.BR logins (8),
+.BR useradd (8),
+.BR userdel (8),
+.BR usermod (8)
+.SH NOTES
+.LP
+The \fBgroupdel\fR utility only deletes a group definition that is in the local
+\fB/etc/group\fR file. If a network nameservice
+is being used to supplement the local \fB/etc/group\fR file with additional
+entries, \fBgroupdel\fR cannot change information supplied by the network
+nameservice.
+.sp
+.LP
+\fBgroupdel\fR fails if a group entry (a single line in \fB/etc/group\fR)
+exceeds 2047 characters.

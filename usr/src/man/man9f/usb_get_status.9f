@@ -156,7 +156,7 @@ May be called from user or kernel context.
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -172,5 +172,5 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBusb_clr_feature\fR(9F), \fBusb_get_alt_if\fR(9F),
+\fBattributes\fR(7), \fBusb_clr_feature\fR(9F), \fBusb_get_alt_if\fR(9F),
 \fBusb_pipe_get_state\fR(9F), \fBusb_get_cfg\fR(9F),

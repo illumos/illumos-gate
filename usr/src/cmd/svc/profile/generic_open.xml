@@ -41,7 +41,7 @@
   <xi:include href='file:/etc/svc/profile/name_service.xml' />
 
   <!--
-      svc.startd(1M) services
+      svc.startd(8) services
   -->
   <service name='system/coreadm' version='1' type='service'>
     <instance name='default' enabled='true'/>
@@ -186,7 +186,7 @@
   </service>
 
   <!--
-      Include inetd(1M) services profile.
+      Include inetd(8) services profile.
   -->
   <xi:include href='file:/etc/svc/profile/inetd_services.xml' />
 </service_bundle>

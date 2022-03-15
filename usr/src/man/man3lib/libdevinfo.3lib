@@ -80,7 +80,7 @@ interfaces are called to get minor node data.
 .LP
 In some configurations, multipath device access via a virtual host controller
 interface (vHCI) abstraction is possible. An example of a driver using this
-abstraction is \fBscsi_vhci\fR(7D). In such cases, devices are not directly
+abstraction is \fBscsi_vhci\fR(4D). In such cases, devices are not directly
 represented as children of their physical host controller interface (pHCI) bus
 adapter. Instead, devices have an identity-oriented representation as a child
 of a vHCI. All paths leading to the same identity are represented by a common
@@ -276,7 +276,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -293,16 +293,28 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpvs\fR(1), \fBdevlinks\fR(1M), \fBprtconf\fR(1M), \fBIntro\fR(3),
-\fBdi_binding_name\fR(3DEVINFO), \fBdi_child_node\fR(3DEVINFO),
-\fBdi_devfs_path\fR(3DEVINFO), \fBdi_init\fR(3DEVINFO),
-\fBdi_minor_devt\fR(3DEVINFO), \fBdi_minor_next\fR(3DEVINFO),
-\fBdi_path_bus_addr\fR(3DEVINFO), \fBdi_path_client_next_path\fR(3DEVINFO),
-\fBdi_path_prop_bytes\fR(3DEVINFO), \fBdi_path_prop_lookup_bytes\fR(3DEVINFO),
-\fBdi_path_prop_next\fR(3DEVINFO), \fBdi_prom_init\fR(3DEVINFO),
-\fBdi_prop_bytes\fR(3DEVINFO), \fBdi_prop_lookup_bytes\fR(3DEVINFO),
-\fBdi_prop_next\fR(3DEVINFO), \fBdi_walk_minor\fR(3DEVINFO),
-\fBdi_walk_node\fR(3DEVINFO), \fBattributes\fR(5)
+.BR pvs (1),
+.BR Intro (3),
+.BR di_binding_name (3DEVINFO),
+.BR di_child_node (3DEVINFO),
+.BR di_devfs_path (3DEVINFO),
+.BR di_init (3DEVINFO),
+.BR di_minor_devt (3DEVINFO),
+.BR di_minor_next (3DEVINFO),
+.BR di_path_bus_addr (3DEVINFO),
+.BR di_path_client_next_path (3DEVINFO),
+.BR di_path_prop_bytes (3DEVINFO),
+.BR di_path_prop_lookup_bytes (3DEVINFO),
+.BR di_path_prop_next (3DEVINFO),
+.BR di_prom_init (3DEVINFO),
+.BR di_prop_bytes (3DEVINFO),
+.BR di_prop_lookup_bytes (3DEVINFO),
+.BR di_prop_next (3DEVINFO),
+.BR di_walk_minor (3DEVINFO),
+.BR di_walk_node (3DEVINFO),
+.BR attributes (7),
+.BR devlinks (8),
+.BR prtconf (8)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -102,5 +102,9 @@ to enqueue the operation and service it once the bus has been unquiesced.  Note
 that not all busses support the quiesce/unquiesce operations, so this value may
 never be seen by some drivers.
 .SH SEE ALSO
-\fBattach\fR(9E),  \fBioctl\fR(9E), \fBopen\fR(9E), \fBread\fR(9E),
-\fBstrategy\fR(9E), \fBwrite\fR(9E), \fBddi_dev_report_fault\fR(9F)
+\fBattach\fR(9E),  \fBioctl\fR(9E),
+.BR open (9E),
+.BR read (9E),
+.BR strategy (9E),
+.BR write (9E),
+.BR ddi_dev_report_fault (9F)

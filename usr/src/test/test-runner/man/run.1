@@ -80,7 +80,7 @@ executed, and the remaining tests are marked "SKIPPED." Any test that exceeds
 its \fItimeout\fR is terminated, and marked "KILLED."
 
 By default, tests are executed with the credentials of the \fBrun\fR script.
-Executing tests with other credentials is done via \fBsudo\fR(1m), which must
+Executing tests with other credentials is done via \fBsudo\fR(8), which must
 be configured to allow execution without prompting for a password. Environment
 variables from the calling shell are available to individual tests. During test
 execution, the working directory is changed to \fIoutputdir\fR.
@@ -367,4 +367,4 @@ An error occurred.
 .SH SEE ALSO
 .sp
 .LP
-\fBsudo\fR(1m)
+\fBsudo\fR(8)

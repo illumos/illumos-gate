@@ -44,8 +44,8 @@ file path=kernel/drv/$(ARCH64)/igb group=sys
 file path=kernel/drv/igb.conf group=sys \
     original_name=SUNWigb:kernel/drv/igb.conf preserve=renamenew
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/igb.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/igb.4d
 driver name=igb perms="* 0666 root sys" clone_perms="igb 0666 root sys" \
     alias=pciex8086,438 \
     alias=pciex8086,10a7 \

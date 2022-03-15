@@ -62,7 +62,7 @@ error logging, but was unable to complete the logging for whatever reason.
 .SH SEE ALSO
 .sp
 .LP
-\fBcmn_err\fR(9F)
+.BR cmn_err (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

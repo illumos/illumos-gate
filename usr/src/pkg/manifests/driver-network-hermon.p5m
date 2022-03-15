@@ -41,8 +41,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/hermon group=sys
 file path=kernel/drv/hermon.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/hermon.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/hermon.4d
 driver name=hermon perms="* 0666 root sys" \
     alias=pciex15b3,6340 \
     alias=pciex15b3,634a \

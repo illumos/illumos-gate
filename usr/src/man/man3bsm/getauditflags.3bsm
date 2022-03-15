@@ -48,7 +48,7 @@ Upon successful completion, \fBgetauditflagsbin()\fR and
 \fBgetauditflagschar()\fR return 0. Otherwise they return \(mi1.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -63,7 +63,8 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBaudit.log\fR(4), \fBattributes\fR(5)
+.BR audit.log (5),
+.BR attributes (7)
 .SH BUGS
 .LP
 This is not a very extensible interface.

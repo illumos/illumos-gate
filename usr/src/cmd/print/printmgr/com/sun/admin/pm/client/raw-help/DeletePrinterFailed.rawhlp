@@ -22,7 +22,6 @@
 -- Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
 -- Use is subject to license terms.
 --
--- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 <!-- Tag=DeletePrinterFailed -->
 
@@ -34,7 +33,7 @@ If the Delete printer process fails, follow the instructions in the
 error dialog. If the instructions are incomplete or unclear, display
 the Command-Line Console to help pinpoint where the error may have
 occurred. Choose Show Command-Line Console from the Print Manager menu
-to display the Command-Line Console. See the man page for lpadmin(1M)
+to display the Command-Line Console. See the man page for lpadmin(8)
 for more information.
 
 <p>

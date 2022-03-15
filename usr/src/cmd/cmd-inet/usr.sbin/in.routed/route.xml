@@ -80,7 +80,7 @@ privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_cho
 			value='solaris.smf.manage.routing' />
 	</property_group>
 
-	<!-- Properties in this group are used by routeadm (1M) -->
+	<!-- Properties in this group are used by routeadm(8) -->
 	<property_group name='routeadm' type='application'>
 		<stability value='Unstable' />
 		<propval name='protocol' type='astring' value='ipv4' />
@@ -90,7 +90,7 @@ privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_cho
 			value='solaris.smf.value.routing' />
 	</property_group>
 
-	<!-- Properties in this group are modifiable via routeadm (1M) -->
+	<!-- Properties in this group are modifiable via routeadm(8) -->
 	<property_group name='routing' type='application'>
 		<stability value='Evolving' />
 
@@ -122,7 +122,7 @@ privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_cho
 		<propval name='quiet_mode' type='boolean' value='false' />
 
 		<!-- Equivalent to -s option if true -->
-		<propval name='supply_routes' type='boolean' value='false' />	
+		<propval name='supply_routes' type='boolean' value='false' />
 
 		<!-- Equivalent to -S option if true -->
 		<propval name='default_routes_only' type='boolean'
@@ -162,7 +162,7 @@ privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_cho
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='in.routed' section='1M'
+			<manpage title='in.routed' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

@@ -45,7 +45,7 @@ different CPU.
 The \fBscsi_hba_pkt_comp()\fR function can be called from user, interrupt, or
 kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -59,7 +59,9 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5), \fBtran_setup_pkt\fR(9E), \fBscsi_pkt\fR(9S)
+.BR attributes (7),
+.BR tran_setup_pkt (9E),
+.BR scsi_pkt (9S)
 .SH NOTES
 HBA driver calls \fBscsi_hba_pkt_comp()\fR instead of calling
 \fBscsi_pkt\fR(9S) \fIpkt_comp\fR directly.

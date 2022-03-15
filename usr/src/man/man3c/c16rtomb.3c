@@ -282,4 +282,4 @@ then the functions are
 .Xr setlocale 3C ,
 .Xr uselocale 3C ,
 .Xr uchar.h 3HEAD ,
-.Xr environ 5
+.Xr environ 7

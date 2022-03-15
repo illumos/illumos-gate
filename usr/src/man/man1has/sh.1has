@@ -398,7 +398,7 @@ are also referred to as environment variables.
 .RS 13n
 The default argument (home directory) for the \fBcd\fR command, set to the
 user's login directory by \fBlogin\fR(1) from the password file (see
-\fBpasswd\fR(4)).
+\fBpasswd\fR(5)).
 .RE
 
 .sp
@@ -504,7 +504,7 @@ section below) for this name.
 
 .sp
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBsh\fR: \fBLC_CTYPE\fR and \fBLC_MESSAGES\fR.
 .sp
 .LP
@@ -771,7 +771,7 @@ needed to complete a command, the secondary prompt (that is, the value of
 \fBPS2\fR) is issued.
 .SS "Environment"
 .LP
-The \fIenvironment\fR (see \fBenviron\fR(5)) is a list of name-value pairs that
+The \fIenvironment\fR (see \fBenviron\fR(7)) is a list of name-value pairs that
 is passed to an executed program in the same way as a normal argument list. The
 shell interacts with the environment in several ways. On invocation, the shell
 scans the environment and creates a parameter for each name found, giving it
@@ -1495,9 +1495,9 @@ maximum CPU time (in seconds)
 maximum size of virtual memory (in kbytes)
 .RE
 
-Run the \fBsysdef\fR(1M) command to obtain the maximum possible limits for your
+Run the \fBsysdef\fR(8) command to obtain the maximum possible limits for your
 system. The values reported are in hexadecimal, but can be translated into
-decimal numbers using the \fBbc\fR(1) utility. See \fBswap\fR(1M).)
+decimal numbers using the \fBbc\fR(1) utility. See \fBswap\fR(8).)
 .sp
 As an example of \fBulimit\fR, to limit the size of a core file dump to 0
 Megabytes, type the following:
@@ -1596,7 +1596,7 @@ group IDs to the real user and group IDs.
 .ad
 .RS 15n
 If the \fB-r\fR flag is present the shell is a restricted shell (see
-\fBrsh\fR(1M)).
+\fBrsh\fR(8)).
 .RE
 
 .sp
@@ -1826,7 +1826,7 @@ Stops the execution of the current shell (but not if it is the login shell).
 
 .SS "Large File Behavior"
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBsh\fR and
+See \fBlargefile\fR(7) for the description of the behavior of \fBsh\fR and
 \fBjsh\fR when encountering files greater than or equal to 2 Gbyte ( 2^31
 bytes).
 .SH EXIT STATUS
@@ -1861,7 +1861,7 @@ is exited.
 \fB/tmp/sh*\fR
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/sh, /usr/bin/jsh"
 .TS
 box;
@@ -1884,14 +1884,42 @@ CSI	Enabled
 
 .SH SEE ALSO
 .LP
-\fBIntro\fR(1), \fBbc\fR(1), \fBecho\fR(1), \fBgetoptcvt\fR(1), \fBkill\fR(1),
-\fBksh\fR(1), \fBlogin\fR(1), \fBnewgrp\fR(1), \fBpfsh\fR(1), \fBpfexec\fR(1),
-\fBps\fR(1), \fBpwd\fR(1), \fBset\fR(1), \fBshell_builtins\fR(1),
-\fBstty\fR(1), \fBtest\fR(1), \fBumask\fR(1), \fBwait\fR(1), \fBrsh\fR(1M),
-\fBsu\fR(1M), \fBswap\fR(1M), \fBsysdef\fR(1M), \fBdup\fR(2), \fBexec\fR(2),
-\fBfork\fR(2), \fBgetrlimit\fR(2), \fBpipe\fR(2), \fBulimit\fR(2),
-\fBsetlocale\fR(3C), \fBsignal.h\fR(3HEAD), \fBpasswd\fR(4), \fBprofile\fR(4),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBXPG4\fR(5)
+.BR Intro (1),
+.BR bc (1),
+.BR echo (1),
+.BR getoptcvt (1),
+.BR kill (1),
+.BR ksh (1),
+.BR login (1),
+.BR newgrp (1),
+.BR pfexec (1),
+.BR pfsh (1),
+.BR ps (1),
+.BR pwd (1),
+.BR set (1),
+.BR shell_builtins (1),
+.BR stty (1),
+.BR test (1),
+.BR umask (1),
+.BR wait (1),
+.BR dup (2),
+.BR exec (2),
+.BR fork (2),
+.BR getrlimit (2),
+.BR pipe (2),
+.BR ulimit (2),
+.BR setlocale (3C),
+.BR signal.h (3HEAD),
+.BR passwd (5),
+.BR profile (5),
+.BR XPG4 (7),
+.BR attributes (7),
+.BR environ (7),
+.BR largefile (7),
+.BR rsh (8),
+.BR su (8),
+.BR swap (8),
+.BR sysdef (8)
 .SH WARNINGS
 .LP
 The use of \fBsetuid\fR shell scripts is \fBstrongly\fR discouraged.

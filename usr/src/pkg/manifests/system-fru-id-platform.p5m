@@ -189,8 +189,8 @@ $(sparc_ONLY)file path=usr/platform/sun4u/lib/picl/plugins/libpiclfrudata.so.1 \
     group=sys
 $(sparc_ONLY)dir path=usr/platform/sun4u/sbin
 $(sparc_ONLY)file path=usr/platform/sun4u/sbin/fruadm group=sys mode=0755
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/fruadm.1m
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/fruadm.8
 $(i386_ONLY)legacy pkg=SUNWfruip.i arch=$(ARCH).i86pc \
     desc="FRU ID platform data module and access library" \
     name="FRU ID Platform Modules (Usr)"

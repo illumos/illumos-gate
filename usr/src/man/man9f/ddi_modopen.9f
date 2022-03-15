@@ -45,7 +45,7 @@ The name of the dynamically-loaded kernel module (file) to be opened. The
 .sp
 
 Each "\fInamespace\fR/" directory along the standard kernel
-moddir/\fImodule-path\fR path (\fBsystem\fR(4)) is searched to locate the
+moddir/\fImodule-path\fR path (\fBsystem\fR(5)) is searched to locate the
 module. If "\fInamespace\fR/" is not specified, "misc/" is assumed. If
 "\fIdirspace\fR" is specified, then "\fInamespace\fR/" must be explicitly
 provided.
@@ -288,13 +288,21 @@ rv = ddi_modclose(modp);
 .in -2
 
 .SH SEE ALSO
-\fBdlclose\fR(3C), \fBdlopen\fR(3C), \fBdlsym\fR(3C), \fBlibdl\fR(3LIB),
-\fBboot\fR(1M), \fBelfwrap\fR(1), \fBmodload\fR(1M), \fBsystem\fR(4),
-\fB_fini\fR(9E), \fB_info\fR(9E), \fB_init\fR(9E)
+.BR elfwrap (1),
+.BR dlclose (3C),
+.BR dlopen (3C),
+.BR dlsym (3C),
+.BR libdl (3LIB),
+.BR system (5),
+.BR boot (8),
+.BR modload (8),
+.BR _fini (9E),
+.BR _info (9E),
+.BR _init (9E)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-A \fBsystem\fR(4)forceload must be established for modules targeted by
+A \fBsystem\fR(5)forceload must be established for modules targeted by
 \fBddi_modopen()\fR by code involved in the mount of root on "bootdev" during
-machine \fBboot\fR(1M).
+machine \fBboot\fR(8).

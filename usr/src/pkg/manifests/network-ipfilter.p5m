@@ -107,26 +107,26 @@ file path=usr/share/ipfilter/examples/pool.conf
 file path=usr/share/ipfilter/examples/server
 file path=usr/share/ipfilter/examples/tcpstate
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/ipf.1m
-file path=usr/share/man/man1m/ipfs.1m
-file path=usr/share/man/man1m/ipfstat.1m
-file path=usr/share/man/man1m/ipmon.1m
-file path=usr/share/man/man1m/ipnat.1m
-file path=usr/share/man/man1m/ippool.1m
-file path=usr/share/man/man4/ipf.4
-link path=usr/share/man/man4/ipf.conf.4 target=./ipf.4
-link path=usr/share/man/man4/ipf6.conf.4 target=./ipf.4
-file path=usr/share/man/man4/ipmon.4
-link path=usr/share/man/man4/ipmon.conf.4 target=./ipmon.4
-file path=usr/share/man/man4/ipnat.4
-link path=usr/share/man/man4/ipnat.conf.4 target=./ipnat.4
-file path=usr/share/man/man4/ippool.4
-link path=usr/share/man/man4/ippool.conf.4 target=./ippool.4
-dir  path=usr/share/man/man5
-file path=usr/share/man/man5/ipfilter.5
-dir  path=usr/share/man/man7i
-file path=usr/share/man/man7i/ipnat.7i
+dir  path=usr/share/man/man4i
+file path=usr/share/man/man4i/ipnat.4i
+file path=usr/share/man/man5/ipf.5
+link path=usr/share/man/man5/ipf.conf.5 target=./ipf.5
+link path=usr/share/man/man5/ipf6.conf.5 target=./ipf.5
+file path=usr/share/man/man5/ipmon.5
+link path=usr/share/man/man5/ipmon.conf.5 target=./ipmon.5
+file path=usr/share/man/man5/ipnat.5
+link path=usr/share/man/man5/ipnat.conf.5 target=./ipnat.5
+file path=usr/share/man/man5/ippool.5
+link path=usr/share/man/man5/ippool.conf.5 target=./ippool.5
+dir  path=usr/share/man/man7
+file path=usr/share/man/man7/ipfilter.7
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/ipf.8
+file path=usr/share/man/man8/ipfs.8
+file path=usr/share/man/man8/ipfstat.8
+file path=usr/share/man/man8/ipmon.8
+file path=usr/share/man/man8/ipnat.8
+file path=usr/share/man/man8/ippool.8
 dir  path=var group=sys
 dir  path=var/db group=sys
 dir  path=var/db/ipf group=sys

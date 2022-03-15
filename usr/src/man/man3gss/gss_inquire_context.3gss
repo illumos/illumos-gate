@@ -266,7 +266,7 @@ of the \fIminor_status\fR parameter details the error condition.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -282,11 +282,16 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBgss_accept_sec_context\fR(3GSS), \fBgss_context_time\fR(3GSS),
-\fBgss_delete_sec_context\fR(3GSS), \fBgss_export_sec_context\fR(3GSS),
-\fBgss_import_sec_context\fR(3GSS), \fBgss_init_sec_context\fR(3GSS),
-\fBgss_process_context_token\fR(3GSS), \fBgss_wrap\fR(3GSS),
-\fBgss_wrap_size_limit\fR(3GSS), \fBattributes\fR(5)
+.BR gss_accept_sec_context (3GSS),
+.BR gss_context_time (3GSS),
+.BR gss_delete_sec_context (3GSS),
+.BR gss_export_sec_context (3GSS),
+.BR gss_import_sec_context (3GSS),
+.BR gss_init_sec_context (3GSS),
+.BR gss_process_context_token (3GSS),
+.BR gss_wrap (3GSS),
+.BR gss_wrap_size_limit (3GSS),
+.BR attributes (7)
 .sp
 .LP
 \fISolaris Security for Developers Guide\fR

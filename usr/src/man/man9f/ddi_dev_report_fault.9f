@@ -207,5 +207,6 @@ xx_error_intr(xx_soft_state *ssp)
 The \fBddi_dev_report_fault()\fR function may be called from user, kernel, or
 interrupt context.
 .SH SEE ALSO
-\fBddi_check_acc_handle\fR(9F), \fBddi_check_dma_handle\fR(9F),
-\fBddi_get_devstate\fR(9F)
+.BR ddi_check_acc_handle (9F),
+.BR ddi_check_dma_handle (9F),
+.BR ddi_get_devstate (9F)

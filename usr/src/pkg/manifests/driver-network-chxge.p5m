@@ -41,8 +41,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/chxge group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/chxge.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/chxge.4d
 driver name=chxge perms="* 0666 root sys" clone_perms="chxge 0666 root sys" \
     alias=pci1425,7 \
     alias=pci1425,a

@@ -62,7 +62,7 @@ integer, if \fBimmedok()\fR is set. See \fBcurs_outopts\fR(3CURSES).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -78,8 +78,10 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBcurs_addch\fR(3CURSES), \fBcurs_outopts\fR(3CURSES), \fBcurses\fR(3CURSES),
-\fBattributes\fR(5)
+.BR curs_addch (3CURSES),
+.BR curs_outopts (3CURSES),
+.BR curses (3CURSES),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

@@ -43,7 +43,7 @@
  * klooukp [ target [ RR_type ] ]
  *
  * Utitilizes DNS lookups to discover domain and realm information.  This CLI
- * is used primarily by kdcmgr(1M) and kclient(1M).
+ * is used primarily by kdcmgr(8) and kclient(8).
  */
 
 int

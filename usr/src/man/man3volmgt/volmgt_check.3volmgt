@@ -22,7 +22,7 @@ This function is obsolete. The management of removable media by the Volume
 Management feature, including \fBvold\fR, has been replaced by software that
 supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL is
 through the HAL APIs, which are documented on the HAL web site. See
-\fBhal\fR(5). The return value of this function is undefined.
+\fBhal\fR(7). The return value of this function is undefined.
 .sp
 .LP
 This routine asks volume Management to check the specified \fIpathname\fR and
@@ -87,7 +87,7 @@ appropriate for the new media.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -103,8 +103,13 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBvolcheck\fR(1), \fBopen\fR(2), \fBstat\fR(2), \fBvolmgt_inuse\fR(3VOLMGT),
-\fBvolmgt_running\fR(3VOLMGT), \fBattributes\fR(5), \fBhal\fR(5)
+.BR volcheck (1),
+.BR open (2),
+.BR stat (2),
+.BR volmgt_inuse (3VOLMGT),
+.BR volmgt_running (3VOLMGT),
+.BR attributes (7),
+.BR hal (7)
 .SH NOTES
 .sp
 .LP

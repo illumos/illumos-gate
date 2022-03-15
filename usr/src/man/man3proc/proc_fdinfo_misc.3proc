@@ -52,7 +52,7 @@ The definition of the
 structure may be found in the
 .Sx fdinfo
 section of
-.Xr proc 4 .
+.Xr proc 5 .
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn proc_fdinfo_misc
@@ -68,4 +68,4 @@ is returned to indicate that the item was not found.
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr proc_fdinfowalk 3PROC ,
-.Xr proc 4
+.Xr proc 5

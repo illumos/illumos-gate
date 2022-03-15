@@ -53,7 +53,7 @@ algorithm has specific key material requirements, as stated in the PKCS#11
 specification. If \fB-k\fR is not specified, \fBmac\fR prompts for  key
 material using \fBgetpassphrase\fR(3C).
 .sp
-For information on generating a key file, see \fBpktool\fR(1), \fBdd\fR(1M) or
+For information on generating a key file, see \fBpktool\fR(1), \fBdd\fR(8) or
 the \fISystem Administration Guide: Security Services\fR.
 .RE
 
@@ -214,7 +214,7 @@ An error occurred.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -230,8 +230,13 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBdigest\fR(1), \fBpktool\fR(1), \fBdd\fR(1M), \fBgetpassphrase\fR(3C),
-\fBlibpkcs11\fR(3LIB), \fBattributes\fR(5), \fBpkcs11_softtoken\fR(5)
+.BR digest (1),
+.BR pktool (1),
+.BR getpassphrase (3C),
+.BR libpkcs11 (3LIB),
+.BR attributes (7),
+.BR pkcs11_softtoken (7),
+.BR dd (8)
 .sp
 .LP
 \fISystem Administration Guide: Security Services\fR

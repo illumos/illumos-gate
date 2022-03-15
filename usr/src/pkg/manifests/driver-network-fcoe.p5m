@@ -41,8 +41,8 @@ dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/fcoe group=sys
 file path=kernel/drv/fcoe.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/fcoe.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/fcoe.4d
 driver name=fcoe perms="* 0600 root sys"
 legacy pkg=SUNWfcoe \
     desc="Sun FCoE (Fibre Channel over Ethernet) Transport Driver" \

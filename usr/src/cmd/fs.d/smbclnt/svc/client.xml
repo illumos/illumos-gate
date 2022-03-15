@@ -106,7 +106,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='mount_smbfs' section='1M'
+			<manpage title='mount_smbfs' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

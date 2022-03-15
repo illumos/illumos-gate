@@ -96,11 +96,22 @@ xxawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 .in -2
 
 .SH SEE ALSO
-\fBwrite\fR(2), \fBaiowrite\fR(3C), \fBaread\fR(9E), \fBread\fR(9E),
-\fBstrategy\fR(9E), \fBwrite\fR(9E), \fBanocancel\fR(9F), \fBaphysio\fR(9F),
-\fBddi_get_soft_state\fR(9F), \fBdrv_priv\fR(9F), \fBgetminor\fR(9F),
-\fBminphys\fR(9F), \fBnodev\fR(9F), \fBaio_req\fR(9S), \fBcb_ops\fR(9S),
-\fBuio\fR(9S)
+.BR write (2),
+.BR aiowrite (3C),
+.BR aread (9E),
+.BR read (9E),
+.BR strategy (9E),
+.BR write (9E),
+.BR anocancel (9F),
+.BR aphysio (9F),
+.BR ddi_get_soft_state (9F),
+.BR drv_priv (9F),
+.BR getminor (9F),
+.BR minphys (9F),
+.BR nodev (9F),
+.BR aio_req (9S),
+.BR cb_ops (9S),
+.BR uio (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

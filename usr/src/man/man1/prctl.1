@@ -22,7 +22,7 @@ allows access to the  basic and privileged limits and the  current  usage  on
 the     specified entity.
 .sp
 .LP
-See \fBresource_controls\fR(5) for a description of the resource controls
+See \fBresource_controls\fR(7) for a description of the resource controls
 supported in the current release of the Solaris operating system.
 .SH OPTIONS
 The following options are supported:
@@ -177,7 +177,7 @@ well.
 For compatibility with prior releases, this option is implied if \fB-v\fR is
 specified, without any of \fB-e\fR, \fB-d\fR, \fB-r\fR, or \fB-x\fR.
 .sp
-See \fBresource_controls\fR(5) for a description of unit modifiers and scaling
+See \fBresource_controls\fR(7) for a description of unit modifiers and scaling
 factors you can use to express large values when setting a resource control
 value.
 .RE
@@ -210,7 +210,7 @@ Specifies the value for the resource control for a set operation. If no
 disabling) is carried out on the lowest-valued resource control with the given
 type.
 .sp
-See \fBresource_controls\fR(5) for a description of unit modifiers and scaling
+See \fBresource_controls\fR(7) for a description of unit modifiers and scaling
 factors you can use to express large values when setting a resource control
 value.
 .RE
@@ -428,9 +428,9 @@ The resource limit value after the change shows a new value of 300 Megabytes:
 .sp
 .LP
 The \fBprctl\fR command can use the \fBproject.cpu-cap\fR resource control (see
-\fBresource_controls\fR(5)) to set and modify CPU caps for a project. (The same
+\fBresource_controls\fR(7)) to set and modify CPU caps for a project. (The same
 resource control can be used in the \fB/etc/project\fR file. See
-\fBproject\fR(4)) The following command modifies the CPU cap to limit
+\fBproject\fR(5)) The following command modifies the CPU cap to limit
 \fBuser.smith\fR  to three CPUs:
 
 .sp
@@ -472,8 +472,8 @@ To remove a CPU cap, enter:
 .sp
 .LP
 The \fBprctl\fR command can use the \fBzone.cpu-cap\fR resource control (see
-\fBresource_controls\fR(5)) to set and modify CPU caps for a zone. (The same
-resource control can be manipulated using the \fBzonecfg\fR(1M) command.) The
+\fBresource_controls\fR(7)) to set and modify CPU caps for a zone. (The same
+resource control can be manipulated using the \fBzonecfg\fR(8) command.) The
 following command modifies the CPU cap to limit the global zone to 80 percent
 of a CPU:
 
@@ -536,7 +536,7 @@ Process information and control files
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -554,9 +554,13 @@ Interface Stability	See below.
 The command-line syntax is Committed. The human-readable output is Uncommitted.
 The parsable output is Committed.
 .SH SEE ALSO
-\fBrctladm\fR(1M), \fBzonecfg\fR(1M), \fBsetrctl\fR(2),
-\fBrctlblk_get_local_action\fR(3C), \fBproject\fR(4), \fBattributes\fR(5),
-\fBresource_controls\fR(5)
+.BR setrctl (2),
+.BR rctlblk_get_local_action (3C),
+.BR project (5),
+.BR attributes (7),
+.BR resource_controls (7),
+.BR rctladm (8),
+.BR zonecfg (8)
 .SH NOTES
 The valid signals that can be set on a resource control block allowing local
 actions are \fBSIGABRT\fR, \fBSIGXRES\fR, \fBSIGHUP\fR, \fBSIGSTOP\fR,

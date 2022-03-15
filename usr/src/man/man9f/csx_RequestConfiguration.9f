@@ -429,9 +429,12 @@ No \fBPCMCIA\fR hardware installed.
 .SH CONTEXT
 This function may be called from user or kernel context.
 .SH SEE ALSO
-\fBcsx_AccessConfigurationRegister\fR(9F), \fBcsx_GetStatus\fR(9F),
-\fBcsx_RegisterClient\fR(9F), \fBcsx_ReleaseConfiguration\fR(9F),
-\fBcsx_RequestIO\fR(9F), \fBcsx_RequestIRQ\fR(9F)
+.BR csx_AccessConfigurationRegister (9F),
+.BR csx_GetStatus (9F),
+.BR csx_RegisterClient (9F),
+.BR csx_ReleaseConfiguration (9F),
+.BR csx_RequestIO (9F),
+.BR csx_RequestIRQ (9F)
 .sp
 .LP
 \fIPC Card 95 Standard\fR, PCMCIA/JEIDA

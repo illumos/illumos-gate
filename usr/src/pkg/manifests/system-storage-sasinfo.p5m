@@ -57,8 +57,6 @@ file path=usr/lib/libsun_sas.so.1
 dir  path=usr/sbin
 file path=usr/sbin/sasinfo mode=0555
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/sasinfo.1m
 dir  path=usr/share/man/man3lib
 link path=usr/share/man/man3lib/SMHBA_GetAdapterAttributes.3lib \
     target=libSMHBAAPI.3lib
@@ -127,8 +125,10 @@ link path=usr/share/man/man3lib/SMHBA_SetPersistentBinding.3lib \
     target=libSMHBAAPI.3lib
 file path=usr/share/man/man3lib/libSMHBAAPI.3lib
 link path=usr/share/man/man3lib/libsmhbaapi.3lib target=libSMHBAAPI.3lib
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/smhba.conf.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/smhba.conf.5
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/sasinfo.8
 legacy pkg=SUNWsmhba desc="T11 Storage Management HBA API Libraries and CLI" \
     name="SM-HBA Libraries and CLI"
 legacy pkg=SUNWsmhbar \

@@ -181,7 +181,7 @@ cannot be allocated.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -207,12 +207,16 @@ input to \fBstr_to_label\fR(3TSOL).
 .sp
 .LP
 Conversion types that are relative to the DIA encodings schema are Standard.
-Standard is specified in \fBlabel_encodings\fR(4).
+Standard is specified in \fBlabel_encodings\fR(5).
 .SH SEE ALSO
 .sp
 .LP
-\fBfree\fR(3C), \fBlibtsol\fR(3LIB), \fBstr_to_label\fR(3TSOL),
-\fBlabel_encodings\fR(4), \fBattributes\fR(5), \fBlabels\fR(5)
+.BR free (3C),
+.BR libtsol (3LIB),
+.BR str_to_label (3TSOL),
+.BR label_encodings (5),
+.BR attributes (7),
+.BR labels (7)
 .sp
 .LP
 \fIUsing the label_to_str Function\fR in \fISolaris Trusted Extensions

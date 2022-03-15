@@ -45,7 +45,7 @@ original labels.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -63,8 +63,10 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlabel_to_str\fR(3TSOL), \fBlibtsol\fR(3LIB), \fBsbltos\fR(3TSOL),
-\fBattributes\fR(5)
+.BR libtsol (3LIB),
+.BR label_to_str (3TSOL),
+.BR sbltos (3TSOL),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

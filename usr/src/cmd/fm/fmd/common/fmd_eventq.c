@@ -266,7 +266,7 @@ top:
 	 * If we dequeued a control event, release it and go back to sleep.
 	 * fmd_event_rele() on the event will block as described in fmd_ctl.c.
 	 * This effectively renders control events invisible to our callers
-	 * as well as to statistics and observability tools (e.g. fmstat(1M)).
+	 * as well as to statistics and observability tools (e.g. fmstat(8)).
 	 */
 	if (FMD_EVENT_TYPE(ep) == FMD_EVT_CTL) {
 		fmd_event_rele(ep);

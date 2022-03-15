@@ -19,7 +19,7 @@ API (PAPI).
 .sp
 .LP
 This particular implementation of the PAPI includes naming support as described
-in the \fBprinters.conf\fR(4) and \fBprinters\fR(4) manual pages.  It also
+in the \fBprinters.conf\fR(5) and \fBprinters\fR(5) manual pages.  It also
 supplies support for interaction with local LP services, remote LPD services,
 and remote IPP services through the use of loadable modules that export the
 same interface.  These modules should not be linked with directly, but can be
@@ -178,7 +178,7 @@ private HTTP support
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -194,4 +194,7 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBIntro\fR(3), \fBprinters\fR(4), \fBprinters.conf\fR(4), \fBattributes\fR(5)
+.BR Intro (3),
+.BR printers (5),
+.BR printers.conf (5),
+.BR attributes (7)

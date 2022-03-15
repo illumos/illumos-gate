@@ -83,7 +83,7 @@
 		<documentation>
 			<manpage
 				title='ibp'
-				section='7D'
+				section='4D'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

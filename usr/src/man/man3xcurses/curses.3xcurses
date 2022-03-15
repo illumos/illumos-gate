@@ -37,7 +37,7 @@ set in the Korn Shell (see \fBksh\fR(1)) by typing:
 .sp
 .LP
 To set environment variables using other command line interfaces or shells, see
-the \fBenviron\fR(5) manual page.
+the \fBenviron\fR(7) manual page.
 .sp
 .LP
 Three additional environment variables are useful, and can be set in the Korn
@@ -587,7 +587,7 @@ of input functions like \fBgetch\fR(3XCURSES) and \fBgetnstr\fR(3XCURSES).
 .RS 27n
 In line input mode, the terminal driver handles the input of line units as well
 as  \fBSIGERASE\fR and \fBSIGKILL\fR character processing.   See
-\fBtermio\fR(7I) for more information.
+\fBtermio\fR(4I) for more information.
 .sp
 In this mode, the \fBgetch()\fR and \fBgetnstr()\fR functions will not return
 until a complete line has been read by the terminal driver, at which point only
@@ -857,7 +857,7 @@ This second example is the same as the first, but with the right margin.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -875,18 +875,47 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBksh\fR(1), \fBCOLOR_PAIR\fR(3XCURSES), \fBPAIR_NUMBER\fR(3XCURSES),
-\fBaddchstr\fR(3XCURSES), \fBattr_off\fR(3XCURSES), \fBattroff\fR(3XCURSES),
-\fBbkgdset\fR(3XCURSES), \fBbkgrndset\fR(3XCURSES), \fBcbreak\fR(3XCURSES),
-\fBcopywin\fR(3XCURSES), \fBderwin\fR(3XCURSES), \fBecho\fR(3XCURSES),
-\fBgetcchar\fR(3XCURSES), \fBgetch\fR(3XCURSES), \fBgetnstr\fR(3XCURSES),
-\fBhalfdelay\fR(3XCURSES), \fBinch\fR(3XCURSES), \fBkeypad\fR(3XCURSES),
-\fBlibcurses\fR(3XCURSES), \fBnewpad\fR(3XCURSES), \fBnewwin\fR(3XCURSES),
-\fBnocbreak\fR(3XCURSES), \fBnodelay\fR(3XCURSES), \fBnoecho\fR(3XCURSES),
-\fBnoraw\fR(3XCURSES), \fBnotimeout\fR(3XCURSES), \fBoverlay\fR(3XCURSES),
-\fBoverwrite\fR(3XCURSES), \fBsetcchar\fR(3XCURSES), \fBsubwin\fR(3XCURSES),
-\fBtimeout\fR(3XCURSES), \fBwaddchstr\fR(3XCURSES), \fBwaddstr\fR(3XCURSES),
-\fBwcwidth\fR(3C), \fBwget_wch\fR(3XCURSES), \fBwinsch\fR(3XCURSES),
-\fBwnoutrefresh\fR(3XCURSES), \fBwprintw\fR(3XCURSES),
-\fBwrefresh\fR(3XCURSES), \fBwtimeout\fR(3XCURSES), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBstandards\fR(5), \fBtermio\fR(7I)
+.BR ksh (1),
+.BR wcwidth (3C),
+.BR COLOR_PAIR (3XCURSES),
+.BR PAIR_NUMBER (3XCURSES),
+.BR addchstr (3XCURSES),
+.BR attr_off (3XCURSES),
+.BR attroff (3XCURSES),
+.BR bkgdset (3XCURSES),
+.BR bkgrndset (3XCURSES),
+.BR cbreak (3XCURSES),
+.BR copywin (3XCURSES),
+.BR derwin (3XCURSES),
+.BR echo (3XCURSES),
+.BR getcchar (3XCURSES),
+.BR getch (3XCURSES),
+.BR getnstr (3XCURSES),
+.BR halfdelay (3XCURSES),
+.BR inch (3XCURSES),
+.BR keypad (3XCURSES),
+.BR libcurses (3XCURSES),
+.BR newpad (3XCURSES),
+.BR newwin (3XCURSES),
+.BR nocbreak (3XCURSES),
+.BR nodelay (3XCURSES),
+.BR noecho (3XCURSES),
+.BR noraw (3XCURSES),
+.BR notimeout (3XCURSES),
+.BR overlay (3XCURSES),
+.BR overwrite (3XCURSES),
+.BR setcchar (3XCURSES),
+.BR subwin (3XCURSES),
+.BR timeout (3XCURSES),
+.BR waddchstr (3XCURSES),
+.BR waddstr (3XCURSES),
+.BR wget_wch (3XCURSES),
+.BR winsch (3XCURSES),
+.BR wnoutrefresh (3XCURSES),
+.BR wprintw (3XCURSES),
+.BR wrefresh (3XCURSES),
+.BR wtimeout (3XCURSES),
+.BR termio (4I),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)

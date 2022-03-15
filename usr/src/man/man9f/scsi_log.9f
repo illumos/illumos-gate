@@ -85,7 +85,7 @@ A caret (\fB^\fR), the message goes only to the console.
 .el o
 A question mark (\fB?\fR) and \fIlevel\fR is \fBCE_CONT\fR, the message is
 always sent to the system buffer, but is written to the console only when the
-system has been booted in verbose mode. See \fBkernel\fR(1M). If neither
+system has been booted in verbose mode. See \fBkernel\fR(8). If neither
 condition is met, the \fB?\fR character has no effect and is simply ignored.
 .RE
 .sp
@@ -96,7 +96,10 @@ All formatting conversions in use by \fBcmn_err()\fR also work with
 The \fBscsi_log()\fR function may be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-\fBkernel\fR(1M), \fBsd\fR(7D), \fBcmn_err\fR(9F), \fBscsi_errmsg\fR(9F)
+.BR sd (4D),
+.BR kernel (8),
+.BR cmn_err (9F),
+.BR scsi_errmsg (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -390,16 +390,16 @@
 6157:AUE_mountd_umount:unmount:na
 6158:AUE_rshd:rsh access:lo
 6159:AUE_su:su:lo
-6160:AUE_halt_solaris:halt(1m):ss
-6161:AUE_reboot_solaris:reboot(1m):ss
+6160:AUE_halt_solaris:halt(8):ss
+6161:AUE_reboot_solaris:reboot(8):ss
 6162:AUE_rexecd:rexecd:lo
 6163:AUE_passwd:passwd:lo
 6164:AUE_rexd:rexd:lo
 6165:AUE_ftpd:ftp access:lo
-6166:AUE_init_solaris:init(1m):ss
-6167:AUE_uadmin_solaris:uadmin(1m):no
+6166:AUE_init_solaris:init(8):ss
+6167:AUE_uadmin_solaris:uadmin(8):no
 6168:AUE_shutdown_solaris:shutdown(1b):ss
-6169:AUE_poweroff_solaris:poweroff(1m):ss
+6169:AUE_poweroff_solaris:poweroff(8):ss
 6170:AUE_crontab_mod:crontab-modify:ua
 6171:AUE_ftpd_logout:ftp logout:lo
 6172:AUE_ssh:login - ssh:lo
@@ -460,16 +460,16 @@
 6234:AUE_pool_export:export device from pool:ot
 6235:AUE_dladm_create_secobj:create network security object:as,cy
 6236:AUE_dladm_delete_secobj:delete network security object:as,cy
-6237:AUE_uadmin_shutdown:uadmin(1m) - shutdown:ss
-6238:AUE_uadmin_reboot:uadmin(1m) - reboot:ss
-6239:AUE_uadmin_dump:uadmin(1m) - dump:ss
-6240:AUE_uadmin_freeze:uadmin(1m) - freeze:ss
-6241:AUE_uadmin_remount:uadmin(1m) - remount:ss
-6242:AUE_uadmin_ftrace:uadmin(1m) - ftrace:ss
-6243:AUE_uadmin_swapctl:uadmin(1m) - swapctl:ss
-6244:AUE_smbd_session:smbd(1m) session setup:lo
-6245:AUE_smbd_logoff:smbd(1m) session logoff:lo
-6246:AUE_vscan_quarantine:vscand(1m) quarantine infected file:na
+6237:AUE_uadmin_shutdown:uadmin(8) - shutdown:ss
+6238:AUE_uadmin_reboot:uadmin(8) - reboot:ss
+6239:AUE_uadmin_dump:uadmin(8) - dump:ss
+6240:AUE_uadmin_freeze:uadmin(8) - freeze:ss
+6241:AUE_uadmin_remount:uadmin(8) - remount:ss
+6242:AUE_uadmin_ftrace:uadmin(8) - ftrace:ss
+6243:AUE_uadmin_swapctl:uadmin(8) - swapctl:ss
+6244:AUE_smbd_session:smbd(8) session setup:lo
+6245:AUE_smbd_logoff:smbd(8) session logoff:lo
+6246:AUE_vscan_quarantine:vscand(8) quarantine infected file:na
 6247:AUE_ndmp_connect:ndmp connect:na
 6248:AUE_ndmp_disconnect:ndmp disconnect:na
 6249:AUE_ndmp_backup:ndmp backup:na
@@ -477,11 +477,11 @@
 6251:AUE_cpu_ondemand:set ondemand CPU freq governor:ss
 6252:AUE_cpu_performance:set max CPU freq governor:ss
 6253:AUE_cpu_threshold:set CPU freq threshold:ss
-6254:AUE_uadmin_thaw:uadmin(1m) - thaw after freeze:ss,na
-6255:AUE_uadmin_config:uadmin(1m) - config:ss
+6254:AUE_uadmin_thaw:uadmin(8) - thaw after freeze:ss,na
+6255:AUE_uadmin_config:uadmin(8) - config:ss
 
 #
-# SMF(5) svc.configd events (svcadm(1M) related)
+# smf(7) svc.configd events (svcadm(8) related)
 #
 6260:AUE_smf_enable:persistently enable service instance:ss
 6261:AUE_smf_tmp_enable:temporarily enable service instance:ss
@@ -498,11 +498,11 @@
 6272:AUE_smf_tmp_maintenance:set service instance maintenance temporary state:ss
 6273:AUE_smf_milestone:set service management facility milestone:ss
 #
-# SMF(5) svc.configd miscellaneous events
+# smf(7) svc.configd miscellaneous events
 #
 6275:AUE_smf_read_prop:read restricted access property value:as
 #
-# SMF(5) svc.configd events (svccfg(1M) related)
+# smf(7) svc.configd events (svccfg(8) related)
 #
 6280:AUE_smf_create:create service instance object:as
 6281:AUE_smf_delete:delete service instance object:as
@@ -518,12 +518,12 @@
 6291:AUE_smf_change_prop:change service instance property:as
 6292:AUE_smf_delete_prop:delete service instance property:as
 #
-# nwamd(1M) events
+# nwamd(8) events
 #
 6300:AUE_nwam_enable:enable nwam profile object:ss
 6301:AUE_nwam_disable:disable nwam profile object:ss
 #
-# ilbd(1M) events
+# ilbd(8) events
 #
 6310:AUE_ilb_create_healthcheck:create ILB health check:as
 6311:AUE_ilb_delete_healthcheck:delete ILB health check:as
@@ -538,7 +538,7 @@
 6320:AUE_ilb_create_servergroup:create ILB server group:as
 6321:AUE_ilb_delete_servergroup:delete ILB server group:as
 #
-# netcfgd(1M) events
+# netcfgd(8) events
 #
 6330:AUE_netcfg_update:create or modify configuration object:ss
 6331:AUE_netcfg_remove:remove configuration object from repository:ss
@@ -566,7 +566,7 @@
 6418:AUE_tpm_fieldupgrade:update TPM protected capabilities:as
 6419:AUE_tpm_resetlockvalue:reset TPM failed authorization attempt lock:as
 #
-# hotplugd(1m) events
+# hotplugd(8) events
 #
 6500:AUE_hotplug_state:change hotplug connection state:ss
 6501:AUE_hotplug_set:set hotplug bus private options:ss
@@ -574,7 +574,7 @@
 #
 # sudo event
 #
-6650:AUE_sudo:sudo(1m):lo,ua,as
+6650:AUE_sudo:sudo(8):lo,ua,as
 
 #
 # Trusted Extensions events:

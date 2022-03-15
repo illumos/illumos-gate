@@ -949,7 +949,7 @@ rpcsec_gss_init(
 	}
 
 	/*
-	 * kgss_accept_sec_context()/gssd(1M) can be overly time
+	 * kgss_accept_sec_context()/gssd(8) can be overly time
 	 * consuming so let's queue it and return asap.
 	 *
 	 * taskq func must free arg.

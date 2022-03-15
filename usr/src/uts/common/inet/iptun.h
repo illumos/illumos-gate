@@ -82,7 +82,7 @@ typedef struct iptun_kparams {
 #define	IPTUN_KPARAM_RADDR	0x00000004 /* itk_raddr is set */
 #define	IPTUN_KPARAM_SECINFO	0x00000008 /* itk_secinfo is set */
 #define	IPTUN_KPARAM_IMPLICIT	0x00000010 /* implicitly created IP tunnel */
-#define	IPTUN_KPARAM_IPSECPOL	0x00000020 /* ipsecconf(1M) policy present */
+#define	IPTUN_KPARAM_IPSECPOL	0x00000020 /* ipsecconf(8) policy present */
 
 #ifdef	__cplusplus
 }

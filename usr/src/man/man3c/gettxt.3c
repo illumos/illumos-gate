@@ -116,7 +116,7 @@ contains message files for different languages created by \fBmkmsgs\fR
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -132,5 +132,11 @@ MT-Level	Safe with exceptions
 .SH SEE ALSO
 .sp
 .LP
-\fBexstr\fR(1), \fBmkmsgs\fR(1), \fBsrchtxt\fR(1), \fBgettext\fR(3C),
-\fBfmtmsg\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5)
+.BR exstr (1),
+.BR mkmsgs (1),
+.BR srchtxt (1),
+.BR fmtmsg (3C),
+.BR gettext (3C),
+.BR setlocale (3C),
+.BR attributes (7),
+.BR environ (7)

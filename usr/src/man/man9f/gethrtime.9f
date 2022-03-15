@@ -38,8 +38,10 @@ called.
 .SH SEE ALSO
 .sp
 .LP
-\fBproc\fR(1), \fBgettimeofday\fR(3C), \fBsettimeofday\fR(3C),
-\fBattributes\fR(5)
+.BR proc (1),
+.BR gettimeofday (3C),
+.BR settimeofday (3C),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

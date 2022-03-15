@@ -1,0 +1,344 @@
+'\" te
+.\" Copyright 1989 AT&T
+.\" Copyright (C) 2004, Sun Microsystems, Inc.
+.\" All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TTYMON 8 "Feb 22, 2005"
+.SH NAME
+ttymon \- port monitor for terminal ports
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/lib/saf/ttymon\fR
+.fi
+
+.LP
+.nf
+\fB/usr/lib/saf/ttymon\fR \fB-g\fR [\fB-d\fR \fIdevice\fR] [\fB-h\fR] [\fB-t\fR \fItimeout\fR]
+     [\fB-l\fR \fIttylabel\fR] [\fB-p\fR \fIprompt\fR] [\fB-m\fR \fImodules\fR] [\fB-T\fR \fItermtype\fR]
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBttymon\fR is a STREAMS-based TTY port monitor. Its function is to monitor
+ports, to set terminal modes, baud rates, and line disciplines for the ports,
+and to connect users or applications to services associated with the ports.
+Normally, \fBttymon\fR is configured to run under the Service Access
+Controller, \fBsac\fR(8), as part of the Service Access Facility (SAF). It is
+configured using the \fBsacadm\fR(8) command. Each instance of \fBttymon\fR
+can monitor multiple ports. The ports monitored by an instance of \fBttymon\fR
+are specified in the port monitor's administrative file. The administrative
+file is configured using the \fBpmadm\fR(8) and \fBttyadm\fR(8) commands.
+When an instance of \fBttymon\fR is invoked by the \fBsac\fR command, it starts
+to monitor its ports. For each port, \fBttymon\fR first initializes the line
+disciplines, if they are specified, and the speed and terminal settings. For
+ports with entries in \fB/etc/logindevperm\fR, device owner, group and
+permissions are set. (See \fBlogindevperm\fR(5).) The values used for
+initialization are taken from the appropriate entry in the TTY settings file.
+This file is maintained by the \fBsttydefs\fR(8) command. Default line
+disciplines on ports are usually set up by the \fBautopush\fR(8) command of
+the Autopush Facility.
+.sp
+.LP
+\fBttymon\fR then writes the prompt and waits for user input. If the user
+indicates that the speed is inappropriate by pressing the BREAK key,
+\fBttymon\fR tries the next speed and writes the prompt again. When valid input
+is received, \fBttymon\fR interprets the per-service configuration file for the
+port, if one exists, creates a \fButmpx\fR entry if required (see
+\fButmpx\fR(5)), establishes the service environment, and then invokes the
+service associated with the port. Valid input consists of a string of at least
+one non-newline character, terminated by a carriage return. After the service
+terminates, \fBttymon\fR cleans up the \fButmpx\fR entry, if one exists, and
+returns the port to its initial state.
+.sp
+.LP
+If \fIautobaud\fR is enabled for a port, \fBttymon\fR will try to determine the
+baud rate on the port automatically. Users must enter a carriage return before
+\fBttymon\fR can recognize the baud rate and print the prompt. Currently, the
+baud rates that can be determined by \fIautobaud\fR are \fB110\fR, \fB1200\fR,
+\fB2400\fR, \fB4800\fR, and \fB9600\fR.
+.sp
+.LP
+If a port is configured as a bidirectional port, \fBttymon\fR will allow users
+to connect to a service, and, if the port is free, will allow \fBuucico\fR(8),
+\fBcu\fR(1C), or \fBct\fR(1C) to use it for dialing out. If a port is
+bidirectional, \fBttymon\fR will wait to read a character before it prints a
+prompt.
+.sp
+.LP
+If the \fIconnect-on-carrier\fR flag is set for a port, \fBttymon\fR will
+immediately invoke the port's associated service when a connection request is
+received. The prompt message will not be sent.
+.sp
+.LP
+If a port is disabled, \fBttymon\fR will not start any service on that port. If
+a disabled message is specified, \fBttymon\fR will send out the disabled
+message when a connection request is received. If \fBttymon\fR is disabled, all
+ports under that instance of \fBttymon\fR will also be disabled.
+.SS "Service Invocation"
+.sp
+.LP
+The service \fBttymon\fR invokes for a port is specified in the \fBttymon\fR
+administrative file. \fBttymon\fR will scan the character string giving the
+service to be invoked for this port, looking for a \fB%d\fR or a \fB%%\fR
+two-character sequence. If \fB%d\fR is found, \fBttymon\fR will modify the
+service command to be executed by replacing those two characters by the full
+path name of this port (the device name). If \fB%%\fR is found, they will be
+replaced by a single \fB%\fR. When the service is invoked, file descriptor
+\fB0\fR, \fB1\fR, and \fB2\fR are opened to the port device for reading and
+writing. The service is invoked with the user ID, group ID and current home
+directory set to that of the user name under which the service was registered
+with \fBttymon\fR. Two environment variables, \fBHOME\fR and \fBTTYPROMPT\fR,
+are added to the service's environment by \fBttymon\fR. \fBHOME\fR is set to
+the home directory of the user name under which the service is invoked.
+\fBTTYPROMPT\fR is set to the prompt string configured for the service on the
+port. This is provided so that a service invoked by \fBttymon\fR has a means of
+determining if a prompt was actually issued by \fBttymon\fR and, if so, what
+that prompt actually was.
+.sp
+.LP
+See \fBttyadm\fR(8) for options that can be set for ports monitored by
+\fBttymon\fR under the Service Access Controller.
+.SS "System Console Invocation"
+.sp
+.LP
+The invocation of ttymon on the system console is managed under \fBsmf\fR(7) by
+the service \fBsvc:/system/console-login\fR. It provides a number of properties
+within the property group \fBttymon\fR to control the invocation, as follows:
+.sp
+.in +2
+.nf
+NAME                  TYPE               TTYMON OPTION
+----------------------------------------------------------
+device                astring            [-d device]
+nohangup              boolean            [-h]
+label                 astring            [-l label]
+modules               astring            [-m module1,module2]
+prompt                astring            [-p prompt]
+timeout               count              [-t timeout]
+terminal_type         astring            [-T termtype]
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+If any value is the empty string or an integer set to zero, then the option is
+not passed to the ttymon invocation. The \fB-g\fR option is always specified
+for this invocation. The \fB-d\fR option always defaults to \fB/dev/console\fR
+if it is not set.
+.sp
+.LP
+See \fBEXAMPLES\fR.
+.SH SECURITY
+.sp
+.LP
+\fBttymon\fR uses \fBpam\fR(3PAM) for session management. The \fBPAM\fR
+configuration policy, listed through \fB/etc/pam.conf\fR, specifies the modules
+to be used for \fBttymon\fR. Here is a partial \fBpam.conf\fR file with entries
+for \fBttymon\fR using the UNIX session management module.
+.sp
+.in +2
+.nf
+ttymon session  required /usr/lib/security/pam_unix_session.so.1
+.fi
+.in -2
+
+.sp
+.LP
+If there are no entries for the \fBttymon\fR service, then the entries for the
+"other" service will be used.
+.SH OPTIONS
+.sp
+.LP
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-g\fR\fR
+.ad
+.RS 14n
+A special invocation of \fBttymon\fR is provided with the \fB-g\fR option. This
+form of the command should only be called by applications that need to set the
+correct baud rate and terminal settings on a port and then connect to
+\fBlogin\fR service, but that cannot be pre-configured under the SAC. The
+following combinations of options can be used with \fB-g\fR:
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR\fIdevice\fR\fR
+.ad
+.RS 14n
+\fIdevice\fR is the full path name of the port to which \fBttymon\fR is to
+attach. If this option is not specified, file descriptor \fB0\fR must be set up
+by the invoking process to a TTY port.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-h\fR\fR
+.ad
+.RS 14n
+If the -h flag is not set, \fBttymon\fR will force a hangup on the line by
+setting the speed to zero before setting the speed to the default or specified
+speed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR\fIttylabel\fR\fR
+.ad
+.RS 14n
+\fIttylabel\fR is a link to a speed and TTY definition in the \fBttydefs\fR
+file. This definition tells \fBttymon\fR at what speed to run initially, what
+the initial TTY settings are, and what speed to try next if the user indicates
+that the speed is inappropriate by pressing the BREAK key. The default speed is
+9600 baud.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR\fImodules\fR\fR
+.ad
+.RS 14n
+When initializing the port, \fBttymon\fR will pop all modules on the port, and
+then push \fImodules\fR in the order specified. \fImodules\fR is a
+comma-separated list of pushable modules. Default modules on the ports are
+usually set up by the Autopush Facility.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR\fIprompt\fR\fR
+.ad
+.RS 14n
+Allows the user to specify a prompt string. The default prompt is \fBLogin:\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fItimeout\fR\fR
+.ad
+.RS 14n
+Specifies that \fBttymon\fR should exit if no one types anything in
+\fItimeout\fR seconds after the prompt is sent.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-T\fR\fItermtype\fR\fR
+.ad
+.RS 14n
+Sets the \fBTERM\fR environment variable to \fItermtype\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRSetting the Terminal Type
+.sp
+.LP
+The following example sets the value of the terminal type (\fB-T\fR) option for
+the system console \fBttymon\fR invocation:
+
+.sp
+.in +2
+.nf
+	svccfg -s svc:/system/console-login setprop \e
+	    ttymon/terminal_type = "xterm"
+	svcadm refresh svc:/system/console-login:default
+.fi
+.in -2
+.sp
+
+.SH ENVIRONMENT VARIABLES
+.sp
+.LP
+If any of the \fBLC_*\fR variables ( \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
+\fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR ) (see
+\fBenviron\fR(7)) are not set in the environment, the operational behavior of
+\fBttymon\fR for each corresponding locale category is determined by the value
+of the \fBLANG\fR environment variable. If \fBLC_ALL\fR is set, its contents
+are used to override both the \fBLANG\fR and the other \fBLC_*\fR variables. If
+none of the above variables is set in the environment, the "C" (U.S. style)
+locale determines how \fBttymon\fR behaves.
+.sp
+.ne 2
+.na
+\fB\fBLC_CTYPE\fR\fR
+.ad
+.RS 12n
+Determines how \fBttymon\fR handles characters. When \fBLC_CTYPE\fR is set to a
+valid value, \fBttymon\fR can display and handle text and filenames containing
+valid characters for that locale. \fBttymon\fR can display and handle Extended
+Unix Code (EUC) characters where any individual character can be 1, 2, or 3
+bytes wide. \fBttymon\fR can also handle EUC characters of 1, 2, or more column
+widths. In the "C" locale, only characters from ISO 8859-1 are valid.
+.RE
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/logindevperm\fR\fR
+.ad
+.RS 21n
+
+.RE
+
+.sp
+.LP
+The command-line syntax is Stable. The SMF properties are Evolving.
+.SH SEE ALSO
+.sp
+.LP
+.BR ct (1C),
+.BR cu (1C),
+.BR pam (3PAM),
+.BR logindevperm (5),
+.BR pam.conf (5),
+.BR utmpx (5),
+.BR attributes (7),
+.BR environ (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_dhkeys (7),
+.BR pam_passwd_auth (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7),
+.BR smf (7),
+.BR autopush (8),
+.BR pmadm (8),
+.BR sac (8),
+.BR sacadm (8),
+.BR sttydefs (8),
+.BR ttyadm (8),
+.BR uucico (8)
+.sp
+.LP
+\fI\fR
+.SH NOTES
+.sp
+.LP
+If a port is monitored by more than one \fBttymon\fR, it is possible for the
+\fBttymon\fRs to send out prompt messages in such a way that they compete for
+input.
+.sp
+.LP
+The \fBpam_unix\fR(7) module is no longer supported. Similar functionality is
+provided by \fBpam_authtok_check\fR(7), \fBpam_authtok_get\fR(7),
+\fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), \fBpam_passwd_auth\fR(7),
+\fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7), and
+\fBpam_unix_session\fR(7).

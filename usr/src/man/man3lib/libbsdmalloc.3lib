@@ -58,7 +58,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -73,4 +73,5 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBpvs\fR(1),  \fBIntro\fR(3),  \fBbsdmalloc\fR(3MALLOC), \fBattributes\fR(5)
+\fBpvs\fR(1),  \fBIntro\fR(3),  \fBbsdmalloc\fR(3MALLOC),
+.BR attributes (7)

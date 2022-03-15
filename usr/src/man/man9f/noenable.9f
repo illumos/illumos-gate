@@ -47,8 +47,11 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBenableok\fR(9F), \fBinsq\fR(9F), \fBputbq\fR(9F), \fBputq\fR(9F),
-\fBqenable\fR(9F)
+.BR enableok (9F),
+.BR insq (9F),
+.BR putbq (9F),
+.BR putq (9F),
+.BR qenable (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

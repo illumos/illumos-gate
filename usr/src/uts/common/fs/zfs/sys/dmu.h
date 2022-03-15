@@ -963,7 +963,7 @@ void dmu_objset_fast_stat(objset_t *os, dmu_objset_stats_t *stat);
 
 /*
  * Add entries to the nvlist for all the objset's properties.  See
- * zfs_prop_table[] and zfs(1m) for details on the properties.
+ * zfs_prop_table[] and zfs(8) for details on the properties.
  */
 void dmu_objset_stats(objset_t *os, struct nvlist *nv);
 
@@ -974,7 +974,7 @@ void dmu_objset_stats(objset_t *os, struct nvlist *nv);
  * availbytes is the amount of space available to this objset, taking
  * into account quotas & reservations, assuming that no other objsets
  * use the space first.  These values correspond to the 'referenced' and
- * 'available' properties, described in the zfs(1m) manpage.
+ * 'available' properties, described in the zfs(8) manpage.
  *
  * usedobjs and availobjs are the number of objects currently allocated,
  * and available.

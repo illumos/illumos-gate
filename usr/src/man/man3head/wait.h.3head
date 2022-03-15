@@ -246,7 +246,7 @@ from <\fBsignal.h\fR> and <\fBsys/resource.h\fR>.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -262,5 +262,10 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBexit\fR(2), \fBwaitid\fR(2), \fBexit\fR(3C), \fBwait\fR(3C),
-\fBwaitpid\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR exit (2),
+.BR waitid (2),
+.BR exit (3C),
+.BR wait (3C),
+.BR waitpid (3C),
+.BR attributes (7),
+.BR standards (7)

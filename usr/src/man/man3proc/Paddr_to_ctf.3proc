@@ -116,4 +116,4 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr ctf 4
+.Xr ctf 5

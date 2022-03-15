@@ -151,7 +151,7 @@ Insufficient privilege for accessing device configuration data.
 .ad
 .RS 10n
 Either the device named by \fIphys_path\fR is not present in the system, or the
-\fBdevinfo\fR(7D) driver is not installed properly.
+\fBdevinfo\fR(4D) driver is not installed properly.
 .RE
 
 .sp
@@ -268,7 +268,7 @@ main()
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -286,8 +286,11 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBopen\fR(2), \fBioctl\fR(2), \fBmmap\fR(2), \fBlibdevinfo\fR(3LIB),
-\fBattributes\fR(5)
+.BR ioctl (2),
+.BR mmap (2),
+.BR open (2),
+.BR libdevinfo (3LIB),
+.BR attributes (7)
 .sp
 .LP
 \fIWriting Device Drivers\fR

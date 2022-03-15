@@ -258,7 +258,7 @@
  *   vpr_name
  *
  *	This is the name of the plugin. This is how users will refer to it in
- *	the context of running dladm(1M) commands. Note, this name must be
+ *	the context of running dladm(8) commands. Note, this name must be
  *	unique across the different plugins, as it will cause others with the
  *	same name not to be registered.
  *

@@ -65,7 +65,7 @@ typedef struct fmd_modhash {
 } fmd_modhash_t;
 
 /*
- * Statistics maintained by fmd itself on behalf of all modules for fmstat(1M).
+ * Statistics maintained by fmd itself on behalf of all modules for fmstat(8).
  * NOTE: FMD_TYPE_STRING statistics should not be used here.  If they are
  * required in the future, the FMD_ADM_MODDSTAT service routine must change.
  */

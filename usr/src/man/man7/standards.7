@@ -1,0 +1,493 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH STANDARDS 7 "Nov 26, 2017"
+.SH NAME
+standards, ANSI, C, C++, ISO, POSIX, POSIX.1, POSIX.2, SUS, SUSv2, SUSv3, SVID,
+SVID3, XNS, XNS4, XNS5, XPG, XPG3, XPG4, XPG4v2 \- standards and specifications
+supported by Solaris
+.SH DESCRIPTION
+.LP
+Solaris 10 supports IEEE Std 1003.1 and IEEE Std 1003.2, commonly known as
+POSIX.1 and POSIX.2, respectively. The following table lists each version of
+these standards with a brief description and the SunOS or Solaris release that
+first conformed to it.
+.sp
+
+.sp
+.TS
+c c c
+l l l .
+POSIX Standard	Description	Release
+_
+POSIX.1-1988	system interfaces and headers	SunOS 4.1
+_
+POSIX.1-1990	POSIX.1-1988 update	Solaris 2.0
+_
+POSIX.1b-1993	realtime extensions	Solaris 2.4
+_
+POSIX.1c-1996	threads extensions	Solaris 2.6
+_
+POSIX.2-1992	shell and utilities	Solaris 2.5
+_
+POSIX.2a-1992	interactive shell and utilities	Solaris 2.5
+_
+POSIX.1-2001	T{
+POSIX.1-1990, POSIX.1b-1993, POSIX.1c-1996, POSIX.2-1992, and POSIX.2a-1992 updates
+T}	Solaris 10
+.TE
+
+.sp
+.LP
+Solaris 10 also  supports the X/Open Common Applications Environment (CAE)
+Portability Guide Issue 3 (XPG3) and Issue 4 (XPG4); Single UNIX Specification
+(SUS, also known as XPG4v2); Single UNIX Specification, Version 2 (SUSv2); and
+Single UNIX Specification, Version 3 (SUSv3). Both XPG4 and SUS include
+Networking Services Issue 4 (XNS4). SUSv2 includes Networking Services Issue 5
+(XNS5).
+.sp
+.LP
+The following table lists each X/Open specification with a brief description
+and the SunOS or Solaris release that first conformed to it.
+.sp
+
+.sp
+.TS
+c c c
+c c c .
+X/Open CAE		
+_
+ Specification	Description	Release
+_
+XPG3	T{
+superset of POSIX.1-1988 containing utilities from SVID3
+T}	SunOS 4.1
+_
+XPG4	T{
+superset of POSIX.1-1990, POSIX.2-1992, and POSIX.2a-1992 containing extensions to POSIX standards from XPG3
+T}	Solaris 2.4
+_
+SUS (XPG4v2)	T{
+superset of XPG4 containing historical BSD interfaces widely used by common application packages
+T}	Solaris 2.6
+_
+XNS4	sockets and XTI interfaces	Solaris 2.6
+_
+SUSv2	T{
+superset of SUS extended to support POSIX.1b-1993, POSIX.1c-1996, and ISO/IEC 9899 (C Standard) Amendment 1
+T}	Solaris 7
+_
+XNS5	T{
+superset and LP64-clean derivative of XNS4.
+T}	Solaris 7
+_
+SUSv3	same as POSIX.1-2001	Solaris 10
+.TE
+
+.sp
+.LP
+The XNS4 specification is safe for use only in ILP32 (32-bit) environments and
+should not be used for LP64 (64-bit) application environments. Use XNS5 or
+SUSv3, which have LP64-clean interfaces that are portable across ILP32 and LP64
+environments. Solaris releases 7 through 10 support both the ILP32 and LP64
+environments.
+.sp
+.LP
+Solaris releases 7 through 10 have been branded to conform to The Open Group's
+UNIX 98 Product Standard. Solaris 10 has been branded to conform to The Open
+Group's UNIX 03 Product Standard.
+.sp
+.LP
+Solaris releases 2.0 through 10 support the interfaces specified by the System
+V Interface Definition, Third Edition, Volumes 1 through 4 (SVID3).  Note,
+however, that since the developers of this specification (UNIX Systems
+Laboratories) are no longer in business and since this specification defers to
+POSIX and X/Open CAE specifications, there is some disagreement about what is
+currently required for conformance to this specification.
+.sp
+.LP
+When \fBSun Studio C Compiler 5.6\fR is installed, Solaris releases 2.0 through
+10 support the ANSI X3.159-1989 Programming Language - C and ISO/IEC 9899:1990
+Programming Language - C (C) interfaces.
+.sp
+.LP
+When \fBSun Studio C Compiler 5.6\fR is installed, Solaris releases 7 through
+10 support ISO/IEC 9899:1990 Amendment 1:1995: C Integrity.
+.sp
+.LP
+When \fBSun Studio C Compiler 5.6\fR is installed, Solaris 10 supports ISO/IEC
+9899:1999 Programming Languages - C.
+.sp
+.LP
+When \fBSun Studio C++ Compiler 5.6\fR is installed, Solaris releases 2.5.1
+through 10 support ISO/IEC 14882:1998 Programming Languages - C++.  Unsupported
+features of that standard are described in the compiler README file.
+.SS "Utilities"
+.LP
+If the behavior required by POSIX.2, POSIX.2a, XPG4, SUS, or SUSv2 conflicts
+with historical Solaris utility behavior, the original Solaris version of the
+utility is unchanged; a new version that is standard-conforming has been
+provided in \fB/usr/xpg4/bin\fR. If the behavior required by POSIX.1-2001 or
+SUSv3 conflicts with historical Solaris utility behavior, a new version that is
+standard-conforming has been provided in \fB/usr/xpg4/bin\fR or in
+\fB/usr/xpg6/bin\fR. If the behavior required by POSIX.1-2001 or SUSv3
+conflicts with POSIX.2, POSIX.2a, SUS, or SUSv2, a new version that is SUSv3
+standard-conforming has been provided in \fB/usr/xpg6/bin\fR.
+.sp
+.LP
+An application that wants to use standard-conforming utilities must set the
+\fBPATH\fR (\fBsh\fR(1) or \fBksh\fR(1)) or \fBpath\fR (\fBcsh\fR(1))
+environment variable to specify the directories listed below in the order
+specified to get the appropriate utilities:
+.sp
+.ne 2
+.na
+\fBSVID3, XPG3\fR
+.ad
+.sp .6
+.RS 4n
+.RS +4
+.TP
+1.
+\fB/usr/ccs/bin\fR
+.RE
+.RS +4
+.TP
+2.
+\fB/usr/bin\fR
+.RE
+.RS +4
+.TP
+3.
+directory containing binaries for your compiler
+.RE
+.RS +4
+.TP
+4.
+other directories containing binaries needed by the application
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fBPOSIX.2, POSIX.2a, SUS, SUSv2, XPG4\fR
+.ad
+.sp .6
+.RS 4n
+.RS +4
+.TP
+1.
+\fB/usr/xpg4/bin\fR
+.RE
+.RS +4
+.TP
+2.
+\fB/usr/ccs/bin\fR
+.RE
+.RS +4
+.TP
+3.
+\fB/usr/bin\fR
+.RE
+.RS +4
+.TP
+4.
+directory containing binaries for your compiler
+.RE
+.RS +4
+.TP
+5.
+other directories containing binaries needed by the application
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fBPOSIX.1-2001, SUSv3\fR
+.ad
+.sp .6
+.RS 4n
+.RS +4
+.TP
+1.
+\fB/usr/xpg6/bin\fR
+.RE
+.RS +4
+.TP
+2.
+\fB/usr/xpg4/bin\fR
+.RE
+.RS +4
+.TP
+3.
+\fB/usr/ccs/bin\fR
+.RE
+.RS +4
+.TP
+4.
+\fB/usr/bin\fR
+.RE
+.RS +4
+.TP
+5.
+directory containing binaries for your compiler
+.RE
+.RS +4
+.TP
+6.
+other directories containing binaries needed by the application
+.RE
+.RE
+
+.SS "Feature Test Macros"
+.LP
+Feature test macros are used by applications to indicate additional sets of
+features that are desired beyond those specified by the C standard. If an
+application uses only those interfaces and headers defined by a particular
+standard (such as POSIX or X/Open CAE),  then it need only define the
+appropriate feature test macro specified by that standard. If the application
+is using interfaces and headers not defined by that standard, then in addition
+to defining the appropriate standard feature test macro, it must also define
+\fB__EXTENSIONS__\fR. Defining \fB__EXTENSIONS__\fR provides the application
+with access to all interfaces and headers not in conflict with the specified
+standard. The application must define \fB__EXTENSIONS__\fR either on the
+compile command line or within the application source files.
+.SS "1989 ANSI C, 1990 ISO C, 1999 ISO C"
+.LP
+No feature test macros need to be defined to indicate that an application is a
+conforming C application.
+.SS "ANSI/ISO C++"
+.LP
+ANSI/ISO C++ does not define any feature test macros. If the standard C++
+announcement macro \fB__cplusplus\fR is predefined to value 199711 or greater,
+the compiler operates in a standard-conforming mode, indicating C++ standards
+conformance. The value 199711 indicates conformance to ISO/IEC 14882:1998, as
+required by that standard.  (As noted above, conformance to the standard is
+incomplete.)  A standard-conforming mode is not available with compilers prior
+to Sun WorkShop C++ 5.0.
+.sp
+.LP
+C++ bindings are not defined for POSIX or X/Open CAE, so specifying feature
+test macros such as \fB_POSIX_SOURCE\fR, \fB_POSIX_C_SOURCE\fR, and
+\fB_XOPEN_SOURCE\fR can result in compilation errors due to conflicting
+requirements of standard C++ and those specifications.
+.SS "POSIX"
+.LP
+Applications that are intended to be conforming POSIX.1 applications must
+define the feature test macros specified by the standard before including any
+headers.  For the standards listed below, applications must define the feature
+test macros listed.  Application writers must check the corresponding standards
+for other macros that can be queried to determine if desired options are
+supported by the implementation.
+.sp
+
+.sp
+.TS
+c c
+l l .
+\fBPOSIX Standard\fR	\fBFeature Test Macros\fR
+_
+POSIX.1-1990	\fB_POSIX_SOURCE\fR
+_
+T{
+POSIX.1-1990 and POSIX.2-1992  C-Language Bindings Option
+T}	\fB_POSIX_SOURCE\fR and \fB_POSIX_C_SOURCE=2\fR
+POSIX.1b-1993	\fB_POSIX_C_SOURCE=199309L\fR
+_
+POSIX.1c-1996	\fB_POSIX_C_SOURCE=199506L\fR
+_
+POSIX.1-2001	\fB_POSIX_C_SOURCE=200112L\fR
+.TE
+
+.SS "SVID3"
+.LP
+The SVID3 specification does not specify any feature test macros to indicate
+that an application is written to meet SVID3 requirements.  The SVID3
+specification was written before the C standard was completed.
+.SS "X/Open CAE"
+.LP
+To build or compile an application that conforms to one of the X/Open CAE
+specifications, use the following guidelines. Applications need not set the
+POSIX feature test macros if they require both CAE and POSIX functionality.
+.sp
+.ne 2
+.na
+\fBXPG3\fR
+.ad
+.RS 16n
+The application must define \fB_XOPEN_SOURCE\fR. If \fB_XOPEN_SOURCE\fR is
+defined with a value, the value must be less than 500.
+.RE
+
+.sp
+.ne 2
+.na
+\fBXPG4\fR
+.ad
+.RS 16n
+The application must define \fB_XOPEN_SOURCE\fR and set \fB_XOPEN_VERSION=4\fR.
+If \fB_XOPEN_SOURCE\fR is defined with a value, the value must be less than
+500.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSUS (XPG4v2)\fR
+.ad
+.RS 16n
+The application must define \fB_XOPEN_SOURCE\fR and set
+\fB_XOPEN_SOURCE_EXTENDED=1\fR. If \fB_XOPEN_SOURCE\fR is defined with a value,
+the value must be less than 500.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSUSv2\fR
+.ad
+.RS 16n
+The application must define \fB_XOPEN_SOURCE=500\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSUSv3\fR
+.ad
+.RS 16n
+The application must define \fB_XOPEN_SOURCE=600\fR.
+.RE
+
+.SS "Compilation"
+.LP
+A POSIX.1 (1988-1996)-, XPG4-, SUS-, or SUSv2-conforming implementation must
+include an ANSI X3.159-1989 (ANSI C Language) standard-conforming compilation
+system and the \fBcc\fR and \fBc89\fR utilities. A POSIX.1-2001- or
+SUSv3-conforming implementation must include an ISO/IEC 99899:1999 (1999 ISO C
+Language) standard-conforming compilation system and the \fBc99\fR utility.
+Solaris 10 was tested with the \fBcc\fR, \fBc89\fR, and \fBc99\fR utilities and
+the compilation environment provided by \fBSun Studio C Compiler 5.6\fR.
+.sp
+.LP
+When \fBcc\fR is used to link applications, \fB/usr/lib/values-xpg4.o\fR must
+be specified on any link/load command line, unless the application is
+POSIX.1-2001- or SUSv3-conforming, in which case \fB/usr/lib/values-xpg6.o\fR
+must be specified on any link/load compile line. The preferred way to build
+applications, however, is described in the table below.
+.sp
+.LP
+An XNS4- or XNS5-conforming application must include \fB-l\fR \fBXNS\fR on any
+link/load command line in addition to defining the feature test macros
+specified for SUS or SUSv2, respectively.
+.sp
+.LP
+If the compiler supports the \fBredefine_extname\fR pragma feature (the \fBSun
+Studio C Compiler 5.6\fR compilers define the macro
+\fB__PRAGMA_REDEFINE_EXTNAME\fR to indicate that it supports this feature),
+then the standard headers use \fB#pragma\fR \fBredefine_extname\fR directives
+to properly map function names onto library entry point names. This mapping
+provides full support for ISO C, POSIX, and X/Open namespace reservations.
+.sp
+.LP
+If this pragma feature is not supported by the compiler, the headers use the
+\fB#define\fR directive to map internal function names onto appropriate library
+entry point names. In this instance, applications should avoid using the
+explicit 64-bit file offset symbols listed on the \fBlf64\fR(7) manual page,
+since these names are used by the implementation to name the alternative entry
+points.
+.sp
+.LP
+When using \fBSun Studio C Compiler 5.6\fR compilers, applications conforming
+to the specifications listed above should be compiled using the utilities and
+flags indicated in the following table:
+.sp
+.in +2
+.nf
+Specification            Compiler/Flags         Feature Test Macros
+_________________________________________________________________________
+1989 ANSI C and 1990 ISO C    c89                none
+_________________________________________________________________________
+1999 ISO C                    c99                none
+_________________________________________________________________________
+2011 ISO C                    c11                none
+                              gcc -stdc=c11
+_________________________________________________________________________
+SVID3                         cc -Xt -xc99=none  none
+_________________________________________________________________________
+POSIX.1-1990                  c89                _POSIX_SOURCE
+_________________________________________________________________________
+POSIX.1-1990 and POSIX.2-1992 c89                _POSIX_SOURCE  and
+  C-Language Bindings Option                     POSIX_C_SOURCE=2
+_________________________________________________________________________
+POSIX.1b-1993                 c89                _POSIX_C_SOURCE=199309L
+_________________________________________________________________________
+POSIX.1c-1996                 c89                _POSIX_C_SOURCE=199506L
+_________________________________________________________________________
+POSIX.1-2001                  c99                _POSIX_C_SOURCE=200112L
+_________________________________________________________________________
+CAE XPG3                      cc -Xa -xc99=none  _XOPEN_SOURCE
+_________________________________________________________________________
+CAE XPG4                      c89                _XOPEN_SOURCE and
+                                                 _XOPEN_VERSION=4
+_________________________________________________________________________
+SUS (CAE XPG4v2)              c89                _XOPEN_SOURCE and
+  (includes XNS4)                                 _XOPEN_SOURCE_EXTENDED=1
+_________________________________________________________________________
+SUSv2 (includes XNS5)         c89                _XOPEN_SOURCE=500
+_________________________________________________________________________
+SUSv3                         c99                _XOPEN_SOURCE=600
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+For platforms supporting the LP64 (64-bit) programming environment,
+SUSv2-conforming LP64 applications using XNS5 library calls should be built
+with command lines of the form:
+.sp
+.in +2
+.nf
+c89 $(getconf XBS5_LP64_OFF64_CFLAGS) -D_XOPEN_SOURCE=500 \e
+    $(getconf XBS5_LP64_OFF64_LDFLAGS) foo.c -o foo \e
+    $(getconf XBS5_LP64_OFF64_LIBS) -lxnet
+.fi
+.in -2
+
+.sp
+.LP
+Similar SUSv3-conforming LP64 applications should be built with command lines
+of the form:
+.sp
+.in +2
+.nf
+c99 $(getconf POSIX_V6_LP64_OFF64_CFLAGS) -D_XOPEN_SOURCE=600 \e
+    $(getconf POSIX_V6_LP64_OFF64_LDFLAGS) foo.c -o foo \e
+    $(getconf POSIX_V6_LP64_OFF64_LIBS) -lxnet
+.fi
+.in -2
+
+.SS "SUSv3"
+.ne 2
+.na
+\fB\fBc99\fR\fR
+.ad
+.RS 28n
+\fB_XOPEN_SOURCE=600\fR
+.RE
+
+.SH SEE ALSO
+.LP
+.BR csh (1),
+.BR ksh (1),
+.BR sh (1),
+.BR exec (2),
+.BR sysconf (3C),
+.BR system (3C),
+.BR environ (7),
+.BR lf64 (7)

@@ -69,7 +69,8 @@ indicates the currently active disk area.
 .SH CONTEXT
 This function can be called from user, interrupt, or kernel context.
 .SH SEE ALSO
-\fBstrategy\fR(9E), \fBbuf\fR(9S)
+.BR strategy (9E),
+.BR buf (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -1,0 +1,80 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH TSWTCLMT 4IPP "Sep 29, 2004"
+.SH NAME
+tswtclmt \- Time Sliding Window Three Conformance Level Meter
+.SH DESCRIPTION
+.sp
+.LP
+The Time Sliding Window Three Conformance level meter (\fBtswtcl\fR) meters a
+traffic stream and determines the conformance level of its packets.
+.sp
+.LP
+Packets are deemed to belong to one of the three levels, Red, Yellow or Green,
+depending on the committed and peak rate.
+.sp
+.LP
+The meter provides an estimate of the running average bandwidth. It takes into
+account burstiness and smoothes out its estimate to  approximate the
+longer-term measured sending rate of the traffic  stream.
+.sp
+.LP
+The estimated bandwidth approximates the running average bandwidth of the
+traffic stream over a specific window (time interval). \fBtswtcl\fR estimates
+the average bandwidth using a time-based estimator. When a packet arrives for a
+class, \fBtswtcl\fR re-computes the average rate by using the rate in the last
+window (time interval) and the size of the arriving packet. The window is then
+slid to start at the current time (the packet arrival time). If the computed
+rate is less than the committed configuration parameter, the packet is deemed
+Green; else if the rate is less than the peak rate, it is Yellow; else Red. To
+avoid dropping multiple packets within a TCP window, \fBtswtcl\fR
+probabilistically assigns one of the three conformance level to the packet.
+.SH STATISTICS
+.sp
+.LP
+The \fBtswtcl\fR module exports global and per-class statistics through kstat:
+.sp
+.LP
+Global statistics:
+.sp
+.in +2
+.nf
+module: tswtclmt                         instance: <action id>
+  name: tswtclmt statistics              class <action name>
+        green_bits                      <number of bit in green>
+        green_packets                   <number of packets in green>
+        red_bits                        <number of bits in red>
+        red_packets                     <number of packets in red>
+        yellow_bits                     <number of bits in yellow>
+        yellow_packets                  <number of packets in yellow>
+.fi
+.in -2
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/kernel/ipp/sparcv9/tswtclmt\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit module (SPARC only.)
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR dlcosmk (4IPP),
+.BR dscpmk (4IPP),
+.BR flowacct (4IPP),
+.BR ipgpc (4IPP),
+.BR ipqos (4IPP),
+.BR tokenmt (4IPP),
+.BR ipqosconf (8)
+.sp
+.LP
+\fIRFC 2859, A Time Sliding Window Three Colour Marker (TSWTCM)\fR W. Fang, N.
+Seddigh, B. Nandy \(em The Internet Society, 2000

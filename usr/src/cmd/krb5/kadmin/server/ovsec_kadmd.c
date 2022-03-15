@@ -720,7 +720,7 @@ int main(int argc, char *argv[])
 	 * The option value is "1".  This will allow the server to restart
 	 * whilst the previous process is cleaning up after itself in a
 	 * FIN_WAIT_2 or TIME_WAIT state.  If another process is started
-	 * outside of smf(5) then bind will fail anyway, which is what we want.
+	 * outside of smf(7) then bind will fail anyway, which is what we want.
 	 */
 	reqbuf[sizeof (struct opthdr)] = 1;
 

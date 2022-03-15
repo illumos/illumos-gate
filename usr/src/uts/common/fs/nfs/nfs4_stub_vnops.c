@@ -1906,7 +1906,7 @@ nfs4_trigger_domount(vnode_t *stubvp, domount_args_t *dma, vfs_t **vfsp,
 
 	uap->flags = MS_SYSSPACE | MS_DATA;
 	/* fstype-independent mount options not covered elsewhere */
-	/* copy parent's mount(1M) "-m" flag */
+	/* copy parent's mount(8) "-m" flag */
 	if (stubvfsp->vfs_flag & VFS_NOMNTTAB)
 		uap->flags |= MS_NOMNTTAB;
 

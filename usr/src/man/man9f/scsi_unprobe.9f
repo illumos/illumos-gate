@@ -40,7 +40,9 @@ that were allocated on the driver's behalf during \fBscsi_slave\fR(9F) and
 \fBscsi_unprobe()\fR and \fBscsi_unslave()\fR must not be called from an
 interrupt context.
 .SH SEE ALSO
-\fBscsi_probe\fR(9F), \fBscsi_slave\fR(9F), \fBscsi_device\fR(9S)
+.BR scsi_probe (9F),
+.BR scsi_slave (9F),
+.BR scsi_device (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

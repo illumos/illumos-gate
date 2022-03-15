@@ -40,7 +40,7 @@ extern "C" {
  * hardware faults.  Setting the appropriate flags in a process's
  * set of traced faults via /proc causes the process to stop each
  * time one of the designated faults occurs so that a debugger can
- * take action.  See proc(4) for details.
+ * take action.  See proc(5) for details.
  */
 
 	/* fault enumeration must begin with 1 */

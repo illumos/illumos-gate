@@ -381,7 +381,7 @@ loop:
 		rw_exit(&ip->i_contents);
 		VN_RELE(ITOV(ip));
 		cmn_err(CE_WARN,
-		    "%s: unexpected allocated inode %d, run fsck(1M)%s",
+		    "%s: unexpected allocated inode %d, run fsck(8)%s",
 		    fs->fs_fsmnt, (int)ino,
 		    (TRANS_ISTRANS(ufsvfsp) ? " -o f" : ""));
 		goto loop;
@@ -406,7 +406,7 @@ loop:
 
 		if (ip->i_size) {
 			cmn_err(CE_WARN,
-			    "%s: free inode %d had size 0x%llx, run fsck(1M)%s",
+			    "%s: free inode %d had size 0x%llx, run fsck(8)%s",
 			    fs->fs_fsmnt, (int)ino, ip->i_size,
 			    (TRANS_ISTRANS(ufsvfsp) ? " -o f" : ""));
 		}

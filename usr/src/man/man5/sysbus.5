@@ -1,0 +1,131 @@
+'\" te
+.\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SYSBUS 5 "December 28, 2020"
+.SH NAME
+sysbus, isa \- device tree properties for ISA bus device drivers
+.SH DESCRIPTION
+Solaris for x86 supports the \fBISA\fR bus as the system bus. Drivers for
+devices on this bus use the device tree built by the booting system to
+retrieve the necessary system resources used by the driver. These resources
+include device I/O port addresses, any interrupt capabilities that the device
+can have, any DMA channels it can require, and any memory-mapped addresses it
+can occupy.
+.sp
+.LP
+Configuration files for \fBISA\fR device drivers are only necessary to describe
+properties used by a particular driver that are not part of the standard
+properties found in the device tree. See \fBdriver.conf\fR(5) for further
+details of configuration file syntax.
+.sp
+.LP
+The \fBISA\fR nexus drivers all belong to class \fBsysbus\fR. All bus drivers
+of class \fBsysbus\fR recognize the following properties:
+.sp
+.ne 2
+.na
+\fB\fBinterrupts\fR\fR
+.ad
+.RS 16n
+An arbitrary-length array where each element of the array represents a hardware
+interrupt (IRQ) that is used by the device.  In general, this array only has
+one entry unless a particular device uses more than one IRQ.
+.sp
+Solaris defaults all \fBISA\fR interrupts to IPL 5.  This interrupt priority
+can be overridden by placing an \fBinterrupt-priorities\fR property in a .conf
+file for the driver. Each entry in the array of integers for the
+\fBinterrupt-priorities\fR property is matched one-to-one with the elements in
+the \fBinterrupts\fR property to specify the \fBIPL\fR value that is used by
+the system for this interrupt in this driver. This is the priority that this
+device's interrupt handler receives relative to the interrupt handlers of other
+drivers.  The priority is an integer from \fB1\fR to \fB16\fR. Generally,
+disks are assigned a priority of \fB5\fR, while mice and printers are lower,
+and serial communication devices are higher, typically \fB7\fR. \fB10\fR is
+reserved by the system and must not be used.  Priorities \fB11\fR and greater
+are high level priorities and are generally not recommended (see
+\fBddi_intr_hilevel\fR(9F)).
+.sp
+The driver can refer to the elements of this array by index using
+\fBddi_add_intr\fR(9F). The index into the array is passed as the
+\fIinumber\fR argument of \fBddi_add_intr()\fR.
+.sp
+Only devices that generate interrupts have an \fBinterrupts\fR property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBreg\fR\fR
+.ad
+.RS 16n
+An arbitrary-length array where each element of the array consists of a 3-tuple
+of integers.  Each array element describes a contiguous memory address range
+associated with the device on the bus.
+.sp
+The first integer of the tuple specifies the memory type, \fB0\fR specifies a
+memory range and \fB1\fR specifies an I/O range. The second integer specifies
+the base address of the memory range. The third integer of each 3-tuple
+specifies the size, in bytes, of the mappable region.
+.sp
+The driver can refer to the elements of this array by index, and construct
+kernel mappings to these addresses using \fBddi_map_regs\fR(9F). The index into
+the array is passed as the \fIrnumber\fR argument of \fBddi_map_regs()\fR.
+.sp
+All \fBsysbus\fR devices have \fBreg\fR properties.  The first tuple of this
+property is used to construct the address part of the device name under
+\fB/devices\fR. In the case of \fBPlug and Play ISA\fR devices, the first tuple
+is a special tuple that does not denote a memory range, but is used by the
+system only to create the address part of the device name.  This special tuple
+can be recognized by determining if the top bit of the first integer is set to
+a one.
+.sp
+The order of the tuples in the reg property is determined by the boot system
+probe code and depends on the characteristics of each particular device.
+However, the reg property maintains the same order of entries from system boot
+to system boot.  The recommended way to determine the reg property for a
+particular device is to use the \fBprtconf\fR(8) command after installing the
+particular device.  The output of the \fBprtconf\fR command can be examined to
+determine the reg property for any installed device.
+.sp
+You can use the \fBddi_get*\fR and \fBddi_put*\fR family of functions to access
+register space from a high-level interrupt context.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdma-channels\fR\fR
+.ad
+.RS 16n
+A list of integers that specifies the DMA channels used by this device. Only
+devices that use DMA channels have a \fBdma-channels\fR property.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.BR driver.conf (5),
+.BR scsi (5),
+.BR attributes (7),
+.BR prtconf (8),
+.BR ddi_add_intr (9F),
+.BR ddi_intr_hilevel (9F),
+.BR ddi_map_regs (9F),
+.BR ddi_prop_op (9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR

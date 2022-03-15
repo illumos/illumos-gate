@@ -285,9 +285,13 @@ returned.
 .SH SEE ALSO
 .sp
 .LP
-\fBkmem_alloc\fR(9F), \fBrmalloc_wait\fR(9F), \fBrmallocmap\fR(9F),
-\fBrmallocmap_wait\fR(9F),
-\fBrmfree\fR(9F), \fBrmfreemap\fR(9F), \fBuiomove\fR(9F)
+.BR kmem_alloc (9F),
+.BR rmalloc_wait (9F),
+.BR rmallocmap (9F),
+.BR rmallocmap_wait (9F),
+.BR rmfree (9F),
+.BR rmfreemap (9F),
+.BR uiomove (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

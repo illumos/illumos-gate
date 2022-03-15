@@ -72,7 +72,7 @@ link.
 .sp
 .LP
 The \fBunlinkat()\fR function also removes a link to a file. See
-\fBfsattr\fR(5). If the \fIflag\fR argument is 0, the behavior of
+\fBfsattr\fR(7). If the \fIflag\fR argument is 0, the behavior of
 \fBunlinkat()\fR is the same as \fBunlink()\fR except in the processing of its
 \fIpath\fR argument. If \fIpath\fR is absolute, \fBunlinkat()\fR behaves the
 same as \fBunlink()\fR and the \fIdirfd\fR argument is unused. If \fIpath\fR is
@@ -99,7 +99,7 @@ If the \fIpath\fR argument is a directory and the filesystem supports
 \fBunlink()\fR and \fBunlinkat()\fR on directories, the directory is unlinked
 from its parent with no cleanup being performed.  In UFS, the disconnected
 directory will be found the next time the filesystem is checked with
-\fBfsck\fR(1M). The \fBunlink()\fR and \fBunlinkat()\fR functions will not fail
+\fBfsck\fR(8). The \fBunlink()\fR and \fBunlinkat()\fR functions will not fail
 simply because a directory is not empty. The user with appropriate privileges
 can orphan a non-empty directory without generating an error message.
 .sp
@@ -281,7 +281,7 @@ Applications should use \fBrmdir\fR(2) to remove a directory.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -301,5 +301,12 @@ MT-Level	Async-Signal-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBrm\fR(1), \fBclose\fR(2), \fBlink\fR(2), \fBopen\fR(2), \fBrmdir\fR(2),
-\fBremove\fR(3C), \fBattributes\fR(5), \fBprivileges\fR(5), \fBfsattr\fR(5)
+.BR rm (1),
+.BR close (2),
+.BR link (2),
+.BR open (2),
+.BR rmdir (2),
+.BR remove (3C),
+.BR attributes (7),
+.BR fsattr (7),
+.BR privileges (7)

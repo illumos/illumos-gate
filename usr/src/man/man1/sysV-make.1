@@ -424,7 +424,7 @@ make -pf \(mi2>/dev/null < /dev/null
 
 .sp
 .LP
-A tilde in the above rules refers to an SCCS file (see \fBsccsfile\fR(4)).
+A tilde in the above rules refers to an SCCS file (see \fBsccsfile\fR(5)).
 Thus, the rule \fB\&.c~.o\fR would transform an SCCS C source file into an
 object file (\fB\&.o\fR). Because the \fBs.\fR of the SCCS files is a prefix,
 it is incompatible with the \fBmake\fR suffix point of view. Hence, the tilde
@@ -592,8 +592,12 @@ default rules for \fBmake\fR
 
 .SH SEE ALSO
 .LP
-\fBcd\fR(1), \fBmake\fR(1S), \fBsh\fR(1), \fBprintf\fR(3C), \fBsccsfile\fR(4),
-\fBattributes\fR(5)
+.BR cd (1),
+.BR sh (1),
+.BR make (1S),
+.BR printf (3C),
+.BR sccsfile (5),
+.BR attributes (7)
 .SH NOTES
 .LP
 Some commands return non-zero status inappropriately; use \fB-i\fR or the

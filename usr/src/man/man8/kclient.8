@@ -1,0 +1,599 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH KCLIENT 8 "November 22, 2021"
+.SH NAME
+kclient \- set up a machine as a Kerberos client
+.SH SYNOPSIS
+.nf
+\fB/usr/sbin/kclient\fR [\fB-n\fR] [\fB-R\fR \fIrealm\fR] [\fB-k\fR \fIkdc\fR] [\fB-a\fR \fIadminuser\fR]
+     [\fB-c\fR \fIfilepath\fR] [\fB-d\fR \fIdnsarg\fR] [\fB-f\fR \fIfqdn_list\fR] [\fB-h\fR \fIlogical_host_name\fR]
+     [\fB-k\fR \fIkdc_list\fR] [\fB-m\fR \fImaster_kdc\fR] [\fB-p\fR \fIprofile\fR] [\fB-s\fR \fIpam_service\fR]
+     [\fB-T\fR \fIkdc_vendor\fR]
+.fi
+
+.SH DESCRIPTION
+By specifying the various command options, you can use the \fBkclient\fR
+utility to:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Configure a machine as a Kerberos client for a specified realm and for KDC by
+setting up \fBkrb5.conf\fR(5).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Add the Kerberos host principal to the local host's \fBkeytab\fR file
+(\fB/etc/krb5/krb5.keytab\fR).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Set up the machine to do kerberized NFS.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Bring over a master \fBkrb5.conf\fR copy from a specified pathname.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Setup a machine to do server and/or host/domain name-to-realm mapping lookups
+by means of DNS.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Configure a Kerberos client to use an MS Active Directory server. This
+generates a \fBkeytab\fR file with the Kerberos client's service keys
+populated.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Setup a Kerberos client that has no service keys. This is useful when the
+client does not require service keys, because the client does not wish to host
+a service that uses Kerberos for security.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Configure a Kerberos client that is part of a cluster. This option requires the
+logical host name of the cluster so that the proper service keys are created
+and populated in the client's \fBkeytab\fR file.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Setup a Kerberos client to join an environment that consists of Kerberos
+servers that are non-Solaris and non-MS Active Directory servers.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Configure \fBpam.conf\fR(5) to use Kerberos authentication for specified
+services.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Configure the client as a simple NTP broadcast/multicast client.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Specify custom domain/host name-to-realm name mappings.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Setup the Kerberos client to use multiple KDC servers.
+.RE
+.sp
+.LP
+The \fBkclient\fR utility needs to be run on the client machine with root
+permission and can be run either interactively or non-interactively. In the
+non-interactive mode, the user feeds in the required inputs by means of a
+profile, command-line options, or a combination of profile and command-line
+options. The user is prompted for "required" parameter values (\fBrealm\fR and
+\fBadminuser\fR), if found missing in the non-interactive run. The interactive
+mode is invoked when the utility is run without any command-line arguments.
+.sp
+.LP
+Both the interactive and non-interactive forms of \fBkclient\fR can add the
+\fBhost/fqdn\fR entry to the local host's \fBkeytab\fR file. They also can
+require the user to enter the password for the administrative user requested,
+to obtain the Kerberos Ticket Granting Ticket (TGT) for \fBadminuser\fR. The
+\fBhost/fqdn\fR, \fBnfs/fqdn\fR, and \fBroot/fqdn\fR principals can be added to
+the KDC database (if not already present) before their possible addition to the
+local host's \fBkeytab\fR.
+.sp
+.LP
+The \fBkclient\fR utility assumes that the local host has been setup for DNS
+and requires the presence of a valid \fBresolv.conf\fR(5). Also, \fBkclient\fR
+can fail if the localhost time is not synchronized with that of the KDC. For
+Kerberos to function the localhost time must be within five minutes of that of
+the KDC. It is advised that both systems run some form of time synchronization
+protocol, such as the Network Time Protocol (NTP). See the \fBntpd\fR man page,
+delivered  in  the  \fBSUNWntpu\fR package (not a SunOS man page).
+.SH OPTIONS
+The non-interactive mode supports the following options:
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Set up the machine for kerberized NFS. This involves making changes to
+\fBkrb5*\fR security flavors in \fBnfssec.conf\fR(5). This option will also add
+\fBnfs/fqdn\fR and \fBroot/fqdn\fR entries to the local host's \fBkeytab\fR
+file if the \fB-K\fR option has not been specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR [ \fIrealm\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the Kerberos realm.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR \fIkdc_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fB-k\fR option specifies the KDC host names for the Kerberos client.
+\fIkdc_list\fR is a comma-separated list of KDCs. If the \fB-m\fR option is not
+used, it is assumed that the first (or only) host in \fIkdc_list\fR is the
+master KDC host name. Note that the list specified is used verbatim. This is
+helpful when specifying non-fully qualified KDC host names that can be
+canonicalized by DNS.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-a\fR [ \fIadminuser\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the Kerberos administrative user.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-T\fR \fIkdc_vendor\fR\fR
+.ad
+.sp .6
+.RS 4n
+Configure the Kerberos client to associate with a third party server. Valid
+\fIkdc_vendor\fR currently supported are:
+.sp
+.ne 2
+.na
+\fB\fBms_ad\fR\fR
+.ad
+.sp .6
+.RS 4n
+Microsoft Active Directory
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmit\fR\fR
+.ad
+.sp .6
+.RS 4n
+MIT KDC server
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBheimdal\fR\fR
+.ad
+.sp .6
+.RS 4n
+Heimdal KDC server
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshishi\fR\fR
+.ad
+.sp .6
+.RS 4n
+Shishi KDC server
+.RE
+
+Knowing the administrative password will be required to associate the client
+with the server if the \fBms_ad\fR option is specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-c\fR [ \fIfilepath\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the pathname to the \fBkrb5.conf\fR(5) master file, to be copied over
+to the local host. The path specified normally points to a master copy on a
+remote host and brought over to the local host by means of NFS.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR [ \fIdnsarg\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the DNS lookup option to be used and specified in the
+\fBkrb5.conf\fR(5) file. Valid \fIdnsarg\fR entries are: \fBnone\fR,
+\fBdns_lookup_kdc\fR, \fBdns_lookup_realm\fR and \fBdns_fallback\fR. Any other
+entry is considered invalid. The latter three \fIdnsarg\fR values assume the
+same meaning as those described in \fBkrb5.conf\fR. \fBdns_lookup_kdc\fR
+implies DNS lookups for the KDC and the other servers. \fBdns_lookup_realm\fR
+is for host/domain name-to-realm mapping by means of DNS. \fBdns_fallback\fR is
+a superset and does DNS lookups for both the servers and the host/domain
+name-to-realm mapping. A lookup option of \fBnone\fR specifies that DNS is not
+be used for any kind of mapping lookup.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-D\fR \fIdomain_list\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the host and/or domain names to be mapped to the Kerberos client's
+default realm name. \fIdomain_list\fR is a comma-separated list, for example
+"\fBexample.com,host1.example.com\fR". If the \fB-D\fR option is not used, then
+only the client's domain is used for this mapping. For example, if the client
+is \fBhost1.eng.example.com\fR, then the domain that is mapped to the
+\fBEXAMPLE.COM\fR realm is \fBexample.com\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-K\fR\fR
+.ad
+.sp .6
+.RS 4n
+Configure the Kerberos client without service keys, which are usually stored in
+\fB/etc/krb5/krb5.keytab\fR. This is useful in the following scenarios:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The client IP address is dynamically assigned and therefore does not host
+Kerberized services.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Client has a static IP address, but does not want to host any Kerberized
+services.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Client has a static IP address, but the local administrator does not currently
+have service keys available for the machine. It is expected that, at a later
+time, these keys will be installed on the machine.
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR [ \fIfqdn_list\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+This option creates a service principal entry (host/nfs/root) associated with
+each of the listed fqdn's, if required, and subsequently adds the entries to
+the local host's \fBkeytab\fR.
+.sp
+\fIfqdn_list\fR is a comma-separated list of one or more fully qualified DNS
+domain names.
+.sp
+This option is especially useful in Kerberos realms having systems offering
+kerberized services, but situated in multiple different DNS domains.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-h\fR \fIlogical_host_name\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies that the Kerberos client is a node in a cluster. The
+\fIlogical_host_name\fR is the logical host name given to the cluster. The
+resulting \fB/etc/krb5/krb5.conf\fR and \fB/etc/krb5/krb5.keytab\fR files must
+be manually copied over to the other members of the cluster.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR \fImaster_kdc\fR\fR
+.ad
+.sp .6
+.RS 4n
+This option specifies the master KDC to be used by the Kerberos client.
+\fImaster_kdc\fR is the host name of the master KDC for the client. If the
+\fB-m\fR option is not used, then it is assumed that the first KDC host name
+listed with the \fB-k\fR option is the master KDC.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR [ \fIprofile\fR ]\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the profile to be used to enable the reading in of the values of all
+the parameters required for setup of the machine as a Kerberos client.
+.sp
+The profile should have entries in the format:
+.sp
+.in +2
+.nf
+\fIPARAM\fR \fI<value>\fR
+.fi
+.in -2
+.sp
+
+Valid \fIPARAM\fR entries are: \fBREALM\fR, \fBKDC\fR, \fBADMIN\fR,
+\fBFILEPATH\fR, \fBNFS\fR, \fBDNSLOOKUP\fR, \fBFQDN\fR, \fBNOKEY\fR,
+\fBNOSOL\fR, \fBLHN\fR, \fBKDCVENDOR\fR, \fBRMAP\fR, \fBMAS\fR, and \fBPAM\fR.
+.sp
+These profile entries correspond to the \fB-R\fR [\fIrealm\fR], \fB-k\fR
+[\fIkdc\fR], \fB-a\fR [\fIadminuser\fR], \fB-c\fR [\fIfilepath\fR], \fB-n\fR,
+\fB-d\fR [\fIdnsarg\fR], \fB-f\fR [\fIfqdn_list\fR], \fB-K\fR, \fB-h\fR
+[\fIlogical_host_name\fR], \fB-T\fR [\fIkdc_vendor\fR], \fB-D\fR
+[\fIdomain_list\fR], \fB-m\fR [\fImaster_kdc\fR], and \fB-s\fR
+[\fIpam_service\fR] command-line options, respectively. Any other \fIPARAM\fR
+entry is considered invalid and is ignored.
+.sp
+The NFS profile entry can have a value of 0 (do nothing) or 1 (operation is
+requested). Any other value is considered invalid and is ignored.
+.sp
+Keep in mind that the command line options override the \fIPARAM\fR values
+listed in the profile.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR \fIpam_service\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies that the PAM service names, listed in \fIpam_service\fR, are
+authenticated through Kerberos before any other type of authentication. Using
+this option updates \fBpam.conf\fR(5) to include \fBpam_krb5\fR(7) to existing
+authentication stacks for the specified service(s) in \fIpam_service\fR. An
+example of a possible \fIpam_service\fR value is: \fBdtlogin,sshd-kbdint\fR.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRSetting Up a Kerberos Client Using Command-Line Options
+.sp
+.LP
+To setup a Kerberos client using the \fBclntconfig/admin\fR administrative
+principal for realm \fB\&'EXAMPLE.COM', kdc `example1.example.com'\fR and
+that also does kerberized NFS, enter:
+
+.sp
+.in +2
+.nf
+# /usr/sbin/kclient -n -R EXAMPLE.COM -k example1.example.com -a clntconfig
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Alternatively, to set up a Kerberos client using the \fBclntconfig/admin\fR
+administrative principal for the realm \fB`EAST.EXAMPLE.COM', kdc
+`example2.east.example.com'\fR and that also needs service principal(s) created
+and/or added to the local \fBkeytab\fR for multiple DNS domains, enter:
+
+.sp
+.in +2
+.nf
+# /usr/sbin/kclient -n -R EAST.EXAMPLE.COM -k example2.east.example.com \e
+-f west.example.com,central.example.com -a clntconfig
+.fi
+.in -2
+
+.sp
+.LP
+Note that the \fBkrb5\fR administrative principal used by the administrator
+needs to have only \fBadd\fR, \fBinquire\fR, \fBchange-pwd\fR and \fBmodify\fR
+privileges (for the principals in the KDC database) in order for the
+\fBkclient\fR utility to run. A sample \fBkadm5.acl\fR(5) entry is:
+
+.sp
+.in +2
+.nf
+clntconfig/admin@EXAMPLE.COM acmi
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRSetting Up a Kerberos Client Using the Profile Option
+.sp
+.LP
+To setup a Kerberos client using the \fBclntconfig/admin\fR administrative
+principal for realm \fB`EXAMPLE.COM', kdc `example1.example.com'\fR and that
+also copies over the master \fBkrb5.conf\fR from a specified location, enter:
+
+.sp
+.in +2
+.nf
+# /usr/sbin/kclient -p /net/example1.example.com/export/profile.krb5
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The contents of \fBprofile.krb5\fR:
+
+.sp
+.in +2
+.nf
+REALM EXAMPLE.COM
+KDC example1.example.com
+ADMIN clntconfig
+FILEPATH /net/example1.example.com/export/krb5.conf
+NFS 0
+DNSLOOKUP none
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRSetting Up a Kerberos Client That Has a Dynamic IP Address
+.sp
+.LP
+In this example a Kerberos client is a DHCP client that has a dynamic IP
+address. This client does not wish to host any Kerberized services and
+therefore does not require a \fBkeytab\fR (\fB/etc/krb5/krb5.keytab\fR) file.
+
+.sp
+.LP
+For this type of client the administrator would issue the following command to
+configure this machine to be a Kerberos client of the \fBEXAMPLE.COM\fR realm
+with the KDC server \fBkdc1.example.com\fR:
+
+.sp
+.in +2
+.nf
+# \fB/usr/sbin/kclient -K -R EXAMPLE.COM -k kdc1.example.com\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/krb5/kadm5.acl\fR\fR
+.ad
+.sp .6
+.RS 4n
+Kerberos access control list (ACL) file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/krb5/krb5.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+Default location for the local host's configuration file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/krb5/krb5.keytab\fR\fR
+.ad
+.sp .6
+.RS 4n
+Default location for the local host's \fBkeytab\fR file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/nfssec.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+File listing NFS security modes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/resolv.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+DNS resolver configuration file.
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.BR encrypt (1),
+.BR ksh93 (1),
+.BR ldapdelete (1),
+.BR ldapmodify (1),
+.BR ldapsearch (1),
+.BR kadm5.acl (5),
+.BR krb5.conf (5),
+.BR nfssec.conf (5),
+.BR pam.conf (5),
+.BR resolv.conf (5),
+.BR attributes (7),
+.BR pam_krb5 (7),
+.BR dd (8),
+.BR smbadm (8)
+.SH NOTES
+\fBfqdn\fR stands for the Fully Qualified Domain Name of the local host. The
+\fBkclient\fR utility saves copies of both the \fBkrb5.conf\fR(5) and
+\fBnfssec.conf\fR(5) files to files with corresponding names and \fB\&.sav\fR
+extensions. The optional copy of the \fBkrb5.conf\fR(5) master file is neither
+encrypted nor integrity-protected and it takes place over regular NFS.

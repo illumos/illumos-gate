@@ -54,7 +54,8 @@ See the \fBgetmajor\fR(9F) manual page for an example of how to use
 .SH SEE ALSO
 .sp
 .LP
-\fBgetmajor\fR(9F), \fBmakedevice\fR(9F)
+.BR getmajor (9F),
+.BR makedevice (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

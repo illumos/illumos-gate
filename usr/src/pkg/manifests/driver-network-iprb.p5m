@@ -43,8 +43,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/iprb group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/iprb.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/iprb.4d
 driver name=iprb perms="* 0666 root sys" clone_perms="iprb 0666 root sys" \
     alias=pci8086,1029 \
     alias=pci8086,1030 \

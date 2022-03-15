@@ -34,11 +34,11 @@
 
 #
 # DESCRIPTION:
-# Ensure that the fsirand(1M) utility fails on a ZFS file system.
+# Ensure that the fsirand(8) utility fails on a ZFS file system.
 #
 # STRATEGY:
 # 1. Populate a ZFS file system with some files.
-# 2. Run fsirand(1M) against the device.
+# 2. Run fsirand(8) against the device.
 # 3. Ensure it fails.
 #
 
@@ -55,7 +55,7 @@ function cleanup
 
 log_onexit cleanup
 
-log_assert "Ensure that the fsirand(1M) utility fails on a ZFS file system."
+log_assert "Ensure that the fsirand(8) utility fails on a ZFS file system."
 
 populate_dir $NUM_FILES
 
@@ -63,4 +63,4 @@ log_must zfs unmount $TESTDIR
 
 log_mustnot fsirand /dev/rdsk/${DISK}s0
 
-log_pass "fsirand(1M) returned an error as expected."
+log_pass "fsirand(8) returned an error as expected."

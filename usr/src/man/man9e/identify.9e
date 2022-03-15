@@ -10,9 +10,10 @@ identify \- determine if a driver is associated with a device
 illumos DDI specific (illumos DDI). This entry point is no longer supported.
 \fBnulldev\fR(9F) must be specified in the  \fBdev_ops\fR(9S) structure.
 .SH SEE ALSO
-\fBnulldev\fR(9F), \fBdev_ops\fR(9S)
+.BR nulldev (9F),
+.BR dev_ops (9S)
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp

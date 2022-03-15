@@ -1,0 +1,84 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH URAL 4D "May 6, 2008"
+.SH NAME
+ural \- Ralink RT2500USB 802.11b/g Wireless Driver
+.SH DESCRIPTION
+.sp
+.LP
+The \fBural\fR \fI802.11b/g\fR wireless NIC driver is  a multi-threaded,
+loadable, clonable,  GLDv3-based  STREAMS driver supporting the Ralink
+RT2500USB chipset-based NIC's.
+.SH CONFIGURATION
+.sp
+.LP
+The \fBural\fR driver performs auto-negotiation  to  determine the data  rate
+and mode. Supported 802.11b data rates are 1, 2, 5.5 and 11 Mbits/sec.
+Supported \fI802.11g\fR data rates are 1, 2, 5.5, 11, 6, 9, 12, 18, 24, 36, 48
+and 54 Mbits/sec. The \fBural\fR driver supports only BSS  networks (also known
+as "ap" or "infrastructure" networks) and "open" (or "open-system") or "shared
+system" authentication.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/ural*\fR\fR
+.ad
+.sp .6
+.RS 4n
+Special character device.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/ural\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit ELF kernel module. (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/ural\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit ELF kernel module. (x86)
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR gld (4D),
+.BR dlpi (4P),
+.BR attributes (7),
+.BR dladm (8),
+.BR wificonfig (8)
+.sp
+.LP
+\fI802.11 - Wireless LAN  Media  Access Control and  Physical Layer
+Specification\fR - IEEE, 2001

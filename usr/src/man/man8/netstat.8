@@ -1,0 +1,1108 @@
+'\" te
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2018, Joyent, Inc.
+.\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
+.TH NETSTAT 8 "Jul 12, 2016"
+.SH NAME
+netstat \- show network status
+.SH SYNOPSIS
+.nf
+\fBnetstat\fR [\fB-anuvR\fR] [\fB-f\fR \fIaddress_family\fR] [\fB-P\fR \fIprotocol\fR]
+.fi
+
+.LP
+.nf
+\fBnetstat\fR \fB-g\fR [\fB-nv\fR] [\fB-f\fR \fIaddress_family\fR]
+.fi
+
+.LP
+.nf
+\fBnetstat\fR \fB-p\fR [\fB-n\fR] [\fB-f\fR \fIaddress_family\fR]
+.fi
+
+.LP
+.nf
+\fBnetstat\fR \fB-s\fR [\fB-f\fR \fIaddress_family\fR] [\fB-P\fR \fIprotocol\fR]
+     [\fB-T\fR u | d ] [\fIinterval\fR [\fIcount\fR]]
+.fi
+
+.LP
+.nf
+\fBnetstat\fR \fB-m\fR [\fB-T\fR u | d ] [\fB-v\fR] [\fIinterval\fR [\fIcount\fR]]
+.fi
+
+.LP
+.nf
+\fBnetstat\fR \fB-i\fR [\fB-I\fR \fIinterface\fR] [\fB-acn\fR] [\fB-f\fR \fIaddress_family\fR]
+     [\fB-T\fR u | d ] [\fIinterval\fR [\fIcount\fR]]
+.fi
+
+.LP
+.nf
+\fBnetstat\fR \fB-r\fR [\fB-acnvR\fR] [\fB-f\fR \fIaddress_family\fR | \fIfilter\fR]
+.fi
+
+.LP
+.nf
+\fBnetstat\fR \fB-M\fR [\fB-cns\fR] [\fB-f\fR \fIaddress_family\fR]
+.fi
+
+.LP
+.nf
+\fBnetstat\fR \fB-D\fR [\fB-I\fR \fIinterface\fR] [\fB-f\fR \fIaddress_family\fR]
+.fi
+
+.SH DESCRIPTION
+The \fBnetstat\fR command displays the contents of certain network-related data
+structures in various formats, depending on the options you select.
+.LP
+The \fBnetstat\fR command has the several forms shown in the SYNOPSIS section,
+above, listed as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The first form of the command (with no required arguments) displays a list of
+active sockets for each protocol.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The second, third, and fourth forms (\fB-g\fR, \fB-p\fR, and \fB-s\fR options)
+display information from various network data structures.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The fifth form (\fB-m\fR option) displays STREAMS memory statistics.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The sixth form (\fB-i\fR option) shows the state of the interfaces.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The seventh form (\fB-r\fR option) displays the routing table.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The eighth form (\fB-M\fR option) displays the multicast routing table.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The ninth form (\fB-D\fR option) displays the state of \fBDHCP\fR on one or all
+interfaces.
+.RE
+.LP
+These forms are described in greater detail below.
+.LP
+With no arguments (the first form), \fBnetstat\fR displays connected sockets
+for \fBPF_INET\fR, \fBPF_INET6\fR, and \fBPF_UNIX\fR, unless modified otherwise
+by the \fB-f\fR option.
+.SH OPTIONS
+.ne 2
+.na
+\fB-a\fR
+.ad
+.sp .6
+.RS 4n
+Show the state of all sockets, all routing table entries, or all interfaces,
+both physical and logical. Normally, listener sockets used by server processes
+are not shown. Under most conditions, only interface, host, network, and
+default routes are shown and only the status of physical interfaces is shown.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-c\fR
+.ad
+.sp .6
+.RS 4n
+Print IPv4 networks using CIDR (x.y.z.a/NN) notation with the \fB-i\fR,
+\fB-r\fR, and \fB-M\fR options. IPv6 networks default to this, but due to
+backward compatibility, IPv4 ones do not without this flag.  A noncontiguous
+IPv4 netmask will print "/NM" if this flag is enabled.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-f\fR \fIaddress_family\fR
+.ad
+.sp .6
+.RS 4n
+Limit all displays to those of the specified \fIaddress_family\fR. The value of
+\fIaddress_family\fR can be one of the following:
+.sp
+.ne 2
+.na
+\fBinet\fR
+.ad
+.RS 9n
+For the \fBAF_INET\fR address family showing IPv4 information.
+.RE
+
+.sp
+.ne 2
+.na
+\fBinet6\fR
+.ad
+.RS 9n
+For the \fBAF_INET6\fR address family showing IPv6 information.
+.RE
+
+.sp
+.ne 2
+.na
+\fBunix\fR
+.ad
+.RS 9n
+For the \fBAF_UNIX\fR address family.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB-f\fR \fIfilter\fR
+.ad
+.sp .6
+.RS 4n
+With \fB-r\fR only, limit the display of routes to those matching the specified
+filter. A filter rule consists of a \fIkeyword\fR:\fIvalue\fR pair. The known
+keywords and the value syntax are:
+.sp
+.ne 2
+.na
+\fBaf:\fR{\fBinet\fR|\fBinet6\fR|\fBunix\fR|\fInumber\fR}
+.ad
+.sp .6
+.RS 4n
+Selects an address family. This is identical to \fB-f\fR \fIaddress_family\fR
+and both syntaxes are supported.
+.RE
+
+.sp
+.ne 2
+.na
+\fBoutif\fR:{\fIname\fR|\fIifIndex\fR|\fBany\fR|\fBnone\fR}
+.ad
+.sp .6
+.RS 4n
+Selects an output interface. You can specify the interface by name (such as
+\fBhme0\fR) or by \fBifIndex\fR number (for example, \fB2\fR). If \fBany\fR is
+used, the filter matches all routes having a specified interface (anything
+other than null). If \fBnone\fR is used, the filter matches all routes having a
+null interface. Note that you can view the index number (\fIifIndex\fR) for an
+interface with the \fB-a\fR option of \fBifconfig\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fBdst\fR:{\fIip-address\fR[/\fImask\fR]|\fBany\fR|\fBnone\fR}
+.ad
+.sp .6
+.RS 4n
+Selects a destination IP address. If specified with a mask length, then any
+routes with matching or longer (more specific) masks are selected. If \fBany\fR
+is used, then all but addresses but 0 are selected. If \fBnone\fR is used, then
+address 0 is selected.
+.RE
+
+.sp
+.ne 2
+.na
+\fBflags:\fR[\fB+ -\fR]?[\fBABDGHLMSU\fR]\fB+\fR
+.ad
+.sp .6
+.RS 4n
+Selects routes tagged with the specified flags. By default, the flags as
+specified must be set in order to match. With a leading \fB+\fR, the flags
+specified must be set but others are ignored. With a leading \fB-\fR, the flags
+specified must not be set and others are permitted.
+.RE
+
+You can specify multiple instances of \fB-f\fR to specify multiple filters. For
+example:
+.sp
+.in +2
+.nf
+% netstat -nr -f outif:hme0 -f outif:hme1 -f dst:10.0.0.0/8
+.fi
+.in -2
+.sp
+
+The preceding command displays routes within network 10.0.0.0/8, with mask
+length 8 or greater, and an output interface of either \fBhme0\fR or
+\fBhme1\fR, and excludes all other routes.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-g\fR
+.ad
+.sp .6
+.RS 4n
+Show the multicast group memberships for all interfaces. If the \fB-v\fR option
+is included, source-specific membership information is also displayed. See
+DISPLAYS, below.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-i\fR
+.ad
+.sp .6
+.RS 4n
+Show the state of the interfaces that are used for \fBIP\fR traffic. Normally
+this shows statistics for the physical interfaces. When combined with the
+\fB-a\fR option, this will also report information for the logical interfaces.
+See \fBifconfig\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fB-m\fR
+.ad
+.sp .6
+.RS 4n
+Show the STREAMS memory statistics.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-n\fR
+.ad
+.sp .6
+.RS 4n
+Show network addresses as numbers. \fBnetstat\fR normally displays addresses as
+symbols. This option may be used with any of the display formats.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-p\fR
+.ad
+.sp .6
+.RS 4n
+Show the net to media tables. See DISPLAYS, below.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-r\fR
+.ad
+.sp .6
+.RS 4n
+Show the routing tables. Normally, only interface, host, network, and default
+routes are shown, but when this option is combined with the \fB-a\fR option,
+all routes will be displayed, including cache. If you have not set up a
+multicast route, \fB-ra\fR might not show any multicast routing entries,
+although the kernel will derive such an entry if needed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-s\fR
+.ad
+.sp .6
+.RS 4n
+Show per-protocol statistics. When used with the \fB-M\fR option, show
+multicast routing statistics instead. When used with the \fB-a\fR option,
+per-interface statistics will be displayed, when available, in addition to
+statistics global to the system. See DISPLAYS, below.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-T\fR \fBu\fR | \fBd\fR
+.ad
+.sp .6
+.RS 4n
+Display a time stamp.
+.sp
+Specify \fBu\fR for a printed representation of the internal representation of
+time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
+\fBdate\fR(1).
+.RE
+
+.sp
+.ne 2
+.na
+\fB-u\fR
+.ad
+.sp .6
+.RS 4n
+For each network endpoint show the list of processes which currently have an
+open file descriptor pointing to that endpoint. For each process in that list,
+show the username, process ID and associated program; the information
+may be truncated. Where multiple processes are associated with an endpoint,
+a line will be output for each process.
+.sp
+While the system gathers this information, the processes associated with a
+given endpoint may change. If such a change occurs, it may not be reflected in
+the output.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose. Show additional information for the sockets, STREAMS memory
+statistics, routing table, and multicast group memberships. In conjunction with
+the \fB-u\fR flag, show the arguments with which the process was started;
+these may be truncated.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-I\fR \fIinterface\fR
+.ad
+.sp .6
+.RS 4n
+Show the state of a particular interface. \fIinterface\fR can be any valid
+interface such as \fBhme0\fR or \fBeri0\fR. Normally, the status and statistics
+for physical interfaces are displayed. When this option is combined with the
+\fB-a\fR option, information for the logical interfaces is also reported.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-M\fR
+.ad
+.sp .6
+.RS 4n
+Show the multicast routing tables. When used with the \fB-s\fR option, show
+multicast routing statistics instead.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-P\fR \fIprotocol\fR
+.ad
+.sp .6
+.RS 4n
+Limit display of statistics or state of all sockets to those applicable to
+\fIprotocol\fR. The protocol can be one of \fBip\fR, \fBipv6\fR, \fBicmp\fR,
+\fBicmpv6\fR, \fBicmp\fR, \fBicmpv6\fR, \fBigmp\fR, \fBudp\fR, \fBtcp\fR,
+\fBrawip\fR. \fBrawip\fR can also be specified as \fBraw\fR. The command
+accepts protocol options only as all lowercase.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-D\fR
+.ad
+.sp .6
+.RS 4n
+Show the status of \fBDHCP\fR configured interfaces.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-R\fR
+.ad
+.sp .6
+.RS 4n
+This modifier displays extended security attributes for sockets and routing
+table entries. The \fB-R\fR modifier is available only if the system is
+configured with the Solaris Trusted Extensions feature.
+.sp
+With \fB-r\fR only, this option displays the routing entries' gateway security
+attributes. See \fBroute\fR(8) for more information on security attributes.
+.sp
+When displaying socket information using the first form of the command, this
+option displays additional information for Multi-Level Port(MLP) sockets. This
+includes:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The label for the peer if the socket is connected.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The following flags can be appended to the socket's "State" output:
+.RS
+
+.sp
+.ne 2
+.na
+\fBP\fR
+.ad
+.RS 5n
+The socket is a MLP on zone-private IP addresses.
+.RE
+
+.sp
+.ne 2
+.na
+\fBS\fR
+.ad
+.RS 5n
+The socket is a MLP on IP addresses shared between zones.
+.RE
+.SH OPERANDS
+.ne 2
+.na
+\fB\fIinterval\fR\fR
+.ad
+.RS 12n
+Display statistics accumulated since last display every \fIinterval\fR seconds,
+repeating forever, unless \fIcount\fR is specified. When invoked with
+\fIinterval\fR, the first row of netstat output shows statistics accumulated
+since last reboot.
+.sp
+The following options support \fIinterval\fR: \fB-i\fR, \fB-m\fR, \fB-s\fR and
+\fB-Ms\fR. Some values are configuration parameters and are just redisplayed at
+each interval.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIcount\fR\fR
+.ad
+.RS 12n
+Display interface statistics the number of times specified by \fIcount\fR, at
+the interval specified by \fIinterval\fR.
+.RE
+
+.SH DISPLAYS
+.SS "Active Sockets (First Form)"
+The display for each active socket shows the local and remote address, the send
+and receive queue sizes (in bytes), the send and receive windows (in bytes),
+and the internal state of the protocol.
+.LP
+The symbolic format normally used to display socket addresses is either:
+.sp
+.in +2
+.nf
+\fBhostname\fR.\fIport\fR
+.fi
+.in -2
+.sp
+when the name of the host is specified, or
+.sp
+.in +2
+.nf
+\fInetwork\fR.\fIport\fR
+.fi
+.in -2
+.sp
+if a socket address specifies a network but no specific host.
+.LP
+The numeric host address or network number associated with the socket is used
+to look up the corresponding symbolic hostname or network name in the
+\fIhosts\fR or \fInetworks\fR database.
+.LP
+If the network or hostname for an address is not known, or if the \fB-n\fR
+option is specified, the numerical network address is shown. Unspecified, or
+"wildcard", addresses and ports appear as an asterisk (\fB*\fR). For more
+information regarding the Internet naming conventions, refer to \fBinet\fR(4P)
+and \fBinet6\fR(4P).
+.LP
+For SCTP sockets, because an endpoint can be represented by multiple addresses,
+the verbose option (\fB-v\fR) displays the list of all the local and remote
+addresses.
+.SS "\fITCP Sockets\fR"
+The possible state values for \fBTCP\fR sockets are as follows:
+.sp
+.ne 2
+.na
+\fBBOUND\fR
+.ad
+.RS 16n
+Bound, ready to connect or listen.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCLOSED\fR
+.ad
+.RS 16n
+Closed. The socket is not being used.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCLOSING\fR
+.ad
+.RS 16n
+Closed, then remote shutdown; awaiting acknowledgment.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCLOSE_WAIT\fR
+.ad
+.RS 16n
+Remote shutdown; waiting for the socket to close.
+.RE
+
+.sp
+.ne 2
+.na
+\fBESTABLISHED\fR
+.ad
+.RS 16n
+Connection has been established.
+.RE
+
+.sp
+.ne 2
+.na
+\fBFIN_WAIT_1\fR
+.ad
+.RS 16n
+Socket closed; shutting down connection.
+.RE
+
+.sp
+.ne 2
+.na
+\fBFIN_WAIT_2\fR
+.ad
+.RS 16n
+Socket closed; waiting for shutdown from remote.
+.RE
+
+.sp
+.ne 2
+.na
+\fBIDLE\fR
+.ad
+.RS 16n
+Idle, opened but not bound.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLAST_ACK\fR
+.ad
+.RS 16n
+Remote shutdown, then closed; awaiting acknowledgment.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLISTEN\fR
+.ad
+.RS 16n
+Listening for incoming connections.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSYN_RECEIVED\fR
+.ad
+.RS 16n
+Initial synchronization of the connection under way.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSYN_SENT\fR
+.ad
+.RS 16n
+Actively trying to establish connection.
+.RE
+
+.sp
+.ne 2
+.na
+\fBTIME_WAIT\fR
+.ad
+.RS 16n
+Wait after close for remote shutdown retransmission.
+.RE
+
+.SS "\fISCTP Sockets\fR"
+The possible state values for SCTP sockets are as follows:
+.sp
+.ne 2
+.na
+\fBCLOSED\fR
+.ad
+.RS 21n
+Closed. The socket is not being used.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLISTEN\fR
+.ad
+.RS 21n
+Listening for incoming associations.
+.RE
+
+.sp
+.ne 2
+.na
+\fBESTABLISHED\fR
+.ad
+.RS 21n
+Association has been established.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCOOKIE_WAIT\fR
+.ad
+.RS 21n
+\fBINIT\fR has been sent to the peer, awaiting acknowledgment.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCOOKIE_ECHOED\fR
+.ad
+.RS 21n
+State cookie from the INIT-ACK has been sent to the peer, awaiting
+acknowledgement.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSHUTDOWN_PENDING\fR
+.ad
+.RS 21n
+\fBSHUTDOWN\fR has been received from the upper layer, awaiting acknowledgement
+of all outstanding \fBDATA\fR from the peer.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSHUTDOWN_SENT\fR
+.ad
+.RS 21n
+All outstanding data has been acknowledged in the \fBSHUTDOWN_SENT\fR state.
+\fBSHUTDOWN\fR has been sent to the peer, awaiting acknowledgement.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSHUTDOWN_RECEIVED\fR
+.ad
+.RS 21n
+\fBSHUTDOWN\fR has been received from the peer, awaiting acknowledgement of all
+outstanding \fBDATA\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBSHUTDOWN_ACK_SENT\fR
+.ad
+.RS 21n
+All outstanding data has been acknowledged in the \fBSHUTDOWN_RECEIVED\fR
+state. \fBSHUTDOWN_ACK\fR has been sent to the peer.
+.RE
+
+.SS "Network Data Structures (Second Through Fifth Forms)"
+The form of the display depends upon which of the \fB-g\fR, \fB-m\fR, \fB-p\fR,
+or \fB-s\fR options you select.
+.sp
+.ne 2
+.na
+\fB-g\fR
+.ad
+.RS 6n
+Displays the list of multicast group membership.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-m\fR
+.ad
+.RS 6n
+Displays the memory usage, for example, STREAMS mblks.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-p\fR
+.ad
+.RS 6n
+Displays the net to media mapping table. For IPv4, the address resolution table
+is displayed. See \fBarp\fR(8). For IPv6, the neighbor cache is displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-s\fR
+.ad
+.RS 6n
+Displays the statistics for the various protocol layers.
+.RE
+
+.sp
+.LP
+The statistics use the MIB specified variables. The defined values for
+\fBipForwarding\fR are:
+.sp
+.ne 2
+.na
+\fBforwarding (1)\fR
+.ad
+.RS 21n
+Acting as a gateway.
+.RE
+
+.sp
+.ne 2
+.na
+\fBnot-forwarding (2)\fR
+.ad
+.RS 21n
+Not acting as a gateway.
+.RE
+
+.sp
+.LP
+The IPv6 and ICMPv6 protocol layers maintain per-interface statistics. If the
+\fB-a\fR option is specified with the \fB-s\fR option, then the per-interface
+statistics as well as the total sums are displayed. Otherwise, just the sum of
+the statistics are shown.
+.LP
+For the second, third, and fourth forms of the command, you must specify at
+least \fB-g\fR, \fB-p\fR, or \fB-s\fR. You can specify any combination of these
+options. You can also specify \fB-m\fR (the fifth form) with any set of the
+\fB-g\fR, \fB-p\fR, and \fB-s\fR options. If you specify more than one of these
+options, \fBnetstat\fR displays the information for each one of them.
+.SS "Interface Status (Sixth Form)"
+The interface status display lists information for all current interfaces, one
+interface per line. If an interface is specified using the \fB-I\fR option, it
+displays information for only the specified interface.
+.LP
+The list consists of the interface name, \fBmtu\fR (maximum transmission unit,
+or maximum packet size)(see \fBifconfig\fR(8)), the network to which the
+interface is attached, addresses for each interface, and counter associated
+with the interface. The counters show the number of input packets, input
+errors, output packets, output errors, and collisions, respectively. For
+Point-to-Point interfaces, the Net/Dest field is the name or address on the
+other side of the link.
+.LP
+If the \fB-a\fR option is specified with either the \fB-i\fR option or the
+\fB-I\fR option, then the output includes names of the physical interface(s),
+counts for input packets and output packets for each logical interface, plus
+additional information.
+.LP
+If the \fB-n\fR option is specified, the list displays the IP address instead
+of the interface name.
+.LP
+If an optional \fIinterval\fR is specified, the output will be continually
+displayed in \fIinterval\fR seconds until interrupted by the user or until
+\fIcount\fR is reached. See OPERANDS.
+.LP
+The physical interface is specified using the \fB-I\fR option. When used with
+the \fIinterval\fR operand, output for the \fB-I\fR option has the following
+format:
+.sp
+.in +2
+.nf
+input    eri0          output        input          (Total)   output
+packets  errs  packets errs  colls   packets  errs  packets  errs   colls
+227681   0     659471  1     502     261331   0     99597    1      502
+10       0     0       0     0       10       0     0        0      0
+8        0     0       0     0       8        0     0        0      0
+10       0     2       0     0       10       0     2        0      0
+.fi
+.in -2
+.sp
+.LP
+If the input interface is not specified, the first interface of address family
+\fBinet\fR or \fBinet6\fR will be displayed.
+.SS "Routing Table (Seventh Form)"
+The routing table display lists the available routes and the status of each.
+Each route consists of a destination host or network, and a gateway to use in
+forwarding packets. The \fIflags\fR column shows the status of the route. These
+flags are as follows:
+.sp
+.ne 2
+.na
+\fBU\fR
+.ad
+.RS 5n
+Indicates route is \fBup\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBG\fR
+.ad
+.RS 5n
+Route is to a gateway.
+.RE
+
+.sp
+.ne 2
+.na
+\fBH\fR
+.ad
+.RS 5n
+Route is to a host and not a network.
+.RE
+
+.sp
+.ne 2
+.na
+\fBM\fR
+.ad
+.RS 5n
+Redundant route established with the \fB-multirt\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fBS\fR
+.ad
+.RS 5n
+Route was established using the \fB-setsrc\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fBD\fR
+.ad
+.RS 5n
+Route was created dynamically by a redirect.
+.RE
+
+.sp
+.LP
+If the \fB-a\fR option is specified, there will be routing entries with the
+following flags:
+.sp
+.ne 2
+.na
+\fBA\fR
+.ad
+.RS 5n
+Combined routing and address resolution entries.
+.RE
+
+.sp
+.ne 2
+.na
+\fBB\fR
+.ad
+.RS 5n
+Broadcast addresses.
+.RE
+
+.sp
+.ne 2
+.na
+\fBL\fR
+.ad
+.RS 5n
+Local addresses for the host.
+.RE
+
+.LP
+Interface routes are created for each interface attached to the local host; the
+gateway field for such entries shows the address of the outgoing interface.
+.LP
+The \fBuse\fR column displays the number of packets sent using a combined
+routing and address resolution (\fBA\fR) or a broadcast (\fBB\fR) route. For a
+local (\fBL\fR) route, this count is the number of packets received, and for
+all other routes it is the number of times the routing entry has been used to
+create a new combined route and address resolution entry.
+.LP
+The \fIinterface\fR entry indicates the network interface utilized for the
+route.
+.SS "Multicast Routing Tables (Eighth Form)"
+The multicast routing table consists of the virtual interface table and the
+actual routing table.
+.SS "DHCP Interface Information (Ninth Form)"
+The \fBDHCP\fR interface information consists of the interface name, its
+current state, lease information, packet counts, and a list of flags.
+.LP
+The states correlate with the specifications set forth in \fIRFC 2131\fR.
+.LP
+Lease information includes:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+when the lease began;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+when lease renewal will begin; and
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+when the lease will expire.
+.RE
+.sp
+.LP
+The flags currently defined include:
+.sp
+.ne 2
+.na
+\fBBOOTP\fR
+.ad
+.RS 11n
+The interface has a lease obtained through \fBBOOTP\fR (IPv4 only).
+.RE
+
+.sp
+.ne 2
+.na
+\fBBUSY\fR
+.ad
+.RS 11n
+The interface is busy with a \fBDHCP\fR transaction.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPRIMARY\fR
+.ad
+.RS 11n
+The interface is the primary interface. See \fBdhcpinfo\fR(1) and
+\fBifconfig\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fBFAILED\fR
+.ad
+.RS 11n
+The interface is in failure state and must be manually restarted.
+.RE
+
+.LP
+Packet counts are maintained for the number of packets sent, the number of
+packets received, and the number of lease offers declined by the \fBDHCP\fR
+client. All three counters are initialized to zero and then incremented while
+obtaining a lease. The counters are reset when the period of lease renewal
+begins for the interface. Thus, the counters represent either the number of
+packets sent, received, and declined while obtaining the current lease, or the
+number of packets sent, received, and declined while attempting to obtain a
+future lease.
+.SH FILES
+.ne 2
+.na
+\fB/etc/default/inet_type\fR
+.ad
+.RS 26n
+\fBDEFAULT_IP\fR setting
+.RE
+
+.SH SEE ALSO
+.BR dhcpinfo (1),
+.BR kstat (4D),
+.BR inet (4P),
+.BR inet6 (4P),
+.BR hosts (5),
+.BR inet_type (5),
+.BR networks (5),
+.BR protocols (5),
+.BR services (5),
+.BR attributes (7),
+.BR dhcp (7),
+.BR arp (8),
+.BR dhcpagent (8),
+.BR ifconfig (8),
+.BR iostat (8),
+.BR kstat (8),
+.BR mibiisa (8),
+.BR ndp (8),
+.BR savecore (8),
+.BR vmstat (8)
+.sp
+.LP
+Droms, R., \fIRFC 2131, Dynamic Host Configuration Protocol\fR, Network Working
+Group, March 1997.
+.sp
+.LP
+Droms, R. \fIRFC 3315, Dynamic Host Configuration Protocol for IPv6
+(DHCPv6)\fR. Cisco Systems. July 2003.
+.SH NOTES
+When displaying interface information, \fBnetstat\fR honors the
+\fBDEFAULT_IP\fR setting in \fB/etc/default/inet_type\fR. If it is set to
+\fBIP_VERSION4\fR, then \fBnetstat\fR will omit information relating to IPv6
+interfaces, statistics, connections, routes and the like.
+.LP
+However, you can override the \fBDEFAULT_IP\fR setting in
+\fB/etc/default/inet_type\fR on the command-line. For example, if you have used
+the command-line to explicitly request IPv6 information by using the
+\fBinet6\fR address family or one of the IPv6 protocols, it will override the
+\fBDEFAULT_IP\fR setting.
+.LP
+If you need to examine network status information following a kernel crash, use
+the \fBmdb\fR(1) utility on the \fBsavecore\fR(8) output.
+.LP
+The \fBnetstat\fR utility obtains TCP statistics from the system by opening
+\fB/dev/tcp\fR and issuing queries. Because of this, \fBnetstat\fR might
+display an extra, unused connection in \fBIDLE\fR state when reporting
+connection status.
+.LP
+Previous versions of \fBnetstat\fR had undocumented methods for reporting
+kernel statistics published using the \fBkstat\fR(4D) facility. This
+functionality has been removed. Use \fBkstat\fR(8) instead.
+.LP
+\fBnetstat\fR restricts its output to information that is relevant to the zone
+in which \fBnetstat\fR runs. (This is true for both shared-IP and exclusive-IP
+zones.)

@@ -4913,7 +4913,7 @@ ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type,
 }
 
 /*
- * Sanity check parameters provided by ipsecalgs(1m). Assume that
+ * Sanity check parameters provided by ipsecalgs(8). Assume that
  * the algoritm is marked as valid, there is a check at the top
  * of this function. If any of the checks below fail, the algorithm
  * entry is invalid.

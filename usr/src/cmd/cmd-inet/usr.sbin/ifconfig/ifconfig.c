@@ -86,8 +86,8 @@ typedef struct {
 } if_appflags_t;
 
 static const if_appflags_t if_appflags_tbl[] = {
-	{ "dhcpagent(1M)",	IFF_DHCPRUNNING,	1 },
-	{ "in.ndpd(1M)",	IFF_ADDRCONF,		3 },
+	{ "dhcpagent(8)",	IFF_DHCPRUNNING,	1 },
+	{ "in.ndpd(8)",		IFF_ADDRCONF,		3 },
 	{  NULL,		0,			0 }
 };
 
@@ -643,7 +643,7 @@ ifconfig(int argc, char *argv[], int af, struct ifaddrs *ifa)
 	 * sometimes two or more attributes must be set together.  For
 	 * example, setting an address without a netmask does not make sense.
 	 * Yet they can be set separately for IPv4 address using the current
-	 * ifconfig(1M) syntax.  The kernel then "infers" the correct netmask
+	 * ifconfig(8) syntax.  The kernel then "infers" the correct netmask
 	 * using the deprecated "IP address classes."  This is simply not
 	 * correct.
 	 *
@@ -660,7 +660,7 @@ ifconfig(int argc, char *argv[], int af, struct ifaddrs *ifa)
 	 * it will use the working interface's address to do the query.
 	 * It will be wrong now as we don't know the logical interface's name.
 	 *
-	 * ifconfig(1M) is too overloaded and the code is so convoluted
+	 * ifconfig(8) is too overloaded and the code is so convoluted
 	 * that it is "safer" not to re-architect the code to fix the above
 	 * issue, hence this "hack."  We may be better off to have a new
 	 * command with better syntax for configuring network interface
@@ -1074,7 +1074,7 @@ setifaddr(char *addr, int64_t param)
 }
 
 /*
- * The following functions are stolen from the ipseckey(1m) program.
+ * The following functions are stolen from the ipseckey(8) program.
  * Perhaps they should be somewhere common, but for now, we just maintain
  * two versions.  We do this because of the different semantics for which
  * algorithms we select ("requested" for ifconfig vs. "actual" for key).
@@ -2244,11 +2244,11 @@ again:
 	}
 
 	/*
-	 * If the interface being moved is under the control of `ipmgmtd(1M)'
+	 * If the interface being moved is under the control of `ipmgmtd(8)'
 	 * dameon then we should inform the daemon about this move, so that
 	 * the daemon can delete the state associated with this interface.
 	 *
-	 * This workaround is needed until the IPMP support in ipadm(1M).
+	 * This workaround is needed until the IPMP support in ipadm(8).
 	 */
 	ipadm_if_move(iph, name);
 

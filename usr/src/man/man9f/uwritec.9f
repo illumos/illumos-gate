@@ -50,7 +50,10 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBuiomove\fR(9F), \fBureadc\fR(9F), \fBiovec\fR(9S), \fBuio\fR(9S)
+.BR uiomove (9F),
+.BR ureadc (9F),
+.BR iovec (9S),
+.BR uio (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

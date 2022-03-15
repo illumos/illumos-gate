@@ -75,8 +75,11 @@ When set, use this file for configuration.
 .SH SEE ALSO
 .sp
 .LP
-\fBslpd\fR(1M), \fBslp_api\fR(3SLP), \fBslp.conf\fR(4), \fBslpd.reg\fR(4),
-\fBattributes\fR(5)
+.BR slp_api (3SLP),
+.BR slp.conf (5),
+.BR slpd.reg (5),
+.BR attributes (7),
+.BR slpd (8)
 .sp
 .LP
 \fISystem Administration Guide: Network Services\fR

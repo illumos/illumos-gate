@@ -53,4 +53,6 @@ driver's \fBdevmap_contextmgt\fR(9E) callback function.
 The \fBdevmap_set_ctx_timeout()\fR function can be called from user, interrupt,
 or kernel context.
 .SH SEE ALSO
-\fBdevmap_contextmgt\fR(9E), \fBdevmap_map\fR(9E), \fBtimeout\fR(9F)
+.BR devmap_contextmgt (9E),
+.BR devmap_map (9E),
+.BR timeout (9F)

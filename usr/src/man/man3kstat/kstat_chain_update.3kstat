@@ -112,4 +112,4 @@ The data for the given kstat was too large to be stored in the structure.
 .Xr kstat_lookup 3KSTAT ,
 .Xr kstat_open 3KSTAT ,
 .Xr kstat_read 3KSTAT ,
-.Xr attributes 5
+.Xr attributes 7

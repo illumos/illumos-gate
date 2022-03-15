@@ -1,12 +1,10 @@
 #
-# hal-fdi-validate.sh : Validate one or more fdi(4) files
+# hal-fdi-validate.sh : Validate one or more fdi(5) files
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Licensed under the Academic Free License version 2.1
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 usage() {

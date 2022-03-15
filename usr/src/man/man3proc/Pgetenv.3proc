@@ -60,4 +60,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Penv_iter 3PROC ,
-.Xr environ 5
+.Xr environ 7

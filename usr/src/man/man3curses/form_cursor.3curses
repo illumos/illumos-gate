@@ -62,7 +62,7 @@ The form is not posted.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -77,7 +77,9 @@ MT-Level	Unsafe
 
 .SH SEE ALSO
 .LP
-\fBcurses\fR(3CURSES), \fBforms\fR(3CURSES), \fBattributes\fR(5)
+.BR curses (3CURSES),
+.BR forms (3CURSES),
+.BR attributes (7)
 .SH NOTES
 .LP
 The header \fB<form.h>\fR automatically includes the headers  \fB<eti.h>\fR and

@@ -61,8 +61,8 @@
  * tells what each component's power state values are, and provides human
  * readable strings (currently unused) for each component name and power state.
  * Devices which export pm-components(9P) are automatically power managed
- * whenever autopm is enabled (via PM_START_PM ioctl issued by pmconfig(1M)
- * after parsing power.conf(4)). The exception to this rule is that power
+ * whenever autopm is enabled (via PM_START_PM ioctl issued by pmconfig(8)
+ * after parsing power.conf(5)). The exception to this rule is that power
  * manageable CPU devices may be automatically managed independently of autopm
  * by either enabling or disabling (via PM_START_CPUPM and PM_STOP_CPUPM
  * ioctls) cpupm. If the CPU devices are not managed independently, then they
@@ -72,13 +72,13 @@
  * hardware state.
  *
  * Each device component also has a threshold time associated with each power
- * transition (see power.conf(4)), and a busy/idle state maintained by the
+ * transition (see power.conf(5)), and a busy/idle state maintained by the
  * driver calling pm_idle_component(9F) and pm_busy_component(9F).
  * Components are created idle.
  *
  * The PM framework provides several functions:
- * -implement PM policy as described in power.conf(4)
- *  Policy is set by pmconfig(1M) issuing pm ioctls based on power.conf(4).
+ * -implement PM policy as described in power.conf(5)
+ *  Policy is set by pmconfig(8) issuing pm ioctls based on power.conf(5).
  *  Policies consist of:
  *    -set threshold values (defaults if none provided by pmconfig)
  *    -set dependencies among devices
@@ -122,7 +122,7 @@
  * cdrom is always up whenever the console framebuffer is up, so that the user
  * can insert a cdrom and see a popup as a result.
  *
- * The dependency terminology used in power.conf(4) is not easy to understand,
+ * The dependency terminology used in power.conf(5) is not easy to understand,
  * so we've adopted a different terminology in the implementation.  We write
  * of a "keeps up" and a "kept up" device.  A relationship can be established
  * where one device keeps up another.  That means that if the keepsup device
@@ -384,7 +384,7 @@ int cpr_platform_enable = 0;
 
 /*
  * pm_S3_enabled indicates that we believe the platform can support S3,
- * which we get from pmconfig(1M)
+ * which we get from pmconfig(8)
  */
 int		pm_S3_enabled;
 
@@ -7646,7 +7646,7 @@ pm_cfb_setup(const char *stdout_path)
 			 */
 		} else {
 			cmn_err(CE_WARN, "Kernel debugger present: see "
-			    "kmdb(1M) for interaction with power management.");
+			    "kmdb(1) for interaction with power management.");
 		}
 	}
 #ifdef DEBUG

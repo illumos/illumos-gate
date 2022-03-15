@@ -1,0 +1,126 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Oxide Computer Company
+.\"
+.Dd September 14, 2020
+.Dt IGB 4D
+.Os
+.Sh NAME
+.Nm igb
+.Nd Intel 1 GbE Server NIC Driver
+.Sh SYNOPSIS
+.Pa /dev/net/igb*
+.Sh DESCRIPTION
+The
+.Nm
+driver is a GLDv3 NIC driver for Intel 1 Gigabit Ethernet PCIe
+controllers which are built-in to motherboards and discrete PCIe
+devices.
+.Pp
+The driver supports the following device families:
+.Bl -dash
+.It
+Intel 82575 Gigabit Ethernet Controller
+.It
+Intel 82576 Gigabit Ethernet Controller
+.It
+Intel 82580 Gigabit Ethernet Controller
+.It
+Intel Ethernet Controller I210
+.It
+Intel Ethernet Controller I211
+.It
+Intel Ethernet Controller I350
+.El
+.Pp
+Many other Intel 1 GbE devices are supported by the
+.Xr e1000g 4D
+driver.
+.Pp
+The driver supports the following functionality depending on the
+controller generation:
+.Bl -dash
+.It
+Jumbo frames up to 9000 bytes.
+.It
+Checksum offload for TCP and UDP on IPv4 and IPv6.
+Checksum offload for IPv4 headers.
+.It
+TCP Segmentation Offload
+.Pq TSO
+over IPv4 and IPv6.
+.It
+Support for multiple hardware rings, enabling receive-side steering
+.Pq RSS
+and multiple MAC address filters.
+.It
+Promiscuous access via
+.Xr snoop 8
+and
+.Xr dlpi 4P .
+.It
+LED control.
+.It
+Link auto-negotiation, manual link controls, and IEEE 802.3x flow
+control.
+.El
+.Sh APPLICATION PROGRAMMING INTERFACE
+For each supported device instance, which corresponds to a port, a
+character-special file is created.
+This device can be used with the Data Link Provider Interface
+.Pq DLPI
+through either
+.Xr libdlpi 3LIB
+or
+.Xr dlpi 4P .
+.Pp
+Each instance is assigned a unique ascending integer identifier starting
+from zero.
+The first instance in the system would be enumerated with the id 0 and
+be named
+.Sy igb0
+and be found in the file system at
+.Pa /dev/net/igb0 .
+.Sh CONFIGURATION
+The
+.Nm
+driver supports operating at 1 Gbps full-duplex, 100 Mbps full and
+half-duplex, and 10 Mbps full and half-duplex.
+By default, the device will use auto-negotiation and prefer the highest
+compatible speed.
+The advertised speeds and broader configuration can be observed and
+modified with
+.Xr dladm 8 .
+While
+.Xr driver.conf 5
+based configuration is possible, it is recommended that
+.Xr dladm 8
+is used wherever possible.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/net/igb*
+.Nm
+special character device.
+.It Pa /kernel/drv/amd64/igb
+x86 device driver.
+.It Pa /kernel/drv/sparcv9/igb
+SPARC device driver
+.It Pa /kernel/drv/igb.conf
+Configuration file.
+.El
+.Sh SEE ALSO
+.Xr libdlpi 3LIB ,
+.Xr e1000g 4D ,
+.Xr dlpi 4P ,
+.Xr driver.conf 5 ,
+.Xr dladm 8 ,
+.Xr mac 9E

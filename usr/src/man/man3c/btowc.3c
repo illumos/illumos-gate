@@ -70,7 +70,7 @@ The \fBbtowc()\fR and \fBbtowc_l\fR()functions determines whether
 state.
 .LP
 The behavior of \fBbtowc()\fR is affected by the \fBLC_CTYPE\fR category of the
-current locale.  See \fBenviron\fR(5). The function \fBbtowc_l()\fR does
+current locale.  See \fBenviron\fR(7). The function \fBbtowc_l()\fR does
 not use the current locale, and instead operates on the locale
 specified by \fIloc\fR.
 .SH RETURN VALUES
@@ -84,7 +84,7 @@ wide-character representation of that character.
 No errors are defined.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .TS
 box;
 c | c
@@ -105,5 +105,10 @@ function is Uncommitted.
 .SH SEE ALSO
 .sp
 .LP
-\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C), \fBwctob\fR(3C),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR wctob (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)

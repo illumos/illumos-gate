@@ -80,7 +80,7 @@ No errors are defined.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -98,5 +98,9 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBwmemchr\fR(3C), \fBwmemcpy\fR(3C), \fBwmemmove\fR(3C), \fBwmemset\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR wmemchr (3C),
+.BR wmemcpy (3C),
+.BR wmemmove (3C),
+.BR wmemset (3C),
+.BR attributes (7),
+.BR standards (7)

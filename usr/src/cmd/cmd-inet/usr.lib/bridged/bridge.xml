@@ -100,7 +100,7 @@ The "bridge" service provides Ethernet bridging and related protocols.
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='bridged' section='1M'
+			<manpage title='bridged' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

@@ -11,7 +11,7 @@ ldap \- LDAP as a naming repository
 .LP
 LDAP refers to Lightweight Directory Access Protocol, which is an industry
 standard for accessing directory servers. By initializing the client using
-\fBldapclient\fR(1M) and using the keyword \fBldap\fR in the name service
+\fBldapclient\fR(8) and using the keyword \fBldap\fR in the name service
 switch file, \fB/etc/nsswitch.conf\fR, Solaris clients can obtain naming
 information from an LDAP server. Information such as usernames, hostnames, and
 passwords are stored on the LDAP server in a Directory Information Tree or
@@ -29,10 +29,10 @@ Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)\fR for
 more details.
 .sp
 .LP
-The \fBldapclient\fR(1M) utility can make a Solaris machine an LDAP client by
+The \fBldapclient\fR(8) utility can make a Solaris machine an LDAP client by
 setting up the appropriate directories, files, and configuration information.
 The LDAP client caches this configuration information in local cache files.
-This configuration information is accessed through the \fBldap_cachemgr\fR(1M)
+This configuration information is accessed through the \fBldap_cachemgr\fR(8)
 daemon. This daemon also refreshes the information in the configuration files
 from the LDAP server, providing better performance and security. The
 \fBldap_cachemgr\fR must run at all times for the proper operation of the
@@ -56,13 +56,13 @@ daemon when the expiration time has elapsed.
 .LP
 Client profiles can be stored on the LDAP server and can be used by the
 \fBldapclient\fR utility to initialize an LDAP client. Using the client profile
-is the easiest way to configure a client machine. See \fBldapclient\fR(1M).
+is the easiest way to configure a client machine. See \fBldapclient\fR(8).
 .sp
 .LP
 Credential information includes client-specific parameters that are used by a
 client. This information could be the Bind DN (LDAP "login" name) of the client
 and the password. If these parameters are required, they are manually defined
-during the initialization through \fBldapclient\fR(1M).
+during the initialization through \fBldapclient\fR(8).
 .sp
 .LP
 The naming information is stored in containers on the LDAP server. A container
@@ -71,7 +71,7 @@ Containers are similar to maps in NIS. A default mapping
 between the NIS databases and the containers in LDAP is presented below. The
 location of these containers as well as their names can be overridden through
 the use of \fBserviceSearchDescriptors\fR. For more information, see
-\fBldapclient\fR(1M).
+\fBldapclient\fR(8).
 .sp
 
 .sp
@@ -192,7 +192,7 @@ The credential level of \fBself\fR enables per-user naming service lookups, or
 lookups that use the \fBGSSAPI\fR credentials of the user when connecting to
 the directory server. Currently the only \fBGSSAPI\fR mechanism supported in
 this model is Kerberos V5. Kerberos must be configured before you can use this
-credential level. See \fBkerberos\fR(5) for details.
+credential level. See \fBkerberos\fR(7) for details.
 .sp
 .LP
 More protection can be provided by means of access control, allowing the server
@@ -209,9 +209,9 @@ Naming and Directory Services (DNS, NIS, and LDAP)\fR regarding the
 restrictions on ACLs and ACIs when using LDAP as a naming repository.
 .sp
 .LP
-A sample \fBnsswitch.conf\fR(4) file called \fBnsswitch.ldap\fR is provided in
+A sample \fBnsswitch.conf\fR(5) file called \fBnsswitch.ldap\fR is provided in
 the \fB/etc\fR directory. This is copied to \fB/etc/nsswitch.conf\fR by the
-\fBldapclient\fR(1M) utility. This file uses LDAP as a repository for the
+\fBldapclient\fR(8) utility. This file uses LDAP as a repository for the
 different databases in the \fBnsswitch.conf\fR file.
 .sp
 .LP
@@ -219,7 +219,7 @@ The following is a list of the user commands related to LDAP:
 .sp
 .ne 2
 .na
-\fB\fBidsconfig\fR(1M)\fR
+\fB\fBidsconfig\fR(8)\fR
 .ad
 .RS 18n
 Prepares a SunOne Directory Server to be ready to support Solaris LDAP clients.
@@ -228,7 +228,7 @@ Prepares a SunOne Directory Server to be ready to support Solaris LDAP clients.
 .sp
 .ne 2
 .na
-\fB\fBldapaddent\fR(1M)\fR
+\fB\fBldapaddent\fR(8)\fR
 .ad
 .RS 18n
 Creates LDAP entries from corresponding \fB/etc\fR files.
@@ -237,7 +237,7 @@ Creates LDAP entries from corresponding \fB/etc\fR files.
 .sp
 .ne 2
 .na
-\fB\fBldapclient\fR(1M)\fR
+\fB\fBldapclient\fR(8)\fR
 .ad
 .RS 18n
 Initializes LDAP clients, or generates a configuration profile to be stored in
@@ -265,7 +265,7 @@ Lists the contents of the LDAP naming space.
 .RS 30n
 Files that contain the LDAP configuration of the client. Do not manually modify
 these files. Their content is not guaranteed to be human readable. Use
-\fBldapclient\fR(1M) to update them.
+\fBldapclient\fR(8) to update them.
 .RE
 
 .sp
@@ -298,20 +298,31 @@ PAM framework configuration file.
 
 .SH SEE ALSO
 .LP
-\fBldaplist\fR(1), \fBidsconfig\fR(1M), \fBldap_cachemgr\fR(1M),
-\fBldapaddent\fR(1M), \fBldapclient\fR(1M), \fBnsswitch.conf\fR(4),
-\fBpam.conf\fR(4), \fBkerberos\fR(5), \fBpam_authtok_check\fR(5),
-\fBpam_authtok_get\fR(5), \fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5),
-\fBpam_ldap\fR(5), \fBpam_passwd_auth\fR(5), \fBpam_unix_account\fR(5),
-\fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5)
+.BR ldaplist (1),
+.BR nsswitch.conf (5),
+.BR pam.conf (5),
+.BR kerberos (7),
+.BR pam_authtok_check (7),
+.BR pam_authtok_get (7),
+.BR pam_authtok_store (7),
+.BR pam_dhkeys (7),
+.BR pam_ldap (7),
+.BR pam_passwd_auth (7),
+.BR pam_unix_account (7),
+.BR pam_unix_auth (7),
+.BR pam_unix_session (7),
+.BR idsconfig (8),
+.BR ldap_cachemgr (8),
+.BR ldapaddent (8),
+.BR ldapclient (8)
 .sp
 .LP
 \fISystem Administration Guide: Naming and Directory Services (DNS, NIS, and
 LDAP)\fR
 .SH NOTES
 .LP
-The \fBpam_unix\fR(5) module is no longer supported. Similar functionality is
-provided by \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
-\fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_passwd_auth\fR(5),
-\fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),
-and \fBpam_unix_session\fR(5).
+The \fBpam_unix\fR(7) module is no longer supported. Similar functionality is
+provided by \fBpam_authtok_check\fR(7), \fBpam_authtok_get\fR(7),
+\fBpam_authtok_store\fR(7), \fBpam_dhkeys\fR(7), \fBpam_passwd_auth\fR(7),
+\fBpam_unix_account\fR(7), \fBpam_unix_auth\fR(7),
+and \fBpam_unix_session\fR(7).

@@ -51,7 +51,7 @@ cat <<EOM
 # ending in "/*", such as "/dev/fbs/*", specifies all entries (except "."
 # and "..") in a directory.  A '#' begins a comment and may appear
 # anywhere in an entry.
-# In addition, regular expressions may be used. Refer to logindevperm(4)
+# In addition, regular expressions may be used. Refer to logindevperm(5)
 # man page.
 # Note that any changes in this file should be made when logged in as
 # root as devfs provides persistence on minor node attributes.

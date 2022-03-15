@@ -608,7 +608,7 @@ function setup_keytab {
 
 	#
 	# 2. Do we want to create and/or add service principal(s) for fqdn's
-	#    other than the one listed in resolv.conf(4) ?
+	#    other than the one listed in resolv.conf(5) ?
 	#
 	if [[ -z $options ]]; then
 		query "$(gettext "Do you have multiple DNS domains spanning the Kerberos realm") $realm ?"
@@ -1456,7 +1456,7 @@ EOF
 	if [[ ${#enctypes[@]} -eq 0 ]]
 	then
 		printf "$(gettext "No enctypes are supported").\n"
-		printf "$(gettext "Please enable arcfour or 1DES, then re-join; see cryptoadm(1M)").\n" >&2
+		printf "$(gettext "Please enable arcfour or 1DES, then re-join; see cryptoadm(8)").\n" >&2
 		error_message
 	fi
 
@@ -1787,7 +1787,7 @@ else
 	# /etc/resolv.conf not present, exit ...
 	#
 	printf "\n$(gettext "%s does not exist and is required for Kerberos setup")\n" $RESOLV_CONF_FILE >&2
-	printf "$(gettext "Refer to resolv.conf(4), exiting").\n" >&2
+	printf "$(gettext "Refer to resolv.conf(5), exiting").\n" >&2
 	error_message
 fi
 
@@ -1798,7 +1798,7 @@ check_nss_conf || printf "$(gettext "/etc/nsswitch.conf does not make use of DNS
 if [[ -z $dnsarg && (-z $options || -z $filepath) ]]; then
 	query "$(gettext "Do you want to use DNS for kerberos lookups") ?"
 	if [[ $answer == yes ]]; then
-		printf "\n$(gettext "Valid DNS lookup options are dns_lookup_kdc, dns_lookup_realm,\nand dns_fallback. Refer krb5.conf(4) for further details").\n"
+		printf "\n$(gettext "Valid DNS lookup options are dns_lookup_kdc, dns_lookup_realm,\nand dns_fallback. Refer krb5.conf(5) for further details").\n"
 		printf "\n$(gettext "Enter required DNS option"): "
 		read dnsarg
 		checkval="DNS_OPTIONS"; check_value $dnsarg
@@ -1948,7 +1948,7 @@ doKRB5config
 if [[ $no_keytab != yes ]]; then
 	setup_keytab
 else
-	printf "\n$(gettext "Note: %s file not created, please refer to verify_ap_req_nofail in krb5.conf(4) for the implications").\n" $KRB5_KEYTAB_FILE
+	printf "\n$(gettext "Note: %s file not created, please refer to verify_ap_req_nofail in krb5.conf(5) for the implications").\n" $KRB5_KEYTAB_FILE
 	printf "$(gettext "Client will also not be able to host services that use Kerberos").\n"
 fi
 

@@ -38,7 +38,7 @@ The credentials are read into the buffer pointed to by
 The
 .Sy prcred_t
 type is defined in
-.Xr proc 4 .
+.Xr proc 5 .
 It contains information about the current effective, saved, and real
 user and group IDs.
 It also allows for supplemental groups to be obtained.
@@ -80,4 +80,4 @@ in
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
 .Xr Psetcred 3PROC ,
-.Xr proc 4
+.Xr proc 5

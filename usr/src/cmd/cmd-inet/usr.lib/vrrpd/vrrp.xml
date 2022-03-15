@@ -2,7 +2,7 @@
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
  CDDL HEADER START
- 
+
  The contents of this file are subject to the terms of the
  Common Development and Distribution License (the "License").
  You may not use this file except in compliance with the License.
@@ -86,9 +86,9 @@
 
 	<!-- to start/stop the VRRP service -->
 	<property_group name='general' type='framework'>
-		<propval name='action_authorization' type='astring' 
+		<propval name='action_authorization' type='astring'
 			value='solaris.smf.manage.vrrp' />
-		<propval name='value_authorization' type='astring' 
+		<propval name='value_authorization' type='astring'
 			value='solaris.smf.manage.vrrp' />
 	</property_group>
 
@@ -105,10 +105,10 @@
 			<loctext xml:lang='C'> VRRP service daemon
 			</loctext>
 		</common_name>
-		<documentation> 
-			<manpage title='vrrpd' section='1M' 
-				manpath='/usr/share/man' /> 
-		</documentation> 
+		<documentation>
+			<manpage title='vrrpd' section='8'
+				manpath='/usr/share/man' />
+		</documentation>
 	</template>
 </service>
 

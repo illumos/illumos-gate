@@ -28,7 +28,7 @@
 
 /*
  * cfga_ib.c:
- *	All cfgadm entry points that are defined in the config_admin(3X)
+ *	All cfgadm entry points that are defined in the config_admin(3CFGADM)
  *	needed for InfiniBand support are described here. These cfgadm
  *	interfaces issue ioctl(s) to the IB nexus driver. Attachment points
  *	supported are - IOC, VPPA, Port, HCA_SVC and Pseudo dynamic ap_ids,
@@ -531,7 +531,7 @@ ib_verify_valid_apid(const char *ap_id)
  *	ib_verify_params
  * Input:
  *	ap_id		- The attachment point of an IB fabric
- *	options		- command options passed by the cfgadm(1M)
+ *	options		- command options passed by the cfgadm(8)
  *	errstring	- This contains error msg if command fails
  * Output:
  *	NONE
@@ -843,11 +843,11 @@ ib_do_control_ioctl(char *ap_id, uint_t sub_cmd1, uint_t sub_cmd2,
  * Input:
  *	state_change_cmd - Argument to the cfgadm -c command
  *	ap_id		- The attachment point of an IB fabric
- *	options		- State Change command options passed by the cfgadm(1M)
+ *	options		- State Change command options passed by the cfgadm(8)
  *	confp		- Whether this command requires confirmation?
  *	msgp		- cfgadm error message for this plugin
  *	errstring	- This contains error msg if command fails
- *	flags		- Cfgadm(1m) flags
+ *	flags		- cfgadm(8) flags
  * Output:
  *	NONE
  * Returns:
@@ -1031,11 +1031,11 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
  *	func		- The private function (passed w/ -x option)
  *	ap_id		- The attachment point of an IB fabric
  *	options		- Private function command options passed
- *				by the cfgadm(1M)
+ *				by the cfgadm(8)
  *	confp		- Whether this command requires confirmation?
  *	msgp		- cfgadm error message for this plugin
  *	errstring	- This contains error msg if command fails
- *	flags		- Cfgadm(1m) flags
+ *	flags		- cfgadm(8) flags
  * Output:
  *	NONE
  * Returns:
@@ -1514,10 +1514,10 @@ cfga_private_func(const char *func, const char *ap_id, const char *options,
  *	cfga_test
  * Input:
  *	ap_id		- The attachment point of an IB fabric
- *	options		- Test command options passed by the cfgadm(1M)
+ *	options		- Test command options passed by the cfgadm(8)
  *	msgp		- cfgadm error message for this plugin
  *	errstring	- This contains error msg if command fails
- *	flags		- Cfgadm(1m) flags
+ *	flags		- cfgadm(8) flags
  * Output:
  *	NONE
  * Returns:
@@ -1624,10 +1624,10 @@ ib_fill_static_apids(char *ap_id, cfga_list_data_t *clp)
  *	ap_id		- The attachment point of an IB fabric
  *	ap_id_list	- The returned "list" information array
  *	nlistp		- Number of elements in the "list" information array
- *	options		- List command options passed by the cfgadm(1M)
+ *	options		- List command options passed by the cfgadm(8)
  *	listopts	- "-s" specific options
  *	errstring	- This contains error msg if command fails
- *	flags		- Cfgadm(1m) flags
+ *	flags		- cfgadm(8) flags
  * Output:
  *	NONE
  * Returns:
@@ -2027,9 +2027,9 @@ cfga_msg(struct cfga_msg *msgp, const char *str)
  * Function:
  *	cfga_help
  * Input:
- *	msgp		- Help message passed on to cfgadm(1M)
- *	options		- Help message options passed on to cfgadm(1M)
- *	flags		- Cfgadm(1m) flags
+ *	msgp		- Help message passed on to cfgadm(8)
+ *	options		- Help message options passed on to cfgadm(8)
+ *	flags		- cfgadm(8) flags
  * Output:
  *	NONE
  * Returns:

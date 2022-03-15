@@ -63,7 +63,7 @@ Each \fBpanels\fR routine that returns a pointer to an object returns
 \fBNULL\fR if an error occurs. Each panel routine that returns an integer,
 returns \fBOK\fR if it executes successfully and \fBERR\fR if it does not.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -77,7 +77,7 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-\fBcurses\fR(3CURSES), \fBattributes\fR(5) and 3CURSES pages whose names begin
+\fBcurses\fR(3CURSES), \fBattributes\fR(7) and 3CURSES pages whose names begin
 "panel_" for detailed routine descriptions.
 .SH NOTES
 The header \fB<panel.h>\fR automatically includes the header

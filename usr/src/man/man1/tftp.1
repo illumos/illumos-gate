@@ -84,8 +84,8 @@ form is used, the specified host becomes the default for future transfers. If
 the remote-directory form is used, the remote host is assumed to be running the
 UNIX system.
 .sp
-The \fIhost\fR can be a host name (see \fBhosts\fR(4)) or an IPv4 or IPv6
-address string (see \fBinet\fR(7P) or \fBinet6\fR(7P)). Since IPv6 addresses
+The \fIhost\fR can be a host name (see \fBhosts\fR(5)) or an IPv4 or IPv6
+address string (see \fBinet\fR(4P) or \fBinet6\fR(4P)). Since IPv6 addresses
 already contain \fB":"s\fR, the \fIhost\fR should be enclosed in square
 brackets when an IPv6 address is used. Otherwise, the first occurrence of a
 colon will be interpreted as the separator between the \fIhost\fR and the
@@ -98,7 +98,7 @@ colon will be interpreted as the separator between the \fIhost\fR and the
 .in -2
 
 Files may be written only if they already exist and are publicly writable. See
-\fBin.tftpd\fR(1M).
+\fBin.tftpd\fR(8).
 .RE
 
 .sp
@@ -258,8 +258,11 @@ Print help information.
 .SH SEE ALSO
 .sp
 .LP
-\fBin.tftpd\fR(1M), \fBhosts\fR(4), \fBattributes\fR(5), \fBinet\fR(7P),
-\fBinet6\fR(7P)
+.BR inet (4P),
+.BR inet6 (4P),
+.BR hosts (5),
+.BR attributes (7),
+.BR in.tftpd (8)
 .sp
 .LP
 Malkin, G. and Harkin, A. \fIRFC 2347, TFTP Option Extension\fR. The Internet

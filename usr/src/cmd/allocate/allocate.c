@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 #include <locale.h>
 #include <pwd.h>
@@ -194,7 +192,7 @@ print_error(int error, char *name)
 		    "Operation inconsistent with device's label range.");
 		break;
 	case LOGINDEVPERMERR:
-		msg = gettext("Device controlled by logindevperm(4)");
+		msg = gettext("Device controlled by logindevperm(5)");
 		break;
 	case NODAERR:
 		msg = gettext("No entry for specified device.");

@@ -36,7 +36,7 @@
  * General Architecture
  * --------------------
  *
- * The logical overlay device that a user sees in dladm(1M) is a combination of
+ * The logical overlay device that a user sees in dladm(8) is a combination of
  * two different components that work together. The first component is this
  * kernel module, which is responsible for answering question one -- how should
  * I transform a packet to put it on the wire.
@@ -56,7 +56,7 @@
  * general, the path isn't very common.
  *
  * The following is what makes up the logical overlay device that a user would
- * create with dladm(1M).
+ * create with dladm(8).
  *
  *       Kernel                                     Userland
  *   . . . . . . . . . . . . . . . . . . . . .   . . . . . . . . . . . . .
@@ -244,7 +244,7 @@
  * Finally, a property may declare a list of valid values. These valid values
  * are used for display purposes, they are not enforced by the broader system,
  * but merely allow a means for the information to be communicated to the user
- * through dladm(1M). Like a default value, this is optional.
+ * through dladm(8). Like a default value, this is optional.
  *
  * The general scaffolding does not do very much with respect to the getting and
  * setting of properties. That is really owned by the individual plugins
@@ -401,7 +401,7 @@
  *   +-------------------------------+
  *
  * The primary entries that we care about are the overlay_dev_t, which
- * correspond to each overlay device that is created with dladm(1M). Globally,
+ * correspond to each overlay device that is created with dladm(8). Globally,
  * these devices are maintained in a simple list_t which is protected with a
  * lock.  Hence, these include important information such as the mac_handle_t
  * and a datalink_id_t which is used to interact with the broader MAC and DLS

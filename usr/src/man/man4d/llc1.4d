@@ -1,0 +1,234 @@
+'\" te
+.\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH LLC1 4D "Feb 13, 1997"
+.SH NAME
+llc1 \- Logical Link Control Protocol Class 1 Driver
+.SH SYNOPSIS
+.LP
+.nf
+\fB#include <sys/stropts.h>\fR
+.fi
+
+.LP
+.nf
+\fB#include <sys/ethernet.h>\fR
+.fi
+
+.LP
+.nf
+\fB#include <sys/dlpi.h>\fR
+.fi
+
+.LP
+.nf
+\fB#include <sys/llc1.h>\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fBllc1\fR driver is a multi-threaded, loadable, clonable, STREAMS
+multiplexing driver supporting the connectionless Data Link Provider Interface,
+\fBdlpi\fR(4P), implementing IEEE 802.2 Logical Link Control Protocol Class 1
+over a STREAM to a MAC level driver. Multiple MAC level interfaces installed
+within the system can be supported by the driver. The  \fBllc1\fR driver
+provides basic support for the LLC1 protocol. Functions provided include frame
+transmit and receive, XID, and TEST, multicast support, and error recovery and
+reporting.
+.sp
+.LP
+The cloning, character-special device, \fB/dev/llc1\fR, is used to access all
+LLC1 controllers configured under \fBllc1\fR.
+.sp
+.LP
+The  \fBllc1\fR driver is a "Style 2" Data Link Service provider. All messages
+of types \fBM_PROTO\fR and \fBM_PCPROTO\fR are interpreted as DLPI primitives.
+An explicit \fBDL_ATTACH_REQ\fR message by the user is required to associate
+the opened stream with a particular device (\fBppa\fR). The \fBppa\fR ID is
+interpreted as an unsigned long and indicates the corresponding device instance
+(unit) number. An error  (\fBDL_ERROR_ACK\fR) is returned by the driver if the
+\fBppa\fR field value does not correspond to a valid device instance number for
+this system.
+.sp
+.LP
+The values returned by the driver in the \fBDL_INFO_ACK\fR primitive in
+response to the \fBDL_INFO_REQ\fR from the user are as follows:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The maximum Service Data UNIT (SDU) is derived from the MAC layer linked below
+the driver.  In the case of an Ethernet driver, the SDU will be 1497.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The minimum SDU is 0.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The MAC type is \fBDL_CSMACD\fR or  \fBDL_TPR\fR as determined by the driver
+linked under \fBllc1.\fR If the driver reports that it is \fBDL_ETHER,\fR it
+will be changed to \fBDL_CSMACD;\fR otherwise the type is the same as the MAC
+type.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The \fBsap\fR length value is \(mi1, meaning the physical address component is
+followed immediately by a 1-octet \fBsap\fR component within the DLSAP address.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The service mode is \fBDL_CLDLS.\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The MAC type is \fBDL_CSMACD\fR or  \fBDL_TPR\fR as determined by the driver
+linked under \fBllc1.\fR If the driver reports that it is \fBDL_ETHER,\fR it
+will be changed to \fBDL_CSMACD;\fR otherwise the type is the same as the MAC
+type.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The  \fBdlsap\fR address length is 7.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+No optional quality of service (QOS) support is included at present, so the QOS
+fields should be initialized to 0.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The DLPI version is \fBDL_VERSION_2.\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The provider style is \fBDL_STYLE2.\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The broadcast address value is the broadcast address returned from the lower
+level driver.
+.RE
+.sp
+.LP
+Once in the \fBDL_ATTACHED\fR state, the user must send a \fBDL_BIND_REQ\fR to
+associate a particular Service Access Point (SAP) with the stream. The
+\fBllc1\fR driver interprets the  \fBsap\fR field within the \fBDL_BIND_REQ\fR
+as an IEEE 802.2 "SAP," therefore valid values for the \fBsap\fR field are in
+the [0-0xFF] range with only even values being legal.
+.sp
+.LP
+The  \fBllc1\fR driver DLSAP address format consists of  the 6-octet physical
+(e.g., Ethernet) address component followed immediately by the 1-octet
+\fBsap\fR (type) component producing a 7-octet DLSAP address. Applications
+should  \fInot\fR hard-code to this particular implementation-specific DLSAP
+address format, but use information returned in the \fBDL_INFO_ACK\fR primitive
+to compose and decompose DLSAP addresses. The \fBsap\fR length, full DLSAP
+length, and \fBsap\fR/physical ordering are included within the
+\fBDL_INFO_ACK.\fR The physical address length can be computed by subtracting
+the absolute value of the \fBsap\fR length from the full DLSAP address length
+or by issuing the  \fBDL_PHYS_ADDR_REQ\fR to obtain the current physical
+address associated with the stream.
+.sp
+.LP
+Once in the \fBDL_BOUND\fR state, the user may transmit frames on the LAN by
+sending \fBDL_UNITDATA_REQ\fR messages to the  \fBllc1\fR driver. The
+\fBllc1\fR driver will route received frames up all open and bound streams
+having a \fBsap\fR which matches the IEEE 802.2 DSAP as  \fBDL_UNITDATA_IND\fR
+messages. Received frames are duplicated and routed up multiple open streams if
+necessary. The DLSAP address contained within the \fBDL_UNITDATA_REQ\fR and
+\fBDL_UNITDATA_IND\fR messages consists of both the \fBsap\fR (type) and
+physical (Ethernet) components.
+.sp
+.LP
+In addition to the mandatory, connectionless DLPI message set, the driver
+additionally supports the following primitives:
+.sp
+.LP
+The \fBDL_ENABMULTI_REQ\fR and \fBDL_DISABMULTI_REQ\fR primitives
+enable/disable reception of specific multicast group addresses. A set of
+multicast addresses may be iteratively created and modified on a per-stream
+basis using these primitives. These primitives are accepted by the driver in
+any driver state that is valid while still being attached to the \fBppa\fR.
+.sp
+.LP
+The \fBDL_PHYS_ADDR_REQ\fR primitive returns the 6-octet physical address
+currently associated (attached) to the stream in the  \fBDL_PHYS_ADDR_ACK\fR
+primitive. This primitive is valid only in states following a successful
+\fBDL_ATTACH_REQ.\fR
+.sp
+.LP
+The \fBDL_SET_PHYS_ADDR_REQ\fR primitive changes the 6-octet physical address
+currently associated (attached) to this stream. Once changed, all streams
+subsequently opened and attached to this device will obtain this new physical
+address. Once changed, the physical address will remain set until this
+primitive is used to change the physical address again or the system is
+rebooted, whichever occurs first.
+.sp
+.LP
+The \fBDL_XID_REQ/DL_TEST_REQ\fR primitives provide the means for a user to
+issue an \fBLLC XID\fR or \fBTEST\fR request message.  A response to one of
+these messages will be in the form of a  \fBDL_XID_CON/DL_TEST_CON\fR message.
+.sp
+.LP
+The  \fBDL_XID_RES/DL_TEST_RES\fR primitives provide a way for the user to
+respond to the receipt of an  \fBXID\fR or  \fBTEST\fR message that was
+received as a  \fBDL_XID_IND/DL_TEST_IND\fR message.
+.sp
+.LP
+\fBXID\fR and  \fBTEST\fR will be automatically processed by \fBllc1\fR if the
+\fBDL_AUTO_XID/DL_AUTO_TEST\fR bits are set in the \fBDL_BIND_REQ.\fR
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/llc1\fR\fR
+.ad
+.RS 13n
+cloning, character-special device
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	x86
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR dlpi (4P),
+.BR attributes (7)

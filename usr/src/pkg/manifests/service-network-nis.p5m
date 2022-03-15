@@ -66,23 +66,23 @@ file path=usr/lib/netsvc/yp/ypxfrd mode=0555
 dir  path=usr/sbin
 file path=usr/sbin/mknetid mode=0555
 file path=usr/sbin/revnetgroup mode=0555
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/inityp2l.1m
-file path=usr/share/man/man1m/rpc.yppasswdd.1m
-file path=usr/share/man/man1m/rpc.ypupdated.1m
-file path=usr/share/man/man1m/ypmake.1m
-file path=usr/share/man/man1m/ypmap2src.1m
-link path=usr/share/man/man1m/yppasswdd.1m target=rpc.yppasswdd.1m
-file path=usr/share/man/man1m/yppush.1m
-file path=usr/share/man/man1m/ypserv.1m
-link path=usr/share/man/man1m/ypupdated.1m target=rpc.ypupdated.1m
-link path=usr/share/man/man1m/ypxfrd.1m target=ypserv.1m
-file path=usr/share/man/man4/NISLDAPmapping.4
-file path=usr/share/man/man4/securenets.4
-file path=usr/share/man/man4/updaters.4
-file path=usr/share/man/man4/ypfiles.4
-file path=usr/share/man/man4/yppasswdd.4
-file path=usr/share/man/man4/ypserv.4
+file path=usr/share/man/man5/NISLDAPmapping.5
+file path=usr/share/man/man5/securenets.5
+file path=usr/share/man/man5/updaters.5
+file path=usr/share/man/man5/ypfiles.5
+file path=usr/share/man/man5/yppasswdd.5
+file path=usr/share/man/man5/ypserv.5
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/inityp2l.8
+file path=usr/share/man/man8/rpc.yppasswdd.8
+file path=usr/share/man/man8/rpc.ypupdated.8
+file path=usr/share/man/man8/ypmake.8
+file path=usr/share/man/man8/ypmap2src.8
+link path=usr/share/man/man8/yppasswdd.8 target=rpc.yppasswdd.8
+file path=usr/share/man/man8/yppush.8
+file path=usr/share/man/man8/ypserv.8
+link path=usr/share/man/man8/ypupdated.8 target=rpc.ypupdated.8
+link path=usr/share/man/man8/ypxfrd.8 target=ypserv.8
 dir  path=var group=sys
 dir  path=var/yp
 file path=var/yp/Makefile mode=0555 original_name=SUNWyp:var/yp/Makefile \

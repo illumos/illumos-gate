@@ -235,7 +235,7 @@ field of the directory each time the directory is actually read.
 .Pp
 The standard-conforming version
 .Po see
-.Xr standards 5
+.Xr standards 7
 .Pc
 of the
 .Fn readdir_r
@@ -383,7 +383,7 @@ and
 .Fn readdir_r
 functions have transitional interfaces for 64-bit file offsets.
 See
-.Xr lf64 5 .
+.Xr lf64 7 .
 .Sh INTERFACE STABILITY
 .Sy Committed
 .Sh MT-LEVEL
@@ -408,9 +408,9 @@ function is
 .Xr rewinddir 3C ,
 .Xr scandir 3C ,
 .Xr seekdir 3C ,
-.Xr attributes 5 ,
-.Xr lf64 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr lf64 7 ,
+.Xr standards 7
 .Sh NOTES
 When compiling multithreaded programs, see the
 .Sy MULTITHREADED APPLICATIONS

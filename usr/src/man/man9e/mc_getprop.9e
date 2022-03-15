@@ -96,7 +96,7 @@ identify which one it is.
 At this time, private properties are limited to being string based properties.
 If other types of property values are used, they will not be rendered
 correctly by
-.Xr dladm 1M .
+.Xr dladm 8 .
 .Pp
 The device
 driver can access its device soft state by casting the

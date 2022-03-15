@@ -563,7 +563,7 @@ softmac_update_info(softmac_t *softmac, datalink_id_t *linkidp)
 
 		cmn_err(CE_WARN, "%s device might not be available "
 		    "for use.", softmac->smac_devname);
-		cmn_err(CE_WARN, "See dladm(1M) for more information.");
+		cmn_err(CE_WARN, "See dladm(8) for more information.");
 	}
 
 	return (err);

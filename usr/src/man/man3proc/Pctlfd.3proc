@@ -70,4 +70,4 @@ in
 .Xr Pgrab_file 3PROC ,
 .Xr Prelease 3PROC ,
 .Xr Preopen 3PROC ,
-.Xr proc 4
+.Xr proc 5

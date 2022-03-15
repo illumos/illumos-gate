@@ -1,0 +1,43 @@
+'\" te
+.\"  Copyright (c) 1995 Sun Microsystems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH NOLOGIN 5 "Dec 21, 1995"
+.SH NAME
+nologin \- message displayed to users attempting to log on in the process of a
+system shutdown
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/nologin\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+The  \fB/etc/nologin\fR file contains the message displayed to users attempting
+to log on to a  machine in the process of being shutdown.  After displaying the
+contents of the  \fBnologin\fR file,  the  \fBlogin\fR procedure  terminates,
+preventing the user from logging onto the machine.
+.sp
+.LP
+This procedure is preferable to  terminating a user's session by
+\fBshutdown\fR shortly after the user has logged on.
+.sp
+.LP
+Logins by  super-user are not affected by this procedure.
+.sp
+.LP
+The message contained in the  \fBnologin\fR file is editable by super-user. A
+typical  \fBnologin\fR file contains a message similar to:
+.sp
+.LP
+\fBNO LOGINS: System going down in 10 minutes.\fR
+.SH SEE ALSO
+.sp
+.LP
+.BR login (1),
+.BR rlogin (1),
+.BR telnet (1),
+.BR shutdown (8)

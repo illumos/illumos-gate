@@ -92,4 +92,4 @@ MT-Level	MT-Safe
 .BR duplocale (3C),
 .BR newlocale (3C),
 .BR setlocale (3C),
-.BR locale (5)
+.BR locale (7)

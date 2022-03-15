@@ -243,8 +243,8 @@ application knows that the objects being copied do not overlap.
 .Sy MT-Safe
 .Sh SEE ALSO
 .Xr string 3C ,
-.Xr attributes 5 ,
-.Xr standards 5
+.Xr attributes 7 ,
+.Xr standards 7
 .Sh NOTES
 Overlap between objects being copied can arise even when their
 .Pq virtual

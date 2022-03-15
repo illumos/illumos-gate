@@ -155,5 +155,9 @@ A \fBlio_listio()\fR element operation option requesting a write.
 .SH SEE ALSO
 .sp
 .LP
-\fBlseek\fR(2), \fBread\fR(2), \fBwrite\fR(2), \fBfsync\fR(3C),
-\fBlibaio\fR(3LIB), \fBlio_listio\fR(3C)
+.BR lseek (2),
+.BR read (2),
+.BR write (2),
+.BR fsync (3C),
+.BR lio_listio (3C),
+.BR libaio (3LIB)

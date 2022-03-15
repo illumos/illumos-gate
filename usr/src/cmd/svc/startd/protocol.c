@@ -476,7 +476,7 @@ restarter_protocol_send_event(const char *inst, evchan_t *chan,
 
 	/*
 	 * For the purposes of loading state after interruption, this is
-	 * sufficient, as svc.startd(1M) won't receive events on the contracts
+	 * sufficient, as svc.startd(8) won't receive events on the contracts
 	 * associated with each delegate.
 	 */
 	MUTEX_LOCK(&st->st_load_lock);

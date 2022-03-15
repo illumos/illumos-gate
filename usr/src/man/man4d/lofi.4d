@@ -1,0 +1,143 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH LOFI 4D "Nov 25, 2008"
+.SH NAME
+lofi \- Loopback file driver
+.SH DESCRIPTION
+.sp
+.LP
+The \fBlofi\fR file driver exports a file as a block device, enabling system
+utilities such as \fBfstyp\fR(8), \fBfsck\fR(8) and \fBmount\fR(8) to
+operate on underlying file system images (including CD-ROM and FAT floppy
+images) contained on the block device. Reads and writes to the block device are
+translated to reads and writes on the exported file. See \fBlofiadm\fR(8) for
+examples.
+.sp
+.LP
+File block device entries are contained in \fB/dev/lofi\fR. The
+\fB/dev/rlofi\fR file contains the character (or raw) device entries. Entries
+are in the  form of decimal  numbers and are assigned  through
+\fBlofiadm\fR(8).  When  created, these device entries are owned by root, in
+group sys and have permissions of 0600. Ownership, group, and permission
+settings can be altered, however there may be ramifications. See
+\fBlofiadm\fR(8) for more information.
+.sp
+.LP
+\fBlofi\fR devices can be compressed. See \fBlofiadm\fR(8) for more
+information.
+.sp
+.LP
+Files exported through \fBlofi\fR can also be encrypted. See \fBlofiadm\fR(8)
+for details on how to specify encryption keys.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/lofictl\fR\fR
+.ad
+.sp .6
+.RS 4n
+Master control device
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/lofi/\fIn\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Block device for file \fIn\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/rlofi/\fIn\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Character device for file \fIn\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/lofi\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit driver
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/lofi\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit driver (SPARC)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/lofi\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit driver (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/lofi.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+Driver configuration file. (Do not alter).
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR lofs (4FS),
+.BR attributes (7),
+.BR fsck (8),
+.BR fstyp (8),
+.BR lofiadm (8),
+.BR mount (8),
+.BR newfs (8)
+.SH NOTES
+.sp
+.LP
+Just as you would not directly access a disk device that has mounted file
+systems, you should not access a file associated with a block device except
+through the \fBlofi\fR file driver.
+.sp
+.LP
+For compatibility purposes, a raw device is also exported with the block
+device. (For example, \fBnewfs\fR(8)).

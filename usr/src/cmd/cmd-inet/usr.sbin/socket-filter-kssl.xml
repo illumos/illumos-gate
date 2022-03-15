@@ -41,7 +41,7 @@
 		    grouping='require_all'
 		    restart_on='none'
 		    type='service'>
-			<service_fmri value='svc:/system/filesystem/root' />	
+			<service_fmri value='svc:/system/filesystem/root' />
 		</dependency>
 
 		<exec_method
@@ -70,15 +70,15 @@
 			<propval name='socket_tuples' type='astring'
 				value='2:2:0,2:2:6,26:2:0,26:2:6' />
 		</property_group>
-		
+
 		<template>
 			<common_name>
 				<loctext xml:lang='C'>
-				kernel SSL socket filter 
+				kernel SSL socket filter
 				</loctext>
 			</common_name>
 			<documentation>
-				<manpage title='ksslcfg' section='1M'
+				<manpage title='ksslcfg' section='8'
 				    manpath='/usr/share/man' />
 			</documentation>
 		</template>

@@ -1,0 +1,728 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2017 Nexenta Systems, Inc.
+.\"
+.Dd February 25, 2017
+.Dt AUTOMOUNT 8
+.Os
+.Sh NAME
+.Nm automount
+.Nd install automatic mount points
+.Sh SYNOPSIS
+.Nm
+.Op Fl v
+.Op Fl t Ar duration
+.Sh DESCRIPTION
+The
+.Nm
+utility installs
+.Nm autofs
+mount points and associates an automount map with each mount point.
+It starts the
+.Xr automountd 8
+daemon if it finds any non-trivial entries in either local or distributed
+automount maps and if the daemon is not already running.
+The
+.Nm autofs
+file system monitors attempts to access directories within it and notifies the
+.Xr automountd 8
+daemon.
+The daemon uses the map to locate a file system, which it then mounts at the
+point of reference within the
+.Nm autofs
+file system.
+A map can be assigned to an
+.Nm autofs
+mount using an entry in the
+.Pa /etc/auto_master
+map or a direct map.
+.Pp
+If the file system is not accessed within an appropriate interval
+.Pq 10 minutes by default ,
+the
+.Nm automountd
+daemon unmounts the file system.
+.Pp
+The file
+.Pa /etc/auto_master
+determines the locations of all
+.Nm autofs
+mount points.
+By default, this file contains three entries:
+.Bd -literal -offset indent
+# Master map for automounter
+#
++auto_master
+/net	-hosts -nosuid
+/home	auto_home
+.Ed
+.Pp
+The
+.Sy +auto_master
+entry is a reference to an external NIS master map.
+If one exists, then its entries are read as if they occurred in place of the
+.Sy +auto_master
+entry.
+The remaining entries in the master file specify a directory on which an
+.Nm autofs
+mount will be made followed by the automounter map to be associated with it.
+Optional mount options may be supplied as an optional third field in the each
+entry.
+These options are used for any entries in the map that do not specify mount
+options explicitly.
+The
+.Nm
+command is usually run without arguments.
+It compares the entries
+.Pa /etc/auto_master
+with the current list of
+.Nm autofs
+mounts in
+.Pa /etc/mnttab
+and adds, removes or updates
+.Nm autofs
+mounts to bring the
+.Pa /etc/mnttab
+up to date with the
+.Pa /etc/auto_master .
+At boot time it installs all
+.Nm autofs
+mounts from the master map.
+Subsequently, it may be run to install
+.Nm autofs
+mounts for new entries in the master map or the direct map, or to perform
+unmounts for entries that have been removed from these maps.
+.Ss Automount with Solaris Trusted Extensions
+If a system is configured with Solaris Trusted Extensions, additional
+processing is performed to facilitate multilevel home directory access.
+A list of zones whose labels are dominated by the current zone is generated and
+default
+.Sy auto_home
+automount maps are generated if they do not currently exist.
+These automount maps are named
+.Sy auto_home_ Ns Ar zonename ,
+where
+.Ar zonename
+is the name of each zone's lower-level zone.
+An
+.Nm autofs
+mount of each such
+.Sy auto_home
+map is then performed, regardless of whether it is explicitly or implicitly
+listed in the master map.
+Instead of
+.Nm autofs
+mounting the standard
+.Sy auto_home
+map, the zone uses an
+.Pa auto_home
+file appended with its own zone name.
+Each zone's
+.Sy auto_home
+map is uniquely named so that it can be maintained and shared by all zones using
+a common name server.
+.Pp
+By default, the home directories of lower-level zones are mounted read-only
+under
+.Pa /zone/ Ns Ar zonename Ns Pa /export/home
+when each zone is booted.
+The default
+.Sy auto_home_ Ns Ar zonename
+automount map specifies that path as the source directory for an
+.Nm lofs
+remount onto
+.Pa /zone/ Ns Ar zonename Ns Pa /home/ Ns Ar username .
+For example, the file
+.Pa auto_home_public ,
+as generated from a higher level zone would contain:
+.Bd -literal -offset indent
++auto_home_public
+*	-fstype=lofs	:/zone/public/export/home/&
+.Ed
+.Pp
+When a home directory is referenced and the name does not match any other keys
+in the
+.Sy auto_home_public
+map, it will match this loopback mount specification.
+If this loopback match occurs and the name corresponds to a valid user whose
+home directory does not exist in the public zone, the directory is automatically
+created on behalf of the user.
+.Sh OPTIONS
+The following options are supported:
+.Bl -tag -width Ds
+.It Fl v
+Verbose mode.
+Notifies of
+.Nm autofs
+mounts, unmounts, or other non-essential information.
+.It Fl t Ar duration
+Specifies a
+.Ar duration ,
+in seconds, that a file system is to remain mounted when not in use.
+The default is
+.Sy 10
+minutes.
+.El
+.Sh USAGE
+.Ss Map Entry Format
+A simple map entry
+.Pq mapping
+takes the form:
+.Bd -literal -offset indent
+.Ar key Oo Fl Ns Ar mount-options Oc Ar location Ns ...
+.Ed
+.Pp
+where
+.Ar key
+is the full pathname of the directory to mount when used in a direct map, or the
+simple name of a subdirectory in an indirect map.
+.Ar mount-options
+is a comma-separated list of
+.Nm mount
+options, and
+.Ar location
+specifies a file system from which the directory may be mounted.
+In the case of a simple NFS mount, the options that can be used are specified in
+.Xr mount_nfs 8 ,
+and
+.Ar location
+takes the form:
+.Pp
+.Dl Ar host Ns \&: Ns Ar pathname
+.Pp
+.Ar host
+is the name of the host from which to mount the file system, and
+.Ar pathname
+is the absolute pathname of the directory to mount.
+.Pp
+Options to other file systems are documented in the other
+.Nm mount_*
+reference manual pages.
+.Ss Replicated File Systems
+Multiple
+.Ar location
+fields can be specified for replicated NFS file systems, in which case
+.Nm
+and the kernel will each try to use that information to increase availability.
+If the read-only flag is set in the map entry,
+.Nm automountd
+mounts a list of locations that the kernel may use, sorted by several criteria.
+Only locations available at mount time will be mounted, and thus be available to
+the kernel.
+When a server does not respond, the kernel will switch to an alternate server.
+The sort ordering of
+.Nm
+is used to determine how the next server is chosen.
+If the read-only flag is not set,
+.Nm
+will mount the best single location, chosen by the same sort ordering, and new
+servers will only be chosen when an unmount has been possible, and a remount is
+done.
+Servers on the same local subnet are given the strongest preference, and servers
+on the local net are given the second strongest preference.
+Among servers equally far away, response times will determine the order if no
+weighting factors
+.Pq see below
+are used.
+.Pp
+If the list includes server locations using both the NFS Version 2 Protocol and
+the NFS Version 3 Protocol,
+.Nm
+will choose only a subset of the server locations on the list, so that all
+entries will be the same protocol.
+It will choose servers with the NFS Version 3 Protocol so long as an NFS Version
+2 Protocol server on a local subnet will not be ignored.
+See the FIXME for additional details.
+.Pp
+If each
+.Ar location
+in the list shares the same
+.Ar pathname
+then a single
+.Ar location
+may be used with a comma-separated list of hostnames:
+.Bd -literal -offset indent
+.Ar hostname Ns \&, Ns Ar hostname Ns ...: Ns Ar pathname
+.Ed
+.Pp
+Requests for a server may be weighted, with the weighting factor appended to
+the server name as an integer in parentheses.
+Servers without a weighting are assumed to have a value of zero
+.Pq most likely to be selected .
+Progressively higher values decrease the chance of being selected.
+In the example,
+.Bd -literal -offset indent
+man -ro	alpha,bravo,charlie(1),delta(4):/usr/man
+.Ed
+.Pp
+hosts
+.Sy alpha
+and
+.Sy bravo
+have the highest priority; host
+.Sy delta
+has the lowest.
+.Pp
+Server proximity takes priority in the selection process.
+In the example above, if the server
+.Sy delta
+is on the same network segment as the client, but the others are on different
+network segments, then
+.Sy delta
+will be selected; the weighting value is ignored.
+The weighting has effect only when selecting between servers with the same
+network proximity.
+The automounter always selects the localhost over other servers on the same
+network segment, regardless of weighting.
+.Pp
+In cases where each server has a different export point, the weighting can
+still be applied.
+For example:
+.Bd -literal -offset indent
+man	-ro	alpha:/usr/man bravo,charlie(1):/usr/share/man \e
+		delta(3):/export/man
+.Ed
+.Pp
+A mapping can be continued across input lines by escaping the NEWLINE with a
+backslash
+.Pq Qq Sy \e .
+Comments begin with a number sign
+.Pq Qq Sy #
+and end at the subsequent NEWLINE.
+.Ss Map Key Substitution
+The ampersand
+.Pq Qq Sy \*(Am
+character is expanded to the value of the
+.Ar key
+field for the entry in which it occurs.
+In this case:
+.Bd -literal -offset indent
+jane	sparcserver:/home/&
+.Ed
+.Pp
+the
+.Sy \*(Am
+expands to
+.Sy jane .
+.Ss Wildcard Key
+The asterisk
+.Pq Qq Sy *
+character, when supplied as the
+.Ar key
+field, is recognized as the catch-all entry.
+Such an entry will match any key not previously matched.
+For instance, if the following entry appeared in the indirect map for
+.Pa /config :
+.Bd -literal -offset indent
+*	&:/export/config/&
+.Ed
+.Pp
+this would allow automatic mounts in
+.Pa /config
+of any remote file system whose location could be specified as:
+.Bd -literal -offset indent
+.Ar hostname Ns \&: Ns Pa /export/config/ Ns Ar hostname
+.Ed
+.Pp
+Note that the wildcard key does not work in conjunction with the
+.Fl browse
+option.
+.Ss Variable Substitution
+Client specific variables can be used within an
+.Nm
+map.
+For instance, if
+.Sy $HOST
+appeared within a map,
+.Nm
+would expand it to its current value for the client's host name.
+Supported variables are:
+.Bl -column "PLATFORM" "arch -k or uname -m"
+.It Sy NAME Ta Sy OUTPUT OF Ta Sy DESCRIPTION (EXAMPLE)
+.It Ev ARCH Ta Nm arch Ta architecture name Pq Qq Sy sun4
+.It Ev CPU Ta Nm uname Fl p Ta processor type Pq Qq Sy sparc
+.It Ev HOST Ta Nm uname Fl n Ta host name Pq Qq Sy myhost
+.It Ev KARCH Ta Nm arch Fl k No or Nm uname Fl m Ta kernel architecture name or
+machine hardware name
+.Pq Qq Sy sun4u
+.It Ev OSNAME Ta Nm uname Fl s Ta OS name Pq Qq Sy SunOS
+.It Ev OSREL Ta Nm name Fl r Ta OS release name Pq Qq Sy 5.3
+.It Ev OSVERS Ta Nm uname Fl v Ta OS version Pq Qq Sy beta1.0
+.It Ev NATISA Ta Nm isainfo Fl n Ta native instruction set architecture for the
+system
+.Pq Qq Sy sparcv9
+.It Ev PLATFORM Ta Nm uname Fl i Ta platform name Pq Qq Sy SUNW,Sun-Fire-V240
+.El
+.Pp
+If a reference needs to be protected from affixed characters, you can surround
+the variable name with curly braces
+.Pq Qq Sy \(lC Ns Sy \(rC .
+.Ss Multiple Mounts
+A multiple mount entry takes the form:
+.Bd -literal -offset indent
+.Ar key Oo Fl Ns Ar mount-options Oc Oo Oo Ar mountpoint Oc
+.Oo Fl Ns Ar mount-options Oc  Ar location Ns ... Oc Ns ...
+.Ed
+.Pp
+The initial
+.Ar mountpoint
+is optional for the first mount and mandatory for all subsequent mounts.
+The optional
+.Ar mountpoint
+is taken as a pathname relative to the directory named by
+.Ar key .
+If
+.Ar mountpoint
+is omitted in the first occurrence, a
+.Ar mountpoint
+of
+.Pa /
+.Pq root
+is implied.
+.Pp
+Given an entry in the indirect map for
+.Pa /src :
+.Bd -literal -offset indent
+beta	-ro \e
+	/		svr1,svr2:/export/src/beta  \e
+	/1.0		svr1,svr2:/export/src/beta/1.0 \e
+	/1.0/man	svr1,svr2:/export/src/beta/1.0/man
+.Ed
+.Pp
+All offsets must exist on the server under
+.Sy beta .
+.Nm
+will automatically mount
+.Pa /src/beta ,
+.Pa /src/beta/1.0 ,
+and
+.Pa /src/beta/1.0/man ,
+as needed, from either
+.Sy svr1
+or
+.Sy svr2 ,
+whichever host is nearest and responds first.
+.Ss Other File System Types
+The automounter assumes NFS mounts as a default file system type.
+Other file system types can be described using the
+.Sy fstype
+mount option.
+Other mount options specific to this file system type can be combined with the
+.Sy fstype
+option.
+The location field must contain information specific to the file system type.
+If the location field begins with a slash, a colon character must be prepended,
+for instance, to mount a CD file system:
+.Bd -literal -offset indent
+cdrom	-fstype=hsfs,ro	:/dev/sr0
+.Ed
+.Pp
+or to perform an
+.Nm autofs
+mount:
+.Bd -literal -offset indent
+src	-fstype=autofs	auto_src
+.Ed
+.Pp
+Use this procedure only if you are not using Volume Manager.
+.Pp
+See the
+.Sx NOTES
+section for information on option inheritance.
+.Ss Indirect Maps
+An indirect map allows you to specify mappings for the subdirectories you wish
+to mount under the
+.Ar directory
+indicated on the command line.
+In an indirect map, each
+.Ar key
+consists of a simple name that refers to one or more file systems that are to be
+mounted as needed.
+.Ss Direct Maps
+Entries in a direct map are associated directly with
+.Nm autofs
+mount points.
+Each
+.Ar key
+is the full pathname of an
+.Nm autofs
+mount point.
+The direct map as a whole is not associated with any single directory.
+.Pp
+Direct maps are distinguished from indirect maps by the
+.Sy \-
+key.
+For example:
+.Bd -literal -offset indent
+# Master map for automounter
+#
++auto_master
+/net	-hosts		-nosuid,nobrowse
+/home	auto_home	-nobrowse
+/-	auto_direct
+.Ed
+.Ss Included Maps
+The contents of another map can be included within a map with an entry of the
+form
+.Bd -literal -offset indent
+.No + Ns Ar mapname
+.Ed
+.Pp
+If
+.Ar mapname
+begins with a slash, it is assumed to be the pathname of a local file.
+Otherwise, the location of the map is determined by the policy of the name
+service switch according to the entry for the automounter in
+.Pa /etc/nsswitch.conf ,
+such as
+.Bd -literal -offset indent
+automount: files nis
+.Ed
+.Pp
+If the name service is
+.Sy files ,
+then the name is assumed to be that of a local file in
+.Pa /etc .
+If the key being searched for is not found in the included map, the search
+continues with the next entry.
+.Ss Special Maps
+There are two special maps available:
+.Sy -hosts
+and
+.Sy -null .
+The
+.Sy -hosts
+map is used with the
+.Pa /net
+directory and assumes that the map key is the hostname of an NFS server.
+The
+.Nm automountd
+daemon dynamically constructs a map entry from the server's list of exported
+file systems.
+References to a directory under
+.Pa /net/hermes
+will refer to the corresponding directory relative to
+.Sy hermes
+root.
+.Pp
+The
+.Sy -null
+map cancels a previous map for the directory indicated.
+This is most useful in the
+.Pa /etc/auto_master
+for cancelling entries that would otherwise be inherited from the
+.Sy +auto_master
+include entry.
+To be effective, the
+.Sy -null
+entries must be inserted before the included map entry.
+.Ss Executable Maps
+Local maps that have the execute bit set in their file permissions will be
+executed by the automounter and provided with a key to be looked up as an
+argument.
+The executable map is expected to return the content of an automounter map entry
+on its stdout or no output if the entry cannot be determined.
+A direct map cannot be made executable.
+.Ss Configuration and the auto_master Map
+When initiated without arguments,
+.Nm
+consults the master map for a list of
+.Nm autofs
+mount points and their maps.
+It mounts any
+.Nm autofs
+mounts that are not already mounted, and unmounts
+.Nm autofs
+mounts that have been removed from the master map or direct map.
+.Pp
+The master map is assumed to be called
+.Sy auto_master
+and its location is determined by the name service switch policy.
+Normally the master map is located initially as a local file
+.Pa /etc/auto_master .
+.Ss Browsing
+The
+.Nm automountd
+daemon supports browsability of indirect maps.
+This allows all of the potential mount points to be visible, whether or not they
+are mounted.
+The
+.Sy -nobrowse
+option can be added to any indirect
+.Nm autofs
+map to disable browsing.
+For example:
+.Bd -literal -offset indent
+/net	-hosts		-nosuid,nobrowse
+/home	auto_home
+.Ed
+.Pp
+In this case, any
+.Ar hostname Ns s
+would only be visible in
+.Pa /net
+after they are mounted, but all potential mount points would be visible under
+.Pa /home .
+The
+.Sy -browse
+option enables browsability of
+.Nm autofs
+file systems.
+This is the default for all indirect maps.
+.Pp
+The
+.Sy -browse
+option does not work in conjunction with the wildcard key.
+.Ss Restricting Mount Maps
+Options specified for a map are used as the default options for all the entries
+in that map.
+They are ignored when map entries specify their own mount options.
+.Pp
+In some cases, however, it is desirable to force
+.Sy nosuid , nodevices , nosetuid ,
+or
+.Sy noexec
+for a complete mount map and its submounts.
+This can be done by specifying the additional mount option,
+.Sy -restrict .
+.Bd -literal -offset indent
+/home	auto_home	-restrict,nosuid,hard
+.Ed
+.Pp
+The
+.Sy -restrict
+option forces the inheritance of all the restrictive options
+.Sy nosuid , nodevices , nosetuid ,
+and
+.Sy noexec
+as well as the restrict option itself.
+In this particular example, the
+.Sy nosuid
+and
+.Sy restrict
+option are inherited but the
+.Sy hard
+option is not.
+The
+.Sy restrict
+option also prevents the execution of
+.Qq executable maps
+and is enforced for auto mounts established by programs with fewer than all
+privileges available in their zone.
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /etc/auto_master
+Master automount map.
+.It Pa /etc/auto_home
+Map to support automounted home directories.
+.It Pa /etc/nsswitch.conf
+Name service switch configuration file.
+See
+.Xr nsswitch.conf 5 .
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr isainfo 1 ,
+.Xr ls 1 ,
+.Xr svcs 1 ,
+.Xr uname 1 ,
+.Xr autofs 5 ,
+.Xr attributes 7 ,
+.Xr nfssec 7 ,
+.Xr smf 7 ,
+.Xr automountd 8 ,
+.Xr mount 8 ,
+.Xr mount_nfs 8 ,
+.Xr svcadm 8
+.Sh NOTES
+.Nm autofs
+mount points must not be hierarchically related.
+.Nm
+does not allow an
+.Nm autofs
+mount point to be created within another
+.Nm autofs
+mount.
+.Pp
+Since each direct map entry results in a new
+.Nm autofs
+mount such maps should be kept short.
+.Pp
+Entries in both direct and indirect maps can be modified at any time.
+The new information is used when
+.Nm automountd
+next uses the map entry to do a mount.
+.Pp
+New entries added to a master map or direct map will not be useful until the
+automount command is run to install them as new
+.Nm autofs
+mount points.
+New entries added to an indirect map may be used immediately.
+.Pp
+As of the Solaris 2.6 release, a listing
+.Po see
+.Xr ls 1
+.Pc
+of the
+.Nm autofs
+directory associated with an indirect map shows all potential mountable
+entries.
+The attributes associated with the potential mountable entries are temporary.
+The real file system attributes will only be shown once the file system has been
+mounted.
+.Pp
+Default mount options can be assigned to an entire map when specified as an
+optional third field in the master map.
+These options apply only to map entries that have no mount options.
+Note that map entities with options override the default options, as at this
+time, the options do not concatenate.
+The concatenation feature is planned for a future release.
+.Pp
+When operating on a map that invokes an NFS mount, the default number of
+retries for the automounter is 0, that is, a single mount attempt, with no
+retries.
+Note that this is significantly different from the default
+.Pq 10000
+for the
+.Xr mount_nfs 8
+utility.
+.Pp
+The Network Information Service
+.Pq NIS
+was formerly known as Sun Yellow Pages
+.Pq YP .
+The functionality of the two remains the same.
+.Pp
+The
+.Nm
+service is managed by the service management facility,
+.Xr smf 7 ,
+under the service identifier:
+.Bd -literal -offset indent
+svc:/system/filesystem/autofs:default
+.Ed
+.Pp
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using
+.Xr svcadm 8 .
+The service's status can be queried using the
+.Xr svcs 1
+command.

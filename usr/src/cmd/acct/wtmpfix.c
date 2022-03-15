@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wtmpfix - adjust wtmpx file and remove date changes.
  *	wtmpfix <wtmpx1 >wtmpx2
@@ -53,9 +51,9 @@
 #define	UTRSZ		(sizeof (struct futmpx)) /* file record size */
 
 /*
- * The acctsh(1M) shell scripts startup(1M) and shutacct(1M) as well as the
+ * The acctsh(8) shell scripts startup(8) and shutacct(8) as well as the
  * runacct script each pass their own specific reason strings in the first
- * argument to acctwtmp(1M), to be propagated into ut_line fields.  Additional
+ * argument to acctwtmp(8), to be propagated into ut_line fields.  Additional
  * reasons (RUNLVL_MSG, ..., DOWN_MSG), used by compiled code, are defined in
  * <utmp.h> as preprocessor constants.
  * For simplicity we predefine similar constants for the scripted strings
@@ -326,7 +324,7 @@ invalid(char *name)
  * next.  Aside from the temp file position, we remember whether we were
  * in multi-user mode or not.  Absent evidence to the contrary, we begin
  * processing assuming multi-user mode, because runacct's wtmpx rotation
- * normally gives us a file recently initialized by utmp2wtmp(1M) with no
+ * normally gives us a file recently initialized by utmp2wtmp(8) with no
  * older RUN_LVL records surviving.
  */
 

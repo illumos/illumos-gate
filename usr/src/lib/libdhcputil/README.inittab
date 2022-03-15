@@ -24,7 +24,6 @@ All rights reserved.
 
 Inittab Purpose, Goals, and Functionality
 Peter Memishian
-ident	"%Z%%M%	%I%	%E% SMI"
 
 PROBLEM STATEMENT
 =================
@@ -41,8 +40,8 @@ in core Solaris (in.dhcpd, dhcpinfo, snoop, and dhcpmgr), the
 situation has spiraled out of control.  In addition to the obvious
 maintenance headache caused by the redundant code, it has also become
 a burden to our customers, who already have to cope with multiple
-places where DHCP option information is stored (dhcptags(4),
-dhcptab(4)).
+places where DHCP option information is stored (dhcptags(5),
+dhcptab(5)).
 
 The inittab API is designed to reduce the confusion, both for the
 customer and the application developer.  Its goal is to provide a
@@ -61,7 +60,7 @@ new DHCP options, but this should be rare.
 
 The inittab file consists of inittab records, each being one line long
 and describing a particular option.  The format is based heavily on
-the format for defining symbols in dhcptab(4).  Each line has the
+the format for defining symbols in dhcptab(5).  Each line has the
 following syntax:
 
    option_name	category, code, type, granularity, maximum, consumers
@@ -69,7 +68,7 @@ following syntax:
 where:
 
    `option_name' is user-interpretable name of the option (for use with
-      dhcpinfo(1M) for instance).  This field should at least be per-
+      dhcpinfo(1) for instance).  This field should at least be per-
       category unique and ideally should be unique across all categories.
       Of particular note is that options names in the STANDARD, SITE, and
       VENDOR spaces should not overlap, or the behavior is undefined.
@@ -132,7 +131,7 @@ for all DHCP option consumers, with the following exceptions and notes:
       programs, even if they are listed as a `consumer' of the given
       option.  An example of this is that the DHCP server never
       requests any fields with the VENDOR category. (VENDOR information
-      for the DHCP server comes from dhcptab(4) instead).
+      for the DHCP server comes from dhcptab(5) instead).
 
    o  In general, changing provided information in a released inittab
       file is ill-advised.  Adding new entries should be the extent
@@ -145,9 +144,9 @@ for all DHCP option consumers, with the following exceptions and notes:
       absolutely necessary, since it nullifies some of the advantages
       of having an inittab.
 
-   o  Where a symbol is defined both in the inittab and in dhcptab(4),
+   o  Where a symbol is defined both in the inittab and in dhcptab(5),
       inittab is authoritative.  EXTEND symbol definitions in
-      dhcptab(4) will be deprecated in a future release of Solaris.
+      dhcptab(5) will be deprecated in a future release of Solaris.
 
 C-LEVEL API
 ===========

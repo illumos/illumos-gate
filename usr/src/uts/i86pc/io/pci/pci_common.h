@@ -35,7 +35,7 @@ extern "C" {
 
 /*
  *	Common header file with definitions shared between
- *	pci(7D) and npe(7D)
+ *	pci(4D) and npe(4D)
  */
 
 /* State structure. */
@@ -49,7 +49,7 @@ typedef struct pci_state {
 	kmutex_t pci_err_mutex;
 
 	/*
-	 * The following members are only used by npe(7D).
+	 * The following members are only used by npe(4D).
 	 * See uts/i86pc/io/pciex/npe.c for more information.
 	 */
 	ndi_event_hdl_t pci_ndi_event_hdl;
@@ -57,8 +57,8 @@ typedef struct pci_state {
 
 /*
  * These are the access routines.
- * The pci_bus_map sets the handle to point to these in pci(7D).
- * The npe_bus_map sets the handle to point to these in npe(7D).
+ * The pci_bus_map sets the handle to point to these in pci(4D).
+ * The npe_bus_map sets the handle to point to these in npe(4D).
  */
 uint8_t		pci_config_rd8(ddi_acc_impl_t *hdlp, uint8_t *addr);
 uint16_t	pci_config_rd16(ddi_acc_impl_t *hdlp, uint16_t *addr);

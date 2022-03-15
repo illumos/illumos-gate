@@ -25,7 +25,7 @@
 
 /*
  * prof_solaris.c:
- * Abstracted contract private interfaces for configuring krb5.conf(4).
+ * Abstracted contract private interfaces for configuring krb5.conf(5).
  */
 
 #include <ctype.h>

@@ -382,7 +382,7 @@ leaky_subr_estimate(size_t *estp)
 
 	if ((state = mdb_get_state()) == MDB_STATE_RUNNING) {
 		mdb_warn("findleaks: can only be run on a system "
-		    "dump or under kmdb; see dumpadm(1M)\n");
+		    "dump or under kmdb; see dumpadm(8)\n");
 		return (DCMD_ERR);
 	}
 

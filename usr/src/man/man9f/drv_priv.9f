@@ -41,7 +41,7 @@ privilege policy. It determines whether the credentials supplied by the user
 credential structure pointed to by \fIcr\fR identify a process that has the
 \fB{PRIV_SYS_DEVICES}\fR privilege asserted in its effective set. This function
 should be used only when file access modes, special minor device numbers, and
-the device policy (see \fBprivileges\fR(5), \fBadd_drv\fR(1M)) are insufficient
+the device policy (see \fBprivileges\fR(7), \fBadd_drv\fR(8)) are insufficient
 to provide protection for the requested driver function. It is intended to
 replace all calls to \fBsuser()\fR and any explicit checks for effective user
 ID = 0 in driver code.
@@ -57,7 +57,9 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBadd_drv\fR(1M), \fBupdate_drv\fR(1M), \fBprivileges\fR(5)
+.BR privileges (7),
+.BR add_drv (8),
+.BR update_drv (8)
 .sp
 .LP
 \fIWriting Device Drivers\fR

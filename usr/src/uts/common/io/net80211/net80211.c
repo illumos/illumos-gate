@@ -670,7 +670,7 @@ ieee80211_notify_node_leave(ieee80211com_t *ic, ieee80211_node_t *in)
 
 
 /*
- * Get 802.11 kstats defined in ieee802.11(5)
+ * Get 802.11 kstats defined in ieee802.11(7)
  *
  * Return 0 on success
  */

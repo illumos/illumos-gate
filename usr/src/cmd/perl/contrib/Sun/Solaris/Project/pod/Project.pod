@@ -89,7 +89,7 @@ process.
 B<C<fgetprojent($filehandle)>>
 
 This function returns the next project entry from C<$filehandle>, a Perl file
-handle that must refer to a previously opened file in C<project(4)> format.
+handle that must refer to a previously opened file in C<project(5)> format.
 Return values are the same as for C<getprojent()>.
 
 B<C<inproj($user, $project)>>
@@ -129,7 +129,7 @@ used to selectively import constants and functions defined in this module:
 
 =head1 ATTRIBUTES
 
-See C<attributes(5)> for descriptions of the following attributes:
+See C<attributes(7)> for descriptions of the following attributes:
 
   ___________________________________________________________
  |       ATTRIBUTE TYPE        |       ATTRIBUTE VALUE       |
@@ -142,4 +142,4 @@ See C<attributes(5)> for descriptions of the following attributes:
 =head1 SEE ALSO
 
 C<getprojid(2)>, C<getdefaultproj(3PROJECT)>, C<inproj(3PROJECT)>,
-C<libproject(3LIB)>, C<setproject(3PROJECT)>, C<project(4)>, C<attributes(5)>
+C<libproject(3LIB)>, C<setproject(3PROJECT)>, C<project(5)>, C<attributes(7)>

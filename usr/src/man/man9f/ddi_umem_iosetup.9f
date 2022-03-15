@@ -144,5 +144,8 @@ The \fBddi_umem_iosetup\fR(9F) function can be called from any context only if
 flag is set to \fBDDI_UMEM_NOSLEEP\fR. If \fBDDI_UMEM_SLEEP\fR is set,
 \fBddi_umem_iosetup\fR(9F) can be called from user and kernel context only.
 .SH SEE ALSO
-\fBddi_umem_lock\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F), \fBfreerbuf\fR(9F),
-\fBphysio\fR(9F), \fBbuf\fR(9S)
+.BR ddi_dma_buf_bind_handle (9F),
+.BR ddi_umem_lock (9F),
+.BR freerbuf (9F),
+.BR physio (9F),
+.BR buf (9S)

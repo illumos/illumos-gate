@@ -332,7 +332,7 @@ get_passwd_defaults(pam_handle_t *pamh, char *user, struct pwdefaults *p)
 		syslog(LOG_ERR, "%s: pam_authtok_check: The configured "
 		    "minimum password length (PASSLENGTH=%d) is larger than "
 		    "the number of significant characters the current "
-		    "encryption algorithm uses (%d). See policy.conf(4) for "
+		    "encryption algorithm uses (%d). See policy.conf(5) for "
 		    "alternative password encryption algorithms.", progname);
 		/* this won't lead to failure */
 	}

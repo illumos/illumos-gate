@@ -27,7 +27,7 @@ epoll_wait, epoll_pwait \- wait for epoll events
 .fi
 
 .SH DESCRIPTION
-The \fBepoll_wait()\fR function waits for events on the \fBepoll\fR(5)
+The \fBepoll_wait()\fR function waits for events on the \fBepoll\fR(7)
 instance specified by \fIepfd\fR.  The \fIevents\fR parameter must point to
 an array of \fImaxevents\fR \fIepoll_event\fR structures to be
 filled in with pending events.  The \fItimeout\fR argument specifies the
@@ -82,19 +82,23 @@ A signal was received during the \fBepoll_wait()\fR or \fBepoll_pwait()\fR.
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-Either \fIepfd\fR is not a valid \fBepoll\fR(5) instance or \fImaxevents\fR
+Either \fIepfd\fR is not a valid \fBepoll\fR(7) instance or \fImaxevents\fR
 is not greater than zero.
 .RE
 
 .sp
 .SH NOTES
-The \fBepoll\fR(5) facility is implemented for purposes of offering
+The \fBepoll\fR(7) facility is implemented for purposes of offering
 compatibility for Linux-borne applications; native
 applications should continue to prefer using event ports via the
 \fBport_create\fR(3C), \fBport_associate\fR(3C) and \fBport_get\fR(3C)
-interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
+interfaces.  See \fBepoll\fR(7) for compatibility details and restrictions.
 
 .SH SEE ALSO
-\fBepoll_create\fR(3C), \fBepoll_ctl\fR(3C),
-\fBport_create\fR(3C), \fBport_associate\fR(3C), \fBport_get\fR(3C),
-\fBpselect\fR(3C), \fBepoll\fR(5)
+.BR epoll_create (3C),
+.BR epoll_ctl (3C),
+.BR port_associate (3C),
+.BR port_create (3C),
+.BR port_get (3C),
+.BR pselect (3C),
+.BR epoll (7)

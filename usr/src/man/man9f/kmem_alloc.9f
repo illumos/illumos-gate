@@ -98,7 +98,9 @@ interrupt context only if the \fBKM_NOSLEEP\fR flag is set. They can be
 called from user context with any valid \fIflag\fR. The \fBkmem_free()\fR
 function can be called from from user, interrupt, or kernel context.
 .SH SEE ALSO
-\fBcopyout\fR(9F), \fBfreerbuf\fR(9F), \fBgetrbuf\fR(9F)
+.BR copyout (9F),
+.BR freerbuf (9F),
+.BR getrbuf (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

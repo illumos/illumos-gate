@@ -140,7 +140,7 @@ safe_strdup(const char *s1)
 
 /*
  * Given a wchar_t which might represent an 'escapable' sequence (see
- * formats(5)), return the base ascii character needed to print that
+ * formats(7)), return the base ascii character needed to print that
  * sequence.
  *
  * The comparisons performed may look suspect at first, but all are valid;
@@ -202,7 +202,7 @@ unctrl_str_strict_ascii(const char *src, int escape_slash, int *unprintable)
 }
 
 /*
- * Convert control characters as described in format(5) to their readable
+ * Convert control characters as described in formats(7) to their readable
  * representation; special care is taken to handle multibyte character sets.
  *
  * If escape_slash is true, escaping of '\' occurs.  The first time a string

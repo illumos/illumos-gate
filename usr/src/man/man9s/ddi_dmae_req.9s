@@ -198,7 +198,7 @@ default, in the \fBder_cycles\fR structure member) should use the
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -212,5 +212,7 @@ Architecture	x86
 .TE
 
 .SH SEE ALSO
-\fBisa\fR(4), \fBattributes\fR(5),
-\fBddi_dmae\fR(9F), \fBddi_dma_attr\fR(9S)
+.BR isa (5),
+.BR attributes (7),
+.BR ddi_dmae (9F),
+.BR ddi_dma_attr (9S)

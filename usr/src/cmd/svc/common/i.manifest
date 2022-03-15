@@ -23,7 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# i.manifest - smf(5) service manifest install class action script
+# i.manifest - smf(7) service manifest install class action script
 #
 
 repfile=$PKG_INSTALL_ROOT/etc/svc/repository.db
@@ -75,7 +75,7 @@ svc_deathrow()
 
 #
 # If the repository does not yet exist, create it from the appropriate seed.  If
-# for some reason the seeds do not exist, svccfg(1M) will create the repository
+# for some reason the seeds do not exist, svccfg(8) will create the repository
 # automatically.
 #
 if [ ! -f $repfile ]; then
@@ -93,8 +93,8 @@ fi
 
 if [ ! -r $PKG_INSTALL_ROOT/etc/svc/volatile/repository_door ]; then
 	#
-	# smf(5) is not presently running for the destination environment.
-	# Since we presently cannot refresh without a running svc.startd(1M), we
+	# smf(7) is not presently running for the destination environment.
+	# Since we presently cannot refresh without a running svc.startd(8), we
 	# cannot consistently handle dependent placement.  Defer to next boot.
 	#
 	while read src dst; do

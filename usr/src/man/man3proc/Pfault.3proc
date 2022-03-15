@@ -40,7 +40,7 @@ A hardware fault may occur because an illegal instruction was executed,
 a breakpoint or watchpoint was encountered, or an arithmetic exception occurred,
 among others.
 The full list of faults is available in both
-.Xr proc 4
+.Xr proc 5
 and
 .In sys/fault.h .
 .Pp
@@ -105,4 +105,4 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

@@ -17,7 +17,7 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lnls\fR [ \fIlibrary\fR... ]
 .sp
 .LP
 The functions in this library interact with the network listener daemon,
-\fBlisten\fR(1M). The functions are provided for services invoked by the
+\fBlisten\fR(8). The functions are provided for services invoked by the
 listener daemon and for clients that connect to the services using
 \fBlisten\fR.
 .SH INTERFACES
@@ -58,7 +58,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -74,4 +74,6 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBlisten\fR(1M), \fBIntro\fR(3), \fBattributes\fR(5)
+.BR Intro (3),
+.BR attributes (7),
+.BR listen (8)

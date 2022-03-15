@@ -241,7 +241,7 @@ defined.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
+See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
 .sp
@@ -257,6 +257,11 @@ MT Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBfcntl\fR(2), \fBt_alloc\fR(3NSL), \fBt_open\fR(3NSL),
-\fBt_rcvudata\fR(3NSL), \fBt_rcvuderr\fR(3NSL), \fBt_sndudata\fR(3NSL),
-\fBt_sndvudata\fR(3NSL), \fBattributes\fR(5)
+.BR fcntl (2),
+.BR t_alloc (3NSL),
+.BR t_open (3NSL),
+.BR t_rcvudata (3NSL),
+.BR t_rcvuderr (3NSL),
+.BR t_sndudata (3NSL),
+.BR t_sndvudata (3NSL),
+.BR attributes (7)

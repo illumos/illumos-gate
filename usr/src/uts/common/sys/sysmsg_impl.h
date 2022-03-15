@@ -27,8 +27,6 @@
 #ifndef	_SYS_SYSMSG_IMPL_H
 #define	_SYS_SYSMSG_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -36,7 +34,7 @@ extern "C" {
 #define	SYSMSG		"/dev/sysmsg"
 
 /*
- * consadm(1M) uses these ioctls to interface with /dev/sysmsg.
+ * consadm(8) uses these ioctls to interface with /dev/sysmsg.
  */
 
 /*

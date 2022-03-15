@@ -224,7 +224,7 @@ declarations for the old interfaces are included through the header files.
 \fBauthdes_create()\fR is the first of two routines which interface to the
 \fBRPC\fR secure authentication system, known as \fBDES\fR authentication. The
 second is \fBauthdes_getucred()\fR, below.  Note: the keyserver daemon
-\fBkeyserv\fR(1M) must be running for the \fBDES\fR authentication system to
+\fBkeyserv\fR(8) must be running for the \fBDES\fR authentication system to
 work.
 .sp
 \fBauthdes_create()\fR, used on the client side, returns an authentication
@@ -800,7 +800,7 @@ This routine exists for backward compatibility only, and is made obsolete by
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -815,13 +815,26 @@ MT-Level	Unsafe
 
 .SH SEE ALSO
 .LP
-\fBkeyserv\fR(1M), \fBrpcbind\fR(1M), \fBrpcinfo\fR(1M), \fBnetdir\fR(3NSL),
-\fBnetdir_getbyname\fR(3NSL), \fBrpc\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL),
-\fBrpc_clnt_calls\fR(3NSL), \fBrpc_clnt_create\fR(3NSL),
-\fBrpc_svc_calls\fR(3NSL), \fBrpc_svc_create\fR(3NSL), \fBrpc_svc_err\fR(3NSL),
-\fBrpc_svc_reg\fR(3NSL), \fBrpc_xdr\fR(3NSL), \fBrpcbind\fR(3NSL),
-\fBsecure_rpc\fR(3NSL), \fBselect\fR(3C), \fBxdr_authsys_parms\fR(3NSL),
-\fBlibnsl\fR(3LIB), \fBattributes\fR(5)
+.BR select (3C),
+.BR libnsl (3LIB),
+.BR netdir (3NSL),
+.BR netdir_getbyname (3NSL),
+.BR rpc (3NSL),
+.BR rpc_clnt_auth (3NSL),
+.BR rpc_clnt_calls (3NSL),
+.BR rpc_clnt_create (3NSL),
+.BR rpc_svc_calls (3NSL),
+.BR rpc_svc_create (3NSL),
+.BR rpc_svc_err (3NSL),
+.BR rpc_svc_reg (3NSL),
+.BR rpc_xdr (3NSL),
+.BR rpcbind (3NSL),
+.BR secure_rpc (3NSL),
+.BR xdr_authsys_parms (3NSL),
+.BR attributes (7),
+.BR keyserv (8),
+.BR rpcbind (8),
+.BR rpcinfo (8)
 .SH NOTES
 .LP
 These interfaces are unsafe in multithreaded applications.  Unsafe interfaces

@@ -40,8 +40,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/rtls group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/rtls.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/rtls.4d
 driver name=rtls perms="* 0666 root sys" clone_perms="rtls 0666 root sys" \
     alias=pci10ec,8139 \
     alias=pci1113,1211 \

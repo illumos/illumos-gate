@@ -68,7 +68,7 @@
  * special casing itself.
  *
  * A composite outcome of these two concepts is that we can now create
- * a tree of process contracts, rooted at init(1M), which represent
+ * a tree of process contracts, rooted at init(8), which represent
  * services and subservices that are reliably observed and can be
  * restarted when fatal errors occur.  The service management framework
  * (SMF) realizes this structure.
@@ -787,7 +787,7 @@ contract_process_init(void)
 	    &contract_process_ops, contract_process_default);
 
 	/*
-	 * Create a template for use with init(1M) and other
+	 * Create a template for use with init(8) and other
 	 * kernel-started processes.
 	 */
 	sys_process_tmpl = kmem_alloc(sizeof (ctmpl_process_t), KM_SLEEP);

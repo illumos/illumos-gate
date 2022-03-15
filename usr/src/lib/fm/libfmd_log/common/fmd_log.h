@@ -26,8 +26,6 @@
 #ifndef	_FMD_LOG_H
 #define	_FMD_LOG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libnvpair.h>
 #include <exacct.h>
 #include <regex.h>
@@ -60,12 +58,12 @@ extern int fmd_log_errno(fmd_log_t *);
 typedef struct fmd_log_header {
 	const char *log_creator;	/* ea_get_creator(3EXACCT) string */
 	const char *log_hostname;	/* ea_get_hostname(3EXACCT) string */
-	const char *log_label;		/* fmd(1M) log file label */
-	const char *log_version;	/* fmd(1M) log file version */
+	const char *log_label;		/* fmd(8) log file label */
+	const char *log_version;	/* fmd(8) log file version */
 	const char *log_osrelease;	/* uname(1) -r value at creation time */
 	const char *log_osversion;	/* uname(1) -v value at creation time */
 	const char *log_platform;	/* uname(1) -i value at creation time */
-	const char *log_uuid;		/* fmd(1M) log file uuid */
+	const char *log_uuid;		/* fmd(8) log file uuid */
 } fmd_log_header_t;
 
 extern void fmd_log_header(fmd_log_t *, fmd_log_header_t *);
@@ -114,7 +112,7 @@ typedef struct fmd_log_filter_nvarg {
 
 /*
  * fmd_log_xiter() can be used to perform sophisticated iteration over an fmd
- * log file such as that required by fmdump(1M).  The arguments are as follows:
+ * log file such as that required by fmdump(8).  The arguments are as follows:
  *
  * fmd_log_t *lp - log to use for iteration from fmd_log_open()
  * uint_t iflags - FMD_LOG_XITER_* flags (see above)

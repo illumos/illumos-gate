@@ -90,9 +90,9 @@
 
 		<!-- to start stop mdns service -->
 		<property_group name='general' type='framework'>
-			<propval name='action_authorization' type='astring' 
+			<propval name='action_authorization' type='astring'
 				value='solaris.smf.manage.mdns' />
-			<propval name='value_authorization' type='astring' 
+			<propval name='value_authorization' type='astring'
 				value='solaris.smf.manage.mdns' />
 		</property_group>
 
@@ -140,7 +140,7 @@
 			<propval name='value_authorization' type='astring'
 			    value='solaris.smf.value.firewall.config' />
 		</property_group>
-	
+
 	</instance>
 
 	<stability value='Unstable' />
@@ -152,7 +152,7 @@
 		</loctext>
 	</common_name>
 	<documentation>
-		<manpage title='mdnsd' section='1M' />
+		<manpage title='mdnsd' section='8' />
 		<doc_link name='Service Discovery OpenSolaris Project Page'
 		uri="http://opensolaris.org/os/project/nwam/service-discovery/"/>
 	</documentation>

@@ -102,7 +102,7 @@ for the naming service, also.
 determine where a particular print job will be printed; the
 destination option of the lp command is the first place looked, and
 other environment variables are checked before this one. See the man
-page for printers.conf(4) for a full explanation of the search order.
+page for printers.conf(5) for a full explanation of the search order.
 
 <p>
 

@@ -1025,7 +1025,7 @@ check_rules(const char *fname, char type)
 }
 
 /*
- * Function to determine if an entry in a rules file (see bart_rules(4)) applies
+ * Function to determine if an entry in a rules file (see bart_rules(5)) applies
  * to a filename. We truncate "fname" such that it has the same number of
  * components as "rule" and let fnmatch(3C) do the rest. A "component" is one
  * part of an fname as delimited by slashes ('/'). So "/A/B/C/D" has four

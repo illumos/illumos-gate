@@ -45,7 +45,7 @@
  *   device access, a nexus driver can still internally use the transport
  *   services.
  *
- *   A scsi(4) example of this type of use is SCSA enumeration services
+ *   A scsi(5) example of this type of use is SCSA enumeration services
  *   issuing a scsi REPORT_LUN command to a lun-0 'probe' node bound to
  *   nulldriver in order to discover all luns supported by a target.
  */

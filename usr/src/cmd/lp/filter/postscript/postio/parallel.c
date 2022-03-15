@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 extern char *postbegin;
 
 #include <stdio.h>
@@ -101,7 +99,7 @@ char *BppState(int state)
 	static char buf[BUFSIZ];
 
 	memset(buf, 0, sizeof(buf));
-	sprintf(buf, "State (0x%.4x) - (%s%s%s%s)\n", state, 
+	sprintf(buf, "State (0x%.4x) - (%s%s%s%s)\n", state,
 		((state & BPP_SLCT_ERR) ?  "offline " : ""),
 		((state & BPP_BUSY_ERR) ?  "busy " : ""),
 		((state & BPP_PE_ERR) ?  "paper " : ""),
@@ -121,10 +119,10 @@ int bpp_state(int fd)
 			exit(PRINTER_IO_ERROR);
 		state = bpp_stat.pin_status;
 
-#if defined(DEBUG) && defined(NOTDEF)	
+#if defined(DEBUG) && defined(NOTDEF)
 		logit("%s", BppState(state));
 #endif
-	
+
 		if (state == (BPP_PE_ERR | BPP_ERR_ERR | BPP_SLCT_ERR)) {
 			/* paper is out */
 			return(PRINTER_ERROR_PAPER_OUT);
@@ -148,7 +146,7 @@ int bpp_state(int fd)
 	return(0);
 }
 
-int 
+int
 get_ecpp_status(int fd)
 {
 	int state;
@@ -179,7 +177,7 @@ get_ecpp_status(int fd)
 }
 
 /**
- * For prnio(7I) - generic printer interface
+ * For prnio(4I) - generic printer interface
  **/
 int is_a_prnio(int fd)
 {
@@ -235,7 +233,7 @@ int prnio_state(int fd)
 	}
 	return(0);
 }
-	
+
 /**
  *	Common routines
  **/

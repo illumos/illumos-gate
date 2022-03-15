@@ -318,7 +318,7 @@ extern void topo_debug_set(topo_hdl_t *, const char *, const char *);
 
 /*
  * Each topology node advertises the name and data stability of each of its
- * modules and properties. (see attributes(5)).
+ * modules and properties. (see attributes(7)).
  */
 
 /*

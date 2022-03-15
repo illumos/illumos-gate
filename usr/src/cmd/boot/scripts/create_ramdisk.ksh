@@ -39,8 +39,8 @@ dirsize=0
 
 usage() {
 	cat <<- EOM
-This utility is a component of the bootadm(1M) implementation and it is not
-recommended for stand-alone use. Please use bootadm(1M) instead.
+This utility is a component of the bootadm(8) implementation and it is not
+recommended for stand-alone use. Please use bootadm(8) instead.
 
 Usage: ${0##*/}: [-R <root>] [-p <platform>] [ -f <format> ] [--nocompress]
 where <platform> is one of i86pc, sun4u or sun4v

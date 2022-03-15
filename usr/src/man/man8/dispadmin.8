@@ -1,0 +1,249 @@
+'\" te
+.\"  Copyright 1989 AT&T Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved.
+.\"  Copyright 2020 (c) Sergio Aguayo, All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DISPADMIN 8 "Oct 7, 2008"
+.SH NAME
+dispadmin \- process scheduler administration
+.SH SYNOPSIS
+.nf
+\fBdispadmin\fR \fB-l\fR
+.fi
+
+.LP
+.nf
+\fBdispadmin\fR \fB-c\fR \fIclass\fR {\fB-g\fR [\fB-r\fR \fIres\fR] | \fB-s\fR \fIfile\fR}
+.fi
+
+.LP
+.nf
+\fBdispadmin\fR \fB-d\fR [\fIclass\fR]
+.fi
+
+.SH DESCRIPTION
+The \fBdispadmin\fR command displays or changes process scheduler parameters
+while the system is running.
+.sp
+.LP
+\fBdispadmin\fR does limited checking on the values supplied in \fIfile\fR to
+verify that they are within their required bounds. The checking, however, does
+not attempt to analyze the effect that the new values have on the performance
+of the system. Inappropriate values can have a negative effect on system
+performance. (See \fISystem Administration Guide: Advanced Administration\fR.)
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-c\fR \fIclass\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the class whose parameters are to be displayed or changed. Valid
+\fIclass\fR values are: \fBRT\fR for the real-time class, \fBTS\fR for the
+time-sharing class, \fBIA\fR for the inter-active class, \fBFSS\fR for the
+fair-share class, and \fBFX\fR for the fixed-priority class. The time-sharing
+and inter-active classes share the same scheduler, so changes to the
+scheduling parameters of one will change those of the other.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-d\fR [\fIclass\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Sets or displays the name of the default scheduling class to be used on reboot
+when starting \fBsvc:/system/scheduler:default\fR. If class name is not
+specified, the name and description of the current default scheduling class is
+displayed. If class name is specified and is a valid scheduling class name,
+then it is saved in \fBdispadmin\fR's private configuration file
+\fB/etc/dispadmin.conf\fR. Only super-users can set the default scheduling
+class.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-g\fR\fR
+.ad
+.sp .6
+.RS 4n
+Gets the parameters for the specified class and writes them to the standard
+output. Parameters for the real-time class are described in \fBrt_dptbl\fR(5).
+Parameters for the time-sharing and inter-active classes are described in
+\fBts_dptbl\fR(5). Parameters for the fair-share class are described in
+\fBFSS\fR(4). Parameters for the fixed-priority class are described in
+\fBfx_dptbl\fR(5).
+.sp
+The \fB-g\fR and \fB-s\fR options are mutually exclusive: you may not retrieve
+the table at the same time you are overwriting it.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR\fR
+.ad
+.sp .6
+.RS 4n
+Lists the scheduler classes currently configured in the system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR \fIres\fR\fR
+.ad
+.sp .6
+.RS 4n
+When using the \fB-g\fR option you may also use the \fB-r\fR option to specify
+a resolution to be used for outputting the time quantum values. If no
+resolution is specified, time quantum values are in milliseconds. If \fIres\fR
+is specified it must be a positive integer between 1 and 1000000000 inclusive,
+and the resolution used is the reciprocal of \fIres\fR in seconds. For example,
+a \fIres\fR value of 10 yields time quantum values expressed in tenths of a
+second; a \fIres\fR value of 1000000 yields time quantum values expressed in
+microseconds. If the time quantum cannot be expressed as an integer in the
+specified resolution, it is rounded up to the next integral multiple of the
+specified resolution.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR \fIfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets scheduler parameters for the specified class using the values in
+\fIfile\fR. These values overwrite the current values in memory\(emthey become
+the parameters that control scheduling of processes in the specified class. The
+values in \fIfile\fR must be in the format output by the \fB-g\fR option.
+Moreover, the values must describe a table that is the same size (has same
+number of priority levels) as the table being overwritten. Super-user
+privileges are required in order to use the \fB-s\fR option.
+.sp
+Time quantum values for scheduling classes are specified in system clock ticks
+rather than constant-time units.  These values are based on the value of the
+kernel's \fBhz\fR variable.  By default, the system operates at 1000 Hz and
+thus with a quantum of 1 millisecond.  If the kernel tunable \fBhires_tick\fR
+is set to 0, this drops to 100 Hz for a larger quantum of 10 milliseconds.
+.sp
+The \fB-g\fR and \fB-s\fR options are mutually exclusive: you may not retrieve
+the table at the same time you are overwriting it.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fRRetrieving the Current Scheduler Parameters for the real-time
+class
+.sp
+.LP
+The following command retrieves the current scheduler parameters for the
+real-time class from kernel memory and writes them to the standard output. Time
+quantum values are in microseconds.
+
+.sp
+.in +2
+.nf
+dispadmin \fB-c\fR RT \fB-g\fR \fB-r\fR 1000000
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fROverwriting the Current Scheduler Parameters for the Real-time
+Class
+.sp
+.LP
+The following command overwrites the current scheduler parameters for the
+real-time class with the values specified in \fBrt.config\fR.
+
+.sp
+.in +2
+.nf
+dispadmin \fB-c\fR RT \fB-s\fR rt.config
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRRetrieving the Current Scheduler Parameters for the
+Time-sharing Class
+.sp
+.LP
+The following command retrieves the current scheduler parameters for the
+time-sharing class from kernel memory and writes them to the standard output.
+Time quantum values are in nanoseconds.
+
+.sp
+.in +2
+.nf
+dispadmin \fB-c\fR TS \fB-g\fR \fB-r\fR 1000000000
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fROverwriting the Current Scheduler Parameters for the
+Time-sharing Class
+.sp
+.LP
+The following command overwrites the current scheduler parameters for the
+time-sharing class with the values specified in \fBts.config\fR.
+
+.sp
+.in +2
+.nf
+dispadmin \fB-c\fR TS \fB-s\fR ts.config
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/dispadmin.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+Possible location for argument to \fB-s\fR option.
+.RE
+
+.SH SEE ALSO
+.BR priocntl (1),
+.BR svcs (1),
+.BR priocntl (2),
+.BR FSS (4),
+.BR fx_dptbl (5),
+.BR rt_dptbl (5),
+.BR ts_dptbl (5),
+.BR attributes (7),
+.BR smf (7),
+.BR svcadm (8)
+.sp
+.LP
+\fI\fR \fI\fR
+.SH DIAGNOSTICS
+\fBdispadmin\fR prints an appropriate diagnostic message if it fails to
+overwrite the current scheduler parameters due to lack of required permissions
+or a problem with the specified input file.
+.SH NOTES
+The default scheduling class setting facility is managed by the service
+management facility, \fBsmf\fR(7), under the service identifier:
+.sp
+.in +2
+.nf
+svc:/system/scheduler:default
+.fi
+.in -2
+
+.sp
+.LP
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(8). Note that
+disabling the service while it is running will not change anything. The
+service's status can be queried using the \fBsvcs\fR(1) command.

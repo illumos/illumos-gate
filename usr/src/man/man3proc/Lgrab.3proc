@@ -114,4 +114,4 @@ for the list of possible errors.
 .Xr libproc 3LIB ,
 .Xr Lfree 3PROC ,
 .Xr Lgrab_error 3PROC ,
-.Xr proc 4
+.Xr proc 5

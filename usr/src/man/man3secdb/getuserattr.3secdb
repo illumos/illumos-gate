@@ -49,8 +49,8 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lsecdb  -lsocket  -lnsl [ \fIlibrary\fR... ]
 .SH DESCRIPTION
 .LP
 The \fBgetuserattr()\fR, \fBgetusernam()\fR, and \fBgetuseruid()\fR functions
-each return a \fBuser_attr\fR(4) entry. Entries can come from any of the
-sources specified in the \fBnsswitch.conf\fR(4) file. The \fBgetuserattr()\fR
+each return a \fBuser_attr\fR(5) entry. Entries can come from any of the
+sources specified in the \fBnsswitch.conf\fR(5) file. The \fBgetuserattr()\fR
 function enumerates \fBuser_attr\fR entries. The \fBgetusernam()\fR function
 searches for a \fBuser_attr\fR entry with a given user name \fIname\fR. The
 \fBgetuseruid()\fR function searches for a \fBuser_attr\fR entry with a given
@@ -133,7 +133,7 @@ configuration file lookup information for the name service switch
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -148,6 +148,9 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBgetauthattr\fR(3SECDB), \fBgetexecattr\fR(3SECDB),
-\fBgetprofattr\fR(3SECDB), \fBkva_match\fR(3SECDB), \fBuser_attr\fR(4),
-\fBattributes\fR(5)
+.BR getauthattr (3SECDB),
+.BR getexecattr (3SECDB),
+.BR getprofattr (3SECDB),
+.BR kva_match (3SECDB),
+.BR user_attr (5),
+.BR attributes (7)

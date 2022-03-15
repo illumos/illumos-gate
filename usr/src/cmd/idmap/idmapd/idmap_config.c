@@ -25,7 +25,7 @@
 
 
 /*
- * Config routines common to idmap(1M) and idmapd(1M)
+ * Config routines common to idmap(8) and idmapd(8)
  */
 
 #include <stdlib.h>

@@ -248,7 +248,7 @@ int (*gl_stat)(const char *, struct stat *);
 .fi
 .sp
 This extension is provided to allow programs such as
-\fBufsrestore\fR(1M) to provide globbing from directories stored
+\fBufsrestore\fR(8) to provide globbing from directories stored
 on tape.
 .RE
 
@@ -637,7 +637,7 @@ glob ("*.h", GLOB_DOOFFS|GLOB_APPEND, NULL, &globbuf);
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -655,5 +655,11 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBexecv\fR(2), \fBstat\fR(2), \fBfnmatch\fR(3C), \fBopendir\fR(3C),
-\fBreaddir\fR(3C), \fBwordexp\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR execv (2),
+.BR stat (2),
+.BR fnmatch (3C),
+.BR opendir (3C),
+.BR readdir (3C),
+.BR wordexp (3C),
+.BR attributes (7),
+.BR standards (7)

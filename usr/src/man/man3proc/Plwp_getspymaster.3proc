@@ -41,13 +41,13 @@ When an agent LWP is created, it leverages an existing thread in the process and
 it also creates a record of whom created the agent, which is called the spy
 master.
 For more information on the agent LWP and the spy master, see
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 If the thread identified
 .Fa lwpid
 has an agent LWP, the corresponding ps information
 .Po see
-.Xr proc 4
+.Xr proc 5
 for the definition of the
 .Sy psinfo_t
 .Pc
@@ -78,7 +78,7 @@ is not modified.
 For a full list of possible errors also see the
 .Sy DIAGNOSTICS
 section in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn Plwp_getpsinfo
@@ -117,4 +117,4 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

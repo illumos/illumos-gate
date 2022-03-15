@@ -288,7 +288,7 @@ if (setattrat(fildes, XATTR_VIEW_READWRITE, "file", request)) {
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -305,6 +305,13 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2), \fBfstat\fR(2), \fBfstatat\fR(2),
-\fBopen\fR(2), \fBpipe\fR(2), \fBlibnvpair\fR(3LIB), \fBattributes\fR(5),
-\fBfsattr\fR(5)
+.BR creat (2),
+.BR dup (2),
+.BR fcntl (2),
+.BR fstat (2),
+.BR fstatat (2),
+.BR open (2),
+.BR pipe (2),
+.BR libnvpair (3LIB),
+.BR attributes (7),
+.BR fsattr (7)

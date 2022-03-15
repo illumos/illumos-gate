@@ -24,15 +24,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/promif_impl.h>
 
 /*
  * The Automatic System Recovery (ASR) database present in some
  * versions of firmware is not supported on sun4v platforms.
  * However, there is an external interface to these prom interfaces
- * from the openprom(7D) driver. They are not documented in the
+ * from the openprom(4D) driver. They are not documented in the
  * man page, but they should still be handled here, just enough
  * so the user gets a sensible error back if they stumble onto
  * them.

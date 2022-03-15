@@ -433,7 +433,7 @@ wput_iocdata(queue_t *q, mblk_t *msgp)
 .in -2
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -447,7 +447,10 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-\fBdevmap\fR(9E), \fBioctl\fR(9E), \fBmmap\fR(9E), \fBddi_mmap_get_model\fR(9F)
+.BR devmap (9E),
+.BR ioctl (9E),
+.BR mmap (9E),
+.BR ddi_mmap_get_model (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

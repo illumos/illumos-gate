@@ -126,7 +126,7 @@
  *
  * Encryption:
  *	Each lofi device can have its own symmetric key and cipher.
- *	They are passed to us by lofiadm(1m) in the correct format for use
+ *	They are passed to us by lofiadm(8) in the correct format for use
  *	with the misc/kcf crypto_* routines.
  *
  *	Each block has its own IV, that is calculated in lofi_blk_mech(), based
@@ -2275,7 +2275,7 @@ fake_disk_geometry(struct lofi_state *lsp)
 {
 	u_offset_t dsize = lsp->ls_vp_size - lsp->ls_crypto_offset;
 
-	/* dk_geom - see dkio(7I) */
+	/* dk_geom - see dkio(4I) */
 	/*
 	 * dkg_ncyl _could_ be set to one here (one big cylinder with gobs
 	 * of sectors), but that breaks programs like fdisk which want to
@@ -2305,7 +2305,7 @@ fake_disk_geometry(struct lofi_state *lsp)
 }
 
 /*
- * build vtoc - see dkio(7I)
+ * build vtoc - see dkio(4I)
  *
  * Fakes one big partition based on the size of the file. This is needed
  * because we allow newfs'ing the traditional lofi device and newfs will
@@ -2345,7 +2345,7 @@ fake_disk_vtoc(struct lofi_state *lsp, struct vtoc *vt)
 }
 
 /*
- * build dk_cinfo - see dkio(7I)
+ * build dk_cinfo - see dkio(4I)
  */
 static void
 fake_disk_info(dev_t dev, struct dk_cinfo *ci)

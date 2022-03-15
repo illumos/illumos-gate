@@ -44,7 +44,7 @@ depends on it.
 2. Running the OS Unit Test Suite
 
 The pre-requisites for running the OS Unit Test Suite are:
-	- A non-root user with the ability to sudo(1M) to root without a
+	- A non-root user with the ability to sudo(8) to root without a
 	  password or the root user must run the test.
 
 Once the pre-requisites are satisfied, simply run the ostest script:

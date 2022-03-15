@@ -565,7 +565,7 @@ msgstr "The illumos Fault Manager received an event from the IO subsystem for wh
 msgid "SUN4U-8001-2X.response"
 msgstr "The error information has been saved for examination by your illumos distribution team."
 msgid "SUN4U-8001-2X.impact"
-msgstr "The error log will need to be manually examined using fmdump(1M) in order to determine if any human response is required."
+msgstr "The error log will need to be manually examined using fmdump(8) in order to determine if any human response is required."
 msgid "SUN4U-8001-2X.action"
 msgstr "Use fmdump -ev -u <EVENT-ID> to view and record the undiagnosed errors."
 #

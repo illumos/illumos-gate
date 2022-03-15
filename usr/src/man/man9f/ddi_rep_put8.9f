@@ -135,7 +135,7 @@ useful when writing to a data register.
 .SH CONTEXT
 These functions can be called from user, kernel, or interrupt context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -149,6 +149,9 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBddi_get8\fR(9F), \fBddi_put8\fR(9F), \fBddi_regs_map_free\fR(9F),
-\fBddi_regs_map_setup\fR(9F), \fBddi_rep_get8\fR(9F),
-\fBddi_device_acc_attr\fR(9S)
+.BR ddi_get8 (9F),
+.BR ddi_put8 (9F),
+.BR ddi_regs_map_free (9F),
+.BR ddi_regs_map_setup (9F),
+.BR ddi_rep_get8 (9F),
+.BR ddi_device_acc_attr (9S)

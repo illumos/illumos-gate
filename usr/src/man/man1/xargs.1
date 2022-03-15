@@ -294,7 +294,7 @@ The following operands are supported:
 .ad
 .RS 12n
 The name of the utility to be invoked, found by search path using the
-\fBPATH\fR environment variable. (ee \fBenviron\fR(5).) If \fIutility\fR is
+\fBPATH\fR environment variable. (ee \fBenviron\fR(7).) If \fIutility\fR is
 omitted, the default is the \fBecho\fR(1) utility. If the \fIutility\fR operand
 names any of the special built-in utilities in \fBshell_builtins\fR(1), the
 results are undefined.
@@ -419,7 +419,7 @@ example% \fBecho $* | xargs -n 2 diff\fR
 
 .SH ENVIRONMENT VARIABLES
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBxargs\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
@@ -440,7 +440,7 @@ the behavior of ranges, equivalence classes, and multi-character collating
 elements used in the expression defined for \fByesexpr\fR. The locale specified
 in \fBLC_CTYPE\fR determines the locale for interpretation of sequences of
 bytes of text data a characters, the behavior of character classes used in the
-expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
+expression defined for the \fByesexpr\fR. See \fBlocale\fR(7).
 .SH EXIT STATUS
 .LP
 The following exit values are returned:
@@ -491,7 +491,7 @@ signal, or an invocation of the utility exits with exit status \fB255\fR, the
 remaining input.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -508,5 +508,8 @@ Interface Stability	Standard
 
 .SH SEE ALSO
 .LP
-\fBecho\fR(1), \fBshell_builtins\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBstandards\fR(5)
+.BR echo (1),
+.BR shell_builtins (1),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)

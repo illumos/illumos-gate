@@ -22,7 +22,7 @@
  *
  * varpd's purpose it to provide a means for looking up the destination on the
  * underlay network for a host on an overlay network and to also be a door
- * server such that dladm(1M) via libdladm can configure and get useful status
+ * server such that dladm(8) via libdladm can configure and get useful status
  * information. The heavy lifting is all done by libvarpd and the various lookup
  * plugins.
  *

@@ -2548,17 +2548,12 @@ post_sh_head(POST_ARGS)
 	goodsec = NULL;
 	switch (sec) {
 	case SEC_ERRORS:
+	case SEC_RETURN_VALUES:
 		if (*mdoc->meta.msec == '4')
 			break;
 		if (*mdoc->meta.msec == '7')
 			break;
 		goodsec = "2, 3, 4, 7, 9";
-		/* FALLTHROUGH */
-	case SEC_RETURN_VALUES:
-		if (*mdoc->meta.msec == '7')
-			break;
-		if (NULL == goodsec)
-			goodsec = "2, 3, 7, 9";
 		/* FALLTHROUGH */
 	case SEC_LIBRARY:
 		if (*mdoc->meta.msec == '2')

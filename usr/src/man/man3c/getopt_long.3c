@@ -448,7 +448,7 @@ and
 .Ev LC_ALL ,
 .Ev LC_MESSAGES .
 See
-.Xr environ 5 .
+.Xr environ 7 .
 .Bl -tag -width ".Ev POSIXLY_CORRECT"
 .It Ev POSIXLY_CORRECT
 If set, option processing stops when the first non-option is found and

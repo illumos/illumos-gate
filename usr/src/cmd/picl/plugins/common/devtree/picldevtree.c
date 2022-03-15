@@ -1764,7 +1764,7 @@ update_subtree(picl_nodehdl_t nodeh, di_node_t dinode)
 }
 
 /*
- * Check for a stale OBP node. EINVAL is returned from the openprom(7D) driver
+ * Check for a stale OBP node. EINVAL is returned from the openprom(4D) driver
  * if the nodeid stored in the snapshot is not valid.
  */
 static int

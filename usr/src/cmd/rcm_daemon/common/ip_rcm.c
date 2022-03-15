@@ -482,14 +482,14 @@ ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 
 	/*
 	 * This is an IPMP interface that can be offlined.
-	 * Request in.mpathd(1M) to offline the physical interface.
+	 * Request in.mpathd(8) to offline the physical interface.
 	 */
 	if ((retval = ip_ipmp_offline(node)) != IPMP_SUCCESS)
 		ip_log_err(node, errorp, "in.mpathd offline failed");
 
 	if (retval == IPMP_EMINRED && !detachable) {
 		/*
-		 * in.mpathd(1M) could not offline the device because it was
+		 * in.mpathd(8) could not offline the device because it was
 		 * the last interface in the group.  However, it's possible
 		 * that it's still okay to offline it as long as there are
 		 * higher-level failover mechanisms for the addresses it owns

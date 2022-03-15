@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -51,7 +49,7 @@
  *
  * Be careful of some priorities (facility + severity) that get "lost" by
  * default since they have no syslog.conf entries such as daemon.info and
- * daemon.debug; see syslog(3C) and syslog.conf(4) for more info
+ * daemon.debug; see syslog(3C) and syslog.conf(5) for more info
  */
 int dpritab[] = {LOG_INFO, LOG_WARNING, LOG_NOTICE, LOG_NOTICE};
 int dpritab_len = sizeof (dpritab) / sizeof (dpritab[0]);

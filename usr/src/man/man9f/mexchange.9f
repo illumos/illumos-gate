@@ -87,7 +87,8 @@ failure.
 .SH CONTEXT
 This function can be called from user, kernel or interrupt context.
 .SH SEE ALSO
-\fBdupmsg\fR(9F), \fBmerror\fR(9F)
+.BR dupmsg (9F),
+.BR merror (9F)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

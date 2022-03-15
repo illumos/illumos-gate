@@ -87,7 +87,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='hotplugd' section='1M'
+			<manpage title='hotplugd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

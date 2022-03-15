@@ -68,7 +68,7 @@ the device have incompatible endian characteristics.
 .SH CONTEXT
 These functions can be called from user, kernel, or interrupt context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -82,7 +82,13 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-\fBisa\fR(4), \fBddi_get8\fR(9F), \fBddi_get16\fR(9F), \fBddi_get32\fR(9F),
-\fBddi_io_put8\fR(9F), \fBddi_io_rep_get8\fR(9F), \fBddi_io_rep_put8\fR(9F),
-\fBddi_regs_map_free\fR(9F), \fBddi_regs_map_setup\fR(9F),
-\fBddi_device_acc_attr\fR(9S)
+.BR isa (5),
+.BR ddi_get16 (9F),
+.BR ddi_get32 (9F),
+.BR ddi_get8 (9F),
+.BR ddi_io_put8 (9F),
+.BR ddi_io_rep_get8 (9F),
+.BR ddi_io_rep_put8 (9F),
+.BR ddi_regs_map_free (9F),
+.BR ddi_regs_map_setup (9F),
+.BR ddi_device_acc_attr (9S)

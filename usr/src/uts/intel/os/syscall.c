@@ -285,7 +285,7 @@ pre_syscall()
 	}
 
 	/*
-	 * From the proc(4) manual page:
+	 * From the proc(5) manual page:
 	 * When entry to a system call is being traced, the traced process
 	 * stops after having begun the call to the system but before the
 	 * system call arguments have been fetched from the process.
@@ -549,7 +549,7 @@ post_syscall(long rval1, long rval2)
 	}
 
 	/*
-	 * From the proc(4) manual page:
+	 * From the proc(5) manual page:
 	 * When exit from a system call is being traced, the traced process
 	 * stops on completion of the system call just prior to checking for
 	 * signals and returning to user level.  At this point all return

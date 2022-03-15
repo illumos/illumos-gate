@@ -12,7 +12,7 @@
 libc \- C library
 .SH DESCRIPTION
 Functions in this library provide various facilities defined by System V, ANSI
-C, POSIX, and so on.  See \fBstandards\fR(5). In addition, those facilities
+C, POSIX, and so on.  See \fBstandards\fR(7). In addition, those facilities
 previously defined in the internationalization and the wide-character libraries
 are now defined in this library, as are the facilities previously defined in
 the multithreading libraries, \fBlibthread\fR and \fBlibpthread\fR.
@@ -967,7 +967,7 @@ symbols
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -980,8 +980,12 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-\fBpvs\fR(1), \fBIntro\fR(2), \fBIntro\fR(3), \fBattributes\fR(5),
-\fBlf64\fR(5), \fBstandards\fR(5)
+.BR pvs (1),
+.BR Intro (2),
+.BR Intro (3),
+.BR attributes (7),
+.BR lf64 (7),
+.BR standards (7)
 .SH NOTES
 The synonyms compatibility library, \fBc_synonyms.so.1\fR, provides a mechanism
 to support old applications and libraries that were mistakenly built using

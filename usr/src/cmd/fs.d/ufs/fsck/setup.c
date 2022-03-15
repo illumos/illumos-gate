@@ -640,7 +640,7 @@ find_superblock(caddr_t devstr)
 			    "YOU MUST USE THE -o b OPTION\n"
 			    "TO FSCK TO SPECIFY THE LOCATION OF A VALID "
 			    "ALTERNATE SUPERBLOCK TO\n"
-			    "SUPPLY NEEDED INFORMATION; SEE fsck(1M).\n");
+			    "SUPPLY NEEDED INFORMATION; SEE fsck(8).\n");
 			bflag = 0;
 			retval = -1;
 			goto finish;
@@ -669,7 +669,7 @@ find_superblock(caddr_t devstr)
 			if (cg >= 0) {
 				pwarn("Please verify that the indicated block "
 				    "contains a proper\nsuperblock for the "
-				    "filesystem (see fsdb(1M)).\n");
+				    "filesystem (see fsdb(8)).\n");
 				if (yflag)
 					pwarn("\nFSCK was running in YES "
 					    "mode.  If you wish to run in "
@@ -1231,7 +1231,7 @@ badsb(int listerr, caddr_t s)
 		pwarn("e.g. fsck [-F ufs] -o b=# [special ...] \n");
 		exitstat = EXERRFATAL;
 		pfatal(
-	    "where # is the alternate super block. SEE fsck_ufs(1M). \n");
+	    "where # is the alternate super block. SEE fsck_ufs(8). \n");
 	}
 	/* we're expected to return if not preening */
 }

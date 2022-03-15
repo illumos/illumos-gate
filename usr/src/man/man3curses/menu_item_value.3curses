@@ -68,7 +68,7 @@ The menu driver could not process the request.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -84,8 +84,10 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBcurses\fR(3CURSES), \fBmenus\fR(3CURSES), \fBmenu_opts\fR(3CURSES),
-\fBattributes\fR(5)
+.BR curses (3CURSES),
+.BR menu_opts (3CURSES),
+.BR menus (3CURSES),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

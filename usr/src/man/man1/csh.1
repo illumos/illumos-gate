@@ -949,7 +949,7 @@ Match any single character.
 Match any single character in the enclosed list(s) or range(s). A list is a
 string of characters. A range is two characters separated by a dash
 (\fB\(mi\fR), and includes all the characters in between in the \fBASCII\fR
-collating sequence (see \fBascii\fR(5)).
+collating sequence (see \fBascii\fR(7)).
 .RE
 
 .sp
@@ -1262,7 +1262,7 @@ When a pathname is found that has proper execute permissions, the shell forks a
 new process and passes it, along with its arguments, to the kernel using the
 \fBexecve\fR(\|) system call (see \fBexec\fR(2)). The kernel then attempts to
 overlay the new process with the desired program. If the file is an executable
-binary (in \fBa.out\fR(4) format) the kernel succeeds and begins executing the
+binary (in \fBa.out\fR(5) format) the kernel succeeds and begins executing the
 new process. If the file is a text file and the first line begins with
 \fB#!\fR, the next word is taken to be the pathname of a shell (or command) to
 interpret that script. Subsequent words on the first line are taken as options
@@ -1761,7 +1761,7 @@ Limit the consumption by the current process or any process it spawns, each not
 to exceed \fImax-use\fR on the specified \fIresource\fR. The string
 \fBunlimited\fR requests that the current limit, if any, be removed. If
 \fImax-use\fR is omitted, print the current limit. If \fIresource\fR is
-omitted, display all limits. Run the \fBsysdef\fR(1M) command to display
+omitted, display all limits. Run the \fBsysdef\fR(8) command to display
 maximum limits for certain resources in your system (although it does not
 report stack size). The values reported are in hexadecimal, but can be
 translated into decimal numbers using the \fBbc\fR(1) command.
@@ -1793,7 +1793,7 @@ Maximum \fBCPU\fR seconds per process.
 .ad
 .RS 23n
 Largest single file allowed. Limited to the size of the filesystem. (See
-\fBdf\fR(1M)).
+\fBdf\fR(8)).
 .RE
 
 .sp
@@ -1803,7 +1803,7 @@ Largest single file allowed. Limited to the size of the filesystem. (See
 .ad
 .RS 23n
 Maximum data size (including stack) for the process. This is the size of your
-virtual memory See \fBswap\fR(1M).
+virtual memory See \fBswap\fR(8).
 .RE
 
 .sp
@@ -2136,7 +2136,7 @@ when changed within the C shell.
 .sp
 If any of the \fBLC_*\fR variables (\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
 \fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR) (see
-\fBenviron\fR(5)) are not set in the environment, the operational behavior of
+\fBenviron\fR(7)) are not set in the environment, the operational behavior of
 \fBcsh\fR for each corresponding locale category is determined by the value of
 the \fBLANG\fR environment variable. If \fBLC_ALL\fR is set, its contents are
 used to override both the \fBLANG\fR and the other \fBLC_*\fR variables. If
@@ -2911,7 +2911,7 @@ Display each command after history substitution takes place.
 
 .SS "Large File Behavior"
 .LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBcsh\fR when
+See \fBlargefile\fR(7) for the description of the behavior of \fBcsh\fR when
 encountering files greater than or equal to 2 Gbyte (2^31 bytes).
 .SH FILES
 .ne 2
@@ -2978,7 +2978,7 @@ Source of home directories for `~\fIname\fR'.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -2993,12 +2993,32 @@ CSI	Enabled
 
 .SH SEE ALSO
 .LP
-\fBbc\fR(1), \fBecho\fR(1), \fBlimit\fR(1), \fBlogin\fR(1), \fBls\fR(1),
-\fBmore\fR(1), \fBpfcsh\fR(1), \fBpfexec\fR(1), \fBps\fR(1), \fBsh\fR(1),
-\fBshell_builtins\fR(1), \fBtset\fR(1B), \fBwhich\fR(1), \fBdf\fR(1M),
-\fBswap\fR(1M), \fBsysdef\fR(1M), \fBaccess\fR(2), \fBexec\fR(2),
-\fBfork\fR(2), \fBpipe\fR(2), \fBa.out\fR(4), \fBascii\fR(5),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBtermio\fR(7I)
+.BR bc (1),
+.BR echo (1),
+.BR limit (1),
+.BR login (1),
+.BR ls (1),
+.BR more (1),
+.BR pfcsh (1),
+.BR pfexec (1),
+.BR ps (1),
+.BR sh (1),
+.BR shell_builtins (1),
+.BR which (1),
+.BR tset (1B),
+.BR access (2),
+.BR exec (2),
+.BR fork (2),
+.BR pipe (2),
+.BR termio (4I),
+.BR a.out (5),
+.BR ascii (7),
+.BR attributes (7),
+.BR environ (7),
+.BR largefile (7),
+.BR df (8),
+.BR swap (8),
+.BR sysdef (8)
 .SH DIAGNOSTICS
 .ne 2
 .na

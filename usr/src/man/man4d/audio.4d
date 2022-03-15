@@ -1,0 +1,180 @@
+'\" te
+.\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH AUDIO 4D "Jan 10, 2020"
+.SH NAME
+audio \- common audio framework
+.SH DESCRIPTION
+The \fBaudio\fR driver provides common support routines for audio devices in
+Solaris.
+.sp
+.LP
+The audio framework supports multiple \fBpersonalities\fR, allowing for devices
+to be accessed with different programming interfaces.
+.sp
+.LP
+The audio framework also provides a number of facilities, such as mixing of
+audio streams, and data format and sample rate conversion.
+.SS "Overview"
+The audio framework provides a software mixing engine (audio mixer) for all
+audio devices, allowing more than one process to play or record audio at the
+same time.
+.SS "Multi-Stream Codecs"
+The audio mixer supports multi-stream Codecs. These devices have DSP engines
+that provide  sample rate conversion, hardware mixing, and other features. The
+use of such hardware features is opaque to applications.
+.SS "Backward Compatibility"
+It is not possible to disable the mixing function. Applications must not assume
+that they have exclusive access to the audio device.
+.SS "Audio Formats"
+Digital audio data represents a quantized approximation of an analog audio
+signal waveform. In the simplest case, these quantized numbers represent the
+amplitude of the input waveform at particular sampling intervals. To achieve
+the best approximation of an input signal, the highest possible sampling
+frequency and precision should be used. However, increased accuracy comes at a
+cost of increased data storage requirements. For instance, one minute of
+monaural audio recorded in u-Law format (pronounced \fBmew-law\fR) at 8 KHz
+requires nearly 0.5 megabytes of storage, while the standard Compact Disc audio
+format (stereo 16-bit linear PCM data sampled at 44.1 KHz) requires
+approximately 10 megabytes per minute.
+.sp
+.LP
+An audio data format is characterized in the audio driver by four parameters:
+sample Rate, encoding, precision, and channels. Refer to the device-specific
+manual pages for a list of the audio formats that each device supports. In
+addition to the formats that the audio device supports directly, other formats
+provide higher data compression. Applications can convert audio data to and
+from these formats when playing or recording.
+.SS "Sample Rate"
+Sample rate is a number that represents the sampling frequency (in samples per
+second) of the audio data.
+.sp
+.LP
+The audio mixer always configures the hardware for the highest possible sample
+rate for both play and record. This ensures that none of the audio streams
+require compute-intensive low pass filtering. The result is that high sample
+rate audio streams are not degraded by filtering.
+.sp
+.LP
+Sample rate conversion can be a compute-intensive operation, depending on the
+number of channels and a device's sample rate. For example, an 8KHz signal can
+be easily converted to 48KHz, requiring a low cost up sampling by 6. However,
+converting from 44.1KHz to 48KHz is computer intensive because it must be up
+sampled by 160 and then down sampled by 147. This is only done using integer
+multipliers.
+.sp
+.LP
+Applications can greatly reduce the impact of sample rate conversion by
+carefully picking the sample rate. Applications should always use the highest
+sample rate the device supports. An application can also do its own sample rate
+conversion (to take advantage of floating point and accelerated instructions)
+or use small integers for up and down sampling.
+.sp
+.LP
+All modern audio devices run at 48 kHz or a multiple thereof, hence just using
+48 kHz can be a reasonable compromise if the application is not prepared to
+select higher sample rates.
+.SS "Encodings"
+An encoding parameter specifies the audiodata representation. u-Law encoding
+corresponds to CCITT G.711, and is the standard for voice data used by
+telephone companies in the United States, Canada, and Japan. A-Law encoding is
+also part of CCITT G.711 and is the standard encoding for telephony elsewhere
+in the world. A-Law and u-Law audio data are sampled at a rate of 8000 samples
+per second with 12-bit precision, with the data compressed to 8-bit samples.
+The resulting audio data quality is equivalent to that of stan dard analog
+telephone service.
+.sp
+.LP
+Linear Pulse Code Modulation (PCM) is an uncompressed, signed audio format in
+which sample values are directly proportional to audio signal voltages. Each
+sample is a 2's complement number that represents a positive or negative
+amplitude.
+.SS "Precision"
+Precision indicates the number of bits used to store each audio sample. For
+instance, u-Law and A-Law data are stored with 8-bit precision. PCM data can be
+stored at various precisions, though 16-bit is the most common.
+.SS "Channels"
+Multiple channels of audio can be interleaved at sample boundaries. A sample
+frame consists of a single sample from each active channel. For example, a
+sample frame of stereo 16-bit PCM data consists of 2 16-bit samples,
+corresponding to the left and right channel data. The audio mixer sets the
+hardware to the maximum number of channels supported. If a mono signal is
+played or recorded, it is mixed on the first two (usually the left and right)
+channel only. Silence is mixed on the remaining channels.
+.SS "Supported Formats"
+The audio mixer supports the following audio formats:
+.sp
+.in +2
+.nf
+Encoding            Precision  Channels
+Signed Linear PCM   32-bit     Mono or Stereo
+Signed Linear PCM   16-bit     Mono or Stereo
+Signed Linear PCM   8-bit      Mono or Stereo
+u-Law               8-bit      Mono or Stereo
+A-Law               8-bit      Mono or Stereo
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The audio mixer converts all audio streams to 24-bit Linear PCM before mixing.
+After mixing, conversion is made to the best possible Codec format. The
+conversion process is not compute intensive and audio applications can choose
+the encoding format that best meets their needs.
+.sp
+.LP
+The mixer discards the low order 8 bits of 32-bit Signed Linear PCM in order to
+perform mixing. (This is done to allow for possible overflows to fit into
+32-bits when mixing multiple streams together.) Hence, the maximum effective
+precision is 24-bits.
+.SH FILES
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/audio\fR\fR
+.ad
+.RS 29n
+Device driver (x86)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/audio\fR\fR
+.ad
+.RS 29n
+Device driver (SPARC)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/audio.conf\fR\fR
+.ad
+.RS 29n
+Driver configuration file
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+l | l
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86
+_
+Interface Stability	Uncommitted
+.TE
+
+.SH SEE ALSO
+.BR ioctl (2),
+.BR audio (4I),
+.BR dsp (4I),
+.BR attributes (7)

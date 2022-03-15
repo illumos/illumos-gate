@@ -288,7 +288,7 @@ zonestat_usage(boolean_t explicit)
 "	      \"%s\"\n"
 "	      \"%s\"\n"
 "	      Name of a pool processor set\n"
-"	      Id of a processor set created with psrset(1m)\n"
+"	      Id of a processor set created with psrset(8)\n"
 "	      Name of a zone using dedicated-cpu\n"),
 	    "-z", "-n",
 	    ZONESTAT_NAME_MEM_DEFAULT, ZONESTAT_NAME_VM_DEFAULT);

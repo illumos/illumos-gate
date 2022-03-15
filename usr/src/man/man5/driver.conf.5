@@ -1,0 +1,229 @@
+'\" te
+.\"  Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH DRIVER.CONF 5 "Sep 16, 2018"
+.SH NAME
+driver.conf \- driver configuration files
+.SH SYNOPSIS
+.LP
+.nf
+\fBdriver.conf\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+Driver configuration files provide values for device properties. The values
+override values provided by the devices themselves. Most modern devices provide
+enough property values to make a driver configuration file unnecessary.
+.sp
+.LP
+The system associates a driver with its configuration file by name. For
+example, a driver in \fB/usr/kernel/drv\fR called \fBwombat\fR has the driver
+configuration file \fBwombat.conf\fR, also stored in \fB/usr/kernel/drv\fR,
+associated with it. On systems that support 64-bit drivers, the driver
+configuration file should be placed in the directory in which the 32-bit driver
+is (or would be) located, even if only a 64-bit version is provided. For
+example, a 64-bit driver stored in \fB/usr/kernel/drv/sparcv9\fR stores its
+driver configuration file in \fB/usr/kernel/drv\fR.
+.sp
+.LP
+The value of the \fBname\fR property is the node name. In a \fBdriver.conf\fR
+file, where the generic node name and \fBcompatible\fR property associated with
+a self-identifying devices are typically not used, the node name must be a
+binding name. The binding name is the name chosen by the system to bind a
+driver to the device. The binding name is either an alias associated with the
+driver established by \fBadd_drv\fR(8) or the driver name itself.
+.sp
+.LP
+The syntax of a single entry in a driver configuration file takes one of three
+forms:
+.sp
+.in +2
+.nf
+\fBname\fR="\fInode name\fR" \fBparent\fR="\fIparent name\fR" [\fIproperty-name=value\fR ...]\fB;\fR
+.fi
+.in -2
+
+.sp
+.LP
+In this form, the parent name can be either the binding name of the parent
+nexus driver or a specific full pathname, beginning with a slash (\fB/\fR)
+character, identifying a specific instance of a parent bus. If a binding name
+is used then all parent nodes bound to that driver match. A generic name (for
+example, \fBpci\fR) is not a valid binding name even though it can appear in
+the full pathname of all intended parents.
+.sp
+.LP
+Alternatively, the parent can be specified by the type of interface it presents
+to its children.
+.sp
+.in +2
+.nf
+\fBname\fR="\fInode name\fR" \fBclass\fR="\fIclass name\fR" [\fIproperty-name=value\fR ...]\fB;\fR
+.fi
+.in -2
+
+.sp
+.LP
+For example, the driver for the \fBSCSI\fR host adapter can have different
+names on different platforms, but the target drivers can use class \fBscsi\fR
+to insulate themselves from these differences.
+.sp
+.LP
+Entries of either form above correspond to a device information (\fBdevinfo\fR)
+node in the kernel device tree. Each node has a \fIname\fR which is usually the
+name of the driver, and a \fIparent\fR name which is the name of the parent
+\fBdevinfo\fR node to which it will be connected. Any number of name-value
+pairs can be specified to create properties on the prototype \fBdevinfo\fR
+node. These properties can be retrieved using the DDI property interfaces (for
+example, \fBddi_prop_get_int\fR(9F) and \fBddi_prop_lookup\fR(9F)). The
+prototype \fBdevinfo\fR node specification must be terminated with a semicolon
+(\fB;\fR).
+.sp
+.LP
+The third form of an entry is simply a list of properties.
+.sp
+.in +2
+.nf
+[\fIproperty-name=value\fR ...]\fB;\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+A property created in this way is treated as global to the driver. It can be
+overridden by a property with the same name on a particular \fBdevinfo\fR node,
+either by creating one explicitly on the prototype node in the driver.conf file
+or by the driver.
+.sp
+.LP
+Items are separated by any number of newlines, \fBSPACE\fR or \fBTAB\fR
+characters.
+.sp
+.LP
+The configuration file can contain several entries to specify different device
+configurations and parent nodes. The system can call the driver for each
+possible prototype \fBdevinfo\fR node, and it is generally the responsibility
+of the drivers \fBprobe\fR(9E) routine to determine if the hardware described
+by the prototype \fBdevinfo\fR node is really present.
+.sp
+.LP
+Property names must not violate the naming conventions for Open Boot PROM
+properties or for IEEE 1275 names. In particular, property names should contain
+only printable characters, and should not contain at-sign (\fB@\fR), slash
+(\fB/\fR), backslash (\fB\e\fR), colon (\fB:\fR), or square brackets
+(\fB[]\fR). Property values can be decimal integers or strings delimited by
+double quotes (\fB"\fR). Hexadecimal integers can be constructed by prefixing
+the digits with \fB0x\fR.
+.sp
+.LP
+A comma separated list of integers can be used to construct properties whose
+value is an integer array. The value of such properties can be retrieved inside
+the driver using \fBddi_prop_lookup_int_array\fR(9F).
+.sp
+.LP
+Comments are specified by placing a \fB#\fR character at the beginning of the
+comment string, the comment string extends for the rest of the line.
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRConfiguration File for a PCI Bus Frame Buffer
+.sp
+.LP
+The following is an example of a configuration file called
+\fBACME,simple.conf\fR for a \fBPCI\fR bus frame buffer called
+\fBACME,simple\fR.
+
+.sp
+.in +2
+.nf
+#
+# Copyright (c) 1993, by ACME Fictitious Devices, Inc.
+#
+#ident  "@(#)ACME,simple.conf   1.3     1999/09/09"
+
+name="ACME,simple" class="pci" unit-address="3,1"
+        debug-mode=12;
+.fi
+.in -2
+
+.sp
+.LP
+This example creates a prototype \fBdevinfo\fR node called \fBACME,simple\fR
+under all parent nodes of class \fBpci\fR. The node has device and function
+numbers of 3 and 1, respectively; the property \fBdebug-mode\fR is provided for
+all instances of the driver.
+
+.LP
+\fBExample 2 \fRConfiguration File for a Pseudo Device Driver
+.sp
+.LP
+The following is an example of a configuration file called
+\fBACME,example.conf\fR for a pseudo device driver called \fBACME,example\fR.
+
+.sp
+.in +2
+.nf
+#
+# Copyright (c) 1993, ACME Fictitious Devices, Inc.
+#
+#ident  "@(#)ACME,example.conf  1.2   93/09/09"
+name="ACME,example" parent="pseudo" instance=0
+    debug-level=1;
+
+name="ACME,example" parent="pseudo" instance=1;
+
+whizzy-mode="on";
+debug-level=3;
+.fi
+.in -2
+
+.sp
+.LP
+This creates two \fBdevinfo\fR nodes called \fBACME,example\fR which attaches
+below the \fBpseudo\fR node in the kernel device tree. The \fBinstance\fR
+property is only interpreted by the \fBpseudo\fR node, see \fBpseudo\fR(5) for
+further details. A property called \fBdebug-level\fR is created on the first
+\fBdevinfo\fR node which has the value 1. The \fBexample\fR driver is able to
+fetch the value of this property using \fBddi_prop_get_int\fR(9F).
+
+.sp
+.LP
+Two global driver properties are created, \fBwhizzy-mode\fR (which has the
+string value "on") and \fBdebug-level\fR (which has the value 3). If the driver
+looks up the property \fBwhizzy-mode\fR on either node, it retrieves the value
+of the global \fBwhizzy-mode\fR property ("on"). If the driver looks up the
+\fBdebug-level\fR property on the first node, it retrieves the value of the
+\fBdebug-level\fR property on that node (1). Looking up the same property on
+the second node retrieves the value of the global \fBdebug-level\fR property
+(3).
+
+.SH SEE ALSO
+.LP
+.BR pci (5),
+.BR pseudo (5),
+.BR sbus (5),
+.BR scsi (5),
+.BR add_drv (8),
+.BR probe (9E),
+.BR ddi_getlongprop (9F),
+.BR ddi_getprop (9F),
+.BR ddi_getproplen (9F),
+.BR ddi_prop_get_int (9F),
+.BR ddi_prop_lookup (9F),
+.BR ddi_prop_op (9F)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.SH WARNINGS
+.LP
+To avoid namespace collisions between multiple driver vendors, it is strongly
+recommended that the \fIname\fR property of the driver should begin with a
+vendor-unique string. A reasonably compact and unique choice is the vendor
+over-the-counter stock symbol.
+.SH NOTES
+.LP
+The \fBupdate_drv\fR(8) command should be used to prompt the kernel to reread
+\fBdriver.conf\fR files.

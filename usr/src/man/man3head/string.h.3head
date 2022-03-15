@@ -77,7 +77,7 @@ as described in <\fBstddef.h\fR>
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -93,6 +93,11 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBmemory\fR(3C), \fBstrcoll\fR(3C), \fBstring\fR(3C), \fBstrxfrm\fR(3C),
-\fBstddef.h\fR(3HEAD), \fBtypes.h\fR(3HEAD), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR memory (3C),
+.BR strcoll (3C),
+.BR string (3C),
+.BR strxfrm (3C),
+.BR stddef.h (3HEAD),
+.BR types.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

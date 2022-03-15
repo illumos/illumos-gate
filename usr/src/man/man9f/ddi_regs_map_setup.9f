@@ -129,9 +129,9 @@ non-zero value is in the third tuple (\fIrnumber\fR \fB2\fR).
 .sp
 .LP
 For a full treatment of the meaning of the \fIreg\fR property for PCI
-devices, see \fBpci\fR(4). For PCI express devices, see \fBpcie\fR(4).
-For ISA devices, see \fBisa\fR(4). For cardbus, see \fBcardbus\fR(4).
-For SBus devices, see \fBsbus\fR(4).
+devices, see \fBpci\fR(5). For PCI express devices, see \fBpcie\fR(5).
+For ISA devices, see \fBisa\fR(5). For cardbus, see \fBcardbus\fR(5).
+For SBus devices, see \fBsbus\fR(5).
 .SH RETURN VALUES
 \fBddi_regs_map_setup()\fR returns:
 .sp
@@ -181,7 +181,7 @@ checking for a specific failure value.
 .SH CONTEXT
 \fBddi_regs_map_setup()\fR must be called from user or kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -195,8 +195,14 @@ Architecture	PCI Local Bus, SBus, ISA
 .TE
 
 .SH SEE ALSO
-\fBcardbus\fR(4), \fBisa\fR(4), \fBpci\fR(4), \fBpcie\fR(4), \fBsbus\fR(4),
-\fBattributes\fR(5), \fBddi_regs_map_free\fR(9F), \fBddi_device_acc_attr\fR(9S)
+.BR cardbus (5),
+.BR isa (5),
+.BR pci (5),
+.BR pcie (5),
+.BR sbus (5),
+.BR attributes (7),
+.BR ddi_regs_map_free (9F),
+.BR ddi_device_acc_attr (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

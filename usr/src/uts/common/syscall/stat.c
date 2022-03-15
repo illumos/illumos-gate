@@ -216,7 +216,7 @@ cstat(vnode_t *vp, struct stat *ubp, int flag, cred_t *cr)
 	 * instead we return the value MAXOFF32_T (LONG_MAX).
 	 *
 	 * 32-bit applications that care about the size of devices should be
-	 * built 64-bit or use a large file interface (lfcompile(5) or lf64(5)).
+	 * built 64-bit or use a large file interface (lfcompile(7) or lf64(7)).
 	 */
 	if ((vattr.va_size > MAXOFF32_T) &&
 	    ((vp->v_type == VBLK) || (vp->v_type == VCHR))) {

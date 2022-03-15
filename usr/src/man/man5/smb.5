@@ -1,0 +1,621 @@
+'\" te
+.\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2017, Nexenta Systems, Inc. All Rights Reserved.
+.\" Copyright 2021, RackTop Systems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.TH SMB 5 "December 28, 2020"
+.SH NAME
+smb \- configuration properties for Solaris CIFS server
+.SH DESCRIPTION
+Behavior of the Solaris CIFS server is defined by property values that are
+stored in the Service Management Facility, \fBsmf\fR(7).
+.sp
+.LP
+An authorized user can use the \fBsharectl\fR(8) command to set global values
+for these properties in SMF.
+.sp
+.LP
+The following list describes the properties:
+.sp
+.ne 2
+.na
+\fB\fBads_site\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the site configured in DNS to look up Active Directory information.
+Sites provide a mechanism to partition or delegate administration and policy
+management, which are typically used in large or complex domains.
+.sp
+The value should not be set if you do not have a local Active Directory site.
+By default, no value is set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBautohome_map\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the full path for the SMD autohome map file, \fBsmbautohome\fR. The
+default path is \fB/etc\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbypass_traverse_checking\fR\fR
+.ad
+.sp .6
+.RS 4n
+When set, allows the SMB server to bypass ACL "traverse" checks.
+The default value is \fBtrue\fR, for Windows compatibility.
+If this parameter is \fBfalse\fR, ACL checks require that
+"traverse" (directory execute) is granted on every directory
+above the directory the SMB client tries to access.
+Windows shares are normally setup with the higher level
+directories not specifically granting such access.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdisposition\fR\fR
+.ad
+.sp .6
+.RS 4n
+A value that controls whether to disconnect the share or proceed if the map
+command fails. The disposition property only has meaning when the map property
+has been set. Otherwise it will have no effect.
+.sp
+.in +2
+.nf
+disposition = [ continue | terminate ]
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fB\fBcontinue\fR\fR
+.ad
+.sp .6
+.RS 4n
+Proceed with share connection if the map command fails. This is the default in
+the event that disposition is not specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBterminate\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disconnect the share if the map command fails.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBddns_enable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables or disables dynamic DNS updates. A value of \fBtrue\fR enables dynamic
+updates, while a value of \fBfalse\fR disables dynamic updates. By default, the
+value is \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBencrypt\fR\fR
+.ad
+.sp .6
+.RS 4n
+Controls SMB3 Encryption. For requests on a particular share, the server's
+behavior is controlled by the stricter of this option and the per-share
+"encrypt" option.
+.sp
+When set to \fBdisabled\fR, the server will not ask clients to encrypt requests.
+When set to \fBenabled\fR, the server will ask clients to encrypt requests,
+but will not require that they do so. Any message that can be encrypted
+will be encrypted.
+When set to \fBrequired\fR, the server will deny access to or disconnect
+any client that does not support encryption or fails to encrypt requests
+that they should.
+.sp
+In other words, the \fBenabled\fR behavior is that any message that CAN
+be encrypted SHOULD be encrypted, while the \fBrequired\fR behavior is that any
+message that CAN be encrypted MUST be encrypted.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBencrypt_cipher\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a list of enabled SMB 3.1.1 encryption ciphers. This property is only
+used when encryption is On (see \fBencrypt\fR property) and negotiated SMB
+dialect is 3.1.1 or higher (see \fBmax_protocol\fR property). Otherwise it is
+ignored.
+.sp
+When the property is set, a list of comma separated ciphers should be specified,
+or the value \fBall\fR should be used instead to enable all supported ciphers.
+By default, when the property is empty, it is equivalent to value \fBall\fR -
+all available ciphers will be enabled.
+.sp
+The list of ciphers should contain these values:
+.sp
+.ne 2
+.na
+\fBaes128-ccm\fR
+.ad
+.RS 13n
+AES-128-CCM cipher is enabled. It is the only cipher used for SMB 3.0.2
+dialect.
+.RE
+
+.sp
+.ne 2
+.na
+\fBaes128-gcm\fR
+.ad
+.RS 13n
+AES-128-GCM cipher is enabled.
+preferred.
+.RE
+
+.sp
+.ne 2
+.na
+\fBall\fR
+.ad
+.RS 13n
+All ciphers are enabled.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv6_enable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables IPv6 Internet protocol support within the CIFS Service. Valid values
+are \fBtrue\fR and \fBfalse\fR. The default value is \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBkeep_alive\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the number of seconds before an idle SMB connection is dropped by the
+Solaris CIFS server. If set to 0, idle connections are not dropped. Valid
+values are 0 and from 20 seconds and above. The default value is 0.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlmauth_level\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the LAN Manager (LM) authentication level. The LM compatibility level
+controls the type of user authentication to use in workgroup mode or domain
+mode. The default value is 3.
+.sp
+The following describes the behavior at each level.
+.sp
+.ne 2
+.na
+\fB2\fR
+.ad
+.RS 13n
+In Windows workgroup mode, the Solaris CIFS server accepts LM, NTLM, LMv2, and
+NTLMv2 requests. In domain mode, the SMB redirector on the Solaris CIFS server
+sends NTLM requests.
+.RE
+
+.sp
+.ne 2
+.na
+\fB3\fR
+.ad
+.RS 13n
+In Windows workgroup mode, the Solaris CIFS server accepts LM, NTLM, LMv2, and
+NTLMv2 requests. In domain mode, the SMB redirector on the Solaris CIFS server
+sends LMv2 and NTLMv2 requests.
+.RE
+
+.sp
+.ne 2
+.na
+\fB4\fR
+.ad
+.RS 13n
+In Windows workgroup mode, the Solaris CIFS server accepts NTLM, LMv2, and
+NTLMv2 requests. In domain mode, the SMB redirector on the Solaris CIFS server
+sends LMv2 and NTLMv2 requests.
+.RE
+
+.sp
+.ne 2
+.na
+\fB5\fR
+.ad
+.RS 13n
+In Windows workgroup mode, the Solaris CIFS server accepts LMv2 and NTLMv2
+requests. In domain mode, the SMB redirector on the Solaris CIFS server sends
+LMv2 and NTLMv2 requests.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmap\fR\fR
+.ad
+.sp .6
+.RS 4n
+The value is a command to be executed when connecting to the share. The command
+can take the following arguments, which will be substituted when the command is
+exec'd as described below:
+.sp
+.ne 2
+.na
+\fB\fB%U\fR\fR
+.ad
+.sp .6
+.RS 4n
+Windows username.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%D\fR\fR
+.ad
+.sp .6
+.RS 4n
+Name of the domain or workgroup of \fB%U\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%h\fR\fR
+.ad
+.sp .6
+.RS 4n
+The server hostname.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%M\fR\fR
+.ad
+.sp .6
+.RS 4n
+The client hostname, or \fB""\fR if not available.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%L\fR\fR
+.ad
+.sp .6
+.RS 4n
+The server NetBIOS name.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%m\fR\fR
+.ad
+.sp .6
+.RS 4n
+The client NetBIOS name, or \fB""\fR if not available. This option is only
+valid for NetBIOS connections (port 139).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%I\fR\fR
+.ad
+.sp .6
+.RS 4n
+The IP address of the client machine.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%i\fR\fR
+.ad
+.sp .6
+.RS 4n
+The local IP address to which the client is connected.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%S\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the share.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%P\fR\fR
+.ad
+.sp .6
+.RS 4n
+The root directory of the share.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB%u\fR\fR
+.ad
+.sp .6
+.RS 4n
+The UID of the Unix user.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmax_protocol\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the maximum SMB protocol level that the SMB service
+should allow clients to negotiate.  The default value is \fB3.11\fR.
+Valid settings include: \fB1\fR, \fB2.1\fR, \fB3.0\fR, \fB3.02\fR, \fB3.11\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmin_protocol\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the minimum SMB protocol level that the SMB service
+should allow clients to negotiate.  The default value is \fB1\fR.
+Valid settings include: \fB1\fR, \fB2.1\fR, \fB3.0\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmax_workers\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the maximum number of worker threads that will be launched to process
+incoming CIFS requests. The SMB \fBmax_mpx\fR value, which indicates to a
+client the maximum number of outstanding SMB requests that it may have pending
+on the server, is derived from the \fBmax_workers\fR value. To ensure
+compatibility with older versions of Windows the lower 8-bits of \fBmax_mpx\fR
+must not be zero. If the lower byte of \fBmax_workers\fR is zero, \fB64\fR is
+added to the value. Thus the minimum value is \fB64\fR and the default value,
+which appears in \fBsharectl\fR(8) as \fB1024\fR, is \fB1088\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnetbios_scope\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the NetBIOS scope identifier, which identifies logical NetBIOS
+networks that are on the same physical network. When you specify a NetBIOS
+scope identifier, the server filters the number of machines that are listed in
+the browser display to make it easier to find other hosts. The value is a text
+string that represents a domain name. By default, no value is set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBoplock_enable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Controls whether "oplocks" may be granted by the SMB server.
+The term "oplock" is short for "opportunistic lock", which is
+the legacy name for cache delegations in SMB.
+By default, oplocks are enabled.
+Note that if oplocks are disabled, file I/O performance may be
+severely reduced.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpdc\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the preferred IP address for the domain controller. This property is
+sometimes used when there are multiple domain controllers to indicate which one
+is preferred. If the specified domain controller responds, it is chosen even if
+the other domain controllers are also available. By default, no value is set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrestrict_anonymous\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disables anonymous access to IPC$, which requires that the client be
+authenticated to get access to MSRPC services through IPC$. A value of
+\fBtrue\fR disables anonymous access to IPC$, while a value of \fBfalse\fR
+enables anonymous access.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsigning_enabled\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables SMB signing. When signing is enabled but not required it is possible
+for clients to connect regardless of whether or not the client supports SMB
+signing. If a packet has been signed, the signature will be verified. If a
+packet has not been signed it will be accepted without signature verification.
+Valid values are \fBtrue\fR and \fBfalse\fR. The default value is \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsigning_required\fR\fR
+.ad
+.sp .6
+.RS 4n
+When SMB signing is required, all packets must be signed or they will be
+rejected, and clients that do not support signing will be unable to connect to
+the server. The \fBsigning_required\fR setting is only taken into account when
+\fBsigning_enabled\fR is \fBtrue\fR. Valid values are \fBtrue\fR and
+\fBfalse\fR. The default value is \fBfalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsystem_comment\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies an optional description for the system, which is a text string. This
+property value might appear in various places, such as Network Neighborhood or
+Network Places on Windows clients. By default, no value is set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtraverse_mounts\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBtraverse_mounts\fR setting determines how the SMB server
+presents sub-mounts underneath an SMB share.  When \fBtraverse_mounts\fR
+is \fBtrue\fR (the default), sub-mounts are presented to SMB clients
+like any other subdirectory.   When \fBtraverse_mounts\fR is \fBfalse\fR,
+sub-mounts are not shown to SMB clients.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBunmap\fR\fR
+.ad
+.sp .6
+.RS 4n
+The value is a command to be executed when disconnecting the share. The command
+can take the same substitutions listed on the \fBmap\fR property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBwins_exclude\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies a comma-separated list of network interfaces that should not be
+registered with WINS. NetBIOS host announcements are made on excluded
+interfaces.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBwins_server_1\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the IP address of the primary WINS server. By default, no value is
+set.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBwins_server_2\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the IP address of the secondary WINS server. By default, no value is
+set.
+.RE
+
+.SH ATTRIBUTES
+See the \fBattributes\fR(7) man page for descriptions of the following
+attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Uncommitted
+.TE
+
+.SH SEE ALSO
+.BR attributes (7),
+.BR smf (7),
+.BR sharectl (8),
+.BR smbadm (8),
+.BR smbd (8),
+.BR smbstat (8)

@@ -33,10 +33,10 @@ authorizations.
 An asterisk (\fB*\fR) indicates all authorizations in a class.
 .sp
 .LP
-A user's authorizations are looked up in \fBuser_attr\fR(4) and in the
-\fB/etc/security/policy.conf\fR file (see \fBpolicy.conf\fR(4)). Authorizations
-may be specified directly in \fBuser_attr\fR(4) or indirectly through
-\fBprof_attr\fR(4). Authorizations may also be assigned to every user in the
+A user's authorizations are looked up in \fBuser_attr\fR(5) and in the
+\fB/etc/security/policy.conf\fR file (see \fBpolicy.conf\fR(5)). Authorizations
+may be specified directly in \fBuser_attr\fR(5) or indirectly through
+\fBprof_attr\fR(5). Authorizations may also be assigned to every user in the
 system directly as default authorizations or indirectly as default profiles in
 the \fB/etc/security/policy.conf\fR file.
 .SH EXAMPLES
@@ -100,6 +100,11 @@ An error occurred.
 .SH SEE ALSO
 .sp
 .LP
-\fBprofiles\fR(1), \fBroles\fR(1), \fBgetauthattr\fR(3SECDB),
-\fBauth_attr\fR(4), \fBpolicy.conf\fR(4), \fBprof_attr\fR(4),
-\fBuser_attr\fR(4), \fBattributes\fR(5)
+.BR profiles (1),
+.BR roles (1),
+.BR getauthattr (3SECDB),
+.BR auth_attr (5),
+.BR policy.conf (5),
+.BR prof_attr (5),
+.BR user_attr (5),
+.BR attributes (7)

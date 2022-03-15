@@ -93,7 +93,7 @@ Place the hook after another hook on the list of hooks. The value in
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -107,4 +107,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBnetinfo\fR(9F)
+.BR netinfo (9F)

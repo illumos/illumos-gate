@@ -320,7 +320,7 @@ transmit beyond \fBgldm_maxpkt\fR. For example, if an Ethernet device can
 handle packets whose payload section is no greater than 1522 bytes and the
 \fBgldm_maxpkt\fR is set to 1500 (as is typical for Ethernet), then
 \fBgldm_margin\fR is set to 22. The registered \fBgldm_margin\fR value is
-reported in acknowledgements of the DLIOCMARGININFO ioctl (see \fBdlpi\fR(7P)).
+reported in acknowledgements of the DLIOCMARGININFO ioctl (see \fBdlpi\fR(4P)).
 .RE
 
 .sp
@@ -334,8 +334,13 @@ link state, the GLD_CAP_LINKSTATE bit should be set.
 .RE
 
 .SH SEE ALSO
-\fBgld\fR(7D), \fBdlpi\fR(7P), \fBattach\fR(9E), \fBgld\fR(9E),
-\fBddi_add_intr\fR(9F), \fBgld\fR(9F), \fBgld_stats\fR(9S)
+.BR gld (4D),
+.BR dlpi (4P),
+.BR attach (9E),
+.BR gld (9E),
+.BR ddi_add_intr (9F),
+.BR gld (9F),
+.BR gld_stats (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

@@ -63,7 +63,10 @@ Someone wants to write to band.
 .SH SEE ALSO
 .sp
 .LP
-\fBstrqget\fR(9F), \fBstrqset\fR(9F), \fBmsgb\fR(9S), \fBqueue\fR(9S)
+.BR strqget (9F),
+.BR strqset (9F),
+.BR msgb (9S),
+.BR queue (9S)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

@@ -71,7 +71,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='in.mpathd' section='1M' />
+			<manpage title='in.mpathd' section='8' />
 		</documentation>
 	</template>
 </service>

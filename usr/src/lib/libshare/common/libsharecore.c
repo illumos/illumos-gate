@@ -58,7 +58,7 @@
 #define	DFSTAB_NOTICE_LINES	5
 static char *notice[DFSTAB_NOTICE_LINES] =	{
 	"# Do not modify this file directly.\n",
-	"# Use the sharemgr(1m) command for all share management\n",
+	"# Use the sharemgr(8) command for all share management\n",
 	"# This file is reconstructed and only maintained for backward\n",
 	"# compatibility. Configuration lines could be lost.\n",
 	"#\n"

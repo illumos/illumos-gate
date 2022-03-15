@@ -64,7 +64,7 @@ is
 .Sy Unsafe .
 .Sh SEE ALSO
 .Xr err 3c ,
-.Xr attributes 5
+.Xr attributes 7
 .Sh NOTES
 The use of
 .Fn setprogname

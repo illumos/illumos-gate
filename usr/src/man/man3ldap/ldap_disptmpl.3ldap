@@ -92,7 +92,7 @@ Entry display templates provide a standard way for LDAP applications to display
 directory entries.  The general idea is that it is possible to map the list of
 object class values present in an entry to an appropriate display template.
 Display templates are defined in a configuration file. See
-\fBldaptemplates.conf\fR(4). Each display template contains a pre-determined
+\fBldaptemplates.conf\fR(5). Each display template contains a pre-determined
 list of items, where each item generally corresponds to an attribute to be
 displayed.  The items contain information and flags that the caller can use to
 display the attribute and values in a reasonable fashion.  Each item has a
@@ -102,7 +102,7 @@ produce text output.
 .sp
 .LP
 \fBldap_init_templates()\fR reads a sequence of templates from a valid LDAP
-template configuration file (see  \fBldaptemplates.conf\fR(4)). Upon success,
+template configuration file (see  \fBldaptemplates.conf\fR(5)). Upon success,
 \fB0\fR is returned, and \fItmpllistp\fR is set to point to a list of
 templates.  Each member of the list is an \fBldap_disptmpl\fR structure
 (defined below in the DISPTMPL Structure Elements section).
@@ -111,7 +111,7 @@ templates.  Each member of the list is an \fBldap_disptmpl\fR structure
 \fBldap_init_templates_buf()\fR reads a sequence of templates from \fIbuf\fR
 (whose size is \fIbuflen).\fR \fIbuf\fR should point to the data in the format
 defined for an LDAP template configuration file (see
-\fBldaptemplates.conf\fR(4)). Upon success,  \fB0\fR is returned, and
+\fBldaptemplates.conf\fR(5)). Upon success,  \fB0\fR is returned, and
 \fItmpllistp\fR is set to point to a list of templates.
 .sp
 .LP
@@ -430,7 +430,7 @@ cannot be read.   Other functions generally return \fINULL\fR upon error.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -445,5 +445,7 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBldap_entry2text\fR(3LDAP), \fBldaptemplates.conf\fR(4),
-\fBattributes\fR(5)
+.BR ldap (3LDAP),
+.BR ldap_entry2text (3LDAP),
+.BR ldaptemplates.conf (5),
+.BR attributes (7)

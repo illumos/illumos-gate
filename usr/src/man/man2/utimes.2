@@ -97,7 +97,7 @@ file referenced by the file descriptor \fIfildes\fR.
 .sp
 .LP
 The \fBfutimesat()\fR function also sets access and modification times.  See
-\fBfsattr\fR(5). If \fIpath\fR is a relative path name, however,
+\fBfsattr\fR(7). If \fIpath\fR is a relative path name, however,
 \fBfutimesat()\fR resolves the path relative to the \fIfildes\fR argument
 rather than the current working directory.  If \fIfildes\fR is set to
 \fBAT_FDCWD\fR, defined in <\fBfcntl.h\fR>, \fBfutimesat()\fR resolves the path
@@ -288,7 +288,7 @@ length exceeds {\fIPATH_MAX\fR}.
 .RE
 
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -305,7 +305,10 @@ Standard	See below.
 
 .sp
 .LP
-For \fButimes()\fR, \fButimensat()\fR and \fBfutimensat()\fR, see \fBstandards\fR(5).
+For \fButimes()\fR, \fButimensat()\fR and \fBfutimensat()\fR, see \fBstandards\fR(7).
 .SH SEE ALSO
-\fBstat\fR(2), \fButime\fR(2), \fBattributes\fR(5),
-\fBfsattr\fR(5), \fBstandards\fR(5)
+.BR stat (2),
+.BR utime (2),
+.BR attributes (7),
+.BR fsattr (7),
+.BR standards (7)

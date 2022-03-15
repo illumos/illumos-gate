@@ -1,0 +1,374 @@
+'\" te
+.\" Copyright (c) 2013 Gary Mills
+.\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SYSLOGD 8 "June 20, 2021"
+.SH NAME
+syslogd \- log system messages
+.SH SYNOPSIS
+.nf
+\fB/usr/sbin/syslogd\fR [\fB-d\fR] [\fB-f\fR \fIconfigfile\fR] [\fB-m\fR \fImarkinterval\fR]
+     [\fB-p\fR \fIpath\fR] [\fB-t\fR | \fB-T\fR]
+.fi
+
+.SH DESCRIPTION
+\fBsyslogd\fR reads and forwards system messages to the appropriate log files
+or users, depending upon the priority of a message and the system facility from
+which it originates. The configuration file \fB/etc/syslog.conf\fR (see
+\fBsyslog.conf\fR(5)) controls where messages are forwarded. \fBsyslogd\fR logs
+a mark (timestamp) message every \fImarkinterval\fR minutes (default \fB20\fR)
+at priority \fBLOG_INFO\fR to the facility whose name is given as \fBmark\fR in
+the \fBsyslog.conf\fR file.
+.sp
+.LP
+A system message consists of a single line of text, which may be prefixed with
+a priority code number enclosed in angle-brackets (\fB<\|>\fR); priorities are
+defined in \fB<sys/syslog.h>\fR\&.
+.sp
+.LP
+\fBsyslogd\fR reads from the \fBSTREAMS\fR log driver, \fB/dev/log\fR, and from
+any transport provider specified in \fB/etc/netconfig\fR,
+\fB/etc/net/transport/hosts\fR, and \fB/etc/net/transport/services\fR.
+.sp
+.LP
+\fBsyslogd\fR reads the configuration file when it starts up, and again
+whenever it receives a \fBHUP\fR signal (see \fBsignal.h\fR(3HEAD), at which
+time it also closes all files it has open, re-reads its configuration file, and
+then opens only the log files that are listed in that file. \fBsyslogd\fR exits
+when it receives a \fBTERM\fR signal.
+.sp
+.LP
+As it starts up, \fBsyslogd\fR creates the file \fB/var/run/syslog.pid\fR, if
+possible, containing its process identifier (\fBPID\fR).
+.sp
+.LP
+If message \fBID\fR generation is enabled (see \fBlog\fR(4D)), each message
+will be preceded by an identifier in the following format: \fB[ID\fR \fImsgid
+facility\fR\fB\&.\fR\fIpriority\fR\fB]\fR. \fImsgid\fR is the message's numeric
+identifier described in \fBmsgid\fR(8). \fIfacility\fR and \fIpriority\fR are
+described in \fBsyslog.conf\fR(5). \fB[ID 123456 kern.notice]\fR is an example
+of an identifier when message \fBID\fR generation is enabled.
+.sp
+.LP
+If the message originated in a loadable kernel module or driver, the kernel
+module's name (for example, \fBufs\fR) will be displayed instead of \fBunix\fR.
+See \fBEXAMPLES\fR for sample output from \fBsyslogd\fR with and without
+message \fBID\fR generation enabled.
+.sp
+.LP
+In an effort to reduce visual clutter, message \fBID\fRs are not displayed when
+writing to the console; message \fBID\fRs are only written to the log file.
+See \fBEXAMPLES\fR.
+.sp
+.LP
+The \fB/etc/default/syslogd\fR file contains the following default parameter
+settings, which are in effect if neither the \fB-t\fR nor \fB-T\fR option is
+selected. See \fBFILES\fR.
+.sp
+.LP
+The recommended way to allow or disallow message logging is through the use of
+the service management facility (\fBsmf\fR(7)) property:
+.sp
+.in +2
+.nf
+svc:/system/system-log/config/log_from_remote
+.fi
+.in -2
+
+.sp
+.LP
+This property specifies whether remote messages are logged.
+\fBlog_from_remote=true\fR is equivalent to the \fB-t\fR command-line option
+and \fBfalse\fR is equivalent to the \fB-T\fR command-line option. The default
+value for \fB-log_from_remote\fR is \fBfalse\fR. See NOTES, below.
+.sp
+.ne 2
+.na
+\fB\fBLOG_FROM_REMOTE\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies whether remote messages are logged. \fBLOG_FROM_REMOTE=NO\fR is
+equivalent to the \fB-t\fR command-line option. The default value for
+\fBLOG_FROM_REMOTE\fR is \fBYES\fR.
+.RE
+
+.SH OPTIONS
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-d\fR\fR
+.ad
+.sp .6
+.RS 4n
+Turn on debugging. This option should only be used interactively in a root
+shell once the system is in multi-user mode. It should \fBnot\fR be used in the
+system start-up scripts, as this will cause the system to hang at the point
+where \fBsyslogd\fR is started.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fIconfigfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify an alternate configuration file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-m\fR \fImarkinterval\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify an interval, in minutes, between mark messages.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIpath\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify an alternative log device name. The default is \fB/dev/log\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-T\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable the \fBsyslogd\fR \fBUDP\fR port to turn on logging of remote messages.
+This is the default behavior. See \fBEXAMPLES\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disable the \fBsyslogd\fR \fBUDP\fR port to turn off logging of remote
+messages. See \fBEXAMPLES\fR.
+.RE
+
+.SH EXAMPLES
+\fBExample 1 \fR\fBsyslogd\fR Output Without Message ID Generation Enabled
+.sp
+.LP
+The following example shows the output from \fBsyslogd\fR when message \fBID\fR
+generation \fBis not\fR enabled:
+
+.sp
+.in +2
+.nf
+Sep 29 21:41:18 cathy unix: alloc /: file system full
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fR\fBsyslogd\fR Output with ID generation Enabled
+.sp
+.LP
+The following example shows the output from \fBsyslogd\fR when message \fBID\fR
+generation \fBis\fR enabled. The message \fBID\fR is displayed when writing to
+log file \fB/var/adm/messages\fR.
+
+.sp
+.in +2
+.nf
+Sep 29 21:41:18 cathy ufs: [ID 845546 kern.notice]
+                                    alloc /: file system full
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fR\fBsyslogd\fR Output with ID Generation Enabled
+.sp
+.LP
+The following example shows the output from \fBsyslogd\fR when message \fBID\fR
+generation \fBis\fR enabled when writing to the console. Even though message ID
+is enabled, the message \fBID\fR is not displayed at the console.
+
+.sp
+.in +2
+.nf
+Sep 29 21:41:18 cathy ufs: alloc /: file system full
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fREnabling Acceptance of UDP Messages from Remote Systems
+.sp
+.LP
+The following commands enable \fBsyslogd\fR to accept entries from remote
+systems.
+
+.sp
+.in +2
+.nf
+# \fBsvccfg -s svc:/system/system-log setprop config/log_from_remote = true\fR
+# \fBsvcadm restart svc:/system/system-log\fR
+.fi
+.in -2
+.sp
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/etc/syslog.conf\fR\fR
+.ad
+.sp .6
+.RS 4n
+Configuration file
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/var/run/syslog.pid\fR\fR
+.ad
+.sp .6
+.RS 4n
+Process \fBID\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/default/syslogd\fR\fR
+.ad
+.sp .6
+.RS 4n
+Contains default settings. You can override some of the settings by
+command-line options.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/dev/log\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBSTREAMS\fR log driver
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/netconfig\fR\fR
+.ad
+.sp .6
+.RS 4n
+Transport providers available on the system
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/net/transport/hosts\fR\fR
+.ad
+.sp .6
+.RS 4n
+Network hosts for each transport
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/etc/net/transport/services\fR\fR
+.ad
+.sp .6
+.RS 4n
+Network services for each transport
+.RE
+
+.SH SEE ALSO
+.BR logger (1),
+.BR svcs (1),
+.BR syslog (3C),
+.BR signal.h (3HEAD),
+.BR log (4D),
+.BR syslog.conf (5),
+.BR attributes (7),
+.BR smf (7),
+.BR msgid (8),
+.BR svcadm (8),
+.BR svccfg (8)
+.SH NOTES
+The \fBmark\fR message is a system time stamp, and so it is only defined for
+the system on which \fBsyslogd\fR is running. It can not be forwarded to other
+systems.
+.sp
+.LP
+When \fBsyslogd\fR receives a \fBHUP\fR signal, it attempts to complete
+outputting pending messages, and close all log files to which it is currently
+logging messages. If, for some reason, one (or more) of these files does not
+close within a generous grace period, \fBsyslogd\fR discards the pending
+messages, forcibly closes these files, and starts reconfiguration. If this
+shutdown procedure is disturbed by an unexpected error and \fBsyslogd\fR cannot
+complete reconfiguration, \fBsyslogd\fR sends a mail message to the superuser
+on the current system stating that it has shut down, and exits.
+.sp
+.LP
+Care should be taken to ensure that each window displaying messages forwarded
+by \fBsyslogd\fR (especially console windows) is run in the system default
+locale (which is \fBsyslogd\fR's locale). If this advice is not followed, it is
+possible for a \fBsyslog\fR message to alter the terminal settings for that
+window, possibly even allowing remote execution of arbitrary commands from that
+window.
+.sp
+.LP
+The \fBsyslogd\fR service is managed by the service management facility,
+\fBsmf\fR(7), under the service identifier:
+.sp
+.in +2
+.nf
+ svc:/system/system-log:default
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(8). The service's
+status can be queried using the \fBsvcs\fR(1) command.
+.sp
+.LP
+When \fBsyslogd\fR is started by means of \fBsvcadm\fR(8), if a value is
+specified for \fBLOG_FROM_REMOTE\fR in the \fB/etc/defaults/syslogd\fR file,
+the SMF property \fBsvc:/system/system-log/config/log_from_remote\fR is set to
+correspond to the \fBLOG_FROM_REMOTE\fR value and the
+\fB/etc/default/syslogd\fR file is modified to replace the
+\fBLOG_FROM_REMOTE\fR specification with the following comment:
+.sp
+.in +2
+.nf
+# LOG_FROM_REMOTE is now set using svccfg(8), see syslogd(8).
+.fi
+.in -2
+
+.sp
+.LP
+If neither \fBLOG_FROM_REMOTE\fR nor
+\fBsvc:/system/system-log/config/log_from_remote\fR are defined, the default is
+to log remote messages.
+.sp
+.LP
+On installation, the initial value of
+\fBsvc:/system/system-log/config/log_from_remote\fR is \fBfalse\fR.

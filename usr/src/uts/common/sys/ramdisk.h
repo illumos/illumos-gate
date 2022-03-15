@@ -26,8 +26,6 @@
 #ifndef	_SYS_RAMDISK_H
 #define	_SYS_RAMDISK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/vtoc.h>
@@ -93,7 +91,7 @@ extern "C" {
 	}
 
 /*
- * Interface between the ramdisk(7D) driver and ramdiskadm(1M).  Use is:
+ * Interface between the ramdisk(4D) driver and ramdiskadm(8).  Use is:
  *
  *	fd = open("/dev/ramdiskctl", O_RDWR | O_EXCL);
  *
@@ -117,7 +115,7 @@ extern "C" {
  *  by the RD_DELETE_DISK ioctl).
  *
  * Note that these ioctls are completely private, and only for the use of
- * ramdiskadm(1M).
+ * ramdiskadm(8).
  */
 #define	RD_IOC_BASE		(('R' << 16) | ('D' << 8))
 

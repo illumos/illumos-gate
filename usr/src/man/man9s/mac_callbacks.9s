@@ -216,7 +216,7 @@ opened.
 Note that most device drivers will not have a need to implement this.
 It is not required for this function to be implemented for this device to be
 used with
-.Xr dlpi 7P .
+.Xr dlpi 4P .
 This entry point is optional.
 For it to be used, the
 .Sy MC_OPEN
@@ -233,7 +233,7 @@ closed.
 Note that most device drivers will not have a need to implement this.
 It is not required for this function to be implemented for this device to be
 used with
-.Xr dlpi 7P .
+.Xr dlpi 4P .
 This entry point is optional.
 For it to be used, the
 .Sy MC_CLOSE
@@ -322,10 +322,10 @@ or
 .Sy mc_propinfo
 will want to implement all three endpoints to ensure that the property
 is fully integrated into user land utilities such as
-.Xr dladm 1M .
+.Xr dladm 8 .
 .Sh SEE ALSO
-.Xr dladm 1M ,
-.Xr dlpi 7P ,
+.Xr dlpi 4P ,
+.Xr dladm 8 ,
 .Xr mac 9E ,
 .Xr mc_close 9E ,
 .Xr mc_getcapab 9E ,

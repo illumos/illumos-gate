@@ -255,7 +255,7 @@ application wishing to check for error situations should set \fBerrno\fR to 0
 call \fBwcstod()\fR, \fBwcstof()\fR, \fBwcstold()\fR, or \fBwstod()\fR, then
 check  \fBerrno\fR and if it is non-zero, assume an error has occurred.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -273,5 +273,11 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-\fBiswspace\fR(3C), \fBlocaleconv\fR(3C), \fBmath.h\fR(3HEAD), \fBscanf\fR(3C),
-\fBsetlocale\fR(3C), \fBwcstol\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+.BR iswspace (3C),
+.BR localeconv (3C),
+.BR scanf (3C),
+.BR setlocale (3C),
+.BR wcstol (3C),
+.BR math.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

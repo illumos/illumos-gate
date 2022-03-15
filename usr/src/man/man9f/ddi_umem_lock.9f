@@ -171,8 +171,10 @@ Requested memory is not aligned on a system page boundary.
 The \fBddi_umem_lock()\fR function can only be called from user context;
 \fBddi_umem_unlock()\fR from user, kernel, and interrupt contexts.
 .SH SEE ALSO
-\fBddi_umem_iosetup\fR(9F), \fBddi_dma_buf_bind_handle\fR(9F),
-\fBdevmap_umem_setup\fR(9F), \fBddi_umem_alloc\fR(9F)
+.BR ddi_dma_buf_bind_handle (9F),
+.BR ddi_umem_alloc (9F),
+.BR ddi_umem_iosetup (9F),
+.BR devmap_umem_setup (9F)
 .SH NOTES
 The \fBddi_umem_unlock()\fR function consumes physical memory. The driver is
 responsible for a speedy unlock to free up the resources.

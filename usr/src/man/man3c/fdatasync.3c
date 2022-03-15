@@ -111,7 +111,7 @@ returns the error conditions defined for \fBread\fR(2) and \fBwrite\fR(2).
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -125,12 +125,18 @@ Interface Stability	Committed
 _
 MT-Level	Async-Signal-Safe
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBfcntl\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2), \fBfsync\fR(3C),
-\fBaio_fsync\fR(3C), \fBfcntl.h\fR(3HEAD), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR fcntl (2),
+.BR open (2),
+.BR read (2),
+.BR write (2),
+.BR aio_fsync (3C),
+.BR fsync (3C),
+.BR fcntl.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

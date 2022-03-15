@@ -59,4 +59,4 @@ in
 .Xr exec 2 ,
 .Xr libproc 3LIB ,
 .Xr librtld_db 3LIB ,
-.Xr proc 4
+.Xr proc 5

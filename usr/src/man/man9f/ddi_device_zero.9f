@@ -138,7 +138,8 @@ The byte count is not a multiple of  \fIdev_datasz\fR.
 .SH CONTEXT
 \fBddi_device_zero()\fR can be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-\fBddi_regs_map_free\fR(9F), \fBddi_regs_map_setup\fR(9F)
+.BR ddi_regs_map_free (9F),
+.BR ddi_regs_map_setup (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

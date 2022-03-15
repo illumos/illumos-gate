@@ -1,0 +1,480 @@
+'\" te
+.\"  Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH FORMAT.DAT 5 "Apr 19, 2001"
+.SH NAME
+format.dat \- disk drive configuration for the format command
+.SH DESCRIPTION
+.sp
+.LP
+\fBformat.dat\fR enables you to use your specific disk drives with
+\fBformat\fR(8). On Solaris 2.3 and compatible systems, \fBformat\fR will
+automatically configure and label SCSI drives, so that they need not be defined
+in \fBformat.dat\fR. Three things can be defined in the data file:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+search paths
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+disk types
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+partition tables.
+.RE
+.SS "Syntax"
+.sp
+.LP
+The following syntax rules apply to the data file:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+The pound \fB#\fR sign is the comment character. Any text on a line after a
+pound sign is not interpreted by \fBformat\fR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Each definition in the \fBformat.dat\fR file appears on a single logical line.
+If the definition is more than one line long, all but the last line of the
+definition must end with a backslash (\e).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A definition consists of a series of assignments that have an identifier on the
+left side and one or more values on the right side. The assignment operator is
+the equal sign (=). Assignments within a definition must be separated by a
+colon (:).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+White space is ignored by \fBformat\fR(8). If you want an assigned value to
+contain white space, enclose the entire value in double quotes ("). This will
+cause the white space within quotes to be preserved as part of the assignment
+value.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Some assignments can have multiple values on the right hand side. Separate
+values by a comma (,).
+.RE
+.SS "Keywords"
+.sp
+.LP
+The data file contains disk definitions that are read in by \fBformat\fR(8)
+when it starts up. Each definition starts with one of the following keywords:
+\fBsearch_path\fR, \fBdisk_type\fR, and \fBpartition\fR.
+.sp
+.ne 2
+.na
+\fB\fBsearch_path\fR\fR
+.ad
+.RS 15n
+4.x: Tells \fBformat\fR which disks it should search for when it starts up. The
+list in the default data file contains all the disks in the GENERIC
+configuration file. If your system has disks that are not in the GENERIC
+configuration file, add them to the \fBsearch_path\fR definition in your data
+file. The data file can contain only one \fBsearch_path\fR definition. However,
+this single definition lets you specify all the disks you have in your system.
+.sp
+5.x: By default, \fBformat\fR(8) understands all the logical devices that are
+of the form \fB/dev/rdsk/cntndnsn\fR; hence \fBsearch_path\fR is not normally
+defined on a 5.x system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdisk_type\fR\fR
+.ad
+.RS 15n
+Defines the controller and disk model. Each \fBdisk_type\fR definition contains
+information concerning the physical geometry of the disk. The default data file
+contains definitions for the controllers and disks that the Solaris operating
+environment supports. You need to add a new \fBdisk_type\fR only if you have an
+unsupported disk. You can add as many \fBdisk_type\fR definitions to the data
+file as you want.
+.sp
+The following controller types are supported by \fBformat\fR(8):
+.sp
+.ne 2
+.na
+\fBXY450\fR
+.ad
+.RS 10n
+Xylogics 450 controller (SMD)
+.RE
+
+.sp
+.ne 2
+.na
+\fBXD7053\fR
+.ad
+.RS 10n
+Xylogics 7053 controller (SMD)
+.RE
+
+.sp
+.ne 2
+.na
+\fBSCSI\fR
+.ad
+.RS 10n
+True SCSI (CCS or SCSI-2)
+.RE
+
+.sp
+.ne 2
+.na
+\fBISP-80\fR
+.ad
+.RS 10n
+IPI panther controller
+.RE
+
+The keyword itself is assigned the name of the disk type. This name appears in
+the disk's label and is used to identify the disk type whenever
+\fBformat\fR(8) is run. Enclose the name in double quotes to preserve any
+white space in the name.
+.sp
+Below are lists of identifiers for supported controllers. Note that an asterisk
+('*') indicates the identifier is mandatory for that controller -- it is not
+part of the keyword name.
+.sp
+The following identifiers are assigned values in all \fBdisk_type\fR
+definitions:
+.sp
+.ne 2
+.na
+\fB\fBacyl*\fR\fR
+.ad
+.RS 12n
+alternate cylinders
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBasect\fR\fR
+.ad
+.RS 12n
+alternate sectors per track
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBatrks\fR\fR
+.ad
+.RS 12n
+alternate tracks
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfmt_time\fR\fR
+.ad
+.RS 12n
+formatting time per cylinder
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBncyl*\fR\fR
+.ad
+.RS 12n
+number of logical cylinders
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnhead*\fR\fR
+.ad
+.RS 12n
+number of logical heads
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnsect*\fR\fR
+.ad
+.RS 12n
+number of logical sectors per track
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpcyl*\fR\fR
+.ad
+.RS 12n
+number of physical cylinders
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBphead\fR\fR
+.ad
+.RS 12n
+number of physical heads
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpsect\fR\fR
+.ad
+.RS 12n
+number of physical sectors per track
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrpm*\fR\fR
+.ad
+.RS 12n
+drive RPM
+.RE
+
+These identifiers are for SCSI and MD-21 Controllers
+.sp
+.ne 2
+.na
+\fB\fBread_retries\fR\fR
+.ad
+.RS 17n
+page 1 byte 3 (read retries)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBwrite_retries\fR\fR
+.ad
+.RS 17n
+page 1 byte 8 (write retries)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcyl_skew\fR\fR
+.ad
+.RS 17n
+page 3 bytes 18-19 (cylinder skew)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtrk_skew\fR\fR
+.ad
+.RS 17n
+page 3 bytes 16-17 (track skew)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtrks_zone\fR\fR
+.ad
+.RS 17n
+page 3 bytes 2-3 (tracks per zone)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcache\fR\fR
+.ad
+.RS 17n
+page 38 byte 2 (cache parameter)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBprefetch\fR\fR
+.ad
+.RS 17n
+page 38 byte 3 (prefetch parameter)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmax_prefetch\fR\fR
+.ad
+.RS 17n
+page 38 byte 4 (minimum prefetch)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmin_prefetch\fR\fR
+.ad
+.RS 17n
+page 38 byte 6 (maximum prefetch)
+.RE
+
+Note: The Page 38 values are device-specific. Refer the user to the particular
+disk's manual for these values.
+.sp
+For SCSI disks, the following geometry specifiers may cause a mode select on
+the byte(s) indicated:
+.sp
+.ne 2
+.na
+\fB\fBasect\fR\fR
+.ad
+.RS 9n
+page 3 bytes 4-5 (alternate sectors per zone)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBatrks\fR\fR
+.ad
+.RS 9n
+page 3 bytes 8-9 (alt. tracks per logical unit)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBphead\fR\fR
+.ad
+.RS 9n
+page 4 byte 5 (number of heads)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpsect\fR\fR
+.ad
+.RS 9n
+page 3 bytes 10-11 (sectors per track)
+.RE
+
+And these identifiers are for SMD Controllers Only
+.sp
+.ne 2
+.na
+\fB\fBbps*\fR\fR
+.ad
+.RS 8n
+bytes per sector (SMD)
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbpt*\fR\fR
+.ad
+.RS 8n
+bytes per track (SMD)
+.RE
+
+Note: under SunOS 5.x, bpt is only required for SMD disks. Under SunOS 4.x, bpt
+was required for all disk types, even though it was only used for SMD disks.
+.sp
+And this identifier is for XY450 SMD Controllers Only
+.sp
+.ne 2
+.na
+\fB\fBdrive_type*\fR\fR
+.ad
+.RS 15n
+drive type (SMD) (just call this "xy450 drive type")
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBpartition\fR\fR
+.ad
+.RS 15n
+Defines a partition table for a specific disk type. The partition table
+contains the partitioning information, plus a name that lets you refer to it in
+\fBformat\fR(8). The default data file contains default partition definitions
+for several kinds of disk drives. Add a partition definition if you
+repartitioned any of the disks on your system. Add as many partition
+definitions to the data file as you need.
+.sp
+Partition naming conventions differ in SunOS 4.x and in SunOS 5.x.
+.sp
+4.x: the partitions are named as \fBa\fR, \fBb\fR, \fBc\fR, \fBd\fR, \fBe\fR,
+\fBf\fR, \fBg\fR, \fBh\fR.
+.sp
+5.x: the partitions are referred to by numbers \fB0\fR, \fB1\fR, \fB2\fR,
+\fB3\fR, \fB4\fR, \fB5\fR, \fB6\fR, \fB7\fR.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRA sample \fBdisk_type\fR and \fBpartition\fR.
+.sp
+.LP
+Following is a sample \fBdisk_type\fR and \fBpartition\fR definition in
+\fBformat.dat\fR file for SUN0535 disk device.
+
+.sp
+.in +2
+.nf
+disk_type = "SUN0535" \e
+	: ctlr = SCSI : fmt_time = 4 \e
+	: ncyl = 1866 : acyl = 2 : pcyl = 2500 : nhead = 7 : nsect = 80 \e
+	: rpm = 5400
+partition = "SUN0535" \e
+	: disk = "SUN0535" : ctlr = SCSI \e
+      : 0 = 0, 64400 : 1 = 115, 103600 : 2 = 0, 1044960 : 6 = 300, 876960
+.fi
+.in -2
+.sp
+
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/etc/format.dat\fR\fR
+.ad
+.RS 19n
+default data file if \fBformat\fR \fB-x\fR is not specified, nor is there a
+\fBformat.dat\fR file in the current directory.
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR format (8)
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR

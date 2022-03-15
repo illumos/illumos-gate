@@ -95,24 +95,24 @@ $(i386_ONLY)dir path=usr/lib/xhci group=sys
 $(i386_ONLY)file path=usr/lib/xhci/xhci_portsc group=sys mode=0555
 dir  path=usr/share
 dir  path=usr/share/man
-file path=usr/share/man/man7d/ehci.7d
-file path=usr/share/man/man7d/hid.7d
-file path=usr/share/man/man7d/hubd.7d
-file path=usr/share/man/man7d/ohci.7d
-file path=usr/share/man/man7d/scsa2usb.7d
-file path=usr/share/man/man7d/uhci.7d
-link path=usr/share/man/man7d/usb.7d target=usba.7d
-file path=usr/share/man/man7d/usb_ac.7d
-file path=usr/share/man/man7d/usb_as.7d
-file path=usr/share/man/man7d/usb_ia.7d
-file path=usr/share/man/man7d/usb_mid.7d
-file path=usr/share/man/man7d/usba.7d
-file path=usr/share/man/man7d/usbprn.7d
-$(i386_ONLY)file path=usr/share/man/man7d/xhci.7d
-dir  path=usr/share/man/man7m
-file path=usr/share/man/man7m/usb_ah.7m
-file path=usr/share/man/man7m/usbkbm.7m
-file path=usr/share/man/man7m/usbms.7m
+file path=usr/share/man/man4d/ehci.4d
+file path=usr/share/man/man4d/hid.4d
+file path=usr/share/man/man4d/hubd.4d
+file path=usr/share/man/man4d/ohci.4d
+file path=usr/share/man/man4d/scsa2usb.4d
+file path=usr/share/man/man4d/uhci.4d
+link path=usr/share/man/man4d/usb.4d target=usba.4d
+file path=usr/share/man/man4d/usb_ac.4d
+file path=usr/share/man/man4d/usb_as.4d
+file path=usr/share/man/man4d/usb_ia.4d
+file path=usr/share/man/man4d/usb_mid.4d
+file path=usr/share/man/man4d/usba.4d
+file path=usr/share/man/man4d/usbprn.4d
+$(i386_ONLY)file path=usr/share/man/man4d/xhci.4d
+dir  path=usr/share/man/man4m
+file path=usr/share/man/man4m/usb_ah.4m
+file path=usr/share/man/man4m/usbkbm.4m
+file path=usr/share/man/man4m/usbms.4m
 dir  path=usr/share/man/man9e
 file path=usr/share/man/man9e/usba_hcdi.9e
 link path=usr/share/man/man9e/usba_hcdi_cb_close.9e target=usba_hcdi_cb_ops.9e

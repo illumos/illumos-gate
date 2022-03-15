@@ -91,7 +91,7 @@ should be a
 array of character strings whose entries are in the form of
 .Em key=value .
 For more on the process environment, see
-.Xr environ 5 .
+.Xr environ 7 .
 .Pp
 The
 .Fn Pcreate_callback

@@ -535,8 +535,8 @@ sysev_init(fmd_hdl_t *hdl)
  * the system default, we do *not* want to unsubscribe because the kernel will
  * remove the subscriber queue and any events published in our absence will
  * therefore be lost.  This scenario may occur when, for example, fmd is sent
- * a SIGTERM by init(1M) during reboot but an error is detected and makes it
- * into the sysevent channel queue before init(1M) manages to call uadmin(2).
+ * a SIGTERM by init(8) during reboot but an error is detected and makes it
+ * into the sysevent channel queue before init(8) manages to call uadmin(2).
  */
 void
 sysev_fini(fmd_hdl_t *hdl)

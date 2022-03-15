@@ -568,13 +568,13 @@ error:
 		if (kwarn_del_warning(client_name) != 0) {
 			__pam_log(LOG_AUTH | LOG_NOTICE,
 			    "PAM-KRB5 (setcred): kwarn_del_warning"
-			    " failed: ktkt_warnd(1M) down?");
+			    " failed: ktkt_warnd(8) down?");
 		}
 
 		if (kwarn_add_warning(client_name, endtime) != 0) {
 			__pam_log(LOG_AUTH | LOG_NOTICE,
 			    "PAM-KRB5 (setcred): kwarn_add_warning"
-			    " failed: ktkt_warnd(1M) down?");
+			    " failed: ktkt_warnd(8) down?");
 		}
 	}
 

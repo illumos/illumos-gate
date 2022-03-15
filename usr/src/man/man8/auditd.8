@@ -1,0 +1,191 @@
+'\" te
+.\" Copyright (c) 2017 Peter Tribble
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH AUDITD 8 "Mar 6, 2017"
+.SH NAME
+auditd \- audit daemon
+.SH SYNOPSIS
+.LP
+.nf
+\fB/usr/sbin/auditd\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The audit daemon, \fBauditd\fR, controls the generation and location of audit
+trail files and the generation of syslog messages based on its configuration,
+stored in \fBsmf\fR(7) and managed using the \fBauditconfig\fR(8) command.
+.sp
+.LP
+\fBaudit\fR(8) is used to control \fBauditd\fR. It can cause \fBauditd\fR to:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+close the current audit file and open a new one;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+close the current audit file, reread its configuration and
+open a new audit file;
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+close the audit trail and terminate auditing.
+.RE
+.SS "Auditing Conditions"
+.LP
+The audit daemon invokes the program \fBaudit_warn\fR(8) under the following
+conditions with the indicated options:
+.sp
+.ne 2
+.na
+\fB\fBaudit_warn soft\fR \fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+The file system upon which \fIpathname\fR resides has exceeded the minimum free
+space limit defined by the \fBp_minfree\fR attribute of the \fBaudit_binfile\fR
+plugin. A new audit trail has been opened on another file system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBaudit_warn allsoft\fR\fR
+.ad
+.sp .6
+.RS 4n
+All available file systems have been filled beyond the minimum free space
+limit. A new audit trail has been opened anyway.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBaudit_warn hard\fR \fIpathname\fR\fR
+.ad
+.sp .6
+.RS 4n
+The file system upon which \fIpathname\fR resides has filled or for some reason
+become unavailable. A new audit trail has been opened on another file system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBaudit_warn allhard\fR \fIcount\fR\fR
+.ad
+.sp .6
+.RS 4n
+All available file systems have been filled or for some reason become
+unavailable. The audit daemon will repeat this call to \fBaudit_warn\fR at
+intervals of at least twenty seconds until space becomes available. \fIcount\fR
+is the number of times that \fBaudit_warn\fR has been called since the problem
+arose.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBaudit_warn tmpfile\fR\fR
+.ad
+.sp .6
+.RS 4n
+There was a problem creating a symlink from \fB/var/run/.audit.log\fR to the
+current audit log file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBaudit_warn nostart\fR\fR
+.ad
+.sp .6
+.RS 4n
+There was an internal error starting auditing.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBaudit_warn auditoff\fR\fR
+.ad
+.sp .6
+.RS 4n
+The internal system audit condition has been changed to not be
+\fBAUC_AUDITING\fR by someone other than the audit daemon. This causes the
+audit daemon to exit.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.SH SEE ALSO
+.LP
+.BR auditon (2),
+.BR audit.log (5),
+.BR attributes (7),
+.BR audit_binfile (7),
+.BR audit (8),
+.BR audit_warn (8),
+.BR auditconfig (8),
+.BR praudit (8)
+.SH NOTES
+.LP
+If the audit policy \fBperzone\fR is set, \fBauditd\fR runs in each zone,
+starting automatically when the local zone boots. If a zone is running when the
+\fBperzone\fR policy is set, auditing must be started manually in local zones.
+It is not necessary to reboot the system or the local zone to start auditing in
+a local zone. \fBauditd\fR can be started with "\fB/usr/sbin/audit\fR \fB-s\fR"
+and will start automatically with future boots of the zone.
+.sp
+.LP
+When \fBauditd\fR runs in a local zone, the configuration is taken from the
+local zone's \fB/etc/security\fR directory's files:
+\fBaudit_class\fR, and \fBaudit_event\fR.
+.sp
+.LP
+Configuration changes do not affect audit sessions that are currently running,
+as the changes do not modify a process's preselection mask. To change the
+preselection mask on a running process, use the \fB-setpmask\fR option of the
+\fBauditconfig\fR command (see \fBauditconfig\fR(8)). If the user logs out and
+logs back in, the new configuration changes will be reflected in the next audit
+session.
+.sp
+.LP
+The \fBauditd\fR service is managed by the service management facility,
+\fBsmf\fR(7), under the service identifier:
+.sp
+.in +2
+.nf
+svc:/system/auditd
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The service's status can be queried using the \fBsvcs\fR(1) command. While
+administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(8), the \fBaudit\fR(8)
+command is the preferred administrative interface.

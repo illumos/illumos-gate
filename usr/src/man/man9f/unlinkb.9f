@@ -76,7 +76,7 @@ remove and free the  \fBM_PROTO\fR header and return the remaining
 .SH SEE ALSO
 .sp
 .LP
-\fBlinkb\fR(9F)
+.BR linkb (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

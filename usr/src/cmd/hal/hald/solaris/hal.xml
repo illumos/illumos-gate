@@ -91,7 +91,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='hald' section='1M' manpath='/usr/man' />
+			<manpage title='hald' section='8' manpath='/usr/man' />
 		</documentation>
 	</template>
 

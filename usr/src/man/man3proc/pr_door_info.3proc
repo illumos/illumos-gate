@@ -99,4 +99,4 @@ in
 .Sh SEE ALSO
 .Xr door_info 3C ,
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

@@ -164,7 +164,7 @@ The \fBscf_pg_get_flags()\fR function retrieves the flags for the property
 group to which \fIpg\fR is set. If \fBSCF_PG_FLAG_NONPERSISTENT\fR is set, the
 property group is not included in snapshots and will lose its contents upon
 system shutdown or reboot. Non-persistent property groups are mainly used for
-smf-internal state. See \fBsmf\fR(5).
+smf-internal state. See \fBsmf\fR(7).
 .sp
 .LP
 The \fBscf_pg_update()\fR function ensures that \fIpg\fR is attached to the
@@ -363,7 +363,7 @@ The \fBscf_service_get_pg()\fR, \fBscf_instance_get_pg()\fR,
 .ad
 .sp .6
 .RS 4n
-The  storage  mechanism  that  the   repository server (\fBsvc.configd\fR(1M))
+The  storage  mechanism  that  the   repository server (\fBsvc.configd\fR(8))
 chose for the operation denied access.
 .RE
 
@@ -784,7 +784,7 @@ scf_property_t *out) {
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -802,7 +802,13 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF), \fBscf_handle_decode_fmri\fR(3SCF),
-\fBscf_instance_create\fR(3SCF), \fBscf_pg_to_fmri\fR(3SCF),
-\fBscf_service_create\fR(3SCF), \fBscf_snaplevel_create\fR(3SCF),
-\fBscf_transaction_create\fR(3SCF), \fBattributes\fR(5), \fBsmf\fR(5)
+.BR libscf (3LIB),
+.BR scf_error (3SCF),
+.BR scf_handle_decode_fmri (3SCF),
+.BR scf_instance_create (3SCF),
+.BR scf_pg_to_fmri (3SCF),
+.BR scf_service_create (3SCF),
+.BR scf_snaplevel_create (3SCF),
+.BR scf_transaction_create (3SCF),
+.BR attributes (7),
+.BR smf (7)

@@ -747,7 +747,7 @@ get_dns_txt_domain(cb_t *argp)
 	if (stat(_PATH_RESCONF, &st) < 0 && errno == ENOENT) {
 		/*
 		 * If /etc/resolv.conf is not there, then we'll
-		 * get the domain from domainname(1M). No real
+		 * get the domain from domainname(8). No real
 		 * reason to query DNS or fire a thread since we
 		 * have no nameserver addresses.
 		 */
@@ -1011,7 +1011,7 @@ get_dns_domain(void)
 			case ENOENT:
 				/*
 				 * The resolver defaults to obtaining the
-				 * domain off of the NIS domainname(1M) if
+				 * domain off of the NIS domainname(8) if
 				 * /etc/resolv.conf does not exist, so we
 				 * move forward.
 				 */

@@ -54,7 +54,7 @@ No errors are defined.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -72,6 +72,13 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBread\fR(2), \fBIntro\fR(3), \fB__fsetlocking\fR(3C), \fBfseek\fR(3C),
-\fBfsetpos\fR(3C), \fBgetc\fR(3C), \fBsetbuf\fR(3C), \fBstdio\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR read (2),
+.BR Intro (3),
+.BR __fsetlocking (3C),
+.BR fseek (3C),
+.BR fsetpos (3C),
+.BR getc (3C),
+.BR setbuf (3C),
+.BR stdio (3C),
+.BR attributes (7),
+.BR standards (7)

@@ -268,7 +268,7 @@ member is an
 .Em optional
 entry point that will be called every time a device is removed from the
 system, whether through it being unplugged or a
-.Xr cfgadm 1M
+.Xr cfgadm 8
 action.
 If an HCD does not need this functionality, the member should be set to
 .Dv NULL .
@@ -302,7 +302,7 @@ See
 .Xr usba_hcdi_hub_update 9E
 for more information.
 .Sh SEE ALSO
-.Xr cfgadm 1M ,
+.Xr cfgadm 8 ,
 .Xr attach 9E ,
 .Xr usba_hcdi 9E ,
 .Xr usba_hcdi_device_address 9E ,

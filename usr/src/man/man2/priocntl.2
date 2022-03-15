@@ -216,7 +216,7 @@ processes in the \fBSYS\fR class that are included in a specified set of
 processes are disregarded by  \fBpriocntl()\fR. For example, an \fIidtype\fR of
 \fBP_UID\fR and an \fIid\fR value of 0 would specify all processes with a user
 ID of 0 except processes in the \fBSYS\fR class and (if changing the parameters
-using \fBPC_SETPARMS\fR or \fBPC_SETXPARMS\fR) the  \fBinit\fR(1M) process.
+using \fBPC_SETPARMS\fR or \fBPC_SETXPARMS\fR) the  \fBinit\fR(8) process.
 .sp
 .LP
 The \fBinit\fR process is a special case. For a \fBpriocntl()\fR call to change
@@ -316,7 +316,7 @@ Available \fBpriocntl()\fR commands are:
 .ad
 .RS 16n
 This command provides functionality needed for the implementation of the
-\fBdispadmin\fR(1M) utility. It is not intended for general use by other
+\fBdispadmin\fR(8) utility. It is not intended for general use by other
 applications.
 .RE
 
@@ -699,7 +699,7 @@ Set an infinite time quantum.
 \fB\fBRT_TQDEF\fR\fR
 .ad
 .RS 15n
-Set the time quantum to the default for this priority (see \fBrt_dptbl\fR(4)).
+Set the time quantum to the default for this priority (see \fBrt_dptbl\fR(5)).
 .RE
 
 .sp
@@ -754,7 +754,7 @@ scheduling parameters of the target process(es) to their default values.
 Changing the class of an LWP to realtime from some other class causes the
 parameters to be set to their default values. The default realtime priority
 (\fBRT_KY_PRI\fR) is \fB0\fR. A default time quantum (\fBRT_TQDEF\fR) is
-assigned to each priority class (see \fBrt_dptbl\fR(4)). The default realtime
+assigned to each priority class (see \fBrt_dptbl\fR(5)). The default realtime
 time quantum signal (\fBRT_KY_TQSIG\fR) is \fB0\fR.
 .sp
 .LP
@@ -1067,7 +1067,7 @@ and the exec family of functions.
 .LP
 The fair-share scheduling policy provides a fair allocation of CPU resources
 among projects, independent of the number of processes they contain. Projects
-are given "shares" to control their quota of CPU resources. See \fBFSS\fR(7)
+are given "shares" to control their quota of CPU resources. See \fBFSS\fR(4)
 for more information about how to configure shares.
 .sp
 .LP
@@ -1293,7 +1293,7 @@ the parameter to be set to a default value. The default value for the
 \fIfx_uprilim\fR is 0 and the default for the \fIfx_upri\fR is to set it equal
 to the \fIfx_uprilim\fR that is being set. The default for time quantum is
 dependent on the \fIfx_upri\fR and on the system configuration; see
-\fBfx_dptbl\fR(4).
+\fBfx_dptbl\fR(5).
 .sp
 .LP
 The \fIfx_tqsecs\fR and \fIfx_tqnsecs\fR members are used for getting or
@@ -1333,7 +1333,7 @@ Set an infinite time quantum.
 \fB\fBFX_TQDEF\fR\fR
 .ad
 .RS 15n
-Set the time quantum to the default for this priority (see \fBfx_dptbl\fR(4)).
+Set the time quantum to the default for this priority (see \fBfx_dptbl\fR(5)).
 .RE
 
 .sp
@@ -1390,7 +1390,7 @@ to be set to their default values. The default value for the user priority
 limit (\fBFX_KY_UPRILIM\fR) is 0. The default value for the user priority
 (\fBFX_KY_UPRI\fR) is equal to the user priority limit (\fBFX_KY_UPRILIM\fR)
 that is being set. A default time quantum (\fBFX_TQDEF\fR) is assigned to each
-priority class (see \fBfx_dptbl\fR(4)).
+priority class (see \fBfx_dptbl\fR(5)).
 .sp
 .LP
 The value associated with \fBFX_KY_TQSECS\fR is the number of seconds in the
@@ -1496,9 +1496,17 @@ None of the specified LWPs exist.
 .SH SEE ALSO
 .sp
 .LP
-\fBpriocntl\fR(1), \fBdispadmin\fR(1M), \fBinit\fR(1M), \fBexec\fR(2),
-\fBfork\fR(2), \fBnice\fR(2), \fBpriocntlset\fR(2), \fBfx_dptbl\fR(4),
-\fBprocess\fR(4), \fBrt_dptbl\fR(4), \fBprivileges\fR(5)
+.BR priocntl (1),
+.BR exec (2),
+.BR fork (2),
+.BR nice (2),
+.BR priocntlset (2),
+.BR fx_dptbl (5),
+.BR process (5),
+.BR rt_dptbl (5),
+.BR privileges (7),
+.BR dispadmin (8),
+.BR init (8)
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR

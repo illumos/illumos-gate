@@ -77,7 +77,7 @@ by a null byte, and may include \fBNEWLINE\fR characters.
 .sp
 .LP
 The \fBre_comp()\fR and \fBre_exec()\fR functions support \fIsimple regular
-expressions\fR, which are defined on the \fBregexp\fR(5) manual page. The
+expressions\fR, which are defined on the \fBregexp\fR(7) manual page. The
 regular expressions of the form \fB\e{\fRm\fB\e}\fR, \fB\e{\fRm,\fB\e}\fR, or
 \fB\e{\fRm,n\fB\e}\fR are not supported.
 .SH RETURN VALUES
@@ -114,9 +114,15 @@ No errors are defined.
 .LP
 For portability to implementations conforming to X/Open standards prior to SUS,
 \fBregcomp\fR(3C) and \fBregexec\fR(3C) are preferred to these functions.  See
-\fBstandards\fR(5).
+\fBstandards\fR(7).
 .SH SEE ALSO
 .sp
 .LP
-\fBgrep\fR(1), \fBregcmp\fR(1), \fBregcmp\fR(3C), \fBregcomp\fR(3C),
-\fBregexec\fR(3C), \fBregexpr\fR(3GEN), \fBregexp\fR(5), \fBstandards\fR(5)
+.BR grep (1),
+.BR regcmp (1),
+.BR regcmp (3C),
+.BR regcomp (3C),
+.BR regexec (3C),
+.BR regexpr (3GEN),
+.BR regexp (7),
+.BR standards (7)

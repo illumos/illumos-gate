@@ -96,7 +96,7 @@ routines are more suitable and their use is recommended.
 .LP
 Initially, \fBsetupterm()\fR should be called. Note that \fBsetupterm()\fR is
 automatically called by \fBinitscr()\fR and \fBnewterm()\fR. This defines the
-set of terminal-dependent variables (listed in \fBterminfo\fR(4)). The
+set of terminal-dependent variables (listed in \fBterminfo\fR(5)). The
 \fIterminfo\fR variables \fBlines\fR and \fBcolumns\fR are initialized by
 \fBsetupterm()\fR as follows:  If \fBuse_env(FALSE)\fR has been called, values
 for \fBlines\fR and \fBcolumns\fR specified in \fIterminfo\fR are used.
@@ -219,7 +219,7 @@ With the \fBtigetstr()\fR routine, the value \fB(char *)\(mi1\fR is returned if
 .sp
 .LP
 The \fIcapname\fR for each capability is given in the table column entitled
-\fIcapname\fR code in the capabilities section of \fBterminfo\fR(4).
+\fIcapname\fR code in the capabilities section of \fBterminfo\fR(5).
 .sp
 .in +2
 .nf
@@ -245,7 +245,7 @@ Routines that return pointers always return \fINULL\fR on error.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -261,9 +261,13 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBcurs_initscr\fR(3CURSES), \fBcurs_kernel\fR(3CURSES),
-\fBcurs_termcap\fR(3CURSES), \fBcurses\fR(3CURSES), \fBputc\fR(3C),
-\fBterminfo\fR(4), \fBattributes\fR(5)
+.BR putc (3C),
+.BR curs_initscr (3CURSES),
+.BR curs_kernel (3CURSES),
+.BR curs_termcap (3CURSES),
+.BR curses (3CURSES),
+.BR terminfo (5),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

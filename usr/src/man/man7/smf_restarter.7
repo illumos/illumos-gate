@@ -1,0 +1,109 @@
+'\" te
+.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019 Joyent, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SMF_RESTARTER 7 "Dec 11, 2019"
+.SH NAME
+smf_restarter \- service management facility conventions for restarters
+.SH DESCRIPTION
+All service instances in the service management facility must be managed by a
+restarter. This manual page describes configuration, functionality, and
+reporting characteristics that are common to all restarters in the framework.
+Characteristics specific to a particular restarter are described in the
+restarter's man page.
+.sp
+.LP
+For each managed service, a restarter relies on retrieving properties on the
+service instance to determine configuration. The restarter manages a set of
+property groups to communicate the current disposition of a service with
+display tools such as \fBsvcs\fR(1).
+.SS "Service Configuration"
+The common restarter configuration for all services is captured in the
+\fBgeneral\fR property group. This group includes the following required and
+optional property settings.
+.sp
+.ne 2
+.na
+\fB\fBenabled\fR\fR
+.ad
+.RS 19n
+This is a required property. If set, the restarter of an instance attempts to
+maintain availability of the service.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrestarter\fR\fR
+.ad
+.RS 19n
+This is an optional property that allows the specification of an alternate
+restarter to manage the service instance. If the restarter property is empty or
+absent, the restarter defaults to \fBsvc.startd\fR(8).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsingle_instance\fR\fR
+.ad
+.RS 19n
+This is an optional property. When set, only one instance of the service is
+allowed to transition to an online or degraded status at any time. Note that no
+known implementation honours this setting, and it should be considered obsolete.
+.RE
+
+.SS "Service Reporting"
+All restarters report status using the \fBrestarter\fR property group, which
+includes the following properties:
+.sp
+.ne 2
+.na
+\fB\fBnext_state\fR\fR
+.ad
+.RS 19n
+The current state and next state, if currently in transition, for instances
+stored in these properties. See \fBsmf\fR(7) for a description of the potential
+states.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBauxiliary_state\fR\fR
+.ad
+.RS 19n
+An astring with no spaces that contains a precise term to describe the full
+restarter-specific state in combination with the restarter state property. The
+auxiliary state cannot always be set and is always cleared during transition
+out of any state. Each restarter must define the precise list of auxiliary
+states it uses.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBstate_timestamp\fR\fR
+.ad
+.RS 19n
+The time when the current state was reached.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcontract\fR\fR
+.ad
+.RS 19n
+The primary process contract ID, if any, under which the service instance is
+executing.
+.RE
+
+.SH SEE ALSO
+.BR svcs (1),
+.BR service_bundle (5),
+.BR smf (7),
+.BR smf_method (7),
+.BR svc.startd (8)

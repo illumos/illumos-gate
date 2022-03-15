@@ -250,7 +250,7 @@ URL doesn't begin with \fBldap://\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -265,7 +265,9 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBldap_search\fR(3LDAP), \fBattributes\fR(5)
+.BR ldap (3LDAP),
+.BR ldap_search (3LDAP),
+.BR attributes (7)
 .sp
 .LP
 \fBAn\fR \fBLDAP\fR \fBURL\fR \fBFormat,\fR Tim Howes and Mark Smith, December

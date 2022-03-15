@@ -595,7 +595,7 @@ keyspan_download_firmware(keyspan_pre_state_t *kbp)
 	if (!record) {
 		USB_DPRINTF_L1(DPRINT_ATTACH, kbp->kb_lh,
 		    "No firmware available for Keyspan usa49wlc"
-		    " usb-to-serial adapter. Refer to usbsksp(7D)"
+		    " usb-to-serial adapter. Refer to usbsksp(4D)"
 		    " for details.");
 
 		return (USB_FAILURE);

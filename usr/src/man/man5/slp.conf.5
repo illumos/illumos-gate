@@ -1,0 +1,1152 @@
+'\" te
+.\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH SLP.CONF 5 "Feb 18, 2003"
+.SH NAME
+slp.conf \- configuration file for Service Location Protocol agents
+.SH SYNOPSIS
+.LP
+.nf
+\fB/etc/inet/slp.conf\fR
+.fi
+
+.SH DESCRIPTION
+.sp
+.LP
+\fBslp.conf \fR provides all  Service Location Protocol ("\fBSLP\fR") agents
+with  their  operational  configuration. \fBslpd\fR(8) reads \fBslp.conf\fR on
+startup. Service Agents ("\fBSA\fRs") and User Agents ("\fBUA\fRs") read
+\fBslp.conf\fR on invocation of the \fBSA\fR and \fBUA\fR  library routines;
+configuration parameters are then cached on a per-process basis. All \fBSA\fR's
+must use the same set of properties as \fBslpd\fR on the local machine, since
+\fBslpd\fR acts as an \fBSA\fR server.
+.sp
+.LP
+The configuration file format consists of a newline-delimited list of zero or
+more property definitions. Each property definition corresponds to a particular
+configurable \fBSLP\fR, network, or other parameter in one or more of the three
+\fBSLP\fR agents. The file format grammar is shown in \fIRFC 2234\fR as
+follows:
+.sp
+.in +2
+.nf
+config-file   =  line-list
+line-list     =  line / line line-list
+line          =  property-line / comment-line
+comment-line  =  ( "#" / ";" ) 1*allchar newline
+property-line =  property newline
+property      =  tag "=" value-list
+tag           =  prop / prop "." tag
+prop          =  1*tagchar
+value-list    =  value / value "," value-list
+value         =  int / bool /
+                 "(" value-list ")" / string
+int           =  1*DIGIT
+bool          =  "true" / "false" / "TRUE" / "FALSE"
+newline       =  CR / ( CRLF )
+string        =  1*stringchar
+tagchar       =  DIGIT / ALPHA / tother / escape
+tother        =  %x21-%x2d / %x2f /
+                 %x3a / %x3c-%x40 /
+                 %x5b-%x60 / %7b-%7e
+                 ; i.e., all characters except `.',
+                 ; and `='.
+stringchar    =  DIGIT / ALPHA / sother / escape
+sother        =  %x21-%x29 / %x2a-%x2b /
+                 %x2d-%x2f / %x3a-%x40 /
+                 %x5b-%x60 / %7b-%7e
+                 ; i.e., all characters except `,'
+allchar       =  DIGIT / ALPHA / HTAB / SP
+escape        =  "\e" HEXDIG HEXDIG
+                 ; Used for reserved characters
+.fi
+.in -2
+
+.sp
+.LP
+The properties fall into one of the following categories:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBDA\fR Configuration
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Static Scope Configuration
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Tracing and Logging
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Serialized Proxy Registrations
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Networking Configuration Parameters
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBUA\fR Configuration
+.RE
+.SS "DA Configuration"
+.sp
+.LP
+The following are configuration properties and their parameters for \fBDA\fRs:
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.isDA\fR\fR
+.ad
+.RS 24n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Boolean
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fBFalse\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+\fBTrue\fR or \fBFalse\fR
+.RE
+
+A boolean that indicates whether \fBslpd\fR(8) is to act as  a \fBDA\fR. If
+\fBFalse\fR, \fBslpd\fR(8) is not run as a \fBDA\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.DAHeartBeat\fR\fR
+.ad
+.RS 24n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Integer
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+10800 seconds (3 hours)
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+2000 - 259200000 seconds
+.RE
+
+A 32-bit integer  giving the  number of seconds for  the passive \fBDA\fR
+advertisement heartbeat. The default value is  10800 seconds. This property is
+ignored if \fBnet.slp.isDA\fR is \fBFalse\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.DAAttributes\fR\fR
+.ad
+.RS 24n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+List of Strings
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+Unassigned
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+List of Attribute Tag/Value List Pairs
+.RE
+
+A comma-separated list of parenthesized attribute tag/value list pairs that the
+\fBDA\fR must advertise in \fBDA\fR advertisements.  The property must be in
+the \fBSLP\fR attribute list wire format, which requires that you use a
+backslash ("\\") to escape reserved characters. See \fIRFC 2608\fR for more
+information on reserved characters, or refer to the \fISystem Administration
+Guide: Network Services\fR.
+.RE
+
+.SS "Static Scope Configuration"
+.sp
+.LP
+The following properties and their parameters allow you to configure various
+aspects of scope and \fBDA\fR handling:
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.useScopes\fR\fR
+.ad
+.RS 23n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+List of Strings
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fBDefault\fR, for \fBSA\fR and \fBDA\fR; unassigned for \fBUA\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+List of Strings
+.RE
+
+A list of  strings indicating either the scopes that a  \fBUA\fR or an \fBSA\fR
+is allowed to use when making requests, or the scopes  a \fBDA\fR  must
+support. If not present for the \fBDA\fR and \fBSA\fR, the default scope
+\fBDefault\fR is used. If not present for the \fBUA\fR, then the user scoping
+model is in force, in which active and passive \fBDA\fR or \fBSA\fR discovery
+are used for scope discovery. The scope \fBDefault\fR  is used if no other
+information is available. If a \fBDA\fR or \fBSA\fR gets another  scope in a
+request, a \fBSCOPE_NOT_SUPPORTED\fR error is  returned, unless the request was
+multicast, in which case it is dropped. If a \fBDA\fR receives another scope in
+a registration, a \fBSCOPE_NOT_SUPPORTED\fR error will be returned.  Unlike
+other properties, this property is "read-only", so  attempts to change it
+programmatically after the configuration file has been  read are ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.DAAddresses\fR\fR
+.ad
+.RS 23n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+List of Strings
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+Unassigned
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+IPv4 addresses or host names
+.RE
+
+A  list of  \fBIP\fR  addresses  or  \fBDNS\fR-resolvable  names that denote
+the  \fBDA\fRs to  use for statically  configured \fBUA\fRs and  \fBSA\fRs. The
+property is read by \fBslpd\fR(8), and registrations are forwarded to the
+\fBDA\fRs. The \fBDA\fRs are provided to \fBUA\fRs upon request. Unlike other
+properties, this property is "read-only", so attempts to change it after the
+configuration file has been read are ignored.
+.sp
+The following grammar describes the property:
+.sp
+.in +2
+.nf
+addr-list  =  addr / addr "," addr-list
+addr       =  fqdn / hostnumber
+fqdn       =  ALPHA / ALPHA *[ anum / "-" ] anum
+anum       =  ALPHA / DIGIT
+hostnumber =  1*3DIGIT 3("." 1*3DIGIT)
+.fi
+.in -2
+
+The following is an example using this grammar:
+.sp
+.in +2
+.nf
+sawah,mandi,sambal
+.fi
+.in -2
+
+\fBIP\fR addresses can be used instead of host names in networks where
+\fBDNS\fR is not deployed, but network administrators are reminded that using
+\fBIP\fR addresses will complicate machine renumbering, since the \fBSLP\fR
+configuration property files in statically configured networks will have to be
+changed.
+.RE
+
+.SS "Tracing and Logging"
+.sp
+.LP
+These properties direct tracing and logging information to be sent to
+\fBsyslogd\fR at the \fBLOG_INFO\fR priority. These properties affect
+\fBslpd\fR(8) only.
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.traceDATraffic\fR\fR
+.ad
+.RS 26n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Boolean
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fBFalse\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+\fBTrue\fR or \fBFalse\fR
+.RE
+
+Set \fBnet.slp.traceDATraffic\fR to \fBTrue\fR to enable logging of \fBDA\fR
+traffic by \fBslpd\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.traceMsg\fR\fR
+.ad
+.RS 26n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Boolean
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fBFalse\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+\fBTrue\fR or \fBFalse\fR
+.RE
+
+Set \fBnet.slp.traceMsg\fR to \fBTrue\fR to display details about \fBSLP\fR
+messages. The  fields  in all  incoming  messages  and outgoing replies are
+printed by \fBslpd\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.traceDrop\fR\fR
+.ad
+.RS 26n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Boolean
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fBFalse\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+\fBTrue\fR or \fBFalse\fR
+.RE
+
+Set this property to \fBTrue\fR to display details when an \fBSLP\fRmessage is
+dropped by \fBslpd\fR for any reason.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.traceReg\fR\fR
+.ad
+.RS 26n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Boolean
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fBFalse\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+\fBTrue\fR or \fBFalse\fR
+.RE
+
+Set this property to \fBTrue\fR to display the  table of service advertisements
+when a registration or deregistration is processed by \fBslpd\fR.
+.RE
+
+.SS "Serialized Proxy Registrations"
+.sp
+.LP
+The following properties  control  reading  and  writing  serialized
+registrations.
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.serializedRegURL\fR\fR
+.ad
+.RS 28n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+String
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+Unassigned
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+Valid \fBURL\fR
+.RE
+
+A  string containing  a  \fBURL\fR pointing to a document, which contains
+serialized registrations that should  be processed when the \fBslpd\fR starts
+up.
+.RE
+
+.SS "Networking Configuration Parameters"
+.sp
+.LP
+The properties that follow allow you to set various network configuration
+parameters:
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.isBroadcastOnly\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Boolean
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fBFalse\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+\fBTrue\fR or \fBFalse\fR
+.RE
+
+A  boolean that indicates if  broadcast  should  be  used instead of multicast.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.multicastTTL\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Positive Integer
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fB255\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+A positive integer from 1 to 255.
+.RE
+
+A positive integer  less than or  equal to 255 that defines the multicast
+\fBTTL\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.DAActiveDiscoveryInterval\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Integer
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+900 seconds (15 minutes)
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+From 300 to 10800 seconds
+.RE
+
+A 16-bit positive integer giving the number of seconds between \fBDA\fR active
+discovery queries. The default value is 900 seconds (15 minutes). If the
+property is set to zero, active discovery is turned off. This is useful when
+the \fBDA\fRs available are explicitly restricted to those obtained from the
+\fBnet.slp.DAAddresses\fR property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.multicastMaximumWait\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Integer
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+15000 milliseconds (15 seconds)
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+ 1000 to 60000 milliseconds
+.RE
+
+A 32-bit integer giving the maximum value for the sum of the
+\fBnet.slp.multicastTimeouts\fR values and \fBnet.slp.DADiscoveryTimeouts\fR
+values in milliseconds.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.multicastTimeouts\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+List of Integers
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fB3000,3000,3000,3000\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+List of Positive Integers
+.RE
+
+A list of 32-bit integers used as timeouts, in milliseconds, to implement the
+multicast convergence algorithm. Each value specifies the time to wait before
+sending the next request, or until nothing new has been learned from two
+successive requests. In a fast network the aggressive values of
+\fB1000,1250,1500,2000,4000\fR allow better performance. The sum of the list
+must equal \fBnet.slp.multicastMaximumWait\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.passiveDADetection\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Boolean
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fBTrue\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+\fBTrue\fR or \fBFalse\fR
+.RE
+
+A  boolean indicating  whether \fBslpd\fR should perform passive  \fBDA\fR
+detection.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.DADiscoveryTimeouts\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+List of  Integers.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fB2000,2000,2000,2000,3000,4000\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+List of Positive Integers
+.RE
+
+A list of 32-bit integers used as timeouts, in milliseconds, to implement the
+multicast convergence algorithm during active \fBDA\fR discovery.  Each value
+specifies the time to wait before sending the next request, or until nothing
+new has been learned from two successive requests. The sum of the list must
+equal \fBnet.slp.multicastMaximumWait\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.datagramTimeouts\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+List of Integers
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fB3000,3000,3000\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+List of Positive Integers
+.RE
+
+A list of 32-bit integers used as timeouts, in milliseconds, to implement
+unicast datagram transmission to \fBDA\fRs.  The \fIn\fRth value gives the time
+to block waiting for a reply on the \fIn\fRth try to contact the \fBDA\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.randomWaitBound\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Integer
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+1000 milliseconds (1 second)
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+1000 to 3000 milliseconds
+.RE
+
+Sets the upper bound for calculating the random wait time before attempting to
+contact a \fBDA\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.MTU\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Integer
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+1400
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+128 to 8192
+.RE
+
+A 16-bit integer that specifies the network  packet size, in bytes. The packet
+size includes \fBIP\fR and \fBTCP\fR or \fBUDP\fR headers.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.interfaces\fR\fR
+.ad
+.sp .6
+.RS 4n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+List of Strings
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+Default interface
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+IPv4 addresses or host names
+.RE
+
+List of strings giving the \fBIP\fR addresses or host names of the network
+interface cards on which the \fBDA\fR or \fBSA\fR should listen on port 427 for
+multicast, unicast \fBUDP\fR, and \fBTCP\fR messages. The default value is
+unassigned, indicating that the default network interface card should be used.
+An example is:
+.sp
+.in +2
+.nf
+195.42.42.42,195.42.142.1,195.42.120.1
+.fi
+.in -2
+
+The example machine has three interfaces on which the \fBDA\fR should listen.
+Note that if \fBIP\fR addresses are used, the property must be renumbered if
+the network is renumbered.
+.RE
+
+.SS "UA Configuration"
+.sp
+.LP
+The following configuration parameters apply to the \fBUA\fR:
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.locale\fR\fR
+.ad
+.RS 22n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+String
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fBen\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+See \fIRFC 1766\fR for a list of the locale language tag names.
+.RE
+
+A  \fIRFC 1766\fR  Language  Tag for  the language  locale. Setting this
+property causes the property  value  to become the default  locale for
+\fBSLP\fR messages.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.maxResults\fR\fR
+.ad
+.RS 22n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+Integer
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+\fB-1\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+\fB-1\fR, positive integer
+.RE
+
+A 32 bit-integer that specifies the maximum number of results to accumulate and
+return for a synchronous request before the timeout, or the maximum number of
+results to return through a callback if the request results are reported
+asynchronously.  Positive integers and \fB-1\fR are legal values.  If the value
+of \fBnet.slp.maxResults\fR is \fB-1\fR, all results should be returned.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBnet.slp.typeHint\fR\fR
+.ad
+.RS 22n
+.sp
+.ne 2
+.na
+\fBSetting Type\fR
+.ad
+.RS 19n
+List of Strings
+.RE
+
+.sp
+.ne 2
+.na
+\fBDefault Value\fR
+.ad
+.RS 19n
+Unassigned
+.RE
+
+.sp
+.ne 2
+.na
+\fBRange of Values\fR
+.ad
+.RS 19n
+Service type names
+.RE
+
+A list of service type names.  In the absence of any \fBDA\fRs, \fBUA\fRs
+perform \fBSA\fR discovery to find scopes.  If the \fBnet.slp.typeHint\fR
+property is set, only \fBSA\fR's advertising types on the list respond. Note
+that \fBUA\fRs set this property programmatically. It is not typically set in
+the configuration file. The default is unassigned, meaning do not restrict the
+type.
+.RE
+
+.SH ATTRIBUTES
+.sp
+.LP
+See \fBattributes\fR(7)  for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+CSI	Enabled
+_
+Interface Stability	Standard
+.TE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR slp_api (3SLP),
+.BR slp (4P),
+.BR slpd.reg (5),
+.BR slpd (8)
+.sp
+.LP
+\fISystem Administration Guide: Network Services\fR
+.sp
+.LP
+Alvestrand, H. \fIRFC 1766: Tags for the Identification of Languages\fR.
+Network Working Group. March 1995.
+.sp
+.LP
+Crocker, D., Overell, P. \fIRFC 2234, Augmented BNF for Syntax Specifications:
+ABNF\fR. The Internet Society. 1997.
+.sp
+.LP
+Kempf, J. and Guttman, E. \fIRFC 2614, An API for Service Location\fR. The
+Internet Society. June 1999.

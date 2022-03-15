@@ -41,8 +41,8 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/dmfe group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/dmfe.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/dmfe.4d
 driver name=dmfe perms="* 0666 root sys" clone_perms="dmfe 0666 root sys" \
     alias=pci108e,9102 \
     alias=pci1282,9102

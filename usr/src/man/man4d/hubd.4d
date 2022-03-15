@@ -1,0 +1,316 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH HUBD 4D "May 13, 2017"
+.SH NAME
+hubd \- USB hub driver
+.SH SYNOPSIS
+.LP
+.nf
+\fBhub@unit-address\fR
+.fi
+
+.SH DESCRIPTION
+.LP
+The \fBhubd\fR is a USBA (illumos USB Architecture) compliant client driver
+that supports USB hubs conforming to the \fIUniversal Serial Bus Specification
+3.0\fR. The \fBhubd\fR driver supports bus-powered and self-powered hubs. The
+driver supports hubs with individual port power, ganged power and no power
+switching.
+.sp
+.LP
+When a device is attached to a hub port, the \fBhubd\fR driver enumerates the
+device by determining its type and assigning an address to it. For
+multi-configuration devices, \fBhubd\fR sets the preferred configuration (refer
+to \fBcfgadm_usb\fR(8) to select a configuration). The \fBhubd\fR driver
+attaches a driver to the device if one is available for the default or selected
+configuration. When the device is disconnected from the hub port, the
+\fBhubd\fR driver offlines any driver instance attached to the device.
+.SH FILES
+.ne 2
+.na
+\fB\fB/kernel/drv/hubd\fR\fR
+.ad
+.RS 28n
+32- bit x86 ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/hubd\fR\fR
+.ad
+.RS 28n
+64- bit x86 ELF kernel module
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/hubd\fR\fR
+.ad
+.RS 28n
+64-bit SPARC ELF kernel module
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for a description of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	SPARC, x86, PCI-based systems
+.TE
+
+.SH SEE ALSO
+.LP
+.BR usba (4D),
+.BR attributes (7),
+.BR cfgadm_usb (8)
+.sp
+.LP
+\fIWriting Device Drivers\fR
+.sp
+.LP
+\fIUniversal Serial Bus Specification 2.0\fR
+.sp
+.LP
+\fISystem Administration Guide: Basic Administration\fR
+.SH DIAGNOSTICS
+.LP
+In addition to being logged, the following messages may also appear on the
+system console. Messages are formatted in the following manner:
+.sp
+.in +2
+.nf
+WARNING: <device path> <hubd<instance number>): Message...
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+where \fB<instance number>\fR is the instance number of \fBhubd\fR and
+\fB<device path>\fR is the physical path to the device in \fB/devices\fR
+directory. Messages from the root hub are displayed with a \fBusb<instance
+number>\fR prefix instead of \fBhub<instance number>\fR as the root hub is an
+integrated part of the host controller.
+.sp
+.ne 2
+.na
+\fBConnecting device on port \fI<number>\fR failed.\fR
+.ad
+.sp .6
+.RS 4n
+The driver failed to enumerate the device connected on port \fI<number>\fR of
+hub. If enumeration fails, disconnect and re-connect.
+.RE
+
+.sp
+.ne 2
+.na
+\fBUse of a USB 1.0 hub behind a high speed port may cause unexpected
+failures.\fR
+.ad
+.sp .6
+.RS 4n
+Devices connected to a USB 1.0 hub which are in turn connected to an external
+USB 2.0 hub, may misbehave unexpectedly or suddenly go offline. This is due to
+a documented incompatibility between USB 1.0 hubs and USB 2.0 hub Transaction
+Translators. Please use only USB 2.0 or USB 1.1 hubs behind high-speed ports.
+.RE
+
+.sp
+.ne 2
+.na
+\fBConnecting a high speed device to a non-high speed hub (port x) will result
+in a loss of performance. Please connect the device to a high speed port to get
+the maximum performance.\fR
+.ad
+.sp .6
+.RS 4n
+USB 2.0 devices connected to USB 1.0 or 1.1 hubs cannot run at their highest
+speed, even when the hub is in turn connected to a high-speed port. For best
+performance, reconnect without going through a USB 1.0 or 1.1 hub.
+.RE
+
+.sp
+.ne 2
+.na
+\fBCannot access <device>. Please reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+This hub has been disconnected because a device other than the original one has
+been inserted. The driver informs you of this fact by displaying the name of
+the original device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPort <n> overcurrent. \fR
+.ad
+.sp .6
+.RS 4n
+An overcurrent condition was detected. Please remove the device on this port.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDevices not identical to the previous one on this port. Please disconnect
+and reconnect.\fR
+.ad
+.sp .6
+.RS 4n
+Same condition as described above; however in this case, the driver is unable
+to identify the original device with a name string.
+.RE
+
+.sp
+.ne 2
+.na
+\fBHub driver supports max of \fI<n>\fR ports on hub. Hence, using the first
+\fI<number of physical ports>\fR of \fI<n>\fR ports available.\fR
+.ad
+.sp .6
+.RS 4n
+The current hub driver supports hubs that have \fI<n>\fR ports or less. A hub
+with more than \fI<n>\fR ports has been plugged in. Only the first \fI<n>\fR
+out of the total \fI<number of physical ports>\fR ports are usable.
+.RE
+
+.sp
+.ne 2
+.na
+\fBHub global over current condition, please disconnect the devices connected
+to the hub to clear the condition. You may need to re-connect the hub if the
+ports do not work.\fR
+.ad
+.sp .6
+.RS 4n
+An overcurrent condition was detected on the hub. This means that the
+aggregate current being drawn by the devices on the downstream ports exceeds a
+preset value. Refer to section 7.2.1.2 and 11.13 of the \fIUniversal Serial Bus
+Specification 2.0\fR. If this message continues to display, you may need to
+remove downstream devices to eliminate the problem. If any port does not work
+after the overcurrent condition is cleared, re-connect the hub to re-enable the
+ports.
+.RE
+
+.sp
+.ne 2
+.na
+\fBRoot hub over current condition, please check your system to clear the
+condition as soon as possible. You may need to reboot the system if the root
+hub does not recover automatically.\fR
+.ad
+.sp .6
+.RS 4n
+An overcurrent condition was detected on the root hub, indicating that
+malfunctioning devices on the downstream ports are drawing too much current.
+Please disconnect the problematic downstream devices to eliminate the problem.
+If the root hub doesn't work after the overcurrent condition is cleared, you
+may need to reboot the system.
+.RE
+
+.sp
+.LP
+The following messages may be logged into the system log. They are formatted in
+the following manner:
+.sp
+.in +2
+.nf
+<device path><hubd<instance number>): message...
+.fi
+.in -2
+.sp
+
+.sp
+.ne 2
+.na
+\fBLocal power has been lost, please disconnect hub.\fR
+.ad
+.sp .6
+.RS 4n
+A USB self-powered hub has lost external power. All USB devices connected
+down-stream from this hub will cease to function. Disconnect the hub, plug in
+the external power-supply and then plug in the hub again.
+.RE
+
+.sp
+.ne 2
+.na
+\fBLocal power has been lost, the hub could draw <x> mA power from the USB
+bus.\fR
+.ad
+.sp .6
+.RS 4n
+A USB self/bus-powered hub has lost external power. Some USB devices connected
+down-stream from this hub may cease to function. Disconnect the
+external power-supply and then plug in the hub again.
+.RE
+
+.sp
+.ne 2
+.na
+\fBTwo bus-powered hubs cannot be concatenated.\fR
+.ad
+.sp .6
+.RS 4n
+A bus-powered hub was connected to a bus powered hub port. Please remove this
+bus-powered hub and connect it to a self-powered hub or a root hub port.
+.RE
+
+.sp
+.ne 2
+.na
+\fBConfiguration <n> for device <device> at port <m> exceeds power available
+for this port. Please re-insert your device into another hub port which has
+enough power.\fR
+.ad
+.sp .6
+.RS 4n
+The device requires more power than is available on this port.
+.RE
+
+.sp
+.ne 2
+.na
+\fBPort <\fIn\fR\fB> in over current condition, please check the attached device
+to clear the condition. The system will try to recover the port, but if not
+successful, you need to re-connect the hub or reboot the system to bring the
+port back to work.\fR
+.ad
+.sp .6
+.RS 4n
+An overcurrent condition was detected on port <\fIn\fR>. This means the device
+connected to the port is drawing more current than the hub can supply. If this
+message continues to display, please disconnect the device to eliminate the
+problem. If the port doesn't work after the overcurrent condition is cleared,
+please re-connect the hub or reboot the system to enable the port again.
+.RE
+
+.sp
+.ne 2
+.na
+\fBUnable to attach USB 3.x hub <vendor> <device>. A maximum of 5 hubs
+may be cascaded.\fR
+.ad
+.sp .6
+.RS 4n
+USB 3.0 has an upper bound on the number of hubs that may be chained
+together. If this limit is exceeded, a hub may not be detected or
+attached. The hub will be functional if plugged into a different part of
+the USB topology. To determine the depth of the hub, count the number of
+devices between it and the host controller.
+.RE

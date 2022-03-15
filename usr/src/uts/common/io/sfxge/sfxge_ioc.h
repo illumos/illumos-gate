@@ -78,7 +78,7 @@ typedef	struct sfxge_nvram_ioc_s {
 	uint16_t	sni_version[4];		/* get/set_ver */
 	/*
 	 * Streams STRMSGSZ limit (default 64kb)
-	 * See write(2) and I_STR in streamio(7i)
+	 * See write(2) and I_STR in streamio(4I)
 	 */
 	uint8_t		sni_data[32*1024];	/* read/write */
 } sfxge_nvram_ioc_t;

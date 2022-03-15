@@ -51,7 +51,7 @@
  *		the process has removed its entry it cleans the entry when the
  *		the process terminates.
  *		The AT&T Copyright above is there since we borrowed the pipe
- *		mechanism from init(1m).
+ *		mechanism from init(8).
  */
 
 
@@ -1093,7 +1093,7 @@ warn_utmp()
 	if (lstat(UTMP_FILE, &s) == 0 &&
 	    s.st_size % sizeof (struct utmp) == 0) {
 		nonfatal("WARNING: /var/adm/utmp exists!\nSee "
-		    "utmp(4) for more information");
+		    "utmp(5) for more information");
 	}
 }
 

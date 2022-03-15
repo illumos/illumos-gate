@@ -33,7 +33,7 @@ linked with the \fBlibnsl\fR library.
 In the case of multithreaded applications, the \fB-mt\fR option must be
 specified on the command line at compilation time to enable a thread-specific
 version of \fBrpc_createerr()\fR. See \fBrpc_clnt_create\fR(3NSL) and
-\fBthreads\fR(5).
+\fBthreads\fR(7).
 .sp
 .LP
 When used in multithreaded applications, client-side routines are MT-Safe.
@@ -388,7 +388,7 @@ which they are described:
 \fB\fBauth_destroy\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_auth\fR(3NSL)
+.BR rpc_clnt_auth (3NSL)
 .RE
 
 .sp
@@ -397,7 +397,7 @@ which they are described:
 \fB\fBauthdes_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -406,7 +406,7 @@ which they are described:
 \fB\fBauthdes_getucred\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -415,7 +415,7 @@ which they are described:
 \fB\fBauthdes_seccreate\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -424,7 +424,7 @@ which they are described:
 \fB\fBauthnone_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_auth\fR(3NSL)
+.BR rpc_clnt_auth (3NSL)
 .RE
 
 .sp
@@ -433,7 +433,7 @@ which they are described:
 \fB\fBauthsys_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_auth\fR(3NSL)
+.BR rpc_clnt_auth (3NSL)
 .RE
 
 .sp
@@ -442,7 +442,7 @@ which they are described:
 \fB\fBauthsys_create_default\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_auth\fR(3NSL)
+.BR rpc_clnt_auth (3NSL)
 .RE
 
 .sp
@@ -451,7 +451,7 @@ which they are described:
 \fB\fBauthunix_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -460,7 +460,7 @@ which they are described:
 \fB\fBauthunix_create_default\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -469,7 +469,7 @@ which they are described:
 \fB\fBcallrpc\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -478,7 +478,7 @@ which they are described:
 \fB\fBclnt_broadcast\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -487,7 +487,7 @@ which they are described:
 \fB\fBclnt_call\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -496,7 +496,7 @@ which they are described:
 \fB\fBclnt_control\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -505,7 +505,7 @@ which they are described:
 \fB\fBclnt_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -514,7 +514,7 @@ which they are described:
 \fB\fBclnt_destroy\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -523,7 +523,7 @@ which they are described:
 \fB\fBclnt_dg_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -532,7 +532,7 @@ which they are described:
 \fB\fBclnt_freeres\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -541,7 +541,7 @@ which they are described:
 \fB\fBclnt_geterr\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -550,7 +550,7 @@ which they are described:
 \fB\fBclnt_pcreateerror\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -559,7 +559,7 @@ which they are described:
 \fB\fBclnt_perrno\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -568,7 +568,7 @@ which they are described:
 \fB\fBclnt_perror\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -577,7 +577,7 @@ which they are described:
 \fB\fBclnt_raw_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -586,7 +586,7 @@ which they are described:
 \fB\fBclnt_spcreateerror\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -595,7 +595,7 @@ which they are described:
 \fB\fBclnt_sperrno\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -604,7 +604,7 @@ which they are described:
 \fB\fBclnt_sperror\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -613,7 +613,7 @@ which they are described:
 \fB\fBclnt_tli_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -622,7 +622,7 @@ which they are described:
 \fB\fBclnt_tp_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -631,7 +631,7 @@ which they are described:
 \fB\fBclnt_vc_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_create\fR(3NSL)
+.BR rpc_clnt_create (3NSL)
 .RE
 
 .sp
@@ -640,7 +640,7 @@ which they are described:
 \fB\fBclntraw_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -649,7 +649,7 @@ which they are described:
 \fB\fBclnttcp_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -658,7 +658,7 @@ which they are described:
 \fB\fBclntudp_bufcreate\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -667,7 +667,7 @@ which they are described:
 \fB\fBclntudp_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -676,7 +676,7 @@ which they are described:
 \fB\fBget_myaddress\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -685,7 +685,7 @@ which they are described:
 \fB\fBgetnetname\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -694,7 +694,7 @@ which they are described:
 \fB\fBhost2netname\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -703,7 +703,7 @@ which they are described:
 \fB\fBkey_decryptsession\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -712,7 +712,7 @@ which they are described:
 \fB\fBkey_encryptsession\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -721,7 +721,7 @@ which they are described:
 \fB\fBkey_gendes\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -730,7 +730,7 @@ which they are described:
 \fB\fBkey_setsecret\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -739,7 +739,7 @@ which they are described:
 \fB\fBnetname2host\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -748,7 +748,7 @@ which they are described:
 \fB\fBnetname2user\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -757,7 +757,7 @@ which they are described:
 \fB\fBpmap_getmaps\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -766,7 +766,7 @@ which they are described:
 \fB\fBpmap_getport\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -775,7 +775,7 @@ which they are described:
 \fB\fBpmap_rmtcall\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -784,7 +784,7 @@ which they are described:
 \fB\fBpmap_set\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -793,7 +793,7 @@ which they are described:
 \fB\fBpmap_unset\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -802,7 +802,7 @@ which they are described:
 \fB\fBregisterrpc\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -811,7 +811,7 @@ which they are described:
 \fB\fBrpc_broadcast\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -820,7 +820,7 @@ which they are described:
 \fB\fBrpc_broadcast_exp\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -829,7 +829,7 @@ which they are described:
 \fB\fBrpc_call\fR\fR
 .ad
 .RS 27n
-\fBrpc_clnt_calls\fR(3NSL)
+.BR rpc_clnt_calls (3NSL)
 .RE
 
 .sp
@@ -838,7 +838,7 @@ which they are described:
 \fB\fBrpc_reg\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_reg\fR(3NSL)
+.BR rpc_svc_reg (3NSL)
 .RE
 
 .sp
@@ -847,7 +847,7 @@ which they are described:
 \fB\fBsvc_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_create\fR(3NSL)
+.BR rpc_svc_create (3NSL)
 .RE
 
 .sp
@@ -856,7 +856,7 @@ which they are described:
 \fB\fBsvc_destroy\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_create\fR(3NSL)
+.BR rpc_svc_create (3NSL)
 .RE
 
 .sp
@@ -865,7 +865,7 @@ which they are described:
 \fB\fBsvc_dg_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_create\fR(3NSL)
+.BR rpc_svc_create (3NSL)
 .RE
 
 .sp
@@ -874,7 +874,7 @@ which they are described:
 \fB\fBsvc_dg_enablecache\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+.BR rpc_svc_calls (3NSL)
 .RE
 
 .sp
@@ -883,7 +883,7 @@ which they are described:
 \fB\fBsvc_fd_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_create\fR(3NSL)
+.BR rpc_svc_create (3NSL)
 .RE
 
 .sp
@@ -892,7 +892,7 @@ which they are described:
 \fB\fBsvc_fds\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -901,7 +901,7 @@ which they are described:
 \fB\fBsvc_freeargs\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+.BR rpc_svc_calls (3NSL)
 .RE
 
 .sp
@@ -910,7 +910,7 @@ which they are described:
 \fB\fBsvc_getargs\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+.BR rpc_svc_calls (3NSL)
 .RE
 
 .sp
@@ -919,7 +919,7 @@ which they are described:
 \fB\fBsvc_getcaller\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -928,7 +928,7 @@ which they are described:
 \fB\fBsvc_getreq\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -937,7 +937,7 @@ which they are described:
 \fB\fBsvc_getreqset\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+.BR rpc_svc_calls (3NSL)
 .RE
 
 .sp
@@ -946,7 +946,7 @@ which they are described:
 \fB\fBsvc_getrpccaller\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+.BR rpc_svc_calls (3NSL)
 .RE
 
 .sp
@@ -955,7 +955,7 @@ which they are described:
 \fB\fBsvc_raw_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_create\fR(3NSL)
+.BR rpc_svc_create (3NSL)
 .RE
 
 .sp
@@ -964,7 +964,7 @@ which they are described:
 \fB\fBsvc_reg\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_reg\fR(3NSL)
+.BR rpc_svc_reg (3NSL)
 .RE
 
 .sp
@@ -973,7 +973,7 @@ which they are described:
 \fB\fBsvc_register\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -982,7 +982,7 @@ which they are described:
 \fB\fBsvc_run\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+.BR rpc_svc_calls (3NSL)
 .RE
 
 .sp
@@ -991,7 +991,7 @@ which they are described:
 \fB\fBsvc_sendreply\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_calls\fR(3NSL)
+.BR rpc_svc_calls (3NSL)
 .RE
 
 .sp
@@ -1000,7 +1000,7 @@ which they are described:
 \fB\fBsvc_tli_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_create\fR(3NSL)
+.BR rpc_svc_create (3NSL)
 .RE
 
 .sp
@@ -1009,7 +1009,7 @@ which they are described:
 \fB\fBsvc_tp_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_create\fR(3NSL)
+.BR rpc_svc_create (3NSL)
 .RE
 
 .sp
@@ -1018,7 +1018,7 @@ which they are described:
 \fB\fBsvc_unreg\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_reg\fR(3NSL)
+.BR rpc_svc_reg (3NSL)
 .RE
 
 .sp
@@ -1027,7 +1027,7 @@ which they are described:
 \fB\fBsvc_unregister\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -1036,7 +1036,7 @@ which they are described:
 \fB\fBsvc_vc_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_create\fR(3NSL)
+.BR rpc_svc_create (3NSL)
 .RE
 
 .sp
@@ -1045,7 +1045,7 @@ which they are described:
 \fB\fBsvcerr_auth\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_err\fR(3NSL)
+.BR rpc_svc_err (3NSL)
 .RE
 
 .sp
@@ -1054,7 +1054,7 @@ which they are described:
 \fB\fBsvcerr_decode\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_err\fR(3NSL)
+.BR rpc_svc_err (3NSL)
 .RE
 
 .sp
@@ -1063,7 +1063,7 @@ which they are described:
 \fB\fBsvcerr_noproc\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_err\fR(3NSL)
+.BR rpc_svc_err (3NSL)
 .RE
 
 .sp
@@ -1072,7 +1072,7 @@ which they are described:
 \fB\fBsvcerr_noprog\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_err\fR(3NSL)
+.BR rpc_svc_err (3NSL)
 .RE
 
 .sp
@@ -1081,7 +1081,7 @@ which they are described:
 \fB\fBsvcerr_progvers\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_err\fR(3NSL)
+.BR rpc_svc_err (3NSL)
 .RE
 
 .sp
@@ -1090,7 +1090,7 @@ which they are described:
 \fB\fBsvcerr_systemerr\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_err\fR(3NSL)
+.BR rpc_svc_err (3NSL)
 .RE
 
 .sp
@@ -1099,7 +1099,7 @@ which they are described:
 \fB\fBsvcerr_weakauth\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_err\fR(3NSL)
+.BR rpc_svc_err (3NSL)
 .RE
 
 .sp
@@ -1108,7 +1108,7 @@ which they are described:
 \fB\fBsvcfd_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -1117,7 +1117,7 @@ which they are described:
 \fB\fBsvcraw_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -1126,7 +1126,7 @@ which they are described:
 \fB\fBsvctcp_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -1135,7 +1135,7 @@ which they are described:
 \fB\fBsvcudp_bufcreate\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -1144,7 +1144,7 @@ which they are described:
 \fB\fBsvcudp_create\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -1153,7 +1153,7 @@ which they are described:
 \fB\fBuser2netname\fR\fR
 .ad
 .RS 27n
-\fBsecure_rpc\fR(3NSL)
+.BR secure_rpc (3NSL)
 .RE
 
 .sp
@@ -1162,7 +1162,7 @@ which they are described:
 \fB\fBxdr_accepted_reply\fR\fR
 .ad
 .RS 27n
-\fBrpc_xdr\fR(3NSL)
+.BR rpc_xdr (3NSL)
 .RE
 
 .sp
@@ -1171,7 +1171,7 @@ which they are described:
 \fB\fBxdr_authsys_parms\fR\fR
 .ad
 .RS 27n
-\fBrpc_xdr\fR(3NSL)
+.BR rpc_xdr (3NSL)
 .RE
 
 .sp
@@ -1180,7 +1180,7 @@ which they are described:
 \fB\fBxdr_authunix_parms\fR\fR
 .ad
 .RS 27n
-\fBrpc_soc\fR(3NSL)
+.BR rpc_soc (3NSL)
 .RE
 
 .sp
@@ -1189,7 +1189,7 @@ which they are described:
 \fB\fBxdr_callhdr\fR\fR
 .ad
 .RS 27n
-\fBrpc_xdr\fR(3NSL)
+.BR rpc_xdr (3NSL)
 .RE
 
 .sp
@@ -1198,7 +1198,7 @@ which they are described:
 \fB\fBxdr_callmsg\fR\fR
 .ad
 .RS 27n
-\fBrpc_xdr\fR(3NSL)
+.BR rpc_xdr (3NSL)
 .RE
 
 .sp
@@ -1207,7 +1207,7 @@ which they are described:
 \fB\fBxdr_opaque_auth\fR\fR
 .ad
 .RS 27n
-\fBrpc_xdr\fR(3NSL)
+.BR rpc_xdr (3NSL)
 .RE
 
 .sp
@@ -1216,7 +1216,7 @@ which they are described:
 \fB\fBxdr_rejected_reply\fR\fR
 .ad
 .RS 27n
-\fBrpc_xdr\fR(3NSL)
+.BR rpc_xdr (3NSL)
 .RE
 
 .sp
@@ -1225,7 +1225,7 @@ which they are described:
 \fB\fBxdr_replymsg\fR\fR
 .ad
 .RS 27n
-\fBrpc_xdr\fR(3NSL)
+.BR rpc_xdr (3NSL)
 .RE
 
 .sp
@@ -1234,7 +1234,7 @@ which they are described:
 \fB\fBxprt_register\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_reg\fR(3NSL)
+.BR rpc_svc_reg (3NSL)
 .RE
 
 .sp
@@ -1243,7 +1243,7 @@ which they are described:
 \fB\fBxprt_unregister\fR\fR
 .ad
 .RS 27n
-\fBrpc_svc_reg\fR(3NSL)
+.BR rpc_svc_reg (3NSL)
 .RE
 
 .SH FILES
@@ -1251,7 +1251,7 @@ which they are described:
 \fB/etc/netconfig\fR
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -1266,9 +1266,21 @@ MT-Level	MT-Safe with exceptions
 
 .SH SEE ALSO
 .LP
-\fBgetnetconfig\fR(3NSL), \fBgetnetpath\fR(3NSL), \fBrpc_clnt_auth\fR(3NSL),
-\fBrpc_clnt_calls\fR(3NSL), \fBrpc_clnt_create\fR(3NSL),
-\fBrpc_svc_calls\fR(3NSL), \fBrpc_svc_create\fR(3NSL), \fBrpc_svc_err\fR(3NSL),
-\fBrpc_svc_reg\fR(3NSL), \fBrpc_xdr\fR(3NSL), \fBrpcbind\fR(3NSL),
-\fBsecure_rpc\fR(3NSL), \fBthreads\fR(5), \fBxdr\fR(3NSL), \fBnetconfig\fR(4),
-\fBrpc\fR(4), \fBattributes\fR(5), \fBenviron\fR(5)
+.BR getnetconfig (3NSL),
+.BR getnetpath (3NSL),
+.BR rpc_clnt_auth (3NSL),
+.BR rpc_clnt_calls (3NSL),
+.BR rpc_clnt_create (3NSL),
+.BR rpc_svc_calls (3NSL),
+.BR rpc_svc_create (3NSL),
+.BR rpc_svc_err (3NSL),
+.BR rpc_svc_reg (3NSL),
+.BR rpc_xdr (3NSL),
+.BR rpcbind (3NSL),
+.BR secure_rpc (3NSL),
+.BR xdr (3NSL),
+.BR netconfig (5),
+.BR rpc (5),
+.BR attributes (7),
+.BR environ (7),
+.BR threads (7)

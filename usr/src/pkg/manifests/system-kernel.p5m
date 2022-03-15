@@ -37,15 +37,15 @@
 # information about overriding the defaults.
 #
 <include global_zone_only_component>
-<include system-kernel.man1m.inc>
 <include system-kernel.man2.inc>
 <include system-kernel.man4.inc>
+<include system-kernel.man4d.inc>
+<include system-kernel.man4fs.inc>
+<include system-kernel.man4m.inc>
+<include system-kernel.man4p.inc>
 <include system-kernel.man5.inc>
 <include system-kernel.man7.inc>
-<include system-kernel.man7d.inc>
-<include system-kernel.man7fs.inc>
-<include system-kernel.man7m.inc>
-<include system-kernel.man7p.inc>
+<include system-kernel.man8.inc>
 <include system-kernel.man9.inc>
 <include system-kernel.man9e.inc>
 <include system-kernel.man9f.inc>
@@ -335,7 +335,7 @@ $(sparc_ONLY)file path=kernel/misc/$(ARCH64)/dada group=sys mode=0755
 link path=kernel/misc/$(ARCH64)/des target=../../../kernel/crypto/$(ARCH64)/des
 file path=kernel/misc/$(ARCH64)/dls group=sys mode=0755
 # Sadly vuid mouse support is in different packages on different platforms
-# While kstat(7D) is in SUNWcs, the structures are general
+# While kstat(4D) is in SUNWcs, the structures are general
 hardlink path=kernel/misc/$(ARCH64)/edonr \
     target=../../../kernel/crypto/$(ARCH64)/edonr
 file path=kernel/misc/$(ARCH64)/fssnap_if group=sys mode=0755
@@ -472,19 +472,19 @@ dir  path=usr/kernel/drv/$(ARCH64) group=sys
 file path=usr/kernel/drv/$(ARCH64)/signalfd group=sys
 file path=usr/kernel/drv/signalfd.conf group=sys
 dir  path=usr/share/man
-dir  path=usr/share/man/man1m
-$(sparc_ONLY)file path=usr/share/man/man1m/monitor.1m
-$(sparc_ONLY)file path=usr/share/man/man1m/obpsym.1m
 dir  path=usr/share/man/man2
 dir  path=usr/share/man/man3
 dir  path=usr/share/man/man4
+dir  path=usr/share/man/man4d
+$(sparc_ONLY)file path=usr/share/man/man4d/dad.4d
+$(i386_ONLY)file path=usr/share/man/man4d/smbios.4d
+dir  path=usr/share/man/man4fs
+dir  path=usr/share/man/man4m
+dir  path=usr/share/man/man4p
 dir  path=usr/share/man/man5
-dir  path=usr/share/man/man7d
-$(sparc_ONLY)file path=usr/share/man/man7d/dad.7d
-$(i386_ONLY)file path=usr/share/man/man7d/smbios.7d
-dir  path=usr/share/man/man7fs
-dir  path=usr/share/man/man7m
-dir  path=usr/share/man/man7p
+dir  path=usr/share/man/man8
+$(sparc_ONLY)file path=usr/share/man/man8/monitor.8
+$(sparc_ONLY)file path=usr/share/man/man8/obpsym.8
 dir  path=usr/share/man/man9
 dir  path=usr/share/man/man9e
 dir  path=usr/share/man/man9f

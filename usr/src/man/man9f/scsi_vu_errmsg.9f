@@ -248,9 +248,14 @@ WARNING: /sbus@1,f8000000/esp@0,800000/sd@1,0 (sd1):
 .in -2
 
 .SH SEE ALSO
-\fBcmn_err\fR(9F), \fBscsi_errmsg\fR(9F), \fBscsi_log\fR(9F),
-\fBscsi_errmsg\fR(9F), \fBscsi_asc_key_strings\fR(9S), \fBscsi_device\fR(9S),
-\fBscsi_extended_sense\fR(9S), \fBscsi_pkt\fR(9S)
+.BR cmn_err (9F),
+.BR scsi_errmsg (9F),
+.BR scsi_errmsg (9F),
+.BR scsi_log (9F),
+.BR scsi_asc_key_strings (9S),
+.BR scsi_device (9S),
+.BR scsi_extended_sense (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

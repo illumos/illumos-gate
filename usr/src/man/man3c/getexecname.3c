@@ -48,7 +48,7 @@ that is always present.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -64,4 +64,6 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBexec\fR(2), \fBgetcwd\fR(3C), \fBattributes\fR(5)
+.BR exec (2),
+.BR getcwd (3C),
+.BR attributes (7)

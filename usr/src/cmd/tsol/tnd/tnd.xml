@@ -23,7 +23,6 @@
 	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
-	ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <service_bundle type='manifest' name='SUNWtsg:tnd'>
@@ -118,7 +117,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='tnd' section='1M'
+			<manpage title='tnd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

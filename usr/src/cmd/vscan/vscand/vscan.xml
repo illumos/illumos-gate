@@ -116,7 +116,7 @@
 			<loctext xml:lang='C'> VSCAN Service daemon</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='vscand' section='1M'
+			<manpage title='vscand' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

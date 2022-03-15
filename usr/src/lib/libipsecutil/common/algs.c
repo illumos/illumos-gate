@@ -35,11 +35,11 @@
 #include <errno.h>
 
 static char *preamble =
-"# /etc/inet/ipsecalgs output from ipsecalgs(1m)\n"
+"# /etc/inet/ipsecalgs output from ipsecalgs(8)\n"
 "#\n"
 "# DO NOT EDIT OR PARSE THIS FILE!\n"
 "#\n"
-"# Use the ipsecalgs(1m) command to change the contents of this file.\n"
+"# Use the ipsecalgs(8) command to change the contents of this file.\n"
 "# The algorithm descriptions contained in this file are synchronised to the\n"
 "# kernel with ipsecalgs -s, the kernel validates the entries at this point."
 "\n\n"

@@ -98,9 +98,9 @@ in.telnetd supports the standard TELNET virtual terminal protocol.
 			</loctext>
 		</description>
 		<documentation>
-			<manpage title='in.telnetd' section='1M'
+			<manpage title='in.telnetd' section='8'
 				manpath='/usr/share/man' />
-			<manpage title='telnetd' section='1M'
+			<manpage title='telnetd' section='8'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

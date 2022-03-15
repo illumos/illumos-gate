@@ -598,7 +598,7 @@ done:
 
 /*
  * Open and read each line from "/etc/nca/ncalogd.conf" and parse for
- * the tokens and token text (i.e. key and value ncalogd.conf(4)):
+ * the tokens and token text (i.e. key and value ncalogd.conf(5)):
  *
  *	status=enabled
  *

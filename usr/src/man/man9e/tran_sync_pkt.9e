@@ -49,9 +49,15 @@ data associated with the \fIpkt\fR, typically by calling
 hardware-specific details, such as  flushing \fBI/O\fR caches, or stalling
 until hardware buffers have been drained.
 .SH SEE ALSO
-\fBattach\fR(9E), \fBtran_init_pkt\fR(9E), \fBddi_dma_sync\fR(9F),
-\fBscsi_hba_attach\fR(9F), \fBscsi_init_pkt\fR(9F), \fBscsi_sync_pkt\fR(9F),
-\fBscsi_address\fR(9S), \fBscsi_hba_tran\fR(9S), \fBscsi_pkt\fR(9S)
+.BR attach (9E),
+.BR tran_init_pkt (9E),
+.BR ddi_dma_sync (9F),
+.BR scsi_hba_attach (9F),
+.BR scsi_init_pkt (9F),
+.BR scsi_sync_pkt (9F),
+.BR scsi_address (9S),
+.BR scsi_hba_tran (9S),
+.BR scsi_pkt (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

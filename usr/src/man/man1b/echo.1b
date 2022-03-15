@@ -81,8 +81,13 @@ Do not add the \fINEWLINE\fR to the output.
 .SH SEE ALSO
 .sp
 .LP
-\fBcsh\fR(1), \fBecho\fR(1), \fBksh\fR(1), \fBsh\fR(1), \fBtr\fR(1),
-\fBwc\fR(1), \fBattributes\fR(5)
+.BR csh (1),
+.BR echo (1),
+.BR ksh (1),
+.BR sh (1),
+.BR tr (1),
+.BR wc (1),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

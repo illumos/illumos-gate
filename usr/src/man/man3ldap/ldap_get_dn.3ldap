@@ -107,7 +107,7 @@ caller should free the returned string if it is non-zero.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -122,8 +122,10 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBldap_first_entry\fR(3LDAP), \fBldap_error\fR(3LDAP),
-\fBldap_value_free\fR(3LDAP)
+.BR ldap (3LDAP),
+.BR ldap_error (3LDAP),
+.BR ldap_first_entry (3LDAP),
+.BR ldap_value_free (3LDAP)
 .SH NOTES
 .sp
 .LP

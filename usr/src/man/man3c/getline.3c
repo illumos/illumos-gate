@@ -128,5 +128,9 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBfgetc\fR(3C), \fBfgets\fR(3C), \fBfree\fR(3C), \fBmalloc\fR(3C),
-\fBrealloc\fR(3C), \fBattributes\fR(5)
+.BR fgetc (3C),
+.BR fgets (3C),
+.BR free (3C),
+.BR malloc (3C),
+.BR realloc (3C),
+.BR attributes (7)

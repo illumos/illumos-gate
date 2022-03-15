@@ -31,12 +31,13 @@ a pointer the device's \fBdev_info\fR structure.
 .SH DESCRIPTION
 \fBddi_report_dev()\fR prints a banner at boot time,  announcing the device
 pointed to by \fIdip\fR. The banner is always placed in the system logfile
-(displayed by \fBdmesg\fR(1M)), but is only displayed on the console if the
+(displayed by \fBdmesg\fR(8)), but is only displayed on the console if the
 system was booted with the verbose (\fB-v\fR) argument.
 .SH CONTEXT
 \fBddi_report_dev()\fR can be called from user context.
 .SH SEE ALSO
-\fBdmesg\fR(1M), \fBkernel\fR(1M)
+.BR dmesg (8),
+.BR kernel (8)
 .sp
 .LP
 \fIWriting Device Drivers\fR

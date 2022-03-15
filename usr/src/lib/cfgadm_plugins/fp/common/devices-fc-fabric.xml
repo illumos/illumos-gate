@@ -79,7 +79,7 @@ Use is subject to license terms.
 			</loctext>
 		</common_name>
                 <documentation>
-                        <manpage title='cfgadm_fp' section='1M'
+                        <manpage title='cfgadm_fp' section='8'
                                 manpath='/usr/share/man' />
                 </documentation>
 	</template>

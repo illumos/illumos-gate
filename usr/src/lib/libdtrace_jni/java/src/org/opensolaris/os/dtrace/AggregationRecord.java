@@ -22,8 +22,6 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -174,7 +172,7 @@ public final class AggregationRecord implements Record, Serializable {
      * Option#aggsortkey aggsortkey}, {@link Option#aggsortkeypos
      * aggsortkeypos}, {@link Option#aggsortpos aggsortpos}, and {@link
      * Option#aggsortrev aggsortrev} DTrace options and matches the way
-     * that the records would be ordered by {@code dtrace(1M)}.
+     * that the records would be ordered by {@code dtrace(8)}.
      *
      * @return non-negative ordinal from zero (first) to n-1 (last)
      * within the {@code Aggregate} containing this record

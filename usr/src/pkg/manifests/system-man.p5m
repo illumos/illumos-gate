@@ -43,15 +43,15 @@ file path=usr/share/man/man1/apropos.1
 file path=usr/share/man/man1/man.1
 file path=usr/share/man/man1/mandoc.1
 link path=usr/share/man/man1/whatis.1 target=apropos.1
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/catman.1m
-dir  path=usr/share/man/man5
-file path=usr/share/man/man5/eqn.5
-file path=usr/share/man/man5/man.5
-file path=usr/share/man/man5/mandoc_char.5
-file path=usr/share/man/man5/mandoc_roff.5
-file path=usr/share/man/man5/mdoc.5
-file path=usr/share/man/man5/tbl.5
+dir  path=usr/share/man/man7
+file path=usr/share/man/man7/eqn.7
+file path=usr/share/man/man7/man.7
+file path=usr/share/man/man7/mandoc_char.7
+file path=usr/share/man/man7/mandoc_roff.7
+file path=usr/share/man/man7/mdoc.7
+file path=usr/share/man/man7/tbl.7
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/catman.8
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/man/THIRDPARTYLICENSE \
     license=usr/src/cmd/man/THIRDPARTYLICENSE

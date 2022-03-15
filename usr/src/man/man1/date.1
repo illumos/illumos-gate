@@ -91,7 +91,7 @@ written.
 Specifications of native language translations of month and weekday names are
 supported. The month and weekday names used for a language are based on the
 locale specified by the environment variable \fBLC_TIME\fR. See
-\fBenviron\fR(5).
+\fBenviron\fR(7).
 .sp
 .LP
 The following is the default form for the "C" locale:
@@ -307,7 +307,7 @@ conversion to and from local standard and daylight time. Only the super-user
 may change the date. After successfully setting the date and time, \fBdate\fR
 displays the new date according to the default format. The \fBdate\fR command
 uses \fBTZ\fR to determine the correct time zone information; see
-\fBenviron\fR(5).
+\fBenviron\fR(7).
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRGenerating Output
@@ -379,7 +379,7 @@ Thu Jan 01 00:30:00 GMT 2000
 
 .SH ENVIRONMENT VARIABLES
 .LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
+See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBdate\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_TIME\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .sp
@@ -416,7 +416,7 @@ An error occurred.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/date"
 
 .TS
@@ -443,7 +443,10 @@ Interface Stability	Standard
 
 .SH SEE ALSO
 .LP
-\fBstrftime\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.BR strftime (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .SH DIAGNOSTICS
 .ne 2
 .na

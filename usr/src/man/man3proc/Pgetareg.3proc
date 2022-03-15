@@ -59,7 +59,7 @@ to by
 The getting and setting of registers of the process operates on the
 representative thread (LWP).
 For more information on how the representative is chosen, see
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 To change the registers of a specific thread, use the
 .Fn Lgetareg
@@ -180,4 +180,4 @@ in
 .Xr Lgrab 3PROC ,
 .Xr Pgrab_file 3PROC ,
 .Xr Pstop 3PROC ,
-.Xr proc 4
+.Xr proc 5

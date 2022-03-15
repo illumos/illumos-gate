@@ -45,7 +45,7 @@ There are no return values for the \fBldap_memfree()\fR function.
 No errors are defined for the \fBldap_memfree()\fR function.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -60,5 +60,8 @@ Interface Stability	Evolving
 
 .SH SEE ALSO
 .LP
-\fBldap\fR(3LDAP), \fBldap_first_attribute\fR(3LDAP), \fBldap_get_dn\fR(3LDAP),
-\fBldap_next_attribute\fR(3LDAP), \fBattributes\fR(5)
+.BR ldap (3LDAP),
+.BR ldap_first_attribute (3LDAP),
+.BR ldap_get_dn (3LDAP),
+.BR ldap_next_attribute (3LDAP),
+.BR attributes (7)

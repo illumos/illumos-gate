@@ -37,7 +37,7 @@ be avoided in portable applications.
 .SH ATTRIBUTES
 .LP
 See
-.BR attributes (5)
+.BR attributes (7)
 for descriptions of the following attributes:
 .TS
 box;
@@ -54,6 +54,6 @@ Interface Stability	Uncommitted
 .BR setlocale (3C),
 .BR uselocale (3C),
 .BR locale (3HEAD),
-.BR attributes (5),
-.BR locale (5),
-.BR standards (5)
+.BR attributes (7),
+.BR locale (7),
+.BR standards (7)

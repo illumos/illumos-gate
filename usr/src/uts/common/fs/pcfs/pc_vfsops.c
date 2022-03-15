@@ -589,7 +589,7 @@ pcfs_parse_mntopts(struct pcfs *fsp)
 
 	/*
 	 * The "secsize=..." mount option is a workaround for the lack of
-	 * lofi(7d) support for DKIOCGMEDIAINFO. If PCFS wants to parse the
+	 * lofi(4D) support for DKIOCGMEDIAINFO. If PCFS wants to parse the
 	 * partition table of a disk image and it has been partitioned with
 	 * sector sizes other than 512 bytes, we'd fail on loopback'ed disk
 	 * images.
@@ -1988,7 +1988,7 @@ parseBPB(struct pcfs *fsp, uchar_t *bpb, int *valid)
 		mediasize = (len_t)totsec * (len_t)secsize;
 		/*
 		 * This is not an error because not all devices support the
-		 * dkio(7i) mediasize queries, and/or not all devices are
+		 * dkio(4I) mediasize queries, and/or not all devices are
 		 * partitioned. If we have not been able to figure out the
 		 * size of the underlaying medium, we have to trust the BPB.
 		 */
@@ -2286,7 +2286,7 @@ recheck:
  *
  * Test whether the device is:
  *	- a floppy device from a known controller type via DKIOCINFO
- *	- a real floppy using the fd(7d) driver and capable of fdio(7I) ioctls
+ *	- a real floppy using the fd(4D) driver and capable of fdio(4I) ioctls
  *	- a USB floppy drive (identified by drive geometry)
  *
  * Detecting a floppy will make PCFS metadata updates on such media synchronous,
@@ -2381,7 +2381,7 @@ pcfs_device_getinfo(struct pcfs *fsp)
 	    arg.mi.dki_media_type == DK_JAZ);
 
 	/*
-	 * if this device understands fdio(7I) requests it's
+	 * if this device understands fdio(4I) requests it's
 	 * obviously a floppy drive.
 	 */
 	if (!isfloppy &&
@@ -2390,7 +2390,7 @@ pcfs_device_getinfo(struct pcfs *fsp)
 
 	/*
 	 * some devices we like to treat as floppies, but they don't
-	 * understand fdio(7I) requests.
+	 * understand fdio(4I) requests.
 	 */
 	if (!isfloppy &&
 	    !ldi_ioctl(lh, DKIOCINFO, argp, FKIOCTL, cr, NULL) &&

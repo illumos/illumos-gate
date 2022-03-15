@@ -57,7 +57,7 @@ locale.h, locale \- category macros
 .LP
 The <\fBlocale.h\fR> header provides a definition for the \fBlconv\fR
 structure, which includes the following members. (See the definition of
-\fBLC_MONETARY\fR in \fBlocale\fR(5).)
+\fBLC_MONETARY\fR in \fBlocale\fR(7).)
 .sp
 .in +2
 .nf
@@ -159,7 +159,7 @@ Additional macro definitions, beginning with the characters \fBLC_\fR and an
 uppercase letter, can also be specified here.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .TS
 box;
 c | c
@@ -177,6 +177,6 @@ Interface Stability	Standard
 .BR uselocale (3C),
 .BR localeconv (3C),
 .BR stddef.h (3HEAD),
-.BR attributes (5),
-.BR locale (5),
-.BR standards (5)
+.BR attributes (7),
+.BR locale (7),
+.BR standards (7)

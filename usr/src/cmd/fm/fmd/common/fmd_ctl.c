@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * FMD Control Event Subsystem
  *
@@ -84,7 +82,7 @@ fmd_ctl_addhrt(nvlist_t *nvl)
 	fmd_time_addhrtime(delta);
 
 	/*
-	 * If the non-adjustable clock has reached the apocalypse, fmd(1M)
+	 * If the non-adjustable clock has reached the apocalypse, fmd(8)
 	 * should exit gracefully: queue a SIGTERM for the main thread.
 	 */
 	if (fmd_time_gethrtime() == INT64_MAX)

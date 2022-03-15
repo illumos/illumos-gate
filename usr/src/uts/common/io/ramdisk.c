@@ -29,7 +29,7 @@
  *
  * There are two types of ramdisk: 'real' OBP-created ramdisks, and 'pseudo'
  * ramdisks created at runtime with no corresponding OBP device node.  The
- * ramdisk(7D) driver is capable of dealing with both, and with the creation
+ * ramdisk(4D) driver is capable of dealing with both, and with the creation
  * and deletion of 'pseudo' ramdisks.
  *
  * Every ramdisk has a single 'state' structure which maintains data for
@@ -44,7 +44,7 @@
  * assigned to the ramdisk.  All 'pseudo' ramdisks share a common devinfo
  * structure.
  *
- * A single character device node is used by ramdiskadm(1M) to communicate
+ * A single character device node is used by ramdiskadm(8) to communicate
  * with the ramdisk driver, with minor number 0:
  *
  *	/dev/ramdiskctl -> /devices/pseudo/ramdisk@0:ctl
@@ -495,7 +495,7 @@ rd_map_window(rd_devstate_t *rsp, off_t offset)
 static void
 rd_fake_disk_geometry(rd_devstate_t *rsp)
 {
-	/* dk_geom - see dkio(7I) */
+	/* dk_geom - see dkio(4I) */
 	/*
 	 * dkg_ncyl _could_ be set to one here (one big cylinder with gobs
 	 * of sectors), but that breaks programs like fdisk which want to
@@ -529,7 +529,7 @@ rd_fake_disk_geometry(rd_devstate_t *rsp)
 	rsp->rd_dkg.dkg_write_reinstruct = 0;
 	rsp->rd_dkg.dkg_read_reinstruct = 0;
 
-	/* vtoc - see dkio(7I) */
+	/* vtoc - see dkio(4I) */
 	bzero(&rsp->rd_vtoc, sizeof (struct vtoc));
 	rsp->rd_vtoc.v_sanity = VTOC_SANE;
 	rsp->rd_vtoc.v_version = V_VERSION;
@@ -548,7 +548,7 @@ rd_fake_disk_geometry(rd_devstate_t *rsp)
 	rsp->rd_vtoc.v_part[0].p_size = rsp->rd_dkg.dkg_pcyl *
 	    rsp->rd_dkg.dkg_nsect * rsp->rd_dkg.dkg_nhead;
 
-	/* dk_cinfo - see dkio(7I) */
+	/* dk_cinfo - see dkio(4I) */
 	bzero(&rsp->rd_ci, sizeof (struct dk_cinfo));
 	(void) strcpy(rsp->rd_ci.dki_cname, RD_DRIVER_NAME);
 	rsp->rd_ci.dki_ctype = DKC_MD;

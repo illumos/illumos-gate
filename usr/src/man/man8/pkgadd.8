@@ -1,0 +1,482 @@
+'\" te
+.\" Copyright (c) 2017 Peter Tribble.
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 1989 AT&T
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH PKGADD 8 "Mar 2, 2017"
+.SH NAME
+pkgadd \- transfer software packages to the system
+.SH SYNOPSIS
+.LP
+.nf
+\fBpkgadd\fR [\fB-nv\fR] [\fB-a\fR \fIadmin\fR] [\fB-G\fR] [ [\fB-M\fR] \fB-R\fR \fIroot_path\fR]
+     [\fB-r\fR \fIresponse\fR] [\fB-V\fR \fIfs_file\fR]
+     [\fB-d\fR \fIdevice\fR | \fB-d\fR \fIdatastream\fR \fIpkginst\fR | all]
+     [\fIpkginst\fR | \fB-Y\fR \fIcategory\fR [\fI, category\fR]...]
+.fi
+
+.LP
+.nf
+\fBpkgadd\fR \fB-s\fR [\fB-d\fR \fIdevice\fR | \fB-d\fR \fIdatastream\fR \fIpkginst\fR | all]
+     [\fIpkginst\fR | \fB-Y\fR \fIcategory\fR [\fI, category\fR]...]
+.fi
+
+.SH DESCRIPTION
+.LP
+\fBpkgadd\fR transfers the contents of a software package from the distribution
+medium or directory to install it onto the system. Used without the \fB-d\fR
+\fIdevice\fR source specifier, \fBpkgadd\fR looks in the default spool
+directory (\fB/var/spool/pkg\fR) for the package. Used with the \fB-s\fR
+option, it writes the package to a spool directory instead of installing it.
+.sp
+.LP
+The \fBpkgadd\fR utility requires an amount of temporary space the size of the
+package that is being installed. \fBpkgadd\fR determines which temporary
+directory to use by checking for the existence of the \fB$TMPDIR\fR environment
+variable. If \fB$TMPDIR\fR is not defined, \fBpkgadd\fR uses \fBP_tmpdir\fR
+from \fBstdio.h\fR. \fBP_tmpdir\fR has a default of \fB/var/tmp/\fR.
+.sp
+.LP
+Certain unbundled and third-party packages are no longer entirely compatible
+with the latest version of \fBpkgadd\fR. These packages require user
+interaction throughout the installation and not just at the very beginning, or
+require that their request scripts be run as the root user.
+.sp
+.LP
+To install these older packages (released prior to Solaris 2.4), set the
+following environment variable: \fBNONABI_SCRIPTS=TRUE\fR
+.sp
+.LP
+As long as this environment variable is set, \fBpkgadd\fR permits keyboard
+interaction throughout the installation and package request scripts are run as
+\fBroot\fR.
+.sp
+.LP
+If you have package request scripts that require running as user \fBroot\fR
+(instead of \fBnoaccess\fR [the default] or user \fBinstall\fR), use the
+\fBrscript_alt\fR parameter in the \fBadmin\fR(5) file to make an appropriate
+selection. See \fBadmin\fR(5).
+.sp
+.LP
+Note that, in Solaris 8 and Solaris 9, the default user when running a request
+script was either \fBroot\fR or \fBnobody\fR, depending on the operating
+system's patch level. In the current release, the default user is
+\fBnoaccess\fR.
+.sp
+.LP
+When running \fBpkgadd\fR in the global zone (see \fBzones\fR(7)), a package
+that contains a request script (see \fBpkgask\fR(8)) is added only to the
+global zone. The package is not propagated to any current or
+yet-to-be-installed non-global zone. This behavior mimics the effect of the
+\fB-G\fR option, described below.
+.sp
+.LP
+Package commands are \fBlargefile\fR(7)-aware. They handle files larger than 2
+GB in the same way they handle smaller files. In their current implementations,
+\fBpkgadd\fR, \fBpkgtrans\fR(1) and other package commands can process a
+datastream of  up to 4 GB.
+.sp
+.LP
+The \fB-d\fR, \fB-Y\fR, and \fIpkginst\fR arguments shown in the SYNOPSIS are
+described under OPERANDS, following OPTIONS.
+.SH OPTIONS
+.LP
+The supported options are described as follows. The \fB-d\fR \fIdevice\fR
+source specifier is described under OPERANDS, below.
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-a\fR \fIadmin\fR\fR
+.ad
+.sp .6
+.RS 4n
+Define an installation administration file, \fIadmin\fR, to be used in place of
+the default administration file. The token \fBnone\fR overrides the use of any
+\fIadmin\fR file, and thus forces interaction with the user. Unless a full path
+name is given, \fBpkgadd\fR first looks in the current working directory for
+the administration file. If the specified administration file is not in the
+current working directory, \fBpkgadd\fR looks in the
+\fB/var/sadm/install/admin\fR directory for the administration file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-G\fR\fR
+.ad
+.sp .6
+.RS 4n
+Add package(s) in the current zone only. When used in the global zone, the
+package is added to the global zone only and is not propagated to any existing
+or yet-to-be-created non-global zone. When used in a non-global zone, the
+package(s) are added to the non-global zone only.
+.sp
+This option causes package installation to fail if, in the \fBpkginfo\fR file
+for a package, \fBSUNW_PKG_ALLZONES\fR is set to true. See \fBpkginfo\fR(5).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-M\fR\fR
+.ad
+.sp .6
+.RS 4n
+Instruct \fBpkgadd\fR not to use the \fB$\fR\fIroot_path\fR\fB/etc/vfstab\fR
+file for determining the client's mount points. This option assumes the mount
+points are correct on the server and it behaves consistently with Solaris 2.5
+and earlier releases.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Installation occurs in non-interactive mode. Suppress output of the list of
+installed files. The default mode is interactive.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-r\fR \fIresponse\fR\fR
+.ad
+.sp .6
+.RS 4n
+Identify a file or directory which contains output from a previous
+\fBpkgask\fR(8) session. This file supplies the interaction responses that
+would be requested by the package in interactive mode. \fIresponse\fR must be a
+full pathname.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-R\fR \fIroot_path\fR\fR
+.ad
+.sp .6
+.RS 4n
+Define the full path name of a directory to use as the \fIroot_path\fR. All
+files, including package system information files, are relocated to a directory
+tree starting in the specified \fIroot_path\fR. The \fIroot_path\fR may be
+specified when installing to a client from a server (for example,
+\fB/export/root/client1\fR).
+.LP
+Note -
+.sp
+.RS 2
+The root file system of any non-global zones must not be referenced with the
+\fB-R\fR option. Doing so might damage the global zone's file system, might
+compromise the security of the global zone, and might damage the non-global
+zone's file system. See \fBzones\fR(7).
+.RE
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB\fR\fB-s\fR \fIspool\fR\fR
+.ad
+.sp .6
+.RS 4n
+Write the package into the directory \fIspool\fR instead of installing it.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-v\fR\fR
+.ad
+.sp .6
+.RS 4n
+Trace all of the scripts that get executed by \fBpkgadd\fR, located in the
+\fIpkginst\fR\fB/install\fR directory. This option is used for debugging the
+procedural and non-procedural scripts.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-V\fR \fIfs_file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specify an alternative \fIfs_file\fR to map the client's file systems. For
+example, used in situations where the \fB$\fR\fIroot_path\fR\fB/etc/vfstab\fR
+file is non-existent or unreliable.
+.RE
+
+.sp
+.LP
+When executed without options or operands, \fBpkgadd\fR uses
+\fB/var/spool/pkg\fR (the default spool directory).
+.SH OPERANDS
+.LP
+The following operands are supported:
+.SS "Sources"
+.LP
+By default, pkgadd looks in the \fB/var/spool/pkg\fR directory when searching
+for instances of a package to install or spool. Optionally, the source for the
+package instances to be installed or spooled can be specified using:
+.sp
+.ne 2
+.na
+\fB\fB-d\fR \fIdevice\fR\fR
+.ad
+.br
+.na
+\fB\fB-d\fR \fIdatastream\fR \fIpkgname\fR,... | \fBall\fR\fR
+.ad
+.sp .6
+.RS 4n
+Install or copy a package from \fIdevice\fR. \fIdevice\fR can be any of the
+following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A full path name to a directory or the identifiers for tape, floppy disk, or
+removable disk (for example, \fB/var/tmp\fR or
+\fB/floppy/\fIfloppy_name\fR\fR).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A device alias (for example, \fB/floppy/floppy0\fR).
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+A datastream created by \fBpkgtrans\fR (see \fBpkgtrans\fR(1)).
+.RE
+The second form of the \fB-d\fR specifier, above, indicates the syntax you use
+when specifying a datastream. In this case you must specify either a
+comma-separated list of package names or the keyword \fBall\fR.
+.RE
+
+.SS "Instances"
+.LP
+By default, \fBpkgadd\fR searches the specified source, and presents an
+interactive menu allowing the user to select which package instances found on
+the source are to be installed. As an alternative, the package instances to be
+installed can be specified using:
+.sp
+.ne 2
+.na
+\fB\fIpkginst\fR\fR
+.ad
+.sp .6
+.RS 4n
+The package instance or list of instances to be installed. The token \fBall\fR
+may be used to refer to all packages available on the source medium. The format
+\fIpkginst\fR\fB\&.*\fR can be used to indicate all instances of a package.
+.sp
+The asterisk character (\fB*\fR) is a special character to some shells and may
+need to be escaped. In the C-Shell, the asterisk must be surrounded by single
+quotes (\fB\&'\fR) or preceded by a backslash (\fB\e\fR).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-Y\fR \fIcategory\fR[,\fIcategory\fR...]\fR
+.ad
+.sp .6
+.RS 4n
+Install packages based on the value of the \fBCATEGORY\fR parameter stored in
+the package's \fBpkginfo\fR(5) file. All packages on the source medium whose
+\fBCATEGORY\fR matches one of the specified categories will be selected for
+installation or spooling.
+.RE
+
+.SH EXAMPLES
+.LP
+\fBExample 1 \fRInstalling a Package from a Solaris DVD
+.sp
+.LP
+The following example installs a package from a Solaris DVD. You are prompted
+for the name of the package you want to install.
+
+.sp
+.in +2
+.nf
+example# \fBpkgadd -d /cdrom/cdrom0/s0/Solaris_10/Product\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 2 \fRInstalling a Set of Packages from a Datastream
+.sp
+.LP
+The example command shown below installs all of the packages in the datastream
+specified by the \fB-d\fR source specifier. Prior to this command, this
+datastream must have been created with the \fBpkgtrans\fR(1) command.
+
+.sp
+.in +2
+.nf
+example# \fBpkgadd -d /var/tmp/datastream all\fR
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The keyword \fBall\fR specifies that all of the packages found in the
+designated datastream will be installed.
+
+.SH EXIT STATUS
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.sp .6
+.RS 4n
+Successful completion
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB1\fR\fR
+.ad
+.sp .6
+.RS 4n
+Fatal error.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB2\fR\fR
+.ad
+.sp .6
+.RS 4n
+Warning.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB3\fR\fR
+.ad
+.sp .6
+.RS 4n
+Interruption.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB4\fR\fR
+.ad
+.sp .6
+.RS 4n
+Administration.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB5\fR\fR
+.ad
+.sp .6
+.RS 4n
+Administration. Interaction is required. Do not use \fBpkgadd\fR \fB-n\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB10\fR\fR
+.ad
+.sp .6
+.RS 4n
+Reboot after installation of all packages.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB20\fR\fR
+.ad
+.sp .6
+.RS 4n
+Reboot after installation of this package.
+.RE
+
+.SH FILES
+.ne 2
+.na
+\fB\fB/var/sadm/install/logs/\fR\fR
+.ad
+.sp .6
+.RS 4n
+Location where \fBpkgadd\fR logs an instance of software installation.
+.RE
+
+.SH ATTRIBUTES
+.LP
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Evolving
+.TE
+
+.SH SEE ALSO
+.LP
+.BR pkginfo (1),
+.BR pkgmk (1),
+.BR pkgparam (1),
+.BR pkgproto (1),
+.BR pkgtrans (1),
+.BR admin (5),
+.BR pkginfo (5),
+.BR attributes (7),
+.BR largefile (7),
+.BR zones (7),
+.BR installf (8),
+.BR pkgadm (8),
+.BR pkgask (8),
+.BR pkgchk (8),
+.BR pkgrm (8),
+.BR removef (8)
+
+.SH NOTES
+.LP
+When transferring a package to a spool directory, the \fB-r\fR, \fB-n\fR, and
+\fB-a\fR options cannot be used.
+.sp
+.LP
+The \fB-r\fR option can be used to indicate a directory name as well as a
+filename. The directory can contain numerous response files, each sharing the
+name of the package with which it should be associated. This would be used, for
+example, when adding multiple interactive packages with one invocation of
+\fBpkgadd\fR. In this situation, each package would need a response file. If
+you create response files with the same name as the package (for example,
+\fBpkinst1\fR and \fBpkinst2\fR), then name the directory in which these files
+reside after the \fB-r\fR.
+.sp
+.LP
+The \fB-n\fR option causes the installation to halt if any interaction is
+needed to complete it.
+.sp
+.LP
+If the default \fIadmin\fR file is too restrictive, the administration file may
+need to be modified to allow for total non-interaction during a package
+installation. See \fBadmin\fR(5) for details.

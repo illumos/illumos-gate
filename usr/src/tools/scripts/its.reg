@@ -65,7 +65,7 @@
 #
 # REGEX (required)
 #
-#     A regexp(5) to tokenize a valid, unique key.  See NOTES below.
+#     A regexp(7) to tokenize a valid, unique key.  See NOTES below.
 #
 # CONTACT
 #
@@ -78,7 +78,7 @@
 # NOTES
 #
 # REGEX should use parenthesization via \(\) to provide one or more
-# tokens to be substituted in *_URLs.  See regexp(5) for syntax.
+# tokens to be substituted in *_URLs.  See regexp(7) for syntax.
 #
 # A REGEX for a particular system is required to match any unique keys
 # that are valid for that system.  For the common case, where such a key

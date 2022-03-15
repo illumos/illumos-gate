@@ -2983,7 +2983,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		if (stat != IDMAP_SUCCESS) {
 			print_error(pos,
 			    gettext("Unable to create handle for communicating"
-			    " with idmapd(1M) (%s)\n"),
+			    " with idmapd(8) (%s)\n"),
 			    idmap_stat2string(stat));
 			idmap_get_destroy(ghandle);
 			goto cleanup;
@@ -3078,7 +3078,7 @@ do_show_mapping(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	 * idmapd returns fallback uid/gid in case of errors. However
 	 * it uses special sentinel value i.e 4294967295 (or -1) to
 	 * indicate that falbback pid is not available either. In such
-	 * case idmap(1M) should not display the mapping because there
+	 * case idmap(8) should not display the mapping because there
 	 * is no fallback mapping.
 	 */
 

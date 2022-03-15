@@ -83,7 +83,8 @@ called from an interrupt routine.
 The \fBscsi_hba_tran_free()\fR function can be called from user, interrupt, or
 kernel context context.
 .SH SEE ALSO
-\fBscsi_hba_attach_setup\fR(9F), \fBscsi_hba_tran\fR(9S)
+.BR scsi_hba_attach_setup (9F),
+.BR scsi_hba_tran (9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR

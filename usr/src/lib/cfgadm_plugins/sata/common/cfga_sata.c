@@ -35,7 +35,7 @@
 
 /*
  * This file contains the entry points to the plug-in as defined in the
- * config_admin(3X) man page.
+ * config_admin(3CFGADM) man page.
  */
 
 /*

@@ -182,13 +182,13 @@ get_reply() {
 #
 find_fs()
 {
-	# The list of files in device_maps(4) is in an unspecified order.
-	# To speed up the fstyp(1M) scanning below in most cases, perform
+	# The list of files in device_maps(5) is in an unspecified order.
+	# To speed up the fstyp(8) scanning below in most cases, perform
 	# the search for filesystems as follows:
 	# 1) Select only block device files of the form "/dev/dsk/*".
 	# 2) Sort the list of files in an order more likely to yield
-	#    matches: first the fdisk(1M) partitions ("/dev/dsk/cNtNdNpN")
-	#    then the format(1M) slices ("/dev/dsk/cNtNdNsN"), in ascending
+	#    matches: first the fdisk(8) partitions ("/dev/dsk/cNtNdNpN")
+	#    then the format(8) slices ("/dev/dsk/cNtNdNsN"), in ascending
 	#    numeric order within each group.
 	DEVall="`echo $FILES | \
 	    /usr/bin/tr ' ' '\n' | \

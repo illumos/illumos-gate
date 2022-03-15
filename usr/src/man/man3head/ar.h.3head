@@ -79,7 +79,7 @@ size of the file exclusive of padding.
 Notice there is no provision for empty areas in an archive file.
 .sp
 .LP
-Each archive that contains object files (see  \fBa.out\fR(4)) includes an
+Each archive that contains object files (see  \fBa.out\fR(5)) includes an
 archive symbol table. This symbol table is used by the link editor  \fBld\fR to
 determine which archive members must be loaded during the link edit process.
 The archive symbol table (if it exists) is always the first file in the archive
@@ -210,7 +210,10 @@ _____________________|______________|___________________________
 .SH SEE ALSO
 .sp
 .LP
-\fBar\fR(1), \fBld\fR(1), \fBstrip\fR(1), \fBa.out\fR(4)
+.BR ar (1),
+.BR ld (1),
+.BR strip (1),
+.BR a.out (5)
 .SH NOTES
 .sp
 .LP

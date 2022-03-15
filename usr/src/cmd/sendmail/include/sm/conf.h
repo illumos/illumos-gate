@@ -420,7 +420,7 @@ typedef int		pid_t;
 #   endif /* SOLARIS >= 20600 || (SOLARIS < 10000 && SOLARIS >= 206) */
 #    if SOLARIS < 207 || (SOLARIS > 10000 && SOLARIS < 20700)
 #     ifndef LA_TYPE
-#      define LA_TYPE	LA_KSTAT	/* use kstat(3k) -- may work in < 2.5 */
+#      define LA_TYPE	LA_KSTAT	/* use kstat(3KSTAT) -- may work in < 2.5 */
 #     endif /* ! LA_TYPE */
 #     ifndef RANDOMSHIFT		/* random() doesn't work well (sometimes) */
 #      define RANDOMSHIFT	8

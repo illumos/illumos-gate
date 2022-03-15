@@ -67,7 +67,7 @@ field of \fIdiff\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -85,8 +85,12 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBcpc\fR(3CPC), \fBcpc_buf_add\fR(3CPC), \fBcpc_buf_sub\fR(3CPC),
-\fBcpc_event\fR(3CPC), \fBlibcpc\fR(3LIB), \fBattributes\fR(5)
+.BR cpc (3CPC),
+.BR cpc_buf_add (3CPC),
+.BR cpc_buf_sub (3CPC),
+.BR cpc_event (3CPC),
+.BR libcpc (3LIB),
+.BR attributes (7)
 .SH NOTES
 .sp
 .LP

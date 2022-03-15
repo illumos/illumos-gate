@@ -155,7 +155,7 @@ An attempt was made to allocate a privilege that was longer than
 .SH CONTEXT
 This functions can be called from user, interrupt, or kernel context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -169,7 +169,9 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBacct\fR(3HEAD), \fBattributes\fR(5), \fBprivileges\fR(5)
+.BR acct (3HEAD),
+.BR attributes (7),
+.BR privileges (7)
 .sp
 .LP
 \fIWriting Device Drivers\fR

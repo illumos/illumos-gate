@@ -118,7 +118,7 @@ void	ibtl_ibnex_unregister_callback();
  *			    alternate_HCA database
  *			IBTL_IBNEX_UNCFG_CLNTS_FLAG - Build client devpaths/
  *			    ap_id database
- *	callback	- Callback function to get ap_id from ib(7d)
+ *	callback	- Callback function to get ap_id from ib(4D)
  * Output:
  *	buffer		- The information is returned in this buffer
  *      bufsiz		- The size of the information buffer
@@ -192,7 +192,7 @@ ibt_status_t	ibtl_ibnex_get_hca_verbose_data(ib_guid_t, char **, size_t *);
  *	registered HCAs's dip.  If match found return IBT_SUCCESS,
  *	else IBT_NO_HCAS_AVAILABLE.
  *	For IOC/Pseudo devices check if the given pdip is that of
- *	the ib(7d) nexus. If yes return IBT_SUCCESS,
+ *	the ib(4D) nexus. If yes return IBT_SUCCESS,
  *	else IBT_NO_HCAS_AVAILABLE.
  */
 ibt_status_t	ibtl_ibnex_valid_hca_parent(dev_info_t *);

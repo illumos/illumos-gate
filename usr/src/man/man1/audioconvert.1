@@ -320,7 +320,7 @@ unrecognized file header.
 .RE
 
 .SH USAGE
-See \fBlargefile\fR(5) for the description of the behavior of
+See \fBlargefile\fR(7) for the description of the behavior of
 \fBaudioconvert\fR when encountering files greater than or equal to 2 Gbyte
 (2^31 bytes).
 .SH EXAMPLES
@@ -368,8 +368,10 @@ example% \fBaudioconvert -p -i voice -f sun *.au\fR
 .sp
 
 .SH SEE ALSO
-\fBaudioplay\fR(1), \fBaudiorecord\fR(1), \fBfile\fR(1),
-\fBlargefile\fR(5)
+.BR audioplay (1),
+.BR audiorecord (1),
+.BR file (1),
+.BR largefile (7)
 .SH NOTES
 The algorithm used for converting multi-channel data to mono is implemented by
 simply summing the channels together. If the input data is perfectly in phase

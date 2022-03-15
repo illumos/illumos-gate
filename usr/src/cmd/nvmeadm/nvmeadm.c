@@ -157,13 +157,13 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 	},
 	{
 		"detach",
-		"detach blkdev(7d) from namespace(s) of a controller",
+		"detach blkdev(4D) from namespace(s) of a controller",
 		NULL,
 		do_attach_detach, usage_attach_detach, B_FALSE
 	},
 	{
 		"attach",
-		"attach blkdev(7d) to namespace(s) of a controller",
+		"attach blkdev(4D) to namespace(s) of a controller",
 		NULL,
 		do_attach_detach, usage_attach_detach, B_FALSE
 	},
@@ -1231,7 +1231,7 @@ static void
 usage_attach_detach(const char *c_name)
 {
 	(void) fprintf(stderr, "%s <ctl>[/<ns>]\n\n"
-	    "  %c%s blkdev(7d) %s one or all namespaces of the "
+	    "  %c%s blkdev(4D) %s one or all namespaces of the "
 	    "specified NVMe controller.\n",
 	    c_name, toupper(c_name[0]), &c_name[1],
 	    c_name[0] == 'd' ? "from" : "to");

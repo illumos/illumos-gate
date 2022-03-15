@@ -28,9 +28,9 @@ dir  path=usr/lib
 file path=usr/lib/udf mode=0555
 file path=usr/lib/usmn mode=0555
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/usmn.7d
-file path=usr/share/man/man7d/zen_udf.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/usmn.4d
+file path=usr/share/man/man4d/zen_udf.4d
 driver name=usmn
 driver name=zen_udf
 license lic_CDDL license=lic_CDDL

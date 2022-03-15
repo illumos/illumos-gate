@@ -26,7 +26,7 @@ The \fBlckpwdf()\fR and \fBulckpwdf()\fR functions enable modification access
 to the password databases through the lock file. A process first uses
 \fBlckpwdf()\fR to lock the lock file, thereby gaining exclusive rights to
 modify the  \fB/etc/passwd\fR or  \fB/etc/shadow\fR password database.  See
-\fBpasswd\fR(4) and \fBshadow\fR(4). Upon completing modifications, a process
+\fBpasswd\fR(5) and \fBshadow\fR(5). Upon completing modifications, a process
 should release the lock on the lock file using \fBulckpwdf()\fR. This mechanism
 prevents simultaneous modification of the password databases. The lock file,
 \fB/etc/.pwd.lock\fR, is used to coordinate modification access to the password
@@ -77,7 +77,7 @@ lock file
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -93,5 +93,8 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), \fBpasswd\fR(4), \fBshadow\fR(4),
-\fBattributes\fR(5)
+.BR getpwnam (3C),
+.BR getspnam (3C),
+.BR passwd (5),
+.BR shadow (5),
+.BR attributes (7)

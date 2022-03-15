@@ -331,7 +331,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 
 	/*
 	 * Since this is a new krb5 principal, do a pam_set_data()
-	 * for possible use by the acct_mgmt routine of pam_krb5(5)
+	 * for possible use by the acct_mgmt routine of pam_krb5(7)
 	 */
 	if (pam_get_data(pamh, KRB5_AUTOMIGRATE_DATA,
 	    (const void **)&olduserdata) == PAM_SUCCESS) {

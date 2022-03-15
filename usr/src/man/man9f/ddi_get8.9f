@@ -72,15 +72,15 @@ the device have incompatible endian characteristics.
 .LP
 For certain bus types, you can call these \fBDDI\fR functions from a
 high-interrupt context. These types include \fBISA\fR and SBus buses. See
-\fBsysbus\fR(4), \fBisa\fR(4), and \fBsbus\fR(4) for details. For the PCI bus,
+\fBsysbus\fR(5), \fBisa\fR(5), and \fBsbus\fR(5) for details. For the PCI bus,
 you can, under certain conditions, call these \fBDDI\fR functions from a
-high-interrupt context. See \fBpci\fR(4).
+high-interrupt context. See \fBpci\fR(5).
 .SH RETURN VALUES
 These functions return the value read from the mapped address.
 .SH CONTEXT
 These functions can be called from user, kernel, or interrupt context.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -94,5 +94,8 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-\fBddi_put8\fR(9F), \fBddi_regs_map_free\fR(9F), \fBddi_regs_map_setup\fR(9F),
-\fBddi_rep_get8\fR(9F), \fBddi_rep_put8\fR(9F)
+.BR ddi_put8 (9F),
+.BR ddi_regs_map_free (9F),
+.BR ddi_regs_map_setup (9F),
+.BR ddi_rep_get8 (9F),
+.BR ddi_rep_put8 (9F)

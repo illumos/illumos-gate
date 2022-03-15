@@ -263,7 +263,7 @@ must be mapped \fBMAP_PRIVATE\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -281,5 +281,6 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBrsm_get_controller\fR(3RSM), \fBrsm_memseg_export_publish\fR(3RSM),
-\fBattributes\fR(5)
+.BR rsm_get_controller (3RSM),
+.BR rsm_memseg_export_publish (3RSM),
+.BR attributes (7)

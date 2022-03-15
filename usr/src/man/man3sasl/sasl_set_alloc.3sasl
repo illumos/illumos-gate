@@ -59,7 +59,7 @@ A pointer to a \fBrealloc()\fR function
 .SH RETURN VALUES
 \fBsasl_set_alloc()\fR has no return values.
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -75,7 +75,7 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-\fBattributes\fR(5)
+.BR attributes (7)
 .SH NOTES
 While most of \fBlibsasl\fR is MT-Safe, \fBsasl_set_*\fR modifies the global
 state and should be considered Unsafe.

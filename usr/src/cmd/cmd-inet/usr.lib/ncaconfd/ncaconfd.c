@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/tihdr.h>
@@ -155,7 +153,7 @@ logwarn(char *fmt, ...)
 }
 
 /*
- * Print out debugging info.  Note that syslogd(1M) should be configured to
+ * Print out debugging info.  Note that syslogd(8) should be configured to
  * take ordinary debug info for it to get this kind of info.
  */
 /*PRINTFLIKE1*/
@@ -996,7 +994,7 @@ get_router_ether_addr(mib_item_t *item, boolean_t *changed)
 
 /*
  * Ping all default routers.  It just uses system(3F) to call
- * ping(1M) to do the job...
+ * ping(8) to do the job...
  */
 static void
 ping_them(void)

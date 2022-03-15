@@ -152,7 +152,7 @@ The value specified by \fIlock\fR is invalid.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -170,5 +170,7 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBpthread_spin_lock\fR(3C), \fBpthread_spin_unlock\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR pthread_spin_lock (3C),
+.BR pthread_spin_unlock (3C),
+.BR attributes (7),
+.BR standards (7)

@@ -26,7 +26,7 @@
 #
 
 #
-# This file contains tunable parameters for dhcpagent(1M).
+# This file contains tunable parameters for dhcpagent(8).
 #
 
 # All parameters can be tuned for a specific interface by prepending
@@ -105,9 +105,9 @@
 
 # By default, the DHCP agent will try to request the Fully Qualified Domain
 # Name (FQDN) currently associated with the interface performing DHCP.  The
-# hostname is defined by using the -h,--reqhost option of ipadm(1M) or the
-# ncu ip-reqhost property of nwamcfg(1M) or by flagging the interface as
-# primary so that nodename(4) is used as the hostname.
+# hostname is defined by using the -h,--reqhost option of ipadm(8) or the
+# ncu ip-reqhost property of nwamcfg(8) or by flagging the interface as
+# primary so that nodename(5) is used as the hostname.
 #
 # A defined hostname will be used as the FQDN if it is "rooted" (i.e., if
 # it ends with a '.') or if it consists of at least three DNS labels (e.g.,
@@ -128,19 +128,19 @@
 # REQUEST_FQDN=no
 
 # By default, the DHCP agent will not attempt to construct an FQDN from a
-# PQDN specified by the -h,--reqhost option of ipadm(1M), by the ncu
-# ip-reqhost property of nwamcfg(1M), or by nodename(4).  Set and
+# PQDN specified by the -h,--reqhost option of ipadm(8), by the ncu
+# ip-reqhost property of nwamcfg(8), or by nodename(5).  Set and
 # uncomment the following parameter to indicate a domain name to be used by
 # the DHCP agent to construct if necessary an FQDN.
 #
 # DNS_DOMAINNAME=
 
 # By default, the DHCP agent will not attempt to use a domain name returned
-# by the DHCP server or the domain in resolv.conf(4) to construct an FQDN
-# from a PQDN specified by the -h,--reqhost option of ipadm(1M), by the ncu
-# ip-reqhost property of nwamcfg(1M), or by nodename(4).  Set and uncomment
+# by the DHCP server or the domain in resolv.conf(5) to construct an FQDN
+# from a PQDN specified by the -h,--reqhost option of ipadm(8), by the ncu
+# ip-reqhost property of nwamcfg(8), or by nodename(5).  Set and uncomment
 # the following parameter to indicate that a returned DHCPv4 DNSdmain or the
-# domain from resolv.conf(4) should be adopted by the DHCP agent to
+# domain from resolv.conf(5) should be adopted by the DHCP agent to
 # construct if necessary an FQDN.
 #
 # ADOPT_DOMAINNAME=yes
@@ -148,14 +148,14 @@
 # By default, the DHCP agent will try to request the hostname currently
 # associated with the interface performing DHCP.  If this option is
 # enabled, the agent will attempt to use an -h,--reqhost option saved with
-# ipadm(1M) or an ncu ip-reqhost property set with nwamcfg(1M); or else
+# ipadm(8) or an ncu ip-reqhost property set with nwamcfg(8); or else
 # attempt to find a host name in /etc/hostname.<if>, which must contain a
 # line of the form
 #
 #	inet name
 #
 # where "name" is a single RFC 1101-compliant token; or else use
-# nodename(4) for a DHCP interface flagged as primary.  If found in any of
+# nodename(5) for a DHCP interface flagged as primary.  If found in any of
 # these configurations, the token will be used to request that host name
 # from the DHCP server.  To prevent this, uncomment the following line.
 #

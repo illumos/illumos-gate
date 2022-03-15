@@ -128,7 +128,7 @@ dladm_open(dladm_handle_t *handle)
 		return (dladm_errno2status(errno));
 
 	/*
-	 * Don't open DLMGMT_DOOR now.  dlmgmtd(1M) is not able to
+	 * Don't open DLMGMT_DOOR now.  dlmgmtd(8) is not able to
 	 * open the door when the dladm handle is opened because the
 	 * door hasn't been created yet at that time.  Thus, we must
 	 * open it on-demand in dladm_door_fd().  Move the open()

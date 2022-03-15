@@ -75,4 +75,4 @@ in
 .Xr Pgrab_core 3PROC ,
 .Xr Pgrab_file 3PROC ,
 .Xr Prelease 3PROC ,
-.Xr proc 4
+.Xr proc 5

@@ -119,7 +119,7 @@ advance(const char *instr, const char *expbuf)
 
 /*
  * the compile and step routines here simulate the old libgen routines of
- * compile/step Re: regexpr(3G). in order to do this, we must assume
+ * compile/step Re: regexpr(3GEN). in order to do this, we must assume
  * that expbuf[] consists of the following format:
  *	1) the first two bytes consist of a special encoding - see below.
  *	2) the next part is a regex_t used by regexec()/regcomp() for step

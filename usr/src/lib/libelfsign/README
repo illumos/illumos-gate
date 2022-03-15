@@ -23,8 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 
 Note that this library does not have a spec file.
 
@@ -34,5 +32,5 @@ here are ever elevated to a public taxonomy then a spec file needs to
 be introduced.
 
 A 64 bit version of this library does not exist.
-That isn't an issue since kcfd(1m) and elfsign(1) are 32 bit
+That isn't an issue since kcfd(8) and elfsign(1) are 32 bit
 applications and are the only consumers.

@@ -226,7 +226,7 @@ dt_probe_key(const dtrace_probedesc_t *pdp, char *s)
 }
 
 /*
- * If a probe was discovered from the kernel, ask dtrace(7D) for a description
+ * If a probe was discovered from the kernel, ask dtrace(4D) for a description
  * of each of its arguments, including native and translated types.
  */
 static dt_probe_t *
@@ -365,7 +365,7 @@ dt_probe_discover(dt_provider_t *pvp, const dtrace_probedesc_t *pdp)
 /*
  * Lookup a probe declaration based on a known provider and full or partially
  * specified module, function, and name.  If the probe is not known to us yet,
- * ask dtrace(7D) to match the description and then cache any useful results.
+ * ask dtrace(4D) to match the description and then cache any useful results.
  */
 dt_probe_t *
 dt_probe_lookup(dt_provider_t *pvp, const char *s)
@@ -392,7 +392,7 @@ dt_probe_lookup(dt_provider_t *pvp, const char *s)
 
 	/*
 	 * If the probe isn't known, use the probe description computed above
-	 * to ask dtrace(7D) to find the first matching probe.
+	 * to ask dtrace(4D) to find the first matching probe.
 	 */
 	if (dt_ioctl(dtp, DTRACEIOC_PROBEMATCH, &pd) == 0)
 		return (dt_probe_discover(pvp, &pd));
@@ -769,7 +769,7 @@ dt_probe_info(dtrace_hdl_t *dtp,
 		}
 
 		/*
-		 * If we matched a probe exported by dtrace(7D), then discover
+		 * If we matched a probe exported by dtrace(4D), then discover
 		 * the real attributes.  Otherwise grab the static declaration.
 		 */
 		if (pd.dtpd_id != DTRACE_IDNONE)

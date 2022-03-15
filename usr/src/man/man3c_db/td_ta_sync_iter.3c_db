@@ -170,7 +170,7 @@ The call did not complete successfully.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for description of the following attributes:
+See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
 .sp
@@ -187,4 +187,4 @@ MT-Level	Safe
 .sp
 .LP
 \fBlibc_db\fR(3LIB), \fBmutex_init\fR(3C), \fBtd_sync_get_info\fR(3C_DB),
-\fBtd_thr_get_info\fR(3C_DB), \fBtd_thr_tsd\fR(3C_DB), \fBattributes\fR(5)
+\fBtd_thr_get_info\fR(3C_DB), \fBtd_thr_tsd\fR(3C_DB), \fBattributes\fR(7)

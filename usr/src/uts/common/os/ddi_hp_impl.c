@@ -92,8 +92,8 @@
  *	- Through the nexus driver interface, ndi_hp_state_change_req. PCIe
  *	nexus drivers that pass a hotplug interrupt through to pciehpc will kick
  *	off state changes in this way.
- *	- Through coordinated removal, ddihp_modctl. Both cfgadm(1M) and
- *	hotplug(1M) pass state change requests through hotplugd, which uses
+ *	- Through coordinated removal, ddihp_modctl. Both cfgadm(8) and
+ *	hotplug(8) pass state change requests through hotplugd, which uses
  *	modctl to request state changes to the DDI hotplug framework. That
  *	interface is ultimately implemented by ddihp_modctl.
  *
@@ -131,7 +131,7 @@
  * of some key components are below.
  *
  *				+------------+
- *				| cfgadm(1M) |
+ *				| cfgadm(8)  |
  *				+------------+
  *				      |
  *			    +-------------------+
@@ -139,7 +139,7 @@
  *			    +-------------------+
  *				      |
  *	+-------------+		 +------------+
- *	| hotplug(1M) |----------| libhotplug |
+ *	| hotplug(8)  |----------| libhotplug |
  *	+-------------+		 +------------+
  *				      |
  *				 +----------+
@@ -193,14 +193,14 @@
  *
  * KEY HOTPLUG SOFTWARE COMPONENTS
  *
- *	CFGADM(1M)
+ *	cfgadm(8)
  *
  *	cfgadm is the canonical tool for hotplug operations. It can be used to
  *	list connections on the system and change their state in a coordinated
  *	fashion. For more information, see its manual page.
  *
  *
- *	HOTPLUG(1M)
+ *	hotplug(8)
  *
  *	hotplug is a command line tool for managing hotplug connections for
  *	connectors. For more information, see its manual page.

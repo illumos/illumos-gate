@@ -48,7 +48,7 @@ modify or access \fBuc_mcontext\fR.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -64,6 +64,10 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBgetcontext\fR(2), \fBsigaction\fR(2), \fBsigaltstack\fR(2),
-\fBsigprocmask\fR(2), \fBmakecontext\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR getcontext (2),
+.BR sigaction (2),
+.BR sigaltstack (2),
+.BR sigprocmask (2),
+.BR makecontext (3C),
+.BR attributes (7),
+.BR standards (7)

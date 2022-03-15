@@ -387,7 +387,7 @@ lastdump(int arg)	/* w ==> just what to do; W ==> most recent dumps */
 			if (strncmp(lastname, itwalk->id_name,
 			    sizeof (itwalk->id_name)) == 0)
 				continue;
-			/* must be ctime(), per ufsdump(4) */
+			/* must be ctime(), per ufsdump(5) */
 			ddate = itwalk->id_ddate;
 			date = (char *)ctime(&ddate);
 			date[16] = '\0';	/* blow away seconds and year */

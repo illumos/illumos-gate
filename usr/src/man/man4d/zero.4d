@@ -1,0 +1,43 @@
+'\" te
+.\"  Copyright 1989 AT&T  Copyright (c) 1990, Sun Microsystems, Inc.  All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH ZERO 4D "Jul 3, 1990"
+.SH NAME
+zero \- source of zeroes
+.SH DESCRIPTION
+.sp
+.LP
+A zero special file is a source of zeroed unnamed memory.
+.sp
+.LP
+Reads from a zero special file always return a buffer full of zeroes. The file
+is of infinite length.
+.sp
+.LP
+Writes to a zero special file are always successful, but the data written is
+ignored.
+.sp
+.LP
+Mapping a zero special file creates a zero-initialized unnamed memory object of
+a length equal to the length of the mapping and rounded up to the nearest page
+size as returned by \fBsysconf\fR. Multiple processes can share such a zero
+special file object provided a common ancestor mapped the object
+\fBMAP_SHARED\fR.
+.SH FILES
+.sp
+.ne 2
+.na
+\fB\fB/dev/zero\fR\fR
+.ad
+.RS 13n
+
+.RE
+
+.SH SEE ALSO
+.sp
+.LP
+.BR fork (2),
+.BR mmap (2),
+.BR sysconf (3C)

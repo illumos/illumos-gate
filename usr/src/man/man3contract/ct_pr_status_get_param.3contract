@@ -65,11 +65,11 @@ returned by \fBct_status_read\fR(3CONTRACT).
 .sp
 .LP
 The \fBct_pr_status_get_param()\fR function reads the parameter set term. The
-value is a collection of bits as described in \fBprocess\fR(4).
+value is a collection of bits as described in \fBprocess\fR(5).
 .sp
 .LP
 The \fBct_pr_status_get_fatal()\fR function reads the fatal event set term. The
-value is a collection of bits as described in \fBprocess\fR(4).
+value is a collection of bits as described in \fBprocess\fR(5).
 .sp
 .LP
 The \fBct_pr_status_get_members()\fR function obtains a list of the process IDs
@@ -173,7 +173,7 @@ close(fd);
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -191,6 +191,10 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBct_status_free\fR(3CONTRACT), \fBct_status_read\fR(3CONTRACT),
-\fBlibcontract\fR(3LIB), \fBcontract\fR(4), \fBprocess\fR(4),
-\fBattributes\fR(5), \fBlfcompile\fR(5)
+.BR ct_status_free (3CONTRACT),
+.BR ct_status_read (3CONTRACT),
+.BR libcontract (3LIB),
+.BR contract (5),
+.BR process (5),
+.BR attributes (7),
+.BR lfcompile (7)

@@ -127,7 +127,7 @@ err(1, "%s", string);
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -148,5 +148,8 @@ These functions are safe to use in multithreaded applications as long as
 \fBsetlocale\fR(3C) is not being called to change the locale.
 .SH SEE ALSO
 .LP
-\fBexit\fR(3C), \fBgetexecname\fR(3C), \fBsetlocale\fR(3C), \fBstrerror\fR(3C),
-\fBattributes\fR(5)
+.BR exit (3C),
+.BR getexecname (3C),
+.BR setlocale (3C),
+.BR strerror (3C),
+.BR attributes (7)

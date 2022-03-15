@@ -758,7 +758,7 @@ The <\fBstropts.h\fR> header can make visible all of the symbols from
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -774,7 +774,18 @@ Interface Stability	Standard
 .SH SEE ALSO
 .sp
 .LP
-\fBclose\fR(2), \fBfcntl\fR(2), \fBgetmsg\fR(2), \fBioctl\fR(2), \fBopen\fR(2),
-\fBpipe\fR(2), \fBpoll\fR(2), \fBputmsg\fR(2), \fBread\fR(2), \fBwrite\fR(2),
-\fBsignal\fR(3C), \fBtypes.h\fR(3HEAD), \fBunistd.h\fR(3HEAD),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR close (2),
+.BR fcntl (2),
+.BR getmsg (2),
+.BR ioctl (2),
+.BR open (2),
+.BR pipe (2),
+.BR poll (2),
+.BR putmsg (2),
+.BR read (2),
+.BR write (2),
+.BR signal (3C),
+.BR types.h (3HEAD),
+.BR unistd.h (3HEAD),
+.BR attributes (7),
+.BR standards (7)

@@ -144,7 +144,7 @@ appropriate privileges.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -162,9 +162,16 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBfdetach\fR(1M), \fBchmod\fR(2), \fBmount\fR(2), \fBstat\fR(2),
-\fBdoor_create\fR(3C), \fBfdetach\fR(3C), \fBisastream\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5), \fBstreamio\fR(7I)
+.BR chmod (2),
+.BR mount (2),
+.BR stat (2),
+.BR door_create (3C),
+.BR fdetach (3C),
+.BR isastream (3C),
+.BR streamio (4I),
+.BR attributes (7),
+.BR standards (7),
+.BR fdetach (8)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

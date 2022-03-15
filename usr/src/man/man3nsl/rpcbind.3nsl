@@ -57,7 +57,7 @@ rpcb_unset \- library routines for RPC bind service
 .LP
 These routines allow client C programs to make procedure calls to the RPC
 binder service. \fBrpcbind\fR maintains a list of mappings between programs and
-their universal addresses. See \fBrpcbind\fR(1M).
+their universal addresses. See \fBrpcbind\fR(8).
 .SS "Routines"
 .ne 2
 .na
@@ -157,7 +157,7 @@ super-user can destroy the mapping. See also \fBsvc_unreg()\fR in
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -172,5 +172,9 @@ MT-Level	MT-Safe
 
 .SH SEE ALSO
 .LP
-\fBrpcbind\fR(1M), \fBrpcinfo\fR(1M), \fBrpc_clnt_calls\fR(3NSL),
-\fBrpc_clnt_create\fR(3NSL), \fBrpc_svc_calls\fR(3NSL), \fBattributes\fR(5)
+.BR rpc_clnt_calls (3NSL),
+.BR rpc_clnt_create (3NSL),
+.BR rpc_svc_calls (3NSL),
+.BR attributes (7),
+.BR rpcbind (8),
+.BR rpcinfo (8)

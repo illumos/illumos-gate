@@ -288,7 +288,7 @@ openfile(char *filename)
  * Get the boot arguments from the PROM and split it into filename and
  * options components.
  *
- * As per IEEE1275 and boot(1M), the boot arguments will have the syntax
+ * As per IEEE1275 and boot(8), the boot arguments will have the syntax
  * "[filename] [-options]".  If filename is specified, it is copied into the
  * first buffer.  (Otherwise, the buffer is left alone.)  The rest of the string
  * is copied into the second buffer.

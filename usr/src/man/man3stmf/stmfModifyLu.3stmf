@@ -175,7 +175,7 @@ The value of \fIprop\fR is unknown for this resource type.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -193,4 +193,6 @@ MT-Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBlibstmf\fR(3LIB), \fBstmfCreateLuResource\fR(3STMF), \fBattributes\fR(5)
+.BR libstmf (3LIB),
+.BR stmfCreateLuResource (3STMF),
+.BR attributes (7)

@@ -756,7 +756,7 @@ out:
 
 			/*
 			 * TCSBRK meaningful if data part of message is 0
-			 * cf. termio(7).
+			 * cf. termio(4I).
 			 */
 			if (!(*(int *)mp->b_cont->b_rptr))
 				(void) putnextctl(q, M_BREAK);

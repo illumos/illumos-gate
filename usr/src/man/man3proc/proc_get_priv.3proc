@@ -42,7 +42,7 @@ ensures that it is large enough to hold all of the privilege sets.
 The definition of the
 .Sy prpriv_t
 structure may be found in
-.Xr proc 4 .
+.Xr proc 5 .
 .Pp
 The
 .Fn proc_free_priv
@@ -69,4 +69,4 @@ is returned to indicate an error occurred.
 .Sy MT-Safe
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr proc 4
+.Xr proc 5

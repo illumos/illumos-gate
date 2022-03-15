@@ -59,7 +59,9 @@ context.
 .SH SEE ALSO
 .sp
 .LP
-\fBdelay\fR(9F), \fBdrv_hztousec\fR(9F), \fBtimeout\fR(9F)
+.BR delay (9F),
+.BR drv_hztousec (9F),
+.BR timeout (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

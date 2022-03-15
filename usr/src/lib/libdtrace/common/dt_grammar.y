@@ -312,7 +312,7 @@ probe_definition:
 			 * it.  This can only occur if the next token is EOF or
 			 * an ambiguous predicate was slurped up as a comment.
 			 * We cannot perform this check if input() is a string
-			 * because dtrace(1M) [-fmnP] also use the compiler and
+			 * because dtrace(8) [-fmnP] also use the compiler and
 			 * things like dtrace -n BEGIN have to be accepted.
 			 */
 			if (yypcb->pcb_fileptr != NULL) {

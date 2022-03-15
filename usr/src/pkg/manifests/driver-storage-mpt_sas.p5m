@@ -42,8 +42,8 @@ file path=kernel/drv/$(ARCH64)/mpt_sas group=sys
 file path=kernel/drv/mpt_sas.conf group=sys \
     original_name=SUNWmptsas:kernel/drv/mpt_sas.conf preserve=true
 dir  path=usr/share/man
-dir  path=usr/share/man/man7d
-file path=usr/share/man/man7d/mpt_sas.7d
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/mpt_sas.4d
 driver name=mpt_sas class=scsi-self-identifying \
     alias=pci1000,64 \
     alias=pci1000,70 \

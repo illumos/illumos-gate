@@ -593,7 +593,7 @@ shared object
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -611,12 +611,19 @@ MT Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBelf\fR(3ELF), \fBelf32_checksum\fR(3ELF), \fBelf32_fsize\fR(3ELF),
-\fBelf32_getehdr\fR(3ELF), \fBelf32_newehdr\fR(3ELF),
-\fBelf32_getphdr\fR(3ELF), \fBelf32_newphdr\fR(3ELF),
-\fBelf32_getshdr\fR(3ELF), \fBelf32_xlatetof\fR(3ELF),
-\fBelf32_xlatetom\fR(3ELF), \fBelf_errno\fR(3ELF), \fBlibelf\fR(3LIB),
-\fBattributes\fR(5)
+.BR elf (3ELF),
+.BR elf32_checksum (3ELF),
+.BR elf32_fsize (3ELF),
+.BR elf32_getehdr (3ELF),
+.BR elf32_getphdr (3ELF),
+.BR elf32_getshdr (3ELF),
+.BR elf32_newehdr (3ELF),
+.BR elf32_newphdr (3ELF),
+.BR elf32_xlatetof (3ELF),
+.BR elf32_xlatetom (3ELF),
+.BR elf_errno (3ELF),
+.BR libelf (3LIB),
+.BR attributes (7)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

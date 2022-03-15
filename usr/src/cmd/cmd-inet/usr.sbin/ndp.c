@@ -106,7 +106,7 @@ static	boolean_t	ndp_run = B_TRUE;
 #define	NETSTAT_PATH	"/usr/bin/netstat"
 
 /*
- * Macros borrowed from route(1M) for working with PF_ROUTE messages
+ * Macros borrowed from route(8) for working with PF_ROUTE messages
  */
 #define	RT_ADVANCE(x, n) ((x) += ndp_salen(n))
 #define	RT_NEXTADDR(cp, w, u) \

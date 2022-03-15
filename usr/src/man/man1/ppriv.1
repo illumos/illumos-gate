@@ -180,7 +180,7 @@ of the \fBppriv\fR utility must be a super set of the controlled process's
 the target's limit set. If the target's process uids do not match, the
 \fB{PRIV_PROC_OWNER}\fR privilege must be asserted in the utility's effective
 set. If the controlled processes have any uid with the value \fB0\fR, more
-restrictions might exist. See \fBprivileges\fR(5).
+restrictions might exist. See \fBprivileges\fR(7).
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRObtaining the Process Privileges of the Current Shell
@@ -275,7 +275,7 @@ The system call number can be mapped to a system call using
 .sp
 .LP
 The following example lists the privileges available in the current zone (see
-\fBzones\fR(5)). When run in the global zone, all defined privileges are
+\fBzones\fR(7)). When run in the global zone, all defined privileges are
 listed.
 
 .sp
@@ -357,7 +357,7 @@ system call name to number mapping
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -376,5 +376,11 @@ The invocation is Committed. The output is Uncommitted.
 .SH SEE ALSO
 .sp
 .LP
-\fBgcore\fR(1), \fBtruss\fR(1), \fBsetpflags\fR(2), \fBpriv_str_to_set\fR(3C),
-\fBproc\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5), \fBzones\fR(5)
+.BR gcore (1),
+.BR truss (1),
+.BR setpflags (2),
+.BR priv_str_to_set (3C),
+.BR proc (5),
+.BR attributes (7),
+.BR privileges (7),
+.BR zones (7)

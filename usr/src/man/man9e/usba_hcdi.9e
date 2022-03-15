@@ -36,7 +36,7 @@ DMA, and also act as the root hub.
 .Sy hcdi
 drivers are part of the illumos USB Architecture (USBA).
 The
-.Xr usba 7D
+.Xr usba 4D
 driver provides support for many of the surrounding needs of an
 .Sy hcdi
 driver and requires that such drivers implement a specific operations
@@ -270,7 +270,7 @@ They should not be used as they have gaps added by the compiler for alignment.
 Once assembled, the device driver should call
 .Xr usba_hubdi_bind_root_hub 9F .
 This will cause an instance of the
-.Xr hubd 7D
+.Xr hubd 4D
 driver to be attached and associated with the root controller.
 As such, driver writers need to ensure that all initialization is done prior to
 loading the root hub.
@@ -847,12 +847,12 @@ Due to the way host controller drivers need to interact with hotplug,
 drivers should generally set the
 .Sy ddi-forceattach
 property to one in their
-.Xr driver.conf 4
+.Xr driver.conf 5
 file.
 .Sh SEE ALSO
-.Xr driver.conf 4 ,
-.Xr hubd 7D ,
-.Xr usba 7D ,
+.Xr hubd 4D ,
+.Xr usba 4D ,
+.Xr driver.conf 5 ,
 .Xr attach 9E ,
 .Xr close 9E ,
 .Xr detach 9E ,

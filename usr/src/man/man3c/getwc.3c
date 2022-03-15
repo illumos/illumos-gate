@@ -91,7 +91,7 @@ functions is not recommended; \fBfgetwc\fR(3C) and \fBfgetwc_l\fR(3C)
 should be used instead.
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .TS
 box;
 c | c
@@ -111,5 +111,9 @@ function is Standard.  The
 function is Uncommitted.
 .SH SEE ALSO
 .LP
-\fBfgetwc\fR(3C), \fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.BR fgetwc (3C),
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR uselocale (3C),
+.BR attributes (7),
+.BR standards (7)

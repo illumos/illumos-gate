@@ -106,11 +106,21 @@ void	(*devmap_unmap)(devmap_cookie_t dhp, void *pvtp,
 .in -2
 
 .SH SEE ALSO
-\fBexit\fR(2), \fBfork\fR(2), \fBmmap\fR(2), \fBmunmap\fR(2), \fBdevmap\fR(9E),
-\fBdevmap_access\fR(9E), \fBdevmap_dup\fR(9E), \fBdevmap_map\fR(9E),
-\fBdevmap_unmap\fR(9E), \fBddi_devmap_segmap\fR(9F),
-\fBdevmap_default_access\fR(9F), \fBdevmap_devmem_setup\fR(9F),
-\fBdevmap_do_ctxmgt\fR(9F), \fBdevmap_setup\fR(9F), \fBdevmap_umem_setup\fR(9F)
+.BR exit (2),
+.BR fork (2),
+.BR mmap (2),
+.BR munmap (2),
+.BR devmap (9E),
+.BR devmap_access (9E),
+.BR devmap_dup (9E),
+.BR devmap_map (9E),
+.BR devmap_unmap (9E),
+.BR ddi_devmap_segmap (9F),
+.BR devmap_default_access (9F),
+.BR devmap_devmem_setup (9F),
+.BR devmap_do_ctxmgt (9F),
+.BR devmap_setup (9F),
+.BR devmap_umem_setup (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

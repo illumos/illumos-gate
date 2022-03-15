@@ -88,7 +88,7 @@ associated character sequence. The implemenation will behave as if no function
 defined in the Reference Manual calls \fBmbrlen()\fR.
 .LP
 The behavior of \fBmbrlen()\fR is affected by the \fBLC_CTYPE\fR category of the
-current locale.  See \fBenviron\fR(5). The behavior of \fBmbrlen_l()\fR does not
+current locale.  See \fBenviron\fR(7). The behavior of \fBmbrlen_l()\fR does not
 use the current enivronment and instead uses the locale specified by \fBloc\fR.
 .SH RETURN VALUES
 .LP
@@ -162,7 +162,7 @@ Invalid character sequence is detected.
 
 .SH ATTRIBUTES
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .TS
 box;
 c | c
@@ -182,9 +182,13 @@ function is Standard.  The
 function is Uncommitted.
 .SH SEE ALSO
 .LP
-\fBmbrtowc\fR(3C), \fBmbsinit\fR(3C), \fBnewlocale\fR(3C),
-\fBsetlocale\fR(3C), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBstandards\fR(5)
+.BR mbrtowc (3C),
+.BR mbsinit (3C),
+.BR newlocale (3C),
+.BR setlocale (3C),
+.BR attributes (7),
+.BR environ (7),
+.BR standards (7)
 .SH NOTES
 .sp
 .LP

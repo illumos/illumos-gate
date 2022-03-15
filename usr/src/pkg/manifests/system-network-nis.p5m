@@ -79,25 +79,25 @@ file path=usr/share/man/man1/ypcat.1
 file path=usr/share/man/man1/ypmatch.1
 file path=usr/share/man/man1/yppasswd.1
 file path=usr/share/man/man1/ypwhich.1
-dir  path=usr/share/man/man1m
-file path=usr/share/man/man1m/idsconfig.1m
-file path=usr/share/man/man1m/ldap_cachemgr.1m
-file path=usr/share/man/man1m/ldapaddent.1m
-file path=usr/share/man/man1m/ldapclient.1m
-file path=usr/share/man/man1m/newkey.1m
-file path=usr/share/man/man1m/ypbind.1m
-file path=usr/share/man/man1m/ypinit.1m
-file path=usr/share/man/man1m/yppoll.1m
-file path=usr/share/man/man1m/ypset.1m
-file path=usr/share/man/man1m/ypstart.1m
-link path=usr/share/man/man1m/ypstop.1m target=ypstart.1m
-file path=usr/share/man/man1m/ypxfr.1m
-link path=usr/share/man/man1m/ypxfr_1perday.1m target=ypxfr.1m
-link path=usr/share/man/man1m/ypxfr_1perhour.1m target=ypxfr.1m
-link path=usr/share/man/man1m/ypxfr_2perday.1m target=ypxfr.1m
-dir  path=usr/share/man/man4
-file path=usr/share/man/man4/defaultdomain.4
-file path=usr/share/man/man4/publickey.4
+dir  path=usr/share/man/man5
+file path=usr/share/man/man5/defaultdomain.5
+file path=usr/share/man/man5/publickey.5
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/idsconfig.8
+file path=usr/share/man/man8/ldap_cachemgr.8
+file path=usr/share/man/man8/ldapaddent.8
+file path=usr/share/man/man8/ldapclient.8
+file path=usr/share/man/man8/newkey.8
+file path=usr/share/man/man8/ypbind.8
+file path=usr/share/man/man8/ypinit.8
+file path=usr/share/man/man8/yppoll.8
+file path=usr/share/man/man8/ypset.8
+file path=usr/share/man/man8/ypstart.8
+link path=usr/share/man/man8/ypstop.8 target=ypstart.8
+file path=usr/share/man/man8/ypxfr.8
+link path=usr/share/man/man8/ypxfr_1perday.8 target=ypxfr.8
+link path=usr/share/man/man8/ypxfr_1perhour.8 target=ypxfr.8
+link path=usr/share/man/man8/ypxfr_2perday.8 target=ypxfr.8
 dir  path=var group=sys
 dir  path=var/ldap group=sys
 dir  path=var/yp

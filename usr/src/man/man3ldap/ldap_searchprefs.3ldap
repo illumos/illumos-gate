@@ -57,14 +57,14 @@ specify the type of search to be performed.
 .LP
 \fBldap_init_searchprefs()\fR reads a sequence of search preference
 configurations from a valid LDAP  searchpref configuration file. See
-\fBldapsearchprefs.conf\fR(4). Upon success, \fB0\fR is returned and
+\fBldapsearchprefs.conf\fR(5). Upon success, \fB0\fR is returned and
 \fIsolistp\fR is set to point to a list of search preference data structures.
 .sp
 .LP
 \fBldap_init_searchprefs_buf()\fR reads a sequence of search preference
 configurations from \fIbuf\fR, whose size is \fIbuflen.\fR \fIbuf\fR should
 point to the data in the format defined for an LDAP search preference
-configuration file. See  \fBldapsearchprefs.conf\fR(4). Upon success, \fB0\fR
+configuration file. See  \fBldapsearchprefs.conf\fR(5). Upon success, \fB0\fR
 is returned and \fIsolistp\fR is set to point to a list of search preference
 data structures.
 .sp
@@ -108,7 +108,7 @@ Memory allocation problem.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for a description of the following attributes:
+See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
 .sp
@@ -123,7 +123,9 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .sp
 .LP
-\fBldap\fR(3LDAP), \fBldapsearchprefs.conf\fR(4), \fBattributes\fR(5)
+.BR ldap (3LDAP),
+.BR ldapsearchprefs.conf (5),
+.BR attributes (7)
 .sp
 .LP
 Yeong, W., Howes, T., and Hardcastle-Kille, S., "Lightweight Directory Access

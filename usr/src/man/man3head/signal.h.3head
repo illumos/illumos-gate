@@ -161,9 +161,9 @@ The signals currently defined by <\fBsignal.h\fR> are as follows:
 c c c c
 l l l l .
 Name	Value	Default	Event
-\fBSIGHUP\fR	1	Exit	Hangup (see \fBtermio\fR(7I))
-\fBSIGINT\fR	2	Exit	Interrupt (see \fBtermio\fR(7I))
-\fBSIGQUIT\fR	3	Core	Quit (see \fBtermio\fR(7I))
+\fBSIGHUP\fR	1	Exit	Hangup (see \fBtermio\fR(4I))
+\fBSIGINT\fR	2	Exit	Interrupt (see \fBtermio\fR(4I))
+\fBSIGQUIT\fR	3	Core	Quit (see \fBtermio\fR(4I))
 \fBSIGILL\fR	4	Core	Illegal Instruction
 \fBSIGTRAP\fR	5	Core	Trace or Breakpoint Trap
 \fBSIGABRT\fR	6	Core	Abort
@@ -182,12 +182,12 @@ Name	Value	Default	Event
 \fBSIGPWR\fR	19	Ignore	Power Fail or Restart
 \fBSIGWINCH\fR	20	Ignore	Window Size Change
 \fBSIGURG\fR	21	Ignore	Urgent Socket Condition
-\fBSIGPOLL\fR	22	Exit	Pollable Event (see \fBstreamio\fR(7I))
+\fBSIGPOLL\fR	22	Exit	Pollable Event (see \fBstreamio\fR(4I))
 \fBSIGSTOP\fR	23	Stop	Stopped (signal)
-\fBSIGTSTP\fR	24	Stop	Stopped (user) (see \fBtermio\fR(7I))
+\fBSIGTSTP\fR	24	Stop	Stopped (user) (see \fBtermio\fR(4I))
 \fBSIGCONT\fR	25	Ignore	Continued
-\fBSIGTTIN\fR	26	Stop	Stopped (tty input) (see \fBtermio\fR(7I))
-\fBSIGTTOU\fR	27	Stop	Stopped (tty output) (see \fBtermio\fR(7I))
+\fBSIGTTIN\fR	26	Stop	Stopped (tty input) (see \fBtermio\fR(4I))
+\fBSIGTTOU\fR	27	Stop	Stopped (tty output) (see \fBtermio\fR(4I))
 \fBSIGVTALRM\fR	28	Exit	Virtual Timer Expired
 \fBSIGPROF\fR	29	Exit	Profiling Timer Expired
 \fBSIGXCPU\fR	30	Core	T{
@@ -440,7 +440,7 @@ silently discarded.
 .SH ATTRIBUTES
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
+See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
 .sp
@@ -452,21 +452,41 @@ ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
 Interface Stability	Committed
 _
-Standard	See \fBstandards\fR(5).
+Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
 .sp
 .LP
-\fBlockd\fR(1M), \fBIntro\fR(2), \fBalarm\fR(2), \fBexit\fR(2), \fBfcntl\fR(2),
-\fBgetrlimit\fR(2), \fBioctl\fR(2), \fBkill\fR(2), \fBpause\fR(2),
-\fBsetrctl\fR(2), \fBsigaction\fR(2), \fBsigaltstack\fR(2),
-\fBsigprocmask\fR(2), \fBsigsend\fR(2), \fBsigsuspend\fR(2), \fBsigwait\fR(2),
-\fBport_associate\fR(3C), \fBpthread_create\fR(3C), \fBpthread_kill\fR(3C),
-\fBpthread_sigmask\fR(3C), \fBsetjmp\fR(3C), \fBsiginfo.h\fR(3HEAD),
-\fBsignal\fR(3C), \fBsigqueue\fR(3C), \fBsigsetops\fR(3C),
-\fBucontext.h\fR(3HEAD), \fBwait\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5)
+.BR Intro (2),
+.BR alarm (2),
+.BR exit (2),
+.BR fcntl (2),
+.BR getrlimit (2),
+.BR ioctl (2),
+.BR kill (2),
+.BR pause (2),
+.BR setrctl (2),
+.BR sigaction (2),
+.BR sigaltstack (2),
+.BR sigprocmask (2),
+.BR sigsend (2),
+.BR sigsuspend (2),
+.BR sigwait (2),
+.BR port_associate (3C),
+.BR pthread_create (3C),
+.BR pthread_kill (3C),
+.BR pthread_sigmask (3C),
+.BR setjmp (3C),
+.BR signal (3C),
+.BR sigqueue (3C),
+.BR sigsetops (3C),
+.BR wait (3C),
+.BR siginfo.h (3HEAD),
+.BR ucontext.h (3HEAD),
+.BR attributes (7),
+.BR standards (7),
+.BR lockd (8)
 .SH NOTES
 .sp
 .LP

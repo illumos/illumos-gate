@@ -631,7 +631,7 @@ main(int argc, char **argv)
 
 		/*
 		 * Public interface: Identify a file or directory which
-		 * contains output from a previous pkgask(1M)
+		 * contains output from a previous pkgask(8)
 		 * session. This file supplies the interaction responses
 		 * that would be requested by the package in interactive
 		 * mode. response must be a full pathname.
@@ -698,7 +698,7 @@ main(int argc, char **argv)
 		/*
 		 * Public interface: Install packages based on the value
 		 * of the CATEGORY parameter stored in the package's
-		 * pkginfo(4) file. All packages on the source medium
+		 * pkginfo(5) file. All packages on the source medium
 		 * whose CATEGORY matches one of the specified categories
 		 * will be selected for installation or spooling. Install
 		 * packages that contain the same CATEGORY as the one
@@ -910,7 +910,7 @@ main(int argc, char **argv)
 
 	/*
 	 * This function is in the libinst library; it reads the specified
-	 * admin(4) file and, using fpkgparam(), sets the global "adm" structure
+	 * admin(5) file and, using fpkgparam(), sets the global "adm" structure
 	 * values to match what is in the specified admin file.
 	 */
 

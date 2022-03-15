@@ -66,12 +66,12 @@ SCRIPT_PATH=/etc/svc/volatile/nwam
 #
 # echoes DHCP controlled interfaces separated by commas
 #
-# Don't parse the output of ifconfig(1M) because interfaces that haven't
+# Don't parse the output of ifconfig(8) because interfaces that haven't
 # acquired a DHCP lease also have the DHCP flag set.
 #
 get_dhcp_interfaces () {
 	#
-	# 1. parse netstat(1M) output for v4 interfaces in BOUND
+	# 1. parse netstat(8) output for v4 interfaces in BOUND
 	#    or INFORMATION state
 	# 2. make a space-separated list of interface names
 	#
@@ -302,7 +302,7 @@ do_nis () {
 #
 # do_ldap <location>
 #
-# Installs LDAP information using ldapclient(1M) for location
+# Installs LDAP information using ldapclient(8) for location
 #
 # Returns 0 on success, 1 on failure
 #
@@ -334,7 +334,7 @@ do_ldap () {
 			;;
 		esac
 
-		# Use ldapclient(1M) to initialize LDAP client settings.
+		# Use ldapclient(8) to initialize LDAP client settings.
 		if [ -n "$DEFAULT_DOMAIN" -o -n "$LDAP_SERVERS" ]; then
 			$LDAPCLIENT init -a domainName=$DEFAULT_DOMAIN \
 			    $LDAP_SERVERS
@@ -367,9 +367,9 @@ do_ns () {
 	stop_svc $LDAP_CLIENT_FMRI
 
 	#
-	# Remove /etc/defaultdomain and unset domainname(1M).  If NIS
+	# Remove /etc/defaultdomain and unset domainname(8).  If NIS
 	# and/or LDAP is configured, they will create /etc/defaultdomain
-	# and set the domainname(1M).
+	# and set the domainname(8).
 	#
 	$RM -f $ETC_DEFAULT_DOMAIN
 	$DOMAINNAME " "

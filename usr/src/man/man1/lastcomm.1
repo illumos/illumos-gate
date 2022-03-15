@@ -21,7 +21,7 @@ The \fBlastcomm\fR command gives information on previously executed commands.
 recorded during the current accounting file's lifetime. If called with
 arguments, \fBlastcomm\fR only displays accounting entries with a matching
 \fIcommand-name\fR, \fIuser-name\fR, or \fIterminal-name\fR. If extended
-process accounting is active (see \fBacctadm\fR(1M)) and is recording the
+process accounting is active (see \fBacctadm\fR(8)) and is recording the
 appropriate data items, \fBlastcomm\fR attempts to take data from the current
 extended process accounting file. If standard process accounting is active,
 \fBlastcomm\fR takes data from the current standard accounting file (see
@@ -176,5 +176,9 @@ extended accounting file
 
 .SH SEE ALSO
 .LP
-\fBlast\fR(1), \fBacctadm\fR(1M), \fBacct\fR(2), \fBacct.h\fR(3HEAD),
-\fBcore\fR(4), \fBattributes\fR(5)
+.BR last (1),
+.BR acct (2),
+.BR acct.h (3HEAD),
+.BR core (5),
+.BR attributes (7),
+.BR acctadm (8)
