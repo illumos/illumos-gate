@@ -1,26 +1,20 @@
 '\" te
 .\" Copyright 2020 Peter Tribble
+.\" Copyright 2022 Joyent, Inc.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright (c) 2011, Joyent, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FLOWADM 8 "February 5, 2022"
+.TH FLOWADM 8 "March 15, 2022"
 .SH NAME
 flowadm \- administer bandwidth resource control and priority for protocols,
 services, containers, and virtual machines
 .SH SYNOPSIS
-.LP
 .nf
-\fBflowadm show-flow\fR [\fB-pP\fR] [\fB-S\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-l\fR \fIlink\fR]
-     [\fB-o\fR \fIfield\fR[,...]] [\fB-z\fR \fIzonename\fR] [\fIflow\fR]
-.fi
-
-.LP
-.nf
-\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR \fIlink\fR
-     \fB-a\fR \fIattr\fR=\fIvalue\fR[,...] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR
+\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR \fIlink\fR \fB-a\fR
+     \fIattr\fR=\fIvalue\fR[,...] [\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIflow\fR
 \fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] {\fB-l\fR \fIlink\fR | \fIflow\fR}
+\fBflowadm show-flow\fR [\fB-p\fR] [\fB-l\fR \fIlink\fR] [\fB-o\fR \fIfield\fR[,...]] [\fB-z\fR \fIzonename\fR] [\fIflow\fR]
 .fi
 
 .LP
@@ -69,7 +63,9 @@ The following subcommands are supported:
 .sp
 .ne 2
 .na
-\fB\fBflowadm show-flow\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fB-z\fR \fIzonename\fR] [\fIflow\fR]\fR
+\fB\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
+[\fB-z\fR \fIzonename\fR] \fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...]
+[\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIflow\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -102,6 +98,16 @@ the default.
 .RS 4n
 Specifies an alternate root directory where \fBflowadm\fR should apply
 persistent creation.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
 .RE
 
 .sp
@@ -141,8 +147,8 @@ values. Flow properties are documented in the "Flow Properties" section, below.
 .sp
 .ne 2
 .na
-\fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
-{\fIlink\fR | \fIflow\fR}\fR
+\fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR]
+\fB-l\fR {\fIlink\fR | \fIflow\fR}\fR
 .ad
 .sp .6
 .RS 4n
@@ -180,13 +186,23 @@ If a link is specified, remove all flows from that link. If a single flow is
 specified, remove only that flow.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
 .RE
 
 .sp
 .ne 2
 .na
 \fB\fBflowadm show-flow\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]]
-[\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fIflow\fR]\fR
+[\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fB-z\fR \fIzonename\fR] [\fIflow\fR]\fR
 .ad
 .sp .6
 .RS 4n
@@ -209,8 +225,17 @@ display all fields. For each flow found, the following fields can be displayed:
 .ad
 .sp .6
 .RS 4n
-Display information for all flows on the named link or information for the
-named flow.
+The name of the flow.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlink\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the link the flow is on.
 .RE
 
 .sp
@@ -221,18 +246,6 @@ named flow.
 .sp .6
 .RS 4n
 Operate on a link that has been delegated to the specified zone.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR \fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR\fR
-.ad
-.sp .6
-.RS 4n
-The name of the link the flow is on.
 .RE
 
 .sp
@@ -259,17 +272,7 @@ The name of the layer for protocol to be used.
 .sp
 .ne 2
 .na
-\fB\fB-z\fR \fIzonename\fR
-.ad
-.sp .6
-.RS 4n
-Operate on a link that has been delegated to the specified zone.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR\fR
+\fB\fBlport\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -303,15 +306,7 @@ header.
 .sp
 .ne 2
 .na
-\fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR {\fIlink\fR | \fIflow\fR}\fR
-.ad
-.sp .6
-.RS 4n
-Remove an existing flow identified by its link or name.
-.sp
-.ne 2
-.na
-\fB\fB-t\fR, \fB--temporary\fR\fR
+\fB\fB-p\fR, \fB--parsable\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -331,17 +326,7 @@ Display persistent flow property information.
 .sp
 .ne 2
 .na
-\fB\fB-z\fR \fIzonename\fR
-.ad
-.sp .6
-.RS 4n
-Operate on a link that has been delegated to the specified zone.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-l\fR \fIlink\fR | \fIflow\fR, \fB--link\fR=\fIlink\fR | \fIflow\fR\fR
+\fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR | \fIflow\fR\fR
 .ad
 .sp .6
 .RS 4n

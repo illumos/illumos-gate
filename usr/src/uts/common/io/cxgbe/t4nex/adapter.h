@@ -428,8 +428,10 @@ struct sge {
 	struct sge_ofld_rxq *ofld_rxq;	/* TOE rx queues */
 #endif
 
-	uint16_t iq_start;
-	int eq_start;
+	int iq_start; /* iq context id map start index */
+	int eq_start; /* eq context id map start index */
+	int iqmap_sz; /* size of iq context id map */
+	int eqmap_sz; /* size of eq context id map */
 	struct sge_iq **iqmap;	/* iq->cntxt_id to iq mapping */
 	struct sge_eq **eqmap;	/* eq->cntxt_id to eq mapping */
 

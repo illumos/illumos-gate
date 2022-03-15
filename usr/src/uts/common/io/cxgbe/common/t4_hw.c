@@ -3380,7 +3380,6 @@ int t4_get_pfres(struct adapter *adapter)
 	 */
 	word = be32_to_cpu(rpl.niqflint_niq);
 	pfres->niqflint = G_FW_PFVF_CMD_NIQFLINT(word);
-	pfres->niq = G_FW_PFVF_CMD_NIQ(word);
 
 	word = be32_to_cpu(rpl.type_to_neq);
 	pfres->neq = G_FW_PFVF_CMD_NEQ(word);

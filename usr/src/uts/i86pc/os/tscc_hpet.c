@@ -98,9 +98,16 @@ tsc_calibrate_hpet(uint64_t *freqp)
 	return (B_TRUE);
 }
 
+/*
+ * Reports from the field suggest that HPET calibration is currently producing
+ * a substantially greater error than PIT calibration on a wide variety of
+ * systems.  We are placing it last in the preference order until that can be
+ * resolved.  HPET calibration cannot be disabled completely, as some systems
+ * no longer emulate the PIT at all.
+ */
 static tsc_calibrate_t tsc_calibration_hpet = {
 	.tscc_source = "HPET",
-	.tscc_preference = 50,
+	.tscc_preference = 1,
 	.tscc_calibrate = tsc_calibrate_hpet,
 };
 TSC_CALIBRATION_SOURCE(tsc_calibration_hpet);

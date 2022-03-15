@@ -157,8 +157,9 @@ tsc_calibrate_pit(uint64_t *freqp)
 }
 
 /*
- * Typically any source besides the PIT is going to provide better
- * results, so a low preference is assigned to the PIT so it is tried last.
+ * Typically a calibration source that allows the hardware or the hypervisor to
+ * simply declare a specific frequency, rather than requiring calibration at
+ * runtime, is going to provide better results than the using PIT.
  */
 static tsc_calibrate_t tsc_calibration_pit = {
 	.tscc_source = "PIT",

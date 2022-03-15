@@ -172,7 +172,7 @@ def not_check(root, cmd):
     should be excluded from the check named by 'cmd'"""
 
     ignorefiles = list(filter(os.path.exists,
-                         [os.path.join(root, ".git", "%s.NOT" % cmd),
+                         [os.path.join(root, ".git/info", "%s.NOT" % cmd),
                           os.path.join(root, "exception_lists", cmd)]))
     return Ignore.ignore(root, ignorefiles)
 

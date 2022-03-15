@@ -12,6 +12,7 @@
 
 #
 # Copyright (c) 2017, Joyent, Inc.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 soe_arg0="$(basename $0)"
@@ -38,7 +39,7 @@ function fatal
 
 function setup
 {
-	dladm create-overlay -v $soe_vnetid -e $soe_encap -s $soe_search \
+	dladm create-overlay -t -v $soe_vnetid -e $soe_encap -s $soe_search \
 	    -p vxlan/listen_ip=$soe_dummy_ip -p direct/dest_ip=$soe_dummy_ip \
 	    -p direct/dest_port=$soe_port $soe_overlay || \
 	    fatal "failed to create overlay"
@@ -79,4 +80,4 @@ efail $soe_overlay $soe_etherstub
 
 cleanup
 
-printf "TEST PASS: $soe_arg0"
+print "TEST PASS: $soe_arg0"
