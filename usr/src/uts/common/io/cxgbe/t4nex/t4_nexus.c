@@ -313,12 +313,12 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_device_acc_attr_t da = {
 		.devacc_attr_version = DDI_DEVICE_ATTR_V0,
 		.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC,
-		.devacc_attr_dataorder = DDI_UNORDERED_OK_ACC
+		.devacc_attr_dataorder = DDI_STRICTORDER_ACC 
 	};
 	ddi_device_acc_attr_t da1 = {
 		.devacc_attr_version = DDI_DEVICE_ATTR_V0,
 		.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC,
-		.devacc_attr_dataorder = DDI_MERGING_OK_ACC
+		.devacc_attr_dataorder = DDI_STRICTORDER_ACC
 	};
 
 	if (cmd != DDI_ATTACH)
