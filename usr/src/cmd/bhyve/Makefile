@@ -158,14 +158,13 @@ $(PROG) := LDLIBS += \
 	-ldladm \
 	-lmd \
 	-lnvpair \
-	-lproc \
 	-lsunw_crypto \
 	-luuid \
 	-lvmmapi \
 	-lz
 NATIVE_LIBS += libz.so libsunw_crypto.so
 $(ZHYVE_PROG) := LDLIBS += -lnvpair
-$(MEVENT_TEST_PROG) := LDLIBS += -lsocket -lproc
+$(MEVENT_TEST_PROG) := LDLIBS += -lsocket
 $(PROG) := LDFLAGS += $(ZASLR)
 
 .KEEP_STATE:

@@ -29,8 +29,6 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(SRC)/cmd/bhyve \
 		-DWITHOUT_CAPSICUM
 
-LDFLAGS +=	-lproc
-
 SMOFF += all_func_returns
 
 CLOBBERFILES +=	$(PROG)
