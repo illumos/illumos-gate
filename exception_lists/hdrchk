@@ -407,7 +407,6 @@ usr/src/cmd/bhyve/pci_lpc.h
 usr/src/cmd/bhyve/pctestdev.h
 usr/src/cmd/bhyve/ps2kbd.h
 usr/src/cmd/bhyve/ps2mouse.h
-usr/src/cmd/bhyve/rfb.h
 usr/src/cmd/bhyve/rtc.h
 usr/src/cmd/bhyve/smbiostbl.h
 usr/src/cmd/bhyve/sockstream.h

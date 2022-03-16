@@ -35,6 +35,10 @@ __FBSDID("$FreeBSD$");
 #include <stdio.h>
 #include <string.h>
 
+#ifndef __FreeBSD__
+#include <pthread.h>
+#endif
+
 #include "bhyvegc.h"
 
 struct bhyvegc {
@@ -63,16 +67,26 @@ bhyvegc_init(int width, int height, void *fbaddr)
 
 	gc->gc_image = gc_image;
 
+#ifndef __FreeBSD__
+	pthread_mutex_init(&gc_image->mtx, NULL);
+#endif
+
 	return (gc);
 }
 
 void
 bhyvegc_set_fbaddr(struct bhyvegc *gc, void *fbaddr)
 {
+#ifndef __FreeBSD__
+	pthread_mutex_lock(&gc->gc_image->mtx);
+#endif
 	gc->raw = 1;
 	if (gc->gc_image->data && gc->gc_image->data != fbaddr)
 		free(gc->gc_image->data);
 	gc->gc_image->data = fbaddr;
+#ifndef __FreeBSD__
+	pthread_mutex_unlock(&gc->gc_image->mtx);
+#endif
 }
 
 void
@@ -80,6 +94,9 @@ bhyvegc_resize(struct bhyvegc *gc, int width, int height)
 {
 	struct bhyvegc_image *gc_image;
 
+#ifndef __FreeBSD__
+	pthread_mutex_lock(&gc->gc_image->mtx);
+#endif
 	gc_image = gc->gc_image;
 
 	gc_image->width = width;
@@ -91,6 +108,9 @@ bhyvegc_resize(struct bhyvegc *gc, int width, int height)
 			memset(gc_image->data, 0, width * height *
 			    sizeof (uint32_t));
 	}
+#ifndef __FreeBSD__
+	pthread_mutex_unlock(&gc->gc_image->mtx);
+#endif
 }
 
 struct bhyvegc_image *

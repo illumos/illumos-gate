@@ -142,6 +142,7 @@ umem_create_update_thread(void)
 	    THR_BOUND | THR_DAEMON | THR_DETACHED | THR_SUSPENDED,
 	    &newthread) == 0) {
 		(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+		(void) thr_setname(newthread, "umem_update");
 
 		(void) mutex_lock(&umem_update_lock);
 		/*

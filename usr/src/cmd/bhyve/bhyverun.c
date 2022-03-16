@@ -1666,8 +1666,6 @@ main(int argc, char *argv[])
 	}
 #endif
 
-	vga_init(1);
-
 	if (lpc_bootrom()) {
 #ifdef __FreeBSD__
 		if (vm_set_capability(ctx, BSP, VM_CAP_UNRESTRICTED_GUEST, 1)) {

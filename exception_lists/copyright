@@ -523,7 +523,6 @@ usr/src/cmd/bhyve/pmtmr.c
 usr/src/cmd/bhyve/post.c
 usr/src/cmd/bhyve/ps2kbd.[ch]
 usr/src/cmd/bhyve/ps2mouse.[ch]
-usr/src/cmd/bhyve/rfb.[ch]
 usr/src/cmd/bhyve/rtc.[ch]
 usr/src/cmd/bhyve/smbiostbl.[ch]
 usr/src/cmd/bhyve/sockstream.[ch]

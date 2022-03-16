@@ -31,6 +31,10 @@
 #ifndef _BHYVEGC_H_
 #define	_BHYVEGC_H_
 
+#ifndef __FreeBSD__
+#include <pthread.h>
+#endif
+
 struct bhyvegc;
 
 struct bhyvegc_image {
@@ -38,6 +42,9 @@ struct bhyvegc_image {
 	int		width;
 	int		height;
 	uint32_t	*data;
+#ifndef __FreeBSD__
+	pthread_mutex_t	mtx;
+#endif
 };
 
 struct bhyvegc *bhyvegc_init(int width, int height, void *fbaddr);
