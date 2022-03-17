@@ -137,6 +137,7 @@ UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython2\..
 UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython3\..
 UNUSED_RPATH	/usr/snadm/lib.*\ from\ .*/usr/snadm/lib/libspmicommon\.so\.1
 UNUSED_RPATH	/usr/gcc/.*/lib.*\ from\ .*
+UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*libncurses\.so\.5
 
 # Unused runpaths for reasons not captured above
 UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1	# future needs
