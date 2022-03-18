@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -31,21 +32,16 @@ typedef enum nvme_list_ofmt_field {
 	NVME_LIST_USED,
 	NVME_LIST_INSTANCE,
 	NVME_LIST_NAMESPACE,
-	NVME_LIST_DISK
+	NVME_LIST_DISK,
+	NVME_LIST_UNALLOC,
 } nvme_list_ofmt_field_t;
 
 static boolean_t
-nvme_list_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
+nvme_list_common_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
 {
 	const nvme_process_arg_t *npa = ofmt_arg->ofmt_cbarg;
-	nvme_idns_lbaf_t *lbaf;
-	uint_t blksize;
-	uint64_t val;
 	int nvmelen;
 	size_t ret;
-
-	lbaf = &npa->npa_idns->id_lbaf[npa->npa_idns->id_flbas.lba_format];
-	blksize = 1 << lbaf->lbaf_lbads;
 
 	switch (ofmt_arg->ofmt_id) {
 	case NVME_LIST_MODEL:
@@ -85,6 +81,53 @@ nvme_list_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
 	case NVME_LIST_INSTANCE:
 		ret = strlcat(buf, npa->npa_name, buflen);
 		break;
+	default:
+		abort();
+	}
+	if (ret >= buflen) {
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+static boolean_t
+nvme_list_ctrl_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
+{
+	const nvme_process_arg_t *npa = ofmt_arg->ofmt_cbarg;
+	size_t ret;
+
+	switch (ofmt_arg->ofmt_id) {
+	case NVME_LIST_CAPACITY:
+		ret = nvme_snprint_uint128(buf, buflen,
+		    npa->npa_idctl->ap_tnvmcap, 0, 0);
+		break;
+	case NVME_LIST_UNALLOC:
+		ret = nvme_snprint_uint128(buf, buflen,
+		    npa->npa_idctl->ap_unvmcap, 0, 0);
+		break;
+	default:
+		abort();
+	}
+
+	if (ret >= buflen) {
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+static boolean_t
+nvme_list_nsid_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
+{
+	const nvme_process_arg_t *npa = ofmt_arg->ofmt_cbarg;
+	nvme_idns_lbaf_t *lbaf;
+	uint_t blksize;
+	uint64_t val;
+	size_t ret;
+
+	lbaf = &npa->npa_idns->id_lbaf[npa->npa_idns->id_flbas.lba_format];
+	blksize = 1 << lbaf->lbaf_lbads;
+
+	switch (ofmt_arg->ofmt_id) {
 	case NVME_LIST_NAMESPACE:
 		ret = strlcat(buf, di_minor_name(npa->npa_minor), buflen);
 		break;
@@ -117,16 +160,27 @@ nvme_list_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
 	return (B_TRUE);
 }
 
-const ofmt_field_t nvme_list_ofmt[] = {
-	{ "MODEL", 30, NVME_LIST_MODEL, nvme_list_ofmt_cb },
-	{ "SERIAL", 30, NVME_LIST_SERIAL, nvme_list_ofmt_cb },
-	{ "FWREV", 10, NVME_LIST_FWREV, nvme_list_ofmt_cb },
-	{ "VERSION", 10, NVME_LIST_VERSION, nvme_list_ofmt_cb },
-	{ "SIZE", 15, NVME_LIST_SIZE, nvme_list_ofmt_cb },
-	{ "CAPACITY", 15, NVME_LIST_CAPACITY, nvme_list_ofmt_cb },
-	{ "USED", 15, NVME_LIST_USED, nvme_list_ofmt_cb },
-	{ "INSTANCE", 10, NVME_LIST_INSTANCE, nvme_list_ofmt_cb },
-	{ "NAMESPACE", 10, NVME_LIST_NAMESPACE, nvme_list_ofmt_cb },
-	{ "DISK", 15, NVME_LIST_DISK, nvme_list_ofmt_cb },
+const ofmt_field_t nvme_list_ctrl_ofmt[] = {
+	{ "MODEL", 30, NVME_LIST_MODEL, nvme_list_common_ofmt_cb },
+	{ "SERIAL", 30, NVME_LIST_SERIAL, nvme_list_common_ofmt_cb },
+	{ "FWREV", 10, NVME_LIST_FWREV, nvme_list_common_ofmt_cb },
+	{ "VERSION", 10, NVME_LIST_VERSION, nvme_list_common_ofmt_cb },
+	{ "CAPACITY", 15, NVME_LIST_CAPACITY, nvme_list_ctrl_ofmt_cb },
+	{ "INSTANCE", 10, NVME_LIST_INSTANCE, nvme_list_common_ofmt_cb },
+	{ "UNALLOCATED", 15, NVME_LIST_UNALLOC, nvme_list_ctrl_ofmt_cb },
+	{ NULL, 0, 0, NULL }
+};
+
+const ofmt_field_t nvme_list_nsid_ofmt[] = {
+	{ "MODEL", 30, NVME_LIST_MODEL, nvme_list_common_ofmt_cb },
+	{ "SERIAL", 30, NVME_LIST_SERIAL, nvme_list_common_ofmt_cb },
+	{ "FWREV", 10, NVME_LIST_FWREV, nvme_list_common_ofmt_cb },
+	{ "VERSION", 10, NVME_LIST_VERSION, nvme_list_common_ofmt_cb },
+	{ "SIZE", 15, NVME_LIST_SIZE, nvme_list_nsid_ofmt_cb },
+	{ "CAPACITY", 15, NVME_LIST_CAPACITY, nvme_list_nsid_ofmt_cb },
+	{ "USED", 15, NVME_LIST_USED, nvme_list_nsid_ofmt_cb },
+	{ "INSTANCE", 10, NVME_LIST_INSTANCE, nvme_list_common_ofmt_cb },
+	{ "NAMESPACE", 10, NVME_LIST_NAMESPACE, nvme_list_nsid_ofmt_cb },
+	{ "DISK", 15, NVME_LIST_DISK, nvme_list_nsid_ofmt_cb },
 	{ NULL, 0, 0, NULL }
 };
