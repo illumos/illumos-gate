@@ -104,27 +104,15 @@ nvme_version(int fd)
 	return (vs);
 }
 
-nvme_identify_ctrl_t *
-nvme_identify_ctrl(int fd)
+void *
+nvme_identify(int fd, uint8_t cns)
 {
 	void *idctl = NULL;
 	size_t bufsize = NVME_IDENTIFY_BUFSIZE;
 
-	(void) nvme_ioctl(fd, NVME_IOC_IDENTIFY_CTRL, &bufsize, &idctl, 0,
-	    NULL);
+	(void) nvme_ioctl(fd, NVME_IOC_IDENTIFY, &bufsize, &idctl, cns, NULL);
 
 	return (idctl);
-}
-
-nvme_identify_nsid_t *
-nvme_identify_nsid(int fd)
-{
-	void *idns = NULL;
-	size_t bufsize = NVME_IDENTIFY_BUFSIZE;
-
-	(void) nvme_ioctl(fd, NVME_IOC_IDENTIFY_NSID, &bufsize, &idns, 0, NULL);
-
-	return (idns);
 }
 
 void *

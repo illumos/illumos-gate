@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -584,9 +585,10 @@ discover_nvme_ctl(di_node_t node, di_minor_t minor, void *arg)
 	}
 	nioc.n_len = NVME_IDENTIFY_BUFSIZE;
 	nioc.n_buf = (uintptr_t)idctl;
+	nioc.n_arg = NVME_IDENTIFY_CTRL;
 
-	if (ioctl(fd, NVME_IOC_IDENTIFY_CTRL, &nioc) != 0) {
-		topo_mod_dprintf(mod, "NVME_IOC_IDENTIFY_CTRL ioctl "
+	if (ioctl(fd, NVME_IOC_IDENTIFY, &nioc) != 0) {
+		topo_mod_dprintf(mod, "NVME_IOC_IDENTIFY ioctl "
 		    "failed: %s", strerror(errno));
 		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
 		goto error;
@@ -594,6 +596,7 @@ discover_nvme_ctl(di_node_t node, di_minor_t minor, void *arg)
 
 	nioc.n_len = sizeof (nvme_version_t);
 	nioc.n_buf = (uintptr_t)&nvme_info.nei_vers;
+	nioc.n_arg = 0;
 
 	if (ioctl(fd, NVME_IOC_VERSION, &nioc) != 0) {
 		topo_mod_dprintf(mod, "NVME_IOC_VERSION ioctl failed: %s",

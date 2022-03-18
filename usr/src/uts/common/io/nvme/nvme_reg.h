@@ -10,9 +10,8 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2020 Joyent, Inc.
- * Copyright 2019 Western Digital Corporation
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -396,21 +395,6 @@ typedef union {
 } nvme_create_sq_dw11_t;
 
 /*
- * NVMe Identify
- */
-
-/* NVMe Identify parameters (cdw10) */
-#define	NVME_IDENTIFY_NSID	0x0	/* Identify Namespace */
-#define	NVME_IDENTIFY_CTRL	0x1	/* Identify Controller */
-#define	NVME_IDENTIFY_LIST	0x2	/* Identify List Namespaces */
-
-#define	NVME_IDENTIFY_NSID_ALLOC_LIST	0x10	/* List Allocated NSID */
-#define	NVME_IDENTIFY_NSID_ALLOC	0x11	/* Identify Allocated NSID */
-#define	NVME_IDENTIFY_NSID_CTRL_LIST	0x12	/* List Controllers on NSID */
-#define	NVME_IDENTIFY_CTRL_LIST		0x13	/* Controller List */
-#define	NVME_IDENTIFY_PRIMARY_CAPS	0x14	/* Primary Controller Caps */
-
-/*
  * NVMe Abort Command
  */
 typedef union {
@@ -420,7 +404,6 @@ typedef union {
 	} b;
 	uint32_t r;
 } nvme_abort_cmd_t;
-
 
 /*
  * NVMe Get Log Page
