@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  * Copyright 2020 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1076,18 +1076,17 @@
  *
  * We have to use a common external location of the thunk and not inline it into
  * the callsite so that way we can have a single place to patch these functions.
- * As it turns out, we actually have three different forms of retpolines that
+ * As it turns out, we currently have two different forms of retpolines that
  * exist in the system:
  *
  *  1. A full retpoline
- *  2. An AMD-specific optimized retpoline
- *  3. A no-op version
+ *  2. A no-op version
  *
- * The first one is used in the general case. The second one is used if we can
- * determine that we're on an AMD system and we can successfully toggle the
- * lfence serializing MSR that exists on the platform. Basically with this
- * present, an lfence is sufficient and we don't need to do anywhere near as
- * complicated a dance to successfully use retpolines.
+ * The first one is used in the general case. Historically, there was an
+ * AMD-specific optimized retopoline variant that was based around using a
+ * serializing lfence instruction; however, in March 2022 it was announced that
+ * this was actually still vulnerable to Spectre v2 and therefore we no longer
+ * use it and it is no longer available in the system.
  *
  * The third form described above is the most curious. It turns out that the way
  * that retpolines are implemented is that they rely on how speculation is
@@ -1428,7 +1427,6 @@ int x86_use_invpcid = -1;
 
 typedef enum {
 	X86_SPECTREV2_RETPOLINE,
-	X86_SPECTREV2_RETPOLINE_AMD,
 	X86_SPECTREV2_ENHANCED_IBRS,
 	X86_SPECTREV2_DISABLED
 } x86_spectrev2_mitigation_t;
@@ -2817,9 +2815,6 @@ cpuid_patch_retpolines(x86_spectrev2_mitigation_t mit)
 	case X86_SPECTREV2_RETPOLINE:
 		type = "gen";
 		break;
-	case X86_SPECTREV2_RETPOLINE_AMD:
-		type = "amd";
-		break;
 	case X86_SPECTREV2_ENHANCED_IBRS:
 	case X86_SPECTREV2_DISABLED:
 		type = "jmp";
@@ -2855,21 +2850,6 @@ cpuid_enable_enhanced_ibrs(void)
 	val = rdmsr(MSR_IA32_SPEC_CTRL);
 	val |= IA32_SPEC_CTRL_IBRS;
 	wrmsr(MSR_IA32_SPEC_CTRL, val);
-}
-
-/*
- * Determine whether or not we can use the AMD optimized retpoline
- * functionality. We use this when we know we're on an AMD system and we can
- * successfully verify that lfence is dispatch serializing.
- */
-static boolean_t
-cpuid_use_amd_retpoline(struct cpuid_info *cpi)
-{
-	if (cpi->cpi_vendor != X86_VENDOR_AMD &&
-	    cpi->cpi_vendor != X86_VENDOR_HYGON)
-		return (B_FALSE);
-
-	return (is_x86_feature(x86_featureset, X86FSET_LFENCE_SER));
 }
 
 /*
@@ -3102,15 +3082,16 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 	/*
 	 * By default we've come in with retpolines enabled. Check whether we
 	 * should disable them or enable enhanced IBRS. RSB stuffing is enabled
-	 * by default, but disabled if we are using enhanced IBRS.
+	 * by default, but disabled if we are using enhanced IBRS. Note, we do
+	 * not allow the use of AMD optimized retpolines as it was disclosed by
+	 * AMD in March 2022 that they were still vulnerable. Prior to that
+	 * point, we used them.
 	 */
 	if (x86_disable_spectrev2 != 0) {
 		v2mit = X86_SPECTREV2_DISABLED;
 	} else if (is_x86_feature(featureset, X86FSET_IBRS_ALL)) {
 		cpuid_enable_enhanced_ibrs();
 		v2mit = X86_SPECTREV2_ENHANCED_IBRS;
-	} else if (cpuid_use_amd_retpoline(cpi)) {
-		v2mit = X86_SPECTREV2_RETPOLINE_AMD;
 	} else {
 		v2mit = X86_SPECTREV2_RETPOLINE;
 	}

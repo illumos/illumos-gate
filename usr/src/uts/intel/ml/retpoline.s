@@ -61,17 +61,6 @@
 	SET_SIZE(__x86_indirect_thunk_gen_/**/reg)
 
 /*
- * This macro generates the AMD optimized form of a retpoline which will be used
- * on systems where the lfence dispatch serializing behavior has been changed.
- */
-#define	RETPOLINE_MKLFENCE(reg)			\
-	ENTRY(__x86_indirect_thunk_amd_/**/reg)	\
-	lfence;					\
-	jmp	*%/**/reg;			\
-	SET_SIZE(__x86_indirect_thunk_amd_/**/reg)
-
-
-/*
  * This macro generates the no-op form of the retpoline which will be used if we
  * either need to disable retpolines because we have enhanced IBRS or because we
  * have been asked to disable mitigations.
@@ -112,22 +101,6 @@
 	RETPOLINE_MKGENERIC(r13)
 	RETPOLINE_MKGENERIC(r14)
 	RETPOLINE_MKGENERIC(r15)
-
-	RETPOLINE_MKLFENCE(rax)
-	RETPOLINE_MKLFENCE(rbx)
-	RETPOLINE_MKLFENCE(rcx)
-	RETPOLINE_MKLFENCE(rdx)
-	RETPOLINE_MKLFENCE(rdi)
-	RETPOLINE_MKLFENCE(rsi)
-	RETPOLINE_MKLFENCE(rbp)
-	RETPOLINE_MKLFENCE(r8)
-	RETPOLINE_MKLFENCE(r9)
-	RETPOLINE_MKLFENCE(r10)
-	RETPOLINE_MKLFENCE(r11)
-	RETPOLINE_MKLFENCE(r12)
-	RETPOLINE_MKLFENCE(r13)
-	RETPOLINE_MKLFENCE(r14)
-	RETPOLINE_MKLFENCE(r15)
 
 	RETPOLINE_MKJUMP(rax)
 	RETPOLINE_MKJUMP(rbx)
