@@ -10447,6 +10447,8 @@ f usr/lib/security/amd64/pam_roles.so.1 0755 root bin
 s usr/lib/security/amd64/pam_roles.so=pam_roles.so.1
 f usr/lib/security/amd64/pam_sample.so.1 0755 root bin
 s usr/lib/security/amd64/pam_sample.so=pam_sample.so.1
+f usr/lib/security/amd64/pam_smb_passwd.so.1 0755 root bin
+s usr/lib/security/amd64/pam_smb_passwd.so=pam_smb_passwd.so.1
 f usr/lib/security/amd64/pam_smbfs_login.so.1 0755 root bin
 s usr/lib/security/amd64/pam_smbfs_login.so=pam_smbfs_login.so.1
 f usr/lib/security/amd64/pam_timestamp.so.1 0755 root bin
@@ -10535,6 +10537,8 @@ d usr/lib/smbfs 0755 root bin
 f usr/lib/smbfs/smbiod 0555 root bin
 f usr/lib/smbfs/smbiod-svc 0555 root bin
 d usr/lib/smbsrv 0755 root bin
+d usr/lib/smbsrv/amd64 0755 root bin
+f usr/lib/smbsrv/amd64/libsmb.so.1 0555 root bin
 d usr/lib/smbsrv/dtrace 0755 root bin
 f usr/lib/smbsrv/dtrace/nbl-conflict.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smb-trace.d 0555 root bin

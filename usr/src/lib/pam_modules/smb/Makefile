@@ -31,7 +31,7 @@ POFILE=		smb_passwd.po
 MSGFILES=	smb_passwd.c
 
 SUBDIRS=	$(MACH)
-#$(BUILD64)SUBDIRS += $(MACH64)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all	:=	TARGET= all
 clean	:=	TARGET= clean

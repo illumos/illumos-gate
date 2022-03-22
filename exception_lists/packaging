@@ -633,9 +633,23 @@ usr/lib/smbsrv/bind-helper
 usr/lib/smbsrv/fksmbd
 usr/lib/smbsrv/libfksmbsrv.so
 usr/lib/smbsrv/libfksmbsrv.so.1
+usr/lib/smbsrv/amd64/libfksmbsrv.so		i386
+usr/lib/smbsrv/amd64/libfksmbsrv.so.1		i386
+usr/lib/smbsrv/sparcv9/libfksmbsrv.so		sparc
+usr/lib/smbsrv/sparcv9/libfksmbsrv.so.1		sparc
 usr/lib/smbsrv/libmlsvc.so
+usr/lib/smbsrv/amd64/libmlsvc.so		i386
+usr/lib/smbsrv/amd64/libmlsvc.so.1		i386
+usr/lib/smbsrv/sparcv9/libmlsvc.so		sparc
+usr/lib/smbsrv/sparcv9/libmlsvc.so.1		sparc
 usr/lib/smbsrv/libsmb.so
+usr/lib/smbsrv/amd64/libsmb.so			i386
+usr/lib/smbsrv/sparcv9/libsmb.so		sparc
 usr/lib/smbsrv/libsmbns.so
+usr/lib/smbsrv/amd64/libsmbns.so		i386
+usr/lib/smbsrv/amd64/libsmbns.so.1		i386
+usr/lib/smbsrv/sparcv9/libsmbns.so		sparc
+usr/lib/smbsrv/sparcv9/libsmbns.so.1		sparc
 usr/lib/smbsrv/nvlprint
 usr/lib/smbsrv/test-msgbuf
 usr/lib/smbsrv/testoplock
@@ -643,9 +657,6 @@ usr/lib/smbsrv/testoplock
 #
 # Private/Internal 64-bit libraries of smbsrv. Do not ship.
 #
-usr/lib/smbsrv/amd64				i386
-usr/lib/smbsrv/sparcv9				sparc
-
 usr/lib/reparse/amd64/libreparse_smb.so		i386
 usr/lib/reparse/amd64/libreparse_smb.so.1	i386
 usr/lib/reparse/sparcv9/libreparse_smb.so	sparc

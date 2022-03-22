@@ -43,9 +43,9 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2017 Joyent, Inc.
 .\" Copyright 2020 RackTop Systems, Inc.
-.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH DLADM 8 "October 20, 2021"
+.TH DLADM 8 "February 01, 2022"
 .SH NAME
 dladm \- administer data links
 .SH SYNOPSIS
@@ -181,7 +181,7 @@ dladm \- administer data links
 .LP
 .nf
 \fBdladm create-overlay\fR [\fB-t\fR] \fB-e\fR \fIencap\fR \fB-s\fR \fIsearch\fR \fB-v\fR \fIvnetid\fR [\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIoverlay\fR
-\fBdladm delete-overlay\fR \fIoverlay\fR
+\fBdladm delete-overlay\fR [\fB-t\fR] \fIoverlay\fR
 \fBdladm modify-overlay\fR \fB-d\fR \fImac\fR | \fB-f\fR | \fB-s\fR \fImac=ip:port\fR \fIoverlay\fR
 \fBdladm show-overlay\fR [ \fB-f\fR | \fB-t\fR ] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIoverlay\fR]
 .fi
@@ -4461,8 +4461,7 @@ The tunnel destination address.
 .sp
 .ne 2
 .na
-\fBdladm create-overlay\fR \fB-e\fR \fIencap\fR \fB-s\fR \fIsearch\fR
-\fB-v\fR \fIvnetid\fR [\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIoverlay\fR
+\fBdladm create-overlay\fR [\fB-t\fR] \fB-e\fR \fIencap\fR \fB-s\fR \fIsearch\fR \fB-v\fR \fIvnetid\fR [\fB-p\fR \fIprop\fR=\fIvalue\fR[,...]] \fIoverlay\fR
 .ad
 .sp .6
 .RS 4n
@@ -4546,12 +4545,21 @@ determined by the encapsulation plugin specified by \fB-e\fR.
 .sp
 .ne 2
 .na
-\fBdladm delete-overlay\fR \fIoverlay\fR
+\fBdladm delete-overlay\fR [\fB-t\fR] \fIoverlay\fR
 .ad
 .sp .6
 .RS 4n
 Delete the specified overlay. This will fail if there are VNICs on top of the
 device.
+.sp
+.ne 2
+.na
+\fB-t\fR, \fB--temporary\fR
+.ad
+.sp .6
+.RS 4n
+Specifies that the deletion is temporary. Temporary deletions last until the
+next reboot.
 .RE
 
 .sp

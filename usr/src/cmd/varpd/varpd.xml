@@ -11,21 +11,20 @@ source.  A copy of the CDDL is also available via the Internet at
 http://www.illumos.org/license/CDDL.
 
 Copyright 2018, Joyent, Inc.
+Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 -->
 
 <service_bundle type="manifest" name="illumos:varpd" >
 
 	<service name="network/varpd" type="service" version="1" >
 
-		<create_default_instance enabled="true" />
+		<create_default_instance enabled="false" />
 
-		<single_instance/>
-
-		<dependency name="varpd-network-physical"
+		<dependency name="varpd-datalink-management"
 			grouping="require_all"
 			restart_on="none"
 			type="service">
-			<service_fmri value="svc:/network/physical:default" />
+			<service_fmri value="svc:/network/datalink-management:default" />
 		</dependency>
 
 		<dependency name="varpd-device-local"
@@ -34,6 +33,19 @@ Copyright 2018, Joyent, Inc.
 			type="service">
 			<service_fmri value="svc:/system/device/local:default" />
 		</dependency>
+
+		<dependency name="varpd-filesystem-minimal"
+			grouping="require_all"
+			restart_on="none"
+			type="service">
+			<service_fmri value="svc:/system/filesystem/minimal:default" />
+		</dependency>
+
+		<dependent name='varpd-network-physical-default'
+			grouping='optional_all'
+			restart_on='none'>
+			<service_fmri value='svc:/network/physical:default' />
+		</dependent>
 
 		<exec_method
 			type="method"

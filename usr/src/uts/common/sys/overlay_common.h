@@ -42,7 +42,7 @@ typedef enum overlay_prop_type {
 	OVERLAY_PROP_T_INT = 0x1,	/* signed int */
 	OVERLAY_PROP_T_UINT,		/* unsigned int */
 	OVERLAY_PROP_T_IP,		/* sinaddr6 */
-	OVERLAY_PROP_T_STRING		/* OVERLAY_PROPS_SIZEMAX */
+	OVERLAY_PROP_T_STRING		/* OVERLAY_PROP_SIZEMAX */
 } overlay_prop_type_t;
 
 typedef enum overlay_prop_prot {

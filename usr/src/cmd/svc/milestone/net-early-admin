@@ -50,6 +50,11 @@ if ! smf_is_globalzone; then
     exit $SMT_EXIT_OK
 fi
 
+# XXX Until OS-8367 is sorted out, immediately enable the varpd service.
+# SMF will properly cope with things if it fails (and blocks both
+# network/physical and zones).
+svcadm enable varpd
+
 if ! boot_file_config_enabled; then
     echo "Boot-time networking files not present; exiting"
     exit $SMF_EXIT_OK
