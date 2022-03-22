@@ -45,6 +45,7 @@ struct nvme_process_arg {
 	boolean_t npa_isns;
 	boolean_t npa_ignored;
 	boolean_t npa_interactive;
+	uint32_t npa_cmdflags;
 	const nvmeadm_cmd_t *npa_cmd;
 	di_node_t npa_node;
 	di_minor_t npa_minor;
