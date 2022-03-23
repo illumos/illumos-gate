@@ -4,23 +4,13 @@
 #
 # These are ignored during package lint runs.
 #
-pkg:/data/docbook
-pkg:/developer/gnu-binutils
-pkg:/developer/java/jdk
 pkg:/developer/java/openjdk8
-pkg:/developer/lexer/flex
 pkg:/developer/macro/cpp
-pkg:/developer/macro/gnu-m4
-pkg:/developer/parser/bison
-pkg:/developer/versioning/mercurial
 pkg:/gnome/zenity
 pkg:/library/expat
 pkg:/library/glib2
 pkg:/library/libxml2
-pkg:/library/libxslt
 pkg:/library/nspr
-pkg:/library/nspr/header-nspr
-pkg:/library/perl-5/xml-parser
 pkg:/library/security/openssl
 pkg:/library/security/openssl-10
 pkg:/library/security/openssl-11
@@ -29,8 +19,6 @@ pkg:/library/security/openssl-3
 pkg:/library/security/trousers
 pkg:/library/zlib
 pkg:/package/pkg
-pkg:/print/cups
-pkg:/print/filter/ghostscript
 pkg:/release/name
 pkg:/runtime/python-27
 pkg:/runtime/python-35
@@ -52,10 +40,8 @@ pkg:/system/library/gcc-runtime
 pkg:/system/library/libdbus
 pkg:/system/library/libdbus-glib
 pkg:/system/library/mozilla-nss
-pkg:/system/library/mozilla-nss/header-nss
 pkg:/system/management/snmp/net-snmp
 pkg:/system/test/fio
 pkg:/system/xvm/xvmstore
-pkg:/text/gnu-gettext
 pkg:/text/less
 pkg:/web/wget
