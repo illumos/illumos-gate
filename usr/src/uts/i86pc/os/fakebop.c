@@ -1448,6 +1448,30 @@ process_boot_environment(struct boot_modules *benv)
 			continue;
 		}
 
+		/*
+		 * The loader allows multiple console devices to be specified
+		 * as a comma-separated list, but the kernel does not yet
+		 * support multiple console devices.  If a list is provided,
+		 * ignore all but the first entry:
+		 */
+		if (strcmp(name, "console") == 0) {
+			char propval[BP_MAX_STRLEN];
+
+			for (uint32_t i = 0; i < BP_MAX_STRLEN; i++) {
+				propval[i] = value[i];
+				if (value[i] == ' ' ||
+				    value[i] == ',' ||
+				    value[i] == '\0') {
+					propval[i] = '\0';
+					break;
+				}
+
+				if (i + 1 == BP_MAX_STRLEN)
+					propval[i] = '\0';
+			}
+			bsetprops(name, propval);
+			continue;
+		}
 		if (name_is_blacklisted(name) == B_TRUE)
 			continue;
 
