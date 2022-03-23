@@ -185,6 +185,7 @@ cons_set(struct env_var *ev, int flags, const void *value)
 {
 	int	ret, cons;
 	char	*list, *tmp;
+	const char *console;
 
 	if ((value == NULL) || (cons_check(value) == 0)) {
 		/*
@@ -201,9 +202,39 @@ cons_set(struct env_var *ev, int flags, const void *value)
 
 	/*
 	 * build list of active consoles.
+	 * Note, we need to preserve the ordered device list in 'value'.
 	 */
 	list = NULL;
-	for (cons = 0; consoles[cons] != NULL; cons++) {
+	console = value;
+	while (console[0] != '\0') {
+		/* Find corresponding entry from consoles array. */
+		for (cons = 0; consoles[cons] != NULL; cons++) {
+			const char *name = consoles[cons]->c_name;
+			size_t len = strlen(name);
+
+			if (strncmp(name, console, len) != 0)
+				continue;
+			len++;
+			if (console[len] == ',' ||
+			    console[len] == ' ' ||
+			    console[len] == '\0') {
+				break;
+			}
+		}
+
+		/* Skip to delimiter */
+		while (console[0] != ',' &&
+		    console[0] != ' ' &&
+		    console[0] != '\0')
+			console++;
+		/* Skip to next name */
+		while (console[0] == ',' || console[0] == ' ')
+			console++;
+
+		/* no such console? */
+		if (consoles[cons] == NULL)
+			continue;
+
 		if ((consoles[cons]->c_flags & (C_ACTIVEIN | C_ACTIVEOUT)) ==
 		    (C_ACTIVEIN | C_ACTIVEOUT)) {
 			if (list == NULL) {
