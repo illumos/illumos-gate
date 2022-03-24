@@ -279,7 +279,7 @@ void	tem_write(tem_vt_state_t, uint8_t *, ssize_t);
 void	tem_get_size(uint16_t *, uint16_t *, uint16_t *, uint16_t *);
 void	tem_save_state(void);
 void	tem_register_modechg_cb(tem_modechg_cb_t, tem_modechg_cb_arg_t);
-void	tem_activate(tem_vt_state_t, boolean_t);
+void	tem_activate(tem_vt_state_t, bool);
 void	tem_get_colors(tem_vt_state_t, text_color_t *, text_color_t *);
 void	tem_image_display(struct tem_vt_state *, screen_pos_t, screen_pos_t,
 	screen_pos_t, screen_pos_t);

@@ -91,7 +91,7 @@ static void	tems_modechange_callback(struct vis_modechg_arg *,
 static void	tems_reset_colormap(void);
 
 static void	tem_free_buf(struct tem_vt_state *);
-static void	tem_internal_init(struct tem_vt_state *, boolean_t, boolean_t);
+static void	tem_internal_init(struct tem_vt_state *, bool, bool);
 static void	tems_get_initial_color(tem_color_t *pcolor);
 
 static void	tem_control(struct tem_vt_state *, uint8_t);
@@ -130,7 +130,7 @@ static void	tem_virtual_display(struct tem_vt_state *, term_char_t *,
 static void	tem_align_cursor(struct tem_vt_state *tem);
 
 static void	tem_check_first_time(struct tem_vt_state *tem);
-static void	tem_reset_display(struct tem_vt_state *, boolean_t, boolean_t);
+static void	tem_reset_display(struct tem_vt_state *, bool, bool);
 static void	tem_terminal_emulate(struct tem_vt_state *, uint8_t *, int);
 static void	tem_text_cursor(struct tem_vt_state *, short);
 static void	tem_text_cls(struct tem_vt_state *,
@@ -155,7 +155,7 @@ static void	tem_text_copy(struct tem_vt_state *,
 		    screen_pos_t, screen_pos_t);
 static void	tem_pix_bit2pix(struct tem_vt_state *, term_char_t *);
 static void	tem_pix_cls_range(struct tem_vt_state *, screen_pos_t, int,
-		    int, screen_pos_t, int, int, boolean_t);
+		    int, screen_pos_t, int, int, bool);
 static void	tem_pix_cls(struct tem_vt_state *, int,
 		    screen_pos_t, screen_pos_t);
 
@@ -213,7 +213,7 @@ tem_write(tem_vt_state_t tem_arg, uint8_t *buf, ssize_t len)
 
 static void
 tem_internal_init(struct tem_vt_state *ptem,
-    boolean_t init_color, boolean_t clear_screen)
+    bool init_color, bool clear_screen)
 {
 	size_t size, width, height;
 
@@ -285,7 +285,7 @@ tem_init(void)
 		return ((tem_vt_state_t)ptem);
 	}
 
-	tem_internal_init(ptem, B_TRUE, B_FALSE);
+	tem_internal_init(ptem, true, false);
 	tem_add(ptem);
 
 	return ((tem_vt_state_t)ptem);
@@ -296,12 +296,12 @@ tem_init(void)
  * been re-inited.
  */
 static void
-tem_reinit(struct tem_vt_state *tem, boolean_t reset_display)
+tem_reinit(struct tem_vt_state *tem, bool reset_display)
 {
 	tem_free_buf(tem); /* only free virtual buffers */
 
 	/* reserve color */
-	tem_internal_init(tem, B_FALSE, reset_display);
+	tem_internal_init(tem, false, reset_display);
 }
 
 static void
@@ -321,7 +321,7 @@ tem_free_buf(struct tem_vt_state *tem)
 }
 
 static int
-tems_failed(boolean_t finish_ioctl)
+tems_failed(bool finish_ioctl)
 {
 	if (finish_ioctl && tems.ts_hdl != NULL)
 		(void) tems.ts_hdl->c_ioctl(tems.ts_hdl, VIS_DEVFINI, NULL);
@@ -360,7 +360,7 @@ tem_info_init(struct console *cp)
 	 */
 	if (cp->c_ioctl(cp, VIS_DEVINIT, &temargs) != 0) {
 		printf("terminal emulator: Compatible fb not found\n");
-		ret = tems_failed(B_FALSE);
+		ret = tems_failed(false);
 		return (ret);
 	}
 
@@ -369,7 +369,7 @@ tem_info_init(struct console *cp)
 		printf(
 		    "terminal emulator: VIS_CONS_REV %d (see sys/visual_io.h) "
 		    "of console fb driver not supported\n", temargs.version);
-		ret = tems_failed(B_TRUE);
+		ret = tems_failed(true);
 		return (ret);
 	}
 
@@ -378,13 +378,13 @@ tem_info_init(struct console *cp)
 	    (temargs.depth == 15) || (temargs.depth == 16) ||
 	    (temargs.depth == 24) || (temargs.depth == 32))) {
 		printf("terminal emulator: unsupported depth\n");
-		ret = tems_failed(B_TRUE);
+		ret = tems_failed(true);
 		return (ret);
 	}
 
 	if ((temargs.mode != VIS_TEXT) && (temargs.mode != VIS_PIXEL)) {
 		printf("terminal emulator: unsupported mode\n");
-		ret = tems_failed(B_TRUE);
+		ret = tems_failed(true);
 		return (ret);
 	}
 
@@ -402,7 +402,7 @@ tem_info_init(struct console *cp)
 
 	for (p = list_head(&tems.ts_list); p != NULL;
 	    p = list_next(&tems.ts_list, p)) {
-		tem_internal_init(p, B_TRUE, B_FALSE);
+		tem_internal_init(p, true, false);
 		if (temargs.mode == VIS_PIXEL)
 			tem_pix_align(p);
 	}
@@ -594,7 +594,7 @@ tems_modechange_callback(struct vis_modechg_arg *arg __unused,
 		active->tvs_fg_color = tems.ts_init_color.fg_color;
 		active->tvs_bg_color = tems.ts_init_color.bg_color;
 		active->tvs_flags = tems.ts_init_color.a_flags;
-		tem_reinit(active, B_TRUE);
+		tem_reinit(active, true);
 		return;
 	}
 
@@ -609,7 +609,7 @@ tems_modechange_callback(struct vis_modechg_arg *arg __unused,
 		/* color depth did change, reset colors */
 		tems_reset_colormap();
 		tems_get_initial_color(&tems.ts_init_color);
-		tem_reinit(active, B_TRUE);
+		tem_reinit(active, true);
 
 		return;
 	}
@@ -787,7 +787,7 @@ tem_prom_scroll_up(struct tem_vt_state *tem, int nrows)
 	ncols = (tems.ts_p_dimension.width + (width - 1)) / width;
 
 	tem_pix_cls_range(tem, 0, nrows, tems.ts_p_offset.y,
-	    0, ncols, 0, B_TRUE);
+	    0, ncols, 0, true);
 }
 
 /*
@@ -859,20 +859,20 @@ tem_pix_align(struct tem_vt_state *tem)
 		    (screen_pos_t)row;
 		tem->tvs_s_cursor.col = tem->tvs_c_cursor.col = 0;
 	} else {
-		tem_reset_display(tem, B_TRUE, B_TRUE);
+		tem_reset_display(tem, true, true);
 	}
 }
 
 static void
-tems_get_inverses(boolean_t *p_inverse, boolean_t *p_inverse_screen)
+tems_get_inverses(bool *p_inverse, bool *p_inverse_screen)
 {
 	int i_inverse = 0;
 	int i_inverse_screen = 0;
 
 	plat_tem_get_inverses(&i_inverse, &i_inverse_screen);
 
-	*p_inverse = (i_inverse == 0) ? B_FALSE : B_TRUE;
-	*p_inverse_screen = (i_inverse_screen == 0) ? B_FALSE : B_TRUE;
+	*p_inverse = i_inverse != 0;
+	*p_inverse_screen = i_inverse_screen != 0;
 }
 
 /*
@@ -881,7 +881,7 @@ tems_get_inverses(boolean_t *p_inverse, boolean_t *p_inverse_screen)
 static void
 tems_get_initial_color(tem_color_t *pcolor)
 {
-	boolean_t inverse, inverse_screen;
+	bool inverse, inverse_screen;
 	unsigned short  flags = 0;
 	uint8_t fg, bg;
 
@@ -923,7 +923,7 @@ tems_get_initial_color(tem_color_t *pcolor)
 }
 
 void
-tem_activate(tem_vt_state_t tem_arg, boolean_t unblank)
+tem_activate(tem_vt_state_t tem_arg, bool unblank)
 {
 	struct tem_vt_state *tem = (struct tem_vt_state *)tem_arg;
 
@@ -1145,7 +1145,7 @@ tem_control(struct tem_vt_state *tem, uint8_t ch)
 	case A_CSI:
 		tem->tvs_curparam = 0;
 		tem->tvs_paramval = 0;
-		tem->tvs_gotparam = B_FALSE;
+		tem->tvs_gotparam = false;
 		/* clear the parameters */
 		for (int i = 0; i < TEM_MAXPARAMS; i++)
 			tem->tvs_params[i] = -1;
@@ -1736,7 +1736,7 @@ tem_getparams(struct tem_vt_state *tem, uint8_t ch)
 {
 	if (isdigit(ch)) {
 		tem->tvs_paramval = ((tem->tvs_paramval * 10) + (ch - '0'));
-		tem->tvs_gotparam = B_TRUE;  /* Remember got parameter */
+		tem->tvs_gotparam = true;  /* Remember got parameter */
 		return; /* Return immediately */
 	} else if (tem->tvs_state == A_STATE_CSI_EQUAL ||
 	    tem->tvs_state == A_STATE_CSI_QMARK) {
@@ -1753,7 +1753,7 @@ tem_getparams(struct tem_vt_state *tem, uint8_t ch)
 
 		if (ch == ';') {
 			/* Restart parameter search */
-			tem->tvs_gotparam = B_FALSE;
+			tem->tvs_gotparam = false;
 			tem->tvs_paramval = 0; /* No parame value yet */
 		} else {
 			/* Handle escape sequence */
@@ -2011,7 +2011,7 @@ tem_parse(struct tem_vt_state *tem, tem_char_t ch)
 	if (ch == '[') {
 		tem->tvs_curparam = 0;
 		tem->tvs_paramval = 0;
-		tem->tvs_gotparam = B_FALSE;
+		tem->tvs_gotparam = false;
 		/* clear the parameters */
 		for (i = 0; i < TEM_MAXPARAMS; i++)
 			tem->tvs_params[i] = -1;
@@ -2024,7 +2024,7 @@ tem_parse(struct tem_vt_state *tem, tem_char_t ch)
 		tem->tvs_state = A_STATE_START;
 		if (ch == 'c') {
 			/* ESC c resets display */
-			tem_reset_display(tem, B_TRUE, B_TRUE);
+			tem_reset_display(tem, true, true);
 		} else if (ch == 'H') {
 			/* ESC H sets a tab */
 			tem_set_tab(tem);
@@ -2335,7 +2335,7 @@ tem_pix_copy(struct tem_vt_state *tem,
     screen_pos_t t_col, screen_pos_t t_row)
 {
 	struct vis_conscopy ma;
-	static boolean_t need_clear = B_TRUE;
+	static bool need_clear = true;
 
 	if (need_clear && tem->tvs_first_line > 0) {
 		/*
@@ -2348,7 +2348,7 @@ tem_pix_copy(struct tem_vt_state *tem,
 		 */
 		tem_pix_clear_prom_output(tem);
 	}
-	need_clear = B_FALSE;
+	need_clear = false;
 
 	ma.s_row = s_row * tems.ts_font.vf_height + tems.ts_p_offset.y;
 	ma.e_row = (e_row + 1) * tems.ts_font.vf_height +
@@ -2406,7 +2406,7 @@ tem_pix_cls(struct tem_vt_state *tem, int count,
     screen_pos_t row, screen_pos_t col)
 {
 	tem_pix_cls_range(tem, row, 1, tems.ts_p_offset.y,
-	    col, count, tems.ts_p_offset.x, B_FALSE);
+	    col, count, tems.ts_p_offset.x, false);
 }
 
 /*
@@ -2445,8 +2445,7 @@ tem_pix_clear_prom_output(struct tem_vt_state *tem)
 	ncols = (tems.ts_p_dimension.width + (width - 1)) / width;
 
 	if (nrows > 0)
-		tem_pix_cls_range(tem, 0, nrows, offset, 0, ncols, 0,
-		    B_FALSE);
+		tem_pix_cls_range(tem, 0, nrows, offset, 0, ncols, 0, false);
 }
 
 /*
@@ -2591,7 +2590,7 @@ tem_mv_cursor(struct tem_vt_state *tem, int row, int col)
 
 /* ARGSUSED */
 static void
-tem_reset_emulator(struct tem_vt_state *tem, boolean_t init_color)
+tem_reset_emulator(struct tem_vt_state *tem, bool init_color)
 {
 	int j;
 
@@ -2603,7 +2602,7 @@ tem_reset_emulator(struct tem_vt_state *tem, boolean_t init_color)
 	tem->tvs_s_cursor.col = 0;
 	tem->tvs_outindex = 0;
 	tem->tvs_state = A_STATE_START;
-	tem->tvs_gotparam = B_FALSE;
+	tem->tvs_gotparam = false;
 	tem->tvs_curparam = 0;
 	tem->tvs_paramval = 0;
 	tem->tvs_nscroll = 1;
@@ -2628,8 +2627,7 @@ tem_reset_emulator(struct tem_vt_state *tem, boolean_t init_color)
 }
 
 static void
-tem_reset_display(struct tem_vt_state *tem,
-    boolean_t clear_txt, boolean_t init_color)
+tem_reset_display(struct tem_vt_state *tem, bool clear_txt, bool init_color)
 {
 	tem_reset_emulator(tem, init_color);
 
@@ -2875,7 +2873,7 @@ static void
 tem_pix_cls_range(struct tem_vt_state *tem,
     screen_pos_t row, int nrows, int offset_y,
     screen_pos_t col, int ncols, int offset_x,
-    boolean_t sroll_up)
+    bool sroll_up)
 {
 	struct vis_consdisplay da;
 	int	i, j;

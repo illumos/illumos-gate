@@ -44,6 +44,7 @@
 #include <sys/vgareg.h>
 #include <sys/vgasubr.h>
 #include <machine/cpufunc.h>
+#include <stdbool.h>
 
 #if KEYBOARD_PROBE
 
@@ -66,7 +67,7 @@ static int vidc_text_devinit(struct vis_devinit *);
 static int vidc_text_cons_clear(struct vis_consclear *);
 static void vidc_text_cons_copy(struct vis_conscopy *);
 static void vidc_text_cons_display(struct vis_consdisplay *);
-static void vidc_text_set_cursor(screen_pos_t, screen_pos_t, boolean_t);
+static void vidc_text_set_cursor(screen_pos_t, screen_pos_t, bool);
 static void vidc_text_get_cursor(screen_pos_t *, screen_pos_t *);
 static int vidc_text_cons_put_cmap(struct vis_cmap *);
 
@@ -141,7 +142,7 @@ plat_stdout_is_framebuffer(void)
 void
 plat_tem_hide_prom_cursor(void)
 {
-	vidc_text_set_cursor(0, 0, B_FALSE);
+	vidc_text_set_cursor(0, 0, false);
 }
 
 void
@@ -481,7 +482,7 @@ vidc_text_cons_display(struct vis_consdisplay *da)
 }
 
 static void
-vidc_text_set_cursor(screen_pos_t row, screen_pos_t col, boolean_t visible)
+vidc_text_set_cursor(screen_pos_t row, screen_pos_t col, bool visible)
 {
 	uint16_t addr;
 	uint8_t msl, s, e;
@@ -490,7 +491,7 @@ vidc_text_set_cursor(screen_pos_t row, screen_pos_t col, boolean_t visible)
 	s = vga_get_crtc(VGA_REG_ADDR, VGA_CRTC_CSSL) & 0xC0;
 	e = vga_get_crtc(VGA_REG_ADDR, VGA_CRTC_CESL);
 
-	if (visible == B_TRUE) {
+	if (visible) {
 		addr = row * TEXT_COLS + col;
 		vga_set_crtc(VGA_REG_ADDR, VGA_CRTC_CLAH, addr >> 8);
 		vga_set_crtc(VGA_REG_ADDR, VGA_CRTC_CLAL, addr & 0xff);
@@ -522,13 +523,13 @@ vidc_cons_cursor(struct vis_conscursor *cc)
 		if (plat_stdout_is_framebuffer())
 			gfx_fb_display_cursor(cc);
 		else
-			vidc_text_set_cursor(cc->row, cc->col, B_FALSE);
+			vidc_text_set_cursor(cc->row, cc->col, false);
 		break;
 	case VIS_DISPLAY_CURSOR:
 		if (plat_stdout_is_framebuffer())
 			gfx_fb_display_cursor(cc);
 		else
-			vidc_text_set_cursor(cc->row, cc->col, B_TRUE);
+			vidc_text_set_cursor(cc->row, cc->col, true);
 		break;
 	case VIS_GET_CURSOR:
 		if (plat_stdout_is_framebuffer()) {
@@ -882,7 +883,7 @@ vidc_init(struct console *cp, int arg)
 	if (rc == 0 && tem == NULL) {
 		tem = tem_init();
 		if (tem != NULL)
-			tem_activate(tem, B_TRUE);
+			tem_activate(tem, true);
 	}
 
 	for (i = 0; i < 10 && vidc_ischar(cp); i++)
