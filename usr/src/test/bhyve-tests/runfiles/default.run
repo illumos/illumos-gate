@@ -35,7 +35,16 @@ tests = [
 	'vhpet_freq',
 	'vlapic_freq',
 	'vlapic_freq_periodic',
+	'vlapic_mmio_access',
+	'vlapic_msr_access',
 	'vpmtmr_freq'
+	]
+
+[/opt/bhyve-tests/tests/inst_emul]
+user = root
+tests = [
+	'rdmsr',
+	'wrmsr'
 	]
 
 # Tests of userspace mevent system, built from cmd/bhyve

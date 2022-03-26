@@ -38,7 +38,7 @@ void svm_msr_guest_init(struct svm_softc *sc, int vcpu);
 void svm_msr_guest_enter(struct svm_softc *sc, int vcpu);
 void svm_msr_guest_exit(struct svm_softc *sc, int vcpu);
 
-int svm_wrmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t val);
-int svm_rdmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t *result);
+vm_msr_result_t svm_wrmsr(struct svm_softc *, int, uint32_t, uint64_t);
+vm_msr_result_t svm_rdmsr(struct svm_softc *, int, uint32_t, uint64_t *);
 
 #endif	/* _SVM_MSR_H_ */

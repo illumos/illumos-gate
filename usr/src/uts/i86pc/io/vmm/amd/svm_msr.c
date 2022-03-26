@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpufunc.h>
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
+#include <sys/vmm_kernel.h>
 
 #include "svm.h"
 #include "vmcb.h"
@@ -121,11 +122,9 @@ svm_msr_guest_exit(struct svm_softc *sc, int vcpu)
 	/* MSR_KGSBASE will be restored on the way back to userspace */
 }
 
-int
-svm_rdmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t *result)
+vm_msr_result_t
+svm_rdmsr(struct svm_softc *sc, int vcpu, uint32_t num, uint64_t *result)
 {
-	int error = 0;
-
 	switch (num) {
 	case MSR_SYSCFG:
 	case MSR_AMDK8_IPM:
@@ -145,18 +144,14 @@ svm_rdmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t *result)
 		}
 		break;
 	default:
-		error = EINVAL;
-		break;
+		return (VMR_UNHANLDED);
 	}
-
-	return (error);
+	return (VMR_OK);
 }
 
-int
-svm_wrmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t val)
+vm_msr_result_t
+svm_wrmsr(struct svm_softc *sc, int vcpu, uint32_t num, uint64_t val)
 {
-	int error = 0;
-
 	switch (num) {
 	case MSR_SYSCFG:
 		/* Ignore writes */
@@ -177,9 +172,8 @@ svm_wrmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t val)
 	case MSR_EXTFEATURES:
 		break;
 	default:
-		error = EINVAL;
-		break;
+		return (VMR_UNHANLDED);
 	}
 
-	return (error);
+	return (VMR_OK);
 }

@@ -15,24 +15,19 @@ include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
 include $(SRC)/test/Makefile.com
 
-PROG =	vpmtmr_freq \
-	vhpet_freq \
-	vlapic_freq \
-	vlapic_freq_periodic \
-	vlapic_mmio_access \
-	vlapic_msr_access \
-	vatpit_freq
+PROG =	rdmsr \
+	wrmsr
 
 PAYLOADS = $(PROG)
 include ../Makefile.in_guest
 
 COMMON_OBJS =	in_guest.o
 
-CLEANFILES =	$(COMMON_OBJS) $(PAYLOAD_CLEANFILES) payload_utils.o
+CLEANFILES =	$(COMMON_OBJS) $(PAYLOAD_CLEANFILES)
 CLOBBERFILES =	$(PROG)
 
 ROOTOPTPKG = $(ROOT)/opt/bhyve-tests
-TESTDIR = $(ROOTOPTPKG)/tests/kdev
+TESTDIR = $(ROOTOPTPKG)/tests/inst_emul
 
 CMDS = $(PROG:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
@@ -75,5 +70,3 @@ $(TESTDIR)/%: %
 %: %.o
 	$(LINK.c) -o $@ $^ $(LDLIBS)
 	$(POST_PROCESS)
-
-$(PAYLOADS:%=payload_%): payload_utils.o

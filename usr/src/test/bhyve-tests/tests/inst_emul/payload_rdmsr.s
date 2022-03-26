@@ -13,19 +13,14 @@
  * Copyright 2022 Oxide Computer Company
  */
 
-#ifndef _PAYLOAD_UTILS_H_
-#define	_PAYLOAD_UTILS_H_
+#include <sys/asm_linkage.h>
 
-#include <sys/types.h>
-#include <stdbool.h>
-
-void outb(uint16_t, uint8_t);
-void outw(uint16_t, uint16_t);
-void outl(uint16_t, uint32_t);
-uint8_t inb(uint16_t);
-uint16_t inw(uint16_t);
-uint32_t inl(uint16_t);
-uint64_t rdmsr(uint32_t);
-void wrmsr(uint32_t, uint64_t);
-
-#endif /* _PAYLOAD_UTILS_H_ */
+ENTRY(start)
+	/*
+	 * Pad test value with garbage to make sure it is properly trimmed off
+	 * when the emulation handles the exit.
+	 */
+	movq    $0xff01020304, %rcx
+	rdmsr
+	hlt
+SET_SIZE(start)

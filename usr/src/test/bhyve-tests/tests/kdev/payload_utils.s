@@ -53,3 +53,20 @@ ENTRY(inl)
 	inl    (%dx)
 	ret
 SET_SIZE(inl)
+
+ENTRY(rdmsr)
+	movl    %edi, %ecx
+	rdmsr
+	shlq    $32, %rdx
+	orq     %rdx, %rax
+	ret
+SET_SIZE(rdmsr)
+
+ENTRY(wrmsr)
+	movq    %rsi, %rdx
+	shrq    $32, %rdx
+	movl    %esi, %eax
+	movl    %edi, %ecx
+	wrmsr
+	ret
+SET_SIZE(wrmsr)

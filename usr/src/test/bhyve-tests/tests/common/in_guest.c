@@ -172,6 +172,17 @@ test_fail_vmexit(const struct vm_exit *vexit)
 		    vexit->u.inout.bytes,
 		    vexit->u.inout.flags);
 		break;
+	case VM_EXITCODE_RDMSR:
+		(void) fprintf(stderr, hdr_fmt, "RDMSR", vexit->rip);
+		(void) fprintf(stderr, "\tcode: %08x\n", vexit->u.msr.code);
+		break;
+	case VM_EXITCODE_WRMSR:
+		(void) fprintf(stderr, hdr_fmt, "WRMSR", vexit->rip);
+		(void) fprintf(stderr,
+		    "\tcode: %08x\n"
+		    "\twval: %016lx\n",
+		    vexit->u.msr.code, vexit->u.msr.wval);
+		break;
 	case VM_EXITCODE_MMIO:
 		(void) fprintf(stderr, hdr_fmt, "MMIO", vexit->rip);
 		(void) fprintf(stderr,
@@ -437,7 +448,7 @@ which_exit_kind(struct vm_entry *ventry, const struct vm_exit *vexit)
 	case VM_EXITCODE_INOUT:
 		if (inout->port == IOP_TEST_RESULT &&
 		    (inout->flags & INOUT_IN) == 0) {
-			if (inout->eax == 0) {
+			if (inout->eax == TEST_RESULT_PASS) {
 				return (VEK_TEST_PASS);
 			} else {
 				return (VEK_TEST_FAIL);

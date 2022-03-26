@@ -1506,7 +1506,9 @@ vm_service_mmio_read(struct vm *vm, int cpuid, uint64_t gpa, uint64_t *rval,
 	int err = ESRCH;
 
 	if (gpa >= DEFAULT_APIC_BASE && gpa < DEFAULT_APIC_BASE + PAGE_SIZE) {
-		err = lapic_mmio_read(vm, cpuid, gpa, rval, rsize);
+		struct vlapic *vlapic = vm_lapic(vm, cpuid);
+
+		err = vlapic_mmio_read(vlapic, gpa, rval, rsize);
 	} else if (gpa >= VIOAPIC_BASE && gpa < VIOAPIC_BASE + VIOAPIC_SIZE) {
 		err = vioapic_mmio_read(vm, cpuid, gpa, rval, rsize);
 	} else if (gpa >= VHPET_BASE && gpa < VHPET_BASE + VHPET_SIZE) {
@@ -1523,7 +1525,9 @@ vm_service_mmio_write(struct vm *vm, int cpuid, uint64_t gpa, uint64_t wval,
 	int err = ESRCH;
 
 	if (gpa >= DEFAULT_APIC_BASE && gpa < DEFAULT_APIC_BASE + PAGE_SIZE) {
-		err = lapic_mmio_write(vm, cpuid, gpa, wval, wsize);
+		struct vlapic *vlapic = vm_lapic(vm, cpuid);
+
+		err = vlapic_mmio_write(vlapic, gpa, wval, wsize);
 	} else if (gpa >= VIOAPIC_BASE && gpa < VIOAPIC_BASE + VIOAPIC_SIZE) {
 		err = vioapic_mmio_write(vm, cpuid, gpa, wval, wsize);
 	} else if (gpa >= VHPET_BASE && gpa < VHPET_BASE + VHPET_SIZE) {
