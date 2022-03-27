@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Spencer Evans-Cole.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -56,6 +55,7 @@ main(int argc, char **argv)
 	char *arg;
 	unsigned i;
 	int verbose = 0;
+	pid_t mypid = getpid();
 
 	if ((command = strrchr(argv[0], '/')) != NULL)
 		command++;
@@ -75,7 +75,7 @@ main(int argc, char **argv)
 		(void) fprintf(stderr, "usage:\t%s [-v] pid ...\n", command);
 		(void) fprintf(stderr, "  (wait for processes to terminate)\n");
 		(void) fprintf(stderr,
-			"  -v: verbose; report terminations to standard out\n");
+		    "  -v: verbose; report terminations to standard out\n");
 		return (2);
 	}
 
@@ -87,8 +87,8 @@ main(int argc, char **argv)
 			rlim.rlim_cur = argc + nfiles + SLOP;
 			if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
 				(void) fprintf(stderr,
-					"%s: insufficient file descriptors\n",
-					command);
+				    "%s: insufficient file descriptors\n",
+				    command);
 				return (2);
 			}
 		}
@@ -105,6 +105,13 @@ main(int argc, char **argv)
 		char psinfofile[100];
 
 		arg = argv[i];
+		if (mypid == atol(arg)) {
+			if (verbose) {
+				(void) printf("%s: has the same"
+				    " pid as this process\n", arg);
+			}
+			continue;
+		}
 		if (strchr(arg, '/') != NULL)
 			(void) strncpy(psinfofile, arg, sizeof (psinfofile));
 		else {
@@ -112,7 +119,7 @@ main(int argc, char **argv)
 			(void) strncat(psinfofile, arg, sizeof (psinfofile)-6);
 		}
 		(void) strncat(psinfofile, "/psinfo",
-			sizeof (psinfofile)-strlen(psinfofile));
+		    sizeof (psinfofile) - strlen(psinfofile));
 
 		pfd = &pollfd[i];
 		if ((pfd->fd = open(psinfofile, O_RDONLY)) >= 0) {
@@ -126,7 +133,7 @@ main(int argc, char **argv)
 			pfd->revents = 0;
 		} else if (errno == ENOENT) {
 			(void) fprintf(stderr, "%s: no such process: %s\n",
-				command, arg);
+			    command, arg);
 		} else {
 			perror(arg);
 		}
@@ -160,9 +167,9 @@ main(int argc, char **argv)
 					if (pread(pfd->fd, &psinfo,
 					    sizeof (psinfo), (off_t)0)
 					    == sizeof (psinfo)) {
-						(void) printf(
-					"%s: terminated, wait status 0x%.4x\n",
-							arg, psinfo.pr_wstat);
+						(void) printf("%s: terminated,"
+						    " wait status 0x%.4x\n",
+						    arg, psinfo.pr_wstat);
 					} else {
 						(void) printf(
 						    "%s: terminated\n", arg);
@@ -170,10 +177,10 @@ main(int argc, char **argv)
 				}
 				if (pfd->revents & POLLNVAL)
 					(void) printf("%s: system process\n",
-						arg);
+					    arg);
 				if (pfd->revents & ~(POLLPRI|POLLHUP|POLLNVAL))
 					(void) printf("%s: unknown error\n",
-						arg);
+					    arg);
 			}
 
 			(void) close(pfd->fd);
