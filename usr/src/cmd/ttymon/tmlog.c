@@ -25,10 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * error/logging/cleanup functions for ttymon.
@@ -51,10 +48,6 @@
 #include "tmstruct.h"
 #include "tmextern.h"
 
-# ifdef DEBUG
-extern FILE *Debugfp;
-# endif
-
 const char *appname = "ttymon";
 
 void
@@ -62,15 +55,14 @@ openttymonlog(void)
 {
 	int	fd, ret;
 	char	logfile[MAXPATHLEN];
-	extern	char	*Tag;
 
 	/* the log file resides in /var/saf/pmtag/ */
 	(void) snprintf(logfile, sizeof (logfile), "%s%s/%s", LOGDIR, Tag,
 	    LOGFILE);
 
 	Logfp = NULL;
-	(void)close(0);
-	if ((fd = open(logfile, O_WRONLY|O_CREAT|O_APPEND,0444)) != -1) 
+	(void) close(0);
+	if ((fd = open(logfile, O_WRONLY | O_CREAT | O_APPEND, 0444)) != -1)
 		if ((ret = fcntl(fd, F_DUPFD, 3)) == 3) {
 			/* set close-on-exec flag */
 			if (fcntl(ret, F_SETFD, FD_CLOEXEC) == 0) {
@@ -91,7 +83,7 @@ openttymonlog(void)
 }
 
 static void
-roll_log()
+roll_log(void)
 {
 	char logf[MAXPATHLEN];
 	char ologf[MAXPATHLEN];
@@ -116,7 +108,7 @@ roll_log()
 		if (!stat(tlogf, &buf) && rename(tlogf, ologf))
 			(void) fprintf(Logfp,
 			    "rename tmp to old file failed\n");
-	} else if (nlogfp = fopen(logf, "w")) {
+	} else if ((nlogfp = fopen(logf, "w")) != NULL) {
 		(void) fclose(Logfp);
 		Logfp = nlogfp;
 		/* reset close-on-exec */
@@ -215,11 +207,11 @@ fatal(const char *fmt, ...)
 	exit(1);
 }
 
-# ifdef DEBUG
+#ifdef DEBUG
 
 /*
  * opendebug - open debugging file, sets global file pointer Debugfp
- * 	arg:   getty - if TRUE, ttymon is in getty_mode and use a different
+ *	arg:   getty - if TRUE, ttymon is in getty_mode and use a different
  *		       debug file
  */
 
@@ -228,23 +220,21 @@ opendebug(int getty_mode)
 {
 	int  fd, ret;
 	char	debugfile[BUFSIZ];
-	extern	char	*Tag;
 
 	if (!getty_mode) {
-		(void)strcpy(debugfile, LOGDIR);
-		(void)strcat(debugfile, Tag);
-		(void)strcat(debugfile, "/");
-		(void)strcat(debugfile, DBGFILE);
+		(void) strcpy(debugfile, LOGDIR);
+		(void) strcat(debugfile, Tag);
+		(void) strcat(debugfile, "/");
+		(void) strcat(debugfile, DBGFILE);
 		if ((Debugfp = fopen(debugfile, "a+")) == NULL)
 			fatal("open debug file failed");
-	}
-	else {
+	} else {
 		if ((fd = open(EX_DBG, O_WRONLY|O_APPEND|O_CREAT)) < 0)
 			fatal("open %s failed: %s", EX_DBG, errno);
 
-		if (fd >= 3) 
+		if (fd >= 3) {
 			ret = fd;
-		else {
+		} else {
 			if ((ret = fcntl(fd, F_DUPFD, 3)) < 0)
 				fatal("F_DUPFD fcntl failed: %s",
 				    strerror(errno));
@@ -254,7 +244,7 @@ opendebug(int getty_mode)
 			fatal("fdopen failed: %s", strerror(errno));
 
 		if (ret != fd)
-			(void)close(fd);
+			(void) close(fd);
 	}
 	/* set close-on-exec flag */
 	if (fcntl(fileno(Debugfp), F_SETFD, 1) == -1)

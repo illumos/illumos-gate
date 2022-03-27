@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 /*
  * Copyright (c) 2018, Joyent, Inc.
  */
@@ -47,21 +47,17 @@
 #include "tmextern.h"
 #include "sac.h"
 
-extern	int	Retry;
-static	struct	pmtab	*find_pid();
-static	void	kill_children();
+static	struct	pmtab	*find_pid(pid_t);
+static	void	kill_subprocesses(void);
 
-static 	struct	pmtab	*find_fd();
-static	void	pcsync_close();
-extern  void	sigalarm();
-extern	void	tmchild();
+static	struct	pmtab	*find_fd(int);
+static	void	pcsync_close(int *, int *, int, int);
 
 /*
  *	fork_tmchild	- fork child on the device
  */
 static	void
-fork_tmchild(pmptr)
-struct	pmtab	*pmptr;
+fork_tmchild(struct pmtab *pmptr)
 {
 	pid_t	pid;
 	sigset_t	cset;
@@ -75,7 +71,7 @@ struct	pmtab	*pmptr;
 	pmptr->p_inservice = FALSE;
 
 	/*
-	 * initialize pipe. 
+	 * initialize pipe.
 	 * Child has pcpipe[0] pipe fd for reading and writing
 	 * and closes pcpipe[1]. Parent has pcpipe[1] pipe fd for
 	 * reading and writing and closes pcpipe[0].
@@ -88,48 +84,46 @@ struct	pmtab	*pmptr;
 
 	if (((p0 = pipe(pcpipe0)) == -1) || (pipe(pcpipe1) == -1))  {
 		if (p0 == 0) {
-			close(pcpipe0[0]);
-			close(pcpipe0[1]);
+			(void) close(pcpipe0[0]);
+			(void) close(pcpipe0[1]);
 		}
 		log("pipe() failed: %s", strerror(errno));
 		pmptr->p_status = VALID;
-		pmptr->p_pid = 0;
+		pmptr->p_childpid = 0;
 		Retry = TRUE;
 	}
 
 	/* protect following region from SIGCLD */
-	(void)sigprocmask(SIG_SETMASK, NULL, &cset);
+	(void) sigprocmask(SIG_SETMASK, NULL, &cset);
 	tset = cset;
-	(void)sigaddset(&tset, SIGCLD);
-	(void)sigprocmask(SIG_SETMASK, &tset, NULL);
-	if( (pid=fork()) == 0 ) {
+	(void) sigaddset(&tset, SIGCLD);
+	(void) sigprocmask(SIG_SETMASK, &tset, NULL);
+	if ((pid = fork()) == 0) {
 		/*
 		 * Close all file descriptors except pmptr->p_fd
 		 * Wait for the parent process to close its fd
 		 */
 		pcsync_close(pcpipe0, pcpipe1, pid, pmptr->p_fd);
-	 	/* The CHILD */
-		tmchild(pmptr); 
+		/* The CHILD */
+		tmchild(pmptr);
 		/* tmchild should never return */
 		fatal("tmchild for <%s> returns unexpected", pmptr->p_device);
-	}
-	else if (pid < 0) {
+	} else if (pid < 0) {
 		log("fork failed: %s", strerror(errno));
 		pmptr->p_status = VALID;
-		pmptr->p_pid = 0;
+		pmptr->p_childpid = 0;
 		Retry = TRUE;
-	}
-	else {
+	} else {
 		/*
 		 * The PARENT - store pid of child and close the device
 		 */
-		pmptr->p_pid = pid;
+		pmptr->p_childpid = pid;
 	}
 	if (pmptr->p_fd > 0) {
-		(void)close(pmptr->p_fd); 
-		pmptr->p_fd = 0; 
+		(void) close(pmptr->p_fd);
+		pmptr->p_fd = 0;
 	}
-	(void)sigprocmask(SIG_SETMASK, &cset, NULL);
+	(void) sigprocmask(SIG_SETMASK, &cset, NULL);
 	/*
 	 * Wait for child to close file descriptors
 	 */
@@ -141,37 +135,32 @@ struct	pmtab	*pmptr;
  *	       - depends on the flags, different action is taken
  *	       - R_FLAG - wait for data
  *	       - C_FLAG - if port is not disabled, fork tmchild
- *	       - A_FLAG - wait for data 
+ *	       - A_FLAG - wait for data
  *	       - otherwise - write out prompt, then wait for data
  */
 void
-got_carrier(pmptr)
-struct	pmtab	*pmptr;
+got_carrier(struct pmtab *pmptr)
 {
 	flush_input(pmptr->p_fd);
 
 	if (pmptr->p_ttyflags & R_FLAG) {
 #ifdef	DEBUG
-	debug("R_FLAG");
+		debug("R_FLAG");
 #endif
 		return;
-	} 
-	else if ((pmptr->p_ttyflags & (C_FLAG|B_FLAG)) &&
-		(State != PM_DISABLED) &&
-		(!(pmptr->p_flags & X_FLAG))) {
+	} else if ((pmptr->p_ttyflags & (C_FLAG|B_FLAG)) &&
+	    (State != PM_DISABLED) &&
+	    (!(pmptr->p_flags & X_FLAG))) {
 		fork_tmchild(pmptr);
-	}
-	else if (pmptr->p_ttyflags & A_FLAG) {
+	} else if (pmptr->p_ttyflags & A_FLAG) {
 #ifdef	DEBUG
 	debug("A_FLAG");
 #endif
 		return;
-	}
-	else if (pmptr->p_timeout) {
+	} else if (pmptr->p_timeout) {
 		fork_tmchild(pmptr);
-	}
-	else if ( ! (pmptr->p_ttyflags & X_FLAG) ) {
-		write_prompt(pmptr->p_fd,pmptr,TRUE,TRUE);
+	} else if (!(pmptr->p_ttyflags & X_FLAG)) {
+		write_prompt(pmptr->p_fd, pmptr, TRUE, TRUE);
 	}
 }
 
@@ -179,38 +168,36 @@ struct	pmtab	*pmptr;
  * got_data - data is detected on the stream, fork tmchild
  */
 static void
-got_data(pmptr)
-struct	pmtab	*pmptr;
+got_data(struct pmtab *pmptr)
 {
 	struct	sigaction sigact;
 
 	if (tm_checklock(pmptr->p_fd) != 0) {
 		pmptr->p_status = LOCKED;
-		(void)close(pmptr->p_fd);
+		(void) close(pmptr->p_fd);
 		pmptr->p_fd = 0;
 		Nlocked++;
 		if (Nlocked == 1) {
 			sigact.sa_flags = 0;
 			sigact.sa_handler = sigalarm;
-			(void)sigemptyset(&sigact.sa_mask);
-			(void)sigaction(SIGALRM, &sigact, NULL);
-			(void)alarm(ALARMTIME);
+			(void) sigemptyset(&sigact.sa_mask);
+			(void) sigaction(SIGALRM, &sigact, NULL);
+			(void) alarm(ALARMTIME);
 		}
-	}
-	else 
+	} else {
 		fork_tmchild(pmptr);
+	}
 }
 /*
  * got_hup - stream hangup is detected, close the device
  */
 static void
-got_hup(pmptr)
-struct	pmtab	*pmptr;
+got_hup(struct pmtab *pmptr)
 {
 #ifdef	DEBUG
 	debug("in got hup");
 #endif
-	(void)close(pmptr->p_fd);
+	(void) close(pmptr->p_fd);
 	pmptr->p_fd = 0;
 	pmptr->p_inservice = 0;
 	Retry = TRUE;
@@ -223,11 +210,9 @@ struct	pmtab	*pmptr;
  *		- if POLLIN received, fork tmchild.
  */
 void
-do_poll(fdp,nfds)
-struct 	pollfd *fdp; 
-int 	nfds;
+do_poll(struct  pollfd *fdp, int nfds)
 {
-	int	i,n;
+	int	i, n;
 	struct	pmtab	*pmptr;
 
 	n = poll(fdp, (unsigned long)nfds, -1);	/* blocked poll */
@@ -239,18 +224,16 @@ int 	nfds;
 			return;
 		fatal("do_poll: poll failed: %s", strerror(errno));
 	}
-	for (i = 0; (i < nfds)&&(n); i++,fdp++) {
+	for (i = 0; (i < nfds) && (n != 0); i++, fdp++) {
 		if (fdp->revents != 0) {
 			n--;
 			if ((pmptr = find_fd(fdp->fd)) == NULL) {
 				log("do_poll: cannot find fd %d in pmtab",
 				    fdp->fd);
 				continue;
-			}
-			else if (fdp->revents & POLLHUP) {
+			} else if (fdp->revents & POLLHUP) {
 				got_hup(pmptr);
-			}
-			else if (fdp->revents & POLLIN) {
+			} else if (fdp->revents & POLLIN) {
 #ifdef	DEBUG
 				debug("got POLLIN");
 #endif
@@ -269,15 +252,12 @@ int 	nfds;
  *			- clean utmp if U_FLAG is set
  */
 void
-/*ARGSUSED*/
-sigchild(n)
-int	n;	/* this is declared to make cc happy, but it is not used */
+sigchild(int n __unused)
 {
 	struct	pmtab	*pmptr;
-	struct	sigaction	sigact;
 	siginfo_t	info;
-	int 	status;
-	pid_t 	pid;
+	int	status;
+	pid_t	pid;
 	int	rcode;
 
 #ifdef	DEBUG
@@ -322,7 +302,7 @@ int	n;	/* this is declared to make cc happy, but it is not used */
 				cleanut(pid, status);
 			pmptr->p_status = VALID;
 			pmptr->p_fd = 0;
-			pmptr->p_pid = 0;
+			pmptr->p_childpid = 0;
 			pmptr->p_inservice = 0;
 			Retry = TRUE;
 		}
@@ -333,7 +313,7 @@ int	n;	/* this is declared to make cc happy, but it is not used */
  *	sigterm	- handler for SIGTERM
  */
 void
-sigterm()
+sigterm(int _s __unused)
 {
 	fatal("caught SIGTERM");
 }
@@ -343,7 +323,7 @@ sigterm()
  *			  its internal state between enabled and disabled
  */
 void
-state_change()
+state_change(void)
 {
 	struct pmtab *pmptr;
 
@@ -351,12 +331,12 @@ state_change()
 	debug("in state_change");
 #endif
 
-	/* 
-	 * closing PCpipe will cause attached non-service children 
+	/*
+	 * closing PCpipe will cause attached non-service children
 	 * to get SIGPOLL and exit
 	 */
-	(void)close(PCpipe[0]);
-	(void)close(PCpipe[1]);
+	(void) close(PCpipe[0]);
+	(void) close(PCpipe[1]);
 
 	/* reopen PCpipe */
 	setup_PCpipe();
@@ -366,8 +346,8 @@ state_change()
 	 * with new internal state
 	 */
 	for (pmptr = PMtab; pmptr; pmptr = pmptr->p_next) {
-		if ((pmptr->p_fd > 0) && (pmptr->p_pid == 0)) {
-			(void)close(pmptr->p_fd);
+		if ((pmptr->p_fd > 0) && (pmptr->p_childpid == 0)) {
+			(void) close(pmptr->p_fd);
 			pmptr->p_fd = 0;
 		}
 	}
@@ -380,23 +360,22 @@ state_change()
  *		- kill tmchild if entry changed
  */
 void
-re_read()
+re_read(void)
 {
-	extern	struct	pollfd	*Pollp;
 	sigset_t	cset;
 	sigset_t	tset;
 
-	(void)sigprocmask(SIG_SETMASK, NULL, &cset);
+	(void) sigprocmask(SIG_SETMASK, NULL, &cset);
 	tset = cset;
-	(void)sigaddset(&tset, SIGCLD);
-	(void)sigprocmask(SIG_SETMASK, &tset, NULL);
+	(void) sigaddset(&tset, SIGCLD);
+	(void) sigprocmask(SIG_SETMASK, &tset, NULL);
 	if (Nlocked > 0) {
-		alarm(0);
+		(void) alarm(0);
 		Nlocked = 0;
 	}
 	read_pmtab();
-	kill_children();
-	(void)sigprocmask(SIG_SETMASK, &cset, NULL);
+	kill_subprocesses();
+	(void) sigprocmask(SIG_SETMASK, &cset, NULL);
 	purge();
 
 	if (Nentries > Npollfd) {
@@ -404,13 +383,12 @@ re_read()
 		debug("Nentries > Npollfd, reallocating pollfds");
 #endif
 		/* need to malloc more pollfd structure */
-		free((char *)Pollp);
+		free(Pollp);
 		Npollfd = Nentries + 10;
 		if (Npollfd > Maxfds)
 			Npollfd = Maxfds;
-		if ((Pollp = (struct pollfd *)
-		    malloc((unsigned)(Npollfd * sizeof(struct pollfd))))
-		    == (struct pollfd *)NULL) 
+		Pollp = malloc((unsigned)(Npollfd * sizeof (struct pollfd)));
+		if (Pollp == NULL)
 			fatal("malloc for Pollp failed");
 	}
 	Retry = TRUE;
@@ -420,62 +398,59 @@ re_read()
  *	find_pid(pid)	- find the corresponding pmtab entry for the pid
  */
 static	struct pmtab *
-find_pid(pid)
-pid_t	pid;
+find_pid(pid_t pid)
 {
 	struct pmtab *pmptr;
 
 	for (pmptr = PMtab; pmptr; pmptr = pmptr->p_next) {
-		if (pmptr->p_pid == pid) {
-			return(pmptr);
+		if (pmptr->p_childpid == pid) {
+			return (pmptr);
 		}
 	}
-	return((struct pmtab *)NULL);
+	return (NULL);
 }
 
 /*
  *	find_fd(fd)	- find the corresponding pmtab entry for the fd
  */
 static struct pmtab *
-find_fd(fd)
-int	fd;
+find_fd(int fd)
 {
 	struct pmtab *pmptr;
 
 	for (pmptr = PMtab; pmptr; pmptr = pmptr->p_next) {
 		if (pmptr->p_fd == fd) {
-			return(pmptr);
+			return (pmptr);
 		}
 	}
-	return((struct pmtab *)NULL);
+	return (NULL);
 }
 
 /*
- *	kill_children()	- if the pmtab entry has been changed,
+ *	kill_subprocesses() - if the pmtab entry has been changed,
  *			  kill tmchild if it is not in service.
  *			- close the device if there is no tmchild
  */
 static	void
-kill_children()
+kill_subprocesses(void)
 {
 	struct pmtab *pmptr;
+
 	for (pmptr = PMtab; pmptr; pmptr = pmptr->p_next) {
 		if (pmptr->p_status == VALID)
 			continue;
-		if ((pmptr->p_fd > 0) && (pmptr->p_pid == 0)) {
-			(void)close(pmptr->p_fd);
+		if ((pmptr->p_fd > 0) && (pmptr->p_childpid == 0)) {
+			(void) close(pmptr->p_fd);
 			pmptr->p_fd = 0;
-		}
-		else if ((pmptr->p_fd == 0) && (pmptr->p_pid > 0)
-			&& (pmptr->p_inservice == FALSE)) {
-			(void)kill(pmptr->p_pid, SIGTERM);
+		} else if ((pmptr->p_fd == 0) && (pmptr->p_childpid > 0) &&
+		    (pmptr->p_inservice == FALSE)) {
+			(void) kill(pmptr->p_childpid, SIGTERM);
 		}
 	}
 }
 
 static	void
-mark_service(pid)
-pid_t	pid;
+mark_service(pid_t pid)
 {
 	struct	pmtab	*pmptr;
 #ifdef	DEBUG
@@ -486,30 +461,28 @@ pid_t	pid;
 		return;
 	}
 	pmptr->p_inservice = TRUE;
-	return;
 }
 
 /*
  * read_pid(fd)	- read pid info from PCpipe
  */
 static	void
-read_pid(fd)
-int	fd;
+read_pid(int fd)
 {
 	int	ret;
 	pid_t	pid;
 
 	for (;;) {
-		if ((ret = read(fd,&pid,sizeof(pid))) < 0) {
+		if ((ret = read(fd, &pid, sizeof (pid))) < 0) {
 			if (errno == EINTR)
 				continue;
-			if (errno == EAGAIN) 
+			if (errno == EAGAIN)
 				return;
 			fatal("read PCpipe failed: %s", strerror(errno));
 		}
 		if (ret == 0)
 			return;
-		if (ret != sizeof(pid))
+		if (ret != sizeof (pid))
 			fatal("read return size incorrect, ret = %d", ret);
 
 		mark_service(pid);
@@ -521,7 +494,7 @@ int	fd;
  *			- it will check both PCpipe and pmpipe
  */
 void
-sigpoll_catch()
+sigpoll_catch(int s __unused)
 {
 	int	ret;
 	struct	pollfd	pfd[2];
@@ -538,72 +511,68 @@ sigpoll_catch()
 		fatal("sigpoll_catch: poll failed: %s", strerror(errno));
 
 	if (ret > 0) {
-		if (pfd[0].revents & POLLIN) 
+		if (pfd[0].revents & POLLIN)
 			read_pid(pfd[0].fd);
 		if (pfd[1].revents & POLLIN)
 			sacpoll();
 	}
 }
 
-/*ARGSUSED*/
 void
-sigalarm(signo)
-int	signo;
+sigalarm(int signo __unused)
 {
 	struct pmtab *pmptr;
 	struct sigaction sigact;
 	int	fd;
-	extern	int	check_session();
 
 #ifdef	DEBUG
 	debug("in sigalarm, Nlocked = %d", Nlocked);
 #endif
 	for (pmptr = PMtab; pmptr; pmptr = pmptr->p_next) {
 		if ((pmptr->p_status == LOCKED) && (pmptr->p_fd == 0)) {
-			if ((fd=open(pmptr->p_device,O_RDWR|O_NONBLOCK)) == -1){
+			fd = open(pmptr->p_device, O_RDWR | O_NONBLOCK);
+			if (fd == -1) {
 				log("open (%s) failed: %s", pmptr->p_device,
 				    strerror(errno));
 				pmptr->p_status = VALID;
 				Nlocked--;
 				Retry = TRUE;
-			}
-			else {
+			} else {
 				if (tm_checklock(fd) == 0) {
 					Nlocked--;
 					pmptr->p_fd = fd;
 					Retry = TRUE;
+				} else {
+					(void) close(fd);
 				}
-				else
-					(void)close(fd);
 			}
-		}
-		else if ((pmptr->p_status == SESSION) && (pmptr->p_fd == 0)) {
-			if ((fd=open(pmptr->p_device,O_RDWR|O_NONBLOCK)) == -1){
+		} else if ((pmptr->p_status == SESSION) && (pmptr->p_fd == 0)) {
+			fd = open(pmptr->p_device, O_RDWR | O_NONBLOCK);
+			if (fd == -1) {
 				log("open (%s) failed: %s", pmptr->p_device,
 				    strerror(errno));
 				pmptr->p_status = VALID;
 				Nlocked--;
 				Retry = TRUE;
-			}
-			else { 
+			} else {
 				if (check_session(fd) == 0) {
 					Nlocked--;
 					pmptr->p_fd = fd;
 					Retry = TRUE;
+				} else {
+					(void) close(fd);
 				}
-				else
-					(void)close(fd);
 			}
-		}
-		else if ((pmptr->p_status == UNACCESS) && (pmptr->p_fd == 0)) {
-			if ((fd=open(pmptr->p_device,O_RDWR|O_NONBLOCK)) == -1){
+		} else if ((pmptr->p_status == UNACCESS) &&
+		    (pmptr->p_fd == 0)) {
+			fd = open(pmptr->p_device, O_RDWR | O_NONBLOCK);
+			if (fd == -1) {
 				log("open (%s) failed: %s", pmptr->p_device,
 				    strerror(errno));
 				pmptr->p_status = VALID;
 				Nlocked--;
 				Retry = TRUE;
-			}
-			else { 
+			} else {
 				Nlocked--;
 				pmptr->p_fd = fd;
 				Retry = TRUE;
@@ -613,15 +582,14 @@ int	signo;
 	if (Nlocked > 0) {
 		sigact.sa_flags = 0;
 		sigact.sa_handler = sigalarm;
-		(void)sigemptyset(&sigact.sa_mask);
-		(void)sigaction(SIGALRM, &sigact, NULL);
-		(void)alarm(ALARMTIME);
-	}
-	else {
+		(void) sigemptyset(&sigact.sa_mask);
+		(void) sigaction(SIGALRM, &sigact, NULL);
+		(void) alarm(ALARMTIME);
+	} else {
 		sigact.sa_flags = 0;
 		sigact.sa_handler = SIG_IGN;
-		(void)sigemptyset(&sigact.sa_mask);
-		(void)sigaction(SIGALRM, &sigact, NULL);
+		(void) sigemptyset(&sigact.sa_mask);
+		(void) sigaction(SIGALRM, &sigact, NULL);
 	}
 }
 
@@ -641,15 +609,19 @@ pcsync_close(int *p0, int *p1, int pid, int fd)
 		struct  pmtab   *tp;
 		for (tp = PMtab; tp; tp = tp->p_next)
 			if ((tp->p_fd > 0) && (tp->p_fd != fd))
-				close(tp->p_fd);
-		close(p0[1]); close(p1[0]);
+				(void) close(tp->p_fd);
+		(void) close(p0[1]);
+		(void) close(p1[0]);
 		if (read(p0[0], &ch, 1) == 1)
-			write(p1[1], "a", 1);
-		close(p0[0]); close(p1[1]);
+			(void) write(p1[1], "a", 1);
+		(void) close(p0[0]);
+		(void) close(p1[1]);
 	} else {				/* Parent */
-		close(p0[0]); close(p1[1]);
+		(void) close(p0[0]);
+		(void) close(p1[1]);
 		if (write(p0[1], "a", 1) == 1)
-			read(p1[0], &ch, 1);
-		close(p0[1]); close(p1[0]);
+			(void) read(p1[0], &ch, 1);
+		(void) close(p0[1]);
+		(void) close(p1[0]);
 	}
 }

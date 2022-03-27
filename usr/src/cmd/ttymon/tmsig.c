@@ -24,10 +24,7 @@
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include	<stdio.h>
 #include	<signal.h>
@@ -43,54 +40,49 @@
  *	SIGCLD	- tmchild died
  */
 void
-catch_signals()
+catch_signals(void)
 {
 	sigset_t cset;
 	struct sigaction sigact;
-	extern void sigterm();
-	extern void sigchild();
-	extern void sigpoll_catch();
-#ifdef	DEBUG
-	extern void dump_pmtab();
-	extern void dump_ttydefs();
 
+#ifdef	DEBUG
 	debug("in catch_signals");
 #endif
 
 	cset = Origmask;
-	(void)sigdelset(&cset, SIGTERM);
-	(void)sigdelset(&cset, SIGCLD);
-	(void)sigdelset(&cset, SIGPOLL);
+	(void) sigdelset(&cset, SIGTERM);
+	(void) sigdelset(&cset, SIGCLD);
+	(void) sigdelset(&cset, SIGPOLL);
 #ifdef	DEBUG
-	(void)sigdelset(&cset, SIGUSR1);
-	(void)sigdelset(&cset, SIGUSR2);
+	(void) sigdelset(&cset, SIGUSR1);
+	(void) sigdelset(&cset, SIGUSR2);
 #endif
-	(void)sigprocmask(SIG_SETMASK, &cset, NULL);
+	(void) sigprocmask(SIG_SETMASK, &cset, NULL);
 	sigact.sa_flags = 0;
 	sigact.sa_handler = sigterm;
-	(void)sigemptyset(&sigact.sa_mask);
-	(void)sigaddset(&sigact.sa_mask, SIGTERM);
-	(void)sigaction(SIGTERM, &sigact, NULL);
+	(void) sigemptyset(&sigact.sa_mask);
+	(void) sigaddset(&sigact.sa_mask, SIGTERM);
+	(void) sigaction(SIGTERM, &sigact, NULL);
 	sigact.sa_flags = 0;
 	sigact.sa_handler = sigchild;
-	(void)sigemptyset(&sigact.sa_mask);
-	(void)sigaction(SIGCLD, &sigact, NULL);
+	(void) sigemptyset(&sigact.sa_mask);
+	(void) sigaction(SIGCLD, &sigact, NULL);
 	sigact.sa_flags = 0;
 	sigact.sa_handler = sigpoll_catch;
-	(void)sigemptyset(&sigact.sa_mask);
-	(void)sigaddset(&sigact.sa_mask, SIGPOLL);
-	(void)sigaction(SIGPOLL, &sigact, NULL);
+	(void) sigemptyset(&sigact.sa_mask);
+	(void) sigaddset(&sigact.sa_mask, SIGPOLL);
+	(void) sigaction(SIGPOLL, &sigact, NULL);
 #ifdef	DEBUG
 	sigact.sa_flags = 0;
 	sigact.sa_handler = dump_pmtab;
-	(void)sigemptyset(&sigact.sa_mask);
-	(void)sigaddset(&sigact.sa_mask, SIGUSR1);
-	(void)sigaction(SIGUSR1, &sigact, NULL);
+	(void) sigemptyset(&sigact.sa_mask);
+	(void) sigaddset(&sigact.sa_mask, SIGUSR1);
+	(void) sigaction(SIGUSR1, &sigact, NULL);
 	sigact.sa_flags = 0;
 	sigact.sa_handler = dump_ttydefs;
-	(void)sigemptyset(&sigact.sa_mask);
-	(void)sigaddset(&sigact.sa_mask, SIGUSR2);
-	(void)sigaction(SIGUSR2, &sigact, NULL);
+	(void) sigemptyset(&sigact.sa_mask);
+	(void) sigaddset(&sigact.sa_mask, SIGUSR2);
+	(void) sigaction(SIGUSR2, &sigact, NULL);
 #endif
 }
 
@@ -99,25 +91,23 @@ catch_signals()
  *		      and need to reset them
  */
 void
-child_sigcatch()
+child_sigcatch(void)
 {
 	struct	sigaction	sigact;
 	sigset_t cset;
-	extern	void	sigpoll();
-	extern	void	sigint();
 
 	cset = Origmask;
-	(void)sigdelset(&cset, SIGINT);
-	(void)sigdelset(&cset, SIGPOLL);
-	(void)sigprocmask(SIG_SETMASK, &cset, NULL);
+	(void) sigdelset(&cset, SIGINT);
+	(void) sigdelset(&cset, SIGPOLL);
+	(void) sigprocmask(SIG_SETMASK, &cset, NULL);
 	sigact.sa_flags = 0;
 	sigact.sa_handler = sigpoll;
-	(void)sigemptyset(&sigact.sa_mask);
-	(void)sigaddset(&sigact.sa_mask, SIGPOLL);
-	(void)sigaction(SIGPOLL, &sigact, NULL);
+	(void) sigemptyset(&sigact.sa_mask);
+	(void) sigaddset(&sigact.sa_mask, SIGPOLL);
+	(void) sigaction(SIGPOLL, &sigact, NULL);
 	sigact.sa_flags = 0;
 	sigact.sa_handler = sigint;
-	(void)sigemptyset(&sigact.sa_mask);
-	(void)sigaddset(&sigact.sa_mask, SIGINT);
-	(void)sigaction(SIGINT, &sigact, NULL);
+	(void) sigemptyset(&sigact.sa_mask);
+	(void) sigaddset(&sigact.sa_mask, SIGINT);
+	(void) sigaction(SIGINT, &sigact, NULL);
 }

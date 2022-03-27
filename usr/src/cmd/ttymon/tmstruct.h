@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef	_TMSTRUCT_H
@@ -34,10 +34,10 @@
  * /etc/ttydefs structure
  */
 struct Gdef {
-	char		*g_id;		/* id for modes & speeds 	*/
-	char		*g_iflags;	/* initial terminal flags 	*/
-	char		*g_fflags;	/* final terminal flags 	*/
-	short		g_autobaud;	/* autobaud indicator 		*/
+	char		*g_id;		/* id for modes & speeds	*/
+	char		*g_iflags;	/* initial terminal flags	*/
+	char		*g_fflags;	/* final terminal flags		*/
+	short		g_autobaud;	/* autobaud indicator		*/
 	char		*g_nextid;	/* next id if this speed is wrong */
 };
 
@@ -56,7 +56,7 @@ struct pmtab {
 	long	p_ttyflags;	/* ttyflags			*/
 	int	p_count;	/* wait_read count		*/
 	char	*p_server;	/* full service cmd line	*/
-	int	p_timeout;	/* timeout for input 		*/
+	int	p_timeout;	/* timeout for input		*/
 	char	*p_ttylabel;	/* ttylabel in /etc/ttydefs	*/
 	char	*p_modules;	/* modules to push		*/
 	char	*p_prompt;	/* prompt message		*/
@@ -65,10 +65,10 @@ struct pmtab {
 	char	*p_softcar;	/* use softcarrier		*/
 
 	/* the following fields are for ttymon internal use	*/
-	int	p_status;	/* status of entry 		*/
+	int	p_status;	/* status of entry		*/
 	int	p_fd;		/* fd for the open device	*/
-	pid_t	p_pid;		/* pid of child on the device 	*/
-	int 	p_inservice;	/* service invoked		*/
+	pid_t	p_childpid;	/* pid of child on the device	*/
+	int	p_inservice;	/* service invoked		*/
 	int	p_respawn;	/* respawn count in this series */
 	long	p_time;		/* start time of a series	*/
 	uid_t	p_uid;		/* uid of p_identity		*/
@@ -80,8 +80,8 @@ struct pmtab {
 /*
  *	valid flags for p_flags field of pmtab
  */
-#define	X_FLAG	0x1	/* port/service disabled 		*/
-#define	U_FLAG  0x2	/* create utmp entry for the service 	*/
+#define	X_FLAG	0x1	/* port/service disabled		*/
+#define	U_FLAG  0x2	/* create utmp entry for the service	*/
 
 /*
  *	valid flags for p_ttyflags field of pmtab
@@ -102,13 +102,11 @@ struct pmtab {
  */
 #define	NOTVALID	0	/* entry is not valid		*/
 #define	VALID		1	/* entry is valid		*/
-#define	CHANGED		2	/* entry is valid but changed 	*/
+#define	CHANGED		2	/* entry is valid but changed	*/
 #define	GETTY		3	/* entry is for ttymon express	*/
 
 #define	ALLOC_PMTAB \
 	((struct pmtab *)calloc((unsigned)1, \
 		(unsigned)sizeof (struct pmtab)))
-
-#define	PNULL	((struct pmtab *)NULL)
 
 #endif /* _TMSTRUCT_H */
