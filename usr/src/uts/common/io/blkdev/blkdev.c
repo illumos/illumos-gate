@@ -1959,8 +1959,7 @@ bd_dle_sysevent_task(void *arg)
 		 * active zpools for child vdevs matching this physical path.
 		 * In order to catch both whole disk pools and those with an
 		 * EFI boot partition, generate separate sysevents for minor
-		 * node 'a' and 'b'. (By comparison, io/scsi/targets/sd.c sends
-		 * events for just 'a')
+		 * node 'a' and 'b'.
 		 */
 		for (char c = 'a'; c < 'c'; c++) {
 			path[n - 1] = c;

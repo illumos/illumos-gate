@@ -29,6 +29,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2019 Racktop Systems
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -19745,6 +19746,7 @@ sd_log_dev_status_event(struct sd_lun *un, char *esc, int km_flag)
 	int err;
 	char			*path;
 	nvlist_t		*attr_list;
+	size_t			n;
 
 	/* Allocate and build sysevent attribute list */
 	err = nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, km_flag);
@@ -19761,30 +19763,36 @@ sd_log_dev_status_event(struct sd_lun *un, char *esc, int km_flag)
 		    "sd_log_dev_status_event: fail to allocate space\n");
 		return;
 	}
+
+	n = snprintf(path, MAXPATHLEN, "/devices");
+	(void) ddi_pathname(SD_DEVINFO(un), path + n);
+	n = strlen(path);
+	n += snprintf(path + n, MAXPATHLEN - n, ":x");
+
 	/*
-	 * Add path attribute to identify the lun.
-	 * We are using minor node 'a' as the sysevent attribute.
+	 * On receipt of this event, the ZFS sysevent module will scan
+	 * active zpools for child vdevs matching this physical path.
+	 * In order to catch both whole disk pools and those with an
+	 * EFI boot partition, generate separate sysevents for minor
+	 * node 'a' and 'b'.
 	 */
-	(void) snprintf(path, MAXPATHLEN, "/devices");
-	(void) ddi_pathname(SD_DEVINFO(un), path + strlen(path));
-	(void) snprintf(path + strlen(path), MAXPATHLEN - strlen(path),
-	    ":a");
+	for (char c = 'a'; c < 'c'; c++) {
+		path[n - 1] = c;
 
-	err = nvlist_add_string(attr_list, DEV_PHYS_PATH, path);
-	if (err != 0) {
-		nvlist_free(attr_list);
-		kmem_free(path, MAXPATHLEN);
-		SD_ERROR(SD_LOG_ERROR, un,
-		    "sd_log_dev_status_event: fail to add attribute\n");
-		return;
-	}
+		err = nvlist_add_string(attr_list, DEV_PHYS_PATH, path);
+		if (err != 0) {
+			SD_ERROR(SD_LOG_ERROR, un,
+			    "sd_log_dev_status_event: fail to add attribute\n");
+			break;
+		}
 
-	/* Log dynamic lun expansion sysevent */
-	err = ddi_log_sysevent(SD_DEVINFO(un), SUNW_VENDOR, EC_DEV_STATUS,
-	    esc, attr_list, NULL, km_flag);
-	if (err != DDI_SUCCESS) {
-		SD_ERROR(SD_LOG_ERROR, un,
-		    "sd_log_dev_status_event: fail to log sysevent\n");
+		err = ddi_log_sysevent(SD_DEVINFO(un), SUNW_VENDOR,
+		    EC_DEV_STATUS, esc, attr_list, NULL, km_flag);
+		if (err != DDI_SUCCESS) {
+			SD_ERROR(SD_LOG_ERROR, un,
+			    "sd_log_dev_status_event: fail to log sysevent\n");
+			break;
+		}
 	}
 
 	nvlist_free(attr_list);
