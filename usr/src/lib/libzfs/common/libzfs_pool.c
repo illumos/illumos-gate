@@ -44,6 +44,8 @@
 #include <sys/efi_partition.h>
 #include <sys/vtoc.h>
 #include <sys/zfs_ioctl.h>
+#include <sys/modctl.h>
+#include <sys/mkdev.h>
 #include <dlfcn.h>
 #include <libzutil.h>
 
@@ -2803,9 +2805,11 @@ static int
 zpool_relabel_disk(libzfs_handle_t *hdl, const char *name, const char *msg)
 {
 	char path[MAXPATHLEN];
-	enum dkio_state st;
 	int fd, error;
 	int (*_efi_use_whole_disk)(int);
+	char drv[MODMAXNAMELEN];
+	major_t maj;
+	struct stat st;
 
 	if ((_efi_use_whole_disk = (int (*)(int))dlsym(RTLD_DEFAULT,
 	    "efi_use_whole_disk")) == NULL)
@@ -2838,9 +2842,18 @@ zpool_relabel_disk(libzfs_handle_t *hdl, const char *name, const char *msg)
 	 * it to be checked by querying the device state, otherwise the
 	 * subsequent vdev_reopen() will very likely fail to read the device
 	 * size, faulting the pool.
+	 *
+	 * The dkio(4I) ioctls are implemented by the disk driver rather than
+	 * some generic framework, so we limit its use here to drivers with
+	 * which it has been tested.
 	 */
-	st = DKIO_NONE;
-	(void) ioctl(fd, DKIOCSTATE, (caddr_t)&st);
+	if (fstat(fd, &st) == 0 &&
+	    (maj = major(st.st_rdev)) != (major_t)NODEV &&
+	    modctl(MODGETNAME, drv, sizeof (drv), &maj) == 0 &&
+	    (strcmp(drv, "blkdev") == 0 || strcmp(drv, "sd") == 0)) {
+		enum dkio_state dkst = DKIO_NONE;
+		(void) ioctl(fd, DKIOCSTATE, &dkst);
+	}
 
 	(void) close(fd);
 

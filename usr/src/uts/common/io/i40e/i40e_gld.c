@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2022 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  * Copyright 2020 Ryan Zezeski
  * Copyright 2020 RackTop Systems, Inc.
@@ -81,7 +81,7 @@ i40e_group_remove_mac(void *arg, const uint8_t *mac_addr)
 	if (i40e_aq_remove_macvlan(hw, iua->iua_vsi, &filt, 1, NULL) !=
 	    I40E_SUCCESS) {
 		i40e_error(i40e, "failed to remove mac address "
-		    "%2x:%2x:%2x:%2x:%2x:%2x from unicast filter: %d",
+		    "%02x:%02x:%02x:%02x:%02x:%02x from unicast filter: %d",
 		    mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3],
 		    mac_addr[4], mac_addr[5], filt.error_code);
 		ret = EIO;
@@ -149,7 +149,7 @@ i40e_group_add_mac(void *arg, const uint8_t *mac_addr)
 	if ((ret = i40e_aq_add_macvlan(hw, rxg->irg_vsi_seid, &filt, 1,
 	    NULL)) != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to add mac address "
-		    "%2x:%2x:%2x:%2x:%2x:%2x to unicast filter: %d",
+		    "%02x:%02x:%02x:%02x:%02x:%02x to unicast filter: %d",
 		    mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3],
 		    mac_addr[4], mac_addr[5], ret);
 		ret = EIO;
@@ -316,7 +316,7 @@ i40e_multicast_add(i40e_t *i40e, const uint8_t *multicast_address)
 	if ((ret = i40e_aq_add_macvlan(hw, I40E_DEF_VSI_SEID(i40e), &filt, 1,
 	    NULL)) != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to add mac address "
-		    "%2x:%2x:%2x:%2x:%2x:%2x to multicast filter: %d",
+		    "%02x:%02x:%02x:%02x:%02x:%02x to multicast filter: %d",
 		    multicast_address[0], multicast_address[1],
 		    multicast_address[2], multicast_address[3],
 		    multicast_address[4], multicast_address[5],
@@ -357,7 +357,7 @@ i40e_multicast_remove(i40e_t *i40e, const uint8_t *multicast_address)
 		if (i40e_aq_remove_macvlan(hw, I40E_DEF_VSI_SEID(i40e), &filt,
 		    1, NULL) != I40E_SUCCESS) {
 			i40e_error(i40e, "failed to remove mac address "
-			    "%2x:%2x:%2x:%2x:%2x:%2x from multicast "
+			    "%02x:%02x:%02x:%02x:%02x:%02x from multicast "
 			    "filter: %d",
 			    multicast_address[0], multicast_address[1],
 			    multicast_address[2], multicast_address[3],
