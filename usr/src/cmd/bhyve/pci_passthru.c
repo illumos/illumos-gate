@@ -877,8 +877,8 @@ passthru_cfgread(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 	if (coff == PCIR_COMMAND) {
 		if (bytes <= 2)
 			return (-1);
-		*rv = pci_get_cfgdata16(pi, PCIR_COMMAND) << 16 |
-		    passthru_read_config(sc, PCIR_STATUS, 2);
+		*rv = passthru_read_config(sc, PCIR_STATUS, 2) << 16 |
+		    pci_get_cfgdata16(pi, PCIR_COMMAND);
 		return (0);
 	}
 
