@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd October 23, 2017
+.Dd March 13, 2022
 .Dt MHD 4I
 .Os
 .Sh NAME
@@ -61,7 +61,7 @@ caller must first obtain the open file descriptor.
 Non-shared multihost disks ioctls consist of
 .Dv MHIOCTKOWN ,
 .Dv MHIOCRELEASE ,
-.Dv HIOCSTATUS ,
+.Dv MHIOCSTATUS ,
 and
 .Dv MHIOCQRESERVE .
 These ioctl requests control the access rights of non-shared multihost disks.

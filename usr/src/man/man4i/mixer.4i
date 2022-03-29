@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd February 1, 2019
+.Dd March 13, 2022
 .Dt MIXER 4I
 .Os
 .Sh NAME
@@ -438,10 +438,10 @@ should open this file to access the mixer settings.
 The pseudo
 .Pa /dev/mixer
 device supports ioctls that can change the
-oarious settings for the audio hardware in the system.
+various settings for the audio hardware in the system.
 .Pp
 Those ioctls should only be used by dedicated mixer applications or desktop
-olumme controls, and not by typical ordinary audio applications such as media
+volume controls, and not by typical ordinary audio applications such as media
 players.
 Ordinary applications that wish to adjust their own volume settings
 should use the

@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd August 31, 2018
+.Dd March 13, 2022
 .Dt VISUAL_IO 4I
 .Os
 .Sh NAME
@@ -51,7 +51,7 @@ standalone mode (for example, when using a stand-alone debugger, entering
 the PROM monitor, or when the system panicking).
 These are also known as
 .Dq Polled I/O
-entry points, which operate under an an explicit set of restrictions, described below.
+entry points, which operate under an explicit set of restrictions, described below.
 .Sh IOCTLS
 .Bl -tag -width VIS_GETIDENTIFIER -compact
 .It Dv VIS_GETIDENTIFIER
@@ -62,11 +62,6 @@ used in the illumos VISUAL environment.
 This is a mandatory ioctl and must return a unique string.
 We suggest that the name be formed as
 .Ao companysymbol Ac Ns Ao devicetype Ac .
-For example, the
-.Xr cgsix 4D
-driver
-returns
-.Sy SUNWcg6 .
 .Pp
 .Dv VIS_GETIDENTIFIER
 takes a
@@ -105,7 +100,7 @@ struct vis_cursorcmap {
 #define VIS_CURSOR_SETCURSOR   0x01  /* set cursor */
         /* set cursor position */
 #define VIS_CURSOR_SETPOSITION 0x02
-        /* set cursur hot spot */
+        /* set cursor hot spot */
 #define VIS_CURSOR_SETHOTSPOT  0x04
         /* set cursor colormap */
 #define VIS_CURSOR_SETCOLORMAP 0x08
@@ -609,7 +604,7 @@ ioctl was set to
 and
 .Fa t_col
 are defined to be pixel offsets from the starting position of the
-onssole device.
+console device.
 .Pp
 .Fa direction
 specifies which way to do the copy.
@@ -684,7 +679,7 @@ addition to performing the prescribed function of their ioctl counterparts, the
 standalone vectors operate in a special context and must adhere to a strict set
 of rules.
 The polled I/O vectors are called directly whenever the system is
-quisced (running in a limited context) and must send output to the display.
+quiesced (running in a limited context) and must send output to the display.
 Standalone mode describes the state in which the system is running in
 single-threaded mode and only one processor is active.
 illumos operating

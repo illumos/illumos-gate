@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the fields
 .\" enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd October 22, 2017
+.Dd March 13, 2022
 .Dt FBIO 4I
 .Os
 .Sh NAME
@@ -137,8 +137,7 @@ are used to transfer
 variable-length, device-specific information into and out of framebuffers.
 .Sh SEE ALSO
 .Xr ioctl 2 ,
-.Xr mmap 2 ,
-.Xr cgsix 4D
+.Xr mmap 2
 .Sh BUGS
 The
 .Dv FBIOSATTR
