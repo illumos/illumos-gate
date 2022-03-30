@@ -74,6 +74,7 @@ struct pmtab {
 	uid_t	p_uid;		/* uid of p_identity		*/
 	gid_t	p_gid;		/* gid of p_identity		*/
 	char	*p_dir;		/* home dir of p_identity	*/
+	char	*p_ttymode;	/* mode line for serial device	*/
 	struct	pmtab	*p_next;
 };
 
