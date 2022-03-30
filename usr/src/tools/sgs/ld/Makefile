@@ -25,16 +25,17 @@
 include		../Makefile.com
 include		../../Makefile.tools
 include		$(SGSHOME)/ld/Makefile.com
+include		$(SRC)/Makefile.master.64
 
-LDLIBS =	-lumem -L../libconv -L$(ROOTONBLDLIBMACH) -lld -lelf -lconv
+LDLIBS =	-lumem -L../libconv -L$(ROOTONBLDLIBMACH64) -lld -lelf -lconv
 NATIVE_LIBS +=	libc.so libumem.so
 CPPFLAGS =	$(NATIVE_CPPFLAGS)
 CFLAGS =	$(NATIVE_CFLAGS)
 MAPFILES =	$(SRCDIR)/common/mapfile-intf
-RPATH =		'-R$$ORIGIN/../../lib/$(MACH)'
+RPATH =		'-R$$ORIGIN/../../lib/$(MACH)/64'
 CW_LINKER =
 
-install: $(ROOTONBLDMACHPROG)
+install: $(ROOTONBLDMACH64PROG)
 
 .KEEP_STATE:
 

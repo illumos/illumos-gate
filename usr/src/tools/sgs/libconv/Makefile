@@ -27,6 +27,7 @@
 
 include		../Makefile.com
 include		$(SGSHOME)/libconv/Makefile.com
+include		$(SRC)/Makefile.master.64
 
 CPPFLAGS =	 $(NATIVE_CPPFLAGS) -I$(SRC)/lib/libc/inc -I$(ELFCAP) \
 	-I$(SRC)/common/sgsrtcid \

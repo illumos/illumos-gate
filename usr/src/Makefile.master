@@ -931,7 +931,7 @@ CW=			$(ONBLD_TOOLS)/bin/$(MACH)/cw
 BUILD_CC=		$(CW) $(CW_LINKER) $(CW_CC_COMPILERS) --
 BUILD_CCC=		$(CW) -C $(CW_LINKER) $(CW_CCC_COMPILERS) --
 BUILD_CPP=		/usr/lib/cpp
-BUILD_LD=		$(ONBLD_TOOLS)/bin/$(MACH)/ld
+BUILD_LD=		$(ONBLD_TOOLS)/bin/$(MACH64)/ld
 
 $(MACH)_CC=		$(BUILD_CC)
 $(MACH)_CCC=		$(BUILD_CCC)

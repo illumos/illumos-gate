@@ -108,6 +108,7 @@ ROOTDIRS=					\
 	$(ROOTONBLD)				\
 	$(ROOTONBLD)/bin			\
 	$(ROOTONBLD)/bin/$(MACH)		\
+	$(ROOTONBLD)/bin/$(MACH64)		\
 	$(ROOTONBLD)/lib			\
 	$(ROOTONBLD)/lib/$(MACH)		\
 	$(ROOTONBLD)/lib/$(MACH)/64		\
