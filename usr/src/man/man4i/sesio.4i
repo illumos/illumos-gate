@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd October 23, 2017
+.Dd March 13, 2022
 .Dt SESIO 4I
 .Os
 .Sh NAME
@@ -90,6 +90,7 @@ uint8_t  reserved[3];    /* Reserved; Set to 0 */
 .Ed
 .Sh ARCHITECTURE
 SPARC
+X86
 .Sh SEE ALSO
-.Xr ses 4D ,
-.Xr ioctl 9E
+.Xr ioctl 2 ,
+.Xr ses 4D

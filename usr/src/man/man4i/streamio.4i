@@ -15,7 +15,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd October 29, 2017
+.Dd March 13, 2022
 .Dt STREAMIO 4I
 .Os
 .Sh NAME
@@ -357,14 +357,14 @@ On failure,
 .Va errno
 is set to one of the following values:
 .Bl -tag -width EINVAL
-.It Sy EINVAL
+.It Er EINVAL
 .Fa arg
 value is invalid or
 .Fa arg
 is zero and process is not registered to receive the
 .Dv SIGPOLL
 signal.
-.It Sy EAGAIN
+.It Er EAGAIN
 Allocation of a data structure to store the signal request failed.
 .El
 .It Dv I_GETSIG
@@ -381,11 +381,11 @@ On failure,
 .Va errno
 is set to one of the following values:
 .Bl -tag -width EINVAL
-.It Sy EINVAL
+.It Er EINVAL
 Process not registered to receive the
 .Dv SIGPOLL
 signal.
-.It Sy EFAULT
+.It Er EFAULT
 .Fa arg
 points outside the allocated address space.
 .El
@@ -399,10 +399,10 @@ On failure,
 .Va errno
 is set to one of the following values:
 .Bl -tag -width EINVAL
-.It Sy EFAULT
+.It Er EFAULT
 .Fa arg
 points outside the allocated address space.
-.It Sy EINVAL
+.It Er EINVAL
 .Fa arg
 does not contain a valid module name.
 .El
@@ -807,7 +807,7 @@ calls
 will block until the active
 .Dv I_STR
 completes via a positive or negative
-acknowlegment, a timeout, or an error condition at the stream head.
+acknowledgement, a timeout, or an error condition at the stream head.
 By setting the
 .Fa ic_timout
 field to 0, the user is requesting STREAMS to provide
@@ -897,7 +897,7 @@ On failure,
 .Va errno
 may be set to the following value:
 .Bl -tag -width EINVAL
-.It Sy EINVAL
+.It Er EINVAL
 .Fa arg
 is not the above legal value.
 .El
@@ -1168,7 +1168,7 @@ On failure,
 .Va errno
 is set to the following value:
 .Bl -tag -width EINVAL
-.It Sy EINVAL
+.It Er EINVAL
 Invalid
 .Va arg
 value.
@@ -1259,7 +1259,7 @@ On failure,
 .Va errno
 is set to the following value:
 .Bl -tag -width EFAULT
-.It Sy EFAULT
+.It Er EFAULT
 .Fa arg
 points outside the allocated address space.
 .El
@@ -1495,7 +1495,7 @@ On failure,
 .Va errno
 is set to one of the following values:
 .Bl -tag -width EAGAIN
-.It Sy ENXIO
+.It Er ENXIO
 Hangup received on
 .Fa fildes .
 .It Er ETIME

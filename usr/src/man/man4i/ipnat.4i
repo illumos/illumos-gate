@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd October 23, 2017
+.Dd March 13, 2022
 .Dt IPNAT 4I
 .Os
 .Sh NAME
@@ -23,7 +23,7 @@
 .Sh DESCRIPTION
 The
 .Sy ipnat
-device provides interfaction with the NAT features of the Solaris IPFilter.
+device provides interaction with the NAT features of the Solaris IPFilter.
 .Sh APPLICATION PROGRAMMING INTERFACE
 The NAT features programming model is a component of the Solaris IP Filter and
 is accessed via the NAT device file
@@ -421,7 +421,7 @@ before setting the
 flag and providing a pointer in the
 .Fa nat_fr
 field that cannot  be found in the current rule set.
-.It Er EACESS
+.It Er EACCES
 The calling process issued a
 .Dv SIOCSTPUT
 before issuing a

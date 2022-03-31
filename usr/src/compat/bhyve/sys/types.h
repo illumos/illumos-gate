@@ -29,11 +29,6 @@ typedef __uint64_t	u_int64_t;
 typedef __register_t	register_t;
 #endif
 
-#ifndef	__SBINTIME_T_DEFINED
-#define	__SBINTIME_T_DEFINED
-typedef __int64_t	sbintime_t;
-#endif
-
 #ifndef	__VM_MEMATTR_T_DEFINED
 #define	__VM_MEMATTR_T_DEFINED
 typedef char	vm_memattr_t;

@@ -70,6 +70,7 @@ struct viona_desb {
 	uint32_t		d_len;
 	uint16_t		d_cookie;
 	uchar_t			*d_headers;
+	vmm_page_t		*d_pages;
 };
 
 static void viona_tx(viona_link_t *, viona_vring_t *);
@@ -287,6 +288,14 @@ viona_desb_release(viona_desb_t *dp)
 	cookie = dp->d_cookie;
 	dp->d_len = 0;
 	dp->d_cookie = 0;
+	vmm_drv_page_release_chain(dp->d_pages);
+	dp->d_pages = NULL;
+
+	/*
+	 * Ensure all other changes to the desb are visible prior to zeroing its
+	 * refcount, signifying its readiness for reuse.
+	 */
+	membar_exit();
 	dp->d_ref = 0;
 
 	viona_tx_done(ring, len, cookie);
@@ -484,12 +493,13 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	viona_desb_t		*dp = NULL;
 	mac_client_handle_t	link_mch = link->l_mch;
 	const struct virtio_net_hdr *hdr;
+	vmm_page_t *pages = NULL;
 
 	mp_head = mp_tail = NULL;
 
 	ASSERT(iov != NULL);
 
-	n = vq_popchain(ring, iov, max_segs, &cookie);
+	n = vq_popchain(ring, iov, max_segs, &cookie, &pages);
 	if (n == 0) {
 		VIONA_PROBE1(tx_absent, viona_vring_t *, ring);
 		VIONA_RING_STAT_INCR(ring, tx_absent);
@@ -670,6 +680,7 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 
 	if (dp != NULL) {
 		dp->d_len = len;
+		dp->d_pages = pages;
 		mutex_enter(&ring->vr_lock);
 		ring->vr_xfer_outstanding++;
 		mutex_exit(&ring->vr_lock);
@@ -679,6 +690,7 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 		 * be marked as 'used' now, rather than deferring that action
 		 * until after successful packet transmission.
 		 */
+		vmm_drv_page_release_chain(pages);
 		viona_tx_done(ring, len, cookie);
 	}
 
@@ -731,5 +743,6 @@ drop_hook:
 
 	VIONA_PROBE3(tx_drop, viona_vring_t *, ring, uint32_t, len,
 	    uint16_t, cookie);
+	vmm_drv_page_release_chain(pages);
 	viona_tx_done(ring, len, cookie);
 }

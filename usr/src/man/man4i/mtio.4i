@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd August 28, 2021
+.Dd March 13, 2022
 .Dt MTIO 4I
 .Os
 .Sh NAME
@@ -201,7 +201,7 @@ errors until the
 ioctl is issued.
 An
 .Dv MTFSF
-ioctl can then he issued.
+ioctl can then be issued.
 .Pp
 Two successful successive reads that both return zero byte counts indicate
 .Sy EOM
@@ -284,7 +284,7 @@ issued, two records are written; one for 65,534 bytes followed by another
 record for 6 bytes.
 Newer variable-length tape drivers may relax the above
 limitation and allow applications to write record sizes larger than 65,534.
-effer to the specific tape driver man page for details.
+Refer to the specific tape driver man page for details.
 .Pp
 When logical
 .Sy EOT
@@ -840,7 +840,7 @@ Note \(em When tape alert cleaning is managed by the st driver, the tape
 target driver may continue to return a
 .Dq drive needs cleaning
 status unless an
-.Dv MTIOCGE
+.Dv MTIOCGET
 .Xr ioctl 2
 call is made while the cleaning media is in the drive.
 .Pp

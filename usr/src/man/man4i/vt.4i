@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd December 28, 2020
+.Dd March 13, 2022
 .Dt VT 4I
 .Os
 .Sh NAME
@@ -319,7 +319,8 @@ online         17:49:11 svc:/system/console-login:vt6
 .Sy console-login:default
 is for the system console, others for virtual consoles.
 .Pp
-You can modify properties/disable/enable and remove/add virtual consoles using
+You can modify properties of, disable/enable, and remove/add virtual consoles
+using
 .Xr smf 7 :
 .Bd -literal -offset indent
 # svccfg -s console-login add vt8

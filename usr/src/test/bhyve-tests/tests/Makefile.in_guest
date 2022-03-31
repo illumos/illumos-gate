@@ -1,0 +1,48 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2022 Oxide Computer Company
+
+PAYLOAD_CLEANFILES =	payload_start.o	\
+		$(PAYLOADS:%=payload_%)		\
+		$(PAYLOADS:%=payload_%.o)		\
+		$(PAYLOADS:%=pobj_%.o)		\
+		$(PAYLOADS:%=pobj_%.s)
+
+$(PAYLOADS:%=payload_%.o) := AS_CPPFLAGS += -I../common
+
+payload_%: payload_start.o payload_%.o
+	$(LD) -dn -e _start -M ../common/Mapfile.payload -o $@ $^
+
+pobj_%.s: payload_%
+	@echo " .data"                                  > $@
+	@echo " .globl payload_data"                    >> $@
+	@echo "payload_data:"                           >> $@
+	$(ELFEXTRACT) $^                                >> $@
+	@echo " .size  payload_data, [.-payload_data]"  >> $@
+	@echo " .align 4"                               >> $@
+	@echo " .globl payload_size"                    >> $@
+	@echo " .size payload_size, 4"                  >> $@
+	@echo "payload_size:"                           >> $@
+	@echo " .data"                                  >> $@
+	@echo " .long  [.-payload_data]"                >> $@
+
+pobj_%.o: pobj_%.s
+	$(COMPILE.s) -o $@ $^
+	$(POST_PROCESS)
+
+%.o: ../common/%.s
+	$(COMPILE.s) -o $@ $^
+	$(POST_PROCESS)
+
+%.o: ../common/%.c
+	$(COMPILE.c) -o $@ $^
+	$(POST_PROCESS)

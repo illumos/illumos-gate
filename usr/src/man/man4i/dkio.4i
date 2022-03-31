@@ -19,7 +19,7 @@
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\" Copyright (c) 2017, Joyent, Inc.
 .\"
-.Dd October 23, 2017
+.Dd March 13, 2022
 .Dt DKIO 4I
 .Os
 .Sh NAME
@@ -47,7 +47,7 @@ controller, partitions, or geometry information on all architectures:
 The argument is a pointer to a
 .Vt dk_cinfo
 structure (described below).
-This structure tells the controller-type and attributes regarding bad-block
+This structure contains the controller-type and attributes regarding bad-block
 processing done on the controller.
 .Bd -literal -offset 2n
 /*
@@ -809,7 +809,7 @@ On disks larger than 1TB, this ioctl must be used instead of
  * Used by applications to get partition or slice information
  */
 struct extpart_info {
-    diskkaddr_t      p_start;
+    diskaddr_t       p_start;
     diskaddr_t       p_length;
 };
 .Ed

@@ -15,7 +15,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd August 13, 2021
+.Dd March 13, 2022
 .Dt TERMIO 4I
 .Os
 .Sh NAME
@@ -233,7 +233,7 @@ Reprinting also occurs automatically if
 characters that would normally be erased from the screen are fouled by program
 output.
 The characters are reprinted as if they were being echoed;
-consequencely, if
+consequently, if
 .Dv ECHO
 is not set, they are not printed.
 .Pp
@@ -407,7 +407,7 @@ example, file transfer programs), where a program would like to process at
 least
 .Sy MIN
 characters at a time.
-In case A, the inteercharacter timer is
+In case A, the intercharacter timer is
 activated by a user as a safety measure; in case B, the timer is turned off.
 .Pp
 Cases C and D exist to handle single character, timed transfers.

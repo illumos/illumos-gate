@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd October 22, 2017
+.Dd March 13, 2022
 .Dt FDIO 4I
 .Os
 .Sh NAME
@@ -147,7 +147,7 @@ struct fd_drive {
     int	fdd_ejectable;    /* does the drive support eject? */
     int	fdd_maxsearch;    /* size of per-unit search table */
     int	fdd_writeprecomp; /* cyl to start write precompensation */
-    int	fdd_writereduce;  /* cyl to start recucing write current */
+    int	fdd_writereduce;  /* cyl to start reducing write current */
     int	fdd_stepwidth;    /* width of step pulse in 1 us units */
     int	fdd_steprate;     /* step rate in 100 us units */
     int	fdd_headsettle;   /* delay, in 100 us units */

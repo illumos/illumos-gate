@@ -170,9 +170,10 @@ struct vlapic {
 	uint32_t		esr_pending;
 
 	struct callout	callout;	/* vlapic timer */
-	struct bintime	timer_fire_bt;	/* callout expiry time */
-	struct bintime	timer_freq_bt;	/* timer frequency */
-	struct bintime	timer_period_bt; /* timer period */
+	hrtime_t	timer_fire_when;
+	hrtime_t	timer_period;
+	uint32_t	timer_cur_freq;
+
 	struct mtx	timer_mtx;
 
 	uint64_t	msr_apicbase;

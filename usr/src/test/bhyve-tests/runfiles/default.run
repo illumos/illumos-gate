@@ -28,6 +28,16 @@ tests = [
 	'mem_seg_map'
 	]
 
+[/opt/bhyve-tests/tests/kdev]
+user = root
+tests = [
+	'vatpit_freq',
+	'vhpet_freq',
+	'vlapic_freq',
+	'vlapic_freq_periodic',
+	'vpmtmr_freq'
+	]
+
 # Tests of userspace mevent system, built from cmd/bhyve
 [/opt/bhyve-tests/tests/mevent]
 tests = ['lists_delete', 'read_disable', 'read_pause', 'read_requeue',

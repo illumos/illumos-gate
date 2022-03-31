@@ -14,7 +14,7 @@
 .\" If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd October 23, 2017
+.Dd March 13, 2022
 .Dt USCSI 4I
 .Os
 .Sh NAME
@@ -251,7 +251,7 @@ must point to memory writable by the application.
 .It Dv USCSI_RENEGOT
 Tells USCSI to renegotiate wide mode and synchronous transfer speed before the
 transmitted SCSI command is executed.
-This flag in effects tells the target driver to pass the
+This flag in effect tells the target driver to pass the
 .Dv FLAG_RENEGOTIATE_WIDE_SYNC
 flag in the SCSI packet
 before passing the command to an adapter driver for transport.

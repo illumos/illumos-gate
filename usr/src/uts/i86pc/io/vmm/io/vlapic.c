@@ -94,7 +94,7 @@ __FBSDID("$FreeBSD$");
 /*
  * APIC timer frequency:
  * - arbitrary but chosen to be in the ballpark of contemporary hardware.
- * - power-of-two to avoid loss of precision when converted to a bintime.
+ * - power-of-two to avoid loss of precision when calculating times
  */
 #define	VLAPIC_BUS_FREQ		(128 * 1024 * 1024)
 
@@ -215,7 +215,6 @@ vlapic_dump_lvt(uint32_t offset, uint32_t *lvt)
 static uint32_t
 vlapic_get_ccr(struct vlapic *vlapic)
 {
-	struct bintime bt_now, bt_rem;
 	struct LAPIC *lapic;
 	uint32_t ccr;
 
@@ -228,12 +227,11 @@ vlapic_get_ccr(struct vlapic *vlapic)
 		 * If the timer is scheduled to expire in the future then
 		 * compute the value of 'ccr' based on the remaining time.
 		 */
-		binuptime(&bt_now);
-		if (BINTIME_CMP(&vlapic->timer_fire_bt, >, &bt_now)) {
-			bt_rem = vlapic->timer_fire_bt;
-			bintime_sub(&bt_rem, &bt_now);
-			ccr += bt_rem.sec * BT2FREQ(&vlapic->timer_freq_bt);
-			ccr += bt_rem.frac / vlapic->timer_freq_bt.frac;
+
+		const hrtime_t now = gethrtime();
+		if (vlapic->timer_fire_when > now) {
+			ccr += hrt_freq_count(vlapic->timer_fire_when - now,
+			    vlapic->timer_cur_freq);
 		}
 	}
 	KASSERT(ccr <= lapic->icr_timer, ("vlapic_get_ccr: invalid ccr %x, "
@@ -263,9 +261,9 @@ vlapic_dcr_write_handler(struct vlapic *vlapic)
 	 * XXX changes to the frequency divider will not take effect until
 	 * the timer is reloaded.
 	 */
-	FREQ2BT(VLAPIC_BUS_FREQ / divisor, &vlapic->timer_freq_bt);
-	vlapic->timer_period_bt = vlapic->timer_freq_bt;
-	bintime_mul(&vlapic->timer_period_bt, lapic->icr_timer);
+	vlapic->timer_cur_freq = VLAPIC_BUS_FREQ / divisor;
+	vlapic->timer_period = hrt_freq_interval(vlapic->timer_cur_freq,
+	    lapic->icr_timer);
 
 	VLAPIC_TIMER_UNLOCK(vlapic);
 }
@@ -729,20 +727,16 @@ vlapic_trigger_lvt(struct vlapic *vlapic, int vector)
 }
 
 static void
-vlapic_callout_reset(struct vlapic *vlapic, sbintime_t t)
+vlapic_callout_reset(struct vlapic *vlapic)
 {
-	callout_reset_sbt(&vlapic->callout, t, 0,
-	    vlapic_callout_handler, vlapic, 0);
+	callout_reset_hrtime(&vlapic->callout, vlapic->timer_fire_when,
+	    vlapic_callout_handler, vlapic, C_ABSOLUTE);
 }
 
 static void
 vlapic_callout_handler(void *arg)
 {
-	struct vlapic *vlapic;
-	struct bintime bt, btnow;
-	sbintime_t rem_sbt;
-
-	vlapic = arg;
+	struct vlapic *vlapic = arg;
 
 	VLAPIC_TIMER_LOCK(vlapic);
 	if (callout_pending(&vlapic->callout))	/* callout was reset */
@@ -756,42 +750,25 @@ vlapic_callout_handler(void *arg)
 	vlapic_fire_timer(vlapic);
 
 	if (vlapic_periodic_timer(vlapic)) {
-		binuptime(&btnow);
-
-		KASSERT(BINTIME_CMP(&btnow, >=, &vlapic->timer_fire_bt),
-		    ("vlapic callout at %lx.%lx, expected at %lx.%lx",
-		    btnow.sec, btnow.frac, vlapic->timer_fire_bt.sec,
-		    vlapic->timer_fire_bt.frac));
-
 		/*
 		 * Compute the delta between when the timer was supposed to
-		 * fire and the present time.
+		 * fire and the present time.  We can depend on the fact that
+		 * cyclics (which underly these callouts) will never be called
+		 * early.
 		 */
-		bt = btnow;
-		bintime_sub(&bt, &vlapic->timer_fire_bt);
-
-		rem_sbt = bttosbt(vlapic->timer_period_bt);
-		if (BINTIME_CMP(&bt, <, &vlapic->timer_period_bt)) {
+		const hrtime_t now = gethrtime();
+		const hrtime_t delta = now - vlapic->timer_fire_when;
+		if (delta >= vlapic->timer_period) {
 			/*
-			 * Adjust the time until the next countdown downward
-			 * to account for the lost time.
+			 * If we are so behind that we have missed an entire
+			 * timer period, reset the time base rather than
+			 * attempting to catch up.
 			 */
-			rem_sbt -= bttosbt(bt);
+			vlapic->timer_fire_when = now + vlapic->timer_period;
 		} else {
-			/*
-			 * If the delta is greater than the timer period then
-			 * just reset our time base instead of trying to catch
-			 * up.
-			 */
-			vlapic->timer_fire_bt = btnow;
-			VLAPIC_CTR2(vlapic, "vlapic timer lagging by %lu "
-			    "usecs, period is %lu usecs - resetting time base",
-			    bttosbt(bt) / SBT_1US,
-			    bttosbt(vlapic->timer_period_bt) / SBT_1US);
+			vlapic->timer_fire_when += vlapic->timer_period;
 		}
-
-		bintime_add(&vlapic->timer_fire_bt, &vlapic->timer_period_bt);
-		vlapic_callout_reset(vlapic, rem_sbt);
+		vlapic_callout_reset(vlapic);
 	}
 done:
 	VLAPIC_TIMER_UNLOCK(vlapic);
@@ -800,27 +777,18 @@ done:
 void
 vlapic_icrtmr_write_handler(struct vlapic *vlapic)
 {
-	struct LAPIC *lapic;
-	sbintime_t sbt;
-	uint32_t icr_timer;
+	struct LAPIC *lapic = vlapic->apic_page;
 
 	VLAPIC_TIMER_LOCK(vlapic);
-
-	lapic = vlapic->apic_page;
-	icr_timer = lapic->icr_timer;
-
-	vlapic->timer_period_bt = vlapic->timer_freq_bt;
-	bintime_mul(&vlapic->timer_period_bt, icr_timer);
-
-	if (icr_timer != 0) {
-		binuptime(&vlapic->timer_fire_bt);
-		bintime_add(&vlapic->timer_fire_bt, &vlapic->timer_period_bt);
-
-		sbt = bttosbt(vlapic->timer_period_bt);
-		vlapic_callout_reset(vlapic, sbt);
-	} else
+	vlapic->timer_period = hrt_freq_interval(vlapic->timer_cur_freq,
+	    lapic->icr_timer);
+	if (vlapic->timer_period != 0) {
+		vlapic->timer_fire_when = gethrtime() + vlapic->timer_period;
+		vlapic_callout_reset(vlapic);
+	} else {
+		vlapic->timer_fire_when = 0;
 		callout_stop(&vlapic->callout);
-
+	}
 	VLAPIC_TIMER_UNLOCK(vlapic);
 }
 
