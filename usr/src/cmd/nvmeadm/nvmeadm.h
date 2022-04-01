@@ -40,6 +40,8 @@ struct nvme_process_arg {
 	char **npa_argv;
 	char *npa_name;
 	char *npa_nsid;
+	char *npa_eui64;
+	char *npa_nguid;
 	int npa_found;
 	boolean_t npa_excl;
 	boolean_t npa_isns;
@@ -48,7 +50,6 @@ struct nvme_process_arg {
 	const nvmeadm_cmd_t *npa_cmd;
 	di_node_t npa_node;
 	di_minor_t npa_minor;
-	char *npa_path;
 	char *npa_dsk;
 	uint32_t npa_ns_state;
 	nvme_identify_ctrl_t *npa_idctl;

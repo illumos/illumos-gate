@@ -2013,8 +2013,9 @@ nvme_async_event_task(void *arg)
 					break;
 
 				dev_err(nvme->n_dip, CE_NOTE,
-				    "!namespace %u (%s) has changed.", nsid,
-				    NVME_NSID2NS(nvme, nsid)->ns_name);
+				    "!namespace nvme%d/%u has changed.",
+				    ddi_get_instance(nvme->n_dip), nsid);
+
 
 				if (nvme_init_ns(nvme, nsid) != DDI_SUCCESS)
 					continue;
@@ -3016,19 +3017,10 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 		bcopy(idns->id_nguid, ns->ns_nguid, sizeof (ns->ns_nguid));
 
 	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
-	if (*(uint64_t *)ns->ns_eui64 != 0) {
-		uint8_t *eui64 = ns->ns_eui64;
-
-		(void) snprintf(ns->ns_name, sizeof (ns->ns_name),
-		    "%02x%02x%02x%02x%02x%02x%02x%02x",
-		    eui64[0], eui64[1], eui64[2], eui64[3],
-		    eui64[4], eui64[5], eui64[6], eui64[7]);
-	} else {
-		(void) snprintf(ns->ns_name, sizeof (ns->ns_name), "%d",
-		    ns->ns_id);
-
+	if (*(uint64_t *)ns->ns_eui64 == 0)
 		nvme_prepare_devid(nvme, ns->ns_id);
-	}
+
+	(void) snprintf(ns->ns_name, sizeof (ns->ns_name), "%u", ns->ns_id);
 
 	/*
 	 * Find the LBA format with no metadata and the best relative
