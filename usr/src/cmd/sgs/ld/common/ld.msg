@@ -35,7 +35,6 @@
 @ MSG_SYS_EXEC		"file %s: exec failed: %s"
 
 @ MSG_SYS_ALLOC		"alloc failed: %s"
-@ MSG_SYS_64		"unable to execute 64-bit version of ld"
 
 @ MSG_ERR_BADTARG	"unknown target platform: %s"
 
@@ -60,7 +59,6 @@
 
 @ MSG_ARG_TWO		"2"
 @ MSG_ARG_FOUR		"4"
-@ MSG_ARG_ALTEXEC64	"altexec64"
 @ MSG_ARG_TARGET	"target="
 
 @ MSG_LD_OPTIONS	"LD_OPTIONS"

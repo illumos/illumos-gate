@@ -27,7 +27,8 @@
 
 include		$(SRC)/Makefile.master
 
-SUBDIRS =	$(MACH) $(EXTRASUBDIRS)
+SUBDIRS =	$(EXTRASUBDIRS)
+$(BUILD32)SUBDIRS += $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET= all

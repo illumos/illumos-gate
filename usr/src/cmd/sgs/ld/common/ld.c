@@ -226,12 +226,11 @@ archive(int fd, Elf *elf, uchar_t *class_ret, Half *mach_ret)
 /*
  * Determine:
  *	- ELFCLASS of resulting object (class)
- *	- Whether user specified class of the linker (ldclass)
  *	- ELF machine type of resulting object (m_mach)
  *
  * In order of priority, we determine this information as follows:
  *
- * -	Command line options (-32, -64, -z altexec64, -z target).
+ * -	Command line options (-32, -64 -z target).
  * -	From the first plain object seen on the command line. (This is
  *	by far the most common case.)
  * -	From the first object contained within the first archive
@@ -241,17 +240,11 @@ archive(int fd, Elf *elf, uchar_t *class_ret, Half *mach_ret)
  * entry:
  *	argc, argv - Command line argument vector
  *	class_ret - Address of variable to receive ELFCLASS of output object
- *	ldclass_ret - Address of variable to receive ELFCLASS of
- *		linker to use. This will be ELFCLASS32/ELFCLASS64 if one
- *		is explicitly specified, and ELFCLASSNONE otherwise.
- *		ELFCLASSNONE therefore means that we should use the best
- *		link-editor that the system/kernel will allow.
  */
 static int
-process_args(int argc, char **argv, uchar_t *class_ret, uchar_t *ldclass_ret,
-    Half *mach)
+process_args(int argc, char **argv, uchar_t *class_ret, Half *mach)
 {
-	uchar_t	ldclass = ELFCLASSNONE, class = ELFCLASSNONE, ar_class;
+	uchar_t	class = ELFCLASSNONE, ar_class;
 	Half	mach32 = EM_NONE, mach64 = EM_NONE, ar_mach;
 	int	c, ar_found = 0;
 
@@ -277,10 +270,6 @@ process_args(int argc, char **argv, uchar_t *class_ret, uchar_t *ldclass_ret,
 	 *		entirely from archives, and the first archive contains
 	 *		a mix of 32 and 64-bit objects, and the first object
 	 *		in that archive is 32-bit.
-	 *
-	 *	-z altexec64
-	 *		Use the 64-bit linker regardless of the class
-	 *		of the output object.
 	 *
 	 *	-z target=platform
 	 *		Produce output object for the specified platform.
@@ -313,14 +302,6 @@ getmore:
 			break;
 
 		case 'z':
-#if	!defined(_LP64)
-			/* -z altexec64 */
-			if (strncmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64),
-			    MSG_ARG_ALTEXEC64_SIZE) == 0) {
-				ldclass = ELFCLASS64;
-				break;
-			}
-#endif
 			/* -z target=platform */
 			if (strncmp(optarg, MSG_ORIG(MSG_ARG_TARGET),
 			    MSG_ARG_TARGET_SIZE) == 0) {
@@ -458,9 +439,6 @@ getmore:
 	if (class == ELFCLASSNONE)
 		class = ar_found ? ar_class : ELFCLASS32;
 	*class_ret = class;
-
-	/* ELFCLASS of link-editor to use */
-	*ldclass_ret = ldclass;
 
 	/*
 	 * Machine type of output object: If we did not establish a machine
@@ -660,8 +638,7 @@ ld_altexec(char **argv, char **envp)
 int
 main(int argc, char **argv, char **envp)
 {
-	char		**oargv = argv;
-	uchar_t 	class, ldclass, checkclass;
+	uchar_t		class;
 	Half		mach;
 
 	/*
@@ -690,30 +667,8 @@ main(int argc, char **argv, char **envp)
 	 *	- link-editor class
 	 *	- target machine
 	 */
-	if (process_args(argc, argv, &class, &ldclass, &mach))
+	if (process_args(argc, argv, &class, &mach))
 		return (1);
-
-	/*
-	 * Unless a 32-bit link-editor was explicitly requested, try
-	 * to exec the 64-bit version.
-	 */
-	if (ldclass != ELFCLASS32)
-		checkclass = conv_check_native(oargv, envp);
-
-	/*
-	 * If an attempt to exec the 64-bit link-editor fails:
-	 * -	Bail if the 64-bit linker was explicitly requested
-	 * -	Continue quietly if the 64-bit linker was not requested.
-	 *	This is undoubtedly due to hardware/kernel limitations,
-	 *	and therefore represents the best we can do. Note that
-	 *	the 32-bit linker is capable of linking anything the
-	 *	64-bit version is, subject to a 4GB limit on memory, and
-	 *	2GB object size.
-	 */
-	if ((ldclass == ELFCLASS64) && (checkclass != ELFCLASS64)) {
-		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_64));
-		return (1);
-	}
 
 	/* Call the libld entry point for the specified ELFCLASS */
 	if (class == ELFCLASS64)

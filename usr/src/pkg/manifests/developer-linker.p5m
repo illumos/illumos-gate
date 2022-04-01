@@ -40,7 +40,7 @@ file path=usr/bin/$(ARCH32)/truss mode=0555
 dir  path=usr/bin/$(ARCH64)
 file path=usr/bin/$(ARCH64)/elfwrap mode=0555
 file path=usr/bin/$(ARCH64)/gcore mode=0555
-file path=usr/bin/$(ARCH64)/ld mode=0755
+link path=usr/bin/$(ARCH64)/ld target=../../bin/ld
 file path=usr/bin/$(ARCH64)/ldd mode=0555
 file path=usr/bin/$(ARCH64)/plimit mode=0555
 file path=usr/bin/$(ARCH64)/pvs mode=0555

@@ -26,16 +26,13 @@
 
 include		../Makefile.com
 
-LDLIBDIR =	$(LDLIBDIR64)
-ELFLIBDIR =	$(ELFLIBDIR64)
-LDDBGLIBDIR =	$(LDDBGLIBDIR64)
-CONVLIBDIR =	$(CONVLIBDIR64)
+install:	all $(ROOTPROG) $(ROOTPROG64) \
+	$(ROOTCCSBINLINK) $(ROOTCCSBINLINK64)
 
-RPATH = $(RPATH64)
+$(ROOTBIN64)/ld:
+	$(RM) $@; $(SYMLINK) ../../bin/ld $@
 
 .KEEP_STATE:
-
-install:	all $(ROOTBIN64) $(ROOTCCSBINLINK64)
 
 include		../Makefile.targ
 include		$(SRC)/Makefile.master.64
