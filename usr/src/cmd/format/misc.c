@@ -44,17 +44,8 @@
 #include "label.h"
 #include "startup.h"
 
-#ifdef __STDC__
-
 /* Function prototypes for ANSI C Compilers */
 static void	cleanup(int sig);
-
-#else	/* __STDC__ */
-
-/* Function prototypes for non-ANSI C Compilers */
-static void	cleanup();
-
-#endif	/* __STDC__ */
 
 struct	env *current_env = NULL;	/* ptr to current environment */
 static int	stop_pending = 0;	/* ctrl-Z is pending */
@@ -82,12 +73,11 @@ char	*confirm_list[] = {
  * and checks the return value so the caller doesn't have to.
  */
 void *
-zalloc(count)
-	int	count;
+zalloc(int count)
 {
 	void	*ptr;
 
-	if ((ptr = (void *) calloc(1, (unsigned)count)) == NULL) {
+	if ((ptr = calloc(1, (unsigned)count)) == NULL) {
 		err_print("Error: unable to calloc more space.\n");
 		fullabort();
 	}
@@ -101,15 +91,12 @@ zalloc(count)
  * zeroed.
  */
 void *
-rezalloc(ptr, count)
-	void	*ptr;
-	int	count;
+rezalloc(void *ptr, int count)
 {
 	void	*new_ptr;
 
 
-	if ((new_ptr = (void *) realloc((char *)ptr,
-				(unsigned)count)) == NULL) {
+	if ((new_ptr = realloc((char *)ptr, (unsigned)count)) == NULL) {
 		err_print("Error: unable to realloc more space.\n");
 		fullabort();
 	}
@@ -120,10 +107,9 @@ rezalloc(ptr, count)
  * This routine is a wrapper for free.
  */
 void
-destroy_data(data)
-	char	*data;
+destroy_data(char *data)
 {
-	free((char *)data);
+	free(data);
 }
 
 #ifdef	not
@@ -132,28 +118,27 @@ destroy_data(data)
  * returns a mnemonic name for that space.
  */
 char *
-space2str(space)
-	uint_t	space;
+space2str(uint_t space)
 {
 	char	*name;
 
 	switch (space&SP_BUSMASK) {
-	    case SP_VIRTUAL:
+	case SP_VIRTUAL:
 		name = "virtual";
 		break;
-	    case SP_OBMEM:
+	case SP_OBMEM:
 		name = "obmem";
 		break;
-	    case SP_OBIO:
+	case SP_OBIO:
 		name = "obio";
 		break;
-	    case SP_MBMEM:
+	case SP_MBMEM:
 		name = "mbmem";
 		break;
-	    case SP_MBIO:
+	case SP_MBIO:
 		name = "mbio";
 		break;
-	    default:
+	default:
 		err_print("Error: unknown address space type encountered.\n");
 		fullabort();
 	}
@@ -166,8 +151,7 @@ space2str(space)
  * the response.
  */
 int
-check(question)
-	char	*question;
+check(char *question)
 {
 	int		answer;
 	u_ioparam_t	ioparam;
@@ -181,8 +165,7 @@ check(question)
 	 * Ask the user.
 	 */
 	ioparam.io_charlist = confirm_list;
-	answer = input(FIO_MSTR, question, '?', &ioparam,
-	    (int *)NULL, DATA_INPUT);
+	answer = input(FIO_MSTR, question, '?', &ioparam, NULL, DATA_INPUT);
 	return (answer);
 }
 
@@ -190,12 +173,9 @@ check(question)
  * This routine aborts the current command.  It is called by a ctrl-C
  * interrupt and also under certain error conditions.
  */
-/*ARGSUSED*/
 void
-cmdabort(sig)
-	int	sig;
+cmdabort(int sig __unused)
 {
-
 	/*
 	 * If there is no usable saved environment, gracefully exit.  This
 	 * allows the user to interrupt the program even when input is from
@@ -233,10 +213,8 @@ cmdabort(sig)
  * This routine implements the ctrl-Z suspend mechanism.  It is called
  * when a suspend signal is received.
  */
-/*ARGSUSED*/
 void
-onsusp(sig)
-	int	sig;
+onsusp(int sig __unused)
 {
 	int		fix_term;
 #ifdef	NOT_DEF
@@ -267,7 +245,7 @@ onsusp(sig)
 	 * to cause us to stop.
 	 */
 	sigmask.sigbits[0] = (ulong_t)0xffffffff;
-	if (sigprocmask(SIG_SETMASK, &sigmask, (sigset_t *)NULL) == -1)
+	if (sigprocmask(SIG_SETMASK, &sigmask, NULL) == -1)
 		err_print("sigprocmask failed %d\n", errno);
 #endif	/* NOT_DEF */
 	(void) signal(SIGTSTP, SIG_DFL);
@@ -294,10 +272,8 @@ onsusp(sig)
  * disk operations (e.g. formatting).  It is called when an alarm signal
  * is received.
  */
-/*ARGSUSED*/
 void
-onalarm(sig)
-	int	sig;
+onalarm(int sig __unused)
 {
 }
 
@@ -306,7 +282,7 @@ onalarm(sig)
  * This routine gracefully exits the program.
  */
 void
-fullabort()
+fullabort(void)
 {
 
 	fmt_print("\n");
@@ -386,7 +362,7 @@ cleanup(int sig)
  * necessarily pairing between calls to enter_critical() and exit_critical().
  */
 void
-enter_critical()
+enter_critical(void)
 {
 
 	/*
@@ -406,7 +382,7 @@ enter_critical()
  * one call to exit_critical() will erase any number of such calls.
  */
 void
-exit_critical()
+exit_critical(void)
 {
 
 	/*
@@ -436,7 +412,7 @@ exit_critical()
  * This routine turns off echoing on the controlling tty for the program.
  */
 void
-echo_off()
+echo_off(void)
 {
 	/*
 	 * Open the tty and store the file pointer for later.
@@ -472,7 +448,7 @@ echo_off()
  * This routine turns on echoing on the controlling tty for the program.
  */
 void
-echo_on()
+echo_on(void)
 {
 
 	/*
@@ -496,7 +472,7 @@ echo_on()
  * This routine turns off single character entry mode for tty.
  */
 void
-charmode_on()
+charmode_on(void)
 {
 
 	/*
@@ -540,7 +516,7 @@ charmode_on()
  * Note, this routine must be called before echo_on.
  */
 void
-charmode_off()
+charmode_off(void)
 {
 
 	/*
@@ -570,15 +546,14 @@ charmode_off()
  * Use destroy_data() to free when no longer used.
  */
 char *
-alloc_string(s)
-	char	*s;
+alloc_string(char *s)
 {
 	char	*ns;
 
-	if (s == (char *)NULL) {
-		ns = (char *)zalloc(1);
+	if (s == NULL) {
+		ns = zalloc(1);
 	} else {
-		ns = (char *)zalloc(strlen(s) + 1);
+		ns = zalloc(strlen(s) + 1);
 		(void) strcpy(ns, s);
 	}
 	return (ns);
@@ -614,22 +589,16 @@ alloc_string(s)
 #define	INCR_LISTSIZE		32
 
 char **
-build_argvlist(argvlist, size, alloc, str)
-	char	**argvlist;
-	int	*size;
-	int	*alloc;
-	char	*str;
+build_argvlist(char **argvlist, int *size, int *alloc, char *str)
 {
 	if (*size + 2 > *alloc) {
 		if (*alloc == 0) {
 			*alloc = INITIAL_LISTSIZE;
-			argvlist = (char **)
-				zalloc(sizeof (char *) * (*alloc));
+			argvlist = zalloc(sizeof (char *) * (*alloc));
 		} else {
 			*alloc += INCR_LISTSIZE;
-			argvlist = (char **)
-				rezalloc((void *) argvlist,
-				sizeof (char *) * (*alloc));
+			argvlist = rezalloc((void *) argvlist,
+			    sizeof (char *) * (*alloc));
 		}
 	}
 
@@ -734,8 +703,7 @@ fdisk_physical_name(char *name)
  * would appear in the device directory itself.
  */
 int
-whole_disk_name(name)
-	char	*name;
+whole_disk_name(char *name)
 {
 	must_be(name, 'c');
 	skip_digits(name);
@@ -755,8 +723,7 @@ whole_disk_name(name)
  * Return true if a name is in the internal canonical form
  */
 int
-canonical_name(name)
-	char	*name;
+canonical_name(char *name)
 {
 	must_be(name, 'c');
 	skip_digits(name);
@@ -775,8 +742,7 @@ canonical_name(name)
  * Used to support 4.x naming conventions under 5.0.
  */
 int
-canonical4x_name(name)
-	char	*name;
+canonical4x_name(char *name)
 {
 	char    **p;
 	int	i;
@@ -801,9 +767,7 @@ canonical4x_name(name)
  *	/dev/rdsk/c0t0d0s0 -> c0t0d0
  */
 void
-canonicalize_name(dst, src)
-	char	*dst;
-	char	*src;
+canonicalize_name(char *dst, char *src)
 {
 	char	*s;
 
@@ -832,9 +796,7 @@ canonicalize_name(dst, src)
  * s1, but we do have to match all of s2
  */
 int
-match_substr(s1, s2)
-	char    *s1;
-	char    *s2;
+match_substr(char *s1, char *s2)
 {
 	while (*s2 != 0) {
 		if (*s1++ != *s2++)
@@ -851,11 +813,7 @@ match_substr(s1, s2)
 #define	BYTES_PER_LINE		16
 
 void
-dump(hdr, src, nbytes, format)
-	char	*hdr;
-	caddr_t	src;
-	int	nbytes;
-	int	format;
+dump(char *hdr, caddr_t src, int nbytes, int format)
 {
 	int	i;
 	int	n;
@@ -883,8 +841,7 @@ dump(hdr, src, nbytes, format)
 			}
 			err_print("    ");
 			for (i = 0; i < n; i++) {
-				err_print("%c",
-					isprint(src[i]) ? src[i] : '.');
+				err_print("%c", isprint(src[i]) ? src[i] : '.');
 			}
 		}
 		err_print("\n");
@@ -946,12 +903,12 @@ gb2bn(float gb)
  * window. The default value of TTY_LINES is returned on error.
  */
 int
-get_tty_lines()
+get_tty_lines(void)
 {
 	int	tty_lines = TTY_LINES;
 	struct	winsize	winsize;
 
-	if ((option_f == (char *)NULL) && isatty(0) == 1 && isatty(1) == 1) {
+	if ((option_f == NULL) && isatty(0) == 1 && isatty(1) == 1) {
 		/*
 		 * We have a real terminal for std input and output
 		 */

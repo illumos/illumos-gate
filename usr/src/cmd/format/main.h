@@ -28,8 +28,6 @@
 #ifndef	_MAIN_H
 #define	_MAIN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

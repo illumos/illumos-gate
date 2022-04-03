@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains routines relating to running the menus.
  */
@@ -33,17 +31,7 @@
 #include "menu.h"
 #include "misc.h"
 
-#ifdef __STDC__
-
-/* Function prototypes for ANSI C Compilers */
-static int	(*find_enabled_menu_item())(struct menu_item *menu, int item);
-
-#else	/* __STDC__ */
-
-/* Function prototypes for non-ANSI C Compilers */
-static int	(*find_enabled_menu_item())();
-
-#endif	/* __STDC__ */
+static int	(*find_enabled_menu_item(struct menu_item *, int))(void);
 
 static char	cur_title[MAXPATHLEN];
 
@@ -53,12 +41,11 @@ static char	cur_title[MAXPATHLEN];
  * All menus have a 'quit' command at the bottom to exit the menu.
  */
 char **
-create_menu_list(menu)
-	struct	menu_item *menu;
+create_menu_list(struct menu_item *menu)
 {
-	register struct menu_item *mptr;
-	register char	**cpptr;
-	register char	**list;
+	struct menu_item *mptr;
+	char	**cpptr;
+	char	**list;
 	int		nitems;
 
 	/*
@@ -96,10 +83,9 @@ create_menu_list(menu)
  * prints it nicely on the screen.
  */
 void
-display_menu_list(list)
-	char	**list;
+display_menu_list(char **list)
 {
-	register char **str;
+	char **str;
 
 	for (str = list; *str != NULL; str++)
 		fmt_print("        %s\n", *str);
@@ -111,9 +97,7 @@ display_menu_list(list)
  * original list of enabled commands was constructed.
  */
 static int (*
-find_enabled_menu_item(menu, item))()
-	struct menu_item	*menu;
-	int			item;
+find_enabled_menu_item(struct menu_item *menu, int item))(void)
 {
 	struct menu_item	*mp;
 
@@ -135,11 +119,7 @@ find_enabled_menu_item(menu, item))()
  */
 /*ARGSUSED*/
 void
-run_menu(menu, title, prompt, display_flag)
-	struct	menu_item *menu;
-	char	*title;
-	char	*prompt;
-	int	display_flag;
+run_menu(struct menu_item *menu, char *title, char *prompt, int display_flag)
 {
 	char		**list;
 	int		i;
@@ -164,8 +144,7 @@ run_menu(menu, title, prompt, display_flag)
 		 * Ask the user which command they want to run.
 		 */
 		ioparam.io_charlist = list;
-		i = input(FIO_MSTR, prompt, '>', &ioparam,
-		    (int *)NULL, CMD_INPUT);
+		i = input(FIO_MSTR, prompt, '>', &ioparam, NULL, CMD_INPUT);
 		/*
 		 * If they choose 'quit', the party's over.
 		 */
@@ -217,8 +196,7 @@ run_menu(menu, title, prompt, display_flag)
  *
  */
 void
-redisplay_menu_list(list)
-char **list;
+redisplay_menu_list(char **list)
 {
 	fmt_print("\n\n%s MENU:\n", cur_title);
 	display_menu_list(list);
@@ -230,7 +208,7 @@ char **list;
  * are always enabled.
  */
 int
-true()
+true(void)
 {
 	return (1);
 }
@@ -248,7 +226,7 @@ true()
  * Return true for menu items enabled only for embedded SCSI controllers
  */
 int
-embedded_scsi()
+embedded_scsi(void)
 {
 	if (cur_ctype == NULL && option_f)
 		return (0);
@@ -259,7 +237,7 @@ embedded_scsi()
  * Return false for menu items disabled only for embedded SCSI controllers
  */
 int
-not_embedded_scsi()
+not_embedded_scsi(void)
 {
 	if (cur_ctype == NULL && option_f)
 		return (0);
@@ -270,7 +248,7 @@ not_embedded_scsi()
  * Return false for menu items disabled for scsi controllers
  */
 int
-not_scsi()
+not_scsi(void)
 {
 	if (cur_ctype == NULL && option_f)
 		return (0);
@@ -281,7 +259,7 @@ not_scsi()
  * Return false for menu items disabled for efi labels
  */
 int
-not_efi()
+not_efi(void)
 {
 	if ((cur_disk == NULL) && option_f)
 		return (0);
@@ -291,7 +269,7 @@ not_efi()
 }
 
 int
-disp_expert_change_expert_efi()
+disp_expert_change_expert_efi(void)
 {
 	if ((cur_disk == NULL) && option_f)
 		return (0);
@@ -303,7 +281,7 @@ disp_expert_change_expert_efi()
 }
 
 int
-disp_expand_efi()
+disp_expand_efi(void)
 {
 	if ((cur_disk == NULL) && option_f)
 		return (0);
@@ -315,7 +293,7 @@ disp_expand_efi()
 }
 
 int
-disp_all_change_expert_efi()
+disp_all_change_expert_efi(void)
 {
 	if ((cur_disk == NULL) && option_f)
 		return (0);
@@ -328,7 +306,7 @@ disp_all_change_expert_efi()
  * Return true for menu items enabled scsi controllers
  */
 int
-scsi()
+scsi(void)
 {
 	if (cur_ctype == NULL && option_f)
 		return (0);
@@ -340,7 +318,7 @@ scsi()
  * Return true for menu items enabled if expert mode is enabled
  */
 int
-scsi_expert()
+scsi_expert(void)
 {
 	if (cur_ctype == NULL && option_f)
 		return (0);
@@ -352,7 +330,7 @@ scsi_expert()
  * Return true for menu items enabled if expert mode is enabled
  */
 int
-expert()
+expert(void)
 {
 	return (expert_mode);
 }
@@ -362,7 +340,7 @@ expert()
  * Return true for menu items enabled if developer mode is enabled
  */
 int
-developer()
+developer(void)
 {
 	return (dev_expert);
 }
@@ -374,7 +352,7 @@ developer()
  *	if a PCATA disk is selected.
  */
 int
-support_fdisk_on_sparc()
+support_fdisk_on_sparc(void)
 {
 #if defined(sparc)
 	/*

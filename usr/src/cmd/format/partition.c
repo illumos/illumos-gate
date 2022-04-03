@@ -357,7 +357,7 @@ change_partition(int num)
  * created.
  */
 int
-get_partition()
+get_partition(void)
 {
 	register struct partition_info *pptr;
 	register struct partition_info *parts;
@@ -408,7 +408,7 @@ get_partition()
  * the new map starts out all zeroes.
  */
 void
-make_partition()
+make_partition(void)
 {
 	register struct partition_info *pptr, *parts;
 	int	i;

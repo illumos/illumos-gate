@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the declarations of menus for the program.  To add
  * a new command/menu, simply add it to the appropriate table and define

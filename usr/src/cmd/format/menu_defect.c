@@ -43,24 +43,14 @@
  */
 struct	defect_list work_list;
 
-#ifdef __STDC__
-
-/* Function prototypes for ANSI C Compilers */
 static int	commit_list(void);
-
-#else	/* __STDC__ */
-
-/* Function prototypes for non-ANSI C Compilers */
-static int	commit_list();
-
-#endif	/* __STDC__ */
 
 /*
  * This routine implements the 'restore' command.  It sets the working
  * list equal to the current list.
  */
 int
-d_restore()
+d_restore(void)
 {
 	int	i;
 
@@ -116,7 +106,7 @@ d_restore()
  * manufacturer's defect list from the current disk.
  */
 int
-d_original()
+d_original(void)
 {
 	int	status;
 
@@ -176,7 +166,7 @@ and may take a long while. Continue"))
  * entire defect list from the current disk.
  */
 int
-d_extract()
+d_extract(void)
 {
 	int	status;
 
@@ -261,7 +251,7 @@ and may take a long while. Continue"))
  * the user breaks out with a ctrl-C.
  */
 int
-d_add()
+d_add(void)
 {
 	int			type, deflt, index;
 	diskaddr_t		bn;
@@ -295,7 +285,7 @@ loop:
 			ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
 		}
 		bn = input(FIO_BN, "Enter defective block number", ':',
-		    &ioparam, (int *)NULL, DATA_INPUT);
+		    &ioparam, NULL, DATA_INPUT);
 		def.cyl = bn2c(bn);
 		def.head = bn2h(bn);
 		def.sect = bn2s(bn);
@@ -309,13 +299,13 @@ loop:
 		ioparam.io_bounds.upper = pcyl - 1;
 		def.cyl = input(FIO_INT,
 		    "Enter defect's cylinder number", ':',
-		    &ioparam, (int *)NULL, DATA_INPUT);
+		    &ioparam, NULL, DATA_INPUT);
 		ioparam.io_bounds.upper = nhead - 1;
 		def.head = input(FIO_INT, "Enter defect's head number",
-		    ':', &ioparam, (int *)NULL, DATA_INPUT);
+		    ':', &ioparam, NULL, DATA_INPUT);
 		ioparam.io_bounds.upper = cur_dtype->dtype_bpt - 1;
 		def.bfi = input(FIO_INT, "Enter defect's bytes-from-index",
-		    ':', &ioparam, (int *)NULL, DATA_INPUT);
+		    ':', &ioparam, NULL, DATA_INPUT);
 		ioparam.io_bounds.lower = -1;
 		ioparam.io_bounds.upper = (cur_dtype->dtype_bpt - def.bfi) * 8;
 		if (ioparam.io_bounds.upper >= 32 * 1024)
@@ -374,7 +364,7 @@ loop:
  * to manually delete a defect from the working list.
  */
 int
-d_delete()
+d_delete(void)
 {
 	int		i, count, num;
 	u_ioparam_t	ioparam;
@@ -397,7 +387,7 @@ d_delete()
 	ioparam.io_bounds.lower = 1;
 	ioparam.io_bounds.upper = count;
 	num = input(FIO_INT, "Specify defect to be deleted (enter its number)",
-	    ':', &ioparam, (int *)NULL, DATA_INPUT);
+	    ':', &ioparam, NULL, DATA_INPUT);
 	/*
 	 *
 	 * The user thinks it's one relative but it's not really.
@@ -449,7 +439,7 @@ d_delete()
  * defect list out in human-readable format.
  */
 int
-d_print()
+d_print(void)
 {
 	int	i, nomore = 0;
 	int	c, one_line = 0;
@@ -537,7 +527,7 @@ PRINT_EXIT:
  * defect list to a file.
  */
 int
-d_dump()
+d_dump(void)
 {
 	int	i, status = 0;
 	char	*str;
@@ -561,7 +551,7 @@ d_dump()
 	 * type OSTR.
 	 */
 	str = (char *)(uintptr_t)input(FIO_OSTR, "Enter name of defect file",
-	    ':', (u_ioparam_t *)NULL, (int *)NULL, DATA_INPUT);
+	    ':', NULL, NULL, DATA_INPUT);
 	/*
 	 * Lock out interrupts so the file doesn't get half written.
 	 */
@@ -610,7 +600,7 @@ out:
  * list in from a file.
  */
 int
-d_load()
+d_load(void)
 {
 	int	i, items, status = 0, count, cksum;
 	uint_t	magicno;
@@ -626,7 +616,7 @@ d_load()
 	 * input will be malloc'd space since we inputted type OSTR.
 	 */
 	str = (char *)(uintptr_t)input(FIO_OSTR, "Enter name of defect file",
-	    ':', (u_ioparam_t *)NULL, (int *)NULL, DATA_INPUT);
+	    ':', NULL, NULL, DATA_INPUT);
 	/*
 	 * Copy the file name into local space then destroy the string
 	 * it came in.  This is simply a precaution against later having
@@ -752,7 +742,7 @@ out:
  * the next format.
  */
 int
-d_commit()
+d_commit(void)
 {
 	/*
 	 * If the working list wasn't modified, no commit is necessary.
@@ -771,7 +761,7 @@ d_commit()
 }
 
 int
-do_commit()
+do_commit(void)
 {
 	int	status;
 
@@ -788,7 +778,7 @@ do_commit()
 
 
 static int
-commit_list()
+commit_list(void)
 {
 	int	i;
 
@@ -846,7 +836,7 @@ commit_list()
  * manufacturer's defect on the current disk from the defect list
  */
 int
-d_create()
+d_create(void)
 {
 	int	status;
 
@@ -898,7 +888,7 @@ IT WILL DESTROY ALL OF THE DATA ON THE DISK! Continue"))
  * Extract primary defect list - SCSI only
  */
 int
-d_primary()
+d_primary(void)
 {
 	int	status;
 
@@ -941,7 +931,7 @@ d_primary()
  * Extract grown defects list - SCSI only
  */
 int
-d_grown()
+d_grown(void)
 {
 	int	status;
 
@@ -984,7 +974,7 @@ d_grown()
  * Extract both primary and grown defects list - SCSI only
  */
 int
-d_both()
+d_both(void)
 {
 	int	status;
 

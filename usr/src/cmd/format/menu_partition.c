@@ -35,7 +35,6 @@
 #include "misc.h"
 #include "param.h"
 
-/* Function prototypes for ANSI C Compilers */
 static void	nspaces(int);
 static int	ndigits(uint64_t);
 
@@ -344,7 +343,7 @@ p_name(void)
 	 */
 	name = (char *)(uintptr_t)input(FIO_OSTR,
 	    "Enter table name (remember quotes)",
-	    ':', (u_ioparam_t *)NULL, (int *)NULL, DATA_INPUT);
+	    ':', NULL, NULL, DATA_INPUT);
 	/*
 	 * Lock out interrupts.
 	 */
@@ -493,13 +492,13 @@ print_efi_partition(struct dk_gpt *map, int partnum, int want_header)
 
 	fmt_print("  %d ", partnum);
 	s = find_string(ptag_choices, (int)map->efi_parts[partnum].p_tag);
-	if (s == (char *)NULL)
+	if (s == NULL)
 		s = "-";
 	nspaces(10 - (int)strlen(s));
 	fmt_print("%s", s);
 
 	s = find_string(pflag_choices, (int)map->efi_parts[partnum].p_flag);
-	if (s == (char *)NULL)
+	if (s == NULL)
 		s = "-";
 	nspaces(6 - (int)strlen(s));
 	fmt_print("%s", s);
@@ -594,7 +593,7 @@ print_partition(struct partition_info *pinfo, int partnum, int want_header)
 	 * Print the partition tag.  If invalid, print -
 	 */
 	s = find_string(ptag_choices, (int)pinfo->vtoc.v_part[partnum].p_tag);
-	if (s == (char *)NULL)
+	if (s == NULL)
 		s = "-";
 	nspaces(10 - (int)strlen(s));
 	fmt_print("%s", s);

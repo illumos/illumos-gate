@@ -27,8 +27,6 @@
 #ifndef	_PARTITION_H
 #define	_PARTITION_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

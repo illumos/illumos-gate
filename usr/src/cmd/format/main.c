@@ -118,7 +118,7 @@ main(int argc, char *argv[])
 	 * Initialize cur_ctype to avoid null pointer dereference
 	 * in auto_efi_sense().
 	 */
-	cur_ctype = (struct ctlr_type *)NULL;
+	cur_ctype = NULL;
 	/*
 	 * Decode the command line options.
 	 */
@@ -153,7 +153,7 @@ main(int argc, char *argv[])
 	 * look like disks.
 	 */
 	if (i < 0) {
-		arglist = (char **)NULL;
+		arglist = NULL;
 	/*
 	 * There were disks on the command line.  They comprise the
 	 * search list.
@@ -174,7 +174,7 @@ main(int argc, char *argv[])
 	act.sa_handler = cmdabort;
 	(void) memset(&act.sa_mask, 0, sizeof (sigset_t));
 	act.sa_flags = SA_RESTART | SA_NODEFER;
-	if (sigaction(SIGINT, &act, (struct sigaction *)NULL) == -1) {
+	if (sigaction(SIGINT, &act, NULL) == -1) {
 		err_print("sigaction(SIGINT) failed - %s\n",
 		    strerror(errno));
 		fullabort();
@@ -183,7 +183,7 @@ main(int argc, char *argv[])
 	act.sa_handler = onsusp;
 	(void) memset(&act.sa_mask, 0, sizeof (sigset_t));
 	act.sa_flags = SA_RESTART | SA_NODEFER;
-	if (sigaction(SIGTSTP, &act, (struct sigaction *)NULL) == -1) {
+	if (sigaction(SIGTSTP, &act, NULL) == -1) {
 		err_print("sigaction(SIGTSTP) failed - %s\n",
 		    strerror(errno));
 		fullabort();
@@ -192,7 +192,7 @@ main(int argc, char *argv[])
 	act.sa_handler = onalarm;
 	(void) memset(&act.sa_mask, 0, sizeof (sigset_t));
 	act.sa_flags = SA_RESTART;
-	if (sigaction(SIGALRM, &act, (struct sigaction *)NULL) == -1) {
+	if (sigaction(SIGALRM, &act, NULL) == -1) {
 		err_print("sigaction(SIGALRM) failed - %s\n",
 		    strerror(errno));
 		fullabort();
@@ -613,7 +613,7 @@ Select <partition> <expand> to adjust the label capacity. \n");
  * prompting for everything that isn't in the label.
  */
 static void
-get_disk_characteristics()
+get_disk_characteristics(void)
 {
 	/*
 	 * The need_spefs flag is used to tell us that this disk

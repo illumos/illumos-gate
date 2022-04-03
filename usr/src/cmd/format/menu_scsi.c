@@ -44,11 +44,6 @@
 #include "startup.h"
 #include "checkdev.h"
 
-
-#ifdef	__STDC__
-/*
- *	ANSI prototypes for local static functions
- */
 static int	do_mode_sense(int);
 static int	do_mode_sense_all(void);
 static int	do_mode_select(struct chg_list *);
@@ -64,24 +59,6 @@ static void	free_change_list(void);
 static void	do_default(char *);
 static void	default_all_pages(void);
 static int	default_page(int);
-#else
-static int	do_mode_sense();
-static int	do_mode_sense_all();
-static int	do_mode_select();
-static int	do_format();
-static void	do_list();
-static int	do_inquiry();
-static void	do_apply();
-static void	do_cancel();
-static void	do_display();
-static int	parse_change_spec();
-static void	add_new_change_list_item();
-static void	free_change_list();
-static void	do_default();
-static void	default_all_pages();
-static int	default_page();
-#endif	/* __STDC__ */
-
 
 /*
  * Menu data for the SCSI menu display
@@ -159,7 +136,7 @@ static	struct chg_list	*change_list;
  * so we cannot use the standard format menu-handling functions.
  */
 int
-c_scsi()
+c_scsi(void)
 {
 	int			i;
 	struct env		env;
@@ -336,8 +313,7 @@ exit:
  * Get all the various flavors:  default, current, saved, changeable.
  */
 static int
-do_mode_sense(pageno)
-	int	pageno;
+do_mode_sense(int pageno)
 {
 	struct scsi_ms_header	header;
 	struct mode_page	*pg;
@@ -354,39 +330,35 @@ do_mode_sense(pageno)
 
 	fmt_print("\nPage 0x%x:\n", pageno);
 	if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_DEFAULT,
-			msbuf, MAX_MODE_SENSE_SIZE, &header)) {
+	    msbuf, MAX_MODE_SENSE_SIZE, &header)) {
 		err_print("%sfailed\n", default_msg);
 		result = 1;
 	} else {
-		dump(default_msg, msbuf, MODESENSE_PAGE_LEN(pg),
-			HEX_ONLY);
+		dump(default_msg, msbuf, MODESENSE_PAGE_LEN(pg), HEX_ONLY);
 	}
 
 	if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_CURRENT,
-			msbuf, MAX_MODE_SENSE_SIZE, &header)) {
+	    msbuf, MAX_MODE_SENSE_SIZE, &header)) {
 		err_print("%sfailed\n", current_msg);
 		result = 1;
 	} else {
-		dump(current_msg, msbuf, MODESENSE_PAGE_LEN(pg),
-			HEX_ONLY);
+		dump(current_msg, msbuf, MODESENSE_PAGE_LEN(pg), HEX_ONLY);
 	}
 
 	if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_SAVED,
-			msbuf, MAX_MODE_SENSE_SIZE, &header)) {
+	    msbuf, MAX_MODE_SENSE_SIZE, &header)) {
 		err_print("%sfailed\n", saved_msg);
 		result = 1;
 	} else {
-		dump(saved_msg, msbuf, MODESENSE_PAGE_LEN(pg),
-			HEX_ONLY);
+		dump(saved_msg, msbuf, MODESENSE_PAGE_LEN(pg), HEX_ONLY);
 	}
 
 	if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_CHANGEABLE,
-			msbuf, MAX_MODE_SENSE_SIZE, &header)) {
+	    msbuf, MAX_MODE_SENSE_SIZE, &header)) {
 		err_print("%sfailed\n", changeable_msg);
 		result = 1;
 	} else {
-		dump(changeable_msg, msbuf, MODESENSE_PAGE_LEN(pg),
-			HEX_ONLY);
+		dump(changeable_msg, msbuf, MODESENSE_PAGE_LEN(pg), HEX_ONLY);
 	}
 
 	fmt_print("\n");
@@ -398,7 +370,7 @@ do_mode_sense(pageno)
  * Dump all the pages a device supports
  */
 static int
-do_mode_sense_all()
+do_mode_sense_all(void)
 {
 	int	result = 0;
 
@@ -426,8 +398,7 @@ do_mode_sense_all()
  * are changeable.
  */
 static int
-do_mode_select(change_item)
-	struct chg_list	*change_item;
+do_mode_select(struct chg_list *change_item)
 {
 	struct scsi_ms_header	header;
 	char			saved[MAX_MODE_SENSE_SIZE];
@@ -445,9 +416,9 @@ do_mode_select(change_item)
 	 * Get changeable mode sense
 	 */
 	if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_CHANGEABLE,
-			changeable, MAX_MODE_SENSE_SIZE, &header)) {
+	    changeable, MAX_MODE_SENSE_SIZE, &header)) {
 		err_print("Mode sense on page %x (changeable) failed\n",
-			pageno);
+		    pageno);
 		return (1);
 	}
 
@@ -455,13 +426,12 @@ do_mode_select(change_item)
 	 * Get saved mode sense.  If saved fails, use current values.
 	 */
 	if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_SAVED,
-			saved, MAX_MODE_SENSE_SIZE, &header)) {
-		err_print("Mode sense on page %x (saved) failed\n",
-			pageno);
+	    saved, MAX_MODE_SENSE_SIZE, &header)) {
+		err_print("Mode sense on page %x (saved) failed\n", pageno);
 		if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_CURRENT,
-				saved, MAX_MODE_SENSE_SIZE, &header)) {
+		    saved, MAX_MODE_SENSE_SIZE, &header)) {
 			err_print("Mode sense on page %x (current) failed\n",
-				pageno);
+			    pageno);
 			return (1);
 		} else {
 			err_print("Using current values instead\n");
@@ -479,7 +449,7 @@ do_mode_select(change_item)
 	 * Try making this change to this page
 	 */
 	if (apply_chg_list(pageno, length, (uchar_t *)saved,
-			(uchar_t *)changeable, change_item)) {
+	    (uchar_t *)changeable, change_item)) {
 		/*
 		 * A change was made.  Do a mode select
 		 * We always want to set the Page Format bit.
@@ -494,7 +464,7 @@ do_mode_select(change_item)
 		header.mode_header.length = 0;
 		header.mode_header.device_specific = 0;
 		if (uscsi_mode_select(cur_file, pageno, flags,
-				saved, length, &header)) {
+		    saved, length, &header)) {
 			/*
 			 * Failed - try not saving parameters,
 			 * if possible.
@@ -502,8 +472,7 @@ do_mode_select(change_item)
 			if (flags & MODE_SELECT_SP) {
 				flags &= ~MODE_SELECT_SP;
 				if (uscsi_mode_select(cur_file, pageno,
-						flags, saved,
-						length, &header)) {
+				    flags, saved, length, &header)) {
 					result = 1;
 				}
 			} else {
@@ -535,7 +504,7 @@ Mode select on page %x ok.\n", pageno);
  * Ask if we should format with the P or the P&G lists.
  */
 static int
-do_format()
+do_format(void)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
@@ -621,7 +590,7 @@ currently being used for swapping.\n\n");
  * List common SCSI-2 mode pages
  */
 static void
-do_list()
+do_list(void)
 {
 	fmt_print("\n\
 Common SCSI-2 pages applicable to direct-access devices:\n\n");
@@ -666,7 +635,7 @@ static char *scsi_inquiry_labels[] = {
  * Dump the full inquiry as returned by the device
  */
 static int
-do_inquiry()
+do_inquiry(void)
 {
 	char			inqbuf[255];
 	struct scsi_inquiry	*inq;
@@ -721,7 +690,7 @@ do_inquiry()
 
 
 static void
-do_apply()
+do_apply(void)
 {
 	if (change_list == NULL) {
 		fmt_print("\nlist empty.\n");
@@ -733,7 +702,7 @@ do_apply()
 
 
 static void
-do_cancel()
+do_cancel(void)
 {
 	if (change_list == NULL) {
 		fmt_print("\nlist empty.\n");
@@ -744,7 +713,7 @@ do_cancel()
 
 
 static void
-do_display()
+do_display(void)
 {
 	struct chg_list	*cp;
 
@@ -776,11 +745,8 @@ do_display()
 
 
 static int
-parse_change_spec(full_input, input, pageno, chg_item)
-	char		*full_input;
-	char		*input;
-	int		pageno;
-	struct chg_list	*chg_item;
+parse_change_spec(char *full_input, char *input, int pageno,
+    struct chg_list *chg_item)
 {
 	char		*p;
 	int		tilde;
@@ -797,8 +763,7 @@ parse_change_spec(full_input, input, pageno, chg_item)
 		return (0);
 	}
 	if (chg_item->byteno < 2) {
-		err_print(" Unsupported byte offset: %d\n",
-			chg_item->byteno);
+		err_print(" Unsupported byte offset: %d\n", chg_item->byteno);
 		return (0);
 	}
 	for (input = p; *input == ' '; input++)
@@ -851,8 +816,7 @@ parse_change_spec(full_input, input, pageno, chg_item)
 
 
 static void
-add_new_change_list_item(chg_item)
-	struct chg_list		*chg_item;
+add_new_change_list_item(struct chg_list *chg_item)
 {
 	struct chg_list	*cp;
 
@@ -868,7 +832,7 @@ add_new_change_list_item(chg_item)
 
 
 static void
-free_change_list()
+free_change_list(void)
 {
 	struct chg_list	*cp;
 	struct chg_list	*cp2;
@@ -884,8 +848,7 @@ free_change_list()
 
 
 static void
-do_default(input)
-	char		*input;
+do_default(char *input)
 {
 	char		*s = input;
 	char		*p;
@@ -935,7 +898,7 @@ do_default(input)
 
 
 static void
-default_all_pages()
+default_all_pages(void)
 {
 	char			*p;
 	struct mode_header	*mh;
@@ -1004,8 +967,7 @@ error:
 
 
 static int
-default_page(pageno)
-	int		pageno;
+default_page(int pageno)
 {
 	struct scsi_ms_header	header;
 	char			saved[MAX_MODE_SENSE_SIZE];
@@ -1023,9 +985,8 @@ default_page(pageno)
 	 * Get default mode sense
 	 */
 	if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_DEFAULT,
-			dfault, MAX_MODE_SENSE_SIZE, &header)) {
-		err_print("Mode sense on page %x (dfault) failed\n",
-			pageno);
+	    dfault, MAX_MODE_SENSE_SIZE, &header)) {
+		err_print("Mode sense on page %x (dfault) failed\n", pageno);
 		return (0);
 	}
 
@@ -1033,9 +994,8 @@ default_page(pageno)
 	 * Get the current mode sense.
 	 */
 	if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_CURRENT,
-			current, MAX_MODE_SENSE_SIZE, &header)) {
-		err_print("Mode sense on page %x (current) failed\n",
-			pageno);
+	    current, MAX_MODE_SENSE_SIZE, &header)) {
+		err_print("Mode sense on page %x (current) failed\n", pageno);
 		return (0);
 	}
 
@@ -1044,7 +1004,7 @@ default_page(pageno)
 	 * the same as the current.
 	 */
 	if (uscsi_mode_sense(cur_file, pageno, MODE_SENSE_PC_SAVED,
-			saved, MAX_MODE_SENSE_SIZE, &header)) {
+	    saved, MAX_MODE_SENSE_SIZE, &header)) {
 		(void) memcpy(saved, current, MAX_MODE_SENSE_SIZE);
 	}
 
@@ -1067,8 +1027,7 @@ default_page(pageno)
 	}
 
 	if (need_mode_select == 0) {
-		fmt_print("Defaulting page 0x%x: ok\n",
-			pageno);
+		fmt_print("Defaulting page 0x%x: ok\n", pageno);
 		return (1);
 	}
 
@@ -1087,7 +1046,7 @@ default_page(pageno)
 	header.mode_header.length = 0;
 	header.mode_header.device_specific = 0;
 	if (uscsi_mode_select(cur_file, pageno, flags,
-			current, length, &header)) {
+	    current, length, &header)) {
 		/*
 		 * Failed - try not saving parameters,
 		 * if possible.
@@ -1095,12 +1054,11 @@ default_page(pageno)
 		if (flags & MODE_SELECT_SP) {
 			flags &= ~MODE_SELECT_SP;
 			if (uscsi_mode_select(cur_file, pageno, flags,
-					saved, length, &header)) {
+			    saved, length, &header)) {
 				fmt_print("Defaulting page 0x%x: failed\n",
-					pageno);
+				    pageno);
 			} else {
-				fmt_print("Defaulting page 0x%x: ",
-					pageno);
+				fmt_print("Defaulting page 0x%x: ", pageno);
 				fmt_print("cannot save page permanently\n");
 			}
 		} else {
