@@ -250,6 +250,7 @@ auto_efi_sense(int fd, struct efi_info *label)
 	struct dk_cinfo dkinfo;
 	struct partition_info *part;
 	uint64_t reserved;
+	uint16_t type;
 
 	if (ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
 		if (option_msg && diag_msg) {
@@ -257,11 +258,14 @@ auto_efi_sense(int fd, struct efi_info *label)
 		}
 		return (NULL);
 	}
-	if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_DIRECT ||
-	    cur_ctype->ctype_ctype == DKC_VBD ||
-	    cur_ctype->ctype_ctype == DKC_BLKDEV)) {
-		ctlr = find_ctlr_info(&dkinfo, cur_ctype->ctype_ctype);
-		disk_info = find_disk_info(&dkinfo, cur_ctype->ctype_ctype);
+	if (cur_ctype != NULL)
+		type = cur_ctype->ctype_ctype;
+	else
+		type = dkinfo.dki_ctype;
+
+	if (type == DKC_DIRECT || type == DKC_VBD || type == DKC_BLKDEV) {
+		ctlr = find_ctlr_info(&dkinfo, type);
+		disk_info = find_disk_info(&dkinfo, type);
 	} else {
 		ctlr = find_scsi_ctlr_info(&dkinfo);
 		disk_info = find_scsi_disk_info(&dkinfo);

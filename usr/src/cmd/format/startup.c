@@ -1920,7 +1920,9 @@ add_device_to_disklist(char *devname, char *devpath)
 	 * Configuration.
 	 */
 	ctlr = search_ctlr->ctlr_ctype;
-	if ((status == -1) && (ctlr->ctype_ctype == DKC_SCSI_CCS)) {
+	if ((status == -1) &&
+	    (ctlr->ctype_ctype == DKC_SCSI_CCS ||
+	    ctlr->ctype_ctype == DKC_BLKDEV)) {
 		if (option_msg && diag_msg) {
 			err_print("%s: attempting auto configuration\n",
 			    search_disk->disk_name);
@@ -1937,8 +1939,10 @@ add_device_to_disklist(char *devname, char *devpath)
 				status = 0;
 				search_disk->disk_flags |=
 				    (DSK_LABEL_DIRTY | DSK_AUTO_CONFIG);
+				break;
 			}
-			break;
+			/* With SOLARIS label type failed, try EFI. */
+			/* FALLTHROUGH */
 		case (L_TYPE_EFI):
 			efi_disk = auto_efi_sense(search_file, &efi_info);
 			if (efi_disk != NULL) {
@@ -1946,6 +1950,7 @@ add_device_to_disklist(char *devname, char *devpath)
 				 * Auto config worked, so we now have
 				 * a valid label for the disk.
 				 */
+				search_disk->label_type = L_TYPE_EFI;
 				status = 0;
 				search_disk->disk_flags |=
 				    (DSK_LABEL_DIRTY | DSK_AUTO_CONFIG);
