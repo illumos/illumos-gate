@@ -11,16 +11,22 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
  * vdso_tool: a build-time tool for adjusting properties of the "lx_vdso.so.1"
  * object we build for VDSO emulation in the LX brand.
  *
- * This tool ensures that the shared object contains only one loadable program
- * header (PT_LOAD), and extends the size of that program header to induce the
- * loading of all sections into memory.  It also sets a few attributes in the
- * ELF header.
+ * This tool:
+ * - sets a few attributes in the ELF header;
+ * - ensures that there is only a single PT_LOAD program header section;
+ * - extends the size of that PT_LOAD program header to induce the loading of
+ *   all sections into memory.
+ * - ensures that there is only a single PT_DYNAMIC program header section;
+ * - ensures that that PT_DYNAMIC section's p_flags do not have the writeable
+ *   bit set; this is used by glibc >= 2.35 as the basis for whether to
+ *   do relocation.
  */
 
 #include <stdlib.h>
@@ -47,6 +53,7 @@ typedef struct vdso {
 	Elf *v_elf;
 	vdso_flags_t v_flags;
 	int v_ptload_phdr;
+	int v_ptdynamic_phdr;
 	Elf64_Off v_max_offset;
 } vdso_t;
 
@@ -59,7 +66,7 @@ open_vdso(vdso_t **vp, char *path)
 	    (v->v_path = strdup(path)) == NULL) {
 		err(1, "could not allocate memory");
 	}
-	v->v_ptload_phdr = -1;
+	v->v_ptload_phdr = v->v_ptdynamic_phdr = -1;
 	v->v_fd = -1;
 	*vp = v;
 
@@ -180,9 +187,9 @@ errout:
 }
 
 static int
-find_pt_load_phdr(vdso_t *v)
+find_phdrs(vdso_t *v)
 {
-	size_t nphdr, nloadable = 0;
+	size_t nphdr, nloadable = 0, ndynamic = 0;
 	int i;
 
 	if (elf_getphdrnum(v->v_elf, &nphdr) != 0) {
@@ -203,8 +210,8 @@ find_pt_load_phdr(vdso_t *v)
 
 		if (phdr.p_type == PT_LOAD) {
 			if (nloadable++ != 0) {
-				(void) fprintf(stderr, "multiple PT_LOAD "
-				    "phdrs\n");
+				(void) fprintf(stderr,
+				    "multiple PT_LOAD phdrs\n");
 				goto errout;
 			}
 
@@ -220,7 +227,26 @@ find_pt_load_phdr(vdso_t *v)
 			}
 
 			if (phdr.p_filesz == 0) {
-				(void) fprintf(stderr, "filesz was zero\n");
+				(void) fprintf(stderr,
+				    "PT_LOAD filesz was zero\n");
+				goto errout;
+			}
+		}
+
+		if (phdr.p_type == PT_DYNAMIC) {
+			if (ndynamic++ != 0) {
+				(void) fprintf(stderr,
+				    "multiple PT_DYNAMIC phdrs\n");
+				goto errout;
+			}
+
+			(void) fprintf(stdout,
+			    "PT_DYNAMIC header is phdr[%d]\n", i);
+			v->v_ptdynamic_phdr = i;
+
+			if (phdr.p_filesz == 0) {
+				(void) fprintf(stderr,
+				    "PT_DYNAMIC filesz was zero\n");
 				goto errout;
 			}
 		}
@@ -309,6 +335,44 @@ errout:
 	return (-1);
 }
 
+static int
+update_pt_dynamic_flags(vdso_t *v)
+{
+	GElf_Phdr phdr;
+
+	if (gelf_getphdr(v->v_elf, v->v_ptdynamic_phdr, &phdr) == NULL) {
+		(void) fprintf(stderr, "could not get phdr[%d] count: %s\n",
+		    v->v_ptdynamic_phdr, elf_errmsg(-1));
+		goto errout;
+	}
+
+	(void) fprintf(stdout, "PT_DYNAMIC flags are currently %x\n",
+	    phdr.p_flags);
+
+	if (phdr.p_flags & PF_W) {
+		phdr.p_flags &= ~PF_W;
+
+		(void) fprintf(stdout, "PT_DYNAMIC flags are now %x\n",
+		    phdr.p_flags);
+
+		if (gelf_update_phdr(v->v_elf, v->v_ptdynamic_phdr,
+		    &phdr) == 0) {
+			(void) fprintf(stderr,
+			    "could not update PT_DYNAMIC phdr: %s",
+			    elf_errmsg(-1));
+			goto errout;
+		}
+
+		v->v_flags |= VDSO_UPDATE;
+	}
+
+	return (0);
+
+errout:
+	v->v_flags |= VDSO_UNLINK;
+	return (-1);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -363,7 +427,7 @@ main(int argc, char **argv)
 	}
 
 	status++;
-	if (find_pt_load_phdr(v) == -1) {
+	if (find_phdrs(v) == -1) {
 		goto out;
 	}
 
@@ -374,6 +438,11 @@ main(int argc, char **argv)
 
 	status++;
 	if (do_update && update_pt_load_size(v) == -1) {
+		goto out;
+	}
+
+	status++;
+	if (do_update && update_pt_dynamic_flags(v) == -1) {
 		goto out;
 	}
 
