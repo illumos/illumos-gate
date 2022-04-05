@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 Joyent, Inc.
  */
 
 /*
@@ -2732,6 +2732,8 @@ conn_get_socket_info(conn_t *connp, mib2_socketInfoEntry_t *sie)
 	vnode_t *vn = NULL;
 	vattr_t attr;
 	uint64_t flags = 0;
+	sock_upcalls_t *upcalls;
+	sock_upper_handle_t upper_handle;
 
 	/*
 	 * If the connection is closing, it is not safe to make an upcall or
@@ -2750,11 +2752,21 @@ conn_get_socket_info(conn_t *connp, mib2_socketInfoEntry_t *sie)
 	 * Continue to hold conn_lock because we don't want to race with an
 	 * in-progress close, which will have set-to-NULL (and destroyed
 	 * upper_handle, aka sonode (and vnode)) BEFORE setting CONN_CLOSING.
+	 *
+	 * There is still a race with an in-progress OPEN, however, where
+	 * conn_upper_handle and conn_upcalls are being assigned (in multiple
+	 * codepaths) WITHOUT conn_lock being held.  We address that race
+	 * HERE, however, given that both are going from NULL to non-NULL,
+	 * if we lose the race, we don't get any data for the in-progress-OPEN
+	 * socket.
 	 */
 
-	if (connp->conn_upper_handle != NULL) {
-		vn = (*connp->conn_upcalls->su_get_vnode)
-		    (connp->conn_upper_handle);
+	upcalls = connp->conn_upcalls;
+	upper_handle = connp->conn_upper_handle;
+	/* Check BOTH for non-NULL before attempting an upcall. */
+	if (upper_handle != NULL && upcalls != NULL) {
+		/* su_get_vnode() returns one with VN_HOLD() already done. */
+		vn = upcalls->su_get_vnode(upper_handle);
 	} else if (!IPCL_IS_NONSTR(connp) && connp->conn_rq != NULL) {
 		vn = STREAM(connp->conn_rq)->sd_pvnode;
 		if (vn != NULL)
