@@ -57,7 +57,7 @@ typedef struct pdinfo
 	uint32_t		pd_unit;	/* unit number */
 	uint32_t		pd_open;	/* reference counter */
 	void			*pd_bcache;	/* buffer cache data */
-	struct pdinfo		*pd_parent;	/* Linked items (eg partitions) */
+	struct pdinfo		*pd_parent; /* Linked items (eg partitions) */
 	struct devsw		*pd_devsw;	/* Back pointer to devsw */
 } pdinfo_t;
 
@@ -120,7 +120,9 @@ void cpy16to8(const CHAR16 *, char *, size_t);
 
 EFI_STATUS efi_illumos_getenv(const char *v, void *data, size_t *len);
 EFI_STATUS efi_getenv(EFI_GUID *g, const char *v, void *data, size_t *len);
+EFI_STATUS efi_setenv(EFI_GUID *g, uint32_t, const char *, void *, size_t);
 EFI_STATUS efi_global_getenv(const char *v, void *data, size_t *len);
+EFI_STATUS efi_global_setenv(const char *v, void *data, size_t len);
 EFI_STATUS efi_setenv_illumos_wcs(const char *varname, CHAR16 *valstr);
 
 /* guids and names */
