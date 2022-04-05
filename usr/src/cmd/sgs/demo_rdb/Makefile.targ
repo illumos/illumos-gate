@@ -104,8 +104,3 @@ catalog check chkmsg:
 # DEMO DELETE END
 
 FRC:
-
-# DEMO DELETE START
-
-include		$(SRC)/cmd/sgs/Makefile.targ
-# DEMO DELETE END

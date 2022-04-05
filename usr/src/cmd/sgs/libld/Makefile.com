@@ -99,14 +99,14 @@ SMOFF += no_if_block
 
 # Location of the shared relocation engines maintained under usr/src/uts.
 #
-KRTLD_I386 = $(SRC)/uts/$(VAR_PLAT_i386)/krtld
-KRTLD_AMD64 = $(SRC)/uts/$(VAR_PLAT_amd64)/krtld
-KRTLD_SPARC = $(SRC)/uts/$(VAR_PLAT_sparc)/krtld
+KRTLD_I386 = $(SRC)/uts/intel/ia32/krtld
+KRTLD_AMD64 = $(SRC)/uts/intel/amd64/krtld
+KRTLD_SPARC = $(SRC)/uts/sparc/krtld
 
 
 CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRC)/lib/libc/inc \
 		    -I$(SRC)/uts/common/krtld -I$(SRC)/uts/sparc \
-		    $(VAR_LIBLD_CPPFLAGS)
+		    -I $(SRC)/uts/common
 LDLIBS +=	$(CONVLIBDIR) -lconv $(LDDBGLIBDIR) -llddbg \
 		    $(ELFLIBDIR) -lelf $(DLLIB) -lc
 
@@ -153,7 +153,7 @@ CHKSRCS =	$(SRC)/uts/common/krtld/reloc.h \
 LIBSRCS =	$(SGSCOMMONOBJ:%.o=$(SGSCOMMON)/%.c) \
 		$(SGSCOMMONOBJ:%.o=$(SGSCOMMON)/%.c) \
 		$(COMOBJS:%.o=$(SRCDIR)/common/%.c) \
-		$(AVLOBJS:%.o=$(VAR_AVLDIR)/%.c) \
+		$(AVLOBJS:%.o=$(SRC)/common/avl/%.c) \
 		$(BLTDATA)
 
 CLEANFILES +=	$(BLTFILES)

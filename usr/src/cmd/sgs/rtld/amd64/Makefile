@@ -91,4 +91,4 @@ adbmacros:	adb .WAIT $(ADBSCRIPTS)
 adbinstall:	adbmacros .WAIT $(ROOTADB64)
 
 include		$(SRC)/cmd/sgs/rtld/Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

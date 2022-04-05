@@ -34,4 +34,4 @@ all:		$(DYNLIB)
 install:	all $(ROOTDYNLIB64)
 
 include ../Makefile.targ
-include ../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

@@ -43,7 +43,7 @@ $(PROG):	$(PSRC)
 		$(CHMOD) +x $@
 
 install \
-package:	all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
+package:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(PROG)

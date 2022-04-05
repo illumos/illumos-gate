@@ -56,7 +56,6 @@ objs objs.xpg4:
 		-@ mkdir -p $@
 
 include		$(SRC)/cmd/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
 

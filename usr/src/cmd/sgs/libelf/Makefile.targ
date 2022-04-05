@@ -58,7 +58,6 @@ CLOBBERFILES += $(LIBLINKS)
 # include common library targets
 #
 include		$(SRC)/lib/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 xlate.c:	$(SRCDIR)/common/xlate.m4
 		$(M4) < $(SRCDIR)/common/xlate.m4 > xlate.c

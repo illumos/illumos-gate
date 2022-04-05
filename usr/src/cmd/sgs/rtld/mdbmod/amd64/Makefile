@@ -39,4 +39,4 @@ all:		$(BLTDEFS) .WAIT $(DYNLIB)
 install:	all .WAIT $(ROOTMDBLIBS)
 
 include		../Makefile.targ
-include		../../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

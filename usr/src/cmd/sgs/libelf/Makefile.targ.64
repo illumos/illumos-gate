@@ -57,7 +57,6 @@ CLOBBERFILES += $(LIBLINKS)
 # include common library targets
 #
 include		$(SRC)/lib/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 xlate.c:	../common/xlate.m4
 		$(M4) < ../common/xlate.m4 > xlate.c
@@ -96,6 +95,6 @@ $(BLTMESG):	$(SGSMSGALL) xlate.c xlate64.c
 #
 # 64-bit overrides
 #
-include ../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64
 
 FRC:

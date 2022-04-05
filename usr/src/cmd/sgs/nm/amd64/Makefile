@@ -61,11 +61,10 @@ $(PROG):	$(OBJS)
 		$(POST_PROCESS)
 
 package \
-install:	all $(VAR_SGSBINPROG64) $(VAR_SGSCCSLINK64)
+install:	all $(ROOTPROG64) $(ROOTCCSBINLINK64)
 
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
 
-include		../../Makefile.targ
 include		../../../Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

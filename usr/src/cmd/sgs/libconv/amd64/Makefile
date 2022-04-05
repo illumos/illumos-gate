@@ -23,15 +23,13 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include 	../Makefile.com
+include		../Makefile.com
 
 .PARALLEL:	$(PICS)
 .KEEP_STATE:
 
 install all:	$(LIBRARY) .WAIT
 
-include 	../Makefile.targ
-include		../../Makefile.sub.64
+include		../Makefile.targ
+include		$(SRC)/Makefile.master.64

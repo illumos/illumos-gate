@@ -51,7 +51,6 @@ delete:
 $(PICS):	pics
 
 include		$(SRC)/lib/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
 

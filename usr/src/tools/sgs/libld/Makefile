@@ -42,7 +42,7 @@ CW_LINKER =
 
 CPPFLAGS = $(NATIVE_CPPFLAGS) -DUSE_LIBLD_MALLOC -I$(SRC)/lib/libc/inc \
 		    -I$(SRC)/uts/common/krtld -I$(SRC)/uts/sparc \
-		    $(VAR_LIBLD_CPPFLAGS)
+		    -I$(SRC)/uts/common
 LDLIBS +=	-L../libconv -lconv -L$(ROOTONBLDLIBMACH) -llddbg -lelf -lc
 NATIVE_LIBS +=	libc.so
 

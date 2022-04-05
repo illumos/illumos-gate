@@ -29,8 +29,6 @@
 .KEEP_STATE_FILE: .make.state.$(MACH)
 
 
-include		$(SRC)/cmd/sgs/Makefile.var
-
 i386_ARCH =	intel
 sparc_ARCH =	sparc
 

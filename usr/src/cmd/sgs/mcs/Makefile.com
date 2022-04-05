@@ -28,8 +28,10 @@
 
 PROG=		mcs
 STRIPFILE=	strip
+ROOTLINKS=	$(ROOTBIN)/$(STRIPFILE)
 
-ROOTLINKS=	$(VAR_SGSBIN)/$(STRIPFILE)
+ROOTSTRIPFILEPROG=      $(STRIPFILE:%=$(ROOTCCSBIN)/%)
+ROOTSTRIPFILEPROG64=    $(STRIPFILE:%=$(ROOTCCSBIN64)/%)
 
 include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/sgs/Makefile.com

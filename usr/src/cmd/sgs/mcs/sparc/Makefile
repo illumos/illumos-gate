@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 
 include		../Makefile.com
 
@@ -31,7 +30,5 @@ include		../Makefile.com
 include		../Makefile.targ
 
 install \
-package:        all $(VAR_SGSBINPROG) $(ROOTLINKS) $(VAR_SGSCCSLINK)
-		$(RM) $(ROOTSTRIPFILEPROG)
-		$(SYMLINK) ../../bin/$(STRIPFILE) $(ROOTSTRIPFILEPROG)
-
+package:        all $(ROOTPROG)  $(ROOTSTRIPFILEPROG) \
+    $(ROOTLINKS) $(ROOTCCSBINLINK)
