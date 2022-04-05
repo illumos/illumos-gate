@@ -158,6 +158,16 @@ extern "C" {
 #define	__packed		__attribute__((__packed__))
 #define	__section(x)		__attribute__((__section__(x)))
 #define	__unused		__sun_attr__((__unused__))
+#ifdef DEBUG
+/* We want to discover unused variables in DEBUG build. */
+#define	__maybe_unused
+#else
+/*
+ * In release build, disable warnings about variables
+ * which are used only for debugging.
+ */
+#define	__maybe_unused		__sun_attr__((__unused__))
+#endif
 #define	__used			__attribute__((__used__))
 #define	__weak_symbol		__attribute__((__weak__))
 #define	__HIDDEN		__attribute__((visibility("hidden")))
