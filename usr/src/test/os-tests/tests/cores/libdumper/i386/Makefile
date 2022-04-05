@@ -16,3 +16,6 @@
 include ../Makefile.com
 
 install: all $(ROOTLIBS) $(ROOTLINKS)
+
+$(ROOTLIBS): $(ROOTLIBDIR)
+$(ROOTLINKS): $(ROOTLIBS)
