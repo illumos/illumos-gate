@@ -22,11 +22,10 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com> All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 The MathWorks, Inc.  All rights reserved.
- * Copyright 2019 Western Digital Corporation.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -719,7 +718,6 @@ bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	bd->d_dip = dip;
 	bd->d_handle = hdl;
-	hdl->h_bd = bd;
 	ddi_set_driver_private(dip, bd);
 
 	mutex_init(&bd->d_ksmutex, NULL, MUTEX_DRIVER, NULL);
@@ -862,6 +860,7 @@ bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "hotpluggable", NULL, 0);
 	}
 
+	hdl->h_bd = bd;
 	ddi_report_dev(dip);
 
 	return (DDI_SUCCESS);
@@ -893,9 +892,11 @@ fail_drive_info:
 static int
 bd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	bd_t	*bd;
+	bd_handle_t	hdl;
+	bd_t		*bd;
 
 	bd = ddi_get_driver_private(dip);
+	hdl = ddi_get_parent_data(dip);
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -906,6 +907,8 @@ bd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	default:
 		return (DDI_FAILURE);
 	}
+
+	hdl->h_bd = NULL;
 
 	if (bd->d_ksp != NULL) {
 		kstat_delete(bd->d_ksp);
