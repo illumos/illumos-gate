@@ -68,7 +68,7 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start)
     code const FAR *dcode;      /* local strm->distcode */
     unsigned lmask;             /* mask for first level of length codes */
     unsigned dmask;             /* mask for first level of distance codes */
-    code here;                  /* retrieved table entry */
+    code const *here;           /* retrieved table entry */
     unsigned op;                /* code bits, operation, extra bits, or */
                                 /*  window position, window bytes to copy */
     unsigned len;               /* match length, unused bytes */
@@ -105,20 +105,20 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start)
             hold += (unsigned long)(*in++) << bits;
             bits += 8;
         }
-        here = lcode[hold & lmask];
+        here = lcode + (hold & lmask);
       dolen:
-        op = (unsigned)(here.bits);
+        op = (unsigned)(here->bits);
         hold >>= op;
         bits -= op;
-        op = (unsigned)(here.op);
+        op = (unsigned)(here->op);
         if (op == 0) {                          /* literal */
-            Tracevv((stderr, here.val >= 0x20 && here.val < 0x7f ?
+            Tracevv((stderr, here->val >= 0x20 && here->val < 0x7f ?
                     "inflate:         literal '%c'\n" :
-                    "inflate:         literal 0x%02x\n", here.val));
-            *out++ = (unsigned char)(here.val);
+                    "inflate:         literal 0x%02x\n", here->val));
+            *out++ = (unsigned char)(here->val);
         }
         else if (op & 16) {                     /* length base */
-            len = (unsigned)(here.val);
+            len = (unsigned)(here->val);
             op &= 15;                           /* number of extra bits */
             if (op) {
                 if (bits < op) {
@@ -136,14 +136,14 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start)
                 hold += (unsigned long)(*in++) << bits;
                 bits += 8;
             }
-            here = dcode[hold & dmask];
+            here = dcode + (hold & dmask);
           dodist:
-            op = (unsigned)(here.bits);
+            op = (unsigned)(here->bits);
             hold >>= op;
             bits -= op;
-            op = (unsigned)(here.op);
+            op = (unsigned)(here->op);
             if (op & 16) {                      /* distance base */
-                dist = (unsigned)(here.val);
+                dist = (unsigned)(here->val);
                 op &= 15;                       /* number of extra bits */
                 if (bits < op) {
                     hold += (unsigned long)(*in++) << bits;
@@ -262,7 +262,7 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start)
                 }
             }
             else if ((op & 64) == 0) {          /* 2nd level distance code */
-                here = dcode[here.val + (hold & ((1U << op) - 1))];
+                here = dcode + here->val + (hold & ((1U << op) - 1));
                 goto dodist;
             }
             else {
@@ -272,7 +272,7 @@ void ZLIB_INTERNAL inflate_fast(z_streamp strm, unsigned start)
             }
         }
         else if ((op & 64) == 0) {              /* 2nd level length code */
-            here = lcode[here.val + (hold & ((1U << op) - 1))];
+            here = lcode + here->val + (hold & ((1U << op) - 1));
             goto dolen;
         }
         else if (op & 32) {                     /* end-of-block */
