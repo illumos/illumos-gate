@@ -29,6 +29,7 @@
 #include <stdarg.h>
 #include <err.h>
 #include <assert.h>
+#include <libcmdutils.h>
 
 #include "nvmeadm.h"
 
@@ -585,14 +586,19 @@ void
 nvme_print_nsid_summary(nvme_identify_nsid_t *idns)
 {
 	int bsize = 1 << idns->id_lbaf[idns->id_flbas.lba_format].lbaf_lbads;
+	char numbuf[40];
 
-	(void) printf("Size = %"PRId64" MB, "
-	    "Capacity = %"PRId64" MB, "
-	    "Used = %"PRId64" MB\n",
-	    idns->id_nsize * bsize / 1024 / 1024,
-	    idns->id_ncap * bsize / 1024 / 1024,
-	    idns->id_nuse * bsize / 1024 / 1024);
+	nicenum_scale(idns->id_nsize, bsize, numbuf, sizeof (numbuf),
+	    NN_UNIT_SPACE);
+	(void) printf("Size = %sB, ", numbuf);
 
+	nicenum_scale(idns->id_ncap, bsize, numbuf, sizeof (numbuf),
+	    NN_UNIT_SPACE);
+	(void) printf("Capacity = %sB, ", numbuf);
+
+	nicenum_scale(idns->id_nuse, bsize, numbuf, sizeof (numbuf),
+	    NN_UNIT_SPACE);
+	(void) printf("Used = %sB\n", numbuf);
 }
 
 /*
