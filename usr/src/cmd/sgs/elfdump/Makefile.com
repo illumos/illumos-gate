@@ -51,11 +51,10 @@ MAPOPT=		$(MAPFILE:%=-Wl,-M%)
 CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
 		-I$(SRC)/lib/libc/inc -I$(SRC)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master) -I$(ELFCAP)
-LLDFLAGS =	'-R$$ORIGIN/../../lib'
-LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
-LDFLAGS +=	$(VERSREF) $(MAPOPT) $(LLDFLAGS)
-LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) -llddbg \
-		    $(CONVLIBDIR) -lconv
+
+LDFLAGS +=	$(VERSREF) $(MAPOPT) '-R$$ORIGIN/../../lib/$(MACH64)'
+LDLIBS +=	$(ELFLIBDIR64) -lelf $(LDDBGLIBDIR64) -llddbg \
+		    $(CONVLIBDIR64) -lconv
 
 NATIVE_LDFLAGS = $(LDASSERTS) $(BDIRECT)
 

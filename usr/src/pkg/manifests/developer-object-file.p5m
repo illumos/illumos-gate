@@ -36,7 +36,7 @@ dir  path=usr/bin
 dir  path=usr/bin/$(ARCH64)
 file path=usr/bin/$(ARCH64)/ar mode=0555
 file path=usr/bin/$(ARCH64)/dump mode=0555
-file path=usr/bin/$(ARCH64)/elfdump mode=0555
+link path=usr/bin/$(ARCH64)/elfdump target=../../bin/elfdump
 file path=usr/bin/$(ARCH64)/elfedit mode=0555
 file path=usr/bin/$(ARCH64)/mcs mode=0555
 file path=usr/bin/$(ARCH64)/nm mode=0555

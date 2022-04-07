@@ -31,15 +31,12 @@ include		../Makefile.com
 .KEEP_STATE:
 
 ARCH =		amd64
-LLDFLAGS =	$(LLDFLAGS64)
-ELFLIBDIR =	$(ELFLIBDIR64)
-LDDBGLIBDIR =	$(LDDBGLIBDIR64)
-CONVLIBDIR =	$(CONVLIBDIR64)
-
-ROOTPROG = $(ROOTPROG64)
-ROOTCCSBINLINK = $(ROOTCCSBINLINK64)
 
 include		../Makefile.targ
 include		$(SRC)/Makefile.master.64
 
-install:	$(ROOTPROG64)
+install:	$(ROOTPROG) $(ROOTPROG64) \
+	$(ROOTCCSBINLINK) $(ROOTCCSBINLINK64)
+
+$(ROOTBIN64)/elfdump:
+	$(RM) $@; $(SYMLINK) ../../bin/elfdump $@

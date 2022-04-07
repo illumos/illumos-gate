@@ -174,7 +174,7 @@ detail_usage()
  */
 void
 dump_hex_bytes(const void *data, size_t n, int indent,
-	int bytes_per_col, int col_per_row)
+    int bytes_per_col, int col_per_row)
 {
 	const uchar_t *ldata = data;
 	int	bytes_per_row = bytes_per_col * col_per_row;
@@ -733,12 +733,6 @@ main(int argc, char **argv, char **envp)
 	match_rec_t	match_data;
 	int		ret;
 	uchar_t		osabi = ELFOSABI_NONE;
-
-	/*
-	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of
-	 * the binary.  If successful, conv_check_native() won't return.
-	 */
-	(void) conv_check_native(argv, envp);
 
 	/*
 	 * Establish locale.
