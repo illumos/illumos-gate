@@ -28,10 +28,10 @@ include		../Makefile.com
 
 .KEEP_STATE:
 
-CONVLIBDIR =	$(CONVLIBDIR64)
-LLDFLAGS =	$(LLDFLAGS64)
-
-ROOTPROG =	$(ROOTPROG64)
-
 include		../Makefile.targ
 include		$(SRC)/Makefile.master.64
+
+install:	$(ROOTPROG) $(ROOTPROG64)
+
+$(ROOTBIN64)/ldd:
+	$(RM) $@; $(SYMLINK) ../../bin/ldd $@
