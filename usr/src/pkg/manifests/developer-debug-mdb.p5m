@@ -297,7 +297,7 @@ legacy pkg=SUNWmdbr desc="Modular Debugger (MDB) (Root)" \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
+license usr/src/contrib/zlib/THIRDPARTYLICENSE \
+    license=usr/src/contrib/zlib/THIRDPARTYLICENSE
 license usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE
-license usr/src/uts/common/zmod/THIRDPARTYLICENSE \
-    license=usr/src/uts/common/zmod/THIRDPARTYLICENSE
