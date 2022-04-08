@@ -29,6 +29,7 @@
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -849,6 +850,18 @@ mmu_init(void)
 	 * Use CPU info to set various MMU parameters
 	 */
 	cpuid_get_addrsize(CPU, &pa_bits, &va_bits);
+
+	/*
+	 * Check if 5 level paging is on, we dont support that (yet).
+	 * X86_64 processors that support 5 level paging report
+	 * the number of va bits for 5 level paging even if
+	 * not in 5 level paging mode.  So we need
+	 * to adjust va_bits to max for 4 level paging if not in 5 level mode.
+	 */
+	if ((getcr4() & CR4_LA57) != 0)
+		panic("5 Level paging enabled but not yet supported");
+	else if (va_bits > MMU_MAX4LEVELVABITS)
+		va_bits = MMU_MAX4LEVELVABITS;
 
 	if (va_bits < sizeof (void *) * NBBY) {
 		mmu.hole_start = (1ul << (va_bits - 1));

@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _SYS_MACH_MMU_H
@@ -59,6 +60,15 @@ extern "C" {
 #define	FOUR_GIG	((uint64_t)4 * ONE_GIG)
 
 #define	MMU_STD_PAGESIZE	4096
+
+/*
+ * Defines for 4 and 5 level Virtual address ranges
+ */
+#define	MMU_NPGOFFBITS		12
+#define	MMU_NPTIXBITS		9
+#define	MMU_MAX4LEVELVABITS	(4 * MMU_NPTIXBITS + MMU_NPGOFFBITS)
+#define	MMU_MAX5LEVELVABITS	(5 * MMU_NPTIXBITS + MMU_NPGOFFBITS)
+
 #ifdef __amd64
 #define	MMU_STD_PAGEMASK	0xFFFFFFFFFFFFF000ULL
 #else
