@@ -42,8 +42,7 @@ $(ROOTFS_DYNLIB64) :=	FILEMODE= 755
 
 all:		$(DYNLIB) $(LIBLINKS)
 
-install \
-package:	all $(ROOTFS_DYNLIB64)
+install:	all $(ROOTFS_DYNLIB64)
 
 include		../Makefile.targ
 include		$(SRC)/Makefile.master.64

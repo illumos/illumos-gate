@@ -33,7 +33,6 @@ $(PROG):	$(OBJS)
 
 all:		$(PROG)
 
-package \
 install:        all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:

@@ -34,10 +34,6 @@ pics/%.o:	../common/%.c
 $(LIBLINKS):
 		-$(RM) $@; $(SYMLINK) $(DYNLIB) $@
 
-delete:
-		$(RM) $(DYNLIB)
-
-
 include		$(SRC)/lib/Makefile.targ
 
 # Derived source and header files (messaging).

@@ -32,8 +32,7 @@
 		$(COMPILE.c) $<
 		$(POST_PROCESS_O)
 
-install \
-package:	all $(ROOTPROG)
+install:	all $(ROOTPROG)
 
 all:		$(PROG)
 
@@ -43,9 +42,6 @@ $(PROG):	$(OBJS) $(MAPFILE)
 
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
-
-delete:
-		$(RM) $(PROG)
 
 include		$(SRC)/cmd/Makefile.targ
 

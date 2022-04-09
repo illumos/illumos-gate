@@ -29,6 +29,5 @@ include		../Makefile.com
 
 include		../Makefile.targ
 
-install \
-package:        all $(ROOTPROG)  $(ROOTSTRIPFILEPROG) \
+install:        all $(ROOTPROG)  $(ROOTSTRIPFILEPROG) \
     $(ROOTLINKS) $(ROOTCCSBINLINK)

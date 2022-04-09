@@ -34,9 +34,6 @@ pics/%64.o:	../common/%.c
 		$(COMPILE.c) -o $@ -D_ELF64 $<
 		$(POST_PROCESS_O)
 
-delete:
-		-$(RM) $(DYNLIB)
-
 $(PICS):	pics
 
 include		$(SRC)/lib/Makefile.targ
@@ -46,5 +43,3 @@ include		$(SRC)/lib/Makefile.targ
 catalog:
 
 chkmsg:
-
-package:

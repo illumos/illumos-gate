@@ -35,9 +35,6 @@ objs.xpg4/%.o:	%.c
 clean:
 		$(RM) $(OBJS) $(XPG4OBJS) $(CLEANFILES)
 
-delete:
-		$(RM) $(PROG)
-
 catalog:	$(BLTMESG)
 
 $(PROG):	$(OBJS)

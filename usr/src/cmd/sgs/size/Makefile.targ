@@ -33,13 +33,9 @@ $(PROG):	$(OBJS)
 
 all:		$(PROG)
 
-package \
 install:        all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(CLEANFILES)
-
-delete:
-		$(RM) $(PROG)
 
 include		$(SRC)/cmd/Makefile.targ

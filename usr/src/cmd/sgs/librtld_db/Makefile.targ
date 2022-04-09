@@ -37,9 +37,6 @@ pics/%64.o:	../common/%.c
 		$(COMPILE.c) -D_ELF64 $(PICFLAGS) -o $@ $<
 		$(POST_PROCESS_O)
 
-delete:
-		-$(RM) $(DYNLIB)
-
 include		$(SRC)/lib/Makefile.targ
 
 # Derived source and header files (messaging).

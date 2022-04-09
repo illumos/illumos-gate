@@ -32,7 +32,6 @@ include		../Makefile.com
 
 all:		$(DYNLIB) $(LIBLINKS)
 
-install \
-package:	all $(ROOTDYNLIB)
+install:	all $(ROOTDYNLIB)
 
 include		../Makefile.targ

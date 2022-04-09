@@ -60,7 +60,6 @@ $(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-package \
 install:	all $(ROOTPROG64) $(ROOTCCSBINLINK64)
 
 clean:

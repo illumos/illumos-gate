@@ -36,8 +36,7 @@ CONVLIBDIR=	$(CONVLIBDIR64)
 ELFLIBDIR=	$(ELFLIBDIR64)
 
 all:		$(DYNLIB)
-install \
-package:	all $(ROOTDYNLIB64)
+install:	all $(ROOTDYNLIB64)
 
 include	../Makefile.targ
 include		$(SRC)/Makefile.master.64

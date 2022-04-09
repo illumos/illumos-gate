@@ -27,7 +27,6 @@ include		../Makefile.com
 
 all:		$(PROG) $(XPG4)
 
-install \
-package:	all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTCCSBINLINK)
+install:	all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTCCSBINLINK)
 
 include		../Makefile.targ

@@ -30,7 +30,6 @@ DEFLIST=	-DSPARC -DELF
 
 .KEEP_STATE:
 
-package \
 install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 include		../Makefile.targ

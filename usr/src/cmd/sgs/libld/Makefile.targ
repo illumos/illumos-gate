@@ -91,9 +91,6 @@ pics/%_sparc_64.o: \
 $(LIBLINKS):
 		$(RM) $@; $(SYMLINK) $(DYNLIB) $@
 
-delete:
-		$(RM) $(DYNLIB)
-
 $(PICS):	pics
 
 include		$(SRC)/lib/Makefile.targ

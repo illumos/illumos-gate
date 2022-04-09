@@ -35,7 +35,7 @@ RPATH = $(RPATH64)
 
 .KEEP_STATE:
 
-package install:	all $(ROOTBIN64) $(ROOTCCSBINLINK64)
+install:	all $(ROOTBIN64) $(ROOTCCSBINLINK64)
 
 include		../Makefile.targ
 include		$(SRC)/Makefile.master.64

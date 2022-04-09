@@ -74,7 +74,6 @@ $(XPG4OBJS):	objs.xpg4
 objs.xpg4:
 	-@mkdir -p $@
 
-package \
 install:	all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTCCSBINLINK)
 
 clean:

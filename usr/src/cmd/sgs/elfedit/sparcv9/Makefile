@@ -40,5 +40,4 @@ ROOTPROG= $(ROOTPROG64)
 include		../Makefile.targ
 include		$(SRC)/Makefile.master.64
 
-install \
-package:	$(ROOTPROG64)
+install:	$(ROOTPROG64)

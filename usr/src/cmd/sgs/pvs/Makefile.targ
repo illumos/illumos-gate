@@ -38,11 +38,7 @@ all:		$(PROG)
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
 
-delete:
-		$(RM) $(PROG)
-
-install \
-package:	all $(ROOTPROG)
+install:	all $(ROOTPROG)
 
 $(PROG):	$(OBJS)  $(MAPFILE)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

@@ -26,6 +26,6 @@ include		../Makefile.com
 
 .KEEP_STATE:
 
-package install:	all $(ROOTBIN) $(ROOTCCSBINLINK)
+install:	all $(ROOTBIN) $(ROOTCCSBINLINK)
 
 include		../Makefile.targ

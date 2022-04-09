@@ -53,11 +53,7 @@ all:		$(PROG)
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
 
-delete:
-		$(RM) $(PROG)
-
-install \
-package:	all $(ROOTPROG)
+install:	all $(ROOTPROG)
 
 include		$(SRC)/cmd/Makefile.targ
 

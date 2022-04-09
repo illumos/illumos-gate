@@ -75,9 +75,6 @@ $(RTLD):	pics $(PICS) $(CRTS)
 		    $(LDLIBS) $(CRTN)
 		$(POST_PROCESS_SO)
 
-delete:
-		-$(RM) $(RTLD)
-
 $(ROOTFS_LIBDIR)/%:	%
 		$(INS.file)
 

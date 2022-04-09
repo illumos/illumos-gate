@@ -39,9 +39,6 @@ all:		$(PROG) $(STRIPFILE)
 clean:
 	$(RM) $(CLEANFILES)
 
-delete:
-		$(RM) $(PROG)
-
 $(PROG):	$(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)

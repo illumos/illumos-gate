@@ -31,16 +31,14 @@ SUBDIRS=	$(MACH)
 all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-delete :=	TARGET= delete
 install :=	TARGET= install
 catalog :=	TARGET= catalog
-package :=	TARGET= package
 chkmsg :=	TARGET= chkmsg
 
 .KEEP_STATE:
 .KEEP_STATE_FILE: .make.state.$(MACH)
 
-all clean clobber delete install catalog package chkmsg:	$(SUBDIRS)
+all clean clobber install catalog chkmsg:	$(SUBDIRS)
 
 $(SUBDIRS):	FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

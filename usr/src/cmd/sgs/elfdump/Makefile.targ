@@ -74,10 +74,6 @@ clean:
 		  check_struct_layout gen_layout_obj.o \
 		  struct_layout_$(ARCH).tmp
 
-delete:
-		$(RM) $(PROG)
-
-package \
 install:        all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 include		$(SRC)/cmd/Makefile.targ

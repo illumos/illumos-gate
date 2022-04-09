@@ -37,8 +37,6 @@ $(MSGDOMAIN)/$(POFILE): \
 		$(RM) $(MSGDOMAIN)/$(POFILE)
 		cp $(POFILE) $(MSGDOMAIN)
 
-delete:
-
 clean:
 		$(RM) $(CLEANFILES)
 

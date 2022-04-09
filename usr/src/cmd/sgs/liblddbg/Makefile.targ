@@ -45,9 +45,6 @@ pics/%64.o:	$(SRCDIR)/common/%.c
 $(LIBLINKS):
 		-$(RM) $@; $(SYMLINK) $(DYNLIB) $@
 
-delete:
-		$(RM) $(DYNLIB)
-
 $(PICS):	pics
 
 include		$(SRC)/lib/Makefile.targ

@@ -40,9 +40,6 @@ $(PROG):	$(OBJS) $(MAPFILES)
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
 
-delete:
-		$(RM) $(PROG)
-
 include		$(SRC)/cmd/Makefile.targ
 
 # Derived source and header files (messaging).
