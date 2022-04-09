@@ -20,9 +20,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1996 by Sun Microsystems, Inc.
 # All rights reserved.
+
+BUILD32 = $(POUND_SIGN)
 
 include		$(SRC)/cmd/sgs/Makefile.sub
