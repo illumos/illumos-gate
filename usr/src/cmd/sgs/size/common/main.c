@@ -23,12 +23,9 @@
  * Copyright (c) 1989 AT&T
  * All Rights Reserved
  *
- *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* UNIX HEADERS */
 #include <stdio.h>
@@ -36,7 +33,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <libelf.h>
-
 
 /* SIZE HEADER */
 #include "defs.h"
@@ -49,7 +45,7 @@
 /* EXTERNAL VARIABLES DEFINED */
 int		fflag = 0,	/* print full output if -f option is supplied */
 		Fflag = 0,	/* print full output if -F option is supplied */
-		nflag = 0; 	/* include NOLOAD sections in size if -n */
+		nflag = 0;	/* include NOLOAD sections in size if -n */
 				/* option  is supplied */
 int		numbase = DECIMAL;
 static int	errflag = 0;	/* Global error flag */
@@ -114,11 +110,6 @@ main(int argc, char ** argv, char ** envp)
 	Elf_Cmd		cmd;
 	Elf		*arf;
 	unsigned	Vflag = 0;
-
-	/*
-	 * Check for a binary that better fits this architecture.
-	 */
-	(void) conv_check_native(argv, envp);
 
 	tool_name = argv[0];
 
