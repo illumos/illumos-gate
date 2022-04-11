@@ -111,7 +111,13 @@ extern "C" {
 #define	ZONE_CHECK_DATALINK	12
 #define	ZONE_LIST_DATALINK	13
 
-/* zone attributes */
+/*
+ * zone attributes
+ *
+ * Note that values up to ZONE_ATTR_HOSTID are baked into things like Solaris
+ * 10 which can be run under the s10 brand; don't renumber or change them. Ones
+ * which are no longer used are commented out.
+ */
 #define	ZONE_ATTR_ROOT		1
 #define	ZONE_ATTR_NAME		2
 #define	ZONE_ATTR_STATUS	3
@@ -123,18 +129,23 @@ extern "C" {
 #define	ZONE_ATTR_INITNAME	9
 #define	ZONE_ATTR_BOOTARGS	10
 #define	ZONE_ATTR_BRAND		11
-#define	ZONE_ATTR_SCHED_CLASS	12
-#define	ZONE_ATTR_FLAGS		13
-#define	ZONE_ATTR_HOSTID	14
-#define	ZONE_ATTR_FS_ALLOWED	15
-#define	ZONE_ATTR_NETWORK	16
-#define	ZONE_ATTR_DID		17
-#define	ZONE_ATTR_INITNORESTART	18
-#define	ZONE_ATTR_APP_SVC_CT	19
-#define	ZONE_ATTR_SCHED_FIXEDHI	20
+/* #define	ZONE_ATTR_PHYS_MCAP	12 */
+#define	ZONE_ATTR_SCHED_CLASS	13
+#define	ZONE_ATTR_FLAGS		14
+#define	ZONE_ATTR_HOSTID	15
+#define	ZONE_ATTR_FS_ALLOWED	16
+#define	ZONE_ATTR_NETWORK	17
+
+/* illumos extensions */
+#define	ZONE_ATTR_INITNORESTART	20
 #define	ZONE_ATTR_SECFLAGS	21
 #define	ZONE_ATTR_INITRESTART0	22
 #define	ZONE_ATTR_INITREBOOT	23
+
+/* OmniOS/SmartOS extensions */
+#define	ZONE_ATTR_DID		30
+#define	ZONE_ATTR_APP_SVC_CT	31
+#define	ZONE_ATTR_SCHED_FIXEDHI	32
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768

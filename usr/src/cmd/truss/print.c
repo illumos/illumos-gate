@@ -2551,8 +2551,21 @@ prt_zga(private_t *pri, int raw, long val)
 		case ZONE_ATTR_INITNAME:	s = "ZONE_ATTR_INITNAME"; break;
 		case ZONE_ATTR_BOOTARGS:	s = "ZONE_ATTR_BOOTARGS"; break;
 		case ZONE_ATTR_BRAND:	s = "ZONE_ATTR_BRAND"; break;
+		case ZONE_ATTR_SCHED_CLASS: s = "ZONE_ATTR_SCHED_CLASS"; break;
 		case ZONE_ATTR_FLAGS:	s = "ZONE_ATTR_FLAGS"; break;
-		case ZONE_ATTR_DID:	s = "ZONE_ATTR_DID"; break;
+		case ZONE_ATTR_HOSTID:	s = "ZONE_ATTR_HOSTID"; break;
+		case ZONE_ATTR_FS_ALLOWED: s = "ZONE_ATTR_FS_ALLOWED"; break;
+		case ZONE_ATTR_NETWORK:	s = "ZONE_ATTR_NETWORK"; break;
+		case ZONE_ATTR_INITNORESTART: s = "ZONE_ATTR_INITNORESTART";
+			break;
+		case ZONE_ATTR_SECFLAGS: s = "ZONE_ATTR_SECFLAGS"; break;
+		case ZONE_ATTR_INITRESTART0: s = "ZONE_ATTR_INITRESTART0";
+			break;
+		case ZONE_ATTR_INITREBOOT: s = "ZONE_ATTR_INITREBOOT"; break;
+		case ZONE_ATTR_DID: s = "ZONE_ATTR_DID"; break;
+		case ZONE_ATTR_APP_SVC_CT: s = "ZONE_ATTR_APP_SVC_CT"; break;
+		case ZONE_ATTR_SCHED_FIXEDHI: s = "ZONE_ATTR_SCHED_FIXEDHI";
+			break;
 		}
 	}
 
