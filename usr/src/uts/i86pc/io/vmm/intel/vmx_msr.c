@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
+#include <sys/vmm_kernel.h>
 
 #include "vmx.h"
 #include "vmx_msr.h"
@@ -421,14 +422,10 @@ vmx_msr_guest_exit(struct vmx *vmx, int vcpuid)
 	/* MSR_KGSBASE will be restored on the way back to userspace */
 }
 
-int
-vmx_rdmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t *val)
+vm_msr_result_t
+vmx_rdmsr(struct vmx *vmx, int vcpuid, uint32_t num, uint64_t *val)
 {
-	const uint64_t *guest_msrs;
-	int error;
-
-	guest_msrs = vmx->guest_msrs[vcpuid];
-	error = 0;
+	const uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
 
 	switch (num) {
 	case MSR_IA32_FEATURE_CONTROL:
@@ -453,21 +450,16 @@ vmx_rdmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t *val)
 		*val = guest_msrs[IDX_MSR_PAT];
 		break;
 	default:
-		error = EINVAL;
-		break;
+		return (VMR_UNHANLDED);
 	}
-	return (error);
+	return (VMR_OK);
 }
 
-int
-vmx_wrmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t val)
+vm_msr_result_t
+vmx_wrmsr(struct vmx *vmx, int vcpuid, uint32_t num, uint64_t val)
 {
-	uint64_t *guest_msrs;
+	uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
 	uint64_t changed;
-	int error;
-
-	guest_msrs = vmx->guest_msrs[vcpuid];
-	error = 0;
 
 	switch (num) {
 	case MSR_IA32_MISC_ENABLE:
@@ -486,20 +478,19 @@ vmx_wrmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t val)
 		/*
 		 * Punt to userspace if any other bits are being modified.
 		 */
-		if (changed)
-			error = EINVAL;
-
+		if (changed) {
+			return (VMR_UNHANLDED);
+		}
 		break;
 	case MSR_PAT:
-		if (pat_valid(val))
-			guest_msrs[IDX_MSR_PAT] = val;
-		else
-			vm_inject_gp(vmx->vm, vcpuid);
+		if (!pat_valid(val)) {
+			return (VMR_GP);
+		}
+		guest_msrs[IDX_MSR_PAT] = val;
 		break;
 	default:
-		error = EINVAL;
-		break;
+		return (VMR_UNHANLDED);
 	}
 
-	return (error);
+	return (VMR_OK);
 }

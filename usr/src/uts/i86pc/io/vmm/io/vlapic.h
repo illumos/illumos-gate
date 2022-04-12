@@ -36,15 +36,14 @@
 #ifndef _VLAPIC_H_
 #define	_VLAPIC_H_
 
-struct vm;
-enum x2apic_state;
-
 void vlapic_reset(struct vlapic *vlapic);
 
-int vlapic_write(struct vlapic *vlapic, int mmio_access, uint64_t offset,
-    uint64_t data);
-int vlapic_read(struct vlapic *vlapic, int mmio_access, uint64_t offset,
-    uint64_t *data);
+int vlapic_mmio_write(struct vlapic *, uint64_t, uint64_t, uint_t);
+int vlapic_mmio_read(struct vlapic *, uint64_t, uint64_t *, uint_t);
+
+bool vlapic_owned_msr(uint32_t);
+vm_msr_result_t vlapic_rdmsr(struct vlapic *, uint32_t, uint64_t *);
+vm_msr_result_t vlapic_wrmsr(struct vlapic *, uint32_t, uint64_t);
 
 /*
  * Returns 0 if there is no eligible vector that can be delivered to the
@@ -81,10 +80,7 @@ int vlapic_trigger_lvt(struct vlapic *vlapic, int vector);
 
 void vlapic_sync_tpr(struct vlapic *vlapic);
 
-uint64_t vlapic_get_apicbase(struct vlapic *vlapic);
-int vlapic_set_apicbase(struct vlapic *vlapic, uint64_t val);
 void vlapic_set_x2apic_state(struct vm *vm, int vcpuid, enum x2apic_state s);
-bool vlapic_enabled(struct vlapic *vlapic);
 
 void vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
     int delmode, int vec);
@@ -101,11 +97,11 @@ void vlapic_ldr_write_handler(struct vlapic *vlapic);
 void vlapic_dfr_write_handler(struct vlapic *vlapic);
 void vlapic_svr_write_handler(struct vlapic *vlapic);
 void vlapic_esr_write_handler(struct vlapic *vlapic);
-int vlapic_icrlo_write_handler(struct vlapic *vlapic);
+void vlapic_icrlo_write_handler(struct vlapic *vlapic);
 void vlapic_icrtmr_write_handler(struct vlapic *vlapic);
 void vlapic_dcr_write_handler(struct vlapic *vlapic);
 void vlapic_lvt_write_handler(struct vlapic *vlapic, uint32_t offset);
-void vlapic_self_ipi_handler(struct vlapic *vlapic, uint64_t val);
+void vlapic_self_ipi_handler(struct vlapic *vlapic, uint32_t val);
 
 void vlapic_localize_resources(struct vlapic *vlapic);
 

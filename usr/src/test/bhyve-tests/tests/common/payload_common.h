@@ -41,4 +41,8 @@
 #define	IOP_TEST_PARAM2		0xef22U
 #define	IOP_TEST_PARAM3		0xef23U
 
+/* Expected values emitted through IOP_TEST_RESULT */
+#define	TEST_RESULT_PASS	0
+#define	TEST_RESULT_FAIL	1
+
 #endif /* _PAYLOAD_COMMON_H_ */

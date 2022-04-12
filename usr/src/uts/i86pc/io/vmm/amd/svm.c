@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm_dev.h>
 #include <sys/vmm_instruction_emul.h>
 #include <sys/vmm_vm.h>
+#include <sys/vmm_kernel.h>
 
 #include "vmm_lapic.h"
 #include "vmm_stat.h"
@@ -1115,109 +1116,118 @@ svm_inject_irq(struct svm_softc *sc, int vcpu, int vector)
 
 #define	EFER_MBZ_BITS	0xFFFFFFFFFFFF0200UL
 
-static int
+static vm_msr_result_t
 svm_write_efer(struct svm_softc *sc, int vcpu, uint64_t newval)
 {
-	struct vm_exit *vme;
-	struct vmcb_state *state;
-	uint64_t changed, lma, oldval;
+	struct vmcb_state *state = svm_get_vmcb_state(sc, vcpu);
+	uint64_t lma;
 	int error;
 
-	state = svm_get_vmcb_state(sc, vcpu);
-
-	oldval = state->efer;
-	VCPU_CTR2(sc->vm, vcpu, "wrmsr(efer) %lx/%lx", oldval, newval);
-
 	newval &= ~0xFE;		/* clear the Read-As-Zero (RAZ) bits */
-	changed = oldval ^ newval;
 
-	if (newval & EFER_MBZ_BITS)
-		goto gpf;
+	if (newval & EFER_MBZ_BITS) {
+		return (VMR_GP);
+	}
 
 	/* APMv2 Table 14-5 "Long-Mode Consistency Checks" */
+	const uint64_t changed = state->efer ^ newval;
 	if (changed & EFER_LME) {
-		if (state->cr0 & CR0_PG)
-			goto gpf;
+		if (state->cr0 & CR0_PG) {
+			return (VMR_GP);
+		}
 	}
 
 	/* EFER.LMA = EFER.LME & CR0.PG */
-	if ((newval & EFER_LME) != 0 && (state->cr0 & CR0_PG) != 0)
+	if ((newval & EFER_LME) != 0 && (state->cr0 & CR0_PG) != 0) {
 		lma = EFER_LMA;
-	else
+	} else {
 		lma = 0;
+	}
+	if ((newval & EFER_LMA) != lma) {
+		return (VMR_GP);
+	}
 
-	if ((newval & EFER_LMA) != lma)
-		goto gpf;
-
-	if (newval & EFER_NXE) {
-		if (!vm_cpuid_capability(sc->vm, vcpu, VCC_NO_EXECUTE))
-			goto gpf;
+	if ((newval & EFER_NXE) != 0 &&
+	    !vm_cpuid_capability(sc->vm, vcpu, VCC_NO_EXECUTE)) {
+		return (VMR_GP);
+	}
+	if ((newval & EFER_FFXSR) != 0 &&
+	    !vm_cpuid_capability(sc->vm, vcpu, VCC_FFXSR)) {
+		return (VMR_GP);
+	}
+	if ((newval & EFER_TCE) != 0 &&
+	    !vm_cpuid_capability(sc->vm, vcpu, VCC_TCE)) {
+		return (VMR_GP);
 	}
 
 	/*
-	 * XXX bhyve does not enforce segment limits in 64-bit mode. Until
-	 * this is fixed flag guest attempt to set EFER_LMSLE as an error.
+	 * Until bhyve has proper support for long-mode segment limits, just
+	 * toss a #GP at the guest if they attempt to use it.
 	 */
 	if (newval & EFER_LMSLE) {
-		vme = vm_exitinfo(sc->vm, vcpu);
-		vm_exit_svm(vme, VMCB_EXIT_MSR, 1, 0);
-		return (-1);
-	}
-
-	if (newval & EFER_FFXSR) {
-		if (!vm_cpuid_capability(sc->vm, vcpu, VCC_FFXSR))
-			goto gpf;
-	}
-
-	if (newval & EFER_TCE) {
-		if (!vm_cpuid_capability(sc->vm, vcpu, VCC_TCE))
-			goto gpf;
+		return (VMR_GP);
 	}
 
 	error = svm_setreg(sc, vcpu, VM_REG_GUEST_EFER, newval);
-	KASSERT(error == 0, ("%s: error %d updating efer", __func__, error));
-	return (0);
-gpf:
-	vm_inject_gp(sc->vm, vcpu);
-	return (0);
+	VERIFY0(error);
+	return (VMR_OK);
 }
 
 static int
-emulate_wrmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t val)
+svm_handle_msr(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit,
+    bool is_wrmsr)
 {
-	int error;
+	struct vmcb_state *state = svm_get_vmcb_state(svm_sc, vcpu);
+	struct svm_regctx *ctx = svm_get_guest_regctx(svm_sc, vcpu);
+	const uint32_t ecx = ctx->sctx_rcx;
+	vm_msr_result_t res;
+	uint64_t val = 0;
 
-	if (lapic_msr(num))
-		error = lapic_wrmsr(sc->vm, vcpu, num, val);
-	else if (num == MSR_EFER)
-		error = svm_write_efer(sc, vcpu, val);
-	else
-		error = svm_wrmsr(sc, vcpu, num, val);
+	if (is_wrmsr) {
+		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_WRMSR, 1);
+		val = ctx->sctx_rdx << 32 | (uint32_t)state->rax;
 
-	return (error);
-}
+		if (vlapic_owned_msr(ecx)) {
+			struct vlapic *vlapic = vm_lapic(svm_sc->vm, vcpu);
 
-static int
-emulate_rdmsr(struct svm_softc *sc, int vcpu, uint_t num)
-{
-	struct vmcb_state *state;
-	struct svm_regctx *ctx;
-	uint64_t result;
-	int error;
+			res = vlapic_wrmsr(vlapic, ecx, val);
+		} else if (ecx == MSR_EFER) {
+			res = svm_write_efer(svm_sc, vcpu, val);
+		} else {
+			res = svm_wrmsr(svm_sc, vcpu, ecx, val);
+		}
+	} else {
+		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_RDMSR, 1);
 
-	if (lapic_msr(num))
-		error = lapic_rdmsr(sc->vm, vcpu, num, &result);
-	else
-		error = svm_rdmsr(sc, vcpu, num, &result);
+		if (vlapic_owned_msr(ecx)) {
+			struct vlapic *vlapic = vm_lapic(svm_sc->vm, vcpu);
 
-	if (error == 0) {
-		state = svm_get_vmcb_state(sc, vcpu);
-		ctx = svm_get_guest_regctx(sc, vcpu);
-		state->rax = result & 0xffffffff;
-		ctx->sctx_rdx = result >> 32;
+			res = vlapic_rdmsr(vlapic, ecx, &val);
+		} else {
+			res = svm_rdmsr(svm_sc, vcpu, ecx, &val);
+		}
 	}
 
-	return (error);
+	switch (res) {
+	case VMR_OK:
+		/* Store rdmsr result in the appropriate registers */
+		if (!is_wrmsr) {
+			state->rax = (uint32_t)val;
+			ctx->sctx_rdx = val >> 32;
+		}
+		return (1);
+	case VMR_GP:
+		vm_inject_gp(svm_sc->vm, vcpu);
+		return (1);
+	case VMR_UNHANLDED:
+		vmexit->exitcode = is_wrmsr ?
+		    VM_EXITCODE_WRMSR : VM_EXITCODE_RDMSR;
+		vmexit->u.msr.code = ecx;
+		vmexit->u.msr.wval = val;
+		return (0);
+	default:
+		panic("unexpected msr result %u\n", res);
+	}
 }
 
 /*
@@ -1253,8 +1263,7 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 	struct vmcb_state *state;
 	struct vmcb_ctrl *ctrl;
 	struct svm_regctx *ctx;
-	uint64_t code, info1, info2, val;
-	uint32_t eax, ecx, edx;
+	uint64_t code, info1, info2;
 	int error, errcode_valid = 0, handled, idtvec, reflect;
 
 	ctx = svm_get_guest_regctx(svm_sc, vcpu);
@@ -1426,41 +1435,8 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		}
 		handled = 1;
 		break;
-	case VMCB_EXIT_MSR:	/* MSR access. */
-		eax = state->rax;
-		ecx = ctx->sctx_rcx;
-		edx = ctx->sctx_rdx;
-
-		if (info1) {
-			vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_WRMSR, 1);
-			val = (uint64_t)edx << 32 | eax;
-			VCPU_CTR2(svm_sc->vm, vcpu, "wrmsr %x val %lx",
-			    ecx, val);
-			error = emulate_wrmsr(svm_sc, vcpu, ecx, val);
-			if (error == 0) {
-				handled = 1;
-			} else if (error > 0) {
-				vmexit->exitcode = VM_EXITCODE_WRMSR;
-				vmexit->u.msr.code = ecx;
-				vmexit->u.msr.wval = val;
-			} else {
-				KASSERT(vmexit->exitcode != VM_EXITCODE_BOGUS,
-				    ("emulate_wrmsr retu with bogus exitcode"));
-			}
-		} else {
-			VCPU_CTR1(svm_sc->vm, vcpu, "rdmsr %x", ecx);
-			vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_RDMSR, 1);
-			error = emulate_rdmsr(svm_sc, vcpu, ecx);
-			if (error == 0) {
-				handled = 1;
-			} else if (error > 0) {
-				vmexit->exitcode = VM_EXITCODE_RDMSR;
-				vmexit->u.msr.code = ecx;
-			} else {
-				KASSERT(vmexit->exitcode != VM_EXITCODE_BOGUS,
-				    ("emulate_rdmsr retu with bogus exitcode"));
-			}
-		}
+	case VMCB_EXIT_MSR:
+		handled = svm_handle_msr(svm_sc, vcpu, vmexit, info1 != 0);
 		break;
 	case VMCB_EXIT_IO:
 		handled = svm_handle_inout(svm_sc, vcpu, vmexit);
