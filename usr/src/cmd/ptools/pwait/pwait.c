@@ -21,6 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Spencer Evans-Cole.
  */
 
 #include <stdio.h>
@@ -57,6 +58,7 @@ main(int argc, char **argv)
 	char *arg;
 	unsigned i;
 	int verbose = 0;
+	pid_t mypid = getpid();
 
 	if ((command = strrchr(argv[0], '/')) != NULL)
 		command++;
@@ -108,6 +110,13 @@ main(int argc, char **argv)
 		char psinfofile[100];
 
 		arg = argv[i];
+		if (mypid == atol(arg)) {
+			if (verbose) {
+				(void) printf("%s: has the same"
+				    " pid as this process\n", arg);
+			}
+			continue;
+		}
 		if (strchr(arg, '/') != NULL)
 			(void) strncpy(psinfofile, arg, sizeof (psinfofile));
 		else {
@@ -115,7 +124,7 @@ main(int argc, char **argv)
 			(void) strncat(psinfofile, arg, sizeof (psinfofile)-6);
 		}
 		(void) strncat(psinfofile, "/psinfo",
-		    sizeof (psinfofile)-strlen(psinfofile));
+		    sizeof (psinfofile) - strlen(psinfofile));
 
 		pfd = &pollfd[i];
 		if ((pfd->fd = open(psinfofile, O_RDONLY)) >= 0) {
@@ -163,8 +172,8 @@ main(int argc, char **argv)
 					if (pread(pfd->fd, &psinfo,
 					    sizeof (psinfo), (off_t)0)
 					    == sizeof (psinfo)) {
-						(void) printf("%s: terminated, "
-						    "wait status 0x%.4x\n",
+						(void) printf("%s: terminated,"
+						    " wait status 0x%.4x\n",
 						    arg, psinfo.pr_wstat);
 					} else {
 						(void) printf(
