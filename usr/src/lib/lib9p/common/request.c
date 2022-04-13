@@ -1410,12 +1410,12 @@ l9p_dispatch_trenameat(struct l9p_request *req)
 	int error;
 
 	error = fid_lookup(conn, req->lr_req.hdr.fid, ENOENT,
-	    F_REQUIRE_DIR | F_FORBID_OPEN, &req->lr_fid);
+	    F_REQUIRE_DIR, &req->lr_fid);
 	if (error)
 		return (error);
 
 	error = fid_lookup(conn, req->lr_req.trenameat.newdirfid, ENOENT,
-	    F_REQUIRE_DIR | F_FORBID_OPEN, &req->lr_fid2);
+	    F_REQUIRE_DIR, &req->lr_fid2);
 	if (error)
 		return (error);
 
@@ -1434,7 +1434,7 @@ l9p_dispatch_tunlinkat(struct l9p_request *req)
 	int error;
 
 	error = fid_lookup(conn, req->lr_req.hdr.fid, ENOENT,
-	    F_REQUIRE_DIR | F_FORBID_OPEN, &req->lr_fid);
+	    F_REQUIRE_DIR, &req->lr_fid);
 	if (error)
 		return (error);
 
