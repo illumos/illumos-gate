@@ -37,10 +37,8 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 
 SMOFF += all_func_returns
 
-GREP=		grep
-
-SADC= 		sadc
-SAR= 		sar
+SADC=		sadc
+SAR=		sar
 TIMEX=		timex
 SA1=		sa1
 SA2=		sa2
@@ -56,7 +54,7 @@ INITSHELL=	$(PERF)
 
 PROGS=		$(BINPROG) $(SBINPROG) $(LIBPROG)
 SHELLS=		$(LIBSHELL)
-TXTS= 		README
+TXTS=		README
 ALL=		$(PROGS) $(SHELLS)
 
 # Source files
@@ -87,11 +85,11 @@ ENTRY3=		'$(POUND_SIGN) 5 18 * * 1-5 /usr/lib/sa/sa2 -s 8:00 -e 18:01 -i 1200 -A
 CLOBBERFILES=	$(PROGS) $(SHELLS)
 
 # Conditionals
-$(LIBSAD)/$(SADC) 	:= FILEMODE = 0555
+$(LIBSAD)/$(SADC)	:= FILEMODE = 0555
 
 .KEEP_STATE:
 
-all: 		$(ALL) $(TXTS)
+all:		$(ALL) $(TXTS)
 
 $(SADC):	$(SADC_OBJECTS)
 	$(LINK.c) -o $@ $(SADC_OBJECTS) $(LDLIBS)

@@ -44,9 +44,6 @@ XGETFLAGS=	-a
 POFILE=		$(LIBRARY:.a=.po)
 POFILES=	generic.po
 
-SED=	sed
-GREP=	grep
-
 .KEEP_STATE:
 
 all debug clean clobber delete install package: $(SUBDIRS)

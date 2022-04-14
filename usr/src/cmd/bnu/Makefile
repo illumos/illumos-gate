@@ -59,7 +59,6 @@ TXTFILES =	README $(FILES)	\
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 
-CAT =		cat
 POFILE =	bnu.po
 # step around name collisions
 POFILES =	$(PROG:%=%.cat)
@@ -181,7 +180,7 @@ common.po:	../chmod/common.c
 		$(COMPILE.cpp) ../chmod/common.c > common.c.i
 		$(XGETTEXT) $(XGETFLAGS) common.c.i ;\
 		$(RM)   $@ ;\
-		sed "/^domain/d" < messages.po  > $@ ;\
+		$(SED) "/^domain/d" < messages.po  > $@ ;\
 		$(RM) messages.po common.c.i
 
 include		../Makefile.targ

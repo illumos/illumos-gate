@@ -42,9 +42,6 @@ XGETFLAGS=	-a -x ib.xcl
 POFILE=		ib.po
 POFILES=	generic.po
 
-SED=	sed
-GREP=	grep
-
 .KEEP_STATE:
 
 all clean delete install package: $(SUBDIRS)

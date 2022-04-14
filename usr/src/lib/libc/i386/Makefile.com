@@ -31,7 +31,6 @@
 LIBCDIR=	$(SRC)/lib/libc
 LIB_PIC=	libc_pic.a
 VERS=		.1
-CPP=		/usr/lib/cpp
 TARGET_ARCH=	i386
 
 # include comm page definitions

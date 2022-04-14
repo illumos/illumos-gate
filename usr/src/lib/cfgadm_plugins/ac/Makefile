@@ -44,9 +44,6 @@ XGETFLAGS=	-a -x ac.xcl
 POFILE=		ac.po
 POFILES=	generic.po
 
-SED=	sed
-GREP=	grep
-
 .KEEP_STATE:
 
 all clean delete install catalog package: $(SUBDIRS)

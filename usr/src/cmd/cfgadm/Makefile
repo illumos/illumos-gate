@@ -29,7 +29,6 @@ PROG= cfgadm
 
 include ../Makefile.cmd
 
-SED= sed
 DCFILE= $(PROG).dc
 
 XGETFLAGS += -a -x cfgadm.xcl

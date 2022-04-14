@@ -29,8 +29,6 @@ CPPFLAGS +=	-I../inc -I$(SRC)/cmd/smserverd/
 
 POFILE  = $(LIBRARY:%.a=%.po)
 POFILE_SRCS =  $(OBJECTS:%.o=common/%.c)
-SED	= /usr/bin/sed
-CP	= /usr/bin/cp
 
 SUBDIRS =	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
@@ -43,7 +41,7 @@ install :=	TARGET= install
 all install clean: $(SUBDIRS)
 
 clobber : $(SUBDIRS)
-	$(RM) -f $(POFILE)
+	$(RM) $(POFILE)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -43,8 +43,6 @@ XGETFLAGS=	-a
 POFILE=		$(LIBRARY:.a=.po)
 POFILES=	generic.po
 
-SED=	sed
-
 .KEEP_STATE:
 
 all clean clobber install package: $(SUBDIRS)

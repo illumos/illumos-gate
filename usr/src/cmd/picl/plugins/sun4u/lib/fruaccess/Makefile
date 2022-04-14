@@ -70,8 +70,6 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 _msg :=		TARGET= _msg
 
-LN = ln -s
-
 POFILE=		$(LIBRARY:.a=.po)
 
 all:  $(DYNLIB) $(LIBLINKS) $(CONF)

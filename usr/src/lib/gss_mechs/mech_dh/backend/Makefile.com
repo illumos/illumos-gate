@@ -69,7 +69,6 @@ MAPFILES =	../mapfile-vers
 LDLIBS +=  -lgss -lnsl -lc
 
 RPCGEN += -C
-SED = sed
 
 .KEEP_STATE:
 

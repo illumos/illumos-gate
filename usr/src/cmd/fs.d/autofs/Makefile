@@ -81,10 +81,8 @@ SHAREOBJS=	$(SHARESRCS:%.c=%.o)
 UNSHAREOBJS=	$(UNSHARESRCS:%.c=%.o)
 
 POFILE= autofs.po
-GREP= egrep
-SED= sed
 
-$(AUTO) := 	LDLIBS += -lnsl -lsldap -lscf
+$(AUTO) :=	LDLIBS += -lnsl -lsldap -lscf
 $(MOUNT):=	LDLIBS += -lscf
 $(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lkstat -lscf
 
@@ -150,11 +148,11 @@ XLINE= "program DUMP { version VERS \
 
 $(XFILE):	$(BUILDDIR)
 		$(RM) $(XFILE)
-		echo $(XLINE) > $(XFILE)
+		$(ECHO) $(XLINE) > $(XFILE)
 
 $(BUILDDIR):
 		$(RM) -r $(BUILDDIR)
-		mkdir $(BUILDDIR)
+		$(MKDIR) $(BUILDDIR)
 
 $(DUMP_PROTO):	$(BUILDDIR) $(XFILE)
 		cd $(BUILDDIR); $(RM) *.[ch] makefile.malloc_dump ; rpcgen -a `basename $(XFILE)
@@ -162,7 +160,7 @@ $(DUMP_PROTO):	$(BUILDDIR) $(XFILE)
 
 $(DUMP_PROG):	$(DUMP_PROTO)
 		$(RM) $@
-		cp $(DUMP_PROTO) $@
+		$(CP) $(DUMP_PROTO) $@
 
 clean_dump:
 		$(RM) -r $(BUILDDIR)
@@ -199,13 +197,13 @@ webnfs.h:	webnfs.x
 
 webnfs.x:	../nfs/lib/webnfs.x
 	$(RM) webnfs.x
-	cp ../nfs/lib/webnfs.x .
+	$(CP) ../nfs/lib/webnfs.x .
 
 catalog: $(POFILE)
 
 $(POFILE):
 	$(RM) messages.po
-	$(SED) -e 's/pr_msg/gettext/' `$(GREP) -l "pr_msg|gettext" *.[ch]` | \
+	$(SED) -e 's/pr_msg/gettext/' `$(EGREP) -l "pr_msg|gettext" *.[ch]` | \
 	$(XGETTEXT) $(XGETFLAGS) -
 	$(SED) -e '/^# msg/d' -e '/^domain/d' < messages.po > $@
 	$(RM) messages.po

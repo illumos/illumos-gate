@@ -24,13 +24,13 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 
-LIBRARY= 	lib.a
+LIBRARY=	lib.a
 
-DATEFILE= 	ugdates
-DATEFILESRC= 	ugdates.dat
-TXT= 		$(DATEFILESRC)
+DATEFILE=	ugdates
+DATEFILESRC=	ugdates.dat
+TXT=		$(DATEFILESRC)
 
-OBJECTS= 	putgrent.o \
+OBJECTS=	putgrent.o \
 		errmsg.o \
 		file.o \
 		vgid.o \
@@ -51,7 +51,6 @@ include ../../../lib/Makefile.lib
 
 SRCDIR =	.
 
-GREP= 		grep
 FILEMODE=	$(LIBFILEMODE)
 
 PRODUCT=	$(LIBRARY) $(DATEFILE)

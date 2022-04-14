@@ -29,8 +29,6 @@ BINPROG=	mail
 
 PROG=	       $(BINPROG)
 
-GREP=		grep
-
 include ../Makefile.cmd
 
 CLOBBERFILES=	$(PROG)
@@ -66,7 +64,7 @@ ROOTSYMLINKS=	$(ROOTBIN)/rmail
 
 
 EDITPATH= \
-	sed -e 's!REAL_PATH!/usr/bin!g' \
+	$(SED) -e 's!REAL_PATH!/usr/bin!g' \
 	    -e 's!USR_SHARE_LIB!/usr/share/lib!g' \
 	    -e 's!VAR_MAIL!/var/mail!g' < $? > $@
 

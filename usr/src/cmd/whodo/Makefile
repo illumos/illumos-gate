@@ -28,7 +28,6 @@ PROG= whodo
 
 include ../Makefile.cmd
 
-SED= sed
 DCFILE= $(PROG).dc
 
 SUBDIRS += $(MACH64)
@@ -41,7 +40,7 @@ lint	:=	TARGET = lint
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS) 
+all:	$(SUBDIRS)
 
 clean clobber lint:	$(SUBDIRS)
 

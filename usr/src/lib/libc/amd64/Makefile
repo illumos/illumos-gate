@@ -33,7 +33,6 @@ LIBCDIR=	$(SRC)/lib/libc
 LIBRARY=	libc.a
 LIB_PIC=	libc_pic.a
 VERS=		.1
-CPP=		/usr/lib/cpp
 TARGET_ARCH=	amd64
 
 # include comm page definitions

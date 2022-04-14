@@ -23,8 +23,6 @@
 # Use is subject to license terms.
 #
 
-GREP	=	egrep
-WC	=	wc
 TOPDIR	=	../../../../..
 
 include $(TOPDIR)/Makefile.master

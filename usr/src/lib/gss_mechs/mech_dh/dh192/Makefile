@@ -31,9 +31,6 @@ SUBDIRS = $(MACH) $(BUILD64) $(MACH64)
 # include library definitions
 include ../../../Makefile.lib
 
-SED=    sed
-GREP=   grep
-
 all :=          TARGET= all
 clean :=        TARGET= clean
 clobber :=      TARGET= clobber

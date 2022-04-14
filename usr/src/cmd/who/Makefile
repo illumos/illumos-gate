@@ -33,8 +33,6 @@ CLOBBERFILES += $(UTMPS)
 
 include ../Makefile.cmd
 
-SED= sed
-
 $(ROOTUTMPS):= FILEMODE= 644
 
 $(ROOTADM)/%: %
@@ -48,7 +46,7 @@ $(XPG4):= CPPFLAGS += -DXPG4
 all: $(PROG) $(UTMPS) $(XPG4)
 
 $(UTMPS):
-	touch $@
+	$(TOUCH) $@
 
 install: all $(ROOTPROG) $(ROOTUTMPS) $(SYMSETC) $(ROOTXPG4PROG)
 

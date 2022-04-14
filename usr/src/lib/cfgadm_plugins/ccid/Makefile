@@ -37,9 +37,6 @@ install :=	TARGET= install
 _msg :=		TARGET= _msg
 package :=	TARGET= package
 
-SED=	sed
-GREP=	grep
-
 .KEEP_STATE:
 
 all clean delete install package: $(SUBDIRS)

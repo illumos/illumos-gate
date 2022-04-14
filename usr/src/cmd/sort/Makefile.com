@@ -74,7 +74,6 @@ CLEANFILES = $(OBJS) $(XPG4OBJS) $(LNTS)
 
 include ../../Makefile.cmd
 
-SED =		sed
 DCFILE =	$(PROG).dc
 
 SPACEFLAG =

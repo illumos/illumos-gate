@@ -44,9 +44,6 @@ XGETFLAGS=	-a
 POFILE=		$(LIBRARY:.a=.po)
 POFILES=	generic.po
 
-SED=	sed
-GREP=	grep
-
 # definitions for install_h target
 HDRS=		libproc.h
 ROOTHDRDIR=	$(ROOT)/usr/include

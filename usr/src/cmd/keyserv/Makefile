@@ -52,8 +52,6 @@ OBJS	= $(KEYSERVOBJS) $(KEYLOGOUTOBJS) $(KEYLOGINOBJS) $(CHKEYOBJS) \
 	$(K_OBJS)  $(CHANGE_OBJS)
 SRCS	= $(OBJS:.o=.c)
 
-SED=	sed
-
 include ../Makefile.cmd
 
 IBINPROG=		$(BINPROG:%=$(ROOTBIN)/%)
