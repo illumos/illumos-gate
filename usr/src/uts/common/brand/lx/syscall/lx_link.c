@@ -154,6 +154,11 @@ lx_unlinkat(int atfd, char *path, int flag)
 		if (lx_isdir(atfd, path))
 			return (set_errno(EISDIR));
 	}
+	if (err == EEXIST && (flag & AT_REMOVEDIR)) {
+		/* On Linux, an unlink of a non-empty dir returns ENOTEMPTY, not EEXIST. */
+		if (lx_isdir(atfd, path))
+			return (set_errno(ENOTEMPTY));
+	}
 
 	return (err);
 }
