@@ -48,7 +48,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/queue.h>
-#include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -77,7 +76,7 @@ struct ioapic_stats {
 
 struct vioapic {
 	struct vm	*vm;
-	struct mtx	mtx;
+	kmutex_t	lock;
 	uint32_t	id;
 	uint32_t	ioregsel;
 	struct {
@@ -93,9 +92,9 @@ struct vioapic {
 	struct ioapic_stats stats;
 };
 
-#define	VIOAPIC_LOCK(vioapic)		mtx_lock_spin(&((vioapic)->mtx))
-#define	VIOAPIC_UNLOCK(vioapic)		mtx_unlock_spin(&((vioapic)->mtx))
-#define	VIOAPIC_LOCKED(vioapic)		mtx_owned(&((vioapic)->mtx))
+#define	VIOAPIC_LOCK(vioapic)		mutex_enter(&((vioapic)->lock))
+#define	VIOAPIC_UNLOCK(vioapic)		mutex_exit(&((vioapic)->lock))
+#define	VIOAPIC_LOCKED(vioapic)		MUTEX_HELD(&((vioapic)->lock))
 
 static MALLOC_DEFINE(M_VIOAPIC, "vioapic", "bhyve virtual ioapic");
 
@@ -452,7 +451,7 @@ vioapic_init(struct vm *vm)
 	vioapic = malloc(sizeof (struct vioapic), M_VIOAPIC, M_WAITOK | M_ZERO);
 
 	vioapic->vm = vm;
-	mtx_init(&vioapic->mtx, "vioapic lock", NULL, MTX_SPIN);
+	mutex_init(&vioapic->lock, NULL, MUTEX_ADAPTIVE, NULL);
 
 	/* Initialize all redirection entries to mask all interrupts */
 	for (i = 0; i < REDIR_ENTRIES; i++)
@@ -464,7 +463,7 @@ vioapic_init(struct vm *vm)
 void
 vioapic_cleanup(struct vioapic *vioapic)
 {
-
+	mutex_destroy(&vioapic->lock);
 	free(vioapic, M_VIOAPIC);
 }
 

@@ -37,7 +37,6 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
@@ -88,7 +87,7 @@ struct vhpet_timer {
 
 struct vhpet {
 	struct vm	*vm;
-	struct mtx	mtx;
+	kmutex_t	lock;
 
 	uint64_t	config;		/* Configuration */
 	uint64_t	isr;		/* Interrupt Status */
@@ -98,8 +97,8 @@ struct vhpet {
 	struct vhpet_timer timer[VHPET_NUM_TIMERS];
 };
 
-#define	VHPET_LOCK(vhp)		mtx_lock(&((vhp)->mtx))
-#define	VHPET_UNLOCK(vhp)	mtx_unlock(&((vhp)->mtx))
+#define	VHPET_LOCK(vhp)		mutex_enter(&((vhp)->lock))
+#define	VHPET_UNLOCK(vhp)	mutex_exit(&((vhp)->lock))
 
 static void vhpet_start_timer(struct vhpet *vhpet, int n, uint32_t counter,
     hrtime_t now);
@@ -708,7 +707,7 @@ vhpet_init(struct vm *vm)
 
 	vhpet = malloc(sizeof (struct vhpet), M_VHPET, M_WAITOK | M_ZERO);
 	vhpet->vm = vm;
-	mtx_init(&vhpet->mtx, "vhpet lock", NULL, MTX_DEF);
+	mutex_init(&vhpet->lock, NULL, MUTEX_ADAPTIVE, NULL);
 
 	pincount = vioapic_pincount(vm);
 	if (pincount >= 32)
@@ -745,6 +744,7 @@ vhpet_cleanup(struct vhpet *vhpet)
 	for (i = 0; i < VHPET_NUM_TIMERS; i++)
 		callout_drain(&vhpet->timer[i].callout);
 
+	mutex_destroy(&vhpet->lock);
 	free(vhpet, M_VHPET);
 }
 

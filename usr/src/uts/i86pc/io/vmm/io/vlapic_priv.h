@@ -174,7 +174,7 @@ struct vlapic {
 	hrtime_t	timer_period;
 	uint32_t	timer_cur_freq;
 
-	struct mtx	timer_mtx;
+	kmutex_t	timer_lock;
 
 	uint64_t	msr_apicbase;
 

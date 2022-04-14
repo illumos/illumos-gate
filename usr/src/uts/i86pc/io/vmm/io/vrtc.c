@@ -38,7 +38,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/queue.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
-#include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/clock.h>
 #include <sys/sysctl.h>
@@ -77,7 +76,7 @@ CTASSERT(offsetof(struct rtcdev, century) == RTC_CENTURY);
 
 struct vrtc {
 	struct vm	*vm;
-	struct mtx	mtx;
+	kmutex_t	lock;
 	struct callout	callout;
 	uint_t		addr;		/* RTC register to read or write */
 	hrtime_t	base_uptime;
@@ -85,9 +84,9 @@ struct vrtc {
 	struct rtcdev	rtcdev;
 };
 
-#define	VRTC_LOCK(vrtc)		mtx_lock(&((vrtc)->mtx))
-#define	VRTC_UNLOCK(vrtc)	mtx_unlock(&((vrtc)->mtx))
-#define	VRTC_LOCKED(vrtc)	mtx_owned(&((vrtc)->mtx))
+#define	VRTC_LOCK(vrtc)		mutex_enter(&((vrtc)->lock))
+#define	VRTC_UNLOCK(vrtc)	mutex_exit(&((vrtc)->lock))
+#define	VRTC_LOCKED(vrtc)	MUTEX_HELD(&((vrtc)->lock))
 
 /*
  * RTC time is considered "broken" if:
@@ -152,7 +151,7 @@ vrtc_curtime(struct vrtc *vrtc, hrtime_t *basetime)
 	time_t t = vrtc->base_rtctime;
 	hrtime_t base = vrtc->base_uptime;
 
-	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
+	ASSERT(VRTC_LOCKED(vrtc));
 
 	if (update_enabled(vrtc)) {
 		const hrtime_t delta = gethrtime() - vrtc->base_uptime;
@@ -187,7 +186,7 @@ secs_to_rtc(time_t rtctime, struct vrtc *vrtc, int force_update)
 	struct rtcdev *rtc;
 	int hour;
 
-	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
+	ASSERT(VRTC_LOCKED(vrtc));
 
 	if (rtctime < 0) {
 		KASSERT(rtctime == VRTC_BROKEN_TIME,
@@ -288,7 +287,7 @@ rtc_to_secs(struct vrtc *vrtc)
 	struct rtcdev *rtc;
 	int century, error, hour, pm, year;
 
-	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
+	ASSERT(VRTC_LOCKED(vrtc));
 
 	rtc = &vrtc->rtcdev;
 
@@ -396,7 +395,7 @@ vrtc_time_update(struct vrtc *vrtc, time_t newtime, hrtime_t newbase)
 	time_t oldtime;
 	uint8_t alarm_sec, alarm_min, alarm_hour;
 
-	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
+	ASSERT(VRTC_LOCKED(vrtc));
 
 	rtc = &vrtc->rtcdev;
 	alarm_sec = rtc->alarm_sec;
@@ -486,7 +485,7 @@ vrtc_freq(struct vrtc *vrtc)
 		NANOSEC / 2,
 	};
 
-	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
+	ASSERT(VRTC_LOCKED(vrtc));
 
 	/*
 	 * If both periodic and alarm interrupts are enabled then use the
@@ -511,7 +510,7 @@ static void
 vrtc_callout_reset(struct vrtc *vrtc, hrtime_t freqhrt)
 {
 
-	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
+	ASSERT(VRTC_LOCKED(vrtc));
 
 	if (freqhrt == 0) {
 		if (callout_active(&vrtc->callout)) {
@@ -583,7 +582,7 @@ vrtc_set_reg_c(struct vrtc *vrtc, uint8_t newval)
 	int oldirqf, newirqf;
 	uint8_t oldval, changed;
 
-	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
+	ASSERT(VRTC_LOCKED(vrtc));
 
 	rtc = &vrtc->rtcdev;
 	newval &= RTCIR_ALARM | RTCIR_PERIOD | RTCIR_UPDATE;
@@ -623,7 +622,7 @@ vrtc_set_reg_b(struct vrtc *vrtc, uint8_t newval)
 	int error;
 	uint8_t oldval, changed;
 
-	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
+	ASSERT(VRTC_LOCKED(vrtc));
 
 	rtc = &vrtc->rtcdev;
 	oldval = rtc->reg_b;
@@ -698,7 +697,7 @@ vrtc_set_reg_a(struct vrtc *vrtc, uint8_t newval)
 	hrtime_t oldfreq, newfreq;
 	uint8_t oldval, changed;
 
-	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
+	ASSERT(VRTC_LOCKED(vrtc));
 
 	newval &= ~RTCSA_TUP;
 	oldval = vrtc->rtcdev.reg_a;
@@ -970,7 +969,7 @@ vrtc_init(struct vm *vm)
 
 	vrtc = malloc(sizeof (struct vrtc), M_VRTC, M_WAITOK | M_ZERO);
 	vrtc->vm = vm;
-	mtx_init(&vrtc->mtx, "vrtc lock", NULL, MTX_DEF);
+	mutex_init(&vrtc->lock, NULL, MUTEX_ADAPTIVE, NULL);
 	callout_init(&vrtc->callout, 1);
 
 	/* Allow dividers to keep time but disable everything else */
@@ -1000,8 +999,8 @@ vrtc_init(struct vm *vm)
 void
 vrtc_cleanup(struct vrtc *vrtc)
 {
-
 	callout_drain(&vrtc->callout);
+	mutex_destroy(&vrtc->lock);
 	free(vrtc, M_VRTC);
 }
 
