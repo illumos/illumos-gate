@@ -12,6 +12,7 @@
 #
 # Copyright 2022 Toomas Soome <tsoome@me.com>
 # Copyright 2022 Joyent, Inc.
+# Copyright 2022 MNX Cloud, Inc.
 #
 include $(SRC)/Makefile.master
 
@@ -54,7 +55,7 @@ FORTH +=	support.4th
 FORTH +=	version.4th
 FILES +=	illumos-logo.png
 FILES +=	illumos-brand.png
-FILES +=	joyent.png
+FILES +=	triton-logo.png
 FILES +=	triton.png
 FILES +=	loader.rc
 
@@ -69,10 +70,10 @@ $(ROOT_BOOT)/%: % $(ROOT_BOOT)
 $(ROOT_BOOT_DEFAULTS)/%: % $(ROOT_BOOT_DEFAULTS)
 	$(INS.file)
 
-$(ROOT_BOOT_FORTH)/menu.rc: joyent.menu.rc $(ROOT_BOOT_FORTH)
+$(ROOT_BOOT_FORTH)/menu.rc: triton.menu.rc $(ROOT_BOOT_FORTH)
 	$(RM) $@; \
-	$(INS) -s -m $(FILEMODE) -f $(@D) joyent.menu.rc; \
-	$(MV) $(@D)/joyent.menu.rc $@
+	$(INS) -s -m $(FILEMODE) -f $(@D) triton.menu.rc; \
+	$(MV) $(@D)/triton.menu.rc $@
 
 $(ROOT_BOOT_FORTH)/%: % $(ROOT_BOOT_FORTH)
 	$(INS.file)

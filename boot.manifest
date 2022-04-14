@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2022 MNX Cloud, Inc.
 #
 
 #
@@ -43,10 +44,10 @@ f boot/forth/shortcuts.4th 0444 root sys
 f boot/forth/support.4th 0444 root sys
 f boot/forth/version.4th 0444 root sys
 f boot/gptzfsboot 0444 root sys
-f boot/joyent.png 0444 root sys
 f boot/loader 0444 root sys
 f boot/loader64.efi 0555 root sys
 f boot/loader.help 0444 root sys
 f boot/loader.rc 0444 root sys
 f boot/pmbr 0444 root sys
 f boot/triton.png 0444 root sys
+f boot/triton-logo.png 0444 root sys

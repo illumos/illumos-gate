@@ -11,6 +11,7 @@
 
 \
 \ Copyright 2019 Joyent, Inc.
+\ Copyright 2022 MNX Cloud, Inc.
 \
 
 2 brandX ! 1 brandY ! \ Initialize brand placement defaults
@@ -21,17 +22,17 @@
 	1+ \ increase y for next time we're called
 ;
 
-: brand ( x y -- ) \ "joyent" [wide] logo in B/W (7 rows x 42 columns)
+: brand ( x y -- ) \ "triton" [wide] logo in B/W (7 rows x 42 columns)
 
-	0 1 1 0 0 s" /boot/joyent.png" fb-putimage if 2drop exit then
+	0 1 1 0 0 s" /boot/triton-logo.png" fb-putimage if 2drop exit then
 
-	s"       #                                   " brand+
-	s"       #  ####  #   # ###### #    # #####  " brand+
-	s"       # #    #  # #  #      ##   #   #    " brand+
-	s"       # #    #   #   #####  # #  #   #    " brand+
-	s" #     # #    #   #   #      #  # #   #    " brand+
-	s" #     # #    #   #   #      #   ##   #    " brand+
-	s"  #####   ####    #   ###### #    #   #  TM" brand+
+	s"                                           " brand+
+	s" #####  ####   #  #####   ###   #   #      " brand+
+	s"   #    #   #  #    #    #   #  ##  #      " brand+
+	s"   #    ####   #    #    #   #  # # #      " brand+
+	s"   #    # #    #    #    #   #  #  ##      " brand+
+	s"   #    #  #   #    #    #   #  #  ##      " brand+
+	s"   #    #   #  #    #     ###   #   # TM   " brand+
 
 	2drop
 ;
