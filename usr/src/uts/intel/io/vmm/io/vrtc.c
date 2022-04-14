@@ -97,6 +97,7 @@ struct vrtc {
 #define	RTC_IRQ			8
 #define	RTCSB_BIN		0x04
 #define	RTCSB_ALL_INTRS		(RTCSB_UINTR | RTCSB_AINTR | RTCSB_PINTR)
+#define	RTCSC_MASK	(RTCIR_UPDATE | RTCIR_ALARM | RTCIR_PERIOD | RTCIR_INT)
 #define	rtc_halted(vrtc)	((vrtc->rtcdev.reg_b & RTCSB_HALT) != 0)
 #define	aintr_enabled(vrtc)	(((vrtc)->rtcdev.reg_b & RTCSB_AINTR) != 0)
 #define	pintr_enabled(vrtc)	(((vrtc)->rtcdev.reg_b & RTCSB_PINTR) != 0)
@@ -968,3 +969,69 @@ vrtc_localize_resources(struct vrtc *vrtc)
 {
 	vmm_glue_callout_localize(&vrtc->callout);
 }
+
+static int
+vrtc_data_read(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_RTC);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_rtc_v1));
+
+	struct vrtc *vrtc = datap;
+	struct vdi_rtc_v1 *out = req->vdr_data;
+
+	VRTC_LOCK(vrtc);
+
+	out->vr_addr = vrtc->addr;
+	out->vr_time_base = vm_normalize_hrtime(vrtc->vm, vrtc->base_uptime);
+	out->vr_rtc_sec = vrtc->base_rtctime;
+	/* XXX: vrtc does not have sub-1s precision yet */
+	out->vr_rtc_nsec = 0;
+	bcopy(&vrtc->rtcdev, out->vr_content, sizeof (out->vr_content));
+
+	VRTC_UNLOCK(vrtc);
+
+	return (0);
+}
+
+static int
+vrtc_data_write(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_RTC);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_rtc_v1));
+
+	struct vrtc *vrtc = datap;
+	const struct vdi_rtc_v1 *src = req->vdr_data;
+
+	VRTC_LOCK(vrtc);
+
+	vrtc->addr = src->vr_addr;
+	vrtc->base_uptime = vm_denormalize_hrtime(vrtc->vm, src->vr_time_base);
+	vrtc->base_rtctime = src->vr_rtc_sec;
+	bcopy(src->vr_content, &vrtc->rtcdev, sizeof (vrtc->rtcdev));
+
+	/* TODO: handle status update for register B */
+	vrtc->rtcdev.reg_a &= ~RTCSA_TUP;
+	vrtc->rtcdev.reg_c &= RTCSC_MASK;
+	vrtc->rtcdev.reg_d = RTCSD_PWR;
+
+	/* Sync the actual RTC time into the appropriate fields */
+	time_t curtime = vrtc_curtime(vrtc, NULL);
+	secs_to_rtc(curtime, vrtc, 1);
+
+	/* Make sure the callout is appropriately scheduled */
+	vrtc_callout_reset(vrtc, vrtc_freq(vrtc));
+
+	VRTC_UNLOCK(vrtc);
+	return (0);
+}
+
+static const vmm_data_version_entry_t rtc_v1 = {
+	.vdve_class = VDC_RTC,
+	.vdve_version = 1,
+	.vdve_len_expect = sizeof (struct vdi_rtc_v1),
+	.vdve_readf = vrtc_data_read,
+	.vdve_writef = vrtc_data_write,
+};
+VMM_DATA_VERSION(rtc_v1);

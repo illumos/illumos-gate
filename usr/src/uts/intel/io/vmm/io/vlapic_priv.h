@@ -106,10 +106,6 @@
 
 #define	VLAPIC_TMR_CNT		8
 
-#ifdef DEBUG
-#define	__ISRVEC_DEBUG
-#endif
-
 struct vlapic;
 
 struct vlapic_ops {
@@ -146,19 +142,6 @@ struct vlapic {
 	 */
 	uint32_t	svr_last;
 	uint32_t	lvt_last[VLAPIC_MAXLVT_INDEX + 1];
-
-#ifdef __ISRVEC_DEBUG
-	/*
-	 * The 'isrvec_stk' is a stack of vectors injected by the local APIC.
-	 * It is used as a debugging method to double-check the behavior of the
-	 * emulation.  Vectors are pushed to the stack when they are accepted
-	 * for injection and popped from the stack when the processor performs
-	 * an EOI.  The vector on the top of the stack is used to verify the
-	 * computed Processor Priority.
-	 */
-	uint8_t		isrvec_stk[ISRVEC_STK_SIZE];
-	int		isrvec_stk_top;
-#endif
 };
 
 void vlapic_init(struct vlapic *vlapic);

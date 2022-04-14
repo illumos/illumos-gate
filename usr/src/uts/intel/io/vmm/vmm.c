@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmm_instruction_emul.h>
 #include <sys/vmm_vm.h>
 #include <sys/vmm_gpt.h>
+#include <sys/vmm_data.h>
 
 #include "vmm_ioport.h"
 #include "vmm_host.h"
@@ -211,7 +212,9 @@ struct vm {
 	uint16_t	cores;			/* (o) num of cores/socket */
 	uint16_t	threads;		/* (o) num of threads/core */
 	uint16_t	maxcpus;		/* (o) max pluggable cpus */
+
 	uint64_t	boot_tsc_offset;	/* (i) TSC offset at VM boot */
+	hrtime_t	boot_hrtime;		/* (i) hrtime at VM boot */
 
 	struct ioport_config ioports;		/* (o) ioport handling */
 
@@ -519,7 +522,12 @@ vm_init(struct vm *vm, bool create)
 	 * The TSC offsetting math is all unsigned, using overflow for negative
 	 * offets.  A reading of the TSC is negated to form the boot offset.
 	 */
-	vm->boot_tsc_offset = (uint64_t)(-(int64_t)rdtsc_offset());
+	const uint64_t boot_tsc = rdtsc_offset();
+	vm->boot_tsc_offset = (uint64_t)(-(int64_t)boot_tsc);
+
+	/* Convert the boot TSC reading to hrtime */
+	vm->boot_hrtime = (hrtime_t)boot_tsc;
+	scalehrtime(&vm->boot_hrtime);
 }
 
 /*
@@ -3007,6 +3015,9 @@ vm_set_capability(struct vm *vm, int vcpu, int type, int val)
 struct vlapic *
 vm_lapic(struct vm *vm, int cpu)
 {
+	ASSERT3S(cpu, >=, 0);
+	ASSERT3S(cpu, <, VM_MAXCPU);
+
 	return (vm->vcpu[cpu].vlapic);
 }
 
@@ -3084,6 +3095,22 @@ vcpu_tsc_offset(struct vm *vm, int vcpuid, bool phys_adj)
 	}
 
 	return (vcpu_off);
+}
+
+/* Normalize hrtime against the boot time for a VM */
+hrtime_t
+vm_normalize_hrtime(struct vm *vm, hrtime_t hrt)
+{
+	/* To avoid underflow/overflow UB, perform math as unsigned */
+	return ((hrtime_t)((uint64_t)hrt - (uint64_t)vm->boot_hrtime));
+}
+
+/* Denormalize hrtime against the boot time for a VM */
+hrtime_t
+vm_denormalize_hrtime(struct vm *vm, hrtime_t hrt)
+{
+	/* To avoid underflow/overflow UB, perform math as unsigned */
+	return ((hrtime_t)((uint64_t)hrt + (uint64_t)vm->boot_hrtime));
 }
 
 int
@@ -3663,4 +3690,167 @@ vmm_kstat_update_vcpu(struct kstat *ksp, int rw)
 	vvk->vvk_time_sched.value.ui64 = vcpu->ustate_total[VU_SCHED];
 
 	return (0);
+}
+
+SET_DECLARE(vmm_data_version_entries, const vmm_data_version_entry_t);
+
+static inline bool
+vmm_data_is_cpu_specific(uint16_t data_class)
+{
+	switch (data_class) {
+	case VDC_REGISTER:
+	case VDC_MSR:
+	case VDC_FPU:
+	case VDC_LAPIC:
+	case VDC_VMM_ARCH:
+		return (true);
+	default:
+		return (false);
+	}
+}
+
+static const vmm_data_version_entry_t *
+vmm_data_find(const vmm_data_req_t *req, int *err)
+{
+	const vmm_data_version_entry_t **vdpp, *vdp;
+	SET_FOREACH(vdpp, vmm_data_version_entries) {
+		vdp = *vdpp;
+		if (vdp->vdve_class == req->vdr_class &&
+		    vdp->vdve_version == req->vdr_version) {
+			/*
+			 * Enforce any data length expectation expressed by the
+			 * provider for this data.
+			 */
+			if (vdp->vdve_len_expect != 0 &&
+			    vdp->vdve_len_expect != req->vdr_len) {
+				*err = ENOSPC;
+				return (NULL);
+			}
+			return (vdp);
+		}
+	}
+	*err = EINVAL;
+	return (NULL);
+}
+
+static void *
+vmm_data_from_class(const vmm_data_req_t *req, struct vm *vm, int vcpuid)
+{
+	switch (req->vdr_class) {
+		/* per-cpu data/devices */
+	case VDC_LAPIC:
+		return (vm_lapic(vm, vcpuid));
+
+	case VDC_FPU:
+	case VDC_REGISTER:
+	case VDC_VMM_ARCH:
+	case VDC_MSR:
+		/*
+		 * These have per-CPU handling which is dispatched outside
+		 * vmm_data_version_entries listing.
+		 */
+		return (NULL);
+
+		/* system-wide data/devices */
+	case VDC_IOAPIC:
+		return (vm->vioapic);
+	case VDC_ATPIT:
+		return (vm->vatpit);
+	case VDC_ATPIC:
+		return (vm->vatpic);
+	case VDC_HPET:
+		return (vm->vhpet);
+	case VDC_PM_TIMER:
+		return (vm->vpmtmr);
+	case VDC_RTC:
+		return (vm->vrtc);
+
+	default:
+		/* The data class will have been validated by now */
+		panic("Unexpected class %u", req->vdr_class);
+	}
+}
+
+int
+vmm_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
+{
+	int err = 0;
+
+	if (vmm_data_is_cpu_specific(req->vdr_class)) {
+		if (vcpuid >= VM_MAXCPU) {
+			return (EINVAL);
+		}
+	}
+
+	const vmm_data_version_entry_t *entry;
+	entry = vmm_data_find(req, &err);
+	if (entry == NULL) {
+		ASSERT(err != 0);
+		return (err);
+	}
+
+	void *datap = vmm_data_from_class(req, vm, vcpuid);
+	if (datap != NULL) {
+		err = entry->vdve_readf(datap, req);
+	} else {
+		switch (req->vdr_class) {
+		case VDC_FPU:
+			/* TODO: wire up to xsave export via hma_fpu iface */
+			err = EINVAL;
+			break;
+		case VDC_REGISTER:
+		case VDC_VMM_ARCH:
+		case VDC_MSR:
+			/* TODO: implement */
+			err = EINVAL;
+			break;
+		default:
+			err = EINVAL;
+			break;
+		}
+	}
+
+	return (err);
+}
+
+int
+vmm_data_write(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
+{
+	int err = 0;
+
+	if (vmm_data_is_cpu_specific(req->vdr_class)) {
+		if (vcpuid >= VM_MAXCPU) {
+			return (EINVAL);
+		}
+	}
+
+	const vmm_data_version_entry_t *entry;
+	entry = vmm_data_find(req, &err);
+	if (entry == NULL) {
+		ASSERT(err != 0);
+		return (err);
+	}
+
+	void *datap = vmm_data_from_class(req, vm, vcpuid);
+	if (datap != NULL) {
+		err = entry->vdve_writef(datap, req);
+	} else {
+		switch (req->vdr_class) {
+		case VDC_FPU:
+			/* TODO: wire up to xsave import via hma_fpu iface */
+			err = EINVAL;
+			break;
+		case VDC_REGISTER:
+		case VDC_VMM_ARCH:
+		case VDC_MSR:
+			/* TODO: implement */
+			err = EINVAL;
+			break;
+		default:
+			err = EINVAL;
+			break;
+		}
+	}
+
+	return (err);
 }

@@ -155,3 +155,44 @@ vpmtmr_handler(void *arg, bool in, uint16_t port, uint8_t bytes, uint32_t *val)
 
 	return (0);
 }
+
+static int
+vpmtmr_data_read(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_PM_TIMER);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_pm_timer_v1));
+
+	struct vpmtmr *vpmtmr = datap;
+	struct vdi_pm_timer_v1 *out = req->vdr_data;
+
+	out->vpt_time_base = vm_normalize_hrtime(vpmtmr->vm, vpmtmr->base_time);
+	out->vpt_ioport = vpmtmr->io_port;
+
+	return (0);
+}
+
+static int
+vpmtmr_data_write(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_PM_TIMER);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_pm_timer_v1));
+
+	struct vpmtmr *vpmtmr = datap;
+	const struct vdi_pm_timer_v1 *src = req->vdr_data;
+
+	vpmtmr->base_time =
+	    vm_denormalize_hrtime(vpmtmr->vm, src->vpt_time_base);
+
+	return (0);
+}
+
+static const vmm_data_version_entry_t pm_timer_v1 = {
+	.vdve_class = VDC_PM_TIMER,
+	.vdve_version = 1,
+	.vdve_len_expect = sizeof (struct vdi_pm_timer_v1),
+	.vdve_readf = vpmtmr_data_read,
+	.vdve_writef = vpmtmr_data_write,
+};
+VMM_DATA_VERSION(pm_timer_v1);
