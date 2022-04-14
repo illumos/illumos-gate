@@ -168,7 +168,7 @@ CHMOD=		/usr/bin/chmod
 MV=		/usr/bin/mv -f
 RM=		/usr/bin/rm -f
 CUT=		/usr/bin/cut
-NM=		/usr/ccs/bin/nm
+NM=		/usr/bin/nm
 DIFF=		/usr/bin/diff
 GREP=		/usr/bin/grep
 EGREP=		/usr/bin/egrep
@@ -177,15 +177,15 @@ KSH93=		/usr/bin/ksh93
 SED=		/usr/bin/sed
 AWK=		/usr/bin/nawk
 CP=		/usr/bin/cp -f
-MCS=		/usr/ccs/bin/mcs
+MCS=		/usr/bin/mcs
 CAT=            /usr/bin/cat
-ELFDUMP=	/usr/ccs/bin/elfdump
+ELFDUMP=	/usr/bin/elfdump
 M4=		/usr/bin/m4
 GM4=		/usr/bin/gm4
-STRIP=		/usr/ccs/bin/strip
-LEX=		/usr/ccs/bin/lex
+STRIP=		/usr/bin/strip
+LEX=		/usr/bin/lex
 FLEX=		/usr/bin/flex
-YACC=		/usr/ccs/bin/yacc
+YACC=		/usr/bin/yacc
 BISON=		/usr/bin/bison
 CPP=		/usr/lib/cpp
 SH=		/usr/bin/sh
@@ -930,7 +930,7 @@ CW=			$(ONBLD_TOOLS)/bin/$(MACH)/cw
 
 BUILD_CC=		$(CW) $(CW_LINKER) $(CW_CC_COMPILERS) --
 BUILD_CCC=		$(CW) -C $(CW_LINKER) $(CW_CCC_COMPILERS) --
-BUILD_CPP=		/usr/ccs/lib/cpp
+BUILD_CPP=		/usr/lib/cpp
 BUILD_LD=		$(ONBLD_TOOLS)/bin/$(MACH)/ld
 
 $(MACH)_CC=		$(BUILD_CC)
@@ -942,10 +942,10 @@ $(MACH64)_CCC=		$(BUILD_CCC)
 $(MACH64)_CPP=		$(BUILD_CPP)
 $(MACH64)_LD=		$(BUILD_LD)
 
-sparc_AS=		/usr/ccs/bin/as -xregsym=no
+sparc_AS=		/usr/bin/as -xregsym=no
 sparcv9_AS=		$($(MACH)_AS)
 
-i386_AS=		/usr/ccs/bin/as
+i386_AS=		/usr/bin/as
 $(__GNUC)i386_AS=	$(ONBLD_TOOLS)/bin/$(MACH)/aw
 amd64_AS=		$(ONBLD_TOOLS)/bin/$(MACH)/aw
 
