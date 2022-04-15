@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1999,2000 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #ifndef _FSCK_PCFS_H
@@ -166,6 +167,10 @@ typedef struct clinfo ClusterInfo;
  *  FILEnnnn.CHK.
  */
 #define	MAXCHKVAL	9999
+
+extern size_t bpsec;
+extern bool AlwaysYes;	/* assume a yes answer to all questions */
+extern bool AlwaysNo;	/* assume a no answer to all questions */
 
 /*
  * Function prototypes

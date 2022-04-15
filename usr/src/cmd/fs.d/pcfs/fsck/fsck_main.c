@@ -31,6 +31,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <err.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -42,7 +43,7 @@
 #include <stropts.h>
 #include <sys/fcntl.h>
 #include <sys/dktp/fdisk.h>
-#include <sys/dkio.h>
+#include "getresponse.h"
 #include "pcfs_common.h"
 #include "fsck_pcfs.h"
 #include "pcfs_bpb.h"
@@ -76,34 +77,14 @@ int	ReadOnly = 0;
 int	IsFAT32 = 0;
 int	Verbose = 0;
 
-int	AlwaysYes = 0;	/* -y or -Y, assume a yes answer to all questions */
-int	AlwaysNo = 0;	/* -n or -N, assume a no answer to all questions */
+bool	AlwaysYes = false; /* -y or -Y, assume a yes answer to all questions */
+bool	AlwaysNo = false; /* -n or -N, assume a no answer to all questions */
 
 extern	ClusterContents	TheRootDir;
 
 /*
  * Function definitions
  */
-/*
- * Use DKIOCGMEDIAINFO to get sector size.
- */
-static int
-get_media_sector_size(int fd, size_t *sizep)
-{
-	struct dk_minfo dkminfo;
-
-	if (ioctl(fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
-		*sizep = dkminfo.dki_lbsize;
-		return (0);
-	}
-	/* In case the DKIOCGMEDIAINFO is not supported, return MINBPS. */
-	if (errno == ENOTTY) {
-		*sizep = MINBPS;
-		return (0);
-	}
-
-	return (errno);
-}
 
 static void
 passOne(int fd)
@@ -159,8 +140,8 @@ doOpen(int *inFD, int *outFD, char *name, char *outName)
 			} else {
 				tryOpen(inFD, name, O_RDONLY,
 				    EXIT_ON_OPEN_FAILURE);
-				AlwaysYes = 0;
-				AlwaysNo = 1;
+				AlwaysYes = false;
+				AlwaysNo = true;
 				ReadOnly = 1;
 				*outFD = -1;
 			}
@@ -212,7 +193,7 @@ openFS(char *special, int *inFD, int *outFD)
 		    strerror(rv));
 		exit(2);
 	}
-	if (bpsec != 512 && bpsec != 1024 && bpsec != 2048 && bpsec != 4096) {
+	if (!is_sector_size_valid(bpsec)) {
 		(void) fprintf(stderr,
 		    gettext("unsupported sector size: %zu\n"), bpsec);
 		exit(2);
@@ -220,7 +201,7 @@ openFS(char *special, int *inFD, int *outFD)
 
 	if (suffix) {
 		if ((PartitionOffset =
-		    findPartitionOffset(*inFD, suffix)) < 0) {
+		    findPartitionOffset(*inFD, bpsec, suffix)) < 0) {
 			mountSanityCheckFails();
 			(void) fprintf(stderr,
 			    gettext("Unable to find logical drive %s\n"),
@@ -388,6 +369,8 @@ main(int argc, char *argv[])
 #define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
+	if (init_yes() < 0)
+		errx(2, gettext(ERR_MSG_INIT_YES), strerror(errno));
 
 	if (argc < 2)
 		usage();
@@ -412,19 +395,20 @@ main(int argc, char *argv[])
 						    opt_text);
 				}
 				(void) printf("\n");
+				fini_yes();
 				exit(0);
 			}
 			break;
 		case 'N':
 		case 'n':
-			AlwaysYes = 0;
-			AlwaysNo = 1;
+			AlwaysYes = false;
+			AlwaysNo = true;
 			ReadOnly = 1;
 			break;
 		case 'Y':
 		case 'y':
-			AlwaysYes = 1;
-			AlwaysNo = 0;
+			AlwaysYes = true;
+			AlwaysNo = false;
 			break;
 		case 'm':
 			Mflag++;
@@ -469,5 +453,6 @@ main(int argc, char *argv[])
 	 */
 	printSummary(stdout);
 	writeBackChanges(ofd);
+	fini_yes();
 	return (0);
 }

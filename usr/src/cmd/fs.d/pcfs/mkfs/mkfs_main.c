@@ -19,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2011 Gary Mills
- *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2011 Gary Mills
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
 #include <sys/types.h>
@@ -30,7 +30,9 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <libintl.h>
@@ -41,11 +43,20 @@
 #include <sys/vtoc.h>
 #include <sys/efi_partition.h>
 #include <sys/sysmacros.h>
-#include "mkfs_pcfs.h"
 #include <sys/fs/pc_fs.h>
 #include <sys/fs/pc_dir.h>
 #include <sys/fs/pc_label.h>
-#include <macros.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <installboot.h>
+#include "getresponse.h"
+#include "pcfs_bpb.h"
+#include "pcfs_common.h"
+
+/* Drop gettext for debug build, so we can catch format errors. */
+#ifdef DEBUG
+#define	gettext(x)	x
+#endif
 
 /*
  *	mkfs (for pcfs)
@@ -58,10 +69,24 @@
 #define	IN_RANGE(n, x, y) (((n) >= (x)) && ((n) <= (y)))
 #define	DEFAULT_LABEL "NONAME"
 
-static char	*BootBlkFn = NULL;
+/*
+ * Extended boot signature. This byte indicates that VOLID, VOLLAB and
+ * FILSYSTYPE fields are present. [fatgen103, pages 11 and 12].
+ */
+#define	BOOTSIG	0x29
+
+/* Exit codes. */
+#define	ERR_USAGE	1
+#define	ERR_OS		2	/* open fail, stat  fail etc */
+#define	ERR_INVALID	3	/* Validation failed */
+#define	ERR_FAIL	4	/* IO error, no memory etc */
+#define	ERR_USER	5	/* User input */
+#define	ERR_INVAL	6	/* Invalid data */
+
+static char	*BootBlkFn = "/boot/pmbr";
 static char	*DiskName = NULL;
 static char	*FirstFn = NULL;
-static char	*Label = NULL;
+static char	*Label = DEFAULT_LABEL;
 static char	Firstfileattr = 0x20;
 static int	Outputtofile = 0;
 static int	SunBPBfields = 0;
@@ -105,21 +130,18 @@ static int	DontUseFdisk = 0;
 /*
  * Function prototypes
  */
-#ifndef i386
+#ifdef _BIG_ENDIAN
 static void swap_pack_grabsebpb(bpb_t *wbpb, struct _boot_sector *bsp);
 static void swap_pack_bpb32cpy(struct _boot_sector32 *bsp, bpb_t *wbpb);
 static void swap_pack_sebpbcpy(struct _boot_sector *bsp, bpb_t *wbpb);
-static void swap_pack_grabbpb(bpb_t *wbpb, struct _boot_sector *bsp);
 static void swap_pack_bpbcpy(struct _boot_sector *bsp, bpb_t *wbpb);
 #endif
 
 static uchar_t *build_rootdir(bpb_t *wbpb, char *ffn, int fffd,
 	ulong_t ffsize, pc_cluster32_t ffstart, ulong_t *rdirsize);
 static uchar_t *build_fat(bpb_t *wbpb, struct fat_od_fsi *fsinfop,
-	ulong_t bootblksize, ulong_t *fatsize, char *ffn, int *fffd,
+	ulong_t *fatsize, char *ffn, int *fffd,
 	ulong_t *ffsize, pc_cluster32_t *ffstartclust);
-
-static char *stat_actual_disk(char *diskname, struct stat *info, char **suffix);
 
 static void compare_existing_with_computed(int fd, char *suffix,
 	bpb_t *wbpb, int *prtsize, int *prtspc, int *prtbpf, int *prtnsect,
@@ -128,7 +150,7 @@ static void compare_existing_with_computed(int fd, char *suffix,
 static void print_reproducing_command(int fd, char *actualdisk, char *suffix,
 	bpb_t *wbpb);
 static void compute_file_area_size(bpb_t *wbpb);
-static void write_fat32_bootstuff(int fd, boot_sector_t *bsp,
+static void write_fat32_bootstuff(int fd, boot_sector_t *bsp, bpb_t *wbpb,
 	struct fat_od_fsi *fsinfop, off64_t seekto);
 static void sanity_check_options(int argc, int optind);
 static void compute_cluster_size(bpb_t *wbpb);
@@ -141,51 +163,40 @@ static void warn_funky_fatsize(void);
 static void warn_funky_floppy(void);
 static void dirent_time_fill(struct pcdir *dep);
 static void parse_suboptions(char *optsstr);
-static void header_for_dump(void);
 static void write_bootsects(int fd, boot_sector_t *bsp, bpb_t *wbpb,
 	struct fat_od_fsi *fsinfop, off64_t seekto);
 static void fill_bpb_sizes(bpb_t *wbpb, struct ipart part[],
 	int partno, off64_t offset);
 static void set_fat_string(bpb_t *wbpb, int fatsize);
 static void partn_lecture(char *dn);
-static void store_16_bits(uchar_t **bp, uint32_t v);
-static void store_32_bits(uchar_t **bp, uint32_t v);
 static void lookup_floppy(struct fd_char *fdchar, bpb_t *wbpb);
 static void label_volume(char *lbl, bpb_t *wbpb);
 static void mark_cluster(uchar_t *fatp, pc_cluster32_t clustnum,
 	uint32_t value);
-static void missing_arg(char *option);
 static void dashm_bail(int fd);
-static void dump_bytes(uchar_t *, int);
 static void write_rest(bpb_t *wbpb, char *efn,
 	int dfd, int sfd, int remaining);
 static void write_fat(int fd, off64_t seekto, char *fn, char *lbl,
 	char *ffn, bpb_t *wbpb);
-static void bad_arg(char *option);
-static void usage(void);
 
-static int prepare_image_file(char *fn, bpb_t *wbpb);
-static int verify_bootblkfile(char *fn, boot_sector_t *bs,
-	ulong_t *blkfilesize);
+static int prepare_image_file(const char *fn, bpb_t *wbpb);
+static int verify_bootblkfile(char *fn, boot_sector_t *bs);
 static int open_and_examine(char *dn, bpb_t *wbpb);
 static int verify_firstfile(char *fn, ulong_t *filesize);
 static int lookup_FAT_size(uchar_t partid);
-static int open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto);
+static int open_and_seek(const char *dn, bpb_t *wbpb, off64_t *seekto);
 static int warn_mismatch(char *desc, char *src, int expect, int assigned);
-static int copy_bootblk(char *fn, boot_sector_t *bootsect,
-	ulong_t *bootblksize);
+static void copy_bootblk(char *fn, boot_sector_t *bootsect);
 static int parse_drvnum(char *pn);
-static int seek_nofdisk(int fd, bpb_t *wbpb, off64_t *seekto);
-static int ask_nicely(char *special);
-static int seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto);
-static int yes(void);
+static bool seek_nofdisk(int fd, bpb_t *wbpb, off64_t *seekto);
+static bool ask_nicely(int bits, char *special);
+static bool seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto);
 
 /*
  *  usage
  *
  *	Display usage message and exit.
  */
-static
 void
 usage(void)
 {
@@ -213,31 +224,12 @@ usage(void)
 	    "drive specifier.\n"
 	    "Examples are: /dev/rdiskette and "
 	    "/dev/rdsk/c0t0d0p0:c\n"));
-	exit(1);
+	exit(ERR_USAGE);
 }
 
 static
-int
-yes(void)
-{
-	char *affirmative = gettext("yY");
-	char *a = affirmative;
-	int b;
-
-	b = getchar();
-	while (b == '\n' && b != '\0' && b != EOF)
-		b = getchar();
-	while (*a) {
-		if (b == (int)*a)
-			break;
-		a++;
-	}
-	return (*a);
-}
-
-static
-int
-ask_nicely(char *special)
+bool
+ask_nicely(int bits, char *special)
 {
 	/*
 	 * 4228473 - No way to non-interactively make a pcfs filesystem
@@ -247,112 +239,13 @@ ask_nicely(char *special)
 	 *	to any questions we would ask.
 	 */
 	if (Notreally || !isatty(fileno(stdin)))
-		return (1);
+		return (true);
 
 	(void) printf(
-	    gettext("Construct a new FAT file system on %s: (y/n)? "), special);
+	    gettext("Construct a new FAT%d file system on %s: (y/n)? "),
+	    bits, special);
 	(void) fflush(stdout);
 	return (yes());
-}
-
-/*
- * store_16_bits
- *	Save the lower 16 bits of a 32 bit value (v) into the provided
- *	buffer (pointed at by *bp), and increment the buffer pointer
- *	as well.  This way the routine can be called multiple times in
- *	succession to fill buffers.  The value is stored in little-endian
- *	order.
- */
-static
-void
-store_16_bits(uchar_t **bp, uint32_t v)
-{
-	uchar_t *l = *bp;
-
-	*l++ = v & 0xff;
-	*l = (v >> 8) & 0xff;
-	*bp += 2;
-}
-
-/*
- * store_32_bits
- * 	Save the 32 bit value (v) into the provided buffer (pointed
- *	at by *bp), and increment the buffer pointer as well.  This way
- *	the routine can be called multiple times in succession to fill
- *	buffers.  The value is stored in little-endian order.
- */
-static
-void
-store_32_bits(uchar_t **bp, uint32_t v)
-{
-	uchar_t *l = *bp;
-	int b;
-
-	for (b = 0; b < 4; b++) {
-		*l++ = v & 0xff;
-		v = v >> 8;
-	}
-	*bp += 4;
-}
-
-/*
- *  dump_bytes  -- display bytes as hex numbers.
- *		   b is the pointer to the byte buffer
- *		   n is the number of bytes in the buffer
- */
-/* Note: BPL = bytes to display per line */
-#define	BPL 16
-
-static
-void
-dump_bytes(uchar_t *b, int n)
-{
-	int cd = n;
-	int cu = 0;
-	int o = 0;
-	int bl;
-	int ac;
-
-	/* Display offset, 16 bytes per line, and printable ascii version */
-	while (cd > 0) {
-		ac = 0;
-		(void) printf("\n%06x: ", o);
-		for (bl = 0; bl < BPL; bl++) {
-			if (cu+bl < n) {
-				(void) printf("%02x ", (b[cu+bl] & 0xff));
-				ac++;
-			}
-			else
-				(void) printf("   ");
-		}
-		for (bl = 0; bl < BPL; bl++) {
-			if ((cu+bl < n) &&
-			    ((b[cu+bl] >= ' ') && (b[cu+bl] <= '~')))
-				(void) printf("%c", b[cu+bl]);
-			else
-				(void) printf(".");
-		}
-		cu += ac; o += ac; cd -= ac;
-	}
-	(void) printf("\n\n");
-}
-
-/*
- *  header_for_dump  --  display simple header over what will be output.
- */
-static
-void
-header_for_dump(void)
-{
-	int bl;
-
-	(void) printf("\n        ");
-	for (bl = 0; bl < BPL; bl++)
-		(void) printf("%02x ", bl);
-	(void) printf("\n       ");
-	bl = 3*BPL;
-	while (bl-- > 0)
-		(void) printf("-");
 }
 
 /*
@@ -480,7 +373,7 @@ warn_mismatch(char *desc, char *src, int expect, int assigned)
 	if (yes())
 		return (assigned);
 	else
-		exit(2);
+		exit(ERR_USER);
 	/*NOTREACHED*/
 }
 
@@ -539,7 +432,7 @@ fill_bpb_sizes(bpb_t *wbpb, struct ipart part[], int partno, off64_t offset)
 		if (Verbose) {
 			(void) printf(
 			    gettext("Partition size (from FDISK table) "
-			    "= %d sectors.\n"), usesize);
+			    "= %lu sectors.\n"), usesize);
 		}
 	} else {
 		usesize = warn_mismatch(
@@ -612,7 +505,7 @@ lookup_FAT_size(uchar_t partid)
  *	messages here.
  */
 static
-int
+bool
 seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 {
 	struct ipart part[FD_NUMPART];
@@ -643,18 +536,18 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 	int numExtraDrives = 0;
 
 	if ((drvnum = parse_drvnum(pn)) < 0)
-		return (PART_NOT_FOUND);
+		return (false);
 
 	if (read(fd, &mb, sizeof (mb)) != sizeof (mb)) {
 		(void) fprintf(stderr,
 		    gettext("Couldn't read a Master Boot Record?!\n"));
-		return (PART_NOT_FOUND);
+		return (false);
 	}
 
 	if (ltohs(mb.signature) != BOOTSECSIG) {
 		(void) fprintf(stderr,
 		    gettext("Bad Sig on master boot record!\n"));
-		return (PART_NOT_FOUND);
+		return (false);
 	}
 
 	*seekto = 0;
@@ -708,27 +601,28 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 		if (bootPart < 0) {
 			(void) fprintf(stderr,
 			    gettext("No boot partition found on drive\n"));
-			return (PART_NOT_FOUND);
+			return (false);
 		}
 		if ((*seekto = ltohi(part[bootPart].relsect)) == 0) {
 			(void) fprintf(stderr, gettext("Bogus FDISK entry? "
 			    "A boot partition starting\nat sector 0 would "
 			    "collide with the FDISK table!\n"));
-			return (PART_NOT_FOUND);
+			return (false);
 		}
 
 		fill_bpb_sizes(wbpb, part, bootPart, *seekto);
-		*seekto *= BPSEC;
+		*seekto *= wbpb->bpb.bytes_per_sector;
 		FdiskFATsize = lookup_FAT_size(part[bootPart].systid);
 		if (Verbose)
 			(void) printf(gettext("Boot partition's offset: "
-			    "Sector %x.\n"), *seekto/BPSEC);
+			    "Sector %llx.\n"),
+			    *seekto / wbpb->bpb.bytes_per_sector);
 		if (lseek64(fd, *seekto, SEEK_SET) < 0) {
 			(void) fprintf(stderr, gettext("Partition %s: "), pn);
 			perror("");
-			return (PART_NOT_FOUND);
+			return (false);
 		}
-		return (PART_FOUND);
+		return (true);
 	}
 
 	if (drvnum == PRIMARY_DOS_DRIVE && primaryPart >= 0) {
@@ -736,21 +630,22 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 			(void) fprintf(stderr, gettext("Bogus FDISK entry? "
 			    "A partition starting\nat sector 0 would "
 			    "collide with the FDISK table!\n"));
-			return (PART_NOT_FOUND);
+			return (false);
 		}
 
 		fill_bpb_sizes(wbpb, part, primaryPart, *seekto);
-		*seekto *= BPSEC;
+		*seekto *= wbpb->bpb.bytes_per_sector;
 		FdiskFATsize = lookup_FAT_size(part[primaryPart].systid);
 		if (Verbose)
 			(void) printf(gettext("Partition's offset: "
-			    "Sector %x.\n"), *seekto/BPSEC);
+			    "Sector %llx.\n"),
+			    *seekto / wbpb->bpb.bytes_per_sector);
 		if (lseek64(fd, *seekto, SEEK_SET) < 0) {
 			(void) fprintf(stderr, gettext("Partition %s: "), pn);
 			perror("");
-			return (PART_NOT_FOUND);
+			return (false);
 		}
-		return (PART_FOUND);
+		return (true);
 	}
 
 	/*
@@ -762,7 +657,7 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 		(void) fprintf(stderr,
 		    gettext("No such logical drive "
 		    "(missing extended partition entry)\n"));
-		return (PART_NOT_FOUND);
+		return (false);
 	}
 
 	if (extendedPart >= 0) {
@@ -781,12 +676,13 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 			 *  Seek the next extended partition, and find
 			 *  logical drives within it.
 			 */
-			if (lseek64(fd, nextseek * BPSEC, SEEK_SET) < 0 ||
+			if (lseek64(fd, nextseek * wbpb->bpb.bytes_per_sector,
+			    SEEK_SET) < 0 ||
 			    read(fd, &extmboot, sizeof (extmboot)) !=
 			    sizeof (extmboot)) {
 				perror(gettext("Unable to read extended "
 				    "partition record"));
-				return (PART_NOT_FOUND);
+				return (false);
 			}
 			(void) memcpy(part, extmboot.parts, sizeof (part));
 			lastseek = nextseek;
@@ -794,7 +690,7 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 				(void) fprintf(stderr,
 				    gettext("Bad signature on "
 				    "extended partition\n"));
-				return (PART_NOT_FOUND);
+				return (false);
 			}
 			/*
 			 *  Count up drives, and track where the next
@@ -844,33 +740,34 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 				    "drive starting at\nsector 0x%llx would "
 				    "collide with the\nFDISK information in "
 				    "that sector.\n"), *seekto);
-				return (PART_NOT_FOUND);
+				return (false);
 			} else if (*seekto <= xstartsect ||
 			    *seekto >= (xstartsect + xnumsect)) {
 				(void) fprintf(stderr,
 				    gettext("Bogus FDISK entry?  "
 				    "Logical drive start sector (0x%llx)\n"
 				    "not within extended partition! "
-				    "(Expected in range 0x%x - 0x%x)\n"),
+				    "(Expected in range 0x%llx - 0x%llx)\n"),
 				    *seekto, xstartsect + 1,
 				    xstartsect + xnumsect - 1);
-				return (PART_NOT_FOUND);
+				return (false);
 			}
 			fill_bpb_sizes(wbpb, part, extndDrives[driveIndex],
 			    *seekto);
-			*seekto *= BPSEC;
+			*seekto *= wbpb->bpb.bytes_per_sector;
 			FdiskFATsize = lookup_FAT_size(
 			    part[extndDrives[driveIndex]].systid);
 			if (Verbose)
 				(void) printf(gettext("Partition's offset: "
-				    "Sector 0x%x.\n"), *seekto/BPSEC);
+				    "Sector 0x%llx.\n"),
+				    *seekto/wbpb->bpb.bytes_per_sector);
 			if (lseek64(fd, *seekto, SEEK_SET) < 0) {
 				(void) fprintf(stderr,
 				    gettext("Partition %s: "), pn);
 				perror("");
-				return (PART_NOT_FOUND);
+				return (false);
 			}
-			return (PART_FOUND);
+			return (true);
 		} else {
 			/*
 			 * We ran out of extended dos partition
@@ -894,26 +791,27 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 			(void) fprintf(stderr, gettext("Bogus FDISK entry? "
 			    "A partition starting\nat sector 0 would "
 			    "collide with the FDISK table!\n"));
-			return (PART_NOT_FOUND);
+			return (false);
 		}
 
 		fill_bpb_sizes(wbpb, part, extraDrives[driveIndex], *seekto);
-		*seekto *= BPSEC;
+		*seekto *= wbpb->bpb.bytes_per_sector;
 		FdiskFATsize =
 		    lookup_FAT_size(part[extraDrives[driveIndex]].systid);
 		if (Verbose)
 			(void) printf(gettext("Partition's offset: "
-			    "Sector %x.\n"), *seekto/BPSEC);
+			    "Sector %llx.\n"),
+			    *seekto / wbpb->bpb.bytes_per_sector);
 		if (lseek64(fd, *seekto, SEEK_SET) < 0) {
 			(void) fprintf(stderr,
 			    gettext("Partition %s: "), pn);
 			perror("");
-			return (PART_NOT_FOUND);
+			return (false);
 		}
-		return (PART_FOUND);
+		return (true);
 	}
 	(void) fprintf(stderr, gettext("No such logical drive\n"));
-	return (PART_NOT_FOUND);
+	return (false);
 }
 
 /*
@@ -924,7 +822,7 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
  *	is if the 'hidden' parameter was given.
  */
 static
-int
+bool
 seek_nofdisk(int fd, bpb_t *wbpb, off64_t *seekto)
 {
 	if (TotSize > 0xffff)
@@ -933,22 +831,22 @@ seek_nofdisk(int fd, bpb_t *wbpb, off64_t *seekto)
 		wbpb->bpb.sectors_in_volume = (short)TotSize;
 	wbpb->bpb.sectors_in_logical_volume = TotSize;
 
-	*seekto = RelOffset * BPSEC;
+	*seekto = RelOffset * wbpb->bpb.bytes_per_sector;
 	wbpb->bpb.hidden_sectors = RelOffset;
 	wbpb->sunbpb.bs_offset_high = RelOffset >> 16;
 	wbpb->sunbpb.bs_offset_low = RelOffset & 0xFFFF;
 
 	if (Verbose)
-		(void) printf(gettext("Requested offset: Sector %x.\n"),
-		    *seekto/BPSEC);
+		(void) printf(gettext("Requested offset: Sector %llx.\n"),
+		    *seekto/wbpb->bpb.bytes_per_sector);
 
 	if (lseek64(fd, *seekto, SEEK_SET) < 0) {
 		(void) fprintf(stderr,
-		    gettext("User specified start sector %d"), RelOffset);
+		    gettext("User specified start sector %lu"), RelOffset);
 		perror("");
-		return (PART_NOT_FOUND);
+		return (false);
 	}
-	return (PART_FOUND);
+	return (true);
 }
 
 /*
@@ -980,14 +878,14 @@ set_fat_string(bpb_t *wbpb, int fatsize)
  */
 static
 int
-prepare_image_file(char *fn, bpb_t *wbpb)
+prepare_image_file(const char *fn, bpb_t *wbpb)
 {
 	int fd;
 	char zerobyte = '\0';
 
 	if ((fd = open(fn, O_RDWR | O_CREAT | O_EXCL, 0666)) < 0) {
 		perror(fn);
-		exit(2);
+		exit(ERR_OS);
 	}
 
 	if (Imagesize == 5) {
@@ -1016,22 +914,22 @@ prepare_image_file(char *fn, bpb_t *wbpb)
 	 * Make a holey file, with length the exact
 	 * size of the floppy image.
 	 */
-	if (lseek(fd, (wbpb->bpb.sectors_in_volume * BPSEC)-1, SEEK_SET) < 0) {
+	if (lseek(fd, (wbpb->bpb.sectors_in_volume * MINBPS)-1, SEEK_SET) < 0) {
 		(void) close(fd);
 		perror(fn);
-		exit(2);
+		exit(ERR_OS);
 	}
 
 	if (write(fd, &zerobyte, 1) != 1) {
 		(void) close(fd);
 		perror(fn);
-		exit(2);
+		exit(ERR_OS);
 	}
 
 	if (lseek(fd, 0, SEEK_SET) < 0) {
 		(void) close(fd);
 		perror(fn);
-		exit(2);
+		exit(ERR_OS);
 	}
 
 	Fatentsize = 12;  /* Size of fat entry in bits */
@@ -1077,7 +975,7 @@ warn_funky_floppy(void)
 	(void) fprintf(stderr,
 	    gettext("Use the 'nofdisk' option to create file systems\n"
 	    "on non-standard floppies.\n\n"));
-	exit(4);
+	exit(ERR_FAIL);
 }
 
 static
@@ -1088,7 +986,7 @@ warn_funky_fatsize(void)
 	    gettext("Non-standard FAT size requested for floppy.\n"
 	    "The 'nofdisk' option must be used to\n"
 	    "override the 12 bit floppy default.\n\n"));
-	exit(4);
+	exit(ERR_FAIL);
 }
 
 static
@@ -1275,7 +1173,7 @@ lookup_floppy(struct fd_char *fdchar, bpb_t *wbpb)
  *
  *	Compute an acceptable sectors/cluster value.
  *
- * 	Based on values from the Hardware White Paper
+ *	Based on values from the Hardware White Paper
  *	from Microsoft.
  *	"Microsoft Extensible Firmware Initiative
  *	 FAT32 File System Specification
@@ -1290,7 +1188,7 @@ compute_cluster_size(bpb_t *wbpb)
 {
 	ulong_t volsize;
 	ulong_t spc;
-	ulong_t rds, tmpval1, tmpval2;
+	ulong_t rds, scale, tmpval1, tmpval2;
 	ulong_t fatsz;
 	int newfat = 16;
 
@@ -1316,7 +1214,7 @@ compute_cluster_size(bpb_t *wbpb)
 				(void) fprintf(stderr,
 				    gettext("Requested size is too "
 				    "small for FAT16.\n"));
-				exit(4);
+				exit(ERR_FAIL);
 			}
 			/* SPC must be a power of 2 */
 			for (spc = 1; spc <= 64; spc = spc * 2) {
@@ -1327,15 +1225,15 @@ compute_cluster_size(bpb_t *wbpb)
 				(void) fprintf(stderr,
 				    gettext("Requested size is too "
 				    "large for FAT16.\n"));
-				exit(4);
+				exit(ERR_FAIL);
 			}
 		} else { /* FAT32 */
 			/* volsize is in sectors */
-			if (volsize < FAT16_MAX_CLUSTERS) {
+			if (volsize <= FAT16_MAX_CLUSTERS) {
 				(void) fprintf(stderr,
 				    gettext("Requested size is too "
 				    "small for FAT32.\n"));
-				exit(4);
+				exit(ERR_FAIL);
 			}
 			/* SPC must be a power of 2 */
 			for (spc = 1; spc <= 64; spc = spc * 2) {
@@ -1346,7 +1244,7 @@ compute_cluster_size(bpb_t *wbpb)
 				(void) fprintf(stderr,
 				    gettext("Requested size is too "
 				    "large for FAT32.\n"));
-				exit(4);
+				exit(ERR_FAIL);
 			}
 		}
 	} else {
@@ -1363,7 +1261,7 @@ compute_cluster_size(bpb_t *wbpb)
 		if (nclust <= FAT16_MAX_CLUSTERS && MakeFAT32) {
 			(void) fprintf(stderr, gettext("Requested size is too "
 			    "small for FAT32.\n"));
-			exit(4);
+			exit(ERR_FAIL);
 		}
 		if (!MakeFAT32) {
 			/* Determine if FAT12 or FAT16 */
@@ -1375,17 +1273,17 @@ compute_cluster_size(bpb_t *wbpb)
 				(void) fprintf(stderr,
 				    gettext("Requested size is too "
 				    "small for FAT32.\n"));
-				exit(4);
+				exit(ERR_FAIL);
 			}
 		}
 	}
 
 	/*
 	 * RootDirSectors = ((BPB_RootEntCnt * 32) +
-	 *	(BPB_BytsPerSec  1)) / BPB_BytsPerSec;
+	 *	(BPB_BytsPerSec - 1)) / BPB_BytsPerSec;
 	 */
 	rds = ((wbpb->bpb.num_root_entries * 32) +
-	    (wbpb->bpb.bytes_sector - 1)) / wbpb->bpb.bytes_sector;
+	    (wbpb->bpb.bytes_per_sector - 1)) / wbpb->bpb.bytes_per_sector;
 
 	if (GetBPF) {
 		if (MakeFAT32)
@@ -1418,7 +1316,7 @@ compute_cluster_size(bpb_t *wbpb)
 				if (yes())
 					Fatentsize = 16;
 				else
-					exit(5);
+					exit(ERR_USER);
 			}
 		}
 	}
@@ -1430,8 +1328,8 @@ compute_cluster_size(bpb_t *wbpb)
 		    "entry size (%d bits) with FDISK table.\n"
 		    "FDISK table has an unknown file system "
 		    "type for this device.  Giving up...\n"),
-		    Fatentsize, Fatentsize);
-		exit(6);
+		    Fatentsize);
+		exit(ERR_INVAL);
 	} else if (!GetFsParams && FdiskFATsize && FdiskFATsize != Fatentsize) {
 		(void) printf(
 		    gettext("Chosen/computed FAT entry size (%d bits) "
@@ -1440,30 +1338,38 @@ compute_cluster_size(bpb_t *wbpb)
 		(void) printf(
 		    gettext("Use -o fat=%d to build a FAT "
 		    "that matches the FDISK entry.\n"), FdiskFATsize);
-		exit(6);
+		exit(ERR_INVAL);
 	}
 	set_fat_string(wbpb, Fatentsize);
 	/*
-	 * Compure the FAT sizes according to algorithm from Microsoft:
+	 * Compute the FAT sizes according to algorithm from Microsoft:
 	 *
 	 * RootDirSectors = ((BPB_RootEntCnt * 32) +
-	 *	(BPB_BytsPerSec  1)) / BPB_BytsPerSec;
+	 *	(BPB_BytsPerSec - 1)) / BPB_BytsPerSec;
 	 * TmpVal1 = DskSize - (BPB_ResvdSecCnt + RootDirSectors);
 	 * TmpVal2 = (256 * BPB_SecPerClus) + BPB_NumFATs;
 	 * If (FATType == FAT32)
-	 * 	TmpVal2 = TmpVal2 / 2;
-	 * FATSz = (TMPVal1 + (TmpVal2  1)) / TmpVal2;
+	 *	TmpVal2 = TmpVal2 / 2;
+	 * FATSz = (TMPVal1 + (TmpVal2 - 1)) / TmpVal2;
 	 * If (FATType == FAT32) {
-	 * 	BPB_FATSz16 = 0;
+	 *	BPB_FATSz16 = 0;
 	 *	BPB_FATSz32 = FATSz;
 	 * } else {
 	 *	BPB_FATSz16 = LOWORD(FATSz);
-	 * 	// there is no BPB_FATSz32 in a FAT16 BPB
+	 *	// there is no BPB_FATSz32 in a FAT16 BPB
 	 * }
+	 *
+	 * The comment from Microsoft [fatgen103, page 21] is that we should
+	 * not think too much about this algorithm and that it works.
+	 * However, they neglected to mention, it does work with a 512B sector
+	 * size. When using different sector sizes we need to change the
+	 * scale factor from 256. Apparently the scale factor is actually
+	 * meant to be half of the sector size.
 	 */
+	scale = wbpb->bpb.bytes_per_sector / 2;
 	tmpval1 = volsize - (wbpb->bpb.resv_sectors + rds);
 
-	tmpval2 = (256 * wbpb->bpb.sectors_per_cluster) + wbpb->bpb.num_fats;
+	tmpval2 = (scale * wbpb->bpb.sectors_per_cluster) + wbpb->bpb.num_fats;
 
 	if (Fatentsize == 32)
 		tmpval2 = tmpval2 / 2;
@@ -1476,15 +1382,15 @@ compute_cluster_size(bpb_t *wbpb)
 		wbpb->bpb.sectors_per_fat = 0;
 		wbpb->bpb32.big_sectors_per_fat = fatsz;
 		if (Verbose)
-			(void) printf("compute_cluster_size: Sectors per "
-			    "FAT32 = %d\n", wbpb->bpb32.big_sectors_per_fat);
+			(void) printf("%s: Sectors per FAT32 = %d\n",
+			    __func__, wbpb->bpb32.big_sectors_per_fat);
 		break;
 	case 12:
 	default:	/* 16 bit FAT */
 		wbpb->bpb.sectors_per_fat = (ushort_t)(fatsz & 0x0000FFFF);
 		if (Verbose)
-			(void) printf("compute_cluster_size: Sectors per "
-			    "FAT16 = %d\n", wbpb->bpb.sectors_per_fat);
+			(void) printf("%s: Sectors per FAT16 = %d\n",
+			    __func__, wbpb->bpb.sectors_per_fat);
 		break;
 	}
 }
@@ -1507,7 +1413,7 @@ find_fixed_details(int fd, bpb_t *wbpb)
 			perror(
 			    gettext("Drive geometry lookup (need "
 			    "tracks/cylinder and/or sectors/track"));
-			exit(2);
+			exit(ERR_OS);
 		}
 	}
 
@@ -1542,33 +1448,6 @@ find_fixed_details(int fd, bpb_t *wbpb)
 }
 
 static
-char *
-stat_actual_disk(char *diskname, struct stat *info, char **suffix)
-{
-	char *actualdisk;
-
-	if (stat(diskname, info)) {
-		/*
-		 *  Device named on command line doesn't exist.  That
-		 *  probably means there is a partition-specifying
-		 *  suffix attached to the actual disk name.
-		 */
-		actualdisk = strtok(strdup(diskname), ":");
-		if (*suffix = strchr(diskname, ':'))
-			(*suffix)++;
-
-		if (stat(actualdisk, info)) {
-			perror(actualdisk);
-			exit(2);
-		}
-	} else {
-		actualdisk = strdup(diskname);
-	}
-
-	return (actualdisk);
-}
-
-static
 void
 compute_file_area_size(bpb_t *wbpb)
 {
@@ -1576,8 +1455,9 @@ compute_file_area_size(bpb_t *wbpb)
 	int TotSec;
 	int DataSec;
 	int RootDirSectors =
-	    ((wbpb->bpb.num_root_entries * 32) + (wbpb->bpb.bytes_sector - 1)) /
-	    wbpb->bpb.bytes_sector;
+	    ((wbpb->bpb.num_root_entries * 32) +
+	    (wbpb->bpb.bytes_per_sector - 1)) /
+	    wbpb->bpb.bytes_per_sector;
 
 	if (wbpb->bpb.sectors_per_fat) {
 		/*
@@ -1604,13 +1484,14 @@ compute_file_area_size(bpb_t *wbpb)
 	TotalClusters = DataSec / wbpb->bpb.sectors_per_cluster;
 
 	if (Verbose)
-		(void) printf(gettext("Disk has a file area of %d "
-		    "allocation units,\neach with %d sectors = %d "
+		(void) printf(gettext("Disk has a file area of %lu "
+		    "allocation units,\neach with %d sectors = %lu "
 		    "bytes.\n"), TotalClusters, wbpb->bpb.sectors_per_cluster,
-		    TotalClusters * wbpb->bpb.sectors_per_cluster * BPSEC);
+		    TotalClusters * wbpb->bpb.sectors_per_cluster *
+		    wbpb->bpb.bytes_per_sector);
 }
 
-#ifndef i386
+#ifdef _BIG_ENDIAN
 /*
  *  swap_pack_{bpb,bpb32,sebpb}cpy
  *
@@ -1630,7 +1511,7 @@ swap_pack_bpbcpy(struct _boot_sector *bsp, bpb_t *wbpb)
 
 	fillp = (uchar_t *)&(bsp->bs_filler[ORIG_BPB_START_INDEX]);
 
-	store_16_bits(&fillp, wbpb->bpb.bytes_sector);
+	store_16_bits(&fillp, wbpb->bpb.bytes_per_sector);
 	*fillp++ = wbpb->bpb.sectors_per_cluster;
 	store_16_bits(&fillp, wbpb->bpb.resv_sectors);
 	*fillp++ = wbpb->bpb.num_fats;
@@ -1661,7 +1542,7 @@ swap_pack_bpb32cpy(struct _boot_sector32 *bsp, bpb_t *wbpb)
 
 	fillp = (uchar_t *)&(bsp->bs_filler[ORIG_BPB_START_INDEX]);
 
-	store_16_bits(&fillp, wbpb->bpb.bytes_sector);
+	store_16_bits(&fillp, wbpb->bpb.bytes_per_sector);
 	*fillp++ = wbpb->bpb.sectors_per_cluster;
 	store_16_bits(&fillp, wbpb->bpb.resv_sectors);
 	*fillp++ = wbpb->bpb.num_fats;
@@ -1706,52 +1587,6 @@ swap_pack_sebpbcpy(struct _boot_sector *bsp, bpb_t *wbpb)
 
 static
 void
-swap_pack_grabbpb(bpb_t *wbpb, struct _boot_sector *bsp)
-{
-	uchar_t *grabp;
-
-	grabp = (uchar_t *)&(bsp->bs_filler[ORIG_BPB_START_INDEX]);
-
-	((uchar_t *)&(wbpb->bpb.bytes_sector))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.bytes_sector))[0] = *grabp++;
-	wbpb->bpb.sectors_per_cluster = *grabp++;
-	((uchar_t *)&(wbpb->bpb.resv_sectors))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.resv_sectors))[0] = *grabp++;
-	wbpb->bpb.num_fats = *grabp++;
-	((uchar_t *)&(wbpb->bpb.num_root_entries))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.num_root_entries))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_in_volume))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_in_volume))[0] = *grabp++;
-	wbpb->bpb.media = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_per_fat))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_per_fat))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_per_track))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_per_track))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.heads))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.heads))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.hidden_sectors))[3] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.hidden_sectors))[2] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.hidden_sectors))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.hidden_sectors))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_in_logical_volume))[3] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_in_logical_volume))[2] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_in_logical_volume))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb.sectors_in_logical_volume))[0] = *grabp++;
-	wbpb->ebpb.phys_drive_num = *grabp++;
-	wbpb->ebpb.reserved = *grabp++;
-	wbpb->ebpb.ext_signature = *grabp++;
-	((uchar_t *)&(wbpb->ebpb.volume_id))[3] = *grabp++;
-	((uchar_t *)&(wbpb->ebpb.volume_id))[2] = *grabp++;
-	((uchar_t *)&(wbpb->ebpb.volume_id))[1] = *grabp++;
-	((uchar_t *)&(wbpb->ebpb.volume_id))[0] = *grabp++;
-
-	(void) strncpy((char *)wbpb->ebpb.volume_label, (char *)grabp, 11);
-	grabp += 11;
-	(void) strncpy((char *)wbpb->ebpb.type, (char *)grabp, 8);
-}
-
-static
-void
 swap_pack_grabsebpb(bpb_t *wbpb, struct _boot_sector *bsp)
 {
 	uchar_t *grabp;
@@ -1762,45 +1597,7 @@ swap_pack_grabsebpb(bpb_t *wbpb, struct _boot_sector *bsp)
 	((uchar_t *)&(wbpb->sunbpb.bs_offset_low))[1] = *grabp++;
 	((uchar_t *)&(wbpb->sunbpb.bs_offset_low))[0] = *grabp++;
 }
-
-static
-void
-swap_pack_grab32bpb(bpb_t *wbpb, struct _boot_sector *bsp)
-{
-	uchar_t *grabp;
-
-	grabp = (uchar_t *)&(bsp->bs_filler[BPB_32_START_INDEX]);
-
-	((uchar_t *)&(wbpb->bpb32.big_sectors_per_fat))[3] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.big_sectors_per_fat))[2] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.big_sectors_per_fat))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.big_sectors_per_fat))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.ext_flags))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.ext_flags))[0] = *grabp++;
-	wbpb->bpb32.fs_vers_lo = *grabp++;
-	wbpb->bpb32.fs_vers_hi = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.root_dir_clust))[3] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.root_dir_clust))[2] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.root_dir_clust))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.root_dir_clust))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.fsinfosec))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.fsinfosec))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.backupboot))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.backupboot))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[0]))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[0]))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[1]))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[1]))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[2]))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[2]))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[3]))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[3]))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[4]))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[4]))[0] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[5]))[1] = *grabp++;
-	((uchar_t *)&(wbpb->bpb32.reserved[5]))[0] = *grabp++;
-}
-#endif	/* ! i386 */
+#endif	/* ! _BIG_ENDIAN */
 
 static
 void
@@ -1810,7 +1607,7 @@ dashm_bail(int fd)
 	    gettext("This media does not appear to be "
 	    "formatted with a FAT file system.\n"));
 	(void) close(fd);
-	exit(6);
+	exit(ERR_INVAL);
 }
 
 /*
@@ -1825,19 +1622,21 @@ void
 read_existing_bpb(int fd, bpb_t *wbpb)
 {
 	boot_sector_t ubpb;
+	size_t bps;
 
-	if (read(fd, ubpb.buf, BPSEC) < BPSEC) {
+	bps = wbpb->bpb.bytes_per_sector;
+	if (read(fd, ubpb.buf, bps) < (ssize_t)bps) {
 		perror(gettext("Read BIOS parameter block "
 		    "from previously formatted media"));
 		(void) close(fd);
-		exit(6);
+		exit(ERR_INVAL);
 	}
 
 	if (ltohs(ubpb.mb.signature) != BOOTSECSIG) {
 		dashm_bail(fd);
 	}
 
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 	(void) memcpy(&(wbpb->bpb), &(ubpb.bs.bs_front.bs_bpb),
 	    sizeof (wbpb->bpb));
 	(void) memcpy(&(wbpb->ebpb), &(ubpb.bs.bs_ebpb), sizeof (wbpb->ebpb));
@@ -1845,34 +1644,21 @@ read_existing_bpb(int fd, bpb_t *wbpb)
 	swap_pack_grabbpb(wbpb, &(ubpb.bs));
 #endif
 	if (SunBPBfields) {
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 		(void) memcpy(&(wbpb->sunbpb), &(ubpb.bs.bs_sebpb),
 		    sizeof (wbpb->sunbpb));
 #else
 		swap_pack_grabsebpb(wbpb, &(ubpb.bs));
 #endif
 	}
-	if (wbpb->bpb.bytes_sector != BPSEC) {
-		(void) fprintf(stderr,
-		    gettext("Bogus bytes per sector value.\n"));
-		if (!(ISP2(wbpb->bpb.bytes_sector) &&
-		    IN_RANGE(wbpb->bpb.bytes_sector, 1, BPSEC * 8))) {
-			(void) fprintf(stderr,
-			    gettext("The device name may be missing a "
-			    "logical drive specifier.\n"));
-			(void) close(fd);
-			exit(6);
-		} else {
-			(void) fprintf(stderr,
-			    gettext("Do not know how to build FATs with a\n"
-			    "non-standard sector size. Standard "
-			    "size is %d bytes,\nyour sector size "
-			    "is %d bytes.\n"), BPSEC,
-			    wbpb->bpb.bytes_sector);
-			(void) close(fd);
-			exit(6);
-		}
+	if (!is_sector_size_valid(wbpb->bpb.bytes_per_sector)) {
+		(void) close(fd);
+		err(ERR_INVAL,
+		    gettext("Invalid bytes/sector (%u): must be 512, 1024, "
+		    "2048 or 4096\n"), wbpb->bpb.bytes_per_sector);
 	}
+	bps = wbpb->bpb.bytes_per_sector;
+
 	if (!(ISP2(wbpb->bpb.sectors_per_cluster) &&
 	    IN_RANGE(wbpb->bpb.sectors_per_cluster, 1, 128))) {
 		(void) fprintf(stderr,
@@ -1881,18 +1667,18 @@ read_existing_bpb(int fd, bpb_t *wbpb)
 		    gettext("The device name may be missing a "
 		    "logical drive specifier.\n"));
 		(void) close(fd);
-		exit(6);
+		exit(ERR_INVAL);
 	}
 
 	if (wbpb->bpb.sectors_per_fat == 0) {
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 		(void) memcpy(&(wbpb->bpb32), &(ubpb.bs32.bs_bpb32),
 		    sizeof (wbpb->bpb32));
 #else
 		swap_pack_grab32bpb(wbpb, &(ubpb.bs));
 #endif
 		compute_file_area_size(wbpb);
-		if ((wbpb->bpb32.big_sectors_per_fat * BPSEC / 4) >=
+		if ((wbpb->bpb32.big_sectors_per_fat * bps / 4) >=
 		    TotalClusters) {
 			MakeFAT32 = 1;
 		} else {
@@ -2020,7 +1806,8 @@ compare_existing_with_computed(int fd, char *suffix,
 		(*dashos)++;
 		(*prtbpf)++;
 	} else {
-		fatents = wbpb->bpb.sectors_per_fat * BPSEC * 2 / 3;
+		fatents = wbpb->bpb.sectors_per_fat *
+		    wbpb->bpb.bytes_per_sector * 2 / 3;
 		if (fatents >= TotalClusters && wbpb->ebpb.type[4] == '2')
 			Fatentsize = 12;
 		else
@@ -2058,7 +1845,7 @@ print_reproducing_command(int fd, char *actualdisk, char *suffix, bpb_t *wbpb)
 	 */
 	(void) printf("mkfs -F pcfs");
 
-	ll = min(11, (int)strlen((char *)wbpb->ebpb.volume_label));
+	ll = MIN(11, (int)strlen((char *)wbpb->ebpb.volume_label));
 	/*
 	 * First, eliminate trailing spaces. Now compare the name against
 	 * our default label.  If there's a match we don't need to print
@@ -2168,8 +1955,8 @@ open_and_examine(char *dn, bpb_t *wbpb)
 	off64_t ignored;
 	char *actualdisk = NULL;
 	char *suffix = NULL;
-	int fd;
-	struct dk_minfo dkminfo;
+	int fd, rv;
+	size_t ssize;
 
 	if (Verbose)
 		(void) printf(gettext("Opening destination device/file.\n"));
@@ -2183,33 +1970,36 @@ open_and_examine(char *dn, bpb_t *wbpb)
 		(void) fprintf(stderr,
 		    gettext("\n%s: device name must be a "
 		    "character special device.\n"), actualdisk);
-		exit(2);
+		exit(ERR_OS);
 	} else if ((fd = open(actualdisk, O_RDWR)) < 0) {
 		perror(actualdisk);
-		exit(2);
+		exit(ERR_OS);
 	}
 
 	/*
-	 * Check the media sector size
+	 * Get the media sector size.
 	 */
-	if (ioctl(fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
-		if (dkminfo.dki_lbsize != 0 &&
-		    ISP2(dkminfo.dki_lbsize / DEV_BSIZE) &&
-		    dkminfo.dki_lbsize != DEV_BSIZE) {
-			(void) fprintf(stderr,
-			    gettext("The device sector size %u is not "
-			    "supported by pcfs!\n"), dkminfo.dki_lbsize);
-			(void) close(fd);
-			exit(1);
-		}
+	rv = get_media_sector_size(fd, &ssize);
+	if (rv != 0) {
+		int e = errno;
+		(void) close(fd);
+		errc(ERR_OS, e, gettext("failed to obtain sector size for %s"),
+		    actualdisk);
 	}
+	if (!is_sector_size_valid(ssize)) {
+		(void) close(fd);
+		err(ERR_OS,
+		    gettext("Invalid bytes/sector (%zu): must be 512, 1024, "
+		    "2048 or 4096\n"), ssize);
+	}
+	wbpb->bpb.bytes_per_sector = ssize;
 
 	/*
 	 * Find appropriate partition if we were requested to do so.
 	 */
 	if (suffix && !(seek_partn(fd, suffix, wbpb, &ignored))) {
 		(void) close(fd);
-		exit(2);
+		exit(ERR_OS);
 	}
 
 	read_existing_bpb(fd, wbpb);
@@ -2226,16 +2016,14 @@ open_and_examine(char *dn, bpb_t *wbpb)
  * Secondarily, we need to detect the FAT type and size when dealing with
  * GPT partitions.
  */
-static int
-getdiskinfo(char *dn, char **suffix)
+static void
+getdiskinfo(const char *dn, char **actualdisk, char **suffix)
 {
-	struct dk_minfo	dkminfo;
 	struct stat di;
 	int rv, fd, reserved;
-	char *actualdisk = NULL;
 	dk_gpt_t *gpt = NULL;
 
-	actualdisk = stat_actual_disk(dn, &di, suffix);
+	*actualdisk = stat_actual_disk(dn, &di, suffix);
 
 	/*
 	 * Destination exists, now find more about it.
@@ -2243,26 +2031,11 @@ getdiskinfo(char *dn, char **suffix)
 	if (!(S_ISCHR(di.st_mode))) {
 		(void) fprintf(stderr,
 		    gettext("Device name must indicate a "
-		    "character special device: %s\n"), actualdisk);
-		exit(2);
-	} else if ((fd = open(actualdisk, O_RDWR)) < 0) {
-		perror(actualdisk);
-		exit(2);
-	}
-
-	/*
-	 * Check the media sector size
-	 */
-	if (ioctl(fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
-		if (dkminfo.dki_lbsize != 0 &&
-		    ISP2(dkminfo.dki_lbsize / DEV_BSIZE) &&
-		    dkminfo.dki_lbsize != DEV_BSIZE) {
-			(void) fprintf(stderr,
-			    gettext("The device sector size %u is not "
-			    "supported by pcfs!\n"), dkminfo.dki_lbsize);
-			(void) close(fd);
-			exit(2);
-		}
+		    "character special device: %s\n"), *actualdisk);
+		exit(ERR_OS);
+	} else if ((fd = open(*actualdisk, O_RDWR)) < 0) {
+		err(ERR_OS, "%s: failed to open disk device %s", __func__,
+		    *actualdisk);
 	}
 
 	rv = efi_alloc_and_read(fd, &gpt);
@@ -2285,7 +2058,7 @@ getdiskinfo(char *dn, char **suffix)
 			break;
 		}
 		(void) close(fd);
-		exit(2);
+		exit(ERR_OS);
 	}
 	if (rv >= 0) {
 		DontUseFdisk = 1;
@@ -2295,16 +2068,16 @@ getdiskinfo(char *dn, char **suffix)
 			    "GPT partitioning.\n"), *suffix);
 			efi_free(gpt);
 			(void) close(fd);
-			exit(2);
+			exit(ERR_OS);
 		}
 		/* Can not use whole disk, 7 is GPT minor node "wd" */
 		if (rv == 7) {
 			(void) fprintf(stderr,
 			    gettext("Device name must indicate a "
-			    "partition: %s\n"), actualdisk);
+			    "partition: %s\n"), *actualdisk);
 			efi_free(gpt);
 			(void) close(fd);
-			exit(2);
+			exit(ERR_OS);
 		}
 
 		if (GetSize == 1) {
@@ -2356,11 +2129,47 @@ getdiskinfo(char *dn, char **suffix)
 			} else {
 				MakeFAT32 = 1;
 				Fatentsize = 32;
+				Resrvd = reserved;
+				GetResrvd = 0;
 			}
 		}
 		efi_free(gpt);
 	}
-	return (fd);
+	(void) close(fd);
+}
+
+static void
+prepare_wbpb(const char *dn, bpb_t *wbpb, char **actualdisk, char **suffix)
+{
+	/*
+	 * We hold these truths to be self evident, all BPBs we create
+	 * will have these values in these fields.
+	 */
+	wbpb->bpb.num_fats = 2;
+	/* Set value for prepare_image_file() */
+	wbpb->bpb.bytes_per_sector = MINBPS;
+
+	/* Collect info about device */
+	if (!Outputtofile)
+		getdiskinfo(dn, actualdisk, suffix);
+
+	/*
+	 * Assign or use supplied numbers for hidden and
+	 * reserved sectors in the file system.
+	 */
+	if (GetResrvd)
+		if (MakeFAT32)
+			wbpb->bpb.resv_sectors = 32;
+		else
+			wbpb->bpb.resv_sectors = 1;
+	else
+		wbpb->bpb.resv_sectors = Resrvd;
+
+	wbpb->ebpb.ext_signature = BOOTSIG; /* Magic number for modern format */
+	wbpb->ebpb.volume_id = 0;
+
+	if (MakeFAT32)
+		fill_fat32_bpb(wbpb);
 }
 
 /*
@@ -2375,42 +2184,19 @@ getdiskinfo(char *dn, char **suffix)
  */
 static
 int
-open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
+open_and_seek(const char *dn, bpb_t *wbpb, off64_t *seekto)
 {
 	struct fd_char fdchar;
 	struct dk_geom dg;
 	char *actualdisk = NULL;
 	char *suffix = NULL;
-	int fd;
+	size_t size = 0;
+	int fd, rv;
 
 	if (Verbose)
 		(void) printf(gettext("Opening destination device/file.\n"));
 
-	/*
-	 * We hold these truths to be self evident, all BPBs we create
-	 * will have these values in these fields.
-	 */
-	wbpb->bpb.num_fats = 2;
-	wbpb->bpb.bytes_sector = BPSEC;
-
-	/*
-	 * Assign or use supplied numbers for hidden and
-	 * reserved sectors in the file system.
-	 */
-	if (GetResrvd)
-		if (MakeFAT32)
-			wbpb->bpb.resv_sectors = 32;
-		else
-			wbpb->bpb.resv_sectors = 1;
-	else
-		wbpb->bpb.resv_sectors = Resrvd;
-
-	wbpb->ebpb.ext_signature = 0x29; /* Magic number for modern format */
-	wbpb->ebpb.volume_id = 0;
-
-	if (MakeFAT32)
-		fill_fat32_bpb(wbpb);
-
+	prepare_wbpb(dn, wbpb, &actualdisk, &suffix);
 	/*
 	 * If all output goes to a simple file, call a routine to setup
 	 * that scenario. Otherwise, try to find the device.
@@ -2418,8 +2204,30 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 	if (Outputtofile)
 		return (prepare_image_file(dn, wbpb));
 
-	/* Collect info about device */
-	fd = getdiskinfo(dn, &suffix);
+	fd = open(actualdisk, O_RDWR);
+	if (fd < 0) {
+		err(ERR_OS, "Failed to open disk device %s",
+		    actualdisk);
+	}
+	/*
+	 * Check the media sector size
+	 */
+	rv = get_media_sector_size(fd, &size);
+	if (rv != 0) {
+		int e = errno;
+		(void) close(fd);
+		errc(ERR_OS, e, gettext("Failed to obtain sector size for %s"),
+		    actualdisk);
+	}
+
+	if (!is_sector_size_valid(size)) {
+		(void) close(fd);
+		err(ERR_OS,
+		    gettext("Invalid bytes/sector (%zu): must be 512, 1024, "
+		    "2048 or 4096\n"), size);
+	}
+	/* record sector size */
+	wbpb->bpb.bytes_per_sector = size;
 
 	/*
 	 * Sanity check.  If we've been provided a partition-specifying
@@ -2437,10 +2245,10 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 	/*
 	 * Find appropriate partition if we were requested to do so.
 	 */
-	if (suffix && !(seek_partn(fd, suffix, wbpb, seekto)))
+	if (suffix != NULL && !(seek_partn(fd, suffix, wbpb, seekto)))
 		goto err_out;
 
-	if (!suffix) {
+	if (suffix == NULL) {
 		/*
 		 * We have one of two possibilities.  Chances are we have
 		 * a floppy drive.  But the user may be trying to format
@@ -2500,93 +2308,8 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 
 err_out:
 	(void) close(fd);
-	exit(2);
+	exit(ERR_OS);
 }
-
-/*
- * The following is a copy of MS-DOS 4.0 boot block.
- * It consists of the BIOS parameter block, and a disk
- * bootstrap program.
- *
- * The BIOS parameter block contains the right values
- * for the 3.5" high-density 1.44MB floppy format.
- *
- * This will be our default boot sector, if the user
- * didn't point us at a different one.
- *
- */
-static
-uchar_t DefBootSec[512] = {
-	0xeb, 0x3c, 0x90, 	/* 8086 short jump + displacement + NOP */
-	'M', 'S', 'D', 'O', 'S', '4', '.', '0',	/* OEM name & version */
-	0x00, 0x02, 0x01, 0x01, 0x00,
-	0x02, 0xe0, 0x00, 0x40, 0x0b,
-	0xf0, 0x09, 0x00, 0x12, 0x00,
-	0x02, 0x00,
-	0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00,
-	0x29, 0x00, 0x00, 0x00, 0x00,
-	'N', 'O', 'N', 'A', 'M', 'E', ' ', ' ', ' ', ' ', ' ',
-	'F', 'A', 'T', '1', '2', ' ', ' ', ' ',
-	0xfa, 0x33,
-	0xc0, 0x8e, 0xd0, 0xbc, 0x00, 0x7c, 0x16, 0x07,
-	0xbb, 0x78, 0x00, 0x36, 0xc5, 0x37, 0x1e, 0x56,
-	0x16, 0x53, 0xbf, 0x3e, 0x7c, 0xb9, 0x0b, 0x00,
-	0xfc, 0xf3, 0xa4, 0x06, 0x1f, 0xc6, 0x45, 0xfe,
-	0x0f, 0x8b, 0x0e, 0x18, 0x7c, 0x88, 0x4d, 0xf9,
-	0x89, 0x47, 0x02, 0xc7, 0x07, 0x3e, 0x7c, 0xfb,
-	0xcd, 0x13, 0x72, 0x7c, 0x33, 0xc0, 0x39, 0x06,
-	0x13, 0x7c, 0x74, 0x08, 0x8b, 0x0e, 0x13, 0x7c,
-	0x89, 0x0e, 0x20, 0x7c, 0xa0, 0x10, 0x7c, 0xf7,
-	0x26, 0x16, 0x7c, 0x03, 0x06, 0x1c, 0x7c, 0x13,
-	0x16, 0x1e, 0x7c, 0x03, 0x06, 0x0e, 0x7c, 0x83,
-	0xd2, 0x00, 0xa3, 0x50, 0x7c, 0x89, 0x16, 0x52,
-	0x7c, 0xa3, 0x49, 0x7c, 0x89, 0x16, 0x4b, 0x7c,
-	0xb8, 0x20, 0x00, 0xf7, 0x26, 0x11, 0x7c, 0x8b,
-	0x1e, 0x0b, 0x7c, 0x03, 0xc3, 0x48, 0xf7, 0xf3,
-	0x01, 0x06, 0x49, 0x7c, 0x83, 0x16, 0x4b, 0x7c,
-	0x00, 0xbb, 0x00, 0x05, 0x8b, 0x16, 0x52, 0x7c,
-	0xa1, 0x50, 0x7c, 0xe8, 0x87, 0x00, 0x72, 0x20,
-	0xb0, 0x01, 0xe8, 0xa1, 0x00, 0x72, 0x19, 0x8b,
-	0xfb, 0xb9, 0x0b, 0x00, 0xbe, 0xdb, 0x7d, 0xf3,
-	0xa6, 0x75, 0x0d, 0x8d, 0x7f, 0x20, 0xbe, 0xe6,
-	0x7d, 0xb9, 0x0b, 0x00, 0xf3, 0xa6, 0x74, 0x18,
-	0xbe, 0x93, 0x7d, 0xe8, 0x51, 0x00, 0x32, 0xe4,
-	0xcd, 0x16, 0x5e, 0x1f, 0x8f, 0x04, 0x8f, 0x44,
-	0x02, 0xcd, 0x19, 0x58, 0x58, 0x58, 0xeb, 0xe8,
-	0xbb, 0x00, 0x07, 0xb9, 0x03, 0x00, 0xa1, 0x49,
-	0x7c, 0x8b, 0x16, 0x4b, 0x7c, 0x50, 0x52, 0x51,
-	0xe8, 0x3a, 0x00, 0x72, 0xe6, 0xb0, 0x01, 0xe8,
-	0x54, 0x00, 0x59, 0x5a, 0x58, 0x72, 0xc9, 0x05,
-	0x01, 0x00, 0x83, 0xd2, 0x00, 0x03, 0x1e, 0x0b,
-	0x7c, 0xe2, 0xe2, 0x8a, 0x2e, 0x15, 0x7c, 0x8a,
-	0x16, 0x24, 0x7c, 0x8b, 0x1e, 0x49, 0x7c, 0xa1,
-	0x4b, 0x7c, 0xea, 0x00, 0x00, 0x70, 0x00, 0xac,
-	0x0a, 0xc0, 0x74, 0x29, 0xb4, 0x0e, 0xbb, 0x07,
-	0x00, 0xcd, 0x10, 0xeb, 0xf2, 0x3b, 0x16, 0x18,
-	0x7c, 0x73, 0x19, 0xf7, 0x36, 0x18, 0x7c, 0xfe,
-	0xc2, 0x88, 0x16, 0x4f, 0x7c, 0x33, 0xd2, 0xf7,
-	0x36, 0x1a, 0x7c, 0x88, 0x16, 0x25, 0x7c, 0xa3,
-	0x4d, 0x7c, 0xf8, 0xc3, 0xf9, 0xc3, 0xb4, 0x02,
-	0x8b, 0x16, 0x4d, 0x7c, 0xb1, 0x06, 0xd2, 0xe6,
-	0x0a, 0x36, 0x4f, 0x7c, 0x8b, 0xca, 0x86, 0xe9,
-	0x8a, 0x16, 0x24, 0x7c, 0x8a, 0x36, 0x25, 0x7c,
-	0xcd, 0x13, 0xc3, 0x0d, 0x0a, 0x4e, 0x6f, 0x6e,
-	0x2d, 0x53, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x20,
-	0x64, 0x69, 0x73, 0x6b, 0x20, 0x6f, 0x72, 0x20,
-	0x64, 0x69, 0x73, 0x6b, 0x20, 0x65, 0x72, 0x72,
-	0x6f, 0x72, 0x0d, 0x0a, 0x52, 0x65, 0x70, 0x6c,
-	0x61, 0x63, 0x65, 0x20, 0x61, 0x6e, 0x64, 0x20,
-	0x70, 0x72, 0x65, 0x73, 0x73, 0x20, 0x61, 0x6e,
-	0x79, 0x20, 0x6b, 0x65, 0x79, 0x20, 0x77, 0x68,
-	0x65, 0x6e, 0x20, 0x72, 0x65, 0x61, 0x64, 0x79,
-	0x0d, 0x0a, 0x00, 0x49, 0x4f, 0x20, 0x20, 0x20,
-	0x20, 0x20, 0x20, 0x53, 0x59, 0x53, 0x4d, 0x53,
-	0x44, 0x4f, 0x53, 0x20, 0x20, 0x20, 0x53, 0x59,
-	0x53, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x55, 0xaa
-};
 
 /*
  *  verify_bootblkfile
@@ -2600,26 +2323,27 @@ uchar_t DefBootSec[512] = {
  */
 static
 int
-verify_bootblkfile(char *fn, boot_sector_t *bs, ulong_t *blkfilesize)
+verify_bootblkfile(char *fn, boot_sector_t *bs)
 {
 	struct stat fi;
 	int bsfd = -1;
 
 	if (stat(fn, &fi)) {
 		perror(fn);
-	} else if (fi.st_size < BPSEC) {
+	} else if (fi.st_size != MINBPS) {
 		(void) fprintf(stderr,
-		    gettext("%s: Too short to be a boot sector.\n"), fn);
+		    gettext("%s: File size does not fit for a boot sector.\n"),
+		    fn);
 	} else if ((bsfd = open(fn, O_RDONLY)) < 0) {
 		perror(fn);
-	} else if (read(bsfd, bs->buf, BPSEC) < BPSEC) {
+	} else if (read(bsfd, bs->buf, MINBPS) < MINBPS) {
 		(void) close(bsfd);
 		bsfd = -1;
 		perror(gettext("Boot block read"));
 	} else {
 		if ((bs->bs.bs_signature[0] != (BOOTSECSIG & 0xFF) &&
 		    bs->bs.bs_signature[1] != ((BOOTSECSIG >> 8) & 0xFF)) ||
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 		    (bs->bs.bs_front.bs_jump_code[0] != OPCODE1 &&
 		    bs->bs.bs_front.bs_jump_code[0] != OPCODE2)
 #else
@@ -2633,7 +2357,25 @@ verify_bootblkfile(char *fn, boot_sector_t *bs, ulong_t *blkfilesize)
 			(void) fprintf(stderr,
 			    gettext("Boot block (%s) bogus.\n"), fn);
 		}
-		*blkfilesize = fi.st_size;
+		bs->bs.bs_front.bs_oem_name[0] = 'M';
+		bs->bs.bs_front.bs_oem_name[1] = 'S';
+		bs->bs.bs_front.bs_oem_name[2] = 'W';
+		bs->bs.bs_front.bs_oem_name[3] = 'I';
+		bs->bs.bs_front.bs_oem_name[4] = 'N';
+		bs->bs.bs_front.bs_oem_name[5] = '4';
+		bs->bs.bs_front.bs_oem_name[6] = '.';
+		bs->bs.bs_front.bs_oem_name[7] = '1';
+		/*
+		 * As we are storing Partition Boot Record, unset
+		 * pmbr built in stage2 lba and size.
+		 * We do this to stop mdb disk_label module to
+		 * try to interpret it.
+		 */
+		if (*((uint64_t *)(bs->buf + STAGE1_STAGE2_LBA)) == 256 &&
+		    *((uint16_t *)(bs->buf + STAGE1_STAGE2_SIZE)) == 1) {
+			*((uint64_t *)(bs->buf + STAGE1_STAGE2_LBA)) = 0;
+			*((uint16_t *)(bs->buf + STAGE1_STAGE2_SIZE)) = 0;
+		}
 	}
 	return (bsfd);
 }
@@ -2684,7 +2426,7 @@ label_volume(char *lbl, bpb_t *wbpb)
 	if (!lbl)
 		lbl = DEFAULT_LABEL;
 
-	ll = min(11, (int)strlen(lbl));
+	ll = MIN(11, (int)strlen(lbl));
 	for (i = 0; i < ll; i++) {
 		wbpb->ebpb.volume_label[i] = toupper(lbl[i]);
 	}
@@ -2694,33 +2436,24 @@ label_volume(char *lbl, bpb_t *wbpb)
 }
 
 static
-int
-copy_bootblk(char *fn, boot_sector_t *bootsect, ulong_t *bootblksize)
+void
+copy_bootblk(char *fn, boot_sector_t *bootsect)
 {
 	int bsfd = -1;
 
-	if (Verbose && fn)
+	if (Verbose)
 		(void) printf(gettext("Request to install boot "
 		    "block file %s.\n"), fn);
-	else if (Verbose)
-		(void) printf(gettext("Request to install DOS boot block.\n"));
 
 	/*
-	 *  If they want to install their own boot block, sanity check
-	 *  that block.
+	 *  Sanity check that block.
 	 */
-	if (fn) {
-		bsfd = verify_bootblkfile(fn, bootsect, bootblksize);
-		if (bsfd < 0) {
-			exit(3);
-		}
-		*bootblksize = roundup(*bootblksize, BPSEC);
-	} else {
-		(void) memcpy(bootsect, DefBootSec, BPSEC);
-		*bootblksize = BPSEC;
+	bsfd = verify_bootblkfile(fn, bootsect);
+	if (bsfd < 0) {
+		exit(ERR_INVALID);
 	}
 
-	return (bsfd);
+	(void) close(bsfd);
 }
 
 /*
@@ -2760,9 +2493,8 @@ mark_cluster(uchar_t *fatp, pc_cluster32_t clustnum, uint32_t value)
 
 static
 uchar_t *
-build_fat(bpb_t *wbpb, struct fat_od_fsi *fsinfop, ulong_t bootblksize,
-    ulong_t *fatsize, char *ffn, int *fffd, ulong_t *ffsize,
-    pc_cluster32_t *ffstartclust)
+build_fat(bpb_t *wbpb, struct fat_od_fsi *fsinfop, ulong_t *fatsize,
+    char *ffn, int *fffd, ulong_t *ffsize, pc_cluster32_t *ffstartclust)
 {
 	pc_cluster32_t nextfree, ci;
 	uchar_t *fatp;
@@ -2777,16 +2509,17 @@ build_fat(bpb_t *wbpb, struct fat_od_fsi *fsinfop, ulong_t bootblksize,
 	}
 
 	if (MakeFAT32) {
-		*fatsize = BPSEC * wbpb->bpb32.big_sectors_per_fat;
+		*fatsize = wbpb->bpb.bytes_per_sector *
+		    wbpb->bpb32.big_sectors_per_fat;
 	} else {
-		*fatsize = BPSEC * wbpb->bpb.sectors_per_fat;
+		*fatsize = wbpb->bpb.bytes_per_sector *
+		    wbpb->bpb.sectors_per_fat;
 	}
 
-	if (!(fatp = (uchar_t *)malloc(*fatsize))) {
+	fatp = calloc(1, *fatsize);
+	if (fatp == NULL) {
 		perror(gettext("FAT table alloc"));
-		exit(4);
-	} else {
-		(void) memset(fatp, 0, *fatsize);
+		exit(ERR_FAIL);
 	}
 
 	/* Build in-memory FAT */
@@ -2817,24 +2550,6 @@ build_fat(bpb_t *wbpb, struct fat_od_fsi *fsinfop, ulong_t bootblksize,
 		*fffd = verify_firstfile(ffn, ffsize);
 
 	/*
-	 * Compute number of clusters to preserve for bootblk overage.
-	 * Remember that we already wrote the first sector of the boot block.
-	 * These clusters are marked BAD to prevent them from being deleted
-	 * or used.  The first available cluster is 2, so we always offset
-	 * the clusters.
-	 */
-	numsect = idivceil((bootblksize - BPSEC), BPSEC);
-	numclust = idivceil(numsect, wbpb->bpb.sectors_per_cluster);
-
-	if (Verbose && numclust)
-		(void) printf(gettext("Hiding %d excess bootblk cluster(s).\n"),
-		    numclust);
-	for (ci = 0; ci < numclust; ci++)
-		mark_cluster(fatp, nextfree++,
-		    MakeFAT32 ? PCF_BADCLUSTER32 : PCF_BADCLUSTER);
-	remclust -= numclust;
-
-	/*
 	 * Reserve a cluster for the root directory on a FAT32.
 	 */
 	if (MakeFAT32) {
@@ -2848,7 +2563,7 @@ build_fat(bpb_t *wbpb, struct fat_od_fsi *fsinfop, ulong_t bootblksize,
 	 */
 	if (*fffd >= 0) {
 		*ffstartclust = nextfree;
-		numsect = idivceil(*ffsize, BPSEC);
+		numsect = idivceil(*ffsize, wbpb->bpb.bytes_per_sector);
 		numclust = idivceil(numsect, wbpb->bpb.sectors_per_cluster);
 
 		if (numclust > remclust) {
@@ -2874,7 +2589,7 @@ finish:
 	if (Verbose) {
 		(void) printf(gettext("First sector of FAT"));
 		header_for_dump();
-		dump_bytes(fatp, BPSEC);
+		dump_bytes(fatp, wbpb->bpb.bytes_per_sector);
 	}
 
 	(void) memset(fsinfop, 0, sizeof (*fsinfop));
@@ -2917,7 +2632,7 @@ dirent_label_fill(struct pcdir *dep, char *fn)
 	/*
 	 * We spread the volume label across both the NAME and EXT fields
 	 */
-	nl = min(PCFNAMESIZE, strlen(fn));
+	nl = MIN(PCFNAMESIZE, strlen(fn));
 	for (i = 0; i < nl; i++) {
 		dep->pcd_filename[i] = toupper(fn[i]);
 	}
@@ -2928,7 +2643,7 @@ dirent_label_fill(struct pcdir *dep, char *fn)
 			dep->pcd_ext[i] = ' ';
 		return;
 	}
-	nl = min(PCFEXTSIZE, strlen(fn) - PCFNAMESIZE);
+	nl = MIN(PCFEXTSIZE, strlen(fn) - PCFNAMESIZE);
 	for (i = 0; i < nl; i++)
 		dep->pcd_ext[i] = toupper(fn[i + PCFNAMESIZE]);
 	if (i < PCFEXTSIZE) {
@@ -2944,13 +2659,13 @@ dirent_fname_fill(struct pcdir *dep, char *fn)
 	char *fname, *fext;
 	int nl, i;
 
-	if (fname = strrchr(fn, '/')) {
+	if ((fname = strrchr(fn, '/')) != NULL) {
 		fname++;
 	} else {
 		fname = fn;
 	}
 
-	if (fext = strrchr(fname, '.')) {
+	if ((fext = strrchr(fname, '.')) != NULL) {
 		fext++;
 	} else {
 		fext = "";
@@ -2958,7 +2673,7 @@ dirent_fname_fill(struct pcdir *dep, char *fn)
 
 	fname = strtok(fname, ".");
 
-	nl = min(PCFNAMESIZE, (int)strlen(fname));
+	nl = MIN(PCFNAMESIZE, (int)strlen(fname));
 	for (i = 0; i < nl; i++) {
 		dep->pcd_filename[i] = toupper(fname[i]);
 	}
@@ -2966,7 +2681,7 @@ dirent_fname_fill(struct pcdir *dep, char *fn)
 		dep->pcd_filename[i] = ' ';
 	}
 
-	nl = min(PCFEXTSIZE, (int)strlen(fext));
+	nl = MIN(PCFEXTSIZE, (int)strlen(fext));
 	for (i = 0; i < nl; i++) {
 		dep->pcd_ext[i] = toupper(fext[i]);
 	}
@@ -2992,13 +2707,14 @@ build_rootdir(bpb_t *wbpb, char *ffn, int fffd,
 		 * We devote an entire cluster to the root
 		 * directory on FAT32.
 		 */
-		*rdirsize = wbpb->bpb.sectors_per_cluster * BPSEC;
+		*rdirsize = wbpb->bpb.sectors_per_cluster *
+		    wbpb->bpb.bytes_per_sector;
 	} else {
 		*rdirsize = wbpb->bpb.num_root_entries * sizeof (struct pcdir);
 	}
 	if ((rootdirp = (struct pcdir *)malloc(*rdirsize)) == NULL) {
 		perror(gettext("Root directory allocation"));
-		exit(4);
+		exit(ERR_FAIL);
 	} else {
 		entry = rootdirp;
 		(void) memset((char *)rootdirp, 0, *rdirsize);
@@ -3051,42 +2767,64 @@ static
 void
 write_rest(bpb_t *wbpb, char *efn, int dfd, int sfd, int remaining)
 {
-	char buf[BPSEC];
+	char *buf;
 	ushort_t numsect, numclust;
 	ushort_t wnumsect, s;
 	int doneread = 0;
 	int rstat;
+	size_t size;
 
+	size = wbpb->bpb.bytes_per_sector;
+	buf = malloc(size);
+	if (buf == NULL) {
+		perror(efn);
+		return;
+	}
 	/*
 	 * Compute number of clusters required to contain remaining bytes.
 	 */
-	numsect = idivceil(remaining, BPSEC);
+	numsect = idivceil(remaining, size);
 	numclust = idivceil(numsect, wbpb->bpb.sectors_per_cluster);
 
 	wnumsect = numclust * wbpb->bpb.sectors_per_cluster;
 	for (s = 0; s < wnumsect; s++) {
 		if (!doneread) {
-			if ((rstat = read(sfd, buf, BPSEC)) < 0) {
+			if ((rstat = read(sfd, buf, size)) < 0) {
 				perror(efn);
 				doneread = 1;
 				rstat = 0;
 			} else if (rstat == 0) {
 				doneread = 1;
 			}
-			(void) memset(&(buf[rstat]), 0, BPSEC - rstat);
+			(void) memset(&(buf[rstat]), 0, size - rstat);
 		}
-		if (write(dfd, buf, BPSEC) != BPSEC) {
+		if (write(dfd, buf, size) != (ssize_t)size) {
 			(void) fprintf(stderr, gettext("Copying "));
 			perror(efn);
 		}
 	}
+	free(buf);
 }
 
 static
 void
-write_fat32_bootstuff(int fd, boot_sector_t *bsp,
+write_fat32_bootstuff(int fd, boot_sector_t *bsp, bpb_t *wbpb,
     struct fat_od_fsi *fsinfop, off64_t seekto)
 {
+	char *buf = NULL;
+	size_t size = wbpb->bpb.bytes_per_sector;
+
+	if (size != MINBPS && !Notreally) {
+		buf = calloc(1, size);
+		if (buf == NULL) {
+			perror(gettext("FS info buffer alloc"));
+			exit(ERR_FAIL);
+		}
+		(void) memcpy(buf, fsinfop, sizeof (*fsinfop));
+	} else {
+		buf = (char *)fsinfop;
+	}
+
 	if (Verbose) {
 		(void) printf(gettext("Dump of the fs info sector"));
 		header_for_dump();
@@ -3098,18 +2836,19 @@ write_fat32_bootstuff(int fd, boot_sector_t *bsp,
 		 * FAT32's have an FS info sector, then a backup of the boot
 		 * sector, and a modified backup of the FS Info sector.
 		 */
-		if (write(fd, fsinfop, sizeof (*fsinfop)) != BPSEC) {
+		if (write(fd, buf, size) != (ssize_t)size) {
 			perror(gettext("FS info sector write"));
-			exit(4);
+			exit(ERR_FAIL);
 		}
-		if (lseek64(fd,	seekto + BKUP_BOOTSECT_OFFSET, SEEK_SET) < 0) {
+		if (lseek64(fd,	seekto + wbpb->bpb32.backupboot * size,
+		    SEEK_SET) < 0) {
 			(void) close(fd);
 			perror(gettext("Boot sector backup seek"));
-			exit(4);
+			exit(ERR_FAIL);
 		}
-		if (write(fd, bsp->buf, sizeof (bsp->buf)) != BPSEC) {
+		if (write(fd, bsp->buf, size) != (ssize_t)size) {
 			perror(gettext("Boot sector backup write"));
-			exit(4);
+			exit(ERR_FAIL);
 		}
 	}
 
@@ -3117,6 +2856,7 @@ write_fat32_bootstuff(int fd, boot_sector_t *bsp,
 	 * Second copy of fs info sector is modified to have "don't know"
 	 * as the number of free clusters
 	 */
+	fsinfop = (struct fat_od_fsi *)buf;
 	fsinfop->fsi_incore.fs_next_free = LE_32(FSINFO_UNKNOWN);
 
 	if (Verbose) {
@@ -3126,11 +2866,13 @@ write_fat32_bootstuff(int fd, boot_sector_t *bsp,
 	}
 
 	if (!Notreally) {
-		if (write(fd, fsinfop, sizeof (*fsinfop)) != BPSEC) {
+		if (write(fd, buf, size) != (ssize_t)size) {
 			perror(gettext("FS info sector backup write"));
-			exit(4);
+			exit(ERR_FAIL);
 		}
 	}
+	if (size != MINBPS && !Notreally)
+		free(buf);
 }
 
 static
@@ -3140,7 +2882,7 @@ write_bootsects(int fd, boot_sector_t *bsp, bpb_t *wbpb,
 {
 	if (MakeFAT32) {
 		/* Copy our BPB into bootsec structure */
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 		(void) memcpy(&(bsp->bs32.bs_front.bs_bpb), &(wbpb->bpb),
 		    sizeof (wbpb->bpb));
 		(void) memcpy(&(bsp->bs32.bs_bpb32), &(wbpb->bpb32),
@@ -3152,7 +2894,7 @@ write_bootsects(int fd, boot_sector_t *bsp, bpb_t *wbpb,
 #endif
 	} else {
 		/* Copy our BPB into bootsec structure */
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 		(void) memcpy(&(bsp->bs.bs_front.bs_bpb), &(wbpb->bpb),
 		    sizeof (wbpb->bpb));
 		(void) memcpy(&(bsp->bs.bs_ebpb), &(wbpb->ebpb),
@@ -3163,7 +2905,7 @@ write_bootsects(int fd, boot_sector_t *bsp, bpb_t *wbpb,
 
 		/* Copy SUN BPB extensions into bootsec structure */
 		if (SunBPBfields) {
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 			(void) memcpy(&(bsp->bs.bs_sebpb), &(wbpb->sunbpb),
 			    sizeof (wbpb->sunbpb));
 #else
@@ -3173,19 +2915,20 @@ write_bootsects(int fd, boot_sector_t *bsp, bpb_t *wbpb,
 	}
 
 	/* Write boot sector */
-	if (!Notreally && write(fd, bsp->buf, sizeof (bsp->buf)) != BPSEC) {
+	if (!Notreally && write(fd, bsp->buf, wbpb->bpb.bytes_per_sector) !=
+	    (ssize_t)wbpb->bpb.bytes_per_sector) {
 		perror(gettext("Boot sector write"));
-		exit(4);
+		exit(ERR_FAIL);
 	}
 
 	if (Verbose) {
 		(void) printf(gettext("Dump of the boot sector"));
 		header_for_dump();
-		dump_bytes(bsp->buf, sizeof (bsp->buf));
+		dump_bytes(bsp->buf, MINBPS);
 	}
 
 	if (MakeFAT32)
-		write_fat32_bootstuff(fd, bsp, fsinfop, seekto);
+		write_fat32_bootstuff(fd, bsp, wbpb, fsinfop, seekto);
 }
 
 static
@@ -3196,44 +2939,48 @@ write_fat(int fd, off64_t seekto, char *fn, char *lbl, char *ffn, bpb_t *wbpb)
 	pc_cluster32_t ffsc;
 	boot_sector_t bootsect;
 	uchar_t *fatp, *rdirp;
-	ulong_t bootblksize, fatsize, rdirsize, ffsize;
-	int bsfd = -1;
+	ulong_t fatsize, rdirsize, ffsize;
 	int fffd = -1;
 
 	compute_file_area_size(wbpb);
 
-	bsfd = copy_bootblk(fn, &bootsect, &bootblksize);
+	/* boot sector structure size is always 512B */
+	copy_bootblk(fn, &bootsect);
 	label_volume(lbl, wbpb);
 
 	if (Verbose)
 		(void) printf(gettext("Building FAT.\n"));
-	fatp = build_fat(wbpb, &fsinfo, bootblksize, &fatsize,
+	fatp = build_fat(wbpb, &fsinfo, &fatsize,
 	    ffn, &fffd, &ffsize, &ffsc);
 
 	write_bootsects(fd, &bootsect, wbpb, &fsinfo, seekto);
 
 	if (lseek64(fd,
-	    seekto + (BPSEC * wbpb->bpb.resv_sectors), SEEK_SET) < 0) {
+	    seekto + (wbpb->bpb.bytes_per_sector * wbpb->bpb.resv_sectors),
+	    SEEK_SET) < 0) {
 		(void) close(fd);
 		perror(gettext("Seek to end of reserved sectors"));
-		exit(4);
+		exit(ERR_FAIL);
 	}
 
 	/* Write FAT */
 	if (Verbose)
-		(void) printf(gettext("Writing FAT(s). %d bytes times %d.\n"),
+		(void) printf(gettext("Writing FAT(s). %lu bytes times %u.\n"),
 		    fatsize, wbpb->bpb.num_fats);
 	if (!Notreally) {
-		int nf, wb;
-		for (nf = 0; nf < (int)wbpb->bpb.num_fats; nf++)
-			if ((wb = write(fd, fatp, fatsize)) != fatsize) {
+		for (uint_t nf = 0; nf < wbpb->bpb.num_fats; nf++) {
+			ssize_t wb;
+
+			wb = write(fd, fatp, fatsize);
+			if (wb != (ssize_t)fatsize) {
 				perror(gettext("FAT write"));
-				exit(4);
+				exit(ERR_FAIL);
 			} else {
 				if (Verbose)
 					(void) printf(
-					    gettext("Wrote %d bytes\n"), wb);
+					    gettext("Wrote %zd bytes\n"), wb);
 			}
+		}
 	}
 	free(fatp);
 
@@ -3244,43 +2991,32 @@ write_fat(int fd, off64_t seekto, char *fn, char *lbl, char *ffn, bpb_t *wbpb)
 	/*
 	 *  In non FAT32, root directory exists outside of the file area
 	 */
-	if (!MakeFAT32) {
-		if (Verbose)
-			(void) printf(gettext("Writing root directory. "
-			    "%d bytes.\n"), rdirsize);
-		if (!Notreally) {
-			if (write(fd, rdirp, rdirsize) != rdirsize) {
-				perror(gettext("Root directory write"));
-				exit(4);
-			}
+	if (Verbose)
+		(void) printf(gettext("Writing root directory. %lu bytes.\n"),
+		    rdirsize);
+	if (MakeFAT32) {
+		if (lseek64(fd, seekto +
+		    wbpb->bpb.bytes_per_sector * wbpb->bpb.resv_sectors +
+		    wbpb->bpb.num_fats * fatsize +
+		    wbpb->bpb.bytes_per_sector * wbpb->bpb.sectors_per_cluster *
+		    (wbpb->bpb32.root_dir_clust - 2),
+		    SEEK_SET) < 0) {
+			(void) close(fd);
+			perror(gettext("Seek to end of reserved sectors"));
+			exit(ERR_FAIL);
 		}
-		free(rdirp);
 	}
+	if (!Notreally) {
+		if (write(fd, rdirp, rdirsize) != rdirsize) {
+			perror(gettext("Root directory write"));
+			exit(ERR_FAIL);
+		}
+	}
+	free(rdirp);
 
 	/*
 	 * Now write anything that needs to be in the file space.
 	 */
-	if (bootblksize > BPSEC) {
-		if (Verbose)
-			(void) printf(gettext("Writing remainder of "
-			    "boot block.\n"));
-		if (!Notreally)
-			write_rest(wbpb, fn, fd, bsfd, bootblksize - BPSEC);
-	}
-
-	if (MakeFAT32) {
-		if (Verbose)
-			(void) printf(gettext("Writing root directory. "
-			    "%d bytes.\n"), rdirsize);
-		if (!Notreally) {
-			if (write(fd, rdirp, rdirsize) != rdirsize) {
-				perror(gettext("Root directory write"));
-				exit(4);
-			}
-		}
-		free(rdirp);
-	}
-
 	if (fffd >= 0) {
 		if (Verbose)
 			(void) printf(gettext("Writing first file.\n"));
@@ -3331,26 +3067,6 @@ char *LegalOpts[] = {
 	"hidden",
 	NULL
 };
-
-static
-void
-bad_arg(char *option)
-{
-	(void) fprintf(stderr,
-	    gettext("Unrecognized option %s.\n"), option);
-	usage();
-	exit(2);
-}
-
-static
-void
-missing_arg(char *option)
-{
-	(void) fprintf(stderr,
-	    gettext("Option %s requires a value.\n"), option);
-	usage();
-	exit(3);
-}
 
 static
 void
@@ -3529,24 +3245,24 @@ sanity_check_options(int argc, int optind)
 	    BitsPerFAT != 12 && BitsPerFAT != 16 && BitsPerFAT != 32) {
 		(void) fprintf(stderr, gettext("Invalid Bits/Fat value."
 		    " Must be 12, 16 or 32.\n"));
-		exit(2);
+		exit(ERR_OS);
 	} else if (!GetSPC && !(ISP2(SecPerClust) &&
 	    IN_RANGE(SecPerClust, 1, 128))) {
 		(void) fprintf(stderr,
 		    gettext("Invalid Sectors/Cluster value.  Must be a "
 		    "power of 2 between 1 and 128.\n"));
-		exit(2);
+		exit(ERR_OS);
 	} else if (!GetResrvd && (Resrvd < 1 || Resrvd > 0xffff)) {
 		(void) fprintf(stderr,
 		    gettext("Invalid number of reserved sectors.  "
 		    "Must be at least 1 but\nno larger than 65535."));
-		exit(2);
+		exit(ERR_OS);
 	} else if (!GetResrvd && MakeFAT32 &&
 	    (Resrvd < 32 || Resrvd > 0xffff)) {
 		(void) fprintf(stderr,
 		    gettext("Invalid number of reserved sectors.  "
 		    "Must be at least 32 but\nno larger than 65535."));
-		exit(2);
+		exit(ERR_OS);
 	} else if (Imagesize != 3 && Imagesize != 5) {
 		usage();
 	}
@@ -3567,6 +3283,8 @@ main(int argc, char **argv)
 #define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
+	if (init_yes() < 0)
+		errx(ERR_OS, gettext(ERR_MSG_INIT_YES), strerror(errno));
 
 	while ((c = getopt(argc, argv, "F:Vmo:")) != EOF) {
 		switch (c) {
@@ -3613,10 +3331,11 @@ main(int argc, char **argv)
 		fd = open_and_examine(DiskName, &dskparamblk);
 	} else {
 		fd = open_and_seek(DiskName, &dskparamblk, &AbsBootSect);
-		if (ask_nicely(DiskName))
+		if (ask_nicely(Fatentsize, DiskName))
 			write_fat(fd, AbsBootSect, BootBlkFn, Label,
 			    FirstFn, &dskparamblk);
 	}
 	(void) close(fd);
+	fini_yes();
 	return (0);
 }

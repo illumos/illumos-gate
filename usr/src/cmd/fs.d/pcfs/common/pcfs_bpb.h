@@ -20,18 +20,23 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996, 1998, 1999 by Sun Microsystems, Inc.
+ * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright 2024 MNX Cloud, Inc.
  */
 
-#ifndef _MKFS_PCFS_H
-#define	_MKFS_PCFS_H
+#ifndef _PCFS_BPB_H
+#define	_PCFS_BPB_H
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-#define	BPSEC		512	/* Assumed # of bytes per sector */
+/*
+ * Common Bios Parameter Block definitions for the pcfs user-level utilities
+ */
+#define	MINBPS		512
+#define	MAXBPS		4096
 
 #define	OPCODE1		0xE9
 #define	OPCODE2		0xEB
@@ -58,18 +63,6 @@ extern "C" {
 #endif
 
 /*
- *  A macro implementing a ceiling function for integer divides.
- */
-#define	idivceil(dvend, dvsor) \
-	((dvend)/(dvsor) + (((dvend)%(dvsor) == 0) ? 0 : 1))
-
-/*
- *  Return values for the seek_XXX functions
- */
-#define	PART_NOT_FOUND 0
-#define	PART_FOUND 1
-
-/*
  *	MS-DOS Disk layout:
  *
  *	---------------------
@@ -87,29 +80,36 @@ extern "C" {
  *	|     File area     |
  *	|___________________|
  */
-
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 #pragma	pack(1)
 #endif
 struct _orig_bios_param_blk {
-	uint16_t bytes_sector;
+	uint16_t bytes_per_sector;
 	uchar_t	 sectors_per_cluster;
 	uint16_t resv_sectors;
 	uchar_t	 num_fats;
 	uint16_t num_root_entries;
+/*
+ *  The sectors_in_volume field will be zero on larger volumes (>32Mb)
+ *  and newer file systems (>=MSDOS4.0).  In these cases the
+ *  sectors_in_logical_volume field should be used instead.
+ */
 	uint16_t sectors_in_volume;
 	uchar_t	 media;
 	uint16_t sectors_per_fat;
 	uint16_t sectors_per_track;
 	uint16_t heads;
+/*
+ *  Number of sectors in the partition prior to the start of the logical disk
+ */
 	uint32_t hidden_sectors;
 	uint32_t sectors_in_logical_volume;
 };
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 #pragma pack()
 #endif
 
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 #pragma	pack(1)
 #endif
 struct _bpb32_extensions {
@@ -122,11 +122,11 @@ struct _bpb32_extensions {
 	uint16_t backupboot;
 	uint16_t reserved[6];
 };
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 #pragma pack()
 #endif
 
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 #pragma	pack(1)
 #endif
 struct _bpb_extensions {
@@ -137,18 +137,18 @@ struct _bpb_extensions {
 	uchar_t  volume_label[11];
 	uchar_t  type[8];
 };
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 #pragma pack()
 #endif
 
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 #pragma	pack(1)
 #endif
 struct _sun_bpb_extensions {
 	uint16_t  bs_offset_high;
 	uint16_t  bs_offset_low;
 };
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 #pragma pack()
 #endif
 
@@ -164,7 +164,7 @@ typedef struct _bios_param_blk {
 	struct _sun_bpb_extensions  sunbpb;
 } bpb_t;
 
-#ifdef i386
+#ifdef _LITTLE_ENDIAN
 #pragma	pack(1)
 struct _bpb_head {
 	uchar_t			    bs_jump_code[3];
@@ -217,11 +217,11 @@ typedef union _ubso {
 	struct _boot_sector	bs;
 	struct _boot_sector32	bs32;
 	struct mboot		mb;
-	uchar_t			buf[BPSEC];
+	uchar_t			buf[MAXBPS];
 } boot_sector_t;
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* _MKFS_PCFS_H */
+#endif /* _PCFS_BPB_H */
