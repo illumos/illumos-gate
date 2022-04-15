@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <syslog.h>
@@ -301,10 +302,17 @@ smb_ddiscover_service(void *arg)
 			(void) cond_wait(&sdl->sdl_cv,
 			    &sdl->sdl_mtx);
 
+	find_again:
 		if (!smb_config_getbool(SMB_CI_DOMAIN_MEMB)) {
 			sdl->sdl_status = NT_STATUS_INVALID_SERVER_STATE;
 			syslog(LOG_DEBUG, "smb_ddiscover_service: "
 			    "not a domain member");
+			goto wait_again;
+		}
+		if (sdl->sdl_domain[0] == '\0') {
+			sdl->sdl_status = NT_STATUS_INVALID_SERVER_STATE;
+			syslog(LOG_DEBUG, "smb_ddiscover_service: "
+			    "null domain name");
 			goto wait_again;
 		}
 
@@ -312,7 +320,6 @@ smb_ddiscover_service(void *arg)
 		 * Want to know if these change below.
 		 * Note: mutex held here
 		 */
-	find_again:
 		bad_dc = sdl->sdl_bad_dc;
 		sdl->sdl_bad_dc = B_FALSE;
 		if (bad_dc) {

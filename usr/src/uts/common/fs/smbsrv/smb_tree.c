@@ -178,7 +178,7 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_share.h>
 
-int smb_tcon_mute = 0;
+int smb_tcon_mute = 1;
 
 uint32_t	smb_tree_connect_core(smb_request_t *);
 uint32_t	smb_tree_connect_disk(smb_request_t *, smb_arg_tcon_t *);

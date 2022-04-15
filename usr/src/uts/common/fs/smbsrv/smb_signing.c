@@ -353,9 +353,8 @@ smb_sign_check_request(smb_request_t *sr)
 		return (0);
 	}
 
-	DTRACE_PROBE2(smb__signature__mismatch, smb_request_t *, sr,
+	DTRACE_PROBE2(signature__mismatch, smb_request_t *, sr,
 	    unsigned char *, mac_sig);
-	cmn_err(CE_NOTE, "smb_sign_check_request: bad signature");
 
 	/*
 	 * check nearby sequence numbers in debug mode
