@@ -45,7 +45,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
-#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
@@ -62,9 +61,9 @@ __FBSDID("$FreeBSD$");
 
 static MALLOC_DEFINE(M_VATPIC, "atpic", "bhyve virtual atpic (8259)");
 
-#define	VATPIC_LOCK(vatpic)		mtx_lock_spin(&((vatpic)->mtx))
-#define	VATPIC_UNLOCK(vatpic)		mtx_unlock_spin(&((vatpic)->mtx))
-#define	VATPIC_LOCKED(vatpic)		mtx_owned(&((vatpic)->mtx))
+#define	VATPIC_LOCK(vatpic)		mutex_enter(&((vatpic)->lock))
+#define	VATPIC_UNLOCK(vatpic)		mutex_exit(&((vatpic)->lock))
+#define	VATPIC_LOCKED(vatpic)		MUTEX_HELD(&((vatpic)->lock))
 
 #define	IRQ_BASE_MASK	0xf8
 
@@ -111,7 +110,7 @@ struct atpic_stats {
 
 struct vatpic {
 	struct vm	*vm;
-	struct mtx	mtx;
+	kmutex_t	lock;
 	struct atpic	atpic[2];
 	struct atpic_stats stats;
 };
@@ -228,7 +227,7 @@ vatpic_notify_intr(struct vatpic *vatpic)
 	struct atpic *atpic;
 	int pin;
 
-	KASSERT(VATPIC_LOCKED(vatpic), ("vatpic_notify_intr not locked"));
+	ASSERT(VATPIC_LOCKED(vatpic));
 
 	/*
 	 * First check the slave.
@@ -813,7 +812,7 @@ vatpic_init(struct vm *vm)
 	vatpic = malloc(sizeof (struct vatpic), M_VATPIC, M_WAITOK | M_ZERO);
 	vatpic->vm = vm;
 
-	mtx_init(&vatpic->mtx, "vatpic lock", NULL, MTX_SPIN);
+	mutex_init(&vatpic->lock, NULL, MUTEX_ADAPTIVE, NULL);
 
 	return (vatpic);
 }
@@ -821,5 +820,6 @@ vatpic_init(struct vm *vm)
 void
 vatpic_cleanup(struct vatpic *vatpic)
 {
+	mutex_destroy(&vatpic->lock);
 	free(vatpic, M_VATPIC);
 }

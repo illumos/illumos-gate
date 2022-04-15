@@ -53,7 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
 #include <sys/pcpu.h>
-#include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/rwlock.h>
@@ -113,7 +112,7 @@ typedef struct vm_thread_ctx {
  */
 struct vcpu {
 	/* (o) protects state, run_state, hostcpu, sipi_vector */
-	struct mtx	mtx;
+	kmutex_t	lock;
 
 	enum vcpu_state	state;		/* (o) vcpu state */
 	enum vcpu_run_state run_state;	/* (i) vcpu init/sipi/run state */
@@ -148,11 +147,9 @@ struct vcpu {
 	struct ctxop	*ctxop;		/* (o) ctxop storage for vcpu */
 };
 
-#define	vcpu_lock_initialized(v) mtx_initialized(&((v)->mtx))
-#define	vcpu_lock_init(v)	mtx_init(&((v)->mtx), "vcpu lock", 0, MTX_SPIN)
-#define	vcpu_lock(v)		mtx_lock_spin(&((v)->mtx))
-#define	vcpu_unlock(v)		mtx_unlock_spin(&((v)->mtx))
-#define	vcpu_assert_locked(v)	mtx_assert(&((v)->mtx), MA_OWNED)
+#define	vcpu_lock(v)		mutex_enter(&((v)->lock))
+#define	vcpu_unlock(v)		mutex_exit(&((v)->lock))
+#define	vcpu_assert_locked(v)	ASSERT(MUTEX_HELD(&((v)->lock)))
 
 struct mem_seg {
 	size_t	len;
@@ -318,13 +315,18 @@ vcpu_cleanup(struct vm *vm, int i, bool destroy)
 	VLAPIC_CLEANUP(vm->cookie, vcpu->vlapic);
 	if (destroy) {
 		vmm_stat_free(vcpu->stats);
+
 		hma_fpu_free(vcpu->guestfpu);
 		vcpu->guestfpu = NULL;
+
 		vie_free(vcpu->vie_ctx);
 		vcpu->vie_ctx = NULL;
+
 		vmc_destroy(vcpu->vmclient);
 		vcpu->vmclient = NULL;
+
 		ctxop_free(vcpu->ctxop);
+		mutex_destroy(&vcpu->lock);
 	}
 }
 
@@ -339,7 +341,8 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 	vcpu = &vm->vcpu[vcpu_id];
 
 	if (create) {
-		vcpu_lock_init(vcpu);
+		mutex_init(&vcpu->lock, NULL, MUTEX_ADAPTIVE, NULL);
+
 		vcpu->state = VCPU_IDLE;
 		vcpu->hostcpu = NOCPU;
 		vcpu->lastloccpu = NOCPU;
@@ -1323,7 +1326,7 @@ vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 			vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
 			VCPU_CTR1(vm, vcpuid, "vcpu state change from %s to "
 			    "idle requested", vcpu_state2str(vcpu->state));
-			cv_wait(&vcpu->state_cv, &vcpu->mtx.m);
+			cv_wait(&vcpu->state_cv, &vcpu->lock);
 		}
 	} else {
 		KASSERT(vcpu->state != VCPU_IDLE, ("invalid transition from "
@@ -1457,7 +1460,7 @@ vm_handle_hlt(struct vm *vm, int vcpuid, bool intr_disabled)
 
 		vcpu_ustate_change(vm, vcpuid, VU_IDLE);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
-		(void) cv_wait_sig(&vcpu->vcpu_cv, &vcpu->mtx.m);
+		(void) cv_wait_sig(&vcpu->vcpu_cv, &vcpu->lock);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
 		vcpu_ustate_change(vm, vcpuid, VU_EMU_KERN);
 	}
@@ -1750,7 +1753,7 @@ vm_handle_suspend(struct vm *vm, int vcpuid)
 		}
 
 		vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
-		rc = cv_reltimedwait_sig(&vcpu->vcpu_cv, &vcpu->mtx.m, hz,
+		rc = cv_reltimedwait_sig(&vcpu->vcpu_cv, &vcpu->lock, hz,
 		    TR_CLOCK_TICK);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
 
@@ -1845,7 +1848,7 @@ vm_handle_run_state(struct vm *vm, int vcpuid)
 
 		vcpu_ustate_change(vm, vcpuid, VU_IDLE);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
-		(void) cv_wait_sig(&vcpu->vcpu_cv, &vcpu->mtx.m);
+		(void) cv_wait_sig(&vcpu->vcpu_cv, &vcpu->lock);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
 		vcpu_ustate_change(vm, vcpuid, VU_EMU_KERN);
 	}

@@ -34,7 +34,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
-#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
@@ -48,9 +47,8 @@ __FBSDID("$FreeBSD$");
 
 static MALLOC_DEFINE(M_VATPIT, "atpit", "bhyve virtual atpit (8254)");
 
-#define	VATPIT_LOCK(vatpit)		mtx_lock_spin(&((vatpit)->mtx))
-#define	VATPIT_UNLOCK(vatpit)		mtx_unlock_spin(&((vatpit)->mtx))
-#define	VATPIT_LOCKED(vatpit)		mtx_owned(&((vatpit)->mtx))
+#define	VATPIT_LOCK(vatpit)		mutex_enter(&((vatpit)->lock))
+#define	VATPIT_UNLOCK(vatpit)		mutex_exit(&((vatpit)->lock))
 
 #define	TIMER_SEL_MASK		0xc0
 #define	TIMER_RW_MASK		0x30
@@ -100,7 +98,7 @@ struct channel {
 
 struct vatpit {
 	struct vm	*vm;
-	struct mtx	mtx;
+	kmutex_t	lock;
 
 	struct channel	channel[3];
 };
@@ -455,7 +453,7 @@ vatpit_init(struct vm *vm)
 	vatpit = malloc(sizeof (struct vatpit), M_VATPIT, M_WAITOK | M_ZERO);
 	vatpit->vm = vm;
 
-	mtx_init(&vatpit->mtx, "vatpit lock", NULL, MTX_SPIN);
+	mutex_init(&vatpit->lock, NULL, MUTEX_ADAPTIVE, NULL);
 
 	for (i = 0; i < 3; i++) {
 		callout_init(&vatpit->channel[i].callout, 1);
@@ -475,6 +473,7 @@ vatpit_cleanup(struct vatpit *vatpit)
 	for (i = 0; i < 3; i++)
 		callout_drain(&vatpit->channel[i].callout);
 
+	mutex_destroy(&vatpit->lock);
 	free(vatpit, M_VATPIT);
 }
 
