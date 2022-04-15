@@ -750,3 +750,13 @@ DRV_KMODS	+= usmn zen_udf
 #	Intel Integrated Memory Controller
 #
 DRV_KMODS	+= imc imcstub
+
+#
+#	VirtIO-Net Accellerated driver (for bhyve)
+#
+DRV_KMODS	+= viona
+
+#
+#	bhyve PCI-passthru
+#
+DRV_KMODS	+= ppt

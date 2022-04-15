@@ -30,7 +30,7 @@ SRCDIR		= ../common
 LIBS		= $(DYNLIB)
 
 CPPFLAGS	= -I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
-	$(CPPFLAGS.master) -I$(SRC)/uts/i86pc
+	$(CPPFLAGS.master) -I$(SRC)/uts/intel
 
 SMOFF += all_func_returns
 

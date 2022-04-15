@@ -12,54 +12,41 @@
 #
 # Copyright 2013 Pluribus Networks Inc.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2022 Oxide Computer Company
 #
 
-#
-#	Path to the base of the uts directory tree (usually /usr/src/uts).
-#
 UTSBASE	= ../..
 
-#
-#	Define the module and object file sets.
-#
 MODULE		= ppt
 OBJECTS		= $(PPT_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/i86pc/io/vmm/io
-MAPFILE		= $(UTSBASE)/i86pc/io/vmm/io/ppt.mapfile
+CONF_SRCDIR	= $(UTSBASE)/intel/io/vmm/io
+MAPFILE		= $(UTSBASE)/intel/io/vmm/io/ppt.mapfile
 
-#
-#	Include common rules.
-#
-include $(UTSBASE)/i86pc/Makefile.i86pc
+include $(UTSBASE)/intel/Makefile.intel
 
-#
-#	Define targets
-#
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
-
-#
-#	Overrides and additions
-#
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
-PRE_INC_PATH	= -I$(COMPAT)/bhyve -I$(COMPAT)/bhyve/amd64 \
-	-I$(CONTRIB)/bhyve -I$(CONTRIB)/bhyve/amd64
-INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(UTSBASE)/i86pc/io/vmm/io
-AS_INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(OBJS_DIR)
 
-LDFLAGS         += -N drv/vmm -N misc/pcie
-LDFLAGS         += -M $(MAPFILE)
+PRE_INC_PATH	= \
+	-I$(COMPAT)/bhyve \
+	-I$(COMPAT)/bhyve/amd64 \
+	-I$(CONTRIB)/bhyve \
+	-I$(CONTRIB)/bhyve/amd64
+
+INC_PATH	+= -I$(UTSBASE)/intel/io/vmm -I$(UTSBASE)/intel/io/vmm/io
+AS_INC_PATH	+= -I$(UTSBASE)/intel/io/vmm -I$(OBJS_DIR)
+
+LDFLAGS		+= -N drv/vmm -N misc/pcie
+LDFLAGS		+= -M $(MAPFILE)
 
 $(OBJS_DIR)/ppt.o := CERRWARN	+= -_gcc=-Wno-unused-variable
 
 # needs work
 SMOFF += all_func_returns
 
-#
-#	Default build targets.
-#
 .KEEP_STATE:
 
 def:		$(DEF_DEPS)
@@ -72,7 +59,5 @@ clobber:	$(CLOBBER_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-#
-#	Include common targets.
-#
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ
+include $(UTSBASE)/intel/io/vmm/Makefile.rules

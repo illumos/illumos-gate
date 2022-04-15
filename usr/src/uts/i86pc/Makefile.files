@@ -67,9 +67,6 @@ CORE_OBJS +=			\
 	hardclk.o		\
 	hat_i86.o		\
 	hat_kdi.o		\
-	hma.o			\
-	hma_asm.o		\
-	hma_fpu.o		\
 	hment.o			\
 	hold_page.o		\
 	hpet_acpi.o		\
@@ -117,7 +114,6 @@ CORE_OBJS +=			\
 	pmem.o			\
 	ppage.o			\
 	pwrnow.o		\
-	smt.o			\
 	speedstep.o		\
 	ssp.o			\
 	startup.o		\
@@ -241,51 +237,6 @@ UPPC_OBJS += uppc.o psm_common.o
 XSVC_OBJS += xsvc.o
 AMD_IOMMU_OBJS +=	amd_iommu.o amd_iommu_impl.o amd_iommu_acpi.o \
 			amd_iommu_cmd.o amd_iommu_log.o amd_iommu_page_tables.o
-VMM_OBJS += vmm.o \
-	vmm_sol_dev.o \
-	vmm_host.o \
-	vmm_instruction_emul.o \
-	vmm_ioport.o \
-	vmm_lapic.o \
-	vmm_stat.o \
-	vmm_util.o \
-	x86.o \
-	iommu.o \
-	vatpic.o \
-	vatpit.o \
-	vhpet.o \
-	vioapic.o \
-	vlapic.o \
-	vrtc.o \
-	vpmtmr.o \
-	vmcs.o \
-	vmx_msr.o \
-	vmx.o \
-	vmx_support.o \
-	vtd.o \
-	vtd_sol.o \
-	svm.o \
-	svm_msr.o \
-	vmcb.o \
-	svm_support.o \
-	amdv.o \
-	vmm_gpt.o \
-	seg_vmm.o \
-	vmm_reservoir.o \
-	vmm_sol_glue.o \
-	vmm_sol_ept.o \
-	vmm_sol_rvi.o \
-	vmm_support.o \
-	vmm_vm.o \
-	vmm_zsd.o
-
-VIONA_OBJS += viona_main.o \
-	viona_ring.o \
-	viona_rx.o \
-	viona_tx.o \
-	viona_hook.o \
-
-PPT_OBJS += ppt.o
 
 PCI_PRD_OBJS += pci_prd_i86pc.o pci_memlist.o
 

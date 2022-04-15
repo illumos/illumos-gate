@@ -512,7 +512,7 @@ init_msix_table(struct vmctx *ctx, struct passthru_softc *sc)
 
 	/*
 	 * Mapping pptfd provides access to the BAR containing the MSI-X
-	 * table. See ppt_devmap() in usr/src/uts/i86pc/io/vmm/io/ppt.c
+	 * table. See ppt_devmap() in usr/src/uts/intel/io/vmm/io/ppt.c
 	 *
 	 * This maps the whole BAR and then mprotect(PROT_NONE) is used below
 	 * to prevent access to pages that don't contain the MSI-X table.

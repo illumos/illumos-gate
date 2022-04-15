@@ -275,6 +275,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/zfs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/viona/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 #
 # krtld compiled into unix
 #

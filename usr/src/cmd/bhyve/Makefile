@@ -121,9 +121,9 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(SRC)/lib/lib9p/common \
 		-I$(SRC)/uts/common/io/e1000api \
 		$(CPPFLAGS.master) \
-		-I$(SRC)/uts/i86pc/io/vmm \
+		-I$(SRC)/uts/intel/io/vmm \
 		-I$(SRC)/uts/common \
-		-I$(SRC)/uts/i86pc \
+		-I$(SRC)/uts/intel \
 		-DWITHOUT_CAPSICUM
 
 pci_nvme.o := CERRWARN += -_gcc=-Wno-pointer-sign

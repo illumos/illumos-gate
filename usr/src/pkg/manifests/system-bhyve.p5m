@@ -57,8 +57,8 @@ driver name=ppt
 driver name=viona
 driver name=vmm
 license lic_CDDL license=lic_CDDL
-license usr/src/uts/i86pc/io/vmm/THIRDPARTYLICENSE \
-    license=usr/src/uts/i86pc/io/vmm/THIRDPARTYLICENSE
+license usr/src/uts/intel/io/vmm/THIRDPARTYLICENSE \
+    license=usr/src/uts/intel/io/vmm/THIRDPARTYLICENSE
 depend type=require fmri=developer/acpi
 depend type=require fmri=system/bhyve/firmware
 depend type=require fmri=system/library/bhyve

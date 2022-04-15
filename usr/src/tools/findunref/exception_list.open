@@ -193,8 +193,8 @@
 ./usr/src/uts/common/fs/smbclnt/netsmb/THIRDPARTYLICENSE.boris_popov.descrip
 ./usr/src/uts/common/io/e1000api/THIRDPARTYLICENSE
 ./usr/src/uts/common/io/e1000api/THIRDPARTYLICENSE.descrip
-./usr/src/uts/i86pc/io/viona/THIRDPARTYLICENSE
-./usr/src/uts/i86pc/io/viona/THIRDPARTYLICENSE.descrip
+./usr/src/uts/intel/io/viona/THIRDPARTYLICENSE
+./usr/src/uts/intel/io/viona/THIRDPARTYLICENSE.descrip
 
 # This is covered by license_in_headers in nfs4_prot.x
 ./usr/src/head/rpcsvc/THIRDPARTYLICENSE.nfs4_prot
