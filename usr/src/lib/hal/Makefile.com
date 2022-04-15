@@ -24,39 +24,14 @@
 #
 #
 
+VERSPKG = $(HAL_VERSION)
+
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/cmd/hal/Makefile.hal
 
 CPPFLAGS =	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(CPPFLAGS.master)
 
-LIBDIR =	/usr/lib
-LIBDIR64 =	/usr/lib/$(MACH64)
-ROOTLIBPCDIR =	$(ROOT)/usr/lib/pkgconfig
-ROOTLIBPCDIR64 = $(ROOT)/usr/lib/$(MACH64)/pkgconfig
-ROOTLIBPC =	$(LIBPCSRC:%=$(ROOTLIBPCDIR)/%)
-ROOTLIBPC64 =	$(LIBPCSRC:%=$(ROOTLIBPCDIR64)/%)
-
-CLOBBERFILES +=	$(LIBPCSRC)
-
 #
 # Ensure `all' is the default target.
 #
 all:
-
-$(ROOTLIBPCDIR):
-	$(INS.dir)
-
-$(ROOTLIBPCDIR64):
-	$(INS.dir)
-
-$(ROOTLIBPC): $(ROOTLIBPCDIR) $(LIBPCSRC)
-	$(INS.file) $(LIBPCSRC)
-
-$(ROOTLIBPC64): $(ROOTLIBPCDIR64) $(LIBPCSRC)
-	$(INS.file) $(LIBPCSRC)
-
-$(LIBPCSRC): ../common/$(LIBPCSRC).in
-	$(SED)	-e "s@__VERSION__@$(HAL_VERSION)@" \
-		-e "s@__LIBDIR__@$(LIBDIR)@" \
-		 < ../common/$(LIBPCSRC).in > $(LIBPCSRC)
-

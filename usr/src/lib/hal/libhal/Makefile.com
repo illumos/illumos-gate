@@ -31,7 +31,7 @@ LIBRARY =	libhal.a
 VERS =		.1.0.0
 VERS_MAJ =	.1
 OBJECTS =	libhal.o
-LIBPCSRC =	hal.pc
+PCFILE =	hal.pc
 
 include ../../Makefile.com
 

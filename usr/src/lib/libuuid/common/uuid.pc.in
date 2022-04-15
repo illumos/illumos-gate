@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/__LIBDIR__
+includedir=${prefix}/include
+
+Name: uuid
+Description: Universally unique id library
+Version: __VERSPKG__
+Requires:
+Cflags: -I${includedir}/uuid
+Libs: -L${libdir} -luuid

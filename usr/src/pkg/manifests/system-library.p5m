@@ -732,6 +732,8 @@ link path=usr/lib/$(ARCH64)/nss_nis.so.1 \
 link path=usr/lib/$(ARCH64)/nss_user.so.1 \
     target=../../../lib/$(ARCH64)/nss_user.so.1
 file path=usr/lib/$(ARCH64)/passwdutil.so.1
+dir  path=usr/lib/$(ARCH64)/pkgconfig group=other
+file path=usr/lib/$(ARCH64)/pkgconfig/uuid.pc mode=0444
 link path=usr/lib/$(ARCH64)/straddr.so target=straddr.so.2
 file path=usr/lib/$(ARCH64)/straddr.so.2
 file path=usr/lib/$(ARCH64)/watchmalloc.so.1
@@ -997,6 +999,8 @@ file path=usr/lib/nss_ldap.so.1
 link path=usr/lib/nss_nis.so.1 target=../../lib/nss_nis.so.1
 link path=usr/lib/nss_user.so.1 target=../../lib/nss_user.so.1
 file path=usr/lib/passwdutil.so.1
+dir  path=usr/lib/pkgconfig group=other
+file path=usr/lib/pkgconfig/uuid.pc mode=0444
 dir  path=usr/lib/raidcfg
 dir  path=usr/lib/raidcfg/$(ARCH64)
 file path=usr/lib/raidcfg/$(ARCH64)/mpt.so.1

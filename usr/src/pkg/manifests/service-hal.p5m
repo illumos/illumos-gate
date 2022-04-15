@@ -108,8 +108,8 @@ link path=usr/lib/$(ARCH64)/libhal.so target=./libhal.so.1.0.0
 link path=usr/lib/$(ARCH64)/libhal.so.1 target=./libhal.so.1.0.0
 file path=usr/lib/$(ARCH64)/libhal.so.1.0.0
 dir  path=usr/lib/$(ARCH64)/pkgconfig group=other
-file path=usr/lib/$(ARCH64)/pkgconfig/hal-storage.pc
-file path=usr/lib/$(ARCH64)/pkgconfig/hal.pc
+file path=usr/lib/$(ARCH64)/pkgconfig/hal-storage.pc mode=0444
+file path=usr/lib/$(ARCH64)/pkgconfig/hal.pc mode=0444
 dir  path=usr/lib/hal
 file path=usr/lib/hal/hal-functions mode=0555
 file path=usr/lib/hal/hal-is-caller-privileged mode=0555
@@ -153,8 +153,8 @@ link path=usr/lib/libhal.so target=./libhal.so.1.0.0
 link path=usr/lib/libhal.so.1 target=./libhal.so.1.0.0
 file path=usr/lib/libhal.so.1.0.0
 dir  path=usr/lib/pkgconfig group=other
-file path=usr/lib/pkgconfig/hal-storage.pc
-file path=usr/lib/pkgconfig/hal.pc
+file path=usr/lib/pkgconfig/hal-storage.pc mode=0444
+file path=usr/lib/pkgconfig/hal.pc mode=0444
 dir  path=usr/sbin
 file path=usr/sbin/hal-device mode=0555
 file path=usr/sbin/hal-fdi-validate mode=0555

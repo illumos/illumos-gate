@@ -37,7 +37,7 @@ link path=usr/lib/libpolkit.so target=./libpolkit.so.0.0.0
 link path=usr/lib/libpolkit.so.0 target=./libpolkit.so.0.0.0
 file path=usr/lib/libpolkit.so.0.0.0
 dir  path=usr/lib/pkgconfig group=other
-file path=usr/lib/pkgconfig/polkit.pc
+file path=usr/lib/pkgconfig/polkit.pc mode=0444
 dir  path=usr/sbin
 file path=usr/sbin/polkit-is-privileged mode=0555
 dir  path=usr/share/man/man8

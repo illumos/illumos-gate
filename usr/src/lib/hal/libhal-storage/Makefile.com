@@ -28,7 +28,7 @@ LIBRARY =	libhal-storage.a
 VERS =		.1.0.0
 VERS_MAJ =	.1
 OBJECTS =	libhal-storage.o
-LIBPCSRC =	hal-storage.pc
+PCFILE =	hal-storage.pc
 
 include ../../Makefile.com
 

@@ -41,6 +41,8 @@ $(ROOTFS_LIBDIR)/$(DYNLIBCCC) :=	FILEMODE= 755
 $(ROOTLIBDIR64)/$(DYNLIB) :=	FILEMODE= 755
 $(ROOTLIBDIR64)/$(DYNLIBCCC) :=	FILEMODE= 755
 
+$(ROOTLIBPC) $(ROOTLIBPC64) :=	FILEMODE= 444
+
 # install rules
 $(ROOTHDRDIR)/%: $(HDRDIR)/%
 	$(INS.file)
@@ -79,6 +81,20 @@ objs/%.o pics/%.o: $(SRCDIR)/%.cc
 
 objs pics:
 	-@mkdir -p $@
+
+$(ROOTLIBPCDIR):
+	$(INS.dir)
+$(ROOTLIBPC): $(ROOTLIBPCDIR) $(PCFILE)
+	$(INS.file) $(PCFILE)
+$(ROOTLIBPCDIR64):
+	$(INS.dir)
+$(ROOTLIBPC64): $(ROOTLIBPCDIR64) $(PCFILE)
+	$(INS.file) $(PCFILE)
+%.pc: $(SRCDIR)/%.pc.in
+	$(RM) $@; \
+	$(SED)  -e "s@__LIBDIR__@$(PCLIBDIR)@g" \
+		-e "s@__VERSPKG__@$(VERSPKG)@g" \
+		< $< > $@
 
 $(LIBRARY): objs .WAIT $$(OBJS)
 	$(BUILD.AR)

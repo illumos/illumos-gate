@@ -7,12 +7,12 @@
 
 prefix=/usr
 exec_prefix=${prefix}
-libdir=__LIBDIR__
+libdir=${prefix}/__LIBDIR__
 includedir=${prefix}/include
 
 Name: hal-storage
 Description: hal library for storage devices and volumes
-Version: __VERSION__
+Version: __VERSPKG__
 Requires: dbus-1 hal
 Libs: -L${libdir} -lhal-storage
 Cflags: -DDBUS_API_SUBJECT_TO_CHANGE -I${includedir}/hal

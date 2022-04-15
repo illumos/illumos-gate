@@ -98,6 +98,14 @@ HDRSRCS=	$(HDRS:%=$(HDRDIR)/%)
 CHECKHDRS=	$(HDRSRCS:%.h=%.check)
 ROOTLIBS=	$(LIBS:%=$(ROOTLIBDIR)/%)
 ROOTLIBS64=	$(LIBS:%=$(ROOTLIBDIR64)/%)
+# explicitly use usr/lib here instead of ROOTLIBDIR, so that pc files always
+# end up under /usr/lib, even if a library includes lib/Makefile.rootfs
+ROOTLIBPCDIR=	$(ROOT)/usr/lib/pkgconfig
+ROOTLIBPCDIR64=	$(ROOT)/usr/lib/$(MACH64)/pkgconfig
+ROOTLIBPC=	$(PCFILE:%=$(ROOTLIBPCDIR)/%)
+ROOTLIBPC64=	$(PCFILE:%=$(ROOTLIBPCDIR64)/%)
+PCLIBDIR = lib
+PCLIBDIR64 = lib/$(MACH64)
 ROOTFS_LIBS=	$(DYNLIB:%=$(ROOTFS_LIBDIR)/%)
 ROOTFS_LIBS64=	$(DYNLIB:%=$(ROOTFS_LIBDIR64)/%)
 ROOTLINKS=	$(ROOTLIBDIR)/$(LIBLINKS)
@@ -240,7 +248,7 @@ TARGETMACH=	$(MACH)
 # Allow people to define their own clobber rules.  Normal makefiles
 # shouldn't override this - they should override $(CLOBBERFILES) instead.
 #
-CLOBBERTARGFILES= $(LIBS) $(DYNLIB) $(CLOBBERFILES)
+CLOBBERTARGFILES= $(LIBS) $(DYNLIB) $(CLOBBERFILES) $(PCFILE)
 
 #
 # Define the default ctfdiff invocation used to check a list of types

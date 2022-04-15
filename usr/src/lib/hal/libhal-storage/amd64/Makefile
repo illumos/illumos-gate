@@ -27,6 +27,4 @@
 include ../Makefile.com
 include ../../../Makefile.lib.64
 
-LIBDIR = $(LIBDIR64)
-
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLIBPC64) $(ROOTMAJLINK64)
