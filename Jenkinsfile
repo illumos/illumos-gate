@@ -6,6 +6,7 @@
 
 /*
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2022 MNX Cloud, Inc.
  */
 
 @Library('jenkins-joylib@v1.0.8') _
@@ -13,8 +14,8 @@
 pipeline {
 
     agent {
-        label 'platform:true && image_ver:18.4.0 && pkgsrc_arch:x86_64 && ' +
-            'dram:16gb && !virt:kvm && fs:pcfs && fs:ufs && jenkins_agent:2'
+        label 'platform:true && image_ver:21.4.0 && pkgsrc_arch:x86_64 && ' +
+            'dram:16gb && !virt:kvm && fs:pcfs && fs:ufs && jenkins_agent:3'
     }
 
     options {
@@ -38,7 +39,7 @@ pipeline {
                 }
             }
             steps {
-                build(job:'joyent-org/smartos-live/master',
+                build(job:'TritonDataCenter/smartos-live/master',
                     wait: false,
                     parameters: [
                         text(name: 'CONFIGURE_PROJECTS',
