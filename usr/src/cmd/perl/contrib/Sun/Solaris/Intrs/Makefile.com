@@ -13,20 +13,10 @@
 # Copyright 2016 RackTop Systems.
 #
 
-include $(SRC)/Makefile.master
+MODULE = Intrs
 
-SUBDIRS=
-$(BUILDPERL32)SUBDIRS += $(MACH)
-$(BUILDPERL64)SUBDIRS += $(MACH64)
+include $(SRC)/cmd/perl/Makefile.perl
 
-all :=		TARGET = all
-install :=	TARGET = install
-clean :=	TARGET = clean
-clobber :=	TARGET = clobber
+CERRWARN += -_gcc=-Wno-unused-variable
 
-all install clean clobber: $(SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+MAPFILES = ../mapfile-vers

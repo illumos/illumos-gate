@@ -13,20 +13,14 @@
 # Copyright 2016 RackTop Systems.
 #
 
-include $(SRC)/Makefile.master
+MODULE = Project
 
-SUBDIRS=
-$(BUILDPERL32)SUBDIRS += $(MACH)
-$(BUILDPERL64)SUBDIRS += $(MACH64)
+include $(SRC)/cmd/perl/Makefile.perl
 
-all :=		TARGET = all
-install :=	TARGET = install
-clean :=	TARGET = clean
-clobber :=	TARGET = clobber
+LDLIBS += -lproject -lgen
 
-all install clean clobber: $(SUBDIRS)
+CERRWARN += -_gcc=-Wno-unused-variable
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+XSUBPPFLAGS = -typemap typemap
 
-FRC:
+MAPFILES = ../mapfile-vers

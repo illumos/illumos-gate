@@ -17,15 +17,15 @@ MODULE = _BSMparse
 
 include $(SRC)/cmd/perl/Makefile.perl
 
+PERLMOD = $(MODULE).pm
+
 # Install module into arch independent directory
 ROOTPERLMODDIR = $(ROOTPERLDIR)/lib/Sun/Solaris/BSM
 
-include $(SRC)/cmd/perl/Makefile.targ
-
 .KEEP_STATE:
 
-all: $(PERLMOD)
+all:
 
 install: $(ROOTPERLMOD)
 
-clean clobber:
+include $(SRC)/cmd/perl/Makefile.targ

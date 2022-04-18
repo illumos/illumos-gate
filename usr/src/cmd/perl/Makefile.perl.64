@@ -8,23 +8,21 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-#
-# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2016 RackTop Systems.
-#
 
-MODULE = Pg
+# Copyright 2022 Richard Lowe.
 
-include $(SRC)/cmd/perl/Makefile.perl
+include $(SRC)/lib/Makefile.lib.64
 
-PERLMOD = $(MODULE).pm
+PERLLIBDIR = $(PERLLIBDIR64)
+PERLINCDIR = $(PERLINCDIR64)
 
-# Install module into arch independent directory
-ROOTPERLMODDIR = $(ROOTPERLDIR)/lib/Sun/Solaris
+ROOTPERLLIBDIR = $(ROOTPERLLIBDIR64)
+ROOTPERLMODDIR = $(ROOTPERLMODDIR64)
+ROOTPERLEXTDIR = $(ROOTPERLEXTDIR64)
 
-.KEEP_STATE:
+ROOTPERLMOD = $(ROOTPERLMOD64)
+ROOTPERLEXT = $(ROOTPERLEXT64)
 
-all:
-install: $(ROOTPERLMOD)
+XSUBPP = $(XSUBPP64)
 
-include $(SRC)/cmd/perl/Makefile.targ
+PCFLAGS = $(PCFLAGS64)
