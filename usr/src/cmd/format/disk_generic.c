@@ -59,19 +59,9 @@
 #include "ctlr_scsi.h"
 #include "auto_sense.h"
 
-#ifdef	__STDC__
-/*
- *	Local prototypes for ANSI C compilers
- */
 static int	generic_ck_format(void);
 static int	generic_rdwr(int dir, int fd, diskaddr_t blkno, int secnt,
 			caddr_t bufaddr, int flags, int *xfercntp);
-#else	/* __STDC__ */
-
-static int	generic_ck_format();
-static int	generic_rdwr();
-
-#endif	/* __STDC__ */
 
 struct  ctlr_ops genericops = {
 	generic_rdwr,
@@ -90,7 +80,7 @@ struct  ctlr_ops genericops = {
  * the disk has been formatted.
  */
 static int
-generic_ck_format()
+generic_ck_format(void)
 {
 	int	status;
 
@@ -108,14 +98,8 @@ generic_ck_format()
  */
 /*ARGSUSED*/
 static int
-generic_rdwr(dir, fd, blkno, secnt, bufaddr, flags, xfercntp)
-	int	dir;
-	int	fd;
-	diskaddr_t	blkno;
-	int	secnt;
-	caddr_t	bufaddr;
-	int	flags;
-	int	*xfercntp;
+generic_rdwr(int dir, int fd, diskaddr_t blkno, int secnt, caddr_t bufaddr,
+    int flags, int *xfercntp)
 {
 
 	offset_t	tmpsec, status, tmpblk;

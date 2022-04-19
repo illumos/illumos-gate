@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the code to add new disk_type and partition
  * definitions to a format data file.
@@ -76,7 +74,7 @@ static int	add_entry();
  * Add new definitions for the current disk/partition to a format data file.
  */
 int
-add_definition()
+add_definition(void)
 {
 	FILE	*fd;
 	char	*filename;
@@ -107,7 +105,7 @@ add_definition()
 	 * information has been changed, there's nothing to save.
 	 */
 	if (cur_dtype->dtype_filename != NULL &&
-			cur_parts->pinfo_filename != NULL) {
+	    cur_parts->pinfo_filename != NULL) {
 		err_print("\
 Neither the disk type nor the partitioning has been changed.\n");
 		return (-1);
@@ -125,7 +123,7 @@ Neither the disk type nor the partitioning has been changed.\n");
 	 * Let the user know what we're doing
 	 */
 	if (cur_dtype->dtype_filename == NULL &&
-			cur_parts->pinfo_filename == NULL) {
+	    cur_parts->pinfo_filename == NULL) {
 		fmt_print("Saving new disk and partition definitions\n");
 	} else if (cur_dtype->dtype_filename == NULL) {
 		fmt_print("Saving new disk definition\n");
@@ -139,14 +137,14 @@ Neither the disk type nor the partitioning has been changed.\n");
 	prompt = "Enter file name";
 	(void) strcpy(x.deflt_str, "./format.dat");
 	filename = (char *)(uintptr_t)input(FIO_OSTR, prompt,
-		':', (u_ioparam_t *)NULL, &x.xfoo, DATA_INPUT);
+	    ':', NULL, &x.xfoo, DATA_INPUT);
 	assert(filename != NULL);
 	/*
 	 * Open the file in append mode, or create it, if necessary
 	 */
 	if ((fd = fopen(filename, "a")) == NULL) {
 		err_print("Cannot open `%s' - %s\n", filename,
-			strerror(errno));
+		    strerror(errno));
 		destroy_data(filename);
 		return (-1);
 	}
@@ -154,7 +152,7 @@ Neither the disk type nor the partitioning has been changed.\n");
 	 * Write a header for the new definitions
 	 */
 	if ((cur_dtype->dtype_filename == NULL) &&
-			(cur_parts->pinfo_filename == NULL)) {
+	    (cur_parts->pinfo_filename == NULL)) {
 		(void) fprintf(fd, "#\n# New disk/partition type ");
 	} else if (cur_dtype->dtype_filename == NULL) {
 		(void) fprintf(fd, "#\n# New disk type ");
@@ -184,9 +182,7 @@ Neither the disk type nor the partitioning has been changed.\n");
  * Add a disk_type definition to the file fd
  */
 static void
-add_disktype(fd, disk_info)
-	FILE			*fd;
-	struct disk_info	*disk_info;
+add_disktype(FILE *fd, struct disk_info *disk_info)
 {
 	int			col;
 	struct disk_type	*disk_type;
@@ -194,9 +190,9 @@ add_disktype(fd, disk_info)
 	disk_type = disk_info->disk_type;
 
 	(void) fprintf(fd, "disk_type = \"%s\" \\\n",
-		disk_type->dtype_asciilabel);
+	    disk_type->dtype_asciilabel);
 	col = add_entry(0, fd, " : ctlr = %s",
-		((disk_info->disk_ctlr)->ctlr_ctype)->ctype_name);
+	    ((disk_info->disk_ctlr)->ctlr_ctype)->ctype_name);
 
 	col = add_entry(col, fd, " : ncyl = %d", disk_type->dtype_ncyl);
 
@@ -208,14 +204,14 @@ add_disktype(fd, disk_info)
 
 	if (disk_type->dtype_options & SUP_PHEAD) {
 		col = add_entry(col, fd, " : phead = %d",
-			disk_type->dtype_phead);
+		    disk_type->dtype_phead);
 	}
 
 	col = add_entry(col, fd, " : nsect = %d", disk_type->dtype_nsect);
 
 	if (disk_type->dtype_options & SUP_PSECT) {
 		col = add_entry(col, fd, " : psect = %d",
-			disk_type->dtype_psect);
+		    disk_type->dtype_psect);
 	}
 
 	if (disk_type->dtype_options & SUP_BPT) {
@@ -226,62 +222,62 @@ add_disktype(fd, disk_info)
 
 	if (disk_type->dtype_options & SUP_FMTTIME) {
 		col = add_entry(col, fd, " : fmt_time = %d",
-			disk_type->dtype_fmt_time);
+		    disk_type->dtype_fmt_time);
 	}
 
 	if (disk_type->dtype_options & SUP_CYLSKEW) {
 		col = add_entry(col, fd, " : cyl_skew = %d",
-			disk_type->dtype_cyl_skew);
+		    disk_type->dtype_cyl_skew);
 	}
 
 	if (disk_type->dtype_options & SUP_TRKSKEW) {
 		col = add_entry(col, fd, " : trk_skew = %d",
-			disk_type->dtype_trk_skew);
+		    disk_type->dtype_trk_skew);
 	}
 
 	if (disk_type->dtype_options & SUP_TRKS_ZONE) {
 		col = add_entry(col, fd, " : trks_zone = %d",
-			disk_type->dtype_trks_zone);
+		    disk_type->dtype_trks_zone);
 	}
 
 	if (disk_type->dtype_options & SUP_ATRKS) {
 		col = add_entry(col, fd, " : atrks = %d",
-			disk_type->dtype_atrks);
+		    disk_type->dtype_atrks);
 	}
 
 	if (disk_type->dtype_options & SUP_ASECT) {
 		col = add_entry(col, fd, " : asect = %d",
-			disk_type->dtype_asect);
+		    disk_type->dtype_asect);
 	}
 
 	if (disk_type->dtype_options & SUP_CACHE) {
 		col = add_entry(col, fd, " : cache = %d",
-			disk_type->dtype_cache);
+		    disk_type->dtype_cache);
 	}
 
 	if (disk_type->dtype_options & SUP_PREFETCH) {
 		col = add_entry(col, fd, " : prefetch = %d",
-			disk_type->dtype_threshold);
+		    disk_type->dtype_threshold);
 	}
 
 	if (disk_type->dtype_options & SUP_CACHE_MIN) {
 		col = add_entry(col, fd, " : min_prefetch = %d",
-			disk_type->dtype_prefetch_min);
+		    disk_type->dtype_prefetch_min);
 	}
 
 	if (disk_type->dtype_options & SUP_CACHE_MAX) {
 		col = add_entry(col, fd, " : max_prefetch = %d",
-			disk_type->dtype_prefetch_max);
+		    disk_type->dtype_prefetch_max);
 	}
 
 	if (disk_type->dtype_options & SUP_BPS) {
 		col = add_entry(col, fd, " : bps = %d",
-			disk_type->dtype_bps);
+		    disk_type->dtype_bps);
 	}
 
 	if (disk_type->dtype_options & SUP_DRTYPE) {
 		col = add_entry(col, fd, " : drive_type = %d",
-			disk_type->dtype_dr_type);
+		    disk_type->dtype_dr_type);
 	}
 
 	/*
@@ -301,10 +297,8 @@ add_disktype(fd, disk_info)
  * Add a partition definition to the file fd
  */
 static void
-add_partition(fd, disk_info, part)
-	FILE			*fd;
-	struct disk_info	*disk_info;
-	struct partition_info	*part;
+add_partition(FILE *fd, struct disk_info *disk_info,
+    struct partition_info *part)
 {
 	int			col;
 	int			i;
@@ -327,8 +321,8 @@ add_partition(fd, disk_info, part)
 
 	(void) fprintf(fd, "partition = \"%s\" \\\n", part->pinfo_name);
 	(void) fprintf(fd, "\t : disk = \"%s\" : ctlr = %s \\\n",
-		disk_type->dtype_asciilabel,
-		((disk_info->disk_ctlr)->ctlr_ctype)->ctype_name);
+	    disk_type->dtype_asciilabel,
+	    ((disk_info->disk_ctlr)->ctlr_ctype)->ctype_name);
 
 	/*
 	 * Print the specifications for each useful partition
@@ -340,22 +334,20 @@ add_partition(fd, disk_info, part)
 	for (i = 0; i < NDKMAP; i++, pp++, pv++, dv++) {
 		if (pp->dkl_nblk != 0) {
 			col = add_entry(col, fd, " : %c = ",
-				i + PARTITION_BASE);
+			    i + PARTITION_BASE);
 			if (pv->p_tag != dv->p_tag ||
-					pv->p_flag != dv->p_flag) {
-				s = find_string(ptag_choices,
-						(int)pv->p_tag);
+			    pv->p_flag != dv->p_flag) {
+				s = find_string(ptag_choices, (int)pv->p_tag);
 				if (s != NULL) {
 					col = add_entry(col, fd, " %s,", s);
 				}
-				s = find_string(pflag_choices,
-						(int)pv->p_flag);
+				s = find_string(pflag_choices, (int)pv->p_flag);
 				if (s != NULL) {
 					col = add_entry(col, fd, " %s,", s);
 				}
 			}
 			col = add_entry(col, fd, " %d, %d", pp->dkl_cylno,
-				pp->dkl_nblk);
+			    pp->dkl_nblk);
 		}
 	}
 

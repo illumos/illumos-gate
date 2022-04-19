@@ -113,7 +113,7 @@ slist_t	pflag_choices[] = {
  * disks that were found at startup time.
  */
 int
-c_disk()
+c_disk(void)
 {
 	struct disk_info	*disk;
 	u_ioparam_t		ioparam;
@@ -159,7 +159,7 @@ c_disk()
 		/*
 		 * Convert the token into an integer.
 		 */
-		if (geti(cleantoken, &index, (int *)NULL))
+		if (geti(cleantoken, &index, NULL))
 			return (0);
 
 		/*
@@ -175,7 +175,7 @@ c_disk()
 	fmt_print("\n\nAVAILABLE DISK SELECTIONS:\n");
 
 	i = 0;
-	if ((option_f == (char *)NULL) && isatty(0) == 1 && isatty(1) == 1) {
+	if ((option_f == NULL) && isatty(0) == 1 && isatty(1) == 1) {
 		/*
 		 * We have a real terminal for std input and output, enable
 		 * more style of output for disk selection list.
@@ -359,7 +359,7 @@ exit:
  * in the data file.
  */
 int
-c_type()
+c_type(void)
 {
 	struct disk_type	*type, *tptr, *oldtype;
 	u_ioparam_t		ioparam;
@@ -694,7 +694,7 @@ c_type()
  * the partition menu.
  */
 int
-c_partition()
+c_partition(void)
 {
 
 	/*
@@ -738,7 +738,7 @@ c_partition()
  * current disk.
  */
 int
-c_current()
+c_current(void)
 {
 
 	/*
@@ -797,7 +797,7 @@ c_current()
  * to format and verify any portion of the disk.
  */
 int
-c_format()
+c_format(void)
 {
 	diskaddr_t		start, end;
 	time_t			clock;
@@ -1219,7 +1219,7 @@ currently being used for swapping.\n");
  * to reallocate sectors on the disk that have gone bad.
  */
 int
-c_repair()
+c_repair(void)
 {
 	diskaddr_t	bn;
 	int		status;
@@ -1277,7 +1277,7 @@ c_repair()
 	}
 	bn = input(FIO_BN,
 	    "Enter absolute block number of defect", ':',
-	    &ioparam, (int *)NULL, DATA_INPUT);
+	    &ioparam, NULL, DATA_INPUT);
 	/*
 	 * Check to see if there is a mounted file system over the
 	 * specified sector.  If there is, make sure the user is
@@ -1440,7 +1440,7 @@ This block doesn't appear to be bad.  Repair it anyway")) {
  * cylinder/head/sector format.
  */
 int
-c_show()
+c_show(void)
 {
 	u_ioparam_t	ioparam;
 	diskaddr_t	bn;
@@ -1462,7 +1462,7 @@ c_show()
 		ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
 	}
 	bn = input(FIO_BN, "Enter a disk block", ':',
-	    &ioparam, (int *)NULL, DATA_INPUT);
+	    &ioparam, NULL, DATA_INPUT);
 	/*
 	 * Echo it back.
 	 */
@@ -1477,7 +1477,7 @@ c_show()
  * primary and backup labels onto the current disk.
  */
 int
-c_label()
+c_label(void)
 {
 	int			status;
 	int			deflt, *defltptr = NULL;
@@ -1767,7 +1767,7 @@ expert_end:
  * the analyze menu.
  */
 int
-c_analyze()
+c_analyze(void)
 {
 
 	/*
@@ -1793,7 +1793,7 @@ c_analyze()
  * the defect menu.
  */
 int
-c_defect()
+c_defect(void)
 {
 	int	i;
 
@@ -1866,7 +1866,7 @@ c_defect()
  * the current defect list is written out if a backup label is found.
  */
 int
-c_backup()
+c_backup(void)
 {
 	struct	dk_label label;
 	struct	disk_type *dtype;
@@ -2065,7 +2065,7 @@ Unknown disk type in backup label\n");
  * This routine is called by c_verify() for an EFI labeled disk
  */
 static int
-c_verify_efi()
+c_verify_efi(void)
 {
 	struct efi_info efi_info;
 	struct	partition_info	tmp_pinfo;
@@ -2119,7 +2119,7 @@ c_verify_efi()
  * to read the labels on the current disk.
  */
 int
-c_verify()
+c_verify(void)
 {
 	struct	dk_label p_label, b_label, *label;
 	struct	partition_info tmp_pinfo;
@@ -2354,7 +2354,7 @@ Warning: Check the current partitioning and 'label' the disk or use the\n\
  * displays the resulting vendor, product id and revision level.
  */
 int
-c_inquiry()
+c_inquiry(void)
 {
 	char			inqbuf[255];
 	struct scsi_inquiry	*inq;
@@ -2386,7 +2386,7 @@ c_inquiry()
  * primary and backup labels onto the current disk.
  */
 int
-c_volname()
+c_volname(void)
 {
 	int	 status;
 	char	*prompt;

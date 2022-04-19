@@ -354,7 +354,7 @@ open_cur_file(int mode)
  * Use of this is restricted to interactive mode only.
  */
 int
-c_fdisk()
+c_fdisk(void)
 {
 
 	char		buf[MAXPATHLEN];
@@ -364,7 +364,7 @@ c_fdisk()
 	/*
 	 * We must be in interactive mode to use the fdisk command
 	 */
-	if (option_f != (char *)NULL || isatty(0) != 1 || isatty(1) != 1) {
+	if (option_f != NULL || isatty(0) != 1 || isatty(1) != 1) {
 		err_print("Fdisk command is for interactive use only!\n");
 		return (-1);
 	}
@@ -424,7 +424,7 @@ c_fdisk()
  */
 #ifdef DEADCODE
 static void
-update_cur_parts()
+update_cur_parts(void)
 {
 
 	int i;
@@ -959,7 +959,7 @@ auto_solaris_part(struct dk_label *label)
 
 
 int
-good_fdisk()
+good_fdisk(void)
 {
 	char		buf[MAXPATHLEN];
 	struct stat	statbuf;

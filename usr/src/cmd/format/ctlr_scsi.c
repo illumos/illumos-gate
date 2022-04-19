@@ -66,10 +66,6 @@
 
 #define	PROGRESS_INDICATION_BASE	65536
 
-#ifdef	__STDC__
-/*
- *	Local prototypes for ANSI C compilers
- */
 static int	scsi_format(uint64_t, uint64_t, struct defect_list *);
 static int	scsi_raw_format(void);
 static int	scsi_ms_page8(int);
@@ -97,37 +93,6 @@ static int	scsi_ms_page4(int);
 static int	scsi_repair(uint64_t, int);
 static int	scsi_read_defect_data(struct defect_list *, int);
 static int	scsi_ck_format(void);
-
-#else	/* __STDC__ */
-
-static int	scsi_format();
-static int	scsi_raw_format();
-static int	scsi_ms_page8();
-static int	scsi_ms_page38();
-static void	scsi_convert_list_to_new();
-static char	*scsi_find_command_name();
-static int	chg_list_affects_page();
-static void	scsi_printerr();
-static diskaddr_t	scsi_extract_sense_info_descr();
-static void	scsi_print_extended_sense();
-static void	scsi_print_descr_sense();
-
-static int	test_until_ready();
-
-static int	uscsi_reserve_release();
-static int	check_support_for_defects();
-static int	scsi_format_without_defects();
-static int	scsi_ms_page1();
-static int	scsi_ms_page2();
-static int	scsi_ms_page3();
-static int	scsi_ms_page4();
-static int	scsi_repair();
-static int	scsi_read_defect_data();
-static int	scsi_ck_format();
-
-#endif	/* __STDC__ */
-
-
 
 struct	ctlr_ops scsiops = {
 	scsi_rdwr,
@@ -183,7 +148,7 @@ static slist_t mode_select_strings[] = {
 };
 
 static int scsi_format_revolutions = 5;
-static int scsi_format_timeout = 2*60*60;		/* two hours */
+static int scsi_format_timeout = 2 * 60 * 60;		/* two hours */
 
 /*
  * READ DEFECT DATA commands is optional as per SCSI-2 spec.
@@ -197,14 +162,8 @@ static int scsi_format_timeout = 2*60*60;		/* two hours */
  * Read or write the disk.
  */
 int
-scsi_rdwr(dir, fd, blkno, secnt, bufaddr, flags, xfercntp)
-	int	dir;
-	int	fd;
-	diskaddr_t	blkno;
-	int	secnt;
-	caddr_t bufaddr;
-	int	flags;
-	int	*xfercntp;
+scsi_rdwr(int dir, int fd, diskaddr_t blkno, int secnt, caddr_t bufaddr,
+    int flags, int *xfercntp)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
@@ -293,7 +252,7 @@ scsi_rdwr(dir, fd, blkno, secnt, bufaddr, flags, xfercntp)
 	if (xfercntp != NULL && max_sectors < *xfercntp) {
 		if (diag_msg)
 			err_print("reducing xfercnt %d %d\n",
-					*xfercntp, max_sectors);
+			    *xfercntp, max_sectors);
 		*xfercntp = max_sectors;
 	}
 	return (rc);
@@ -305,11 +264,7 @@ scsi_rdwr(dir, fd, blkno, secnt, bufaddr, flags, xfercntp)
  * If we are able to read the first track, we conclude that
  * the disk has been formatted.
  */
-#ifdef i386
 static int
-#else /* i386 */
-static int
-#endif /* i386 */
 scsi_ck_format(void)
 {
 	int	status;
@@ -326,12 +281,8 @@ scsi_ck_format(void)
 /*
  * Format the disk, the whole disk, and nothing but the disk.
  */
-/*ARGSUSED*/
 static int
-scsi_format(start, end, list)
-	uint64_t		start;		/* irrelevant for us */
-	uint64_t		end;
-	struct defect_list	*list;
+scsi_format(uint64_t start __unused, uint64_t end, struct defect_list *list)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
@@ -379,8 +330,8 @@ scsi_format(start, end, list)
 	 * in format.dat.
 	 */
 	if (scsi_ms_page1(flag) || scsi_ms_page2(flag) ||
-		scsi_ms_page4(flag) || scsi_ms_page38(flag) ||
-			scsi_ms_page8(flag) || scsi_ms_page3(flag)) {
+	    scsi_ms_page4(flag) || scsi_ms_page38(flag) ||
+	    scsi_ms_page8(flag) || scsi_ms_page3(flag)) {
 		(void) uscsi_reserve_release(cur_file, SCMD_RELEASE);
 		return (-1);
 	}
@@ -479,7 +430,7 @@ scsi_format(start, end, list)
 	fmt_print("Formatting...\n");
 	(void) fflush(stdout);
 	status = uscsi_cmd(cur_file, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 
 	/* check if format with immed was successfully accepted */
 	if (status == 0) {
@@ -515,7 +466,7 @@ scsi_format(start, end, list)
 		 * formatting failed with fmtdata = 1.
 		 * Check if defects list command is supported, if it
 		 * is not supported then use fmtdata = 0.
-		 * 	From SCSI Spec
+		 *	From SCSI Spec
 		 *	    A FmtData bit of zero indicates, the
 		 *	    source of defect information is not specified.
 		 * else
@@ -614,7 +565,7 @@ scsi_raw_format(void)
  * Caller should add 50% margin to cover defect management overhead.
  */
 int
-scsi_format_time()
+scsi_format_time(void)
 {
 	struct mode_geometry		*page4;
 	struct scsi_ms_header		header;
@@ -697,10 +648,8 @@ scsi_format_time()
  * Check disk error recovery parameters via mode sense.
  * Issue a mode select if we need to change something.
  */
-/*ARGSUSED*/
 static int
-scsi_ms_page1(scsi2_flag)
-	int	scsi2_flag;
+scsi_ms_page1(int scsi2_flag __unused)
 {
 	struct mode_err_recov		*page1;
 	struct mode_err_recov		*fixed;
@@ -726,11 +675,11 @@ scsi_ms_page1(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_ERR_RECOV,
-			MODE_SENSE_PC_DEFAULT, (caddr_t)page1,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_DEFAULT, (caddr_t)page1,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_ERR_RECOV,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page1,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page1,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	/*
@@ -738,12 +687,12 @@ scsi_ms_page1(scsi2_flag)
 	 * If the saved values fail, use the current instead.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_ERR_RECOV,
-			MODE_SENSE_PC_SAVED, (caddr_t)page1,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_SAVED, (caddr_t)page1,
+	    MAX_MODE_SENSE_SIZE, &header);
 	if (status) {
 		status = uscsi_mode_sense(cur_file, DAD_MODE_ERR_RECOV,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page1,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page1,
+		    MAX_MODE_SENSE_SIZE, &header);
 		if (status) {
 			return (0);
 		}
@@ -765,8 +714,8 @@ scsi_ms_page1(scsi2_flag)
 	 * Ask for changeable parameters.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_ERR_RECOV,
-		MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
-		MAX_MODE_SENSE_SIZE, &fixed_hdr);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
+	    MAX_MODE_SENSE_SIZE, &fixed_hdr);
 	if (status || MODESENSE_PAGE_LEN(fixed) < MIN_PAGE1_LEN) {
 		return (0);
 	}
@@ -780,35 +729,34 @@ scsi_ms_page1(scsi2_flag)
 	tmp1 = page1->read_retry_count;
 	tmp2 = page1->write_retry_count;
 	if (cur_dtype->dtype_options & SUP_READ_RETRIES &&
-			fixed->read_retry_count != 0) {
+	    fixed->read_retry_count != 0) {
 		flag |= (page1->read_retry_count !=
-				cur_dtype->dtype_read_retries);
+		    cur_dtype->dtype_read_retries);
 		page1->read_retry_count = cur_dtype->dtype_read_retries;
 	}
 	if (length > 8) {
 		if (cur_dtype->dtype_options & SUP_WRITE_RETRIES &&
-				fixed->write_retry_count != 0) {
+		    fixed->write_retry_count != 0) {
 			flag |= (page1->write_retry_count !=
-					cur_dtype->dtype_write_retries);
+			    cur_dtype->dtype_write_retries);
 			page1->write_retry_count =
-					cur_dtype->dtype_write_retries;
+			    cur_dtype->dtype_write_retries;
 		}
 	}
 	/*
 	 * Report any changes so far...
 	 */
 	if (flag && option_msg) {
-		fmt_print(
-"PAGE 1: read retries= %d (%d)  write retries= %d (%d)\n",
-			page1->read_retry_count, tmp1,
-			page1->write_retry_count, tmp2);
+		fmt_print("PAGE 1: read retries= %d (%d) "
+		    " write retries= %d (%d)\n",
+		    page1->read_retry_count, tmp1,
+		    page1->write_retry_count, tmp2);
 	}
 	/*
 	 * Apply any changes requested via the change list method
 	 */
 	flag |= apply_chg_list(DAD_MODE_ERR_RECOV, length,
-		(uchar_t *)page1, (uchar_t *)fixed,
-			cur_dtype->dtype_chglist);
+	    (uchar_t *)page1, (uchar_t *)fixed, cur_dtype->dtype_chglist);
 	/*
 	 * If no changes required, do not issue a mode select
 	 */
@@ -828,16 +776,16 @@ scsi_ms_page1(scsi2_flag)
 	header.mode_header.length = 0;
 	header.mode_header.device_specific = 0;
 	status = uscsi_mode_select(cur_file, DAD_MODE_ERR_RECOV,
-		sp_flags, (caddr_t)page1, length, &header);
+	    sp_flags, (caddr_t)page1, length, &header);
 	if (status && (sp_flags & MODE_SELECT_SP)) {
 		/* If failed, try not saving mode select params. */
 		sp_flags &= ~MODE_SELECT_SP;
 		status = uscsi_mode_select(cur_file, DAD_MODE_ERR_RECOV,
-			sp_flags, (caddr_t)page1, length, &header);
+		    sp_flags, (caddr_t)page1, length, &header);
 		}
 	if (status && option_msg) {
-		err_print("\
-Warning: Using default error recovery parameters.\n\n");
+		err_print("Warning: Using default error recovery "
+		    "parameters.\n\n");
 	}
 
 	/*
@@ -847,11 +795,11 @@ Warning: Using default error recovery parameters.\n\n");
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_ERR_RECOV,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page1,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page1,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_ERR_RECOV,
-			MODE_SENSE_PC_SAVED, (caddr_t)page1,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_SAVED, (caddr_t)page1,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	return (0);
@@ -861,10 +809,8 @@ Warning: Using default error recovery parameters.\n\n");
  * Check disk disconnect/reconnect parameters via mode sense.
  * Issue a mode select if we need to change something.
  */
-/*ARGSUSED*/
 static int
-scsi_ms_page2(scsi2_flag)
-	int	scsi2_flag;
+scsi_ms_page2(int scsi2_flag __unused)
 {
 	struct mode_disco_reco		*page2;
 	struct mode_disco_reco		*fixed;
@@ -888,11 +834,11 @@ scsi_ms_page2(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, MODEPAGE_DISCO_RECO,
-			MODE_SENSE_PC_DEFAULT, (caddr_t)page2,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_DEFAULT, (caddr_t)page2,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, MODEPAGE_DISCO_RECO,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page2,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page2,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	/*
@@ -900,12 +846,12 @@ scsi_ms_page2(scsi2_flag)
 	 * If the saved values fail, use the current instead.
 	 */
 	status = uscsi_mode_sense(cur_file, MODEPAGE_DISCO_RECO,
-			MODE_SENSE_PC_SAVED, (caddr_t)page2,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_SAVED, (caddr_t)page2,
+	    MAX_MODE_SENSE_SIZE, &header);
 	if (status) {
 		status = uscsi_mode_sense(cur_file, MODEPAGE_DISCO_RECO,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page2,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page2,
+		    MAX_MODE_SENSE_SIZE, &header);
 		if (status) {
 			return (0);
 		}
@@ -927,8 +873,8 @@ scsi_ms_page2(scsi2_flag)
 	 * Ask for changeable parameters.
 	 */
 	status = uscsi_mode_sense(cur_file, MODEPAGE_DISCO_RECO,
-		MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
-		MAX_MODE_SENSE_SIZE, &fixed_hdr);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
+	    MAX_MODE_SENSE_SIZE, &fixed_hdr);
 	if (status || MODESENSE_PAGE_LEN(fixed) < MIN_PAGE2_LEN) {
 		return (0);
 	}
@@ -943,8 +889,7 @@ scsi_ms_page2(scsi2_flag)
 	 * Apply any changes requested via the change list method
 	 */
 	flag |= apply_chg_list(MODEPAGE_DISCO_RECO, length,
-		(uchar_t *)page2, (uchar_t *)fixed,
-			cur_dtype->dtype_chglist);
+	    (uchar_t *)page2, (uchar_t *)fixed, cur_dtype->dtype_chglist);
 	/*
 	 * If no changes required, do not issue a mode select
 	 */
@@ -964,12 +909,12 @@ scsi_ms_page2(scsi2_flag)
 	header.mode_header.length = 0;
 	header.mode_header.device_specific = 0;
 	status = uscsi_mode_select(cur_file, MODEPAGE_DISCO_RECO,
-		MODE_SELECT_SP, (caddr_t)page2, length, &header);
+	    MODE_SELECT_SP, (caddr_t)page2, length, &header);
 	if (status && (sp_flags & MODE_SELECT_SP)) {
 		/* If failed, try not saving mode select params. */
 		sp_flags &= ~MODE_SELECT_SP;
 		status = uscsi_mode_select(cur_file, MODEPAGE_DISCO_RECO,
-			sp_flags, (caddr_t)page2, length, &header);
+		    sp_flags, (caddr_t)page2, length, &header);
 		}
 	if (status && option_msg) {
 		err_print("Warning: Using default .\n\n");
@@ -982,11 +927,11 @@ scsi_ms_page2(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, MODEPAGE_DISCO_RECO,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page2,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page2,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, MODEPAGE_DISCO_RECO,
-			MODE_SENSE_PC_SAVED, (caddr_t)page2,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_SAVED, (caddr_t)page2,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	return (0);
@@ -996,10 +941,8 @@ scsi_ms_page2(scsi2_flag)
  * Check disk format parameters via mode sense.
  * Issue a mode select if we need to change something.
  */
-/*ARGSUSED*/
 static int
-scsi_ms_page3(scsi2_flag)
-	int	scsi2_flag;
+scsi_ms_page3(int scsi2_flag __unused)
 {
 	struct mode_format		*page3;
 	struct mode_format		*fixed;
@@ -1026,11 +969,11 @@ scsi_ms_page3(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_FORMAT,
-			MODE_SENSE_PC_DEFAULT, (caddr_t)page3,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_DEFAULT, (caddr_t)page3,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_FORMAT,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page3,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page3,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	/*
@@ -1038,12 +981,12 @@ scsi_ms_page3(scsi2_flag)
 	 * If the saved values fail, use the current instead.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_FORMAT,
-			MODE_SENSE_PC_SAVED, (caddr_t)page3,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_SAVED, (caddr_t)page3,
+	    MAX_MODE_SENSE_SIZE, &header);
 	if (status) {
 		status = uscsi_mode_sense(cur_file, DAD_MODE_FORMAT,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page3,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page3,
+		    MAX_MODE_SENSE_SIZE, &header);
 		if (status) {
 			return (0);
 		}
@@ -1065,8 +1008,8 @@ scsi_ms_page3(scsi2_flag)
 	 * Ask for changeable parameters.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_FORMAT,
-		MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
-		MAX_MODE_SENSE_SIZE, &fixed_hdr);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
+	    MAX_MODE_SENSE_SIZE, &fixed_hdr);
 	if (status || MODESENSE_PAGE_LEN(fixed) < MIN_PAGE3_LEN) {
 		return (0);
 	}
@@ -1090,32 +1033,29 @@ scsi_ms_page3(scsi2_flag)
 	page3->interleave = 1;
 
 	if (cur_dtype->dtype_options & SUP_CYLSKEW &&
-					fixed->cylinder_skew != 0) {
+	    fixed->cylinder_skew != 0) {
 		flag |= (page3->cylinder_skew != cur_dtype->dtype_cyl_skew);
 		page3->cylinder_skew = cur_dtype->dtype_cyl_skew;
 	}
-	if (cur_dtype->dtype_options & SUP_TRKSKEW &&
-					fixed->track_skew != 0) {
+	if (cur_dtype->dtype_options & SUP_TRKSKEW && fixed->track_skew != 0) {
 		flag |= (page3->track_skew != cur_dtype->dtype_trk_skew);
 		page3->track_skew = cur_dtype->dtype_trk_skew;
 	}
-	if (cur_dtype->dtype_options & SUP_PSECT &&
-					fixed->sect_track != 0) {
+	if (cur_dtype->dtype_options & SUP_PSECT && fixed->sect_track != 0) {
 		flag |= (page3->sect_track != psect);
 		page3->sect_track = (ushort_t)psect;
 	}
 	if (cur_dtype->dtype_options & SUP_TRKS_ZONE &&
-					fixed->tracks_per_zone != 0) {
+	    fixed->tracks_per_zone != 0) {
 		flag |= (page3->tracks_per_zone != cur_dtype->dtype_trks_zone);
 		page3->tracks_per_zone = cur_dtype->dtype_trks_zone;
 	}
-	if (cur_dtype->dtype_options & SUP_ASECT &&
-					fixed->alt_sect_zone != 0) {
+	if (cur_dtype->dtype_options & SUP_ASECT && fixed->alt_sect_zone != 0) {
 		flag |= (page3->alt_sect_zone != cur_dtype->dtype_asect);
 		page3->alt_sect_zone = cur_dtype->dtype_asect;
 	}
 	if (cur_dtype->dtype_options & SUP_ATRKS &&
-					fixed->alt_tracks_vol != 0) {
+	    fixed->alt_tracks_vol != 0) {
 		flag |= (page3->alt_tracks_vol != cur_dtype->dtype_atrks);
 		page3->alt_tracks_vol = cur_dtype->dtype_atrks;
 	}
@@ -1124,20 +1064,19 @@ scsi_ms_page3(scsi2_flag)
 	 */
 	if (flag && option_msg) {
 		fmt_print("PAGE 3: trk skew= %d (%d)   cyl skew= %d (%d)   ",
-			page3->track_skew, tmp1, page3->cylinder_skew, tmp2);
+		    page3->track_skew, tmp1, page3->cylinder_skew, tmp2);
 		fmt_print("sects/trk= %d (%d)\n", page3->sect_track, tmp3);
 		fmt_print("        trks/zone= %d (%d)   alt trks= %d (%d)   ",
-			page3->tracks_per_zone, tmp4,
-			page3->alt_tracks_vol, tmp5);
+		    page3->tracks_per_zone, tmp4,
+		    page3->alt_tracks_vol, tmp5);
 		fmt_print("alt sects/zone= %d (%d)\n",
-				page3->alt_sect_zone, tmp6);
+		    page3->alt_sect_zone, tmp6);
 	}
 	/*
 	 * Apply any changes requested via the change list method
 	 */
 	flag |= apply_chg_list(DAD_MODE_FORMAT, length,
-		(uchar_t *)page3, (uchar_t *)fixed,
-			cur_dtype->dtype_chglist);
+	    (uchar_t *)page3, (uchar_t *)fixed, cur_dtype->dtype_chglist);
 	/*
 	 * If no changes required, do not issue a mode select
 	 */
@@ -1160,12 +1099,12 @@ scsi_ms_page3(scsi2_flag)
 	header.mode_header.length = 0;
 	header.mode_header.device_specific = 0;
 	status = uscsi_mode_select(cur_file, DAD_MODE_FORMAT,
-		MODE_SELECT_SP, (caddr_t)page3, length, &header);
+	    MODE_SELECT_SP, (caddr_t)page3, length, &header);
 	if (status && (sp_flags & MODE_SELECT_SP)) {
 		/* If failed, try not saving mode select params. */
 		sp_flags &= ~MODE_SELECT_SP;
 		status = uscsi_mode_select(cur_file, DAD_MODE_FORMAT,
-			sp_flags, (caddr_t)page3, length, &header);
+		    sp_flags, (caddr_t)page3, length, &header);
 		}
 	if (status && option_msg) {
 		err_print("Warning: Using default drive format parameters.\n");
@@ -1179,11 +1118,11 @@ scsi_ms_page3(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_FORMAT,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page3,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page3,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_FORMAT,
-			MODE_SENSE_PC_SAVED, (caddr_t)page3,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_SAVED, (caddr_t)page3,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	return (0);
@@ -1193,10 +1132,8 @@ scsi_ms_page3(scsi2_flag)
  * Check disk geometry parameters via mode sense.
  * Issue a mode select if we need to change something.
  */
-/*ARGSUSED*/
 static int
-scsi_ms_page4(scsi2_flag)
-	int	scsi2_flag;
+scsi_ms_page4(int scsi2_flag __unused)
 {
 	struct mode_geometry		*page4;
 	struct mode_geometry		*fixed;
@@ -1221,11 +1158,11 @@ scsi_ms_page4(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-			MODE_SENSE_PC_DEFAULT, (caddr_t)page4,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_DEFAULT, (caddr_t)page4,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page4,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page4,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	/*
@@ -1233,12 +1170,12 @@ scsi_ms_page4(scsi2_flag)
 	 * If the saved values fail, use the current instead.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-			MODE_SENSE_PC_SAVED, (caddr_t)page4,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_SAVED, (caddr_t)page4,
+	    MAX_MODE_SENSE_SIZE, &header);
 	if (status) {
 		status = uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page4,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page4,
+		    MAX_MODE_SENSE_SIZE, &header);
 		if (status) {
 			return (0);
 		}
@@ -1260,8 +1197,8 @@ scsi_ms_page4(scsi2_flag)
 	 * Ask for changeable parameters.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-		MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
-		MAX_MODE_SENSE_SIZE, &fixed_hdr);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
+	    MAX_MODE_SENSE_SIZE, &fixed_hdr);
 	if (status || MODESENSE_PAGE_LEN(fixed) < MIN_PAGE4_LEN) {
 		return (0);
 	}
@@ -1284,14 +1221,13 @@ scsi_ms_page4(scsi2_flag)
 	 */
 	if (flag && option_msg) {
 		fmt_print("PAGE 4:   cylinders= %d    heads= %d (%d)\n",
-			tmp1, page4->heads, tmp2);
+		    tmp1, page4->heads, tmp2);
 	}
 	/*
 	 * Apply any changes requested via the change list method
 	 */
 	flag |= apply_chg_list(DAD_MODE_GEOMETRY, length,
-		(uchar_t *)page4, (uchar_t *)fixed,
-			cur_dtype->dtype_chglist);
+	    (uchar_t *)page4, (uchar_t *)fixed, cur_dtype->dtype_chglist);
 	/*
 	 * If no changes required, do not issue a mode select
 	 */
@@ -1314,12 +1250,12 @@ scsi_ms_page4(scsi2_flag)
 	header.mode_header.length = 0;
 	header.mode_header.device_specific = 0;
 	status = uscsi_mode_select(cur_file, DAD_MODE_GEOMETRY,
-		MODE_SELECT_SP, (caddr_t)page4, length, &header);
+	    MODE_SELECT_SP, (caddr_t)page4, length, &header);
 	if (status && (sp_flags & MODE_SELECT_SP)) {
 		/* If failed, try not saving mode select params. */
 		sp_flags &= ~MODE_SELECT_SP;
 		status = uscsi_mode_select(cur_file, DAD_MODE_GEOMETRY,
-			sp_flags, (caddr_t)page4, length, &header);
+		    sp_flags, (caddr_t)page4, length, &header);
 		}
 	if (status && option_msg) {
 		err_print("Warning: Using default drive geometry.\n\n");
@@ -1332,11 +1268,11 @@ scsi_ms_page4(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page4,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page4,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-			MODE_SENSE_PC_SAVED, (caddr_t)page4,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_SAVED, (caddr_t)page4,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	return (0);
@@ -1346,10 +1282,8 @@ scsi_ms_page4(scsi2_flag)
  * Check SCSI-2 disk cache parameters via mode sense.
  * Issue a mode select if we need to change something.
  */
-/*ARGSUSED*/
 static int
-scsi_ms_page8(scsi2_flag)
-	int	scsi2_flag;
+scsi_ms_page8(int scsi2_flag __unused)
 {
 	struct mode_cache		*page8;
 	struct mode_cache		*fixed;
@@ -1380,11 +1314,11 @@ scsi_ms_page8(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_DEFAULT, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_DEFAULT, (caddr_t)page8,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page8,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	/*
@@ -1392,12 +1326,12 @@ scsi_ms_page8(scsi2_flag)
 	 * If the saved values fail, use the current instead.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_SAVED, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_SAVED, (caddr_t)page8,
+	    MAX_MODE_SENSE_SIZE, &header);
 	if (status) {
 		status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page8,
+		    MAX_MODE_SENSE_SIZE, &header);
 		if (status) {
 			return (0);
 		}
@@ -1419,8 +1353,8 @@ scsi_ms_page8(scsi2_flag)
 	 * Ask for changeable parameters.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-		MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
-		MAX_MODE_SENSE_SIZE, &fixed_hdr);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
+	    MAX_MODE_SENSE_SIZE, &fixed_hdr);
 	if (status || MODESENSE_PAGE_LEN(fixed) < MIN_PAGE8_LEN) {
 		return (0);
 	}
@@ -1435,8 +1369,7 @@ scsi_ms_page8(scsi2_flag)
 	 * Apply any changes requested via the change list method
 	 */
 	flag |= apply_chg_list(DAD_MODE_CACHE, length,
-		(uchar_t *)page8, (uchar_t *)fixed,
-			cur_dtype->dtype_chglist);
+	    (uchar_t *)page8, (uchar_t *)fixed, cur_dtype->dtype_chglist);
 	/*
 	 * If no changes required, do not issue a mode select
 	 */
@@ -1459,16 +1392,16 @@ scsi_ms_page8(scsi2_flag)
 	header.mode_header.length = 0;
 	header.mode_header.device_specific = 0;
 	status = uscsi_mode_select(cur_file, DAD_MODE_CACHE,
-		sp_flags, (caddr_t)page8, length, &header);
+	    sp_flags, (caddr_t)page8, length, &header);
 	if (status && (sp_flags & MODE_SELECT_SP)) {
 		/* If failed, try not saving mode select params. */
 		sp_flags &= ~MODE_SELECT_SP;
 		status = uscsi_mode_select(cur_file, DAD_MODE_CACHE,
-			sp_flags, (caddr_t)page8, length, &header);
-		}
+		    sp_flags, (caddr_t)page8, length, &header);
+	}
 	if (status && option_msg) {
-		err_print("\
-Warning: Using default SCSI-2 cache parameters.\n\n");
+		err_print(
+		    "Warning: Using default SCSI-2 cache parameters.\n\n");
 	}
 
 	/*
@@ -1478,11 +1411,11 @@ Warning: Using default SCSI-2 cache parameters.\n\n");
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page8,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_SAVED, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_SAVED, (caddr_t)page8,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	return (0);
@@ -1492,10 +1425,8 @@ Warning: Using default SCSI-2 cache parameters.\n\n");
  * Check CCS disk cache parameters via mode sense.
  * Issue a mode select if we need to change something.
  */
-/*ARGSUSED*/
 static int
-scsi_ms_page38(scsi2_flag)
-	int	scsi2_flag;
+scsi_ms_page38(int scsi2_flag __unused)
 {
 	struct mode_cache_ccs		*page38;
 	struct mode_cache_ccs		*fixed;
@@ -1516,9 +1447,8 @@ scsi_ms_page38(scsi2_flag)
 	 * Not all devices support it.
 	 */
 	if (((cur_dtype->dtype_options & (SUP_CACHE | SUP_PREFETCH |
-		SUP_CACHE_MIN | SUP_CACHE_MAX)) == 0) &&
-			(!chg_list_affects_page(cur_dtype->dtype_chglist,
-				0x38))) {
+	    SUP_CACHE_MIN | SUP_CACHE_MAX)) == 0) &&
+	    (!chg_list_affects_page(cur_dtype->dtype_chglist, 0x38))) {
 		return (0);
 	}
 
@@ -1531,11 +1461,11 @@ scsi_ms_page38(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_CACHE_CCS,
-			MODE_SENSE_PC_DEFAULT, (caddr_t)page38,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_DEFAULT, (caddr_t)page38,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_CACHE_CCS,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page38,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page38,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	/*
@@ -1543,12 +1473,12 @@ scsi_ms_page38(scsi2_flag)
 	 * If the saved values fail, use the current instead.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE_CCS,
-			MODE_SENSE_PC_SAVED, (caddr_t)page38,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_SAVED, (caddr_t)page38,
+	    MAX_MODE_SENSE_SIZE, &header);
 	if (status) {
 		status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE_CCS,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page38,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page38,
+		    MAX_MODE_SENSE_SIZE, &header);
 		if (status) {
 			return (0);
 		}
@@ -1570,8 +1500,8 @@ scsi_ms_page38(scsi2_flag)
 	 * Ask for changeable parameters.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE_CCS,
-		MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
-		MAX_MODE_SENSE_SIZE, &fixed_hdr);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)fixed,
+	    MAX_MODE_SENSE_SIZE, &fixed_hdr);
 	if (status || MODESENSE_PAGE_LEN(fixed) < MIN_PAGE38_LEN) {
 		return (0);
 	}
@@ -1588,26 +1518,26 @@ scsi_ms_page38(scsi2_flag)
 
 	flag = 0;
 	if ((cur_dtype->dtype_options & SUP_CACHE) &&
-			(fixed->mode & cur_dtype->dtype_cache) ==
-				cur_dtype->dtype_cache) {
+	    (fixed->mode & cur_dtype->dtype_cache) ==
+	    cur_dtype->dtype_cache) {
 		flag |= (page38->mode != cur_dtype->dtype_cache);
 		page38->mode = cur_dtype->dtype_cache;
 	}
 	if ((cur_dtype->dtype_options & SUP_PREFETCH) &&
-		(fixed->threshold & cur_dtype->dtype_threshold) ==
-				cur_dtype->dtype_threshold) {
+	    (fixed->threshold & cur_dtype->dtype_threshold) ==
+	    cur_dtype->dtype_threshold) {
 		flag |= (page38->threshold != cur_dtype->dtype_threshold);
 		page38->threshold = cur_dtype->dtype_threshold;
 	}
 	if ((cur_dtype->dtype_options & SUP_CACHE_MIN) &&
-		(fixed->min_prefetch & cur_dtype->dtype_prefetch_min) ==
-				cur_dtype->dtype_prefetch_min) {
+	    (fixed->min_prefetch & cur_dtype->dtype_prefetch_min) ==
+	    cur_dtype->dtype_prefetch_min) {
 		flag |= (page38->min_prefetch != cur_dtype->dtype_prefetch_min);
 		page38->min_prefetch = cur_dtype->dtype_prefetch_min;
 	}
 	if ((cur_dtype->dtype_options & SUP_CACHE_MAX) &&
-		(fixed->max_prefetch & cur_dtype->dtype_prefetch_max) ==
-				cur_dtype->dtype_prefetch_max) {
+	    (fixed->max_prefetch & cur_dtype->dtype_prefetch_max) ==
+	    cur_dtype->dtype_prefetch_max) {
 		flag |= (page38->max_prefetch != cur_dtype->dtype_prefetch_max);
 		page38->max_prefetch = cur_dtype->dtype_prefetch_max;
 	}
@@ -1616,24 +1546,24 @@ scsi_ms_page38(scsi2_flag)
 	 */
 	if (flag && option_msg) {
 		fmt_print("PAGE 38: cache mode= 0x%x (0x%x)\n",
-					page38->mode, tmp1);
+		    page38->mode, tmp1);
 		fmt_print("         min. prefetch multiplier= %d   ",
-					page38->min_multiplier);
+		    page38->min_multiplier);
 		fmt_print("max. prefetch multiplier= %d\n",
-					page38->max_multiplier);
+		    page38->max_multiplier);
 		fmt_print("         threshold= %d (%d)   ",
-					page38->threshold, tmp2);
+		    page38->threshold, tmp2);
 		fmt_print("min. prefetch= %d (%d)   ",
-					page38->min_prefetch, tmp3);
+		    page38->min_prefetch, tmp3);
 		fmt_print("max. prefetch= %d (%d)\n",
-					page38->max_prefetch, tmp4);
+		    page38->max_prefetch, tmp4);
 	}
 	/*
 	 * Apply any changes requested via the change list method
 	 */
 	flag |= apply_chg_list(DAD_MODE_CACHE_CCS, length,
-		(uchar_t *)page38, (uchar_t *)fixed,
-			cur_dtype->dtype_chglist);
+	    (uchar_t *)page38, (uchar_t *)fixed,
+	    cur_dtype->dtype_chglist);
 	/*
 	 * If no changes required, do not issue a mode select
 	 */
@@ -1655,13 +1585,13 @@ scsi_ms_page38(scsi2_flag)
 	header.mode_header.length = 0;
 	header.mode_header.device_specific = 0;
 	status = uscsi_mode_select(cur_file, DAD_MODE_CACHE_CCS,
-		sp_flags, (caddr_t)page38, length, &header);
+	    sp_flags, (caddr_t)page38, length, &header);
 	if (status && (sp_flags & MODE_SELECT_SP)) {
 		/* If failed, try not saving mode select params. */
 		sp_flags &= ~MODE_SELECT_SP;
 		status = uscsi_mode_select(cur_file, DAD_MODE_CACHE_CCS,
-			sp_flags, (caddr_t)page38, length, &header);
-		}
+		    sp_flags, (caddr_t)page38, length, &header);
+	}
 	if (status && option_msg) {
 		err_print("Warning: Using default CCS cache parameters.\n\n");
 	}
@@ -1673,11 +1603,11 @@ scsi_ms_page38(scsi2_flag)
 	 */
 	if (option_msg && diag_msg) {
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_CACHE_CCS,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page38,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page38,
+		    MAX_MODE_SENSE_SIZE, &header);
 		(void) uscsi_mode_sense(cur_file, DAD_MODE_CACHE_CCS,
-			MODE_SENSE_PC_SAVED, (caddr_t)page38,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_SAVED, (caddr_t)page38,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 
 	return (0);
@@ -1688,8 +1618,7 @@ scsi_ms_page38(scsi2_flag)
  * Extract the manufacturer's defect list.
  */
 int
-scsi_ex_man(list)
-	struct  defect_list	*list;
+scsi_ex_man(struct defect_list *list)
 {
 	int	i;
 
@@ -1706,8 +1635,7 @@ scsi_ex_man(list)
  * and the grown (G) lists.
  */
 int
-scsi_ex_cur(list)
-	struct  defect_list *list;
+scsi_ex_cur(struct defect_list *list)
 {
 	int	i;
 
@@ -1723,8 +1651,7 @@ scsi_ex_cur(list)
  * Extract the grown list only
  */
 int
-scsi_ex_grown(list)
-	struct defect_list *list;
+scsi_ex_grown(struct defect_list *list)
 {
 	int	i;
 
@@ -1737,9 +1664,7 @@ scsi_ex_grown(list)
 
 
 static int
-scsi_read_defect_data(list, pglist_flags)
-	struct  defect_list	*list;
-	int			pglist_flags;
+scsi_read_defect_data(struct defect_list *list, int pglist_flags)
 {
 	struct uscsi_cmd	ucmd;
 	char			rqbuf[255];
@@ -1778,22 +1703,21 @@ scsi_read_defect_data(list, pglist_flags)
 	rq = (struct scsi_extended_sense *)ucmd.uscsi_rqbuf;
 
 	status = uscsi_cmd(cur_file, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 
 	if (status != 0) {
 		/*
 		 * check if read_defect_list_is_supported.
 		 */
 		if (ucmd.uscsi_rqstatus == STATUS_GOOD &&
-			rq->es_key == KEY_ILLEGAL_REQUEST &&
-					rq->es_add_code == INVALID_OPCODE) {
+		    rq->es_key == KEY_ILLEGAL_REQUEST &&
+		    rq->es_add_code == INVALID_OPCODE) {
 			err_print("\nWARNING: Current Disk does not support"
-				" defect lists. \n");
-		} else
-		if (option_msg) {
+			    " defect lists.\n");
+		} else if (option_msg) {
 			err_print("No %s defect list.\n",
-				pglist_flags & DLD_GROWN_DEF_LIST ?
-				"grown" : "manufacturer's");
+			    pglist_flags & DLD_GROWN_DEF_LIST ?
+			    "grown" : "manufacturer's");
 		}
 		return (-1);
 	}
@@ -1818,7 +1742,7 @@ scsi_read_defect_data(list, pglist_flags)
 	ucmd.uscsi_bufaddr = (caddr_t)defects;
 	ucmd.uscsi_buflen = nbytes;
 	status = uscsi_cmd(cur_file, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 
 	if (status) {
 		err_print("can't read defect list 2nd time");
@@ -1834,7 +1758,7 @@ scsi_read_defect_data(list, pglist_flags)
 		return (-1);
 	}
 	scsi_convert_list_to_new(list, (struct scsi_defect_list *)defects,
-			DLD_BFI_FORMAT);
+	    DLD_BFI_FORMAT);
 	destroy_data((char *)defects);
 	return (0);
 }
@@ -1843,11 +1767,8 @@ scsi_read_defect_data(list, pglist_flags)
 /*
  * Map a block.
  */
-/*ARGSUSED*/
 static int
-scsi_repair(bn, flag)
-	uint64_t	bn;
-	int		flag;
+scsi_repair(uint64_t bn, int flag __unused)
 {
 	struct uscsi_cmd		ucmd;
 	union scsi_cdb			cdb;
@@ -1859,7 +1780,7 @@ scsi_repair(bn, flag)
 	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
 	(void) memset((char *)&cdb, 0, sizeof (union scsi_cdb));
 	(void) memset((char *)&defect_list, 0,
-		sizeof (struct scsi_reassign_blk));
+	    sizeof (struct scsi_reassign_blk));
 	cdb.scc_cmd = SCMD_REASSIGN_BLOCK;
 	ucmd.uscsi_cdb = (caddr_t)&cdb;
 	ucmd.uscsi_cdblen = CDB_GROUP0;
@@ -1870,7 +1791,7 @@ scsi_repair(bn, flag)
 	defect_list.defect = bn;
 	defect_list.defect = BE_32(defect_list.defect);
 	return (uscsi_cmd(cur_file, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT));
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT));
 }
 
 /*
@@ -1878,15 +1799,13 @@ scsi_repair(bn, flag)
  * We can handle different format lists.
  */
 static void
-scsi_convert_list_to_new(list, def_list, list_format)
-	struct defect_list		*list;
-	struct scsi_defect_list		*def_list;
-	int				 list_format;
+scsi_convert_list_to_new(struct defect_list *list,
+    struct scsi_defect_list *def_list, int list_format)
 {
-	register struct scsi_bfi_defect	*old_defect, *old_defect1;
-	register struct defect_entry	*new_defect;
-	register int			len, new_len, obfi, nbfi;
-	register int			i;
+	struct scsi_bfi_defect	*old_defect, *old_defect1;
+	struct defect_entry	*new_defect;
+	int			len, new_len, obfi, nbfi;
+	int			i;
 	int				old_cyl, new_cyl;
 	unsigned char			*cp;
 
@@ -1940,9 +1859,9 @@ scsi_convert_list_to_new(list, def_list, list_format)
 			 * and update the length of the defect
 			 */
 			while ((i < len) &&
-				(old_cyl  == new_cyl) &&
-				(old_defect->head == old_defect1->head) &&
-				(nbfi == (obfi + BITSPERBYTE))) {
+			    (old_cyl  == new_cyl) &&
+			    (old_defect->head == old_defect1->head) &&
+			    (nbfi == (obfi + BITSPERBYTE))) {
 				old_defect1 = old_defect++;
 				cp = (unsigned char *)old_defect;
 				new_cyl = (cp[0] << 16 | cp[1] << 8) | cp[2];
@@ -1981,10 +1900,7 @@ scsi_convert_list_to_new(list, def_list, list_format)
  *
  */
 int
-uscsi_cmd(fd, ucmd, flags)
-	int			fd;
-	struct uscsi_cmd	*ucmd;
-	int			flags;
+uscsi_cmd(int fd, struct uscsi_cmd *ucmd, int flags)
 {
 	struct scsi_extended_sense	*rq;
 	char				rqbuf[255];
@@ -2055,7 +1971,7 @@ uscsi_cmd(fd, ucmd, flags)
 		}
 		if (option_msg && diag_msg) {
 			err_print("format_timeout set to %d seconds, %d"
-				" required\n", ucmd->uscsi_timeout, timeout);
+			    " required\n", ucmd->uscsi_timeout, timeout);
 		}
 		break;
 
@@ -2118,26 +2034,26 @@ uscsi_cmd(fd, ucmd, flags)
 	if (ucmd->uscsi_rqstatus == IMPOSSIBLE_SCSI_STATUS) {
 		if (option_msg && diag_msg) {
 			err_print("No request sense for command %s\n",
-				scsi_find_command_name(ucmd->uscsi_cdb[0]));
+			    scsi_find_command_name(ucmd->uscsi_cdb[0]));
 		}
 		return (-1);
 	}
 	if (ucmd->uscsi_rqstatus != STATUS_GOOD) {
 		if (option_msg && diag_msg) {
 			err_print("Request sense status for command %s: 0x%x\n",
-				scsi_find_command_name(ucmd->uscsi_cdb[0]),
-				ucmd->uscsi_rqstatus);
+			    scsi_find_command_name(ucmd->uscsi_cdb[0]),
+			    ucmd->uscsi_rqstatus);
 		}
 		return (-1);
 	}
 	rq = (struct scsi_extended_sense *)ucmd->uscsi_rqbuf;
 	rqlen = ucmd->uscsi_rqlen - ucmd->uscsi_rqresid;
 	if ((((int)rq->es_add_len) + 8) < MIN_REQUEST_SENSE_LEN ||
-			rq->es_class != CLASS_EXTENDED_SENSE ||
-				rqlen < MIN_REQUEST_SENSE_LEN) {
+	    rq->es_class != CLASS_EXTENDED_SENSE ||
+	    rqlen < MIN_REQUEST_SENSE_LEN) {
 		if (option_msg) {
 			err_print("Request sense for command %s failed\n",
-				scsi_find_command_name(ucmd->uscsi_cdb[0]));
+			    scsi_find_command_name(ucmd->uscsi_cdb[0]));
 		}
 		if (option_msg && diag_msg) {
 			err_print("Sense data:\n");
@@ -2160,9 +2076,9 @@ uscsi_cmd(fd, ucmd, flags)
 	 */
 	if (ucmd->uscsi_cdb[0] == SCMD_MODE_SELECT) {
 		if (rq->es_key == KEY_RECOVERABLE_ERROR &&
-			rq->es_add_code == ROUNDED_PARAMETER &&
-			rq->es_qual_code == 0) {
-				return (0);
+		    rq->es_add_code == ROUNDED_PARAMETER &&
+		    rq->es_qual_code == 0) {
+			return (0);
 		}
 	}
 
@@ -2204,13 +2120,8 @@ uscsi_cmd(fd, ucmd, flags)
  * will be returned to it upon subsequent mode selects.
  */
 int
-uscsi_mode_sense(fd, page_code, page_control, page_data, page_size, header)
-	int	fd;			/* file descriptor */
-	int	page_code;		/* requested page number */
-	int	page_control;		/* current, changeable, etc. */
-	caddr_t	page_data;		/* place received data here */
-	int	page_size;		/* size of page_data */
-	struct	scsi_ms_header *header;	/* mode header/block descriptor */
+uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
+    int page_size, struct scsi_ms_header *header)
 {
 	caddr_t			mode_sense_buf;
 	struct mode_header	*hdr;
@@ -2223,15 +2134,15 @@ uscsi_mode_sense(fd, page_code, page_control, page_data, page_size, header)
 
 	assert(page_size >= 0 && page_size < 256);
 	assert(page_control == MODE_SENSE_PC_CURRENT ||
-		page_control == MODE_SENSE_PC_CHANGEABLE ||
-			page_control == MODE_SENSE_PC_DEFAULT ||
-				page_control == MODE_SENSE_PC_SAVED);
+	    page_control == MODE_SENSE_PC_CHANGEABLE ||
+	    page_control == MODE_SENSE_PC_DEFAULT ||
+	    page_control == MODE_SENSE_PC_SAVED);
 	/*
 	 * Allocate a buffer for the mode sense headers
 	 * and mode sense data itself.
 	 */
 	nbytes = sizeof (struct block_descriptor) +
-				sizeof (struct mode_header) + page_size;
+	    sizeof (struct mode_header) + page_size;
 	nbytes = page_size;
 	if ((mode_sense_buf = malloc((uint_t)nbytes)) == NULL) {
 		err_print("cannot malloc %d bytes\n", nbytes);
@@ -2252,11 +2163,11 @@ uscsi_mode_sense(fd, page_code, page_control, page_data, page_size, header)
 	ucmd.uscsi_bufaddr = mode_sense_buf;
 	ucmd.uscsi_buflen = nbytes;
 	status = uscsi_cmd(fd, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 	if (status) {
 		if (option_msg) {
 			err_print("Mode sense page 0x%x failed\n",
-				page_code);
+			    page_code);
 		}
 		free(mode_sense_buf);
 		return (-1);
@@ -2272,30 +2183,29 @@ uscsi_mode_sense(fd, page_code, page_control, page_data, page_size, header)
 	hdr = (struct mode_header *)mode_sense_buf;
 	(void) memset((caddr_t)header, 0, sizeof (struct scsi_ms_header));
 	if (hdr->bdesc_length != sizeof (struct block_descriptor) &&
-				hdr->bdesc_length != 0) {
+	    hdr->bdesc_length != 0) {
 		if (option_msg) {
-			err_print("\
-\nMode sense page 0x%x: block descriptor length %d incorrect\n",
-				page_code, hdr->bdesc_length);
+			err_print("\nMode sense page 0x%x: block "
+			    "descriptor length %d incorrect\n",
+			    page_code, hdr->bdesc_length);
 			if (diag_msg)
 				dump("Mode sense: ", mode_sense_buf,
-					nbytes, HEX_ONLY);
+				    nbytes, HEX_ONLY);
 		}
 		free(mode_sense_buf);
 		return (-1);
 	}
 	(void) memcpy((caddr_t)header, mode_sense_buf,
-		(int) (sizeof (struct mode_header) + hdr->bdesc_length));
+	    sizeof (struct mode_header) + hdr->bdesc_length);
 	pg = (struct mode_page *)((ulong_t)mode_sense_buf +
-		sizeof (struct mode_header) + hdr->bdesc_length);
+	    sizeof (struct mode_header) + hdr->bdesc_length);
 	if (pg->code != page_code) {
 		if (option_msg) {
-			err_print("\
-\nMode sense page 0x%x: incorrect page code 0x%x\n",
-				page_code, pg->code);
+			err_print("\nMode sense page 0x%x: incorrect page "
+			    "code 0x%x\n", page_code, pg->code);
 			if (diag_msg)
 				dump("Mode sense: ", mode_sense_buf,
-					nbytes, HEX_ONLY);
+				    nbytes, HEX_ONLY);
 		}
 		free(mode_sense_buf);
 		return (-1);
@@ -2309,12 +2219,12 @@ uscsi_mode_sense(fd, page_code, page_control, page_data, page_size, header)
 	maximum = page_size - sizeof (struct mode_page) - hdr->bdesc_length;
 	if (((int)pg->length) > maximum) {
 		if (option_msg) {
-			err_print("\
-Mode sense page 0x%x: incorrect page length %d - expected max %d\n",
-				page_code, pg->length, maximum);
+			err_print("Mode sense page 0x%x: incorrect page "
+			    "length %d - expected max %d\n",
+			    page_code, pg->length, maximum);
 			if (diag_msg)
 				dump("Mode sense: ", mode_sense_buf,
-					nbytes, HEX_ONLY);
+				    nbytes, HEX_ONLY);
 		}
 		free(mode_sense_buf);
 		return (-1);
@@ -2324,12 +2234,13 @@ Mode sense page 0x%x: incorrect page length %d - expected max %d\n",
 
 	if (option_msg && diag_msg) {
 		char *pc = find_string(page_control_strings, page_control);
+
 		err_print("\nMode sense page 0x%x (%s):\n", page_code,
-			pc != NULL ? pc : "");
+		    pc != NULL ? pc : "");
 		dump("header: ", (caddr_t)header,
-			sizeof (struct scsi_ms_header), HEX_ONLY);
+		    sizeof (struct scsi_ms_header), HEX_ONLY);
 		dump("data:   ", page_data,
-			MODESENSE_PAGE_LEN(pg), HEX_ONLY);
+		    MODESENSE_PAGE_LEN(pg), HEX_ONLY);
 	}
 
 	free(mode_sense_buf);
@@ -2341,13 +2252,8 @@ Mode sense page 0x%x: incorrect page length %d - expected max %d\n",
  * Execute a uscsi mode select command.
  */
 int
-uscsi_mode_select(fd, page_code, options, page_data, page_size, header)
-	int	fd;			/* file descriptor */
-	int	page_code;		/* mode select page */
-	int	options;		/* save page/page format */
-	caddr_t	page_data;		/* place received data here */
-	int	page_size;		/* size of page_data */
-	struct	scsi_ms_header *header;	/* mode header/block descriptor */
+uscsi_mode_select(int fd, int page_code, int options, caddr_t page_data,
+    int page_size, struct scsi_ms_header *header)
 {
 	caddr_t				mode_select_buf;
 	int				nbytes;
@@ -2364,7 +2270,7 @@ uscsi_mode_select(fd, page_code, options, page_data, page_size, header)
 	 * Allocate a buffer for the mode select header and data
 	 */
 	nbytes = sizeof (struct block_descriptor) +
-				sizeof (struct mode_header) + page_size;
+	    sizeof (struct mode_header) + page_size;
 	if ((mode_select_buf = malloc((uint_t)nbytes)) == NULL) {
 		err_print("cannot malloc %d bytes\n", nbytes);
 		return (-1);
@@ -2378,7 +2284,7 @@ uscsi_mode_select(fd, page_code, options, page_data, page_size, header)
 	(void) memset(mode_select_buf, 0, nbytes);
 	nbytes = sizeof (struct mode_header);
 	if (header->mode_header.bdesc_length ==
-				sizeof (struct block_descriptor)) {
+	    sizeof (struct block_descriptor)) {
 		nbytes += sizeof (struct block_descriptor);
 	}
 
@@ -2387,14 +2293,15 @@ uscsi_mode_select(fd, page_code, options, page_data, page_size, header)
 	 */
 	if (option_msg && diag_msg) {
 		char *s;
+
 		s = find_string(mode_select_strings,
-			options & (MODE_SELECT_SP|MODE_SELECT_PF));
+		    options & (MODE_SELECT_SP|MODE_SELECT_PF));
 		err_print("\nMode select page 0x%x%s:\n", page_code,
-			s != NULL ? s : "");
+		    s != NULL ? s : "");
 		dump("header: ", (caddr_t)header,
-			nbytes, HEX_ONLY);
+		    nbytes, HEX_ONLY);
 		dump("data:   ", (caddr_t)page_data,
-			page_size, HEX_ONLY);
+		    page_size, HEX_ONLY);
 	}
 
 	/*
@@ -2488,7 +2395,7 @@ uscsi_mode_select(fd, page_code, options, page_data, page_size, header)
 	ucmd.uscsi_bufaddr = mode_select_buf;
 	ucmd.uscsi_buflen = nbytes;
 	status = uscsi_cmd(fd, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 
 	if (status && option_msg) {
 		err_print("Mode select page 0x%x failed\n", page_code);
@@ -2504,10 +2411,7 @@ uscsi_mode_select(fd, page_code, options, page_data, page_size, header)
  * resulting data.
  */
 int
-uscsi_inquiry(fd, inqbuf, inqbufsiz)
-	int		fd;
-	caddr_t		inqbuf;
-	int		inqbufsiz;
+uscsi_inquiry(int fd, caddr_t inqbuf, int inqbufsiz)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
@@ -2515,8 +2419,7 @@ uscsi_inquiry(fd, inqbuf, inqbufsiz)
 	int			n;
 	int			status;
 
-	assert(inqbufsiz >= sizeof (struct scsi_inquiry) &&
-		inqbufsiz < 256);
+	assert(inqbufsiz >= sizeof (struct scsi_inquiry) && inqbufsiz < 256);
 
 	/*
 	 * Build and execute the uscsi ioctl
@@ -2531,7 +2434,7 @@ uscsi_inquiry(fd, inqbuf, inqbufsiz)
 	ucmd.uscsi_bufaddr = (caddr_t)inqbuf;
 	ucmd.uscsi_buflen = inqbufsiz;
 	status = uscsi_cmd(fd, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 	if (status) {
 		if (option_msg) {
 			err_print("Inquiry failed\n");
@@ -2553,10 +2456,7 @@ uscsi_inquiry(fd, inqbuf, inqbufsiz)
  * Execute a uscsi inquiry command with page code 86h
  */
 int
-uscsi_inquiry_page_86h(fd, inqbuf, inqbufsiz)
-	int	fd;
-	caddr_t	inqbuf;
-	int	inqbufsiz;
+uscsi_inquiry_page_86h(int fd, caddr_t inqbuf, int inqbufsiz)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb	cdb;
@@ -2595,9 +2495,7 @@ uscsi_inquiry_page_86h(fd, inqbuf, inqbufsiz)
  * Return the Read Capacity information
  */
 int
-uscsi_read_capacity_16(fd, capacity)
-	int	fd;
-	struct scsi_capacity_16 *capacity;
+uscsi_read_capacity_16(int fd, struct scsi_capacity_16 *capacity)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb	cdb;
@@ -2654,9 +2552,7 @@ uscsi_read_capacity_16(fd, capacity)
 }
 
 int
-uscsi_read_capacity(fd, capacity)
-	int			fd;
-	struct scsi_capacity_16	*capacity;
+uscsi_read_capacity(int fd, struct scsi_capacity_16 *capacity)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
@@ -2676,7 +2572,7 @@ uscsi_read_capacity(fd, capacity)
 	ucmd.uscsi_bufaddr = (caddr_t)&cap_old;
 	ucmd.uscsi_buflen = sizeof (struct scsi_capacity);
 	status = uscsi_cmd(fd, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 
 	if (cap_old.capacity == UINT_MAX32) {
 		/*
@@ -2687,8 +2583,7 @@ uscsi_read_capacity(fd, capacity)
 		 * to get the correct size.
 		 */
 		(void) memset((char *)&ucmd, 0, sizeof (ucmd));
-		(void) memset((char *)&cdb, 0,
-			sizeof (union scsi_cdb));
+		(void) memset((char *)&cdb, 0, sizeof (union scsi_cdb));
 
 		ucmd.uscsi_cdb = (caddr_t)&cdb;
 		ucmd.uscsi_cdblen = CDB_GROUP4;
@@ -2716,7 +2611,7 @@ uscsi_read_capacity(fd, capacity)
 		    (uchar_t)(ucmd.uscsi_buflen & 0x000000ff);
 
 		status = uscsi_cmd(fd, &ucmd,
-			(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+		    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 	}
 
 	if (status) {
@@ -2736,10 +2631,10 @@ uscsi_read_capacity(fd, capacity)
 		 */
 		if (cap_old.capacity == UINT_MAX32) {
 			dump("Capacity: ", (caddr_t)capacity,
-				sizeof (struct scsi_capacity_16), HEX_ONLY);
+			    sizeof (struct scsi_capacity_16), HEX_ONLY);
 		} else {
 			dump("Capacity: ", (caddr_t)&cap_old,
-				sizeof (struct scsi_capacity), HEX_ONLY);
+			    sizeof (struct scsi_capacity), HEX_ONLY);
 		}
 	}
 
@@ -2759,7 +2654,7 @@ uscsi_read_capacity(fd, capacity)
  * Reserve the current disk
  */
 static int
-uscsi_reserve_release(int fd, int cmd)
+uscsi_reserve_release(int fd __maybe_unused, int cmd __maybe_unused)
 {
 	int			status = 0;
 #ifdef sparc
@@ -2798,21 +2693,13 @@ uscsi_reserve_release(int fd, int cmd)
 			}
 		}
 	}
-#else /* not sparc */
-
-#ifdef lint
-	fd = fd;
-	cmd = cmd;
-#endif /* lint */
-
-#endif /* not sparc */
+#endif /* sparc */
 
 	return (status);
 }
 
 int
-scsi_dump_mode_sense_pages(page_control)
-	int			page_control;
+scsi_dump_mode_sense_pages(int page_control)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
@@ -2849,20 +2736,20 @@ scsi_dump_mode_sense_pages(page_control)
 	ucmd.uscsi_bufaddr = msbuf;
 	ucmd.uscsi_buflen = nbytes;
 	status = uscsi_cmd(cur_file, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 	if (status) {
 		err_print("\nMode sense page 0x3f (%s) failed\n",
-			pc_str);
+		    pc_str);
 		result = 1;
 	} else {
 		err_print("\nMode sense pages (%s):\n", pc_str);
 		mh = (struct mode_header *)msbuf;
 		nbytes = mh->length - sizeof (struct mode_header) -
-				mh->bdesc_length + 1;
+		    mh->bdesc_length + 1;
 		p = msbuf + sizeof (struct mode_header) +
-			mh->bdesc_length;
+		    mh->bdesc_length;
 		dump("         ", msbuf, sizeof (struct mode_header) +
-			(int)mh->bdesc_length, HEX_ONLY);
+		    (int)mh->bdesc_length, HEX_ONLY);
 		while (nbytes > 0) {
 			mp = (struct mode_page *)p;
 			n = mp->length + sizeof (struct mode_page);
@@ -2875,7 +2762,7 @@ scsi_dump_mode_sense_pages(page_control)
 		}
 		if (nbytes < 0) {
 			err_print("  Sense data formatted incorrectly:\n");
-			dump("    ", msbuf, (int)mh->length+1, HEX_ONLY);
+			dump("    ", msbuf, (int)mh->length + 1, HEX_ONLY);
 			result = 1;
 		}
 		err_print("\n");
@@ -2887,10 +2774,7 @@ scsi_dump_mode_sense_pages(page_control)
 
 
 static void
-scsi_printerr(ucmd, rq, rqlen)
-	struct uscsi_cmd		*ucmd;
-	struct scsi_extended_sense	*rq;
-	int				rqlen;
+scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq, int rqlen)
 {
 	diskaddr_t	blkno;
 	struct scsi_descr_sense_hdr *sdsp =
@@ -3114,15 +2998,16 @@ scsi_find_command_name(uint_t cmd)
  * Return true if we support a particular mode page
  */
 int
-scsi_supported_page(int page) {
+scsi_supported_page(int page)
+{
 	return (page == 1 || page == 2 || page == 3 || page == 4 ||
-		page == 8 || page == 0x38);
+	    page == 8 || page == 0x38);
 }
 
 
 int
 apply_chg_list(int pageno, int pagsiz, uchar_t *curbits,
-		uchar_t *chgbits, struct chg_list *chglist)
+    uchar_t *chgbits, struct chg_list *chglist)
 {
 	uchar_t		c;
 	int		i;
@@ -3174,9 +3059,7 @@ apply_chg_list(int pageno, int pagsiz, uchar_t *curbits,
  * the change list.
  */
 static int
-chg_list_affects_page(chglist, pageno)
-	struct chg_list	*chglist;
-	int		pageno;
+chg_list_affects_page(struct chg_list *chglist, int pageno)
 {
 	while (chglist != NULL) {
 		if (chglist->pageno == pageno) {
@@ -3215,9 +3098,7 @@ static char *scsi_extended_sense_labels[] = {
  * Display the full scsi_extended_sense as returned by the device
  */
 static void
-scsi_print_extended_sense(rq, rqlen)
-	struct scsi_extended_sense	*rq;
-	int				rqlen;
+scsi_print_extended_sense(struct scsi_extended_sense *rq, int rqlen)
 {
 	char			**p;
 
@@ -3240,18 +3121,18 @@ scsi_print_extended_sense(rq, rqlen)
 	fmt_print("%s%d\n", *p++, rq->es_key);
 
 	fmt_print("%s0x%02x 0x%02x 0x%02x 0x%02x\n", *p++, rq->es_info_1,
-		rq->es_info_2, rq->es_info_3, rq->es_info_4);
+	    rq->es_info_2, rq->es_info_3, rq->es_info_4);
 	fmt_print("%s%d\n", *p++, rq->es_add_len);
 	fmt_print("%s0x%02x 0x%02x 0x%02x 0x%02x\n", *p++, rq->es_cmd_info[0],
-		rq->es_cmd_info[1], rq->es_cmd_info[2], rq->es_cmd_info[3]);
+	    rq->es_cmd_info[1], rq->es_cmd_info[2], rq->es_cmd_info[3]);
 	fmt_print("%s0x%02x = %d\n", *p++, rq->es_add_code, rq->es_add_code);
 	fmt_print("%s0x%02x = %d\n", *p++, rq->es_qual_code, rq->es_qual_code);
 	fmt_print("%s%d\n", *p++, rq->es_fru_code);
 	fmt_print("%s0x%02x 0x%02x 0x%02x\n", *p++, rq->es_skey_specific[0],
-		rq->es_skey_specific[1], rq->es_skey_specific[2]);
+	    rq->es_skey_specific[1], rq->es_skey_specific[2]);
 	if (rqlen >= sizeof (*rq)) {
 		fmt_print("%s0x%02x 0x%02x%s\n", *p, rq->es_add_info[0],
-		rq->es_add_info[1], (rqlen > sizeof (*rq)) ? " ..." : "");
+		    rq->es_add_info[1], (rqlen > sizeof (*rq)) ? " ..." : "");
 	}
 
 	fmt_print("\n");
@@ -3275,9 +3156,7 @@ static char *scsi_descr_sense_labels[] = {
  */
 
 static void
-scsi_print_descr_sense(rq, rqlen)
-	struct scsi_descr_sense_hdr	*rq;
-	int				rqlen;
+scsi_print_descr_sense(struct scsi_descr_sense_hdr *rq, int rqlen)
 {
 	char			**p;
 	uint8_t			*descr_offset;
@@ -3312,7 +3191,7 @@ scsi_print_descr_sense(rq, rqlen)
 	 */
 	valid_sense_length =
 	    min((sizeof (struct scsi_descr_sense_hdr) +
-		rq->ds_addl_sense_length), rqlen);
+	    rq->ds_addl_sense_length), rqlen);
 
 	/*
 	 * Iterate through the list of descriptors, stopping when we
@@ -3335,13 +3214,13 @@ scsi_print_descr_sense(rq, rqlen)
 
 			information =
 			    (((uint64_t)isd->isd_information[0] << 56) |
-				((uint64_t)isd->isd_information[1] << 48) |
-				((uint64_t)isd->isd_information[2] << 40) |
-				((uint64_t)isd->isd_information[3] << 32) |
-				((uint64_t)isd->isd_information[4] << 24) |
-				((uint64_t)isd->isd_information[5] << 16) |
-				((uint64_t)isd->isd_information[6] << 8)  |
-				((uint64_t)isd->isd_information[7]));
+			    ((uint64_t)isd->isd_information[1] << 48) |
+			    ((uint64_t)isd->isd_information[2] << 40) |
+			    ((uint64_t)isd->isd_information[3] << 32) |
+			    ((uint64_t)isd->isd_information[4] << 24) |
+			    ((uint64_t)isd->isd_information[5] << 16) |
+			    ((uint64_t)isd->isd_information[6] << 8)  |
+			    ((uint64_t)isd->isd_information[7]));
 			fmt_print("Information field:               "
 			    "%0llx\n", information);
 			break;
@@ -3353,13 +3232,13 @@ scsi_print_descr_sense(rq, rqlen)
 
 			cmd_specific =
 			    (((uint64_t)c->css_cmd_specific_info[0] << 56) |
-				((uint64_t)c->css_cmd_specific_info[1] << 48) |
-				((uint64_t)c->css_cmd_specific_info[2] << 40) |
-				((uint64_t)c->css_cmd_specific_info[3] << 32) |
-				((uint64_t)c->css_cmd_specific_info[4] << 24) |
-				((uint64_t)c->css_cmd_specific_info[5] << 16) |
-				((uint64_t)c->css_cmd_specific_info[6] << 8)  |
-				((uint64_t)c->css_cmd_specific_info[7]));
+			    ((uint64_t)c->css_cmd_specific_info[1] << 48) |
+			    ((uint64_t)c->css_cmd_specific_info[2] << 40) |
+			    ((uint64_t)c->css_cmd_specific_info[3] << 32) |
+			    ((uint64_t)c->css_cmd_specific_info[4] << 24) |
+			    ((uint64_t)c->css_cmd_specific_info[5] << 16) |
+			    ((uint64_t)c->css_cmd_specific_info[6] << 8)  |
+			    ((uint64_t)c->css_cmd_specific_info[7]));
 			fmt_print("Command-specific information:    "
 			    "%0llx\n", cmd_specific);
 			break;
@@ -3409,7 +3288,7 @@ scsi_print_descr_sense(rq, rqlen)
  * on the current disk.
  */
 static int
-check_support_for_defects()
+check_support_for_defects(void)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
@@ -3465,7 +3344,7 @@ check_support_for_defects()
  * which do not support read defect list command.
  */
 static int
-scsi_format_without_defects()
+scsi_format_without_defects(void)
 {
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
@@ -3516,7 +3395,7 @@ static int test_until_ready(int fd) {
 	union scsi_cdb			cdb;
 	struct scsi_extended_sense	sense;
 	time_t				start, check, time_left;
-	uint16_t 			progress;
+	uint16_t			progress;
 	int				hour, min, sec;
 
 	(void) memset((char *)&ucmd, 0, sizeof (ucmd));

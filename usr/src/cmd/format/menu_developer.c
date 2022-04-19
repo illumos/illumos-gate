@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains functions that implement the fdisk menu commands.
  */
@@ -61,7 +59,7 @@ extern	struct menu_item menu_developer[];
 
 
 int
-c_developer()
+c_developer(void)
 {
 
 	cur_menu++;
@@ -76,7 +74,7 @@ c_developer()
 }
 
 int
-dv_disk()
+dv_disk(void)
 {
 	struct disk_info *diskp;
 
@@ -86,13 +84,13 @@ dv_disk()
 		(void) printf("\ndisk_name %s  ", diskp->disk_name);
 		(void) printf("disk_path %s\n", diskp->disk_path);
 		(void) printf("ctlr_cname = %s  ",
-			diskp->disk_ctlr->ctlr_cname);
+		    diskp->disk_ctlr->ctlr_cname);
 		(void) printf("cltr_dname = %s  ",
-			diskp->disk_ctlr->ctlr_dname);
+		    diskp->disk_ctlr->ctlr_dname);
 		(void) printf("ctype_name = %s\n",
-			diskp->disk_ctlr->ctlr_ctype->ctype_name);
+		    diskp->disk_ctlr->ctlr_ctype->ctype_name);
 		(void) printf("ctype_ctype = %d\n",
-			diskp->disk_ctlr->ctlr_ctype->ctype_ctype);
+		    diskp->disk_ctlr->ctlr_ctype->ctype_ctype);
 		(void) printf("devfsname = %s\n", diskp->devfs_name);
 		diskp = diskp->disk_next;
 	}
@@ -100,7 +98,7 @@ dv_disk()
 }
 
 int
-dv_cont()
+dv_cont(void)
 {
 	struct ctlr_info *contp;
 
@@ -108,18 +106,18 @@ dv_cont()
 	while (contp != NULL) {
 
 		(void) printf("\nctype_name = %s ",
-			contp->ctlr_ctype->ctype_name);
+		    contp->ctlr_ctype->ctype_name);
 		(void) printf("cname = %s dname =  %s ",
-			contp->ctlr_cname, contp->ctlr_dname);
+		    contp->ctlr_cname, contp->ctlr_dname);
 		(void) printf("ctype_ctype = %d\n",
-			contp->ctlr_ctype->ctype_ctype);
+		    contp->ctlr_ctype->ctype_ctype);
 		contp = contp->ctlr_next;
 	}
 	return (0);
 }
 
 int
-dv_cont_chain()
+dv_cont_chain(void)
 {
 	struct mctlr_list *ctlrp;
 
@@ -130,14 +128,14 @@ dv_cont_chain()
 
 	while (ctlrp != NULL) {
 		(void) printf("ctlrp->ctlr_type->ctype_name = %s\n",
-			ctlrp->ctlr_type->ctype_name);
+		    ctlrp->ctlr_type->ctype_name);
 		ctlrp = ctlrp->next;
 	}
 	return (0);
 }
 
 int
-dv_params()
+dv_params(void)
 {
 	(void) printf("ncyl = %d\n", ncyl);
 	(void) printf("acyl = %d\n", acyl);

@@ -198,7 +198,7 @@ ata_rdwr(int dir, int fd, diskaddr_t blk64, int secnt, caddr_t bufaddr,
 }
 
 int
-ata_ck_format()
+ata_ck_format(void)
 {
 	char *bufaddr;
 	int status;
@@ -216,7 +216,7 @@ ata_ck_format()
 #if defined(i386)
 
 static int
-get_alts_slice()
+get_alts_slice(void)
 {
 
 	int	i;
@@ -249,7 +249,7 @@ get_alts_slice()
 
 
 static int
-put_alts_slice()
+put_alts_slice(void)
 {
 	int	status;
 

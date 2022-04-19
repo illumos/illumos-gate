@@ -56,36 +56,23 @@
 #include <sys/efi_partition.h>
 
 /* Function prototypes */
-#ifdef	__STDC__
-
 static struct	swaptable *getswapentries(void);
 static void	freeswapentries(struct swaptable *);
 static int	getpartition(char *pathname);
 static int	checkpartitions(int bm_mounted);
 
-#else	/* __STDC__ */
-
-static struct swaptable *getswapentries();
-static void freeswapentries();
-static int	getpartition();
-static int	checkpartitions();
-
-#endif	/* __STDC__ */
-
-extern char	*getfullname();
-
 static struct swaptable *
 getswapentries(void)
 {
-	register struct swaptable *st;
-	register struct swapent *swapent;
+	struct swaptable *st;
+	struct swapent *swapent;
 	int	i, num;
 	char	fullpathname[MAXPATHLEN];
 
 	/*
 	 * get the number of swap entries
 	 */
-	if ((num = swapctl(SC_GETNSWP, (void *)NULL)) == -1) {
+	if ((num = swapctl(SC_GETNSWP, NULL)) == -1) {
 		err_print("swapctl error ");
 		fullabort();
 	}
@@ -120,10 +107,9 @@ getswapentries(void)
 }
 
 static void
-freeswapentries(st)
-struct swaptable *st;
+freeswapentries(struct swaptable *st)
 {
-	register struct swapent *swapent;
+	struct swapent *swapent;
 	int i;
 
 	swapent = st->swt_ent;
@@ -137,8 +123,7 @@ struct swaptable *st;
  *  function getpartition:
  */
 static int
-getpartition(pathname)
-char *pathname;
+getpartition(char *pathname)
 {
 	int		mfd;
 	struct dk_cinfo dkinfo;
@@ -184,10 +169,9 @@ char *pathname;
 	 * If it's not the disk we're interested in, it doesn't apply.
 	 */
 	if (cur_disk->disk_dkinfo.dki_ctype != dkinfo.dki_ctype ||
-		cur_disk->disk_dkinfo.dki_cnum != dkinfo.dki_cnum ||
-		cur_disk->disk_dkinfo.dki_unit != dkinfo.dki_unit ||
-		strcmp(cur_disk->disk_dkinfo.dki_dname,
-				dkinfo.dki_dname) != 0) {
+	    cur_disk->disk_dkinfo.dki_cnum != dkinfo.dki_cnum ||
+	    cur_disk->disk_dkinfo.dki_unit != dkinfo.dki_unit ||
+	    strcmp(cur_disk->disk_dkinfo.dki_dname, dkinfo.dki_dname) != 0) {
 		return (found);
 	}
 
@@ -203,8 +187,7 @@ char *pathname;
  * that the entire disk should be checked
  */
 int
-checkswap(start, end)
-	diskaddr_t start, end;
+checkswap(diskaddr_t start, diskaddr_t end)
 {
 	struct swaptable *st;
 	struct swapent *swapent;
@@ -228,7 +211,7 @@ checkswap(start, end)
 	/*
 	 * if there are no swap entries return.
 	 */
-	if (st == (struct swaptable *)NULL)
+	if (st == NULL)
 		return (0);
 	swapent = st->swt_ent;
 	for (i = 0; i < st->swt_n; i++, swapent++) {
@@ -239,8 +222,8 @@ checkswap(start, end)
 			}
 			map = &cur_parts->pinfo_map[part];
 			if ((start >= (int)(map->dkl_cylno * spc() +
-				map->dkl_nblk)) || (end < (int)(map->dkl_cylno
-							* spc()))) {
+			    map->dkl_nblk)) ||
+			    (end < (int)(map->dkl_cylno * spc()))) {
 					continue;
 			}
 			found = -1;
@@ -270,7 +253,7 @@ checkswap(start, end)
  */
 int
 checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
-	int check_label)
+    int check_label)
 {
 
 	int		error;
@@ -559,8 +542,7 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
  * that the entire disk should be checked.
  */
 int
-checkmount(start, end)
-	diskaddr_t	start, end;
+checkmount(diskaddr_t start, diskaddr_t end)
 {
 	FILE		*fp;
 	int		found = 0;
@@ -613,7 +595,7 @@ checkmount(start, end)
 		 */
 		map = &cur_parts->pinfo_map[part];
 		if ((start >= (int)(map->dkl_cylno * spc() + map->dkl_nblk)) ||
-			(end < (int)(map->dkl_cylno * spc()))) {
+		    (end < (int)(map->dkl_cylno * spc()))) {
 			continue;
 		}
 		found = -1;
@@ -641,7 +623,7 @@ checkmount(start, end)
 }
 
 int
-check_label_with_swap()
+check_label_with_swap(void)
 {
 	int			i;
 	struct swaptable *st;
@@ -664,7 +646,7 @@ check_label_with_swap()
 	/*
 	 * if there are no swap entries return.
 	 */
-	if (st == (struct swaptable *)NULL)
+	if (st == NULL)
 		return (0);
 	swapent = st->swt_ent;
 	for (i = 0; i < st->swt_n; i++, swapent++)
@@ -681,7 +663,7 @@ check_label_with_swap()
  * affected by writing the new label.
  */
 int
-check_label_with_mount()
+check_label_with_mount(void)
 {
 	FILE			*fp;
 	int			part;

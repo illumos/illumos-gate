@@ -33,15 +33,13 @@
 #include "menu_analyze.h"
 #include "param.h"
 
-
-
 /*
  * This routine implements the 'read' command.  It performs surface
  * analysis by reading the disk.  It is ok to run this command on
  * mounted file systems.
  */
 int
-a_read()
+a_read(void)
 {
 	/*
 	 * The current disk must be formatted before disk analysis.
@@ -65,7 +63,7 @@ a_read()
  * they are mounted.
  */
 int
-a_refresh()
+a_refresh(void)
 {
 	/*
 	 * The current disk must be formatted before disk analysis.
@@ -90,7 +88,7 @@ a_refresh()
  * mounted.
  */
 int
-a_test()
+a_test(void)
 {
 	/*
 	 * The current disk must be formatted before disk analysis.
@@ -113,7 +111,7 @@ a_test()
  * It is not ok to run this command on any data you want to keep.
  */
 int
-a_write()
+a_write(void)
 {
 	/*
 	 * The current disk must be formatted before disk analysis.
@@ -137,7 +135,7 @@ a_write()
  * It is not ok to run this command on any data you want to keep.
  */
 int
-a_compare()
+a_compare(void)
 {
 	/*
 	 * The current disk must be formatted before disk analysis.
@@ -160,7 +158,7 @@ a_compare()
  * a specific set of data (by reading it then printing it).
  */
 int
-a_print()
+a_print(void)
 {
 	int	i, j, lines, nomore = 0;
 	int	c, one_line = 0;
@@ -250,7 +248,7 @@ PRINT_EXIT:
  * value as the default.
  */
 int
-a_setup()
+a_setup(void)
 {
 	int			deflt;
 	uint64_t		size;
@@ -358,7 +356,7 @@ a_setup()
  * check the current setup.
  */
 int
-a_config()
+a_config(void)
 {
 
 	fmt_print("        Analyze entire disk? ");
@@ -413,7 +411,7 @@ a_config()
  * It is not ok to run this command on any data you want to keep.
  */
 int
-a_purge()
+a_purge(void)
 {
 	int status = 0;
 
@@ -459,7 +457,7 @@ a_purge()
  * It is not ok to run this command on any data you want to keep.
  */
 int
-a_verify()
+a_verify(void)
 {
 	/*
 	 * The current disk must be formatted before disk analysis.

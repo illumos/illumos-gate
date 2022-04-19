@@ -173,7 +173,7 @@ trim_id(char *id)
  * in this margin, then such illegal geometries can slip through the cracks.
  */
 static int
-do_geometry_sanity_check()
+do_geometry_sanity_check(void)
 {
 	struct scsi_capacity_16	 capacity;
 
@@ -250,7 +250,7 @@ SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc)
  * the label and partition information it has written on the disk.
  */
 int
-write_label()
+write_label(void)
 {
 	int	error = 0, head, sec;
 	struct dk_label label;

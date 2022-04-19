@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains functions that implement the cache menu commands.
  */
@@ -63,7 +61,7 @@ extern	struct menu_item menu_read_cache[];
 
 
 int
-c_cache()
+c_cache(void)
 {
 	cur_menu++;
 	last_menu = cur_menu;
@@ -73,7 +71,7 @@ c_cache()
 }
 
 int
-ca_write_cache()
+ca_write_cache(void)
 {
 	cur_menu++;
 	last_menu = cur_menu;
@@ -83,7 +81,7 @@ ca_write_cache()
 }
 
 int
-ca_read_cache()
+ca_read_cache(void)
 {
 	cur_menu++;
 	last_menu = cur_menu;
@@ -93,7 +91,7 @@ ca_read_cache()
 }
 
 int
-ca_write_display()
+ca_write_display(void)
 {
 	struct mode_cache		*page8;
 	struct scsi_ms_header		header;
@@ -106,8 +104,8 @@ ca_write_display()
 	page8 = &u_page8.page8;
 
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_CURRENT, (caddr_t)page8,
+	    MAX_MODE_SENSE_SIZE, &header);
 
 	if (status == 0) {
 		if (page8->wce) {
@@ -122,7 +120,7 @@ ca_write_display()
 }
 
 int
-ca_write_enable()
+ca_write_enable(void)
 {
 	struct mode_cache		*page8;
 	struct scsi_ms_header		header;
@@ -137,18 +135,19 @@ ca_write_enable()
 	page8 = &u_page8.page8;
 
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_CHANGEABLE, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)page8,
+	    MAX_MODE_SENSE_SIZE, &header);
 
 	if (status == 0) {
 		if (page8->wce) {
 			status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-				MODE_SENSE_PC_SAVED, (caddr_t)page8,
-				MAX_MODE_SENSE_SIZE, &header);
+			    MODE_SENSE_PC_SAVED, (caddr_t)page8,
+			    MAX_MODE_SENSE_SIZE, &header);
 			if (status != 0) {
 				status = uscsi_mode_sense(cur_file,
-				DAD_MODE_CACHE, MODE_SENSE_PC_CURRENT,
-				(caddr_t)page8, MAX_MODE_SENSE_SIZE, &header);
+				    DAD_MODE_CACHE, MODE_SENSE_PC_CURRENT,
+				    (caddr_t)page8, MAX_MODE_SENSE_SIZE,
+				    &header);
 			}
 
 			if (status == 0) {
@@ -165,8 +164,8 @@ This setting is valid until next reset only. It is not saved permanently.\n");
 				header.mode_header.length = 0;
 				header.mode_header.device_specific = 0;
 				status = uscsi_mode_select(cur_file,
-					DAD_MODE_CACHE, sp_flags,
-					(caddr_t)page8, length, &header);
+				    DAD_MODE_CACHE, sp_flags,
+				    (caddr_t)page8, length, &header);
 				if (status != 0) {
 					err_print("Mode select failed\n");
 					return (0);
@@ -183,7 +182,7 @@ This setting is valid until next reset only. It is not saved permanently.\n");
 }
 
 int
-ca_write_disable()
+ca_write_disable(void)
 {
 	struct mode_cache		*page8;
 	struct scsi_ms_header		header;
@@ -198,18 +197,19 @@ ca_write_disable()
 	page8 = &u_page8.page8;
 
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_CHANGEABLE, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)page8,
+	    MAX_MODE_SENSE_SIZE, &header);
 
 	if (status == 0) {
 		if (page8->wce) {
 			status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-				MODE_SENSE_PC_SAVED, (caddr_t)page8,
-				MAX_MODE_SENSE_SIZE, &header);
+			    MODE_SENSE_PC_SAVED, (caddr_t)page8,
+			    MAX_MODE_SENSE_SIZE, &header);
 			if (status != 0) {
 				status = uscsi_mode_sense(cur_file,
-				DAD_MODE_CACHE, MODE_SENSE_PC_CURRENT,
-				(caddr_t)page8, MAX_MODE_SENSE_SIZE, &header);
+				    DAD_MODE_CACHE, MODE_SENSE_PC_CURRENT,
+				    (caddr_t)page8, MAX_MODE_SENSE_SIZE,
+				    &header);
 			}
 
 			if (status == 0) {
@@ -226,8 +226,8 @@ This setting is valid until next reset only. It is not saved permanently.\n");
 				header.mode_header.length = 0;
 				header.mode_header.device_specific = 0;
 				status = uscsi_mode_select(cur_file,
-					DAD_MODE_CACHE, sp_flags,
-					(caddr_t)page8, length, &header);
+				    DAD_MODE_CACHE, sp_flags,
+				    (caddr_t)page8, length, &header);
 				if (status != 0) {
 					err_print("Mode select failed\n");
 					return (0);
@@ -244,7 +244,7 @@ This setting is valid until next reset only. It is not saved permanently.\n");
 }
 
 int
-ca_read_display()
+ca_read_display(void)
 {
 	struct mode_cache		*page8;
 	struct scsi_ms_header		header;
@@ -257,8 +257,8 @@ ca_read_display()
 	page8 = &u_page8.page8;
 
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_CURRENT, (caddr_t)page8,
+	    MAX_MODE_SENSE_SIZE, &header);
 
 	if (status == 0) {
 		if (page8->rcd) {
@@ -273,7 +273,7 @@ ca_read_display()
 }
 
 int
-ca_read_enable()
+ca_read_enable(void)
 {
 	struct mode_cache		*page8;
 	struct scsi_ms_header		header;
@@ -288,18 +288,19 @@ ca_read_enable()
 	page8 = &u_page8.page8;
 
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-			MODE_SENSE_PC_CHANGEABLE, (caddr_t)page8,
-			MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)page8,
+	    MAX_MODE_SENSE_SIZE, &header);
 
 	if (status == 0) {
 		if (page8->rcd) {
 			status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-				MODE_SENSE_PC_SAVED, (caddr_t)page8,
-				MAX_MODE_SENSE_SIZE, &header);
+			    MODE_SENSE_PC_SAVED, (caddr_t)page8,
+			    MAX_MODE_SENSE_SIZE, &header);
 			if (status != 0) {
 				status = uscsi_mode_sense(cur_file,
-				DAD_MODE_CACHE, MODE_SENSE_PC_CURRENT,
-				(caddr_t)page8, MAX_MODE_SENSE_SIZE, &header);
+				    DAD_MODE_CACHE, MODE_SENSE_PC_CURRENT,
+				    (caddr_t)page8, MAX_MODE_SENSE_SIZE,
+				    &header);
 			}
 
 			if (status == 0) {
@@ -316,8 +317,8 @@ This setting is valid until next reset only. It is not saved permanently.\n");
 				header.mode_header.length = 0;
 				header.mode_header.device_specific = 0;
 				status = uscsi_mode_select(cur_file,
-					DAD_MODE_CACHE, sp_flags,
-					(caddr_t)page8, length, &header);
+				    DAD_MODE_CACHE, sp_flags,
+				    (caddr_t)page8, length, &header);
 				if (status != 0) {
 					err_print("Mode select failed\n");
 					return (0);
@@ -334,7 +335,7 @@ This setting is valid until next reset only. It is not saved permanently.\n");
 }
 
 int
-ca_read_disable()
+ca_read_disable(void)
 {
 	struct mode_cache		*page8;
 	struct scsi_ms_header		header;
@@ -349,18 +350,19 @@ ca_read_disable()
 	page8 = &u_page8.page8;
 
 	status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-		MODE_SENSE_PC_CHANGEABLE, (caddr_t)page8,
-		MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_CHANGEABLE, (caddr_t)page8,
+	    MAX_MODE_SENSE_SIZE, &header);
 
 	if (status == 0) {
 		if (page8->rcd) {
 			status = uscsi_mode_sense(cur_file, DAD_MODE_CACHE,
-				MODE_SENSE_PC_SAVED, (caddr_t)page8,
-				MAX_MODE_SENSE_SIZE, &header);
+			    MODE_SENSE_PC_SAVED, (caddr_t)page8,
+			    MAX_MODE_SENSE_SIZE, &header);
 			if (status != 0) {
 				status = uscsi_mode_sense(cur_file,
-				DAD_MODE_CACHE, MODE_SENSE_PC_CURRENT,
-				(caddr_t)page8, MAX_MODE_SENSE_SIZE, &header);
+				    DAD_MODE_CACHE, MODE_SENSE_PC_CURRENT,
+				    (caddr_t)page8, MAX_MODE_SENSE_SIZE,
+				    &header);
 			}
 
 			if (status == 0) {
@@ -377,8 +379,8 @@ This setting is valid until next reset only. It is not saved permanently.\n");
 				header.mode_header.length = 0;
 				header.mode_header.device_specific = 0;
 				status = uscsi_mode_select(cur_file,
-					DAD_MODE_CACHE, sp_flags,
-					(caddr_t)page8, length, &header);
+				    DAD_MODE_CACHE, sp_flags,
+				    (caddr_t)page8, length, &header);
 				if (status != 0) {
 					err_print("Mode select failed\n");
 					return (0);

@@ -27,8 +27,6 @@
 #ifndef	_STARTUP_H
 #define	_STARTUP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

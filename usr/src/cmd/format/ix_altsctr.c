@@ -69,16 +69,16 @@ struct	alts_mempart	*ap = &alts_part;	/* pointer to incore */
 /* prototypes */
 int updatebadsec(struct  dkl_partition *, int);
 int read_altsctr(struct  dkl_partition *);
-static int chk_badsec();
-static int init_altsctr();
-static int get_altsctr();
-int wr_altsctr();
-static void get_badsec();
-static int count_badsec();
-static int gen_alts_ent();
-static int assign_altsctr();
-static void expand_map();
-static void compress_map();
+static int chk_badsec(void);
+static int init_altsctr(void);
+static int get_altsctr(void);
+int wr_altsctr(void);
+static void get_badsec(void);
+static int count_badsec(void);
+static int gen_alts_ent(void);
+static int assign_altsctr(void);
+static void expand_map(void);
+static void compress_map(void);
 static int altsmap_getbit(blkaddr_t);
 static blkaddr_t altsmap_alloc(blkaddr_t, blkaddr_t, int, int);
 static void ent_sort(struct  alts_ent *, int);
@@ -92,9 +92,7 @@ static int chk_bad_altsctr(blkaddr_t);
  * updatebadsec () -- update bad sector/track mapping tables
  */
 int
-updatebadsec(part, init_flag)
-int	init_flag;
-struct  dkl_partition *part;
+updatebadsec(struct dkl_partition *part, int init_flag)
 {
 	if (init_flag)
 		ap->ap_flag |= ALTS_ADDPART;
@@ -115,54 +113,55 @@ int
 read_altsctr(struct dkl_partition *part)
 {
 	if (ap->ap_tblp == NULL) {
-/*	    allocate buffer for the alts partition table (sector size)	*/
-	    ap->ap_tbl_secsiz = byte_to_secsiz(ALTS_PARTTBL_SIZE, NBPSCTR);
-	    ap->ap_tblp = (struct alts_parttbl *)malloc(ap->ap_tbl_secsiz);
-	    if (ap->ap_tblp == NULL) {
-		(void) fprintf(stderr,
-			"Unable to malloc alternate partition table.\n");
-		return (50);
-	    }
+		/* allocate buffer for the alts partition table (sector size) */
+		ap->ap_tbl_secsiz = byte_to_secsiz(ALTS_PARTTBL_SIZE, NBPSCTR);
+		ap->ap_tblp = malloc(ap->ap_tbl_secsiz);
+		if (ap->ap_tblp == NULL) {
+			(void) fprintf(stderr,
+			    "Unable to malloc alternate partition table.\n");
+			return (50);
+		}
 
-/*	    allocate buffer for the alts partition map (sector size)	*/
-/*	    buffers include the disk image bit map			*/
-/*	    and the incore transformed char map				*/
+		/*
+		 * allocate buffer for the alts partition map (sector size)
+		 * buffers include the disk image bit map
+		 * and the incore transformed char map.
+		 */
 
-	    if ((ap->ap_memmapp = (uchar_t *)malloc(part->p_size)) == NULL) {
-		(void) fprintf(stderr,
-			"Unable to malloc incore alternate partition map.\n");
-		return (51);
-	    }
-	    ap->ap_tblp->alts_map_len = (part->p_size + 8 - 1) / 8;
-	    ap->ap_map_secsiz = byte_to_secsiz(ap->ap_tblp->alts_map_len,
-						NBPSCTR);
-	    ap->ap_map_sectot = ap->ap_map_secsiz / NBPSCTR;
-	    if ((ap->ap_mapp = (uchar_t *)malloc(ap->ap_map_secsiz)) == NULL) {
-		(void) fprintf(stderr,
-				"Unable to malloc alternate partition map.\n");
-		return (52);
-	    }
-/*	    clear the buffers to zero					*/
-	    (void) memset(ap->ap_memmapp, 0, part->p_size);
-	    (void) memset(ap->ap_mapp, 0, ap->ap_map_secsiz);
-	    ap->part = *part;		/* struct copy			*/
+		if ((ap->ap_memmapp = malloc(part->p_size)) == NULL) {
+			(void) fprintf(stderr, "Unable to malloc incore "
+			    "alternate partition map.\n");
+			return (51);
+		}
+		ap->ap_tblp->alts_map_len = (part->p_size + 8 - 1) / 8;
+		ap->ap_map_secsiz = byte_to_secsiz(ap->ap_tblp->alts_map_len,
+		    NBPSCTR);
+		ap->ap_map_sectot = ap->ap_map_secsiz / NBPSCTR;
+		if ((ap->ap_mapp = malloc(ap->ap_map_secsiz)) == NULL) {
+			(void) fprintf(stderr, "Unable to malloc alternate "
+			    "partition map.\n");
+			return (52);
+		}
+		/* clear the buffers to zero */
+		(void) memset(ap->ap_memmapp, 0, part->p_size);
+		(void) memset(ap->ap_mapp, 0, ap->ap_map_secsiz);
+		ap->part = *part;		/* struct copy */
 
-/*
- *	    if add alternate partition flag is set, then install the partition
- *	    otherwise read the alts partition info from disk
- *	    if failed, then assume the first installation
- */
-	    if (ap->ap_flag & ALTS_ADDPART)
-	    {
-		(void) fprintf(stderr,
-			"WARNING: Manually initializing alternate table.\n");
-		(void) init_altsctr();
-	    } else {
-		if (get_altsctr() == SUCCESS)
-		    (void) chk_badsec();
-		else
-		    (void) init_altsctr();
-	    }
+		/*
+		 * if add alternate partition flag is set, then install
+		 * the partition. Otherwise read the alts partition info
+		 * from disk. If failed, then assume the first installation
+		 */
+		if (ap->ap_flag & ALTS_ADDPART) {
+			(void) fprintf(stderr, "WARNING: Manually "
+			    "initializing alternate table.\n");
+			(void) init_altsctr();
+		} else {
+			if (get_altsctr() == SUCCESS)
+				(void) chk_badsec();
+			else
+				(void) init_altsctr();
+		}
 	}
 	return (SUCCESS);
 }
@@ -172,7 +171,7 @@ read_altsctr(struct dkl_partition *part)
  *	checking duplicate bad sectors or bad sectors in ALTSCTR partition
  */
 static int
-chk_badsec()
+chk_badsec(void)
 {
 	blkaddr_t	badsec;
 	blkaddr_t	altsp_srtsec = ap->part.p_start;
@@ -181,51 +180,63 @@ chk_badsec()
 	int	status;
 
 	for (cnt = 0; cnt < ap->ap_gbadcnt; cnt++) {
-	    badsec = (ap->ap_gbadp)[cnt].bad_start;
+		badsec = (ap->ap_gbadp)[cnt].bad_start;
 
-	    /* if bad sector is within the ATLSCTR partition */
-	    if ((badsec >= altsp_srtsec) && (badsec <= altsp_endsec)) {
-		if ((ap->ap_memmapp)[badsec - altsp_srtsec] != ALTS_BAD) {
-		    if ((badsec >= altsp_srtsec) && (badsec <= (altsp_srtsec +
-			ap->ap_tbl_secsiz / NBPSCTR - 1))) {
-			(void) fprintf(stderr,
-			"Alternate partition information table is bad.\n");
-			return (53);
-		    }
-		    if ((badsec >= altsp_srtsec+ap->ap_tblp->alts_map_base) &&
-			(badsec <= (altsp_srtsec + ap->ap_tblp->alts_map_base +
-			ap->ap_map_sectot - 1))) {
-			(void) fprintf(stderr,
-					"Alternate partition map is bad.\n");
-			return (54);
-		    }
-		    if ((badsec >= altsp_srtsec+ap->ap_tblp->alts_ent_base) &&
-			(badsec <= (altsp_srtsec + ap->ap_tblp->alts_ent_base +
-			ap->ap_ent_secsiz / NBPSCTR - 1))) {
-			(void) fprintf(stderr,
-				"Alternate partition entry table is bad.\n");
-			return (55);
-		    }
-		    (ap->ap_memmapp)[badsec - altsp_srtsec] = ALTS_BAD;
-		    (ap->ap_gbadp)[cnt].bad_start = (uint32_t)ALTS_ENT_EMPTY;
+		/* if bad sector is within the ATLSCTR partition */
+		if ((badsec >= altsp_srtsec) && (badsec <= altsp_endsec)) {
+			if ((ap->ap_memmapp)[badsec - altsp_srtsec] !=
+			    ALTS_BAD) {
+				if ((badsec >= altsp_srtsec) &&
+				    (badsec <= (altsp_srtsec +
+				    ap->ap_tbl_secsiz / NBPSCTR - 1))) {
+					(void) fprintf(stderr,
+					    "Alternate partition information "
+					    "table is bad.\n");
+					return (53);
+				}
+				if ((badsec >=
+				    altsp_srtsec+ap->ap_tblp->alts_map_base) &&
+				    (badsec <=
+				    (altsp_srtsec + ap->ap_tblp->alts_map_base +
+				    ap->ap_map_sectot - 1))) {
+					(void) fprintf(stderr, "Alternate "
+					    "partition map is bad.\n");
+					return (54);
+				}
+				if ((badsec >=
+				    altsp_srtsec+ap->ap_tblp->alts_ent_base) &&
+				    (badsec <=
+				    (altsp_srtsec + ap->ap_tblp->alts_ent_base +
+				    ap->ap_ent_secsiz / NBPSCTR - 1))) {
+					(void) fprintf(stderr, "Alternate "
+					    "partition entry table is bad.\n");
+					return (55);
+				}
+				(ap->ap_memmapp)[badsec - altsp_srtsec] =
+				    ALTS_BAD;
+				(ap->ap_gbadp)[cnt].bad_start =
+				    (uint32_t)ALTS_ENT_EMPTY;
+			} else {
+				status = chk_bad_altsctr(badsec);
+				(ap->ap_gbadp)[cnt].bad_start =
+				    (uint32_t)ALTS_ENT_EMPTY;
+			}
 		} else {
-		    status = chk_bad_altsctr(badsec);
-		    (ap->ap_gbadp)[cnt].bad_start = (uint32_t)ALTS_ENT_EMPTY;
+			/*
+			 * binary search for bad sector in the alts entry table
+			 */
+			status = ent_bsearch(ap->ap_entp,
+			    ap->ap_tblp->alts_ent_used,
+			    &((ap->ap_gbadp)[cnt]));
+			/*
+			 * if the bad sector had already been remapped
+			 * (found in alts_entry), then ignore the bad sector.
+			 */
+			if (status != -1) {
+				(ap->ap_gbadp)[cnt].bad_start =
+				    (uint32_t)ALTS_ENT_EMPTY;
+			}
 		}
-	    } else {
-/*
- *		binary search for bad sector in the alts entry table
- */
-		status = ent_bsearch(ap->ap_entp, ap->ap_tblp->alts_ent_used,
-					&((ap->ap_gbadp)[cnt]));
-/*
- *		if the bad sector had already been remapped(found in alts_entry)
- *		then ignore the bad sector
- */
-		if (status != -1) {
-		    (ap->ap_gbadp)[cnt].bad_start = (uint32_t)ALTS_ENT_EMPTY;
-		}
-	    }
 	}
 	return (SUCCESS);
 }
@@ -234,7 +245,7 @@ chk_badsec()
  *	initialize the alternate partition tables
  */
 static int
-init_altsctr()
+init_altsctr(void)
 {
 	blkaddr_t	badsec;
 	blkaddr_t	altsp_srtsec = ap->part.p_start;
@@ -251,28 +262,29 @@ init_altsctr()
 	ap->ap_tblp->alts_ent_end  = 0;
 	ap->ap_tblp->alts_resv_base = ap->part.p_size - 1;
 	for (cnt = 0; cnt < 5; cnt++)
-	    ap->ap_tblp->alts_pad[cnt] = 0;
+		ap->ap_tblp->alts_pad[cnt] = 0;
 
 	for (cnt = 0; cnt < ap->ap_gbadcnt; cnt++) {
-	    badsec = (ap->ap_gbadp)[cnt].bad_start;
-	    if ((badsec >= altsp_srtsec) && (badsec <= altsp_endsec)) {
-		if (badsec == altsp_srtsec) {
-		    (void) fprintf(stderr,
-			"First sector of alternate partition is bad.\n");
-		    return (56);
+		badsec = (ap->ap_gbadp)[cnt].bad_start;
+		if ((badsec >= altsp_srtsec) && (badsec <= altsp_endsec)) {
+			if (badsec == altsp_srtsec) {
+				(void) fprintf(stderr, "First sector of "
+				    "alternate partition is bad.\n");
+				return (56);
+			}
+			(ap->ap_memmapp)[badsec - altsp_srtsec] = ALTS_BAD;
+			(ap->ap_gbadp)[cnt].bad_start =
+			    (uint32_t)ALTS_ENT_EMPTY;
 		}
-		(ap->ap_memmapp)[badsec - altsp_srtsec] = ALTS_BAD;
-		(ap->ap_gbadp)[cnt].bad_start = (uint32_t)ALTS_ENT_EMPTY;
-	    }
 	}
 
-/*	allocate the alts_map on disk skipping possible bad sectors	*/
+	/* allocate the alts_map on disk skipping possible bad sectors */
 	ap->ap_tblp->alts_map_base =
-		altsmap_alloc(ap->ap_tbl_secsiz / NBPSCTR,
-			ap->part.p_size, ap->ap_map_sectot, ALTS_MAP_UP);
+	    altsmap_alloc(ap->ap_tbl_secsiz / NBPSCTR,
+	    ap->part.p_size, ap->ap_map_sectot, ALTS_MAP_UP);
 	if (ap->ap_tblp->alts_map_base == 0) {
-	    perror("Unable to allocate alternate map on disk: ");
-	    return (57);
+		perror("Unable to allocate alternate map on disk: ");
+		return (57);
 	}
 	(void) wr_altsctr();
 
@@ -289,51 +301,50 @@ get_altsctr(void)
 	int	mystatus = FAILURE;
 	int	status = 0;
 
-/*	get alts partition table info					*/
+	/* get alts partition table info */
 
 	status = ata_rdwr(DIR_READ, cur_file, altsec_offset,
-			ap->ap_tbl_secsiz / UBSIZE, (char *)ap->ap_tblp,
-			0, NULL);
+	    ap->ap_tbl_secsiz / UBSIZE, (char *)ap->ap_tblp, 0, NULL);
 	if (status == FAILURE) {
-	    perror("Unable to read alternate sector partition: ");
-	    return (58);
+		perror("Unable to read alternate sector partition: ");
+		return (58);
 	}
 	if (ap->ap_tblp->alts_sanity != ALTS_SANITY)
-	    return (mystatus);
+		return (mystatus);
 
-/*	get the alts map						*/
+	/* get the alts map */
 	status = ata_rdwr(DIR_READ, cur_file,
-		(ap->ap_tblp->alts_map_base) + altsec_offset,
-		ap->ap_map_secsiz / UBSIZE, (char *)ap->ap_mapp, 0, NULL);
+	    (ap->ap_tblp->alts_map_base) + altsec_offset,
+	    ap->ap_map_secsiz / UBSIZE, (char *)ap->ap_mapp, 0, NULL);
 	if (status == FAILURE) {
-	    perror("Unable to read alternate sector partition map: ");
-	    return (59);
+		perror("Unable to read alternate sector partition map: ");
+		return (59);
 	}
 
-/*	transform the disk image bit-map to incore char map		*/
+	/* transform the disk image bit-map to incore char map */
 	expand_map();
 
 	if (ap->ap_tblp->alts_ent_used == 0) {
-	    ap->ap_entp = NULL;
-	    ap->ap_ent_secsiz = 0;
+		ap->ap_entp = NULL;
+		ap->ap_ent_secsiz = 0;
 	} else {
-	    ap->ap_ent_secsiz = byte_to_secsiz(
-			(ap->ap_tblp->alts_ent_used*ALTS_ENT_SIZE), NBPSCTR);
-	    if ((ap->ap_entp =
-		(struct alts_ent *)malloc(ap->ap_ent_secsiz)) == NULL) {
-		(void) fprintf(stderr,
-			"Unable to malloc alternate sector entry table.\n");
-		return (60);
-	    }
+		ap->ap_ent_secsiz = byte_to_secsiz(
+		    (ap->ap_tblp->alts_ent_used*ALTS_ENT_SIZE), NBPSCTR);
+		ap->ap_entp = malloc(ap->ap_ent_secsiz);
+		if (ap->ap_entp == NULL) {
+			(void) fprintf(stderr,
+			    "Unable to malloc alternate sector entry table.\n");
+			return (60);
+		}
 
-	status = ata_rdwr(DIR_READ, cur_file,
-			(ap->ap_tblp->alts_ent_base) + altsec_offset,
-			ap->ap_ent_secsiz / UBSIZE, (char *)ap->ap_entp,
-			0, NULL);
-	if (status == FAILURE) {
-		perror("Unable to read alternate sector entry table: ");
-		return (61);
-	    }
+		status = ata_rdwr(DIR_READ, cur_file,
+		    (ap->ap_tblp->alts_ent_base) + altsec_offset,
+		    ap->ap_ent_secsiz / UBSIZE, (char *)ap->ap_entp,
+		    0, NULL);
+		if (status == FAILURE) {
+			perror("Unable to read alternate sector entry table: ");
+			return (61);
+		}
 	}
 
 	return (SUCCESS);
@@ -344,7 +355,7 @@ get_altsctr(void)
  *	update the new alternate partition tables on disk
  */
 int
-wr_altsctr()
+wr_altsctr(void)
 {
 	int	status;
 
@@ -360,20 +371,21 @@ wr_altsctr()
 	}
 
 	if (ata_rdwr(DIR_WRITE, cur_file, (ap->ap_tblp->alts_map_base) +
-			altsec_offset, ap->ap_map_secsiz / UBSIZE,
-			(char *)ap->ap_mapp, 0, NULL) == FAILURE) {
-	    perror("Unable to write alternate sector partition map: ");
-	    return (63);
+	    altsec_offset, ap->ap_map_secsiz / UBSIZE,
+	    (char *)ap->ap_mapp, 0, NULL) == FAILURE) {
+		perror("Unable to write alternate sector partition map: ");
+		return (63);
 	}
 
 	if (ap->ap_tblp->alts_ent_used != 0) {
-	    if (ata_rdwr(DIR_WRITE, cur_file,
-				(ap->ap_tblp->alts_ent_base)+ altsec_offset,
-				ap->ap_ent_secsiz / UBSIZE,
-				(char *)ap->ap_entp, 0, NULL) == FAILURE) {
-		perror("Unable to write alternate sector entry table: ");
-		return (64);
-	    }
+		if (ata_rdwr(DIR_WRITE, cur_file,
+		    (ap->ap_tblp->alts_ent_base)+ altsec_offset,
+		    ap->ap_ent_secsiz / UBSIZE,
+		    (char *)ap->ap_entp, 0, NULL) == FAILURE) {
+			perror("Unable to write alternate sector "
+			    "entry table: ");
+			return (64);
+		}
 	}
 	return (0);
 }
@@ -383,49 +395,51 @@ wr_altsctr()
  *	get a list of bad sector
  */
 static void
-get_badsec()
+get_badsec(void)
 {
 	int	cnt;
 	struct	badsec_lst *blc_p;
 	blkaddr_t	curbad;
 	blkaddr_t	maxsec = cur_dtype->dtype_nhead *
-				cur_dtype->dtype_ncyl *
-				cur_dtype->dtype_nsect;
+	    cur_dtype->dtype_ncyl * cur_dtype->dtype_nsect;
 	struct	alts_ent *growbadp;
 	int	i;
 
 	cnt = count_badsec();
-	if (!cnt) {
-	    ap->ap_gbadp = NULL;
-	    ap->ap_gbadcnt = 0;
+	if (cnt == 0) {
+		ap->ap_gbadp = NULL;
+		ap->ap_gbadcnt = 0;
 	} else {
-	    ap->ap_gbadp = malloc(cnt*ALTS_ENT_SIZE);
-	    if (ap->ap_gbadp == NULL) {
-		    err_print("get_badsec: unable to malloc %d bytes\n",
-			cnt*ALTS_ENT_SIZE);
-		    fullabort();
-	    }
-	    (void) memset(ap->ap_gbadp, 0, cnt*ALTS_ENT_SIZE);
-
-	    for (growbadp = ap->ap_gbadp, cnt = 0, blc_p = badsl_chain;
-		blc_p; blc_p = blc_p->bl_nxt) {
-		for (i = 0; i < blc_p->bl_cnt; i++) {
-		    curbad = blc_p->bl_sec[i];
-		    if (curbad < (blkaddr_t)cur_dtype->dtype_nsect) {
-			(void) fprintf(stderr,
-"Ignoring bad sector %ld which is in first track of the drive.\n", curbad);
-			continue;
-		    }
-		    if (curbad >= maxsec) {
-			(void) fprintf(stderr,
-"Ignoring bad sector %ld which is past the end of the drive.\n", curbad);
-			continue;
-		    }
-		    growbadp[cnt].bad_start = curbad;
-		    growbadp[cnt].bad_end = curbad;
-		    cnt++;
+		ap->ap_gbadp = malloc(cnt * ALTS_ENT_SIZE);
+		if (ap->ap_gbadp == NULL) {
+			err_print("get_badsec: unable to malloc %d bytes\n",
+			    cnt * ALTS_ENT_SIZE);
+			fullabort();
 		}
-	    }
+		(void) memset(ap->ap_gbadp, 0, cnt * ALTS_ENT_SIZE);
+
+		for (growbadp = ap->ap_gbadp, cnt = 0, blc_p = badsl_chain;
+		    blc_p; blc_p = blc_p->bl_nxt) {
+			for (i = 0; i < blc_p->bl_cnt; i++) {
+				curbad = blc_p->bl_sec[i];
+				if (curbad <
+				    (blkaddr_t)cur_dtype->dtype_nsect) {
+					(void) fprintf(stderr, "Ignoring bad "
+					    "sector %ld which is in first "
+					    "track of the drive.\n", curbad);
+					continue;
+				}
+				if (curbad >= maxsec) {
+					(void) fprintf(stderr, "Ignoring bad "
+					    "sector %ld which is past the end "
+					    "of the drive.\n", curbad);
+					continue;
+				}
+				growbadp[cnt].bad_start = curbad;
+				growbadp[cnt].bad_end = curbad;
+				cnt++;
+			}
+		}
 	}
 	ap->ap_gbadcnt = cnt;
 }
@@ -436,14 +450,13 @@ get_badsec()
  *	one given through the command line
  */
 static int
-count_badsec()
+count_badsec(void)
 {
-
 	struct badsec_lst *blc_p;
 
-	if (!badsl_chain)
+	if (!badsl_chain) {
 		badsl_chain = gbadsl_chain;
-	else {
+	} else {
 		for (blc_p = badsl_chain; blc_p->bl_nxt; blc_p = blc_p->bl_nxt)
 			;
 		blc_p->bl_nxt = gbadsl_chain;
@@ -459,12 +472,13 @@ count_badsec()
  *	the new entry list.
  */
 static int
-gen_alts_ent() {
+gen_alts_ent(void)
+{
 	uint_t	ent_used;
 	struct	alts_ent *entp;
 
 	if (ap->ap_gbadcnt == 0)
-	    return (0);
+		return (0);
 
 	ent_used = ap->ap_tblp->alts_ent_used + ap->ap_gbadcnt;
 	ap->ap_ent_secsiz = byte_to_secsiz(ent_used*ALTS_ENT_SIZE, NBPSCTR);
@@ -476,32 +490,30 @@ gen_alts_ent() {
 	}
 
 	ent_used = ent_merge(entp, ap->ap_entp, ap->ap_tblp->alts_ent_used,
-			    ap->ap_gbadp, ap->ap_gbadcnt);
-	if (ap->ap_entp)
-	    free(ap->ap_entp);
-	if (ap->ap_gbadp)
-	    free(ap->ap_gbadp);
+	    ap->ap_gbadp, ap->ap_gbadcnt);
+	free(ap->ap_entp);
+	free(ap->ap_gbadp);
 	ap->ap_entp = entp;
 	ap->ap_ent_secsiz = byte_to_secsiz(ent_used*ALTS_ENT_SIZE, NBPSCTR);
 	ap->ap_tblp->alts_ent_used = ent_used;
 	ap->ap_gbadp = NULL;
 	ap->ap_gbadcnt = 0;
 
-/*	assign alternate sectors to the bad sectors			*/
+	/* assign alternate sectors to the bad sectors */
 	(void) assign_altsctr();
 
-/*	allocate the alts_entry on disk skipping possible bad sectors	*/
+	/* allocate the alts_entry on disk skipping possible bad sectors */
 	ap->ap_tblp->alts_ent_base =
-		altsmap_alloc((blkaddr_t)ap->ap_tblp->alts_map_base +
-			ap->ap_map_sectot, (blkaddr_t)ap->part.p_size,
-			ap->ap_ent_secsiz / NBPSCTR, ALTS_MAP_UP);
+	    altsmap_alloc((blkaddr_t)ap->ap_tblp->alts_map_base +
+	    ap->ap_map_sectot, (blkaddr_t)ap->part.p_size,
+	    ap->ap_ent_secsiz / NBPSCTR, ALTS_MAP_UP);
 	if (ap->ap_tblp->alts_ent_base == 0) {
-	    perror("Unable to allocate alternate entry table on disk: ");
-	    return (65);
+		perror("Unable to allocate alternate entry table on disk: ");
+		return (65);
 	}
 
 	ap->ap_tblp->alts_ent_end = ap->ap_tblp->alts_ent_base +
-			(ap->ap_ent_secsiz / NBPSCTR) - 1;
+	    (ap->ap_ent_secsiz / NBPSCTR) - 1;
 	return (0);
 }
 
@@ -510,7 +522,7 @@ gen_alts_ent() {
  *	assign alternate sectors for bad sector mapping
  */
 static int
-assign_altsctr()
+assign_altsctr(void)
 {
 	uint_t	i;
 	uint_t	j;
@@ -518,26 +530,26 @@ assign_altsctr()
 	uint_t	cluster;
 
 	for (i = 0; i < ap->ap_tblp->alts_ent_used; i++) {
-	    if ((ap->ap_entp)[i].bad_start == (uint32_t)ALTS_ENT_EMPTY)
-		continue;
-	    if ((ap->ap_entp)[i].good_start != 0)
-		continue;
-	    cluster = (ap->ap_entp)[i].bad_end-(ap->ap_entp)[i].bad_start +1;
-	    alts_ind =
-		altsmap_alloc(ap->part.p_size-1, ap->ap_tblp->alts_map_base +
-			ap->ap_map_sectot - 1, cluster, ALTS_MAP_DOWN);
-	    if (alts_ind == 0) {
-		(void) fprintf(stderr,
-	"Unable to allocate alternates for bad starting sector %u.\n",
-			(ap->ap_entp)[i].bad_start);
-		return (65);
-	    }
-	    alts_ind = alts_ind - cluster + 1;
-	    (ap->ap_entp)[i].good_start = alts_ind +ap->part.p_start;
-	    for (j = 0; j < cluster; j++) {
-		(ap->ap_memmapp)[alts_ind+j] = ALTS_BAD;
-	    }
-
+		if ((ap->ap_entp)[i].bad_start == (uint32_t)ALTS_ENT_EMPTY)
+			continue;
+		if ((ap->ap_entp)[i].good_start != 0)
+			continue;
+		cluster =
+		    (ap->ap_entp)[i].bad_end - (ap->ap_entp)[i].bad_start + 1;
+		alts_ind = altsmap_alloc(ap->part.p_size - 1,
+		    ap->ap_tblp->alts_map_base +
+		    ap->ap_map_sectot - 1, cluster, ALTS_MAP_DOWN);
+		if (alts_ind == 0) {
+			(void) fprintf(stderr, "Unable to allocate alternates "
+			    "for bad starting sector %u.\n",
+			    (ap->ap_entp)[i].bad_start);
+			return (65);
+		}
+		alts_ind = alts_ind - cluster + 1;
+		(ap->ap_entp)[i].good_start = alts_ind +ap->part.p_start;
+		for (j = 0; j < cluster; j++) {
+			(ap->ap_memmapp)[alts_ind+j] = ALTS_BAD;
+		}
 	}
 	return (SUCCESS);
 }
@@ -551,7 +563,7 @@ expand_map(void)
 	int	i;
 
 	for (i = 0; i < ap->part.p_size; i++) {
-	    (ap->ap_memmapp)[i] = altsmap_getbit(i);
+		(ap->ap_memmapp)[i] = altsmap_getbit(i);
 	}
 }
 
@@ -567,20 +579,19 @@ compress_map(void)
 	int	maplen = 0;
 
 	for (i = 0, bytesz = 7; i < ap->part.p_size; i++) {
-	    mask |= ((ap->ap_memmapp)[i] << bytesz--);
-	    if (bytesz < 0) {
-		(ap->ap_mapp)[maplen++] = mask;
-		bytesz = 7;
-		mask = 0;
-	    }
+		mask |= ((ap->ap_memmapp)[i] << bytesz--);
+		if (bytesz < 0) {
+			(ap->ap_mapp)[maplen++] = mask;
+			bytesz = 7;
+			mask = 0;
+		}
 	}
-/*
- *	if partition size != multiple number of bytes
- *	then record the last partial byte
- */
+	/*
+	 * if partition size != multiple number of bytes
+	 * then record the last partial byte
+	 */
 	if (bytesz != 7)
-	    (ap->ap_mapp)[maplen] = mask;
-
+		(ap->ap_mapp)[maplen] = mask;
 }
 
 /*
@@ -588,8 +599,7 @@ compress_map(void)
  *	and identify the sector as good or bad
  */
 static int
-altsmap_getbit(badsec)
-blkaddr_t	badsec;
+altsmap_getbit(blkaddr_t badsec)
 {
 	uint_t	slot = badsec / 8;
 	uint_t	field = badsec % 8;
@@ -598,7 +608,7 @@ blkaddr_t	badsec;
 	mask = ALTS_BAD<<7;
 	mask >>= field;
 	if ((ap->ap_mapp)[slot] & mask)
-	    return (ALTS_BAD);
+		return (ALTS_BAD);
 	return (ALTS_GOOD);
 }
 
@@ -607,11 +617,7 @@ blkaddr_t	badsec;
  *	allocate a range of sectors from the alternate partition
  */
 static blkaddr_t
-altsmap_alloc(srt_ind, end_ind, cnt, dir)
-blkaddr_t	srt_ind;
-blkaddr_t	end_ind;
-int	cnt;
-int	dir;
+altsmap_alloc(blkaddr_t srt_ind, blkaddr_t end_ind, int cnt, int dir)
 {
 	blkaddr_t	i;
 	blkaddr_t	total;
@@ -619,15 +625,14 @@ int	dir;
 
 	for (i = srt_ind, first_ind = srt_ind, total = 0;
 	    i != end_ind; i += dir) {
-	    if ((ap->ap_memmapp)[i] == ALTS_BAD) {
-		total = 0;
-		first_ind = i + dir;
-		continue;
-	    }
-	    total++;
-	    if (total == cnt)
-		return (first_ind);
-
+		if ((ap->ap_memmapp)[i] == ALTS_BAD) {
+			total = 0;
+			first_ind = i + dir;
+			continue;
+		}
+		total++;
+		if (total == cnt)
+			return (first_ind);
 	}
 	return (0);
 }
@@ -638,31 +643,29 @@ int	dir;
  *	bubble sort the entry table into ascending order
  */
 static void
-ent_sort(buf, cnt)
-struct	alts_ent buf[];
-int	cnt;
+ent_sort(struct alts_ent buf[], int cnt)
 {
-struct	alts_ent temp;
-int	flag;
-int	i, j;
+	struct	alts_ent temp;
+	int	flag;
+	int	i, j;
 
 	for (i = 0; i < cnt-1; i++) {
-	    temp = buf[cnt-1];
-	    flag = 1;
+		temp = buf[cnt-1];
+		flag = 1;
 
-	    for (j = cnt-1; j > i; j--) {
-		if (buf[j-1].bad_start < temp.bad_start) {
-		    buf[j] = temp;
-		    temp = buf[j-1];
-		} else {
-		    buf[j] = buf[j-1];
-		    flag = 0;
+		for (j = cnt-1; j > i; j--) {
+			if (buf[j-1].bad_start < temp.bad_start) {
+				buf[j] = temp;
+				temp = buf[j - 1];
+			} else {
+				buf[j] = buf[j - 1];
+				flag = 0;
+			}
 		}
-	    }
-	    buf[i] = temp;
-	    if (flag) break;
+		buf[i] = temp;
+		if (flag)
+			break;
 	}
-
 }
 
 
@@ -672,26 +675,25 @@ int	i, j;
  *	before the compression.
  */
 static void
-ent_compress(buf, cnt)
-struct	alts_ent buf[];
-int	cnt;
+ent_compress(struct alts_ent buf[], int cnt)
 {
-int	keyp;
-int	movp;
-int	i;
+	int	keyp;
+	int	movp;
+	int	i;
 
 	for (i = 0; i < cnt; i++) {
-	    if (buf[i].bad_start == (uint32_t)ALTS_ENT_EMPTY)
-		continue;
-	    for (keyp = i, movp = i+1; movp < cnt; movp++) {
-		if (buf[movp].bad_start == (uint32_t)ALTS_ENT_EMPTY)
+		if (buf[i].bad_start == (uint32_t)ALTS_ENT_EMPTY)
 			continue;
-		if (buf[keyp].bad_end+1 != buf[movp].bad_start)
-		    break;
-		buf[keyp].bad_end++;
-		buf[movp].bad_start = (uint32_t)ALTS_ENT_EMPTY;
-	    }
-	    if (movp == cnt) break;
+		for (keyp = i, movp = i+1; movp < cnt; movp++) {
+			if (buf[movp].bad_start == (uint32_t)ALTS_ENT_EMPTY)
+				continue;
+			if (buf[keyp].bad_end+1 != buf[movp].bad_start)
+				break;
+			buf[keyp].bad_end++;
+			buf[movp].bad_start = (uint32_t)ALTS_ENT_EMPTY;
+		}
+		if (movp == cnt)
+			break;
 	}
 }
 
@@ -701,39 +703,35 @@ int	i;
  *	all empty slots in the entry table will be removed.
  */
 static int
-ent_merge(buf, list1, lcnt1, list2, lcnt2)
-struct	alts_ent buf[];
-struct	alts_ent list1[];
-int	lcnt1;
-struct	alts_ent list2[];
-int	lcnt2;
+ent_merge(struct alts_ent buf[], struct alts_ent list1[], int lcnt1,
+    struct alts_ent list2[], int lcnt2)
 {
 	int	i;
 	int	j1, j2;
 
 	for (i = 0, j1 = 0, j2 = 0; j1 < lcnt1 && j2 < lcnt2; ) {
-	    if (list1[j1].bad_start == (uint32_t)ALTS_ENT_EMPTY) {
-		j1++;
-		continue;
-	    }
-	    if (list2[j2].bad_start == (uint32_t)ALTS_ENT_EMPTY) {
-		j2++;
-		continue;
-	    }
-	    if (list1[j1].bad_start < list2[j2].bad_start)
-		buf[i++] = list1[j1++];
-	    else
-		buf[i++] = list2[j2++];
+		if (list1[j1].bad_start == (uint32_t)ALTS_ENT_EMPTY) {
+			j1++;
+			continue;
+		}
+		if (list2[j2].bad_start == (uint32_t)ALTS_ENT_EMPTY) {
+			j2++;
+			continue;
+		}
+		if (list1[j1].bad_start < list2[j2].bad_start)
+			buf[i++] = list1[j1++];
+		else
+			buf[i++] = list2[j2++];
 	}
 	for (; j1 < lcnt1; j1++) {
-	    if (list1[j1].bad_start == (uint32_t)ALTS_ENT_EMPTY)
-		continue;
-	    buf[i++] = list1[j1];
+		if (list1[j1].bad_start == (uint32_t)ALTS_ENT_EMPTY)
+			continue;
+		buf[i++] = list1[j1];
 	}
 	for (; j2 < lcnt2; j2++) {
-	    if (list2[j2].bad_start == (uint32_t)ALTS_ENT_EMPTY)
-		continue;
-	    buf[i++] = list2[j2];
+		if (list2[j2].bad_start == (uint32_t)ALTS_ENT_EMPTY)
+			continue;
+		buf[i++] = list2[j2];
 	}
 	return (i);
 }
@@ -743,10 +741,7 @@ int	lcnt2;
  *	binary search for bad sector in the alternate entry table
  */
 static int
-ent_bsearch(buf, cnt, key)
-struct	alts_ent buf[];
-int	cnt;
-struct	alts_ent *key;
+ent_bsearch(struct alts_ent buf[], int cnt, struct alts_ent *key)
 {
 	int	i;
 	int	ind;
@@ -754,27 +749,31 @@ struct	alts_ent *key;
 	int	mystatus = -1;
 
 	if (!cnt)
-	    return (mystatus);
+		return (mystatus);
 
 	for (i = 1; i <= cnt; i <<= 1)
-	    ind = i;
+		ind = i;
 
 	for (interval = ind; interval; ) {
-	    if ((key->bad_start >= buf[ind-1].bad_start) &&
-		(key->bad_start <= buf[ind-1].bad_end)) {
-		return (mystatus = ind-1);
-	    } else {
-		interval >>= 1;
-		if (!interval) break;
-		if (key->bad_start < buf[ind-1].bad_start) {
-		    ind = ind - interval;
+		if ((key->bad_start >= buf[ind-1].bad_start) &&
+		    (key->bad_start <= buf[ind-1].bad_end)) {
+			return (mystatus = ind-1);
 		} else {
-/*	if key is larger than the last element then break	*/
-		    if (ind == cnt) break;
-		    if ((ind+interval) <= cnt)
-			ind += interval;
+			interval >>= 1;
+			if (!interval) break;
+			if (key->bad_start < buf[ind-1].bad_start) {
+				ind = ind - interval;
+			} else {
+				/*
+				 * if key is larger than the last element,
+				 * then break.
+				 */
+				if (ind == cnt)
+					break;
+				if ((ind + interval) <= cnt)
+					ind += interval;
+			}
 		}
-	    }
 	}
 	return (mystatus);
 }
@@ -783,8 +782,7 @@ struct	alts_ent *key;
  *	check for bad sector in assigned alternate sectors
  */
 static int
-chk_bad_altsctr(badsec)
-blkaddr_t	badsec;
+chk_bad_altsctr(blkaddr_t badsec)
 {
 	int	i;
 	blkaddr_t	numsec;
@@ -794,12 +792,13 @@ blkaddr_t	badsec;
  */
 
 	for (i = 0; i < cnt; i++) {
-	    numsec = (ap->ap_entp)[i].bad_end - (ap->ap_entp)[i].bad_start;
-	    if ((badsec >= (ap->ap_entp)[i].good_start) &&
-		(badsec <= ((ap->ap_entp)[i].good_start + numsec))) {
-		(void) fprintf(stderr,
-		"Bad sector %ld is an assigned alternate sector.\n", badsec);
-		return (66);
+		numsec = (ap->ap_entp)[i].bad_end - (ap->ap_entp)[i].bad_start;
+		if ((badsec >= (ap->ap_entp)[i].good_start) &&
+		    (badsec <= ((ap->ap_entp)[i].good_start + numsec))) {
+			(void) fprintf(stderr,
+			    "Bad sector %ld is an assigned alternate sector.\n",
+			    badsec);
+			return (66);
 /*
  *		if (!numsec) {
  *		    (ap->ap_entp)[i].good_start = 0;
@@ -809,9 +808,9 @@ blkaddr_t	badsec;
  *		intv[1] = 1;
  *		intv[2] = (ap->ap_entp)[i].good_start + numsec - badsec;
  */
-	    }
+		}
 	}
-/*	the bad sector has already been identified as bad		*/
+	/* the bad sector has already been identified as bad */
 	return (SUCCESS);
 
 }
