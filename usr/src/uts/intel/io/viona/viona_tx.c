@@ -699,7 +699,11 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	 * guest can't run concurrently.
 	 */
 	smt_begin_unsafe();
-	mac_tx(link_mch, mp_head, 0, MAC_DROP_ON_NO_DESC, NULL);
+	/*
+	 * Ignore, for now, any signal from MAC about whether the outgoing
+	 * packet was dropped or not.
+	 */
+	(void) mac_tx(link_mch, mp_head, 0, MAC_DROP_ON_NO_DESC, NULL);
 	smt_end_unsafe();
 	return;
 
