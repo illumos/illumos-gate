@@ -212,9 +212,9 @@ void
 vmm_zsd_fini(void)
 {
 	/* Calls vmm_zsd_destroy() on all zones. */
-	zone_key_delete(vmm_zsd_key);
-	ASSERT(list_is_empty(&vmm_zsd_list));
+	VERIFY0(zone_key_delete(vmm_zsd_key));
 
+	ASSERT(list_is_empty(&vmm_zsd_list));
 	list_destroy(&vmm_zsd_list);
 	mutex_destroy(&vmm_zsd_lock);
 }

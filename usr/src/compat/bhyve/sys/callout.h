@@ -44,9 +44,9 @@ struct callout {
  */
 #define	callout_pending(c)	((c)->c_target > (c)->c_fired)
 
-void	vmm_glue_callout_init(struct callout *c, int mpsafe);
-int	vmm_glue_callout_stop(struct callout *c);
-int	vmm_glue_callout_drain(struct callout *c);
+void vmm_glue_callout_init(struct callout *c, int mpsafe);
+void vmm_glue_callout_stop(struct callout *c);
+void vmm_glue_callout_drain(struct callout *c);
 
 /* illumos-custom function for resource locality optimization */
 void	vmm_glue_callout_localize(struct callout *c);
@@ -57,16 +57,16 @@ callout_init(struct callout *c, int mpsafe)
 	vmm_glue_callout_init(c, mpsafe);
 }
 
-static __inline int
+static __inline void
 callout_stop(struct callout *c)
 {
-	return (vmm_glue_callout_stop(c));
+	vmm_glue_callout_stop(c);
 }
 
-static __inline int
+static __inline void
 callout_drain(struct callout *c)
 {
-	return (vmm_glue_callout_drain(c));
+	vmm_glue_callout_drain(c);
 }
 
 void callout_reset_hrtime(struct callout *c, hrtime_t target,

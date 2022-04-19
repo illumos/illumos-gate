@@ -1118,7 +1118,7 @@ ppt_unassign_device(struct vm *vm, int pptfd)
 	return (err);
 }
 
-int
+void
 ppt_unassign_all(struct vm *vm)
 {
 	struct pptdev *ppt;
@@ -1131,8 +1131,6 @@ ppt_unassign_all(struct vm *vm)
 		}
 	}
 	mutex_exit(&pptdev_mtx);
-
-	return (0);
 }
 
 int

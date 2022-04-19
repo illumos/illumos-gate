@@ -925,6 +925,7 @@ svm_save_exitintinfo(struct svm_softc *svm_sc, int vcpu)
 {
 	struct vmcb_ctrl *ctrl;
 	uint64_t intinfo;
+	int err;
 
 	ctrl  = svm_get_vmcb_ctrl(svm_sc, vcpu);
 	intinfo = ctrl->exitintinfo;
@@ -940,7 +941,8 @@ svm_save_exitintinfo(struct svm_softc *svm_sc, int vcpu)
 	VCPU_CTR2(svm_sc->vm, vcpu, "SVM:Pending INTINFO(0x%lx), vector=%d.\n",
 	    intinfo, VMCB_EXITINTINFO_VECTOR(intinfo));
 	vmm_stat_incr(svm_sc->vm, vcpu, VCPU_EXITINTINFO, 1);
-	vm_exit_intinfo(svm_sc->vm, vcpu, intinfo);
+	err = vm_exit_intinfo(svm_sc->vm, vcpu, intinfo);
+	VERIFY0(err);
 }
 
 static __inline int
@@ -1443,7 +1445,7 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_INOUT, 1);
 		break;
 	case VMCB_EXIT_SHUTDOWN:
-		vm_suspend(svm_sc->vm, VM_SUSPEND_TRIPLEFAULT);
+		(void) vm_suspend(svm_sc->vm, VM_SUSPEND_TRIPLEFAULT);
 		handled = 1;
 		break;
 	case VMCB_EXIT_INVD:

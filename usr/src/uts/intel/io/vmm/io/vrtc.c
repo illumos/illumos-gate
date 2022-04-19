@@ -606,8 +606,8 @@ vrtc_set_reg_c(struct vrtc *vrtc, uint8_t newval)
 
 	if (!oldirqf && newirqf) {
 		VM_CTR1(vrtc->vm, "RTC irq %d asserted", RTC_IRQ);
-		vatpic_pulse_irq(vrtc->vm, RTC_IRQ);
-		vioapic_pulse_irq(vrtc->vm, RTC_IRQ);
+		(void) vatpic_pulse_irq(vrtc->vm, RTC_IRQ);
+		(void) vioapic_pulse_irq(vrtc->vm, RTC_IRQ);
 	} else if (oldirqf && !newirqf) {
 		VM_CTR1(vrtc->vm, "RTC irq %d deasserted", RTC_IRQ);
 	}
@@ -873,7 +873,7 @@ vrtc_data_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
 
 	error = 0;
 	curtime = vrtc_curtime(vrtc, &basetime);
-	vrtc_time_update(vrtc, curtime, basetime);
+	(void) vrtc_time_update(vrtc, curtime, basetime);
 
 	/*
 	 * Update RTC date/time fields if necessary.
@@ -953,7 +953,8 @@ vrtc_reset(struct vrtc *vrtc)
 	VRTC_LOCK(vrtc);
 
 	rtc = &vrtc->rtcdev;
-	vrtc_set_reg_b(vrtc, rtc->reg_b & ~(RTCSB_ALL_INTRS | RTCSB_SQWE));
+	(void) vrtc_set_reg_b(vrtc,
+	    rtc->reg_b & ~(RTCSB_ALL_INTRS | RTCSB_SQWE));
 	vrtc_set_reg_c(vrtc, 0);
 	KASSERT(!callout_active(&vrtc->callout), ("rtc callout still active"));
 
@@ -966,6 +967,7 @@ vrtc_init(struct vm *vm)
 	struct vrtc *vrtc;
 	struct rtcdev *rtc;
 	time_t curtime;
+	int error;
 
 	vrtc = malloc(sizeof (struct vrtc), M_VRTC, M_WAITOK | M_ZERO);
 	vrtc->vm = vm;
@@ -989,7 +991,8 @@ vrtc_init(struct vm *vm)
 
 	VRTC_LOCK(vrtc);
 	vrtc->base_rtctime = VRTC_BROKEN_TIME;
-	vrtc_time_update(vrtc, curtime, gethrtime());
+	error = vrtc_time_update(vrtc, curtime, gethrtime());
+	VERIFY0(error);
 	secs_to_rtc(curtime, vrtc, 0);
 	VRTC_UNLOCK(vrtc);
 

@@ -163,8 +163,8 @@ vatpit_callout_handler(void *a)
 		pit_timer_start_cntr0(vatpit);
 	}
 
-	vatpic_pulse_irq(vatpit->vm, 0);
-	vioapic_pulse_irq(vatpit->vm, 2);
+	(void) vatpic_pulse_irq(vatpit->vm, 0);
+	(void) vioapic_pulse_irq(vatpit->vm, 2);
 
 done:
 	VATPIT_UNLOCK(vatpit);
@@ -323,7 +323,7 @@ vatpit_update_mode(struct vatpit *vatpit, uint8_t val)
 
 	c = &vatpit->channel[sel >> 6];
 	if (rw == TIMER_LATCH) {
-		pit_update_counter(vatpit, c, true);
+		(void) pit_update_counter(vatpit, c, true);
 	} else {
 		c->mode = mode;
 		c->olatched = false;	/* reset latch after reprogramming */

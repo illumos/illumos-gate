@@ -136,10 +136,10 @@ vmm_stat_desc_copy(int index, char *buf, int bufsize)
 		vst = vsttab[i];
 		if (index >= vst->index && index < vst->index + vst->nelems) {
 			if (vst->nelems > 1) {
-				snprintf(buf, bufsize, "%s[%d]",
+				(void) snprintf(buf, bufsize, "%s[%d]",
 				    vst->desc, index - vst->index);
 			} else {
-				strlcpy(buf, vst->desc, bufsize);
+				(void) strlcpy(buf, vst->desc, bufsize);
 			}
 			return (0);	/* found it */
 		}

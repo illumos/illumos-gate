@@ -1329,7 +1329,7 @@ vmp_release_inner(vm_page_t *vmp, vm_client_t *vmc)
 
 		if ((vmp->vmp_prot & PROT_WRITE) != 0 && vmc->vmc_track_dirty) {
 			vmm_gpt_t *gpt = vmc->vmc_space->vms_gpt;
-			vmm_gpt_reset_dirty(gpt, vmp->vmp_ptep, true);
+			(void) vmm_gpt_reset_dirty(gpt, vmp->vmp_ptep, true);
 		}
 	}
 	kmem_free(vmp, sizeof (*vmp));

@@ -531,7 +531,11 @@ vmmr_free(vmmr_region_t *region)
 	mutex_exit(&vmmr_lock);
 
 	if (region->vr_transient) {
-		vmmr_remove(region->vr_size, true);
+		/*
+		 * Since the transient capacity was previously allocated for
+		 * this region, its removal should not fail.
+		 */
+		VERIFY0(vmmr_remove(region->vr_size, true));
 	}
 	kmem_free(region, sizeof (*region));
 }

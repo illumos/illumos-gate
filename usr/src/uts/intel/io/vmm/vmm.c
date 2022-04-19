@@ -366,14 +366,14 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 
 	vcpu->run_state = VRS_HALT;
 	vcpu->vlapic = VLAPIC_INIT(vm->cookie, vcpu_id);
-	vm_set_x2apic_state(vm, vcpu_id, X2APIC_DISABLED);
+	(void) vm_set_x2apic_state(vm, vcpu_id, X2APIC_DISABLED);
 	vcpu->reqidle = 0;
 	vcpu->exitintinfo = 0;
 	vcpu->nmi_pending = 0;
 	vcpu->extint_pending = 0;
 	vcpu->exception_pending = 0;
 	vcpu->guest_xcr0 = XFEATURE_ENABLED_X87;
-	hma_fpu_init(vcpu->guestfpu);
+	(void) hma_fpu_init(vcpu->guestfpu);
 	vmm_stat_init(vcpu->stats);
 	vcpu->tsc_offset = 0;
 }
@@ -526,7 +526,7 @@ vm_create(const char *name, uint64_t flags, struct vm **retvm)
 		return (ENOMEM);
 
 	vm = malloc(sizeof (struct vm), M_VM, M_WAITOK | M_ZERO);
-	strcpy(vm->name, name);
+	(void) strlcpy(vm->name, name, sizeof (vm->name));
 
 	vm->vmspace = vmspace;
 	vm->mem_transient = (flags & VCF_RESERVOIR_MEM) == 0;
@@ -857,7 +857,7 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 	if ((flags & VM_MEMMAP_F_WIRED) != 0) {
 		error = vmspace_populate(vm->vmspace, gpa, gpa + len);
 		if (error != 0) {
-			vmspace_unmap(vm->vmspace, gpa, gpa + len);
+			VERIFY0(vmspace_unmap(vm->vmspace, gpa, gpa + len));
 			return (EFAULT);
 		}
 	}
@@ -1012,7 +1012,7 @@ vm_iommu_modify(struct vm *vm, bool map)
 			vmp = vmc_hold(vmc, gpa, PROT_WRITE);
 			ASSERT(vmp != NULL);
 			hpa = ((uintptr_t)vmp_get_pfn(vmp) << PAGESHIFT);
-			vmp_release(vmp);
+			(void) vmp_release(vmp);
 
 			if (map) {
 				iommu_create_mapping(vm->iommu, gpa, hpa, sz);
@@ -1470,8 +1470,9 @@ vm_handle_hlt(struct vm *vm, int vcpuid, bool intr_disabled)
 
 	vcpu_unlock(vcpu);
 
-	if (vm_halted)
-		vm_suspend(vm, VM_SUSPEND_HALT);
+	if (vm_halted) {
+		(void) vm_suspend(vm, VM_SUSPEND_HALT);
+	}
 
 	return (userspace_exit ? -1 : 0);
 }
@@ -2312,7 +2313,7 @@ restart:
 		affinity_type = CPU_BEST;
 		break;
 	case VM_EXITCODE_MTRAP:
-		vm_suspend_cpu(vm, vcpuid);
+		VERIFY0(vm_suspend_cpu(vm, vcpuid));
 		error = -1;
 		break;
 	default:
@@ -2483,7 +2484,7 @@ nested_fault(struct vm *vm, int vcpuid, uint64_t info1, uint64_t info2,
 	if (type1 == VM_INTINFO_HWEXCEPTION && vector1 == IDT_DF) {
 		VCPU_CTR2(vm, vcpuid, "triple fault: info1(%lx), info2(%lx)",
 		    info1, info2);
-		vm_suspend(vm, VM_SUSPEND_TRIPLEFAULT);
+		(void) vm_suspend(vm, VM_SUSPEND_TRIPLEFAULT);
 		*retinfo = 0;
 		return (0);
 	}
@@ -2637,8 +2638,9 @@ vm_inject_exception(struct vm *vm, int vcpuid, int vector, int errcode_valid,
 	KASSERT(error == 0, ("%s: error %d clearing interrupt shadow",
 	    __func__, error));
 
-	if (restart_instruction)
-		vm_restart_instruction(vm, vcpuid);
+	if (restart_instruction) {
+		VERIFY0(vm_restart_instruction(vm, vcpuid));
+	}
 
 	vcpu->exception_pending = 1;
 	vcpu->exc_vector = vector;
@@ -2960,7 +2962,7 @@ vcpu_arch_reset(struct vm *vm, int vcpuid, bool init_only)
 	 */
 	if (!init_only) {
 		vcpu->guest_xcr0 = XFEATURE_ENABLED_X87;
-		hma_fpu_init(vcpu->guestfpu);
+		(void) hma_fpu_init(vcpu->guestfpu);
 
 		/* XXX: clear MSRs and other pieces */
 	}
@@ -3464,7 +3466,7 @@ vm_copy_teardown(struct vm *vm, int vcpuid, struct vm_copyinfo *copyinfo,
 {
 	for (uint_t idx = 0; idx < num_copyinfo; idx++) {
 		if (copyinfo[idx].cookie != NULL) {
-			vmp_release((vm_page_t *)copyinfo[idx].cookie);
+			(void) vmp_release((vm_page_t *)copyinfo[idx].cookie);
 		}
 	}
 	bzero(copyinfo, num_copyinfo * sizeof (struct vm_copyinfo));

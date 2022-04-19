@@ -320,7 +320,7 @@ vcpu_unlock_one(vmm_softc_t *sc, int vcpu)
 	ASSERT(vcpu >= 0 && vcpu < VM_MAXCPU);
 
 	VERIFY3U(vcpu_get_state(sc->vmm_vm, vcpu, NULL), ==, VCPU_FROZEN);
-	vcpu_set_state(sc->vmm_vm, vcpu, VCPU_IDLE, false);
+	VERIFY0(vcpu_set_state(sc->vmm_vm, vcpu, VCPU_IDLE, false));
 }
 
 static void
@@ -1981,13 +1981,13 @@ vmm_drv_page_hold(vmm_lease_t *lease, uintptr_t gpa, int prot)
 void
 vmm_drv_page_release(vmm_page_t *vmmp)
 {
-	vmp_release((vm_page_t *)vmmp);
+	(void) vmp_release((vm_page_t *)vmmp);
 }
 
 void
 vmm_drv_page_release_chain(vmm_page_t *vmmp)
 {
-	vmp_release_chain((vm_page_t *)vmmp);
+	(void) vmp_release_chain((vm_page_t *)vmmp);
 }
 
 const void *
