@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
+ * Copyright 2019 Unix Software Ltd.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Racktop Systems.
  * Copyright 2022 Oxide Computer Company.
@@ -109,6 +110,17 @@
  * minor nodes are open(9E), close(9E), and ioctl(9E). This serves as the
  * interface for the nvmeadm(8) utility.
  *
+ * Exclusive opens are required for certain ioctl(9E) operations that alter
+ * controller and/or namespace state. While different namespaces may be opened
+ * exclusively in parallel, an exclusive open of the controller minor node
+ * requires that no namespaces are currently open (exclusive or otherwise).
+ * Opening any namespace minor node (exclusive or otherwise) will fail while
+ * the controller minor node is opened exclusively by any other thread. Thus it
+ * is possible for one thread at a time to open the controller minor node
+ * exclusively, and keep it open while opening any namespace minor node of the
+ * same controller, exclusively or otherwise.
+ *
+ *
  *
  * Blkdev Interface:
  *
@@ -194,8 +206,16 @@
  * mutex is non-contentious but is required for implementation completeness
  * and safety.
  *
- * Each minor node has its own nm_mutex, which protects the open count nm_ocnt
- * and exclusive-open flag nm_oexcl.
+ * There is one mutex n_minor_mutex which protects all open flags nm_open and
+ * exclusive-open thread pointers nm_oexcl of each minor node associated with a
+ * controller and its namespaces.
+ *
+ * In addition, there is one mutex n_mgmt_mutex which must be held whenever the
+ * driver state for any namespace is changed, especially across calls to
+ * nvme_init_ns(), nvme_attach_ns() and nvme_detach_ns(). Except when detaching
+ * nvme, it should also be held across calls that modify the blkdev handle of a
+ * namespace. Command and queue mutexes may be acquired and released while
+ * n_mgmt_mutex is held, n_minor_mutex should not.
  *
  *
  * Quiesce / Fast Reboot:
@@ -443,7 +463,11 @@ static int nvme_open(dev_t *, int, int, cred_t *);
 static int nvme_close(dev_t, int, int, cred_t *);
 static int nvme_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
-static void nvme_changed_ns(nvme_t *, int);
+static int nvme_init_ns(nvme_t *, int);
+static int nvme_attach_ns(nvme_t *, int);
+static int nvme_detach_ns(nvme_t *, int);
+
+#define	NVME_NSID2NS(nvme, nsid)	(&((nvme)->n_ns[(nsid) - 1]))
 
 static ddi_ufm_ops_t nvme_ufm_ops = {
 	NULL,
@@ -1950,13 +1974,24 @@ nvme_async_event_task(void *arg)
 				break;
 			}
 
+			mutex_enter(&nvme->n_mgmt_mutex);
 			for (uint_t i = 0; i < NVME_NSCHANGE_LIST_SIZE; i++) {
 				uint32_t nsid = nslist->nscl_ns[i];
 
 				if (nsid == 0)	/* end of list */
 					break;
-				nvme_changed_ns(nvme, nsid);
+
+				dev_err(nvme->n_dip, CE_NOTE,
+				    "!namespace %u (%s) has changed.", nsid,
+				    NVME_NSID2NS(nvme, nsid)->ns_name);
+
+				if (nvme_init_ns(nvme, nsid) != DDI_SUCCESS)
+					continue;
+
+				bd_state_change(
+				    NVME_NSID2NS(nvme, nsid)->ns_bd_hdl);
 			}
+			mutex_exit(&nvme->n_mgmt_mutex);
 
 			break;
 
@@ -2685,60 +2720,30 @@ nvme_prepare_devid(nvme_t *nvme, uint32_t nsid)
 	model[sizeof (nvme->n_idctl->id_model)] = '\0';
 	serial[sizeof (nvme->n_idctl->id_serial)] = '\0';
 
-	nvme->n_ns[nsid - 1].ns_devid = kmem_asprintf("%4X-%s-%s-%X",
+	NVME_NSID2NS(nvme, nsid)->ns_devid = kmem_asprintf("%4X-%s-%s-%X",
 	    nvme->n_idctl->id_vid, model, serial, nsid);
-}
-
-static void
-nvme_changed_ns(nvme_t *nvme, int nsid)
-{
-	nvme_namespace_t *ns = &nvme->n_ns[nsid - 1];
-	nvme_identify_nsid_t *idns, *oidns;
-
-	dev_err(nvme->n_dip, CE_NOTE, "!namespace %u (%s) has changed.",
-	    nsid, ns->ns_name);
-
-	if (ns->ns_ignore)
-		return;
-
-	/*
-	 * The namespace has changed in some way. At present, we only update
-	 * the device capacity and trigger blkdev to check the device state.
-	 */
-
-	if (nvme_identify(nvme, B_FALSE, nsid, (void **)&idns) != 0) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!failed to identify namespace %d", nsid);
-		return;
-	}
-
-	oidns = ns->ns_idns;
-	ns->ns_idns = idns;
-	kmem_free(oidns, sizeof (nvme_identify_nsid_t));
-
-	ns->ns_block_count = idns->id_nsize;
-	ns->ns_block_size =
-	    1 << idns->id_lbaf[idns->id_flbas.lba_format].lbaf_lbads;
-	ns->ns_best_block_size = ns->ns_block_size;
-
-	bd_state_change(ns->ns_bd_hdl);
 }
 
 static int
 nvme_init_ns(nvme_t *nvme, int nsid)
 {
-	nvme_namespace_t *ns = &nvme->n_ns[nsid - 1];
+	nvme_namespace_t *ns = NVME_NSID2NS(nvme, nsid);
 	nvme_identify_nsid_t *idns;
 	boolean_t was_ignored;
 	int last_rp;
 
 	ns->ns_nvme = nvme;
 
+	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+
 	if (nvme_identify(nvme, B_FALSE, nsid, (void **)&idns) != 0) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!failed to identify namespace %d", nsid);
 		return (DDI_FAILURE);
 	}
+
+	if (ns->ns_idns != NULL)
+		kmem_free(ns->ns_idns, sizeof (nvme_identify_nsid_t));
 
 	ns->ns_idns = idns;
 	ns->ns_id = nsid;
@@ -2829,6 +2834,61 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 	}
 
 	return (DDI_SUCCESS);
+}
+
+static int
+nvme_attach_ns(nvme_t *nvme, int nsid)
+{
+	nvme_namespace_t *ns = NVME_NSID2NS(nvme, nsid);
+
+	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+
+	if (ns->ns_ignore)
+		return (ENOTSUP);
+
+	if (ns->ns_bd_hdl == NULL) {
+		bd_ops_t ops = nvme_bd_ops;
+
+		if (!nvme->n_idctl->id_oncs.on_dset_mgmt)
+			ops.o_free_space = NULL;
+
+		ns->ns_bd_hdl = bd_alloc_handle(ns, &ops, &nvme->n_prp_dma_attr,
+		    KM_SLEEP);
+
+		if (ns->ns_bd_hdl == NULL) {
+			dev_err(nvme->n_dip, CE_WARN, "!Failed to get blkdev "
+			    "handle for namespace id %d", nsid);
+			return (EINVAL);
+		}
+	}
+
+	if (bd_attach_handle(nvme->n_dip, ns->ns_bd_hdl) != DDI_SUCCESS)
+		return (EBUSY);
+
+	ns->ns_attached = B_TRUE;
+
+	return (0);
+}
+
+static int
+nvme_detach_ns(nvme_t *nvme, int nsid)
+{
+	nvme_namespace_t *ns = NVME_NSID2NS(nvme, nsid);
+	int rv;
+
+	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
+
+	if (ns->ns_ignore || !ns->ns_attached)
+		return (0);
+
+	ASSERT(ns->ns_bd_hdl != NULL);
+	rv = bd_detach_handle(ns->ns_bd_hdl);
+	if (rv != DDI_SUCCESS)
+		return (EBUSY);
+	else
+		ns->ns_attached = B_FALSE;
+
+	return (0);
 }
 
 static int
@@ -3165,14 +3225,6 @@ nvme_init(nvme_t *nvme)
 
 	nvme->n_ns = kmem_zalloc(sizeof (nvme_namespace_t) *
 	    nvme->n_namespace_count, KM_SLEEP);
-
-	for (i = 0; i != nvme->n_namespace_count; i++) {
-		mutex_init(&nvme->n_ns[i].ns_minor.nm_mutex, NULL, MUTEX_DRIVER,
-		    NULL);
-		nvme->n_ns[i].ns_ignore = B_TRUE;
-		if (nvme_init_ns(nvme, i + 1) != DDI_SUCCESS)
-			goto fail;
-	}
 
 	/*
 	 * Try to set up MSI/MSI-X interrupts.
@@ -3526,7 +3578,6 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	off_t regsize;
 	int i;
 	char name[32];
-	bd_ops_t ops = nvme_bd_ops;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -3551,7 +3602,8 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	mutex_init(&nvme->n_minor.nm_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&nvme->n_minor_mutex, NULL, MUTEX_DRIVER, NULL);
+	nvme->n_progress |= NVME_MUTEX_INIT;
 
 	nvme->n_strict_version = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "strict-version", 1) == 1 ? B_TRUE : B_FALSE;
@@ -3687,9 +3739,6 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (nvme_init(nvme) != DDI_SUCCESS)
 		goto fail;
 
-	if (!nvme->n_idctl->id_oncs.on_dset_mgmt)
-		ops.o_free_space = NULL;
-
 	/*
 	 * Initialize the driver with the UFM subsystem
 	 */
@@ -3702,38 +3751,47 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_ufm_update(nvme->n_ufmh);
 	nvme->n_progress |= NVME_UFM_INIT;
 
+	mutex_init(&nvme->n_mgmt_mutex, NULL, MUTEX_DRIVER, NULL);
+	nvme->n_progress |= NVME_MGMT_INIT;
+
 	/*
-	 * Attach the blkdev driver for each namespace.
+	 * Identify and attach namespaces.
 	 */
-	for (i = 0; i != nvme->n_namespace_count; i++) {
-		if (ddi_create_minor_node(nvme->n_dip, nvme->n_ns[i].ns_name,
-		    S_IFCHR, NVME_MINOR(ddi_get_instance(nvme->n_dip), i + 1),
+	mutex_enter(&nvme->n_mgmt_mutex);
+
+	for (i = 1; i <= nvme->n_namespace_count; i++) {
+		nvme_namespace_t *ns = NVME_NSID2NS(nvme, i);
+		int rv;
+
+		/*
+		 * Namespaces start out ignored. When nvme_init_ns() checks
+		 * their properties and finds they can be used, it will set
+		 * ns_ignore to B_FALSE. It will also use this state change
+		 * to keep an accurate count of attachable namespaces.
+		 */
+		ns->ns_ignore = B_TRUE;
+		if (nvme_init_ns(nvme, i) != 0) {
+			mutex_exit(&nvme->n_mgmt_mutex);
+			goto fail;
+		}
+
+		rv = nvme_attach_ns(nvme, i);
+		if (rv != 0 && rv != ENOTSUP) {
+			mutex_exit(&nvme->n_mgmt_mutex);
+			goto fail;
+		}
+
+		if (ddi_create_minor_node(nvme->n_dip, ns->ns_name, S_IFCHR,
+		    NVME_MINOR(ddi_get_instance(nvme->n_dip), i),
 		    DDI_NT_NVME_ATTACHMENT_POINT, 0) != DDI_SUCCESS) {
+			mutex_exit(&nvme->n_mgmt_mutex);
 			dev_err(dip, CE_WARN,
 			    "!failed to create minor node for namespace %d", i);
 			goto fail;
 		}
-
-		if (nvme->n_ns[i].ns_ignore)
-			continue;
-
-		nvme->n_ns[i].ns_bd_hdl = bd_alloc_handle(&nvme->n_ns[i],
-		    &ops, &nvme->n_prp_dma_attr, KM_SLEEP);
-
-		if (nvme->n_ns[i].ns_bd_hdl == NULL) {
-			dev_err(dip, CE_WARN,
-			    "!failed to get blkdev handle for namespace %d", i);
-			goto fail;
-		}
-
-		if (bd_attach_handle(dip, nvme->n_ns[i].ns_bd_hdl)
-		    != DDI_SUCCESS) {
-			dev_err(dip, CE_WARN,
-			    "!failed to attach blkdev handle for namespace %d",
-			    i);
-			goto fail;
-		}
 	}
+
+	mutex_exit(&nvme->n_mgmt_mutex);
 
 	if (ddi_create_minor_node(dip, "devctl", S_IFCHR,
 	    NVME_MINOR(ddi_get_instance(dip), 0), DDI_NT_NVME_NEXUS, 0)
@@ -3772,29 +3830,33 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	ddi_remove_minor_node(dip, "devctl");
-	mutex_destroy(&nvme->n_minor.nm_mutex);
 
 	if (nvme->n_ns) {
-		for (i = 0; i != nvme->n_namespace_count; i++) {
-			ddi_remove_minor_node(dip, nvme->n_ns[i].ns_name);
-			mutex_destroy(&nvme->n_ns[i].ns_minor.nm_mutex);
+		for (i = 1; i <= nvme->n_namespace_count; i++) {
+			nvme_namespace_t *ns = NVME_NSID2NS(nvme, i);
 
-			if (nvme->n_ns[i].ns_bd_hdl) {
-				(void) bd_detach_handle(
-				    nvme->n_ns[i].ns_bd_hdl);
-				bd_free_handle(nvme->n_ns[i].ns_bd_hdl);
+			ddi_remove_minor_node(dip, ns->ns_name);
+
+			if (ns->ns_bd_hdl) {
+				(void) bd_detach_handle(ns->ns_bd_hdl);
+				bd_free_handle(ns->ns_bd_hdl);
 			}
 
-			if (nvme->n_ns[i].ns_idns)
-				kmem_free(nvme->n_ns[i].ns_idns,
+			if (ns->ns_idns)
+				kmem_free(ns->ns_idns,
 				    sizeof (nvme_identify_nsid_t));
-			if (nvme->n_ns[i].ns_devid)
-				strfree(nvme->n_ns[i].ns_devid);
+			if (ns->ns_devid)
+				strfree(ns->ns_devid);
 		}
 
 		kmem_free(nvme->n_ns, sizeof (nvme_namespace_t) *
 		    nvme->n_namespace_count);
 	}
+
+	if (nvme->n_progress & NVME_MGMT_INIT) {
+		mutex_destroy(&nvme->n_mgmt_mutex);
+	}
+
 	if (nvme->n_progress & NVME_UFM_INIT) {
 		ddi_ufm_fini(nvme->n_ufmh);
 		mutex_destroy(&nvme->n_fwslot_mutex);
@@ -3806,6 +3868,10 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	for (i = 0; i < nvme->n_cq_count; i++) {
 		if (nvme->n_cq[i]->ncq_cmd_taskq != NULL)
 			taskq_wait(nvme->n_cq[i]->ncq_cmd_taskq);
+	}
+
+	if (nvme->n_progress & NVME_MUTEX_INIT) {
+		mutex_destroy(&nvme->n_minor_mutex);
 	}
 
 	if (nvme->n_ioq_count > 0) {
@@ -4101,6 +4167,18 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 	nvme_namespace_t *ns = arg;
 	nvme_t *nvme = ns->ns_nvme;
 	uint_t ns_count = MAX(1, nvme->n_namespaces_attachable);
+	boolean_t mutex_exit_needed = B_TRUE;
+
+	/*
+	 * nvme_bd_driveinfo is called by blkdev in two situations:
+	 * - during bd_attach_handle(), which we call with the mutex held
+	 * - during bd_attach(), which may be called with or without the
+	 *   mutex held
+	 */
+	if (mutex_owned(&nvme->n_mgmt_mutex))
+		mutex_exit_needed = B_FALSE;
+	else
+		mutex_enter(&nvme->n_mgmt_mutex);
 
 	/*
 	 * Set the blkdev qcount to the number of submission queues.
@@ -4165,6 +4243,9 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 	 */
 	if (nvme->n_idctl->id_oncs.on_dset_mgmt)
 		drive->d_max_free_seg = NVME_DSET_MGMT_MAX_RANGES;
+
+	if (mutex_exit_needed)
+		mutex_exit(&nvme->n_mgmt_mutex);
 }
 
 static int
@@ -4172,10 +4253,22 @@ nvme_bd_mediainfo(void *arg, bd_media_t *media)
 {
 	nvme_namespace_t *ns = arg;
 	nvme_t *nvme = ns->ns_nvme;
+	boolean_t mutex_exit_needed = B_TRUE;
 
 	if (nvme->n_dead) {
 		return (EIO);
 	}
+
+	/*
+	 * nvme_bd_mediainfo is called by blkdev in various situations,
+	 * most of them out of our control. There's one exception though:
+	 * When we call bd_state_change() in response to "namespace change"
+	 * notification, where the mutex is already being held by us.
+	 */
+	if (mutex_owned(&nvme->n_mgmt_mutex))
+		mutex_exit_needed = B_FALSE;
+	else
+		mutex_enter(&nvme->n_mgmt_mutex);
 
 	media->m_nblks = ns->ns_block_count;
 	media->m_blksize = ns->ns_block_size;
@@ -4183,6 +4276,9 @@ nvme_bd_mediainfo(void *arg, bd_media_t *media)
 	media->m_solidstate = B_TRUE;
 
 	media->m_pblksize = ns->ns_best_block_size;
+
+	if (mutex_exit_needed)
+		mutex_exit(&nvme->n_mgmt_mutex);
 
 	return (0);
 }
@@ -4333,26 +4429,46 @@ nvme_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	if (nvme->n_dead)
 		return (EIO);
 
-	nm = nsid == 0 ? &nvme->n_minor : &nvme->n_ns[nsid - 1].ns_minor;
+	mutex_enter(&nvme->n_minor_mutex);
 
-	mutex_enter(&nm->nm_mutex);
-	if (nm->nm_oexcl) {
+	/*
+	 * First check the devctl node and error out if it's been opened
+	 * exclusively already by any other thread.
+	 */
+	if (nvme->n_minor.nm_oexcl != NULL &&
+	    nvme->n_minor.nm_oexcl != curthread) {
 		rv = EBUSY;
 		goto out;
 	}
 
+	nm = nsid == 0 ? &nvme->n_minor : &(NVME_NSID2NS(nvme, nsid)->ns_minor);
+
 	if (flag & FEXCL) {
-		if (nm->nm_ocnt != 0) {
+		if (nm->nm_oexcl != NULL || nm->nm_open) {
 			rv = EBUSY;
 			goto out;
 		}
-		nm->nm_oexcl = B_TRUE;
+
+		/*
+		 * If at least one namespace is already open, fail the
+		 * exclusive open of the devctl node.
+		 */
+		if (nsid == 0) {
+			for (int i = 1; i <= nvme->n_namespace_count; i++) {
+				if (NVME_NSID2NS(nvme, i)->ns_minor.nm_open) {
+					rv = EBUSY;
+					goto out;
+				}
+			}
+		}
+
+		nm->nm_oexcl = curthread;
 	}
 
-	nm->nm_ocnt++;
+	nm->nm_open = B_TRUE;
 
 out:
-	mutex_exit(&nm->nm_mutex);
+	mutex_exit(&nvme->n_minor_mutex);
 	return (rv);
 
 }
@@ -4378,15 +4494,17 @@ nvme_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	if (nsid > nvme->n_namespace_count)
 		return (ENXIO);
 
-	nm = nsid == 0 ? &nvme->n_minor : &nvme->n_ns[nsid - 1].ns_minor;
+	nm = nsid == 0 ? &nvme->n_minor : &(NVME_NSID2NS(nvme, nsid)->ns_minor);
 
-	mutex_enter(&nm->nm_mutex);
-	if (nm->nm_oexcl)
-		nm->nm_oexcl = B_FALSE;
+	mutex_enter(&nvme->n_minor_mutex);
+	if (nm->nm_oexcl != NULL) {
+		ASSERT(nm->nm_oexcl == curthread);
+		nm->nm_oexcl = NULL;
+	}
 
-	ASSERT(nm->nm_ocnt > 0);
-	nm->nm_ocnt--;
-	mutex_exit(&nm->nm_mutex);
+	ASSERT(nm->nm_open);
+	nm->nm_open = B_FALSE;
+	mutex_exit(&nvme->n_minor_mutex);
 
 	return (0);
 }
@@ -4766,10 +4884,19 @@ nvme_ioctl_format(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 {
 	_NOTE(ARGUNUSED(mode));
 	nvme_format_nvm_t frmt = { 0 };
-	int c_nsid = nsid != 0 ? nsid - 1 : 0;
+	int c_nsid = nsid != 0 ? nsid : 1;
+	nvme_identify_nsid_t *idns;
+	nvme_minor_state_t *nm;
 
 	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
 		return (EPERM);
+
+	nm = nsid == 0 ? &nvme->n_minor : &(NVME_NSID2NS(nvme, nsid)->ns_minor);
+	if (nm->nm_oexcl != curthread)
+		return (EACCES);
+
+	if (nsid != 0 && NVME_NSID2NS(nvme, nsid)->ns_attached)
+		return (EBUSY);
 
 	frmt.r = nioc->n_arg & 0xffffffff;
 
@@ -4800,8 +4927,9 @@ nvme_ioctl_format(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	 * Don't allow formatting using an illegal LBA format, or any LBA format
 	 * that uses metadata.
 	 */
-	if (frmt.b.fm_lbaf > nvme->n_ns[c_nsid].ns_idns->id_nlbaf ||
-	    nvme->n_ns[c_nsid].ns_idns->id_lbaf[frmt.b.fm_lbaf].lbaf_ms != 0)
+	idns = NVME_NSID2NS(nvme, c_nsid)->ns_idns;
+	if (frmt.b.fm_lbaf > idns->id_nlbaf ||
+	    idns->id_lbaf[frmt.b.fm_lbaf].lbaf_ms != 0)
 		return (EINVAL);
 
 	/*
@@ -4824,7 +4952,7 @@ nvme_ioctl_detach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
     cred_t *cred_p)
 {
 	_NOTE(ARGUNUSED(nioc, mode));
-	int rv = 0;
+	int rv;
 
 	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
 		return (EPERM);
@@ -4832,12 +4960,14 @@ nvme_ioctl_detach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nsid == 0)
 		return (EINVAL);
 
-	if (nvme->n_ns[nsid - 1].ns_ignore)
-		return (0);
+	if (NVME_NSID2NS(nvme, nsid)->ns_minor.nm_oexcl != curthread)
+		return (EACCES);
 
-	rv = bd_detach_handle(nvme->n_ns[nsid - 1].ns_bd_hdl);
-	if (rv != DDI_SUCCESS)
-		rv = EBUSY;
+	mutex_enter(&nvme->n_mgmt_mutex);
+
+	rv = nvme_detach_ns(nvme, nsid);
+
+	mutex_exit(&nvme->n_mgmt_mutex);
 
 	return (rv);
 }
@@ -4847,8 +4977,7 @@ nvme_ioctl_attach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
     cred_t *cred_p)
 {
 	_NOTE(ARGUNUSED(nioc, mode));
-	nvme_identify_nsid_t *idns;
-	int rv = 0;
+	int rv;
 
 	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
 		return (EPERM);
@@ -4856,27 +4985,19 @@ nvme_ioctl_attach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nsid == 0)
 		return (EINVAL);
 
-	/*
-	 * Identify namespace again, free old identify data.
-	 */
-	idns = nvme->n_ns[nsid - 1].ns_idns;
-	if (nvme_init_ns(nvme, nsid) != DDI_SUCCESS)
+	if (NVME_NSID2NS(nvme, nsid)->ns_minor.nm_oexcl != curthread)
+		return (EACCES);
+
+	mutex_enter(&nvme->n_mgmt_mutex);
+
+	if (nvme_init_ns(nvme, nsid) != DDI_SUCCESS) {
+		mutex_exit(&nvme->n_mgmt_mutex);
 		return (EIO);
+	}
 
-	kmem_free(idns, sizeof (nvme_identify_nsid_t));
+	rv = nvme_attach_ns(nvme, nsid);
 
-	if (nvme->n_ns[nsid - 1].ns_ignore)
-		return (ENOTSUP);
-
-	if (nvme->n_ns[nsid - 1].ns_bd_hdl == NULL)
-		nvme->n_ns[nsid - 1].ns_bd_hdl = bd_alloc_handle(
-		    &nvme->n_ns[nsid - 1], &nvme_bd_ops, &nvme->n_prp_dma_attr,
-		    KM_SLEEP);
-
-	rv = bd_attach_handle(nvme->n_dip, nvme->n_ns[nsid - 1].ns_bd_hdl);
-	if (rv != DDI_SUCCESS)
-		rv = EBUSY;
-
+	mutex_exit(&nvme->n_mgmt_mutex);
 	return (rv);
 }
 
@@ -5283,7 +5404,7 @@ nvme_ioctl_is_ignored_ns(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nsid == 0)
 		return (EINVAL);
 
-	if (nvme->n_ns[nsid - 1].ns_ignore)
+	if (NVME_NSID2NS(nvme, nsid)->ns_ignore)
 		nioc->n_arg = 1;
 	else
 		nioc->n_arg = 0;

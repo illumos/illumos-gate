@@ -37,12 +37,17 @@ extern "C" {
 #define	_CNIOC		(('C'<<24)|('N'<<16))
 #define	_CNIOC_MASK	(~0xffff)
 #define	CONS_GETTERM	(_CNIOC | 0)
+#define	CONS_GETDEV	(_CNIOC | 1)
 
 #define	MAX_TERM_TYPE_LEN	10
 
 struct cons_getterm {
 	uint_t	cn_term_len;
 	char	*cn_term_type;
+};
+
+struct cons_getdev {
+	dev_t	cnd_rconsdev;
 };
 
 #ifdef _KERNEL
@@ -55,6 +60,10 @@ struct cons_getterm {
 struct cons_getterm32 {
 	uint32_t  cn_term_len;
 	caddr32_t cn_term_type;
+};
+
+struct cons_getdev32 {
+	dev32_t	cnd_rconsdev;
 };
 #endif /* _SYSCALL32 */
 

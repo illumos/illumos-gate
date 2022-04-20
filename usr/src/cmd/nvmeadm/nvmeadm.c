@@ -58,9 +58,12 @@ struct nvme_feature {
 	    nvme_version_t *);
 };
 
-#define	NVMEADM_CTRL	1
-#define	NVMEADM_NS	2
-#define	NVMEADM_BOTH	(NVMEADM_CTRL | NVMEADM_NS)
+#define	NVMEADM_F_CTRL	1
+#define	NVMEADM_F_NS	2
+#define	NVMEADM_F_BOTH	(NVMEADM_F_CTRL | NVMEADM_F_NS)
+
+#define	NVMEADM_C_MULTI	1
+#define	NVMEADM_C_EXCL	2
 
 struct nvmeadm_cmd {
 	char *c_name;
@@ -68,8 +71,8 @@ struct nvmeadm_cmd {
 	const char *c_flagdesc;
 	int (*c_func)(int, const nvme_process_arg_t *);
 	void (*c_usage)(const char *);
-	boolean_t c_multi;
 	void (*c_optparse)(nvme_process_arg_t *);
+	int c_flags;
 };
 
 
@@ -123,119 +126,131 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		"list controllers and namespaces",
 		"  -p\t\tprint parsable output\n"
 		    "  -o field\tselect a field for parsable output\n",
-		do_list, usage_list, B_TRUE, optparse_list
+		do_list, usage_list, optparse_list,
+		NVMEADM_C_MULTI
 	},
 	{
 		"identify",
 		"identify controllers and/or namespaces",
 		NULL,
-		do_identify, usage_identify, B_TRUE
+		do_identify, usage_identify, NULL,
+		NVMEADM_C_MULTI
 	},
 	{
 		"get-logpage",
 		"get a log page from controllers and/or namespaces",
 		NULL,
-		do_get_logpage, usage_get_logpage, B_TRUE
+		do_get_logpage, usage_get_logpage, NULL,
+		NVMEADM_C_MULTI
 	},
 	{
 		"get-features",
 		"get features from controllers and/or namespaces",
 		NULL,
-		do_get_features, usage_get_features, B_TRUE
+		do_get_features, usage_get_features, NULL,
+		NVMEADM_C_MULTI
 	},
 	{
 		"format",
 		"format namespace(s) of a controller",
 		NULL,
-		do_format, usage_format, B_FALSE
+		do_format, usage_format, NULL,
+		NVMEADM_C_EXCL
 	},
 	{
 		"secure-erase",
 		"secure erase namespace(s) of a controller",
 		"  -c  Do a cryptographic erase.",
-		do_secure_erase, usage_secure_erase, B_FALSE
+		do_secure_erase, usage_secure_erase, NULL,
+		NVMEADM_C_EXCL
 	},
 	{
 		"detach",
 		"detach blkdev(4D) from namespace(s) of a controller",
 		NULL,
-		do_attach_detach, usage_attach_detach, B_FALSE
+		do_attach_detach, usage_attach_detach, NULL,
+		NVMEADM_C_EXCL
 	},
 	{
 		"attach",
 		"attach blkdev(4D) to namespace(s) of a controller",
 		NULL,
-		do_attach_detach, usage_attach_detach, B_FALSE
+		do_attach_detach, usage_attach_detach, NULL,
+		NVMEADM_C_EXCL
 	},
 	{
 		"list-firmware",
 		"list firmware on a controller",
 		NULL,
-		do_get_logpage_fwslot, usage_firmware_list, B_FALSE
+		do_get_logpage_fwslot, usage_firmware_list, NULL,
+		0
 	},
 	{
 		"load-firmware",
 		"load firmware to a controller",
 		NULL,
-		do_firmware_load, usage_firmware_load, B_FALSE
+		do_firmware_load, usage_firmware_load, NULL,
+		0
 	},
 	{
 		"commit-firmware",
 		"commit downloaded firmware to a slot of a controller",
 		NULL,
-		do_firmware_commit, usage_firmware_commit, B_FALSE
+		do_firmware_commit, usage_firmware_commit, NULL,
+		0
 	},
 	{
 		"activate-firmware",
 		"activate a firmware slot of a controller",
 		NULL,
-		do_firmware_activate, usage_firmware_activate, B_FALSE
+		do_firmware_activate, usage_firmware_activate, NULL,
+		0
 	},
 	{
 		NULL, NULL, NULL,
-		NULL, NULL, B_FALSE
+		NULL, NULL, NULL, 0
 	}
 };
 
 static const nvme_feature_t features[] = {
 	{ "Arbitration", "",
-	    NVME_FEAT_ARBITRATION, 0, NVMEADM_CTRL,
+	    NVME_FEAT_ARBITRATION, 0, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_arbitration },
 	{ "Power Management", "",
-	    NVME_FEAT_POWER_MGMT, 0, NVMEADM_CTRL,
+	    NVME_FEAT_POWER_MGMT, 0, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_power_mgmt },
 	{ "LBA Range Type", "range",
-	    NVME_FEAT_LBA_RANGE, NVME_LBA_RANGE_BUFSIZE, NVMEADM_NS,
+	    NVME_FEAT_LBA_RANGE, NVME_LBA_RANGE_BUFSIZE, NVMEADM_F_NS,
 	    do_get_feat_common, nvme_print_feat_lba_range },
 	{ "Temperature Threshold", "",
-	    NVME_FEAT_TEMPERATURE, 0, NVMEADM_CTRL,
+	    NVME_FEAT_TEMPERATURE, 0, NVMEADM_F_CTRL,
 	    do_get_feat_temp_thresh, nvme_print_feat_temperature },
 	{ "Error Recovery", "",
-	    NVME_FEAT_ERROR, 0, NVMEADM_CTRL,
+	    NVME_FEAT_ERROR, 0, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_error },
 	{ "Volatile Write Cache", "cache",
-	    NVME_FEAT_WRITE_CACHE, 0, NVMEADM_CTRL,
+	    NVME_FEAT_WRITE_CACHE, 0, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_write_cache },
 	{ "Number of Queues", "queues",
-	    NVME_FEAT_NQUEUES, 0, NVMEADM_CTRL,
+	    NVME_FEAT_NQUEUES, 0, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_nqueues },
 	{ "Interrupt Coalescing", "coalescing",
-	    NVME_FEAT_INTR_COAL, 0, NVMEADM_CTRL,
+	    NVME_FEAT_INTR_COAL, 0, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_intr_coal },
 	{ "Interrupt Vector Configuration", "vector",
-	    NVME_FEAT_INTR_VECT, 0, NVMEADM_CTRL,
+	    NVME_FEAT_INTR_VECT, 0, NVMEADM_F_CTRL,
 	    do_get_feat_intr_vect, nvme_print_feat_intr_vect },
 	{ "Write Atomicity", "atomicity",
-	    NVME_FEAT_WRITE_ATOM, 0, NVMEADM_CTRL,
+	    NVME_FEAT_WRITE_ATOM, 0, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_write_atom },
 	{ "Asynchronous Event Configuration", "event",
-	    NVME_FEAT_ASYNC_EVENT, 0, NVMEADM_CTRL,
+	    NVME_FEAT_ASYNC_EVENT, 0, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_async_event },
 	{ "Autonomous Power State Transition", "",
-	    NVME_FEAT_AUTO_PST, NVME_AUTO_PST_BUFSIZE, NVMEADM_CTRL,
+	    NVME_FEAT_AUTO_PST, NVME_AUTO_PST_BUFSIZE, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_auto_pst },
 	{ "Software Progress Marker", "progress",
-	    NVME_FEAT_PROGRESS, 0, NVMEADM_CTRL,
+	    NVME_FEAT_PROGRESS, 0, NVMEADM_F_CTRL,
 	    do_get_feat_common, nvme_print_feat_progress },
 	{ NULL, NULL, 0, 0, B_FALSE, NULL }
 };
@@ -294,6 +309,7 @@ main(int argc, char **argv)
 
 	npa.npa_cmd = cmd;
 	npa.npa_interactive = B_TRUE;
+	npa.npa_excl = ((cmd->c_flags & NVMEADM_C_EXCL) != 0);
 
 	optind++;
 
@@ -334,7 +350,7 @@ main(int argc, char **argv)
 	 * aren't allowed to do that.
 	 */
 	if (ctrl != NULL && strchr(ctrl, ',') != NULL &&
-	    cmd->c_multi == B_FALSE) {
+	    (cmd->c_flags & NVMEADM_C_MULTI) == 0) {
 		warnx("%s not allowed on multiple controllers",
 		    cmd->c_name);
 		usage(cmd);
@@ -513,7 +529,7 @@ nvme_process(di_node_t node, di_minor_t minor, void *arg)
 	if (!nvme_match(npa))
 		return (DI_WALK_CONTINUE);
 
-	if ((fd = nvme_open(minor)) < 0)
+	if ((fd = nvme_open(minor, npa->npa_excl)) < 0)
 		return (DI_WALK_CONTINUE);
 
 	npa->npa_found++;
@@ -851,9 +867,9 @@ usage_get_features(const char *c_name)
 	for (feat = &features[0]; feat->f_feature != 0; feat++) {
 		char *type;
 
-		if ((feat->f_getflags & NVMEADM_BOTH) == NVMEADM_BOTH)
+		if ((feat->f_getflags & NVMEADM_F_BOTH) == NVMEADM_F_BOTH)
 			type = "both";
-		else if ((feat->f_getflags & NVMEADM_CTRL) != 0)
+		else if ((feat->f_getflags & NVMEADM_F_CTRL) != 0)
 			type = "controller only";
 		else
 			type = "namespace only";
@@ -1065,9 +1081,9 @@ do_get_features(int fd, const nvme_process_arg_t *npa)
 		(void) printf("%s: Get Features\n", npa->npa_name);
 		for (feat = &features[0]; feat->f_feature != 0; feat++) {
 			if ((npa->npa_isns &&
-			    (feat->f_getflags & NVMEADM_NS) == 0) ||
+			    (feat->f_getflags & NVMEADM_F_NS) == 0) ||
 			    (!npa->npa_isns &&
-			    (feat->f_getflags & NVMEADM_CTRL) == 0))
+			    (feat->f_getflags & NVMEADM_F_CTRL) == 0))
 				continue;
 
 			(void) feat->f_get(fd, feat, npa);
@@ -1101,11 +1117,12 @@ do_get_features(int fd, const nvme_process_arg_t *npa)
 		}
 
 		if ((npa->npa_isns &&
-		    (feat->f_getflags & NVMEADM_NS) == 0) ||
+		    (feat->f_getflags & NVMEADM_F_NS) == 0) ||
 		    (!npa->npa_isns &&
-		    (feat->f_getflags & NVMEADM_CTRL) == 0)) {
+		    (feat->f_getflags & NVMEADM_F_CTRL) == 0)) {
 			warnx("feature %s %s supported for namespaces",
-			    feat->f_name, (feat->f_getflags & NVMEADM_NS) != 0 ?
+			    feat->f_name,
+			    (feat->f_getflags & NVMEADM_F_NS) != 0 ?
 			    "only" : "not");
 			continue;
 		}
@@ -1248,6 +1265,7 @@ do_attach_detach(int fd, const nvme_process_arg_t *npa)
 		ns_npa.npa_name = npa->npa_name;
 		ns_npa.npa_isns = B_TRUE;
 		ns_npa.npa_cmd = npa->npa_cmd;
+		ns_npa.npa_excl = npa->npa_excl;
 
 		nvme_walk(&ns_npa, npa->npa_node);
 

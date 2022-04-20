@@ -241,7 +241,7 @@ nvme_is_ignored_ns(int fd)
 }
 
 int
-nvme_open(di_minor_t minor)
+nvme_open(di_minor_t minor, boolean_t excl)
 {
 	char *devpath, *path;
 	int fd;
@@ -256,7 +256,7 @@ nvme_open(di_minor_t minor)
 
 	di_devfs_path_free(devpath);
 
-	fd = open(path, O_RDWR);
+	fd = open(path, O_RDWR | (excl ? O_EXCL: 0));
 
 	if (fd < 0) {
 		if (debug)

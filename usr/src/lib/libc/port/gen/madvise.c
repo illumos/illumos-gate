@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -35,7 +33,7 @@
  * management of the memory resources of a particular application.
  */
 int
-madvise(caddr_t addr, size_t len, int advice)
+madvise(void *addr, size_t len, int advice)
 {
 	return (memcntl(addr, len, MC_ADVISE, (caddr_t)(intptr_t)advice, 0, 0));
 }

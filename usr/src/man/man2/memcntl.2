@@ -1,433 +1,449 @@
-'\" te
+.\"
+.\" Copyright 2022 Oxide Computer Company
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MEMCNTL 2 "May 13, 2017"
-.SH NAME
-memcntl \- memory management control
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/types.h>
-#include <sys/mman.h>
-
-\fBint\fR \fBmemcntl\fR(\fBcaddr_t\fR \fIaddr\fR, \fBsize_t\fR \fIlen\fR, \fBint\fR \fIcmd\fR, \fBcaddr_t\fR \fIarg\fR,
-     \fBint\fR \fIattr\fR, \fBint\fR \fImask\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBmemcntl()\fR function allows the calling process to apply a variety of
-control operations over the address space identified by the mappings
-established for the address range [\fIaddr\fR, \fIaddr\fR + \fIlen\fR).
-.sp
-.LP
-The \fIaddr\fR argument must be a multiple of the pagesize as returned by
-\fBsysconf\fR(3C). The scope of the control operations can be further defined
-with additional selection criteria (in the form of attributes) according to the
-bit pattern contained in \fIattr\fR.
-.sp
-.LP
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd March 13, 2022
+.Dt MEMCNTL 2
+.Os
+.Sh NAME
+.Nm memcntl
+.Nd memory management control
+.Sh SYNOPSIS
+.In sys/types.h
+.In sys/mman.h
+.Ft int
+.Fo memcntl
+.Fa "void *addr"
+.Fa "size_t len"
+.Fa "int cmd"
+.Fa "void *arg"
+.Fa "int attr"
+.Fa "int mask"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn memcntl
+function allows the calling process to apply a variety of control operations
+over the address space identified by the mappings established for the address
+range [
+.Fa addr ,
+.Fa addr
++
+.Fa len
+).
+.Pp
+The
+.Fa addr
+argument must be a multiple of the pagesize as returned by
+.Xr sysconf 3C .
+The scope of the control operations can be further defined with additional
+selection criteria
+.Pq in the form of attributes
+according to the bit pattern contained in
+.Fa attr .
+.Pp
 The following attributes specify page mapping selection criteria:
-.sp
-.ne 2
-.na
-\fB\fBSHARED\fR\fR
-.ad
-.RS 11n
+.Bl -tag -width Ds -offset indent
+.It Dv MEMCNTL_SHARED
 Page is mapped shared.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPRIVATE\fR\fR
-.ad
-.RS 11n
+.It Dv MEMCNTL_PRIVATE
 Page is mapped private.
-.RE
-
-.sp
-.LP
-The following attributes specify page protection selection criteria. The
-selection criteria are constructed by a bitwise OR operation on the attribute
-bits and must match exactly.
-.sp
-.ne 2
-.na
-\fB\fBPROT_READ\fR\fR
-.ad
-.RS 14n
+.El
+.Pp
+The following attributes specify page protection selection criteria.
+The selection criteria are constructed by a bitwise OR operation on the
+attribute bits and must match exactly.
+.Bl -tag -width Ds -offset indent
+.It Dv PROT_READ
 Page can be read.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPROT_WRITE\fR\fR
-.ad
-.RS 14n
+.It Dv PROT_WRITE
 Page can be written.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPROT_EXEC\fR\fR
-.ad
-.RS 14n
+.It Dv PROT_EXEC
 Page can be executed.
-.RE
-
-.sp
-.LP
+.El
+.Pp
 The following criteria may also be specified:
-.sp
-.ne 2
-.na
-\fB\fBPROC_TEXT\fR\fR
-.ad
-.RS 13n
+.Bl -tag -width Ds -offset indent
+.It Dv PROC_TEXT
 Process text.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPROC_DATA\fR\fR
-.ad
-.RS 13n
+.It Dv PROC_DATA
 Process data.
-.RE
-
-.sp
-.LP
-The \fBPROC_TEXT\fR attribute specifies all privately mapped segments with read
-and execute permission, and the \fBPROC_DATA\fR attribute specifies all
-privately mapped segments with write permission.
-.sp
-.LP
+.El
+.Pp
+The
+.Dv PROC_TEXT
+attribute specifies all privately mapped segments with read and execute
+permission, and the
+.Dv PROC_DATA
+attribute specifies all privately mapped segments with write permission.
+.Pp
 Selection criteria can be used to describe various abstract memory objects
-within the address space on which to operate. If an operation shall not be
-constrained by the selection criteria, \fIattr\fR must have the value \fB0\fR.
-.sp
-.LP
-The operation to be performed is identified by the argument \fIcmd\fR. The
-symbolic names for the operations are defined in <\fBsys/mman.h\fR> as follows:
-.sp
-.ne 2
-.na
-\fB\fBMC_LOCK\fR\fR
-.ad
-.sp .6
-.RS 4n
-Lock in memory all pages in the range with attributes \fIattr\fR. A given page
-may be locked multiple times through different mappings; however, within a
-given mapping, page locks do not nest. Multiple lock operations on the same
-address in the same process will all be removed with a single unlock operation.
-A page locked in one process and mapped in another (or visible through a
-different mapping in the locking process) is locked in memory as long as the
-locking process does neither an implicit nor explicit unlock operation. If a
-locked mapping is removed, or a page is deleted through file removal or
-truncation, an unlock operation is implicitly performed. If a writable
-\fBMAP_PRIVATE\fR page in the address range is changed, the lock will be
-transferred to the private page.
-.sp
-The \fIarg\fR argument is not used, but must be 0 to ensure compatibility with
-potential future enhancements.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMC_LOCKAS\fR\fR
-.ad
-.sp .6
-.RS 4n
+within the address space on which to operate.
+If an operation shall not be constrained by the selection criteria,
+.Fa attr
+must have the value
+.Sy 0 .
+.Pp
+The operation to be performed is identified by the argument
+.Fa cmd .
+The symbolic names for the operations are defined in
+.In sys/mman.h
+as follows:
+.Bl -tag -width Ds -offset indent
+.It Dv MC_LOCK
+Lock in memory all pages in the range with attributes
+.Fa attr .
+A given page may be locked multiple times through different mappings; however,
+within a given mapping, page locks do not nest.
+Multiple lock operations on the same address in the same process will all be
+removed with a single unlock operation.
+A page locked in one process and mapped in another
+.Pq or visible through a different mapping in the locking process
+is locked in memory as long as the locking process does neither an implicit nor
+explicit unlock operation.
+If a locked mapping is removed, or a page is deleted through file removal or
+truncation, an unlock operation is implicitly performed.
+If a writable
+.Dv MAP_PRIVATE
+page in the address range is changed, the lock will be transferred to the
+private page.
+.Pp
+The
+.Fa arg
+argument is not used, but must be
+.Dv NULL
+to ensure compatibility with potential future enhancements.
+.It Dv MC_LOCKAS
 Lock in memory all pages mapped by the address space with attributes
-\fIattr\fR. The \fIaddr\fR and \fIlen\fR arguments are not used, but must be
-\fINULL\fR and \fB0\fR respectively, to ensure compatibility with potential
-future enhancements.  The \fIarg\fR argument is a bit pattern built from the
-flags:
-.sp
-.ne 2
-.na
-\fB\fBMCL_CURRENT\fR\fR
-.ad
-.RS 15n
+.Fa attr .
+The
+.Fa addr
+and
+.Fa len
+arguments are not used, but must be
+.Dv NULL
+and
+.Sy 0
+respectively, to ensure compatibility with potential future enhancements.
+The
+.Fa arg
+argument is a bit pattern built from the flags:
+.Bl -tag -width Ds
+.It Dv MCL_CURRENT
 Lock current mappings.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMCL_FUTURE\fR\fR
-.ad
-.RS 15n
+.It Dv MCL_FUTURE
 Lock future mappings.
-.RE
-
-The value of \fIarg\fR determines whether the pages to be locked are those
-currently mapped by the address space, those that will be mapped in the future,
-or both. If \fBMCL_FUTURE\fR is specified, then all mappings subsequently added
-to the address space will be locked, provided sufficient memory is available.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMC_SYNC\fR\fR
-.ad
-.sp .6
-.RS 4n
+.El
+.Pp
+The value of
+.Fa arg
+determines whether the pages to be locked are those currently mapped by the
+address space, those that will be mapped in the future, or both.
+If
+.Dv MCL_FUTURE
+is specified, then all mappings subsequently added to the address space will be
+locked, provided sufficient memory is available.
+.It Dv MC_SYNC
 Write to their backing storage locations all modified pages in the range with
-attributes \fIattr\fR. Optionally, invalidate cache copies. The backing storage
-for a modified \fBMAP_SHARED\fR mapping is the file the page is mapped to; the
-backing storage for a modified \fBMAP_PRIVATE\fR mapping is its swap area. The
-\fIarg\fR argument is a bit pattern built from the flags used to control the
-behavior of the operation:
-.sp
-.ne 2
-.na
-\fB\fBMS_ASYNC\fR\fR
-.ad
-.RS 17n
+attributes
+.Fa attr .
+Optionally, invalidate cache copies.
+The backing storage for a modified
+.Dv MAP_SHARED
+mapping is the file the page is mapped to; the backing storage for a modified
+.Dv MAP_PRIVATE
+mapping is its swap area.
+The
+.Fa arg
+argument is a bit pattern built from the flags used to control the behavior of
+the operation:
+.Bl -tag -width Ds
+.It Dv MS_ASYNC
 Perform asynchronous writes.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMS_SYNC\fR\fR
-.ad
-.RS 17n
+The function returns immediately once all write operations are scheduled
+.Po unless
+.Dv MS_SYNC
+is also specified
+.Pc .
+.It Dv MS_SYNC
 Perform synchronous writes.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMS_INVALIDATE\fR\fR
-.ad
-.RS 17n
-Invalidate mappings.
-.RE
-
-\fBMS_ASYNC\fR Return immediately once all write operations are scheduled; with
-\fBMS_SYNC\fR the function will not return until all write operations are
-completed.
-.sp
-\fBMS_INVALIDATE\fR Invalidate all cached copies of data in memory, so that
-further references to the pages will be obtained by the system from their
-backing storage locations. This operation should be used by applications that
-require a memory object to be in a known state.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMC_UNLOCK\fR\fR
-.ad
-.sp .6
-.RS 4n
-Unlock all pages in the range with attributes \fIattr\fR. The \fIarg\fR
-argument is not used, but must be \fB0\fR to ensure compatibility with
-potential future enhancements.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMC_UNLOCKAS\fR\fR
-.ad
-.sp .6
-.RS 4n
+The function will not return until all write operations are completed.
+.It Dv MS_INVALIDATE
+Invalidate all cached copies of data in memory, so that further references to
+the pages will be obtained by the system from their backing storage locations.
+This operation should be used by applications that require a memory object to be
+in a known state.
+.El
+.It Dv MC_UNLOCK
+Unlock all pages in the range with attributes
+.Fa attr .
+The
+.Fa arg
+argument is not used, but must be
+.Dv NULL
+to ensure compatibility with potential future enhancements.
+.It Dv MC_UNLOCKAS
 Remove address space memory locks and locks on all pages in the address space
-with attributes \fIattr\fR. The \fIaddr\fR, \fIlen\fR, and \fIarg\fR arguments
-are not used, but must be \fINULL\fR, 0 and 0, respectively, to ensure
-compatibility with potential future enhancements.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMC_HAT_ADVISE\fR\fR
-.ad
-.sp .6
-.RS 4n
-Advise system how a region of user-mapped memory will be accessed. The
-\fIarg\fR argument is interpreted as a "\fBstruct memcntl_mha *\fR". The
-following members are defined in a \fBstruct memcntl_mha\fR:
-.sp
-.in +2
-.nf
+with attributes
+.Fa attr .
+The
+.Fa addr ,
+.Fa len ,
+and
+.Fa arg
+arguments are not used, but must be
+.Dv NULL ,
+0, and
+.Dv NULL ,
+respectively, to ensure compatibility with potential future enhancements.
+.It Dv MC_HAT_ADVISE
+Advise system how a region of user-mapped memory will be accessed.
+The
+.Fa arg
+argument is interpreted as a
+.Dq Vt struct memcntl_mha * .
+The following members are defined in a
+.Vt struct memcntl_mha :
+.Bd -literal -offset indent
 uint_t mha_cmd;
 uint_t mha_flags;
 size_t mha_pagesize;
-.fi
-.in -2
-
-The accepted values for \fBmha_cmd\fR are:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+The accepted values for
+.Vt mha_cmd
+are:
+.Bd -literal -offset indent
 MHA_MAPSIZE_VA
 MHA_MAPSIZE_STACK
 MHA_MAPSIZE_BSSBRK
-.fi
-.in -2
-
-The \fBmha_flags\fR member is reserved for future use and must always be set to
-0. The \fBmha_pagesize\fR member must be a valid size as obtained from
-\fBgetpagesizes\fR(3C) or the constant value 0 to allow the system to choose an
-appropriate hardware address translation mapping size.
-.sp
-\fBMHA_MAPSIZE_VA\fR sets the preferred hardware address translation mapping
-size of the region of memory from \fIaddr\fR to \fIaddr\fR + \fIlen\fR. Both
-\fIaddr\fR and \fIlen\fR must be aligned to an \fBmha_pagesize\fR boundary. The
-entire virtual address region from \fIaddr\fR to \fIaddr\fR + \fIlen\fR must
-not have any holes. Permissions within each \fBmha_pagesize\fR-aligned portion
-of the region must be consistent. When a size of 0 is specified, the system
-selects an appropriate size based on the size and alignment of the memory
-region, type of processor, and other considerations.
-.sp
-\fBMHA_MAPSIZE_STACK\fR sets the preferred hardware address translation mapping
-size of the process main thread stack segment. The \fIaddr\fR and \fIlen\fR
-arguments must be \fINULL\fR and 0, respectively.
-.sp
-\fBMHA_MAPSIZE_BSSBRK\fR sets the preferred hardware address translation
-mapping size of the process heap. The \fIaddr\fR and \fIlen\fR arguments must
-be \fINULL\fR and 0, respectively. See the NOTES section of the \fBppgsz\fR(1)
+.Ed
+.Pp
+The
+.Fa mha_flags
+member is reserved for future use and must always be set to 0.
+The
+.Fa mha_pagesize
+member must be a valid size as obtained from
+.Xr getpagesizes 3C
+or the constant value 0 to allow the system to choose an appropriate hardware
+address translation mapping size.
+.Pp
+.Dv MHA_MAPSIZE_VA
+sets the preferred hardware address translation mapping size of the region of
+memory from
+.Fa addr
+to
+.Fa addr
++
+.Fa len .
+Both
+.Fa addr
+and
+.Fa len
+must be aligned to an
+.Fa mha_pagesize
+boundary.
+The entire virtual address region from
+.Fa addr
+to
+.Fa addr
++
+.Fa len
+must not have any holes.
+Permissions within each
+.Fa mha_pagesize Ns -aligned
+portion of the region must be consistent.
+When a size of 0 is specified, the system selects an appropriate size based on
+the size and alignment of the memory region, type of processor, and other
+considerations.
+.Pp
+.Dv MHA_MAPSIZE_STACK
+sets the preferred hardware address translation mapping size of the process main
+thread stack segment.
+The
+.Fa addr
+and
+.Fa len
+arguments must be
+.Dv NULL
+and 0, respectively.
+.Pp
+.Dv MHA_MAPSIZE_BSSBRK
+sets the preferred hardware address translation mapping size of the process
+heap.
+The
+.Fa addr
+and
+.Fa len
+arguments must be
+.Dv NULL
+and 0, respectively.
+See the NOTES section of the
+.Xr ppgsz 1
 manual page for additional information on process heap alignment.
-.sp
-The \fIattr\fR argument must be 0 for all \fBMC_HAT_ADVISE\fR operations.
-.RE
-
-.sp
-.LP
-The \fImask\fR argument must be \fB0\fR; it is reserved for future use.
-.sp
-.LP
+.Pp
+The
+.Fa attr
+argument must be 0 for all
+.Dv MC_HAT_ADVISE
+operations.
+.El
+.Pp
+The
+.Fa mask
+argument must be 0; it is reserved for future use.
+.Pp
 Locks established with the lock operations are not inherited by a child process
-after \fBfork\fR(2). The \fBmemcntl()\fR function fails if it attempts to lock
-more memory than a system-specific limit.
-.sp
-.LP
+after
+.Xr fork 2 .
+The
+.Fn memcntl
+function fails if it attempts to lock more memory than a system-specific limit.
+.Pp
 Due to the potential impact on system resources, the operations
-\fBMC_LOCKAS\fR, \fBMC_LOCK\fR, \fBMC_UNLOCKAS\fR, and \fBMC_UNLOCK\fR are
-restricted to privileged processes.
-.SH USAGE
-.LP
-The \fBmemcntl()\fR function subsumes the operations of \fBplock\fR(3C).
-.sp
-.LP
-\fBMC_HAT_ADVISE\fR is intended to improve performance of applications that use
-large amounts of memory on processors that support multiple hardware address
-translation mapping sizes; however, it should be used with care. Not all
-processors support all sizes with equal efficiency. Use of larger sizes may
-also introduce extra overhead that could reduce performance or available
-memory.  Using large sizes for one application may reduce available resources
-for other applications and result in slower system wide performance.
-.SH RETURN VALUES
-.LP
-Upon successful completion, \fBmemcntl()\fR returns \fB0\fR; otherwise, it
-returns \fB\(mi1\fR and sets \fBerrno\fR to indicate an error.
-.SH ERRORS
-.LP
-The \fBmemcntl()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
+.Dv MC_LOCKAS ,
+.Dv MC_LOCK ,
+.Dv MC_UNLOCKAS ,
+and
+.Dv MC_UNLOCK
+are restricted to privileged processes.
+.Sh USAGE
+The
+.Fn memcntl
+function subsumes the operations of
+.Xr plock 3C .
+.Pp
+.Dv MC_HAT_ADVISE
+is intended to improve performance of applications that use large amounts of
+memory on processors that support multiple hardware address translation mapping
+sizes; however, it should be used with care.
+Not all processors support all sizes with equal efficiency.
+Use of larger sizes may also introduce extra overhead that could reduce
+performance or available memory.
+Using large sizes for one application may reduce available resources for other
+applications and result in slower system wide performance.
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn memcntl
+returns
+.Sy 0 .
+Otherwise, it returns
+.Sy -1
+and sets
+.Va errno
+to indicate an error.
+.Sh ERRORS
+The
+.Fn memcntl
+function will fail if:
+.Bl -tag -width Er
+.It Er EAGAIN
 When the selection criteria match, some or all of the memory identified by the
-operation could not be locked when \fBMC_LOCK\fR or \fBMC_LOCKAS\fR was
-specified, some or all mappings in the address range [\fIaddr\fR, \fIaddr\fR +
-\fIlen\fR) are locked for I/O when \fBMC_HAT_ADVISE\fR was specified, or the
-system has insufficient resources when \fBMC_HAT_ADVISE\fR was specified.
-.sp
-The \fIcmd\fR is \fBMC_LOCK\fR or \fBMC_LOCKAS\fR and locking the memory
-identified by this operation would exceed a limit or resource control on locked
-memory.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEBUSY\fR\fR
-.ad
-.RS 10n
+operation could not be locked when
+.Dv MC_LOCK
+or
+.Dv MC_LOCKAS
+was specified, some or all mappings in the address range
+.Pf [ Fa addr ,
+.Fa addr
++
+.Fa len Ns
+) are locked for I/O when
+.Dv MC_HAT_ADVISE
+was specified, or the system has insufficient resources when
+.Dv MC_HAT_ADVISE
+was specified.
+.Pp
+The
+.Fa cmd
+is
+.Dv MC_LOCK
+or
+.Dv MC_LOCKAS
+and locking the memory identified by this operation would exceed a limit or
+resource control on locked memory.
+.It Er EBUSY
 When the selection criteria match, some or all of the addresses in the range
-[\fIaddr, addr + len\fR) are locked and \fBMC_SYNC\fR with the
-\fBMS_INVALIDATE\fR option was specified.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fIaddr\fR argument specifies invalid selection criteria or is not a
-multiple of the page size as returned by \fBsysconf\fR(3C); the \fIaddr\fR
-and/or \fIlen\fR argument does not have the value \fB0\fR when \fBMC_LOCKAS\fR
-or \fBMC_UNLOCKAS\fR is specified; the \fIarg\fR argument is not valid for the
-function specified; \fBmha_pagesize\fR or \fBmha_cmd\fR is invalid; or
-\fBMC_HAT_ADVISE\fR is specified and not all pages in the specified region have
-the same access permissions within the given size boundaries.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
+.Pf [ Fa addr ,
+.Fa addr
++
+.Fa len Ns
+) are locked and
+.Dv MC_SYNC with the
+.Dv MS_INVALIDATE
+option was specified.
+.It Er EINVAL
+The
+.Fa addr
+argument specifies invalid selection criteria or is not a multiple of the page
+size as returned by
+.Xr sysconf 3C ;
+the
+.Fa addr
+and/or
+.Fa len
+argument does not have the value 0 when
+.Dv MC_LOCKAS
+or
+.Dv MC_UNLOCKAS
+is specified; the
+.Fa arg
+argument is not valid for the function specified;
+.Fa mha_pagesize
+or
+.Fa mha_cmd
+is invalid; or
+.Dv MC_HAT_ADVISE
+is specified and not all pages in the specified region have the same access
+permissions within the given size boundaries.
+.It Er ENOMEM
 When the selection criteria match, some or all of the addresses in the range
-[\fIaddr\fR, \fIaddr\fR + \fIlen\fR) are invalid for the address space of a
-process or specify one or more pages which are not mapped.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEPERM\fR\fR
-.ad
-.RS 10n
-The {\fBPRIV_PROC_LOCK_MEMORY\fR} privilege is not asserted in the effective
-set of the calling process and \fBMC_LOCK\fR, \fBMC_LOCKAS\fR, \fBMC_UNLOCK\fR,
-or \fBMC_UNLOCKAS\fR was specified.
-.RE
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.LP
-.BR ppgsz (1),
-.BR fork (2),
-.BR mmap (2),
-.BR mprotect (2),
-.BR getpagesizes (3C),
-.BR mlock (3C),
-.BR mlockall (3C),
-.BR msync (3C),
-.BR plock (3C),
-.BR sysconf (3C),
-.BR attributes (7),
-.BR privileges (7)
+.Pf [ Fa addr ,
+.Fa addr
++
+.Fa len Ns
+) are invalid for the address space of a process or specify one or more pages
+which are not mapped.
+.It Er EPERM
+The
+.Brq Dv PRIV_PROC_LOCK_MEMORY
+privilege is not asserted in the effective set of the calling process and
+.Dv MC_LOCK ,
+.Dv MC_LOCKAS ,
+.Dv MC_UNLOCK ,
+or
+.Dv MC_UNLOCKAS
+was specified.
+.El
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr ppgsz 1 ,
+.Xr fork 2 ,
+.Xr mmap 2 ,
+.Xr mprotect 2 ,
+.Xr getpagesizes 3C ,
+.Xr mlock 3C ,
+.Xr mlockall 3C ,
+.Xr msync 3C ,
+.Xr plock 3C ,
+.Xr sysconf 3C ,
+.Xr attributes 7 ,
+.Xr privileges 7
