@@ -23,6 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Racktop Systems, Inc.
  */
 
 /*
@@ -354,6 +355,8 @@ dtracemdb_aggdesc(dtrace_state_t *state, dtrace_aggdesc_t *agd)
 static int
 dtracemdb_bufsnap(dtrace_buffer_t *which, dtrace_bufdesc_t *desc)
 {
+	static hrtime_t hr_offset = 0;
+	static boolean_t offset_set = B_FALSE;
 	uintptr_t addr;
 	size_t bufsize;
 	dtrace_buffer_t buf;
@@ -430,10 +433,52 @@ dtracemdb_bufsnap(dtrace_buffer_t *which, dtrace_bufdesc_t *desc)
 		desc->dtbd_oldest = 0;
 	}
 
+	/*
+	 * On a live system, dtbd_timestamp is set to gethrtime() when the
+	 * DTRACEIOC_BUFSNAP ioctl is called. The effect of this is that the
+	 * timestamps of all the enabled probe records in the buf will always
+	 * be less than dtbd_timestamp. dtrace_consume() relies on this
+	 * invariant to determine when it needs to retrieve more dtrace bufs
+	 * from the kernel.
+	 *
+	 * However when mdb is reading a crash dump, the value of
+	 * gethrtime() on the system running mdb may smaller than the
+	 * enabled probe records in the crash dump, violating the invariant
+	 * dtrace_consume() is relying on. This can cause dtrace_consume()
+	 * to prematurely stop processing records.
+	 *
+	 * To preserve the invariant dtrace_consume() requires, we simply
+	 * add the value of panic_hrtime to gethrtime() when setting
+	 * dtdb_timestamp. On a live system, panic_hrtime will be 0, and
+	 * the invariant will be preserved by virtue of being running on
+	 * a live system. On a crash dump, no valid probe record can have a
+	 * timestamp greater than panic_hrtime, so adding this to the value
+	 * of gethrtime() will guarantee the invariant expected by
+	 * dtrace_consume() is preserved.
+	 */
+	if (!offset_set) {
+		hrtime_t panic_hrtime;
+
+		/*
+		 * We could be slightly more clever and only set hr_offset
+		 * if gethrtime() in mdb is < panic_hrtime, but it doesn't
+		 * seem necessary. If for some reason, we cannot read
+		 * panic_hrtime, we'll try to continue -- ::dtrace may
+		 * still succeed, so we just warn and continue.
+		 */
+		if (mdb_readvar(&panic_hrtime, "panic_hrtime") == -1) {
+			mdb_warn("failed to read 'panic_hrtime' -- "
+			    "some dtrace data may not be displayed");
+		} else {
+			hr_offset = panic_hrtime;
+		}
+		offset_set = B_TRUE;
+	}
+
 	desc->dtbd_size = bufsize;
 	desc->dtbd_drops = buf.dtb_drops;
 	desc->dtbd_errors = buf.dtb_errors;
-	desc->dtbd_timestamp = gethrtime();
+	desc->dtbd_timestamp = gethrtime() + hr_offset;
 
 	return (0);
 }
