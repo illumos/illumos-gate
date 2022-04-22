@@ -33,8 +33,8 @@ CSTD=		$(CSTD_GNU99)
 CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
 		$(CPPFLAGS.master) \
-		-I$(SRC)/uts/i86pc/io/vmm \
-		-I$(SRC)/uts/i86pc
+		-I$(SRC)/uts/intel/io/vmm \
+		-I$(SRC)/uts/intel
 $(PROG) :=	LDLIBS += -lvmmapi
 
 all: $(PROG)

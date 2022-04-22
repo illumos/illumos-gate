@@ -29,7 +29,7 @@ LIBS		= $(DYNLIB)
 # directly and pull in CPPFLAGS.master at the appropriate place.
 CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
-		$(CPPFLAGS.master) -I$(SRC)/uts/i86pc
+		$(CPPFLAGS.master) -I$(SRC)/uts/intel
 
 LDLIBS +=	-lc -lvmmapi
 

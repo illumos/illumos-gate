@@ -24,6 +24,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 Peter Tribble.
+# Copyright 2022 Oxide Computer Company
 #
 
 #
@@ -122,6 +123,15 @@ LX_SYS_OBJS +=	\
 
 LX_AUTOFS_OBJS +=	\
 	lx_autofs.o
+
+#
+#	shared hypervisor functionality
+#
+CORE_OBJS +=		\
+	hma.o		\
+	hma_asm.o	\
+	hma_fpu.o	\
+	smt.o		\
 
 #
 #	ZFS file system module
@@ -450,3 +460,18 @@ ZEN_UDF_OBJS = zen_udf.o
 #
 IMC_OBJS =	imc.o imc_decode.o imc_dump.o
 IMCSTUB_OBJS =	imcstub.o
+
+#
+# viona (VirtIO-Net Accelerated)
+#
+VIONA_OBJS = \
+	viona_main.o \
+	viona_ring.o \
+	viona_rx.o \
+	viona_tx.o \
+	viona_hook.o
+
+#
+# bhyve PCI-passthru
+#
+PPT_OBJS = ppt.o

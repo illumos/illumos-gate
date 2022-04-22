@@ -1,0 +1,48 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+# Copyright 2022 Oxide Computer Company
+#
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/amd/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/intel/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/io/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/intel/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/amd/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(ASSYM_VMX): $(OFFSETS_VMX) $(GENASSYM)
+	$(OFFSETS_CREATE) -I$(UTSBASE)/intel/io/vmm < $(OFFSETS_VMX) >$@
+$(ASSYM_SVM): $(OFFSETS_SVM) $(GENASSYM)
+	$(OFFSETS_CREATE) -I$(UTSBASE)/intel/io/vmm < $(OFFSETS_SVM) >$@
+
+$(OBJS_DIR)/vmx_support.o:  $(ASSYM_VMX)
+$(OBJS_DIR)/svm_support.o:  $(ASSYM_SVM)

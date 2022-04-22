@@ -1724,6 +1724,7 @@ $(i386_ONLY)file path=usr/platform/i86pc/include/sys/rm_platter.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/sbd_ioctl.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/smp_impldefs.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/smt.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/smt_machcpu.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/vm_machparam.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/x_call.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/xc_levels.h

@@ -125,10 +125,9 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(SRC)/lib/lib9p/common \
 		-I$(SRC)/uts/common/io/e1000api \
 		$(CPPFLAGS.master) \
-		-I$(ROOT)/usr/platform/i86pc/include \
-		-I$(SRC)/uts/i86pc/io/vmm \
+		-I$(SRC)/uts/intel/io/vmm \
 		-I$(SRC)/uts/common \
-		-I$(SRC)/uts/i86pc \
+		-I$(SRC)/uts/intel \
 		-I$(SRC)/lib/libdladm/common \
 		-DWITHOUT_CAPSICUM
 
@@ -196,6 +195,6 @@ include ../Makefile.targ
 $(ZHYVE_DIR)/%: %
 	$(INS.file)
 
-%.o: $(SRC)/uts/i86pc/io/vmm/%.c
+%.o: $(SRC)/uts/intel/io/vmm/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)

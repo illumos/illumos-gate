@@ -43,6 +43,7 @@ extern "C" {
 #include <sys/stddef.h>
 #include <sys/debug.h>
 #include <sys/cpuvar.h>
+#include <sys/smt_machcpu.h>
 
 #ifndef	_ASM
 /*
@@ -139,15 +140,6 @@ struct kpti_frame {
 
 	uint64_t	kf_upper_redzone;
 };
-
-typedef struct cpu_smt {
-	lock_t cs_lock;
-	char cs_pad[56];
-	struct cpu *cs_sib;
-	volatile uint64_t cs_intr_depth;
-	volatile uint64_t cs_state;
-	volatile uint64_t cs_sibstate;
-} cpu_smt_t;
 
 /*
  * This first value, MACHCPU_SIZE is the size of all the members in the cpu_t

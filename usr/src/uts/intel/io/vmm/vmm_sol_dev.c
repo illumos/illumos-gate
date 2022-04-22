@@ -86,7 +86,7 @@ static const char *vmmdev_hvm_name = "bhyve";
 /* For sdev plugin (/dev) */
 #define	VMM_SDEV_ROOT "/dev/vmm"
 
-/* From uts/i86pc/io/vmm/intel/vmx.c */
+/* From uts/intel/io/vmm/intel/vmx.c */
 extern int vmx_x86_supported(const char **);
 
 /* Holds and hooks from drivers external to vmm */

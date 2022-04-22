@@ -91,6 +91,12 @@ HDRS	=			\
 	x86_archext.h		\
 	xen_errno.h
 
+
+# Headers shared with the various machine architectures are installed via
+# different means, but are checked here, since it is a common point.
+include Makefile.psm
+CHECK_ONLY_HDRS = $(PSM_SHARED_HDRS)
+
 ROOTDIR=	$(ROOT)/usr/include/sys
 SCSIDIR=	$(ROOTDIR)/scsi
 SCSIDIRS=	$(SCSIDIR) $(SCSIDIR)/conf $(SCSIDIR)/generic \
@@ -100,8 +106,9 @@ ROOTDIRS=	$(ROOTDIR) $(ROOTFSDIR)
 
 ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%)
 
-CHECKHDRS= 			\
-	$(HDRS:%.h=%.check)
+CHECKHDRS = \
+	$(HDRS:%.h=%.check)		\
+	$(CHECK_ONLY_HDRS:%.h=%.check)	\
 
 # install rules
 $(ROOTDIR)/%: %

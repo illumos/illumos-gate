@@ -24,7 +24,7 @@ CLEANFILES +=	$(PROG1) $(PROG2)
 
 $(PROG1) :=	LDLIBS += -lnvpair -lcustr
 $(PROG2) :=	CPPFLAGS = -I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
-	$(CPPFLAGS.master) -I$(SRC)/uts/i86pc \
+	$(CPPFLAGS.master) -I$(SRC)/uts/intel \
 	-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64
 
 TEMPLATES =	SYSbhyve.xml

@@ -1421,8 +1421,8 @@ usr/src/compat/bhyve/*
 usr/src/contrib/bhyve/*
 usr/src/lib/libvmmapi/common/vmmapi.[ch]
 usr/src/test/libc-tests/tests/qsort/*.c
-usr/src/uts/i86pc/io/vmm/amd/amdvi_*.[ch]
-usr/src/uts/i86pc/io/vmm/amd/ivrs_*.c
-usr/src/uts/i86pc/sys/vmm.h
-usr/src/uts/i86pc/sys/vmm_dev.h
+usr/src/uts/intel/io/vmm/amd/amdvi_*.[ch]
+usr/src/uts/intel/io/vmm/amd/ivrs_*.c
+usr/src/uts/intel/sys/vmm.h
+usr/src/uts/intel/sys/vmm_dev.h
 usr/src/lib/lib9p/common/*

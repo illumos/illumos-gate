@@ -1,0 +1,85 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+# Copyright 2022 Oxide Computer Company
+#
+
+CONF_SRCDIR	= $(UTSBASE)/intel/io/vmm
+MAPFILE		= $(UTSBASE)/intel/io/vmm/vmm.mapfile
+
+PRE_INC_PATH	= \
+	-I$(COMPAT)/bhyve \
+	-I$(COMPAT)/bhyve/amd64 \
+	-I$(CONTRIB)/bhyve \
+	-I$(CONTRIB)/bhyve/amd64
+
+INC_PATH	+= -I$(UTSBASE)/intel/io/vmm -I$(UTSBASE)/intel/io/vmm/io
+AS_INC_PATH	+= -I$(UTSBASE)/intel/io/vmm -I$(OBJS_DIR)
+
+# enable collection of VMM statistics
+CFLAGS		+= -DVMM_KEEP_STATS
+
+LDFLAGS		+= -N misc/acpica -N misc/pcie -N fs/dev
+LDFLAGS		+= -M $(MAPFILE)
+
+# 3rd party code
+SMOFF		+= all_func_returns
+
+# needs work
+$(OBJS_DIR)/vmm_sol_dev.o := SMOFF += signed_integer_overflow_check
+
+OFFSETS_VMX	= $(CONF_SRCDIR)/intel/offsets.in
+OFFSETS_SVM	= $(CONF_SRCDIR)/amd/offsets.in
+ASSYM_VMX	= $(OBJS_DIR)/vmx_assym.h
+ASSYM_SVM	= $(OBJS_DIR)/svm_assym.h
+
+CLEANFILES	+= $(ASSYM_VMX) $(ASSYM_SVM)
+
+VMM_OBJS = \
+	vmm.o \
+	vmm_sol_dev.o \
+	vmm_host.o \
+	vmm_instruction_emul.o \
+	vmm_ioport.o \
+	vmm_lapic.o \
+	vmm_stat.o \
+	vmm_util.o \
+	x86.o \
+	iommu.o \
+	vatpic.o \
+	vatpit.o \
+	vhpet.o \
+	vioapic.o \
+	vlapic.o \
+	vrtc.o \
+	vpmtmr.o \
+	vmcs.o \
+	vmx_msr.o \
+	vmx.o \
+	vmx_support.o \
+	vtd.o \
+	vtd_sol.o \
+	svm.o \
+	svm_msr.o \
+	vmcb.o \
+	svm_support.o \
+	amdv.o \
+	vmm_gpt.o \
+	seg_vmm.o \
+	vmm_reservoir.o \
+	vmm_sol_glue.o \
+	vmm_sol_ept.o \
+	vmm_sol_rvi.o \
+	vmm_support.o \
+	vmm_vm.o \
+	vmm_zsd.o
