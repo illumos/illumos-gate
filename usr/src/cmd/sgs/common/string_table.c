@@ -158,7 +158,7 @@ st_new(uint_t flags)
 {
 	Str_tbl	*stp;
 
-	if ((stp = calloc(sizeof (*stp), 1)) == NULL)
+	if ((stp = calloc(1, sizeof (*stp))) == NULL)
 		return (NULL);
 
 	/*
@@ -173,7 +173,7 @@ st_new(uint_t flags)
 	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0)
 		return (stp);
 
-	if ((stp->st_lentree = calloc(sizeof (*stp->st_lentree), 1)) == NULL)
+	if ((stp->st_lentree = calloc(1, sizeof (*stp->st_lentree))) == NULL)
 		return (NULL);
 
 	avl_create(stp->st_lentree, &avl_len_compare, sizeof (LenNode),
@@ -225,10 +225,10 @@ st_insert(Str_tbl *stp, const char *str)
 	 */
 	ln.ln_strlen = len;
 	if ((lnp = avl_find(stp->st_lentree, &ln, &where)) == NULL) {
-		if ((lnp = calloc(sizeof (*lnp), 1)) == NULL)
+		if ((lnp = calloc(1, sizeof (*lnp))) == NULL)
 			return (-1);
 
-		if ((lnp->ln_strtree = calloc(sizeof (*lnp->ln_strtree), 1)) ==
+		if ((lnp->ln_strtree = calloc(1, sizeof (*lnp->ln_strtree))) ==
 		    NULL) {
 			free(lnp);
 			return (-1);
@@ -248,7 +248,7 @@ st_insert(Str_tbl *stp, const char *str)
 	 */
 	sn.sn_str = str;
 	if ((snp = avl_find(lnp->ln_strtree, &sn, &where)) == NULL) {
-		if ((snp = calloc(sizeof (*snp), 1)) == NULL)
+		if ((snp = calloc(1, sizeof (*snp))) == NULL)
 			return (-1);
 		snp->sn_str = str;
 		avl_insert(lnp->ln_strtree, snp, where);
@@ -542,7 +542,7 @@ st_hash_insert(Str_tbl *stp, const char *str, size_t len)
 		/*
 		 * allocate a new master string
 		 */
-		if ((mstr = calloc(sizeof (*mstr), 1)) == 0)
+		if ((mstr = calloc(1, sizeof (*mstr))) == NULL)
 			return (-1);
 		mstr->sm_next = stp->st_mstrlist;
 		stp->st_mstrlist = mstr;
@@ -557,7 +557,7 @@ st_hash_insert(Str_tbl *stp, const char *str, size_t len)
 		stp->st_strsize += len - mstr->sm_strlen;
 	}
 
-	if ((sthash = calloc(sizeof (*sthash), 1)) == 0)
+	if ((sthash = calloc(1, sizeof (*sthash))) == NULL)
 		return (-1);
 
 	mstr->sm_hashval = sthash->hi_hashval = hashval;
@@ -598,8 +598,8 @@ st_getstrtab_sz(Str_tbl *stp)
 		 * strings input.
 		 */
 		stp->st_hbckcnt = findprime(stp->st_strcnt);
-		if ((stp->st_hashbcks = calloc(sizeof (*stp->st_hashbcks),
-		    stp->st_hbckcnt)) == NULL)
+		if ((stp->st_hashbcks = calloc(stp->st_hbckcnt,
+		    sizeof (*stp->st_hashbcks))) == NULL)
 			return (0);
 
 		/*

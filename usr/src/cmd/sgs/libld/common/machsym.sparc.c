@@ -236,8 +236,8 @@ ld_reg_enter_sparc(Sym_desc *sdp, Ofl_desc *ofl)
 
 		ofl->ofl_regsymsno = STO_SPARC_REGISTER_G7 + 1;
 
-		if ((ofl->ofl_regsyms = libld_calloc(sizeof (Sym_desc *),
-		    ofl->ofl_regsymsno)) == NULL) {
+		if ((ofl->ofl_regsyms = libld_calloc(ofl->ofl_regsymsno,
+		    sizeof (Sym_desc *))) == NULL) {
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}

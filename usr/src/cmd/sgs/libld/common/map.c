@@ -1369,11 +1369,12 @@ ld_map_parse_v1(Mapfile *mf)
 				if (sgp1->sg_flags & FLG_SG_P_FLAGS)
 					stack->sg_phdr.p_flags =
 					    sgp1->sg_phdr.p_flags;
-				free(sgp1);
 
 				DBG_CALL(Dbg_map_seg(ofl,
 				    DBG_STATE_MOD_AFTER, ndx, sgp1,
 				    mf->mf_lineno));
+
+				free(sgp1);
 				break;
 			}
 

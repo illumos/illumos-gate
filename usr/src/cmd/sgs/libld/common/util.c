@@ -50,143 +50,6 @@
 #include "_libld.h"
 
 /*
- * libld_malloc() and dz_map() are used for both performance and for ease of
- * programming:
- *
- * Performance:
- *	The link-edit is a short lived process which doesn't really free much
- *	of the dynamic memory that it requests.  Because of this, it is more
- *	important to optimize for quick memory allocations than the
- *	re-usability of the memory.
- *
- *	By also mmaping blocks of pages in from /dev/zero we don't need to
- *	waste the overhead of zeroing out these pages for calloc() requests.
- *
- * Memory Management:
- *	By doing all libld memory management through the ld_malloc routine
- *	it's much easier to free up all memory at the end by simply unmaping
- *	all of the blocks that were mapped in through dz_map().  This is much
- *	simpler then trying to track all of the libld structures that were
- *	dynamically allocate and are actually pointers into the ELF files.
- *
- *	It's important that we can free up all of our dynamic memory because
- *	libld is used by ld.so.1 when it performs dlopen()'s of relocatable
- *	objects.
- *
- * Format:
- *	The memory blocks for each allocation store the size of the allocation
- *	in the first 8 bytes of the block.  The pointer that is returned by
- *	libld_malloc() is actually the address of (block + 8):
- *
- *		(addr - 8)	block_size
- *		(addr)		<allocated block>
- *
- *	The size is retained in order to implement realloc(), and to perform
- *	the required memcpy().  8 bytes are uses, as the memory area returned
- *	by libld_malloc() must be 8 byte-aligned.  Even in a 32-bit environment,
- *	u_longlog_t pointers are employed.
- *
- * Map anonymous memory via MAP_ANON (added in Solaris 8).
- */
-static void *
-dz_map(size_t size)
-{
-	void	*addr;
-
-	if ((addr = mmap(0, size, (PROT_READ | PROT_WRITE | PROT_EXEC),
-	    (MAP_PRIVATE | MAP_ANON), -1, 0)) == MAP_FAILED) {
-		int	err = errno;
-		eprintf(NULL, ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
-		    strerror(err));
-		return (MAP_FAILED);
-	}
-	return (addr);
-}
-
-void *
-libld_malloc(size_t size)
-{
-	Ld_heap		*chp = ld_heap;
-	void		*vptr;
-	size_t		asize = size + HEAPALIGN;
-
-	/*
-	 * If this is the first allocation, or the allocation request is greater
-	 * than the current free space available, allocate a new heap.
-	 */
-	if ((chp == NULL) ||
-	    (((size_t)chp->lh_end - (size_t)chp->lh_free) <= asize)) {
-		Ld_heap	*nhp;
-		size_t	hsize = (size_t)S_ROUND(sizeof (Ld_heap), HEAPALIGN);
-		size_t	tsize = (size_t)S_ROUND((asize + hsize), HEAPALIGN);
-
-		/*
-		 * Allocate a block that is at minimum 'HEAPBLOCK' size
-		 */
-		if (tsize < HEAPBLOCK)
-			tsize = HEAPBLOCK;
-
-		if ((nhp = dz_map(tsize)) == MAP_FAILED)
-			return (NULL);
-
-		nhp->lh_next = chp;
-		nhp->lh_free = (void *)((size_t)nhp + hsize);
-		nhp->lh_end = (void *)((size_t)nhp + tsize);
-
-		ld_heap = chp = nhp;
-	}
-	vptr = chp->lh_free;
-
-	/*
-	 * Assign size to head of allocated block (used by realloc), and
-	 * memory arena as then next 8-byte aligned offset.
-	 */
-	*((size_t *)vptr) = size;
-	vptr = (void *)((size_t)vptr + HEAPALIGN);
-
-	/*
-	 * Increment free to point to next available block
-	 */
-	chp->lh_free = (void *)S_ROUND((size_t)chp->lh_free + asize,
-	    HEAPALIGN);
-
-	return (vptr);
-}
-
-void *
-libld_realloc(void *ptr, size_t size)
-{
-	size_t	psize;
-	void	*vptr;
-
-	if (ptr == NULL)
-		return (libld_malloc(size));
-
-	/*
-	 * Size of the allocated blocks is stored *just* before the blocks
-	 * address.
-	 */
-	psize = *((size_t *)((size_t)ptr - HEAPALIGN));
-
-	/*
-	 * If the block actually fits then just return.
-	 */
-	if (size <= psize)
-		return (ptr);
-
-	if ((vptr = libld_malloc(size)) != NULL)
-		(void) memcpy(vptr, ptr, psize);
-
-	return (vptr);
-}
-
-void
-/* ARGSUSED 0 */
-libld_free(void *ptr)
-{
-}
-
-/*
  * Determine if a shared object definition structure already exists and if
  * not create one.  These definitions provide for recording information
  * regarding shared objects that are still to be processed.  Once processed
@@ -230,7 +93,7 @@ sdf_add(const char *name, APlist **alpp)
 {
 	Sdf_desc	*sdf;
 
-	if ((sdf = libld_calloc(sizeof (Sdf_desc), 1)) == NULL)
+	if ((sdf = libld_calloc(1, sizeof (Sdf_desc))) == NULL)
 		return ((Sdf_desc *)S_ERROR);
 
 	sdf->sdf_name = name;
@@ -756,7 +619,7 @@ cap_names_match(Alist *alp1, Alist *alp2)
 
 	for (ALIST_TRAVERSE(alp1, idx1, capstr1)) {
 		Capstr		*capstr2;
-		Aliste 		idx2;
+		Aliste		idx2;
 
 		for (ALIST_TRAVERSE(alp2, idx2, capstr2)) {
 			if (strcmp(capstr1->cs_str, capstr2->cs_str))

@@ -636,7 +636,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 	/*
 	 * Allocate and initialize the Elf_Data structure.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == NULL)
+	if ((data = libld_calloc(1, sizeof (Elf_Data))) == NULL)
 		return (S_ERROR);
 	data->d_type = sec_info->d_type;
 	data->d_size = size;
@@ -646,7 +646,7 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 	/*
 	 * Allocate and initialize the Shdr structure.
 	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == NULL)
+	if ((shdr = libld_calloc(1, sizeof (Shdr))) == NULL)
 		return (S_ERROR);
 	shdr->sh_type = shtype;
 	shdr->sh_size = size;
@@ -700,7 +700,7 @@ new_section_from_template(Ofl_desc *ofl, Is_desc *tmpl_isp, size_t size,
 	/*
 	 * Allocate and initialize the Elf_Data structure.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == NULL)
+	if ((data = libld_calloc(1, sizeof (Elf_Data))) == NULL)
 		return (S_ERROR);
 	data->d_type = tmpl_isp->is_indata->d_type;
 	data->d_size = size;
@@ -842,7 +842,7 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, APlist *alp)
 	    S_ERROR)
 		return (S_ERROR);
 
-	if ((data->d_buf = libld_calloc(sizeof (Addr), entcount)) == NULL)
+	if ((data->d_buf = libld_calloc(entcount, sizeof (Addr))) == NULL)
 		return (S_ERROR);
 
 	if (ld_place_section(ofl, isec, NULL, ld_targ.t_id.id_array, NULL) ==
@@ -2198,7 +2198,7 @@ make_dynsort(Ofl_desc *ofl)
 		if (new_section(ofl, SHT_SUNW_symsort,
 		    MSG_ORIG(MSG_SCN_DYNSYMSORT), ofl->ofl_dynsymsortcnt,
 		    &isec, &shdr, &data) == S_ERROR)
-		return (S_ERROR);
+			return (S_ERROR);
 
 		if ((ofl->ofl_osdynsymsort = ld_place_section(ofl, isec, NULL,
 		    ld_targ.t_id.id_dynsort, NULL)) == (Os_desc *)S_ERROR)
@@ -2210,7 +2210,7 @@ make_dynsort(Ofl_desc *ofl)
 		if (new_section(ofl, SHT_SUNW_tlssort,
 		    MSG_ORIG(MSG_SCN_DYNTLSSORT),
 		    ofl->ofl_dyntlssortcnt, &isec, &shdr, &data) == S_ERROR)
-		return (S_ERROR);
+			return (S_ERROR);
 
 		if ((ofl->ofl_osdyntlssort = ld_place_section(ofl, isec, NULL,
 		    ld_targ.t_id.id_dynsort, NULL)) == (Os_desc *)S_ERROR)

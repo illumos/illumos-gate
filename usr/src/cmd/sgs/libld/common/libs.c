@@ -216,7 +216,7 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	adp->ad_start = start;
 	adp->ad_allextract = FALSE;
 	if (start) {
-		adp->ad_aux = libld_calloc(sizeof (Ar_aux), number);
+		adp->ad_aux = libld_calloc(number, sizeof (Ar_aux));
 		if (adp->ad_aux == NULL)
 			return ((Ar_desc *)S_ERROR);
 	} else {
@@ -647,8 +647,8 @@ ar_extract_bysym(const char *name, int fd, Ar_desc *adp,
 				 * allocate one.
 				 */
 				if (!amp) {
-					if ((amp = libld_calloc(sizeof (Ar_mem),
-					    1)) == NULL)
+					if ((amp = libld_calloc(1,
+					    sizeof (Ar_mem))) == NULL)
 						return (FALSE);
 					amp->am_elf = arelf;
 					amp->am_name = arname;

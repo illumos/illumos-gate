@@ -388,9 +388,9 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 * Allocate a Sym Descriptor, Auxiliary Descriptor, and a Sym AVLNode -
 	 * contiguously.
 	 */
-	if ((savl = libld_calloc(S_DROUND(sizeof (Sym_avlnode)) +
+	if ((savl = libld_calloc(1, S_DROUND(sizeof (Sym_avlnode)) +
 	    S_DROUND(sizeof (Sym_desc)) +
-	    S_DROUND(sizeof (Sym_aux)), 1)) == NULL)
+	    S_DROUND(sizeof (Sym_aux)))) == NULL)
 		return ((Sym_desc *)S_ERROR);
 	sdp = (Sym_desc *)((uintptr_t)savl +
 	    S_DROUND(sizeof (Sym_avlnode)));
@@ -738,7 +738,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		/*
 		 * If the symbol does not exist create it.
 		 */
-		if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
+		if ((sym = libld_calloc(1, sizeof (Sym))) == NULL)
 			return (S_ERROR);
 		sym->st_shndx = SHN_ABS;
 		sym->st_info = ELF_ST_INFO(STB_GLOBAL, STT_OBJECT);
@@ -2157,7 +2157,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		return (S_ERROR);
 	if ((etype == ET_REL) && (local != 0)) {
 		if ((ifl->ifl_locs =
-		    libld_calloc(sizeof (Sym_desc), local)) == NULL)
+		    libld_calloc(local, sizeof (Sym_desc))) == NULL)
 			return (S_ERROR);
 		/* LINTED */
 		ifl->ifl_locscnt = local;
@@ -2687,7 +2687,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    (isp->is_flags & FLG_IS_DISCARD)) {
 				/* Discarded but not via COMDAT */
 				if ((sdp =
-				    libld_calloc(sizeof (Sym_desc), 1)) == NULL)
+				    libld_calloc(1, sizeof (Sym_desc))) == NULL)
 					return (S_ERROR);
 
 				/*
@@ -3140,7 +3140,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			idstr = capset->oc_id.cs_str;
 			nsize = strlen(oname);
 			tsize = nsize + 1 + strlen(idstr) + 1;
-			if ((cname = libld_malloc(tsize)) == 0)
+			if ((cname = libld_malloc(tsize)) == NULL)
 				return (S_ERROR);
 
 			(void) strcpy(cname, oname);
@@ -3237,11 +3237,11 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	 * If no descriptor exists create one.
 	 */
 	if (ifl == NULL) {
-		if ((ifl = libld_calloc(sizeof (Ifl_desc), 1)) == NULL)
+		if ((ifl = libld_calloc(1, sizeof (Ifl_desc))) == NULL)
 			return ((Sym_desc *)S_ERROR);
 		ifl->ifl_name = reference;
 		ifl->ifl_flags = FLG_IF_NEEDED | FLG_IF_FILEREF;
-		if ((ifl->ifl_ehdr = libld_calloc(sizeof (Ehdr), 1)) == NULL)
+		if ((ifl->ifl_ehdr = libld_calloc(1, sizeof (Ehdr))) == NULL)
 			return ((Sym_desc *)S_ERROR);
 		ifl->ifl_ehdr->e_type = ET_REL;
 
@@ -3252,7 +3252,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	/*
 	 * Allocate a symbol structure and add it to the global symbol table.
 	 */
-	if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
+	if ((sym = libld_calloc(1, sizeof (Sym))) == NULL)
 		return ((Sym_desc *)S_ERROR);
 	sym->st_info = ELF_ST_INFO(STB_GLOBAL, STT_NOTYPE);
 	sym->st_shndx = SHN_UNDEF;

@@ -1687,3 +1687,4 @@ Bugid   Risk Synopsis
 14319	ld shouldn't warn about SHF_EXCLUDE unknown sections
 14401	elfdump should understand LLVM section types
 4795	/usr/bin/ld manpage and help should indicate '-soname' not '--soname'
+14090	ld(1) could use a normal allocator

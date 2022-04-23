@@ -37,7 +37,7 @@ make_mvsections(Ofl_desc *ofl)
 {
 	Aliste		idx;
 	Sym_desc	*sdp;
-	Word 		mv_nums = 0;
+	Word		mv_nums = 0;
 	Xword		align_parexpn = 0;	/* for -z nopartial .data sec */
 	size_t		size_parexpn = 0;	/* size of parexpn section */
 
@@ -95,7 +95,7 @@ make_mvsections(Ofl_desc *ofl)
 static uintptr_t
 append_move_desc(Ofl_desc *ofl, Sym_desc *sdp, Move *mvp, Is_desc *isp)
 {
-	int 	i, cnt = mvp->m_repeat;
+	int	i, cnt = mvp->m_repeat;
 
 	for (i = 0; i < cnt; i++) {
 		Aliste		idx;
@@ -170,7 +170,7 @@ ld_process_move(Ofl_desc *ofl)
 {
 	Aliste		idx;
 	Is_desc		*isp;
-	int 		errcnt = 0;
+	int		errcnt = 0;
 
 	for (APLIST_TRAVERSE(ofl->ofl_ismove, idx, isp)) {
 		Ifl_desc	*ifile = isp->is_file;
@@ -190,7 +190,7 @@ ld_process_move(Ofl_desc *ofl)
 		num = isp->is_shdr->sh_size / isp->is_shdr->sh_entsize;
 
 		for (i = 0; i < num; i++) {
-			Xword 		ndx = ELF_M_SYM(mvp->m_info);
+			Xword		ndx = ELF_M_SYM(mvp->m_info);
 			Sym_desc	*sdp;
 			Sym		*sym;
 
@@ -288,8 +288,8 @@ ld_process_move(Ofl_desc *ofl)
 
 					if (sdp->sd_osym == NULL) {
 						if ((sdp->sd_osym =
-						    libld_calloc(sizeof (Sym),
-						    1)) == NULL)
+						    libld_calloc(1,
+						    sizeof (Sym))) == NULL)
 							return (S_ERROR);
 						*(sdp->sd_osym) =
 						    *(sdp->sd_sym);
