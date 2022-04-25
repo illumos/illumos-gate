@@ -434,6 +434,10 @@ pci_fbuf_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	/* XXX until VGA rendering is enabled */
 	if (sc->vga_full != 0) {
 		EPRINTLN("pci_fbuf: VGA rendering not enabled");
+#ifndef __FreeBSD__
+		errno = ENOTSUP;
+		error = -1;
+#endif
 		goto done;
 	}
 
@@ -459,7 +463,7 @@ pci_fbuf_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	(void) asprintf(&name, "%s (bhyve)", get_config_value("name"));
 
 	if (sc->rfb_unix != NULL) {
-		error = rfb_init_unix(sc->rfb_unix, sc->rfb_wait,
+		error = rfb_init((char *)sc->rfb_unix, -1, sc->rfb_wait,
 		    sc->rfb_password, name != NULL ? name : "bhyve");
 	} else {
 		error = rfb_init(sc->rfb_host, sc->rfb_port, sc->rfb_wait,

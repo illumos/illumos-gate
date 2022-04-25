@@ -146,18 +146,23 @@ pci_xhci.o := CERRWARN += -_gcc11=-Wno-address-of-packed-member
 
 SMOFF += all_func_returns,leaks,no_if_block
 
+rfb.o := SMOFF=
+
 # Force c99 for everything
 CSTD=		$(CSTD_GNU99)
 
 $(PROG) := LDLIBS += \
 	-l9p \
-	-lsocket \
-	-lnsl \
-	-ldlpi \
+	-lcmdutils \
 	-ldladm \
+	-ldlpi \
+	-lidspace \
 	-lmd \
+	-lnsl \
 	-lnvpair \
+	-lsocket \
 	-lsunw_crypto \
+	-lumem \
 	-luuid \
 	-lvmmapi \
 	-lz

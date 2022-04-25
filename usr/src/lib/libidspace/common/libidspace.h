@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _LIBIDSPACE_H
@@ -32,6 +33,7 @@ extern id_space_t *id_space_create(const char *, id_t, id_t);
 extern void id_space_destroy(id_space_t *);
 extern void id_space_extend(id_space_t *, id_t, id_t);
 extern id_t id_alloc(id_space_t *);
+extern id_t id_allocff(id_space_t *);
 extern id_t id_alloc_specific(id_space_t *, id_t);
 extern void id_free(id_space_t *, id_t);
 

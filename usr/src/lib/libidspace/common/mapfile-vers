@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -31,7 +32,8 @@ $mapfile_version 2
 
 SYMBOL_VERSION ILLUMOS_1.0 {    # first release of libidspace
     global:
-        id_alloc;
+	id_alloc;
+	id_allocff;
 	id_alloc_specific;
 	id_free;
         id_space_create;

@@ -483,8 +483,13 @@ pci_xhci_portregs_write(struct pci_xhci_softc *sc, uint64_t offset,
 		oldpls = XHCI_PS_PLS_GET(p->portsc);
 		newpls = XHCI_PS_PLS_GET(value);
 
+#ifndef __FreeBSD__
+		p->portsc &= XHCI_PS_PED | XHCI_PS_PP | XHCI_PS_PLS_MASK |
+		             XHCI_PS_SPEED_MASK | XHCI_PS_PIC_MASK;
+#else
 		p->portsc &= XHCI_PS_PED | XHCI_PS_PLS_MASK |
 		             XHCI_PS_SPEED_MASK | XHCI_PS_PIC_MASK;
+#endif
 
 		if (XHCI_DEVINST_PTR(sc, port))
 			p->portsc |= XHCI_PS_CCS;
@@ -2851,6 +2856,11 @@ pci_xhci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_xhci_softc *sc;
 	int	error;
+
+#ifndef __FreeBSD__
+	if (get_config_bool_default("xhci.debug", false))
+		xhci_debug = 1;
+#endif
 
 	if (xhci_in_use) {
 		WPRINTF(("pci_xhci controller already defined"));

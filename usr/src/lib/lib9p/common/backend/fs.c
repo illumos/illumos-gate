@@ -1838,8 +1838,11 @@ fs_remove(void *softc, struct l9p_fid *fid)
 		return (error);
 
 	if (unlinkat(file->ff_dirfd, file->ff_name,
-	    S_ISDIR(cst.st_mode) ? AT_REMOVEDIR : 0) != 0)
+	    S_ISDIR(cst.st_mode) ? AT_REMOVEDIR : 0) != 0) {
 		error = errno;
+		if (error == EEXIST && S_ISDIR(cst.st_mode))
+			error = ENOTEMPTY;
+	}
 
 	return (error);
 }
@@ -3038,8 +3041,11 @@ fs_unlinkat(void *softc, struct l9p_request *req)
 		return (error);
 
 	if (req->lr_req.tunlinkat.flags & L9PL_AT_REMOVEDIR) {
-		if (unlinkat(dirff->ff_dirfd, newname, AT_REMOVEDIR) != 0)
+		if (unlinkat(dirff->ff_dirfd, newname, AT_REMOVEDIR) != 0) {
 			error = errno;
+			if (error == EEXIST)
+				error = ENOTEMPTY;
+		}
 	} else {
 		if (unlinkat(dirff->ff_dirfd, newname, 0) != 0)
 			error = errno;
