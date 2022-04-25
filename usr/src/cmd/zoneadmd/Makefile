@@ -29,6 +29,7 @@
 PROG= zoneadmd
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 ROOTCMDDIR=	$(ROOTLIB)/zones
 
@@ -38,9 +39,6 @@ POFILE=zoneadmd_all.po
 POFILES= $(OBJS:%.o=%.po)
 
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-switch
-CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += $(CNOWARN_UNINIT)
 
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
@@ -65,8 +63,6 @@ $(POFILE): $(POFILES)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 check:
 	$(CSTYLE) -p -P $(SRCS:%=%)

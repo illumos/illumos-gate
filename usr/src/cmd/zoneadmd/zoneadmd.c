@@ -1205,7 +1205,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	zone_cmd_t cmd;
 	zone_cmd_arg_t *zargp;
 
-	boolean_t kernelcall;
+	boolean_t kernelcall = B_FALSE;
 
 	int rval = -1;
 	uint64_t uniqid;
@@ -1490,6 +1490,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			zerror(zlogp, B_FALSE, "zone is already ready");
 			rval = 0;
 			break;
+		case Z_FORCEBOOT:
 		case Z_BOOT:
 			(void) strlcpy(boot_args, zargp->bootbuf,
 			    sizeof (boot_args));
@@ -1515,6 +1516,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		case Z_SHUTDOWN:
 		case Z_REBOOT:
 		case Z_NOTE_UNINSTALLING:
+		case Z_FORCEMOUNT:
 		case Z_MOUNT:
 		case Z_UNMOUNT:
 			if (kernelcall)	/* Invalid; can't happen */
@@ -1562,6 +1564,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			else
 				eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
+		case Z_FORCEBOOT:
 		case Z_BOOT:
 			/*
 			 * We could have two clients racing to boot this
@@ -1609,6 +1612,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			}
 			break;
 		case Z_NOTE_UNINSTALLING:
+		case Z_FORCEMOUNT:
 		case Z_MOUNT:
 		case Z_UNMOUNT:
 			zerror(zlogp, B_FALSE, "%s operation is invalid "
