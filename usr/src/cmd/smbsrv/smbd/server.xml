@@ -245,6 +245,8 @@ file.
 			value='1000' override='true'/>
 		<propval name='netlogon_flags' type='integer'
 			value='0' override='true'/>
+		<propval name='max_opens' type='integer'
+			value='0' override='true'/>
 	</property_group>
 
 	<!-- SMB service-specific shares exec configuration defaults -->

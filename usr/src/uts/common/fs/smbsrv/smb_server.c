@@ -2142,6 +2142,7 @@ smb_server_store_cfg(smb_server_t *sv, smb_ioc_cfg_t *ioc)
 	sv->sv_cfg.skc_encrypt_ciphers = ioc->encrypt_ciphers;
 	sv->sv_cfg.skc_execflags = ioc->exec_flags;
 	sv->sv_cfg.skc_negtok_len = ioc->negtok_len;
+	sv->sv_cfg.skc_max_opens = ioc->max_opens;
 	sv->sv_cfg.skc_version = ioc->version;
 	sv->sv_cfg.skc_initial_credits = ioc->initial_credits;
 	sv->sv_cfg.skc_maximum_credits = ioc->maximum_credits;

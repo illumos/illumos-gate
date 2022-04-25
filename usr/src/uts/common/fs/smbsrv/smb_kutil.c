@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -392,6 +393,194 @@ smb_idpool_free(
 	/* Freeing a free ID. */
 	ASSERT(0);
 	mutex_exit(&pool->id_mutex);
+}
+
+/*
+ * smb_lavl_constructor
+ *
+ * This function initializes a locked avl.
+ */
+void
+smb_lavl_constructor(
+    smb_lavl_t	*la,
+    int (*compar) (const void *, const void *),
+    size_t	size,
+    size_t	offset)
+{
+	rw_init(&la->la_lock, NULL, RW_DEFAULT, NULL);
+	mutex_init(&la->la_mutex, NULL, MUTEX_DEFAULT, NULL);
+	avl_create(&la->la_tree, compar, size, offset);
+	list_create(&la->la_deleteq, sizeof (smb_dtor_t),
+	    offsetof(smb_dtor_t, dt_lnd));
+	la->la_wrop = 0;
+	la->la_deleteq_count = 0;
+	la->la_flushing = B_FALSE;
+}
+
+/*
+ * Flush the delete queue and destroy a locked avl.
+ */
+void
+smb_lavl_destructor(
+    smb_lavl_t	*la)
+{
+	smb_lavl_flush(la);
+
+	ASSERT(la->la_deleteq_count == 0);
+	ASSERT0(avl_numnodes(&la->la_tree));
+
+	rw_destroy(&la->la_lock);
+	avl_destroy(&la->la_tree);
+	list_destroy(&la->la_deleteq);
+	mutex_destroy(&la->la_mutex);
+}
+
+/*
+ * smb_lavl_enter
+ * Not a macro so dtrace smbsrv:* can see it.
+ */
+void
+smb_lavl_enter(smb_lavl_t *la, krw_t mode)
+{
+	rw_enter(&la->la_lock, mode);
+}
+
+/*
+ * Post an object to the delete queue.  The delete queue will be processed
+ * during smb_lavl_exit or lavl destruction.  Objects are often posted for
+ * deletion during avl iteration (while the lavl is locked) but that is
+ * not required, and an object can be posted at any time.
+ */
+void
+smb_lavl_post(smb_lavl_t *la, void *object, smb_dtorproc_t dtorproc)
+{
+	smb_dtor_t	*dtor;
+
+	ASSERT((object != NULL) && (dtorproc != NULL));
+
+	dtor = kmem_cache_alloc(smb_dtor_cache, KM_SLEEP);
+	bzero(dtor, sizeof (smb_dtor_t));
+	dtor->dt_magic = SMB_DTOR_MAGIC;
+	dtor->dt_object = object;
+	dtor->dt_proc = dtorproc;
+
+	mutex_enter(&la->la_mutex);
+	list_insert_tail(&la->la_deleteq, dtor);
+	++la->la_deleteq_count;
+	mutex_exit(&la->la_mutex);
+}
+
+/*
+ * Exit the lavl lock and process the delete queue.
+ */
+void
+smb_lavl_exit(smb_lavl_t *la)
+{
+	rw_exit(&la->la_lock);
+	smb_lavl_flush(la);
+}
+
+/*
+ * Flush the lavl delete queue.  The mutex is dropped across the destructor
+ * call in case this leads to additional objects being posted to the delete
+ * queue.
+ */
+void
+smb_lavl_flush(smb_lavl_t *la)
+{
+	smb_dtor_t    *dtor;
+
+	mutex_enter(&la->la_mutex);
+	if (la->la_flushing) {
+		mutex_exit(&la->la_mutex);
+		return;
+	}
+	la->la_flushing = B_TRUE;
+
+	dtor = list_head(&la->la_deleteq);
+	while (dtor != NULL) {
+		SMB_DTOR_VALID(dtor);
+		ASSERT((dtor->dt_object != NULL) && (dtor->dt_proc != NULL));
+		list_remove(&la->la_deleteq, dtor);
+		--la->la_deleteq_count;
+		mutex_exit(&la->la_mutex);
+
+		dtor->dt_proc(dtor->dt_object);
+
+		dtor->dt_magic = (uint32_t)~SMB_DTOR_MAGIC;
+		kmem_cache_free(smb_dtor_cache, dtor);
+		mutex_enter(&la->la_mutex);
+		dtor = list_head(&la->la_deleteq);
+	}
+	la->la_flushing = B_FALSE;
+
+	mutex_exit(&la->la_mutex);
+}
+
+/*
+ * smb_lavl_upgrade
+ *
+ * This function tries to upgrade the lock of the locked avl. It assumes the
+ * locked has already been entered in RW_READER mode. It first tries using the
+ * Solaris function rw_tryupgrade(). If that call fails the lock is released
+ * and reentered in RW_WRITER mode. In that last case a window is opened during
+ * which the contents of the avl may have changed. The return code indicates
+ * whether or not the avl was modified when the lock was exited.
+ */
+int smb_lavl_upgrade(
+    smb_lavl_t *la)
+{
+	uint64_t	wrop;
+
+	if (rw_tryupgrade(&la->la_lock) != 0) {
+		return (0);
+	}
+	wrop = la->la_wrop;
+	rw_exit(&la->la_lock);
+	rw_enter(&la->la_lock, RW_WRITER);
+	return (wrop != la->la_wrop);
+}
+
+/*
+ * smb_lavl_insert
+ *
+ * This function inserts the object passed into the tree
+ * at the position determined by the AVL comparator.
+ */
+void
+smb_lavl_insert(
+    smb_lavl_t	*la,
+    void	*obj)
+{
+	avl_add(&la->la_tree, obj);
+	++la->la_wrop;
+}
+
+/*
+ * smb_lavl_remove
+ *
+ * This function removes the object passed from the lavl. This function
+ * assumes the lock of the lavl has already been entered.
+ */
+void
+smb_lavl_remove(
+    smb_lavl_t	*la,
+    void	*obj)
+{
+	avl_remove(&la->la_tree, obj);
+	++la->la_wrop;
+}
+
+/*
+ * smb_lavl_get_count
+ *
+ * This function returns the number of elements in the specified avl.
+ */
+uint32_t
+smb_lavl_get_count(
+    smb_lavl_t *la)
+{
+	return ((uint32_t)avl_numnodes(&la->la_tree));
 }
 
 /*
@@ -1217,7 +1406,7 @@ smb_panic(char *file, const char *func, int line)
  */
 void
 smb_avl_create(smb_avl_t *avl, size_t size, size_t offset,
-	const smb_avl_nops_t *ops)
+    const smb_avl_nops_t *ops)
 {
 	ASSERT(avl);
 	ASSERT(ops);
