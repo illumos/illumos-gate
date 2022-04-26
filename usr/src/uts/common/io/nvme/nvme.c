@@ -411,7 +411,7 @@ static int nvme_setup_interrupts(nvme_t *, int, int);
 static void nvme_release_interrupts(nvme_t *);
 static uint_t nvme_intr(caddr_t, caddr_t);
 
-static void nvme_shutdown(nvme_t *, int, boolean_t);
+static void nvme_shutdown(nvme_t *, boolean_t);
 static boolean_t nvme_reset(nvme_t *, boolean_t);
 static int nvme_init(nvme_t *);
 static nvme_cmd_t *nvme_alloc_cmd(nvme_t *, int);
@@ -2695,15 +2695,31 @@ nvme_reset(nvme_t *nvme, boolean_t quiesce)
 	csts.r = nvme_get32(nvme, NVME_REG_CSTS);
 	if (csts.b.csts_rdy == 1) {
 		nvme_put32(nvme, NVME_REG_CC, 0);
-		for (i = 0; i != nvme->n_timeout * 10; i++) {
+
+		/*
+		 * The timeout value is from the Controller Capabilities
+		 * register (CAP.TO, section 3.1.1). This is the worst case
+		 * time to wait for CSTS.RDY to transition from 1 to 0 after
+		 * CC.EN transitions from 1 to 0.
+		 *
+		 * The timeout units are in 500 ms units, and we are delaying
+		 * in 50ms chunks, hence counting to n_timeout * 10.
+		 */
+		for (i = 0; i < nvme->n_timeout * 10; i++) {
 			csts.r = nvme_get32(nvme, NVME_REG_CSTS);
 			if (csts.b.csts_rdy == 0)
 				break;
 
-			if (quiesce)
+			/*
+			 * Quiescing drivers should not use locks or timeouts,
+			 * so if this is the quiesce path, use a quiesce-safe
+			 * delay.
+			 */
+			if (quiesce) {
 				drv_usecwait(50000);
-			else
+			} else {
 				delay(drv_usectohz(50000));
+			}
 		}
 	}
 
@@ -2716,27 +2732,26 @@ nvme_reset(nvme_t *nvme, boolean_t quiesce)
 }
 
 static void
-nvme_shutdown(nvme_t *nvme, int mode, boolean_t quiesce)
+nvme_shutdown(nvme_t *nvme, boolean_t quiesce)
 {
 	nvme_reg_cc_t cc;
 	nvme_reg_csts_t csts;
 	int i;
 
-	ASSERT(mode == NVME_CC_SHN_NORMAL || mode == NVME_CC_SHN_ABRUPT);
-
 	cc.r = nvme_get32(nvme, NVME_REG_CC);
-	cc.b.cc_shn = mode & 0x3;
+	cc.b.cc_shn = NVME_CC_SHN_NORMAL;
 	nvme_put32(nvme, NVME_REG_CC, cc.r);
 
-	for (i = 0; i != 10; i++) {
+	for (i = 0; i < 10; i++) {
 		csts.r = nvme_get32(nvme, NVME_REG_CSTS);
 		if (csts.b.csts_shst == NVME_CSTS_SHN_COMPLETE)
 			break;
 
-		if (quiesce)
+		if (quiesce) {
 			drv_usecwait(100000);
-		else
+		} else {
 			delay(drv_usectohz(100000));
+		}
 	}
 }
 
@@ -4247,7 +4262,7 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	if (nvme->n_progress & NVME_REGS_MAPPED) {
-		nvme_shutdown(nvme, NVME_CC_SHN_NORMAL, B_FALSE);
+		nvme_shutdown(nvme, B_FALSE);
 		(void) nvme_reset(nvme, B_FALSE);
 	}
 
@@ -4310,11 +4325,11 @@ nvme_quiesce(dev_info_t *dip)
 	if (nvme == NULL)
 		return (DDI_FAILURE);
 
-	nvme_shutdown(nvme, NVME_CC_SHN_ABRUPT, B_TRUE);
+	nvme_shutdown(nvme, B_TRUE);
 
 	(void) nvme_reset(nvme, B_TRUE);
 
-	return (DDI_FAILURE);
+	return (DDI_SUCCESS);
 }
 
 static int
