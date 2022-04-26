@@ -33,6 +33,11 @@ SRCDIR =	../common
 #
 STRIP_STABS = /bin/true
 
+$(ROOTOPTDIR):
+	$(INS.dir)
+
+$(ROOTLIBDIR): $(ROOTOPTDIR)
+	$(INS.dir)
 
 $(ROOTLIBDIR64): $(ROOTLIBDIR)
 	$(INS.dir)

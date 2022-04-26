@@ -16,4 +16,7 @@
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
-install: all $(ROOTLIBDIR64) .WAIT $(ROOTLIBS64) $(ROOTLINKS64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)
+
+$(ROOTLIBS64): $(ROOTLIBDIR64)
+$(ROOTLINKS64): $(ROOTLIBS64)
