@@ -28,6 +28,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #include "mcs.h"
 #include "extern.h"
@@ -60,14 +63,14 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 		Action[act_index].a_cnt++;
 		switch (Action[act_index].a_action) {
 		case ACT_ZAP:
-			if (GET_ACTION(info->flags) == ACT_DELETE)
+			if (GET_ACTION(info->si_flags) == ACT_DELETE)
 				break;
 			dozap(info);
-			SET_ACTION(info->flags, ACT_ZAP);
-			SET_MODIFIED(info->flags);
+			SET_ACTION(info->si_flags, ACT_ZAP);
+			SET_MODIFIED(info->si_flags);
 			break;
 		case ACT_PRINT:
-			if (GET_ACTION(info->flags) == ACT_DELETE)
+			if (GET_ACTION(info->si_flags) == ACT_DELETE)
 				break;
 			if (shdr.sh_type == SHT_NOBITS) {
 				error_message(ACT_PRINT_ERROR, PLAIN_ERROR,
@@ -81,17 +84,17 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 			 * If I am strip command, this is the
 			 * only action I can take.
 			 */
-			if (GET_ACTION(info->flags) == ACT_DELETE)
+			if (GET_ACTION(info->si_flags) == ACT_DELETE)
 				break;
-			if (GET_LOC(info->flags) == IN) {
+			if (GET_LOC(info->si_flags) == IN) {
 				/*
 				 * If I am 'strip', I have to
 				 * unset the candidate flag and
 				 * unset the error return code.
 				 */
-				if (CHK_OPT(info, I_AM_STRIP)) {
+				if (CHK_OPT(cmd_info, I_AM_STRIP)) {
 					ret = 0;
-					UNSET_CANDIDATE(info->flags);
+					UNSET_CANDIDATE(info->si_flags);
 				} else {
 					char *name = info->name;
 
@@ -109,9 +112,9 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 				 * unset the candidate flag and
 				 * unset the error return code.
 				 */
-				if (CHK_OPT(info, I_AM_STRIP)) {
+				if (CHK_OPT(cmd_info, I_AM_STRIP)) {
 					ret = 0;
-					UNSET_CANDIDATE(info->flags);
+					UNSET_CANDIDATE(info->si_flags);
 				} else {
 					ret++;
 					error_message(ACT_DELETE2_ERROR,
@@ -120,7 +123,7 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 					    info->rel_name);
 				}
 				break;
-			} else if (GET_LOC(info->flags) == PRIOR) {
+			} else if (GET_LOC(info->si_flags) == PRIOR) {
 				/*
 				 * I can not delete this
 				 * section. I can only NULL
@@ -132,8 +135,8 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 				info->secno = (GElf_Word)DELETED;
 				(cmd_info->no_of_delete)++;
 			}
-			SET_ACTION(info->flags, ACT_DELETE);
-			SET_MODIFIED(info->flags);
+			SET_ACTION(info->si_flags, ACT_DELETE);
+			SET_MODIFIED(info->si_flags);
 			break;
 		case ACT_APPEND:
 			if (shdr.sh_type == SHT_NOBITS) {
@@ -141,7 +144,7 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 				error_message(ACT_APPEND1_ERROR, PLAIN_ERROR,
 				    NULL, prog, cur_file, SECT_NAME);
 				break;
-			} else if (GET_LOC(info->flags) == IN) {
+			} else if (GET_LOC(info->si_flags) == IN) {
 				ret++;
 				error_message(ACT_APPEND2_ERROR, PLAIN_ERROR,
 				    NULL, prog, cur_file, SECT_NAME);
@@ -150,9 +153,9 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 			doappend(Action[act_index].a_string, info);
 			(cmd_info->no_of_append)++;
 			info->secno = info->osecno;
-			SET_ACTION(info->flags, ACT_APPEND);
-			SET_MODIFIED(info->flags);
-			if (GET_LOC(info->flags) == PRIOR)
+			SET_ACTION(info->si_flags, ACT_APPEND);
+			SET_MODIFIED(info->si_flags);
+			if (GET_LOC(info->si_flags) == PRIOR)
 				info->secno = (GElf_Word)EXPANDED;
 			break;
 		case ACT_COMPRESS:
@@ -160,14 +163,14 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 			 * If this section is already deleted,
 			 * don't do anything.
 			 */
-			if (GET_ACTION(info->flags) == ACT_DELETE)
+			if (GET_ACTION(info->si_flags) == ACT_DELETE)
 				break;
 			if (shdr.sh_type == SHT_NOBITS) {
 				ret++;
 				error_message(ACT_COMPRESS1_ERROR, PLAIN_ERROR,
 				    NULL, prog, cur_file, SECT_NAME);
 				break;
-			} else if (GET_LOC(info->flags) == IN) {
+			} else if (GET_LOC(info->si_flags) == IN) {
 				ret++;
 				error_message(ACT_COMPRESS2_ERROR, PLAIN_ERROR,
 				    NULL, prog, cur_file, SECT_NAME);
@@ -176,9 +179,9 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 
 			docompress(info);
 			(cmd_info->no_of_compressed)++;
-			SET_ACTION(info->flags, ACT_COMPRESS);
-			SET_MODIFIED(info->flags);
-			if (GET_LOC(info->flags) == PRIOR)
+			SET_ACTION(info->si_flags, ACT_COMPRESS);
+			SET_MODIFIED(info->si_flags);
+			if (GET_LOC(info->si_flags) == PRIOR)
 				info->secno = (GElf_Word)SHRUNK;
 			break;
 		}
@@ -217,7 +220,7 @@ doprint(char *cur_file, section_info_table *info)
 	size_t	temp_size;
 	char	*temp_string;
 
-	if (GET_MODIFIED(info->flags) == 0)
+	if (GET_MODIFIED(info->si_flags) == 0)
 		data = info->data;
 	else
 		data = info->mdata;
@@ -289,7 +292,7 @@ doappend(char *a_string, section_info_table *info)
 		 * Check if the section is deleted or not.
 		 * Or if the size is 0 or not.
 		 */
-		if ((GET_ACTION(info->flags) == ACT_DELETE) ||
+		if ((GET_ACTION(info->si_flags) == ACT_DELETE) ||
 		    data->d_size == 0) {
 			/*
 			 * The section was deleated.
@@ -328,7 +331,7 @@ doappend(char *a_string, section_info_table *info)
 		 * Modify it.
 		 */
 		data = info->mdata;
-		if ((GET_ACTION(info->flags) == ACT_DELETE) ||
+		if ((GET_ACTION(info->si_flags) == ACT_DELETE) ||
 		    data->d_size == 0) {
 			/*
 			 * The section was deleated.
