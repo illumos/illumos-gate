@@ -39,9 +39,6 @@ TEXT_DOMAIN =	SUNW_OST_NETRPC
 POFILES =	generic.po
 POFILE = mech_dh.po
 
-SED=    sed
-GREP=   grep
-
 all :=          TARGET= all
 clean :=        TARGET= clean
 clobber :=      TARGET= clobber

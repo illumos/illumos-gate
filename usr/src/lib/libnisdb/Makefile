@@ -32,8 +32,6 @@ VERS=	.2
 PROTOCOL_DIR= $(ROOT)/include/rpcsvc
 YPTOL_DIR= ./yptol
 
-SED=	sed
-
 OBJECTS = \
 	db_entry.o db_entry_c_xdr.o \
 	db_item.o db_item_c_xdr.o \

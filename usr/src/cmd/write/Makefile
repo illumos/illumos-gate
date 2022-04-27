@@ -27,7 +27,6 @@ PROG= write
 
 include ../Makefile.cmd
 
-SED= sed
 DCFILE= $(PROG).dc
 
 FILEMODE = 02555

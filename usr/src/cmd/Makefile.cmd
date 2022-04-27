@@ -28,12 +28,6 @@
 
 include $(SRC)/Makefile.master
 
-LN=		ln
-SH=		sh
-ECHO=		echo
-MKDIR=		mkdir
-TOUCH=		touch
-
 FILEMODE=	0555
 LIBFILEMODE=	0444
 XPG4=		$(XPG4PROG:%=%.xpg4)

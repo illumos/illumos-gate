@@ -63,12 +63,12 @@ $(ROOTMANIFESTDIR)/%: %
 
 $(KSHPROG): $(KSHPROG).ksh
 	$(RM) $@
-	sed -e "s/TEXT_DOMAIN/${TEXT_DOMAIN}/g" $(KSHPROG).ksh > $@
+	$(SED) -e "s/TEXT_DOMAIN/${TEXT_DOMAIN}/g" $(KSHPROG).ksh > $@
 	$(CHMOD) +x $@
 
 $(BASHPROG): $(BASHPROG).bash
 	$(RM) $@
-	sed -e "s/TEXT_DOMAIN/${TEXT_DOMAIN}/g" $(BASHPROG).bash > $@
+	$(SED) -e "s/TEXT_DOMAIN/${TEXT_DOMAIN}/g" $(BASHPROG).bash > $@
 	$(CHMOD) +x $@
 
 #

@@ -62,7 +62,8 @@ CLEANFILES +=	$(SCRFILES)
 # limit.  maketerm.ed can probably be fixed to prevent this, but it is arguable
 # if this work would ever be worth it.
 #
-screen/term.check      := CSTYLE_TAIL = | grep -v "line > 80 characters" | true
+screen/term.check      := CSTYLE_TAIL = | $(GREP) -v "line > 80 characters" | \
+	$(TRUE)
 
 .KEEP_STATE:
 
@@ -81,18 +82,16 @@ scrfiles:	$(SCRFILES)
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
-ED = ed
-
 screen/curses.h:	screen/curses.ed screen/keycaps screen/tmp
 	(cd screen; $(ED) - < curses.ed)
 
 screen/keycaps:		screen/caps
-	grep "KEY_" screen/caps > screen/keycaps
-	@if tail -1 screen/keycaps | grep 'KEY_MOUSE' > /dev/null;then :; \
+	$(GREP) "KEY_" screen/caps > screen/keycaps
+	@if tail -1 screen/keycaps | $(GREP) 'KEY_MOUSE' > /dev/null;then :; \
 		else echo new keys!! must change setkeymap.c; exit 1;fi
 
 screen/keyname.c:    screen/keyname.sh screen/keycaps
-	(cd screen; sh keyname.sh)
+	(cd screen; $(SH) keyname.sh)
 
 screen/termcap.c:    screen/termcap.ed
 	(cd screen; $(ED) - < termcap.ed)
@@ -109,8 +108,8 @@ screen/term.h:   screen/maketerm.ed
 	(cd screen; $(ED) - < maketerm.ed)
 
 screen/tmp:
-	rm -rf $@
-	mkdir $@
+	$(RM) -r $@
+	$(MKDIR) $@
 
 CLEANFILES += \
 	screen/tmp/keycaps \

@@ -50,9 +50,6 @@ XGETFLAGS=	-a
 POFILE=		$(LIBRARY:%.a=%.po)
 POFILES=	_error.po
 
-SED=	sed
-GREP=	grep
-
 LIBS=		$(DYNLIB)
 
 LDLIBS += -lc

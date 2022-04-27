@@ -43,9 +43,6 @@ XGETFLAGS=	-a -x scsi.xcl
 POFILE=		scsi.po
 POFILES=	generic.po
 
-SED=	sed
-GREP=	grep
-
 .KEEP_STATE:
 
 all clean delete install package: $(SUBDIRS)

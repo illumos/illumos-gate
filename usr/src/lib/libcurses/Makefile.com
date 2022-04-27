@@ -151,9 +151,6 @@ LDLIBS += -lc
 
 CPPFLAGS += -I../screen -I../../common/inc
 
-ED = ed
-RM = rm -f
-
 #
 # If and when somebody gets around to messaging this, CLOBBERFILE should not
 # be cleared (so that any .po file will be clobbered.

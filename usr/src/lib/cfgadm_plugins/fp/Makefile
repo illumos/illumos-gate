@@ -41,10 +41,6 @@ XGETFLAGS=	-a -x fp.xcl
 POFILE=		fp.po
 POFILES=	generic.po
 
-SED=	sed
-GREP=	grep
-CP=	cp
-
 .KEEP_STATE:
 
 all clean delete install package: $(SUBDIRS)

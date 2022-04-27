@@ -8,8 +8,6 @@
 # All rights reserved.  The Berkeley Software License Agreement
 # specifies the terms and conditions for redistribution.
 
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 # C Shell with process control; VM/UNIX VAX Makefile
 # Bill Joy UC Berkeley; Jim Kulp IIASA, Austria
@@ -17,12 +15,9 @@
 
 include ../Makefile.cmd
 
-ED= ed
 #
 # For message catalogue files
 #
-GREP= egrep
-SED= sed
 POFILE= csh.po
 CLOBBERFILES += sh.tconst.h
 CLEANFILES += sh.tconst.h
@@ -57,7 +52,7 @@ XGETFLAGS += -a -x csh.xcl
 #
 _msg: $(MSGDOMAIN) sh.tconst.h .WAIT $(POFILE)
 	$(RM) $(POFILE)
-	cat $(POFILES) > $(POFILE)
+	$(CAT) $(POFILES) > $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)
 	$(CP) $(POFILE) $(MSGDOMAIN)
 
@@ -75,7 +70,7 @@ clobber: local_clobber $(MACH)
 local_clobber:
 	$(RM) $(CLOBBERFILES)
 
-clean: local_clean 
+clean: local_clean
 
 local_clean:
 	$(RM) $(CLEANFILES)

@@ -48,9 +48,7 @@ SMATCH=off
 
 LINTFLAGS += -m -v -u
 
-AR=     /usr/ccs/bin/ar
 RANLIB= /usr/ccs/bin/ranlib
-RM=     /usr/bin/rm -f
 
 LIBCSRCS        = device_ctl.c \
 		  filehdr.c \
@@ -97,7 +95,7 @@ libaudio=	libaudio.a
 install all: $(libaudio)
 
 $(libaudio): $(COBJS) $(CCOBJS)
-	$(RM) -f $@
+	$(RM) $@
 	$(AR) cq $@ $(COBJS) $(CCOBJS)
 	test ! -f $(RANLIB) || $(RANLIB) $@
 

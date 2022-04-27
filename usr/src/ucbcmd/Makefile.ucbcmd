@@ -34,12 +34,6 @@
 
 include $(SRC)/Makefile.master
 
-LN=		ln
-SH=		sh
-CHMOD=		chmod
-MKDIR=		mkdir
-TOUCH=		touch
-
 FILEMODE=	0555
 LIBFILEMODE=	0444
 ROOTBIN=	$(ROOT)/usr/ucb

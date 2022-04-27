@@ -45,8 +45,6 @@ LDLIBS		+= -lpicl -lm
 # used for creating message catalogue files
 #
 TEXT_DOMAIN=	SUNW_OST_OSLIB
-SED=		sed
-GREP=		grep
 
 .KEEP_STATE:
 

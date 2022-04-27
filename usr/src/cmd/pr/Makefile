@@ -29,7 +29,6 @@ XPG4PROG= pr
 
 include ../Makefile.cmd
 
-SED = sed
 DCFILE = $(PROG).dc
 
 CERRWARN += -_gcc=-Wno-parentheses

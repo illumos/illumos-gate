@@ -38,7 +38,6 @@ ROOTLINK=	$(ROOTBIN)/uptime
 
 FILEMODE=	4555
 
-SED=	sed
 DCFILE=	$(PROG).dc
 
 .KEEP_STATE:

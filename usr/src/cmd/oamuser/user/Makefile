@@ -29,11 +29,9 @@ DEFAULTFILES= useradd.dfl
 
 include ../../Makefile.cmd
 
-GREP=		grep
-
-USERADD= 	useradd
-USERDEL= 	userdel
-USERMOD= 	usermod
+USERADD=	useradd
+USERDEL=	userdel
+USERMOD=	usermod
 ROLEADD=	roleadd
 ROLEDEL=	roledel
 ROLEMOD=	rolemod
