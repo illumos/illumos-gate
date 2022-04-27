@@ -441,7 +441,7 @@ and
 return the total
 number of bits set in the bit masks.
 Otherwise,
-.Sy 1
+.Sy -1
 is returned and
 .Dv errno
 is set to indicate the error.
