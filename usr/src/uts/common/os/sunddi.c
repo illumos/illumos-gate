@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -7792,6 +7793,12 @@ ddi_devid_init(
 	case DEVID_SCSI_SERIAL:
 		/*FALLTHRU*/
 	case DEVID_ATA_SERIAL:
+		/*FALLTHRU*/
+	case DEVID_NVME_NSID:
+		/*FALLTHRU*/
+	case DEVID_NVME_EUI64:
+		/*FALLTHRU*/
+	case DEVID_NVME_NGUID:
 		/*FALLTHRU*/
 	case DEVID_ENCAP:
 		if (nbytes == 0)
