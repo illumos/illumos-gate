@@ -54,3 +54,4 @@ XSUBPP64 = $(PERLBINDIR64)/perl $(PERLDIR)/lib/ExtUtils/xsubpp \
 
 CSTD = $(CSTD_GNU99)
 ZGUIDANCE =
+SONAME = $(PERLMOD).so
