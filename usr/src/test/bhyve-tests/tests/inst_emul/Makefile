@@ -16,7 +16,8 @@ include $(SRC)/cmd/Makefile.cmd.64
 include $(SRC)/test/Makefile.com
 
 PROG =	rdmsr \
-	wrmsr
+	wrmsr \
+	triple_fault
 
 PAYLOADS = $(PROG)
 include ../Makefile.in_guest

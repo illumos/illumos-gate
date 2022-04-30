@@ -40,7 +40,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -2201,6 +2201,10 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	}
 
 	switch (reason) {
+	case EXIT_REASON_TRIPLE_FAULT:
+		(void) vm_suspend(vmx->vm, VM_SUSPEND_TRIPLEFAULT);
+		handled = HANDLED;
+		break;
 	case EXIT_REASON_TASK_SWITCH:
 		ts = &vmexit->u.task_switch;
 		ts->tsssel = qual & 0xffff;
