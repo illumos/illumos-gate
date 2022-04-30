@@ -511,10 +511,10 @@ vlapic_fire_lvt(struct vlapic *vlapic, uint_t lvt)
 		vcpu_notify_event_type(vlapic->vm, vlapic->vcpuid, notify);
 		break;
 	case APIC_LVT_DM_NMI:
-		vm_inject_nmi(vlapic->vm, vlapic->vcpuid);
+		(void) vm_inject_nmi(vlapic->vm, vlapic->vcpuid);
 		break;
 	case APIC_LVT_DM_EXTINT:
-		vm_inject_extint(vlapic->vm, vlapic->vcpuid);
+		(void) vm_inject_extint(vlapic->vm, vlapic->vcpuid);
 		break;
 	default:
 		// Other modes ignored
@@ -721,10 +721,12 @@ vlapic_trigger_lvt(struct vlapic *vlapic, int vector)
 		 */
 		switch (vector) {
 			case APIC_LVT_LINT0:
-				vm_inject_extint(vlapic->vm, vlapic->vcpuid);
+				(void) vm_inject_extint(vlapic->vm,
+				    vlapic->vcpuid);
 				break;
 			case APIC_LVT_LINT1:
-				vm_inject_nmi(vlapic->vm, vlapic->vcpuid);
+				(void) vm_inject_nmi(vlapic->vm,
+				    vlapic->vcpuid);
 				break;
 			default:
 				break;
@@ -1030,14 +1032,14 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic)
 		CPU_CLR(i, &dmask);
 		switch (mode) {
 		case APIC_DELMODE_FIXED:
-			lapic_intr_edge(vlapic->vm, i, vec);
+			(void) lapic_intr_edge(vlapic->vm, i, vec);
 			vmm_stat_incr(vlapic->vm, vlapic->vcpuid,
 			    VLAPIC_IPI_SEND, 1);
 			vmm_stat_incr(vlapic->vm, i,
 			    VLAPIC_IPI_RECV, 1);
 			break;
 		case APIC_DELMODE_NMI:
-			vm_inject_nmi(vlapic->vm, i);
+			(void) vm_inject_nmi(vlapic->vm, i);
 			break;
 		case APIC_DELMODE_INIT:
 			(void) vm_inject_init(vlapic->vm, i);
@@ -1062,7 +1064,7 @@ vlapic_self_ipi_handler(struct vlapic *vlapic, uint32_t val)
 	/* self-IPI is only exposed via x2APIC */
 	ASSERT(vlapic_x2mode(vlapic));
 
-	lapic_intr_edge(vlapic->vm, vlapic->vcpuid, vec);
+	(void) lapic_intr_edge(vlapic->vm, vlapic->vcpuid, vec);
 	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_IPI_SEND, 1);
 	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_IPI_RECV, 1);
 	VLAPIC_CTR1(vlapic, "vlapic self-ipi %d", vec);
@@ -1718,9 +1720,9 @@ vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
 		vcpuid--;
 		CPU_CLR(vcpuid, &dmask);
 		if (delmode == IOART_DELEXINT) {
-			vm_inject_extint(vm, vcpuid);
+			(void) vm_inject_extint(vm, vcpuid);
 		} else {
-			lapic_set_intr(vm, vcpuid, vec, level);
+			(void) lapic_set_intr(vm, vcpuid, vec, level);
 		}
 	}
 }

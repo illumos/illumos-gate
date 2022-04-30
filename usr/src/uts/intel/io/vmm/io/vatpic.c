@@ -288,8 +288,8 @@ vatpic_notify_intr(struct vatpic *vatpic)
 		 * interrupt.
 		 */
 		atpic->intr_raised = true;
-		lapic_set_local_intr(vatpic->vm, -1, APIC_LVT_LINT0);
-		vioapic_pulse_irq(vatpic->vm, 0);
+		(void) lapic_set_local_intr(vatpic->vm, -1, APIC_LVT_LINT0);
+		(void) vioapic_pulse_irq(vatpic->vm, 0);
 		vatpic->stats.as_interrupts++;
 	} else {
 		VATPIC_CTR3(vatpic, "atpic master no eligible interrupts "

@@ -179,7 +179,7 @@ vhpet_timer_clear_isr(struct vhpet *vhpet, int n)
 	if (vhpet->isr & (1 << n)) {
 		pin = vhpet_timer_ioapic_pin(vhpet, n);
 		KASSERT(pin != 0, ("vhpet timer %d irq incorrectly routed", n));
-		vioapic_deassert_irq(vhpet->vm, pin);
+		(void) vioapic_deassert_irq(vhpet->vm, pin);
 		vhpet->isr &= ~(1 << n);
 	}
 }
@@ -229,7 +229,7 @@ vhpet_timer_interrupt(struct vhpet *vhpet, int n)
 	}
 
 	if (vhpet_timer_msi_enabled(vhpet, n)) {
-		lapic_intr_msi(vhpet->vm, vhpet->timer[n].msireg >> 32,
+		(void) lapic_intr_msi(vhpet->vm, vhpet->timer[n].msireg >> 32,
 		    vhpet->timer[n].msireg & 0xffffffff);
 		return;
 	}
@@ -241,10 +241,10 @@ vhpet_timer_interrupt(struct vhpet *vhpet, int n)
 	}
 
 	if (vhpet_timer_edge_trig(vhpet, n)) {
-		vioapic_pulse_irq(vhpet->vm, pin);
+		(void) vioapic_pulse_irq(vhpet->vm, pin);
 	} else {
 		vhpet->isr |= 1 << n;
-		vioapic_assert_irq(vhpet->vm, pin);
+		(void) vioapic_assert_irq(vhpet->vm, pin);
 	}
 }
 
@@ -460,7 +460,7 @@ vhpet_timer_update_config(struct vhpet *vhpet, int n, uint64_t data,
 		if (clear_isr) {
 			VM_CTR1(vhpet->vm, "hpet t%d isr cleared due to "
 			    "configuration change", n);
-			vioapic_deassert_irq(vhpet->vm, old_pin);
+			(void) vioapic_deassert_irq(vhpet->vm, old_pin);
 			vhpet->isr &= ~(1 << n);
 		}
 	}

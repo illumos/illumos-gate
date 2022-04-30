@@ -32,11 +32,10 @@ CFLAGS		+= -DVMM_KEEP_STATS
 LDFLAGS		+= -N misc/acpica -N misc/pcie -N fs/dev
 LDFLAGS		+= -M $(MAPFILE)
 
-# 3rd party code
-SMOFF		+= all_func_returns
-
-# needs work
+# devmem span calculations currently run afoul of overflow checks
 $(OBJS_DIR)/vmm_sol_dev.o := SMOFF += signed_integer_overflow_check
+# vmm_zsd_add_vm() failure unhandled in face of racing zone shutdown
+$(OBJS_DIR)/vmm_sol_dev.o := SMOFF += all_func_returns
 
 OFFSETS_VMX	= $(CONF_SRCDIR)/intel/offsets.in
 OFFSETS_SVM	= $(CONF_SRCDIR)/amd/offsets.in

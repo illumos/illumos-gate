@@ -2907,7 +2907,7 @@ vmx_vmcleanup(void *arg)
 	uint16_t maxcpus;
 
 	if (vmx_cap_en(vmx, VMX_CAP_APICV)) {
-		vm_unmap_mmio(vmx->vm, DEFAULT_APIC_BASE, PAGE_SIZE);
+		(void) vm_unmap_mmio(vmx->vm, DEFAULT_APIC_BASE, PAGE_SIZE);
 		kmem_free(vmx->apic_access_page, PAGESIZE);
 	} else {
 		VERIFY3P(vmx->apic_access_page, ==, NULL);

@@ -342,21 +342,19 @@ callout_reset_hrtime(struct callout *c, hrtime_t target, void (*func)(void *),
 	c->c_func = func;
 	c->c_arg = arg;
 	c->c_target = target;
-	cyclic_reprogram(c->c_cyc_id, target);
+	(void) cyclic_reprogram(c->c_cyc_id, target);
 }
 
-int
+void
 vmm_glue_callout_stop(struct callout *c)
 {
 	ASSERT(c->c_cyc_id != CYCLIC_NONE);
 
 	c->c_target = 0;
-	cyclic_reprogram(c->c_cyc_id, CY_INFINITY);
-
-	return (0);
+	(void) cyclic_reprogram(c->c_cyc_id, CY_INFINITY);
 }
 
-int
+void
 vmm_glue_callout_drain(struct callout *c)
 {
 	ASSERT(c->c_cyc_id != CYCLIC_NONE);
@@ -366,8 +364,6 @@ vmm_glue_callout_drain(struct callout *c)
 	cyclic_remove(c->c_cyc_id);
 	c->c_cyc_id = CYCLIC_NONE;
 	mutex_exit(&cpu_lock);
-
-	return (0);
 }
 
 void

@@ -2926,7 +2926,7 @@ static void
 ptp_release(vm_page_t **vmp)
 {
 	if (*vmp != NULL) {
-		vmp_release(*vmp);
+		(void) vmp_release(*vmp);
 		*vmp = NULL;
 	}
 }
@@ -2941,7 +2941,7 @@ ptp_hold(struct vm *vm, int vcpu, uintptr_t gpa, size_t len, vm_page_t **vmp)
 	VERIFY3U(gpa + len, <=, hold_gpa + PAGESIZE);
 
 	if (*vmp != NULL) {
-		vmp_release(*vmp);
+		(void) vmp_release(*vmp);
 	}
 
 	*vmp = vmc_hold(vmc, hold_gpa, PROT_READ | PROT_WRITE);

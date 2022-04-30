@@ -31,7 +31,7 @@
 #ifndef _IO_PPT_H_
 #define	_IO_PPT_H_
 
-int ppt_unassign_all(struct vm *vm);
+void ppt_unassign_all(struct vm *vm);
 int ppt_map_mmio(struct vm *vm, int pptfd, vm_paddr_t gpa, size_t len,
     vm_paddr_t hpa);
 int ppt_unmap_mmio(struct vm *vm, int pptfd, vm_paddr_t gpa, size_t len);
