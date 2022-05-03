@@ -2489,6 +2489,9 @@ vmm_ctl_ioctl(int cmd, intptr_t arg, int md, cred_t *cr, int *rvalp)
 	}
 	case VMM_VM_SUPPORTED:
 		return (vmm_is_supported(arg));
+	case VMM_INTERFACE_VERSION:
+		*rvalp = VMM_CURRENT_INTERFACE_VERSION;
+		return (0);
 	case VMM_RESV_QUERY:
 	case VMM_RESV_ADD:
 	case VMM_RESV_REMOVE:

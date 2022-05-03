@@ -1187,6 +1187,9 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 	case ZS_EXCLUSIVE:
 		curr_iptype = "exclusive";
 		break;
+	default:
+		zerror(zlogp, B_FALSE, "bad ip-type");
+		goto cleanup;
 	}
 	if (curr_iptype == NULL)
 		abort();
@@ -3263,6 +3266,9 @@ get_privset(zlog_t *zlogp, priv_set_t *privs, zone_mnt_t mount_cmd)
 		case ZS_EXCLUSIVE:
 			curr_iptype = "exclusive";
 			break;
+		default:
+			zerror(zlogp, B_FALSE, "bad ip-type");
+			return (-1);
 		}
 
 		if (zonecfg_default_privset(privs, curr_iptype) == Z_OK)
@@ -4778,13 +4784,10 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zone_did)
 		zerror(zlogp, B_TRUE, "unable to determine ip-type");
 		return (-1);
 	}
-	switch (iptype) {
-	case ZS_SHARED:
-		flags = 0;
-		break;
-	case ZS_EXCLUSIVE:
+	if (iptype == ZS_EXCLUSIVE) {
 		flags = ZCF_NET_EXCL;
-		break;
+	} else {
+		flags = 0;
 	}
 	if (flags == -1)
 		abort();

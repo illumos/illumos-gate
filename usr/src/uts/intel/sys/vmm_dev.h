@@ -350,6 +350,24 @@ struct vmm_dirty_tracker {
 	void		*vdt_pfns;	/* bit vector of dirty bits */
 };
 
+/*
+ * VMM Interface Version
+ *
+ * Despite the fact that the kernel interface to bhyve is explicitly considered
+ * Private, there are out-of-gate consumers which utilize it.  While they assume
+ * the risk of any breakage incurred by changes to bhyve, we can at least try to
+ * make it easier to detect changes by exposing a "version" of the interface.
+ * It can also be used by the in-gate userland to detect if packaging updates
+ * somehow result in the userland and kernel falling out of sync.
+ *
+ * There are no established criteria for the magnitude of change which requires
+ * this version to be incremented, and maintenance of it is considered a
+ * best-effort activity.  Nothing is to be inferred about the magnitude of a
+ * change when the version is modified.  It follows no rules like semver.
+ */
+#define	VMM_CURRENT_INTERFACE_VERSION	1
+
+
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
 #define	VMM_IOC_BASE		(('v' << 16) | ('m' << 8))
 #define	VMM_LOCK_IOC_BASE	(('v' << 16) | ('l' << 8))
@@ -359,6 +377,7 @@ struct vmm_dirty_tracker {
 #define	VMM_CREATE_VM		(VMMCTL_IOC_BASE | 0x01)
 #define	VMM_DESTROY_VM		(VMMCTL_IOC_BASE | 0x02)
 #define	VMM_VM_SUPPORTED	(VMMCTL_IOC_BASE | 0x03)
+#define	VMM_INTERFACE_VERSION	(VMMCTL_IOC_BASE | 0x04)
 
 #define	VMM_RESV_QUERY		(VMMCTL_IOC_BASE | 0x10)
 #define	VMM_RESV_ADD		(VMMCTL_IOC_BASE | 0x11)

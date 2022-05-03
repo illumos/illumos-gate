@@ -18,7 +18,8 @@ include $(SRC)/test/Makefile.com
 PROG =	mem_partial \
 	mem_seg_map \
 	mem_devmem \
-	fpu_getset
+	fpu_getset \
+	interface_version
 
 COMMON_OBJS =	common.o
 CLEAN_OBJS =	$(PROG:%=%.o)

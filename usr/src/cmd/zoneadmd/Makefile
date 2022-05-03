@@ -39,9 +39,6 @@ clobber	:=	TARGET = clobber
 lint	:=	TARGET = lint
 
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-switch
-CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += $(CNOWARN_UNINIT)
 
 XGETFLAGS += -a -x zoneadmd.xcl
 
@@ -63,7 +60,8 @@ install: $(SUBDIRS)
 
 $(POFILE):
 
-clean clobebr lint:	$(SUBDIRS)
+clean:
+	$(RM) $(OBJS)
 
 check:
 	$(CSTYLE) -p -P *.c
