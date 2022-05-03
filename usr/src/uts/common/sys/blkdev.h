@@ -20,10 +20,9 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Western Digital Corporation.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_BLKDEV_H
@@ -120,8 +119,10 @@ struct bd_drive {
 	char			*d_serial;
 	size_t			d_revision_len;
 	char			*d_revision;
+
 	uint8_t			d_eui64[8];
-	/* Added at the end to maintain binary compatibility */
+	uint8_t			d_guid[16];
+
 	uint32_t		d_qcount;
 
 	/*
