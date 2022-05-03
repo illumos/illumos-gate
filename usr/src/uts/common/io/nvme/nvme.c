@@ -272,6 +272,31 @@
  *   can be less than max-submission-queues, in which case the completion
  *   queues are shared.
  *
+ * In addition to the above properties, some device-specific tunables can be
+ * configured using the nvme-config-list global property. The value of this
+ * property is a list of triplets. The formal syntax is:
+ *
+ *   nvme-config-list ::= <triplet> [, <triplet>]* ;
+ *   <triplet>        ::= "<model>" , "<rev-list>" , "<tuple-list>"
+ *   <rev-list>       ::= [ <fwrev> [, <fwrev>]*]
+ *   <tuple-list>     ::= <tunable> [, <tunable>]*
+ *   <tunable>        ::= <name> : <value>
+ *
+ * The <model> and <fwrev> are the strings in nvme_identify_ctrl_t`id_model and
+ * nvme_identify_ctrl_t`id_fwrev, respectively. The remainder of <tuple-list>
+ * contains one or more tunables to apply to all controllers that match the
+ * specified model number and optionally firmware revision. Each <tunable> is a
+ * <name> : <value> pair.  Supported tunables are:
+ *
+ * - ignore-unknown-vendor-status:  can be set to "on" to not handle any vendor
+ *   specific command status as a fatal error leading device faulting
+ *
+ * - min-phys-block-size: the minimum physical block size to report to blkdev,
+ *   which is among other things the basis for ZFS vdev ashift
+ *
+ * - volatile-write-cache: can be set to "on" or "off" to enable or disable the
+ *   volatile write cache, if present
+ *
  *
  * TODO:
  * - figure out sane default for I/O queue depth reported to blkdev
@@ -2698,6 +2723,180 @@ nvme_shutdown(nvme_t *nvme, int mode, boolean_t quiesce)
 	}
 }
 
+/*
+ * Return length of string without trailing spaces.
+ */
+static int
+nvme_strlen(const char *str, int len)
+{
+	if (len <= 0)
+		return (0);
+
+	while (str[--len] == ' ')
+		;
+
+	return (++len);
+}
+
+static void
+nvme_config_min_block_size(nvme_t *nvme, char *model, char *val)
+{
+	ulong_t bsize = 0;
+	char *msg = "";
+
+	if (ddi_strtoul(val, NULL, 0, &bsize) != 0)
+		goto err;
+
+	if (!ISP2(bsize)) {
+		msg = ": not a power of 2";
+		goto err;
+	}
+
+	if (bsize < NVME_DEFAULT_MIN_BLOCK_SIZE) {
+		msg = ": too low";
+		goto err;
+	}
+
+	nvme->n_min_block_size = bsize;
+	return;
+
+err:
+	dev_err(nvme->n_dip, CE_WARN,
+	    "!nvme-config-list: ignoring invalid min-phys-block-size '%s' "
+	    "for model '%s'%s", val, model, msg);
+
+	nvme->n_min_block_size = NVME_DEFAULT_MIN_BLOCK_SIZE;
+}
+
+static void
+nvme_config_boolean(nvme_t *nvme, char *model, char *name, char *val,
+    boolean_t *b)
+{
+	if (strcmp(val, "on") == 0 ||
+	    strcmp(val, "true") == 0)
+		*b = B_TRUE;
+	else if (strcmp(val, "off") == 0 ||
+	    strcmp(val, "false") == 0)
+		*b = B_FALSE;
+	else
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!nvme-config-list: invalid value for %s '%s'"
+		    " for model '%s', ignoring", name, val, model);
+}
+
+static void
+nvme_config_list(nvme_t *nvme)
+{
+	char	**config_list;
+	uint_t	nelem;
+	int	rv, i;
+
+	/*
+	 * We're following the pattern of 'sd-config-list' here, but extend it.
+	 * Instead of two we have three separate strings for "model", "fwrev",
+	 * and "name-value-list".
+	 */
+	rv = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, nvme->n_dip,
+	    DDI_PROP_DONTPASS, "nvme-config-list", &config_list, &nelem);
+
+	if (rv != DDI_PROP_SUCCESS) {
+		if (rv == DDI_PROP_CANNOT_DECODE) {
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!nvme-config-list: cannot be decoded");
+		}
+
+		return;
+	}
+
+	if ((nelem % 3) != 0) {
+		dev_err(nvme->n_dip, CE_WARN, "!nvme-config-list: must be "
+		    "triplets of <model>/<fwrev>/<name-value-list> strings ");
+		goto out;
+	}
+
+	for (i = 0; i < nelem; i += 3) {
+		char	*model = config_list[i];
+		char	*fwrev = config_list[i + 1];
+		char	*nvp, *save_nv;
+		int	id_model_len, id_fwrev_len;
+
+		id_model_len = nvme_strlen(nvme->n_idctl->id_model,
+		    sizeof (nvme->n_idctl->id_model));
+
+		if (strlen(model) != id_model_len)
+			continue;
+
+		if (strncmp(model, nvme->n_idctl->id_model, id_model_len) != 0)
+			continue;
+
+		id_fwrev_len = nvme_strlen(nvme->n_idctl->id_fwrev,
+		    sizeof (nvme->n_idctl->id_fwrev));
+
+		if (strlen(fwrev) != 0) {
+			boolean_t match = B_FALSE;
+			char *fwr, *last_fw;
+
+			for (fwr = strtok_r(fwrev, ",", &last_fw);
+			    fwr != NULL;
+			    fwr = strtok_r(NULL, ",", &last_fw)) {
+				if (strlen(fwr) != id_fwrev_len)
+					continue;
+
+				if (strncmp(fwr, nvme->n_idctl->id_fwrev,
+				    id_fwrev_len) == 0)
+					match = B_TRUE;
+			}
+
+			if (!match)
+				continue;
+		}
+
+		/*
+		 * We should now have a comma-separated list of name:value
+		 * pairs.
+		 */
+		for (nvp = strtok_r(config_list[i + 2], ",", &save_nv);
+		    nvp != NULL; nvp = strtok_r(NULL, ",", &save_nv)) {
+			char	*name = nvp;
+			char	*val = strchr(nvp, ':');
+
+			if (val == NULL || name == val) {
+				dev_err(nvme->n_dip, CE_WARN,
+				    "!nvme-config-list: <name-value-list> "
+				    "for model '%s' is malformed", model);
+				goto out;
+			}
+
+			/*
+			 * Null-terminate 'name', move 'val' past ':' sep.
+			 */
+			*val++ = '\0';
+
+			/*
+			 * Process the name:val pairs that we know about.
+			 */
+			if (strcmp(name, "ignore-unknown-vendor-status") == 0) {
+				nvme_config_boolean(nvme, model, name, val,
+				    &nvme->n_ignore_unknown_vendor_status);
+			} else if (strcmp(name, "min-phys-block-size") == 0) {
+				nvme_config_min_block_size(nvme, model, val);
+			} else if (strcmp(name, "volatile-write-cache") == 0) {
+				nvme_config_boolean(nvme, model, name, val,
+				    &nvme->n_write_cache_enabled);
+			} else {
+				/*
+				 * Unknown 'name'.
+				 */
+				dev_err(nvme->n_dip, CE_WARN,
+				    "!nvme-config-list: unknown config '%s' "
+				    "for model '%s', ignoring", name, model);
+			}
+		}
+	}
+
+out:
+	ddi_prop_free(config_list);
+}
 
 static void
 nvme_prepare_devid(nvme_t *nvme, uint32_t nsid)
@@ -3087,6 +3286,11 @@ nvme_init(nvme_t *nvme)
 		    "!failed to identify controller");
 		goto fail;
 	}
+
+	/*
+	 * Process nvme-config-list (if present) in nvme.conf.
+	 */
+	nvme_config_list(nvme);
 
 	/*
 	 * Get Vendor & Product ID
