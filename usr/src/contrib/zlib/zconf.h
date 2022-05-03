@@ -10,6 +10,8 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/types.h>
+
+#define	Z_U8	uint64_t
 #endif
 
 /*

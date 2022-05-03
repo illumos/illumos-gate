@@ -45,7 +45,8 @@ tests = [
 user = root
 tests = [
 	'rdmsr',
-	'wrmsr'
+	'wrmsr',
+	'triple_fault'
 	]
 
 # Tests of userspace mevent system, built from cmd/bhyve
