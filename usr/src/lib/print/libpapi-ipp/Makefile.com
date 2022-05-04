@@ -57,7 +57,7 @@ SMATCH=off
 
 MAPFILES =	$(SRCDIR)/mapfile
 
-LDLIBS +=	-L$(ROOTLIBDIR) -R/usr/lib/print -lhttp-core -lmd5
+LDLIBS +=	-L$(ROOTLIBDIR) -R/usr/lib/print -lhttp-core -lmd
 LDLIBS +=	-lipp-core -lc
 
 .KEEP_STATE:

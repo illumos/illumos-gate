@@ -32,7 +32,7 @@ include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lavl -lumem -lidspace -lnvpair -lmd5 -lrename \
+LDLIBS +=	-lc -lavl -lumem -lidspace -lnvpair -lmd -lrename \
 		-lbunyan
 CPPFLAGS +=	-I../common
 

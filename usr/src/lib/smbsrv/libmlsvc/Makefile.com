@@ -86,7 +86,7 @@ INCS += -I$(SRC)/common/smbsrv
 INCS += -I$(SRC)/uts/common/smbsrv/ndl
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS += -lmlrpc -lsmb -lsmbns -lshare -lsmbfs -lnsl -lpkcs11 -lmd5	 \
+LDLIBS += -lmlrpc -lsmb -lsmbns -lshare -lsmbfs -lnsl -lpkcs11 -lmd	 \
 	-lscf -lcmdutils -lsec -lavl -lnvpair -luutil -luuid -lgen -lzfs \
 	-lresolv -lc
 
