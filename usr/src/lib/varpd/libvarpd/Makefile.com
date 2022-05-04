@@ -32,7 +32,7 @@ include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lavl -lumem -lidspace -lnvpair -lmd5 -lrename
+LDLIBS +=	-lc -lavl -lumem -lidspace -lnvpair -lmd -lrename
 CPPFLAGS +=	-I../common
 
 CERRWARN +=	-erroff=E_STRUCT_DERIVED_FROM_FLEX_MBR

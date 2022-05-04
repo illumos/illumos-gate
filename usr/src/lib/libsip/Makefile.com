@@ -36,7 +36,7 @@ include ../../Makefile.lib
 
 SRCDIR =	../common
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lmd5 -lc
+LDLIBS +=	-lmd -lc
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-DOS='"solaris"' -D__OS_solaris -DNDEBUG
