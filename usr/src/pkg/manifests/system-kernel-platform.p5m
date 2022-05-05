@@ -1084,14 +1084,14 @@ license lic_CDDL license=lic_CDDL
 license usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE \
     license=usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE
 license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
+license usr/src/contrib/zlib/THIRDPARTYLICENSE \
+    license=usr/src/contrib/zlib/THIRDPARTYLICENSE
 $(sparc_ONLY)license usr/src/stand/lib/tcp/THIRDPARTYLICENSE \
     license=usr/src/stand/lib/tcp/THIRDPARTYLICENSE
 license usr/src/uts/common/krtld/THIRDPARTYLICENSE.bootrd_cpio \
     license=usr/src/uts/common/krtld/THIRDPARTYLICENSE.bootrd_cpio
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
-license usr/src/uts/common/zmod/THIRDPARTYLICENSE \
-    license=usr/src/uts/common/zmod/THIRDPARTYLICENSE
 $(i386_ONLY)license usr/src/uts/intel/THIRDPARTYLICENSE \
     license=usr/src/uts/intel/THIRDPARTYLICENSE
 $(i386_ONLY)depend type=require fmri=system/microcode/amd
