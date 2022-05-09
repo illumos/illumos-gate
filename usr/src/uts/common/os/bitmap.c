@@ -19,16 +19,15 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
+/* All Rights Reserved */
 
 
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Oxide Computer Company
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Operations on bitmaps of arbitrary size
@@ -39,7 +38,7 @@
 
 #include <sys/types.h>
 #include <sys/bitmap.h>
-#include <sys/debug.h>		/* ASSERT */
+#include <sys/debug.h>
 
 /*
  * Return index of first available bit in denoted bitmap, or -1 for
@@ -49,7 +48,7 @@
  * Caller is responsible for range checks.
  */
 index_t
-bt_availbit(ulong_t *bitmap, size_t nbits)
+bt_availbit(const ulong_t *bitmap, size_t nbits)
 {
 	index_t	maxword;	/* index of last in map */
 	index_t	wx;		/* word index in map */
@@ -92,7 +91,7 @@ bt_availbit(ulong_t *bitmap, size_t nbits)
  * the word specified by wx.
  */
 int
-bt_gethighbit(ulong_t *mapp, int wx)
+bt_gethighbit(const ulong_t *mapp, int wx)
 {
 	ulong_t word;
 
@@ -115,7 +114,7 @@ bt_gethighbit(ulong_t *mapp, int wx)
  * and one past the last bit (pos2) in the pattern.
  */
 int
-bt_range(ulong_t *bitmap, size_t *pos1, size_t *pos2, size_t end_pos)
+bt_range(const ulong_t *bitmap, size_t *pos1, size_t *pos2, size_t end_pos)
 {
 	size_t pos;
 
@@ -169,7 +168,7 @@ odd_parity(ulong_t i)
  * a -1 is returned.
  */
 int
-bt_getlowbit(ulong_t *map, size_t start, size_t stop)
+bt_getlowbit(const ulong_t *map, size_t start, size_t stop)
 {
 	ulong_t		word;
 	int		counter = start >> BT_ULSHIFT;
@@ -236,7 +235,7 @@ bt_getlowbit(ulong_t *map, size_t start, size_t stop)
  * Copy the bitmap.
  */
 void
-bt_copy(ulong_t *from, ulong_t *to, ulong_t size)
+bt_copy(const ulong_t *from, ulong_t *to, ulong_t size)
 {
 	ulong_t i;
 	for (i = 0; i < size; i++)

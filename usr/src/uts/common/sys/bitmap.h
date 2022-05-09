@@ -28,6 +28,7 @@
  * Copyright (c) 2014 by Delphix. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -142,14 +143,13 @@ extern "C" {
 /*
  * return next available bit index from map with specified number of bits
  */
-extern index_t	bt_availbit(ulong_t *bitmap, size_t nbits);
+extern index_t	bt_availbit(const ulong_t *, size_t);
 /*
  * find the highest order bit that is on, and is within or below
  * the word specified by wx
  */
-extern int	bt_gethighbit(ulong_t *mapp, int wx);
-extern int	bt_range(ulong_t *bitmap, size_t *pos1, size_t *pos2,
-			size_t end_pos);
+extern int	bt_gethighbit(const ulong_t *, int wx);
+extern int	bt_range(const ulong_t *, size_t *, size_t *, size_t);
 /*
  * Find highest and lowest one bit set.
  *	Returns bit number + 1 of bit that is set, otherwise returns 0.
@@ -158,8 +158,8 @@ extern int	bt_range(ulong_t *bitmap, size_t *pos1, size_t *pos2,
 extern int	highbit(ulong_t);
 extern int	highbit64(uint64_t);
 extern int	lowbit(ulong_t);
-extern int	bt_getlowbit(ulong_t *bitmap, size_t start, size_t stop);
-extern void	bt_copy(ulong_t *, ulong_t *, ulong_t);
+extern int	bt_getlowbit(const ulong_t *, size_t, size_t);
+extern void	bt_copy(const ulong_t *, ulong_t *, ulong_t);
 
 /*
  * find the parity
