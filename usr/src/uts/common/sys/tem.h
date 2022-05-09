@@ -33,6 +33,7 @@ extern "C" {
 
 #ifdef _KERNEL
 
+#include <sys/stream.h>
 #include <sys/visual_io.h>
 #include <sys/cred.h>
 #include <sys/beep.h>
@@ -44,7 +45,7 @@ typedef	struct __tem_vt_state *tem_vt_state_t;
 
 boolean_t tem_initialized(tem_vt_state_t);
 
-tem_vt_state_t tem_init(cred_t *);
+tem_vt_state_t tem_init(cred_t *, queue_t *);
 
 void	tem_destroy(tem_vt_state_t, cred_t *);
 

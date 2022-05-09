@@ -351,7 +351,7 @@ vt_open(minor_t minor, queue_t *rq, cred_t *crp)
 		 * vc_tem might not be intialized if !tems.ts_initialized,
 		 * and this only happens during console configuration.
 		 */
-		pvc->vc_tem = tem_init(crp);
+		pvc->vc_tem = tem_init(crp, rq);
 	}
 
 	if (!(pvc->vc_flags & WCS_INIT))

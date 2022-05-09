@@ -149,7 +149,7 @@ static struct qinit conskbdlrinit = {
 /* lower write processing procedures structures */
 static struct qinit conskbdlwinit = {
 	putq,				/* qi_putp */
-	conskbdlwserv,	/* qi_srvp */
+	conskbdlwserv,			/* qi_srvp */
 	(int (*)())NULL,		/* qi_qopen */
 	(int (*)())NULL,		/* qi_qclose */
 	(int (*)())NULL,		/* qi_qadmin */
@@ -1131,6 +1131,15 @@ conskbdlrput(queue_t *q, mblk_t *mp)
 	DPRINTF(PRINT_L1, PRINT_MASK_ALL, ("conskbdlrput\n"));
 
 	switch (mp->b_datap->db_type) {
+	case M_CTL:
+		mp->b_datap->db_type = M_DATA;
+		if (conskbd.conskbd_directio)
+			putnext(conskbd_regqueue, mp);
+		else if (conskbd_consqueue != NULL)
+			putnext(conskbd_consqueue, mp);
+		else
+			freemsg(mp);
+		break;
 
 	case M_FLUSH:
 		if (*mp->b_rptr == FLUSHR) {

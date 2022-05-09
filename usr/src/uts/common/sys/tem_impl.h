@@ -187,6 +187,7 @@ typedef struct term_char {
  * State structure for each virtual terminal emulator
  */
 struct tem_vt_state {
+	queue_t		*tvs_queue;	/* read queue for console */
 	kmutex_t	tvs_lock;
 	uchar_t		tvs_fbmode;	/* framebuffer mode */
 	uchar_t		tvs_alpha;	/* rgb alpha channel */

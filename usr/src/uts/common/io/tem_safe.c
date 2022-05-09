@@ -845,6 +845,57 @@ tem_safe_selgraph(struct tem_vt_state *tem)
 }
 
 /*
+ * Handle window manipulation.
+ */
+static void
+tem_safe_window(struct tem_vt_state *tem, enum called_from called_from)
+{
+	int curparam;
+	int param;
+	int index = 0;
+	mblk_t *bp;
+	size_t len;
+	char buf[27];
+
+	tem->tvs_state = A_STATE_START;
+	curparam = tem->tvs_curparam;
+	do {
+		param = tem->tvs_params[index];
+
+		switch (param) {
+		case 8:	/* Resize window to Ps2 lines and Ps3 columns. */
+			/* We ignore this */
+			index += 2;
+			curparam -= 2;
+			break;
+
+		case 18: /* Reports terminal size in characters. */
+			if (called_from == CALLED_FROM_STANDALONE)
+				break;
+			if (!canputnext(tem->tvs_queue))
+				break;
+
+			/* Response: CSI 8 ; lines ; columns t */
+			len = snprintf(buf, sizeof (buf), "%c[8;%u;%ut",
+			    0x1b, tems.ts_c_dimension.height,
+			    tems.ts_c_dimension.width);
+
+			bp = allocb(len, BPRI_HI);
+			if (bp != NULL) {
+				bp->b_datap->db_type = M_CTL;
+				bcopy(buf, bp->b_wptr, len);
+				bp->b_wptr += len;
+				(void) putnext(tem->tvs_queue, bp);
+			}
+			break;
+		}
+
+		index++;
+		curparam--;
+	} while (curparam > 0);
+}
+
+/*
  * perform the appropriate action for the escape sequence
  *
  * General rule:  This code does not validate the arguments passed.
@@ -1078,6 +1129,11 @@ tem_safe_chkparam(struct tem_vt_state *tem, tem_char_t ch, cred_t *credp,
 		    tems.ts_c_dimension.height - 1,
 		    tem->tvs_params[0], TEM_SCROLL_DOWN,
 		    credp, called_from);
+		break;
+
+	case 't':
+		tem_safe_send_data(tem, credp, called_from);
+		tem_safe_window(tem, called_from);
 		break;
 
 	case 'X':		/* erase char */
