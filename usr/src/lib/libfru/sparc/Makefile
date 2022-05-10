@@ -29,9 +29,6 @@ include ../Makefile.flag
 LDLIBS += -L$(SRC)/lib/libfruutils/$(MACH) -lfruutils
 LDLIBS += -L$(SRC)/lib/libfru/libfrureg/$(MACH) -lfrureg
 
-# Redefine this such that libC is found.
-BUILDCCC.SO=	$(LINK.cc) $(DYNFLAGS) -o $@ $(GSHARED) $(PICS) $(LDLIBS)
-
 install: all $(ROOTLIBDIR) $(ROOTLINKSCCC)
 
 $(ROOTLIBDIR):

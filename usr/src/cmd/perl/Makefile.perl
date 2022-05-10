@@ -15,10 +15,6 @@
 
 include $(SRC)/lib/Makefile.lib
 
-# PERL_VERSION and PERL_ARCH used to be set here,
-# but as they were also needed in usr/src/pkg/Makefile,
-# the definition was moved to usr/src/Makefile.master
-
 PERLDIR = $(ADJUNCT_PROTO)/usr/perl5/$(PERL_VERSION)
 PERLLIBDIR = $(PERLDIR)/lib/$(PERL_ARCH)
 PERLINCDIR = $(PERLLIBDIR)/CORE
@@ -30,9 +26,9 @@ PERLBINDIR64 = $(PERLDIR)/bin
 $(BUILDPERL64)PERLBINDIR = $(PERLDIR)/bin/$(MACH)
 $(BUILDPERL32)PERLBINDIR64 = $(PERLDIR)/bin/$(MACH64)
 
-PERLMOD = $(MODULE).pm
-PERLEXT = $(MACH)/$(MODULE).so
-PERLEXT64 = $(MACH64)/$(MODULE).so
+PERLMOD = ../$(MODULE).pm
+PERLEXT = $(MODULE).so
+PERLXS = ../$(MODULE).xs
 
 ROOTPERLDIR = $(ROOT)/usr/perl5/$(PERL_VERSION)
 ROOTPERLLIBDIR = $(ROOTPERLDIR)/lib/$(PERL_ARCH)
@@ -52,5 +48,14 @@ XSUBPP = $(PERLBINDIR)/perl $(PERLDIR)/lib/ExtUtils/xsubpp \
 XSUBPP64 = $(PERLBINDIR64)/perl $(PERLDIR)/lib/ExtUtils/xsubpp \
 	-typemap $(PERLDIR)/lib/ExtUtils/typemap
 
+# CFLAGS for perl, specifically.
+PCFLAGS= -DPERL_EUPXS_ALWAYS_EXPORT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 \
+	-DPERL_USE_SAFE_PUTENV -D_TS_ERRNO
+PCFLAGS64= -DPERL_EUPXS_ALWAYS_EXPORT -D_LARGEFILE_SOURCE64 \
+	 -DPERL_USE_SAFE_PUTENV -D_TS_ERRNO
+
 CSTD = $(CSTD_GNU99)
 ZGUIDANCE =
+SONAME = $(PERLEXT)
+
+CLEANFILES += $(PERLEXT) $(MODULE).o $(MODULE).c

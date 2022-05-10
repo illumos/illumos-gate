@@ -13,27 +13,20 @@
 # Copyright 2016 RackTop Systems.
 #
 
-MODULE = Project
+include $(SRC)/Makefile.master
 
-include $(SRC)/cmd/perl/Makefile.perl
+SUBDIRS=
+$(BUILDPERL32)SUBDIRS += $(MACH)
+$(BUILDPERL64)SUBDIRS += $(MACH64)
 
-LDLIBS += -lproject -lgen
+all :=		TARGET = all
+install :=	TARGET = install
+clean :=	TARGET = clean
+clobber :=	TARGET = clobber
 
-CERRWARN += -_gcc=-Wno-unused-variable
+all install clean clobber: $(SUBDIRS)
 
-XSUBPPFLAGS = -typemap typemap
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-MAPFILES = mapfile-vers
-
-include $(SRC)/cmd/perl/Makefile.targ
-
-.KEEP_STATE:
-
-$(BUILDPERL32)all: $(PERLEXT) $(PERLMOD)
-$(BUILDPERL64)all: $(PERLEXT64) $(PERLMOD)
-
-$(BUILDPERL32)install: $(ROOTPERLEXT) $(ROOTPERLMOD)
-$(BUILDPERL64)install: $(ROOTPERLEXT64) $(ROOTPERLMOD64)
-
-clean clobber:
-	$(RM) -r $(MACH) $(MACH64)
+FRC:
