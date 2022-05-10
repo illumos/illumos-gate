@@ -2232,13 +2232,6 @@ startup_end(void)
 	PRM_POINT("startup_end() done");
 }
 
-/*
- * Don't remove the following 2 variables.  They are necessary
- * for reading the hostid from the legacy file (/kernel/misc/sysinit).
- */
-char *_hs1107 = hw_serial;
-ulong_t  _bdhs34;
-
 void
 post_startup(void)
 {
@@ -2829,17 +2822,6 @@ set_soft_hostid(void)
 	 */
 
 	if ((file = kobj_open_file(hostid_file)) == (struct _buf *)-1) {
-		/*
-		 * hostid file not found - try to load sysinit module
-		 * and see if it has a nonzero hostid value...use that
-		 * instead of generating a new hostid here if so.
-		 */
-		if ((i = modload("misc", "sysinit")) != -1) {
-			if (strlen(hw_serial) > 0)
-				hostid = (int32_t)atoi(hw_serial);
-			(void) modunload(i);
-		}
-
 		/*
 		 * We try to use the SMBIOS UUID. But not if it is blacklisted
 		 * in /etc/system.
