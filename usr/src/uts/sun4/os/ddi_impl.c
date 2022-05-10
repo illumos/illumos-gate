@@ -1731,8 +1731,7 @@ parse_idprom(void)
 	if (idprom.id_format == IDFORM_1) {
 		(void) localetheraddr((struct ether_addr *)idprom.id_ether,
 		    (struct ether_addr *)NULL);
-		(void) snprintf(hw_serial, HW_HOSTID_LEN, "%u",
-		    (idprom.id_machine << 24) + idprom.id_serial);
+		hw_serial = (idprom.id_machine << 24) + idprom.id_serial
 	} else
 		prom_printf("Invalid format code in IDprom.\n");
 }

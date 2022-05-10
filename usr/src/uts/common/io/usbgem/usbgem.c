@@ -3799,8 +3799,7 @@ usbgem_gld3_init(struct usbgem_dev *dp, mac_register_t *macp)
 void
 usbgem_generate_macaddr(struct usbgem_dev *dp, uint8_t *mac)
 {
-	extern char	hw_serial[];
-	char		*hw_serial_p;
+	extern uint32_t	hw_serial;
 	int		i;
 	uint64_t	val;
 	uint64_t	key;
@@ -3811,8 +3810,7 @@ usbgem_generate_macaddr(struct usbgem_dev *dp, uint8_t *mac)
 	    dp->name);
 
 	/* prefer a fixed address for DHCP */
-	hw_serial_p = &hw_serial[0];
-	val = stoi(&hw_serial_p);
+	val = hw_serial;
 
 	key = 0;
 	for (i = 0; i < USBGEM_NAME_LEN; i++) {

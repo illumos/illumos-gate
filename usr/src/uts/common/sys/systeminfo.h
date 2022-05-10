@@ -41,7 +41,7 @@ extern "C" {
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 extern char architecture[];
 extern char architecture_32[];
-extern char hw_serial[];	/* machine's 32-bit hostid; a decimal string */
+extern uint32_t hw_serial;	/* machine's hostid */
 extern char hw_provider[];
 extern char srpc_domain[];
 extern char platform[];

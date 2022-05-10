@@ -1513,7 +1513,7 @@ startup_modules(void)
 {
 	int cnt;
 	extern void prom_setup(void);
-	int32_t v, h;
+	uint32_t h;
 	char d[11];
 	char *cp;
 	cmi_hdl_t hdl;
@@ -1633,15 +1633,7 @@ startup_modules(void)
 	if ((h = set_soft_hostid()) == HW_INVALID_HOSTID) {
 		cmn_err(CE_WARN, "Unable to set hostid");
 	} else {
-		for (v = h, cnt = 0; cnt < 10; cnt++) {
-			d[cnt] = (char)(v % 10);
-			v /= 10;
-			if (v == 0)
-				break;
-		}
-		for (cp = hw_serial; cnt >= 0; cnt--)
-			*cp++ = d[cnt] + '0';
-		*cp = 0;
+		hw_serial = h;
 	}
 
 	/*

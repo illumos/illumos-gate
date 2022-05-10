@@ -30,7 +30,7 @@ static	char	*pmcs_driver_rev = PMCS_DRIVER_VERSION;
 /*
  * Non-DDI Compliant stuff
  */
-extern char hw_serial[];
+extern uint32_t hw_serial;
 
 /*
  * Global driver data
@@ -3253,7 +3253,7 @@ pmcs_fabricate_wwid(pmcs_hw_t *pwp)
 	int i;
 
 	cp = &c;
-	(void) ddi_strtoul(hw_serial, &cp, 10, (unsigned long *)&adr);
+	adr = hw_serial;
 
 	if (adr == 0) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,

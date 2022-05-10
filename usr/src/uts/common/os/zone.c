@@ -3546,13 +3546,8 @@ zone_set_name(zone_t *zone, const char *uname)
 uint32_t
 zone_get_hostid(zone_t *zonep)
 {
-	unsigned long machine_hostid;
-
-	if (zonep == NULL || zonep->zone_hostid == HW_INVALID_HOSTID) {
-		if (ddi_strtoul(hw_serial, NULL, 10, &machine_hostid) != 0)
-			return (HW_INVALID_HOSTID);
-		return ((uint32_t)machine_hostid);
-	}
+	if (zonep == NULL || zonep->zone_hostid == HW_INVALID_HOSTID)
+		return (hw_serial);
 	return (zonep->zone_hostid);
 }
 

@@ -57,7 +57,7 @@ extern void system_taskq_fini(void);
 
 pgcnt_t physmem;
 vnode_t *rootdir = (vnode_t *)0xabcd1234;
-char hw_serial[HW_HOSTID_LEN];
+uint32_t hw_serial;
 kmutex_t cpu_lock;
 vmem_t *zio_arena = NULL;
 
@@ -524,8 +524,7 @@ kernel_init(int mode)
 	dprintf("physmem = %llu pages (%.2f GB)\n", physmem,
 	    (double)physmem * sysconf(_SC_PAGE_SIZE) / (1ULL << 30));
 
-	(void) snprintf(hw_serial, sizeof (hw_serial), "%ld",
-	    (mode & FWRITE) ? get_system_hostid() : 0);
+	hw_serial = (mode & FWRITE) ? get_system_hostid() : 0;
 
 	system_taskq_init();
 
@@ -551,7 +550,7 @@ zone_get_hostid(void *zonep)
 	/*
 	 * We're emulating the system's hostid in userland.
 	 */
-	return (strtoul(hw_serial, NULL, 10));
+	return (hw_serial);
 }
 
 int

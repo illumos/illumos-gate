@@ -17404,7 +17404,7 @@ ip_ipmp_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 
 	ASSERT(IS_IPMP(ill));
 
-	(void) ddi_strtoul(hw_serial, NULL, 10, &hostid);
+	hostid = hw_serial;
 	ic.ic_hostid = htonl((uint32_t)hostid);
 
 	(void) strlcpy(ic.ic_ifname, ill->ill_name, LIFNAMSIZ);

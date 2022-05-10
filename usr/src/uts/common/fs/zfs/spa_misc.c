@@ -2470,7 +2470,7 @@ spa_get_hostid(void)
 	 * We're emulating the system's hostid in userland, so
 	 * we can't use zone_get_hostid().
 	 */
-	(void) ddi_strtoul(hw_serial, NULL, 10, &myhostid);
+	myhostid = hw_serial;
 #endif	/* _KERNEL */
 
 	return (myhostid);

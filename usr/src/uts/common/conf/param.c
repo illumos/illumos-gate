@@ -524,12 +524,12 @@ struct var v;			/* System Configuration Information */
  */
 
 /*
- * The physical system's host identifier, expressed as a decimal string.
+ * The physical system's host identifier.
  * Code should only directly access this value when writing to it (setting the
  * physical system's host identifier).  Code that reads the physical system's
  * host identifier should use zone_get_hostid(NULL) instead.
  */
-char hw_serial[HW_HOSTID_LEN] = "0";
+uint32_t hw_serial = 0;
 
 #if defined(__sparc)
 
