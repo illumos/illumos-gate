@@ -61,6 +61,10 @@ struct	ctlr_type ctlr_types[] = {
 		&genericops,
 		CF_NOWLIST },
 
+	{ DKC_BLKDEV,
+		"generic-block-device",
+		&genericops,
+		CF_NOWLIST }
 };
 
 /*
