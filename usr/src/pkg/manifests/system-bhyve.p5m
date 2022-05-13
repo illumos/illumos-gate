@@ -15,7 +15,7 @@
 
 #
 # Copyright 2018 Joyent, Inc.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -46,6 +46,81 @@ file path=usr/sbin/bhyve mode=0555
 file path=usr/sbin/bhyvectl mode=0555
 file path=usr/sbin/pptadm mode=0555
 dir  path=usr/share
+dir  path=usr/share/bhyve
+dir  path=usr/share/bhyve/kbdlayout
+file path=usr/share/bhyve/kbdlayout/am mode=0444
+file path=usr/share/bhyve/kbdlayout/be mode=0444
+file path=usr/share/bhyve/kbdlayout/be_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/bg_bds mode=0444
+file path=usr/share/bhyve/kbdlayout/bg_phonetic mode=0444
+file path=usr/share/bhyve/kbdlayout/br mode=0444
+file path=usr/share/bhyve/kbdlayout/br_noacc mode=0444
+file path=usr/share/bhyve/kbdlayout/centraleuropean mode=0444
+file path=usr/share/bhyve/kbdlayout/ch mode=0444
+file path=usr/share/bhyve/kbdlayout/ch-fr mode=0444
+file path=usr/share/bhyve/kbdlayout/ch-fr_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/ch_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/ch_macbook_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/cz mode=0444
+file path=usr/share/bhyve/kbdlayout/de mode=0444
+file path=usr/share/bhyve/kbdlayout/de_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/de_noacc mode=0444
+file path=usr/share/bhyve/kbdlayout/default mode=0444
+file path=usr/share/bhyve/kbdlayout/dk mode=0444
+file path=usr/share/bhyve/kbdlayout/dk_macbook mode=0444
+file path=usr/share/bhyve/kbdlayout/ee mode=0444
+file path=usr/share/bhyve/kbdlayout/es mode=0444
+file path=usr/share/bhyve/kbdlayout/es_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/es_dvorak mode=0444
+file path=usr/share/bhyve/kbdlayout/fi mode=0444
+file path=usr/share/bhyve/kbdlayout/fr mode=0444
+file path=usr/share/bhyve/kbdlayout/fr_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/fr_dvorak mode=0444
+file path=usr/share/bhyve/kbdlayout/fr_dvorak_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/fr_macbook mode=0444
+file path=usr/share/bhyve/kbdlayout/gr mode=0444
+file path=usr/share/bhyve/kbdlayout/gr_101_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/gr_elot_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/hr mode=0444
+file path=usr/share/bhyve/kbdlayout/hu_101 mode=0444
+file path=usr/share/bhyve/kbdlayout/hu_102 mode=0444
+file path=usr/share/bhyve/kbdlayout/is mode=0444
+file path=usr/share/bhyve/kbdlayout/is_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/it mode=0444
+file path=usr/share/bhyve/kbdlayout/jp mode=0444
+file path=usr/share/bhyve/kbdlayout/jp_capsctrl mode=0444
+file path=usr/share/bhyve/kbdlayout/kz_io mode=0444
+file path=usr/share/bhyve/kbdlayout/kz_kst mode=0444
+file path=usr/share/bhyve/kbdlayout/latinamerican mode=0444
+file path=usr/share/bhyve/kbdlayout/latinamerican_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/lt mode=0444
+file path=usr/share/bhyve/kbdlayout/nl mode=0444
+file path=usr/share/bhyve/kbdlayout/no mode=0444
+file path=usr/share/bhyve/kbdlayout/no_dvorak mode=0444
+file path=usr/share/bhyve/kbdlayout/nordic_asus-eee mode=0444
+file path=usr/share/bhyve/kbdlayout/pl_dvorak mode=0444
+file path=usr/share/bhyve/kbdlayout/pt mode=0444
+file path=usr/share/bhyve/kbdlayout/pt_acc mode=0444
+file path=usr/share/bhyve/kbdlayout/ru mode=0444
+file path=usr/share/bhyve/kbdlayout/ru_shift mode=0444
+file path=usr/share/bhyve/kbdlayout/ru_win mode=0444
+file path=usr/share/bhyve/kbdlayout/se mode=0444
+file path=usr/share/bhyve/kbdlayout/si mode=0444
+file path=usr/share/bhyve/kbdlayout/tr mode=0444
+file path=usr/share/bhyve/kbdlayout/tr_f mode=0444
+file path=usr/share/bhyve/kbdlayout/ua mode=0444
+file path=usr/share/bhyve/kbdlayout/ua_shift_alt mode=0444
+file path=usr/share/bhyve/kbdlayout/uk mode=0444
+file path=usr/share/bhyve/kbdlayout/uk_capsctrl mode=0444
+file path=usr/share/bhyve/kbdlayout/uk_dvorak mode=0444
+file path=usr/share/bhyve/kbdlayout/uk_macbook mode=0444
+file path=usr/share/bhyve/kbdlayout/us_dvorak mode=0444
+file path=usr/share/bhyve/kbdlayout/us_dvorakl mode=0444
+file path=usr/share/bhyve/kbdlayout/us_dvorakp mode=0444
+file path=usr/share/bhyve/kbdlayout/us_dvorakr mode=0444
+file path=usr/share/bhyve/kbdlayout/us_dvorakx mode=0444
+file path=usr/share/bhyve/kbdlayout/us_emacs mode=0444
+file path=usr/share/bhyve/kbdlayout/us_unix mode=0444
 dir  path=usr/share/man
 dir  path=usr/share/man/man5
 file path=usr/share/man/man5/bhyve_config.5

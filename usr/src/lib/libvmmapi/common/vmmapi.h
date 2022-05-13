@@ -91,6 +91,7 @@ enum {
 #endif
 	VM_BOOTROM,
 	VM_FRAMEBUFFER,
+	VM_PCIROM,
 };
 
 /*

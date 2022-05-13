@@ -567,13 +567,13 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_STATS_IOC: {
 		struct vm_stats vmstats;
 
-		CTASSERT(MAX_VM_STATS >= MAX_VMM_STAT_ELEMS);
 		if (ddi_copyin(datap, &vmstats, sizeof (vmstats), md)) {
 			error = EFAULT;
 			break;
 		}
 		hrt2tv(gethrtime(), &vmstats.tv);
-		error = vmm_stat_copy(sc->vmm_vm, vmstats.cpuid,
+		error = vmm_stat_copy(sc->vmm_vm, vmstats.cpuid, vmstats.index,
+		    nitems(vmstats.statbuf),
 		    &vmstats.num_entries, vmstats.statbuf);
 		if (error == 0 &&
 		    ddi_copyout(&vmstats, datap, sizeof (vmstats), md)) {

@@ -544,7 +544,7 @@ blockif_open(nvlist_t *nvl, const char *ident)
 
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_t rights;
-	cap_ioctl_t cmds[] = { DIOCGFLUSH, DIOCGDELETE };
+	cap_ioctl_t cmds[] = { DIOCGFLUSH, DIOCGDELETE, DIOCGMEDIASIZE };
 #endif
 
 	pthread_once(&blockif_once, blockif_init);
@@ -657,9 +657,10 @@ blockif_open(nvlist_t *nvl, const char *ident)
 		struct dk_minfo_ext dkmext;
 		int wce_val;
 
-		/* Look for a more accurate physical blocksize */
+		/* Look for a more accurate physical block/media size */
 		if (ioctl(fd, DKIOCGMEDIAINFOEXT, &dkmext) == 0) {
 			psectsz = dkmext.dki_pbsize;
+			size = dkmext.dki_lbsize * dkmext.dki_capacity;
 		}
 		/* See if a configurable write cache is present and working */
 		if (ioctl(fd, DKIOCGETWCE, &wce_val) == 0) {
@@ -807,14 +808,34 @@ blockif_resized(int fd, enum ev_type type, void *arg)
 {
 	struct blockif_ctxt *bc;
 	struct stat sb;
+	off_t mediasize;
 
 	if (fstat(fd, &sb) != 0)
 		return;
 
+#ifdef __FreeBSD__
+	if (S_ISCHR(sb.st_mode)) {
+		if (ioctl(fd, DIOCGMEDIASIZE, &mediasize) < 0) {
+			EPRINTLN("blockif_resized: get mediasize failed: %s",
+			    strerror(errno));
+			return;
+		}
+	} else
+		mediasize = sb.st_size;
+#else
+	mediasize = sb.st_size;
+	if (S_ISCHR(sb.st_mode)) {
+		struct dk_minfo dkm;
+
+		if (ioctl(fd, DKIOCGMEDIAINFO, &dkm) == 0)
+			mediasize = dkm.dki_lbsize * dkm.dki_capacity;
+	}
+#endif
+
 	bc = arg;
 	pthread_mutex_lock(&bc->bc_mtx);
-	if (sb.st_size != bc->bc_size) {
-		bc->bc_size = sb.st_size;
+	if (mediasize != bc->bc_size) {
+		bc->bc_size = mediasize;
 		bc->bc_resize_cb(bc, bc->bc_resize_cb_arg, bc->bc_size);
 	}
 	pthread_mutex_unlock(&bc->bc_mtx);

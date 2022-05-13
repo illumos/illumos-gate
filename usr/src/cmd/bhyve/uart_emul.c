@@ -846,7 +846,7 @@ uart_init(uart_intr_func_t intr_assert, uart_intr_func_t intr_deassert,
 static int
 uart_sock_backend(struct uart_softc *sc, const char *inopts)
 {
-	char *opts;
+	char *opts, *tofree;
 	char *opt;
 	char *nextopt;
 	char *path = NULL;
@@ -858,7 +858,7 @@ uart_sock_backend(struct uart_softc *sc, const char *inopts)
 		return (-1);
 	}
 
-	nextopt = opts;
+	tofree = nextopt = opts;
 	for (opt = strsep(&nextopt, ","); opt != NULL;
 	    opt = strsep(&nextopt, ",")) {
 		if (path == NULL && *opt == '/') {
@@ -869,13 +869,13 @@ uart_sock_backend(struct uart_softc *sc, const char *inopts)
 		 * XXX check for server and client options here.  For now,
 		 * everything is a server
 		 */
-		free(opts);
+		free(tofree);
 		return (-1);
 	}
 
 	sc->usc_sock.clifd = -1;
 	if ((sc->usc_sock.servfd = init_sock(path)) == -1) {
-		free(opts);
+		free(tofree);
 		return (-1);
 	}
 	sc->sock = true;
@@ -884,6 +884,7 @@ uart_sock_backend(struct uart_softc *sc, const char *inopts)
 	    uart_sock_accept, sc);
 	assert(sc->usc_sock.servmev != NULL);
 
+	free(tofree);
 	return (0);
 }
 #endif /* not __FreeBSD__ */

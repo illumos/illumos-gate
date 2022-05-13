@@ -206,8 +206,10 @@ static cpuset_t cpumask;
 
 static void vm_loop(struct vmctx *ctx, int vcpu, uint64_t rip);
 
-static struct vm_exit vmexit[VM_MAXCPU];
-static struct vm_entry vmentry[VM_MAXCPU];
+static struct vm_exit *vmexit;
+#ifndef __FreeBSD__
+static struct vm_entry *vmentry;
+#endif
 
 struct bhyvestats {
 	uint64_t	vmexit_bogus;
@@ -227,10 +229,10 @@ struct mt_vmm_info {
 	struct vmctx	*mt_ctx;
 	int		mt_vcpu;
 	uint64_t	mt_startrip;
-} mt_vmm_info[VM_MAXCPU];
+} *mt_vmm_info;
 
 #ifdef	__FreeBSD__
-static cpuset_t *vcpumap[VM_MAXCPU] = { NULL };
+static cpuset_t **vcpumap;
 #endif
 
 static void
@@ -264,6 +266,7 @@ usage(int code)
 		"       -H: vmexit from the guest on hlt\n"
 		"       -h: help\n"
 		"       -k: key=value flat config file\n"
+		"       -K: PS2 keyboard layout\n"
 		"       -l: LPC device configuration\n"
 		"       -m: memory size\n"
 		"       -o: set config 'var' to 'value'\n"
@@ -296,7 +299,7 @@ usage(int code)
 static int
 topology_parse(const char *opt)
 {
-	char *cp, *str;
+	char *cp, *str, *tofree;
 
 	if (*opt == '\0') {
 		set_config_value("sockets", "1");
@@ -306,7 +309,7 @@ topology_parse(const char *opt)
 		return (0);
 	}
 
-	str = strdup(opt);
+	tofree = str = strdup(opt);
 	if (str == NULL)
 		errx(4, "Failed to allocate memory");
 
@@ -328,11 +331,11 @@ topology_parse(const char *opt)
 		else
 			set_config_value("cpus", cp);
 	}
-	free(str);
+	free(tofree);
 	return (0);
 
 out:
-	free(str);
+	free(tofree);
 	return (-1);
 }
 
@@ -454,9 +457,8 @@ pincpu_parse(const char *opt)
 		return (-1);
 	}
 
-	if (vcpu < 0 || vcpu >= VM_MAXCPU) {
-		fprintf(stderr, "vcpu '%d' outside valid range from 0 to %d\n",
-		    vcpu, VM_MAXCPU - 1);
+	if (vcpu < 0) {
+		fprintf(stderr, "invalid vcpu '%d'\n", vcpu);
 		return (-1);
 	}
 
@@ -533,6 +535,7 @@ build_vcpumaps(void)
 	const char *value;
 	int vcpu;
 
+	vcpumap = calloc(guest_ncpus, sizeof(*vcpumap));
 	for (vcpu = 0; vcpu < guest_ncpus; vcpu++) {
 		snprintf(key, sizeof(key), "vcpu.%d.cpuset", vcpu);
 		value = get_config_value(key);
@@ -1179,23 +1182,28 @@ vm_loop(struct vmctx *ctx, int vcpu, uint64_t startrip)
 static int
 num_vcpus_allowed(struct vmctx *ctx)
 {
+	uint16_t sockets, cores, threads, maxcpus;
 #ifdef __FreeBSD__
 	int tmp, error;
-
-	error = vm_get_capability(ctx, BSP, VM_CAP_UNRESTRICTED_GUEST, &tmp);
 
 	/*
 	 * The guest is allowed to spinup more than one processor only if the
 	 * UNRESTRICTED_GUEST capability is available.
 	 */
-	if (error == 0)
-		return (VM_MAXCPU);
-	else
+	error = vm_get_capability(ctx, BSP, VM_CAP_UNRESTRICTED_GUEST, &tmp);
+	if (error != 0)
 		return (1);
 #else
+	int error;
 	/* Unrestricted Guest is always enabled on illumos */
-	return (VM_MAXCPU);
+
 #endif /* __FreeBSD__ */
+
+	error = vm_get_topology(ctx, &sockets, &cores, &threads, &maxcpus);
+	if (error == 0)
+		return (maxcpus);
+	else
+		return (1);
 }
 
 void
@@ -1445,10 +1453,10 @@ main(int argc, char *argv[])
 	progname = basename(argv[0]);
 
 #ifdef	__FreeBSD__
-	optstr = "aehuwxACDHIPSWYk:o:p:G:c:s:m:l:U:";
+	optstr = "aehuwxACDHIPSWYk:o:p:G:c:s:m:l:K:U:";
 #else
 	/* +d, +B, -p */
-	optstr = "adehuwxACDHIPSWYk:o:G:c:s:m:l:B:U:";
+	optstr = "adehuwxACDHIPSWYk:o:G:c:s:m:l:B:K:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
@@ -1504,6 +1512,9 @@ main(int argc, char *argv[])
 			break;
 		case 'k':
 			parse_simple_config_file(optarg);
+			break;
+		case 'K':
+			set_config_value("keyboard.layout", optarg);
 			break;
 		case 'l':
 			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
@@ -1648,7 +1659,7 @@ main(int argc, char *argv[])
 		exit(4);
 	}
 
-	init_mem();
+	init_mem(guest_ncpus);
 	init_inout();
 #ifdef	__FreeBSD__
 	kernemu_dev_init();
@@ -1662,6 +1673,13 @@ main(int argc, char *argv[])
 	sci_init(ctx);
 #ifndef	__FreeBSD__
 	pmtmr_init(ctx);
+#endif
+
+	/* Allocate per-VCPU resources. */
+	vmexit = calloc(guest_ncpus, sizeof(*vmexit));
+	mt_vmm_info = calloc(guest_ncpus, sizeof(*mt_vmm_info));
+#ifndef	__FreeBSD__
+	vmentry = calloc(guest_ncpus, sizeof(*vmentry));
 #endif
 
 	/*

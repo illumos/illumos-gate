@@ -533,7 +533,7 @@ usr/src/cmd/bhyve/pci_hostbridge.c
 usr/src/cmd/bhyve/pci_irq.[ch]
 usr/src/cmd/bhyve/pci_lpc.[ch]
 usr/src/cmd/bhyve/pci_nvme.c
-usr/src/cmd/bhyve/pci_passthru.c
+usr/src/cmd/bhyve/pci_passthru.[ch]
 usr/src/cmd/bhyve/pci_uart.c
 usr/src/cmd/bhyve/pci_virtio_block.c
 usr/src/cmd/bhyve/pci_virtio_console.c
@@ -565,6 +565,7 @@ usr/src/cmd/bhyvectl/THIRDPARTYLICENSE.descrip
 usr/src/cmd/bhyvectl/bhyvectl.c
 usr/src/compat/bhyve/*
 usr/src/contrib/bhyve/*
+usr/src/data/bhyve/kbdlayout/*
 usr/src/lib/libvmmapi/THIRDPARTYLICENSE
 usr/src/lib/libvmmapi/THIRDPARTYLICENSE.descrip
 usr/src/lib/libvmmapi/common/vmmapi.[ch]

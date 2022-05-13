@@ -1,16 +1,24 @@
 Git commit hashes in this file refer to the official FreeBSD distributed
 public Git repository at https://git.freebsd.org/src.git
 
-The bhyve kernel module and its associated userland consumers have been updated
-to the latest upstream FreeBSD sources as of:
+The bhyve userland code in this directory, and its associated libraries and
+parts of the kernel module have been updated to the latest upstream FreeBSD
+sources as of:
 
-    commit 4558c11f1b4dfd7fd505d70b79467eb7f1193f07
-    Author: Mark Johnston <markj@FreeBSD.org>
-    Date:   Wed Jan 5 10:08:13 2022 -0500
+    commit 3ebe1109348f53f64b395293578416abedef4090
+    Author: Robert Wing <rew@FreeBSD.org>
+    Date:   Thu Mar 17 21:55:52 2022 -0800
 
-        bhyve: Correct unmapping of the MSI-X table BAR
+        bhyve: sweep MAX_VMNAME
+
+        MAX_VMNAME is no longer used.
 
 Divergence Notes:
+
+The kernel component of bhyve has diverged from the FreeBSD sources and
+will continue to evolve away from the initial compatibility interfaces towards
+native illumos ones. The vmmapi library abstracts those interfaces wherever
+possible so that the bhyve userspace can remain close to upstream.
 
 The source code for the following components is present and included in
 syncs from FreeBSD, but currently disabled. See the comments in 'Makefile'
