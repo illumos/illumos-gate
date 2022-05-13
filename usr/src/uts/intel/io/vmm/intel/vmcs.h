@@ -30,7 +30,7 @@
 
 /*
  * Copyright 2017 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _VMCS_H_
@@ -56,17 +56,6 @@ void vmcs_clear(uintptr_t vmcs_pa);
 
 uint64_t vmcs_read(uint32_t encoding);
 void vmcs_write(uint32_t encoding, uint64_t val);
-
-#define	vmexit_instruction_length()	vmcs_read(VMCS_EXIT_INSTRUCTION_LENGTH)
-#define	vmcs_guest_rip()		vmcs_read(VMCS_GUEST_RIP)
-#define	vmcs_instruction_error()	vmcs_read(VMCS_INSTRUCTION_ERROR)
-#define	vmcs_exit_reason()		(vmcs_read(VMCS_EXIT_REASON) & 0xffff)
-#define	vmcs_exit_qualification()	vmcs_read(VMCS_EXIT_QUALIFICATION)
-#define	vmcs_guest_cr3()		vmcs_read(VMCS_GUEST_CR3)
-#define	vmcs_gpa()			vmcs_read(VMCS_GUEST_PHYSICAL_ADDRESS)
-#define	vmcs_gla()			vmcs_read(VMCS_GUEST_LINEAR_ADDRESS)
-#define	vmcs_idt_vectoring_info()	vmcs_read(VMCS_IDT_VECTORING_INFO)
-#define	vmcs_idt_vectoring_err()	vmcs_read(VMCS_IDT_VECTORING_ERROR)
 
 #endif	/* _ASM */
 #endif	/* _KERNEL */
@@ -258,7 +247,13 @@ void vmcs_write(uint32_t encoding, uint64_t val);
 #define	VMRESUME_WITH_NON_LAUNCHED_VMCS	5
 
 /*
- * VMCS exit reasons
+ * Bits 15:0 of VMCS_EXIT_REASON field represent the "basic exit reason", as
+ * detailed below.
+ */
+#define	BASIC_EXIT_REASON_MASK	0xffff
+
+/*
+ * VMCS (basic) exit reasons
  */
 #define	EXIT_REASON_EXCEPTION		0
 #define	EXIT_REASON_EXT_INTR		1

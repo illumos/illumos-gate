@@ -896,22 +896,6 @@ vmx_handle_cpuid(struct vm *vm, int vcpu, struct vmxctx *vmxctx)
 	return (handled);
 }
 
-static __inline void
-vmx_run_trace(struct vmx *vmx, int vcpu)
-{
-#ifdef KTR
-	VCPU_CTR1(vmx->vm, vcpu, "Resume execution at %lx", vmcs_guest_rip());
-#endif
-}
-
-static __inline void
-vmx_astpending_trace(struct vmx *vmx, int vcpu, uint64_t rip)
-{
-#ifdef KTR
-	VCPU_CTR1(vmx->vm, vcpu, "astpending vmexit at 0x%0lx", rip);
-#endif
-}
-
 static VMM_STAT_INTEL(VCPU_INVVPID_SAVED, "Number of vpid invalidations saved");
 static VMM_STAT_INTEL(VCPU_INVVPID_DONE, "Number of vpid invalidations done");
 
@@ -1131,6 +1115,76 @@ vmx_apply_tsc_adjust(struct vmx *vmx, int vcpu)
 	}
 }
 
+CTASSERT(VMCS_INTR_T_HWINTR		== VM_INTINFO_HWINTR);
+CTASSERT(VMCS_INTR_T_NMI		== VM_INTINFO_NMI);
+CTASSERT(VMCS_INTR_T_HWEXCEPTION	== VM_INTINFO_HWEXCP);
+CTASSERT(VMCS_INTR_T_SWINTR		== VM_INTINFO_SWINTR);
+CTASSERT(VMCS_INTR_T_PRIV_SWEXCEPTION	== VM_INTINFO_RESV5);
+CTASSERT(VMCS_INTR_T_SWEXCEPTION	== VM_INTINFO_RESV6);
+CTASSERT(VMCS_IDT_VEC_ERRCODE_VALID	== VM_INTINFO_DEL_ERRCODE);
+CTASSERT(VMCS_INTR_T_MASK		== VM_INTINFO_MASK_TYPE);
+
+static uint64_t
+vmx_idtvec_to_intinfo(uint32_t info)
+{
+	ASSERT(info & VMCS_IDT_VEC_VALID);
+
+	const uint32_t type = info & VMCS_INTR_T_MASK;
+	const uint8_t vec = info & 0xff;
+
+	switch (type) {
+	case VMCS_INTR_T_HWINTR:
+	case VMCS_INTR_T_NMI:
+	case VMCS_INTR_T_HWEXCEPTION:
+	case VMCS_INTR_T_SWINTR:
+	case VMCS_INTR_T_PRIV_SWEXCEPTION:
+	case VMCS_INTR_T_SWEXCEPTION:
+		break;
+	default:
+		panic("unexpected event type 0x%03x", type);
+	}
+
+	uint64_t intinfo = VM_INTINFO_VALID | type | vec;
+	if (info & VMCS_IDT_VEC_ERRCODE_VALID) {
+		const uint32_t errcode = vmcs_read(VMCS_IDT_VECTORING_ERROR);
+		intinfo |= (uint64_t)errcode << 32;
+	}
+
+	return (intinfo);
+}
+
+static void
+vmx_inject_intinfo(uint64_t info)
+{
+	ASSERT(VM_INTINFO_PENDING(info));
+	ASSERT0(info & VM_INTINFO_MASK_RSVD);
+
+	/*
+	 * The bhyve format matches that of the VMCS, which is ensured by the
+	 * CTASSERTs above.
+	 */
+	uint32_t inject = info;
+	switch (VM_INTINFO_VECTOR(info)) {
+	case IDT_BP:
+	case IDT_OF:
+		/*
+		 * VT-x requires #BP and #OF to be injected as software
+		 * exceptions.
+		 */
+		inject &= ~VMCS_INTR_T_MASK;
+		inject |= VMCS_INTR_T_SWEXCEPTION;
+		break;
+	default:
+		break;
+	}
+
+	if (VM_INTINFO_HAS_ERRCODE(info)) {
+		vmcs_write(VMCS_ENTRY_EXCEPTION_ERROR,
+		    VM_INTINFO_ERRCODE(info));
+	}
+	vmcs_write(VMCS_ENTRY_INTR_INFO, inject);
+}
+
 #define	NMI_BLOCKING	(VMCS_INTERRUPTIBILITY_NMI_BLOCKING |		\
 			VMCS_INTERRUPTIBILITY_MOVSS_BLOCKING)
 #define	HWINTR_BLOCKING	(VMCS_INTERRUPTIBILITY_STI_BLOCKING |		\
@@ -1190,24 +1244,7 @@ vmx_inject_events(struct vmx *vmx, int vcpu, uint64_t rip)
 	}
 
 	if (vm_entry_intinfo(vmx->vm, vcpu, &entryinfo)) {
-		ASSERT(entryinfo & VMCS_INTR_VALID);
-
-		info = entryinfo;
-		vector = info & 0xff;
-		if (vector == IDT_BP || vector == IDT_OF) {
-			/*
-			 * VT-x requires #BP and #OF to be injected as software
-			 * exceptions.
-			 */
-			info &= ~VMCS_INTR_T_MASK;
-			info |= VMCS_INTR_T_SWEXCEPTION;
-		}
-
-		if (info & VMCS_INTR_DEL_ERRCODE) {
-			vmcs_write(VMCS_ENTRY_EXCEPTION_ERROR, entryinfo >> 32);
-		}
-
-		vmcs_write(VMCS_ENTRY_INTR_INFO, info);
+		vmx_inject_intinfo(entryinfo);
 		state = EIS_EV_INJECTED;
 	}
 
@@ -1744,7 +1781,7 @@ vmx_paging_mode(void)
 static void
 vmx_paging_info(struct vm_guest_paging *paging)
 {
-	paging->cr3 = vmcs_guest_cr3();
+	paging->cr3 = vmcs_read(VMCS_GUEST_CR3);
 	paging->cpl = vmx_cpl();
 	paging->cpu_mode = vmx_cpu_mode();
 	paging->paging_mode = vmx_paging_mode();
@@ -2121,9 +2158,9 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	struct vie *vie;
 	struct vlapic *vlapic;
 	struct vm_task_switch *ts;
-	uint32_t idtvec_info, idtvec_err, intr_info;
+	uint32_t idtvec_info, intr_info;
 	uint32_t intr_type, intr_vec, reason;
-	uint64_t exitintinfo, qual, gpa;
+	uint64_t qual, gpa;
 
 	CTASSERT((PINBASED_CTLS_ONE_SETTING & PINBASED_VIRTUAL_NMI) != 0);
 	CTASSERT((PINBASED_CTLS_ONE_SETTING & PINBASED_NMI_EXITING) != 0);
@@ -2158,17 +2195,11 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	 * See "Information for VM Exits During Event Delivery" in Intel SDM
 	 * for details.
 	 */
-	idtvec_info = vmcs_idt_vectoring_info();
+	idtvec_info = vmcs_read(VMCS_IDT_VECTORING_INFO);
 	if (idtvec_info & VMCS_IDT_VEC_VALID) {
-		idtvec_info &= ~(1 << 12); /* clear undefined bit */
-		exitintinfo = idtvec_info;
-		if (idtvec_info & VMCS_IDT_VEC_ERRCODE_VALID) {
-			idtvec_err = vmcs_idt_vectoring_err();
-			exitintinfo |= (uint64_t)idtvec_err << 32;
-		}
-		error = vm_exit_intinfo(vmx->vm, vcpu, exitintinfo);
-		KASSERT(error == 0, ("%s: vm_set_intinfo error %d",
-		    __func__, error));
+		/* Record exit intinfo */
+		VERIFY0(vm_exit_intinfo(vmx->vm, vcpu,
+		    vmx_idtvec_to_intinfo(idtvec_info)));
 
 		/*
 		 * If 'virtual NMIs' are being used and the VM-exit
@@ -2238,7 +2269,8 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 				vmexit->inst_length = 0;
 				if (idtvec_info & VMCS_IDT_VEC_ERRCODE_VALID) {
 					ts->errcode_valid = 1;
-					ts->errcode = vmcs_idt_vectoring_err();
+					ts->errcode =
+					    vmcs_read(VMCS_IDT_VECTORING_ERROR);
 				}
 			}
 		}
@@ -2428,7 +2460,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		 * memory then this must be a nested page fault otherwise
 		 * this must be an instruction that accesses MMIO space.
 		 */
-		gpa = vmcs_gpa();
+		gpa = vmcs_read(VMCS_GUEST_PHYSICAL_ADDRESS);
 		if (vm_mem_allocated(vmx->vm, vcpu, gpa) ||
 		    apic_access_fault(vmx, vcpu, gpa)) {
 			vmexit->exitcode = VM_EXITCODE_PAGING;
@@ -2440,7 +2472,8 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 			    vmx, vcpu, vmexit, gpa, qual);
 		} else if (ept_emulation_fault(qual)) {
 			vie = vm_vie_ctx(vmx->vm, vcpu);
-			vmexit_mmio_emul(vmexit, vie, gpa, vmcs_gla());
+			vmexit_mmio_emul(vmexit, vie, gpa,
+			    vmcs_read(VMCS_GUEST_LINEAR_ADDRESS));
 			vmm_stat_incr(vmx->vm, vcpu, VMEXIT_MMIO_EMUL, 1);
 			SDT_PROBE4(vmm, vmx, exit, mmiofault,
 			    vmx, vcpu, vmexit, gpa);
@@ -2564,7 +2597,7 @@ vmx_exit_inst_error(struct vmxctx *vmxctx, int rc, struct vm_exit *vmexit)
 	vmexit->inst_length = 0;
 	vmexit->exitcode = VM_EXITCODE_VMX;
 	vmexit->u.vmx.status = vmxctx->inst_fail_status;
-	vmexit->u.vmx.inst_error = vmcs_instruction_error();
+	vmexit->u.vmx.inst_error = vmcs_read(VMCS_INSTRUCTION_ERROR);
 	vmexit->u.vmx.exit_reason = ~0;
 	vmexit->u.vmx.exit_qualification = ~0;
 
@@ -2720,8 +2753,7 @@ vmx_run(void *arg, int vcpu, uint64_t rip)
 		enum event_inject_state inject_state;
 		uint64_t eptgen;
 
-		KASSERT(vmcs_guest_rip() == rip, ("%s: vmcs guest rip mismatch "
-		    "%lx/%lx", __func__, vmcs_guest_rip(), rip));
+		ASSERT3U(vmcs_read(VMCS_GUEST_RIP), ==, rip);
 
 		handled = UNHANDLED;
 
@@ -2844,7 +2876,6 @@ vmx_run(void *arg, int vcpu, uint64_t rip)
 			vmx->eptgen[curcpu] = eptgen;
 		}
 
-		vmx_run_trace(vmx, vcpu);
 		vcpu_ustate_change(vm, vcpu, VU_RUN);
 		vmx_dr_enter_guest(vmxctx);
 
@@ -2862,10 +2893,12 @@ vmx_run(void *arg, int vcpu, uint64_t rip)
 		}
 
 		/* Collect some information for VM exit processing */
-		vmexit->rip = rip = vmcs_guest_rip();
-		vmexit->inst_length = vmexit_instruction_length();
-		vmexit->u.vmx.exit_reason = exit_reason = vmcs_exit_reason();
-		vmexit->u.vmx.exit_qualification = vmcs_exit_qualification();
+		vmexit->rip = rip = vmcs_read(VMCS_GUEST_RIP);
+		vmexit->inst_length = vmcs_read(VMCS_EXIT_INSTRUCTION_LENGTH);
+		vmexit->u.vmx.exit_reason = exit_reason =
+		    (vmcs_read(VMCS_EXIT_REASON) & BASIC_EXIT_REASON_MASK);
+		vmexit->u.vmx.exit_qualification =
+		    vmcs_read(VMCS_EXIT_QUALIFICATION);
 		/* Update 'nextrip' */
 		vmx->state[vcpu].nextrip = rip;
 

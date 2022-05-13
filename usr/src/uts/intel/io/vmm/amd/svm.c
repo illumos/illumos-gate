@@ -37,7 +37,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2018 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -920,6 +920,13 @@ svm_update_virqinfo(struct svm_softc *sc, int vcpu)
 	    "v_intr_vector %d", __func__, ctrl->v_intr_vector));
 }
 
+CTASSERT(VMCB_EVENTINJ_TYPE_INTR	== VM_INTINFO_HWINTR);
+CTASSERT(VMCB_EVENTINJ_TYPE_NMI		== VM_INTINFO_NMI);
+CTASSERT(VMCB_EVENTINJ_TYPE_EXCEPTION	== VM_INTINFO_HWEXCP);
+CTASSERT(VMCB_EVENTINJ_TYPE_INTn	== VM_INTINFO_SWINTR);
+CTASSERT(VMCB_EVENTINJ_EC_VALID		== VM_INTINFO_DEL_ERRCODE);
+CTASSERT(VMCB_EVENTINJ_VALID		== VM_INTINFO_VALID);
+
 static void
 svm_save_exitintinfo(struct svm_softc *svm_sc, int vcpu)
 {
@@ -941,6 +948,10 @@ svm_save_exitintinfo(struct svm_softc *svm_sc, int vcpu)
 	VCPU_CTR2(svm_sc->vm, vcpu, "SVM:Pending INTINFO(0x%lx), vector=%d.\n",
 	    intinfo, VMCB_EXITINTINFO_VECTOR(intinfo));
 	vmm_stat_incr(svm_sc->vm, vcpu, VCPU_EXITINTINFO, 1);
+	/*
+	 * Relies on match between VMCB exitintinfo format and bhyve-generic
+	 * format, which is ensured by CTASSERTs above.
+	 */
 	err = vm_exit_intinfo(svm_sc->vm, vcpu, intinfo);
 	VERIFY0(err);
 }
@@ -1050,39 +1061,51 @@ svm_clear_nmi_blocking(struct svm_softc *sc, int vcpu)
 }
 
 static void
-svm_inject_event(struct svm_softc *sc, int vcpu, uint64_t intinfo)
+svm_inject_event(struct vmcb_ctrl *ctrl, uint64_t info)
 {
-	struct vmcb_ctrl *ctrl;
-	uint8_t vector;
-	uint32_t evtype;
+	ASSERT(VM_INTINFO_PENDING(info));
 
-	ASSERT(VMCB_EXITINTINFO_VALID(intinfo));
+	uint8_t vector = VM_INTINFO_VECTOR(info);
+	uint32_t type = VM_INTINFO_TYPE(info);
 
-	ctrl = svm_get_vmcb_ctrl(sc, vcpu);
-	vector = VMCB_EXITINTINFO_VECTOR(intinfo);
-	evtype = VMCB_EXITINTINFO_TYPE(intinfo);
-
-	switch (evtype) {
-	case VMCB_EVENTINJ_TYPE_INTR:
-	case VMCB_EVENTINJ_TYPE_NMI:
-	case VMCB_EVENTINJ_TYPE_INTn:
+	/*
+	 * Correct behavior depends on bhyve intinfo event types lining up with
+	 * those defined by AMD for event injection in the VMCB.  The CTASSERTs
+	 * above svm_save_exitintinfo() ensure it.
+	 */
+	switch (type) {
+	case VM_INTINFO_NMI:
+		/* Ensure vector for injected event matches its type (NMI) */
+		vector = IDT_NMI;
 		break;
-	case VMCB_EVENTINJ_TYPE_EXCEPTION:
-		VERIFY(vector <= 31);
-		/*
-		 * NMIs are expected to be injected with VMCB_EVENTINJ_TYPE_NMI,
-		 * rather than as an exception with the NMI vector.
-		 */
-		VERIFY(vector != 2);
+	case VM_INTINFO_HWINTR:
+	case VM_INTINFO_SWINTR:
+		break;
+	case VM_INTINFO_HWEXCP:
+		if (vector == IDT_NMI) {
+			/*
+			 * NMIs are expected to be injected with
+			 * VMCB_EVENTINJ_TYPE_NMI, rather than as an exception
+			 * with the NMI vector.
+			 */
+			type = VM_INTINFO_NMI;
+		}
+		VERIFY(vector < 32);
 		break;
 	default:
-		panic("unexpected event type %x", evtype);
+		/*
+		 * Since there is not strong validation for injected event types
+		 * at this point, fall back to software interrupt for those we
+		 * do not recognized.
+		 */
+		type = VM_INTINFO_SWINTR;
+		break;
 	}
 
-	ctrl->eventinj = VMCB_EVENTINJ_VALID | evtype | vector;
-	if (VMCB_EXITINTINFO_EC_VALID(intinfo)) {
+	ctrl->eventinj = VMCB_EVENTINJ_VALID | type | vector;
+	if (VM_INTINFO_HAS_ERRCODE(info)) {
 		ctrl->eventinj |= VMCB_EVENTINJ_EC_VALID;
-		ctrl->eventinj |= (uint64_t)VMCB_EXITINTINFO_EC(intinfo) << 32;
+		ctrl->eventinj |= (uint64_t)VM_INTINFO_ERRCODE(info) << 32;
 	}
 }
 
@@ -1266,7 +1289,7 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 	struct vmcb_ctrl *ctrl;
 	struct svm_regctx *ctx;
 	uint64_t code, info1, info2;
-	int error, errcode_valid = 0, handled, idtvec, reflect;
+	int handled;
 
 	ctx = svm_get_guest_regctx(svm_sc, vcpu);
 	vmcb = svm_get_vmcb(svm_sc, vcpu);
@@ -1367,37 +1390,35 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		 */
 		handled = 1;
 		break;
-	case 0x40 ... 0x5F:
+	case VMCB_EXIT_EXCP0 ... VMCB_EXIT_EXCP31: {
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_EXCEPTION, 1);
-		reflect = 1;
-		idtvec = code - 0x40;
+
+		const uint8_t idtvec = code - VMCB_EXIT_EXCP0;
+		uint32_t errcode = 0;
+		bool reflect = true;
+		bool errcode_valid = false;
+
 		switch (idtvec) {
 		case IDT_MC:
-			/*
-			 * Call the machine check handler by hand. Also don't
-			 * reflect the machine check back into the guest.
-			 */
-			reflect = 0;
-			VCPU_CTR0(svm_sc->vm, vcpu, "Vectoring to MCE handler");
+			/* The host will handle the MCE itself. */
+			reflect = false;
 			vmm_call_trap(T_MCE);
 			break;
 		case IDT_PF:
-			error = svm_setreg(svm_sc, vcpu, VM_REG_GUEST_CR2,
-			    info2);
-			KASSERT(error == 0, ("%s: error %d updating cr2",
-			    __func__, error));
+			VERIFY0(svm_setreg(svm_sc, vcpu, VM_REG_GUEST_CR2,
+			    info2));
 			/* fallthru */
 		case IDT_NP:
 		case IDT_SS:
 		case IDT_GP:
 		case IDT_AC:
 		case IDT_TS:
-			errcode_valid = 1;
+			errcode_valid = true;
+			errcode = info1;
 			break;
 
 		case IDT_DF:
-			errcode_valid = 1;
-			info1 = 0;
+			errcode_valid = true;
 			break;
 
 		case IDT_BP:
@@ -1412,31 +1433,22 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 			 * event injection is identical to what it was when
 			 * the exception originally happened.
 			 */
-			VCPU_CTR2(svm_sc->vm, vcpu, "Reset inst_length from %d "
-			    "to zero before injecting exception %d",
-			    vmexit->inst_length, idtvec);
 			vmexit->inst_length = 0;
 			/* fallthru */
 		default:
-			errcode_valid = 0;
-			info1 = 0;
+			errcode_valid = false;
 			break;
 		}
-		KASSERT(vmexit->inst_length == 0, ("invalid inst_length (%d) "
-		    "when reflecting exception %d into guest",
-		    vmexit->inst_length, idtvec));
+		VERIFY0(vmexit->inst_length);
 
 		if (reflect) {
 			/* Reflect the exception back into the guest */
-			VCPU_CTR2(svm_sc->vm, vcpu, "Reflecting exception "
-			    "%d/%x into the guest", idtvec, (int)info1);
-			error = vm_inject_exception(svm_sc->vm, vcpu, idtvec,
-			    errcode_valid, info1, 0);
-			KASSERT(error == 0, ("%s: vm_inject_exception error %d",
-			    __func__, error));
+			VERIFY0(vm_inject_exception(svm_sc->vm, vcpu, idtvec,
+			    errcode_valid, errcode, false));
 		}
 		handled = 1;
 		break;
+		}
 	case VMCB_EXIT_MSR:
 		handled = svm_handle_msr(svm_sc, vcpu, vmexit, info1 != 0);
 		break;
@@ -1586,9 +1598,7 @@ svm_inject_events(struct svm_softc *sc, int vcpu)
 	 * by the hypervisor (e.g. #PF during instruction emulation).
 	 */
 	if (vm_entry_intinfo(sc->vm, vcpu, &intinfo)) {
-		ASSERT(VMCB_EXITINTINFO_VALID(intinfo));
-
-		svm_inject_event(sc, vcpu, intinfo);
+		svm_inject_event(ctrl, intinfo);
 		vmm_stat_incr(sc->vm, vcpu, VCPU_INTINFO_INJECTED, 1);
 		ev_state = EIS_EV_INJECTED;
 	}

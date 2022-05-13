@@ -166,10 +166,10 @@ int vm_set_fpu(struct vm *vm, int vcpuid, void *buf, size_t len);
 int vm_run(struct vm *vm, int vcpuid, const struct vm_entry *);
 int vm_suspend(struct vm *vm, enum vm_suspend_how how);
 int vm_inject_nmi(struct vm *vm, int vcpu);
-int vm_nmi_pending(struct vm *vm, int vcpuid);
+bool vm_nmi_pending(struct vm *vm, int vcpuid);
 void vm_nmi_clear(struct vm *vm, int vcpuid);
 int vm_inject_extint(struct vm *vm, int vcpu);
-int vm_extint_pending(struct vm *vm, int vcpuid);
+bool vm_extint_pending(struct vm *vm, int vcpuid);
 void vm_extint_clear(struct vm *vm, int vcpuid);
 int vm_inject_init(struct vm *vm, int vcpuid);
 int vm_inject_sipi(struct vm *vm, int vcpuid, uint8_t vec);
@@ -278,8 +278,8 @@ struct vrtc *vm_rtc(struct vm *vm);
  * This function should only be called in the context of the thread that is
  * executing this vcpu.
  */
-int vm_inject_exception(struct vm *vm, int vcpuid, int vector, int err_valid,
-    uint32_t errcode, int restart_instruction);
+int vm_inject_exception(struct vm *vm, int vcpuid, uint8_t vector,
+    bool err_valid, uint32_t errcode, bool restart_instruction);
 
 /*
  * This function is called after a VM-exit that occurred during exception or
@@ -301,10 +301,9 @@ int vm_exit_intinfo(struct vm *vm, int vcpuid, uint64_t intinfo);
  * event that should be injected into the guest. This function combines
  * nested events into a double or triple fault.
  *
- * Returns 0 if there are no events that need to be injected into the guest
- * and non-zero otherwise.
+ * Returns false if there are no events that need to be injected into the guest.
  */
-int vm_entry_intinfo(struct vm *vm, int vcpuid, uint64_t *info);
+bool vm_entry_intinfo(struct vm *vm, int vcpuid, uint64_t *info);
 
 int vm_get_intinfo(struct vm *vm, int vcpuid, uint64_t *info1, uint64_t *info2);
 
@@ -344,15 +343,11 @@ void vm_copyout(struct vm *vm, int vcpuid, const void *kaddr,
 
 int vcpu_trace_exceptions(struct vm *vm, int vcpuid);
 
-/* APIs to inject faults into the guest */
-void vm_inject_fault(struct vm *vm, int vcpuid, int vector, int errcode_valid,
-    int errcode);
-
 void vm_inject_ud(struct vm *vm, int vcpuid);
 void vm_inject_gp(struct vm *vm, int vcpuid);
-void vm_inject_ac(struct vm *vm, int vcpuid, int errcode);
-void vm_inject_ss(struct vm *vm, int vcpuid, int errcode);
-void vm_inject_pf(struct vm *vm, int vcpuid, int errcode, uint64_t cr2);
+void vm_inject_ac(struct vm *vm, int vcpuid, uint32_t errcode);
+void vm_inject_ss(struct vm *vm, int vcpuid, uint32_t errcode);
+void vm_inject_pf(struct vm *vm, int vcpuid, uint32_t errcode, uint64_t cr2);
 
 /*
  * Both SVM and VMX have complex logic for injecting events such as exceptions

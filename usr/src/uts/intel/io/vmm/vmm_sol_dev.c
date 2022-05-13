@@ -14,7 +14,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -681,8 +681,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			break;
 		}
 		error = vm_inject_exception(sc->vmm_vm, vcpu, vmexc.vector,
-		    vmexc.error_code_valid, vmexc.error_code,
-		    vmexc.restart_instruction);
+		    vmexc.error_code_valid != 0, vmexc.error_code,
+		    vmexc.restart_instruction != 0);
 		break;
 	}
 	case VM_INJECT_NMI: {
