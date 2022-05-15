@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2014 QLogic Corporation. All Rights Reserved
 .\"
-.TH BNXE 4D "Jan 10, 2020"
+.TH BNXE 4D "March 22, 2022"
 .SH NAME
 bnxe \- QLogic NetXtreme II 10 Gigabit Ethernet Device Driver
 
@@ -138,7 +138,7 @@ Device driver (SPARC)
 .RE
 
 .SH SEE ALSO
-.BR gld (4P),
+.BR gld (4D),
 .BR driver.conf (5),
 .BR dladm (8),
 .BR ifconfig (8),

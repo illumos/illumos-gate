@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Oxide Comptuer Company
 .\"
-.Dd October 31, 2020
+.Dd March 30, 2022
 .Dt PUPANIC 3PROC
 .Os
 .Sh NAME
@@ -98,6 +98,6 @@ See
 in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
-.Xr upanic 3C ,
+.Xr upanic 2 ,
 .Xr libproc 3LIB ,
 .Xr core 5

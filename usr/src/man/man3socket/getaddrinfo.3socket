@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETADDRINFO 3SOCKET "Feb 25, 2017"
+.TH GETADDRINFO 3SOCKET "March 30, 2022"
 .SH NAME
 getaddrinfo, getnameinfo, freeaddrinfo, gai_strerror \- translate between node
 name and address
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR \&.\|.\|. \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR \&.\|.\|. ]
 #include <sys/socket.h>
@@ -36,7 +35,6 @@ name and address
 .fi
 
 .SH DESCRIPTION
-.LP
 These functions perform translations from node name to address and from address
 to node name in a protocol-independent manner.
 .sp
@@ -277,7 +275,7 @@ hosts.
 If the flag bit \fBNI_NUMERICHOST\fR is set, or if the host's name cannot be
 located in the name service, the numeric form of the host's address is returned
 instead of its name, for example, by calling \fBinet_ntop()\fR (see
-\fBinet\fR(3SOCKET)) instead of \fBgetipnodebyname\fR(3SOCKET). If the flag bit
+\fBinet\fR(3C)) instead of \fBgetipnodebyname\fR(3SOCKET). If the flag bit
 \fBNI_NAMEREQD\fR is set, an error is returned if the host's name cannot be
 located in the name service database.
 .sp
@@ -298,7 +296,6 @@ TCP.
 These \fBNI_\fR* flags are defined in <\fBnetdb.h\fR> along with the \fBAI_\fR*
 flags already defined for \fBgetaddrinfo()\fR.
 .SH RETURN VALUES
-.LP
 For \fBgetaddrinfo()\fR, if the query is successful, a pointer to a linked list
 of one or more \fBaddrinfo\fR structures is returned by the fourth argument and
 the function returns \fB0\fR. The order of the addresses returned in the fourth
@@ -312,7 +309,6 @@ pointer to a string containing an error message appropriate for the \fBEAI_\fR*
 errors is returned. If \fIerrcode\fR is not one of the \fBEAI_\fR* values, a
 pointer to a string indicating an unknown error is returned.
 .SS "Address Ordering"
-.LP
 AF_INET6 addresses returned by the fourth argument of \fBgetaddrinfo()\fR are
 ordered according to the algorithm described in \fIRFC 3484, Default Address
 Selection for Internet Protocol version 6 (IPv6)\fR. The addresses are ordered
@@ -372,7 +368,6 @@ T}
 .TE
 
 .SH ERRORS
-.LP
 The following names are the error values returned by \fBgetaddrinfo()\fR and
 are defined in <\fBnetdb.h\fR>:
 .sp
@@ -511,7 +506,6 @@ configuration file for the name service switch
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
@@ -530,12 +524,11 @@ Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
-.LP
 .BR htonl (3C),
+.BR inet (3C),
 .BR netdb.h (3HEAD),
 .BR gethostbyname (3NSL),
 .BR getipnodebyname (3SOCKET),
-.BR inet (3SOCKET),
 .BR sockaddr (3SOCKET),
 .BR socket (3SOCKET),
 .BR inet6 (4P),
@@ -549,5 +542,4 @@ Standard	See \fBstandards\fR(7).
 Draves, R. \fIRFC 3484, Default Address Selection for Internet Protocol version
 6 (IPv6)\fR. Network Working Group. February 2003.
 .SH NOTES
-.LP
 IPv4-mapped addresses are not recommended.

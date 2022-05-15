@@ -44,7 +44,7 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited. All Rights Reserved
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH GETHOSTBYNAME 3NSL "June 18, 2021"
+.TH GETHOSTBYNAME 3NSL "March 30, 2022"
 .SH NAME
 gethostbyname, gethostbyname_r, gethostbyaddr, gethostbyaddr_r, gethostent,
 gethostent_r, sethostent, endhostent \- get network host entry
@@ -366,9 +366,9 @@ T}
 .BR Intro (2),
 .BR Intro (3),
 .BR byteorder (3C),
+.BR inet (3C),
 .BR netdb.h (3HEAD),
 .BR netdir (3NSL),
-.BR inet (3SOCKET),
 .BR hosts (5),
 .BR netconfig (5),
 .BR nss (5),
@@ -430,6 +430,6 @@ for the Internet address family (type \fBAF_INET\fR).
 .sp
 .LP
 The form for an address of type \fBAF_INET\fR is a \fBstruct in_addr\fR defined
-in <\fBnetinet/in.h\fR>. The functions described in \fBinet\fR(3SOCKET), and
+in <\fBnetinet/in.h\fR>. The functions described in \fBinet\fR(3C), and
 illustrated in the \fBEXAMPLES\fR section, are helpful in constructing and
 manipulating addresses in this form.

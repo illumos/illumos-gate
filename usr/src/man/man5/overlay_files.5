@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015, Joyent, Inc.
 .\"
-.Dd Apr 13, 2015
+.Dd March 30, 2022
 .Dt OVERLAY_FILES 5
 .Os
 .Sh NAME
@@ -80,7 +80,7 @@ The value is a
 Both IPv4 and IPv6 addresses are supported and should be written out in their
 traditional forms.
 Follow the guidelines for writing addresses in
-.Xr inet_aton 3SOCKET .
+.Xr inet_aton 3C .
 .Ed
 .It Sy port
 .Bd -filled -compact
@@ -110,7 +110,7 @@ what is configured on top of it.
 The value is a
 .Em JSON String
 and should be written out following the guidelines for IPv4 addresses in
-.Xr inet_aton 3SOCKET .
+.Xr inet_aton 3C .
 .Ed
 .It Sy ndp
 .Bd -filled -compact
@@ -128,7 +128,7 @@ what is configured on top of it.
 The value is a
 .Em JSON String
 and should be written out following the guidelines for IPv6 addresses in
-.Xr inet_aton 3SOCKET .
+.Xr inet_aton 3C .
 .Ed
 .It Sy dhcp-proxy
 .Bd -filled -compact
