@@ -26,6 +26,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #ifndef	_MCS_H
 #define	_MCS_H
@@ -68,16 +71,16 @@ extern "C" {
 #define	SET_ACTION(x, y)	x = (x & 0xfffffff0) | y
 #define	GET_ACTION(x)		(x & 0x0000000f)
 
-#define	NOSEG 		0x00000010
-#define	IN    		0x00000020 /* section is IN a segment */
-#define	PRIOR 		0x00000030 /* section is PRIOR to a segment */
-#define	AFTER 		0x00000040 /* section is AFTER a segment */
+#define	NOSEG		0x00000010
+#define	IN		0x00000020 /* section is IN a segment */
+#define	PRIOR		0x00000030 /* section is PRIOR to a segment */
+#define	AFTER		0x00000040 /* section is AFTER a segment */
 #define	SET_LOC(x, y)	x = (x & 0xffffff0f) | y
 #define	GET_LOC(x)	(x & 0x000000f0)
 
-#define	CANDIDATE 	0x00000100
-#define	MOVING  	0x00000200
-#define	MODIFIED  	0x00000400
+#define	CANDIDATE	0x00000100
+#define	MOVING		0x00000200
+#define	MODIFIED	0x00000400
 
 #define	UNSET_CANDIDATE(x)	x = x & ~CANDIDATE
 #define	SET_CANDIDATE(x)	x = x | CANDIDATE
@@ -107,14 +110,14 @@ typedef struct section_info_table {
 	 */
 	Elf_Scn		*scn;		/* Section */
 	Elf_Data	*data;		/* Original data */
-	Elf_Data	*mdata; 	/* Modified data */
+	Elf_Data	*mdata;		/* Modified data */
 	char		*name;		/* Section name, or NULL if unknown */
 	char		*rel_name;
 	GElf_Shdr	shdr;
 	GElf_Word	secno;		/* The new index */
 	GElf_Word	osecno;		/* The original index */
 	GElf_Word	rel_scn_index;
-	GElf_Xword	flags;
+	GElf_Xword	si_flags;
 	GElf_Xword	rel_loc;
 } section_info_table;
 
@@ -131,7 +134,7 @@ typedef struct action {
  * Structure to hold the section names specified.
  */
 typedef struct s_name {
-	char 		*name;
+	char		*name;
 	struct s_name	*next;
 	unsigned char	flags;
 } S_Name;
@@ -144,13 +147,13 @@ typedef struct s_name {
  */
 typedef struct cmd_info {
 	APlist	*sh_groups;	/* list of SHT_GROUP sections */
-	int 	no_of_append;
+	int	no_of_append;
 	int	no_of_delete;
 	int	no_of_nulled;
 	int	no_of_compressed;
 	int	no_of_moved;
 	size_t	str_size;	/* size of string to be appended */
-	int	flags;		/* Various flags */
+	int	ci_flags;	/* Various flags */
 } Cmd_Info;
 
 #define	MIGHT_CHG	0x0001
@@ -166,7 +169,8 @@ typedef struct cmd_info {
 #define	SHF_GROUP_MOVE	0x0400	/* SHF_GROUP section moves */
 #define	SHF_GROUP_DEL	0x0800	/* SHF_GROUP section deleted */
 
-#define	CHK_OPT(_x, _y)	(_x->flags & _y)
+#define	CHK_OPT(_x, _y)	(((_x)->ci_flags & (_y)) != 0)
+#define	SET_OPT(_x, _y)	((_x)->ci_flags |= (_y))
 
 /*
  * Segment Table
@@ -208,8 +212,8 @@ void		free_tempfile(Tmp_File *);
 #define	GETARHDR_ERROR		7
 #define	FILE_TYPE_ERROR		8
 #define	NOT_MANIPULATED_ERROR	9
-#define	WRN_MANIPULATED_ERROR 	10
-#define	NO_SECT_TABLE_ERROR 	11
+#define	WRN_MANIPULATED_ERROR	10
+#define	NO_SECT_TABLE_ERROR	11
 #define	READ_ERROR		12
 #define	READ_MANI_ERROR		13
 #define	WRITE_MANI_ERROR	14

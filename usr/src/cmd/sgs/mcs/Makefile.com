@@ -33,6 +33,7 @@ ROOTLINKS=	$(VAR_SGSBIN)/$(STRIPFILE)
 
 include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/cmd/Makefile.ctf
 
 COMOBJS =	main.o		file.o		utils.o		global.o \
 		message.o

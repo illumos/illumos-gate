@@ -29,6 +29,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #include "stdlib.h"
 #include "conv.h"
@@ -105,31 +108,31 @@ main(int argc, char ** argv, char ** envp)
 		exit(FAILURE);
 	}
 	if (my_prog == STRIP)
-		cmd_info->flags |= I_AM_STRIP;
+		SET_OPT(cmd_info, I_AM_STRIP);
 
 	while ((c = getopt(argc, argv, (char *)opt)) != EOF) {
 		switch (c) {
 		case 'a':
 			optcnt++;
 			queue(ACT_APPEND, optarg);
-			cmd_info->flags |= (MIGHT_CHG | aFLAG);
+			SET_OPT(cmd_info, MIGHT_CHG | aFLAG);
 			cmd_info->str_size += strlen(optarg) + 1;
 			break;
 		case 'c':
 			optcnt++;
 			queue(ACT_COMPRESS, NULL);
-			cmd_info->flags |= (MIGHT_CHG | cFLAG);
+			SET_OPT(cmd_info, MIGHT_CHG | cFLAG);
 			break;
 		case 'd':
 			optcnt++;
-			if (CHK_OPT(cmd_info, dFLAG) == 0)
+			if (!CHK_OPT(cmd_info, dFLAG))
 				queue(ACT_DELETE, NULL);
-			cmd_info->flags |= (MIGHT_CHG | dFLAG);
+			SET_OPT(cmd_info, MIGHT_CHG | dFLAG);
 			break;
 		case 'z':
 			optcnt++;
 			queue(ACT_ZAP, NULL);
-			cmd_info->flags |= (MIGHT_CHG | zFLAG);
+			SET_OPT(cmd_info, MIGHT_CHG | zFLAG);
 			break;
 		case 'n':
 			(void) setup_sectname(optarg, my_prog);
@@ -137,19 +140,19 @@ main(int argc, char ** argv, char ** envp)
 			break;
 		case 'l':
 			optcnt++;
-			cmd_info->flags |= lFLAG;
+			SET_OPT(cmd_info, lFLAG);
 			break;
 		case 'p':
 			optcnt++;
 			queue(ACT_PRINT, NULL);
-			cmd_info->flags |= pFLAG;
+			SET_OPT(cmd_info, pFLAG);
 			break;
 		case 'x':
 			optcnt++;
-			cmd_info->flags |= xFLAG;
+			SET_OPT(cmd_info, xFLAG);
 			break;
 		case 'V':
-			cmd_info->flags |= VFLAG;
+			SET_OPT(cmd_info, VFLAG);
 			(void) fprintf(stderr, "%s: %s %s\n", prog,
 			    (const char *)SGU_PKG, (const char *)SGU_REL);
 			break;
@@ -211,8 +214,7 @@ main(int argc, char ** argv, char ** envp)
 		}
 		if (CHK_OPT(cmd_info, dFLAG) == 0) {
 			queue(ACT_DELETE, NULL);
-			cmd_info->flags |= MIGHT_CHG;
-			cmd_info->flags |= dFLAG;
+			SET_OPT(cmd_info, MIGHT_CHG | dFLAG);
 		}
 	}
 
