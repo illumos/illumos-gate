@@ -25,20 +25,17 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-# include <stdio.h>
-# include <unistd.h>
-# include <stdlib.h>
-# include <string.h>
-# include <sys/types.h>
-# include <ctype.h>
-# include <sys/stat.h>
-# include "tmstruct.h"
-# include "ttymon.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <ctype.h>
+#include <sys/stat.h>
+#include "tmstruct.h"
+#include "ttymon.h"
 
 /*
  *	find_label - return 1 if ttylabel already exists
@@ -49,7 +46,7 @@ find_label(FILE *fp, char *ttylabel)
 {
 	char *p;		/* working pointer */
 	int line = 0;		/* line number we found entry on */
-	static char buf[BUFSIZ];/* scratch buffer */
+	static char buf[BUFSIZ]; /* scratch buffer */
 
 	while (fgets(buf, BUFSIZ, fp)) {
 		line++;
@@ -57,13 +54,13 @@ find_label(FILE *fp, char *ttylabel)
 		while (isspace(*p))
 			p++;
 		if ((p = strtok(p, " :")) != NULL) {
-			if (!(strcmp(p, ttylabel)))
-				return(line);
+			if (strcmp(p, ttylabel) == 0)
+				return (line);
 		}
 	}
 	if (!feof(fp)) {
-		(void)fprintf(stderr, "error reading \"%s\"\n", TTYDEFS);
-		return(0);
+		(void) fprintf(stderr, "error reading \"%s\"\n", TTYDEFS);
+		return (0);
 	}
-	return(0);
+	return (0);
 }

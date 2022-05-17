@@ -55,14 +55,7 @@
 #include <getwidth.h>
 #endif /* EUC */
 #include "stty.h"
-
-extern const char *not_supported[];
-
-extern char *getenv();
-extern void exit();
-extern void perror();
-extern int get_ttymode();
-extern int set_ttymode();
+#include "tmextern.h"
 
 static char *STTY = "stty: ";
 static int pitt = 0;
@@ -80,19 +73,19 @@ static ldterm_cs_data_user_t kcswp;	/* Kernel side codeset width data */
 static int invalid_ldterm_dat_file;
 #endif /* EUC */
 
-static void prmodes();
-static void pramodes();
+static void prmodes(void);
+static void pramodes(void);
 static void pit(unsigned char what, char *itsname, char *sep);
 static void delay(int m, char *s);
 static void prspeed(char *c, int s);
-static void prencode();
+static void prencode(void);
 
 int
 main(int argc, char *argv[])
 {
 	int i;
 	int fd;
-	char *s_arg, *sttyparse();	/* s_arg: ptr to mode to be set */
+	char *s_arg;	/* s_arg: ptr to mode to be set */
 #ifdef	EUC
 	char *lc;
 	char tmps[PATH_MAX];
@@ -107,7 +100,7 @@ main(int argc, char *argv[])
 #ifdef EUC
 	lc = setlocale(LC_CTYPE, (const char *)NULL);
 	if (lc) {
-		sprintf(tmps, _LDTERM_DAT_PATH, lc);
+		(void) sprintf(tmps, _LDTERM_DAT_PATH, lc);
 
 		fd = open(tmps, O_RDONLY, 0);
 		if (fd != -1) {
@@ -159,8 +152,8 @@ main(int argc, char *argv[])
 		prmodes();
 		exit(0);
 	}
-	if ((argc == 2) && (argv[1][0] == '-') && (argv[1][2] == '\0'))
-	switch (argv[1][1]) {
+	if ((argc == 2) && (argv[1][0] == '-') && (argv[1][2] == '\0')) {
+		switch (argv[1][1]) {
 		case 'a':
 			pramodes();
 			return (0);
@@ -176,23 +169,28 @@ main(int argc, char *argv[])
 			(void) fprintf(stderr, gettext(
 			    "       stty [modes]\n"));
 			return (2);
+		}
 	}
 
-	if ((argc == 3) && (argv[1][0] == '-') && (argv[1][2] == '\0') &&
-	    (argv[2][0] == '-') && (argv[2][1] == '-') && (argv[2][2] == '\0'))
-	switch (argv[1][1]) {
-	case 'a':
-		pramodes();
-		return (0);
-	case 'g':
-		prencode();
-		return (0);
-	default:
-		(void) fprintf(stderr, gettext(
-		    "usage: stty [-a| -g]\n"));
-		(void) fprintf(stderr, gettext(
-		    "       stty [modes]\n"));
-		return (2);
+	if ((argc == 3) && (argv[1][0] == '-') &&
+	    (argv[1][2] == '\0') &&
+	    (argv[2][0] == '-') &&
+	    (argv[2][1] == '-') &&
+	    (argv[2][2] == '\0')) {
+		switch (argv[1][1]) {
+		case 'a':
+			pramodes();
+			return (0);
+		case 'g':
+			prencode();
+			return (0);
+		default:
+			(void) fprintf(stderr, gettext(
+			    "usage: stty [-a| -g]\n"));
+			(void) fprintf(stderr, gettext(
+			    "       stty [modes]\n"));
+			return (2);
+		}
 	}
 	if ((argc >= 3) && (argv[1][0] == '-') && (argv[1][1] == '-') &&
 	    (argv[1][2] == '\0')) {
@@ -200,11 +198,13 @@ main(int argc, char *argv[])
 		--argc;
 		++argv;
 	}
-	if (s_arg = sttyparse(argc, argv, term, &ocb, &cb, &termiox, &winsize
 #ifdef EUC
-	    /* */, &wp, &kwp, &cswp, &kcswp
+	s_arg = sttyparse(argc, argv, term, &ocb, &cb, &termiox, &winsize,
+	    &wp, &kwp, &cswp, &kcswp);
+#else
+	s_arg = sttyparse(argc, argv, term, &ocb, &cb, &termiox, &winsize);
 #endif /* EUC */
-	    /* */)) {
+	if (s_arg != NULL) {
 		char *s = s_arg;
 		if (*s == '-') s++;
 		for (i = 0; not_supported[i]; i++) {
@@ -231,7 +231,7 @@ main(int argc, char *argv[])
 	return (0);
 }
 
-void
+static void
 prmodes(void)				/* print modes, no options, argc is 1 */
 {
 	int m;
@@ -399,11 +399,12 @@ prmodes(void)				/* print modes, no options, argc is 1 */
 				(void) printf("onocr ");
 			if (m&ONLRET)
 				(void) printf("onlret ");
-			if (m&OFILL)
+			if (m&OFILL) {
 				if (m&OFDEL)
 					(void) printf("del-fill ");
 				else
 					(void) printf("nul-fill ");
+			}
 			delay((m&CRDLY)/CR1, "cr");
 			delay((m&NLDLY)/NL1, "nl");
 			delay((m&TABDLY)/TAB1, "tab");
@@ -500,7 +501,7 @@ prmodes(void)				/* print modes, no options, argc is 1 */
 	}
 }
 
-void
+static void
 pramodes(void)				/* print all modes, -a option */
 {
 	int m;
@@ -701,8 +702,8 @@ pit(unsigned char what, char *itsname, char *sep)
 
 	pitt++;
 	(void) printf("%s", itsname);
-	if ((term & TERMIOS) && what == _POSIX_VDISABLE ||
-	    !(term & TERMIOS) && what == 0200) {
+	if (((term & TERMIOS) && what == _POSIX_VDISABLE) ||
+	    (!(term & TERMIOS) && what == 0200)) {
 		(void) printf(" = <undef>%s", sep);
 		return;
 	}
@@ -747,7 +748,7 @@ prspeed(char *c, int scode)
 }
 
 /* print current settings for use with  */
-void
+static void
 prencode(void)		/* another stty cmd, used for -g option */
 {
 	int i, last;
@@ -784,7 +785,8 @@ prencode(void)		/* another stty cmd, used for -g option */
 		if (*kcswp.locale_name == '\0') {
 			(void) printf("00");
 		} else {
-			for (i = 0; kcswp.locale_name[i] && i < MAXNAMELEN; i++)
+			for (i = 0; i < MAXNAMELEN &&
+			    kcswp.locale_name[i] != '\0'; i++)
 				(void) printf("%02x", kcswp.locale_name[i]);
 		}
 		for (i = 0; i < LDTERM_CS_MAX_CODESETS; i++)

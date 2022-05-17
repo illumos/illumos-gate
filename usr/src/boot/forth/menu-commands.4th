@@ -396,6 +396,9 @@ create chaincmd 1030 chars allot
 	then				( n c-addr/u | n 0 )
 
 	dup 0<> if			( n c-addr/u )
+		\ because all usable console names have 4 chars,
+		\ we can only compare first 4 chars.
+		drop 4
 		2dup s" ttyd" compare 0= if
 			2drop 4
 		else 2dup s" ttyc" compare 0= if

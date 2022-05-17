@@ -25,10 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include <unistd.h>
 #include <stdarg.h>
@@ -47,7 +44,7 @@
 #include "tmextern.h"
 
 #define	NSTRPUSH	9	/* should agree with the tunable in	*/
-				/* 		/etc/master.d/kernel	*/
+				/* /etc/master.d/kernel			*/
 
 /*
  *	check_device - check to see if the device exists,
@@ -61,28 +58,27 @@ check_device(char *device)
 
 	if ((device == NULL) || (*device == '\0')) {
 		log("error -- device field is missing");
-		return(-1);
+		return (-1);
 	}
 	if (*device != '/') {
 		log("error -- must specify full path name for \"%s\".", device);
-		return(-1);
+		return (-1);
 	}
 	if (access(device, 0) == 0) {
-		if (stat(device,&statbuf) < 0) {
+		if (stat(device, &statbuf) < 0) {
 			log("stat(%s) failed: %s", device, strerror(errno));
-			return(-1);
+			return (-1);
 		}
 		if ((statbuf.st_mode & S_IFMT) != S_IFCHR) {
 			log("error -- \"%s\" not character special device",
 			    device);
-			return(-1);
+			return (-1);
 		}
-	}
-	else {
+	} else {
 		log("error -- device \"%s\" does not exist", device);
-		return(-1);
+		return (-1);
 	}
-	return(0);
+	return (0);
 }
 
 /*
@@ -99,33 +95,32 @@ check_cmd(char *cmd)
 
 	if ((cmd == NULL) || (*cmd == '\0')) {
 		log("error -- server command is missing");
-		return(-1);
+		return (-1);
 	}
-	(void)strcpy(tp,cmd);
-	(void)strtok(tp, " \t");
+	(void) strcpy(tp, cmd);
+	(void) strtok(tp, " \t");
 	if (*tp != '/') {
 		log("error -- must specify full path name for \"%s\".", tp);
-		return(-1);
+		return (-1);
 	}
 	if (access(tp, 0) == 0) {
-		if (stat(tp,&statbuf) < 0) {
+		if (stat(tp, &statbuf) < 0) {
 			log("stat(%s) failed.", tp);
-			return(-1);
+			return (-1);
 		}
 		if (!(statbuf.st_mode & 0111)) {
 			log("error -- \"%s\" not executable\n", tp);
-			return(-1);
+			return (-1);
 		}
 		if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
 			log("error -- \"%s\" not a regular file", tp);
-			return(-1);
+			return (-1);
 		}
-	}
-	else {
+	} else {
 		log("error -- \"%s\" does not exist", tp);
-		return(-1);
+		return (-1);
 	}
-	return(0);
+	return (0);
 }
 
 /*
@@ -137,26 +132,24 @@ check_cmd(char *cmd)
  *				- return 0 if successful, -1 if failed.
  */
 int
-strcheck(sp, flag)
-char	*sp;		/* string ptr		*/
-int	flag;		/* either NUM or ALNUM	*/
+strcheck(char *sp, int flag)
 {
-	register	char	*cp;
+	char	*cp;
+
 	if (flag == NUM) {
 		for (cp = sp; *cp; cp++) {
 			if (!isdigit(*cp)) {
-				return(-1);
+				return (-1);
 			}
 		}
-	}
-	else {	/* (flag == ALNUM) */
+	} else {	/* (flag == ALNUM) */
 		for (cp = sp; *cp; cp++) {
 			if (!isalnum(*cp)) {
-				return(-1);
+				return (-1);
 			}
 		}
 	}
-	return(0);
+	return (0);
 }
 
 /*
@@ -164,8 +157,7 @@ int	flag;		/* either NUM or ALNUM	*/
  *		- return 0 if successful, -1 if failed
  */
 int
-vml(modules)
-char	*modules;
+vml(char *modules)
 {
 	char	*modp, *svmodp;
 	int	i, fd;
@@ -173,7 +165,7 @@ char	*modules;
 	struct str_list	newlist;		/* modules to be pushed	*/
 
 	if ((modules == NULL) || (*modules == '\0'))
-		return(0);
+		return (0);
 
 	newlist.sl_modlist = newmods;
 	newlist.sl_nmods = NSTRPUSH;
@@ -182,19 +174,18 @@ char	*modules;
 		return (-1);
 	};
 	svmodp = modp;
-	(void)strcpy(modp, modules);
+	(void) strcpy(modp, modules);
 	/*
 	 * pull mod names out of comma-separated list
 	 */
-	for ( i = 0, modp = strtok(modp, ",");
-	modp != NULL; i++, modp = strtok(NULL, ",") ) {
-		if ( i >= NSTRPUSH) {
+	for (i = 0, modp = strtok(modp, ",");
+	    modp != NULL; i++, modp = strtok(NULL, ",")) {
+		if (i >= NSTRPUSH) {
 			log("too many modules in <%s>", modules);
 			i = -1;
 			break;
 		}
-		(void)strncpy(newlist.sl_modlist[i].l_name,
-					modp, FMNAMESZ);
+		(void) strncpy(newlist.sl_modlist[i].l_name, modp, FMNAMESZ);
 		newlist.sl_modlist[i].l_name[FMNAMESZ] = '\0';
 	}
 	free(svmodp);
@@ -207,25 +198,26 @@ char	*modules;
 	 */
 	if ((fd = open(USERDEV, O_RDWR)) == -1) {
 		if (errno == EBUSY) {
-			log("Warning - can't validate module list, /dev/sad/user busy");
-			return(0);
+			log("Warning - can't validate module list, "
+			    "/dev/sad/user busy");
+			return (0);
 		}
 		log("open /dev/sad/user failed: %s", strerror(errno));
-		return(-1);
+		return (-1);
 	}
-	if ( (i = ioctl(fd, SAD_VML, &newlist)) < 0 ) {
+	if ((i = ioctl(fd, SAD_VML, &newlist)) < 0) {
 		log("Validate modules ioctl failed, modules = <%s>: %s",
 		    modules, strerror(errno));
-		(void)close(fd);
-		return(-1);
+		(void) close(fd);
+		return (-1);
 	}
-	if ( i != 0 ) {
+	if (i != 0) {
 		log("Error - invalid STREAMS module list <%s>.", modules);
-		(void)close(fd);
-		return(-1);
+		(void) close(fd);
+		return (-1);
 	}
-	(void)close(fd);
-	return(0);
+	(void) close(fd);
+	return (0);
 }
 
 /*
@@ -233,8 +225,7 @@ char	*modules;
  *		   - also put '\' in front of ':'
  */
 void
-copystr(s1,s2)
-char	*s1, *s2;
+copystr(char *s1, char *s2)
 {
 	while (*s2) {
 		if (*s2 == ':') {

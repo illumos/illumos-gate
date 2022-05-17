@@ -25,10 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include <stdio.h>
 #include <unistd.h>
@@ -43,12 +40,11 @@
 #include "tmstruct.h"
 #include "tmextern.h"
 
-#define BRK	1
-#define DEL	2
+#define	BRK	1
+#define	DEL	2
 
-struct	strbuf *do_peek();
-static	int	process();
-extern	void	sigint();
+struct	strbuf *do_peek(int, int);
+static	int	process(int, struct strbuf *);
 
 static	int	interrupt;
 
@@ -60,7 +56,7 @@ static	int	interrupt;
  *			- exit if hangup is received
  */
 int
-poll_data()
+poll_data(void)
 {
 	int j;
 	struct strbuf *ptr;
@@ -71,35 +67,35 @@ poll_data()
 	debug("in poll_data");
 #endif
 	if (peek_ptr != NULL) {
-		for(j=0; j<peek_ptr->len; j++) peek_ptr->buf[j] &= 0x7F;
-		return(process(0,peek_ptr));
+		for (j = 0; j < peek_ptr->len; j++)
+			peek_ptr->buf[j] &= 0x7F;
+		return (process(0, peek_ptr));
 	}
 	fds[0].fd = 0;
 	fds[0].events = POLLIN;
 	sigact.sa_flags = 0;
 	sigact.sa_handler = sigint;
-	(void)sigemptyset(&sigact.sa_mask);
-	(void)sigaddset(&sigact.sa_mask, SIGINT);
-	(void)sigaction(SIGINT, &sigact, NULL);
+	(void) sigemptyset(&sigact.sa_mask);
+	(void) sigaddset(&sigact.sa_mask, SIGINT);
+	(void) sigaction(SIGINT, &sigact, NULL);
 	for (;;) {
 		interrupt = 0;
-		if ((j = poll(fds,1,-1)) == -1) {
+		if ((j = poll(fds, 1, -1)) == -1) {
 			if (interrupt == BRK) {
-				return(BADSPEED);
+				return (BADSPEED);
 			}
 			if (interrupt == DEL) { /* XXX revisit kmd */
-				return(BADSPEED);
+				return (BADSPEED);
 			}
-		}
-		else if (j > 0) {
+		} else if (j > 0) {
 			if (fds[0].revents & POLLHUP) {
-				log( "POLLHUP received, about to exit");
+				log("POLLHUP received, about to exit");
 				exit(1);
 			}
 			if (fds[0].revents & POLLIN) {
 				ptr = do_peek(fds[0].fd, 255);
 				if (ptr != NULL) {
-					return(process(fds[0].fd,ptr));
+					return (process(fds[0].fd, ptr));
 				}
 			}
 		}
@@ -107,17 +103,17 @@ poll_data()
 }
 
 /*
- *	process	- process the data 
- *		- return GOODNAME if it is a non-empty line 
+ *	process	- process the data
+ *		- return GOODNAME if it is a non-empty line
  *		- return NONAME if a <CR> is received
  *		- return BADNAME if zero byte is detected
  *		- except the case of GOODNAME, data will be pulled out
- *		  of the stream 
+ *		  of the stream
  */
 static int
 process(
-	int	fd,		/* fd to read data from if necessary 	*/
-	struct strbuf *ptr)	/* ptr that holds data in ptr->buf 	*/
+	int	fd,		/* fd to read data from if necessary	*/
+	struct strbuf *ptr)	/* ptr that holds data in ptr->buf	*/
 {
 	unsigned i;
 	char	junk[BUFSIZ];
@@ -144,19 +140,19 @@ process(
 
 /*
  *	do_peek	- peek at the stream to get the data
+ *	int	fd;	fd to do the ioctl on
+ *	int	n;	maxlen of data to peek at
  *		- this only called when POLLIN is detected,
- *		- so there should always be something there 
+ *		- so there should always be something there
  *		- return a ptr to the buf that contains the data
  *		- return NULL if nothing to peek at
  */
 struct	strbuf	*
-do_peek(fd,n)
-int	fd;	/* fd to do the ioctl on */
-int	n;	/* maxlen of data to peek at */
+do_peek(int fd, int n)
 {
 	int	 ret;
-	static 	 struct strpeek peek;
-	register struct strpeek *peekp;
+	static	 struct strpeek peek;
+	struct strpeek *peekp;
 	static	 char	buf[BUFSIZ];
 
 #ifdef	DEBUG
@@ -176,16 +172,16 @@ int	n;	/* maxlen of data to peek at */
 		exit(1);
 	}
 	if (ret == 0) {
-		return( (struct strbuf *)NULL );
+		return (NULL);
 	}
-	return(&(peekp->databuf));
+	return (&(peekp->databuf));
 }
 
 /*
  *	sigint	- this is called when SIGINT is caught
  */
 void
-sigint()
+sigint(int s __unused)
 {
 	struct strbuf *ptr;
 	char   junk[2];
@@ -196,13 +192,11 @@ sigint()
 	ptr = do_peek(0, 1);
 	if (ptr == NULL) {	/* somebody type <del> */
 		interrupt = DEL;
-	}
-	else {
+	} else {
 		if (ptr->buf[0] == '\0') {
 			/* somebody type <brk> or frame error */
-			(void)read(0,junk,1);
+			(void) read(0, junk, 1);
 			interrupt = BRK;
 		}
 	}
 }
-

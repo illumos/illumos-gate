@@ -25,10 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include <stdio.h>
 #include <errno.h>
@@ -69,8 +66,6 @@ static struct	autobaud {
 	0,		0
 };
 
-extern	struct	strbuf *peek_ptr;
-
 /*
  *	auto_termio - set termio to allow autobaud
  *		    - the line is set to raw mode, with VMIN = 5, VTIME = 1
@@ -86,10 +81,10 @@ auto_termio(int fd)
 		if (ioctl(fd, TCGETA, &termio) == -1) {
 			log("auto_termio: ioctl TCGETA failed, fd = %d: %s", fd,
 			    strerror(errno));
-			return(-1);
+			return (-1);
 		}
 		termio.c_iflag = 0;
-		termio.c_cflag &= ~(CBAUD|CSIZE|PARENB); 
+		termio.c_cflag &= ~(CBAUD|CSIZE|PARENB);
 		termio.c_cflag |= CREAD|HUPCL|(CS8&CSIZE)|(B2400&CBAUD);
 		termio.c_lflag &= ~(ISIG|ICANON|ECHO|ECHOE|ECHOK);
 		termio.c_oflag = 0;
@@ -100,34 +95,34 @@ auto_termio(int fd)
 		if (ioctl(fd, TCSETAF, &termio) == -1) {
 			log("auto_termio: ioctl TCSETAF failed, fd = %d: %s",
 			    fd, strerror(errno));
-			return(-1);
+			return (-1);
 		}
 	} else {
 		termios.c_iflag &= 0xffff0000;
-		termios.c_cflag &= ~(CSIZE|PARENB); 
+		termios.c_cflag &= ~(CSIZE|PARENB);
 		termios.c_cflag |= CREAD|HUPCL|(CS8&CSIZE);
 		termios.c_lflag &= ~(ISIG|ICANON|ECHO|ECHOE|ECHOK);
 		termios.c_oflag &= 0xffff0000;
 
 		termios.c_cc[VMIN] = 5;
 		termios.c_cc[VTIME] = 1;
-		cfsetospeed(&termios, B2400);
+		(void) cfsetospeed(&termios, B2400);
 
 		if (ioctl(fd, TCSETSF, &termios) == -1) {
 			log("auto_termio: ioctl TCSETSF failed, fd = %d: %s",
-			      fd, strerror(errno));
-			return(-1);
+			    fd, strerror(errno));
+			return (-1);
 		}
 	}
-	return(0);
+	return (0);
 }
 
 /*
  *	autobaud - determine the baudrate by reading data at 2400 baud rate
- *		 - the program is anticipating <CR> 
+ *		 - the program is anticipating <CR>
  *		 - the bit pattern is matched again an autobaud table
  *		 - if a match is found, the matched speed is returned
- *		 - otherwise, NULL is returned 
+ *		 - otherwise, NULL is returned
  */
 
 char *
@@ -135,49 +130,48 @@ autobaud(int fd, int timeout)
 {
 	int i, k, count;
 	static char	buf[5];
-	register char *cp = buf;
+	char *cp = buf;
 	struct	autobaud *tp;
 	struct	sigaction sigact;
-	extern	void	timedout();
-	extern	void	flush_input();
 
 #ifdef	DEBUG
 	debug("in autobaud");
 #endif
-	auto_termio(fd);
+	(void) auto_termio(fd);
 	sigact.sa_flags = 0;
 	sigact.sa_handler = SIG_IGN;
-	(void)sigemptyset(&sigact.sa_mask);
-	(void)sigaction(SIGINT, &sigact, NULL);
+	(void) sigemptyset(&sigact.sa_mask);
+	(void) sigaction(SIGINT, &sigact, NULL);
 	count = NTRY;
 	while (count--) {
 		if (timeout) {
 			sigact.sa_flags = 0;
 			sigact.sa_handler = timedout;
-			(void)sigemptyset(&sigact.sa_mask);
-			(void)sigaction(SIGALRM, &sigact, NULL);
-			(void)alarm((unsigned)timeout);
+			(void) sigemptyset(&sigact.sa_mask);
+			(void) sigaction(SIGALRM, &sigact, NULL);
+			(void) alarm((unsigned)timeout);
 		}
 		cp = &buf[1];
-		if ( peek_ptr ) {
-			strncpy(cp, peek_ptr->buf, k=peek_ptr->len);
+		if (peek_ptr != NULL) {
+			k = peek_ptr->len;
+			(void) strncpy(cp, peek_ptr->buf, k);
 			peek_ptr = NULL;
-		} else if ((k=read(fd, cp, 5)) < 0) {
+		} else if ((k = read(fd, cp, 5)) < 0) {
 			fatal("autobaud: read failed: %s", strerror(errno));
 		}
 		if (timeout)
-			(void)alarm((unsigned)0);
+			(void) alarm((unsigned)0);
 		buf[0] = (char)k;
 		for (tp = autob2400; tp->a_speed; tp++) {
-			for (i = 0;; i++) {
+			for (i = 0; ; i++) {
 				if (buf[i] != tp->a_pattern[i])
 					break;
 				if (i == buf[0]) {
-					return(tp->a_speed);
+					return (tp->a_speed);
 				}
 			}
 		}
 		flush_input(fd);
 	} /* end while */
-	return(NULL);		/* autobaud failed */
+	return (NULL);		/* autobaud failed */
 }

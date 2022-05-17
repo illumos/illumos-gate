@@ -17,7 +17,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd November 1, 2006
+.Dd March 30, 2022
 .Dt HSFS 4FS
 .Os
 .Sh NAME
@@ -127,10 +127,10 @@ See
 .Pp
 If the CD-ROM contains Rock Ridge, ISO 9660 version 2 or Joliet extensions, the
 file names and directory names may contain any character supported under
-.Xr UFS 4FS .
+.Xr ufs 4FS .
 The names may also be upper and/or lower case and are case sensitive.
 File name lengths can be as long as those of
-.Xr UFS 4FS .
+.Xr ufs 4FS .
 .Pp
 Files accessed through
 .Nm
@@ -142,7 +142,7 @@ grants execute permission to the directory, allowing it to be searched.
 .Pp
 With Rock Ridge extensions, files and directories can have any permissions that
 are supported on a
-.Xr UFS 4FS
+.Xr ufs 4FS
 file system.
 However, under all write permissions, the file system is read-only, with
 .Er EROFS
@@ -180,7 +180,7 @@ It will be listed as
 The specific reason appears on the following line.
 You might be attempting to mount a CD-ROM containing a different file system,
 such as
-.Xr UFS 4FS
+.Xr ufs 4FS
 .It "hsfs: Warning: the file system... contains a file [with an] unsupported"
 type"
 The

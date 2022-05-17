@@ -4,19 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IN.ROUTED 8 "Jul 24, 2008"
+.TH IN.ROUTED 8 "March 30, 2022"
 .SH NAME
 in.routed, routed \- network routing daemon
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/in.routed\fR [\fB-AdghmnqsStVz\fR] [\fB-T\fR \fItracefile\fR [\fB-v\fR]]
  [\fB-F\fR \fInet\fR[/mask ][,metric]] [\fB-P\fR \fIparams\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The daemon \fBin.routed\fR, often referred to as \fBrouted\fR, is invoked at
 boot time to manage the network routing tables. It uses Routing Information
 Protocol, RIPv1 (RFC 1058), RIPv2 (RFC 2453), and Internet Router Discovery
@@ -91,7 +88,7 @@ flash update response containing only recently changed routes is sent.
 In addition to processing incoming packets, in.routed also periodically checks
 the routing table entries. If an entry has not been updated for 3 minutes, the
 entry's metric is set to infinity and marked for deletion. Deletions are
-delayed until the route has been advertised with an infnite metric to insure
+delayed until the route has been advertised with an infinite metric to insure
 the invalidation is propagated throughout the local internet. This is a form of
 poison reverse.
 .sp
@@ -188,8 +185,6 @@ a route if necessary, and that other routes to that destination should not be
 installed by \fBin.routed\fR. Such entries are required only when both routers
 might learn of routes to the same destination.
 .SH OPTIONS
-.sp
-.LP
 Listed below are available options. Any other argument supplied is interpreted
 as the name of a file in which the actions of \fBin.routed\fR should be logged.
 It is better to use \fB-T\fR (described below) instead of appending the name of
@@ -427,7 +422,6 @@ the \fBrtquery\fR(8) command.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/defaultrouter\fR\fR
@@ -448,10 +442,8 @@ See \fBgateways\fR(5).
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ioctl (2),
-.BR inet (3SOCKET),
+.BR inet (3C),
 .BR icmp (4P),
 .BR inet (4P),
 .BR udp (4P),
@@ -479,8 +471,6 @@ Standard\fR
 .LP
 \fIICMP Router Discovery Messages (RFC 1256, September 1991)\fR
 .SH NOTES
-.sp
-.LP
 In keeping with its intended design, this daemon deviates from RFC 2453 in two
 notable ways:
 .RS +4

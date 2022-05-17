@@ -25,15 +25,14 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include	<unistd.h>
 #include	<string.h>
 #include	<sys/termios.h>
-/*--------------------------------------------------------- */
+#include	"tmextern.h"
+
+/* -------------------------------------------------------- */
 /* the follwing are here so we can use routines in ulockf.c */
 int	Debug = 0;
 char	*Bnptr;
@@ -42,17 +41,19 @@ char	*Bnptr;
 /*ARGSUSED*/
 void
 assert(char *s1, char *s2, int i1, char *s3, int i2)
-{}
+{
+}
 
 void
-cleanup(){}
+cleanup(void)
+{
+}
 
-/*ARGSUSED*/
 void
-logent(char *s1, char *s2)
-{}		/* so we can load ulockf() */
-/*---------------------------------------------------------- */
-extern	int	lockf();
+logent(char *s1 __unused, char *s2 __unused)
+{
+	/* so we can load ulockf() */
+}
 
 /*
  *	lastname	- If the path name starts with "/dev/",
@@ -68,7 +69,7 @@ lastname(char *name)
 	if (strncmp(sp, "/dev/", 5) == 0)
 		sp += 5;
 	else
-		while ((p = (char *)strchr(sp,'/')) != (char *)NULL) {
+		while ((p = (char *)strchr(sp, '/')) != NULL) {
 			sp = ++p;
 		}
 	return (sp);
@@ -80,17 +81,15 @@ lastname(char *name)
 int
 tm_lock(int fd)
 {
-	extern	int	fd_mklock();
 	return (fd_mklock(fd));
 }
 
 /*
- *	tm_checklock	- check if advisory lock is on 
+ *	tm_checklock	- check if advisory lock is on
  */
 int
 tm_checklock(int fd)
 {
-	extern	int	fd_cklock();
 	return (fd_cklock(fd));
 }
 
@@ -105,9 +104,9 @@ check_session(int fd)
 	pid_t	sid;
 
 	if (ioctl(fd, TIOCGSID, &sid) == -1)
-		return(0);
+		return (0);
 	else if (sid == 0)
-		return(0);
+		return (0);
 	else
-		return(1);
+		return (1);
 }

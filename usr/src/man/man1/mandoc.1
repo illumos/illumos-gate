@@ -15,7 +15,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: August 14 2021 $
+.Dd March 30, 2022
 .Dt MANDOC 1
 .Os
 .Sh NAME
@@ -858,7 +858,7 @@ macro, of the
 .Fl Ios
 command line option, or, if neither are present, in the return value
 of the
-.Xr uname 3
+.Xr uname 2
 function.
 .Ss Conventions for base system manuals
 .Bl -ohang
@@ -1147,7 +1147,7 @@ The date given in a
 or
 .Ic \&TH
 macro is more than a day ahead of the current system
-.Xr time 3 .
+.Xr time 2 .
 .It Sy "missing Os macro, using \(dq\(dq"
 .Pq mdoc
 The default or current system is not shown in this case.
@@ -2106,12 +2106,12 @@ The request is ignored including all its arguments.
 The first call to
 .Ic \&Nm ,
 or any call in the NAME section, lacks the required argument.
-.It Sy "uname(3) system call failed, using UNKNOWN"
+.It Sy "uname(2) system call failed, using UNKNOWN"
 .Pq mdoc
 The
 .Ic \&Os
 macro is called without arguments, and the
-.Xr uname 3
+.Xr uname 2
 system call failed.
 As a workaround,
 .Nm

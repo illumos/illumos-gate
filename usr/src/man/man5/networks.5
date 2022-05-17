@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NETWORKS 5 "Feb 25, 2017"
+.TH NETWORKS 5 "March 30, 2022"
 .SH NAME
 networks \- network name database
 .SH SYNOPSIS
-.LP
 .nf
 \fB/etc/inet/networks\fR
 .fi
@@ -19,7 +18,6 @@ networks \- network name database
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBnetworks\fR file is a local source of information regarding the networks
 which comprise the Internet. The networks file can be used in conjunction
 with, or instead of, other networks sources, including the NIS maps
@@ -49,17 +47,14 @@ it up to date regarding unofficial aliases and/or unknown networks.
 .LP
 Network numbers may be specified in the conventional dot (`\fB\&.\fR') notation
 using the \fBinet_network\fR routine from the Internet address manipulation
-library, \fBinet\fR(4P). Network names may contain any printable character
+library, \fBinet\fR(3C). Network names may contain any printable character
 other than a field delimiter, \fBNEWLINE\fR, or comment character.
 .SH SEE ALSO
-.LP
+.BR inet (3C),
 .BR getnetbyaddr (3SOCKET),
 .BR getnetbyname (3SOCKET),
-.BR inet (3SOCKET),
-.BR inet (4P),
 .BR nsswitch.conf (5)
 .SH NOTES
-.LP
 The official SVR4 name of the \fBnetworks\fR file is \fB/etc/inet/networks\fR.
 The symbolic link \fB/etc/networks\fR exists for \fBBSD\fR compatibility.
 .sp

@@ -3,19 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GATEWAYS 5 "May 20, 2009"
+.TH GATEWAYS 5 "March 30, 2022"
 .SH NAME
 gateways \- configuration file for /usr/sbin/in.routed IPv4 network routing
 daemon
 .SH SYNOPSIS
-.LP
 .nf
 \fB/etc/gateways\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fB/etc/gateways\fR file is used by the routing daemon,
 \fBin.routed\fR(8). When the daemon starts, it reads \fB/etc/gateways\fR to
 find such distant gateways that cannot be located using only information from a
@@ -60,7 +57,7 @@ The parameters in the lines shown above are described as follows:
 .sp .6
 .RS 4n
 Name of the destination network or host. It can be a symbolic network name or
-an Internet address specified in \fBdot\fR notation (see \fBinet\fR(3SOCKET)).
+an Internet address specified in \fBdot\fR notation (see \fBinet\fR(3C)).
 If it is a name, then it must either be defined in \fB/etc/networks\fR or
 \fB/etc/hosts\fR, or a naming service must have been started before
 \fBin.routed\fR(8).
@@ -492,9 +489,10 @@ used to set a broadcast type advertisement on a point-to-point link.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBin.routed\fR(8), \fBroute\fR(8), \fBrtquery\fR(8), \fBinet\fR(3SOCKET),
+.BR inet (3C),
+.BR in.routed (8),
+.BR route (8),
+.BR rtquery (8)
 .sp
 .LP
 \fIInternet Transport Protocols, XSIS 028112, Xerox System Integration

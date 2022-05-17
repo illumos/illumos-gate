@@ -43,7 +43,7 @@ TTYMONOBJ=	ttymon.o tmglobal.o tmhandler.o tmpmtab.o tmttydefs.o \
 TTYADMOBJ=	ttyadm.o tmutil.o admutil.o
 
 STTYDEFSOBJ=	sttydefs.o admutil.o tmttydefs.o tmparse.o sttytable.o \
-		sttyparse.o
+		sttyparse.o tmglobal.o
 
 OBJS= $(STTYOBJ) $(XPG4STTYOBJ) $(TTYMONOBJ) $(TTYADMOBJ) $(STTYDEFSOBJ)
 STTYSRC= stty.c sttytable.c sttyparse.c
@@ -72,14 +72,6 @@ $(XPG4STTYOBJ) := CPPFLAGS += -DEUC
 
 CFLAGS += $(CCVERBOSE)
 LDFLAGS += $(MAPFILE.NGB:%=-Wl,-M%)
-
-CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	$(CNOWARN_UNINIT)
-CERRWARN +=	-_gcc=-Wno-extra
-
-# not linted
-SMATCH=off
 
 #
 # Message catalog

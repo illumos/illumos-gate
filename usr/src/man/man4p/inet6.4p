@@ -3,18 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INET6 4P "Oct 3, 2002"
+.TH INET6 4P "March 30, 2022"
 .SH NAME
 inet6 \- Internet protocol family for Internet Protocol version 6
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <sys/types.h>
 #include <netinet/in.h>\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBinet6\fR protocol family implements a collection of protocols that are
 centered around the Internet Protocol version 6 (\fBIPv6\fR) and share a common
 address format. The \fBinet6\fR protocol family can be accessed using the
@@ -23,7 +21,6 @@ and \fBSOCK_RAW\fR socket types, or the Transport Level Interface (\fBTLI\fR),
 where it supports  the connectionless (\fBT_CLTS\fR) and connection oriented
 (\fBT_COTS_ORD\fR) service types.
 .SH PROTOCOLS
-.LP
 The Internet protocol family for \fBIPv6\fR included the Internet Protocol
 Version 6 (\fBIPv6\fR), the Neighbor Discovery Protocol (\fBNDP\fR), the
 Internet Control Message Protocol (\fBICMPv6\fR), the Transmission Control
@@ -160,7 +157,6 @@ The last 64 bits are the interface \fBID\fR. This will most often be the
 hardware address of the link in \fBIEEE EUI-64\fR format.
 .RE
 .SH ADDRESSING
-.LP
 \fBIPv6\fR addresses are sixteen byte quantities, stored in network byte order.
 The socket \fBAPI\fR uses the \fBsockaddr_in6\fR structure when passing
 \fBIPv6\fR addresses between an application and the kernel. The
@@ -168,7 +164,7 @@ The socket \fBAPI\fR uses the \fBsockaddr_in6\fR structure when passing
 .sp
 .in +2
 .nf
-sa_familty_t     sin6_family;
+sa_family_t      sin6_family;
 in_port_t        sin6_port;
 uint32_t         sin6_flowinfo;
 struct in6_addr  sin6_addr;
@@ -180,7 +176,7 @@ uint32_t         __sin6_src_id;
 .sp
 .LP
 Library routines are provided to  manipulate  structures of this form. See
-\fBinet\fR(3SOCKET).
+\fBinet\fR(3C).
 .sp
 .LP
 The \fBsin6_addr\fR field of the \fBsockaddr_in6\fR structure specifies a local
@@ -239,7 +235,6 @@ In addition, the same port may be bound by two separate sockets if one is an
 numbers. These semantics apply when Internet family protocols are used using
 the \fBTLI\fR.
 .SH SOURCE ADDRESS SELECTION
-.LP
 IPv6 source address selection is done on a per destination basis, and utilizes
 a list of rules from which the best source address is selected from candidate
 addresses. The candidate set comprises a set of local addresses assigned on the
@@ -369,8 +364,8 @@ If SB ^ D < SA ^ D, then prefer SB.
 Applications can override this algorithm by calling  \fBbind\fR(3SOCKET) and
 specifying an address.
 .SH SEE ALSO
-.LP
 .BR ioctl (2),
+.BR inet (3C),
 .BR bind (3SOCKET),
 .BR connect (3SOCKET),
 .BR getipnodebyaddr (3SOCKET),
@@ -378,7 +373,6 @@ specifying an address.
 .BR getprotobyname (3SOCKET),
 .BR getservbyname (3SOCKET),
 .BR getsockopt (3SOCKET),
-.BR inet (3SOCKET),
 .BR send (3SOCKET),
 .BR sockaddr (3SOCKET),
 .BR icmp6 (4P),
@@ -407,7 +401,6 @@ Society.  February 2003.
 Narten, T., and Draves, R. \fIRFC 3041, Privacy Extensions for Stateless
 Address Autoconfiguration in IPv6.\fR The Internet Society.  January 2001.
 .SH NOTES
-.LP
 The \fBIPv6\fR support is subject to change as the Internet protocols develop.
 Users should not depend on details of the current implementation, but rather
 the services exported.
