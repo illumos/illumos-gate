@@ -41,7 +41,6 @@ COMMON_MODULES_PROC = \
 	libmlsvc \
 	libnvpair \
 	libproc \
-	libpython \
 	libsysevent \
 	libtopo \
 	libumem \
@@ -50,6 +49,12 @@ COMMON_MODULES_PROC = \
 	list \
 	mdb_ds \
 	mdb_test
+
+#
+# MDB modules used for debugging user processes which are only 64-bit
+#
+COMMON_MODULES_PROC_64BIT = \
+	libpython
 
 #
 # MDB modules used for debugging user processes which are only 32-bit

@@ -27,6 +27,7 @@ include ../../Makefile.common
 
 MODULES = \
 	$(COMMON_MODULES_PROC) \
+	$(COMMON_MODULES_PROC_64BIT)
 	$(COMMON_MODULES_KVM) \
 	intr \
 	ssd

@@ -1299,12 +1299,9 @@ license usr/src/man/man3c/THIRDPARTYLICENSE.getentropy \
     license=usr/src/man/man3c/THIRDPARTYLICENSE.getentropy
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
-$(python3_ONLY)depend type=conditional \
-    fmri=system/library/python/solaris$(PYTHON3_PKGVERS) \
+depend type=conditional fmri=system/library/python/solaris$(PYTHON3_PKGVERS) \
     predicate=runtime/python$(PYTHON3_PKGVERS)
-$(python2_ONLY)depend type=conditional \
-    fmri=system/library/python/solaris$(PYTHON_PKGVERS) \
-    predicate=runtime/python$(PYTHON_PKGVERS)
+
 #
 # libses.so needs to dlopen(3C) plugins from usr/lib/scsi/plugins/ses/vendor/,
 # a dependency which cannot be automatically derived

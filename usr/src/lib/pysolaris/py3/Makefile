@@ -16,9 +16,8 @@
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-PYSHEBANG = $(PYTHON3)
 PYVER = $(PYTHON3_VERSION)
-PYSUFFIX = $(PYTHON3_SUFFIX)
+PYSUFFIX= $(PYTHON3_SUFFIX)
 
 LDLIBS64 += -L$(ADJUNCT_PROTO)/usr/lib/$(MACH64)
 MAPFILES= $(SRCDIR)/mapfile-py3

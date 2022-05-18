@@ -96,9 +96,9 @@ ROOTTGTS		= $(ROOTTGTS_$(MDBTGT))
 # building with an LFS python, we attempt to use -isystem when it's
 # available.
 #
-PYCPPFLAGS		= -_gcc=-isystem -_gcc=$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
-PYCPPFLAGS		+= -_cc=-I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
-PYLNFLAGS		= -I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
+PYCPPFLAGS		= -_gcc=-isystem -_gcc=$(ADJUNCT_PROTO)/usr/include/python$(PYTHON3_VERSION)$(PYTHON3_SUFFIX)
+PYCPPFLAGS		+= -_cc=-I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON3_VERSION)$(PYTHON3_SUFFIX)
+PYLNFLAGS		= -I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON3_VERSION)$(PYTHON3_SUFFIX)
 
 kvm_TGTFLAGS		= -D_KERNEL
 proc_TGTFLAGS		= -D_USER

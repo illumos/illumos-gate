@@ -22,7 +22,7 @@
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-PROGS =		s10_native s10_isaexec_wrapper s10_python_wrapper \
+PROGS =		s10_native s10_isaexec_wrapper \
 		s10_net_physical
 
 include $(SRC)/cmd/Makefile.cmd
@@ -31,15 +31,10 @@ include ../Makefile.s10
 # override the install directory
 ROOTBIN =	$(ROOTBRANDDIR)
 CLOBBERFILES =	$(ROOTPROGS)
-CLEANFILES +=	s10_python_wrapper.sh
-
-s10_python_wrapper.sh:	s10_python_wrapper.sh.in
-	$(SED) -e "s:@PYTHON_VERSION@:$(PYTHON_VERSION):g" < s10_python_wrapper.sh.in > $@
 
 .KEEP_STATE:
 
 all: $(PROGS)
-
 
 install: all $(ROOTPROGS)
 

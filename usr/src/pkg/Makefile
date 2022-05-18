@@ -193,17 +193,11 @@ PKGMOG_DEFINES= \
 	PERL_PKGVERS=$(PERL_PKGVERS) \
 	BUILDPERL32=$(BUILDPERL32) \
 	BUILDPERL64=$(BUILDPERL64) \
-	PYTHON_VERSION=$(PYTHON_VERSION) \
 	PYTHON3_VERSION=$(PYTHON3_VERSION) \
 	PYTHON3b_VERSION=$(PYTHON3b_VERSION) \
-	PYTHON_PKGVERS=$(PYTHON_PKGVERS) \
 	PYTHON3_PKGVERS=$(PYTHON3_PKGVERS) \
 	PYTHON3b_PKGVERS=$(PYTHON3b_PKGVERS) \
-	python2_ONLY=$(BUILDPY2) \
-	python3_ONLY=$(BUILDPY3) \
 	python3b_ONLY=$(BUILDPY3b) \
-	python2tools_ONLY=$(BUILDPY2TOOLS) \
-	python3tools_ONLY=$(BUILDPY3TOOLS) \
 	JAVA_11_ONLY=$(JAVA_11_ONLY) \
 	JAVA_8_ONLY=$(JAVA_8_ONLY)
 
@@ -251,21 +245,15 @@ CLOBBERFILES= $(PDIR) proto_list_$(PKGMACH) install-$(PKGMACH).out \
 # SPECIAL_MANIFESTS variable. It can contain wildcards in regexp form, i.e.
 # SUNW.* as one useful example.
 #
-SPECIAL_MANIFESTS = system-library-python-.*
+SPECIAL_MANIFESTS = system-library-python-libbe-3b\.p5m \
+    system-library-python-solaris-3b\.p5m \
+    system-library-python-zfs-3b\.p5m
 LIST_MANIFESTS_CMD = (cd manifests ; /usr/bin/ls -1 *.p5m |\
 	$(SED) $(SPECIAL_MANIFESTS:%=-e '/^%$$/d') )
 MANIFESTS = $(LIST_MANIFESTS_CMD:sh)
 
-# Conditionally add back python modules
-$(BUILDPY2) MANIFESTS += \
-	system-library-python-libbe-2.p5m \
-	system-library-python-solaris-2.p5m \
-	system-library-python-zfs-2.p5m
-$(BUILDPY3) MANIFESTS += \
-	system-library-python-libbe-3.p5m \
-	system-library-python-solaris-3.p5m \
-	system-library-python-zfs-3.p5m
-$(BUILDPY3b) MANIFESTS += \
+# Conditionally add back the py3b manifests if requested
+$(BUILDPY3b)MANIFESTS += \
 	system-library-python-libbe-3b.p5m \
 	system-library-python-solaris-3b.p5m \
 	system-library-python-zfs-3b.p5m
@@ -715,8 +703,6 @@ pkglint: makesilent
 	$(PKGDEBUG)$(CP) etc/pkglintrc $(PDIR)/pkglintrc
 	$(PKGDEBUG)$(GREP) pkg:/ $(CODEMGR_WS)/exception_lists/packaging.deps \
 	    | sed 's/.*/    & \\/' >> $(PDIR)/pkglintrc
-	$(PKGDEBUG)echo "    pkg:/runtime/python$(PYTHON_PKGVERS) \\" \
-	     >> $(PDIR)/pkglintrc
 	$(PKGDEBUG)echo "    pkg:/runtime/python$(PYTHON3_PKGVERS) \\" \
 	     >> $(PDIR)/pkglintrc
 	$(PKGDEBUG) echo "    pkg:/runtime/perl$(PERL_PKGVERS) \\" \

@@ -210,24 +210,19 @@ $(SPARC_BLD)PERL_MACH=	sun4
 PERL_VARIANT=
 PERL_ARCH=	$(PERL_MACH)-solaris$(PERL_VARIANT)-64int
 PERL_ARCH64=	$(PERL_MACH)-solaris$(PERL_VARIANT)-64
-PYTHON_VERSION=	2.7
-PYTHON_PKGVERS=	-27
-PYTHON_SUFFIX=
-PYTHON=		/usr/bin/python$(PYTHON_VERSION)
 PYTHON3_VERSION=	3.5
 PYTHON3_PKGVERS=	-35
 PYTHON3_SUFFIX=		m
-# BUILDPY3b should be overridden in the .env file in order to build the libbe
-# python module with a secondary python to aid migration between versions.
+PYTHON3=		/usr/bin/python$(PYTHON3_VERSION)
+# BUILDPY3b should be overridden in the env file in order to build python
+# modules with a secondary python to aid migration between versions.
 BUILDPY3b=		$(POUND_SIGN)
 PYTHON3b_VERSION=	3.9
 PYTHON3b_PKGVERS=	-39
 PYTHON3b_SUFFIX=
 #
-PYTHON3=		/usr/bin/python$(PYTHON3_VERSION)
 $(BUILDPY3b)PYTHON3b=	/usr/bin/python$(PYTHON3b_VERSION)
-$(BUILDPY3TOOLS)TOOLS_PYTHON=		$(PYTHON3)
-$(BUILDPY2TOOLS)TOOLS_PYTHON=		$(PYTHON)
+TOOLS_PYTHON=		$(PYTHON3)
 SORT=		/usr/bin/sort
 TR=		/usr/bin/tr
 TOUCH=		/usr/bin/touch
@@ -301,9 +296,7 @@ INS.symlink=	$(RM) $@; $(SYMLINK) $(INSLINKTARGET) $@
 # The path to python that will be used for the shebang line when installing
 # python scripts to the proto area. This is overridden by makefiles to
 # select to the correct version.
-PYSHEBANG=	$(PYTHON)
-$(BUILDPY3)PYSHEBANG=	$(PYTHON3)
-$(BUILDPY2)PYSHEBANG=	$(PYTHON)
+PYSHEBANG=	$(PYTHON3)
 
 #
 # Python bakes the mtime of the .py file into the compiled .pyc and
@@ -1260,11 +1253,6 @@ PKGPUBLISHER_NONREDIST=	on-extra
 		-e "1s:^\#!@PYTHON@:\#!$(PYSHEBANG):" \
 		-e "1s:^\#!@TOOLS_PYTHON@:\#!$(TOOLS_PYTHON):" \
 		< $< > $@; $(CHMOD) +x $@
-
-.py.pyc:
-	$(RM) $@
-	$(PYTHON) -mpy_compile $<
-	@[ $(<)c = $@ ] || $(MV) $(<)c $@
 
 .py.po:
 	$(GNUXGETTEXT) $(GNUXGETFLAGS) -d $(<F:%.py=%) $< ;

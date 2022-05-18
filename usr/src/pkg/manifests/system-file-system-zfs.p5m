@@ -153,9 +153,5 @@ license usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.cityhash \
     license=usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.cityhash
 license usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4 \
     license=usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4
-$(python3_ONLY)depend type=conditional \
-    fmri=system/library/python/zfs$(PYTHON3_PKGVERS) \
+depend type=conditional fmri=system/library/python/zfs$(PYTHON3_PKGVERS) \
     predicate=runtime/python$(PYTHON3_PKGVERS)
-$(python2_ONLY)depend type=conditional \
-    fmri=system/library/python/zfs$(PYTHON_PKGVERS) \
-    predicate=runtime/python$(PYTHON_PKGVERS)

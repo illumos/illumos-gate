@@ -199,7 +199,7 @@ file path=usr/lib/mdb/proc/$(ARCH64)/libavl.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libc.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libnvpair.so group=sys mode=0555
 file path=usr/lib/mdb/proc/$(ARCH64)/libproc.so group=sys mode=0555
-file path=usr/lib/mdb/proc/$(ARCH64)/libpython$(PYTHON_VERSION).so group=sys \
+file path=usr/lib/mdb/proc/$(ARCH64)/libpython$(PYTHON3_VERSION).so group=sys \
     mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/proc/$(ARCH64)/libsmbios.so group=sys \
     mode=0555
@@ -215,7 +215,6 @@ file path=usr/lib/mdb/proc/libavl.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libc.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libnvpair.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libproc.so group=sys mode=0555
-file path=usr/lib/mdb/proc/libpython$(PYTHON_VERSION).so group=sys mode=0555
 $(i386_ONLY)file path=usr/lib/mdb/proc/libsmbios.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libsysevent.so group=sys mode=0555
 file path=usr/lib/mdb/proc/libtopo.so group=sys mode=0555
