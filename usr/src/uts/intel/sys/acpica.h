@@ -32,6 +32,10 @@
 #ifndef _SYS_ACPICA_H
 #define	_SYS_ACPICA_H
 
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/acpi/acpi.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -138,32 +142,22 @@ typedef struct iflag {
 #define	ACPI_DEVCFG_PCI		0x8
 
 /*
- * master_ops.c
+ * isapnp_devs.c
  */
 typedef struct device_id {
 	struct device_id *next;
 	char	*id;
 } device_id_t;
 
-typedef struct property {
-	struct property *next;
-	char *name;
-	char *value;
-} property_t;
+typedef struct isapnp_desc {
+	const char *ipnp_id;		/* device ID */
+	boolean_t ipnp_prefix;		/* prefix match? */
+	const char *ipnp_name;		/* dev tree name */
+	const char *ipnp_compat;	/* dev tree compatible */
+	const char *ipnp_model;		/* dev tree model */
+} isapnp_desc_t;
 
-typedef struct master_rec {
-	struct master_rec *next;
-	device_id_t	*device_ids;
-	char		*name;
-	char		*description;
-	property_t	*properties;
-} master_rec_t;
-
-extern const master_rec_t *master_file_lookup(device_id_t *);
-extern device_id_t *mf_alloc_device_id(void);
-extern void mf_free_device_id(device_id_t *);
-extern void process_master_file(void);
-extern void free_master_data(void);
+extern const isapnp_desc_t *isapnp_desc_lookup(const device_id_t *);
 
 /*
  * Function prototypes

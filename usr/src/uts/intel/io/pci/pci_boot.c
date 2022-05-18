@@ -1740,6 +1740,18 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 	}
 }
 
+/*
+ * As a workaround for devices which is_pciide() (below, which see) would not
+ * match due to device issues, check an undocumented device tree property
+ * 'pci-ide', the value of which is a 1275 device identifier.
+ *
+ * Should a device matching this (in normal 'compatible' order) be found, and
+ * the device not otherwise bound, it will be have its node name changed to
+ * 'pci-ide' so the pci-ide driver will attach.
+ *
+ * This can be set via `eeprom pci-ide=pciXXXX,YYYY` (see eeprom(8)) or
+ * otherwise added to bootenv.rc.
+ */
 static int
 check_pciide_prop(uchar_t revid, ushort_t venid, ushort_t devid,
     ushort_t subvenid, ushort_t subdevid)
@@ -1790,18 +1802,22 @@ static int
 is_pciide(uchar_t basecl, uchar_t subcl, uchar_t revid,
     ushort_t venid, ushort_t devid, ushort_t subvenid, ushort_t subdevid)
 {
-	struct ide_table {	/* table for PCI_MASS_OTHER */
+	struct ide_table {
 		ushort_t venid;
 		ushort_t devid;
 	} *entry;
 
-	/* XXX SATA and other devices: need a way to add dynamically */
+	/*
+	 * Devices which need to be matched specially as pci-ide because of
+	 * various device issues.  Commonly their specification as being
+	 * PCI_MASS_OTHER or PCI_MASS_SATA despite our using them in ATA mode.
+	 */
 	static struct ide_table ide_other[] = {
-		{0x1095, 0x3112},
-		{0x1095, 0x3114},
-		{0x1095, 0x3512},
-		{0x1095, 0x680},	/* Sil0680 */
-		{0x1283, 0x8211},	/* ITE 8211F is subcl PCI_MASS_OTHER */
+		{0x1095, 0x3112}, /* Silicon Image 3112 SATALink/SATARaid */
+		{0x1095, 0x3114}, /* Silicon Image 3114 SATALink/SATARaid */
+		{0x1095, 0x3512}, /* Silicon Image 3512 SATALink/SATARaid */
+		{0x1095, 0x680},  /* Silicon Image PCI0680 Ultra ATA-133 */
+		{0x1283, 0x8211}, /* Integrated Technology Express 8211F */
 		{0, 0}
 	};
 
@@ -1820,7 +1836,7 @@ is_pciide(uchar_t basecl, uchar_t subcl, uchar_t revid,
 	}
 
 	entry = &ide_other[0];
-	while (entry->venid) {
+	while (entry->venid != 0) {
 		if (entry->venid == venid && entry->devid == devid)
 			return (1);
 		entry++;
@@ -1832,9 +1848,9 @@ static int
 is_display(uint_t classcode)
 {
 	static uint_t disp_classes[] = {
-		0x000100,
-		0x030000,
-		0x030001
+		0x000100,	/* pre-class code VGA Compatible */
+		0x030000,	/* VGA Compatible */
+		0x030001	/* VGA+8514 Compatible */
 	};
 	int i, nclasses = sizeof (disp_classes) / sizeof (uint_t);
 
@@ -2209,7 +2225,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	 *
 	 * If it is, check if any other higher precedence driver listed in
 	 * driver_aliases will claim the node by calling
-	 * ddi_compatibile_driver_major.  If so, clear pciide and do not
+	 * ddi_compatible_driver_major.  If so, clear pciide and do not
 	 * create a pci-ide node or any other special handling.
 	 *
 	 * If another driver does not bind, set the node name to pci-ide
@@ -2473,7 +2489,7 @@ static struct {
 };
 
 static int
-pciIdeAdjustBAR(uchar_t progcl, int index, uint_t *basep, uint_t *lenp)
+pciide_adjust_bar(uchar_t progcl, int index, uint_t *basep, uint_t *lenp)
 {
 	int hard_decode = 0;
 
@@ -2616,7 +2632,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 				if (subclass != PCI_MASS_IDE)
 					progclass = (PCI_IDE_IF_NATIVE_PRI |
 					    PCI_IDE_IF_NATIVE_SEC);
-				hard_decode = pciIdeAdjustBAR(progclass, j,
+				hard_decode = pciide_adjust_bar(progclass, j,
 				    &base, &len);
 			} else if (value == 0) {
 				/* skip base regs with size of 0 */

@@ -135,6 +135,7 @@ driver name=t4nex perms="* 0666 root sys" clone_perms="t4nex 0666 root sys" \
     alias=pciex1425,6488 \
     alias=pciex1425,6489 \
     alias=pciex1425,648a \
-    alias=pciex1425,648b devlink=type=ddi_ctl:devctl;minor1=t4nex\tt4nex\M2
+    alias=pciex1425,648b \
+    alias=pciex1425,6492 devlink=type=ddi_ctl:devctl;minor1=t4nex\tt4nex\M2
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

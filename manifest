@@ -56,8 +56,6 @@ d boot/forth 0755 root root
 f boot/forth/menu.rc 0444 root root
 d boot/solaris 0755 root sys
 f boot/solaris/bootenv.rc 0644 root root
-d boot/solaris/devicedb 0755 root sys
-f boot/solaris/devicedb/master 0644 root sys
 d dev 0755 root sys
 s dev/allkmem=../devices/pseudo/mm@0:allkmem
 s dev/arp=../devices/pseudo/arp@0:arp
