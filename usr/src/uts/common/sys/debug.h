@@ -133,10 +133,7 @@ _NOTE(CONSTCOND) } while (0)
 /*
  * Compile-time assertion. The condition 'x' must be constant.
  */
-#define	CTASSERT(x)		_CTASSERT(x, __LINE__)
-#define	_CTASSERT(x, y)		__CTASSERT(x, y)
-#define	__CTASSERT(x, y) \
-	typedef char __compile_time_assertion__ ## y [(x) ? 1 : -1] __unused
+#define	CTASSERT(x)	_Static_assert(x, "compile-time assertion failed")
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 

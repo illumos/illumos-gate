@@ -36,12 +36,10 @@
  * gain a little bit of type safety when dealing with endian-swapped bitfields.
  */
 
-#pragma pack(1)
-typedef struct { uint16_t be_val; } uint16be_t;
-typedef struct { uint8_t be_val[3]; } uint24be_t;
-typedef struct { uint32_t be_val; } uint32be_t;
-typedef struct { uint64_t be_val; } uint64be_t;
-#pragma pack()
+typedef struct { uint16_t be_val; } __packed uint16be_t;
+typedef struct { uint8_t be_val[3]; } __packed uint24be_t;
+typedef struct { uint32_t be_val; } __packed uint32be_t;
+typedef struct { uint64_t be_val; } __packed uint64be_t;
 
 static inline uint16_t
 from_be16(uint16be_t v)

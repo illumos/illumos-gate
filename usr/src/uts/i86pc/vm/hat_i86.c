@@ -1140,8 +1140,8 @@ hat_pcp_setup(struct cpu *cpu)
 	 */
 	hati_cpu_punchin(cpu, (uintptr_t)&kdi_idt, PROT_READ);
 
-	CTASSERT(((uintptr_t)&kpti_tramp_start % MMU_PAGESIZE) == 0);
-	CTASSERT(((uintptr_t)&kpti_tramp_end % MMU_PAGESIZE) == 0);
+	VERIFY0((uintptr_t)&kpti_tramp_start % MMU_PAGESIZE);
+	VERIFY0((uintptr_t)&kpti_tramp_end % MMU_PAGESIZE);
 	for (va = (uintptr_t)&kpti_tramp_start;
 	    va < (uintptr_t)&kpti_tramp_end; va += MMU_PAGESIZE) {
 		hati_cpu_punchin(cpu, va, PROT_READ | PROT_EXEC);
@@ -1175,8 +1175,8 @@ hat_pcp_setup(struct cpu *cpu)
 		}
 	}
 
-	CTASSERT(((uintptr_t)&kdi_isr_start % MMU_PAGESIZE) == 0);
-	CTASSERT(((uintptr_t)&kdi_isr_end % MMU_PAGESIZE) == 0);
+	VERIFY0((uintptr_t)&kdi_isr_start % MMU_PAGESIZE);
+	VERIFY0((uintptr_t)&kdi_isr_end % MMU_PAGESIZE);
 	for (va = (uintptr_t)&kdi_isr_start;
 	    va < (uintptr_t)&kdi_isr_end; va += MMU_PAGESIZE) {
 		hati_cpu_punchin(cpu, va, PROT_READ | PROT_EXEC);

@@ -367,7 +367,8 @@ getbn(char *str, diskaddr_t *iptr)
 	if (geti(buf, &cyl, &wild))
 		return (-1);
 	if ((cyl < 0) || (cyl >= (ncyl + acyl))) {
-		err_print("`%d' is out of range.\n", cyl);
+		err_print("`%d' is out of range [0-%u].\n", cyl,
+		    ncyl + acyl - 1);
 		return (-1);
 	}
 	/*
@@ -378,7 +379,7 @@ getbn(char *str, diskaddr_t *iptr)
 	if (geti(buf, &head, &wild))
 		return (-1);
 	if ((head < 0) || (head >= nhead)) {
-		err_print("`%d' is out of range.\n", head);
+		err_print("`%d' is out of range [0-%u].\n", head, nhead - 1);
 		return (-1);
 	}
 	/*
@@ -389,7 +390,8 @@ getbn(char *str, diskaddr_t *iptr)
 	if (geti(buf, &sect, &wild))
 		return (-1);
 	if ((sect < 0) || (sect >= sectors(head))) {
-		err_print("`%d' is out of range.\n", sect);
+		err_print("`%d' is out of range [0-%u].\n", sect,
+		    sectors(head) - 1);
 		return (-1);
 	}
 	/*
@@ -784,7 +786,8 @@ reprompt:
 		if ((bn64 < bounds->lower) || (bn64 > bounds->upper)) {
 			err_print("`");
 			pr_dblock(err_print, bn64);
-			err_print("' is out of range.\n");
+			err_print("' is out of range [%llu-%llu].\n",
+			    bounds->lower, bounds->upper);
 			break;
 		}
 		/*
@@ -817,7 +820,8 @@ reprompt:
 		 * Check to be sure it is within the legal bounds.
 		 */
 		if ((bn < bounds->lower) || (bn > bounds->upper)) {
-			err_print("`%lu' is out of range.\n", bn);
+			err_print("`%lu' is out of range [%llu-%llu].\n", bn,
+			    bounds->lower, bounds->upper);
 			break;
 		}
 		/*
@@ -848,7 +852,8 @@ reprompt:
 		 * Check to be sure it is within the legal bounds.
 		 */
 		if ((bn64 < bounds->lower) || (bn64 > bounds->upper)) {
-			err_print("`%llu' is out of range.\n", bn64);
+			err_print("`%llu' is out of range [%llu-%llu].\n",
+			    bn64, bounds->lower, bounds->upper);
 			break;
 		}
 		/*
@@ -881,7 +886,8 @@ reprompt:
 		 * Check to be sure it is within the legal bounds.
 		 */
 		if ((bn < bounds->lower) || (bn > bounds->upper)) {
-			err_print("`%lu' is out of range.\n", bn);
+			err_print("`%lu' is out of range [%llu-%llu].\n", bn,
+			    bounds->lower, bounds->upper);
 			break;
 		}
 		/*
@@ -1150,8 +1156,9 @@ reprompt:
 			/*
 			 * Check the bounds - cyls is number of cylinders
 			 */
-			if (cyls > (bounds->upper/spc())) {
-				err_print("`%dc' is out of range\n", cyls);
+			if (cyls > (bounds->upper / spc())) {
+				err_print("`%dc' is out of range [0-%llu]\n",
+				    cyls, bounds->upper / spc());
 				break;
 			}
 			/*
@@ -1171,7 +1178,8 @@ reprompt:
 			 * Check the bounds
 			 */
 			if (nmegs > bn2mb(bounds->upper)) {
-				err_print("`%1.2fmb' is out of range\n", nmegs);
+				err_print("`%1.2fmb' is out of range "
+				    "[0-%1.2f]\n", nmegs, bn2mb(bounds->upper));
 				break;
 			}
 			/*
@@ -1197,7 +1205,8 @@ reprompt:
 			 * Check the bounds
 			 */
 			if (ngigs > bn2gb(bounds->upper)) {
-				err_print("`%1.2fgb' is out of range\n", ngigs);
+				err_print("`%1.2fgb' is out of range "
+				    "[0-%1.2f]\n", ngigs, bn2gb(bounds->upper));
 				break;
 			}
 			/*
@@ -1384,8 +1393,9 @@ or g(gigabytes)\n");
 			 * Check the bounds - cyls is number of
 			 * cylinders
 			 */
-			if (cyls > (bounds->upper/spc())) {
-				err_print("`%dc' is out of range\n", cyls);
+			if (cyls > (bounds->upper / spc())) {
+				err_print("`%dc' is out of range [0-%llu]\n",
+				    cyls, bounds->upper / spc());
 				break;
 			}
 
@@ -1410,7 +1420,8 @@ or g(gigabytes)\n");
 			 * Check the bounds
 			 */
 			if (nmegs > bn2mb(bounds->upper)) {
-				err_print("`%1.2fmb' is out of range\n", nmegs);
+				err_print("`%1.2fmb' is out of range "
+				    "[0-%1.2f]\n", nmegs, bn2mb(bounds->upper));
 				break;
 			}
 
@@ -1441,7 +1452,8 @@ or g(gigabytes)\n");
 			 * Check the bounds
 			 */
 			if (ngigs > bn2gb(bounds->upper)) {
-				err_print("`%1.2fgb' is out of range\n", ngigs);
+				err_print("`%1.2fgb' is out of range "
+				    "[0-%1.2f]\n", ngigs, bn2gb(bounds->upper));
 				break;
 			}
 
@@ -1608,7 +1620,9 @@ or g(gigabytes)\n");
 			 * Check the bounds
 			 */
 			if (nmegs > bn2mb(bounds->upper - bounds->lower)) {
-				err_print("`%1.2fmb' is out of range\n", nmegs);
+				err_print("`%1.2fmb' is out of range "
+				    "[0-%1.2f]\n", nmegs,
+				    bn2mb(bounds->upper - bounds->lower));
 				break;
 			}
 
@@ -1621,7 +1635,9 @@ or g(gigabytes)\n");
 				break;
 			}
 			if (nmegs > bn2gb(bounds->upper - bounds->lower)) {
-				err_print("`%1.2fgb' is out of range\n", nmegs);
+				err_print("`%1.2fgb' is out of range "
+				    "[0-%1.2f]\n", nmegs,
+				    bn2gb(bounds->upper - bounds->lower));
 				break;
 			}
 
@@ -1634,7 +1650,9 @@ or g(gigabytes)\n");
 				break;
 			}
 			if (nmegs > bn2tb(bounds->upper - bounds->lower)) {
-				err_print("`%1.2ftb' is out of range\n", nmegs);
+				err_print("`%1.2ftb' is out of range "
+				    "[0-%1.2f]\n", nmegs,
+				    bn2tb(bounds->upper - bounds->lower));
 				break;
 			}
 			return (uint64_t)((float)nmegs * 1024.0 *

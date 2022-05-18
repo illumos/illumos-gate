@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2016 Toomas Soome <tsoome@me.com>
- * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -226,12 +226,12 @@ disk_callback_blkdev(di_minor_t minor, di_node_t node)
 {
 	char *addr;
 	char disk[DISK_SUBPATH_MAX];
-	uint64_t eui64;
+	char guid[50];
 	uint_t lun = 0;
 
 	addr = di_bus_addr(node);
-	(void) sscanf(addr, "w%016"PRIx64",%X", &eui64, &lun);
-	(void) snprintf(disk, DISK_SUBPATH_MAX, "t%016"PRIX64"d%d", eui64, lun);
+	(void) sscanf(addr, "w%49[0-9A-F],%X", &guid, &lun);
+	(void) snprintf(disk, DISK_SUBPATH_MAX, "t%sd%d", guid, lun);
 	disk_common(minor, node, disk, RM_STALE);
 	return (DEVFSADM_CONTINUE);
 }
