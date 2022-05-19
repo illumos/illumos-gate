@@ -52,7 +52,6 @@ __FBSDID("$FreeBSD$");
 #include <x86/apicreg.h>
 
 #include <machine/vmm.h>
-#include "vmm_ktr.h"
 #include "vmm_lapic.h"
 #include "vlapic.h"
 
@@ -120,10 +119,8 @@ lapic_intr_msi(struct vm *vm, uint64_t addr, uint64_t msg)
 	uint32_t dest;
 	bool phys;
 
-	VM_CTR2(vm, "lapic MSI addr: %#lx msg: %#lx", addr, msg);
-
 	if ((addr & MSI_X86_ADDR_MASK) != MSI_X86_ADDR_BASE) {
-		VM_CTR1(vm, "lapic MSI invalid addr %#lx", addr);
+		/* Invalid MSI address */
 		return (-1);
 	}
 
@@ -142,9 +139,6 @@ lapic_intr_msi(struct vm *vm, uint64_t addr, uint64_t msg)
 	phys = (addr & MSI_X86_ADDR_LOG) == 0;
 	delmode = msg & APIC_DELMODE_MASK;
 	vec = msg & 0xff;
-
-	VM_CTR3(vm, "lapic MSI %s dest %#x, vec %d",
-	    phys ? "physical" : "logical", dest, vec);
 
 	vlapic_deliver_intr(vm, LAPIC_TRIG_EDGE, dest, phys, delmode, vec);
 	return (0);

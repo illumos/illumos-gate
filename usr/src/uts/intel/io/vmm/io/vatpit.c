@@ -40,7 +40,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/vmm.h>
 
-#include "vmm_ktr.h"
 #include "vatpic.h"
 #include "vioapic.h"
 #include "vatpit.h"
@@ -146,8 +145,6 @@ vatpit_callout_handler(void *a)
 	vatpit = arg->vatpit;
 	c = &vatpit->channel[arg->channel_num];
 	callout = &c->callout;
-
-	VM_CTR1(vatpit->vm, "atpit t%d fired", arg->channel_num);
 
 	VATPIT_LOCK(vatpit);
 
@@ -348,7 +345,7 @@ vatpit_handler(void *arg, bool in, uint16_t port, uint8_t bytes, uint32_t *eax)
 
 	if (port == TIMER_MODE) {
 		if (in) {
-			VM_CTR0(vatpit->vm, "vatpit attempt to read mode");
+			/* Mode is write-only */
 			return (-1);
 		}
 

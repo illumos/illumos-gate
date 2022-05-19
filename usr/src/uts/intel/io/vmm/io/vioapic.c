@@ -57,7 +57,6 @@ __FBSDID("$FreeBSD$");
 #include <x86/apicreg.h>
 #include <machine/vmm.h>
 
-#include "vmm_ktr.h"
 #include "vmm_lapic.h"
 #include "vlapic.h"
 #include "vioapic.h"
@@ -98,18 +97,6 @@ struct vioapic {
 
 static MALLOC_DEFINE(M_VIOAPIC, "vioapic", "bhyve virtual ioapic");
 
-#define	VIOAPIC_CTR1(vioapic, fmt, a1)					\
-	VM_CTR1((vioapic)->vm, fmt, a1)
-
-#define	VIOAPIC_CTR2(vioapic, fmt, a1, a2)				\
-	VM_CTR2((vioapic)->vm, fmt, a1, a2)
-
-#define	VIOAPIC_CTR3(vioapic, fmt, a1, a2, a3)				\
-	VM_CTR3((vioapic)->vm, fmt, a1, a2, a3)
-
-#define	VIOAPIC_CTR4(vioapic, fmt, a1, a2, a3, a4)			\
-	VM_CTR4((vioapic)->vm, fmt, a1, a2, a3, a4)
-
 static void
 vioapic_send_intr(struct vioapic *vioapic, int pin)
 {
@@ -124,7 +111,7 @@ vioapic_send_intr(struct vioapic *vioapic, int pin)
 	high = vioapic->rtbl[pin].reg >> 32;
 
 	if ((low & IOART_INTMASK) == IOART_INTMSET) {
-		VIOAPIC_CTR1(vioapic, "ioapic pin%d: masked", pin);
+		/* Pin is masked */
 		return;
 	}
 
@@ -133,8 +120,7 @@ vioapic_send_intr(struct vioapic *vioapic, int pin)
 	level = low & IOART_TRGRLVL ? true : false;
 	if (level) {
 		if ((low & IOART_REM_IRR) != 0) {
-			VIOAPIC_CTR1(vioapic, "ioapic pin%d: irr pending",
-			    pin);
+			/* IRR already pending */
 			return;
 		}
 		vioapic->rtbl[pin].reg |= IOART_REM_IRR;
@@ -331,9 +317,6 @@ vioapic_write(struct vioapic *vioapic, int vcpuid, uint32_t addr, uint32_t data)
 		    (vioapic->rtbl[pin].reg & IOART_REM_IRR) != 0)
 			vioapic->rtbl[pin].reg &= ~IOART_REM_IRR;
 
-		VIOAPIC_CTR2(vioapic, "ioapic pin%d: redir table entry %#lx",
-		    pin, vioapic->rtbl[pin].reg);
-
 		/*
 		 * Generate an interrupt if the following conditions are met:
 		 * - pin trigger mode is level
@@ -341,8 +324,6 @@ vioapic_write(struct vioapic *vioapic, int vcpuid, uint32_t addr, uint32_t data)
 		 */
 		if ((vioapic->rtbl[pin].reg & IOART_TRGRMOD) == IOART_TRGRLVL &&
 		    (vioapic->rtbl[pin].acnt > 0)) {
-			VIOAPIC_CTR2(vioapic, "ioapic pin%d: asserted at rtbl "
-			    "write, acnt %d", pin, vioapic->rtbl[pin].acnt);
 			vioapic_send_intr(vioapic, pin);
 		}
 	}
@@ -420,7 +401,6 @@ vioapic_process_eoi(struct vm *vm, int vcpuid, int vector)
 	    ("vioapic_process_eoi: invalid vector %d", vector));
 
 	vioapic = vm_ioapic(vm);
-	VIOAPIC_CTR1(vioapic, "ioapic processing eoi for vector %d", vector);
 
 	/*
 	 * XXX keep track of the pins associated with this vector instead
@@ -434,8 +414,7 @@ vioapic_process_eoi(struct vm *vm, int vcpuid, int vector)
 			continue;
 		vioapic->rtbl[pin].reg &= ~IOART_REM_IRR;
 		if (vioapic->rtbl[pin].acnt > 0) {
-			VIOAPIC_CTR2(vioapic, "ioapic pin%d: asserted at eoi, "
-			    "acnt %d", pin, vioapic->rtbl[pin].acnt);
+			/* Pin asserted at EOI */
 			vioapic_send_intr(vioapic, pin);
 		}
 	}

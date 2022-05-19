@@ -63,7 +63,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysmacros.h>
 
 #include "vmm_lapic.h"
-#include "vmm_ktr.h"
 
 #include "iommu.h"
 #include "ppt.h"
