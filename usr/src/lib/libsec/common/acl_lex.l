@@ -20,6 +20,8 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 %{
@@ -41,7 +43,7 @@ int grab_string(char *terminators);
 static int input();
 static void unput(int);
 
-int 
+int
 yyerror(const char *s)
 {
 	return (0);
@@ -127,7 +129,7 @@ INHERIT_STR [fdinFSI-]+
 			}
 <TS>sid:		{
 				BEGIN NS;
-				yylval.val = GROUP_SID_TOK;
+				yylval.val = BARE_SID_TOK;
 				return (ENTRY_TYPE);
 			}
 <TS>mask:		{
@@ -150,7 +152,7 @@ INHERIT_STR [fdinFSI-]+
 				yylval.val = OTHER_TOK;
 				return (ENTRY_TYPE);
 			}
-<TS>defaultuser: 	{
+<TS>defaultuser:	{
 				BEGIN NS;
 				yylval.val = DEFAULT_USER_TOK;
 				return (ENTRY_TYPE);
@@ -160,7 +162,7 @@ INHERIT_STR [fdinFSI-]+
 				yylval.val = DEFAULT_USER_TOK;
 				return (ENTRY_TYPE);
 			}
-<TS>defaultgroup: 	{
+<TS>defaultgroup:	{
 				BEGIN NS;
 				yylval.val = DEFAULT_GROUP_TOK;
 				return (ENTRY_TYPE);
@@ -170,12 +172,12 @@ INHERIT_STR [fdinFSI-]+
 				yylval.val = DEFAULT_GROUP_TOK;
 				return (ENTRY_TYPE);
 			}
-<TS>defaultother: 	{
+<TS>defaultother:	{
 				BEGIN PS;
 				yylval.val = DEFAULT_OTHER_TOK;
 				return (ENTRY_TYPE);
 			}
-<TS>defaultother:: 	{
+<TS>defaultother::	{
 				BEGIN PS;
 				yylval.val = DEFAULT_OTHER_TOK;
 				return (ENTRY_TYPE);
@@ -185,12 +187,12 @@ INHERIT_STR [fdinFSI-]+
 				yylval.val = DEFAULT_OTHER_TOK;
 				return (ENTRY_TYPE);
 			}
-<TS>defaultmask: 	{
+<TS>defaultmask:	{
 				BEGIN PS;
 				yylval.val = DEFAULT_MASK_TOK;
 				return (ENTRY_TYPE);
 			}
-<TS>defaultmask:: 	{
+<TS>defaultmask::	{
 				BEGIN PS;
 				yylval.val = DEFAULT_MASK_TOK;
 				return (ENTRY_TYPE);
@@ -242,7 +244,7 @@ INHERIT_STR [fdinFSI-]+
 			}
 <NS>.			{
 				int error;
-				
+
 				error = grab_string(":,\n");
 				if (error != 0) {
 					acl_error(dgettext(TEXT_DOMAIN,
@@ -265,7 +267,7 @@ INHERIT_STR [fdinFSI-]+
 			}
 <PS>list_directory/[:/,] {
 				yylval.val = ACE_LIST_DIRECTORY;
-			 	return (ACE_PERM);
+				return (ACE_PERM);
 			}
 <PS>write_data/[:/,]	{
 				yylval.val = ACE_WRITE_DATA;
@@ -305,7 +307,7 @@ INHERIT_STR [fdinFSI-]+
 			}
 <PS>write_attributes/[:/,] {
 				yylval.val = ACE_WRITE_ATTRIBUTES;
-			 	return (ACE_PERM);
+				return (ACE_PERM);
 			}
 <PS>delete/[:/,]		{
 				yylval.val = ACE_DELETE;
@@ -362,8 +364,8 @@ INHERIT_STR [fdinFSI-]+
 					BEGIN US;
 				else if (c != ':')
 					BEGIN ES;
-				
-				return (PERM_TOK);	
+
+				return (PERM_TOK);
 			}
 <PS>"/:"		{
 				acl_error(dgettext(TEXT_DOMAIN,
@@ -402,7 +404,7 @@ INHERIT_STR [fdinFSI-]+
 				yylval.val = EACL_PERM_MASK_ERROR;
 				return (ERROR);
 			}
-<PS>. 			{
+<PS>.			{
 				if (grab_string("/:,\n") != 0) {
 					acl_error(dgettext(TEXT_DOMAIN,
 					    "Failed to retrieve"
@@ -412,7 +414,7 @@ INHERIT_STR [fdinFSI-]+
 				}
 				acl_error(dgettext(TEXT_DOMAIN,
 				    "Invalid permission(s) '%s' "
-				    "specified.\n"), yylval.str); 
+				    "specified.\n"), yylval.str);
 				free(yylval.str);
 				yylval.val = EACL_PERM_MASK_ERROR;
 				return (ERROR);
@@ -420,7 +422,7 @@ INHERIT_STR [fdinFSI-]+
 <AS>allow/[:,\n]	{
 
 				int c;
-			
+
 				c = input();
 				unput(c);
 				if (c == ',' || c == '\n')
@@ -433,7 +435,7 @@ INHERIT_STR [fdinFSI-]+
 <AS>deny/[:,\n]		{
 
 				int c;
-				
+
 				c = input();
 				unput(c);
 				if (c == ',' || c == '\n')
@@ -446,7 +448,7 @@ INHERIT_STR [fdinFSI-]+
 			}
 <AS>audit/[:,\n]	{
 				int c;
-				
+
 				c = input();
 				unput(c);
 				if (c == ',' || c == '\n')
@@ -459,7 +461,7 @@ INHERIT_STR [fdinFSI-]+
 			}
 <AS>alarm/[:,\n]	{
 				int c;
-				
+
 				c = input();
 				unput(c);
 				if (c == ',' || c == '\n')
@@ -471,7 +473,7 @@ INHERIT_STR [fdinFSI-]+
 				return (ACCESS_TYPE);
 			}
 <AS>:			{
-				
+
 				acl_error(dgettext(TEXT_DOMAIN,
 				    "Invalid Access type "
 				    "specified.\nThe field is blank, when"
@@ -514,7 +516,7 @@ INHERIT_STR [fdinFSI-]+
 <AIS>allow/[:,\n]	{
 
 				int c;
-			
+
 				c = input();
 				unput(c);
 				if (c == ',' || c == '\n')
@@ -527,7 +529,7 @@ INHERIT_STR [fdinFSI-]+
 <AIS>deny/[:,\n]	{
 
 				int c;
-				
+
 				c = input();
 				unput(c);
 				if (c == ',' || c == '\n')
@@ -540,7 +542,7 @@ INHERIT_STR [fdinFSI-]+
 			}
 <AIS>audit/[:,\n]	{
 				int c;
-				
+
 				c = input();
 				unput(c);
 				if (c == ',' || c == '\n')
@@ -554,7 +556,7 @@ INHERIT_STR [fdinFSI-]+
 <AIS>alarm/[:,\n]	{
 
 				int c;
-				
+
 				c = input();
 				unput(c);
 				if (c == ',' || c == '\n')
@@ -648,8 +650,8 @@ INHERIT_STR [fdinFSI-]+
 					acl_error(
 					    dgettext(TEXT_DOMAIN,
 					    "Invalid inheritance or"
-				    	    " access type '%s' specified.\n"),
-				    	    yylval.str);
+					    " access type '%s' specified.\n"),
+					    yylval.str);
 				} else {
 					acl_error(
 					    dgettext(TEXT_DOMAIN,
@@ -697,17 +699,17 @@ INHERIT_STR [fdinFSI-]+
 				yylval.val = EACL_ENTRY_ERROR;
 				return (ERROR);
 			}
-<US>.			{ 
+<US>.			{
 				if (grab_string(",\n") != 0) {
 					acl_error(dgettext(TEXT_DOMAIN,
 					    "Failed to retrieve"
-					    " error string.\n"));	
+					    " error string.\n"));
 					yylval.val = EACL_MEM_ERROR;
 					return (ERROR);
 				}
 				acl_error(
 				    dgettext(TEXT_DOMAIN,
-				    "Invalid data ':%s' specified"	
+				    "Invalid data ':%s' specified"
 				    " on end of ACL.\n"), yylval.str);
 				free(yylval.str);
 				yylval.val = EACL_ENTRY_ERROR;
@@ -730,14 +732,14 @@ INHERIT_STR [fdinFSI-]+
 					acl_error(
 					    dgettext(TEXT_DOMAIN,
 					    "Failed to retrieve error"
-				    	    " string.\n"));
+					    " string.\n"));
 					yylval.val = EACL_MEM_ERROR;
 					return (ERROR);
 				}
 				acl_error(
 				    dgettext(TEXT_DOMAIN,
 				    "Unrecognized data '%s' found"
-			    	    " in ACL specification.\n"), yylval.str);
+				    " in ACL specification.\n"), yylval.str);
 				free(yylval.str);
 				yylval.val = EACL_UNKNOWN_DATA;
 				return (ERROR);
@@ -766,7 +768,7 @@ grab_string(char *terminators)
 		int alloced;
 		int error = 0;
 		char *ptr;
-			
+
 		cnt = strlen(yytext);
 		yylval.str = calloc(cnt + 1, sizeof (char));
 		if (yylval.str == NULL) {
@@ -777,7 +779,7 @@ grab_string(char *terminators)
 
 		do {
 			c = input();
-			if (c == EOF) 
+			if (c == EOF)
 				break;
 
 			for (ptr = terminators; *ptr; ptr++) {
@@ -786,10 +788,10 @@ grab_string(char *terminators)
 					break;
 				}
 			}
-			
+
 			if (done)
 				break;
-				
+
 			if (cnt + 1 >= alloced) {
 				yylval.str = realloc(yylval.str,
 				    alloced + 80);
@@ -817,7 +819,7 @@ input(void)
 		return (EOF);
 	}
 
-	return (c);	
+	return (c);
 }
 
 static void
@@ -832,6 +834,8 @@ unput(int c)
 	}
 }
 
+static int sid_isuser = 0;
+
 /*
  * return ACE entry type
  */
@@ -840,6 +844,12 @@ ace_entry_type(int type)
 {
 	int ret = -1;
 	switch (type) {
+		case BARE_SID_TOK:
+			if (sid_isuser == 0)
+				ret = ACE_IDENTIFIER_GROUP;
+			else
+				ret = 0;
+			break;
 		case USER_TOK:
 		case USER_SID_TOK:
 			ret = 0;
@@ -942,7 +952,7 @@ get_id(int entry_type, char *name, uid_t *id)
 		if (pw) {
 			*id = pw->pw_uid;
 			error = 0;
-		} 
+		}
 		break;
 
 	case GROUP_TOK:
@@ -953,7 +963,7 @@ get_id(int entry_type, char *name, uid_t *id)
 		if (gr) {
 			*id = gr->gr_gid;
 			error = 0;
-		} 
+		}
 		break;
 	case USER_SID_TOK:
 		if (sid_to_id(name, B_TRUE, id))
@@ -962,6 +972,11 @@ get_id(int entry_type, char *name, uid_t *id)
 
 	case GROUP_SID_TOK:
 		if (sid_to_id(name, B_FALSE, id))
+			error = EACL_INVALID_USER_GROUP;
+		break;
+
+	case BARE_SID_TOK:
+		if (sid_to_xid(name, &sid_isuser, id))
 			error = EACL_INVALID_USER_GROUP;
 		break;
 	}

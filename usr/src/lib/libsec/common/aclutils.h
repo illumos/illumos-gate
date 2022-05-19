@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef _ACLUTILS_H
@@ -141,6 +143,7 @@ extern void yyreset(void);
 extern void yycleanup(void);
 extern acl_t *acl_to_aclp(enum acl_type, void *, int);
 extern int sid_to_id(char *, boolean_t, uid_t *);
+extern int sid_to_xid(char *, int *, uid_t *);
 
 #ifdef	__cplusplus
 }
