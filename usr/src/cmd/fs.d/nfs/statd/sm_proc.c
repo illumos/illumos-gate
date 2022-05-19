@@ -1353,6 +1353,9 @@ merge_ips(void)
 			break;
 		}
 
+		case AF_LINK:
+			continue;
+
 		default:
 			syslog(LOG_WARNING, "Unknown address family %d for "
 			    "interface %s", sa->sa_family, cifap->ifa_name);
