@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2022 Sebastian Wiedenroth
  */
 
 #include <netdb.h>
@@ -29,13 +30,33 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <sys/sockio.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <net/if.h>
+#include <door.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/dld_ioc.h>
+#include <sys/dld.h>
+#include <sys/dls_mgmt.h>
+#include <sys/mac.h>
+#include <sys/dlpi.h>
+#include <net/if_types.h>
 #include <ifaddrs.h>
 #include <libsocket_priv.h>
+
+/*
+ * <ifaddrs.h> directs folks towards our internal symbol, __getifaddrs. This
+ * means we cannot name the original symbol 'getifaddrs' here or it will be
+ * renamed. Instead, we use another redefine_extname to take care of this. Note,
+ * the extern declaration is required as gcc and others will only apply this for
+ * things they see an extern declaration for.
+ */
+#pragma redefine_extname getifaddrs_old getifaddrs
+extern int getifaddrs_old(struct ifaddrs **);
 
 /*
  * Create a linked list of `struct ifaddrs' structures, one for each
@@ -46,7 +67,7 @@
  * only be properly freed by passing it to `freeifaddrs'.
  */
 int
-getifaddrs(struct ifaddrs **ifap)
+_getifaddrs(struct ifaddrs **ifap, boolean_t can_handle_links)
 {
 	int		err;
 	char		*cp;
@@ -57,14 +78,57 @@ getifaddrs(struct ifaddrs **ifap)
 		return (-1);
 	}
 	*ifap = NULL;
-	err = getallifaddrs(AF_UNSPEC, ifap, LIFC_ENABLED);
-	if (err == 0) {
-		for (curr = *ifap; curr != NULL; curr = curr->ifa_next) {
-			if ((cp = strchr(curr->ifa_name, ':')) != NULL)
-				*cp = '\0';
+
+	if (can_handle_links) {
+		err = getallifaddrs(AF_UNSPEC, ifap, LIFC_ENABLED);
+	} else {
+		err = getallifaddrs(AF_INET, ifap, LIFC_ENABLED);
+		if (err != 0)
+			return (err);
+
+		/* Find end of the list to append to */
+		curr = *ifap;
+		while (curr && curr->ifa_next) {
+			curr = curr->ifa_next;
 		}
+
+		err = getallifaddrs(AF_INET6, curr ? &curr->ifa_next : ifap,
+		    LIFC_ENABLED);
 	}
-	return (err);
+
+	if (err != 0)
+		return (err);
+
+	for (curr = *ifap; curr != NULL; curr = curr->ifa_next) {
+		if ((cp = strchr(curr->ifa_name, ':')) != NULL)
+			*cp = '\0';
+	}
+
+	return (0);
+}
+
+/*
+ * Legacy symbol
+ * For a long time getifaddrs() only returned AF_INET and AF_INET6 entries.
+ * Some consumers came to expect that no other address family may be returned.
+ * To prevent existing binaries that can't handle AF_LINK entries from breaking
+ * this symbol is kept around. Consumers that want the fixed behaviour need to
+ * recompile and link to the fixed symbol.
+ */
+int
+getifaddrs_old(struct ifaddrs **ifap)
+{
+	return (_getifaddrs(ifap, B_FALSE));
+}
+
+/*
+ * Current symbol
+ * May return AF_INET, AF_INET6 and AF_LINK entries
+ */
+int
+__getifaddrs(struct ifaddrs **ifap)
+{
+	return (_getifaddrs(ifap, B_TRUE));
 }
 
 void
@@ -79,8 +143,138 @@ freeifaddrs(struct ifaddrs *ifa)
 		free(curr->ifa_addr);
 		free(curr->ifa_netmask);
 		free(curr->ifa_dstaddr);
+		free(curr->ifa_data);
 		free(curr);
 	}
+}
+
+static uint_t
+dlpi_iftype(uint_t dlpitype)
+{
+	switch (dlpitype) {
+	case DL_ETHER:
+		return (IFT_ETHER);
+
+	case DL_ATM:
+		return (IFT_ATM);
+
+	case DL_CSMACD:
+		return (IFT_ISO88023);
+
+	case DL_TPB:
+		return (IFT_ISO88024);
+
+	case DL_TPR:
+		return (IFT_ISO88025);
+
+	case DL_FDDI:
+		return (IFT_FDDI);
+
+	case DL_IB:
+		return (IFT_IB);
+
+	case DL_OTHER:
+		return (IFT_OTHER);
+	}
+
+	return (IFT_OTHER);
+}
+
+/*
+ * Make a door call to dlmgmtd.
+ * If successful the result is stored in rbuf and 0 returned.
+ * On errors, return -1 and set `errno'.
+ */
+static int
+dl_door_call(int door_fd, void *arg, size_t asize, void *rbuf, size_t *rsizep)
+{
+	int err;
+	door_arg_t	darg;
+	darg.data_ptr	= arg;
+	darg.data_size	= asize;
+	darg.desc_ptr	= NULL;
+	darg.desc_num	= 0;
+	darg.rbuf	= rbuf;
+	darg.rsize	= *rsizep;
+
+	if (door_call(door_fd, &darg) == -1) {
+		return (-1);
+	}
+
+	if (darg.rbuf != rbuf) {
+		/*
+		 * The size of the input rbuf was not big enough so that
+		 * the door allocated the rbuf itself. In this case, return
+		 * the required size to the caller.
+		 */
+		err = errno;
+		(void) munmap(darg.rbuf, darg.rsize);
+		*rsizep = darg.rsize;
+		errno = err;
+		return (-1);
+	} else if (darg.rsize != *rsizep) {
+		return (-1);
+	}
+	return (0);
+}
+
+
+/*
+ * Get the name from dlmgmtd by linkid.
+ * If successful the result is stored in name_retval and 0 returned.
+ * On errors, return -1 and set `errno'.
+ */
+static int
+dl_get_name(int door_fd, datalink_id_t linkid,
+    dlmgmt_getname_retval_t *name_retval)
+{
+	size_t name_sz = sizeof (*name_retval);
+	dlmgmt_door_getname_t getname;
+	bzero(&getname, sizeof (dlmgmt_door_getname_t));
+	getname.ld_cmd = DLMGMT_CMD_GETNAME;
+	getname.ld_linkid = linkid;
+
+	if (dl_door_call(door_fd, &getname, sizeof (getname), name_retval,
+	    &name_sz) < 0) {
+		return (-1);
+	}
+	if (name_retval->lr_err != 0) {
+		errno = name_retval->lr_err;
+		return (-1);
+	}
+	return (0);
+}
+
+/*
+ * Get the next link from dlmgmtd.
+ * Start iterating by passing DATALINK_INVALID_LINKID as linkid.
+ * The end is marked by next_retval.lr_linkid set to DATALINK_INVALID_LINKID.
+ * If successful the result is stored in next_retval and 0 returned.
+ * On errors, return -1 and set `errno'.
+ */
+static int
+dl_get_next(int door_fd, datalink_id_t linkid, datalink_class_t class,
+    datalink_media_t dmedia, uint32_t flags,
+    dlmgmt_getnext_retval_t *next_retval)
+{
+	size_t next_sz = sizeof (*next_retval);
+	dlmgmt_door_getnext_t getnext;
+	bzero(&getnext, sizeof (dlmgmt_door_getnext_t));
+	getnext.ld_cmd = DLMGMT_CMD_GETNEXT;
+	getnext.ld_class = class;
+	getnext.ld_dmedia = dmedia;
+	getnext.ld_flags = flags;
+	getnext.ld_linkid = linkid;
+
+	if (dl_door_call(door_fd, &getnext, sizeof (getnext), next_retval,
+	    &next_sz) < 0) {
+		return (-1);
+	}
+	if (next_retval->lr_err != 0) {
+		errno = next_retval->lr_err;
+		return (-1);
+	}
+	return (0);
 }
 
 /*
@@ -98,9 +292,21 @@ getallifaddrs(sa_family_t af, struct ifaddrs **ifap, int64_t flags)
 	int ret;
 	int s, n, numifs;
 	struct ifaddrs *curr, *prev;
+	struct sockaddr_dl *ifa_addr = NULL;
+	if_data_t *ifa_data = NULL;
 	sa_family_t lifr_af;
-	int sock4;
-	int sock6;
+	datalink_id_t linkid;
+	dld_ioc_attr_t dia;
+	dld_macaddrinfo_t *dmip;
+	dld_ioc_macaddrget_t *iomp = NULL;
+	dlmgmt_getnext_retval_t next_retval;
+	dlmgmt_getname_retval_t	name_retval;
+	int bufsize;
+	int nmacaddr = 1024;
+	int sock4 = -1;
+	int sock6 = -1;
+	int door_fd = -1;
+	int dld_fd = -1;
 	int err;
 
 	/*
@@ -111,14 +317,16 @@ getallifaddrs(sa_family_t af, struct ifaddrs **ifap, int64_t flags)
 		return (EINVAL);
 	*ifap = NULL;
 
-	if ((sock4 = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-		return (-1);
-	if ((sock6 = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		err = errno;
-		close(sock4);
-		errno = err;
-		return (-1);
-	}
+	if ((sock4 = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ||
+	    (sock6 = socket(AF_INET6, SOCK_DGRAM, 0)) < 0 ||
+	    (door_fd = open(DLMGMT_DOOR, O_RDONLY)) < 0 ||
+	    (dld_fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		goto fail;
+
+	bufsize = sizeof (dld_ioc_macaddrget_t) + nmacaddr *
+	    sizeof (dld_macaddrinfo_t);
+	if ((iomp = calloc(1, bufsize)) == NULL)
+		goto fail;
 
 retry:
 	/* Get all interfaces from SIOCGLIFCONF */
@@ -205,19 +413,118 @@ retry:
 		}
 
 	}
+
+	/* add AF_LINK entries */
+	if (af == AF_UNSPEC || af == AF_LINK) {
+
+		linkid = DATALINK_INVALID_LINKID;
+		for (;;) {
+			if (dl_get_next(door_fd, linkid, DATALINK_CLASS_ALL,
+			    DATALINK_ANY_MEDIATYPE, DLMGMT_ACTIVE,
+			    &next_retval) != 0) {
+				break;
+			}
+
+			linkid = next_retval.lr_linkid;
+			if (linkid == DATALINK_INVALID_LINKID)
+				break;
+
+			/* get mac addr */
+			iomp->dig_size = nmacaddr * sizeof (dld_macaddrinfo_t);
+			iomp->dig_linkid = linkid;
+
+			if (ioctl(dld_fd, DLDIOC_MACADDRGET, iomp) < 0)
+				continue;
+
+			dmip = (dld_macaddrinfo_t *)(iomp + 1);
+
+			/* get name */
+			if (dl_get_name(door_fd, linkid, &name_retval) != 0)
+				continue;
+
+			/* get MTU */
+			dia.dia_linkid = linkid;
+			if (ioctl(dld_fd, DLDIOC_ATTR, &dia) < 0)
+				continue;
+
+			curr = calloc(1, sizeof (struct ifaddrs));
+			if (curr == NULL)
+				goto fail;
+
+			if (prev != NULL) {
+				prev->ifa_next = curr;
+			} else {
+				/* First node in the linked list */
+				*ifap = curr;
+			}
+			prev = curr;
+
+			if ((curr->ifa_name = strdup(name_retval.lr_link)) ==
+			    NULL)
+				goto fail;
+
+			curr->ifa_addr =
+			    calloc(1, sizeof (struct sockaddr_storage));
+			if (curr->ifa_addr == NULL)
+				goto fail;
+
+			curr->ifa_data = calloc(1, sizeof (if_data_t));
+			if (curr->ifa_data == NULL)
+				goto fail;
+
+			curr->ifa_addr->sa_family = AF_LINK;
+			ifa_addr = (struct sockaddr_dl *)curr->ifa_addr;
+			ifa_data = curr->ifa_data;
+
+			(void) memcpy(ifa_addr->sdl_data, dmip->dmi_addr,
+			    dmip->dmi_addrlen);
+			ifa_addr->sdl_alen = dmip->dmi_addrlen;
+
+			ifa_data->ifi_mtu = dia.dia_max_sdu;
+			ifa_data->ifi_type = dlpi_iftype(next_retval.lr_media);
+
+			/*
+			 * get interface index
+			 * This is only possible if the link has been plumbed.
+			 */
+			if (strlcpy(lifrl.lifr_name, name_retval.lr_link,
+			    sizeof (lifrl.lifr_name)) >=
+			    sizeof (lifrl.lifr_name))
+				continue;
+
+			if (ioctl(sock4, SIOCGLIFINDEX, (caddr_t)&lifrl) >= 0) {
+				ifa_addr->sdl_index = lifrl.lifr_index;
+			} else if (ioctl(sock6, SIOCGLIFINDEX,
+			    (caddr_t)&lifrl) >= 0) {
+				/* retry for IPv6 */
+				ifa_addr->sdl_index = lifrl.lifr_index;
+			}
+		}
+	}
 	free(buf);
-	close(sock4);
-	close(sock6);
+	free(iomp);
+	(void) close(sock4);
+	(void) close(sock6);
+	(void) close(door_fd);
+	(void) close(dld_fd);
 	return (0);
 fail:
 	err = errno;
 	free(buf);
+	free(iomp);
 	freeifaddrs(*ifap);
 	*ifap = NULL;
 	if (err == ENXIO)
 		goto retry;
-	close(sock4);
-	close(sock6);
+
+	if (sock4 != -1)
+		(void) close(sock4);
+	if (sock6 != -1)
+		(void) close(sock6);
+	if (door_fd != -1)
+		(void) close(door_fd);
+	if (dld_fd != -1)
+		(void) close(dld_fd);
 	errno = err;
 	return (-1);
 }

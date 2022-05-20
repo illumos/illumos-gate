@@ -12,11 +12,10 @@
 .\"
 .\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\"
-.TH GETIFADDRS 3SOCKET "Apr 18, 2013"
+.TH GETIFADDRS 3SOCKET "Feb 1, 2022"
 .SH NAME
 getifaddrs, freeifaddrs \- get interface addresses
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR \fB-lnsl\fR \
 [ \fIlibrary\fR ... ]
@@ -36,7 +35,6 @@ getifaddrs, freeifaddrs \- get interface addresses
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBgetifaddrs\fR() function is used to obtain the list of network
 interfaces on the local machine.  A reference to a linked list of \fBifaddrs\fR
 structures, as defined in \fB<ifaddrs.h>\fR, is stored in the memory referenced
@@ -97,7 +95,9 @@ for more information.
 
 .sp
 .LP
-The \fIifa_data\fR member is presently unused.
+The \fIifa_data\fR member is specific to the address family. It is currently
+only available for AF_LINK entries where it contains a pointer to the
+\fBstruct if_data\fR (as defined in \fBif.h\fR(3HEAD)).
 
 .sp
 .LP
@@ -105,12 +105,10 @@ The memory used by \fBgetifaddrs\fR() to back the list is dynamically allocated.
 It should be freed using \fBfreeifaddrs\fR().
 
 .SH RETURN VALUES
-.LP
 If successful, \fBgetifaddrs\fR() returns the value \fB0\fR; otherwise it
 returns \fB\(mi1\fR and sets \fIerrno\fR to indicate the error.
 
 .SH ERRORS
-.LP
 The \fBgetifaddrs\fR() function may fail and set \fIerrno\fR for any of the
 errors specified for the library routines \fBioctl\fR(2),
 \fBsocket\fR(3SOCKET), and \fBmalloc\fR(3C).
@@ -128,7 +126,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR ioctl (2),
 .BR malloc (3C),
 .BR socket.h (3HEAD),
@@ -140,12 +137,8 @@ MT-Level	MT-Safe
 .BR ipadm (8)
 
 .SH NOTES
-.LP
-On an illumos system, this function lists only interfaces with the \fBIFF_UP\fR
-flag set; see \fBif_tcp\fR(4P) and \fBifconfig\fR(8) for more information.
-
-.SH BUGS
-.LP
-At present, this function only lists addresses from the \fBAF_INET\fR and
-\fBAF_INET6\fR families.  Other families, such as \fBAF_LINK\fR, are not
-included.
+This function lists interfaces of type AF_INET, AF_INET6, and AF_LINK.
+For AF_INET and AF_INET6 only interfaces with the \fBIFF_UP\fR
+flag set are listed; see \fBif_tcp\fR(7P) and \fBifconfig\fR(1M) for more
+information. For AF_LINK entries the interface index is only available when the
+link is plumbed.
