@@ -23,6 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  * Copyright 2021, Tintri by DDN. All rights reserved.
+ * Copyright 2022, Oxide Computer Company.
  */
 
 /*
@@ -401,6 +402,9 @@ ipmgmt_aobjop_handler(void *argp)
 		    sizeof (node.am_ifname));
 		node.am_family = af;
 		node.am_atype = atype;
+		if (atype == IPADM_ADDR_IPV6_ADDRCONF) {
+			node.ipmgmt_am_linklocal = B_TRUE;
+		}
 		/* no logical number is associated with this addrobj yet */
 		node.am_lnum = -1;
 		/* The address object is not persisted yet. */
