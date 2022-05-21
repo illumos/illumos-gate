@@ -128,8 +128,6 @@ dir  path=usr/lib/sysevent/modules
 file path=usr/lib/sysevent/modules/zfs_mod.so group=sys
 dir  path=usr/lib/zfs
 file path=usr/lib/zfs/availdevs mode=0555
-file path=usr/lib/zfs/pyzfs.py mode=0555
-file path=usr/lib/zfs/pyzfs.pyc mode=0555
 dir  path=usr/sbin
 $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir  path=usr/sbin/$(ARCH64)
