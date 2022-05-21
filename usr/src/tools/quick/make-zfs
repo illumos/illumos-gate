@@ -201,8 +201,7 @@ for cmd in \
   zinject \
   zpool \
   ztest \
-  zstreamdump \
-  pyzfs
+  zstreamdump
 do
   (cd $SRC/cmd/$cmd && $make $1)
 done
@@ -336,8 +335,6 @@ sbin/zfs
 sbin/zpool
 usr/lib/sysevent/modules/zfs_mod.so
 usr/lib/zfs/availdevs
-usr/lib/zfs/pyzfs.py
-usr/lib/zfs/pyzfs.pyc
 usr/sbin/$arch32/zdb
 usr/sbin/$arch64/zdb
 usr/sbin/$arch32/zhack

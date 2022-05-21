@@ -10,13 +10,13 @@
 # or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
-#    
+#
 # When distributing Covered Code, include this CDDL HEADER in each
 # file and include the License file at usr/src/OPENSOLARIS.LICENSE.
 # If applicable, add the following below this CDDL HEADER, with the
 # fields enclosed by brackets "[]" replaced with your own identifying
 # information: Portions Copyright [yyyy] [name of copyright owner]
-#    
+#
 # CDDL HEADER END
 #
 #
@@ -44,7 +44,7 @@ elif [ "$arch" = "sparc" ]; then
 	ARCH32=
         ARCH64=sparcv9
 else
-        echo "Unsupported architecture: $arch" 
+        echo "Unsupported architecture: $arch"
         exit 2
 fi
 
@@ -80,17 +80,6 @@ replace_with_native() {
 	[ ! -f $1 ] && printf "$w_missing" "$1"
 	if [ ! -h $path_dname -a -d $path_dname ]; then
 		safe_replace $ZONEROOT/$1 $BRANDDIR/s10_isaexec_wrapper $2 $3 \
-		    remove
-	fi
-}
-
-replace_with_native_py() {
-	path_dname=$ZONEROOT/`dirname $1`
-
-	[ ! -f $1 ] && printf "$w_missing" "$1"
-
-	if [ ! -h $path_dname -a -d $path_dname ]; then
-		safe_replace $ZONEROOT/$1 $BRANDDIR/s10_python_wrapper $2 $3 \
 		    remove
 	fi
 }
@@ -241,7 +230,7 @@ if [ ! -h $ZONEROOT/usr/lib/inet -a -d $ZONEROOT/usr/lib/inet ]; then
 	    /lib/inet/in.mpathd 0555 root:bin remove
 fi
 
-# 
+#
 # Create wrapper at /lib/inet/in.mpathd as well because native ifconfig
 # looks up in.mpathd under /lib/inet.
 #
@@ -293,7 +282,6 @@ replace_with_native /usr/lib/fs/zfs/fstyp 0555 root:bin
 replace_with_native /usr/lib/zfs/availdevs 0555 root:bin
 replace_with_native /usr/sbin/df 0555 root:bin
 replace_with_native /usr/sbin/zstreamdump 0555 root:bin
-replace_with_native_py /usr/lib/zfs/pyzfs.py 0555 root:bin
 
 #
 # Replace automount and automountd with native wrappers.
