@@ -5,12 +5,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH OPEN 9E "March 7, 2019"
+.TH OPEN 9E "May 21, 2022"
 .SH NAME
 open \- gain access to a device
 .SH SYNOPSIS
 .SS "Block and Character"
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/file.h>
@@ -27,7 +26,6 @@ open \- gain access to a device
 .fi
 
 .SS "STREAMS"
-.LP
 .nf
 #include <sys/file.h>
 #include <sys/stream.h>
@@ -41,9 +39,8 @@ open \- gain access to a device
 .fi
 
 .SH INTERFACE LEVEL
-.LP
 Architecture independent level 1 (DDI/DKI). This entry point is required, but
-it can be \fBnulldev\fR(9F)
+it can be \fBnulldev\fR(9F).
 .SH PARAMETERS
 .SS "Block and Character"
 .ne 2
@@ -98,8 +95,8 @@ allow both read and write access.
 \fB\fBFWRITE\fR\fR
 .ad
 .RS 11n
-Open a device with write-only permission. If ORed with \fBFREAD\fR, allow both
-read and write access.
+Open a device with write-only permission. If \fBOR\fRed with \fBFREAD\fR,
+allow both read and write access.
 .RE
 
 .RE
@@ -116,7 +113,7 @@ function can be called many times, but the \fBclose\fR(9E) function is called
 only when the last reference to a device is removed. If the device is accessed
 through file descriptors, it is done by a call to \fBclose\fR(2) or
 \fBexit\fR(2). If the device is accessed through memory mapping, it is done by
-a call to  \fBmunmap\fR(2) or \fBexit\fR(2). For \fBOTYP_LYR\fR, there is
+a call to \fBmunmap\fR(2) or \fBexit\fR(2). For \fBOTYP_LYR\fR, there is
 exactly one \fBclose\fR(9E) for each \fBopen()\fR operation that is called.
 This permits software drivers to exist above hardware drivers and removes any
 ambiguity from the hardware driver regarding how a device is used.
@@ -188,7 +185,7 @@ stream.
 .ad
 .RS 10n
 Valid \fIoflag\fR values are \fBFEXCL\fR, \fBFNDELAY\fR, \fBFREAD\fR, and
-\fBFWRITEL\fR \(em the same as those listed above for \fIflag.\fR. For
+\fBFWRITEL\fR \(em the same as those listed above for \fIflag\fR. For
 \fBSTREAMS\fR modules, \fIoflag\fR is always set to \fB0\fR.
 .RE
 
@@ -242,8 +239,7 @@ Pointer to the user credential structure.
 .RE
 
 .SH DESCRIPTION
-.LP
-The driver's  \fBopen()\fR function is called by the kernel during an
+The driver's \fBopen()\fR function is called by the kernel during an
 \fBopen\fR(2) or a \fBmount\fR(2) on the special file for the device. A device
 can be opened simultaneously by multiple processes and the \fBopen()\fR driver
 operation is called for each open. Note that a device is referenced once its
@@ -300,11 +296,9 @@ occurs.
 .in -2
 
 .SH RETURN VALUES
-.LP
 The \fBopen()\fR function should return \fB0\fR for success, or the appropriate
 error number.
 .SH SEE ALSO
-.LP
 .BR close (2),
 .BR exit (2),
 .BR mmap (2),
@@ -327,7 +321,6 @@ error number.
 .LP
 \fISTREAMS Programming Guide\fR
 .SH WARNINGS
-.LP
 Do not attempt to change the major number.
 .sp
 .LP

@@ -4,18 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SASL_APPNAME.CONF 5 "Oct 14, 2003"
+.TH SASL_APPNAME.CONF 5 "May 21, 2022"
 .SH NAME
 sasl_appname.conf \- SASL options and configuration file
 .SH SYNOPSIS
-.LP
 .nf
 /etc/sasl/\fIappname\fR\fB\&.conf\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fB/etc/sasl/\fIappname\fR.conf\fR file is a user-supplied configuration
 file that supports user set options for server applications.
 .sp
@@ -73,8 +70,8 @@ default, SASL will use or query all available auxiliary property plug-ins.
 .ad
 .RS 25n
 The name of the canonical user plug-in to use. By default, the value of
-\fBcanon_user_plugin\fR is \fBINTERNAL\fR, to indicated the use of built-in
-plug-ins..
+\fBcanon_user_plugin\fR is \fBINTERNAL\fR, to indicate the use of built-in
+plug-ins.
 .RE
 
 .sp
@@ -149,8 +146,6 @@ the GSS client security context. The default value of \fBuser_authid\fR is
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -165,6 +160,4 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR attributes (7)

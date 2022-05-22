@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MSGFMT 1 "Sep 17, 2001"
+.TH MSGFMT 1 "May 21, 2022"
 .SH NAME
 msgfmt \- create a message object from a message file
 .SH SYNOPSIS
-.LP
 .nf
 \fBmsgfmt\fR [\fB-D\fR \fIdir\fR | \fB-\(midirectory\fR=\fIdir\fR]
      [\fB-f\fR | \fB-\(miuse-fuzzy\fR] [\fB-g\fR]
@@ -16,7 +15,6 @@ msgfmt \- create a message object from a message file
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBmsgfmt\fR utility creates message object files from portable object
 files (\fIfilename\fR\fB\&.po\fR), without changing the portable object files.
 .sp
@@ -34,7 +32,6 @@ script or programs.
 the \fBLC_CTYPE\fR locale category or according to the codeset specified in the
 \fB\&.po\fR file.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -133,7 +130,6 @@ check is performed.
 .RE
 
 .SH USAGE
-.LP
 The format of portable object files (\fB\&.po\fR files) is defined as follows.
 Each \fB\&.po\fR file contains one or more lines, with each line containing
 either a comment or a statement. Comments start the line with a pound sign
@@ -258,8 +254,8 @@ Solaris message files):
 .nf
 # \fItranslator-comments\fR
 #. \fIautomatic-comments\fR
-#: \fIreference\fR..
-#, \fIflag\fR
+#: \fIreference\fR...
+#, \fIflag\fR...
 .fi
 .in -2
 .sp
@@ -350,7 +346,6 @@ codeset is determined by the current locale's codeset (the return value of
 \fBnl_langinfo(CODESET\fR)) by default, and can be changed by the call of
 \fBbind_textdomain_codeset()\fR.
 .SS "Message catalog file format"
-.LP
 The \fBmsgfmt\fR utility can generate the message object both in Solaris
 message catalog file format and in GNU-compatible message catalog file format.
 If the \fB-s\fR option is specified and the input file is a Solaris \fB\&.po\fR
@@ -383,7 +378,6 @@ that are specific to the GNU-compatible message catalog file format, such as
 \fBmsgid_plural\fR and \fBmsgstr\fR[\fIn\fR], the \fBmsgfmt\fR utility handles
 those directives as invalid specifications.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreating message objects from message files
 .sp
 .LP
@@ -463,12 +457,10 @@ example% \fBmsgfmt -o hello.mo module1.po module2.po\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.LP
 See \fBenviron\fR(7) for descriptions of the following environmental variables
 that affect the execution of \fBmsgfmt\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
 and \fBNLSPATH\fR.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -483,13 +475,11 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-.LP
 .BR xgettext (1),
 .BR gettext (3C),
 .BR setlocale (3C),
 .BR attributes (7),
 .BR environ (7)
 .SH NOTES
-.LP
 Installing message catalogs under the C locale is pointless, since they are
 ignored for the sake of efficiency.

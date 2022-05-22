@@ -3,21 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BFE 4D "Jun 23, 2009"
+.TH BFE 4D "May 21, 2022"
 .SH NAME
 bfe \- Device driver for Broadcom BCM4401 100Base-T NIC
 .SH DESCRIPTION
-.sp
-.LP
 The \fBbfe\fR Fast Ethernet driver is GLD-based and supports the Broadcom
-BCM4401 100Base-T NIC adapters :\fBpci14e4,170c Broadcom BCM4401 100Base-T.\fR.
+BCM4401 100Base-T NIC adapters :\fBpci14e4,170c Broadcom BCM4401 100Base-T\fR.
 .sp
 .LP
 The \fBbfe\fR driver supports IEEE 802.3 auto-negotiation, flow control and
 VLAN tagging.
 .SS "Configuration"
-.sp
-.LP
 The default configuration is auto-negotiation with bidirectional flow control.
 The advertised capabilities for auto-negotiation are based on the capabilities
 of the \fBPHY\fR.
@@ -29,7 +25,6 @@ with en (enabled) in the parameters listed by the command \fBdladm\fR(8). Each
 of these boolean parameters determines if the device advertises that mode of
 operation when the hardware supports it.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/bfe\fR\fR
@@ -57,8 +52,6 @@ Special character device
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
@@ -73,8 +66,6 @@ Architecture	SPARC, x86
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR streamio (4I),
 .BR dlpi (4P),
 .BR driver.conf (5),

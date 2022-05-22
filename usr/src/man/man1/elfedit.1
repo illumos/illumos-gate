@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ELFEDIT 1 "May 17, 2020"
+.TH ELFEDIT 1 "May 21, 2022"
 .SH NAME
 elfedit \- examine or edit ELF files
 .SH SYNOPSIS
@@ -556,7 +556,7 @@ useful for performing simple operations from shell scripts and makefiles.
 .ad
 .RS 29n
 Sets default path for locating \fBelfedit\fR modules. Modules are described in
-\fBModule Search Path\fR section of this manual page..
+\fBModule Search Path\fR section of this manual page.
 .RE
 
 .sp
@@ -677,7 +677,7 @@ allow access to the command documentation available from the help
 .LP
 If one or more \fB-e\fR options are specified, the commands they supply are
 executed in the order given. \fBelfedit\fR adds implicit calls to write
-(\fBsys:write\fR) and quit (\fBsys:qui\fRt) immediately following the given
+(\fBsys:write\fR) and quit (\fBsys:quit\fR) immediately following the given
 commands, causing the output file to be written and the \fBelfedit\fR process
 to exit. This form of use is convenient in shell scripts and makefiles.
 .sp
