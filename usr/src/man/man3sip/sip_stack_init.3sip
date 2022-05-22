@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SIP_STACK_INIT 3SIP "Jan 23, 2007"
+.TH SIP_STACK_INIT 3SIP "May 19, 2022"
 .SH NAME
 sip_stack_init \- initializes SIP stack
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... -lsip [ \fIlibrary\fR ... ]
 #include <sip.h>
@@ -16,7 +15,6 @@ sip_stack_init \- initializes SIP stack
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBsip_stack_init()\fR function is used to initialize the \fBSIP\fR stack.
 The stack can be initialized by a process only once. Any shared library that is
 linked with a main program or another library that has already initialized the
@@ -59,7 +57,6 @@ all.
 .RE
 
 .SS "Upper Layer Registrations"
-.LP
 These include callbacks that are invoked to deliver incoming messages or error
 notification.
 .sp
@@ -175,7 +172,6 @@ If these callback routines are registered, the stack invokes
 .RE
 
 .SS "Connection Manager Interface"
-.LP
 The connection manager interfaces must be registered by the application to
 provide I/O related functionality to the stack. These interfaces act on a
 connection object that is defined by the application. The application registers
@@ -321,7 +317,6 @@ retransmit interval - default \fB32\fR \fBsecs\fR).
 .RE
 
 .SS "Custom \fBSIP\fR headers"
-.LP
 In addition to the \fBSIP\fR headers supported by the stack, an application can
 optionally provide a table of custom headers and associated parsing functions.
 The table is an array with an entry for each header. If the table includes
@@ -354,7 +349,7 @@ typedef struct header_function_table {
 \fBheader_name\fR
 .ad
 .RS 27n
-The full name of the header. The application must ensure that he name does not
+The full name of the header. The application must ensure that the name does not
 conflict with existing headers. If it does, the one registered by the
 application takes precedence.
 .RE
@@ -410,7 +405,6 @@ application.
 .RE
 
 .SH RETURN VALUES
-.LP
 On success \fBsip_stack_init()\fR returns \fB0\fR. Otherwise, the function
 returns the error value.
 .sp
@@ -418,7 +412,6 @@ returns the error value.
 The value of \fBerrno\fR is not changed by these calls in the event of an
 error.
 .SH ERRORS
-.LP
 On failure, the \fBsip_stack_init()\fR function returns the following error
 value:
 .sp
@@ -432,7 +425,6 @@ missing.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -449,6 +441,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR libsip (3LIB),
 .BR sockaddr (3SOCKET)
