@@ -43,18 +43,15 @@
 .\" Copyright 1989 AT&T.
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH MATH.H 3HEAD "Aug 11, 2004"
+.TH MATH.H 3HEAD "May 19, 2022"
 .SH NAME
 math.h, math \- mathematical declarations
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <math.h>\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The <\fBmath.h\fR> header includes definitions for the following types:
 .sp
 .ne 2
@@ -373,7 +370,7 @@ the program. If a macro definition is suppressed or a program defines an
 identifier with the name \fBmath_errhandling\fR, the behavior is undefined.
 .sp
 .LP
-The <\fBmath.h\fR> header defines he following external variable:
+The <\fBmath.h\fR> header defines the following external variable:
 .sp
 .in +2
 .nf
@@ -386,8 +383,6 @@ extern int signgam;
 The <\fBmath.h\fR> header defines the structure and constants used by the
 \fBmatherr\fR(3M) error-handling mechanisms.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -402,8 +397,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR Intro (3),
 .BR fenv.h (3HEAD),
 .BR limits.h (3HEAD),

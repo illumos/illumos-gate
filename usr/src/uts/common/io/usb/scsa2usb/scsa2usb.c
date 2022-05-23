@@ -25,6 +25,7 @@
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 
@@ -92,7 +93,6 @@ static void	scsa2usb_override(scsa2usb_state_t *);
 static int	scsa2usb_parse_input_str(char *, scsa2usb_ov_t *,
 		    scsa2usb_state_t *);
 static void	scsa2usb_override_error(char *, scsa2usb_state_t *);
-static char	*scsa2usb_strtok_r(char *, char *, char **);
 
 
 /* PANIC callback handling */
@@ -1576,11 +1576,11 @@ scsa2usb_parse_input_str(char *str, scsa2usb_ov_t *ovp,
 	u_longlong_t	value;
 
 	/* parse all the input pairs in the string */
-	for (input_field = scsa2usb_strtok_r(str, "=", &lasts);
+	for (input_field = strtok_r(str, "=", &lasts);
 	    input_field != NULL;
-	    input_field = scsa2usb_strtok_r(lasts, "=", &lasts)) {
+	    input_field = strtok_r(lasts, "=", &lasts)) {
 
-		if ((input_value = scsa2usb_strtok_r(lasts, " ", &lasts)) ==
+		if ((input_value = strtok_r(lasts, " ", &lasts)) ==
 		    NULL) {
 			scsa2usb_override_error("format", scsa2usbp);
 
@@ -1700,41 +1700,6 @@ scsa2usb_override_error(char *input_field, scsa2usb_state_t *scsa2usbp)
 {
 	USB_DPRINTF_L1(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "invalid %s in scsa2usb.conf file entry", input_field);
-}
-
-/*
- * scsa2usb_strtok_r:
- *	parse a list of tokens
- */
-static char *
-scsa2usb_strtok_r(char *p, char *sep, char **lasts)
-{
-	char	*e;
-	char	*tok = NULL;
-
-	if (p == 0 || *p == 0) {
-
-		return (NULL);
-	}
-
-	e = p+strlen(p);
-
-	do {
-		if (strchr(sep, *p) != NULL) {
-			if (tok != NULL) {
-				*p = 0;
-				*lasts = p+1;
-
-				return (tok);
-			}
-		} else if (tok == NULL) {
-			tok = p;
-		}
-	} while (++p < e);
-
-	*lasts = NULL;
-
-	return (tok);
 }
 
 

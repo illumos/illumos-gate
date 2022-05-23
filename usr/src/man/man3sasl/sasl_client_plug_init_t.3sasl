@@ -5,11 +5,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SASL_CLIENT_PLUG_INIT_T 3SASL "Oct 27, 2003"
+.TH SASL_CLIENT_PLUG_INIT_T 3SASL "May 21, 2022"
 .SH NAME
 sasl_client_plug_init_t \- client plug-in entry point
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsasl\fR   [ \fIlibrary\fR ... ]
 #include <sasl/saslplug.h>
@@ -19,12 +18,9 @@ sasl_client_plug_init_t \- client plug-in entry point
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsasl_client_plug_init_t()\fR callback function is the client plug-in
 entry point.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIutils\fR\fR
@@ -48,7 +44,7 @@ The highest client plug-in version supported.
 \fB\fIout_version\fR\fR
 .ad
 .RS 15n
-The client plug-in version of the result..
+The client plug-in version of the result.
 .RE
 
 .sp
@@ -70,13 +66,10 @@ The number of client mechanism plug-ins.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 Like other SASL callback functions, \fBsasl_client_plug_init_t()\fR returns an
 integer that corresponds to a SASL error code. See <\fBsasl.h\fR> for a
 complete list of SASL error codes.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBSASL_OK\fR\fR
@@ -89,8 +82,6 @@ The call to \fBsasl_client_plug_init_t()\fR was successful.
 .LP
 See \fBsasl_errors\fR(3SASL) for information on SASL error codes.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -107,7 +98,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR sasl_errors (3SASL),
 .BR attributes (7)

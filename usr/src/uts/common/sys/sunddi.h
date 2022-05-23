@@ -23,8 +23,8 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_SUNDDI_H
@@ -479,6 +479,7 @@ extern size_t strlcpy(char *, const char *, size_t);
 extern size_t strspn(const char *, const char *);
 extern size_t strcspn(const char *, const char *);
 extern char *strsep(char **, const char *);
+extern char *strtok_r(char *, const char *, char **);
 extern int bcmp(const void *, const void *, size_t) __PURE;
 extern int stoi(char **);
 extern void numtos(ulong_t, char *);

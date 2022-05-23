@@ -43,11 +43,10 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH FREEADDRINFO 3XNET "Feb 25, 2017"
+.TH FREEADDRINFO 3XNET "May 19, 2022"
 .SH NAME
 freeaddrinfo, getaddrinfo \- get address information
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lxnet\fR [ \fIlibrary\fR ... ]
 #include <sys/socket.h>
@@ -64,7 +63,6 @@ freeaddrinfo, getaddrinfo \- get address information
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBfreeaddrinfo()\fR function frees one or more \fBaddrinfo\fR structures
 returned by \fBgetaddrinfo()\fR, along with any additional storage associated
 with those structures. If the \fBai_next\fR member of the structure is not
@@ -196,7 +194,6 @@ protocol; the value of \fBai_protocol\fR is interpreted as in a call to the
 \fBsocket()\fR function with the corresponding values of \fBai_family\fR and
 \fBai_protocol\fR.
 .SH RETURN VALUES
-.LP
 A 0 return value for \fBgetaddrinfo()\fR indicates successful completion; a
 non-zero return value indicates failure. The possible values for the failures
 are listed in the ERRORS section.
@@ -233,7 +230,6 @@ are not filled in through an explicit argument (for example,
 \fBsin6_flowinfo\fR) are set to 0, making it easier to compare socket address
 structures.
 .SH ERRORS
-.LP
 The \fBgetaddrinfo()\fR function will fail if:
 .sp
 .ne 2
@@ -287,7 +283,7 @@ return value.
 \fB\fBEAI_NONAME\fR\fR
 .ad
 .RS 16n
-he name does not resolve for the supplied parameters.  Neither \fInodename\fR
+The name does not resolve for the supplied parameters.  Neither \fInodename\fR
 nor \fIservname\fR were supplied. At least one of these must be supplied.
 .RE
 
@@ -328,7 +324,6 @@ An argument buffer overflowed.
 .RE
 
 .SH USAGE
-.LP
 If the caller handles only TCP and not UDP, for example, then the
 \fBai_protocol\fR member of the \fIhints\fR structure should be set to
 \fBIPPROTO_TCP\fR when \fBgetaddrinfo()\fR is called.
@@ -338,7 +333,6 @@ If the caller handles only IPv4 and not IPv6, then the \fBai_family\fR member
 of the \fIhints\fR structure should be set to \fBAF_INET\fR when
 \fBgetaddrinfo()\fR is called.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -355,7 +349,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR connect (3XNET),
 .BR gai_strerror (3XNET),
 .BR gethostbyname (3XNET),
