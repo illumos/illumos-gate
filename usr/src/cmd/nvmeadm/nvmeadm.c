@@ -103,6 +103,7 @@ static int do_firmware_commit(int, const nvme_process_arg_t *);
 static int do_firmware_activate(int, const nvme_process_arg_t *);
 
 static void optparse_list(nvme_process_arg_t *);
+static void optparse_secure_erase(nvme_process_arg_t *);
 
 static void usage_list(const char *);
 static void usage_identify(const char *);
@@ -118,6 +119,9 @@ static void usage_firmware_activate(const char *);
 
 int verbose;
 int debug;
+
+#define	NVMEADM_O_SE_CRYPTO	0x00000004
+
 static int exitcode;
 
 static const nvmeadm_cmd_t nvmeadm_cmds[] = {
@@ -161,7 +165,7 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		"secure-erase",
 		"secure erase namespace(s) of a controller",
 		"  -c  Do a cryptographic erase.",
-		do_secure_erase, usage_secure_erase, NULL,
+		do_secure_erase, usage_secure_erase, optparse_secure_erase,
 		NVMEADM_C_EXCL
 	},
 	{
@@ -406,10 +410,12 @@ nvme_oferr(const char *fmt, ...)
 static void
 usage(const nvmeadm_cmd_t *cmd)
 {
+	const char *progname = getprogname();
+
 	(void) fprintf(stderr, "usage:\n");
-	(void) fprintf(stderr, "  %s -h %s\n", getprogname(),
+	(void) fprintf(stderr, "  %s -h %s\n", progname,
 	    cmd != NULL ? cmd->c_name : "[<command>]");
-	(void) fprintf(stderr, "  %s [-dv] ", getprogname());
+	(void) fprintf(stderr, "  %s [-dv] ", progname);
 
 	if (cmd != NULL) {
 		cmd->c_usage(cmd->c_name);
@@ -424,12 +430,17 @@ usage(const nvmeadm_cmd_t *cmd)
 			(void) fprintf(stderr, "  %-18s - %s\n",
 			    cmd->c_name, cmd->c_desc);
 	}
-	(void) fprintf(stderr, "\nflags:\n"
+	(void) fprintf(stderr, "\n%s flags:\n"
 	    "  -h\t\tprint usage information\n"
 	    "  -d\t\tprint information useful for debugging %s\n"
-	    "  -v\t\tprint verbose information\n", getprogname());
-	if (cmd != NULL && cmd->c_flagdesc != NULL)
+	    "  -v\t\tprint verbose information\n",
+	    progname, progname);
+
+	if (cmd != NULL && cmd->c_flagdesc != NULL) {
+		(void) fprintf(stderr, "\n%s %s flags:\n",
+		    progname, cmd->c_name);
 		(void) fprintf(stderr, "%s\n", cmd->c_flagdesc);
+	}
 }
 
 static boolean_t
@@ -1216,9 +1227,30 @@ do_format(int fd, const nvme_process_arg_t *npa)
 static void
 usage_secure_erase(const char *c_name)
 {
-	(void) fprintf(stderr, "%s <ctl>[/<ns>] [-c]\n\n"
+	(void) fprintf(stderr, "%s [-c] <ctl>[/<ns>]\n\n"
 	    "  Secure-Erase one or all namespaces of the specified "
 	    "NVMe controller.\n", c_name);
+}
+
+static void
+optparse_secure_erase(nvme_process_arg_t *npa)
+{
+	int c;
+
+	optind = 0;
+	while ((c = getopt(npa->npa_argc, npa->npa_argv, ":c")) != -1) {
+		switch (c) {
+		case 'c':
+			npa->npa_cmdflags |= NVMEADM_O_SE_CRYPTO;
+			break;
+		case '?':
+			errx(-1, "unknown secure-erase option: -%c", optopt);
+			break;
+		}
+	}
+
+	npa->npa_argc -= optind;
+	npa->npa_argv += optind;
 }
 
 static int
@@ -1227,6 +1259,9 @@ do_secure_erase(int fd, const nvme_process_arg_t *npa)
 	unsigned long lbaf;
 	uint8_t ses = NVME_FRMT_SES_USER;
 
+	if (npa->npa_argc > 0)
+		errx(-1, "Too many arguments");
+
 	if (npa->npa_idctl->id_oacs.oa_format == 0)
 		errx(-1, "%s not supported", npa->npa_cmd->c_name);
 
@@ -1234,12 +1269,8 @@ do_secure_erase(int fd, const nvme_process_arg_t *npa)
 		errx(-1, "%s not supported on individual namespace",
 		    npa->npa_cmd->c_name);
 
-	if (npa->npa_argc > 0) {
-		if (strcmp(npa->npa_argv[0], "-c") == 0)
-			ses = NVME_FRMT_SES_CRYPTO;
-		else
-			usage(npa->npa_cmd);
-	}
+	if ((npa->npa_cmdflags & NVMEADM_O_SE_CRYPTO) != 0)
+		ses = NVME_FRMT_SES_CRYPTO;
 
 	if (ses == NVME_FRMT_SES_CRYPTO &&
 	    npa->npa_idctl->id_fna.fn_crypt_erase == 0)
