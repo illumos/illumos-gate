@@ -37,9 +37,6 @@ $(PROG):	$(OBJS)
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
 
-delete:
-		$(RM) $(PROG)
-
 install:	all
 
 include		../../../Makefile.targ

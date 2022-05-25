@@ -23,8 +23,6 @@
 # Copyright 1994-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		lddstub
 SRCS=		lddstub.s
@@ -33,9 +31,7 @@ OBJS=		$(SRCS:%.s=%.o)
 include		../../../Makefile.cmd
 include		../../Makefile.com
 
-# As of Solaris 9 the kernel accepts $ORIGIN within the interpreter field.
-
-INTERP=         $(VAR_LDDSTUB_INTERP)
+INTERP=         -I'$$ORIGIN/ld.so.1'
 
 ASFLAGS=	-P -D_ASM
 LDFLAGS=	$(VERSREF) $(INTERP) $(CONVLIBDIR) -lconv -e stub \

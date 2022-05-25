@@ -36,8 +36,7 @@ CONVLIBDIR =	$(CONVLIBDIR64)
 ROOTPROG=	$(ROOTPROG64)
 
 include		../Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64
 
-install \
-package:	$(ROOTPROG64)
+install:	$(ROOTPROG64)
 

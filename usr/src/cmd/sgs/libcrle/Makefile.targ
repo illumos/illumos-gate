@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 pics64/%.o:	../common/%.c
 		$(COMPILE.c) -o $@ -D_ELF64 $<
@@ -36,12 +34,7 @@ pics/%.o:	../common/%.c
 $(LIBLINKS):
 		-$(RM) $@; $(SYMLINK) $(DYNLIB) $@
 
-delete:
-		$(RM) $(DYNLIB)
-
-
 include		$(SRC)/lib/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
 

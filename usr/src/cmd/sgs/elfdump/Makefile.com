@@ -51,8 +51,8 @@ MAPOPT=		$(MAPFILE:%=-Wl,-M%)
 CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
 		-I$(SRC)/lib/libc/inc -I$(SRC)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master) -I$(ELFCAP)
-LLDFLAGS =	$(VAR_ELFDUMP_LLDFLAGS)
-LLDFLAGS64 =	$(VAR_ELFDUMP_LLDFLAGS64)
+LLDFLAGS =	'-R$$ORIGIN/../../lib'
+LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
 LDFLAGS +=	$(VERSREF) $(MAPOPT) $(LLDFLAGS)
 LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) -llddbg \
 		    $(CONVLIBDIR) -lconv

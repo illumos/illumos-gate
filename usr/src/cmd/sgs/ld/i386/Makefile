@@ -26,6 +26,6 @@ include		../Makefile.com
 
 .KEEP_STATE:
 
-package install:	all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
+install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 include		../Makefile.targ

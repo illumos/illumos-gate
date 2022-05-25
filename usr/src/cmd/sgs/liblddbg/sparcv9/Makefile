@@ -32,8 +32,7 @@ CONVLIBDIR =	$(CONVLIBDIR64)
 
 all:		$(DYNLIB) $(LIBLINKS)
 
-install \
-package:	all $(ROOTLIBS64) $(ROOTCOMPATLINKS64)
+install:	all $(ROOTLIBS64) $(ROOTCOMPATLINKS64)
 
 include		../Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

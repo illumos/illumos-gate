@@ -66,7 +66,6 @@ SUBDIRS=	$(MACH)
 
 all:=		TARGET=	all
 install:=	TARGET=	install
-package:=	TARGET=	package
 clean:=		TARGET=	clean
 clobber:=	TARGET=	clobber
 
@@ -74,11 +73,9 @@ clobber:=	TARGET=	clobber
 
 .KEEP_STATE:
 
-all clean clobber: \
-	$(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 
-package install : \
-	$(ROOTDEMODIRS) .WAIT $(SUBDIRS) $(ROOTDEMOFILES)
+install: $(ROOTDEMODIRS) .WAIT $(SUBDIRS) $(ROOTDEMOFILES)
 
 $(SUBDIRS):	FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

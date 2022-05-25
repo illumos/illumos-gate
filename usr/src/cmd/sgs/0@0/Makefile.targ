@@ -37,6 +37,3 @@ all:		$(DYNLIB)
 $(DYNLIB):	pics .WAIT $(CRTS)
 
 include		$(SRC)/lib/Makefile.targ
-
-delete:
-		$(RM) $(DYNLIB)

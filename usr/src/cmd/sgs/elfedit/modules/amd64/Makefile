@@ -41,10 +41,9 @@ LLDFLAGS =	$(LLDFLAGS64)
 
 all:		$(PICDIR) .WAIT $(ELFEDITLIBS)
 
-install \
-package:	all .WAIT $(ROOTELFEDITDIR64) .WAIT $(ROOTELFEDITLIBS)
+install:	all .WAIT $(ROOTELFEDITDIR64) .WAIT $(ROOTELFEDITLIBS)
 
 
 include		../Makefile.targ
-include		../../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64
 

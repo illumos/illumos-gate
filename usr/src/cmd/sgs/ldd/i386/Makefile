@@ -28,7 +28,6 @@ include		../Makefile.com
 
 .KEEP_STATE:
 
-install \
-package:	$(ROOTPROG)
+install:	$(ROOTPROG)
 
 include		../Makefile.targ

@@ -47,4 +47,4 @@ pics/plt32_resolution.o: ../i386/plt32_resolution.c
 		$(POST_PROCESS_O)
 
 include		../Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

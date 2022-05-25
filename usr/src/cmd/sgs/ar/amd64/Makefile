@@ -37,9 +37,8 @@ ROOTPROG =	$(ROOTPROG64)
 
 all:		$(PROG)
 
-install \
-package:	all $(ROOTPROG64) $(ROOTCCSBINLINK64)
+install:	all $(ROOTPROG64) $(ROOTCCSBINLINK64)
 
 
 include		../Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

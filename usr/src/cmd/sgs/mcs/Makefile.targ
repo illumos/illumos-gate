@@ -26,43 +26,38 @@
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
-ROOTSTRIPFILEPROG=      $(STRIPFILE:%=$(ROOTCCSBIN)/%)
-ROOTSTRIPFILEPROG64=    $(STRIPFILE:%=$(ROOTCCSBIN64)/%)
-
 %.o:		../common/%.c
-		$(COMPILE.c) $<
-		$(POST_PROCESS_O)
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 %.o:		$(SGSCOMMON)/%.c
-		$(COMPILE.c) $<
-		$(POST_PROCESS_O)
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 all:		$(PROG) $(STRIPFILE)
 
 clean:
-		$(RM) $(CLEANFILES)
-
-delete:
-		$(RM) $(PROG)
+	$(RM) $(CLEANFILES)
 
 $(PROG):	$(OBJS)
-		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-		$(POST_PROCESS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
 $(STRIPFILE):
 
-$(ROOTLINKS):	$(VAR_SGSBINPROG)
-		$(RM) $@
-		$(LN) $(VAR_SGSBINPROG) $@
-
-$(STRIPSYMLINK): $(RM) $(ROOTSTRIPFILEPROG)
-		$(SYMLINK) ../../bin/$(STRIPFILE) $(ROOTSTRIPFILEPROG)
-
-$(STRIPSYMLINK64): $(RM) $(ROOTSTRIPFILEPROG64)
-		$(SYMLINK) ../../bin/$(MACH)/$(STRIPFILE) $(ROOTSTRIPFILEPROG64)
+$(ROOTLINKS):	$(ROOTPROG)
+	$(RM) $@
+	$(LN) $(ROOTPROG) $@
 
 $(ROOTBIN64)/%: %
-		$(INS.file)
+	$(INS.file)
+
+$(ROOTSTRIPFILEPROG):
+	$(RM) $@
+	$(SYMLINK) ../../bin/$(STRIPFILE) $@
+
+$(ROOTSTRIPFILEPROG64):
+	$(RM) $@
+	$(SYMLINK) ../../../bin/$(MACH64)/$(STRIPFILE) $@
 
 include		$(SRC)/cmd/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ

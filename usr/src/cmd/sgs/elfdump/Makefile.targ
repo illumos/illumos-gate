@@ -74,16 +74,11 @@ clean:
 		  check_struct_layout gen_layout_obj.o \
 		  struct_layout_$(ARCH).tmp
 
-delete:
-		$(RM) $(PROG)
-
-package \
 install:        all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
 		-$(RM) $(ROOTPROG)
 		-$(LN) $(ISAEXEC) $(ROOTPROG)
 
 include		$(SRC)/cmd/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
 

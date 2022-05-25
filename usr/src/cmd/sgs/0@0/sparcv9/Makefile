@@ -32,5 +32,5 @@ include		$(SRC)/cmd/sgs/0@0/Makefile.com
 install:	all $(ROOTLIBDIR64)/$(DYNLIB)
 
 include		$(SRC)/cmd/sgs/0@0/Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64
 

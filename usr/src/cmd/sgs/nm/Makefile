@@ -35,7 +35,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-package :=	TARGET= package
 
 # for messaging catalog
 #
@@ -43,7 +42,7 @@ POFILE= nm.po
 
 .KEEP_STATE:
 
-all clean clobber install package:	$(SUBDIRS)
+all clean clobber install:	$(SUBDIRS)
 
 catalog:	$(POFILE)
 

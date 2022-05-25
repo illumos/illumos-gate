@@ -38,7 +38,7 @@ CPPFLAGS +=	-D_ELF64
 
 
 include		$(SRC)/cmd/sgs/librtld/Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64
 
 CONVLIBDIR =	$(CONVLIBDIR64)
 ELFLIBDIR =	$(ELFLIBDIR64)

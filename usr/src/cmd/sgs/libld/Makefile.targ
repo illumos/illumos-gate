@@ -50,7 +50,7 @@ pics/%.o:	$(SGSCOMMON)/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics/%.o:	$(VAR_AVLDIR)/%.c
+pics/%.o:	$(SRC)/common/avl/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
@@ -91,13 +91,9 @@ pics/%_sparc_64.o: \
 $(LIBLINKS):
 		$(RM) $@; $(SYMLINK) $(DYNLIB) $@
 
-delete:
-		$(RM) $(DYNLIB)
-
 $(PICS):	pics
 
 include		$(SRC)/lib/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
 

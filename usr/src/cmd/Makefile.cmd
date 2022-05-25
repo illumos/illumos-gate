@@ -158,10 +158,7 @@ ROOTUSRSBINPROG32=	$(PROG:%=$(ROOTUSRSBIN32)/%)
 ROOTUSRSBINPROG64=	$(PROG:%=$(ROOTUSRSBIN64)/%)
 ROOTLIBSVCBINPROG=	$(PROG:%=$(ROOTLIBSVCBIN)/%)
 
-# Symlink rules for /usr/ccs/bin commands. Note, those commands under
-# the rule of the linker area, are controlled by a different set of
-# rules defined in $(SRC)/cmd/sgs/Makefile.var.
-
+# Note that commands in usr/src/cmd/sgs have separate targets for this
 INS.ccsbinlink= \
 	$(RM) $(ROOTCCSBINPROG); \
 	$(SYMLINK) ../../bin/$(PROG) $(ROOTCCSBINPROG)

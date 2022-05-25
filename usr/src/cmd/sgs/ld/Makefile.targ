@@ -40,11 +40,7 @@ $(PROG):	$(OBJS) $(MAPFILES)
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
 
-delete:
-		$(RM) $(PROG)
-
 include		$(SRC)/cmd/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
 
@@ -57,4 +53,3 @@ $(BLTDEFS) + \
 $(BLTDATA) + \
 $(BLTMESG):	$(SGSMSGALL)
 		$(SGSMSG) $(SGSMSGFLAGS) $(SGSMSGALL)
-

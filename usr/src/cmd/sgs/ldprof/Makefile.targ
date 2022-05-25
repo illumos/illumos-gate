@@ -33,11 +33,7 @@ pics/%.o:	../common/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-delete:
-		-$(RM) $(DYNLIB)
-
 include		../../../../lib/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging)
 

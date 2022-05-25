@@ -36,8 +36,8 @@ CFLAGS64 +=	$(C_PICFLAGS64) -D_ELF64
 .KEEP_STATE:
 
 all:		$(BLTDEFS) .WAIT $(DYNLIB)
-install package:	all $(ROOTDYNLIB64)
+install:	all $(ROOTDYNLIB64)
 	@echo doing make install $(ROOTDYNLIB64)
 
 include ../Makefile.targ
-include ../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

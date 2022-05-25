@@ -34,7 +34,6 @@ CFLAGS +=	$(C_PICFLAGS)
 
 all:		$(OBJDIR) $(PICDIR) .WAIT $(ELFEDITLIBS)
 
-install \
-package:	all .WAIT $(ROOTELFEDITDIR) .WAIT $(ROOTELFEDITLIBS)
+install:	all .WAIT $(ROOTELFEDITDIR) .WAIT $(ROOTELFEDITLIBS)
 
 include		../Makefile.targ

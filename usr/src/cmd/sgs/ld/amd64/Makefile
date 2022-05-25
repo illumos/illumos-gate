@@ -32,12 +32,11 @@ ELFLIBDIR =	$(ELFLIBDIR64)
 LDDBGLIBDIR =	$(LDDBGLIBDIR64)
 CONVLIBDIR =	$(CONVLIBDIR64)
 
-VAR_LD_LLDFLAGS = \
-		$(VAR_LD_LLDFLAGS64)
+RPATH = $(RPATH64)
 
-package install:	all $(VAR_SGSBINPROG64) $(VAR_SGSCCSLINK64)
+install:	all $(ROOTPROG64) $(ROOTCCSBINLINK64)
 
 .KEEP_STATE:
 
 include		../Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

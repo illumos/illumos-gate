@@ -46,15 +46,8 @@ INCLIST=	-I../../include -I../../include/sparc \
 DEFLIST=	-DTARGET=SPARC -DSPARC=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)  -I$(ELFCAP)
 LDLIBS +=	$(CONVLIBDIR) -lconv $(ELFLIBDIR) -lelf
+
 objs.xpg4/%.o := CPPFLAGS += -DXPG4
-
-
-# Building SUNWonld results in a call to the `package' target.  Requirements
-# needed to run this application on older releases are established:
-#	i18n support requires libintl.so.1 prior to 2.6
-
-package :=	LDLIBS += /usr/lib/libintl.so.1
-
 
 objs.xpg4/%.o:	../common/%.c
 		$(COMPILE.c) -o $@ $<
@@ -79,11 +72,9 @@ $(XPG4OBJS):	objs.xpg4
 objs.xpg4:
 	-@mkdir -p $@
 
-package \
-install:	all $(VAR_SGSBINPROG) $(ROOTXPG4PROG) $(VAR_SGSCCSLINK)
+install:	all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(OBJS) $(XPG4OBJS) $(CLEANFILES)
 
 include		../../../Makefile.targ
-include		../../Makefile.targ

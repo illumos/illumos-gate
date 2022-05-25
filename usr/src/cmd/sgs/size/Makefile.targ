@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 %.o:		../common/%.c
 		$(COMPILE.c) $<
@@ -35,14 +33,9 @@ $(PROG):	$(OBJS)
 
 all:		$(PROG)
 
-package \
-install:        all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
+install:        all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(CLEANFILES)
 
-delete:
-		$(RM) $(PROG)
-
 include		$(SRC)/cmd/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ

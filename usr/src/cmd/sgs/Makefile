@@ -100,13 +100,10 @@ MSGSUBDIRS=	ld		ldd		libld		liblddbg \
 
 MSGDIR=		messages
 
-
 all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-delete :=	TARGET= delete
-lint :=		TARGET= lint
 _msg :=		TARGET= catalog
 _msg_gettext :=	TARGET= catalog
 _msg_sgsmsg :=	TARGET= catalog
@@ -148,9 +145,7 @@ install_lib:	FRC
 		@ cd lex; pwd; $(MAKE) $@
 		@ cd yacc; pwd; $(MAKE) $@
 
-lint:
-
-delete clean clobber: $(SUBDIRS) $(MSGDIR)
+clean clobber: $(SUBDIRS) $(MSGDIR)
 
 $(SUBDIRS):	FRC
 		@ cd $@; pwd; $(MAKE) $(TARGET)

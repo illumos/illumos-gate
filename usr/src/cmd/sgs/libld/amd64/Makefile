@@ -23,15 +23,13 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include		../Makefile.com
 
 .KEEP_STATE:
 
 ROOTFS_LIBDIR64 = \
-		$(VAR_LIBLD_64_ROOTFS_LIBDIR)
+		$(ROOT)/lib/$(MACH64)
 
 ROOTFS_DYNLIB64 = \
 		$(DYNLIB:%=$(ROOTFS_LIBDIR64)/%)
@@ -44,8 +42,7 @@ $(ROOTFS_DYNLIB64) :=	FILEMODE= 755
 
 all:		$(DYNLIB) $(LIBLINKS)
 
-install \
-package:	all $(ROOTFS_DYNLIB64)
+install:	all $(ROOTFS_DYNLIB64)
 
 include		../Makefile.targ
-include		../../Makefile.sub.64
+include		$(SRC)/Makefile.master.64

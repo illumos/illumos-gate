@@ -50,11 +50,11 @@ pics/%.o:	../common/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics/%.o:	$(VAR_AVLDIR)/%.c
+pics/%.o:	$(SRC)/common/avl/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics/%.o:	$(VAR_DTRDIR)/%.c
+pics/%.o:	$(SRC)/common/dtrace/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
@@ -75,9 +75,6 @@ $(RTLD):	pics $(PICS) $(CRTS)
 		    $(LDLIBS) $(CRTN)
 		$(POST_PROCESS_SO)
 
-delete:
-		-$(RM) $(RTLD)
-
 $(ROOTFS_LIBDIR)/%:	%
 		$(INS.file)
 
@@ -85,7 +82,6 @@ $(ETCLIBDIR)/%:		%
 		$(INS.file)
 
 include		$(SRC)/lib/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
 

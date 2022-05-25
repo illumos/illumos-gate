@@ -47,7 +47,7 @@ NATIVE_LDFLAGS = $(LDASSERTS) $(BDIRECT)
 NATIVE=		$(OBJECTS:%.o=%)
 SRCS=		$(OBJECTS:%.o=../common/%.c)
 
-CPPFLAGS +=	$(VAR_TOOLS_CPPFLAGS)
+CPPFLAGS +=	-I$(SRC)/uts/common
 
 ROOTDIR=	$(ROOT)/opt/SUNWonld
 ROOTPROGS=	$(PROGS:%=$(ROOTDIR)/bin/%)

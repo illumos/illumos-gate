@@ -92,7 +92,3 @@ clobber:	clean
 
 clean:
 		-$(RM) $(PICS) $(CLEANFILES)
-
-delete:
-
-include		$(SRC)/cmd/sgs/Makefile.targ

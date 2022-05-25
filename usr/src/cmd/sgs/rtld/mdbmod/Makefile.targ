@@ -32,7 +32,6 @@ pics/%.o:	../common/%.c
 		$(POST_PROCESS_O)
 
 include		$(SRC)/lib/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 chkmsg:		$(MSGSRCS)
 		sh $(CHKMSG) $(CHKMSGFLAGS) $(MSGSRCS)

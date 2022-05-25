@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 # Makefile to support tools used for linker development.  GEXECS are those
-# tools that the installed for distribution in the SUNWonld package.
+# tools that are installed in /opt/SUNWonld in the proto area.
 #
 #  o	`c' programs are built from the $(MACH)/Makefile
 #
@@ -48,9 +48,7 @@ clobber:=	TARGET= clobber
 
 .KEEP_STATE:
 
-all install clean clobberall: $(SUBDIRS)
-
-delete:
+all install clean clobber: $(SUBDIRS)
 
 $(SUBDIRS):	FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

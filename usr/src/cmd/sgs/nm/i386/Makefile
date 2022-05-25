@@ -74,11 +74,9 @@ $(XPG4OBJS):	objs.xpg4
 objs.xpg4:
 	-@mkdir -p $@
 
-package \
-install:	all $(VAR_SGSBINPROG) $(ROOTXPG4PROG) $(VAR_SGSCCSLINK)
+install:	all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(OBJS) $(XPG4OBJS) $(CLEANFILES)
 
 include		../../../Makefile.targ
-include		../../Makefile.targ

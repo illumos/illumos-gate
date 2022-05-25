@@ -42,8 +42,7 @@ $(PROG):	$(PSRC)
 		$(SED) -e "s@TEXT_DOMAIN@\"SUNW_OST_SGS\"@" $(PSRC) > $@
 		$(CHMOD) +x $@
 
-install \
-package:	all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
+install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(PROG)

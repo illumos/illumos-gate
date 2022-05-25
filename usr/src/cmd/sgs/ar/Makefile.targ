@@ -35,9 +35,6 @@ objs.xpg4/%.o:	%.c
 clean:
 		$(RM) $(OBJS) $(XPG4OBJS) $(CLEANFILES)
 
-delete:
-		$(RM) $(PROG)
-
 catalog:	$(BLTMESG)
 
 $(PROG):	$(OBJS)
@@ -56,7 +53,6 @@ objs objs.xpg4:
 		-@ mkdir -p $@
 
 include		$(SRC)/cmd/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
 
