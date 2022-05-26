@@ -686,6 +686,7 @@ print_cpus(const char *banner, const cpuset_t *cpus)
 	printf("\n");
 }
 
+#ifdef __FreeBSD__
 static void
 print_intinfo(const char *banner, uint64_t info)
 {
@@ -716,6 +717,36 @@ print_intinfo(const char *banner, uint64_t info)
 	}
 	printf("\n");
 }
+#else /* __FreeBSD__ */
+static void
+print_intinfo(const char *banner, uint64_t info)
+{
+	printf("%s:\t", banner);
+	if (VM_INTINFO_PENDING(info)) {
+		switch (VM_INTINFO_TYPE(info)) {
+		case VM_INTINFO_HWINTR:
+			printf("extint");
+			break;
+		case VM_INTINFO_NMI:
+			printf("nmi");
+			break;
+		case VM_INTINFO_SWINTR:
+			printf("swint");
+			break;
+		default:
+			printf("exception");
+			break;
+		}
+		printf(" vector %hhd", VM_INTINFO_VECTOR(info));
+		if (VM_INTINFO_HAS_ERRCODE(info)) {
+			printf(" errcode %#x", VM_INTINFO_ERRCODE(info));
+		}
+	} else {
+		printf("n/a");
+	}
+	printf("\n");
+}
+#endif /* __FreeBSD__ */
 
 static bool
 cpu_vendor_intel(void)

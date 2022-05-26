@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -139,13 +139,11 @@ struct vcpu {
 	int		reqidle;	/* (i) request vcpu to idle */
 	struct vlapic	*vlapic;	/* (i) APIC device model */
 	enum x2apic_state x2apic_state;	/* (i) APIC mode */
-	uint64_t	exitintinfo;	/* (i) events pending at VM exit */
-	int		nmi_pending;	/* (i) NMI pending */
-	int		extint_pending;	/* (i) INTR pending */
-	int	exception_pending;	/* (i) exception pending */
-	int	exc_vector;		/* (x) exception collateral */
-	int	exc_errcode_valid;
-	uint32_t exc_errcode;
+	uint64_t	exit_intinfo;	/* (i) events pending at VM exit */
+	uint64_t	exc_pending;	/* (i) exception pending */
+	bool		nmi_pending;	/* (i) NMI pending */
+	bool		extint_pending;	/* (i) INTR pending */
+
 	uint8_t		sipi_vector;	/* (i) SIPI vector */
 	hma_fpu_t	*guestfpu;	/* (a,i) guest fpu state */
 	uint64_t	guest_xcr0;	/* (i) guest %xcr0 register */
@@ -386,10 +384,10 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 	vcpu->vlapic = VLAPIC_INIT(vm->cookie, vcpu_id);
 	(void) vm_set_x2apic_state(vm, vcpu_id, X2APIC_DISABLED);
 	vcpu->reqidle = 0;
-	vcpu->exitintinfo = 0;
-	vcpu->nmi_pending = 0;
-	vcpu->extint_pending = 0;
-	vcpu->exception_pending = 0;
+	vcpu->exit_intinfo = 0;
+	vcpu->nmi_pending = false;
+	vcpu->extint_pending = false;
+	vcpu->exc_pending = 0;
 	vcpu->guest_xcr0 = XFEATURE_ENABLED_X87;
 	(void) hma_fpu_init(vcpu->guestfpu);
 	vmm_stat_init(vcpu->stats);
@@ -2490,27 +2488,26 @@ int
 vm_exit_intinfo(struct vm *vm, int vcpuid, uint64_t info)
 {
 	struct vcpu *vcpu;
-	int type, vector;
 
 	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
 		return (EINVAL);
 
 	vcpu = &vm->vcpu[vcpuid];
 
-	if (info & VM_INTINFO_VALID) {
-		type = info & VM_INTINFO_TYPE;
-		vector = info & 0xff;
+	if (VM_INTINFO_PENDING(info)) {
+		const uint32_t type = VM_INTINFO_TYPE(info);
+		const uint8_t vector = VM_INTINFO_VECTOR(info);
+
 		if (type == VM_INTINFO_NMI && vector != IDT_NMI)
 			return (EINVAL);
-		if (type == VM_INTINFO_HWEXCEPTION && vector >= 32)
+		if (type == VM_INTINFO_HWEXCP && vector >= 32)
 			return (EINVAL);
-		if (info & VM_INTINFO_RSVD)
+		if (info & VM_INTINFO_MASK_RSVD)
 			return (EINVAL);
 	} else {
 		info = 0;
 	}
-	VCPU_CTR2(vm, vcpuid, "%s: info1(%lx)", __func__, info);
-	vcpu->exitintinfo = info;
+	vcpu->exit_intinfo = info;
 	return (0);
 }
 
@@ -2525,14 +2522,10 @@ enum exc_class {
 static enum exc_class
 exception_class(uint64_t info)
 {
-	int type, vector;
-
-	KASSERT(info & VM_INTINFO_VALID, ("intinfo must be valid: %lx", info));
-	type = info & VM_INTINFO_TYPE;
-	vector = info & 0xff;
+	ASSERT(VM_INTINFO_PENDING(info));
 
 	/* Table 6-4, "Interrupt and Exception Classes", Intel SDM, Vol 3 */
-	switch (type) {
+	switch (VM_INTINFO_TYPE(info)) {
 	case VM_INTINFO_HWINTR:
 	case VM_INTINFO_SWINTR:
 	case VM_INTINFO_NMI:
@@ -2553,7 +2546,7 @@ exception_class(uint64_t info)
 		break;
 	}
 
-	switch (vector) {
+	switch (VM_INTINFO_VECTOR(info)) {
 	case IDT_PF:
 	case IDT_VE:
 		return (EXC_PAGEFAULT);
@@ -2568,105 +2561,61 @@ exception_class(uint64_t info)
 	}
 }
 
-static int
-nested_fault(struct vm *vm, int vcpuid, uint64_t info1, uint64_t info2,
-    uint64_t *retinfo)
-{
-	enum exc_class exc1, exc2;
-	int type1, vector1;
-
-	KASSERT(info1 & VM_INTINFO_VALID, ("info1 %lx is not valid", info1));
-	KASSERT(info2 & VM_INTINFO_VALID, ("info2 %lx is not valid", info2));
-
-	/*
-	 * If an exception occurs while attempting to call the double-fault
-	 * handler the processor enters shutdown mode (aka triple fault).
-	 */
-	type1 = info1 & VM_INTINFO_TYPE;
-	vector1 = info1 & 0xff;
-	if (type1 == VM_INTINFO_HWEXCEPTION && vector1 == IDT_DF) {
-		VCPU_CTR2(vm, vcpuid, "triple fault: info1(%lx), info2(%lx)",
-		    info1, info2);
-		(void) vm_suspend(vm, VM_SUSPEND_TRIPLEFAULT);
-		*retinfo = 0;
-		return (0);
-	}
-
-	/*
-	 * Table 6-5 "Conditions for Generating a Double Fault", Intel SDM, Vol3
-	 */
-	exc1 = exception_class(info1);
-	exc2 = exception_class(info2);
-	if ((exc1 == EXC_CONTRIBUTORY && exc2 == EXC_CONTRIBUTORY) ||
-	    (exc1 == EXC_PAGEFAULT && exc2 != EXC_BENIGN)) {
-		/* Convert nested fault into a double fault. */
-		*retinfo = IDT_DF;
-		*retinfo |= VM_INTINFO_VALID | VM_INTINFO_HWEXCEPTION;
-		*retinfo |= VM_INTINFO_DEL_ERRCODE;
-	} else {
-		/* Handle exceptions serially */
-		*retinfo = info2;
-	}
-	return (1);
-}
-
-static uint64_t
-vcpu_exception_intinfo(struct vcpu *vcpu)
-{
-	uint64_t info = 0;
-
-	if (vcpu->exception_pending) {
-		info = vcpu->exc_vector & 0xff;
-		info |= VM_INTINFO_VALID | VM_INTINFO_HWEXCEPTION;
-		if (vcpu->exc_errcode_valid) {
-			info |= VM_INTINFO_DEL_ERRCODE;
-			info |= (uint64_t)vcpu->exc_errcode << 32;
-		}
-	}
-	return (info);
-}
-
-int
+/*
+ * Fetch event pending injection into the guest, if one exists.
+ *
+ * Returns true if an event is to be injected (which is placed in `retinfo`).
+ */
+bool
 vm_entry_intinfo(struct vm *vm, int vcpuid, uint64_t *retinfo)
 {
-	struct vcpu *vcpu;
-	uint64_t info1, info2;
-	int valid;
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
+	const uint64_t info1 = vcpu->exit_intinfo;
+	vcpu->exit_intinfo = 0;
+	const uint64_t info2 = vcpu->exc_pending;
+	vcpu->exc_pending = 0;
 
-	KASSERT(vcpuid >= 0 &&
-	    vcpuid < vm->maxcpus, ("invalid vcpu %d", vcpuid));
-
-	vcpu = &vm->vcpu[vcpuid];
-
-	info1 = vcpu->exitintinfo;
-	vcpu->exitintinfo = 0;
-
-	info2 = 0;
-	if (vcpu->exception_pending) {
-		info2 = vcpu_exception_intinfo(vcpu);
-		vcpu->exception_pending = 0;
-		VCPU_CTR2(vm, vcpuid, "Exception %d delivered: %lx",
-		    vcpu->exc_vector, info2);
-	}
-
-	if ((info1 & VM_INTINFO_VALID) && (info2 & VM_INTINFO_VALID)) {
-		valid = nested_fault(vm, vcpuid, info1, info2, retinfo);
-	} else if (info1 & VM_INTINFO_VALID) {
+	if (VM_INTINFO_PENDING(info1) && VM_INTINFO_PENDING(info2)) {
+		/*
+		 * If an exception occurs while attempting to call the
+		 * double-fault handler the processor enters shutdown mode
+		 * (aka triple fault).
+		 */
+		if (VM_INTINFO_TYPE(info1) == VM_INTINFO_HWEXCP &&
+		    VM_INTINFO_VECTOR(info1) == IDT_DF) {
+			(void) vm_suspend(vm, VM_SUSPEND_TRIPLEFAULT);
+			*retinfo = 0;
+			return (false);
+		}
+		/*
+		 * "Conditions for Generating a Double Fault"
+		 *  Intel SDM, Vol3, Table 6-5
+		 */
+		const enum exc_class exc1 = exception_class(info1);
+		const enum exc_class exc2 = exception_class(info2);
+		if ((exc1 == EXC_CONTRIBUTORY && exc2 == EXC_CONTRIBUTORY) ||
+		    (exc1 == EXC_PAGEFAULT && exc2 != EXC_BENIGN)) {
+			/* Convert nested fault into a double fault. */
+			*retinfo =
+			    VM_INTINFO_VALID |
+			    VM_INTINFO_DEL_ERRCODE |
+			    VM_INTINFO_HWEXCP |
+			    IDT_DF;
+		} else {
+			/* Handle exceptions serially */
+			vcpu->exit_intinfo = info1;
+			*retinfo = info2;
+		}
+		return (true);
+	} else if (VM_INTINFO_PENDING(info1)) {
 		*retinfo = info1;
-		valid = 1;
-	} else if (info2 & VM_INTINFO_VALID) {
+		return (true);
+	} else if (VM_INTINFO_PENDING(info2)) {
 		*retinfo = info2;
-		valid = 1;
-	} else {
-		valid = 0;
+		return (true);
 	}
 
-	if (valid) {
-		VCPU_CTR4(vm, vcpuid, "%s: info1(%lx), info2(%lx), "
-		    "retinfo(%lx)", __func__, info1, info2, *retinfo);
-	}
-
-	return (valid);
+	return (false);
 }
 
 int
@@ -2678,14 +2627,14 @@ vm_get_intinfo(struct vm *vm, int vcpuid, uint64_t *info1, uint64_t *info2)
 		return (EINVAL);
 
 	vcpu = &vm->vcpu[vcpuid];
-	*info1 = vcpu->exitintinfo;
-	*info2 = vcpu_exception_intinfo(vcpu);
+	*info1 = vcpu->exit_intinfo;
+	*info2 = vcpu->exc_pending;
 	return (0);
 }
 
 int
-vm_inject_exception(struct vm *vm, int vcpuid, int vector, int errcode_valid,
-    uint32_t errcode, int restart_instruction)
+vm_inject_exception(struct vm *vm, int vcpuid, uint8_t vector,
+    bool errcode_valid, uint32_t errcode, bool restart_instruction)
 {
 	struct vcpu *vcpu;
 	uint64_t regval;
@@ -2694,14 +2643,14 @@ vm_inject_exception(struct vm *vm, int vcpuid, int vector, int errcode_valid,
 	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
 		return (EINVAL);
 
-	if (vector < 0 || vector >= 32)
+	if (vector >= 32)
 		return (EINVAL);
 
 	/*
-	 * NMIs (which bear an exception vector of 2) are to be injected via
-	 * their own specialized path using vm_inject_nmi().
+	 * NMIs are to be injected via their own specialized path using
+	 * vm_inject_nmi().
 	 */
-	if (vector == 2) {
+	if (vector == IDT_NMI) {
 		return (EINVAL);
 	}
 
@@ -2710,14 +2659,14 @@ vm_inject_exception(struct vm *vm, int vcpuid, int vector, int errcode_valid,
 	 * the guest. It is a derived exception that results from specific
 	 * combinations of nested faults.
 	 */
-	if (vector == IDT_DF)
+	if (vector == IDT_DF) {
 		return (EINVAL);
+	}
 
 	vcpu = &vm->vcpu[vcpuid];
 
-	if (vcpu->exception_pending) {
-		VCPU_CTR2(vm, vcpuid, "Unable to inject exception %d due to "
-		    "pending exception %d", vector, vcpu->exc_vector);
+	if (VM_INTINFO_PENDING(vcpu->exc_pending)) {
+		/* Unable to inject exception due to one already pending */
 		return (EBUSY);
 	}
 
@@ -2726,9 +2675,10 @@ vm_inject_exception(struct vm *vm, int vcpuid, int vector, int errcode_valid,
 		 * Exceptions don't deliver an error code in real mode.
 		 */
 		error = vm_get_register(vm, vcpuid, VM_REG_GUEST_CR0, &regval);
-		KASSERT(!error, ("%s: error %d getting CR0", __func__, error));
-		if (!(regval & CR0_PE))
-			errcode_valid = 0;
+		VERIFY0(error);
+		if ((regval & CR0_PE) == 0) {
+			errcode_valid = false;
+		}
 	}
 
 	/*
@@ -2738,68 +2688,50 @@ vm_inject_exception(struct vm *vm, int vcpuid, int vector, int errcode_valid,
 	 * one instruction or incurs an exception.
 	 */
 	error = vm_set_register(vm, vcpuid, VM_REG_GUEST_INTR_SHADOW, 0);
-	KASSERT(error == 0, ("%s: error %d clearing interrupt shadow",
-	    __func__, error));
+	VERIFY0(error);
 
 	if (restart_instruction) {
 		VERIFY0(vm_restart_instruction(vm, vcpuid));
 	}
 
-	vcpu->exception_pending = 1;
-	vcpu->exc_vector = vector;
-	vcpu->exc_errcode = errcode;
-	vcpu->exc_errcode_valid = errcode_valid;
-	VCPU_CTR1(vm, vcpuid, "Exception %d pending", vector);
+	uint64_t val = VM_INTINFO_VALID | VM_INTINFO_HWEXCP | vector;
+	if (errcode_valid) {
+		val |= VM_INTINFO_DEL_ERRCODE;
+		val |= (uint64_t)errcode << VM_INTINFO_SHIFT_ERRCODE;
+	}
+	vcpu->exc_pending = val;
 	return (0);
-}
-
-void
-vm_inject_fault(struct vm *vm, int vcpuid, int vector, int errcode_valid,
-    int errcode)
-{
-	int error;
-
-	error = vm_inject_exception(vm, vcpuid, vector, errcode_valid,
-	    errcode, 1);
-	KASSERT(error == 0, ("vm_inject_exception error %d", error));
 }
 
 void
 vm_inject_ud(struct vm *vm, int vcpuid)
 {
-	vm_inject_fault(vm, vcpuid, IDT_UD, 0, 0);
+	VERIFY0(vm_inject_exception(vm, vcpuid, IDT_UD, false, 0, true));
 }
 
 void
 vm_inject_gp(struct vm *vm, int vcpuid)
 {
-	vm_inject_fault(vm, vcpuid, IDT_GP, 1, 0);
+	VERIFY0(vm_inject_exception(vm, vcpuid, IDT_GP, true, 0, true));
 }
 
 void
-vm_inject_ac(struct vm *vm, int vcpuid, int errcode)
+vm_inject_ac(struct vm *vm, int vcpuid, uint32_t errcode)
 {
-	vm_inject_fault(vm, vcpuid, IDT_AC, 1, errcode);
+	VERIFY0(vm_inject_exception(vm, vcpuid, IDT_AC, true, errcode, true));
 }
 
 void
-vm_inject_ss(struct vm *vm, int vcpuid, int errcode)
+vm_inject_ss(struct vm *vm, int vcpuid, uint32_t errcode)
 {
-	vm_inject_fault(vm, vcpuid, IDT_SS, 1, errcode);
+	VERIFY0(vm_inject_exception(vm, vcpuid, IDT_SS, true, errcode, true));
 }
 
 void
-vm_inject_pf(struct vm *vm, int vcpuid, int error_code, uint64_t cr2)
+vm_inject_pf(struct vm *vm, int vcpuid, uint32_t errcode, uint64_t cr2)
 {
-	int error;
-
-	VCPU_CTR2(vm, vcpuid, "Injecting page fault: error_code %x, cr2 %lx",
-	    error_code, cr2);
-
-	error = vm_set_register(vm, vcpuid, VM_REG_GUEST_CR2, cr2);
-	KASSERT(error == 0, ("vm_set_register(cr2) error %d", error));
-
-	vm_inject_fault(vm, vcpuid, IDT_PF, 1, error_code);
+	VERIFY0(vm_set_register(vm, vcpuid, VM_REG_GUEST_CR2, cr2));
+	VERIFY0(vm_inject_exception(vm, vcpuid, IDT_PF, true, errcode, true));
 }
 
 static VMM_STAT(VCPU_NMI_COUNT, "number of NMIs delivered to vcpu");
@@ -2814,20 +2746,15 @@ vm_inject_nmi(struct vm *vm, int vcpuid)
 
 	vcpu = &vm->vcpu[vcpuid];
 
-	vcpu->nmi_pending = 1;
+	vcpu->nmi_pending = true;
 	vcpu_notify_event(vm, vcpuid);
 	return (0);
 }
 
-int
+bool
 vm_nmi_pending(struct vm *vm, int vcpuid)
 {
-	struct vcpu *vcpu;
-
-	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
-		panic("vm_nmi_pending: invalid vcpuid %d", vcpuid);
-
-	vcpu = &vm->vcpu[vcpuid];
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 
 	return (vcpu->nmi_pending);
 }
@@ -2835,17 +2762,11 @@ vm_nmi_pending(struct vm *vm, int vcpuid)
 void
 vm_nmi_clear(struct vm *vm, int vcpuid)
 {
-	struct vcpu *vcpu;
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 
-	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
-		panic("vm_nmi_pending: invalid vcpuid %d", vcpuid);
+	ASSERT(vcpu->nmi_pending);
 
-	vcpu = &vm->vcpu[vcpuid];
-
-	if (vcpu->nmi_pending == 0)
-		panic("vm_nmi_clear: inconsistent nmi_pending state");
-
-	vcpu->nmi_pending = 0;
+	vcpu->nmi_pending = false;
 	vmm_stat_incr(vm, vcpuid, VCPU_NMI_COUNT, 1);
 }
 
@@ -2861,20 +2782,15 @@ vm_inject_extint(struct vm *vm, int vcpuid)
 
 	vcpu = &vm->vcpu[vcpuid];
 
-	vcpu->extint_pending = 1;
+	vcpu->extint_pending = true;
 	vcpu_notify_event(vm, vcpuid);
 	return (0);
 }
 
-int
+bool
 vm_extint_pending(struct vm *vm, int vcpuid)
 {
-	struct vcpu *vcpu;
-
-	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
-		panic("vm_extint_pending: invalid vcpuid %d", vcpuid);
-
-	vcpu = &vm->vcpu[vcpuid];
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 
 	return (vcpu->extint_pending);
 }
@@ -2882,17 +2798,11 @@ vm_extint_pending(struct vm *vm, int vcpuid)
 void
 vm_extint_clear(struct vm *vm, int vcpuid)
 {
-	struct vcpu *vcpu;
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 
-	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
-		panic("vm_extint_pending: invalid vcpuid %d", vcpuid);
+	ASSERT(vcpu->extint_pending);
 
-	vcpu = &vm->vcpu[vcpuid];
-
-	if (vcpu->extint_pending == 0)
-		panic("vm_extint_clear: inconsistent extint_pending state");
-
-	vcpu->extint_pending = 0;
+	vcpu->extint_pending = false;
 	vmm_stat_incr(vm, vcpuid, VCPU_EXTINT_COUNT, 1);
 }
 
@@ -3054,9 +2964,9 @@ vcpu_arch_reset(struct vm *vm, int vcpuid, bool init_only)
 
 	VERIFY0(vm_set_register(vm, vcpuid, VM_REG_GUEST_INTR_SHADOW, 0));
 
-	vcpu->exitintinfo = 0;
-	vcpu->exception_pending = 0;
-	vcpu->nmi_pending = 0;
+	vcpu->exit_intinfo = 0;
+	vcpu->exc_pending = 0;
+	vcpu->nmi_pending = false;
 	vcpu->extint_pending = 0;
 
 	/*

@@ -38,7 +38,7 @@
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
  *
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _VMCB_H_
@@ -145,7 +145,8 @@ struct svm_softc;
 #define	VMCB_EXIT_CR15_READ		0x0f
 #define	VMCB_EXIT_CR0_WRITE		0x10
 #define	VMCB_EXIT_CR15_WRITE		0x1f
-#define	VMCB_EXIT_MC			0x52
+#define	VMCB_EXIT_EXCP0			0x40
+#define	VMCB_EXIT_EXCP31		0x5f
 #define	VMCB_EXIT_INTR			0x60
 #define	VMCB_EXIT_NMI			0x61
 #define	VMCB_EXIT_SMI			0x62

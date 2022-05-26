@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _VMM_H_
@@ -112,15 +112,29 @@ enum x2apic_state {
 	X2APIC_STATE_LAST
 };
 
-#define	VM_INTINFO_VECTOR(info)	((info) & 0xff)
-#define	VM_INTINFO_DEL_ERRCODE	0x800
-#define	VM_INTINFO_RSVD		0x7ffff000
-#define	VM_INTINFO_VALID	0x80000000
-#define	VM_INTINFO_TYPE		0x700
+#define	VM_INTINFO_MASK_VECTOR	0xffUL
+#define	VM_INTINFO_MASK_TYPE	0x700UL
+#define	VM_INTINFO_MASK_RSVD	0x7ffff000UL
+#define	VM_INTINFO_SHIFT_ERRCODE 32
+
+#define	VM_INTINFO_VECTOR(val)	((val) & VM_INTINFO_MASK_VECTOR)
+#define	VM_INTINFO_TYPE(val)	((val) & VM_INTINFO_MASK_TYPE)
+#define	VM_INTINFO_ERRCODE(val)	((val) >> VM_INTINFO_SHIFT_ERRCODE)
+#define	VM_INTINFO_PENDING(val)	(((val) & VM_INTINFO_VALID) != 0)
+#define	VM_INTINFO_HAS_ERRCODE(val) (((val) & VM_INTINFO_DEL_ERRCODE) != 0)
+
+#define	VM_INTINFO_VALID	(1UL << 31)
+#define	VM_INTINFO_DEL_ERRCODE	(1UL << 11)
+
 #define	VM_INTINFO_HWINTR	(0 << 8)
 #define	VM_INTINFO_NMI		(2 << 8)
-#define	VM_INTINFO_HWEXCEPTION	(3 << 8)
+#define	VM_INTINFO_HWEXCP	(3 << 8)
 #define	VM_INTINFO_SWINTR	(4 << 8)
+/* Reserved for CPU (read: Intel) specific types */
+#define	VM_INTINFO_RESV1	(1 << 8)
+#define	VM_INTINFO_RESV5	(5 << 8)
+#define	VM_INTINFO_RESV6	(6 << 8)
+#define	VM_INTINFO_RESV7	(7 << 8)
 
 /*
  * illumos doesn't have a limitation based on SPECNAMELEN like FreeBSD does.
