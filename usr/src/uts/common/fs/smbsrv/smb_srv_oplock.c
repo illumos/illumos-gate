@@ -164,6 +164,7 @@ smb_oplock_ind_break_in_ack(smb_request_t *ack_sr, smb_ofile_t *ofile,
 	smb_server_t *sv = ofile->f_server;
 	smb_node_t *node = ofile->f_node;
 	smb_request_t *sr = NULL;
+	taskqid_t tqid;
 	boolean_t use_postwork = B_TRUE;
 
 	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
@@ -248,12 +249,14 @@ smb_oplock_ind_break_in_ack(smb_request_t *ack_sr, smb_ofile_t *ofile,
 		 */
 		sr->smb2_cmd_code = SMB2_OPLOCK_BREAK;
 		smb2sr_append_postwork(ack_sr, sr);
-	} else {
-		/* Will call smb_oplock_send_break */
-		sr->smb2_status = STATUS_CANT_GRANT;
-		(void) taskq_dispatch(sv->sv_worker_pool,
-		    smb_oplock_async_break, sr, TQ_SLEEP);
+		return;
 	}
+
+	/* Will call smb_oplock_send_break */
+	sr->smb2_status = STATUS_CANT_GRANT;
+	tqid = taskq_dispatch(sv->sv_worker_pool,
+	    smb_oplock_async_break, sr, TQ_SLEEP);
+	VERIFY(tqid != TASKQID_INVALID);
 }
 
 /*
@@ -277,6 +280,7 @@ smb_oplock_ind_break(smb_ofile_t *ofile, uint32_t NewLevel,
 	smb_server_t *sv = ofile->f_server;
 	smb_node_t *node = ofile->f_node;
 	smb_request_t *sr = NULL;
+	taskqid_t tqid;
 
 	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
 	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
@@ -375,8 +379,9 @@ smb_oplock_ind_break(smb_ofile_t *ofile, uint32_t NewLevel,
 	smb_oplock_hdl_update(sr);
 
 	/* Will call smb_oplock_send_break */
-	(void) taskq_dispatch(sv->sv_worker_pool,
+	tqid = taskq_dispatch(sv->sv_worker_pool,
 	    smb_oplock_async_break, sr, TQ_SLEEP);
+	VERIFY(tqid != TASKQID_INVALID);
 }
 
 /*

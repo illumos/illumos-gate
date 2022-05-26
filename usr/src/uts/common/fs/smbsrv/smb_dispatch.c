@@ -30,7 +30,7 @@
  * Request
  *   Header
  *	Magic		0xFF 'S' 'M' 'B'
- *	smb_com 	a byte, the "first" command
+ *	smb_com		a byte, the "first" command
  *	Error		a 4-byte union, ignored in a request
  *	smb_flg		a one byte set of eight flags
  *	smb_flg2	a two byte set of 16 flags
@@ -75,7 +75,7 @@
  * Reply
  *   Header
  *	Magic		0xFF 'S' 'M' 'B'
- *	smb_com 	a byte, the "first" command, corresponds
+ *	smb_com		a byte, the "first" command, corresponds
  *			to request
  *	Error		a 4-byte union, coding depends on dialect in use
  *			for "DOS" errors
@@ -533,6 +533,7 @@ smb1sr_newrq(smb_request_t *sr)
 {
 	uint16_t pid_hi, pid_lo;
 	int rc, save_offset;
+	taskqid_t tqid;
 
 	/*
 	 * Decode the SMB header now (peek) so that
@@ -596,8 +597,9 @@ smb1sr_newrq(smb_request_t *sr)
 	sr->sr_time_submitted = gethrtime();
 	sr->sr_state = SMB_REQ_STATE_SUBMITTED;
 	smb_srqueue_waitq_enter(sr->session->s_srqueue);
-	(void) taskq_dispatch(sr->sr_server->sv_worker_pool,
+	tqid = taskq_dispatch(sr->sr_server->sv_worker_pool,
 	    smb1_tq_work, sr, TQ_SLEEP);
+	VERIFY(tqid != TASKQID_INVALID);
 
 	return (0);
 }

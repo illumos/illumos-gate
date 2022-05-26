@@ -499,6 +499,7 @@ smb_user_auth_tmo(void *arg)
 {
 	smb_user_t *user = arg;
 	smb_request_t *sr;
+	taskqid_t tqid;
 
 	SMB_USER_VALID(user);
 
@@ -531,10 +532,10 @@ smb_user_auth_tmo(void *arg)
 	sr->uid_user = user;
 	sr->user_cr = user->u_cred;
 	sr->sr_state = SMB_REQ_STATE_SUBMITTED;
-
-	(void) taskq_dispatch(
+	tqid = taskq_dispatch(
 	    user->u_server->sv_worker_pool,
 	    smb_user_logoff_tq, sr, TQ_SLEEP);
+	VERIFY(tqid != TASKQID_INVALID);
 }
 
 /*
