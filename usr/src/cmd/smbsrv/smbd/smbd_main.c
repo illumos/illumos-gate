@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -1008,6 +1009,19 @@ smbd_report(const char *fmt, ...)
 	va_end(ap);
 
 	(void) fprintf(stderr, "smbd: %s\n", buf);
+}
+
+/*
+ * Once we're out of memory, we're not likely to recover
+ * without a restart. Let SMF restart this service.
+ */
+void
+smbd_nomem(void)
+{
+	smbd_report(strerror(ENOMEM));
+	if (smbd.s_debug)
+		abort();
+	exit(1);
 }
 
 /*

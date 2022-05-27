@@ -234,7 +234,7 @@ pipesvc_listener(void *varg)
 		if (np == NULL) {
 			smbd_report("pipesvc_listener, alloc1 failed");
 			(void) close(newfd);
-			continue;
+			smbd_nomem();
 		}
 
 		rc = pthread_create(&tid, NULL, pipesvc_worker, np);
@@ -242,7 +242,7 @@ pipesvc_listener(void *varg)
 			smbd_report("pipesvc_listener, pthread_create: %d",
 			    errno);
 			np_free(np);
-			continue;
+			smbd_nomem();
 		}
 		(void) pthread_detach(tid);
 
