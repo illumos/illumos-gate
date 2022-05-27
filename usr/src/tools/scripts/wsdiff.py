@@ -826,7 +826,8 @@ def diff_elf_section(f1, f2, section, sh_type) :
 	tmpFile1 = tmpDir1 + os.path.basename(f1) + t.name
 	tmpFile2 = tmpDir2 + os.path.basename(f2) + t.name
 
-	if (sh_type == "SHT_RELA") : # sh_type == SHT_RELA
+	if ((sh_type == "SHT_RELA") or
+	    (sh_type == "SHT_REL")): # relocation section
 		cmd1 = elfdump_cmd + " -r " + f1 + " > " + tmpFile1
 		cmd2 = elfdump_cmd + " -r " + f2 + " > " + tmpFile2
 	elif (section == ".group") :
@@ -1606,4 +1607,3 @@ if __name__ == '__main__' :
 		main()
 	except KeyboardInterrupt :
 		cleanup(1);
-
