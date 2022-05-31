@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2019 by Western Digital Corporation
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 #include <unistd.h>
 #include <stdio.h>
@@ -1606,6 +1606,15 @@ make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd,
 
 	if (ipmi_get_sensor_thresholds(hdl, &thresh,
 	    sd->sd_fs_sdr->is_fs_number) != 0) {
+		/*
+		 * Some sensors report supporting reading thresholds, but Get
+		 * Sensor Thresholds returns Invalid Command.  Do not consider
+		 * this an error so we could continue enumerating sensors for
+		 * the entity.
+		 */
+		if (ipmi_errno(hdl) == EIPMI_INVALID_COMMAND)
+			return (0);
+
 		topo_mod_dprintf(mod, "Failed to get sensor thresholds for "
 		    "node %s (%s)\n", topo_node_name(fnode), ipmi_errmsg(hdl));
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
