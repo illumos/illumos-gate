@@ -1443,12 +1443,6 @@ idmap_cfg_update_thread(void *arg)
 				 * Forget any DC we had previously.
 				 */
 				flags |= CFG_FORGET_DC;
-
-				/*
-				 * Blow away the ccache, we might have
-				 * re-joined the domain or joined a new one
-				 */
-				(void) unlink(IDMAP_CACHEDIR "/ccache");
 				break;
 			case EVENT_POKED:
 				if (DBG(CONFIG, 1))
@@ -2814,6 +2808,8 @@ idmapd_set_krb5_realm(char *domain)
 	static char realm[MAXHOSTNAMELEN];
 	size_t ilen, olen;
 	int err;
+
+	(void) unlink(IDMAP_CACHEDIR "/ccache");
 
 	if (domain == NULL) {
 		(void) unsetenv("KRB5_DEFAULT_REALM");

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -401,6 +402,29 @@ get_db_handle(sqlite **db)
 }
 
 /*
+ * Force next get_db_handle to reopen.
+ * Called after DB errors.
+ */
+void
+kill_db_handle(sqlite *db)
+{
+	idmap_tsd_t	*tsd;
+	sqlite		*t;
+
+	if (db == NULL)
+		return;
+
+	if ((tsd = idmap_get_tsd()) == NULL)
+		return;
+
+	if ((t = tsd->db_db) == NULL)
+		return;
+	assert(t == db);
+	tsd->db_db = NULL;
+	(void) sqlite_close(t);
+}
+
+/*
  * Get the cache handle
  */
 idmap_retcode
@@ -440,6 +464,29 @@ get_cache_handle(sqlite **cache)
 }
 
 /*
+ * Force next get_cache_handle to reopen.
+ * Called after DB errors.
+ */
+void
+kill_cache_handle(sqlite *db)
+{
+	idmap_tsd_t	*tsd;
+	sqlite		*t;
+
+	if (db == NULL)
+		return;
+
+	if ((tsd = idmap_get_tsd()) == NULL)
+		return;
+
+	if ((t = tsd->cache_db) == NULL)
+		return;
+	assert(t == db);
+	tsd->cache_db = NULL;
+	(void) sqlite_close(t);
+}
+
+/*
  * Initialize cache and db
  */
 int
@@ -467,6 +514,17 @@ init_dbs(void)
 	    sql, REMOVE_IF_CORRUPT, &created, &upgraded) < 0)
 		return (-1);
 
+	/*
+	 * TODO: If cache DB NOT created, get MAX PID for allocids(), eg.
+	 * sql = "SELECT MAX(pid) as max_pid FROM idmap_cache;"
+	 * sqlite_get_table(db, sql, &results, &nrow, NULL, &errmsg);
+	 *
+	 * However, the allocids() system call does not currently allow
+	 * for this kind of initialization.  Until that's dealt with,
+	 * use of a persistent idmap cache DB cannot work.
+	 */
+
+	/* This becomes the "flush" flag for allocids() */
 	_idmapdstate.new_eph_db = (created || upgraded) ? 1 : 0;
 
 	return (0);
@@ -575,12 +633,30 @@ sql_exec_no_cb(sqlite *db, const char *dbname, char *sql)
 	idmap_retcode	retcode;
 
 	r = sqlite_exec(db, sql, NULL, NULL, &errmsg);
-	assert(r != SQLITE_LOCKED && r != SQLITE_BUSY);
-
 	if (r != SQLITE_OK) {
 		idmapdlog(LOG_ERR, "Database error on %s while executing %s "
 		    "(%s)", dbname, sql, CHECK_NULL(errmsg));
-		retcode = idmapd_string2stat(errmsg);
+
+		switch (r) {
+		case SQLITE_BUSY:
+		case SQLITE_LOCKED:
+			assert(0);
+			retcode = IDMAP_ERR_INTERNAL;
+			break;
+
+		case SQLITE_NOMEM:
+			retcode = IDMAP_ERR_MEMORY;
+			break;
+
+		case SQLITE_FULL:
+			retcode = IDMAP_ERR_DB;
+			break;
+
+		default:
+			retcode = idmapd_string2stat(errmsg);
+			break;
+		}
+
 		if (errmsg != NULL)
 			sqlite_freemem(errmsg);
 		return (retcode);
@@ -4931,11 +5007,13 @@ idmap_cache_flush(idmap_flush_op op)
 	 */
 
 	rc = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql1);
-	if (rc != IDMAP_SUCCESS)
-		return (rc);
+	if (rc == IDMAP_SUCCESS)
+		rc = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql2);
+	if (rc == IDMAP_SUCCESS)
+		(void) __idmap_flush_kcache();
 
-	rc = sql_exec_no_cb(cache, IDMAP_CACHENAME, sql2);
+	if (rc == IDMAP_ERR_DB)
+		kill_cache_handle(cache);
 
-	(void) __idmap_flush_kcache();
 	return (rc);
 }

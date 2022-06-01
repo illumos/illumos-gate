@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 
@@ -167,10 +168,17 @@ adspriv_getdcname_1_svc(
 	}
 
 	dci->dci_DcName = strdup(ds->host);
+	if (dci->dci_DcName == NULL) {
+		res->status = NT_STATUS_NO_MEMORY;
+		goto out;
+	}
 
 	dci->dci_DcAddr = calloc(1, INET6_ADDRSTRLEN);
-	if (dci->dci_DcAddr != NULL &&
-	    ad_disc_getnameinfo(dci->dci_DcAddr, INET6_ADDRSTRLEN,
+	if (dci->dci_DcAddr == NULL) {
+		res->status = NT_STATUS_NO_MEMORY;
+		goto out;
+	}
+	if (ad_disc_getnameinfo(dci->dci_DcAddr, INET6_ADDRSTRLEN,
 	    &ds->addr) == 0)
 		dci->dci_AddrType = DS_INET_ADDRESS;
 
@@ -179,17 +187,36 @@ adspriv_getdcname_1_svc(
 		(void) memcpy(dci->dci_guid, uuid, sizeof (uuid));
 	}
 
-	if ((s = pgcfg->domain_name) != NULL)
+	if ((s = pgcfg->domain_name) != NULL) {
 		dci->dci_DomainName = strdup(s);
+		if (dci->dci_DomainName == NULL) {
+			res->status = NT_STATUS_NO_MEMORY;
+			goto out;
+		}
+	}
 
-	if ((s = pgcfg->forest_name) != NULL)
+	if ((s = pgcfg->forest_name) != NULL) {
 		dci->dci_DnsForestName = strdup(s);
+		if (dci->dci_DnsForestName == NULL) {
+			res->status = NT_STATUS_NO_MEMORY;
+			goto out;
+		}
+	}
 
 	dci->dci_Flags = ds->flags;
 	dci->dci_DcSiteName = strdup(ds->site);
+	if (dci->dci_DcSiteName == NULL) {
+		res->status = NT_STATUS_NO_MEMORY;
+		goto out;
+	}
 
-	if ((s = pgcfg->site_name) != NULL)
+	if ((s = pgcfg->site_name) != NULL) {
 		dci->dci_ClientSiteName = strdup(s);
+		if (dci->dci_ClientSiteName == NULL) {
+			res->status = NT_STATUS_NO_MEMORY;
+			goto out;
+		}
+	}
 
 	/* Address in binary form too. */
 	(void) memcpy(&dci->dci_sockaddr,
@@ -197,6 +224,11 @@ adspriv_getdcname_1_svc(
 
 out:
 	UNLOCK_CONFIG();
+
+	if (res->status != 0) {
+		/* Caller will free only if status == 0 */
+		xdr_free(xdr_adspriv_dcinfo, (char *)dci);
+	}
 
 	return (TRUE);
 }
