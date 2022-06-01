@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_CONTROLREGS_H
@@ -111,7 +112,7 @@ extern "C" {
 #define	CR4_OSFXSR	0x0200		/* OS fxsave/fxrstor support	*/
 #define	CR4_OSXMMEXCPT	0x0400		/* OS unmasked exception support */
 #define	CR4_UMIP	0x0800		/* user-mode instruction prevention */
-					/* 0x1000 reserved */
+#define	CR4_LA57	0x1000		/* enable 57 bit Logical addressing */
 #define	CR4_VMXE	0x2000		/* VMX enable */
 #define	CR4_SMXE	0x4000		/* SMX enable */
 					/* 0x8000 reserved */
@@ -124,8 +125,8 @@ extern "C" {
 
 #define	FMT_CR4						\
 	"\20\27pke\26smap\25smep\23osxsav"		\
-	"\22pcide\20fsgsbase\17smxe\16vmxe"		\
-	"\14umip\13xmme\12fxsr\11pce\10pge"		\
+	"\22pcide\21fsgsbase\17smxe\16vmxe"		\
+	"\15la57\14umip\13xmme\12fxsr\11pce\10pge"	\
 	"\7mce\6pae\5pse\4de\3tsd\2pvi\1vme"
 
 /*

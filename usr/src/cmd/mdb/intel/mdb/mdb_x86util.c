@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -155,6 +156,7 @@ mdb_x86_print_sysregs(struct sysregs *sregs, boolean_t long_mode)
 		{ "OSFXSR",	CR4_OSFXSR,	CR4_OSFXSR },
 		{ "OSXMMEXCPT",	CR4_OSXMMEXCPT,	CR4_OSXMMEXCPT },
 		{ "UMIP",	CR4_UMIP,	CR4_UMIP },
+		{ "LA57",	CR4_LA57,	CR4_LA57 },
 		{ "VMXE",	CR4_VMXE,	CR4_VMXE },
 		{ "SMXE",	CR4_SMXE,	CR4_SMXE },
 		{ "FSGSBASE",	CR4_FSGSBASE,	CR4_FSGSBASE },

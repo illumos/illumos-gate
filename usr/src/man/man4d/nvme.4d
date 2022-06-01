@@ -9,11 +9,10 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2018, Joyent, Inc.
-.\" Copyright 2019, Western Digital Corporation
+.\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd January 22, 2022
+.Dd May 11, 2022
 .Dt NVME 4D
 .Os
 .Sh NAME
@@ -108,7 +107,99 @@ The number of queues created will not exceed the number of interrupt vectors,
 .Em max-submission-queues ,
 or the drive's hardware limitation.
 .El
-.
+.Pp
+In addition to the above properties, some device-specific tunables can be
+configured in
+.Pa nvme.conf
+using the
+.Va nvme-config-list
+global property.
+The value of this property is a list of triplets.
+The formal syntax is:
+.Bl -column "nvme-config-list" -offset indent
+.It nvme-config-list	::= <triplet>
+.Op \&, <triplet> Ns
+*
+;
+.It <triplet>	::=
+.Qq <model>
+\&,
+.Qq <rev-list>
+\&,
+.Qq <tuple-list>
+.It <rev-list>	::=
+.Op <fwrev> Oo \&, <fwrev> Oc Ns *
+.It <tuple-list>	::=
+<tunable>
+.Op \&, <tunable> Ns
+*
+.It <tunable>	::=
+.Qq <name>
+\&:
+.Qq <value>
+.El
+.Pp
+The
+.Va <model>
+and
+.Va <fwrev>
+are the strings that are returned in the
+.Qq Model Number
+and
+.Qq Firmware Revision
+fields, respectively, in the
+.Qq Identify Controller
+data structure as returned by the
+.Qq IDENTIFY
+command.
+Specifying a
+.Va <rev-list>
+is optional, an empty string
+.Po Qo Qc Pc
+may be used instead.
+.Pp
+The
+.Va <tuple-list>
+contains one or more tunables to apply to all controllers that match the
+specified model number and optional firmware revisions.
+Each
+.Va <tunable>
+is a
+.Va <name>
+:
+.Va <value>
+pair.
+Supported tunable names are:
+.Bl -tag -width Va
+.It Va ignore-unknown-vendor-status
+Similar to the global property, this property accepts a boolean value specified
+as either
+.Qq on ,
+.Qq off ,
+.Qq true ,
+or
+.Qq false
+to enable or disable the driver continuing operation even if it receives an
+unknown vendor command status from a controller.
+.It Va min-phys-block-size
+Same as the global property, this is the minimum physical block size that is
+reported to
+.Xr blkdev 4D .
+This value must be a power of 2 greater than or equal to 512.
+If the device reports a best block size larger than what is
+specified here the driver will ignore the value specified here.
+.It Va volatile-write-cache
+Similar to the global property
+.Va volatile-write-cache-enable ,
+this property accepts a boolean value specified as either
+.Qq on ,
+.Qq off ,
+.Qq true ,
+or
+.Qq false
+to enable or disable the volatile write cache, if the hardware supports it.
+By default the volatile write cache is enabled.
+.El
 .Sh FILES
 .Bl -tag -compact -width Pa
 .It Pa /dev/dsk/cntnd0sn

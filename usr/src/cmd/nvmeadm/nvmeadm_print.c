@@ -245,7 +245,7 @@ nvme_print(int indent, const char *name, int index, const char *fmt, ...)
 int
 nvme_strlen(const char *str, int len)
 {
-	if (len < 0)
+	if (len <= 0)
 		return (0);
 
 	while (str[--len] == ' ')
