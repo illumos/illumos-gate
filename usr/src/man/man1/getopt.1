@@ -1,21 +1,19 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright 2000, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2022, Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETOPT 1 "Jan 7, 2000"
+.TH GETOPT 1 "Jun 1, 2022"
 .SH NAME
 getopt \- parse command options
 .SH SYNOPSIS
-.LP
 .nf
 \fBset\fR \fB--\fR ` getopt \fIoptstring\fR $ * `
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBgetopts\fR command supersedes \fBgetopt\fR. For more information, see
 NOTES below.
 .sp
@@ -32,7 +30,6 @@ recognizes it; otherwise, \fBgetopt\fR generates it; in either case,
 by a \fB\(mi\fR and is in its own positional parameter; each option argument is
 also parsed into its own positional parameter.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRProcessing the arguments for a command
 .sp
 .LP
@@ -77,8 +74,6 @@ cmd -a -oarg -- filename1 filename2\fR
 .sp
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -92,8 +87,6 @@ CSI	enabled
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR Intro (1),
 .BR getoptcvt (1),
 .BR getopts (1),
@@ -102,18 +95,9 @@ CSI	enabled
 .BR getopt (3C),
 .BR attributes (7)
 .SH DIAGNOSTICS
-.sp
-.LP
 \fBgetopt\fR prints an error message on the standard error when it encounters
 an option letter not included in \fIoptstring\fR.
 .SH NOTES
-.sp
-.LP
-\fBgetopt\fR will not be supported in the next major release. For this release
-a conversion tool has been provided, namely, \fBgetoptcvt\fR. For more
-information, see \fBgetopts\fR(1) and \fBgetoptcvt\fR(1).
-.sp
-.LP
 Reset \fBoptind\fR to \fB1\fR when rescanning the options.
 .sp
 .LP
