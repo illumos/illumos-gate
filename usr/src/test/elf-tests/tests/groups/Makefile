@@ -14,15 +14,6 @@
 # Copyright 2018 Joyent, Inc.
 #
 
-SUBDIRS =		\
-	assert-deflib	\
-	groups		\
-	linker-sets	\
-	mapfiles	\
-	relocs		\
-	resolution	\
-	sections	\
-	string-merge	\
-	tls
+SUBDIRS = no-relobj-group-merge
 
 include $(SRC)/test/Makefile.com

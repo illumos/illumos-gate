@@ -260,6 +260,7 @@
 #
 @ MSG_GRP_INVALNDX	"file %s: group section [%u]%s: entry %d: \
 			 invalid section index: %d"
+@ MSG_GRP_MISSINGOUT	"file %s: discarded section: [%u]%s: part of output group [%u]%s"
 
 # Relocation processing messages (some of these are required to satisfy
 # do_reloc(), which is common code used by cmd/sgs/rtld - make sure both

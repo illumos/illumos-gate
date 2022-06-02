@@ -3304,17 +3304,23 @@ update_ogroup(Ofl_desc *ofl)
 		gdata = (Word *)osp->os_outdata->d_buf;
 
 		for (i = 1; i < grpcnt; i++) {
-			Os_desc	*_osp;
 			Is_desc	*_isp = ifl->ifl_isdesc[gdata[i]];
+			Os_desc	*_osp = _isp->is_osdesc;
 
 			/*
-			 * If the referenced section didn't make it to the
-			 * output file - just zero out the entry.
+			 * If a section in the group is not part of the output
+			 * image, something has gone wrong, and corrupted this
+			 * group.
 			 */
-			if ((_osp = _isp->is_osdesc) == NULL)
-				gdata[i] = 0;
-			else
+			if (_osp == NULL) {
+				ld_eprintf(ofl, ERR_FATAL,
+				    MSG_INTL(MSG_GRP_MISSINGOUT),
+				    ifl->ifl_name, gdata[i], _isp->is_name,
+				    elf_ndxscn(osp->os_scn), osp->os_name);
+				error = S_ERROR;
+			} else {
 				gdata[i] = (Word)elf_ndxscn(_osp->os_scn);
+			}
 		}
 	}
 	return (error);
