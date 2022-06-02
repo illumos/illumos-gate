@@ -431,6 +431,7 @@ smb_common_open(smb_request_t *sr)
 
 	if (rc == 0) {
 		last_comp_found = B_TRUE;
+		fnode = op->fqi.fq_fnode;
 		fnode_held = B_TRUE;
 
 		/*
