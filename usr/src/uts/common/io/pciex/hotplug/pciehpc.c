@@ -816,6 +816,15 @@ pciehpc_slotinfo_init(pcie_hp_ctrl_t *ctrl_p)
 	    B_TRUE : B_FALSE;
 
 	/*
+	 * Contrary to what one might expect, not all systems actually have
+	 * power control despite having hot-swap capabilities. This is most
+	 * commonly due to the Enterprise SSD specification which doesn't call
+	 * for power-control in the PCIe native hotplug implementation.
+	 */
+	ctrl_p->hc_has_pwr = (slot_capabilities &
+	    PCIE_SLOTCAP_POWER_CONTROLLER) ? B_TRUE: B_FALSE;
+
+	/*
 	 * PCI-E version 1.1 defines EMI Lock Present bit
 	 * in Slot Capabilities register. Check for it.
 	 */
@@ -1109,6 +1118,22 @@ pciehpc_slot_poweron(pcie_hp_slot_t *slot_p, ddi_hp_cn_state_t *result)
 		goto cleanup;
 	}
 
+	/*
+	 * If the hardware doesn't have support for a power controller, then
+	 * that generally means that power is already on or at the least there
+	 * isn't very much else we can do and the PCIe spec says it's the
+	 * responsibility of the controller to have turned it on if a device is
+	 * present. Given that we checked for presence above, in such a case we
+	 * just return. Note, we still indicate that is a failure since we can't
+	 * change it and instead rely on code executing the actual state machine
+	 * to figure out how to handle this.
+	 */
+	if (!ctrl_p->hc_has_pwr) {
+		PCIE_DBG("slot %d has no power, but was asked to power on\n",
+		    slot_p->hs_phy_slot_num);
+		return (DDI_FAILURE);
+	}
+
 	/* get the current state of Slot Control Register */
 	control =  pciehpc_reg_get16(ctrl_p,
 	    bus_p->bus_pcie_off + PCIE_SLOTCTL);
@@ -1257,6 +1282,21 @@ pciehpc_slot_poweroff(pcie_hp_slot_t *slot_p, ddi_hp_cn_state_t *result)
 		PCIE_DBG("pciehpc_slot_poweroff(): slot %d is empty\n",
 		    slot_p->hs_phy_slot_num);
 		goto cleanup;
+	}
+
+	/*
+	 * Some devices do not have a power controller. In such cases we need to
+	 * fail any request to power it off. If a device is being pulled, the
+	 * state will generally have automatically been updated; however, if
+	 * someone is asking for us to do something via an explicit request,
+	 * then this will fail. Note, this is after the presence check to ensure
+	 * that an empty slot is accounted for correctly.
+	 */
+	if (!ctrl_p->hc_has_pwr) {
+		PCIE_DBG("pciehpc_slot_poweroff(): slot %d doesn't have a "
+		    "power controller\n",
+		    slot_p->hs_phy_slot_num);
+		return (DDI_ENOTSUP);
 	}
 
 	/*
@@ -1441,6 +1481,14 @@ pciehpc_upgrade_slot_state(pcie_hp_slot_t *slot_p,
 				rv = DDI_FAILURE;
 			break;
 		case DDI_HP_CN_STATE_PRESENT:
+			if (!slot_p->hs_ctrl->hc_has_pwr) {
+				pciehpc_get_slot_state(slot_p);
+				curr_state = slot_p->hs_info.cn_state;
+				if (curr_state < DDI_HP_CN_STATE_POWERED)
+					rv = DDI_FAILURE;
+				break;
+			}
+
 			rv = (slot_p->hs_ctrl->hc_ops.poweron_hpc_slot)(slot_p,
 			    &curr_state);
 
@@ -1481,6 +1529,22 @@ pciehpc_downgrade_slot_state(pcie_hp_slot_t *slot_p,
 				rv = DDI_FAILURE;
 			break;
 		case DDI_HP_CN_STATE_POWERED:
+			/*
+			 * If the device doesn't have power control then we
+			 * cannot ask it to power off the slot. However, a
+			 * device may have been removed and therefore we need to
+			 * manually check if the device was removed by getting
+			 * the state. Otherwise we let power control do
+			 * everything.
+			 */
+			if (!slot_p->hs_ctrl->hc_has_pwr) {
+				pciehpc_get_slot_state(slot_p);
+				curr_state = slot_p->hs_info.cn_state;
+				if (curr_state >= DDI_HP_CN_STATE_POWERED)
+					rv = DDI_FAILURE;
+				break;
+			}
+
 			rv = (slot_p->hs_ctrl->hc_ops.poweroff_hpc_slot)(
 			    slot_p, &curr_state);
 
