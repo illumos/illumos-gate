@@ -33,6 +33,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -51,8 +52,8 @@ uint_t  pci_cap_debug = 0;
  * pci_cap_probe: returns the capid and base based upon a given index
  */
 int
-pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
-	uint32_t *id_p, uint16_t *base_p)
+pci_cap_probe(ddi_acc_handle_t h, uint16_t index, uint32_t *id_p,
+    uint16_t *base_p)
 {
 	int i, search_ext = 0;
 	uint16_t base, pcix_cmd, status;
@@ -125,7 +126,7 @@ int
 pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p)
 {
 	uint8_t header;
-	uint16_t status, base;
+	uint16_t status, base, ncaps;
 
 	status = pci_config_get16(h, PCI_CONF_STAT);
 
@@ -149,12 +150,17 @@ pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p)
 		return (DDI_FAILURE);
 	}
 
+	ncaps = 0;
 	for (base = pci_config_get8(h, base); base;
 	    base = pci_config_get8(h, base + PCI_CAP_NEXT_PTR)) {
 		if (pci_config_get8(h, base) == id) {
 			*base_p = base;
 			return (DDI_SUCCESS);
 		}
+
+		ncaps++;
+		if (ncaps >= PCI_CAP_MAX_PTR)
+			break;
 	}
 
 	*base_p = PCI_CAP_NEXT_PTR_NULL;
@@ -168,13 +174,14 @@ int
 pci_xcap_locate(ddi_acc_handle_t h, uint16_t id, uint16_t *base_p)
 {
 	uint16_t status, base;
-	uint32_t xcaps_hdr;
+	uint32_t xcaps_hdr, ncaps;
 
 	status = pci_config_get16(h, PCI_CONF_STAT);
 
 	if (status == PCI_CAP_EINVAL16 || !(status & PCI_STAT_CAP))
 		return (DDI_FAILURE);
 
+	ncaps = 0;
 	for (base = PCIE_EXT_CAP; base; base = (xcaps_hdr >>
 	    PCIE_EXT_CAP_NEXT_PTR_SHIFT) & PCIE_EXT_CAP_NEXT_PTR_MASK) {
 
@@ -186,6 +193,10 @@ pci_xcap_locate(ddi_acc_handle_t h, uint16_t id, uint16_t *base_p)
 			*base_p = base;
 			return (DDI_SUCCESS);
 		}
+
+		ncaps++;
+		if (ncaps >= PCIE_EXT_CAP_MAX_PTR)
+			break;
 	}
 
 	*base_p = PCI_CAP_NEXT_PTR_NULL;
@@ -249,8 +260,8 @@ pci_htcap_locate(ddi_acc_handle_t h, uint16_t reg_mask, uint16_t reg_val,
  * because no cap list traversal is required.
  */
 uint32_t
-pci_cap_get(ddi_acc_handle_t h, pci_cap_config_size_t size,
-	uint32_t id, uint16_t base, uint16_t offset)
+pci_cap_get(ddi_acc_handle_t h, pci_cap_config_size_t size, uint32_t id,
+    uint16_t base, uint16_t offset)
 {
 	uint32_t data;
 
@@ -291,8 +302,7 @@ pci_cap_get(ddi_acc_handle_t h, pci_cap_config_size_t size,
  */
 int
 pci_cap_put(ddi_acc_handle_t h, pci_cap_config_size_t size,
-	uint32_t id, uint16_t base, uint16_t offset,
-	uint32_t data)
+    uint32_t id, uint16_t base, uint16_t offset, uint32_t data)
 {
 
 	/*
@@ -327,7 +337,7 @@ pci_cap_put(ddi_acc_handle_t h, pci_cap_config_size_t size,
  */
 int
 pci_cap_read(ddi_acc_handle_t h, uint32_t id, uint16_t base,
-	uint32_t *buf_p, uint32_t nwords)
+    uint32_t *buf_p, uint32_t nwords)
 {
 
 	int i;
