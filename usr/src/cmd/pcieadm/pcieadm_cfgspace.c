@@ -989,8 +989,17 @@ static pcieadm_regdef_t pcieadm_regdef_bist[] = {
 static pcieadm_regdef_t pcieadm_regdef_exprom[] = {
 	{ 0, 0, "enable", "Enable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 1, 3, "valsts", "Validation Status", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "not supported", "in progress",
+	    "valid contents, no trust test performed",
+	    "valid and trusted contents",
+	    "invalid contents",
+	    "valid but untrusted contents",
+	    "valid contents with warning, no trust test performed",
+	    "valid and trusted contents with warning" } } },
+	{ 4, 7, "valdet", "Validation Details", PRDV_HEX },
 	{ 11, 31, "addr", "Base Address", PRDV_HEX,
-	    .prd_val = { .prdv_hex = { 21 } } },
+	    .prd_val = { .prdv_hex = { 11 } } },
 	{ -1, -1, NULL }
 };
 
