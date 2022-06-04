@@ -22,7 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -2462,15 +2462,17 @@ smb_spool_add_doc(smb_tree_t *tree, smb_kspooldoc_t *sp)
 static void
 smb_server_create_session(smb_listener_daemon_t *ld, ksocket_t s_so)
 {
-	smb_session_t		*session;
-	taskqid_t		tqid;
-	smb_llist_t		*sl;
 	smb_server_t		*sv = ld->ld_sv;
+	smb_session_t		*session;
+	smb_llist_t		*sl;
+	taskqid_t		tqid;
+	clock_t			now;
 
 	session = smb_session_create(s_so, ld->ld_port, sv,
 	    ld->ld_family);
 
 	if (session == NULL) {
+		/* This should be rare (create sleeps) */
 		smb_soshutdown(s_so);
 		smb_sodestroy(s_so);
 		cmn_err(CE_WARN, "SMB Session: alloc failed");
@@ -2479,6 +2481,17 @@ smb_server_create_session(smb_listener_daemon_t *ld, ksocket_t s_so)
 
 	sl = &sv->sv_session_list;
 	smb_llist_enter(sl, RW_WRITER);
+	if (smb_llist_get_count(sl) >= sv->sv_cfg.skc_maxconnections) {
+		/*
+		 * New session not in sv_session_list, so we can just
+		 * delete it directly.
+		 */
+		smb_llist_exit(sl);
+		DTRACE_PROBE1(maxconn, smb_session_t *, session);
+		smb_soshutdown(session->sock);
+		smb_session_delete(session);
+		goto logmaxconn;
+	}
 	smb_llist_insert_tail(sl, session);
 	smb_llist_exit(sl);
 
@@ -2489,13 +2502,33 @@ smb_server_create_session(smb_listener_daemon_t *ld, ksocket_t s_so)
 	tqid = taskq_dispatch(sv->sv_receiver_pool,
 	    smb_server_receiver, session, TQ_NOQUEUE | TQ_SLEEP);
 	if (tqid == TASKQID_INVALID) {
+		/*
+		 * We never entered smb_server_receiver()
+		 * so need to do it's return cleanup
+		 */
+		DTRACE_PROBE1(maxconn, smb_session_t *, session);
 		smb_session_disconnect(session);
+		smb_session_logoff(session);
 		smb_server_destroy_session(session);
-		cmn_err(CE_WARN, "SMB Session: taskq_dispatch failed");
-		return;
+		goto logmaxconn;
 	}
-	/* handy for debugging */
+
+	/* Success */
 	session->s_receiver_tqid = tqid;
+	return;
+
+logmaxconn:
+	/*
+	 * If we hit max_connections, log something so an admin
+	 * can find out why new connections are failing, but
+	 * log this no more than once a minute.
+	 */
+	now = ddi_get_lbolt();
+	if (now > ld->ld_quiet) {
+		ld->ld_quiet = now + SEC_TO_TICK(60);
+		cmn_err(CE_WARN, "SMB can't create session: "
+		    "Would exceed max_connections.");
+	}
 }
 
 static void
