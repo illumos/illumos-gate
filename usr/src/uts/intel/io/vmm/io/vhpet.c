@@ -39,7 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/mutex.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/systm.h>
 
 #include <dev/acpica/acpi_hpet.h>
@@ -52,7 +52,6 @@ __FBSDID("$FreeBSD$");
 #include "vioapic.h"
 #include "vhpet.h"
 
-static MALLOC_DEFINE(M_VHPET, "vhpet", "bhyve virtual hpet");
 
 #define	HPET_FREQ	16777216		/* 16.7 (2^24) Mhz */
 #define	FS_PER_S	1000000000000000ul
@@ -682,7 +681,7 @@ vhpet_init(struct vm *vm)
 	uint64_t allowed_irqs;
 	struct vhpet_callout_arg *arg;
 
-	vhpet = malloc(sizeof (struct vhpet), M_VHPET, M_WAITOK | M_ZERO);
+	vhpet = kmem_zalloc(sizeof (struct vhpet), KM_SLEEP);
 	vhpet->vm = vm;
 	mutex_init(&vhpet->lock, NULL, MUTEX_ADAPTIVE, NULL);
 
@@ -722,7 +721,7 @@ vhpet_cleanup(struct vhpet *vhpet)
 		callout_drain(&vhpet->timer[i].callout);
 
 	mutex_destroy(&vhpet->lock);
-	free(vhpet, M_VHPET);
+	kmem_free(vhpet, sizeof (*vhpet));
 }
 
 int

@@ -51,7 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/cpuset.h>
 
 #include <x86/apicreg.h>
@@ -95,7 +95,6 @@ struct vioapic {
 #define	VIOAPIC_UNLOCK(vioapic)		mutex_exit(&((vioapic)->lock))
 #define	VIOAPIC_LOCKED(vioapic)		MUTEX_HELD(&((vioapic)->lock))
 
-static MALLOC_DEFINE(M_VIOAPIC, "vioapic", "bhyve virtual ioapic");
 
 static void
 vioapic_send_intr(struct vioapic *vioapic, int pin)
@@ -427,7 +426,7 @@ vioapic_init(struct vm *vm)
 	int i;
 	struct vioapic *vioapic;
 
-	vioapic = malloc(sizeof (struct vioapic), M_VIOAPIC, M_WAITOK | M_ZERO);
+	vioapic = kmem_zalloc(sizeof (struct vioapic), KM_SLEEP);
 
 	vioapic->vm = vm;
 	mutex_init(&vioapic->lock, NULL, MUTEX_ADAPTIVE, NULL);
@@ -443,7 +442,7 @@ void
 vioapic_cleanup(struct vioapic *vioapic)
 {
 	mutex_destroy(&vioapic->lock);
-	free(vioapic, M_VIOAPIC);
+	kmem_free(vioapic, sizeof (*vioapic));
 }
 
 int

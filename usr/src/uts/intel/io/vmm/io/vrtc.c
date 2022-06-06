@@ -37,7 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/mutex.h>
 #include <sys/clock.h>
 #include <sys/sysctl.h>
@@ -104,8 +104,6 @@ struct vrtc {
 
 static void vrtc_callout_handler(void *arg);
 static void vrtc_set_reg_c(struct vrtc *vrtc, uint8_t newval);
-
-static MALLOC_DEFINE(M_VRTC, "vrtc", "bhyve virtual rtc");
 
 SYSCTL_DECL(_hw_vmm);
 SYSCTL_NODE(_hw_vmm, OID_AUTO, vrtc, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
@@ -927,7 +925,7 @@ vrtc_init(struct vm *vm)
 	time_t curtime;
 	int error;
 
-	vrtc = malloc(sizeof (struct vrtc), M_VRTC, M_WAITOK | M_ZERO);
+	vrtc = kmem_zalloc(sizeof (struct vrtc), KM_SLEEP);
 	vrtc->vm = vm;
 	mutex_init(&vrtc->lock, NULL, MUTEX_ADAPTIVE, NULL);
 	callout_init(&vrtc->callout, 1);
@@ -962,7 +960,7 @@ vrtc_cleanup(struct vrtc *vrtc)
 {
 	callout_drain(&vrtc->callout);
 	mutex_destroy(&vrtc->lock);
-	free(vrtc, M_VRTC);
+	kmem_free(vrtc, sizeof (*vrtc));
 }
 
 void

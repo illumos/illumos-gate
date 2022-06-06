@@ -377,6 +377,9 @@ typedef enum vm_msr_result {
 void vmm_sol_glue_init(void);
 void vmm_sol_glue_cleanup(void);
 
+void *vmm_contig_alloc(size_t);
+void vmm_contig_free(void *, size_t);
+
 int vmm_mod_load(void);
 int vmm_mod_unload(void);
 

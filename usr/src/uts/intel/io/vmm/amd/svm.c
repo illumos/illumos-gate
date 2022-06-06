@@ -46,7 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
@@ -111,9 +111,6 @@ SYSCTL_NODE(_hw_vmm, OID_AUTO, svm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
 static uint32_t vmcb_clean = VMCB_CACHE_DEFAULT;
 SYSCTL_INT(_hw_vmm_svm, OID_AUTO, vmcb_clean, CTLFLAG_RDTUN, &vmcb_clean,
     0, NULL);
-
-static MALLOC_DEFINE(M_SVM, "svm", "svm");
-static MALLOC_DEFINE(M_SVM_VLAPIC, "svm-vlapic", "svm-vlapic");
 
 /* SVM features advertised by CPUID.8000000AH:EDX */
 static uint32_t svm_feature = ~0U;	/* AMD SVM features. */
@@ -427,16 +424,13 @@ svm_vminit(struct vm *vm)
 	int i;
 	uint16_t maxcpus;
 
-	svm_sc = malloc(sizeof (*svm_sc), M_SVM, M_WAITOK | M_ZERO);
-	if (((uintptr_t)svm_sc & PAGE_MASK) != 0)
-		panic("malloc of svm_softc not aligned on page boundary");
+	svm_sc = kmem_zalloc(sizeof (*svm_sc), KM_SLEEP);
+	VERIFY3U(((uintptr_t)svm_sc & PAGE_MASK),  ==,  0);
 
-	svm_sc->msr_bitmap = contigmalloc(SVM_MSR_BITMAP_SIZE, M_SVM,
-	    M_WAITOK, 0, ~(vm_paddr_t)0, PAGE_SIZE, 0);
+	svm_sc->msr_bitmap = vmm_contig_alloc(SVM_MSR_BITMAP_SIZE);
 	if (svm_sc->msr_bitmap == NULL)
 		panic("contigmalloc of SVM MSR bitmap failed");
-	svm_sc->iopm_bitmap = contigmalloc(SVM_IO_BITMAP_SIZE, M_SVM,
-	    M_WAITOK, 0, ~(vm_paddr_t)0, PAGE_SIZE, 0);
+	svm_sc->iopm_bitmap = vmm_contig_alloc(SVM_IO_BITMAP_SIZE);
 	if (svm_sc->iopm_bitmap == NULL)
 		panic("contigmalloc of SVM IO bitmap failed");
 
@@ -2035,9 +2029,9 @@ svm_vmcleanup(void *arg)
 {
 	struct svm_softc *sc = arg;
 
-	contigfree(sc->iopm_bitmap, SVM_IO_BITMAP_SIZE, M_SVM);
-	contigfree(sc->msr_bitmap, SVM_MSR_BITMAP_SIZE, M_SVM);
-	free(sc, M_SVM);
+	vmm_contig_free(sc->iopm_bitmap, SVM_IO_BITMAP_SIZE);
+	vmm_contig_free(sc->msr_bitmap, SVM_MSR_BITMAP_SIZE);
+	kmem_free(sc, sizeof (*sc));
 }
 
 static uint64_t *
@@ -2400,8 +2394,7 @@ svm_vlapic_init(void *arg, int vcpuid)
 	struct vlapic *vlapic;
 
 	svm_sc = arg;
-	vlapic = malloc(sizeof (struct vlapic), M_SVM_VLAPIC,
-	    M_WAITOK | M_ZERO);
+	vlapic = kmem_zalloc(sizeof (struct vlapic), KM_SLEEP);
 	vlapic->vm = svm_sc->vm;
 	vlapic->vcpuid = vcpuid;
 	vlapic->apic_page = (struct LAPIC *)&svm_sc->apic_page[vcpuid];
@@ -2415,7 +2408,7 @@ static void
 svm_vlapic_cleanup(void *arg, struct vlapic *vlapic)
 {
 	vlapic_cleanup(vlapic);
-	free(vlapic, M_SVM_VLAPIC);
+	kmem_free(vlapic, sizeof (struct vlapic));
 }
 
 static void

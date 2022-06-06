@@ -45,7 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
 
@@ -57,8 +57,6 @@ __FBSDID("$FreeBSD$");
 #include "vmm_lapic.h"
 #include "vioapic.h"
 #include "vatpic.h"
-
-static MALLOC_DEFINE(M_VATPIC, "atpic", "bhyve virtual atpic (8259)");
 
 #define	VATPIC_LOCK(vatpic)		mutex_enter(&((vatpic)->lock))
 #define	VATPIC_UNLOCK(vatpic)		mutex_exit(&((vatpic)->lock))
@@ -781,7 +779,7 @@ vatpic_init(struct vm *vm)
 {
 	struct vatpic *vatpic;
 
-	vatpic = malloc(sizeof (struct vatpic), M_VATPIC, M_WAITOK | M_ZERO);
+	vatpic = kmem_zalloc(sizeof (struct vatpic), KM_SLEEP);
 	vatpic->vm = vm;
 
 	mutex_init(&vatpic->lock, NULL, MUTEX_ADAPTIVE, NULL);
@@ -793,5 +791,5 @@ void
 vatpic_cleanup(struct vatpic *vatpic)
 {
 	mutex_destroy(&vatpic->lock);
-	free(vatpic, M_VATPIC);
+	kmem_free(vatpic, sizeof (*vatpic));
 }

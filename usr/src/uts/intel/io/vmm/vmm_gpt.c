@@ -15,7 +15,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/malloc.h>
 #include <sys/atomic.h>
 #include <sys/kmem.h>
 #include <sys/sysmacros.h>

@@ -51,7 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/sysctl.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/pcpu.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
@@ -271,8 +271,6 @@ static vmm_pte_ops_t *pte_ops = NULL;
 #define	fpu_stop_emulating()	clts()
 
 SDT_PROVIDER_DEFINE(vmm);
-
-static MALLOC_DEFINE(M_VM, "vm", "vm");
 
 SYSCTL_NODE(_hw, OID_AUTO, vmm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     NULL);
@@ -536,7 +534,7 @@ vm_create(uint64_t flags, struct vm **retvm)
 	if (vmspace == NULL)
 		return (ENOMEM);
 
-	vm = malloc(sizeof (struct vm), M_VM, M_WAITOK | M_ZERO);
+	vm = kmem_zalloc(sizeof (struct vm), KM_SLEEP);
 
 	vm->vmspace = vmspace;
 	vm->mem_transient = (flags & VCF_RESERVOIR_MEM) == 0;
@@ -657,7 +655,7 @@ void
 vm_destroy(struct vm *vm)
 {
 	vm_cleanup(vm, true);
-	free(vm, M_VM);
+	kmem_free(vm, sizeof (*vm));
 }
 
 int

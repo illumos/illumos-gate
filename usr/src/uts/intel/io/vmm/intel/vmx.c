@@ -49,7 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
@@ -161,9 +161,6 @@ __FBSDID("$FreeBSD$");
 
 #define	HANDLED		1
 #define	UNHANDLED	0
-
-static MALLOC_DEFINE(M_VMX, "vmx", "vmx");
-static MALLOC_DEFINE(M_VLAPIC, "vlapic", "vlapic");
 
 SYSCTL_DECL(_hw_vmm);
 SYSCTL_NODE(_hw_vmm, OID_AUTO, vmx, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
@@ -694,13 +691,10 @@ vmx_vminit(struct vm *vm)
 	uint32_t proc_ctls, proc2_ctls, pin_ctls;
 	uint64_t apic_access_pa = UINT64_MAX;
 
-	vmx = malloc(sizeof (struct vmx), M_VMX, M_WAITOK | M_ZERO);
-	if ((uintptr_t)vmx & PAGE_MASK) {
-		panic("malloc of struct vmx not aligned on %d byte boundary",
-		    PAGE_SIZE);
-	}
-	vmx->vm = vm;
+	vmx = kmem_zalloc(sizeof (struct vmx), KM_SLEEP);
+	VERIFY3U((uintptr_t)vmx & PAGE_MASK, ==, 0);
 
+	vmx->vm = vm;
 	vmx->eptp = vmspace_table_root(vm_get_vmspace(vm));
 
 	/*
@@ -2937,7 +2931,7 @@ vmx_vmcleanup(void *arg)
 	for (i = 0; i < maxcpus; i++)
 		vpid_free(vmx->state[i].vpid);
 
-	free(vmx, M_VMX);
+	kmem_free(vmx, sizeof (*vmx));
 }
 
 static uint64_t *
@@ -3628,21 +3622,18 @@ vmx_tpr_shadow_exit(struct vlapic *vlapic)
 static struct vlapic *
 vmx_vlapic_init(void *arg, int vcpuid)
 {
-	struct vmx *vmx;
-	struct vlapic *vlapic;
+	struct vmx *vmx = arg;
 	struct vlapic_vtx *vlapic_vtx;
+	struct vlapic *vlapic;
 
-	vmx = arg;
+	vlapic_vtx = kmem_zalloc(sizeof (struct vlapic_vtx), KM_SLEEP);
+	vlapic_vtx->pir_desc = &vmx->pir_desc[vcpuid];
+	vlapic_vtx->vmx = vmx;
 
-	vlapic = malloc(sizeof (struct vlapic_vtx), M_VLAPIC,
-	    M_WAITOK | M_ZERO);
+	vlapic = &vlapic_vtx->vlapic;
 	vlapic->vm = vmx->vm;
 	vlapic->vcpuid = vcpuid;
 	vlapic->apic_page = (struct LAPIC *)&vmx->apic_page[vcpuid];
-
-	vlapic_vtx = (struct vlapic_vtx *)vlapic;
-	vlapic_vtx->pir_desc = &vmx->pir_desc[vcpuid];
-	vlapic_vtx->vmx = vmx;
 
 	if (vmx_cap_en(vmx, VMX_CAP_TPR_SHADOW)) {
 		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_ts;
@@ -3666,9 +3657,8 @@ vmx_vlapic_init(void *arg, int vcpuid)
 static void
 vmx_vlapic_cleanup(void *arg, struct vlapic *vlapic)
 {
-
 	vlapic_cleanup(vlapic);
-	free(vlapic, M_VLAPIC);
+	kmem_free(vlapic, sizeof (struct vlapic_vtx));
 }
 
 static void

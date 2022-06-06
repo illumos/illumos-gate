@@ -44,7 +44,7 @@
 #include <sys/archsystm.h>
 #include <sys/cpuset.h>
 #include <sys/fp.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/queue.h>
 #include <sys/spl.h>
 #include <sys/systm.h>
@@ -146,138 +146,117 @@ cpusetobj_ffs(const cpuset_t *set)
 	return (small + 1);
 }
 
-struct kmem_item {
-	void			*addr;
-	size_t			size;
+struct vmm_ptp_item {
+	void *vpi_vaddr;
 };
-static kmutex_t kmem_items_lock;
+static kmutex_t vmm_ptp_lock;
 
-static mod_hash_t *vmm_alloc_hash;
-uint_t vmm_alloc_hash_nchains = 16381;
-uint_t vmm_alloc_hash_size = PAGESIZE;
+static mod_hash_t *vmm_ptp_hash;
+uint_t vmm_ptp_hash_nchains = 16381;
+uint_t vmm_ptp_hash_size = PAGESIZE;
 
 static void
-vmm_alloc_hash_valdtor(mod_hash_val_t val)
+vmm_ptp_hash_valdtor(mod_hash_val_t val)
 {
-	struct kmem_item *i = (struct kmem_item *)val;
+	struct vmm_ptp_item *i = (struct vmm_ptp_item *)val;
 
-	kmem_free(i->addr, i->size);
-	kmem_free(i, sizeof (struct kmem_item));
+	kmem_free(i->vpi_vaddr, PAGE_SIZE);
+	kmem_free(i, sizeof (*i));
 }
 
 static void
-vmm_alloc_init(void)
+vmm_ptp_init(void)
 {
-	vmm_alloc_hash = mod_hash_create_ptrhash("vmm_alloc_hash",
-	    vmm_alloc_hash_nchains, vmm_alloc_hash_valdtor,
-	    vmm_alloc_hash_size);
+	vmm_ptp_hash = mod_hash_create_ptrhash("vmm_ptp_hash",
+	    vmm_ptp_hash_nchains, vmm_ptp_hash_valdtor, vmm_ptp_hash_size);
 
-	VERIFY(vmm_alloc_hash != NULL);
+	VERIFY(vmm_ptp_hash != NULL);
 }
 
 static uint_t
-vmm_alloc_check(mod_hash_key_t key, mod_hash_val_t *val, void *unused)
+vmm_ptp_check(mod_hash_key_t key, mod_hash_val_t *val, void *unused)
 {
-	struct kmem_item *i = (struct kmem_item *)val;
+	struct vmm_ptp_item *i = (struct vmm_ptp_item *)val;
 
-	cmn_err(CE_PANIC, "!vmm_alloc_check: hash not empty: %p, %lu", i->addr,
-	    i->size);
+	cmn_err(CE_PANIC, "!vmm_ptp_check: hash not empty: %p", i->vpi_vaddr);
 
 	return (MH_WALK_TERMINATE);
 }
 
 static void
-vmm_alloc_cleanup(void)
+vmm_ptp_cleanup(void)
 {
-	mod_hash_walk(vmm_alloc_hash, vmm_alloc_check, NULL);
-	mod_hash_destroy_ptrhash(vmm_alloc_hash);
+	mod_hash_walk(vmm_ptp_hash, vmm_ptp_check, NULL);
+	mod_hash_destroy_ptrhash(vmm_ptp_hash);
 }
 
+/*
+ * The logic in VT-d uses both kernel-virtual and direct-mapped addresses when
+ * freeing PTP pages.  Until the consuming code is improved to better track the
+ * pages it allocates, we keep the kernel-virtual addresses to those pages in a
+ * hash table for when they are freed.
+ */
 void *
-malloc(unsigned long size, struct malloc_type *mtp, int flags)
+vmm_ptp_alloc(void)
 {
-	void			*p;
-	struct kmem_item	*i;
-	int			kmem_flag = KM_SLEEP;
+	void *p;
+	struct vmm_ptp_item *i;
 
-	if (flags & M_NOWAIT)
-		kmem_flag = KM_NOSLEEP;
+	p = kmem_zalloc(PAGE_SIZE, KM_SLEEP);
+	i = kmem_alloc(sizeof (struct vmm_ptp_item), KM_SLEEP);
+	i->vpi_vaddr = p;
 
-	if (flags & M_ZERO) {
-		p = kmem_zalloc(size, kmem_flag);
-	} else {
-		p = kmem_alloc(size, kmem_flag);
-	}
-
-	if (p == NULL)
-		return (NULL);
-
-	i = kmem_zalloc(sizeof (struct kmem_item), kmem_flag);
-
-	if (i == NULL) {
-		kmem_free(p, size);
-		return (NULL);
-	}
-
-	mutex_enter(&kmem_items_lock);
-	i->addr = p;
-	i->size = size;
-
-	VERIFY(mod_hash_insert(vmm_alloc_hash,
+	mutex_enter(&vmm_ptp_lock);
+	VERIFY(mod_hash_insert(vmm_ptp_hash,
 	    (mod_hash_key_t)PHYS_TO_DMAP(vtophys(p)), (mod_hash_val_t)i) == 0);
-
-	mutex_exit(&kmem_items_lock);
+	mutex_exit(&vmm_ptp_lock);
 
 	return (p);
 }
 
 void
-free(void *addr, struct malloc_type *mtp)
+vmm_ptp_free(void *addr)
 {
-	mutex_enter(&kmem_items_lock);
-	VERIFY(mod_hash_destroy(vmm_alloc_hash,
+	mutex_enter(&vmm_ptp_lock);
+	VERIFY(mod_hash_destroy(vmm_ptp_hash,
 	    (mod_hash_key_t)PHYS_TO_DMAP(vtophys(addr))) == 0);
-	mutex_exit(&kmem_items_lock);
+	mutex_exit(&vmm_ptp_lock);
 }
 
+/* Reach into i86pc/os/ddi_impl.c for these */
 extern void *contig_alloc(size_t, ddi_dma_attr_t *, uintptr_t, int);
 extern void contig_free(void *, size_t);
 
 void *
-contigmalloc(unsigned long size, struct malloc_type *type, int flags,
-    vm_paddr_t low, vm_paddr_t high, unsigned long alignment,
-    vm_paddr_t boundary)
+vmm_contig_alloc(size_t size)
 {
 	ddi_dma_attr_t attr = {
 		/* Using fastboot_dma_attr as a guide... */
-		DMA_ATTR_V0,
-		low,			/* dma_attr_addr_lo */
-		high,			/* dma_attr_addr_hi */
-		0x00000000FFFFFFFFULL,	/* dma_attr_count_max */
-		alignment,		/* dma_attr_align */
-		1,			/* dma_attr_burstsize */
-		1,			/* dma_attr_minxfer */
-		0x00000000FFFFFFFFULL,	/* dma_attr_maxxfer */
-		0x00000000FFFFFFFFULL,	/* dma_attr_seg: any */
-		1,			/* dma_attr_sgllen */
-		alignment,		/* dma_attr_granular */
-		0,			/* dma_attr_flags */
+		.dma_attr_version	= DMA_ATTR_V0,
+		.dma_attr_addr_lo	= 0,
+		.dma_attr_addr_hi	= ~0UL,
+		.dma_attr_count_max	= 0x00000000FFFFFFFFULL,
+		.dma_attr_align		= PAGE_SIZE,
+		.dma_attr_burstsizes	= 1,
+		.dma_attr_minxfer	= 1,
+		.dma_attr_maxxfer	= 0x00000000FFFFFFFFULL,
+		.dma_attr_seg		= 0x00000000FFFFFFFFULL, /* any */
+		.dma_attr_sgllen	= 1,
+		.dma_attr_granular	= PAGE_SIZE,
+		.dma_attr_flags		= 0,
 	};
-	int cansleep = (flags & M_WAITOK);
-	void *result;
+	void *res;
 
-	ASSERT(alignment == PAGESIZE);
-
-	result = contig_alloc((size_t)size, &attr, alignment, cansleep);
-
-	if (result != NULL && (flags & M_ZERO) != 0) {
-		bzero(result, size);
+	res = contig_alloc(size, &attr, PAGE_SIZE, 1);
+	if (res != NULL) {
+		bzero(res, size);
 	}
-	return (result);
+
+	return (res);
 }
 
 void
-contigfree(void *addr, unsigned long size, struct malloc_type *type)
+vmm_contig_free(void *addr, size_t size)
 {
 	contig_free(addr, size);
 }
@@ -429,14 +408,14 @@ vmm_cpuid_init(void)
 void
 vmm_sol_glue_init(void)
 {
-	vmm_alloc_init();
+	vmm_ptp_init();
 	vmm_cpuid_init();
 }
 
 void
 vmm_sol_glue_cleanup(void)
 {
-	vmm_alloc_cleanup();
+	vmm_ptp_cleanup();
 }
 
 
