@@ -383,3 +383,8 @@ VIONA_OBJS = \
 # bhyve PCI-passthru
 #
 PPT_OBJS = ppt.o
+
+#
+# bhyve VT-d
+#
+VMM_VTD_OBJS = vtd.o

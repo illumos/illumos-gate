@@ -27,6 +27,18 @@
  *
  * $FreeBSD$
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2022 Oxide Computer Company
+ */
 
 #ifndef _IO_IOMMU_H_
 #define	_IO_IOMMU_H_
@@ -42,8 +54,8 @@ typedef uint64_t (*iommu_create_mapping_t)(void *domain, vm_paddr_t gpa,
 typedef uint64_t (*iommu_remove_mapping_t)(void *domain, vm_paddr_t gpa,
     uint64_t len);
 typedef void (*iommu_add_device_t)(void *domain, uint16_t rid);
-typedef void (*iommu_remove_device_t)(void *dom, uint16_t rid);
-typedef void (*iommu_invalidate_tlb_t)(void *dom);
+typedef void (*iommu_remove_device_t)(void *domain, uint16_t rid);
+typedef void (*iommu_invalidate_tlb_t)(void *domain);
 
 struct iommu_ops {
 	iommu_init_func_t	init;		/* module wide */
@@ -60,19 +72,17 @@ struct iommu_ops {
 	iommu_invalidate_tlb_t	invalidate_tlb;
 };
 
-extern const struct iommu_ops iommu_ops_intel;
-extern const struct iommu_ops iommu_ops_amd;
+#define	IOMMU_OPS_SYM_NAME	"vmm_iommu_ops"
 
-void	iommu_cleanup(void);
-void	*iommu_host_domain(void);
-void	*iommu_create_domain(vm_paddr_t maxaddr);
-void	iommu_destroy_domain(void *dom);
-void	iommu_create_mapping(void *dom, vm_paddr_t gpa, vm_paddr_t hpa,
+void *iommu_host_domain(void);
+void *iommu_create_domain(vm_paddr_t maxaddr);
+void iommu_destroy_domain(void *domain);
+void iommu_create_mapping(void *domain, vm_paddr_t gpa, vm_paddr_t hpa,
     size_t len);
-void	iommu_remove_mapping(void *dom, vm_paddr_t gpa, size_t len);
-void	iommu_add_device(void *dom, uint16_t rid);
-void	iommu_remove_device(void *dom, uint16_t rid);
-void	iommu_invalidate_tlb(void *domain);
+void iommu_remove_mapping(void *domain, vm_paddr_t gpa, size_t len);
+void iommu_add_device(void *domain, uint16_t rid);
+void iommu_remove_device(void *domain, uint16_t rid);
+void iommu_invalidate_tlb(void *domain);
 
 /* Glue functions used by iommu provider(s) */
 void *vmm_ptp_alloc(void);

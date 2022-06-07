@@ -11,7 +11,6 @@
 # This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE
 
 #
-# Copyright 2019 Joyent, Inc.
 # Copyright 2022 Oxide Computer Company
 #
 
@@ -38,36 +37,8 @@ SYMBOL_VERSION ILLUMOSprivate {
 	_init;
 	_info;
 
-	# bhyve driver API
-	vmm_drv_hold;
-	vmm_drv_rele;
-	vmm_drv_release_reqd;
-	vmm_drv_lease_sign;
-	vmm_drv_lease_break;
-	vmm_drv_lease_expired;
-	vmm_drv_page_hold;
-	vmm_drv_page_release;
-	vmm_drv_page_release_chain;
-	vmm_drv_page_readable;
-	vmm_drv_page_writable;
-	vmm_drv_page_chain;
-	vmm_drv_page_next;
-	vmm_drv_ioport_hook;
-	vmm_drv_ioport_unhook;
-	vmm_drv_msi;
-
-	# IOMMU API for PCI pass-thru
-	iommu_add_device;
-	iommu_host_domain;
-	iommu_remove_device;
-	lapic_intr_msi;
-	vm_iommu_domain;
-	vm_map_mmio;
-	vm_unmap_mmio;
-	vmm_ptp_alloc;
-	vmm_ptp_free;
-	invalidate_cache_all;
-	vtophys;
+	# IOMMU ops consumed by bhyve
+	vmm_iommu_ops;
 
     local:
 	*;
