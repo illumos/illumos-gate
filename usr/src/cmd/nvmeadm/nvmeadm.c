@@ -567,9 +567,10 @@ nvme_process(di_node_t node, di_minor_t minor, void *arg)
 	if (npa->npa_idns == NULL)
 		goto out;
 
+	npa->npa_dsk = NULL;
 	if (npa->npa_isns) {
-		npa->npa_ignored = nvme_is_ignored_ns(fd);
-		if (!npa->npa_ignored)
+		npa->npa_ns_state = nvme_namespace_state(fd);
+		if ((npa->npa_ns_state & NVME_NS_STATE_ATTACHED) != 0)
 			npa->npa_dsk = nvme_dskname(npa);
 	}
 
@@ -668,23 +669,38 @@ static int
 do_list_nsid(int fd, const nvme_process_arg_t *npa)
 {
 	_NOTE(ARGUNUSED(fd));
-	const uint_t format = npa->npa_idns->id_flbas.lba_format;
-	const uint_t bshift = npa->npa_idns->id_lbaf[format].lbaf_lbads;
+	char *dskname;
 
-	/*
-	 * Some devices have extra namespaces with illegal block sizes and
-	 * zero blocks. Don't list them when verbose operation isn't requested.
-	 */
-	if ((bshift < 9 || npa->npa_idns->id_nsize == 0) && verbose == 0)
+	if (!npa->npa_interactive &&
+	    (npa->npa_ns_state & NVME_NS_STATE_IGNORED) != 0 &&
+	    verbose == 0)
 		return (0);
 
-	if (npa->npa_ofmt == NULL) {
-		(void) printf("  %s/%s (%s): ", npa->npa_name,
-		    di_minor_name(npa->npa_minor),
-		    npa->npa_dsk != NULL ? npa->npa_dsk : "unattached");
-		nvme_print_nsid_summary(npa->npa_idns);
-	} else {
+	if (npa->npa_ofmt != NULL) {
 		ofmt_print(npa->npa_ofmt, (void *)npa);
+		return (0);
+	}
+
+	if (npa->npa_ns_state == NVME_NS_STATE_IGNORED) {
+		(void) printf("  %s/%s (unallocated)\n", npa->npa_name,
+		    di_minor_name(npa->npa_minor));
+	} else {
+		if ((npa->npa_ns_state & NVME_NS_STATE_ATTACHED) != 0) {
+			dskname = npa->npa_dsk;
+		} else if ((npa->npa_ns_state & NVME_NS_STATE_ACTIVE) != 0) {
+			if ((npa->npa_ns_state & NVME_NS_STATE_IGNORED) != 0) {
+				dskname = "ignored";
+			} else {
+				dskname = "unattached";
+			}
+		} else if ((npa->npa_ns_state & NVME_NS_STATE_ALLOCATED) != 0) {
+			dskname = "inactive";
+		} else {
+			dskname = "invalid state";
+		}
+		(void) printf("  %s/%s (%s): ", npa->npa_name,
+		    di_minor_name(npa->npa_minor), dskname);
+		nvme_print_nsid_summary(npa->npa_idns);
 	}
 
 	return (0);
@@ -867,6 +883,10 @@ do_get_logpage(int fd, const nvme_process_arg_t *npa)
 		func = do_get_logpage_fwslot;
 	else
 		errx(-1, "invalid log page: %s", npa->npa_argv[0]);
+
+	if (npa->npa_isns &&
+	    (npa->npa_ns_state & NVME_NS_STATE_ACTIVE) == 0)
+		errx(-1, "cannot get logpage: namespace is inactive");
 
 	ret = func(fd, npa);
 	return (ret);
@@ -1092,6 +1112,10 @@ do_get_features(int fd, const nvme_process_arg_t *npa)
 	if (npa->npa_argc > 1)
 		errx(-1, "unexpected arguments");
 
+	if (npa->npa_isns &&
+	    (npa->npa_ns_state & NVME_NS_STATE_ACTIVE) == 0)
+		errx(-1, "cannot get feature: namespace is inactive");
+
 	/*
 	 * No feature list given, print all supported features.
 	 */
@@ -1166,6 +1190,12 @@ do_format_common(int fd, const nvme_process_arg_t *npa, unsigned long lbaf,
 {
 	nvme_process_arg_t ns_npa = { 0 };
 	nvmeadm_cmd_t cmd = { 0 };
+
+	if (npa->npa_isns &&
+	    (npa->npa_ns_state & NVME_NS_STATE_ACTIVE) == 0) {
+		errx(-1, "cannot %s: namespace is inactive",
+		    npa->npa_cmd->c_name);
+	}
 
 	cmd = *(npa->npa_cmd);
 	cmd.c_func = do_attach_detach;
@@ -1316,7 +1346,8 @@ do_attach_detach(int fd, const nvme_process_arg_t *npa)
 	 * that are ignored by the driver, thereby avoiding printing pointless
 	 * error messages.
 	 */
-	if (!npa->npa_interactive && npa->npa_ignored)
+	if (!npa->npa_interactive &&
+	    (npa->npa_ns_state & NVME_NS_STATE_IGNORED))
 		return (0);
 
 	if ((c_name[0] == 'd' ? nvme_detach : nvme_attach)(fd)

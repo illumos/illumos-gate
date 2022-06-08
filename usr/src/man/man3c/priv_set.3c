@@ -1,134 +1,162 @@
-'\" te
 .\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRIV_SET 3C "Sep 25, 2003"
-.SH NAME
-priv_set, priv_ineffect \- change privilege sets and check whether privileges
-are set
-.SH SYNOPSIS
-.LP
-.nf
-#include <priv.h>
-
-\fBint\fR \fBpriv_set\fR(\fBpriv_op_t\fR \fIop\fR, \fBpriv_ptype_t\fR  \fIwhich\fR...);
-.fi
-
-.LP
-.nf
-\fBboolean_t\fR \fBpriv_ineffect\fR(\fBconst char *\fR\fIpriv\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBpriv_set()\fR function is a convenient wrapper for the \fBsetppriv\fR(2)
-function. It takes three or more arguments. The operation argument, \fIop\fR,
-can be one of \fBPRIV_OFF\fR, \fBPRIV_ON\fR or \fBPRIV_SET\fR. The \fIwhich\fR
-argument is the name of the privilege set to change. The third argument is a
-list of zero or more privilege names terminated with a null pointer. If
-\fIwhich\fR is the special pseudo set \fBPRIV_ALLSETS\fR, the operation should
-be applied to all privilege sets.
-.sp
-.LP
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd June 3, 2022
+.Dt PRIV_SET 3C
+.Os
+.Sh NAME
+.Nm priv_set ,
+.Nm priv_ineffect
+.Nd change privilege sets and check whether privileges are set
+.Sh SYNOPSIS
+.In priv.h
+.Ft int
+.Fo priv_set
+.Fa "priv_op_t op"
+.Fa "priv_ptype_t which"
+.Fa "..."
+.Fc
+.Ft boolean_t
+.Fo priv_ineffect
+.Fa "const char *priv"
+.Fc
+.Sh DESCRIPTION
+.Fn priv_set
+is a convenient wrapper for the
+.Xr setppriv 2
+function.
+It takes three or more arguments.
+The operation argument,
+.Ar op ,
+can be one of
+.Dv PRIV_OFF , PRIV_ON
+or
+.Dv PRIV_SET .
+The
+.Ar which
+argument is the name of the privilege set to change, one of
+.Dv PRIV_EFFECTIVE , PRIV_INHERITABLE , PRIV_PERMITTED , PRIV_LIMIT
+or the special pseudo set
+.Dv PRIV_ALLSETS
+if the operation should be applied to all privilege sets.
+Subsequent arguments provide zero or more privilege names, terminated with a
+.Dv NULL
+pointer.
+See
+.Sx EXAMPLES .
+.Pp
 The specified privileges are converted to a binary privilege set and
-\fBsetppriv()\fR is called with the same \fIop\fR and \fIwhich\fR arguments.
-When called with \fBPRIV_ALLSETS\fR as the value for the \fIwhich\fR argument,
-\fBsetppriv()\fR is called for each set in turn, aborting on the first failed
-call.
-.sp
-.LP
-The \fBpriv_ineffect()\fR function is a conventient wrapper for the
-\fBgetppriv\fR(2) function. The \fIpriv\fR argument specifies the name of the
-privilege for which this function checks its presence in the effective set.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBpriv_set()\fR return 0. Otherwise, -1  is
-returned and \fBerrno\fR is set to indicate the error.
-.sp
-.LP
-If \fIpriv\fR is a valid privilege that is a member of the effective set,
-\fBpriv_ineffect()\fR returns \fBB_TRUE\fR. Otherwise, it returns \fBB_FALSE\fR
-and sets \fBerrno\fR to incicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBpriv_set()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value of \fIop\fR or \fIwhich\fR is out of range.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
+.Xr setppriv 2
+is called with the same
+.Ar op
+and
+.Ar which
+arguments.
+When called with
+.Dv PRIV_ALLSETS
+as the value for the
+.Ar which
+argument,
+.Xr setppriv 2
+is called for each set in turn, aborting on the first failed call.
+.Pp
+.Fn priv_ineffect
+is a convenient wrapper for the
+.Xr getppriv 2
+function.
+The
+.Ar priv
+argument specifies the name of a privilege, and this function checks for its
+presence in the effective set.
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn priv_set
+return 0.
+Otherwise, -1  is returned and
+.Dv errno
+is set to indicate the error.
+.Pp
+If
+.Ar priv
+is a valid privilege that is a member of the effective set,
+.Fn priv_ineffect
+returns
+.Dv B_TRUE .
+Otherwise, it returns
+.Dv B_FALSE
+and sets
+.Dv errno
+to indicate the error.
+.Sh EXAMPLES
+.Sy Example 1
+Using
+.Fn priv_set
+.Bd -literal -offset 6n
+#include <priv.h>
+\&...
+/* Remove basic privileges we don't need */
+(void) priv_set(PRIV_OFF, PRIV_PERMITTED, PRIV_PROC_EXEC,
+    PRIV_PROC_INFO, PRIV_FILE_LINK_ANY, PRIV_PROC_SESSION,
+    NULL);
+.Ed
+.Sh ERRORS
+The
+.Fn priv_set
+function will fail if:
+.Bl -tag -width Ds
+.It Er EINVAL
+The value of
+.Ar op
+or
+.Ar which
+is out of range.
+.It Er ENOMEM
 Insufficient memory was allocated.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEPERM\fR\fR
-.ad
-.RS 10n
-The application attempted to add privileges to \fBPRIV_LIMIT\fR or
-\fBPRIV_PERMITTED\fR, or the application attempted to add privileges to
-\fBPRIV_INHERITABLE\fR or \fBPRIV_EFFECTIVE\fR that were not in
-\fBPRIV_PERMITTED\fR.
-.RE
-
-.sp
-.LP
-The \fBpriv_ineffect()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The privilege specified by \fIpriv\fR is invalid.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
+.It Er EPERM
+The application attempted to add privileges to
+.Dv PRIV_LIMIT
+or
+.Dv PRIV_PERMITTED ,
+or the application attempted to add privileges to
+.Dv PRIV_INHERITABLE
+or
+.Dv PRIV_EFFECTIVE
+that were not in
+.Dv PRIV_PERMITTED .
+.El
+.Pp
+The
+.Fn priv_ineffect
+function will fail if:
+.Bl -tag -width Ds
+.It Er EINVAL
+The privilege specified by
+.Ar priv
+is invalid.
+.It Er ENOMEM
 Insufficient memory was allocated.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Evolving
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR setppriv (2),
-.BR priv_str_to_set (3C),
-.BR attributes (7),
-.BR privileges (7)
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr setppriv 2 ,
+.Xr priv_str_to_set 3C ,
+.Xr attributes 7 ,
+.Xr privileges 7
