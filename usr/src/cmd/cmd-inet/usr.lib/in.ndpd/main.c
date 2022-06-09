@@ -19,6 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include "defs.h"
@@ -2418,7 +2419,7 @@ ndpd_delete_addrs(const char *ifname)
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(&pi->pi_token)) {
 		logmsg(LOG_ERR, "token does not exist for %s", ifname);
-		return (EINVAL);
+		return (ENOENT);
 	}
 
 	if (ifsock < 0) {

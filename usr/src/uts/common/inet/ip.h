@@ -25,6 +25,7 @@
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_INET_IP_H
@@ -2009,7 +2010,7 @@ enum { IF_CMD = 1, LIF_CMD, ARP_CMD, XARP_CMD, MSFILT_CMD, MISC_CMD };
 #define	IPI_DONTCARE	0	/* For ioctl encoded values that don't matter */
 
 /* Flag values in ipi_flags */
-#define	IPI_PRIV	0x1	/* Root only command */
+#define	IPI_PRIV	0x1	/* Command requires PRIV_SYS_IP_CONFIG */
 #define	IPI_MODOK	0x2	/* Permitted on mod instance of IP */
 #define	IPI_WR		0x4	/* Need to grab writer access */
 #define	IPI_GET_CMD	0x8	/* branch to mi_copyout on success */
