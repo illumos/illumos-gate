@@ -34,18 +34,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
 
 #include <machine/vmm.h>
 
-#include "vmm_ktr.h"
 #include "vatpic.h"
 #include "vioapic.h"
 #include "vatpit.h"
-
-static MALLOC_DEFINE(M_VATPIT, "atpit", "bhyve virtual atpit (8254)");
 
 #define	VATPIT_LOCK(vatpit)		mutex_enter(&((vatpit)->lock))
 #define	VATPIT_UNLOCK(vatpit)		mutex_exit(&((vatpit)->lock))
@@ -146,8 +143,6 @@ vatpit_callout_handler(void *a)
 	vatpit = arg->vatpit;
 	c = &vatpit->channel[arg->channel_num];
 	callout = &c->callout;
-
-	VM_CTR1(vatpit->vm, "atpit t%d fired", arg->channel_num);
 
 	VATPIT_LOCK(vatpit);
 
@@ -348,7 +343,7 @@ vatpit_handler(void *arg, bool in, uint16_t port, uint8_t bytes, uint32_t *eax)
 
 	if (port == TIMER_MODE) {
 		if (in) {
-			VM_CTR0(vatpit->vm, "vatpit attempt to read mode");
+			/* Mode is write-only */
 			return (-1);
 		}
 
@@ -450,7 +445,7 @@ vatpit_init(struct vm *vm)
 	struct vatpit_callout_arg *arg;
 	int i;
 
-	vatpit = malloc(sizeof (struct vatpit), M_VATPIT, M_WAITOK | M_ZERO);
+	vatpit = kmem_zalloc(sizeof (struct vatpit), KM_SLEEP);
 	vatpit->vm = vm;
 
 	mutex_init(&vatpit->lock, NULL, MUTEX_ADAPTIVE, NULL);
@@ -474,7 +469,7 @@ vatpit_cleanup(struct vatpit *vatpit)
 		callout_drain(&vatpit->channel[i].callout);
 
 	mutex_destroy(&vatpit->lock);
-	free(vatpit, M_VATPIT);
+	kmem_free(vatpit, sizeof (*vatpit));
 }
 
 void

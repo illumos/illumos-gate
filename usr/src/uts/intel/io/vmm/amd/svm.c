@@ -46,7 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
@@ -67,7 +67,6 @@ __FBSDID("$FreeBSD$");
 
 #include "vmm_lapic.h"
 #include "vmm_stat.h"
-#include "vmm_ktr.h"
 #include "vmm_ioport.h"
 #include "vatpic.h"
 #include "vlapic.h"
@@ -112,9 +111,6 @@ SYSCTL_NODE(_hw_vmm, OID_AUTO, svm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
 static uint32_t vmcb_clean = VMCB_CACHE_DEFAULT;
 SYSCTL_INT(_hw_vmm_svm, OID_AUTO, vmcb_clean, CTLFLAG_RDTUN, &vmcb_clean,
     0, NULL);
-
-static MALLOC_DEFINE(M_SVM, "svm", "svm");
-static MALLOC_DEFINE(M_SVM_VLAPIC, "svm-vlapic", "svm-vlapic");
 
 /* SVM features advertised by CPUID.8000000AH:EDX */
 static uint32_t svm_feature = ~0U;	/* AMD SVM features. */
@@ -275,8 +271,6 @@ svm_set_intercept(struct svm_softc *sc, int vcpu, int idx, uint32_t bitmask,
 
 	if (ctrl->intercept[idx] != oldval) {
 		svm_set_dirty(sc, vcpu, VMCB_CACHE_I);
-		VCPU_CTR3(sc->vm, vcpu, "intercept[%d] modified "
-		    "from %x to %x", idx, oldval, ctrl->intercept[idx]);
 	}
 }
 
@@ -430,16 +424,13 @@ svm_vminit(struct vm *vm)
 	int i;
 	uint16_t maxcpus;
 
-	svm_sc = malloc(sizeof (*svm_sc), M_SVM, M_WAITOK | M_ZERO);
-	if (((uintptr_t)svm_sc & PAGE_MASK) != 0)
-		panic("malloc of svm_softc not aligned on page boundary");
+	svm_sc = kmem_zalloc(sizeof (*svm_sc), KM_SLEEP);
+	VERIFY3U(((uintptr_t)svm_sc & PAGE_MASK),  ==,  0);
 
-	svm_sc->msr_bitmap = contigmalloc(SVM_MSR_BITMAP_SIZE, M_SVM,
-	    M_WAITOK, 0, ~(vm_paddr_t)0, PAGE_SIZE, 0);
+	svm_sc->msr_bitmap = vmm_contig_alloc(SVM_MSR_BITMAP_SIZE);
 	if (svm_sc->msr_bitmap == NULL)
 		panic("contigmalloc of SVM MSR bitmap failed");
-	svm_sc->iopm_bitmap = contigmalloc(SVM_IO_BITMAP_SIZE, M_SVM,
-	    M_WAITOK, 0, ~(vm_paddr_t)0, PAGE_SIZE, 0);
+	svm_sc->iopm_bitmap = vmm_contig_alloc(SVM_IO_BITMAP_SIZE);
 	if (svm_sc->iopm_bitmap == NULL)
 		panic("contigmalloc of SVM IO bitmap failed");
 
@@ -945,8 +936,6 @@ svm_save_exitintinfo(struct svm_softc *svm_sc, int vcpu)
 	 * If a #VMEXIT happened during event delivery then record the event
 	 * that was being delivered.
 	 */
-	VCPU_CTR2(svm_sc->vm, vcpu, "SVM:Pending INTINFO(0x%lx), vector=%d.\n",
-	    intinfo, VMCB_EXITINTINFO_VECTOR(intinfo));
 	vmm_stat_incr(svm_sc->vm, vcpu, VCPU_EXITINTINFO, 1);
 	/*
 	 * Relies on match between VMCB exitintinfo format and bhyve-generic
@@ -992,7 +981,6 @@ svm_enable_intr_window_exiting(struct svm_softc *sc, int vcpu)
 	VERIFY((ctrl->eventinj & VMCB_EVENTINJ_VALID) != 0 ||
 	    (state->rflags & PSL_I) == 0 || ctrl->intr_shadow);
 
-	VCPU_CTR0(sc->vm, vcpu, "Enable intr window exiting");
 	ctrl->v_irq |= V_IRQ;
 	ctrl->v_intr_prio |= V_IGN_TPR;
 	ctrl->v_intr_vector = 0;
@@ -1013,7 +1001,6 @@ svm_disable_intr_window_exiting(struct svm_softc *sc, int vcpu)
 		return;
 	}
 
-	VCPU_CTR0(sc->vm, vcpu, "Disable intr window exiting");
 	ctrl->v_irq &= ~V_IRQ;
 	ctrl->v_intr_vector = 0;
 	svm_set_dirty(sc, vcpu, VMCB_CACHE_TPR);
@@ -1038,7 +1025,6 @@ svm_clear_nmi_blocking(struct svm_softc *sc, int vcpu)
 	struct vmcb_ctrl *ctrl;
 
 	KASSERT(svm_nmi_blocked(sc, vcpu), ("vNMI already unblocked"));
-	VCPU_CTR0(sc->vm, vcpu, "vNMI blocking cleared");
 	/*
 	 * When the IRET intercept is cleared the vcpu will attempt to execute
 	 * the "iret" when it runs next. However, it is possible to inject
@@ -1498,23 +1484,15 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 	case VMCB_EXIT_NPF:
 		/* EXITINFO2 contains the faulting guest physical address */
 		if (info1 & VMCB_NPF_INFO1_RSV) {
-			VCPU_CTR2(svm_sc->vm, vcpu, "nested page fault with "
-			    "reserved bits set: info1(%lx) info2(%lx)",
-			    info1, info2);
+			/* nested fault with reserved bits set */
 		} else if (vm_mem_allocated(svm_sc->vm, vcpu, info2)) {
 			vmexit->exitcode = VM_EXITCODE_PAGING;
 			vmexit->u.paging.gpa = info2;
 			vmexit->u.paging.fault_type = npf_fault_type(info1);
 			vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_NESTED_FAULT, 1);
-			VCPU_CTR3(svm_sc->vm, vcpu, "nested page fault "
-			    "on gpa %lx/%lx at rip %lx",
-			    info2, info1, state->rip);
 		} else if (svm_npf_emul_fault(info1)) {
 			svm_handle_mmio_emul(svm_sc, vcpu, vmexit, info2);
 			vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_MMIO_EMUL, 1);
-			VCPU_CTR3(svm_sc->vm, vcpu, "mmio_emul fault "
-			    "for gpa %lx/%lx at rip %lx",
-			    info2, info1, state->rip);
 		}
 		break;
 	case VMCB_EXIT_MONITOR:
@@ -2015,11 +1993,9 @@ svm_vmrun(void *arg, int vcpu, uint64_t rip)
 
 		ctrl->vmcb_clean = vmcb_clean & ~vcpustate->dirty;
 		vcpustate->dirty = 0;
-		VCPU_CTR1(vm, vcpu, "vmcb clean %x", ctrl->vmcb_clean);
 
 		/* Launch Virtual Machine. */
 		vcpu_ustate_change(vm, vcpu, VU_RUN);
-		VCPU_CTR1(vm, vcpu, "Resume execution at %lx", state->rip);
 		svm_dr_enter_guest(gctx);
 		svm_launch(vmcb_pa, gctx, get_pcpu());
 		svm_dr_leave_guest(gctx);
@@ -2053,9 +2029,9 @@ svm_vmcleanup(void *arg)
 {
 	struct svm_softc *sc = arg;
 
-	contigfree(sc->iopm_bitmap, SVM_IO_BITMAP_SIZE, M_SVM);
-	contigfree(sc->msr_bitmap, SVM_MSR_BITMAP_SIZE, M_SVM);
-	free(sc, M_SVM);
+	vmm_contig_free(sc->iopm_bitmap, SVM_IO_BITMAP_SIZE);
+	vmm_contig_free(sc->msr_bitmap, SVM_MSR_BITMAP_SIZE);
+	kmem_free(sc, sizeof (*sc));
 }
 
 static uint64_t *
@@ -2418,8 +2394,7 @@ svm_vlapic_init(void *arg, int vcpuid)
 	struct vlapic *vlapic;
 
 	svm_sc = arg;
-	vlapic = malloc(sizeof (struct vlapic), M_SVM_VLAPIC,
-	    M_WAITOK | M_ZERO);
+	vlapic = kmem_zalloc(sizeof (struct vlapic), KM_SLEEP);
 	vlapic->vm = svm_sc->vm;
 	vlapic->vcpuid = vcpuid;
 	vlapic->apic_page = (struct LAPIC *)&svm_sc->apic_page[vcpuid];
@@ -2433,7 +2408,7 @@ static void
 svm_vlapic_cleanup(void *arg, struct vlapic *vlapic)
 {
 	vlapic_cleanup(vlapic);
-	free(vlapic, M_SVM_VLAPIC);
+	kmem_free(vlapic, sizeof (struct vlapic));
 }
 
 static void

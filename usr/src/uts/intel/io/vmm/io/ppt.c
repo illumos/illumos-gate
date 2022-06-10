@@ -39,7 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/pciio.h>
@@ -63,7 +63,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysmacros.h>
 
 #include "vmm_lapic.h"
-#include "vmm_ktr.h"
 
 #include "iommu.h"
 #include "ppt.h"

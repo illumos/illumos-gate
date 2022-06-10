@@ -44,7 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/systm.h>
 
 #include <machine/vmm.h>
@@ -67,14 +67,12 @@ struct vpmtmr {
 	hrtime_t	base_time;
 };
 
-static MALLOC_DEFINE(M_VPMTMR, "vpmtmr", "bhyve virtual acpi timer");
-
 struct vpmtmr *
 vpmtmr_init(struct vm *vm)
 {
 	struct vpmtmr *vpmtmr;
 
-	vpmtmr = malloc(sizeof (struct vpmtmr), M_VPMTMR, M_WAITOK | M_ZERO);
+	vpmtmr = kmem_zalloc(sizeof (struct vpmtmr), KM_SLEEP);
 	vpmtmr->vm = vm;
 	vpmtmr->base_time = gethrtime();
 
@@ -111,7 +109,7 @@ vpmtmr_cleanup(struct vpmtmr *vpmtmr)
 	err = vpmtmr_detach_ioport(vpmtmr);
 	VERIFY3P(err, ==, 0);
 
-	free(vpmtmr, M_VPMTMR);
+	kmem_free(vpmtmr, sizeof (*vpmtmr));
 }
 
 int

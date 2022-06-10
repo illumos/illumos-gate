@@ -39,7 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/mutex.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/systm.h>
 
 #include <dev/acpica/acpi_hpet.h>
@@ -52,9 +52,6 @@ __FBSDID("$FreeBSD$");
 #include "vioapic.h"
 #include "vhpet.h"
 
-#include "vmm_ktr.h"
-
-static MALLOC_DEFINE(M_VHPET, "vhpet", "bhyve virtual hpet");
 
 #define	HPET_FREQ	16777216		/* 16.7 (2^24) Mhz */
 #define	FS_PER_S	1000000000000000ul
@@ -224,7 +221,6 @@ vhpet_timer_interrupt(struct vhpet *vhpet, int n)
 	 * If a level triggered interrupt is already asserted then just return.
 	 */
 	if ((vhpet->isr & (1 << n)) != 0) {
-		VM_CTR1(vhpet->vm, "hpet t%d intr is already asserted", n);
 		return;
 	}
 
@@ -236,7 +232,7 @@ vhpet_timer_interrupt(struct vhpet *vhpet, int n)
 
 	pin = vhpet_timer_ioapic_pin(vhpet, n);
 	if (pin == 0) {
-		VM_CTR1(vhpet->vm, "hpet t%d intr is not routed to ioapic", n);
+		/* Interrupt is not routed to IOAPIC */
 		return;
 	}
 
@@ -289,8 +285,6 @@ vhpet_handler(void *a)
 	n = arg->timer_num;
 	callout = &vhpet->timer[n].callout;
 
-	VM_CTR1(vhpet->vm, "hpet t%d fired", n);
-
 	VHPET_LOCK(vhpet);
 
 	if (callout_pending(callout))		/* callout was reset */
@@ -314,8 +308,6 @@ done:
 static void
 vhpet_stop_timer(struct vhpet *vhpet, int n, hrtime_t now)
 {
-
-	VM_CTR1(vhpet->vm, "hpet t%d stopped", n);
 	callout_stop(&vhpet->timer[n].callout);
 
 	/*
@@ -326,8 +318,6 @@ vhpet_stop_timer(struct vhpet *vhpet, int n, hrtime_t now)
 	 * the next interrupt has to wait for the counter to wrap around.
 	 */
 	if (vhpet->timer[n].callout_expire < now) {
-		VM_CTR1(vhpet->vm, "hpet t%d interrupt triggered after "
-		    "stopping timer", n);
 		vhpet_timer_interrupt(vhpet, n);
 	}
 }
@@ -415,7 +405,6 @@ vhpet_timer_update_config(struct vhpet *vhpet, int n, uint64_t data,
 		return;
 
 	vhpet->timer[n].cap_config = newval;
-	VM_CTR2(vhpet->vm, "hpet t%d cap_config set to 0x%016x", n, newval);
 
 	/*
 	 * Validate the interrupt routing in the HPET_TCNF_INT_ROUTE field.
@@ -425,8 +414,7 @@ vhpet_timer_update_config(struct vhpet *vhpet, int n, uint64_t data,
 	allowed_irqs = vhpet->timer[n].cap_config >> 32;
 	new_pin = vhpet_timer_ioapic_pin(vhpet, n);
 	if (new_pin != 0 && (allowed_irqs & (1 << new_pin)) == 0) {
-		VM_CTR3(vhpet->vm, "hpet t%d configured invalid irq %d, "
-		    "allowed_irqs 0x%08x", n, new_pin, allowed_irqs);
+		/* Invalid IRQ configured */
 		new_pin = 0;
 		vhpet->timer[n].cap_config &= ~HPET_TCNF_INT_ROUTE;
 	}
@@ -458,8 +446,6 @@ vhpet_timer_update_config(struct vhpet *vhpet, int n, uint64_t data,
 			clear_isr = false;
 
 		if (clear_isr) {
-			VM_CTR1(vhpet->vm, "hpet t%d isr cleared due to "
-			    "configuration change", n);
 			(void) vioapic_deassert_irq(vhpet->vm, old_pin);
 			vhpet->isr &= ~(1 << n);
 		}
@@ -496,15 +482,12 @@ vhpet_mmio_write(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t val,
 		}
 		break;
 	default:
-		VM_CTR2(vhpet->vm, "hpet invalid mmio write: "
-		    "offset 0x%08x, size %d", offset, size);
+		/* Invalid MMIO write */
 		goto done;
 	}
 
 	/* Access to the HPET should be naturally aligned to its width */
 	if (offset & (size - 1)) {
-		VM_CTR2(vhpet->vm, "hpet invalid mmio write: "
-		    "offset 0x%08x, size %d", offset, size);
 		goto done;
 	}
 
@@ -528,10 +511,8 @@ vhpet_mmio_write(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t val,
 		if ((oldval ^ vhpet->config) & HPET_CNF_ENABLE) {
 			if (vhpet_counter_enabled(vhpet)) {
 				vhpet_start_counting(vhpet);
-				VM_CTR0(vhpet->vm, "hpet enabled");
 			} else {
 				vhpet_stop_counting(vhpet, counter, now);
-				VM_CTR0(vhpet->vm, "hpet disabled");
 			}
 		}
 		goto done;
@@ -541,7 +522,6 @@ vhpet_mmio_write(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t val,
 		isr_clear_mask = vhpet->isr & data;
 		for (i = 0; i < VHPET_NUM_TIMERS; i++) {
 			if ((isr_clear_mask & (1 << i)) != 0) {
-				VM_CTR1(vhpet->vm, "hpet t%d isr cleared", i);
 				vhpet_timer_clear_isr(vhpet, i);
 			}
 		}
@@ -630,16 +610,12 @@ vhpet_mmio_read(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t *rval,
 
 	/* Accesses to the HPET should be 4 or 8 bytes wide */
 	if (size != 4 && size != 8) {
-		VM_CTR2(vhpet->vm, "hpet invalid mmio read: "
-		    "offset 0x%08x, size %d", offset, size);
 		data = 0;
 		goto done;
 	}
 
 	/* Access to the HPET should be naturally aligned to its width */
 	if (offset & (size - 1)) {
-		VM_CTR2(vhpet->vm, "hpet invalid mmio read: "
-		    "offset 0x%08x, size %d", offset, size);
 		data = 0;
 		goto done;
 	}
@@ -705,7 +681,7 @@ vhpet_init(struct vm *vm)
 	uint64_t allowed_irqs;
 	struct vhpet_callout_arg *arg;
 
-	vhpet = malloc(sizeof (struct vhpet), M_VHPET, M_WAITOK | M_ZERO);
+	vhpet = kmem_zalloc(sizeof (struct vhpet), KM_SLEEP);
 	vhpet->vm = vm;
 	mutex_init(&vhpet->lock, NULL, MUTEX_ADAPTIVE, NULL);
 
@@ -745,7 +721,7 @@ vhpet_cleanup(struct vhpet *vhpet)
 		callout_drain(&vhpet->timer[i].callout);
 
 	mutex_destroy(&vhpet->lock);
-	free(vhpet, M_VHPET);
+	kmem_free(vhpet, sizeof (*vhpet));
 }
 
 int

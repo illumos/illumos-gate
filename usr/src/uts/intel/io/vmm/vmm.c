@@ -51,7 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/sysctl.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/pcpu.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
@@ -74,7 +74,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmm_gpt.h>
 
 #include "vmm_ioport.h"
-#include "vmm_ktr.h"
 #include "vmm_host.h"
 #include "vmm_util.h"
 #include "vatpic.h"
@@ -206,7 +205,6 @@ struct vm {
 	struct mem_map	mem_maps[VM_MAX_MEMMAPS]; /* (i) guest address space */
 	struct mem_seg	mem_segs[VM_MAX_MEMSEGS]; /* (o) guest memory regions */
 	struct vmspace	*vmspace;		/* (o) guest's address space */
-	char		name[VM_MAX_NAMELEN];	/* (o) virtual machine name */
 	struct vcpu	vcpu[VM_MAXCPU];	/* (i) guest vcpus */
 	/* The following describe the vm cpu topology */
 	uint16_t	sockets;		/* (o) num of sockets */
@@ -273,8 +271,6 @@ static vmm_pte_ops_t *pte_ops = NULL;
 #define	fpu_stop_emulating()	clts()
 
 SDT_PROVIDER_DEFINE(vmm);
-
-static MALLOC_DEFINE(M_VM, "vm", "vm");
 
 SYSCTL_NODE(_hw, OID_AUTO, vmm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     NULL);
@@ -522,7 +518,7 @@ uint_t threads_per_core = 1;
 bool gpt_track_dirty = false;
 
 int
-vm_create(const char *name, uint64_t flags, struct vm **retvm)
+vm_create(uint64_t flags, struct vm **retvm)
 {
 	struct vm *vm;
 	struct vmspace *vmspace;
@@ -534,15 +530,11 @@ vm_create(const char *name, uint64_t flags, struct vm **retvm)
 	if (!vmm_initialized)
 		return (ENXIO);
 
-	/* Name validation has already occurred */
-	VERIFY3U(strnlen(name, VM_MAX_NAMELEN), <, VM_MAX_NAMELEN);
-
 	vmspace = vmspace_alloc(VM_MAXUSER_ADDRESS, pte_ops, gpt_track_dirty);
 	if (vmspace == NULL)
 		return (ENOMEM);
 
-	vm = malloc(sizeof (struct vm), M_VM, M_WAITOK | M_ZERO);
-	(void) strlcpy(vm->name, name, sizeof (vm->name));
+	vm = kmem_zalloc(sizeof (struct vm), KM_SLEEP);
 
 	vm->vmspace = vmspace;
 	vm->mem_transient = (flags & VCF_RESERVOIR_MEM) == 0;
@@ -663,7 +655,7 @@ void
 vm_destroy(struct vm *vm)
 {
 	vm_cleanup(vm, true);
-	free(vm, M_VM);
+	kmem_free(vm, sizeof (*vm));
 }
 
 int
@@ -703,12 +695,6 @@ vm_reinit(struct vm *vm, uint64_t flags)
 	vm_cleanup(vm, false);
 	vm_init(vm, false);
 	return (0);
-}
-
-const char *
-vm_name(struct vm *vm)
-{
-	return (vm->name);
 }
 
 int
@@ -1127,7 +1113,6 @@ vm_set_register(struct vm *vm, int vcpuid, int reg, uint64_t val)
 		return (error);
 
 	/* Set 'nextrip' to match the value of %rip */
-	VCPU_CTR1(vm, vcpuid, "Setting nextrip to %lx", val);
 	vcpu = &vm->vcpu[vcpuid];
 	vcpu->nextrip = val;
 	return (0);
@@ -1340,8 +1325,6 @@ vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 		while (vcpu->state != VCPU_IDLE) {
 			vcpu->reqidle = 1;
 			vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
-			VCPU_CTR1(vm, vcpuid, "vcpu state change from %s to "
-			    "idle requested", vcpu_state2str(vcpu->state));
 			cv_wait(&vcpu->state_cv, &vcpu->lock);
 		}
 	} else {
@@ -1379,9 +1362,6 @@ vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 
 	if (error)
 		return (EBUSY);
-
-	VCPU_CTR2(vm, vcpuid, "vcpu state changed from %s to %s",
-	    vcpu_state2str(vcpu->state), vcpu_state2str(newstate));
 
 	vcpu->state = newstate;
 	if (newstate == VCPU_RUNNING)
@@ -1511,9 +1491,6 @@ vm_handle_paging(struct vm *vm, int vcpuid)
 
 	rv = vmc_fault(vmc, vme->u.paging.gpa, ftype);
 
-	VCPU_CTR3(vm, vcpuid, "vm_handle_paging rv = %d, gpa = %lx, "
-	    "ftype = %d", rv, vme->u.paging.gpa, ftype);
-
 	if (rv != 0)
 		return (EFAULT);
 	return (0);
@@ -1576,9 +1553,6 @@ vm_handle_mmio_emul(struct vm *vm, int vcpuid)
 	inst_addr = vme->rip + vme->u.mmio_emul.cs_base;
 	cs_d = vme->u.mmio_emul.cs_d;
 
-	VCPU_CTR1(vm, vcpuid, "inst_emul fault accessing gpa %lx",
-	    vme->u.mmio_emul.gpa);
-
 	/* Fetch the faulting instruction */
 	if (vie_needs_fetch(vie)) {
 		error = vie_fetch_instruction(vie, vm, vcpuid, inst_addr,
@@ -1597,8 +1571,6 @@ vm_handle_mmio_emul(struct vm *vm, int vcpuid)
 	}
 
 	if (vie_decode_instruction(vie, vm, vcpuid, cs_d) != 0) {
-		VCPU_CTR1(vm, vcpuid, "Error decoding instruction at %lx",
-		    inst_addr);
 		/* Dump (unrecognized) instruction bytes in userspace */
 		vie_fallback_exitinfo(vie, vme);
 		return (-1);
@@ -1765,7 +1737,6 @@ vm_handle_suspend(struct vm *vm, int vcpuid)
 		int rc;
 
 		if (CPU_CMP(&vm->suspended_cpus, &vm->active_cpus) == 0) {
-			VCPU_CTR0(vm, vcpuid, "All vcpus suspended");
 			break;
 		}
 
@@ -2435,8 +2406,6 @@ exit:
 	vmm_savectx(&vcpu->vtc);
 	kpreempt_enable();
 
-	VCPU_CTR2(vm, vcpuid, "retu %d/%d", error, vme->exitcode);
-
 	vcpu_ustate_change(vm, vcpuid, VU_EMU_USER);
 	return (error);
 }
@@ -2464,8 +2433,6 @@ vm_restart_instruction(void *arg, int vcpuid)
 		 * instruction to be restarted.
 		 */
 		vcpu->exitinfo.inst_length = 0;
-		VCPU_CTR1(vm, vcpuid, "restarting instruction at %lx by "
-		    "setting inst_length to zero", vcpu->exitinfo.rip);
 	} else if (state == VCPU_FROZEN) {
 		/*
 		 * When a vcpu is "frozen" it is outside the critical section
@@ -2475,8 +2442,6 @@ vm_restart_instruction(void *arg, int vcpuid)
 		 */
 		error = vm_get_register(vm, vcpuid, VM_REG_GUEST_RIP, &rip);
 		KASSERT(!error, ("%s: error %d getting rip", __func__, error));
-		VCPU_CTR2(vm, vcpuid, "restarting instruction by updating "
-		    "nextrip from %lx to %lx", vcpu->nextrip, rip);
 		vcpu->nextrip = rip;
 	} else {
 		panic("%s: invalid state %d", __func__, state);
@@ -3125,7 +3090,6 @@ vm_activate_cpu(struct vm *vm, int vcpuid)
 		return (EBUSY);
 	}
 
-	VCPU_CTR0(vm, vcpuid, "activated");
 	CPU_SET_ATOMIC(vcpuid, &vm->active_cpus);
 
 	/*

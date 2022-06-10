@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -129,8 +130,12 @@ i_ipadm_delete_ipv6addrs(ipadm_handle_t iph, ipadm_addrobj_t ipaddr)
 	 */
 	status = i_ipadm_send_ndpd_cmd(ipaddr->ipadm_ifname, ipaddr,
 	    IPADM_DELETE_ADDRS);
-	if (status == IPADM_NDPD_NOT_RUNNING)
+
+	/* if the entry is not found, or ndpd is not running, just carry on */
+	if (status == IPADM_NDPD_NOT_RUNNING || status == IPADM_ENXIO ||
+	    status == IPADM_NOTFOUND)
 		status = IPADM_SUCCESS;
+
 	if (status == IPADM_SUCCESS)
 		status = i_ipadm_delete_addr(iph, ipaddr);
 

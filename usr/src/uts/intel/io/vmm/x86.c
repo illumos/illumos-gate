@@ -60,7 +60,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm.h>
 
 #include "vmm_host.h"
-#include "vmm_ktr.h"
 #include "vmm_util.h"
 #include "x86.h"
 
@@ -109,8 +108,6 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id, uint64_t *rax, uint64_t *rbx,
 	 */
 	func = (uint32_t)*rax;
 	param = (uint32_t)*rcx;
-
-	VCPU_CTR2(vm, vcpu_id, "cpuid %#x,%#x", func, param);
 
 	/*
 	 * Requests for invalid CPUID levels should map to the highest

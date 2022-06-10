@@ -34,7 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 
 #include <machine/vmm.h>
 #include "vmm_util.h"
@@ -50,8 +50,6 @@ __FBSDID("$FreeBSD$");
  */
 static int vst_num_elems, vst_num_types;
 static struct vmm_stat_type *vsttab[MAX_VMM_STAT_ELEMS];
-
-static MALLOC_DEFINE(M_VMM_STAT, "vmm stat", "vmm stat");
 
 #define	vst_size	((size_t)vst_num_elems * sizeof (uint64_t))
 
@@ -122,21 +120,19 @@ vmm_stat_copy(struct vm *vm, int vcpu, int index, int count, int *num_stats,
 void *
 vmm_stat_alloc(void)
 {
-
-	return (malloc(vst_size, M_VMM_STAT, M_WAITOK));
+	return (kmem_alloc(vst_size, KM_SLEEP));
 }
 
 void
 vmm_stat_init(void *vp)
 {
-
 	bzero(vp, vst_size);
 }
 
 void
 vmm_stat_free(void *vp)
 {
-	free(vp, M_VMM_STAT);
+	kmem_free(vp, vst_size);
 }
 
 int

@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -2063,6 +2063,7 @@ typedef struct {
 	int			ld_family;
 	struct sockaddr_in	ld_sin;
 	struct sockaddr_in6	ld_sin6;
+	clock_t			ld_quiet;
 } smb_listener_daemon_t;
 
 #define	SMB_SSETUP_CMD			"authentication"

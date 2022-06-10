@@ -45,7 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
 
@@ -54,12 +54,9 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/vmm.h>
 
-#include "vmm_ktr.h"
 #include "vmm_lapic.h"
 #include "vioapic.h"
 #include "vatpic.h"
-
-static MALLOC_DEFINE(M_VATPIC, "atpic", "bhyve virtual atpic (8259)");
 
 #define	VATPIC_LOCK(vatpic)		mutex_enter(&((vatpic)->lock))
 #define	VATPIC_UNLOCK(vatpic)		mutex_exit(&((vatpic)->lock))
@@ -114,21 +111,6 @@ struct vatpic {
 	struct atpic	atpic[2];
 	struct atpic_stats stats;
 };
-
-#define	VATPIC_CTR0(vatpic, fmt)					\
-	VM_CTR0((vatpic)->vm, fmt)
-
-#define	VATPIC_CTR1(vatpic, fmt, a1)					\
-	VM_CTR1((vatpic)->vm, fmt, a1)
-
-#define	VATPIC_CTR2(vatpic, fmt, a1, a2)				\
-	VM_CTR2((vatpic)->vm, fmt, a1, a2)
-
-#define	VATPIC_CTR3(vatpic, fmt, a1, a2, a3)				\
-	VM_CTR3((vatpic)->vm, fmt, a1, a2, a3)
-
-#define	VATPIC_CTR4(vatpic, fmt, a1, a2, a3, a4)			\
-	VM_CTR4((vatpic)->vm, fmt, a1, a2, a3, a4)
 
 /*
  * Loop over all the pins in priority order from highest to lowest.
@@ -235,10 +217,6 @@ vatpic_notify_intr(struct vatpic *vatpic)
 	atpic = &vatpic->atpic[1];
 	if (!atpic->intr_raised &&
 	    (pin = vatpic_get_highest_irrpin(atpic)) != -1) {
-		VATPIC_CTR4(vatpic, "atpic slave notify pin = %d "
-		    "(imr 0x%x irr 0x%x isr 0x%x)", pin,
-		    atpic->reg_imr, atpic->reg_irr, atpic->reg_isr);
-
 		/*
 		 * Cascade the request from the slave to the master.
 		 */
@@ -247,9 +225,7 @@ vatpic_notify_intr(struct vatpic *vatpic)
 			(void) vatpic_set_pinstate(vatpic, 2, false);
 		}
 	} else {
-		VATPIC_CTR3(vatpic, "atpic slave no eligible interrupts "
-		    "(imr 0x%x irr 0x%x isr 0x%x)",
-		    atpic->reg_imr, atpic->reg_irr, atpic->reg_isr);
+		/* No eligible interrupts on slave chip */
 	}
 
 	/*
@@ -258,10 +234,6 @@ vatpic_notify_intr(struct vatpic *vatpic)
 	atpic = &vatpic->atpic[0];
 	if (!atpic->intr_raised &&
 	    (pin = vatpic_get_highest_irrpin(atpic)) != -1) {
-		VATPIC_CTR4(vatpic, "atpic master notify pin = %d "
-		    "(imr 0x%x irr 0x%x isr 0x%x)", pin,
-		    atpic->reg_imr, atpic->reg_irr, atpic->reg_isr);
-
 		/*
 		 * From Section 3.6.2, "Interrupt Modes", in the
 		 * MPtable Specification, Version 1.4
@@ -292,9 +264,7 @@ vatpic_notify_intr(struct vatpic *vatpic)
 		(void) vioapic_pulse_irq(vatpic->vm, 0);
 		vatpic->stats.as_interrupts++;
 	} else {
-		VATPIC_CTR3(vatpic, "atpic master no eligible interrupts "
-		    "(imr 0x%x irr 0x%x isr 0x%x)",
-		    atpic->reg_imr, atpic->reg_irr, atpic->reg_isr);
+		/* No eligible interrupts on master chip */
 	}
 }
 
@@ -312,12 +282,12 @@ vatpic_icw1(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 	atpic->special_mask_mode = false;
 
 	if ((val & ICW1_SNGL) != 0) {
-		VATPIC_CTR0(vatpic, "vatpic cascade mode required");
+		/* Cascade mode reqired */
 		return (-1);
 	}
 
 	if ((val & ICW1_IC4) == 0) {
-		VATPIC_CTR0(vatpic, "vatpic icw4 required");
+		/* ICW4 reqired */
 		return (-1);
 	}
 
@@ -347,7 +317,7 @@ static int
 vatpic_icw4(struct vatpic *vatpic, struct atpic *atpic, uint8_t val)
 {
 	if ((val & ICW4_8086) == 0) {
-		VATPIC_CTR0(vatpic, "vatpic microprocessor mode required");
+		/* Microprocessor mode required */
 		return (-1);
 	}
 
@@ -809,7 +779,7 @@ vatpic_init(struct vm *vm)
 {
 	struct vatpic *vatpic;
 
-	vatpic = malloc(sizeof (struct vatpic), M_VATPIC, M_WAITOK | M_ZERO);
+	vatpic = kmem_zalloc(sizeof (struct vatpic), KM_SLEEP);
 	vatpic->vm = vm;
 
 	mutex_init(&vatpic->lock, NULL, MUTEX_ADAPTIVE, NULL);
@@ -821,5 +791,5 @@ void
 vatpic_cleanup(struct vatpic *vatpic)
 {
 	mutex_destroy(&vatpic->lock);
-	free(vatpic, M_VATPIC);
+	kmem_free(vatpic, sizeof (*vatpic));
 }

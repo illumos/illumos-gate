@@ -26,7 +26,6 @@
 #include <sys/sysmacros.h>
 #include <sys/machsystm.h>
 #include <sys/vmsystm.h>
-#include <sys/malloc.h>
 #include <sys/x86_archext.h>
 #include <vm/as.h>
 #include <vm/hat_i86.h>

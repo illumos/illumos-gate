@@ -62,7 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <x86/specialreg.h>
 
 #include "vmm_ioport.h"
-#include "vmm_ktr.h"
 
 enum vie_status {
 	VIES_INIT		= (1U << 0),

@@ -37,7 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/mutex.h>
 #include <sys/clock.h>
 #include <sys/sysctl.h>
@@ -46,7 +46,6 @@ __FBSDID("$FreeBSD$");
 
 #include <isa/rtc.h>
 
-#include "vmm_ktr.h"
 #include "vatpic.h"
 #include "vioapic.h"
 #include "vrtc.h"
@@ -105,8 +104,6 @@ struct vrtc {
 
 static void vrtc_callout_handler(void *arg);
 static void vrtc_set_reg_c(struct vrtc *vrtc, uint8_t newval);
-
-static MALLOC_DEFINE(M_VRTC, "vrtc", "bhyve virtual rtc");
 
 SYSCTL_DECL(_hw_vmm);
 SYSCTL_NODE(_hw_vmm, OID_AUTO, vrtc, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
@@ -403,8 +400,6 @@ vrtc_time_update(struct vrtc *vrtc, time_t newtime, hrtime_t newbase)
 	alarm_hour = rtc->alarm_hour;
 
 	oldtime = vrtc->base_rtctime;
-	VM_CTR2(vrtc->vm, "Updating RTC secs from %lx to %lx",
-	    oldtime, newtime);
 
 	vrtc->base_uptime = newbase;
 
@@ -425,7 +420,6 @@ vrtc_time_update(struct vrtc *vrtc, time_t newtime, hrtime_t newbase)
 	 * Return an error if RTC updates are halted by the guest.
 	 */
 	if (rtc_halted(vrtc)) {
-		VM_CTR0(vrtc->vm, "RTC update halted by guest");
 		return (EBUSY);
 	}
 
@@ -514,12 +508,10 @@ vrtc_callout_reset(struct vrtc *vrtc, hrtime_t freqhrt)
 
 	if (freqhrt == 0) {
 		if (callout_active(&vrtc->callout)) {
-			VM_CTR0(vrtc->vm, "RTC callout stopped");
 			callout_stop(&vrtc->callout);
 		}
 		return;
 	}
-	VM_CTR1(vrtc->vm, "RTC callout frequency %d hz", NANOSEC / freqhrt);
 	callout_reset_hrtime(&vrtc->callout, freqhrt, vrtc_callout_handler,
 	    vrtc, 0);
 }
@@ -531,7 +523,6 @@ vrtc_callout_handler(void *arg)
 	time_t rtctime;
 	int error;
 
-	VM_CTR0(vrtc->vm, "vrtc callout fired");
 
 	VRTC_LOCK(vrtc);
 	if (callout_pending(&vrtc->callout))	/* callout was reset */
@@ -580,7 +571,6 @@ vrtc_set_reg_c(struct vrtc *vrtc, uint8_t newval)
 {
 	struct rtcdev *rtc;
 	int oldirqf, newirqf;
-	uint8_t oldval, changed;
 
 	ASSERT(VRTC_LOCKED(vrtc));
 
@@ -596,20 +586,14 @@ vrtc_set_reg_c(struct vrtc *vrtc, uint8_t newval)
 		newirqf = 0;
 	}
 
-	oldval = rtc->reg_c;
 	rtc->reg_c = newirqf | newval;
-	changed = oldval ^ rtc->reg_c;
-	if (changed) {
-		VM_CTR2(vrtc->vm, "RTC reg_c changed from %x to %x",
-		    oldval, rtc->reg_c);
-	}
 
 	if (!oldirqf && newirqf) {
-		VM_CTR1(vrtc->vm, "RTC irq %d asserted", RTC_IRQ);
+		/* IRQ asserted */
 		(void) vatpic_pulse_irq(vrtc->vm, RTC_IRQ);
 		(void) vioapic_pulse_irq(vrtc->vm, RTC_IRQ);
 	} else if (oldirqf && !newirqf) {
-		VM_CTR1(vrtc->vm, "RTC irq %d deasserted", RTC_IRQ);
+		/* IRQ de-asserted */
 	}
 }
 
@@ -630,10 +614,6 @@ vrtc_set_reg_b(struct vrtc *vrtc, uint8_t newval)
 
 	rtc->reg_b = newval;
 	changed = oldval ^ newval;
-	if (changed) {
-		VM_CTR2(vrtc->vm, "RTC reg_b changed from %x to %x",
-		    oldval, newval);
-	}
 
 	if (changed & RTCSB_HALT) {
 		hrtime_t basetime;
@@ -695,7 +675,7 @@ static void
 vrtc_set_reg_a(struct vrtc *vrtc, uint8_t newval)
 {
 	hrtime_t oldfreq, newfreq;
-	uint8_t oldval, changed;
+	uint8_t oldval;
 
 	ASSERT(VRTC_LOCKED(vrtc));
 
@@ -704,8 +684,7 @@ vrtc_set_reg_a(struct vrtc *vrtc, uint8_t newval)
 	oldfreq = vrtc_freq(vrtc);
 
 	if (divider_enabled(oldval) && !divider_enabled(newval)) {
-		VM_CTR2(vrtc->vm, "RTC divider held in reset at %lx/%lx",
-		    vrtc->base_rtctime, vrtc->base_uptime);
+		/* RTC divider held in reset */
 	} else if (!divider_enabled(oldval) && divider_enabled(newval)) {
 		/*
 		 * If the dividers are coming out of reset then update
@@ -714,18 +693,11 @@ vrtc_set_reg_a(struct vrtc *vrtc, uint8_t newval)
 		 * while the dividers were disabled.
 		 */
 		vrtc->base_uptime = gethrtime();
-		VM_CTR2(vrtc->vm, "RTC divider out of reset at %lx/%lx",
-		    vrtc->base_rtctime, vrtc->base_uptime);
 	} else {
 		/* NOTHING */
 	}
 
 	vrtc->rtcdev.reg_a = newval;
-	changed = oldval ^ newval;
-	if (changed) {
-		VM_CTR2(vrtc->vm, "RTC reg_a changed from %x to %x",
-		    oldval, newval);
-	}
 
 	/*
 	 * Side effect of changes to rate select and divider enable bits.
@@ -747,13 +719,6 @@ vrtc_set_time(struct vm *vm, time_t secs)
 	VRTC_LOCK(vrtc);
 	error = vrtc_time_update(vrtc, secs, gethrtime());
 	VRTC_UNLOCK(vrtc);
-
-	if (error) {
-		VM_CTR2(vrtc->vm, "Error %d setting RTC time to %lx", error,
-		    secs);
-	} else {
-		VM_CTR1(vrtc->vm, "RTC time set to %lx", secs);
-	}
 
 	return (error);
 }
@@ -785,15 +750,13 @@ vrtc_nvram_write(struct vm *vm, int offset, uint8_t value)
 	 */
 	if (offset < offsetof(struct rtcdev, nvram[0]) ||
 	    offset == RTC_CENTURY || offset >= sizeof (struct rtcdev)) {
-		VM_CTR1(vrtc->vm, "RTC nvram write to invalid offset %d",
-		    offset);
+		/* NVRAM write to invalid offset */
 		return (EINVAL);
 	}
 
 	VRTC_LOCK(vrtc);
 	ptr = (uint8_t *)(&vrtc->rtcdev);
 	ptr[offset] = value;
-	VM_CTR2(vrtc->vm, "RTC nvram write %x to offset %x", value, offset);
 	VRTC_UNLOCK(vrtc);
 
 	return (0);
@@ -897,25 +860,19 @@ vrtc_data_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
 		} else {
 			*val = *((uint8_t *)rtc + offset);
 		}
-		VM_CTR2(vm, "Read value %x from RTC offset %x",
-		    *val, offset);
 	} else {
 		switch (offset) {
 		case 10:
-			VM_CTR1(vm, "RTC reg_a set to %x", *val);
 			vrtc_set_reg_a(vrtc, *val);
 			break;
 		case 11:
-			VM_CTR1(vm, "RTC reg_b set to %x", *val);
 			error = vrtc_set_reg_b(vrtc, *val);
 			break;
 		case 12:
-			VM_CTR1(vm, "RTC reg_c set to %x (ignored)",
-			    *val);
+			/* Ignored write to reg_c */
 			break;
 		case 13:
-			VM_CTR1(vm, "RTC reg_d set to %x (ignored)",
-			    *val);
+			/* Ignored write to reg_d */
 			break;
 		case 0:
 			/*
@@ -924,7 +881,6 @@ vrtc_data_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
 			*val &= 0x7f;
 			/* FALLTHRU */
 		default:
-			VM_CTR2(vm, "RTC offset %x set to %x", offset, *val);
 			*((uint8_t *)rtc + offset) = *val;
 			break;
 		}
@@ -969,7 +925,7 @@ vrtc_init(struct vm *vm)
 	time_t curtime;
 	int error;
 
-	vrtc = malloc(sizeof (struct vrtc), M_VRTC, M_WAITOK | M_ZERO);
+	vrtc = kmem_zalloc(sizeof (struct vrtc), KM_SLEEP);
 	vrtc->vm = vm;
 	mutex_init(&vrtc->lock, NULL, MUTEX_ADAPTIVE, NULL);
 	callout_init(&vrtc->callout, 1);
@@ -1004,7 +960,7 @@ vrtc_cleanup(struct vrtc *vrtc)
 {
 	callout_drain(&vrtc->callout);
 	mutex_destroy(&vrtc->lock);
-	free(vrtc, M_VRTC);
+	kmem_free(vrtc, sizeof (*vrtc));
 }
 
 void

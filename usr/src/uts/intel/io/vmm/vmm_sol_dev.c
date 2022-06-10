@@ -1665,7 +1665,7 @@ vmmdev_do_vm_create(const struct vm_create_req *req, cred_t *cr)
 		goto fail;
 	}
 
-	error = vm_create(req->name, req->flags, &sc->vmm_vm);
+	error = vm_create(req->flags, &sc->vmm_vm);
 	if (error == 0) {
 		/* Complete VM intialization and report success. */
 		(void) strlcpy(sc->vmm_name, name, sizeof (sc->vmm_name));

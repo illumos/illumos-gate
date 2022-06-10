@@ -34,7 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 
 #include <dev/pci/pcireg.h>
 
@@ -130,8 +130,6 @@ static dev_info_t	*vtddips[DRHD_MAX_UNITS];
 
 static uint64_t root_table[PAGE_SIZE / sizeof (uint64_t)] __aligned(4096);
 static uint64_t ctx_tables[256][PAGE_SIZE / sizeof (uint64_t)] __aligned(4096);
-
-static MALLOC_DEFINE(M_VTD, "vtd", "vtd");
 
 static int
 vtd_max_domains(struct vtdmap *vtdmap)
@@ -666,7 +664,7 @@ vtd_update_mapping(void *arg, vm_paddr_t gpa, vm_paddr_t hpa, uint64_t len,
 		 * to it from the current page table.
 		 */
 		if (ptp[ptpindex] == 0) {
-			void *nlp = malloc(PAGE_SIZE, M_VTD, M_WAITOK | M_ZERO);
+			void *nlp = vmm_ptp_alloc();
 			ptp[ptpindex] = vtophys(nlp)| VTD_PTE_RD | VTD_PTE_WR;
 		}
 
@@ -779,12 +777,12 @@ vtd_create_domain(vm_paddr_t maxaddr)
 		    tmp, agaw);
 	}
 
-	dom = malloc(sizeof (struct domain), M_VTD, M_ZERO | M_WAITOK);
+	dom = kmem_zalloc(sizeof (struct domain), KM_SLEEP);
 	dom->pt_levels = pt_levels;
 	dom->addrwidth = addrwidth;
 	dom->id = domain_id();
 	dom->maxaddr = maxaddr;
-	dom->ptp = malloc(PAGE_SIZE, M_VTD, M_ZERO | M_WAITOK);
+	dom->ptp = vmm_ptp_alloc();
 	if ((uintptr_t)dom->ptp & PAGE_MASK)
 		panic("vtd_create_domain: ptp (%p) not page aligned", dom->ptp);
 
@@ -846,8 +844,7 @@ vtd_free_ptp(uint64_t *ptp, int level)
 		}
 	}
 
-	bzero(ptp, PAGE_SIZE);
-	free(ptp, M_VTD);
+	vmm_ptp_free(ptp);
 }
 
 static void
@@ -859,7 +856,7 @@ vtd_destroy_domain(void *arg)
 
 	SLIST_REMOVE(&domhead, dom, domain, next);
 	vtd_free_ptp(dom->ptp, dom->pt_levels);
-	free(dom, M_VTD);
+	kmem_free(dom, sizeof (*dom));
 }
 
 const struct iommu_ops iommu_ops_intel = {

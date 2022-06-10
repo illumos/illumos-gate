@@ -111,10 +111,9 @@ struct vmm_ops {
 extern struct vmm_ops vmm_ops_intel;
 extern struct vmm_ops vmm_ops_amd;
 
-int vm_create(const char *name, uint64_t flags, struct vm **retvm);
+int vm_create(uint64_t flags, struct vm **retvm);
 void vm_destroy(struct vm *vm);
 int vm_reinit(struct vm *vm, uint64_t);
-const char *vm_name(struct vm *vm);
 uint16_t vm_get_maxcpus(struct vm *vm);
 void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
     uint16_t *threads, uint16_t *maxcpus);
@@ -377,6 +376,9 @@ typedef enum vm_msr_result {
 
 void vmm_sol_glue_init(void);
 void vmm_sol_glue_cleanup(void);
+
+void *vmm_contig_alloc(size_t);
+void vmm_contig_free(void *, size_t);
 
 int vmm_mod_load(void);
 int vmm_mod_unload(void);

@@ -48,7 +48,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
+#include <sys/kmem.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
 #include <sys/cpuset.h>
@@ -62,7 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmm_kernel.h>
 
 #include "vmm_lapic.h"
-#include "vmm_ktr.h"
 #include "vmm_stat.h"
 
 #include "vlapic.h"
@@ -163,8 +162,7 @@ vlapic_dfr_write_handler(struct vlapic *vlapic)
 
 	lapic = vlapic->apic_page;
 	if (vlapic_x2mode(vlapic)) {
-		VM_CTR1(vlapic->vm, "ignoring write to DFR in x2apic mode: %#x",
-		    lapic->dfr);
+		/* Ignore write to DFR in x2APIC mode */
 		lapic->dfr = 0;
 		return;
 	}
@@ -182,12 +180,10 @@ vlapic_ldr_write_handler(struct vlapic *vlapic)
 
 	/* LDR is read-only in x2apic mode */
 	if (vlapic_x2mode(vlapic)) {
-		VLAPIC_CTR1(vlapic, "ignoring write to LDR in x2apic mode: %#x",
-		    lapic->ldr);
+		/* Ignore write to LDR in x2APIC mode */
 		lapic->ldr = x2apic_ldr(vlapic);
 	} else {
 		lapic->ldr &= ~APIC_LDR_RESERVED;
-		VLAPIC_CTR1(vlapic, "vlapic LDR set to %#x", lapic->ldr);
 	}
 }
 
@@ -263,8 +259,6 @@ vlapic_get_ccr(struct vlapic *vlapic)
 	}
 	KASSERT(ccr <= lapic->icr_timer, ("vlapic_get_ccr: invalid ccr %x, "
 	    "icr_timer is %x", ccr, lapic->icr_timer));
-	VLAPIC_CTR2(vlapic, "vlapic ccr_timer = %#x, icr_timer = %#x",
-	    ccr, lapic->icr_timer);
 	VLAPIC_TIMER_UNLOCK(vlapic);
 	return (ccr);
 }
@@ -279,8 +273,6 @@ vlapic_dcr_write_handler(struct vlapic *vlapic)
 	VLAPIC_TIMER_LOCK(vlapic);
 
 	divisor = vlapic_timer_divisor(lapic->dcr_timer);
-	VLAPIC_CTR2(vlapic, "vlapic dcr_timer=%#x, divisor=%d",
-	    lapic->dcr_timer, divisor);
 
 	/*
 	 * Update the timer frequency and the timer period.
@@ -574,7 +566,6 @@ vlapic_update_ppr(struct vlapic *vlapic)
 	}
 
 	vlapic->apic_page->ppr = ppr;
-	VLAPIC_CTR1(vlapic, "vlapic_update_ppr 0x%02x", ppr);
 }
 
 /*
@@ -598,7 +589,6 @@ vlapic_raise_ppr(struct vlapic *vlapic, int vec)
 #endif /* __ISRVEC_DEBUG */
 
 	lapic->ppr = ppr;
-	VLAPIC_CTR1(vlapic, "vlapic_update_ppr 0x%02x", ppr);
 }
 
 void
@@ -627,9 +617,6 @@ vlapic_process_eoi(struct vlapic *vlapic)
 			vector = i * 32 + bitpos;
 
 			isrptr[idx] &= ~(1 << bitpos);
-			VCPU_CTR1(vlapic->vm, vlapic->vcpuid, "EOI vector %d",
-			    vector);
-			VLAPIC_CTR_ISR(vlapic, "vlapic_process_eoi");
 #ifdef __ISRVEC_DEBUG
 			vlapic_isrstk_eoi(vlapic, vector);
 #endif
@@ -641,7 +628,6 @@ vlapic_process_eoi(struct vlapic *vlapic)
 			return;
 		}
 	}
-	VCPU_CTR0(vlapic->vm, vlapic->vcpuid, "Gratuitous EOI");
 	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_GRATUITOUS_EOI, 1);
 }
 
@@ -690,7 +676,6 @@ vlapic_fire_timer(struct vlapic *vlapic)
 	ASSERT(VLAPIC_TIMER_LOCKED(vlapic));
 
 	if (vlapic_fire_lvt(vlapic, APIC_LVT_TIMER)) {
-		VLAPIC_CTR0(vlapic, "vlapic timer fired");
 		vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_INTR_TIMER, 1);
 	}
 }
@@ -908,8 +893,6 @@ vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
 				 * Guest has configured a bad logical
 				 * model for this vcpu - skip it.
 				 */
-				VLAPIC_CTR1(vlapic, "vlapic has bad logical "
-				    "model %x - cannot deliver interrupt", dfr);
 				continue;
 			}
 
@@ -931,8 +914,6 @@ vlapic_set_tpr(struct vlapic *vlapic, uint8_t val)
 	struct LAPIC *lapic = vlapic->apic_page;
 
 	if (lapic->tpr != val) {
-		VCPU_CTR2(vlapic->vm, vlapic->vcpuid, "vlapic TPR changed "
-		    "from %#x to %#x", lapic->tpr, val);
 		lapic->tpr = val;
 		vlapic_update_ppr(vlapic);
 	}
@@ -1067,7 +1048,6 @@ vlapic_self_ipi_handler(struct vlapic *vlapic, uint32_t val)
 	(void) lapic_intr_edge(vlapic->vm, vlapic->vcpuid, vec);
 	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_IPI_SEND, 1);
 	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_IPI_RECV, 1);
-	VLAPIC_CTR1(vlapic, "vlapic self-ipi %d", vec);
 }
 
 int
@@ -1090,7 +1070,6 @@ vlapic_pending_intr(struct vlapic *vlapic, int *vecptr)
 		if (bitpos != 0) {
 			vector = i * 32 + (bitpos - 1);
 			if (PRIO(vector) > PRIO(lapic->ppr)) {
-				VLAPIC_CTR1(vlapic, "pending intr %d", vector);
 				if (vecptr != NULL)
 					*vecptr = vector;
 				return (1);
@@ -1121,11 +1100,9 @@ vlapic_intr_accepted(struct vlapic *vlapic, int vector)
 
 	irrptr = &lapic->irr0;
 	atomic_clear_int(&irrptr[idx], 1 << (vector % 32));
-	VLAPIC_CTR_IRR(vlapic, "vlapic_intr_accepted");
 
 	isrptr = &lapic->isr0;
 	isrptr[idx] |= 1 << (vector % 32);
-	VLAPIC_CTR_ISR(vlapic, "vlapic_intr_accepted");
 
 	/*
 	 * The only way a fresh vector could be accepted into ISR is if it was
@@ -1158,7 +1135,6 @@ vlapic_svr_write_handler(struct vlapic *vlapic)
 			 * The apic is now disabled so stop the apic timer
 			 * and mask all the LVT entries.
 			 */
-			VLAPIC_CTR0(vlapic, "vlapic is software-disabled");
 			VLAPIC_TIMER_LOCK(vlapic);
 			callout_stop(&vlapic->callout);
 			VLAPIC_TIMER_UNLOCK(vlapic);
@@ -1168,7 +1144,6 @@ vlapic_svr_write_handler(struct vlapic *vlapic)
 			 * The apic is now enabled so restart the apic timer
 			 * if it is configured in periodic mode.
 			 */
-			VLAPIC_CTR0(vlapic, "vlapic is software-enabled");
 			if (vlapic_periodic_timer(vlapic))
 				vlapic_icrtmr_write_handler(vlapic);
 		}
@@ -1704,7 +1679,7 @@ vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
 	if (delmode != IOART_DELFIXED &&
 	    delmode != IOART_DELLOPRI &&
 	    delmode != IOART_DELEXINT) {
-		VM_CTR1(vm, "vlapic intr invalid delmode %#x", delmode);
+		/* Invalid delivery mode */
 		return;
 	}
 	lowprio = (delmode == IOART_DELLOPRI);
