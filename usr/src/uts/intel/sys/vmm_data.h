@@ -18,7 +18,6 @@
 #define	_VMM_DATA_H_
 
 /* VMM Data Classes */
-#define	VDC_META	0	/* Meta information about data system */
 #define	VDC_VERSION	1	/* Version information for each data class */
 
 /* Classes bearing per-CPU data */
@@ -42,21 +41,27 @@
 
 /* VMM Data Identifiers */
 
-
 /*
- * VDC_REGISTER:
- */
-
-/*
- * VDC_MSR:
+ * Generic field encoding for 64-bit (or smaller) data which are identified by a
+ * 32-bit (or smaller) name.
  *
- * Use MSR identifiers directly
+ * Used by the following classes/version:
+ * - VDC_REGISTER v1: `vm_reg_name` identifiers
+ * - VDC_MSR v1: MSR identifiers
+ * - VDC_VMM_ARCH v1: Identifiers described below
  */
-
-struct vdi_msr_entry_v1 {
-	uint32_t	vme_msr;
+struct vdi_field_entry_v1 {
+	uint32_t	vfe_ident;
 	uint32_t	_pad;
-	uint64_t	vme_value;
+	uint64_t	vfe_value;
+};
+
+/* VDC_VERSION */
+struct vdi_version_entry_v1 {
+	uint16_t	vve_class;
+	uint16_t	vve_version;
+	uint16_t	vve_len_expect;
+	uint16_t	vve_len_per_item;
 };
 
 /*
@@ -98,10 +103,21 @@ struct vdi_lapic_v1 {
 	uint32_t		vl_esr_pending;
 };
 
-
 /*
  * VDC_VMM_ARCH:
  */
+
+/*
+ * Version 1 identifiers:
+ */
+
+/* Offset of guest TSC from system at time of boot */
+#define	VAI_TSC_BOOT_OFFSET	1
+/* Time that guest (nominally) booted, as hrtime */
+#define	VAI_BOOT_HRTIME		2
+/* Guest TSC frequency measured by hrtime (not effected by wall clock adj.) */
+#define	VAI_TSC_FREQ		3
+
 
 /* VDC_IOAPIC: */
 

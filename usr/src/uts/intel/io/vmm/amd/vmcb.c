@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 
+#include <machine/specialreg.h>
 #include <machine/vmm.h>
 
 #include "vmcb.h"
@@ -145,6 +146,66 @@ vmcb_regptr(struct vmcb *vmcb, int ident, uint32_t *dirtyp)
 	ASSERT(res != NULL);
 	if (dirtyp != NULL) {
 		*dirtyp |= dirty;
+	}
+	return (res);
+}
+
+uint64_t *
+vmcb_msr_ptr(struct vmcb *vmcb, uint32_t msr, uint32_t *dirtyp)
+{
+	uint64_t *res = NULL;
+	uint32_t dirty = 0;
+	struct vmcb_state *state = &vmcb->state;
+
+	switch (msr) {
+	case MSR_EFER:
+		res = &state->efer;
+		dirty = VMCB_CACHE_CR;
+		break;
+
+	case MSR_GSBASE:
+		res = &state->gs.base;
+		dirty = VMCB_CACHE_SEG;
+		break;
+	case MSR_FSBASE:
+		res = &state->fs.base;
+		dirty = VMCB_CACHE_SEG;
+		break;
+	case MSR_KGSBASE:
+		res = &state->kernelgsbase;
+		break;
+
+	case MSR_STAR:
+		res = &state->star;
+		break;
+	case MSR_LSTAR:
+		res = &state->lstar;
+		break;
+	case MSR_CSTAR:
+		res = &state->cstar;
+		break;
+	case MSR_SF_MASK:
+		res = &state->sfmask;
+		break;
+
+	case MSR_SYSENTER_CS_MSR:
+		res = &state->sysenter_cs;
+		break;
+	case MSR_SYSENTER_ESP_MSR:
+		res = &state->sysenter_esp;
+		break;
+	case MSR_SYSENTER_EIP_MSR:
+		res = &state->sysenter_eip;
+		break;
+
+	case MSR_PAT:
+		res = &state->g_pat;
+		dirty = VMCB_CACHE_NP;
+		break;
+	}
+
+	if (res != NULL && dirtyp != NULL) {
+		*dirtyp = dirty;
 	}
 	return (res);
 }

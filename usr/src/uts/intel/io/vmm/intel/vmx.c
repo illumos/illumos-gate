@@ -85,7 +85,6 @@ __FBSDID("$FreeBSD$");
 #include "vmcs.h"
 #include "vmx.h"
 #include "vmx_msr.h"
-#include "x86.h"
 #include "vmx_controls.h"
 
 #define	PINBASED_CTLS_ONE_SETTING					\
@@ -1629,6 +1628,25 @@ vmx_set_guest_reg(struct vmx *vmx, int vcpu, int ident, uint64_t regval)
 	}
 }
 
+static void
+vmx_sync_efer_state(struct vmx *vmx, int vcpu, uint64_t efer)
+{
+	uint64_t ctrl;
+
+	/*
+	 * If the "load EFER" VM-entry control is 1 (which we require) then the
+	 * value of EFER.LMA must be identical to "IA-32e mode guest" bit in the
+	 * VM-entry control.
+	 */
+	ctrl = vmcs_read(VMCS_ENTRY_CTLS);
+	if ((efer & EFER_LMA) != 0) {
+		ctrl |= VM_ENTRY_GUEST_LMA;
+	} else {
+		ctrl &= ~VM_ENTRY_GUEST_LMA;
+	}
+	vmcs_write(VMCS_ENTRY_CTLS, ctrl);
+}
+
 static int
 vmx_emulate_cr0_access(struct vmx *vmx, int vcpu, uint64_t exitqual)
 {
@@ -1655,20 +1673,14 @@ vmx_emulate_cr0_access(struct vmx *vmx, int vcpu, uint64_t exitqual)
 	vmcs_write(VMCS_GUEST_CR0, crval);
 
 	if (regval & CR0_PG) {
-		uint64_t efer, entry_ctls;
+		uint64_t efer;
 
-		/*
-		 * If CR0.PG is 1 and EFER.LME is 1 then EFER.LMA and
-		 * the "IA-32e mode guest" bit in VM-entry control must be
-		 * equal.
-		 */
+		/* Keep EFER.LMA properly updated if paging is enabled */
 		efer = vmcs_read(VMCS_GUEST_IA32_EFER);
 		if (efer & EFER_LME) {
 			efer |= EFER_LMA;
 			vmcs_write(VMCS_GUEST_IA32_EFER, efer);
-			entry_ctls = vmcs_read(VMCS_ENTRY_CTLS);
-			entry_ctls |= VM_ENTRY_GUEST_LMA;
-			vmcs_write(VMCS_ENTRY_CTLS, entry_ctls);
+			vmx_sync_efer_state(vmx, vcpu, efer);
 		}
 	}
 
@@ -2934,6 +2946,44 @@ vmx_vmcleanup(void *arg)
 	kmem_free(vmx, sizeof (*vmx));
 }
 
+/*
+ * Ensure that the VMCS for this vcpu is loaded.
+ * Returns true if a VMCS load was required.
+ */
+static bool
+vmx_vmcs_access_ensure(struct vmx *vmx, int vcpu)
+{
+	int hostcpu;
+
+	if (vcpu_is_running(vmx->vm, vcpu, &hostcpu)) {
+		if (hostcpu != curcpu) {
+			panic("unexpected vcpu migration %d != %d",
+			    hostcpu, curcpu);
+		}
+		/* Earlier logic already took care of the load */
+		return (false);
+	} else {
+		vmcs_load(vmx->vmcs_pa[vcpu]);
+		return (true);
+	}
+}
+
+static void
+vmx_vmcs_access_done(struct vmx *vmx, int vcpu)
+{
+	int hostcpu;
+
+	if (vcpu_is_running(vmx->vm, vcpu, &hostcpu)) {
+		if (hostcpu != curcpu) {
+			panic("unexpected vcpu migration %d != %d",
+			    hostcpu, curcpu);
+		}
+		/* Later logic will take care of the unload */
+	} else {
+		vmcs_clear(vmx->vmcs_pa[vcpu]);
+	}
+}
+
 static uint64_t *
 vmxctx_regptr(struct vmxctx *vmxctx, int reg)
 {
@@ -2989,13 +3039,8 @@ vmxctx_regptr(struct vmxctx *vmxctx, int reg)
 static int
 vmx_getreg(void *arg, int vcpu, int reg, uint64_t *retval)
 {
-	int running, hostcpu, err;
 	struct vmx *vmx = arg;
 	uint64_t *regp;
-
-	running = vcpu_is_running(vmx->vm, vcpu, &hostcpu);
-	if (running && hostcpu != curcpu)
-		panic("vmx_getreg: %d is running", vcpu);
 
 	/* VMCS access not required for ctx reads */
 	if ((regp = vmxctx_regptr(&vmx->ctx[vcpu], reg)) != NULL) {
@@ -3003,11 +3048,9 @@ vmx_getreg(void *arg, int vcpu, int reg, uint64_t *retval)
 		return (0);
 	}
 
-	if (!running) {
-		vmcs_load(vmx->vmcs_pa[vcpu]);
-	}
+	bool vmcs_loaded = vmx_vmcs_access_ensure(vmx, vcpu);
+	int err = 0;
 
-	err = 0;
 	if (reg == VM_REG_GUEST_INTR_SHADOW) {
 		uint64_t gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
 		*retval = (gi & HWINTR_BLOCKING) ? 1 : 0;
@@ -3035,23 +3078,17 @@ vmx_getreg(void *arg, int vcpu, int reg, uint64_t *retval)
 		}
 	}
 
-	if (!running) {
-		vmcs_clear(vmx->vmcs_pa[vcpu]);
+	if (vmcs_loaded) {
+		vmx_vmcs_access_done(vmx, vcpu);
 	}
-
 	return (err);
 }
 
 static int
 vmx_setreg(void *arg, int vcpu, int reg, uint64_t val)
 {
-	int running, hostcpu, error;
 	struct vmx *vmx = arg;
 	uint64_t *regp;
-
-	running = vcpu_is_running(vmx->vm, vcpu, &hostcpu);
-	if (running && hostcpu != curcpu)
-		panic("vmx_setreg: %d is running", vcpu);
 
 	/* VMCS access not required for ctx writes */
 	if ((regp = vmxctx_regptr(&vmx->ctx[vcpu], reg)) != NULL) {
@@ -3059,9 +3096,8 @@ vmx_setreg(void *arg, int vcpu, int reg, uint64_t val)
 		return (0);
 	}
 
-	if (!running) {
-		vmcs_load(vmx->vmcs_pa[vcpu]);
-	}
+	bool vmcs_loaded = vmx_vmcs_access_ensure(vmx, vcpu);
+	int err = 0;
 
 	if (reg == VM_REG_GUEST_INTR_SHADOW) {
 		if (val != 0) {
@@ -3069,39 +3105,24 @@ vmx_setreg(void *arg, int vcpu, int reg, uint64_t val)
 			 * Forcing the vcpu into an interrupt shadow is not
 			 * presently supported.
 			 */
-			error = EINVAL;
+			err = EINVAL;
 		} else {
 			uint64_t gi;
 
 			gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
 			gi &= ~HWINTR_BLOCKING;
 			vmcs_write(VMCS_GUEST_INTERRUPTIBILITY, gi);
-			error = 0;
+			err = 0;
 		}
 	} else {
 		uint32_t encoding;
 
-		error = 0;
+		err = 0;
 		encoding = vmcs_field_encoding(reg);
 		switch (encoding) {
 		case VMCS_GUEST_IA32_EFER:
-			/*
-			 * If the "load EFER" VM-entry control is 1 then the
-			 * value of EFER.LMA must be identical to "IA-32e mode
-			 * guest" bit in the VM-entry control.
-			 */
-			if ((entry_ctls & VM_ENTRY_LOAD_EFER) != 0) {
-				uint64_t ctls;
-
-				ctls = vmcs_read(VMCS_ENTRY_CTLS);
-				if (val & EFER_LMA) {
-					ctls |= VM_ENTRY_GUEST_LMA;
-				} else {
-					ctls &= ~VM_ENTRY_GUEST_LMA;
-				}
-				vmcs_write(VMCS_ENTRY_CTLS, ctls);
-			}
 			vmcs_write(encoding, val);
+			vmx_sync_efer_state(vmx, vcpu, val);
 			break;
 		case VMCS_GUEST_CR0:
 			/*
@@ -3130,10 +3151,11 @@ vmx_setreg(void *arg, int vcpu, int reg, uint64_t val)
 			 * XXX the processor retains global mappings when %cr3
 			 * is updated but vmx_invvpid() does not.
 			 */
-			vmx_invvpid(vmx, vcpu, running);
+			vmx_invvpid(vmx, vcpu,
+			    vcpu_is_running(vmx->vm, vcpu, NULL));
 			break;
 		case VMCS_INVALID_ENCODING:
-			error = EINVAL;
+			err = EINVAL;
 			break;
 		default:
 			vmcs_write(encoding, val);
@@ -3141,27 +3163,19 @@ vmx_setreg(void *arg, int vcpu, int reg, uint64_t val)
 		}
 	}
 
-	if (!running) {
-		vmcs_clear(vmx->vmcs_pa[vcpu]);
+	if (vmcs_loaded) {
+		vmx_vmcs_access_done(vmx, vcpu);
 	}
-
-	return (error);
+	return (err);
 }
 
 static int
 vmx_getdesc(void *arg, int vcpu, int seg, struct seg_desc *desc)
 {
-	int hostcpu, running;
 	struct vmx *vmx = arg;
 	uint32_t base, limit, access;
 
-	running = vcpu_is_running(vmx->vm, vcpu, &hostcpu);
-	if (running && hostcpu != curcpu)
-		panic("vmx_getdesc: %d is running", vcpu);
-
-	if (!running) {
-		vmcs_load(vmx->vmcs_pa[vcpu]);
-	}
+	bool vmcs_loaded = vmx_vmcs_access_ensure(vmx, vcpu);
 
 	vmcs_seg_desc_encoding(seg, &base, &limit, &access);
 	desc->base = vmcs_read(base);
@@ -3172,8 +3186,8 @@ vmx_getdesc(void *arg, int vcpu, int seg, struct seg_desc *desc)
 		desc->access = 0;
 	}
 
-	if (!running) {
-		vmcs_clear(vmx->vmcs_pa[vcpu]);
+	if (vmcs_loaded) {
+		vmx_vmcs_access_done(vmx, vcpu);
 	}
 	return (0);
 }
@@ -3181,17 +3195,10 @@ vmx_getdesc(void *arg, int vcpu, int seg, struct seg_desc *desc)
 static int
 vmx_setdesc(void *arg, int vcpu, int seg, const struct seg_desc *desc)
 {
-	int hostcpu, running;
 	struct vmx *vmx = arg;
 	uint32_t base, limit, access;
 
-	running = vcpu_is_running(vmx->vm, vcpu, &hostcpu);
-	if (running && hostcpu != curcpu)
-		panic("vmx_setdesc: %d is running", vcpu);
-
-	if (!running) {
-		vmcs_load(vmx->vmcs_pa[vcpu]);
-	}
+	bool vmcs_loaded = vmx_vmcs_access_ensure(vmx, vcpu);
 
 	vmcs_seg_desc_encoding(seg, &base, &limit, &access);
 	vmcs_write(base, desc->base);
@@ -3200,10 +3207,92 @@ vmx_setdesc(void *arg, int vcpu, int seg, const struct seg_desc *desc)
 		vmcs_write(access, desc->access);
 	}
 
-	if (!running) {
-		vmcs_clear(vmx->vmcs_pa[vcpu]);
+	if (vmcs_loaded) {
+		vmx_vmcs_access_done(vmx, vcpu);
 	}
 	return (0);
+}
+
+static uint64_t *
+vmx_msr_ptr(struct vmx *vmx, int vcpu, uint32_t msr)
+{
+	uint64_t *guest_msrs = vmx->guest_msrs[vcpu];
+
+	switch (msr) {
+	case MSR_LSTAR:
+		return (&guest_msrs[IDX_MSR_LSTAR]);
+	case MSR_CSTAR:
+		return (&guest_msrs[IDX_MSR_CSTAR]);
+	case MSR_STAR:
+		return (&guest_msrs[IDX_MSR_STAR]);
+	case MSR_SF_MASK:
+		return (&guest_msrs[IDX_MSR_SF_MASK]);
+	case MSR_KGSBASE:
+		return (&guest_msrs[IDX_MSR_KGSBASE]);
+	case MSR_PAT:
+		return (&guest_msrs[IDX_MSR_PAT]);
+	default:
+		return (NULL);
+	}
+}
+
+static int
+vmx_msr_get(void *arg, int vcpu, uint32_t msr, uint64_t *valp)
+{
+	struct vmx *vmx = arg;
+
+	ASSERT(valp != NULL);
+
+	const uint64_t *msrp = vmx_msr_ptr(vmx, vcpu, msr);
+	if (msrp != NULL) {
+		*valp = *msrp;
+		return (0);
+	}
+
+	const uint32_t vmcs_enc = vmcs_msr_encoding(msr);
+	if (vmcs_enc != VMCS_INVALID_ENCODING) {
+		bool vmcs_loaded = vmx_vmcs_access_ensure(vmx, vcpu);
+
+		*valp = vmcs_read(vmcs_enc);
+
+		if (vmcs_loaded) {
+			vmx_vmcs_access_done(vmx, vcpu);
+		}
+		return (0);
+	}
+
+	return (EINVAL);
+}
+
+static int
+vmx_msr_set(void *arg, int vcpu, uint32_t msr, uint64_t val)
+{
+	struct vmx *vmx = arg;
+
+	/* TODO: mask value */
+
+	uint64_t *msrp = vmx_msr_ptr(vmx, vcpu, msr);
+	if (msrp != NULL) {
+		*msrp = val;
+		return (0);
+	}
+
+	const uint32_t vmcs_enc = vmcs_msr_encoding(msr);
+	if (vmcs_enc != VMCS_INVALID_ENCODING) {
+		bool vmcs_loaded = vmx_vmcs_access_ensure(vmx, vcpu);
+
+		vmcs_write(vmcs_enc, val);
+
+		if (msr == MSR_EFER) {
+			vmx_sync_efer_state(vmx, vcpu, val);
+		}
+
+		if (vmcs_loaded) {
+			vmx_vmcs_access_done(vmx, vcpu);
+		}
+		return (0);
+	}
+	return (EINVAL);
 }
 
 static int
@@ -3711,6 +3800,9 @@ struct vmm_ops vmm_ops_intel = {
 
 	.vmsavectx	= vmx_savectx,
 	.vmrestorectx	= vmx_restorectx,
+
+	.vmgetmsr	= vmx_msr_get,
+	.vmsetmsr	= vmx_msr_set,
 };
 
 /* Side-effect free HW validation derived from checks in vmx_init. */

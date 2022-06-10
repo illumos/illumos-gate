@@ -1550,32 +1550,48 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 
 		const size_t len = vdx.vdx_len;
-		void *buf = kmem_alloc(len, KM_SLEEP);
-		if ((vdx.vdx_flags & VDX_FLAG_READ_COPYIN) != 0) {
-			if (ddi_copyin(vdx.vdx_data, buf, len, md) != 0) {
+		void *buf = NULL;
+		if (len != 0) {
+			buf = kmem_alloc(len, KM_SLEEP);
+			if ((vdx.vdx_flags & VDX_FLAG_READ_COPYIN) != 0 &&
+			    ddi_copyin(vdx.vdx_data, buf, len, md) != 0) {
 				kmem_free(buf, len);
 				error = EFAULT;
 				break;
+			} else {
+				bzero(buf, len);
 			}
-		} else {
-			bzero(buf, len);
 		}
 
+		vdx.vdx_result_len = 0;
 		vmm_data_req_t req = {
 			.vdr_class = vdx.vdx_class,
 			.vdr_version = vdx.vdx_version,
 			.vdr_flags = vdx.vdx_flags,
-			.vdr_len = vdx.vdx_len,
+			.vdr_len = len,
 			.vdr_data = buf,
+			.vdr_result_len = &vdx.vdx_result_len,
 		};
 		error = vmm_data_read(sc->vmm_vm, vdx.vdx_vcpuid, &req);
 
-		if (error == 0) {
+		if (error == 0 && buf != NULL) {
 			if (ddi_copyout(buf, vdx.vdx_data, len, md) != 0) {
 				error = EFAULT;
 			}
 		}
-		kmem_free(buf, len);
+
+		/*
+		 * Copy out the transfer request so that the value of
+		 * vdx_result_len can be made available, regardless of any
+		 * error(s) which may have occurred.
+		 */
+		if (ddi_copyout(&vdx, datap, sizeof (vdx), md) != 0) {
+			error = (error != 0) ? error : EFAULT;
+		}
+
+		if (buf != NULL) {
+			kmem_free(buf, len);
+		}
 		break;
 	}
 	case VM_DATA_WRITE: {
@@ -1595,19 +1611,24 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 
 		const size_t len = vdx.vdx_len;
-		void *buf = kmem_alloc(len, KM_SLEEP);
-		if (ddi_copyin(vdx.vdx_data, buf, len, md) != 0) {
-			kmem_free(buf, len);
-			error = EFAULT;
-			break;
+		void *buf = NULL;
+		if (len != 0) {
+			buf = kmem_alloc(len, KM_SLEEP);
+			if (ddi_copyin(vdx.vdx_data, buf, len, md) != 0) {
+				kmem_free(buf, len);
+				error = EFAULT;
+				break;
+			}
 		}
 
+		vdx.vdx_result_len = 0;
 		vmm_data_req_t req = {
 			.vdr_class = vdx.vdx_class,
 			.vdr_version = vdx.vdx_version,
 			.vdr_flags = vdx.vdx_flags,
-			.vdr_len = vdx.vdx_len,
+			.vdr_len = len,
 			.vdr_data = buf,
+			.vdr_result_len = &vdx.vdx_result_len,
 		};
 		if (vmm_allow_state_writes == 0) {
 			/* XXX: Play it safe for now */
@@ -1617,13 +1638,25 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			    &req);
 		}
 
-		if (error == 0 &&
+		if (error == 0 && buf != NULL &&
 		    (vdx.vdx_flags & VDX_FLAG_WRITE_COPYOUT) != 0) {
 			if (ddi_copyout(buf, vdx.vdx_data, len, md) != 0) {
 				error = EFAULT;
 			}
 		}
-		kmem_free(buf, len);
+
+		/*
+		 * Copy out the transfer request so that the value of
+		 * vdx_result_len can be made available, regardless of any
+		 * error(s) which may have occurred.
+		 */
+		if (ddi_copyout(&vdx, datap, sizeof (vdx), md) != 0) {
+			error = (error != 0) ? error : EFAULT;
+		}
+
+		if (buf != NULL) {
+			kmem_free(buf, len);
+		}
 		break;
 	}
 

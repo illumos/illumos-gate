@@ -72,7 +72,6 @@ __FBSDID("$FreeBSD$");
 #include "vlapic.h"
 #include "vlapic_priv.h"
 
-#include "x86.h"
 #include "vmcb.h"
 #include "svm.h"
 #include "svm_softc.h"
@@ -2257,6 +2256,17 @@ svm_setdesc(void *arg, int vcpu, int reg, const struct seg_desc *desc)
 		if (SEG_DESC_UNUSABLE(desc->access)) {
 			seg->attrib &= ~0x80;
 		}
+		/*
+		 * Keep CPL synced with the DPL specified for %ss.
+		 *
+		 * KVM notes that a SYSRET to non-cpl-3 is possible on AMD
+		 * (unlike Intel), but accepts such a possible deviation for
+		 * what is otherwise unreasonable behavior for a guest OS, since
+		 * they do the same synchronization.
+		 */
+		if (reg == VM_REG_GUEST_SS) {
+			vmcb->state.cpl = SEG_DESC_DPL(desc->access);
+		}
 		break;
 
 	case VM_REG_GUEST_GDTR:
@@ -2336,6 +2346,55 @@ svm_getdesc(void *arg, int vcpu, int reg, struct seg_desc *desc)
 	desc->base = seg->base;
 	desc->limit = seg->limit;
 	return (0);
+}
+
+static int
+svm_get_msr(void *arg, int vcpu, uint32_t msr, uint64_t *valp)
+{
+	struct svm_softc *sc = arg;
+	struct vmcb *vmcb = svm_get_vmcb(sc, vcpu);
+	const uint64_t *msrp = vmcb_msr_ptr(vmcb, msr, NULL);
+
+	if (msrp != NULL) {
+		*valp = *msrp;
+		return (0);
+	}
+
+	return (EINVAL);
+}
+
+static int
+svm_set_msr(void *arg, int vcpu, uint32_t msr, uint64_t val)
+{
+	struct svm_softc *sc = arg;
+	struct vmcb *vmcb = svm_get_vmcb(sc, vcpu);
+
+	uint32_t dirty = 0;
+	uint64_t *msrp = vmcb_msr_ptr(vmcb, msr, &dirty);
+	if (msrp == NULL) {
+		return (EINVAL);
+	}
+	switch (msr) {
+	case MSR_EFER:
+		/*
+		 * For now, just clone the logic from
+		 * svm_setreg():
+		 *
+		 * EFER_SVM must always be set when the guest is
+		 * executing
+		 */
+		*msrp = val | EFER_SVM;
+		break;
+	/* TODO: other necessary MSR masking */
+	default:
+		*msrp = val;
+		break;
+	}
+	if (dirty != 0) {
+		svm_set_dirty(sc, vcpu, dirty);
+	}
+	return (0);
+
 }
 
 static int
@@ -2450,4 +2509,7 @@ struct vmm_ops vmm_ops_amd = {
 
 	.vmsavectx	= svm_savectx,
 	.vmrestorectx	= svm_restorectx,
+
+	.vmgetmsr	= svm_get_msr,
+	.vmsetmsr	= svm_set_msr,
 };

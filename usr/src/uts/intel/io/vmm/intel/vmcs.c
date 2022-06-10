@@ -165,6 +165,34 @@ vmcs_seg_desc_encoding(int seg, uint32_t *base, uint32_t *lim, uint32_t *acc)
 	}
 }
 
+uint32_t
+vmcs_msr_encoding(uint32_t msr)
+{
+	switch (msr) {
+	case MSR_PAT:
+		return (VMCS_GUEST_IA32_PAT);
+	case MSR_EFER:
+		return (VMCS_GUEST_IA32_EFER);
+	case MSR_SYSENTER_CS_MSR:
+		return (VMCS_GUEST_IA32_SYSENTER_CS);
+	case MSR_SYSENTER_ESP_MSR:
+		return (VMCS_GUEST_IA32_SYSENTER_ESP);
+	case MSR_SYSENTER_EIP_MSR:
+		return (VMCS_GUEST_IA32_SYSENTER_EIP);
+	/*
+	 * While fsbase and gsbase are expected to be accessed (by the VMM) via
+	 * the segment descriptor interfaces, we still make it available as MSR
+	 * contents as well.
+	 */
+	case MSR_FSBASE:
+		return (VMCS_GUEST_FS_BASE);
+	case MSR_GSBASE:
+		return (VMCS_GUEST_GS_BASE);
+	default:
+		return (VMCS_INVALID_ENCODING);
+	}
+}
+
 void
 vmcs_clear(uintptr_t vmcs_pa)
 {

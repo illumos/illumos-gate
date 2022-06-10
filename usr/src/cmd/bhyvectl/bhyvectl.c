@@ -51,9 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/errno.h>
 #include <sys/mman.h>
 #include <sys/cpuset.h>
-#ifndef __FreeBSD__
 #include <sys/fp.h>
-#endif /* __FreeBSD__ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
+#include <sys/vmm_data.h>
 #include <vmmapi.h>
 
 #include "amd/vmcb.h"
@@ -95,10 +94,8 @@ usage(bool cpu_intel)
 	"       [--cpu=<vcpu_number>]\n"
 	"       [--create]\n"
 	"       [--destroy]\n"
-#ifndef __FreeBSD__
 	"       [--pmtmr-port=ioport]\n"
 	"       [--wrlock-cycle]\n"
-#endif
 	"       [--get-all]\n"
 	"       [--get-stats]\n"
 	"       [--set-desc-ds]\n"
@@ -186,9 +183,6 @@ usage(bool cpu_intel)
 	"       [--get-ldtr]\n"
 	"       [--set-x2apic-state=<state>]\n"
 	"       [--get-x2apic-state]\n"
-#ifdef __FreeBSD__
-	"       [--unassign-pptdev=<bus/slot/func>]\n"
-#endif
 	"       [--set-mem=<memory in units of MB>]\n"
 	"       [--get-lowmem]\n"
 	"       [--get-highmem]\n"
@@ -307,16 +301,11 @@ static int set_cs, set_ds, set_es, set_fs, set_gs, set_ss, set_tr, set_ldtr;
 static int get_cs, get_ds, get_es, get_fs, get_gs, get_ss, get_tr, get_ldtr;
 static int set_x2apic_state, get_x2apic_state;
 enum x2apic_state x2apic_state;
-#ifdef __FreeBSD__
-static int unassign_pptdev, bus, slot, func;
-#endif
 static int run;
 static int get_cpu_topology;
-#ifndef __FreeBSD__
 static int pmtmr_port;
 static int wrlock_cycle;
 static int get_fpu;
-#endif
 
 /*
  * VMCB specific.
@@ -339,12 +328,13 @@ static int get_cr4_mask, get_cr4_shadow;
 static int get_cr3_targets;
 static int get_apic_access_addr, get_virtual_apic_addr, get_tpr_threshold;
 static int get_msr_bitmap, get_msr_bitmap_address;
+static int get_guest_msrs;
 static int get_vpid_asid;
 static int get_inst_err, get_exit_ctls, get_entry_ctls;
 static int get_host_cr0, get_host_cr3, get_host_cr4;
 static int get_host_rip, get_host_rsp;
-static int get_guest_pat, get_host_pat;
-static int get_guest_sysenter, get_vmcs_link;
+static int get_host_pat;
+static int get_vmcs_link;
 static int get_exit_reason, get_vmcs_exit_qualification;
 static int get_vmcs_exit_interruption_info, get_vmcs_exit_interruption_error;
 static int get_vmcs_exit_inst_length;
@@ -406,172 +396,7 @@ dump_vm_run_exitcode(struct vm_exit *vmexit, int vcpu)
 #define MSR_AMD7TH_START	0xC0010000
 #define MSR_AMD7TH_END		0xC0011FFF
 
-#ifdef __FreeBSD__
-static const char *
-msr_name(uint32_t msr)
-{
-	static char buf[32];
-
-	switch(msr) {
-	case MSR_TSC:
-		return ("MSR_TSC");
-	case MSR_EFER:
-		return ("MSR_EFER");
-	case MSR_STAR:
-		return ("MSR_STAR");
-	case MSR_LSTAR:	
-		return ("MSR_LSTAR");
-	case MSR_CSTAR:
-		return ("MSR_CSTAR");
-	case MSR_SF_MASK:
-		return ("MSR_SF_MASK");
-	case MSR_FSBASE:
-		return ("MSR_FSBASE");
-	case MSR_GSBASE:
-		return ("MSR_GSBASE");
-	case MSR_KGSBASE:
-		return ("MSR_KGSBASE");
-	case MSR_SYSENTER_CS_MSR:
-		return ("MSR_SYSENTER_CS_MSR");
-	case MSR_SYSENTER_ESP_MSR:
-		return ("MSR_SYSENTER_ESP_MSR");
-	case MSR_SYSENTER_EIP_MSR:
-		return ("MSR_SYSENTER_EIP_MSR");
-	case MSR_PAT:
-		return ("MSR_PAT");
-	}
-	snprintf(buf, sizeof(buf), "MSR       %#08x", msr);
-
-	return (buf);
-}
-
-static inline void
-print_msr_pm(uint64_t msr, int vcpu, int readable, int writeable)
-{
-
-	if (readable || writeable) {
-		printf("%-20s[%d]\t\t%c%c\n", msr_name(msr), vcpu,
-			readable ? 'R' : '-', writeable ? 'W' : '-');
-	}
-}
-
-/*
- * Reference APM vol2, section 15.11 MSR Intercepts.
- */
-static void
-dump_amd_msr_pm(const char *bitmap, int vcpu)
-{
-	int byte, bit, readable, writeable;
-	uint32_t msr;
-
-	for (msr = 0; msr < 0x2000; msr++) {
-		byte = msr / 4;
-		bit = (msr % 4) * 2;
-
-		/* Look at MSRs in the range 0x00000000 to 0x00001FFF */
-		readable = (bitmap[byte] & (1 << bit)) ? 0 : 1;
-		writeable = (bitmap[byte] & (2 << bit)) ?  0 : 1;
-		print_msr_pm(msr, vcpu, readable, writeable);
-
-		/* Look at MSRs in the range 0xC0000000 to 0xC0001FFF */
-		byte += 2048;
-		readable = (bitmap[byte] & (1 << bit)) ? 0 : 1;
-		writeable = (bitmap[byte] & (2 << bit)) ?  0 : 1;
-		print_msr_pm(msr + MSR_AMD6TH_START, vcpu, readable,
-				writeable);
-		
-		/* MSR 0xC0010000 to 0xC0011FF is only for AMD */
-		byte += 4096;
-		readable = (bitmap[byte] & (1 << bit)) ? 0 : 1;
-		writeable = (bitmap[byte] & (2 << bit)) ?  0 : 1;
-		print_msr_pm(msr + MSR_AMD7TH_START, vcpu, readable,
-				writeable);
-	}
-}
-
-/*
- * Reference Intel SDM Vol3 Section 24.6.9 MSR-Bitmap Address
- */
-static void
-dump_intel_msr_pm(const char *bitmap, int vcpu)
-{
-	int byte, bit, readable, writeable;
-	uint32_t msr;
-
-	for (msr = 0; msr < 0x2000; msr++) {
-		byte = msr / 8;
-		bit = msr & 0x7;
-
-		/* Look at MSRs in the range 0x00000000 to 0x00001FFF */
-		readable = (bitmap[byte] & (1 << bit)) ? 0 : 1;
-		writeable = (bitmap[2048 + byte] & (1 << bit)) ?  0 : 1;
-		print_msr_pm(msr, vcpu, readable, writeable);
-
-		/* Look at MSRs in the range 0xC0000000 to 0xC0001FFF */
-		byte += 1024;
-		readable = (bitmap[byte] & (1 << bit)) ? 0 : 1;
-		writeable = (bitmap[2048 + byte] & (1 << bit)) ?  0 : 1;
-		print_msr_pm(msr + MSR_AMD6TH_START, vcpu, readable,
-				writeable);
-	}
-}
-
-static int
-dump_msr_bitmap(int vcpu, uint64_t addr, bool cpu_intel)
-{
-	int error, fd, map_size;
-	const char *bitmap;
-
-	error = -1;
-	bitmap = MAP_FAILED;
-
-	fd = open("/dev/mem", O_RDONLY, 0);
-	if (fd < 0) {
-		perror("Couldn't open /dev/mem");
-		goto done;
-	}
-
-	if (cpu_intel)
-		map_size = PAGE_SIZE;
-	else
-		map_size = 2 * PAGE_SIZE;
-
-	bitmap = mmap(NULL, map_size, PROT_READ, MAP_SHARED, fd, addr);
-	if (bitmap == MAP_FAILED) {
-		perror("mmap failed");
-		goto done;
-	}
-	
-	if (cpu_intel)
-		dump_intel_msr_pm(bitmap, vcpu);
-	else	
-		dump_amd_msr_pm(bitmap, vcpu);
-
-	error = 0;
-done:
-	if (bitmap != MAP_FAILED)
-		munmap((void *)bitmap, map_size);
-	if (fd >= 0)
-		close(fd);
-
-	return (error);
-}
-
-static int
-vm_get_vmcs_field(struct vmctx *ctx, int vcpu, int field, uint64_t *ret_val)
-{
-
-	return (vm_get_register(ctx, vcpu, VMCS_IDENT(field), ret_val));
-}
-
-static int
-vm_set_vmcs_field(struct vmctx *ctx, int vcpu, int field, uint64_t val)
-{
-
-	return (vm_set_register(ctx, vcpu, VMCS_IDENT(field), val));
-}
-#else /* __FreeBSD__ */
-/* VMCS does not allow arbitrary reads/writes */
+/* Until a safe method is created, arbitrary VMCS reads/writes are forbidden */
 static int
 vm_get_vmcs_field(struct vmctx *ctx, int vcpu, int field, uint64_t *ret_val)
 {
@@ -584,29 +409,11 @@ vm_set_vmcs_field(struct vmctx *ctx, int vcpu, int field, uint64_t val)
 {
 	return (EINVAL);
 }
-#endif /* __FreeBSD__ */
 
-#ifdef __FreeBSD__
+/* Until a safe method is created, arbitrary VMCB reads/writes are forbidden */
 static int
 vm_get_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
-	uint64_t *ret_val)
-{
-
-	return (vm_get_register(ctx, vcpu, VMCB_ACCESS(off, bytes), ret_val));
-}
-
-static int
-vm_set_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
-	uint64_t val)
-{
-	
-	return (vm_set_register(ctx, vcpu, VMCB_ACCESS(off, bytes), val));
-}
-#else /* __FreeBSD__ */
-/* Arbitrary VMCB read/write is not allowed */
-static int
-vm_get_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
-	uint64_t *ret_val)
+    uint64_t *ret_val)
 {
 	*ret_val = 0;
 	return (0);
@@ -614,11 +421,10 @@ vm_get_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
 
 static int
 vm_set_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
-	uint64_t val)
+    uint64_t val)
 {
 	return (EINVAL);
 }
-#endif /* __FreeBSD__ */
 
 enum {
 	VMNAME = 1000,	/* avoid collision with return values from getopt */
@@ -661,9 +467,7 @@ enum {
 	SET_RTC_TIME,
 	SET_RTC_NVRAM,
 	RTC_NVRAM_OFFSET,
-#ifndef __FreeBSD__
 	PMTMR_PORT,
-#endif
 };
 
 static void
@@ -686,38 +490,6 @@ print_cpus(const char *banner, const cpuset_t *cpus)
 	printf("\n");
 }
 
-#ifdef __FreeBSD__
-static void
-print_intinfo(const char *banner, uint64_t info)
-{
-	int type;
-
-	printf("%s:\t", banner);
-	if (info & VM_INTINFO_VALID) {
-		type = info & VM_INTINFO_TYPE;
-		switch (type) {
-		case VM_INTINFO_HWINTR:
-			printf("extint");
-			break;
-		case VM_INTINFO_NMI:
-			printf("nmi");
-			break;
-		case VM_INTINFO_SWINTR:
-			printf("swint");
-			break;
-		default:
-			printf("exception");
-			break;
-		}
-		printf(" vector %d", (int)VM_INTINFO_VECTOR(info));
-		if (info & VM_INTINFO_DEL_ERRCODE)
-			printf(" errcode %#x", (u_int)(info >> 32));
-	} else {
-		printf("n/a");
-	}
-	printf("\n");
-}
-#else /* __FreeBSD__ */
 static void
 print_intinfo(const char *banner, uint64_t info)
 {
@@ -746,7 +518,6 @@ print_intinfo(const char *banner, uint64_t info)
 	}
 	printf("\n");
 }
-#endif /* __FreeBSD__ */
 
 static bool
 cpu_vendor_intel(void)
@@ -1141,7 +912,7 @@ get_misc_vmcs(struct vmctx *ctx, int vcpu)
 		if (error == 0)
 			printf("cr4_shadow[%d]\t\t0x%016lx\n", vcpu, cr4shadow);
 	}
-	
+
 	if (!error && (get_cr3_targets || get_all)) {
 		uint64_t target_count, target_addr;
 		error = vm_get_vmcs_field(ctx, vcpu, VMCS_CR3_TARGET_COUNT,
@@ -1214,7 +985,7 @@ get_misc_vmcs(struct vmctx *ctx, int vcpu)
 			printf("gpa[%d]\t\t0x%016lx\n", vcpu, u64);
 	}
 
-	if (!error && (get_vmcs_entry_interruption_info || 
+	if (!error && (get_vmcs_entry_interruption_info ||
 		get_all)) {
 		error = vm_get_vmcs_field(ctx, vcpu, VMCS_ENTRY_INTR_INFO,&u64);
 		if (error == 0) {
@@ -1336,7 +1107,7 @@ get_misc_vmcs(struct vmctx *ctx, int vcpu)
 			printf("vmcs_exit_qualification[%d]\t0x%016lx\n",
 				vcpu, u64);
 	}
-	
+
 	return (error);
 }
 
@@ -1549,9 +1320,7 @@ setup_options(bool cpu_intel)
 					NO_ARG,	&get_msr_bitmap, 	1 },
 		{ "get-msr-bitmap-address",
 					NO_ARG,	&get_msr_bitmap_address, 1 },
-		{ "get-guest-pat",	NO_ARG,	&get_guest_pat,		1 },
-		{ "get-guest-sysenter",
-					NO_ARG,	&get_guest_sysenter, 	1 },
+		{ "get-guest-msrs",	NO_ARG,	&get_guest_msrs,	1 },
 		{ "get-exit-reason",
 					NO_ARG,	&get_exit_reason, 	1 },
 		{ "get-x2apic-state",	NO_ARG,	&get_x2apic_state, 	1 },
@@ -1566,11 +1335,9 @@ setup_options(bool cpu_intel)
 		{ "get-suspended-cpus", NO_ARG,	&get_suspended_cpus, 	1 },
 		{ "get-intinfo", 	NO_ARG,	&get_intinfo,		1 },
 		{ "get-cpu-topology",	NO_ARG, &get_cpu_topology,	1 },
-#ifndef __FreeBSD__
 		{ "pmtmr-port",		REQ_ARG,	0,	PMTMR_PORT },
 		{ "wrlock-cycle",	NO_ARG,	&wrlock_cycle,	1 },
 		{ "get-fpu",	NO_ARG,		&get_fpu,	1 },
-#endif
 	};
 
 	const struct option intel_opts[] = {
@@ -1632,7 +1399,7 @@ setup_options(bool cpu_intel)
 	const struct option amd_opts[] = {
 		{ "get-vmcb-intercepts",
 				NO_ARG,	&get_vmcb_intercept, 	1 },
-		{ "get-vmcb-asid", 
+		{ "get-vmcb-asid",
 				NO_ARG,	&get_vpid_asid,	     	1 },
 		{ "get-vmcb-exit-details",
 				NO_ARG, &get_vmcb_exit_details,	1 },
@@ -1788,7 +1555,6 @@ show_memseg(struct vmctx *ctx)
 	}
 }
 
-#ifndef __FreeBSD__
 static int
 show_fpu(struct vmctx *ctx, int vcpu)
 {
@@ -1873,7 +1639,87 @@ show_fpu(struct vmctx *ctx, int vcpu)
 	free(buf);
 	return (0);
 }
-#endif /*__FreeBSD__ */
+
+static const char *
+msr_name(uint32_t msr)
+{
+#define MSR_IDENT_MAP(x)	case x: return (#x);
+	switch (msr) {
+	MSR_IDENT_MAP(MSR_PAT)
+	MSR_IDENT_MAP(MSR_SYSENTER_CS_MSR)
+	MSR_IDENT_MAP(MSR_SYSENTER_ESP_MSR)
+	MSR_IDENT_MAP(MSR_SYSENTER_EIP_MSR)
+	MSR_IDENT_MAP(MSR_STAR)
+	MSR_IDENT_MAP(MSR_LSTAR)
+	MSR_IDENT_MAP(MSR_CSTAR)
+	MSR_IDENT_MAP(MSR_SF_MASK)
+	MSR_IDENT_MAP(MSR_FSBASE)
+	MSR_IDENT_MAP(MSR_GSBASE)
+	MSR_IDENT_MAP(MSR_KGSBASE)
+	MSR_IDENT_MAP(MSR_EFER)
+	MSR_IDENT_MAP(MSR_MTRRcap)
+	MSR_IDENT_MAP(MSR_MTRRdefType)
+	case MSR_TSC:
+		return ("MSR_TSC (offset from system boot)");
+	default:
+		return (NULL);
+	}
+}
+
+static int
+show_msrs(struct vmctx *ctx, int vcpu)
+{
+	struct vdi_field_entry_v1 *msrs;
+	struct vm_data_xfer xfer = {
+		.vdx_vcpuid = vcpu,
+		.vdx_class = VDC_MSR,
+		.vdx_version = 1,
+		.vdx_len = 0,
+		.vdx_data = &msrs,
+	};
+	int fd = vm_get_device_fd(ctx);
+	int res;
+
+	/* Figure out how many entries we need to alloc for */
+	res = ioctl(fd, VM_DATA_READ, &xfer);
+	if (res == 0) {
+		return (EINVAL);
+	} else if (errno != ENOSPC) {
+		return (errno);
+	}
+	const uint32_t len = xfer.vdx_result_len;
+	msrs = malloc(len);
+	if (msrs == NULL) {
+		return (ENOMEM);
+	}
+	bzero(msrs, len);
+	xfer.vdx_data = msrs;
+	xfer.vdx_len = len;
+
+	/* Query the actual data, now that we should have an adequate buffer */
+	res = ioctl(fd, VM_DATA_READ, &xfer);
+	if (res != 0) {
+		free(msrs);
+		return (errno);
+	}
+
+	const uint_t count =
+	    xfer.vdx_result_len / sizeof (struct vdi_field_entry_v1);
+	for (uint_t i = 0; i < count; i++) {
+		const uint32_t ident = msrs[i].vfe_ident;
+		const uint64_t value = msrs[i].vfe_value;
+
+		const char *name = msr_name(ident);
+
+		if (name != NULL) {
+			printf("msr[%s]\t = %x\n", name, value);
+		} else {
+			printf("msr[%08x]\t = %x\n", ident, value);
+		}
+	}
+	free(msrs);
+	return (0);
+}
 
 int
 main(int argc, char *argv[])
@@ -1883,7 +1729,7 @@ main(int argc, char *argv[])
 	vm_paddr_t gpa_pmap;
 	struct vm_exit vmexit;
 	uint64_t rax, cr0, cr2, cr3, cr4, dr0, dr1, dr2, dr3, dr6, dr7;
-	uint64_t rsp, rip, rflags, efer, pat;
+	uint64_t rsp, rip, rflags, efer;
 	uint64_t eptp, bm, addr, u64, pteval[4], *pte, info[2];
 	struct vmctx *ctx;
 	cpuset_t cpus;
@@ -2049,21 +1895,12 @@ main(int argc, char *argv[])
 		case CAPNAME:
 			capname = optarg;
 			break;
-#ifdef __FreeBSD__
-		case UNASSIGN_PPTDEV:
-			unassign_pptdev = 1;
-			if (sscanf(optarg, "%d/%d/%d", &bus, &slot, &func) != 3)
-				usage(cpu_intel);
-			break;
-#endif
 		case ASSERT_LAPIC_LVT:
 			assert_lapic_lvt = atoi(optarg);
 			break;
-#ifndef __FreeBSD__
 		case PMTMR_PORT:
 			pmtmr_port = strtoul(optarg, NULL, 16);
 			break;
-#endif
 		default:
 			usage(cpu_intel);
 		}
@@ -2076,13 +1913,8 @@ main(int argc, char *argv[])
 
 	error = 0;
 
-#ifndef __FreeBSD__
 	if (!error && create)
 		error = vm_create(vmname, 0);
-# else
-	if (!error && create)
-		error = vm_create(vmname);
-#endif /* __FreeBSD__ */
 
 	if (!error) {
 		ctx = vm_open(vmname);
@@ -2094,16 +1926,15 @@ main(int argc, char *argv[])
 		}
 	}
 
-#ifndef __FreeBSD__
 	if (!error && pmtmr_port) {
 		error = vm_pmtmr_set_location(ctx, pmtmr_port);
 		exit(error);
 	}
+
 	if (!error && wrlock_cycle) {
 		error = vm_wrlock_cycle(ctx);
 		exit(error);
 	}
-#endif /* __FreeBSD__ */
 
 	if (!error && memsize)
 		error = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
@@ -2232,11 +2063,6 @@ main(int argc, char *argv[])
 	if (!error && set_x2apic_state)
 		error = vm_set_x2apic_state(ctx, vcpu, x2apic_state);
 
-#ifdef __FreeBSD__
-	if (!error && unassign_pptdev)
-		error = vm_unassign_pptdev(ctx, bus, slot, func);
-#endif /* __FreeBSD__ */
-
 	if (!error && set_exception_bitmap) {
 		if (cpu_intel)
 			error = vm_set_vmcs_field(ctx, vcpu,
@@ -2273,11 +2099,9 @@ main(int argc, char *argv[])
 	if (!error)
 		error = get_all_segments(ctx, vcpu);
 
-#ifndef __FreeBSD__
 	if (!error && (get_fpu || get_all)) {
 		error = show_fpu(ctx, vcpu);
 	}
-#endif /* __FreeBSD__ */
 
 	if (!error) {
 		if (cpu_intel)
@@ -2285,7 +2109,7 @@ main(int argc, char *argv[])
 		else
 			error = get_misc_vmcb(ctx, vcpu);
 	}
-	
+
 	if (!error && (get_x2apic_state || get_all)) {
 		error = vm_get_x2apic_state(ctx, vcpu, &x2apic_state);
 		if (error == 0)
@@ -2340,7 +2164,7 @@ main(int argc, char *argv[])
 						  &tscoff);
 		else
 			error = vm_get_vmcb_field(ctx, vcpu,
-						  VMCB_OFF_TSC_OFFSET, 
+						  VMCB_OFF_TSC_OFFSET,
 						  8, &tscoff);
 		if (error == 0)
 			printf("tsc_offset[%d]\t0x%016lx\n", vcpu, tscoff);
@@ -2348,7 +2172,7 @@ main(int argc, char *argv[])
 
 	if (!error && (get_msr_bitmap_address || get_all)) {
 		if (cpu_intel)
-			error = vm_get_vmcs_field(ctx, vcpu, VMCS_MSR_BITMAP, 
+			error = vm_get_vmcs_field(ctx, vcpu, VMCS_MSR_BITMAP,
 						  &addr);
 		else
 			error = vm_get_vmcb_field(ctx, vcpu,
@@ -2357,90 +2181,27 @@ main(int argc, char *argv[])
 			printf("msr_bitmap[%d]\t\t%#lx\n", vcpu, addr);
 	}
 
-	if (!error && (get_msr_bitmap || get_all)) {
-		if (cpu_intel) {
-			error = vm_get_vmcs_field(ctx, vcpu, 
-						  VMCS_MSR_BITMAP, &addr);
-		} else {
-			error = vm_get_vmcb_field(ctx, vcpu,
-						  VMCB_OFF_MSR_PERM, 8,
-						  &addr);
-		}
-
-#ifdef __FreeBSD__
-		if (error == 0)
-			error = dump_msr_bitmap(vcpu, addr, cpu_intel);
-#else
-		/*
-		 * Skip dumping the MSR bitmap since raw access to the VMCS is
-		 * currently not possible.
-		 */
-#endif /* __FreeBSD__ */
-	}
-
 	if (!error && (get_vpid_asid || get_all)) {
 		uint64_t vpid;
 		if (cpu_intel)
 			error = vm_get_vmcs_field(ctx, vcpu, VMCS_VPID, &vpid);
 		else
-			error = vm_get_vmcb_field(ctx, vcpu, VMCB_OFF_ASID, 
+			error = vm_get_vmcb_field(ctx, vcpu, VMCB_OFF_ASID,
 						  4, &vpid);
 		if (error == 0)
-			printf("%s[%d]\t\t0x%04lx\n", 
+			printf("%s[%d]\t\t0x%04lx\n",
 				cpu_intel ? "vpid" : "asid", vcpu, vpid);
 	}
 
-	if (!error && (get_guest_pat || get_all)) {
-		if (cpu_intel)
-			error = vm_get_vmcs_field(ctx, vcpu,
-						  VMCS_GUEST_IA32_PAT, &pat);
-		else
-			error = vm_get_vmcb_field(ctx, vcpu,
-						  VMCB_OFF_GUEST_PAT, 8, &pat);
-		if (error == 0)
-			printf("guest_pat[%d]\t\t0x%016lx\n", vcpu, pat);
-	}
-
-	if (!error && (get_guest_sysenter || get_all)) {
-		if (cpu_intel)
-			error = vm_get_vmcs_field(ctx, vcpu,
-						  VMCS_GUEST_IA32_SYSENTER_CS,
-						  &cs);
-		else
-			error = vm_get_vmcb_field(ctx, vcpu,
-						  VMCB_OFF_SYSENTER_CS, 8,
-						  &cs);
-
-		if (error == 0)
-			printf("guest_sysenter_cs[%d]\t%#lx\n", vcpu, cs);
-		if (cpu_intel)
-			error = vm_get_vmcs_field(ctx, vcpu,
-						  VMCS_GUEST_IA32_SYSENTER_ESP,
-						  &rsp);
-		else
-			error = vm_get_vmcb_field(ctx, vcpu,
-						  VMCB_OFF_SYSENTER_ESP, 8,
-						  &rsp);
-
-		if (error == 0)
-			printf("guest_sysenter_sp[%d]\t%#lx\n", vcpu, rsp);
-		if (cpu_intel)
-			error = vm_get_vmcs_field(ctx, vcpu,
-						  VMCS_GUEST_IA32_SYSENTER_EIP,
-						  &rip);
-		else
-			error = vm_get_vmcb_field(ctx, vcpu,
-						  VMCB_OFF_SYSENTER_EIP, 8, 
-						  &rip);
-		if (error == 0)
-			printf("guest_sysenter_ip[%d]\t%#lx\n", vcpu, rip);
+	if (!error && (get_guest_msrs || get_all)) {
+		error = show_msrs(ctx, vcpu);
 	}
 
 	if (!error && (get_exit_reason || get_all)) {
 		if (cpu_intel)
 			error = vm_get_vmcs_field(ctx, vcpu, VMCS_EXIT_REASON,
 						  &u64);
-		else	
+		else
 			error = vm_get_vmcb_field(ctx, vcpu,
 						  VMCB_OFF_EXIT_REASON, 8,
 						  &u64);
