@@ -49,6 +49,12 @@ tests = [
 	'triple_fault'
 	]
 
+[/opt/bhyve-tests/tests/viona]
+user = root
+tests = [
+	'interface_version'
+	]
+
 # Tests of userspace mevent system, built from cmd/bhyve
 [/opt/bhyve-tests/tests/mevent]
 tests = ['lists_delete', 'read_disable', 'read_pause', 'read_requeue',

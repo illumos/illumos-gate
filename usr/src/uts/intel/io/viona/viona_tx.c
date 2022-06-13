@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 
@@ -179,11 +179,11 @@ viona_tx_done(viona_vring_t *ring, uint32_t len, uint16_t cookie)
 	viona_intr_ring(ring, B_FALSE);
 }
 
+#define	TX_BURST_THRESH	32
+
 void
 viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 {
-	proc_t *p = ttoproc(curthread);
-
 	(void) thread_vsetname(curthread, "viona_tx_%p", ring);
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
@@ -192,23 +192,30 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 	mutex_exit(&ring->vr_lock);
 
 	for (;;) {
-		boolean_t bail = B_FALSE;
-		boolean_t renew = B_FALSE;
-		uint_t ntx = 0;
+		uint_t ntx = 0, burst = 0;
 
 		viona_ring_disable_notify(ring);
-		while (viona_ring_num_avail(ring)) {
+		while (viona_ring_num_avail(ring) != 0) {
 			viona_tx(link, ring);
+			ntx++;
+			burst++;
 
 			/*
 			 * It is advantageous for throughput to keep this
 			 * transmission loop tight, but periodic breaks to
 			 * check for other events are of value too.
 			 */
-			if (ntx++ >= ring->vr_size)
-				break;
+			if (burst >= TX_BURST_THRESH) {
+				mutex_enter(&ring->vr_lock);
+				const bool need_bail = vring_need_bail(ring);
+				mutex_exit(&ring->vr_lock);
+
+				if (need_bail) {
+					break;
+				}
+				burst = 0;
+			}
 		}
-		viona_ring_enable_notify(ring);
 
 		VIONA_PROBE2(tx, viona_link_t *, link, uint_t, ntx);
 
@@ -219,14 +226,11 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		 * The barrier ensures that visibility of the no-notify
 		 * store does not cross the viona_ring_num_avail() check below.
 		 */
+		viona_ring_enable_notify(ring);
 		membar_enter();
-		bail = VRING_NEED_BAIL(ring, p);
-		renew = vmm_drv_lease_expired(ring->vr_lease);
-		if (!bail && !renew && viona_ring_num_avail(ring)) {
-			continue;
-		}
 
-		if ((link->l_features & VIRTIO_F_RING_NOTIFY_ON_EMPTY) != 0) {
+		if (viona_ring_num_avail(ring) == 0 &&
+		    (link->l_features & VIRTIO_F_RING_NOTIFY_ON_EMPTY) != 0) {
 			/*
 			 * The NOTIFY_ON_EMPTY interrupt should not pay heed to
 			 * the presence of AVAIL_NO_INTERRUPT.
@@ -235,36 +239,43 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		}
 
 		mutex_enter(&ring->vr_lock);
+		for (;;) {
+			if (vring_need_bail(ring)) {
+				ring->vr_state = VRS_STOP;
+				viona_tx_wait_outstanding(ring);
+				return;
+			}
 
-		while (!bail && !renew && !viona_ring_num_avail(ring)) {
-			(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
-			bail = VRING_NEED_BAIL(ring, p);
-			renew = vmm_drv_lease_expired(ring->vr_lease);
-		}
+			if (vmm_drv_lease_expired(ring->vr_lease)) {
+				ring->vr_state_flags |= VRSF_RENEW;
+				/*
+				 * When renewing the lease for the ring, no TX
+				 * frames may be outstanding, as they contain
+				 * references to guest memory.
+				 */
+				viona_tx_wait_outstanding(ring);
 
-		if (bail) {
-			break;
-		} else if (renew) {
-			ring->vr_state_flags |= VRSF_RENEW;
-			/*
-			 * When renewing the lease for the ring, no TX
-			 * frames may be outstanding, as they contain
-			 * references to guest memory.
-			 */
-			viona_tx_wait_outstanding(ring);
+				const boolean_t renewed =
+				    viona_ring_lease_renew(ring);
+				ring->vr_state_flags &= ~VRSF_RENEW;
 
-			if (!viona_ring_lease_renew(ring)) {
+				if (!renewed) {
+					/* stop ring on failed renewal */
+					ring->vr_state = VRS_STOP;
+					return;
+				}
+			}
+
+			if (viona_ring_num_avail(ring) != 0) {
 				break;
 			}
-			ring->vr_state_flags &= ~VRSF_RENEW;
+
+			/* Wait for further activity on the ring */
+			(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
 		}
 		mutex_exit(&ring->vr_lock);
 	}
-
-	ASSERT(MUTEX_HELD(&ring->vr_lock));
-
-	ring->vr_state = VRS_STOP;
-	viona_tx_wait_outstanding(ring);
+	/* UNREACHABLE */
 }
 
 static void

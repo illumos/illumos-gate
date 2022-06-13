@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_VIONA_IMPL_H
@@ -76,7 +76,8 @@ enum viona_ring_state {
 enum viona_ring_state_flags {
 	VRSF_REQ_START	= 0x1,	/* start running from INIT state */
 	VRSF_REQ_STOP	= 0x2,	/* stop running, clean up, goto RESET state */
-	VRSF_RENEW	= 0x4,	/* ring renewing lease */
+	VRSF_REQ_PAUSE	= 0x4,	/* stop running, goto INIT state */
+	VRSF_RENEW	= 0x8,	/* ring renewing lease */
 };
 
 typedef struct viona_vring {
@@ -232,11 +233,6 @@ struct virtio_net_hdr {
 };
 #pragma pack()
 
-#define	VRING_NEED_BAIL(ring, proc)					\
-		(((ring)->vr_state_flags & VRSF_REQ_STOP) != 0 ||	\
-		((proc)->p_flag & SEXITING) != 0)
-
-
 #define	VNETHOOK_INTERESTED_IN(neti) \
 	(neti)->vni_nethook.vnh_event_in.he_interested
 #define	VNETHOOK_INTERESTED_OUT(neti) \
@@ -288,12 +284,23 @@ struct virtio_net_hdr {
 #define	VIRTIO_F_RING_INDIRECT_DESC	(1 << 28)
 #define	VIRTIO_F_RING_EVENT_IDX		(1 << 29)
 
+struct viona_ring_params {
+	uint64_t	vrp_pa;
+	uint16_t	vrp_size;
+	uint16_t	vrp_avail_idx;
+	uint16_t	vrp_used_idx;
+};
 
 void viona_ring_alloc(viona_link_t *, viona_vring_t *);
 void viona_ring_free(viona_vring_t *);
+int viona_ring_get_state(viona_link_t *, uint16_t, struct viona_ring_params *);
+int viona_ring_set_state(viona_link_t *, uint16_t,
+    const struct viona_ring_params *);
 int viona_ring_reset(viona_vring_t *, boolean_t);
-int viona_ring_init(viona_link_t *, uint16_t, uint16_t, uint64_t);
+int viona_ring_init(viona_link_t *, uint16_t, const struct viona_ring_params *);
 boolean_t viona_ring_lease_renew(viona_vring_t *);
+bool vring_need_bail(const viona_vring_t *);
+int viona_ring_pause(viona_vring_t *);
 
 int vq_popchain(viona_vring_t *, struct iovec *, uint_t, uint16_t *,
     vmm_page_t **);
