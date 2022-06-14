@@ -38,4 +38,6 @@ of updating the manifest as necessary. Be careful about new files.
 AMD: Updated in March 2012 as part of illumos#2546. Exact revision
 unknown.
 
-Intel: Linux 20220207 release
+Intel: Linux YYYYMMDD release, see
+    usr/src/pkg/manifests/system-microcode-intel.p5m
+for exact current version

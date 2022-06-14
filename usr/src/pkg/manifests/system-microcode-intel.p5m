@@ -26,6 +26,7 @@
 # Copyright 2019 Peter Tribble.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Joyent, Inc.
+# Copyright 2022 MNX Cloud, Inc.
 #
 
 #
@@ -35,7 +36,7 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri \
-    value=pkg:/system/microcode/intel@20220207,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/microcode/intel@20220510,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Microcode for Intel CPUs"
 set name=pkg.description value="Microcode for Intel CPUs"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -580,6 +581,14 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/000806EC-10 target=000806EC-04
 hardlink path=platform/i86pc/ucode/GenuineIntel/000806EC-80 target=000806EC-04
 file path=platform/i86pc/ucode/GenuineIntel/00090661-01 group=sys mode=0444 \
     reboot-needed=true
+file path=platform/i86pc/ucode/GenuineIntel/00090672-01 group=sys mode=0444 \
+    reboot-needed=true
+hardlink path=platform/i86pc/ucode/GenuineIntel/00090672-02 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/00090675-01 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/00090675-02 target=00090672-01
+file path=platform/i86pc/ucode/GenuineIntel/000906A3-80 group=sys mode=0444 \
+    reboot-needed=true
+hardlink path=platform/i86pc/ucode/GenuineIntel/000906A4-80 target=000906A3-80
 file path=platform/i86pc/ucode/GenuineIntel/000906C0-01 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000906E9-02 group=sys mode=0444 \
@@ -611,6 +620,10 @@ file path=platform/i86pc/ucode/GenuineIntel/000A0661-80 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000A0671-02 group=sys mode=0444 \
     reboot-needed=true
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F2-01 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F2-02 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F5-01 target=00090672-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B06F5-02 target=00090672-01
 license lic_CDDL license=lic_CDDL
 license usr/src/data/ucode/intel/THIRDPARTYLICENSE \
     license=usr/src/data/ucode/intel/THIRDPARTYLICENSE
