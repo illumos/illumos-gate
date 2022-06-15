@@ -5088,6 +5088,9 @@ d usr/kernel/kmdb 0755 root sys
 d usr/kernel/kmdb/amd64 0755 root sys
 f usr/kernel/kmdb/amd64/smbfs 0555 root sys
 f usr/kernel/kmdb/amd64/smbsrv 0555 root sys
+d usr/kernel/misc 0755 root sys
+d usr/kernel/misc/amd64 0755 root sys
+f usr/kernel/misc/amd64/vmm_vtd 0755 root sys
 d usr/kernel/sched 0755 root sys
 d usr/kernel/sched/amd64 0755 root sys
 f usr/kernel/sched/amd64/FSS 0755 root sys

@@ -29,7 +29,7 @@ AS_INC_PATH	+= -I$(UTSBASE)/intel/io/vmm -I$(OBJS_DIR)
 # enable collection of VMM statistics
 CFLAGS		+= -DVMM_KEEP_STATS
 
-LDFLAGS		+= -N misc/acpica -N misc/pcie -N fs/dev
+LDFLAGS		+= -N misc/pcie -N fs/dev
 LDFLAGS		+= -M $(MAPFILE)
 
 # devmem span calculations currently run afoul of overflow checks
@@ -66,13 +66,10 @@ VMM_OBJS = \
 	vmx_msr.o \
 	vmx.o \
 	vmx_support.o \
-	vtd.o \
-	vtd_sol.o \
 	svm.o \
 	svm_msr.o \
 	vmcb.o \
 	svm_support.o \
-	amdv.o \
 	vmm_gpt.o \
 	seg_vmm.o \
 	vmm_reservoir.o \

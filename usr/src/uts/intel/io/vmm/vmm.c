@@ -458,13 +458,30 @@ vmm_mod_unload()
 
 	VERIFY(vmm_initialized == 1);
 
-	iommu_cleanup();
 	error = VMM_CLEANUP();
 	if (error)
 		return (error);
 	vmm_initialized = 0;
 
 	return (0);
+}
+
+/*
+ * Create a test IOMMU domain to see if the host system has necessary hardware
+ * and drivers to do so.
+ */
+bool
+vmm_check_iommu(void)
+{
+	void *domain;
+	const size_t arb_test_sz = (1UL << 32);
+
+	domain = iommu_create_domain(arb_test_sz);
+	if (domain == NULL) {
+		return (false);
+	}
+	iommu_destroy_domain(domain);
+	return (true);
 }
 
 static void
@@ -975,15 +992,9 @@ vm_iommu_modify(struct vm *vm, bool map)
 	int i, sz;
 	vm_paddr_t gpa, hpa;
 	struct mem_map *mm;
-#ifdef __FreeBSD__
-	void *vp, *cookie, *host_domain;
-#endif
 	vm_client_t *vmc;
 
 	sz = PAGE_SIZE;
-#ifdef __FreeBSD__
-	host_domain = iommu_host_domain();
-#endif
 	vmc = vmspace_client_alloc(vm->vmspace);
 
 	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
@@ -1016,16 +1027,22 @@ vm_iommu_modify(struct vm *vm, bool map)
 			hpa = ((uintptr_t)vmp_get_pfn(vmp) << PAGESHIFT);
 			(void) vmp_release(vmp);
 
+			/*
+			 * When originally ported from FreeBSD, the logic for
+			 * adding memory to the guest domain would
+			 * simultaneously remove it from the host domain.  The
+			 * justification for that is not clear, and FreeBSD has
+			 * subsequently changed the behavior to not remove the
+			 * memory from the host domain.
+			 *
+			 * Leaving the guest memory in the host domain for the
+			 * life of the VM is necessary to make it available for
+			 * DMA, such as through viona in the TX path.
+			 */
 			if (map) {
 				iommu_create_mapping(vm->iommu, gpa, hpa, sz);
-#ifdef __FreeBSD__
-				iommu_remove_mapping(host_domain, hpa, sz);
-#endif
 			} else {
 				iommu_remove_mapping(vm->iommu, gpa, sz);
-#ifdef __FreeBSD__
-				iommu_create_mapping(host_domain, hpa, hpa, sz);
-#endif
 			}
 
 			gpa += PAGE_SIZE;
@@ -1037,14 +1054,7 @@ vm_iommu_modify(struct vm *vm, bool map)
 	 * Invalidate the cached translations associated with the domain
 	 * from which pages were removed.
 	 */
-#ifdef __FreeBSD__
-	if (map)
-		iommu_invalidate_tlb(host_domain);
-	else
-		iommu_invalidate_tlb(vm->iommu);
-#else
 	iommu_invalidate_tlb(vm->iommu);
-#endif
 }
 
 int

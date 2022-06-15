@@ -16,6 +16,7 @@
 #
 # Copyright 2018 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 Oxide Computer Company
 #
 
 #
@@ -40,6 +41,9 @@ file path=usr/kernel/drv/$(ARCH64)/vmm
 file path=usr/kernel/drv/ppt.conf
 file path=usr/kernel/drv/viona.conf
 file path=usr/kernel/drv/vmm.conf
+dir  path=usr/kernel/misc group=sys
+dir  path=usr/kernel/misc/$(ARCH64) group=sys
+file path=usr/kernel/misc/$(ARCH64)/vmm_vtd mode=0755
 file path=usr/lib/rsrvrctl mode=0555
 dir  path=usr/sbin
 file path=usr/sbin/bhyve mode=0555

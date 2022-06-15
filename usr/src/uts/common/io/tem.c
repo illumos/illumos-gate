@@ -276,7 +276,7 @@ tem_initialized(tem_vt_state_t tem_arg)
 }
 
 tem_vt_state_t
-tem_init(cred_t *credp)
+tem_init(cred_t *credp, queue_t *rq)
 {
 	struct tem_vt_state *ptem;
 
@@ -288,6 +288,7 @@ tem_init(cred_t *credp)
 
 	ptem->tvs_isactive = B_FALSE;
 	ptem->tvs_fbmode = KD_TEXT;
+	ptem->tvs_queue = rq;
 
 	/*
 	 * A tem is regarded as initialized only after tem_internal_init(),

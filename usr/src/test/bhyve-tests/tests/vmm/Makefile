@@ -19,7 +19,8 @@ PROG =	mem_partial \
 	mem_seg_map \
 	mem_devmem \
 	fpu_getset \
-	interface_version
+	interface_version \
+	check_iommu
 
 COMMON_OBJS =	common.o
 CLEAN_OBJS =	$(PROG:%=%.o)

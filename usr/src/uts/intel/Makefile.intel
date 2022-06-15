@@ -770,3 +770,4 @@ DRV_KMODS	+= viona
 #	bhyve PCI-passthru
 #
 DRV_KMODS	+= ppt
+DRV_KMODS	+= vmm_vtd

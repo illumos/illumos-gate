@@ -383,6 +383,8 @@ void vmm_contig_free(void *, size_t);
 int vmm_mod_load(void);
 int vmm_mod_unload(void);
 
+bool vmm_check_iommu(void);
+
 void vmm_call_trap(uint64_t);
 
 /*
