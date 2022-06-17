@@ -29,6 +29,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
 /*	  All Rights Reserved	*/
 
+/*
+ * Copyright 2021 RackTop Systems, Inc.
+ */
+
 #ifndef	_SYS_TEM_IMPL_H
 #define	_SYS_TEM_IMPL_H
 
@@ -76,7 +80,7 @@ extern "C" {
 #define	TEM_ATTR(c)		(((c) & TEM_ATTR_MASK) << 21)
 #define	TEM_ATTR_ISSET(c, a)	((TEM_CHAR_ATTR(c) & (a)) == (a))
 
-#define	TEM_MAXPARAMS	5	/* maximum number of ANSI paramters */
+#define	TEM_MAXPARAMS	32	/* maximum number of ANSI paramters */
 #define	TEM_MAXFKEY	30	/* max length of function key with <ESC>Q */
 
 #define	TEM_SCROLL_UP		0
@@ -228,6 +232,7 @@ struct tem_vt_state {
 
 	boolean_t	tvs_isactive;
 	boolean_t	tvs_initialized;	/* initialization flag */
+	boolean_t	tvs_cursor_hidden;
 
 	list_node_t	tvs_list_node;
 };
