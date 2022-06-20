@@ -107,7 +107,7 @@ nge_reg_put32(nge_t *ngep, nge_regno_t regno, uint32_t data)
 
 }
 
-
+#if	NGE_DEBUGGING
 static int nge_chip_peek_cfg(nge_t *ngep, nge_peekpoke_t *ppd);
 #pragma	no_inline(nge_chip_peek_cfg)
 
@@ -426,6 +426,7 @@ nge_chip_poke_seeprom(nge_t *ngep, nge_peekpoke_t *ppd)
 	    ppd->pp_acc_offset, &data);
 	return (err);
 }
+#endif /* NGE_DEBUGGING */
 
 void
 nge_init_dev_spec_param(nge_t *ngep)
@@ -1846,6 +1847,7 @@ nge_chip_intr(caddr_t arg1, caddr_t arg2)
 	return (DDI_INTR_CLAIMED);
 }
 
+#if	NGE_DEBUGGING
 static enum ioc_reply
 nge_pp_ioctl(nge_t *ngep, int cmd, mblk_t *mp, struct iocblk *iocp)
 {
@@ -1985,6 +1987,7 @@ nge_diag_ioctl(nge_t *ngep, int cmd, mblk_t *mp, struct iocblk *iocp)
 
 	/* NOTREACHED */
 }
+#endif /* NGE_DEBUGGING */
 
 enum ioc_reply
 nge_chip_ioctl(nge_t *ngep, mblk_t *mp, struct iocblk *iocp)

@@ -2668,7 +2668,7 @@ pmcs_find_phy_needing_work(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 
 	return (NULL);
 }
-#endif
+#endif /* DEBUG */
 
 /*
  * We may (or may not) report observations to SCSA.  This is prefaced by

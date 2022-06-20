@@ -145,15 +145,18 @@ struct seg kvmmseg;		/* Segment for vmm memory */
  */
 
 size_t	segkmem_lpsize;
-static  uint_t	segkmem_lpshift = PAGESHIFT;
 int	segkmem_lpszc = 0;
 
 size_t  segkmem_kmemlp_quantum = 0x400000;	/* 4MB */
 size_t  segkmem_heaplp_quantum;
 vmem_t *heap_lp_arena;
 static  vmem_t *kmem_lp_arena;
-static  vmem_t *segkmem_ppa_arena;
 static	segkmem_lpcb_t segkmem_lpcb;
+
+#ifdef __sparc
+static  uint_t	segkmem_lpshift = PAGESHIFT;
+static  vmem_t *segkmem_ppa_arena;
+#endif
 
 /*
  * We use "segkmem_kmemlp_max" to limit the total amount of physical memory
@@ -1097,6 +1100,7 @@ kmem_freepages(void *addr, pgcnt_t npages)
 	kmem_free(addr, ptob(npages));
 }
 
+#ifdef __sparc
 /*
  * segkmem_page_create_large() allocates a large page to be used for the kmem
  * caches. If kpr is enabled we ask for a relocatable page unless requested
@@ -1243,6 +1247,7 @@ segkmem_free_one_lp(caddr_t addr, size_t size)
 
 	/* page_unresv() is done by the caller */
 }
+#endif /* __sparc */
 
 /*
  * This function is called to import new spans into the vmem arenas like
@@ -1387,6 +1392,7 @@ segkmem_free_lp(vmem_t *vmp, void *inaddr, size_t size)
 	}
 }
 
+#ifdef __sparc
 /*
  * segkmem_alloc_lpi() imports virtual memory from large page heap arena
  * into kmem_lp arena. In the process it maps the imported segment with
@@ -1439,6 +1445,7 @@ segkmem_free_lpi(vmem_t *vmp, void *inaddr, size_t size)
 
 	vmem_free(vmp, inaddr, size);
 }
+#endif /* __sparc */
 
 /*
  * This function is called at system boot time by kmem_init right after

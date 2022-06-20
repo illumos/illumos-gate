@@ -791,6 +791,7 @@ axf_tx_make_packet(struct usbgem_dev *dp, mblk_t *mp)
 	return (new);
 }
 
+#if DEBUG_LEVEL > 10
 static void
 axf_dump_packet(struct usbgem_dev *dp, uint8_t *bp, int n)
 {
@@ -801,6 +802,7 @@ axf_dump_packet(struct usbgem_dev *dp, uint8_t *bp, int n)
 		    bp[0], bp[1], bp[2], bp[3], bp[4], bp[5], bp[6], bp[7]);
 	}
 }
+#endif
 
 static mblk_t *
 axf_rx_make_packet(struct usbgem_dev *dp, mblk_t *mp)
