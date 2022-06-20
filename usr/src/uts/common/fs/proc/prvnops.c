@@ -169,12 +169,12 @@ static prdirent_t piddir[] = {
 		"contracts" },
 	{ PR_SECFLAGS,	28 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"secflags" },
-	{ PR_ARGV,	28 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_ARGV,	29 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"argv" },
-	{ PR_CMDLINE,	29 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_CMDLINE,	30 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"cmdline" },
 #if defined(__x86)
-	{ PR_LDT,	30 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_LDT,	31 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"ldt" },
 #endif
 };
