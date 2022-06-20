@@ -1037,81 +1037,24 @@ vioscsi_probe_target(vioscsi_softc_t *sc, vioscsi_request_t *req,
 }
 
 static void
-vioscsi_null_complete(struct scsi_pkt *pkt)
-{
-	/*
-	 * This intentionally does nothing.
-	 */
-}
-
-static void
-vioscsi_dev_rescan(vioscsi_dev_t *vd)
-{
-	struct scsi_pkt *pkt;
-	struct scsi_arq_status *aqs;
-	uint8_t *sense;
-
-	/*
-	 * This routine is a bit of a hack, to workaround the fact that we have
-	 * no other good way to convince the SCSI HBA framework to rescan for
-	 * new LUNs.  What we do is fake an inquiry and complete it with a UNIT
-	 * ATTENTION indicating that the REPORT LUNS data has changed.
-	 */
-
-	pkt = scsi_init_pkt(&vd->vd_sd->sd_address, NULL, NULL, 6,
-	    sizeof (struct scsi_arq_status), 0, 0, SLEEP_FUNC, NULL);
-	if (pkt == NULL) { /* should never happen with SLEEP_FUNC */
-		return;
-	}
-
-	/*
-	 * Must have a non-null completion routine in order to get the HBA
-	 * logic to check the UNIT ATTENTION STATUS.
-	 */
-	pkt->pkt_comp = vioscsi_null_complete;
-
-	/*
-	 * The default CDB is 0, TEST UNIT READY, which takes no data, and
-	 * returns no data.
-	 */
-	pkt->pkt_state = CMD_CMPLT;
-	pkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET | STATE_SENT_CMD |
-	    STATE_GOT_STATUS | STATE_ARQ_DONE;
-	pkt->pkt_scbp[0] = STATUS_CHECK;
-	aqs = (void *)pkt->pkt_scbp;
-	aqs->sts_rqpkt_reason = CMD_CMPLT;
-	aqs->sts_rqpkt_resid = 0;
-	aqs->sts_rqpkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
-	    STATE_GOT_STATUS | STATE_SENT_CMD | STATE_XFERRED_DATA;
-	sense = (void *)&aqs->sts_sensedata;
-
-	/*
-	 * Descriptor format sense response:
-	 */
-	sense[0] = 0x72;
-	sense[1] = KEY_UNIT_ATTENTION;
-	sense[2] = 0x3f;	/* ASC  - reported LUNs data changed	*/
-	sense[3] = 0x0e;	/* ASCQ					*/
-	sense[7] = 0x00;	/* additional sense length (none)	*/
-
-	vd->vd_rescan = B_FALSE;
-
-	scsi_hba_pkt_comp(pkt);
-}
-
-static void
 vioscsi_rescan_luns(void *arg)
 {
-	vioscsi_softc_t *sc = arg;
-	vioscsi_dev_t *vd;
-	list_t *l;
+	vioscsi_softc_t		*sc = arg;
+	vioscsi_dev_t		*vd;
+	scsi_hba_tgtmap_t	*tm = sc->vs_tgtmap;
+	list_t			*l;
+	char			addr[16];
 
 	l = &sc->vs_devs;
 	mutex_enter(&sc->vs_lock);
 	for (vd = list_head(l); vd != NULL; vd = list_next(l, vd)) {
-		if (vd->vd_rescan) {
-			vioscsi_dev_rescan(vd);
+		if (!vd->vd_rescan) {
+			continue;
 		}
+
+		vd->vd_rescan = B_FALSE;
+		(void) snprintf(addr, sizeof (addr), "%x", vd->vd_target);
+		scsi_hba_tgtmap_scan_luns(tm, addr);
 	}
 	mutex_exit(&sc->vs_lock);
 }

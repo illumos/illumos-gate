@@ -15,6 +15,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2020-2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright 2022 RackTop Systems, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -1161,6 +1162,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		scsi_hba_iportmap_iport_remove.9f		\
 		scsi_hba_pkt_free.9f				\
 		scsi_hba_tgtmap_destroy.9f			\
+		scsi_hba_tgtmap_scan_luns.9f			\
 		scsi_hba_tgtmap_set_begin.9f			\
 		scsi_hba_tgtmap_set_add.9f			\
 		scsi_hba_tgtmap_set_end.9f			\
@@ -2026,6 +2028,7 @@ scsi_hba_iport_find.9f			:= LINKSRC = scsi_hba_iport_exist.9f
 scsi_hba_pkt_free.9f			:= LINKSRC = scsi_hba_pkt_alloc.9f
 
 scsi_hba_tgtmap_destroy.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
+scsi_hba_tgtmap_scan_luns.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
 scsi_hba_tgtmap_set_begin.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
 scsi_hba_tgtmap_set_add.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
 scsi_hba_tgtmap_set_end.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f

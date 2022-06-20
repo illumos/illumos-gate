@@ -23,6 +23,7 @@
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <sys/note.h>
@@ -5609,7 +5610,7 @@ scsi_hba_pkt_comp(struct scsi_pkt *pkt)
 			pkt->pkt_stmp = scsi_lunchg1_list;
 			scsi_lunchg1_list = pkt;
 			if (pkt->pkt_stmp == NULL)
-				(void) cv_signal(&scsi_lunchg1_cv);
+				cv_signal(&scsi_lunchg1_cv);
 			mutex_exit(&scsi_lunchg1_mutex);
 			return;
 		}
@@ -5719,7 +5720,7 @@ scsi_hba_barrier_add(dev_info_t *probe, int seconds)
 	nb->barrier_probe = probe;
 	*bp = nb;
 	if (bp == &scsi_hba_barrier_list)
-		(void) cv_signal(&scsi_hba_barrier_cv);
+		cv_signal(&scsi_hba_barrier_cv);
 	mutex_exit(&scsi_hba_barrier_mutex);
 }
 
@@ -5935,9 +5936,9 @@ scsi_lunchg1_daemon(void *arg)
 		 * lun enumeration.
 		 */
 		(void) ddi_pathname(self, path);
-		(void) strcat(path, "/luns@");
-		(void) strcat(path, taddr);
-		(void) strcat(path, ",*");
+		(void) strlcat(path, "/luns@", sizeof (path));
+		(void) strlcat(path, taddr, sizeof (path));
+		(void) strlcat(path, ",*", sizeof (path));
 
 		/*
 		 * Now that we have the path, complete the pkt that
@@ -5956,7 +5957,7 @@ scsi_lunchg1_daemon(void *arg)
 		lunchg2->lunchg2_next = scsi_lunchg2_list;
 		scsi_lunchg2_list = lunchg2;
 		if (lunchg2->lunchg2_next == NULL)
-			(void) cv_signal(&scsi_lunchg2_cv);
+			cv_signal(&scsi_lunchg2_cv);
 		mutex_exit(&scsi_lunchg2_mutex);
 	}
 }
@@ -8909,6 +8910,39 @@ scsi_hba_tgtmap_tgt_remove(scsi_hba_tgtmap_t *handle,
 
 	return ((damap_addr_del(tgtmap->tgtmap_dam[tgt_type],
 	    tgt_addr) == DAM_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
+}
+
+void
+scsi_hba_tgtmap_scan_luns(scsi_hba_tgtmap_t *handle, char *tgt_addr)
+{
+	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)handle;
+	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;
+	struct scsi_lunchg2	*lunchg2;
+	struct scsi_lunchg2	*p;
+	char			path[MAXPATHLEN];
+
+	(void) ddi_pathname(self, path);
+	(void) strlcat(path, "/luns@", sizeof (path));
+	(void) strlcat(path, tgt_addr, sizeof (path));
+	(void) strlcat(path, ",*", sizeof (path));
+
+	mutex_enter(&scsi_lunchg2_mutex);
+
+	/* if we're already scheduled to do this, don't submit another one */
+	for (p = scsi_lunchg2_list; p != NULL; p = p->lunchg2_next) {
+		if (strcmp(path, p->lunchg2_path) == 0) {
+			mutex_exit(&scsi_lunchg2_mutex);
+			return;
+		}
+	}
+
+	lunchg2 = kmem_alloc(sizeof (*lunchg2), KM_SLEEP);
+	lunchg2->lunchg2_path = strdup(path);
+	lunchg2->lunchg2_next = scsi_lunchg2_list;
+	scsi_lunchg2_list = lunchg2;
+	if (lunchg2->lunchg2_next == NULL)
+		cv_signal(&scsi_lunchg2_cv);
+	mutex_exit(&scsi_lunchg2_mutex);
 }
 
 int
