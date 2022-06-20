@@ -256,9 +256,9 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	 * group, mark each section as COMDAT.
 	 */
 	for (ndx = 1; ndx < gd.gd_cnt; ndx++) {
-		Word	gndx;
+		Word	gndx = gd.gd_data[ndx];
 
-		if ((gndx = gd.gd_data[ndx]) >= gifl->ifl_shnum) {
+		if ((gndx == 0) || (gndx >= gifl->ifl_shnum)) {
 			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_GRP_INVALNDX), gifl->ifl_name,
 			    EC_WORD(gisc->is_scnndx), gisc->is_name, ndx, gndx);

@@ -4258,7 +4258,7 @@ group(Cache *cache, Word shnum, const char *file, uint_t flags)
 			(void) snprintf(index, MAXNDXSIZE,
 			    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(gcnt));
 
-			if (grpdata[gcnt] >= shnum)
+			if ((grpdata[gcnt] == 0) || (grpdata[gcnt] >= shnum))
 				name = MSG_INTL(MSG_GRP_INVALSCN);
 			else
 				name = cache[grpdata[gcnt]].c_name;

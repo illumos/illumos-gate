@@ -1080,6 +1080,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 		 * -	The ident values match
 		 * -	The names match
 		 * -	Not a GROUP section
+		 * -	Not a GROUP member, if producing a relocatable object
 		 * -	Not a DTrace dof section
 		 * -	Section types match
 		 * -	Matching section flags, after screening out the
@@ -1096,6 +1097,8 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, Place_path_info *path_info,
 		    (ident != ld_targ.t_id.id_rel) &&
 		    (onamehash == osp->os_namehash) &&
 		    (shdr->sh_type != SHT_GROUP) &&
+		    (((shdr->sh_flags & SHF_GROUP) == 0) ||
+		    ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)) &&
 		    (shdr->sh_type != SHT_SUNW_dof) &&
 		    ((shdr->sh_type == os_shdr->sh_type) ||
 		    (is_ehframe && (osp->os_flags & FLG_OS_EHFRAME)) ||

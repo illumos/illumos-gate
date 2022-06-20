@@ -27,6 +27,13 @@ dir  path=opt/elf-tests/tests
 dir  path=opt/elf-tests/tests/assert-deflib
 file path=opt/elf-tests/tests/assert-deflib/link.c mode=0444
 file path=opt/elf-tests/tests/assert-deflib/test-deflib mode=0555
+dir  path=opt/elf-tests/tests/groups
+dir  path=opt/elf-tests/tests/groups/no-relobj-group-merge
+file path=opt/elf-tests/tests/groups/no-relobj-group-merge/README.md mode=0444
+file \
+    path=opt/elf-tests/tests/groups/no-relobj-group-merge/no-relobj-group-merge \
+    mode=0555
+file path=opt/elf-tests/tests/groups/no-relobj-group-merge/sections.s mode=0444
 dir  path=opt/elf-tests/tests/linker-sets
 file path=opt/elf-tests/tests/linker-sets/in-use-check mode=0555
 file path=opt/elf-tests/tests/linker-sets/simple mode=0555
