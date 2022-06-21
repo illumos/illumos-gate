@@ -24,6 +24,7 @@
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -593,12 +594,16 @@ pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pcieb_plat_attach_workaround(devi);
 
 	/*
-	 * If this is a root port, determine and set the max payload size.
-	 * Since this will involve scanning the fabric, all error enabling
-	 * and sw workarounds should be in place before doing this.
+	 * If this is a root port, we need to go through and at this point in
+	 * time set up and initialize all fabric-wide settings such as the max
+	 * packet size, tagging, etc. Since this will involve scanning the
+	 * fabric, all error enabling and sw workarounds should be in place
+	 * before doing this. For hotplug-capable bridges, this will happen
+	 * again when a hotplug event occurs. See the pcie theory statement in
+	 * uts/common/io/pciex/pcie.c for more information.
 	 */
 	if (PCIE_IS_RP(bus_p))
-		pcie_init_root_port_mps(devi);
+		pcie_fabric_setup(devi);
 
 	ddi_report_dev(devi);
 	return (DDI_SUCCESS);
