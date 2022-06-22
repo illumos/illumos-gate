@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -890,6 +891,27 @@ pciehpc_enable_intr(pcie_hp_ctrl_t *ctrl_p)
 	pcie_hp_slot_t	*slot_p = ctrl_p->hc_slots[0];
 	pcie_bus_t	*bus_p = PCIE_DIP2BUS(ctrl_p->hc_dip);
 	uint16_t	reg;
+	uint16_t	intr_mask = PCIE_SLOTCTL_INTR_MASK;
+
+	/*
+	 * power fault detection interrupt is enabled only
+	 * when the slot is powered ON
+	 */
+	if (slot_p->hs_info.cn_state < DDI_HP_CN_STATE_POWERED)
+		intr_mask &= ~PCIE_SLOTCTL_PWR_FAULT_EN;
+
+	/*
+	 * enable interrupt sources but leave the top-level
+	 * interrupt disabled. some sources may generate a
+	 * spurrious event when they are first enabled.
+	 * by leaving the top-level interrupt disabled, those
+	 * can be cleared first.
+	 */
+	reg = pciehpc_reg_get16(ctrl_p,
+	    bus_p->bus_pcie_off + PCIE_SLOTCTL);
+	pciehpc_reg_put16(ctrl_p,
+	    bus_p->bus_pcie_off + PCIE_SLOTCTL,
+	    reg | (intr_mask & ~PCIE_SLOTCTL_HP_INTR_EN));
 
 	/* clear any interrupt status bits */
 	reg = pciehpc_reg_get16(ctrl_p,
@@ -897,21 +919,12 @@ pciehpc_enable_intr(pcie_hp_ctrl_t *ctrl_p)
 	pciehpc_reg_put16(ctrl_p,
 	    bus_p->bus_pcie_off + PCIE_SLOTSTS, reg);
 
-	/* read the Slot Control Register */
+	/* enable top-level interrupt */
 	reg = pciehpc_reg_get16(ctrl_p,
 	    bus_p->bus_pcie_off + PCIE_SLOTCTL);
-
-	/*
-	 * enable interrupts: power fault detection interrupt is enabled
-	 * only when the slot is powered ON
-	 */
-	if (slot_p->hs_info.cn_state >= DDI_HP_CN_STATE_POWERED)
-		pciehpc_reg_put16(ctrl_p, bus_p->bus_pcie_off +
-		    PCIE_SLOTCTL, reg | PCIE_SLOTCTL_INTR_MASK);
-	else
-		pciehpc_reg_put16(ctrl_p, bus_p->bus_pcie_off +
-		    PCIE_SLOTCTL, reg | (PCIE_SLOTCTL_INTR_MASK &
-		    ~PCIE_SLOTCTL_PWR_FAULT_EN));
+	pciehpc_reg_put16(ctrl_p,
+	    bus_p->bus_pcie_off + PCIE_SLOTCTL,
+	    reg | intr_mask);
 
 	return (DDI_SUCCESS);
 }
