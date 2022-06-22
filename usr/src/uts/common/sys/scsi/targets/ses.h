@@ -24,6 +24,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2020 RackTop Systems, Inc.
+ */
 
 #ifndef _SYS_SCSI_TARGETS_SES_H
 #define	_SYS_SCSI_TARGETS_SES_H
@@ -116,17 +119,6 @@ typedef struct {
 	uchar_t		encstat[4];	/* state && stats */
 } encobj;
 
-#ifndef	__lint				/* no warlock for X86 */
-#ifdef	_KERNEL
-_NOTE(MUTEX_PROTECTS_DATA(scsi_device::sd_mutex, encobj))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(encobj::priv))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(encobj::svalid))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(encobj::enctype))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(encobj::encstat))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(encobj::subenclosure))
-#endif	/* _KERNEL */
-#endif	/* __lint */
-
 
 /*
  * Overall Status is bits 0..3- status validity reserved at bit 7
@@ -140,10 +132,10 @@ struct ses_softc {
 	void *		ses_private;	/* private data */
 	encobj *	ses_objmap;	/* objects */
 	uchar_t		ses_encstat;	/* overall status */
-	Scsidevp  	ses_devp;	/* backpointer to owning SCSI device */
-	struct buf 	*ses_rqbp;	/* request sense buf pointer */
+	Scsidevp	ses_devp;	/* backpointer to owning SCSI device */
+	struct buf	*ses_rqbp;	/* request sense buf pointer */
 	Scsipktp	ses_rqpkt;	/* SCSI Request Sense Packet */
-	struct buf 	*ses_sbufp;	/* for use in internal io */
+	struct buf	*ses_sbufp;	/* for use in internal io */
 	timeout_id_t	ses_restart_id; /* restart timeout id */
 	kcondvar_t	ses_sbufcv;	/* cv on sbuf */
 	uchar_t		ses_sbufbsy;	/* sbuf busy flag */
@@ -151,8 +143,9 @@ struct ses_softc {
 	uchar_t		ses_present;	/* device present */
 	uchar_t		ses_suspended;	/* nonzero if suspended */
 	uchar_t		ses_arq;	/* auto request sense enabled */
-	uint_t 		ses_lyropen;	/* layered open count */
-	int 		ses_retries;	/* retry count */
+	uint_t		ses_lyropen;	/* layered open count */
+	int		ses_retries;	/* retry count */
+	ddi_devid_t	ses_dev_id;	/* device id */
 	/*
 	 * Associated storage for the special buf.
 	 * Since we're single threaded on sbuf anyway,
