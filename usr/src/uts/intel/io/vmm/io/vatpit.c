@@ -26,6 +26,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2022 Oxide Computer Company
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -54,6 +66,8 @@ __FBSDID("$FreeBSD$");
 
 #define	TIMER_STS_OUT		0x80
 #define	TIMER_STS_NULLCNT	0x40
+
+#define	VALID_STATUS_BITS	(TIMER_STS_OUT | TIMER_STS_NULLCNT)
 
 #define	TIMER_RB_LCTR		0x20
 #define	TIMER_RB_LSTATUS	0x10
@@ -185,7 +199,7 @@ pit_timer_start_cntr0(struct vatpit *vatpit)
 	hrtime_t now = gethrtime();
 	if (c->time_target < now) {
 		const uint64_t ticks_behind =
-		    hrt_freq_count(c->time_target - now, PIT_8254_FREQ);
+		    hrt_freq_count(now - c->time_target, PIT_8254_FREQ);
 
 		c->total_target += roundup(ticks_behind, c->initial);
 		c->time_target = c->time_loaded +
@@ -482,3 +496,128 @@ vatpit_localize_resources(struct vatpit *vatpit)
 		}
 	}
 }
+
+static int
+vatpit_data_read(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_ATPIT);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_atpit_v1));
+
+	struct vatpit *vatpit = datap;
+	struct vdi_atpit_v1 *out = req->vdr_data;
+
+	VATPIT_LOCK(vatpit);
+	for (uint_t i = 0; i < 3; i++) {
+		const struct channel *src = &vatpit->channel[i];
+		struct vdi_atpit_channel_v1 *chan = &out->va_channel[i];
+
+		chan->vac_initial = src->initial;
+		chan->vac_reg_cr =
+		    (src->reg_cr[0] | (uint16_t)src->reg_cr[1] << 8);
+		chan->vac_reg_ol =
+		    (src->reg_ol[0] | (uint16_t)src->reg_ol[1] << 8);
+		chan->vac_reg_status = src->reg_status;
+		chan->vac_mode = src->mode;
+		chan->vac_status =
+		    (src->slatched ? (1 << 0) : 0) |
+		    (src->olatched ? (1 << 1) : 0) |
+		    (src->cr_sel ? (1 << 2) : 0) |
+		    (src->ol_sel ? (1 << 3) : 0) |
+		    (src->fr_sel ? (1 << 4) : 0);
+		/* Only channel 0 has the timer configured */
+		if (i == 0) {
+			chan->vac_time_target =
+			    vm_normalize_hrtime(vatpit->vm, src->time_target);
+		} else {
+			chan->vac_time_target = 0;
+		}
+	}
+	VATPIT_UNLOCK(vatpit);
+
+	return (0);
+}
+
+static bool
+vatpit_data_validate(const struct vdi_atpit_v1 *src)
+{
+	for (uint_t i = 0; i < 3; i++) {
+		const struct vdi_atpit_channel_v1 *chan = &src->va_channel[i];
+
+		if ((chan->vac_status & ~VALID_STATUS_BITS) != 0) {
+			return (false);
+		}
+	}
+	return (true);
+}
+
+static int
+vatpit_data_write(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_ATPIT);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_atpit_v1));
+
+	struct vatpit *vatpit = datap;
+	const struct vdi_atpit_v1 *src = req->vdr_data;
+	if (!vatpit_data_validate(src)) {
+		return (EINVAL);
+	}
+
+	VATPIT_LOCK(vatpit);
+	for (uint_t i = 0; i < 3; i++) {
+		const struct vdi_atpit_channel_v1 *chan = &src->va_channel[i];
+		struct channel *out = &vatpit->channel[i];
+
+		out->initial = chan->vac_initial;
+		out->reg_cr[0] = chan->vac_reg_cr;
+		out->reg_cr[1] = chan->vac_reg_cr >> 8;
+		out->reg_ol[0] = chan->vac_reg_ol;
+		out->reg_ol[1] = chan->vac_reg_ol >> 8;
+		out->reg_status = chan->vac_reg_status;
+		out->mode = chan->vac_mode;
+		out->slatched = (chan->vac_status & (1 << 0)) != 0;
+		out->olatched = (chan->vac_status & (1 << 1)) != 0;
+		out->cr_sel = (chan->vac_status & (1 << 2)) != 0;
+		out->ol_sel = (chan->vac_status & (1 << 3)) != 0;
+		out->fr_sel = (chan->vac_status & (1 << 4)) != 0;
+
+		/* Only channel 0 has the timer configured */
+		if (i != 0) {
+			continue;
+		}
+
+		struct callout *callout = &out->callout;
+		if (callout_active(callout)) {
+			callout_deactivate(callout);
+		}
+
+		if (chan->vac_time_target == 0) {
+			out->time_loaded = 0;
+			out->time_target = 0;
+			continue;
+		}
+
+		/* back-calculate time_loaded for the appropriate interval */
+		const uint64_t time_target =
+		    vm_denormalize_hrtime(vatpit->vm, chan->vac_time_target);
+		out->total_target = out->initial;
+		out->time_target = time_target;
+		out->time_loaded = time_target -
+		    hrt_freq_interval(PIT_8254_FREQ, out->initial);
+		callout_reset_hrtime(callout, out->time_target,
+		    vatpit_callout_handler, &out->callout_arg, C_ABSOLUTE);
+	}
+	VATPIT_UNLOCK(vatpit);
+
+	return (0);
+}
+
+static const vmm_data_version_entry_t atpit_v1 = {
+	.vdve_class = VDC_ATPIT,
+	.vdve_version = 1,
+	.vdve_len_expect = sizeof (struct vdi_atpit_v1),
+	.vdve_readf = vatpit_data_read,
+	.vdve_writef = vatpit_data_write,
+};
+VMM_DATA_VERSION(atpit_v1);

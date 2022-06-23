@@ -89,7 +89,7 @@ void vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
     bool lowprio, bool x2apic_dest);
 
 void vlapic_set_cr8(struct vlapic *vlapic, uint64_t val);
-uint64_t vlapic_get_cr8(struct vlapic *vlapic);
+uint64_t vlapic_get_cr8(const struct vlapic *vlapic);
 
 /* APIC write handlers */
 void vlapic_id_write_handler(struct vlapic *vlapic);

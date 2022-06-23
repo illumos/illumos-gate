@@ -81,6 +81,9 @@ static list_t		vmm_destroy_list;
 static id_space_t	*vmm_minors;
 static void		*vmm_statep;
 
+/* temporary safety switch */
+int		vmm_allow_state_writes;
+
 static const char *vmmdev_hvm_name = "bhyve";
 
 /* For sdev plugin (/dev) */
@@ -475,6 +478,24 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_TRACK_DIRTY_PAGES:
 		vmm_read_lock(sc);
 		lock_type = LOCK_READ_HOLD;
+		break;
+
+	case VM_DATA_READ:
+	case VM_DATA_WRITE:
+		if (ddi_copyin(datap, &vcpu, sizeof (vcpu), md)) {
+			return (EFAULT);
+		}
+		if (vcpu == -1) {
+			/* Access data for VM-wide devices */
+			vmm_write_lock(sc);
+			lock_type = LOCK_WRITE_HOLD;
+		} else if (vcpu >= 0 && vcpu < vm_get_maxcpus(sc->vmm_vm)) {
+			/* Access data associated with a specific vCPU */
+			vcpu_lock_one(sc, vcpu);
+			lock_type = LOCK_VCPU;
+		} else {
+			return (EINVAL);
+		}
 		break;
 
 	case VM_GET_GPA_PMAP:
@@ -1510,6 +1531,99 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		 * Present a test mechanism to acquire/release the write lock
 		 * on the VM without any other effects.
 		 */
+		break;
+	}
+	case VM_DATA_READ: {
+		struct vm_data_xfer vdx;
+
+		if (ddi_copyin(datap, &vdx, sizeof (vdx), md) != 0) {
+			error = EFAULT;
+			break;
+		}
+		if ((vdx.vdx_flags & ~VDX_FLAGS_VALID) != 0) {
+			error = EINVAL;
+			break;
+		}
+		if (vdx.vdx_len > VM_DATA_XFER_LIMIT) {
+			error = EFBIG;
+			break;
+		}
+
+		const size_t len = vdx.vdx_len;
+		void *buf = kmem_alloc(len, KM_SLEEP);
+		if ((vdx.vdx_flags & VDX_FLAG_READ_COPYIN) != 0) {
+			if (ddi_copyin(vdx.vdx_data, buf, len, md) != 0) {
+				kmem_free(buf, len);
+				error = EFAULT;
+				break;
+			}
+		} else {
+			bzero(buf, len);
+		}
+
+		vmm_data_req_t req = {
+			.vdr_class = vdx.vdx_class,
+			.vdr_version = vdx.vdx_version,
+			.vdr_flags = vdx.vdx_flags,
+			.vdr_len = vdx.vdx_len,
+			.vdr_data = buf,
+		};
+		error = vmm_data_read(sc->vmm_vm, vdx.vdx_vcpuid, &req);
+
+		if (error == 0) {
+			if (ddi_copyout(buf, vdx.vdx_data, len, md) != 0) {
+				error = EFAULT;
+			}
+		}
+		kmem_free(buf, len);
+		break;
+	}
+	case VM_DATA_WRITE: {
+		struct vm_data_xfer vdx;
+
+		if (ddi_copyin(datap, &vdx, sizeof (vdx), md) != 0) {
+			error = EFAULT;
+			break;
+		}
+		if ((vdx.vdx_flags & ~VDX_FLAGS_VALID) != 0) {
+			error = EINVAL;
+			break;
+		}
+		if (vdx.vdx_len > VM_DATA_XFER_LIMIT) {
+			error = EFBIG;
+			break;
+		}
+
+		const size_t len = vdx.vdx_len;
+		void *buf = kmem_alloc(len, KM_SLEEP);
+		if (ddi_copyin(vdx.vdx_data, buf, len, md) != 0) {
+			kmem_free(buf, len);
+			error = EFAULT;
+			break;
+		}
+
+		vmm_data_req_t req = {
+			.vdr_class = vdx.vdx_class,
+			.vdr_version = vdx.vdx_version,
+			.vdr_flags = vdx.vdx_flags,
+			.vdr_len = vdx.vdx_len,
+			.vdr_data = buf,
+		};
+		if (vmm_allow_state_writes == 0) {
+			/* XXX: Play it safe for now */
+			error = EPERM;
+		} else {
+			error = vmm_data_write(sc->vmm_vm, vdx.vdx_vcpuid,
+			    &req);
+		}
+
+		if (error == 0 &&
+		    (vdx.vdx_flags & VDX_FLAG_WRITE_COPYOUT) != 0) {
+			if (ddi_copyout(buf, vdx.vdx_data, len, md) != 0) {
+				error = EFAULT;
+			}
+		}
+		kmem_free(buf, len);
 		break;
 	}
 

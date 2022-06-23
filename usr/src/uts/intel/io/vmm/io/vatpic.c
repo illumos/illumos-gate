@@ -729,6 +729,20 @@ vatpic_slave_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
 	return (vatpic_write(vatpic, atpic, in, port, bytes, eax));
 }
 
+static const uint8_t vatpic_elc_mask[2] = {
+	/*
+	 * For the master PIC the cascade channel (IRQ2), the heart beat timer
+	 * (IRQ0), and the keyboard controller (IRQ1) cannot be programmed for
+	 * level mode.
+	 */
+	0xf8,
+	/*
+	 * For the slave PIC the real time clock (IRQ8) and the floating point
+	 * error interrupt (IRQ13) cannot be programmed for level mode.
+	 */
+	0xde
+};
+
 int
 vatpic_elc_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
     uint32_t *eax)
@@ -740,21 +754,11 @@ vatpic_elc_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
 	switch (port) {
 	case IO_ELCR1:
 		atpic = &vatpic->atpic[0];
-		/*
-		 * For the master PIC the cascade channel (IRQ2), the heart beat
-		 * timer (IRQ0), and the keyboard controller (IRQ1) cannot be
-		 * programmed for level mode.
-		 */
-		elc_mask = 0xf8;
+		elc_mask = vatpic_elc_mask[0];
 		break;
 	case IO_ELCR2:
 		atpic = &vatpic->atpic[1];
-		/*
-		 * For the slave PIC the real time clock (IRQ8) and the floating
-		 * point error interrupt (IRQ13) cannot be programmed for level
-		 * mode.
-		 */
-		elc_mask = 0xde;
+		elc_mask = vatpic_elc_mask[1];
 		break;
 	default:
 		return (-1);
@@ -793,3 +797,117 @@ vatpic_cleanup(struct vatpic *vatpic)
 	mutex_destroy(&vatpic->lock);
 	kmem_free(vatpic, sizeof (*vatpic));
 }
+
+static int
+vatpic_data_read(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_ATPIC);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_atpic_v1));
+
+	struct vatpic *vatpic = datap;
+	struct vdi_atpic_v1 *out = req->vdr_data;
+
+	VATPIC_LOCK(vatpic);
+	for (uint_t i = 0; i < 2; i++) {
+		const struct atpic *src = &vatpic->atpic[i];
+		struct vdi_atpic_chip_v1 *chip = &out->va_chip[i];
+
+		chip->vac_icw_state = src->icw_state;
+		chip->vac_status =
+		    (src->ready ? (1 << 0) : 0) |
+		    (src->auto_eoi ? (1 << 1) : 0) |
+		    (src->poll ? (1 << 2) : 0) |
+		    (src->rotate ? (1 << 3) : 0) |
+		    (src->special_full_nested ? (1 << 4) : 0) |
+		    (src->read_isr_next ? (1 << 5) : 0) |
+		    (src->intr_raised ? (1 << 6) : 0) |
+		    (src->special_mask_mode ? (1 << 7) : 0);
+		chip->vac_reg_irr = src->reg_irr;
+		chip->vac_reg_isr = src->reg_isr;
+		chip->vac_reg_imr = src->reg_imr;
+		chip->vac_irq_base = src->irq_base;
+		chip->vac_lowprio = src->lowprio;
+		chip->vac_elc = src->elc;
+		for (uint_t j = 0; j < 8; j++) {
+			chip->vac_level[j] = src->acnt[j];
+		}
+	}
+	VATPIC_UNLOCK(vatpic);
+
+	return (0);
+}
+
+static bool
+vatpic_data_validate(const struct vdi_atpic_v1 *src)
+{
+	for (uint_t i = 0; i < 2; i++) {
+		const struct vdi_atpic_chip_v1 *chip = &src->va_chip[i];
+
+		if (chip->vac_icw_state > IS_ICW4) {
+			return (false);
+		}
+		if ((chip->vac_elc & ~vatpic_elc_mask[i]) != 0) {
+			return (false);
+		}
+		/*
+		 * TODO: The state of `intr_raised` could be checked what
+		 * resides in the ISR/IRR registers.
+		 */
+	}
+
+	return (true);
+}
+
+static int
+vatpic_data_write(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_ATPIC);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_atpic_v1));
+
+	struct vatpic *vatpic = datap;
+	const struct vdi_atpic_v1 *src = req->vdr_data;
+	if (!vatpic_data_validate(src)) {
+		return (EINVAL);
+	}
+
+	VATPIC_LOCK(vatpic);
+	for (uint_t i = 0; i < 2; i++) {
+		const struct vdi_atpic_chip_v1 *chip = &src->va_chip[i];
+		struct atpic *out = &vatpic->atpic[i];
+
+		out->icw_state = chip->vac_icw_state;
+
+		out->ready = (chip->vac_status & (1 << 0)) != 0;
+		out->auto_eoi = (chip->vac_status & (1 << 1)) != 0;
+		out->poll = (chip->vac_status & (1 << 2)) != 0;
+		out->rotate = (chip->vac_status & (1 << 3)) != 0;
+		out->special_full_nested = (chip->vac_status & (1 << 4)) != 0;
+		out->read_isr_next = (chip->vac_status & (1 << 5)) != 0;
+		out->intr_raised = (chip->vac_status & (1 << 6)) != 0;
+		out->special_mask_mode = (chip->vac_status & (1 << 7)) != 0;
+
+		out->reg_irr = chip->vac_reg_irr;
+		out->reg_isr = chip->vac_reg_isr;
+		out->reg_imr = chip->vac_reg_imr;
+		out->irq_base = chip->vac_irq_base;
+		out->lowprio = chip->vac_lowprio;
+		out->elc = chip->vac_elc;
+		for (uint_t j = 0; j < 8; j++) {
+			out->acnt[j] = chip->vac_level[j];
+		}
+	}
+	VATPIC_UNLOCK(vatpic);
+
+	return (0);
+}
+
+static const vmm_data_version_entry_t atpic_v1 = {
+	.vdve_class = VDC_ATPIC,
+	.vdve_version = 1,
+	.vdve_len_expect = sizeof (struct vdi_atpic_v1),
+	.vdve_readf = vatpic_data_read,
+	.vdve_writef = vatpic_data_write,
+};
+VMM_DATA_VERSION(atpic_v1);

@@ -49,6 +49,8 @@
 #include <sys/sdt.h>
 #include <x86/segments.h>
 #include <sys/vmm.h>
+#include <sys/vmm_data.h>
+#include <sys/linker_set.h>
 
 SDT_PROVIDER_DECLARE(vmm);
 
@@ -65,6 +67,7 @@ struct vmspace;
 struct vm_client;
 struct vm_object;
 struct vm_guest_paging;
+struct vmm_data_req;
 
 typedef int	(*vmm_init_func_t)(void);
 typedef int	(*vmm_cleanup_func_t)(void);
@@ -229,8 +232,10 @@ void vcpu_block_run(struct vm *, int);
 void vcpu_unblock_run(struct vm *, int);
 
 uint64_t vcpu_tsc_offset(struct vm *vm, int vcpuid, bool phys_adj);
+hrtime_t vm_normalize_hrtime(struct vm *, hrtime_t);
+hrtime_t vm_denormalize_hrtime(struct vm *, hrtime_t);
 
-static __inline int
+static __inline bool
 vcpu_is_running(struct vm *vm, int vcpu, int *hostcpu)
 {
 	return (vcpu_get_state(vm, vcpu, hostcpu) == VCPU_RUNNING);
@@ -433,5 +438,30 @@ typedef struct vmm_vcpu_kstats {
 #define	VMM_KSTAT_CLASS	"misc"
 
 int vmm_kstat_update_vcpu(struct kstat *, int);
+
+typedef struct vmm_data_req {
+	uint16_t	vdr_class;
+	uint16_t	vdr_version;
+	uint32_t	vdr_flags;
+	uint32_t	vdr_len;
+	void		*vdr_data;
+} vmm_data_req_t;
+typedef struct vmm_data_req vmm_data_req_t;
+
+typedef int (*vmm_data_writef_t)(void *, const vmm_data_req_t *);
+typedef int (*vmm_data_readf_t)(void *, const vmm_data_req_t *);
+
+typedef struct vmm_data_version_entry {
+	uint16_t		vdve_class;
+	uint16_t		vdve_version;
+	uint16_t		vdve_len_expect;
+	vmm_data_readf_t	vdve_readf;
+	vmm_data_writef_t	vdve_writef;
+} vmm_data_version_entry_t;
+
+#define	VMM_DATA_VERSION(sym)	SET_ENTRY(vmm_data_version_entries, sym)
+
+int vmm_data_read(struct vm *, int, const vmm_data_req_t *);
+int vmm_data_write(struct vm *, int, const vmm_data_req_t *);
 
 #endif /* _VMM_KERNEL_H_ */

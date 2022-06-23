@@ -738,3 +738,180 @@ vhpet_localize_resources(struct vhpet *vhpet)
 		vmm_glue_callout_localize(&vhpet->timer[i].callout);
 	}
 }
+
+static int
+vhpet_data_read(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_HPET);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_hpet_v1));
+
+	struct vhpet *vhpet = datap;
+	struct vdi_hpet_v1 *out = req->vdr_data;
+
+	VHPET_LOCK(vhpet);
+	out->vh_config = vhpet->config;
+	out->vh_isr = vhpet->isr;
+	out->vh_count_base = vhpet->base_count;
+	out->vh_time_base = vm_normalize_hrtime(vhpet->vm, vhpet->base_time);
+	for (uint_t i = 0; i < 8; i++) {
+		const struct vhpet_timer *timer = &vhpet->timer[i];
+		struct vdi_hpet_timer_v1 *timer_out = &out->vh_timers[i];
+
+		timer_out->vht_config = timer->cap_config;
+		timer_out->vht_msi = timer->msireg;
+		timer_out->vht_comp_val = timer->compval;
+		timer_out->vht_comp_rate = timer->comprate;
+		if (callout_pending(&timer->callout)) {
+			timer_out->vht_time_target =
+			    vm_normalize_hrtime(vhpet->vm,
+			    timer->callout_expire);
+		} else {
+			timer_out->vht_time_target = 0;
+		}
+	}
+	VHPET_UNLOCK(vhpet);
+
+	return (0);
+}
+
+enum vhpet_validation_error {
+	VVE_OK,
+	VVE_BAD_CONFIG,
+	VVE_BAD_BASE_TIME,
+	VVE_BAD_ISR,
+	VVE_BAD_TIMER_CONFIG,
+	VVE_BAD_TIMER_ISR,
+	VVE_BAD_TIMER_TIME,
+};
+
+static enum vhpet_validation_error
+vhpet_data_validate(const vmm_data_req_t *req, struct vm *vm)
+{
+	ASSERT(req->vdr_version == 1 &&
+	    req->vdr_len == sizeof (struct vdi_hpet_v1));
+	const struct vdi_hpet_v1 *src = req->vdr_data;
+
+	/* LegacyReplacement Routing is not supported */
+	if ((src->vh_config & HPET_CNF_LEG_RT) != 0) {
+		return (VVE_BAD_CONFIG);
+	}
+
+	/* A base time in the future makes no sense */
+	const hrtime_t base_time = vm_denormalize_hrtime(vm, src->vh_time_base);
+	if (base_time > gethrtime()) {
+		return (VVE_BAD_BASE_TIME);
+	}
+
+	/* All asserted ISRs must be associated with an existing timer */
+	if ((src->vh_isr & ~(uint64_t)((1 << VHPET_NUM_TIMERS) - 1)) != 0) {
+		return (VVE_BAD_ISR);
+	}
+
+	for (uint_t i = 0; i < 8; i++) {
+		const struct vdi_hpet_timer_v1 *timer = &src->vh_timers[i];
+
+		const bool msi_enabled =
+		    (timer->vht_config & HPET_TCNF_FSB_EN) != 0;
+		const bool level_triggered =
+		    (timer->vht_config & HPET_TCNF_INT_TYPE) != 0;
+		const bool irq_asserted = (src->vh_isr & (1 << i)) != 0;
+		const uint32_t allowed_irqs = (timer->vht_config >> 32);
+		const uint32_t irq_pin =
+		    (timer->vht_config & HPET_TCNF_INT_ROUTE) >> 9;
+
+		if (msi_enabled) {
+			if (level_triggered) {
+				return (VVE_BAD_TIMER_CONFIG);
+			}
+		} else {
+			/*
+			 * Ensure interrupt route is valid as ensured by the
+			 * logic in vhpet_timer_update_config.
+			 */
+			if (irq_pin != 0 &&
+			    (allowed_irqs & (1 << irq_pin)) == 0) {
+				return (VVE_BAD_TIMER_CONFIG);
+			}
+		}
+		if (irq_asserted && !level_triggered) {
+			return (VVE_BAD_TIMER_ISR);
+		}
+
+		if (timer->vht_time_target != 0) {
+			/*
+			 * A timer scheduled earlier than the base time of the
+			 * entire HPET makes no sense.
+			 */
+			const uint64_t timer_target =
+			    vm_denormalize_hrtime(vm, timer->vht_time_target);
+			if (timer_target < base_time) {
+				return (VVE_BAD_TIMER_TIME);
+			}
+		}
+	}
+
+	return (VVE_OK);
+}
+
+static int
+vhpet_data_write(void *datap, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_HPET);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_hpet_v1));
+
+	struct vhpet *vhpet = datap;
+
+	if (vhpet_data_validate(req, vhpet->vm) != VVE_OK) {
+		return (EINVAL);
+	}
+	const struct vdi_hpet_v1 *src = req->vdr_data;
+
+	VHPET_LOCK(vhpet);
+	vhpet->config = src->vh_config;
+	vhpet->isr = src->vh_isr;
+	vhpet->base_count = src->vh_count_base;
+	vhpet->base_time = vm_denormalize_hrtime(vhpet->vm, src->vh_time_base);
+
+	for (uint_t i = 0; i < 8; i++) {
+		struct vhpet_timer *timer = &vhpet->timer[i];
+		const struct vdi_hpet_timer_v1 *timer_src = &src->vh_timers[i];
+
+		timer->cap_config = timer_src->vht_config;
+		timer->msireg = timer_src->vht_msi;
+		timer->compval = timer_src->vht_comp_val;
+		timer->comprate = timer_src->vht_comp_rate;
+
+		/*
+		 * For now, any state associating an IOAPIC pin with a given
+		 * timer is not kept in sync. (We will not increment or
+		 * decrement a pin level based on the timer state.)  It is left
+		 * to the consumer to keep those pin levels maintained if
+		 * modifying either the HPET or the IOAPIC.
+		 *
+		 * If both the HPET and IOAPIC are exported and then imported,
+		 * this will occur naturally, as any asserted IOAPIC pin level
+		 * from the HPET would come along for the ride.
+		 */
+
+		/* TODO: properly configure timer */
+		if (timer_src->vht_time_target != 0) {
+			timer->callout_expire = vm_denormalize_hrtime(vhpet->vm,
+			    timer_src->vht_time_target);
+		} else {
+			timer->callout_expire = 0;
+		}
+	}
+	VHPET_UNLOCK(vhpet);
+	return (0);
+}
+
+static const vmm_data_version_entry_t hpet_v1 = {
+	.vdve_class = VDC_HPET,
+	.vdve_version = 1,
+	.vdve_len_expect = sizeof (struct vdi_hpet_v1),
+	.vdve_readf = vhpet_data_read,
+	.vdve_writef = vhpet_data_write,
+};
+VMM_DATA_VERSION(hpet_v1);

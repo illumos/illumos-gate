@@ -49,6 +49,7 @@
 
 #include <sys/param.h>
 #include <sys/cpuset.h>
+#include <sys/vmm_data.h>
 
 struct vm_create_req {
 	char		name[VM_MAX_NAMELEN];
@@ -351,6 +352,23 @@ struct vmm_dirty_tracker {
 	void		*vdt_pfns;	/* bit vector of dirty bits */
 };
 
+/* Current (arbitrary) max length for vm_data_xfer */
+#define VM_DATA_XFER_LIMIT	8192
+
+#define	VDX_FLAG_READ_COPYIN	(1 << 0)
+#define	VDX_FLAG_WRITE_COPYOUT	(1 << 1)
+
+#define	VDX_FLAGS_VALID		(VDX_FLAG_READ_COPYIN | VDX_FLAG_WRITE_COPYOUT)
+
+struct vm_data_xfer {
+	int		vdx_vcpuid;
+	uint16_t	vdx_class;
+	uint16_t	vdx_version;
+	uint32_t	vdx_flags;
+	uint32_t	vdx_len;
+	void		*vdx_data;
+};
+
 /*
  * VMM Interface Version
  *
@@ -366,7 +384,7 @@ struct vmm_dirty_tracker {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	1
+#define	VMM_CURRENT_INTERFACE_VERSION	2
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
@@ -471,6 +489,9 @@ struct vmm_dirty_tracker {
 /* Note: forces a barrier on a flush operation before returning. */
 #define	VM_TRACK_DIRTY_PAGES		(VMM_IOC_BASE | 0x20)
 #define	VM_DESC_FPU_AREA		(VMM_IOC_BASE | 0x21)
+
+#define	VM_DATA_READ			(VMM_IOC_BASE | 0x22)
+#define	VM_DATA_WRITE			(VMM_IOC_BASE | 0x23)
 
 #define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 
