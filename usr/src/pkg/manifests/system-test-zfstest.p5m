@@ -2907,6 +2907,8 @@ file path=opt/zfs-tests/tests/functional/replacement/replacement_002_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/replacement/replacement_003_pos \
     mode=0555
+file path=opt/zfs-tests/tests/functional/replacement/scrub_after_replace \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/replacement/setup mode=0555
 dir  path=opt/zfs-tests/tests/functional/reservation
 file path=opt/zfs-tests/tests/functional/reservation/cleanup mode=0555

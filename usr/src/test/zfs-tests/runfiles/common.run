@@ -747,7 +747,7 @@ tests = ['rename_dirs_001_pos']
 tags = ['functional', 'rename_dirs']
 
 [tests/functional/replacement]
-tests = ['replacement_001_pos', 'replacement_002_pos']
+tests = ['replacement_001_pos', 'replacement_002_pos', 'scrub_after_replace']
 tags = ['functional', 'replacement']
 
 [tests/functional/reservation]

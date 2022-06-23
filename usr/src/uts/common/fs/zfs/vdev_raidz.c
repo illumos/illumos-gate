@@ -414,6 +414,7 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t ashift, uint64_t dcols,
 		rm->rm_col[c].rc_error = 0;
 		rm->rm_col[c].rc_tried = 0;
 		rm->rm_col[c].rc_skipped = 0;
+		rm->rm_col[c].rc_force_repair = 0;
 
 		if (c >= acols)
 			rm->rm_col[c].rc_size = 0;
@@ -2245,9 +2246,23 @@ vdev_raidz_io_done(zio_t *zio)
 	for (c = 0; c < rm->rm_cols; c++) {
 		rc = &rm->rm_col[c];
 
-		if (rc->rc_error) {
-			ASSERT(rc->rc_error != ECKSUM);	/* child has no bp */
+		/*
+		 * If scrubbing and a replacing/sparing child vdev determined
+		 * that not all of its children have an identical copy of the
+		 * data, then clear the error so the column is treated like
+		 * any other read and force a repair to correct the damage.
+		 */
+		if (rc->rc_error == ECKSUM) {
+			ASSERT(zio->io_flags & ZIO_FLAG_SCRUB);
+			raidz_checksum_error(zio, rc, rc->rc_abd);
+			rc->rc_force_repair = 1;
+			rc->rc_error = 0;
+		}
 
+		if (rc->rc_force_repair)
+			unexpected_errors++;
+
+		if (rc->rc_error) {
 			if (c < rm->rm_firstdatacol)
 				parity_errors++;
 			else
@@ -2472,7 +2487,7 @@ done:
 			rc = &rm->rm_col[c];
 			cvd = vd->vdev_child[rc->rc_devidx];
 
-			if (rc->rc_error == 0)
+			if (rc->rc_error == 0 && !rc->rc_force_repair)
 				continue;
 
 			zio_nowait(zio_vdev_child_io(zio, NULL, cvd,

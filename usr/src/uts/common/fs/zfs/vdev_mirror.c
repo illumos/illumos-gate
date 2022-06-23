@@ -103,6 +103,7 @@ vdev_mirror_stat_fini(void)
 
 typedef struct mirror_child {
 	vdev_t		*mc_vd;
+	abd_t		*mc_abd;
 	uint64_t	mc_offset;
 	int		mc_error;
 	int		mc_load;
@@ -573,17 +574,20 @@ vdev_mirror_io_start(zio_t *zio)
 	}
 
 	if (zio->io_type == ZIO_TYPE_READ) {
-		if (zio->io_bp != NULL &&
-		    (zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_resilvering) {
+		if ((zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_resilvering) {
 			/*
-			 * For scrubbing reads (if we can verify the
-			 * checksum here, as indicated by io_bp being
-			 * non-NULL) we need to allocate a read buffer for
-			 * each child and issue reads to all children.  If
-			 * any child succeeds, it will copy its data into
-			 * zio->io_data in vdev_mirror_scrub_done.
+			 * For scrubbing reads we need to allocate a buffer
+			 * for each child and issue reads to all children.
+			 * If we can verify the checksum here, as indicated
+			 * by io_bp being non-NULL, the data will be copied
+			 * into zio->io_abd in vdev_mirror_scrub_done().
+			 * If not, then vdev_mirror_io_done() will compare
+			 * all of the read buffers and return a checksum
+			 * error if they aren't all identical.
 			 */
 			for (c = 0; c < mm->mm_children; c++) {
+				abd_t *abd;
+
 				mc = &mm->mm_child[c];
 
 				/* Don't issue ZIOs to offline children */
@@ -595,12 +599,15 @@ vdev_mirror_io_start(zio_t *zio)
 					continue;
 				}
 
+				abd = abd_alloc_sametype(zio->io_abd,
+				    zio->io_size);
+				if (zio->io_bp == NULL)
+					mc->mc_abd = abd;
 				zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
-				    mc->mc_vd, mc->mc_offset,
-				    abd_alloc_sametype(zio->io_abd,
-				    zio->io_size), zio->io_size,
+				    mc->mc_vd, mc->mc_offset, abd, zio->io_size,
 				    zio->io_type, zio->io_priority, 0,
-				    vdev_mirror_scrub_done, mc));
+				    zio->io_bp ? vdev_mirror_scrub_done :
+				    vdev_mirror_child_done, mc));
 			}
 			zio_execute(zio);
 			return;
@@ -678,7 +685,6 @@ vdev_mirror_io_done(zio_t *zio)
 		 * no non-degraded top-level vdevs left, and not update DTLs
 		 * if we intend to reallocate.
 		 */
-		/* XXPOLICY */
 		if (good_copies != mm->mm_children) {
 			/*
 			 * Always require at least one good copy.
@@ -705,7 +711,6 @@ vdev_mirror_io_done(zio_t *zio)
 	/*
 	 * If we don't have a good copy yet, keep trying other children.
 	 */
-	/* XXPOLICY */
 	if (good_copies == 0 && (c = vdev_mirror_child_select(zio)) != -1) {
 		ASSERT(c >= 0 && c < mm->mm_children);
 		mc = &mm->mm_child[c];
@@ -717,7 +722,63 @@ vdev_mirror_io_done(zio_t *zio)
 		return;
 	}
 
-	/* XXPOLICY */
+	/*
+	 * If we're scrubbing but don't have a BP available (because this
+	 * vdev is under a raidz vdev) then the best we can do is compare
+	 * all of the copies read.  If they're not identical then return a
+	 * checksum error and the most likely correct data.  The raidz code
+	 * will issue a repair I/O if possible.
+	 */
+	if ((zio->io_flags & ZIO_FLAG_SCRUB) && zio->io_bp == NULL &&
+	    !mm->mm_resilvering) {
+		int best = -1;
+
+		ASSERT(zio->io_vd->vdev_ops == &vdev_replacing_ops ||
+		    zio->io_vd->vdev_ops == &vdev_spare_ops);
+
+		/*
+		 * The most likely correct copy is the first one from a
+		 * child whose DTL doesn't say that it's missing this txg,
+		 * otherwise the first good copy.  A child that is being
+		 * resilvered, such as the new device of a replacing vdev,
+		 * may not have the data yet.
+		 */
+		for (c = 0; c < mm->mm_children; c++) {
+			mc = &mm->mm_child[c];
+			if (mc->mc_error || !mc->mc_tried)
+				continue;
+			if (best == -1)
+				best = c;
+			if (!vdev_dtl_contains(mc->mc_vd, DTL_MISSING,
+			    zio->io_txg, 1)) {
+				best = c;
+				break;
+			}
+		}
+
+		if (best != -1) {
+			abd_t *best_abd = mm->mm_child[best].mc_abd;
+
+			for (c = 0; c < mm->mm_children; c++) {
+				mc = &mm->mm_child[c];
+				if (c == best || mc->mc_error || !mc->mc_tried)
+					continue;
+				if (abd_cmp(mc->mc_abd, best_abd,
+				    zio->io_size) != 0)
+					zio->io_error = SET_ERROR(ECKSUM);
+			}
+			abd_copy(zio->io_abd, best_abd, zio->io_size);
+		}
+
+		for (c = 0; c < mm->mm_children; c++) {
+			mc = &mm->mm_child[c];
+			if (mc->mc_abd != NULL) {
+				abd_free(mc->mc_abd);
+				mc->mc_abd = NULL;
+			}
+		}
+	}
+
 	if (good_copies == 0) {
 		zio->io_error = vdev_mirror_worst_error(mm);
 		ASSERT(zio->io_error != 0);
