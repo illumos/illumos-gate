@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Gary Mills
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore <garrett@damore.org>
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2019 Peter Tribble.
@@ -369,9 +369,6 @@ file path=lib/svc/manifest/network/rpc/keyserv.xml group=sys mode=0444
 dir  path=lib/svc/manifest/network/shares group=sys
 file path=lib/svc/manifest/network/shares/group.xml group=sys mode=0444
 file path=lib/svc/manifest/network/shares/reparsed.xml group=sys mode=0444
-file path=lib/svc/manifest/network/socket-filter-kssl.xml group=sys mode=0444
-dir  path=lib/svc/manifest/network/ssl group=sys
-file path=lib/svc/manifest/network/ssl/kssl-proxy.xml group=sys mode=0444
 dir  path=lib/svc/manifest/platform group=sys
 $(sparc_ONLY)dir path=lib/svc/manifest/platform/sun4u group=sys
 dir  path=lib/svc/manifest/site group=sys
@@ -1184,7 +1181,6 @@ hardlink path=usr/lib/inet/in.iked target=../../../usr/lib/isaexec
 file path=usr/lib/inet/inetd mode=0555
 file path=usr/lib/intrd mode=0555
 file path=usr/lib/isaexec mode=0555
-file path=usr/lib/kssladm mode=0555
 $(sparc_ONLY)file path=usr/lib/ld.so
 link path=usr/lib/ld.so.1 target=../../lib/ld.so.1
 file path=usr/lib/libshare.so.1
@@ -1405,7 +1401,6 @@ file path=usr/sbin/ipsecconf mode=0555
 file path=usr/sbin/ipseckey mode=0555
 file path=usr/sbin/keyserv group=sys mode=0555
 file path=usr/sbin/killall mode=0555
-file path=usr/sbin/ksslcfg mode=0555
 link path=usr/sbin/labelit target=./clri
 file path=usr/sbin/link mode=0555
 hardlink path=usr/sbin/list_devices target=../../usr/sbin/allocate
@@ -1614,7 +1609,6 @@ dir  path=var/svc/manifest/network/routing group=sys
 dir  path=var/svc/manifest/network/rpc group=sys
 dir  path=var/svc/manifest/network/security group=sys
 dir  path=var/svc/manifest/network/shares group=sys
-dir  path=var/svc/manifest/network/ssl group=sys
 dir  path=var/svc/manifest/platform group=sys
 $(sparc_ONLY)dir path=var/svc/manifest/platform/sun4u group=sys
 $(sparc_ONLY)dir path=var/svc/manifest/platform/sun4v group=sys

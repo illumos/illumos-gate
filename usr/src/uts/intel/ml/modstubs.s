@@ -23,6 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Garrett D'Amore <garrett@damore.org>
  */
 
 #include <sys/asm_linkage.h>
@@ -858,7 +859,6 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(c2audit, audit_devpolicy,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_setfsat_path,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_cryptoadm,	nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_kssl,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_pf_policy,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, au_doormsg,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, au_uwrite,		nomod_zero);

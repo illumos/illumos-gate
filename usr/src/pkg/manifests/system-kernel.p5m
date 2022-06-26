@@ -147,7 +147,6 @@ file path=kernel/drv/$(ARCH64)/iwscn group=sys
 file path=kernel/drv/$(ARCH64)/kb8042 group=sys
 file path=kernel/drv/$(ARCH64)/keysock group=sys
 file path=kernel/drv/$(ARCH64)/kmdb group=sys
-file path=kernel/drv/$(ARCH64)/kssl group=sys
 file path=kernel/drv/$(ARCH64)/llc1 group=sys
 file path=kernel/drv/$(ARCH64)/lofi group=sys
 file path=kernel/drv/$(ARCH64)/log group=sys
@@ -225,7 +224,6 @@ file path=kernel/drv/iptun.conf group=sys
 file path=kernel/drv/iwscn.conf group=sys
 file path=kernel/drv/keysock.conf group=sys
 file path=kernel/drv/kmdb.conf group=sys
-file path=kernel/drv/kssl.conf group=sys
 file path=kernel/drv/llc1.conf group=sys
 file path=kernel/drv/lofi.conf group=sys
 file path=kernel/drv/log.conf group=sys \
@@ -397,7 +395,6 @@ dir  path=kernel/socketmod group=sys
 dir  path=kernel/socketmod/$(ARCH64) group=sys
 hardlink path=kernel/socketmod/$(ARCH64)/icmp \
     target=../../../kernel/drv/$(ARCH64)/icmp
-file path=kernel/socketmod/$(ARCH64)/ksslf group=sys mode=0755
 hardlink path=kernel/socketmod/$(ARCH64)/rts \
     target=../../../kernel/drv/$(ARCH64)/rts
 file path=kernel/socketmod/$(ARCH64)/socksctp group=sys mode=0755
@@ -546,7 +543,6 @@ driver name=kb8042 alias=pnpPNP,303
 driver name=keysock perms="keysock 0666 root sys" \
     policy="read_priv_set=sys_ip_config write_priv_set=sys_ip_config"
 driver name=kmdb
-driver name=kssl perms="* 0666 root sys"
 driver name=llc1 clone_perms="llc1 0666 root sys"
 driver name=lofi perms="* 0600 root sys" perms="ctl 0644 root sys"
 driver name=log perms="conslog 0666 root sys" perms="log 0640 root sys"

@@ -28,6 +28,7 @@
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2019 Peter Tribble.
 # Copyright 2019 RackTop Systems
+# Copyright 2022 Garrett D'Amore <garrett@damore.org>
 #
 
 #
@@ -206,7 +207,7 @@ DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace dcpc
 DRV_KMODS	+= fssnap icmp icmp6 ip ip6 ipnet ipsecah
 DRV_KMODS	+= ipsecesp iptun iwscn keysock kmdb kstat ksyms llc1
 DRV_KMODS	+= lofi
-DRV_KMODS	+= log logindmux kssl mm nca physmem pm poll pool
+DRV_KMODS	+= log logindmux mm nca physmem pm poll pool
 DRV_KMODS	+= pseudo ptc ptm pts ptsl ramdisk random rsm rts sad
 DRV_KMODS	+= simnet softmac sppp sppptun sy sysevent sysmsg
 DRV_KMODS	+= spdsock
@@ -497,7 +498,6 @@ SOCKET_KMODS	+= sockpfp
 SOCKET_KMODS	+= socksctp
 SOCKET_KMODS	+= socksdp
 SOCKET_KMODS	+= sockrds
-SOCKET_KMODS	+= ksslf
 
 #
 #	kiconv modules (/kernel/kiconv):

@@ -20,6 +20,7 @@
 #
 
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2022 Garrett D'Amore <garrett@damore.org>
 #
 # /etc/security/exec_attr
 #
@@ -224,7 +225,6 @@ Network IPsec Management:suser:cmd:::/usr/sbin/ikecert:euid=0
 Network IPsec Management:suser:cmd:::/usr/sbin/ipsecconf:euid=0
 Network IPsec Management:suser:cmd:::/usr/sbin/ipseckey:uid=0
 Network IPsec Management:suser:cmd:::/usr/sbin/ipsecalgs:euid=0
-Network Security:solaris:cmd:::/usr/sbin/ksslcfg:euid=0
 Network Security:suser:cmd:::/usr/bin/ssh-keygen:uid=0;gid=sys
 Object Access Management:solaris:cmd:::/usr/bin/chgrp:privs=file_chown
 Object Access Management:solaris:cmd:::/usr/bin/chmod:privs=file_owner

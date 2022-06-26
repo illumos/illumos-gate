@@ -61,7 +61,6 @@
 #include <sys/devpolicy.h>
 #include <sys/crypto/ioctladmin.h>
 #include <sys/cred_impl.h>
-#include <inet/kssl/kssl.h>
 #include <net/pfpolicy.h>
 
 static void add_return_token(caddr_t *, unsigned int scid, int err, int rval);
@@ -1999,79 +1998,6 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 	AS_INC(as_kernel, 1, kctx);
 
 	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CRYPTOADM, tad->tad_evmod,
-	    NULL);
-}
-
-/*
- * Audit the kernel SSL administration command. The address and the
- * port number for the SSL instance, and the proxy port are put in the
- * audit trail.
- */
-void
-audit_kssl(int cmd, void *params, int error)
-{
-	cred_t			*cr = CRED();
-	t_audit_data_t		*tad;
-	token_t			*ad = NULL;
-	const auditinfo_addr_t	*ainfo = crgetauinfo(cr);
-	au_kcontext_t		*kctx = GET_KCTX_PZ;
-
-	tad = U2A(u);
-
-	if (ainfo == NULL)
-		return;
-
-	tad->tad_event = AUE_CONFIGKSSL;
-
-	if (audit_success(kctx, tad, error, NULL) != AU_OK)
-		return;
-
-	/* Add subject information */
-	AUDIT_SETSUBJ((caddr_t *)&ad, cr, ainfo, kctx);
-
-	switch (cmd) {
-	case KSSL_ADD_ENTRY: {
-		char buf[32];
-		kssl_params_t *kp = (kssl_params_t *)params;
-		struct sockaddr_in6 *saddr = &kp->kssl_addr;
-
-		au_write((caddr_t *)&ad, au_to_text("op=KSSL_ADD_ENTRY"));
-		au_write((caddr_t *)&ad,
-		    au_to_in_addr_ex((int32_t *)&saddr->sin6_addr));
-		(void) snprintf(buf, sizeof (buf), "SSL port=%d",
-		    saddr->sin6_port);
-		au_write((caddr_t *)&ad, au_to_text(buf));
-
-		(void) snprintf(buf, sizeof (buf), "proxy port=%d",
-		    kp->kssl_proxy_port);
-		au_write((caddr_t *)&ad, au_to_text(buf));
-		break;
-	}
-
-	case KSSL_DELETE_ENTRY: {
-		char buf[32];
-		struct sockaddr_in6 *saddr = (struct sockaddr_in6 *)params;
-
-		au_write((caddr_t *)&ad, au_to_text("op=KSSL_DELETE_ENTRY"));
-		au_write((caddr_t *)&ad,
-		    au_to_in_addr_ex((int32_t *)&saddr->sin6_addr));
-		(void) snprintf(buf, sizeof (buf), "SSL port=%d",
-		    saddr->sin6_port);
-		au_write((caddr_t *)&ad, au_to_text(buf));
-		break;
-	}
-
-	default:
-		return;
-	}
-
-	/* add a return token */
-	add_return_token((caddr_t *)&ad, tad->tad_scid, error, 0);
-
-	AS_INC(as_generated, 1, kctx);
-	AS_INC(as_kernel, 1, kctx);
-
-	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CONFIGKSSL, tad->tad_evmod,
 	    NULL);
 }
 

@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2016 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore <garrett@damore.org>
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
@@ -495,10 +495,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/ipnet/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:                $(UTSBASE)/common/inet/iptun/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/kssl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 

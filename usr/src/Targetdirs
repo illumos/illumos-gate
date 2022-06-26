@@ -24,7 +24,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2012, Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2017 RackTop Systems.
@@ -218,7 +218,6 @@ DIRS= \
 	/lib/svc/manifest/network/rpc \
 	/lib/svc/manifest/network/security \
 	/lib/svc/manifest/network/shares \
-	/lib/svc/manifest/network/ssl \
 	/lib/svc/manifest/application \
 	/lib/svc/manifest/application/management \
 	/lib/svc/manifest/application/security \
@@ -428,7 +427,6 @@ DIRS= \
 	/var/svc/manifest/network/routing \
 	/var/svc/manifest/network/security \
 	/var/svc/manifest/network/shares \
-	/var/svc/manifest/network/ssl \
 	/var/svc/manifest/application \
 	/var/svc/manifest/application/management \
 	/var/svc/manifest/application/print \
