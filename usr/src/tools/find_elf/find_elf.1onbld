@@ -19,11 +19,13 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH FIND_ELF 1ONBLD "December 3, 2021"
+.\" Copyright 2022 Jason King
+.\"
+.TH FIND_ELF 1ONBLD "May 29, 2022"
 .SH NAME
 find_elf \- Locate ELF objects
 .SH SYNOPSIS
-\fBfind_elf [-afrs] path\fP
+\fBfind_elf [-afhnrs] path\fP
 .SH DESCRIPTION
 The
 .I find_elf
@@ -45,6 +47,21 @@ Executables must have the execute bit set, and
 shared objects must end with a .so extension. Files that do not
 meet these requirements are silently eliminated from consideration without
 further analysis.
+.TP 4
+.B \-h
+Show usage message.
+.TP 4
+.B \-n
+Do not treat well known hard-linked binaries as special. Certain well known
+binaries (currently \fBalias\fP and \fBisaexec\fP) are hard linked to many
+other names in a proto directory tree.
+.P
+By default,
+.I find_elf
+will use these well known names as the initial name and all other hard links
+to those binaries are treated as aliases. Disabling this behavior with the
+\fB-n\fR option will choose the first name encountered during directory
+traversal as the name, and all other hard links to the binary as aliases.
 .TP 4
 .B \-r
 Report file names as relative paths, relative to the given file or directory,
