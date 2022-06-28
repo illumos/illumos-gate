@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd August 28, 2021
+.Dd June 14, 2022
 .Dt VIOBLK 4D
 .Os
 .Sh NAME
@@ -82,6 +82,7 @@ x86 device driver.
 .El
 .Sh SEE ALSO
 .Xr blkdev 4D ,
+.Xr vioscsi 4D ,
 .Xr virtio 4D ,
 .Xr dkio 4I ,
 .Xr diskinfo 8
