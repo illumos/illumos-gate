@@ -397,6 +397,7 @@ CTASSERT(offsetof(struct vmcb, state) == 0x400);
 
 struct vmcb_segment *vmcb_segptr(struct vmcb *vmcb, int type);
 uint64_t *vmcb_regptr(struct vmcb *vmcb, int ident, uint32_t *dirtyp);
+uint64_t *vmcb_msr_ptr(struct vmcb *vmcb, uint32_t ident, uint32_t *dirtyp);
 
 #endif /* _KERNEL */
 #endif /* _VMCB_H_ */

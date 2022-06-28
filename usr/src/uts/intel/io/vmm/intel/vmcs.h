@@ -48,6 +48,7 @@ CTASSERT(sizeof (struct vmcs) == PAGE_SIZE);
 uint32_t vmcs_field_encoding(int ident);
 void vmcs_seg_desc_encoding(int seg, uint32_t *base, uint32_t *lim,
     uint32_t *acc);
+uint32_t vmcs_msr_encoding(uint32_t msr);
 
 void vmcs_initialize(struct vmcs *vmcs, uintptr_t vmcs_pa);
 

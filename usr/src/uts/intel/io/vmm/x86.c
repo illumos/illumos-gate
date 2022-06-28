@@ -58,10 +58,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/specialreg.h>
 
 #include <machine/vmm.h>
+#include <sys/vmm_kernel.h>
 
 #include "vmm_host.h"
 #include "vmm_util.h"
-#include "x86.h"
 
 SYSCTL_DECL(_hw_vmm);
 
@@ -79,6 +79,42 @@ static int cpuid_leaf_b = 1;
  * host CPU reports having it.
  */
 static int vmm_force_invariant_tsc = 0;
+
+#define	CPUID_0000_0000	(0x0)
+#define	CPUID_0000_0001	(0x1)
+#define	CPUID_0000_0002	(0x2)
+#define	CPUID_0000_0003	(0x3)
+#define	CPUID_0000_0004	(0x4)
+#define	CPUID_0000_0006	(0x6)
+#define	CPUID_0000_0007	(0x7)
+#define	CPUID_0000_000A	(0xA)
+#define	CPUID_0000_000B	(0xB)
+#define	CPUID_0000_000D	(0xD)
+#define	CPUID_0000_000F	(0xF)
+#define	CPUID_0000_0010	(0x10)
+#define	CPUID_0000_0015	(0x15)
+#define	CPUID_8000_0000	(0x80000000)
+#define	CPUID_8000_0001	(0x80000001)
+#define	CPUID_8000_0002	(0x80000002)
+#define	CPUID_8000_0003	(0x80000003)
+#define	CPUID_8000_0004	(0x80000004)
+#define	CPUID_8000_0006	(0x80000006)
+#define	CPUID_8000_0007	(0x80000007)
+#define	CPUID_8000_0008	(0x80000008)
+#define	CPUID_8000_001D	(0x8000001D)
+#define	CPUID_8000_001E	(0x8000001E)
+
+/*
+ * CPUID instruction Fn0000_0001:
+ */
+#define	CPUID_0000_0001_APICID_MASK	(0xff<<24)
+#define	CPUID_0000_0001_APICID_SHIFT	24
+
+/*
+ * CPUID instruction Fn0000_0001 ECX
+ */
+#define	CPUID_0000_0001_FEAT0_VMX	(1<<5)
+
 
 /*
  * Round up to the next power of two, if necessary, and then take log2.
@@ -649,6 +685,10 @@ default_leaf:
 	return (1);
 }
 
+/*
+ * Return 'true' if the capability 'cap' is enabled in this virtual cpu
+ * and 'false' otherwise.
+ */
 bool
 vm_cpuid_capability(struct vm *vm, int vcpuid, enum vm_cpuid_capability cap)
 {
@@ -689,4 +729,24 @@ vm_cpuid_capability(struct vm *vm, int vcpuid, enum vm_cpuid_capability cap)
 		panic("%s: unknown vm_cpu_capability %d", __func__, cap);
 	}
 	return (rv);
+}
+
+bool
+validate_guest_xcr0(uint64_t val, uint64_t limit_mask)
+{
+	/* x87 feature must be enabled */
+	if ((val & XFEATURE_ENABLED_X87) == 0) {
+		return (false);
+	}
+	/* AVX cannot be enabled without SSE */
+	if ((val & (XFEATURE_ENABLED_SSE | XFEATURE_ENABLED_AVX)) ==
+	    XFEATURE_ENABLED_SSE) {
+		return (false);
+	}
+	/* No bits should be outside what we dictate to be allowed */
+	if ((val & ~limit_mask) != 0) {
+		return (false);
+	}
+
+	return (true);
 }

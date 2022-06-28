@@ -1,698 +1,362 @@
-'\" te
-.\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSI_PKT 9S "Jan 11, 2009"
-.SH NAME
-scsi_pkt \- SCSI packet structure
-.SH SYNOPSIS
-.nf
-#include <sys/scsi/scsi.h>
-.fi
-
-.SH INTERFACE LEVEL
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2022 Garrett D'Amore
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd June 21, 2022
+.Dt SCSI_PKT 9S
+.Os
+.Sh NAME
+.Nm scsi_pkt
+.Nd SCSI packet structure
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Sh INTERFACE LEVEL
 illumos DDI specific (illumos DDI).
-.SH DESCRIPTION
-A \fBscsi_pkt\fR structure defines the packet that is allocated by
-\fBscsi_init_pkt\fR(9F). The target driver fills in some information and passes
-it to \fBscsi_transport\fR(9F) for execution on the target. The host bus
-adapter (\fBHBA\fR) fills in other information as the command is processed.
+.Sh DESCRIPTION
+A
+.Nm
+structure defines the packet that is allocated by
+.Xr scsi_init_pkt 9F .
+The target driver fills in some information and passes it to
+.Xr scsi_transport 9F
+for execution on the target.
+The host bus adapter
+.Pq HBA
+fills in other information as the command is processed.
 When the command completes or can be taken no further, the completion function
 specified in the packet is called with a pointer to the packet as its argument.
 From fields within the packet, the target driver can determine the success or
 failure of the command.
-.SH STRUCTURE MEMBERS
-.in +2
-.nf
-opaque_t             pkt_ha_private;           /* private data for
-                                                  host adapter */
-struct scsi_address  pkt_address;              /* destination packet */
-opaque_t             pkt_private;              /* private data
-                                                  for target driver */
-void                 (*pkt_comp)(struct scsi_pkt *); /* callback */
-uint_t               pkt_flags;                /* flags */
-int                  pkt_time;                 /* time allotted to
-                                                  complete command */
-uchar_t              *pkt_scbp;                /* pointer to
-                                                  status block */
-uchar_t              *pkt_cdbp;                /* pointer to
-                                                  command block */
-ssize_t              pkt_resid;                /* number of bytes
-                                                  not transferred */
-uint_t               pkt_state;                /* state of command */
-uint_t               pkt_statistics;           /* statistics */
-uchar_t              pkt_reason;               /* reason completion
-                                                  called */
-uint_t               pkt_cdblen;               /* length of pkt_cdbp */
-uint_t               pkt_scdblen;              /* length of pkt_scbp */
-uint_t               pkt_tgtlen;               /* length of pkt_private */
-uint_t               pkt_numcookies;           /* number of DMA cookies */
-ddi_dma_cookie_t     *pkt_cookies;             /* array of DMA cookies */
-uint_t               pkt_dma_flags;            /* DMA flags */
-.fi
-.in -2
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_ha_private\fR\fR
-.ad
-.RS 18n
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset indent
+opaque_t             pkt_ha_private;
+struct scsi_address  pkt_address;
+opaque_t             pkt_private;
+void                 (*pkt_comp)(struct scsi_pkt *);
+uint_t               pkt_flags;
+int                  pkt_time;
+uchar_t              *pkt_scbp;
+uchar_t              *pkt_cdbp;
+ssize_t              pkt_resid;
+uint_t               pkt_state;
+uint_t               pkt_statistics;
+uchar_t              pkt_reason;
+uint_t               pkt_cdblen;
+uint_t               pkt_scblen;
+uint_t               pkt_tgtlen;
+uint_t               pkt_numcookies;
+ddi_dma_cookie_t     *pkt_cookies;
+uint_t               pkt_dma_flags;
+.Ed
+.Pp
+These members are described here:
+.Bl -tag -width indent
+.It Fa pkt_ha_private
 Opaque pointer that the HBA uses to reference a private data structure that
-transfers \fBscsi_pkt\fR requests.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_address\fR\fR
-.ad
-.RS 18n
-Initialized by \fBscsi_init_pkt\fR(9F), \fBpkt_address\fR records the intended
-route and the recipient of a request.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_private\fR\fR
-.ad
-.RS 18n
-Reserved for the use of the target driver, \fBpkt_private\fR is not changed by
-the HBA driver.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_comp\fR\fR
-.ad
-.RS 18n
-Specifies the command completion callback routine. When the host adapter driver
-has gone as far as it can in transporting a command to a \fBSCSI\fR target, and
-the command has either run to completion or can go no further for some other
-reason, the host adapter driver calls the function pointed to by this field and
-passes a pointer to the packet as argument. The callback routine itself is
-called from interrupt context and must not sleep or call any function that
-might sleep.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_flags\fR\fR
-.ad
-.RS 18n
+transfers
+.Nm
+requests.
+.It Fa pkt_address
+Initialized by
+.Xr scsi_init_pkt 9F ,
+.Fa pkt_address
+records the intended route and the recipient of a request.
+.It Fa pkt_private
+Reserved for the use of the target driver,
+.Fa pkt_private
+is not changed by the HBA driver.
+.It Fa pkt_comp
+Specifies the command completion callback routine.
+When the host adapter driver has gone as far as it can in transporting a
+command to a SCSI target, and the command has either run to completion or
+can go no further for some other reason, the host adapter driver calls the
+function pointed to by this field and passes a pointer to the packet as
+argument.
+The callback routine itself is called from interrupt context and must not
+sleep or call any function that might sleep.
+.It Fa pkt_flags
 Provides additional information about how the target driver expects the command
-to be executed. See \fBpkt_flag Definitions\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_time\fR\fR
-.ad
-.RS 18n
+to be executed.
+See
+.Sx pkt_flags Definitions .
+.It Fa pkt_time
 Set by the target driver to represent the maximum time allowed in seconds for
-this command to complete. Timeout starts when the command is transmitted on the
-\fBSCSI\fR bus. The \fBpkt_time\fR may be \fB0\fR if no timeout is required.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_scbp\fR\fR
-.ad
-.RS 18n
-Points to either a struct \fBscsi_status\fR(9S) or, if \fBauto-rqsense\fR is
-enabled and \fBpkt_state\fR includes \fBSTATE_ARQ_DONE\fR, a struct
-\fBscsi_arq_status\fR. If \fBscsi_status\fR is returned, the \fBSCSI\fR status
-byte resulting from the requested command is available. If
-\fBscsi_arq_status\fR(9S) is returned, the sense information is also available.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_cdbp\fR\fR
-.ad
-.RS 18n
+this command to complete.
+Timeout starts when the command is transmitted on the SCSI bus.
+The
+.Fa pkt_time
+may be zero if no timeout is required.
+.It Fa pkt_scbp
+Points to either a struct
+.Xr scsi_status 9S
+or, if
+.Fa auto-rqsense
+is enabled and
+.Fa pkt_state
+includes
+.Dv STATE_ARQ_DONE ,
+a struct
+.Xr scsi_arq_status 9S .
+If
+.Xr scsi_status 9S
+is returned, the SCSI status byte resulting from the requested command is
+available.
+If
+.Xr scsi_arq_status 9S
+is returned, the sense information is also available.
+.It Fa pkt_cdbp
 Points to a kernel-addressable buffer with a length specified by a call to the
-proper resource allocation routine, \fBscsi_init_pkt\fR(9F).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_resid\fR\fR
-.ad
-.RS 18n
+proper resource allocation routine,
+.Xr scsi_init_pkt 9F .
+.It Fa pkt_resid
 Contains a residual count, either the number of data bytes that have not been
-transferred (\fBscsi_transport\fR(9F)) or the number of data bytes for which
-DMA resources could not be allocated \fBscsi_init_pkt\fR(9F). In the latter
-case, partial DMA resources can be allocated only if \fBscsi_init_pkt\fR(9F) is
-called with the \fBPKT_DMA_PARTIAL\fR flag.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_state\fR\fR
-.ad
-.RS 18n
+transferred by
+.Xr scsi_transport 9F
+or the number of data bytes for which
+DMA resources could not be allocated by
+.Xr scsi_init_pkt 9F .
+In the latter case, partial DMA resources can be allocated only if
+.Xr scsi_init_pkt 9F
+is called with the
+.Dv PKT_DMA_PARTIAL
+flag.
+.It Fa pkt_state
 Has bit positions that represent the six most important states that a
-\fBSCSI\fR command can go through. See \fBpkt_state Definitions\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_statistics\fR\fR
-.ad
-.RS 18n
-Maintains some transport-related statistics. See \fBpkt_statistics
-Definitions\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_reason\fR\fR
-.ad
-.RS 18n
-Contains a completion code that indicates why the \fBpkt_comp\fR function was
-called. See \fBpkt_reason Definitions\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_cdblen\fR\fR
-.ad
-.RS 18n
-Length of buffer pointed to by \fBpkt_cdbp\fR. See \fBtran_setup_pkt\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_scblen\fR\fR
-.ad
-.RS 18n
-Length of buffer pointed to by \fBpkt_scbp\fR. See \fBtran_setup_pkt\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_tgtlen\fR\fR
-.ad
-.RS 18n
-Length of buffer pointed to by \fBpkt_private\fR. See \fBtran_setup_pkt\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_numcookies\fR\fR
-.ad
-.RS 18n
-Length \fBpkt_cookies\fR array. See \fBtran_setup_pkt\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_cookies\fR\fR
-.ad
-.RS 18n
-Array of DMA cookies. See \fBtran_setup_pkt\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpkt_dma_flags\fR\fR
-.ad
-.RS 18n
-DMA flags used, such as \fBDDI_DMA_READ\fR and \fBDDI_DMA_WRITE\fR. See
-\fBtran_setup_pkt\fR.
-.RE
-
-.sp
-.LP
-The host adapter driver will update the \fBpkt_resid\fR, \fBpkt_reason\fR,
-\fBpkt_state\fR, and \fBpkt_statistics\fR fields.
-.SS "\fBpkt_flags\fR Definitions"
-The appropriate definitions for the structure member \fBpkt_flags\fR are:
-.sp
-.ne 2
-.na
-\fB\fBFLAG_NOINTR\fR\fR
-.ad
-.RS 30n
-Run command with no command completion callback. Command is complete upon
-return from \fBscsi_transport\fR(9F).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLAG_NODISCON\fR\fR
-.ad
-.RS 30n
+SCSI command can go through.
+See
+.Sx pkt_state Definitions .
+.It Fa pkt_statistics
+Maintains some transport-related statistics.
+See
+.Sx pkt_statistics Definitions .
+.It Fa pkt_reason
+Contains a completion code that indicates why the
+.Fa pkt_comp
+function was called.
+See
+.Sx pkt_reason Definitions .
+.It Fa pkt_cdblen
+Length of buffer pointed to by
+.Fa pkt_cdbp .
+Se
+.Xr  tran_setup_pkt 9E .
+.It Fa pkt_scblen
+Length of buffer pointed to by
+.Fa pkt_scbp .
+See
+.Xr tran_setup_pkt 9E .
+.It Fa pkt_tgtlen
+Length of buffer pointed to by
+.Fa pkt_private .
+See
+.Xr tran_setup_pkt 9E .
+.It Fa pkt_numcookies
+Length of
+.Fa pkt_cookies
+array.
+See
+.Xr tran_setup_pkt 9E .
+.It Fa pkt_cookies
+Array of DMA cookies.
+See
+.Xr tran_setup_pkt 9E .
+.It Fa pkt_dma_flags
+DMA flags used, such as
+.Dv DDI_DMA_READ
+and
+.Dv DDI_DMA_WRITE .
+See
+.Xr tran_setup_pkt 9E .
+.El
+.Pp
+The host adapter driver will update the
+.Fa pkt_resid ,
+.Fa pkt_reason ,
+.Fa pkt_state ,
+and
+.Fa pkt_statistics
+fields.
+.Ss "pkt_flags Definitions"
+The appropriate definitions for the structure member
+.Fa pkt_flags
+are:
+.Bl -tag -width indent
+.It Dv FLAG_NOINTR
+Run command with no command completion callback.
+Command is complete upon return from
+.Xr scsi_transport 9F .
+.It Dv FLAG_NODISCON
 Run command without disconnects.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLAG_NOPARITY\fR\fR
-.ad
-.RS 30n
+.It Dv FLAG_NOPARITY
 Run command without parity checking.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLAG_HTAG\fR\fR
-.ad
-.RS 30n
+.It Dv FLAG_HTAG
 Run command as the head-of-queue-tagged command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLAG_OTAG\fR\fR
-.ad
-.RS 30n
+.It Dv FLAG_OTAG
 Run command as an ordered-queue-tagged command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLAG_STAG\fR\fR
-.ad
-.RS 30n
+.It Dv FLAG_STAG
 Run command as a simple-queue-tagged command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLAG_SENSING\fR\fR
-.ad
-.RS 30n
+.It Dv FLAG_SENSING
 Indicates a request sense command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLAG_HEAD\fR\fR
-.ad
-.RS 30n
+.It Dv FLAG_HEAD
 Place command at the head of the queue.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLAG_RENEGOTIATE_WIDE_SYNC\fR\fR
-.ad
-.RS 30n
+.It Dv FLAG_RENEGOTIATE_WIDE_SYNC
 Before transporting this command, the host adapter should initiate the
-renegotiation of wide mode and synchronous transfer speed. Normally, the HBA
-driver manages negotiations but under certain conditions forcing a
-renegotiation is appropriate. Renegotiation is recommended before Request Sense
-and Inquiry commands. Refer to the SCSI 2 standard, sections 6.6.21 and 6.6.23.
-.sp
+renegotiation of wide mode and synchronous transfer speed.
+Normally, the HBA driver manages negotiations but under certain conditions
+forcing a renegotiation is appropriate.
+Renegotiation is recommended before
+.Ql "Request Sense"
+and
+.Ql Inquiry
+commands.
+Refer to the SCSI 2 standard, sections 6.6.21 and 6.6.23.
+.Pp
 This flag should not be set for every packet as this will severely impact
 performance.
-.RE
-
-.SS "\fBpkt_reason\fR Definitions"
-The appropriate definitions for the structure member \fBpkt_reason\fR are:
-.sp
-.ne 2
-.na
-\fB\fBCMD_CMPLT\fR\fR
-.ad
-.RS 20n
+.El
+.Ss "pkt_reason Definitions"
+The appropriate definitions for the structure member
+.Fa pkt_reason
+are:
+.Bl -tag -width indent
+.It Dv CMD_CMPLT
 No transport errors; normal completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_INCOMPLETE\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_INCOMPLETE
 Transport stopped with abnormal state.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_DMA_DERR\fR\fR
-.ad
-.RS 20n
-\fBDMA\fRd irection error.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_TRAN_ERR\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_DMA_DERR
+DMA direction error.
+.It Dv CMD_TRAN_ERR
 Unspecified transport error.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_RESET\fR\fR
-.ad
-.RS 20n
-\fBSCSI\fR bus reset destroyed command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_ABORTED\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_RESET
+SCSI bus reset destroyed command.
+.It Dv CMD_ABORTED
 Command transport aborted on request.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_TIMEOUT\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_TIMEOUT
 Command timed out.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_DATA_OVR\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_DATA_OVR
 Data overrun.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_CMD_OVR\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_CMD_OVR
 Command overrun.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_STS_OVR\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_STS_OVR
 Status overrun.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_BADMSG\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_BADMSG
 Message not command complete.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_NOMSGOUT\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_NOMSGOUT
 Target refused to go to message out phase.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_XID_FAIL\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_XID_FAIL
 Extended identify message rejected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_IDE_FAIL\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_IDE_FAIL
 "Initiator Detected Error" message rejected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_ABORT_FAIL\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_ABORT_FAIL
 Abort message rejected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_REJECT_FAIL\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_REJECT_FAIL
 Reject message rejected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_NOP_FAIL\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_NOP_FAIL
 "No Operation" message rejected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_PER_FAIL\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_PER_FAIL
 "Message Parity Error" message rejected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_BDR_FAIL\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_BDR_FAIL
 "Bus Device Reset" message rejected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_ID_FAIL\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_ID_FAIL
 Identify message rejected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_UNX_BUS_FREE\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_UNX_BUS_FREE
 Unexpected bus free phase.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_TAG_REJECT\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_TAG_REJECT
 Target rejected the tag message.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCMD_DEV_GONE\fR\fR
-.ad
-.RS 20n
+.It Dv CMD_DEV_GONE
 The device has been removed.
-.RE
-
-.SS "pkt_state Definitions"
-The appropriate definitions for the structure member \fBpkt_state\fR are:
-.sp
-.ne 2
-.na
-\fB\fBSTATE_GOT_BUS\fR\fR
-.ad
-.RS 22n
+.El
+.Ss "pkt_state Definitions"
+The appropriate definitions for the structure member
+.Fa pkt_state
+are:
+.Bl -tag -width indent
+.It Dv STATE_GOT_BUS
 Bus arbitration succeeded.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTATE_GOT_TARGET\fR\fR
-.ad
-.RS 22n
+.It Dv STATE_GOT_TARGET
 Target successfully selected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTATE_SENT_CMD\fR\fR
-.ad
-.RS 22n
+.It Dv STATE_SENT_CMD
 Command successfully sent.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTATE_XFERRED_DATA\fR\fR
-.ad
-.RS 22n
+.It Dv STATE_XFERRED_DATA
 Data transfer took place.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTATE_GOT_STATUS\fR\fR
-.ad
-.RS 22n
+.It Dv STATE_GOT_STATUS
 Status received.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTATE_ARQ_DONE\fR\fR
-.ad
-.RS 22n
+.It Dv STATE_ARQ_DONE
 The command resulted in a check condition and the host adapter driver executed
 an automatic request sense command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTATE_XARQ_DONE\fR\fR
-.ad
-.RS 22n
-The command requested in extra sense data using a \fBPKT_XARQ\fR flag got a
-check condition. The host adapter driver was able to successfully request and
-return this. The \fBscsi_pkt.pkt_scbp->sts_rqpkt_resid\fR returns the sense
-data residual based on the \fIstatuslen\fR parameter of the
-\fBscsi_init_pkt\fR(9F) call. The sense data begins at
-\fBscsi_pkt.pkt_scbp->sts_sensedata\fR.
-.RE
-
-.SS "pkt_statistics Definitions"
+.It Dv STATE_XARQ_DONE
+The command requested in extra sense data using a
+.Dv PKT_XARQ
+flag got a check condition.
+The host adapter driver was able to successfully request and return this.
+The
+.Sy scsi_pkt.pkt_scbp->sts_rqpkt_resid
+returns the sense data residual based on the
+.Fa statuslen
+parameter of the
+.Xr scsi_init_pkt 9F
+call.
+The sense data begins at
+.Sy scsi_pkt.pkt_scbp->sts_sensedata .
+.El
+.Ss "pkt_statistics Definitions"
 The definitions that are appropriate for the structure member
-\fBpkt_statistics\fR are:
-.sp
-.ne 2
-.na
-\fB\fBSTAT_DISCON\fR\fR
-.ad
-.RS 18n
+.Fa pkt_statistics
+are:
+.Bl -tag -width indent
+.It Dv STAT_DISCON
 Device disconnect.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTAT_SYNC\fR\fR
-.ad
-.RS 18n
+.It Dv STAT_SYNC
 Command did a synchronous data transfer.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTAT_PERR\fR\fR
-.ad
-.RS 18n
-\fBSCSI\fR parity error.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTAT_BUS_RESET\fR\fR
-.ad
-.RS 18n
+.It Dv STAT_PERR
+SCSI parity error.
+.It Dv STAT_BUS_RESET
 Bus reset.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTAT_DEV_RESET\fR\fR
-.ad
-.RS 18n
+.It Dv STAT_DEV_RESET
 Device reset.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTAT_ABORTED\fR\fR
-.ad
-.RS 18n
+.It Dv STAT_ABORTED
 Command was aborted.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTAT_TIMEOUT\fR\fR
-.ad
-.RS 18n
+.It Dv STAT_TIMEOUT
 Command timed out.
-.RE
-
-.SH SEE ALSO
-.BR tran_init_pkt (9E),
-.BR tran_setup_pkt (9E),
-.BR scsi_hba_pkt_comp (9F),
-.BR scsi_init_pkt (9F),
-.BR scsi_transport (9F),
-.BR scsi_arq_status (9S),
-.BR scsi_status (9S)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.SH NOTES
-HBA drivers should signal \fBscsi_pkt\fR completion by calling
-\fBscsi_hba_pkt_comp\fR(9F). This is mandatory for HBA drivers that implement
-\fBtran_setup_pkt\fR(9E). Failure to comply results in undefined behavior.
+.El
+.Sh SEE ALSO
+.Xr tran_init_pkt 9E ,
+.Xr tran_setup_pkt 9E ,
+.Xr scsi_hba_pkt_comp 9F ,
+.Xr scsi_init_pkt 9F ,
+.Xr scsi_transport 9F ,
+.Xr scsi_arq_status 9S ,
+.Xr scsi_status 9S
+.Pp
+.Rs
+.%T "Writing Device Drivers"
+.Re
+.Sh NOTES
+HBA drivers should signal
+.Nm
+completion by calling
+.Xr scsi_hba_pkt_comp 9F .
+This is mandatory for HBA drivers that implement
+.Xr tran_setup_pkt 9E .
+Failure to comply results in undefined behavior.
+.Pp
+Drivers must not make assumptions about the size of the
+.Nm
+structure.
+In particular, this structure must not be directly
+inlined into other driver structures nor allocated
+except by one of the specialized allocation functions
+such as
+.Xr scsi_init_pkt 9F .

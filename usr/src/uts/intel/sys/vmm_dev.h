@@ -366,6 +366,7 @@ struct vm_data_xfer {
 	uint16_t	vdx_version;
 	uint32_t	vdx_flags;
 	uint32_t	vdx_len;
+	uint32_t	vdx_result_len;
 	void		*vdx_data;
 };
 
@@ -384,7 +385,7 @@ struct vm_data_xfer {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	2
+#define	VMM_CURRENT_INTERFACE_VERSION	3
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
