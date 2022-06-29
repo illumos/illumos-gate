@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd October 3, 2020
+.Dd June 14, 2022
 .Dt VIRTIO 4D
 .Os
 .Sh NAME
@@ -39,7 +39,8 @@ x86 device driver.
 .El
 .Sh SEE ALSO
 .Xr vioblk 4D ,
-.Xr vioif 4D
+.Xr vioif 4D ,
+.Xr vioscsi 4D
 .Rs
 .%T Virtual I/O Device (VIRTIO) Version 1.1
 .%D April, 2019
