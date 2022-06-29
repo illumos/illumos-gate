@@ -10469,25 +10469,16 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 			/*
 			 * Destroy the cache (if it exists) which was
-			 * allocated for the write maps since this is
-			 * the last close for this media.
+			 * allocated for the write maps, as long as no
+			 * other outstanding commands for the device exist.
+			 * (If we don't destroy it here, we will do so later
+			 * on detach.  More likely we'll just reuse it on
+			 * a future open.)
 			 */
-			if (un->un_wm_cache) {
-				/*
-				 * Check if there are pending commands.
-				 * and if there are give a warning and
-				 * do not destroy the cache.
-				 */
-				if (un->un_ncmds_in_driver > 0) {
-					scsi_log(SD_DEVINFO(un),
-					    sd_label, CE_WARN,
-					    "Unable to clean up memory "
-					    "because of pending I/O\n");
-				} else {
-					kmem_cache_destroy(
-					    un->un_wm_cache);
-					un->un_wm_cache = NULL;
-				}
+			if ((un->un_wm_cache != NULL) &&
+			    (un->un_ncmds_in_driver == 0)) {
+				kmem_cache_destroy(un->un_wm_cache);
+				un->un_wm_cache = NULL;
 			}
 		}
 	}
