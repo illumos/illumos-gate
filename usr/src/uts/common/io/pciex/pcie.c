@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/sysmacros.h>
@@ -2254,9 +2254,12 @@ pcie_init_root_port_mps(dev_info_t *dip)
 {
 	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
 	int rp_cap, max_supported = pcie_max_mps;
+	int circular_count;
 
+	ndi_devi_enter(dip, &circular_count);
 	(void) pcie_get_fabric_mps(ddi_get_parent(dip),
 	    ddi_get_child(dip), &max_supported);
+	ndi_devi_exit(dip, circular_count);
 
 	rp_cap = PCI_CAP_GET16(bus_p->bus_cfg_hdl, 0,
 	    bus_p->bus_pcie_off, PCIE_DEVCAP) &
