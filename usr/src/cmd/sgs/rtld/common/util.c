@@ -1447,7 +1447,7 @@ static	u_longlong_t		cmdisa = 0;	/* command line (-e) ISA */
  */
 static void
 ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
-    Word *lmtflags, uint_t env_flags, int aout)
+    Word *lmtflags, uint_t env_flags)
 {
 	u_longlong_t	variable = 0;
 	ushort_t	select = 0;
@@ -1510,9 +1510,11 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		} else if ((len == MSG_LD_BIND_NOT_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_BIND_NOT), MSG_LD_BIND_NOT_SIZE) == 0)) {
 			/*
-			 * Another trick, enabled to help debug AOUT
-			 * applications under BCP, but not documented for
-			 * general use.
+			 * Another trick, initially implemented to help debug
+			 * a.out executables under SunOS 4 binary
+			 * compatibility (now removed), not documented for
+			 * general use, but still useful for debugging around
+			 * the PLT, etc.
 			 */
 			select |= SEL_ACT_RT;
 			val = RT_FL_NOBIND;
@@ -1819,10 +1821,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		    (strncmp(s1, MSG_ORIG(MSG_LD_TRACE_OBJS),
 		    MSG_LD_TRACE_OBJS_SIZE) == 0)) ||
 		    ((len == MSG_LD_TRACE_OBJS_E_SIZE) &&
-		    (((strncmp(s1, MSG_ORIG(MSG_LD_TRACE_OBJS_E),
-		    MSG_LD_TRACE_OBJS_E_SIZE) == 0) && !aout) ||
-		    ((strncmp(s1, MSG_ORIG(MSG_LD_TRACE_OBJS_A),
-		    MSG_LD_TRACE_OBJS_A_SIZE) == 0) && aout)))) {
+		    (strncmp(s1, MSG_ORIG(MSG_LD_TRACE_OBJS_E),
+		    MSG_LD_TRACE_OBJS_E_SIZE) == 0))) {
 			char	*s0 = (char *)s1;
 
 			select |= SEL_ACT_SPEC_2;
@@ -2120,7 +2120,7 @@ ld_arch_env(const char *s1, size_t *len)
  */
 static int
 ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
-    uint_t env_flags, int aout)
+    uint_t env_flags)
 {
 	char	*nstr, *sstr, *estr = NULL;
 	size_t	nlen, len;
@@ -2195,7 +2195,7 @@ ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
 		 */
 		if ((flags |= ld_arch_env(nstr, &nlen)) != ENV_TYP_IGNORE) {
 			ld_generic_env(nstr, nlen, estr, lmflags,
-			    lmtflags, (env_flags | flags), aout);
+			    lmtflags, (env_flags | flags));
 		}
 		if (len == 0)
 			break;
@@ -2214,7 +2214,7 @@ ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
  */
 int
 rtld_getopt(char **argv, char ***envp, auxv_t **auxv, Word *lmflags,
-    Word *lmtflags, int aout)
+    Word *lmtflags)
 {
 	int	ndx;
 
@@ -2251,7 +2251,7 @@ rtld_getopt(char **argv, char ***envp, auxv_t **auxv, Word *lmflags,
 		    (str[3] != '\0'))
 			str += 3;
 		if (ld_flags_env(str, lmflags, lmtflags,
-		    ENV_TYP_CMDLINE, aout) == 1)
+		    ENV_TYP_CMDLINE) == 1)
 			return (1);
 	}
 
@@ -2274,8 +2274,7 @@ rtld_getopt(char **argv, char ***envp, auxv_t **auxv, Word *lmflags,
  * Process a single LD_XXXX string.
  */
 static void
-ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
-    int aout)
+ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags)
 {
 	const char	*s2;
 	size_t		len;
@@ -2317,7 +2316,7 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
 		return;
 	env_flags |= flags;
 
-	ld_generic_env(s1, len, s2, lmflags, lmtflags, env_flags, aout);
+	ld_generic_env(s1, len, s2, lmflags, lmtflags, env_flags);
 }
 
 /*
@@ -2414,20 +2413,20 @@ readenv_user(const char **envp, APlist **ealpp)
  * Process any LD_XXXX environment variables collected by readenv_user().
  */
 int
-procenv_user(APlist *ealp, Word *lmflags, Word *lmtflags, int aout)
+procenv_user(APlist *ealp, Word *lmflags, Word *lmtflags)
 {
 	Aliste		idx;
 	const char	*s1;
 
 	for (APLIST_TRAVERSE(ealp, idx, s1))
-		ld_str_env(s1, lmflags, lmtflags, 0, aout);
+		ld_str_env(s1, lmflags, lmtflags, 0);
 
 	/*
 	 * Having collected the best representation of any LD_FLAGS, process
 	 * these strings.
 	 */
 	if (rpl_ldflags) {
-		if (ld_flags_env(rpl_ldflags, lmflags, lmtflags, 0, aout) == 1)
+		if (ld_flags_env(rpl_ldflags, lmflags, lmtflags, 0) == 1)
 			return (1);
 		rpl_ldflags = NULL;
 	}
@@ -2460,11 +2459,11 @@ procenv_user(APlist *ealp, Word *lmflags, Word *lmtflags, int aout)
 }
 
 /*
- * Configuration environment processing.  Called after the a.out has been
- * processed (as the a.out can specify its own configuration file).
+ * Configuration environment processing.  Called after the executable has been
+ * processed (as the executable can specify its own configuration file).
  */
 int
-readenv_config(Rtc_env * envtbl, Addr addr, int aout)
+readenv_config(Rtc_env * envtbl, Addr addr)
 {
 	Word		*lmflags = &(lml_main.lm_flags);
 	Word		*lmtflags = &(lml_main.lm_tflags);
@@ -2481,7 +2480,7 @@ readenv_config(Rtc_env * envtbl, Addr addr, int aout)
 
 		if ((*s1++ == 'L') && (*s1++ == 'D') &&
 		    (*s1++ == '_') && (*s1 != '\0'))
-			ld_str_env(s1, lmflags, lmtflags, env_flags, 0);
+			ld_str_env(s1, lmflags, lmtflags, env_flags);
 
 		envtbl++;
 	}
@@ -2490,10 +2489,10 @@ readenv_config(Rtc_env * envtbl, Addr addr, int aout)
 	 * Having collected the best representation of any LD_FLAGS, process
 	 * these strings.
 	 */
-	if (ld_flags_env(rpl_ldflags, lmflags, lmtflags, 0, aout) == 1)
+	if (ld_flags_env(rpl_ldflags, lmflags, lmtflags, 0) == 1)
 		return (1);
-	if (ld_flags_env(prm_ldflags, lmflags, lmtflags, ENV_TYP_CONFIG,
-	    aout) == 1)
+	if (ld_flags_env(prm_ldflags, lmflags, lmtflags,
+	    ENV_TYP_CONFIG) == 1)
 		return (1);
 
 	/*
@@ -2931,14 +2930,17 @@ veprintf(Lm_list *lml, Error error, const char *format, va_list args)
 				err_strs[ERR_GUIDANCE] =
 				    MSG_INTL(MSG_ERR_GUIDANCE);
 			break;
-		case ERR_FATAL:
-			if (err_strs[ERR_FATAL] == NULL)
-				err_strs[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
-			break;
 		case ERR_ELF:
 			if (err_strs[ERR_ELF] == NULL)
 				err_strs[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
 			break;
+		/* If this API is mis-used, create a fatal error */
+		case ERR_FATAL:
+		default:
+			if (err_strs[ERR_FATAL] == NULL)
+				err_strs[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
+			break;
+
 		}
 		if (procname) {
 			if (bufprint(&prf, MSG_ORIG(MSG_STR_EMSGFOR1),

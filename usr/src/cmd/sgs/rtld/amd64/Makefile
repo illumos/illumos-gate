@@ -27,7 +27,7 @@
 BASEPLAT =	amd64
 
 # Object lists are organized into primary (most frequently used code) and
-# secondary lists (less frequently used code, ie. a.out support).
+# secondary lists (less frequently used code).
 
 P_COMOBJS=	debugdata.o \
 		analyze.o	elf.o		external.o	globals.o \

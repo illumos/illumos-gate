@@ -146,7 +146,7 @@ ld_calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
 
 /*
  *  Build a single plt entry - code is:
- *	if (building a.out)
+ *	if (building dynamic executable)
  *		JMP	*got_off
  *	else
  *		JMP	*got_off@GOT(%ebx)
@@ -1518,7 +1518,7 @@ ld_fillin_gotplt(Ofl_desc *ofl)
 	/*
 	 * Fill in the reserved slot in the procedure linkage table the first
 	 * entry is:
-	 *  if (building a.out) {
+	 *  if (building executable) {
 	 *	PUSHL	got[1]		    # the address of the link map entry
 	 *	JMP *	got[2]		    # the address of rtbinder
 	 *  } else {

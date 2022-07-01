@@ -52,14 +52,14 @@
 #
 #	usage: ld [-6:abc:.....] file(s)
 #		[-a]		create an absolute file
-#		[-b]		do not do special PIC relocations in a.out
+#		[-b]		do not create special PIC relocations in executables
 #		[-c file]	record configuration 'file'
 #
 @ MSG_ARG_USAGE		"usage: ld [-%s] file(s)\n"
 @ MSG_ARG_DETAIL_3	"\t[-32]\t\tenforce a 32-bit link-edit\n"
 @ MSG_ARG_DETAIL_6	"\t[-64]\t\tenforce a 64-bit link-edit\n"
 @ MSG_ARG_DETAIL_A	"\t[-a]\t\tcreate an absolute file\n"
-@ MSG_ARG_DETAIL_B	"\t[-b]\t\tdo not do special PIC relocations in a.out\n"
+@ MSG_ARG_DETAIL_B	"\t[-b]\t\tdo not create special PIC relocations in executables\n"
 @ MSG_ARG_DETAIL_CBDR	"\t[-B direct | nodirect]\n\
 			 \t\t\testablish direct bindings, or inhibit direct \
 			 binding\n\

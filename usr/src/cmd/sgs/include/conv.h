@@ -53,6 +53,9 @@ extern "C" {
  * Configuration features available - maintained here (instead of debug.h)
  * to save libconv from having to include debug.h which results in numerous
  * "declared but not used or defined" lint errors.
+ *
+ * AOUT flags (ADLIBPATH, ASLIBPATH) are unused, but retained so they may
+ * still be fully dumped under LD_DEBUG.
  */
 #define	CONF_EDLIBPATH	0x000100	/* ELF default library path */
 #define	CONF_ESLIBPATH	0x000200	/* ELF secure library path */

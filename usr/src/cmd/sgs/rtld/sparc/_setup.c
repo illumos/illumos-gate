@@ -53,9 +53,6 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"msg.h"
-#ifdef A_OUT
-#include	"_a.out.h"
-#endif /* A_OUT */
 
 /* VARARGS */
 unsigned long
@@ -76,9 +73,6 @@ _setup(Boot *ebp, Dyn *ld_dyn)
 	gid_t		gid = (gid_t)-1, egid = (gid_t)-1;
 	char		*_platform = NULL, *_execname = NULL, *_emulator = NULL;
 	int		auxflags = -1;
-#ifdef	A_OUT
-	void		*aoutdyn = NULL;
-#endif	/* A_OUT */
 
 	/*
 	 * Scan the bootstrap structure to pick up the basics.
@@ -86,9 +80,6 @@ _setup(Boot *ebp, Dyn *ld_dyn)
 	for (; ebp->eb_tag != EB_NULL; ebp++)
 		switch (ebp->eb_tag) {
 		case EB_DYNAMIC:
-#ifdef A_OUT
-			aoutdyn = (Link_dynamic *)ebp->eb_un.eb_val;
-#endif /* A_OUT */
 			break;
 		case EB_LDSO_BASE:
 			ld_base = (unsigned long)ebp->eb_un.eb_val;
@@ -240,12 +231,8 @@ _setup(Boot *ebp, Dyn *ld_dyn)
 	if ((lmp = setup((char **)_envp, (auxv_t *)_auxv, _flags, _platform,
 	    _syspagsz, _rt_name, ld_base, interp_base, fd, phdr,
 	    _execname, _argv, uid, euid, gid, egid,
-#ifdef	A_OUT
-	    aoutdyn, auxflags, hwcap)) == NULL) {
-#else
 	    /* CSTYLED */
 	    NULL, auxflags, hwcap)) == NULL) {
-#endif	/* A_OUT */
 		rtldexit(&lml_main, 1);
 	}
 	/* END CSTYLED */

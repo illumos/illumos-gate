@@ -195,7 +195,7 @@
 # Error messages
 #
 @ MSG_ERR_NAS		"%s:: no address specified\n"
-@ MSG_ERR_READ		"%s:: failed to read from: 0x%p\n"	
+@ MSG_ERR_READ		"%s:: failed to read from: 0x%p\n"
 @ MSG_ERR_SYMFAILED	"rtmaps:: lookup of %s`%s failed\n"
 
 #
@@ -448,7 +448,7 @@
    \t    lmco    rtmap      ADDR()     NAME()\n\
    \t    ---------------------------------------------\n\
    \t    [0xc]   0xff3f7cc0 0xff3c0000 /lib/ld.so.1\n"
- 
+
 
 #
 # Rt_map messages.
@@ -580,7 +580,7 @@
    \t  Callers: 0xff3b08cc APlist[used 1: total 4]\n\
    \t    ----------------------------------------------\n\
    \t    Binding descriptor located at: 0xff3b0514\n\
-   \t       caller: 0xff3b0214    a.out\n\
+   \t       caller: 0xff3b0214    executable\n\
    \t       depend: 0xff3b0554    /lib/libc.so.1\n\
    \t        flags: 0x00000003    [ NEEDED,REFERENCED ]\n"
 

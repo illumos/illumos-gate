@@ -235,7 +235,7 @@ _setup(Boot *ebp, Dyn *ld_dyn)
 	 */
 	if ((lmp = setup((char **)_envp, (auxv_t *)_auxv, _flags, _platform,
 	    _syspagsz, _rt_name, ld_base, interp_base, fd, phdr,
-	    _execname, _argv, uid, euid, gid, egid, NULL, auxflags,
+	    _execname, _argv, uid, euid, gid, egid, auxflags,
 	    hwcap)) == NULL) {
 		rtldexit(&lml_main, 1);
 	}

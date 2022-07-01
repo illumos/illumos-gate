@@ -450,8 +450,8 @@ typedef struct {
 } Spath_desc;
 
 /*
- * Define a path name definition descriptor.  Used to maintain initial ELF and
- * AOUT path name definitions.
+ * Define a path name definition descriptor.  Used to maintain initial path
+ * name definitions.
  */
 typedef struct {
 	const char	*sd_name;	/* path name */
@@ -575,11 +575,6 @@ extern uchar_t		search_rules[];	/* dependency search rules */
 
 extern Fct		elf_fct;	/* ELF file class dependent data */
 
-#if	defined(__sparc) && !defined(__sparcv9)
-extern Fct		aout_fct;	/* a.out (4.x) file class dependent */
-					/*	data */
-#endif
-
 extern Config		*config;		/* configuration structure */
 extern const char	*locale;		/* locale environment setting */
 
@@ -599,8 +594,6 @@ extern const char	*prm_preload;	/* permanent LD_PRELOAD string */
 
 extern Alist		*elf_def_dirs;	/* ELF default directory seach paths */
 extern Alist		*elf_sec_dirs;	/* ELF secure directory seach paths */
-extern Alist		*aout_def_dirs;	/* AOUT default directory seach paths */
-extern Alist		*aout_sec_dirs;	/* AOUT secure directory seach paths */
 
 extern uint_t		env_info;	/* information regarding environment */
 					/*	variables */
@@ -675,7 +668,7 @@ extern void		*calloc(size_t, size_t);
 extern int		cap_alternative(void);
 extern int		cap_check_fdesc(Fdesc *, Cap *, char *, Rej_desc *);
 extern int		cap_check_lmp(Rt_map *, Rej_desc *);
-extern int 		cap_filtees(Alist **, Aliste, const char *, Aliste,
+extern int		cap_filtees(Alist **, Aliste, const char *, Aliste,
 			    Rt_map *, Rt_map *, const char *, int, uint_t,
 			    int *);
 extern int		cap_match(Sresult *, uint_t, Sym *, char *);
@@ -729,7 +722,7 @@ extern void		lm_append(Lm_list *, Aliste, Rt_map *);
 extern void		lm_delete(Lm_list *, Rt_map *, Rt_map *);
 extern void		lm_move(Lm_list *, Aliste, Aliste, Lm_cntl *,
 			    Lm_cntl *);
-extern Rt_map 		*load_cap(Lm_list *, Aliste, const char *, Rt_map *,
+extern Rt_map		*load_cap(Lm_list *, Aliste, const char *, Rt_map *,
 			    uint_t, uint_t, Grp_hdl **, Rej_desc *, int *);
 extern void		load_completion(Rt_map *);
 extern Rt_map		*load_file(Lm_list *, Aliste, Rt_map *, Fdesc *, int *);
@@ -750,10 +743,10 @@ extern int		platcap_check(Syscapset *, const char *, Rej_desc *);
 extern void		platform_name(Syscapset *);
 extern int		pnavl_recorded(avl_tree_t **, const char *, uint_t,
 			    avl_index_t *);
-extern int		procenv_user(APlist *, Word *, Word *, int);
+extern int		procenv_user(APlist *, Word *, Word *);
 extern void		rd_event(Lm_list *, rd_event_e, r_state_e);
 extern int		readenv_user(const char **, APlist **);
-extern int		readenv_config(Rtc_env *, Addr, int);
+extern int		readenv_config(Rtc_env *, Addr);
 extern void		rejection_inherit(Rej_desc *, Rej_desc *);
 extern int		relocate_lmc(Lm_list *, Aliste, Rt_map *, Rt_map *,
 			    int *);
@@ -781,14 +774,14 @@ extern int		rtld_fstat(int, rtld_stat_t *restrict);
 extern int		rtld_stat(const char *restrict, rtld_stat_t *restrict);
 #endif
 extern int		rtld_getopt(char **, char ***, auxv_t **, Word *,
-			    Word *, int);
+			    Word *);
 extern void		security(uid_t, uid_t, gid_t, gid_t, int);
 extern void		set_environ(Lm_list *);
 extern void		set_dirs(Alist **, Spath_defn *, uint_t);
 extern int		set_prot(Rt_map *, mmapobj_result_t *, int);
 extern Rt_map		*setup(char **, auxv_t *, Word, char *, int, char *,
 			    ulong_t, ulong_t, int fd, Phdr *, char *, char **,
-			    uid_t, uid_t, gid_t, gid_t, void *, int, uint_t *);
+			    uid_t, uid_t, gid_t, gid_t, int, uint_t *);
 extern const char	*stravl_insert(const char *, uint_t, size_t, int);
 extern void		spavl_insert(const char *);
 extern int		sfcap1_check(Syscapset *, Xword, Rej_desc *);

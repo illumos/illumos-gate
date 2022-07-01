@@ -181,19 +181,20 @@ elf_config_validate(Addr addr, Rtc_head *head, Rt_map *lmp)
  *
  * A configuration file can be specified using the LD_CONFIG environment
  * variable, from a DT_CONFIG string recorded in the executable (see ld(1) -c),
- * or in the case of a crle() dumped image, the file is "fabricated" to a
+ * or in the case of a crle(1) dumped image, the file is "fabricated" to a
  * configuration file that may have been associated with the dumped image.  In
  * the absence of any of these techniques, a default configuration file is used.
  *
- * The LD_CONFIG variable take precedence, unless the application is secure, in
- * which case the environment variable is ignored (see ld_generic_env()).
+ * The LD_CONFIG variable takes precedence, unless the application is secure
+ * (see ld.so.1(1), issetugid(2)), in which case the environment variable is
+ * ignored (see ld_generic_env()).
  *
  * A DT_CONFIG string is honored, even if the application is secure.  However,
  * the path name follows the same rules as RUNPATH's, which must be a full path
  * name with no use of $ORIGIN.
  */
 int
-elf_config(Rt_map *lmp, int aout)
+elf_config(Rt_map *lmp)
 {
 	Rtc_id		*id;
 	Rtc_head	*head;
@@ -349,20 +350,7 @@ elf_config(Rt_map *lmp, int aout)
 		    (LA_SER_SECURE | LA_SER_CONFIG), PD_TKN_CAP) != 0)
 			features |= CONF_ESLIBPATH;
 	}
-#if	defined(__sparc) && !defined(_ELF64)
-	if (head->ch_adlibpath) {
-		str = (const char *)(head->ch_adlibpath + addr);
-		if (expand_paths(lmp, str, &aout_def_dirs, AL_CNT_SEARCH,
-		    (LA_SER_DEFAULT | LA_SER_CONFIG), PD_TKN_CAP) != 0)
-			features |= CONF_ADLIBPATH;
-	}
-	if (head->ch_aslibpath) {
-		str = (const char *)(head->ch_aslibpath + addr);
-		if (expand_paths(lmp, str, &aout_sec_dirs, AL_CNT_SEARCH,
-		    (LA_SER_SECURE | LA_SER_CONFIG), PD_TKN_CAP) != 0)
-			features |= CONF_ASLIBPATH;
-	}
-#endif
+
 	/*
 	 * Apply any environment variables.  This attribute was added with
 	 * RTC_VER_THREE.
@@ -370,7 +358,7 @@ elf_config(Rt_map *lmp, int aout)
 	if ((head->ch_version >= RTC_VER_THREE) && head->ch_env &&
 	    (!(rtld_flags & RT_FL_NOENVCFG))) {
 		if (readenv_config((Rtc_env *)(head->ch_env + addr),
-		    addr, aout) != 0)
+		    addr) != 0)
 			return (-1);
 		features |= CONF_ENVS;
 	}

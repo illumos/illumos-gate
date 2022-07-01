@@ -181,7 +181,7 @@ typedef struct {
 	union {
 		int		(*lc_func)();	/* external function pointer */
 		uintptr_t	lc_val;		/* external value */
-		char    	*lc_ptr;	/* external character pointer */
+		char		*lc_ptr;	/* external character pointer */
 	} lc_un;
 } Lc_desc;
 
@@ -428,7 +428,7 @@ struct lm_list32 {
  * Handles can be created from:
  *
  *  -	a dlopen() request.  This associates a caller to a reference object,
- * 	and the referenced objects dependencies.  This group of objects can
+ *	and the referenced objects dependencies.  This group of objects can
  *	then be inspected for symbols (dlsym()).
  *  -	a filtering request.  This associates a filter (caller) to a referenced
  *	object (filtee).  The redirection of filter symbols to their filtee
@@ -765,10 +765,10 @@ typedef struct rt_map32 {
 	uint32_t	rt_groups;
 	uint32_t	rt_fct;
 	uint32_t	rt_priv;
-	uint32_t 	rt_list;
-	uint32_t 	rt_objfltrndx;
-	uint32_t 	rt_symsfltrcnt;
-	uint32_t 	rt_symafltrcnt;
+	uint32_t	rt_list;
+	uint32_t	rt_objfltrndx;
+	uint32_t	rt_symsfltrcnt;
+	uint32_t	rt_symafltrcnt;
 	int32_t		rt_mode;
 	int32_t		rt_sortval;
 	uint32_t	rt_cycgroup;
@@ -777,8 +777,8 @@ typedef struct rt_map32 {
 	uint32_t	rt_origname;
 	uint32_t	rt_dirsz;
 	Rt_map_copy32	rt_copy;
-	uint32_t 	rt_auditors;
-	uint32_t 	rt_audinfo;
+	uint32_t	rt_auditors;
+	uint32_t	rt_audinfo;
 	uint32_t	rt_syminfo;
 	uint32_t	rt_initarray;
 	uint32_t	rt_finiarray;
@@ -788,8 +788,8 @@ typedef struct rt_map32 {
 	uint32_t	rt_initarraysz;
 	uint32_t	rt_finiarraysz;
 	uint32_t	rt_preinitarraysz;
-	uint32_t 	rt_dyninfo;
-	uint32_t 	rt_dyninfocnt;
+	uint32_t	rt_dyninfo;
+	uint32_t	rt_dyninfocnt;
 	uint32_t	rt_relacount;
 	uint32_t	rt_idx;
 	uint32_t	rt_lazy;
@@ -797,7 +797,7 @@ typedef struct rt_map32 {
 	uint32_t	rt_capchain;
 	uint32_t	rt_cntl;
 	uint32_t	rt_aflags;
-	uint32_t 	rt_init;
+	uint32_t	rt_init;
 	uint32_t	rt_fini;
 	uint32_t	rt_symintp;
 } Rt_map32;
@@ -998,8 +998,7 @@ typedef struct rt_map32 {
 #define	LKUP_DEFT	0x0000		/* simple lookup request */
 #define	LKUP_SPEC	0x0001		/* special ELF lookup (allows address */
 					/*	resolutions to plt[] entries) */
-#define	LKUP_LDOT	0x0002		/* indicates the original A_OUT */
-					/*	symbol had a leading `.' */
+/* 0x2 was previously used as part of a.out support */
 #define	LKUP_FIRST	0x0004		/* lookup symbol in first link map */
 					/*	only */
 #define	LKUP_COPY	0x0008		/* lookup symbol for a COPY reloc, do */
@@ -1017,7 +1016,7 @@ typedef struct rt_map32 {
 #define	LKUP_SYMNDX	0x0800		/* establish symbol index */
 #define	LKUP_SINGLETON	0x1000		/* search for a singleton symbol */
 #define	LKUP_STANDARD	0x2000		/* standard lookup - originated from */
-					/* 	head link-map element */
+					/*	head link-map element */
 #define	LKUP_WORLD	0x4000		/* ensure world lookup */
 #define	LKUP_DLSYM	0x8000		/* lookup stems from dlsym() request */
 

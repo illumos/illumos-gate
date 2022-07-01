@@ -2790,14 +2790,14 @@ ld_reloc_process(Ofl_desc *ofl)
  *
  * Note.  For historic reasons -ztext is not a default option (however all OS
  * shared object builds use this option).  It can be argued that this option
- * should also be default when generating an a.out (see 1163979).  However, if
- * an a.out contains text relocations it is either because the user is creating
- * something pretty weird (they've used the -b or -znodefs options), or because
- * the library against which they're building wasn't constructed correctly (ie.
- * a function has a NOTYPE type, in which case the a.out won't generate an
- * associated plt).  In the latter case the builder of the a.out can't do
- * anything to fix the error - thus we've chosen not to give the user an error,
- * or warning, for this case.
+ * should also be default when generating an executable (see 1163979).
+ * However, if an executable contains text relocations it is either because
+ * the user is creating something pretty weird (they've used the -b or
+ * -znodefs options), or because the library against which they're building
+ * wasn't constructed correctly (ie.  a function has a NOTYPE type, in which
+ * case the executable won't generate an associated plt).  In the latter case
+ * the builder of the executable can't do anything to fix the error - thus we've
+ * chosen not to give the user an error, or warning, for this case.
  */
 void
 ld_reloc_remain_entry(Rel_desc *orsp, Os_desc *osp, Ofl_desc *ofl,

@@ -663,7 +663,6 @@
 @ MSG_FIL_FIXNAME	"file=%s;  required name=%s"
 @ MSG_FIL_PROMOTE	"file=%s;  promoting mode to %s"
 @ MSG_FIL_DEFERRED	"file=%s;  deferred dependency exchanged for file=%s"
-@ MSG_FIL_AOUT		"file=%s  [ AOUT ]; generating link map"
 @ MSG_FIL_ELF		"file=%s  [ ELF ]; generating link map%s"
 @ MSG_FIL_LDSO		"file=%s  [ ELF ]"
 
@@ -977,7 +976,6 @@
 @ MSG_SYM_COPY_DST	"symbol=%s;  copy destination: alignment: 0x%x"
 @ MSG_SYM_COPY_REF	"symbol=%s;  copy reference"
 
-@ MSG_SYM_AOUT		"symbol=%s;  (original AOUT name)"
 @ MSG_SYM_LOOKUP	"symbol=%s;  lookup in file=%s  [ %s ]"
 
 @ MSG_DLSYM_1		"symbol=%s;  dlsym() called from file=%s %s %s"
@@ -1759,7 +1757,6 @@
 
 @ MSG_MR_PADDING	"[ PADDING ]"
 @ MSG_MR_HDR_ELF	"[ HDR_ELF ]"
-@ MSG_MR_HDR_AOUT	"[ HDR_AOUT ]"
 
 # audit originator
 

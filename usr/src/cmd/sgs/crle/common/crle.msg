@@ -36,7 +36,7 @@
 @ MSG_ARG_USAGE		"usage: %s [-64] [-a name] [-A name] [-c conf] \
 			 [-e env] [-E env] [-f flags] [-g name] [-G name ] \
 			 [-i name] [-I name] [-l dir] [-o dir ] [-s dir] \
-			 [-t ELF|AOUT] [-u] [-v]\n\
+			 [-u] [-v]\n\
 			 \t[-64]\t\tprocess 64-bit objects\n\
 			 \t[-a name]\tdefine an alternative object name\n\
 			 \t[-A name]\tdefine an optional alternative object \
@@ -56,7 +56,6 @@
 			 \t[-l dir]\tdefine a default search directory\n\
 			 \t[-o dir]\tuse directory for alternative objects\n\
 			 \t[-s dir]\tdefine a  trusted search directory\n\
-			 \t[-t ELF|AOUT]\ttoggle object type for -l and -s\n\
 			 \t[-u]\t\tupdate existing configuration file\n\
 			 \t[-v]\t\tprovide verbose processing information\n\
 			 \n\
@@ -150,12 +149,6 @@
 @ MSG_DEF_NEWTD_64	"  Trusted Directories (ELF):\t\
 			 /lib/secure/64:/usr/lib/secure/64  (system default)\n"
 
-@ MSG_DEF_AOUTDLP	"  Default Library Path (AOUT):\t\
-			 /usr/lib:/usr/local/lib  \
-			 (system default)\n"
-@ MSG_DEF_AOUTNEWTD	"  Trusted Directories (AOUT):\t\
-			 /lib/secure:/usr/lib/secure  (system default)\n"
-
 @ MSG_ENV_TITLE		"\nEnvironment Variables:\n"
 @ MSG_ENV_RPL		"  %s  (replaceable)\n"
 @ MSG_ENV_PRM		"  %s  (permanent)\n"
@@ -238,11 +231,8 @@
 @ MSG_CMD_EDLIB		"-l %s"
 @ MSG_CMD_OUTPUT	"-o %s"
 @ MSG_CMD_ESLIB		"-s %s"
-@ MSG_CMD_ASLIB		"-t AOUT -s %s"
-@ MSG_CMD_ADLIB		"-t AOUT -l %s"
 
 @ MSG_STR_ELF		"ELF"
-@ MSG_STR_AOUT		"AOUT"
 @ MSG_STR_EMPTY		""
 @ MSG_STR_READ		"r"
 @ MSG_STR_NL		"\n"
@@ -280,8 +270,6 @@
 @ MSG_PTH_NEWTD_64	"/lib/secure/64:/usr/lib/secure/64"
 @ MSG_PTH_OLDTD_64	"/usr/lib/secure/64"
 @ MSG_PTH_UPTD_64	"/lib/secure/64"
-
-@ MSG_PTH_AOUTDLP	"/usr/lib:/usr/local/lib"
 
 @ MSG_DIR_ROOT		"/"
 @ MSG_DIR_DOT		"."

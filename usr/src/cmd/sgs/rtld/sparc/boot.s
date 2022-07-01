@@ -26,13 +26,11 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Bootstrap routine for ld.so.  Control arrives here either directly from
  * exec() upon invocation of a dynamically linked program specifying ld.so
- * as its interpreter, or from the "a.out compatibility ld.so".  Entry
- * vector at "_rt_boot" used to discriminate between the two.
+ * as its interpreter.
  *
  * On entry, the stack appears as:
  *
@@ -68,13 +66,6 @@
  *	!			!
  *	!   Window save area	!
  *	!_______________________! <- %sp
- *
- * In the case of being invoked from the a.out compatibility ld.so, the stack
- * has the appearance above but also several frames pushed by the compatibility
- * routine.  An "elf_boot" structure is available in %o1 on entry, which
- * has been "pre-evaluated" to hold much of the information needed from the
- * original stack frame -- we pass this directly into the main portion of the
- * ld.so bootstrap.
  */
 
 #if	defined(lint)
@@ -103,7 +94,7 @@ main()
 
 ! Entry vector
 !	+0: normal start
-!	+4: compatibility start
+!	+4: compatibility start, now an error
 !	+8: alias start (frame exists)
 
 _rt_boot:

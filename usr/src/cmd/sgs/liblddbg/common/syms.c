@@ -28,19 +28,6 @@
 #include	"_debug.h"
 #include	"libld.h"
 
-#if	!(defined(_ELF64))
-
-void
-Dbg_syms_lookup_aout(Lm_list *lml, const char *name)
-{
-	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
-		return;
-
-	dbg_print(lml, MSG_INTL(MSG_SYM_AOUT), Dbg_demangle_name(name));
-}
-
-#endif
-
 void
 Dbg_syms_lookup(Rt_map *lmp, const char *name, const char *type)
 {
