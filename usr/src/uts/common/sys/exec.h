@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Garrett D'Amore <garrett@damore.org>
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -190,22 +191,12 @@ extern kmutex_t execsw_lock;
 extern short elfmagic;
 extern short intpmagic;
 extern short javamagic;
-#if defined(__sparc)
-extern short aout_zmagic;
-extern short aout_nmagic;
-extern short aout_omagic;
-#endif
 extern short nomagic;
 
 extern char elf32magicstr[];
 extern char elf64magicstr[];
 extern char intpmagicstr[];
 extern char javamagicstr[];
-#if defined(__sparc)
-extern char aout_nmagicstr[];
-extern char aout_zmagicstr[];
-extern char aout_omagicstr[];
-#endif
 extern char nomagicstr[];
 
 extern int exec_args(execa_t *, uarg_t *, intpdata_t *, void **);
@@ -259,18 +250,6 @@ extern int core_seg(proc_t *, vnode_t *, offset_t, caddr_t,
 
 extern int core_write(vnode_t *, enum uio_seg, offset_t,
     const void *, size_t, rlim64_t, cred_t *);
-
-/* a.out stuff */
-
-struct exec;
-
-extern caddr_t gettmem(struct exec *exp);
-extern caddr_t getdmem(struct exec *exp);
-extern ulong_t getdfile(struct exec *exp);
-extern uint_t gettfile(struct exec *exp);
-extern int chkaout(struct exdata *exp);
-extern void getexinfo(struct exdata *edp_in, struct exdata *edp_out,
-    int *pagetext, int *pagedata);
 
 #endif	/* _KERNEL */
 

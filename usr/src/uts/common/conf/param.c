@@ -23,6 +23,7 @@
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2022 Garrett D'Amore <garrett@damore.org>
  */
 
 #include <sys/types.h>
@@ -336,11 +337,6 @@ short elfmagic = 0x7f45;
 short intpmagic = 0x2321;
 short jmagic = 0x504b;
 
-#if defined(__sparc)
-short aout_nmagic = NMAGIC;
-short aout_zmagic = ZMAGIC;
-short aout_omagic = OMAGIC;
-#endif
 short nomagic = 0;
 
 /*
@@ -350,9 +346,6 @@ short nomagic = 0;
 #define	ELF64MAGIC_STRING	"\x7f""ELF\x2"
 #define	INTPMAGIC_STRING	"#!"
 #define	JAVAMAGIC_STRING	"PK\003\004"
-#define	AOUT_OMAGIC_STRING	"\x1""\x07"	/* 0407 */
-#define	AOUT_NMAGIC_STRING	"\x1""\x08"	/* 0410 */
-#define	AOUT_ZMAGIC_STRING	"\x1""\x0b"	/* 0413 */
 #define	NOMAGIC_STRING		""
 
 #define	SHBIN_CNTL(x)	((x)&037)
@@ -364,11 +357,6 @@ char elf64magicstr[] = ELF64MAGIC_STRING;
 char intpmagicstr[] = INTPMAGIC_STRING;
 char shbinmagicstr[] = SHBINMAGIC_STRING;
 char javamagicstr[] = JAVAMAGIC_STRING;
-#if defined(__sparc)
-char aout_nmagicstr[] = AOUT_NMAGIC_STRING;
-char aout_zmagicstr[] = AOUT_ZMAGIC_STRING;
-char aout_omagicstr[] = AOUT_OMAGIC_STRING;
-#endif
 char nomagicstr[] = NOMAGIC_STRING;
 
 char *execswnames[] = {
@@ -379,11 +367,6 @@ char *execswnames[] = {
 	"intpexec",
 	"shbinexec",
 	"javaexec",
-#if defined(__sparc)
-	"aoutexec",
-	"aoutexec",
-	"aoutexec",
-#endif
 	NULL,
 	NULL,
 	NULL
@@ -397,11 +380,6 @@ struct execsw execsw[] = {
 	{ intpmagicstr, 0, 2, NULL, NULL, NULL },
 	{ shbinmagicstr, 0, SHBINMAGIC_LEN, NULL, NULL, NULL },
 	{ javamagicstr, 0, 4, NULL, NULL, NULL },
-#if defined(__sparc)
-	{ aout_zmagicstr, 2, 2, NULL, NULL, NULL },
-	{ aout_nmagicstr, 2, 2, NULL, NULL, NULL },
-	{ aout_omagicstr, 2, 2, NULL, NULL, NULL },
-#endif
 	{ nomagicstr, 0, 0, NULL, NULL, NULL },
 	{ nomagicstr, 0, 0, NULL, NULL, NULL },
 	{ nomagicstr, 0, 0, NULL, NULL, NULL },

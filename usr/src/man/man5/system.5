@@ -3,15 +3,15 @@
 .\" Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 .\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2019 Peter Tribble
+.\" Copyright 2022 Garrett D'Amore <garrett@damore.org>
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSTEM 5 "Apr 20, 2019"
+.TH SYSTEM 5 "June 30, 2022"
 .SH NAME
 system \- system configuration information file
 .SH DESCRIPTION
-.LP
 The \fBsystem\fR file is used for customizing the operation of the operating
 system kernel. The recommended procedure is to preserve the original
 \fBsystem\fR file before modifying it.
@@ -52,6 +52,15 @@ namespace. The following namespaces are currently supported on all platforms:
 .sp
 .ne 2
 .na
+\fBdacf\fR
+.ad
+.RS 10n
+These modules provide rules and actions for device auto-configuration.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBdrv\fR\fR
 .ad
 .RS 10n
@@ -68,38 +77,11 @@ Modules in this namespace are execution format modules. The following
 \fBexec\fR modules are currently provided:
 .sp
 .ne 2
-.na
-\fBOnly on SPARC systems:\fR
-.ad
-.RS 28n
-.sp
-.in +2
-.nf
-aoutexec
-.fi
-.in -2
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fBOn SPARC and IA systems:\fR
-.ad
-.RS 28n
-.sp
-.in +2
 .nf
 elfexec
 intpexec
 javaexec
 .fi
-.in -2
-.sp
-
-.RE
-
 .RE
 
 .sp
@@ -156,36 +138,6 @@ These modules implement loadable system-call modules.
 .RS 10n
 These modules do not fit into any of the above categories, so are considered
 "miscellaneous" modules.
-.RE
-
-.sp
-.LP
-SPARC only:
-.sp
-.ne 2
-.na
-\fB\fBdacf\fR\fR
-.ad
-.RS 8n
-These modules provide rules and actions for device auto-configuration.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBtod\fR\fR
-.ad
-.RS 8n
-These modules provide support for the time of day hardware.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcpu\fR\fR
-.ad
-.RS 8n
-These modules provide \fBCPU\fR-specific kernel routines.
 .RE
 
 .sp
@@ -299,9 +251,7 @@ escape sequences are supported within the quoted string:
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRA sample \fBsystem\fR file.
-.sp
 .LP
 The following is a sample \fBsystem\fR file.
 
@@ -350,12 +300,10 @@ set moddebug | 0x40
 .sp
 
 .SH SEE ALSO
-.LP
 .BR boot (8),
 .BR init (8),
 .BR kernel (8)
 .SH WARNINGS
-.LP
 Use care when modifying the \fBsystem\fR file; it modifies the operation of the
 kernel. If you preserved the original \fBsystem\fR file, you can boot using
 \fBboot -a\fR, which will ask you to specify the path to the saved file. This
@@ -364,5 +312,4 @@ file that will work, you may specify \fB/dev/null\fR. This acts as an empty
 \fBsystem\fR file, and the system will attempt to boot using its default
 settings.
 .SH NOTES
-.LP
 The \fBsystem\fR files are read only once, at boot time.

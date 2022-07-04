@@ -350,7 +350,7 @@ DRV_KMODS	+= pcic
 #
 #	Exec Class Modules (/kernel/exec):
 #
-EXEC_KMODS	+= aoutexec elfexec intpexec shbinexec javaexec
+EXEC_KMODS	+= elfexec intpexec shbinexec javaexec
 
 #
 #	Scheduling Class Modules (/kernel/sched):

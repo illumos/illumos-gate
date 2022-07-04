@@ -276,7 +276,6 @@ file path=kernel/drv/vnic.conf group=sys
 file path=kernel/drv/wc.conf group=sys
 dir  path=kernel/exec group=sys
 dir  path=kernel/exec/$(ARCH64) group=sys
-$(sparc_ONLY)file path=kernel/exec/$(ARCH64)/aoutexec group=sys mode=0755
 file path=kernel/exec/$(ARCH64)/elfexec group=sys mode=0755
 file path=kernel/exec/$(ARCH64)/intpexec group=sys mode=0755
 dir  path=kernel/firmware group=sys
