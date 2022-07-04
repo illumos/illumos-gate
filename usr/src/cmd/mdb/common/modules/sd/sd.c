@@ -23,6 +23,9 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2022 RackTop Systems, Inc.
+ */
 
 #include <sys/mdb_modapi.h>
 #include <sys/scsi/scsi.h>
@@ -409,64 +412,6 @@ sd_state_walk_fini(mdb_walk_state_t *wsp)
 }
 
 /*
- *    Function: process_semo_sleepq
- *
- * Description: Iterate over the semoclose wait Q members of the soft state.
- *		Print the contents of each member. In case of silent mode
- *		the contents are avoided and only the address is printed.
- *
- *   Arguments: starting queue address, print mode.
- */
-static int
-process_semo_sleepq(uintptr_t	walk_addr, int silent)
-{
-	uintptr_t	rootBuf;
-	buf_t		currentBuf;
-	int		semo_sleepq_count = 0;
-
-	/* Set up to process the device's semoclose wait Q */
-	rootBuf = walk_addr;
-
-	if (!silent) {
-		mdb_printf("\nSEMOCLOSE SLEEP Q:\n");
-		mdb_printf("----------\n");
-	}
-
-	mdb_printf("SEMOCLOSE sleep Q head: %lx\n", rootBuf);
-
-	while (rootBuf) {
-		/* Process the device's cmd. wait Q */
-		if (!silent) {
-			mdb_printf("SEMOCLOSE SLEEP Q list entry:\n");
-			mdb_printf("------------------\n");
-		}
-
-		if (mdb_vread((void *)&currentBuf, sizeof (buf_t),
-		    rootBuf) == -1) {
-			mdb_warn("failed to read buf at %p", rootBuf);
-			return (FAIL);
-		}
-
-		if (!silent) {
-			mdb_set_dot(rootBuf);
-			mdb_eval("$<buf");
-			mdb_printf("---\n");
-		}
-		++semo_sleepq_count;
-		rootBuf = (uintptr_t)currentBuf.av_forw;
-	}
-
-	if (rootBuf == 0) {
-		mdb_printf("------------------------------\n");
-		mdb_printf("Processed %d SEMOCLOSE SLEEP Q entries\n",
-		    semo_sleepq_count);
-		mdb_printf("------------------------------\n");
-
-	}
-	return (SUCCESS);
-}
-
-/*
  *    Function: process_sdlun_waitq
  *
  * Description: Iterate over the wait Q members of the soft state.
@@ -688,12 +633,6 @@ sd_callback(uintptr_t addr, const void *walk_data, void *flg_silent)
 	/* process device cmd wait Q */
 	process_sdlun_waitq((uintptr_t)sdLun.un_waitq_headp, silent);
 
-	/* process device semoclose wait Q */
-	if (sdLun.un_semoclose._opaque[1] == 0) {
-		process_semo_sleepq((uintptr_t)sdLun.un_semoclose._opaque[0],
-		    silent);
-	}
-
 	/* print the actual number of soft state processed */
 	print_footer(walk_data);
 	return (SUCCESS);
@@ -760,12 +699,6 @@ dcmd_sd_state(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		/* process device' cmd wait Q */
 		process_sdlun_waitq((uintptr_t)sdLun.un_waitq_headp, silent);
-
-		/* process device's semoclose wait Q */
-		if (sdLun.un_semoclose._opaque[1] == 0) {
-			process_semo_sleepq(
-			    (uintptr_t)sdLun.un_semoclose._opaque[0], silent);
-		}
 	}
 	return (DCMD_OK);
 }
@@ -831,12 +764,6 @@ dcmd_ssd_state(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		/* process device' cmd wait Q */
 		process_sdlun_waitq((uintptr_t)sdLun.un_waitq_headp, silent);
-
-		/* process device's semoclose wait Q */
-		if (sdLun.un_semoclose._opaque[1] == 0) {
-			process_semo_sleepq(
-			    (uintptr_t)sdLun.un_semoclose._opaque[0], silent);
-		}
 	}
 	return (DCMD_OK);
 }

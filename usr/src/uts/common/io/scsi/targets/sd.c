@@ -182,8 +182,6 @@ static	char *sd_config_list		= "sd-config-list";
 #define	sd_qfull_throttle_enable	ssd_qfull_throttle_enable
 #define	sd_check_media_time		ssd_check_media_time
 #define	sd_wait_cmds_complete		ssd_wait_cmds_complete
-#define	sd_label_mutex			ssd_label_mutex
-#define	sd_detach_mutex			ssd_detach_mutex
 #define	sd_log_buf			ssd_log_buf
 #define	sd_log_mutex			ssd_log_mutex
 
@@ -285,21 +283,6 @@ static int sd_check_media_time		= 3000000;
  * Wait value used for in progress operations during a DDI_SUSPEND
  */
 static int sd_wait_cmds_complete	= SD_WAIT_CMDS_COMPLETE;
-
-/*
- * sd_label_mutex protects a static buffer used in the disk label
- * component of the driver
- */
-static kmutex_t sd_label_mutex;
-
-/*
- * sd_detach_mutex protects un_layer_count, un_detach_count, and
- * un_opens_in_progress in the sd_lun structure.
- */
-static kmutex_t sd_detach_mutex;
-
-_NOTE(MUTEX_PROTECTS_DATA(sd_detach_mutex,
-	sd_lun::{un_layer_count un_detach_count un_opens_in_progress}))
 
 /*
  * Global buffer and mutex for debug logging
@@ -2413,9 +2396,7 @@ _init(void)
 		return (err);
 	}
 
-	mutex_init(&sd_detach_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&sd_log_mutex,    NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&sd_label_mutex,  NULL, MUTEX_DRIVER, NULL);
 
 	mutex_init(&sd_tr.srq_resv_reclaim_mutex, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&sd_tr.srq_resv_reclaim_cv, NULL, CV_DRIVER, NULL);
@@ -2440,9 +2421,7 @@ _init(void)
 		/* delete taskq if install fails */
 		sd_taskq_delete();
 
-		mutex_destroy(&sd_detach_mutex);
 		mutex_destroy(&sd_log_mutex);
-		mutex_destroy(&sd_label_mutex);
 
 		mutex_destroy(&sd_tr.srq_resv_reclaim_mutex);
 		cv_destroy(&sd_tr.srq_resv_reclaim_cv);
@@ -2482,9 +2461,7 @@ _fini(void)
 
 	sd_taskq_delete();
 
-	mutex_destroy(&sd_detach_mutex);
 	mutex_destroy(&sd_log_mutex);
-	mutex_destroy(&sd_label_mutex);
 	mutex_destroy(&sd_tr.srq_resv_reclaim_mutex);
 
 	sd_scsi_probe_cache_fini();
@@ -6580,20 +6557,18 @@ sd_pm_idletimeout_handler(void *arg)
 	const hrtime_t idletime = sd_pm_idletime * NANOSEC;
 	struct sd_lun *un = arg;
 
-	mutex_enter(&sd_detach_mutex);
-	if (un->un_detach_count != 0) {
-		/* Abort if the instance is detaching */
-		mutex_exit(&sd_detach_mutex);
-		return;
-	}
-	mutex_exit(&sd_detach_mutex);
-
 	/*
 	 * Grab both mutexes, in the proper order, since we're accessing
 	 * both PM and softstate variables.
 	 */
 	mutex_enter(SD_MUTEX(un));
 	mutex_enter(&un->un_pm_mutex);
+	/* if timeout id is NULL, we are being canceled via untimeout */
+	if (un->un_pm_idle_timeid == NULL) {
+		mutex_exit(&un->un_pm_mutex);
+		mutex_exit(SD_MUTEX(un));
+		return;
+	}
 	if (((gethrtime() - un->un_pm_idle_time) > idletime) &&
 	    (un->un_ncmds_in_driver == 0) && (un->un_pm_count == 0)) {
 		/*
@@ -6667,7 +6642,6 @@ sdpower(dev_info_t *devi, int component, int level)
 	uchar_t		save_state = SD_STATE_NORMAL;
 	int		sval;
 	uchar_t		state_before_pm;
-	int		got_semaphore_here;
 	sd_ssc_t	*ssc;
 	int	last_power_level = SD_SPINDLE_UNINIT;
 
@@ -6682,19 +6656,6 @@ sdpower(dev_info_t *devi, int component, int level)
 
 	SD_TRACE(SD_LOG_IO_PM, un, "sdpower: entry, level = %d\n", level);
 
-	/*
-	 * Must synchronize power down with close.
-	 * Attempt to decrement/acquire the open/close semaphore,
-	 * but do NOT wait on it. If it's not greater than zero,
-	 * ie. it can't be decremented without waiting, then
-	 * someone else, either open or close, already has it
-	 * and the try returns 0. Use that knowledge here to determine
-	 * if it's OK to change the device power level.
-	 * Also, only increment it on exit if it was decremented, ie. gotten,
-	 * here.
-	 */
-	got_semaphore_here = sema_tryp(&un->un_semoclose);
-
 	mutex_enter(SD_MUTEX(un));
 
 	SD_INFO(SD_LOG_POWER, un, "sdpower: un_ncmds_in_driver = %ld\n",
@@ -6702,19 +6663,15 @@ sdpower(dev_info_t *devi, int component, int level)
 
 	/*
 	 * If un_ncmds_in_driver is non-zero it indicates commands are
-	 * already being processed in the driver, or if the semaphore was
-	 * not gotten here it indicates an open or close is being processed.
+	 * already being processed in the driver.
 	 * At the same time somebody is requesting to go to a lower power
 	 * that can't perform I/O, which can't happen, therefore we need to
 	 * return failure.
 	 */
 	if ((!SD_PM_IS_IO_CAPABLE(un, level)) &&
-	    ((un->un_ncmds_in_driver != 0) || (got_semaphore_here == 0))) {
+	    (un->un_ncmds_in_driver != 0)) {
 		mutex_exit(SD_MUTEX(un));
 
-		if (got_semaphore_here != 0) {
-			sema_v(&un->un_semoclose);
-		}
 		SD_TRACE(SD_LOG_IO_PM, un,
 		    "sdpower: exit, device has queued cmds.\n");
 
@@ -6733,9 +6690,6 @@ sdpower(dev_info_t *devi, int component, int level)
 	    (un->un_state == SD_STATE_SUSPENDED)) {
 		mutex_exit(SD_MUTEX(un));
 
-		if (got_semaphore_here != 0) {
-			sema_v(&un->un_semoclose);
-		}
 		SD_TRACE(SD_LOG_IO_PM, un,
 		    "sdpower: exit, device is off-line.\n");
 
@@ -6794,9 +6748,6 @@ sdpower(dev_info_t *devi, int component, int level)
 			kmem_free(log_page_data, log_page_size);
 			/* Cannot support power management on those drives */
 
-			if (got_semaphore_here != 0) {
-				sema_v(&un->un_semoclose);
-			}
 			/*
 			 * On exit put the state back to it's original value
 			 * and broadcast to anyone waiting for the power
@@ -6889,11 +6840,8 @@ sdpower(dev_info_t *devi, int component, int level)
 			} else {
 				mutex_exit(&un->un_pm_mutex);
 			}
-			if (got_semaphore_here != 0) {
-				sema_v(&un->un_semoclose);
-			}
 			/*
-			 * On exit put the state back to it's original value
+			 * On exit put the state back to its original value
 			 * and broadcast to anyone waiting for the power
 			 * change completion.
 			 */
@@ -6907,11 +6855,8 @@ sdpower(dev_info_t *devi, int component, int level)
 
 			goto sdpower_failed;
 		case -1:
-			if (got_semaphore_here != 0) {
-				sema_v(&un->un_semoclose);
-			}
 			/*
-			 * On exit put the state back to it's original value
+			 * On exit put the state back to its original value
 			 * and broadcast to anyone waiting for the power
 			 * change completion.
 			 */
@@ -6948,11 +6893,8 @@ sdpower(dev_info_t *devi, int component, int level)
 		 */
 		if ((rval = sd_pm_state_change(un, level, SD_PM_STATE_CHANGE))
 		    == DDI_FAILURE) {
-			if (got_semaphore_here != 0) {
-				sema_v(&un->un_semoclose);
-			}
 			/*
-			 * On exit put the state back to it's original value
+			 * On exit put the state back to its original value
 			 * and broadcast to anyone waiting for the power
 			 * change completion.
 			 */
@@ -7101,11 +7043,8 @@ sdpower(dev_info_t *devi, int component, int level)
 		}
 	}
 
-	if (got_semaphore_here != 0) {
-		sema_v(&un->un_semoclose);
-	}
 	/*
-	 * On exit put the state back to it's original value
+	 * On exit put the state back to its original value
 	 * and broadcast to anyone waiting for the power
 	 * change completion.
 	 */
@@ -7651,13 +7590,6 @@ sd_unit_attach(dev_info_t *devi)
 
 	cv_init(&un->un_wcc_cv,   NULL, CV_DRIVER, NULL);
 	un->un_f_wcc_inprog = 0;
-
-	/*
-	 * The open/close semaphore is used to serialize threads executing
-	 * in the driver's open & close entry point routines for a given
-	 * instance.
-	 */
-	(void) sema_init(&un->un_semoclose, 1, NULL, SEMA_DRIVER, NULL);
 
 	/*
 	 * The conf file entry and softstate variable is a forceful override,
@@ -8576,7 +8508,6 @@ create_errstats_failed:
 	ddi_xbuf_attr_destroy(un->un_xbuf_attr);
 
 	ddi_prop_remove_all(devi);
-	sema_destroy(&un->un_semoclose);
 	cv_destroy(&un->un_state_cv);
 
 	sd_free_rqs(un);
@@ -8626,32 +8557,19 @@ sd_unit_detach(dev_info_t *devi)
 	dev_info_t		*pdip = ddi_get_parent(devi);
 	int			instance = ddi_get_instance(devi);
 
-	mutex_enter(&sd_detach_mutex);
-
 	/*
 	 * Fail the detach for any of the following:
 	 *  - Unable to get the sd_lun struct for the instance
-	 *  - A layered driver has an outstanding open on the instance
-	 *  - Another thread is already detaching this instance
-	 *  - Another thread is currently performing an open
+	 *  - There is pending I/O
 	 */
 	devp = ddi_get_driver_private(devi);
 	if ((devp == NULL) ||
 	    ((un = (struct sd_lun *)devp->sd_private) == NULL) ||
-	    (un->un_ncmds_in_driver != 0) || (un->un_layer_count != 0) ||
-	    (un->un_detach_count != 0) || (un->un_opens_in_progress != 0)) {
-		mutex_exit(&sd_detach_mutex);
+	    (un->un_ncmds_in_driver != 0)) {
 		return (DDI_FAILURE);
 	}
 
 	SD_TRACE(SD_LOG_ATTACH_DETACH, un, "sd_unit_detach: entry 0x%p\n", un);
-
-	/*
-	 * Mark this instance as currently in a detach, to inhibit any
-	 * opens from a layered driver.
-	 */
-	un->un_detach_count++;
-	mutex_exit(&sd_detach_mutex);
 
 	tgt = ddi_prop_get_int(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
 	    SCSI_ADDR_PROP_TARGET, -1);
@@ -8958,12 +8876,6 @@ sd_unit_detach(dev_info_t *devi)
 	cmlb_free_handle(&un->un_cmlbhandle);
 
 	/*
-	 * Hold the detach mutex here, to make sure that no other threads ever
-	 * can access a (partially) freed soft state structure.
-	 */
-	mutex_enter(&sd_detach_mutex);
-
-	/*
 	 * Clean up the soft state struct.
 	 * Cleanup is done in reverse order of allocs/inits.
 	 * At this point there should be no competing threads anymore.
@@ -9042,9 +8954,6 @@ sd_unit_detach(dev_info_t *devi)
 
 	cv_destroy(&un->un_wcc_cv);
 
-	/* Open/close semaphore */
-	sema_destroy(&un->un_semoclose);
-
 	/* Removable media condvar. */
 	cv_destroy(&un->un_state_cv);
 
@@ -9060,8 +8969,6 @@ sd_unit_detach(dev_info_t *devi)
 	bzero(un, sizeof (struct sd_lun));
 
 	ddi_soft_state_free(sd_state, instance);
-
-	mutex_exit(&sd_detach_mutex);
 
 	/* This frees up the INQUIRY data associated with the device. */
 	scsi_unprobe(devp);
@@ -9089,10 +8996,6 @@ err_stillbusy:
 	_NOTE(NO_COMPETING_THREADS_NOW);
 
 err_remove_event:
-	mutex_enter(&sd_detach_mutex);
-	un->un_detach_count--;
-	mutex_exit(&sd_detach_mutex);
-
 	SD_TRACE(SD_LOG_ATTACH_DETACH, un, "sd_unit_detach: exit failure\n");
 	return (DDI_FAILURE);
 }
@@ -10168,15 +10071,11 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 
 	dev = *dev_p;
 	instance = SDUNIT(dev);
-	mutex_enter(&sd_detach_mutex);
 
 	/*
-	 * Fail the open if there is no softstate for the instance, or
-	 * if another thread somewhere is trying to detach the instance.
+	 * Fail the open if there is no softstate for the instance.
 	 */
-	if (((un = ddi_get_soft_state(sd_state, instance)) == NULL) ||
-	    (un->un_detach_count != 0)) {
-		mutex_exit(&sd_detach_mutex);
+	if ((un = ddi_get_soft_state(sd_state, instance)) == NULL) {
 		/*
 		 * The probe cache only needs to be cleared when open (9e) fails
 		 * with ENXIO (4238046).
@@ -10191,40 +10090,9 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		return (ENXIO);
 	}
 
-	/*
-	 * The un_layer_count is to prevent another thread in specfs from
-	 * trying to detach the instance, which can happen when we are
-	 * called from a higher-layer driver instead of thru specfs.
-	 * This will not be needed when DDI provides a layered driver
-	 * interface that allows specfs to know that an instance is in
-	 * use by a layered driver & should not be detached.
-	 *
-	 * Note: the semantics for layered driver opens are exactly one
-	 * close for every open.
-	 */
-	if (otyp == OTYP_LYR) {
-		un->un_layer_count++;
-	}
-
-	/*
-	 * Keep a count of the current # of opens in progress. This is because
-	 * some layered drivers try to call us as a regular open. This can
-	 * cause problems that we cannot prevent, however by keeping this count
-	 * we can at least keep our open and detach routines from racing against
-	 * each other under such conditions.
-	 */
-	un->un_opens_in_progress++;
-	mutex_exit(&sd_detach_mutex);
-
 	nodelay  = (flag & (FNDELAY | FNONBLOCK));
 	part	 = SDPART(dev);
 	partmask = 1 << part;
-
-	/*
-	 * We use a semaphore here in order to serialize
-	 * open and close requests on the device.
-	 */
-	sema_p(&un->un_semoclose);
 
 	mutex_enter(SD_MUTEX(un));
 
@@ -10410,12 +10278,6 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		sd_pm_exit(un);
 	}
 
-	sema_v(&un->un_semoclose);
-
-	mutex_enter(&sd_detach_mutex);
-	un->un_opens_in_progress--;
-	mutex_exit(&sd_detach_mutex);
-
 	SD_TRACE(SD_LOG_OPEN_CLOSE, un, "sdopen: exit success\n");
 	return (DDI_SUCCESS);
 
@@ -10433,14 +10295,6 @@ open_fail:
 		sd_pm_exit(un);
 	}
 open_failed_with_pm:
-	sema_v(&un->un_semoclose);
-
-	mutex_enter(&sd_detach_mutex);
-	un->un_opens_in_progress--;
-	if (otyp == OTYP_LYR) {
-		un->un_layer_count--;
-	}
-	mutex_exit(&sd_detach_mutex);
 
 	return (rval);
 }
@@ -10484,12 +10338,6 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 	SD_TRACE(SD_LOG_OPEN_CLOSE, un,
 	    "sdclose: close of part %d type %d\n", part, otyp);
-
-	/*
-	 * We use a semaphore here in order to serialize
-	 * open and close requests on the device.
-	 */
-	sema_p(&un->un_semoclose);
 
 	mutex_enter(SD_MUTEX(un));
 
@@ -10645,17 +10493,6 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	}
 
 	mutex_exit(SD_MUTEX(un));
-	sema_v(&un->un_semoclose);
-
-	if (otyp == OTYP_LYR) {
-		mutex_enter(&sd_detach_mutex);
-		/*
-		 * The detach routine may run when the layer count
-		 * drops to zero.
-		 */
-		un->un_layer_count--;
-		mutex_exit(&sd_detach_mutex);
-	}
 
 	return (rval);
 }
