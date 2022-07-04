@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2022 Garrett D'Amore
 
 SYMPROG= hosts inetd.conf networks protocols services netmasks
 
@@ -27,7 +28,7 @@ EDITPROG= ipaddrsel.conf ipsecalgs
 PROG= datemsk.ndpd ipsecinit.sample ipqosconf.1.sample ipqosconf.2.sample \
     ipqosconf.3.sample
 ETCPROG= $(SYMPROG) $(EDITPROG) $(PROG)
-SUBDIRS= default dhcp init.d ike nca ppp secret sock2path.d
+SUBDIRS= default dhcp init.d ike ppp secret sock2path.d
 
 include ../../Makefile.cmd
 
@@ -37,8 +38,8 @@ install:=	TARGET= install
 ROOTVAR=	$(ROOT)/var
 INETETCDIR=	$(ROOTETC)/inet
 INETVARDIR=	$(ROOTVAR)/inet
-DIRS= 		$(INETETCDIR) $(INETVARDIR)
-SYMDIR= 	inet
+DIRS=		$(INETETCDIR) $(INETVARDIR)
+SYMDIR=		inet
 ETCINETPROG=	$(ETCPROG:%=$(INETETCDIR)/%)
 EDITFILES=	$(SYMPROG:%=$(INETETCDIR)/%) $(EDITPROG:%=$(INETETCDIR)/%)
 # Only old /etc/inet files get symlinks in /etc.

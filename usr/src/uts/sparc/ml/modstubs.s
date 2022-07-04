@@ -377,7 +377,6 @@ stubs_base:
 	NO_UNLOAD_STUB(sockfs, sosendfile64,  	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, snf_segmap,  	nomod_einval);
 	NO_UNLOAD_STUB(sockfs, sock_getfasync,  nomod_zero);
-	NO_UNLOAD_STUB(sockfs, nl7c_sendfilev,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sotpi_sototpi,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, socket_sendmblk,	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, socket_setsockopt,	nomod_zero);

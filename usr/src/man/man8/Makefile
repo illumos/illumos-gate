@@ -19,7 +19,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 Peter Tribble
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-# Copryight 2022 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore
 #
 
 include		$(SRC)/Makefile.master
@@ -312,7 +312,6 @@ _MANFILES=	6to4relay.8		\
 		mpstat.8		\
 		msgid.8			\
 		mvdir.8			\
-		ncaconfd.8		\
 		ncheck.8		\
 		ncheck_ufs.8		\
 		ndd.8			\

@@ -21,20 +21,20 @@
 
 #
 # Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore
 #
 
 SUBDIRS=	bridged ilbd in.chargend in.daytimed \
 		in.discardd in.echod in.mpathd in.ndpd \
-		in.ripngd in.timed inetd mdnsd ncaconfd pppoe \
+		in.ripngd in.timed inetd mdnsd pppoe \
 		slpd vrrpd wpad
 
-MSGSUBDIRS=	ilbd inetd ncaconfd vrrpd
+MSGSUBDIRS=	ilbd inetd vrrpd
 
 include ../../Makefile.cmd
 include ./Makefile.lib
 
-POFILES=	inetd/inetd.po ncaconfd/ncaconfd.po vrrpd/vrrpd.po
+POFILES=	inetd/inetd.po vrrpd/vrrpd.po
 POFILE=		usr.lib.po
 
 all:=		TARGET= all

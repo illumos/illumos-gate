@@ -21,9 +21,6 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#	This makefile drives the production of the nca driver
-#	kernel module.
-#
 #	intel architecture dependent
 #
 

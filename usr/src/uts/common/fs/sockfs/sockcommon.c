@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2017 Sebastian Wiedenroth
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/types.h>
@@ -47,7 +48,6 @@
 #include <inet/ipclassifier.h>
 #include <fs/sockfs/sockcommon.h>
 #include <fs/sockfs/sockfilter_impl.h>
-#include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/socktpi.h>
 #include <fs/sockfs/sodirect.h>
 #include <inet/ip.h>

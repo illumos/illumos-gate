@@ -23,9 +23,6 @@
 # Use is subject to license terms.
 
 #
-#	This makefile drives the production of the nca driver
-#	kernel module.
-#
 #	sparc architecture dependent
 #
 

@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2022 Garrett D'Amore
 #
 
 include ../Makefile.master
@@ -138,7 +139,6 @@ COMMON_HDRDIRS= common/c2 \
 		common/klm \
 		common/inet \
 		common/inet/ipf/netinet \
-		common/inet/nca \
 		common/inet/sockmods/netpacket \
 		common/io/bpf/net \
 		common/io/fibre-channel/fca/qlc \

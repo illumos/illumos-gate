@@ -19,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2014 Garrett D'Amore <garrett@damore.org>
- *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2022 Garrett D'Amore
+ *
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -160,7 +160,7 @@ typedef	void		*_RESTRICT_KYWD Psocklen_t;
 					/* when doing zero-copy */
 
 struct so_snd_bufinfo {
-	ushort_t	sbi_wroff; 	/* Write offset */
+	ushort_t	sbi_wroff;	/* Write offset */
 	ssize_t		sbi_maxblk;	/* Max size of a single mblk */
 	ssize_t		sbi_maxpsz;	/* Max total size of a mblk chain */
 	ushort_t	sbi_tail;	/* Extra space available at the end */
@@ -299,7 +299,7 @@ struct	linger {
 #define	AF_LINK		25		/* Link-layer interface */
 #define	AF_INET6	26		/* Internet Protocol, Version 6 */
 #define	AF_KEY		27		/* Security Association DB socket */
-#define	AF_NCA		28		/* NCA socket */
+#define	AF_NCA		28		/* NCA socket (obsolete) */
 #define	AF_POLICY	29		/* Security Policy DB socket */
 #define	AF_INET_OFFLOAD	30		/* Sun private; do not use */
 #define	AF_TRILL	31		/* TRILL interface */

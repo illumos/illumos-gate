@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2019, Joyent, Inc.
+# Copyright 2022 Garrett D'Amore
 #
 
 set name=pkg.fmri value=pkg:/developer/debug/mdb@$(PKGVERS)
@@ -55,7 +56,6 @@ file path=kernel/kmdb/$(ARCH64)/mm group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/mpt group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/mpt_sas group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/mr_sas group=sys mode=0555
-file path=kernel/kmdb/$(ARCH64)/nca group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/neti group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/nfs group=sys mode=0555
 $(sparc_ONLY)link path=kernel/kmdb/$(ARCH64)/niumx target=intr
@@ -170,7 +170,6 @@ file path=usr/lib/mdb/kvm/$(ARCH64)/mm.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/mpt.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/mpt_sas.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/mr_sas.so group=sys mode=0555
-file path=usr/lib/mdb/kvm/$(ARCH64)/nca.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/neti.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/nfs.so group=sys mode=0555
 $(sparc_ONLY)link path=usr/lib/mdb/kvm/$(ARCH64)/niumx.so target=intr.so

@@ -21,17 +21,14 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2022 Garrett D'Amore
+#
 # cmd/cmd-inet/etc/init.d/Makefile
 
-PROG4=	ncalogd
-PROG5=	ncakmod
 PPPD=	pppd
-PROG=	$(PROG4) $(PROG5) $(PPPD)
+PROG=	$(PPPD)
 
 include ../../../Makefile.cmd
-
-STARTINET3= $(ROOTETC)/rc2.d/S94ncalogd
-STARTINET4= $(ROOTETC)/rc2.d/S42ncakmod
 
 PPPDK=	K50pppd
 PPPDS=	S47pppd
@@ -53,18 +50,12 @@ $(INITD)/% : % $(INITD)
 	$(INS.file)
 
 ln_PROG : $(ETCINITPROG)
-	@for dir in rc0.d rcS.d rc1.d; do \
-		echo $(LN) $(INITD)/$(PROG4) $(ROOTETC)/$$dir/K34ncalogd; \
-		$(RM) $(ROOTETC)/$$dir/K34ncalogd; \
-		$(LN) $(INITD)/$(PROG4) $(ROOTETC)/$$dir/K34ncalogd; \
-		echo $(LN) $(INITD)/$(PPPD) $(ROOTETC)/$$dir/$(PPPDK); \
-		$(RM) $(ROOTETC)/$$dir/$(PPPDK); \
-		$(LN) $(INITD)/$(PPPD) $(ROOTETC)/$$dir/$(PPPDK); \
-	done
-	-$(RM) $(STARTINET3)
-	$(LN) $(INITD)/$(PROG4) $(STARTINET3)
-	-$(RM) $(STARTINET4)
-	$(LN) $(INITD)/$(PROG5) $(STARTINET4)
+	-$(RM) $(ROOTETC)/rc0.d/$(PPPDK)
+	$(LN) $(INITD)/$(PPPD) $(ROOTETC)/rc0.d/$(PPPDK)
+	-$(RM) $(ROOTETC)/rc1.d/$(PPPDK)
+	$(LN) $(INITD)/$(PPPD) $(ROOTETC)/rc1.d/$(PPPDK)
+	-$(RM) $(ROOTETC)/rcS.d/$(PPPDK)
+	$(LN) $(INITD)/$(PPPD) $(ROOTETC)/rcS.d/$(PPPDK)
 	-$(RM) $(ROOTETC)/rc2.d/$(PPPDS)
 	$(LN) $(INITD)/$(PPPD) $(ROOTETC)/rc2.d/$(PPPDS)
 

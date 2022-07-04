@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1858,13 +1859,14 @@ prt_skp(private_t *pri, int raw, long val)
 	switch (pri->sys_args[0]) {
 	case PF_INET6:
 	case PF_INET:
-	case PF_NCA:	if ((s = ipprotos((int)val)) != NULL) {
-				outstring(pri, s);
-				break;
-			}
-			/* FALLTHROUGH */
-	default:	prt_dec(pri, 0, val);
+		if ((s = ipprotos((int)val)) != NULL) {
+			outstring(pri, s);
 			break;
+		}
+		/* FALLTHROUGH */
+	default:
+		prt_dec(pri, 0, val);
+		break;
 	}
 }
 

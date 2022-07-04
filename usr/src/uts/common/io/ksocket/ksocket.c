@@ -23,6 +23,7 @@
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/file.h>
@@ -56,9 +57,6 @@ ksocket_socket(ksocket_t *ksp, int domain, int type, int protocol, int flags,
 
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
-
-	if (domain == AF_NCA)
-		return (EAFNOSUPPORT);
 
 	ASSERT(flags == KSOCKET_SLEEP || flags == KSOCKET_NOSLEEP);
 	so = socket_create(domain, type, protocol, NULL, NULL, version, flags,

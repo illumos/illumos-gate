@@ -25,6 +25,7 @@
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/types.h>
@@ -69,7 +70,6 @@
 #include <vm/seg_map.h>
 #include <vm/seg_kpm.h>
 
-#include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/sockcommon.h>
 #include <fs/sockfs/sockfilter_impl.h>
 #include <fs/sockfs/socktpi.h>
@@ -81,9 +81,6 @@ int do_useracc = 1;		/* Controlled by setting SO_DEBUG to 4 */
 #endif /* SOCK_TEST */
 
 extern int	xnet_truncate_print;
-
-extern void	nl7c_init(void);
-extern int	sockfs_defer_nl7c_init;
 
 /*
  * Kernel component of socket creation.
@@ -1699,37 +1696,9 @@ sockconf_add_sock(int family, int type, int protocol, char *name)
 	}
 	if (strncmp(buf, "/dev", strlen("/dev")) == 0) {
 		/* For device */
-
-		/*
-		 * Special handling for NCA:
-		 *
-		 * DEV_NCA is never opened even if an application
-		 * requests for AF_NCA. The device opened is instead a
-		 * predefined AF_INET transport (NCA_INET_DEV).
-		 *
-		 * Prior to Volo (PSARC/2007/587) NCA would determine
-		 * the device using a lookup, which worked then because
-		 * all protocols were based on TPI. Since TPI is no
-		 * longer the default, we have to explicitly state
-		 * which device to use.
-		 */
-		if (strcmp(buf, NCA_DEV) == 0) {
-			/* only support entry <28, 2, 0> */
-			if (family != AF_NCA || type != SOCK_STREAM ||
-			    protocol != 0) {
-				kmem_free(buf, MAXPATHLEN);
-				return (EINVAL);
-			}
-
-			pathlen = strlen(NCA_INET_DEV) + 1;
-			kdevpath = kmem_alloc(pathlen, KM_SLEEP);
-			bcopy(NCA_INET_DEV, kdevpath, pathlen);
-			kdevpath[pathlen - 1] = '\0';
-		} else {
-			kdevpath = kmem_alloc(pathlen, KM_SLEEP);
-			bcopy(buf, kdevpath, pathlen);
-			kdevpath[pathlen - 1] = '\0';
-		}
+		kdevpath = kmem_alloc(pathlen, KM_SLEEP);
+		bcopy(buf, kdevpath, pathlen);
+		kdevpath[pathlen - 1] = '\0';
 	} else {
 		/* For socket module */
 		kmodule = kmem_alloc(pathlen, KM_SLEEP);
@@ -1928,11 +1897,6 @@ sockconfig(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 
 	if (secpolicy_net_config(CRED(), B_FALSE) != 0)
 		return (set_errno(EPERM));
-
-	if (sockfs_defer_nl7c_init) {
-		nl7c_init();
-		sockfs_defer_nl7c_init = 0;
-	}
 
 	switch (cmd) {
 	case SOCKCONFIG_ADD_SOCK:

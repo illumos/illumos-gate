@@ -15,6 +15,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2018 Gary Mills
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 Garrett D'Amore <garrett@dmaore.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -109,11 +110,6 @@ _MANFILES=	Intro.5				\
 		mech.5				\
 		mnttab.5			\
 		mpapi.conf.5			\
-		nca.if.5			\
-		ncad_addr.5			\
-		ncakmod.conf.5			\
-		ncalogd.conf.5			\
-		ncaport.conf.5			\
 		ndmp.5				\
 		ndpd.conf.5			\
 		netconfig.5			\
