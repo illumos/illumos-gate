@@ -1935,6 +1935,8 @@ SKD_OBJS = skd.o
 
 NVME_OBJS = nvme.o
 
+PVSCSI_OBJS = pvscsi.o
+
 #
 #	Build up defines and paths.
 #
@@ -2312,4 +2314,3 @@ MLXCX_OBJS +=	mlxcx.o mlxcx_dma.o mlxcx_cmd.o mlxcx_intr.o mlxcx_gld.o \
 #
 ENA_OBJS +=	ena.o ena_admin.o ena_dma.o ena_gld.o ena_hw.o ena_intr.o \
 		ena_stats.o ena_tx.o ena_rx.o
-

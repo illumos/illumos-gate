@@ -329,11 +329,6 @@ VMXNET3S_OBJS =	vmxnet3_main.o \
 		vmxnet3_utils.o
 
 #
-# VMware PVSCSI SCSI Controller
-#
-PVSCSI_OBJS =	pvscsi.o
-
-#
 # Intel Temperature Module
 #
 CORETEMP_OBJS =	coretemp.o
