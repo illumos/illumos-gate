@@ -48,7 +48,6 @@ dir  path=opt/onbld/bin
 dir  path=opt/onbld/bin/$(ARCH)
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/btxld mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/chk4ubin mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/cpcgen mode=0555
 file path=opt/onbld/bin/$(ARCH)/cscope-fast mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfconvert mode=0555
@@ -62,8 +61,6 @@ link path=opt/onbld/bin/$(ARCH)/dmake target=make
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/elfextract mode=0555
 file path=opt/onbld/bin/$(ARCH)/find_elf mode=0555
 file path=opt/onbld/bin/$(ARCH)/findunref mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth_preload.so.1 mode=0555
 file path=opt/onbld/bin/$(ARCH)/install mode=0555
 hardlink path=opt/onbld/bin/$(ARCH)/install.bin target=./install
 file path=opt/onbld/bin/$(ARCH)/lintdump mode=0555
@@ -74,10 +71,7 @@ file path=opt/onbld/bin/$(ARCH)/ndrgen mode=0555
 file path=opt/onbld/bin/$(ARCH)/ndrgen1 mode=0555
 file path=opt/onbld/bin/$(ARCH)/protocmp mode=0555
 file path=opt/onbld/bin/$(ARCH)/protolist mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/stabs mode=0555
 file path=opt/onbld/bin/$(ARCH)/tic mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize.exe mode=0555
 file path=opt/onbld/bin/$(ARCH)/zic mode=0555
 file path=opt/onbld/bin/Install mode=0555
 file path=opt/onbld/bin/bldenv mode=0555

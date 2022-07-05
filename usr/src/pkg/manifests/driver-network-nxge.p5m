@@ -31,50 +31,23 @@
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/nxge@$(PKGVERS)
 set name=pkg.summary value="Sun NIU leaf driver"
-$(sparc_ONLY)set name=pkg.description value="Sun NIU 10Gb/1Gb driver"
-$(i386_ONLY)set name=pkg.description value="Sun NIU 10Gb/1Gb leaf driver"
+set name=pkg.description value="Sun NIU 10Gb/1Gb leaf driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=$(ARCH)
-$(i386_ONLY)dir path=kernel group=sys
-$(i386_ONLY)dir path=kernel/drv group=sys
-$(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
-$(i386_ONLY)file path=kernel/drv/$(ARCH64)/nxge group=sys
-$(i386_ONLY)file path=kernel/drv/nxge.conf group=sys \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/nxge group=sys
+file path=kernel/drv/nxge.conf group=sys \
     original_name=SUNWnxge:kernel/drv/nxge.conf preserve=renamenew
-$(sparc_ONLY)dir path=platform group=sys
-$(sparc_ONLY)dir path=platform/sun4u group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/nxge group=sys
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/nxge.conf group=sys \
-    original_name=SUNWnxge:platform/sun4u/kernel/drv/nxge.conf \
-    preserve=renamenew
-$(sparc_ONLY)dir path=platform/sun4v group=sys
-$(sparc_ONLY)dir path=platform/sun4v/kernel group=sys
-$(sparc_ONLY)dir path=platform/sun4v/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/sun4v/kernel/drv/$(ARCH64) group=sys
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/nxge group=sys
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/nxge.conf group=sys \
-    original_name=SUNWnxge:platform/sun4v/kernel/drv/nxge.conf \
-    preserve=renamenew
 dir  path=usr/share/man
 dir  path=usr/share/man/man4d
 file path=usr/share/man/man4d/nxge.4d
-$(sparc_ONLY)driver name=nxge perms="* 0600 root sys" \
-    alias=SUNW,niusl \
-    alias=SUNW,niusl-kt \
-    alias=SUNW,rock-pciex108e,abcd \
-    alias=pciex108e,abcd
-$(i386_ONLY)driver name=nxge perms="* 0600 root sys" \
+driver name=nxge perms="* 0600 root sys" \
     alias=SUNW,niusl \
     alias=pciex108e,abcd
-$(i386_ONLY)legacy pkg=SUNWnxge desc="Sun NIU 10Gb/1Gb leaf driver" \
+legacy pkg=SUNWnxge desc="Sun NIU 10Gb/1Gb leaf driver" \
     name="Sun NIU leaf driver"
-$(sparc_ONLY)legacy pkg=SUNWnxge.u arch=$(ARCH).sun4u \
-    desc="Sun NIU 10Gb/1Gb driver" name="Sun NIU leaf driver"
-$(sparc_ONLY)legacy pkg=SUNWnxge.v arch=$(ARCH).sun4v \
-    desc="Sun NIU leaf driver" name="Sun NIU leaf driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

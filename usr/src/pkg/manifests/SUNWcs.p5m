@@ -260,16 +260,7 @@ file path=etc/svc/profile/ns_files.xml group=sys mode=0444
 file path=etc/svc/profile/ns_ldap.xml group=sys mode=0444
 file path=etc/svc/profile/ns_nis.xml group=sys mode=0444
 file path=etc/svc/profile/ns_none.xml group=sys mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,SPARC-Enterprise.xml \
-    group=sys mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-880.xml \
-    group=sys mode=0444
-$(sparc_ONLY)hardlink path=etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml \
-    target=./platform_SUNW,Sun-Fire-880.xml
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire.xml group=sys \
-    mode=0444
 file path=etc/svc/profile/platform_none.xml group=sys mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_sun4v.xml group=sys mode=0444
 dir  path=etc/svc/profile/site group=sys
 dir  path=etc/svc/volatile group=sys
 link path=etc/swap target=../usr/sbin/swap
@@ -370,7 +361,6 @@ dir  path=lib/svc/manifest/network/shares group=sys
 file path=lib/svc/manifest/network/shares/group.xml group=sys mode=0444
 file path=lib/svc/manifest/network/shares/reparsed.xml group=sys mode=0444
 dir  path=lib/svc/manifest/platform group=sys
-$(sparc_ONLY)dir path=lib/svc/manifest/platform/sun4u group=sys
 dir  path=lib/svc/manifest/site group=sys
 dir  path=lib/svc/manifest/system group=sys
 file path=lib/svc/manifest/system/auditd.xml group=sys mode=0444
@@ -1181,7 +1171,6 @@ hardlink path=usr/lib/inet/in.iked target=../../../usr/lib/isaexec
 file path=usr/lib/inet/inetd mode=0555
 file path=usr/lib/intrd mode=0555
 file path=usr/lib/isaexec mode=0555
-$(sparc_ONLY)file path=usr/lib/ld.so
 link path=usr/lib/ld.so.1 target=../../lib/ld.so.1
 file path=usr/lib/libshare.so.1
 dir  path=usr/lib/locale
@@ -1438,7 +1427,6 @@ hardlink path=usr/sbin/poweroff target=./halt
 file path=usr/sbin/praudit mode=0555
 file path=usr/sbin/prtconf group=sys mode=2555
 $(i386_ONLY)file path=usr/sbin/prtdiag group=sys mode=2755
-$(sparc_ONLY)hardlink path=usr/sbin/prtdiag target=../../usr/lib/platexec
 file path=usr/sbin/prtvtoc group=sys mode=0555
 file path=usr/sbin/psradm group=sys mode=0555
 file path=usr/sbin/psrinfo group=sys mode=0555
@@ -1508,7 +1496,6 @@ file path=usr/sbin/update_drv group=sys mode=0555
 file path=usr/sbin/useradd group=sys mode=0555
 file path=usr/sbin/userdel group=sys mode=0555
 file path=usr/sbin/usermod group=sys mode=0555
-$(sparc_ONLY)file path=usr/sbin/virtinfo mode=0555
 file path=usr/sbin/volcopy mode=0555
 file path=usr/sbin/wall group=tty mode=2555
 file path=usr/sbin/whodo mode=4555
@@ -1610,8 +1597,6 @@ dir  path=var/svc/manifest/network/rpc group=sys
 dir  path=var/svc/manifest/network/security group=sys
 dir  path=var/svc/manifest/network/shares group=sys
 dir  path=var/svc/manifest/platform group=sys
-$(sparc_ONLY)dir path=var/svc/manifest/platform/sun4u group=sys
-$(sparc_ONLY)dir path=var/svc/manifest/platform/sun4v group=sys
 dir  path=var/svc/manifest/site group=sys
 dir  path=var/svc/manifest/system group=sys
 dir  path=var/svc/manifest/system/device group=sys

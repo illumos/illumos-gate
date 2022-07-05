@@ -136,7 +136,7 @@ Incremental Builds
    packages will simply be added to the existing repository.
 
    To do cross-platform packaging, prefix your target with (for
-   example) "sparc/", as in "dmake sparc/install".  Note that we
+   example) "i386/", as in "dmake i386/install".  Note that we
    currently pull some license files directly from a built source
    tree, so if you do this in a workspace that had proto area copied
    in via nightly -U, then you'll need to set $SRC to point to the
@@ -213,7 +213,6 @@ We supply a set of commonly-used macros for use in package manifests.
 These are the PKGMOG_DEFINES in usr/src/pkg/Makefile.
 
 	$(i386_ONLY)
-	$(sparc_ONLY)
 	$(ARCH)
 	$(ARCH32)
 	$(ARCH64)

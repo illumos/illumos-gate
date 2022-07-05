@@ -28,11 +28,7 @@ set name=pkg.fmri value=pkg:/system/boot/real-mode@$(PKGVERS)
 set name=pkg.summary value="Realmode Modules"
 set name=pkg.description value="Realmode Modules"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
-# SUNWrmod doesn't deliver anything for sparc, but SUNWrmodu was
-# renamed for i386, and we can't obsolete one variant and rename
-# another, so SUNWrmod continues to be delivered as sparc, but
-# empty to satisfy the rename.
-set name=variant.arch value=$(ARCH)
+set name=variant.arch value=i386
 $(i386_ONLY)dir path=boot group=sys
 $(i386_ONLY)dir path=boot/solaris group=sys
 $(i386_ONLY)hardlink path=boot/solaris.xpm target=splashimage.xpm

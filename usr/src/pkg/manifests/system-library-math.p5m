@@ -30,16 +30,6 @@ file path=lib/$(ARCH64)/libm.so.1
 file path=lib/$(ARCH64)/libm.so.2
 link path=lib/$(ARCH64)/libmvec.so target=libmvec.so.1
 file path=lib/$(ARCH64)/libmvec.so.1
-$(sparc_ONLY)dir path=lib/cpu
-$(sparc_ONLY)dir path=lib/cpu/sparcv8plus+vis
-$(sparc_ONLY)file path=lib/cpu/sparcv8plus+vis/libmvec_isa.so.1
-$(sparc_ONLY)dir path=lib/cpu/sparcv9+vis
-$(sparc_ONLY)dir path=lib/cpu/sparcv9+vis/$(ARCH64)
-$(sparc_ONLY)file path=lib/cpu/sparcv9+vis/$(ARCH64)/libmvec_isa.so.1
-$(sparc_ONLY)dir path=lib/cpu/sparcv9+vis2
-$(sparc_ONLY)dir path=lib/cpu/sparcv9+vis2/$(ARCH64)
-$(sparc_ONLY)file path=lib/cpu/sparcv9+vis2/$(ARCH64)/libmvec_isa.so.1
-$(sparc_ONLY)file path=lib/cpu/sparcv9+vis2/libmvec_isa.so.1
 link path=lib/libm.so target=libm.so.2
 file path=lib/libm.so.1
 file path=lib/libm.so.2

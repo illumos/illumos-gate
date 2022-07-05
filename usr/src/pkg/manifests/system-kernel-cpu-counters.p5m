@@ -45,34 +45,8 @@ $(i386_ONLY)dir path=platform/i86pc/kernel/sys group=sys
 $(i386_ONLY)dir path=platform/i86pc/kernel/sys/$(ARCH64) group=sys
 $(i386_ONLY)hardlink path=platform/i86pc/kernel/sys/$(ARCH64)/cpc \
     target=../../drv/$(ARCH64)/cpc
-$(sparc_ONLY)dir path=platform/sun4u group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/cpc group=sys
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/cpc.conf group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/sys group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/sys/$(ARCH64) group=sys
-$(sparc_ONLY)hardlink path=platform/sun4u/kernel/sys/$(ARCH64)/cpc \
-    target=../../drv/$(ARCH64)/cpc
-$(sparc_ONLY)dir path=platform/sun4v group=sys
-$(sparc_ONLY)dir path=platform/sun4v/kernel group=sys
-$(sparc_ONLY)dir path=platform/sun4v/kernel/drv group=sys
-$(sparc_ONLY)dir path=platform/sun4v/kernel/drv/$(ARCH64) group=sys
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/cpc group=sys
-$(sparc_ONLY)file path=platform/sun4v/kernel/drv/cpc.conf group=sys
-$(sparc_ONLY)dir path=platform/sun4v/kernel/sys group=sys
-$(sparc_ONLY)dir path=platform/sun4v/kernel/sys/$(ARCH64) group=sys
-$(sparc_ONLY)hardlink path=platform/sun4v/kernel/sys/$(ARCH64)/cpc \
-    target=../../drv/$(ARCH64)/cpc
 driver name=cpc perms="shared 0666 root sys"
 $(i386_ONLY)legacy pkg=SUNWcpc.i arch=$(ARCH).i86pc \
-    desc="Kernel support for CPU Performance Counters" \
-    name="CPU Performance Counter driver"
-$(sparc_ONLY)legacy pkg=SUNWcpc.u arch=$(ARCH).sun4u \
-    desc="Kernel support for CPU Performance Counters" \
-    name="CPU Performance Counter driver"
-$(sparc_ONLY)legacy pkg=SUNWcpc.v arch=$(ARCH).sun4v \
     desc="Kernel support for CPU Performance Counters" \
     name="CPU Performance Counter driver"
 license cr_Sun license=cr_Sun

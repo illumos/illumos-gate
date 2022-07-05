@@ -45,10 +45,6 @@ dir  path=usr/include/sys
 dir  path=usr/kernel group=sys
 dir  path=usr/kernel/pcbe group=sys
 dir  path=usr/kernel/pcbe/$(ARCH64) group=sys
-$(sparc_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.23 target=pcbe.62
-$(sparc_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.4.6 group=sys mode=0755
-$(sparc_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.4.7 target=pcbe.4.6
-$(sparc_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.62 group=sys mode=0755
 $(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.AuthenticAMD group=sys \
     mode=0755
 $(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.15 group=sys \
@@ -278,5 +274,3 @@ $(i386_ONLY)license usr/src/data/perfmon/THIRDPARTYLICENSE \
     license=usr/src/data/perfmon/THIRDPARTYLICENSE
 $(i386_ONLY)license usr/src/uts/intel/pcbe/THIRDPARTYLICENSE \
     license=usr/src/uts/intel/pcbe/THIRDPARTYLICENSE
-$(sparc_ONLY)license usr/src/uts/sun4u/pcbe/THIRDPARTYLICENSE \
-    license=usr/src/uts/sun4u/pcbe/THIRDPARTYLICENSE

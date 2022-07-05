@@ -38,15 +38,10 @@ set name=variant.arch value=$(ARCH)
 dir  path=kernel group=sys
 dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
-$(sparc_ONLY)file path=kernel/drv/$(ARCH64)/fas group=sys
 file path=kernel/drv/$(ARCH64)/hme group=sys
 dir  path=usr/share/man
 dir  path=usr/share/man/man4d
-$(sparc_ONLY)file path=usr/share/man/man4d/fas.4d
 file path=usr/share/man/man4d/hme.4d
-$(sparc_ONLY)driver name=fas perms="devctl 0600 root sys" class=scsi \
-    alias=SUNW,fas
-$(sparc_ONLY)driver name=hme alias=SUNW,hme
 $(i386_ONLY)driver name=hme alias=pci108e,1001
 legacy pkg=SUNWhmd desc="SunSwift Adapter Drivers" \
     name="SunSwift Adapter Drivers"

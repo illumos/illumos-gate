@@ -153,9 +153,7 @@ PKGVERS= $(PKGVERS_COMPONENT),$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 # packaging, we need both values.
 #
 i386_ARCH32= i86
-sparc_ARCH32= sparcv7
 i386_ARCH64= amd64
-sparc_ARCH64= sparcv9
 
 #
 # macros and transforms needed by pkgmogrify
@@ -178,7 +176,6 @@ $(JAVA_8_ONLY)JAVA_11_ONLY=$(POUND_SIGN)
 
 PKGMOG_DEFINES= \
 	i386_ONLY=$(POUND_SIGN) \
-	sparc_ONLY=$(POUND_SIGN) \
 	$(PKGMACH)_ONLY= \
 	ARCH=$(PKGMACH) \
 	ARCH32=$($(PKGMACH)_ARCH32) \
@@ -207,11 +204,6 @@ PKGDEP_TOKENS_i386= \
 	'PLATFORM=i86xpv' \
 	'ISALIST=amd64' \
 	'ISALIST=i386'
-PKGDEP_TOKENS_sparc= \
-	'PLATFORM=sun4u' \
-	'PLATFORM=sun4v' \
-	'ISALIST=sparcv9' \
-	'ISALIST=sparc'
 PKGDEP_TOKENS= $(PKGDEP_TOKENS_$(PKGMACH))
 
 #
@@ -757,9 +749,9 @@ gendeps: $(PDIR)/gendeps
 # Since the most common use case for this is "install," the architecture
 # specific install targets have been further abbreviated to elide "/install."
 #
-i386/% sparc/%:
+i386/%:
 	$(MAKE) -e $(@F) PKGMACH=$(@D) SUPPRESSPKGDEP=$(SUPPRESSPKGDEP)
 
-i386 sparc: $$(@)/install
+i386: $$(@)/install
 
 FRC:

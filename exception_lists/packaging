@@ -115,7 +115,6 @@ usr/include/ipadm_ndpd.h
 usr/include/libipadm.h
 lib/libipadm.so
 lib/amd64/libipadm.so		i386
-lib/sparcv9/libipadm.so		sparc
 #
 # Private libsocket header file
 #
@@ -129,14 +128,11 @@ usr/include/errfp.h
 usr/include/ikedoor.h
 usr/include/ipsec_util.h
 usr/lib/amd64/libike.so			i386
-usr/lib/sparcv9/libike.so		sparc
 usr/lib/libipsecutil.so
 usr/lib/amd64/libipsecutil.so		i386
-usr/lib/sparcv9/libipsecutil.so		sparc
 usr/lib/llib-like
 usr/lib/llib-like.ln
 usr/lib/amd64/llib-like.ln		i386
-usr/lib/sparcv9/llib-like.ln		sparc
 #
 usr/include/inet/ip_impl.h
 usr/include/inet/ip_ndp.h
@@ -182,7 +178,6 @@ usr/include/raidcfg_spi.h
 usr/include/raidcfg.h
 usr/lib/libraidcfg.so
 usr/lib/amd64/libraidcfg.so		i386
-usr/lib/sparcv9/libraidcfg.so		sparc
 #
 # This file is used for private communication between mdb, drv/kmdb, and
 # misc/kmdb.  The interfaces described herein are not intended for customer
@@ -197,10 +192,8 @@ usr/include/sys/kmdb.h
 #
 lib/libdhcpagent.so
 lib/amd64/libdhcpagent.so		i386
-lib/sparcv9/libdhcpagent.so		sparc
 lib/libdhcputil.so
 lib/amd64/libdhcputil.so		i386
-lib/sparcv9/libdhcputil.so		sparc
 usr/include/dhcp_hostconf.h
 usr/include/dhcp_impl.h
 usr/include/dhcp_inittab.h
@@ -211,10 +204,8 @@ usr/include/dhcpagent_util.h
 usr/include/dhcpmsg.h
 usr/lib/libdhcpagent.so
 usr/lib/amd64/libdhcpagent.so		i386
-usr/lib/sparcv9/libdhcpagent.so		sparc
 usr/lib/libdhcputil.so
 usr/lib/amd64/libdhcputil.so		i386
-usr/lib/sparcv9/libdhcputil.so		sparc
 #
 # Don't ship header files private to libipmp and in.mpathd
 #
@@ -233,13 +224,11 @@ usr/lib/libinetsvc.so
 #
 lib/libinetutil.so
 lib/amd64/libinetutil.so		i386
-lib/sparcv9/libinetutil.so		sparc
 usr/include/libinetutil.h
 usr/include/netinet/inetutil.h
 usr/include/ofmt.h
 usr/lib/libinetutil.so
 usr/lib/amd64/libinetutil.so		i386
-usr/lib/sparcv9/libinetutil.so		sparc
 #
 # Miscellaneous kernel interfaces or kernel<->user interfaces that are
 # consolidation private and we do not want to export at this time.
@@ -263,7 +252,6 @@ usr/include/librcm_impl.h
 # MDB deliverables that are not yet public
 #
 usr/lib/mdb/proc/mdb_test.so
-usr/lib/mdb/proc/sparcv9/mdb_test.so	sparc
 #
 # these are "removed" from the source product build because the only
 # packages that currently deliver them are removed.
@@ -277,15 +265,8 @@ etc/sfw
 usr/include/gssapi/gssapi_krb5.h
 usr/lib/gss/libmech_krb5.so
 usr/lib/amd64/gss/libmech_krb5.so	i386
-usr/lib/sparcv9/gss/libmech_krb5.so	sparc
 usr/lib/libmech_krb5.so
 usr/lib/amd64/libmech_krb5.so		i386
-usr/lib/sparcv9/libmech_krb5.so		sparc
-#
-# Entries for headers from efcode project which user does not need to see
-#
-usr/platform/sun4u/include/sys/fc_plat.h			sparc
-usr/platform/sun4u/include/sys/fcode.h				sparc
 #
 # Private net80211 headers
 #
@@ -329,7 +310,6 @@ usr/include/libcontract_priv.h
 usr/include/librestart_priv.h
 usr/include/librestart.h
 usr/lib/librestart.so
-usr/lib/sparcv9/librestart.so					sparc
 lib/svc/manifest/platform/sun4u					i386
 lib/svc/manifest/platform/sun4v					i386
 var/svc/manifest/platform/sun4u					i386
@@ -345,15 +325,6 @@ etc/svc/profile/platform_SUNW,Sun-Fire.xml			i386
 lib/libuutil.so
 usr/include/libuutil_impl.h
 usr/lib/libuutil.so
-usr/lib/sparcv9/libuutil.so		sparc
-#
-# Even though all the objects built under usr/src/stand are later glommed
-# together into a couple of second-stage boot loaders, we dump the static
-# archives and lint libraries into $(ROOT)/stand for intermediate use
-# (e.g., for lint, linking the second-stage boot loaders, ...).  Since
-# these are merely intermediate objects, they do not need to be packaged.
-#
-stand					sparc
 #
 # Private KCF header files
 #
@@ -368,11 +339,9 @@ usr/include/sys/crypto/sched_impl.h
 #
 lib/libcmdutils.so
 lib/amd64/libcmdutils.so		i386
-lib/sparcv9/libcmdutils.so		sparc
 usr/include/libcmdutils.h
 usr/lib/libcmdutils.so
 usr/lib/amd64/libcmdutils.so		i386
-usr/lib/sparcv9/libcmdutils.so		sparc
 #
 # Private librename
 #
@@ -409,21 +378,12 @@ usr/include/aclutils.h
 # USB skeleton driver stays in sync with the rest of USB but doesn't ship.
 #
 kernel/drv/amd64/usbskel	i386
-kernel/drv/sparcv9/usbskel	sparc
 kernel/drv/usbskel.conf
 #
 # Consolidation and Sun private libdevid interfaces
 # Public libdevid interfaces provided by devid.h
 #
 usr/include/sys/libdevid.h
-#
-# The following files are installed in the proto area by the build of
-# mdesc driver in sun4v. These header files are used on in the build
-# and do not need to be shipped to customers.
-#
-usr/include/sys/mdesc.h					sparc
-usr/include/sys/mdesc_impl.h				sparc
-usr/platform/sun4v/include/sys/mach_descrip.h		sparc
 #
 # ZFS JNI headers
 #
@@ -447,7 +407,6 @@ usr/include/sys/scsi/adapters/mpapi_scsi_vhci.h
 #
 usr/lib/libstanddisasm.so
 usr/lib/amd64/libstanddisasm.so		i386
-usr/lib/sparcv9/libstanddisasm.so	sparc
 #
 # TSol: tsol doesn't ship lint source, and tsnet isn't for customers at all.
 #
@@ -462,30 +421,21 @@ usr/include/nss.h
 # libast
 usr/lib/libast.so
 usr/lib/amd64/libast.so			i386
-usr/lib/sparcv9/libast.so		sparc
 # libdll
 usr/lib/libdll.so
 usr/lib/amd64/libdll.so			i386
-usr/lib/sparcv9/libdll.so		sparc
 # libpp (a helper library needed by AST's msgcc)
 usr/lib/libpp.so
 usr/lib/locale/C/LC_MESSAGES/libpp
 # libcmd
 usr/lib/libcmd.so
 usr/lib/amd64/libcmd.so			i386
-usr/lib/sparcv9/libcmd.so		sparc
 # libshell
 usr/lib/libshell.so
 usr/lib/amd64/libshell.so		i386
-usr/lib/sparcv9/libshell.so		sparc
 # libsum
 usr/lib/libsum.so
 usr/lib/amd64/libsum.so			i386
-usr/lib/sparcv9/libsum.so		sparc
-#
-# This file is used in ON to build DSCP clients.  It is not for customers.
-#
-usr/include/libdscp.h		sparc
 #
 # These files are used by the iSCSI Target and the iSCSI Initiator
 #
@@ -506,42 +456,17 @@ usr/include/sys/iscsit/radius_protocol.h
 #
 usr/lib/libshare.so
 usr/lib/amd64/libshare.so		i386
-usr/lib/sparcv9/libshare.so		sparc
 usr/lib/fs/autofs/libshare_autofs.so
 usr/lib/fs/autofs/amd64/libshare_autofs.so		i386
-usr/lib/fs/autofs/sparcv9/libshare_autofs.so		sparc
 usr/lib/fs/nfs/libshare_nfs.so
 usr/lib/fs/nfs/amd64/libshare_nfs.so		i386
-usr/lib/fs/nfs/sparcv9/libshare_nfs.so		sparc
 usr/lib/fs/nfs/test_svc_tp_create
 usr/lib/fs/smb/libshare_smb.so
 usr/lib/fs/smb/amd64/libshare_smb.so		i386
-usr/lib/fs/smb/sparcv9/libshare_smb.so		sparc
 usr/lib/fs/smbfs/libshare_smbfs.so
 usr/lib/fs/smbfs/amd64/libshare_smbfs.so	i386
-usr/lib/fs/smbfs/sparcv9/libshare_smbfs.so	sparc
 usr/include/libshare_impl.h
 usr/include/scfutil.h
-#
-# These files are installed in the proto area by the build of libpri for
-# the benefit of the builds of FMA libldom, Zeus, picld plugins, and/or
-# other libpri consumers. However, the libpri interfaces are private to
-# Sun (Consolidation Private) and not intended for customer use. So these
-# files (the symlink and the lint library) are excluded from packaging.
-#
-usr/lib/libpri.so		sparc
-usr/lib/sparcv9/libpri.so	sparc
-#
-# These files are installed in the proto area by the build of libds for
-# the benefit of the builds of sun4v IO FMA and/or other libds
-# consumers.  However, the libds interfaces are private to Sun
-# (Consolidation Private) and not intended for customer use. So these
-# files (the symlink and the lint library) are excluded from packaging.
-#
-usr/lib/libds.so			sparc
-usr/lib/sparcv9/libds.so		sparc
-usr/platform/sun4v/include/sys/libds.h	sparc
-usr/platform/sun4v/include/sys/vlds.h	sparc
 #
 # Private/Internal u8_textprep header file. Do not ship.
 #
@@ -604,41 +529,30 @@ usr/include/smbsrv
 # Private/Internal files for libfakekernel. Do not ship.
 #
 lib/amd64/libfakekernel.so			i386
-lib/sparcv9/libfakekernel.so			sparc
 lib/libfakekernel.so
 usr/include/libfakekernel
 usr/lib/libfakekernel.so
 usr/lib/amd64/libfakekernel.so			i386
-usr/lib/sparcv9/libfakekernel.so		sparc
 #
 # Private/Internal libraries of smbsrv. Do not ship.
 #
 usr/lib/mdb/proc/libfksmbsrv.so
 usr/lib/mdb/proc/amd64/libfksmbsrv.so		i386
-usr/lib/mdb/proc/sparcv9/libfksmbsrv.so		sparc
 usr/lib/mdb/proc/amd64/libmlsvc.so		i386
-usr/lib/mdb/proc/sparcv9/libmlsvc.so		sparc
 usr/lib/smbsrv/bind-helper
 usr/lib/smbsrv/fksmbd
 usr/lib/smbsrv/libfksmbsrv.so
 usr/lib/smbsrv/libfksmbsrv.so.1
 usr/lib/smbsrv/amd64/libfksmbsrv.so		i386
 usr/lib/smbsrv/amd64/libfksmbsrv.so.1		i386
-usr/lib/smbsrv/sparcv9/libfksmbsrv.so		sparc
-usr/lib/smbsrv/sparcv9/libfksmbsrv.so.1		sparc
 usr/lib/smbsrv/libmlsvc.so
 usr/lib/smbsrv/amd64/libmlsvc.so		i386
 usr/lib/smbsrv/amd64/libmlsvc.so.1		i386
-usr/lib/smbsrv/sparcv9/libmlsvc.so		sparc
-usr/lib/smbsrv/sparcv9/libmlsvc.so.1		sparc
 usr/lib/smbsrv/libsmb.so
 usr/lib/smbsrv/amd64/libsmb.so			i386
-usr/lib/smbsrv/sparcv9/libsmb.so		sparc
 usr/lib/smbsrv/libsmbns.so
 usr/lib/smbsrv/amd64/libsmbns.so		i386
 usr/lib/smbsrv/amd64/libsmbns.so.1		i386
-usr/lib/smbsrv/sparcv9/libsmbns.so		sparc
-usr/lib/smbsrv/sparcv9/libsmbns.so.1		sparc
 usr/lib/smbsrv/nvlprint
 usr/lib/smbsrv/test-msgbuf
 usr/lib/smbsrv/testoplock
@@ -648,8 +562,6 @@ usr/lib/smbsrv/testoplock
 #
 usr/lib/reparse/amd64/libreparse_smb.so		i386
 usr/lib/reparse/amd64/libreparse_smb.so.1	i386
-usr/lib/reparse/sparcv9/libreparse_smb.so	sparc
-usr/lib/reparse/sparcv9/libreparse_smb.so.1	sparc
 #
 # Private dirent, extended to include flags, for use by SMB server
 #
@@ -676,15 +588,12 @@ usr/include/libmlrpc
 usr/lib/libmlrpc.so
 usr/lib/amd64/libmlrpc.so		i386
 usr/lib/amd64/libmlrpc.so.2		i386
-usr/lib/sparcv9/libmlrpc.so		sparc
-usr/lib/sparcv9/libmlrpc.so.2		sparc
 #
 # libsmbfs is private (SMB client and server)
 #
 usr/include/netsmb
 usr/lib/libsmbfs.so
 usr/lib/amd64/libsmbfs.so		i386
-usr/lib/sparcv9/libsmbfs.so		sparc
 #
 # debug & test program for smbfs (private)
 #
@@ -694,10 +603,7 @@ usr/lib/mdb/proc/libfknsmb.so
 usr/lib/mdb/proc/libfksmbfs.so
 usr/lib/mdb/proc/amd64/libfknsmb.so	i386
 usr/lib/mdb/proc/amd64/libfksmbfs.so	i386
-usr/lib/mdb/proc/sparcv9/libfknsmb.so	sparc
-usr/lib/mdb/proc/sparcv9/libfksmbfs.so	sparc
 usr/lib/smbfs/amd64			i386
-usr/lib/smbfs/sparcv9			sparc
 usr/lib/smbfs/fksmbcl
 usr/lib/smbfs/libfknsmb.so
 usr/lib/smbfs/libfknsmb.so.1
@@ -706,23 +612,9 @@ usr/lib/smbfs/libfksmbfs.so.1
 #
 # FC related files
 kernel/kmdb/amd64/fcip		i386
-kernel/kmdb/sparcv9/fcip	sparc
 kernel/kmdb/amd64/fcp		i386
-kernel/kmdb/sparcv9/fcp		sparc
 kernel/kmdb/amd64/fctl		i386
-kernel/kmdb/sparcv9/fctl	sparc
 kernel/kmdb/amd64/qlc		i386
-kernel/kmdb/sparcv9/qlc		sparc
-usr/include/a_state.h		sparc
-usr/include/a5k.h		sparc
-usr/include/exec.h		sparc
-usr/include/g_scsi.h		sparc
-usr/include/g_state.h		sparc
-usr/include/gfc.h		sparc
-usr/include/l_common.h		sparc
-usr/include/l_error.h		sparc
-usr/include/rom.h		sparc
-usr/include/stgcom.h		sparc
 usr/include/sys/fibre-channel
 #
 # These files are used by the iSCSI initiator only.
@@ -771,26 +663,19 @@ usr/include/nvfru.h
 usr/include/libvrrpadm.h
 usr/lib/libvrrpadm.so
 usr/lib/amd64/libvrrpadm.so		i386
-usr/lib/sparcv9/libvrrpadm.so		sparc
 #
 # This is only used during the -t tools build
 #
 opt/onbld/bin/i386/mandoc	i386
-opt/onbld/bin/sparc/mandoc	sparc
 opt/onbld/bin/i386/geniconvtbl	i386
-opt/onbld/bin/sparc/geniconvtbl	sparc
 opt/onbld/bin/i386/makesoftcore	i386
-opt/onbld/bin/sparc/makesoftcore	sparc
 opt/onbld/bin/i386/rpcgen	i386
-opt/onbld/bin/sparc/rpcgen	sparc
 opt/onbld/bin/i386/vtfontcvt	i386
-opt/onbld/bin/sparc/vtfontcvt	sparc
 
 #
 # Private libdwarf
 #
 opt/onbld/lib/i386/libdwarf.so	i386
-opt/onbld/lib/sparc/libdwarf.so	sparc
 
 #
 # Private socket filter API
@@ -807,11 +692,6 @@ licenses
 # Libbe is private
 #
 usr/include/libbe_priv.h
-#
-# ipmi is at present only useful on i386, but for historical reasons is
-# delivered on SPARC and used by the build.
-#
-usr/include/sys/ipmi.h	sparc
 
 #
 # libsaveargs is private
@@ -825,7 +705,6 @@ usr/lib/amd64/libstandsaveargs.so	i386
 #
 usr/include/pcidb.h
 usr/lib/amd64/libpcidb.so		i386
-usr/lib/sparcv9/libpcidb.so		sparc
 usr/lib/libpcidb.so
 
 #
@@ -842,7 +721,6 @@ usr/bin/test-getdc
 #
 usr/include/ficllocal.h
 usr/lib/amd64/libficl-sys.so		i386
-usr/lib/sparcv9/libficl-sys.so		sparc
 usr/lib/libficl-sys.so
 
 #
@@ -850,7 +728,6 @@ usr/lib/libficl-sys.so
 #
 usr/include/libsff.h
 usr/lib/amd64/libsff.so			i386
-usr/lib/sparcv9/libsff.so		sparc
 usr/lib/libsff.so
 
 #
@@ -869,24 +746,20 @@ usr/lib/libppt.so			i386
 #
 usr/include/libcustr.h
 lib/amd64/libcustr.so		i386
-lib/sparcv9/libcustr.so		sparc
 lib/libcustr.so
 
 #
 # smatch is delivered and used only with the source tree
 #
 opt/onbld/bin/i386/smatch	i386
-opt/onbld/bin/sparc/smatch	sparc
 opt/onbld/share/smatch
 
 #
 # libdwarf is private for the moment
 #
 lib/amd64/libdwarf.so			i386
-lib/sparcv9/libdwarf.so			sparc
 lib/libdwarf.so
 usr/lib/amd64/libdwarf.so		i386
-usr/lib/sparcv9/libdwarf.so		sparc
 usr/lib/libdwarf.so
 
 #
@@ -906,30 +779,21 @@ usr/bin/ctfmerge
 #
 usr/include/libjedec.h
 usr/lib/amd64/libjedec.so	i386
-usr/lib/sparcv9/libjedec.so	sparc
 usr/lib/libjedec.so
 
 #
 # the tools copy of the link-editor is not delivered
 #
 opt/onbld/bin/amd64			i386
-opt/onbld/bin/sparcv9			sparc
 # The directory exclusions above cover bin/.../ld, should we ever not exclude
 # those directories, ld must be added here
 opt/onbld/bin/i386/sgsmsg		i386
-opt/onbld/bin/sparc/sgsmsg		sparc
 opt/onbld/lib/i386/64/libelf.so		i386
 opt/onbld/lib/i386/64/libelf.so.1	i386
 opt/onbld/lib/i386/64/libld.so		i386
 opt/onbld/lib/i386/64/libld.so.4	i386
 opt/onbld/lib/i386/64/liblddbg.so	i386
 opt/onbld/lib/i386/64/liblddbg.so.4	i386
-opt/onbld/lib/sparc/64/libelf.so	sparc
-opt/onbld/lib/sparc/64/libelf.so.1	sparc
-opt/onbld/lib/sparc/64/libld.so		sparc
-opt/onbld/lib/sparc/64/libld.so.4	sparc
-opt/onbld/lib/sparc/64/liblddbg.so	sparc
-opt/onbld/lib/sparc/64/liblddbg.so.4	sparc
 opt/onbld/man/man1onbld/sgsmsg.1onbld
 
 #
