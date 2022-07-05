@@ -1226,7 +1226,6 @@ smb_node_alloc(
     uint32_t	hashkey)
 {
 	smb_node_t	*node;
-	vnode_t		*root_vp;
 
 	node = kmem_cache_alloc(smb_node_cache, KM_SLEEP);
 
@@ -1251,11 +1250,8 @@ smb_node_alloc(
 	if (strcmp(od_name, XATTR_DIR) == 0)
 		node->flags |= NODE_XATTR_DIR;
 
-	if (VFS_ROOT(vp->v_vfsp, &root_vp) == 0) {
-		if (vp == root_vp)
-			node->flags |= NODE_FLAGS_VFSROOT;
-		VN_RELE(root_vp);
-	}
+	if ((vp->v_flag & VROOT) != 0)
+		node->flags |= NODE_FLAGS_VFSROOT;
 
 	node->n_state = SMB_NODE_STATE_AVAILABLE;
 	node->n_magic = SMB_NODE_MAGIC;
