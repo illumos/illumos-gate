@@ -9,9 +9,10 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.Dd May 12, 2016
+.Dd July 2, 2022
 .Dt MAC_CALLBACKS 9S
 .Os
 .Sh NAME
@@ -25,20 +26,21 @@ illumos DDI specific
 .Sh DESCRIPTION
 The
 .Sy mac_callbacks
-structure is used by GLDv3 networking device drivers implementing the
+structure is used by GLDv3 networking device drivers implementing and
+using the
 .Xr mac 9E
-interface.
+framework and interfaces.
 .Pp
 The structure is normally allocated statically by drivers as a single
 global entry.
 A pointer to it is passed as the
-.Sy m_callbacks
+.Fa m_callbacks
 member of the
-.Sy mac_register_t
+.Vt mac_register_t
 structure.
 .Sh TYPES
 The following types define the function pointers in use in the
-.Sy mac_register_t .
+.Vt mac_register_t .
 .Bd -literal -offset indent
 typedef int		(*mac_getstat_t)(void *, uint_t, uint64_t *);
 typedef	int		(*mac_start_t)(void *);
@@ -80,59 +82,59 @@ mac_prop_info_t	mc_propinfo;	/* Get property information */
 .Ed
 .Pp
 The
-.Sy mc_callbacks
+.Fa mc_callbacks
 member is used to denote which of a series of optional callbacks are
 present.
 This method allows additional members to be added to the
-.Sy mac_callbacks_t
+.Vt mac_callbacks_t
 structure while maintaining ABI compatibility with existing modules.
 If a member is not mentioned below, then it is a part of the base version
 of the structure and device drivers do not need to set anything to
 indicate that it is present.
 The
-.Sy mc_callbacks
+.Fa mc_callbacks
 member should be set to the bitwise inclusive OR of the following
 pre-processor values:
 .Bl -tag -width Dv -offset indent
-.It Sy MC_IOCTL
+.It Dv MC_IOCTL
 Indicates that the
-.Sy mc_ioctl
+.Fa mc_ioctl
 structure member has been set.
-.It Sy MC_GETCAPAB
+.It Dv MC_GETCAPAB
 Indicates that the
-.Sy mc_getcapab
+.Fa mc_getcapab
 structure member has been set.
-.It Sy MC_OPEN
+.It Dv MC_OPEN
 Indicates that the
-.Sy mc_open
+.Fa mc_open
 structure member has been set.
-.It Sy MC_CLOSE
+.It Dv MC_CLOSE
 Indicates that the
-.Sy mc_close
+.Fa mc_close
 structure member has been set.
-.It Sy MC_SETPROP
+.It Dv MC_SETPROP
 Indicates that the
-.Sy mc_setprop
+.Fa mc_setprop
 structure member has been set.
-.It Sy MC_GETPROP
+.It Dv MC_GETPROP
 Indicates that the
-.Sy mc_getprop
+.Fa mc_getprop
 structure member has been set.
-.It Sy MC_PROPINFO
+.It Dv MC_PROPINFO
 Indicates that the
-.Sy mc_propinfo
+.Fa mc_propinfo
 structure member has been set.
-.It Sy MC_PROPERTIES
+.It Dv MC_PROPERTIES
 Indicates that the
-.Sy mc_getprop ,
-.Sy mc_propinfo ,
+.Fa mc_getprop ,
+.Fa mc_propinfo ,
 and
-.Sy mc_setprop
+.Fa mc_setprop
 structure members have been set.
 .El
 .Pp
 The
-.Sy mc_getstat
+.Fa mc_getstat
 function defines an entry point used to receive statistics about the
 device.
 A list of statistics that it is required to support is available in
@@ -141,76 +143,76 @@ For more information on the requirements of the function, see
 .Xr mc_getstat 9E .
 .Pp
 The
-.Sy mc_start
+.Fa mc_start
 member defines an entry point that is used to start the device.
 For more information on the requirements of the function, see
 .Xr mc_start 9E .
 .Pp
 The
-.Sy mc_stop
+.Fa mc_stop
 member defines an entry point that is used to stop the device.
 It is the opposite of the
-.Sy mc_start
+.Fa mc_start
 member.
 For more information on the requirements of the function, see
 .Xr mc_stop 9E .
 .Pp
 The
-.Sy mc_setpromisc
+.Fa mc_setpromisc
 member is used to enable and disable promiscuous mode on the device.
 For more information on the requirements of the function, see
 .Xr mc_setpromisc 9E .
 .Pp
 The
-.Sy mc_multicst
+.Fa mc_multicst
 member is used to enable or disable multicast addresses in the device's
 filters.
 For more information on the requirements of the function, see
 .Xr mc_multicst 9E .
 .Pp
 The
-.Sy mc_unicst
+.Fa mc_unicst
 member is used to set the primary unicast MAC address of the device.
 For more information on the requirements of the function, see
 .Xr mc_unicst 9E .
 .Pp
 The
-.Sy mc_tx
+.Fa mc_tx
 member is used to transmit a single message on the wire.
 For more information on the requirements of the function, see
 .Xr mc_tx 9E .
 .Pp
 The
-.Sy mc_ioctl
+.Fa mc_ioctl
 member is used to process device specific ioctls.
-The GLDv3 does not define any ioctls that devices should handle; however, there
-may be private ioctls for this device.
+The MAC framework does not define any ioctls that devices should handle;
+however, there may be private ioctls for this device.
 This entry point is optional.
 For it to be considered, the
-.Sy MC_IOCTL
+.Dv MC_IOCTL
 value must be present in the
-.Sy mc_callbacks
+.Fa mc_callbacks
 member.
 For more information on the requirements of the function, see
 .Xr mc_ioctl 9E .
 .Pp
 The
-.Sy mc_getcapab
+.Fa mc_getcapab
 member is used to determine device capabilities.
 Each capability has its own data and semantics associated with it.
 A list of capabilities is provided in
 .Xr mac 9E .
 This entry point is optional.
 For it to be used, the
-.Sy MC_GETCAPAB
+.Dv MC_GETCAPAB
 value must be present in the
-.Sy mc_callbacks
+.Fa mc_callbacks
 member.
 For more information on the requirements of the function, see
 .Xr mc_getcapab 9E .
 .Pp
 The
-.Sy mc_open
+.Fa mc_open
 member is used to provide specific actions to take when the device is
 opened.
 Note that most device drivers will not have a need to implement this.
@@ -219,15 +221,15 @@ used with
 .Xr dlpi 4P .
 This entry point is optional.
 For it to be used, the
-.Sy MC_OPEN
+.Dv MC_OPEN
 value must be present in the
-.Sy mc_callbacks
+.Fa mc_callbacks
 member.
 For more information on the requirements of the function, see
 .Xr mc_open 9E .
 .Pp
 The
-.Sy mc_close
+.Fa mc_close
 member is used to provide specific actions to take when the device is
 closed.
 Note that most device drivers will not have a need to implement this.
@@ -236,52 +238,52 @@ used with
 .Xr dlpi 4P .
 This entry point is optional.
 For it to be used, the
-.Sy MC_CLOSE
+.Dv MC_CLOSE
 value must be present in the
-.Sy mc_callbacks
+.Fa mc_callbacks
 member.
 For more information on the requirements of the function, see
 .Xr mc_close 9E .
 .Pp
 The
-.Sy mc_getprop
+.Fa mc_getprop
 member is used to get the current value of a property from the device.
 A list of properties, their sizes, and their interpretation is available in
 .Xr mac 9E .
 This entry point is optional.
 For it to be used, the
-.Sy MC_GETPROP
+.Dv MC_GETPROP
 value must be present in the
-.Sy mc_callbacks
+.Fa mc_callbacks
 member.
 For more information on the requirements of the function, see
 .Xr mc_getprop 9E .
 .Pp
 The
-.Sy mc_setprop
+.Fa mc_setprop
 member is used to set the value of a device property.
 A list of properties, their sizes, and their interpretation is available in
 .Xr mac 9E .
 This entry point is optional.
 For it to be used, the
-.Sy MC_SETPROP
+.Dv MC_SETPROP
 value must be present in the
-.Sy mc_callbacks
+.Fa mc_callbacks
 member.
 For more information on the requirements of the function, see
 .Xr mc_setprop 9E .
 .Pp
 The
-.Sy mc_propinfo
+.Fa mc_propinfo
 member is used to obtain metadata about a property such as its default
 value, whether or not it is writable, and more.
 A list of properties, their sizes, and their interpretation is available in
 .Xr mac 9E .
 This entry point is optional.
 For it to be used, the
-.Sy MC_PROPINFO
+.Dv MC_PROPINFO
 value must be present in the
-.Sy mc_callbacks
+.Fa mc_callbacks
 member.
 For more information on the requirements of the function, see
 .Xr mc_propinfo 9E .
@@ -292,34 +294,39 @@ members must be set or a call to
 will fail.
 .Bl -bullet -offset indent
 .It
-.Sy mc_getstat
+.Fa mc_getstat
 .It
-.Sy mc_start
+.Fa mc_start
 .It
-.Sy mc_stop
+.Fa mc_stop
 .It
-.Sy mc_setpromisc
+.Fa mc_setpromisc
 .It
-.Sy mc_multicst
+.Fa mc_multicst
 .It
-.Sy mc_tx
+.Fa mc_tx
 .It
-.Sy mc_unicst
+.Fa mc_unicst
 .El
 .Pp
-Note, that devices which implement the GLDv3 ring capabilities must not
-implement the
-.Sy mc_unicst
-and
-.Sy mc_tx
-functions.
-However, the ring capabilities are still private and evolving at this time.
+Devices which implement the
+.Dv MAC_CAPAB_RINGS
+capability for receive rings must not implement the
+.Fa mc_unicst
+entry point.
+Devices which implement the
+.Dv MAC_CAPAB_RINGS
+capability for transmit rings must not implement the
+.Fa mc_tx
+entry points.
+For more information about the capability, please see
+.Xr mac_capab_rings 9E .
 .Pp
 Generally, a device that implements one of
-.Sy mc_getprop ,
-.Sy mc_setprop ,
+.Fa mc_getprop ,
+.Fa mc_setprop ,
 or
-.Sy mc_propinfo
+.Fa mc_propinfo
 will want to implement all three endpoints to ensure that the property
 is fully integrated into user land utilities such as
 .Xr dladm 8 .
@@ -327,6 +334,7 @@ is fully integrated into user land utilities such as
 .Xr dlpi 4P ,
 .Xr dladm 8 ,
 .Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
 .Xr mc_close 9E ,
 .Xr mc_getcapab 9E ,
 .Xr mc_getprop 9E ,
@@ -341,4 +349,5 @@ is fully integrated into user land utilities such as
 .Xr mc_stop 9E ,
 .Xr mc_tx 9E ,
 .Xr mc_unicst 9E ,
+.Xr mac_register 9F ,
 .Xr mac_register 9S

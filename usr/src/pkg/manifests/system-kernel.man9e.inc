@@ -60,7 +60,9 @@ file path=usr/share/man/man9e/ks_snapshot.9e
 file path=usr/share/man/man9e/ks_update.9e
 file path=usr/share/man/man9e/mac.9e
 file path=usr/share/man/man9e/mac_capab_led.9e
+file path=usr/share/man/man9e/mac_capab_rings.9e
 file path=usr/share/man/man9e/mac_capab_transceiver.9e
+file path=usr/share/man/man9e/mac_filter.9e
 link path=usr/share/man/man9e/mc_close.9e target=mc_open.9e
 file path=usr/share/man/man9e/mc_getcapab.9e
 file path=usr/share/man/man9e/mc_getprop.9e
@@ -78,7 +80,22 @@ file path=usr/share/man/man9e/mc_unicst.9e
 link path=usr/share/man/man9e/mcl_set.9e target=mac_capab_led.9e
 link path=usr/share/man/man9e/mct_info.9e target=mac_capab_transceiver.9e
 link path=usr/share/man/man9e/mct_read.9e target=mac_capab_transceiver.9e
+link path=usr/share/man/man9e/mgi_addmac.9e target=mac_filter.9e
+link path=usr/share/man/man9e/mgi_addvlan.9e target=mac_filter.9e
+link path=usr/share/man/man9e/mgi_remmac.9e target=mac_filter.9e
+link path=usr/share/man/man9e/mgi_remvlan.9e target=mac_filter.9e
+file path=usr/share/man/man9e/mgi_start.9e
+link path=usr/share/man/man9e/mgi_stop.9e target=mgi_start.9e
+link path=usr/share/man/man9e/mi_disable.9e target=mi_enable.9e
+file path=usr/share/man/man9e/mi_enable.9e
 file path=usr/share/man/man9e/mmap.9e
+file path=usr/share/man/man9e/mr_gget.9e
+file path=usr/share/man/man9e/mr_rget.9e
+file path=usr/share/man/man9e/mri_poll.9e
+link path=usr/share/man/man9e/mri_start.9e target=mgi_start.9e
+file path=usr/share/man/man9e/mri_stat.9e
+link path=usr/share/man/man9e/mri_stop.9e target=mgi_start.9e
+link path=usr/share/man/man9e/mri_tx.9e target=mc_tx.9e
 file path=usr/share/man/man9e/open.9e
 file path=usr/share/man/man9e/power.9e
 file path=usr/share/man/man9e/print.9e

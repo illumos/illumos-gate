@@ -24,7 +24,7 @@
 # Copyright (c) 2011, 2014 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 # Copyright 2018 Nexenta Systems, Inc.
-# Copyright 2016 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore <garrett@damore.org>
 # Copyright 2021 Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
@@ -1661,13 +1661,6 @@ ECCPROV_OBJS += ecc.o ec.o ec2_163.o ec2_mont.o ecdecode.o ecl_mult.o \
 RSAPROV_OBJS += rsa.o rsa_impl.o pkcs1.o
 
 SWRANDPROV_OBJS += swrand.o
-
-#
-#			kernel SSL
-#
-KSSL_OBJS +=	kssl.o ksslioctl.o
-
-KSSL_SOCKFIL_MOD_OBJS += ksslfilter.o ksslapi.o ksslrec.o
 
 #
 #			misc. modules

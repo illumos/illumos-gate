@@ -9,13 +9,15 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.Dd Nov 26, 2017
+.Dd July 2, 2022
 .Dt MC_TX 9E
 .Os
 .Sh NAME
-.Nm mc_tx
+.Nm mc_tx ,
+.Nm mri_tx
 .Nd transmit a message block chain
 .Sh SYNOPSIS
 .In sys/mac_provider.h
@@ -24,24 +26,45 @@
 .Fa "void *driver"
 .Fa "mblk_t *mp_chain"
 .Fc
+.Ft "mblk_t *"
+.Fo prefix_ring_tx
+.Fa "void *driver_rh"
+.Fa "mblk_t *mp_chain"
+.Fc
 .Sh INTERFACE LEVEL
 illumos DDI specific
+.Pp
+The
+.Fn mri_tx
+entry point is
+.Sy Uncommitted -
+API and ABI stability is not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa driver
 A pointer to the driver's private data that was passed in via the
-.Sy m_pdata
+.Fa m_pdata
 member of the
 .Xr mac_register 9S
 structure to the
 .Xr mac_register 9F
 function.
+.It Fa driver_rh
+A pointer to the driver's private data for the ring that was passed in
+via the
+.Fa mri_driver
+member of the
+.Xr mac_ring_info 9S
+structure.
+This is initialized by the driver when its
+.Xr mr_rget 9E
+is called by MAC.
 .It Fa mp_chain
 A series of
 .Xr mblk 9S
 structures that may have multiple independent packets linked together on
 their
-.Sy b_next
+.Fa b_next
 member.
 .El
 .Sh DESCRIPTION
@@ -56,10 +79,10 @@ argument represents the first frame.
 The frame may be spread out across one or more
 .Xr mblk 9S
 structures that are linked together by the
-.Sy b_cont
+.Fa b_cont
 member.
 There may be multiple frames, linked together by the
-.Sy b_next
+.Fa b_next
 pointer of the
 .Xr mblk 9S .
 .Pp
@@ -73,9 +96,9 @@ section of
 .Pp
 As it processes each frame in the chain, if the device driver has
 advertised either of the
-.Sy MAC_CAPAB_HCKSUM
+.Dv MAC_CAPAB_HCKSUM
 or
-.Sy MAC_CAPAB_LSO
+.Dv MAC_CAPAB_LSO
 flags, it must check whether either apply for the given frame using the
 .Xr mac_hcksum_get 9F
 and
@@ -99,8 +122,8 @@ Return the frames to indicate that resources are not available.
 .Pp
 The device driver is in charge of the memory associated with
 .Fa mp_chain .
-If the device driver does not return the message blocks to the GLDv3,
-then it must call
+If the device driver does not return the message blocks to the MAC
+framework, then it must call
 .Xr freemsg 9F
 on the frames.
 If it does not, the memory associated with them will be leaked.
@@ -133,9 +156,9 @@ Once a device driver has returned unprocessed frames from its
 entry point, then the device driver will not receive any additional
 calls to its
 .Fn mc_tx
-entry point until it calls
+entry point until it calls the
 .Xr mac_tx_update 9F
-to indicate that resources are available again.
+function to indicate that resources are available again.
 Note that because it is the device driver that is calling this function to
 indicate resources are available, it is very important that it only return
 frames in cases where the device driver itself will be notified that resources
@@ -153,6 +176,32 @@ related data structures.
 Note that the device driver should expect that it may have its transmit
 endpoints called into from other threads while it's servicing device interrupts
 related to them.
+.Pp
+The
+.Fn mri_tx
+entry point is similar to the
+.Fn mc_tx
+entry point, except that it is used by device drivers that have
+negotiated the
+.Dv MAC_CAPAB_RINGS
+capability with transmit rings.
+The driver should follow all of the same rules described earlier, except
+that it will access a ring-specific data structure through
+.Fa driver_rh
+and when it needs to update that there is additional space available, it
+must use
+.Xr mac_tx_update_ring 9F
+and not
+.Xr mac_tx_update 9F .
+.Pp
+When the
+.Fn mri_tx
+entry point is called, the ring that should be used has been specified.
+The driver must not attempt to use any other ring than the one specified
+by
+.Fa driver_rh
+for any reason, including a lack of resources or an attempt to perform
+its own hashing.
 .Sh CONTEXT
 The
 .Fn mc_tx
@@ -165,14 +214,21 @@ context.
 Upon successful completion, the device driver should return
 .Dv NULL .
 Otherwise, it should return all unprocessed message blocks and ensure
-that it calls
+that it calls either
 .Xr mac_tx_update 9F
+or
+.Xr mac_tx_ring_update 9F
 some time in the future.
 .Sh SEE ALSO
 .Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mr_rget 9E ,
 .Xr freemsg 9F ,
+.Xr mac_hcksum_get 9F ,
 .Xr mac_lso_get 9F ,
 .Xr mac_register 9F ,
+.Xr mac_tx_ring_update 9F ,
 .Xr mac_tx_update 9F ,
 .Xr mac_register 9S ,
+.Xr mac_ring_info 9S ,
 .Xr mblk 9S

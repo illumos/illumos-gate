@@ -23,7 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2020 Joyent, Inc.
@@ -295,8 +295,6 @@ file path=usr/include/inet/ipclassifier.h
 file path=usr/include/inet/ipdrop.h
 file path=usr/include/inet/ipnet.h
 file path=usr/include/inet/ipp_common.h
-dir  path=usr/include/inet/kssl
-file path=usr/include/inet/kssl/ksslapi.h
 file path=usr/include/inet/led.h
 file path=usr/include/inet/mi.h
 file path=usr/include/inet/mib2.h

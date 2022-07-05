@@ -311,7 +311,6 @@ svc:/network/routing/legacy-routing:ipv4 var/svc/manifest/network/routing/legacy
 svc:/network/routing/legacy-routing var/svc/manifest/network/routing/legacy-routing.xml
 svc:/network/shares/group:default var/svc/manifest/network/shares/group.xml
 svc:/network/shares/group var/svc/manifest/network/shares/group.xml
-svc:/network/ssl/proxy var/svc/manifest/network/ssl/kssl-proxy.xml
 svc:/system/auditd:default var/svc/manifest/system/auditd.xml
 svc:/system/auditd var/svc/manifest/system/auditd.xml
 svc:/system/boot-archive-update:default var/svc/manifest/system/boot-archive-update.xml

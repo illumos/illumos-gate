@@ -138,7 +138,6 @@ COMMON_HDRDIRS= common/c2 \
 		common/klm \
 		common/inet \
 		common/inet/ipf/netinet \
-		common/inet/kssl \
 		common/inet/nca \
 		common/inet/sockmods/netpacket \
 		common/io/bpf/net \

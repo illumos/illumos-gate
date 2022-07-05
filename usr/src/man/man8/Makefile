@@ -19,6 +19,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 Peter Tribble
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copryight 2022 Garrett D'Amore <garrett@damore.org>
 #
 
 include		$(SRC)/Makefile.master
@@ -249,7 +250,6 @@ _MANFILES=	6to4relay.8		\
 		kpropd.8		\
 		kproplog.8		\
 		krb5kdc.8		\
-		ksslcfg.8		\
 		kstat.8			\
 		ktkt_warnd.8		\
 		labelit.8		\

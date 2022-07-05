@@ -23,6 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 
@@ -517,6 +518,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_SRST_NO_HOSTPORT	0x800
 /* Enclosure Management Services available */
 #define	AHCI_CAP_EMS			0x1000
+/* DevSleep Supported */
+#define	AHCI_CAP_SDS			0x2000
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */

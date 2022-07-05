@@ -140,7 +140,6 @@
 			 allow extraction of\n\
 			 \t\t\tarchive members to resolve weak references from \
 			 \n\t\t\t\archive files\n"
-@ MSG_ARG_DETAIL_ZAL	"\t[-z altexec64]\texecute the 64-bit link-editor\n"
 @ MSG_ARG_DETAIL_ZADLIB	"\t[-z assert-deflib]\n\
 			\t\t\tenables warnings for linking with libraries in \
 			the \n\t\t\tdefault search path\n\

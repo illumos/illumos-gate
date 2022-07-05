@@ -1689,3 +1689,4 @@ Bugid   Risk Synopsis
 4795	/usr/bin/ld manpage and help should indicate '-soname' not '--soname'
 14090	ld(1) could use a normal allocator
 14722	ld should keep group members in separate output sections
+14770	ld(1) should be 64bit only

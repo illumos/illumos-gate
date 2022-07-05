@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Garrett D'Amore <garrett@damore.org>
  */
 
 /*
@@ -595,7 +596,6 @@ void	audit_psecflags(proc_t *, psecflagwhich_t,
     const secflagdelta_t *);
 void	audit_devpolicy(int, const struct devplcysys *);
 void	audit_update_context(proc_t *, cred_t *);
-void	audit_kssl(int, void *, int);
 void	audit_pf_policy(int, cred_t *, netstack_t *, char *, boolean_t, int,
     pid_t);
 void	audit_sec_attributes(caddr_t *, struct vnode *);

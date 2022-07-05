@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #ifndef _AHCIREG_H
@@ -68,7 +69,6 @@ extern "C" {
 #define	AHCI_HBA_CAP_FBSS	(0x1 << 16) /* FIS-based switching */
 #define	AHCI_HBA_CAP_SPM	(0x1 << 17) /* port multiplier */
 #define	AHCI_HBA_CAP_SAM	(0x1 << 18) /* AHCI mode only */
-#define	AHCI_HBA_CAP_SNZO	(0x1 << 19) /* non-zero DMA offsets */
 #define	AHCI_HBA_CAP_ISS	(0xf << 20) /* interface speed support */
 #define	AHCI_HBA_CAP_SCLO	(0x1 << 24) /* command list override */
 #define	AHCI_HBA_CAP_SAL	(0x1 << 25) /* activity LED */
@@ -114,6 +114,12 @@ extern "C" {
 #define	AHCI_HBA_EM_CTL_ATTR_ALHD	(0x1 << 26) /* Activity LED HW Driven */
 #define	AHCI_HBA_EM_CTL_ATTR_PM		(0x1 << 27) /* PM Support */
 
+#define	AHCI_HBA_CAP2_BOH	(0x1 << 0) /* BIOS/OS Handoff */
+#define	AHCI_HBA_CAP2_NVMP	(0x1 << 1) /* NVMHCI present */
+#define	AHCI_HBA_CAP2_APST	(0x1 << 2) /* Auto Partial to Slumber */
+#define	AHCI_HBA_CAP2_SDS	(0x1 << 3) /* Device Sleep */
+#define	AHCI_HBA_CAP2_SADM	(0x1 << 4) /* Aggressive Dev Sleep Mgmt */
+#define	AHCI_HBA_CAP2_DESO	(0x1 << 5) /* DevSleep from Slumber Only */
 
 /* global HBA registers definitions */
 #define	AHCI_GLOBAL_OFFSET(ahci_ctlp)	(ahci_ctlp->ahcictl_ahci_addr)
@@ -313,7 +319,7 @@ typedef struct ahci_fis_h2d_register {
 	(fis->ahcifhr_type_pmp_rsvd_cmddevctl_cmd_features |= (type & 0xff))
 
 #define	SET_FIS_PMP(fis, pmp)					\
-	(fis->ahcifhr_type_pmp_rsvd_cmddevctl_cmd_features |= 	\
+	(fis->ahcifhr_type_pmp_rsvd_cmddevctl_cmd_features |=	\
 		((pmp & 0xf) << 8))
 
 #define	SET_FIS_CDMDEVCTL(fis, cmddevctl)			\
@@ -396,7 +402,7 @@ typedef struct ahci_fis_h2d_register {
 	(fis->ahcifhr_sectcount_sectcountexp_rsvd_devctl & 0xff)
 
 #define	SET_FIS_SECTOR_COUNT(fis, sector_count)			\
-	(fis->ahcifhr_sectcount_sectcountexp_rsvd_devctl |= 	\
+	(fis->ahcifhr_sectcount_sectcountexp_rsvd_devctl |=	\
 		((sector_count & 0xff)))
 
 #define	GET_FIS_SECTOR_COUNT_EXP(fis)				\
@@ -407,7 +413,7 @@ typedef struct ahci_fis_h2d_register {
 		((sector_count_exp & 0xff) << 8))
 
 #define	SET_FIS_DEVCTL(fis, devctl)				\
-	(fis->ahcifhr_sectcount_sectcountexp_rsvd_devctl |= 	\
+	(fis->ahcifhr_sectcount_sectcountexp_rsvd_devctl |=	\
 		((devctl & 0xff) << 24))
 
 	/* offset 0x10 */

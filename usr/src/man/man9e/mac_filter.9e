@@ -1,0 +1,172 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd July 2, 2022
+.Dt MAC_FILTER 9E
+.Os
+.Sh NAME
+.Nm mac_filter ,
+.Nm mgi_addmac ,
+.Nm mgi_remmac ,
+.Nm mgi_addvlan ,
+.Nm mgi_remvlan
+.Nd add and remove filters from MAC groups
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo prefix_ring_add_mac
+.Fa "mac_group_driver_t driver"
+.Fa "const uint8_t *mac"
+.Fc
+.Ft int
+.Fo prefix_ring_rem_mac
+.Fa "mac_group_driver_t driver"
+.Fa "const uint8_t *mac"
+.Fc
+.Ft int
+.Fo prefix_ring_add_vlan
+.Fa "mac_group_driver_t driver"
+.Fa "uint16_t vlan"
+.Fc
+.Ft int
+.Fo prefix_ring_rem_vlan
+.Fa "mac_group_driver_t driver"
+.Fa "uint16_t vlan"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the ring's private data that was passed in via the
+.Vt mgi_driver
+member of the
+.Xr mac_group_info 9S
+structure as part of the
+.Xr mr_gget 9E
+entry point.
+.It Fa mac
+A pointer to an array of bytes that contains the unicast address to add
+or remove from a filter.
+It is guaranteed to be at least as long, in bytes, as the MAC plugin's
+address length.
+For Ethernet devices that length is six bytes,
+.Dv ETHERADDRL .
+.It Fa vlan
+The numeric value of the VLAN that should be added or removed from a
+filter.
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_filter
+family of entry points are used to add and remove various classes of
+filters from a device.
+For more information on the filters, see the
+.Sy Filters
+section of
+.Xr mac_capab_rings 9S
+and the discussion around setting these members in
+.Xr mac_group_info 9S .
+.Pp
+The
+.Fa driver
+argument indicates which group the request to add or remove a filter is
+being requested on.
+.Pp
+The filter addition operations,
+.Fn mgi_addmac ,
+.Fn mgi_addvlan ,
+and
+.Fn mgi_addmvf ,
+all instruct the system to add a filter to the specified group.
+The filter should not target any specific ring in the group.
+If multiple rings are present, then the driver should ensure that the
+hardware balances incoming traffic amongst all of the rings through a
+consistent hashing mechanism such as receive side scaling.
+.Pp
+The
+.Fn mgi_addmac
+entry point instructs the driver to add the MAC address specified in
+.Fa mac
+to the filter list for the group.
+The MAC address should always be a unicast MAC address; however, the
+driver is encouraged to verify that before adding it.
+.Pp
+The
+.Fn mgi_remmac
+should remove the MAC address specified in
+.Fa mac
+from the filter list for the group.
+.Pp
+The
+.Fn mgi_addvlan
+entry point instructs the driver to add the VLAN specified in
+.Fa vlan
+to the filter list for the group.
+The
+.Fn mgi_remvlan
+entry point instructs the driver to remove the VLAN specified in
+.Fa vlan
+from the filter list for the group.
+.Ss Stacking Filters
+Multiple filters of the same class should always be treated as a
+logical-OR.
+The frame may match any of the filters in a given class to be accepted.
+Filters of different classes should always be treated as a logical-AND.
+The frame must match a filter in all programmed classes to be accepted.
+For more information, see the
+.Sy Filters
+section of
+.Xr mac_capab_rings 9S .
+.Sh RETURN VALUES
+Upon successful completion, the driver should ensure that the filter has
+been added or removed and return
+.Sy 0 .
+Otherwise, it should return the appropriate error number.
+.Sh ERRORS
+The device driver may return one of the following errors.
+While this list is not intended to be exhaustive, it is recommended to use one
+of these if possible.
+.Bl -tag -width Er
+.It Er EEXIST
+The requested filter has already been programmed into the device.
+.It Er EINVAL
+The address
+.Fa mac
+is not a valid unicast address.
+The VLAN
+.Fa vlan
+is not a valid VLAN identifier.
+.It Er EIO
+The driver encountered a device or transport error while trying to
+update the device's state.
+.It Er ENOENT
+The driver was asked to remove a filter which was not currently
+programmed.
+.It Er ENOTSUP
+The driver does not support this specific function.
+This should only be used on specific hardware
+.Pq generally devices from cloud providers
+where neither promiscuous mode nor filters will allow
+the filter to operate.
+.It Er ENOSPC
+The driver has run out of available hardware filters.
+.El
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mr_gget 9E ,
+.Xr mac_group_info 9S

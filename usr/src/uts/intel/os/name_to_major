@@ -36,7 +36,6 @@ iwscn 30
 kb8042 31
 keysock 32
 kmdb 33
-kssl 34
 llc1 35
 lofi 36
 log 37

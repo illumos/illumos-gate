@@ -810,12 +810,14 @@ link path=usr/share/man/man9f/mac_prop_info_set_perm.9f target=mac_prop_info.9f
 link path=usr/share/man/man9f/mac_prop_info_set_range_uint32.9f \
     target=mac_prop_info.9f
 file path=usr/share/man/man9f/mac_register.9f
+link path=usr/share/man/man9f/mac_ring_rx.9f target=mac_rx.9f
 file path=usr/share/man/man9f/mac_rx.9f
 file path=usr/share/man/man9f/mac_transceiver_info.9f
 link path=usr/share/man/man9f/mac_transceiver_info_set_present.9f \
     target=mac_transceiver_info.9f
 link path=usr/share/man/man9f/mac_transceiver_info_set_usable.9f \
     target=mac_transceiver_info.9f
+link path=usr/share/man/man9f/mac_tx_ring_update.9f target=mac_tx_update.9f
 file path=usr/share/man/man9f/mac_tx_update.9f
 link path=usr/share/man/man9f/mac_unregister.9f target=mac_register.9f
 file path=usr/share/man/man9f/makecom.9f

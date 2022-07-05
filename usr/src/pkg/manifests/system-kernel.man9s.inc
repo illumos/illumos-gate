@@ -76,3 +76,9 @@ file path=usr/share/man/man9s/streamtab.9s
 file path=usr/share/man/man9s/stroptions.9s
 file path=usr/share/man/man9s/tuple.9s
 file path=usr/share/man/man9s/uio.9s
+file path=usr/share/man/man9s/mac_group_info.9s
+link path=usr/share/man/man9s/mac_group_info_t.9s target=mac_group_info.9s
+file path=usr/share/man/man9s/mac_intr.9s
+link path=usr/share/man/man9s/mac_intr_t.9s target=mac_intr.9s
+file path=usr/share/man/man9s/mac_ring_info.9s
+link path=usr/share/man/man9s/mac_ring_info_t.9s target=mac_ring_info.9s

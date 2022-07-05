@@ -143,7 +143,6 @@ file path=usr/share/man/man8/ipsecconf.8
 file path=usr/share/man/man8/ipseckey.8
 file path=usr/share/man/man8/keyserv.8
 file path=usr/share/man/man8/killall.8
-file path=usr/share/man/man8/ksslcfg.8
 file path=usr/share/man/man8/labelit.8
 file path=usr/share/man/man8/labelit_hsfs.8
 file path=usr/share/man/man8/labelit_ufs.8

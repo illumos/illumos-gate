@@ -29,8 +29,6 @@
 # application/x11/xfs.xml
 # application/x11/xvnc-inetd.xml
 # network/rpc/keyserv.xml
-# network/socket-filter-kssl.xml
-# network/ssl/kssl-proxy.xml
 # network/dns/server.xml
 # network/ftp.xml
 # network/finger.xml

@@ -23,6 +23,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright (c) 2017, Joyent, Inc. All rights reserved.
+ * Copyright 2022 Garrett D'Amore <garrett@damore.org>
  */
 
 #include "assym.h"
@@ -891,7 +892,6 @@ stubs_base:
 	NO_UNLOAD_STUB(c2audit, audit_devpolicy,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_setfsat_path,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_cryptoadm,	nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_kssl,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_pf_policy,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, au_doormsg,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, au_uwrite,		nomod_zero);

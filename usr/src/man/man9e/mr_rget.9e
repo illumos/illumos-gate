@@ -1,0 +1,151 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Compuer Company
+.\"
+.Dd July 2, 2022
+.Dt MR_RGET 9E
+.Os
+.Sh NAME
+.Nm mr_rget
+.Nd fill in ring information
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo prefix_fill_ring_info
+.Fa "void *driver"
+.Fa "mac_ring_type_t rtype"
+.Fa "const int group_index"
+.Fa "const int ring_index"
+.Fa "mac_ring_info_t *infop"
+.Fa "mac_ring_handle_t rh"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Fa m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa group_index
+An integer value indicating the group that this ring belongs to.
+Groups are numbered starting from zero.
+.It Fa rtype
+A value indicating the type of ring.
+Valid values include:
+.Bl -tag -width Dv
+.It Dv MAC_RING_TYPE_RX
+The ring is a receive ring.
+.It Dv MAC_RING_TYPE_TX
+The ring is a transmit ring.
+.El
+.It Fa ring_index
+An integer indicating the index of the ring inside of the group.
+Ring indexes are numbered starting from zero.
+Each group has its own set of ring indexes.
+.It Fa infop
+A pointer to an instance of a
+.Xr mac_ring_info 9S
+structure.
+.It Fa rh
+An opaque pointer to a ring handle that can be used to identify this
+ring.
+.El
+.Sh DESCRIPTION
+The
+.Fn mr_rget
+entry point provides a means for the device driver to fill in
+information about a ring.
+The driver must fill in information into the
+.Fa infop
+argument.
+For the list of fields and an explanation of how to fill them in, please
+see
+.Xr mac_ring_info 9S .
+.Pp
+The
+.Fa rtype
+argument describes whether this is a receive ring or transmit ring
+identified by a value of
+.Dv MAC_RING_TYPE_RX
+or
+.Dv MAC_RING_TYPE_TX
+respectively.
+The ring information that is filled in varies between transmit and
+receive rings.
+If separate entry points were not specified in the
+.Xr mac_capab_rings 9E
+structure, then the driver
+must ensure that it checks this value.
+.Pp
+The
+.Fa group_index
+and
+.Fa ring_index
+arguments are used to uniquely identify a ring.
+The number of groups that a driver supports is based on the values
+present in the
+.Fa mr_gnum
+member of the
+.Vt mac_capbab_rings_t
+structure which is described in
+.Xr mac_capab_rings 9E .
+The group index ranges from zero to the specified number of groups minus
+one.
+The number of rings in the group is determined based on the values
+specified in
+.Xr mac_group_info 9S
+structure that is filled in during the
+.Xr mr_gget 9E
+entry point.
+The ring numbering for each group is independent and always starts at
+zero.
+Based on the combination of group and ring index, the driver should be
+able to map that to a unique ring.
+.Pp
+After filling out the ring structure in
+.Fa infop ,
+the driver should make sure to store the ring handle in
+.Fa rh
+for future use.
+This is required for callbacks such as
+.Xr mac_rx_ring 9F
+or
+.Xr mac_tx_ring_update 9F .
+.Sh CONTEXT
+The
+.Fn mr_rget
+entry point will be called in response to a driver calling the
+.Xr mac_register 9F
+function and the driver has acknowledged that it supports the
+.Dv MAC_CAPAB_RINGS
+capability.
+This will be called after a call to the driver's
+.Xr mr_gget 9E
+entry point.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mr_gget 9E ,
+.Xr mac_register 9F ,
+.Xr mac_rx_ring 9F ,
+.Xr mac_tx_ring_update 9F ,
+.Xr mac_group_info 9S ,
+.Xr mac_register 9S ,
+.Xr mac_ring_info 9S

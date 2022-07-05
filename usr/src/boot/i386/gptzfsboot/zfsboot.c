@@ -105,6 +105,7 @@ static const struct string {
 };
 
 static const unsigned char dev_maj[NDEV] = {30, 4, 2};
+extern int sio_port;
 
 static struct i386_devdesc *bdev;
 static char cmd[512];
@@ -155,6 +156,7 @@ main(void)
 	bool auto_boot;
 	bool nextboot = false;
 	struct disk_devdesc devdesc;
+	char *ptr;
 
 	bios_getmem();
 
@@ -167,6 +169,40 @@ main(void)
 		heap_top = (char *)PTOV(bios_basemem);
 	}
 	setheap(heap_bottom, heap_top);
+
+	/*
+	 * detect ACPI for future reference. This may set console to comconsole
+	 * if we do have ACPI SPCR table.
+	 */
+	biosacpi_detect();
+	ptr = getenv("console");
+	if (ptr != NULL && strcmp(ptr, "text") != 0) {
+		char mode[10];
+
+		ioctrl = IO_SERIAL;
+		snprintf(mode, sizeof (mode), "%s-mode", ptr);
+
+		switch (ptr[3]) {
+		case 'a':
+			sio_port = 0x3F8;
+			break;
+		case 'b':
+			sio_port = 0x2F8;
+			break;
+		case 'c':
+			sio_port = 0x3E8;
+			break;
+		case 'd':
+			sio_port = 0x2E8;
+			break;
+		}
+		ptr = getenv(mode);
+		if (ptr != NULL) {
+			comspeed = strtoul(ptr, NULL, 0);
+			if (sio_init(115200 / comspeed) != 0)
+				ioctrl |= IO_KEYBOARD;
+		}
+	}
 
 	/*
 	 * Initialise the block cache. Set the upper limit.

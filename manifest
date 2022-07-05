@@ -106,7 +106,6 @@ s dev/kbd=../devices/pseudo/conskbd@0:kbd
 s dev/keysock=../devices/pseudo/keysock@0:keysock
 s dev/kmdb=../devices/pseudo/kmdb@0:kmdb
 s dev/kmem=../devices/pseudo/mm@0:kmem
-s dev/kssl=../devices/pseudo/kssl@0:kssl
 s dev/kstat=../devices/pseudo/kstat@0:kstat
 s dev/ksyms=../devices/pseudo/ksyms@0:ksyms
 s dev/llc1=../devices/pseudo/clone@0:llc1
@@ -712,7 +711,6 @@ f kernel/drv/amd64/kb8042 0755 root sys
 f kernel/drv/amd64/keysock 0755 root sys
 f kernel/drv/amd64/ksensor 0755 root sys
 f kernel/drv/amd64/kmdb 0755 root sys
-f kernel/drv/amd64/kssl 0755 root sys
 f kernel/drv/amd64/llc1 0755 root sys
 f kernel/drv/amd64/lockstat 0755 root sys
 f kernel/drv/amd64/lofi 0755 root sys
@@ -886,7 +884,6 @@ f kernel/drv/ixgbe.conf 0644 root sys
 f kernel/drv/keysock.conf 0644 root sys
 f kernel/drv/kmdb.conf 0644 root sys
 f kernel/drv/ksensor.conf 0644 root sys
-f kernel/drv/kssl.conf 0644 root sys
 f kernel/drv/llc1.conf 0644 root sys
 f kernel/drv/lockstat.conf 0644 root sys
 f kernel/drv/lofi.conf 0644 root sys
@@ -1190,7 +1187,6 @@ d kernel/socketmod 0755 root sys
 d kernel/socketmod/amd64 0755 root sys
 f kernel/socketmod/amd64/datafilt 0755 root sys
 h kernel/socketmod/amd64/icmp=kernel/drv/amd64/icmp
-f kernel/socketmod/amd64/ksslf 0755 root sys
 f kernel/socketmod/amd64/lx_netlink 0755 root sys
 f kernel/socketmod/amd64/rts 0755 root sys
 f kernel/socketmod/amd64/sockrds 0755 root sys
@@ -2496,7 +2492,7 @@ f usr/bin/amd64/ficl-sys 0555 root bin
 f usr/bin/amd64/gcore 0555 root bin
 f usr/bin/amd64/ksh93 0555 root bin
 h usr/bin/amd64/ksh=usr/bin/amd64/ksh93
-f usr/bin/amd64/ld 0755 root bin
+s usr/bin/amd64/ld=usr/bin/ld
 f usr/bin/amd64/ldd 0555 root bin
 f usr/bin/amd64/ls 0555 root bin
 f usr/bin/amd64/mac 0555 root bin
@@ -3329,11 +3325,6 @@ f usr/include/inet/ipsecah.h 0644 root bin
 f usr/include/inet/ipsecesp.h 0644 root bin
 f usr/include/inet/iptun.h 0644 root bin
 f usr/include/inet/keysock.h 0644 root bin
-d usr/include/inet/kssl 0755 root bin
-f usr/include/inet/kssl/kssl.h 0644 root bin
-f usr/include/inet/kssl/ksslapi.h 0644 root bin
-f usr/include/inet/kssl/ksslimpl.h 0644 root bin
-f usr/include/inet/kssl/ksslproto.h 0644 root bin
 f usr/include/inet/led.h 0644 root bin
 f usr/include/inet/mi.h 0644 root bin
 f usr/include/inet/mib2.h 0644 root bin
@@ -6652,7 +6643,6 @@ d usr/lib/krb5/plugins 0755 root bin
 d usr/lib/krb5/plugins/preauth 0755 root bin
 f usr/lib/krb5/plugins/preauth/pkinit.so.1 0755 root bin
 s usr/lib/krb5/plugins/preauth/pkinit.so=pkinit.so.1
-f usr/lib/kssladm 0555 root bin
 f usr/lib/labeld 0555 root bin
 d usr/lib/ld 0755 root bin
 s usr/lib/ld.so.1=../../lib/ld.so.1
@@ -10970,7 +10960,6 @@ f usr/sbin/iscsiadm 0555 root bin
 f usr/sbin/itadm 0555 root bin
 f usr/sbin/keyserv 0555 root sys
 f usr/sbin/killall 0555 root bin
-f usr/sbin/ksslcfg 0555 root bin
 s usr/sbin/labelit=clri
 f usr/sbin/ldapaddent 0555 root bin
 f usr/sbin/ldapclient 0555 root bin
@@ -19681,7 +19670,6 @@ f usr/share/man/man8/itadm.8 0444 root bin
 f usr/share/man/man8/kernel.8 0444 root bin
 f usr/share/man/man8/keyserv.8 0444 root bin
 f usr/share/man/man8/killall.8 0444 root bin
-f usr/share/man/man8/ksslcfg.8 0444 root bin
 f usr/share/man/man8/kstat.8 0444 root bin
 f usr/share/man/man8/labelit.8 0444 root bin
 f usr/share/man/man8/labelit_hsfs.8 0444 root bin
@@ -19962,7 +19950,9 @@ f usr/share/man/man9e/ks_snapshot.9e 0444 root bin
 f usr/share/man/man9e/ks_update.9e 0444 root bin
 f usr/share/man/man9e/mac.9e 0444 root bin
 f usr/share/man/man9e/mac_capab_led.9e 0444 root bin
+f usr/share/man/man9e/mac_capab_rings.9e 0444 root bin
 f usr/share/man/man9e/mac_capab_transceiver.9e 0444 root bin
+f usr/share/man/man9e/mac_filter.9e 0444 root bin
 s usr/share/man/man9e/mc_close.9e=mc_open.9e
 f usr/share/man/man9e/mc_getcapab.9e 0444 root bin
 f usr/share/man/man9e/mc_getprop.9e 0444 root bin
@@ -19980,6 +19970,21 @@ f usr/share/man/man9e/mc_unicst.9e 0444 root bin
 s usr/share/man/man9e/mcl_set.9e=mac_capab_led.9e
 s usr/share/man/man9e/mct_info.9e=mac_capab_transceiver.9e
 s usr/share/man/man9e/mct_read.9e=mac_capab_transceiver.9e
+s usr/share/man/man9e/mgi_addmac.9e=mac_filter.9e
+s usr/share/man/man9e/mgi_addvlan.9e=mac_filter.9e
+s usr/share/man/man9e/mgi_remmac.9e=mac_filter.9e
+s usr/share/man/man9e/mgi_remvlan.9e=mac_filter.9e
+f usr/share/man/man9e/mgi_start.9e 0444 root bin
+s usr/share/man/man9e/mgi_stop.9e=mgi_start.9e
+s usr/share/man/man9e/mi_disable.9e=mi_enable.9e
+f usr/share/man/man9e/mi_enable.9e 0444 root bin
+f usr/share/man/man9e/mr_gget.9e 0444 root bin
+f usr/share/man/man9e/mr_rget.9e 0444 root bin
+f usr/share/man/man9e/mri_poll.9e 0444 root bin
+s usr/share/man/man9e/mri_start.9e=mgi_start.9e
+f usr/share/man/man9e/mri_stat.9e 0444 root bin
+s usr/share/man/man9e/mri_stop.9e=mgi_start.9e
+s usr/share/man/man9e/mri_tx.9e=mc_tx.9e
 f usr/share/man/man9e/mmap.9e 0444 root bin
 f usr/share/man/man9e/open.9e 0444 root bin
 f usr/share/man/man9e/power.9e 0444 root bin
@@ -20830,10 +20835,12 @@ s usr/share/man/man9f/mac_prop_info_set_default_uint8.9f=mac_prop_info.9f
 s usr/share/man/man9f/mac_prop_info_set_perm.9f=mac_prop_info.9f
 s usr/share/man/man9f/mac_prop_info_set_range_uint32.9f=mac_prop_info.9f
 f usr/share/man/man9f/mac_register.9f 0444 root bin
+s usr/share/man/man9f/mac_ring_rx.9f=mac_rx.9f
 f usr/share/man/man9f/mac_rx.9f 0444 root bin
 f usr/share/man/man9f/mac_transceiver_info.9f 0444 root bin
 s usr/share/man/man9f/mac_transceiver_info_set_present.9f=mac_transceiver_info.9f
 s usr/share/man/man9f/mac_transceiver_info_set_usable.9f=mac_transceiver_info.9f
+s usr/share/man/man9f/mac_tx_ring_update.9f=mac_tx_update.9f
 f usr/share/man/man9f/mac_tx_update.9f 0444 root bin
 s usr/share/man/man9f/mac_unregister.9f=mac_register.9f
 f usr/share/man/man9f/makecom.9f 0444 root bin
@@ -21387,8 +21394,14 @@ f usr/share/man/man9s/kstat_named.9s 0444 root bin
 f usr/share/man/man9s/linkblk.9s 0444 root bin
 f usr/share/man/man9s/mac_callbacks.9s 0444 root bin
 s usr/share/man/man9s/mac_callbacks_t.9s=mac_callbacks.9s
+f usr/share/man/man9s/mac_group_info.9s 0444 root bin
+s usr/share/man/man9s/mac_group_info_t.9s=mac_group_info.9s
+f usr/share/man/man9s/mac_intr.9s 0444 root bin
+s usr/share/man/man9s/mac_intr_t.9s=mac_intr.9s
 f usr/share/man/man9s/mac_register.9s 0444 root bin
 s usr/share/man/man9s/mac_register_t.9s=mac_register.9s
+f usr/share/man/man9s/mac_ring_info.9s 0444 root bin
+s usr/share/man/man9s/mac_ring_info_t.9s=mac_ring_info.9s
 s usr/share/man/man9s/mblk.9s=msgb.9s
 f usr/share/man/man9s/modldrv.9s 0444 root bin
 f usr/share/man/man9s/modlinkage.9s 0444 root bin

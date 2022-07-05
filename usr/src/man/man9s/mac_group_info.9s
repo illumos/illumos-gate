@@ -1,0 +1,182 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd July 2, 2022
+.Dt MAC_GROUP_INFO 9S
+.Os
+.Sh NAME
+.Nm mac_group_info ,
+.Nm mac_group_info_t
+.Nd MAC group information structure
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Sh INTERFACE LEVEL
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh DESCRIPTION
+The
+.Vt mac_group_info_t
+structure is used by the MAC framework as part of the
+.Dv MAC_CAPAB_RINGS
+capability.
+For background on the MAC framework, please see
+.Xr mac 9E
+and for an introduction to the
+.Dv MAC_CAPAB_RINGS
+capability,
+.Xr mac_capab_rings 9E .
+.Pp
+When a device driver declares that it supports the
+.Dv MAC_CAPAB_RINGS
+capability and fills out the capability structure as described in
+.Xr mac_capab_rings 9E ,
+it indicates that it supports a number of transmit and receive groups.
+For each group that it indicates, its
+.Xr mr_gget 9E
+entry point will be called, during which it will have to fill out the
+.Vt mac_group_info_t
+structure described here.
+.Sh TYPES
+The following types define the function pointers in use in the
+.Vt mac_group_info_t
+structure.
+.Bd -literal -offset indent
+typedef int (*mac_group_start_t)(mac_group_driver_t);
+typedef void (*mac_group_stop_t)(mac_group_driver_t);
+typedef int (*mac_add_mac_addr_t)(mac_group_driver_t, const uint8_t *mac,
+    uint_t flags)
+typedef int (*mac_rem_mac_addr_t)(mac_group_driver_t, const uint8_t *mac,
+    uint_t flags)
+typedef int (*mac_add_vlan_t)(mac_group_driver_t, uint16_t vlan, uint_t flags)
+typedef int (*mac_rem_vlan_t)(mac_group_driver_t, uint16_t vlan, uint_t flags)
+.Ed
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset indent
+mac_group_driver_t      mgi_driver;
+mac_group_start_t       mgi_start;
+mac_group_start_t       mgi_stop;
+uint_t                  mgi_count;
+mac_add_mac_addr_t      mgi_addmac;
+mac_rem_mac_addr_t      mgi_remmac;
+mac_add_vlan_t          mgi_addvlan;
+mac_rem_vlan_t          mgi_remvlan;
+.Ed
+.Pp
+The
+.Fa mgi_driver
+member should be set by the driver to a driver-specific value that
+represents the data structure that corresponds to this group.
+The driver will receive this value in all of the callback functions that
+are defined in this structure and listed below.
+.Pp
+The
+.Fa mgi_start
+member is an optional entry point.
+If the driver needs to take a specific action before it the group is
+used, then it should set this to a function.
+For more information, see
+.Xr mgi_start 9E .
+.Pp
+The
+.Fa mgi_stop
+member is an optional entry point.
+If the driver needs to take a specific action when the group is being
+stopped, then it should set this to a function.
+For more information, see
+.Xr mgi_stop 9E .
+.Pp
+The
+.Fa mgi_count
+member should be set to a count of the number of rings that are present
+in this group.
+When the group type is
+.Dv MAC_GROUP_TYPE_STATIC ,
+then the value in
+.Fa mgi_count
+represents the fixed number of rings available to the group.
+.Pp
+The
+.Fa mgi_addmac
+member is an optional entry point and should be set to a function that
+can add a MAC address filter to the group in hardware.
+For more information, see
+.Xr mgi_addmac 9E .
+This member only has meaning for a receive group, transmit groups should
+set this to
+.Dv NULL .
+.Pp
+The
+.Fa mgi_remmac
+member is an optional entry point and should be set to a function that
+can remove a MAC address filter from a group in hardware.
+If the
+.Fa mgi_addmac
+member is a valid pointer, then this entry point must be as well.
+For more information, see
+.Xr mgi_remmac 9E .
+This member only has meaning for a receive group, transmit groups should
+set this to
+.Dv NULL .
+.Pp
+The
+.Fa mgi_addvlan
+member is an optional entry point and should be set to a function that
+can add a VLAN filter to the group in hardware.
+For more information, see
+.Xr mgi_addvlan 9E .
+This member only has meaning for a receive group, transmit groups should
+set this to
+.Dv NULL .
+.Pp
+The
+.Fa mgi_remvlan
+member is an optional entry point and should be set to a function that
+can remove a VLAN filter from a group in hardware.
+If the
+.Fa mgi_addvlan
+member is a valid pointer, then this entry point must be as well.
+For more information, see
+.Xr mgi_remvlan 9E .
+This member only has meaning for a receive group, transmit groups should
+set this to
+.Dv NULL .
+.Ss Required Members
+All of the non-function pointers described in this manual are required
+members for both transmit and receive groups.
+The
+.Fa mgi_start
+and
+.Fa mgi_stop
+members are optional for both transmit and receive groups.
+.Pp
+For transmit groups, all of the filter entry points must be set to
+.Dv NULL .
+.Pp
+Receive groups must have some way to set a MAC address filter.
+This means that one of the MAC address related functions must be set.
+Currently, the driver must implement either
+.Fa mgi_addmac
+and
+.Fa mgi_remmac .
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mgi_addmac 9E ,
+.Xr mgi_addvlan 9E ,
+.Xr mgi_remmac 9E ,
+.Xr mgi_remvlan 9E ,
+.Xr mgi_start 9E ,
+.Xr mgi_stop 9E ,
+.Xr mr_gget 9E

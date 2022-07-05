@@ -986,8 +986,10 @@ MANLINKS=	AVL_NEXT.9f					\
 		mac_prop_info_set_default_uint8.9f		\
 		mac_prop_info_set_perm.9f			\
 		mac_prop_info_set_range_uint32.9f		\
+		mac_ring_rx.9f					\
 		mac_transceiver_info_set_present.9f		\
 		mac_transceiver_info_set_usable.9f		\
+		mac_tx_ring_update.9f				\
 		mac_unregister.9f				\
 		makecom_g0.9f					\
 		makecom_g0_s.9f					\
@@ -1806,8 +1808,12 @@ mac_prop_info_set_default_uint64.9f	:= LINKSRC = mac_prop_info.9f
 mac_prop_info_set_perm.9f		:= LINKSRC = mac_prop_info.9f
 mac_prop_info_set_range_uint32.9f	:= LINKSRC = mac_prop_info.9f
 
+mac_ring_rx.9f				:= LINKSRC = mac_rx.9f
+
 mac_transceiver_info_set_present.9f	:= LINKSRC = mac_transceiver_info.9f
 mac_transceiver_info_set_usable.9f	:= LINKSRC = mac_transceiver_info.9f
+
+mac_tx_ring_update.9f			:= LINKSRC = mac_tx_update.9f
 
 mac_unregister.9f			:= LINKSRC = mac_register.9f
 

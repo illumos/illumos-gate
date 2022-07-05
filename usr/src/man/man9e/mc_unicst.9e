@@ -9,9 +9,10 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.Dd May 31, 2016
+.Dd July 2, 2022
 .Dt MC_UNICST 9E
 .Os
 .Sh NAME
@@ -30,7 +31,7 @@ illumos DDI specific
 .Bl -tag -width Fa
 .It Fa driver
 A pointer to the driver's private data that was passed in via the
-.Sy m_pdata
+.Fa m_pdata
 member of the
 .Xr mac_register 9S
 structure to the
@@ -42,12 +43,12 @@ the device.
 It is guaranteed to be at least a number of bytes long equal to the length of
 the MAC plugin's address length.
 For Ethernet devices that length is six bytes,
-.Sy ETHERADDRL .
+.Dv ETHERADDRL .
 .El
 .Sh DESCRIPTION
 The
 .Fn mc_unicst
-entry point is used by the GLDv3 to indicate that the device driver
+entry point is used by the MAC framework to indicate that the device driver
 should update the primary MAC address of the device.
 In the basic mode of operation, this entry point is required and the device has
 a single primary MAC address.
@@ -56,8 +57,14 @@ promiscuous mode.
 This call should overwrite the existing MAC address that is programmed into the
 device.
 .Pp
+Device drivers that implement the
+.Dv MAC_CAPAB_RINGS
+capability
+.Em must not
+implement this interface.
+.Pp
 As noted in the
-.Sx PARAMETERS
+.Sy PARAMETERS
 section, the
 .Fa mac
 array is guaranteed to be at least as many bytes as is required to
@@ -83,8 +90,13 @@ The
 entry point only supports a single MAC address.
 In this case, devices should only use a single MAC address and replace that MAC
 address.
-Support for using more than a single MAC address filter will be provided
-by future interfaces.
+To enable the operating system to take advantage of multiple unicast MAC
+address filters, the driver should implement the
+.Dv MAC_CAPAB_RINGS
+capability.
+See
+.Xr mac_capab_rings 9E
+for more information.
 .Sh RETURN VALUES
 Upon successful completion, the device driver should have updated its
 unicast filter and return
@@ -106,5 +118,6 @@ update the device's state.
 .El
 .Sh SEE ALSO
 .Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
 .Xr mac_register 9F ,
 .Xr mac_register 9S

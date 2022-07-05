@@ -192,7 +192,6 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_CY));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZA));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAE));
-	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZADLIB));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZC));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDEF));
@@ -1580,8 +1579,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *usage)
 				}
 			/*
 			 * The following options just need validation as they
-			 * are interpreted on the second pass through the
-			 * command line arguments.
+			 * are interpreted either on the second pass through
+			 * the command line arguments, by ld(1) directly, or
+			 * are merely accepted for compatibility.
 			 */
 			} else if (
 			    strncmp(optarg, MSG_ORIG(MSG_ARG_INITARRAY),

@@ -30,8 +30,6 @@
 # application/x11/xvnc-inetd.xml
 # network/ldap/client.xml
 # network/rpc/keyserv.xml
-# network/socket-filter-kssl.xml
-# network/ssl/kssl-proxy.xml
 # network/nfs/rquota.xml
 # network/smb/server.xml
 # network/dns/server.xml

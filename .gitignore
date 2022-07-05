@@ -817,8 +817,6 @@ usr/src/cmd/cmd-inet/usr.sbin/ipsecutils/ikecert
 usr/src/cmd/cmd-inet/usr.sbin/ipsecutils/ipsecalgs
 usr/src/cmd/cmd-inet/usr.sbin/ipsecutils/ipsecconf
 usr/src/cmd/cmd-inet/usr.sbin/ipsecutils/ipseckey
-usr/src/cmd/cmd-inet/usr.sbin/kssl/kssladm/kssladm
-usr/src/cmd/cmd-inet/usr.sbin/kssl/ksslcfg/ksslcfg
 usr/src/cmd/cmd-inet/usr.sbin/ndd
 usr/src/cmd/cmd-inet/usr.sbin/nwamadm/nwamadm
 usr/src/cmd/cmd-inet/usr.sbin/nwamcfg/nwamcfg

@@ -1,0 +1,152 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide computer Company
+.\"
+.Dd July 2, 2022
+.Dt MGI_START 9E
+.Os
+.Sh NAME
+.Nm mgi_start ,
+.Nm mgi_stop ,
+.Nm mri_start ,
+.Nm mri_stop
+.Nd MAC group and ring start and stop entry points
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo prefix_group_start
+.Fa "mac_group_driver_t gh"
+.Fc
+.Ft void
+.Fo prefix_group_stop
+.Fa "mac_group_driver_t gh"
+.Fc
+.Ft int
+.Fo prefix_ring_start
+.Fa "mac_ring_driver_t rh"
+.Fa "uint64_t mr_gen"
+.Fc
+.Ft void
+.Fo prefix_ring_stop
+.Fa "mac_ring_driver_t rh"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the ring's private data that was passed in via the
+.Vt mgi_driver
+member of the
+.Xr mac_group_info 9S
+structure as part of the
+.Xr mr_gget 9E
+entry point.
+.It Fa rh
+A pointer to the ring's private data that was passed in via the
+.Vt mri_driver
+member of the
+.Xr mac_ring_info 9S
+structure as part of the
+.Xr mr_rget 9E
+entry point.
+.It Fa mr_gen
+A 64-bit generation number.
+.El
+.Sh DESCRIPTION
+The
+.Fn mgi_start ,
+.Fn mgi_stop ,
+.Fn mri_start ,
+and
+.Fn mri_stop
+entry points are used to start and stop MAC rings and groups.
+The group entry points are optional, while the ring entry points are
+required.
+The group start entry point will be called before any rings and
+similarly, the ring stop entry point will be called for all rings before
+the group stop entry point.
+In the group case, the group is identified by
+.Fa gh ,
+while the ring entry points use
+.Fa rh
+to identify the specific ring.
+These are opaque pointers to data that was set in the
+.Xr mac_group_info 9S
+and
+.Xr mac_ring_info 9S
+structures during the
+.Xr mr_gget 9E
+and
+.Xr mr_rget 9E
+entry points respectively.
+.Pp
+These entry points give the driver a chance to take action prior to
+actually transmitting or receiving any data.
+The amount of work that is required will vary based on the driver and
+its design.
+At a minimum, during the
+.Fn mri_start
+entry point, a driver is required to save the value of
+.Fa mr_gen
+for later use, in particular when calling
+.Xr mac_rx_ring 9E .
+This is used by the system to discriminate between generations of the
+device's configuration and its operation.
+The operating system will check that all received packets are called
+with the value of
+.Fa mr_gen
+that it expects.
+If they do not match, then they received packets will be dropped.
+.Pp
+In general, it is recommended that descriptor rings are allocated during
+the driver's initial
+.Xr attach 9E .
+In contrast, allocating and freeing the actual memory associated with
+the descriptor entries during ring start and stop can be a reasonable
+way to try and reduce memory overhead of the driver.
+For example, a receive ring generally needs to allocate one DMA buffer
+for each entry in its receive ring that covers the maximum frame size
+that the device can receive.
+This is something that could be deferred to the
+.Fn mri_start
+entry point and then freed in the
+.Fn mri_stop
+entry point.
+.Pp
+It's worth noting that the
+.Fn mrg_stop
+and
+.Fn mrg_stop
+entry points purposefully return
+.Ft void .
+In particular, this means that the driver must be careful about doing
+things which might fail, such as asynchronous communication to a device.
+If that is necessary and such communication fails, the device should be
+marked as faulted and attempt to recover via a reset or similar
+mechanism in another context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn mgi_start
+and
+.Fn mri_start
+entry points should return
+.Sy 0 .
+Otherwise, they should return the appropriate error number.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mr_gget 9E ,
+.Xr mac_group_info 9S

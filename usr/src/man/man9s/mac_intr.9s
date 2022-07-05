@@ -1,0 +1,114 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2022 Oxide Compuer Company
+.\"
+.Dd July 2, 2022
+.Dt MAC_INTR 9S
+.Os
+.Sh NAME
+.Nm mac_intr ,
+.Nm mac_intr_t
+.Nd MAC interrupt information
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Sh INTERFACE STABILITY
+.Sy Uncommitted -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh DESCRIPTION
+The
+.Vt mac_intr_t
+structure is used by the MAC framework as part of the
+.Dv MAC_CAPAB_RINGS
+capability.
+For more background on the MAC framework, please see
+.Xr mac 9E
+and for more information on the
+.Dv MAC_CAPAB_RINGS
+capability,
+.Xr mac_capab_rings 9E .
+.Pp
+The
+.Vt mac_intr_t
+structure is used to describe an interrupt and additional capabilities
+around it.
+The structure is usually used as part of another
+.Xr mac 9E
+related structure such as the
+.Fa mri_intr
+member of the
+.Xr mac_ring_info 9S
+structure.
+The MAC framework uses the functions described here to enable and
+disable interrupt generation for a specific ring, which is used as part
+of switching between polling and interrupt-driven receiving.
+.Pp
+While the structure does embed a
+.Vt ddi_intr_handle_t
+that corresponds to the ring's unerlying MSI-X, MSI, INTx, or other
+interrupt type, the
+.Vt mac_intr_t
+still represents and is scoped to a single ring itself.
+.Sh TYPES
+Tye following types define the function pointers in use in the
+.Vt mac_intr_t
+structure.
+.Bd -literal -offset indent
+typedef int (*mac_intr_enable_t)(mac_intr_handle_t);
+typedef int (*mac_intr_disable_t)(mac_intr_handle_t);
+.Ed
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset indent
+mac_intr_handle_t       mi_handle;
+mac_intr_enable_t       mi_enable;
+mac_intr_disable_t      mi_disable;
+ddi_intr_handle_t       mi_ddi_handle;
+.Ed
+.Pp
+The
+.Fa mi_handle
+member should be set to a driver-specific value that will be passed back
+to the driver in the various callback functions that are setin the
+structure and described below.
+.Pp
+The
+.Fa mi_enable
+member is a required entry point for receive rings and optional for
+transmit rings.
+It should be set to a function which enables interrupts for the ring.
+For more information, see
+.Xr mi_enable 9E .
+.Pp
+The
+.Fa mi_disable
+member is a required entry point for receive rings and an optional entry
+point for transmit rings.
+It should be set to a function which disables interrupts for the ring.
+For more information, see
+.Xr mi_disable 9E .
+.Pp
+The
+.Fa mi_ddi_handle
+member should be set to the interrupt handle that corresponds to the
+ring.
+the interrupt handle will have come from
+.Xr ddi_intr_alloc 9F .
+This member should only be set if the interrupt is a MSI or MSI-X
+interrupt.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_rings 9E ,
+.Xr mi_disable 9E ,
+.Xr mi_enable 9E ,
+.Xr ddi_intr_alloc 9F ,
+.Xr mac_ring_inf 9S
