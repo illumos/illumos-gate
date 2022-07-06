@@ -352,7 +352,6 @@ extern	int	pr_set(proc_t *, long);
 extern	int	pr_unset(proc_t *, long);
 extern	void	pr_sethold(prnode_t *, sigset_t *);
 extern	file_t	*pr_getf(proc_t *, uint_t, short *);
-extern	void	pr_releasef(proc_t *, uint_t);
 extern	void	pr_setfault(proc_t *, fltset_t *);
 extern	int	prusrio(proc_t *, enum uio_rw, struct uio *, int);
 extern	int	prwritectl(vnode_t *, struct uio *, cred_t *);

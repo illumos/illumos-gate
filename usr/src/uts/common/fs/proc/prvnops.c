@@ -24,6 +24,7 @@
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 MNX Cloud, Inc.
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
@@ -824,10 +825,8 @@ pr_read_fdinfo(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 	prfdinfo_t *fdinfo;
 	list_t data;
 	proc_t *p;
-	vnode_t *vp;
 	uint_t fd;
 	file_t *fp;
-	cred_t *file_cred;
 	short ufp_flag;
 	int error = 0;
 
@@ -865,9 +864,6 @@ pr_read_fdinfo(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 		goto out;
 	}
 
-	vp = fp->f_vnode;
-	VN_HOLD(vp);
-
 	/*
 	 * For fdinfo, we don't want to include the placeholder pr_misc at the
 	 * end of the struct. We'll terminate the data with an empty pr_misc
@@ -881,21 +877,16 @@ pr_read_fdinfo(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 	if ((fdinfo->pr_fileflags & (FSEARCH | FEXEC)) == 0)
 		fdinfo->pr_fileflags += FOPEN;
 	fdinfo->pr_offset = fp->f_offset;
-	file_cred = fp->f_cred;
-	crhold(file_cred);
 	/*
 	 * Information from the vnode (rather than the file_t) is retrieved
 	 * later, in prgetfdinfo() - for example sock_getfasync()
 	 */
-	pr_releasef(p, fd);
 
 	prunlock(pnp);
 
-	error = prgetfdinfo(p, vp, fdinfo, cr, file_cred, &data);
+	error = prgetfdinfo(p, fp->f_vnode, fdinfo, cr, fp->f_cred, &data);
 
-	crfree(file_cred);
-
-	VN_RELE(vp);
+	(void) closef(fp);
 
 out:
 	if (error == 0)
@@ -3105,11 +3096,35 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		return (0);
 	}
 
+	/* A subset of prlock(pnp...) */
 	p = pr_p_lock(pnp);
 	mutex_exit(&pr_pidlock);
 	if (p == NULL)
 		return (ENOENT);
 	pcp = pnp->pr_common;
+
+	/*
+	 * Because we're performing a subset of prlock() inline here, we must
+	 * follow prlock's semantics when encountering a zombie process
+	 * (PRC_DESTROY flag is set) or an exiting process (SEXITING flag is
+	 * set). Those semantics indicate acting as if the process is no
+	 * longer there (return ENOENT).
+	 *
+	 * If we chose to proceed here regardless, we may encounter issues
+	 * when we drop the p_lock (see PR_OBJECTDIR, PR_PATHDIR, PR_*MAP,
+	 * PR_LDT, and PR_*PAGEDATA below). A process-cleanup which was
+	 * blocked on p_lock may ignore the P_PR_LOCK flag we set above, since
+	 * it set one of PRC_DESTROY or SEXITING. If the process then gets
+	 * destroyed our "p" will be useless, as will its p_lock.
+	 *
+	 * It may be desirable to move this check to only places further down
+	 * prior to actual droppages of p->p_lock, but for now, we're playing
+	 * it safe and checking here immediately, like prlock() does..
+	 */
+	if (((pcp->prc_flags & PRC_DESTROY) || (p->p_flag & SEXITING))) {
+		prunlock(pnp);
+		return (ENOENT);
+	}
 
 	mutex_enter(&p->p_crlock);
 	vap->va_uid = crgetruid(p->p_cred);
@@ -3182,7 +3197,6 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		break;
 	case PR_FDINFO: {
 		file_t *fp;
-		vnode_t *vp;
 		int fd = pnp->pr_index;
 
 		fp = pr_getf(p, fd, NULL);
@@ -3190,13 +3204,10 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			prunlock(pnp);
 			return (ENOENT);
 		}
-		vp = fp->f_vnode;
-		VN_HOLD(vp);
-		pr_releasef(p, fd);
 		prunlock(pnp);
-		vap->va_size = prgetfdinfosize(p, vp, cr);
-		VN_RELE(vp);
+		vap->va_size = prgetfdinfosize(p, fp->f_vnode, cr);
 		vap->va_nblocks = (fsblkcnt64_t)btod(vap->va_size);
+		(void) closef(fp);
 		return (0);
 	}
 	case PR_LWPDIR:
@@ -4245,7 +4256,7 @@ pr_lookup_lwpiddir(vnode_t *dp, char *comp)
 }
 
 /*
- * Lookup one of the process's open files.
+ * Lookup one of the process's file vnodes.
  */
 static vnode_t *
 pr_lookup_fddir(vnode_t *dp, char *comp)
@@ -4292,10 +4303,11 @@ pr_lookup_fddir(vnode_t *dp, char *comp)
 			pnp->pr_mode |= 0222;
 		vp = fp->f_vnode;
 		VN_HOLD(vp);
-		pr_releasef(p, fd);
 	}
 
 	prunlock(dpnp);
+	if (fp != NULL)
+		(void) closef(fp);
 
 	if (vp == NULL) {
 		prfreenode(pnp);
