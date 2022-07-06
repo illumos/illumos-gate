@@ -15,6 +15,7 @@
 # Copyright 2020-2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Joyent, Inc.
+# Copyright 2022 RackTop Systems, Inc.
 #
 
 file path=usr/share/man/man9f/ASSERT.9f
@@ -1195,6 +1196,8 @@ link path=usr/share/man/man9f/scsi_hba_pkt_free.9f target=scsi_hba_pkt_alloc.9f
 file path=usr/share/man/man9f/scsi_hba_probe.9f
 file path=usr/share/man/man9f/scsi_hba_tgtmap_create.9f
 link path=usr/share/man/man9f/scsi_hba_tgtmap_destroy.9f \
+    target=scsi_hba_tgtmap_create.9f
+link path=usr/share/man/man9f/scsi_hba_tgtmap_scan_luns.9f \
     target=scsi_hba_tgtmap_create.9f
 link path=usr/share/man/man9f/scsi_hba_tgtmap_set_add.9f \
     target=scsi_hba_tgtmap_create.9f

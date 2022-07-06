@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef	_SYS_SCSI_IMPL_TRANSPORT_H
@@ -652,6 +653,9 @@ int	scsi_hba_tgtmap_tgt_remove(
 				char			*tgt_addr);
 
 void	scsi_hba_tgtmap_destroy(scsi_hba_tgtmap_t	*tgt_map);
+
+void	scsi_hba_tgtmap_scan_luns(scsi_hba_tgtmap_t	*tgt_map,
+				char			*tgt_addr);
 
 
 /*
