@@ -28,6 +28,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/types.h>
@@ -73,7 +74,6 @@
 #include <sys/sunldi_impl.h>
 #include <sys/strsun.h>
 #include <sys/isa_defs.h>
-#include <sys/multidata.h>
 #include <sys/pattr.h>
 #include <sys/strft.h>
 #include <sys/fs/snode.h>
@@ -8481,102 +8481,6 @@ mblk_copycred(mblk_t *mp, const mblk_t *src)
 		dbp->db_cpid = cpid;
 }
 
-
-/*
- * Now that NIC drivers are expected to deal only with M_DATA mblks, the
- * hcksum_assoc and hcksum_retrieve functions are deprecated in favor of their
- * respective mac_hcksum_set and mac_hcksum_get counterparts.
- */
-int
-hcksum_assoc(mblk_t *mp,  multidata_t *mmd, pdesc_t *pd,
-    uint32_t start, uint32_t stuff, uint32_t end, uint32_t value,
-    uint32_t flags, int km_flags)
-{
-	int rc = 0;
-
-	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_MULTIDATA);
-	if (mp->b_datap->db_type == M_DATA) {
-		/* Associate values for M_DATA type */
-		DB_CKSUMSTART(mp) = (intptr_t)start;
-		DB_CKSUMSTUFF(mp) = (intptr_t)stuff;
-		DB_CKSUMEND(mp) = (intptr_t)end;
-		DB_CKSUMFLAGS(mp) = flags;
-		DB_CKSUM16(mp) = (uint16_t)value;
-
-	} else {
-		pattrinfo_t pa_info;
-
-		ASSERT(mmd != NULL);
-
-		pa_info.type = PATTR_HCKSUM;
-		pa_info.len = sizeof (pattr_hcksum_t);
-
-		if (mmd_addpattr(mmd, pd, &pa_info, B_TRUE, km_flags) != NULL) {
-			pattr_hcksum_t *hck = (pattr_hcksum_t *)pa_info.buf;
-
-			hck->hcksum_start_offset = start;
-			hck->hcksum_stuff_offset = stuff;
-			hck->hcksum_end_offset = end;
-			hck->hcksum_cksum_val.inet_cksum = (uint16_t)value;
-			hck->hcksum_flags = flags;
-		} else {
-			rc = -1;
-		}
-	}
-	return (rc);
-}
-
-void
-hcksum_retrieve(mblk_t *mp, multidata_t *mmd, pdesc_t *pd,
-    uint32_t *start, uint32_t *stuff, uint32_t *end,
-    uint32_t *value, uint32_t *flags)
-{
-	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_MULTIDATA);
-	if (mp->b_datap->db_type == M_DATA) {
-		if (flags != NULL) {
-			*flags = DB_CKSUMFLAGS(mp) & HCK_FLAGS;
-			if ((*flags & (HCK_PARTIALCKSUM |
-			    HCK_FULLCKSUM)) != 0) {
-				if (value != NULL)
-					*value = (uint32_t)DB_CKSUM16(mp);
-				if ((*flags & HCK_PARTIALCKSUM) != 0) {
-					if (start != NULL)
-						*start =
-						    (uint32_t)DB_CKSUMSTART(mp);
-					if (stuff != NULL)
-						*stuff =
-						    (uint32_t)DB_CKSUMSTUFF(mp);
-					if (end != NULL)
-						*end =
-						    (uint32_t)DB_CKSUMEND(mp);
-				}
-			}
-		}
-	} else {
-		pattrinfo_t hck_attr = {PATTR_HCKSUM};
-
-		ASSERT(mmd != NULL);
-
-		/* get hardware checksum attribute */
-		if (mmd_getpattr(mmd, pd, &hck_attr) != NULL) {
-			pattr_hcksum_t *hck = (pattr_hcksum_t *)hck_attr.buf;
-
-			ASSERT(hck_attr.len >= sizeof (pattr_hcksum_t));
-			if (flags != NULL)
-				*flags = hck->hcksum_flags;
-			if (start != NULL)
-				*start = hck->hcksum_start_offset;
-			if (stuff != NULL)
-				*stuff = hck->hcksum_stuff_offset;
-			if (end != NULL)
-				*end = hck->hcksum_end_offset;
-			if (value != NULL)
-				*value = (uint32_t)
-				    hck->hcksum_cksum_val.inet_cksum;
-		}
-	}
-}
-
 void
 lso_info_set(mblk_t *mp, uint32_t mss, uint32_t flags)
 {
@@ -8656,23 +8560,6 @@ bcksum(uchar_t *bp, int len, unsigned int psum)
 	 * checksum. The max psum value before normalization is 0x3FDFE.
 	 */
 	return ((psum >> 16) + (psum & 0xFFFF));
-}
-
-boolean_t
-is_vmloaned_mblk(mblk_t *mp, multidata_t *mmd, pdesc_t *pd)
-{
-	boolean_t rc;
-
-	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_MULTIDATA);
-	if (DB_TYPE(mp) == M_DATA) {
-		rc = (((mp)->b_datap->db_struioflag & STRUIO_ZC) != 0);
-	} else {
-		pattrinfo_t zcopy_attr = {PATTR_ZCOPY};
-
-		ASSERT(mmd != NULL);
-		rc = (mmd_getpattr(mmd, pd, &zcopy_attr) != NULL);
-	}
-	return (rc);
 }
 
 void

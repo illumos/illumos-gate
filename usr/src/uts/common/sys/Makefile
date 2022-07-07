@@ -411,8 +411,6 @@ CHKHDRS=			\
 	msio.h			\
 	msreg.h			\
 	mtio.h			\
-	multidata.h		\
-	multidata_impl.h	\
 	mutex.h			\
 	nbmlock.h		\
 	ndifm.h			\

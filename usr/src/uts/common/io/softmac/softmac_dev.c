@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/types.h>
@@ -625,7 +626,6 @@ softmac_drv_wput(queue_t *wq, mblk_t *mp)
 
 	switch (DB_TYPE(mp)) {
 	case M_DATA:
-	case M_MULTIDATA:
 		softmac_wput_data(sup, mp);
 		break;
 	case M_PROTO:

@@ -21,6 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 Garrett D'Amore
  */
 
 /*
@@ -32,8 +34,6 @@
 
 #ifndef	_SYS_GLDPRIV_H
 #define	_SYS_GLDPRIV_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -58,7 +58,6 @@ extern "C" {
 /* gld per instance options */
 #define	GLDOPT_FAST_RECV	0x40
 #define	GLDOPT_CANONICAL_ADDR	0x08
-#define	GLDOPT_MDT		0x100
 
 /*
  * This version of GLD allows a "Virtual-LAN-PPA" to be specified in
@@ -226,20 +225,10 @@ typedef enum packet_flag {
 } packet_flag_t;
 
 /*
- * Flags input to the gld_interpret_mdt_*() interpreter routines.
- */
-typedef enum mdt_packet_flag {
-	GLD_MDT_TX,
-	GLD_MDT_TXPKT,
-	GLD_MDT_RXLOOP
-} mdt_packet_flag_t;
-
-/*
  * Describes characteristics of the Media Access Layer.
  * The mac_type is one of the supported DLPI media types (see <sys/dlpi.h>).
  * The mtu_size is the size of the largest frame.
  * The interpreter is the function that "knows" how to interpret the frame.
- * The interpreter_mdt routine knows how to interpret/format MDT packets.
  * Other routines create and/or add headers to packets.
  */
 typedef struct {
@@ -248,8 +237,6 @@ typedef struct {
 	int	hdr_size;
 	int	(*interpreter)(gld_mac_info_t *, mblk_t *, pktinfo_t *,
 		    packet_flag_t);
-	void	(*interpreter_mdt)(gld_mac_info_t *, mblk_t *,
-		    struct pdescinfo_s *, pktinfo_t *, mdt_packet_flag_t);
 	mblk_t	*(*mkfastpath)(gld_t *, mblk_t *);
 	mblk_t	*(*mkunitdata)(gld_t *, mblk_t *);
 	void	(*init)(gld_mac_info_t *);
@@ -628,8 +615,6 @@ int gld_interpret_ether(gld_mac_info_t *, mblk_t *, pktinfo_t *, packet_flag_t);
 int gld_interpret_fddi(gld_mac_info_t *, mblk_t *, pktinfo_t *, packet_flag_t);
 int gld_interpret_tr(gld_mac_info_t *, mblk_t *, pktinfo_t *, packet_flag_t);
 int gld_interpret_ib(gld_mac_info_t *, mblk_t *, pktinfo_t *, packet_flag_t);
-void gld_interpret_mdt_ib(gld_mac_info_t *, mblk_t *, pdescinfo_t *,
-    pktinfo_t *, mdt_packet_flag_t);
 
 mblk_t *gld_fastpath_ether(gld_t *, mblk_t *);
 mblk_t *gld_fastpath_fddi(gld_t *, mblk_t *);

@@ -26,6 +26,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/types.h>
@@ -45,8 +46,6 @@
 #include <sys/vtrace.h>
 #include <sys/ftrace.h>
 #include <sys/ontrap.h>
-#include <sys/multidata.h>
-#include <sys/multidata_impl.h>
 #include <sys/sdt.h>
 #include <sys/strft.h>
 
@@ -405,9 +404,6 @@ streams_msg_init(void)
 	    fthdr_constructor, fthdr_destructor, NULL, NULL, NULL, 0);
 	ftblk_cache = kmem_cache_create("streams_ftblk", sizeof (ftblk_t), 32,
 	    ftblk_constructor, ftblk_destructor, NULL, NULL, NULL, 0);
-
-	/* Initialize Multidata caches */
-	mmd_init();
 
 	/* initialize throttling queue for esballoc */
 	esballoc_queue_init();
@@ -1433,31 +1429,6 @@ copyb(mblk_t *bp)
 	if (dp->db_fthdr != NULL)
 		STR_FTEVENT_MBLK(bp, caller(), FTEV_COPYB, 0);
 
-	/*
-	 * Special handling for Multidata message; this should be
-	 * removed once a copy-callback routine is made available.
-	 */
-	if (dp->db_type == M_MULTIDATA) {
-		cred_t *cr;
-
-		if ((nbp = mmd_copy(bp, KM_NOSLEEP)) == NULL)
-			return (NULL);
-
-		nbp->b_flag = bp->b_flag;
-		nbp->b_band = bp->b_band;
-		ndp = nbp->b_datap;
-
-		/* See comments below on potential issues. */
-		STR_FTEVENT_MBLK(nbp, caller(), FTEV_COPYB, 1);
-
-		ASSERT(ndp->db_type == dp->db_type);
-		cr = dp->db_credp;
-		if (cr != NULL)
-			crhold(ndp->db_credp = cr);
-		ndp->db_cpid = dp->db_cpid;
-		return (nbp);
-	}
-
 	size = dp->db_lim - dp->db_base;
 	unaligned = P2PHASE((uintptr_t)dp->db_base, sizeof (uint_t));
 	if ((nbp = allocb_tmpl(size + unaligned, bp)) == NULL)
@@ -1589,15 +1560,6 @@ pullupmsg(mblk_t *mp, ssize_t len)
 	ASSERT(mp->b_datap->db_ref > 0);
 	ASSERT(mp->b_next == NULL && mp->b_prev == NULL);
 
-	/*
-	 * We won't handle Multidata message, since it contains
-	 * metadata which this function has no knowledge of; we
-	 * assert on DEBUG, and return failure otherwise.
-	 */
-	ASSERT(mp->b_datap->db_type != M_MULTIDATA);
-	if (mp->b_datap->db_type == M_MULTIDATA)
-		return (0);
-
 	if (len == -1) {
 		if (mp->b_cont == NULL && str_aligned(mp->b_rptr))
 			return (1);
@@ -1663,15 +1625,6 @@ msgpullup(mblk_t *mp, ssize_t len)
 	ssize_t	totlen;
 	ssize_t	n;
 
-	/*
-	 * We won't handle Multidata message, since it contains
-	 * metadata which this function has no knowledge of; we
-	 * assert on DEBUG, and return failure otherwise.
-	 */
-	ASSERT(mp->b_datap->db_type != M_MULTIDATA);
-	if (mp->b_datap->db_type == M_MULTIDATA)
-		return (NULL);
-
 	totlen = xmsgsize(mp);
 
 	if ((len > 0) && (len > totlen))
@@ -1730,14 +1683,6 @@ adjmsg(mblk_t *mp, ssize_t len)
 	int first;
 
 	ASSERT(mp != NULL);
-	/*
-	 * We won't handle Multidata message, since it contains
-	 * metadata which this function has no knowledge of; we
-	 * assert on DEBUG, and return failure otherwise.
-	 */
-	ASSERT(mp->b_datap->db_type != M_MULTIDATA);
-	if (mp->b_datap->db_type == M_MULTIDATA)
-		return (0);
 
 	if (len < 0) {
 		fromhead = 0;
@@ -1901,21 +1846,6 @@ getq(queue_t *q)
 }
 
 /*
- * Calculate number of data bytes in a single data message block taking
- * multidata messages into account.
- */
-
-#define	ADD_MBLK_SIZE(mp, size)						\
-	if (DB_TYPE(mp) != M_MULTIDATA) {				\
-		(size) += MBLKL(mp);					\
-	} else {							\
-		uint_t	pinuse;						\
-									\
-		mmd_getsize(mmd_getmultidata(mp), NULL, &pinuse);	\
-		(size) += pinuse;					\
-	}
-
-/*
  * Returns the number of bytes in a message (a message is defined as a
  * chain of mblks linked by b_cont). If a non-NULL mblkcnt is supplied we
  * also return the number of distinct mblks in the message.
@@ -1928,7 +1858,7 @@ mp_cont_len(mblk_t *bp, int *mblkcnt)
 	int	bytes = 0;
 
 	for (mp = bp; mp != NULL; mp = mp->b_cont) {
-		ADD_MBLK_SIZE(mp, bytes);
+		bytes += MBLKL(mp);
 		mblks++;
 	}
 
@@ -1982,7 +1912,7 @@ getq_noenab(queue_t *q, ssize_t rbytes)
 			 */
 			for (mp1 = bp; mp1 != NULL; mp1 = mp1->b_cont) {
 				mblkcnt++;
-				ADD_MBLK_SIZE(mp1, bytecnt);
+				bytecnt += MBLKL(mp1);
 				if (bytecnt  >= rbytes)
 					break;
 			}

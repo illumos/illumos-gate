@@ -23,6 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <mdb/mdb_param.h>
@@ -90,7 +91,6 @@
 #include "log.h"
 #include "mdi.h"
 #include "memory.h"
-#include "mmd.h"
 #include "modhash.h"
 #include "ndievents.h"
 #include "net.h"
@@ -4365,19 +4365,6 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "swapinfo", "?", "display a struct swapinfo", swapinfof },
 	{ "vnode2smap", ":[offset]", "translate vnode to smap", vnode2smap },
 
-	/* from mmd.c */
-	{ "multidata", ":[-sv]", "display a summarized multidata_t",
-		multidata },
-	{ "pattbl", ":", "display a summarized multidata attribute table",
-		pattbl },
-	{ "pattr2multidata", ":", "print multidata pointer from pattr_t",
-		pattr2multidata },
-	{ "pdesc2slab", ":", "print pdesc slab pointer from pdesc_t",
-		pdesc2slab },
-	{ "pdesc_verify", ":", "verify integrity of a pdesc_t", pdesc_verify },
-	{ "slab2multidata", ":", "print multidata pointer from pdesc_slab_t",
-		slab2multidata },
-
 	/* from modhash.c */
 	{ "modhash", "?[-ceht] [-k key] [-v val] [-i index]",
 		"display information about one or all mod_hash structures",
@@ -4771,14 +4758,6 @@ static const mdb_walker_t walkers[] = {
 		segvn_pages_walk_fini, SEGVN_PAGES_ALL },
 	{ "swapinfo", "walk swapinfo structures",
 		swap_walk_init, swap_walk_step, NULL },
-
-	/* from mmd.c */
-	{ "pattr", "walk pattr_t structures", pattr_walk_init,
-		mmdq_walk_step, mmdq_walk_fini },
-	{ "pdesc", "walk pdesc_t structures",
-		pdesc_walk_init, mmdq_walk_step, mmdq_walk_fini },
-	{ "pdesc_slab", "walk pdesc_slab_t structures",
-		pdesc_slab_walk_init, mmdq_walk_step, mmdq_walk_fini },
 
 	/* from modhash.c */
 	{ "modhash", "walk list of mod_hash structures", modhash_walk_init,

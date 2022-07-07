@@ -27,6 +27,7 @@
  *
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/types.h>
@@ -134,13 +135,6 @@ mblk_free(mblk_t *mp)
 	dbp->db_struioun.cksum.flags = 0;
 
 	kmem_cache_free(dbp->db_cache, dbp);
-}
-
-/* ARGSUSED */
-mblk_t *
-mmd_copy(mblk_t *bp, int flags)
-{
-	return (NULL);
 }
 
 /*

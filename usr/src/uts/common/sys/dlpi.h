@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -596,8 +597,7 @@ union	DL_qos_types {
 					/* dl_data is dl_capab_id_t */
 #define	DL_CAPAB_HCKSUM		0x01	/* Checksum offload */
 					/* dl_data is dl_capab_hcksum_t */
-#define	DL_CAPAB_MDT		0x04	/* Multidata Transmit capability */
-					/* dl_data is dl_capab_mdt_t */
+#define	DL_CAPAB_MDT		0x04	/* OBSOLETE, DO NOT USE */
 #define	DL_CAPAB_ZEROCOPY	0x05	/* Zero-copy capability */
 					/* dl_data is dl_capab_zerocopy_t */
 #define	DL_CAPAB_DLD		0x06	/* dld capability */
@@ -627,30 +627,6 @@ typedef struct {
 	dl_mid_t		id_mid;		/* module ID token */
 	dl_capability_sub_t	id_subcap;	/* sub-capability */
 } dl_capab_id_t;
-
-/*
- * Multidata Transmit sub-capability (follows dl_capability_sub_t)
- */
-typedef struct {
-	t_uscalar_t	mdt_version;	/* interface version */
-	t_uscalar_t	mdt_flags;	/* flags */
-	t_uscalar_t	mdt_hdr_head;	/* minimum leading header space */
-	t_uscalar_t	mdt_hdr_tail;	/* minimum trailing header space */
-	t_uscalar_t	mdt_max_pld;	/* maximum doable payload buffers */
-	t_uscalar_t	mdt_span_limit;	/* scatter-gather descriptor limit */
-	dl_mid_t	mdt_mid;	/* module ID token */
-} dl_capab_mdt_t;
-
-/*
- * Multidata Transmit revision definition history
- */
-#define	MDT_CURRENT_VERSION	0x02
-#define	MDT_VERSION_2		0x02
-
-/*
- * mdt_flags values
- */
-#define	DL_CAPAB_MDT_ENABLE	0x01	/* enable Multidata Transmit */
 
 /*
  * DL_CAPAB_HCKSUM

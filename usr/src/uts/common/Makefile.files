@@ -24,7 +24,7 @@
 # Copyright (c) 2011, 2014 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 # Copyright 2018 Nexenta Systems, Inc.
-# Copyright 2022 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore
 # Copyright 2020 Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
@@ -249,7 +249,6 @@ GENUNIX_OBJS +=	\
 		mount.o		\
 		move.o		\
 		msacct.o	\
-		multidata.o	\
 		nbmlock.o	\
 		ndifm.o		\
 		nice.o		\

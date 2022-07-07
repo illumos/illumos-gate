@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 Garrett D'Amore
  */
 
 /*
@@ -29,8 +31,6 @@
 
 #ifndef	_SYS_GLD_H
 #define	_SYS_GLD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ethernet.h>
 
@@ -191,7 +191,7 @@ typedef struct gld_mac_info {
 	unsigned char	reserved9[ETHERADDRL];		/* GLD PRIVATE */
 	t_uscalar_t	gldm_ppa;			/* SET BY DRIVER */
 	int32_t		reserved10;			/* GLD PRIVATE */
-	uint32_t	gldm_capabilities; 		/* SET BY DRIVER */
+	uint32_t	gldm_capabilities;		/* SET BY DRIVER */
 	int32_t		gldm_linkstate;			/* GLD PRIVATE */
 	uint32_t	reserved11;			/* GLD PRIVATE */
 	caddr_t		reserved12;			/* GLD PRIVATE */
@@ -211,19 +211,10 @@ typedef struct gld_mac_info {
 	int		(*gldm_set_promiscuous)();	/* SET BY DRIVER */
 	int		(*gldm_get_stats)();		/* SET BY DRIVER */
 	int		(*gldm_ioctl)();		/* SET BY DRIVER */
-	int		(*gldm_set_multicast)(); 	/* SET BY DRIVER */
+	int		(*gldm_set_multicast)();	/* SET BY DRIVER */
 	uint_t		(*gldm_intr)();			/* SET BY DRIVER */
 	int		(*gldm_mctl)();			/* SET BY DRIVER */
 	int		(*gldm_send_tagged)();		/* SET BY DRIVER */
-	/*
-	 * The following MDT related entry points are Sun private,
-	 * meant only for use by Sun's IPoIB (ibd) driver.
-	 */
-	int		(*gldm_mdt_pre)();		/* SET BY DRIVER */
-	void		(*gldm_mdt_send)();		/* SET BY DRIVER */
-	void		(*gldm_mdt_post)();		/* SET BY DRIVER */
-	int		gldm_mdt_sgl;			/* SET BY DRIVER */
-	int		gldm_mdt_segs;			/* SET BY DRIVER */
 } gld_mac_info_t;
 
 /* flags for physical promiscuous state */

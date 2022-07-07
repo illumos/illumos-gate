@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 Garrett D'Amore
  */
 
 #ifndef	_SYS_SOFTMAC_IMPL_H
@@ -183,8 +185,6 @@ typedef struct softmac {
 	uint32_t	smac_capab_flags;
 	uint32_t	smac_hcksum_txflags;
 	boolean_t	smac_no_capability_req;
-	dl_capab_mdt_t	smac_mdt_capab;
-	boolean_t	smac_mdt;
 
 	/*
 	 * Lower stream structure, accessed by the MAC provider API. The GLDv3

@@ -23,13 +23,13 @@
  * Copyright 2016 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
 #include <inet/ip.h>
 #include <inet/tcp_impl.h>
 #include <inet/cc.h>
-#include <sys/multidata.h>
 #include <sys/sunddi.h>
 
 /* Max size IP datagram is 64k - 1 */

@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
-# Copyright 2022 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2017 RackTop Systems.
@@ -346,10 +346,6 @@ lib/libuutil.so
 usr/include/libuutil_impl.h
 usr/lib/libuutil.so
 usr/lib/sparcv9/libuutil.so		sparc
-#
-# Private Multidata file.
-#
-usr/include/sys/multidata_impl.h
 #
 # Even though all the objects built under usr/src/stand are later glommed
 # together into a couple of second-stage boot loaders, we dump the static
