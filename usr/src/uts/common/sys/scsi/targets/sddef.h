@@ -25,6 +25,7 @@
  * Copyright 2011 cyril.galibern@opensvc.com
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef	_SYS_SCSI_TARGETS_SDDEF_H
@@ -346,11 +347,6 @@ struct sd_lun {
 	uchar_t	un_last_pkt_reason;	/* used to suppress multiple msgs */
 	int	un_tagflags;		/* Pkt Flags for Tagged Queueing  */
 	short	un_resvd_status;	/* Reservation Status */
-	ulong_t	un_detach_count;	/* !0 if executing detach routine */
-	ulong_t	un_layer_count;		/* Current total # of layered opens */
-	ulong_t un_opens_in_progress;	/* Current # of threads in sdopen */
-
-	ksema_t	un_semoclose;		/* serialize opens/closes */
 
 	/*
 	 * Control & status info for command throttling
