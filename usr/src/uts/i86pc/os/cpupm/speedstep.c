@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Co.
  */
 /*
  * Copyright (c) 2009,  Intel Corporation.
@@ -270,8 +271,8 @@ speedstep_supported(uint_t family, uint_t model)
 	struct cpuid_regs cpu_regs;
 
 	/* Required features */
-	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
-	    !is_x86_feature(x86_featureset, X86FSET_MSR)) {
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
+	if (!is_x86_feature(x86_featureset, X86FSET_MSR)) {
 		return (B_FALSE);
 	}
 
@@ -302,8 +303,8 @@ speedstep_turbo_supported(void)
 	struct cpuid_regs cpu_regs;
 
 	/* Required features */
-	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
-	    !is_x86_feature(x86_featureset, X86FSET_MSR)) {
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
+	if (!is_x86_feature(x86_featureset, X86FSET_MSR)) {
 		return (B_FALSE);
 	}
 

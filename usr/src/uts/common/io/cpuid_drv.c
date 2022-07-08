@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Co.
  */
 
 
@@ -114,8 +115,7 @@ cpuid_read(dev_t dev, uio_t *uio, cred_t *cr)
 	struct cpuid_regs crs;
 	int error = 0;
 
-	if (!is_x86_feature(x86_featureset, X86FSET_CPUID))
-		return (ENXIO);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
 
 	if (uio->uio_resid & (sizeof (crs) - 1))
 		return (EINVAL);

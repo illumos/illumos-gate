@@ -860,7 +860,7 @@ void
 bind_hwcap(void)
 {
 	uint_t cpu_hwcap_flags[2];
-	cpuid_pass4(NULL, cpu_hwcap_flags);
+	cpuid_execpass(NULL, CPUID_PASS_RESOLVE, cpu_hwcap_flags);
 
 	auxv_hwcap = (auxv_hwcap_include | cpu_hwcap_flags[0]) &
 	    ~auxv_hwcap_exclude;

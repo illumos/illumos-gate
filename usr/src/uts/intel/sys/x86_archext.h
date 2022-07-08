@@ -1204,8 +1204,6 @@ extern uint_t x86_clflush_size;
 
 extern uint_t pentiumpro_bug4046376;
 
-extern const char CyrixInstead[];
-
 /*
  * These functions are all used to perform various side-channel mitigations.
  * Please see uts/i86pc/os/cpuid.c for more information.
@@ -1255,9 +1253,21 @@ extern void mtrr_sync(void);
 extern void cpu_fast_syscall_enable(void);
 extern void cpu_fast_syscall_disable(void);
 
+typedef enum cpuid_pass {
+	CPUID_PASS_NONE = 0,
+	CPUID_PASS_PRELUDE,
+	CPUID_PASS_IDENT,
+	CPUID_PASS_BASIC,
+	CPUID_PASS_EXTENDED,
+	CPUID_PASS_DYNAMIC,
+	CPUID_PASS_RESOLVE
+} cpuid_pass_t;
+
 struct cpu;
 
-extern int cpuid_checkpass(struct cpu *, int);
+extern boolean_t cpuid_checkpass(const struct cpu *const, const cpuid_pass_t);
+extern void cpuid_execpass(struct cpu *, const cpuid_pass_t, void *);
+extern void cpuid_pass_ucode(struct cpu *, uchar_t *);
 extern uint32_t cpuid_insn(struct cpu *, struct cpuid_regs *);
 extern uint32_t __cpuid_insn(struct cpuid_regs *);
 extern int cpuid_getbrandstr(struct cpu *, char *, size_t);
@@ -1300,13 +1310,8 @@ struct cpuid_info;
 extern void setx86isalist(void);
 extern void cpuid_alloc_space(struct cpu *);
 extern void cpuid_free_space(struct cpu *);
-extern void cpuid_pass1(struct cpu *, uchar_t *);
-extern void cpuid_pass2(struct cpu *);
-extern void cpuid_pass3(struct cpu *);
-extern void cpuid_pass4(struct cpu *, uint_t *);
 extern void cpuid_set_cpu_properties(void *, processorid_t,
     struct cpuid_info *);
-extern void cpuid_pass_ucode(struct cpu *, uchar_t *);
 extern void cpuid_post_ucodeadm(void);
 
 extern void cpuid_get_addrsize(struct cpu *, uint_t *, uint_t *);
@@ -1384,6 +1389,8 @@ extern void xsave_setup_msr(struct cpu *);
 #if !defined(__xpv)
 extern void reset_gdtr_limit(void);
 #endif
+
+extern int enable_platform_detection;
 
 /*
  * Hypervisor signatures
