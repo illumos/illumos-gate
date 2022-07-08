@@ -259,9 +259,7 @@ genconfig(Crle_desc *crle)
 	head->ch_cnflags |= RTC_HDR_64;
 #endif
 
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 	head->ch_cnflags |= RTC_HDR_UPM;
-#endif
 	/*
 	 * If we have a hash table then there are directory and file entries
 	 * to process.

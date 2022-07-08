@@ -320,7 +320,6 @@ elf_config(Rt_map *lmp, int aout)
 	 */
 	if (head->ch_edlibpath) {
 		str = (const char *)(head->ch_edlibpath + addr);
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 		if ((head->ch_cnflags & RTC_HDR_UPM) == 0) {
 #if	defined(_ELF64)
 			str = conv_config_upm(str, MSG_ORIG(MSG_PTH_USRLIB_64),
@@ -330,14 +329,12 @@ elf_config(Rt_map *lmp, int aout)
 			    MSG_ORIG(MSG_PTH_LIB), MSG_PTH_LIB_SIZE);
 #endif
 		}
-#endif
 		if (expand_paths(lmp, str, &elf_def_dirs, AL_CNT_SEARCH,
 		    (LA_SER_DEFAULT | LA_SER_CONFIG), PD_TKN_CAP) != 0)
 			features |= CONF_EDLIBPATH;
 	}
 	if (head->ch_eslibpath) {
 		str = (const char *)(head->ch_eslibpath + addr);
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 		if ((head->ch_cnflags & RTC_HDR_UPM) == 0) {
 #if	defined(_ELF64)
 			str = conv_config_upm(str,
@@ -348,7 +345,6 @@ elf_config(Rt_map *lmp, int aout)
 			    MSG_ORIG(MSG_PTH_LIBSE), MSG_PTH_LIBSE_SIZE);
 #endif
 		}
-#endif
 		if (expand_paths(lmp, str, &elf_sec_dirs, AL_CNT_SEARCH,
 		    (LA_SER_SECURE | LA_SER_CONFIG), PD_TKN_CAP) != 0)
 			features |= CONF_ESLIBPATH;

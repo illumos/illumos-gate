@@ -61,10 +61,8 @@ extern int	_end, _edata, _etext;
 extern void	_init(void);
 extern int	_brk_unlocked(void *);
 
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 /* needed for _brk_unlocked() */
 void *_nd = &_end;
-#endif
 
 /*
  * Counters that are incremented every time an object is mapped/unmapped.
