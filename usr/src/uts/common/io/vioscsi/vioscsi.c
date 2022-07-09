@@ -467,7 +467,7 @@ vioscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			/*
 			 * List empty, or this one expires before others:
 			 */
-			list_insert_tail(l, req);
+			list_insert_head(l, req);
 		}
 		if (vd->vd_timeout == 0) {
 			vd->vd_timeout = timeout(vioscsi_dev_timeout, vd,
