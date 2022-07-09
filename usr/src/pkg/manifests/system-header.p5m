@@ -23,7 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
-# Copyright 2022 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2020 Joyent, Inc.
@@ -1411,7 +1411,6 @@ file path=usr/include/sys/sysdc.h
 file path=usr/include/sys/sysdc_impl.h
 dir  path=usr/include/sys/sysevent
 file path=usr/include/sys/sysevent.h
-file path=usr/include/sys/sysevent/ap_driver.h
 file path=usr/include/sys/sysevent/datalink.h
 file path=usr/include/sys/sysevent/dev.h
 file path=usr/include/sys/sysevent/domain.h

@@ -23,6 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #ifndef	_SYS_SYSEVENT_EVENTDEFS_H
@@ -45,7 +46,6 @@ extern "C" {
 #define	EC_DR		"EC_dr"	/* Dynamic reconfiguration event class */
 #define	EC_ENV		"EC_env"	/* Environmental monitor event class */
 #define	EC_DOMAIN	"EC_domain"	/* Domain event class */
-#define	EC_AP_DRIVER	"EC_ap_driver"	/* Alternate Pathing event class */
 #define	EC_IPMP		"EC_ipmp"	/* IP Multipathing event class */
 #define	EC_DEV_ADD	"EC_dev_add"	/* device add event class */
 #define	EC_DEV_REMOVE	"EC_dev_remove"	/* device remove event class */
@@ -91,19 +91,6 @@ extern "C" {
 #define	ESC_DOMAIN_STATE_CHANGE		"ESC_domain_state_change"
 /* Domain loghost name change */
 #define	ESC_DOMAIN_LOGHOST_CHANGE	"ESC_domain_loghost_change"
-
-/*
- * EC_AP_DRIVER subclass definitions - supporting attributes (name/value pairs)
- * are found in sys/sysevent/ap_driver.h
- */
-
-/* Alternate Pathing path switch */
-#define	ESC_AP_DRIVER_PATHSWITCH	"ESC_ap_driver_pathswitch"
-/* Alternate Pathing database commit */
-#define	ESC_AP_DRIVER_COMMIT		"ESC_ap_driver_commit"
-/* Alternate Pathing physical path status change */
-#define	ESC_AP_DRIVER_PHYS_PATH_STATUS_CHANGE	\
-	"ESC_ap_driver_phys_path_status_change"
 
 /*
  * EC_IPMP subclass definitions - supporting attributes (name/value pairs)

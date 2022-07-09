@@ -4774,7 +4774,6 @@ f usr/include/sys/sysdc.h 0644 root bin
 f usr/include/sys/sysdc_impl.h 0644 root bin
 d usr/include/sys/sysevent 0755 root bin
 f usr/include/sys/sysevent.h 0644 root bin
-f usr/include/sys/sysevent/ap_driver.h 0644 root bin
 f usr/include/sys/sysevent/datalink.h 0644 root bin
 f usr/include/sys/sysevent/dev.h 0644 root bin
 f usr/include/sys/sysevent/domain.h 0644 root bin
