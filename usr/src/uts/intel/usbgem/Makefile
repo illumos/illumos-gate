@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2022 Garrett D'Amore
 #
 
 #
@@ -35,10 +36,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #	these pre-processor macros to define the set we care about.
 #
 CPPFLAGS	+= \
-		-DUSBGEM_CONFIG_GLDv3 \
 		-DMODULE \
-		-DGEN_CONFIG_FMA \
-		-DUSBGEM_CONFIG_MAC_PROP \
 		-DVERSION=\"1.6\"
 
 CERRWARN	+= $(CNOWARN_UNINIT)
