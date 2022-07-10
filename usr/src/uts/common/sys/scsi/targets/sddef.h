@@ -26,6 +26,7 @@
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #ifndef	_SYS_SCSI_TARGETS_SDDEF_H
@@ -467,8 +468,6 @@ struct sd_lun {
 						/* device is attached */
 	    un_f_log_sense_supported	:1,	/* support log sense */
 	    un_f_pm_supported		:1, 	/* support power-management */
-	    un_f_cfg_is_lsi		:1,	/* Is LSI device, */
-						/* default to NO */
 	    un_f_wcc_inprog		:1,	/* write cache change in */
 						/* progress */
 	    un_f_ejecting		:1,	/* media is ejecting */
@@ -494,7 +493,7 @@ struct sd_lun {
 	    un_f_enable_rmw		:1,	/* Force RMW in sd driver */
 	    un_f_expnevent		:1,
 	    un_f_cache_mode_changeable	:1,	/* can change cache mode */
-	    un_f_reserved		:1;
+	    un_f_reserved		:2;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
@@ -555,13 +554,6 @@ struct sd_lun {
 
 	hrtime_t	un_pm_idle_time;
 	timeout_id_t	un_pm_idle_timeid;
-
-	/*
-	 * Count to determine if a Sonoma controller is in the process of
-	 * failing over, and how many I/O's are failed with the 05/94/01
-	 * sense code.
-	 */
-	uint_t		un_sonoma_failure_count;
 
 	/*
 	 * Support for failfast operation.
@@ -784,15 +776,6 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_lun::un_fi_mutex,
 #define	ISCD(un)		((un)->un_ctype == CTYPE_CDROM)
 #define	ISROD(un)		((un)->un_ctype == CTYPE_ROD)
 #define	ISPXRE(un)		((un)->un_ctype == CTYPE_PXRE)
-
-/*
- * This macro checks the vendor of the device to see if it is LSI. Because
- * LSI has some devices out there that return 'Symbios' or 'SYMBIOS', we
- * need to check for those also.
- *
- * This is used in some vendor specific checks.
- */
-#define	SD_IS_LSI(un)	((un)->un_f_cfg_is_lsi == TRUE)
 
 /*
  * Macros for non-512 byte writes to removable devices.

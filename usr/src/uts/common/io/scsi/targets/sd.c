@@ -30,6 +30,7 @@
  * Copyright 2019 Racktop Systems
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -1108,7 +1109,6 @@ static int sd_pm_idletime = 1;
 #define	sd_failfast_flushq		ssd_failfast_flushq
 #define	sd_failfast_flushq_callback	ssd_failfast_flushq_callback
 
-#define	sd_is_lsi			ssd_is_lsi
 #define	sd_tg_rdwr			ssd_tg_rdwr
 #define	sd_tg_getinfo			ssd_tg_getinfo
 #define	sd_rmw_msg_print_handler	ssd_rmw_msg_print_handler
@@ -1634,11 +1634,6 @@ sddump_do_read_of_rmw(struct sd_lun *un, uint64_t blkno, uint64_t nblk,
  */
 static void sd_failfast_flushq(struct sd_lun *un);
 static int sd_failfast_flushq_callback(struct buf *bp);
-
-/*
- * Function prototypes to check for lsi devices
- */
-static void sd_is_lsi(struct sd_lun *un);
 
 /*
  * Function prototypes for partial DMA support
@@ -3720,11 +3715,6 @@ sd_read_unit_properties(struct sd_lun *un)
 	if (sd_process_sdconf_file(un) == SD_FAILURE) {
 		sd_process_sdconf_table(un);
 	}
-
-	/* check for LSI device */
-	sd_is_lsi(un);
-
-
 }
 
 
@@ -4784,47 +4774,6 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 	    (un->un_min_throttle > un->un_throttle)) {
 		un->un_saved_throttle = un->un_throttle = sd_max_throttle;
 		un->un_min_throttle = sd_min_throttle;
-	}
-}
-
-/*
- *   Function: sd_is_lsi()
- *
- *   Description: Check for lsi devices, step through the static device
- *	table to match vid/pid.
- *
- *   Args: un - ptr to sd_lun
- *
- *   Notes:  When creating new LSI property, need to add the new LSI property
- *		to this function.
- */
-static void
-sd_is_lsi(struct sd_lun *un)
-{
-	char	*id = NULL;
-	int	table_index;
-	int	idlen;
-	void	*prop;
-
-	ASSERT(un != NULL);
-	for (table_index = 0; table_index < sd_disk_table_size;
-	    table_index++) {
-		id = sd_disk_table[table_index].device_id;
-		idlen = strlen(id);
-		if (idlen == 0) {
-			continue;
-		}
-
-		if (sd_sdconf_id_match(un, id, idlen) == SD_SUCCESS) {
-			prop = sd_disk_table[table_index].properties;
-			if (prop == &lsi_properties ||
-			    prop == &lsi_oem_properties ||
-			    prop == &lsi_properties_scsi ||
-			    prop == &symbios_properties) {
-				un->un_f_cfg_is_lsi = TRUE;
-			}
-			break;
-		}
 	}
 }
 
@@ -16898,12 +16847,6 @@ sdintr(struct scsi_pkt *pktp)
 	    (SD_GET_PKT_STATUS(pktp) == STATUS_GOOD)) {
 
 		/*
-		 * Since this command is returned with a good status, we
-		 * can reset the count for Sonoma failover.
-		 */
-		un->un_sonoma_failure_count = 0;
-
-		/*
 		 * Return all USCSI commands on good status
 		 */
 		if (pktp->pkt_resid == 0) {
@@ -17925,18 +17868,6 @@ sd_print_sense_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
 			return;
 		}
 	}
-	/*
-	 * Check for Sonoma Failover and keep a count of how many failed I/O's
-	 */
-	if ((SD_IS_LSI(un)) &&
-	    (scsi_sense_key(sensep) == KEY_ILLEGAL_REQUEST) &&
-	    (scsi_sense_asc(sensep) == 0x94) &&
-	    (scsi_sense_ascq(sensep) == 0x01)) {
-		un->un_sonoma_failure_count++;
-		if (un->un_sonoma_failure_count > 1) {
-			return;
-		}
-	}
 
 	if (SD_FM_LOG(un) == SD_FM_LOG_NSUP ||
 	    ((scsi_sense_key(sensep) == KEY_RECOVERABLE_ERROR) &&
@@ -18302,7 +18233,6 @@ sd_sense_key_medium_or_hardware_error(struct sd_lun *un, uint8_t *sense_datap,
 {
 	struct sd_sense_info	si;
 	uint8_t sense_key = scsi_sense_key(sense_datap);
-	uint8_t asc = scsi_sense_asc(sense_datap);
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -18325,50 +18255,20 @@ sd_sense_key_medium_or_hardware_error(struct sd_lun *un, uint8_t *sense_datap,
 		/* Do NOT do a RESET_ALL here: too intrusive. (4112858) */
 		if (un->un_f_allow_bus_device_reset == TRUE) {
 
-			boolean_t try_resetting_target = B_TRUE;
-
-			/*
-			 * We need to be able to handle specific ASC when we are
-			 * handling a KEY_HARDWARE_ERROR. In particular
-			 * taking the default action of resetting the target may
-			 * not be the appropriate way to attempt recovery.
-			 * Resetting a target because of a single LUN failure
-			 * victimizes all LUNs on that target.
-			 *
-			 * This is true for the LSI arrays, if an LSI
-			 * array controller returns an ASC of 0x84 (LUN Dead) we
-			 * should trust it.
-			 */
-
-			if (sense_key == KEY_HARDWARE_ERROR) {
-				switch (asc) {
-				case 0x84:
-					if (SD_IS_LSI(un)) {
-						try_resetting_target = B_FALSE;
-					}
-					break;
-				default:
-					break;
-				}
+			int reset_retval = 0;
+			if (un->un_f_lun_reset_enabled == TRUE) {
+				SD_TRACE(SD_LOG_IO_CORE, un,
+				    "sd_sense_key_medium_or_hardware_"
+				    "error: issuing RESET_LUN\n");
+				reset_retval = scsi_reset(SD_ADDRESS(un),
+				    RESET_LUN);
 			}
-
-			if (try_resetting_target == B_TRUE) {
-				int reset_retval = 0;
-				if (un->un_f_lun_reset_enabled == TRUE) {
-					SD_TRACE(SD_LOG_IO_CORE, un,
-					    "sd_sense_key_medium_or_hardware_"
-					    "error: issuing RESET_LUN\n");
-					reset_retval =
-					    scsi_reset(SD_ADDRESS(un),
-					    RESET_LUN);
-				}
-				if (reset_retval == 0) {
-					SD_TRACE(SD_LOG_IO_CORE, un,
-					    "sd_sense_key_medium_or_hardware_"
-					    "error: issuing RESET_TARGET\n");
-					(void) scsi_reset(SD_ADDRESS(un),
-					    RESET_TARGET);
-				}
+			if (reset_retval == 0) {
+				SD_TRACE(SD_LOG_IO_CORE, un,
+				    "sd_sense_key_medium_or_hardware_"
+				    "error: issuing RESET_TARGET\n");
+				(void) scsi_reset(SD_ADDRESS(un),
+				    RESET_TARGET);
 			}
 		}
 		mutex_enter(SD_MUTEX(un));
@@ -26505,9 +26405,7 @@ sd_send_polled_RQS(struct sd_lun *un)
  *		send a scsi_pkt to a device as a polled command.  This version
  *		is to ensure more robust handling of transport errors.
  *		Specifically this routine cures not ready, coming ready
- *		transition for power up and reset of sonoma's.  This can take
- *		up to 45 seconds for power-on and 20 seconds for reset of a
- *		sonoma lun.
+ *		transition for power up and reset.
  *
  *   Arguments: scsi_pkt - The scsi_pkt being sent to a device
  *
