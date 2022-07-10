@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_SOC 3NSL "May 13, 2017"
+.TH RPC_SOC 3NSL "May 22, 2022"
 .SH NAME
 rpc_soc, authdes_create, authunix_create, authunix_create_default, callrpc,
 clnt_broadcast, clntraw_create, clnttcp_create, clntudp_bufcreate,
@@ -14,7 +14,6 @@ svc_getreq, svc_register, svc_unregister, svcfd_create, svcraw_create,
 svctcp_create, svcudp_bufcreate, svcudp_create, xdr_authunix_parms \- obsolete
 library routines for RPC
 .SH SYNOPSIS
-.LP
 .nf
 #define PORTMAP
 #include <rpc/rpc.h>
@@ -23,7 +22,8 @@ library routines for RPC
 .LP
 .nf
 \fBAUTH *\fR\fBauthdes_create\fR(\fBchar *\fR\fIname\fR, \fBuint_t\fR \fIwindow\fR,
-     \fBstruct sockaddr_in *\fR\fIsyncaddr\fR, \fBdes_block *\fR\fIckey\fR);
+     \fBstruct sockaddr_in *\fR\fIsyncaddr\fR, \fBdes_block *\fR\fIckey\fR,
+     \fBint\fR \fIcalltype\fR, \fBAUTH **\fR\fIretauth\fR);
 .fi
 
 .LP
@@ -39,7 +39,7 @@ library routines for RPC
 
 .LP
 .nf
-\fBcallrpc\fR(\fBchar *\fR\fIhost\fR, \fBrpcprog_t\fR \fIprognum\fR, \fBrpcvers_t\fR \fIversnum\fR,
+\fBint\fR \fBcallrpc\fR(\fBchar *\fR\fIhost\fR, \fBrpcprog_t\fR \fIprognum\fR, \fBrpcvers_t\fR \fIversnum\fR,
      \fBrpcproc_t\fR \fIprocnum\fR, \fBxdrproc_t\fR \fIinproc\fR, \fBchar *\fR\fIin\fR,
      \fBxdrproc_t\fR \fIoutproc\fR, \fBchar *\fR\fIout\fR);
 .fi
@@ -48,7 +48,7 @@ library routines for RPC
 .nf
 \fBenum\fR \fBclnt_stat_clnt_broadcast\fR(\fBrpcprog_t\fR \fIprognum\fR, \fBrpcvers_t\fR \fIversnum\fR,
      \fBrpcproc_t\fR \fIprocnum\fR, \fBxdrproc_t\fR \fIinproc\fR, \fBchar *\fR\fIin\fR,
-     \fBxdrproc_t\fR \fIoutproc\fR, \fBchar *\fR\fIout\fR, \fBresultproc_t\fR\fIeachresult\fR);
+     \fBxdrproc_t\fR \fIoutproc\fR, \fBchar *\fR\fIout\fR, \fBresultproc_t\fR \fIeachresult\fR);
 .fi
 
 .LP
@@ -72,8 +72,8 @@ library routines for RPC
 
 .LP
 .nf
-\fBCLIENT *\fR\fBclntudp_create\fR(\fBstruct sockaddr_in *\fR\fIaddr\fR,
-     \fBrpcprog_t\fR \fIprognum\fR, \fBstruct timeval\fR \fIwait\fR, \fBint *\fR\fIfdp\fR);
+\fBCLIENT *\fR\fBclntudp_create\fR(\fBstruct sockaddr_in *\fR\fIaddr\fR, \fBrpcprog_t\fR \fIprognum\fR,
+     \fBrpcvers_t\fR \fIversnum\fR, \fBstruct timeval\fR \fIwait\fR, \fBint *\fR\fIfdp\fR);
 .fi
 
 .LP
@@ -164,14 +164,14 @@ int svc_fds;
 
 .LP
 .nf
-\fB\fR\fBregisterrpc\fR(\fBrpcprog_t\fR \fIprognum\fR, \fBrpcvers_t\fR \fIversnum\fR, \fBrpcproc_t\fR \fIprocnum\fR,
+\fBint\fR \fBregisterrpc\fR(\fBrpcprog_t\fR \fIprognum\fR, \fBrpcvers_t\fR \fIversnum\fR, \fBrpcproc_t\fR \fIprocnum\fR,
      \fBchar *(*procname)()\fR, \fBxdrproc_t\fR \fIinproc\fR, \fBxdrproc_t\fR \fIoutproc\fR);
 .fi
 
 .LP
 .nf
-\fBbool_t\fR\fBsvc_register\fR(\fBSVCXPRT *\fR\fIxprt\fR, \fBrpcprog_t\fR \fIprognum\fR, \fBrpcvers_t\fR \fIversnum\fR,
-     \fBvoid (*\fR\fIdispatch()\fR, \fBint\fR \fIprotocol\fR);
+\fBbool_t\fR \fBsvc_register\fR(\fBSVCXPRT *\fR\fIxprt\fR, \fBrpcprog_t\fR \fIprognum\fR, \fBrpcvers_t\fR \fIversnum\fR,
+     \fBvoid (*)\fR\fIdispatch()\fR, \fBint\fR \fIprotocol\fR);
 .fi
 
 .LP
@@ -185,7 +185,6 @@ int svc_fds;
 .fi
 
 .SH DESCRIPTION
-.LP
 \fBRPC\fR routines allow C programs to make procedure calls on other machines
 across the network. First, the client calls a procedure to send a request to
 the server. Upon receipt of the request, the server calls a dispatch routine to
@@ -198,7 +197,6 @@ routines. The preferred routine is given after the description of the routine.
 New programs should use the preferred routines, as support for the older
 interfaces may be dropped in future releases.
 .SS "File Descriptors"
-.LP
 Transport independent \fBRPC\fR uses \fBTLI\fR as its transport interface
 instead of sockets.
 .sp
@@ -211,7 +209,6 @@ with both \fBlibrpcsoc\fR and \fBlibnsl\fR. If the user passed
 \fBlibnsl\fR only, then the routine will return a \fBTLI\fR file descriptor
 and not a socket.
 .SS "Routines"
-.LP
 The following routines require that the header \fB<rpc/rpc.h>\fR be included.
 The symbol \fBPORTMAP\fR should be defined so that the appropriate function
 declarations for the old interfaces are included through the header files.
@@ -223,9 +220,9 @@ declarations for the old interfaces are included through the header files.
 .RS 30n
 \fBauthdes_create()\fR is the first of two routines which interface to the
 \fBRPC\fR secure authentication system, known as \fBDES\fR authentication. The
-second is \fBauthdes_getucred()\fR, below.  Note: the keyserver daemon
-\fBkeyserv\fR(8) must be running for the \fBDES\fR authentication system to
-work.
+second is \fBauthdes_getucred()\fR, see \fBsecure_rpc\fR(3NSL).  Note: the
+keyserver daemon \fBkeyserv\fR(8) must be running for the \fBDES\fR
+authentication system to work.
 .sp
 \fBauthdes_create()\fR, used on the client side, returns an authentication
 handle that will enable the use of the secure authentication system. The first
@@ -236,13 +233,13 @@ using \fBuser2netname()\fR. See \fBsecure_rpc\fR(3NSL). The second field is
 window on the validity of the client credential, given in seconds.  A small
 window is more secure than a large one, but choosing too small of a window
 will increase the frequency of resynchronizations because of clock drift.  The
-third parameter \fIsyncaddr\fR is optional.  If it is \fBNULL,\fR then the
+third parameter \fIsyncaddr\fR is optional.  If it is \fBNULL\fR, then the
 authentication system will assume that the local clock is always in sync with
 the server's clock, and will not attempt resynchronizations. If an address is
 supplied, however, then the system will use the address for consulting the
 remote time service whenever resynchronization is required.  This parameter is
 usually the address of the \fBRPC\fR server itself. The final parameter
-\fIckey\fR is also optional. If it is \fBNULL,\fR then the authentication
+\fIckey\fR is also optional. If it is \fBNULL\fR, then the authentication
 system will generate a random \fBDES\fR key to be used for the encryption of
 credentials. If it is supplied, however, then it will be used instead.
 .sp
@@ -256,10 +253,10 @@ This routine exists for backward compatibility only, and it is made obsolete by
 \fB\fBauthunix_create()\fR\fR
 .ad
 .RS 30n
-Create and return an \fBRPC\fR authentication handle that contains .UX
+Create and return an \fBRPC\fR authentication handle that contains UNIX
 authentication information. The parameter \fIhost\fR is the name of the machine
-on which the information was created; \fIuid\fR is the user's user \fBID;\fR
-\fIgid\fR is the user's current group \fBID;\fR \fIgrouplen\fR and
+on which the information was created; \fIuid\fR is the user's user \fBID\fR;
+\fIgid\fR is the user's current group \fBID\fR; \fIgrouplen\fR and
 \fIgidlistp\fR refer to a counted array of groups to which the user belongs.
 .sp
 It is not very difficult to impersonate a user.
@@ -320,13 +317,13 @@ where \fIout\fR is the same as \fIout\fR passed to \fBclnt_broadcast()\fR,
 except that the remote procedure's output is decoded there; \fIaddr\fR points
 to the address of the machine that sent the results. If \fBeachresult()\fR
 returns \fB0\fR, \fBclnt_broadcast()\fR waits for more replies; otherwise it
-returns with appropriate status.  If \fBeachresult()\fR is \fBNULL,\fR
+returns with appropriate status.  If \fBeachresult()\fR is \fBNULL\fR,
 \fBclnt_broadcast()\fR returns without waiting for any replies.
 .sp
 Broadcast packets are limited in size to the maximum transfer unit of the
-transports involved. For Ethernet, the callers argument size is approximately
+transports involved. For Ethernet, the caller's argument size is approximately
 1500 bytes. Since the call message is sent to all connected networks, it may
-potentially lead to broadcast storms. \fBclnt_broadcast()\fR uses SB AUTH_SYS
+potentially lead to broadcast storms. \fBclnt_broadcast()\fR uses \fBAUTH_SYS\fR
 credentials by default. See \fBrpc_clnt_auth\fR(3NSL). This routine exists for
 backward compatibility only, and is made obsolete by \fBrpc_broadcast()\fR. See
 \fBrpc_clnt_calls\fR(3NSL).
@@ -365,7 +362,7 @@ that the remote program is listening on. The remote \fBrpcbind\fR service is
 consulted for this information. The parameter \fI*fdp\fR is a file descriptor,
 which may be open and bound; if it is \fBRPC_ANYSOCK\fR, then this routine
 opens a new one and sets \fI*fdp\fR. Refer to the \fBFile Descriptor\fR section
-for more information. Since \fBTCP-based\fR \fBRPC\fR uses buffered \fBI/O,\fR
+for more information. Since \fBTCP\fR-based \fBRPC\fR uses buffered \fBI/O\fR,
 the user may specify the size of the send and receive buffers with the
 parameters \fIsendsz\fR and \fIrecvsz\fR. Values of \fB0\fR choose suitable
 defaults. This routine returns \fBNULL\fR if it fails.
@@ -381,7 +378,8 @@ This routine exists for backward compatibility only. \fBclnt_create()\fR,
 \fB\fBclntudp_bufcreate()\fR\fR
 .ad
 .RS 30n
-Create a client handle for the remote program \fIprognum\fR, on \fIversnum\fR;
+Create a client handle for the remote program \fIprognum\fR, version
+\fIversnum\fR;
 the client uses \fBUDP/IP\fR as the transport. The remote program is located
 at the Internet address \fIaddr\fR. If \fIaddr\fR->\fIsin_port\fR is \fB0\fR,
 it is set to port on which the remote program is listening on (the remote
@@ -397,7 +395,7 @@ error can be printed using the \fBclnt_pcreateerror()\fR routine. See
 \fBrpc_clnt_create\fR(3NSL).
 .sp
 The user can specify the maximum packet size for sending and receiving by using
-\fIsendsz\fR and \fIrecvsz\fR arguments for \fBUDP-based\fR \fBRPC\fR messages.
+\fIsendsz\fR and \fIrecvsz\fR arguments for \fBUDP\fR-based \fBRPC\fR messages.
 .sp
 If \fIaddr\fR->\fIsin_port\fR is \fB0\fR and the requested version number
 \fIversnum\fR is not registered with the remote portmap service, it returns a
@@ -418,7 +416,7 @@ This routine exists for backward compatibility only. \fBclnt_tli_create()\fR or
 This routine creates an \fBRPC\fR client handle for the remote program
 \fIprognum\fR, version \fIversnum\fR; the client uses \fBUDP/IP\fR as a
 transport. The remote program is located at Internet address \fIaddr\fR. If
-\fIaddr\fR->\fIsin_port\fR is \fB0\fR, then it is set to actual port that the
+\fIaddr\fR->\fIsin_port\fR is \fB0\fR, then it is set to the actual port that the
 remote program is listening on. The remote \fBrpcbind\fR service is consulted
 for this information. The parameter \fI*fdp\fR is a file descriptor, which may
 be open and bound; if it is \fBRPC_ANYSOCK\fR, then this routine opens a new
@@ -430,7 +428,7 @@ total time for the call to time out is specified by \fBclnt_call()\fR. See
 success, otherwise it returns \fBNULL\fR. The error can be printed using the
 \fBclnt_pcreateerror()\fR routine. See \fBrpc_clnt_create\fR(3NSL).
 .sp
-Since \fBUDP-based\fR \fBRPC\fR messages can only hold up to 8 Kbytes of
+Since \fBUDP\fR-based \fBRPC\fR messages can only hold up to 8 Kbytes of
 encoded data, this transport cannot be used for procedures that take large
 arguments or return huge results.
 .sp
@@ -487,8 +485,8 @@ provided by \fBrpcb_getaddr()\fR. See \fBrpcbind\fR(3NSL).
 .RS 30n
 A user interface to the \fBportmap\fR service, which returns a list of the
 current \fBRPC\fR program-to-port mappings on the host located at \fBIP\fR
-address \fIaddr\fR. This routine can return \fBNULL .\fR The command
-`\fBrpcinfo\fR\fB-p\fR' uses this routine.
+address \fIaddr\fR. This routine can return \fBNULL\fR. The command
+`\fBrpcinfo\fR \fB-p\fR' uses this routine.
 .sp
 This routine exists for backward compatibility only, enhanced functionality is
 provided by \fBrpcb_getmaps()\fR. See \fBrpcbind\fR(3NSL).
@@ -505,9 +503,9 @@ on which waits a service that supports program \fIprognum\fR, version
 \fIversnum\fR, and speaks the transport protocol associated with
 \fIprotocol\fR. The value of \fIprotocol\fR is most likely \fBIPPROTO_UDP\fR or
 \fBIPPROTO_TCP\fR. A return value of \fB0\fR means that the mapping does not
-exist or that the \fBRPC\fR system failured to contact the remote \fBportmap\fR
+exist or that the \fBRPC\fR system failed to contact the remote \fBportmap\fR
 service.  In the latter case, the global variable \fBrpc_createerr\fR contains
-the \fB RPC\fR status.
+the \fBRPC\fR status.
 .sp
 This routine exists for backward compatibility only, enhanced functionality is
 provided by \fBrpcb_getaddr()\fR. See \fBrpcbind\fR(3NSL).
@@ -525,7 +523,7 @@ an \fBRPC\fR on the behalf of the caller to a procedure on that host.
 succeeds. The definitions of other parameters are discussed in \fBcallrpc()\fR
 and \fBclnt_call()\fR. See \fBrpc_clnt_calls\fR(3NSL).
 .sp
-This procedure is only available for the UDP transport.
+This procedure is only available for the \fBUDP\fR transport.
 .sp
 If the requested remote procedure is not registered with the remote
 \fBportmap\fR then no error response is returned and the call times out. Also,
@@ -562,8 +560,8 @@ provided by \fBrpcb_set()\fR. See \fBrpcbind\fR(3NSL).
 .RS 30n
 A user interface to the \fBportmap\fR service, which destroys all mapping
 between the triple [\fIprognum\fR, \fIversnum\fR, \fIall-protocols\fR] and
-\fIport\fR on the machine's \fBportmap\fR service.  This routine returns one if
-it succeeds, \fB0\fR otherwise.
+\fIport\fR on the machine's \fBportmap\fR service.  This routine returns
+\fB1\fR if it succeeds, \fB0\fR otherwise.
 .sp
 This routine exists for backward compatibility only, enhanced functionality is
 provided by \fBrpcb_unset()\fR. See \fBrpcbind\fR(3NSL).
@@ -578,7 +576,7 @@ provided by \fBrpcb_unset()\fR. See \fBrpcbind\fR(3NSL).
 A global variable reflecting the \fBRPC\fR service side's read file descriptor
 bit mask; it is suitable as a parameter to the \fBselect()\fR call. This is
 only of interest if a service implementor does not call \fBsvc_run()\fR, but
-rather does his own asynchronous event processing. This variable is read-only ,
+rather does his own asynchronous event processing. This variable is read-only,
 yet it may change after calls to \fBsvc_getreq()\fR or any creation routines.
 Do not pass its address to \fBselect()\fR! Similar to \fBsvc_fdset\fR, but
 limited to 32 descriptors.
@@ -660,15 +658,15 @@ obsoletes it.
 \fB\fBsvctcp_create()\fR\fR
 .ad
 .RS 30n
-This routine creates a \fBTCP/IP-based\fR \fBRPC\fR service transport, to which
+This routine creates a \fBTCP/IP\fR-based \fBRPC\fR service transport, to which
 it returns a pointer. The transport is associated with the file descriptor
 \fIfd\fR, which may be \fBRPC_ANYSOCK\fR, in which case a new file descriptor
 is created. If the file descriptor is not bound to a local \fBTCP\fR port, then
 this routine binds it to an arbitrary port. Refer to the \fBFile Descriptor\fR
 section for more information. Upon completion, \fIxprt\fR->\fBxp_fd\fR is the
 transport's file descriptor, and \fIxprt\fR->\fBxp_port\fR is the transport's
-port number. This routine returns \fBNULL\fR if it fails. Since \fBTCP-based\fR
-\fBRPC\fR uses buffered \fBI/O,\fR users may specify the size of buffers;
+port number. This routine returns \fBNULL\fR if it fails. Since \fBTCP\fR-based
+\fBRPC\fR uses buffered \fBI/O\fR, users may specify the size of buffers;
 values of \fB0\fR choose suitable defaults.
 .sp
 This routine exists for backward compatibility only. \fBsvc_create()\fR,
@@ -682,7 +680,7 @@ This routine exists for backward compatibility only. \fBsvc_create()\fR,
 \fB\fBsvcudp_bufcreate()\fR\fR
 .ad
 .RS 30n
-This routine creates a \fBUDP/IP-based\fR \fBRPC\fR service transport, to which
+This routine creates a \fBUDP/IP\fR-based \fBRPC\fR service transport, to which
 it returns a pointer. The transport is associated with the file descriptor
 \fIfd\fR. If \fIfd\fR is \fBRPC_ANYSOCK\fR then a new file descriptor is
 created. If the file descriptor is not bound to a local \fBUDP\fR port, then
@@ -692,7 +690,8 @@ this routine binds it to an arbitrary port. Upon completion,
 Descriptor\fR section for more information. This routine returns \fBNULL\fR if
 it fails.
 .sp
-The user specifies the maximum packet size for sending and receiving UDP-based
+The user specifies the maximum packet size for sending and receiving
+\fBUDP\fR-based
 \fBRPC\fR messages by using the \fIsendsz\fR and \fIrecvsz\fR parameters.
 .sp
 This routine exists for backward compatibility only. \fBsvc_tli_create()\fR, or
@@ -705,7 +704,7 @@ This routine exists for backward compatibility only. \fBsvc_tli_create()\fR, or
 \fB\fBsvcudp_create()\fR\fR
 .ad
 .RS 30n
-This routine creates a \fBUDP/IP-based\fR \fBRPC\fR service transport, to which
+This routine creates a \fBUDP/IP\fR-based \fBRPC\fR service transport, to which
 it returns a pointer. The transport is associated with the file descriptor
 \fIfd\fR, which may be \fBRPC_ANYSOCK\fR, in which case a new file descriptor
 is created. If the file descriptor is not bound to a local \fBUDP\fR port, then
@@ -714,7 +713,7 @@ this routine binds it to an arbitrary port. Upon completion,
 \fIxprt\fR->\fBxp_port\fR is the transport's port number. This routine returns
 \fBNULL\fR if it fails.
 .sp
-Since \fBUDP-based\fR \fBRPC\fR messages can only hold up to 8 Kbytes of
+Since \fBUDP\fR-based \fBRPC\fR messages can only hold up to 8 Kbytes of
 encoded data, this transport cannot be used for procedures that take large
 arguments or return huge results.
 .sp
@@ -729,7 +728,7 @@ This routine exists for backward compatibility only. \fBsvc_create()\fR,
 \fB\fBregisterrpc()\fR\fR
 .ad
 .RS 30n
-Register program \fIprognum\fR, procedure \fIprocname\fR, and version
+Register program \fIprognum\fR, procedure \fIprocnum\fR, and version
 \fIversnum\fR with the \fBRPC\fR service package. If a request arrives for
 program \fIprognum\fR, version \fIversnum\fR, and procedure \fIprocnum\fR,
 \fIprocname\fR is called with a pointer to its parameter(s). \fIprocname\fR
@@ -799,7 +798,6 @@ This routine exists for backward compatibility only, and is made obsolete by
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -814,7 +812,6 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR select (3C),
 .BR libnsl (3LIB),
 .BR netdir (3NSL),
@@ -836,6 +833,5 @@ MT-Level	Unsafe
 .BR rpcbind (8),
 .BR rpcinfo (8)
 .SH NOTES
-.LP
 These interfaces are unsafe in multithreaded applications.  Unsafe interfaces
 should be called only from the main thread.
