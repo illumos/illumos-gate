@@ -85,7 +85,6 @@
 # Ignore internal packages, scripts, and tools that are intentionally not
 # built or used during a nightly.
 #
-./usr/src/cmd/sgs/rtld.4.x
 ./usr/src/prototypes
 ./usr/src/cmd/pools/poold/com/sun/solaris/*/*/package.html
 ./usr/src/uts/intel/io/acpica/cmp_ca.sh

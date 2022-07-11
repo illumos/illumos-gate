@@ -1,0 +1,59 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2022 RackTop Systems, Inc.
+.\"
+.Dd July 1, 2022
+.Dt PVSCSI 4D
+.Os
+.Sh NAME
+.Nm pvscsi
+.Nd VMware SCSI driver
+.Sh DESCRIPTION
+The
+.Nm
+driver provides a paravirtual SCSI transport, allowing
+access to SCSI targets exposed to guests using VMware's
+paravirtualization support.
+The driver supports the following capabilities:
+.Bl -dash
+.It
+Dynamic hot-plug (if supported by the host)
+.It
+Honors packet timeouts specified in
+.Xr scsi_pkt 9S
+.It
+Reset of target or logical unit via
+.Xr scsi_reset 9F
+.It
+Abort for individual commands via
+.Xr scsi_abort 9F
+.It
+Command queueing (both tagged and untagged)
+.El
+.Pp
+The
+.Nm
+driver is based on
+.Xr iport 9 ,
+and uses a single iport per PCI function,
+with a unit-address of "iport0".
+Children of the iport use a unit-address with the
+format "target,lun", where both target and lun are
+presented as hexadecimal values.
+.Sh SEE ALSO
+.Xr sd 4D ,
+.Xr st 4D ,
+.Xr scsi 5 ,
+.Xr iport 9 ,
+.Xr scsi_abort 9F ,
+.Xr scsi_reset 9F ,
+.Xr scsi_pkt 9S

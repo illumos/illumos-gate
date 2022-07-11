@@ -38,11 +38,9 @@
  * file with a dynamic executable stub. The runtime linker (ld.so.1) actually
  * provides the diagnostic output, according to the environment variables set.
  *
- * If neither -d nor -r is specified, we set only LD_TRACE_LOADED_OBJECTS_[AE].
+ * If neither -d nor -r is specified, we set only LD_TRACE_LOADED_OBJECTS_E.
  * The runtime linker will print the pathnames of all dynamic objects it
- * loads, and then exit.  Note that we distiguish between ELF and AOUT objects
- * when setting this environment variable - AOUT executables cause the mapping
- * of sbcp, the dependencies of which the user isn't interested in.
+ * loads, and then exit.
  *
  * If -d or -r is specified, we also set LD_WARN=1; the runtime linker will
  * perform its normal relocations and issue warning messages for unresolved
@@ -126,7 +124,6 @@
 #include	"msg.h"
 
 static int	elf_check(int, char *, char *, Elf *, int);
-static int	aout_check(int, char *, char *, int, int);
 static int	run(int, char *, char *, const char *, int);
 
 
@@ -136,7 +133,6 @@ static int	run(int, char *, char *, const char *, int);
  */
 static char	bind[] =	"LD_BIND_NOW= ",
 		load_elf[] =	"LD_TRACE_LOADED_OBJECTS_E= ",
-		load_aout[] =	"LD_TRACE_LOADED_OBJECTS_A= ",
 		path[] =	"LD_TRACE_SEARCH_PATHS= ",
 		verb[] =	"LD_VERBOSE= ",
 		warn[] =	"LD_WARN= ",
@@ -356,8 +352,7 @@ main(int argc, char **argv, char **envp)
 		}
 
 		/*
-		 * Get the files elf descriptor and process it as an elf or
-		 * a.out (4.x) file.
+		 * Get the files elf descriptor and process it as an elf file.
 		 */
 		elf = elf_begin(var, ELF_C_READ, (Elf *)0);
 		switch (elf_kind(elf)) {
@@ -366,21 +361,15 @@ main(int argc, char **argv, char **envp)
 			    cname, fname);
 			error = 1;
 			break;
-		case ELF_K_COFF:
-			(void) fprintf(stderr, MSG_INTL(MSG_USP_UNKNOWN),
-			    cname, fname);
-			error = 1;
-			break;
 		case ELF_K_ELF:
 			if (elf_check(nfile, fname, cname, elf, fflag) != 0)
 				error = 1;
 			break;
+		case ELF_K_COFF:
 		default:
-			/*
-			 * This is either an unknown file or an aout format
-			 */
-			if (aout_check(nfile, fname, cname, var, fflag) != 0)
-				error = 1;
+			(void) fprintf(stderr, MSG_INTL(MSG_USP_UNKNOWN),
+			    cname, fname);
+			error = 1;
 			break;
 		}
 		(void) elf_end(elf);
@@ -570,52 +559,6 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 		return (run(nfile, cname, fname, conv_lddstub(class), class));
 }
 
-static int
-aout_check(int nfile, char *fname, char *cname, int fd, int fflag)
-{
-	struct exec32	aout;
-	int		err;
-
-	if (lseek(fd, 0, SEEK_SET) != 0) {
-		err = errno;
-		(void) fprintf(stderr, MSG_INTL(MSG_SYS_LSEEK), cname, fname,
-		    strerror(err));
-		return (1);
-	}
-	if (read(fd, (char *)&aout, sizeof (aout)) != sizeof (aout)) {
-		err = errno;
-		(void) fprintf(stderr, MSG_INTL(MSG_SYS_READ), cname, fname,
-		    strerror(err));
-		return (1);
-	}
-	if (aout.a_machtype != M_SPARC) {
-		(void) fprintf(stderr, MSG_INTL(MSG_USP_UNKNOWN), cname, fname);
-		return (1);
-	}
-	if (N_BADMAG(aout) || !aout.a_dynamic) {
-		(void) fprintf(stderr, MSG_INTL(MSG_USP_NODYNORSO), cname,
-		    fname);
-		return (1);
-	}
-	if (!fflag && (geteuid() == 0)) {
-		(void) fprintf(stderr, MSG_INTL(MSG_USP_AOUTINS), cname, fname);
-		return (1);
-	}
-
-	/*
-	 * Run the required program.
-	 */
-	if ((aout.a_magic == ZMAGIC) && (aout.a_entry <= sizeof (aout))) {
-		load = load_elf;
-		return (run(nfile, cname, fname, conv_lddstub(ELFCLASS32),
-		    ELFCLASS32));
-	} else {
-		load = load_aout;
-		return (run(nfile, cname, fname, (const char *)fname,
-		    ELFCLASS32));
-	}
-}
-
 
 /*
  * Run the required program, setting the preload and trace environment
@@ -708,9 +651,8 @@ run(int nfile, char *cname, char *fname, const char *ename, int class)
 			}
 
 			/*
-			 * The pointer "load" has be assigned to load_elf[] or
-			 * load_aout[].  Use the size of load_elf[] as the size
-			 * of load_aout[] is the same.
+			 * The pointer "load" has be assigned to load_elf[].
+			 * Use the size of load_elf[].
 			 */
 			load[sizeof (load_elf) - 2] = '2';
 		} else

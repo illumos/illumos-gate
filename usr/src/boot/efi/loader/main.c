@@ -61,6 +61,7 @@ EFI_GUID imgid = LOADED_IMAGE_PROTOCOL;
 EFI_GUID smbios = SMBIOS_TABLE_GUID;
 EFI_GUID smbios3 = SMBIOS3_TABLE_GUID;
 EFI_GUID inputid = SIMPLE_TEXT_INPUT_PROTOCOL;
+EFI_GUID serialio = SERIAL_IO_PROTOCOL;
 
 extern void acpi_detect(void);
 extern void efi_getsmap(void);
@@ -489,10 +490,212 @@ interactive_interrupt(const char *msg)
 	return (false);
 }
 
+static void
+setenv_int(const char *key, int val)
+{
+	char buf[20];
+
+	(void) snprintf(buf, sizeof (buf), "%d", val);
+	(void) setenv(key, buf, 1);
+}
+
+/*
+ * Parse ConOut (the list of consoles active) and see if we can find a
+ * serial port and/or a video port. It would be nice to also walk the
+ * ACPI name space to map the UID for the serial port to a port. The
+ * latter is especially hard.
+ */
+static int
+parse_uefi_con_out(void)
+{
+	int how, rv;
+	int vid_seen = 0, com_seen = 0, seen = 0;
+	size_t sz;
+	char buf[4096], *ep;
+	EFI_DEVICE_PATH *node;
+	ACPI_HID_DEVICE_PATH *acpi;
+	UART_DEVICE_PATH *uart;
+	bool pci_pending = false;
+
+	how = 0;
+	sz = sizeof (buf);
+	rv = efi_global_getenv("ConOut", buf, &sz);
+	if (rv != EFI_SUCCESS)
+		rv = efi_global_getenv("ConOutDev", buf, &sz);
+	if (rv != EFI_SUCCESS) {
+		/*
+		 * If we don't have any ConOut default to video.
+		 * non-server systems may not have serial.
+		 */
+		goto out;
+	}
+	ep = buf + sz;
+	node = (EFI_DEVICE_PATH *)buf;
+	while ((char *)node < ep) {
+		if (IsDevicePathEndType(node)) {
+			if (pci_pending && vid_seen == 0)
+				vid_seen = ++seen;
+		}
+		pci_pending = false;
+		if (DevicePathType(node) == ACPI_DEVICE_PATH &&
+		    (DevicePathSubType(node) == ACPI_DP ||
+		    DevicePathSubType(node) == ACPI_EXTENDED_DP)) {
+			/* Check for Serial node */
+			acpi = (void *)node;
+			if (EISA_ID_TO_NUM(acpi->HID) == 0x501) {
+				setenv_int("efi_8250_uid", acpi->UID);
+				com_seen = ++seen;
+			}
+		} else if (DevicePathType(node) == MESSAGING_DEVICE_PATH &&
+		    DevicePathSubType(node) == MSG_UART_DP) {
+			com_seen = ++seen;
+			uart = (void *)node;
+			setenv_int("efi_com_speed", uart->BaudRate);
+		} else if (DevicePathType(node) == ACPI_DEVICE_PATH &&
+		    DevicePathSubType(node) == ACPI_ADR_DP) {
+			/* Check for AcpiAdr() Node for video */
+			vid_seen = ++seen;
+		} else if (DevicePathType(node) == HARDWARE_DEVICE_PATH &&
+		    DevicePathSubType(node) == HW_PCI_DP) {
+			/*
+			 * Note, vmware fusion has a funky console device
+			 *	PciRoot(0x0)/Pci(0xf,0x0)
+			 * which we can only detect at the end since we also
+			 * have to cope with:
+			 *	PciRoot(0x0)/Pci(0x1f,0x0)/Serial(0x1)
+			 * so only match it if it's last.
+			 */
+			pci_pending = true;
+		}
+		node = NextDevicePathNode(node); /* Skip the end node */
+	}
+
+	/*
+	 * Truth table for RB_MULTIPLE | RB_SERIAL
+	 * Value		Result
+	 * 0			Use only video console
+	 * RB_SERIAL		Use only serial console
+	 * RB_MULTIPLE		Use both video and serial console
+	 *			(but video is primary so gets rc messages)
+	 * both			Use both video and serial console
+	 *			(but serial is primary so gets rc messages)
+	 *
+	 * Try to honor this as best we can. If only one of serial / video
+	 * found, then use that. Otherwise, use the first one we found.
+	 * This also implies if we found nothing, default to video.
+	 */
+	how = 0;
+	if (vid_seen && com_seen) {
+		how |= RB_MULTIPLE;
+		if (com_seen < vid_seen)
+			how |= RB_SERIAL;
+	} else if (com_seen)
+		how |= RB_SERIAL;
+out:
+	return (how);
+}
+
 caddr_t
 ptov(uintptr_t x)
 {
 	return ((caddr_t)x);
+}
+
+static int
+efi_serial_get_uid(EFI_DEVICE_PATH *devpath)
+{
+	ACPI_HID_DEVICE_PATH  *acpi;
+
+	while (!IsDevicePathEnd(devpath)) {
+		if (DevicePathType(devpath) == ACPI_DEVICE_PATH &&
+		    (DevicePathSubType(devpath) == ACPI_DP ||
+		    DevicePathSubType(devpath) == ACPI_EXTENDED_DP)) {
+			acpi = (ACPI_HID_DEVICE_PATH *)devpath;
+			if (EISA_ID_TO_NUM(acpi->HID) == 0x501) {
+				return (acpi->UID);
+			}
+		}
+
+		devpath = NextDevicePathNode(devpath);
+	}
+	return (-1);
+}
+
+/*
+ * Walk serialio protocol handle array and find index for serial console
+ * device. The problem is, we check for acpi UID value, but we can not be sure,
+ * if it will start from 0 or 1.
+ */
+static const char *
+uefi_serial_console(void)
+{
+	UINTN bufsz;
+	EFI_STATUS status;
+	EFI_HANDLE *handles;
+	int i, nhandles;
+	unsigned long uid, lowest;
+	char *env, *ep;
+	extern struct console ttya;
+	extern struct console ttyb;
+	extern struct console ttyc;
+	extern struct console ttyd;
+
+	env = getenv("efi_8250_uid");
+	if (env == NULL)
+		return (NULL);
+	(void) unsetenv("efi_8250_uid");
+	errno = 0;
+	uid = strtoul(env, &ep, 10);
+	if (errno != 0 || *ep != '\0')
+		return (NULL);
+
+	/* if uid is 0, this is first serial port */
+	if (uid == 0)
+		return (ttya.c_name);
+
+	/*
+	 * get buffer size
+	 */
+	bufsz = 0;
+	handles = NULL;
+	status = BS->LocateHandle(ByProtocol, &serialio, NULL, &bufsz, handles);
+	if (status != EFI_BUFFER_TOO_SMALL)
+		return (NULL);
+	if ((handles = malloc(bufsz)) == NULL)
+		return (NULL);
+
+	/*
+	 * get handle array
+	 */
+	status = BS->LocateHandle(ByProtocol, &serialio, NULL, &bufsz, handles);
+	if (EFI_ERROR(status)) {
+		free(handles);
+		return (NULL);
+	}
+	nhandles = (int)(bufsz / sizeof (EFI_HANDLE));
+
+	lowest = 255;	/* high enough value */
+	for (i = 0; i < nhandles; i++) {
+		EFI_DEVICE_PATH *devpath;
+		unsigned long _uid;
+
+		devpath = efi_lookup_devpath(handles[i]);
+		_uid = efi_serial_get_uid(devpath);
+		if (_uid < lowest)
+			lowest = _uid;
+	}
+	free(handles);
+	switch (uid - lowest) {
+	case 0:
+		return (ttya.c_name);
+	case 1:
+		return (ttyb.c_name);
+	case 2:
+		return (ttyc.c_name);
+	case 3:
+		return (ttyd.c_name);
+	}
+	return (NULL);
 }
 
 EFI_STATUS
@@ -504,6 +707,7 @@ main(int argc, CHAR16 *argv[])
 	void *ptr;
 	bool has_kbd;
 	char *s;
+	const char *serial;
 	EFI_DEVICE_PATH *imgpath;
 	CHAR16 *text;
 	EFI_STATUS status;
@@ -527,24 +731,42 @@ main(int argc, CHAR16 *argv[])
 	/* Get our loaded image protocol interface structure. */
 	(void) OpenProtocolByHandle(IH, &imgid, (void **)&img);
 
-	/* Init the time source */
-	efi_time_init();
-
-	has_kbd = has_keyboard();
-
 	/*
 	 * XXX Chicken-and-egg problem; we want to have console output
 	 * early, but some console attributes may depend on reading from
 	 * eg. the boot device, which we can't do yet.  We can use
 	 * printf() etc. once this is done.
 	 */
+	setenv("console", "text", 1);
+	howto = parse_uefi_con_out();
+	serial = uefi_serial_console();
 	cons_probe();
 	efi_getsmap();
+
+	if ((s = getenv("efi_com_speed")) != NULL) {
+		char *name;
+
+		(void) snprintf(var, sizeof (var), "%s,8,n,1,-", s);
+		if (asprintf(&name, "%s-mode", serial) > 0) {
+			(void) setenv (name, var, 1);
+			free(name);
+		}
+		if (asprintf(&name, "%s-spcr-mode", serial) > 0) {
+			(void) setenv (name, var, 1);
+			free(name);
+		}
+		(void) unsetenv("efi_com_speed");
+	}
+
+	/* Init the time source */
+	efi_time_init();
 
 	/*
 	 * Initialise the block cache. Set the upper limit.
 	 */
 	bcache_init(32768, 512);
+
+	has_kbd = has_keyboard();
 
 	/*
 	 * Parse the args to set the console settings, etc
@@ -558,7 +780,6 @@ main(int argc, CHAR16 *argv[])
 	 * args from UCS-2 to ASCII (16 to 8 bit) as they are copied (though
 	 * this method is flawed for non-ASCII characters).
 	 */
-	howto = 0;
 	for (i = 1; i < argc; i++) {
 		if (argv[i][0] == '-') {
 			for (j = 1; argv[i][j] != 0; j++) {
@@ -647,13 +868,15 @@ main(int argc, CHAR16 *argv[])
 	 */
 	if (howto & RB_MULTIPLE) {
 		if (howto & RB_SERIAL)
-			setenv("console", "ttya text", 1);
+			(void) snprintf(var, sizeof (var), "%s text", serial);
 		else
-			setenv("console", "text ttya", 1);
+			(void) snprintf(var, sizeof (var), "text %s", serial);
 	} else if (howto & RB_SERIAL) {
-		setenv("console", "ttya", 1);
-	} else
-		setenv("console", "text", 1);
+		(void) snprintf(var, sizeof (var), "%s", serial);
+	} else {
+		(void) snprintf(var, sizeof (var), "text");
+	}
+	(void) setenv("console", var, 1);
 
 	if ((s = getenv("fail_timeout")) != NULL)
 		fail_timeout = strtol(s, NULL, 10);

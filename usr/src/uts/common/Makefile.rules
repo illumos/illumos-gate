@@ -403,6 +403,10 @@ $(OBJS_DIR)/%.o:	$(UTSBASE)/common/io/scsi/adapters/pmcs/%.c
 $(OBJS_DIR)/%.o:	$(UTSBASE)/common/io/scsi/adapters/pmcs/%.bin
 	$(COMPILE.b) -o $@ $<
 
+$(OBJS_DIR)/%.o:	$(UTSBASE)/common/io/scsi/adapters/pvscsi/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/fsreparse/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
