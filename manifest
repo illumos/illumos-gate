@@ -1052,7 +1052,6 @@ f kernel/kmdb/amd64/mm 0555 root sys
 f kernel/kmdb/amd64/mpt 0555 root sys
 f kernel/kmdb/amd64/mpt_sas 0555 root sys
 f kernel/kmdb/amd64/mr_sas 0555 root sys
-f kernel/kmdb/amd64/nca 0555 root sys
 f kernel/kmdb/amd64/neti 0555 root sys
 f kernel/kmdb/amd64/nfs 0555 root sys
 f kernel/kmdb/amd64/ptm 0555 root sys
@@ -1208,7 +1207,6 @@ f kernel/strmod/amd64/ipsecah 0755 root sys
 f kernel/strmod/amd64/ipsecesp 0755 root sys
 f kernel/strmod/amd64/keysock 0755 root sys
 f kernel/strmod/amd64/ldterm 0755 root sys
-f kernel/strmod/amd64/nca 0755 root sys
 f kernel/strmod/amd64/pckt 0755 root sys
 f kernel/strmod/amd64/pfmod 0755 root sys
 f kernel/strmod/amd64/pipemod 0755 root sys
@@ -3328,13 +3326,6 @@ f usr/include/inet/keysock.h 0644 root bin
 f usr/include/inet/led.h 0644 root bin
 f usr/include/inet/mi.h 0644 root bin
 f usr/include/inet/mib2.h 0644 root bin
-d usr/include/inet/nca 0755 root bin
-f usr/include/inet/nca/nca.h 0644 root bin
-f usr/include/inet/nca/ncadoorhdr.h 0644 root bin
-f usr/include/inet/nca/ncaio.h 0644 root bin
-f usr/include/inet/nca/ncakmem.h 0644 root bin
-f usr/include/inet/nca/ncalogd.h 0644 root bin
-f usr/include/inet/nca/ncandd.h 0644 root bin
 f usr/include/inet/nd.h 0644 root bin
 f usr/include/inet/optcom.h 0644 root bin
 f usr/include/inet/rawip_impl.h 0644 root bin
@@ -5532,8 +5523,6 @@ s usr/lib/amd64/libzutil.so=../../../lib/amd64/libzutil.so.1
 f usr/lib/amd64/lx_brand.so.1 0755 root sys
 f usr/lib/amd64/madv.so.1 0755 root bin
 f usr/lib/amd64/mpss.so.1 0755 root bin
-f usr/lib/amd64/ncad_addr.so.1 0755 root bin
-s usr/lib/amd64/ncad_addr.so=ncad_addr.so.1
 f usr/lib/amd64/nss_ad.so.1 0755 root bin
 s usr/lib/amd64/nss_compat.so.1=../../../lib/amd64/nss_compat.so.1
 s usr/lib/amd64/nss_dns.so.1=../../../lib/amd64/nss_dns.so.1
@@ -6579,7 +6568,6 @@ f usr/lib/inet/in.ripngd 0555 root bin
 f usr/lib/inet/in.timed 0555 root bin
 f usr/lib/inet/inetd 0555 root bin
 f usr/lib/inet/mdnsd 0555 root bin
-f usr/lib/inet/ncaconfd 0555 root bin
 d usr/lib/inet/ppp 0755 root bin
 f usr/lib/inet/ppp/minconn.so 0544 root bin
 f usr/lib/inet/ppp/passprompt.so 0544 root bin
@@ -10127,7 +10115,6 @@ f usr/lib/mdb/kvm/amd64/mm.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mpt.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mpt_sas.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mr_sas.so 0555 root sys
-f usr/lib/mdb/kvm/amd64/nca.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/neti.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/nfs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/nsmb.so 0555 root sys
@@ -10199,8 +10186,6 @@ f usr/lib/mdb/raw/disk_label.so 0555 root sys
 f usr/lib/mdb/raw/dof.so 0555 root sys
 f usr/lib/more.help 0644 root bin
 f usr/lib/mpss.so.1 0755 root bin
-f usr/lib/ncad_addr.so.1 0755 root bin
-s usr/lib/ncad_addr.so=ncad_addr.so.1
 d usr/lib/ndmp 0755 root bin
 f usr/lib/ndmp/ndmpd 0555 root bin
 d usr/lib/netsvc 0755 root sys
@@ -19234,11 +19219,6 @@ s usr/share/man/man5/mdi_scsi_vhci_cache.5=devices.5
 f usr/share/man/man5/mech.5 0444 root bin
 f usr/share/man/man5/mnttab.5 0444 root bin
 f usr/share/man/man5/mpapi.conf.5 0444 root bin
-f usr/share/man/man5/nca.if.5 0444 root bin
-f usr/share/man/man5/ncad_addr.5 0444 root bin
-f usr/share/man/man5/ncakmod.conf.5 0444 root bin
-f usr/share/man/man5/ncalogd.conf.5 0444 root bin
-f usr/share/man/man5/ncaport.conf.5 0444 root bin
 f usr/share/man/man5/ndmp.5 0444 root bin
 f usr/share/man/man5/ndpd.conf.5 0444 root bin
 f usr/share/man/man5/netconfig.5 0444 root bin
