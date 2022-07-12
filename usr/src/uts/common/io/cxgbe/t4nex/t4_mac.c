@@ -459,9 +459,6 @@ t4_mc_getstat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	default:
-#ifdef DEBUG
-		cxgb_printf(pi->dip, CE_NOTE, "stat %d not implemented.", stat);
-#endif
 		return (ENOTSUP);
 	}
 #undef GET_STAT
