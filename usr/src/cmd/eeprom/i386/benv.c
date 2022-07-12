@@ -934,12 +934,13 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
+	optind = 0;
 
 	if (bootenv) {
 		int rv = 0;
 
 		if (argc == 1)
-			value = argv[0];
+			value = argv[optind];
 
 		if (bootenv_print)
 			return (lzbe_bootenv_print(name, nvlist, stdout));
@@ -978,7 +979,7 @@ main(int argc, char **argv)
 	if (optind >= argc) {
 		print_vars(elist);
 		return (0);
-	} else
+	} else {
 		while (optind < argc) {
 			/*
 			 * If "-" specified, read variables from stdin;
@@ -996,6 +997,7 @@ main(int argc, char **argv)
 
 			optind++;
 		}
+	}
 
 	/*
 	 * don't write benv if we are processing delayed writes since
