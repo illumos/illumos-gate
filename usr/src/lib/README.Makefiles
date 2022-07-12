@@ -592,7 +592,7 @@ outlined in this document:
 	  Example of a simple 32/64-bit library that obtains its sources
 	  from multiple directories.
 
-	lib/ncad_addr
+	lib/nametoaddr/straddr
 
 	  Example of a simple loadable module.
 

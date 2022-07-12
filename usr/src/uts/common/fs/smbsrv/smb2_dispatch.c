@@ -326,32 +326,34 @@ smb2_credit_decrease(smb_request_t *sr)
 	smb_session_t *session = sr->session;
 	uint16_t cur, d;
 
+	ASSERT3U(sr->smb2_credit_request, <, sr->smb2_credit_charge);
+
 	mutex_enter(&session->s_credits_mutex);
 	cur = session->s_cur_credits;
+	ASSERT(cur > 0);
 
 	/* Handle credit decrease. */
 	d = sr->smb2_credit_charge - sr->smb2_credit_request;
-	cur -= d;
-	if (cur & 0x8000) {
-		/*
-		 * underflow (bad credit charge or request)
-		 * leave credits unchanged (response=charge)
-		 */
-		cur = session->s_cur_credits;
-		sr->smb2_credit_response = sr->smb2_credit_charge;
-		DTRACE_PROBE1(smb2__credit__neg, smb_request_t *, sr);
-	}
 
 	/*
-	 * The server MUST ensure that the number of credits
-	 * held by the client is never reduced to zero.
+	 * Prevent underflow of current credits, and
+	 * enforce a minimum of one credit, per:
 	 * [MS-SMB2] 3.3.1.2
 	 */
-	if (cur == 0) {
+	if (d >= cur) {
+		/*
+		 * Tried to give up more credits than we should.
+		 * Reduce the decrement.
+		 */
+		d = cur - 1;
 		cur = 1;
-		sr->smb2_credit_response += 1;
-		DTRACE_PROBE1(smb2__credit__min, smb_request_t *, sr);
+		DTRACE_PROBE1(smb2__credit__neg, smb_request_t *, sr);
+	} else {
+		cur -= d;
 	}
+
+	ASSERT3U(d, <=, sr->smb2_credit_charge);
+	sr->smb2_credit_response = sr->smb2_credit_charge - d;
 
 	DTRACE_PROBE3(smb2__credit__decrease,
 	    smb_request_t *, sr, int, (int)cur,
@@ -370,23 +372,26 @@ smb2_credit_increase(smb_request_t *sr)
 	smb_session_t *session = sr->session;
 	uint16_t cur, d;
 
+	ASSERT3U(sr->smb2_credit_request, >, sr->smb2_credit_charge);
+
 	mutex_enter(&session->s_credits_mutex);
 	cur = session->s_cur_credits;
 
 	/* Handle credit increase. */
 	d = sr->smb2_credit_request - sr->smb2_credit_charge;
-	cur += d;
 
 	/*
 	 * If new credits would be above max,
 	 * reduce the credit grant.
 	 */
-	if (cur > session->s_max_credits) {
-		d = cur - session->s_max_credits;
+	if (d > (session->s_max_credits - cur)) {
+		d = session->s_max_credits - cur;
 		cur = session->s_max_credits;
-		sr->smb2_credit_response -= d;
-		DTRACE_PROBE1(smb2__credit__max, smb_request_t, sr);
+		DTRACE_PROBE1(smb2__credit__max, smb_request_t *, sr);
+	} else {
+		cur += d;
 	}
+	sr->smb2_credit_response = sr->smb2_credit_charge + d;
 
 	DTRACE_PROBE3(smb2__credit__increase,
 	    smb_request_t *, sr, int, (int)cur,
@@ -859,7 +864,6 @@ cmd_start:
 	 * when we sent the interim reply.
 	 */
 	if (!sr->smb2_async) {
-		sr->smb2_credit_response = sr->smb2_credit_request;
 		if (sr->smb2_credit_request < sr->smb2_credit_charge) {
 			smb2_credit_decrease(sr);
 		}
@@ -1205,7 +1209,6 @@ cmd_start:
 	 * credit decrease was done by the caller.
 	 */
 	if (sr->smb2_cmd_hdr != saved_cmd_hdr) {
-		sr->smb2_credit_response = sr->smb2_credit_request;
 		if (sr->smb2_credit_request < sr->smb2_credit_charge) {
 			smb2_credit_decrease(sr);
 		}

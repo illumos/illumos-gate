@@ -265,10 +265,6 @@ usr/include/librcm_impl.h
 usr/lib/mdb/proc/mdb_test.so
 usr/lib/mdb/proc/sparcv9/mdb_test.so	sparc
 #
-# SNCA project exception list
-#
-usr/include/inet/nca
-#
 # these are "removed" from the source product build because the only
 # packages that currently deliver them are removed.
 # they really should't be in here.

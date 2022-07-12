@@ -3,11 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SENDFILEV 3EXT "Nov 26, 2017"
+.\" Copyright 2022 Garrett D'Amore
+.TH SENDFILEV 3EXT "July 3, 2022"
 .SH NAME
 sendfilev \- send a file
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lsendfile\fR  [ \fIlibrary\fR... ]
 #include <sys/sendfile.h>
@@ -17,7 +17,6 @@ sendfilev \- send a file
 .fi
 
 .SH PARAMETERS
-.LP
 The \fBsendfilev()\fR function supports the following parameters:
 .sp
 .ne 2
@@ -25,9 +24,8 @@ The \fBsendfilev()\fR function supports the following parameters:
 \fB\fIfildes\fR\fR
 .ad
 .RS 11n
-A file descriptor to a regular file or to a \fBAF_NCA\fR, \fBAF_INET\fR, or
+A file descriptor to a regular file or to a \fBAF_INET\fR or
 \fBAF_INET6\fR family type \fBSOCK_STREAM\fR socket that is open for writing.
-For \fBAF_NCA\fR, the protocol type should be zero.
 .RE
 
 .sp
@@ -59,11 +57,10 @@ The total number of bytes written to \fBout_fd\fR.
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBsendfilev()\fR function attempts to write data from the \fIsfvcnt\fR
 buffers specified by the members of \fIvec\fR array: \fBvec[0], vec[1], ... ,
 vec[sfvcnt-1]\fR. The \fIfildes\fR argument is a file descriptor to a regular
-file or to an \fBAF_NCA\fR, \fBAF_INET\fR, or \fBAF_INET6\fR family type
+file or to an \fBAF_INET\fR or \fBAF_INET6\fR family type
 \fBSOCK_STREAM\fR socket that is open for writing.
 .sp
 .LP
@@ -108,7 +105,6 @@ To send data directly from the address space of the process, set \fBsfv_fd\fR
 to \fBSFV_FD_SELF\fR. \fBsfv_off\fR should point to the data, with
 \fBsfv_len\fR containing the length of the buffer.
 .SH RETURN VALUES
-.LP
 Upon successful completion, the \fBsendfilev()\fR function returns total number
 of bytes written to \fBout_fd\fR. Otherwise, it returns \fB-1\fR, and
 \fBerrno\fR is set to indicate the error. The \fIxferred\fR argument contains
@@ -220,11 +216,9 @@ The socket type is not supported.
 .RE
 
 .SH USAGE
-.LP
 The \fBsendfilev()\fR function has a transitional interface for 64-bit file
 offsets. See \fBlf64\fR(7).
 .SH EXAMPLES
-.LP
 The following example sends 2 vectors, one of HEADER data and a file of length
 100 over \fBsockfd\fR. \fBsockfd\fR is in a connected state, that is,
 \fBsocket()\fR, \fBaccept()\fR, and \fBbind()\fR operation are complete.
@@ -262,7 +256,6 @@ main (int argc, char *argv[]){
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -279,7 +272,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR open (2),
 .BR writev (2),
 .BR sendfile (3EXT),

@@ -13,6 +13,7 @@
  * Copyright (c) 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Co.
  */
 
 /*
@@ -285,10 +286,6 @@ print_vp(int nspec)
 			if (((len = strlen(vcpu->v_brand)) != 0) &&
 			    (strncmp(vcpu->v_brand, vcpu->v_impl, len) != 0))
 				(void) printf("\t%s", vcpu->v_brand);
-			if (strcmp(vcpu->v_socket, "Unknown") != 0)
-				(void) printf("\t[ %s: %s ]", _("Socket"),
-				    vcpu->v_socket);
-			(void) putchar('\n');
 		} else {
 			for (l2 = chip->p_cores; l2; l2 = l2->l_next) {
 				core = l2->l_ptr;
@@ -305,8 +302,13 @@ print_vp(int nspec)
 			}
 			if (((len = strlen(vcpu->v_brand)) != 0) &&
 			    (strncmp(vcpu->v_brand, vcpu->v_impl, len) != 0))
-				(void) printf("      %s\n", vcpu->v_brand);
+				(void) printf("      %s", vcpu->v_brand);
 		}
+		if (strcmp(vcpu->v_socket, "Unknown") != 0) {
+			(void) printf("\t[ %s: %s ]", _("Socket"),
+			    vcpu->v_socket);
+		}
+		(void) putchar('\n');
 	}
 }
 

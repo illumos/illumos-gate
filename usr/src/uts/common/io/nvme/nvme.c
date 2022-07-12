@@ -3817,6 +3817,27 @@ nvme_remove_callback(dev_info_t *dip, ddi_eventcookie_t cookie, void *a,
 	}
 }
 
+static void
+nvme_attach_children(void *arg)
+{
+	nvme_t *nvme = arg;
+	int i;
+
+	mutex_enter(&nvme->n_mgmt_mutex);
+
+	for (i = 1; i <= nvme->n_namespace_count; i++) {
+		int rv;
+
+		rv = nvme_attach_ns(nvme, i);
+		if (rv != 0 && rv != ENOTSUP) {
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!failed to attach namespace %d: %d", i, rv);
+		}
+	}
+
+	mutex_exit(&nvme->n_mgmt_mutex);
+}
+
 static int
 nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -4003,13 +4024,12 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nvme->n_progress |= NVME_MGMT_INIT;
 
 	/*
-	 * Identify and attach namespaces.
+	 * Identify namespaces.
 	 */
 	mutex_enter(&nvme->n_mgmt_mutex);
 
 	for (i = 1; i <= nvme->n_namespace_count; i++) {
 		nvme_namespace_t *ns = NVME_NSID2NS(nvme, i);
-		int rv;
 
 		/*
 		 * Namespaces start out ignored. When nvme_init_ns() checks
@@ -4019,12 +4039,6 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		ns->ns_ignore = B_TRUE;
 		if (nvme_init_ns(nvme, i) != 0) {
-			mutex_exit(&nvme->n_mgmt_mutex);
-			goto fail;
-		}
-
-		rv = nvme_attach_ns(nvme, i);
-		if (rv != 0 && rv != ENOTSUP) {
 			mutex_exit(&nvme->n_mgmt_mutex);
 			goto fail;
 		}
@@ -4048,6 +4062,17 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "cannot create devctl minor node");
 		goto fail;
 	}
+
+	nvme->n_tq = ddi_taskq_create(dip, "attach_children", 1,
+	    TASKQ_DEFAULTPRI, 0);
+	if (nvme->n_tq == NULL) {
+		dev_err(dip, CE_WARN,
+		    "!failed to create attach_children taskq");
+		goto fail;
+	}
+
+	(void) ddi_taskq_dispatch(nvme->n_tq, nvme_attach_children, nvme,
+	    DDI_SLEEP);
 
 	return (DDI_SUCCESS);
 
@@ -4076,6 +4101,9 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (nvme == NULL)
 		return (DDI_FAILURE);
+
+	if (nvme->n_tq != NULL)
+		ddi_taskq_destroy(nvme->n_tq);
 
 	ddi_remove_minor_node(dip, "devctl");
 

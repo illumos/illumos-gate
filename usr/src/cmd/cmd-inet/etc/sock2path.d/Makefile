@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2022 Garrett D'Amore
 #
 # cmd/cmd-inet/etc/sock2path.d/Makefile
 #
@@ -28,8 +29,7 @@ SOCK2PATHFILES= \
     driver%2Fnetwork%2Frds \
     driver%2Fnetwork%2Frdsv3 \
     driver%2Fnetwork%2Fsdp \
-    system%2Fkernel \
-    system%2Fnetwork%2Fhttp%2Fcache%2Faccelerator
+    system%2Fkernel
 
 include ../../../Makefile.cmd
 

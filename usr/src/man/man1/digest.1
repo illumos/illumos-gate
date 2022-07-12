@@ -4,22 +4,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DIGEST 1 "Feb 07, 2018"
+.TH DIGEST 1 "July 3, 2022"
 .SH NAME
 digest \- calculate a message digest
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/digest\fR \fB-l\fR | [\fB-v\fR] \fB-a\fR \fIalgorithm\fR [\fIfile\fR]...
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBdigest\fR utility calculates the message digest of the given files or
 \fBstdin\fR using the algorithm specified. If more than one file is given, each
 line of output is the digest of a single file.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -52,7 +49,6 @@ Verbose output. Includes the algorithm name and filename in the output.
 
 .SH USAGE
 .SS "Algorithms"
-.LP
 These algorithms are provided by the Cryptographic Framework. Each algorithm
 supported by the command is an alias of the PKCS #11 mechanism for easier
 access. For example, \fBsha1\fR is an alias to \fBCKM_SHA_1\fR.
@@ -60,7 +56,6 @@ access. For example, \fBsha1\fR is an alias to \fBCKM_SHA_1\fR.
 .LP
 These aliases are used with the \fB-a\fR option and are case-sensitive.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSimulating Output
 .sp
 .LP
@@ -111,7 +106,6 @@ sha1 (/usr/lib/inet/in.iked) = be6061fad725d37256e773dc85f8bd5248649463
 sha1 (/usr/lib/inet/in.mpathd) = 5bd6bf0340fd5c4cc0c53f2df158302a0e85f9d0
 sha1 (/usr/lib/inet/in.ndpd) = fdb768aebe7e5eb4465e1c1bb5e679b496f5c5c6
 sha1 (/usr/lib/inet/in.ripngd) = 4f56a0df2d4a252f581a73c2e84143b920d0b66b
-sha1 (/usr/lib/inet/ncaconfd) = 7219542b5585a8d1104d7ce4a2ced07d8a260ea3
 sha1 (/usr/lib/inet/ppp) = c96ee458549871a6ffdf2674a888b01d0c9e9740
 sha1 (/usr/lib/inet/pppoec) = 5f022498d79dacacd947cddadc64f171822e3dee
 sha1 (/usr/lib/inet/pppoed) = 252bd2f0863dbc1b05fffae72821a2a95609b8ad
@@ -141,7 +135,6 @@ sha512
 .sp
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -162,7 +155,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -177,7 +169,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 .BR cksum (1),
 .BR encrypt (1),
 .BR mac (1),

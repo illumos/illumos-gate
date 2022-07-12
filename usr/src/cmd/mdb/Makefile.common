@@ -23,6 +23,7 @@
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2022 Garrett D'Amore
 #
 
 #
@@ -83,7 +84,6 @@ COMMON_MODULES_KVM = \
 	mm \
 	mpt_sas \
 	mr_sas \
-	nca \
 	nsmb \
 	pmcs \
 	ptm \

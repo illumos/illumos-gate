@@ -5,11 +5,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SOCKET 3SOCKET "Jan 28, 2009"
+.\" Copyright 2022 Garrett D'Amore
+.TH SOCKET 3SOCKET "July 6, 2022"
 .SH NAME
 socket \- create an endpoint for communication
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR ... ] \fIfile\fR ... \fB-lsocket\fR \fB -lnsl \fR [ \fIlibrary\fR ... ]
 #include <sys/types.h>
@@ -19,11 +19,8 @@ socket \- create an endpoint for communication
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsocket()\fR function creates an endpoint for communication and returns a
 descriptor.
-.sp
 .LP
 The \fIdomain\fR argument specifies the protocol family within which
 communication takes place. The protocol family is generally the same as the
@@ -57,15 +54,6 @@ Internet Protocol Version 4 (IPv4)
 .ad
 .RS 12n
 Internet Protocol Version 6 (IPv6)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPF_NCA\fR\fR
-.ad
-.RS 12n
-Network Cache and Accelerator (NCA) protocols
 .RE
 
 .sp
@@ -197,13 +185,9 @@ The operation of sockets is controlled by socket level \fIoptions\fR. These
 options are defined in the file <\fBsys/socket.h\fR>. \fBsetsockopt\fR(3SOCKET)
 and \fBgetsockopt\fR(3SOCKET) are used to set and get options, respectively.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, a descriptor referencing the socket is returned.
 Otherwise, -1 is returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBsocket()\fR function will fail if:
 .sp
 .ne 2
@@ -296,8 +280,6 @@ One or more of the specified flags is not supported.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -312,9 +294,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-.BR nca (1),
 .BR close (2),
 .BR exec (2),
 .BR fcntl (2),
@@ -337,7 +316,5 @@ MT-Level	Safe
 .BR socketpair (3SOCKET),
 .BR attributes (7)
 .SH NOTES
-.sp
-.LP
 Historically, \fBAF_\fR* was commonly used in places where \fBPF_\fR* was
 meant. New code should be careful to use \fBPF_\fR* as necessary.

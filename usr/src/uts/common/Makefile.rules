@@ -538,10 +538,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/udp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/nca/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/sockmods/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
