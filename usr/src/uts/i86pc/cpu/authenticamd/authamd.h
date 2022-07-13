@@ -69,7 +69,7 @@ struct authamd_nodeshared {
 	uint_t ans_chipid;
 	uint_t ans_procnodeid;
 	uint_t ans_family;		/* family number */
-	uint32_t ans_rev;		/* revision per cpuid_getchiprev */
+	x86_chiprev_t ans_rev;		/* revision per cpuid_getchiprev */
 	volatile ulong_t ans_cfgonce;	/* Config performed once per chip */
 	hrtime_t ans_poll_timestamp;	/* Checks poll owner is alive */
 	cmi_hdl_t ans_pollowner;	/* poller of shared resources */

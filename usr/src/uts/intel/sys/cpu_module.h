@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Co.
  */
 
 #ifndef _SYS_CPU_MODULE_H
@@ -33,6 +34,7 @@
 #include <sys/nvpair.h>
 #include <sys/mc.h>
 #include <sys/sunddi.h>
+#include <sys/x86_archext.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -157,7 +159,7 @@ extern uint_t cmi_hdl_strandid(cmi_hdl_t);
 extern uint_t cmi_hdl_strand_apicid(cmi_hdl_t);
 extern uint_t cmi_hdl_procnodes_per_pkg(cmi_hdl_t);
 extern boolean_t cmi_hdl_is_cmt(cmi_hdl_t);
-extern uint32_t cmi_hdl_chiprev(cmi_hdl_t);
+extern x86_chiprev_t cmi_hdl_chiprev(cmi_hdl_t);
 extern const char *cmi_hdl_chiprevstr(cmi_hdl_t);
 extern uint32_t cmi_hdl_getsockettype(cmi_hdl_t);
 extern const char *cmi_hdl_getsocketstr(cmi_hdl_t);

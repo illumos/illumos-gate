@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Co.
  */
 
 #include <sys/conf.h>
@@ -207,7 +208,7 @@ mc_nvl_add_socket(nvlist_t *nvl, mc_t *mc)
 static uint32_t
 mc_ecc_enabled(mc_t *mc)
 {
-	uint32_t rev = mc->mc_props.mcp_rev;
+	x86_chiprev_t rev = mc->mc_props.mcp_rev;
 	union mcreg_nbcfg nbcfg;
 
 	MCREG_VAL32(&nbcfg) = mc->mc_cfgregs.mcr_nbcfg;
@@ -220,7 +221,7 @@ mc_ecc_enabled(mc_t *mc)
 static uint32_t
 mc_ck_enabled(mc_t *mc)
 {
-	uint32_t rev = mc->mc_props.mcp_rev;
+	x86_chiprev_t rev = mc->mc_props.mcp_rev;
 	union mcreg_nbcfg nbcfg;
 
 	MCREG_VAL32(&nbcfg) = mc->mc_cfgregs.mcr_nbcfg;
@@ -533,7 +534,7 @@ mc_dimmlist_create(mc_t *mc)
 	union mcreg_dramcfg_hi *drcfghip =
 	    (union mcreg_dramcfg_hi *)(&mc->mc_cfgregs.mcr_dramcfghi);
 	mc_props_t *mcp = &mc->mc_props;
-	uint32_t rev = mcp->mcp_rev;
+	x86_chiprev_t rev = mcp->mcp_rev;
 	mc_cs_t *mccs;
 	int r4 = 0, s4 = 0;
 
@@ -726,7 +727,7 @@ mc_mkprops_addrmap(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 static void
 mc_getmiscctl(mc_t *mc)
 {
-	uint32_t rev = mc->mc_props.mcp_rev;
+	x86_chiprev_t rev = mc->mc_props.mcp_rev;
 	union mcreg_nbcfg nbcfg;
 	union mcreg_sparectl sparectl;
 
@@ -786,7 +787,7 @@ mc_mkprops_dramctl(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 	mc_cfgregs_t *mcr = &mc->mc_cfgregs;
 	int maskdivisor;
 	int wide = 0;
-	uint32_t rev = mc->mc_props.mcp_rev;
+	x86_chiprev_t rev = mc->mc_props.mcp_rev;
 	int i;
 	mcamd_hdl_t hdl;
 
@@ -1401,7 +1402,7 @@ mc_scrubber_enable(mc_t *mc)
 {
 	mc_props_t *mcp = &mc->mc_props;
 	chipid_t chipid = (chipid_t)mcp->mcp_num;
-	uint32_t rev = (uint32_t)mcp->mcp_rev;
+	x86_chiprev_t rev = (x86_chiprev_t)mcp->mcp_rev;
 	mc_cfgregs_t *mcr = &mc->mc_cfgregs;
 	union mcreg_scrubctl scrubctl;
 	union mcreg_dramscrublo dalo;
@@ -1495,7 +1496,7 @@ mc_scrubber_enable(mc_t *mc)
 	 */
 	if (mc_scrub_rate_dram != AMD_NB_SCRUBCTL_RATE_NONE &&
 	    mcp->mcp_ilen != 0 &&
-	    !X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_E)) {
+	    !chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_E)) {
 		cmn_err(CE_CONT, "?Opteron DRAM scrubber disabled on revision "
 		    "%s chip %d because DRAM memory is node-interleaved",
 		    mc->mc_revname, chipid);
