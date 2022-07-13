@@ -24,6 +24,7 @@
  * Copyright 2015 Joyent, Inc.  All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -445,7 +446,7 @@ typedef	struct	bcache {
  */
 #define	M_DATA		0x00		/* regular data */
 #define	M_PROTO		0x01		/* protocol control */
-#define	M_MULTIDATA	0x02		/* reserved for Multidata use only */
+#define	M_MULTIDATA	0x02		/* obsolete, do not use */
 
 /*
  * Control messages (regular and priority)
@@ -745,7 +746,6 @@ typedef struct cmdblk {
  */
 #define	datamsg(type) \
 		((type) == M_DATA || \
-		    (type) == M_MULTIDATA || \
 		    (type) == M_PROTO || \
 		    (type) == M_PCPROTO || \
 		    (type) == M_DELAY)

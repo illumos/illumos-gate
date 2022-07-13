@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 /*
@@ -312,7 +313,6 @@ softmac_capability_advertise(softmac_upper_t *sup, mblk_t *mp)
 	boolean_t		dld_capable = B_FALSE;
 	boolean_t		hcksum_capable = B_FALSE;
 	boolean_t		zcopy_capable = B_FALSE;
-	boolean_t		mdt_capable = B_FALSE;
 
 	ASSERT(sup->su_mode == SOFTMAC_FASTPATH);
 
@@ -346,12 +346,6 @@ softmac_capability_advertise(softmac_upper_t *sup, mblk_t *mp)
 		zcopy_capable = B_TRUE;
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_zerocopy_t);
-	}
-
-	if (softmac->smac_mdt) {
-		mdt_capable = B_TRUE;
-		subsize += sizeof (dl_capability_sub_t) +
-		    sizeof (dl_capab_mdt_t);
 	}
 
 	/*
@@ -433,30 +427,6 @@ softmac_capability_advertise(softmac_upper_t *sup, mblk_t *mp)
 		dlcapabsetqid(&(zcopy.zerocopy_mid), sup->su_rq);
 		bcopy(&zcopy, ptr, sizeof (dl_capab_zerocopy_t));
 		ptr += sizeof (dl_capab_zerocopy_t);
-	}
-
-	/*
-	 * MDT
-	 */
-	if (mdt_capable) {
-		dl_capab_mdt_t mdt;
-
-		dlsp = (dl_capability_sub_t *)ptr;
-
-		dlsp->dl_cap = DL_CAPAB_MDT;
-		dlsp->dl_length = sizeof (dl_capab_mdt_t);
-		ptr += sizeof (dl_capability_sub_t);
-
-		bzero(&mdt, sizeof (dl_capab_mdt_t));
-		mdt.mdt_version = MDT_VERSION_2;
-		mdt.mdt_flags = DL_CAPAB_MDT_ENABLE;
-		mdt.mdt_hdr_head = softmac->smac_mdt_capab.mdt_hdr_head;
-		mdt.mdt_hdr_tail = softmac->smac_mdt_capab.mdt_hdr_tail;
-		mdt.mdt_max_pld = softmac->smac_mdt_capab.mdt_max_pld;
-		mdt.mdt_span_limit = softmac->smac_mdt_capab.mdt_span_limit;
-		dlcapabsetqid(&(mdt.mdt_mid), sup->su_rq);
-		bcopy(&mdt, ptr, sizeof (dl_capab_mdt_t));
-		ptr += sizeof (dl_capab_mdt_t);
 	}
 
 	ASSERT(ptr == mp->b_rptr + sizeof (dl_capability_ack_t) + subsize);

@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 /*
@@ -60,7 +61,6 @@
 #include <sys/policy.h>
 #include <sys/atomic.h>
 
-#include <sys/multidata.h>
 #include <sys/gld.h>
 #include <sys/gldpriv.h>
 
@@ -136,12 +136,9 @@ static dev_info_t *gld_finddevinfo(dev_t);
 /* called from wput, wsrv, unidata, and v0_sched to send a packet */
 /* also from the source routing stuff for sending RDE protocol packets */
 static int gld_start(queue_t *, mblk_t *, int, uint32_t);
-static int gld_start_mdt(queue_t *, mblk_t *, int);
 
-/* called from gld_start[_mdt] to loopback packet(s) in promiscuous mode */
+/* called from gld_start to loopback packet(s) in promiscuous mode */
 static void gld_precv(gld_mac_info_t *, mblk_t *, uint32_t, struct gld_stats *);
-static void gld_precv_mdt(gld_mac_info_t *, gld_vlan_t *, mblk_t *,
-    pdesc_t *, pktinfo_t *);
 
 /* receive group: called from gld_recv and gld_precv* with maclock held */
 static void gld_sendup(gld_mac_info_t *, pktinfo_t *, mblk_t *,
@@ -282,7 +279,6 @@ static gld_interface_t interfaces[] = {
 		(uint_t)-1,
 		sizeof (struct ether_header),
 		gld_interpret_ether,
-		NULL,
 		gld_fastpath_ether,
 		gld_unitdata_ether,
 		gld_init_ether,
@@ -296,7 +292,6 @@ static gld_interface_t interfaces[] = {
 		4352,
 		sizeof (struct fddi_mac_frm),
 		gld_interpret_fddi,
-		NULL,
 		gld_fastpath_fddi,
 		gld_unitdata_fddi,
 		gld_init_fddi,
@@ -310,7 +305,6 @@ static gld_interface_t interfaces[] = {
 		17914,
 		-1,			/* variable header size */
 		gld_interpret_tr,
-		NULL,
 		gld_fastpath_tr,
 		gld_unitdata_tr,
 		gld_init_tr,
@@ -324,7 +318,6 @@ static gld_interface_t interfaces[] = {
 		4092,
 		sizeof (struct ipoib_header),
 		gld_interpret_ib,
-		gld_interpret_mdt_ib,
 		gld_fastpath_ib,
 		gld_unitdata_ib,
 		gld_init_ib,
@@ -658,29 +651,6 @@ gld_register(dev_info_t *devinfo, char *devname, gld_mac_info_t *macinfo)
 	 */
 	if (VLAN_CAPABLE(macinfo) && (macinfo->gldm_margin == 0))
 		macinfo->gldm_margin = VTAG_SIZE;
-
-	/*
-	 * For now, only Infiniband drivers can use MDT. Do not add
-	 * support for Ethernet, FDDI or TR.
-	 */
-	if (macinfo->gldm_mdt_pre != NULL) {
-		if (mediatype != DL_IB) {
-			cmn_err(CE_WARN, "GLD: MDT not supported for %s "
-			    "driver of type %d", devname, mediatype);
-			goto failure;
-		}
-
-		/*
-		 * Validate entry points.
-		 */
-		if ((macinfo->gldm_mdt_send == NULL) ||
-		    (macinfo->gldm_mdt_post == NULL)) {
-			cmn_err(CE_WARN, "GLD: invalid MDT entry points for "
-			    "%s driver of type %d", devname, mediatype);
-			goto failure;
-		}
-		macinfo->gldm_options |= GLDOPT_MDT;
-	}
 
 	mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
 	mac_pvt->major_dev = glddev;
@@ -1705,7 +1675,6 @@ gld_wput(queue_t *q, mblk_t *mp)
 {
 	gld_t  *gld = (gld_t *)(q->q_ptr);
 	int	rc;
-	boolean_t multidata = B_TRUE;
 	uint32_t upri;
 
 #ifdef GLD_DEBUG
@@ -1729,13 +1698,6 @@ gld_wput(queue_t *q, mblk_t *mp)
 		 * modules. MBLK_VTAG is used to save the vtag information.
 		 */
 		GLD_CLEAR_MBLK_VTAG(mp);
-		multidata = B_FALSE;
-		/* FALLTHROUGH */
-	case M_MULTIDATA:
-		/* Only call gld_start() directly if nothing queued ahead */
-		/* No guarantees about ordering with different threads */
-		if (q->q_first)
-			goto use_wsrv;
 
 		/*
 		 * This can happen if wsrv has taken off the last mblk but
@@ -1768,8 +1730,7 @@ gld_wput(queue_t *q, mblk_t *mp)
 		upri = (gld->gld_flags & GLD_RAW) ? gld->gld_upri :
 		    UPRI(gld, mp->b_band);
 
-		rc = (multidata) ? gld_start_mdt(q, mp, GLD_WPUT) :
-		    gld_start(q, mp, GLD_WPUT, upri);
+		rc = gld_start(q, mp, GLD_WPUT, upri);
 
 		/* Allow DL_UNBIND again */
 		membar_exit();
@@ -1843,7 +1804,6 @@ gld_wsrv(queue_t *q)
 	gld_mac_info_t *macinfo;
 	union DL_primitives *prim;
 	int err;
-	boolean_t multidata;
 	uint32_t upri;
 
 #ifdef GLD_DEBUG
@@ -1870,8 +1830,6 @@ gld_wsrv(queue_t *q)
 	while ((mp = getq(q)) != NULL) {
 		switch (DB_TYPE(mp)) {
 		case M_DATA:
-		case M_MULTIDATA:
-			multidata = (DB_TYPE(mp) == M_MULTIDATA);
 
 			/*
 			 * retry of a previously processed UNITDATA_REQ
@@ -1893,8 +1851,7 @@ gld_wsrv(queue_t *q)
 			upri = (gld->gld_flags & GLD_RAW) ? gld->gld_upri :
 			    UPRI(gld, mp->b_band);
 
-			err = (multidata) ? gld_start_mdt(q, mp, GLD_WSRV) :
-			    gld_start(q, mp, GLD_WSRV, upri);
+			err = gld_start(q, mp, GLD_WSRV, upri);
 			if (err == GLD_NORESOURCES) {
 				/* gld_sched will qenable us later */
 				gld->gld_xwait = B_TRUE; /* want qenable */
@@ -2227,212 +2184,6 @@ badarg:
 }
 
 /*
- * With MDT V.2 a single message mp can have one header area and multiple
- * payload areas. A packet is described by dl_pkt_info, and each packet can
- * span multiple payload areas (currently with TCP, each packet will have one
- * header and at the most two payload areas). MACs might have a limit on the
- * number of payload segments (i.e. per packet scatter-gather limit), and
- * MDT V.2 has a way of specifying that with mdt_span_limit; the MAC driver
- * might also have a limit on the total number of payloads in a message, and
- * that is specified by mdt_max_pld.
- */
-static int
-gld_start_mdt(queue_t *q, mblk_t *mp, int caller)
-{
-	mblk_t *nextmp;
-	gld_t *gld = (gld_t *)q->q_ptr;
-	gld_mac_info_t *macinfo = gld->gld_mac_info;
-	gld_mac_pvt_t *mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
-	int numpacks, mdtpacks;
-	gld_interface_t *ifp = mac_pvt->interfacep;
-	pktinfo_t pktinfo;
-	gld_vlan_t *vlan = (gld_vlan_t *)gld->gld_vlan;
-	boolean_t doloop = B_FALSE;
-	multidata_t *dlmdp;
-	pdescinfo_t pinfo;
-	pdesc_t *dl_pkt;
-	void *cookie;
-	uint_t totLen = 0;
-
-	ASSERT(DB_TYPE(mp) == M_MULTIDATA);
-
-	/*
-	 * We're not holding the lock for this check.  If the promiscuous
-	 * state is in flux it doesn't matter much if we get this wrong.
-	 */
-	if (mac_pvt->nprom > 0) {
-		/*
-		 * We want to loopback to the receive side, but to avoid
-		 * recursive lock entry:  if we came from wput(), which
-		 * could have looped back via IP from our own receive
-		 * interrupt thread, we decline this request.  wput()
-		 * will then queue the packet for wsrv().  This means
-		 * that when snoop is running we don't get the advantage
-		 * of the wput() multithreaded direct entry to the
-		 * driver's send routine.
-		 */
-		if (caller == GLD_WPUT) {
-			(void) putbq(q, mp);
-			return (GLD_NORESOURCES);
-		}
-		doloop = B_TRUE;
-
-		/*
-		 * unlike the M_DATA case, we don't have to call
-		 * dupmsg_noloan here because mmd_transform
-		 * (called by gld_precv_mdt) will make a copy of
-		 * each dblk.
-		 */
-	}
-
-	while (mp != NULL) {
-		/*
-		 * The lower layer driver only gets a single multidata
-		 * message; this also makes it easier to handle noresources.
-		 */
-		nextmp = mp->b_cont;
-		mp->b_cont = NULL;
-
-		/*
-		 * Get number of packets in this message; if nothing
-		 * to transmit, go to next message.
-		 */
-		dlmdp = mmd_getmultidata(mp);
-		if ((mdtpacks = (int)mmd_getcnt(dlmdp, NULL, NULL)) == 0) {
-			freemsg(mp);
-			mp = nextmp;
-			continue;
-		}
-
-		/*
-		 * Run interpreter to populate media specific pktinfo fields.
-		 * This collects per MDT message information like sap,
-		 * broad/multicast etc.
-		 */
-		(void) (*ifp->interpreter_mdt)(macinfo, mp, NULL, &pktinfo,
-		    GLD_MDT_TX);
-
-		numpacks = (*macinfo->gldm_mdt_pre)(macinfo, mp, &cookie);
-
-		if (numpacks > 0) {
-			/*
-			 * Driver indicates it can transmit at least 1, and
-			 * possibly all, packets in MDT message.
-			 */
-			int count = numpacks;
-
-			for (dl_pkt = mmd_getfirstpdesc(dlmdp, &pinfo);
-			    (dl_pkt != NULL);
-			    dl_pkt = mmd_getnextpdesc(dl_pkt, &pinfo)) {
-				/*
-				 * Format this packet by adding link header and
-				 * adjusting pdescinfo to include it; get
-				 * packet length.
-				 */
-				(void) (*ifp->interpreter_mdt)(macinfo, NULL,
-				    &pinfo, &pktinfo, GLD_MDT_TXPKT);
-
-				totLen += pktinfo.pktLen;
-
-				/*
-				 * Loop back packet before handing to the
-				 * driver.
-				 */
-				if (doloop &&
-				    mmd_adjpdesc(dl_pkt, &pinfo) != NULL) {
-					GLDM_LOCK(macinfo, RW_WRITER);
-					gld_precv_mdt(macinfo, vlan, mp,
-					    dl_pkt, &pktinfo);
-					GLDM_UNLOCK(macinfo);
-				}
-
-				/*
-				 * And send off to driver.
-				 */
-				(*macinfo->gldm_mdt_send)(macinfo, cookie,
-				    &pinfo);
-
-				/*
-				 * Be careful not to invoke getnextpdesc if we
-				 * already sent the last packet, since driver
-				 * might have posted it to hardware causing a
-				 * completion and freemsg() so the MDT data
-				 * structures might not be valid anymore.
-				 */
-				if (--count == 0)
-					break;
-			}
-			(*macinfo->gldm_mdt_post)(macinfo, mp, cookie);
-			pktinfo.pktLen = totLen;
-			UPDATE_STATS(vlan->gldv_stats, NULL, pktinfo, numpacks);
-
-			/*
-			 * In the noresources case (when driver indicates it
-			 * can not transmit all packets in the MDT message),
-			 * adjust to skip the first few packets on retrial.
-			 */
-			if (numpacks != mdtpacks) {
-				/*
-				 * Release already processed packet descriptors.
-				 */
-				for (count = 0; count < numpacks; count++) {
-					dl_pkt = mmd_getfirstpdesc(dlmdp,
-					    &pinfo);
-					mmd_rempdesc(dl_pkt);
-				}
-				ATOMIC_BUMP(vlan->gldv_stats, NULL,
-				    glds_xmtretry, 1);
-				mp->b_cont = nextmp;
-				(void) putbq(q, mp);
-				return (GLD_NORESOURCES);
-			}
-		} else if (numpacks == 0) {
-			/*
-			 * Driver indicates it can not transmit any packets
-			 * currently and will request retrial later.
-			 */
-			ATOMIC_BUMP(vlan->gldv_stats, NULL, glds_xmtretry, 1);
-			mp->b_cont = nextmp;
-			(void) putbq(q, mp);
-			return (GLD_NORESOURCES);
-		} else {
-			ASSERT(numpacks == -1);
-			/*
-			 * We're supposed to count failed attempts as well.
-			 */
-			dl_pkt = mmd_getfirstpdesc(dlmdp, &pinfo);
-			while (dl_pkt != NULL) {
-				/*
-				 * Call interpreter to determine total packet
-				 * bytes that are being dropped.
-				 */
-				(void) (*ifp->interpreter_mdt)(macinfo, NULL,
-				    &pinfo, &pktinfo, GLD_MDT_TXPKT);
-
-				totLen += pktinfo.pktLen;
-
-				dl_pkt = mmd_getnextpdesc(dl_pkt, &pinfo);
-			}
-			pktinfo.pktLen = totLen;
-			UPDATE_STATS(vlan->gldv_stats, NULL, pktinfo, mdtpacks);
-
-			/*
-			 * Transmit error; drop the message, move on
-			 * to the next one.
-			 */
-			freemsg(mp);
-		}
-
-		/*
-		 * Process the next multidata block, if there is one.
-		 */
-		mp = nextmp;
-	}
-
-	return (GLD_SUCCESS);
-}
-
-/*
  * gld_intr (macinfo)
  */
 uint_t
@@ -2536,31 +2287,6 @@ gld_precv(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag,
 	pktinfo.user_pri = GLD_VTAG_PRI(vtag);
 
 	gld_sendup(macinfo, &pktinfo, mp, gld_paccept);
-}
-
-/*
- * Called from gld_start_mdt to loopback packet(s) when in promiscuous mode.
- * Note that 'vlan' is always a physical link, because MDT can only be
- * enabled on non-VLAN streams.
- */
-/*ARGSUSED*/
-static void
-gld_precv_mdt(gld_mac_info_t *macinfo, gld_vlan_t *vlan, mblk_t *mp,
-    pdesc_t *dl_pkt, pktinfo_t *pktinfo)
-{
-	mblk_t *adjmp;
-	gld_mac_pvt_t *mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
-	gld_interface_t *ifp = mac_pvt->interfacep;
-
-	ASSERT(GLDM_LOCK_HELD_WRITE(macinfo));
-
-	/*
-	 * Get source/destination.
-	 */
-	(void) (*ifp->interpreter_mdt)(macinfo, mp, NULL, pktinfo,
-	    GLD_MDT_RXLOOP);
-	if ((adjmp = mmd_transform(dl_pkt)) != NULL)
-		gld_sendup(macinfo, pktinfo, adjmp, gld_paccept);
 }
 
 /*
@@ -3680,13 +3406,10 @@ gld_cap_ack(queue_t *q, mblk_t *mp)
 {
 	gld_t *gld = (gld_t *)q->q_ptr;
 	gld_mac_info_t *macinfo = gld->gld_mac_info;
-	gld_interface_t *ifp;
 	dl_capability_ack_t *dlap;
 	dl_capability_sub_t *dlsp;
 	size_t size = sizeof (dl_capability_ack_t);
 	size_t subsize = 0;
-
-	ifp = ((gld_mac_pvt_t *)macinfo->gldm_mac_pvt)->interfacep;
 
 	if (macinfo->gldm_capabilities & GLD_CAP_CKSUM_ANY)
 		subsize += sizeof (dl_capability_sub_t) +
@@ -3694,9 +3417,6 @@ gld_cap_ack(queue_t *q, mblk_t *mp)
 	if (macinfo->gldm_capabilities & GLD_CAP_ZEROCOPY)
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_zerocopy_t);
-	if (macinfo->gldm_options & GLDOPT_MDT)
-		subsize += (sizeof (dl_capability_sub_t) +
-		    sizeof (dl_capab_mdt_t));
 
 	if ((mp = mexchange(q, mp, size + subsize, M_PROTO,
 	    DL_CAPABILITY_ACK)) == NULL)
@@ -3740,21 +3460,6 @@ gld_cap_ack(queue_t *q, mblk_t *mp)
 
 		dlcapabsetqid(&(dlzp->zerocopy_mid), RD(q));
 		dlsp = (dl_capability_sub_t *)&dlzp[1];
-	}
-
-	if (macinfo->gldm_options & GLDOPT_MDT) {
-		dl_capab_mdt_t *dlmp = (dl_capab_mdt_t *)&dlsp[1];
-
-		dlsp->dl_cap = DL_CAPAB_MDT;
-		dlsp->dl_length = sizeof (dl_capab_mdt_t);
-
-		dlmp->mdt_version = MDT_VERSION_2;
-		dlmp->mdt_max_pld = macinfo->gldm_mdt_segs;
-		dlmp->mdt_span_limit = macinfo->gldm_mdt_sgl;
-		dlcapabsetqid(&dlmp->mdt_mid, OTHERQ(q));
-		dlmp->mdt_flags = DL_CAPAB_MDT_ENABLE;
-		dlmp->mdt_hdr_head = ifp->hdr_size;
-		dlmp->mdt_hdr_tail = 0;
 	}
 
 	qreply(q, mp);

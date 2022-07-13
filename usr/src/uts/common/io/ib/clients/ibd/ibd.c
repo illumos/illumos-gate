@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
 
 /*
@@ -58,7 +59,6 @@
 #include <sys/ib/clients/ibd/ibd.h>
 #include <sys/ib/mgt/sm_attr.h>	/* for SM_INIT_TYPE_* */
 #include <sys/note.h>
-#include <sys/multidata.h>
 
 #include <sys/ib/mgt/ibmf/ibmf.h>	/* for ibd_get_portspeed */
 
@@ -653,9 +653,9 @@ _NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_txpost_lock,
 /*
  * id_acache_req_lock
  */
-_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_acache_req_lock, 
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_acache_req_lock,
     ibd_state_t::id_acache_req_cv))
-_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_acache_req_lock, 
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_acache_req_lock,
     ibd_state_t::id_req_list))
 _NOTE(SCHEME_PROTECTS_DATA("atomic",
     ibd_acache_s::ac_ref))
@@ -717,7 +717,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_sched_lock,
 /*
  * id_link_mutex
  */
-_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_link_mutex, 
+_NOTE(MUTEX_PROTECTS_DATA(ibd_state_t::id_link_mutex,
     ibd_state_t::id_link_state))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ibd_state_t::id_link_state))
 _NOTE(SCHEME_PROTECTS_DATA("only async thr and ibd_m_start",
@@ -951,7 +951,7 @@ _NOTE(SCHEME_PROTECTS_DATA("counters for problem diagnosis",
     ibd_rc_stat_s::rc_rcv_copy_byte
     ibd_rc_stat_s::rc_rcv_copy_pkt
     ibd_rc_stat_s::rc_rcv_alloc_fail
-    ibd_rc_stat_s::rc_rcq_err 
+    ibd_rc_stat_s::rc_rcq_err
     ibd_rc_stat_s::rc_rwqe_short
     ibd_rc_stat_s::rc_xmt_bytes
     ibd_rc_stat_s::rc_xmt_small_pkt
@@ -8169,9 +8169,9 @@ ibd_create_partition(void *karg, intptr_t arg, int mode, cred_t *credp,
 	ibd_state_t		*state, *port_state, *p;
 	int			i, err, rval = 0;
 	mac_register_t		*macp;
-	ibt_hca_portinfo_t 	*pinfop = NULL;
-	ibt_status_t 		ibt_status;
-	uint_t 			psize, pinfosz;
+	ibt_hca_portinfo_t	*pinfop = NULL;
+	ibt_status_t		ibt_status;
+	uint_t			psize, pinfosz;
 	boolean_t		force_create = B_FALSE;
 
 	cmd->ibdioc.ioc_status = 0;
@@ -8421,9 +8421,9 @@ ibd_get_partition_info(void *karg, intptr_t arg, int mode, cred_t *cred,
 #endif
 	ibd_state_t		*state, *port_state;
 	int			size;
-	ibt_hca_portinfo_t 	*pinfop = NULL;
-	ibt_status_t 		ibt_status;
-	uint_t 			psize, pinfosz;
+	ibt_hca_portinfo_t	*pinfop = NULL;
+	ibt_status_t		ibt_status;
+	uint_t			psize, pinfosz;
 	int			rval = 0;
 
 	size = sizeof (ibd_ioctl_t);

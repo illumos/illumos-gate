@@ -21,9 +21,8 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * gld - Generic LAN Driver
@@ -44,7 +43,6 @@
 #include <sys/strsun.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
-#include <sys/multidata.h>
 #include <sys/gld.h>
 #include <sys/gldpriv.h>
 #include <sys/ddi.h>
@@ -109,7 +107,7 @@ gld_init_ether(gld_mac_info_t *macinfo)
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sp->glds_defer, "defer_xmts", KSTAT_DATA_ULONG);
 	kstat_named_init(&sp->glds_xmtlatecoll, "tx_late_collisions",
-					KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sp->glds_short, "runt_errors", KSTAT_DATA_ULONG);
 	kstat_named_init(&sp->glds_excoll, "ex_collisions", KSTAT_DATA_ULONG);
 
@@ -801,88 +799,6 @@ out:
 	return (0);
 }
 
-/*
- * The packet format sent to the driver is: 2b sap :: 2b 0s :: data
- */
-void
-gld_interpret_mdt_ib(gld_mac_info_t *macinfo, mblk_t *mp, pdescinfo_t *pinfo,
-    pktinfo_t *pktinfo, mdt_packet_flag_t flags)
-{
-	gld_mac_pvt_t *mac_pvt;
-	multidata_t *dlmdp;
-	pattrinfo_t attr_info = { PATTR_DSTADDRSAP, };
-	pattr_t *patr;
-	ipoib_ptxhdr_t *dlap = NULL;
-
-	/*
-	 * Per packet formatting.
-	 */
-	if (flags == GLD_MDT_TXPKT) {
-		ipoib_hdr_t *hptr;
-		uint_t seg;
-
-		if (PDESC_HDRL(pinfo) == 0)
-			return;
-
-		/*
-		 * Update packet's link header.
-		 */
-		pinfo->hdr_rptr -= IPOIB_HDRSIZE;
-		hptr = (ipoib_hdr_t *)pinfo->hdr_rptr;
-		hptr->ipoib_mbz = htons(0);
-		hptr->ipoib_type = pktinfo->ethertype;
-
-		/*
-		 * Total #bytes that will be put on wire.
-		 */
-		pktinfo->pktLen = PDESC_HDRL(pinfo);
-		for (seg = 0; seg < pinfo->pld_cnt; seg++)
-			pktinfo->pktLen += PDESC_PLDL(pinfo, seg);
-
-		return;
-	}
-
-	/*
-	 * The following two cases of GLD_MDT_TX and GLD_MDT_RXLOOP are per
-	 * MDT message processing.
-	 */
-	dlmdp = mmd_getmultidata(mp);
-	patr = mmd_getpattr(dlmdp, NULL, &attr_info);
-	ASSERT(patr != NULL);
-	ASSERT(macinfo->gldm_saplen == -2);
-	if (patr != NULL)
-		dlap = (ipoib_ptxhdr_t *)((pattr_addr_t *)attr_info.buf)->addr;
-
-	if (flags == GLD_MDT_TX) {
-		bzero((void *)pktinfo, sizeof (*pktinfo));
-		if (dlap == NULL)
-			return;
-
-		/*
-		 * Check if mac is broadcast or multicast address; all these
-		 * types of address have the top 4 bytes as 0x00FFFFFF.
-		 */
-		if (mac_eq(dlap, macinfo->gldm_broadcast_addr,
-		    sizeof (uint32_t))) {
-			if (mac_eq(dlap, macinfo->gldm_broadcast_addr,
-			    IPOIB_ADDRL))
-				pktinfo->isBroadcast = 1;
-			else
-				pktinfo->isMulticast = 1;
-		}
-		pktinfo->ethertype = REF_NET_USHORT(dlap->
-		    ipoib_rhdr.ipoib_type);
-	} else {
-		ASSERT(flags == GLD_MDT_RXLOOP);
-		pktinfo->macLen = IPOIB_HDRSIZE;
-		mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
-		mac_copy(mac_pvt->curr_macaddr, pktinfo->shost, IPOIB_ADDRL);
-		if (dlap == NULL)
-			return;
-		mac_copy(&dlap->ipoib_dest, pktinfo->dhost, IPOIB_ADDRL);
-	}
-}
-
 mblk_t *
 gld_unitdata_ib(gld_t *gld, mblk_t *mp)
 {
@@ -1322,7 +1238,7 @@ gld_init_tr(gld_mac_info_t *macinfo)
 	mutex_init(GLD_SR_MUTEX(macinfo), NULL, MUTEX_DRIVER, NULL);
 
 	GLD_SR_VAR(macinfo) = kmem_zalloc(sizeof (struct srtab *)*SR_HASH_SIZE,
-				KM_SLEEP);
+	    KM_SLEEP);
 
 	/* Default is RDE enabled for this medium */
 	((gld_mac_pvt_t *)macinfo->gldm_mac_pvt)->rde_enabled =

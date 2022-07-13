@@ -4495,8 +4495,6 @@ f usr/include/sys/msg_impl.h 0644 root bin
 f usr/include/sys/msio.h 0644 root bin
 f usr/include/sys/msreg.h 0644 root bin
 f usr/include/sys/mtio.h 0644 root bin
-f usr/include/sys/multidata.h 0644 root bin
-f usr/include/sys/multidata_impl.h 0644 root bin
 f usr/include/sys/mutex.h 0644 root bin
 f usr/include/sys/mutex_impl.h 0644 root bin
 f usr/include/sys/nbmlock.h 0644 root bin

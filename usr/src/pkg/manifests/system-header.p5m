@@ -1164,7 +1164,6 @@ file path=usr/include/sys/msg_impl.h
 file path=usr/include/sys/msio.h
 file path=usr/include/sys/msreg.h
 file path=usr/include/sys/mtio.h
-file path=usr/include/sys/multidata.h
 file path=usr/include/sys/mutex.h
 $(i386_ONLY)file path=usr/include/sys/mutex_impl.h
 file path=usr/include/sys/nbmlock.h

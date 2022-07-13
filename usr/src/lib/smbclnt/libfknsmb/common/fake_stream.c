@@ -26,6 +26,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/types.h>
@@ -288,7 +289,7 @@ streams_msg_init(void)
 	    DBLK_CACHE_ALIGN, dblk_esb_constructor, dblk_destructor, NULL,
 	    (void *)sizeof (dblk_t), NULL, dblk_kmem_flags);
 
-	/* fthdr_cache, ftblk_cache, mmd_init... */
+	/* fthdr_cache, ftblk_cache, ... */
 }
 
 /*ARGSUSED*/
@@ -632,7 +633,7 @@ frnop_func(void *arg)
  */
 static mblk_t *
 gesballoc(unsigned char *base, size_t size, uint32_t db_rtfu, frtn_t *frp,
-	void (*lastfree)(mblk_t *, dblk_t *), int kmflags)
+    void (*lastfree)(mblk_t *, dblk_t *), int kmflags)
 {
 	dblk_t *dbp;
 	mblk_t *mp;
@@ -1007,15 +1008,6 @@ copyb(mblk_t *bp)
 	dp = bp->b_datap;
 	if (dp->db_fthdr != NULL)
 		STR_FTEVENT_MBLK(bp, caller(), FTEV_COPYB, 0);
-
-	/*
-	 * Special handling for Multidata message; this should be
-	 * removed once a copy-callback routine is made available.
-	 */
-	if (dp->db_type == M_MULTIDATA) {
-		/* _KERNEL mmd_copy stuff */
-		return (NULL);
-	}
 
 	size = dp->db_lim - dp->db_base;
 	unaligned = P2PHASE((uintptr_t)dp->db_base, sizeof (uint_t));

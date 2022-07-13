@@ -21,9 +21,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 Garrett D'Amore
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mac.h>
@@ -32,18 +32,14 @@
 typedef struct softmac_capab_ops {
 	int	(*sc_hcksum_ack)(void *, t_uscalar_t);
 	int	(*sc_zcopy_ack)(void *, t_uscalar_t);
-	int	(*sc_mdt_ack)(void *, dl_capab_mdt_t *);
 } softmac_capab_ops_t;
 
 static int	dl_capab(ldi_handle_t, mblk_t **);
 static int	softmac_fill_hcksum_ack(void *, t_uscalar_t);
 static int	softmac_fill_zcopy_ack(void *, t_uscalar_t);
-static int	softmac_fill_mdt_ack(void *, dl_capab_mdt_t *);
 static int	softmac_adv_hcksum_ack(void *, t_uscalar_t);
 static int	softmac_adv_zcopy_ack(void *, t_uscalar_t);
-static int	softmac_adv_mdt_ack(void *, dl_capab_mdt_t *);
 static int	softmac_enable_hcksum_ack(void *, t_uscalar_t);
-static int	softmac_enable_mdt_ack(void *, dl_capab_mdt_t *);
 static int	softmac_capab_send(softmac_lower_t *, boolean_t);
 static int	i_capab_ack(mblk_t *, queue_t *, softmac_capab_ops_t *, void *);
 static int	i_capab_id_ack(mblk_t *, dl_capability_sub_t *, queue_t *,
@@ -54,31 +50,25 @@ static int	i_capab_hcksum_ack(dl_capab_hcksum_t *, queue_t *,
     softmac_capab_ops_t *, void *);
 static int	i_capab_zcopy_ack(dl_capab_zerocopy_t *, queue_t *,
     softmac_capab_ops_t *, void *);
-static int	i_capab_mdt_ack(dl_capab_mdt_t *, queue_t *,
-    softmac_capab_ops_t *, void *);
 static int	i_capab_hcksum_verify(dl_capab_hcksum_t *, queue_t *);
 static int	i_capab_zcopy_verify(dl_capab_zerocopy_t *, queue_t *);
-static int	i_capab_mdt_verify(dl_capab_mdt_t *, queue_t *);
 
 static softmac_capab_ops_t softmac_fill_capab_ops =
 {
 	softmac_fill_hcksum_ack,
 	softmac_fill_zcopy_ack,
-	softmac_fill_mdt_ack,
 };
 
 static softmac_capab_ops_t softmac_adv_capab_ops =
 {
 	softmac_adv_hcksum_ack,
 	softmac_adv_zcopy_ack,
-	softmac_adv_mdt_ack
 };
 
 static softmac_capab_ops_t softmac_enable_capab_ops =
 {
 	softmac_enable_hcksum_ack,
 	NULL,
-	softmac_enable_mdt_ack
 };
 
 int
@@ -196,28 +186,6 @@ softmac_fill_zcopy_ack(void *arg, t_uscalar_t flags)
 	return (0);
 }
 
-static int
-softmac_fill_mdt_ack(void *arg, dl_capab_mdt_t *mdt)
-{
-	softmac_t *softmac = (softmac_t *)arg;
-
-	/*
-	 * There are two types of acks we process here:
-	 * 1. acks in reply to a (first form) generic capability req
-	 *    (ENABLE flag might be set by some drivers)
-	 * 2. acks in reply to a ENABLE capability req.
-	 *    (ENABLE flag set)
-	 */
-
-	ASSERT(mdt->mdt_version == MDT_VERSION_2);
-	softmac->smac_mdt = B_TRUE;
-	softmac->smac_mdt_capab.mdt_hdr_head = mdt->mdt_hdr_head;
-	softmac->smac_mdt_capab.mdt_hdr_tail = mdt->mdt_hdr_tail;
-	softmac->smac_mdt_capab.mdt_max_pld = mdt->mdt_max_pld;
-	softmac->smac_mdt_capab.mdt_span_limit = mdt->mdt_span_limit;
-	return (0);
-}
-
 int
 softmac_capab_enable(softmac_lower_t *slp)
 {
@@ -260,18 +228,6 @@ softmac_capab_send(softmac_lower_t *slp, boolean_t enable)
 			size += sizeof (dl_capability_sub_t) +
 			    sizeof (dl_capab_hcksum_t);
 
-		if (softmac->smac_mdt) {
-			if (!(softmac->smac_mdt_capab.mdt_flags &
-			    DL_CAPAB_MDT_ENABLE)) {
-				/*
-				 * The MDT capability was not enabled for the
-				 * first time, enable it now.
-				 */
-				size += sizeof (dl_capability_sub_t) +
-				    sizeof (dl_capab_mdt_t);
-			}
-		}
-
 		if (size == 0)
 			return (0);
 	}
@@ -310,36 +266,6 @@ softmac_capab_send(softmac_lower_t *slp, boolean_t enable)
 		hck_subcapp->hcksum_version = HCKSUM_VERSION_1;
 		hck_subcapp->hcksum_txflags =
 		    softmac->smac_hcksum_txflags | HCKSUM_ENABLE;
-	}
-
-	if (softmac->smac_mdt) {
-		if (!(softmac->smac_mdt_capab.mdt_flags &
-		    DL_CAPAB_MDT_ENABLE)) {
-			dl_capab_mdt_t *mdt_subcapp;
-
-			size = sizeof (dl_capability_sub_t) +
-			    sizeof (dl_capab_mdt_t);
-			capb->dl_sub_length += size;
-
-			subcapb = (dl_capability_sub_t *)
-			    ((uint8_t *)(subcapb + 1) + subcapb->dl_length);
-
-			subcapb->dl_cap = DL_CAPAB_MDT;
-			subcapb->dl_length = sizeof (dl_capab_mdt_t);
-			mdt_subcapp = (dl_capab_mdt_t *)(subcapb + 1);
-			mdt_subcapp->mdt_version = MDT_VERSION_2;
-			mdt_subcapp->mdt_flags =
-			    (softmac->smac_mdt_capab.mdt_flags |
-			    DL_CAPAB_MDT_ENABLE);
-			mdt_subcapp->mdt_hdr_head =
-			    softmac->smac_mdt_capab.mdt_hdr_head;
-			mdt_subcapp->mdt_hdr_tail =
-			    softmac->smac_mdt_capab.mdt_hdr_tail;
-			mdt_subcapp->mdt_max_pld =
-			    softmac->smac_mdt_capab.mdt_max_pld;
-			mdt_subcapp->mdt_span_limit =
-			    softmac->smac_mdt_capab.mdt_span_limit;
-		}
 	}
 
 output:
@@ -414,35 +340,6 @@ softmac_adv_zcopy_ack(void *arg, t_uscalar_t flags)
 }
 
 static int
-softmac_adv_mdt_ack(void *arg, dl_capab_mdt_t *mdt)
-{
-	softmac_t *softmac = (softmac_t *)arg;
-
-	/*
-	 * The acknowledgement should be the same as we got when
-	 * the softmac is created.
-	 */
-	if (!softmac->smac_mdt) {
-		ASSERT(B_FALSE);
-		return (-1);
-	}
-
-	if ((softmac->smac_mdt_capab.mdt_hdr_head != mdt->mdt_hdr_head) ||
-	    (softmac->smac_mdt_capab.mdt_hdr_tail != mdt->mdt_hdr_tail) ||
-	    (softmac->smac_mdt_capab.mdt_max_pld != mdt->mdt_max_pld) ||
-	    (softmac->smac_mdt_capab.mdt_span_limit != mdt->mdt_span_limit)) {
-		ASSERT(B_FALSE);
-		return (-1);
-	}
-	/*
-	 * We need the mdt_flags field to know whether an additional
-	 * DL_CAPAB_MDT_ENABLE is necessary.
-	 */
-	softmac->smac_mdt_capab.mdt_flags = mdt->mdt_flags;
-	return (0);
-}
-
-static int
 softmac_enable_hcksum_ack(void *arg, t_uscalar_t flags)
 {
 	softmac_t	*softmac = (softmac_t *)arg;
@@ -465,43 +362,6 @@ softmac_enable_hcksum_ack(void *arg, t_uscalar_t flags)
 	} else {
 		cmn_err(CE_WARN, "softmac_enable_hcksum_ack: "
 		    "hardware checksum flag HCKSUM_ENABLE is not set");
-		return (-1);
-	}
-
-	return (0);
-}
-
-static int
-softmac_enable_mdt_ack(void *arg, dl_capab_mdt_t *mdt)
-{
-	softmac_t	*softmac = (softmac_t *)arg;
-
-	/*
-	 * There are two types of acks we process here:
-	 * 1. acks in reply to a (first form) generic capability req
-	 *    (no ENABLE flag set)
-	 * 2. acks in reply to a ENABLE capability req.
-	 *    (ENABLE flag set)
-	 * Only the second type should be expected here.
-	 */
-
-	if (mdt->mdt_flags & DL_CAPAB_MDT_ENABLE) {
-		if ((softmac->smac_mdt_capab.mdt_hdr_head !=
-		    mdt->mdt_hdr_head) ||
-		    (softmac->smac_mdt_capab.mdt_hdr_tail !=
-		    mdt->mdt_hdr_tail) ||
-		    (softmac->smac_mdt_capab.mdt_max_pld !=
-		    mdt->mdt_max_pld) ||
-		    (softmac->smac_mdt_capab.mdt_span_limit !=
-		    mdt->mdt_span_limit)) {
-			cmn_err(CE_WARN, "softmac_enable_mdt_ack: "
-			    "unexpected MDT capability value");
-			return (-1);
-		}
-		softmac->smac_mdt_capab.mdt_flags = mdt->mdt_flags;
-	} else {
-		cmn_err(CE_WARN, "softmac_enable_mdt_ack: "
-		    "MDT flag DL_CAPAB_MDT_ENABLE is not set");
 		return (-1);
 	}
 
@@ -595,7 +455,6 @@ i_capab_sub_ack(mblk_t *mp, dl_capability_sub_t *sub, queue_t *q,
 	caddr_t			capend;
 	dl_capab_hcksum_t	*hcksum;
 	dl_capab_zerocopy_t	*zcopy;
-	dl_capab_mdt_t		*mdt;
 	int			err = 0;
 
 	capend = (caddr_t)(sub + 1) + sub->dl_length;
@@ -614,11 +473,6 @@ i_capab_sub_ack(mblk_t *mp, dl_capability_sub_t *sub, queue_t *q,
 	case DL_CAPAB_ZEROCOPY:
 		zcopy = (dl_capab_zerocopy_t *)(sub + 1);
 		err = i_capab_zcopy_ack(zcopy, q, op, arg);
-		break;
-
-	case DL_CAPAB_MDT:
-		mdt = (dl_capab_mdt_t *)(sub + 1);
-		err = i_capab_mdt_ack(mdt, q, op, arg);
 		break;
 
 	default:
@@ -684,24 +538,6 @@ i_capab_zcopy_ack(dl_capab_zerocopy_t *zcopy, queue_t *q,
 }
 
 static int
-i_capab_mdt_ack(dl_capab_mdt_t *mdt, queue_t *q,
-    softmac_capab_ops_t *op, void *arg)
-{
-	int	err;
-
-	if ((err = i_capab_mdt_verify(mdt, q)) != 0)
-		return (err);
-
-	if (op->sc_mdt_ack)
-		return (op->sc_mdt_ack(arg, mdt));
-	else {
-		cmn_err(CE_WARN, "i_capab_mdt_ack: unexpected MDT "
-		    "acknowledgement");
-		return (EINVAL);
-	}
-}
-
-static int
 i_capab_hcksum_verify(dl_capab_hcksum_t *hcksum, queue_t *q)
 {
 	if (hcksum->hcksum_version != HCKSUM_VERSION_1) {
@@ -732,24 +568,6 @@ i_capab_zcopy_verify(dl_capab_zerocopy_t *zcopy, queue_t *q)
 	if ((q != NULL) && !dlcapabcheckqid(&zcopy->zerocopy_mid, q)) {
 		cmn_err(CE_WARN, "i_capab_zcopy_verify: unexpected pass-thru "
 		    "module detected; zcopy checksum capability discarded");
-		return (-1);
-	}
-	return (0);
-}
-
-static int
-i_capab_mdt_verify(dl_capab_mdt_t *mdt, queue_t *q)
-{
-	if (mdt->mdt_version != MDT_VERSION_2) {
-		cmn_err(CE_WARN, "i_capab_mdt_verify: unsupported MDT "
-		    "capability (version %d, expected %d)",
-		    mdt->mdt_version, MDT_VERSION_2);
-		return (-1);
-	}
-
-	if ((q != NULL) && !dlcapabcheckqid(&mdt->mdt_mid, q)) {
-		cmn_err(CE_WARN, "i_capab_mdt_verify: unexpected pass-thru "
-		    "module detected; MDT capability discarded");
 		return (-1);
 	}
 	return (0);

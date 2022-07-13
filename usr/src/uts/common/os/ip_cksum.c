@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -36,9 +37,6 @@
 #include <inet/sctp_crc32.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
-
-#include <sys/multidata.h>
-#include <sys/multidata_impl.h>
 
 extern unsigned int ip_ocsum(ushort_t *, int, unsigned int);
 
@@ -399,136 +397,6 @@ sctp_cksum(mblk_t *mp, int offset)
 	crc32 = ~crc32;
 
 	return (crc32);
-}
-
-/*
- * Routine to compute Internet checksum (16-bit 1's complement) of a given
- * Multidata packet descriptor.  As in the non-Multidata routine, this doesn't
- * 1's complement the result, such that it may be used to compute partial
- * checksums.  Since it works on buffer spans rather than mblks, this routine
- * does not handle existing partial checksum value as in the STRUIO_IP special
- * mblk case (supporting this is rather trivial, but is perhaps of no use at
- * the moment unless synchronous streams and delayed checksum calculation are
- * revived.)
- *
- * Note also here that the given Multidata packet descriptor must refer to
- * a header buffer, i.e. it must have a header fragment.  In addition, the
- * offset must lie within the boundary of the header fragment.  For the
- * outbound tcp (MDT) case, this will not be an issue because the stack
- * ensures that such conditions are met, and that there is no need whatsoever
- * to compute partial checksums on an arbitrary offset that is not part of
- * the header fragment.  We may need to revisit this routine to handle all
- * cases of the inbound (MDR) case, especially when we need to perform partial
- * checksum calculation due to padded bytes (non-zeroes) in the frame.
- */
-uint_t
-ip_md_cksum(pdesc_t *pd, int offset, uint_t sum)
-{
-	pdescinfo_t	*pdi = &pd->pd_pdi;
-	uchar_t		*reg_start, *reg_end;
-	ssize_t		mlen, i;
-	ushort_t	*w;
-	boolean_t	byteleft = B_FALSE;
-
-	ASSERT((pdi->flags & PDESC_HAS_REF) != 0);
-	ASSERT(pdi->hdr_rptr != NULL && pdi->hdr_wptr != NULL);
-	ASSERT(offset <= PDESC_HDRL(pdi));
-
-	for (i = 0; i < pdi->pld_cnt + 1; i++) {
-		if (i == 0) {
-			reg_start = pdi->hdr_rptr;
-			reg_end = pdi->hdr_wptr;
-		} else {
-			reg_start = pdi->pld_ary[i - 1].pld_rptr;
-			reg_end = pdi->pld_ary[i - 1].pld_wptr;
-			offset = 0;
-		}
-
-		w = (ushort_t *)(reg_start + offset);
-		mlen = reg_end - (uchar_t *)w;
-
-		if (mlen > 0 && byteleft) {
-			/*
-			 * There is a byte left from the last
-			 * segment; add it into the checksum.
-			 * Don't have to worry about a carry-
-			 * out here because we make sure that
-			 * high part of (32 bit) sum is small
-			 * below.
-			 */
-#ifdef _LITTLE_ENDIAN
-			sum += *(uchar_t *)w << 8;
-#else
-			sum += *(uchar_t *)w;
-#endif
-			w = (ushort_t *)((char *)w + 1);
-			mlen--;
-			byteleft = B_FALSE;
-		}
-
-		if (mlen == 0)
-			continue;
-
-		if (is_even(w)) {
-			sum = ip_ocsum(w, mlen >> 1, sum);
-			w += mlen >> 1;
-			/*
-			 * If we had an odd number of bytes,
-			 * then the last byte goes in the high
-			 * part of the sum, and we take the
-			 * first byte to the low part of the sum
-			 * the next time around the loop.
-			 */
-			if (is_odd(mlen)) {
-#ifdef _LITTLE_ENDIAN
-				sum += *(uchar_t *)w;
-#else
-				sum += *(uchar_t *)w << 8;
-#endif
-				byteleft = B_TRUE;
-			}
-		} else {
-			ushort_t swsum;
-#ifdef _LITTLE_ENDIAN
-			sum += *(uchar_t *)w;
-#else
-			sum += *(uchar_t *)w << 8;
-#endif
-			mlen--;
-			w = (ushort_t *)(1 + (uintptr_t)w);
-
-			/* Do a separate checksum and copy operation */
-			swsum = ip_ocsum(w, mlen >> 1, 0);
-			sum += ((swsum << 8) & 0xffff) | (swsum >> 8);
-			w += mlen >> 1;
-			/*
-			 * If we had an even number of bytes,
-			 * then the last byte goes in the low
-			 * part of the sum.  Otherwise we had an
-			 * odd number of bytes and we take the first
-			 * byte to the low part of the sum the
-			 * next time around the loop.
-			 */
-			if (is_odd(mlen)) {
-#ifdef _LITTLE_ENDIAN
-				sum += *(uchar_t *)w << 8;
-#else
-				sum += *(uchar_t *)w;
-#endif
-			} else {
-				byteleft = B_TRUE;
-			}
-		}
-	}
-
-	/*
-	 * Add together high and low parts of sum and carry to get cksum.
-	 * Have to be careful to not drop the last carry here.
-	 */
-	sum = (sum & 0xffff) + (sum >> 16);
-	sum = (sum & 0xffff) + (sum >> 16);
-
-	return (sum);
 }
 
 /* Return the IP checksum for the IP header at "iph". */
