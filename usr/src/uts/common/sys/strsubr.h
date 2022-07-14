@@ -1254,7 +1254,6 @@ extern void strsetrwputdatahooks(vnode_t *, msgfunc_t, msgfunc_t);
 extern int strwaitmark(vnode_t *);
 extern void strsignal_nolock(stdata_t *, int, uchar_t);
 
-struct multidata_s;
 struct pdesc_s;
 
 extern void lso_info_set(mblk_t *, uint32_t, uint32_t);
