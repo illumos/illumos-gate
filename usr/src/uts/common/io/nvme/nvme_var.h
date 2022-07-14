@@ -273,8 +273,6 @@ struct nvme {
 	nvme_fwslot_log_t *n_fwslot;
 	/* Lock protecting the cached firmware slot info */
 	kmutex_t n_fwslot_mutex;
-
-	ddi_taskq_t *n_tq;
 };
 
 struct nvme_namespace {
