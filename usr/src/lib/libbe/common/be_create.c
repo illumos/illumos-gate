@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2016 Martin Matuska. All rights reserved.
- * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -206,8 +206,12 @@ be_init(nvlist_t *be_attrs)
 	}
 
 	/* Generate string for BE's root dataset */
-	be_make_root_ds(bt.nbe_zpool, bt.nbe_name, nbe_root_ds,
-	    sizeof (nbe_root_ds));
+	if ((ret = be_make_root_ds(bt.nbe_zpool, bt.nbe_name, nbe_root_ds,
+	    sizeof (nbe_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.nbe_zpool, bt.nbe_name);
+		return (ret);
+	}
 
 	/*
 	 * Create property list for new BE root dataset.  If some
@@ -446,8 +450,12 @@ be_destroy(nvlist_t *be_attrs)
 	}
 
 	/* Generate string for obe_name's root dataset */
-	be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
-	    sizeof (obe_root_ds));
+	if ((ret = be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
+	    sizeof (obe_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.obe_zpool, bt.obe_name);
+		return (ret);
+	}
 	bt.obe_root_ds = obe_root_ds;
 
 	if (getzoneid() != GLOBAL_ZONEID) {
@@ -780,10 +788,28 @@ be_copy(nvlist_t *be_attrs)
 	}
 
 	/*
+	 * If an auto named BE is desired, it must be in the same
+	 * pool as the original BE.
+	 */
+	if (bt.nbe_name == NULL && bt.nbe_zpool != NULL) {
+		be_print_err(gettext("be_copy: cannot specify pool "
+		    "name when creating an auto named BE\n"));
+		ret = BE_ERR_INVAL;
+		goto done;
+	}
+
+	/*
+	 * If the zpool name to create new BE in is not provided,
+	 * create the new BE in the original BE's pool.
+	 */
+	if (bt.nbe_zpool == NULL)
+		bt.nbe_zpool = bt.obe_zpool;
+
+	/*
 	 * If new BE name provided, validate the BE name and then verify
 	 * that new BE name doesn't already exist in some pool.
 	 */
-	if (bt.nbe_name) {
+	if (bt.nbe_name != NULL) {
 		/* Validate original BE name */
 		if (!be_valid_be_name(bt.nbe_name)) {
 			be_print_err(gettext("be_copy: "
@@ -808,8 +834,13 @@ be_copy(nvlist_t *be_attrs)
 				goto done;
 			}
 		} else {
-			be_make_root_ds(bt.nbe_zpool, bt.nbe_name, nbe_root_ds,
-			    sizeof (nbe_root_ds));
+			if ((ret = be_make_root_ds(bt.nbe_zpool, bt.nbe_name,
+			    nbe_root_ds, sizeof (nbe_root_ds))) != BE_SUCCESS) {
+				be_print_err(gettext("%s: failed to get BE "
+				    "container dataset for %s/%s\n"), __func__,
+				    bt.nbe_zpool, bt.nbe_name);
+				goto done;
+			}
 			if (zfs_dataset_exists(g_zfs, nbe_root_ds,
 			    ZFS_TYPE_FILESYSTEM)) {
 				be_print_err(gettext("be_copy: BE (%s) already "
@@ -819,17 +850,6 @@ be_copy(nvlist_t *be_attrs)
 			}
 		}
 	} else {
-		/*
-		 * If an auto named BE is desired, it must be in the same
-		 * pool is the original BE.
-		 */
-		if (bt.nbe_zpool != NULL) {
-			be_print_err(gettext("be_copy: cannot specify pool "
-			    "name when creating an auto named BE\n"));
-			ret = BE_ERR_INVAL;
-			goto done;
-		}
-
 		/*
 		 * Generate auto named BE
 		 */
@@ -844,19 +864,19 @@ be_copy(nvlist_t *be_attrs)
 		autoname = B_TRUE;
 	}
 
-	/*
-	 * If zpool name to create new BE in is not provided,
-	 * create new BE in original BE's pool.
-	 */
-	if (bt.nbe_zpool == NULL) {
-		bt.nbe_zpool = bt.obe_zpool;
-	}
-
 	/* Get root dataset names for obe_name and nbe_name */
-	be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
-	    sizeof (obe_root_ds));
-	be_make_root_ds(bt.nbe_zpool, bt.nbe_name, nbe_root_ds,
-	    sizeof (nbe_root_ds));
+	if ((ret = be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
+	    sizeof (obe_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.obe_zpool, bt.obe_name);
+		goto done;
+	}
+	if ((ret = be_make_root_ds(bt.nbe_zpool, bt.nbe_name, nbe_root_ds,
+	    sizeof (nbe_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.nbe_zpool, bt.nbe_name);
+		goto done;
+	}
 
 	bt.obe_root_ds = obe_root_ds;
 	bt.nbe_root_ds = nbe_root_ds;
@@ -966,8 +986,15 @@ be_copy(nvlist_t *be_attrs)
 				 * Regenerate string for new BE's
 				 * root dataset name
 				 */
-				be_make_root_ds(bt.nbe_zpool, bt.nbe_name,
-				    nbe_root_ds, sizeof (nbe_root_ds));
+				if ((ret = be_make_root_ds(bt.nbe_zpool,
+				    bt.nbe_name, nbe_root_ds,
+				    sizeof (nbe_root_ds))) != BE_SUCCESS) {
+					be_print_err(gettext(
+					    "%s: failed to get BE container "
+					    "dataset for %s/%s\n"), __func__,
+					    bt.nbe_zpool, bt.nbe_name);
+					goto done;
+				}
 				bt.nbe_root_ds = nbe_root_ds;
 
 				/*
@@ -1122,10 +1149,18 @@ be_copy(nvlist_t *be_attrs)
 	 * Update new BE's vfstab.
 	 */
 
-	be_make_root_container_ds(bt.obe_zpool, obe_root_container,
-	    sizeof (obe_root_container));
-	be_make_root_container_ds(bt.nbe_zpool, nbe_root_container,
-	    sizeof (nbe_root_container));
+	if ((ret = be_make_root_container_ds(bt.obe_zpool, obe_root_container,
+	    sizeof (obe_root_container))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s\n"), __func__, bt.obe_zpool);
+		goto done;
+	}
+	if ((ret = be_make_root_container_ds(bt.nbe_zpool, nbe_root_container,
+	    sizeof (nbe_root_container))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s\n"), __func__, bt.nbe_zpool);
+		goto done;
+	}
 
 	if ((ret = be_update_vfstab(bt.nbe_name, obe_root_container,
 	    nbe_root_container, &fld, new_mp)) != BE_SUCCESS) {
@@ -1258,11 +1293,15 @@ be_find_zpool_callback(zpool_handle_t *zlp, void *data)
 	be_transaction_data_t	*bt = data;
 	const char		*zpool =  zpool_get_name(zlp);
 	char			be_root_ds[MAXPATHLEN];
+	int			ret = 0;
 
 	/*
 	 * Generate string for the BE's root dataset
 	 */
-	be_make_root_ds(zpool, bt->obe_name, be_root_ds, sizeof (be_root_ds));
+	if (be_make_root_ds(zpool, bt->obe_name, be_root_ds,
+	    sizeof (be_root_ds)) != BE_SUCCESS) {
+		goto out;
+	}
 
 	/*
 	 * Check if dataset exists
@@ -1270,12 +1309,12 @@ be_find_zpool_callback(zpool_handle_t *zlp, void *data)
 	if (zfs_dataset_exists(g_zfs, be_root_ds, ZFS_TYPE_FILESYSTEM)) {
 		/* BE's root dataset exists in zpool */
 		bt->obe_zpool = strdup(zpool);
-		zpool_close(zlp);
-		return (1);
+		ret = 1;
 	}
 
+out:
 	zpool_close(zlp);
-	return (0);
+	return (ret);
 }
 
 /*
@@ -1297,23 +1336,27 @@ be_exists_callback(zpool_handle_t *zlp, void *data)
 	const char	*zpool = zpool_get_name(zlp);
 	char		*be_name = data;
 	char		be_root_ds[MAXPATHLEN];
+	int		ret = 0;
 
 	/*
 	 * Generate string for the BE's root dataset
 	 */
-	be_make_root_ds(zpool, be_name, be_root_ds, sizeof (be_root_ds));
+	if (be_make_root_ds(zpool, be_name, be_root_ds,
+	    sizeof (be_root_ds)) != BE_SUCCESS) {
+		goto out;
+	}
 
 	/*
 	 * Check if dataset exists
 	 */
 	if (zfs_dataset_exists(g_zfs, be_root_ds, ZFS_TYPE_FILESYSTEM)) {
 		/* BE's root dataset exists in zpool */
-		zpool_close(zlp);
-		return (1);
+		ret = 1;
 	}
 
+out:
 	zpool_close(zlp);
-	return (0);
+	return (ret);
 }
 
 /*
@@ -1779,8 +1822,12 @@ be_destroy_zone_roots(char *zonepath_ds, be_destroy_data_t *dd)
 	int		ret = BE_SUCCESS;
 
 	/* Generate string for the root container dataset for this zone. */
-	be_make_container_ds(zonepath_ds, zone_container_ds,
-	    sizeof (zone_container_ds));
+	if ((ret = be_make_container_ds(zonepath_ds, zone_container_ds,
+	    sizeof (zone_container_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s\n"), __func__, zonepath_ds);
+		return (ret);
+	}
 
 	/* Get handle to this zone's root container dataset. */
 	if ((zhp = zfs_open(g_zfs, zone_container_ds, ZFS_TYPE_FILESYSTEM))
@@ -2049,8 +2096,12 @@ be_copy_zones(char *obe_name, char *obe_root_ds, char *nbe_root_ds)
 			goto done;
 		}
 
-		be_make_container_ds(zonepath_ds, zone_container_ds,
-		    sizeof (zone_container_ds));
+		if ((ret = be_make_container_ds(zonepath_ds, zone_container_ds,
+		    sizeof (zone_container_ds))) != BE_SUCCESS) {
+			be_print_err(gettext("%s: failed to get BE container "
+			    "dataset for %s\n"), __func__, zonepath_ds);
+			goto done;
+		}
 
 		if ((z_zhp = zfs_open(g_zfs, zoneroot_ds,
 		    ZFS_TYPE_FILESYSTEM)) == NULL) {
@@ -2901,8 +2952,12 @@ be_create_container_ds(char *zpool)
 	char		be_container_ds[MAXPATHLEN];
 
 	/* Generate string for BE container dataset for this pool */
-	be_make_container_ds(zpool, be_container_ds,
-	    sizeof (be_container_ds));
+	if (be_make_container_ds(zpool, be_container_ds,
+	    sizeof (be_container_ds)) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s\n"), __func__, zpool);
+		return (B_FALSE);
+	}
 
 	if (!zfs_dataset_exists(g_zfs, be_container_ds, ZFS_TYPE_FILESYSTEM)) {
 

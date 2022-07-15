@@ -28,7 +28,7 @@
  * Copyright 2015 Toomas Soome <tsoome@me.com>
  * Copyright 2015 Gary Mills
  * Copyright (c) 2016 Martin Matuska. All rights reserved.
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <assert.h>
@@ -444,8 +444,12 @@ be_get_list_callback(zpool_handle_t *zlp, void *data)
 	/*
 	 * Generate string for the BE container dataset
 	 */
-	be_make_container_ds(rpool, be_container_ds,
-	    sizeof (be_container_ds));
+	if (be_make_container_ds(rpool, be_container_ds,
+	    sizeof (be_container_ds)) != BE_SUCCESS) {
+		/* Move on to the next pool */
+		zpool_close(zlp);
+		return (0);
+	}
 
 	/*
 	 * If a BE name was specified we use it's root dataset in place of
@@ -453,12 +457,17 @@ be_get_list_callback(zpool_handle_t *zlp, void *data)
 	 * the information for the specified BE.
 	 */
 	if (cb->be_name != NULL) {
+		int rv;
+
 		if (!be_valid_be_name(cb->be_name))
 			return (BE_ERR_INVAL);
 		/*
 		 * Generate string for the BE root dataset
 		 */
-		be_make_root_ds(rpool, cb->be_name, be_ds, sizeof (be_ds));
+		if ((rv = be_make_root_ds(rpool, cb->be_name, be_ds,
+		    sizeof (be_ds))) != BE_SUCCESS) {
+			return (rv);
+		}
 		open_ds = be_ds;
 	} else {
 		open_ds = be_container_ds;
