@@ -34,7 +34,6 @@
 #include	<ctype.h>
 #include	<string.h>
 #include	<signal.h>
-#include	<sys/stat.h>
 #include	<utmpx.h>
 #include	<pwd.h>
 #include	<dirent.h>
@@ -42,6 +41,7 @@
 #include	<sys/acl.h>
 #include	<sys/stat.h>
 #include	<sys/types.h>
+#include	<sys/mkdev.h>
 #include	<sys/console.h>
 #include	<libdevinfo.h>
 #include	"ttymon.h"
@@ -143,6 +143,44 @@ ttymon_express(int argc, char **argv)
 }
 
 /*
+ * For serial device, return ttyX-mode property value.
+ */
+static char *
+get_ttymode_prop(dev_t rconsdev)
+{
+	char *rootpath = "/";
+	char path[MAXPATHLEN];
+	di_node_t root;
+	char *propname, *v;
+	struct stat st;
+
+	(void) snprintf(path, sizeof (path), "/dev/tty%c",
+	    'a' + minor(rconsdev));
+	if (stat(path, &st) < 0)
+		return (NULL);
+
+	if (st.st_rdev != rconsdev)
+		return (NULL);
+
+	if (asprintf(&propname, "%s-mode", path + 5) <= 0)
+		return (NULL);
+
+	root = di_init(rootpath, DINFOPROP);
+	if (root == DI_NODE_NIL) {
+		free(propname);
+		return (NULL);
+	}
+
+	v = NULL;
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, root, propname, &v) > 0)
+		v = strdup(v);
+
+	di_fini(root);
+	free(propname);
+	return (v);
+}
+
+/*
  * parse_arg	- parse cmd line arguments
  */
 static	int
@@ -172,11 +210,13 @@ parse_args(int argc, char **argv, struct pmtab *pmtab)
 	pmtab->p_termtype = "";
 	pmtab->p_device = "";
 	pmtab->p_status = GETTY;
+	pmtab->p_ttymode = NULL;
 	if (strcmp(lastname(argv[0]), "getty") == 0) {
 		pmtab->p_ttylabel = "300";
 		getty_options(argc, argv, pmtab);
 	} else {
 		int	cn_fd;
+		struct	cons_getdev cnd;
 
 		pmtab->p_ttylabel = "9600";
 		ttymon_options(argc, argv, pmtab);
@@ -200,6 +240,10 @@ parse_args(int argc, char **argv, struct pmtab *pmtab)
 
 			if (ioctl(cn_fd, CONS_GETTERM, &cnterm) != -1)
 				pmtab->p_termtype = cnterm.cn_term_type;
+
+			if (ioctl(cn_fd, CONS_GETDEV, &cnd) != -1)
+				pmtab->p_ttymode =
+				    get_ttymode_prop(cnd.cnd_rconsdev);
 			(void) close(cn_fd);
 		}
 	}

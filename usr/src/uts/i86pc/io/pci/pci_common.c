@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -1018,6 +1019,31 @@ pci_common_get_reg_prop(dev_info_t *dip, pci_regspec_t *pci_rp)
 	for (i = 0; i < number; i++) {
 		if ((assigned_addr[i].pci_phys_hi & PCI_CONF_ADDR_MASK) ==
 		    phys_hi) {
+			/*
+			 * When the system does not manage to allocate PCI
+			 * resources for a device, then the value that is stored
+			 * in assigned addresses ends up being the hardware
+			 * default reset value of '0'. On currently supported
+			 * platforms, physical address zero is associated with
+			 * memory; however, on other platforms this may be the
+			 * exception vector table (ARM), etc. and so we opt to
+			 * generally keep the idea in PCI that the reset value
+			 * will not be used for actual MMIO allocations. If such
+			 * a platform comes around where it is worth using that
+			 * bit of MMIO for PCI then we should make this check
+			 * platform-specific.
+			 *
+			 * Note, the +1 in the print statement is because a
+			 * given regs[0] describes B/D/F information for the
+			 * device.
+			 */
+			if (assigned_addr[i].pci_phys_mid == 0 &&
+			    assigned_addr[i].pci_phys_low == 0) {
+				dev_err(dip, CE_WARN, "regs[%u] does not have "
+				    "a valid MMIO address", i + 1);
+				goto err;
+			}
+
 			pci_rp->pci_phys_mid = assigned_addr[i].pci_phys_mid;
 			pci_rp->pci_phys_low = assigned_addr[i].pci_phys_low;
 			ddi_prop_free(assigned_addr);
@@ -1025,6 +1051,7 @@ pci_common_get_reg_prop(dev_info_t *dip, pci_regspec_t *pci_rp)
 		}
 	}
 
+err:
 	ddi_prop_free(assigned_addr);
 	return (DDI_FAILURE);
 }

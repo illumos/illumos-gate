@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -109,6 +109,14 @@
  *        |		bhyve process death) while the worker thread is
  *        |		starting, the worker will transition the ring to
  *        |		VRS_RESET and exit.
+ *        |						^
+ *        |						|
+ *        |<-------------------------------------------<+
+ *        |	      |					|
+ *        |	      |					^
+ *        |	      *	If ring is requested to pause (but not stop)from the
+ *        |             VRS_RUN state, it will return to the VRS_INIT state.
+ *        |
  *        |						^
  *        |						|
  *        |						^
@@ -286,8 +294,11 @@ static int viona_ioc_delete(viona_soft_state_t *, boolean_t);
 
 static int viona_ioc_set_notify_ioport(viona_link_t *, uint16_t);
 static int viona_ioc_ring_init(viona_link_t *, void *, int);
+static int viona_ioc_ring_set_state(viona_link_t *, void *, int);
+static int viona_ioc_ring_get_state(viona_link_t *, void *, int);
 static int viona_ioc_ring_reset(viona_link_t *, uint_t);
 static int viona_ioc_ring_kick(viona_link_t *, uint_t);
+static int viona_ioc_ring_pause(viona_link_t *, uint_t);
 static int viona_ioc_ring_set_msi(viona_link_t *, void *, int);
 static int viona_ioc_ring_intr_clear(viona_link_t *, uint_t);
 static int viona_ioc_intr_poll(viona_link_t *, void *, int, int *);
@@ -530,6 +541,9 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 		return (viona_ioc_create(ss, dptr, md, cr));
 	case VNA_IOC_DELETE:
 		return (viona_ioc_delete(ss, B_FALSE));
+	case VNA_IOC_VERSION:
+		*rv = VIONA_CURRENT_INTERFACE_VERSION;
+		return (0);
 	default:
 		break;
 	}
@@ -578,6 +592,16 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 	case VNA_IOC_RING_INTR_CLR:
 		err = viona_ioc_ring_intr_clear(link, (uint_t)data);
 		break;
+	case VNA_IOC_RING_SET_STATE:
+		err = viona_ioc_ring_set_state(link, dptr, md);
+		break;
+	case VNA_IOC_RING_GET_STATE:
+		err = viona_ioc_ring_get_state(link, dptr, md);
+		break;
+	case VNA_IOC_RING_PAUSE:
+		err = viona_ioc_ring_pause(link, (uint_t)data);
+		break;
+
 	case VNA_IOC_INTR_POLL:
 		err = viona_ioc_intr_poll(link, dptr, md, rv);
 		break;
@@ -853,10 +877,62 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 	if (ddi_copyin(udata, &kri, sizeof (kri), md) != 0) {
 		return (EFAULT);
 	}
+	const struct viona_ring_params params = {
+		.vrp_pa = kri.ri_qaddr,
+		.vrp_size = kri.ri_qsize,
+		.vrp_avail_idx = 0,
+		.vrp_used_idx = 0,
+	};
 
-	err = viona_ring_init(link, kri.ri_index, kri.ri_qsize, kri.ri_qaddr);
+	err = viona_ring_init(link, kri.ri_index, &params);
 
 	return (err);
+}
+
+static int
+viona_ioc_ring_set_state(viona_link_t *link, void *udata, int md)
+{
+	vioc_ring_state_t krs;
+	int err;
+
+	if (ddi_copyin(udata, &krs, sizeof (krs), md) != 0) {
+		return (EFAULT);
+	}
+	const struct viona_ring_params params = {
+		.vrp_pa = krs.vrs_qaddr,
+		.vrp_size = krs.vrs_qsize,
+		.vrp_avail_idx = krs.vrs_avail_idx,
+		.vrp_used_idx = krs.vrs_used_idx,
+	};
+
+	err = viona_ring_init(link, krs.vrs_index, &params);
+
+	return (err);
+}
+
+static int
+viona_ioc_ring_get_state(viona_link_t *link, void *udata, int md)
+{
+	vioc_ring_state_t krs;
+
+	if (ddi_copyin(udata, &krs, sizeof (krs), md) != 0) {
+		return (EFAULT);
+	}
+
+	struct viona_ring_params params;
+	int err = viona_ring_get_state(link, krs.vrs_index, &params);
+	if (err != 0) {
+		return (err);
+	}
+	krs.vrs_qsize = params.vrp_size;
+	krs.vrs_qaddr = params.vrp_pa;
+	krs.vrs_avail_idx = params.vrp_avail_idx;
+	krs.vrs_used_idx = params.vrp_used_idx;
+
+	if (ddi_copyout(&krs, udata, sizeof (krs), md) != 0) {
+		return (EFAULT);
+	}
+	return (0);
 }
 
 static int
@@ -909,6 +985,17 @@ viona_ioc_ring_kick(viona_link_t *link, uint_t idx)
 }
 
 static int
+viona_ioc_ring_pause(viona_link_t *link, uint_t idx)
+{
+	if (idx >= VIONA_VQ_MAX) {
+		return (EINVAL);
+	}
+
+	viona_vring_t *ring = &link->l_vrings[idx];
+	return (viona_ring_pause(ring));
+}
+
+static int
 viona_ioc_ring_set_msi(viona_link_t *link, void *data, int md)
 {
 	vioc_ring_msi_t vrm;
@@ -935,21 +1022,33 @@ viona_notify_iop(void *arg, bool in, uint16_t port, uint8_t bytes,
     uint32_t *val)
 {
 	viona_link_t *link = (viona_link_t *)arg;
-	uint16_t vq = *val;
 
-	if (in) {
-		/*
-		 * Do not service read (in/ins) requests on this ioport.
-		 * Instead, indicate that the handler is not found, causing a
-		 * fallback to userspace processing.
-		 */
+	/*
+	 * If the request is a read (in/ins), or direct at a port other than
+	 * what we expect to be registered on, ignore it.
+	 */
+	if (in || port != link->l_notify_ioport) {
 		return (ESRCH);
 	}
 
-	if (port != link->l_notify_ioport) {
-		return (EINVAL);
+	/* Let userspace handle notifications for rings other than RX/TX. */
+	const uint16_t vq = *val;
+	if (vq >= VIONA_VQ_MAX) {
+		return (ESRCH);
 	}
-	return (viona_ioc_ring_kick(link, vq));
+
+	viona_vring_t *ring = &link->l_vrings[vq];
+	int res = 0;
+
+	mutex_enter(&ring->vr_lock);
+	if (ring->vr_state == VRS_RUN) {
+		cv_broadcast(&ring->vr_cv);
+	} else {
+		res = ESRCH;
+	}
+	mutex_exit(&ring->vr_lock);
+
+	return (res);
 }
 
 static int

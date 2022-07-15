@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -86,8 +86,6 @@ viona_rx_fini(void)
 void
 viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 {
-	proc_t *p = ttoproc(curthread);
-
 	(void) thread_vsetname(curthread, "viona_rx_%p", ring);
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
@@ -122,7 +120,7 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 		 * place to inject frames into the guest.
 		 */
 		(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
-	} while (!VRING_NEED_BAIL(ring, p));
+	} while (!vring_need_bail(ring));
 
 	ring->vr_state = VRS_STOP;
 

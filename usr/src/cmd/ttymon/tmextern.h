@@ -222,7 +222,7 @@ extern "C" {
 	extern	int	Splflag;
 
 /* ttymon.c	*/
-	extern	struct	Gdef *get_speed(char *);
+	extern	struct	Gdef *get_speed(struct pmtab *);
 	extern	void	open_device(struct pmtab *);
 	extern	void	set_softcar(struct pmtab *);
 	extern	void	setup_PCpipe(void);

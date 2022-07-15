@@ -244,7 +244,7 @@ initial_termio(int fd, struct pmtab *pmptr)
 	int	ret;
 	struct	Gdef *speedef;
 
-	speedef = get_speed(pmptr->p_ttylabel);
+	speedef = get_speed(pmptr);
 	if (speedef->g_autobaud & A_FLAG) {
 		pmptr->p_ttyflags |= A_FLAG;
 		if (auto_termio(fd) == -1) {

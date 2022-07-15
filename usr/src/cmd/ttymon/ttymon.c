@@ -26,6 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
+#include <ctype.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -597,25 +598,106 @@ free_defs(void)
 }
 
 /*
+ * rebuild flags entry using speed from ttymode.
+ */
+static char *
+merge_flags(char *src, char *ttymode)
+{
+	char *data, *ptr, *flags;
+
+	/* copy speed entry */
+	data = strsave(src);
+	flags = strsave(ttymode);
+	ptr = strchr(flags, ',');
+	if (ptr == NULL) {	/* ttymode is corrupted */
+		free(flags);
+		return (data);
+	}
+	*ptr = '\0';
+	ptr = flags;
+	flags = strsave(flags);
+	free(ptr);
+
+	/*
+	 * The flags line is supposed to have stty keywords separated by space.
+	 * We need to split up the keywords, replace the speed and
+	 * reconstruct the flags line.
+	 */
+
+	ptr = strtok(data, " \t");
+	if (ptr == NULL) {
+		free(data);
+		return (flags);
+	}
+
+	do {
+		char *tmp;
+
+		/* skip speed */
+		if (isdigit(*ptr))
+			continue;
+
+		if (asprintf(&tmp, "%s %s", flags, ptr) <= 0) {
+			/* should we complain? */
+			break;
+		}
+		free(flags);
+		flags = tmp;
+	} while ((ptr = strtok(NULL, " \t")) != NULL);
+
+	free(data);
+	return (flags);
+}
+
+/*
  * struct Gdef *get_speed(ttylabel)
  *	- search "/etc/ttydefs" for speed and term. specification
  *	  using "ttylabel". If "ttylabel" is NULL, default
  *	  to DEFAULT
+ *	- for /dev/console, if we are in fact using serial console,
+ *	  use ttyX-mode value to get speed. This allows us to use
+ *	  the value set for serial console either from firmware (or BMC sol),
+ *	  or boot loader default.
  * arg:	  ttylabel - label/id of speed settings.
  */
 
 struct Gdef *
-get_speed(char *ttylabel)
+get_speed(struct pmtab *pmptr)
 {
+	static struct Gdef serial = { 0 };
 	struct Gdef *sp;
+	char *ttylabel = pmptr->p_ttylabel;
 
 	if ((ttylabel != NULL) && (*ttylabel != '\0')) {
 		if ((sp = find_def(ttylabel)) == NULL) {
 			log("unable to find <%s> in \"%s\"", ttylabel, TTYDEFS);
 			sp = &DEFAULT; /* use default */
 		}
-	} else sp = &DEFAULT; /* use default */
-	return (sp);
+	} else {
+		sp = &DEFAULT; /* use default */
+	}
+
+	/*
+	 * if this is not /dev/console or /dev/console is not using serial,
+	 * we are done.
+	 */
+	if (pmptr->p_ttymode == NULL ||
+	    strcmp(pmptr->p_device, "/dev/console") != 0)
+		return (sp);
+
+	/* is entry for serial set up? */
+	if (serial.g_id == NULL) {
+		/*
+		 * Copy data from sp, except we need to update inital and
+		 * final flags.
+		 */
+		serial.g_id = strsave(sp->g_id);
+		serial.g_iflags = merge_flags(sp->g_iflags, pmptr->p_ttymode);
+		serial.g_fflags = merge_flags(sp->g_fflags, pmptr->p_ttymode);
+		serial.g_autobaud = sp->g_autobaud;
+		serial.g_nextid = strsave(sp->g_nextid);
+	}
+	return (&serial);
 }
 
 /*

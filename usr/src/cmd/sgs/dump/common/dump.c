@@ -2010,11 +2010,6 @@ main(int argc, char *argv[], char *envp[])
 	char *optstr = OPTSTR; /* option string used by getopt() */
 	int optchar;
 
-	/*
-	 * Check for a binary that better fits this architecture.
-	 */
-	(void) conv_check_native(argv, envp);
-
 	prog_name = argv[0];
 
 	(void) setlocale(LC_ALL, "");

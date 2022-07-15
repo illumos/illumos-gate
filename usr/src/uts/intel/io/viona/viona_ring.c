@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 
@@ -281,15 +281,19 @@ viona_ring_free(viona_vring_t *ring)
 }
 
 int
-viona_ring_init(viona_link_t *link, uint16_t idx, uint16_t qsz, uint64_t pa)
+viona_ring_init(viona_link_t *link, uint16_t idx,
+    const struct viona_ring_params *params)
 {
 	viona_vring_t *ring;
 	kthread_t *t;
 	int err = 0;
+	const uint16_t qsz = params->vrp_size;
+	const uint64_t pa = params->vrp_pa;
 
 	if (idx >= VIONA_VQ_MAX) {
 		return (EINVAL);
 	}
+
 	if (qsz == 0 || qsz > VRING_MAX_LEN || (1 << (ffs(qsz) - 1)) != qsz) {
 		return (EINVAL);
 	}
@@ -320,8 +324,8 @@ viona_ring_init(viona_link_t *link, uint16_t idx, uint16_t qsz, uint64_t pa)
 	}
 
 	/* Initialize queue indexes */
-	ring->vr_cur_aidx = 0;
-	ring->vr_cur_uidx = 0;
+	ring->vr_cur_aidx = params->vrp_avail_idx;
+	ring->vr_cur_uidx = params->vrp_used_idx;
 
 	if (idx == VIONA_VQ_TX) {
 		viona_tx_ring_alloc(ring, qsz);
@@ -351,8 +355,45 @@ fail:
 	ring->vr_size = 0;
 	ring->vr_mask = 0;
 	ring->vr_pa = 0;
+	ring->vr_cur_aidx = 0;
+	ring->vr_cur_uidx = 0;
 	mutex_exit(&ring->vr_lock);
 	return (err);
+}
+
+int
+viona_ring_get_state(viona_link_t *link, uint16_t idx,
+    struct viona_ring_params *params)
+{
+	viona_vring_t *ring;
+
+	if (idx >= VIONA_VQ_MAX) {
+		return (EINVAL);
+	}
+
+	ring = &link->l_vrings[idx];
+	mutex_enter(&ring->vr_lock);
+
+	params->vrp_size = ring->vr_size;
+	params->vrp_pa = ring->vr_pa;
+
+	if (ring->vr_state == VRS_RUN) {
+		/* On a running ring, we must heed the avail/used locks */
+		mutex_enter(&ring->vr_a_mutex);
+		params->vrp_avail_idx = ring->vr_cur_aidx;
+		mutex_exit(&ring->vr_a_mutex);
+		mutex_enter(&ring->vr_u_mutex);
+		params->vrp_used_idx = ring->vr_cur_uidx;
+		mutex_exit(&ring->vr_u_mutex);
+	} else {
+		/* Otherwise vr_lock is adequate protection */
+		params->vrp_avail_idx = ring->vr_cur_aidx;
+		params->vrp_used_idx = ring->vr_cur_uidx;
+	}
+
+	mutex_exit(&ring->vr_lock);
+
+	return (0);
 }
 
 int
@@ -485,40 +526,152 @@ viona_intr_ring(viona_vring_t *ring, boolean_t skip_flags_check)
 	}
 }
 
+static inline bool
+vring_stop_req(const viona_vring_t *ring)
+{
+	return ((ring->vr_state_flags & VRSF_REQ_STOP) != 0);
+}
+
+static inline bool
+vring_pause_req(const viona_vring_t *ring)
+{
+	return ((ring->vr_state_flags & VRSF_REQ_PAUSE) != 0);
+}
+
+static inline bool
+vring_start_req(const viona_vring_t *ring)
+{
+	return ((ring->vr_state_flags & VRSF_REQ_START) != 0);
+}
+
+/*
+ * Check if vring worker thread should bail out.  This will heed indications
+ * that the containing process is exiting, as well as requests to stop or pause
+ * the ring.  The `stop_only` parameter controls if pause requests are ignored
+ * (true) or checked (false).
+ *
+ * Caller should hold vr_lock.
+ */
+static bool
+vring_need_bail_ext(const viona_vring_t *ring, bool stop_only)
+{
+	ASSERT(MUTEX_HELD(&ring->vr_lock));
+
+	if (vring_stop_req(ring) ||
+	    (!stop_only && vring_pause_req(ring))) {
+		return (true);
+	}
+
+	kthread_t *t = ring->vr_worker_thread;
+	if (t != NULL) {
+		proc_t *p = ttoproc(t);
+
+		ASSERT(p != NULL);
+		if ((p->p_flag & SEXITING) != 0) {
+			return (true);
+		}
+	}
+	return (false);
+}
+
+bool
+vring_need_bail(const viona_vring_t *ring)
+{
+	return (vring_need_bail_ext(ring, false));
+}
+
+int
+viona_ring_pause(viona_vring_t *ring)
+{
+	mutex_enter(&ring->vr_lock);
+	switch (ring->vr_state) {
+	case VRS_RESET:
+	case VRS_SETUP:
+	case VRS_INIT:
+		/*
+		 * For rings which have not yet started (even those in the
+		 * VRS_SETUP and VRS_INIT phases, where there a running worker
+		 * thread (waiting to be released to do its intended task), it
+		 * is adequate to simply clear any start request, to keep them
+		 * from proceeding into the actual work processing function.
+		 */
+		ring->vr_state_flags &= ~VRSF_REQ_START;
+		mutex_exit(&ring->vr_lock);
+		return (0);
+
+	case VRS_STOP:
+		if ((ring->vr_state_flags & VRSF_REQ_STOP) != 0) {
+			/* A ring on its way to RESET cannot be paused. */
+			mutex_exit(&ring->vr_lock);
+			return (EBUSY);
+		}
+		/* FALLTHROUGH */
+	case VRS_RUN:
+		ring->vr_state_flags |= VRSF_REQ_PAUSE;
+		cv_broadcast(&ring->vr_cv);
+		break;
+
+	default:
+		panic("invalid ring state %d", ring->vr_state);
+		break;
+	}
+
+	for (;;) {
+		int res = cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
+
+		if (ring->vr_state == VRS_INIT ||
+		    (ring->vr_state_flags & VRSF_REQ_PAUSE) == 0) {
+			/* Ring made it to (or through) paused state */
+			mutex_exit(&ring->vr_lock);
+			return (0);
+		}
+		if (res == 0) {
+			/* interrupted by signal */
+			mutex_exit(&ring->vr_lock);
+			return (EINTR);
+		}
+	}
+	/* NOTREACHED */
+}
+
 static void
 viona_worker(void *arg)
 {
 	viona_vring_t *ring = (viona_vring_t *)arg;
 	viona_link_t *link = ring->vr_link;
-	proc_t *p = ttoproc(curthread);
 
 	mutex_enter(&ring->vr_lock);
 	VERIFY3U(ring->vr_state, ==, VRS_SETUP);
 
 	/* Bail immediately if ring shutdown or process exit was requested */
-	if (VRING_NEED_BAIL(ring, p)) {
-		goto cleanup;
+	if (vring_need_bail_ext(ring, true)) {
+		goto ring_reset;
 	}
 
 	/* Report worker thread as alive and notify creator */
+ring_init:
 	ring->vr_state = VRS_INIT;
 	cv_broadcast(&ring->vr_cv);
 
-	while (ring->vr_state_flags == 0) {
+	while (!vring_start_req(ring)) {
 		/*
 		 * Keeping lease renewals timely while waiting for the ring to
 		 * be started is important for avoiding deadlocks.
 		 */
 		if (vmm_drv_lease_expired(ring->vr_lease)) {
 			if (!viona_ring_lease_renew(ring)) {
-				goto cleanup;
+				goto ring_reset;
 			}
 		}
 
 		(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
 
-		if (VRING_NEED_BAIL(ring, p)) {
-			goto cleanup;
+		if (vring_pause_req(ring)) {
+			/* We are already paused in the INIT state. */
+			ring->vr_state_flags &= ~VRSF_REQ_PAUSE;
+		}
+		if (vring_need_bail_ext(ring, true)) {
+			goto ring_reset;
 		}
 	}
 
@@ -529,7 +682,7 @@ viona_worker(void *arg)
 	/* Ensure ring lease is valid first */
 	if (vmm_drv_lease_expired(ring->vr_lease)) {
 		if (!viona_ring_lease_renew(ring)) {
-			goto cleanup;
+			goto ring_reset;
 		}
 	}
 
@@ -543,15 +696,18 @@ viona_worker(void *arg)
 	}
 
 	VERIFY3U(ring->vr_state, ==, VRS_STOP);
+	VERIFY3U(ring->vr_xfer_outstanding, ==, 0);
 
-cleanup:
-	if (ring->vr_txdesb != NULL) {
-		/*
-		 * Transmit activity must be entirely concluded before the
-		 * associated descriptors can be cleaned up.
-		 */
-		VERIFY(ring->vr_xfer_outstanding == 0);
+	/* Respond to a pause request if the ring is not required to stop */
+	if (vring_pause_req(ring)) {
+		ring->vr_state_flags &= ~VRSF_REQ_PAUSE;
+
+		if (!vring_need_bail_ext(ring, true)) {
+			goto ring_init;
+		}
 	}
+
+ring_reset:
 	viona_ring_misc_free(ring);
 
 	viona_ring_lease_drop(ring);

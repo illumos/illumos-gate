@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/scsi/scsi.h>
@@ -390,8 +391,6 @@ free_pktiopb(struct scsi_pkt *pkt, caddr_t datap, int datalen)
  * Common naming functions
  */
 
-static char scsi_tmpname[64];
-
 char *
 scsi_dname(int dtyp)
 {
@@ -479,7 +478,7 @@ scsi_cname(uchar_t cmd, register char **cmdvec)
 		}
 		cmdvec++;
 	}
-	return (sprintf(scsi_tmpname, "<undecoded cmd 0x%x>", cmd));
+	return ("<undecoded cmd>");
 }
 
 char *

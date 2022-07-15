@@ -99,7 +99,7 @@ tmchild(struct pmtab *pmtab)
 		 */
 		(void) setsid();
 	}
-	speedef = get_speed(pmtab->p_ttylabel);
+	speedef = get_speed(pmtab);
 	openline(pmtab, speedef);
 	if (pmtab->p_ttyflags & (C_FLAG|B_FLAG)) {
 		if (pmtab->p_fd >= 0) {

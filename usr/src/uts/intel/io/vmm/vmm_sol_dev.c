@@ -2239,6 +2239,24 @@ vmm_drv_purge(vmm_softc_t *sc)
 		    hold = list_next(&sc->vmm_holds, hold)) {
 			hold->vmh_release_req = B_TRUE;
 		}
+
+		/*
+		 * Require that all leases on the instance be broken, now that
+		 * all associated holds have been marked as needing release.
+		 *
+		 * Dropping vmm_mtx is not strictly necessary, but if any of the
+		 * lessees are slow to respond, it would be nice to leave it
+		 * available for other parties.
+		 */
+		mutex_exit(&vmm_mtx);
+		vmm_lease_block(sc);
+		vmm_lease_unblock(sc);
+		mutex_enter(&vmm_mtx);
+
+		/*
+		 * With all of the leases broken, we can proceed in an orderly
+		 * fashion to waiting for any lingering holds to be dropped.
+		 */
 		while ((sc->vmm_flags & VMM_HELD) != 0) {
 			if (cv_wait_sig(&sc->vmm_cv, &vmm_mtx) <= 0) {
 				return (EINTR);
