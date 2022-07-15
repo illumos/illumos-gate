@@ -1935,7 +1935,6 @@ f platform/i86pc/kernel/drv/amd64/pci-ide 0755 root sys
 f platform/i86pc/kernel/drv/amd64/pit_beep 0755 root sys
 f platform/i86pc/kernel/drv/amd64/ppm 0755 root sys
 f platform/i86pc/kernel/drv/amd64/rootnex 0755 root sys
-f platform/i86pc/kernel/drv/amd64/xsvc 0755 root sys
 f platform/i86pc/kernel/drv/amd_iommu.conf 0644 root sys
 f platform/i86pc/kernel/drv/cpc.conf 0644 root sys
 f platform/i86pc/kernel/drv/dr.conf 0644 root sys
@@ -1945,7 +1944,6 @@ f platform/i86pc/kernel/drv/pci-ide.conf 0644 root sys
 f platform/i86pc/kernel/drv/pit_beep.conf 0644 root sys
 f platform/i86pc/kernel/drv/ppm.conf 0644 root sys
 f platform/i86pc/kernel/drv/rootnex.conf 0644 root sys
-f platform/i86pc/kernel/drv/xsvc.conf 0644 root sys
 d platform/i86pc/kernel/kmdb 0755 root sys
 d platform/i86pc/kernel/kmdb/amd64 0755 root sys
 f platform/i86pc/kernel/kmdb/amd64/apix 0555 root sys
