@@ -30,7 +30,7 @@ export SMARTOS_TEST_PKGS="
     python27
     sudo
     coreutils
-    gcc7
+    gcc10
     gmake
 "
 
@@ -203,9 +203,9 @@ function setup_pkgsrc {
     # We should always use the same pkgsrc version as we have installed
     # on the build machine in case any of our tests link against libraries
     # in /opt/local
-    PKGSRC_STEM="https://pkgsrc.joyent.com/packages/SmartOS/bootstrap"
-    BOOTSTRAP_TAR="bootstrap-2018Q4-tools.tar.gz"
-    BOOTSTRAP_SHA="b599667c80e4a42157763ed25d868ec7dc34962d"
+    PKGSRC_STEM="https://pkgsrc.smartos.org/packages/SmartOS/bootstrap"
+    BOOTSTRAP_TAR="bootstrap-2021Q4-tools.tar.gz"
+    BOOTSTRAP_SHA="c427cb1ed664fd161d8e12c5191adcae7aee68b4"
 
     # Ensure we are in a directory with enough space for the bootstrap
     # download, by default the SmartOS /root directory is limited to the size
