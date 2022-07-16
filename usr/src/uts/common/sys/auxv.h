@@ -30,6 +30,7 @@
  */
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_SYS_AUXV_H
@@ -141,6 +142,7 @@ typedef struct {
  */
 #define	AT_SUN_HWCAP	2009
 #define	AT_SUN_HWCAP2	2023
+#define	AT_SUN_HWCAP3	2029
 
 #if defined(_KERNEL)
 /*
@@ -149,9 +151,11 @@ typedef struct {
  */
 extern uint_t auxv_hwcap;
 extern uint_t auxv_hwcap_2;
+extern uint_t auxv_hwcap_3;
 #if defined(_SYSCALL32)
 extern uint_t auxv_hwcap32;
 extern uint_t auxv_hwcap32_2;
+extern uint_t auxv_hwcap32_3;
 #endif /* _SYSCALL32 */
 #else
 extern uint_t getisax(uint32_t *, uint_t);

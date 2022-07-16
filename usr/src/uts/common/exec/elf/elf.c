@@ -27,7 +27,7 @@
 /*	   All Rights Reserved	*/
 /*
  * Copyright (c) 2019, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -415,11 +415,12 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 *	AT_SUN_AUXFLAGS
 		 *	AT_SUN_HWCAP
 		 *	AT_SUN_HWCAP2
+		 *	AT_SUN_HWCAP3
 		 *	AT_SUN_PLATFORM (added in stk_copyout)
 		 *	AT_SUN_EXECNAME (added in stk_copyout)
 		 *	AT_NULL
 		 *
-		 * total == 9
+		 * total == 10
 		 */
 		if (hasintp && hasu) {
 			/*
@@ -434,7 +435,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 *
 			 * total = 5
 			 */
-			args->auxsize = (9 + 5) * sizeof (aux_entry_t);
+			args->auxsize = (10 + 5) * sizeof (aux_entry_t);
 		} else if (hasintp) {
 			/*
 			 * Has PT_INTERP but no PT_PHDR
@@ -444,9 +445,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 *
 			 * total = 2
 			 */
-			args->auxsize = (9 + 2) * sizeof (aux_entry_t);
+			args->auxsize = (10 + 2) * sizeof (aux_entry_t);
 		} else {
-			args->auxsize = 9 * sizeof (aux_entry_t);
+			args->auxsize = 10 * sizeof (aux_entry_t);
 		}
 	} else {
 		args->auxsize = 0;
@@ -837,18 +838,16 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * Used for choosing faster library routines.
 		 * (Potentially different between 32-bit and 64-bit ABIs)
 		 */
-#if defined(_LP64)
 		if (args->to_model == DATAMODEL_NATIVE) {
 			ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap)
 			ADDAUX(aux, AT_SUN_HWCAP2, auxv_hwcap_2)
+			ADDAUX(aux, AT_SUN_HWCAP3, auxv_hwcap_3)
 		} else {
 			ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap32)
 			ADDAUX(aux, AT_SUN_HWCAP2, auxv_hwcap32_2)
+			ADDAUX(aux, AT_SUN_HWCAP3, auxv_hwcap32_3)
 		}
-#else
-		ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap)
-		ADDAUX(aux, AT_SUN_HWCAP2, auxv_hwcap_2)
-#endif
+
 		if (branded) {
 			/*
 			 * Reserve space for the brand-private aux vectors,

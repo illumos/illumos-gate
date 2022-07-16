@@ -60,6 +60,7 @@ SUBDIRS=	 libconv	\
 		crle		\
 		ar		\
 		dump		\
+		elfcap.chk	\
 		elfdump		\
 		elfedit		\
 		elfwrap		\
@@ -94,6 +95,8 @@ MSGSUBDIRS=	ld		ldd		libld		liblddbg \
 		elfedit		crle		moe		lari \
 		librtld_db	elfwrap		ar
 
+CHKSUBDIRS=	elfcap.chk
+
 MSGDIR=		messages
 
 all :=		TARGET= all
@@ -104,6 +107,7 @@ _msg :=		TARGET= catalog
 _msg_gettext :=	TARGET= catalog
 _msg_sgsmsg :=	TARGET= catalog
 chkmsg :=	TARGET= chkmsg
+check :=	TARGET= check
 
 
 .KEEP_STATE:
@@ -134,7 +138,7 @@ $(MSGDIR):	$(MSGSUBDIRS) FRC
 
 chkmsg:		libconv $(MSGSUBDIRS) FRC
 
-check:		chkmsg
+check:		chkmsg $(CHKSUBDIRS)
 
 # built from lib/Makefile
 install_lib:	FRC

@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -147,30 +148,52 @@ static void
 report_hwcap(int d, const char *isa)
 {
 	struct cpuid_get_hwcap __cgh, *cgh = &__cgh;
-	char buffer[1024], cap2[1024];
+	char cap1[ELFCAP_HW1_BUFSIZE];
+	char cap2[ELFCAP_HW2_BUFSIZE];
+	char cap3[ELFCAP_HW3_BUFSIZE];
 
 	cgh->cgh_archname = (char *)isa;
 	if (ioctl(d, CPUID_GET_HWCAP, cgh) != 0)
 		return;
 
 	(void) elfcap_hw1_to_str(ELFCAP_STYLE_LC, cgh->cgh_hwcap[0],
-	    buffer, sizeof (buffer), ELFCAP_FMT_SNGSPACE, machtype(isa));
+	    cap1, sizeof (cap1), ELFCAP_FMT_SNGSPACE, machtype(isa));
 
-	if (cgh->cgh_hwcap[1] != 0)
+	if (cgh->cgh_hwcap[1] != 0) {
 		(void) elfcap_hw2_to_str(ELFCAP_STYLE_LC, cgh->cgh_hwcap[1],
 		    cap2, sizeof (cap2), ELFCAP_FMT_SNGSPACE, machtype(isa));
-	else
+	} else {
 		cap2[0] = '\0';
+	}
+
+	if (cgh->cgh_hwcap[2] != 0) {
+		(void) elfcap_hw3_to_str(ELFCAP_STYLE_LC, cgh->cgh_hwcap[2],
+		    cap3, sizeof (cap3), ELFCAP_FMT_SNGSPACE, machtype(isa));
+	} else {
+		cap3[0] = '\0';
+	}
 
 	if (mode & EXTN_MODE) {
 		(void) printf(":");
+		if (cgh->cgh_hwcap[2] != 0)
+			(void) printf(" %s", cap3);
 		if (cgh->cgh_hwcap[1] != 0)
 			(void) printf(" %s", cap2);
-		(void) printf(" %s", buffer);
+		(void) printf(" %s", cap1);
 		(void) printf("\n");
 	} else {
 		char *p;
 		int linecnt = 0;
+
+		for (p = strtok(cap3, " "); p; p = strtok(NULL, " ")) {
+			if (linecnt + strlen(p) > 68) {
+				(void) printf("\n");
+				linecnt = 0;
+			}
+			if (linecnt == 0)
+				linecnt = printf("\t");
+			linecnt += printf("%s ", p);
+		}
 
 		for (p = strtok(cap2, " "); p; p = strtok(NULL, " ")) {
 			if (linecnt + strlen(p) > 68) {
@@ -182,7 +205,7 @@ report_hwcap(int d, const char *isa)
 			linecnt += printf("%s ", p);
 		}
 
-		for (p = strtok(buffer, " "); p; p = strtok(NULL, " ")) {
+		for (p = strtok(cap1, " "); p; p = strtok(NULL, " ")) {
 			if (linecnt + strlen(p) > 68) {
 				(void) printf("\n");
 				linecnt = 0;

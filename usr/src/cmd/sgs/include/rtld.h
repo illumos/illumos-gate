@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 #ifndef	_RTLD_H
 #define	_RTLD_H
@@ -1119,6 +1120,7 @@ typedef	struct {
 	elfcap_mask_t	sc_hw_1;	/* CA_SUNW_HW_1 capabilities */
 	elfcap_mask_t	sc_sf_1;	/* CA_SUNW_SF_1 capabilities */
 	elfcap_mask_t	sc_hw_2;	/* CA_SUNW_HW_2 capabilities */
+	elfcap_mask_t	sc_hw_3;	/* CA_SUNW_HW_3 capabilities */
 	char		*sc_plat;	/* CA_SUNW_PLAT capability */
 	size_t		sc_platsz;	/*	and size */
 	char		*sc_mach;	/* CA_SUNW_MACH capability */

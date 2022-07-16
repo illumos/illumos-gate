@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -33,23 +35,43 @@
 #include	"cap_msg.h"
 #include	"_conv.h"
 
+/*
+ * These are assertions that the various sizes that are dependent on elfcap.c
+ * are actually all the same.
+ */
+#if CONV_CAP_VAL_HW1_BUFSIZE != ELFCAP_HW1_BUFSIZE
+#error "libconv needs to update CONV_CAP_VAL_HW1_BUFSIZE to match elfcap.h"
+#endif
+
+#if CONV_CAP_VAL_HW2_BUFSIZE != ELFCAP_HW2_BUFSIZE
+#error "libconv needs to update CONV_CAP_VAL_HW2_BUFSIZE to match elfcap.h"
+#endif
+
+#if CONV_CAP_VAL_HW3_BUFSIZE != ELFCAP_HW3_BUFSIZE
+#error "libconv needs to update CONV_CAP_VAL_HW3_BUFSIZE to match elfcap.h"
+#endif
+
+#if CONV_CAP_VAL_SF1_BUFSIZE != ELFCAP_SF1_BUFSIZE
+#error "libconv needs to update CONV_CAP_VAL_SF1_BUFSIZE to match elfcap.h"
+#endif
+
 const conv_ds_t **
 conv_cap_tag_strings(Conv_fmt_flags_t fmt_flags)
 {
-#if	(CA_SUNW_NUM != (CA_SUNW_ID + 1))
+#if	(CA_SUNW_NUM != (CA_SUNW_HW_3 + 1))
 #error	"CA_SUNW_NUM has grown"
 #endif
 	static const Msg	tags_cf[] = {
 		MSG_CA_SUNW_NULL_CF,	MSG_CA_SUNW_HW_1_CF,
 		MSG_CA_SUNW_SF_1_CF,	MSG_CA_SUNW_HW_2_CF,
 		MSG_CA_SUNW_PLAT_CF,	MSG_CA_SUNW_MACH_CF,
-		MSG_CA_SUNW_ID_CF
+		MSG_CA_SUNW_ID_CF,	MSG_CA_SUNW_HW_3_CF
 	};
 	static const Msg	tags_nf[] = {
 		MSG_CA_SUNW_NULL_NF,	MSG_CA_SUNW_HW_1_NF,
 		MSG_CA_SUNW_SF_1_NF,	MSG_CA_SUNW_HW_2_NF,
 		MSG_CA_SUNW_PLAT_NF,	MSG_CA_SUNW_MACH_NF,
-		MSG_CA_SUNW_ID_NF
+		MSG_CA_SUNW_ID_NF,	MSG_CA_SUNW_HW_3_NF
 	};
 	static const conv_ds_msg_t ds_tags_cf = {
 	    CONV_DS_MSG_INIT(ELFCLASSNONE, tags_cf) };
@@ -140,6 +162,13 @@ conv_iter_ret_t
 conv_iter_cap_val_hw2(Half mach, Conv_fmt_flags_t fmt_flags,
     conv_iter_cb_t func, void *uvalue)
 {
+	if ((mach == EM_386) || (mach == EM_486) ||
+	    (mach == EM_AMD64) || (mach == CONV_MACH_ALL))
+		if (conv_iter_elfcap(elfcap_getdesc_hw2_386(),
+		    ELFCAP_NUM_HW2_386, fmt_flags, func, uvalue) ==
+		    CONV_ITER_DONE)
+			return (CONV_ITER_DONE);
+
 	return (CONV_ITER_DONE);
 }
 
@@ -152,4 +181,18 @@ conv_iter_cap_val_sf1(Conv_fmt_flags_t fmt_flags, conv_iter_cb_t func,
 {
 	return (conv_iter_elfcap(elfcap_getdesc_sf1(), ELFCAP_NUM_SF1,
 	    fmt_flags, func, uvalue));
+}
+
+conv_iter_ret_t
+conv_iter_cap_val_hw3(Half mach, Conv_fmt_flags_t fmt_flags,
+    conv_iter_cb_t func, void *uvalue)
+{
+	if ((mach == EM_386) || (mach == EM_486) ||
+	    (mach == EM_AMD64) || (mach == CONV_MACH_ALL))
+		if (conv_iter_elfcap(elfcap_getdesc_hw3_386(),
+		    ELFCAP_NUM_HW3_386, fmt_flags, func, uvalue) ==
+		    CONV_ITER_DONE)
+			return (CONV_ITER_DONE);
+
+	return (CONV_ITER_DONE);
 }

@@ -29,6 +29,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -203,9 +204,10 @@ ld_map_cap_set_ovflag(Mapfile *mf, Word type)
 		FLG_OF1_OVHWCAP2,	/* CA_SUNW_HW_2 */
 		FLG_OF1_OVPLATCAP,	/* CA_SUNW_PLAT */
 		FLG_OF1_OVMACHCAP,	/* CA_SUNW_MACH */
-		FLG_OF1_OVIDCAP		/* CA_SUNW_ID */
+		FLG_OF1_OVIDCAP,	/* CA_SUNW_ID */
+		FLG_OF1_OVHWCAP3	/* CA_SUNW_HW_3 */
 	};
-#if CA_SUNW_NUM != (CA_SUNW_ID + 1)
+#if CA_SUNW_NUM != (CA_SUNW_HW_3 + 1)
 #error "CA_SUNW_NUM has grown"
 #endif
 	mf->mf_ofl->ofl_flags1 |= override_flag[type];

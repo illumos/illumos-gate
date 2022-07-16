@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #pragma weak _getisax = getisax
@@ -48,10 +49,12 @@ getisax(uint32_t *array, uint_t n)
 	int i;
 	static uint32_t auxv_hwcap;
 	static uint32_t auxv_hwcap_2;
+	static uint32_t auxv_hwcap_3;
 
 	if (auxv_hwcap == 0) {
 		auxv_hwcap = (uint32_t)___getauxval(AT_SUN_HWCAP);
 		auxv_hwcap_2 = (uint32_t)___getauxval(AT_SUN_HWCAP2);
+		auxv_hwcap_3 = (uint32_t)___getauxval(AT_SUN_HWCAP3);
 	}
 
 	if (n > 0) {
@@ -59,9 +62,15 @@ getisax(uint32_t *array, uint_t n)
 			array[0] = auxv_hwcap;
 		if (n >= 2)
 			array[1] = auxv_hwcap_2;
-		for (i = 2; i < n; i++)
+		if (n >= 3)
+			array[2] = auxv_hwcap_3;
+		for (i = 3; i < n; i++)
 			array[i] = 0;
 	}
 
-	return (auxv_hwcap == 0 ? 0 : n >= 2 ? 2 : 1);
+	if (auxv_hwcap == 0) {
+		return (0);
+	}
+
+	return (n >= 3 ? 3 : n);
 }

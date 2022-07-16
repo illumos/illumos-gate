@@ -27,6 +27,7 @@
 /*	  All Rights Reserved	*/
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 
@@ -111,7 +112,7 @@ typedef struct uf_entry {
 	short		uf_busy;	/* file is allocated [grow, fork] */
 	kcondvar_t	uf_wanted_cv;	/* waiting for setf() [never copied] */
 	kcondvar_t	uf_closing_cv;	/* waiting for close() [never copied] */
-	struct portfd 	*uf_portfd;	/* associated with port [grow] */
+	struct portfd	*uf_portfd;	/* associated with port [grow] */
 	uf_entry_gen_t	uf_gen;		/* assigned fd generation [grow,fork] */
 	/* Avoid false sharing - pad to coherency granularity (64 bytes) */
 	char		uf_pad[64 - sizeof (kmutex_t) - 2 * sizeof (void*) -
@@ -204,7 +205,7 @@ typedef struct {		/* kernel syscall set type */
 #if defined(__sparc)
 #define	__KERN_NAUXV_IMPL 20
 #elif defined(__i386) || defined(__amd64)
-#define	__KERN_NAUXV_IMPL 25
+#define	__KERN_NAUXV_IMPL 26
 #endif
 
 struct execsw;

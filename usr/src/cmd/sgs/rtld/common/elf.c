@@ -27,6 +27,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -2311,6 +2312,9 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 			case CA_SUNW_MACH:
 				CAPSET(lmp).sc_mach = STRTAB(lmp) +
 				    cap->c_un.c_ptr;
+				break;
+			case CA_SUNW_HW_3:
+				CAPSET(lmp).sc_hw_3 = cap->c_un.c_val;
 				break;
 			}
 			cap++;

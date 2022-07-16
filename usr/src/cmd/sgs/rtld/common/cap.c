@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include	<sys/types.h>
@@ -69,9 +70,19 @@ compare(const void *vp_a, const void *vp_b)
 		return (-1);
 	if (strcap_b && (strcap_a == NULL))
 		return (1);
+	/*
+	 * Third, investigate any CA_SUNW_HW_3 hardware capabilities.
+	 */
+	hwcap_a = fdp_a->fd_scapset.sc_hw_3;
+	hwcap_b = fdp_b->fd_scapset.sc_hw_3;
+
+	if (hwcap_a > hwcap_b)
+		return (-1);
+	if (hwcap_a < hwcap_b)
+		return (1);
 
 	/*
-	 * Third, investigate any CA_SUNW_HW_2 hardware capabilities.
+	 * Fourth, investigate any CA_SUNW_HW_2 hardware capabilities.
 	 */
 	hwcap_a = fdp_a->fd_scapset.sc_hw_2;
 	hwcap_b = fdp_b->fd_scapset.sc_hw_2;
@@ -152,6 +163,30 @@ hwcap2_check(Syscapset *scapset, Xword val, Rej_desc *rej)
 
 			rej->rej_type = SGS_REJ_HWCAP_2;
 			rej->rej_str = conv_cap_val_hw2(mval,
+			    M_MACH, 0, &cap_buf);
+		}
+		return (0);
+	}
+	return (1);
+}
+
+/*
+ * Determine whether HWCAP3 capabilities value is supported.
+ */
+int
+hwcap3_check(Syscapset *scapset, Xword val, Rej_desc *rej)
+{
+	Xword	mval;
+
+	/*
+	 * Ensure that the kernel can cope with the required capabilities.
+	 */
+	if ((mval = (val & ~scapset->sc_hw_3)) != 0) {
+		if (rej) {
+			static Conv_cap_val_hw3_buf_t	cap_buf;
+
+			rej->rej_type = SGS_REJ_HWCAP_3;
+			rej->rej_str = conv_cap_val_hw3(mval,
 			    M_MACH, 0, &cap_buf);
 		}
 		return (0);
@@ -342,6 +377,12 @@ cap_check(Cap *cptr, char *strs, int alt, Fdesc *fdp, Rej_desc *rej)
 			 * but are not attributes that must be compared with
 			 * the system.  They are ignored.
 			 */
+			break;
+		case CA_SUNW_HW_3:
+			if (hwcap3_check(scapset, val, rej) == 0)
+				return (0);
+			if (fdp)
+				fdp->fd_scapset.sc_hw_3 = val;
 			break;
 		default:
 			rej->rej_type = SGS_REJ_UNKCAP;
@@ -837,15 +878,28 @@ typedef enum {
 	CAP_DISABLE =	2		/* disable capabilities */
 } cap_mode;
 
+/*
+ * The override indexes originally followed the values of CA_SUNW_HW_1, SF_1,
+ * etc.
+ */
+typedef enum {
+	CAP_OVR_HW_1 = 0,
+	CAP_OVR_SF_1,
+	CAP_OVR_HW_2,
+	CAP_OVR_HW_3,
+	CAP_OVR_MAX
+} cap_index_t;
+
 static struct {
 	elfcap_mask_t	cs_val[3];	/* value settings, and indicator for */
 	int		cs_set[3];	/*	OVERRIDE, ENABLE and DISABLE */
 	elfcap_mask_t	*cs_aval;	/* alternative variable for final */
 					/*	update */
-} cap_settings[3] = {
+} cap_settings[CAP_OVR_MAX] = {
 	{ { 0, 0, 0 }, { 0, 0, 0 }, NULL },		/* CA_SUNW_HW_1 */
 	{ { 0, 0, 0 }, { 0, 0, 0 }, NULL },		/* CA_SUNW_SF_1 */
-	{ { 0, 0, 0 }, { 0, 0, 0 }, NULL }		/* CA_SUNW_HW_2 */
+	{ { 0, 0, 0 }, { 0, 0, 0 }, NULL },		/* CA_SUNW_HW_2 */
+	{ { 0, 0, 0 }, { 0, 0, 0 }, NULL }		/* CA_SUNW_HW_3 */
 };
 
 static int
@@ -853,7 +907,7 @@ cap_modify(Xword tag, const char *str)
 {
 	char		*caps, *ptr, *next;
 	cap_mode	mode = CAP_OVERRIDE;
-	Xword		ndx;
+	cap_index_t	ndx;
 
 	if ((caps = strdup(str)) == NULL)
 		return (0);
@@ -885,16 +939,22 @@ cap_modify(Xword tag, const char *str)
 			 * a known hardware capability mask.  Note, the caller
 			 * indicates that these are hardware capabilities by
 			 * passing in the CA_SUNW_HW_1 tag.  However, the
-			 * tokens could be CA_SUNW_HW_1 or CA_SUNW_HW_2.
+			 * tokens could be CA_SUNW_HW_1, CA_SUNW_HW_2, or
+			 * CA_SUNW_HW_3.
 			 */
+			if ((val = (Xword)elfcap_hw3_from_str(ELFCAP_STYLE,
+			    ptr, M_MACH)) != 0) {
+				ndx = CAP_OVR_HW_3;
+				break;
+			}
 			if ((val = (Xword)elfcap_hw2_from_str(ELFCAP_STYLE,
 			    ptr, M_MACH)) != 0) {
-				ndx = CA_SUNW_HW_2;
+				ndx = CAP_OVR_HW_2;
 				break;
 			}
 			if ((val = (Xword)elfcap_hw1_from_str(ELFCAP_STYLE,
 			    ptr, M_MACH)) != 0)
-				ndx = CA_SUNW_HW_1;
+				ndx = CAP_OVR_HW_1;
 			break;
 		case CA_SUNW_SF_1:
 			/*
@@ -906,7 +966,7 @@ cap_modify(Xword tag, const char *str)
 			 */
 			if ((val = (Xword)elfcap_sf1_from_str(ELFCAP_STYLE,
 			    ptr, M_MACH)) != 0)
-				ndx = CA_SUNW_SF_1;
+				ndx = CAP_OVR_SF_1;
 			break;
 		}
 
@@ -918,6 +978,7 @@ cap_modify(Xword tag, const char *str)
 		 *
 		 *	LD_HWCAP=[1]0x40    sets CA_SUNW_HW_1 with 0x40
 		 *	LD_HWCAP=[2]0x80    sets CA_SUNW_HW_2 with 0x80
+		 *	LD_HWCAP=[3]0x44    sets CA_SUNW_HW_3 with 0x44
 		 *
 		 * Invalid indexes are ignored.
 		 */
@@ -926,11 +987,19 @@ cap_modify(Xword tag, const char *str)
 
 			if ((*ptr == '[') && (*(ptr + 2) == ']')) {
 				if (*(ptr + 1) == '1') {
-					ndx = tag;
+					ndx = CAP_OVR_HW_1;
 					ptr += 3;
+				} else if (*(ptr + 1) == '3') {
+					if (tag == CA_SUNW_HW_1) {
+						ndx = CAP_OVR_HW_3;
+						ptr += 3;
+					} else {
+						/* invalid index */
+						continue;
+					}
 				} else if (*(ptr + 1) == '2') {
 					if (tag == CA_SUNW_HW_1) {
-						ndx = CA_SUNW_HW_2;
+						ndx = CAP_OVR_HW_2;
 						ptr += 3;
 					} else {
 						/* invalid index */
@@ -940,8 +1009,9 @@ cap_modify(Xword tag, const char *str)
 					/* invalid index */
 					continue;
 				}
-			} else
-				ndx = tag;
+			} else {
+				ndx = tag - 1;
+			}
 
 			errno = 0;
 			if (((val = strtol(ptr, &end, 16)) == 0) && errno)
@@ -959,8 +1029,8 @@ cap_modify(Xword tag, const char *str)
 			}
 		}
 
-		cap_settings[ndx - 1].cs_val[mode] |= val;
-		cap_settings[ndx - 1].cs_set[mode]++;
+		cap_settings[ndx].cs_val[mode] |= val;
+		cap_settings[ndx].cs_set[mode]++;
 
 	}
 
@@ -968,7 +1038,7 @@ cap_modify(Xword tag, const char *str)
 	 * If the "override" token was supplied, set the alternative
 	 * system capabilities, then enable or disable others.
 	 */
-	for (ndx = 0; ndx < CA_SUNW_HW_2; ndx++) {
+	for (ndx = 0; ndx < CAP_OVR_MAX; ndx++) {
 		if (cap_settings[ndx].cs_set[CAP_OVERRIDE])
 			*(cap_settings[ndx].cs_aval) =
 			    cap_settings[ndx].cs_val[CAP_OVERRIDE];
@@ -1046,9 +1116,10 @@ cap_alternative(void)
 		return (0);
 	*alt_scapset = *org_scapset;
 
-	cap_settings[CA_SUNW_HW_1 - 1].cs_aval = &alt_scapset->sc_hw_1;
-	cap_settings[CA_SUNW_SF_1 - 1].cs_aval = &alt_scapset->sc_sf_1;
-	cap_settings[CA_SUNW_HW_2 - 1].cs_aval = &alt_scapset->sc_hw_2;
+	cap_settings[CAP_OVR_HW_1].cs_aval = &alt_scapset->sc_hw_1;
+	cap_settings[CAP_OVR_SF_1].cs_aval = &alt_scapset->sc_sf_1;
+	cap_settings[CAP_OVR_HW_2].cs_aval = &alt_scapset->sc_hw_2;
+	cap_settings[CAP_OVR_HW_3].cs_aval = &alt_scapset->sc_hw_3;
 
 	/*
 	 * Process any replaceable variables.
@@ -1203,6 +1274,15 @@ sym_cap_check(Cap *cptr, uint_t cndx, Syscapset *bestcapset, Rt_map *lmp,
 					ivlmach++;
 			}
 			break;
+		case CA_SUNW_HW_3:
+			bestcapset->sc_hw_3 = val;
+			DBG_CALL(Dbg_syms_cap_lookup(lmp, DBG_CAP_HW_3,
+			    name, ndx, M_MACH, bestcapset));
+
+			if (hwcap3_check(scapset, val, NULL) == 0)
+				capfail++;
+			break;
+
 		default:
 			break;
 		}
@@ -1269,12 +1349,18 @@ is_sym_the_best(Syscapset *bestcapset, Syscapset *symcapset)
 		return (1);
 
 	/*
-	 * Check the hardware capabilities.  If the best symbols CA_SUNW_HW_2
+	 * Check the hardware capabilities.  If the best symbols CA_SUNW_HW_3
 	 * capabilities are greater than the new symbols capabilities, then
-	 * retain the best capabilities group.  If the new symbols CA_SUNW_HW_2
+	 * retain the best capabilities group.  If the new symbols CA_SUNW_HW_3
 	 * capabilities are greater than the best symbol, then the new symbol
-	 * needs to be taken.
+	 * needs to be taken. Repeat the same process for CA_SUNW_HW_2.
 	 */
+	if (bestcapset->sc_hw_3 > symcapset->sc_hw_3)
+		return (0);
+
+	if (bestcapset->sc_hw_3 < symcapset->sc_hw_3)
+		return (1);
+
 	if (bestcapset->sc_hw_2 > symcapset->sc_hw_2)
 		return (0);
 

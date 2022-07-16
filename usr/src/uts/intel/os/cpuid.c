@@ -1634,7 +1634,12 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"ppin",
 	"vaes",
 	"vpclmulqdq",
-	"lfence_serializing"
+	"lfence_serializing",
+	"gfni",
+	"avx512_vp2intersect",
+	"avx512_bitalg",
+	"avx512_vbmi2",
+	"avx512_bf16"
 };
 
 boolean_t
@@ -1786,6 +1791,7 @@ struct cpuid_info {
 					/* Intel fn: 4, AMD fn: 8000001d */
 	struct cpuid_regs **cpi_cache_leaves;	/* Acual leaves from above */
 	struct cpuid_regs cpi_std[NMAX_CPI_STD];	/* 0 .. 7 */
+	struct cpuid_regs cpi_sub7[1];	/* Leaf 7, sub-leaf 1 */
 	/*
 	 * extended function information
 	 */
@@ -1857,6 +1863,7 @@ static struct cpuid_info cpuid_info0;
 #define	CPI_FEATURES_7_0_EBX(cpi)	((cpi)->cpi_std[7].cp_ebx)
 #define	CPI_FEATURES_7_0_ECX(cpi)	((cpi)->cpi_std[7].cp_ecx)
 #define	CPI_FEATURES_7_0_EDX(cpi)	((cpi)->cpi_std[7].cp_edx)
+#define	CPI_FEATURES_7_1_EAX(cpi)	((cpi)->cpi_sub7[0].cp_eax)
 
 #define	CPI_BRANDID(cpi)	BITX((cpi)->cpi_std[1].cp_ebx, 7, 0)
 #define	CPI_CHUNKS(cpi)		BITX((cpi)->cpi_std[1].cp_ebx, 15, 7)
@@ -3386,6 +3393,109 @@ cpuid_basic_thermal(cpu_t *cpu, uchar_t *featureset)
 }
 
 /*
+ * This is used when we discover that we have AVX support in cpuid. This
+ * proceeds to scan for the rest of the AVX derived features.
+ */
+static void
+cpuid_basic_avx(cpu_t *cpu, uchar_t *featureset)
+{
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	/*
+	 * If we don't have AVX, don't bother with most of this.
+	 */
+	if ((cpi->cpi_std[1].cp_ecx & CPUID_INTC_ECX_AVX) == 0)
+		return;
+
+	add_x86_feature(featureset, X86FSET_AVX);
+
+	/*
+	 * Intel says we can't check these without also
+	 * checking AVX.
+	 */
+	if (cpi->cpi_std[1].cp_ecx & CPUID_INTC_ECX_F16C)
+		add_x86_feature(featureset, X86FSET_F16C);
+
+	if (cpi->cpi_std[1].cp_ecx & CPUID_INTC_ECX_FMA)
+		add_x86_feature(featureset, X86FSET_FMA);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_BMI1)
+		add_x86_feature(featureset, X86FSET_BMI1);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_BMI2)
+		add_x86_feature(featureset, X86FSET_BMI2);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_AVX2)
+		add_x86_feature(featureset, X86FSET_AVX2);
+
+	if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_VAES)
+		add_x86_feature(featureset, X86FSET_VAES);
+
+	if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_VPCLMULQDQ)
+		add_x86_feature(featureset, X86FSET_VPCLMULQDQ);
+
+	/*
+	 * The rest of the AVX features require AVX512. Do not check them unless
+	 * it is present.
+	 */
+	if ((cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_AVX512F) == 0)
+		return;
+	add_x86_feature(featureset, X86FSET_AVX512F);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_AVX512DQ)
+		add_x86_feature(featureset, X86FSET_AVX512DQ);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_AVX512IFMA)
+		add_x86_feature(featureset, X86FSET_AVX512FMA);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_AVX512PF)
+		add_x86_feature(featureset, X86FSET_AVX512PF);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_AVX512ER)
+		add_x86_feature(featureset, X86FSET_AVX512ER);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_AVX512CD)
+		add_x86_feature(featureset, X86FSET_AVX512CD);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_AVX512BW)
+		add_x86_feature(featureset, X86FSET_AVX512BW);
+
+	if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_AVX512VL)
+		add_x86_feature(featureset, X86FSET_AVX512VL);
+
+	if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_AVX512VBMI)
+		add_x86_feature(featureset, X86FSET_AVX512VBMI);
+
+	if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_AVX512VBMI2)
+		add_x86_feature(featureset, X86FSET_AVX512_VBMI2);
+
+	if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_AVX512VNNI)
+		add_x86_feature(featureset, X86FSET_AVX512VNNI);
+
+	if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_AVX512BITALG)
+		add_x86_feature(featureset, X86FSET_AVX512_BITALG);
+
+	if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_AVX512VPOPCDQ)
+		add_x86_feature(featureset, X86FSET_AVX512VPOPCDQ);
+
+	if (cpi->cpi_std[7].cp_edx & CPUID_INTC_EDX_7_0_AVX5124NNIW)
+		add_x86_feature(featureset, X86FSET_AVX512NNIW);
+
+	if (cpi->cpi_std[7].cp_edx & CPUID_INTC_EDX_7_0_AVX5124FMAPS)
+		add_x86_feature(featureset, X86FSET_AVX512FMAPS);
+
+	/*
+	 * More features here are in Leaf 7, subleaf 1. Don't bother checking if
+	 * we don't need to.
+	 */
+	if (cpi->cpi_std[7].cp_eax < 1)
+		return;
+
+	if (cpi->cpi_sub7[0].cp_eax & CPUID_INTC_EAX_7_1_AVX512_BF16)
+		add_x86_feature(featureset, X86FSET_AVX512_BF16);
+}
+
+/*
  * PPIN is the protected processor inventory number. On AMD this is an actual
  * feature bit. However, on Intel systems we need to read the platform
  * information MSR if we're on a specific model.
@@ -3781,7 +3891,8 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 
 	/*
 	 * In addition to ecx and edx, Intel and AMD are storing a bunch of
-	 * instruction set extensions in leaf 7's ebx, ecx, and edx.
+	 * instruction set extensions in leaf 7's ebx, ecx, and edx. Note, leaf
+	 * 7 has sub-leaves determined by ecx.
 	 */
 	if (cpi->cpi_maxeax >= 7) {
 		struct cpuid_regs *ecp;
@@ -3792,7 +3903,10 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 
 		/*
 		 * If XSAVE has been disabled, just ignore all of the
-		 * extended-save-area dependent flags here.
+		 * extended-save-area dependent flags here. By removing most of
+		 * the leaf 7, sub-leaf 0 flags, that will ensure tha we don't
+		 * end up looking at additional xsave dependent leaves right
+		 * now.
 		 */
 		if (xsave_force_disable) {
 			ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_BMI1;
@@ -3804,6 +3918,7 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 			ecp->cp_edx &= ~CPUID_INTC_EDX_7_0_ALL_AVX512;
 			ecp->cp_ecx &= ~CPUID_INTC_ECX_7_0_VAES;
 			ecp->cp_ecx &= ~CPUID_INTC_ECX_7_0_VPCLMULQDQ;
+			ecp->cp_ecx &= ~CPUID_INTC_ECX_7_0_GFNI;
 		}
 
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_SMEP)
@@ -3840,13 +3955,27 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 			add_x86_feature(featureset, X86FSET_PKU);
 		if (ecp->cp_ecx & CPUID_INTC_ECX_7_0_OSPKE)
 			add_x86_feature(featureset, X86FSET_OSPKE);
+		if (ecp->cp_ecx & CPUID_INTC_ECX_7_0_GFNI)
+			add_x86_feature(featureset, X86FSET_GFNI);
+
+		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_CLWB)
+			add_x86_feature(featureset, X86FSET_CLWB);
 
 		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
 			if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_MPX)
 				add_x86_feature(featureset, X86FSET_MPX);
+		}
 
-			if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_CLWB)
-				add_x86_feature(featureset, X86FSET_CLWB);
+		/*
+		 * If we have subleaf 1 available, grab and store that. This is
+		 * used for more AVX and related features.
+		 */
+		if (ecp->cp_eax >= 1) {
+			struct cpuid_regs *c71;
+			c71 = &cpi->cpi_sub7[0];
+			c71->cp_eax = 7;
+			c71->cp_ecx = 1;
+			(void) __cpuid_insn(c71);
 		}
 	}
 
@@ -3937,105 +4066,7 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 			add_x86_feature(featureset, X86FSET_XSAVE);
 
 			/* We only test AVX & AVX512 when there is XSAVE */
-
-			if (cp->cp_ecx & CPUID_INTC_ECX_AVX) {
-				add_x86_feature(featureset,
-				    X86FSET_AVX);
-
-				/*
-				 * Intel says we can't check these without also
-				 * checking AVX.
-				 */
-				if (cp->cp_ecx & CPUID_INTC_ECX_F16C)
-					add_x86_feature(featureset,
-					    X86FSET_F16C);
-
-				if (cp->cp_ecx & CPUID_INTC_ECX_FMA)
-					add_x86_feature(featureset,
-					    X86FSET_FMA);
-
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_BMI1)
-					add_x86_feature(featureset,
-					    X86FSET_BMI1);
-
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_BMI2)
-					add_x86_feature(featureset,
-					    X86FSET_BMI2);
-
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_AVX2)
-					add_x86_feature(featureset,
-					    X86FSET_AVX2);
-
-				if (cpi->cpi_std[7].cp_ecx &
-				    CPUID_INTC_ECX_7_0_VAES)
-					add_x86_feature(featureset,
-					    X86FSET_VAES);
-
-				if (cpi->cpi_std[7].cp_ecx &
-				    CPUID_INTC_ECX_7_0_VPCLMULQDQ)
-					add_x86_feature(featureset,
-					    X86FSET_VPCLMULQDQ);
-			}
-
-			if (cpi->cpi_vendor == X86_VENDOR_Intel &&
-			    (cpi->cpi_std[7].cp_ebx &
-			    CPUID_INTC_EBX_7_0_AVX512F) != 0) {
-				add_x86_feature(featureset, X86FSET_AVX512F);
-
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_AVX512DQ)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512DQ);
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_AVX512IFMA)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512FMA);
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_AVX512PF)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512PF);
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_AVX512ER)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512ER);
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_AVX512CD)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512CD);
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_AVX512BW)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512BW);
-				if (cpi->cpi_std[7].cp_ebx &
-				    CPUID_INTC_EBX_7_0_AVX512VL)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512VL);
-
-				if (cpi->cpi_std[7].cp_ecx &
-				    CPUID_INTC_ECX_7_0_AVX512VBMI)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512VBMI);
-				if (cpi->cpi_std[7].cp_ecx &
-				    CPUID_INTC_ECX_7_0_AVX512VNNI)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512VNNI);
-				if (cpi->cpi_std[7].cp_ecx &
-				    CPUID_INTC_ECX_7_0_AVX512VPOPCDQ)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512VPOPCDQ);
-
-				if (cpi->cpi_std[7].cp_edx &
-				    CPUID_INTC_EDX_7_0_AVX5124NNIW)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512NNIW);
-				if (cpi->cpi_std[7].cp_edx &
-				    CPUID_INTC_EDX_7_0_AVX5124FMAPS)
-					add_x86_feature(featureset,
-					    X86FSET_AVX512FMAPS);
-			}
+			cpuid_basic_avx(cpu, featureset);
 		}
 	}
 
@@ -4761,36 +4792,16 @@ cpuid_pass_extended(cpu_t *cpu, void *_arg __unused)
 					    X86FSET_VAES);
 					remove_x86_feature(x86_featureset,
 					    X86FSET_VPCLMULQDQ);
-
-					CPI_FEATURES_ECX(cpi) &=
-					    ~CPUID_INTC_ECX_XSAVE;
-					CPI_FEATURES_ECX(cpi) &=
-					    ~CPUID_INTC_ECX_AVX;
-					CPI_FEATURES_ECX(cpi) &=
-					    ~CPUID_INTC_ECX_F16C;
-					CPI_FEATURES_ECX(cpi) &=
-					    ~CPUID_INTC_ECX_FMA;
-					CPI_FEATURES_7_0_EBX(cpi) &=
-					    ~CPUID_INTC_EBX_7_0_BMI1;
-					CPI_FEATURES_7_0_EBX(cpi) &=
-					    ~CPUID_INTC_EBX_7_0_BMI2;
-					CPI_FEATURES_7_0_EBX(cpi) &=
-					    ~CPUID_INTC_EBX_7_0_AVX2;
-					CPI_FEATURES_7_0_EBX(cpi) &=
-					    ~CPUID_INTC_EBX_7_0_MPX;
-					CPI_FEATURES_7_0_EBX(cpi) &=
-					    ~CPUID_INTC_EBX_7_0_ALL_AVX512;
-
-					CPI_FEATURES_7_0_ECX(cpi) &=
-					    ~CPUID_INTC_ECX_7_0_ALL_AVX512;
-
-					CPI_FEATURES_7_0_ECX(cpi) &=
-					    ~CPUID_INTC_ECX_7_0_VAES;
-					CPI_FEATURES_7_0_ECX(cpi) &=
-					    ~CPUID_INTC_ECX_7_0_VPCLMULQDQ;
-
-					CPI_FEATURES_7_0_EDX(cpi) &=
-					    ~CPUID_INTC_EDX_7_0_ALL_AVX512;
+					remove_x86_feature(x86_featureset,
+					    X86FSET_GFNI);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512_VP2INT);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512_BITALG);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512_VBMI2);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512_BF16);
 
 					xsave_force_disable = B_TRUE;
 				} else {
@@ -5420,11 +5431,93 @@ cpuid_pass_dynamic(cpu_t *cpu, void *_arg __unused)
 	}
 }
 
+typedef struct {
+	uint32_t avm_av;
+	uint32_t avm_feat;
+} av_feat_map_t;
+
+/*
+ * These arrays are used to map features that we should add based on x86
+ * features that are present. As a large number depend on kernel features,
+ * rather than rechecking and clearing CPUID everywhere, we simply map these.
+ * There is an array of these for each hwcap word. Some features aren't tracked
+ * in the kernel x86 featureset and that's ok. They will not show up in here.
+ */
+static const av_feat_map_t x86fset_to_av1[] = {
+	{ AV_386_CX8, X86FSET_CX8 },
+	{ AV_386_SEP, X86FSET_SEP },
+	{ AV_386_AMD_SYSC, X86FSET_ASYSC },
+	{ AV_386_CMOV, X86FSET_CMOV },
+	{ AV_386_FXSR, X86FSET_SSE },
+	{ AV_386_SSE, X86FSET_SSE },
+	{ AV_386_SSE2, X86FSET_SSE2 },
+	{ AV_386_SSE3, X86FSET_SSE3 },
+	{ AV_386_CX16, X86FSET_CX16 },
+	{ AV_386_TSCP, X86FSET_TSCP },
+	{ AV_386_AMD_SSE4A, X86FSET_SSE4A },
+	{ AV_386_SSSE3, X86FSET_SSSE3 },
+	{ AV_386_SSE4_1, X86FSET_SSE4_1 },
+	{ AV_386_SSE4_2, X86FSET_SSE4_2 },
+	{ AV_386_AES, X86FSET_AES },
+	{ AV_386_PCLMULQDQ, X86FSET_PCLMULQDQ },
+	{ AV_386_XSAVE, X86FSET_XSAVE },
+	{ AV_386_AVX, X86FSET_AVX },
+	{ AV_386_VMX, X86FSET_VMX },
+	{ AV_386_AMD_SVM, X86FSET_SVM }
+};
+
+static const av_feat_map_t x86fset_to_av2[] = {
+	{ AV_386_2_F16C, X86FSET_F16C },
+	{ AV_386_2_RDRAND, X86FSET_RDRAND },
+	{ AV_386_2_BMI1, X86FSET_BMI1 },
+	{ AV_386_2_BMI2, X86FSET_BMI2 },
+	{ AV_386_2_FMA, X86FSET_FMA },
+	{ AV_386_2_AVX2, X86FSET_AVX2 },
+	{ AV_386_2_ADX, X86FSET_ADX },
+	{ AV_386_2_RDSEED, X86FSET_RDSEED },
+	{ AV_386_2_AVX512F, X86FSET_AVX512F },
+	{ AV_386_2_AVX512DQ, X86FSET_AVX512DQ },
+	{ AV_386_2_AVX512IFMA, X86FSET_AVX512FMA },
+	{ AV_386_2_AVX512PF, X86FSET_AVX512PF },
+	{ AV_386_2_AVX512ER, X86FSET_AVX512ER },
+	{ AV_386_2_AVX512CD, X86FSET_AVX512CD },
+	{ AV_386_2_AVX512BW, X86FSET_AVX512BW },
+	{ AV_386_2_AVX512VL, X86FSET_AVX512VL },
+	{ AV_386_2_AVX512VBMI, X86FSET_AVX512VBMI },
+	{ AV_386_2_AVX512VPOPCDQ, X86FSET_AVX512VPOPCDQ },
+	{ AV_386_2_SHA, X86FSET_SHA },
+	{ AV_386_2_FSGSBASE, X86FSET_FSGSBASE },
+	{ AV_386_2_CLFLUSHOPT, X86FSET_CLFLUSHOPT },
+	{ AV_386_2_CLWB, X86FSET_CLWB },
+	{ AV_386_2_MONITORX, X86FSET_MONITORX },
+	{ AV_386_2_CLZERO, X86FSET_CLZERO },
+	{ AV_386_2_AVX512_VNNI, X86FSET_AVX512VNNI },
+	{ AV_386_2_VPCLMULQDQ, X86FSET_VPCLMULQDQ },
+	{ AV_386_2_VAES, X86FSET_VAES },
+	{ AV_386_2_GFNI, X86FSET_GFNI },
+	{ AV_386_2_AVX512_VP2INT, X86FSET_AVX512_VP2INT },
+	{ AV_386_2_AVX512_BITALG, X86FSET_AVX512_BITALG }
+};
+
+static const av_feat_map_t x86fset_to_av3[] = {
+	{ AV_386_3_AVX512_VBMI2, X86FSET_AVX512_VBMI2 },
+	{ AV_386_3_AVX512_BF16, X86FSET_AVX512_BF16 }
+};
+
 /*
  * This routine is called out of bind_hwcap() much later in the life
  * of the kernel (post_startup()).  The job of this routine is to resolve
  * the hardware feature support and kernel support for those features into
  * what we're actually going to tell applications via the aux vector.
+ *
+ * Most of the aux vector is derived from the x86_featureset array vector where
+ * a given feature indicates that an aux vector should be plumbed through. This
+ * allows the kernel to use one tracking mechanism for these based on whether or
+ * not it has the required hardware support (most often xsave). Most newer
+ * features are added there in case we need them in the kernel. Otherwise,
+ * features are evaluated based on looking at the cpuid features that remain. If
+ * you find yourself wanting to clear out cpuid features for some reason, they
+ * should instead be driven by the feature set so we have a consistent view.
  */
 
 static void
@@ -5432,65 +5525,42 @@ cpuid_pass_resolve(cpu_t *cpu, void *arg)
 {
 	uint_t *hwcap_out = (uint_t *)arg;
 	struct cpuid_info *cpi;
-	uint_t hwcap_flags = 0, hwcap_flags_2 = 0;
+	uint_t hwcap_flags = 0, hwcap_flags_2 = 0, hwcap_flags_3 = 0;
 
 	cpi = cpu->cpu_m.mcpu_cpi;
 
+	for (uint_t i = 0; i < ARRAY_SIZE(x86fset_to_av1); i++) {
+		if (is_x86_feature(x86_featureset,
+		    x86fset_to_av1[i].avm_feat)) {
+			hwcap_flags |= x86fset_to_av1[i].avm_av;
+		}
+	}
+
+	for (uint_t i = 0; i < ARRAY_SIZE(x86fset_to_av2); i++) {
+		if (is_x86_feature(x86_featureset,
+		    x86fset_to_av2[i].avm_feat)) {
+			hwcap_flags_2 |= x86fset_to_av2[i].avm_av;
+		}
+	}
+
+	for (uint_t i = 0; i < ARRAY_SIZE(x86fset_to_av3); i++) {
+		if (is_x86_feature(x86_featureset,
+		    x86fset_to_av3[i].avm_feat)) {
+			hwcap_flags_3 |= x86fset_to_av3[i].avm_av;
+		}
+	}
+
+	/*
+	 * From here on out we're working through features that don't have
+	 * corresponding kernel feature flags for various reasons that are
+	 * mostly just due to the historical implementation.
+	 */
 	if (cpi->cpi_maxeax >= 1) {
 		uint32_t *edx = &cpi->cpi_support[STD_EDX_FEATURES];
 		uint32_t *ecx = &cpi->cpi_support[STD_ECX_FEATURES];
-		uint32_t *ebx = &cpi->cpi_support[STD_EBX_FEATURES];
 
 		*edx = CPI_FEATURES_EDX(cpi);
 		*ecx = CPI_FEATURES_ECX(cpi);
-		*ebx = CPI_FEATURES_7_0_EBX(cpi);
-
-		/*
-		 * [these require explicit kernel support]
-		 */
-		if (!is_x86_feature(x86_featureset, X86FSET_SEP))
-			*edx &= ~CPUID_INTC_EDX_SEP;
-
-		if (!is_x86_feature(x86_featureset, X86FSET_SSE))
-			*edx &= ~(CPUID_INTC_EDX_FXSR|CPUID_INTC_EDX_SSE);
-		if (!is_x86_feature(x86_featureset, X86FSET_SSE2))
-			*edx &= ~CPUID_INTC_EDX_SSE2;
-
-		if (!is_x86_feature(x86_featureset, X86FSET_HTT))
-			*edx &= ~CPUID_INTC_EDX_HTT;
-
-		if (!is_x86_feature(x86_featureset, X86FSET_SSE3))
-			*ecx &= ~CPUID_INTC_ECX_SSE3;
-
-		if (!is_x86_feature(x86_featureset, X86FSET_SSSE3))
-			*ecx &= ~CPUID_INTC_ECX_SSSE3;
-		if (!is_x86_feature(x86_featureset, X86FSET_SSE4_1))
-			*ecx &= ~CPUID_INTC_ECX_SSE4_1;
-		if (!is_x86_feature(x86_featureset, X86FSET_SSE4_2))
-			*ecx &= ~CPUID_INTC_ECX_SSE4_2;
-		if (!is_x86_feature(x86_featureset, X86FSET_AES))
-			*ecx &= ~CPUID_INTC_ECX_AES;
-		if (!is_x86_feature(x86_featureset, X86FSET_PCLMULQDQ))
-			*ecx &= ~CPUID_INTC_ECX_PCLMULQDQ;
-		if (!is_x86_feature(x86_featureset, X86FSET_XSAVE))
-			*ecx &= ~(CPUID_INTC_ECX_XSAVE |
-			    CPUID_INTC_ECX_OSXSAVE);
-		if (!is_x86_feature(x86_featureset, X86FSET_AVX))
-			*ecx &= ~CPUID_INTC_ECX_AVX;
-		if (!is_x86_feature(x86_featureset, X86FSET_F16C))
-			*ecx &= ~CPUID_INTC_ECX_F16C;
-		if (!is_x86_feature(x86_featureset, X86FSET_FMA))
-			*ecx &= ~CPUID_INTC_ECX_FMA;
-		if (!is_x86_feature(x86_featureset, X86FSET_BMI1))
-			*ebx &= ~CPUID_INTC_EBX_7_0_BMI1;
-		if (!is_x86_feature(x86_featureset, X86FSET_BMI2))
-			*ebx &= ~CPUID_INTC_EBX_7_0_BMI2;
-		if (!is_x86_feature(x86_featureset, X86FSET_AVX2))
-			*ebx &= ~CPUID_INTC_EBX_7_0_AVX2;
-		if (!is_x86_feature(x86_featureset, X86FSET_RDSEED))
-			*ebx &= ~CPUID_INTC_EBX_7_0_RDSEED;
-		if (!is_x86_feature(x86_featureset, X86FSET_ADX))
-			*ebx &= ~CPUID_INTC_EBX_7_0_ADX;
 
 		/*
 		 * [no explicit support required beyond x87 fp context]
@@ -5502,125 +5572,26 @@ cpuid_pass_resolve(cpu_t *cpu, void *arg)
 		 * Now map the supported feature vector to things that we
 		 * think userland will care about.
 		 */
-		if (*edx & CPUID_INTC_EDX_SEP)
-			hwcap_flags |= AV_386_SEP;
-		if (*edx & CPUID_INTC_EDX_SSE)
-			hwcap_flags |= AV_386_FXSR | AV_386_SSE;
-		if (*edx & CPUID_INTC_EDX_SSE2)
-			hwcap_flags |= AV_386_SSE2;
-		if (*ecx & CPUID_INTC_ECX_SSE3)
-			hwcap_flags |= AV_386_SSE3;
-		if (*ecx & CPUID_INTC_ECX_SSSE3)
-			hwcap_flags |= AV_386_SSSE3;
-		if (*ecx & CPUID_INTC_ECX_SSE4_1)
-			hwcap_flags |= AV_386_SSE4_1;
-		if (*ecx & CPUID_INTC_ECX_SSE4_2)
-			hwcap_flags |= AV_386_SSE4_2;
 		if (*ecx & CPUID_INTC_ECX_MOVBE)
 			hwcap_flags |= AV_386_MOVBE;
-		if (*ecx & CPUID_INTC_ECX_AES)
-			hwcap_flags |= AV_386_AES;
-		if (*ecx & CPUID_INTC_ECX_PCLMULQDQ)
-			hwcap_flags |= AV_386_PCLMULQDQ;
-		if ((*ecx & CPUID_INTC_ECX_XSAVE) &&
-		    (*ecx & CPUID_INTC_ECX_OSXSAVE)) {
-			hwcap_flags |= AV_386_XSAVE;
 
-			if (*ecx & CPUID_INTC_ECX_AVX) {
-				uint32_t *ecx_7 = &CPI_FEATURES_7_0_ECX(cpi);
-				uint32_t *edx_7 = &CPI_FEATURES_7_0_EDX(cpi);
-
-				hwcap_flags |= AV_386_AVX;
-				if (*ecx & CPUID_INTC_ECX_F16C)
-					hwcap_flags_2 |= AV_386_2_F16C;
-				if (*ecx & CPUID_INTC_ECX_FMA)
-					hwcap_flags_2 |= AV_386_2_FMA;
-
-				if (*ebx & CPUID_INTC_EBX_7_0_BMI1)
-					hwcap_flags_2 |= AV_386_2_BMI1;
-				if (*ebx & CPUID_INTC_EBX_7_0_BMI2)
-					hwcap_flags_2 |= AV_386_2_BMI2;
-				if (*ebx & CPUID_INTC_EBX_7_0_AVX2)
-					hwcap_flags_2 |= AV_386_2_AVX2;
-				if (*ebx & CPUID_INTC_EBX_7_0_AVX512F)
-					hwcap_flags_2 |= AV_386_2_AVX512F;
-				if (*ebx & CPUID_INTC_EBX_7_0_AVX512DQ)
-					hwcap_flags_2 |= AV_386_2_AVX512DQ;
-				if (*ebx & CPUID_INTC_EBX_7_0_AVX512IFMA)
-					hwcap_flags_2 |= AV_386_2_AVX512IFMA;
-				if (*ebx & CPUID_INTC_EBX_7_0_AVX512PF)
-					hwcap_flags_2 |= AV_386_2_AVX512PF;
-				if (*ebx & CPUID_INTC_EBX_7_0_AVX512ER)
-					hwcap_flags_2 |= AV_386_2_AVX512ER;
-				if (*ebx & CPUID_INTC_EBX_7_0_AVX512CD)
-					hwcap_flags_2 |= AV_386_2_AVX512CD;
-				if (*ebx & CPUID_INTC_EBX_7_0_AVX512BW)
-					hwcap_flags_2 |= AV_386_2_AVX512BW;
-				if (*ebx & CPUID_INTC_EBX_7_0_AVX512VL)
-					hwcap_flags_2 |= AV_386_2_AVX512VL;
-
-				if (*ecx_7 & CPUID_INTC_ECX_7_0_AVX512VBMI)
-					hwcap_flags_2 |= AV_386_2_AVX512VBMI;
-				if (*ecx_7 & CPUID_INTC_ECX_7_0_AVX512VNNI)
-					hwcap_flags_2 |= AV_386_2_AVX512_VNNI;
-				if (*ecx_7 & CPUID_INTC_ECX_7_0_AVX512VPOPCDQ)
-					hwcap_flags_2 |= AV_386_2_AVX512VPOPCDQ;
-				if (*ecx_7 & CPUID_INTC_ECX_7_0_VAES)
-					hwcap_flags_2 |= AV_386_2_VAES;
-				if (*ecx_7 & CPUID_INTC_ECX_7_0_VPCLMULQDQ)
-					hwcap_flags_2 |= AV_386_2_VPCLMULQDQ;
-
-				if (*edx_7 & CPUID_INTC_EDX_7_0_AVX5124NNIW)
-					hwcap_flags_2 |= AV_386_2_AVX512_4NNIW;
-				if (*edx_7 & CPUID_INTC_EDX_7_0_AVX5124FMAPS)
-					hwcap_flags_2 |= AV_386_2_AVX512_4FMAPS;
-			}
-		}
-		if (*ecx & CPUID_INTC_ECX_VMX)
-			hwcap_flags |= AV_386_VMX;
 		if (*ecx & CPUID_INTC_ECX_POPCNT)
 			hwcap_flags |= AV_386_POPCNT;
 		if (*edx & CPUID_INTC_EDX_FPU)
 			hwcap_flags |= AV_386_FPU;
 		if (*edx & CPUID_INTC_EDX_MMX)
 			hwcap_flags |= AV_386_MMX;
-
 		if (*edx & CPUID_INTC_EDX_TSC)
 			hwcap_flags |= AV_386_TSC;
-		if (*edx & CPUID_INTC_EDX_CX8)
-			hwcap_flags |= AV_386_CX8;
-		if (*edx & CPUID_INTC_EDX_CMOV)
-			hwcap_flags |= AV_386_CMOV;
-		if (*ecx & CPUID_INTC_ECX_CX16)
-			hwcap_flags |= AV_386_CX16;
-
-		if (*ecx & CPUID_INTC_ECX_RDRAND)
-			hwcap_flags_2 |= AV_386_2_RDRAND;
-		if (*ebx & CPUID_INTC_EBX_7_0_ADX)
-			hwcap_flags_2 |= AV_386_2_ADX;
-		if (*ebx & CPUID_INTC_EBX_7_0_RDSEED)
-			hwcap_flags_2 |= AV_386_2_RDSEED;
-		if (*ebx & CPUID_INTC_EBX_7_0_SHA)
-			hwcap_flags_2 |= AV_386_2_SHA;
-		if (*ebx & CPUID_INTC_EBX_7_0_FSGSBASE)
-			hwcap_flags_2 |= AV_386_2_FSGSBASE;
-		if (*ebx & CPUID_INTC_EBX_7_0_CLWB)
-			hwcap_flags_2 |= AV_386_2_CLWB;
-		if (*ebx & CPUID_INTC_EBX_7_0_CLFLUSHOPT)
-			hwcap_flags_2 |= AV_386_2_CLFLUSHOPT;
-
 	}
-	/*
-	 * Check a few miscilaneous features.
-	 */
-	if (is_x86_feature(x86_featureset, X86FSET_CLZERO))
-		hwcap_flags_2 |= AV_386_2_CLZERO;
 
+	/*
+	 * Check a few miscellaneous features.
+	 */
 	if (cpi->cpi_xmaxeax < 0x80000001)
 		goto resolve_done;
 
 	switch (cpi->cpi_vendor) {
-		struct cpuid_regs cp;
 		uint32_t *edx, *ecx;
 
 	case X86_VENDOR_Intel:
@@ -5641,27 +5612,6 @@ cpuid_pass_resolve(cpu_t *cpu, void *arg)
 		*ecx = CPI_FEATURES_XTD_ECX(cpi);
 
 		/*
-		 * [these features require explicit kernel support]
-		 */
-		switch (cpi->cpi_vendor) {
-		case X86_VENDOR_Intel:
-			if (!is_x86_feature(x86_featureset, X86FSET_TSCP))
-				*edx &= ~CPUID_AMD_EDX_TSCP;
-			break;
-
-		case X86_VENDOR_AMD:
-		case X86_VENDOR_HYGON:
-			if (!is_x86_feature(x86_featureset, X86FSET_TSCP))
-				*edx &= ~CPUID_AMD_EDX_TSCP;
-			if (!is_x86_feature(x86_featureset, X86FSET_SSE4A))
-				*ecx &= ~CPUID_AMD_ECX_SSE4A;
-			break;
-
-		default:
-			break;
-		}
-
-		/*
 		 * [no explicit support required beyond
 		 * x87 fp context and exception handlers]
 		 */
@@ -5669,41 +5619,27 @@ cpuid_pass_resolve(cpu_t *cpu, void *arg)
 			*edx &= ~(CPUID_AMD_EDX_MMXamd |
 			    CPUID_AMD_EDX_3DNow | CPUID_AMD_EDX_3DNowx);
 
-		if (!is_x86_feature(x86_featureset, X86FSET_NX))
-			*edx &= ~CPUID_AMD_EDX_NX;
 		/*
 		 * Now map the supported feature vector to
 		 * things that we think userland will care about.
 		 */
-		if (*edx & CPUID_AMD_EDX_SYSC)
-			hwcap_flags |= AV_386_AMD_SYSC;
 		if (*edx & CPUID_AMD_EDX_MMXamd)
 			hwcap_flags |= AV_386_AMD_MMX;
 		if (*edx & CPUID_AMD_EDX_3DNow)
 			hwcap_flags |= AV_386_AMD_3DNow;
 		if (*edx & CPUID_AMD_EDX_3DNowx)
 			hwcap_flags |= AV_386_AMD_3DNowx;
-		if (*ecx & CPUID_AMD_ECX_SVM)
-			hwcap_flags |= AV_386_AMD_SVM;
 
 		switch (cpi->cpi_vendor) {
 		case X86_VENDOR_AMD:
 		case X86_VENDOR_HYGON:
-			if (*edx & CPUID_AMD_EDX_TSCP)
-				hwcap_flags |= AV_386_TSCP;
 			if (*ecx & CPUID_AMD_ECX_AHF64)
 				hwcap_flags |= AV_386_AHF;
-			if (*ecx & CPUID_AMD_ECX_SSE4A)
-				hwcap_flags |= AV_386_AMD_SSE4A;
 			if (*ecx & CPUID_AMD_ECX_LZCNT)
 				hwcap_flags |= AV_386_AMD_LZCNT;
-			if (*ecx & CPUID_AMD_ECX_MONITORX)
-				hwcap_flags_2 |= AV_386_2_MONITORX;
 			break;
 
 		case X86_VENDOR_Intel:
-			if (*edx & CPUID_AMD_EDX_TSCP)
-				hwcap_flags |= AV_386_TSCP;
 			if (*ecx & CPUID_AMD_ECX_LZCNT)
 				hwcap_flags |= AV_386_AMD_LZCNT;
 			/*
@@ -5713,16 +5649,9 @@ cpuid_pass_resolve(cpu_t *cpu, void *arg)
 			if (*ecx & CPUID_INTC_ECX_AHF64)
 				hwcap_flags |= AV_386_AHF;
 			break;
-
 		default:
 			break;
 		}
-		break;
-
-	case X86_VENDOR_TM:
-		cp.cp_eax = 0x80860001;
-		(void) __cpuid_insn(&cp);
-		cpi->cpi_support[TM_EDX_FEATURES] = cp.cp_edx;
 		break;
 
 	default:
@@ -5733,6 +5662,7 @@ resolve_done:
 	if (hwcap_out != NULL) {
 		hwcap_out[0] = hwcap_flags;
 		hwcap_out[1] = hwcap_flags_2;
+		hwcap_out[2] = hwcap_flags_3;
 	}
 }
 

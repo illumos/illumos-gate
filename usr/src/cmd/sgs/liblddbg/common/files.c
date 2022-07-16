@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include	<sys/auxv.h>
@@ -652,8 +653,11 @@ Dbg_file_generic(Lm_list *lml, Ifl_desc *ifl)
 	    ifl->ifl_ehdr->e_type, 0, &inv_buf));
 }
 
-static const Msg
-reject[] = {
+#if SGS_REJ_NUM != (SGS_REJ_HWCAP_3 + 1)
+#error SGS_REJ_NUM has changed
+#endif
+
+static const Msg reject[SGS_REJ_NUM] = {
 	MSG_STR_EMPTY,
 	MSG_REJ_MACH,		/* MSG_INTL(MSG_REJ_MACH) */
 	MSG_REJ_CLASS,		/* MSG_INTL(MSG_REJ_CLASS) */
@@ -671,7 +675,10 @@ reject[] = {
 	MSG_REJ_SFCAP_1,	/* MSG_INTL(MSG_REJ_SFCAP_1) */
 	MSG_REJ_MACHCAP,	/* MSG_INTL(MSG_REJ_MACHCAP) */
 	MSG_REJ_PLATCAP,	/* MSG_INTL(MSG_REJ_PLATCAP) */
-	MSG_REJ_HWCAP_2		/* MSG_INTL(MSG_REJ_HWCAP_2) */
+	MSG_REJ_HWCAP_2,	/* MSG_INTL(MSG_REJ_HWCAP_2) */
+	MSG_REJ_ARCHIVE,	/* MSG_INTL(MSG_REJ_ARCHIVE) */
+	MSG_REJ_KMOD,		/* MSG_INTL(MSG_REJ_KMOD) */
+	MSG_REJ_HWCAP_3		/* MSG_INTL(MSG_REJ_HWCAP_3) */
 };
 
 void

@@ -25,7 +25,7 @@
 #
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright (c) 2018 Joyent, Inc.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2022 Oxide Computer Company
 #
 
 @ MSG_NT_PRSTATUS		"[ NT_PRSTATUS ]"
@@ -107,6 +107,7 @@
 @ MSG_AUXV_AT_SUN_COMMPAGE		"SUN_COMMPAGE"
 @ MSG_AUXV_AT_SUN_FPTYPE		"SUN_FPTYPE"
 @ MSG_AUXV_AT_SUN_FPSIZE		"SUN_FPSIZE"
+@ MSG_AUXV_AT_SUN_HWCAP3		"SUN_HWCAP3"
 
 
 @ MSG_CC_CONTENT_STACK		"STACK"

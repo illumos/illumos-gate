@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include	<stdio.h>
@@ -82,6 +83,11 @@ Dbg_cap_val(Lm_list *lml, Syscapset *sys, Syscapset *alt, Half mach)
 	if (sys->sc_mach) {
 		dbg_print(lml, MSG_INTL(MSG_CAP_SYS_MACH), sys->sc_mach);
 	}
+	if (sys->sc_hw_3) {
+		dbg_print(lml, MSG_INTL(MSG_CAP_SYS_HW_3),
+		    conv_cap_val_hw3(sys->sc_hw_3, mach, 0,
+		    &cap_val_buf.cap_val_hw3_buf));
+	}
 	if (sys->sc_hw_2) {
 		dbg_print(lml, MSG_INTL(MSG_CAP_SYS_HW_2),
 		    conv_cap_val_hw2(sys->sc_hw_2, mach, 0,
@@ -107,6 +113,11 @@ Dbg_cap_val(Lm_list *lml, Syscapset *sys, Syscapset *alt, Half mach)
 		if (alt->sc_mach != sys->sc_mach) {
 			dbg_print(lml, MSG_INTL(MSG_CAP_ALT_MACH),
 			    alt->sc_mach);
+		}
+		if (alt->sc_hw_3 != sys->sc_hw_3) {
+			dbg_print(lml, MSG_INTL(MSG_CAP_ALT_HW_3),
+			    conv_cap_val_hw3(alt->sc_hw_3, mach, 0,
+			    &cap_val_buf.cap_val_hw3_buf));
 		}
 		if (alt->sc_hw_2 != sys->sc_hw_2) {
 			dbg_print(lml, MSG_INTL(MSG_CAP_ALT_HW_2),

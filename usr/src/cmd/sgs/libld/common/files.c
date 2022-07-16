@@ -25,6 +25,7 @@
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -389,12 +390,21 @@ hw_cap(Ofl_desc *ofl, Xword tag, Xword val)
 	elfcap_mask_t	*hwcap;
 	ofl_flag_t	flags1;
 
-	if (tag == CA_SUNW_HW_1) {
+	switch (tag) {
+	case CA_SUNW_HW_1:
 		hwcap = &ofl->ofl_ocapset.oc_hw_1.cm_val;
 		flags1 = FLG_OF1_OVHWCAP1;
-	} else {
+		break;
+	case CA_SUNW_HW_2:
 		hwcap = &ofl->ofl_ocapset.oc_hw_2.cm_val;
 		flags1 = FLG_OF1_OVHWCAP2;
+		break;
+	case CA_SUNW_HW_3:
+		hwcap = &ofl->ofl_ocapset.oc_hw_3.cm_val;
+		flags1 = FLG_OF1_OVHWCAP3;
+		break;
+	default:
+		assert(0);
 	}
 
 	/*
@@ -547,6 +557,9 @@ ld_cap_move_symtoobj(Ofl_desc *ofl)
 				    CA_SUNW_MACH, &ofl->ofl_ocapset.oc_mach);
 			}
 		}
+		if (scapset->oc_hw_3.cm_val)
+			hw_cap(ofl, CA_SUNW_HW_3, scapset->oc_hw_3.cm_val);
+
 		if (scapset->oc_hw_2.cm_val)
 			hw_cap(ofl, CA_SUNW_HW_2, scapset->oc_hw_2.cm_val);
 
@@ -598,6 +611,8 @@ get_cap_group(Objcapset *ocapset, Word cnum, Ofl_desc *ofl, Is_desc *isp)
 		if (cgp->cg_set.oc_sf_1.cm_val != ocapset->oc_sf_1.cm_val)
 			continue;
 		if (cgp->cg_set.oc_hw_2.cm_val != ocapset->oc_hw_2.cm_val)
+			continue;
+		if (cgp->cg_set.oc_hw_3.cm_val != ocapset->oc_hw_3.cm_val)
 			continue;
 
 		calp = cgp->cg_set.oc_plat.cl_val;
@@ -898,6 +913,7 @@ process_cap(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *cisp)
 		case CA_SUNW_HW_1:
 		case CA_SUNW_SF_1:
 		case CA_SUNW_HW_2:
+		case CA_SUNW_HW_3:
 			/*
 			 * If this is the start of a new group, save it.
 			 */
@@ -1099,7 +1115,8 @@ process_cap(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *cisp)
 				 */
 				ocapset.oc_hw_1.cm_val =
 				    ocapset.oc_sf_1.cm_val =
-				    ocapset.oc_hw_2.cm_val = 0;
+				    ocapset.oc_hw_2.cm_val =
+				    ocapset.oc_hw_3.cm_val = 0;
 				if (ocapset.oc_plat.cl_val) {
 					free((void *)ocapset.oc_plat.cl_val);
 					ocapset.oc_plat.cl_val = NULL;
@@ -1156,6 +1173,13 @@ process_cap(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *cisp)
 			DBG_CALL(Dbg_cap_ptr_entry(ofl->ofl_lml,
 			    DBG_STATE_ORIGINAL, CA_SUNW_ID,
 			    ocapset.oc_id.cs_str));
+			break;
+
+		case CA_SUNW_HW_3:
+			ocapset.oc_hw_3.cm_val = data->c_un.c_val;
+			DBG_CALL(Dbg_cap_val_entry(ofl->ofl_lml,
+			    DBG_STATE_ORIGINAL, CA_SUNW_HW_3,
+			    ocapset.oc_hw_3.cm_val, ld_targ.t_m.m_mach));
 			break;
 		}
 

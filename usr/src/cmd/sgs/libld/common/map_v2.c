@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -1063,7 +1064,7 @@ at_cap_hw(Mapfile *mf, Token eq_tok, void *uvalue)
 	Token		tok;
 	ld_map_tkval_t	tkv;
 	Conv_inv_buf_t	inv_buf;
-	Word		hw1 = 0, hw2 = 0;
+	Word		hw1 = 0, hw2 = 0, hw3 = 0;
 	uint64_t	v;
 
 	for (done = 0; done == 0; ) {
@@ -1080,6 +1081,12 @@ at_cap_hw(Mapfile *mf, Token eq_tok, void *uvalue)
 			if ((v = elfcap_hw2_from_str(ELFCAP_STYLE,
 			    tkv.tkv_str, ld_targ.t_m.m_mach)) != 0) {
 				hw2 |= v;
+				break;
+			}
+
+			if ((v = elfcap_hw3_from_str(ELFCAP_STYLE,
+			    tkv.tkv_str, ld_targ.t_m.m_mach)) != 0) {
+				hw3 |= v;
 				break;
 			}
 			goto bad_flag;
@@ -1102,6 +1109,9 @@ at_cap_hw(Mapfile *mf, Token eq_tok, void *uvalue)
 		return (TK_ERROR);
 	if (!set_capmask(mf, &mf->mf_ofl->ofl_ocapset.oc_hw_2, eq_tok,
 	    CA_SUNW_HW_2, hw2, FALSE))
+		return (TK_ERROR);
+	if (!set_capmask(mf, &mf->mf_ofl->ofl_ocapset.oc_hw_3, eq_tok,
+	    CA_SUNW_HW_3, hw3, FALSE))
 		return (TK_ERROR);
 	return (tok);
 }
@@ -1209,6 +1219,17 @@ at_cap_plat(Mapfile *mf, Token eq_tok, void *uvalue)
 }
 
 /*
+ * CAPABILITY [capid] { HW_3 = value ;
+ * ---------------------------^
+ */
+static Token
+at_cap_hw_3(Mapfile *mf, Token eq_tok, void *uvalue)
+{
+	return (parse_cap_mask(mf, eq_tok, &mf->mf_ofl->ofl_ocapset.oc_hw_3,
+	    CA_SUNW_HW_3, elfcap_hw3_from_str));
+}
+
+/*
  * Top Level Directive:
  *
  * CAPABILITY [capid] { ...
@@ -1222,6 +1243,7 @@ dir_capability(Mapfile *mf)
 		{ MSG_ORIG(MSG_MAPKW_HW),	at_cap_hw, ATTR_FMT_EQ_ALL },
 		{ MSG_ORIG(MSG_MAPKW_HW_1),	at_cap_hw_1, ATTR_FMT_EQ_ALL },
 		{ MSG_ORIG(MSG_MAPKW_HW_2),	at_cap_hw_2, ATTR_FMT_EQ_ALL },
+		{ MSG_ORIG(MSG_MAPKW_HW_3),	at_cap_hw_3, ATTR_FMT_EQ_ALL },
 
 		{ MSG_ORIG(MSG_MAPKW_MACHINE),	at_cap_mach, ATTR_FMT_EQ_ALL },
 		{ MSG_ORIG(MSG_MAPKW_PLATFORM),	at_cap_plat, ATTR_FMT_EQ_ALL },
@@ -1241,6 +1263,7 @@ dir_capability(Mapfile *mf)
 	    KW_NAME_SIZE(MSG_MAPKW_HW) +
 	    KW_NAME_SIZE(MSG_MAPKW_HW_1) +
 	    KW_NAME_SIZE(MSG_MAPKW_HW_2) +
+	    KW_NAME_SIZE(MSG_MAPKW_HW_3) +
 	    KW_NAME_SIZE(MSG_MAPKW_MACHINE) +
 	    KW_NAME_SIZE(MSG_MAPKW_PLATFORM) +
 	    KW_NAME_SIZE(MSG_MAPKW_SF) +

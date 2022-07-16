@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -108,6 +110,19 @@ conv_cap_val_sf1(Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
 }
 
 const char *
+conv_cap_val_hw3(Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
+    Conv_cap_val_hw3_buf_t *cap_val_hw3_buf)
+{
+	if (val == 0)
+		return (MSG_ORIG(MSG_GBL_ZERO));
+
+	if (conv_cap(val, cap_val_hw3_buf->buf, sizeof (cap_val_hw3_buf->buf),
+	    mach, fmt_flags, elfcap_hw3_to_str) == 0)
+		return (conv_invalid_val(&cap_val_hw3_buf->inv_buf, val, 0));
+	return ((const char *)cap_val_hw3_buf->buf);
+}
+
+const char *
 conv_cap_tag(Xword tag, Conv_fmt_flags_t fmt_flags, Conv_inv_buf_t *inv_buf)
 {
 #ifdef _ELF64
@@ -143,6 +158,10 @@ conv_cap_val(Xword tag, Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
 	case CA_SUNW_HW_2:
 		return (conv_cap_val_hw2(val, mach, fmt_flags,
 		    &cap_val_buf->cap_val_hw2_buf));
+
+	case CA_SUNW_HW_3:
+		return (conv_cap_val_hw3(val, mach, fmt_flags,
+		    &cap_val_buf->cap_val_hw3_buf));
 
 	default:
 		return (conv_invalid_val(&cap_val_buf->inv_buf, val, 0));

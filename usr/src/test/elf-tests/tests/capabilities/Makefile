@@ -9,21 +9,33 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
-# Copyright 2018 Joyent, Inc.
-#
+# Copyright 2022 Oxide Computer Company
 
-SUBDIRS =		\
-	assert-deflib	\
-	capabilities	\
-	groups		\
-	linker-sets	\
-	mapfiles	\
-	relocs		\
-	resolution	\
-	sections	\
-	string-merge	\
-	tls
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+PROGS =	symcap objcap
+
+ROOTOPTPKG = $(ROOT)/opt/elf-tests
+TESTDIR = $(ROOTOPTPKG)/tests/capabilities
+
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all:
+
+install: all $(CMDS)
+
+clobber: clean
+	-$(RM) $(PROG)
+
+clean:
+	-$(RM) $(CLEANFILES)
+
+$(CMDS): $(TESTDIR)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)
