@@ -37,7 +37,7 @@
 static int	cons_set(struct env_var *ev, int flags, const void *value);
 static int	cons_find(const char *name);
 static int	cons_check(const char *string);
-static int	cons_change(const char *string);
+static int	cons_change(const char *string, char **);
 static int	twiddle_set(struct env_var *ev, int flags, const void *value);
 
 /*
@@ -50,7 +50,7 @@ cons_probe(void)
 {
 	int	cons;
 	int	active;
-	char	*prefconsole;
+	char	*prefconsole, *list, *console;
 
 	/* We want a callback to install the new value when this var changes. */
 	env_setenv("twiddle_divisor", EV_VOLATILE, "1", twiddle_set,
@@ -63,28 +63,30 @@ cons_probe(void)
 	}
 	/* Now find the first working one */
 	active = -1;
-	for (cons = 0; consoles[cons] != NULL && active == -1; cons++) {
-		consoles[cons]->c_flags = 0;
-		consoles[cons]->c_probe(consoles[cons]);
-		if (consoles[cons]->c_flags == (C_PRESENTIN | C_PRESENTOUT))
+	for (cons = 0; consoles[cons] != NULL; cons++) {
+		if (consoles[cons]->c_flags == (C_PRESENTIN | C_PRESENTOUT)) {
 			active = cons;
+			break;
+		}
 	}
+
 	/* Force a console even if all probes failed */
 	if (active == -1)
 		active = 0;
 
 	/* Check to see if a console preference has already been registered */
+	list = NULL;
 	prefconsole = getenv("console");
 	if (prefconsole != NULL)
 		prefconsole = strdup(prefconsole);
-	if (prefconsole != NULL) {
-		unsetenv("console");		/* we want to replace this */
-		cons_change(prefconsole);
-	} else {
-		consoles[active]->c_flags |= C_ACTIVEIN | C_ACTIVEOUT;
-		consoles[active]->c_init(consoles[active], 0);
+	if (prefconsole == NULL)
 		prefconsole = strdup(consoles[active]->c_name);
-	}
+
+	/*
+	 * unset "console", we need to create one with callbacks.
+	 */
+	unsetenv("console");
+	cons_change(prefconsole, &list);
 
 	printf("Consoles: ");
 	for (cons = 0; consoles[cons] != NULL; cons++)
@@ -92,11 +94,16 @@ cons_probe(void)
 			printf("%s  ", consoles[cons]->c_desc);
 	printf("\n");
 
-	if (prefconsole != NULL) {
-		env_setenv("console", EV_VOLATILE, prefconsole, cons_set,
-		    env_nounset);
-		free(prefconsole);
-	}
+	if (list != NULL)
+		console = list;
+	else
+		console = prefconsole;
+
+	env_setenv("console", EV_VOLATILE, console, cons_set,
+	    env_nounset);
+
+	free(prefconsole);
+	free(list);
 }
 
 void
@@ -183,9 +190,8 @@ cons_find(const char *name)
 static int
 cons_set(struct env_var *ev, int flags, const void *value)
 {
-	int	ret, cons;
-	char	*list, *tmp;
-	const char *console;
+	int	ret;
+	char	*list;
 
 	if ((value == NULL) || (cons_check(value) == 0)) {
 		/*
@@ -196,58 +202,10 @@ cons_set(struct env_var *ev, int flags, const void *value)
 		return (CMD_OK);
 	}
 
-	ret = cons_change(value);
+	list = NULL;
+	ret = cons_change(value, &list);
 	if (ret != CMD_OK)
 		return (ret);
-
-	/*
-	 * build list of active consoles.
-	 * Note, we need to preserve the ordered device list in 'value'.
-	 */
-	list = NULL;
-	console = value;
-	while (console[0] != '\0') {
-		/* Find corresponding entry from consoles array. */
-		for (cons = 0; consoles[cons] != NULL; cons++) {
-			const char *name = consoles[cons]->c_name;
-			size_t len = strlen(name);
-
-			if (strncmp(name, console, len) != 0)
-				continue;
-			len++;
-			if (console[len] == ',' ||
-			    console[len] == ' ' ||
-			    console[len] == '\0') {
-				break;
-			}
-		}
-
-		/* Skip to delimiter */
-		while (console[0] != ',' &&
-		    console[0] != ' ' &&
-		    console[0] != '\0')
-			console++;
-		/* Skip to next name */
-		while (console[0] == ',' || console[0] == ' ')
-			console++;
-
-		/* no such console? */
-		if (consoles[cons] == NULL)
-			continue;
-
-		if ((consoles[cons]->c_flags & (C_ACTIVEIN | C_ACTIVEOUT)) ==
-		    (C_ACTIVEIN | C_ACTIVEOUT)) {
-			if (list == NULL) {
-				list = strdup(consoles[cons]->c_name);
-			} else {
-				if (asprintf(&tmp, "%s,%s", list,
-				    consoles[cons]->c_name) > 0) {
-					free(list);
-					list = tmp;
-				}
-			}
-		}
-	}
 
 	/*
 	 * set console variable.
@@ -260,7 +218,7 @@ cons_set(struct env_var *ev, int flags, const void *value)
 		    NULL, NULL);
 	}
 	free(list);
-	return (CMD_OK);
+	return (ret);
 }
 
 /*
@@ -310,14 +268,32 @@ cons_check(const char *string)
 	return (found);
 }
 
+/*
+ * Helper function to build string with list of console names.
+ */
+static char *
+cons_add_list(char *list, const char *value)
+{
+	char *tmp;
+
+	if (list == NULL)
+		return (strdup(value));
+
+	if (asprintf(&tmp, "%s,%s", list, value) > 0) {
+		free(list);
+		list = tmp;
+	}
+	return (list);
+}
 
 /*
- * Activate all the valid consoles listed in *string and disable all others.
+ * Activate all the valid consoles listed in string and disable all others.
+ * Return comma separated string with list of activated console names.
  */
 static int
-cons_change(const char *string)
+cons_change(const char *string, char **list)
 {
-	int	cons, active;
+	int	cons, active, rv;
 	char	*curpos, *dup, *next;
 
 	/* Disable all consoles */
@@ -328,6 +304,8 @@ cons_change(const char *string)
 	/* Enable selected consoles */
 	dup = next = strdup(string);
 	active = 0;
+	*list = NULL;
+	rv = CMD_OK;
 	while (next != NULL) {
 		curpos = strsep(&next, " ,");
 		if (*curpos == '\0')
@@ -340,6 +318,7 @@ cons_change(const char *string)
 			    (C_ACTIVEIN | C_ACTIVEOUT)) ==
 			    (C_ACTIVEIN | C_ACTIVEOUT)) {
 				active++;
+				*list = cons_add_list(*list, curpos);
 				continue;
 			}
 
@@ -365,15 +344,18 @@ cons_change(const char *string)
 			consoles[cons]->c_init(consoles[cons], 0);
 			if ((consoles[cons]->c_flags &
 			    (C_ACTIVEIN | C_ACTIVEOUT)) ==
-			    (C_ACTIVEIN | C_ACTIVEOUT))
+			    (C_ACTIVEIN | C_ACTIVEOUT)) {
 				active++;
+				*list = cons_add_list(*list,
+				    consoles[cons]->c_name);
+			}
 		}
 
 		if (active == 0)
-			return (CMD_ERROR); /* Recovery failed. */
+			rv = CMD_ERROR; /* Recovery failed. */
 	}
 
-	return (CMD_OK);
+	return (rv);
 }
 
 /*
