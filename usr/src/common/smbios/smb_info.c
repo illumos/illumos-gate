@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -696,6 +696,7 @@ smbios_info_processor(smbios_hdl_t *shp, id_t id, smbios_processor_t *pp)
 	pp->smbp_type = p.smbpr_type;
 	pp->smbp_family = p.smbpr_family;
 	pp->smbp_voltage = p.smbpr_voltage;
+	pp->smbp_clkspeed = p.smbpr_clkspeed;
 	pp->smbp_maxspeed = p.smbpr_maxspeed;
 	pp->smbp_curspeed = p.smbpr_curspeed;
 	pp->smbp_status = p.smbpr_status;
@@ -727,6 +728,10 @@ smbios_info_processor(smbios_hdl_t *shp, id_t id, smbios_processor_t *pp)
 		if (pp->smbp_threadcount == 0xff) {
 			pp->smbp_threadcount = p.smbpr_threadcount2;
 		}
+	}
+
+	if (smb_libgteq(shp, SMB_VERSION_36)) {
+		pp->smbp_threadsenabled = p.smpbr_threaden;
 	}
 
 	return (0);

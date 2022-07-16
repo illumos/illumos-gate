@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Robert Mustacchi
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _SMBIOS_TEST_H
@@ -146,6 +146,13 @@ extern boolean_t smbios_test_chassis_verify_base(smbios_hdl_t *);
 extern boolean_t smbios_test_chassis_verify_comps(smbios_hdl_t *);
 extern boolean_t smbios_test_chassis_verify_sku_nocomps(smbios_hdl_t *);
 extern boolean_t smbios_test_chassis_verify_sku(smbios_hdl_t *);
+
+
+extern boolean_t smbios_test_proc_mktable_25(smbios_test_table_t *);
+extern boolean_t smbios_test_proc_mktable_36(smbios_test_table_t *);
+extern boolean_t smbios_test_proc_verify_25(smbios_hdl_t *);
+extern boolean_t smbios_test_proc_verify_36(smbios_hdl_t *);
+extern boolean_t smbios_test_proc_verify_36_25(smbios_hdl_t *);
 
 #ifdef __cplusplus
 }

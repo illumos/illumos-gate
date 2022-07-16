@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -179,6 +179,7 @@ typedef struct smb_processor {
 	uint16_t smbpr_corecount2;	/* second number of cores per socket */
 	uint16_t smbpr_coresenabled2;	/* second number of enabled cores */
 	uint16_t smbpr_threadcount2;	/* second number of enabled threads */
+	uint16_t smpbr_threaden;	/* enabled thread count */
 } smb_processor_t;
 
 /*

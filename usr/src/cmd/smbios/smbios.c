@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2017, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -644,6 +644,12 @@ print_processor(smbios_hdl_t *shp, id_t id, FILE *fp)
 	id_printf(fp, "  L1 Cache Handle: ", p.smbp_l1cache);
 	id_printf(fp, "  L2 Cache Handle: ", p.smbp_l2cache);
 	id_printf(fp, "  L3 Cache Handle: ", p.smbp_l3cache);
+
+	if (p.smbp_threadsenabled != 0) {
+		oprintf(fp, "  Threads Enabled: %u\n", p.smbp_threadsenabled);
+	} else {
+		oprintf(fp, "  Threads Enabled: Unknown\n");
+	}
 }
 
 static void
