@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCIE_HP_H
@@ -230,6 +231,7 @@ struct pcie_hp_ctrl {
 	pcie_hp_slot_t	*hc_slots[PCIE_HP_MAX_SLOTS]; /* Slot pointers */
 	boolean_t	hc_has_attn;		/* Do we have attn btn?	*/
 	boolean_t	hc_has_mrl;		/* Do we have MRL? */
+	boolean_t	hc_has_pwr;		/* Do we have a power ctl? */
 	kcondvar_t	hc_cmd_comp_cv;		/* Command Completion intr */
 	boolean_t	hc_cmd_pending;		/* Command completion pending */
 
