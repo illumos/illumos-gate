@@ -249,6 +249,7 @@ variable page_remainder
 	s" boot_kmdb" unsetenv
 	s" boot_drop_into_kmdb" unsetenv
 	s" boot_reconfigure" unsetenv
+	s" boot_noncluster" unsetenv
 	start			\ load config, kernel and modules
 	." Current boot device: " s" currdev" getenv type cr
 ;
