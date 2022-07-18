@@ -6274,7 +6274,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 			return (!(regs.cp_edx & 0x100));
 		}
 		return (0);
-	case 6323525:
+	case 147:
 		/*
 		 * This erratum (K8 #147) is not present on family 10 and newer.
 		 */

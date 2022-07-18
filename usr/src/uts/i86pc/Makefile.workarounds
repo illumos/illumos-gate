@@ -101,9 +101,10 @@ WORKAROUND_DEFS += -DOPTERON_ERRATUM_131
 WORKAROUND_DEFS += -DOPTERON_WORKAROUND_6336786
 
 #
-# Mutex primitives don't work as expected
+# Potential Violation of Read Ordering Rules Between Semaphore Operations and
+# Unlocked Read-Modify-Write Instructions
 #
-WORKAROUND_DEFS += -DOPTERON_WORKAROUND_6323525
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_147
 
 #
 # Some Registered DIMMs incompatible with address parity feature

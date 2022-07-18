@@ -26,8 +26,6 @@
 #ifndef _SYS_LOCKSTAT_H
 #define	_SYS_LOCKSTAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dtrace.h>
 
 #ifdef	__cplusplus
@@ -123,7 +121,7 @@ extern void (*lockstat_probe)(dtrace_id_t, uintptr_t, uintptr_t,
 
 extern int lockstat_active_threads(void);
 extern int lockstat_depth(void);
-extern void lockstat_hot_patch(void);
+extern void lockstat_hotpatch_probe(int);
 
 /*
  * Macros to record lockstat probes.
@@ -175,10 +173,10 @@ extern void lockstat_hot_patch(void);
 			if (t_spin) {					\
 				t_spin = gethrtime_waitfree() - t_spin;	\
 				t_spin = CLAMP32(t_spin);		\
-			} 						\
+			}						\
 			(*lockstat_probe)(id, (uintptr_t)(lp), t_spin,	\
 			0, 0, 0);					\
-		} 							\
+		}							\
 		curthread->t_lockstat--;				\
 	}
 

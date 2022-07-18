@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Oxide Computer Company
  */
 
 
@@ -93,7 +94,7 @@ lockstat_enable(void *arg, dtrace_id_t id, void *parg)
 	lockstat_probemap[probe->lsp_probe] = id;
 	membar_producer();
 
-	lockstat_hot_patch();
+	lockstat_hotpatch_probe(probe->lsp_probe);
 	membar_producer();
 
 	/*
@@ -115,7 +116,7 @@ lockstat_disable(void *arg, dtrace_id_t id, void *parg)
 	ASSERT(lockstat_probemap[probe->lsp_probe]);
 
 	lockstat_probemap[probe->lsp_probe] = 0;
-	lockstat_hot_patch();
+	lockstat_hotpatch_probe(probe->lsp_probe);
 	membar_producer();
 
 	/*

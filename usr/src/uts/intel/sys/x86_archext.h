@@ -1366,9 +1366,9 @@ extern int opteron_erratum_100;
 extern int opteron_erratum_121;
 #endif
 
-#if defined(OPTERON_WORKAROUND_6323525)
-extern int opteron_workaround_6323525;
-extern void patch_workaround_6323525(void);
+#if defined(OPTERON_ERRATUM_147)
+extern int opteron_erratum_147;
+extern void patch_erratum_147(void);
 #endif
 
 #if !defined(__xpv)

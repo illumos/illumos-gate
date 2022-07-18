@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include "assym.h"
@@ -35,6 +36,38 @@
 #include <sys/regset.h>
 #include <sys/rwlock_impl.h>
 #include <sys/lockstat.h>
+
+
+#if defined(OPTERON_ERRATUM_147)
+
+/*
+ * Leave space for an lfence to be inserted if required by a CPU which suffers
+ * from this erratum.  Pad (with nops) the location for the lfence so that it
+ * is adequately aligned for atomic hotpatching.
+ */
+#define	ERRATUM147_PATCH_POINT(name)	\
+	.align	4, NOP_INSTR;		\
+./**/name/**/_147_patch_point:		\
+	nop;				\
+	nop;				\
+	nop;				\
+	nop;
+
+#else /* defined(OPTERON_ERRATUM_147) */
+
+/* Empty macro so ifdefs are not required for all of the erratum sites. */
+#define	ERRATUM147_PATCH_POINT(name)
+
+#endif /* defined(OPTERON_ERRATUM_147) */
+
+/*
+ * Patch point for lockstat probes.  When the associated probe is disabled, it
+ * will 'ret' from the function.  It is hotpatched to allow execution to fall
+ * through when the probe is enabled.
+ */
+#define	LOCKSTAT_RET(name)		\
+./**/name/**/_lockstat_patch_point:	\
+	ret;
 
 /*
  * lock_try(lp), ulock_try(lp)
@@ -51,8 +84,8 @@
 	movzbq	%dl, %rax
 	xchgb	%dl, (%rdi)
 	xorb	%dl, %al
-.lock_try_lockstat_patch_point:
-	ret
+	LOCKSTAT_RET(lock_try)
+
 	testb	%al, %al
 	jnz	0f
 	ret
@@ -79,7 +112,7 @@
 
 	movq	%rdi, %r12		/* preserve lock ptr for debugging */
 	leaq	.ulock_panic_msg(%rip), %rdi
-	pushq	%rbp			/* align stack properly */
+	pushq	%rbp
 	movq	%rsp, %rbp
 	xorl	%eax, %eax		/* clear for varargs */
 	call	panic
@@ -107,8 +140,8 @@ ulock_pass:
 
 	ENTRY(lock_clear)
 	movb	$0, (%rdi)
-.lock_clear_lockstat_patch_point:
-	ret
+	LOCKSTAT_RET(lock_clear)
+
 	movq	%rdi, %rsi			/* rsi = lock addr */
 	movq	%gs:CPU_THREAD, %rdx		/* rdx = thread addr */
 	movl	$LS_LOCK_CLEAR_RELEASE, %edi	/* edi = event */
@@ -122,7 +155,7 @@ ulock_pass:
 	jb	ulock_clr		/*	 uaddr < kernelbase, proceed */
 
 	leaq	.ulock_clear_msg(%rip), %rdi
-	pushq	%rbp			/* align stack properly */
+	pushq	%rbp
 	movq	%rsp, %rbp
 	xorl	%eax, %eax		/* clear for varargs */
 	call	panic
@@ -163,12 +196,13 @@ ulock_clr:
 	movq	16(%rsp), %rdx		/* rdx = old pil addr */
 	movw	%ax, (%rdx)		/* store old pil */
 	leave
-.lock_set_spl_lockstat_patch_point:
-	ret
+	LOCKSTAT_RET(lock_set_spl)
+
 	movq	%rdi, %rsi		/* rsi = lock addr */
 	movq	%gs:CPU_THREAD, %rdx	/* rdx = thread addr */
 	movl	$LS_LOCK_SET_SPL_ACQUIRE, %edi
 	jmp	lockstat_wrapper
+
 .lss_miss:
 	movl	8(%rsp), %esi		/* new_pil */
 	movq	16(%rsp), %rdx		/* old_pil_addr */
@@ -197,8 +231,8 @@ ulock_clr:
 	xchgb	%dl, (%rdi)		/* try to set lock */
 	testb	%dl, %dl		/* did we get it? */
 	jnz	lock_set_spin		/* no, go to C for the hard case */
-.lock_set_lockstat_patch_point:
-	ret
+	LOCKSTAT_RET(lock_set)
+
 	movq	%rdi, %rsi		/* rsi = lock addr */
 	movq	%gs:CPU_THREAD, %rdx	/* rdx = thread addr */
 	movl	$LS_LOCK_SET_ACQUIRE, %edi
@@ -210,39 +244,20 @@ ulock_clr:
  */
 
 	ENTRY(lock_clear_splx)
-	movb	$0, (%rdi)		/* clear lock */
-.lock_clear_splx_lockstat_patch_point:
-	jmp	0f
-0:
-	movl	%esi, %edi		/* arg for splx */
-	jmp	splx			/* let splx do its thing */
-.lock_clear_splx_lockstat:
-	pushq	%rbp			/* align stack properly */
+	pushq	%rbp
 	movq	%rsp, %rbp
-	subq	$16, %rsp		/* space to save args across splx */
-	movq	%rdi, 8(%rsp)		/* save lock ptr across splx call */
-	movl	%esi, %edi		/* arg for splx */
-	call	splx			/* lower the priority */
-	movq	8(%rsp), %rsi		/* rsi = lock ptr */
-	leave				/* unwind stack */
+	pushq	%rdi		/* save lp across call for lockstat */
+	movb	$0, (%rdi)	/* clear lock */
+	movl	%esi, %edi	/* arg for splx */
+	call	splx		/* let splx do its thing */
+	popq	%rsi		/* retreive lp for lockstat */
+	leave
+	LOCKSTAT_RET(lock_clear_splx)
+
 	movq	%gs:CPU_THREAD, %rdx	/* rdx = thread addr */
 	movl	$LS_LOCK_CLEAR_SPLX_RELEASE, %edi
 	jmp	lockstat_wrapper
 	SET_SIZE(lock_clear_splx)
-
-#if defined(__GNUC_AS__)
-#define	LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_VAL	\
-	(.lock_clear_splx_lockstat - .lock_clear_splx_lockstat_patch_point - 2)
-
-#define LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_POINT	\
-	(.lock_clear_splx_lockstat_patch_point + 1)
-#else
-#define	LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_VAL	\
-	[.lock_clear_splx_lockstat - .lock_clear_splx_lockstat_patch_point - 2]
-
-#define LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_POINT	\
-	[.lock_clear_splx_lockstat_patch_point + 1]
-#endif
 
 /*
  * mutex_enter() and mutex_exit().
@@ -261,11 +276,6 @@ ulock_clr:
  * If we interrupt a thread in mutex_exit() that has not yet cleared
  * the lock, cmnint() resets its PC back to the beginning of
  * mutex_exit() so it will check again for waiters when it resumes.
- *
- * The lockstat code below is activated when the lockstat driver
- * calls lockstat_hot_patch() to hot-patch the kernel mutex code.
- * Note that we don't need to test lockstat_event_mask here -- we won't
- * patch this code in unless we're gathering ADAPTIVE_HOLD lockstats.
  */
 
 	ENTRY_NP(mutex_enter)
@@ -274,29 +284,27 @@ ulock_clr:
 	lock
 	cmpxchgq %rdx, (%rdi)
 	jnz	mutex_vector_enter
-.mutex_enter_lockstat_patch_point:
-#if defined(OPTERON_WORKAROUND_6323525)
-.mutex_enter_6323525_patch_point:
-	ret					/* nop space for lfence */
-	nop
-	nop
-.mutex_enter_lockstat_6323525_patch_point:	/* new patch point if lfence */
-	nop
-#else	/* OPTERON_WORKAROUND_6323525 */
-	ret
-#endif	/* OPTERON_WORKAROUND_6323525 */
+
+	ERRATUM147_PATCH_POINT(mutex_enter)
+
+	LOCKSTAT_RET(mutex_enter)
+
 	movq	%rdi, %rsi
 	movl	$LS_MUTEX_ENTER_ACQUIRE, %edi
+	jmp	lockstat_wrapper
+	SET_SIZE(mutex_enter)
+
+
 /*
  * expects %rdx=thread, %rsi=lock, %edi=lockstat event
  */
-	ALTENTRY(lockstat_wrapper)
+	ENTRY_NP(lockstat_wrapper)
 	incb	T_LOCKSTAT(%rdx)		/* curthread->t_lockstat++ */
 	leaq	lockstat_probemap(%rip), %rax
 	movl	(%rax, %rdi, DTRACE_IDSIZE), %eax
 	testl	%eax, %eax			/* check for non-zero probe */
 	jz	1f
-	pushq	%rbp				/* align stack properly */
+	pushq	%rbp
 	movq	%rsp, %rbp
 	movl	%eax, %edi
 	movq	lockstat_probe, %rax
@@ -308,7 +316,6 @@ ulock_clr:
 	movl	$1, %eax			/* return success if tryenter */
 	ret
 	SET_SIZE(lockstat_wrapper)
-	SET_SIZE(mutex_enter)
 
 /*
  * expects %rcx=thread, %rdx=arg, %rsi=lock, %edi=lockstat event
@@ -319,7 +326,7 @@ ulock_clr:
 	movl	(%rax, %rdi, DTRACE_IDSIZE), %eax
 	testl	%eax, %eax			/* check for non-zero probe */
 	jz	1f
-	pushq	%rbp				/* align stack properly */
+	pushq	%rbp
 	movq	%rsp, %rbp
 	movl	%eax, %edi
 	movq	lockstat_probe, %rax
@@ -340,20 +347,13 @@ ulock_clr:
 	cmpxchgq %rdx, (%rdi)
 	jnz	mutex_vector_tryenter
 	not	%eax				/* return success (nonzero) */
-#if defined(OPTERON_WORKAROUND_6323525)
-.mutex_tryenter_lockstat_patch_point:
-.mutex_tryenter_6323525_patch_point:
-	ret					/* nop space for lfence */
-	nop
-	nop
-.mutex_tryenter_lockstat_6323525_patch_point:	/* new patch point if lfence */
-	nop
-#else	/* OPTERON_WORKAROUND_6323525 */
-.mutex_tryenter_lockstat_patch_point:
-	ret
-#endif	/* OPTERON_WORKAROUND_6323525 */
+
+	ERRATUM147_PATCH_POINT(mutex_tryenter)
+
+	LOCKSTAT_RET(mutex_tryenter)
+
 	movq	%rdi, %rsi
-	movl	$LS_MUTEX_ENTER_ACQUIRE, %edi
+	movl	$LS_MUTEX_TRYENTER_ACQUIRE, %edi
 	jmp	lockstat_wrapper
 	SET_SIZE(mutex_tryenter)
 
@@ -364,15 +364,10 @@ ulock_clr:
 	cmpxchgq %rdx, (%rdi)
 	jnz	0f
 	not	%eax				/* return success (nonzero) */
-#if defined(OPTERON_WORKAROUND_6323525)
-.mutex_atryenter_6323525_patch_point:
-	ret					/* nop space for lfence */
-	nop
-	nop
-	nop
-#else	/* OPTERON_WORKAROUND_6323525 */
+
+	ERRATUM147_PATCH_POINT(mutex_atryenter)
+
 	ret
-#endif	/* OPTERON_WORKAROUND_6323525 */
 0:
 	xorl	%eax, %eax			/* return failure */
 	ret
@@ -415,8 +410,8 @@ mutex_exit_critical_start:		/* If interrupted, restart here */
 	jne	mutex_vector_exit		/* wrong type or wrong owner */
 	movq	$0, (%rdi)			/* clear owner AND lock */
 .mutex_exit_critical_end:
-.mutex_exit_lockstat_patch_point:
-	ret
+	LOCKSTAT_RET(mutex_exit)
+
 	movq	%rdi, %rsi
 	movl	$LS_MUTEX_EXIT_RELEASE, %edi
 	jmp	lockstat_wrapper
@@ -448,13 +443,14 @@ mutex_exit_critical_size:
 	lock
 	cmpxchgq %rdx, (%rdi)			/* try to grab read lock */
 	jnz	rw_enter_sleep
-.rw_read_enter_lockstat_patch_point:
-	ret
+	LOCKSTAT_RET(rw_read_enter)
+
 	movq	%gs:CPU_THREAD, %rcx		/* rcx = thread ptr */
 	movq	%rdi, %rsi			/* rsi = lock ptr */
 	movl	$LS_RW_ENTER_ACQUIRE, %edi
 	movl	$RW_READER, %edx
 	jmp	lockstat_wrapper_arg
+
 .rw_write_enter:
 	movq	%gs:CPU_THREAD, %rdx
 	orq	$RW_WRITE_LOCKED, %rdx		/* rdx = write-locked value */
@@ -463,18 +459,9 @@ mutex_exit_critical_size:
 	cmpxchgq %rdx, (%rdi)			/* try to grab write lock */
 	jnz	rw_enter_sleep
 
-#if defined(OPTERON_WORKAROUND_6323525)
-.rw_write_enter_lockstat_patch_point:
-.rw_write_enter_6323525_patch_point:
-	ret
-	nop
-	nop
-.rw_write_enter_lockstat_6323525_patch_point:
-	nop
-#else	/* OPTERON_WORKAROUND_6323525 */
-.rw_write_enter_lockstat_patch_point:
-	ret
-#endif	/* OPTERON_WORKAROUND_6323525 */
+	ERRATUM147_PATCH_POINT(rw_write_enter)
+
+	LOCKSTAT_RET(rw_write_enter)
 
 	movq	%gs:CPU_THREAD, %rcx		/* rcx = thread ptr */
 	movq	%rdi, %rsi			/* rsi = lock ptr */
@@ -492,13 +479,14 @@ mutex_exit_critical_size:
 	lock
 	cmpxchgq %rdx, (%rdi)			/* try to drop read lock */
 	jnz	rw_exit_wakeup
-.rw_read_exit_lockstat_patch_point:
-	ret
+	LOCKSTAT_RET(rw_read_exit)
+
 	movq	%gs:CPU_THREAD, %rcx		/* rcx = thread ptr */
 	movq	%rdi, %rsi			/* rsi = lock ptr */
 	movl	$LS_RW_EXIT_RELEASE, %edi
 	movl	$RW_READER, %edx
 	jmp	lockstat_wrapper_arg
+
 .rw_not_single_reader:
 	testl	$RW_WRITE_LOCKED, %eax	/* write-locked or write-wanted? */
 	jnz	.rw_write_exit
@@ -513,8 +501,8 @@ mutex_exit_critical_size:
 	lock
 	cmpxchgq %rdx, (%rdi)			/* try to drop read lock */
 	jnz	rw_exit_wakeup
-.rw_write_exit_lockstat_patch_point:
-	ret
+	LOCKSTAT_RET(rw_write_exit)
+
 	movq	%gs:CPU_THREAD, %rcx		/* rcx = thread ptr */
 	movq	%rdi, %rsi			/* rsi - lock ptr */
 	movl	$LS_RW_EXIT_RELEASE, %edi
@@ -522,149 +510,131 @@ mutex_exit_critical_size:
 	jmp	lockstat_wrapper_arg
 	SET_SIZE(rw_exit)
 
-#if defined(OPTERON_WORKAROUND_6323525)
+#if defined(OPTERON_ERRATUM_147)
 
 /*
- * If it is necessary to patch the lock enter routines with the lfence
- * workaround, workaround_6323525_patched is set to a non-zero value so that
- * the lockstat_hat_patch routine can patch to the new location of the 'ret'
- * instruction.
+ * Track if erratum 147 workaround has been hotpatched into place.
  */
-	DGDEF3(workaround_6323525_patched, 4, 4)
+	DGDEF3(erratum_147_patched, 4, 4)
 	.long	0
 
-#define HOT_MUTEX_PATCH(srcaddr, dstaddr, size)	\
-	movq	$size, %rbx;			\
-	movq	$dstaddr, %r13;			\
-	addq	%rbx, %r13;			\
-	movq	$srcaddr, %r12;			\
-	addq	%rbx, %r12;			\
-0:						\
-	decq	%r13;				\
-	decq	%r12;				\
-	movzbl	(%r12), %esi;			\
-	movq	$1, %rdx;			\
-	movq	%r13, %rdi;			\
-	call	hot_patch_kernel_text;		\
-	decq	%rbx;				\
-	testq	%rbx, %rbx;			\
-	jg	0b;
+#define HOT_MUTEX_PATCH(iaddr, insn_reg)	\
+	movq	$iaddr, %rdi;		\
+	movl	%insn_reg, %esi;	\
+	movl	$4, %edx;		\
+	call	hot_patch_kernel_text;
+
 
 /*
- * patch_workaround_6323525: provide workaround for 6323525
+ * void
+ * patch_erratum_147(void)
+ *
+ * Patch lock operations to work around erratum 147.
  *
  * The workaround is to place a fencing instruction (lfence) between the
  * mutex operation and the subsequent read-modify-write instruction.
- *
- * This routine hot patches the lfence instruction on top of the space
- * reserved by nops in the lock enter routines.
  */
-	ENTRY_NP(patch_workaround_6323525)
+
+	ENTRY_NP(patch_erratum_147)
 	pushq	%rbp
 	movq	%rsp, %rbp
 	pushq	%r12
-	pushq	%r13
-	pushq	%rbx
 
 	/*
-	 * lockstat_hot_patch() to use the alternate lockstat workaround
-	 * 6323525 patch points (points past the lfence instruction to the
-	 * new ret) when workaround_6323525_patched is set.
+	 * Patch `nop; nop; nop; nop` sequence to `lfence; nop`.  Since those
+	 * patch points have been aligned to a 4-byte boundary, we can be
+	 * confident that hot_patch_kernel_text() will be able to proceed
+	 * safely and successfully.
 	 */
-	movl	$1, workaround_6323525_patched
+	movl	$0x90e8ae0f, %r12d
+	HOT_MUTEX_PATCH(.mutex_enter_147_patch_point, r12d)
+	HOT_MUTEX_PATCH(.mutex_tryenter_147_patch_point, r12d)
+	HOT_MUTEX_PATCH(.mutex_atryenter_147_patch_point, r12d)
+	HOT_MUTEX_PATCH(.rw_write_enter_147_patch_point, r12d)
 
-	/*
-	 * patch ret/nop/nop/nop to lfence/ret at the end of the lock enter
-	 * routines. The 4 bytes are patched in reverse order so that the
-	 * the existing ret is overwritten last. This provides lock enter
-	 * sanity during the intermediate patching stages.
-	 */
-	HOT_MUTEX_PATCH(_lfence_insn, .mutex_enter_6323525_patch_point, 4)
-	HOT_MUTEX_PATCH(_lfence_insn, .mutex_tryenter_6323525_patch_point, 4)
-	HOT_MUTEX_PATCH(_lfence_insn, .mutex_atryenter_6323525_patch_point, 4)
-	HOT_MUTEX_PATCH(_lfence_insn, .rw_write_enter_6323525_patch_point, 4)
+	/* Record that erratum 147 points have been hotpatched */
+	movl	$1, erratum_147_patched
 
-	popq	%rbx
-	popq	%r13
 	popq	%r12
 	movq	%rbp, %rsp
 	popq	%rbp
 	ret
-_lfence_insn:
-	lfence
-	ret
-	SET_SIZE(patch_workaround_6323525)
+	SET_SIZE(patch_erratum_147)
 
+#endif	/* OPTERON_ERRATUM_147 */
 
-#endif	/* OPTERON_WORKAROUND_6323525 */
-
-
-#define	HOT_PATCH(addr, event, active_instr, normal_instr, len)	\
-	movq	$normal_instr, %rsi;		\
-	movq	$active_instr, %rdi;		\
-	leaq	lockstat_probemap(%rip), %rax;	\
-	movl	_MUL(event, DTRACE_IDSIZE)(%rax), %eax;	\
-	testl	%eax, %eax;			\
-	jz	9f;				\
-	movq	%rdi, %rsi;			\
-9:						\
-	movq	$len, %rdx;			\
-	movq	$addr, %rdi;			\
-	call	hot_patch_kernel_text
-
-	ENTRY(lockstat_hot_patch)
-	pushq	%rbp			/* align stack properly */
+	/*
+	 * void
+	 * lockstat_hotpatch_site(caddr_t instr_addr, int do_enable)
+	 */
+	ENTRY(lockstat_hotpatch_site)
+	pushq	%rbp
 	movq	%rsp, %rbp
+	pushq	%rdi
+	pushq	%rsi
 
-#if defined(OPTERON_WORKAROUND_6323525)
-	cmpl	$0, workaround_6323525_patched
-	je	1f
-	HOT_PATCH(.mutex_enter_lockstat_6323525_patch_point,
-		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.mutex_tryenter_lockstat_6323525_patch_point,
-		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.rw_write_enter_lockstat_6323525_patch_point,
-		LS_RW_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	jmp	2f
-1:
-	HOT_PATCH(.mutex_enter_lockstat_patch_point,
-		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.mutex_tryenter_lockstat_patch_point,
-		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.rw_write_enter_lockstat_patch_point,
-		LS_RW_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-2:
-#else	/* OPTERON_WORKAROUND_6323525 */
-	HOT_PATCH(.mutex_enter_lockstat_patch_point,
-		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.mutex_tryenter_lockstat_patch_point,
-		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.rw_write_enter_lockstat_patch_point,
-		LS_RW_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-#endif	/* !OPTERON_WORKAROUND_6323525 */
-	HOT_PATCH(.mutex_exit_lockstat_patch_point,
-		LS_MUTEX_EXIT_RELEASE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.rw_read_enter_lockstat_patch_point,
-		LS_RW_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.rw_write_exit_lockstat_patch_point,
-		LS_RW_EXIT_RELEASE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.rw_read_exit_lockstat_patch_point,
-		LS_RW_EXIT_RELEASE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.lock_set_lockstat_patch_point,
-		LS_LOCK_SET_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.lock_try_lockstat_patch_point,
-		LS_LOCK_TRY_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.lock_clear_lockstat_patch_point,
-		LS_LOCK_CLEAR_RELEASE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.lock_set_spl_lockstat_patch_point,
-		LS_LOCK_SET_SPL_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
+	testl	%esi, %esi
+	jz	.do_disable
 
-	HOT_PATCH(LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_POINT,
-		LS_LOCK_CLEAR_SPLX_RELEASE,
-		LOCK_CLEAR_SPLX_LOCKSTAT_PATCH_VAL, 0, 1);
-	leave			/* unwind stack */
+	/* enable the probe (replace ret with nop) */
+	movl	$NOP_INSTR, %esi
+	movl	$1, %edx
+	call	hot_patch_kernel_text
+	leave
 	ret
-	SET_SIZE(lockstat_hot_patch)
+
+.do_disable:
+	/* disable the probe (replace nop with ret) */
+	movl	$RET_INSTR, %esi
+	movl	$1, %edx
+	call	hot_patch_kernel_text
+	leave
+	ret
+	SET_SIZE(lockstat_hotpatch_site)
+
+#define	HOT_PATCH_MATCH(name, probe, reg)			\
+	cmpl	$probe, %reg;					\
+	jne	1f;						\
+	leaq	lockstat_probemap(%rip), %rax;			\
+	movl	_MUL(probe, DTRACE_IDSIZE)(%rax), %esi;		\
+	movq	$./**/name/**/_lockstat_patch_point, %rdi;	\
+	call	lockstat_hotpatch_site;				\
+	1:
+
+/*
+ * void
+ * lockstat_hotpatch_probe(int ls_probe)
+ *
+ * Given a lockstat probe identifier, hotpatch any associated lockstat
+ * primitive routine(s) so they fall through into the lockstat_probe() call (if
+ * the probe is enabled) or return normally (when the probe is disabled).
+ */
+
+	ENTRY(lockstat_hotpatch_probe)
+	pushq	%rbp
+	movq	%rsp, %rbp
+	pushq	%r12
+	movl	%edi, %r12d
+
+	HOT_PATCH_MATCH(mutex_enter, LS_MUTEX_ENTER_ACQUIRE, r12d)
+	HOT_PATCH_MATCH(mutex_tryenter, LS_MUTEX_TRYENTER_ACQUIRE, r12d)
+	HOT_PATCH_MATCH(mutex_exit, LS_MUTEX_EXIT_RELEASE, r12d)
+
+	HOT_PATCH_MATCH(rw_write_enter, LS_RW_ENTER_ACQUIRE, r12d)
+	HOT_PATCH_MATCH(rw_read_enter, LS_RW_ENTER_ACQUIRE, r12d)
+	HOT_PATCH_MATCH(rw_write_exit, LS_RW_EXIT_RELEASE, r12d)
+	HOT_PATCH_MATCH(rw_read_exit, LS_RW_EXIT_RELEASE, r12d)
+
+	HOT_PATCH_MATCH(lock_set, LS_LOCK_SET_ACQUIRE, r12d)
+	HOT_PATCH_MATCH(lock_try, LS_LOCK_TRY_ACQUIRE, r12d)
+	HOT_PATCH_MATCH(lock_clear, LS_LOCK_CLEAR_RELEASE, r12d)
+	HOT_PATCH_MATCH(lock_set_spl, LS_LOCK_SET_SPL_ACQUIRE, r12d)
+	HOT_PATCH_MATCH(lock_clear_splx, LS_LOCK_CLEAR_SPLX_RELEASE, r12d)
+
+	popq	%r12
+	leave
+	ret
+	SET_SIZE(lockstat_hotpatch_probe)
 
 	ENTRY(membar_enter)
 	ALTENTRY(membar_exit)
