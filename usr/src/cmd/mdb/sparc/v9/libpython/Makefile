@@ -25,7 +25,7 @@
 
 include $(SRC)/Makefile.master
 
-MODULE = libpython$(PYTHON_VERSION).so
+MODULE = libpython$(PYTHON3_VERSION).so
 MDBTGT = proc
 MODULE_NAME = libpython
 

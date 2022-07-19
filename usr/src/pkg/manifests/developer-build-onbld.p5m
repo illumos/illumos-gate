@@ -48,7 +48,6 @@ dir  path=opt/onbld/bin
 dir  path=opt/onbld/bin/$(ARCH)
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/btxld mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/chk4ubin mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/cpcgen mode=0555
 file path=opt/onbld/bin/$(ARCH)/cscope-fast mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfconvert mode=0555
@@ -62,8 +61,6 @@ link path=opt/onbld/bin/$(ARCH)/dmake target=make
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/elfextract mode=0555
 file path=opt/onbld/bin/$(ARCH)/find_elf mode=0555
 file path=opt/onbld/bin/$(ARCH)/findunref mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth_preload.so.1 mode=0555
 file path=opt/onbld/bin/$(ARCH)/install mode=0555
 hardlink path=opt/onbld/bin/$(ARCH)/install.bin target=./install
 file path=opt/onbld/bin/$(ARCH)/lintdump mode=0555
@@ -74,10 +71,7 @@ file path=opt/onbld/bin/$(ARCH)/ndrgen mode=0555
 file path=opt/onbld/bin/$(ARCH)/ndrgen1 mode=0555
 file path=opt/onbld/bin/$(ARCH)/protocmp mode=0555
 file path=opt/onbld/bin/$(ARCH)/protolist mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/stabs mode=0555
 file path=opt/onbld/bin/$(ARCH)/tic mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize mode=0555
-$(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize.exe mode=0555
 file path=opt/onbld/bin/$(ARCH)/zic mode=0555
 file path=opt/onbld/bin/Install mode=0555
 file path=opt/onbld/bin/bldenv mode=0555
@@ -144,242 +138,109 @@ file path=opt/onbld/lib/$(ARCH)/libmakestate.so.1
 dir  path=opt/onbld/lib/perl
 file path=opt/onbld/lib/perl/onbld_elfmod.pm
 file path=opt/onbld/lib/perl/onbld_elfmod_vertype.pm
-$(python2tools_ONLY)link path=opt/onbld/lib/python \
-    target=python$(PYTHON_VERSION)
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/CStyle.py \
+dir  path=opt/onbld/lib/python$(PYTHON3_VERSION)
+dir  path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld
+dir  path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/CStyle.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Cddl.py mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/CmtBlk.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Cddl.py mode=0444
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/CmtBlk.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Comments.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Comments.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Copyright.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Copyright.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/DbLookups.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/DbLookups.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/HdrChk.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/HdrChk.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/JStyle.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/JStyle.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Keywords.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Keywords.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/ManLint.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/ManLint.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Mapfile.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/Mapfile.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/PkgFmt.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/PkgFmt.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/ProcessCheck.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/ProcessCheck.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/ShellLint.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/ShellLint.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/SpellCheck.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/SpellCheck.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/WsCheck.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/WsCheck.py \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__init__.py \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__init__.py \
     mode=0444
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__
-$(python3tools_ONLY)file \
+dir  path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/CStyle.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/Cddl.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/CmtBlk.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/Comments.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/Copyright.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/DbLookups.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/HdrChk.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/JStyle.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/Keywords.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/ManLint.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/Mapfile.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/PkgFmt.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/ProcessCheck.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/ShellLint.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/SpellCheck.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/WsCheck.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Checks/__pycache__/__init__.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/Ignore.py mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__init__.py mode=0444
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__pycache__
-$(python3tools_ONLY)file \
+dir  path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/Ignore.py mode=0444
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__init__.py mode=0444
+dir  path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__pycache__
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__pycache__/Ignore.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/Scm/__pycache__/__init__.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python3tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/__init__.py mode=0444
-$(python3tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/__pycache__
-$(python3tools_ONLY)file \
+file path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/__init__.py mode=0444
+dir  path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/__pycache__
+file \
     path=opt/onbld/lib/python$(PYTHON3_VERSION)/onbld/__pycache__/__init__.cpython$(PYTHON3_PKGVERS).pyc \
     mode=0444
-$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)
-$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld
-$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CStyle.py mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CStyle.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Cddl.py mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Cddl.pyc mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CmtBlk.py mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/CmtBlk.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Comments.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Comments.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Copyright.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Copyright.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/DbLookups.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/DbLookups.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/HdrChk.py mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/HdrChk.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/JStyle.py mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/JStyle.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Keywords.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Keywords.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/ManLint.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/ManLint.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Mapfile.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/Mapfile.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/PkgFmt.py mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/PkgFmt.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/ProcessCheck.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/ProcessCheck.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/ShellLint.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/ShellLint.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/SpellCheck.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/SpellCheck.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/WsCheck.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/WsCheck.pyc \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/__init__.py \
-    mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/__init__.pyc \
-    mode=0444
-$(python2tools_ONLY)dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Ignore.py mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Ignore.pyc mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/__init__.py mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/__init__.pyc mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/__init__.py mode=0444
-$(python2tools_ONLY)file \
-    path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/__init__.pyc mode=0444
 dir  path=opt/onbld/man
 dir  path=opt/onbld/man/man1onbld
 file path=opt/onbld/man/man1onbld/Install.1onbld

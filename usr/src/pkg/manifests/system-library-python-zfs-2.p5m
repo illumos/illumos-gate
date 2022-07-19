@@ -13,39 +13,6 @@
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
-set name=pkg.fmri \
-    value=pkg:/system/library/python/zfs$(PYTHON_PKGVERS)@$(PKGVERS)
-set name=pkg.summary value="zfs module, python2"
-set name=pkg.description value="ZFS Python2 Module"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Libraries
+set name=pkg.fmri value=pkg:/system/library/python/zfs-27@$(PKGVERS)
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir  path=usr group=sys
-dir  path=usr/lib
-dir  path=usr/lib/python$(PYTHON_VERSION)
-dir  path=usr/lib/python$(PYTHON_VERSION)/vendor-packages
-dir  path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs
-dir  path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/64
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/64/ioctl.so
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/__init__.py
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/__init__.pyc
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/allow.py
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/allow.pyc
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/dataset.py
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/dataset.pyc
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/groupspace.py
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/groupspace.pyc
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/holds.py
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/holds.pyc
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/ioctl.so
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/table.py
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/table.pyc
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/unallow.py
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/unallow.pyc
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/userspace.py
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/userspace.pyc
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/util.py
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/util.pyc
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-depend type=require fmri=runtime/python$(PYTHON_PKGVERS)

@@ -33,24 +33,21 @@ set name=pkg.fmri value=pkg:/driver/storage/sdcard@$(PKGVERS)
 set name=pkg.summary value="SD/MMC Drivers"
 set name=pkg.description value="SD/MMC Drivers"
 set name=info.classification value=org.opensolaris.category.2008:Drivers/Storage
-# SUNWsdcard doesn't deliver anything for sparc, but we keep delivering
-# the package on sparc because we can't use direct obsolete support to
-# obsolete only one variant.
 set name=variant.arch value=$(ARCH)
-$(i386_ONLY)dir path=kernel group=sys
-$(i386_ONLY)dir path=kernel/drv group=sys
-$(i386_ONLY)dir path=kernel/drv/$(ARCH64) group=sys
-$(i386_ONLY)file path=kernel/drv/$(ARCH64)/sdhost group=sys
-$(i386_ONLY)dir path=kernel/misc group=sys
-$(i386_ONLY)dir path=kernel/misc/$(ARCH64) group=sys
-$(i386_ONLY)file path=kernel/misc/$(ARCH64)/sda group=sys mode=0755
-$(i386_ONLY)dir path=usr/share/man
-$(i386_ONLY)dir path=usr/share/man/man4d
-$(i386_ONLY)file path=usr/share/man/man4d/sda.4d
-$(i386_ONLY)file path=usr/share/man/man4d/sdhost.4d
-$(i386_ONLY)driver name=sdhost perms="* 0644 root root" \
+dir  path=kernel group=sys
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/sdhost group=sys
+dir  path=kernel/misc group=sys
+dir  path=kernel/misc/$(ARCH64) group=sys
+file path=kernel/misc/$(ARCH64)/sda group=sys mode=0755
+dir  path=usr/share/man
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/sda.4d
+file path=usr/share/man/man4d/sdhost.4d
+driver name=sdhost perms="* 0644 root root" \
     alias=pciclass,080500 \
     alias=pciclass,080501
-$(i386_ONLY)legacy pkg=SUNWsdcard desc="SD/MMC Drivers" name="SD/MMC Drivers"
-$(i386_ONLY)license cr_Sun license=cr_Sun
-$(i386_ONLY)license lic_CDDL license=lic_CDDL
+legacy pkg=SUNWsdcard desc="SD/MMC Drivers" name="SD/MMC Drivers"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

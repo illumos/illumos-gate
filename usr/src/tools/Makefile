@@ -123,13 +123,7 @@ ROOTDIRS=					\
 	$(ROOTONBLD)/man			\
 	$(ROOTONBLD)/man/man1onbld
 
-$(BUILDPY2TOOLS)ROOTDIRS += \
-	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)		\
-	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld		\
-	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/Checks	\
-	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/Scm
-
-$(BUILDPY3TOOLS)ROOTDIRS +=							\
+ROOTDIRS +=							\
 	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)				\
 	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld				\
 	$(ROOTONBLD)/lib/python$(PYTHON3_VERSION)/onbld/__pycache__		\
@@ -154,7 +148,6 @@ DOROOTDIRS= $(ROOTDIRS)
 clobber:= DOROOTDIRS=
 clean:= DOROOTDIRS=
 
-$(BUILDPY2TOOLS)DOROOTONBLDLIBPY= $(ROOTONBLDLIBPY)
 clobber:= DOROOTONBLDLIBPY=
 clean:= DOROOTONBLDLIBPY=
 
@@ -181,6 +174,6 @@ $(ROOTDIRS):
 	$(MKDIR) -p -m $(DIRMODE) $@
 
 $(ROOTONBLDLIBPY): $(ROOTDIRS)
-	$(RM) -r $@; $(SYMLINK) python$(PYTHON_VERSION) $@
+	$(RM) -r $@; $(SYMLINK) python$(PYTHON3_VERSION) $@
 
 FRC:

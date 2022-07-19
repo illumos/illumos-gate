@@ -86,7 +86,7 @@ class BugDB(object):
 
 		try:
 			data = urlopen(req)
-		except HTTPError, e:
+		except HTTPError as e:
 			if e.code == 404 or e.code == 403 or e.code == 400:
 				raise NonExistentBug(cr)
 			else:

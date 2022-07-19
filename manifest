@@ -10145,7 +10145,7 @@ f usr/lib/mdb/proc/amd64/libavl.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libc.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libnvpair.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libproc.so 0555 root sys
-f usr/lib/mdb/proc/amd64/libpython2.6.so 0555 root sys
+f usr/lib/mdb/proc/amd64/libpython3.9.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libsmbios.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libsysevent.so 0555 root sys
 f usr/lib/mdb/proc/amd64/libtopo.so 0555 root sys
@@ -10163,7 +10163,6 @@ f usr/lib/mdb/proc/libc.so 0555 root sys
 f usr/lib/mdb/proc/libmlsvc.so 0555 root sys
 f usr/lib/mdb/proc/libnvpair.so 0555 root sys
 f usr/lib/mdb/proc/libproc.so 0555 root sys
-f usr/lib/mdb/proc/libpython2.6.so 0555 root sys
 f usr/lib/mdb/proc/libsmbios.so 0555 root sys
 f usr/lib/mdb/proc/libsysevent.so 0555 root sys
 f usr/lib/mdb/proc/libtopo.so 0555 root sys

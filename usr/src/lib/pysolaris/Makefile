@@ -26,11 +26,8 @@
 
 include	../Makefile.lib
 
-SUBDIRS=
-$(BUILDPY2)SUBDIRS += $(MACH)
-$(BUILD64)$(BUILDPY2)SUBDIRS += $(MACH64)
-$(BUILD64)$(BUILDPY3)SUBDIRS += py3
-$(BUILD64)$(BUILDPY3b)SUBDIRS += py3b
+SUBDIRS= py3
+$(BUILDPY3b)SUBDIRS += py3b
 
 all :=		TARGET= all
 install :=	TARGET= install

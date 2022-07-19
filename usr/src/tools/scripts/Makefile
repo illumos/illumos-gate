@@ -136,7 +136,7 @@ all:	$(SHFILES) $(PERLFILES) $(PERLMODULES) $(PYFILES) \
 	$(MAN1ONBLDFILES) $(MAKEFILES) $(SCRIPTS)
 
 onu.sh:	onu.sh.in
-	$(SED) -e "s:@PYTHON_VERSION@:$(PYTHON_VERSION):g" < onu.sh.in > $@
+	$(SED) -e "s:@PYTHON_VERSION@:$(PYTHON3_VERSION):g" < onu.sh.in > $@
 
 $(ROOTONBLDBIN)/git-nits:
 	$(RM) $(ROOTONBLDBIN)/git-nits

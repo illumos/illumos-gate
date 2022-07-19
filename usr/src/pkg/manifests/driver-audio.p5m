@@ -39,7 +39,6 @@ dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/audio group=sys
 file path=kernel/drv/$(ARCH64)/audio1575 group=sys
-$(sparc_ONLY)file path=kernel/drv/$(ARCH64)/audiocs group=sys
 file path=kernel/drv/$(ARCH64)/audioens group=sys
 file path=kernel/drv/$(ARCH64)/audiopci group=sys
 file path=kernel/drv/$(ARCH64)/audiots group=sys
@@ -51,7 +50,6 @@ dir  path=usr/share/man
 dir  path=usr/share/man/man4d
 file path=usr/share/man/man4d/audio.4d
 file path=usr/share/man/man4d/audio1575.4d
-$(sparc_ONLY)file path=usr/share/man/man4d/audiocs.4d
 file path=usr/share/man/man4d/audioens.4d
 file path=usr/share/man/man4d/audiopci.4d
 file path=usr/share/man/man4d/audiots.4d
@@ -61,7 +59,6 @@ file path=usr/share/man/man4i/dsp.4i
 file path=usr/share/man/man4i/mixer.4i
 driver name=audio perms="* 0666 root sys"
 driver name=audio1575 alias=pci10b9,5455
-$(sparc_ONLY)driver name=audiocs alias=SUNW,CS4231
 driver name=audioens \
     alias=pci1274,1371 \
     alias=pci1274,5880

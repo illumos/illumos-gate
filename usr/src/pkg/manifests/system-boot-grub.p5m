@@ -32,10 +32,8 @@
 <include global_zone_only_component>
 set name=pkg.fmri \
     value=pkg:/system/boot/grub@0.97,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
-$(i386_ONLY)set name=pkg.summary value="GNU GRUB - GNU GRand Unified Bootloader"
-$(sparc_ONLY)set name=pkg.summary value=GRUB
-$(sparc_ONLY)set name=pkg.description value="GRUB libraries"
-$(i386_ONLY)set name=pkg.description value="Multiboot Boot Loader"
+set name=pkg.summary value="GNU GRUB - GNU GRand Unified Bootloader"
+set name=pkg.description value="Multiboot Boot Loader"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 $(i386_ONLY)dir path=boot group=sys
@@ -72,7 +70,7 @@ file path=lib/libgrubmgmt.so.1
 dir  path=usr/share/man
 dir  path=usr/share/man/man7
 file path=usr/share/man/man7/grub.7
-$(i386_ONLY)legacy pkg=SUNWgrub desc="Multiboot Boot Loader" \
+legacy pkg=SUNWgrub desc="Multiboot Boot Loader" \
     name="GNU GRUB - GNU GRand Unified Bootloader"
 legacy pkg=SUNWgrubr desc="GRUB libraries" name="GRUB (Root)"
 license cr_Sun license=cr_Sun

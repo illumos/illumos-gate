@@ -85,19 +85,7 @@ pyclobber:
 	$(RM) $(CLOBBERFILES)
 	$(RM) -rf $(CLOBBERDIRS)
 
-# Python 2 module compilation
-
-python$(PYVER)/%.pyc: ../%.py
-	@[ -d $(@D) ] || mkdir $(@D)
-	$(RM) $@
-	$(PYTHON) -mpy_compile $<
-	$(MV) ../$(*).pyc $@
-
-$(ROOTPYDIR)/%.pyc: python$(PYVER)/%.pyc
-	$(INS.pyfile)
-
-# Python 3 module compilation
-
+# Python module compilation
 python$(PYVER)/__pycache__/%.cpython$(PYPKGVERS).pyc: ../%.py
 	@[ -d $(@D) ] || mkdir -p $(@D)
 	$(RM) $@
@@ -106,4 +94,3 @@ python$(PYVER)/__pycache__/%.cpython$(PYPKGVERS).pyc: ../%.py
 
 $(ROOTPYDIR)/__pycache__/%.pyc: python$(PYVER)/__pycache__/%.pyc
 	$(INS.pyfile)
-

@@ -704,8 +704,6 @@ $(i386_ONLY)link path=usr/lib/$(ARCH64)/libuutil.so \
     target=../../../lib/$(ARCH64)/libuutil.so.1
 link path=usr/lib/$(ARCH64)/libuutil.so.1 \
     target=../../../lib/$(ARCH64)/libuutil.so.1
-$(sparc_ONLY)link path=usr/lib/$(ARCH64)/libv12n.so target=./libv12n.so.1
-$(sparc_ONLY)file path=usr/lib/$(ARCH64)/libv12n.so.1
 link path=usr/lib/$(ARCH64)/libvolmgt.so target=libvolmgt.so.1
 file path=usr/lib/$(ARCH64)/libvolmgt.so.1
 link path=usr/lib/$(ARCH64)/libw.so target=../../../lib/$(ARCH64)/libw.so.1
@@ -968,8 +966,6 @@ link path=usr/lib/libumem.so.1 target=../../lib/libumem.so.1
 link path=usr/lib/libuuid.so target=../../lib/libuuid.so.1
 link path=usr/lib/libuuid.so.1 target=../../lib/libuuid.so.1
 link path=usr/lib/libuutil.so.1 target=../../lib/libuutil.so.1
-$(sparc_ONLY)link path=usr/lib/libv12n.so target=./libv12n.so.1
-$(sparc_ONLY)file path=usr/lib/libv12n.so.1
 link path=usr/lib/libvolmgt.so target=./libvolmgt.so.1
 file path=usr/lib/libvolmgt.so.1
 link path=usr/lib/libw.so target=../../lib/libw.so.1
@@ -1032,8 +1028,6 @@ file path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)/libses.so
 file path=usr/lib/scsi/plugins/ses/framework/$(ARCH64)/ses2.so
 file path=usr/lib/scsi/plugins/ses/framework/libses.so
 file path=usr/lib/scsi/plugins/ses/framework/ses2.so
-dir  path=usr/lib/scsi/plugins/ses/vendor
-$(sparc_ONLY)dir path=usr/lib/scsi/plugins/ses/vendor/$(ARCH64)
 dir  path=usr/lib/scsi/plugins/smp
 dir  path=usr/lib/scsi/plugins/smp/engine
 dir  path=usr/lib/scsi/plugins/smp/engine/$(ARCH64)
@@ -1299,12 +1293,9 @@ license usr/src/man/man3c/THIRDPARTYLICENSE.getentropy \
     license=usr/src/man/man3c/THIRDPARTYLICENSE.getentropy
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
-$(python3_ONLY)depend type=conditional \
-    fmri=system/library/python/solaris$(PYTHON3_PKGVERS) \
+depend type=conditional fmri=system/library/python/solaris$(PYTHON3_PKGVERS) \
     predicate=runtime/python$(PYTHON3_PKGVERS)
-$(python2_ONLY)depend type=conditional \
-    fmri=system/library/python/solaris$(PYTHON_PKGVERS) \
-    predicate=runtime/python$(PYTHON_PKGVERS)
+
 #
 # libses.so needs to dlopen(3C) plugins from usr/lib/scsi/plugins/ses/vendor/,
 # a dependency which cannot be automatically derived

@@ -27,9 +27,7 @@
 
 include ../../Makefile.tools
 
-SUBDIRS=
-$(BUILDPY2TOOLS)SUBDIRS += py2
-$(BUILDPY3TOOLS)SUBDIRS += py3
+SUBDIRS=py3
 
 all :=		TARGET= all
 install :=	TARGET= install

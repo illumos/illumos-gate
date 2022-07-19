@@ -27,9 +27,7 @@
 
 include ../Makefile.tools
 
-SUBDIRS=Checks Scm
-$(BUILDPY2TOOLS)SUBDIRS += py2
-$(BUILDPY3TOOLS)SUBDIRS += py3
+SUBDIRS=Checks Scm py3
 
 all :=		TARGET= all
 install :=	TARGET= install
