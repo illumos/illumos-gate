@@ -20,7 +20,7 @@
 #
 
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore
 
 set name=pkg.fmri value=pkg:/consolidation/osnet/osnet-message-files@$(PKGVERS)
 set name=pkg.summary value="Localizable ON message files"
@@ -277,13 +277,9 @@ file path=usr/lib/locale/C/LC_MESSAGES/PCI.po
 file path=usr/lib/locale/C/LC_MESSAGES/PCIEX.po
 file path=usr/lib/locale/C/LC_MESSAGES/SCA1000.po
 file path=usr/lib/locale/C/LC_MESSAGES/SCA500.po
-file path=usr/lib/locale/C/LC_MESSAGES/SCF.po
 file path=usr/lib/locale/C/LC_MESSAGES/SENSOR.po
 file path=usr/lib/locale/C/LC_MESSAGES/SMF.po
 file path=usr/lib/locale/C/LC_MESSAGES/STORAGE.po
-file path=usr/lib/locale/C/LC_MESSAGES/SUN4.po
-file path=usr/lib/locale/C/LC_MESSAGES/SUN4U.po
-file path=usr/lib/locale/C/LC_MESSAGES/SUN4V.po
 file path=usr/lib/locale/C/LC_MESSAGES/SUNOS.po
 file path=usr/lib/locale/C/LC_MESSAGES/SUNW_OST_ADMIN.po group=sys
 file path=usr/lib/locale/C/LC_MESSAGES/SUNW_OST_LINFO group=sys

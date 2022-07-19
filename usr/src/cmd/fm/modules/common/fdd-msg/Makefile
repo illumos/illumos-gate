@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2022 Garrett D'Amore
 #
 
 MODULE = fdd-msg
@@ -28,9 +29,7 @@ SRCS = fdd_msg.c
 
 include ../../Makefile.plugin
 
-LDLIBS_sparc = -lipmi
 LDLIBS_i386 = -L$(ROOT)/usr/lib/fm -lipmi -lumem -lfmd_agent
-LDFLAGS_sparc =
 LDFLAGS_i386 = -R/usr/lib/fm
 LDLIBS += $(LDLIBS_$(MACH))
 LDFLAGS += $(LDFLAGS_$(MACH))

@@ -23,22 +23,6 @@
 # Use is subject to license terms.
 #
 
-sparc_SUBDIRS	= sun4u \
-		  sun4v \
-		  SUNW,SPARC-Enterprise \
-		  SUNW,Netra-CP3060 \
-		  SUNW,Netra-CP3260 \
-		  SUNW,Sun-Blade-T6300 \
-		  SUNW,Sun-Blade-T6320 \
-		  SUNW,Netra-T5220 \
-		  SUNW,Sun-Fire-T200 \
-		  SUNW,Netra-T5440 \
-		  SUNW,T5140 \
-		  SUNW,USBRDT-5240 \
-		  SUNW,SPARC-Enterprise-T5120
-
-i386_SUBDIRS	=
-
-SUBDIRS = common $($(MACH)_SUBDIRS)
+SUBDIRS = common
 
 include ../Makefile.subdirs

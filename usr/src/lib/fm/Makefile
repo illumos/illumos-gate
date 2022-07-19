@@ -21,11 +21,12 @@
 
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2022 Garrett D'Amore
 #
 
 include ../Makefile.lib
 
-common_SUBDIRS = \
+SUBDIRS = \
 	libfmd_agent \
 	libdiagcode \
 	libdiskstatus \
@@ -39,18 +40,8 @@ common_SUBDIRS = \
 	libfmnotify \
 	topo
 
-sparc_SUBDIRS = \
-	libmdesc \
-	libldom
-
-i386_SUBDIRS =
-
-SUBDIRS = $(common_SUBDIRS) $($(MACH)_SUBDIRS)
-
-libldom: libmdesc libfmd_agent
-
 libfmd_snmp: libfmd_adm topo
 
-topo: $($(MACH)_SUBDIRS) libfmd_agent libdiskstatus
+topo: libfmd_agent libdiskstatus
 
 include ./Makefile.subdirs

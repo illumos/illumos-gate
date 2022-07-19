@@ -24,23 +24,8 @@
 # Use is subject to license terms.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
+# Copyright 2022 Garrett D'Amore
 #
-
-sparc_SUBDIRS =	sun4u \
-		sun4v \
-		sparc \
-		SUNW,Sun-Fire \
-		SUNW,Sun-Fire-T200 \
-		SUNW,SPARC-Enterprise \
-		SUNW,Sun-Blade-T6300 \
-		SUNW,Sun-Blade-T6320 \
-		SUNW,SPARC-Enterprise-T5120 \
-		SUNW,T5140 \
-		SUNW,Netra-CP3060 \
-		SUNW,Netra-CP3260 \
-		SUNW,USBRDT-5240 \
-		SUNW,Netra-T5220 \
-		SUNW,Netra-T5440
 
 i386_SUBDIRS = i86pc \
 		i386 \
