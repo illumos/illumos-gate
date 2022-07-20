@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2022 MNX Cloud, Inc.
  */
 
 /*
@@ -1834,14 +1835,16 @@ overlay_setprop_vnetid(overlay_dev_t *odd, uint64_t vnetid)
 	mutex_exit(&odd->odd_lock);
 
 	overlay_mux_remove_dev(odd->odd_mux, odd);
+
 	mutex_enter(&odd->odd_lock);
 	odd->odd_vid = vnetid;
 	mutex_exit(&odd->odd_lock);
+
 	overlay_mux_add_dev(odd->odd_mux, odd);
 
 	mutex_enter(&odd->odd_lock);
 	ASSERT(odd->odd_flags & OVERLAY_F_IN_MUX);
-	odd->odd_flags &= ~OVERLAY_F_IN_MUX;
+	odd->odd_flags &= ~OVERLAY_F_MDDROP;
 	mutex_exit(&odd->odd_lock);
 }
 

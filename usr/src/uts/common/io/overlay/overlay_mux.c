@@ -36,9 +36,6 @@
 
 #include <sys/sdt.h>
 
-#define	OVERLAY_FREEMSG(mp, reason) \
-    DTRACE_PROBE2(overlay__freemsg, mblk_t *, mp, char *, reason)
-
 static list_t overlay_mux_list;
 static kmutex_t overlay_mux_lock;
 

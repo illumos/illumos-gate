@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2022 MNX Cloud, Inc.
  */
 
 /*
@@ -901,6 +902,14 @@ overlay_target_inject(overlay_target_hdl_t *thdl, void *arg)
 	}
 
 	mutex_enter(&odd->odd_lock);
+	if ((odd->odd_flags & OVERLAY_F_MDDROP) ||
+	    !(odd->odd_flags & OVERLAY_F_IN_MUX)) {
+		/* Can't do receive... */
+		mutex_exit(&odd->odd_lock);
+		OVERLAY_FREEMSG(mp, "dev dropped");
+		freeb(mp);
+		return (EBUSY);
+	}
 	overlay_io_start(odd, OVERLAY_F_IN_RX);
 	mutex_exit(&odd->odd_lock);
 
