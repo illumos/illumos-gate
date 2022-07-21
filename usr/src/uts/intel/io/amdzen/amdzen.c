@@ -277,18 +277,19 @@ amdzen_df_read32_bcast(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def)
 
 
 static uint32_t
-amdzen_smn_read32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg)
+amdzen_smn_read32(amdzen_t *azn, amdzen_df_t *df, const smn_reg_t reg)
 {
 	VERIFY(MUTEX_HELD(&azn->azn_mutex));
-	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, reg);
+	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, SMN_REG_ADDR(reg));
 	return (amdzen_stub_get32(df->adf_nb, AMDZEN_NB_SMN_DATA));
 }
 
 static void
-amdzen_smn_write32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg, uint32_t val)
+amdzen_smn_write32(amdzen_t *azn, amdzen_df_t *df, const smn_reg_t reg,
+    const uint32_t val)
 {
 	VERIFY(MUTEX_HELD(&azn->azn_mutex));
-	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, reg);
+	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, SMN_REG_ADDR(reg));
 	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_DATA, val);
 }
 
@@ -321,7 +322,7 @@ amdzen_df_find(amdzen_t *azn, uint_t dfno)
  * Client functions that are used by nexus children.
  */
 int
-amdzen_c_smn_read32(uint_t dfno, uint32_t reg, uint32_t *valp)
+amdzen_c_smn_read32(uint_t dfno, const smn_reg_t reg, uint32_t *valp)
 {
 	amdzen_df_t *df;
 	amdzen_t *azn = amdzen_data;
@@ -344,7 +345,7 @@ amdzen_c_smn_read32(uint_t dfno, uint32_t reg, uint32_t *valp)
 }
 
 int
-amdzen_c_smn_write32(uint_t dfno, uint32_t reg, uint32_t val)
+amdzen_c_smn_write32(uint_t dfno, const smn_reg_t reg, const uint32_t val)
 {
 	amdzen_df_t *df;
 	amdzen_t *azn = amdzen_data;

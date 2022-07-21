@@ -1856,7 +1856,8 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	umc_cs_t *cs0, *cs1;
 	const uint32_t id = chan->chan_logid;
 	int ret;
-	uint32_t val, reg;
+	uint32_t val;
+	smn_reg_t reg;
 
 	ASSERT3U(dimmno, <, ZEN_UMC_MAX_DIMMS);
 	dimm = &chan->chan_dimms[dimmno];
@@ -1872,11 +1873,11 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	 */
 	for (uint_t i = 0; i < ZEN_UMC_MAX_CS_PER_DIMM; i++) {
 		uint64_t addr;
-		const uint32_t reginst = i + dimmno * 2;
+		const uint16_t reginst = i + dimmno * 2;
 		reg = UMC_BASE(id, reginst);
 		if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 			dev_err(umc->umc_dip, CE_WARN, "failed to read base "
-			    "register %x: %d", reg, ret);
+			    "register %x: %d", SMN_REG_ADDR(reg), ret);
 			return (B_FALSE);
 		}
 
@@ -1887,7 +1888,8 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 		reg = UMC_BASE_SEC(id, reginst);
 		if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 			dev_err(umc->umc_dip, CE_WARN, "failed to read "
-			    "secondary base register %x: %d", reg, ret);
+			    "secondary base register %x: %d", SMN_REG_ADDR(reg),
+			    ret);
 			return (B_FALSE);
 		}
 
@@ -1899,7 +1901,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_MASK_DDR4(id, dimmno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read mask register "
-		    "%x: %d", reg, ret);
+		    "%x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 
@@ -1915,7 +1917,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_MASK_SEC_DDR4(id, dimmno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read secondary mask "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	cs0->ucs_sec_mask = (uint64_t)UMC_MASK_GET_ADDR(val) <<
@@ -1926,7 +1928,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_ADDRCFG_DDR4(id, dimmno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read address config "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 
@@ -1962,7 +1964,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_ADDRSEL_DDR4(id, dimmno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read bank address "
-		    "select register %x: %d", reg, ret);
+		    "select register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	cs0->ucs_row_hi_bit = UMC_ADDRSEL_DDR4_GET_ROW_HI(val) +
@@ -1987,7 +1989,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_COLSEL_LO_DDR4(id, dimmno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read column address "
-		    "select low register %x: %d", reg, ret);
+		    "select low register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	for (uint_t i = 0; i < ZEN_UMC_MAX_COLSEL_PER_REG; i++) {
@@ -1998,7 +2000,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_COLSEL_HI_DDR4(id, dimmno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read column address "
-		    "select high register %x: %d", reg, ret);
+		    "select high register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	for (uint_t i = 0; i < ZEN_UMC_MAX_COLSEL_PER_REG; i++) {
@@ -2017,7 +2019,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_RMSEL_DDR4(id, dimmno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read rank address "
-		    "select register %x: %d", reg, ret);
+		    "select register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	cs0->ucs_inv_msbs = UMC_RMSEL_DDR4_GET_INV_MSBE(val);
@@ -2033,7 +2035,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_RMSEL_SEC_DDR4(id, dimmno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read secondary rank "
-		    "address select register %x: %d", reg, ret);
+		    "address select register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	cs0->ucs_inv_msbs_sec = UMC_RMSEL_DDR4_GET_INV_MSBE(val);
@@ -2050,7 +2052,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_DIMMCFG_DDR4(id, dimmno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read DIMM "
-		    "configuration register %x: %d", reg, ret);
+		    "configuration register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	dimm->ud_dimmcfg_raw = val;
@@ -2100,7 +2102,8 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 {
 	int ret;
 	umc_cs_t *cs;
-	uint32_t reg, val;
+	uint32_t val;
+	smn_reg_t reg;
 	const uint32_t id = chan->chan_logid;
 	const uint32_t regno = dimmno * 2 + rankno;
 
@@ -2111,7 +2114,7 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_BASE(id, regno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read base "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	cs->ucs_base.udb_base = (uint64_t)UMC_BASE_GET_ADDR(val) <<
@@ -2124,7 +2127,8 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 		if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) !=
 		    0) {
 			dev_err(umc->umc_dip, CE_WARN, "failed to read "
-			    "extended base register %x: %d", reg, ret);
+			    "extended base register %x: %d", SMN_REG_ADDR(reg),
+			    ret);
 			return (B_FALSE);
 		}
 
@@ -2136,7 +2140,7 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_BASE_SEC(id, regno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read secondary base "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	cs->ucs_sec.udb_base = (uint64_t)UMC_BASE_GET_ADDR(val) <<
@@ -2149,8 +2153,8 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 		if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) !=
 		    0) {
 			dev_err(umc->umc_dip, CE_WARN, "failed to read "
-			    "extended secondary base register %x: %d", reg,
-			    ret);
+			    "extended secondary base register %x: %d",
+			    SMN_REG_ADDR(reg), ret);
 			return (B_FALSE);
 		}
 
@@ -2162,7 +2166,7 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_MASK_DDR5(id, regno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read mask "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	cs->ucs_base_mask = (uint64_t)UMC_MASK_GET_ADDR(val) <<
@@ -2175,7 +2179,8 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 		if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) !=
 		    0) {
 			dev_err(umc->umc_dip, CE_WARN, "failed to read "
-			    "extended mask register %x: %d", reg, ret);
+			    "extended mask register %x: %d", SMN_REG_ADDR(reg),
+			    ret);
 			return (B_FALSE);
 		}
 
@@ -2188,7 +2193,7 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_MASK_SEC_DDR5(id, regno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read secondary mask "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	cs->ucs_sec_mask = (uint64_t)UMC_MASK_GET_ADDR(val) <<
@@ -2201,7 +2206,8 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 		if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) !=
 		    0) {
 			dev_err(umc->umc_dip, CE_WARN, "failed to read "
-			    "extended mask register %x: %d", reg, ret);
+			    "extended mask register %x: %d", SMN_REG_ADDR(reg),
+			    ret);
 			return (B_FALSE);
 		}
 
@@ -2213,7 +2219,7 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_ADDRCFG_DDR5(id, regno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read address config "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	if ((umc->umc_fdata->zufd_flags & ZEN_UMC_FAM_F_CS_XOR) != 0) {
@@ -2234,7 +2240,7 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_ADDRSEL_DDR5(id, regno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read address select "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	cs->ucs_row_hi_bit = 0;
@@ -2254,7 +2260,7 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_COLSEL_LO_DDR5(id, regno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read column address "
-		    "select low register %x: %d", reg, ret);
+		    "select low register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	for (uint_t i = 0; i < ZEN_UMC_MAX_COLSEL_PER_REG; i++) {
@@ -2265,7 +2271,7 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_COLSEL_HI_DDR5(id, regno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read column address "
-		    "select high register %x: %d", reg, ret);
+		    "select high register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	for (uint_t i = 0; i < ZEN_UMC_MAX_COLSEL_PER_REG; i++) {
@@ -2282,7 +2288,7 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	reg = UMC_RMSEL_DDR5(id, regno);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read rank multiply "
-		    "select register %x: %d", reg, ret);
+		    "select register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 
@@ -2358,7 +2364,7 @@ zen_umc_fill_chan_hash(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
     boolean_t ddr4)
 {
 	int ret;
-	uint32_t reg;
+	smn_reg_t reg;
 	uint32_t val;
 
 	const umc_chan_hash_flags_t flags = umc->umc_fdata->zufd_chan_hash;
@@ -2379,7 +2385,8 @@ zen_umc_fill_chan_hash(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 			if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg,
 			    &val)) != 0) {
 				dev_err(umc->umc_dip, CE_WARN, "failed to read "
-				    "bank hash register %x: %d", reg, ret);
+				    "bank hash register %x: %d",
+				    SMN_REG_ADDR(reg), ret);
 				return (B_FALSE);
 			}
 
@@ -2403,7 +2410,8 @@ zen_umc_fill_chan_hash(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 			if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg,
 			    &val)) != 0) {
 				dev_err(umc->umc_dip, CE_WARN, "failed to read "
-				    "rm hash register %x: %d", reg, ret);
+				    "rm hash register %x: %d",
+				    SMN_REG_ADDR(reg), ret);
 				return (B_FALSE);
 			}
 
@@ -2420,7 +2428,8 @@ zen_umc_fill_chan_hash(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 			if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg,
 			    &val)) != 0) {
 				dev_err(umc->umc_dip, CE_WARN, "failed to read "
-				    "rm hash ext register %x: %d", reg, ret);
+				    "rm hash ext register %x: %d",
+				    SMN_REG_ADDR(reg), ret);
 				return (B_FALSE);
 			}
 
@@ -2441,7 +2450,7 @@ zen_umc_fill_chan_hash(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 
 		if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 			dev_err(umc->umc_dip, CE_WARN, "failed to read pc hash "
-			    "register %x: %d", reg, ret);
+			    "register %x: %d", SMN_REG_ADDR(reg), ret);
 			return (B_FALSE);
 		}
 
@@ -2457,7 +2466,7 @@ zen_umc_fill_chan_hash(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 
 		if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 			dev_err(umc->umc_dip, CE_WARN, "failed to read pc hash "
-			    "2 register %x: %d", reg, ret);
+			    "2 register %x: %d", SMN_REG_ADDR(reg), ret);
 			return (B_FALSE);
 		}
 
@@ -2478,7 +2487,7 @@ zen_umc_fill_chan_hash(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 			if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg,
 			    &val)) != 0) {
 				dev_err(umc->umc_dip, CE_WARN, "failed to read "
-				    "cs hash register %x", reg);
+				    "cs hash register %x", SMN_REG_ADDR(reg));
 				return (B_FALSE);
 			}
 
@@ -2495,7 +2504,8 @@ zen_umc_fill_chan_hash(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 			if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg,
 			    &val)) != 0) {
 				dev_err(umc->umc_dip, CE_WARN, "failed to read "
-				    "cs hash ext register %x", reg);
+				    "cs hash ext register %x",
+				    SMN_REG_ADDR(reg));
 				return (B_FALSE);
 			}
 
@@ -2514,7 +2524,8 @@ zen_umc_fill_chan_hash(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 static boolean_t
 zen_umc_fill_chan(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan)
 {
-	uint32_t reg, val;
+	uint32_t val;
+	smn_reg_t reg;
 	const uint32_t id = chan->chan_logid;
 	int ret;
 	boolean_t ddr4;
@@ -2538,7 +2549,7 @@ zen_umc_fill_chan(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan)
 	reg = UMC_UMCCFG(id);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read UMC "
-		    "configuration register %x: %d", reg, ret);
+		    "configuration register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 
@@ -2561,7 +2572,7 @@ zen_umc_fill_chan(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan)
 	reg = UMC_DATACTL(id);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read data control "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	chan->chan_datactl_raw = val;
@@ -2582,7 +2593,7 @@ zen_umc_fill_chan(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan)
 	reg = UMC_ECCCTL(id);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read ECC control "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	chan->chan_eccctl_raw = val;
@@ -2594,7 +2605,7 @@ zen_umc_fill_chan(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan)
 	reg = UMC_UMCCAP(id);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read UMC cap"
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	chan->chan_umccap_raw = val;
@@ -2602,7 +2613,7 @@ zen_umc_fill_chan(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan)
 	reg = UMC_UMCCAP_HI(id);
 	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
 		dev_err(umc->umc_dip, CE_WARN, "failed to read UMC cap high "
-		    "register %x: %d", reg, ret);
+		    "register %x: %d", SMN_REG_ADDR(reg), ret);
 		return (B_FALSE);
 	}
 	chan->chan_umccap_hi_raw = val;
