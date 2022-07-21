@@ -23,13 +23,15 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2022 Garrett D'Amore
+#
 
 .KEEP_STATE:
 .SUFFIXES:
 
 include ../../Makefile.libstand
 
-SRCS_COMMON += \
+SRCS += \
 	bcmp.c \
 	bcopy.c \
 	bsearch.c \
@@ -49,10 +51,6 @@ SRCS_COMMON += \
 	strtol.c \
 	strtoul.c
 
-sparcv9_SRCS= \
-	multi3.c
-
-SRCS += $(SRCS_COMMON) $($(MACH64)_SRCS)
 
 # We don't want thread-specific errno's in kmdb, as we're single-threaded.
 DTS_ERRNO=

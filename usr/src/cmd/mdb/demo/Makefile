@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2022 Garrett D'Amore
+#
 
 #
 # Note that this Makefile is *not* the Makefile that is installed in the proto
@@ -38,11 +40,9 @@ DEMOFILES = \
 	Makefile.common \
 	Makefile.i386 \
 	Makefile.amd64 \
-	Makefile.sparc \
-	Makefile.sparcv9 \
 	README
 
-DEMOSUBDIRS = common i386 amd64 sparc sparcv9
+DEMOSUBDIRS = common i386 amd64
 
 ROOTDEMODIR = $(ROOT)/usr/demo/mdb
 ROOTDEMOFILES = $(DEMOFILES:%=$(ROOTDEMODIR)/%)

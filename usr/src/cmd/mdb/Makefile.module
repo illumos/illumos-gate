@@ -185,11 +185,6 @@ KMDB_LINKTEST = \
 KMDB_LINKTEST_ENABLE=$(POUND_SIGN)
 $(KMDB_LINKTEST_ENABLE)KMDB_LINKTEST_CMD = $(KMDB_LINKTEST)
 
-#
-# Ensure that dmods don't use floating point
-#
-KMDB_FPTEST_CMD = $(KMDB_FPTEST)
-
 # Allow overriding this because mdb_ks is special case fake module,
 # see Makefile.mdb_ks
 KMODFLAG = -ztype=kmod
@@ -198,7 +193,6 @@ $(KMODFILE): kmod .WAIT $(KMODOBJS) $(MAPFILE)
 	$(LD) $(KMODFLAG) $(MAPFILE:%=-Wl,-M%) -Nmisc/kmdbmod -o $@ $(KMODOBJS) \
 	$(STANDOBJS)
 	$(KMDB_LINKTEST_CMD)
-	$(KMDB_FPTEST_CMD)
 	$(CTFMERGE) -l "$(UTS_LABEL)" -o $@ $(KMODOBJS)
 	$(POST_PROCESS)
 	$(SETDYNFLAG) -f DF_1_NOKSYMS $@

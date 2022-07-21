@@ -23,15 +23,15 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2022 Garrett D'Amore
+#
 
 include $(SRC)/Makefile.master
 
 .KEEP_STATE:
 
-sparc_MACHDIR = sparc
 i386_MACHDIR = intel
 
-sparc_SUBDIRS = sparc sun4u sun4v
 i386_SUBDIRS = intel i86pc i86xpv
 
 MACHDIR = $($(MACH)_MACHDIR)
@@ -69,5 +69,5 @@ FRC:
 # Cross-reference customization: build the cross-reference only over the
 # source directories, and ignore Makefiles and machine-generated source.
 #
-XRDIRS = common $(sparc_SUBDIRS) $(i386_SUBDIRS)
+XRDIRS = common $(i386_SUBDIRS)
 XRDEL = mdb_lex.c mdb_grammar.c Makefile*

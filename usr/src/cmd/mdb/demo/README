@@ -23,7 +23,8 @@
 Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+Copyright 2022 Garrett D'Amore
+
 
 1. Introduction
 
@@ -41,15 +42,14 @@ Guide".  This document is available on-line at http://docs.sun.com.
 As the files in this directory are owned by the administrator, you should make
 a copy of this directory to your home directory or other location before you
 begin experimenting with MDB.  If you wish to change the configuration, edit
-the CC and LINT macro definitions in Makefile.sparc, Makefile.sparcv9, 
-Makefile.i386 and Makefile.amd64 to point to the appropriate pathnames.
+the CC macro definitions in Makefile.i386 and Makefile.amd64 to point to the
+appropriate pathnames.
+
 The Makefiles contained in this directory are set up to use the C compiler (cc)
 and lint utility found in your $PATH.  These four Makefiles can also be used
 to define base compiler settings for the corresponding instruction set
 architecture (ISA):
 
-	Makefile.sparc		- rules for building 32-bit SPARC objects
-	Makefile.sparcv9	- rules for building 64-bit SPARC objects
 	Makefile.i386		- rules for building 32-bit x86 objects
 	Makefile.amd64		- rules for building 64-bit x86 objects
 
@@ -84,7 +84,7 @@ execute the default "make all" target.
 4. Loading Modules
 
 After you successfully compile the example modules, the module object files
-reside in one or more of the i386/, amd64/, sparc/, and sparcv9/ subdirectories
+reside in one or more of the i386/, amd64/ subdirectories
 depending on the ISAs supported on your machine.  In order to load the example
 modules, you can either use the ::load built-in dcmd with the absolute pathname
 of a given module, or you can adjust the module library path to include the
