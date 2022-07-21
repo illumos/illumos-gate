@@ -79,3 +79,7 @@ marker task-screen.4th
 \ Place the cursor at the bottom left of the screen
 : at-bl 0 sr at-xy ;
 
+\ set cursor invisible or normal (civis/cnorm)
+: cursor-invisible ( -- ) [char] l ;
+: cursor-normal ( -- ) [char] h ;
+: cursor-set ( cursor-mode -- ) escc [char] ? emit 25 .# emit ;

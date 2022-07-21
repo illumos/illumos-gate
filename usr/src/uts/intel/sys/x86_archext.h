@@ -32,7 +32,7 @@
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright 2018 Nexenta Systems, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _SYS_X86_ARCHEXT_H
@@ -616,6 +616,15 @@ extern "C" {
 #define	IA32_PKG_THERM_INTTERUPT_TR2_VAL(x)	(((x) >> 16) & 0x7f)
 #define	IA32_PKG_THERM_INTERRUPT_TR2_IE		0x00800000
 #define	IA32_PKG_THERM_INTERRUPT_PL_NE		0x01000000
+
+/*
+ * AMD TOM and TOM2 MSRs. These control the split between DRAM and MMIO below
+ * and above 4 GiB respectively. These have existed since family 0xf.
+ */
+#define	MSR_AMD_TOM				0xc001001a
+#define	MSR_AMD_TOM_MASK(x)			((x) & 0xffffff800000)
+#define	MSR_AMD_TOM2				0xc001001d
+#define	MSR_AMD_TOM2_MASK(x)			((x) & 0xffffff800000)
 
 
 #define	MCI_CTL_VALUE		0xffffffff

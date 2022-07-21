@@ -14,9 +14,10 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 Oxide Computer Company
 #
 
-SUBDIRS_i386 = i386 imc
+SUBDIRS_i386 = i386 imc zen_umc
 
 SUBDIRS =       \
 		cores \

@@ -27,7 +27,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 RackTop Systems
 # Copyright 2019 Peter Tribble.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2022 Oxide Computer Company
 #
 
 #
@@ -746,7 +746,7 @@ DRV_KMODS	+= smntemp
 #
 DRV_KMODS	+= amdzen
 DRV_KMODS	+= amdzen_stub
-DRV_KMODS	+= usmn zen_udf
+DRV_KMODS	+= usmn zen_udf zen_umc
 
 #
 #	Intel Integrated Memory Controller

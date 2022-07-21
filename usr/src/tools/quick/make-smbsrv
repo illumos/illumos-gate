@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
+# Copyright 2022 Tintri by DDN, Inc.  All rights reserved.
 #
 
 # Use normal make (not dmake) by default.
@@ -262,7 +262,7 @@ do
   # We build these libraries (to the proto area), so we need to
   # build the mdb modules for all dependent libraries too.
 
-  for lib in libfksmbsrv libmlsvc libcmdutils libavl
+  for lib in libfksmbsrv libmlsvc list libavl
   do
     (cd $SRC/cmd/mdb/$x/$a/$lib && $make $1 )
 

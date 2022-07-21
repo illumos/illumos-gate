@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _SYS_MC_H
@@ -87,21 +88,62 @@ typedef struct mc_snapshot_info {
 
 /*
  * Data used to simulate encoding or decoding of a physical / DIMM address.
+ * These are used in different ways between AMD and Intel, so this is a bit of a
+ * smorgasbord. Details about each field are listed below.
  */
 typedef struct mc_encode_ioc {
+	/*
+	 * The first three values here are different addresses. We have a
+	 * physical / system address. A DRAM-channel relative address, and
+	 * finally a rank-relative address. Where a platform does not support
+	 * one of these, UINT64_MAX is used.
+	 */
 	uint64_t	mcei_pa;
+	uint64_t	mcei_chan_addr;
+	uint64_t	mcei_rank_addr;
+	/*
+	 * These next two provide a way for the memory controller software
+	 * driver to provide additional information. The mcei_err generally
+	 * corresponds to an enum that the driver has and the errdata is
+	 * error-specific data that can be useful.
+	 */
 	uint64_t	mcei_errdata;
 	uint32_t	mcei_err;
+	/*
+	 * This next set is used to identify information about where to find a
+	 * DIMM in question. The board and chip are used to uniquely identify a
+	 * socket. Generally on x86, there is only one board, so it would be
+	 * zero. The chip should correspond to the socket ID. The die refers to
+	 * a particular internal die if on a chiplet or MCP. The memory
+	 * controller and channel refer to a unique instance of both within a
+	 * given die. On platforms where the memory controller and channel are
+	 * 1:1 (that is each memory controller has only a single channel or
+	 * doesn't have a specific distinction between the two), set chan to 0
+	 * and set the mc to the logical channel value. The DIMM is a relative
+	 * DIMM in the channel, meaning it's usually going to be 0, 1, or 2.
+	 */
 	uint32_t	mcei_board;
 	uint32_t	mcei_chip;
+	uint32_t	mcei_die;
 	uint32_t	mcei_mc;
 	uint32_t	mcei_chan;
 	uint32_t	mcei_dimm;
-	uint64_t	mcei_rank_addr;
-	uint32_t	mcei_rank;
+	/*
+	 * These values all refer to information on the DIMM itself and identify
+	 * how to find the address. mcei_rank is meant to be a logical rank;
+	 * however, some systems phrase things that way while others phrase
+	 * things in terms of a chip select and rank multiplication. For unknown
+	 * entries use UINT8_MAX.
+	 */
 	uint32_t	mcei_row;
 	uint32_t	mcei_column;
-	uint32_t	mcei_pad;
+	uint8_t		mcei_rank;
+	uint8_t		mcei_cs;
+	uint8_t		mcei_rm;
+	uint8_t		mcei_bank;
+	uint8_t		mcei_bank_group;
+	uint8_t		mcei_subchan;
+	uint8_t		mcei_pad[6];
 } mc_encode_ioc_t;
 
 #ifdef __cplusplus

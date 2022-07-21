@@ -1015,6 +1015,7 @@ also menu-namespace
 		then
 	then
 
+	cursor-invisible cursor-set
 	menu-create
 
 	begin \ Loop forever
@@ -1023,6 +1024,7 @@ also menu-namespace
 		getkey     \ Block here, waiting for a key to be pressed
 
 		dup -1 = if
+			cursor-normal cursor-set
 			drop exit \ Caught abort (abnormal return)
 		then
 
@@ -1030,6 +1032,7 @@ also menu-namespace
 		\ Ctrl-Enter/Ctrl-J (10)
 		dup over 13 = swap 10 = or if
 			drop ( no longer needed )
+			cursor-normal cursor-set
 			do_ipxe if
 				s" efi-version" getenv? if
 					s" ipxe_chainload" evaluate
@@ -1075,6 +1078,7 @@ also menu-namespace
 					0= if
 						drop \ key pressed
 						drop \ loop iterator
+						cursor-normal cursor-set
 						exit
 					else
 						swap \ need iterator on top
@@ -1109,6 +1113,8 @@ also menu-namespace
 							evaluate
 							0= if
 								2drop
+								cursor-normal
+								cursor-set
 								exit
 							then
 						else

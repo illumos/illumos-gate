@@ -229,15 +229,15 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 		}
 		break;
 	case PCIEADM_SDO_TYPE:
-		if (pcieadm_speed2gen(psdo->psdo_mspeed) == 0 ||
+		if (pcieadm_speed2gen(psdo->psdo_cspeed) == 0 ||
 		    psdo->psdo_mwidth == -1) {
 			if (strlcat(buf, "PCI", buflen) >= buflen) {
 				return (B_FALSE);
 			}
 		} else {
 			if (snprintf(buf, buflen, "PCIe Gen %ux%u",
-			    pcieadm_speed2gen(psdo->psdo_mspeed),
-			    psdo->psdo_mwidth) >= buflen) {
+			    pcieadm_speed2gen(psdo->psdo_cspeed),
+			    psdo->psdo_cwidth) >= buflen) {
 				return (B_FALSE);
 			}
 		}

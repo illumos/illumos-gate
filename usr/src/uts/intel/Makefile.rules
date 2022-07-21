@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2022 Oxide Computer Company
 #
 
 #
@@ -142,6 +143,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/amdnbtemp/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/amdzen/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(SRC)/common/mc/zen_umc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 

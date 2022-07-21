@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -75,6 +75,7 @@ zen_udf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	uint_t dfno;
 	zen_udf_t *zen_udf = &zen_udf_data;
 	zen_udf_io_t zui;
+	df_reg_def_t def;
 
 	if (cmd != ZEN_UDF_READ32 && cmd != ZEN_UDF_READ64) {
 		return (ENOTTY);
@@ -94,12 +95,19 @@ zen_udf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		return (EFAULT);
 	}
 
+	/*
+	 * Cons up a register definition based on the user request. We set the
+	 * gen to our current one.
+	 */
+	def.drd_gens = amdzen_c_df_rev();
+	def.drd_func = zui.zui_func;
+	def.drd_reg = zui.zui_reg;
+
 	if (cmd == ZEN_UDF_READ32) {
 		int ret;
 		uint32_t data;
 
-		ret = amdzen_c_df_read32(dfno, zui.zui_inst, zui.zui_func,
-		    zui.zui_reg, &data);
+		ret = amdzen_c_df_read32(dfno, zui.zui_inst, def, &data);
 		if (ret != 0) {
 			return (ret);
 		}
@@ -108,8 +116,8 @@ zen_udf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	} else {
 		int ret;
 
-		ret = amdzen_c_df_read64(dfno, zui.zui_inst, zui.zui_func,
-		    zui.zui_reg, &zui.zui_data);
+		ret = amdzen_c_df_read64(dfno, zui.zui_inst, def,
+		    &zui.zui_data);
 		if (ret != 0) {
 			return (ret);
 		}

@@ -448,6 +448,7 @@ AMDZEN_STUB_OBJS = amdzen_stub.o
 SMNTEMP_OBJS = smntemp.o
 USMN_OBJS = usmn.o
 ZEN_UDF_OBJS = zen_udf.o
+ZEN_UMC_OBJS = zen_umc.o zen_umc_decode.o zen_fabric_utils.o zen_umc_dump.o
 
 #
 # Intel Integrated Memory Controller

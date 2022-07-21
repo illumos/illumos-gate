@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -119,6 +119,29 @@
  * provided by one driver, we instead have created a nexus driver that will
  * itself try and load children. Children are all pseudo-device drivers that
  * provide different pieces of functionality that use this.
+ *
+ * -------
+ * Locking
+ * -------
+ *
+ * The amdzen_data structure contains a single lock, azn_mutex. The various
+ * client functions are intended for direct children of our nexus, but have been
+ * designed in case someone else depends on this driver despite not being a
+ * child. Once a DF has been discovered, the set of entities inside of it
+ * (adf_nents, adf_ents[]) is considered static, constant data. This means that
+ * iterating over it in and of itself does not require locking; however, the
+ * discovery of the amd_df_t does. In addition, whenever performing register
+ * accesses to the DF or SMN, those require locking. This means that one must
+ * hold the lock in the following circumstances:
+ *
+ *   o Looking up DF structures
+ *   o Reading or writing to DF registers
+ *   o Reading or writing to SMN registers
+ *
+ * In general, it is preferred that the lock be held across an entire client
+ * operation if possible. The only time this becomes an issue are when we have
+ * callbacks into our callers (ala amdzen_c_df_iter()) as they will likely
+ * recursively call into us.
  */
 
 #include <sys/modctl.h>
@@ -132,6 +155,8 @@
 #include <sys/x86_archext.h>
 #include <sys/cpuvar.h>
 
+#include <sys/amdzen/df.h>
+#include "amdzen_client.h"
 #include "amdzen.h"
 
 amdzen_t *amdzen_data;
@@ -158,8 +183,74 @@ typedef struct {
 static const amdzen_child_data_t amdzen_children[] = {
 	{ "smntemp", AMDZEN_C_SMNTEMP },
 	{ "usmn", AMDZEN_C_USMN },
-	{ "zen_udf", AMDZEN_C_ZEN_UDF }
+	{ "zen_udf", AMDZEN_C_ZEN_UDF },
+	{ "zen_umc", AMDZEN_C_ZEN_UMC }
 };
+
+/*
+ * Provide a caller with the notion of what CPU family their device falls into.
+ * This is useful for client drivers that want to make decisions based on model
+ * ranges.
+ */
+zen_family_t
+amdzen_c_family(void)
+{
+	uint_t vendor, family, model;
+	zen_family_t ret = ZEN_FAMILY_UNKNOWN;
+
+	vendor = cpuid_getvendor(CPU);
+	family = cpuid_getfamily(CPU);
+	model = cpuid_getmodel(CPU);
+
+	switch (family) {
+	case 0x17:
+		if (vendor != X86_VENDOR_AMD)
+			break;
+		if (model < 0x10) {
+			ret = ZEN_FAMILY_NAPLES;
+		} else if (model >= 0x10 && model < 0x30) {
+			ret = ZEN_FAMILY_DALI;
+		} else if (model >= 0x30 && model < 0x40) {
+			ret = ZEN_FAMILY_ROME;
+		} else if (model >= 0x60 && model < 0x70) {
+			ret = ZEN_FAMILY_RENOIR;
+		} else if (model >= 0x70 && model < 0x80) {
+			ret = ZEN_FAMILY_MATISSE;
+		} else if (model >= 0x90 && model < 0xa0) {
+			ret = ZEN_FAMILY_VAN_GOGH;
+		} else if (model >= 0xa0 && model < 0xb0) {
+			ret = ZEN_FAMILY_MENDOCINO;
+		}
+		break;
+	case 0x18:
+		if (vendor != X86_VENDOR_HYGON)
+			break;
+		if (model < 0x10)
+			ret = ZEN_FAMILY_DHYANA;
+		break;
+	case 0x19:
+		if (vendor != X86_VENDOR_AMD)
+			break;
+		if (model < 0x10) {
+			ret = ZEN_FAMILY_MILAN;
+		} else if (model >= 0x10 && model < 0x20) {
+			ret = ZEN_FAMILY_GENOA;
+		} else if (model >= 0x20 && model < 0x30) {
+			ret = ZEN_FAMILY_VERMEER;
+		} else if (model >= 0x40 && model < 0x50) {
+			ret = ZEN_FAMILY_REMBRANDT;
+		} else if (model >= 0x50 && model < 0x60) {
+			ret = ZEN_FAMILY_CEZANNE;
+		} else if (model >= 0x60 && model < 0x70) {
+			ret = ZEN_FAMILY_RAPHAEL;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return (ret);
+}
 
 static uint32_t
 amdzen_stub_get32(amdzen_stub_t *stub, off_t reg)
@@ -179,39 +270,76 @@ amdzen_stub_put32(amdzen_stub_t *stub, off_t reg, uint32_t val)
 	pci_config_put32(stub->azns_cfgspace, reg, val);
 }
 
+static uint64_t
+amdzen_df_read_regdef(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def,
+    uint8_t inst, boolean_t do_64)
+{
+	df_reg_def_t ficaa;
+	df_reg_def_t ficad;
+	uint32_t val = 0;
+	df_rev_t df_rev = azn->azn_dfs[0].adf_rev;
+
+	VERIFY(MUTEX_HELD(&azn->azn_mutex));
+	ASSERT3U(def.drd_gens & df_rev, ==, df_rev);
+	val = DF_FICAA_V2_SET_TARG_INST(val, 1);
+	val = DF_FICAA_V2_SET_FUNC(val, def.drd_func);
+	val = DF_FICAA_V2_SET_INST(val, inst);
+	val = DF_FICAA_V2_SET_64B(val, do_64 ? 1 : 0);
+
+	switch (df_rev) {
+	case DF_REV_2:
+	case DF_REV_3:
+	case DF_REV_3P5:
+		ficaa = DF_FICAA_V2;
+		ficad = DF_FICAD_LO_V2;
+		/*
+		 * Both here and in the DFv4 case, the register ignores the
+		 * lower 2 bits. That is we can only address and encode things
+		 * in units of 4 bytes.
+		 */
+		val = DF_FICAA_V2_SET_REG(val, def.drd_reg >> 2);
+		break;
+	case DF_REV_4:
+		ficaa = DF_FICAA_V4;
+		ficad = DF_FICAD_LO_V4;
+		val = DF_FICAA_V4_SET_REG(val, def.drd_reg >> 2);
+		break;
+	default:
+		panic("encountered unexpected DF rev: %u", df_rev);
+	}
+
+	amdzen_stub_put32(df->adf_funcs[ficaa.drd_func], ficaa.drd_reg, val);
+	if (do_64) {
+		return (amdzen_stub_get64(df->adf_funcs[ficad.drd_func],
+		    ficad.drd_reg));
+	} else {
+		return (amdzen_stub_get32(df->adf_funcs[ficad.drd_func],
+		    ficad.drd_reg));
+	}
+}
+
 /*
  * Perform a targeted 32-bit indirect read to a specific instance and function.
  */
 static uint32_t
-amdzen_df_read32(amdzen_t *azn, amdzen_df_t *df, uint8_t inst, uint8_t func,
-    uint16_t reg)
+amdzen_df_read32(amdzen_t *azn, amdzen_df_t *df, uint8_t inst,
+    const df_reg_def_t def)
 {
-	uint32_t val;
-
-	VERIFY(MUTEX_HELD(&azn->azn_mutex));
-	val = AMDZEN_DF_F4_FICAA_TARG_INST | AMDZEN_DF_F4_FICAA_SET_REG(reg) |
-	    AMDZEN_DF_F4_FICAA_SET_FUNC(func) |
-	    AMDZEN_DF_F4_FICAA_SET_INST(inst);
-	amdzen_stub_put32(df->adf_funcs[4], AMDZEN_DF_F4_FICAA, val);
-	return (amdzen_stub_get32(df->adf_funcs[4], AMDZEN_DF_F4_FICAD_LO));
+	return (amdzen_df_read_regdef(azn, df, def, inst, B_FALSE));
 }
 
 /*
- * Perform a targeted 64-bit indirect read to a specific instance and function.
+ * For a broadcast read, just go to the underlying PCI function and perform a
+ * read. At this point in time, we don't believe we need to use the FICAA/FICAD
+ * to access it (though it does have a broadcast mode).
  */
-static uint64_t
-amdzen_df_read64(amdzen_t *azn, amdzen_df_t *df, uint8_t inst, uint8_t func,
-    uint16_t reg)
+static uint32_t
+amdzen_df_read32_bcast(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def)
 {
-	uint32_t val;
-
 	VERIFY(MUTEX_HELD(&azn->azn_mutex));
-	val = AMDZEN_DF_F4_FICAA_TARG_INST | AMDZEN_DF_F4_FICAA_SET_REG(reg) |
-	    AMDZEN_DF_F4_FICAA_SET_FUNC(func) |
-	    AMDZEN_DF_F4_FICAA_SET_INST(inst) | AMDZEN_DF_F4_FICAA_SET_64B;
-	amdzen_stub_put32(df->adf_funcs[4], AMDZEN_DF_F4_FICAA, val);
-	return (amdzen_stub_get64(df->adf_funcs[4], AMDZEN_DF_F4_FICAD_LO));
+	return (amdzen_stub_get32(df->adf_funcs[def.drd_func], def.drd_reg));
 }
+
 
 static uint32_t
 amdzen_smn_read32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg)
@@ -316,9 +444,34 @@ amdzen_c_df_count(void)
 	return (ret);
 }
 
+df_rev_t
+amdzen_c_df_rev(void)
+{
+	amdzen_df_t *df;
+	amdzen_t *azn = amdzen_data;
+	df_rev_t rev;
+
+	/*
+	 * Always use the first DF instance to determine what we're using. Our
+	 * current assumption, which seems to generally be true, is that the
+	 * given DF revisions are the same in a given system when the DFs are
+	 * directly connected.
+	 */
+	mutex_enter(&azn->azn_mutex);
+	df = amdzen_df_find(azn, 0);
+	if (df == NULL) {
+		rev = DF_REV_UNKNOWN;
+	} else {
+		rev = df->adf_rev;
+	}
+	mutex_exit(&azn->azn_mutex);
+
+	return (rev);
+}
+
 int
-amdzen_c_df_read32(uint_t dfno, uint8_t inst, uint8_t func,
-    uint16_t reg, uint32_t *valp)
+amdzen_c_df_read32(uint_t dfno, uint8_t inst, const df_reg_def_t def,
+    uint32_t *valp)
 {
 	amdzen_df_t *df;
 	amdzen_t *azn = amdzen_data;
@@ -330,15 +483,15 @@ amdzen_c_df_read32(uint_t dfno, uint8_t inst, uint8_t func,
 		return (ENOENT);
 	}
 
-	*valp = amdzen_df_read32(azn, df, inst, func, reg);
+	*valp = amdzen_df_read_regdef(azn, df, def, inst, B_FALSE);
 	mutex_exit(&azn->azn_mutex);
 
 	return (0);
 }
 
 int
-amdzen_c_df_read64(uint_t dfno, uint8_t inst, uint8_t func,
-    uint16_t reg, uint64_t *valp)
+amdzen_c_df_read64(uint_t dfno, uint8_t inst, const df_reg_def_t def,
+    uint64_t *valp)
 {
 	amdzen_df_t *df;
 	amdzen_t *azn = amdzen_data;
@@ -350,9 +503,109 @@ amdzen_c_df_read64(uint_t dfno, uint8_t inst, uint8_t func,
 		return (ENOENT);
 	}
 
-	*valp = amdzen_df_read64(azn, df, inst, func, reg);
+	*valp = amdzen_df_read_regdef(azn, df, def, inst, B_TRUE);
 	mutex_exit(&azn->azn_mutex);
 
+	return (0);
+}
+
+int
+amdzen_c_df_iter(uint_t dfno, zen_df_type_t type, amdzen_c_iter_f func,
+    void *arg)
+{
+	amdzen_df_t *df;
+	amdzen_t *azn = amdzen_data;
+	df_type_t df_type;
+	uint8_t df_subtype;
+
+	/*
+	 * Unlike other calls here, we hold our lock only to find the DF here.
+	 * The main reason for this is the nature of the callback function.
+	 * Folks are iterating over instances so they can call back into us. If
+	 * you look at the locking statement, the thing that is most volatile
+	 * right here and what we need to protect is the DF itself and
+	 * subsequent register accesses to it. The actual data about which
+	 * entities exist is static and so once we have found a DF we should
+	 * hopefully be in good shape as they only come, but don't go.
+	 */
+	mutex_enter(&azn->azn_mutex);
+	df = amdzen_df_find(azn, dfno);
+	if (df == NULL) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOENT);
+	}
+	mutex_exit(&azn->azn_mutex);
+
+	switch (type) {
+	case ZEN_DF_TYPE_CS_UMC:
+		df_type = DF_TYPE_CS;
+		/*
+		 * In the original Zeppelin DFv2 die there was no subtype field
+		 * used for the CS. The UMC is the only type and has a subtype
+		 * of zero.
+		 */
+		if (df->adf_rev != DF_REV_2) {
+			df_subtype = DF_CS_SUBTYPE_UMC;
+		} else {
+			df_subtype = 0;
+		}
+		break;
+	case ZEN_DF_TYPE_CCM_CPU:
+		df_type = DF_TYPE_CCM;
+		/*
+		 * In the Genoa/DFv4 timeframe, with the introduction of CXL and
+		 * related, a subtype was added here where as previously it was
+		 * always zero.
+		 */
+		if (df->adf_major >= 4) {
+			df_subtype = DF_CCM_SUBTYPE_CPU;
+		} else {
+			df_subtype = 0;
+		}
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	for (uint_t i = 0; i < df->adf_nents; i++) {
+		amdzen_df_ent_t *ent = &df->adf_ents[i];
+
+		/*
+		 * Some DF components are not considered enabled and therefore
+		 * will end up having bogus values in their ID fields. If we do
+		 * not have an enable flag set, we must skip this node.
+		 */
+		if ((ent->adfe_flags & AMDZEN_DFE_F_ENABLED) == 0)
+			continue;
+
+		if (ent->adfe_type == df_type &&
+		    ent->adfe_subtype == df_subtype) {
+			int ret = func(dfno, ent->adfe_fabric_id,
+			    ent->adfe_inst_id, arg);
+			if (ret != 0) {
+				return (ret);
+			}
+		}
+	}
+
+	return (0);
+}
+
+int
+amdzen_c_df_fabric_decomp(df_fabric_decomp_t *decomp)
+{
+	const amdzen_df_t *df;
+	amdzen_t *azn = amdzen_data;
+
+	mutex_enter(&azn->azn_mutex);
+	df = amdzen_df_find(azn, 0);
+	if (df == NULL) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOENT);
+	}
+
+	*decomp = df->adf_decomp;
+	mutex_exit(&azn->azn_mutex);
 	return (0);
 }
 
@@ -477,6 +730,218 @@ amdzen_is_rome_style(uint_t id)
 }
 
 /*
+ * To be able to do most other things we want to do, we must first determine
+ * what revision of the DF (data fabric) that we're using.
+ *
+ * Snapshot the df version. This was added explicitly in DFv4.0, around the Zen
+ * 4 timeframe and allows us to tell apart different version of the DF register
+ * set, most usefully when various subtypes were added.
+ *
+ * Older versions can theoretically be told apart based on usage of reserved
+ * registers. We walk these in the following order, starting with the newest rev
+ * and walking backwards to tell things apart:
+ *
+ *   o v3.5 -> Check function 1, register 0x150. This was reserved prior
+ *             to this point. This is actually DF_FIDMASK0_V3P5. We are supposed
+ *             to check bits [7:0].
+ *
+ *   o v3.0 -> Check function 1, register 0x208. The low byte (7:0) was
+ *             changed to indicate a component mask. This is non-zero
+ *             in the 3.0 generation. This is actually DF_FIDMASK_V2.
+ *
+ *   o v2.0 -> This is just the not that case. Presumably v1 wasn't part
+ *             of the Zen generation.
+ *
+ * Because we don't know what version we are yet, we do not use the normal
+ * versioned register accesses which would check what DF version we are and
+ * would want to use the normal indirect register accesses (which also require
+ * us to know the version). We instead do direct broadcast reads.
+ */
+static void
+amdzen_determine_df_vers(amdzen_t *azn, amdzen_df_t *df)
+{
+	uint32_t val;
+	df_reg_def_t rd = DF_FBICNT;
+
+	val = amdzen_stub_get32(df->adf_funcs[rd.drd_func], rd.drd_reg);
+	df->adf_major = DF_FBICNT_V4_GET_MAJOR(val);
+	df->adf_minor = DF_FBICNT_V4_GET_MINOR(val);
+	if (df->adf_major == 0 && df->adf_minor == 0) {
+		rd = DF_FIDMASK0_V3P5;
+		val = amdzen_stub_get32(df->adf_funcs[rd.drd_func], rd.drd_reg);
+		if (bitx32(val, 7, 0) != 0) {
+			df->adf_major = 3;
+			df->adf_minor = 5;
+			df->adf_rev = DF_REV_3P5;
+		} else {
+			rd = DF_FIDMASK_V2;
+			val = amdzen_stub_get32(df->adf_funcs[rd.drd_func],
+			    rd.drd_reg);
+			if (bitx32(val, 7, 0) != 0) {
+				df->adf_major = 3;
+				df->adf_minor = 0;
+				df->adf_rev = DF_REV_3;
+			} else {
+				df->adf_major = 2;
+				df->adf_minor = 0;
+				df->adf_rev = DF_REV_2;
+			}
+		}
+	} else if (df->adf_major == 4 && df->adf_minor == 0) {
+		df->adf_rev = DF_REV_4;
+	} else {
+		df->adf_rev = DF_REV_UNKNOWN;
+	}
+}
+
+/*
+ * All of the different versions of the DF have different ways of getting at and
+ * answering the question of how do I break a fabric ID into a corresponding
+ * socket, die, and component. Importantly the goal here is to obtain, cache,
+ * and normalize:
+ *
+ *  o The DF System Configuration
+ *  o The various Mask registers
+ *  o The Node ID
+ */
+static void
+amdzen_determine_fabric_decomp(amdzen_t *azn, amdzen_df_t *df)
+{
+	uint32_t mask;
+	df_fabric_decomp_t *decomp = &df->adf_decomp;
+
+	switch (df->adf_rev) {
+	case DF_REV_2:
+		df->adf_syscfg = amdzen_df_read32_bcast(azn, df, DF_SYSCFG_V2);
+		switch (DF_SYSCFG_V2_GET_MY_TYPE(df->adf_syscfg)) {
+		case DF_DIE_TYPE_CPU:
+			mask = amdzen_df_read32_bcast(azn, df,
+			    DF_DIEMASK_CPU_V2);
+			break;
+		case DF_DIE_TYPE_APU:
+			mask = amdzen_df_read32_bcast(azn, df,
+			    DF_DIEMASK_APU_V2);
+			break;
+		default:
+			panic("DF thinks we're not on a CPU!");
+		}
+		df->adf_mask0 = mask;
+
+		/*
+		 * DFv2 is a bit different in how the fabric mask register is
+		 * phrased. Logically a fabric ID is broken into something that
+		 * uniquely identifies a "node" (a particular die on a socket)
+		 * and something that identifies a "component", e.g. a memory
+		 * controller.
+		 *
+		 * Starting with DFv3, these registers logically called out how
+		 * to separate the fabric ID first into a node and a component.
+		 * Then the node was then broken down into a socket and die. In
+		 * DFv2, there is no separate mask and shift of a node. Instead
+		 * the socket and die are absolute offsets into the fabric ID
+		 * rather than relative offsets into the node ID. As such, when
+		 * we encounter DFv2, we fake up a node mask and shift and make
+		 * it look like DFv3+.
+		 */
+		decomp->dfd_node_mask = DF_DIEMASK_V2_GET_SOCK_MASK(mask) |
+		    DF_DIEMASK_V2_GET_DIE_MASK(mask);
+		decomp->dfd_node_shift = DF_DIEMASK_V2_GET_DIE_SHIFT(mask);
+		decomp->dfd_comp_mask = DF_DIEMASK_V2_GET_COMP_MASK(mask);
+		decomp->dfd_comp_shift = 0;
+
+		decomp->dfd_sock_mask = DF_DIEMASK_V2_GET_SOCK_MASK(mask) >>
+		    decomp->dfd_node_shift;
+		decomp->dfd_die_mask = DF_DIEMASK_V2_GET_DIE_MASK(mask) >>
+		    decomp->dfd_node_shift;
+		decomp->dfd_sock_shift = DF_DIEMASK_V2_GET_SOCK_SHIFT(mask) -
+		    decomp->dfd_node_shift;
+		decomp->dfd_die_shift = DF_DIEMASK_V2_GET_DIE_SHIFT(mask) -
+		    decomp->dfd_node_shift;
+		ASSERT3U(decomp->dfd_die_shift, ==, 0);
+		break;
+	case DF_REV_3:
+		df->adf_syscfg = amdzen_df_read32_bcast(azn, df, DF_SYSCFG_V3);
+		df->adf_mask0 =  amdzen_df_read32_bcast(azn, df,
+		    DF_FIDMASK0_V3);
+		df->adf_mask1 =  amdzen_df_read32_bcast(azn, df,
+		    DF_FIDMASK1_V3);
+
+		decomp->dfd_sock_mask =
+		    DF_FIDMASK1_V3_GET_SOCK_MASK(df->adf_mask1);
+		decomp->dfd_sock_shift =
+		    DF_FIDMASK1_V3_GET_SOCK_SHIFT(df->adf_mask1);
+		decomp->dfd_die_mask =
+		    DF_FIDMASK1_V3_GET_DIE_MASK(df->adf_mask1);
+		decomp->dfd_die_shift = 0;
+		decomp->dfd_node_mask =
+		    DF_FIDMASK0_V3_GET_NODE_MASK(df->adf_mask0);
+		decomp->dfd_node_shift =
+		    DF_FIDMASK1_V3_GET_NODE_SHIFT(df->adf_mask1);
+		decomp->dfd_comp_mask =
+		    DF_FIDMASK0_V3_GET_COMP_MASK(df->adf_mask0);
+		decomp->dfd_comp_shift = 0;
+		break;
+	case DF_REV_3P5:
+		df->adf_syscfg = amdzen_df_read32_bcast(azn, df,
+		    DF_SYSCFG_V3P5);
+		df->adf_mask0 =  amdzen_df_read32_bcast(azn, df,
+		    DF_FIDMASK0_V3P5);
+		df->adf_mask1 =  amdzen_df_read32_bcast(azn, df,
+		    DF_FIDMASK1_V3P5);
+		df->adf_mask2 =  amdzen_df_read32_bcast(azn, df,
+		    DF_FIDMASK2_V3P5);
+
+		decomp->dfd_sock_mask =
+		    DF_FIDMASK2_V3P5_GET_SOCK_MASK(df->adf_mask2);
+		decomp->dfd_sock_shift =
+		    DF_FIDMASK1_V3P5_GET_SOCK_SHIFT(df->adf_mask1);
+		decomp->dfd_die_mask =
+		    DF_FIDMASK2_V3P5_GET_DIE_MASK(df->adf_mask2);
+		decomp->dfd_die_shift = 0;
+		decomp->dfd_node_mask =
+		    DF_FIDMASK0_V3P5_GET_NODE_MASK(df->adf_mask0);
+		decomp->dfd_node_shift =
+		    DF_FIDMASK1_V3P5_GET_NODE_SHIFT(df->adf_mask1);
+		decomp->dfd_comp_mask =
+		    DF_FIDMASK0_V3P5_GET_COMP_MASK(df->adf_mask0);
+		decomp->dfd_comp_shift = 0;
+		break;
+	case DF_REV_4:
+		df->adf_syscfg = amdzen_df_read32_bcast(azn, df, DF_SYSCFG_V4);
+		df->adf_mask0 =  amdzen_df_read32_bcast(azn, df,
+		    DF_FIDMASK0_V4);
+		df->adf_mask1 =  amdzen_df_read32_bcast(azn, df,
+		    DF_FIDMASK1_V4);
+		df->adf_mask2 =  amdzen_df_read32_bcast(azn, df,
+		    DF_FIDMASK2_V4);
+
+		/*
+		 * The DFv4 registers are at a different location in the DF;
+		 * however, the actual layout of fields is the same as DFv3.5.
+		 * This is why you see V3P5 below.
+		 */
+		decomp->dfd_sock_mask =
+		    DF_FIDMASK2_V3P5_GET_SOCK_MASK(df->adf_mask2);
+		decomp->dfd_sock_shift =
+		    DF_FIDMASK1_V3P5_GET_SOCK_SHIFT(df->adf_mask1);
+		decomp->dfd_die_mask =
+		    DF_FIDMASK2_V3P5_GET_DIE_MASK(df->adf_mask2);
+		decomp->dfd_die_shift = 0;
+		decomp->dfd_node_mask =
+		    DF_FIDMASK0_V3P5_GET_NODE_MASK(df->adf_mask0);
+		decomp->dfd_node_shift =
+		    DF_FIDMASK1_V3P5_GET_NODE_SHIFT(df->adf_mask1);
+		decomp->dfd_comp_mask =
+		    DF_FIDMASK0_V3P5_GET_COMP_MASK(df->adf_mask0);
+		decomp->dfd_comp_shift = 0;
+		break;
+	default:
+		panic("encountered suspicious, previously rejected DF "
+		    "rev: 0x%x", df->adf_rev);
+	}
+}
+
+/*
  * Initialize our knowledge about a given series of nodes on the data fabric.
  */
 static void
@@ -485,10 +950,25 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 	uint_t i;
 	uint32_t val;
 
-	val = amdzen_stub_get32(df->adf_funcs[0], AMDZEN_DF_F0_CFG_ADDR_CTL);
-	df->adf_nb_busno = AMDZEN_DF_F0_CFG_ADDR_CTL_BUS_NUM(val);
-	val = amdzen_stub_get32(df->adf_funcs[0], AMDZEN_DF_F0_FBICNT);
-	df->adf_nents = AMDZEN_DF_F0_FBICNT_COUNT(val);
+	amdzen_determine_df_vers(azn, df);
+
+	switch (df->adf_rev) {
+	case DF_REV_2:
+	case DF_REV_3:
+	case DF_REV_3P5:
+		val = amdzen_df_read32_bcast(azn, df, DF_CFG_ADDR_CTL_V2);
+		break;
+	case DF_REV_4:
+		val = amdzen_df_read32_bcast(azn, df, DF_CFG_ADDR_CTL_V4);
+		break;
+	default:
+		dev_err(azn->azn_dip, CE_WARN, "encountered unsupported DF "
+		    "revision: 0x%x", df->adf_rev);
+		return;
+	}
+	df->adf_nb_busno = DF_CFG_ADDR_CTL_GET_BUS_NUM(val);
+	val = amdzen_df_read32_bcast(azn, df, DF_FBICNT);
+	df->adf_nents = DF_FBICNT_GET_COUNT(val);
 	if (df->adf_nents == 0)
 		return;
 	df->adf_ents = kmem_zalloc(sizeof (amdzen_df_ent_t) * df->adf_nents,
@@ -503,7 +983,8 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 		 * while everything else we can find uses a contiguous instance
 		 * ID pattern.  This means that for Rome, we need to adjust the
 		 * indexes that we iterate over, though the total number of
-		 * entries is right.
+		 * entries is right. This was carried over into Milan, but not
+		 * Genoa.
 		 */
 		if (amdzen_is_rome_style(df->adf_funcs[0]->azns_did)) {
 			if (inst > ARRAY_SIZE(amdzen_df_rome_ids)) {
@@ -517,52 +998,50 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 		}
 
 		dfe->adfe_drvid = inst;
-		dfe->adfe_info0 = amdzen_df_read32(azn, df, inst, 0,
-		    AMDZEN_DF_F0_FBIINFO0);
-		dfe->adfe_info1 = amdzen_df_read32(azn, df, inst, 0,
-		    AMDZEN_DF_F0_FBIINFO1);
-		dfe->adfe_info2 = amdzen_df_read32(azn, df, inst, 0,
-		    AMDZEN_DF_F0_FBIINFO2);
-		dfe->adfe_info3 = amdzen_df_read32(azn, df, inst, 0,
-		    AMDZEN_DF_F0_FBIINFO3);
-		dfe->adfe_syscfg = amdzen_df_read32(azn, df, inst, 1,
-		    AMDZEN_DF_F1_SYSCFG);
-		dfe->adfe_mask0 = amdzen_df_read32(azn, df, inst, 1,
-		    AMDZEN_DF_F1_FIDMASK0);
-		dfe->adfe_mask1 = amdzen_df_read32(azn, df, inst, 1,
-		    AMDZEN_DF_F1_FIDMASK1);
+		dfe->adfe_info0 = amdzen_df_read32(azn, df, inst, DF_FBIINFO0);
+		dfe->adfe_info1 = amdzen_df_read32(azn, df, inst, DF_FBIINFO1);
+		dfe->adfe_info2 = amdzen_df_read32(azn, df, inst, DF_FBIINFO2);
+		dfe->adfe_info3 = amdzen_df_read32(azn, df, inst, DF_FBIINFO3);
 
-		dfe->adfe_type = AMDZEN_DF_F0_FBIINFO0_TYPE(dfe->adfe_info0);
-		dfe->adfe_sdp_width =
-		    AMDZEN_DF_F0_FBIINFO0_SDP_WIDTH(dfe->adfe_info0);
-		if (AMDZEN_DF_F0_FBIINFO0_ENABLED(dfe->adfe_info0)) {
+		dfe->adfe_type = DF_FBIINFO0_GET_TYPE(dfe->adfe_info0);
+		dfe->adfe_subtype = DF_FBIINFO0_GET_SUBTYPE(dfe->adfe_info0);
+
+		/*
+		 * The enabled flag was not present in Zen 1. Simulate it by
+		 * checking for a non-zero register instead.
+		 */
+		if (DF_FBIINFO0_V3_GET_ENABLED(dfe->adfe_info0) ||
+		    (df->adf_rev == DF_REV_2 && dfe->adfe_info0 != 0)) {
 			dfe->adfe_flags |= AMDZEN_DFE_F_ENABLED;
 		}
-		dfe->adfe_fti_width =
-		    AMDZEN_DF_F0_FBIINFO0_FTI_WIDTH(dfe->adfe_info0);
-		dfe->adfe_sdp_count =
-		    AMDZEN_DF_F0_FBIINFO0_SDP_PCOUNT(dfe->adfe_info0);
-		dfe->adfe_fti_count =
-		    AMDZEN_DF_F0_FBIINFO0_FTI_PCOUNT(dfe->adfe_info0);
-		if (AMDZEN_DF_F0_FBIINFO0_HAS_MCA(dfe->adfe_info0)) {
+		if (DF_FBIINFO0_GET_HAS_MCA(dfe->adfe_info0)) {
 			dfe->adfe_flags |= AMDZEN_DFE_F_MCA;
 		}
-		dfe->adfe_subtype =
-		    AMDZEN_DF_F0_FBIINFO0_SUBTYPE(dfe->adfe_info0);
-
-		dfe->adfe_inst_id =
-		    AMDZEN_DF_F0_FBIINFO3_INSTID(dfe->adfe_info3);
-		dfe->adfe_fabric_id =
-		    AMDZEN_DF_F0_FBIINFO3_FABID(dfe->adfe_info3);
+		dfe->adfe_inst_id = DF_FBIINFO3_GET_INSTID(dfe->adfe_info3);
+		switch (df->adf_rev) {
+		case DF_REV_2:
+			dfe->adfe_fabric_id =
+			    DF_FBIINFO3_V2_GET_BLOCKID(dfe->adfe_info3);
+			break;
+		case DF_REV_3:
+			dfe->adfe_fabric_id =
+			    DF_FBIINFO3_V3_GET_BLOCKID(dfe->adfe_info3);
+			break;
+		case DF_REV_3P5:
+			dfe->adfe_fabric_id =
+			    DF_FBIINFO3_V3P5_GET_BLOCKID(dfe->adfe_info3);
+			break;
+		case DF_REV_4:
+			dfe->adfe_fabric_id =
+			    DF_FBIINFO3_V4_GET_BLOCKID(dfe->adfe_info3);
+			break;
+		default:
+			panic("encountered suspicious, previously rejected DF "
+			    "rev: 0x%x", df->adf_rev);
+		}
 	}
 
-	df->adf_syscfg = amdzen_stub_get32(df->adf_funcs[1],
-	    AMDZEN_DF_F1_SYSCFG);
-	df->adf_nodeid = AMDZEN_DF_F1_SYSCFG_NODEID(df->adf_syscfg);
-	df->adf_mask0 = amdzen_stub_get32(df->adf_funcs[1],
-	    AMDZEN_DF_F1_FIDMASK0);
-	df->adf_mask1 = amdzen_stub_get32(df->adf_funcs[1],
-	    AMDZEN_DF_F1_FIDMASK1);
+	amdzen_determine_fabric_decomp(azn, df);
 }
 
 static void

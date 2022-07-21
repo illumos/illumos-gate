@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -2665,14 +2666,22 @@ imc_ioctl_decode(imc_t *imc, mc_encode_ioc_t *encode)
 			break;
 	}
 	encode->mcei_chip = i;
+	/*
+	 * These Intel platforms are all monolithic dies, so set the die to
+	 * zero.
+	 */
+	encode->mcei_die = 0;
 	encode->mcei_mc = dec.ids_tadid;
+	encode->mcei_chan_addr = dec.ids_chanaddr;
 	encode->mcei_chan = dec.ids_channelid;
 	encode->mcei_dimm = dec.ids_dimmid;
 	encode->mcei_rank_addr = dec.ids_rankaddr;
 	encode->mcei_rank = dec.ids_rankid;
 	encode->mcei_row = UINT32_MAX;
 	encode->mcei_column = UINT32_MAX;
-	encode->mcei_pad = 0;
+	encode->mcei_cs = encode->mcei_rm = UINT8_MAX;
+	encode->mcei_bank = encode->mcei_bank_group = UINT8_MAX;
+	encode->mcei_subchan = UINT8_MAX;
 }
 
 static int

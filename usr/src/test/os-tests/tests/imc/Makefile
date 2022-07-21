@@ -56,6 +56,9 @@ clean:
 
 $(CMDS): $(TESTDIR) $(PROG)
 
+$(TESTDIR):
+	$(INS.dir)
+
 $(TESTDIR)/%: %
 	$(INS.file)
 
