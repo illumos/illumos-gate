@@ -822,6 +822,7 @@ f kernel/drv/amd64/wc 0755 root sys
 f kernel/drv/amd64/xge 0755 root sys
 f kernel/drv/amd64/xhci 0755 root sys
 f kernel/drv/amd64/yge 0755 root sys
+f kernel/drv/amd64/zen_umc 0755 root sys
 f kernel/drv/amd64/zfs 0755 root sys
 f kernel/drv/amr.conf 0644 root sys
 f kernel/drv/arcmsr.conf 0644 root sys
@@ -3934,6 +3935,7 @@ f usr/include/sys/av/iec61883.h 0644 root bin
 f usr/include/sys/avintr.h 0644 root bin
 f usr/include/sys/avl.h 0644 root bin
 f usr/include/sys/avl_impl.h 0644 root bin
+f usr/include/sys/bitext.h 0644 root bin
 f usr/include/sys/bitmap.h 0644 root bin
 f usr/include/sys/bitset.h 0644 root bin
 f usr/include/sys/bl.h 0644 root bin
@@ -20181,6 +20183,15 @@ f usr/share/man/man9f/biomodified.9f 0444 root bin
 f usr/share/man/man9f/bioreset.9f 0444 root bin
 f usr/share/man/man9f/biosize.9f 0444 root bin
 f usr/share/man/man9f/biowait.9f 0444 root bin
+f usr/share/man/man9f/bitdel64.9f 0444 root bin
+s usr/share/man/man9f/bitset16.9f=bitset64.9f
+s usr/share/man/man9f/bitset32.9f=bitset64.9f
+f usr/share/man/man9f/bitset64.9f 0444 root bin
+s usr/share/man/man9f/bitset8.9f=bitset64.9f
+s usr/share/man/man9f/bitx16.9f=bitx64.9f
+s usr/share/man/man9f/bitx32.9f=bitx64.9f
+f usr/share/man/man9f/bitx64.9f 0444 root bin
+s usr/share/man/man9f/bitx8.9f=bitx64.9f
 f usr/share/man/man9f/bp_copyin.9f 0444 root bin
 f usr/share/man/man9f/bp_copyout.9f 0444 root bin
 f usr/share/man/man9f/bp_mapin.9f 0444 root bin
