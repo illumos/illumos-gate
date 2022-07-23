@@ -995,7 +995,12 @@ also menu-namespace
 	begin \ Loop forever
 
 		at-bl
+		\ restore cursor for case the getkey ends up in
+		\ booting the kernel. This does restore cursor for
+		\ serial terminals.
+		cursor-normal cursor-set
 		getkey     \ Block here, waiting for a key to be pressed
+		cursor-invisible cursor-set
 
 		dup -1 = if
 			cursor-normal cursor-set
