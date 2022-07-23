@@ -19,8 +19,8 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 RackTop Systems.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
@@ -106,9 +106,9 @@ export ENABLE_SMB_PRINTING=
 
 # If your distro uses certain versions of Python, make sure either
 # Makefile.master contains your new defaults OR your .env file sets them.
-#export PYTHON3_VERSION=3.5
-#export PYTHON3_PKGVERS=-35
-#export PYTHON3_SUFFIX=m
+#export PYTHON3_VERSION=3.9
+#export PYTHON3_PKGVERS=-39
+#export PYTHON3_SUFFIX=
 
 # Set console color scheme either by build type:
 #
