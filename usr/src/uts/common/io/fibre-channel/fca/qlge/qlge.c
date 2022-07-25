@@ -3388,7 +3388,7 @@ ql_alloc_tx_resources(qlge_t *qlge, struct tx_ring *tx_ring)
 	    (size_t)128, /* alignment:128 bytes boundary */
 	    (caddr_t *)&tx_ring->wq_dma.vaddr,
 	    &dma_cookie) != 0) {
-		bzero(&tx_ring->wq_dma, sizeof (&tx_ring->wq_dma));
+		bzero(&tx_ring->wq_dma, sizeof (tx_ring->wq_dma));
 		cmn_err(CE_WARN, "%s(%d): reqQ allocation failed.",
 		    __func__, qlge->instance);
 		return (DDI_FAILURE);

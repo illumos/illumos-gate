@@ -607,7 +607,7 @@ acpi_drv_cbat_ioctl(int index, int cmd, intptr_t arg, int mode, cred_t *cr,
 		bwarn.bw_enabled = acpi_drv_warn_enabled;
 		bwarn.bw_charge_warn = acpi_drv_syn_warn_per;
 		bwarn.bw_charge_low = acpi_drv_syn_low_per;
-		if (copyout(&bwarn, (void *)arg, sizeof (&bwarn))) {
+		if (copyout(&bwarn, (void *)arg, sizeof (bwarn))) {
 			res = EFAULT;
 		}
 		break;
@@ -731,7 +731,7 @@ acpi_drv_lid_ioctl(int index, int cmd, intptr_t arg, int mode, cred_t *cr,
 /*ARGSUSED*/
 static int
 acpi_drv_chpoll(dev_t dev, short events, int anyyet,  short *reventsp,
-	struct pollhead **phpp)
+    struct pollhead **phpp)
 {
 	if (!anyyet) {
 		*phpp = &acpi_drv_pollhead;

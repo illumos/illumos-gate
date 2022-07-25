@@ -6533,7 +6533,7 @@ nxge_mac_register(p_nxge_t nxgep)
 	} else {
 		macp->m_src_addr = KMEM_ZALLOC(MAXMACADDRLEN, KM_SLEEP);
 		macp->m_dst_addr = KMEM_ZALLOC(MAXMACADDRLEN, KM_SLEEP);
-		(void) memset(macp->m_src_addr, 0xff, sizeof (MAXMACADDRLEN));
+		(void) memset(macp->m_src_addr, 0xff, MAXMACADDRLEN);
 	}
 	macp->m_callbacks = &nxge_m_callbacks;
 	macp->m_min_sdu = 0;

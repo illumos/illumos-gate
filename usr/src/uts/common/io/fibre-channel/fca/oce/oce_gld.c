@@ -174,7 +174,7 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 		return (EINVAL);
 	}
 	/* Allocate the local array for holding the addresses temporarily */
-	bzero(&mca_hw_list, sizeof (&mca_hw_list));
+	bzero(&mca_hw_list, sizeof (mca_hw_list));
 	mca_drv_list = &dev->multi_cast[0];
 
 	DEV_LOCK(dev);
