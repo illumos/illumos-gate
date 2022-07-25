@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Oxide Computer Company
  */
 
 
@@ -116,10 +117,7 @@ port_fd_callback(void *arg, int *events, pid_t pid, int flag, void *evp)
 		mutex_enter(&pcp->pc_lock);
 		pdp->pd_fp = NULL;
 		pdp->pd_events = 0;
-		if (pdp->pd_php != NULL) {
-			pollhead_delete(pdp->pd_php, pdp);
-			pdp->pd_php = NULL;
-		}
+		polldat_disassociate(pdp);
 		port_pcache_remove_fd(pcp, pfd);
 		mutex_exit(&pcp->pc_lock);
 		error = 0;
@@ -339,7 +337,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 
 	/*
 	 * To keep synchronization between VOP_POLL above and
-	 * pollhead_insert below, it is necessary to
+	 * polldat_associate() below, it is necessary to
 	 * call VOP_POLL() again (see port_bind_pollhead()).
 	 */
 	if (error) {
@@ -525,23 +523,21 @@ port_bind_pollhead(pollhead_t **php, polldat_t *pdp, short *revents)
 	int		error;
 	file_t		*fp;
 
-	/* polldat_t associated with another pollhead_t pointer */
-	if (pdp->pd_php != NULL)
-		pollhead_delete(pdp->pd_php, pdp);
+	/* break any existing association with pollhead */
+	polldat_disassociate(pdp);
 
 	/*
-	 * Before pollhead_insert() pollwakeup() will not detect a polldat
+	 * Before polldat_associate(), pollwakeup() will not detect a polldat
 	 * entry in the ph_list and the event notification will disappear.
 	 * This happens because polldat_t is still not associated with
 	 * the pointer to the pollhead_t structure.
 	 */
-	pollhead_insert(*php, pdp);
+	polldat_associate(pdp, *php);
 
 	/*
 	 * From now on event notification can be detected in pollwakeup(),
 	 * Use VOP_POLL() again to check the current status of the event.
 	 */
-	pdp->pd_php = *php;
 	fp = pdp->pd_fp;
 	curthread->t_pollcache = (pollcache_t *)pdp->pd_pcache;
 	error = VOP_POLL(fp->f_vnode, pdp->pd_events, 0, revents, php, NULL);

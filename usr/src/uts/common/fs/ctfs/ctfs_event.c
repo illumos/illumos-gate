@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -88,6 +86,7 @@ ctfs_endpoint_inactive(ctfs_endpoint_t *endpt)
 		endpt->ctfs_endpt_flags = 0;
 		cte_remove_listener(&endpt->ctfs_endpt_listener);
 	}
+	pollhead_clean(&endpt->ctfs_endpt_listener.ctl_pollhead);
 	mutex_exit(&endpt->ctfs_endpt_lock);
 }
 

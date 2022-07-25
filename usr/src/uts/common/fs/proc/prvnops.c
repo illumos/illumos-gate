@@ -4951,9 +4951,11 @@ prfreecommon(prcommon_t *pcp)
 		mutex_exit(&pcp->prc_mutex);
 	else {
 		mutex_exit(&pcp->prc_mutex);
-		ASSERT(pcp->prc_pollhead.ph_list == NULL);
+
 		ASSERT(pcp->prc_refcnt == 0);
 		ASSERT(pcp->prc_selfopens == 0 && pcp->prc_writers == 0);
+
+		pollhead_clean(&pcp->prc_pollhead);
 		mutex_destroy(&pcp->prc_mutex);
 		cv_destroy(&pcp->prc_wait);
 		kmem_free(pcp, sizeof (prcommon_t));

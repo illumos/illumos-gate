@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -334,11 +335,7 @@ repoll:
 					pdp->pd_fp = NULL;
 					pdp->pd_events = 0;
 
-					if (pdp->pd_php != NULL) {
-						pollhead_delete(pdp->pd_php,
-						    pdp);
-						pdp->pd_php = NULL;
-					}
+					polldat_disassociate(pdp);
 
 					BT_CLEAR(pcp->pc_bitmap, fd);
 				} else if (pfdp != NULL) {
@@ -379,10 +376,7 @@ repoll:
 				 * that a valid one will be provided as part of
 				 * the later VOP_POLL.
 				 */
-				if (pdp->pd_php != NULL) {
-					pollhead_delete(pdp->pd_php, pdp);
-					pdp->pd_php = NULL;
-				}
+				polldat_disassociate(pdp);
 
 				/*
 				 * Since epoll is expected to act on the
@@ -467,9 +461,8 @@ repoll:
 			 */
 			if (php != NULL && pdp->pd_php != NULL &&
 			    php != pdp->pd_php) {
-				pollhead_delete(pdp->pd_php, pdp);
-				pdp->pd_php = php;
-				pollhead_insert(php, pdp);
+				polldat_disassociate(pdp);
+				polldat_associate(pdp, php);
 				/*
 				 * The bit should still be set.
 				 */
@@ -567,11 +560,7 @@ repoll:
 					 * later add/modify event rearms them.
 					 */
 					pdp->pd_events = POLLONESHOT;
-					if (pdp->pd_php != NULL) {
-						pollhead_delete(pdp->pd_php,
-						    pdp);
-						pdp->pd_php = NULL;
-					}
+					polldat_disassociate(pdp);
 					BT_CLEAR(pcp->pc_bitmap, fd);
 				} else if (pdp->pd_events & POLLET) {
 					/*
@@ -582,8 +571,7 @@ repoll:
 					 */
 					if (php != NULL &&
 					    pdp->pd_php == NULL) {
-						pollhead_insert(php, pdp);
-						pdp->pd_php = php;
+						polldat_associate(pdp, php);
 					}
 
 					/*
@@ -614,12 +602,12 @@ repoll:
 					BT_CLEAR(pcp->pc_bitmap, fd);
 				}
 				if (pdp->pd_php == NULL) {
-					pollhead_insert(php, pdp);
-					pdp->pd_php = php;
+					polldat_associate(pdp, php);
 					/*
 					 * An event of interest may have
 					 * arrived between the VOP_POLL() and
-					 * the pollhead_insert(); check again.
+					 * the polldat_associate(), so we
+					 * must check again.
 					 */
 					goto repoll;
 				}
@@ -1043,7 +1031,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			 * We always set the bit when this fd is cached;
 			 * this forces the first DP_POLL to poll this fd.
 			 * Real performance gain comes from subsequent
-			 * DP_POLL.  We also attempt a pollhead_insert();
+			 * DP_POLL.  We also attempt a polldat_associate();
 			 * if it's not possible, we'll do it in dpioctl().
 			 */
 			BT_SET(pcp->pc_bitmap, fd);
@@ -1056,14 +1044,11 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			pdp->pd_events |= pfdp->events;
 			if (php != NULL) {
 				if (pdp->pd_php == NULL) {
-					pollhead_insert(php, pdp);
-					pdp->pd_php = php;
+					polldat_associate(pdp, php);
 				} else {
 					if (pdp->pd_php != php) {
-						pollhead_delete(pdp->pd_php,
-						    pdp);
-						pollhead_insert(php, pdp);
-						pdp->pd_php = php;
+						polldat_disassociate(pdp);
+						polldat_associate(pdp, php);
 					}
 				}
 			}
@@ -1087,10 +1072,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			pdp->pd_fp = NULL;
 			pdp->pd_events = 0;
 			ASSERT(pdp->pd_thread == NULL);
-			if (pdp->pd_php != NULL) {
-				pollhead_delete(pdp->pd_php, pdp);
-				pdp->pd_php = NULL;
-			}
+			polldat_disassociate(pdp);
 			BT_CLEAR(pcp->pc_bitmap, fd);
 		}
 	}
@@ -1662,11 +1644,8 @@ dpclose(dev_t dev, int flag, int otyp, cred_t *credp)
 	hashtbl = pcp->pc_hash;
 	for (i = 0; i < pcp->pc_hashsize; i++) {
 		for (pdp = hashtbl[i]; pdp; pdp = pdp->pd_hashnext) {
-			if (pdp->pd_php != NULL) {
-				pollhead_delete(pdp->pd_php, pdp);
-				pdp->pd_php = NULL;
-				pdp->pd_fp = NULL;
-			}
+			polldat_disassociate(pdp);
+			pdp->pd_fp = NULL;
 		}
 	}
 	/*

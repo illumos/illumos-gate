@@ -25,11 +25,12 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -198,18 +199,18 @@ static int plist_chkdupfd(file_t *, polldat_t *, pollstate_t *, pollfd_t *, int,
  *
  * When removing a polled fd from poll cache, the fd is always removed
  * from pollhead list first and then from fpollinfo list, i.e.,
- * pollhead_delete() is called before delfpollinfo().
+ * polldat_disassociate() is called before delfpollinfo().
  *
  *
  * Locking hierarchy:
  *	pc_no_exit is a leaf level lock.
  *	ps_lock is held when acquiring pc_lock (except when pollwakeup
  *	acquires pc_lock).
- *	pc_lock might be held when acquiring PHLOCK (pollhead_insert/
- *	pollhead_delete)
+ *	pc_lock might be held when acquiring PHLOCK (polldat_associate/
+ *	polldat_disassociate)
  *	pc_lock is always held (but this is not required)
- *	when acquiring PHLOCK (in polladd/pollhead_delete and pollwakeup called
- *	from pcache_clean_entry).
+ *	when acquiring PHLOCK (in polladd/polldat_disassociate and pollwakeup
+ *	called from pcache_clean_entry).
  *	pc_lock is held across addfpollinfo/delfpollinfo which acquire
  *	uf_lock.
  *	pc_lock is held across getf/releasef which acquire uf_lock.
@@ -780,7 +781,7 @@ retry:
 		if ((pdp->pd_events & events) ||
 		    (events & (POLLHUP | POLLERR))) {
 
-			pollcache_t 	*pcp;
+			pollcache_t	*pcp;
 
 			if (pdp->pd_portev != NULL) {
 				port_kevent_t	*pkevp = pdp->pd_portev;
@@ -933,53 +934,87 @@ pollnotify(pollcache_t *pcp, int fd)
 }
 
 /*
- * add a polldat entry to pollhead ph_list. The polldat struct is used
- * by pollwakeup to wake sleeping pollers when polled events has happened.
+ * Associate a polldat entry with a pollhead (add it to ph_list).
+ *
+ * The polldat struct is used by pollwakeup to wake sleeping pollers when polled
+ * events has happened.
  */
 void
-pollhead_insert(pollhead_t *php, polldat_t *pdp)
+polldat_associate(polldat_t *pdp, pollhead_t *php)
 {
+	ASSERT3P(pdp->pd_php, ==, NULL);
+	ASSERT3P(pdp->pd_next, ==, NULL);
+
 	PH_ENTER(php);
-	ASSERT(pdp->pd_next == NULL);
 #ifdef DEBUG
-	{
-		/*
-		 * the polldat should not be already on the list
-		 */
-		polldat_t *wp;
-		for (wp = php->ph_list; wp; wp = wp->pd_next) {
-			ASSERT(wp != pdp);
-		}
+	/* The polldat should not be already on the list */
+	for (polldat_t *wp = php->ph_list; wp != NULL; wp = wp->pd_next) {
+		ASSERT3P(wp, !=, pdp);
 	}
 #endif	/* DEBUG */
+
 	pdp->pd_next = php->ph_list;
 	php->ph_list = pdp;
+	pdp->pd_php = php;
 	PH_EXIT(php);
 }
 
 /*
- * Delete the polldat entry from ph_list.
+ * Disassociate a polldat from its pollhead (if such an association exists).
  */
 void
-pollhead_delete(pollhead_t *php, polldat_t *pdp)
+polldat_disassociate(polldat_t *pdp)
 {
-	polldat_t *wp;
-	polldat_t **wpp;
+	pollhead_t *php;
 
-	PH_ENTER(php);
-	for (wpp = &php->ph_list; (wp = *wpp) != NULL; wpp = &wp->pd_next) {
+	/*
+	 * Acquire the lock for the pollhead which this polldat is associated
+	 * with.  This must be done with care, re-checking pd_php after entering
+	 * the pollhead lock, since a racing pollhead_clean() could have already
+	 * performed the disassociation.
+	 */
+	for (;;) {
+		php = pdp->pd_php;
+		if (php == NULL) {
+			/* polldat is not associated with a pollhead */
+			return;
+		}
+
+		/*
+		 * The lock for a given pollhead is not stored in the pollhead
+		 * itself, but is rather a global entry in an array (plocks)
+		 * which the pollhead pointer hashes into (see: PHLOCK()).
+		 */
+		PH_ENTER(php);
+		if (pdp->pd_php == php) {
+			break;
+		}
+		PH_EXIT(php);
+	}
+
+	polldat_t **wpp = &php->ph_list, *wp = php->ph_list;
+	while (wp != NULL) {
 		if (wp == pdp) {
+			/* Unlink the polldat from the list */
 			*wpp = pdp->pd_next;
 			pdp->pd_next = NULL;
 			break;
 		}
+		wpp = &wp->pd_next;
+		wp = wp->pd_next;
 	}
+
 #ifdef DEBUG
-	/* assert that pdp is no longer in the list */
+	/* It would be unexpected if pdp was not in the pollhead list */
+	ASSERT(wp != NULL);
+
+	/* Assert that pdp is not duplicated somewhere later in the list */
 	for (wp = *wpp; wp; wp = wp->pd_next) {
 		ASSERT(wp != pdp);
 	}
 #endif	/* DEBUG */
+
+	pdp->pd_php = NULL;
 	PH_EXIT(php);
 }
 
@@ -1149,7 +1184,7 @@ pcache_grow_hashtbl(pollcache_t *pcp, nfds_t nfds)
 void
 pcache_grow_map(pollcache_t *pcp, int fd)
 {
-	int  	newsize;
+	int	newsize;
 	ulong_t	*newmap;
 
 	/*
@@ -1187,10 +1222,7 @@ pcache_clean(pollcache_t *pcp)
 	hashtbl = pcp->pc_hash;
 	for (i = 0; i < pcp->pc_hashsize; i++) {
 		for (pdp = hashtbl[i]; pdp; pdp = pdp->pd_hashnext) {
-			if (pdp->pd_php != NULL) {
-				pollhead_delete(pdp->pd_php, pdp);
-				pdp->pd_php = NULL;
-			}
+			polldat_disassociate(pdp);
 			if (pdp->pd_fp != NULL) {
 				delfpollinfo(pdp->pd_fd);
 				pdp->pd_fp = NULL;
@@ -1202,7 +1234,7 @@ pcache_clean(pollcache_t *pcp)
 void
 pcacheset_invalidate(pollstate_t *ps, polldat_t *pdp)
 {
-	int 	i;
+	int	i;
 	int	fd = pdp->pd_fd;
 
 	/*
@@ -1374,8 +1406,7 @@ pcache_insert(pollstate_t *ps, file_t *fp, pollfd_t *pollfdp, int *fdcntp,
 	}
 	if (memphp) {
 		if (pdp->pd_php == NULL) {
-			pollhead_insert(memphp, pdp);
-			pdp->pd_php = memphp;
+			polldat_associate(pdp, memphp);
 		} else {
 			if (memphp != pdp->pd_php) {
 				/*
@@ -1383,9 +1414,8 @@ pcache_insert(pollstate_t *ps, file_t *fp, pollfd_t *pollfdp, int *fdcntp,
 				 * may change the vnode and thus the pollhead
 				 * pointer out from underneath us.
 				 */
-				pollhead_delete(pdp->pd_php, pdp);
-				pollhead_insert(memphp, pdp);
-				pdp->pd_php = memphp;
+				polldat_disassociate(pdp);
+				polldat_associate(pdp, memphp);
 			}
 		}
 	}
@@ -1428,16 +1458,14 @@ pcache_delete_fd(pollstate_t *ps, int fd, size_t pos, int which, uint_t cevent)
 		refp->xf_position = POLLPOSINVAL;
 		ASSERT(refp->xf_refcnt == 1);
 		refp->xf_refcnt = 0;
-		if (pdp->pd_php) {
-			/*
-			 * It is possible for a wakeup thread to get ahead
-			 * of the following pollhead_delete and set the bit in
-			 * bitmap.  It is OK because the bit will be cleared
-			 * here anyway.
-			 */
-			pollhead_delete(pdp->pd_php, pdp);
-			pdp->pd_php = NULL;
-		}
+
+		/*
+		 * It is possible for a wakeup thread to get ahead of the
+		 * following polldat_disassociate and set the bit in bitmap.
+		 * That is OK because the bit will be cleared here anyway.
+		 */
+		polldat_disassociate(pdp);
+
 		pdp->pd_count = 0;
 		if (pdp->pd_fp != NULL) {
 			pdp->pd_fp = NULL;
@@ -1506,7 +1534,7 @@ pcache_update_xref(pollcache_t *pcp, int fd, ssize_t pos, int which)
 static int
 pollchecksanity(pollstate_t *ps, nfds_t nfds)
 {
-	int    		i;
+	int		i;
 	int		fd;
 	pollcache_t	*pcp = ps->ps_pcache;
 	polldat_t	*pdp;
@@ -1544,7 +1572,7 @@ pollchecksanity(pollstate_t *ps, nfds_t nfds)
 int
 pcacheset_resolve(pollstate_t *ps, nfds_t nfds, int *fdcntp, int which)
 {
-	int    		i;
+	int		i;
 	pollcache_t	*pcp = ps->ps_pcache;
 	pollfd_t	*newlist = NULL;
 	pollfd_t	*current = ps->ps_pollfd;
@@ -1868,8 +1896,8 @@ pcache_poll(pollfd_t *pollfdp, pollstate_t *ps, nfds_t nfds, int *fdcntp,
 {
 	int		i;
 	pollcache_t	*pcp;
-	int 		fd;
-	int 		begin, end, done;
+	int		fd;
+	int		begin, end, done;
 	pollhead_t	*php;
 	int		fdcnt;
 	int		error = 0;
@@ -2011,9 +2039,8 @@ retry:
 			if (php != NULL && pdp->pd_php != NULL &&
 			    php != pdp->pd_php) {
 				releasef(fd);
-				pollhead_delete(pdp->pd_php, pdp);
-				pdp->pd_php = php;
-				pollhead_insert(php, pdp);
+				polldat_disassociate(pdp);
+				polldat_associate(pdp, php);
 				/*
 				 * We could have missed a wakeup on the new
 				 * target device. Make sure the new target
@@ -2064,8 +2091,7 @@ retry:
 				 * do it now.
 				 */
 				if ((pdp->pd_php == NULL) && (php != NULL)) {
-					pdp->pd_php = php;
-					pollhead_insert(php, pdp);
+					polldat_associate(pdp, php);
 					/*
 					 * We are inserting a polldat struct for
 					 * the first time. We may have missed a
@@ -2246,9 +2272,14 @@ pcache_clean_entry(pollstate_t *ps, int fd)
 		}
 	}
 	if (pdp->pd_php) {
+		/*
+		 * Using pdp->pd_php is a bit risky here, as we lack any
+		 * protection from a racing close operation which could free
+		 * that pollhead prior to pollwakeup() acquiring the locks
+		 * necessary to make it safe.
+		 */
 		pollwakeup(pdp->pd_php, POLLHUP);
-		pollhead_delete(pdp->pd_php, pdp);
-		pdp->pd_php = NULL;
+		polldat_disassociate(pdp);
 	}
 }
 
@@ -3040,9 +3071,8 @@ plist_chkdupfd(file_t *fp, polldat_t *pdp, pollstate_t *psp, pollfd_t *pollfdp,
 				 */
 				if (php != NULL && pdp->pd_php != NULL &&
 				    php != pdp->pd_php) {
-					pollhead_delete(pdp->pd_php, pdp);
-					pdp->pd_php = php;
-					pollhead_insert(php, pdp);
+					polldat_disassociate(pdp);
+					polldat_associate(pdp, php);
 					/*
 					 * We could have missed a wakeup on the
 					 * new target device. Make sure the new

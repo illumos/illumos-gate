@@ -802,8 +802,7 @@ ksocket_spoll(ksocket_t ks, int timo, short events, short *revents,
 	pdp->pd_events = events;
 	pdp->pd_pcache = pcp;
 	pcache_insert_fd(pcp, pdp, 1);
-	pollhead_insert(php, pdp);
-	pdp->pd_php = php;
+	polldat_associate(pdp, php);
 
 	mutex_enter(&pcp->pc_lock);
 	while (!(so->so_state & SS_CLOSING)) {
@@ -836,11 +835,8 @@ ksocket_spoll(ksocket_t ks, int timo, short events, short *revents,
 	}
 	mutex_exit(&pcp->pc_lock);
 
-	if (pdp->pd_php != NULL) {
-		pollhead_delete(pdp->pd_php, pdp);
-		pdp->pd_php = NULL;
-		pdp->pd_fd = 0;
-	}
+	polldat_disassociate(pdp);
+	pdp->pd_fd = 0;
 
 	/*
 	 * pollwakeup() may still interact with this pollcache. Wait until

@@ -116,7 +116,7 @@ typedef struct uverbs_ufile_uobj {
 	kmutex_t			lock;
 	int				ref;
 	kcondvar_t			poll_wait;
-	struct pollhead			poll_head;
+	pollhead_t			poll_head;
 	struct uverbs_uctxt_uobj	*uctxt;
 	int				is_async;
 	llist_head_t			event_list;

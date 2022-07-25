@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Oxide Computer Company
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file containts all the functions required for interactions of
@@ -623,10 +622,7 @@ port_remove_fd_object(portfd_t *pfd, port_t *pp, port_fdcache_t *pcp)
 	int		removed = 0;
 
 	ASSERT(MUTEX_HELD(&pcp->pc_lock));
-	if (pdp->pd_php != NULL) {
-		pollhead_delete(pdp->pd_php, pdp);
-		pdp->pd_php = NULL;
-	}
+	polldat_disassociate(pdp);
 	pkevp =  pdp->pd_portev;
 	portq = &pp->port_queue;
 	mutex_enter(&portq->portq_mutex);

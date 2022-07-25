@@ -84,7 +84,7 @@ struct ipmi_request {
 /* Per file descriptor data. */
 typedef struct ipmi_device {
 	TAILQ_HEAD(, ipmi_request) ipmi_completed_requests;
-	pollhead_t		*ipmi_pollhead;
+	pollhead_t		ipmi_pollhead;
 	int			ipmi_requests;
 	uchar_t			ipmi_address;	/* IPMB address. */
 	uchar_t			ipmi_lun;
