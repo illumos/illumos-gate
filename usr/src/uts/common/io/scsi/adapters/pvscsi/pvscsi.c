@@ -1141,6 +1141,7 @@ pvscsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	pvscsi_device_t		*pd;
 	pvscsi_softc_t		*pvs;
 	int			rc;
+	boolean_t		poll;
 
 	/* make sure the packet is sane */
 	if ((pkt->pkt_numcookies > PVSCSI_MAX_SG_SIZE) ||
@@ -1154,7 +1155,7 @@ pvscsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	ASSERT(cmd->pkt == pkt);
 
-	cmd->poll = ((pkt->pkt_flags & FLAG_NOINTR) != 0);
+	poll = cmd->poll = ((pkt->pkt_flags & FLAG_NOINTR) != 0);
 
 	if (pkt->pkt_flags & (FLAG_HTAG|FLAG_HEAD)) {
 		cmd->tag = MSG_HEAD_QTAG;
@@ -1198,7 +1199,7 @@ pvscsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	rc = pvscsi_transport_command(pvs, cmd);
 
-	if (cmd->poll && rc == TRAN_ACCEPT) {
+	if (poll && rc == TRAN_ACCEPT) {
 		pvscsi_poll_cmd(pvs, cmd);
 		pvscsi_set_status(pvs, cmd);
 	}
