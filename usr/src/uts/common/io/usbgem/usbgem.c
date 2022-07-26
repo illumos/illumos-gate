@@ -33,6 +33,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Garrett D'Amore
  */
 
 /*
@@ -266,151 +267,6 @@ usbgem_timestamp_nz()
 	now = ddi_get_lbolt();
 	return (now ? now : (clock_t)1);
 }
-
-#ifdef USBGEM_DEBUG_LEVEL
-#ifdef USBGEM_DEBUG_VLAN
-#ifdef notdef
-#include <netinet/in.h>
-#endif
-static void
-usbgem_dump_packet(struct usbgem_dev *dp, char *title, mblk_t *mp,
-    boolean_t check_cksum)
-{
-	char	msg[180];
-	uint8_t	buf[18+20+20];
-	uint8_t	*p;
-	size_t	offset;
-	uint_t	ethertype;
-	uint_t	proto;
-	uint_t	ipproto = 0;
-	uint_t	iplen;
-	uint_t	iphlen;
-	uint_t	tcplen;
-	uint_t	udplen;
-	uint_t	cksum;
-	int	rest;
-	int	len;
-	char	*bp;
-	mblk_t	*tp;
-	extern uint_t	ip_cksum(mblk_t *, int, uint32_t);
-
-	msg[0] = 0;
-	bp = msg;
-
-	rest = sizeof (buf);
-	offset = 0;
-	for (tp = mp; tp; tp = tp->b_cont) {
-		len = tp->b_wptr - tp->b_rptr;
-		len = min(rest, len);
-		bcopy(tp->b_rptr, &buf[offset], len);
-		rest -= len;
-		offset += len;
-		if (rest == 0) {
-			break;
-		}
-	}
-
-	offset = 0;
-	p = &buf[offset];
-
-	/* ethernet address */
-	sprintf(bp,
-	    "ether: %02x:%02x:%02x:%02x:%02x:%02x"
-	    " -> %02x:%02x:%02x:%02x:%02x:%02x",
-	    p[6], p[7], p[8], p[9], p[10], p[11],
-	    p[0], p[1], p[2], p[3], p[4], p[5]);
-	bp = &msg[strlen(msg)];
-
-	/* vlag tag and etherrtype */
-	ethertype = GET_ETHERTYPE(p);
-	if (ethertype == VTAG_TPID) {
-		sprintf(bp, " vtag:0x%04x", GET_NET16(&p[14]));
-		bp = &msg[strlen(msg)];
-
-		offset += VTAG_SIZE;
-		p = &buf[offset];
-		ethertype = GET_ETHERTYPE(p);
-	}
-	sprintf(bp, " type:%04x", ethertype);
-	bp = &msg[strlen(msg)];
-
-	/* ethernet packet length */
-	sprintf(bp, " mblklen:%d", msgdsize(mp));
-	bp = &msg[strlen(msg)];
-	if (mp->b_cont) {
-		sprintf(bp, "(");
-		bp = &msg[strlen(msg)];
-		for (tp = mp; tp; tp = tp->b_cont) {
-			if (tp == mp) {
-				sprintf(bp, "%d", tp->b_wptr - tp->b_rptr);
-			} else {
-				sprintf(bp, "+%d", tp->b_wptr - tp->b_rptr);
-			}
-			bp = &msg[strlen(msg)];
-		}
-		sprintf(bp, ")");
-		bp = &msg[strlen(msg)];
-	}
-
-	if (ethertype != ETHERTYPE_IP) {
-		goto x;
-	}
-
-	/* ip address */
-	offset += sizeof (struct ether_header);
-	p = &buf[offset];
-	ipproto = p[9];
-	iplen = GET_NET16(&p[2]);
-	sprintf(bp, ", ip: %d.%d.%d.%d -> %d.%d.%d.%d proto:%d iplen:%d",
-	    p[12], p[13], p[14], p[15],
-	    p[16], p[17], p[18], p[19],
-	    ipproto, iplen);
-	bp = (void *)&msg[strlen(msg)];
-
-	iphlen = (p[0] & 0xf) * 4;
-
-	/* cksum for psuedo header */
-	cksum = *(uint16_t *)&p[12];
-	cksum += *(uint16_t *)&p[14];
-	cksum += *(uint16_t *)&p[16];
-	cksum += *(uint16_t *)&p[18];
-	cksum += BE_16(ipproto);
-
-	/* tcp or udp protocol header */
-	offset += iphlen;
-	p = &buf[offset];
-	if (ipproto == IPPROTO_TCP) {
-		tcplen = iplen - iphlen;
-		sprintf(bp, ", tcp: len:%d cksum:%x",
-		    tcplen, GET_NET16(&p[16]));
-		bp = (void *)&msg[strlen(msg)];
-
-		if (check_cksum) {
-			cksum += BE_16(tcplen);
-			cksum = (uint16_t)ip_cksum(mp, offset, cksum);
-			sprintf(bp, " (%s)",
-			    (cksum == 0 || cksum == 0xffff) ? "ok" : "ng");
-			bp = (void *)&msg[strlen(msg)];
-		}
-	} else if (ipproto == IPPROTO_UDP) {
-		udplen = GET_NET16(&p[4]);
-		sprintf(bp, ", udp: len:%d cksum:%x",
-		    udplen, GET_NET16(&p[6]));
-		bp = (void *)&msg[strlen(msg)];
-
-		if (GET_NET16(&p[6]) && check_cksum) {
-			cksum += *(uint16_t *)&p[4];
-			cksum = (uint16_t)ip_cksum(mp, offset, cksum);
-			sprintf(bp, " (%s)",
-			    (cksum == 0 || cksum == 0xffff) ? "ok" : "ng");
-			bp = (void *)&msg[strlen(msg)];
-		}
-	}
-x:
-	cmn_err(CE_CONT, "!%s: %s: %s", dp->name, title, msg);
-}
-#endif /* USBGEM_DEBUG_VLAN */
-#endif /* USBGEM_DEBUG_LEVEL */
 
 /* ============================================================== */
 /*
@@ -856,9 +712,6 @@ usbgem_restart_nic(struct usbgem_dev *dp)
 done:
 	return (USB_SUCCESS);
 err:
-#ifdef GEM_CONFIG_FMA
-	ddi_fm_service_impact(dp->dip, DDI_SERVICE_DEGRADED);
-#endif
 	return (USB_FAILURE);
 }
 
@@ -2597,7 +2450,6 @@ enum ioc_reply {
 };
 
 
-#ifdef USBGEM_CONFIG_MAC_PROP
 static int
 usbgem_get_def_val(struct usbgem_dev *dp, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val)
@@ -3106,7 +2958,6 @@ usbgem_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	rw_exit(&dp->dev_state_lock);
 	return (err);
 }
-#endif /* USBGEM_CONFIG_MAC_PROP */
 
 static void
 usbgem_mac_ioctl(struct usbgem_dev *dp, queue_t *wq, mblk_t *mp)
@@ -3128,16 +2979,6 @@ usbgem_mac_ioctl(struct usbgem_dev *dp, queue_t *wq, mblk_t *mp)
 	miocnak(wq, mp, 0, EINVAL);
 }
 
-#ifndef SYS_MAC_H
-#define	XCVR_UNDEFINED	0
-#define	XCVR_NONE	1
-#define	XCVR_10		2
-#define	XCVR_100T4	3
-#define	XCVR_100X	4
-#define	XCVR_100T2	5
-#define	XCVR_1000X	6
-#define	XCVR_1000T	7
-#endif
 static int
 usbgem_mac_xcvr_inuse(struct usbgem_dev *dp)
 {
@@ -3308,9 +3149,6 @@ usbgem_m_multicst(void *arg, boolean_t add, const uint8_t *ep)
 
 	err = 0;
 	if (ret != USB_SUCCESS) {
-#ifdef GEM_CONFIG_FMA
-		ddi_fm_service_impact(dp->dip, DDI_SERVICE_DEGRADED);
-#endif
 		err = EIO;
 	}
 
@@ -3344,11 +3182,6 @@ usbgem_m_setpromisc(void *arg, boolean_t on)
 
 	rw_exit(&dp->dev_state_lock);
 
-#ifdef GEM_CONFIG_FMA
-	if (err != 0) {
-		ddi_fm_service_impact(dp->dip, DDI_SERVICE_DEGRADED);
-	}
-#endif
 	return (err);
 }
 
@@ -3367,14 +3200,7 @@ usbgem_m_getstat(void *arg, uint_t stat, uint64_t *valp)
 		return (0);
 	}
 
-	/* LINTED */
-	if (usbgem_hal_get_stats(dp) != USB_SUCCESS) {
-#ifdef GEM_CONFIG_FMA
-		rw_exit(&dp->dev_state_lock);
-		ddi_fm_service_impact(dp->dip, DDI_SERVICE_DEGRADED);
-		return (EIO);
-#endif
-	}
+	(void) usbgem_hal_get_stats(dp);
 	rw_exit(&dp->dev_state_lock);
 
 	switch (stat) {
@@ -3700,11 +3526,6 @@ usbgem_m_unicst(void *arg, const uint8_t *mac)
 	sema_v(&dp->rxfilter_lock);
 	rw_exit(&dp->dev_state_lock);
 
-#ifdef GEM_CONFIG_FMA
-	if (err != 0) {
-		ddi_fm_service_impact(dp->dip, DDI_SERVICE_DEGRADED);
-	}
-#endif
 	return (err);
 }
 
@@ -4027,215 +3848,6 @@ usbgem_read_conf(struct usbgem_dev *dp)
 #endif
 }
 
-/*
- * usbem kstat support
- */
-#ifndef GEM_CONFIG_GLDv3
-/* kstat items based from dmfe driver */
-
-struct usbgem_kstat_named {
-	struct kstat_named	ks_xcvr_addr;
-	struct kstat_named	ks_xcvr_id;
-	struct kstat_named	ks_xcvr_inuse;
-	struct kstat_named	ks_link_up;
-	struct kstat_named	ks_link_duplex;	/* 0:unknwon, 1:half, 2:full */
-	struct kstat_named	ks_cap_1000fdx;
-	struct kstat_named	ks_cap_1000hdx;
-	struct kstat_named	ks_cap_100fdx;
-	struct kstat_named	ks_cap_100hdx;
-	struct kstat_named	ks_cap_10fdx;
-	struct kstat_named	ks_cap_10hdx;
-#ifdef NEVER
-	struct kstat_named	ks_cap_remfault;
-#endif
-	struct kstat_named	ks_cap_autoneg;
-
-	struct kstat_named	ks_adv_cap_1000fdx;
-	struct kstat_named	ks_adv_cap_1000hdx;
-	struct kstat_named	ks_adv_cap_100fdx;
-	struct kstat_named	ks_adv_cap_100hdx;
-	struct kstat_named	ks_adv_cap_10fdx;
-	struct kstat_named	ks_adv_cap_10hdx;
-#ifdef NEVER
-	struct kstat_named	ks_adv_cap_remfault;
-#endif
-	struct kstat_named	ks_adv_cap_autoneg;
-	struct kstat_named	ks_lp_cap_1000fdx;
-	struct kstat_named	ks_lp_cap_1000hdx;
-	struct kstat_named	ks_lp_cap_100fdx;
-	struct kstat_named	ks_lp_cap_100hdx;
-	struct kstat_named	ks_lp_cap_10fdx;
-	struct kstat_named	ks_lp_cap_10hdx;
-	struct kstat_named	ks_lp_cap_remfault;
-	struct kstat_named	ks_lp_cap_autoneg;
-};
-
-static int
-usbgem_kstat_update(kstat_t *ksp, int rw)
-{
-	struct usbgem_kstat_named *knp;
-	struct usbgem_dev *dp = (struct usbgem_dev *)ksp->ks_private;
-
-	if (rw != KSTAT_READ) {
-		return (0);
-	}
-
-	knp = (struct usbgem_kstat_named *)ksp->ks_data;
-
-	knp->ks_xcvr_addr.value.ul = dp->mii_phy_addr;
-	knp->ks_xcvr_id.value.ul = dp->mii_phy_id;
-	knp->ks_xcvr_inuse.value.ul = usbgem_mac_xcvr_inuse(dp);
-	knp->ks_link_up.value.ul = dp->mii_state == MII_STATE_LINKUP;
-	knp->ks_link_duplex.value.ul =
-	    (dp->mii_state == MII_STATE_LINKUP) ?
-	    (dp->full_duplex ? 2 : 1) : 0;
-
-	knp->ks_cap_1000fdx.value.ul =
-	    (dp->mii_xstatus & MII_XSTATUS_1000BASET_FD) ||
-	    (dp->mii_xstatus & MII_XSTATUS_1000BASEX_FD);
-	knp->ks_cap_1000hdx.value.ul =
-	    (dp->mii_xstatus & MII_XSTATUS_1000BASET) ||
-	    (dp->mii_xstatus & MII_XSTATUS_1000BASEX);
-	knp->ks_cap_100fdx.value.ul =
-	    BOOLEAN(dp->mii_status & MII_STATUS_100_BASEX_FD);
-	knp->ks_cap_100hdx.value.ul =
-	    BOOLEAN(dp->mii_status & MII_STATUS_100_BASEX);
-	knp->ks_cap_10fdx.value.ul =
-	    BOOLEAN(dp->mii_status & MII_STATUS_10_FD);
-	knp->ks_cap_10hdx.value.ul =
-	    BOOLEAN(dp->mii_status & MII_STATUS_10);
-#ifdef NEVER
-	knp->ks_cap_remfault.value.ul = B_TRUE;
-#endif
-	knp->ks_cap_autoneg.value.ul =
-	    BOOLEAN(dp->mii_status & MII_STATUS_CANAUTONEG);
-
-	knp->ks_adv_cap_1000fdx.value.ul = dp->anadv_1000fdx;
-	knp->ks_adv_cap_1000hdx.value.ul = dp->anadv_1000hdx;
-	knp->ks_adv_cap_100fdx.value.ul	= dp->anadv_100fdx;
-	knp->ks_adv_cap_100hdx.value.ul	= dp->anadv_100hdx;
-	knp->ks_adv_cap_10fdx.value.ul	= dp->anadv_10fdx;
-	knp->ks_adv_cap_10hdx.value.ul	= dp->anadv_10hdx;
-#ifdef NEVER
-	knp->ks_adv_cap_remfault.value.ul = 0;
-#endif
-	knp->ks_adv_cap_autoneg.value.ul = dp->anadv_autoneg;
-
-	knp->ks_lp_cap_1000fdx.value.ul =
-	    BOOLEAN(dp->mii_stat1000 & MII_1000TS_LP_FULL);
-	knp->ks_lp_cap_1000hdx.value.ul =
-	    BOOLEAN(dp->mii_stat1000 & MII_1000TS_LP_HALF);
-	knp->ks_lp_cap_100fdx.value.ul =
-	    BOOLEAN(dp->mii_lpable & MII_ABILITY_100BASE_TX_FD);
-	knp->ks_lp_cap_100hdx.value.ul =
-	    BOOLEAN(dp->mii_lpable & MII_ABILITY_100BASE_TX);
-	knp->ks_lp_cap_10fdx.value.ul =
-	    BOOLEAN(dp->mii_lpable & MII_ABILITY_10BASE_T_FD);
-	knp->ks_lp_cap_10hdx.value.ul =
-	    BOOLEAN(dp->mii_lpable & MII_ABILITY_10BASE_T);
-	knp->ks_lp_cap_remfault.value.ul =
-	    BOOLEAN(dp->mii_exp & MII_AN_EXP_PARFAULT);
-	knp->ks_lp_cap_autoneg.value.ul =
-	    BOOLEAN(dp->mii_exp & MII_AN_EXP_LPCANAN);
-
-	return (0);
-}
-
-
-static int
-usbgem_kstat_init(struct usbgem_dev *dp)
-{
-	int			i;
-	kstat_t			*ksp;
-	struct usbgem_kstat_named	*knp;
-
-	ksp = kstat_create(
-	    (char *)ddi_driver_name(dp->dip), ddi_get_instance(dp->dip),
-	    "mii", "net", KSTAT_TYPE_NAMED,
-	    sizeof (*knp) / sizeof (knp->ks_xcvr_addr), 0);
-
-	if (ksp == NULL) {
-		cmn_err(CE_WARN, "%s: %s() for mii failed",
-		    dp->name, __func__);
-		return (USB_FAILURE);
-	}
-
-	knp = (struct usbgem_kstat_named *)ksp->ks_data;
-
-	kstat_named_init(&knp->ks_xcvr_addr, "xcvr_addr",
-	    KSTAT_DATA_INT32);
-	kstat_named_init(&knp->ks_xcvr_id, "xcvr_id",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_xcvr_inuse, "xcvr_inuse",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_link_up, "link_up",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_link_duplex, "link_duplex",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_cap_1000fdx, "cap_1000fdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_cap_1000hdx, "cap_1000hdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_cap_100fdx, "cap_100fdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_cap_100hdx, "cap_100hdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_cap_10fdx, "cap_10fdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_cap_10hdx, "cap_10hdx",
-	    KSTAT_DATA_UINT32);
-#ifdef NEVER
-	kstat_named_init(&knp->ks_cap_remfault, "cap_rem_fault",
-	    KSTAT_DATA_UINT32);
-#endif
-	kstat_named_init(&knp->ks_cap_autoneg, "cap_autoneg",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_adv_cap_1000fdx, "adv_cap_1000fdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_adv_cap_1000hdx, "adv_cap_1000hdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_adv_cap_100fdx, "adv_cap_100fdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_adv_cap_100hdx, "adv_cap_100hdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_adv_cap_10fdx, "adv_cap_10fdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_adv_cap_10hdx, "adv_cap_10hdx",
-	    KSTAT_DATA_UINT32);
-#ifdef NEVER
-	kstat_named_init(&knp->ks_adv_cap_remfault, "adv_rem_fault",
-	    KSTAT_DATA_UINT32);
-#endif
-	kstat_named_init(&knp->ks_adv_cap_autoneg, "adv_cap_autoneg",
-	    KSTAT_DATA_UINT32);
-
-	kstat_named_init(&knp->ks_lp_cap_1000fdx, "lp_cap_1000fdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_lp_cap_1000hdx, "lp_cap_1000hdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_lp_cap_100fdx, "lp_cap_100fdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_lp_cap_100hdx, "lp_cap_100hdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_lp_cap_10fdx, "lp_cap_10fdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_lp_cap_10hdx, "lp_cap_10hdx",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_lp_cap_remfault, "lp_cap_rem_fault",
-	    KSTAT_DATA_UINT32);
-	kstat_named_init(&knp->ks_lp_cap_autoneg, "lp_cap_autoneg",
-	    KSTAT_DATA_UINT32);
-
-	ksp->ks_private = (void *) dp;
-	ksp->ks_update = usbgem_kstat_update;
-	dp->ksp = ksp;
-
-	kstat_install(ksp);
-
-	return (USB_SUCCESS);
-}
-#endif /* GEM_CONFIG_GLDv3 */
-/* ======================================================================== */
 /*
  * attach/detatch/usb support
  */

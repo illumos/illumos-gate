@@ -504,7 +504,7 @@ bridge_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	switch (pr_num) {
 	case MAC_PROP_STATUS:
 		ASSERT(pr_valsize >= sizeof (bmp->bm_linkstate));
-		bcopy(&bmp->bm_linkstate, pr_val, sizeof (&bmp->bm_linkstate));
+		bcopy(&bmp->bm_linkstate, pr_val, sizeof (bmp->bm_linkstate));
 		break;
 
 	default:

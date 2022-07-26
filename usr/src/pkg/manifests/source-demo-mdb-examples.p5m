@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2022 Garrett D'Amore
 #
 
 set name=pkg.fmri value=pkg:/source/demo/mdb-examples@$(PKGVERS)
@@ -37,16 +38,12 @@ file path=usr/demo/mdb/Makefile
 file path=usr/demo/mdb/Makefile.amd64
 file path=usr/demo/mdb/Makefile.common
 file path=usr/demo/mdb/Makefile.i386
-file path=usr/demo/mdb/Makefile.sparc
-file path=usr/demo/mdb/Makefile.sparcv9
 file path=usr/demo/mdb/README
 dir  path=usr/demo/mdb/amd64
 dir  path=usr/demo/mdb/common
 file path=usr/demo/mdb/common/example1.c
 file path=usr/demo/mdb/common/example2.c
 dir  path=usr/demo/mdb/i386
-dir  path=usr/demo/mdb/sparc
-dir  path=usr/demo/mdb/sparcv9
 legacy pkg=SUNWmdbdm \
     desc="Modular Debugger (MDB) demonstration modules and source code" \
     name="Modular Debugger Demo Source"

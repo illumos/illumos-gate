@@ -63,7 +63,6 @@ ASFLAGS += -P -D_ASM $(INCDIRS:%=-I%) $(ARCHOPTS)
 #
 STACKPROTECT = none
 
-SUBDIR64_sparc		= sparcv9
 SUBDIR64_i386		= amd64
 SUBDIR64		= $(SUBDIR64_$(MACH))
 

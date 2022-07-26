@@ -253,7 +253,7 @@ extern "C" {
 /*
  * IOCTL private to sockfs.
  */
-#define	_SIOCSOCKFALLBACK _IOW('i', 169, 0)
+#define	_SIOCSOCKFALLBACK _IOW('i', 169, int)
 
 /*
  * IOCTLs for getting and setting zone associated with an interface, and
@@ -287,15 +287,15 @@ extern "C" {
  * source filter for a particular multicast group.  Argument is
  * a struct group_filter.  Defined in RFC 3678.
  */
-#define	SIOCGMSFILTER	_IOWR('i', 178, 0)
-#define	SIOCSMSFILTER	_IOW('i', 179, 0)
+#define	SIOCGMSFILTER	_IOWR('i', 178, int)
+#define	SIOCSMSFILTER	_IOW('i', 179, int)
 /*
  * IPv4-specific versions of the above; get or set a socket's source
  * filter for a particular multicast group, for PF_INET sockets only.
  * Argument is a struct ip_msfilter.
  */
-#define	SIOCGIPMSFILTER	_IOWR('i', 180, 0)
-#define	SIOCSIPMSFILTER	_IOW('i', 181, 0)
+#define	SIOCGIPMSFILTER	_IOWR('i', 180, int)
+#define	SIOCSIPMSFILTER	_IOW('i', 181, int)
 
 /*
  * 182 can be reused (was consolidation-private SIOCSIPMPFAILBACK).
@@ -316,14 +316,14 @@ extern "C" {
 /*
  * Private ioctl for Integrated Load Balancer.  The ioctl length varies.
  */
-#define	SIOCILB		_IOWR('i', 187, 0)
+#define	SIOCILB		_IOWR('i', 187, int)
 
 /*
  * IOCTL's to get/set module specific or interface specific properties.
  * Argument is a struct mod_ioc_prop_s. These ioctls are Consolidation Private.
  */
 #define	SIOCGETPROP	_IOWRN('p', 188, 0)
-#define	SIOCSETPROP	_IOW('p', 189, 0)
+#define	SIOCSETPROP	_IOW('p', 189, int)
 
 /*
  * IOCTL used to check for the given ipif, whether DAD is in progress or

@@ -184,12 +184,6 @@ CERRWARN += -_smatch=-p=illumos_kernel
 include $(SRC)/Makefile.smatch
 
 #
-# Unfortunately, _IOWR() is regularly used with a third argument of 0,
-# so we have to disable all these smatch checks.
-#
-SMOFF += sizeof
-
-#
 # Add specific compiler options that are required based on the
 # architecture in question.
 #

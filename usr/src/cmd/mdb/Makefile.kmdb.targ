@@ -34,7 +34,6 @@ $(PROG).core: $(OBJS) $(KMDBLIBS) $(MAPFILE)
 $(PROG): $(PROG).core $(KCTLOBJS)
 	$(LD) -ztype=kmod -o $@ $@.core -Nmisc/ctf $(KCTLOBJS)
 	$(CTFMERGE) -l "$(UTS_LABEL)" -o $@ $(OBJS) $(KCTLOBJS)
-	$(KMDB_FPTEST)
 	$(POST_PROCESS)
 	$(SETDYNFLAG) -f DF_1_IGNMULDEF,DF_1_NOKSYMS $@
 
