@@ -105,7 +105,7 @@ only forth also support-functions also builtins definitions
   then
 
   \ allocate temporary space. max is:
-  \  7 kernel switches
+  \  8 kernel switches
   \  26 for acpi, so use 40 for safety
   blen alen 40 + + allocate abort" out of memory"
   to addr
@@ -173,6 +173,13 @@ only forth also support-functions also builtins definitions
   s" boot_ask" getenv dup -1 <> if
      s" YES" compare-insensitive 0= if
        [char] a addr len + c! len 1+ to len
+     then
+  else
+    drop
+  then
+  s" boot_noncluster" getenv dup -1 <> if
+     s" YES" compare-insensitive 0= if
+       [char] x addr len + c! len 1+ to len
      then
   else
     drop
@@ -288,6 +295,7 @@ only forth definitions also support-functions
 \ -k to boot_kmdb=YES
 \ -d to boot_drop_into_kmdb=YES
 \ -r to boot_reconfigure=YES
+\ -x to boot_noncluster=YES
 \ -B acpi-user-options=X to acpi-user-options=X
 \
 \ This is needed so that the menu can manage these options. Unfortunately, this
@@ -460,7 +468,9 @@ only forth definitions also support-functions
 	  s" set boot_reconfigure=YES" evaluate TRUE
 	else dup c@ [char] a = if
 	  s" set boot_ask=YES" evaluate TRUE
-	then then then then then then
+	else dup c@ [char] x = if
+	  s" set boot_noncluster=YES" evaluate TRUE
+	then then then then then then then
 	dup TRUE = if
 	  drop
 	  dup >r		( addr len len' addr' R: addr' )
