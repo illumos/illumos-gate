@@ -1340,6 +1340,8 @@ fx_tick(kthread_t *t)
 				thread_unlock_nopreempt(t);
 				return;
 			}
+			DTRACE_SCHED1(schedctl__failsafe,
+			    kthread_t *, t);
 			TNF_PROBE_2(schedctl_failsafe,
 			    "schedctl FX fx_tick", /* CSTYLED */,
 			    tnf_pid, pid, ttoproc(t)->p_pid,
