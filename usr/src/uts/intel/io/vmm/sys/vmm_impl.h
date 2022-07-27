@@ -13,7 +13,7 @@
 /*
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _VMM_IMPL_H_
@@ -67,6 +67,7 @@ struct vmm_softc {
 	list_t		vmm_holds;
 	uint_t		vmm_flags;
 	boolean_t	vmm_is_open;
+	boolean_t	vmm_autodestruct;
 
 	kmutex_t	vmm_lease_lock;
 	list_t		vmm_lease_list;
@@ -88,7 +89,7 @@ void vmm_zsd_init(void);
 void vmm_zsd_fini(void);
 int vmm_zsd_add_vm(vmm_softc_t *sc);
 void vmm_zsd_rem_vm(vmm_softc_t *sc);
-int vmm_do_vm_destroy(vmm_softc_t *, boolean_t);
+int vmm_zone_vm_destroy(vmm_softc_t *);
 
 #define	VMM_MODULE_NAME	"vmm"
 

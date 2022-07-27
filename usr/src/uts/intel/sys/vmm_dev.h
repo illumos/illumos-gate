@@ -385,7 +385,7 @@ struct vm_data_xfer {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	3
+#define	VMM_CURRENT_INTERFACE_VERSION	4
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
@@ -493,6 +493,8 @@ struct vm_data_xfer {
 
 #define	VM_DATA_READ			(VMM_IOC_BASE | 0x22)
 #define	VM_DATA_WRITE			(VMM_IOC_BASE | 0x23)
+
+#define	VM_SET_AUTODESTRUCT		(VMM_IOC_BASE | 0x24)
 
 #define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 

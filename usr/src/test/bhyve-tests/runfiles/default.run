@@ -22,6 +22,8 @@ outputdir = /var/tmp/test_results
 [/opt/bhyve-tests/tests/vmm]
 user = root
 tests = [
+	'auto_destruct',
+	'drv_hold',
 	'fpu_getset',
 	'interface_version',
 	'mem_devmem',

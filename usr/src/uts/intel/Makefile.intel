@@ -753,3 +753,8 @@ DRV_KMODS	+= viona
 #
 DRV_KMODS	+= ppt
 DRV_KMODS	+= vmm_vtd
+
+#
+# bhyve drv test interface
+#
+DRV_KMODS	+= vmm_drv_test
