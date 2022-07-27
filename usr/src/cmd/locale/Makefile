@@ -23,31 +23,20 @@
 # Copyright (c) 1997 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2022 Garrett D'Amore
 #
 
 PROG=	locale
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
-SUBDIRS=	$(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+all: $(PROG)
 
-all	:= TARGET = all
-install	:= TARGET = install
-clean	:= TARGET = clean
-clobber	:= TARGET = clobber
-lint	:= TARGET = lint
+install: all $(ROOTPROG)
+
+clean:
 
 .KEEP_STATE:
-
-all install:	$(SUBDIRS)
-
-clean clobber lint:	$(SUBDIRS)
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
 
 include ../Makefile.targ
