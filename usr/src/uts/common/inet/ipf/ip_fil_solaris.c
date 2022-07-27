@@ -1646,7 +1646,7 @@ mblk_t *m, **mpp;
 	qpi.qpi_data = ip;
 	fnew.fin_qpi = &qpi;
 	fnew.fin_ifp = fin->fin_ifp;
-	fnew.fin_flx = FI_NOCKSUM;
+	fnew.fin_flx = FI_NOCKSUM | FI_GENERATED;
 	fnew.fin_m = m;
 	fnew.fin_qfm = m;
 	fnew.fin_ip = ip;
@@ -2251,9 +2251,10 @@ frdest_t *fdp;
 	 * If we're forwarding (vs. injecting), check the src here, fin_ifp is
 	 * the src interface.
 	 */
-	if (fdp != NULL &&
-	   !fr_forwarding_enabled((phy_if_t)fin->fin_ifp, net_data_p))
+	if (fdp != NULL && !(fin->fin_flx & FI_GENERATED) &&
+	    !fr_forwarding_enabled((phy_if_t)fin->fin_ifp, net_data_p)) {
 		return (-1);
+	}
 
 	inj = net_inject_alloc(NETINFO_VERSION);
 	if (inj == NULL)
@@ -2320,8 +2321,10 @@ frdest_t *fdp;
 	}
 
 	/* If we're forwarding (vs. injecting), check the destinatation here. */
-	if (fdp != NULL && !fr_forwarding_enabled(inj->ni_physical, net_data_p))
+	if (fdp != NULL && !(fin->fin_flx & FI_GENERATED) &&
+	    !fr_forwarding_enabled(inj->ni_physical, net_data_p)) {
 		goto bad_fastroute;
+	}
 
 	/*
 	 * Clear the hardware checksum flags from packets that we are doing
