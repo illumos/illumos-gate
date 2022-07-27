@@ -78,6 +78,7 @@ extern void zfs_panic_recover(const char *fmt, ...);
 typedef struct zfs_dbgmsg {
 	list_node_t zdm_node;
 	time_t zdm_timestamp;
+	hrtime_t zdm_hrtime;
 	char zdm_msg[1]; /* variable length allocation */
 } zfs_dbgmsg_t;
 
