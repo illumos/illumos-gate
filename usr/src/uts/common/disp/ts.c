@@ -1687,6 +1687,8 @@ ts_tick(kthread_t *t)
 				return;
 			}
 
+			DTRACE_SCHED1(schedctl__failsafe,
+			    kthread_t *, t);
 			TNF_PROBE_2(schedctl_failsafe,
 			    "schedctl TS ts_tick", /* CSTYLED */,
 			    tnf_pid, pid, ttoproc(t)->p_pid,
