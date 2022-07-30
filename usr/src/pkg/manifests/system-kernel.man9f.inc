@@ -11,7 +11,7 @@
 
 #
 # Copyright 2017, Richard Lowe
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2022 Garrett D'Amore
 # Copyright 2020-2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Joyent, Inc.
@@ -437,7 +437,6 @@ link path=usr/share/man/man9f/ddi_get_soft_iblock_cookie.9f \
     target=ddi_add_softintr.9f
 link path=usr/share/man/man9f/ddi_get_soft_state.9f target=ddi_soft_state.9f
 file path=usr/share/man/man9f/ddi_get_time.9f
-file path=usr/share/man/man9f/ddi_getiminor.9f
 link path=usr/share/man/man9f/ddi_getlongprop.9f target=ddi_prop_op.9f
 link path=usr/share/man/man9f/ddi_getlongprop_buf.9f target=ddi_prop_op.9f
 link path=usr/share/man/man9f/ddi_getprop.9f target=ddi_prop_op.9f

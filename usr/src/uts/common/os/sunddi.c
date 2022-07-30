@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2022 Garrett D'Amore
  */
 
 #include <sys/note.h>
@@ -5323,16 +5323,6 @@ ddi_append_minor_node(dev_info_t *ddip, struct ddi_minor_data *dmdp)
 		dp->next = dmdp;
 	}
 	ndi_devi_exit(ddip, circ);
-}
-
-/*
- * Part of the obsolete SunCluster DDI Hooks.
- * Keep for binary compatibility
- */
-minor_t
-ddi_getiminor(dev_t dev)
-{
-	return (getminor(dev));
 }
 
 static int
