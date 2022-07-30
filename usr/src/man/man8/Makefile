@@ -429,7 +429,6 @@ _MANFILES=	6to4relay.8		\
 		scadm.8			\
 		sdpadm.8		\
 		sendmail.8		\
-		setuname.8		\
 		share.8			\
 		share_nfs.8		\
 		shareall.8		\
