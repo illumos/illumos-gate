@@ -60,7 +60,7 @@ extern uint_t prom_debug;
 	_NOTE(CONSTANTCONDITION)					\
 	} } while (0)
 
-extern void dboot_halt(void);
+extern void dboot_halt(void) __NORETURN;
 extern void *mem_alloc(uint32_t size);
 
 #define	RNDUP(x, y)	(((x) + ((y) - 1ul)) & ~((y) - 1ul))

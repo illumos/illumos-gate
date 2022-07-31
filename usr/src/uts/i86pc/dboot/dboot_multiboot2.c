@@ -19,10 +19,12 @@
 
 #include <sys/inttypes.h>
 #include <sys/param.h>
+#include <sys/machparam.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <sys/multiboot2.h>
 #include <sys/multiboot2_impl.h>
+#include <sys/efi.h>
 
 struct dboot_multiboot2_iterate_ctx;
 
@@ -229,6 +231,20 @@ dboot_multiboot2_get_mmap_tagp(multiboot2_info_header_t *mbi)
 	return (dboot_multiboot2_find_tag(mbi, MULTIBOOT_TAG_TYPE_MMAP));
 }
 
+multiboot_tag_efi_mmap_t *
+dboot_multiboot2_get_efi_mmap_tagp(multiboot2_info_header_t *mbi)
+{
+	multiboot_tag_efi_mmap_t *tagp;
+
+	/* Find tag and check the descriptor version. */
+	tagp = dboot_multiboot2_find_tag(mbi, MULTIBOOT_TAG_TYPE_EFI_MMAP);
+	if (tagp != NULL &&
+	    tagp->mb_descr_vers != EFI_MEMORY_DESCRIPTOR_VERSION)
+		tagp = NULL;
+
+	return (tagp);
+}
+
 boolean_t
 dboot_multiboot2_basicmeminfo(multiboot2_info_header_t *mbi,
     uint32_t *lower, uint32_t *upper)
@@ -247,86 +263,175 @@ dboot_multiboot2_basicmeminfo(multiboot2_info_header_t *mbi,
 /*
  * Return the type of mmap entry referenced by index.
  */
-uint32_t
-dboot_multiboot2_mmap_get_type(multiboot2_info_header_t *mbi,
-    multiboot_tag_mmap_t *mb2_mmap_tagp, int index)
+boolean_t
+dboot_multiboot2_mmap_get_type(multiboot2_info_header_t *mbi, int index,
+    uint32_t *typep)
 {
+	multiboot_tag_mmap_t *mb2_mmap_tagp;
 	multiboot_mmap_entry_t *mapentp;
 
-	if (mb2_mmap_tagp == NULL)
-		mb2_mmap_tagp = dboot_multiboot2_get_mmap_tagp(mbi);
+	if (dboot_multiboot2_mmap_nentries(mbi) < index)
+		return (B_FALSE);
 
+	mb2_mmap_tagp = dboot_multiboot2_get_mmap_tagp(mbi);
 	if (mb2_mmap_tagp == NULL)
-		return (0);
+		return (B_FALSE);
 
-	if (dboot_multiboot2_mmap_nentries(mbi, mb2_mmap_tagp) < index)
-		return (0);
+	if (dboot_multiboot2_mmap_nentries(mbi) < index)
+		return (B_FALSE);
 
 	mapentp = (multiboot_mmap_entry_t *)(mb2_mmap_tagp->mb_entries +
 	    index * mb2_mmap_tagp->mb_entry_size);
-	return (mapentp->mmap_type);
+	*typep = mapentp->mmap_type;
+	return (B_TRUE);
 }
 
 /*
  * Return the length of mmap entry referenced by index.
  */
-uint64_t
-dboot_multiboot2_mmap_get_length(multiboot2_info_header_t *mbi,
-    multiboot_tag_mmap_t *mb2_mmap_tagp, int index)
+boolean_t
+dboot_multiboot2_mmap_get_length(multiboot2_info_header_t *mbi, int index,
+    uint64_t *lengthp)
 {
+	multiboot_tag_mmap_t *mb2_mmap_tagp;
 	multiboot_mmap_entry_t *mapentp;
 
-	if (mb2_mmap_tagp == NULL)
-		mb2_mmap_tagp = dboot_multiboot2_get_mmap_tagp(mbi);
+	if (dboot_multiboot2_mmap_nentries(mbi) < index)
+		return (B_FALSE);
 
+	mb2_mmap_tagp = dboot_multiboot2_get_mmap_tagp(mbi);
 	if (mb2_mmap_tagp == NULL)
-		return (0);
-
-	if (dboot_multiboot2_mmap_nentries(mbi, mb2_mmap_tagp) < index)
-		return (0);
+		return (B_FALSE);
 
 	mapentp = (multiboot_mmap_entry_t *)(mb2_mmap_tagp->mb_entries +
 	    index * mb2_mmap_tagp->mb_entry_size);
-	return (mapentp->mmap_len);
+	*lengthp = mapentp->mmap_len;
+	return (B_TRUE);
 }
 
 /*
  * Return the address from mmap entry referenced by index.
  */
-uint64_t
-dboot_multiboot2_mmap_get_base(multiboot2_info_header_t *mbi,
-    multiboot_tag_mmap_t *mb2_mmap_tagp, int index)
+boolean_t
+dboot_multiboot2_mmap_get_base(multiboot2_info_header_t *mbi, int index,
+    uint64_t *basep)
 {
+	multiboot_tag_mmap_t *mb2_mmap_tagp;
 	multiboot_mmap_entry_t *mapentp;
 
-	if (mb2_mmap_tagp == NULL)
-		mb2_mmap_tagp = dboot_multiboot2_get_mmap_tagp(mbi);
+	if (dboot_multiboot2_mmap_nentries(mbi) < index)
+		return (B_FALSE);
 
+	mb2_mmap_tagp = dboot_multiboot2_get_mmap_tagp(mbi);
 	if (mb2_mmap_tagp == NULL)
-		return (0);
-
-	if (dboot_multiboot2_mmap_nentries(mbi, mb2_mmap_tagp) < index)
-		return (0);
+		return (B_FALSE);
 
 	mapentp = (multiboot_mmap_entry_t *)(mb2_mmap_tagp->mb_entries +
 	    index * mb2_mmap_tagp->mb_entry_size);
-	return (mapentp->mmap_addr);
+	*basep = mapentp->mmap_addr;
+	return (B_TRUE);
 }
 
 /*
  * Count and return the number of mmap entries provided by the tag.
  */
 int
-dboot_multiboot2_mmap_nentries(multiboot2_info_header_t *mbi,
-    multiboot_tag_mmap_t *mb2_mmap_tagp)
+dboot_multiboot2_mmap_nentries(multiboot2_info_header_t *mbi)
 {
-	if (mb2_mmap_tagp == NULL)
-		mb2_mmap_tagp = dboot_multiboot2_get_mmap_tagp(mbi);
+	multiboot_tag_mmap_t *mb2_mmap_tagp;
 
+	mb2_mmap_tagp = dboot_multiboot2_get_mmap_tagp(mbi);
 	if (mb2_mmap_tagp != NULL) {
 		return ((mb2_mmap_tagp->mb_size -
 		    offsetof(multiboot_tag_mmap_t, mb_entries)) /
 		    mb2_mmap_tagp->mb_entry_size);
+	}
+	return (0);
+}
+
+/*
+ * Return the type of efi mmap entry referenced by index.
+ */
+boolean_t
+dboot_multiboot2_efi_mmap_get_type(multiboot2_info_header_t *mbi, int index,
+    uint32_t *typep)
+{
+	multiboot_tag_efi_mmap_t *mb2_efi_mmap_tagp;
+	EFI_MEMORY_DESCRIPTOR *mapentp;
+
+	if (dboot_multiboot2_efi_mmap_nentries(mbi) < index)
+		return (B_FALSE);
+
+	mb2_efi_mmap_tagp = dboot_multiboot2_get_efi_mmap_tagp(mbi);
+	if (mb2_efi_mmap_tagp == NULL)
+		return (B_FALSE);
+
+	mapentp = (EFI_MEMORY_DESCRIPTOR *)(mb2_efi_mmap_tagp->mb_efi_mmap +
+	    index * mb2_efi_mmap_tagp->mb_descr_size);
+
+	*typep = mapentp->Type;
+	return (B_TRUE);
+}
+
+/*
+ * Return the length of efi mmap entry referenced by index.
+ */
+boolean_t
+dboot_multiboot2_efi_mmap_get_length(multiboot2_info_header_t *mbi, int index,
+    uint64_t *lengthp)
+{
+	multiboot_tag_efi_mmap_t *mb2_efi_mmap_tagp;
+	EFI_MEMORY_DESCRIPTOR *mapentp;
+
+	if (dboot_multiboot2_efi_mmap_nentries(mbi) < index)
+		return (B_FALSE);
+
+	mb2_efi_mmap_tagp = dboot_multiboot2_get_efi_mmap_tagp(mbi);
+	if (mb2_efi_mmap_tagp == NULL)
+		return (B_FALSE);
+
+	mapentp = (EFI_MEMORY_DESCRIPTOR *)(mb2_efi_mmap_tagp->mb_efi_mmap +
+	    index * mb2_efi_mmap_tagp->mb_descr_size);
+	*lengthp = mapentp->NumberOfPages << PAGESHIFT;
+	return (B_TRUE);
+}
+
+/*
+ * Return the address from efi mmap entry referenced by index.
+ */
+boolean_t
+dboot_multiboot2_efi_mmap_get_base(multiboot2_info_header_t *mbi, int index,
+    uint64_t *basep)
+{
+	multiboot_tag_efi_mmap_t *mb2_efi_mmap_tagp;
+	EFI_MEMORY_DESCRIPTOR *mapentp;
+
+	if (dboot_multiboot2_efi_mmap_nentries(mbi) < index)
+		return (B_FALSE);
+
+	mb2_efi_mmap_tagp = dboot_multiboot2_get_efi_mmap_tagp(mbi);
+	if (mb2_efi_mmap_tagp == NULL)
+		return (B_FALSE);
+
+	mapentp = (EFI_MEMORY_DESCRIPTOR *)(mb2_efi_mmap_tagp->mb_efi_mmap +
+	    index * mb2_efi_mmap_tagp->mb_descr_size);
+	*basep = mapentp->PhysicalStart;
+	return (B_TRUE);
+}
+
+/*
+ * Count and return the number of efi mmap entries provided by the tag.
+ */
+int
+dboot_multiboot2_efi_mmap_nentries(multiboot2_info_header_t *mbi)
+{
+	multiboot_tag_efi_mmap_t *mb2_efi_mmap_tagp;
+
+	mb2_efi_mmap_tagp = dboot_multiboot2_get_efi_mmap_tagp(mbi);
+	if (mb2_efi_mmap_tagp != NULL) {
+		return ((mb2_efi_mmap_tagp->mb_size -
+		    offsetof(multiboot_tag_efi_mmap_t, mb_efi_mmap)) /
+		    mb2_efi_mmap_tagp->mb_descr_size);
 	}
 	return (0);
 }

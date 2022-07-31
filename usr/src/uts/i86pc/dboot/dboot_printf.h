@@ -45,7 +45,7 @@ extern void dboot_printf(char *fmt, ...)
  */
 /*PRINTFLIKE1*/
 extern void dboot_panic(char *fmt, ...)
-    __KPRINTFLIKE(1);
+    __KPRINTFLIKE(1) __NORETURN;
 
 
 #ifdef	__cplusplus

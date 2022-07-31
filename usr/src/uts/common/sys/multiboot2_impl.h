@@ -36,14 +36,20 @@ extern multiboot_tag_mmap_t *
     dboot_multiboot2_get_mmap_tagp(multiboot2_info_header_t *);
 extern boolean_t dboot_multiboot2_basicmeminfo(multiboot2_info_header_t *,
     uint32_t *, uint32_t *);
-extern uint64_t dboot_multiboot2_mmap_get_length(multiboot2_info_header_t *,
-    multiboot_tag_mmap_t *, int);
-extern uint64_t dboot_multiboot2_mmap_get_base(multiboot2_info_header_t *,
-    multiboot_tag_mmap_t *, int);
-extern uint32_t dboot_multiboot2_mmap_get_type(multiboot2_info_header_t *,
-    multiboot_tag_mmap_t *, int);
-extern int dboot_multiboot2_mmap_nentries(multiboot2_info_header_t *,
-    multiboot_tag_mmap_t *);
+extern boolean_t dboot_multiboot2_mmap_get_length(multiboot2_info_header_t *,
+    int, uint64_t *);
+extern boolean_t dboot_multiboot2_mmap_get_base(multiboot2_info_header_t *,
+    int, uint64_t *);
+extern boolean_t dboot_multiboot2_mmap_get_type(multiboot2_info_header_t *,
+    int, uint32_t *);
+extern int dboot_multiboot2_mmap_nentries(multiboot2_info_header_t *);
+extern boolean_t dboot_multiboot2_efi_mmap_get_length(
+    multiboot2_info_header_t *, int, uint64_t *);
+extern boolean_t dboot_multiboot2_efi_mmap_get_base(multiboot2_info_header_t *,
+    int, uint64_t *);
+extern boolean_t dboot_multiboot2_efi_mmap_get_type(multiboot2_info_header_t *,
+    int, uint32_t *);
+extern int dboot_multiboot2_efi_mmap_nentries(multiboot2_info_header_t *);
 extern paddr_t dboot_multiboot2_highest_addr(multiboot2_info_header_t *);
 
 #ifdef __cplusplus
