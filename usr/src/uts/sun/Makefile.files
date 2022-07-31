@@ -56,17 +56,11 @@ SBUSMEM_OBJS +=	sbusmem.o
 
 SD_OBJS +=	sd.o sd_xbuf.o
 
-SF_OBJS +=	sf.o
-
-SOCAL_OBJS +=	socal.o socal_ucode.o
-
 CMLB_OBJS +=	cmlb.o
 
 DADA_OBJS +=	dcd_hba.o       dcd_transport.o \
 		dcd_control.o   dcd_resource.o  dcd_confsubr.o dcd_subr.o \
 		dcd_confdata.o
-
-SSD_OBJS +=	sd.o sd_xbuf.o
 
 WSDRV_OBJS +=	wsdrv.o
 
