@@ -193,7 +193,6 @@ Network Management:solaris:cmd:::/sbin/ipadm:euid=netadm;egid=netadm;\
 Network Management:suser:cmd:::/usr/bin/netstat:uid=0
 Network Management:suser:cmd:::/usr/bin/rup:euid=0
 Network Management:suser:cmd:::/usr/bin/ruptime:euid=0
-Network Management:suser:cmd:::/usr/bin/setuname:euid=0
 Network Management:suser:cmd:::/usr/sbin/asppp2pppd:euid=0
 Network Management:suser:cmd:::/usr/sbin/ifconfig:uid=0
 Network Management:suser:cmd:::/usr/sbin/ipaddrsel:euid=0
@@ -236,7 +235,7 @@ Object Access Management:suser:cmd:::/usr/bin/chown:euid=0
 Object Access Management:suser:cmd:::/usr/bin/getfacl:euid=0
 Object Access Management:suser:cmd:::/usr/bin/setfacl:euid=0
 Primary Administrator:solaris:cmd:::*:uid=0;gid=0
-Printer Management:suser:cmd:::/usr/lib/lp/local/lpadmin:uid=lp;gid=lp 
+Printer Management:suser:cmd:::/usr/lib/lp/local/lpadmin:uid=lp;gid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpfilter:euid=lp;uid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpforms:euid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpusers:euid=lp

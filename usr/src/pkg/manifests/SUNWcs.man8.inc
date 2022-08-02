@@ -228,7 +228,6 @@ file path=usr/share/man/man8/sac.8
 file path=usr/share/man/man8/sacadm.8
 file path=usr/share/man/man8/saf.8
 file path=usr/share/man/man8/savecore.8
-file path=usr/share/man/man8/setuname.8
 file path=usr/share/man/man8/share.8
 file path=usr/share/man/man8/share_nfs.8
 file path=usr/share/man/man8/shareall.8

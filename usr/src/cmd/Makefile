@@ -376,7 +376,6 @@ COMMON_SUBDIRS=		\
 	setfacl		\
 	setmnt		\
 	setpgrp		\
-	setuname	\
 	sgs		\
 	sh		\
 	sleep		\

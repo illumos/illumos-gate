@@ -2528,7 +2528,6 @@ f usr/bin/amd64/pwdx 0555 root bin
 h usr/bin/amd64/rksh93=usr/bin/amd64/ksh93
 h usr/bin/amd64/rksh=usr/bin/amd64/ksh93
 f usr/bin/amd64/savecore 0555 root bin
-f usr/bin/amd64/setuname 0555 root bin
 s usr/bin/amd64/size=../../size
 f usr/bin/amd64/sort 0555 root bin
 f usr/bin/amd64/strings 0555 root bin
@@ -2876,7 +2875,6 @@ f usr/bin/sed 0555 root bin
 f usr/bin/setfacl 0555 root bin
 f usr/bin/setpgrp 0555 root sys
 h usr/bin/settime=usr/bin/touch
-h usr/bin/setuname=usr/lib/isaexec
 s usr/bin/sh=ksh93
 f usr/bin/shcomp 0555 root bin
 f usr/bin/size 0555 root bin
@@ -19775,7 +19773,6 @@ f usr/share/man/man8/sasinfo.8 0444 root bin
 f usr/share/man/man8/savecore.8 0444 root bin
 f usr/share/man/man8/sbdadm.8 0444 root bin
 f usr/share/man/man8/sendmail.8 0444 root bin
-f usr/share/man/man8/setuname.8 0444 root bin
 f usr/share/man/man8/share.8 0444 root bin
 f usr/share/man/man8/share_nfs.8 0444 root bin
 f usr/share/man/man8/shareall.8 0444 root bin
