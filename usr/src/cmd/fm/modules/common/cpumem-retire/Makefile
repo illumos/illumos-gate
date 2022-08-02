@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2022 Garrett D'Amore
+#
 
 MODULE = cpumem-retire
 CLASS = common
@@ -32,16 +34,11 @@ SRCS = \
 	cma_page.c \
 	cma_page_arch.c
 
-SRCS_sparc = cma_cache.c
-
-SRCS += $(SRCS_$(MACH))
-
 include ../../Makefile.plugin
 
 CMA_VERSION = "1.1"
 
 INCDIRS = .
-$(SPARC_BLD)INCDIRS += $(SRC)/uts/sun4u
 
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
 

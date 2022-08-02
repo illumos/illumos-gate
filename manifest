@@ -2529,6 +2529,7 @@ h usr/bin/amd64/rksh93=usr/bin/amd64/ksh93
 h usr/bin/amd64/rksh=usr/bin/amd64/ksh93
 f usr/bin/amd64/savecore 0555 root bin
 f usr/bin/amd64/setuname 0555 root bin
+s usr/bin/amd64/size=../../size
 f usr/bin/amd64/sort 0555 root bin
 f usr/bin/amd64/strings 0555 root bin
 f usr/bin/amd64/truss 0555 root bin
@@ -7095,16 +7096,12 @@ f usr/lib/locale/C/LC_MESSAGES/SCA1000.mo 0444 root bin
 f usr/lib/locale/C/LC_MESSAGES/SCA1000.po 0644 root bin
 f usr/lib/locale/C/LC_MESSAGES/SCA500.mo 0444 root bin
 f usr/lib/locale/C/LC_MESSAGES/SCA500.po 0644 root bin
-f usr/lib/locale/C/LC_MESSAGES/SCF.po 0644 root bin
 f usr/lib/locale/C/LC_MESSAGES/SENSOR.mo 0444 root bin
 f usr/lib/locale/C/LC_MESSAGES/SENSOR.po 0644 root bin
 f usr/lib/locale/C/LC_MESSAGES/SMF.mo 0444 root bin
 f usr/lib/locale/C/LC_MESSAGES/SMF.po 0644 root bin
 f usr/lib/locale/C/LC_MESSAGES/STORAGE.mo 0444 root bin
 f usr/lib/locale/C/LC_MESSAGES/STORAGE.po 0644 root bin
-f usr/lib/locale/C/LC_MESSAGES/SUN4.po 0644 root bin
-f usr/lib/locale/C/LC_MESSAGES/SUN4U.po 0644 root bin
-f usr/lib/locale/C/LC_MESSAGES/SUN4V.po 0644 root bin
 f usr/lib/locale/C/LC_MESSAGES/SUNOS.mo 0444 root bin
 f usr/lib/locale/C/LC_MESSAGES/SUNOS.po 0644 root bin
 f usr/lib/locale/C/LC_MESSAGES/SUNW_OST_ADMIN.po 0644 root bin
