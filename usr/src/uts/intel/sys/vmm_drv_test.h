@@ -8,19 +8,18 @@
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
  */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
  * Copyright 2022 Oxide Computer Company
  */
 
-#ifndef _COMMON_H_
-#define	_COMMON_H_
+#ifndef _VMM_DRV_TEST_H_
+#define	_VMM_DRV_TEST_H_
 
-void name_test_vm(const char *, char *);
-struct vmctx *create_test_vm(const char *);
-int alloc_memseg(struct vmctx *, int, size_t, const char *);
-int open_drv_test(void);
+#define	VDT_IOC_BASE		(('V' << 16) | ('D' << 8))
 
-#define	PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
+#define	VDT_IOC_HOLD		(VDT_IOC_BASE | 0x01)
+#define	VDT_IOC_RELE		(VDT_IOC_BASE | 0x02)
 
-#endif /* _COMMON_H_ */
+#endif /* _VMM_DRV_TEST_H_ */

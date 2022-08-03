@@ -52,12 +52,20 @@ file path=opt/bhyve-tests/tests/mevent/vnode_zvol mode=0555
 dir  path=opt/bhyve-tests/tests/viona
 file path=opt/bhyve-tests/tests/viona/interface_version mode=0555
 dir  path=opt/bhyve-tests/tests/vmm
+file path=opt/bhyve-tests/tests/vmm/auto_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/check_iommu mode=0555
+file path=opt/bhyve-tests/tests/vmm/drv_hold mode=0555
 file path=opt/bhyve-tests/tests/vmm/fpu_getset mode=0555
 file path=opt/bhyve-tests/tests/vmm/interface_version mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_devmem mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_partial mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_seg_map mode=0555
+dir  path=usr/kernel/drv group=sys
+dir  path=usr/kernel/drv/$(ARCH64) group=sys
+file path=usr/kernel/drv/$(ARCH64)/vmm_drv_test
+file path=usr/kernel/drv/vmm_drv_test.conf
+driver name=vmm_drv_test perms="* 0666 root sys" \
+    policy="read_priv_set=sys_devices write_priv_set=sys_devices"
 license lic_CDDL license=lic_CDDL
 depend type=require fmri=system/bhyve
 depend type=require fmri=system/test/testrunner

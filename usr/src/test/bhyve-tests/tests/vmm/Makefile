@@ -20,7 +20,9 @@ PROG =	mem_partial \
 	mem_devmem \
 	fpu_getset \
 	interface_version \
-	check_iommu
+	check_iommu \
+	auto_destruct \
+	drv_hold
 
 COMMON_OBJS =	common.o
 CLEAN_OBJS =	$(PROG:%=%.o)

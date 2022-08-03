@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <regex.h>
@@ -94,6 +95,9 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "pseudo", "ddi_pseudo", "ppt",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ppt,
+	},
+	{ "pseudo", "ddi_pseudo", "vmm_drv_test",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ln_minor_name,
 	}
 };
 

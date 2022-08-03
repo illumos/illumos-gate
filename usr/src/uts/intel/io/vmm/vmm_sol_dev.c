@@ -111,6 +111,26 @@ struct vmm_lease {
 	struct vmm_hold		*vml_hold;
 };
 
+/* Options for vmm_destroy_locked */
+typedef enum vmm_destroy_opts {
+	VDO_DEFAULT		= 0,
+	/*
+	 * Request that zone-specific-data associated with this VM not be
+	 * cleaned up as part of the destroy.  Skipping ZSD clean-up is
+	 * necessary when VM is being destroyed as part of zone destruction,
+	 * when said ZSD is already being cleaned up.
+	 */
+	VDO_NO_CLEAN_ZSD	= (1 << 0),
+	/*
+	 * Skip any attempt to wait for vmm_drv consumers when attempting to
+	 * purge them from the instance.  When performing an auto-destruct, it
+	 * is not desirable to wait, since said consumer might exist in a
+	 * "higher" file descriptor which has not yet been closed.
+	 */
+	VDO_NO_PURGE_WAIT	= (1 << 1),
+} vmm_destroy_opts_t;
+
+static int vmm_destroy_locked(vmm_softc_t *, vmm_destroy_opts_t, boolean_t *);
 static int vmm_drv_block_hook(vmm_softc_t *, boolean_t);
 static void vmm_lease_block(vmm_softc_t *);
 static void vmm_lease_unblock(vmm_softc_t *);
@@ -502,6 +522,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_IOAPIC_PINCOUNT:
 	case VM_SUSPEND:
 	case VM_DESC_FPU_AREA:
+	case VM_SET_AUTODESTRUCT:
 	default:
 		break;
 	}
@@ -833,6 +854,17 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 				error = EFAULT;
 			}
 		}
+		break;
+	}
+	case VM_SET_AUTODESTRUCT: {
+		/*
+		 * Since this has to do with controlling the lifetime of the
+		 * greater vmm_softc_t, the flag is protected by vmm_mtx, rather
+		 * than the vcpu-centric or rwlock exclusion mechanisms.
+		 */
+		mutex_enter(&vmm_mtx);
+		sc->vmm_autodestruct = (arg != 0);
+		mutex_exit(&vmm_mtx);
 		break;
 	}
 
@@ -1921,6 +1953,7 @@ void
 vmm_drv_rele(vmm_hold_t *hold)
 {
 	vmm_softc_t *sc;
+	boolean_t hma_release = B_FALSE;
 
 	ASSERT(hold != NULL);
 	ASSERT(hold->vmh_sc != NULL);
@@ -1932,9 +1965,25 @@ vmm_drv_rele(vmm_hold_t *hold)
 	if (list_is_empty(&sc->vmm_holds)) {
 		sc->vmm_flags &= ~VMM_HELD;
 		cv_broadcast(&sc->vmm_cv);
+
+		/*
+		 * If pending hold(s) had prevented an auto-destruct of the
+		 * instance when it was closed, finish that clean-up now.
+		 */
+		if (sc->vmm_autodestruct && !sc->vmm_is_open) {
+			int err = vmm_destroy_locked(sc,
+			    VDO_NO_PURGE_WAIT, &hma_release);
+
+			VERIFY0(err);
+			VERIFY(hma_release);
+		}
 	}
 	mutex_exit(&vmm_mtx);
 	kmem_free(hold, sizeof (*hold));
+
+	if (hma_release) {
+		vmm_hma_release();
+	}
 }
 
 boolean_t
@@ -2227,7 +2276,7 @@ vmm_drv_ioport_unhook(vmm_hold_t *hold, void **cookie)
 }
 
 static int
-vmm_drv_purge(vmm_softc_t *sc)
+vmm_drv_purge(vmm_softc_t *sc, boolean_t no_wait)
 {
 	ASSERT(MUTEX_HELD(&vmm_mtx));
 
@@ -2258,7 +2307,13 @@ vmm_drv_purge(vmm_softc_t *sc)
 		 * fashion to waiting for any lingering holds to be dropped.
 		 */
 		while ((sc->vmm_flags & VMM_HELD) != 0) {
-			if (cv_wait_sig(&sc->vmm_cv, &vmm_mtx) <= 0) {
+			/*
+			 * Some holds remain, so wait (if acceptable) for them
+			 * to be cleaned up.
+			 */
+			if (no_wait ||
+			    cv_wait_sig(&sc->vmm_cv, &vmm_mtx) <= 0) {
+				sc->vmm_flags &= ~VMM_CLEANUP;
 				return (EINTR);
 			}
 		}
@@ -2303,7 +2358,7 @@ done:
 }
 
 static int
-vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd,
+vmm_destroy_locked(vmm_softc_t *sc, vmm_destroy_opts_t opts,
     boolean_t *hma_release)
 {
 	dev_info_t	*pdip = ddi_get_parent(vmmdev_dip);
@@ -2313,11 +2368,11 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd,
 
 	*hma_release = B_FALSE;
 
-	if (vmm_drv_purge(sc) != 0) {
+	if (vmm_drv_purge(sc, (opts & VDO_NO_PURGE_WAIT) != 0) != 0) {
 		return (EINTR);
 	}
 
-	if (clean_zsd) {
+	if ((opts & VDO_NO_CLEAN_ZSD) == 0) {
 		vmm_zsd_rem_vm(sc);
 	}
 
@@ -2344,13 +2399,13 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd,
 }
 
 int
-vmm_do_vm_destroy(vmm_softc_t *sc, boolean_t clean_zsd)
+vmm_zone_vm_destroy(vmm_softc_t *sc)
 {
 	boolean_t	hma_release = B_FALSE;
 	int		err;
 
 	mutex_enter(&vmm_mtx);
-	err = vmm_do_vm_destroy_locked(sc, clean_zsd, &hma_release);
+	err = vmm_destroy_locked(sc, VDO_NO_CLEAN_ZSD, &hma_release);
 	mutex_exit(&vmm_mtx);
 
 	if (hma_release)
@@ -2384,7 +2439,7 @@ vmmdev_do_vm_destroy(const struct vm_destroy_req *req, cred_t *cr)
 		mutex_exit(&vmm_mtx);
 		return (EPERM);
 	}
-	err = vmm_do_vm_destroy_locked(sc, B_TRUE, &hma_release);
+	err = vmm_destroy_locked(sc, VDO_DEFAULT, &hma_release);
 
 	mutex_exit(&vmm_mtx);
 
@@ -2589,6 +2644,16 @@ vmm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 		ddi_soft_state_free(vmm_statep, minor);
 		id_free(vmm_minors, minor);
 		hma_release = B_TRUE;
+	} else if (sc->vmm_autodestruct) {
+		/*
+		 * Attempt auto-destruct on instance if requested.
+		 *
+		 * Do not wait for existing holds to be purged from the
+		 * instance, since there is no guarantee that will happen in a
+		 * timely manner.  Auto-destruction will resume when the last
+		 * hold is released. (See: vmm_drv_rele)
+		 */
+		(void) vmm_destroy_locked(sc, VDO_NO_PURGE_WAIT, &hma_release);
 	}
 	mutex_exit(&vmm_mtx);
 

@@ -12,6 +12,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/cpuvar.h>
@@ -188,7 +189,7 @@ vmm_zsd_destroy(zoneid_t zid, void *data)
 		 * This frees all resources associated with the vm, including
 		 * sc.
 		 */
-		err = vmm_do_vm_destroy(sc, B_FALSE);
+		err = vmm_zone_vm_destroy(sc);
 		ASSERT3S(err, ==, 0);
 	}
 
