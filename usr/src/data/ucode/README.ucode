@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 Microcode Management
@@ -27,17 +28,31 @@ Intead of using this method, we will update the microcode and manage
 them in here as individual files. When updating files, please indicate
 the release that the microcode was obtained from here.
 
+>>> Intel
+
 The upstream microcode for Intel can currently be found at:
 
-https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files
+    https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files
 
 The script "update.intel" in this directory can be used to help automate
 the update by providing a tarball of the above microcode, and takes care
 of updating the manifest as necessary. Be careful about new files.
 
-AMD: Updated in March 2012 as part of illumos#2546. Exact revision
-unknown.
-
-Intel: Linux YYYYMMDD release, see
+Intel - see:
     usr/src/pkg/manifests/system-microcode-intel.p5m
 for exact current version
+
+>>> AMD
+
+The upstream microcode for AMD can currently be found at:
+
+    git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
+
+The script "update.amd" in this directory can be used to help automate
+the update by automatically checking out the latest upstream firmware and
+inserting it into the tree and package manifest. Be careful about new files.
+
+AMD - see:
+    usr/src/pkg/manifests/system-microcode-amd.p5m
+for exact current version
+

@@ -106,6 +106,7 @@ usr/src/data/hwdata/pci.ids
 usr/src/data/hwdata/usb.ids
 usr/src/data/perfmon/*
 usr/src/data/ucode/Makefile.links
+usr/src/data/ucode/amd/*
 usr/src/data/ucode/intel/*
 usr/src/grub/grub-0.97/stage2/Makefile.am
 usr/src/grub/grub-0.97/stage2/builtins.c
