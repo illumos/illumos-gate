@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include	$(SRC)/data/Makefile.data
@@ -19,7 +20,7 @@ ROOTUCODEPATH = $(ROOT)/platform/i86pc/ucode
 ROOTAMDDIR = $(ROOTUCODEPATH)/AuthenticAMD
 ROOTINTELDIR = $(ROOTUCODEPATH)/GenuineIntel
 
-AMD_FILES :sh= (cd amd; print *)
+AMD_FILES :sh= (cd amd; print *-* container)
 INTEL_FILES :sh= (cd intel; print *-*)
 include $(SRC)/data/ucode/Makefile.links
 

@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -53,6 +53,7 @@
 #define	UCODE_OPT_INSTALL	0x0001
 #define	UCODE_OPT_UPDATE	0x0002
 #define	UCODE_OPT_VERSION	0x0004
+#define	UCODE_OPT_LIST		0x0008
 
 static const char ucode_dev[] = "/dev/" UCODE_DRIVER_NAME;
 
@@ -69,9 +70,22 @@ static int ucode_convert_intel(const char *, uint8_t *, size_t);
 static ucode_errno_t ucode_gen_files_amd(uint8_t *, int, char *);
 static ucode_errno_t ucode_gen_files_intel(uint8_t *, int, char *);
 
+static void ucode_list_amd(uint8_t *, int);
+static void ucode_list_intel(uint8_t *, int);
+
 static const struct ucode_ops ucode_ops[] = {
-	{ ucode_convert_intel, ucode_gen_files_intel, ucode_validate_intel },
-	{ ucode_convert_amd, ucode_gen_files_amd, ucode_validate_amd },
+	{
+		.convert	= ucode_convert_intel,
+		.gen_files	= ucode_gen_files_intel,
+		.validate	= ucode_validate_intel,
+		.list		= ucode_list_intel,
+	},
+	{
+		.convert	= ucode_convert_amd,
+		.gen_files	= ucode_gen_files_amd,
+		.validate	= ucode_validate_amd,
+		.list		= ucode_list_amd,
+	},
 };
 
 const struct ucode_ops *ucode;
@@ -104,6 +118,12 @@ usage(int verbose)
 		    "\t\t microcode-file.\n\n"));
 	}
 
+	(void) fprintf(stderr, "\t%s -l microcode-file\n", cmdname);
+	if (verbose) {
+		(void) fprintf(stderr, gettext("\t\t Displays details of the "
+		    "microcode file's contents.\n\n"));
+	}
+
 	(void) fprintf(stderr, "\t%s -i [-R path] microcode-file\n", cmdname);
 	if (verbose) {
 		(void) fprintf(stderr, gettext("\t\t Installs microcode to be "
@@ -126,6 +146,8 @@ ucode_perror(const char *str, ucode_errno_t rc)
 /*
  * Convert text format microcode release into binary format.
  * Return the number of characters read.
+ *
+ * AMD microcode is already in binary format.
  */
 static int
 ucode_convert_amd(const char *infile, uint8_t *buf, size_t size)
@@ -151,7 +173,7 @@ ucode_convert_intel(const char *infile, uint8_t *buf, size_t size)
 	char	linebuf[LINESIZE];
 	FILE	*infd = NULL;
 	int	count = 0, firstline = 1;
-	uint32_t *intbuf = (uint32_t *)(intptr_t)buf;
+	uint32_t *intbuf = (uint32_t *)(uintptr_t)buf;
 
 	if (infile == NULL || buf == NULL || size == 0)
 		return (0);
@@ -242,10 +264,9 @@ ucode_gen_files_amd(uint8_t *buf, int size, char *path)
 {
 	uint32_t *ptr = (uint32_t *)buf;
 	char common_path[PATH_MAX];
-	int fd, count, counter;
+	int fd, count, counter = 0;
 	ucode_header_amd_t *uh;
 	int last_cpu_rev = 0;
-
 
 	/* write container file */
 	(void) snprintf(common_path, PATH_MAX, "%s/%s", path, "container");
@@ -339,7 +360,7 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 		ucode_header_intel_t	*uhp;
 		ucode_ext_table_intel_t *extp;
 
-		uhp = (ucode_header_intel_t *)(intptr_t)curbuf;
+		uhp = (ucode_header_intel_t *)(uintptr_t)curbuf;
 
 		total_size = UCODE_TOTAL_SIZE_INTEL(uhp->uh_total_size);
 		body_size = UCODE_BODY_SIZE_INTEL(uhp->uh_body_size);
@@ -408,7 +429,7 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 			continue;
 
 		/* There is extended signature table.  More processing. */
-		extp = (ucode_ext_table_intel_t *)(uintptr_t)&curbuf[offset];
+		extp = (ucode_ext_table_intel_t *)&curbuf[offset];
 
 		for (i = 0; i < extp->uet_count; i++) {
 			ucode_ext_sig_intel_t *uesp = &extp->uet_ext_sig[i];
@@ -474,6 +495,118 @@ ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 	return (EM_OK);
 }
 
+static void
+ucode_fms(uint32_t sig, uint8_t *family, uint8_t *model, uint8_t *stepping)
+{
+	*family = ((sig >> 8) & 0xf) + ((sig >> 20) & 0xff);
+	*model = ((sig >> 4) & 0xf) | ((sig >> 12) & 0xf0);
+	*stepping = sig & 0xf;
+}
+
+static void
+ucode_list_intel(uint8_t *buf, int size)
+{
+	int	remaining;
+
+	printf("Microcode patches:\n");
+	for (remaining = size; remaining > 0; ) {
+		uint8_t *curbuf = &buf[size - remaining];
+		uint8_t family, model, stepping;
+		uint32_t total_size, body_size, offset;
+		ucode_header_intel_t *uhp;
+		ucode_ext_table_intel_t *extp;
+
+		uhp = (ucode_header_intel_t *)(uintptr_t)curbuf;
+
+		total_size = UCODE_TOTAL_SIZE_INTEL(uhp->uh_total_size);
+		body_size = UCODE_BODY_SIZE_INTEL(uhp->uh_body_size);
+
+		remaining -= total_size;
+
+		ucode_fms(uhp->uh_signature, &family, &model, &stepping);
+
+		printf(
+		    "    %08lX-%02lX -> Family=%02x Model=%02x Stepping=%02x\n",
+		    uhp->uh_signature, uhp->uh_proc_flags,
+		    family, model, stepping);
+		printf(
+		    "    %14s Date=%08lX Bytes=%lu\n", "",
+		    uhp->uh_date, uhp->uh_body_size);
+
+		offset = UCODE_HEADER_SIZE_INTEL + body_size;
+
+		/* Check to see if there is extended signature table */
+		if (total_size == offset)
+			continue;
+
+		printf("Extended Signature Table:\n");
+
+		extp = (ucode_ext_table_intel_t *)&curbuf[offset];
+
+		for (uint32_t i = 0; i < extp->uet_count; i++) {
+			ucode_ext_sig_intel_t *uesp = &extp->uet_ext_sig[i];
+
+			ucode_fms(uesp->ues_signature,
+			    &family, &model, &stepping);
+
+			printf(
+			    "    %08lX-%02lX -> Family=%02x Model=%02x "
+			    "Stepping=%02x\n",
+			    uesp->ues_signature, uesp->ues_proc_flags,
+			    family, model, stepping);
+		}
+	}
+}
+
+static void
+ucode_list_amd(uint8_t *buf, int size)
+{
+	ucode_eqtbl_amd_t *eq;
+	ucode_header_amd_t *uh;
+	uint32_t tsz;
+
+	/*
+	 * The file has already been validated so we can skip straight to
+	 * the equivalence table.
+	 */
+	tsz = *(uint32_t *)(buf + 8);
+	eq = (ucode_eqtbl_amd_t *)(buf + 12);
+	size -= 12;
+
+	printf("Equivalence table:\n");
+	while (size >= sizeof (ucode_eqtbl_amd_t) && eq->ue_inst_cpu != 0) {
+		uint8_t family, model, stepping;
+
+		ucode_fms(eq->ue_inst_cpu, &family, &model, &stepping);
+
+		printf(
+		    "    %08lX Family=%02x Model=%02x Stepping=%02x -> %04X\n",
+		    eq->ue_inst_cpu, family, model, stepping, eq->ue_equiv_cpu);
+		eq++;
+		size -= sizeof (*eq);
+	}
+
+	/* Move past the equivalence table terminating record */
+	eq++;
+	size -= sizeof (*eq);
+	buf = (uint8_t *)eq;
+
+	printf("Microcode patches:\n");
+	while (size > sizeof (ucode_header_amd_t) + 8) {
+		tsz = *(uint32_t *)(buf + 4);
+		uh = (ucode_header_amd_t *)(buf + 8);
+
+		if (uh->uh_cpu_rev == 0)
+			break;
+
+		printf("    %4X -> Patch=%08lX Date=%08lX Bytes=%lu\n",
+		    uh->uh_cpu_rev, uh->uh_patch_id, uh->uh_date, tsz);
+
+		buf += (tsz + 8);
+		size -= (tsz + 8);
+	}
+}
+
 /*
  * Returns 0 on success, 2 on usage error, and 3 on operation error.
  */
@@ -493,7 +626,7 @@ main(int argc, char *argv[])
 	ucode_errno_t	rc = EM_OK;
 	processorid_t	cpuid_max;
 	struct stat filestat;
-	uint32_t ucode_size;
+	int ucode_size = 0;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -504,11 +637,16 @@ main(int argc, char *argv[])
 
 	cmdname = basename(argv[0]);
 
-	while ((c = getopt(argc, argv, "idhuvVR:")) != EOF) {
+	while ((c = getopt(argc, argv, "idhluvVR:")) != EOF) {
 		switch (c) {
 
 		case 'i':
 			action |= UCODE_OPT_INSTALL;
+			actcount++;
+			break;
+
+		case 'l':
+			action |= UCODE_OPT_LIST;
 			actcount++;
 			break;
 
@@ -527,9 +665,9 @@ main(int argc, char *argv[])
 			break;
 
 		case 'R':
-			if (optarg[0] == '-')
+			if (optarg[0] == '-') {
 				errflg++;
-			else if (strlen(optarg) > UCODE_MAX_PATH_LEN) {
+			} else if (strlen(optarg) > UCODE_MAX_PATH_LEN) {
 				(void) fprintf(stderr,
 				    gettext("Alternate path too long\n"));
 				errflg++;
@@ -553,8 +691,15 @@ main(int argc, char *argv[])
 		}
 	}
 
+	if (actcount == 0) {
+		(void) fprintf(stderr, gettext("%s: One of -i, -l, -u or -v "
+		    "must be provided.\n"), cmdname);
+		usage(verbose);
+		return (2);
+	}
+
 	if (actcount != 1) {
-		(void) fprintf(stderr, gettext("%s: options -v, -i and -u "
+		(void) fprintf(stderr, gettext("%s: options -i, -l, -u and -v "
 		    "are mutually exclusive.\n"), cmdname);
 		usage(verbose);
 		return (2);
@@ -562,7 +707,7 @@ main(int argc, char *argv[])
 
 	if (optind <= argc - 1)
 		filename = argv[optind];
-	else if (!(action & UCODE_OPT_VERSION))
+	else if (action != UCODE_OPT_VERSION)
 		errflg++;
 
 	if (errflg || action == 0) {
@@ -571,9 +716,11 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Convert from text format to binary format
+	 * Convert from the vendor-shipped format (text for Intel, binary
+	 * container for AMD) to individual microcode files.
 	 */
-	if ((action & UCODE_OPT_INSTALL) || (action & UCODE_OPT_UPDATE)) {
+	if ((action &
+	    (UCODE_OPT_INSTALL | UCODE_OPT_UPDATE | UCODE_OPT_LIST))) {
 		int i;
 		UCODE_VENDORS;
 
@@ -594,26 +741,26 @@ main(int argc, char *argv[])
 		if (ucode_vendors[i].filestr == NULL) {
 			rc = EM_NOVENDOR;
 			ucode_perror(basename(filename), rc);
-			goto err_out;
+			goto out;
 		}
 
 		if ((stat(filename, &filestat)) < 0) {
 			rc = EM_SYS;
 			ucode_perror(filename, rc);
-			goto err_out;
+			goto out;
 		}
 
 		if ((filestat.st_mode & S_IFMT) != S_IFREG &&
 		    (filestat.st_mode & S_IFMT) != S_IFLNK) {
 			rc = EM_FILEFORMAT;
 			ucode_perror(filename, rc);
-			goto err_out;
+			goto out;
 		}
 
 		if ((buf = malloc(filestat.st_size)) == NULL) {
 			rc = EM_SYS;
 			ucode_perror(filename, rc);
-			goto err_out;
+			goto out;
 		}
 
 		ucode_size = ucode->convert(filename, buf, filestat.st_size);
@@ -623,13 +770,18 @@ main(int argc, char *argv[])
 		if (ucode_size == 0) {
 			rc = EM_FILEFORMAT;
 			ucode_perror(filename, rc);
-			goto err_out;
+			goto out;
 		}
 
 		if ((rc = ucode->validate(buf, ucode_size)) != EM_OK) {
 			ucode_perror(filename, rc);
-			goto err_out;
+			goto out;
 		}
+	}
+
+	if (action & UCODE_OPT_LIST) {
+		ucode->list(buf, ucode_size);
+		goto out;
 	}
 
 	/*
@@ -645,7 +797,7 @@ main(int argc, char *argv[])
 			if ((path = malloc(PATH_MAX)) == NULL) {
 				rc = EM_SYS;
 				ucode_perror("malloc", rc);
-				goto err_out;
+				goto out;
 			}
 
 			(void) snprintf(path, PATH_MAX, "/%s/%s",
@@ -655,18 +807,18 @@ main(int argc, char *argv[])
 		if (mkdirp(path, 0755) == -1 && errno != EEXIST) {
 			rc = EM_SYS;
 			ucode_perror(path, rc);
-			goto err_out;
+			goto out;
 		}
 
 		rc = ucode->gen_files(buf, ucode_size, path);
 
-		goto err_out;
+		goto out;
 	}
 
 	if ((dev_fd = open(ucode_dev, O_RDONLY)) == -1) {
 		rc = EM_SYS;
 		ucode_perror(ucode_dev, rc);
-		goto err_out;
+		goto out;
 	}
 
 	if (action & UCODE_OPT_VERSION) {
@@ -685,7 +837,7 @@ main(int argc, char *argv[])
 		    malloc(cpuid_max * sizeof (uint32_t))) == NULL) {
 			rc = EM_SYS;
 			ucode_perror("malloc", rc);
-			goto err_out;
+			goto out;
 		}
 
 		for (i = 0; i < cpuid_max; i++)
@@ -759,7 +911,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-err_out:
+out:
 	if (dev_fd != -1)
 		(void) close(dev_fd);
 

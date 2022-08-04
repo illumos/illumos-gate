@@ -293,6 +293,7 @@ struct ucode_ops {
 	int		(*convert)(const char *, uint8_t *, size_t);
 	ucode_errno_t	(*gen_files)(uint8_t *, int, char *);
 	ucode_errno_t	(*validate)(uint8_t *, int);
+	void		(*list)(uint8_t *, int);
 };
 #endif
 

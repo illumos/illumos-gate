@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2017 RackTop Systems.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG = ucodeadm
@@ -41,10 +41,9 @@ include	../Makefile.ctf
 POFILE = ucodeadm_all.po
 POFILES = $(PROG_OBJS:%.o=%.po)
 
+CSTD = $(GNU_C99)
 CPPFLAGS = -I../../common -I../../uts/common
 CFLAGS	+= $(CCVERBOSE)
-CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-type-limits
 LDLIBS += -lgen
 
 DIRMODE = 0755

@@ -1,0 +1,151 @@
+#!/bin/ksh
+
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source. A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+
+# A simple update script that checks out the upstream AMD firmware
+# repository, extracts the microcode into separate files within the amd/
+# directory, generates the required combined equivalence table and updates
+# the pkg(7) manifest.
+
+UPSTREAM=git://git.kernel.org
+UPSTREAM_PATH=/pub/scm/linux/kernel/git/firmware/linux-firmware.git
+
+# These are the GPG keys that AMD use to sign their CPU microcode updates
+# The first key is the current one and the second is one they have used for
+# older CPU families.
+GPGSERVER=keys.gnupg.net
+typeset -a GPGKEYS=(
+	0xFC7C6C505DAFCC14718357CAE4BE5339F328AE73
+	0x916A770823A7B27AADE01565A5E8DBC98C0108B4
+)
+
+FW=platform/i86pc/ucode/AuthenticAMD
+
+export LC_ALL=C.UTF-8
+
+set -e
+set -o pipefail
+
+mf=../../pkg/manifests/system-microcode-amd.p5m
+[[ -f $mf ]] || {
+	echo "Run from usr/src/data/ucode" 2>&1
+	exit 1
+}
+
+function find_cmd {
+	typeset cmd="$1"
+	typeset var=$(echo $cmd | tr '[:lower:]' '[:upper:]')
+	typeset -n path="$var"
+	path=$(whence -fp "$cmd")
+	if (($? != 0)) || [ ! -x "$path" ]; then
+		echo "Cannot find executable '$cmd' in PATH"
+		exit 1
+	fi
+}
+
+# This script uses a few commands which are not part of illumos and are
+# expected to be available in the path.
+find_cmd git
+find_cmd gpg
+find_cmd pkgfmt
+find_cmd stat
+# Search for 'ucodeadm'. If you need to use an updated ucodeadm to handle this
+# firmware update, as is occasionally necessary, ensure it occurs earlier in
+# the path than /usr/sbin.
+find_cmd ucodeadm
+
+tmp=$(mktemp -d)
+mkdir -p $tmp/out || {
+	echo "Failed to create temporary directory" 2>&1
+	exit 1
+}
+
+trap 'rm -rf $tmp' EXIT
+
+echo "** Adding AMD GPG signing keys to temporary keyring"
+mkdir -m 0700 $tmp/gnupg
+$GPG --homedir $tmp/gnupg --keyserver $GPGSERVER --receive-keys ${GPGKEYS[@]}
+
+echo "** Cloning $UPSTREAM$UPSTREAM_PATH"
+$GIT clone $UPSTREAM$UPSTREAM_PATH $tmp/ucode
+
+ver=`$GIT -C $tmp/ucode log -n1 --format=%ad --date=format:%Y%m%d amd-ucode`
+echo "** Updating to microcode version $ver"
+
+echo "** Verifying microcode signatures"
+for f in $tmp/ucode/amd-ucode/*.bin; do
+	if [[ ! -f "$f.asc" ]]; then
+		echo "Signature missing for ${f##*/}"
+		exit 1
+	fi
+	$GPG --homedir $tmp/gnupg --trust-model=always --verify $f{.asc,}
+done
+
+# Now that everything is in place and verified, begin modifying the tree.
+
+rm -f amd/*
+
+cp $tmp/ucode/LICENSE.amd-ucode amd/THIRDPARTYLICENSE
+echo AMD Processor Microcode Data Files > amd/THIRDPARTYLICENSE.descrip
+
+for f in $tmp/ucode/amd-ucode/*.bin; do
+	bf=${f##*/}
+	bf=${bf#microcode_}
+	bf=${bf%.bin}
+	[[ $bf = amd* ]] || {
+		echo "$f does not look like a firmware file"
+		exit 1
+	}
+	echo "Converting $bf"
+	mkdir $tmp/out/$bf
+	cp $f $tmp/amd-fw
+	$UCODEADM -i -R $tmp/out/$bf $tmp/amd-fw
+	rm -f $tmp/amd-fw
+done
+
+# Copy the combined container file from the old (pre-family-15h) microcode
+# file to 'container'. This file is only used by xVM.
+cp $tmp/out/amd/container amd/
+
+# Copy the firmware files into place
+cp $tmp/out/*/*-?? amd/
+
+# Combine the equivalence tables from the different updates into one
+# Each equivalence-table file is a sequence of 16-byte records with a
+# 16-byte terminator which is all zeros. To merge, we just concatenate
+# the non-terminator records and then add 16 bytes from /dev/zero.
+{
+	for f in $tmp/out/*/equivalence-table; do
+		size=$($STAT -c %s $f)
+		((size -= 16))
+		dd if=$f bs=1 count=$size status=none
+	done
+	# Add terminator
+	dd if=/dev/zero bs=1 count=16 status=none
+} > amd/equivalence-table
+
+$PKGFMT -u $mf
+mv $mf $mf.tmp
+egrep -v "file path=$FW" $mf.tmp > $mf
+rm -f $mf.tmp
+
+for f in amd/*; do
+	bf=${f##*/}
+	[[ $bf = THIRDPARTYLICENSE* ]] && continue
+	echo "file path=$FW/$bf group=sys mode=0444"\
+	    "reboot-needed=true preserve=true" >> $mf
+done
+
+sed -i "/pkg.fmri.*microcode\/amd@/s/@[0-9]*/@$ver/" $mf
+
+$PKGFMT -fv2 $mf
+
