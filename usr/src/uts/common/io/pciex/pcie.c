@@ -25,6 +25,454 @@
  * Copyright 2022 Oxide Computer Company
  */
 
+/*
+ * PCIe Initialization
+ * -------------------
+ *
+ * The PCIe subsystem is split about and initializes itself in a couple of
+ * different places. This is due to the platform-specific nature of initializing
+ * resources and the nature of the SPARC PROM and how that influenced the
+ * subsystem. Note that traditional PCI (mostly seen these days in Virtual
+ * Machines) follows most of the same basic path outlined here, but skips a
+ * large chunk of PCIe-specific initialization.
+ *
+ * First, there is an initial device discovery phase that is taken care of by
+ * the platform. This is where we discover the set of devices that are present
+ * at system power on. These devices may or may not be hot-pluggable. In
+ * particular, this happens in a platform-specific way right now. In general, we
+ * expect most discovery to be driven by scanning each bus, device, and
+ * function, and seeing what actually exists and responds to configuration space
+ * reads. This is driven via pci_boot.c on x86. This may be seeded by something
+ * like device tree, a PROM, supplemented with ACPI, or by knowledge that the
+ * underlying platform has.
+ *
+ * As a part of this discovery process, the full set of resources that exist in
+ * the system for PCIe are:
+ *
+ *   o PCI buses
+ *   o Prefetchable Memory
+ *   o Non-prefetchable memory
+ *   o I/O ports
+ *
+ * This process is driven by a platform's PCI platform Resource Discovery (PRD)
+ * module. The PRD definitions can be found in <sys/plat/pci_prd.h> and are used
+ * to discover these resources, which will be converted into the initial set of
+ * the standard properties in the system: 'regs', 'available', 'ranges', etc.
+ * Currently it is up to platform-specific code (which should ideally be
+ * consolidated at some point) to set up all these properties.
+ *
+ * As a part of the discovery process, the platform code will create a device
+ * node (dev_info_t) for each discovered function and will create a PCIe nexus
+ * for each overall root complex that exists in the system. Most root complexes
+ * will have multiple root ports, each of which is the foundation of an
+ * independent PCIe bus due to the point-to-point nature of PCIe. When a root
+ * complex is found, a nexus driver such as npe (Nexus for PCIe Express) is
+ * attached. In the case of a non-PCIe-capable system this is where the older
+ * pci nexus driver would be used instead.
+ *
+ * To track data about a given device on a bus, a 'pcie_bus_t' structure is
+ * created for and assigned to every PCIe-based dev_info_t. This can be used to
+ * find the root port and get basic information about the device, its faults,
+ * and related information. This contains pointers to the corresponding root
+ * port as well.
+ *
+ * A root complex has its pcie_bus_t initialized as part of the device discovery
+ * process. That is, because we're trying to bootstrap the actual tree and most
+ * platforms don't have a representation for this that's explicitly
+ * discoverable, this is created manually. See callers of pcie_rc_init_bus().
+ *
+ * For other devices, bridges, and switches, the process is split into two.
+ * There is an initial pcie_bus_t that is created which will exist before we go
+ * through the actual driver attachment process. For example, on x86 this is
+ * done as part of the device and function discovery. The second pass of
+ * initialization is done only after the nexus driver actually is attached and
+ * it goes through and finishes processing all of its children.
+ *
+ * Child Initialization
+ * --------------------
+ *
+ * Generally speaking, the platform will first enumerate all PCIe devices that
+ * are in the sytem before it actually creates a device tree. This is part of
+ * the bus/device/function scanning that is performed and from that dev_info_t
+ * nodes are created for each discovered device and are inserted into the
+ * broader device tree. Later in boot, the actual device tree is walked and the
+ * nodes go through the standard dev_info_t initialization process (DS_PROTO,
+ * DS_LINKED, DS_BOUND, etc.).
+ *
+ * PCIe-specific initialization can roughly be broken into the following pieces:
+ *
+ *   1. Platform initial discovery and resource assignment
+ *   2. The pcie_bus_t initialization
+ *   3. Nexus driver child initialization
+ *   4. Fabric initialization
+ *   5. Device driver-specific initialization
+ *
+ * The first part of this (1) and (2) are discussed in the previous section.
+ * Part (1) in particular is a combination of the PRD (platform resource
+ * discovery) and general device initialization. After this, because we have a
+ * device tree, most of the standard nexus initialization happens.
+ *
+ * (5) is somewhat simple, so let's get into it before we discuss (3) and (4).
+ * This is the last thing that is called and that happens after all of the
+ * others are done. This is the logic that occurs in a driver's attach(9E) entry
+ * point. This is always device-specific and generally speaking should not be
+ * manipulating standard PCIe registers directly on their own. For example, the
+ * MSI/MSI-X, AER, Serial Number, etc. capabilities will be automatically dealt
+ * with by the framework in (3) and (4) below. In many cases, particularly
+ * things that are part of (4), adjusting them in the individual driver is not
+ * safe.
+ *
+ * Finally, let's talk about (3) and (4) as these are related. The NDI provides
+ * for a standard hook for a nexus to initialize its children. In our platforms,
+ * there are basically two possible PCIe nexus drivers: there is the generic
+ * pcieb -- PCIe bridge -- driver which is used for standard root ports,
+ * switches, etc. Then there is the platform-specific primary nexus driver,
+ * which is being slowly consolidated into a single one where it makes sense. An
+ * example of this is npe.
+ *
+ * Each of these has a child initialization function which is called from their
+ * DDI_CTLOPS_INITCHILD operation on the bus_ctl function pointer. This goes
+ * through and initializes a large number of different pieces of PCIe-based
+ * settings through the common pcie_initchild() function. This takes care of
+ * things like:
+ *
+ *   o Advanced Error Reporting
+ *   o Alternative Routing
+ *   o Capturing information around link speed, width, serial numbers, etc.
+ *   o Setting common properties around aborts
+ *
+ * There are a few caveats with this that need to be kept in mind:
+ *
+ *   o A dev_info_t indicates a specific function. This means that a
+ *     multi-function device will not all be initialized at the same time and
+ *     there is no guarantee that all children will be initialized before one of
+ *     them is attached.
+ *   o A child is only initialized if we have found a driver that matches an
+ *     alias in the dev_info_t's compatible array property.  While a lot of
+ *     multi-function devices are often multiple instances of the same thing
+ *     (e.g. a multi-port NIC with a function / NIC), this is not always the
+ *     case and one cannot make any assumptions here.
+ *
+ * This in turn leads to the next form of initialization that takes place in the
+ * case of (4). This is where we take care of things that need to be consistent
+ * across either entire devices or more generally across an entire root port and
+ * all of its children. There are a few different examples of this:
+ *
+ *   o Setting the maximum packet size
+ *   o Determining the tag width
+ *
+ * Note that features which are only based on function 0, such as ASPM (Active
+ * State Power Management), hardware autonomous width disable, etc. ultimately
+ * do not go through this path today. There are some implications here in that
+ * today several of these things are captured on functions which may not have
+ * any control here. This is an area of needed improvement.
+ *
+ * The settings in (4) are initialized in a common way, via
+ * pcie_fabric_setup(). This is called into from two different parts of
+ * the stack:
+ *
+ *   1. When we attach a root port, which is driven by pcieb.
+ *   2. When we have a hotplug event that adds a device.
+ *
+ * In general here we are going to use the term 'fabric' to refer to everything
+ * that is downstream of a root port. This corresponds to what the PCIe
+ * specification calls a 'hierarchy domain'. Strictly speaking, this is fine
+ * until peer-to-peer requests begin to happen that cause you to need to forward
+ * things across root ports. At that point the scope of the fabric increases and
+ * these settings become more complicated. We currently optimize for the much
+ * more common case, which is that each root port is effectively independent
+ * from a PCIe transaction routing perspective.
+ *
+ * Put differently, we use the term 'fabric' to refer to a set of PCIe devices
+ * that can route transactions to one another, which is generally constrained to
+ * everything under a root port and that root ports are independent. If this
+ * constraint changes, then all one needs to do is replace the discussion of the
+ * root port below with the broader root complex and system.
+ *
+ * A challenge with these settings is that once they're set and devices are
+ * actively making requests, we cannot really change them without resetting the
+ * links and cancelling all outstanding transactions via device resets. Because
+ * this is not something that we want to do, we instead look at how and when we
+ * set this to constrain what's going on.
+ *
+ * Because of this we basically say that if a given fabric has more than one
+ * hot-plug capable device that's encountered, then we have to use safe defaults
+ * (which we can allow an operator to tune eventually via pcieadm). If we have a
+ * mix of non-hotpluggable slots with downstream endpoints present and
+ * hot-pluggable slots, then we're in this case. If we don't have hot-pluggable
+ * slots, then we can have an arbitrarily complex setup. Let's look at a few of
+ * these visually:
+ *
+ * In the following diagrams, RP stands for Root Port, EP stands for Endpoint.
+ * If something is hot-pluggable, then we label it with (HP).
+ *
+ *   (1) RP --> EP
+ *   (2) RP --> Switch --> EP
+ *                    +--> EP
+ *                    +--> EP
+ *
+ *   (3) RP --> Switch --> EP
+ *                    +--> EP
+ *                    +--> Switch --> EP
+ *                               +--> EP
+ *                    +--> EP
+ *
+ *
+ *   (4) RP (HP) --> EP
+ *   (5) RP (HP) --> Switch --> EP
+ *                         +--> EP
+ *                         +--> EP
+ *
+ *   (6) RP --> Switch (HP) --> EP
+ *   (7) RP (HP) --> Switch (HP) --> EP
+ *
+ * If we look at all of these, these are all cases where it's safe for us to set
+ * things based on all devices. (1), (2), and (3) are straightforward because
+ * they have no hot-pluggable elements. This means that nothing should come/go
+ * on the system and we can set up fabric-wide properties as part of the root
+ * port.
+ *
+ * Case (4) is the most standard one that we encounter for hot-plug. Here you
+ * have a root port directly connected to an endpoint. The most common example
+ * would be an NVMe device plugged into a root port. Case (5) is interesting to
+ * highlight. While there is a switch and multiple endpoints there, they are
+ * showing up as a unit. This ends up being a weirder variant of (4), but it is
+ * safe for us to set advanced properties because we can figure out what the
+ * total set should be.
+ *
+ * Now, the more interesting bits here are (6) and (7). The reason that (6)
+ * works is that ultimately there is only a single down-stream port here that is
+ * hot-pluggable and all non-hotpluggable ports do not have a device present,
+ * which suggests that they will never have a device present. (7) also could be
+ * made to work by making the observation that if there's truly only one
+ * endpoint in a fabric, it doesn't matter how many switches there are that are
+ * hot-pluggable. This would only hold if we can assume for some reason that no
+ * other endpoints could be added.
+ *
+ * In turn, let's look at several cases that we believe aren't safe:
+ *
+ *   (8) RP --> Switch --> EP
+ *                    +--> EP
+ *               (HP) +--> EP
+ *
+ *   (9) RP --> Switch (HP) +--> EP
+ *                     (HP) +--> EP
+ *
+ *   (10) RP (HP) --> Switch (HP) +--> EP
+ *                           (HP) +--> EP
+ *
+ * All of these are situations where it's much more explicitly unsafe. Let's
+ * take (8). The problem here is that the devices on the non-hotpluggable
+ * downstream switches are always there and we should assume all device drivers
+ * will be active and performing I/O when the hot-pluggable slot changes. If the
+ * hot-pluggable slot has a lower max payload size, then we're mostly out of
+ * luck. The case of (9) is very similar to (8), just that we have more hot-plug
+ * capable slots.
+ *
+ * Finally (10) is a case of multiple instances of hotplug. (9) and (10) are the
+ * more general case of (6) and (7). While we can try to detect (6) and (7) more
+ * generally or try to make it safe, we're going to start with a simpler form of
+ * detection for this, which roughly follows the following rules:
+ *
+ *   o If there are no hot-pluggable slots in an entire fabric, then we can set
+ *     all fabric properties based on device capabilities.
+ *   o If we encounter a hot-pluggable slot, we can only set fabric properties
+ *     based on device capabilities if:
+ *
+ *       1. The hotpluggable slot is a root port.
+ *       2. There are no other hotpluggable devices downstream of it.
+ *
+ * Otherwise, if neither of the above is true, then we must use the basic PCIe
+ * defaults for various fabric-wide properties (discussed below). Even in these
+ * more complicated cases, device-specific properties such as the configuration
+ * of AERs, ASPM, etc. are still handled in the general pcie_init_bus() and
+ * related discussed earlier here.
+ *
+ * Because the only fabrics that we'll change are those that correspond to root
+ * ports, we will only call into the actual fabric feature setup when one of
+ * those changes. This has the side effect of simplifying locking. When we make
+ * changes here we need to be able to hold the entire device tree under the root
+ * port (including the root port and its parent). This is much harder to do
+ * safely when starting in the middle of the tree.
+ *
+ * Handling of Specific Properties
+ * -------------------------------
+ *
+ * This section goes into the rationale behind how we initialize and program
+ * various parts of the PCIe stack.
+ *
+ * 5-, 8-, 10- AND 14-BIT TAGS
+ *
+ * Tags are part of PCIe transactions and when combined with a device identifier
+ * are used to uniquely identify a transaction. In PCIe parlance, a Requester
+ * (someone who initiates a PCIe request) sets a unique tag in the request and
+ * the Completer (someone who processes and responds to a PCIe request) echoes
+ * the tag back. This means that a requester generally is responsible for
+ * ensuring that they don't reuse a tag between transactions.
+ *
+ * Thus the number of tags that a device has relates to the number of
+ * outstanding transactions that it can have, which are usually tied to the
+ * number of outstanding DMA transfers. The size of these transactions is also
+ * then scoped by the handling of the Maximum Packet Payload.
+ *
+ * In PCIe 1.0, devices default to a 5-bit tag. There was also an option to
+ * support an 8-bit tag. The 8-bit extended tag did not distinguish between a
+ * Requester or Completer. There was a bit to indicate device support of 8-bit
+ * tags in the Device Capabilities Register of the PCIe Capability and a
+ * separate bit to enable it in the Device Control Register of the PCIe
+ * Capability.
+ *
+ * In PCIe 4.0, support for a 10-bit tag was added. The specification broke
+ * apart the support bit into multiple pieces. In particular, in the Device
+ * Capabilities 2 register of the PCIe Capability there is a separate bit to
+ * indicate whether the device supports 10-bit completions and 10-bit requests.
+ * All PCIe 4.0 compliant devices are required to support 10-bit tags if they
+ * operate at 16.0 GT/s speed (a PCIe Gen 4 compliant device does not have to
+ * operate at Gen 4 speeds).
+ *
+ * This allows a device to support 10-bit completions but not 10-bit requests.
+ * A device that supports 10-bit requests is required to support 10-bit
+ * completions. There is no ability to enable or disable 10-bit completion
+ * support in the Device Capabilities 2 register. There is only a bit to enable
+ * 10-bit requests. This distinction makes our life easier as this means that as
+ * long as the entire fabric supports 10-bit completions, it doesn't matter if
+ * not all devices support 10-bit requests and we can enable them as required.
+ * More on this in a bit.
+ *
+ * In PCIe 6.0, another set of bits was added for 14-bit tags. These follow the
+ * same pattern as the 10-bit tags. The biggest difference is that the
+ * capabilities and control for these are found in the Device Capabilities 3
+ * and Device Control 3 register of the Device 3 Extended Capability. Similar to
+ * what we see with 10-bit tags, requesters are required to support the
+ * completer capability. The only control bit is for whether or not they enable
+ * a 14-bit requester.
+ *
+ * PCIe switches which sit between root ports and endpoints and show up to
+ * software as a set of bridges. Bridges generally don't have to know about tags
+ * as they are usually neither requesters or completers (unless directly talking
+ * to the bridge instance). That is they are generally required to forward
+ * packets without modifying them. This works until we deal with switch error
+ * handling. At that point, the switch may try to interpret the transaction and
+ * if it doesn't understand the tagging scheme in use, return the transaction to
+ * with the wrong tag and also an incorrectly diagnosed error (usually a
+ * malformed TLP).
+ *
+ * With all this, we construct a somewhat simple policy of how and when we
+ * enable extended tags:
+ *
+ *    o If we have a complex hotplug-capable fabric (based on the discussion
+ *      earlier in fabric-specific settings), then we cannot enable any of the
+ *      8-bit, 10-bit, and 14-bit tagging features. This is due to the issues
+ *      with intermediate PCIe switches and related.
+ *
+ *    o If every device supports 8-bit capable tags, then we will go through and
+ *      enable those everywhere.
+ *
+ *    o If every device supports 10-bit capable completions, then we will enable
+ *      10-bit requester on every device that supports it.
+ *
+ *    o If every device supports 14-bit capable completions, then we will enable
+ *      14-bit requesters on every device that supports it.
+ *
+ * This is the simpler end of the policy and one that is relatively easy to
+ * implement. While we could attempt to relax the constraint that every device
+ * in the fabric implement these features by making assumptions about peer-to-
+ * peer requests (that is devices at the same layer in the tree won't talk to
+ * one another), that is a lot of complexity. For now, we leave such an
+ * implementation to those who need it in the future.
+ *
+ * MAX PAYLOAD SIZE
+ *
+ * When performing transactions on the PCIe bus, a given transaction has a
+ * maximum allowed size. This size is called the MPS or 'Maximum Payload Size'.
+ * A given device reports its maximum supported size in the Device Capabilities
+ * register of the PCIe Capability. It is then set in the Device Control
+ * register.
+ *
+ * One of the challenges with this value is that different functions of a device
+ * have independent values, but strictly speaking are required to actually have
+ * the same value programmed in all of them lest device behavior goes awry. When
+ * a device has the ARI (alternative routing ID) capability enabled, then only
+ * function 0 controls the actual payload size.
+ *
+ * The settings for this need to be consistent throughout the fabric. A
+ * Transmitter is not allowed to create a TLP that exceeds its maximum packet
+ * size and a Receiver is not allowed to receive a packet that exceeds its
+ * maximum packet size. In all of these cases, this would result in something
+ * like a malformed TLP error.
+ *
+ * Effectively, this means that everything on a given fabric must have the same
+ * value programmed in its Device Control register for this value. While in the
+ * case of tags, switches generally weren't completers or requesters, here every
+ * device along the path is subject to this. This makes the actual value that we
+ * set throughout the fabric even more important and the constraints of hotplug
+ * even worse to deal with.
+ *
+ * Because a hotplug device can be inserted with any packet size, if we hit
+ * anything other than the simple hotplug cases discussed in the fabric-specific
+ * settings section, then we must use the smallest size of 128 byte payloads.
+ * This is because a device could be plugged in that supports something smaller
+ * than we had otherwise set. If there are other active devices, those could not
+ * be changed without quiescing the entire fabric. As such our algorithm is as
+ * follows:
+ *
+ *     1. Scan the entire fabric, keeping track of the smallest seen MPS in the
+ *        Device Capabilities Register.
+ *     2. If we have a complex fabric, program each Device Control register with
+ *        a 128 byte maximum payload size, otherwise, program it with the
+ *        discovered value.
+ *
+ *
+ * MAX READ REQUEST SIZE
+ *
+ * The maximum read request size (mrrs) is a much more confusing thing when
+ * compared to the maximum payload size counterpart. The maximum payload size
+ * (MPS) above is what restricts the actual size of a TLP. The mrrs value
+ * is used to control part of the behavior of Memory Read Request, which is not
+ * strictly speaking subject to the MPS. A PCIe device is allowed to respond to
+ * a Memory Read Request with less bytes than were actually requested in a
+ * single completion. In general, the default size that a root complex and its
+ * root port will reply to are based around the length of a cache line.
+ *
+ * What this ultimately controls is the number of requests that the Requester
+ * has to make and trades off bandwidth, bus sharing, and related here. For
+ * example, if the maximum read request size is 4 KiB, then the requester would
+ * only issue a single read request asking for 4 KiB. It would still receive
+ * these as multiple packets in units of the MPS. If however, the maximum read
+ * request was only say 512 B, then it would need to make 8 separate requests,
+ * potentially increasing latency. On the other hand, if systems are relying on
+ * total requests for QoS, then it's important to set it to something that's
+ * closer to the actual MPS.
+ *
+ * Traditionally, the OS has not been the most straightforward about this. It's
+ * important to remember that setting this up is also somewhat in the realm of
+ * system firmware. Due to the PCI Firmware specification, the firmware may have
+ * set up a value for not just the MRRS but also the MPS. As such, our logic
+ * basically left the MRRS alone and used whatever the device had there as long
+ * as we weren't shrinking the device's MPS. If we were, then we'd set it to the
+ * MPS. If the device was a root port, then it was just left at a system wide
+ * and PCIe default of 512 bytes.
+ *
+ * If we survey firmware (which isn't easy due to its nature), we have seen most
+ * cases where the firmware just doesn't do anything and leaves it to the
+ * device's default, which is basically just the PCIe default, unless it has a
+ * specific knowledge of something like say wanting to do something for an NVMe
+ * device. The same is generally true of other systems, leaving it at its
+ * default unless otherwise set by a device driver.
+ *
+ * Because this value doesn't really have the same constraints as other fabric
+ * properties, this becomes much simpler and we instead opt to set it as part of
+ * the device node initialization. In addition, there are no real rules about
+ * different functions having different values here as it doesn't really impact
+ * the TLP processing the same way that the MPS does.
+ *
+ * While we should add a fuller way of setting this and allowing operator
+ * override of the MRRS based on things like device class, etc. that is driven
+ * by pcieadm, that is left to the future. For now we opt to that all devices
+ * are kept at their default (512 bytes or whatever firmware left behind) and we
+ * ensure that root ports always have the mrrs set to 512.
+ */
+
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -142,7 +590,6 @@ uint32_t pcie_aer_suce_severity = PCIE_AER_SUCE_SERR_ASSERT | \
     PCIE_AER_SUCE_UC_ADDR_ERR | PCIE_AER_SUCE_UC_ATTR_ERR | \
     PCIE_AER_SUCE_USC_MSG_DATA_ERR;
 
-int pcie_max_mps = PCIE_DEVCTL_MAX_PAYLOAD_4096 >> 5;
 int pcie_disable_ari = 0;
 
 /*
@@ -618,9 +1065,12 @@ pcie_determine_aspm(dev_info_t *dip)
 }
 
 /*
- * PCI-Express child device initialization.
- * This function enables generic pci-express interrupts and error
- * handling.
+ * PCI-Express child device initialization. Note, this only will be called on a
+ * device or function if we actually attach a device driver to it.
+ *
+ * This function enables generic pci-express interrupts and error handling.
+ * Note, tagging, the max packet size, and related are all set up before this
+ * point and is performed in pcie_fabric_setup().
  *
  * @param pdip		root dip (root nexus's dip)
  * @param cdip		child's dip (device's dip)
@@ -772,11 +1222,6 @@ pcie_initchild(dev_info_t *cdip)
 	    == PCIE_ARI_FORW_ENABLED) && (pcie_ari_device(cdip)
 	    == PCIE_ARI_DEVICE)) {
 		bus_p->bus_ari = B_TRUE;
-	}
-
-	if (pcie_initchild_mps(cdip) == DDI_FAILURE) {
-		pcie_fini_cfghdl(cdip);
-		return (DDI_FAILURE);
 	}
 
 	return (DDI_SUCCESS);
@@ -1519,11 +1964,15 @@ pcie_init_bus(dev_info_t *dip, pcie_req_id_t bdf, uint8_t flags)
 	for (base = pci_cfgacc_get8(rcdip, bdf, base); base && num_cap;
 	    base = pci_cfgacc_get8(rcdip, bdf, base + PCI_CAP_NEXT_PTR)) {
 		capid = pci_cfgacc_get8(rcdip, bdf, base);
+		uint16_t pcap;
+
 		switch (capid) {
 		case PCI_CAP_ID_PCI_E:
 			bus_p->bus_pcie_off = base;
-			bus_p->bus_dev_type = pci_cfgacc_get16(rcdip, bdf,
-			    base + PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
+			pcap = pci_cfgacc_get16(rcdip, bdf, base +
+			    PCIE_PCIECAP);
+			bus_p->bus_dev_type = pcap & PCIE_PCIECAP_DEV_TYPE_MASK;
+			bus_p->bus_pcie_vers = pcap & PCIE_PCIECAP_VER_MASK;
 
 			/* Check and save PCIe hotplug capability information */
 			if ((PCIE_IS_RP(bus_p) || PCIE_IS_SWD(bus_p)) &&
@@ -1578,22 +2027,24 @@ pcie_init_bus(dev_info_t *dip, pcie_req_id_t bdf, uint8_t flags)
 		capid = pci_cfgacc_get32(rcdip, bdf, base);
 		if (capid == PCI_CAP_EINVAL32)
 			break;
-		if (((capid >> PCIE_EXT_CAP_ID_SHIFT) & PCIE_EXT_CAP_ID_MASK)
-		    == PCIE_EXT_CAP_ID_AER) {
+		switch ((capid >> PCIE_EXT_CAP_ID_SHIFT) &
+		    PCIE_EXT_CAP_ID_MASK) {
+		case PCIE_EXT_CAP_ID_AER:
 			bus_p->bus_aer_off = base;
+			break;
+		case PCIE_EXT_CAP_ID_DEV3:
+			bus_p->bus_dev3_off = base;
 			break;
 		}
 	}
-
-	/*
-	 * Save and record speed information about the device.
-	 */
 
 caps_done:
 	/* save RP dip and RP bdf */
 	if (PCIE_IS_RP(bus_p)) {
 		bus_p->bus_rp_dip = dip;
 		bus_p->bus_rp_bdf = bus_p->bus_bdf;
+
+		bus_p->bus_fab = PCIE_ZALLOC(pcie_fabric_data_t);
 	} else {
 		for (pdip = ddi_get_parent(dip); pdip;
 		    pdip = ddi_get_parent(pdip)) {
@@ -1626,7 +2077,6 @@ caps_done:
 
 	bus_p->bus_soft_state = PCI_SOFT_STATE_CLOSED;
 	(void) atomic_swap_uint(&bus_p->bus_fm_flags, 0);
-	bus_p->bus_mps = 0;
 
 	ndi_set_bus_private(dip, B_TRUE, DEVI_PORT_TYPE_PCI, (void *)bus_p);
 
@@ -1711,6 +2161,11 @@ pcie_fini_bus(dev_info_t *dip, uint8_t flags)
 	if (flags & PCIE_BUS_INITIAL) {
 		pcie_fini_plat(dip);
 		pcie_fini_pfd(dip);
+
+		if (PCIE_IS_RP(bus_p)) {
+			kmem_free(bus_p->bus_fab, sizeof (pcie_fabric_data_t));
+			bus_p->bus_fab = NULL;
+		}
 
 		kmem_free(bus_p->bus_assigned_addr,
 		    (sizeof (pci_regspec_t) * bus_p->bus_assigned_entries));
@@ -2242,233 +2697,6 @@ pcie_is_link_disabled(dev_info_t *dip)
 			return (B_TRUE);
 	}
 	return (B_FALSE);
-}
-
-/*
- * Initialize the MPS for a root port.
- *
- * dip - dip of root port device.
- */
-void
-pcie_init_root_port_mps(dev_info_t *dip)
-{
-	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
-	int rp_cap, max_supported = pcie_max_mps;
-	int circular_count;
-
-	ndi_devi_enter(dip, &circular_count);
-	(void) pcie_get_fabric_mps(ddi_get_parent(dip),
-	    ddi_get_child(dip), &max_supported);
-	ndi_devi_exit(dip, circular_count);
-
-	rp_cap = PCI_CAP_GET16(bus_p->bus_cfg_hdl, 0,
-	    bus_p->bus_pcie_off, PCIE_DEVCAP) &
-	    PCIE_DEVCAP_MAX_PAYLOAD_MASK;
-
-	if (rp_cap < max_supported)
-		max_supported = rp_cap;
-
-	bus_p->bus_mps = max_supported;
-	(void) pcie_initchild_mps(dip);
-}
-
-/*
- * Initialize the Maximum Payload Size of a device.
- *
- * cdip - dip of device.
- *
- * returns - DDI_SUCCESS or DDI_FAILURE
- */
-int
-pcie_initchild_mps(dev_info_t *cdip)
-{
-	pcie_bus_t	*bus_p;
-	dev_info_t	*pdip = ddi_get_parent(cdip);
-	uint8_t		dev_type;
-
-	bus_p = PCIE_DIP2BUS(cdip);
-	if (bus_p == NULL) {
-		PCIE_DBG("%s: BUS not found.\n",
-		    ddi_driver_name(cdip));
-		return (DDI_FAILURE);
-	}
-
-	dev_type = bus_p->bus_dev_type;
-
-	/*
-	 * For ARI Devices, only function zero's MPS needs to be set.
-	 */
-	if ((dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
-	    (pcie_ari_is_enabled(pdip) == PCIE_ARI_FORW_ENABLED)) {
-		pcie_req_id_t child_bdf;
-
-		if (pcie_get_bdf_from_dip(cdip, &child_bdf) == DDI_FAILURE)
-			return (DDI_FAILURE);
-		if ((child_bdf & PCIE_REQ_ID_ARI_FUNC_MASK) != 0)
-			return (DDI_SUCCESS);
-	}
-
-	if (PCIE_IS_PCIE(bus_p)) {
-		int suggested_mrrs, fabric_mps;
-		uint16_t device_mps, device_mps_cap, device_mrrs, dev_ctrl;
-
-		dev_ctrl = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL);
-		if ((fabric_mps = (PCIE_IS_RP(bus_p) ? bus_p :
-		    PCIE_DIP2BUS(pdip))->bus_mps) < 0) {
-			dev_ctrl = (dev_ctrl & ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
-			    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) |
-			    (pcie_devctl_default &
-			    (PCIE_DEVCTL_MAX_READ_REQ_MASK |
-			    PCIE_DEVCTL_MAX_PAYLOAD_MASK));
-
-			PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL, dev_ctrl);
-			return (DDI_SUCCESS);
-		}
-
-		device_mps_cap = PCIE_CAP_GET(16, bus_p, PCIE_DEVCAP) &
-		    PCIE_DEVCAP_MAX_PAYLOAD_MASK;
-
-		device_mrrs = (dev_ctrl & PCIE_DEVCTL_MAX_READ_REQ_MASK) >>
-		    PCIE_DEVCTL_MAX_READ_REQ_SHIFT;
-
-		if (device_mps_cap < fabric_mps)
-			device_mrrs = device_mps = device_mps_cap;
-		else
-			device_mps = (uint16_t)fabric_mps;
-
-		suggested_mrrs = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		    cdip, DDI_PROP_DONTPASS, "suggested-mrrs", device_mrrs);
-
-		if ((device_mps == fabric_mps) ||
-		    (suggested_mrrs < device_mrrs))
-			device_mrrs = (uint16_t)suggested_mrrs;
-
-		/*
-		 * Replace MPS and MRRS settings.
-		 */
-		dev_ctrl &= ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
-		    PCIE_DEVCTL_MAX_PAYLOAD_MASK);
-
-		dev_ctrl |= ((device_mrrs << PCIE_DEVCTL_MAX_READ_REQ_SHIFT) |
-		    device_mps << PCIE_DEVCTL_MAX_PAYLOAD_SHIFT);
-
-		PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL, dev_ctrl);
-
-		bus_p->bus_mps = device_mps;
-	}
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * Scans a device tree/branch for a maximum payload size capabilities.
- *
- * rc_dip - dip of Root Complex.
- * dip - dip of device where scan will begin.
- * max_supported (IN) - maximum allowable MPS.
- * max_supported (OUT) - maximum payload size capability of fabric.
- */
-void
-pcie_get_fabric_mps(dev_info_t *rc_dip, dev_info_t *dip, int *max_supported)
-{
-	if (dip == NULL)
-		return;
-
-	/*
-	 * Perform a fabric scan to obtain Maximum Payload Capabilities
-	 */
-	(void) pcie_scan_mps(rc_dip, dip, max_supported);
-
-	PCIE_DBG("MPS: Highest Common MPS= %x\n", max_supported);
-}
-
-/*
- * Scans fabric and determines Maximum Payload Size based on
- * highest common denominator alogorithm
- */
-static void
-pcie_scan_mps(dev_info_t *rc_dip, dev_info_t *dip, int *max_supported)
-{
-	int circular_count;
-	pcie_max_supported_t max_pay_load_supported;
-
-	max_pay_load_supported.dip = rc_dip;
-	max_pay_load_supported.highest_common_mps = *max_supported;
-
-	ndi_devi_enter(ddi_get_parent(dip), &circular_count);
-	ddi_walk_devs(dip, pcie_get_max_supported,
-	    (void *)&max_pay_load_supported);
-	ndi_devi_exit(ddi_get_parent(dip), circular_count);
-
-	*max_supported = max_pay_load_supported.highest_common_mps;
-}
-
-/*
- * Called as part of the Maximum Payload Size scan.
- */
-static int
-pcie_get_max_supported(dev_info_t *dip, void *arg)
-{
-	uint32_t max_supported;
-	uint16_t cap_ptr;
-	pcie_max_supported_t *current = (pcie_max_supported_t *)arg;
-	pci_regspec_t *reg;
-	int rlen;
-	caddr_t virt;
-	ddi_acc_handle_t config_handle;
-
-	if (ddi_get_child(current->dip) == NULL) {
-		goto fail1;
-	}
-
-	if (pcie_dev(dip) == DDI_FAILURE) {
-		PCIE_DBG("MPS: pcie_get_max_supported: %s:  "
-		    "Not a PCIe dev\n", ddi_driver_name(dip));
-		goto fail1;
-	}
-
-	/*
-	 * If the suggested-mrrs property exists, then don't include this
-	 * device in the MPS capabilities scan.
-	 */
-	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "suggested-mrrs") != 0)
-		goto fail1;
-
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
-	    (caddr_t)&reg, &rlen) != DDI_PROP_SUCCESS) {
-		PCIE_DBG("MPS: pcie_get_max_supported: %s:  "
-		    "Can not read reg\n", ddi_driver_name(dip));
-		goto fail1;
-	}
-
-	if (pcie_map_phys(ddi_get_child(current->dip), reg, &virt,
-	    &config_handle) != DDI_SUCCESS) {
-		PCIE_DBG("MPS: pcie_get_max_supported: %s:  pcie_map_phys "
-		    "failed\n", ddi_driver_name(dip));
-		goto fail2;
-	}
-
-	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr)) ==
-	    DDI_FAILURE) {
-		goto fail3;
-	}
-
-	max_supported = PCI_CAP_GET16(config_handle, 0, cap_ptr,
-	    PCIE_DEVCAP) & PCIE_DEVCAP_MAX_PAYLOAD_MASK;
-
-	PCIE_DBG("PCIE MPS: %s: MPS Capabilities %x\n", ddi_driver_name(dip),
-	    max_supported);
-
-	if (max_supported < current->highest_common_mps)
-		current->highest_common_mps = max_supported;
-
-fail3:
-	pcie_unmap_phys(&config_handle, reg);
-fail2:
-	kmem_free(reg, rlen);
-fail1:
-	return (DDI_WALK_CONTINUE);
 }
 
 /*
@@ -3252,4 +3480,293 @@ pcie_link_retrain(dev_info_t *dip)
 	}
 
 	return (0);
+}
+
+/*
+ * Here we're going through and grabbing information about a given PCIe device.
+ * Our situation is a little bit complicated at this point. This gets invoked
+ * both during early initialization and during hotplug events. We cannot rely on
+ * the device node having been fully set up, that is, while the pcie_bus_t
+ * normally contains a ddi_acc_handle_t for configuration space, that may not be
+ * valid yet as this can occur before child initialization or we may be dealing
+ * with a function that will never have a handle.
+ *
+ * However, we should always have a fully furnished pcie_bus_t, which means that
+ * we can get its bdf and use that to access the devices configuration space.
+ */
+static int
+pcie_fabric_feature_scan(dev_info_t *dip, void *arg)
+{
+	pcie_bus_t *bus_p;
+	uint32_t devcap;
+	uint16_t mps;
+	dev_info_t *rcdip;
+	pcie_fabric_data_t *fab = arg;
+
+	/*
+	 * Skip over non-PCIe devices. If we encounter something here, we don't
+	 * bother going through any of its children because we don't have reason
+	 * to believe that a PCIe device that this will impact will exist below
+	 * this. While it is possible that there's a PCIe fabric downstream an
+	 * intermediate old PCI/PCI-X bus, at that point, we'll still trigger
+	 * our complex fabric detection and use the minimums.
+	 *
+	 * The reason this doesn't trigger an immediate flagging as a complex
+	 * case like the one below is because we could be scanning a device that
+	 * is a nexus driver and has children already (albeit that would be
+	 * somewhat surprising as we don't anticipate being called at this
+	 * point).
+	 */
+	if (pcie_dev(dip) != DDI_SUCCESS) {
+		return (DDI_WALK_PRUNECHILD);
+	}
+
+	/*
+	 * If we fail to find a pcie_bus_t for some reason, that's somewhat
+	 * surprising. We log this fact and set the complex flag and indicate it
+	 * was because of this case. This immediately transitions us to a
+	 * "complex" case which means use the minimal, safe, settings.
+	 */
+	bus_p = PCIE_DIP2BUS(dip);
+	if (bus_p == NULL) {
+		dev_err(dip, CE_WARN, "failed to find associated pcie_bus_t "
+		    "during fabric scan");
+		fab->pfd_flags |= PCIE_FABRIC_F_COMPLEX;
+		return (DDI_WALK_TERMINATE);
+	}
+	rcdip = pcie_get_rc_dip(dip);
+
+	/*
+	 * First, start by determining what the device's tagging and max packet
+	 * size is. All PCIe devices will always have the 8-bit tag information
+	 * as this has existed since PCIe 1.0. 10-bit tagging requires a V2
+	 * PCIe capability. 14-bit requires the DEV3 cap. If we are missing a
+	 * version or capability, then we always treat that as lacking the bits
+	 * in the fabric.
+	 */
+	ASSERT3U(bus_p->bus_pcie_off, !=, 0);
+	devcap = pci_cfgacc_get32(rcdip, bus_p->bus_bdf, bus_p->bus_pcie_off +
+	    PCIE_DEVCAP);
+	mps = devcap & PCIE_DEVCAP_MAX_PAYLOAD_MASK;
+	if (mps < fab->pfd_mps_found) {
+		fab->pfd_mps_found = mps;
+	}
+
+	if ((devcap & PCIE_DEVCAP_EXT_TAG_8BIT) == 0) {
+		fab->pfd_tag_found &= ~PCIE_TAG_8B;
+	}
+
+	if (bus_p->bus_pcie_vers == PCIE_PCIECAP_VER_2_0) {
+		uint32_t devcap2 = pci_cfgacc_get32(rcdip, bus_p->bus_bdf,
+		    bus_p->bus_pcie_off + PCIE_DEVCAP2);
+		if ((devcap2 & PCIE_DEVCAP2_10B_TAG_COMP_SUP) == 0) {
+			fab->pfd_tag_found &= ~PCIE_TAG_10B_COMP;
+		}
+	} else {
+		fab->pfd_tag_found &= ~PCIE_TAG_10B_COMP;
+	}
+
+	if (bus_p->bus_dev3_off != 0) {
+		uint32_t devcap3 = pci_cfgacc_get32(rcdip, bus_p->bus_bdf,
+		    bus_p->bus_dev3_off + PCIE_DEVCAP3);
+		if ((devcap3 & PCIE_DEVCAP3_14B_TAG_COMP_SUP) == 0) {
+			fab->pfd_tag_found &= ~PCIE_TAG_14B_COMP;
+		}
+	} else {
+		fab->pfd_tag_found &= ~PCIE_TAG_14B_COMP;
+	}
+
+	/*
+	 * Now that we have captured device information, we must go and ask
+	 * questions of the topology here. The big theory statement enumerates
+	 * several types of cases. The big question we need to answer is have we
+	 * encountered a hotpluggable bridge that means we need to mark this as
+	 * complex.
+	 *
+	 * The big theory statement notes several different kinds of hotplug
+	 * topologies that exist that we can theoretically support. Right now we
+	 * opt to keep our lives simple and focus solely on (4) and (5). These
+	 * can both be summarized by a single, fairly straightforward rule:
+	 *
+	 * The only allowed hotpluggable entity is a root port.
+	 *
+	 * The reason that this can work and detect cases like (6), (7), and our
+	 * other invalid ones is that the hotplug code will scan and find all
+	 * children before we are called into here.
+	 */
+	if (bus_p->bus_hp_sup_modes != 0) {
+		/*
+		 * We opt to terminate in this case because there's no value in
+		 * scanning the rest of the tree at this point.
+		 */
+		if (!PCIE_IS_RP(bus_p)) {
+			fab->pfd_flags |= PCIE_FABRIC_F_COMPLEX;
+			return (DDI_WALK_TERMINATE);
+		}
+
+		fab->pfd_flags |= PCIE_FABRIC_F_RP_HP;
+	}
+
+	/*
+	 * As our walk starts at a root port, we need to make sure that we don't
+	 * pick up any of its siblings and their children as those would be
+	 * different PCIe fabric domains for us to scan. In many hardware
+	 * platforms multiple root ports are all at the same level in the tree.
+	 */
+	if (bus_p->bus_rp_dip == dip) {
+		return (DDI_WALK_PRUNESIB);
+	}
+
+	return (DDI_WALK_CONTINUE);
+}
+
+static int
+pcie_fabric_feature_set(dev_info_t *dip, void *arg)
+{
+	pcie_bus_t *bus_p;
+	dev_info_t *rcdip;
+	pcie_fabric_data_t *fab = arg;
+	uint32_t devcap, devctl;
+
+	if (pcie_dev(dip) != DDI_SUCCESS) {
+		return (DDI_WALK_PRUNECHILD);
+	}
+
+	/*
+	 * The missing bus_t sent us into the complex case previously. We still
+	 * need to make sure all devices have values we expect here and thus
+	 * don't terminate like the above.
+	 */
+	bus_p = PCIE_DIP2BUS(dip);
+	if (bus_p == NULL) {
+		return (DDI_WALK_CONTINUE);
+	}
+	rcdip = pcie_get_rc_dip(dip);
+
+	devcap = pci_cfgacc_get32(rcdip, bus_p->bus_bdf, bus_p->bus_pcie_off +
+	    PCIE_DEVCAP);
+	devctl = pci_cfgacc_get16(rcdip, bus_p->bus_bdf, bus_p->bus_pcie_off +
+	    PCIE_DEVCTL);
+
+	if ((devcap & PCIE_DEVCAP_EXT_TAG_8BIT) != 0 &&
+	    (fab->pfd_tag_act & PCIE_TAG_8B) != 0) {
+		devctl |= PCIE_DEVCTL_EXT_TAG_FIELD_EN;
+	}
+
+	devctl &= ~PCIE_DEVCTL_MAX_PAYLOAD_MASK;
+	ASSERT0(fab->pfd_mps_act & ~PCIE_DEVCAP_MAX_PAYLOAD_MASK);
+	devctl |= fab->pfd_mps_act << PCIE_DEVCTL_MAX_PAYLOAD_SHIFT;
+
+	pci_cfgacc_put16(rcdip, bus_p->bus_bdf, bus_p->bus_pcie_off +
+	    PCIE_DEVCTL, devctl);
+
+	if (bus_p->bus_pcie_vers == PCIE_PCIECAP_VER_2_0 &&
+	    (fab->pfd_tag_act & PCIE_TAG_10B_COMP) != 0) {
+		uint32_t devcap2 = pci_cfgacc_get32(rcdip, bus_p->bus_bdf,
+		    bus_p->bus_pcie_off + PCIE_DEVCAP2);
+
+		if ((devcap2 & PCIE_DEVCAP2_10B_TAG_REQ_SUP) == 0) {
+			uint16_t devctl2 = pci_cfgacc_get16(rcdip,
+			    bus_p->bus_bdf, bus_p->bus_pcie_off + PCIE_DEVCTL2);
+			devctl2 |= PCIE_DEVCTL2_10B_TAG_REQ_EN;
+			pci_cfgacc_put16(rcdip, bus_p->bus_bdf,
+			    bus_p->bus_pcie_off + PCIE_DEVCTL2, devctl2);
+		}
+	}
+
+	if (bus_p->bus_dev3_off != 0 &&
+	    (fab->pfd_tag_act & PCIE_TAG_14B_COMP) != 0) {
+		uint32_t devcap3 = pci_cfgacc_get32(rcdip, bus_p->bus_bdf,
+		    bus_p->bus_dev3_off + PCIE_DEVCAP3);
+
+		if ((devcap3 & PCIE_DEVCAP3_14B_TAG_REQ_SUP) == 0) {
+			uint16_t devctl3 = pci_cfgacc_get16(rcdip,
+			    bus_p->bus_bdf, bus_p->bus_dev3_off + PCIE_DEVCTL3);
+			devctl3 |= PCIE_DEVCTL3_14B_TAG_REQ_EN;
+			pci_cfgacc_put16(rcdip, bus_p->bus_bdf,
+			    bus_p->bus_pcie_off + PCIE_DEVCTL2, devctl3);
+		}
+	}
+
+	/*
+	 * As our walk starts at a root port, we need to make sure that we don't
+	 * pick up any of its siblings and their children as those would be
+	 * different PCIe fabric domains for us to scan. In many hardware
+	 * platforms multiple root ports are all at the same level in the tree.
+	 */
+	if (bus_p->bus_rp_dip == dip) {
+		return (DDI_WALK_PRUNESIB);
+	}
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * This is used to scan and determine the total set of PCIe fabric settings that
+ * we should have in the system for everything downstream of this specified root
+ * port. Note, it is only really safe to call this while working from the
+ * perspective of a root port as we will be walking down the entire device tree.
+ *
+ * However, our callers, particularly hoptlug, don't have all the information
+ * we'd like. In particular, we need to check that:
+ *
+ *   o This is actually a PCIe device.
+ *   o That this is a root port (see the big theory statement to understand this
+ *     constraint).
+ */
+void
+pcie_fabric_setup(dev_info_t *dip)
+{
+	pcie_bus_t *bus_p;
+	pcie_fabric_data_t *fab;
+	dev_info_t *pdip;
+	int circular_count;
+
+	bus_p = PCIE_DIP2BUS(dip);
+	if (bus_p == NULL || !PCIE_IS_RP(bus_p)) {
+		return;
+	}
+
+	VERIFY3P(bus_p->bus_fab, !=, NULL);
+	fab = bus_p->bus_fab;
+
+	/*
+	 * For us to call ddi_walk_devs(), our parent needs to be held.
+	 * ddi_walk_devs() will take care of grabbing our dip as part of its
+	 * walk before we iterate over our children.
+	 *
+	 * A reasonable question to ask here is why is it safe to ask for our
+	 * parent? In this case, because we have entered here through some
+	 * thread that's operating on us whether as part of attach or a hotplug
+	 * event, our dip somewhat by definition has to be valid. If we were
+	 * looking at our dip's children and then asking them for a parent, then
+	 * that would be a race condition.
+	 */
+	pdip = ddi_get_parent(dip);
+	VERIFY3P(pdip, !=, NULL);
+	ndi_devi_enter(pdip, &circular_count);
+	fab->pfd_flags |= PCIE_FABRIC_F_SCANNING;
+
+	/*
+	 * Reinitialize the tracking structure to basically set the maximum
+	 * caps. These will be chipped away during the scan.
+	 */
+	fab->pfd_mps_found = PCIE_DEVCAP_MAX_PAYLOAD_4096;
+	fab->pfd_tag_found = PCIE_TAG_ALL;
+	fab->pfd_flags &= ~PCIE_FABRIC_F_COMPLEX;
+
+	ddi_walk_devs(dip, pcie_fabric_feature_scan, fab);
+
+	if ((fab->pfd_flags & PCIE_FABRIC_F_COMPLEX) != 0) {
+		fab->pfd_tag_act = PCIE_TAG_5B;
+		fab->pfd_mps_act = PCIE_DEVCAP_MAX_PAYLOAD_128;
+	} else {
+		fab->pfd_tag_act = fab->pfd_tag_found;
+		fab->pfd_mps_act = fab->pfd_mps_found;
+	}
+
+	ddi_walk_devs(dip, pcie_fabric_feature_set, fab);
+
+	fab->pfd_flags &= ~PCIE_FABRIC_F_SCANNING;
+	ndi_devi_exit(pdip, circular_count);
 }

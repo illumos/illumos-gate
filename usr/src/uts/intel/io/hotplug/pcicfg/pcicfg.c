@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -42,7 +43,6 @@
 #include <sys/hotplug/pci/pcicfg.h>
 #include <sys/ndi_impldefs.h>
 #include <sys/pci_cfgacc.h>
-#include <sys/pcie_impl.h>
 
 /*
  * ************************************************************************
@@ -714,6 +714,18 @@ next:
 			func++;
 		}
 		DEBUG1("Next Function - %x\n", func);
+	}
+
+	/*
+	 * At this point we have set up the various dev_info nodes that we
+	 * expect to see in the tree and we must re-evaluate the general fabric
+	 * settings such as the overall max payload size or the tagging that is
+	 * enabled. However, as part the big theory statement in pcie.c, this
+	 * can only be performed on a root port; however, that determination
+	 * will be made by the fabric scanning logic.
+	 */
+	if (visited > 0 && is_pcie) {
+		pcie_fabric_setup(devi);
 	}
 
 	ndi_devi_exit(devi, circ);

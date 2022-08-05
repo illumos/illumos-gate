@@ -20423,7 +20423,6 @@ s usr/share/man/man9f/ddi_get_soft_iblock_cookie.9f=ddi_add_softintr.9f
 s usr/share/man/man9f/ddi_get_soft_state.9f=ddi_soft_state.9f
 f usr/share/man/man9f/ddi_get_time.9f 0444 root bin
 s usr/share/man/man9f/ddi_getb.9f=ddi_get8.9f
-f usr/share/man/man9f/ddi_getiminor.9f 0444 root bin
 s usr/share/man/man9f/ddi_getl.9f=ddi_get8.9f
 s usr/share/man/man9f/ddi_getll.9f=ddi_get8.9f
 s usr/share/man/man9f/ddi_getlongprop.9f=ddi_prop_op.9f

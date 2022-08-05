@@ -168,16 +168,6 @@ void audio_dump_dwords(const uint32_t *w, int dcount);
 #define	ENGINE_NDELAY		(1U << 21)	/* non-blocking open */
 
 /*
- * entry points used by legacy SADA drivers
- */
-int audio_legacy_open(queue_t *, dev_t *, int, int, cred_t *);
-int audio_legacy_close(queue_t *, int, cred_t *);
-int audio_legacy_wput(queue_t *, mblk_t *);
-int audio_legacy_wsrv(queue_t *);
-
-
-
-/*
  * Audio device controls
  */
 

@@ -146,7 +146,7 @@ typedef struct overlay_target_entry {
 
 #define	OVERLAY_CTL	"overlay"
 
-#define OVERLAY_FREEMSG(mp, reason) \
+#define	OVERLAY_FREEMSG(mp, reason) \
     DTRACE_PROBE2(overlay__freemsg, mblk_t *, mp, char *, reason)
 
 extern dev_info_t *overlay_dip;

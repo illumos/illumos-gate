@@ -170,8 +170,6 @@ ipmi_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	/* Initialize the per file descriptor data. */
 	dev = kmem_zalloc(sizeof (ipmi_device_t), KM_SLEEP);
 
-	dev->ipmi_pollhead = kmem_zalloc(sizeof (pollhead_t), KM_SLEEP);
-
 	TAILQ_INIT(&dev->ipmi_completed_requests);
 	dev->ipmi_address = IPMI_BMC_SLAVE_ADDR;
 	dev->ipmi_lun = IPMI_BMC_SMS_LUN;
@@ -225,7 +223,7 @@ ipmi_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	mutex_exit(&dev_list_lock);
 	id_free(minor_ids, getminor(dev));
 	cv_destroy(&dp->ipmi_cv);
-	kmem_free(dp->ipmi_pollhead, sizeof (pollhead_t));
+	pollhead_clean(&dp->ipmi_pollhead);
 	kmem_free(dp, sizeof (ipmi_device_t));
 
 	return (0);
@@ -463,7 +461,7 @@ ipmi_poll(dev_t dv, short events, int anyyet, short *reventsp,
 	}
 
 	if ((revent == 0 && !anyyet) || (events & POLLET)) {
-		*phpp = dev->ipmi_pollhead;
+		*phpp = &dev->ipmi_pollhead;
 	}
 
 	*reventsp = revent;

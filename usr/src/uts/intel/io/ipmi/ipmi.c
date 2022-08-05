@@ -120,7 +120,7 @@ ipmi_complete_request(struct ipmi_softc *sc, struct ipmi_request *req)
 	} else {
 		dev = req->ir_owner;
 		TAILQ_INSERT_TAIL(&dev->ipmi_completed_requests, req, ir_link);
-		pollwakeup(dev->ipmi_pollhead, POLLIN | POLLRDNORM);
+		pollwakeup(&dev->ipmi_pollhead, POLLIN | POLLRDNORM);
 
 		dev->ipmi_status &= ~IPMI_BUSY;
 		if (dev->ipmi_status & IPMI_CLOSING)

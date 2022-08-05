@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCIE_IMPL_H
@@ -330,6 +331,52 @@ typedef enum {
 } pcie_lbw_state_t;
 
 /*
+ * This structure is used to keep track of a given bus hierarchy and the set of
+ * PCIe tags that we have enabled on it.
+ */
+typedef enum {
+	PCIE_TAG_5B		= 0,
+	PCIE_TAG_8B		= 1 << 0,
+	PCIE_TAG_10B_COMP	= 1 << 1,
+	PCIE_TAG_14B_COMP	= 1 << 2
+} pcie_tag_t;
+
+#define	PCIE_TAG_ALL	(PCIE_TAG_8B | PCIE_TAG_10B_COMP | PCIE_TAG_14B_COMP)
+
+typedef enum {
+	/*
+	 * This flag is kept around for debugging and noticing that we're in the
+	 * process of trying to perform a scan.
+	 */
+	PCIE_FABRIC_F_SCANNING	= 1 << 0,
+	/*
+	 * This is used to indicate that we have discovered a topology that is
+	 * too complex for us to be able to set advanced settings on and
+	 * therefore have to leave it at the bare minimum.
+	 */
+	PCIE_FABRIC_F_COMPLEX	= 1 << 1,
+	/*
+	 * Indicates that we found a hot-pluggable root port in the fabric.
+	 */
+	PCIE_FABRIC_F_RP_HP	= 1 << 2
+} pcie_fabric_flags_t;
+
+/*
+ * This structure represents hierarchy wide settings that are used in a given
+ * PCIe fabric (what the spec calls a "hierarchy domain"). This keeps track of
+ * what we have found and enabled in the fabric as part of our initialization.
+ * For more information on this, please see the theory statement in
+ * uts/common/io/pciex/pcie.c.
+ */
+typedef struct pice_fabric_data {
+	pcie_fabric_flags_t	pfd_flags;
+	uint16_t		pfd_mps_found;
+	uint16_t		pfd_mps_act;
+	pcie_tag_t		pfd_tag_found;
+	pcie_tag_t		pfd_tag_act;
+} pcie_fabric_data_t;
+
+/*
  * For hot plugged device, these data are init'ed during during probe
  * For non-hotplugged device, these data are init'ed in pci_autoconfig (on x86),
  * or in px_attach()(on sparc).
@@ -355,8 +402,10 @@ typedef struct pcie_bus {
 	uint8_t		bus_hdr_type;		/* pci header type, see pci.h */
 	uint16_t	bus_dev_type;		/* PCI-E dev type, see pcie.h */
 	uint8_t		bus_bdg_secbus;		/* Bridge secondary bus num */
+	uint8_t		bus_pcie_vers;		/* Version of the PCIe cap */
 	uint16_t	bus_pcie_off;		/* PCIe Capability Offset */
 	uint16_t	bus_aer_off;		/* PCIe Advanced Error Offset */
+	uint16_t	bus_dev3_off;		/* PCIe Device 3 Capability */
 	uint16_t	bus_pcix_off;		/* PCIx Capability Offset */
 	uint16_t	bus_pci_hp_off;		/* PCI HP (SHPC) Cap Offset */
 	uint16_t	bus_ecc_ver;		/* PCIX ecc version */
@@ -369,8 +418,6 @@ typedef struct pcie_bus {
 	/* Cache of last fault data */
 	pf_data_t	*bus_pfd;
 	pcie_domain_t	*bus_dom;
-
-	int		bus_mps;		/* Maximum Payload Size */
 
 	void		*bus_plat_private;	/* Platform specific */
 	/* Hotplug specific fields */
@@ -404,6 +451,14 @@ typedef struct pcie_bus {
 	uint64_t		bus_lbw_nevents;
 	char			*bus_lbw_pbuf;
 	char			*bus_lbw_cbuf;
+
+	/*
+	 * The following contains fabric wide settings and information that are
+	 * used. This member is only valid on the root port. It is NULL on all
+	 * other pcie_bus_t members who instead need to access this through the
+	 * corresponding root port dip information.
+	 */
+	pcie_fabric_data_t	*bus_fab;
 } pcie_bus_t;
 
 /*
@@ -511,11 +566,6 @@ typedef struct pf_impl {
 #define	PCIE_INVALID_BDF	0xFFFF
 #define	PCIE_CHECK_VALID_BDF(x)	(x != PCIE_INVALID_BDF)
 
-typedef struct {
-	dev_info_t	*dip;
-	int		highest_common_mps;
-} pcie_max_supported_t;
-
 /*
  * Default interrupt priority for all PCI and PCIe nexus drivers including
  * hotplug interrupts.
@@ -585,7 +635,7 @@ extern int pcie_ioctl(dev_info_t *dip, dev_t dev, int cmd, intptr_t arg,
 extern int pcie_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
     int flags, char *name, caddr_t valuep, int *lengthp);
 
-extern void pcie_init_root_port_mps(dev_info_t *dip);
+extern void pcie_fabric_setup(dev_info_t *dip);
 extern int pcie_initchild(dev_info_t *dip);
 extern void pcie_uninitchild(dev_info_t *dip);
 extern int pcie_init_cfghdl(dev_info_t *dip);
@@ -612,10 +662,7 @@ extern int pcie_get_bdf_from_dip(dev_info_t *dip, pcie_req_id_t *bdf);
 extern dev_info_t *pcie_get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip);
 extern uint32_t pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip);
 extern int pcie_dev(dev_info_t *dip);
-extern void pcie_get_fabric_mps(dev_info_t *rc_dip, dev_info_t *dip,
-	int *max_supported);
 extern int pcie_root_port(dev_info_t *dip);
-extern int pcie_initchild_mps(dev_info_t *dip);
 extern void pcie_set_rber_fatal(dev_info_t *dip, boolean_t val);
 extern boolean_t pcie_get_rber_fatal(dev_info_t *dip);
 

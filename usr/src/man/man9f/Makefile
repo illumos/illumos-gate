@@ -11,12 +11,12 @@
 
 #
 # Copyright 2017, Richard Lowe
-# Copyright 2014 Garrett D'Amore <garrett@damore>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2020-2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2022 RackTop Systems, Inc.
 # Copyright 2022 Oxide Computer Company
+# Copyright 2022 Garrett D'Amore
 #
 
 include		$(SRC)/Makefile.master
@@ -191,7 +191,6 @@ MANFILES=	ASSERT.9f				\
 		ddi_get_parent.9f			\
 		ddi_get_pid.9f				\
 		ddi_get_time.9f				\
-		ddi_getiminor.9f			\
 		ddi_in_panic.9f				\
 		ddi_intr_add_handler.9f			\
 		ddi_intr_add_softint.9f			\
