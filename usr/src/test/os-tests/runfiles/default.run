@@ -14,7 +14,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 # Copyright 2022 MNX Cloud, Inc.
 #
 
@@ -56,6 +56,9 @@ tests = ['secflags_aslr',
          'secflags_syscall',
          'secflags_truss',
          'secflags_zonecfg']
+
+[/opt/os-tests/tests/signalfd]
+tests = ['basic_args', 'basic_read']
 
 [/opt/os-tests/tests/sigqueue]
 tests = ['sigqueue_queue_size']
