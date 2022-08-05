@@ -36,6 +36,10 @@ const pci_class_strings_t class_pci[] = {
 	{ 0, 1, 0,	"VGA compatible controller",		"unknown" },
 
 	{ 1, 0, 0,	"SCSI bus controller",			"scsi" },
+	{ 1, 0, 0x11,	"SCSI storage device (SOP, PQI)",	"scsi" },
+	{ 1, 0, 0x12,	"SCSI bus controller (SOP, PQI)",	"scsi" },
+	{ 1, 0, 0x13,	"SCSI bus controller and device (SOP, PQI)", "scsi" },
+	{ 1, 0, 0x21,	"SCSI bus controller and device (SOP, NVMe)", "scsi" },
 	{ 1, 1, 0x80,	"IDE controller", /* Special case */	"ide" },
 	{ 1, 2, 0,	"Floppy controller",			"flpydis" },
 	{ 1, 3, 0,	"IPI bus controller",			"ipi" },
@@ -50,6 +54,7 @@ const pci_class_strings_t class_pci[] = {
 	{ 1, 8, 0,	"Non-Volatile memory controller",	"unknown" },
 	{ 1, 8, 1,	"NVMHCI",				"unknown" },
 	{ 1, 8, 2,	"NVM Express",				"nvme" },
+	{ 1, 8, 2,	"NVM Express administrative controller", "unknown" },
 	{ 1, 9, 0,	"UFS controller",			"unknown" },
 	{ 1, 9, 1,	"UFS Host Controller Interface",	"unknown" },
 	{ 1, 0x80, 0,	"Mass storage controller",		"unknown" },
@@ -62,6 +67,7 @@ const pci_class_strings_t class_pci[] = {
 	{ 2, 5, 0,	"WorldFip controller",			"unknown" },
 	{ 2, 6, 0,	"PICMG 2.14 Multi computing controller", "mcd" },
 	{ 2, 7, 0,	"InfiniBand controller",		"ib", },
+	{ 2, 8, 0,	"Host fabric controller",		"unknown", },
 	{ 2, 0x80, 0,	"Network controller",			"unknown" },
 
 	{ 3, 0, 0,	"VGA compatible controller",		"vga" },
@@ -73,11 +79,14 @@ const pci_class_strings_t class_pci[] = {
 	{ 4, 0, 0,	"Video device",				"video" },
 	{ 4, 1, 0,	"Audio device",				"audio" },
 	{ 4, 2, 0,	"Computer Telephony device",		"teleph" },
-	{ 4, 3, 0,	"Mixed Mode device",			"mixed" },
+	{ 4, 3, 0,	"High Definition Audio 1.0",		"audio" },
+	{ 4, 3, 0x80,	"High Definition Audio 1.0",		"audio" },
 	{ 4, 0x80, 0,	"Multimedia device",			"unknown" },
 
 	{ 5, 0, 0,	"Ram",					"ram" },
 	{ 5, 1, 0,	"Flash memory",				"flash" },
+	{ 5, 2, 0,	"CXL Memory Device",			"cxl" },
+	{ 5, 2, 0x10,	"CXL 2.0 Memory Device",		"cxl" },
 	{ 5, 0x80, 0,	"Memory controller",			"unknown" },
 
 	{ 6, 0, 0,	"Host bridge",				"hostpci" },
@@ -170,6 +179,7 @@ const pci_class_strings_t class_pci[] = {
 	{ 12, 3, 0x10,	"Universal Serial Bus OHCI compliant",	"usb" },
 	{ 12, 3, 0x20,	"Universal Serial Bus EHCI compliant",	"usb" },
 	{ 12, 3, 0x30,	"Universal Serial Bus XHCI compliant",	"usb" },
+	{ 12, 3, 0x40,	"USB4 Host Interface",			"usb" },
 	{ 12, 3, 0x80,	"Universal Serial Bus generic HCD",	"usb" },
 	{ 12, 3, 0xFE,	"Universal Serial Bus device",		"usb" },
 	{ 12, 4, 0,	"Fibre Channel",			"fibre" },
@@ -205,7 +215,7 @@ const pci_class_strings_t class_pci[] = {
 	{ 15, 0x80, 0,	"Satellite Comm controller",		"unknown" },
 
 	{ 16, 0, 0,	"Network and computing en/decryption",	"netcryp" },
-	{ 16, 1, 0,	"Entertainment en/decryption",		"entcryp" },
+	{ 16, 0x10, 0,	"Entertainment en/decryption",		"entcryp" },
 	{ 16, 0x80, 0,	"En/decryption controller",		"unknown" },
 
 	{ 17, 0, 0,	"DPIO modules",				"dpio" },
@@ -215,6 +225,8 @@ const pci_class_strings_t class_pci[] = {
 	{ 17, 0x80, 0,	"DSP/DAP controllers",			"unknown" },
 
 	{ 18, 0, 0,	"Processing Accelerator",		"unknown" },
+	{ 18, 1, 0,	"SNIA Smart Data Acceleration Interface controller",
+		"sdxi" },
 
 	{ 19, 0, 0,	"Non-essential Instrumentation",	"unknown" },
 };
