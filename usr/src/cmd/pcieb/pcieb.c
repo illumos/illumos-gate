@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -64,6 +65,10 @@ pcieb_parse_speed(const char *s)
 		return (PCIEB_LINK_SPEED_GEN3);
 	} else if (strcasecmp(s, "16") == 0 || strcasecmp(s, "gen4") == 0) {
 		return (PCIEB_LINK_SPEED_GEN4);
+	} else if (strcasecmp(s, "32") == 0 || strcasecmp(s, "gen5") == 0) {
+		return (PCIEB_LINK_SPEED_GEN5);
+	} else if (strcasecmp(s, "64") == 0 || strcasecmp(s, "gen6") == 0) {
+		return (PCIEB_LINK_SPEED_GEN6);
 	} else {
 		errx(EXIT_FAILURE, "invalid speed: %s", s);
 	}
@@ -152,6 +157,12 @@ main(int argc, char *argv[])
 			break;
 		case PCIEB_LINK_SPEED_GEN4:
 			(void) printf("16.0 GT/s (gen4)\n");
+			break;
+		case PCIEB_LINK_SPEED_GEN5:
+			(void) printf("32.0 GT/s (gen5)\n");
+			break;
+		case PCIEB_LINK_SPEED_GEN6:
+			(void) printf("64.0 GT/s (gen6)\n");
 			break;
 		default:
 			(void) printf("Unknown Value: 0x%x\n", pits.pits_speed);

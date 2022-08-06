@@ -205,11 +205,13 @@ extern "C" {
 /*
  * In version 2 of PCI express, this indicated that both 5.0 GT/s and 2.5 GT/s
  * speeds were supported. The use of this as the maximum link speed was added
- * with PCIex v3.
+ * with PCIe v3.
  */
 #define	PCIE_LINKCAP_MAX_SPEED_5	0x2	/* 5.0 GT/s Speed */
 #define	PCIE_LINKCAP_MAX_SPEED_8	0x3	/* 8.0 GT/s Speed */
 #define	PCIE_LINKCAP_MAX_SPEED_16	0x4	/* 16.0 GT/s Speed */
+#define	PCIE_LINKCAP_MAX_SPEED_32	0x5	/* 32.0 GT/s Speed */
+#define	PCIE_LINKCAP_MAX_SPEED_64	0x6	/* 64.0 GT/s Speed */
 #define	PCIE_LINKCAP_MAX_SPEED_MASK	0xF	/* Maximum Link Speed */
 #define	PCIE_LINKCAP_MAX_WIDTH_X1	0x010
 #define	PCIE_LINKCAP_MAX_WIDTH_X2	0x020
@@ -290,6 +292,8 @@ extern "C" {
 #define	PCIE_LINKSTS_SPEED_5		0x2	/* 5.0 GT/s Link Speed */
 #define	PCIE_LINKSTS_SPEED_8		0x3	/* 8.0 GT/s Link Speed */
 #define	PCIE_LINKSTS_SPEED_16		0x4	/* 16.0 GT/s Link Speed */
+#define	PCIE_LINKSTS_SPEED_32		0x5	/* 32.0 GT/s Link Speed */
+#define	PCIE_LINKSTS_SPEED_64		0x6	/* 64.0 GT/s Link Speed */
 #define	PCIE_LINKSTS_SPEED_MASK		0xF	/* Link Speed */
 
 #define	PCIE_LINKSTS_NEG_WIDTH_X1	0x010
@@ -470,12 +474,14 @@ extern "C" {
 
 
 /*
- * Link Capability 2 Register (4 bytes)
+ * Link Capabilities 2 Register (4 bytes)
  */
 #define	PCIE_LINKCAP2_SPEED_2_5		0x02
 #define	PCIE_LINKCAP2_SPEED_5		0x04
 #define	PCIE_LINKCAP2_SPEED_8		0x08
 #define	PCIE_LINKCAP2_SPEED_16		0x10
+#define	PCIE_LINKCAP2_SPEED_32		0x20
+#define	PCIE_LINKCAP2_SPEED_64		0x40
 #define	PCIE_LINKCAP2_SPEED_MASK	0xfe
 #define	PCIE_LINKCAP2_CROSSLINK		0x100
 #define	PCIE_LINKCAP2_LSKP_OSGSS_MASK	0xfe00
@@ -483,11 +489,15 @@ extern "C" {
 #define	PCIE_LINKCAP2_LKSP_OSGSS_5	0x0400
 #define	PCIE_LINKCAP2_LKSP_OSGSS_8	0x0800
 #define	PCIE_LINKCAP2_LKSP_OSGSS_16	0x1000
+#define	PCIE_LINKCAP2_LKSP_OSGSS_32	0x2000
+#define	PCIE_LINKCAP2_LKSP_OSGSS_64	0x4000
 #define	PCIE_LINKCAP2_LKSP_OSRSS_MASK	0x7f0000
 #define	PCIE_LINKCAP2_LKSP_OSRSS_2_5	0x010000
 #define	PCIE_LINKCAP2_LKSP_OSRSS_5	0x020000
 #define	PCIE_LINKCAP2_LKSP_OSRSS_8	0x040000
 #define	PCIE_LINKCAP2_LKSP_OSRSS_16	0x080000
+#define	PCIE_LINKCAP2_LKSP_OSRSS_32	0x100000
+#define	PCIE_LINKCAP2_LKSP_OSRSS_64	0x200000
 #define	PCIE_LINKCAP2_RTPD_SUP		0x800000
 #define	PCIE_LINKCAP2_TRTPD_SUP		0x01000000
 #define	PCIE_LINKCAP2_DRS		0x80000000
@@ -500,6 +510,8 @@ extern "C" {
 #define	PCIE_LINKCTL2_TARGET_SPEED_5	0x2	/* 5.0 GT/s Speed */
 #define	PCIE_LINKCTL2_TARGET_SPEED_8	0x3	/* 8.0 GT/s Speed */
 #define	PCIE_LINKCTL2_TARGET_SPEED_16	0x4	/* 16.0 GT/s Speed */
+#define	PCIE_LINKCTL2_TARGET_SPEED_32	0x5	/* 32.0 GT/s Speed */
+#define	PCIE_LINKCTL2_TARGET_SPEED_64	0x6	/* 64.0 GT/s Speed */
 #define	PCIE_LINKCTL2_TARGET_SPEED_MASK	0x000f
 #define	PICE_LINKCTL2_ENTER_COMPLIANCE	0x0010
 #define	PCIE_LINKCTL2_HW_AUTO_SPEED_DIS	0x0020
