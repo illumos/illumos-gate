@@ -171,8 +171,14 @@ static const uint16_t amdzen_nb_ids[] = {
 	0x15d0,
 	/* Family 17h/19h Rome, Milan, Matisse, Vermeer Zen 2/Zen 3 uarch */
 	0x1480,
-	/* Family 17h/19h Renoir, Cezanne Zen 2/3 uarch) */
-	0x1630
+	/* Family 17h/19h Renoir, Cezanne, Van Gogh Zen 2/3 uarch */
+	0x1630,
+	/* Family 19h Genoa */
+	0x14a4,
+	/* Family 17h Mendocino, Family 19h Rembrandt */
+	0x14b5,
+	/* Family 19h Raphael */
+	0x14d8
 };
 
 typedef struct {
@@ -487,17 +493,13 @@ amdzen_c_df_iter(uint_t dfno, zen_df_type_t type, amdzen_c_iter_f func,
 		}
 		break;
 	case ZEN_DF_TYPE_CCM_CPU:
-		df_type = DF_TYPE_CCM;
 		/*
-		 * In the Genoa/DFv4 timeframe, with the introduction of CXL and
-		 * related, a subtype was added here where as previously it was
-		 * always zero.
+		 * While the wording of the PPR is a little weird, the CCM still
+		 * has subtype 0 in DFv4 systems; however, what's said to be for
+		 * the CPU appears to apply to the ACM.
 		 */
-		if (df->adf_major >= 4) {
-			df_subtype = DF_CCM_SUBTYPE_CPU;
-		} else {
-			df_subtype = 0;
-		}
+		df_type = DF_TYPE_CCM;
+		df_subtype = 0;
 		break;
 	default:
 		return (EINVAL);

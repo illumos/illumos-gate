@@ -147,8 +147,8 @@ typedef enum {
  * always zero.
  */
 typedef enum {
-	DF_CCM_SUBTYPE_CPU = 1,
-	DF_CCM_SUBTYPE_ACM = 2
+	DF_CCM_SUBTYPE_CPU = 0,
+	DF_CCM_SUBTYPE_ACM = 1
 } df_ccm_subtype_v4_t;
 #define	DF_FBIINFO0_GET_HAS_MCA(r)	bitx32(r, 23, 23)
 #define	DF_FBIINFO0_GET_FTI_DCNT(r)	bitx32(r, 21, 20)

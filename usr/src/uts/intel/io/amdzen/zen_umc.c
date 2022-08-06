@@ -1840,6 +1840,71 @@ zen_umc_fill_ccm_cb(const uint_t dfno, const uint32_t fabid,
 }
 
 /*
+ * This is used to fill in the common properties about a DIMM. This should occur
+ * after the rank information has been filled out. The information used is the
+ * same between DDR4 and DDR5 DIMMs. The only major difference is the register
+ * offset.
+ */
+static boolean_t
+zen_umc_fill_dimm_common(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
+    const uint_t dimmno, boolean_t ddr4)
+{
+	umc_dimm_t *dimm;
+	int ret;
+	smn_reg_t reg;
+	uint32_t val;
+	const uint32_t id = chan->chan_logid;
+
+	dimm = &chan->chan_dimms[dimmno];
+	dimm->ud_dimmno = dimmno;
+
+	if (ddr4) {
+		reg = UMC_DIMMCFG_DDR4(id, dimmno);
+	} else {
+		reg = UMC_DIMMCFG_DDR5(id, dimmno);
+	}
+	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
+		dev_err(umc->umc_dip, CE_WARN, "failed to read DIMM "
+		    "configuration register %x: %d", SMN_REG_ADDR(reg), ret);
+		return (B_FALSE);
+	}
+	dimm->ud_dimmcfg_raw = val;
+
+	if (UMC_DIMMCFG_GET_X16(val) != 0) {
+		dimm->ud_width = UMC_DIMM_W_X16;
+	} else if (UMC_DIMMCFG_GET_X4(val) != 0) {
+		dimm->ud_width = UMC_DIMM_W_X4;
+	} else {
+		dimm->ud_width = UMC_DIMM_W_X8;
+	}
+
+	if (UMC_DIMMCFG_GET_3DS(val) != 0) {
+		dimm->ud_kind = UMC_DIMM_K_3DS_RDIMM;
+	} else if (UMC_DIMMCFG_GET_LRDIMM(val) != 0) {
+		dimm->ud_kind = UMC_DIMM_K_LRDIMM;
+	} else if (UMC_DIMMCFG_GET_RDIMM(val) != 0) {
+		dimm->ud_kind = UMC_DIMM_K_RDIMM;
+	} else {
+		dimm->ud_kind = UMC_DIMM_K_UDIMM;
+	}
+
+	/*
+	 * DIMM information in a UMC can be somewhat confusing. There are quite
+	 * a number of non-zero reset values that are here. Flag whether or not
+	 * we think this entry should be usable based on enabled chip-selects.
+	 */
+	for (uint_t i = 0; i < ZEN_UMC_MAX_CHAN_BASE; i++) {
+		if (dimm->ud_cs[i].ucs_base.udb_valid ||
+		    dimm->ud_cs[i].ucs_sec.udb_valid) {
+			dimm->ud_flags |= UMC_DIMM_F_VALID;
+			break;
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/*
  * Fill all the information about a DDR4 DIMM. In the DDR4 UMC, some of this
  * information is on a per-chip select basis while at other times it is on a
  * per-DIMM basis.  In general, chip-selects 0/1 correspond to DIMM 0, and
@@ -1861,7 +1926,6 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 
 	ASSERT3U(dimmno, <, ZEN_UMC_MAX_DIMMS);
 	dimm = &chan->chan_dimms[dimmno];
-	dimm->ud_dimmno = dimmno;
 	cs0 = &dimm->ud_cs[0];
 	cs1 = &dimm->ud_cs[1];
 
@@ -2049,46 +2113,7 @@ zen_umc_fill_chan_dimm_ddr4(zen_umc_t *umc, zen_umc_df_t *df,
 	bcopy(cs0->ucs_rm_bits_sec, cs1->ucs_rm_bits_sec,
 	    sizeof (cs0->ucs_rm_bits_sec));
 
-	reg = UMC_DIMMCFG_DDR4(id, dimmno);
-	if ((ret = amdzen_c_smn_read32(df->zud_dfno, reg, &val)) != 0) {
-		dev_err(umc->umc_dip, CE_WARN, "failed to read DIMM "
-		    "configuration register %x: %d", SMN_REG_ADDR(reg), ret);
-		return (B_FALSE);
-	}
-	dimm->ud_dimmcfg_raw = val;
-
-	if (UMC_DIMMCFG_GET_X16(val) != 0) {
-		dimm->ud_width = UMC_DIMM_W_X16;
-	} else if (UMC_DIMMCFG_GET_X4(val) != 0) {
-		dimm->ud_width = UMC_DIMM_W_X4;
-	} else {
-		dimm->ud_width = UMC_DIMM_W_X8;
-	}
-
-	if (UMC_DIMMCFG_GET_3DS(val) != 0) {
-		dimm->ud_kind = UMC_DIMM_K_3DS_RDIMM;
-	} else if (UMC_DIMMCFG_GET_LRDIMM(val) != 0) {
-		dimm->ud_kind = UMC_DIMM_K_LRDIMM;
-	} else if (UMC_DIMMCFG_GET_RDIMM(val) != 0) {
-		dimm->ud_kind = UMC_DIMM_K_RDIMM;
-	} else {
-		dimm->ud_kind = UMC_DIMM_K_UDIMM;
-	}
-
-	/*
-	 * DIMM information in a UMC can be somewhat confusing. There are quite
-	 * a number of non-zero reset values that are here. Flag whether or not
-	 * we think this entry should be usable based on enabled chip-selects.
-	 */
-	for (uint_t i = 0; i < ZEN_UMC_MAX_CHAN_BASE; i++) {
-		if (dimm->ud_cs[i].ucs_base.udb_valid ||
-		    dimm->ud_cs[i].ucs_sec.udb_valid) {
-			dimm->ud_flags |= UMC_DIMM_F_VALID;
-			break;
-		}
-	}
-
-	return (B_TRUE);
+	return (zen_umc_fill_dimm_common(umc, df, chan, dimmno, B_TRUE));
 }
 
 /*
@@ -2309,8 +2334,9 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	bcopy(cs->ucs_rm_bits, cs->ucs_rm_bits_sec,
 	    sizeof (cs->ucs_rm_bits));
 
-	return (B_TRUE);
+	return (zen_umc_fill_dimm_common(umc, df, chan, dimmno, B_FALSE));
 }
+
 
 static void
 zen_umc_fill_ddr_type(zen_umc_chan_t *chan, boolean_t ddr4)
