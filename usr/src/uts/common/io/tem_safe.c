@@ -1177,6 +1177,10 @@ tem_safe_chkparam_qmark(struct tem_vt_state *tem, tem_char_t ch, cred_t *credp,
 	case 'h': /* DEC private mode set */
 		tem_safe_setparam(tem, 1, 1);
 		switch (tem->tvs_params[0]) {
+		case 7: /* Autowrap mode. */
+			tem->tvs_stateflags |= TVS_AUTOWRAP;
+			break;
+
 		case 25: /* show cursor */
 			/*
 			 * Note that cursor is not displayed either way
@@ -1194,6 +1198,10 @@ tem_safe_chkparam_qmark(struct tem_vt_state *tem, tem_char_t ch, cred_t *credp,
 		/* DEC private mode reset */
 		tem_safe_setparam(tem, 1, 1);
 		switch (tem->tvs_params[0]) {
+		case 7: /* Autowrap mode. */
+			tem->tvs_stateflags &= ~TVS_AUTOWRAP;
+			break;
+
 		case 25: /* hide cursor */
 			/*
 			 * Note that the cursor is not displayed already.
@@ -1280,6 +1288,12 @@ tem_safe_outch(struct tem_vt_state *tem, tem_char_t ch,
 	ASSERT((MUTEX_HELD(&tems.ts_lock) && MUTEX_HELD(&tem->tvs_lock)) ||
 	    called_from == CALLED_FROM_STANDALONE);
 
+	/* We have autowrap enabled and we did wrap - get cursor to new line */
+	if ((tem->tvs_stateflags & (TVS_AUTOWRAP | TVS_WRAPPED)) ==
+	    (TVS_AUTOWRAP | TVS_WRAPPED)) {
+		tem_safe_new_line(tem, credp, called_from);
+	}
+
 	/* buffer up the character until later */
 	tem_safe_get_attr(tem, &fg, &bg, &attr, TEM_ATTR_REVERSE);
 	tem->tvs_outbuf[tem->tvs_outindex].tc_char = ch | TEM_ATTR(attr);
@@ -1288,8 +1302,11 @@ tem_safe_outch(struct tem_vt_state *tem, tem_char_t ch,
 	tem->tvs_outindex++;
 	tem->tvs_c_cursor.col++;
 	if (tem->tvs_c_cursor.col >= tems.ts_c_dimension.width) {
+		tem->tvs_stateflags |= TVS_WRAPPED;
+		tem->tvs_c_cursor.col--;
 		tem_safe_send_data(tem, credp, called_from);
-		tem_safe_new_line(tem, credp, called_from);
+	} else {
+		tem->tvs_stateflags &= ~TVS_WRAPPED;
 	}
 }
 
@@ -1305,6 +1322,7 @@ static void
 tem_safe_cr(struct tem_vt_state *tem)
 {
 	tem->tvs_c_cursor.col = 0;
+	tem->tvs_stateflags &= ~TVS_WRAPPED;
 	tem_safe_align_cursor(tem);
 }
 
@@ -1317,6 +1335,7 @@ tem_safe_lf(struct tem_vt_state *tem,
 	ASSERT((called_from == CALLED_FROM_STANDALONE) ||
 	    MUTEX_HELD(&tem->tvs_lock));
 
+	tem->tvs_stateflags &= ~TVS_WRAPPED;
 	/*
 	 * Sanity checking notes:
 	 * . a_nscroll was validated when it was set.
@@ -2258,8 +2277,12 @@ tem_safe_mv_cursor(struct tem_vt_state *tem, int row, int col,
 		row = tems.ts_c_dimension.height - 1;
 	if (col < 0)
 		col = 0;
-	if (col >= tems.ts_c_dimension.width)
+	if (col >= tems.ts_c_dimension.width) {
+		tem->tvs_stateflags |= TVS_WRAPPED;
 		col = tems.ts_c_dimension.width - 1;
+	} else {
+		tem->tvs_stateflags &= ~TVS_WRAPPED;
+	}
 
 	tem_safe_send_data(tem, credp, called_from);
 	tem->tvs_c_cursor.row = (screen_pos_t)row;
