@@ -136,3 +136,6 @@ pre = core_prereqs
 tests = ['coretests']
 
 [/opt/os-tests/tests/zen_umc_test]
+
+[/opt/os-tests/tests/portfs]
+tests = ['file_assoc.32', 'file_assoc.64']
