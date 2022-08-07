@@ -138,34 +138,18 @@ fablib(Crle_desc * crle, int flag)
 	switch (flag) {
 	case CRLE_EDLIB:
 #if M_CLASS == ELFCLASS64
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 		path = MSG_ORIG(MSG_PTH_NEWDLP_64);
 #else
-		path = MSG_ORIG(MSG_PTH_OLDDLP_64);
-#endif
-#else
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 		path = MSG_ORIG(MSG_PTH_NEWDLP);
-#else
-		path = MSG_ORIG(MSG_PTH_OLDDLP);
-#endif
 #endif
 		list = &crle->c_edlibpath;
 		break;
 
 	case CRLE_ESLIB:
 #if M_CLASS == ELFCLASS64
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 		path = MSG_ORIG(MSG_PTH_NEWTD_64);
 #else
-		path = MSG_ORIG(MSG_PTH_OLDTD_64);
-#endif
-#else
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 		path = MSG_ORIG(MSG_PTH_NEWTD);
-#else
-		path = MSG_ORIG(MSG_PTH_OLDTD);
-#endif
 #endif
 		list = &crle->c_eslibpath;
 		break;
@@ -176,11 +160,7 @@ fablib(Crle_desc * crle, int flag)
 		break;
 
 	case CRLE_ASLIB:
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 		path = MSG_ORIG(MSG_PTH_NEWTD);
-#else
-		path = MSG_ORIG(MSG_PTH_OLDTD);
-#endif
 		list = &crle->c_aslibpath;
 		break;
 
@@ -464,7 +444,6 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		if (crle->c_flags & CRLE_UPDATE) {
 			crle->c_flags &= ~CRLE_AOUT;
 
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 			if ((head->ch_cnflags & RTC_HDR_UPM) == 0) {
 				if (head->ch_cnflags & RTC_HDR_64)
 					str = conv_config_upm(str,
@@ -477,7 +456,6 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 					    MSG_ORIG(MSG_PTH_UPDLP),
 					    MSG_PTH_UPDLP_SIZE);
 			}
-#endif
 			if (addlib(crle, &crle->c_edlibpath, str) != 0)
 				return (INSCFG_RET_FAIL);
 		} else {
@@ -508,17 +486,9 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			 * Indicate any system default.
 			 */
 #if M_CLASS == ELFCLASS64
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 			(void) printf(MSG_INTL(MSG_DEF_NEWDLP_64));
 #else
-			(void) printf(MSG_INTL(MSG_DEF_OLDDLP_64));
-#endif
-#else
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 			(void) printf(MSG_INTL(MSG_DEF_NEWDLP));
-#else
-			(void) printf(MSG_INTL(MSG_DEF_OLDDLP));
-#endif
 #endif
 		}
 	}
@@ -531,7 +501,6 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		if (crle->c_flags & CRLE_UPDATE) {
 			crle->c_flags &= ~CRLE_AOUT;
 
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 			if ((head->ch_cnflags & RTC_HDR_UPM) == 0) {
 				if (head->ch_cnflags & RTC_HDR_64)
 					str = conv_config_upm(str,
@@ -544,7 +513,6 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 					    MSG_ORIG(MSG_PTH_UPTD),
 					    MSG_PTH_UPTD_SIZE);
 			}
-#endif
 			if (addlib(crle, &crle->c_eslibpath, str) != 0)
 				return (INSCFG_RET_FAIL);
 		} else {
@@ -575,17 +543,9 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			 * Indicate any system default.
 			 */
 #if M_CLASS == ELFCLASS64
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 			(void) printf(MSG_INTL(MSG_DEF_NEWTD_64));
 #else
-			(void) printf(MSG_INTL(MSG_DEF_OLDTD_64));
-#endif
-#else
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 			(void) printf(MSG_INTL(MSG_DEF_NEWTD));
-#else
-			(void) printf(MSG_INTL(MSG_DEF_OLDTD));
-#endif
 #endif
 		}
 	}
@@ -666,11 +626,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			/*
 			 * Indicate any system default.
 			 */
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 			(void) printf(MSG_INTL(MSG_DEF_AOUTNEWTD));
-#else
-			(void) printf(MSG_INTL(MSG_DEF_AOUTOLDTD));
-#endif
 		}
 	}
 
@@ -1071,28 +1027,14 @@ inspectconfig(Crle_desc * crle, int c_class)
 
 				if (crle->c_flags & CRLE_AOUT) {
 					fmt1 = MSG_INTL(MSG_DEF_AOUTDLP);
-#ifndef SGS_PRE_UNIFIED_PROCESS
 					fmt2 = MSG_INTL(MSG_DEF_AOUTNEWTD);
-#else
-					fmt2 = MSG_INTL(MSG_DEF_AOUTOLDTD);
-#endif
 				} else {
 #if M_CLASS == ELFCLASS64
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 					fmt1 = MSG_INTL(MSG_DEF_NEWDLP_64);
 					fmt2 = MSG_INTL(MSG_DEF_NEWTD_64);
 #else
-					fmt1 = MSG_INTL(MSG_DEF_OLDDLP_64);
-					fmt2 = MSG_INTL(MSG_DEF_OLDTD_64);
-#endif
-#else
-#ifndef	SGS_PRE_UNIFIED_PROCESS
 					fmt1 = MSG_INTL(MSG_DEF_NEWDLP);
 					fmt2 = MSG_INTL(MSG_DEF_NEWTD);
-#else
-					fmt1 = MSG_INTL(MSG_DEF_OLDDLP);
-					fmt2 = MSG_INTL(MSG_DEF_OLDTD);
-#endif
 #endif
 				}
 				(void) printf(fmt1);

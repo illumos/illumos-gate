@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2022 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
@@ -24,6 +24,7 @@ OBJS =	smbios.o \
 	smbios_test_errors.o \
 	smbios_test_fwinfo.o \
 	smbios_test_memdevice.o \
+	smbios_test_proc.o \
 	smbios_test_pinfo.o \
 	smbios_test_slot.o \
 	smbios_test_strings.o \

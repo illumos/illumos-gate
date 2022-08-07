@@ -128,8 +128,8 @@ typedef enum {
 #define	EFI_MEMORY_DESCRIPTOR_VERSION	1
 typedef struct {
 	uint32_t		Type;
-	EFI_PHYSICAL_ADDRESS	PhysicalStart;
 	uint32_t		Pad;
+	EFI_PHYSICAL_ADDRESS	PhysicalStart;
 	EFI_VIRTUAL_ADDRESS	VirtualStart;
 	uint64_t		NumberOfPages;
 	uint64_t		Attribute;

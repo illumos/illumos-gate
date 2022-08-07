@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -520,6 +520,30 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_chassis_verify_sku_nocomps,
 	    .st_desc = "chassis - sku + comps"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_25,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_proc_mktable_25,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_proc_verify_25,
+	    .st_desc = "SMBIOS 2.5 processor"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_36,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_proc_mktable_36,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_proc_verify_36,
+	    .st_desc = "SMBIOS 3.6 processor"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_36,
+	    .st_libvers = SMB_VERSION_25,
+	    .st_mktable = smbios_test_proc_mktable_36,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_proc_verify_36_25,
+	    .st_desc = "SMBIOS 3.6 processor, 2.5 client"
 	}
 };
 

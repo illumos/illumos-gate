@@ -143,28 +143,18 @@
 
 @ MSG_DEF_NEWDLP	"  Default Library Path (ELF):\t/lib:/usr/lib  \
 			 (system default)\n"
-@ MSG_DEF_OLDDLP	"  Default Library Path (ELF):\t/usr/lib  \
-			 (system default)\n"
 @ MSG_DEF_NEWTD		"  Trusted Directories (ELF):\t\
 			 /lib/secure:/usr/lib/secure  (system default)\n"
-@ MSG_DEF_OLDTD		"  Trusted Directories (ELF):\t/usr/lib/secure  \
-			 (system default)\n"
 @ MSG_DEF_NEWDLP_64	"  Default Library Path (ELF):\t/lib/64:/usr/lib/64  \
-			 (system default)\n"
-@ MSG_DEF_OLDDLP_64	"  Default Library Path (ELF):\t/usr/lib/64  \
 			 (system default)\n"
 @ MSG_DEF_NEWTD_64	"  Trusted Directories (ELF):\t\
 			 /lib/secure/64:/usr/lib/secure/64  (system default)\n"
-@ MSG_DEF_OLDTD_64	"  Trusted Directories (ELF):\t\
-			 /usr/lib/secure/64  (system default)\n"
 
 @ MSG_DEF_AOUTDLP	"  Default Library Path (AOUT):\t\
 			 /usr/lib:/usr/local/lib  \
 			 (system default)\n"
 @ MSG_DEF_AOUTNEWTD	"  Trusted Directories (AOUT):\t\
 			 /lib/secure:/usr/lib/secure  (system default)\n"
-@ MSG_DEF_AOUTOLDTD	"  Trusted Directories (AOUT):\t\/usr/lib/secure  \
-			 (system default)\n"
 
 @ MSG_ENV_TITLE		"\nEnvironment Variables:\n"
 @ MSG_ENV_RPL		"  %s  (replaceable)\n"

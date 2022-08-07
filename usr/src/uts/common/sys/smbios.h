@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -455,6 +455,7 @@ typedef struct smbios_processor {
 		/* number of threads per processor socket */
 	uint16_t smbp_cflags;
 		/* processor characteristics (SMB_PRC_*) */
+	uint32_t smbp_threadsenabled;	/* number of enabled threads */
 } smbios_processor_t;
 
 #define	SMB_PRT_OTHER		0x01	/* other */
@@ -546,6 +547,15 @@ typedef struct smbios_processor {
 #define	SMB_PRU_LGA4189		0x3D	/* Socket LGA4189 */
 #define	SMB_PRU_LGA1200		0x3E	/* Socket LGA1200 */
 #define	SMB_PRU_LGA4677		0x3F	/* Socket LGA4677 */
+#define	SMB_PRU_LGA1700		0x40	/* Socket LGA1700 */
+#define	SMB_PRU_BGA1744		0x41	/* Socket BGA1744 */
+#define	SMB_PRU_BGA1781		0x42	/* Socket BGA1781 */
+#define	SMB_PRU_BGA1211		0x43	/* Socket BGA1211 */
+#define	SMB_PRU_BGA2422		0x44	/* Socket BGA2422 */
+#define	SMB_PRU_LGA1211		0x45	/* Socket LGA1211 */
+#define	SMB_PRU_LGA2422		0x46	/* Socket LGA2422 */
+#define	SMB_PRU_LGA5773		0x47	/* Socket LGA5773 */
+#define	SMB_PRU_BGA5773		0x48	/* Socket BGA5773 */
 
 #define	SMB_PRC_RESERVED	0x0001	/* reserved */
 #define	SMB_PRC_UNKNOWN		0x0002	/* unknown */
@@ -759,6 +769,7 @@ typedef struct smbios_processor {
 #define	SMB_PRF_I960		0xFB	/* i960 */
 #define	SMB_PRF_ARMv7		0x100	/* ARMv7 */
 #define	SMB_PRF_ARMv8		0x101	/* ARMv8 */
+#define	SMB_PRF_ARMv9		0x102	/* ARMv9 */
 #define	SMB_PRF_SH3		0x104	/* SH-3 */
 #define	SMB_PRF_SH4		0x105	/* SH-4 */
 #define	SMB_PRF_ARM		0x118	/* ARM */
@@ -772,6 +783,24 @@ typedef struct smbios_processor {
 #define	SMB_PRF_RV32		0x200	/* RISC-V RV32 */
 #define	SMB_PRF_RV64		0x201	/* RISC-V RV64 */
 #define	SMB_PRF_RV128		0x202	/* RISC-V RV128 */
+#define	SMG_PRF_LOONG_ARCH	0x258	/* LoongArch */
+#define	SMG_PRF_LOONG_1		0x259	/* Loongson 1 Processor Family */
+#define	SMG_PRF_LOONG_2		0x25A	/* Loongson 1 Processor Family */
+#define	SMG_PRF_LOONG_3		0x25B	/* Loongson 3 Processor Family */
+#define	SMG_PRF_LOONG_2K	0x25C	/* Loongson 2K Processor Family */
+#define	SMG_PRF_LOONG_3A	0x25D	/* Loongson 3A Processor Family */
+#define	SMG_PRF_LOONG_3B	0x25E	/* Loongson 3B Processor Family */
+#define	SMG_PRF_LOONG_3C	0x25F	/* Loongson 3C Processor Family */
+#define	SMG_PRF_LOONG_3D	0x260	/* Loongson 3E Processor Family */
+/* BEGIN CSTYLED */
+#define	SMG_PRF_LOONG_2K_DC	0x261	/* Dual-Core Loongson 2K Processor 2xxx Series */
+#define	SMG_PRF_LOONG_3A_QC	0x26C	/* Quad-Core Loongson 3A Processor 5xxx Series */
+#define	SMG_PRF_LOONG_3A_MC	0x26D	/* Multi-Core Loongson 3A Processor 5xxx Series */
+#define	SMG_PRF_LOONG_3B_QC	0x26E	/* Quad-Core Loongson 3B Processor 5xxx Series */
+#define	SMG_PRF_LOONG_3B_MC	0x26F	/* Multi-Core Loongson 3B Processor 5xxx Series */
+#define	SMG_PRF_LOONG_3C_MC	0x270	/* Multi-Core Loongson 3C Processor 5xxx Series */
+#define	SMG_PRF_LOONG_3D_MC	0x271	/* Multi-Core Loongson 3D Processor 5xxx Series */
+/* END CSTYLED */
 
 /*
  * SMBIOS Cache Information.  See DSP0134 Section 7.8 for more information.
@@ -1335,6 +1364,7 @@ typedef struct smbios_memdevice {
 #define	SMB_MDT_HBM2		0x21	/* High Bandwidth Memory 2 */
 #define	SMB_MDT_DDR5		0x22	/* DDR5 */
 #define	SMB_MDT_LPDDR5		0x23	/* LPDDR5 */
+#define	SMB_MDT_HBM3		0x24	/* HBM3 */
 
 #define	SMB_MDF_OTHER		0x0002	/* other */
 #define	SMB_MDF_UNKNOWN		0x0004	/* unknown */
@@ -1772,6 +1802,8 @@ typedef struct smbios_processor_info {
 #define	SMB_PROCINFO_T_RV32	0x06	/* 32-bit RISC-V (RV32) */
 #define	SMB_PROCINFO_T_RV64	0x07	/* 64-bit RISC-V (RV64) */
 #define	SMB_PROCINFO_T_RV128	0x08	/* 128-bit RISC-V (RV128) */
+#define	SMB_PROCINFO_T_LA32	0x09	/* 32-bit LoongArch */
+#define	SMB_PROCINFO_T_LA64	0x0A	/* 64-bit LoongArch */
 /* END CSTYLED */
 
 typedef struct smbios_processor_info_riscv {
@@ -1976,7 +2008,8 @@ typedef struct smbios_memdevice_ext {
 #define	SMB_VERSION_33	0x0303		/* SMBIOS encoding for DMTF spec 3.3 */
 #define	SMB_VERSION_34	0x0304		/* SMBIOS encoding for DMTF spec 3.4 */
 #define	SMB_VERSION_35	0x0305		/* SMBIOS encoding for DMTF spec 3.5 */
-#define	SMB_VERSION	SMB_VERSION_35	/* SMBIOS latest version definitions */
+#define	SMB_VERSION_36	0x0306		/* SMBIOS encoding for DMTF spec 3.6 */
+#define	SMB_VERSION	SMB_VERSION_36	/* SMBIOS latest version definitions */
 
 #define	SMB_O_NOCKSUM	0x1		/* do not verify header checksums */
 #define	SMB_O_NOVERS	0x2		/* do not verify header versions */
