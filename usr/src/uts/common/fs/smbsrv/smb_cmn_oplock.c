@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 Nexenta by DDN, Inc.  All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 /*
@@ -558,7 +559,7 @@ smb_oplock_req_excl(
 	/*
 	 * Don't allow grants on closing ofiles.
 	 */
-	if (ofile->f_oplock.og_closing)
+	if (ofile->f_oplock_closing)
 		return (status);
 
 	/*
@@ -1049,7 +1050,7 @@ smb_oplock_req_shared(
 	/*
 	 * Don't allow grants on closing ofiles.
 	 */
-	if (ofile->f_oplock.og_closing)
+	if (ofile->f_oplock_closing)
 		return (status);
 
 	/*
@@ -2288,10 +2289,6 @@ smb_oplock_break_CLOSE(smb_node_t *node, smb_ofile_t *ofile)
 
 	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
 	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
-
-	if (ofile->f_oplock.og_closing)
-		return;
-	ofile->f_oplock.og_closing = B_TRUE;
 
 	/*
 	 * If Oplock.IIOplocks is not empty:

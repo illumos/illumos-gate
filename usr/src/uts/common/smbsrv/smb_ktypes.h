@@ -601,7 +601,6 @@ typedef struct smb_oplock_grant {
 	uint32_t		og_state;	/* latest sent to client */
 	uint32_t		og_breaking;	/* BREAK_TO... flags */
 	uint16_t		og_dialect;	/* how to send breaks */
-	boolean_t		og_closing;
 	/* File-system level state */
 	uint8_t			onlist_II;
 	uint8_t			onlist_R;
@@ -1428,6 +1427,7 @@ typedef struct smb_ofile {
 	pid_t			f_pid;
 	smb_attr_t		f_pending_attr;
 	smb_oplock_grant_t	f_oplock;
+	boolean_t		f_oplock_closing;
 	uint8_t			TargetOplockKey[SMB_LEASE_KEY_SZ];
 	uint8_t			ParentOplockKey[SMB_LEASE_KEY_SZ];
 	struct smb_lease	*f_lease;
