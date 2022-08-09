@@ -38,6 +38,7 @@
  *
  * Copyright 2013 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2022 MNX Cloud, Inc.
  */
 
 #include <sys/asm_linkage.h>
@@ -214,32 +215,7 @@ inst_error:
  * The VMCS-restored %rsp points to the struct vmxctx
  */
 .align	ASM_ENTRY_ALIGN;
-ALTENTRY(vmx_exit_guest)
-	/* Save guest state that is not automatically saved in the vmcs. */
-	VMX_GUEST_SAVE
-
-	/*
-	 * This will return to the caller of 'vmx_enter_guest()' with a return
-	 * value of VMX_GUEST_VMEXIT.
-	 */
-	movl	$VMX_GUEST_VMEXIT, %eax
-	movq	VMXSTK_RBX(%rsp), %rbx
-	movq	VMXSTK_R12(%rsp), %r12
-	movq	VMXSTK_R13(%rsp), %r13
-	movq	VMXSTK_R14(%rsp), %r14
-	movq	VMXSTK_R15(%rsp), %r15
-
-	VMX_GUEST_FLUSH_SCRATCH
-
-	addq	$VMXSTKSIZE, %rsp
-	popq	%rbp
-	ret
-SET_SIZE(vmx_enter_guest)
-
-
-
-.align	ASM_ENTRY_ALIGN;
-ALTENTRY(vmx_exit_guest_flush_rsb)
+ENTRY_NP(vmx_exit_guest)
 	/* Save guest state that is not automatically saved in the vmcs. */
 	VMX_GUEST_SAVE
 
@@ -248,23 +224,11 @@ ALTENTRY(vmx_exit_guest_flush_rsb)
 	/*
 	 * To prevent malicious branch target predictions from affecting the
 	 * host, overwrite all entries in the RSB upon exiting a guest.
+	 *
+	 * NOTE: If RSB mitigations are disabled (see cpuid.c), this call is
+	 * entirely a NOP.
 	 */
-	movl	$16, %ecx	/* 16 iterations, two calls per loop */
-	movq	%rsp, %rax
-loop:
-	call	2f		/* create an RSB entry. */
-1:
-	pause
-	call	1b		/* capture rogue speculation. */
-2:
-	call	2f		/* create an RSB entry. */
-1:
-	pause
-	call	1b		/* capture rogue speculation. */
-2:
-	subl	$1, %ecx
-	jnz	loop
-	movq	%rax, %rsp
+	call	x86_rsb_stuff
 
 	/*
 	 * This will return to the caller of 'vmx_enter_guest()' with a return
@@ -280,7 +244,7 @@ loop:
 	addq	$VMXSTKSIZE, %rsp
 	popq	%rbp
 	ret
-SET_SIZE(vmx_exit_guest_flush_rsb)
+SET_SIZE(vmx_exit_guest)
 
 /*
  * %rdi = trapno
