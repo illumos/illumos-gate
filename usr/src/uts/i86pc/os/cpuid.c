@@ -25,6 +25,7 @@
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Oxide Computer Company
+ * Copyright 2022 MNX Cloud, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1059,7 +1060,7 @@
  *
  *  1. Using Indirect Branch Restricted Speculation (IBRS).
  *  2. Using Retpolines and RSB Stuffing
- *  3. Using Enhanced Indirect Branch Restricted Speculation (EIBRS)
+ *  3. Using Enhanced Indirect Branch Restricted Speculation (eIBRS)
  *
  * IBRS uses a feature added to microcode to restrict speculation, among other
  * things. This form of mitigation has not been used as it has been generally
@@ -1094,11 +1095,11 @@
  * process (which is partly why we need to have return stack buffer stuffing,
  * but more on that in a bit) and in processors starting with Cascade Lake
  * on the server side, it's dangerous to rely on retpolines. Instead, a new
- * mechanism has been introduced called Enhanced IBRS (EIBRS).
+ * mechanism has been introduced called Enhanced IBRS (eIBRS).
  *
- * Unlike IBRS, EIBRS is designed to be enabled once at boot and left on each
+ * Unlike IBRS, eIBRS is designed to be enabled once at boot and left on each
  * physical core. However, if this is the case, we don't want to use retpolines
- * any more. Therefore if EIBRS is present, we end up turning each retpoline
+ * any more. Therefore if eIBRS is present, we end up turning each retpoline
  * function (called a thunk) into a jmp instruction. This means that we're still
  * paying the cost of an extra jump to the external thunk, but it gives us
  * flexibility and the ability to have a single kernel image that works across a
@@ -1125,16 +1126,14 @@
  * worried about such as when we enter the kernel from user land.
  *
  * To prevent against additional manipulation of the RSB from other contexts
- * such as a non-root VMX context attacking the kernel we first look to enhanced
- * IBRS. When EIBRS is present and enabled, then there is nothing else that we
- * need to do to protect the kernel at this time.
+ * such as a non-root VMX context attacking the kernel we first look to
+ * enhanced IBRS. When eIBRS is present and enabled, then there should be
+ * nothing else that we need to do to protect the kernel at this time.
  *
- * On CPUs without EIBRS we need to manually overwrite the contents of the
- * return stack buffer. We do this through the x86_rsb_stuff() function.
- * Currently this is employed on context switch. The x86_rsb_stuff() function is
- * disabled when enhanced IBRS is present because Intel claims on such systems
- * it will be ineffective. Stuffing the RSB in context switch helps prevent user
- * to user attacks via the RSB.
+ * Unfortunately, eIBRS or not, we need to manually overwrite the contents of
+ * the return stack buffer. We do this through the x86_rsb_stuff() function.
+ * Currently this is employed on context switch and vmx_exit. The
+ * x86_rsb_stuff() function is disabled only when mitigations in general are.
  *
  * If SMEP is not present, then we would have to stuff the RSB every time we
  * transitioned from user mode to the kernel, which isn't very practical right
@@ -1365,7 +1364,7 @@
  *
  *  - Spectre v1: Not currently mitigated
  *  - swapgs: lfences after swapgs paths
- *  - Spectre v2: Retpolines/RSB Stuffing or EIBRS if HW support
+ *  - Spectre v2: Retpolines/RSB Stuffing or eIBRS if HW support
  *  - Meltdown: Kernel Page Table Isolation
  *  - Spectre v3a: Updated CPU microcode
  *  - Spectre v4: Not currently mitigated
@@ -2781,6 +2780,10 @@ cpuid_update_l1d_flush(cpu_t *cpu, uchar_t *featureset)
 
 /*
  * We default to enabling RSB mitigations.
+ *
+ * NOTE: We used to skip RSB mitigations with eIBRS, but developments around
+ * post-barrier RSB guessing suggests we should enable RSB mitigations always
+ * unless specifically instructed not to.
  */
 static void
 cpuid_patch_rsb(x86_spectrev2_mitigation_t mit)
@@ -2789,7 +2792,6 @@ cpuid_patch_rsb(x86_spectrev2_mitigation_t mit)
 	uint8_t *stuff = (uint8_t *)x86_rsb_stuff;
 
 	switch (mit) {
-	case X86_SPECTREV2_ENHANCED_IBRS:
 	case X86_SPECTREV2_DISABLED:
 		*stuff = ret;
 		break;
