@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -103,6 +103,8 @@ uint32_t smb_oplock_wait_break(smb_node_t *, int);
 int smb_lock_range_access(smb_request_t *, smb_node_t *,
     uint64_t, uint64_t, boolean_t);
 
+int smb_fem_oplock_install(smb_node_t *);
+void smb_fem_oplock_uninstall(smb_node_t *);
 
 #ifdef	__cplusplus
 }
