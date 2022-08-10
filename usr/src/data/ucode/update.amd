@@ -141,8 +141,7 @@ rm -f $mf.tmp
 for f in amd/*; do
 	bf=${f##*/}
 	[[ $bf = THIRDPARTYLICENSE* ]] && continue
-	echo "file path=$FW/$bf group=sys mode=0444"\
-	    "reboot-needed=true preserve=true" >> $mf
+	echo "file path=$FW/$bf group=sys mode=0444 reboot-needed=true" >> $mf
 done
 
 sed -i "/pkg.fmri.*microcode\/amd@/s/@[0-9]*/@$ver/" $mf

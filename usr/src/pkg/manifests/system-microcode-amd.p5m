@@ -46,53 +46,53 @@ dir  path=platform/i86pc group=sys
 dir  path=platform/i86pc/ucode group=sys
 dir  path=platform/i86pc/ucode/AuthenticAMD group=sys
 file path=platform/i86pc/ucode/AuthenticAMD/1020-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/1022-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/1041-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/1043-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/1062-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/1080-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/1081-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/10A0-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/2031-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/3010-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/5010-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/5020-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/6012-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/6020-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/6101-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/7001-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/8012-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/8082-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/8310-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/A010-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/A011-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/A012-00 group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/container group=sys mode=0444 \
-    preserve=true reboot-needed=true
+    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/equivalence-table group=sys \
-    mode=0444 preserve=true reboot-needed=true
+    mode=0444 reboot-needed=true
 license lic_CDDL license=lic_CDDL
 license usr/src/data/ucode/amd/THIRDPARTYLICENSE \
     license=usr/src/data/ucode/amd/THIRDPARTYLICENSE
