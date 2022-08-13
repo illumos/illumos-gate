@@ -1533,6 +1533,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/vioscsi/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/vio9p/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/idspace/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

@@ -1263,7 +1263,7 @@ vioscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	if (virtio_init_complete(vio, 0) != DDI_SUCCESS) {
+	if (virtio_init_complete(vio, VIRTIO_ANY_INTR_TYPE) != DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "virtio_init_complete failed");
 		vioscsi_teardown(sc, B_TRUE);
 		return (DDI_FAILURE);

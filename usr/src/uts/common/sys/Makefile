@@ -657,6 +657,7 @@ CHKHDRS=			\
 	vfstab.h		\
 	vgareg.h		\
 	videodev2.h		\
+	vio9p.h			\
 	visual_io.h		\
 	vlan.h			\
 	vm.h			\

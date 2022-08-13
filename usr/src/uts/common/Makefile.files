@@ -2104,6 +2104,9 @@ VIOIF_OBJS = vioif.o
 # Virtio SCSI driver
 VIOSCSI_OBJS = vioscsi.o
 
+# Virtio 9P transport driver
+VIO9P_OBJS = vio9p.o
+
 #
 #	kiconv modules
 #

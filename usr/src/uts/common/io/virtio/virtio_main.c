@@ -1440,7 +1440,7 @@ virtio_interrupts_setup(virtio_t *vio, int allow_types)
 		return (DDI_FAILURE);
 	}
 
-	if (allow_types != 0) {
+	if (allow_types != VIRTIO_ANY_INTR_TYPE) {
 		/*
 		 * Restrict the possible interrupt types at the request of the
 		 * driver.

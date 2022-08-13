@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -40,7 +41,21 @@
 #include "virtio.h"
 #include "virtio_impl.h"
 
+typedef int (dma_wait_t)(caddr_t);
 
+static dma_wait_t *
+virtio_dma_wait_from_kmflags(int kmflags)
+{
+	switch (kmflags) {
+	case KM_SLEEP:
+		return (DDI_DMA_SLEEP);
+	case KM_NOSLEEP:
+	case KM_NOSLEEP_LAZY:
+		return (DDI_DMA_DONTWAIT);
+	default:
+		panic("unexpected kmflags value 0x%x", kmflags);
+	}
+}
 
 void
 virtio_dma_sync(virtio_dma_t *vidma, int flag)
@@ -90,10 +105,7 @@ virtio_dma_init_handle(virtio_t *vio, virtio_dma_t *vidma,
 {
 	int r;
 	dev_info_t *dip = vio->vio_dip;
-
-	VERIFY(kmflags == KM_SLEEP || kmflags == KM_NOSLEEP);
-	int (*dma_wait)(caddr_t) = (kmflags == KM_SLEEP) ? DDI_DMA_SLEEP :
-	    DDI_DMA_DONTWAIT;
+	int (*dma_wait)(caddr_t) = virtio_dma_wait_from_kmflags(kmflags);
 
 	vidma->vidma_virtio = vio;
 
@@ -124,10 +136,7 @@ virtio_dma_init(virtio_t *vio, virtio_dma_t *vidma, size_t sz,
 	int r;
 	dev_info_t *dip = vio->vio_dip;
 	caddr_t va = NULL;
-
-	VERIFY(kmflags == KM_SLEEP || kmflags == KM_NOSLEEP);
-	int (*dma_wait)(caddr_t) = (kmflags == KM_SLEEP) ? DDI_DMA_SLEEP :
-	    DDI_DMA_DONTWAIT;
+	int (*dma_wait)(caddr_t) = virtio_dma_wait_from_kmflags(kmflags);
 
 	if (virtio_dma_init_handle(vio, vidma, attr, kmflags) !=
 	    DDI_SUCCESS) {
@@ -168,10 +177,7 @@ virtio_dma_bind(virtio_dma_t *vidma, void *va, size_t sz, int dmaflags,
 	int r;
 	dev_info_t *dip = vidma->vidma_virtio->vio_dip;
 	ddi_dma_cookie_t dmac;
-
-	VERIFY(kmflags == KM_SLEEP || kmflags == KM_NOSLEEP);
-	int (*dma_wait)(caddr_t) = (kmflags == KM_SLEEP) ? DDI_DMA_SLEEP :
-	    DDI_DMA_DONTWAIT;
+	int (*dma_wait)(caddr_t) = virtio_dma_wait_from_kmflags(kmflags);
 
 	VERIFY(vidma->vidma_level & VIRTIO_DMALEVEL_HANDLE_ALLOC);
 	VERIFY(!(vidma->vidma_level & VIRTIO_DMALEVEL_HANDLE_BOUND));

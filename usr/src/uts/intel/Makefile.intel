@@ -411,6 +411,9 @@ DRV_KMODS	+= vioblk
 DRV_KMODS	+= vioif
 DRV_KMODS	+= vioscsi
 
+# Virtio 9P transport driver
+DRV_KMODS	+= vio9p
+
 #
 #	DTrace and DTrace Providers
 #
