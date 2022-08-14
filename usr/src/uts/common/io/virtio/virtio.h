@@ -350,6 +350,12 @@ uint_t virtio_dma_ncookies(virtio_dma_t *);
 uint64_t virtio_dma_cookie_pa(virtio_dma_t *, uint_t);
 size_t virtio_dma_cookie_size(virtio_dma_t *, uint_t);
 
+/*
+ * virtio_init_complete() accepts a mask of allowed interrupt types using the
+ * DDI_INTR_TYPE_* family of constants.  If no specific interrupt type is
+ * required, pass VIRTIO_ANY_INTR_TYPE instead:
+ */
+#define	VIRTIO_ANY_INTR_TYPE	0
 
 #ifdef __cplusplus
 }

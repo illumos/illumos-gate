@@ -24,6 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015 EveryCity Ltd.
  * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -277,8 +278,12 @@ _be_mount(char *be_name, char **altroot, int flags)
 	}
 
 	/* Generate string for obe_name's root dataset */
-	be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
-	    sizeof (obe_root_ds));
+	if ((ret = be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
+	    sizeof (obe_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.obe_zpool, bt.obe_name);
+		return (ret);
+	}
 	bt.obe_root_ds = obe_root_ds;
 
 	/* Get handle to BE's root dataset */
@@ -448,8 +453,12 @@ _be_unmount(char *be_name, int flags)
 	}
 
 	/* Generate string for obe_name's root dataset */
-	be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
-	    sizeof (obe_root_ds));
+	if ((ret = be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
+	    sizeof (obe_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.obe_zpool, bt.obe_name);
+		return (ret);
+	}
 	bt.obe_root_ds = obe_root_ds;
 
 	/* Get handle to BE's root dataset */
@@ -1565,15 +1574,13 @@ iter_shared_fs_callback(zfs_handle_t *zhp, void *data)
 	pool = strtok(tmp_name, "/");
 
 	if (pool) {
-		/* Get the name of this pool's container dataset */
-		be_make_container_ds(pool, container_ds,
-		    sizeof (container_ds));
-
 		/*
 		 * If what we're processing is this pool's BE container
 		 * dataset, skip it.
 		 */
-		if (strcmp(name, container_ds) == 0) {
+		if (be_make_container_ds(pool, container_ds,
+		    sizeof (container_ds)) == BE_SUCCESS &&
+		    strcmp(name, container_ds) == 0) {
 			ZFS_CLOSE(zhp);
 			return (0);
 		}

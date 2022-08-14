@@ -1916,7 +1916,7 @@ vioif_select_interrupt_types(void)
 		 * The system may not have valid SMBIOS data, so ignore a
 		 * failure here.
 		 */
-		return (0);
+		return (VIRTIO_ANY_INTR_TYPE);
 	}
 
 	if (strcmp(info.smbi_manufacturer, "Google") == 0 &&
@@ -1931,7 +1931,7 @@ vioif_select_interrupt_types(void)
 		return (DDI_INTR_TYPE_FIXED);
 	}
 
-	return (0);
+	return (VIRTIO_ANY_INTR_TYPE);
 }
 
 static int

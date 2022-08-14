@@ -25,7 +25,7 @@
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright (c) 2020 Carlos Neira <cneirabustos@gmail.com>
  */
 /*
@@ -2125,9 +2125,9 @@ startup_end(void)
 	 */
 	cpu_event_init();
 
-#if defined(OPTERON_WORKAROUND_6323525)
-	if (opteron_workaround_6323525)
-		patch_workaround_6323525();
+#if defined(OPTERON_ERRATUM_147)
+	if (opteron_erratum_147)
+		patch_erratum_147();
 #endif
 	/*
 	 * If needed, load TOD module now so that ddi_get_time(9F) etc. work

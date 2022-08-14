@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -88,7 +89,7 @@ be_create_snapshot(nvlist_t *be_attrs)
 	char		*snap_name = NULL;
 	char		*policy = NULL;
 	boolean_t	autoname = B_FALSE;
-	int 		ret = BE_SUCCESS;
+	int		ret = BE_SUCCESS;
 
 	/* Initialize libzfs handle */
 	if (!be_zfs_init())
@@ -184,7 +185,7 @@ be_destroy_snapshot(nvlist_t *be_attrs)
 {
 	char	*be_name = NULL;
 	char	*snap_name = NULL;
-	int 	ret = BE_SUCCESS;
+	int	ret = BE_SUCCESS;
 
 	/* Initialize libzfs handle */
 	if (!be_zfs_init())
@@ -319,8 +320,12 @@ be_rollback(nvlist_t *be_attrs)
 	}
 
 	/* Generate string for BE's root dataset */
-	be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
-	    sizeof (obe_root_ds));
+	if ((ret = be_make_root_ds(bt.obe_zpool, bt.obe_name, obe_root_ds,
+	    sizeof (obe_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.obe_zpool, bt.obe_name);
+		return (ret);
+	}
 	bt.obe_root_ds = obe_root_ds;
 
 	if (getzoneid() != GLOBAL_ZONEID) {
@@ -434,8 +439,12 @@ _be_create_snapshot(char *be_name, char **snap_name, char *policy)
 		return (zfs_err_to_be_err(g_zfs));
 	}
 
-	be_make_root_ds(bt.obe_zpool, bt.obe_name, root_ds,
-	    sizeof (root_ds));
+	if ((ret = be_make_root_ds(bt.obe_zpool, bt.obe_name, root_ds,
+	    sizeof (root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.obe_zpool, bt.obe_name);
+		return (ret);
+	}
 	bt.obe_root_ds = root_ds;
 
 	if (getzoneid() != GLOBAL_ZONEID) {
@@ -662,8 +671,12 @@ _be_destroy_snapshot(char *be_name, char *snap_name)
 		return (zfs_err_to_be_err(g_zfs));
 	}
 
-	be_make_root_ds(bt.obe_zpool, bt.obe_name, root_ds,
-	    sizeof (root_ds));
+	if ((ret = be_make_root_ds(bt.obe_zpool, bt.obe_name, root_ds,
+	    sizeof (root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.obe_zpool, bt.obe_name);
+		return (ret);
+	}
 	bt.obe_root_ds = root_ds;
 
 	zhp = zfs_open(g_zfs, bt.obe_root_ds, ZFS_TYPE_DATASET);

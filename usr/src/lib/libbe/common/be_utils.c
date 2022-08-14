@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2015 by Delphix. All rights reserved.
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright (c) 2018, Joyent, Inc.
  */
 
@@ -439,17 +439,19 @@ be_get_defaults(struct be_defaults *defaults)
  *		be_root_ds - pointer to buffer to return BE root dataset in.
  *		be_root_ds_size - size of be_root_ds
  * Returns:
- *		None
+ *		BE_SUCCESS - Success
+ *		be_errno_t - Failure
  * Scope:
  *		Semi-private (library wide use only)
  */
-void
+int
 be_make_root_ds(const char *zpool, const char *be_name, char *be_root_ds,
     int be_root_ds_size)
 {
 	struct be_defaults be_defaults;
 	be_get_defaults(&be_defaults);
-	char	*root_ds = NULL;
+
+	assert(zpool != NULL);
 
 	if (getzoneid() == GLOBAL_ZONEID) {
 		if (be_defaults.be_deflt_rpool_container) {
@@ -461,18 +463,30 @@ be_make_root_ds(const char *zpool, const char *be_name, char *be_root_ds,
 		}
 	} else {
 		/*
-		 * In non-global zone we can use path from mounted root dataset
-		 * to generate BE's root dataset string.
+		 * In a non-global zone we can use the path from the mounted
+		 * root dataset to generate the BE's root dataset string.
 		 */
-		if ((root_ds = be_get_ds_from_dir("/")) != NULL) {
-			(void) snprintf(be_root_ds, be_root_ds_size, "%s/%s",
-			    dirname(root_ds), be_name);
-		} else {
+		char *root_ds = be_get_ds_from_dir("/");
+
+		if (root_ds == NULL) {
 			be_print_err(gettext("be_make_root_ds: zone root "
 			    "dataset is not mounted\n"));
-			return;
+			return (BE_ERR_NOTMOUNTED);
 		}
+		if (strncmp(root_ds, zpool, strlen(zpool)) != 0 ||
+		    root_ds[strlen(zpool)] != '/') {
+			/*
+			 * This pool is not the one that contains the zone
+			 * root.
+			 */
+			return (BE_ERR_ACCESS);
+		}
+
+		(void) snprintf(be_root_ds, be_root_ds_size, "%s/%s",
+		    dirname(root_ds), be_name);
 	}
+
+	return (BE_SUCCESS);
 }
 
 /*
@@ -484,17 +498,17 @@ be_make_root_ds(const char *zpool, const char *be_name, char *be_root_ds,
  *			dataset in.
  *		container_ds_size - size of container_ds
  * Returns:
- *		None
+ *		BE_SUCCESS - Success
+ *		be_errno_t - Failure
  * Scope:
  *		Semi-private (library wide use only)
  */
-void
-be_make_container_ds(const char *zpool,  char *container_ds,
+int
+be_make_container_ds(const char *zpool, char *container_ds,
     int container_ds_size)
 {
 	struct be_defaults be_defaults;
 	be_get_defaults(&be_defaults);
-	char	*root_ds = NULL;
 
 	if (getzoneid() == GLOBAL_ZONEID) {
 		if (be_defaults.be_deflt_rpool_container) {
@@ -505,15 +519,26 @@ be_make_container_ds(const char *zpool,  char *container_ds,
 			    "%s/%s", zpool, BE_CONTAINER_DS_NAME);
 		}
 	} else {
-		if ((root_ds = be_get_ds_from_dir("/")) != NULL) {
-			(void) strlcpy(container_ds, dirname(root_ds),
-			    container_ds_size);
-		} else {
+		char *root_ds = be_get_ds_from_dir("/");
+
+		if (root_ds == NULL) {
 			be_print_err(gettext("be_make_container_ds: zone root "
 			    "dataset is not mounted\n"));
-			return;
+			return (BE_ERR_NOTMOUNTED);
 		}
+		if (strncmp(root_ds, zpool, strlen(zpool)) != 0 ||
+		    root_ds[strlen(zpool)] != '/') {
+			/*
+			 * This pool is not the one that contains the zone
+			 * root.
+			 */
+			return (BE_ERR_ACCESS);
+		}
+		(void) strlcpy(container_ds, dirname(root_ds),
+		    container_ds_size);
 	}
+
+	return (BE_SUCCESS);
 }
 
 /*
@@ -525,17 +550,22 @@ be_make_container_ds(const char *zpool,  char *container_ds,
  *		container_ds - pointer to buffer in which to return result
  *		container_ds_size - size of container_ds
  * Returns:
- *		None
+ *		BE_SUCCESS - Success
+ *		be_errno_t - Failure
  * Scope:
  *		Semi-private (library wide use only)
  */
-void
+int
 be_make_root_container_ds(const char *zpool, char *container_ds,
     int container_ds_size)
 {
 	char *root;
+	int ret;
 
-	be_make_container_ds(zpool, container_ds, container_ds_size);
+	if ((ret = be_make_container_ds(zpool, container_ds,
+	    container_ds_size)) != BE_SUCCESS) {
+		return (ret);
+	}
 
 	/* If the container DS ends with /ROOT, remove it.  */
 
@@ -543,6 +573,8 @@ be_make_root_container_ds(const char *zpool, char *container_ds,
 	    strcmp(root + 1, BE_CONTAINER_DS_NAME) == 0) {
 		*root = '\0';
 	}
+
+	return (BE_SUCCESS);
 }
 
 /*
@@ -714,7 +746,12 @@ be_append_menu(char *be_name, char *be_root_pool, char *boot_pool,
 		    "%s%s", pool_mntpnt, BE_SPARC_MENU);
 	}
 
-	be_make_root_ds(be_root_pool, be_name, be_root_ds, sizeof (be_root_ds));
+	if ((ret = be_make_root_ds(be_root_pool, be_name, be_root_ds,
+	    sizeof (be_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, be_root_pool, be_name);
+		goto cleanup;
+	}
 
 	/*
 	 * Iterate through menu first to make sure the BE doesn't already
@@ -969,7 +1006,12 @@ be_remove_menu(char *be_name, char *be_root_pool, char *boot_pool)
 		boot_pool = be_root_pool;
 
 	/* Get name of BE's root dataset */
-	be_make_root_ds(be_root_pool, be_name, be_root_ds, sizeof (be_root_ds));
+	if ((ret = be_make_root_ds(be_root_pool, be_name, be_root_ds,
+	    sizeof (be_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, be_root_pool, be_name);
+		return (ret);
+	}
 
 	/* Get handle to pool dataset */
 	if ((zhp = zfs_open(g_zfs, be_root_pool, ZFS_TYPE_DATASET)) == NULL) {
@@ -1579,7 +1621,12 @@ be_change_grub_default(char *be_name, char *be_root_pool)
 	}
 
 	/* Generate string for BE's root dataset */
-	be_make_root_ds(be_root_pool, be_name, be_root_ds, sizeof (be_root_ds));
+	if ((ret = be_make_root_ds(be_root_pool, be_name, be_root_ds,
+	    sizeof (be_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, be_root_pool, be_name);
+		return (ret);
+	}
 
 	/* Get handle to pool dataset */
 	if ((zhp = zfs_open(g_zfs, be_root_pool, ZFS_TYPE_DATASET)) == NULL) {
@@ -1848,10 +1895,18 @@ be_update_menu(char *be_orig_name, char *be_new_name, char *be_root_pool,
 		    "%s%s", pool_mntpnt, BE_SPARC_MENU);
 	}
 
-	be_make_root_ds(be_root_pool, be_orig_name, be_root_ds,
-	    sizeof (be_root_ds));
-	be_make_root_ds(be_root_pool, be_new_name, be_new_root_ds,
-	    sizeof (be_new_root_ds));
+	if ((ret = be_make_root_ds(be_root_pool, be_orig_name, be_root_ds,
+	    sizeof (be_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, be_root_pool, be_orig_name);
+		goto cleanup;
+	}
+	if ((ret = be_make_root_ds(be_root_pool, be_new_name, be_new_root_ds,
+	    sizeof (be_new_root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, be_root_pool, be_new_name);
+		goto cleanup;
+	}
 
 	if ((ret = be_open_menu(be_root_pool, menu_file,
 	    &menu_fp, "r", B_TRUE)) != BE_SUCCESS) {
@@ -2714,24 +2769,14 @@ be_zpool_find_current_be_callback(zpool_handle_t *zlp, void *data)
 	zfs_handle_t		*zhp = NULL;
 	const char		*zpool =  zpool_get_name(zlp);
 	char			be_container_ds[MAXPATHLEN];
-	char			*zpath = NULL;
 
 	/*
 	 * Generate string for BE container dataset
 	 */
-	if (getzoneid() != GLOBAL_ZONEID) {
-		if ((zpath = be_get_ds_from_dir("/")) != NULL) {
-			(void) strlcpy(be_container_ds, dirname(zpath),
-			    sizeof (be_container_ds));
-		} else {
-			be_print_err(gettext(
-			    "be_zpool_find_current_be_callback: "
-			    "zone root dataset is not mounted\n"));
-			return (0);
-		}
-	} else {
-		be_make_container_ds(zpool, be_container_ds,
-		    sizeof (be_container_ds));
+	if (be_make_container_ds(zpool, be_container_ds,
+	    sizeof (be_container_ds)) != BE_SUCCESS) {
+		zpool_close(zlp);
+		return (0);
 	}
 
 	/*
@@ -2865,7 +2910,10 @@ be_check_be_roots_callback(zpool_handle_t *zlp, void *data)
 	char		be_container_ds[MAXPATHLEN];
 
 	/* Generate string for this pool's BE root container dataset */
-	be_make_container_ds(zpool, be_container_ds, sizeof (be_container_ds));
+	if (be_make_container_ds(zpool, be_container_ds,
+	    sizeof (be_container_ds)) != BE_SUCCESS) {
+		return (0);
+	}
 
 	/*
 	 * If dataset lives under the BE root container dataset
@@ -3420,6 +3468,7 @@ update_dataset(char *dataset, int dataset_len, char *be_name,
 {
 	char	*ds = NULL;
 	char	*sub_ds = NULL;
+	int	ret;
 
 	/* Tear off the BE container dataset */
 	if ((ds = be_make_name_from_ds(dataset, old_rc_loc)) == NULL) {
@@ -3430,7 +3479,10 @@ update_dataset(char *dataset, int dataset_len, char *be_name,
 	sub_ds = strchr(ds, '/');
 
 	/* Generate the BE root dataset name */
-	be_make_root_ds(new_rc_loc, be_name, dataset, dataset_len);
+	if ((ret = be_make_root_ds(new_rc_loc, be_name, dataset,
+	    dataset_len)) != BE_SUCCESS) {
+		return (ret);
+	}
 
 	/* If a subordinate dataset name was found, append it */
 	if (sub_ds != NULL)

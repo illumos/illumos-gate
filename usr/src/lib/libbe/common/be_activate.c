@@ -26,7 +26,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <assert.h>
@@ -266,7 +266,12 @@ _be_activate(char *be_name, be_nextboot_state_t nextboot)
 		return (ret);
 	}
 
-	be_make_root_ds(cb.obe_zpool, cb.obe_name, root_ds, sizeof (root_ds));
+	if ((ret = be_make_root_ds(cb.obe_zpool, cb.obe_name, root_ds,
+	    sizeof (root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, cb.obe_zpool, cb.obe_name);
+		return (ret);
+	}
 	cb.obe_root_ds = strdup(root_ds);
 
 	if (getzoneid() == GLOBAL_ZONEID) {
@@ -573,8 +578,13 @@ set_canmount(be_node_list_t *be_nodes, char *value)
 	while (list != NULL) {
 		be_dataset_list_t *datasets = list->be_node_datasets;
 
-		be_make_root_ds(list->be_rpool, list->be_node_name, ds_path,
-		    sizeof (ds_path));
+		if ((err = be_make_root_ds(list->be_rpool, list->be_node_name,
+		    ds_path, sizeof (ds_path))) != BE_SUCCESS) {
+			be_print_err(gettext("%s: failed to get BE container "
+			    "dataset for %s/%s\n"), __func__,
+			    list->be_rpool, list->be_node_name);
+			return (err);
+		}
 
 		if ((zhp = zfs_open(g_zfs, ds_path, ZFS_TYPE_DATASET)) ==
 		    NULL) {
@@ -605,9 +615,14 @@ set_canmount(be_node_list_t *be_nodes, char *value)
 		ZFS_CLOSE(zhp);
 
 		while (datasets != NULL) {
-			be_make_root_ds(list->be_rpool,
+			if ((err = be_make_root_ds(list->be_rpool,
 			    datasets->be_dataset_name, ds_path,
-			    sizeof (ds_path));
+			    sizeof (ds_path))) != BE_SUCCESS) {
+				be_print_err(gettext("%s: failed to get BE "
+				    "container dataset for %s/%s\n"), __func__,
+				    list->be_rpool, datasets->be_dataset_name);
+				return (err);
+			}
 
 			if ((zhp = zfs_open(g_zfs, ds_path, ZFS_TYPE_DATASET))
 			    == NULL) {

@@ -1,0 +1,141 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd August 1, 2022
+.Dt VIO9P 4D
+.Os
+.Sh NAME
+.Nm vio9p
+.Nd Virtio 9P Transport Driver
+.Sh SYNOPSIS
+.Pa /dev/9p/*
+.Sh DESCRIPTION
+The
+.Nm
+driver provides access to 9P transport devices commonly used by hypervisors
+and emulators to expose a shared file system.
+.Pp
+The
+.Nm
+driver is not a
+.Sy Committed
+interface, and may change at any time.
+.Sh APPLICATION PROGRAMMING INTERFACE
+Each device corresponds to a specific 9P channel, providing exclusive access to
+one consumer at a time.
+The device may be opened with an
+.Xr open 2
+call, which must include at least the
+.Dv O_EXCL
+and
+.Dv O_RDWR
+flags.
+The
+.Dv O_NONBLOCK
+or
+.Dv O_NDELAY
+flags may be used if non-blocking reads and writes are required.
+.Pp
+Once open,
+.Xr read 2
+and
+.Xr write 2
+calls may be made against the resulting file descriptor.
+Writes represent a 9P request message sent to the hypervisor, and reads
+represent responses to those requests.
+.Pp
+Unlike with other transports like TCP, the channel is not explicitly reset when
+the device is opened or closed.
+After a call to
+.Xr open 2 ,
+the application should use a
+.Sy version
+message to open a new session.
+This will explicitly discard any previous session, clunking any active fids in
+the process and negotiating an appropriate protocol version with the
+hypervisor.
+It is likely also appropriate to do this as part of closing the device, to
+allow the hypervisor to free any session tracking resources.
+.Pp
+Writes must be well-formed 9P messages, conforming to whichever 9P protocol
+specification is used by the hypervisor.
+In particular, each message must include a minimum of seven bytes, representing
+the message
+.Em size[4] ,
+.Em type[1] ,
+and
+.Em tag[2] .
+In most or all available protocol specifications, these fields are unsigned
+integers in little-endian order.
+The driver limits request and response size to 8192 bytes, and will fail larger
+writes with
+.Er EMSGSIZE .
+Applications should, in their initial
+.Sy version
+message,
+negotiate an
+.Em msize[4]
+value less than or equal to 8192 bytes.
+.Pp
+Reads are interruptible and will block waiting for a response to a request sent
+in a previous write.
+If insufficient buffer space is provided to the read call to receive the
+message, the call will fail with
+.Er EOVERFLOW
+and the message will remain available for a subsequent read.
+Messages are provided as-is to the application, including the
+.Em size[4] ,
+.Em type[1] ,
+and
+.Em tag[2] .
+.Pp
+Depending on the 9P server provided by the hypervisor, requests that are issued
+concurrently may result in responses that arrive out of order.
+Applications should develop a strategy for allocating unique
+.Em tag[2]
+values, so that request and response messages can be correlated.
+.Sh IOCTLS
+The driver provides an ioctl,
+.Dv VIO9P_IOC_MOUNT_TAG ,
+to expose the
+.Em Mount Tag
+string if one was provided by the hypervisor.
+The ioctl is defined in
+.In sys/vio9p.h .
+The argument must be a
+.Vt "char *" ,
+pointing to a buffer of
+.Dv VIO9P_MOUNT_TAG_SIZE
+bytes.
+On success, the buffer will contain the mount tag string as read from the
+hypervisor, followed by a null-terminating zero byte added by the driver to
+ensure the result can always be treated as a C string.
+While the hypervisor is expected to provide a human-readable C string,
+applications should take care to verify that the contents are valid for display
+or other purposes.
+Note that even if successfully read, the string may be empty.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/9p/*
+Character device for access to a 9P channel.
+.It Pa /kernel/drv/amd64/vio9p
+Device driver (x86)
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr ioctl 2 ,
+.Xr open 2 ,
+.Xr read 2 ,
+.Xr write 2

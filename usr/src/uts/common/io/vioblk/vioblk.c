@@ -981,7 +981,7 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	virtio_register_cfgchange_handler(vio, vioblk_cfgchange, vib);
 
-	if (virtio_init_complete(vio, 0) != DDI_SUCCESS) {
+	if (virtio_init_complete(vio, VIRTIO_ANY_INTR_TYPE) != DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "failed to complete Virtio init");
 		goto fail;
 	}

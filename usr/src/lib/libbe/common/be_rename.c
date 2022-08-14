@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <assert.h>
@@ -150,9 +150,19 @@ be_rename(nvlist_t *be_attrs)
 	/* New BE will reside in the same zpool as orig BE */
 	bt.nbe_zpool = bt.obe_zpool;
 
-	be_make_root_ds(bt.obe_zpool, bt.obe_name, root_ds, sizeof (root_ds));
+	if ((ret = be_make_root_ds(bt.obe_zpool, bt.obe_name, root_ds,
+	    sizeof (root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.obe_zpool, bt.obe_name);
+		goto done;
+	};
 	bt.obe_root_ds = strdup(root_ds);
-	be_make_root_ds(bt.nbe_zpool, bt.nbe_name, root_ds, sizeof (root_ds));
+	if ((ret = be_make_root_ds(bt.nbe_zpool, bt.nbe_name, root_ds,
+	    sizeof (root_ds))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s/%s\n"), __func__, bt.nbe_zpool, bt.nbe_name);
+		goto done;
+	}
 	bt.nbe_root_ds = strdup(root_ds);
 
 	/*
@@ -248,8 +258,12 @@ be_rename(nvlist_t *be_attrs)
 	 * Since the new and old BEs reside in the same pool (see above),
 	 * the same variable can be used for the container for both.
 	 */
-	be_make_root_container_ds(bt.obe_zpool, be_root_container,
-	    sizeof (be_root_container));
+	if ((ret = be_make_root_container_ds(bt.obe_zpool, be_root_container,
+	    sizeof (be_root_container))) != BE_SUCCESS) {
+		be_print_err(gettext("%s: failed to get BE container dataset "
+		    "for %s\n"), __func__, bt.obe_zpool);
+		goto done;
+	}
 
 	if ((ret = be_update_vfstab(bt.nbe_name, be_root_container,
 	    be_root_container, &fld, mp)) != BE_SUCCESS) {
