@@ -2650,7 +2650,7 @@ pcieadm_cfgspace_print_16geq(pcieadm_cfgspace_walk_t *walkp,
 {
 	if (walkp->pcw_nlanes == 0) {
 		warnx("failed to capture lane count, but somehow have "
-		    "secondary PCIe cap");
+		    "Physical Layer 16.0 GT/s cap");
 		return;
 	}
 
@@ -4361,7 +4361,238 @@ static pcieadm_cfgspace_print_t pcieadm_cap_rcld[] = {
 };
 
 
-pcieadm_pci_cap_t pcieadm_pci_caps[] = {
+/*
+ * Physical Layer 32.0 GT/s Capability
+ */
+static pcieadm_regdef_t pcieadm_regdef_32g_cap[] = {
+	{ 0, 0, "eqbyp", "Equalization Bypass to Highest Rate", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 1, 1, "noeq", "No Equalization Needed", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 8, 8, "mts0", "Modified TS Usage Mode 0 - PCI Express", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 9, 9, "mts1", "Modified TS Usage Mode 1 - Training Set", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 10, 10, "mts2", "Modified TS Usage Mode 2 - Alternate Protocol",
+	    PRDV_STRVAL, .prd_val = { .prdv_strval = { "unsupported",
+	    "supported" } } },
+	/*
+	 * Bits 11 to 15 are defined as reserved for future use here as
+	 * read-only bits. Add them here once they have actual definitions.
+	 */
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_32g_ctl[] = {
+	{ 0, 0, "eqbyp", "Equalization Bypass to Highest Rate", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "enabled", "disabled" } } },
+	{ 1, 1, "noeq", "No Equalization Needed", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "enabled", "disabled" } } },
+	{ 8, 10, "mts", "Modified TS Usage Mode Selected", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "PCIe", "training set messages",
+	    "alternate protocol negotiation" } } },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_32g_sts[] = {
+	{ 0, 0, "eqcomp", "Equalization 32.0 GT/s Complete", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "incomplete", "complete" } } },
+	{ 1, 1, "eqp1", "Equalization 32.0 GT/s Phase 1", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "incomplete", "complete" } } },
+	{ 2, 2, "eqp2", "Equalization 32.0 GT/s Phase 2", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "incomplete", "complete" } } },
+	{ 3, 3, "eqp3", "Equalization 32.0 GT/s Phase 3", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "incomplete", "complete" } } },
+	{ 4, 4, "req", "Link Equalization Request 32.0 GT/s", PRDV_HEX },
+	{ 5, 5, "mts", "Modified TS Received", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "no", "yes" } } },
+	{ 6, 7, "rxelbc", "Received Enhanced Link Behavior Control",
+	    PRDV_STRVAL, .prd_val = { .prdv_strval = {
+	    "full equalization required", "equalization bypass to highest rate",
+	    "no equalization needed", "modified TS1/TS2 ordered sets" } } },
+	{ 8, 8, "txpre", "Transmitter Precoding", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 9, 9, "prereq", "Transmitter Precoding Request", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 10, 10, "noeqrx", "No Equalization Needed Received", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "no", "yes" } } },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_32g_rxts1[] = {
+	{ 0, 2, "mts", "Modified TS Usage Mode Selected", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "PCIe", "training set messages",
+	    "alternate protocol negotiation" } } },
+	{ 3, 15, "info", "Received Modified TS Information 1", PRDV_HEX },
+	{ 16, 31, "vendor", "Received Modified TS Vendor ID", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_32g_rxts2[] = {
+	{ 0, 23, "info", "Received Modified TS Information 2", PRDV_HEX },
+	{ 24, 25, "apnsts", "Alternate Protocol Negotiation Status",
+	    PRDV_STRVAL, .prd_val = { .prdv_strval = { "not supported",
+	    "disabled", "failed", "succeeded" } } },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_32g_txts1[] = {
+	{ 0, 2, "mts", "Transmitted Modified TS Usage Mode", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "PCIe", "training set messages",
+	    "alternate protocol negotiation" } } },
+	{ 3, 15, "info", "Transmitted Modified TS Information 1", PRDV_HEX },
+	{ 16, 31, "vendor", "Transmitted Modified TS Vendor ID", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_32g_txts2[] = {
+	{ 0, 23, "info", "Transmitted Modified TS Information 2", PRDV_HEX },
+	{ 24, 25, "apnsts", "Alternate Protocol Negotiation Status",
+	    PRDV_STRVAL, .prd_val = { .prdv_strval = { "not supported",
+	    "disabled", "failed", "succeeded" } } },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_32g_eq[] = {
+	{ 0, 3, "dstxpre", "Downstream Port 32.0 GT/s Transmitter Preset",
+	    PRDV_HEX },
+	{ 4, 7, "ustxpre", "Upstream Port 32.0 GT/s Transmitter Preset",
+	    PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static void
+pcieadm_cfgspace_print_32geq(pcieadm_cfgspace_walk_t *walkp,
+    pcieadm_cfgspace_print_t *print, void *arg)
+{
+	if (walkp->pcw_nlanes == 0) {
+		warnx("failed to capture lane count, but somehow have "
+		    "Physical Layer 32.0 GT/s cap");
+		return;
+	}
+
+	for (uint_t i = 0; i < walkp->pcw_nlanes; i++) {
+		char eqshort[32], eqhuman[128];
+		pcieadm_cfgspace_print_t p;
+
+		(void) snprintf(eqshort, sizeof (eqshort), "lane%u", i);
+		(void) snprintf(eqhuman, sizeof (eqhuman), "Lane %u EQ Control",
+		    i);
+		p.pcp_off = print->pcp_off + i * 1;
+		p.pcp_len = 1;
+		p.pcp_short = eqshort;
+		p.pcp_human = eqhuman;
+		p.pcp_print = pcieadm_cfgspace_print_regdef;
+		p.pcp_arg = pcieadm_regdef_32g_eq;
+
+		p.pcp_print(walkp, &p, p.pcp_arg);
+	}
+}
+
+static pcieadm_cfgspace_print_t pcieadm_cap_32g[] = {
+	{ 0x0, 4, "caphdr", "Capability Header",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
+	{ 0x4, 4, "cap", "32.0 GT/s Capabilities",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_32g_cap },
+	{ 0x8, 4, "ctl", "32.0 GT/s Control",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_32g_ctl },
+	{ 0xc, 4, "sts", "32.0 GT/s Status",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_32g_sts },
+	{ 0x10, 4, "rxts1", "Received Modified TS Data 1",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_32g_rxts1 },
+	{ 0x14, 4, "rxts2", "Received Modified TS Data 2",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_32g_rxts2 },
+	{ 0x18, 4, "txts1", "Transmitted Modified TS Data 1",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_32g_txts1 },
+	{ 0x1c, 4, "txts2", "Transmitted Modified TS Data 2",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_32g_txts2 },
+	{ 0x20, 1, "eqctl", "32.0 GT/s EQ Control",
+	    pcieadm_cfgspace_print_32geq },
+	{ -1, -1, NULL }
+};
+
+/*
+ * Native PCIe Enclosure Management
+ */
+static pcieadm_regdef_t pcieadm_regdef_npem_cap[] = {
+	{ 0, 0, "npem", "NPEM", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 1, 1, "reset", "NPEM Reset", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 2, 2, "ok", "NPEM OK", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 3, 3, "loc", "NPEM Locate", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 4, 4, "fail", "NPEM Fail", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 5, 5, "rb", "NPEM Rebuild", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 6, 6, "pfa", "NPEM PFA", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 7, 7, "hs", "NPEM Hot Spare", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 8, 8, "crit", "NPEM In a Critical Array", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 9, 9, "fail", "NPEM In a Failed Array", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 10, 10, "invdt", "NPEM Invalid Device type", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 11, 11, "dis", "NPEM Disabled", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ 24, 31, "es", "Enclosure-specific Capabilities", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_npem_ctl[] = {
+	{ 0, 0, "npem", "NPEM", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 1, 1, "reset", "NPEM Initiate Reset", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 2, 2, "ok", "NPEM OK", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 3, 3, "loc", "NPEM Locate", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 4, 4, "fail", "NPEM Fail", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 5, 5, "rb", "NPEM Rebuild", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 6, 6, "pfa", "NPEM PFA", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 7, 7, "hs", "NPEM Hot Spare", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 8, 8, "crit", "NPEM In a Critical Array", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 9, 9, "fail", "NPEM In a Failed Array", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 10, 10, "invdt", "NPEM Invalid Device type", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 11, 11, "dis", "NPEM Disabled", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 24, 31, "es", "Enclosure-specific Control", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_regdef_t pcieadm_regdef_npem_sts[] = {
+	{ 0, 0, "ccmplt", "NPEM Command Complete", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "no", "yes" } } },
+	{ 24, 31, "es", "Enclosure-specific Status", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static pcieadm_cfgspace_print_t pcieadm_cap_npem[] = {
+	{ 0x0, 4, "caphdr", "Capability Header",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
+	{ 0x4, 4, "cap", "NPEM Capability",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_npem_cap },
+	{ 0x8, 4, "ctl", "NPEM Control",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_npem_ctl },
+	{ 0xc, 4, "sts", "NPEM Status",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_npem_sts },
+	{ -1, -1, NULL }
+};
+
+
+static pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	{ PCI_CAP_ID_PM, "pcipm", "PCI Power Management",
 	    pcieadm_cap_info_pcipm, { { 2, 8, pcieadm_cap_pcipm_v3 },
 	    { 3, 8, pcieadm_cap_pcipm_v3 } } },
@@ -4400,7 +4631,7 @@ pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	{ PCI_CAP_ID_FPB, "fpb", "Flattening Portal Bridge" }
 };
 
-pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
+static pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	{ 0, "null", "NULL Capability", pcieadm_cap_info_fixed,
 	    { { 0, 0x4, pcieadm_cap_null } } },
 	{ PCIE_EXT_CAP_ID_AER, "aer", "Advanced Error Reporting",
@@ -4477,8 +4708,15 @@ pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	    "Lane Margining at the Receiver", pcieadm_cap_info_vers,
 	    { { 1, 0x8, pcieadm_cap_margin } } },
 	{ PCIE_EXT_CAP_ID_HIEARCHY_ID, "hierid", "Hierarchy ID" },
-	{ PCIE_EXT_CAP_ID_NPEM, "npem", "Native PCIe Enclosure Management" },
-	{ PCIE_EXT_CAP_ID_PL32GT, "pl32g", "Physical Layer 32.0 GT/s" },
+	{ PCIE_EXT_CAP_ID_NPEM, "npem", "Native PCIe Enclosure Management",
+	    pcieadm_cap_info_vers, { { 1, 0x10, pcieadm_cap_npem } } },
+	/*
+	 * The sizing of the 32.0 GT/s physical layer requires that there's at
+	 * least one lane's worth of information and the device is required to
+	 * pad that out to 4-byte alignment.
+	 */
+	{ PCIE_EXT_CAP_ID_PL32GT, "pl32g", "Physical Layer 32.0 GT/s",
+	    pcieadm_cap_info_vers, { { 1, 0x24, pcieadm_cap_32g } } },
 	{ PCIE_EXT_CAP_ID_AP, "ap", "Alternative Protocol" },
 	{ PCIE_EXT_CAP_ID_SFI, "sfi", "System Firmware Intermediary" },
 	{ PCIE_EXT_CAP_ID_SHDW_FUNC, "sfunc", "Shadow Functions" },
