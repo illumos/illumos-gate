@@ -24,7 +24,7 @@
 .\"
 .\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd February 26, 2022
+.Dd June 1, 2022
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -115,17 +115,28 @@ It will be deprecated in a future version.
 .Xc
 Configure smbios data.
 .Ar type
-must be set to
-.Sy 1 .
-Supported keys are:
-.Sy manufacturer ,
-.Sy product ,
-.Sy version ,
-.Sy serial ,
-.Sy sku ,
-.Sy family
-and
-.Sy uuid .
+must be set to one of
+.Cm 0 , 1 , 2
+or
+.Cm 3 .
+Supported keys for each type are:
+.Bl -tag -width XXX -offset XXX
+.It Cm 0
+.Cm vendor , version , release_date .
+.It Cm 1
+.Cm manufacturer ,
+.Cm product_name Pq or Cm product ,
+.Cm version ,
+.Cm serial_number Pq or Cm serial ,
+.Cm sku ,
+.Cm family_name Pq or Cm family ,
+.Cm uuid .
+.It Cm 2
+.Cm manufacturer , product_name , version , serial_number , asset_tag ,
+.Cm location
+.It Ic 3
+.Cm manufacturer , version , serial_number , asset_tag, sku .
+.El
 .It Xo Fl c
 .Sm off
 .Op Oo Cm cpus= Oc Ar numcpus

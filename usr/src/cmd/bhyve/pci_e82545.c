@@ -232,7 +232,7 @@ struct ck_info {
  * Debug printf
  */
 static int e82545_debug = 0;
-#define WPRINTF(msg,params...) PRINTLN("e82545: " msg, params)
+#define WPRINTF(msg,params...) PRINTLN("e82545: " msg, ##params)
 #define DPRINTF(msg,params...) if (e82545_debug) WPRINTF(msg, params)
 
 #define	MIN(a,b) (((a)<(b))?(a):(b))
@@ -811,7 +811,7 @@ e82545_tx_ctl(struct e82545_softc *sc, uint32_t val)
 	sc->esc_TCTL = val & ~0xFE800005;
 }
 
-int
+static int
 e82545_bufsz(uint32_t rctl)
 {
 
@@ -1025,7 +1025,7 @@ e82545_iov_checksum(struct iovec *iov, int iovcnt, int off, int len)
 /*
  * Return the transmit descriptor type.
  */
-int
+static int
 e82545_txdesc_type(uint32_t lower)
 {
 	int type;
@@ -1089,15 +1089,18 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 	union  e1000_tx_udesc *dsc;
 	int desc, dtype, len, ntype, iovcnt, tcp, tso;
 	int mss, paylen, seg, tiovcnt, left, now, nleft, nnow, pv, pvoff;
-	unsigned hdrlen, vlen;
+	unsigned hdrlen, vlen, pktlen;
 	uint32_t tcpsum, tcpseq;
 	uint16_t ipcs, tcpcs, ipid, ohead;
+	bool invalid;
 
 	ckinfo[0].ck_valid = ckinfo[1].ck_valid = 0;
 	iovcnt = 0;
 	ntype = 0;
 	tso = 0;
+	pktlen = 0;
 	ohead = head;
+	invalid = false;
 
 	/* iovb[0/1] may be used for writable copy of headers. */
 	iov = &iovb[2];
@@ -1147,17 +1150,23 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 		len = (dtype == E1000_TXD_TYP_L) ? dsc->td.lower.flags.length :
 		    dsc->dd.lower.data & 0xFFFFF;
 
-		if (len > 0) {
-			/* Strip checksum supplied by guest. */
-			if ((dsc->td.lower.data & E1000_TXD_CMD_EOP) != 0 &&
-			    (dsc->td.lower.data & E1000_TXD_CMD_IFCS) == 0)
+		/* Strip checksum supplied by guest. */
+		if ((dsc->td.lower.data & E1000_TXD_CMD_EOP) != 0 &&
+		    (dsc->td.lower.data & E1000_TXD_CMD_IFCS) == 0) {
+			if (len <= 2) {
+				WPRINTF("final descriptor too short (%d) -- dropped",
+				    len);
+				invalid = true;
+			} else
 				len -= 2;
-			if (iovcnt < I82545_MAX_TXSEGS) {
-				iov[iovcnt].iov_base = paddr_guest2host(
-				    sc->esc_ctx, dsc->td.buffer_addr, len);
-				iov[iovcnt].iov_len = len;
-			}
+		}
+
+		if (len > 0 && iovcnt < I82545_MAX_TXSEGS) {
+			iov[iovcnt].iov_base = paddr_guest2host(sc->esc_ctx,
+			    dsc->td.buffer_addr, len);
+			iov[iovcnt].iov_len = len;
 			iovcnt++;
+			pktlen += len;
 		}
 
 		/*
@@ -1204,6 +1213,9 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 			break;
 		}
 	}
+
+	if (invalid)
+		goto done;
 
 	if (iovcnt > I82545_MAX_TXSEGS) {
 		WPRINTF("tx too many descriptors (%d > %d) -- dropped",
@@ -1296,10 +1308,20 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 			    "(%d) -- dropped", hdrlen);
 			goto done;
 		}
+		if (ckinfo[1].ck_valid && hdrlen < ckinfo[1].ck_off + 2) {
+			WPRINTF("TSO hdrlen too small for TCP/UDP fields "
+			    "(%d) -- dropped", hdrlen);
+			goto done;
+		}
+	}
+
+	if (pktlen < hdrlen + vlen) {
+		WPRINTF("packet too small for writable header");
+		goto done;
 	}
 
 	/* Allocate, fill and prepend writable header vector. */
-	if (hdrlen != 0) {
+	if (hdrlen + vlen != 0) {
 		hdr = __builtin_alloca(hdrlen + vlen);
 		hdr += vlen;
 		for (left = hdrlen, hdrp = hdr; left > 0;
@@ -2371,7 +2393,7 @@ e82545_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	return (0);
 }
 
-struct pci_devemu pci_de_e82545 = {
+static const struct pci_devemu pci_de_e82545 = {
 	.pe_emu = 	"e1000",
 	.pe_init =	e82545_init,
 	.pe_legacy_config = netbe_legacy_config,
@@ -2379,4 +2401,3 @@ struct pci_devemu pci_de_e82545 = {
 	.pe_barread =	e82545_read,
 };
 PCI_EMUL_SET(pci_de_e82545);
-

@@ -661,7 +661,6 @@ pci_vtcon_notify_rx(void *vsc, struct vqueue_info *vq)
 	}
 }
 
-#ifdef __FreeBSD__
 /*
  * Each console device has a "port" node which contains nodes for
  * each port.  Ports are numbered starting at 0.
@@ -710,7 +709,6 @@ pci_vtcon_legacy_config(nvlist_t *nvl, const char *opts)
 	free(tofree);
 	return (error);
 }
-#endif
 
 static int
 pci_vtcon_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
@@ -779,10 +777,11 @@ pci_vtcon_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	return (0);
 }
 
-struct pci_devemu pci_de_vcon = {
+static const struct pci_devemu pci_de_vcon = {
 	.pe_emu =	"virtio-console",
 	.pe_init =	pci_vtcon_init,
 	.pe_barwrite =	vi_pci_write,
-	.pe_barread =	vi_pci_read
+	.pe_barread =	vi_pci_read,
+	.pe_legacy_config = pci_vtcon_legacy_config,
 };
 PCI_EMUL_SET(pci_de_vcon);

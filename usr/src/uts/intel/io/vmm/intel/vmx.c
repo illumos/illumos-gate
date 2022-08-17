@@ -188,6 +188,9 @@ static int vmx_initialized;
 /* PAUSE triggers a VM-exit */
 static int cap_pause_exit;
 
+/* WBINVD triggers a VM-exit */
+static int cap_wbinvd_exit;
+
 /* Monitor trap flag */
 static int cap_monitor_trap;
 
@@ -548,6 +551,11 @@ vmx_init(void)
 	    PROCBASED_PAUSE_EXITING, 0,
 	    &tmp) == 0);
 
+	cap_wbinvd_exit = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2,
+	    MSR_VMX_PROCBASED_CTLS2,
+	    PROCBASED2_WBINVD_EXITING, 0,
+	    &tmp) == 0);
+
 	cap_invpcid = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2,
 	    MSR_VMX_PROCBASED_CTLS2, PROCBASED2_ENABLE_INVPCID, 0,
 	    &tmp) == 0);
@@ -819,7 +827,12 @@ vmx_vminit(struct vm *vm)
 		vmcs_write(VMCS_EPTP, vmx->eptp);
 		vmcs_write(VMCS_PIN_BASED_CTLS, pin_ctls);
 		vmcs_write(VMCS_PRI_PROC_BASED_CTLS, proc_ctls);
-		vmcs_write(VMCS_SEC_PROC_BASED_CTLS, proc2_ctls);
+
+		uint32_t use_proc2_ctls = proc2_ctls;
+		if (cap_wbinvd_exit && vcpu_trap_wbinvd(vm, i) != 0)
+			use_proc2_ctls |= PROCBASED2_WBINVD_EXITING;
+		vmcs_write(VMCS_SEC_PROC_BASED_CTLS, use_proc2_ctls);
+
 		vmcs_write(VMCS_EXIT_CTLS, exit_ctls);
 		vmcs_write(VMCS_ENTRY_CTLS, entry_ctls);
 		vmcs_write(VMCS_MSR_BITMAP, msr_bitmap_pa);
@@ -2529,6 +2542,11 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	case EXIT_REASON_VMXON:
 		SDT_PROBE3(vmm, vmx, exit, vminsn, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_VMINSN;
+		break;
+	case EXIT_REASON_INVD:
+	case EXIT_REASON_WBINVD:
+		/* ignore exit */
+		handled = HANDLED;
 		break;
 	default:
 		SDT_PROBE4(vmm, vmx, exit, unknown,

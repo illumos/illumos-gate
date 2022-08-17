@@ -1087,7 +1087,7 @@ passthru_addr_rom(struct pci_devinst *const pi, const int idx,
 	} else {
 		if (vm_mmap_memseg(pi->pi_vmctx, addr, VM_PCIROM,
 			pi->pi_romoffset, size, PROT_READ | PROT_EXEC) != 0) {
-			errx(4, "%s: mnmap_memseg @ [%016lx - %016lx]  failed",
+			errx(4, "%s: mmap_memseg @ [%016lx - %016lx]  failed",
 			    __func__, addr, addr + size);
 		}
 	}
@@ -1117,7 +1117,7 @@ passthru_addr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
 	}
 }
 
-struct pci_devemu passthru = {
+static const struct pci_devemu passthru = {
 	.pe_emu		= "passthru",
 	.pe_init	= passthru_init,
 	.pe_legacy_config = passthru_legacy_config,

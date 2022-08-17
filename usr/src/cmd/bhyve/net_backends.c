@@ -196,7 +196,7 @@ SET_DECLARE(net_backend_set, struct net_backend);
  */
 
 #if defined(INET6) || defined(INET)
-const int pf_list[] = {
+static const int pf_list[] = {
 #if defined(INET6)
 	PF_INET6,
 #endif
@@ -1316,6 +1316,7 @@ netbe_legacy_config(nvlist_t *nvl, const char *opts)
 
 	/* Default to the 'dlpi' backend - can still be overridden by opts */
 	set_config_value_node(nvl, "backend", "dlpi");
+	set_config_value_node(nvl, "type", "dlpi");
 
 	config = tofree = strdup(opts);
 	if (config == NULL)
@@ -1352,7 +1353,7 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
     void *param)
 {
 	struct net_backend **pbe, *nbe, *tbe = NULL;
-	const char *value;
+	const char *value, *type;
 	char *devname;
 	int err;
 
@@ -1363,11 +1364,19 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
 	devname = strdup(value);
 
 	/*
+	 * Use the type given by configuration if exists; otherwise
+	 * use the prefix of the backend as the type.
+	 */
+	type = get_config_value_node(nvl, "type");
+	if (type == NULL)
+		type = devname;
+
+	/*
 	 * Find the network backend that matches the user-provided
 	 * device name. net_backend_set is built using a linker set.
 	 */
 	SET_FOREACH(pbe, net_backend_set) {
-		if (strncmp(devname, (*pbe)->prefix,
+		if (strncmp(type, (*pbe)->prefix,
 		    strlen((*pbe)->prefix)) == 0) {
 			tbe = *pbe;
 			assert(tbe->init != NULL);

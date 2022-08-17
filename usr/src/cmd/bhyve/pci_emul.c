@@ -178,6 +178,18 @@ CFGREAD(struct pci_devinst *pi, int coff, int bytes)
 		return (pci_get_cfgdata32(pi, coff));
 }
 
+static int
+is_pcir_bar(int coff)
+{
+	return (coff >= PCIR_BAR(0) && coff < PCIR_BAR(PCI_BARMAX + 1));
+}
+
+static int
+is_pcir_bios(int coff)
+{
+	return (coff >= PCIR_BIOS && coff < PCIR_BIOS + 4);
+}
+
 /*
  * I/O access
  */
@@ -321,7 +333,7 @@ done:
 }
 
 void
-pci_print_supported_devices()
+pci_print_supported_devices(void)
 {
 	struct pci_devemu **pdpp, *pdp;
 
@@ -815,9 +827,6 @@ pci_emul_assign_bar(struct pci_devinst *const pdi, const int idx,
 		limit = 0;
 		mask = PCIM_BIOS_ADDR_MASK;
 		lobits = 0;
-#ifndef __FreeBSD__
-		addr = 0;
-#endif
 		break;
 	default:
 		printf("pci_emul_alloc_base: invalid bar type %d\n", type);
@@ -832,6 +841,8 @@ pci_emul_assign_bar(struct pci_devinst *const pdi, const int idx,
 		error = pci_emul_alloc_resource(baseptr, limit, size, &addr);
 		if (error != 0)
 			return (error);
+	} else {
+		addr = 0;
 	}
 
 	pdi->pi_bar[idx].type = type;
@@ -2132,27 +2143,23 @@ pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
 		/*
 		 * Special handling for write to BAR and ROM registers
 		 */
-		if ((coff >= PCIR_BAR(0) && coff < PCIR_BAR(PCI_BARMAX + 1)) ||
-		    (coff >= PCIR_BIOS && coff < PCIR_BIOS + 4)) {
+		if (is_pcir_bar(coff) || is_pcir_bios(coff)) {
 			/*
 			 * Ignore writes to BAR registers that are not
 			 * 4-byte aligned.
 			 */
 			if (bytes != 4 || (coff & 0x3) != 0)
 				return;
-#ifndef __FreeBSD__
-			if (coff < PCIR_BIOS) {
+
+			if (is_pcir_bar(coff)) {
 				idx = (coff - PCIR_BAR(0)) / 4;
-			} else {
+			} else if (is_pcir_bios(coff)) {
 				idx = PCI_ROM_IDX;
-			}
-#else
-			if (coff != PCIR_BIOS) {
-				idx = (coff - PCIR_BAR(0)) / 4;
 			} else {
-				idx = PCI_ROM_IDX;
+				errx(4, "%s: invalid BAR offset %d", __func__,
+				    coff);
 			}
-#endif
+
 			mask = ~(pi->pi_bar[idx].size - 1);
 			switch (pi->pi_bar[idx].type) {
 			case PCIBAR_NONE:
@@ -2451,7 +2458,7 @@ pci_emul_dior(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 	return (value);
 }
 
-struct pci_devemu pci_dummy = {
+static const struct pci_devemu pci_dummy = {
 	.pe_emu = "dummy",
 	.pe_init = pci_emul_dinit,
 	.pe_barwrite = pci_emul_diow,

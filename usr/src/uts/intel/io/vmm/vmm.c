@@ -286,10 +286,13 @@ SYSCTL_NODE(_hw, OID_AUTO, vmm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
  * Halt the guest if all vcpus are executing a HLT instruction with
  * interrupts disabled.
  */
-static int halt_detection_enabled = 1;
+int halt_detection_enabled = 1;
 
 /* Trap into hypervisor on all guest exceptions and reflect them back */
-static int trace_guest_exceptions;
+int trace_guest_exceptions;
+
+/* Trap WBINVD and ignore it */
+int trap_wbinvd = 1;
 
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
@@ -403,8 +406,13 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 int
 vcpu_trace_exceptions(struct vm *vm, int vcpuid)
 {
-
 	return (trace_guest_exceptions);
+}
+
+int
+vcpu_trap_wbinvd(struct vm *vm, int vcpuid)
+{
+	return (trap_wbinvd);
 }
 
 struct vm_exit *

@@ -252,6 +252,9 @@ usage(int code)
 		"       %*s [-s <pci>] [-U uuid] vmname\n"
 #endif
 		"       -a: local apic is in xAPIC mode (deprecated)\n"
+#ifndef __FreeBSD__
+		"       -B type,key=value,...: set SMBIOS information\n"
+#endif
 		"       -C: include guest memory in core file\n"
 		"       -c: number of cpus and/or topology specification\n"
 		"       -D: destroy on power-off\n"
@@ -1740,11 +1743,9 @@ main(int argc, char *argv[])
 		}
 	}
 
-#ifndef __FreeBSD__
-	smbios_apply();
-#endif
 	error = smbios_build(ctx);
-	assert(error == 0);
+	if (error != 0)
+		exit(4);
 
 	if (get_config_bool("acpi_tables")) {
 		error = acpi_build(ctx, guest_ncpus);
