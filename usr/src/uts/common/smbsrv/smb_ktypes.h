@@ -1233,6 +1233,7 @@ typedef struct smb_tree {
 
 #define	SMB_ODIR_BUFSIZE	(8 * 1024)
 
+/* smb_odir_t d_flags */
 #define	SMB_ODIR_FLAG_WILDCARDS		0x0001
 #define	SMB_ODIR_FLAG_IGNORE_CASE	0x0002
 #define	SMB_ODIR_FLAG_XATTR		0x0004
@@ -1241,6 +1242,7 @@ typedef struct smb_tree {
 #define	SMB_ODIR_FLAG_ABE		0x0020
 #define	SMB_ODIR_FLAG_SHORTNAMES	0x0040
 #define	SMB_ODIR_FLAG_RESTRICTED	0x0080
+#define	SMB_ODIR_FLAG_ACEACCESS		0x0100
 
 typedef enum {
 	SMB_ODIR_STATE_OPEN = 0,

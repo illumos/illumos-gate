@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -959,6 +960,8 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 		od->d_flags |= SMB_ODIR_FLAG_IGNORE_CASE;
 	if (smb_tree_has_feature(tree, SMB_TREE_SHORTNAMES))
 		od->d_flags |= SMB_ODIR_FLAG_SHORTNAMES;
+	if (smb_tree_has_feature(tree, SMB_TREE_ACEMASKONACCESS))
+		od->d_flags |= SMB_ODIR_FLAG_ACEACCESS;
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		od->d_flags |= SMB_ODIR_FLAG_CATIA;
 	if (SMB_TREE_SUPPORTS_ABE(sr))
@@ -1292,19 +1295,18 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
  * than SMB_MAXDIRSIZE is returned.  It is therefore safe to use the
  * offset as the cookie (uint32_t).
  *
- * Returns: 0 - success
- *     ENOENT - no match, proceed to next entry
- *      errno - error
+ * Returns: 0 - success (return this entry)
+ *  any errno - no match, proceed to next entry
  */
 static int
 smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
     smb_odirent_t *odirent, smb_fileinfo_t *fileinfo)
 {
-	int		rc;
-	cred_t		*cr;
-	smb_node_t	*fnode, *tgt_node;
 	smb_attr_t	attr;
 	char		*name;
+	vnode_t		*fvp = NULL;
+	int		de_flags;
+	int		rc;
 	boolean_t	case_conflict;
 
 	ASSERT(sr);
@@ -1315,53 +1317,102 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	ASSERT(MUTEX_HELD(&od->d_mutex));
 	bzero(fileinfo, sizeof (smb_fileinfo_t));
 
-	rc = smb_fsop_lookup(sr, od->d_cred, SMB_CASE_SENSITIVE,
-	    od->d_tree->t_snode, od->d_dnode, odirent->od_name, &fnode);
+	bzero(&attr, sizeof (attr));
+	attr.sa_mask = SMB_AT_ALL;
+
+	/*
+	 * Lookup the vnode and get attributes.  We have the real
+	 * (on disk) name here from readdir, so CS lookup.
+	 * NB the getattr is done with kcred.
+	 */
+	rc = smb_vop_lookup(od->d_dnode->vp, odirent->od_name, &fvp,
+	    NULL, SMB_CASE_SENSITIVE, &de_flags,
+	    od->d_tree->t_snode->vp, &attr, od->d_cred);
+
 	if (rc != 0)
 		return (rc);
 
-	/* follow link to get target node & attr */
-	if (smb_node_is_symlink(fnode) &&
-	    smb_odir_lookup_link(sr, od, odirent->od_name, &tgt_node)) {
-		smb_node_release(fnode);
-		fnode = tgt_node;
+	/*
+	 * follow link to get target node & attr
+	 */
+	if (attr.sa_vattr.va_type == VLNK &&
+	    (attr.sa_dosattr & FILE_ATTRIBUTE_REPARSE_POINT) == 0) {
+		/*
+		 * Follow the symlink (lookup again w/ follow)
+		 * Like smb_odir_lookup_link
+		 *
+		 * Could avoid creating an smb_node_t here,
+		 * but symlinks are not so common.
+		 */
+		smb_node_t *tnode = NULL;
+		vnode_t *tvp = NULL;
+
+		if (smb_odir_lookup_link(sr, od, odirent->od_name, &tnode)) {
+
+			attr.sa_mask = SMB_AT_ALL;
+			rc = smb_fsop_getattr(NULL, zone_kcred(), tnode, &attr);
+			if (rc != 0) {
+				smb_node_release(tnode);
+				VN_RELE(fvp);
+				return (rc);
+			}
+
+			/* Use the link target as fvp */
+			tvp = tnode->vp;
+			VN_HOLD(tvp);
+			smb_node_release(tnode);
+
+			VN_RELE(fvp);
+			fvp = tvp;
+		}
 	}
 
-	/* skip system files */
-	if (smb_node_is_system(fnode)) {
-		smb_node_release(fnode);
+	/*
+	 * skip system files
+	 * Like smb_node_is_system(fnode)
+	 */
+	if (smb_node_is_vfsroot(od->d_dnode) &&
+	    (strcasecmp(odirent->od_name, ".$EXTEND") == 0)) {
+		VN_RELE(fvp);
 		return (ENOENT);
 	}
 
 	/*
-	 * Windows directory listings return not only names, but
-	 * also some attributes.  In Unix, you need some access to
-	 * get those attributes.  Which credential should we use to
-	 * get those?  If we're doing Access Based Enumeration (ABE)
-	 * we want this getattr to fail, which will cause the caller
-	 * to skip this entry.  If we're NOT doing ABE, we normally
-	 * want to show all the directory entries (including their
-	 * attributes) so we want this getattr to succeed!
+	 * check search attributes
 	 */
-	if (smb_tree_has_feature(od->d_tree, SMB_TREE_ABE))
-		cr = od->d_cred;
-	else
-		cr = zone_kcred();
-
-	bzero(&attr, sizeof (attr));
-	attr.sa_mask = SMB_AT_ALL;
-	rc = smb_node_getattr(NULL, fnode, cr, NULL, &attr);
-	if (rc != 0) {
-		smb_node_release(fnode);
-		return (rc);
-	}
-
-	/* check search attributes */
 	if (!smb_sattr_check(attr.sa_dosattr, od->d_sattr)) {
-		smb_node_release(fnode);
+		VN_RELE(fvp);
 		return (ENOENT);
 	}
 
+	/*
+	 * Access Based Enumeration (ABE) checks
+	 * Skip this entry if the user can't read it.
+	 */
+	if ((od->d_flags & SMB_ODIR_FLAG_ABE) != 0) {
+		int atype;
+		int aflags;
+
+		if ((od->d_flags & SMB_ODIR_FLAG_ACEACCESS) != 0) {
+			atype = V_ACE_MASK;
+			aflags = ACE_READ_DATA;
+		} else {
+			atype = 0;
+			aflags = S_IRUSR;
+		}
+		rc = smb_vop_access(fvp, aflags, atype,
+		    od->d_dnode->vp, od->d_cred);
+		if (rc != 0) {
+			/* skip this entry */
+			VN_RELE(fvp);
+			return (rc);
+		}
+	}
+
+	/*
+	 * Deal with names that have conflicts (other names
+	 * that match this one if compared case-insensitive)
+	 */
 	name = odirent->od_name;
 	if (od->d_flags & SMB_ODIR_FLAG_SHORTNAMES) {
 		case_conflict = ((od->d_flags & SMB_ODIR_FLAG_IGNORE_CASE) &&
@@ -1389,7 +1440,9 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	else
 		fileinfo->fi_crtime = attr.sa_vattr.va_mtime;
 
-	smb_node_release(fnode);
+
+	VN_RELE(fvp);
+
 	return (0);
 }
 

@@ -1663,12 +1663,6 @@ smb_node_getattr(smb_request_t *sr, smb_node_t *node, cred_t *cr,
 
 	SMB_NODE_VALID(node);
 
-	/* Deal with some interdependencies */
-	if (attr->sa_mask & SMB_AT_ALLOCSZ)
-		attr->sa_mask |= SMB_AT_SIZE;
-	if (attr->sa_mask & SMB_AT_DOSATTR)
-		attr->sa_mask |= SMB_AT_TYPE;
-
 	rc = smb_fsop_getattr(sr, cr, node, attr);
 	if (rc != 0)
 		return (rc);
@@ -1677,42 +1671,24 @@ smb_node_getattr(smb_request_t *sr, smb_node_t *node, cred_t *cr,
 
 	mutex_enter(&node->n_mutex);
 
-	if (attr->sa_mask & SMB_AT_DOSATTR) {
-		if (attr->sa_dosattr == 0) {
-			attr->sa_dosattr = (isdir) ?
-			    FILE_ATTRIBUTE_DIRECTORY:
-			    FILE_ATTRIBUTE_NORMAL;
-		}
-	}
-
 	/*
-	 * Also fix-up sa_allocsz, which is not persistent.
-	 * When there are no open files, allocsz is faked.
-	 * While there are open files, we pretend we have a
-	 * persistent allocation size in n_allocsz, and
-	 * keep that up-to-date here, increasing it when
-	 * we see the file size grow past it.
+	 * Fix-up sa_allocsz, for which we simulate persistence
+	 * while there are open files. (See smb_node_setattr)
+	 *
+	 * The value in node->n_allocsz is the value last set via
+	 * smb_node_setattr.  It's possible that writes may have
+	 * increased the file size beyond n_allocsz, in which case
+	 * the sa_vattr.va_size, sa_allocsz from smb_fsop_getattr
+	 * will be greater than n_allocsz, so this returns the
+	 * greater of n_allocsz and sa_allocsz.
 	 */
-	if (attr->sa_mask & SMB_AT_ALLOCSZ) {
-		if (isdir) {
-			attr->sa_allocsz = 0;
-		} else if (node->n_open_count == 0) {
-			attr->sa_allocsz =
-			    SMB_ALLOCSZ(attr->sa_vattr.va_size);
-		} else {
-			if (node->n_allocsz < attr->sa_vattr.va_size)
-				node->n_allocsz =
-				    SMB_ALLOCSZ(attr->sa_vattr.va_size);
-			attr->sa_allocsz = node->n_allocsz;
-		}
+	if ((attr->sa_mask & SMB_AT_ALLOCSZ) != 0 &&
+	    node->n_open_count > 0 && !isdir &&
+	    attr->sa_allocsz < node->n_allocsz) {
+		attr->sa_allocsz = node->n_allocsz;
 	}
 
 	mutex_exit(&node->n_mutex);
-
-	if (isdir) {
-		attr->sa_vattr.va_size = 0;
-		attr->sa_vattr.va_nlink = 1;
-	}
 
 	/*
 	 * getattr with an ofile gets any "pending" times that

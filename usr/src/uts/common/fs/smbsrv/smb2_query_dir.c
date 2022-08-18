@@ -71,7 +71,7 @@ static uint32_t smb2_find_mbc_encode(smb_request_t *, smb2_find_args_t *);
  * Tunable parameter to limit the maximum
  * number of entries to be returned.
  */
-uint16_t smb2_find_max = 128;
+uint16_t smb2_find_max = 1024;
 
 smb_sdrc_t
 smb2_query_dir(smb_request_t *sr)
