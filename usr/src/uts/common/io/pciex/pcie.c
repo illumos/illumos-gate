@@ -1538,6 +1538,10 @@ pcie_speed_to_int(pcie_link_speed_t speed)
 		return (8000000000LL);
 	case PCIE_LINK_SPEED_16:
 		return (16000000000LL);
+	case PCIE_LINK_SPEED_32:
+		return (32000000000LL);
+	case PCIE_LINK_SPEED_64:
+		return (64000000000LL);
 	default:
 		return (0);
 	}
@@ -1585,7 +1589,7 @@ pcie_speeds_to_devinfo(dev_info_t *dip, pcie_bus_t *bus_p)
 	}
 
 	if (bus_p->bus_sup_speed != PCIE_LINK_SPEED_UNKNOWN) {
-		int64_t speeds[4];
+		int64_t speeds[PCIE_NSPEEDS];
 		uint_t nspeeds = 0;
 
 		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_2_5) {
@@ -1606,6 +1610,16 @@ pcie_speeds_to_devinfo(dev_info_t *dip, pcie_bus_t *bus_p)
 		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_16) {
 			speeds[nspeeds++] =
 			    pcie_speed_to_int(PCIE_LINK_SPEED_16);
+		}
+
+		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_32) {
+			speeds[nspeeds++] =
+			    pcie_speed_to_int(PCIE_LINK_SPEED_32);
+		}
+
+		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_64) {
+			speeds[nspeeds++] =
+			    pcie_speed_to_int(PCIE_LINK_SPEED_64);
 		}
 
 		(void) ndi_prop_update_int64_array(DDI_DEV_T_NONE, dip,
@@ -1706,6 +1720,12 @@ pcie_capture_speeds(dev_info_t *dip)
 	case PCIE_LINKSTS_SPEED_16:
 		bus_p->bus_cur_speed = PCIE_LINK_SPEED_16;
 		break;
+	case PCIE_LINKSTS_SPEED_32:
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_32;
+		break;
+	case PCIE_LINKSTS_SPEED_64:
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_64;
+		break;
 	default:
 		bus_p->bus_cur_speed = PCIE_LINK_SPEED_UNKNOWN;
 		break;
@@ -1782,6 +1802,10 @@ pcie_capture_speeds(dev_info_t *dip)
 			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_8;
 		if (cap2 & PCIE_LINKCAP2_SPEED_16)
 			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_16;
+		if (cap2 & PCIE_LINKCAP2_SPEED_32)
+			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_32;
+		if (cap2 & PCIE_LINKCAP2_SPEED_64)
+			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_64;
 
 		switch (cap & PCIE_LINKCAP_MAX_SPEED_MASK) {
 		case PCIE_LINKCAP_MAX_SPEED_2_5:
@@ -1795,6 +1819,12 @@ pcie_capture_speeds(dev_info_t *dip)
 			break;
 		case PCIE_LINKCAP_MAX_SPEED_16:
 			bus_p->bus_max_speed = PCIE_LINK_SPEED_16;
+			break;
+		case PCIE_LINKCAP_MAX_SPEED_32:
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_32;
+			break;
+		case PCIE_LINKCAP_MAX_SPEED_64:
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_64;
 			break;
 		default:
 			bus_p->bus_max_speed = PCIE_LINK_SPEED_UNKNOWN;
@@ -1823,6 +1853,12 @@ pcie_capture_speeds(dev_info_t *dip)
 		break;
 	case PCIE_LINKCTL2_TARGET_SPEED_16:
 		bus_p->bus_target_speed = PCIE_LINK_SPEED_16;
+		break;
+	case PCIE_LINKCTL2_TARGET_SPEED_32:
+		bus_p->bus_target_speed = PCIE_LINK_SPEED_32;
+		break;
+	case PCIE_LINKCTL2_TARGET_SPEED_64:
+		bus_p->bus_target_speed = PCIE_LINK_SPEED_64;
 		break;
 	default:
 		bus_p->bus_target_speed = PCIE_LINK_SPEED_UNKNOWN;
@@ -3399,6 +3435,10 @@ pcie_link_set_target(dev_info_t *dip, pcie_link_speed_t speed)
 		return (ENOTSUP);
 	}
 
+	if (bus_p->bus_pcie_vers < 2) {
+		return (ENOTSUP);
+	}
+
 	switch (speed) {
 	case PCIE_LINK_SPEED_2_5:
 		rval = PCIE_LINKCTL2_TARGET_SPEED_2_5;
@@ -3412,11 +3452,22 @@ pcie_link_set_target(dev_info_t *dip, pcie_link_speed_t speed)
 	case PCIE_LINK_SPEED_16:
 		rval = PCIE_LINKCTL2_TARGET_SPEED_16;
 		break;
+	case PCIE_LINK_SPEED_32:
+		rval = PCIE_LINKCTL2_TARGET_SPEED_32;
+		break;
+	case PCIE_LINK_SPEED_64:
+		rval = PCIE_LINKCTL2_TARGET_SPEED_64;
+		break;
 	default:
 		return (EINVAL);
 	}
 
 	mutex_enter(&bus_p->bus_speed_mutex);
+	if ((bus_p->bus_sup_speed & speed) == 0) {
+		mutex_exit(&bus_p->bus_speed_mutex);
+		return (ENOTSUP);
+	}
+
 	bus_p->bus_target_speed = speed;
 	bus_p->bus_speed_flags |= PCIE_LINK_F_ADMIN_TARGET;
 

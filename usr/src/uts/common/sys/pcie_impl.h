@@ -317,8 +317,12 @@ typedef enum pcie_link_speed {
 	PCIE_LINK_SPEED_2_5	= 1 << 0,
 	PCIE_LINK_SPEED_5	= 1 << 1,
 	PCIE_LINK_SPEED_8	= 1 << 2,
-	PCIE_LINK_SPEED_16	= 1 << 3
+	PCIE_LINK_SPEED_16	= 1 << 3,
+	PCIE_LINK_SPEED_32	= 1 << 4,
+	PCIE_LINK_SPEED_64	= 1 << 5
 } pcie_link_speed_t;
+
+#define	PCIE_NSPEEDS	6
 
 typedef enum pcie_link_flags {
 	PCIE_LINK_F_ADMIN_TARGET	= 1 << 1

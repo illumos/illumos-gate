@@ -1546,6 +1546,12 @@ pcieb_ioctl_get_speed(pcieb_devstate_t *pcieb, intptr_t arg, int mode,
 	case PCIE_LINK_SPEED_16:
 		pits.pits_speed = PCIEB_LINK_SPEED_GEN4;
 		break;
+	case PCIE_LINK_SPEED_32:
+		pits.pits_speed = PCIEB_LINK_SPEED_GEN5;
+		break;
+	case PCIE_LINK_SPEED_64:
+		pits.pits_speed = PCIEB_LINK_SPEED_GEN6;
+		break;
 	default:
 		pits.pits_speed = PCIEB_LINK_SPEED_UNKNOWN;
 		break;
@@ -1601,6 +1607,12 @@ pcieb_ioctl_set_speed(pcieb_devstate_t *pcieb, intptr_t arg, int mode,
 		break;
 	case PCIEB_LINK_SPEED_GEN4:
 		speed = PCIE_LINK_SPEED_16;
+		break;
+	case PCIEB_LINK_SPEED_GEN5:
+		speed = PCIE_LINK_SPEED_32;
+		break;
+	case PCIEB_LINK_SPEED_GEN6:
+		speed = PCIE_LINK_SPEED_64;
 		break;
 	default:
 		return (EINVAL);
