@@ -23,7 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 RackTop Systems.
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1612,7 +1612,6 @@ mac_rx_set(mac_client_handle_t mch, mac_rx_t rx_fn, void *arg)
 	mcip->mci_rx_fn = rx_fn;
 	mcip->mci_rx_arg = arg;
 	mac_rx_client_restart(mch);
-	i_mac_perim_exit(mip);
 
 	/*
 	 * If we're changing the Rx function on the primary MAC of a VNIC,
@@ -1622,6 +1621,8 @@ mac_rx_set(mac_client_handle_t mch, mac_rx_t rx_fn, void *arg)
 		ASSERT((umip->mi_state_flags & MIS_IS_VNIC) != 0);
 		mac_vnic_secondary_update(umip);
 	}
+
+	i_mac_perim_exit(mip);
 }
 
 /*
