@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2022 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_USB 8 "Mar 1, 2007"
+.TH CFGADM_USB 8 "Feb 23, 2022"
 .SH NAME
 cfgadm_usb \- USB hardware-specific commands for cfgadm
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/cfgadm\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR] [\fB-v\fR] \fB-c\fR \fIfunction\fR \fIap_id\fR...
 .fi
@@ -30,7 +30,6 @@ cfgadm_usb \- USB hardware-specific commands for cfgadm
 .fi
 
 .SH DESCRIPTION
-.LP
 The Universal Serial Bus (\fBUSB\fR) hardware-specific library
 \fB/usr/lib/cfgadm/usb.so.1\fR provides the functionality for administering
 \fBUSB\fR devices via the \fBcfgadm\fR(8) command. \fBcfgadm\fR operates on
@@ -179,13 +178,13 @@ The following table shows the somewhat confusing routing for this USB 2.0 chip:
 .nf
 logical port number		physical port number
 -------------------		--------------------
-	usb1/1			internal port 1	
+	usb1/1			internal port 1
 	usb1/2			external port 1
 	usb1/3			external port 3
-	
+
 	usb2/1			internal port 2
 	usb2/2			external port 2
-	
+
 	usb3/1			internal port 1
 	usb3/2			internal port 2
 	usb3/3			external port 1
@@ -332,7 +331,6 @@ before removing its device from the \fBUSB\fR. However, it is not recommended
 to hot-remove devices currently in use (such as removable disks currently
 opened by a volume manager or some other application).
 .SH OPTIONS
-.LP
 \fBcfgadm\fR defines several types of operations. These operations include
 invoking configuration state changes (\fB-c\fR), invoking hardware-specific
 functions (\fB-x\fR), and obtaining configuration administration help messages
@@ -446,6 +444,12 @@ the \fB-v\fR option, the \fBInformation\fR field contains the following
 .ie t \(bu
 .el o
 \fBProduct\fR: product string (\fBiProduct\fR)
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+\fBSerial\fR: serial number (\fBiSerialNumber\fR)
 .RE
 .RS +4
 .TP
@@ -623,7 +627,6 @@ connected/configured:
 .sp
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRListing the Status of All USB Devices
 .sp
 .LP
@@ -795,13 +798,19 @@ the '\fBInformation\fR' field:
 .TP
 .ie t \(bu
 .el o
-Manufacturer string: Iomega
+Manufacturer string: STMicroelectronics
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-Product string: \fBUSB Zip 250\fR
+Product string: \fBSTLINK-V3\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Serial number: 003C00174741500520383733
 .RE
 .RS +4
 .TP
@@ -824,11 +833,12 @@ Configuration string descriptor for configuration 0: Default
 .sp
 .in +2
 .nf
-example# \fBcfgadm -lv  usb0/1.5\fR
+example# \fBcfgadm -lv usb2/1.2\fR
 Ap_Id                 Receptacle   Occupant     Condition  Information
-When         Type         Busy         Phys_Id
-usb0/1.5     connected    configured   ok         Mfg:"Io
-mega"  Product:"USB Zip 250"  NConfigs:1  Config:0 : Default
+When         Type         Busy     Phys_Id
+usb2/1.2     connected    configured   ok         Mfg: STMicroelectronics
+Product: STLINK-V3  Serial: 003C00174741500520383733  NConfigs: 1  Config:
+0  : Default Config
 .fi
 .in -2
 .sp
@@ -836,10 +846,10 @@ mega"  Product:"USB Zip 250"  NConfigs:1  Config:0 : Default
 .sp
 .in +2
 .nf
-example# \fBcfgadm -l -s "cols=ap_id:info" usb0/1.5\fR
+example# \fBcfgadm -l -s "cols=ap_id:info" usb2/1.2\fR
 Ap_Id                         Information
-usb0/1.5                      Mfg:"Iomega"  Product:"USB Zip 250"
-NConfigs:1  Config:0 : Default
+usb2/1.2                      Mfg: STMicroelectronics  Product: STLINK-V3
+Serial: 003C00174741500520383733  NConfigs: 1  Config: 0  : Default Config
 .fi
 .in -2
 .sp
@@ -855,21 +865,33 @@ on the system:
 .in +2
 .nf
 example# \fBcfgadm -l -s "select=class(usb),cols=ap_id:info"\fR
-Ap_Id                         Information
-usb0/1                        Mfg:<undefined>  Product:<undefined>
-NConfigs:1  Config:0 <no cfg str descr>
-usb0/2
-usb0/1.1                      Mfg:<undefined>  Product:<undefined>
-NConfigs:1  Config:0 <no cfg str descr>
-usb0/1.2
-usb0/1.3
-usb0/1.4                      Mfg:"Wizard"  Product:"Modem/ISDN"
-NConfigs:3  Config:1 : V.90 Analog Modem
-usb0/1.5                      Mfg:"Iomega"  Product:"USB Zip 250"
-NConfigs:1  Config:0 : Default
-usb0/1.6                      Mfg:"SOLID YEAR"  Product:"SOLID YEAR
-USB"NConfigs:1  Config:0 <no cfg str descr>
-usb0/1.7
+Ap_Id            Information
+usb1/3           Mfg: VIA Labs, Inc.           Product: USB2.0 Hub
+Serial: <undef>  NConfigs: 1  Config: 0  <no cfg str descr>
+usb1/3.1         Mfg: STMicroelectronics  Product: STM32 STLink
+Serial: 0668FF515754888367141334  NConfigs: 1  Config: 0  <no cfg str descr>
+usb1/3.2
+usb1/3.3         Mfg: STMicroelectronics  Product: STLINK-V3
+Serial: 003700303137511139383538  NConfigs: 1  Config: 0  : Default Config
+usb1/3.4         Mfg: FTDI  Product: FT4232H MiniModule
+Serial: FT51SZA7  NConfigs: 1  Config: 0  <no cfg str descr>
+usb1/4
+usb1/5
+usb1/6
+usb1/7           Mfg: VIA Labs, Inc.           Product: USB3.0 Hub
+Serial: <undef>  NConfigs: 1  Config: 0  <no cfg str descr>
+usb1/7.1
+usb1/7.2
+usb1/7.3
+usb1/7.4
+usb1/8
+usb2/1           Mfg: <undef>  Product: <undef>  Serial: <undef>
+NConfigs: 1  Config: 0  <no cfg str descr>
+usb2/1.1         Mfg: ARM  Product: DAPLink CMSIS-DAP
+Serial: 02360b000d96e4fc00000000000000000000000097969905  NConfigs: 1
+Config: 0  <no cfg str descr>
+usb2/1.2         Mfg: STMicroelectronics  Product: STLINK-V3
+Serial: 003C00174741500520383733  NConfigs: 1  Config: 0  : Default Config
 .fi
 .in -2
 .sp
@@ -884,16 +906,14 @@ information about those devices.
 .in +2
 .nf
 example# \fBcfgadm -l -s "select=class(usb),cols=ap_id:info" | grep Mfg\fR
-usb0/1                        Mfg:<undefined>  Product:<undefined>
-NConfigs:1  Config:0 <no cfg str descr>
-usb0/1.1                      Mfg:<undefined>  Product:<undefined>
-NConfigs:1  Config:0 <no cfg str descr>
-usb0/1.4                      Mfg:"Wizard"  Product:"Modem/ISDN"
-NConfigs:3  Config:1 : V.90 Analog Modem
-usb0/1.5                      Mfg:"Iomega"  Product:"USB Zip 250"
-NConfigs:1  Config:0 : Default
-usb0/1.6                      Mfg:"SOLID YEAR"  Product:"SOLID YEAR USB"
-Config:0 <no cfg str descr>
+usb1/3           Mfg: VIA Labs, Inc.           Product: USB2.0 Hub
+Serial: <undef>  NConfigs: 1  Config: 0  <no cfg str descr>
+usb1/3.1         Mfg: STMicroelectronics  Product: STM32 STLink
+Serial: 0668FF515754888367141334  NConfigs: 1  Config: 0  <no cfg str descr>
+usb1/3.3         Mfg: STMicroelectronics  Product: STLINK-V3
+Serial: 003700303137511139383538  NConfigs: 1  Config: 0  : Default Config
+usb1/3.4         Mfg: FTDI  Product: FT4232H MiniModule
+Serial: FT51SZA7  NConfigs: 1  Config: 0  <no cfg str descr>
 .fi
 .in -2
 .sp
@@ -913,10 +933,10 @@ are \fB0\fR, \fB1\fR, and \fB2\fR (\fB0\fR to (\fIN\fR\fBConfigs-1\fR)).
 .sp
 .in +2
 .nf
-example# \fBcfgadm -l -s "cols=ap_id:info" usb0/1.4\fR
-Ap_Id                         Information
-usb0/1.4                      Mfg:"Wizard"  Product:"Modem/ISDN"
-NConfigs:3  Config:1 V.90 Analog Modem"
+example# \fBcfgadm -l -s "cols=ap_id:info" usb1/3.3\fR
+Ap_Id                          Information
+usb1/3.3                       Mfg: STMicroelectronics  Product: STLINK-V3
+Serial: 003700303137511139383538  NConfigs: 1  Config: 0  : Default Config
 .fi
 .in -2
 .sp
@@ -965,7 +985,6 @@ Hardware specific library for generic USB device administration
 .RE
 
 .SH SEE ALSO
-.LP
 .BR config_admin (3CFGADM),
 .BR scsa2usb (4D),
 .BR usba (4D),
@@ -978,7 +997,6 @@ Universal Serial Bus 1.1 Specification (\fBwww.usb.org\fR)
 .LP
 \fI\fR
 .SH NOTES
-.LP
 \fBcfgadm\fR(8) can not unconfigure, disconnect, reset, or change the
 configuration of any \fBUSB\fR device currently opened by any application.
 These operations also fail on a hub if a device in its hierarchy is opened by
