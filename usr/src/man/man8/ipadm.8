@@ -15,7 +15,7 @@
 .\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd November 15, 2021
+.Dd August 20, 2022
 .Dt IPADM 8
 .Os
 .Sh NAME
@@ -192,16 +192,20 @@ For subcommands that take an
 .Em addrobj ,
 the
 .Em addrobj
-specifies a unique address on the system.
+specifies a unique address on the system, and must be unique itself.
 It is made up of two parts, delimited by a
 .Sq / .
-The first part is the name of the interface and the second part is a string up
-to 32 characters long.
+The first part is the name of the interface and the second part is an arbitrary
+string up to 32 alphanumeric characters long, where the first character must be
+alphabetic
+.Pq e.g. a-z,A-Z .
 For example,
 .Qq lo0/v4
 is a loopback interface
 .Em addrobj
-name.
+name, which could also be called
+.Qq lo0/ipv4loopback .
+Consumers should note that this length limit may be lifted in the future.
 .Pp
 For subcommands that take a
 .Em protocol ,
