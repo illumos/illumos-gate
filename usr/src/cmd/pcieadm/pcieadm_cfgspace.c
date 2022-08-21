@@ -4667,6 +4667,33 @@ static const pcieadm_cfgspace_print_t pcieadm_cap_ap[] = {
 	{ -1, -1, NULL }
 };
 
+/*
+ * Root Complex Event Collector Endpoint Association
+ */
+static const pcieadm_regdef_t pcieadm_regdef_rcecea_bus[] = {
+	{ 8, 15, "next", "RCEC Next Bus", PRDV_HEX },
+	{ 16, 23, "last", "RCEC Last Bus", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_cfgspace_print_t pcieadm_cap_rcecea_v1[] = {
+	{ 0x0, 4, "caphdr", "Capability Header",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
+	{ 0x4, 4, "bitmap", "Association Bitmap for RCiEPs",
+	    pcieadm_cfgspace_print_hex },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_cfgspace_print_t pcieadm_cap_rcecea_v2[] = {
+	{ 0x0, 4, "caphdr", "Capability Header",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
+	{ 0x4, 4, "bitmap", "Association Bitmap for RCiEPs",
+	    pcieadm_cfgspace_print_hex },
+	{ 0x8, 4, "bus", "RCEC Associated Bus Numbers",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_rcecea_bus },
+	{ -1, -1, NULL }
+};
+
 static const pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	{ PCI_CAP_ID_PM, "pcipm", "PCI Power Management",
 	    pcieadm_cap_info_pcipm, { { 2, 8, pcieadm_cap_pcipm_v3 },
@@ -4724,7 +4751,9 @@ static const pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	{ PCIE_EXT_CAP_ID_RC_INT_LINKCTRL, "rcilc",
 	    "Root Complex Internal Link Control" },
 	{ PCIE_EXT_CAP_ID_RC_EVNT_CEA, "rcecea",
-	    "Root Complex Event Collector Endpoint Aggregation" },
+	    "Root Complex Event Collector Endpoint Association",
+	    pcieadm_cap_info_vers, { { 1, 0x8, pcieadm_cap_rcecea_v1 },
+	    { 2, 0xc, pcieadm_cap_rcecea_v2 } } },
 	{ PCIE_EXT_CAP_ID_MFVC, "mfvc", "Multi-Function Virtual Channel" },
 	{ PCIE_EXT_CAP_ID_VC_WITH_MFVC, "vcwmfvc", "Virtual Channel with MFVC",
 	    pcieadm_cap_info_vers, { { 0x1, 0x1c, pcieadm_cap_vc } } },
