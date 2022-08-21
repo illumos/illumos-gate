@@ -4592,6 +4592,80 @@ static const pcieadm_cfgspace_print_t pcieadm_cap_npem[] = {
 	{ -1, -1, NULL }
 };
 
+/*
+ * Alternate Protocol Capability
+ */
+static const pcieadm_regdef_t pcieadm_regdef_ap_cap[] = {
+	{ 0, 7, "count", "Alternate Protocol Count", PRDV_HEX },
+	{ 8, 8, "sen", "Alternate Protocol Select Enable", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_ap_ctl[] = {
+	{ 0, 7, "index", "Alternate Protocol Index Select", PRDV_HEX },
+	{ 8, 8, "apngen", "Alternate Protocol Negotiation Global Enable",
+	    PRDV_STRVAL, .prd_val = { .prdv_strval = { "disabled",
+	    "enabled" } } },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_ap_data1[] = {
+	{ 0, 2, "use", "Alternate Protocol Usage Information", PRDV_HEX },
+	{ 5, 15, "detail", "Alternate Protocol Details", PRDV_HEX },
+	{ 16, 31, "vendor", "Alternate Protocol Vendor ID", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_ap_data2[] = {
+	{ 0, 23, "mts2", "Modified TS 2 Information", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_ap_sen[] = {
+	{ 0, 0, "pcie", "Selective Enable Mask - PCIe", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 1, 31, "other", "Selective Enable Mask - Other", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+/*
+ * The Advanced Protocol Selective Enable Mask register is only present if a bit
+ * in the capabilities register is present. As such, we need to check if it is
+ * here before we try to read and print it.
+ */
+static void
+pcieadm_cfgspace_print_ap_sen(pcieadm_cfgspace_walk_t *walkp,
+    const pcieadm_cfgspace_print_t *print, const void *arg)
+{
+	uint32_t ap_cap = walkp->pcw_data->pcb_u32[walkp->pcw_capoff + 4];
+	pcieadm_cfgspace_print_t p;
+
+	if (bitx32(ap_cap, 8, 8) == 0)
+		return;
+
+	(void) memcpy(&p, print, sizeof (*print));
+	p.pcp_print = pcieadm_cfgspace_print_regdef;
+	p.pcp_arg = pcieadm_regdef_ap_sen;
+
+	p.pcp_print(walkp, &p, p.pcp_arg);
+}
+
+static const pcieadm_cfgspace_print_t pcieadm_cap_ap[] = {
+	{ 0x0, 4, "caphdr", "Capability Header",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
+	{ 0x4, 4, "cap", "Alternate Protocol Capabilities",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ap_cap },
+	{ 0x8, 4, "ctl", "Alternate Protocol Control",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ap_ctl },
+	{ 0xc, 4, "data1", "Alternate Protocol Data 1",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ap_data1 },
+	{ 0x10, 4, "data2", "Alternate Protocol Data 2",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ap_data2 },
+	{ 0x14, 4, "sen", "Alternate Protocol Select Enable Mask",
+	    pcieadm_cfgspace_print_ap_sen },
+	{ -1, -1, NULL }
+};
 
 static const pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	{ PCI_CAP_ID_PM, "pcipm", "PCI Power Management",
@@ -4718,7 +4792,8 @@ static const pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	 */
 	{ PCIE_EXT_CAP_ID_PL32GT, "pl32g", "Physical Layer 32.0 GT/s",
 	    pcieadm_cap_info_vers, { { 1, 0x24, pcieadm_cap_32g } } },
-	{ PCIE_EXT_CAP_ID_AP, "ap", "Alternative Protocol" },
+	{ PCIE_EXT_CAP_ID_AP, "ap", "Alternative Protocol",
+	    pcieadm_cap_info_vers, { { 1, 0x14, pcieadm_cap_ap } } },
 	{ PCIE_EXT_CAP_ID_SFI, "sfi", "System Firmware Intermediary" },
 	{ PCIE_EXT_CAP_ID_SHDW_FUNC, "sfunc", "Shadow Functions" },
 	{ PCIE_EXT_CAP_ID_DOE, "doe", "Data Object Exchange" },
