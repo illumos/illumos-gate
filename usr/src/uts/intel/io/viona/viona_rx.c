@@ -36,6 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Oxide Computer Company
+ * Copyright 2022 Michael Zeller
  */
 
 #include <sys/types.h>
@@ -133,7 +134,13 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 	mac_rx_barrier(link->l_mch);
 	mutex_enter(&ring->vr_lock);
 
-	viona_ring_enable_notify(ring);
+	/*
+	 * If we bailed while renewing the ring lease, we cannot reset
+	 * USED_NO_NOTIFY, since we lack a valid mapping to do so.
+	 */
+	if (ring->vr_lease != NULL) {
+		viona_ring_enable_notify(ring);
+	}
 }
 
 static size_t
