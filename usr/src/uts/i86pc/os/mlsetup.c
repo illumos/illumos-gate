@@ -206,6 +206,12 @@ mlsetup(struct regs *rp)
 	init_desctbls();
 
 	/*
+	 * Ensure that we have set the necessary feature bits before setting up
+	 * PCI config space access.
+	 */
+	cpuid_execpass(cpu[0], CPUID_PASS_PRELUDE, x86_featureset);
+
+	/*
 	 * lgrp_init() and possibly cpuid_pass1() need PCI config
 	 * space access
 	 */
@@ -222,17 +228,18 @@ mlsetup(struct regs *rp)
 #endif
 
 	/*
-	 * The first lightweight pass (pass0) through the cpuid data
-	 * was done in locore before mlsetup was called.  Do the next
-	 * pass in C code.
+	 * i86pc doesn't require anything in between the IDENT and BASIC passes;
+	 * we assume that a BIOS has already set up any necessary cpuid feature
+	 * bits, so we run both passes together here.
 	 *
-	 * The x86_featureset is initialized here based on the capabilities
-	 * of the boot CPU.  Note that if we choose to support CPUs that have
-	 * different feature sets (at which point we would almost certainly
-	 * want to set the feature bits to correspond to the feature
-	 * minimum) this value may be altered.
+	 * The x86_featureset is initialized here based on the capabilities of
+	 * the boot CPU.  Note that if we choose to support CPUs that have
+	 * different feature sets (at which point we would almost certainly want
+	 * to set the feature bits to correspond to the feature minimum) this
+	 * value may be altered.
 	 */
-	cpuid_pass1(cpu[0], x86_featureset);
+	cpuid_execpass(cpu[0], CPUID_PASS_IDENT, NULL);
+	cpuid_execpass(cpu[0], CPUID_PASS_BASIC, x86_featureset);
 
 #if !defined(__xpv)
 	if ((get_hwenv() & HW_XEN_HVM) != 0)

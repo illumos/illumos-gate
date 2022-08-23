@@ -898,12 +898,6 @@ _cpuid_chiprevstr(uint_t vendor, uint_t family, uint_t model, uint_t step)
 }
 
 /*
- * CyrixInstead is a variable used by the Cyrix detection code
- * in locore.
- */
-const char CyrixInstead[] = X86_VENDORSTR_CYRIX;
-
-/*
  * Map the vendor string to a type code
  */
 uint_t
@@ -917,7 +911,7 @@ _cpuid_vendorstr_to_vendorcode(char *vendorstr)
 		return (X86_VENDOR_HYGON);
 	else if (strcmp(vendorstr, X86_VENDORSTR_TM) == 0)
 		return (X86_VENDOR_TM);
-	else if (strcmp(vendorstr, CyrixInstead) == 0)
+	else if (strcmp(vendorstr, X86_VENDORSTR_CYRIX) == 0)
 		return (X86_VENDOR_Cyrix);
 	else if (strcmp(vendorstr, X86_VENDORSTR_UMC) == 0)
 		return (X86_VENDOR_UMC);

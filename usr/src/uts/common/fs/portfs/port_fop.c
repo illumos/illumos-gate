@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -730,8 +731,8 @@ port_cache_lookup_fop(portfop_cache_t *pfcp, pid_t pid, uintptr_t obj)
  * caller has to VN_PHANTOM_RELE the vnode(s).
  */
 int
-port_fop_getdvp(void *objptr, vnode_t **vp, vnode_t **dvp,
-    char **cname, int *len, int follow)
+port_fop_getdvp(void *objptr, vnode_t **vp, vnode_t **dvp, char **cname,
+    int *len, int follow)
 {
 	int error = 0;
 	struct pathname pn;
@@ -1476,16 +1477,17 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 		mutex_enter(&pvp->pvp_mutex);
 
 		/*
-		 * remove any queued up event.
+		 * Remove any queued up event.
 		 */
 		if (port_remove_done_event(pfp->pfop_pev)) {
 			pfp->pfop_flags &= ~PORT_FOP_KEV_ONQ;
 		}
 
 		/*
-		 * set new events to watch.
+		 * Set new events to watch and update the user pointer.
 		 */
 		pfp->pfop_events = events;
+		pfp->pfop_pev->portkev_user = user;
 
 		/*
 		 * If not active, mark it active even if it is being
