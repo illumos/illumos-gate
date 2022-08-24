@@ -39,6 +39,7 @@
 #define	_SYS_X86_ARCHEXT_H
 
 #if !defined(_ASM)
+#include <sys/bitext.h>
 #include <sys/regset.h>
 #include <sys/processor.h>
 #include <vm/seg_enum.h>
@@ -837,179 +838,335 @@ extern "C" {
 #define	X86_VENDOR_STRLEN	13
 
 /*
- * Some vendor/family/model/stepping ranges are commonly grouped under
- * a single identifying banner by the vendor.  The following encode
- * that "revision" in a uint32_t with the 8 most significant bits
- * identifying the vendor with X86_VENDOR_*, the next 8 identifying the
- * family, and the remaining 16 typically forming a bitmask of revisions
- * within that family with more significant bits indicating "later" revisions.
+ * For lookups and matching functions only; not an actual vendor.
+ */
+#define	_X86_VENDOR_MATCH_ALL	0xff
+
+/*
+ * See the big theory statement at the top of cpuid.c for information about how
+ * processor families and microarchitecture families relate to cpuid families,
+ * models, and steppings.
  */
 
-#define	_X86_CHIPREV_VENDOR_MASK	0xff000000u
 #define	_X86_CHIPREV_VENDOR_SHIFT	24
-#define	_X86_CHIPREV_FAMILY_MASK	0x00ff0000u
 #define	_X86_CHIPREV_FAMILY_SHIFT	16
-#define	_X86_CHIPREV_REV_MASK		0x0000ffffu
 
-#define	_X86_CHIPREV_VENDOR(x) \
-	(((x) & _X86_CHIPREV_VENDOR_MASK) >> _X86_CHIPREV_VENDOR_SHIFT)
-#define	_X86_CHIPREV_FAMILY(x) \
-	(((x) & _X86_CHIPREV_FAMILY_MASK) >> _X86_CHIPREV_FAMILY_SHIFT)
+#define	_X86_CHIPREV_VENDOR(x)		\
+	bitx32((uint32_t)(x), 31, _X86_CHIPREV_VENDOR_SHIFT)
+
+#define	_X86_CHIPREV_FAMILY(x)		\
+	bitx32((uint32_t)(x), 23, _X86_CHIPREV_FAMILY_SHIFT)
+
 #define	_X86_CHIPREV_REV(x) \
-	((x) & _X86_CHIPREV_REV_MASK)
-
-/* True if x matches in vendor and family and if x matches the given rev mask */
-#define	X86_CHIPREV_MATCH(x, mask) \
-	(_X86_CHIPREV_VENDOR(x) == _X86_CHIPREV_VENDOR(mask) && \
-	_X86_CHIPREV_FAMILY(x) == _X86_CHIPREV_FAMILY(mask) && \
-	((_X86_CHIPREV_REV(x) & _X86_CHIPREV_REV(mask)) != 0))
-
-/* True if x matches in vendor and family, and rev is at least minx */
-#define	X86_CHIPREV_ATLEAST(x, minx) \
-	(_X86_CHIPREV_VENDOR(x) == _X86_CHIPREV_VENDOR(minx) && \
-	_X86_CHIPREV_FAMILY(x) == _X86_CHIPREV_FAMILY(minx) && \
-	_X86_CHIPREV_REV(x) >= _X86_CHIPREV_REV(minx))
+	bitx32((uint32_t)(x), 15, 0)
 
 #define	_X86_CHIPREV_MKREV(vendor, family, rev) \
 	((uint32_t)(vendor) << _X86_CHIPREV_VENDOR_SHIFT | \
-	(family) << _X86_CHIPREV_FAMILY_SHIFT | (rev))
-
-/* True if x matches in vendor, and family is at least minx */
-#define	X86_CHIPFAM_ATLEAST(x, minx) \
-	(_X86_CHIPREV_VENDOR(x) == _X86_CHIPREV_VENDOR(minx) && \
-	_X86_CHIPREV_FAMILY(x) >= _X86_CHIPREV_FAMILY(minx))
-
-/* Revision default */
-#define	X86_CHIPREV_UNKNOWN	0x0
+	(uint32_t)(family) << _X86_CHIPREV_FAMILY_SHIFT | (uint32_t)(rev))
 
 /*
- * Definitions for AMD Family 0xf. Minor revisions C0 and CG are
- * sufficiently different that we will distinguish them; in all other
- * case we will identify the major revision.
+ * The legacy families here are a little bit unfortunate.  Part of this is that
+ * the way AMD used the cpuid family/model/stepping changed somewhat over time,
+ * but the more immediate reason it's this way is more that the way we use
+ * chiprev/processor family changed with it.  The ancient amd_opteron and mc-amd
+ * drivers used the chiprevs that were based on cpuid family, mainly 0xf and
+ * 0x10.  amdzen_umc wants the processor family, in part because AMD's
+ * overloading of the cpuid family has made it effectively useless for
+ * discerning anything about the processor.  That also tied into the way
+ * amd_revmap was previously organised in cpuid_subr.c: up to family 0x14
+ * everything was just "rev A", "rev B", etc.; afterward we started using the
+ * new shorthand, again tied to how AMD was presenting this information.
+ * Because there are other consumers of the processor family, it no longer made
+ * sense for amdzen to derive the processor family from the cpuid family/model
+ * given that we have this collection of definitions already and code in
+ * cpuid_subr.c to make use of them.  The result is this unified approach that
+ * tries to keep old consumers happy while allowing new ones to get the degree
+ * of detail they need and expect.  That required bending things a bit to make
+ * them fit, though critically as long as AMD keep on their current path and all
+ * new consumers look like the ones we are adding these days, we will be able to
+ * continue making new additions that will match all the recent ones and the way
+ * AMD are currently using families and models.  There is absolutely no reason
+ * we couldn't go back and dig through all the legacy parts and break them down
+ * the same way, then change the old MC and CPU drivers to match, but I didn't
+ * feel like doing a lot of work for processors that it's unlikely anyone is
+ * still using and even more unlikely anyone will introduce new code to support.
+ * My compromise was to flesh things out starting where we already had more
+ * detail even if nothing was consuming it programmatically: at 0x15.  Before
+ * that, processor family and cpuid family were effectively the same, because
+ * that's what those old consumers expect.
  */
-#define	X86_CHIPREV_AMD_F_REV_B _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0001)
-#define	X86_CHIPREV_AMD_F_REV_C0 _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0002)
-#define	X86_CHIPREV_AMD_F_REV_CG _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0004)
-#define	X86_CHIPREV_AMD_F_REV_D _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0008)
-#define	X86_CHIPREV_AMD_F_REV_E _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0010)
-#define	X86_CHIPREV_AMD_F_REV_F _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0020)
-#define	X86_CHIPREV_AMD_F_REV_G _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0040)
+
+#ifndef	_ASM
+typedef enum x86_processor_family {
+	X86_PF_UNKNOWN,
+	X86_PF_AMD_LEGACY_F = 0xf,
+	X86_PF_AMD_LEGACY_10 = 0x10,
+	X86_PF_AMD_LEGACY_11 = 0x11,
+	X86_PF_AMD_LEGACY_12 = 0x12,
+	X86_PF_AMD_LEGACY_14 = 0x14,
+	X86_PF_AMD_OROCHI,
+	X86_PF_AMD_TRINITY,
+	X86_PF_AMD_KAVERI,
+	X86_PF_AMD_CARRIZO,
+	X86_PF_AMD_STONEY_RIDGE,
+	X86_PF_AMD_KABINI,
+	X86_PF_AMD_MULLINS,
+	X86_PF_AMD_NAPLES,
+	X86_PF_AMD_PINNACLE_RIDGE,
+	X86_PF_AMD_RAVEN_RIDGE,
+	X86_PF_AMD_PICASSO,
+	X86_PF_AMD_DALI,
+	X86_PF_AMD_ROME,
+	X86_PF_AMD_RENOIR,
+	X86_PF_AMD_MATISSE,
+	X86_PF_AMD_VAN_GOGH,
+	X86_PF_AMD_MENDOCINO,
+	X86_PF_HYGON_DHYANA,
+	X86_PF_AMD_MILAN,
+	X86_PF_AMD_GENOA,
+	X86_PF_AMD_VERMEER,
+	X86_PF_AMD_REMBRANDT,
+	X86_PF_AMD_CEZANNE,
+	X86_PF_AMD_RAPHAEL,
+
+	X86_PF_ANY = 0xff
+} x86_processor_family_t;
+
+#define	_DECL_CHIPREV(_v, _f, _revn, _revb)	\
+	X86_CHIPREV_ ## _v ## _ ## _f ## _ ## _revn =	\
+	_X86_CHIPREV_MKREV(X86_VENDOR_ ## _v, X86_PF_ ## _v ## _ ## _f,	_revb)
+
+#define	_X86_CHIPREV_REV_MATCH_ALL	0xffff
+
+typedef enum x86_chiprev {
+	X86_CHIPREV_UNKNOWN,
+	_DECL_CHIPREV(AMD, LEGACY_F, REV_B, 0x0001),
+	/*
+	 * Definitions for AMD Family 0xf. Minor revisions C0 and CG are
+	 * sufficiently different that we will distinguish them; in all other
+	 * case we will identify the major revision.
+	 */
+	_DECL_CHIPREV(AMD, LEGACY_F, REV_C0, 0x0002),
+	_DECL_CHIPREV(AMD, LEGACY_F, REV_CG, 0x0004),
+	_DECL_CHIPREV(AMD, LEGACY_F, REV_D, 0x0008),
+	_DECL_CHIPREV(AMD, LEGACY_F, REV_E, 0x0010),
+	_DECL_CHIPREV(AMD, LEGACY_F, REV_F, 0x0020),
+	_DECL_CHIPREV(AMD, LEGACY_F, REV_G, 0x0040),
+	_DECL_CHIPREV(AMD, LEGACY_F, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, LEGACY_10, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, LEGACY_10, REV_A, 0x0002),
+	_DECL_CHIPREV(AMD, LEGACY_10, REV_B, 0x0004),
+	_DECL_CHIPREV(AMD, LEGACY_10, REV_C2, 0x0008),
+	_DECL_CHIPREV(AMD, LEGACY_10, REV_C3, 0x0010),
+	_DECL_CHIPREV(AMD, LEGACY_10, REV_D0, 0x0020),
+	_DECL_CHIPREV(AMD, LEGACY_10, REV_D1, 0x0040),
+	_DECL_CHIPREV(AMD, LEGACY_10, REV_E, 0x0080),
+	_DECL_CHIPREV(AMD, LEGACY_10, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, LEGACY_11, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, LEGACY_11, REV_B, 0x0002),
+	_DECL_CHIPREV(AMD, LEGACY_11, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, LEGACY_12, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, LEGACY_12, REV_B, 0x0002),
+	_DECL_CHIPREV(AMD, LEGACY_12, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, LEGACY_14, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, LEGACY_14, REV_B, 0x0002),
+	_DECL_CHIPREV(AMD, LEGACY_14, REV_C, 0x0004),
+	_DECL_CHIPREV(AMD, LEGACY_14, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, OROCHI, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, OROCHI, REV_B2, 0x0002),
+	_DECL_CHIPREV(AMD, OROCHI, REV_C0, 0x0004),
+	_DECL_CHIPREV(AMD, OROCHI, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, TRINITY, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, TRINITY, REV_A1, 0x0002),
+	_DECL_CHIPREV(AMD, TRINITY, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, KAVERI, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, KAVERI, REV_A1, 0x0002),
+	_DECL_CHIPREV(AMD, KAVERI, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, CARRIZO, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, CARRIZO, REV_A0, 0x0002),
+	_DECL_CHIPREV(AMD, CARRIZO, REV_A1, 0x0004),
+	_DECL_CHIPREV(AMD, CARRIZO, REV_DDR4, 0x0008),
+	_DECL_CHIPREV(AMD, CARRIZO, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, STONEY_RIDGE, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, STONEY_RIDGE, REV_A0, 0x0002),
+	_DECL_CHIPREV(AMD, STONEY_RIDGE, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, KABINI, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, KABINI, A1, 0x0002),
+	_DECL_CHIPREV(AMD, KABINI, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, MULLINS, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, MULLINS, A1, 0x0002),
+	_DECL_CHIPREV(AMD, MULLINS, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, NAPLES, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, NAPLES, A0, 0x0002),
+	_DECL_CHIPREV(AMD, NAPLES, B1, 0x0004),
+	_DECL_CHIPREV(AMD, NAPLES, B2, 0x0008),
+	_DECL_CHIPREV(AMD, NAPLES, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, PINNACLE_RIDGE, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, PINNACLE_RIDGE, B2, 0x0002),
+	_DECL_CHIPREV(AMD, PINNACLE_RIDGE, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, RAVEN_RIDGE, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, RAVEN_RIDGE, B0, 0x0002),
+	_DECL_CHIPREV(AMD, RAVEN_RIDGE, B1, 0x0004),
+	_DECL_CHIPREV(AMD, RAVEN_RIDGE, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, PICASSO, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, PICASSO, B1, 0x0002),
+	_DECL_CHIPREV(AMD, PICASSO, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, DALI, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, DALI, A1, 0x0002),
+	_DECL_CHIPREV(AMD, DALI, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, ROME, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, ROME, A0, 0x0002),
+	_DECL_CHIPREV(AMD, ROME, B0, 0x0004),
+	_DECL_CHIPREV(AMD, ROME, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, RENOIR, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, RENOIR, A1, 0x0002),
+	_DECL_CHIPREV(AMD, RENOIR, LCN_A1, 0x0004),
+	_DECL_CHIPREV(AMD, RENOIR, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, MATISSE, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, MATISSE, B0, 0x0002),
+	_DECL_CHIPREV(AMD, MATISSE, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, VAN_GOGH, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, VAN_GOGH, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, MENDOCINO, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, MENDOCINO, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(HYGON, DHYANA, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(HYGON, DHYANA, A1, 0x0002),
+	_DECL_CHIPREV(HYGON, DHYANA, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, MILAN, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, MILAN, A0, 0x0002),
+	_DECL_CHIPREV(AMD, MILAN, B0, 0x0004),
+	_DECL_CHIPREV(AMD, MILAN, B1, 0x0008),
+	_DECL_CHIPREV(AMD, MILAN, B2, 0x0010),
+	_DECL_CHIPREV(AMD, MILAN, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, GENOA, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, GENOA, A0, 0x0002),
+	_DECL_CHIPREV(AMD, GENOA, A1, 0x0004),
+	_DECL_CHIPREV(AMD, GENOA, B0, 0x0008),
+	_DECL_CHIPREV(AMD, GENOA, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, VERMEER, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, VERMEER, A0, 0x0002),
+	_DECL_CHIPREV(AMD, VERMEER, B0, 0x0004),
+	_DECL_CHIPREV(AMD, VERMEER, B2, 0x0008),	/* No B1 */
+	_DECL_CHIPREV(AMD, VERMEER, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, REMBRANDT, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, REMBRANDT, A0, 0x0002),
+	_DECL_CHIPREV(AMD, REMBRANDT, B0, 0x0004),
+	_DECL_CHIPREV(AMD, REMBRANDT, B1, 0x0008),
+	_DECL_CHIPREV(AMD, REMBRANDT, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, CEZANNE, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, CEZANNE, A0, 0x0002),
+	_DECL_CHIPREV(AMD, CEZANNE, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	_DECL_CHIPREV(AMD, RAPHAEL, UNKNOWN, 0x0001),
+	_DECL_CHIPREV(AMD, RAPHAEL, ANY, _X86_CHIPREV_REV_MATCH_ALL),
+
+	/* Keep at the end */
+	X86_CHIPREV_ANY = _X86_CHIPREV_MKREV(_X86_VENDOR_MATCH_ALL, X86_PF_ANY,
+	    _X86_CHIPREV_REV_MATCH_ALL)
+} x86_chiprev_t;
+
+#undef	_DECL_CHIPREV
 
 /*
- * Definitions for AMD Family 0x10.  Rev A was Engineering Samples only.
- */
-#define	X86_CHIPREV_AMD_10_REV_A \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0001)
-#define	X86_CHIPREV_AMD_10_REV_B \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0002)
-#define	X86_CHIPREV_AMD_10_REV_C2 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0004)
-#define	X86_CHIPREV_AMD_10_REV_C3 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0008)
-#define	X86_CHIPREV_AMD_10_REV_D0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0010)
-#define	X86_CHIPREV_AMD_10_REV_D1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0020)
-#define	X86_CHIPREV_AMD_10_REV_E \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0040)
-
-/*
- * Definitions for AMD Family 0x11.
- */
-#define	X86_CHIPREV_AMD_11_REV_B \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x11, 0x0002)
-
-/*
- * Definitions for AMD Family 0x12.
- */
-#define	X86_CHIPREV_AMD_12_REV_B \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x12, 0x0002)
-
-/*
- * Definitions for AMD Family 0x14.
- */
-#define	X86_CHIPREV_AMD_14_REV_B \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x14, 0x0002)
-#define	X86_CHIPREV_AMD_14_REV_C \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x14, 0x0004)
-
-/*
- * Definitions for AMD Family 0x15
- */
-#define	X86_CHIPREV_AMD_15OR_REV_B2 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x15, 0x0001)
-
-#define	X86_CHIPREV_AMD_15TN_REV_A1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x15, 0x0002)
-
-#define	X86_CHIPREV_AMD_150R_REV_C0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x15, 0x0003)
-
-#define	X86_CHIPREV_AMD_15KV_REV_A1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x15, 0x0004)
-
-#define	X86_CHIPREV_AMD_15F60 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x15, 0x0005)
-
-#define	X86_CHIPREV_AMD_15ST_REV_A0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x15, 0x0006)
-
-/*
- * Definitions for AMD Family 0x16
- */
-#define	X86_CHIPREV_AMD_16_KB_A1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x16, 0x0001)
-
-#define	X86_CHIPREV_AMD_16_ML_A1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x16, 0x0002)
-
-/*
- * Definitions for AMD Family 0x17
+ * Same thing, but for microarchitecture (core implementations).  We are not
+ * attempting to capture every possible fine-grained detail here; to the extent
+ * that it matters, we do so in cpuid.c via ISA/feature bits.  We use the same
+ * number of bits for each field as in chiprev.
  */
 
-#define	X86_CHIPREV_AMD_17_ZP_B1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x17, 0x0001)
+#define	_X86_UARCHREV_VENDOR(x)	_X86_CHIPREV_VENDOR(x)
+#define	_X86_UARCHREV_UARCH(x)	_X86_CHIPREV_FAMILY(x)
+#define	_X86_UARCHREV_REV(x)	_X86_CHIPREV_REV(x)
 
-#define	X86_CHIPREV_AMD_17_ZP_B2 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x17, 0x0002)
+#define	_X86_UARCHREV_MKREV(vendor, family, rev) \
+	_X86_CHIPREV_MKREV(vendor, family, rev)
 
-#define	X86_CHIPREV_AMD_17_PiR_B2 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x17, 0x0003)
+typedef enum x86_uarch {
+	X86_UARCH_UNKNOWN,
 
-#define	X86_CHIPREV_AMD_17_RV_B0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x17, 0x0004)
+	X86_UARCH_AMD_LEGACY,
+	X86_UARCH_AMD_ZEN1,
+	X86_UARCH_AMD_ZENPLUS,
+	X86_UARCH_AMD_ZEN2,
+	X86_UARCH_AMD_ZEN3,
+	X86_UARCH_AMD_ZEN4,
 
-#define	X86_CHIPREV_AMD_17_RV_B1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x17, 0x0005)
+	X86_UARCH_ANY = 0xff
+} x86_uarch_t;
 
-#define	X86_CHIPREV_AMD_17_PCO_B1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x17, 0x0006)
+#define	_DECL_UARCHREV(_v, _f, _revn, _revb)	\
+	X86_UARCHREV_ ## _v ## _ ## _f ## _ ## _revn =	\
+	_X86_UARCHREV_MKREV(X86_VENDOR_ ## _v, X86_UARCH_ ## _v ## _ ## _f, \
+	_revb)
 
-#define	X86_CHIPREV_AMD_17_SSP_A0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x17, 0x0007)
+#define	_DECL_UARCHREV_NOREV(_v, _f, _revb)	\
+	X86_UARCHREV_ ## _v ## _ ## _f =	\
+	_X86_UARCHREV_MKREV(X86_VENDOR_ ## _v, X86_UARCH_ ## _v ## _ ## _f, \
+	_revb)
 
-#define	X86_CHIPREV_AMD_17_SSP_B0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x17, 0x0008)
+#define	_X86_UARCHREV_REV_MATCH_ALL	0xffff
 
-#define	X86_CHIPREV_AMD_17_MTS_B0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x17, 0x0009)
+typedef enum x86_uarchrev {
+	X86_UARCHREV_UNKNOWN,
+	_DECL_UARCHREV_NOREV(AMD, LEGACY, 0x0001),
+	_DECL_UARCHREV(AMD, LEGACY, ANY, _X86_UARCHREV_REV_MATCH_ALL),
 
-/*
- * Definitions for Hygon Family 0x18
- */
-#define	X86_CHIPREV_HYGON_18_DN_A1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_HYGON, 0x18, 0x0001)
+	_DECL_UARCHREV_NOREV(AMD, ZEN1, 0x0001),
+	_DECL_UARCHREV(AMD, ZEN1, ANY, _X86_UARCHREV_REV_MATCH_ALL),
 
-#define	X86_CHIPREV_AMD_19_GN_A0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x19, 0x0000)
-#define	X86_CHIPREV_AMD_19_GN_B0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x19, 0x0001)
-#define	X86_CHIPREV_AMD_19_GN_B1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x19, 0x0002)
-#define	X86_CHIPREV_AMD_19_VMR_B0 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x19, 0x0003)
-#define	X86_CHIPREV_AMD_19_VMR_B1 \
-	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x19, 0x0004)
+	_DECL_UARCHREV_NOREV(AMD, ZENPLUS, 0x0001),
+	_DECL_UARCHREV(AMD, ZENPLUS, ANY, _X86_UARCHREV_REV_MATCH_ALL),
+
+	_DECL_UARCHREV(AMD, ZEN2, UNKNOWN, 0x0001),
+	_DECL_UARCHREV(AMD, ZEN2, A0, 0x0002),
+	_DECL_UARCHREV(AMD, ZEN2, B0, 0x0004),
+	_DECL_UARCHREV(AMD, ZEN2, ANY, _X86_UARCHREV_REV_MATCH_ALL),
+
+	_DECL_UARCHREV(AMD, ZEN3, UNKNOWN, 0x0001),
+	_DECL_UARCHREV(AMD, ZEN3, A0, 0x0002),
+	_DECL_UARCHREV(AMD, ZEN3, B0, 0x0004),
+	_DECL_UARCHREV(AMD, ZEN3, B1, 0x0008),
+	_DECL_UARCHREV(AMD, ZEN3, B2, 0x0010),
+	_DECL_UARCHREV(AMD, ZEN3, ANY, _X86_UARCHREV_REV_MATCH_ALL),
+
+	_DECL_UARCHREV_NOREV(AMD, ZEN4, 0x0001),
+	_DECL_UARCHREV(AMD, ZEN4, ANY, _X86_UARCHREV_REV_MATCH_ALL),
+
+	/* Keep at the end */
+	_X86_UARCHREV_ANY = _X86_UARCHREV_MKREV(_X86_VENDOR_MATCH_ALL,
+	    X86_UARCH_ANY, _X86_UARCHREV_REV_MATCH_ALL)
+} x86_uarchrev_t;
+
+#undef	_DECL_UARCHREV
+
+#endif	/* !_ASM */
 
 /*
  * Various socket/package types, extended as the need to distinguish
@@ -1068,7 +1225,12 @@ extern "C" {
 #define	X86_SOCKET_FP5		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x21)
 #define	X86_SOCKET_FP6		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x22)
 #define	X86_SOCKET_STRX4	_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x23)
-#define	X86_NUM_SOCKETS_AMD	0x24
+#define	X86_SOCKET_SP5		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x24)
+#define	X86_SOCKET_AM5		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x25)
+#define	X86_SOCKET_FP7		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x26)
+#define	X86_SOCKET_FP7R2	_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x27)
+#define	X86_SOCKET_FF3		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x28)
+#define	X86_NUM_SOCKETS_AMD	0x28
 
 /*
  * Hygon socket types
@@ -1076,7 +1238,7 @@ extern "C" {
 #define	X86_SOCKET_SL1		_X86_SOCKET_MKVAL(X86_VENDOR_HYGON, 0x01)
 #define	X86_SOCKET_SL1R2	_X86_SOCKET_MKVAL(X86_VENDOR_HYGON, 0x02)
 #define	X86_SOCKET_DM1		_X86_SOCKET_MKVAL(X86_VENDOR_HYGON, 0x03)
-#define	X86_NUM_SOCKETS_HYGON	0x04
+#define	X86_NUM_SOCKETS_HYGON	0x03
 
 #define	X86_NUM_SOCKETS		(X86_NUM_SOCKETS_AMD + X86_NUM_SOCKETS_HYGON)
 
@@ -1298,10 +1460,11 @@ extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);
 
-extern uint32_t cpuid_getchiprev(struct cpu *);
+extern x86_chiprev_t cpuid_getchiprev(struct cpu *);
 extern const char *cpuid_getchiprevstr(struct cpu *);
 extern uint32_t cpuid_getsockettype(struct cpu *);
 extern const char *cpuid_getsocketstr(struct cpu *);
+extern x86_uarchrev_t cpuid_getuarchrev(struct cpu *);
 
 extern int cpuid_opteron_erratum(struct cpu *, uint_t);
 
@@ -1326,6 +1489,14 @@ extern int cpuid_iepb_supported(struct cpu *);
 extern int cpuid_deadline_tsc_supported(void);
 extern void vmware_port(int, uint32_t *);
 #endif
+
+extern x86_processor_family_t chiprev_family(const x86_chiprev_t);
+extern boolean_t chiprev_matches(const x86_chiprev_t, const x86_chiprev_t);
+extern boolean_t chiprev_at_least(const x86_chiprev_t, const x86_chiprev_t);
+
+extern x86_uarch_t uarchrev_uarch(const x86_uarchrev_t);
+extern boolean_t uarchrev_matches(const x86_uarchrev_t, const x86_uarchrev_t);
+extern boolean_t uarchrev_at_least(const x86_uarchrev_t, const x86_uarchrev_t);
 
 struct cpu_ucode_info;
 

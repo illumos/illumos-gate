@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Co.
  */
 
 #include <sys/types.h>
@@ -56,7 +57,8 @@
 #include "ao.h"
 #include "ao_mca_disp.h"
 
-#define	AO_F_REVS_FG (X86_CHIPREV_AMD_F_REV_F | X86_CHIPREV_AMD_F_REV_G)
+#define	AO_F_REVS_FG (X86_CHIPREV_AMD_LEGACY_F_REV_F | \
+	X86_CHIPREV_AMD_LEGACY_F_REV_G)
 
 int ao_mca_smi_disable = 1;		/* attempt to disable SMI polling */
 
@@ -202,7 +204,7 @@ ao_disp_match_one(const ao_error_disp_t *aed, uint64_t status, uint32_t rev,
 	 * This behaviour is fixed in revision F.
 	 */
 	if (bankno == AMD_MCA_BANK_NB &&
-	    !X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F) &&
+	    !chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_F) &&
 	    status & MSR_MC_STATUS_OVER) {
 		stat_mask &= ~AMD_BANK_STAT_CECC;
 		stat_mask_res &= ~AMD_BANK_STAT_CECC;
@@ -243,7 +245,7 @@ ao_ms_disp_match(cmi_hdl_t hdl, int ismc, int banknum, uint64_t status,
     uint64_t addr, uint64_t misc, void *mslogout)
 {
 	ao_ms_data_t *ao = cms_hdl_getcmsdata(hdl);
-	uint32_t rev = ao->ao_ms_shared->aos_chiprev;
+	x86_chiprev_t rev = ao->ao_ms_shared->aos_chiprev;
 	const ao_error_disp_t *aed;
 
 	for (aed = ao_error_disp[banknum]; aed->aed_stat_mask != 0; aed++) {
@@ -295,7 +297,7 @@ nb_mcamisc_init(cmi_hdl_t hdl, ao_ms_data_t *ao, uint32_t rev)
 {
 	uint64_t val, nval;
 
-	if (!X86_CHIPREV_MATCH(rev, AO_F_REVS_FG))
+	if (!chiprev_matches(rev, AO_F_REVS_FG))
 		return;
 
 	if (cmi_hdl_rdmsr(hdl, AMD_MSR_NB_MISC, &val) != CMI_SUCCESS)
@@ -453,7 +455,7 @@ ao_nb_cfg(ao_ms_data_t *ao, uint32_t rev)
 	val |= ao_nb_cfg_add_cmn;
 
 	while (nbcp->cfg_revmask != X86_CHIPREV_UNKNOWN) {
-		if (X86_CHIPREV_MATCH(rev, nbcp->cfg_revmask)) {
+		if (chiprev_matches(rev, nbcp->cfg_revmask)) {
 			val &= ~(*nbcp->cfg_remove_p);
 			val |= *nbcp->cfg_add_p;
 		}
@@ -474,7 +476,7 @@ ao_dram_cfg(ao_ms_data_t *ao, uint32_t rev)
 	ao->ao_ms_shared->aos_bcfg_dcfg_hi =
 	    ao_pcicfg_read(procnodeid, MC_FUNC_DRAMCTL, MC_DC_REG_DRAMCFGHI);
 #ifdef OPTERON_ERRATUM_172
-	if (X86_CHIPREV_MATCH(rev, AO_F_REVS_FG) &&
+	if (chiprev_matches(rev, AO_F_REVS_FG) &&
 	    MCREG_FIELD_F_revFG(&dcfglo, ParEn)) {
 		MCREG_FIELD_F_revFG(&dcfglo, ParEn) = 0;
 		ao_pcicfg_write(procnodeid, MC_FUNC_DRAMCTL,
@@ -796,7 +798,7 @@ ao_ms_bankctl_val(cmi_hdl_t hdl, int banknum, uint64_t def)
 	const struct ao_ctl_init *extrap;
 	const ao_bank_cfg_t *bankcfg;
 	uint64_t mcictl;
-	uint32_t rev = ao->ao_ms_shared->aos_chiprev;
+	x86_chiprev_t rev = ao->ao_ms_shared->aos_chiprev;
 
 	if (banknum >= sizeof (ao_bank_cfgs) / sizeof (ao_bank_cfgs[0]))
 		return (def);
@@ -807,7 +809,7 @@ ao_ms_bankctl_val(cmi_hdl_t hdl, int banknum, uint64_t def)
 	mcictl = bankcfg->bank_ctl_init_cmn;
 
 	while (extrap != NULL && extrap->ctl_revmask != X86_CHIPREV_UNKNOWN) {
-		if (X86_CHIPREV_MATCH(rev, extrap->ctl_revmask))
+		if (chiprev_matches(rev, extrap->ctl_revmask))
 			mcictl |= extrap->ctl_bits;
 		extrap++;
 	}
@@ -852,7 +854,7 @@ void
 ao_ms_mca_init(cmi_hdl_t hdl, int nbanks)
 {
 	ao_ms_data_t *ao = cms_hdl_getcmsdata(hdl);
-	uint32_t rev = ao->ao_ms_shared->aos_chiprev;
+	x86_chiprev_t rev = ao->ao_ms_shared->aos_chiprev;
 	ao_ms_mca_t *mca = &ao->ao_ms_mca;
 	uint64_t *maskp;
 	int i;
@@ -876,7 +878,7 @@ ao_ms_mca_init(cmi_hdl_t hdl, int nbanks)
 	if (ao_chip_once(ao, AO_CFGONCE_NBCFG) == B_TRUE) {
 		ao_nb_cfg(ao, rev);
 
-		if (X86_CHIPREV_MATCH(rev, AO_F_REVS_FG))
+		if (chiprev_matches(rev, AO_F_REVS_FG))
 			ao_sparectl_cfg(ao);
 	}
 

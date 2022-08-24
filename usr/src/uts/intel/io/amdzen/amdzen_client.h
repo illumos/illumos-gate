@@ -28,30 +28,6 @@ extern "C" {
 #endif
 
 /*
- * This enumeration is used to identify a given family of Zen era processors.
- * This is derived from a family/model/stepping range. In some cases such as
- * Dali, several different chips are covered that appear to be mostly the same
- * as far as we can tell for our purposes (e.g. Raven Ridge, Picasso, etc.).
- */
-typedef enum {
-	ZEN_FAMILY_UNKNOWN,
-	ZEN_FAMILY_NAPLES,
-	ZEN_FAMILY_DHYANA,
-	ZEN_FAMILY_DALI,
-	ZEN_FAMILY_ROME,
-	ZEN_FAMILY_RENOIR,
-	ZEN_FAMILY_MATISSE,
-	ZEN_FAMILY_VAN_GOGH,
-	ZEN_FAMILY_MENDOCINO,
-	ZEN_FAMILY_MILAN,
-	ZEN_FAMILY_GENOA,
-	ZEN_FAMILY_VERMEER,
-	ZEN_FAMILY_REMBRANDT,
-	ZEN_FAMILY_CEZANNE,
-	ZEN_FAMILY_RAPHAEL
-} zen_family_t;
-
-/*
  * This struct encodes enough information to later be used to compose and
  * decompose a fabric ID and component ID. A fabric ID is broken into its node
  * and component IDs and then a node ID is further decomposed into a socket and
@@ -68,7 +44,6 @@ typedef struct {
 	uint8_t		dfd_comp_shift;
 } df_fabric_decomp_t;
 
-extern zen_family_t amdzen_c_family(void);
 extern uint_t amdzen_c_df_count(void);
 extern df_rev_t amdzen_c_df_rev(void);
 extern int amdzen_c_df_fabric_decomp(df_fabric_decomp_t *);

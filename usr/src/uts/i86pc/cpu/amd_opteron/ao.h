@@ -126,7 +126,7 @@ typedef struct ao_ms_mca {
  * Per-chip shared state
  */
 struct ao_chipshared {
-	uint32_t aos_chiprev;
+	x86_chiprev_t aos_chiprev;
 	volatile ulong_t aos_cfgonce;	/* Config performed once per chip */
 	hrtime_t aos_nb_poll_timestamp;
 	cmi_hdl_t aos_nb_poll_owner;

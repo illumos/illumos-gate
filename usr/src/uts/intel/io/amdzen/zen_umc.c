@@ -1178,25 +1178,25 @@ static zen_umc_t *zen_umc;
  */
 static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 	{
-		.zufd_family = ZEN_FAMILY_NAPLES,
+		.zufd_family = X86_PF_AMD_NAPLES,
 		.zufd_dram_nrules = 16,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_DHYANA,
+		.zufd_family = X86_PF_HYGON_DHYANA,
 		.zufd_dram_nrules = 16,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_DALI,
+		.zufd_family = X86_PF_AMD_DALI,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR4_APU,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_ROME,
+		.zufd_family = X86_PF_AMD_ROME,
 		.zufd_flags = ZEN_UMC_FAM_F_NP2 | ZEN_UMC_FAM_F_NORM_HASH |
 		    ZEN_UMC_FAM_F_UMC_HASH,
 		.zufd_dram_nrules = 16,
@@ -1205,7 +1205,7 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
 		    UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_RENOIR,
+		.zufd_family = X86_PF_AMD_RENOIR,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
@@ -1213,7 +1213,7 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_PC |
 		    UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_MATISSE,
+		.zufd_family = X86_PF_AMD_MATISSE,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH | ZEN_UMC_FAM_F_UMC_HASH,
 		.zufd_dram_nrules = 16,
 		.zufd_cs_nrules = 2,
@@ -1221,21 +1221,21 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
 		    UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_VAN_GOGH,
+		.zufd_family = X86_PF_AMD_VAN_GOGH,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_MENDOCINO,
+		.zufd_family = X86_PF_AMD_MENDOCINO,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_MILAN,
+		.zufd_family = X86_PF_AMD_MILAN,
 		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP | ZEN_UMC_FAM_F_NP2 |
 		    ZEN_UMC_FAM_F_NORM_HASH | ZEN_UMC_FAM_F_UMC_HASH,
 		.zufd_dram_nrules = 16,
@@ -1244,7 +1244,7 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
 		    UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_GENOA,
+		.zufd_family = X86_PF_AMD_GENOA,
 		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP |
 		    ZEN_UMC_FAM_F_UMC_HASH | ZEN_UMC_FAM_F_UMC_EADDR |
 		    ZEN_UMC_FAM_F_CS_XOR,
@@ -1254,7 +1254,7 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
 		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_VERMEER,
+		.zufd_family = X86_PF_AMD_VERMEER,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH | ZEN_UMC_FAM_F_UMC_HASH,
 		.zufd_dram_nrules = 16,
 		.zufd_cs_nrules = 2,
@@ -1262,14 +1262,14 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
 		    UMC_CHAN_HASH_F_CS,
 	}, {
-		.zufd_family = ZEN_FAMILY_REMBRANDT,
+		.zufd_family = X86_PF_AMD_REMBRANDT,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_CEZANNE,
+		.zufd_family = X86_PF_AMD_CEZANNE,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
@@ -1277,7 +1277,7 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_PC |
 		    UMC_CHAN_HASH_F_CS
 	}, {
-		.zufd_family = ZEN_FAMILY_RAPHAEL,
+		.zufd_family = X86_PF_AMD_RAPHAEL,
 		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP | ZEN_UMC_FAM_F_CS_XOR,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
@@ -2998,7 +2998,7 @@ zen_umc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	umc = kmem_zalloc(sizeof (zen_umc_t), KM_SLEEP);
 	mutex_init(&umc->umc_nvl_lock, NULL, MUTEX_DRIVER, NULL);
-	umc->umc_family = amdzen_c_family();
+	umc->umc_family = chiprev_family(cpuid_getchiprev(CPU));
 	umc->umc_ndfs = amdzen_c_df_count();
 	umc->umc_dip = dip;
 

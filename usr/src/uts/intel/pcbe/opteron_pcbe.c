@@ -66,7 +66,7 @@
 /*
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -602,11 +602,11 @@ opt_pcbe_init(void)
 	 */
 
 	if (amd_family == 0xf) {
-		uint32_t rev;
+		x86_chiprev_t rev;
 
 		rev = cpuid_getchiprev(CPU);
 
-		if (X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F))
+		if (chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_F))
 			amd_pcbe_cpuref = amd_fam_f_NPT_bkdg;
 		else
 			amd_pcbe_cpuref = amd_fam_f_rev_ae_bkdg;

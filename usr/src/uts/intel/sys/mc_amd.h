@@ -21,6 +21,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2022 Oxide Computer Co.
+ */
 
 #ifndef _MC_AMD_H
 #define	_MC_AMD_H
@@ -242,15 +245,16 @@ enum mc_funcnum {
 
 #define	MC_REV_UNKNOWN	X86_CHIPREV_UNKNOWN
 
-#define	MC_F_REV_B	X86_CHIPREV_AMD_F_REV_B
-#define	MC_F_REV_C	(X86_CHIPREV_AMD_F_REV_C0 | X86_CHIPREV_AMD_F_REV_CG)
-#define	MC_F_REV_D	X86_CHIPREV_AMD_F_REV_D
-#define	MC_F_REV_E	X86_CHIPREV_AMD_F_REV_E
-#define	MC_F_REV_F	X86_CHIPREV_AMD_F_REV_F
-#define	MC_F_REV_G	X86_CHIPREV_AMD_F_REV_G
+#define	MC_F_REV_B	X86_CHIPREV_AMD_LEGACY_F_REV_B
+#define	MC_F_REV_C	(X86_CHIPREV_AMD_LEGACY_F_REV_C0 | \
+	X86_CHIPREV_AMD_LEGACY_F_REV_CG)
+#define	MC_F_REV_D	X86_CHIPREV_AMD_LEGACY_F_REV_D
+#define	MC_F_REV_E	X86_CHIPREV_AMD_LEGACY_F_REV_E
+#define	MC_F_REV_F	X86_CHIPREV_AMD_LEGACY_F_REV_F
+#define	MC_F_REV_G	X86_CHIPREV_AMD_LEGACY_F_REV_G
 
-#define	MC_10_REV_A	X86_CHIPREV_AMD_10_REV_A
-#define	MC_10_REV_B	X86_CHIPREV_AMD_10_REV_B
+#define	MC_10_REV_A	X86_CHIPREV_AMD_LEGACY_10_REV_A
+#define	MC_10_REV_B	X86_CHIPREV_AMD_LEGACY_10_REV_B
 
 /*
  * The most common groupings for memory controller features.
@@ -265,12 +269,12 @@ enum mc_funcnum {
 /*
  * Is 'rev' included in the 'revmask' bitmask?
  */
-#define	MC_REV_MATCH(rev, revmask)	X86_CHIPREV_MATCH(rev, revmask)
+#define	MC_REV_MATCH(rev, revmask)	chiprev_matches(rev, revmask)
 
 /*
  * Is 'rev' at least revision 'revmin' or greater
  */
-#define	MC_REV_ATLEAST(rev, minrev)	X86_CHIPREV_ATLEAST(rev, minrev)
+#define	MC_REV_ATLEAST(rev, minrev)	chiprev_at_least(rev, minrev)
 
 #define	_MCREG_FIELD(up, revsuffix, field) ((up)->_fmt_##revsuffix.field)
 

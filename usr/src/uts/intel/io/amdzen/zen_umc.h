@@ -28,6 +28,7 @@ extern "C" {
 #include <sys/stdint.h>
 #include <sys/sunddi.h>
 #include <sys/nvpair.h>
+#include <sys/x86_archext.h>
 #include <amdzen_client.h>
 
 /*
@@ -458,7 +459,7 @@ typedef enum zen_umc_fam_flags {
  * way it works, etc.
  */
 typedef struct zen_umc_fam_data {
-	zen_family_t		zufd_family;
+	x86_processor_family_t	zufd_family;
 	zen_umc_fam_flags_t	zufd_flags;
 	uint8_t			zufd_dram_nrules;
 	uint8_t			zufd_cs_nrules;
@@ -475,7 +476,7 @@ typedef struct zen_umc {
 	uint64_t umc_tom;
 	uint64_t umc_tom2;
 	dev_info_t *umc_dip;
-	zen_family_t umc_family;
+	x86_processor_family_t umc_family;
 	df_rev_t umc_df_rev;
 	const zen_umc_fam_data_t *umc_fdata;
 	df_fabric_decomp_t umc_decomp;

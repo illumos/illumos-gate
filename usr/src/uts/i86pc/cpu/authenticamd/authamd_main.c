@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Co.
  */
 
 /*
@@ -59,15 +60,15 @@ extern int x86gentopo_legacy; /* x86 generic topo support */
 int authamd_ms_support_disable = 0;
 
 #define	AUTHAMD_F_REVS_BCDE \
-	(X86_CHIPREV_AMD_F_REV_B | X86_CHIPREV_AMD_F_REV_C0 | \
-	X86_CHIPREV_AMD_F_REV_CG | X86_CHIPREV_AMD_F_REV_D | \
-	X86_CHIPREV_AMD_F_REV_E)
+	(X86_CHIPREV_AMD_LEGACY_F_REV_B | X86_CHIPREV_AMD_LEGACY_F_REV_C0 | \
+	X86_CHIPREV_AMD_LEGACY_F_REV_CG | X86_CHIPREV_AMD_LEGACY_F_REV_D | \
+	X86_CHIPREV_AMD_LEGACY_F_REV_E)
 
 #define	AUTHAMD_F_REVS_FG \
-	(X86_CHIPREV_AMD_F_REV_F | X86_CHIPREV_AMD_F_REV_G)
+	(X86_CHIPREV_AMD_LEGACY_F_REV_F | X86_CHIPREV_AMD_LEGACY_F_REV_G)
 
 #define	AUTHAMD_10_REVS_AB \
-	(X86_CHIPREV_AMD_10_REV_A | X86_CHIPREV_AMD_10_REV_B)
+	(X86_CHIPREV_AMD_LEGACY_10_REV_A | X86_CHIPREV_AMD_LEGACY_10_REV_B)
 
 /*
  * Bitmasks of support for various features.  Try to enable features
@@ -80,64 +81,64 @@ int authamd_ms_support_disable = 0;
  * Models that include an on-chip NorthBridge.
  */
 #define	AUTHAMD_NBONCHIP(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B) || \
-	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_B) || \
+	chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_A))
 
 /*
  * Families/revisions for which we can recognise main memory ECC errors.
  */
 #define	AUTHAMD_MEMECC_RECOGNISED(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B) || \
-	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_B) || \
+	chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_A))
 
 /*
  * Families/revisions that have an Online Spare Control Register
  */
 #define	AUTHAMD_HAS_ONLINESPARECTL(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F) || \
-	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_F) || \
+	chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_A))
 
 /*
  * Families/revisions for which we will perform NB MCA Config changes
  */
 #define	AUTHAMD_DO_NBMCACFG(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B) || \
-	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_B) || \
+	chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_A))
 
 /*
  * Families/revisions that have chip cache scrubbers.
  */
 #define	AUTHAMD_HAS_CHIPSCRUB(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B) || \
-	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_B) || \
+	chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_A))
 
 /*
  * Families/revisions that have a NB misc register or registers -
  * evaluates to 0 if no support, otherwise the number of MC4_MISCj.
  */
 #define	AUTHAMD_NBMISC_NUM(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F)? 1 : \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A) ? 3 : 0))
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_F)? 1 : \
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_A) ? 3 : 0))
 
 /*
  * Families/revision for which we wish not to machine check for GART
  * table walk errors - bit 10 of NB CTL.
  */
 #define	AUTHAMD_NOGARTTBLWLK_MC(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B) || \
-	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_F_REV_B) || \
+	chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_A))
 
 /*
  * Families/revisions that are potentially L3 capable
  */
 #define	AUTHAMD_L3CAPABLE(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_A))
 
 /*
  * Families/revisions that support x8 ChipKill ECC
  */
 #define	AUTHAMD_SUPPORTS_X8ECC(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_D0))
+	(chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_D0))
 
 /*
  * We recognise main memory ECC errors for AUTHAMD_MEMECC_RECOGNISED
@@ -290,7 +291,7 @@ authamd_read_ecccnt(authamd_data_t *authamd, struct authamd_logout *msl)
 	union mcreg_sparectl sparectl;
 	uint_t procnodeid = authamd->amd_shared->ans_procnodeid;
 	uint_t family = authamd->amd_shared->ans_family;
-	uint32_t rev = authamd->amd_shared->ans_rev;
+	x86_chiprev_t rev = authamd->amd_shared->ans_rev;
 	int chan, cs;
 
 	/*
@@ -382,7 +383,7 @@ authamd_clear_ecccnt(authamd_data_t *authamd, boolean_t clrint)
 	union mcreg_sparectl sparectl;
 	uint_t procnodeid = authamd->amd_shared->ans_procnodeid;
 	uint_t family = authamd->amd_shared->ans_family;
-	uint32_t rev = authamd->amd_shared->ans_rev;
+	x86_chiprev_t rev = authamd->amd_shared->ans_rev;
 	int chan, cs;
 
 	if (!AUTHAMD_HAS_ONLINESPARECTL(rev))
@@ -452,7 +453,7 @@ authamd_clear_ecccnt(authamd_data_t *authamd, boolean_t clrint)
 
 /*
  * Return
- * 	1: supported
+ *	1: supported
  *	0: unsupported
  */
 static int
@@ -484,7 +485,7 @@ authamd_init(cmi_hdl_t hdl, void **datap)
 	uint_t procnodeid = cmi_hdl_procnodeid(hdl);
 	struct authamd_nodeshared *sp, *osp;
 	uint_t family = cmi_hdl_family(hdl);
-	uint32_t rev = cmi_hdl_chiprev(hdl);
+	x86_chiprev_t rev = cmi_hdl_chiprev(hdl);
 	authamd_data_t *authamd;
 	uint64_t cap;
 
@@ -560,7 +561,7 @@ boolean_t
 authamd_bankctl_skipinit(cmi_hdl_t hdl, int bank)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
-	uint32_t rev = authamd->amd_shared->ans_rev;
+	x86_chiprev_t rev = authamd->amd_shared->ans_rev;
 
 	if (authamd->amd_shared->ans_family == AUTHAMD_FAMILY_6)
 		return (bank == 0 ?  B_TRUE : B_FALSE);
@@ -580,7 +581,7 @@ uint64_t
 authamd_bankctl_val(cmi_hdl_t hdl, int bank, uint64_t proposed)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
-	uint32_t rev = authamd->amd_shared->ans_rev;
+	x86_chiprev_t rev = authamd->amd_shared->ans_rev;
 	uint64_t val = proposed;
 
 	/*
@@ -677,7 +678,7 @@ void
 authamd_mca_init(cmi_hdl_t hdl, int nbanks)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
-	uint32_t rev = authamd->amd_shared->ans_rev;
+	x86_chiprev_t rev = authamd->amd_shared->ans_rev;
 	uint_t procnodeid = authamd->amd_shared->ans_procnodeid;
 
 	/*
@@ -705,12 +706,13 @@ authamd_mca_init(cmi_hdl_t hdl, int nbanks)
 			    (uint64_t *)&nbm) != CMI_SUCCESS)
 				continue;
 
-			if (X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F) &&
+			if (chiprev_at_least(rev,
+			    X86_CHIPREV_AMD_LEGACY_F_REV_F) &&
 			    MCMSR_FIELD_F_revFG(&nbm, mcmisc_Valid) &&
 			    MCMSR_FIELD_F_revFG(&nbm, mcmisc_CntP)) {
 				MCMSR_FIELD_F_revFG(&nbm, mcmisc_IntType) = 0;
-			} else if (X86_CHIPREV_ATLEAST(rev,
-			    X86_CHIPREV_AMD_10_REV_A) &&
+			} else if (chiprev_at_least(rev,
+			    X86_CHIPREV_AMD_LEGACY_10_REV_A) &&
 			    MCMSR_FIELD_10_revAB(&nbm, mcmisc_Valid) &&
 			    MCMSR_FIELD_10_revAB(&nbm, mcmisc_CntP)) {
 				MCMSR_FIELD_10_revAB(&nbm, mcmisc_IntType) = 0;
@@ -764,7 +766,7 @@ authamd_mca_init(cmi_hdl_t hdl, int nbanks)
 		 * Bit 0 of the NB MCA Config register is reserved on family
 		 * 0x10.
 		 */
-		if (X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+		if (chiprev_at_least(rev, X86_CHIPREV_AMD_LEGACY_10_REV_A))
 			authamd_nb_mcacfg_add &= ~AMD_NB_CFG_CPUECCERREN;
 
 		val &= ~authamd_nb_mcacfg_remove;
@@ -863,7 +865,7 @@ authamd_bank_logout(cmi_hdl_t hdl, int bank, uint64_t status,
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
 	struct authamd_logout *msl = mslogout;
-	uint32_t rev = authamd->amd_shared->ans_rev;
+	x86_chiprev_t rev = authamd->amd_shared->ans_rev;
 
 	if (msl == NULL)
 		return;
@@ -940,7 +942,7 @@ authamd_disp_match(cmi_hdl_t hdl, int ismc, int bank, uint64_t status,
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
 	/* uint16_t errcode = MCAX86_ERRCODE(status); */
 	uint16_t exterrcode = AMD_EXT_ERRCODE(status);
-	uint32_t rev = authamd->amd_shared->ans_rev;
+	x86_chiprev_t rev = authamd->amd_shared->ans_rev;
 
 	/*
 	 * Recognise main memory ECC errors

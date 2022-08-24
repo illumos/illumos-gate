@@ -93,9 +93,10 @@
  * namespaces that have these attributes.
  *
  * As of NVMe 1.1 namespaces can have an 64bit Extended Unique Identifier
- * (EUI64). This driver uses the EUI64 if present to generate the devid and
- * passes it to blkdev to use it in the device node names. As this is currently
- * untested namespaces with EUI64 are ignored by default.
+ * (EUI64), and NVMe 1.2 introduced an additional 128bit Namespace Globally
+ * Unique Identifier (NGUID). This driver uses either the NGUID or the EUI64
+ * if present to generate the devid, and passes the EUI64 to blkdev to use it
+ * in the device node names.
  *
  * We currently support only (2 << NVME_MINOR_INST_SHIFT) - 2 namespaces in a
  * single controller. This is an artificial limit imposed by the driver to be
@@ -136,9 +137,9 @@
  * Blkdev also supports querying device/media information and generating a
  * devid. The driver reports the best block size as determined by the namespace
  * format back to blkdev as physical block size to support partition and block
- * alignment. The devid is either based on the namespace EUI64, if present, or
- * composed using the device vendor ID, model number, serial number, and the
- * namespace ID.
+ * alignment. The devid is either based on the namespace GUID or EUI64, if
+ * present, or composed using the device vendor ID, model number, serial number,
+ * and the namespace ID.
  *
  *
  * Error Handling:
@@ -2996,10 +2997,16 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 	ns->ns_best_block_size = ns->ns_block_size;
 
 	/*
-	 * Get the EUI64 if present. Use it for devid and device node names.
+	 * Get the EUI64 if present.
 	 */
 	if (NVME_VERSION_ATLEAST(&nvme->n_version, 1, 1))
 		bcopy(idns->id_eui64, ns->ns_eui64, sizeof (ns->ns_eui64));
+
+	/*
+	 * Get the NGUID if present.
+	 */
+	if (NVME_VERSION_ATLEAST(&nvme->n_version, 1, 2))
+		bcopy(idns->id_nguid, ns->ns_nguid, sizeof (ns->ns_nguid));
 
 	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	if (*(uint64_t *)ns->ns_eui64 != 0) {
@@ -4647,12 +4654,15 @@ nvme_bd_devid(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
 		return (EIO);
 	}
 
-	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
-	if (*(uint64_t *)ns->ns_eui64 != 0) {
-		return (ddi_devid_init(devinfo, DEVID_SCSI3_WWN,
+	if (*(uint64_t *)ns->ns_nguid != 0 ||
+	    *(uint64_t *)(ns->ns_nguid + 8) != 0) {
+		return (ddi_devid_init(devinfo, DEVID_NVME_NGUID,
+		    sizeof (ns->ns_nguid), ns->ns_nguid, devid));
+	} else if (*(uint64_t *)ns->ns_eui64 != 0) {
+		return (ddi_devid_init(devinfo, DEVID_NVME_EUI64,
 		    sizeof (ns->ns_eui64), ns->ns_eui64, devid));
 	} else {
-		return (ddi_devid_init(devinfo, DEVID_ENCAP,
+		return (ddi_devid_init(devinfo, DEVID_NVME_NSID,
 		    strlen(ns->ns_devid), ns->ns_devid, devid));
 	}
 }

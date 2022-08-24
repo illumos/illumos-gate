@@ -158,7 +158,16 @@
  *
  * On the other hand, each major AMD architecture generally has its own family.
  * For example, the K8 is family 0x10, Bulldozer 0x15, and Zen 0x17. Within it
- * the model number is used to help identify specific processors.
+ * the model number is used to help identify specific processors.  As AMD's
+ * product lines have expanded, they have started putting a mixed bag of
+ * processors into the same family, with each processor under a single
+ * identifying banner (e.g., Milan, Cezanne) using a range of model numbers.  We
+ * refer to each such collection as a processor family, distinct from cpuid
+ * family.  Importantly, each processor family has a BIOS and Kernel Developer's
+ * Guide (BKDG, older parts) or Processor Programming Reference (PPR) that
+ * defines the processor family's non-architectural features.  In general, we'll
+ * use "family" here to mean the family number reported by the cpuid instruction
+ * and distinguish the processor family from it where appropriate.
  *
  * The stepping is used to refer to a revision of a specific microprocessor. The
  * term comes from equipment used to produce masks that are used to create
@@ -195,6 +204,30 @@
  * programmatic consumption. That is what the family, model, and stepping are
  * for.
  *
+ * We use the x86_chiprev_t to encode a combination of vendor, processor family,
+ * and stepping(s) that refer to a single or very closely related set of silicon
+ * implementations; while there are sometimes more specific ways to learn of the
+ * presence or absence of a particular erratum or workaround, one may generally
+ * assume that all processors of the same chiprev have the same errata and we
+ * have chosen to represent them this way precisely because that is how AMD
+ * groups them in their revision guides (errata documentation).  The processor
+ * family (x86_processor_family_t) may be extracted from the chiprev if that
+ * level of detail is not needed.  Processor families are considered unordered
+ * but revisions within a family may be compared for either an exact match or at
+ * least as recent as a reference revision.  See the chiprev_xxx() functions
+ * below.
+ *
+ * Similarly, each processor family implements a particular microarchitecture,
+ * which itself may have multiple revisions.  In general, non-architectural
+ * features are specific to a processor family, but some may exist across
+ * families containing cores that implement the same microarchitectural revision
+ * (and, such cores share common bugs, too).  We provide utility routines
+ * analogous to those for extracting and comparing chiprevs for
+ * microarchitectures as well; see the uarch_xxx() functions.
+ *
+ * Both chiprevs and uarchrevs are defined in x86_archext.h and both are at
+ * present used and available only for AMD and AMD-like processors.
+ *
  * ------------
  * CPUID Passes
  * ------------
@@ -227,7 +260,13 @@
  *			the cpuid instruction will report during subsequent
  *			passes if needed, and so that any intervening
  *			machine-dependent code that needs basic identity will
- *			have it available.
+ *			have it available.  This includes synthesised
+ *			identifiers such as chiprev and uarchrev as well as the
+ *			values obtained directly from cpuid.  Prior to executing
+ *			this pass, machine-depedent boot code is responsible for
+ *			ensuring that the PCI configuration space access
+ *			functions have been set up and, if necessary, that
+ *			determine_platform() has been called.
  *
  *	BASIC		This is the primary pass and is responsible for doing a
  *			large number of different things:
@@ -1781,9 +1820,10 @@ struct cpuid_info {
 	/*
 	 * Synthesized information, where known.
 	 */
-	uint32_t cpi_chiprev;		/* See X86_CHIPREV_* in x86_archext.h */
+	x86_chiprev_t cpi_chiprev;	/* See X86_CHIPREV_* in x86_archext.h */
 	const char *cpi_chiprevstr;	/* May be NULL if chiprev unknown */
 	uint32_t cpi_socket;		/* Chip package/socket type */
+	x86_uarchrev_t cpi_uarchrev;	/* Microarchitecture and revision */
 
 	struct mwait_info cpi_mwait;	/* fn 5: monitor/mwait info */
 	uint32_t cpi_apicid;
@@ -1917,8 +1957,9 @@ static struct cpuid_info cpuid_info0;
  */
 extern uint32_t _cpuid_skt(uint_t, uint_t, uint_t, uint_t);
 extern const char *_cpuid_sktstr(uint_t, uint_t, uint_t, uint_t);
-extern uint32_t _cpuid_chiprev(uint_t, uint_t, uint_t, uint_t);
+extern x86_chiprev_t _cpuid_chiprev(uint_t, uint_t, uint_t, uint_t);
 extern const char *_cpuid_chiprevstr(uint_t, uint_t, uint_t, uint_t);
+extern x86_uarchrev_t _cpuid_uarchrev(uint_t, uint_t, uint_t, uint_t);
 extern uint_t _cpuid_vendorstr_to_vendorcode(char *);
 
 /*
@@ -3422,7 +3463,9 @@ cpuid_pass_ident(cpu_t *cpu, void *arg __unused)
 	 * config space access has been set up; at present there is no reliable
 	 * way to determine the latter.
 	 */
+#if !defined(__xpv)
 	ASSERT3S(platform_type, !=, -1);
+#endif	/* !__xpv */
 
 	cpi = cpu->cpu_m.mcpu_cpi;
 	ASSERT(cpi != NULL);
@@ -3497,6 +3540,8 @@ cpuid_pass_ident(cpu_t *cpu, void *arg __unused)
 	cpi->cpi_chiprevstr = _cpuid_chiprevstr(cpi->cpi_vendor,
 	    cpi->cpi_family, cpi->cpi_model, cpi->cpi_step);
 	cpi->cpi_socket = _cpuid_skt(cpi->cpi_vendor, cpi->cpi_family,
+	    cpi->cpi_model, cpi->cpi_step);
+	cpi->cpi_uarchrev = _cpuid_uarchrev(cpi->cpi_vendor, cpi->cpi_family,
 	    cpi->cpi_model, cpi->cpi_step);
 }
 
@@ -5936,6 +5981,12 @@ cpuid_getsocketstr(cpu_t *cpu)
 	return (socketstr);
 }
 
+x86_uarchrev_t
+cpuid_getuarchrev(cpu_t *cpu)
+{
+	return (cpu->cpu_m.mcpu_cpi->cpi_uarchrev);
+}
+
 int
 cpuid_get_chipid(cpu_t *cpu)
 {
@@ -7863,4 +7914,78 @@ cpuid_execpass(cpu_t *cp, cpuid_pass_t pass, void *arg)
 
 	panic("unable to execute invalid cpuid pass %d on cpu%d\n",
 	    pass, cp->cpu_id);
+}
+
+/*
+ * Extract the processor family from a chiprev.  Processor families are not the
+ * same as cpuid families; see comments above and in x86_archext.h.
+ */
+x86_processor_family_t
+chiprev_family(const x86_chiprev_t cr)
+{
+	return ((x86_processor_family_t)_X86_CHIPREV_FAMILY(cr));
+}
+
+/*
+ * A chiprev matches its template if the vendor and family are identical and the
+ * revision of the chiprev matches one of the bits set in the template.  Callers
+ * may bitwise-OR together chiprevs of the same vendor and family to form the
+ * template, or use the _ANY variant.  It is not possible to match chiprevs of
+ * multiple vendors or processor families with a single call.  Note that this
+ * function operates on processor families, not cpuid families.
+ */
+boolean_t
+chiprev_matches(const x86_chiprev_t cr, const x86_chiprev_t template)
+{
+	return (_X86_CHIPREV_VENDOR(cr) == _X86_CHIPREV_VENDOR(template) &&
+	    _X86_CHIPREV_FAMILY(cr) == _X86_CHIPREV_FAMILY(template) &&
+	    (_X86_CHIPREV_REV(cr) & _X86_CHIPREV_REV(template)) != 0);
+}
+
+/*
+ * A chiprev is at least min if the vendor and family are identical and the
+ * revision of the chiprev is at least as recent as that of min.  Processor
+ * families are considered unordered and cannot be compared using this function.
+ * Note that this function operates on processor families, not cpuid families.
+ * Use of the _ANY chiprev variant with this function is not useful; it will
+ * always return B_FALSE if the _ANY variant is supplied as the minimum
+ * revision.  To determine only whether a chiprev is of a given processor
+ * family, test the return value of chiprev_family() instead.
+ */
+boolean_t
+chiprev_at_least(const x86_chiprev_t cr, const x86_chiprev_t min)
+{
+	return (_X86_CHIPREV_VENDOR(cr) == _X86_CHIPREV_VENDOR(min) &&
+	    _X86_CHIPREV_FAMILY(cr) == _X86_CHIPREV_FAMILY(min) &&
+	    _X86_CHIPREV_REV(cr) >= _X86_CHIPREV_REV(min));
+}
+
+/*
+ * The uarch functions operate in a manner similar to the chiprev functions
+ * above.  While it is tempting to allow these to operate on microarchitectures
+ * produced by a specific vendor in an ordered fashion (e.g., ZEN3 is "newer"
+ * than ZEN2), we elect not to do so because a manufacturer may supply
+ * processors of multiple different microarchitecture families each of which may
+ * be internally ordered but unordered with respect to those of other families.
+ */
+x86_uarch_t
+uarchrev_uarch(const x86_uarchrev_t ur)
+{
+	return ((x86_uarch_t)_X86_UARCHREV_UARCH(ur));
+}
+
+boolean_t
+uarchrev_matches(const x86_uarchrev_t ur, const x86_uarchrev_t template)
+{
+	return (_X86_UARCHREV_VENDOR(ur) == _X86_UARCHREV_VENDOR(template) &&
+	    _X86_UARCHREV_UARCH(ur) == _X86_UARCHREV_UARCH(template) &&
+	    (_X86_UARCHREV_REV(ur) & _X86_UARCHREV_REV(template)) != 0);
+}
+
+boolean_t
+uarchrev_at_least(const x86_uarchrev_t ur, const x86_uarchrev_t min)
+{
+	return (_X86_UARCHREV_VENDOR(ur) == _X86_UARCHREV_VENDOR(min) &&
+	    _X86_UARCHREV_UARCH(ur) == _X86_UARCHREV_UARCH(min) &&
+	    _X86_UARCHREV_REV(ur) >= _X86_UARCHREV_REV(min));
 }
