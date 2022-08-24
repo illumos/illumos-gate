@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -397,10 +398,14 @@ smb_domain_update(smb_domainex_t *dxi)
 		}
 	}
 
+	dxi->d_primary.di_type = SMB_DOMAIN_PRIMARY;
 	if (smb_dcache_add(&dxi->d_primary) == SMB_DOMAIN_SUCCESS) {
-		for (i = 0; i < dxi->d_trusted.td_num; i++)
-			(void) smb_dcache_add(&dxi->d_trusted.td_domains[i]);
-
+		for (i = 0, dcnode = dxi->d_trusted.td_domains;
+		    i < dxi->d_trusted.td_num;
+		    i++, dcnode++) {
+			dcnode->di_type = SMB_DOMAIN_TRUSTED;
+			(void) smb_dcache_add(dcnode);
+		}
 		smb_dcache_setdc(&dxi->d_dci);
 	}
 
@@ -747,6 +752,8 @@ static uint32_t
 smb_dcache_add(smb_domain_t *di)
 {
 	smb_domain_t *dcnode;
+
+	assert(di->di_type != 0);
 
 	if ((dcnode = malloc(sizeof (smb_domain_t))) == NULL)
 		return (SMB_DOMAIN_NO_MEMORY);
