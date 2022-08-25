@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -244,5 +245,10 @@ out:
 void
 notify_dc_changed(void)
 {
-	smb_notify_dc_changed();
+	int rc;
+	rc = smb_notify_dc_changed();
+	if (rc != 0) {
+		idmapdlog(LOG_WARNING,
+		    "Warning: smb_notify_dc_changed, rc=%d", rc);
+	}
 }

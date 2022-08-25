@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <sys/list.h>
@@ -33,12 +34,14 @@
 #include <stdio.h>
 #include <synch.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <pthread.h>
-#include <strings.h>
-#include <note.h>
+#include <priv.h>
+#include <rpcsvc/daemon_utils.h> /* DAEMON_UID */
+
 #include <smbsrv/smb_door.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_token.h>
@@ -81,31 +84,39 @@ typedef int (*smbd_dop_t)(smbd_arg_t *);
 
 typedef struct smbd_doorop {
 	smb_dopcode_t	opcode;
+	int		opflags;
 	smbd_dop_t	op;
 } smbd_doorop_t;
 
+/* doorop opflags */
+#define	DOF_R	1	/* read */
+#define	DOF_W	2	/* write */
+#define	DOF_K	4	/* kernel caller */
+#define	DOF_D	8	/* daemon caller */
+
 smbd_doorop_t smbd_doorops[] = {
-	{ SMB_DR_NULL,			smbd_dop_null },
-	{ SMB_DR_ASYNC_RESPONSE,	smbd_dop_async_response },
-	{ SMB_DR_USER_AUTH_LOGON,	smbd_dop_user_auth_logon },
-	{ SMB_DR_USER_NONAUTH_LOGON,	smbd_dop_user_nonauth_logon },
-	{ SMB_DR_USER_AUTH_LOGOFF,	smbd_dop_user_auth_logoff },
-	{ SMB_DR_LOOKUP_SID,		smbd_dop_lookup_sid },
-	{ SMB_DR_LOOKUP_NAME,		smbd_dop_lookup_name },
-	{ SMB_DR_JOIN,			smbd_dop_join },
-	{ SMB_DR_GET_DCINFO,		smbd_dop_get_dcinfo },
-	{ SMB_DR_VSS_GET_COUNT,		smbd_dop_vss_get_count },
-	{ SMB_DR_VSS_GET_SNAPSHOTS,	smbd_dop_vss_get_snapshots },
-	{ SMB_DR_VSS_MAP_GMTTOKEN,	smbd_dop_vss_map_gmttoken },
-	{ SMB_DR_ADS_FIND_HOST,		smbd_dop_ads_find_host },
-	{ SMB_DR_QUOTA_QUERY,		smbd_dop_quota_query },
-	{ SMB_DR_QUOTA_SET,		smbd_dop_quota_set },
-	{ SMB_DR_DFS_GET_REFERRALS,	smbd_dop_dfs_get_referrals },
-	{ SMB_DR_SHR_HOSTACCESS,	smbd_dop_shr_hostaccess },
-	{ SMB_DR_SHR_EXEC,		smbd_dop_shr_exec },
-	{ SMB_DR_NOTIFY_DC_CHANGED,	smbd_dop_notify_dc_changed },
-	{ SMB_DR_LOOKUP_LSID,		smbd_dop_lookup_sid },
-	{ SMB_DR_LOOKUP_LNAME,		smbd_dop_lookup_name }
+	{ SMB_DR_NULL,			DOF_R,	smbd_dop_null },
+	{ SMB_DR_ASYNC_RESPONSE,	DOF_K,	smbd_dop_async_response },
+	{ SMB_DR_USER_AUTH_LOGON,	DOF_W,	smbd_dop_user_auth_logon },
+	{ SMB_DR_USER_NONAUTH_LOGON,	DOF_W,	smbd_dop_user_nonauth_logon },
+	{ SMB_DR_USER_AUTH_LOGOFF,	DOF_K,	smbd_dop_user_auth_logoff },
+	{ SMB_DR_LOOKUP_SID,		DOF_R,	smbd_dop_lookup_sid },
+	{ SMB_DR_LOOKUP_NAME,		DOF_R,	smbd_dop_lookup_name },
+	{ SMB_DR_JOIN,			DOF_W,	smbd_dop_join },
+	{ SMB_DR_GET_DCINFO,		DOF_R,	smbd_dop_get_dcinfo },
+	{ SMB_DR_VSS_GET_COUNT,		DOF_K,	smbd_dop_vss_get_count },
+	{ SMB_DR_VSS_GET_SNAPSHOTS,	DOF_K,	smbd_dop_vss_get_snapshots },
+	{ SMB_DR_VSS_MAP_GMTTOKEN,	DOF_K,	smbd_dop_vss_map_gmttoken },
+	{ SMB_DR_ADS_FIND_HOST,		DOF_R,	smbd_dop_ads_find_host },
+	{ SMB_DR_QUOTA_QUERY,		DOF_K,	smbd_dop_quota_query },
+	{ SMB_DR_QUOTA_SET,		DOF_K,	smbd_dop_quota_set },
+	{ SMB_DR_DFS_GET_REFERRALS,	DOF_K,	smbd_dop_dfs_get_referrals },
+	{ SMB_DR_SHR_HOSTACCESS,	DOF_K,	smbd_dop_shr_hostaccess },
+	{ SMB_DR_SHR_EXEC,		DOF_K,	smbd_dop_shr_exec },
+	{ SMB_DR_NOTIFY_DC_CHANGED,	DOF_W|DOF_D,
+						smbd_dop_notify_dc_changed },
+	{ SMB_DR_LOOKUP_LSID,		DOF_R,	smbd_dop_lookup_sid },
+	{ SMB_DR_LOOKUP_LNAME,		DOF_R,	smbd_dop_lookup_name }
 };
 
 static int smbd_ndoorop = (sizeof (smbd_doorops) / sizeof (smbd_doorops[0]));
@@ -204,6 +215,87 @@ smbd_door_stop(void)
 	(void) mutex_unlock(&smbd_doorsvc.sd_mutex);
 }
 
+static boolean_t
+have_req_privs(uint32_t opcode, int opflags)
+{
+	ucred_t *uc = NULL;
+	const priv_set_t *ps = NULL;
+	boolean_t ret = B_FALSE;
+	pid_t pid;
+	uid_t uid;
+
+	/* If only DOF_R (read), let 'em through */
+	if ((opflags & ~DOF_R) == 0)
+		return (B_TRUE);
+
+	if (door_ucred(&uc) != 0) {
+		syslog(LOG_DEBUG, "%s: door_ucred failed", __func__);
+		goto out;
+	}
+
+	/*
+	 * in-kernel callers have pid==0
+	 * If we have pid zero, that's sufficient.
+	 * If not, allow with sys_smb priv (below)
+	 */
+	pid = ucred_getpid(uc);
+	if ((opflags & DOF_K) != 0) {
+		if (pid == 0) {
+			ret = B_TRUE;
+			goto out;
+		}
+	}
+	uid = ucred_geteuid(uc);
+	if ((opflags & DOF_D) != 0) {
+		if (uid == DAEMON_UID) {
+			ret = B_TRUE;
+			goto out;
+		}
+	}
+
+	ps = ucred_getprivset(uc, PRIV_EFFECTIVE);
+	if (ps == NULL) {
+		syslog(LOG_DEBUG, "%s: ucred_getprivset failed", __func__);
+		goto out;
+	}
+
+	if ((opflags & (DOF_W | DOF_K)) != 0) {
+		/*
+		 * Modifying operation.  Require sys_smb priv.
+		 */
+		if (priv_ismember(ps, PRIV_SYS_SMB)) {
+			ret = B_TRUE;
+			goto out;
+		}
+	}
+
+	syslog(LOG_DEBUG, "smbd_door_dispatch: missing privilege, "
+	    "OpCode = %d PID = %d UID = %d",
+	    (int)opcode, (int)pid, (int)uid);
+
+out:
+	/* ps is free'd with the ucred */
+	if (uc != NULL)
+		ucred_free(uc);
+
+	return (ret);
+}
+
+static smbd_doorop_t *
+smbd_door_get_opvec(smb_dopcode_t opcode)
+{
+	smbd_doorop_t	*doorop;
+	int i;
+
+	for (i = 0, doorop = smbd_doorops;
+	    i < smbd_ndoorop;
+	    i++, doorop++) {
+		if (doorop->opcode == opcode)
+			return (doorop);
+	}
+	return (NULL);
+}
+
 /*ARGSUSED*/
 static void
 smbd_door_dispatch(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
@@ -213,6 +305,8 @@ smbd_door_dispatch(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	smb_doorhdr_t	*hdr;
 	size_t		hdr_size;
 	char		*rbuf = NULL;
+	smbd_doorop_t	*doorop;
+	int		opflags;
 
 	smbd_door_enter(&smbd_door_sdh);
 
@@ -238,9 +332,28 @@ smbd_door_dispatch(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 		smbd_door_return(&smbd_door_sdh, NULL, 0, NULL, 0);
 	}
 
+	if ((doorop = smbd_door_get_opvec(hdr->dh_op)) == NULL) {
+		/* invalid door op code */
+		syslog(LOG_DEBUG, "smbd_door_dispatch: invalid op %u",
+		    hdr->dh_op);
+		smbd_door_return(&smbd_door_sdh, NULL, 0, NULL, 0);
+	}
+
 	dop_arg.opname = smb_doorhdr_opname(hdr->dh_op);
 	dop_arg.data = argp + hdr_size;
 	dop_arg.datalen = hdr->dh_datalen;
+
+	/*
+	 * Opflags tell us the privileges requried for this op.
+	 * Override them for async operations, which are only
+	 * requested by the in-kernel door client.
+	 */
+	opflags = doorop->opflags;
+	if ((hdr->dh_flags & SMB_DF_ASYNC) != 0)
+		opflags |= DOF_K;
+	if (!have_req_privs(hdr->dh_op, opflags)) {
+		smbd_door_return(&smbd_door_sdh, NULL, 0, NULL, 0);
+	}
 
 	if (hdr->dh_op == SMB_DR_ASYNC_RESPONSE) {
 		/*
@@ -376,7 +489,6 @@ smbd_door_dispatch_op(void *thread_arg)
 	smbd_arg_t	*arg = (smbd_arg_t *)thread_arg;
 	smbd_doorop_t	*doorop;
 	smb_doorhdr_t	*hdr;
-	int		i;
 
 	if ((!smbd_online()) || arg == NULL)
 		return (NULL);
@@ -384,36 +496,30 @@ smbd_door_dispatch_op(void *thread_arg)
 	hdr = &arg->hdr;
 	arg->opname = smb_doorhdr_opname(hdr->dh_op);
 
-	for (i = 0; i < smbd_ndoorop; ++i) {
-		doorop = &smbd_doorops[i];
+	doorop = smbd_door_get_opvec(hdr->dh_op);
+	if (doorop == NULL)
+		return (NULL);
 
-		if (hdr->dh_op == doorop->opcode) {
-			hdr->dh_door_rc = doorop->op(arg);
-			hdr->dh_status = arg->status;
+	hdr->dh_door_rc = doorop->op(arg);
+	hdr->dh_status = arg->status;
 
-			if ((hdr->dh_flags & SMB_DF_SYSSPACE) &&
-			    (hdr->dh_flags & SMB_DF_ASYNC)) {
-				assert(hdr->dh_op != SMB_DR_ASYNC_RESPONSE);
+	if ((hdr->dh_flags & SMB_DF_SYSSPACE) &&
+	    (hdr->dh_flags & SMB_DF_ASYNC)) {
+		assert(hdr->dh_op != SMB_DR_ASYNC_RESPONSE);
 
-				(void) mutex_lock(&smbd_doorsvc.sd_mutex);
-				if (arg->response_abort) {
-					free(arg->rbuf);
-					arg->rbuf = NULL;
-					smbd_door_release_async(arg);
-				} else {
-					arg->response_ready = B_TRUE;
-				}
-				(void) mutex_unlock(&smbd_doorsvc.sd_mutex);
-
-				(void) smb_kmod_event_notify(hdr->dh_txid);
-			}
-
-			return (NULL);
+		(void) mutex_lock(&smbd_doorsvc.sd_mutex);
+		if (arg->response_abort) {
+			free(arg->rbuf);
+			arg->rbuf = NULL;
+			smbd_door_release_async(arg);
+		} else {
+			arg->response_ready = B_TRUE;
 		}
+		(void) mutex_unlock(&smbd_doorsvc.sd_mutex);
+
+		(void) smb_kmod_event_notify(hdr->dh_txid);
 	}
 
-	syslog(LOG_ERR, "smbd_door_dispatch_op[%s]: invalid op %u",
-	    arg->opname, hdr->dh_op);
 	return (NULL);
 }
 
@@ -575,9 +681,8 @@ smbd_dop_user_auth_logoff(smbd_arg_t *arg)
  * Obtains an access token on successful user authentication.
  */
 static int
-smbd_dop_user_auth_logon(smbd_arg_t *arg)
+smbd_dop_user_auth_logon(smbd_arg_t *arg __unused)
 {
-	_NOTE(ARGUNUSED(arg))
 
 	/* No longer used */
 	return (SMB_DOP_EMPTYBUF);
