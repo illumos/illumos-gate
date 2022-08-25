@@ -2502,7 +2502,7 @@ f usr/bin/amd64/gcore 0555 root bin
 f usr/bin/amd64/ksh93 0555 root bin
 h usr/bin/amd64/ksh=usr/bin/amd64/ksh93
 s usr/bin/amd64/ld=../ld
-f usr/bin/amd64/ldd 0555 root bin
+s usr/bin/amd64/ldd=../ldd
 f usr/bin/amd64/ls 0555 root bin
 f usr/bin/amd64/mac 0555 root bin
 f usr/bin/amd64/mcs 0555 root bin

@@ -163,16 +163,6 @@ main(int argc, char **argv, char **envp)
 	Aliste	idx;
 
 	/*
-	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of
-	 * the binary.  If successful, conv_check_native() won't return.
-	 *
-	 * This is done to ensure that ldd can handle objects >2GB.
-	 * ldd uses libelf, which is not large file capable. The
-	 * 64-bit ldd can handle any sized object.
-	 */
-	(void) conv_check_native(argv, envp);
-
-	/*
 	 * Establish locale.
 	 */
 	(void) setlocale(LC_MESSAGES, MSG_ORIG(MSG_STR_EMPTY));
