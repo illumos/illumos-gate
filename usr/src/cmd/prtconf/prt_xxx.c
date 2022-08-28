@@ -380,7 +380,7 @@ match_priv_data(di_node_t node)
 			/*
 			 * skip a white space
 			 */
-			if (tmp = strchr(tmp, ' '))
+			if ((tmp = strchr(tmp, ' ')) != NULL)
 				tmp++;
 		}
 	}

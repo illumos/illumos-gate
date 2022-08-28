@@ -55,7 +55,7 @@ setpname(const char *name)
 
 	if (name == NULL)
 		opts.o_progname = "prtconf";
-	else if (p = strrchr(name, '/'))
+	else if ((p = strrchr(name, '/')) != NULL)
 		opts.o_progname = (const char *) p + 1;
 	else
 		opts.o_progname = name;
@@ -197,7 +197,7 @@ main(int argc, char *argv[])
 			return (1);
 		}
 
-		if (error = stat(path, &sinfo)) {
+		if ((error = stat(path, &sinfo)) != 0) {
 
 			/* an invalid path was specified */
 			(void) fprintf(stderr, "%s: invalid path specified\n",

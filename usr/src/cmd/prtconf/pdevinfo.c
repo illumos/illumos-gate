@@ -27,6 +27,7 @@
  */
 /*
  * Copyright (c) 2019 Peter Tribble.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -50,7 +51,8 @@
 #include <sys/stat.h>
 #include <zone.h>
 #include <libnvpair.h>
-#include <pcidb.h>
+#include <err.h>
+#include <upanic.h>
 #include "prtconf.h"
 
 
@@ -143,7 +145,6 @@ static void walk_driver(di_node_t, di_arg_t *);
 static int dump_devs(di_node_t, void *);
 static int dump_prop_list(const dumpops_t *, const char *,
 				int, void *, dev_t, int *);
-static int _error(const char *, ...);
 static int is_openprom();
 static void walk(uchar_t *, uint_t, int);
 static void dump_node(nvlist_t *, int);
@@ -191,15 +192,15 @@ prtconf_devinfo(void)
 	if (opts.o_pciid) {
 		flag |= DINFOPROP;
 		if ((prom_hdl = di_prom_init()) == DI_PROM_HANDLE_NIL)
-			exit(_error("di_prom_init() failed."));
+			err(-1, "di_prom_init() failed.");
 	}
 
 	if (opts.o_forcecache) {
 		if (dbg.d_forceload) {
-			exit(_error(NULL, "option combination not supported"));
+			warnx("option combination not supported");
 		}
 		if (strcmp(rootpath, "/") != 0) {
-			exit(_error(NULL, "invalid root path for option"));
+			errx(-1, "invalid root path for option");
 		}
 		flag = DINFOCACHE;
 	} else if (opts.o_verbose) {
@@ -217,12 +218,12 @@ prtconf_devinfo(void)
 
 		/* get devlink (aka aliases) data */
 		if ((devlink_hdl = di_devlink_init(NULL, 0)) == NULL)
-			exit(_error("di_devlink_init() failed."));
+			err(-1, "di_devlink_init() failed.");
 	} else
 		root_node = di_init(rootpath, flag);
 
 	if (root_node == DI_NODE_NIL) {
-		(void) _error(NULL, "devinfo facility not available");
+		warnx("devinfo facility not available");
 		/* not an error if this isn't the global zone */
 		if (getzoneid() == GLOBAL_ZONEID)
 			exit(-1);
@@ -233,8 +234,8 @@ prtconf_devinfo(void)
 	if (opts.o_verbose || opts.o_pciid) {
 		pcidb_hdl = pcidb_open(PCIDB_VERSION);
 		if (pcidb_hdl == NULL)
-			(void) _error(NULL, "pcidb facility not available, "
-			    "continuing anyways");
+			warnx("pcidb facility not available, continuing "
+			    "anyways");
 	}
 
 	di_arg.prom_hdl = prom_hdl;
@@ -275,7 +276,7 @@ prtconf_devinfo(void)
 			 * them as well
 			 */
 			node = target_node;
-			while (node = di_parent_node(node))
+			while ((node = di_parent_node(node)) != DI_NODE_NIL)
 				node_display_private_set(node);
 		} else {
 			/*
@@ -289,7 +290,7 @@ prtconf_devinfo(void)
 			 * target node starts with an indentation of zero.
 			 */
 			node = target_node;
-			while (node = di_parent_node(node))
+			while ((node = di_parent_node(node)) != DI_NODE_NIL)
 				opts.o_target++;
 		}
 
@@ -327,7 +328,7 @@ i_find_target_node(di_node_t node, void *arg)
 		char *path;
 
 		if ((path = di_devfs_path(node)) == NULL)
-			exit(_error("failed to allocate memory"));
+			err(-1, "failed to allocate memory");
 
 		if (strcmp(opts.o_devices_path, path) == 0) {
 			di_devfs_path_free(path);
@@ -347,7 +348,8 @@ i_find_target_node(di_node_t node, void *arg)
 		}
 	} else {
 		/* we should never get here */
-		exit(_error(NULL, "internal error"));
+		const char *msg = "internal error";
+		upanic(msg, strlen(msg));
 	}
 	return (DI_WALK_CONTINUE);
 }
@@ -557,7 +559,7 @@ dump_prop_list(const dumpops_t *dumpops, const char *name, int ilev,
 	di_minor_t	minor;
 	char		*p;
 	int		i, prop_type, nitems;
-	dev_t		pdev;
+	dev_t		pdev = DDI_DEV_T_NONE;
 	int		nprop = 0;
 
 	if (compat_printed)
@@ -838,40 +840,6 @@ dump_devs(di_node_t node, void *arg)
 	return (DI_WALK_CONTINUE);
 }
 
-/* _error([no_perror, ] fmt [, arg ...]) */
-static int
-_error(const char *opt_noperror, ...)
-{
-	int saved_errno;
-	va_list ap;
-	int no_perror = 0;
-	const char *fmt;
-
-	saved_errno = errno;
-
-	(void) fprintf(stderr, "%s: ", opts.o_progname);
-
-	va_start(ap, opt_noperror);
-	if (opt_noperror == NULL) {
-		no_perror = 1;
-		fmt = va_arg(ap, char *);
-	} else
-		fmt = opt_noperror;
-	(void) vfprintf(stderr, fmt, ap);
-	va_end(ap);
-
-	if (no_perror)
-		(void) fprintf(stderr, "\n");
-	else {
-		(void) fprintf(stderr, ": ");
-		errno = saved_errno;
-		perror("");
-	}
-
-	return (-1);
-}
-
-
 /*
  * The rest of the routines handle printing the raw prom devinfo (-p option).
  *
@@ -901,7 +869,7 @@ is_openprom(void)
 
 	opp->oprom_size = MAXVALSIZE;
 	if (ioctl(prom_fd, OPROMGETCONS, opp) < 0)
-		exit(_error("OPROMGETCONS"));
+		err(-1, "OPROMGETCONS");
 
 	i = (unsigned int)((unsigned char)opp->oprom_array[0]);
 	return ((i & OPROMCONS_OPENPROM) == OPROMCONS_OPENPROM);
@@ -913,7 +881,7 @@ do_prominfo(void)
 	uint_t arg = opts.o_verbose;
 
 	if (promopen(O_RDONLY))  {
-		exit(_error("openeepr device open failed"));
+		err(-1, "openeepr device open failed");
 	}
 
 	if (is_openprom() == 0)  {
@@ -924,19 +892,19 @@ do_prominfo(void)
 
 	/* OPROMSNAPSHOT returns size in arg */
 	if (ioctl(prom_fd, OPROMSNAPSHOT, &arg) < 0)
-		exit(_error("OPROMSNAPSHOT"));
+		err(-1, "OPROMSNAPSHOT");
 
 	if (arg == 0)
 		return (1);
 
 	if ((prom_snapshot = malloc(arg)) == NULL)
-		exit(_error("failed to allocate memory"));
+		err(-1, "failed to allocate memory");
 
 	/* copy out the snapshot for printing */
 	/*LINTED*/
 	*(uint_t *)prom_snapshot = arg;
 	if (ioctl(prom_fd, OPROMCOPYOUT, prom_snapshot) < 0)
-		exit(_error("OPROMCOPYOUT"));
+		err(-1, "OPROMCOPYOUT");
 
 	promclose();
 
@@ -958,7 +926,7 @@ walk(uchar_t *buf, uint_t size, int level)
 
 	/* Expand to an nvlist */
 	if (nvlist_unpack((char *)buf, size, &nvl, 0))
-		exit(_error("error processing snapshot"));
+		err(-1, "error processing snapshot");
 
 	/* print current node */
 	dump_node(nvl, level);
@@ -969,9 +937,9 @@ walk(uchar_t *buf, uint_t size, int level)
 		return;		/* no child exists */
 
 	if (error || nvlist_unpack((char *)cbuf, csize, &cnvl, 0))
-		exit(_error("error processing snapshot"));
+		err(-1, "error processing snapshot");
 
-	while (child = nvlist_next_nvpair(cnvl, child)) {
+	while ((child = nvlist_next_nvpair(cnvl, child)) != NULL) {
 		char *name = nvpair_name(child);
 		data_type_t type = nvpair_type(child);
 		uchar_t *nodebuf;
@@ -1017,7 +985,7 @@ dump_node(nvlist_t *nvl, int level)
 	(void) nvlist_lookup_int32(nvl, "@nodeid", &id);
 	(void) printf(" %#08x\n", id);
 
-	while (nvp = nvlist_next_nvpair(nvl, nvp)) {
+	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
 		name = nvpair_name(nvp);
 		if (name[0] == '@')
 			continue;
@@ -1039,8 +1007,10 @@ path_state_name(di_path_state_t st)
 			return ("offline");
 		case DI_PATH_STATE_FAULT:
 			return ("faulted");
+		case DI_PATH_STATE_UNKNOWN:
+		default:
+			return ("unknown");
 	}
-	return ("unknown");
 }
 
 /*
@@ -1119,7 +1089,7 @@ dump_minor_data_paths(int ilev, di_minor_t minor,
 
 	/* get the path to the device and the minor node name */
 	if ((path = di_devfs_minor_path(minor)) == NULL)
-		exit(_error("failed to allocate memory"));
+		err(-1, "failed to allocate memory");
 
 	/* display the path to this minor node */
 	indent_to_level(ilev);
@@ -1282,7 +1252,7 @@ link_lnode_disp(di_link_t link, uint_t endpoint, int ilev,
 		    (uint_t)major(devt), (uint_t)minor(devt));
 
 		/* display paths to the src devt minor node */
-		while (minor = di_minor_next(node, minor)) {
+		while ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
 			if (devt != di_minor_devt(minor))
 				continue;
 
@@ -1306,7 +1276,7 @@ link_lnode_disp(di_link_t link, uint_t endpoint, int ilev,
 	 */
 	node = di_lnode_devinfo(lnode);
 	if ((path = di_devfs_path(node)) == NULL)
-		exit(_error("failed to allocate memory"));
+		err(-1, "failed to allocate memory");
 
 	indent_to_level(ilev + 1);
 	(void) printf("dev_path=%s\n", path);
@@ -1321,7 +1291,8 @@ dump_minor_link_data(int ilev, di_node_t node, dev_t devt,
 	di_link_t	link;
 
 	link = DI_LINK_NIL;
-	while (link = di_link_next_by_node(node, link, DI_LINK_TGT)) {
+	while ((link = di_link_next_by_node(node, link, DI_LINK_TGT)) !=
+	    DI_LINK_NIL) {
 		di_lnode_t	tgt_lnode;
 		dev_t		tgt_devt = DDI_DEV_T_NONE;
 
@@ -1345,7 +1316,8 @@ dump_minor_link_data(int ilev, di_node_t node, dev_t devt,
 	}
 
 	link = DI_LINK_NIL;
-	while (link = di_link_next_by_node(node, link, DI_LINK_SRC)) {
+	while ((link = di_link_next_by_node(node, link, DI_LINK_SRC)) !=
+	    DI_LINK_NIL) {
 		di_lnode_t	src_lnode;
 		dev_t		src_devt = DDI_DEV_T_NONE;
 
@@ -1382,10 +1354,10 @@ dump_minor_data(int ilev, di_node_t node, di_devlink_handle_t devlink_hdl)
 	 * node as undisplayed
 	 */
 	lnode = DI_LNODE_NIL;
-	while (lnode = di_lnode_next(node, lnode))
+	while ((lnode = di_lnode_next(node, lnode)) != DI_LNODE_NIL)
 		lnode_displayed_clear(lnode);
 	minor = DI_MINOR_NIL;
-	while (minor = di_minor_next(node, minor)) {
+	while ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
 		minor_displayed_clear(minor);
 	}
 
@@ -1456,7 +1428,8 @@ dump_minor_data(int ilev, di_node_t node, di_devlink_handle_t devlink_hdl)
 	 * minor node does not exist for the opened devt
 	 */
 	link = DI_LINK_NIL;
-	while (link = di_link_next_by_node(node, link, DI_LINK_TGT)) {
+	while ((link = di_link_next_by_node(node, link, DI_LINK_TGT)) !=
+	    DI_LINK_NIL) {
 		dev_t		devt;
 
 		lnode = di_link_to_lnode(link, DI_LINK_TGT);
@@ -1495,7 +1468,8 @@ dump_link_data(int ilev, di_node_t node, di_devlink_handle_t devlink_hdl)
 	di_link_t	link;
 
 	link = DI_LINK_NIL;
-	while (link = di_link_next_by_node(node, link, DI_LINK_SRC)) {
+	while ((link = di_link_next_by_node(node, link, DI_LINK_SRC)) !=
+	    DI_LINK_NIL) {
 		di_lnode_t	src_lnode;
 		dev_t		src_devt = DDI_DEV_T_NONE;
 
@@ -1679,11 +1653,10 @@ promopen(int oflag)
 			if (errno == ENXIO)
 				return (-1);
 			if (getzoneid() == GLOBAL_ZONEID) {
-				_exit(_error("cannot open %s",
-				    opts.o_promdev));
+				err(-1, "cannot open %s", opts.o_promdev);
 			}
 			/* not an error if this isn't the global zone */
-			(void) _error(NULL, "openprom facility not available");
+			warnx("openprom facility not available");
 			exit(0);
 		} else
 			return (0);
@@ -1694,7 +1667,7 @@ static void
 promclose(void)
 {
 	if (close(prom_fd) < 0)
-		exit(_error("close error on %s", opts.o_promdev));
+		err(-1, "close error on %s", opts.o_promdev);
 }
 
 /*
@@ -1739,7 +1712,7 @@ do_promversion(void)
 
 	opp->oprom_size = MAXVALSIZE;
 	if (ioctl(prom_fd, OPROMGETVERSION, opp) < 0)
-		exit(_error("OPROMGETVERSION"));
+		err(-1, "OPROMGETVERSION");
 
 	(void) printf("%s\n", opp->oprom_array);
 	promclose();
