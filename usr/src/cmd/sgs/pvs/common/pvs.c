@@ -1017,11 +1017,6 @@ main(int argc, char **argv, char **envp)
 	const Gver_sym_data	*vsdata = NULL;
 
 	/*
-	 * Check for a binary that better fits this architecture.
-	 */
-	(void) conv_check_native(argv, envp);
-
-	/*
 	 * Establish locale.
 	 */
 	(void) setlocale(LC_MESSAGES, MSG_ORIG(MSG_STR_EMPTY));

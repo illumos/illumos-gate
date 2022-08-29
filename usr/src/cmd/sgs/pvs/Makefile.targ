@@ -26,23 +26,26 @@
 #
 
 %.o:		../common/%.c
-		$(COMPILE.c) $<
-		$(POST_PROCESS_O)
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 %.o:		$(SGSCOMMON)/%.c
-		$(COMPILE.c) -o $@ $<
-		$(POST_PROCESS_O)
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 all:		$(PROG)
 
 clean:
-		$(RM) $(OBJS) $(CLEANFILES)
+	$(RM) $(OBJS) $(CLEANFILES)
 
-install:	all $(ROOTPROG)
+install:	all $(ROOTPROG) $(ROOTPROG64)
+
+$(ROOTPROG64):
+	$(RM) $@; $(SYMLINK) ../../bin/pvs $@
 
 $(PROG):	$(OBJS)  $(MAPFILE)
-		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-		$(POST_PROCESS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
 include		$(SRC)/cmd/Makefile.targ
 
@@ -51,7 +54,7 @@ include		$(SRC)/cmd/Makefile.targ
 catalog:	$(BLTMESG)
 
 chkmsg:		$(SRCS)
-		sh $(CHKMSG) $(CHKMSGFLAGS) $(SRCS)
+	sh $(CHKMSG) $(CHKMSGFLAGS) $(SRCS)
 
 $(BLTDEFS) + \
 $(BLTDATA) + \
