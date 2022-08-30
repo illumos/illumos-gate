@@ -107,7 +107,6 @@
 #include <sys/tuneable.h>
 #include <sys/debug.h>
 #include <sys/fs/swapnode.h>
-#include <sys/tnf_probe.h>
 #include <sys/lgrp.h>
 #include <sys/policy.h>
 #include <sys/condvar_impl.h>
@@ -2419,10 +2418,6 @@ anon_private(
 
 	CPU_STATS_ADD_K(vm, cow_fault, 1);
 
-	/* Kernel probe */
-	TNF_PROBE_1(anon_private, "vm pagefault", /* CSTYLED */,
-		tnf_opaque,	address,	addr);
-
 	*app = new = anon_alloc(NULL, 0);
 	swap_xlate(new, &vp, &off);
 
@@ -2801,10 +2796,6 @@ anon_zero(struct seg *seg, caddr_t addr, struct anon **app, struct cred *cred)
 	anoff_t off;
 	page_t *anon_pl[1 + 1];
 	int err;
-
-	/* Kernel probe */
-	TNF_PROBE_1(anon_zero, "vm pagefault", /* CSTYLED */,
-		tnf_opaque,	address,	addr);
 
 	*app = ap = anon_alloc(NULL, 0);
 	swap_xlate(ap, &vp, &off);

@@ -93,8 +93,6 @@ tavor_mr_register(tavor_state_t *state, tavor_pdhdl_t pd,
 	tavor_bind_info_t	bind;
 	int			status;
 
-	TAVOR_TNF_ENTER(tavor_mr_register);
-
 	/*
 	 * Fill in the "bind" struct.  This struct provides the majority
 	 * of the information that will be used to distinguish between an
@@ -109,15 +107,8 @@ tavor_mr_register(tavor_state_t *state, tavor_pdhdl_t pd,
 	bind.bi_as    = mr_attr->mr_as;
 	bind.bi_flags = mr_attr->mr_flags;
 	status = tavor_mr_common_reg(state, pd, &bind, mrhdl, op);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_mr_register_cmnreg_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_mr_register);
-		return (status);
-	}
 
-	TAVOR_TNF_EXIT(tavor_mr_register);
-	return (DDI_SUCCESS);
+	return (status);
 }
 
 
@@ -132,8 +123,6 @@ tavor_mr_register_buf(tavor_state_t *state, tavor_pdhdl_t pd,
 {
 	tavor_bind_info_t	bind;
 	int			status;
-
-	TAVOR_TNF_ENTER(tavor_mr_register_buf);
 
 	/*
 	 * Fill in the "bind" struct.  This struct provides the majority
@@ -158,15 +147,8 @@ tavor_mr_register_buf(tavor_state_t *state, tavor_pdhdl_t pd,
 	bind.bi_len   = (uint64_t)buf->b_bcount;
 	bind.bi_flags = mr_attr->mr_flags;
 	status = tavor_mr_common_reg(state, pd, &bind, mrhdl, op);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_mr_register_buf_cmnreg_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_mr_register_buf);
-		return (status);
-	}
 
-	TAVOR_TNF_EXIT(tavor_mr_register_buf);
-	return (DDI_SUCCESS);
+	return (status);
 }
 
 
@@ -190,9 +172,6 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 	uint64_t		mtt_addr, mtt_ddrbaseaddr, pgsize_msk;
 	uint_t			sleep, mr_is_umem;
 	int			status, umem_flags;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_mr_register_shared);
 
 	/*
 	 * Check the sleep flag.  Ensure that it is consistent with the
@@ -203,8 +182,6 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 	    TAVOR_SLEEP;
 	if ((sleep == TAVOR_SLEEP) &&
 	    (sleep != TAVOR_SLEEPFLAG_FOR_CONTEXT())) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "invalid flags");
 		goto mrshared_fail;
 	}
 
@@ -221,8 +198,6 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_MPT, 1, sleep, &mpt);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed MPT");
 		goto mrshared_fail1;
 	}
 
@@ -234,8 +209,6 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_MRHDL, 1, sleep, &rsrc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed MR handle");
 		goto mrshared_fail2;
 	}
 	mr = (tavor_mrhdl_t)rsrc->tr_addr;
@@ -284,8 +257,6 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 	 */
 	if ((mrhdl->mr_is_umem) && (mrhdl->mr_umemcookie == NULL)) {
 		mutex_exit(&mrhdl->mr_lock);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_MR_HDL_INVALID, "invalid mrhdl");
 		goto mrshared_fail3;
 	}
 
@@ -310,8 +281,6 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 		    &umem_cookie, &tavor_umem_cbops, NULL);
 		if (status != 0) {
 			mutex_exit(&mrhdl->mr_lock);
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed umem pin");
 			goto mrshared_fail3;
 		}
 
@@ -320,8 +289,6 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 		    (uint64_t)(uintptr_t)rsrc);
 		if (umapdb == NULL) {
 			mutex_exit(&mrhdl->mr_lock);
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed umap add");
 			goto mrshared_fail4;
 		}
 	}
@@ -403,11 +370,6 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: SW2HW_MPT command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_mr_register_shared_sw2hw_mpt_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(ibc_get_ci_failure(0),
-		    "tavor SW2HW_MPT command");
 		goto mrshared_fail5;
 	}
 
@@ -438,7 +400,6 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 
 	*mrhdl_new = mr;
 
-	TAVOR_TNF_EXIT(tavor_mr_register_shared);
 	return (DDI_SUCCESS);
 
 /*
@@ -460,9 +421,6 @@ mrshared_fail2:
 mrshared_fail1:
 	tavor_pd_refcnt_dec(pd);
 mrshared_fail:
-	TNF_PROBE_1(tavor_mr_register_shared_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_mr_register_shared);
 	return (status);
 }
 
@@ -483,9 +441,6 @@ tavor_mr_deregister(tavor_state_t *state, tavor_mrhdl_t *mrhdl, uint_t level,
 	tavor_bind_info_t	*bind;
 	uint64_t		value;
 	int			status, shared_mtt;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_mr_deregister);
 
 	/*
 	 * Check the sleep flag.  Ensure that it is consistent with the
@@ -494,11 +449,6 @@ tavor_mr_deregister(tavor_state_t *state, tavor_mrhdl_t *mrhdl, uint_t level,
 	 */
 	if ((sleep == TAVOR_SLEEP) &&
 	    (sleep != TAVOR_SLEEPFLAG_FOR_CONTEXT())) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "invalid sleep flags");
-		TNF_PROBE_1(tavor_mr_deregister_fail, TAVOR_TNF_ERROR, "",
-		    tnf_string, msg, errormsg);
-		TAVOR_TNF_EXIT(tavor_mr_deregister);
 		return (status);
 	}
 
@@ -551,15 +501,10 @@ tavor_mr_deregister(tavor_state_t *state, tavor_mrhdl_t *mrhdl, uint_t level,
 		    NULL, 0, mpt->tr_indx, sleep);
 		if (status != TAVOR_CMD_SUCCESS) {
 			if (status == TAVOR_CMD_REG_BOUND) {
-				TAVOR_TNF_EXIT(tavor_mr_deregister);
 				return (IBT_MR_IN_USE);
 			} else {
 				cmn_err(CE_CONT, "Tavor: HW2SW_MPT command "
 				    "failed: %08x\n", status);
-				TNF_PROBE_1(tavor_hw2sw_mpt_cmd_fail,
-				    TAVOR_TNF_ERROR, "", tnf_uint, status,
-				    status);
-				TAVOR_TNF_EXIT(tavor_mr_deregister);
 				return (IBT_INVALID_PARAM);
 			}
 		}
@@ -632,7 +577,6 @@ tavor_mr_deregister(tavor_state_t *state, tavor_mrhdl_t *mrhdl, uint_t level,
 	 */
 	if ((mr->mr_is_umem) && (mr->mr_umemcookie == NULL)) {
 		mutex_exit(&mr->mr_lock);
-		TAVOR_TNF_EXIT(tavor_mr_deregister);
 		return (DDI_SUCCESS);
 	}
 
@@ -651,7 +595,6 @@ mrdereg_finish_cleanup:
 	/* Set the mrhdl pointer to NULL and return success */
 	*mrhdl = NULL;
 
-	TAVOR_TNF_EXIT(tavor_mr_deregister);
 	return (DDI_SUCCESS);
 }
 
@@ -665,8 +608,6 @@ int
 tavor_mr_query(tavor_state_t *state, tavor_mrhdl_t mr,
     ibt_mr_query_attr_t *attr)
 {
-	TAVOR_TNF_ENTER(tavor_mr_query);
-
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*attr))
 
 	mutex_enter(&mr->mr_lock);
@@ -678,8 +619,6 @@ tavor_mr_query(tavor_state_t *state, tavor_mrhdl_t mr,
 	 */
 	if ((mr->mr_is_umem) && (mr->mr_umemcookie == NULL)) {
 		mutex_exit(&mr->mr_lock);
-		TNF_PROBE_0(tavor_mr_query_inv_mrhdl_fail, TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_mr_query);
 		return (IBT_MR_HDL_INVALID);
 	}
 
@@ -713,7 +652,6 @@ tavor_mr_query(tavor_state_t *state, tavor_mrhdl_t mr,
 	    IBT_MR_NONCOHERENT) ? B_TRUE : B_FALSE;
 
 	mutex_exit(&mr->mr_lock);
-	TAVOR_TNF_EXIT(tavor_mr_query);
 	return (DDI_SUCCESS);
 }
 
@@ -730,8 +668,6 @@ tavor_mr_reregister(tavor_state_t *state, tavor_mrhdl_t mr,
 	tavor_bind_info_t	bind;
 	int			status;
 
-	TAVOR_TNF_ENTER(tavor_mr_reregister);
-
 	/*
 	 * Fill in the "bind" struct.  This struct provides the majority
 	 * of the information that will be used to distinguish between an
@@ -746,15 +682,8 @@ tavor_mr_reregister(tavor_state_t *state, tavor_mrhdl_t mr,
 	bind.bi_as    = mr_attr->mr_as;
 	bind.bi_flags = mr_attr->mr_flags;
 	status = tavor_mr_common_rereg(state, mr, pd, &bind, mrhdl_new, op);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_mr_reregister_cmnreg_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_mr_reregister);
-		return (status);
-	}
 
-	TAVOR_TNF_EXIT(tavor_mr_reregister);
-	return (DDI_SUCCESS);
+	return (status);
 }
 
 
@@ -769,8 +698,6 @@ tavor_mr_reregister_buf(tavor_state_t *state, tavor_mrhdl_t mr,
 {
 	tavor_bind_info_t	bind;
 	int			status;
-
-	TAVOR_TNF_ENTER(tavor_mr_reregister_buf);
 
 	/*
 	 * Fill in the "bind" struct.  This struct provides the majority
@@ -795,15 +722,8 @@ tavor_mr_reregister_buf(tavor_state_t *state, tavor_mrhdl_t mr,
 	bind.bi_flags = mr_attr->mr_flags;
 	bind.bi_as = NULL;
 	status = tavor_mr_common_rereg(state, mr, pd, &bind, mrhdl_new, op);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_mr_reregister_buf_cmnreg_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_mr_reregister_buf);
-		return (status);
-	}
 
-	TAVOR_TNF_EXIT(tavor_mr_reregister_buf);
-	return (DDI_SUCCESS);
+	return (status);
 }
 
 
@@ -820,9 +740,6 @@ tavor_mr_sync(tavor_state_t *state, ibt_mr_sync_t *mr_segs, size_t num_segs)
 	uint64_t		mr_start, mr_end;
 	uint_t			type;
 	int			status, i;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_mr_sync);
 
 	/* Process each of the ibt_mr_sync_t's */
 	for (i = 0; i < num_segs; i++) {
@@ -830,8 +747,6 @@ tavor_mr_sync(tavor_state_t *state, ibt_mr_sync_t *mr_segs, size_t num_segs)
 
 		/* Check for valid memory region handle */
 		if (mrhdl == NULL) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_MR_HDL_INVALID, "invalid mrhdl");
 			goto mrsync_fail;
 		}
 
@@ -845,8 +760,6 @@ tavor_mr_sync(tavor_state_t *state, ibt_mr_sync_t *mr_segs, size_t num_segs)
 		 */
 		if ((mrhdl->mr_is_umem) && (mrhdl->mr_umemcookie == NULL)) {
 			mutex_exit(&mrhdl->mr_lock);
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_MR_HDL_INVALID, "invalid mrhdl2");
 			goto mrsync_fail;
 		}
 
@@ -858,14 +771,10 @@ tavor_mr_sync(tavor_state_t *state, ibt_mr_sync_t *mr_segs, size_t num_segs)
 		mr_end	  = mr_start + mrhdl->mr_bindinfo.bi_len - 1;
 		if ((seg_vaddr < mr_start) || (seg_vaddr > mr_end)) {
 			mutex_exit(&mrhdl->mr_lock);
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_MR_VA_INVALID, "invalid vaddr");
 			goto mrsync_fail;
 		}
 		if ((seg_end < mr_start) || (seg_end > mr_end)) {
 			mutex_exit(&mrhdl->mr_lock);
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_MR_LEN_INVALID, "invalid length");
 			goto mrsync_fail;
 		}
 
@@ -876,8 +785,6 @@ tavor_mr_sync(tavor_state_t *state, ibt_mr_sync_t *mr_segs, size_t num_segs)
 			type = DDI_DMA_SYNC_FORCPU;
 		} else {
 			mutex_exit(&mrhdl->mr_lock);
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "invalid sync type");
 			goto mrsync_fail;
 		}
 
@@ -886,13 +793,9 @@ tavor_mr_sync(tavor_state_t *state, ibt_mr_sync_t *mr_segs, size_t num_segs)
 		mutex_exit(&mrhdl->mr_lock);
 	}
 
-	TAVOR_TNF_EXIT(tavor_mr_sync);
 	return (DDI_SUCCESS);
 
 mrsync_fail:
-	TNF_PROBE_1(tavor_mr_sync_fail, TAVOR_TNF_ERROR, "", tnf_string, msg,
-	    errormsg);
-	TAVOR_TNF_EXIT(tavor_mr_sync);
 	return (status);
 }
 
@@ -910,9 +813,6 @@ tavor_mw_alloc(tavor_state_t *state, tavor_pdhdl_t pd, ibt_mw_flags_t flags,
 	tavor_mwhdl_t		mw;
 	uint_t			sleep;
 	int			status;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_mw_alloc);
 
 	/*
 	 * Check the sleep flag.  Ensure that it is consistent with the
@@ -922,8 +822,6 @@ tavor_mw_alloc(tavor_state_t *state, tavor_pdhdl_t pd, ibt_mw_flags_t flags,
 	sleep = (flags & IBT_MW_NOSLEEP) ? TAVOR_NOSLEEP : TAVOR_SLEEP;
 	if ((sleep == TAVOR_SLEEP) &&
 	    (sleep != TAVOR_SLEEPFLAG_FOR_CONTEXT())) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "invalid flags");
 		goto mwalloc_fail;
 	}
 
@@ -941,8 +839,6 @@ tavor_mw_alloc(tavor_state_t *state, tavor_pdhdl_t pd, ibt_mw_flags_t flags,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_MPT, 1, sleep, &mpt);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed MPT");
 		goto mwalloc_fail1;
 	}
 
@@ -956,8 +852,6 @@ tavor_mw_alloc(tavor_state_t *state, tavor_pdhdl_t pd, ibt_mw_flags_t flags,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_MRHDL, 1, sleep, &rsrc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed MR handle");
 		goto mwalloc_fail2;
 	}
 	mw = (tavor_mwhdl_t)rsrc->tr_addr;
@@ -994,11 +888,6 @@ tavor_mw_alloc(tavor_state_t *state, tavor_pdhdl_t pd, ibt_mw_flags_t flags,
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: SW2HW_MPT command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_mw_alloc_sw2hw_mpt_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(ibc_get_ci_failure(0),
-		    "tavor SW2HW_MPT command");
 		goto mwalloc_fail3;
 	}
 
@@ -1012,7 +901,6 @@ tavor_mw_alloc(tavor_state_t *state, tavor_pdhdl_t pd, ibt_mw_flags_t flags,
 	mw->mr_rsrcp	= rsrc;
 	*mwhdl = mw;
 
-	TAVOR_TNF_EXIT(tavor_mw_alloc);
 	return (DDI_SUCCESS);
 
 mwalloc_fail3:
@@ -1022,9 +910,6 @@ mwalloc_fail2:
 mwalloc_fail1:
 	tavor_pd_refcnt_dec(pd);
 mwalloc_fail:
-	TNF_PROBE_1(tavor_mw_alloc_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_mw_alloc);
 	return (status);
 }
 
@@ -1039,10 +924,7 @@ tavor_mw_free(tavor_state_t *state, tavor_mwhdl_t *mwhdl, uint_t sleep)
 	tavor_rsrc_t		*mpt, *rsrc;
 	tavor_mwhdl_t		mw;
 	int			status;
-	char			*errormsg;
 	tavor_pdhdl_t		pd;
-
-	TAVOR_TNF_ENTER(tavor_mw_free);
 
 	/*
 	 * Check the sleep flag.  Ensure that it is consistent with the
@@ -1051,11 +933,6 @@ tavor_mw_free(tavor_state_t *state, tavor_mwhdl_t *mwhdl, uint_t sleep)
 	 */
 	if ((sleep == TAVOR_SLEEP) &&
 	    (sleep != TAVOR_SLEEPFLAG_FOR_CONTEXT())) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "invalid sleep flags");
-		TNF_PROBE_1(tavor_mw_free_fail, TAVOR_TNF_ERROR, "",
-		    tnf_string, msg, errormsg);
-		TAVOR_TNF_EXIT(tavor_mw_free);
 		return (status);
 	}
 
@@ -1081,9 +958,6 @@ tavor_mw_free(tavor_state_t *state, tavor_mwhdl_t *mwhdl, uint_t sleep)
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: HW2SW_MPT command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_hw2sw_mpt_cmd_fail, TAVOR_TNF_ERROR, "",
-		    tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_mw_free);
 		return (IBT_INVALID_PARAM);
 	}
 
@@ -1099,7 +973,6 @@ tavor_mw_free(tavor_state_t *state, tavor_mwhdl_t *mwhdl, uint_t sleep)
 	/* Set the mwhdl pointer to NULL and return success */
 	*mwhdl = NULL;
 
-	TAVOR_TNF_EXIT(tavor_mw_free);
 	return (DDI_SUCCESS);
 }
 
@@ -1155,9 +1028,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 	uint64_t		mtt_addr, mtt_ddrbaseaddr, max_sz;
 	uint_t			sleep, mtt_pgsize_bits, bind_type, mr_is_umem;
 	int			status, umem_flags, bind_override_addr;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_mr_common_reg);
 
 	/*
 	 * Check the "options" flag.  Currently this flag tells the driver
@@ -1187,8 +1057,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 	 */
 	max_sz = ((uint64_t)1 << state->ts_cfg_profile->cp_log_max_mrw_sz);
 	if ((bind->bi_len == 0) || (bind->bi_len > max_sz)) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_MR_LEN_INVALID, "invalid length");
 		goto mrcommon_fail;
 	}
 
@@ -1200,8 +1068,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 	sleep = (flags & IBT_MR_NOSLEEP) ? TAVOR_NOSLEEP: TAVOR_SLEEP;
 	if ((sleep == TAVOR_SLEEP) &&
 	    (sleep != TAVOR_SLEEPFLAG_FOR_CONTEXT())) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "invalid flags");
 		goto mrcommon_fail;
 	}
 
@@ -1224,8 +1090,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_MPT, 1, sleep, &mpt);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed MPT");
 		goto mrcommon_fail1;
 	}
 
@@ -1237,8 +1101,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_MRHDL, 1, sleep, &rsrc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed MR handle");
 		goto mrcommon_fail2;
 	}
 	mr = (tavor_mrhdl_t)rsrc->tr_addr;
@@ -1296,8 +1158,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 		status = umem_lockmemory(umem_addr, umem_len, umem_flags,
 		    &umem_cookie, &tavor_umem_cbops, NULL);
 		if (status != 0) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed umem pin");
 			goto mrcommon_fail3;
 		}
 
@@ -1307,8 +1167,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 		bind->bi_buf = ddi_umem_iosetup(umem_cookie, 0, umem_len,
 		    B_WRITE, 0, 0, NULL, DDI_UMEM_SLEEP);
 		if (bind->bi_buf == NULL) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed iosetup");
 			goto mrcommon_fail3;
 		}
 		bind->bi_type = TAVOR_BINDHDL_UBUF;
@@ -1321,8 +1179,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 		    (uint64_t)(uintptr_t)umem_cookie, MLNX_UMAP_MRMEM_RSRC,
 		    (uint64_t)(uintptr_t)rsrc);
 		if (umapdb == NULL) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed umap add");
 			goto mrcommon_fail4;
 		}
 	}
@@ -1337,8 +1193,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 	status = tavor_mr_mtt_bind(state, bh, bind_dmahdl, &mtt,
 	    &mtt_pgsize_bits);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(status, "failed mtt bind");
 		/*
 		 * When mtt_bind fails, freerbuf has already been done,
 		 * so make sure not to call it again.
@@ -1358,8 +1212,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 	status = tavor_rsrc_alloc(state, TAVOR_REFCNT, 1, sleep,
 	    &mtt_refcnt);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed refence count");
 		goto mrcommon_fail6;
 	}
 	mr->mr_mttrefcntp = mtt_refcnt;
@@ -1408,11 +1260,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: SW2HW_MPT command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_mr_common_reg_sw2hw_mpt_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(ibc_get_ci_failure(0),
-		    "tavor SW2HW_MPT command");
 		goto mrcommon_fail7;
 	}
 
@@ -1443,7 +1290,6 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 
 	*mrhdl = mr;
 
-	TAVOR_TNF_EXIT(tavor_mr_common_reg);
 	return (DDI_SUCCESS);
 
 /*
@@ -1480,9 +1326,6 @@ mrcommon_fail2:
 mrcommon_fail1:
 	tavor_pd_refcnt_dec(pd);
 mrcommon_fail:
-	TNF_PROBE_1(tavor_mr_common_reg_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_mr_common_reg);
 	return (status);
 }
 
@@ -1669,9 +1512,6 @@ tavor_mr_mtt_bind(tavor_state_t *state, tavor_bind_info_t *bind,
 	uint64_t		nummtt;
 	uint_t			sleep;
 	int			status;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_mr_common_reg);
 
 	/*
 	 * Check the sleep flag.  Ensure that it is consistent with the
@@ -1681,8 +1521,6 @@ tavor_mr_mtt_bind(tavor_state_t *state, tavor_bind_info_t *bind,
 	sleep = (bind->bi_flags & IBT_MR_NOSLEEP) ? TAVOR_NOSLEEP: TAVOR_SLEEP;
 	if ((sleep == TAVOR_SLEEP) &&
 	    (sleep != TAVOR_SLEEPFLAG_FOR_CONTEXT())) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "invalid flags");
 		goto mrmttbind_fail;
 	}
 
@@ -1699,8 +1537,6 @@ tavor_mr_mtt_bind(tavor_state_t *state, tavor_bind_info_t *bind,
 	 */
 	status = tavor_mr_mem_bind(state, bind, bind_dmahdl, sleep);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed mem bind");
 		goto mrmttbind_fail;
 	}
 
@@ -1724,8 +1560,6 @@ tavor_mr_mtt_bind(tavor_state_t *state, tavor_bind_info_t *bind,
 	status = tavor_rsrc_alloc(state, TAVOR_MTT,
 	    TAVOR_NUMMTT_TO_MTTSEG(nummtt), sleep, mtt);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed MTT");
 		goto mrmttbind_fail2;
 	}
 
@@ -1737,11 +1571,8 @@ tavor_mr_mtt_bind(tavor_state_t *state, tavor_bind_info_t *bind,
 	 */
 	status = tavor_mr_fast_mtt_write(*mtt, bind, *mtt_pgsize_bits);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(ibc_get_ci_failure(0), "failed write mtt");
 		goto mrmttbind_fail3;
 	}
-	TAVOR_TNF_EXIT(tavor_mr_mtt_bind);
 	return (DDI_SUCCESS);
 
 /*
@@ -1752,9 +1583,6 @@ mrmttbind_fail3:
 mrmttbind_fail2:
 	tavor_mr_mem_unbind(state, bind);
 mrmttbind_fail:
-	TNF_PROBE_1(tavor_mr_mtt_bind_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_mr_mtt_bind);
 	return (status);
 }
 
@@ -1767,8 +1595,6 @@ int
 tavor_mr_mtt_unbind(tavor_state_t *state, tavor_bind_info_t *bind,
     tavor_rsrc_t *mtt)
 {
-	TAVOR_TNF_ENTER(tavor_mr_mtt_unbind);
-
 	/*
 	 * Free up the MTT entries and unbind the memory.  Here, as above, we
 	 * attempt to free these resources only if it is appropriate to do so.
@@ -1776,7 +1602,6 @@ tavor_mr_mtt_unbind(tavor_state_t *state, tavor_bind_info_t *bind,
 	tavor_mr_mem_unbind(state, bind);
 	tavor_rsrc_free(state, &mtt);
 
-	TAVOR_TNF_EXIT(tavor_mr_mtt_unbind);
 	return (DDI_SUCCESS);
 }
 
@@ -1798,9 +1623,6 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 	uint64_t		mtt_addr_to_use, vaddr_to_use, len_to_use;
 	uint_t			sleep, dereg_level;
 	int			status;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_mr_common_rereg);
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*bind))
 
@@ -1810,8 +1632,6 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 	 * currently supported.  Return failure. XXX
 	 */
 	if (mr->mr_is_umem) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_MR_HDL_INVALID, "invalid mrhdl");
 		goto mrrereg_fail;
 	}
 
@@ -1832,8 +1652,6 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 	if ((sleep == TAVOR_SLEEP) &&
 	    (sleep != TAVOR_SLEEPFLAG_FOR_CONTEXT())) {
 		mutex_exit(&mr->mr_lock);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "invalid flags");
 		goto mrrereg_fail;
 	}
 
@@ -1855,7 +1673,6 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 	if (status != TAVOR_CMD_SUCCESS) {
 		mutex_exit(&mr->mr_lock);
 		if (status == TAVOR_CMD_REG_BOUND) {
-			TAVOR_TNF_EXIT(tavor_mr_common_rereg);
 			return (IBT_MR_IN_USE);
 		} else {
 			cmn_err(CE_CONT, "Tavor: HW2SW_MPT command failed: "
@@ -1870,9 +1687,6 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 				TAVOR_WARNING(state, "failed to deregister "
 				    "memory region");
 			}
-			TNF_PROBE_1(tavor_mr_common_rereg_hw2sw_mpt_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-			TAVOR_TNF_EXIT(tavor_mr_common_rereg);
 			return (ibc_get_ci_failure(0));
 		}
 	}
@@ -1898,8 +1712,6 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 				TAVOR_WARNING(state, "failed to deregister "
 				    "memory region");
 			}
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_PD_HDL_INVALID, "invalid PD handle");
 			goto mrrereg_fail;
 		}
 
@@ -1936,9 +1748,6 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 				TAVOR_WARNING(state, "failed to deregister "
 				    "memory region");
 			}
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_MR_ACCESS_REQ_INVALID,
-			    "invalid access flags");
 			goto mrrereg_fail;
 		}
 
@@ -1992,8 +1801,6 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 				    "memory region");
 			}
 
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(status, "failed rereg helper");
 			goto mrrereg_fail;
 		}
 		vaddr_to_use = mr->mr_bindinfo.bi_addr;
@@ -2060,9 +1867,6 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 			TAVOR_WARNING(state, "failed to deregister memory "
 			    "region");
 		}
-		TNF_PROBE_1(tavor_mr_common_rereg_sw2hw_mpt_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_mr_common_rereg);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -2089,13 +1893,9 @@ tavor_mr_common_rereg(tavor_state_t *state, tavor_mrhdl_t mr,
 	*mrhdl_new = mr;
 	mutex_exit(&mr->mr_lock);
 
-	TAVOR_TNF_EXIT(tavor_mr_common_rereg);
 	return (DDI_SUCCESS);
 
 mrrereg_fail:
-	TNF_PROBE_1(tavor_mr_common_rereg_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_mr_common_rereg);
 	return (status);
 }
 
@@ -2120,9 +1920,6 @@ tavor_mr_rereg_xlat_helper(tavor_state_t *state, tavor_mrhdl_t mr,
 	uint64_t		mtt_ddrbaseaddr;
 	uint_t			mtt_pgsize_bits, bind_type, reuse_dmahdl;
 	int			status;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_mr_rereg_xlat_helper);
 
 	ASSERT(MUTEX_HELD(&mr->mr_lock));
 
@@ -2154,8 +1951,6 @@ tavor_mr_rereg_xlat_helper(tavor_state_t *state, tavor_mrhdl_t mr,
 		 */
 		*dereg_level = TAVOR_MR_DEREG_NO_HW2SW_MPT;
 
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_MR_LEN_INVALID, "invalid length");
 		goto mrrereghelp_fail;
 	}
 
@@ -2237,8 +2032,6 @@ tavor_mr_rereg_xlat_helper(tavor_state_t *state, tavor_mrhdl_t mr,
 			 */
 			*dereg_level = TAVOR_MR_DEREG_NO_HW2SW_MPT_OR_UNBIND;
 
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed mem bind");
 			goto mrrereghelp_fail;
 		}
 		if (reuse_dmahdl) {
@@ -2267,9 +2060,6 @@ tavor_mr_rereg_xlat_helper(tavor_state_t *state, tavor_mrhdl_t mr,
 			tavor_mr_mem_unbind(state, bind);
 			*dereg_level = TAVOR_MR_DEREG_NO_HW2SW_MPT_OR_UNBIND;
 
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(ibc_get_ci_failure(0),
-			    "failed write mtt");
 			goto mrrereghelp_fail;
 		}
 
@@ -2338,8 +2128,6 @@ tavor_mr_rereg_xlat_helper(tavor_state_t *state, tavor_mrhdl_t mr,
 			 */
 			*dereg_level = TAVOR_MR_DEREG_NO_HW2SW_MPT_OR_UNBIND;
 
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed mem bind");
 			goto mrrereghelp_fail;
 		}
 		if (reuse_dmahdl) {
@@ -2367,8 +2155,6 @@ tavor_mr_rereg_xlat_helper(tavor_state_t *state, tavor_mrhdl_t mr,
 			tavor_mr_mem_unbind(state, bind);
 			*dereg_level = TAVOR_MR_DEREG_NO_HW2SW_MPT_OR_UNBIND;
 
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed MTT");
 			goto mrrereghelp_fail;
 		}
 
@@ -2405,9 +2191,6 @@ tavor_mr_rereg_xlat_helper(tavor_state_t *state, tavor_mrhdl_t mr,
 				*dereg_level =
 				    TAVOR_MR_DEREG_NO_HW2SW_MPT_OR_UNBIND;
 
-				/* Set "status"/"errormsg", goto failure */
-				TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE,
-				    "failed reference count");
 				goto mrrereghelp_fail;
 			}
 			swrc_new = (tavor_sw_refcnt_t *)mtt_refcnt->tr_addr;
@@ -2444,8 +2227,6 @@ tavor_mr_rereg_xlat_helper(tavor_state_t *state, tavor_mrhdl_t mr,
 			tavor_rsrc_free(state, &mtt);
 			*dereg_level = TAVOR_MR_DEREG_NO_HW2SW_MPT_OR_UNBIND;
 
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed write mtt");
 			goto mrrereghelp_fail;
 		}
 
@@ -2480,13 +2261,9 @@ tavor_mr_rereg_xlat_helper(tavor_state_t *state, tavor_mrhdl_t mr,
 	*mtt_addr	= mtt_ddrbaseaddr + (mtt->tr_indx <<
 	    TAVOR_MTT_SIZE_SHIFT);
 
-	TAVOR_TNF_EXIT(tavor_mr_rereg_xlat_helper);
 	return (DDI_SUCCESS);
 
 mrrereghelp_fail:
-	TNF_PROBE_1(tavor_mr_rereg_xlat_helper_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_mr_rereg_xlat_helper);
 	return (status);
 }
 
@@ -2535,8 +2312,6 @@ tavor_mr_mem_bind(tavor_state_t *state, tavor_bind_info_t *bind,
 	    bind->bi_type == TAVOR_BINDHDL_BUF ||
 	    bind->bi_type == TAVOR_BINDHDL_UBUF);
 
-	TAVOR_TNF_ENTER(tavor_mr_mem_bind);
-
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*bind))
 
 	/* Set the callback flag appropriately */
@@ -2576,9 +2351,6 @@ tavor_mr_mem_bind(tavor_state_t *state, tavor_bind_info_t *bind,
 		status = ddi_dma_alloc_handle(state->ts_dip, &dma_attr,
 		    callback, NULL, &bind->bi_dmahdl);
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(tavor_mr_mem_bind_dmahdl_fail,
-			    TAVOR_TNF_ERROR, "");
-			TAVOR_TNF_EXIT(tavor_mr_mem_bind);
 			return (status);
 		}
 		bind->bi_free_dmahdl = 1;
@@ -2609,13 +2381,9 @@ tavor_mr_mem_bind(tavor_state_t *state, tavor_bind_info_t *bind,
 		if (bind->bi_free_dmahdl != 0) {
 			ddi_dma_free_handle(&bind->bi_dmahdl);
 		}
-		TNF_PROBE_0(tavor_mr_mem_bind_dmabind_fail, TAVOR_TNF_ERROR,
-		    "");
-		TAVOR_TNF_EXIT(tavor_mr_mem_bind);
 		return (status);
 	}
 
-	TAVOR_TNF_EXIT(tavor_mr_mem_bind);
 	return (DDI_SUCCESS);
 }
 
@@ -2628,8 +2396,6 @@ static void
 tavor_mr_mem_unbind(tavor_state_t *state, tavor_bind_info_t *bind)
 {
 	int	status;
-
-	TAVOR_TNF_ENTER(tavor_mr_mem_unbind);
 
 	/*
 	 * In case of TAVOR_BINDHDL_UBUF, the memory bi_buf points to
@@ -2656,9 +2422,6 @@ tavor_mr_mem_unbind(tavor_state_t *state, tavor_bind_info_t *bind)
 	status = ddi_dma_unbind_handle(bind->bi_dmahdl);
 	if (status != DDI_SUCCESS) {
 		TAVOR_WARNING(state, "failed to unbind DMA mapping");
-		TNF_PROBE_0(tavor_mr_mem_unbind_dmaunbind_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_mr_mem_unbind);
 		return;
 	}
 
@@ -2666,8 +2429,6 @@ tavor_mr_mem_unbind(tavor_state_t *state, tavor_bind_info_t *bind)
 	if (bind->bi_free_dmahdl != 0) {
 		ddi_dma_free_handle(&bind->bi_dmahdl);
 	}
-
-	TAVOR_TNF_EXIT(tavor_mr_mem_unbind);
 }
 
 
@@ -2686,8 +2447,6 @@ tavor_mr_fast_mtt_write(tavor_rsrc_t *mtt, tavor_bind_info_t *bind,
 	uint64_t		addr, endaddr;
 	uint64_t		pagesize;
 	int			i;
-
-	TAVOR_TNF_ENTER(tavor_mr_fast_mtt_write);
 
 	/* Calculate page size from the suggested value passed in */
 	pagesize = ((uint64_t)1 << mtt_pgsize_bits);
@@ -2735,7 +2494,6 @@ tavor_mr_fast_mtt_write(tavor_rsrc_t *mtt, tavor_bind_info_t *bind,
 		}
 	}
 
-	TAVOR_TNF_EXIT(tavor_mr_fast_mtt_write);
 	return (DDI_SUCCESS);
 }
 
@@ -2753,8 +2511,6 @@ tavor_mtt_refcnt_inc(tavor_rsrc_t *rsrc)
 
 	/* Increment the MTT's reference count */
 	mutex_enter(&rc->swrc_lock);
-	TNF_PROBE_1_DEBUG(tavor_mtt_refcnt_inc, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, rc->swrc_refcnt);
 	cnt = rc->swrc_refcnt++;
 	mutex_exit(&rc->swrc_lock);
 
@@ -2777,8 +2533,6 @@ tavor_mtt_refcnt_dec(tavor_rsrc_t *rsrc)
 	/* Decrement the MTT's reference count */
 	mutex_enter(&rc->swrc_lock);
 	cnt = --rc->swrc_refcnt;
-	TNF_PROBE_1_DEBUG(tavor_mtt_refcnt_dec, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, rc->swrc_refcnt);
 	mutex_exit(&rc->swrc_lock);
 
 	return (cnt);

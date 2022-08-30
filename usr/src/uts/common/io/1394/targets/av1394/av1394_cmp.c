@@ -61,13 +61,6 @@ static int	av1394_pcr_remote_read(av1394_inst_t *, int, uint32_t *);
 static int	av1394_pcr_remote_cas(av1394_inst_t *, int, uint32_t *,
 		uint32_t, uint32_t);
 
-#define	AV1394_TNF_ENTER(func)	\
-	TNF_PROBE_0_DEBUG(func##_enter, AV1394_TNF_CMP_STACK, "");
-
-#define	AV1394_TNF_EXIT(func)	\
-	TNF_PROBE_0_DEBUG(func##_exit, AV1394_TNF_CMP_STACK, "");
-
-
 int
 av1394_cmp_init(av1394_inst_t *avp)
 {
@@ -75,26 +68,19 @@ av1394_cmp_init(av1394_inst_t *avp)
 	ddi_iblock_cookie_t ibc = avp->av_attachinfo.iblock_cookie;
 	int		ret;
 
-	AV1394_TNF_ENTER(av1394_cmp_init);
-
 	ret = t1394_cmp_register(avp->av_t1394_hdl, NULL, 0);
 
 	if (ret == DDI_SUCCESS) {
 		rw_init(&cmp->cmp_pcr_rwlock, NULL, RW_DRIVER, ibc);
 	}
 
-	AV1394_TNF_EXIT(av1394_cmp_init);
 	return (ret);
 }
 
 void
 av1394_cmp_fini(av1394_inst_t *avp)
 {
-	AV1394_TNF_ENTER(av1394_cmp_fini);
-
 	av1394_cmp_cleanup(avp);
-
-	AV1394_TNF_EXIT(av1394_cmp_fini);
 }
 
 void
@@ -102,8 +88,6 @@ av1394_cmp_bus_reset(av1394_inst_t *avp)
 {
 	av1394_cmp_t	*cmp = &avp->av_i.i_cmp;
 	int		i;
-
-	AV1394_TNF_ENTER(av1394_cmp_bus_reset);
 
 	/* reset PCR values */
 	rw_enter(&cmp->cmp_pcr_rwlock, RW_WRITER);
@@ -122,8 +106,6 @@ av1394_cmp_bus_reset(av1394_inst_t *avp)
 		}
 	}
 	rw_exit(&cmp->cmp_pcr_rwlock);
-
-	AV1394_TNF_EXIT(av1394_cmp_bus_reset);
 }
 
 /*
@@ -490,8 +472,6 @@ av1394_pcr_alloc_addr(av1394_inst_t *avp, uint64_t addr,
 	int		ret;
 	int		result;
 
-	AV1394_TNF_ENTER(av1394_pcr_addr_alloc);
-
 	bzero(&aa, sizeof (aa));
 	aa.aa_address = addr;
 	aa.aa_length = 4;
@@ -502,14 +482,10 @@ av1394_pcr_alloc_addr(av1394_inst_t *avp, uint64_t addr,
 	aa.aa_arg = avp;
 
 	ret = t1394_alloc_addr(avp->av_t1394_hdl, &aa, 0, &result);
-	if (ret != DDI_SUCCESS) {
-		TNF_PROBE_2(av1394_pcr_alloc_addr_error, AV1394_TNF_CMP_ERROR,
-		    "", tnf_int, ret, ret, tnf_int, result, result);
-	} else {
+	if (ret == DDI_SUCCESS) {
 		*hdlp = aa.aa_hdl;
 	}
 
-	AV1394_TNF_EXIT(av1394_pcr_addr_alloc);
 	return (ret);
 }
 
@@ -519,13 +495,7 @@ av1394_pcr_alloc_addr(av1394_inst_t *avp, uint64_t addr,
 static void
 av1394_pcr_free_addr(av1394_inst_t *avp, t1394_addr_handle_t *hdlp)
 {
-	int	ret;
-
-	ret = t1394_free_addr(avp->av_t1394_hdl, hdlp, 0);
-	if (ret != DDI_SUCCESS) {
-		TNF_PROBE_1(av1394_pcr_free_addr_error, AV1394_TNF_CMP_ERROR,
-		    "", tnf_int, ret, ret);
-	}
+	(void) t1394_free_addr(avp->av_t1394_hdl, hdlp, 0);
 }
 
 /*
@@ -641,9 +611,6 @@ av1394_pcr_recv_read_request(cmd1394_cmd_t *req)
 	av1394_cmp_t	*cmp = &avp->av_i.i_cmp;
 	int		idx;	/* PCR index */
 	av1394_pcr_t	*pcr;
-	int		err;
-
-	AV1394_TNF_ENTER(av1394_pcr_recv_read_request);
 
 	idx = (req->cmd_addr - AV1394_PCR_ADDR_START) / 4;
 
@@ -661,13 +628,7 @@ av1394_pcr_recv_read_request(cmd1394_cmd_t *req)
 		req->cmd_result = IEEE1394_RESP_COMPLETE;
 	}
 
-	err = t1394_recv_request_done(avp->av_t1394_hdl, req, 0);
-	if (err != DDI_SUCCESS) {
-		TNF_PROBE_1(av1394_pcr_recv_read_request_done_error,
-		    AV1394_TNF_CMP_ERROR, "", tnf_int, err, err);
-	}
-
-	AV1394_TNF_EXIT(av1394_pcr_recv_read_request);
+	(void) t1394_recv_request_done(avp->av_t1394_hdl, req, 0);
 }
 
 static void
@@ -677,9 +638,6 @@ av1394_pcr_recv_lock_request(cmd1394_cmd_t *req)
 	av1394_cmp_t	*cmp = &avp->av_i.i_cmp;
 	int		idx;	/* PCR index */
 	av1394_pcr_t	*pcr;
-	int		err;
-
-	AV1394_TNF_ENTER(av1394_pcr_recv_lock_request);
 
 	idx = (req->cmd_addr - AV1394_PCR_ADDR_START) / 4;
 
@@ -701,14 +659,7 @@ av1394_pcr_recv_lock_request(cmd1394_cmd_t *req)
 		req->cmd_result = IEEE1394_RESP_COMPLETE;
 	}
 
-	err = t1394_recv_request_done(avp->av_t1394_hdl, req, 0);
-	if (err != DDI_SUCCESS) {
-		TNF_PROBE_2(av1394_pcr_recv_lock_request_done_error,
-		    AV1394_TNF_CMP_ERROR, "", tnf_int, err, err,
-		    tnf_int, result, req->cmd_result);
-	}
-
-	AV1394_TNF_EXIT(av1394_pcr_recv_lock_request);
+	(void) t1394_recv_request_done(avp->av_t1394_hdl, req, 0);
 }
 
 
@@ -738,8 +689,6 @@ av1394_pcr_remote_read(av1394_inst_t *avp, int ph, uint32_t *valp)
 	    (cmd->cmd_result == CMD1394_CMDSUCCESS)) {
 		*valp = cmd->cmd_u.q.quadlet_data;
 	} else {
-		TNF_PROBE_2(av1394_pcr_remote_read_error, AV1394_TNF_CMP_ERROR,
-		    "", tnf_int, err, err, tnf_int, result, cmd->cmd_result);
 		ret = EIO;
 	}
 
@@ -777,8 +726,6 @@ av1394_pcr_remote_cas(av1394_inst_t *avp, int ph, uint32_t *old_valuep,
 	    (cmd->cmd_result == CMD1394_CMDSUCCESS)) {
 		*old_valuep = cmd->cmd_u.l32.old_value;
 	} else {
-		TNF_PROBE_2(av1394_pcr_remote_cas_error, AV1394_TNF_CMP_ERROR,
-		    "", tnf_int, err, err, tnf_int, result, cmd->cmd_result);
 		ret = EIO;
 	}
 

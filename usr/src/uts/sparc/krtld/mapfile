@@ -78,9 +78,6 @@ SYMBOL_SCOPE {
 		kobj_zalloc;
 		kobj_kdi;
 		kobj_linkmaps;
-		__tnf_tag_list_head;
-		__tnf_probe_list_head;
-		tnf_changed_probe_list;
 		boot_cpu_compatible_list;
 	local:
 		*;

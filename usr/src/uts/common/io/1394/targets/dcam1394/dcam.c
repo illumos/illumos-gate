@@ -52,19 +52,12 @@
 #include <sys/uio.h>
 #include <sys/devops.h>
 #include <sys/1394/t1394.h>
-#include <sys/tnf_probe.h>
 
 #include <sys/dcam/dcam1394_io.h>
 #include <sys/1394/targets/dcam1394/dcam.h>
 #include <sys/1394/targets/dcam1394/dcam_reg.h>
 #include <sys/1394/targets/dcam1394/dcam_param.h>
 #include <sys/1394/targets/dcam1394/dcam_frame.h>
-
-#ifndef NPROBE
-extern int tnf_mod_load(void);
-extern int tnf_mod_unload(struct modlinkage *mlp);
-#endif /* ! NPROBE */
-
 
 /* for power management (we have only one component) */
 static char *dcam_pmc[] = {
@@ -155,18 +148,8 @@ _init(void)
 		return (err);
 	}
 
-#ifndef NPROBE
-	(void) tnf_mod_load();
-#endif /* ! NPROBE */
-
 	if (err = mod_install(&modlinkage)) {
-
-#ifndef NPROBE
-		(void) tnf_mod_unload(&modlinkage);
-#endif /* ! NPROBE */
-
 		ddi_soft_state_fini(&dcam_state_p);
-
 	}
 
 	return (err);
@@ -191,10 +174,6 @@ _fini(void)
 	if ((err = mod_remove(&modlinkage)) != 0) {
 		return (err);
 	}
-
-#ifndef NPROBE
-	(void) tnf_mod_unload(&modlinkage);
-#endif /* ! NPROBE */
 
 	ddi_soft_state_fini(&dcam_state_p);
 

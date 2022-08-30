@@ -41,9 +41,6 @@
 #include <sys/sunddi.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/types.h>
-
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
 #include <sys/1394/h1394.h>
@@ -73,18 +70,12 @@ s1394_send_remove_event(s1394_hal_t *hal, dev_info_t *dip,
 	(void) sprintf(name, "%s%d", ddi_driver_name(dip),
 	    ddi_get_instance(dip));
 
-	TNF_PROBE_1_DEBUG(s1394_send_remove_event_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, device,
-	    name);
-
 	if (ndi_event_retrieve_cookie(hal->hal_ndi_event_hdl, dip,
 	    DDI_DEVI_REMOVE_EVENT, &cookie, NDI_EVENT_NOPASS)
 	    == NDI_SUCCESS) {
 		(void) ndi_event_run_callbacks(hal->hal_ndi_event_hdl, dip,
 		    cookie, localinfo);
 	}
-	TNF_PROBE_0_DEBUG(s1394_send_remove_event_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -102,18 +93,11 @@ s1394_send_insert_event(s1394_hal_t *hal, dev_info_t *dip,
 	(void) sprintf(name, "%s%d", ddi_driver_name(dip),
 	    ddi_get_instance(dip));
 
-	TNF_PROBE_1_DEBUG(s1394_send_insert_event_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, device,
-	    name);
-
 	if (ndi_event_retrieve_cookie(hal->hal_ndi_event_hdl, dip,
 	    DDI_DEVI_INSERT_EVENT, &cookie, NDI_EVENT_NOPASS) ==
 	    NDI_SUCCESS)
 		(void) ndi_event_run_callbacks(hal->hal_ndi_event_hdl, dip,
 		    cookie, localinfo);
-
-	TNF_PROBE_0_DEBUG(s1394_send_insert_event_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -155,10 +139,6 @@ s1394_create_devinfo(s1394_hal_t *hal, s1394_node_t *node, uint32_t *unit_dir,
 
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 
-	TNF_PROBE_2_DEBUG(s1394_create_devinfo_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, guid_hi,
-	    node->node_guid_hi, tnf_uint, guid_lo, node->node_guid_lo);
-
 	hal_dip = hal->halinfo.dip;
 
 	/* Allocate and init a new device node instance. */
@@ -169,11 +149,6 @@ s1394_create_devinfo(s1394_hal_t *hal, s1394_node_t *node, uint32_t *unit_dir,
 		cmn_err(CE_NOTE, "!Unable to create devinfo"
 		    " (node's GUID %08x%08x)", node->node_guid_hi,
 		    node->node_guid_lo);
-		TNF_PROBE_2(s1394_create_devinfo_fail_alloc,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_uint, guid_hi,
-		    node->node_guid_hi, tnf_uint, guid_lo, node->node_guid_lo);
-		TNF_PROBE_0_DEBUG(s1394_create_devinfo_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (NULL);
 	}
 
@@ -186,14 +161,8 @@ s1394_create_devinfo(s1394_hal_t *hal, s1394_node_t *node, uint32_t *unit_dir,
 #if defined(DEBUG)
 		cmn_err(CE_CONT, "!Error code %d", result);
 #endif
-		TNF_PROBE_3(s1394_create_devinfo_hp_node,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_uint, guid_hi,
-		    node->node_guid_hi, tnf_uint, guid_lo, node->node_guid_lo,
-		    tnf_int, error, result);
 		ndi_prop_remove_all(target_dip);
 		(void) ndi_devi_free(target_dip);
-		TNF_PROBE_0_DEBUG(s1394_create_devinfo_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (NULL);
 	}
 
@@ -345,20 +314,7 @@ s1394_create_devinfo(s1394_hal_t *hal, s1394_node_t *node, uint32_t *unit_dir,
 #endif
 		ndi_prop_remove_all(target_dip);
 		(void) ndi_devi_free(target_dip);
-		TNF_PROBE_4(s1394_create_devinfo_fail_compat,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_uint, guid_hi,
-		    node->node_guid_hi, tnf_uint, guid_lo, node->node_guid_lo,
-		    tnf_int, error, result, tnf_int, nelements, i);
-		TNF_PROBE_0_DEBUG(s1394_create_devinfo_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (NULL);
-	}
-
-	for (j = 0; j < i; j++) {
-		TNF_PROBE_2_DEBUG(s1394_create_devinfo_props,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_int, compat_index, j,
-		    tnf_string, compat_prop, buf[j]);
 	}
 
 	/* GUID,ADDR */
@@ -381,18 +337,8 @@ s1394_create_devinfo(s1394_hal_t *hal, s1394_node_t *node, uint32_t *unit_dir,
 #endif
 		ndi_prop_remove_all(target_dip);
 		(void) ndi_devi_free(target_dip);
-		TNF_PROBE_3(s1394_create_devinfo_fail_reg,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_uint, guid_hi,
-		    node->node_guid_hi, tnf_uint, guid_lo, node->node_guid_lo,
-		    tnf_int, error, result);
-		TNF_PROBE_0_DEBUG(s1394_create_devinfo_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (NULL);
 	}
-
-	TNF_PROBE_1_DEBUG(s1394_create_devinfo_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "",
-	    tnf_opaque, target_dip, target_dip);
 
 	return (target_dip);
 }
@@ -421,9 +367,6 @@ s1394_devi_find(dev_info_t *pdip, char *name, char *caddr)
 	dev_info_t *cdip = NULL;
 
 	ASSERT((name != NULL) && (caddr != NULL));
-
-	TNF_PROBE_1_DEBUG(s1394_devi_find_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "", tnf_string, addr, caddr);
 
 	/*
 	 * for each child of this parent, find name and addr and match with
@@ -457,13 +400,6 @@ s1394_devi_find(dev_info_t *pdip, char *name, char *caddr)
 			break;
 		}
 	}
-
-	if (cdip == NULL) {
-		TNF_PROBE_1(s1394_devi_find_no_match,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, addr, caddr);
-	}
-
-	TNF_PROBE_0_DEBUG(s1394_devi_find_exit, S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	return (cdip);
 }
@@ -500,10 +436,6 @@ s1394_update_devinfo_tree(s1394_hal_t *hal, s1394_node_t *node)
 	ASSERT(CFGROM_PARSED(node) == B_FALSE);
 	ASSERT(node->cfgrom != NULL);
 
-	TNF_PROBE_2_DEBUG(s1394_update_devinfo_tree_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int, node_num,
-	    node->node_num, tnf_opaque, cfgrom, node->cfgrom);
-
 	/* scan through config rom looking for unit dirs */
 	root_dir = CFGROM_ROOT_DIR(node->cfgrom);
 
@@ -517,10 +449,6 @@ s1394_update_devinfo_tree(s1394_hal_t *hal, s1394_node_t *node)
 		cmn_err(CE_NOTE,
 		    "!Bad root directory in config rom (node's GUID %08x%08x)",
 		    node->node_guid_hi, node->node_guid_lo);
-
-		TNF_PROBE_1_DEBUG(s1394_update_devinfo_tree_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-		    "bad directory");
 
 		SET_CFGROM_PARSED(node);
 		CLEAR_CFGROM_GEN_CHANGED(node);	/* if set */
@@ -540,10 +468,6 @@ s1394_update_devinfo_tree(s1394_hal_t *hal, s1394_node_t *node)
 				cmn_err(CE_NOTE, "!Bad unit directory in config"
 				    " rom (node's GUID %08x%08x)",
 				    node->node_guid_hi, node->node_guid_lo);
-				TNF_PROBE_2(s1394_update_devinfo_tree_bad_dir,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_uint,
-				    guid_hi, node->node_guid_hi, tnf_uint,
-				    guid_lo, node->node_guid_lo);
 			}
 		}
 	}
@@ -624,12 +548,6 @@ s1394_update_devinfo_tree(s1394_hal_t *hal, s1394_node_t *node)
 			s1394_unlock_tree(hal);
 			s1394_send_insert_event(hal, devinfo_ptrs[j], &linfo);
 			if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-				TNF_PROBE_4(s1394_update_devinfo_tree_lock_fail,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "",
-				    tnf_int, node_num, node->node_num,
-				    tnf_opaque, cfgrom, node->cfgrom,
-				    tnf_int, unit, j,
-				    tnf_opaque, devinfo, devinfo_ptrs[j]);
 				lockfail = 1;
 				break;
 			}
@@ -637,17 +555,12 @@ s1394_update_devinfo_tree(s1394_hal_t *hal, s1394_node_t *node)
 	}
 
 	if (lockfail) {
-		TNF_PROBE_0_DEBUG(s1394_update_devinfo_tree_exit,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "");
 		return (DDI_FAILURE);
 	}
 
 	SET_CFGROM_PARSED(node);
 	CLEAR_CFGROM_GEN_CHANGED(node);	/* if set */
 	CLEAR_CFGROM_NEW_ALLOC(node);
-
-	TNF_PROBE_0_DEBUG(s1394_update_devinfo_tree_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -670,15 +583,9 @@ s1394_offline_node(s1394_hal_t *hal, s1394_node_t *node)
 	uint32_t *unit_dir_ptrs[32];
 	dev_info_t *devinfo_ptrs[32];
 	t1394_localinfo_t linfo;
-	uint_t node_num;
 	uint32_t *ptr, *root_dir, dir_len;
 	uint32_t hi, lo, size_hi, size_lo, type, key, value;
 	char caddr[32];
-
-	node_num = node->node_num;
-
-	TNF_PROBE_1_DEBUG(s1394_offline_node_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "", tnf_uint, node_num, node_num);
 
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 
@@ -686,9 +593,6 @@ s1394_offline_node(s1394_hal_t *hal, s1394_node_t *node)
 	rw_enter(&hal->target_list_rwlock, RW_WRITER);
 	t = node->target_list;
 	while (t != NULL) {
-		TNF_PROBE_2(s1394_process_old_tree_mark,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int, node_num, node_num,
-		    tnf_opaque, target, t);
 		t->target_state |= S1394_TARG_GONE;
 		t->on_node = NULL;
 		t = t->target_sibling;
@@ -708,7 +612,7 @@ s1394_offline_node(s1394_hal_t *hal, s1394_node_t *node)
 	for (units = 0, j = 1; j <= dir_len; j++) {
 		CFGROM_TYPE_KEY_VALUE(root_dir[j], type, key, value);
 		if (key == IEEE1212_UNIT_DIRECTORY && type ==
-		    IEEE1212_DIRECTORY_TYPE) {
+				IEEE1212_DIRECTORY_TYPE) {
 			ptr = &root_dir[j] + value;
 			if (s1394_valid_dir(hal, node, key, ptr) == B_TRUE) {
 				unit_dir_ptrs[units++] = ptr;
@@ -719,20 +623,20 @@ s1394_offline_node(s1394_hal_t *hal, s1394_node_t *node)
 	for (d = 0, j = 0; j < units; j++) {
 
 		s1394_cfgrom_parse_unit_dir(unit_dir_ptrs[j],
-		    &hi, &lo, &size_hi, &size_lo);
+				&hi, &lo, &size_hi, &size_lo);
 
 		lo = j;
 
 		if (hi || lo) {
 			(void) sprintf(caddr, "%08x%08x,%04x%08x",
-			    node->node_guid_hi, node->node_guid_lo, hi, lo);
+					node->node_guid_hi, node->node_guid_lo, hi, lo);
 		} else {
 			(void) sprintf(caddr, "%08x%08x",
-			    node->node_guid_hi, node->node_guid_lo);
+					node->node_guid_hi, node->node_guid_lo);
 		}
 
 		if ((tdip = s1394_devi_find(hal->halinfo.dip, "unit", caddr)) !=
-		    NULL)
+				NULL)
 			devinfo_ptrs[d++] = tdip;
 	}
 
@@ -744,26 +648,14 @@ s1394_offline_node(s1394_hal_t *hal, s1394_node_t *node)
 	for (j = 0; j < d; j++) {
 		s1394_unlock_tree(hal);
 
-		TNF_PROBE_2(s1394_offline_node,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int, node_num, node_num,
-		    tnf_opaque, devinfo, devinfo_ptrs[j]);
-
 		s1394_send_remove_event(hal, devinfo_ptrs[j], &linfo);
 		(void) ndi_devi_offline(devinfo_ptrs[j], NDI_DEVI_REMOVE);
 		if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-			TNF_PROBE_2(s1394_offline_node,
-			    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-			    "unlock to relock tree", tnf_uint, node_num,
-			    node_num);
-			TNF_PROBE_0_DEBUG(s1394_offline_node_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
 
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
-	TNF_PROBE_0_DEBUG(s1394_offline_node_exit, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -792,14 +684,7 @@ s1394_process_topology_tree(s1394_hal_t *hal, int *wait_for_cbs,
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
-	TNF_PROBE_0_DEBUG(s1394_process_topology_tree_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_0(s1394_process_topology_tree_lock_failed,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "");
-		TNF_PROBE_0_DEBUG(s1394_process_topology_tree_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -816,13 +701,6 @@ s1394_process_topology_tree(s1394_hal_t *hal, int *wait_for_cbs,
 			return (DDI_FAILURE);
 		}
 		node = &hal->topology_tree[i];
-
-		TNF_PROBE_4_DEBUG(s1394_process_topology_tree,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_int, node_num, i,
-		    tnf_int, parsed, CFGROM_PARSED(node),
-		    tnf_int, matched, NODE_MATCHED(node),
-		    tnf_int, visited, NODE_VISITED(node));
 
 		if (LINK_ACTIVE(node) == B_FALSE) {
 			s1394_unlock_tree(hal);
@@ -841,14 +719,6 @@ s1394_process_topology_tree(s1394_hal_t *hal, int *wait_for_cbs,
 			 * onode->cfgrom != node->cfgrom should have been
 			 * handled by s1394_match_GUID()!!!
 			 */
-			if (onode->cfgrom != node->cfgrom)
-				TNF_PROBE_5(s1394_process_topology_tree_err,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "",
-				    tnf_int, node_num, i, tnf_int, gen_changed,
-				    CFGROM_GEN_CHANGED(node), tnf_int, parsed,
-				    CFGROM_PARSED(node), tnf_opaque, old_cfgrom,
-				    onode->cfgrom, tnf_opaque, new_cfgrom,
-				    node->cfgrom);
 			ASSERT(onode->cfgrom == node->cfgrom);
 		}
 
@@ -864,30 +734,18 @@ s1394_process_topology_tree(s1394_hal_t *hal, int *wait_for_cbs,
 			    DDI_FAILURE) {
 				ASSERT(MUTEX_NOT_HELD(
 				    &hal->topology_tree_mutex));
-				TNF_PROBE_1(s1394_process_topology_tree,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string,
-				    msg, "failure from update devinfo");
-				TNF_PROBE_0_DEBUG(
-				    s1394_process_topology_tree_exit,
-				    S1394_TNF_SL_HOTPLUG_STACK, "");
 				return (DDI_FAILURE);
 			}
 		} else if (CFGROM_PARSED(node) == B_FALSE && CFGROM_BIB_READ(
 		    node) == B_TRUE) {
 			if (s1394_read_rest_of_cfgrom(hal, node, &status) !=
 			    DDI_SUCCESS) {
-				TNF_PROBE_1(s1394_process_topology_tree,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string,
-				    msg, "failure reading rest of cfgrom");
 				if ((status & S1394_LOCK_FAILED) == 0) {
 					ASSERT(MUTEX_HELD(&hal->
 					    topology_tree_mutex));
 					*wait_for_cbs = 0;
 					s1394_unlock_tree(hal);
 				}
-				TNF_PROBE_0_DEBUG(
-				    s1394_process_topology_tree_exit,
-				    S1394_TNF_SL_HOTPLUG_STACK, "");
 				return (DDI_FAILURE);
 			} else {
 				*wait_for_cbs = 1;
@@ -903,19 +761,10 @@ s1394_process_topology_tree(s1394_hal_t *hal, int *wait_for_cbs,
 	 * this, we will use tree matching.
 	 */
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_process_topology_tree,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string,
-		    msg, "relock failed while marking tree processed");
-		TNF_PROBE_0_DEBUG(s1394_process_topology_tree_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 	hal->topology_tree_processed = B_TRUE;
 	s1394_unlock_tree(hal);
-
-	TNF_PROBE_1_DEBUG(s1394_process_topology_tree_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int, hal_instance,
-	    ddi_get_instance(hal->halinfo.dip));
 
 	return (DDI_SUCCESS);
 }
@@ -937,9 +786,6 @@ s1394_process_old_tree(s1394_hal_t *hal)
 	uint_t hal_node_num_old, old_number_of_nodes;
 	s1394_node_t *onode;
 
-	TNF_PROBE_0_DEBUG(s1394_process_old_tree_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	/*
 	 * NODE_MATCHED(onode) == 0 indicates this node doesn't exist
 	 * any more.
@@ -947,10 +793,6 @@ s1394_process_old_tree(s1394_hal_t *hal)
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_0(s1394_process_old_tree_lock_failed,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "");
-		TNF_PROBE_0_DEBUG(s1394_process_old_tree_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 	hal_node_num_old = IEEE1394_NODE_NUM(hal->old_node_id);
@@ -962,12 +804,6 @@ s1394_process_old_tree(s1394_hal_t *hal)
 		if (i == hal_node_num_old)
 			continue;
 		if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-			TNF_PROBE_2(s1394_process_old_tree,
-			    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-			    "lock failed while processing node", tnf_uint,
-			    node_num, i);
-			TNF_PROBE_0_DEBUG(s1394_process_old_tree_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -978,17 +814,6 @@ s1394_process_old_tree(s1394_hal_t *hal)
 			s1394_unlock_tree(hal);
 			continue;
 		}
-
-		TNF_PROBE_1_DEBUG(s1394_process_old_tree,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_opaque,
-		    cfgrom, onode->cfgrom);
-
-		TNF_PROBE_5_DEBUG(s1394_process_old_tree,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int,
-		    node_num, i, tnf_int, parsed, CFGROM_PARSED(onode), tnf_int,
-		    matched, NODE_MATCHED(onode), tnf_int, visited,
-		    NODE_VISITED(onode), tnf_int, generation_changed,
-		    CFGROM_GEN_CHANGED(onode));
 
 		/*
 		 * onode->cur_node == NULL iff we couldn't read cfgrom in the
@@ -1001,28 +826,7 @@ s1394_process_old_tree(s1394_hal_t *hal)
 		    (LINK_ACTIVE(onode) == B_TRUE && LINK_ACTIVE(onode->
 		    cur_node) == B_FALSE)))) {
 
-			if (onode->cur_node != NULL && CFGROM_VALID(onode) ==
-			    B_TRUE &&
-			    CFGROM_VALID(onode->cur_node) == B_FALSE) {
-				TNF_PROBE_1_DEBUG(
-				    s1394_process_old_tree_invalid_cfgrom,
-				    S1394_TNF_SL_HOTPLUG_STACK, "",
-				    tnf_int, node_num, i);
-			}
-			if (onode->cur_node != NULL && LINK_ACTIVE(onode) ==
-			    B_TRUE && LINK_ACTIVE(onode->cur_node) == B_FALSE) {
-				TNF_PROBE_1_DEBUG(
-				    s1394_process_old_tree_link_off,
-				    S1394_TNF_SL_HOTPLUG_STACK,
-				    "", tnf_int, node_num, i);
-			}
 			if (s1394_offline_node(hal, onode) != DDI_SUCCESS) {
-				TNF_PROBE_2(s1394_process_old_tree,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string,
-				    msg, "failure from offline node", tnf_uint,
-				    node_num, i);
-				TNF_PROBE_0_DEBUG(s1394_process_old_tree_exit,
-				    S1394_TNF_SL_HOTPLUG_STACK, "");
 				return (DDI_FAILURE);
 			}
 			s1394_free_cfgrom(hal, onode, S1394_FREE_CFGROM_OLD);
@@ -1032,9 +836,6 @@ s1394_process_old_tree(s1394_hal_t *hal)
 	}
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
-
-	TNF_PROBE_0_DEBUG(s1394_process_old_tree_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1053,12 +854,8 @@ s1394_update_unit_dir_location(s1394_hal_t *hal, dev_info_t *tdip,
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 	ASSERT(tdip != NULL);
 
-	TNF_PROBE_1_DEBUG(s1394_update_unit_dir_location_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, offset, offset);
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, tdip, "unit-dir-offset",
 	    offset);
-	TNF_PROBE_0_DEBUG(s1394_update_unit_dir_location_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -1078,9 +875,6 @@ s1394_add_target_to_node(s1394_target_t *target)
 	char name[MAXNAMELEN];
 	char *ptr;
 
-	TNF_PROBE_0_DEBUG(s1394_add_target_to_node_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	hal = target->on_hal;
 	ASSERT(hal != NULL);
 
@@ -1091,8 +885,6 @@ s1394_add_target_to_node(s1394_target_t *target)
 	ASSERT(rw_read_locked(&target->on_hal->target_list_rwlock) == 0);
 
 	if ((ptr = ddi_get_name_addr(target->target_dip)) == NULL) {
-		TNF_PROBE_0_DEBUG(s1394_add_target_to_node_exit_no_name,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return;
 	}
 
@@ -1140,9 +932,6 @@ s1394_add_target_to_node(s1394_target_t *target)
 			}
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_add_target_to_node_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -1155,9 +944,6 @@ s1394_remove_target_from_node(s1394_target_t *target)
 	s1394_target_t *t, *t1;
 	s1394_hal_t *hal;
 
-	TNF_PROBE_0_DEBUG(s1394_remove_target_from_node_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	hal = target->on_hal;
 	ASSERT(hal != NULL);
 
@@ -1166,12 +952,6 @@ s1394_remove_target_from_node(s1394_target_t *target)
 
 	/* target_list_rwlock should be held in write mode */
 	ASSERT(rw_read_locked(&target->on_hal->target_list_rwlock) == 0);
-
-	if (target->on_node == NULL) {
-		TNF_PROBE_1_DEBUG(s1394_remove_target_from_node_NULL,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_uint, target_state, target->target_state);
-	}
 
 	t = target->target_list;
 	t1 = NULL;
@@ -1199,7 +979,4 @@ s1394_remove_target_from_node(s1394_target_t *target)
 
 	target->on_node = NULL;
 	target->target_sibling = NULL;
-
-	TNF_PROBE_0_DEBUG(s1394_remove_target_from_node_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }

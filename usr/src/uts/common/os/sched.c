@@ -49,7 +49,6 @@
 #include <sys/modctl.h>
 #include <sys/debug.h>
 #include <sys/sdt.h>
-#include <sys/tnf_probe.h>
 #include <sys/procfs.h>
 
 #include <vm/seg.h>
@@ -575,11 +574,6 @@ top:
 
 			/* Kernel probe */
 			DTRACE_SCHED1(swapin__lwp, kthread_t *, tp);
-			TNF_PROBE_4(swapin_lwp, "vm swap swapin", /* CSTYLED */,
-			    tnf_pid,		pid,		pp->p_pid,
-			    tnf_lwpid,		lwpid,		tp->t_tid,
-			    tnf_kthread_id,	tid,		tp,
-			    tnf_ulong,		page_count,	stack_pages);
 
 			rw_enter(&kas.a_lock, RW_READER);
 			err = segkp_fault(segkp->s_as->a_hat, segkp,
@@ -715,14 +709,6 @@ top:
 					/* Kernel probe */
 					DTRACE_SCHED1(swapout__lwp,
 					    kthread_t *, tp);
-					TNF_PROBE_4(swapout_lwp,
-					    "vm swap swapout",
-					    /* CSTYLED */,
-					    tnf_pid, pid, pp->p_pid,
-					    tnf_lwpid, lwpid, tp->t_tid,
-					    tnf_kthread_id, tid, tp,
-					    tnf_ulong, page_count,
-					    stack_pages);
 
 					rw_enter(&kas.a_lock, RW_READER);
 					err = segkp_fault(segkp->s_as->a_hat,
@@ -771,11 +757,9 @@ top:
 
 		TRACE_2(TR_FAC_SCHED, TR_SWAPOUT,
 		    "swapout: pp %p pages_pushed %lu", pp, ws_pages);
+
 		/* Kernel probe */
 		DTRACE_SCHED1(swapout__process, proc_t *, pp);
-		TNF_PROBE_2(swapout_process, "vm swap swapout", /* CSTYLED */,
-		    tnf_pid,	pid,		pp->p_pid,
-		    tnf_ulong,	page_count,	ws_pages);
 	}
 	*swrss = ws_pages;
 	return (swapped_lwps);
@@ -891,11 +875,6 @@ process_swap_queue(void)
 
 		/* Kernel probe */
 		DTRACE_SCHED1(swapout__lwp, kthread_t *, tp);
-		TNF_PROBE_4(swapout_lwp, "vm swap swapout", /* CSTYLED */,
-		    tnf_pid,		pid,		pp->p_pid,
-		    tnf_lwpid,		lwpid,		tp->t_tid,
-		    tnf_kthread_id,	tid,		tp,
-		    tnf_ulong,		page_count,	stack_pages);
 
 		rw_enter(&kas.a_lock, RW_READER);
 		err = segkp_fault(segkp->s_as->a_hat, segkp, tp->t_swap,
@@ -939,12 +918,9 @@ process_swap_queue(void)
 			TRACE_2(TR_FAC_SCHED, TR_SWAPQ_PROC,
 			    "swaplist_proc: pp %p pages_pushed: %lu",
 			    pp, ws_pages);
+
 			/* Kernel probe */
 			DTRACE_SCHED1(swapout__process, proc_t *, pp);
-			TNF_PROBE_2(swapout_process, "vm swap swapout",
-			    /* CSTYLED */,
-			    tnf_pid,	pid,		pp->p_pid,
-			    tnf_ulong,	page_count,	ws_pages);
 		}
 		pp->p_swrss += ws_pages;
 		disp_lock_enter(&swapped_lock);

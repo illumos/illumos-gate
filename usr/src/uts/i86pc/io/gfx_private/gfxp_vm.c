@@ -67,7 +67,6 @@
 #include <sys/visual_io.h>
 #include <sys/fbio.h>
 #include <sys/ddidmareq.h>
-#include <sys/tnf_probe.h>
 #include <sys/kstat.h>
 #include <sys/callb.h>
 #include <sys/promif.h>

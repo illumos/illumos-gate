@@ -24,8 +24,6 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_ohci.c
  *    Provides access routines to the OpenHCI HW.
@@ -89,7 +87,6 @@ hci1394_ohci_init(hci1394_state_t *soft_state, hci1394_drvinfo_t *drvinfo,
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_init_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* alloc the space for ohci */
 	ohci = kmem_alloc(sizeof (hci1394_ohci_t), KM_SLEEP);
@@ -121,10 +118,6 @@ hci1394_ohci_init(hci1394_state_t *soft_state, hci1394_drvinfo_t *drvinfo,
 		mutex_destroy(&ohci->ohci_mutex);
 		kmem_free(ohci, sizeof (hci1394_ohci_t));
 		*ohci_hdl = NULL;
-		TNF_PROBE_0(ddi_regs_map_setup_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_init_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -155,10 +148,6 @@ hci1394_ohci_init(hci1394_state_t *soft_state, hci1394_drvinfo_t *drvinfo,
 		mutex_destroy(&ohci->ohci_mutex);
 		kmem_free(ohci, sizeof (hci1394_ohci_t));
 		*ohci_hdl = NULL;
-		TNF_PROBE_0(hci1394_ohci_chip_init_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -170,10 +159,6 @@ hci1394_ohci_init(hci1394_state_t *soft_state, hci1394_drvinfo_t *drvinfo,
 		mutex_destroy(&ohci->ohci_mutex);
 		kmem_free(ohci, sizeof (hci1394_ohci_t));
 		*ohci_hdl = NULL;
-		TNF_PROBE_0(hci1394_ohci_phy_init_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -186,10 +171,6 @@ hci1394_ohci_init(hci1394_state_t *soft_state, hci1394_drvinfo_t *drvinfo,
 			mutex_destroy(&ohci->ohci_mutex);
 			kmem_free(ohci, sizeof (hci1394_ohci_t));
 			*ohci_hdl = NULL;
-			TNF_PROBE_0(hci1394_ohci_1394a_init_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_ohci_init_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
@@ -213,10 +194,6 @@ hci1394_ohci_init(hci1394_state_t *soft_state, hci1394_drvinfo_t *drvinfo,
 		mutex_destroy(&ohci->ohci_mutex);
 		kmem_free(ohci, sizeof (hci1394_ohci_t));
 		*ohci_hdl = NULL;
-		TNF_PROBE_0(hci1394_ohci_selfid_init_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -228,10 +205,6 @@ hci1394_ohci_init(hci1394_state_t *soft_state, hci1394_drvinfo_t *drvinfo,
 		mutex_destroy(&ohci->ohci_mutex);
 		kmem_free(ohci, sizeof (hci1394_ohci_t));
 		*ohci_hdl = NULL;
-		TNF_PROBE_0(hci1394_ohci_selfid_init_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -244,14 +217,8 @@ hci1394_ohci_init(hci1394_state_t *soft_state, hci1394_drvinfo_t *drvinfo,
 		mutex_destroy(&ohci->ohci_mutex);
 		kmem_free(ohci, sizeof (hci1394_ohci_t));
 		*ohci_hdl = NULL;
-		TNF_PROBE_0(hci1394_ohci_cfgrom_init_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_init_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -268,7 +235,6 @@ hci1394_ohci_fini(hci1394_ohci_handle_t *ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_fini_enter, HCI1394_TNF_HAL_STACK, "");
 
 	ohci = *ohci_hdl;
 
@@ -289,8 +255,6 @@ hci1394_ohci_fini(hci1394_ohci_handle_t *ohci_hdl)
 	/* Free the OpenHCI state space */
 	kmem_free(ohci, sizeof (hci1394_ohci_t));
 	*ohci_hdl = NULL;
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_fini_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -306,16 +270,10 @@ hci1394_ohci_chip_init(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_chip_init_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	/* Reset 1394 OHCI HW */
 	status = hci1394_ohci_soft_reset(ohci_hdl);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_soft_reset_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -429,8 +387,6 @@ hci1394_ohci_chip_init(hci1394_ohci_handle_t ohci_hdl)
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->intr_mask_clr, (uint32_t)0xFFFFFFFF);
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_chip_init_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -446,8 +402,6 @@ hci1394_ohci_soft_reset(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_soft_reset_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Reset 1394 HW - Reset is bit 16 in HCControl */
 	ddi_put32(ohci_hdl->ohci_reg_handle,
@@ -461,15 +415,8 @@ hci1394_ohci_soft_reset(hci1394_ohci_handle_t ohci_hdl)
 	    &ohci_hdl->ohci_regs->hc_ctrl_set);
 	resetStatus = resetStatus & OHCI_HC_SOFT_RESET;
 	if (resetStatus != 0) {
-		TNF_PROBE_0(hci1394_ohci_reset_not_complete_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_soft_reset_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_soft_reset_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -489,15 +436,10 @@ hci1394_ohci_reg_read(hci1394_ohci_handle_t ohci_hdl,
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(data != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_reg_read_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	addr = (uint32_t *)((uintptr_t)ohci_hdl->ohci_regs +
 	    (uintptr_t)(offset & OHCI_REG_ADDR_MASK));
 	*data = ddi_get32(ohci_hdl->ohci_reg_handle, addr);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_reg_read_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -514,15 +456,10 @@ hci1394_ohci_reg_write(hci1394_ohci_handle_t ohci_hdl,
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_reg_read_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	addr = (uint32_t *)((uintptr_t)ohci_hdl->ohci_regs +
 	    (uintptr_t)(offset & OHCI_REG_ADDR_MASK));
 	ddi_put32(ohci_hdl->ohci_reg_handle, addr, data);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_reg_read_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -536,14 +473,9 @@ void
 hci1394_ohci_intr_master_enable(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_master_enable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->intr_mask_set, OHCI_INTR_MASTER_INTR_ENBL);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_master_enable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -557,14 +489,9 @@ void
 hci1394_ohci_intr_master_disable(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_master_disable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->intr_mask_clr, OHCI_INTR_MASTER_INTR_ENBL);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_master_disable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -581,8 +508,6 @@ hci1394_ohci_intr_asserted(hci1394_ohci_handle_t ohci_hdl)
 	uint32_t interrupts_asserted;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_asserted_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Only look at interrupts which are enabled by reading the
@@ -591,8 +516,6 @@ hci1394_ohci_intr_asserted(hci1394_ohci_handle_t ohci_hdl)
 	interrupts_asserted = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->intr_event_clr);
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_asserted_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 	return (interrupts_asserted);
 }
 
@@ -607,14 +530,9 @@ hci1394_ohci_intr_enable(hci1394_ohci_handle_t ohci_hdl,
     uint32_t interrupt_mask)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_enable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->intr_mask_set, interrupt_mask);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_enable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -628,14 +546,9 @@ hci1394_ohci_intr_disable(hci1394_ohci_handle_t ohci_hdl,
     uint32_t interrupt_mask)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_disable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->intr_mask_clr, interrupt_mask);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_disable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -650,16 +563,9 @@ hci1394_ohci_intr_clear(hci1394_ohci_handle_t ohci_hdl,
     uint32_t interrupt_mask)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_clear_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->intr_event_clr, interrupt_mask);
-	TNF_PROBE_1_DEBUG(hci1394_ohci_intr_clear, HCI1394_TNF_HAL, "",
-	    tnf_uint, intr_mask, interrupt_mask);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_intr_clear_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -676,15 +582,11 @@ hci1394_ohci_it_intr_asserted(hci1394_ohci_handle_t ohci_hdl)
 	uint32_t interrupts_asserted;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_intr_asserted_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Only look at interrupts which are enabled */
 	interrupts_asserted = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->it_intr_event_clr);
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_intr_asserted_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 	return (interrupts_asserted);
 }
 
@@ -700,14 +602,9 @@ hci1394_ohci_it_intr_enable(hci1394_ohci_handle_t ohci_hdl,
     uint32_t interrupt_mask)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_intr_enable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->it_intr_mask_set, interrupt_mask);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_intr_enable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -722,14 +619,9 @@ hci1394_ohci_it_intr_disable(hci1394_ohci_handle_t ohci_hdl,
     uint32_t interrupt_mask)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_intr_disable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->it_intr_mask_clr, interrupt_mask);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_intr_disable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -744,14 +636,9 @@ hci1394_ohci_it_intr_clear(hci1394_ohci_handle_t ohci_hdl,
     uint32_t interrupt_mask)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_intr_clear_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->it_intr_event_clr, interrupt_mask);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_intr_clear_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -766,8 +653,6 @@ hci1394_ohci_it_ctxt_count_get(hci1394_ohci_handle_t ohci_hdl)
 	int count;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_ctxt_count_get_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * hw is required to support contexts 0 to N, where N <= 31
@@ -785,8 +670,6 @@ hci1394_ohci_it_ctxt_count_get(hci1394_ohci_handle_t ohci_hdl)
 		count++;
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_ctxt_count_get_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 	return (count);
 }
 
@@ -802,15 +685,10 @@ hci1394_ohci_it_cmd_ptr_set(hci1394_ohci_handle_t ohci_hdl,
     uint_t context_number, uint32_t io_addr)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_cmd_ptr_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->it[context_number].cmd_ptrlo,
 	    io_addr);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_it_cmd_ptr_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -827,15 +705,11 @@ hci1394_ohci_ir_intr_asserted(hci1394_ohci_handle_t ohci_hdl)
 	uint32_t interrupts_asserted;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_intr_asserted_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Only look at interrupts which are enabled */
 	interrupts_asserted = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ir_intr_event_clr);
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_intr_asserted_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 	return (interrupts_asserted);
 }
 
@@ -851,14 +725,9 @@ hci1394_ohci_ir_intr_enable(hci1394_ohci_handle_t ohci_hdl,
     uint32_t interrupt_mask)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_intr_enable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ir_intr_mask_set, interrupt_mask);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_intr_enable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -873,14 +742,9 @@ hci1394_ohci_ir_intr_disable(hci1394_ohci_handle_t ohci_hdl,
     uint32_t interrupt_mask)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_intr_disable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ir_intr_mask_clr, interrupt_mask);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_intr_disable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -895,14 +759,9 @@ hci1394_ohci_ir_intr_clear(hci1394_ohci_handle_t ohci_hdl,
     uint32_t interrupt_mask)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_intr_clear_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ir_intr_event_clr, interrupt_mask);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_intr_clear_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -917,8 +776,6 @@ hci1394_ohci_ir_ctxt_count_get(hci1394_ohci_handle_t ohci_hdl)
 	int count;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_ctxt_count_get_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * hw is required to support contexts 0 to N, where N <= 31
@@ -936,8 +793,6 @@ hci1394_ohci_ir_ctxt_count_get(hci1394_ohci_handle_t ohci_hdl)
 		count++;
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_ctxt_count_get_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 	return (count);
 }
 
@@ -953,15 +808,10 @@ hci1394_ohci_ir_cmd_ptr_set(hci1394_ohci_handle_t ohci_hdl,
     uint_t context_number, uint32_t io_addr)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_cmd_ptr_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ir[context_number].cmd_ptrlo,
 	    io_addr);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_ir_cmd_ptr_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -974,14 +824,9 @@ void
 hci1394_ohci_link_enable(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_link_enable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->hc_ctrl_set, OHCI_HC_LINK_ENBL);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_link_enable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -995,14 +840,9 @@ void
 hci1394_ohci_link_disable(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_link_disable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->hc_ctrl_clr, OHCI_HC_LINK_ENBL);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_link_disable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -1019,8 +859,6 @@ hci1394_ohci_bus_reset(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bus_reset_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * We want to reset the bus.  We also handle the root_holdoff and gap
@@ -1043,19 +881,12 @@ hci1394_ohci_bus_reset(hci1394_ohci_handle_t ohci_hdl)
 	 */
 	status = hci1394_ohci_phy_write(ohci_hdl, 0x1, reg);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_write_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_bus_reset_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* clear the root holdoff and gap count state bits */
 	ohci_hdl->ohci_set_root_holdoff = B_FALSE;
 	ohci_hdl->ohci_set_gap_count = B_FALSE;
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bus_reset_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1088,10 +919,6 @@ hci1394_ohci_bus_reset_nroot(hci1394_ohci_handle_t ohci_hdl)
 	 */
 	status = hci1394_ohci_phy_write(ohci_hdl, 0x1, reg);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_write_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_bus_reset_nroot_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1111,8 +938,6 @@ hci1394_ohci_phy_init(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_init_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * if the phy has extended set to 7, the phy is a not a 1394-1995 PHY.
@@ -1131,10 +956,6 @@ hci1394_ohci_phy_init(hci1394_ohci_handle_t ohci_hdl)
 	 */
 	status = hci1394_ohci_phy_read(ohci_hdl, 2, &phy_reg);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_read_failed,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1148,9 +969,6 @@ hci1394_ohci_phy_init(hci1394_ohci_handle_t ohci_hdl)
 		/* Treat all other PHY's as a 1394A PHY */
 		ohci_hdl->ohci_phy = H1394_PHY_1394A;
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_init_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1166,14 +984,8 @@ static int
 hci1394_ohci_phy_resume(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_resume_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* There is currently nothing to re-initialize here */
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_resume_exit,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	return (DDI_SUCCESS);
 }
 
@@ -1191,8 +1003,6 @@ hci1394_ohci_phy_set(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&ohci_hdl->ohci_mutex);
 
@@ -1200,10 +1010,6 @@ hci1394_ohci_phy_set(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	status = hci1394_ohci_phy_read_no_lock(ohci_hdl, address, &reg);
 	if (status != DDI_SUCCESS) {
 		mutex_exit(&ohci_hdl->ohci_mutex);
-		TNF_PROBE_0(hci1394_ohci_phy_read_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_set_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1212,17 +1018,10 @@ hci1394_ohci_phy_set(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	status = hci1394_ohci_phy_write_no_lock(ohci_hdl, address, reg);
 	if (status != DDI_SUCCESS) {
 		mutex_exit(&ohci_hdl->ohci_mutex);
-		TNF_PROBE_0(hci1394_ohci_phy_write_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_set_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	mutex_exit(&ohci_hdl->ohci_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_set_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (DDI_SUCCESS);
 }
@@ -1241,8 +1040,6 @@ hci1394_ohci_phy_clr(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_clr_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&ohci_hdl->ohci_mutex);
 
@@ -1250,10 +1047,6 @@ hci1394_ohci_phy_clr(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	status = hci1394_ohci_phy_read_no_lock(ohci_hdl, address, &reg);
 	if (status != DDI_SUCCESS) {
 		mutex_exit(&ohci_hdl->ohci_mutex);
-		TNF_PROBE_0(hci1394_ohci_phy_read_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_clr_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1262,18 +1055,10 @@ hci1394_ohci_phy_clr(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	status = hci1394_ohci_phy_write_no_lock(ohci_hdl, address, reg);
 	if (status != DDI_SUCCESS) {
 		mutex_exit(&ohci_hdl->ohci_mutex);
-		TNF_PROBE_0(hci1394_ohci_phy_write_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_clr_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	mutex_exit(&ohci_hdl->ohci_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_clr_exit, HCI1394_TNF_HAL_STACK,
-	    "");
-
 	return (DDI_SUCCESS);
 }
 
@@ -1289,13 +1074,9 @@ hci1394_ohci_phy_read(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	int status;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_read_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 	mutex_enter(&ohci_hdl->ohci_mutex);
 	status = hci1394_ohci_phy_read_no_lock(ohci_hdl, address, data);
 	mutex_exit(&ohci_hdl->ohci_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_read_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (status);
 }
@@ -1312,13 +1093,9 @@ hci1394_ohci_phy_write(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	int status;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_write_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 	mutex_enter(&ohci_hdl->ohci_mutex);
 	status = hci1394_ohci_phy_write_no_lock(ohci_hdl, address, data);
 	mutex_exit(&ohci_hdl->ohci_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_write_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (status);
 }
@@ -1341,15 +1118,9 @@ hci1394_ohci_phy_read_no_lock(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(data != NULL);
 	ASSERT(MUTEX_HELD(&ohci_hdl->ohci_mutex));
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_read_no_lock_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* You can't read or write PHY register #0 */
 	if (address == 0) {
-		TNF_PROBE_1(hci1394_ohci_phy_addr_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "can't rd/wr PHY reg #0");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_read_no_lock_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1357,10 +1128,6 @@ hci1394_ohci_phy_read_no_lock(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	ohci_reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->phy_ctrl);
 	if ((ohci_reg & (OHCI_PHYC_RDREG | OHCI_PHYC_WRREG)) != 0) {
-		TNF_PROBE_1(hci1394_ohci_phy_xfer_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "transfer already in progress?");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_read_no_lock_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1408,10 +1175,6 @@ hci1394_ohci_phy_read_no_lock(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	if (count >= hci1394_phy_delay_uS) {
 		/* we timed out, return failure */
 		*data = 0;
-		TNF_PROBE_0(hci1394_ohci_phy_rd_timeout_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_read_no_lock_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1419,9 +1182,6 @@ hci1394_ohci_phy_read_no_lock(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	*data = (ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->phy_ctrl) & OHCI_PHYC_RDDATA_MASK) >>
 	    OHCI_PHYC_RDDATA_SHIFT;
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_read_no_lock_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1443,15 +1203,9 @@ hci1394_ohci_phy_write_no_lock(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(MUTEX_HELD(&ohci_hdl->ohci_mutex));
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_write_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* You can't read or write PHY register #0 */
 	if (address == 0) {
-		TNF_PROBE_1(hci1394_ohci_phy_addr_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "can't rd/wr PHY reg #0");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_write_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1459,10 +1213,6 @@ hci1394_ohci_phy_write_no_lock(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	ohci_reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->phy_ctrl);
 	if ((ohci_reg & (OHCI_PHYC_RDREG | OHCI_PHYC_WRREG)) != 0) {
-		TNF_PROBE_1(hci1394_ohci_phy_xfer_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "transfer already in progress?");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_write_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1504,15 +1254,8 @@ hci1394_ohci_phy_write_no_lock(hci1394_ohci_handle_t ohci_hdl, uint_t address,
 	/* Check to see if we timed out */
 	if (count >= hci1394_phy_delay_uS) {
 		/* we timed out, return failure */
-		TNF_PROBE_0(hci1394_ohci_phy_wr_timeout_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_write_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_write_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1543,8 +1286,6 @@ hci1394_ohci_phy_info(hci1394_ohci_handle_t ohci_hdl, uint32_t *info)
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(info != NULL);
 	ASSERT(ohci_hdl->ohci_phy == H1394_PHY_1995);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_info_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Set Link on. We are using power class 0 since we have no idea what
@@ -1561,10 +1302,6 @@ hci1394_ohci_phy_info(hci1394_ohci_handle_t ohci_hdl, uint32_t *info)
 	/* Add in Gap Count */
 	status = hci1394_ohci_phy_read(ohci_hdl, 1, &reg);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_read_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_info_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 	phy_info = phy_info | ((reg << IEEE1394_SELFID_GAP_CNT_SHIFT) &
@@ -1573,10 +1310,6 @@ hci1394_ohci_phy_info(hci1394_ohci_handle_t ohci_hdl, uint32_t *info)
 	/* Add in speed & ports */
 	status = hci1394_ohci_phy_read(ohci_hdl, 2, &reg);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_read_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_info_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 	phy_info = phy_info | ((reg & 0xC0) << 8);
@@ -1584,11 +1317,6 @@ hci1394_ohci_phy_info(hci1394_ohci_handle_t ohci_hdl, uint32_t *info)
 
 	/* PHY reports that it has 0 ports?? */
 	if (num_ports == 0) {
-		TNF_PROBE_1(hci1394_ohci_phy_zero_ports_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-		    "1995 phy has zero ports?");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_info_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1599,10 +1327,6 @@ hci1394_ohci_phy_info(hci1394_ohci_handle_t ohci_hdl, uint32_t *info)
 			status = hci1394_ohci_phy_read(ohci_hdl,
 			    count + 3, &reg);
 			if (status != DDI_SUCCESS) {
-				TNF_PROBE_0(hci1394_ohci_phy_read_fail,
-				    HCI1394_TNF_HAL_ERROR, "");
-				TNF_PROBE_0_DEBUG(hci1394_ohci_phy_info_exit,
-				    HCI1394_TNF_HAL_STACK, "");
 				return (DDI_FAILURE);
 			}
 			/* if port is not connected */
@@ -1632,9 +1356,6 @@ hci1394_ohci_phy_info(hci1394_ohci_handle_t ohci_hdl, uint32_t *info)
 	/* Copy the PHY selfid info to the return parameter */
 	*info = phy_info;
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_info_exit,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	return (DDI_SUCCESS);
 }
 
@@ -1651,15 +1372,10 @@ hci1394_ohci_current_busgen(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_current_busgen_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->self_id_count);
 	generation_count = (reg & OHCI_SLFC_GEN_MASK) >> OHCI_SLFC_GEN_SHIFT;
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_current_busgen_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (generation_count);
 }
@@ -1678,8 +1394,6 @@ hci1394_ohci_startup(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_startup_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Turn on 1394 link. This allows us to receive 1394 traffic off the
@@ -1695,20 +1409,12 @@ hci1394_ohci_startup(hci1394_ohci_handle_t ohci_hdl)
 	 */
 	status = hci1394_ohci_bus_reset(ohci_hdl);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_1_DEBUG(hci1394_ohci_startup_exit,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-		    "failed to reset bus");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_startup_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* setup out initial interrupt mask and enable interrupts */
 	hci1394_isr_mask_setup(ohci_hdl->soft_state);
 	hci1394_ohci_intr_master_enable(ohci_hdl);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_startup_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (DDI_SUCCESS);
 }
@@ -1727,8 +1433,6 @@ hci1394_ohci_postwr_addr(hci1394_ohci_handle_t ohci_hdl, uint64_t *addr)
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(addr != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_postwr_addr_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* read in the errored address */
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
@@ -1743,9 +1447,6 @@ hci1394_ohci_postwr_addr(hci1394_ohci_handle_t ohci_hdl, uint64_t *addr)
 	 * See 13.2.8.1 in OpenHCI spec v1.0.
 	 */
 	hci1394_ohci_intr_clear(ohci_hdl, OHCI_INTR_POST_WR_ERR);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_postwr_addr_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -1761,7 +1462,6 @@ hci1394_ohci_guid(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_guid_enter, HCI1394_TNF_HAL_STACK, "");
 
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->guid_hi);
@@ -1769,8 +1469,6 @@ hci1394_ohci_guid(hci1394_ohci_handle_t ohci_hdl)
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->guid_lo);
 	guid = guid | (uint64_t)reg;
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_guid_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (guid);
 }
@@ -1794,8 +1492,6 @@ hci1394_ohci_csr_read(hci1394_ohci_handle_t ohci_hdl, uint_t offset,
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(data != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_csr_read_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	/*
 	 * read the CSR register by doing a cswap with the same compare and
@@ -1805,15 +1501,8 @@ hci1394_ohci_csr_read(hci1394_ohci_handle_t ohci_hdl, uint_t offset,
 	status = hci1394_ohci_csr_cswap(ohci_hdl, generation, offset, 0, 0,
 	    data);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_csr_read_csw_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_csr_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_csr_read_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (DDI_SUCCESS);
 }
@@ -1837,18 +1526,12 @@ hci1394_ohci_csr_cswap(hci1394_ohci_handle_t ohci_hdl, uint_t generation,
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(old != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_csr_cswap_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Make sure we have not gotten a bus reset since this action was
 	 * started.
 	 */
 	if (generation != hci1394_ohci_current_busgen(ohci_hdl)) {
-		TNF_PROBE_1(hci1394_ohci_invbusgen_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "Invalid Bus Generation");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_csr_cswap_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1892,10 +1575,6 @@ hci1394_ohci_csr_cswap(hci1394_ohci_handle_t ohci_hdl, uint_t generation,
 	if (count >= 2) {
 		*old = 0;
 		mutex_exit(&ohci_hdl->ohci_mutex);
-		TNF_PROBE_0(hci1394_ohci_phy_csr_timeout_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_csr_cswap_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1917,17 +1596,9 @@ hci1394_ohci_csr_cswap(hci1394_ohci_handle_t ohci_hdl, uint_t generation,
 	if (generation != hci1394_ohci_current_busgen(ohci_hdl)) {
 		if (*old == compare) {
 			(void) hci1394_ohci_bus_reset(ohci_hdl);
-			TNF_PROBE_1(hci1394_ohci_invbusgen_fail,
-			    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-			    "Invalid Bus Generation");
-			TNF_PROBE_0_DEBUG(hci1394_ohci_csr_cswap_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_csr_cswap_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (DDI_SUCCESS);
 }
@@ -1946,33 +1617,20 @@ hci1394_ohci_contender_enable(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_contender_enable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Make sure that phy is not a 1394-1995 phy. Those phy's do not have a
 	 * contender bit to set.
 	 */
 	if (ohci_hdl->ohci_phy == H1394_PHY_1995) {
-		TNF_PROBE_0(hci1394_ohci_phy_type_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_contender_enable_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* Set the Contender Bit */
 	status = hci1394_ohci_phy_set(ohci_hdl, 0x4, OHCI_PHY_CNTDR);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_set_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_contender_enable_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_contender_enable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -1988,13 +1646,8 @@ int
 hci1394_ohci_root_holdoff_enable(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_root_holdoff_enable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ohci_hdl->ohci_set_root_holdoff = B_TRUE;
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_root_holdoff_enable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2010,14 +1663,9 @@ int
 hci1394_ohci_gap_count_set(hci1394_ohci_handle_t ohci_hdl, uint_t gap_count)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_gap_count_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ohci_hdl->ohci_set_gap_count = B_TRUE;
 	ohci_hdl->ohci_gap_count = gap_count & OHCI_PHY_MAX_GAP;
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_gap_count_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2044,18 +1692,12 @@ hci1394_ohci_phy_filter_set(hci1394_ohci_handle_t ohci_hdl, uint64_t mask,
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_filter_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Make sure we have not gotten a bus reset since this action was
 	 * started.
 	 */
 	if (generation != hci1394_ohci_current_busgen(ohci_hdl)) {
-		TNF_PROBE_1(hci1394_ohci_invbusgen_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "Invalid Bus Generation");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_filter_set_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2075,15 +1717,8 @@ hci1394_ohci_phy_filter_set(hci1394_ohci_handle_t ohci_hdl, uint64_t mask,
 	 */
 	if (generation != hci1394_ohci_current_busgen(ohci_hdl)) {
 		(void) hci1394_ohci_bus_reset(ohci_hdl);
-		TNF_PROBE_1(hci1394_ohci_filterrace_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "Invalid Bus Generation");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_filter_set_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_SUCCESS);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_filter_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2102,18 +1737,12 @@ hci1394_ohci_phy_filter_clr(hci1394_ohci_handle_t ohci_hdl,
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_filter_clr_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Make sure we have not gotten a bus reset since this action was
 	 * started.
 	 */
 	if (generation != hci1394_ohci_current_busgen(ohci_hdl)) {
-		TNF_PROBE_1(hci1394_ohci_invbusgen_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "Invalid Bus Generation");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_phy_filter_clr_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2123,9 +1752,6 @@ hci1394_ohci_phy_filter_clr(hci1394_ohci_handle_t ohci_hdl,
 	data = (uint32_t)(mask & 0xFFFFFFFF);
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->phys_req_filterlo_clr, data);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_phy_filter_clr_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2142,33 +1768,20 @@ hci1394_ohci_bus_reset_short(hci1394_ohci_handle_t ohci_hdl)
 	int status;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bus_reset_short_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Make sure that phy is not a 1394-1995 phy. Those phy's do not have a
 	 * contender bit to set.
 	 */
 	if (ohci_hdl->ohci_phy == H1394_PHY_1995) {
-		TNF_PROBE_0(hci1394_ohci_brs_phy_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_bus_reset_short_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* Initiate the short bus reset */
 	status = hci1394_ohci_phy_set(ohci_hdl, 0x5, OHCI_PHY_ISBR);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_set_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_bus_reset_short_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bus_reset_short_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (status);
 }
@@ -2191,8 +1804,6 @@ hci1394_ohci_cfgrom_update(hci1394_ohci_handle_t ohci_hdl, void *local_buf,
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(local_buf != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cfgrom_update_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	data = (uint32_t *)local_buf;
 
@@ -2218,9 +1829,6 @@ hci1394_ohci_cfgrom_update(hci1394_ohci_handle_t ohci_hdl, void *local_buf,
 	    &ohci_hdl->ohci_regs->bus_options, OHCI_SWAP32(data[2]));
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->config_rom_hdr, OHCI_SWAP32(data[0]));
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cfgrom_update_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2235,13 +1843,9 @@ hci1394_ohci_nodeid_get(hci1394_ohci_handle_t ohci_hdl, uint_t *nodeid)
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(nodeid != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_nodeid_get_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->node_id);
 	*nodeid = (reg & 0xFFFF) << 16;
-	TNF_PROBE_0_DEBUG(hci1394_ohci_nodeid_get_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -2257,15 +1861,10 @@ hci1394_ohci_nodeid_set(hci1394_ohci_handle_t ohci_hdl, uint_t nodeid)
 	uint32_t reg;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_nodeid_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	reg = ((nodeid & 0xFFC00000) >> 16);
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->node_id, reg);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_nodeid_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2284,8 +1883,6 @@ hci1394_ohci_nodeid_info(hci1394_ohci_handle_t ohci_hdl, uint_t *nodeid,
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(nodeid != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_nodeid_info_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->node_id);
@@ -2295,9 +1892,6 @@ hci1394_ohci_nodeid_info(hci1394_ohci_handle_t ohci_hdl, uint_t *nodeid,
 	} else {
 		*error = B_FALSE;
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_nodeid_info_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2311,12 +1905,8 @@ hci1394_ohci_cycletime_get(hci1394_ohci_handle_t ohci_hdl,
 {
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(cycle_time != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cycletime_get_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	*cycle_time = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->isoch_cycle_timer);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cycletime_get_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2329,12 +1919,8 @@ hci1394_ohci_cycletime_set(hci1394_ohci_handle_t ohci_hdl,
     uint32_t cycle_time)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cycletime_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->isoch_cycle_timer, cycle_time);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cycletime_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2352,8 +1938,6 @@ hci1394_ohci_bustime_get(hci1394_ohci_handle_t ohci_hdl, uint32_t *bus_time)
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(bus_time != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bustime_get_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * The bus time is composed of a portion of the cycle time and the
@@ -2370,9 +1954,6 @@ hci1394_ohci_bustime_get(hci1394_ohci_handle_t ohci_hdl, uint32_t *bus_time)
 	} while (bus_time1 != bus_time2);
 
 	*bus_time = (bus_time2 << 7) | (cycle_time >> 25);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bustime_get_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2384,8 +1965,6 @@ void
 hci1394_ohci_bustime_set(hci1394_ohci_handle_t ohci_hdl, uint32_t bus_time)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bustime_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * we will start with the cycle 64 seconds interrupt disabled. If this
@@ -2398,9 +1977,6 @@ hci1394_ohci_bustime_set(hci1394_ohci_handle_t ohci_hdl, uint32_t bus_time)
 		hci1394_ohci_intr_enable(ohci_hdl, OHCI_INTR_CYC_64_SECS);
 	}
 	ohci_hdl->ohci_bustime_count = (bus_time >> 7);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bustime_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2416,13 +1992,9 @@ hci1394_ohci_atreq_retries_get(hci1394_ohci_handle_t ohci_hdl,
 
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(atreq_retries != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_retries_get_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_retries);
 	*atreq_retries = reg & OHCI_RET_MAX_ATREQ_MASK;
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_retries_get_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2438,8 +2010,6 @@ hci1394_ohci_atreq_retries_set(hci1394_ohci_handle_t ohci_hdl,
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_retries_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&ohci_hdl->ohci_mutex);
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
@@ -2449,9 +2019,6 @@ hci1394_ohci_atreq_retries_set(hci1394_ohci_handle_t ohci_hdl,
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_retries, reg);
 	mutex_exit(&ohci_hdl->ohci_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_retries_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2465,8 +2032,6 @@ hci1394_ohci_isr_cycle64seconds(hci1394_ohci_handle_t ohci_hdl)
 	uint32_t cycle_time;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_isr_cycle64seconds_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	hci1394_ohci_intr_clear(ohci_hdl, OHCI_INTR_CYC_64_SECS);
 	cycle_time = ddi_get32(ohci_hdl->ohci_reg_handle,
@@ -2480,9 +2045,6 @@ hci1394_ohci_isr_cycle64seconds(hci1394_ohci_handle_t ohci_hdl)
 	if ((cycle_time & 0x80000000) == 0) {
 		ohci_hdl->ohci_bustime_count++;
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_isr_cycle64seconds_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2498,8 +2060,6 @@ hci1394_ohci_isr_phy(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_isr_phy_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* clear the interrupt */
 	hci1394_ohci_intr_clear(ohci_hdl, OHCI_INTR_PHY);
@@ -2512,20 +2072,12 @@ hci1394_ohci_isr_phy(hci1394_ohci_handle_t ohci_hdl)
 	 * to read.
 	 */
 	if (ohci_hdl->ohci_phy == H1394_PHY_1995) {
-		TNF_PROBE_0(hci1394_ohci_phy_isr_1995,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_isr_phy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return;
 	}
 
 	/* See why we got this interrupt */
 	status = hci1394_ohci_phy_read(ohci_hdl, 5, &phy_status);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_read_failed,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_isr_phy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return;
 	}
 
@@ -2533,28 +2085,20 @@ hci1394_ohci_isr_phy(hci1394_ohci_handle_t ohci_hdl)
 		ohci_hdl->ohci_drvinfo->di_stats.st_phy_loop_err++;
 		cmn_err(CE_NOTE, "hci1394(%d): ERROR - bus loop detected",
 		    ohci_hdl->ohci_drvinfo->di_instance);
-		TNF_PROBE_0(hci1394_ohci_phy_isr_loop, HCI1394_TNF_HAL, "");
 	}
 	if (phy_status & OHCI_PHY_PWRFAIL_ERR) {
 		ohci_hdl->ohci_drvinfo->di_stats.st_phy_pwrfail_err++;
-		TNF_PROBE_0(hci1394_ohci_phy_isr_pwr, HCI1394_TNF_HAL, "");
 	}
 	if (phy_status & OHCI_PHY_TIMEOUT_ERR) {
 		ohci_hdl->ohci_drvinfo->di_stats.st_phy_timeout_err++;
-		TNF_PROBE_0(hci1394_ohci_phy_isr_tmout, HCI1394_TNF_HAL, "");
 	}
 	if (phy_status & OHCI_PHY_PORTEVT_ERR) {
 		ohci_hdl->ohci_drvinfo->di_stats.st_phy_portevt_err++;
-		TNF_PROBE_0(hci1394_ohci_phy_isr_pevt, HCI1394_TNF_HAL, "");
 	}
 
 	/* clear any set status bits */
 	status = hci1394_ohci_phy_write(ohci_hdl, 5, phy_status);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_write_failed,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_isr_phy_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return;
 	}
 
@@ -2564,9 +2108,6 @@ hci1394_ohci_isr_phy(hci1394_ohci_handle_t ohci_hdl)
 	 * we see a selfid complete.
 	 */
 	hci1394_ohci_intr_disable(ohci_hdl, OHCI_INTR_PHY);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_isr_phy_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2582,8 +2123,6 @@ hci1394_ohci_root_check(hci1394_ohci_handle_t ohci_hdl)
 	int status;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_root_check_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->node_id);
 	if ((reg & OHCI_REG_NODEID_ROOT) && (reg & OHCI_NDID_IDVALID)) {
@@ -2591,8 +2130,6 @@ hci1394_ohci_root_check(hci1394_ohci_handle_t ohci_hdl)
 	} else {
 		status = B_FALSE;
 	}
-	TNF_PROBE_0_DEBUG(hci1394_ohci_root_check_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (status);
 }
@@ -2611,8 +2148,6 @@ hci1394_ohci_cmc_check(hci1394_ohci_handle_t ohci_hdl)
 	int status;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cmc_check_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->bus_options);
 	if (reg & OHCI_REG_BUSOPTIONS_CMC) {
@@ -2620,8 +2155,6 @@ hci1394_ohci_cmc_check(hci1394_ohci_handle_t ohci_hdl)
 	} else {
 		status = B_FALSE;
 	}
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cmc_check_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (status);
 }
@@ -2636,8 +2169,6 @@ void
 hci1394_ohci_cycle_master_enable(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cycle_master_enable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* First make sure that cycleTooLong is clear */
 	ddi_put32(ohci_hdl->ohci_reg_handle,
@@ -2646,9 +2177,6 @@ hci1394_ohci_cycle_master_enable(hci1394_ohci_handle_t ohci_hdl)
 	/* Enable Cycle Master */
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->link_ctrl_set, OHCI_LC_CYC_MAST);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cycle_master_enable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2661,15 +2189,10 @@ void
 hci1394_ohci_cycle_master_disable(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cycle_master_disable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* disable cycle master */
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->link_ctrl_clr, OHCI_LC_CYC_MAST);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cycle_master_disable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2685,36 +2208,22 @@ hci1394_ohci_resume(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_resume_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* Re-initialize the OpenHCI chip */
 	status = hci1394_ohci_chip_init(ohci_hdl);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_chip_init_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_resume_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* Re-initialize the PHY */
 	status = hci1394_ohci_phy_resume(ohci_hdl);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_phy_resume_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_resume_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* Re-initialize any 1394A features we are using */
 	status = hci1394_ohci_1394a_resume(ohci_hdl);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_ohci_1394a_resume_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_resume_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2749,8 +2258,6 @@ hci1394_ohci_resume(hci1394_ohci_handle_t ohci_hdl)
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->config_rom_hdr, OHCI_SWAP32(quadlet));
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_resume_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2767,7 +2274,6 @@ hci1394_ohci_selfid_init(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_init_selfid_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Setup for 2K buffer, aligned on a 2Kbyte address boundary. Make sure
@@ -2780,9 +2286,6 @@ hci1394_ohci_selfid_init(hci1394_ohci_handle_t ohci_hdl)
 	status = hci1394_buf_alloc(ohci_hdl->ohci_drvinfo, &parms,
 	    &ohci_hdl->ohci_selfid, &ohci_hdl->ohci_selfid_handle);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_buf_alloc_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_init_selfid_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2793,8 +2296,6 @@ hci1394_ohci_selfid_init(hci1394_ohci_handle_t ohci_hdl)
 
 	/* Enable selfid DMA engine */
 	hci1394_ohci_selfid_enable(ohci_hdl);
-
-	TNF_PROBE_0_DEBUG(hci1394_init_selfid_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -2809,8 +2310,6 @@ void
 hci1394_ohci_selfid_enable(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_enable_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Allow selfid packets to be received.  This should be called during
@@ -2821,9 +2320,6 @@ hci1394_ohci_selfid_enable(hci1394_ohci_handle_t ohci_hdl)
 	 */
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->link_ctrl_set, OHCI_LC_RCV_SELF);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_enable_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2837,12 +2333,8 @@ hci1394_ohci_selfid_read(hci1394_ohci_handle_t ohci_hdl, uint_t offset,
 {
 	ASSERT(ohci_hdl != NULL);
 	ASSERT(data != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_read_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	*data = ddi_get32(ohci_hdl->ohci_selfid.bi_handle,
 	    &((uint32_t *)ohci_hdl->ohci_selfid.bi_kaddr)[offset]);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_read_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2862,8 +2354,6 @@ hci1394_ohci_selfid_info(hci1394_ohci_handle_t ohci_hdl, uint_t *busgen,
 	ASSERT(busgen != NULL);
 	ASSERT(size != NULL);
 	ASSERT(error != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_info_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->self_id_count);
@@ -2874,9 +2364,6 @@ hci1394_ohci_selfid_info(hci1394_ohci_handle_t ohci_hdl, uint_t *busgen,
 	} else {
 		*error = B_TRUE;
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_info_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -2892,8 +2379,6 @@ hci1394_ohci_selfid_buf_current(hci1394_ohci_handle_t ohci_hdl)
 	int status;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_buf_current_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * if the generation stored in the selfid buffer is not equal to the
@@ -2909,9 +2394,6 @@ hci1394_ohci_selfid_buf_current(hci1394_ohci_handle_t ohci_hdl)
 		status = B_TRUE;
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_buf_current_exit,
-	    HCI1394_TNF_HAL_STACK, "");
-
 	return (status);
 }
 
@@ -2924,12 +2406,8 @@ void
 hci1394_ohci_selfid_sync(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_sync_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 	(void) ddi_dma_sync(ohci_hdl->ohci_selfid.bi_dma_handle, 0,
 	    ohci_hdl->ohci_selfid.bi_length, DDI_DMA_SYNC_FORKERNEL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_selfid_sync_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -2945,8 +2423,6 @@ hci1394_ohci_cfgrom_init(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cfgrom_init_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * Setup for 1K buffer, aligned at 1K address boundary, and allow no
@@ -2960,9 +2436,6 @@ hci1394_ohci_cfgrom_init(hci1394_ohci_handle_t ohci_hdl)
 	status = hci1394_buf_alloc(ohci_hdl->ohci_drvinfo, &parms,
 	    &ohci_hdl->ohci_cfgrom, &ohci_hdl->ohci_cfgrom_handle);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_buf_alloc_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_cfgrom_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2970,9 +2443,6 @@ hci1394_ohci_cfgrom_init(hci1394_ohci_handle_t ohci_hdl)
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->config_rom_maplo,
 	    (uint32_t)ohci_hdl->ohci_cfgrom.bi_cookie.dmac_address);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_cfgrom_init_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (DDI_SUCCESS);
 }
@@ -2987,8 +2457,7 @@ hci1394_ohci_bus_capabilities(hci1394_ohci_handle_t ohci_hdl,
     uint32_t *bus_capabilities)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bus_capabilities_enter,
-	    HCI1394_TNF_HAL_STACK, "");
+
 	/*
 	 * read in the bus options register.  Set bits saying that we are isoch
 	 * resource manager capable, Cycle master capable, and Isoch capable
@@ -2996,8 +2465,6 @@ hci1394_ohci_bus_capabilities(hci1394_ohci_handle_t ohci_hdl,
 	*bus_capabilities = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->bus_options) | (OHCI_BOPT_IRMC |
 	    OHCI_BOPT_CMC | OHCI_BOPT_ISC);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_bus_capabilities_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3014,18 +2481,12 @@ hci1394_ohci_at_active(hci1394_ohci_handle_t ohci_hdl)
 
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_at_active_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* see if atreq active bit set */
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_req.ctxt_ctrl_set);
 	if (reg & OHCI_CC_ACTIVE_MASK) {
 		/* atreq engine is still active */
-		TNF_PROBE_0(hci1394_ohci_atreq_active_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_at_active_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (B_TRUE);
 	}
 
@@ -3034,15 +2495,8 @@ hci1394_ohci_at_active(hci1394_ohci_handle_t ohci_hdl)
 	    &ohci_hdl->ohci_regs->at_resp.ctxt_ctrl_set);
 	if (reg & OHCI_CC_ACTIVE_MASK) {
 		/* atresp engine is still active */
-		TNF_PROBE_0(hci1394_ohci_atresp_active_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_ohci_at_active_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (B_TRUE);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_at_active_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* both atreq and atresp active bits are cleared */
 	return (B_FALSE);
@@ -3058,16 +2512,11 @@ void
 hci1394_ohci_atreq_start(hci1394_ohci_handle_t ohci_hdl, uint32_t cmdptr)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_start_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_req.cmd_ptrlo, cmdptr);
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_req.ctxt_ctrl_set, OHCI_CC_RUN_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_start_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3081,14 +2530,9 @@ void
 hci1394_ohci_atreq_wake(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_wake_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_req.ctxt_ctrl_set, OHCI_CC_WAKE_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_wake_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3101,14 +2545,9 @@ void
 hci1394_ohci_atreq_stop(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_stop_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_req.ctxt_ctrl_clr, OHCI_CC_RUN_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atreq_stop_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3121,16 +2560,11 @@ void
 hci1394_ohci_arresp_start(hci1394_ohci_handle_t ohci_hdl, uint32_t cmdptr)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arresp_start_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ar_resp.cmd_ptrlo, cmdptr);
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ar_resp.ctxt_ctrl_set, OHCI_CC_RUN_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arresp_start_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3144,14 +2578,9 @@ void
 hci1394_ohci_arresp_wake(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arresp_wake_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ar_resp.ctxt_ctrl_set, OHCI_CC_WAKE_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arresp_wake_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3164,14 +2593,9 @@ void
 hci1394_ohci_arresp_stop(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arresp_stop_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ar_resp.ctxt_ctrl_clr, OHCI_CC_RUN_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arresp_stop_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3184,16 +2608,11 @@ void
 hci1394_ohci_arreq_start(hci1394_ohci_handle_t ohci_hdl, uint32_t cmdptr)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arreq_start_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ar_req.cmd_ptrlo, cmdptr);
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ar_req.ctxt_ctrl_set, OHCI_CC_RUN_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arreq_start_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3207,14 +2626,9 @@ void
 hci1394_ohci_arreq_wake(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arreq_wake_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ar_req.ctxt_ctrl_set, OHCI_CC_WAKE_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arreq_wake_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3227,14 +2641,9 @@ void
 hci1394_ohci_arreq_stop(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arreq_stop_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->ar_req.ctxt_ctrl_clr, OHCI_CC_RUN_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_arreq_stop_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3247,16 +2656,11 @@ void
 hci1394_ohci_atresp_start(hci1394_ohci_handle_t ohci_hdl, uint32_t cmdptr)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atresp_start_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_resp.cmd_ptrlo, cmdptr);
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_resp.ctxt_ctrl_set, OHCI_CC_RUN_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atresp_start_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3270,14 +2674,9 @@ void
 hci1394_ohci_atresp_wake(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atresp_wake_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_resp.ctxt_ctrl_set, OHCI_CC_WAKE_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atresp_wake_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3290,14 +2689,9 @@ void
 hci1394_ohci_atresp_stop(hci1394_ohci_handle_t ohci_hdl)
 {
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atresp_stop_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	ddi_put32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->at_resp.ctxt_ctrl_clr, OHCI_CC_RUN_MASK);
-
-	TNF_PROBE_0_DEBUG(hci1394_ohci_atresp_stop_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -3313,8 +2707,6 @@ hci1394_ohci_1394a_init(hci1394_ohci_handle_t ohci_hdl)
 	int status;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_1394a_init_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->hc_ctrl_set);
@@ -3324,16 +2716,10 @@ hci1394_ohci_1394a_init(hci1394_ohci_handle_t ohci_hdl)
 		status = hci1394_ohci_phy_set(ohci_hdl, 5,
 		    (OHCI_PHY_ENBL_ACCEL | OHCI_PHY_ENBL_MULTI));
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_ohci_1394a_init_phy_fail,
-			    HCI1394_TNF_HAL_STACK, "");
-			TNF_PROBE_0_DEBUG(hci1394_ohci_1394a_init_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_1394a_init_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -3350,8 +2736,6 @@ hci1394_ohci_1394a_resume(hci1394_ohci_handle_t ohci_hdl)
 	int status;
 
 	ASSERT(ohci_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_ohci_1394a_resume_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	reg = ddi_get32(ohci_hdl->ohci_reg_handle,
 	    &ohci_hdl->ohci_regs->hc_ctrl_set);
@@ -3361,15 +2745,9 @@ hci1394_ohci_1394a_resume(hci1394_ohci_handle_t ohci_hdl)
 		status = hci1394_ohci_phy_set(ohci_hdl, 5,
 		    (OHCI_PHY_ENBL_ACCEL | OHCI_PHY_ENBL_MULTI));
 		if (status != DDI_SUCCESS) {
-			TNF_PROBE_0(hci1394_ohci_1394a_resume_phy_fail,
-			    HCI1394_TNF_HAL_STACK, "");
-			TNF_PROBE_0_DEBUG(hci1394_ohci_1394a_resume_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_ohci_1394a_resume_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 	return (DDI_SUCCESS);
 }

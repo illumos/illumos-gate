@@ -48,15 +48,8 @@ hci1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	hci1394_state_t *soft_state;
 
-
-	TNF_PROBE_0_DEBUG(hci1394_detach_enter, HCI1394_TNF_HAL_STACK, "");
-
 	soft_state = ddi_get_soft_state(hci1394_statep, ddi_get_instance(dip));
 	if (soft_state == NULL) {
-		TNF_PROBE_1(hci1394_detach_ssn_fail, HCI1394_TNF_HAL_ERROR, "",
-		    tnf_string, errmsg, "soft_state = NULL");
-		TNF_PROBE_0_DEBUG(hci1394_detach_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -113,8 +106,6 @@ hci1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_soft_state_free(hci1394_statep,
 		    soft_state->drvinfo.di_instance);
 
-		TNF_PROBE_0_DEBUG(hci1394_detach_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
@@ -150,17 +141,11 @@ hci1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		(void) h1394_detach(&soft_state->drvinfo.di_sl_private,
 		    DDI_SUSPEND);
 
-		TNF_PROBE_0_DEBUG(hci1394_detach_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_SUCCESS);
 
 	default:
-		TNF_PROBE_1(hci1394_detach_fail, HCI1394_TNF_HAL_ERROR, "",
-		    tnf_string, errmsg, "in detach default");
 		break;
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_detach_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_FAILURE);
 }
@@ -214,8 +199,6 @@ void
 hci1394_detach_hardware(hci1394_state_t *soft_state)
 {
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_detach_hardware_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	/* free up vendor specific registers */
 	hci1394_vendor_fini(&soft_state->vendor);
@@ -234,9 +217,6 @@ hci1394_detach_hardware(hci1394_state_t *soft_state)
 
 	/* free up PCI config space */
 	hci1394_pci_fini(soft_state);
-
-	TNF_PROBE_0_DEBUG(hci1394_detach_hardware_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -248,9 +228,7 @@ void
 hci1394_pci_fini(hci1394_state_t *soft_state)
 {
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_pci_fini_enter, HCI1394_TNF_HAL_STACK, "");
 	pci_config_teardown(&soft_state->pci_config);
-	TNF_PROBE_0_DEBUG(hci1394_pci_fini_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -262,9 +240,5 @@ void
 hci1394_soft_state_fini(hci1394_state_t *soft_state)
 {
 	ASSERT(soft_state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_soft_state_fini_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 	mutex_destroy(&soft_state->drvinfo.di_drvstate.ds_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_soft_state_fini_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }

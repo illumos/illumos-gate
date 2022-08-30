@@ -49,7 +49,6 @@
 #include <sys/kmem.h>
 #include <sys/cpuvar.h>
 #include <sys/vtrace.h>
-#include <sys/tnf.h>
 #include <sys/cpupart.h>
 #include <sys/lgrp.h>
 #include <sys/pg.h>
@@ -1328,12 +1327,6 @@ setbackdq(kthread_t *tp)
 	TRACE_3(TR_FAC_DISP, TR_BACKQ, "setbackdq:pri %d cpu %p tid %p",
 	    tpri, cp, tp);
 
-#ifndef NPROBE
-	/* Kernel probe */
-	if (tnf_tracing_active)
-		tnf_thread_queue(tp, cp, tpri);
-#endif /* NPROBE */
-
 	ASSERT(tpri >= 0 && tpri < dp->disp_npri);
 
 	THREAD_RUN(tp, &dp->disp_lock);		/* set t_state to TS_RUN */
@@ -1484,12 +1477,6 @@ setfrontdq(kthread_t *tp)
 	TRACE_2(TR_FAC_DISP, TR_FRONTQ, "frontq:pri %d tid %p", tpri, tp);
 	DTRACE_SCHED3(enqueue, kthread_t *, tp, disp_t *, dp, int, 1);
 
-#ifndef NPROBE
-	/* Kernel probe */
-	if (tnf_tracing_active)
-		tnf_thread_queue(tp, cp, tpri);
-#endif /* NPROBE */
-
 	ASSERT(tpri >= 0 && tpri < dp->disp_npri);
 
 	THREAD_RUN(tp, &dp->disp_lock);		/* set TS_RUN state and lock */
@@ -1600,12 +1587,6 @@ setkpdq(kthread_t *tp, int borf)
 	cp = disp_lowpri_cpu(cp, tp, tp->t_pri);
 	disp_lock_enter_high(&cp->cpu_disp->disp_lock);
 	ASSERT((cp->cpu_flags & CPU_QUIESCED) == 0);
-
-#ifndef NPROBE
-	/* Kernel probe */
-	if (tnf_tracing_active)
-		tnf_thread_queue(tp, cp, tpri);
-#endif /* NPROBE */
 
 	if (cp->cpu_chosen_level < tpri)
 		cp->cpu_chosen_level = tpri;

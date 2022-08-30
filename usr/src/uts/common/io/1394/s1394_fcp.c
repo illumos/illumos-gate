@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s1394_fcp.c
  *    1394 Services Layer FCP Support Routines
@@ -37,7 +35,6 @@
 #include <sys/cmn_err.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
-#include <sys/tnf_probe.h>
 
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
@@ -83,8 +80,6 @@ s1394_fcp_hal_init(s1394_hal_t *hal)
 {
 	int	ret = DDI_SUCCESS;
 
-	TNF_PROBE_0_DEBUG(s1394_fcp_hal_init_enter, S1394_TNF_SL_FCP_STACK, "");
-
 	if ((ddi_prop_exists(DDI_DEV_T_ANY, hal->halinfo.dip, DDI_PROP_DONTPASS,
 	    "h1394-fcp-claim-on-demand")) == 0) {
 		/* if not on-demand, claim addresses now */
@@ -99,7 +94,6 @@ s1394_fcp_hal_init(s1394_hal_t *hal)
 		}
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_fcp_hal_init_exit, S1394_TNF_SL_FCP_STACK, "");
 	return (ret);
 }
 
@@ -170,9 +164,6 @@ s1394_fcp_unregister_common(s1394_target_t *target, s1394_fa_type_t type)
 		if (s1394_fa_list_is_empty(hal, type)) {
 			s1394_fa_free_addr(hal, type);
 		}
-	} else {
-		TNF_PROBE_0(s1394_fcp_unregister_common_error_list,
-		    S1394_TNF_SL_FCP_ERROR, "");
 	}
 
 	rw_exit(&hal->target_list_rwlock);
@@ -195,8 +186,6 @@ s1394_fcp_write_check_cmd(cmd1394_cmd_t *cmd)
 		len = cmd->cmd_u.b.blk_length;
 		if (len == 4) {
 			cmd->cmd_result = CMD1394_ETYPE_ERROR;
-			TNF_PROBE_0(t1394_write_error_type,
-			    S1394_TNF_SL_FCP_ERROR, "");
 			return (DDI_FAILURE);
 		}
 	} else {
@@ -210,14 +199,12 @@ s1394_fcp_write_check_cmd(cmd1394_cmd_t *cmd)
 	if ((cmd->cmd_addr & IEEE1394_ADDR_OFFSET_MASK) + len >
 	    IEC61883_FCP_CMD_SIZE) {
 		cmd->cmd_result = CMD1394_EADDRESS_ERROR;
-		TNF_PROBE_0(t1394_write_error_addr, S1394_TNF_SL_FCP_ERROR, "");
 		return (DDI_FAILURE);
 	}
 
 	/* some options don't make sense for FCP commands */
 	if (cmd->cmd_options & CMD1394_OVERRIDE_ADDR) {
 		cmd->cmd_result = CMD1394_EINVALID_COMMAND;
-		TNF_PROBE_0(t1394_write_error_opt, S1394_TNF_SL_FCP_ERROR, "");
 		return (DDI_FAILURE);
 	}
 
@@ -251,9 +238,6 @@ s1394_fcp_recv_write_request(cmd1394_cmd_t *req, s1394_fa_type_t type)
 	int		(*cb)(cmd1394_cmd_t *req);
 	boolean_t	restored = B_FALSE;
 	int		ret = T1394_REQ_UNCLAIMED;
-
-	TNF_PROBE_0_DEBUG(s1394_fcp_recv_write_request_enter,
-	    S1394_TNF_SL_FCP_STACK, "");
 
 	rw_enter(&hal->target_list_rwlock, RW_READER);
 
@@ -291,10 +275,6 @@ start:
 			 * target than receiving same request more than once
 			 */
 			if (saved_gen != s1394_fa_list_gen(hal, type)) {
-				TNF_PROBE_2(s1394_fcp_recv_write_request_error,
-				    S1394_TNF_SL_FCP_ERROR, "",
-				    tnf_string, msg, "list gen changed",
-				    tnf_opaque, num_retries, num_retries);
 				num_retries++;
 				if (num_retries <= s1394_fcp_notify_retry_cnt) {
 					goto start;
@@ -310,16 +290,11 @@ start:
 	rw_exit(&hal->target_list_rwlock);
 
 	if (ret != T1394_REQ_CLAIMED) {
-		TNF_PROBE_0(s1394_fcp_recv_write_request_error_unclaimed,
-		    S1394_TNF_SL_FCP_ERROR, "");
 		if (restored) {
 			s1394_fa_convert_cmd(hal, req);
 		}
 		s1394_fcp_recv_write_unclaimed(hal, req);
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_fcp_recv_write_request_exit,
-	    S1394_TNF_SL_FCP_STACK, "");
 }
 
 /*

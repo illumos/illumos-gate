@@ -2254,16 +2254,12 @@ extern int dtrace_meta_unregister(dtrace_meta_provider_id_t);
  */
 
 typedef enum dtrace_vtime_state {
-	DTRACE_VTIME_INACTIVE = 0,	/* No DTrace, no TNF */
-	DTRACE_VTIME_ACTIVE,		/* DTrace virtual time, no TNF */
-	DTRACE_VTIME_INACTIVE_TNF,	/* No DTrace, TNF active */
-	DTRACE_VTIME_ACTIVE_TNF		/* DTrace virtual time _and_ TNF */
+	DTRACE_VTIME_INACTIVE = 0,	/* No DTrace */
+	DTRACE_VTIME_ACTIVE,		/* DTrace virtual time */
 } dtrace_vtime_state_t;
 
 extern dtrace_vtime_state_t dtrace_vtime_active;
 extern void dtrace_vtime_switch(kthread_t *next);
-extern void dtrace_vtime_enable_tnf(void);
-extern void dtrace_vtime_disable_tnf(void);
 extern void dtrace_vtime_enable(void);
 extern void dtrace_vtime_disable(void);
 

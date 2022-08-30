@@ -284,8 +284,6 @@
 .if '\\$2'3tecla' .ds ]D Interactive Command-line Input Library Functions
 .if '\\$2'3THR' .ds ]D Threads Library Functions
 .if '\\$2'3thr' .ds ]D Threads Library Functions
-.if '\\$2'3TNF' .ds ]D TNF Library Functions
-.if '\\$2'3tnf' .ds ]D TNF Library Functions
 .if '\\$2'3TSOL' .ds ]D Trusted Extensions Library Functions
 .if '\\$2'3tsol' .ds ]D Trusted Extensions Library Functions
 .if '\\$2'3UCB' .ds ]D SunOS/BSD Compatibility Library Functions

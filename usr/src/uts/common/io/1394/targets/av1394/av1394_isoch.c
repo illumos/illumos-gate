@@ -72,19 +72,11 @@ int av1394_isoch_autorecv_framesz = 250;
 int av1394_isoch_autoxmit_nframes = 50;
 int av1394_isoch_autoxmit_framesz = 250;
 
-#define	AV1394_TNF_ENTER(func)	\
-	TNF_PROBE_0_DEBUG(func##_enter, AV1394_TNF_ISOCH_STACK, "");
-
-#define	AV1394_TNF_EXIT(func)	\
-	TNF_PROBE_0_DEBUG(func##_exit, AV1394_TNF_ISOCH_STACK, "");
-
 int
 av1394_isoch_attach(av1394_inst_t *avp)
 {
 	av1394_isoch_t	*ip = &avp->av_i;
 	ddi_iblock_cookie_t ibc = avp->av_attachinfo.iblock_cookie;
-
-	AV1394_TNF_ENTER(av1394_isoch_attach);
 
 	mutex_init(&ip->i_mutex, NULL, MUTEX_DRIVER, ibc);
 
@@ -92,7 +84,6 @@ av1394_isoch_attach(av1394_inst_t *avp)
 	if (av1394_isoch_create_minor_node(avp) != DDI_SUCCESS) {
 		mutex_exit(&ip->i_mutex);
 		av1394_isoch_cleanup(avp, 1);
-		AV1394_TNF_EXIT(av1394_isoch_attach);
 		return (DDI_FAILURE);
 	}
 
@@ -100,32 +91,25 @@ av1394_isoch_attach(av1394_inst_t *avp)
 	    0, 0, av1394_isoch_softintr, (caddr_t)avp) != DDI_SUCCESS) {
 		mutex_exit(&ip->i_mutex);
 		av1394_isoch_cleanup(avp, 2);
-		AV1394_TNF_EXIT(av1394_isoch_attach);
 		return (DDI_FAILURE);
 	}
 
 	if (av1394_cmp_init(avp) != DDI_SUCCESS) {
 		mutex_exit(&ip->i_mutex);
 		av1394_isoch_cleanup(avp, 3);
-		AV1394_TNF_EXIT(av1394_isoch_attach);
 		return (DDI_FAILURE);
 	}
 
 	av1394_as_init(&ip->i_mmap_as);
 	mutex_exit(&ip->i_mutex);
 
-	AV1394_TNF_EXIT(av1394_isoch_attach);
 	return (DDI_SUCCESS);
 }
 
 void
 av1394_isoch_detach(av1394_inst_t *avp)
 {
-	AV1394_TNF_ENTER(av1394_isoch_detach);
-
 	av1394_isoch_cleanup(avp, AV1394_CLEANUP_LEVEL_MAX);
-
-	AV1394_TNF_EXIT(av1394_isoch_detach);
 }
 
 int
@@ -135,8 +119,6 @@ av1394_isoch_cpr_suspend(av1394_inst_t *avp)
 	av1394_ic_t	*icp;
 	int		i;
 	int		ret = DDI_SUCCESS;
-
-	AV1394_TNF_ENTER(av1394_isoch_cpr_suspend);
 
 	/*
 	 * suspend only if there are no active channels
@@ -154,7 +136,6 @@ av1394_isoch_cpr_suspend(av1394_inst_t *avp)
 	}
 	mutex_exit(&ip->i_mutex);
 
-	AV1394_TNF_EXIT(av1394_isoch_cpr_suspend);
 	return (ret);
 }
 
@@ -164,12 +145,9 @@ av1394_isoch_close(av1394_inst_t *avp, int flag)
 {
 	int	ret;
 
-	AV1394_TNF_ENTER(av1394_isoch_close);
-
 	ret = av1394_ic_close(avp, flag);
 	av1394_cmp_close(avp);
 
-	AV1394_TNF_EXIT(av1394_isoch_close);
 	return (ret);
 }
 
@@ -179,13 +157,10 @@ av1394_isoch_read(av1394_inst_t *avp, struct uio *uiop)
 	av1394_ic_t	*icp;
 	int		ret;
 
-	AV1394_TNF_ENTER(av1394_isoch_read);
-
 	/* use broadcast channel */
 	icp = avp->av_i.i_ic[63];
 	if (icp == NULL) {
 		if ((ret = av1394_isoch_autorecv_init(avp, &icp)) != 0) {
-			AV1394_TNF_EXIT(av1394_isoch_read);
 			return (ret);
 		}
 	} else if (icp->ic_dir != AV1394_IR) {
@@ -197,7 +172,6 @@ av1394_isoch_read(av1394_inst_t *avp, struct uio *uiop)
 		ret = av1394_ir_read(icp, uiop);
 	}
 
-	AV1394_TNF_EXIT(av1394_isoch_read);
 	return (ret);
 }
 
@@ -207,24 +181,19 @@ av1394_isoch_write(av1394_inst_t *avp, struct uio *uiop)
 	av1394_ic_t	*icp;
 	int		ret;
 
-	AV1394_TNF_ENTER(av1394_isoch_write);
-
 	/* use broadcast channel */
 	icp = avp->av_i.i_ic[63];
 	if (icp == NULL) {
 		if ((ret = av1394_isoch_autoxmit_init(avp, &icp, uiop)) != 0) {
-			AV1394_TNF_EXIT(av1394_isoch_write);
 			return (ret);
 		}
 	} else if (icp->ic_dir != AV1394_IT) {
 		/* channel already used for recv */
-		AV1394_TNF_EXIT(av1394_isoch_write);
 		return (EBUSY);
 	}
 
 	ret = av1394_it_write(icp, uiop);
 
-	AV1394_TNF_EXIT(av1394_isoch_write);
 	return (ret);
 }
 
@@ -278,14 +247,11 @@ av1394_isoch_devmap(av1394_inst_t *avp, devmap_cookie_t dhp, offset_t off,
 {
 	av1394_isoch_seg_t *isp;
 
-	AV1394_TNF_ENTER(av1394_isoch_devmap);
-
 	*maplen = 0;
 
 	/* find segment */
 	isp = av1394_isoch_find_seg(avp, off, ptob(btopr(len)));
 	if (isp == NULL) {
-		AV1394_TNF_EXIT(av1394_isoch_devmap);
 		return (EINVAL);
 	}
 
@@ -293,14 +259,10 @@ av1394_isoch_devmap(av1394_inst_t *avp, devmap_cookie_t dhp, offset_t off,
 	if (devmap_umem_setup(dhp, avp->av_dip, &av1394_isoch_devmap_ops,
 	    isp->is_umem_cookie, 0, isp->is_umem_size, PROT_ALL, 0,
 	    &avp->av_attachinfo.acc_attr) != 0) {
-		TNF_PROBE_0(av1394_isoch_devmap_error_umem_setup,
-		    AV1394_TNF_ISOCH_ERROR, "");
-		AV1394_TNF_EXIT(av1394_isoch_devmap);
 		return (EINVAL);
 	}
 	*maplen = isp->is_umem_size;
 
-	AV1394_TNF_EXIT(av1394_isoch_devmap);
 	return (0);
 }
 
@@ -319,10 +281,6 @@ av1394_isoch_create_minor_node(av1394_inst_t *avp)
 	ret = ddi_create_minor_node(avp->av_dip, "isoch",
 	    S_IFCHR, AV1394_ISOCH_INST2MINOR(avp->av_instance),
 	    DDI_NT_AV_ISOCH, 0);
-	if (ret != DDI_SUCCESS) {
-		TNF_PROBE_0(av1394_isoch_create_minor_node_error,
-		    AV1394_TNF_ISOCH_ERROR, "");
-	}
 	return (ret);
 }
 
@@ -393,8 +351,6 @@ av1394_isoch_find_seg(av1394_inst_t *avp, offset_t off, size_t len)
 		icp = NULL;
 	}
 	if (icp == NULL) {
-		TNF_PROBE_0(av1394_isoch_find_seg_error_nochan,
-		    AV1394_TNF_ISOCH_ERROR, "");
 		return (NULL);
 	}
 
@@ -410,15 +366,11 @@ av1394_isoch_find_seg(av1394_inst_t *avp, offset_t off, size_t len)
 		isp = NULL;
 	}
 	if (isp == NULL) {
-		TNF_PROBE_0(av1394_isoch_find_seg_error_noseg,
-		    AV1394_TNF_ISOCH_ERROR, "");
 		return (NULL);
 	}
 
 	/* only whole segments can be mapped */
 	if (len != isp->is_umem_size) {
-		TNF_PROBE_0(av1394_isoch_devmap_error_whole,
-		    AV1394_TNF_ISOCH_ERROR, "");
 		return (NULL);
 	}
 	return (isp);
@@ -433,8 +385,6 @@ av1394_isoch_autorecv_init(av1394_inst_t *avp, av1394_ic_t **icpp)
 	iec61883_isoch_init_t ii;
 	int		ret = 0;
 
-	AV1394_TNF_ENTER(av1394_isoch_autorecv_init);
-
 	bzero(&ii, sizeof (ii));
 	ii.ii_version = IEC61883_V1_0;
 	ii.ii_pkt_size = 512;
@@ -446,7 +396,6 @@ av1394_isoch_autorecv_init(av1394_inst_t *avp, av1394_ic_t **icpp)
 
 	ret = av1394_ic_init(avp, &ii, icpp);
 
-	AV1394_TNF_EXIT(av1394_isoch_autorecv_init);
 	return (ret);
 }
 
@@ -462,13 +411,9 @@ av1394_isoch_autoxmit_init(av1394_inst_t *avp, av1394_ic_t **icpp,
 	uint_t		fmt, dbs, fn, f5060, stype;	/* CIP fields */
 	int		ret = 0;
 
-	AV1394_TNF_ENTER(av1394_isoch_autoxmit_init);
-
 	/* copyin the first CIP header */
 	axp->ax_copy_ciph = B_FALSE;
 	if (uiop->uio_resid < AV1394_CIPSZ) {
-		TNF_PROBE_0_DEBUG(av1394_isoch_autoxmit_init_error_cipsz,
-		    AV1394_TNF_ISOCH_ERROR, "");
 		return (EINVAL);
 	}
 	ret = uiomove(axp->ax_ciph, AV1394_CIPSZ, UIO_WRITE, uiop);
@@ -519,7 +464,6 @@ av1394_isoch_autoxmit_init(av1394_inst_t *avp, av1394_ic_t **icpp,
 
 	ret = av1394_ic_init(avp, &ii, icpp);
 
-	AV1394_TNF_EXIT(av1394_isoch_autoxmit_init);
 	return (ret);
 }
 
@@ -541,17 +485,13 @@ av1394_ioctl_isoch_init(av1394_inst_t *avp, void *arg, int mode)
 	av1394_ic_t		*icp;
 	int			ret;
 
-	AV1394_TNF_ENTER(av1394_ioctl_isoch_init);
-
 	if (ddi_copyin(arg, &ii, sizeof (ii), mode) != 0) {
-		AV1394_TNF_EXIT(av1394_ioctl_isoch_init);
 		return (EFAULT);
 	}
 
 	ret = av1394_ic_init(avp, &ii, &icp);
 
 	if (ret != 0) {
-		AV1394_TNF_EXIT(av1394_ioctl_isoch_init);
 #ifdef _MULTI_DATAMODEL
 		if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 			bcopy(&ii, &ii32, sizeof (ii32));
@@ -575,11 +515,9 @@ av1394_ioctl_isoch_init(av1394_inst_t *avp, void *arg, int mode)
 #endif
 	ret = ddi_copyout(&ii, arg, sizeof (ii), mode);
 	if (ret != 0) {
-		AV1394_TNF_EXIT(av1394_ioctl_isoch_init);
 		return (ENOMEM);
 	}
 
-	AV1394_TNF_EXIT(av1394_ioctl_isoch_init);
 	return (ret);
 }
 
@@ -590,13 +528,7 @@ av1394_ioctl_isoch_handle2ic(av1394_inst_t *avp, void *arg)
 	av1394_isoch_t	*ip = &avp->av_i;
 
 	if (num >= NELEM(ip->i_ic)) {
-		TNF_PROBE_0(av1394_ioctl_isoch_handle2ic_error_range,
-		    AV1394_TNF_ISOCH_ERROR, "");
 		return (NULL);
-	}
-	if (ip->i_ic[num] == NULL) {
-		TNF_PROBE_0(av1394_ioctl_isoch_handle2ic_error_null,
-		    AV1394_TNF_ISOCH_ERROR, "");
 	}
 	return (ip->i_ic[num]);
 }
@@ -607,13 +539,10 @@ av1394_ioctl_isoch_fini(av1394_inst_t *avp, void *arg, int mode)
 {
 	av1394_ic_t	*icp;
 
-	AV1394_TNF_ENTER(av1394_ioctl_isoch_fini);
-
 	if ((icp = av1394_ioctl_isoch_handle2ic(avp, arg)) != NULL) {
 		av1394_ic_fini(icp);
 	}
 
-	AV1394_TNF_EXIT(av1394_ioctl_isoch_fini);
 	return (0);
 }
 
@@ -624,13 +553,10 @@ av1394_ioctl_start(av1394_inst_t *avp, void *arg, int mode)
 	av1394_ic_t	*icp;
 	int		ret = EINVAL;
 
-	AV1394_TNF_ENTER(av1394_ioctl_start);
-
 	if ((icp = av1394_ioctl_isoch_handle2ic(avp, arg)) != NULL) {
 		ret = av1394_ic_start(icp);
 	}
 
-	AV1394_TNF_EXIT(av1394_ioctl_start);
 	return (ret);
 }
 
@@ -641,13 +567,10 @@ av1394_ioctl_stop(av1394_inst_t *avp, void *arg, int mode)
 	av1394_ic_t	*icp;
 	int		ret = EINVAL;
 
-	AV1394_TNF_ENTER(av1394_ioctl_stop);
-
 	if ((icp = av1394_ioctl_isoch_handle2ic(avp, arg)) != NULL) {
 		ret = av1394_ic_stop(icp);
 	}
 
-	AV1394_TNF_EXIT(av1394_ioctl_stop);
 	return (ret);
 }
 
@@ -666,15 +589,9 @@ av1394_ioctl_recv(av1394_inst_t *avp, void *arg, int mode)
 	}
 	num = recv.rx_handle;
 	if (num >= NELEM(ip->i_ic)) {
-		TNF_PROBE_0(av1394_ioctl_recv_error_range,
-		    AV1394_TNF_ISOCH_ERROR, "");
 		return (EINVAL);
 	}
 	icp = ip->i_ic[num];
-	if (icp == NULL) {
-		TNF_PROBE_0(av1394_ioctl_recv_error_null,
-		    AV1394_TNF_ISOCH_ERROR, "");
-	}
 
 	/* now call the actual handler */
 	if (icp->ic_dir != AV1394_IR) {
@@ -708,15 +625,9 @@ av1394_ioctl_xmit(av1394_inst_t *avp, void *arg, int mode)
 	}
 	num = xmit.tx_handle;
 	if (num >= NELEM(ip->i_ic)) {
-		TNF_PROBE_0(av1394_ioctl_xmit_error_range,
-		    AV1394_TNF_ISOCH_ERROR, "");
 		return (EINVAL);
 	}
 	icp = ip->i_ic[num];
-	if (icp == NULL) {
-		TNF_PROBE_0(av1394_ioctl_xmit_error_null,
-		    AV1394_TNF_ISOCH_ERROR, "");
-	}
 
 	/* now call the actual handler */
 	if (icp->ic_dir != AV1394_IT) {

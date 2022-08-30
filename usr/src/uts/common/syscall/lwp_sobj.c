@@ -54,7 +54,6 @@
 #include <sys/schedctl.h>
 #include <sys/sleepq.h>
 #include <sys/policy.h>
-#include <sys/tnf_probe.h>
 #include <sys/lwpchan_impl.h>
 #include <sys/turnstile.h>
 #include <sys/atomic.h>

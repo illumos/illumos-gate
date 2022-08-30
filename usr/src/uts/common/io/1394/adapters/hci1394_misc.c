@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_misc.c
  *    Misc. HBA functions.  These include getinfo, open, close, shutdown, and
@@ -53,20 +51,12 @@ hci1394_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 	minor_t instance;
 	int status;
 
-
-	TNF_PROBE_0_DEBUG(hci1394_getinfo_enter, HCI1394_TNF_HAL_STACK, "");
-
 	switch (cmd) {
 	case DDI_INFO_DEVT2DEVINFO:
 		dev = (dev_t)arg;
 		instance = getminor(dev);
 		soft_state = ddi_get_soft_state(hci1394_statep, instance);
 		if (soft_state == NULL) {
-			TNF_PROBE_1(hci1394_getinfo_gss_fail,
-			    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-			    "ddi_get_soft_state() failed");
-			TNF_PROBE_0_DEBUG(hci1394_getinfo_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 		*result = (void *)soft_state->drvinfo.di_dip;
@@ -81,12 +71,9 @@ hci1394_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 		break;
 
 	default:
-		TNF_PROBE_1(hci1394_getinfo_def_fail, HCI1394_TNF_HAL_ERROR, "",
-		    tnf_string, errmsg, "reached default in switch");
 		status = DDI_FAILURE;
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_getinfo_exit, HCI1394_TNF_HAL_STACK, "");
 	return (status);
 }
 
@@ -97,18 +84,11 @@ hci1394_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
 	hci1394_state_t *soft_state;
 
-
-	TNF_PROBE_0_DEBUG(hci1394_open_enter, HCI1394_TNF_HAL_STACK, "");
-
 	soft_state = ddi_get_soft_state(hci1394_statep, getminor(*devp));
 	if (soft_state == NULL) {
-		TNF_PROBE_1(hci1394_open_gss_fail, HCI1394_TNF_HAL_ERROR, "",
-		    tnf_string, errmsg, "ddi_get_soft_state() failed");
-		TNF_PROBE_0_DEBUG(hci1394_open_exit, HCI1394_TNF_HAL_STACK, "");
 		return (ENXIO);
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_open_exit, HCI1394_TNF_HAL_STACK, "");
 	return (0);
 }
 
@@ -117,10 +97,6 @@ hci1394_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 int
 hci1394_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
-	TNF_PROBE_0_DEBUG(hci1394_close_enter, HCI1394_TNF_HAL_STACK, "");
-
-	TNF_PROBE_0_DEBUG(hci1394_close_exit, HCI1394_TNF_HAL_STACK, "");
-
 	return (0);
 }
 
@@ -144,14 +120,8 @@ hci1394_shutdown(dev_info_t *dip)
 	ASSERT(0);
 #endif
 
-	TNF_PROBE_0_DEBUG(hci1394_shutdown_enter, HCI1394_TNF_HAL_STACK, "");
-
 	soft_state = ddi_get_soft_state(hci1394_statep, ddi_get_instance(dip));
 	if (soft_state == NULL) {
-		TNF_PROBE_1(hci1394_shutdown_gss_fail, HCI1394_TNF_HAL_ERROR,
-		    "", tnf_string, errmsg, "ddi_get_soft_state() failed");
-		TNF_PROBE_0_DEBUG(hci1394_shutdown_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return;
 	}
 
@@ -169,8 +139,6 @@ hci1394_shutdown(dev_info_t *dip)
 
 	/* Flush out async DMA Q's (cancels pendingQ timeouts too) */
 	hci1394_async_flush(soft_state->async);
-
-	TNF_PROBE_0_DEBUG(hci1394_shutdown_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -183,11 +151,9 @@ hci1394_state(hci1394_drvinfo_t *drvinfo)
 {
 	hci1394_statevar_t hal_state;
 
-	TNF_PROBE_0_DEBUG(hci1394_state_enter, HCI1394_TNF_HAL_STACK, "");
 	mutex_enter(&drvinfo->di_drvstate.ds_mutex);
 	hal_state = drvinfo->di_drvstate.ds_state;
 	mutex_exit(&drvinfo->di_drvstate.ds_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_state_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (hal_state);
 }
@@ -202,22 +168,16 @@ hci1394_state(hci1394_drvinfo_t *drvinfo)
 int
 hci1394_state_set(hci1394_drvinfo_t *drvinfo, hci1394_statevar_t state)
 {
-	TNF_PROBE_0_DEBUG(hci1394_state_set_enter, HCI1394_TNF_HAL_STACK, "");
 	mutex_enter(&drvinfo->di_drvstate.ds_mutex);
 
 	/* Do not allow a transition out of shutdown */
 	if (drvinfo->di_drvstate.ds_state == HCI1394_SHUTDOWN) {
 		mutex_exit(&drvinfo->di_drvstate.ds_mutex);
-		TNF_PROBE_1(hci1394_state_set_fail, HCI1394_TNF_HAL_STACK, "",
-		    tnf_string, errmsg, "driver shutdown");
-		TNF_PROBE_0_DEBUG(hci1394_state_set_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
 	drvinfo->di_drvstate.ds_state = state;
 	mutex_exit(&drvinfo->di_drvstate.ds_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_state_set_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }

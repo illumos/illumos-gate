@@ -24,15 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * dcam_reg.c
  *
  * dcam1394 driver.  Control register access support.
  */
 
-#include <sys/tnf_probe.h>
 #include <sys/1394/targets/dcam1394/dcam_reg.h>
 
 

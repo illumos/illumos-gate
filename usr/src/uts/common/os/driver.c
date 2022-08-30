@@ -43,7 +43,6 @@
 #include <sys/kmem.h>
 #include <sys/file.h>
 #include <sys/debug.h>
-#include <sys/tnf_probe.h>
 
 /* Don't #include <sys/ddi.h> - it #undef's getmajor() */
 
@@ -435,18 +434,6 @@ dev_to_instance(dev_t dev)
 	return ((int)(uintptr_t)vinstance);
 }
 
-static void
-bdev_strategy_tnf_probe(struct buf *bp)
-{
-	/* Kernel probe */
-	TNF_PROBE_5(strategy, "io blockio", /* CSTYLED */,
-	    tnf_device, device, bp->b_edev,
-	    tnf_diskaddr, block, bp->b_lblkno,
-	    tnf_size, size, bp->b_bcount,
-	    tnf_opaque, buf, bp,
-	    tnf_bioflags, flags, bp->b_flags);
-}
-
 int
 bdev_strategy(struct buf *bp)
 {
@@ -465,12 +452,6 @@ bdev_strategy(struct buf *bp)
 
 	DTRACE_IO1(start, struct buf *, bp);
 	bp->b_flags |= B_STARTED;
-
-	/*
-	 * Call the TNF probe here instead of the inline code
-	 * to force our compiler to use the tail call optimization.
-	 */
-	bdev_strategy_tnf_probe(bp);
 
 	return (ops->devo_cb_ops->cb_strategy(bp));
 }

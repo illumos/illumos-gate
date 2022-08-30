@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_S1394_H
 #define	_SYS_1394_S1394_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s1394.h
  *    Contains all of the structures used (internally) by the 1394
@@ -171,40 +169,6 @@ extern "C" {
 #define	ISOCH_SPEED_FACTOR_S100		16
 #define	ISOCH_SPEED_FACTOR_S200		8
 #define	ISOCH_SPEED_FACTOR_S400		4
-
-/* TNF probes */
-#define	S1394_TNF_SL			"1394 s1394 "
-#define	S1394_TNF_SL_ERROR		"1394 s1394 error "
-#define	S1394_TNF_SL_STACK		"1394 s1394 stacktrace "
-#define	S1394_TNF_SL_ARREQ_STACK	"1394 s1394 arreq stacktrace "
-#define	S1394_TNF_SL_ARREQ_ERROR	"1394 s1394 arreq error "
-#define	S1394_TNF_SL_ATREQ_STACK	"1394 s1394 atreq stacktrace "
-#define	S1394_TNF_SL_ATREQ_ERROR	"1394 s1394 atreq error "
-#define	S1394_TNF_SL_ATRESP_STACK	"1394 s1394 atresp stacktrace "
-#define	S1394_TNF_SL_ATRESP_ERROR	"1394 s1394 atresp error "
-#define	S1394_TNF_SL_ATREQ_ATRESP_STACK	"1394 s1394 atreq atresp stacktrace "
-#define	S1394_TNF_SL_ATREQ_ATRESP_ERROR	"1394 s1394 atreq atresp error "
-#define	S1394_TNF_SL_BR_STACK		"1394 s1394 bus_reset stacktrace "
-#define	S1394_TNF_SL_BR_ERROR		"1394 s1394 bus_reset error "
-#define	S1394_TNF_SL_IOCTL_STACK	"1394 s1394 ioctl stacktrace "
-#define	S1394_TNF_SL_HOTPLUG_STACK	"1394 s1394 hotplug stacktrace "
-#define	S1394_TNF_SL_HOTPLUG_ERROR	"1394 s1394 hotplug error "
-#define	S1394_TNF_SL_NX1394_STACK	"1394 s1394 nx1394 stacktrace "
-#define	S1394_TNF_SL_CSR_ERROR		"1394 s1394 csr error "
-#define	S1394_TNF_SL_CSR_STACK		"1394 s1394 csr stacktrace "
-#define	S1394_TNF_SL_BR_CSR_STACK	"1394 s1394 bus_reset csr stacktrace "
-#define	S1394_TNF_SL_CFGROM_ERROR	"1394 s1394 cfgrom error "
-#define	S1394_TNF_SL_CFGROM_STACK	"1394 s1394 cfgrom stacktrace "
-#define	S1394_TNF_SL_ISOCH_ERROR	"1394 s1394 isoch error "
-#define	S1394_TNF_SL_ISOCH_STACK	"1394 s1394 isoch stacktrace "
-#define	S1394_TNF_SL_NEXUS_ERROR	"1394 s1394 nexus error "
-#define	S1394_TNF_SL_NEXUS_STACK	"1394 s1394 nexus stacktrace "
-#define	S1394_TNF_SL_FA_STACK		"1394 s1394 FA stacktrace "
-#define	S1394_TNF_SL_FA_ERROR		"1394 s1394 FA error "
-#define	S1394_TNF_SL_FCP_STACK		"1394 s1394 FCP stacktrace "
-#define	S1394_TNF_SL_FCP_ERROR		"1394 s1394 FCP error "
-#define	S1394_TNF_SL_CMP_STACK		"1394 s1394 CMP stacktrace "
-#define	S1394_TNF_SL_CMP_ERROR		"1394 s1394 CMP error "
 
 /* s1394_hal_state_t */
 typedef enum {

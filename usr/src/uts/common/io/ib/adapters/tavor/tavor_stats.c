@@ -119,14 +119,10 @@ tavor_kstat_init(tavor_state_t *state)
 	uint_t			numports;
 	int			i;
 
-	TAVOR_TNF_ENTER(tavor_kstat_init);
-
 	/* Allocate a kstat info structure */
 	ksi = (tavor_ks_info_t *)kmem_zalloc(sizeof (tavor_ks_info_t),
 	    KM_SLEEP);
 	if (ksi == NULL) {
-		TNF_PROBE_0(tavor_kstat_init_kma_fail, TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_kstat_init);
 		return (DDI_FAILURE);
 	}
 	state->ts_ks_info = ksi;
@@ -141,8 +137,6 @@ tavor_kstat_init(tavor_state_t *state)
 		ksi->tki_picN_ksp[i] = tavor_kstat_picN_create(state, i,
 		    TAVOR_CNTR_NUMENTRIES, tavor_ib_perfcnt_list);
 		if (ksi->tki_picN_ksp[i] == NULL) {
-			TNF_PROBE_0(tavor_kstat_init_picN_fail,
-			    TAVOR_TNF_ERROR, "");
 			goto kstat_init_fail;
 		}
 
@@ -156,7 +150,6 @@ tavor_kstat_init(tavor_state_t *state)
 	ksi->tki_cntr_ksp = tavor_kstat_cntr_create(state, numports,
 	    tavor_kstat_cntr_update);
 	if (ksi->tki_cntr_ksp == NULL) {
-		TNF_PROBE_0(tavor_kstat_init_cntr_fail, TAVOR_TNF_ERROR, "");
 		goto kstat_init_fail;
 	}
 
@@ -176,7 +169,6 @@ tavor_kstat_init(tavor_state_t *state)
 	mutex_init(&ksi->tki_perfcntr64_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&ksi->tki_perfcntr64_cv, NULL, CV_DRIVER, NULL);
 
-	TAVOR_TNF_EXIT(tavor_kstat_init);
 	return (DDI_SUCCESS);
 
 
@@ -198,7 +190,6 @@ kstat_init_fail:
 	/* Free the kstat info structure */
 	kmem_free(ksi, sizeof (tavor_ks_info_t));
 
-	TAVOR_TNF_EXIT(tavor_kstat_init);
 	return (DDI_FAILURE);
 }
 
@@ -213,8 +204,6 @@ tavor_kstat_fini(tavor_state_t *state)
 	tavor_ks_info_t		*ksi;
 	uint_t			numports;
 	int			i;
-
-	TAVOR_TNF_ENTER(tavor_kstat_fini);
 
 	/* Get pointer to kstat info */
 	ksi = state->ts_ks_info;
@@ -246,8 +235,6 @@ tavor_kstat_fini(tavor_state_t *state)
 
 	/* Free the kstat info structure */
 	kmem_free(ksi, sizeof (tavor_ks_info_t));
-
-	TAVOR_TNF_EXIT(tavor_kstat_fini);
 }
 
 
@@ -265,8 +252,6 @@ tavor_kstat_picN_create(tavor_state_t *state, int num_pic, int num_evt,
 	char			*drv_name;
 	char			pic_name[16];
 
-	TAVOR_TNF_ENTER(tavor_kstat_picN_create);
-
 	/*
 	 * Create the "picN" kstat.  In the steps, below we will attach
 	 * all of our named event types to it.
@@ -277,9 +262,6 @@ tavor_kstat_picN_create(tavor_state_t *state, int num_pic, int num_evt,
 	picN_ksp = kstat_create(drv_name, drv_instance, pic_name, "bus",
 	    KSTAT_TYPE_NAMED, num_evt, 0);
 	if (picN_ksp == NULL) {
-		TNF_PROBE_0(tavor_kstat_picN_create_kstat_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_kstat_picN_create);
 		return (NULL);
 	}
 	pic_named_data = (struct kstat_named *)(picN_ksp->ks_data);
@@ -305,7 +287,6 @@ tavor_kstat_picN_create(tavor_state_t *state, int num_pic, int num_evt,
 	/* Install the kstat */
 	kstat_install(picN_ksp);
 
-	TAVOR_TNF_EXIT(tavor_kstat_picN_create);
 	return (picN_ksp);
 }
 
@@ -324,8 +305,6 @@ tavor_kstat_cntr_create(tavor_state_t *state, int num_pic,
 	char			*drv_name;
 	char			pic_str[16];
 
-	TAVOR_TNF_ENTER(tavor_kstat_cntr_create);
-
 	/*
 	 * Create the "counters" kstat.  In the steps, below we will attach
 	 * all of our "pic" to it.   Note:  The size of this kstat is
@@ -336,9 +315,6 @@ tavor_kstat_cntr_create(tavor_state_t *state, int num_pic,
 	cntr_ksp = kstat_create(drv_name, drv_instance, "counters", "bus",
 	    KSTAT_TYPE_NAMED, num_pic + 1, KSTAT_FLAG_WRITABLE);
 	if (cntr_ksp == NULL) {
-		TNF_PROBE_0(tavor_kstat_picN_create_kstat_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_kstat_cntr_create);
 		return (NULL);
 	}
 	cntr_named_data = (struct kstat_named *)(cntr_ksp->ks_data);
@@ -364,7 +340,6 @@ tavor_kstat_cntr_create(tavor_state_t *state, int num_pic,
 	/* Install the kstat */
 	kstat_install(cntr_ksp);
 
-	TAVOR_TNF_ENTER(tavor_kstat_cntr_create);
 	return (cntr_ksp);
 }
 
@@ -384,8 +359,6 @@ tavor_kstat_cntr_update(kstat_t *ksp, int rw)
 	uint32_t		pic0, pic1, tmp;
 	uint32_t		shift, mask, oldval;
 	uint_t			numports, indx;
-
-	TAVOR_TNF_ENTER(tavor_kstat_cntr_update);
 
 	/*
 	 * Extract the Tavor softstate pointer, kstat data, pointer to the
@@ -420,7 +393,6 @@ tavor_kstat_cntr_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE) {
 		/* Update the stored "pcr" value */
 		ksi->tki_pcr = data[0].value.ui64;
-		TAVOR_TNF_EXIT(tavor_kstat_cntr_update);
 		return (0);
 	} else {
 		/*
@@ -479,7 +451,6 @@ tavor_kstat_cntr_update(kstat_t *ksp, int rw)
 			data[2].value.ui64 = ksi->tki_pic1;
 		}
 
-		TAVOR_TNF_EXIT(tavor_kstat_cntr_update);
 		return (0);
 	}
 }

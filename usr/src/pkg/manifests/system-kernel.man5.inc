@@ -27,5 +27,4 @@ file path=usr/share/man/man5/pseudo.5
 file path=usr/share/man/man5/scsi.5
 file path=usr/share/man/man5/sock2path.d.5
 file path=usr/share/man/man5/system.5
-file path=usr/share/man/man5/tnf_kernel_probes.5
 file path=usr/share/man/man5/ts_dptbl.5

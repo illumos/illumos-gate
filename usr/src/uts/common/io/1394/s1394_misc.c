@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s1394_misc.c
  *    1394 Services Layer Miscellaneous Routines
@@ -40,8 +38,6 @@
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/kstat.h>
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
 #include <sys/1394/h1394.h>
@@ -61,9 +57,6 @@ static void s1394_cleanup_node_cfgrom(s1394_hal_t *hal);
 void
 s1394_cleanup_for_detach(s1394_hal_t *hal, uint_t cleanup_level)
 {
-
-	TNF_PROBE_0_DEBUG(s1394_cleanup_for_detach_enter, S1394_TNF_SL_STACK,
-	    "");
 
 	switch (cleanup_level) {
 	case H1394_CLEANUP_LEVEL7:
@@ -152,14 +145,8 @@ s1394_cleanup_for_detach(s1394_hal_t *hal, uint_t cleanup_level)
 
 	default:
 		/* Error */
-		TNF_PROBE_1(s1394_cleanup_for_detach_error,
-		    S1394_TNF_SL_ERROR, "", tnf_string, msg,
-		    "Invalid cleanup_level");
 		break;
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_cleanup_for_detach_exit, S1394_TNF_SL_STACK,
-	    "");
 }
 
 /*
@@ -176,8 +163,6 @@ s1394_hal_shutdown(s1394_hal_t *hal, boolean_t disable_hal)
 	ddi_eventcookie_t cookie;
 	t1394_localinfo_t localinfo;
 
-	TNF_PROBE_0_DEBUG(s1394_hal_shutdown_enter, S1394_TNF_SL_STACK, "");
-
 	mutex_enter(&hal->topology_tree_mutex);
 
 	if (hal->hal_state == S1394_HAL_SHUTDOWN) {
@@ -185,8 +170,6 @@ s1394_hal_shutdown(s1394_hal_t *hal, boolean_t disable_hal)
 		if (disable_hal == B_TRUE)
 			HAL_CALL(hal).shutdown(hal->halinfo.hal_private);
 
-		TNF_PROBE_0_DEBUG(s1394_hal_shutdown_exit_already,
-		    S1394_TNF_SL_STACK, "");
 		return;
 	}
 
@@ -209,8 +192,6 @@ s1394_hal_shutdown(s1394_hal_t *hal, boolean_t disable_hal)
 	    NDI_SUCCESS)
 		(void) ndi_event_run_callbacks(hal->hal_ndi_event_hdl, NULL,
 		    cookie, &localinfo);
-
-	TNF_PROBE_0_DEBUG(s1394_hal_shutdown_exit, S1394_TNF_SL_STACK, "");
 }
 
 /*
@@ -222,29 +203,16 @@ s1394_hal_shutdown(s1394_hal_t *hal, boolean_t disable_hal)
 void
 s1394_initiate_hal_reset(s1394_hal_t *hal, int reason)
 {
-	int ret;
-
-	TNF_PROBE_0_DEBUG(s1394_initiate_hal_reset_enter, S1394_TNF_SL_BR_STACK,
-	    "");
-
 	if (hal->num_bus_reset_till_fail > 0) {
 		hal->initiated_bus_reset = B_TRUE;
 		hal->initiated_br_reason = reason;
 
 		/* Reset the bus */
-		ret = HAL_CALL(hal).bus_reset(hal->halinfo.hal_private);
-		if (ret != DDI_SUCCESS) {
-			TNF_PROBE_1(s1394_initiate_hal_reset_error,
-			    S1394_TNF_SL_ERROR, "", tnf_string, msg,
-			    "Error initiating bus reset");
-		}
+		(void) HAL_CALL(hal).bus_reset(hal->halinfo.hal_private);
 	} else {
 		cmn_err(CE_NOTE, "Unable to reenumerate the 1394 bus - If new"
 		    " devices have recently been added, remove them.");
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_initiate_hal_reset_exit, S1394_TNF_SL_BR_STACK,
-	    "");
 }
 
 /*
@@ -269,9 +237,6 @@ s1394_on_br_thread(s1394_hal_t *hal)
 void
 s1394_destroy_br_thread(s1394_hal_t *hal)
 {
-	TNF_PROBE_0_DEBUG(s1394_destroy_br_thread_enter, S1394_TNF_SL_STACK,
-	    "");
-
 	/* Send the signal to the reset thread to go away */
 	mutex_enter(&hal->br_thread_mutex);
 	hal->br_thread_ev_type |= BR_THR_GO_AWAY;
@@ -291,9 +256,6 @@ s1394_destroy_br_thread(s1394_hal_t *hal)
 	/* Wait for the br_thread to be done */
 	while (hal->br_thread_ev_type & BR_THR_GO_AWAY)
 		delay(drv_usectohz(10));
-
-	TNF_PROBE_0_DEBUG(s1394_destroy_br_thread_exit, S1394_TNF_SL_STACK,
-	    "");
 }
 
 /*
@@ -333,9 +295,6 @@ s1394_block_on_asynch_cmd(cmd1394_cmd_t	*cmd)
 {
 	s1394_cmd_priv_t  *s_priv;
 
-	TNF_PROBE_0_DEBUG(s1394_block_on_asynch_cmd_enter,
-	    S1394_TNF_SL_ATREQ_STACK, "");
-
 	/* Get the Services Layer private area */
 	s_priv = S1394_GET_CMD_PRIV(cmd);
 
@@ -348,9 +307,6 @@ s1394_block_on_asynch_cmd(cmd1394_cmd_t	*cmd)
 		s_priv->blocking_flag = B_FALSE;
 		mutex_exit(&s_priv->blocking_mutex);
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_block_on_asynch_cmd_exit,
-	    S1394_TNF_SL_ATREQ_STACK, "");
 }
 
 /*
@@ -399,9 +355,6 @@ s1394_mblk_too_small(cmd1394_cmd_t *cmd)
 	size_t	  msgb_len;
 	size_t	  size;
 
-	TNF_PROBE_0_DEBUG(s1394_mblk_too_small_enter, S1394_TNF_SL_ATREQ_STACK,
-	    "");
-
 	curr_blk = cmd->cmd_u.b.data_block;
 	msgb_len = 0;
 	flag = B_TRUE;
@@ -423,8 +376,6 @@ s1394_mblk_too_small(cmd1394_cmd_t *cmd)
 		curr_blk = curr_blk->b_cont;
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_mblk_too_small_exit, S1394_TNF_SL_ATREQ_STACK,
-	    "");
 	return (flag);
 }
 
@@ -439,9 +390,6 @@ s1394_address_rollover(cmd1394_cmd_t *cmd)
 	uint64_t addr_before;
 	uint64_t addr_after;
 	size_t	 length;
-
-	TNF_PROBE_0_DEBUG(s1394_address_rollover_enter,
-	    S1394_TNF_SL_ATREQ_STACK, "");
 
 	switch (cmd->cmd_type) {
 	case CMD1394_ASYNCH_RD_QUAD:
@@ -464,13 +412,9 @@ s1394_address_rollover(cmd1394_cmd_t *cmd)
 	addr_after = (addr_before + length) & IEEE1394_ADDR_OFFSET_MASK;
 
 	if (addr_after < addr_before) {
-		TNF_PROBE_0_DEBUG(s1394_address_rollover_exit,
-		    S1394_TNF_SL_ATREQ_STACK, "");
 		return (B_TRUE);
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_address_rollover_exit,
-	    S1394_TNF_SL_ATREQ_STACK, "");
 	return (B_FALSE);
 }
 
@@ -515,8 +459,6 @@ s1394_CRC16(uint_t *d, uint_t crc_length)
 	int	shift;
 	int	i;
 
-	TNF_PROBE_0_DEBUG(s1394_CRC16_enter, S1394_TNF_SL_STACK, "");
-
 	for (i = 0; i < crc_length; i++) {
 		data = d[i];
 
@@ -529,8 +471,6 @@ s1394_CRC16(uint_t *d, uint_t crc_length)
 		CRC = next & IEEE1394_CRC16_MASK;
 	}
 
-	TNF_PROBE_1_DEBUG(s1394_CRC16_exit, S1394_TNF_SL_STACK, "",
-	    tnf_uint, crc, CRC);
 	return (CRC);
 }
 
@@ -552,8 +492,6 @@ s1394_CRC16_old(uint_t *d, uint_t crc_length)
 	int	shift;
 	int	i;
 
-	TNF_PROBE_0_DEBUG(s1394_CRC16_old_enter, S1394_TNF_SL_STACK, "");
-
 	for (i = 0; i < crc_length; i++) {
 		data = d[i];
 		for (next = CRC, shift = 28; shift > 0; shift -= 4) {
@@ -563,8 +501,6 @@ s1394_CRC16_old(uint_t *d, uint_t crc_length)
 		CRC = next & IEEE1394_CRC16_MASK;
 	}
 
-	TNF_PROBE_1_DEBUG(s1394_CRC16_old_exit, S1394_TNF_SL_STACK, "",
-	    tnf_uint, crc, CRC);
 	return (CRC);
 }
 
@@ -581,9 +517,6 @@ s1394_ioctl(s1394_hal_t *hal, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	struct devctl_iocdata	*dcp;
 	dev_info_t		*self;
 	int			rv = 0;
-	int			ret;
-
-	TNF_PROBE_0_DEBUG(s1394_ioctl_enter, S1394_TNF_SL_IOCTL_STACK, "");
 
 	self = hal->halinfo.dip;
 
@@ -601,8 +534,6 @@ s1394_ioctl(s1394_hal_t *hal, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 
 	/* Read devctl ioctl data */
 	if (ndi_dc_allochdl((void *)arg, &dcp) != NDI_SUCCESS) {
-		TNF_PROBE_0_DEBUG(s1394_ioctl_exit, S1394_TNF_SL_IOCTL_STACK,
-		    "");
 		return (EFAULT);
 	}
 
@@ -626,20 +557,11 @@ s1394_ioctl(s1394_hal_t *hal, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	case DEVCTL_BUS_RESET:
 	case DEVCTL_BUS_RESETALL:
 		if (hal->halinfo.phy == H1394_PHY_1394A) {
-			ret = HAL_CALL(hal).short_bus_reset(
+			(void) HAL_CALL(hal).short_bus_reset(
 			    hal->halinfo.hal_private);
-			if (ret != DDI_SUCCESS) {
-				TNF_PROBE_1(s1394_ioctl_error,
-				    S1394_TNF_SL_ERROR, "", tnf_string, msg,
-				    "Error initiating short bus reset");
-			}
 		} else {
-			ret = HAL_CALL(hal).bus_reset(hal->halinfo.hal_private);
-			if (ret != DDI_SUCCESS) {
-				TNF_PROBE_1(t1394_initiate_bus_reset_error,
-				    S1394_TNF_SL_ERROR, "", tnf_string, msg,
-				    "Error initiating bus reset");
-			}
+			(void)
+			    HAL_CALL(hal).bus_reset(hal->halinfo.hal_private);
 		}
 		break;
 
@@ -649,7 +571,6 @@ s1394_ioctl(s1394_hal_t *hal, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 
 	ndi_dc_freehdl(dcp);
 
-	TNF_PROBE_0_DEBUG(s1394_ioctl_exit, S1394_TNF_SL_IOCTL_STACK, "");
 	return (rv);
 }
 
@@ -661,8 +582,6 @@ int
 s1394_kstat_init(s1394_hal_t *hal)
 {
 	int instance;
-
-	TNF_PROBE_0_DEBUG(s1394_kstat_init_enter, S1394_TNF_SL_STACK, "");
 
 	hal->hal_kstats = (s1394_kstat_t *)kmem_zalloc(sizeof (s1394_kstat_t),
 	    KM_SLEEP);
@@ -676,13 +595,9 @@ s1394_kstat_init(s1394_hal_t *hal)
 		hal->hal_ksp->ks_update = s1394_kstat_update;
 		kstat_install(hal->hal_ksp);
 
-		TNF_PROBE_0_DEBUG(s1394_kstat_init_exit, S1394_TNF_SL_STACK,
-		    "");
 		return (DDI_SUCCESS);
 	} else {
 		kmem_free((void *)hal->hal_kstats, sizeof (s1394_kstat_t));
-		TNF_PROBE_0_DEBUG(s1394_kstat_init_exit, S1394_TNF_SL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 }
@@ -695,12 +610,9 @@ s1394_kstat_init(s1394_hal_t *hal)
 int
 s1394_kstat_delete(s1394_hal_t *hal)
 {
-	TNF_PROBE_0_DEBUG(s1394_kstat_delete_enter, S1394_TNF_SL_STACK, "");
-
 	kstat_delete(hal->hal_ksp);
 	kmem_free((void *)hal->hal_kstats, sizeof (s1394_kstat_t));
 
-	TNF_PROBE_0_DEBUG(s1394_kstat_delete_exit, S1394_TNF_SL_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -714,19 +626,14 @@ s1394_kstat_update(kstat_t *ksp, int rw)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(s1394_kstat_update_enter, S1394_TNF_SL_STACK, "");
-
 	hal = ksp->ks_private;
 
 	if (rw == KSTAT_WRITE) {
-		TNF_PROBE_0_DEBUG(s1394_kstat_update_exit, S1394_TNF_SL_STACK,
-		    "");
 		return (EACCES);
 	} else {
 		ksp->ks_data = hal->hal_kstats;
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_kstat_update_exit, S1394_TNF_SL_STACK, "");
 	return (0);
 }
 
@@ -834,9 +741,6 @@ s1394_dip_to_hal(dev_info_t *hal_dip)
 {
 	s1394_hal_t	*current_hal = NULL;
 
-	TNF_PROBE_0_DEBUG(s1394_dip_to_hal_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	mutex_enter(&s1394_statep->hal_list_mutex);
 
 	/* Search the HAL list for this dip */
@@ -850,8 +754,6 @@ s1394_dip_to_hal(dev_info_t *hal_dip)
 
 	mutex_exit(&s1394_statep->hal_list_mutex);
 
-	TNF_PROBE_0_DEBUG(s1394_dip_to_hal_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 	return (current_hal);
 }
 
@@ -869,9 +771,6 @@ s1394_target_from_dip_locked(s1394_hal_t *hal, dev_info_t *tdip)
 {
 	s1394_target_t	*temp;
 
-	TNF_PROBE_0_DEBUG(s1394_target_from_dip_locked_enter,
-	    S1394_TNF_SL_STACK, "");
-
 	temp = hal->target_head;
 	while (temp != NULL) {
 	    if (temp->target_dip == tdip) {
@@ -880,8 +779,6 @@ s1394_target_from_dip_locked(s1394_hal_t *hal, dev_info_t *tdip)
 	    temp = temp->target_next;
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_target_from_dip_locked_exit,
-	    S1394_TNF_SL_STACK, "");
 	return (NULL);
 }
 /*
@@ -894,13 +791,10 @@ s1394_target_from_dip(s1394_hal_t *hal, dev_info_t *tdip)
 {
 	s1394_target_t	*target;
 
-	TNF_PROBE_0_DEBUG(s1394_target_from_dip_enter, S1394_TNF_SL_STACK, "");
-
 	rw_enter(&hal->target_list_rwlock, RW_READER);
 	target = s1394_target_from_dip_locked(hal, tdip);
 	rw_exit(&hal->target_list_rwlock);
 
-	TNF_PROBE_0_DEBUG(s1394_target_from_dip_exit, S1394_TNF_SL_STACK, "");
 	return (target);
 }
 
@@ -954,9 +848,6 @@ s1394_cycle_too_long_callback(void *arg)
 	uint32_t	data;
 	uint_t		offset;
 
-	TNF_PROBE_0_DEBUG(s1394_cycle_too_long_callback_enter,
-	    S1394_TNF_SL_STACK, "");
-
 	hal = (s1394_hal_t *)arg;
 
 	/* Clear the cm_timer_cet bit */
@@ -977,7 +868,4 @@ s1394_cycle_too_long_callback(void *arg)
 		(void) HAL_CALL(hal).csr_write(hal->halinfo.hal_private,
 		    offset, data);
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_cycle_too_long_callback_exit,
-	    S1394_TNF_SL_STACK, "");
 }

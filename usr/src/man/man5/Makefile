@@ -182,7 +182,6 @@ _MANFILES=	Intro.5				\
 		term.5				\
 		terminfo.5			\
 		timezone.5			\
-		tnf_kernel_probes.5		\
 		ts_dptbl.5			\
 		ttydefs.5			\
 		ttysrch.5			\

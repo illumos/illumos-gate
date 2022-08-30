@@ -4817,10 +4817,6 @@ f usr/include/sys/timod.h 0644 root bin
 f usr/include/sys/tirdwr.h 0644 root bin
 f usr/include/sys/tiuser.h 0644 root bin
 f usr/include/sys/tl.h 0644 root bin
-f usr/include/sys/tnf.h 0644 root bin
-f usr/include/sys/tnf_com.h 0644 root bin
-f usr/include/sys/tnf_probe.h 0644 root bin
-f usr/include/sys/tnf_writer.h 0644 root bin
 f usr/include/sys/todio.h 0644 root bin
 f usr/include/sys/tpicommon.h 0644 root bin
 f usr/include/sys/trap.h 0644 root bin
@@ -4951,12 +4947,6 @@ f usr/include/thread_db.h 0644 root bin
 f usr/include/threads.h 0644 root bin
 f usr/include/time.h 0644 root bin
 f usr/include/tiuser.h 0644 root bin
-d usr/include/tnf 0755 root bin
-f usr/include/tnf/com.h 0644 root bin
-f usr/include/tnf/probe.h 0644 root bin
-f usr/include/tnf/tnf.h 0644 root bin
-f usr/include/tnf/tnfctl.h 0644 root bin
-f usr/include/tnf/writer.h 0644 root bin
 d usr/include/tsol 0755 root bin
 f usr/include/tsol/label.h 0644 root bin
 f usr/include/tzfile.h 0644 root bin
@@ -5485,10 +5475,6 @@ s usr/lib/amd64/libthread.so.1=../../../lib/amd64/libthread.so.1
 s usr/lib/amd64/libthread.so=../../../lib/amd64/libthread.so.1
 s usr/lib/amd64/libthread_db.so.1=../../../lib/amd64/libc_db.so.1
 s usr/lib/amd64/libthread_db.so=../../../lib/amd64/libc_db.so.1
-f usr/lib/amd64/libtnfctl.so.1 0755 root bin
-s usr/lib/amd64/libtnfctl.so=libtnfctl.so.1
-f usr/lib/amd64/libtnfprobe.so.1 0755 root bin
-s usr/lib/amd64/libtnfprobe.so=libtnfprobe.so.1
 s usr/lib/amd64/libtsnet.so.1=../../../lib/amd64/libtsnet.so.1
 s usr/lib/amd64/libtsnet.so=../../../lib/amd64/libtsnet.so.1
 s usr/lib/amd64/libtsol.so.2=../../../lib/amd64/libtsol.so.2
@@ -7010,12 +6996,6 @@ s usr/lib/libthread.so.1=../../lib/libthread.so.1
 s usr/lib/libthread.so=../../lib/libthread.so.1
 s usr/lib/libthread_db.so.1=../../lib/libc_db.so.1
 s usr/lib/libthread_db.so=../../lib/libc_db.so.1
-f usr/lib/libtnf.so.1 0755 root bin
-s usr/lib/libtnf.so=libtnf.so.1
-f usr/lib/libtnfctl.so.1 0755 root bin
-s usr/lib/libtnfctl.so=libtnfctl.so.1
-f usr/lib/libtnfprobe.so.1 0755 root bin
-s usr/lib/libtnfprobe.so=libtnfprobe.so.1
 s usr/lib/libtsnet.so.1=../../lib/libtsnet.so.1
 s usr/lib/libtsnet.so=../../lib/libtsnet.so.1
 s usr/lib/libtsol.so.2=../../lib/libtsol.so.2
@@ -16143,7 +16123,6 @@ f usr/share/man/man3lib/libtecla.3lib 0444 root bin
 s usr/share/man/man3lib/libtermcap.3lib=libcurses.3lib
 s usr/share/man/man3lib/libtermlib.3lib=libcurses.3lib
 f usr/share/man/man3lib/libthread.3lib 0444 root bin
-f usr/share/man/man3lib/libtnfctl.3lib 0444 root bin
 f usr/share/man/man3lib/libtsalarm.3lib 0444 root bin
 f usr/share/man/man3lib/libumem.3lib 0444 root bin
 f usr/share/man/man3lib/libuuid.3lib 0444 root bin
@@ -18317,24 +18296,6 @@ s usr/share/man/man3tecla/pca_scan_path.3tecla=pca_lookup_file.3tecla
 s usr/share/man/man3tecla/pca_set_check_fn.3tecla=pca_lookup_file.3tecla
 s usr/share/man/man3tecla/ppc_file_start.3tecla=pca_lookup_file.3tecla
 s usr/share/man/man3tecla/ppc_literal_escapes.3tecla=pca_lookup_file.3tecla
-d usr/share/man/man3tnf 0755 root bin
-f usr/share/man/man3tnf/TNF_DECLARE_RECORD.3tnf 0444 root bin
-f usr/share/man/man3tnf/TNF_PROBE.3tnf 0444 root bin
-f usr/share/man/man3tnf/libtnfctl.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnf_process_disable.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_buffer_alloc.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_close.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_indirect_open.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_internal_open.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_kernel_open.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_pid_open.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_probe_apply.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_probe_state_get.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_register_funcs.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_strerror.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_trace_attrs_get.3tnf 0444 root bin
-f usr/share/man/man3tnf/tnfctl_trace_state_set.3tnf 0444 root bin
-f usr/share/man/man3tnf/tracing.3tnf 0444 root bin
 d usr/share/man/man3utempter 0755 root bin
 s usr/share/man/man3utempter/addToUtmp.3utempter=utempter_add_record.3utempter
 s usr/share/man/man3utempter/removeFromUtmp.3utempter=utempter_add_record.3utempter
@@ -19306,7 +19267,6 @@ f usr/share/man/man5/system.5 0444 root bin
 f usr/share/man/man5/term.5 0444 root bin
 f usr/share/man/man5/terminfo.5 0444 root bin
 f usr/share/man/man5/timezone.5 0444 root bin
-f usr/share/man/man5/tnf_kernel_probes.5 0444 root bin
 f usr/share/man/man5/ts_dptbl.5 0444 root bin
 f usr/share/man/man5/ttydefs.5 0444 root bin
 f usr/share/man/man5/ttysrch.5 0444 root bin

@@ -95,61 +95,28 @@ static struct modlinkage hci1394_modlinkage = {
 	NULL
 };
 
-#ifndef NPROBE
-extern int tnf_mod_load(void);
-extern int tnf_mod_unload(struct modlinkage *mlp);
-#endif
-
 int
 _init()
 {
 	int status;
 
-
-#ifndef NPROBE
-	(void) tnf_mod_load();
-#endif
-	TNF_PROBE_0_DEBUG(hci1394_init_enter, HCI1394_TNF_HAL_STACK, "");
-
 	status = ddi_soft_state_init(&hci1394_statep, sizeof (hci1394_state_t),
 	    (size_t)HCI1394_INITIAL_STATES);
 	if (status != 0) {
-		TNF_PROBE_2(hci1394_init_ssi_fail, HCI1394_TNF_HAL_ERROR, "",
-		    tnf_string, errmsg, "failed in ddi_soft_state_init",
-		    tnf_int, error, status);
-		TNF_PROBE_0_DEBUG(hci1394_init_exit, HCI1394_TNF_HAL_STACK, "");
-#ifndef NPROBE
-		(void) tnf_mod_unload(&hci1394_modlinkage);
-#endif
 		return (status);
 	}
 
 	/* Call into services layer to init bus-ops */
 	status = h1394_init(&hci1394_modlinkage);
 	if (status != 0) {
-		TNF_PROBE_2(hci1394_init_h1394_fail, HCI1394_TNF_HAL_ERROR, "",
-		    tnf_string, errmsg, "failed in h1394_init",
-		    tnf_int, error, status);
-		TNF_PROBE_0_DEBUG(hci1394_init_exit, HCI1394_TNF_HAL_STACK, "");
-#ifndef NPROBE
-		(void) tnf_mod_unload(&hci1394_modlinkage);
-#endif
 		return (status);
 	}
 
 	status = mod_install(&hci1394_modlinkage);
 	if (status != 0) {
-		TNF_PROBE_2(hci1394_init_modi_fail, HCI1394_TNF_HAL_ERROR, "",
-		    tnf_string, errmsg, "failed in mod_install",
-		    tnf_int, error, status);
 		ddi_soft_state_fini(&hci1394_statep);
-#ifndef NPROBE
-		(void) tnf_mod_unload(&hci1394_modlinkage);
-#endif
 		return (status);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_init_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (status);
 }
@@ -160,9 +127,7 @@ _info(struct modinfo *modinfop)
 {
 	int status;
 
-	TNF_PROBE_0_DEBUG(hci1394_info_enter, HCI1394_TNF_HAL_STACK, "");
 	status = mod_info(&hci1394_modlinkage, modinfop);
-	TNF_PROBE_0_DEBUG(hci1394_info_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (status);
 }
@@ -173,26 +138,14 @@ _fini()
 {
 	int status;
 
-	TNF_PROBE_0_DEBUG(hci1394_fini_enter, HCI1394_TNF_HAL_STACK, "");
-
 	status = mod_remove(&hci1394_modlinkage);
 	if (status != 0) {
-		TNF_PROBE_2(hci1394_fini_modr_fail, HCI1394_TNF_HAL_ERROR, "",
-		    tnf_string, errmsg, "failed in mod_remove",
-		    tnf_int, error, status);
-		TNF_PROBE_0_DEBUG(hci1394_fini_exit, HCI1394_TNF_HAL_STACK, "");
 		return (status);
 	}
 
 	/* Call into services layer notify about _fini */
 	h1394_fini(&hci1394_modlinkage);
 	ddi_soft_state_fini(&hci1394_statep);
-
-	TNF_PROBE_0_DEBUG(hci1394_fini_exit, HCI1394_TNF_HAL_STACK, "");
-
-#ifndef NPROBE
-	(void) tnf_mod_unload(&hci1394_modlinkage);
-#endif
 
 	return (status);
 }

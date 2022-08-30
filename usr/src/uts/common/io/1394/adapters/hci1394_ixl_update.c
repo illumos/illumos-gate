@@ -34,9 +34,6 @@
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/disp.h>
-
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/h1394.h>
 #include <sys/1394/ixl1394.h>	/* IXL opcodes & data structs */
 
@@ -111,10 +108,6 @@ hci1394_ixl_update(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 	int prepstatus;
 	int ret;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
-
 	/* save caller specified values in update work variables structure */
 	uv.soft_statep = soft_statep;
 	uv.ctxtp = ctxtp;
@@ -152,16 +145,9 @@ hci1394_ixl_update(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 
 		/* if prep evaluation error, return failure */
 		if (prepstatus != IXL_PREP_SUCCESS) {
-			TNF_PROBE_1_DEBUG(hci1394_ixl_update_error,
-			    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, msg,
-			    "IXL_PREP_FAILURE");
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (DDI_FAILURE);
 		}
 		/* if no action or update done, return update successful */
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -172,8 +158,6 @@ hci1394_ixl_update(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 		/* error acquiring control of context - return */
 		*resultp = uv.upd_status;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (DDI_FAILURE);
 	}
 
@@ -201,8 +185,6 @@ hci1394_ixl_update(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 		}
 		*resultp = uv.upd_status;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (DDI_FAILURE);
 	}
 
@@ -217,8 +199,6 @@ hci1394_ixl_update(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 
 		*resultp = uv.upd_status;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (DDI_FAILURE);
 	}
 
@@ -246,8 +226,6 @@ hci1394_ixl_update(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 
 		*resultp = uv.upd_status;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (DDI_FAILURE);
 	}
 
@@ -257,8 +235,6 @@ hci1394_ixl_update(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 	/* return update completion status */
 	*resultp = uv.upd_status;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_exit, HCI1394_TNF_HAL_STACK_ISOCH,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -274,9 +250,6 @@ hci1394_ixl_update_enable(hci1394_ixl_update_vars_t *uvp)
 	int	status;
 	boolean_t retry;
 	uint_t	remretries;
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_enable_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	retry = B_TRUE;
 	/* set arbitrary number of retries before giving up */
@@ -335,8 +308,6 @@ hci1394_ixl_update_enable(hci1394_ixl_update_vars_t *uvp)
 	ASSERT(MUTEX_HELD(&uvp->ctxtp->intrprocmutex));
 	mutex_exit(&uvp->ctxtp->intrprocmutex);
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_enable_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (status);
 }
 
@@ -351,9 +322,6 @@ hci1394_ixl_update_endup(hci1394_ixl_update_vars_t *uvp)
 {
 	uint_t status;
 	hci1394_iso_ctxt_t *ctxtp;
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_endup_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	status = HCI1394_IXL_INTR_NOERROR;
 	ctxtp = uvp->ctxtp;
@@ -405,8 +373,6 @@ hci1394_ixl_update_endup(hci1394_ixl_update_vars_t *uvp)
 		hci1394_do_stop(uvp->soft_statep, ctxtp, B_TRUE, ID1394_FAIL);
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_endup_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (status);
 }
 
@@ -419,17 +385,11 @@ hci1394_ixl_update_prepare(hci1394_ixl_update_vars_t *uvp)
 {
 	int		    ret;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	/* both new and old ixl commands must be the same */
 	if (uvp->ixlnewp->ixl_opcode != uvp->ixloldp->ixl_opcode) {
 
 		uvp->upd_status = IXL1394_EOPCODE_MISMATCH;
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "EOPCODE_MISMATCH");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -452,45 +412,33 @@ hci1394_ixl_update_prepare(hci1394_ixl_update_vars_t *uvp)
 		old_callback_ixlp->callback = new_callback_ixlp->callback;
 
 		/* nothing else to do, return with done ok status */
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_SUCCESS);
 	}
 
 	case IXL1394_OP_JUMP_U:
 		ret = hci1394_ixl_update_prep_jump(uvp);
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (ret);
 
 	case IXL1394_OP_SET_SKIPMODE_U:
 		ret = hci1394_ixl_update_prep_set_skipmode(uvp);
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (ret);
 
 	case IXL1394_OP_SET_TAGSYNC_U:
 		ret = hci1394_ixl_update_prep_set_tagsync(uvp);
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (ret);
 
 	case IXL1394_OP_RECV_PKT_U:
 	case IXL1394_OP_RECV_PKT_ST_U:
 		ret = hci1394_ixl_update_prep_recv_pkt(uvp);
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (ret);
 
 	case IXL1394_OP_RECV_BUF_U:
 		ret = hci1394_ixl_update_prep_recv_buf(uvp);
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (ret);
 
 	case IXL1394_OP_SEND_PKT_U:
@@ -498,23 +446,17 @@ hci1394_ixl_update_prepare(hci1394_ixl_update_vars_t *uvp)
 	case IXL1394_OP_SEND_PKT_WHDR_ST_U:
 		ret = hci1394_ixl_update_prep_send_pkt(uvp);
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (ret);
 
 	case IXL1394_OP_SEND_BUF_U:
 		ret = hci1394_ixl_update_prep_send_buf(uvp);
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (ret);
 
 	default:
 		/* ixl command being updated must be one of above, else error */
 		uvp->upd_status = IXL1394_EOPCODE_DISALLOWED;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 }
@@ -537,9 +479,6 @@ hci1394_ixl_update_prep_jump(hci1394_ixl_update_vars_t *uvp)
 	uint32_t	    desc_hdr;
 	int		    err;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_jump_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	old_jump_ixlp = (ixl1394_jump_t *)uvp->ixloldp;
 	new_jump_ixlp = (ixl1394_jump_t *)uvp->ixlnewp;
 
@@ -547,8 +486,6 @@ hci1394_ixl_update_prep_jump(hci1394_ixl_update_vars_t *uvp)
 	if (new_jump_ixlp->label == old_jump_ixlp->label) {
 
 		/* if none, return with done ok status */
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_jump_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_SUCCESS);
 	}
 
@@ -559,9 +496,6 @@ hci1394_ixl_update_prep_jump(hci1394_ixl_update_vars_t *uvp)
 		/* if not jumping to label, return an error */
 		uvp->upd_status = IXL1394_EJUMP_NOT_TO_LABEL;
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_update_prepare_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, errmsg,
-		    "EJUMP_NOT_TO_LABEL");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -592,9 +526,6 @@ hci1394_ixl_update_prep_jump(hci1394_ixl_update_vars_t *uvp)
 		/* if none, return an error */
 		uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_update_prep_jump_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, errmsg,
-		    "EORIG_IXL_CORRUPTED");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -614,9 +545,6 @@ hci1394_ixl_update_prep_jump(hci1394_ixl_update_vars_t *uvp)
 	if (err != DDI_SUCCESS) {
 		uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_update_prep_jump_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, errmsg,
-		    "EINTERNAL_ERROR: dma_sync() failed");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -685,8 +613,6 @@ hci1394_ixl_update_prep_jump(hci1394_ixl_update_vars_t *uvp)
 			}
 		}
 	}
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_jump_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (IXL_PREP_READY);
 }
 
@@ -702,9 +628,6 @@ hci1394_ixl_update_prep_set_skipmode(hci1394_ixl_update_vars_t *uvp)
 	ixl1394_command_t	*ixlp;
 	hci1394_xfer_ctl_t	*xferctlp;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_set_skipmode_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	old_set_skipmode_ixlp = (ixl1394_set_skipmode_t *)uvp->ixloldp;
 	new_set_skipmode_ixlp = (ixl1394_set_skipmode_t *)uvp->ixlnewp;
 
@@ -716,11 +639,6 @@ hci1394_ixl_update_prep_set_skipmode(hci1394_ixl_update_vars_t *uvp)
 		    IXL1394_SKIP_TO_LABEL) ||
 		    (old_set_skipmode_ixlp->label ==
 		    new_set_skipmode_ixlp->label)) {
-
-			TNF_PROBE_0_DEBUG(
-			    hci1394_ixl_update_prep_set_skipmode_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 			/* No change, return with done ok status */
 			return (IXL_PREP_SUCCESS);
 		}
@@ -740,9 +658,6 @@ hci1394_ixl_update_prep_set_skipmode(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_update_prep_set_skipmode_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string,
-		    errmsg, "EORIG_IXL_CORRUPTED");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -755,9 +670,6 @@ hci1394_ixl_update_prep_set_skipmode(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_update_prep_set_skipmode_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, errmsg,
-		    "EORIG_IXL_CORRUPTED");
 		return (IXL_PREP_FAILURE);
 	}
 	uvp->hci_offset = xferctlp->dma[0].dma_bound & DESC_Z_MASK;
@@ -796,9 +708,6 @@ hci1394_ixl_update_prep_set_skipmode(hci1394_ixl_update_vars_t *uvp)
 		/* return an error if invalid mode */
 		uvp->upd_status = IXL1394_EBAD_SKIPMODE;
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_update_prep_set_skipmode_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string,
-		    errmsg, "EBAD_SKIPMODE");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -813,9 +722,6 @@ hci1394_ixl_update_prep_set_skipmode(hci1394_ixl_update_vars_t *uvp)
 			/* Error - not skipping to valid label */
 			uvp->upd_status = IXL1394_EBAD_SKIP_LABEL;
 
-			TNF_PROBE_0_DEBUG(
-			    hci1394_ixl_update_prep_set_skipmode_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (IXL_PREP_FAILURE);
 		}
 
@@ -863,8 +769,6 @@ hci1394_ixl_update_prep_set_skipmode(hci1394_ixl_update_vars_t *uvp)
 			uvp->skipaddr = xferctlp->dma[0].dma_bound;
 		}
 	}
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_set_skipmode_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (IXL_PREP_READY);
 }
 
@@ -879,18 +783,12 @@ hci1394_ixl_update_prep_set_tagsync(hci1394_ixl_update_vars_t *uvp)
 	ixl1394_set_tagsync_t	*new_set_tagsync_ixlp;
 	hci1394_xfer_ctl_t	*xferctlp;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_set_tagsync_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	old_set_tagsync_ixlp = (ixl1394_set_tagsync_t *)uvp->ixloldp;
 	new_set_tagsync_ixlp = (ixl1394_set_tagsync_t *)uvp->ixlnewp;
 
 	/* check if new set tagsync is change from old set tagsync. */
 	if ((new_set_tagsync_ixlp->tag == old_set_tagsync_ixlp->tag) &&
 	    (new_set_tagsync_ixlp->sync == old_set_tagsync_ixlp->sync)) {
-
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_set_tagsync_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 		/* no change, return with done ok status */
 		return (IXL_PREP_SUCCESS);
@@ -910,16 +808,11 @@ hci1394_ixl_update_prep_set_tagsync(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_set_tagsync_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
 	/* is IXL xfer command an IXL1394_OP_SEND_NO_PKT? */
 	if (uvp->ixlxferp->ixl_opcode == IXL1394_OP_SEND_NO_PKT) {
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_set_tagsync_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 		/* no update needed, return done ok status */
 		return (IXL_PREP_SUCCESS);
 	}
@@ -939,8 +832,6 @@ hci1394_ixl_update_prep_set_tagsync(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_set_tagsync_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 	uvp->hdr_offset = xferctlp->dma[0].dma_bound & DESC_Z_MASK;
@@ -968,8 +859,6 @@ hci1394_ixl_update_prep_set_tagsync(hci1394_ixl_update_vars_t *uvp)
 	uvp->ixldepth = 0;
 	uvp->ixlcount = xferctlp->cnt;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_set_tagsync_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (IXL_PREP_READY);
 }
 
@@ -990,9 +879,6 @@ hci1394_ixl_update_prep_recv_pkt(hci1394_ixl_update_vars_t *uvp)
 	uint32_t	   desc_hdr;
 	int		   err;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_pkt_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	old_xfer_pkt_ixlp = (ixl1394_xfer_pkt_t *)uvp->ixloldp;
 	new_xfer_pkt_ixlp = (ixl1394_xfer_pkt_t *)uvp->ixlnewp;
 
@@ -1001,10 +887,6 @@ hci1394_ixl_update_prep_recv_pkt(hci1394_ixl_update_vars_t *uvp)
 	    (new_xfer_pkt_ixlp->ixl_buf.ixldmac_addr ==
 	    old_xfer_pkt_ixlp->ixl_buf.ixldmac_addr) &&
 	    (new_xfer_pkt_ixlp->mem_bufp == old_xfer_pkt_ixlp->mem_bufp)) {
-
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 		/* no change. return with done ok status */
 		return (IXL_PREP_SUCCESS);
 	}
@@ -1015,8 +897,6 @@ hci1394_ixl_update_prep_recv_pkt(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EXFER_BUF_MISSING;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1030,12 +910,8 @@ hci1394_ixl_update_prep_recv_pkt(hci1394_ixl_update_vars_t *uvp)
 		    uvp->ixloldp->compiler_privatep;
 
 		if (uvp->ixlxferp == NULL) {
-
 			/* Error - no IXL xfer start command found */
 			uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
-
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_pkt_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (IXL_PREP_FAILURE);
 		}
 	} else {
@@ -1046,12 +922,8 @@ hci1394_ixl_update_prep_recv_pkt(hci1394_ixl_update_vars_t *uvp)
 	/* check that xfer_ctl is present in the IXL xfer start command */
 	if ((xferctlp = (hci1394_xfer_ctl_t *)
 	    uvp->ixlxferp->compiler_privatep) == NULL) {
-
 		/* Error - no xfer_ctl struct found */
 		uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
-
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1093,10 +965,6 @@ hci1394_ixl_update_prep_recv_pkt(hci1394_ixl_update_vars_t *uvp)
 	    DDI_DMA_SYNC_FORCPU);
 	if (err != DDI_SUCCESS) {
 		uvp->upd_status = IXL1394_EINTERNAL_ERROR;
-
-		TNF_PROBE_1_DEBUG(hci1394_ixl_update_prep_recv_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, errmsg,
-		    "EINTERNAL_ERROR: dma_sync() failed");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1108,8 +976,6 @@ hci1394_ixl_update_prep_recv_pkt(hci1394_ixl_update_vars_t *uvp)
 	uvp->hcistatus = (uvp->bufsize << DESC_ST_RESCOUNT_SHIFT) &
 	    DESC_ST_RESCOUNT_MASK;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_pkt_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (IXL_PREP_READY);
 }
 
@@ -1124,9 +990,6 @@ hci1394_ixl_update_prep_recv_buf(hci1394_ixl_update_vars_t *uvp)
 	ixl1394_xfer_buf_t *new_xfer_buf_ixlp;
 	hci1394_xfer_ctl_t *xferctlp;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_buf_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	old_xfer_buf_ixlp = (ixl1394_xfer_buf_t *)uvp->ixloldp;
 	new_xfer_buf_ixlp = (ixl1394_xfer_buf_t *)uvp->ixlnewp;
 
@@ -1139,10 +1002,6 @@ hci1394_ixl_update_prep_recv_buf(hci1394_ixl_update_vars_t *uvp)
 		if (((uvp->ctxtp->ctxt_flags & HCI1394_ISO_CTXT_BFFILL) != 0) ||
 		    (new_xfer_buf_ixlp->pkt_size ==
 		    old_xfer_buf_ixlp->pkt_size)) {
-
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_buf_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 			/* no change. return with done ok status */
 			return (IXL_PREP_SUCCESS);
 		}
@@ -1151,11 +1010,7 @@ hci1394_ixl_update_prep_recv_buf(hci1394_ixl_update_vars_t *uvp)
 	/* if new IXL buffer addrs are null, return error */
 	if ((new_xfer_buf_ixlp->ixl_buf.ixldmac_addr == 0) ||
 	    (new_xfer_buf_ixlp->mem_bufp == NULL)) {
-
 		uvp->upd_status = IXL1394_EXFER_BUF_MISSING;
-
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_buf_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1168,13 +1023,8 @@ hci1394_ixl_update_prep_recv_buf(hci1394_ixl_update_vars_t *uvp)
 		if ((new_xfer_buf_ixlp->pkt_size == 0) ||
 		    ((new_xfer_buf_ixlp->size /	new_xfer_buf_ixlp->pkt_size) !=
 		    (old_xfer_buf_ixlp->size / old_xfer_buf_ixlp->pkt_size))) {
-
 			/* count changes. return an error */
 			uvp->upd_status = IXL1394_EXFER_BUF_CNT_DIFF;
-
-			TNF_PROBE_0_DEBUG(
-			    hci1394_ixl_update_prep_recv_buf_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (IXL_PREP_FAILURE);
 		}
 	}
@@ -1185,12 +1035,8 @@ hci1394_ixl_update_prep_recv_buf(hci1394_ixl_update_vars_t *uvp)
 	/* check that the xfer_ctl struct is present in IXL xfer command */
 	if ((xferctlp = (hci1394_xfer_ctl_t *)uvp->ixlxferp->compiler_privatep)
 	    == NULL) {
-
 		/* return an error if no xfer_ctl struct is found for command */
 		uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
-
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_buf_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1215,8 +1061,6 @@ hci1394_ixl_update_prep_recv_buf(hci1394_ixl_update_vars_t *uvp)
 	uvp->hcistatus = (uvp->bufsize << DESC_ST_RESCOUNT_SHIFT) &
 	    DESC_ST_RESCOUNT_MASK;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_recv_buf_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (IXL_PREP_READY);
 }
 
@@ -1238,9 +1082,6 @@ hci1394_ixl_update_prep_send_pkt(hci1394_ixl_update_vars_t *uvp)
 	uint32_t	   desc_hdr, desc_hdr2;
 	int		   err;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_pkt_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	old_xfer_pkt_ixlp = (ixl1394_xfer_pkt_t *)uvp->ixloldp;
 	new_xfer_pkt_ixlp = (ixl1394_xfer_pkt_t *)uvp->ixlnewp;
 
@@ -1249,9 +1090,6 @@ hci1394_ixl_update_prep_send_pkt(hci1394_ixl_update_vars_t *uvp)
 	    (new_xfer_pkt_ixlp->ixl_buf.ixldmac_addr ==
 	    old_xfer_pkt_ixlp->ixl_buf.ixldmac_addr) &&
 	    (new_xfer_pkt_ixlp->mem_bufp == old_xfer_pkt_ixlp->mem_bufp)) {
-
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 		/* if none, return with done ok status */
 		return (IXL_PREP_SUCCESS);
@@ -1263,8 +1101,6 @@ hci1394_ixl_update_prep_send_pkt(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EXFER_BUF_MISSING;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1274,8 +1110,6 @@ hci1394_ixl_update_prep_send_pkt(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EPKT_HDR_MISSING;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1292,8 +1126,6 @@ hci1394_ixl_update_prep_send_pkt(hci1394_ixl_update_vars_t *uvp)
 			/* error if no IXL xfer start command found */
 			uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_pkt_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (IXL_PREP_FAILURE);
 		}
 	} else {
@@ -1311,8 +1143,6 @@ hci1394_ixl_update_prep_send_pkt(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1357,9 +1187,6 @@ hci1394_ixl_update_prep_send_pkt(hci1394_ixl_update_vars_t *uvp)
 	if (err != DDI_SUCCESS) {
 		uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-		TNF_PROBE_1_DEBUG(hci1394_ixl_update_prep_send_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, errmsg,
-		    "EINTERNAL_ERROR: dma_sync() failed");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1380,15 +1207,11 @@ hci1394_ixl_update_prep_send_pkt(hci1394_ixl_update_vars_t *uvp)
 	if (uvp->pkthdr2 > 0xFFFF) {
 		uvp->upd_status = IXL1394_EPKTSIZE_MAX_OFLO;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_pkt_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 	uvp->pkthdr2 = (uvp->pkthdr2 << DESC_PKT_DATALEN_SHIFT) &
 	    DESC_PKT_DATALEN_MASK;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_pkt_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (IXL_PREP_READY);
 }
 
@@ -1403,9 +1226,6 @@ hci1394_ixl_update_prep_send_buf(hci1394_ixl_update_vars_t *uvp)
 	ixl1394_xfer_buf_t *new_xfer_buf_ixlp;
 	hci1394_xfer_ctl_t *xferctlp;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_buf_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	old_xfer_buf_ixlp = (ixl1394_xfer_buf_t *)uvp->ixloldp;
 	new_xfer_buf_ixlp = (ixl1394_xfer_buf_t *)uvp->ixlnewp;
 
@@ -1415,10 +1235,6 @@ hci1394_ixl_update_prep_send_buf(hci1394_ixl_update_vars_t *uvp)
 	    (new_xfer_buf_ixlp->ixl_buf.ixldmac_addr ==
 	    old_xfer_buf_ixlp->ixl_buf.ixldmac_addr) &&
 	    (new_xfer_buf_ixlp->mem_bufp == old_xfer_buf_ixlp->mem_bufp)) {
-
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_buf_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 		/* no change, return with done ok status */
 		return (IXL_PREP_SUCCESS);
 	}
@@ -1429,8 +1245,6 @@ hci1394_ixl_update_prep_send_buf(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EXFER_BUF_MISSING;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_buf_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1445,8 +1259,6 @@ hci1394_ixl_update_prep_send_buf(hci1394_ixl_update_vars_t *uvp)
 		/* Error - new has different pkt count than old */
 		uvp->upd_status = IXL1394_EXFER_BUF_CNT_DIFF;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_buf_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1463,8 +1275,6 @@ hci1394_ixl_update_prep_send_buf(hci1394_ixl_update_vars_t *uvp)
 
 		uvp->upd_status = IXL1394_EORIG_IXL_CORRUPTED;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_buf_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (IXL_PREP_FAILURE);
 	}
 
@@ -1502,8 +1312,6 @@ hci1394_ixl_update_prep_send_buf(hci1394_ixl_update_vars_t *uvp)
 	uvp->pkthdr2 = (uvp->bufsize << DESC_PKT_DATALEN_SHIFT) &
 	    DESC_PKT_DATALEN_MASK;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_prep_send_buf_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (IXL_PREP_READY);
 }
 
@@ -1523,9 +1331,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 	ddi_dma_handle_t	dma_hdl;
 	int			err;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_perform_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	ctxtp = uvp->ctxtp;
 
 	/*
@@ -1537,9 +1342,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 	    uvp->ixlxferp->compiler_privatep) == NULL)) {
 
 		uvp->upd_status = IXL1394_EINTERNAL_ERROR;
-
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_perform_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 		return (DDI_FAILURE);
 	}
@@ -1584,8 +1386,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 		if (err != DDI_SUCCESS) {
 			uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_perform_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (DDI_FAILURE);
 		}
 
@@ -1639,9 +1439,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 			if (err != DDI_SUCCESS) {
 				uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-				TNF_PROBE_0_DEBUG(
-				    hci1394_ixl_update_perform_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "");
 				return (DDI_FAILURE);
 			}
 		}
@@ -1683,9 +1480,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 			if (err != DDI_SUCCESS) {
 				uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-				TNF_PROBE_0_DEBUG(
-				    hci1394_ixl_update_perform_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "");
 				return (DDI_FAILURE);
 			}
 		}
@@ -1724,8 +1518,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 		if (err != DDI_SUCCESS) {
 			uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_perform_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (DDI_FAILURE);
 		}
 
@@ -1741,8 +1533,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 		if (err != DDI_SUCCESS) {
 			uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_perform_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (DDI_FAILURE);
 		}
 
@@ -1791,9 +1581,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 			if (err != DDI_SUCCESS) {
 				uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-				TNF_PROBE_0_DEBUG(
-				    hci1394_ixl_update_perform_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "");
 				return (DDI_FAILURE);
 			}
 
@@ -1821,9 +1608,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 			if (err != DDI_SUCCESS) {
 				uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-				TNF_PROBE_0_DEBUG(
-				    hci1394_ixl_update_perform_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "");
 				return (DDI_FAILURE);
 			}
 		}
@@ -1868,8 +1652,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 		if (err != DDI_SUCCESS) {
 			uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_perform_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (DDI_FAILURE);
 		}
 
@@ -1916,9 +1698,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 			if (err != DDI_SUCCESS) {
 				uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-				TNF_PROBE_0_DEBUG(
-				    hci1394_ixl_update_perform_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "");
 				return (DDI_FAILURE);
 			}
 
@@ -1937,9 +1716,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 			if (err != DDI_SUCCESS) {
 				uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-				TNF_PROBE_0_DEBUG(
-				    hci1394_ixl_update_perform_exit,
-				    HCI1394_TNF_HAL_STACK_ISOCH, "");
 				return (DDI_FAILURE);
 			}
 		}
@@ -1959,8 +1735,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 		/* ixl command being updated must be one of above, else error */
 		uvp->upd_status = IXL1394_EINTERNAL_ERROR;
 
-		TNF_PROBE_0_DEBUG(hci1394_ixl_update_perform_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1974,8 +1748,6 @@ hci1394_ixl_update_perform(hci1394_ixl_update_vars_t *uvp)
 	}
 
 	/* perform update completed successfully */
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_perform_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (DDI_SUCCESS);
 }
 
@@ -1991,9 +1763,6 @@ hci1394_ixl_update_evaluate(hci1394_ixl_update_vars_t *uvp)
 	ixl1394_command_t	*ixlp;
 	int			ixldepth;
 	int			ii;
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_evaluate_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	ctxtp = uvp->ctxtp;
 
@@ -2034,8 +1803,6 @@ hci1394_ixl_update_evaluate(hci1394_ixl_update_vars_t *uvp)
 			/* return post-perform update failed status */
 			uvp->upd_status = IXL1394_EPOST_UPD_DMALOST;
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_evaluate_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (DDI_FAILURE);
 		}
 	}
@@ -2049,8 +1816,6 @@ hci1394_ixl_update_evaluate(hci1394_ixl_update_vars_t *uvp)
 		if ((uvp->locn_info[ii].ixlp == ixlp) &&
 		    (uvp->locn_info[ii].ixldepth == ixldepth)) {
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_evaluate_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (DDI_SUCCESS);
 		}
 	}
@@ -2062,8 +1827,6 @@ hci1394_ixl_update_evaluate(hci1394_ixl_update_vars_t *uvp)
 	 */
 	uvp->upd_status = IXL1394_EPOST_UPD_DMALOST;
 
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_evaluate_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (DDI_FAILURE);
 }
 
@@ -2080,9 +1843,6 @@ hci1394_ixl_update_analysis(hci1394_ixl_update_vars_t *uvp)
 	int			ixldepth;
 	int			ii;
 	int			status;
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_analysis_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	ctxtp = uvp->ctxtp;
 
@@ -2126,8 +1886,6 @@ hci1394_ixl_update_analysis(hci1394_ixl_update_vars_t *uvp)
 			 */
 			uvp->upd_status = IXL1394_EPRE_UPD_DMALOST;
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_analysis_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (DDI_FAILURE);
 		}
 	}
@@ -2156,15 +1914,11 @@ hci1394_ixl_update_analysis(hci1394_ixl_update_vars_t *uvp)
 
 			uvp->upd_status = IXL1394_ERISK_PROHIBITS_UPD;
 
-			TNF_PROBE_0_DEBUG(hci1394_ixl_update_analysis_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (DDI_FAILURE);
 		}
 	}
 
 	/* is save for update to be performed, return ok status */
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_analysis_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2180,9 +1934,6 @@ hci1394_ixl_update_set_locn_info(hci1394_ixl_update_vars_t *uvp)
 	ixl1394_command_t	*ixlp;
 	int			ixldepth;
 	int			ii;
-
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_set_locn_info_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	/*
 	 * find next xfer start ixl command, starting with current ixl command
@@ -2224,6 +1975,4 @@ hci1394_ixl_update_set_locn_info(hci1394_ixl_update_vars_t *uvp)
 			}
 		}
 	}
-	TNF_PROBE_0_DEBUG(hci1394_ixl_update_set_locn_info_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }

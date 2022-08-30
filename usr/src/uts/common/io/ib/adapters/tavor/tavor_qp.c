@@ -86,9 +86,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	uint_t			wq_location, dma_xfer_mode, qp_is_umap;
 	uint_t			qp_srq_en;
 	int			status, flag;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_qp_alloc);
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*attr_p, *queuesz_p))
 
@@ -126,8 +123,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 		status = tavor_umap_db_find(state->ts_instance, ddi_get_pid(),
 		    MLNX_UMAP_UARPG_RSRC, &value, 0, NULL);
 		if (status != DDI_SUCCESS) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "failed UAR page");
 			goto qpalloc_fail;
 		}
 		uarpg = ((tavor_rsrc_t *)(uintptr_t)value)->tr_indx;
@@ -142,9 +137,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 		 * Check for valid SRQ handle pointers
 		 */
 		if (attr_p->qp_ibc_srq_hdl == NULL) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_SRQ_HDL_INVALID,
-			    "invalid SRQ handle");
 			goto qpalloc_fail;
 		}
 		srq = (tavor_srqhdl_t)attr_p->qp_ibc_srq_hdl;
@@ -155,8 +147,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	if (((type != IBT_UD_RQP) && (type != IBT_RC_RQP) &&
 	    (type != IBT_UC_RQP))) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_QP_SRV_TYPE_INVALID, "invalid serv type");
 		goto qpalloc_fail;
 	}
 
@@ -165,8 +155,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 * limitation.  Arbel native mode will not have this shortcoming.
 	 */
 	if (qp_srq_en && type != IBT_RC_RQP) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "invalid serv type with SRQ");
 		goto qpalloc_fail;
 	}
 
@@ -174,8 +162,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 * Check for valid PD handle pointer
 	 */
 	if (attr_p->qp_pd_hdl == NULL) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_PD_HDL_INVALID, "invalid PD handle");
 		goto qpalloc_fail;
 	}
 	pd = (tavor_pdhdl_t)attr_p->qp_pd_hdl;
@@ -184,8 +170,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 * If on an SRQ, check to make sure the PD is the same
 	 */
 	if (qp_srq_en && (pd->pd_pdnum != srq->srq_pdhdl->pd_pdnum)) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_PD_HDL_INVALID, "invalid PD handle");
 		goto qpalloc_fail;
 	}
 
@@ -197,8 +181,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	if ((attr_p->qp_ibc_scq_hdl == NULL) ||
 	    (attr_p->qp_ibc_rcq_hdl == NULL)) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_CQ_HDL_INVALID, "invalid CQ handle");
 		goto qpalloc_fail1;
 	}
 	sq_cq = (tavor_cqhdl_t)attr_p->qp_ibc_scq_hdl;
@@ -211,14 +193,10 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	status = tavor_cq_refcnt_inc(sq_cq, TAVOR_CQ_IS_NORMAL);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_CQ_HDL_INVALID, "invalid CQ handle");
 		goto qpalloc_fail1;
 	}
 	status = tavor_cq_refcnt_inc(rq_cq, TAVOR_CQ_IS_NORMAL);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_CQ_HDL_INVALID, "invalid CQ handle");
 		goto qpalloc_fail2;
 	}
 
@@ -233,8 +211,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_QPC, 1, sleepflag, &qpc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed QP context");
 		goto qpalloc_fail3;
 	}
 
@@ -245,8 +221,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_QPHDL, 1, sleepflag, &rsrc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed QP handle");
 		goto qpalloc_fail4;
 	}
 	qp = (tavor_qphdl_t)rsrc->tr_addr;
@@ -259,8 +233,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	status = tavor_qp_create_qpn(state, qp, qpc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed QPN create");
 		goto qpalloc_fail5;
 	}
 
@@ -275,8 +247,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 		umapdb = tavor_umap_db_alloc(state->ts_instance, qp->qp_qpnum,
 		    MLNX_UMAP_QPMEM_RSRC, (uint64_t)(uintptr_t)rsrc);
 		if (umapdb == NULL) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed umap add");
 			goto qpalloc_fail6;
 		}
 	}
@@ -297,8 +267,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 		status = tavor_rsrc_alloc(state, TAVOR_RDB, max_rdb,
 		    sleepflag, &rdb);
 		if (status != DDI_SUCCESS) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed RDB");
 			goto qpalloc_fail7;
 		}
 		qp->qp_rdbrsrcp = rdb;
@@ -333,8 +301,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	if ((log_qp_sq_size > state->ts_cfg_profile->cp_log_max_qp_sz) ||
 	    (!qp_srq_en && (log_qp_rq_size >
 	    state->ts_cfg_profile->cp_log_max_qp_sz))) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_WR_EXCEEDED, "max QP size");
 		goto qpalloc_fail8;
 	}
 
@@ -346,8 +312,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	max_sgl = state->ts_cfg_profile->cp_wqe_real_max_sgl;
 	if ((attr_p->qp_sizes.cs_sq_sgl > max_sgl) ||
 	    (!qp_srq_en && (attr_p->qp_sizes.cs_rq_sgl > max_sgl))) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_SGL_EXCEEDED, "max QP SGL");
 		goto qpalloc_fail8;
 	}
 
@@ -419,8 +383,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	}
 	status = tavor_queue_alloc(state, &qp->qp_wqinfo, sleepflag);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed work queue");
 		goto qpalloc_fail8;
 	}
 	if (sq_wqe_size > rq_wqe_size) {
@@ -479,8 +441,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	mr_op.mro_bind_override_addr = 1;
 	status = tavor_mr_register(state, pd, &mr_attr, &mr, &mr_op);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed register mr");
 		goto qpalloc_fail9;
 	}
 
@@ -595,7 +555,6 @@ tavor_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 
 	*qphdl = qp;
 
-	TAVOR_TNF_EXIT(tavor_qp_alloc);
 	return (DDI_SUCCESS);
 
 /*
@@ -631,9 +590,6 @@ qpalloc_fail2:
 qpalloc_fail1:
 	tavor_pd_refcnt_dec(pd);
 qpalloc_fail:
-	TNF_PROBE_1(tavor_qp_alloc_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_qp_alloc);
 	return (status);
 }
 
@@ -667,9 +623,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	uint32_t		sq_wqe_size, rq_wqe_size;
 	uint_t			wq_location, dma_xfer_mode;
 	int			status, flag;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_special_qp_alloc);
 
 	/*
 	 * Check the "options" flag.  Currently this flag tells the driver
@@ -696,8 +649,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 * Check for valid special QP type (only SMI & GSI supported)
 	 */
 	if ((type != IBT_SMI_SQP) && (type != IBT_GSI_SQP)) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_QP_SPECIAL_TYPE_INVALID, "invalid QP type");
 		goto spec_qpalloc_fail;
 	}
 
@@ -705,8 +656,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 * Check for valid port number
 	 */
 	if (!tavor_portnum_is_valid(state, port)) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_PORT_INVALID, "invalid port num");
 		goto spec_qpalloc_fail;
 	}
 	port = port - 1;
@@ -715,8 +664,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 * Check for valid PD handle pointer
 	 */
 	if (attr_p->qp_pd_hdl == NULL) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_PD_HDL_INVALID, "invalid PD handle");
 		goto spec_qpalloc_fail;
 	}
 	pd = (tavor_pdhdl_t)attr_p->qp_pd_hdl;
@@ -729,8 +676,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	if ((attr_p->qp_ibc_scq_hdl == NULL) ||
 	    (attr_p->qp_ibc_rcq_hdl == NULL)) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_CQ_HDL_INVALID, "invalid CQ handle");
 		goto spec_qpalloc_fail1;
 	}
 	sq_cq = (tavor_cqhdl_t)attr_p->qp_ibc_scq_hdl;
@@ -743,14 +688,10 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	status = tavor_cq_refcnt_inc(sq_cq, TAVOR_CQ_IS_SPECIAL);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_CQ_HDL_INVALID, "invalid CQ handle");
 		goto spec_qpalloc_fail1;
 	}
 	status = tavor_cq_refcnt_inc(rq_cq, TAVOR_CQ_IS_SPECIAL);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_CQ_HDL_INVALID, "invalid CQ handle");
 		goto spec_qpalloc_fail2;
 	}
 
@@ -768,8 +709,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	status = tavor_special_qp_rsrc_alloc(state, type, port, &qpc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(status, "failed special QP rsrc");
 		goto spec_qpalloc_fail3;
 	}
 
@@ -780,8 +719,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_QPHDL, 1, sleepflag, &rsrc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed QP handle");
 		goto spec_qpalloc_fail4;
 	}
 	qp = (tavor_qphdl_t)rsrc->tr_addr;
@@ -818,8 +755,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	 */
 	if ((log_qp_sq_size > state->ts_cfg_profile->cp_log_max_qp_sz) ||
 	    (log_qp_rq_size > state->ts_cfg_profile->cp_log_max_qp_sz)) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_WR_EXCEEDED, "max QP size");
 		goto spec_qpalloc_fail5;
 	}
 
@@ -831,8 +766,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	max_sgl = state->ts_cfg_profile->cp_wqe_real_max_sgl;
 	if ((attr_p->qp_sizes.cs_sq_sgl > max_sgl) ||
 	    (attr_p->qp_sizes.cs_rq_sgl > max_sgl)) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_SGL_EXCEEDED, "max QP SGL");
 		goto spec_qpalloc_fail5;
 	}
 
@@ -889,8 +822,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	qp->qp_wqinfo.qa_location = wq_location;
 	status = tavor_queue_alloc(state, &qp->qp_wqinfo, sleepflag);
 	if (status != 0) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed work queue");
 		goto spec_qpalloc_fail5;
 	}
 	if (sq_wqe_size > rq_wqe_size) {
@@ -936,8 +867,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	mr_op.mro_bind_override_addr = 1;
 	status = tavor_mr_register(state, pd, &mr_attr, &mr, &mr_op);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed register mr");
 		goto spec_qpalloc_fail6;
 	}
 
@@ -1010,7 +939,6 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 
 	*qphdl = qp;
 
-	TAVOR_TNF_EXIT(tavor_special_qp_alloc);
 	return (DDI_SUCCESS);
 
 /*
@@ -1031,9 +959,6 @@ spec_qpalloc_fail2:
 spec_qpalloc_fail1:
 	tavor_pd_refcnt_dec(pd);
 spec_qpalloc_fail:
-	TNF_PROBE_1(tavor_special_qp_alloc_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_special_qp_alloc);
 	return (status);
 }
 
@@ -1065,9 +990,6 @@ tavor_qp_free(tavor_state_t *state, tavor_qphdl_t *qphdl,
 	uint_t			maxprot;
 	uint_t			qp_srq_en;
 	int			status;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_qp_free);
 
 	/*
 	 * Pull all the necessary information from the Tavor Queue Pair
@@ -1092,7 +1014,6 @@ tavor_qp_free(tavor_state_t *state, tavor_qphdl_t *qphdl,
 	 */
 	if (qp->qp_mcg_refcnt != 0) {
 		mutex_exit(&qp->qp_lock);
-		TAVOR_TNF_FAIL(ibc_get_ci_failure(0), "QP part of MCG on free");
 		goto qpfree_fail;
 	}
 
@@ -1108,9 +1029,6 @@ tavor_qp_free(tavor_state_t *state, tavor_qphdl_t *qphdl,
 		if (tavor_qp_to_reset(state, qp) != DDI_SUCCESS) {
 			mutex_exit(&qp->qp_lock);
 			TAVOR_WARNING(state, "failed to reset QP context");
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(ibc_get_ci_failure(0),
-			    "reset QP context");
 			goto qpfree_fail;
 		}
 		qp->qp_state = TAVOR_QP_RESET;
@@ -1137,7 +1055,6 @@ tavor_qp_free(tavor_state_t *state, tavor_qphdl_t *qphdl,
 		if (status != DDI_SUCCESS) {
 			mutex_exit(&qp->qp_lock);
 			TAVOR_WARNING(state, "failed to find in database");
-			TAVOR_TNF_EXIT(tavor_qp_free);
 			return (ibc_get_ci_failure(0));
 		}
 		tavor_umap_db_free(umapdb);
@@ -1150,7 +1067,6 @@ tavor_qp_free(tavor_state_t *state, tavor_qphdl_t *qphdl,
 				mutex_exit(&qp->qp_lock);
 				TAVOR_WARNING(state, "failed in QP memory "
 				    "devmap_devmem_remap()");
-				TAVOR_TNF_EXIT(tavor_qp_free);
 				return (ibc_get_ci_failure(0));
 			}
 			qp->qp_umap_dhp = (devmap_cookie_t)NULL;
@@ -1194,8 +1110,6 @@ tavor_qp_free(tavor_state_t *state, tavor_qphdl_t *qphdl,
 	    sleepflag);
 	if (status != DDI_SUCCESS) {
 		TAVOR_WARNING(state, "failed to deregister QP memory");
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(ibc_get_ci_failure(0), "failed deregister mr");
 		goto qpfree_fail;
 	}
 
@@ -1218,9 +1132,6 @@ tavor_qp_free(tavor_state_t *state, tavor_qphdl_t *qphdl,
 		status = tavor_special_qp_rsrc_free(state, type, port);
 		if (status != DDI_SUCCESS) {
 			TAVOR_WARNING(state, "failed to free special QP rsrc");
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(ibc_get_ci_failure(0),
-			    "failed special QP rsrc");
 			goto qpfree_fail;
 		}
 
@@ -1261,13 +1172,9 @@ tavor_qp_free(tavor_state_t *state, tavor_qphdl_t *qphdl,
 	/* Set the qphdl pointer to NULL and return success */
 	*qphdl = NULL;
 
-	TAVOR_TNF_EXIT(tavor_qp_free);
 	return (DDI_SUCCESS);
 
 qpfree_fail:
-	TNF_PROBE_1(tavor_qp_free_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_qp_free);
 	return (status);
 }
 
@@ -1289,8 +1196,6 @@ tavor_qp_query(tavor_state_t *state, tavor_qphdl_t qp,
 	ibt_cep_path_t		*path_ptr, *alt_path_ptr;
 	tavor_hw_qpc_t		*qpc;
 	int			status;
-
-	TAVOR_TNF_ENTER(tavor_qp_query);
 
 	mutex_enter(&qp->qp_lock);
 
@@ -1328,9 +1233,6 @@ tavor_qp_query(tavor_state_t *state, tavor_qphdl_t qp,
 		break;
 	default:
 		mutex_exit(&qp->qp_lock);
-		TNF_PROBE_1(tavor_qp_query_inv_qpstate_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, qpstate, qp->qp_state);
-		TAVOR_TNF_EXIT(tavor_qp_query);
 		return (ibc_get_ci_failure(0));
 	}
 	attr_p->qp_info.qp_state = qp_state;
@@ -1361,7 +1263,6 @@ tavor_qp_query(tavor_state_t *state, tavor_qphdl_t qp,
 	 */
 	if (qp_state == IBT_STATE_RESET) {
 		mutex_exit(&qp->qp_lock);
-		TAVOR_TNF_EXIT(tavor_qp_query);
 		return (DDI_SUCCESS);
 	}
 
@@ -1379,9 +1280,6 @@ tavor_qp_query(tavor_state_t *state, tavor_qphdl_t qp,
 		mutex_exit(&qp->qp_lock);
 		cmn_err(CE_CONT, "Tavor: QUERY_QP command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_qp_query_cmd_fail, TAVOR_TNF_ERROR, "",
-		    tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_qp_query);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -1524,7 +1422,6 @@ tavor_qp_query(tavor_state_t *state, tavor_qphdl_t qp,
 	}
 	mutex_exit(&qp->qp_lock);
 
-	TAVOR_TNF_EXIT(tavor_qp_query);
 	return (DDI_SUCCESS);
 }
 
@@ -1539,8 +1436,6 @@ tavor_qp_create_qpn(tavor_state_t *state, tavor_qphdl_t qp, tavor_rsrc_t *qpc)
 	tavor_qpn_entry_t	query;
 	tavor_qpn_entry_t	*entry;
 	avl_index_t		where;
-
-	TAVOR_TNF_ENTER(tavor_qp_create_qpn);
 
 	/*
 	 * Build a query (for the AVL tree lookup) and attempt to find
@@ -1563,7 +1458,6 @@ tavor_qp_create_qpn(tavor_state_t *state, tavor_qphdl_t qp, tavor_rsrc_t *qpc)
 		    sizeof (tavor_qpn_entry_t), KM_NOSLEEP);
 		if (entry == NULL) {
 			mutex_exit(&state->ts_qpn_avl_lock);
-			TAVOR_TNF_EXIT(tavor_qp_create_qpn);
 			return (DDI_FAILURE);
 		}
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*entry))
@@ -1599,7 +1493,6 @@ tavor_qp_create_qpn(tavor_state_t *state, tavor_qphdl_t qp, tavor_rsrc_t *qpc)
 	entry->qpn_refcnt++;
 
 	mutex_exit(&state->ts_qpn_avl_lock);
-	TAVOR_TNF_EXIT(tavor_qp_create_qpn);
 	return (DDI_SUCCESS);
 }
 
@@ -1611,8 +1504,6 @@ tavor_qp_create_qpn(tavor_state_t *state, tavor_qphdl_t qp, tavor_rsrc_t *qpc)
 void
 tavor_qp_release_qpn(tavor_state_t *state, tavor_qpn_entry_t *entry, int flags)
 {
-	TAVOR_TNF_ENTER(tavor_qp_release_qpn);
-
 	ASSERT(entry != NULL);
 
 	mutex_enter(&state->ts_qpn_avl_lock);
@@ -1676,8 +1567,6 @@ tavor_qp_release_qpn(tavor_state_t *state, tavor_qpn_entry_t *entry, int flags)
 		}
 	}
 	mutex_exit(&state->ts_qpn_avl_lock);
-
-	TAVOR_TNF_EXIT(tavor_qp_release_qpn);
 }
 
 
@@ -1690,19 +1579,14 @@ tavor_qpn_avl_compare(const void *q, const void *e)
 {
 	tavor_qpn_entry_t	*entry, *query;
 
-	TAVOR_TNF_ENTER(tavor_qpn_avl_compare);
-
 	entry = (tavor_qpn_entry_t *)e;
 	query = (tavor_qpn_entry_t *)q;
 
 	if (query->qpn_indx < entry->qpn_indx) {
-		TAVOR_TNF_EXIT(tavor_qpn_avl_compare);
 		return (-1);
 	} else if (query->qpn_indx > entry->qpn_indx) {
-		TAVOR_TNF_EXIT(tavor_qpn_avl_compare);
 		return (+1);
 	} else {
-		TAVOR_TNF_EXIT(tavor_qpn_avl_compare);
 		return (0);
 	}
 }
@@ -1715,8 +1599,6 @@ tavor_qpn_avl_compare(const void *q, const void *e)
 void
 tavor_qpn_avl_init(tavor_state_t *state)
 {
-	TAVOR_TNF_ENTER(tavor_qpn_avl_init);
-
 	/* Initialize the lock used for QP number (QPN) AVL tree access */
 	mutex_init(&state->ts_qpn_avl_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(state->ts_intrmsi_pri));
@@ -1725,8 +1607,6 @@ tavor_qpn_avl_init(tavor_state_t *state)
 	avl_create(&state->ts_qpn_avl, tavor_qpn_avl_compare,
 	    sizeof (tavor_qpn_entry_t),
 	    offsetof(tavor_qpn_entry_t, qpn_avlnode));
-
-	TAVOR_TNF_EXIT(tavor_qpn_avl_init);
 }
 
 
@@ -1739,8 +1619,6 @@ tavor_qpn_avl_fini(tavor_state_t *state)
 {
 	tavor_qpn_entry_t	*entry;
 	void			*cookie;
-
-	TAVOR_TNF_ENTER(tavor_qpn_avl_fini);
 
 	/*
 	 * Empty all entries (if necessary) and destroy the AVL tree
@@ -1755,8 +1633,6 @@ tavor_qpn_avl_fini(tavor_state_t *state)
 
 	/* Destroy the lock used for QP number (QPN) AVL tree access */
 	mutex_destroy(&state->ts_qpn_avl_lock);
-
-	TAVOR_TNF_EXIT(tavor_qpn_avl_fini);
 }
 
 
@@ -1802,8 +1678,6 @@ tavor_special_qp_rsrc_alloc(tavor_state_t *state, ibt_sqp_type_t type,
 	uint_t		mask, flags;
 	int		status;
 
-	TAVOR_TNF_ENTER(tavor_special_qp_rsrc_alloc);
-
 	mutex_enter(&state->ts_spec_qplock);
 	flags = state->ts_spec_qpflags;
 	if (type == IBT_SMI_SQP) {
@@ -1818,9 +1692,6 @@ tavor_special_qp_rsrc_alloc(tavor_state_t *state, ibt_sqp_type_t type,
 		 */
 		if (state->ts_cfg_profile->cp_qp0_agents_in_fw != 0) {
 			mutex_exit(&state->ts_spec_qplock);
-			TNF_PROBE_0(tavor_special_qp0_alloc_already_in_fw,
-			    TAVOR_TNF_ERROR, "");
-			TAVOR_TNF_EXIT(tavor_special_qp_rsrc_alloc);
 			return (IBT_QP_IN_USE);
 		}
 
@@ -1836,10 +1707,6 @@ tavor_special_qp_rsrc_alloc(tavor_state_t *state, ibt_sqp_type_t type,
 				mutex_exit(&state->ts_spec_qplock);
 				cmn_err(CE_CONT, "Tavor: CONF_SPECIAL_QP "
 				    "command failed: %08x\n", status);
-				TNF_PROBE_1(tavor_conf_special_qp_cmd_fail,
-				    TAVOR_TNF_ERROR, "", tnf_uint, status,
-				    status);
-				TAVOR_TNF_EXIT(tavor_special_qp_rsrc_alloc);
 				return (IBT_INSUFF_RESOURCE);
 			}
 		}
@@ -1851,9 +1718,6 @@ tavor_special_qp_rsrc_alloc(tavor_state_t *state, ibt_sqp_type_t type,
 		mask = (1 << (TAVOR_SPECIAL_QP0_RSRC + port));
 		if (flags & mask) {
 			mutex_exit(&state->ts_spec_qplock);
-			TNF_PROBE_1(tavor_ts_spec_qp0_alloc_already,
-			    TAVOR_TNF_ERROR, "", tnf_uint, port, port);
-			TAVOR_TNF_EXIT(tavor_special_qp_rsrc_alloc);
 			return (IBT_QP_IN_USE);
 		}
 		state->ts_spec_qpflags |= mask;
@@ -1872,10 +1736,6 @@ tavor_special_qp_rsrc_alloc(tavor_state_t *state, ibt_sqp_type_t type,
 				mutex_exit(&state->ts_spec_qplock);
 				cmn_err(CE_CONT, "Tavor: CONF_SPECIAL_QP "
 				    "command failed: %08x\n", status);
-				TNF_PROBE_1(tavor_conf_special_qp_cmd_fail,
-				    TAVOR_TNF_ERROR, "", tnf_uint, status,
-				    status);
-				TAVOR_TNF_EXIT(tavor_special_qp_rsrc_alloc);
 				return (IBT_INSUFF_RESOURCE);
 			}
 		}
@@ -1887,9 +1747,6 @@ tavor_special_qp_rsrc_alloc(tavor_state_t *state, ibt_sqp_type_t type,
 		mask = (1 << (TAVOR_SPECIAL_QP1_RSRC + port));
 		if (flags & mask) {
 			mutex_exit(&state->ts_spec_qplock);
-			TNF_PROBE_0(tavor_ts_spec_qp1_alloc_already,
-			    TAVOR_TNF_ERROR, "");
-			TAVOR_TNF_EXIT(tavor_special_qp_rsrc_alloc);
 			return (IBT_QP_IN_USE);
 		}
 		state->ts_spec_qpflags |= mask;
@@ -1897,7 +1754,6 @@ tavor_special_qp_rsrc_alloc(tavor_state_t *state, ibt_sqp_type_t type,
 	}
 
 	mutex_exit(&state->ts_spec_qplock);
-	TAVOR_TNF_EXIT(tavor_special_qp_rsrc_alloc);
 	return (DDI_SUCCESS);
 }
 
@@ -1912,8 +1768,6 @@ tavor_special_qp_rsrc_free(tavor_state_t *state, ibt_sqp_type_t type,
 {
 	uint_t		mask, flags;
 	int		status;
-
-	TAVOR_TNF_ENTER(tavor_special_qp_rsrc_free);
 
 	mutex_enter(&state->ts_spec_qplock);
 	if (type == IBT_SMI_SQP) {
@@ -1932,10 +1786,6 @@ tavor_special_qp_rsrc_free(tavor_state_t *state, ibt_sqp_type_t type,
 				mutex_exit(&state->ts_spec_qplock);
 				cmn_err(CE_CONT, "Tavor: CONF_SPECIAL_QP "
 				    "command failed: %08x\n", status);
-				TNF_PROBE_1(tavor_conf_special_qp_cmd_fail,
-				    TAVOR_TNF_ERROR, "", tnf_uint, status,
-				    status);
-				TAVOR_TNF_EXIT(tavor_special_qp_rsrc_free);
 				return (ibc_get_ci_failure(0));
 			}
 		}
@@ -1955,17 +1805,12 @@ tavor_special_qp_rsrc_free(tavor_state_t *state, ibt_sqp_type_t type,
 				mutex_exit(&state->ts_spec_qplock);
 				cmn_err(CE_CONT, "Tavor: CONF_SPECIAL_QP "
 				    "command failed: %08x\n", status);
-				TNF_PROBE_1(tavor_conf_special_qp_cmd_fail,
-				    TAVOR_TNF_ERROR, "", tnf_uint, status,
-				    status);
-				TAVOR_TNF_EXIT(tavor_special_qp_rsrc_free);
 				return (ibc_get_ci_failure(0));
 			}
 		}
 	}
 
 	mutex_exit(&state->ts_spec_qplock);
-	TAVOR_TNF_EXIT(tavor_special_qp_rsrc_free);
 	return (DDI_SUCCESS);
 }
 
@@ -1979,8 +1824,6 @@ tavor_qp_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
     tavor_qp_wq_type_t wq_type, uint_t *logwqesz, uint_t *max_sgl)
 {
 	uint_t	max_size, log2, actual_sgl;
-
-	TAVOR_TNF_ENTER(tavor_qp_sgl_to_logwqesz);
 
 	switch (wq_type) {
 	case TAVOR_QP_WQ_TYPE_SENDQ:
@@ -2063,14 +1906,10 @@ tavor_qp_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
 
 	default:
 		TAVOR_WARNING(state, "unexpected work queue type");
-		TNF_PROBE_0(tavor_qp_sgl_to_logwqesz_inv_wqtype_fail,
-		    TAVOR_TNF_ERROR, "");
 		break;
 	}
 
 	/* Fill in the return values */
 	*logwqesz = log2;
 	*max_sgl  = min(state->ts_cfg_profile->cp_wqe_real_max_sgl, actual_sgl);
-
-	TAVOR_TNF_EXIT(tavor_qp_sgl_to_logwqesz);
 }

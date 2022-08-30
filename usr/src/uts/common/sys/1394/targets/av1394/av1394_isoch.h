@@ -441,16 +441,6 @@ enum {
 	AV1394_PREQ_IT_UNDERRUN		= 0x02
 };
 
-
-/* TNF probes */
-#define	AV1394_TNF_CMP			"1394 av1394 cmp "
-#define	AV1394_TNF_CMP_STACK		"1394 av1394 cmp stacktrace "
-#define	AV1394_TNF_CMP_ERROR		"1394 av1394 cmp error "
-#define	AV1394_TNF_ISOCH		"1394 av1394 isoch "
-#define	AV1394_TNF_ISOCH_STACK		"1394 av1394 isoch stacktrace "
-#define	AV1394_TNF_ISOCH_ERROR		"1394 av1394 isoch error "
-
-
 /* isoch channel */
 int	av1394_ic_open(struct av1394_inst_s *, int);
 int	av1394_ic_close(struct av1394_inst_s *, int);

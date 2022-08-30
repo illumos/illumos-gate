@@ -49,7 +49,6 @@
 #include <sys/zone.h>
 #include <vm/rm.h>
 #include <vm/seg_kmem.h>
-#include <sys/tnf_probe.h>
 #include <sys/policy.h>
 #include <sys/sdt.h>
 #include <sys/cpucaps.h>

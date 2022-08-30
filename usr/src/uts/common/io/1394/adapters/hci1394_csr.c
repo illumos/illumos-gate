@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_csr.c
  *    This code contains the code for the CSR registers handled by the HAL in
@@ -108,7 +106,6 @@ hci1394_csr_init(hci1394_drvinfo_t *drvinfo, hci1394_ohci_handle_t ohci,
 	ASSERT(drvinfo != NULL);
 	ASSERT(ohci != NULL);
 	ASSERT(csr_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_init_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* alloc the space to keep track of the csr registers */
 	csr = kmem_alloc(sizeof (hci1394_csr_t), KM_SLEEP);
@@ -122,8 +119,6 @@ hci1394_csr_init(hci1394_drvinfo_t *drvinfo, hci1394_ohci_handle_t ohci,
 	mutex_init(&csr->csr_mutex, NULL, MUTEX_DRIVER,
 	    drvinfo->di_iblock_cookie);
 	hci1394_csr_state_init(csr);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_init_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -138,14 +133,11 @@ hci1394_csr_fini(hci1394_csr_handle_t *csr_handle)
 
 
 	ASSERT(csr_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_fini_enter, HCI1394_TNF_HAL_STACK, "");
 
 	csr = (hci1394_csr_t *)*csr_handle;
 	mutex_destroy(&csr->csr_mutex);
 	kmem_free(csr, sizeof (hci1394_csr_t));
 	*csr_handle = NULL;
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_fini_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -157,9 +149,7 @@ void
 hci1394_csr_resume(hci1394_csr_handle_t csr_handle)
 {
 	ASSERT(csr_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_resume_enter, HCI1394_TNF_HAL_STACK, "");
 	hci1394_csr_state_init(csr_handle);
-	TNF_PROBE_0_DEBUG(hci1394_csr_resume_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -173,15 +163,10 @@ hci1394_csr_node_capabilities(hci1394_csr_handle_t csr_handle,
 {
 	ASSERT(csr_handle != NULL);
 	ASSERT(capabilities != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_node_capabilities_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 	*capabilities = csr_handle->csr_capabilities;
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_node_capabilities_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -196,15 +181,10 @@ hci1394_csr_state_get(hci1394_csr_handle_t csr_handle, uint32_t *state)
 {
 	ASSERT(csr_handle != NULL);
 	ASSERT(state != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_state_get_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 	*state = csr_handle->csr_state;
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_state_get_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -222,8 +202,6 @@ hci1394_csr_state_bset(hci1394_csr_handle_t csr_handle, uint32_t state)
 
 
 	ASSERT(csr_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_state_bset_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 
@@ -244,9 +222,6 @@ hci1394_csr_state_bset(hci1394_csr_handle_t csr_handle, uint32_t state)
 	csr_handle->csr_state |= supported_state;
 
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_state_bset_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -264,8 +239,6 @@ hci1394_csr_state_bclr(hci1394_csr_handle_t csr_handle, uint32_t state)
 
 
 	ASSERT(csr_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_state_bclr_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 
@@ -286,9 +259,6 @@ hci1394_csr_state_bclr(hci1394_csr_handle_t csr_handle, uint32_t state)
 	csr_handle->csr_state &= ~state;
 
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_state_bclr_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -302,16 +272,10 @@ hci1394_csr_split_timeout_hi_get(hci1394_csr_handle_t csr_handle,
 {
 	ASSERT(csr_handle != NULL);
 	ASSERT(split_timeout_hi != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_hi_get_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 	*split_timeout_hi = csr_handle->csr_split_timeout_hi;
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_hi_get_exit,
-	    HCI1394_TNF_HAL_STACK, "");
-
 }
 
 
@@ -325,8 +289,6 @@ hci1394_csr_split_timeout_lo_get(hci1394_csr_handle_t csr_handle,
 {
 	ASSERT(csr_handle != NULL);
 	ASSERT(split_timeout_lo != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_lo_get_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 
@@ -338,10 +300,6 @@ hci1394_csr_split_timeout_lo_get(hci1394_csr_handle_t csr_handle,
 	    CSR_SPLIT_TIMEOUT_LO_SHIFT;
 
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_lo_get_exit,
-	    HCI1394_TNF_HAL_STACK, "");
-
 }
 
 
@@ -358,8 +316,6 @@ hci1394_csr_split_timeout_hi_set(hci1394_csr_handle_t csr_handle,
     uint32_t split_timeout_hi)
 {
 	ASSERT(csr_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_hi_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 
@@ -373,9 +329,6 @@ hci1394_csr_split_timeout_hi_set(hci1394_csr_handle_t csr_handle,
 	    csr_handle->csr_split_timeout_hi, csr_handle->csr_split_timeout_lo);
 
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_hi_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -392,8 +345,6 @@ hci1394_csr_split_timeout_lo_set(hci1394_csr_handle_t csr_handle,
     uint32_t split_timeout_lo)
 {
 	ASSERT(csr_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_lo_set_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 
@@ -418,9 +369,6 @@ hci1394_csr_split_timeout_lo_set(hci1394_csr_handle_t csr_handle,
 	    csr_handle->csr_split_timeout_hi, csr_handle->csr_split_timeout_lo);
 
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_lo_set_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -437,8 +385,6 @@ hci1394_csr_split_timeout_get(hci1394_csr_handle_t csr_handle)
 
 
 	ASSERT(csr_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_get_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 
@@ -446,9 +392,6 @@ hci1394_csr_split_timeout_get(hci1394_csr_handle_t csr_handle)
 	split_timeout = csr_handle->csr_split_timeout;
 
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_split_timeout_get_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (split_timeout);
 }
@@ -466,8 +409,6 @@ void
 hci1394_csr_bus_reset(hci1394_csr_handle_t csr_handle)
 {
 	ASSERT(csr_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_bus_reset_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	mutex_enter(&csr_handle->csr_mutex);
 
@@ -524,9 +465,6 @@ hci1394_csr_bus_reset(hci1394_csr_handle_t csr_handle)
 	 */
 
 	mutex_exit(&csr_handle->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_bus_reset_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -537,8 +475,6 @@ hci1394_csr_bus_reset(hci1394_csr_handle_t csr_handle)
 static void hci1394_csr_state_init(hci1394_csr_t *csr)
 {
 	ASSERT(csr != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_csr_state_init_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	mutex_enter(&csr->csr_mutex);
 
@@ -570,7 +506,4 @@ static void hci1394_csr_state_init(hci1394_csr_t *csr)
 	csr->csr_capabilities = CSR_INITIAL_NODE_CAPABILITIES;
 
 	mutex_exit(&csr->csr_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_csr_state_init_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
