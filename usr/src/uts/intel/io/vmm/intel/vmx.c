@@ -870,17 +870,6 @@ vmx_vminit(struct vm *vm)
 	return (vmx);
 }
 
-static int
-vmx_handle_cpuid(struct vm *vm, int vcpu, struct vmxctx *vmxctx)
-{
-	int handled;
-
-	handled = x86_emulate_cpuid(vm, vcpu, (uint64_t *)&vmxctx->guest_rax,
-	    (uint64_t *)&vmxctx->guest_rbx, (uint64_t *)&vmxctx->guest_rcx,
-	    (uint64_t *)&vmxctx->guest_rdx);
-	return (handled);
-}
-
 static VMM_STAT_INTEL(VCPU_INVVPID_SAVED, "Number of vpid invalidations saved");
 static VMM_STAT_INTEL(VCPU_INVVPID_DONE, "Number of vpid invalidations done");
 
@@ -2357,7 +2346,12 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	case EXIT_REASON_CPUID:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_CPUID, 1);
 		SDT_PROBE3(vmm, vmx, exit, cpuid, vmx, vcpu, vmexit);
-		handled = vmx_handle_cpuid(vmx->vm, vcpu, vmxctx);
+		vcpu_emulate_cpuid(vmx->vm, vcpu,
+		    (uint64_t *)&vmxctx->guest_rax,
+		    (uint64_t *)&vmxctx->guest_rbx,
+		    (uint64_t *)&vmxctx->guest_rcx,
+		    (uint64_t *)&vmxctx->guest_rdx);
+		handled = HANDLED;
 		break;
 	case EXIT_REASON_EXCEPTION:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_EXCEPTION, 1);

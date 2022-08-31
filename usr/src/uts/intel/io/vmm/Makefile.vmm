@@ -53,6 +53,7 @@ VMM_OBJS = \
 	vmm_lapic.o \
 	vmm_stat.o \
 	vmm_util.o \
+	vmm_cpuid.o \
 	x86.o \
 	iommu.o \
 	vatpic.o \

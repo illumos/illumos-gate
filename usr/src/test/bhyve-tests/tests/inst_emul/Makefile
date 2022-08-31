@@ -17,14 +17,18 @@ include $(SRC)/test/Makefile.com
 
 PROG =	rdmsr \
 	wrmsr \
-	triple_fault
+	triple_fault \
+	cpuid
+
+# C-based payloads need additional utils object
+CPAYLOADS =	cpuid
 
 PAYLOADS = $(PROG)
 include ../Makefile.in_guest
 
 COMMON_OBJS =	in_guest.o
 
-CLEANFILES =	$(COMMON_OBJS) $(PAYLOAD_CLEANFILES)
+CLEANFILES =	$(COMMON_OBJS) $(PAYLOAD_CLEANFILES) payload_utils.o
 CLOBBERFILES =	$(PROG)
 
 ROOTOPTPKG = $(ROOT)/opt/bhyve-tests
@@ -44,7 +48,6 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 ASFLAGS += -P -D__STDC__ -D_ASM
 
 
-CFLAGS = -m64
 $(PROG) :=	LDLIBS += -lvmmapi
 
 all: $(PROG)
@@ -71,3 +74,5 @@ $(TESTDIR)/%: %
 %: %.o
 	$(LINK.c) -o $@ $^ $(LDLIBS)
 	$(POST_PROCESS)
+
+$(CPAYLOADS:%=payload_%): payload_utils.o
