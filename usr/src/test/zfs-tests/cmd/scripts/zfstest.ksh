@@ -17,6 +17,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 MNX Cloud, Inc.
 #
 
 export PATH="/usr/bin"
@@ -133,7 +134,7 @@ function constrain_path
 
 	# SmartOS does not ship some required commands by default.
 	# Link to them in the package manager's namespace.
-	pkgsrc_bin=/opt/local/bin
+	pkgsrc_bin=/opt/tools/bin
 	pkgsrc_packages="sudo truncate python base64 shuf sha256sum"
 	for pkg in $pkgsrc_packages; do
 		if [[ ! -x $PATHDIR/$pkg ]]; then

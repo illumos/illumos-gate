@@ -31,9 +31,6 @@ tests = ['alloc_class_001_pos', 'alloc_class_002_neg', 'alloc_class_003_pos',
     'alloc_class_013_pos']
 tags = ['functional', 'alloc_class']
 
-[/opt/zfs-tests/tests/functional/cli_root/zpool_add]
-tests = ['zpool_add_010_pos', 'add-o_ashift', 'add_prop_ashift']
-
 [/opt/zfs-tests/tests/functional/atime]
 tests = ['atime_001_pos', 'atime_002_neg']
 
@@ -227,6 +224,7 @@ tests = ['zpool_001_neg', 'zpool_002_pos']
 tests = ['zpool_add_001_pos', 'zpool_add_002_pos', 'zpool_add_003_pos',
     'zpool_add_004_pos', 'zpool_add_005_pos', 'zpool_add_006_pos',
     'zpool_add_007_neg', 'zpool_add_008_neg', 'zpool_add_009_neg',
+    'zpool_add_010_pos', 'add-o_ashift', 'add_prop_ashift',
     'add_nested_replacing_spare']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_attach]

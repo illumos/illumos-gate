@@ -27,7 +27,7 @@ export PATH=/usr/bin:/usr/sbin:/opt/tools/sbin:/opt/tools/bin:$PATH
 
 # The pkgsrc packages we will install.
 export SMARTOS_TEST_PKGS="
-    python27
+    python39
     sudo
     coreutils
     gcc10
@@ -202,7 +202,7 @@ function setup_pkgsrc {
 
     # We should always use the same pkgsrc version as we have installed
     # on the build machine in case any of our tests link against libraries
-    # in /opt/local
+    # in /opt/tools
     PKGSRC_STEM="https://pkgsrc.smartos.org/packages/SmartOS/bootstrap"
     BOOTSTRAP_TAR="bootstrap-2021Q4-tools.tar.gz"
     BOOTSTRAP_SHA="c427cb1ed664fd161d8e12c5191adcae7aee68b4"
@@ -223,13 +223,6 @@ function setup_pkgsrc {
 
     # Install bootstrap kit to /opt/tools
     log_must tar -zxpf ${BOOTSTRAP_TAR} -C /
-
-    # add a symlink from /opt/local, needed by many test suites
-    if [[ ! -d /opt/local && ! -L /opt/local ]]; then
-        log_must ln -s /opt/tools /opt/local
-    else
-        log "Not forging /opt/local link"
-    fi
 }
 
 function install_required_pkgs {
