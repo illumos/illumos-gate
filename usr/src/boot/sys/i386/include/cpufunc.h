@@ -113,7 +113,7 @@ do_cpuid(u_int ax, u_int *p)
 			 "cpuid            \n\t"
 			 "movl %%ebx, %1   \n\t"
 			 "popl %%ebx       \n\t"
-			 : "=a" (p[0]), "=m" (p[1]), "=c" (p[2]), "=d" (p[3])
+			 : "=a" (p[0]), "=DS" (p[1]), "=c" (p[2]), "=d" (p[3])
 			 : "0" (ax));
 }
 
