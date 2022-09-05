@@ -57,6 +57,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/bitext.h>
 
 #include "pcieadm.h"
 
@@ -325,7 +326,7 @@ pcieadm_cfgspace_print_parse(pcieadm_cfgspace_walk_t *walkp,
 
 typedef struct pcieadm_cfgspace_print pcieadm_cfgspace_print_t;
 typedef void (*pcieadm_cfgspace_print_f)(pcieadm_cfgspace_walk_t *,
-    pcieadm_cfgspace_print_t *, void *);
+    const pcieadm_cfgspace_print_t *, const void *);
 
 struct pcieadm_cfgspace_print {
 	uint8_t pcp_off;
@@ -333,7 +334,7 @@ struct pcieadm_cfgspace_print {
 	const char *pcp_short;
 	const char *pcp_human;
 	pcieadm_cfgspace_print_f pcp_print;
-	void *pcp_arg;
+	const void *pcp_arg;
 };
 
 static void
@@ -369,7 +370,7 @@ pcieadm_field_printf(pcieadm_cfgspace_walk_t *walkp, const char *shortf,
 
 static void
 pcieadm_cfgspace_printf(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, uint64_t val, const char *fmt, ...)
+    const pcieadm_cfgspace_print_t *print, uint64_t val, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -400,7 +401,7 @@ pcieadm_cfgspace_printf(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_puts(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, const char *str)
+    const pcieadm_cfgspace_print_t *print, const char *str)
 {
 	if (!pcieadm_cfgspace_filter(walkp, print->pcp_short))
 		return;
@@ -431,7 +432,7 @@ pcieadm_cfgspace_puts(pcieadm_cfgspace_walk_t *walkp,
 
 static uint64_t
 pcieadm_cfgspace_extract(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print)
+    const pcieadm_cfgspace_print_t *print)
 {
 	uint32_t val = 0;
 
@@ -449,7 +450,7 @@ pcieadm_cfgspace_extract(pcieadm_cfgspace_walk_t *walkp,
 
 static uint16_t
 pcieadm_cfgspace_extract_u16(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print)
+    const pcieadm_cfgspace_print_t *print)
 {
 	VERIFY(print->pcp_len == 2);
 	return ((uint16_t)pcieadm_cfgspace_extract(walkp, print));
@@ -457,9 +458,9 @@ pcieadm_cfgspace_extract_u16(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_unit(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
-	pcieadm_unitdef_t *unit = arg;
+	const pcieadm_unitdef_t *unit = arg;
 	uint64_t rawval = pcieadm_cfgspace_extract(walkp, print);
 	uint64_t val = rawval;
 
@@ -472,9 +473,9 @@ pcieadm_cfgspace_print_unit(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_regdef(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
-	pcieadm_regdef_t *regdef = arg;
+	const pcieadm_regdef_t *regdef = arg;
 	uint64_t val = pcieadm_cfgspace_extract(walkp, print);
 
 	pcieadm_cfgspace_printf(walkp, print, val, "0x%" PRIx64 "\n", val);
@@ -541,9 +542,9 @@ pcieadm_cfgspace_print_regdef(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_strmap(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
-	pcieadm_strmap_t *strmap = arg;
+	const pcieadm_strmap_t *strmap = arg;
 	uint64_t val = pcieadm_cfgspace_extract(walkp, print);
 	const char *str = "reserved";
 
@@ -559,7 +560,7 @@ pcieadm_cfgspace_print_strmap(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_hex(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint64_t val = pcieadm_cfgspace_extract(walkp, print);
 
@@ -568,7 +569,7 @@ pcieadm_cfgspace_print_hex(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_vendor(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	pcidb_vendor_t *vend;
 	uint16_t vid = pcieadm_cfgspace_extract_u16(walkp, print);
@@ -584,7 +585,7 @@ pcieadm_cfgspace_print_vendor(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_device(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	pcidb_device_t *dev;
 	uint16_t did = pcieadm_cfgspace_extract_u16(walkp, print);
@@ -607,7 +608,7 @@ pcieadm_cfgspace_print_device(pcieadm_cfgspace_walk_t *walkp,
  */
 static void
 pcieadm_cfgspace_print_subid(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint16_t vid = walkp->pcw_data->pcb_u8[PCI_CONF_VENID] +
 	    (walkp->pcw_data->pcb_u8[PCI_CONF_VENID + 1] << 8);
@@ -651,7 +652,7 @@ pcieadm_cfgspace_print_subid(pcieadm_cfgspace_walk_t *walkp,
  */
 static void
 pcieadm_cfgspace_print_bars(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint32_t *barp = &walkp->pcw_data->pcb_u32[(walkp->pcw_capoff +
 	    print->pcp_off) / 4];
@@ -735,11 +736,11 @@ pcieadm_cfgspace_print_bars(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_ecv(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint16_t bitlen, nwords;
 
-	if (BITX(walkp->pcw_data->pcb_u8[walkp->pcw_capoff + 4], 5, 5) == 0) {
+	if (bitx8(walkp->pcw_data->pcb_u8[walkp->pcw_capoff + 4], 5, 5) == 0) {
 		return;
 	}
 
@@ -773,11 +774,11 @@ pcieadm_cfgspace_print_ecv(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_dpa_paa(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint8_t nents;
 
-	nents = BITX(walkp->pcw_data->pcb_u8[walkp->pcw_capoff + 4], 4, 0) + 1;
+	nents = bitx8(walkp->pcw_data->pcb_u8[walkp->pcw_capoff + 4], 4, 0) + 1;
 	if (nents == 0) {
 		return;
 	}
@@ -805,7 +806,7 @@ pcieadm_cfgspace_print_dpa_paa(pcieadm_cfgspace_walk_t *walkp,
 /*
  * Config Space Header Table Definitions
  */
-static pcieadm_regdef_t pcieadm_regdef_command[] = {
+static const pcieadm_regdef_t pcieadm_regdef_command[] = {
 	{ 0, 0, "io", "I/O Space", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "mem", "Memory Space", PRDV_STRVAL,
@@ -831,7 +832,7 @@ static pcieadm_regdef_t pcieadm_regdef_command[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_status[] = {
+static const pcieadm_regdef_t pcieadm_regdef_status[] = {
 	{ 0, 0, "imm", "Immediate Readiness", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } }, },
 	{ 3, 3, "istat", "Interrupt Status", PRDV_STRVAL,
@@ -863,14 +864,14 @@ static pcieadm_regdef_t pcieadm_regdef_status[] = {
 /*
  * It might be interesting to translate these into numbers at a future point.
  */
-static pcieadm_regdef_t pcieadm_regdef_class[] = {
+static const pcieadm_regdef_t pcieadm_regdef_class[] = {
 	{ 16, 23, "class", "Class Code", PRDV_HEX },
 	{ 7, 15, "sclass", "Sub-Class Code", PRDV_HEX },
 	{ 0, 7, "pi", "Programming Interface", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_bridge_iobase[] = {
+static const pcieadm_regdef_t pcieadm_regdef_bridge_iobase[] = {
 	{ 0, 3, "cap", "Addressing Capability", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "16-bit", "32-bit" } } },
 	{ 4, 7, "base", "Base", PRDV_HEX,
@@ -878,7 +879,7 @@ static pcieadm_regdef_t pcieadm_regdef_bridge_iobase[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_bridge_iolim[] = {
+static const pcieadm_regdef_t pcieadm_regdef_bridge_iolim[] = {
 	{ 0, 3, "cap", "Addressing Capability", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "16-bit", "32-bit" } } },
 	{ 4, 7, "limit", "Limit", PRDV_HEX,
@@ -887,7 +888,7 @@ static pcieadm_regdef_t pcieadm_regdef_bridge_iolim[] = {
 };
 
 
-static pcieadm_regdef_t pcieadm_regdef_bridgests[] = {
+static const pcieadm_regdef_t pcieadm_regdef_bridgests[] = {
 	{ 5, 5, "66mhz", "66 MHz", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 7, 7, "fastb2b", "Fast Back-to-Back Transactions", PRDV_STRVAL,
@@ -909,19 +910,19 @@ static pcieadm_regdef_t pcieadm_regdef_bridgests[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_bridge_membase[] = {
+static const pcieadm_regdef_t pcieadm_regdef_bridge_membase[] = {
 	{ 4, 16, "base", "Base", PRDV_HEX,
 	    .prd_val = { .prdv_hex = { 20 } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_bridge_memlim[] = {
+static const pcieadm_regdef_t pcieadm_regdef_bridge_memlim[] = {
 	{ 4, 16, "limit", "Limit", PRDV_HEX,
 	    .prd_val = { .prdv_hex = { 20, 0xfffff } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_bridge_pfbase[] = {
+static const pcieadm_regdef_t pcieadm_regdef_bridge_pfbase[] = {
 	{ 0, 3, "cap", "Addressing Capability", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "32-bit", "64-bit" } } },
 	{ 4, 16, "base", "Base", PRDV_HEX,
@@ -929,7 +930,7 @@ static pcieadm_regdef_t pcieadm_regdef_bridge_pfbase[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_bridge_pflim[] = {
+static const pcieadm_regdef_t pcieadm_regdef_bridge_pflim[] = {
 	{ 0, 3, "cap", "Addressing Capability", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "32-bit", "64-bit" } } },
 	{ 4, 16, "limit", "Limit", PRDV_HEX,
@@ -937,7 +938,7 @@ static pcieadm_regdef_t pcieadm_regdef_bridge_pflim[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_bridge_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_bridge_ctl[] = {
 	{ 0, 0, "perrresp", "Parity Error Response", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "serr", "SERR#", PRDV_STRVAL,
@@ -970,7 +971,7 @@ static pcieadm_unitdef_t pcieadm_unitdef_cache = {
 
 static pcieadm_unitdef_t pcieadm_unitdef_latreg = { "cycle" };
 
-static pcieadm_regdef_t pcieadm_regdef_header[] = {
+static const pcieadm_regdef_t pcieadm_regdef_header[] = {
 	{ 0, 6, "layout", "Header Layout", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "Device", "Bridge", "PC Card" } } },
 	{ 7, 7, "mfd", "Multi-Function Device", PRDV_STRVAL,
@@ -978,7 +979,7 @@ static pcieadm_regdef_t pcieadm_regdef_header[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_bist[] = {
+static const pcieadm_regdef_t pcieadm_regdef_bist[] = {
 	{ 0, 3, "code", "Completion Code", PRDV_HEX },
 	{ 6, 6, "start", "Start BIST", PRDV_HEX },
 	{ 7, 7, "cap", "BIST Capable", PRDV_STRVAL,
@@ -986,7 +987,7 @@ static pcieadm_regdef_t pcieadm_regdef_bist[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_exprom[] = {
+static const pcieadm_regdef_t pcieadm_regdef_exprom[] = {
 	{ 0, 0, "enable", "Enable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 3, "valsts", "Validation Status", PRDV_STRVAL,
@@ -1013,7 +1014,7 @@ static pcieadm_strmap_t pcieadm_strmap_ipin[] = {
 };
 
 
-static pcieadm_cfgspace_print_t pcieadm_cfgspace_type0[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cfgspace_type0[] = {
 	{ 0x0, 2, "vendor", "Vendor ID", pcieadm_cfgspace_print_vendor },
 	{ 0x2, 2, "device", "Device ID", pcieadm_cfgspace_print_device },
 	{ 0x4, 2, "command", "Command", pcieadm_cfgspace_print_regdef,
@@ -1049,7 +1050,7 @@ static pcieadm_cfgspace_print_t pcieadm_cfgspace_type0[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cfgspace_type1[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cfgspace_type1[] = {
 	{ 0x0, 2, "vendor", "Vendor ID", pcieadm_cfgspace_print_vendor },
 	{ 0x2, 2, "device", "Device ID", pcieadm_cfgspace_print_device },
 	{ 0x4, 2, "command", "Command", pcieadm_cfgspace_print_regdef,
@@ -1114,7 +1115,7 @@ static pcieadm_cfgspace_print_t pcieadm_cfgspace_type1[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cfgspace_unknown[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cfgspace_unknown[] = {
 	{ 0x0, 2, "vendor", "Vendor ID", pcieadm_cfgspace_print_vendor },
 	{ 0x2, 2, "device", "Device ID", pcieadm_cfgspace_print_device },
 	{ 0x8, 1, "revision", "Revision ID", pcieadm_cfgspace_print_hex },
@@ -1128,7 +1129,7 @@ static pcieadm_cfgspace_print_t pcieadm_cfgspace_unknown[] = {
  * the same, but are used to indicate compliance to different revisions of the
  * PCI power management specification.
  */
-static pcieadm_regdef_t pcieadm_regdef_pmcap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pmcap[] = {
 	{ 0, 2, "vers", "Version", PRDV_HEX },
 	{ 3, 3, "clock", "PME Clock", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "not required", "required" } } },
@@ -1150,7 +1151,7 @@ static pcieadm_regdef_t pcieadm_regdef_pmcap[] = {
 };
 
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcipm_v3[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pcipm_v3[] = {
 	{ PCI_PMCAP, 2, "pmcap", "Power Management Capabilities",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pmcap },
 	{ -1, -1, NULL }
@@ -1159,7 +1160,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pcipm_v3[] = {
 /*
  * PCI Bridge Subsystem Capability
  */
-static pcieadm_cfgspace_print_t pcieadm_cap_bridge_subsys[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_bridge_subsys[] = {
 	{ 0x4, 2, "subvid", "Subsystem Vendor ID", pcieadm_cfgspace_print_hex },
 	{ 0x6, 2, "subdev", "Subsystem Device ID", pcieadm_cfgspace_print_hex },
 	{ -1, -1, NULL }
@@ -1168,7 +1169,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_bridge_subsys[] = {
 /*
  * MSI Capability
  */
-static pcieadm_regdef_t pcieadm_regdef_msictrl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_msictrl[] = {
 	{ 0, 0, "enable", "MSI Enable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 3, "mmsgcap", "Multiple Message Capable", PRDV_STRVAL,
@@ -1188,7 +1189,7 @@ static pcieadm_regdef_t pcieadm_regdef_msictrl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_msi_32[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_msi_32[] = {
 	{ PCI_MSI_CTRL, 2, "ctrl", "Message Control",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_msictrl },
 	{ PCI_MSI_ADDR_OFFSET, 4, "addr", "Message Address",
@@ -1198,7 +1199,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_msi_32[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_msi_32ext[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_msi_32ext[] = {
 	{ PCI_MSI_CTRL, 2, "ctrl", "Message Control",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_msictrl },
 	{ PCI_MSI_ADDR_OFFSET, 4, "addr", "Message Address",
@@ -1210,7 +1211,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_msi_32ext[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_msi_32pvm[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_msi_32pvm[] = {
 	{ PCI_MSI_CTRL, 2, "ctrl", "Message Control",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_msictrl },
 	{ PCI_MSI_ADDR_OFFSET, 4, "addr", "Message Address",
@@ -1226,7 +1227,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_msi_32pvm[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_msi_64[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_msi_64[] = {
 	{ PCI_MSI_CTRL, 2, "ctrl", "Message Control",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_msictrl },
 	{ PCI_MSI_ADDR_OFFSET, 4, "addr", "Message Address",
@@ -1238,7 +1239,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_msi_64[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_msi_64ext[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_msi_64ext[] = {
 	{ PCI_MSI_CTRL, 2, "ctrl", "Message Control",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_msictrl },
 	{ PCI_MSI_ADDR_OFFSET, 4, "addr", "Message Address",
@@ -1252,7 +1253,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_msi_64ext[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_msi_64pvm[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_msi_64pvm[] = {
 	{ PCI_MSI_CTRL, 2, "ctrl", "Message Control",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_msictrl },
 	{ PCI_MSI_ADDR_OFFSET, 4, "addr", "Message Address",
@@ -1273,7 +1274,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_msi_64pvm[] = {
 /*
  * MSI-X Capability
  */
-static pcieadm_regdef_t pcieadm_regdef_msixctrl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_msixctrl[] = {
 	{ 0, 10, "size", "Table Size", PRDV_HEX,
 	    .prd_val = { .prdv_hex = { 0, 1 } } },
 	{ 14, 14, "mask", "Function Mask", PRDV_STRVAL,
@@ -1283,7 +1284,7 @@ static pcieadm_regdef_t pcieadm_regdef_msixctrl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_msixtable[] = {
+static const pcieadm_regdef_t pcieadm_regdef_msixtable[] = {
 	{ 0, 2, "bir", "Table BIR", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "BAR 0", "BAR 1", "BAR 2", "BAR 3",
 	    "BAR 4", "BAR 5" } } },
@@ -1292,7 +1293,7 @@ static pcieadm_regdef_t pcieadm_regdef_msixtable[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_msixpba[] = {
+static const pcieadm_regdef_t pcieadm_regdef_msixpba[] = {
 	{ 0, 2, "bir", "PBA BIR", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "BAR 0", "BAR 1", "BAR 2", "BAR 3",
 	    "BAR 4", "BAR 5" } } },
@@ -1302,7 +1303,7 @@ static pcieadm_regdef_t pcieadm_regdef_msixpba[] = {
 };
 
 
-static pcieadm_cfgspace_print_t pcieadm_cap_msix[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_msix[] = {
 	{ PCI_MSIX_CTRL, 2, "ctrl", "Control Register",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_msixctrl },
 	{ PCI_MSIX_TBL_OFFSET, 4, "table", "Table Offset",
@@ -1315,7 +1316,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_msix[] = {
 /*
  * PCI Express Capability
  */
-static pcieadm_regdef_t pcieadm_regdef_pcie_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_cap[] = {
 	{ 0, 3, "vers", "Version", PRDV_HEX },
 	{ 4, 7, "type", "Device/Port Type", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "PCIe Endpoint",
@@ -1333,7 +1334,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_devcap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_devcap[] = {
 	{ 0, 2, "mps", "Max Payload Size Supported", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "128 bytes", "256 bytes",
 	    "512 bytes", "1024 bytes", "2048 bytes", "4096 bytes" } } },
@@ -1361,7 +1362,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_devcap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_devctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_devctl[] = {
 	{ 0, 0, "corerr", "Correctable Error Reporting", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "nferr", "Non-Fatal Error Reporting", PRDV_STRVAL,
@@ -1391,7 +1392,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_devctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_devsts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_devsts[] = {
 	{ 0, 0, "corerr", "Correctable Error Detected", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
 	{ 1, 1, "nferr", "Non-Fatal Error Detected", PRDV_STRVAL,
@@ -1409,7 +1410,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_devsts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_linkcap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_linkcap[] = {
 	{ 0, 3, "maxspeed", "Maximum Link Speed", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { NULL, "2.5 GT/s", "5.0 GT/s",
 	    "8.0 GT/s", "16.0 GT/s", "32.0 GT/s", "64.0 GT/s" } } },
@@ -1437,7 +1438,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_linkcap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_linkctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_linkctl[] = {
 	{ 0, 1, "aspmctl", "ASPM Control", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "None", "L0s", "L1", "L0s/L1" } } },
 	{ 3, 3, "rcb", "Read Completion Boundary", PRDV_STRVAL,
@@ -1466,7 +1467,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_linkctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_linksts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_linksts[] = {
 	{ 0, 3, "speed", "Link Speed", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { NULL, "2.5 GT/s", "5.0 GT/s",
 	    "8.0 GT/s", "16.0 GT/s", "32.0 GT/s", "64.0 GT/s" } } },
@@ -1484,7 +1485,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_linksts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_slotcap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_slotcap[] = {
 	{ 0, 0, "attnbtn", "Attention Button Present", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
 	{ 1, 1, "pwrctrl", "Power Controller Present", PRDV_STRVAL,
@@ -1509,7 +1510,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_slotcap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_slotctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_slotctl[] = {
 	{ 0, 0, "attnbtn", "Attention Button Pressed", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "powflt", "Power Fault Detected", PRDV_STRVAL,
@@ -1538,7 +1539,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_slotctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_slotsts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_slotsts[] = {
 	{ 0, 0, "attnbtn", "Attention Button Pressed", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
 	{ 1, 1, "powflt", "Power Fault Detected", PRDV_STRVAL,
@@ -1560,7 +1561,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_slotsts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_rootcap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_rootcap[] = {
 	{ 0, 0, "syscorerr", "System Error on Correctable Error", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "sysnonftl", "System Error on Non-Fatal Error", PRDV_STRVAL,
@@ -1574,13 +1575,13 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_rootcap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_rootctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_rootctl[] = {
 	{ 0, 0, "crssw", "CRS Software Visibility", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_rootsts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_rootsts[] = {
 	{ 0, 15, "pmereqid", "PME Requester ID", PRDV_HEX },
 	{ 16, 16, "pmests", "PME Status", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "deasserted", "asserted" } } },
@@ -1589,7 +1590,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_rootsts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_devcap2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_devcap2[] = {
 	{ 0, 3, "cmpto", "Completion Timeout Ranges Supported", PRDV_BITFIELD,
 	    .prd_val = { .prdv_strval = { "50us-10ms", "10ms-250ms",
 	    "250ms-4s", "4s-64s" } } },
@@ -1640,7 +1641,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_devcap2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_devctl2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_devctl2[] = {
 	{ 0, 3, "cmpto", "Completion Timeout", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "50us-50ms", "50us-100us",
 	    "1ms-10ms", NULL, NULL, "16ms-55ms", "65ms-210ms", NULL, NULL,
@@ -1671,11 +1672,11 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_devctl2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_devsts2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_devsts2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_linkcap2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_linkcap2[] = {
 	{ 1, 7, "supspeeds", "Supported Link Speeds", PRDV_BITFIELD,
 	    .prd_val = { .prdv_strval = { "2.5 GT/s", "5.0 GT/s", "8.0 GT/s",
 	    "16.0 GT/s", "32.0 GT/s", "64.0 GT/s" } } },
@@ -1699,7 +1700,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_linkcap2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_linkctl2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_linkctl2[] = {
 	{ 0, 3, "targspeed", "Target Link Speed", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { NULL, "2.5 GT/s", "5.0 GT/s",
 	    "8.0 GT/s", "16.0 GT/s", "32.0 GT/s", "64.0 GT/s" } } },
@@ -1718,7 +1719,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_linkctl2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_linksts2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_linksts2[] = {
 	{ 0, 0, "curdeemph", "Current De-emphasis Level", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "-6 dB", "-3.5 dB" } } },
 	{ 1, 1, "eq8comp", "Equalization 8.0 GT/s Complete", PRDV_STRVAL,
@@ -1747,21 +1748,21 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_linksts2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_slotcap2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_slotcap2[] = {
 	{ 0, 0, "ibpddis", "In-Band PD Disable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_slotctl2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_slotctl2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie_slotsts2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_slotsts2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_dev[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_dev[] = {
 	{ PCIE_PCIECAP, 2, "cap", "Capability Register",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_cap },
 	{ PCIE_DEVCAP, 4, "devcap", "Device Capabilities",
@@ -1771,7 +1772,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_dev[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_link[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_link[] = {
 	{ PCIE_PCIECAP, 2, "cap", "Capability Register",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_cap },
 	{ PCIE_DEVCAP, 4, "devcap", "Device Capabilities",
@@ -1787,7 +1788,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_link[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_slot[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_slot[] = {
 	{ PCIE_PCIECAP, 2, "cap", "Capability Register",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_cap },
 	{ PCIE_DEVCAP, 4, "devcap", "Device Capabilities",
@@ -1810,7 +1811,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_slot[] = {
 };
 
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_all[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_all[] = {
 	{ PCIE_PCIECAP, 2, "cap", "Capability Register",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_cap },
 	{ PCIE_DEVCAP, 4, "devcap", "Device Capabilities",
@@ -1838,7 +1839,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v1_all[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v2[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pcie_v2[] = {
 	{ PCIE_PCIECAP, 2, "cap", "Capability Register",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_cap },
 	{ PCIE_DEVCAP, 4, "devcap", "Device Capabilities",
@@ -1889,7 +1890,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pcie_v2[] = {
 /*
  * PCIe Extended Capability Header
  */
-static pcieadm_regdef_t pcieadm_regdef_pcie_caphdr[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie_caphdr[] = {
 	{ 0, 15, "capid", "Capability ID", PRDV_HEX },
 	{ 16, 19, "version", "Capability Version", PRDV_HEX },
 	{ 20, 32, "offset", "Next Capability Offset", PRDV_HEX },
@@ -1899,13 +1900,13 @@ static pcieadm_regdef_t pcieadm_regdef_pcie_caphdr[] = {
 /*
  * VPD Capability
  */
-static pcieadm_regdef_t pcieadm_regdef_vpd_addr[] = {
+static const pcieadm_regdef_t pcieadm_regdef_vpd_addr[] = {
 	{ 0, 14, "addr", "VPD Address", PRDV_HEX },
 	{ 15, 15, "flag", "Flag", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_vpd[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_vpd[] = {
 	{ 0x2, 2, "addr", "VPD Address Register",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_vpd_addr },
 	{ 0x4, 4, "data", "VPD Data", pcieadm_cfgspace_print_hex },
@@ -1915,13 +1916,13 @@ static pcieadm_cfgspace_print_t pcieadm_cap_vpd[] = {
 /*
  * SATA Capability per AHCI 1.3.1
  */
-static pcieadm_regdef_t pcieadm_regdef_sata_cr0[] = {
+static const pcieadm_regdef_t pcieadm_regdef_sata_cr0[] = {
 	{ 0, 3, "minrev", "Minor Revision", PRDV_HEX },
 	{ 4, 7, "majrev", "Major Revision", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_sata_cr1[] = {
+static const pcieadm_regdef_t pcieadm_regdef_sata_cr1[] = {
 	{ 0, 3, "bar", "BAR Location", PRDV_HEX,
 	    .prd_val = { .prdv_hex = { 2 } } },
 	{ 4, 23, "offset", "BAR Offset", PRDV_HEX,
@@ -1929,7 +1930,7 @@ static pcieadm_regdef_t pcieadm_regdef_sata_cr1[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_sata[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_sata[] = {
 	{ 0x2, 2, "satacr0", "SATA Capability Register 0",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_sata_cr0 },
 	{ 0x4, 4, "satacr1", "SATA Capability Register 1",
@@ -1940,7 +1941,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_sata[] = {
 /*
  * Debug Capability per EHCI
  */
-static pcieadm_regdef_t pcieadm_regdef_debug[] = {
+static const pcieadm_regdef_t pcieadm_regdef_debug[] = {
 	{ 0, 12, "offset", "BAR Offset", PRDV_HEX },
 	{ 13, 15, "bar", "BAR Location ", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { NULL, "BAR 0", "BAR 1", "BAR 2",
@@ -1948,7 +1949,7 @@ static pcieadm_regdef_t pcieadm_regdef_debug[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_debug[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_debug[] = {
 	{ 0x2, 2, "port", "Debug Port",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_debug },
 	{ -1, -1, NULL }
@@ -1957,7 +1958,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_debug[] = {
 /*
  * AER Capability
  */
-static pcieadm_regdef_t pcieadm_regdef_aer_ue[] = {
+static const pcieadm_regdef_t pcieadm_regdef_aer_ue[] = {
 	{ 4, 4, "dlp", "Data Link Protocol Error", PRDV_HEX },
 	{ 5, 5, "sde", "Surprise Down Error", PRDV_HEX },
 	{ 12, 12, "ptlp", "Poisoned TLP Received", PRDV_HEX },
@@ -1978,7 +1979,7 @@ static pcieadm_regdef_t pcieadm_regdef_aer_ue[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_aer_ce[] = {
+static const pcieadm_regdef_t pcieadm_regdef_aer_ce[] = {
 	{ 0, 0, "rxerr", "Receiver Error", PRDV_HEX },
 	{ 6, 6, "badtlp", "Bad TLP", PRDV_HEX },
 	{ 7, 7, "baddllp", "Bad DLLP", PRDV_HEX },
@@ -1990,7 +1991,7 @@ static pcieadm_regdef_t pcieadm_regdef_aer_ce[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_aer_ctrl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_aer_ctrl[] = {
 	{ 0, 4, "feptr", "First Error Pointer", PRDV_HEX },
 	{ 5, 5, "ecgencap", "ECRC Generation Capable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
@@ -2003,7 +2004,7 @@ static pcieadm_regdef_t pcieadm_regdef_aer_ctrl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_aer_rootcom[] = {
+static const pcieadm_regdef_t pcieadm_regdef_aer_rootcom[] = {
 	{ 0, 0, "corerr", "Correctable Error Reporting", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "nferr", "Non-Fatal Error Reporting", PRDV_STRVAL,
@@ -2013,7 +2014,7 @@ static pcieadm_regdef_t pcieadm_regdef_aer_rootcom[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_aer_rootsts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_aer_rootsts[] = {
 	{ 0, 0, "errcor", "ERR_COR Received", PRDV_HEX },
 	{ 1, 1, "merrcor", "Multiple ERR_COR Received", PRDV_HEX },
 	{ 2, 2, "errfnf", "ERR_FATAL/NONFATAL Received", PRDV_HEX },
@@ -2028,13 +2029,13 @@ static pcieadm_regdef_t pcieadm_regdef_aer_rootsts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_aer_esi[] = {
+static const pcieadm_regdef_t pcieadm_regdef_aer_esi[] = {
 	{ 0, 15, "errcorr", "ERR_COR Source", PRDV_HEX },
 	{ 16, 31, "errfnf", "ERR_FATAL/NONFATAL Source", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_aer_secue[] = {
+static const pcieadm_regdef_t pcieadm_regdef_aer_secue[] = {
 	{ 0, 0, "taosc", "Target-Abort on Split Completion", PRDV_HEX },
 	{ 1, 1, "maosc", "Master-Abort on Split Completion", PRDV_HEX },
 	{ 2, 2, "rxta", "Received Target-Abort", PRDV_HEX },
@@ -2053,13 +2054,13 @@ static pcieadm_regdef_t pcieadm_regdef_aer_secue[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_aer_secctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_aer_secctl[] = {
 	{ 0, 4, "feptr", "Secondary Uncorrectable First Error Pointer",
 	    PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_aer_v1[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_aer_v1[] = {
 	{ PCIE_AER_CAP, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ PCIE_AER_UCE_STS, 4, "uestatus", "Uncorrectable Error Status",
@@ -2091,7 +2092,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_aer_v1[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_aer_v2[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_aer_v2[] = {
 	{ PCIE_AER_CAP, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ PCIE_AER_UCE_STS, 4, "uestatus", "Uncorrectable Error Status",
@@ -2129,7 +2130,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_aer_v2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_aer_bridge[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_aer_bridge[] = {
 	{ PCIE_AER_CAP, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ PCIE_AER_UCE_STS, 4, "uestatus", "Uncorrectable Error Status",
@@ -2184,7 +2185,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_aer_bridge[] = {
 /*
  * Secondary PCI Express Extended Capability
  */
-static pcieadm_regdef_t pcieadm_regdef_pcie2_linkctl3[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie2_linkctl3[] = {
 	{ 0, 0, "peq", "Perform Equalization", PRDV_HEX },
 	{ 1, 1, "leqrie", "Link Equalization Request Interrupt Enable",
 	    PRDV_STRVAL,
@@ -2196,7 +2197,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie2_linkctl3[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcie2_linkeq[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcie2_linkeq[] = {
 	{ 0, 3, "dstxpre", "Downstream Port 8.0 GT/s Transmitter Preset",
 	    PRDV_HEX },
 	{ 4, 6, "dstxhint", "Downstream Port 8.0 GT/s Receiver Hint",
@@ -2210,7 +2211,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcie2_linkeq[] = {
 
 static void
 pcieadm_cfgspace_print_laneq(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	if (walkp->pcw_nlanes == 0) {
 		warnx("failed to capture lane count, but somehow have "
@@ -2236,7 +2237,7 @@ pcieadm_cfgspace_print_laneq(pcieadm_cfgspace_walk_t *walkp,
 	}
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcie2[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pcie2[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "linkctl3", "Link Control 3",
@@ -2250,7 +2251,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pcie2[] = {
 /*
  * Access Control Services
  */
-static pcieadm_regdef_t pcieadm_regdef_acs_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_acs_cap[] = {
 	{ 0, 0, "srcvd", "ACS Source Validation", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "tranblk", "ACS Transaction Blocking", PRDV_STRVAL,
@@ -2271,7 +2272,7 @@ static pcieadm_regdef_t pcieadm_regdef_acs_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_acs_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_acs_ctl[] = {
 	{ 0, 0, "srcvd", "ACS Source Validation", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "tranblk", "ACS Transaction Blocking", PRDV_STRVAL,
@@ -2297,7 +2298,7 @@ static pcieadm_regdef_t pcieadm_regdef_acs_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_acs[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_acs[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 2, "cap", "ACS Capability",
@@ -2311,7 +2312,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_acs[] = {
 /*
  * L1 PM Substates
  */
-static pcieadm_regdef_t pcieadm_regdef_l1pm_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_l1pm_cap[] = {
 	{ 0, 0, "pcil1.2", "PCI-PM L1.2", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "pcil1.1", "PCI-PM L1.1", PRDV_STRVAL,
@@ -2331,7 +2332,7 @@ static pcieadm_regdef_t pcieadm_regdef_l1pm_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_l1pm_ctl1[] = {
+static const pcieadm_regdef_t pcieadm_regdef_l1pm_ctl1[] = {
 	{ 0, 0, "pcil1.2", "PCI-PM L1.2", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "pcil1.1", "PCI-PM L1.1", PRDV_STRVAL,
@@ -2352,20 +2353,20 @@ static pcieadm_regdef_t pcieadm_regdef_l1pm_ctl1[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_l1pm_ctl2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_l1pm_ctl2[] = {
 	{ 0, 1, "poscale", "T_POWER_ON Scale", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "2 us", "10 us", "100 us" } } },
 	{ 3, 7, "portpo", "T_POWER_ON Value", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_l1pm_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_l1pm_sts[] = {
 	{ 0, 0, "la", "Link Activation", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
 
-static pcieadm_cfgspace_print_t pcieadm_cap_l1pm_v1[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_l1pm_v1[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "caps", "L1 PM Substates Capabilities",
@@ -2377,7 +2378,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_l1pm_v1[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_l1pm_v2[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_l1pm_v2[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "caps", "L1 PM Substates Capabilities",
@@ -2394,7 +2395,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_l1pm_v2[] = {
 /*
  * Latency Tolerance Reporting (LTR)
  */
-static pcieadm_regdef_t pcieadm_regdef_ltr[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ltr[] = {
 	{ 0, 9, "latval", "Latency Value", PRDV_HEX },
 	{ 10, 12, "latscale", "Latency Scale", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "1 ns", "32 ns", "1024 ns",
@@ -2402,7 +2403,7 @@ static pcieadm_regdef_t pcieadm_regdef_ltr[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_ltr[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_ltr[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 2, "snoop", "Max Snoop Latency",
@@ -2415,7 +2416,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_ltr[] = {
 /*
  * Alternative Routing ID
  */
-static pcieadm_regdef_t pcieadm_regdef_ari_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ari_cap[] = {
 	{ 0, 0, "mfvcfg", "MFVC Function Groups", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "acsfg", "ACS Function Groups", PRDV_STRVAL,
@@ -2424,7 +2425,7 @@ static pcieadm_regdef_t pcieadm_regdef_ari_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ari_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ari_ctl[] = {
 	{ 0, 0, "mfvcfg", "MFVC Function Groups", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "acsfg", "ACS Function Groups", PRDV_STRVAL,
@@ -2433,7 +2434,7 @@ static pcieadm_regdef_t pcieadm_regdef_ari_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_ari[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_ari[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 2, "cap", "ARI Capability",
@@ -2446,7 +2447,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_ari[] = {
 /*
  * PASID
  */
-static pcieadm_regdef_t pcieadm_regdef_pasid_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pasid_cap[] = {
 	{ 1, 1, "exec", "Execution Permission", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 2, 2, "priv", "Privileged Mode", PRDV_STRVAL,
@@ -2455,7 +2456,7 @@ static pcieadm_regdef_t pcieadm_regdef_pasid_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pasid_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pasid_ctl[] = {
 	{ 0, 0, "pasid", "PASID", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "exec", "Execution Permission", PRDV_STRVAL,
@@ -2466,7 +2467,7 @@ static pcieadm_regdef_t pcieadm_regdef_pasid_ctl[] = {
 };
 
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pasid[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pasid[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 2, "cap", "PASID Capability",
@@ -2479,7 +2480,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pasid[] = {
 /*
  * "Advanced Features"
  */
-static pcieadm_regdef_t pcieadm_regdef_af_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_af_cap[] = {
 	{ 0, 0, "tp", "Transactions Pending", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "flr", "Function Level Reset", PRDV_STRVAL,
@@ -2487,18 +2488,18 @@ static pcieadm_regdef_t pcieadm_regdef_af_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_af_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_af_ctl[] = {
 	{ 0, 0, "flr", "Function Level Reset", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_af_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_af_sts[] = {
 	{ 0, 0, "tp", "Transactions Pending", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "none pending", "pending" } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_af[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_af[] = {
 	{ 0x2, 2, "cap", "AF Capabilities",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_af_cap },
 	{ 0x4, 1, "ctl", "AF Control",
@@ -2511,7 +2512,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_af[] = {
 /*
  * Multicast
  */
-static pcieadm_regdef_t pcieadm_regdef_mcast_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_mcast_cap[] = {
 	{ 0, 5, "maxgrp", "Max Group", PRDV_HEX,
 	    .prd_val = { .prdv_hex = { 0, 1 } } },
 	{ 8, 13, "winsize", "Window Size (raw)", PRDV_HEX },
@@ -2520,7 +2521,7 @@ static pcieadm_regdef_t pcieadm_regdef_mcast_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_mcast_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_mcast_ctl[] = {
 	{ 0, 5, "numgrp", "Number of Groups", PRDV_HEX,
 	    .prd_val = { .prdv_hex = { 0, 1 } } },
 	{ 15, 15, "enable", "Enable", PRDV_STRVAL,
@@ -2528,21 +2529,21 @@ static pcieadm_regdef_t pcieadm_regdef_mcast_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_mcast_base[] = {
+static const pcieadm_regdef_t pcieadm_regdef_mcast_base[] = {
 	{ 0, 5, "index", "Multicast Index Position", PRDV_HEX },
 	{ 12, 63, "addr", "Base Address", PRDV_HEX,
 	    .prd_val = { .prdv_hex = { 12 } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_mcast_overlay[] = {
+static const pcieadm_regdef_t pcieadm_regdef_mcast_overlay[] = {
 	{ 0, 5, "size", "Overlay Size (raw)", PRDV_HEX },
 	{ 6, 63, "addr", "Overlay Base Address", PRDV_HEX,
 	    .prd_val = { .prdv_hex = { 6 } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_mcast[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_mcast[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 2, "cap", "Multicast Capability",
@@ -2563,19 +2564,19 @@ static pcieadm_cfgspace_print_t pcieadm_cap_mcast[] = {
 /*
  * Various vendor extensions
  */
-static pcieadm_regdef_t pcieadm_regdef_vsec[] = {
+static const pcieadm_regdef_t pcieadm_regdef_vsec[] = {
 	{ 0, 15, "id", "ID", PRDV_HEX },
 	{ 16, 19, "rev", "Revision", PRDV_HEX },
 	{ 20, 31, "len", "Length", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_vs[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_vs[] = {
 	{ 0x2, 2, "length", "Length", pcieadm_cfgspace_print_hex },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_vsec[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_vsec[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "header", "Vendor-Specific Header",
@@ -2586,7 +2587,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_vsec[] = {
 /*
  * Data Link Feature
  */
-static pcieadm_regdef_t pcieadm_regdef_dlf_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_dlf_cap[] = {
 	{ 0, 0, "lsfc", "Local Scaled Flow Control", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 31, 31, "dlex", "Data Link Exchange", PRDV_STRVAL,
@@ -2594,7 +2595,7 @@ static pcieadm_regdef_t pcieadm_regdef_dlf_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_dlf_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_dlf_sts[] = {
 	{ 0, 0, "rsfc", "Remote Scaled Flow Control", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 31, 31, "valid", "Remote Data Link Feature Valid", PRDV_STRVAL,
@@ -2602,7 +2603,7 @@ static pcieadm_regdef_t pcieadm_regdef_dlf_sts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_dlf[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_dlf[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "cap", "Data Link Feature Capabilities",
@@ -2615,15 +2616,15 @@ static pcieadm_cfgspace_print_t pcieadm_cap_dlf[] = {
 /*
  * 16.0 GT/s cap
  */
-static pcieadm_regdef_t pcieadm_regdef_16g_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_16g_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_16g_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_16g_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_16g_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_16g_sts[] = {
 	{ 0, 0, "eqcomp", "Equalization 16.0 GT/s Complete", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "incomplete", "complete" } } },
 	{ 1, 1, "eqp1", "Equalization 16.0 GT/s Phase 1", PRDV_STRVAL,
@@ -2636,7 +2637,7 @@ static pcieadm_regdef_t pcieadm_regdef_16g_sts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_16g_eq[] = {
+static const pcieadm_regdef_t pcieadm_regdef_16g_eq[] = {
 	{ 0, 3, "dstxpre", "Downstream Port 16.0 GT/s Transmitter Preset",
 	    PRDV_HEX },
 	{ 4, 7, "ustxpre", "Upstream Port 16.0 GT/s Transmitter Preset",
@@ -2646,7 +2647,7 @@ static pcieadm_regdef_t pcieadm_regdef_16g_eq[] = {
 
 static void
 pcieadm_cfgspace_print_16geq(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	if (walkp->pcw_nlanes == 0) {
 		warnx("failed to capture lane count, but somehow have "
@@ -2672,7 +2673,7 @@ pcieadm_cfgspace_print_16geq(pcieadm_cfgspace_walk_t *walkp,
 	}
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_16g[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_16g[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "cap", "16.0 GT/s Capabilities",
@@ -2697,13 +2698,13 @@ static pcieadm_cfgspace_print_t pcieadm_cap_16g[] = {
 /*
  * Receiver Margining
  */
-static pcieadm_regdef_t pcieadm_regdef_margin_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_margin_cap[] = {
 	{ 0, 0, "sw", "Margining uses Driver Software", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_margin_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_margin_sts[] = {
 	{ 0, 0, "ready", "Margining Ready", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
 	{ 1, 1, "sw", "Margining Software Ready", PRDV_STRVAL,
@@ -2711,7 +2712,7 @@ static pcieadm_regdef_t pcieadm_regdef_margin_sts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_margin_lane[] = {
+static const pcieadm_regdef_t pcieadm_regdef_margin_lane[] = {
 	{ 0, 2, "rxno", "Receiver Number", PRDV_HEX },
 	{ 3, 5, "type", "Margin Type", PRDV_HEX },
 	{ 6, 6, "model", "Usage Model", PRDV_HEX },
@@ -2721,7 +2722,7 @@ static pcieadm_regdef_t pcieadm_regdef_margin_lane[] = {
 
 static void
 pcieadm_cfgspace_print_margin(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	if (walkp->pcw_nlanes == 0) {
 		warnx("failed to capture lane count, but somehow have "
@@ -2759,7 +2760,7 @@ pcieadm_cfgspace_print_margin(pcieadm_cfgspace_walk_t *walkp,
 	}
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_margin[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_margin[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 2, "cap", "Margining Port Capabilities",
@@ -2775,7 +2776,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_margin[] = {
  */
 static void
 pcieadm_cfgspace_print_sn(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	char sn[64];
 	uint16_t off = walkp->pcw_capoff + print->pcp_off;
@@ -2790,7 +2791,7 @@ pcieadm_cfgspace_print_sn(pcieadm_cfgspace_walk_t *walkp,
 	pcieadm_cfgspace_puts(walkp, print, sn);
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_sn[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_sn[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 8, "sn", "Serial Number", pcieadm_cfgspace_print_sn },
@@ -2800,7 +2801,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_sn[] = {
 /*
  * TLP Processing Hints (TPH)
  */
-static pcieadm_regdef_t pcieadm_regdef_tph_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_tph_cap[] = {
 	{ 0, 0, "nost", "No ST Mode", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "ivec", "Interrupt Vector Mode", PRDV_STRVAL,
@@ -2816,7 +2817,7 @@ static pcieadm_regdef_t pcieadm_regdef_tph_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_tph_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_tph_ctl[] = {
 	{ 0, 2, "mode", "ST Mode Select", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "No ST", "Interrupt Vector",
 	    "Device Specific" } } },
@@ -2826,7 +2827,7 @@ static pcieadm_regdef_t pcieadm_regdef_tph_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_tph_st[] = {
+static const pcieadm_regdef_t pcieadm_regdef_tph_st[] = {
 	{ 0, 7, "low", "ST Lower", PRDV_HEX },
 	{ 8, 15, "up", "ST Upper", PRDV_HEX },
 	{ -1, -1, NULL }
@@ -2839,16 +2840,16 @@ static pcieadm_regdef_t pcieadm_regdef_tph_st[] = {
  */
 static void
 pcieadm_cfgspace_print_tphst(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint_t nents;
 	uint32_t tphcap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
 
-	if (BITX(tphcap, 10, 9) != 1) {
+	if (bitx32(tphcap, 10, 9) != 1) {
 		return;
 	}
 
-	nents = BITX(tphcap, 26, 16) + 1;
+	nents = bitx32(tphcap, 26, 16) + 1;
 	for (uint_t i = 0; i < nents; i++) {
 		char tshort[32], thuman[128];
 		pcieadm_cfgspace_print_t p;
@@ -2867,7 +2868,7 @@ pcieadm_cfgspace_print_tphst(pcieadm_cfgspace_walk_t *walkp,
 	}
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_tph[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_tph[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "cap", "TPH Requester Capability",
@@ -2881,7 +2882,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_tph[] = {
 /*
  * SR-IOV
  */
-static pcieadm_regdef_t pcieadm_regdef_sriov_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_sriov_cap[] = {
 	{ 0, 0, "migration", "Migration", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "ari", "ARI Capable Hierarchy Preserved", PRDV_STRVAL,
@@ -2892,7 +2893,7 @@ static pcieadm_regdef_t pcieadm_regdef_sriov_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_sriov_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_sriov_ctl[] = {
 	{ 0, 0, "vf", "VF", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "vfm", "VF Migration", PRDV_STRVAL,
@@ -2906,13 +2907,13 @@ static pcieadm_regdef_t pcieadm_regdef_sriov_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_sriov_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_sriov_sts[] = {
 	{ 0, 0, "vfm", "VF Migration", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "none", "requested" } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_sriov_pgsup[] = {
+static const pcieadm_regdef_t pcieadm_regdef_sriov_pgsup[] = {
 	{ 0, 31, "pgsz", "Supported Page Sizes", PRDV_BITFIELD,
 	    .prd_val = { .prdv_strval = { "4 KB", "8 KB", "16 KB", "32 KB",
 	    "64 KB", "128 KB", "256 KB", "512 KB", "1 MB", "2 MB", "4 MB",
@@ -2922,7 +2923,7 @@ static pcieadm_regdef_t pcieadm_regdef_sriov_pgsup[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_sriov_pgen[] = {
+static const pcieadm_regdef_t pcieadm_regdef_sriov_pgen[] = {
 	{ 0, 31, "pgsz", "System Page Sizes", PRDV_BITFIELD,
 	    .prd_val = { .prdv_strval = { "4 KB", "8 KB", "16 KB", "32 KB",
 	    "64 KB", "128 KB", "256 KB", "512 KB", "1 MB", "2 MB", "4 MB",
@@ -2932,7 +2933,7 @@ static pcieadm_regdef_t pcieadm_regdef_sriov_pgen[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_sriov_mig[] = {
+static const pcieadm_regdef_t pcieadm_regdef_sriov_mig[] = {
 	{ 0, 2, "bir", "VF Migration State BIR", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "BAR 0", "BAR 1", "BAR 2", "BAR 3",
 	    "BAR 4", "BAR 5" } } },
@@ -2941,7 +2942,7 @@ static pcieadm_regdef_t pcieadm_regdef_sriov_mig[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_sriov[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_sriov[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "cap", "SR-IOV Capabilities",
@@ -2972,7 +2973,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_sriov[] = {
 /*
  * PCI-X
  */
-static pcieadm_regdef_t pcieadm_regdef_pcix_dev_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcix_dev_ctl[] = {
 	{ 0, 0, "dper", "Data Parity Error Recovery", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "ro", "Relaxed Ordering", PRDV_STRVAL,
@@ -2986,7 +2987,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcix_dev_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcix_dev_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcix_dev_sts[] = {
 	{ 0, 2, "func", "Function Number", PRDV_HEX },
 	{ 3, 7, "dev", "Device Number", PRDV_HEX },
 	{ 8, 15, "bus", "Bus Number", PRDV_HEX },
@@ -3017,7 +3018,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcix_dev_sts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcix_sec_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcix_sec_sts[] = {
 	{ 0, 0, "64bit", "64-bit Device", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported (32-bit)",
 	    "supported" } } },
@@ -3038,7 +3039,7 @@ static pcieadm_regdef_t pcieadm_regdef_pcix_sec_sts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcix_bridge_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcix_bridge_sts[] = {
 	{ 0, 2, "func", "Function Number", PRDV_HEX },
 	{ 3, 7, "dev", "Device Number", PRDV_HEX },
 	{ 8, 15, "bus", "Bus Number", PRDV_HEX },
@@ -3059,13 +3060,13 @@ static pcieadm_regdef_t pcieadm_regdef_pcix_bridge_sts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pcix_bridge_split[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pcix_bridge_split[] = {
 	{ 0, 15, "cap", "Split Transaction Capacity", PRDV_HEX },
 	{ 16, 31, "limit", "Split Transaction Commitment Limit", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcix_dev[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pcix_dev[] = {
 	{ 0x2, 2, "ctl", "PCI-X Command",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcix_dev_ctl },
 	{ 0x4, 4, "sts", "PCI-X Status",
@@ -3073,7 +3074,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pcix_dev[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pcix_bridge[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pcix_bridge[] = {
 	{ 0x2, 2, "secsts", "PCI-X Secondary Status",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcix_sec_sts },
 	{ 0x4, 4, "sts", "PCI-X Bridge Status",
@@ -3088,7 +3089,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pcix_bridge[] = {
 /*
  * Dynamic Power Allocation
  */
-static pcieadm_regdef_t pcieadm_regdef_dpa_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_dpa_cap[] = {
 	{ 0, 4, "substates", "Substate Max", PRDV_HEX,
 	    { .prdv_hex = { 0, 1 } } },
 	{ 8, 9, "tlu", "Transition Latency Unit", PRDV_STRVAL,
@@ -3101,19 +3102,19 @@ static pcieadm_regdef_t pcieadm_regdef_dpa_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_dpa_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_dpa_sts[] = {
 	{ 0, 4, "substate", "Substate Status", PRDV_HEX },
 	{ 8, 8, "ctlen", "Substate Control Enabled", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_dpa_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_dpa_ctl[] = {
 	{ 0, 4, "substate", "Substate Control", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_dpa[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_dpa[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "cap", "DPA Capability",
@@ -3131,7 +3132,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_dpa[] = {
 /*
  * Power Budgeting
  */
-static pcieadm_regdef_t pcieadm_regdef_powbudg_data[] = {
+static const pcieadm_regdef_t pcieadm_regdef_powbudg_data[] = {
 	{ 0, 7, "base", "Base Power", PRDV_HEX },
 	{ 8, 9, "scale", "Data Scale", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "1.0x", "0.1x", "0.01x",
@@ -3152,14 +3153,14 @@ static pcieadm_regdef_t pcieadm_regdef_powbudg_data[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_powbudg_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_powbudg_cap[] = {
 	{ 0, 0, "sa", "System Allocated", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
 	{ -1, -1, NULL }
 };
 
 
-static pcieadm_cfgspace_print_t pcieadm_cap_powbudg[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_powbudg[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 1, "sel", "Data Select", pcieadm_cfgspace_print_hex },
@@ -3173,7 +3174,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_powbudg[] = {
 /*
  * Precision Time Management
  */
-static pcieadm_regdef_t pcieadm_regdef_ptm_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ptm_cap[] = {
 	{ 0, 0, "req", "PTM Requester", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "resp", "PTM Responder", PRDV_STRVAL,
@@ -3186,7 +3187,7 @@ static pcieadm_regdef_t pcieadm_regdef_ptm_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ptm_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ptm_ctl[] = {
 	{ 0, 0, "en", "PTM Enable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "root", "Root Select", PRDV_STRVAL,
@@ -3195,7 +3196,7 @@ static pcieadm_regdef_t pcieadm_regdef_ptm_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_info_ptm[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_info_ptm[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "cap", "PTM Capability",
@@ -3208,7 +3209,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_info_ptm[] = {
 /*
  * Address Translation Services (ATS)
  */
-static pcieadm_regdef_t pcieadm_regdef_ats_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ats_cap[] = {
 	{ 0, 4, "invqd", "Invalidate Queue Depth", PRDV_HEX },
 	{ 5, 5, "pgalign", "Page Aligned Request", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "not required", "required" } } },
@@ -3219,14 +3220,14 @@ static pcieadm_regdef_t pcieadm_regdef_ats_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ats_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ats_ctl[] = {
 	{ 0, 4, "stu", "Smallest Translation Unit", PRDV_HEX },
 	{ 15, 15, "en", "Enable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_ats[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_ats[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 2, "cap", "ATS Capability",
@@ -3239,14 +3240,14 @@ static pcieadm_cfgspace_print_t pcieadm_cap_ats[] = {
 /*
  * Page Request
  */
-static pcieadm_regdef_t pcieadm_regdef_pgreq_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pgreq_ctl[] = {
 	{ 0, 0, "en", "Enable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "reset", "Reset", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_pgreq_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_pgreq_sts[] = {
 	{ 0, 0, "rf", "Response Failure", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
 	{ 1, 1, "uprgi", "Unexpected Page Request Group Index", PRDV_STRVAL,
@@ -3258,7 +3259,7 @@ static pcieadm_regdef_t pcieadm_regdef_pgreq_sts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_pgreq[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_pgreq[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 2, "ctl", "Page Request Control",
@@ -3275,7 +3276,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_pgreq[] = {
 /*
  * NULL Capability
  */
-static pcieadm_cfgspace_print_t pcieadm_cap_null[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_null[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ -1, -1, NULL }
@@ -3284,7 +3285,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_null[] = {
 /*
  * Downstream Port Containment
  */
-static pcieadm_regdef_t pcieadm_regdef_dpc_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_dpc_cap[] = {
 	{ 0, 4, "inum", "DPC Interrupt Message Number", PRDV_HEX },
 	{ 5, 5, "rpext", "Root Port Extensions", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
@@ -3298,7 +3299,7 @@ static pcieadm_regdef_t pcieadm_regdef_dpc_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_dpc_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_dpc_ctl[] = {
 	{ 0, 1, "trigger", "DPC Trigger", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled, fatal",
 	    "enabled, non-fatal" } } },
@@ -3319,7 +3320,7 @@ static pcieadm_regdef_t pcieadm_regdef_dpc_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_dpc_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_dpc_sts[] = {
 	{ 0, 0, "trigger", "Trigger Status", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "not triggered", "triggered" } } },
 	{ 1, 2, "reason", "Trigger Reason", PRDV_STRVAL,
@@ -3336,7 +3337,7 @@ static pcieadm_regdef_t pcieadm_regdef_dpc_sts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_dpc_rppio_bits[] = {
+static const pcieadm_regdef_t pcieadm_regdef_dpc_rppio_bits[] = {
 	{ 0, 0, "cfgur", "Configuration Request UR Completion", PRDV_HEX },
 	{ 1, 1, "cfgca", "Configuration Request CA Completion", PRDV_HEX },
 	{ 2, 2, "cfgcto", "Configuration Request Completion Timeout",
@@ -3352,11 +3353,11 @@ static pcieadm_regdef_t pcieadm_regdef_dpc_rppio_bits[] = {
 
 static void
 pcieadm_cfgspace_print_dpc_rppio(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
 
-	if (BITX(cap, 5, 5) == 0) {
+	if (bitx32(cap, 5, 5) == 0) {
 		return;
 	}
 
@@ -3365,12 +3366,12 @@ pcieadm_cfgspace_print_dpc_rppio(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_dpc_piohead(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
-	uint32_t nwords = BITX(cap, 11, 8);
+	uint32_t nwords = bitx32(cap, 11, 8);
 
-	if (BITX(cap, 5, 5) == 0 || nwords < 4) {
+	if (bitx32(cap, 5, 5) == 0 || nwords < 4) {
 		return;
 	}
 
@@ -3379,12 +3380,12 @@ pcieadm_cfgspace_print_dpc_piohead(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_dpc_impspec(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
-	uint32_t nwords = BITX(cap, 11, 8);
+	uint32_t nwords = bitx32(cap, 11, 8);
 
-	if (BITX(cap, 5, 5) == 0 || nwords < 5) {
+	if (bitx32(cap, 5, 5) == 0 || nwords < 5) {
 		return;
 	}
 
@@ -3393,12 +3394,12 @@ pcieadm_cfgspace_print_dpc_impspec(pcieadm_cfgspace_walk_t *walkp,
 
 static void
 pcieadm_cfgspace_print_dpc_tlplog(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
-	int32_t nwords = BITX(cap, 11, 8);
+	int32_t nwords = (int32_t)bitx32(cap, 11, 8);
 
-	if (nwords == 0 || BITX(cap, 5, 5) == 0) {
+	if (nwords == 0 || bitx32(cap, 5, 5) == 0) {
 		return;
 	}
 
@@ -3427,7 +3428,7 @@ pcieadm_cfgspace_print_dpc_tlplog(pcieadm_cfgspace_walk_t *walkp,
 	}
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_dpc[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_dpc[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 2, "cap", "DPC Capability",
@@ -3466,7 +3467,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_dpc[] = {
 /*
  * Virtual Channel Capability
  */
-static pcieadm_regdef_t pcieadm_regdef_vc_cap1[] = {
+static const pcieadm_regdef_t pcieadm_regdef_vc_cap1[] = {
 	{ 0, 2, "count", "Extended VC Count", PRDV_HEX },
 	{ 4, 6, "lpcount", "Low Priority Extended VC Count", PRDV_HEX },
 	{ 8, 9, "refclk", "Reference Clock", PRDV_STRVAL,
@@ -3477,7 +3478,7 @@ static pcieadm_regdef_t pcieadm_regdef_vc_cap1[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_vc_cap2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_vc_cap2[] = {
 	{ 0, 7, "arbcap", "VC Arbitration Capability", PRDV_BITFIELD,
 	    .prd_val = { .prdv_strval = { "hardware fixed",
 	    "32 phase weighted round robin", "64 phase weighted round robin",
@@ -3486,7 +3487,7 @@ static pcieadm_regdef_t pcieadm_regdef_vc_cap2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_vc_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_vc_ctl[] = {
 	{ 0, 0, "loadtbl", "Load VC Arbitration Table", PRDV_HEX },
 	{ 1, 3, "arbtype", "VC Arbitration Select", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "hardware fixed",
@@ -3495,12 +3496,12 @@ static pcieadm_regdef_t pcieadm_regdef_vc_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_vc_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_vc_sts[] = {
 	{ 0, 0, "table", "VC Arbitration Table Status", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_vc_rsrccap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_vc_rsrccap[] = {
 	{ 0, 7, "arbcap", "Port Arbitration Capability", PRDV_BITFIELD,
 	    .prd_val = { .prdv_strval = { "hardware fixed",
 	    "32 phase weighted round robin", "64 phase weighted round robin",
@@ -3517,7 +3518,7 @@ static pcieadm_regdef_t pcieadm_regdef_vc_rsrccap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_vc_rsrcctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_vc_rsrcctl[] = {
 	{ 0, 7, "tcmap", "TC/VC Map", PRDV_HEX },
 	{ 16, 16, "loadtbl", "Load VC Arbitration Table", PRDV_HEX },
 	{ 17, 19, "arbtype", "Port Arbitration Select", PRDV_STRVAL,
@@ -3532,17 +3533,17 @@ static pcieadm_regdef_t pcieadm_regdef_vc_rsrcctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_vc_rsrcsts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_vc_rsrcsts[] = {
 	{ 0, 0, "table", "Port Arbitration Table Status", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
 static void
 pcieadm_cfgspace_print_vc_rsrc(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint32_t cap = walkp->pcw_data->pcb_u32[(walkp->pcw_capoff + 4) / 4];
-	uint32_t nents = BITX(cap, 2, 0) + 1;
+	uint32_t nents = bitx32(cap, 2, 0) + 1;
 
 	for (uint32_t i = 0; i < nents; i++) {
 		char vcshort[32], vchuman[128];
@@ -3586,7 +3587,7 @@ pcieadm_cfgspace_print_vc_rsrc(pcieadm_cfgspace_walk_t *walkp,
 	}
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_vc[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_vc[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "cap1", "Port VC Capability 1",
@@ -3604,7 +3605,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_vc[] = {
 /*
  * HyperTransport
  */
-static pcieadm_cfgspace_print_t pcieadm_cap_ht_intr[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_ht_intr[] = {
 	{ 0x2, 1, "index", "Interrupt Discovery Index",
 	    pcieadm_cfgspace_print_hex },
 	{ 0x4, 4, "dataport", "Interrupt Dataport",
@@ -3612,7 +3613,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_ht_intr[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_command_pri[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_command_pri[] = {
 	{ 0, 4, "unitid", "Base Unit ID", PRDV_HEX },
 	{ 5, 9, "count", "Unit Count", PRDV_HEX },
 	{ 10, 10, "host", "Master Host", PRDV_HEX },
@@ -3624,7 +3625,7 @@ static pcieadm_regdef_t pcieadm_regdef_ht_command_pri[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_command_sec[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_command_sec[] = {
 	{ 0, 0, "reset", "Warm Reset", PRDV_HEX },
 	{ 1, 1, "de", "Double Ended", PRDV_HEX },
 	{ 2, 6, "devno", "Device Number", PRDV_HEX },
@@ -3639,7 +3640,7 @@ static pcieadm_regdef_t pcieadm_regdef_ht_command_sec[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_linkctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_linkctl[] = {
 	{ 0, 0, "srcid", "Source ID", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "cfl", "CRC Flood", PRDV_STRVAL,
@@ -3664,7 +3665,7 @@ static pcieadm_regdef_t pcieadm_regdef_ht_linkctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_linkcfg[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_linkcfg[] = {
 	{ 0, 2, "maxin", "Maximum Link Width In", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "8 bits", "16 bits", NULL, "32 bits",
 	    "2 bits", "4 bits", NULL, "not connected" } } },
@@ -3688,13 +3689,13 @@ static pcieadm_regdef_t pcieadm_regdef_ht_linkcfg[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_rev[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_rev[] = {
 	{ 0, 4, "minor", "Minor Revision", PRDV_HEX },
 	{ 5, 7, "major", "Major Revision", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_linkfreq[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_linkfreq[] = {
 	{ 0, 4, "freq", "Link Frequency", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "200 MHz", "300 MHz", "400 MHz",
 	    "500 MHz", "600 MHz", "800 MHz", "1000 MHz", "1200 MHz", "1400 MHz",
@@ -3703,7 +3704,7 @@ static pcieadm_regdef_t pcieadm_regdef_ht_linkfreq[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_linkerr[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_linkerr[] = {
 	{ 4, 4, "prot", "Protocol Error", PRDV_HEX },
 	{ 5, 5, "over", "Overflow Error", PRDV_HEX },
 	{ 6, 6, "eoc", "End of Chain Error", PRDV_HEX },
@@ -3711,7 +3712,7 @@ static pcieadm_regdef_t pcieadm_regdef_ht_linkerr[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_linkcap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_linkcap[] = {
 	{ 0, 15, "freq", "Link Frequency", PRDV_BITFIELD,
 	    .prd_val = { .prdv_strval = { "200 MHz", "300 MHz", "400 MHz",
 	    "500 MHz", "600 MHz", "800 MHz", "1000 MHz", "1200 MHz", "1400 MHz",
@@ -3720,7 +3721,7 @@ static pcieadm_regdef_t pcieadm_regdef_ht_linkcap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_feature[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_feature[] = {
 	{ 0, 0, "isofc", "Isochronous Flow Control", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "ls", "LDTSTOP#", PRDV_STRVAL,
@@ -3742,7 +3743,7 @@ static pcieadm_regdef_t pcieadm_regdef_ht_feature[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_error[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_error[] = {
 	{ 0, 0, "protfl", "Protocol Error Flood", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "ovfl", "Overflow Error Flood", PRDV_STRVAL,
@@ -3776,7 +3777,7 @@ static pcieadm_regdef_t pcieadm_regdef_ht_error[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_memory[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_memory[] = {
 	{ 0, 8, "base", "Memory Base Upper 8 Bits", PRDV_HEX,
 	    .prd_val = { .prdv_hex = { 32 } } },
 	{ 9, 15, "limit", "Memory Limit Upper 8 Bits", PRDV_HEX,
@@ -3784,7 +3785,7 @@ static pcieadm_regdef_t pcieadm_regdef_ht_memory[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_ht_pri[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_ht_pri[] = {
 	{ 0x2, 2, "command", "Command",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ht_command_pri },
 	{ 0x4, 2, "linkctl0", "Link Control 0",
@@ -3821,7 +3822,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_ht_pri[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_ht_sec[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_ht_sec[] = {
 	{ 0x2, 2, "command", "Command",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ht_command_sec },
 	{ 0x4, 2, "linkctl", "Link Control",
@@ -3847,7 +3848,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_ht_sec[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_ht_msi[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ht_msi[] = {
 	{ 0, 0, "en", "Enable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "fixed", "Fixed", PRDV_STRVAL,
@@ -3857,17 +3858,17 @@ static pcieadm_regdef_t pcieadm_regdef_ht_msi[] = {
 
 static void
 pcieadm_cfgspace_print_ht_msi_addr(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint8_t fixed = walkp->pcw_data->pcb_u8[walkp->pcw_capoff + 2];
 
-	if (BITX(fixed, 1, 1) != 0)
+	if (bitx8(fixed, 1, 1) != 0)
 		return;
 
 	pcieadm_cfgspace_print_hex(walkp, print, arg);
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_ht_msi[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_ht_msi[] = {
 	{ 0x2, 2, "command", "Command",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ht_msi },
 	{ 0x4, 8, "address", "MSI Address",
@@ -3881,7 +3882,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_ht_msi[] = {
 typedef struct pcieadm_cap_vers {
 	uint32_t ppr_vers;
 	uint32_t ppr_len;
-	pcieadm_cfgspace_print_t *ppr_print;
+	const pcieadm_cfgspace_print_t *ppr_print;
 } pcieadm_cap_vers_t;
 
 typedef struct pcieadm_subcap {
@@ -3900,7 +3901,7 @@ struct pcieadm_pci_cap {
 	const char *ppc_short;
 	const char *ppc_human;
 	pcieadm_cap_info_f ppc_info;
-	pcieadm_cap_vers_t ppc_vers[4];
+	const pcieadm_cap_vers_t ppc_vers[4];
 };
 
 /*
@@ -3975,23 +3976,23 @@ pcieadm_cap_info_pcipm(pcieadm_cfgspace_walk_t *walkp,
  * implement the entire capbility, but otherwise hardcode registers to zero. As
  * such we get to play guess the length based on the device type.
  */
-static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_dev = {
+static const pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_dev = {
 	1, 0x0c, pcieadm_cap_pcie_v1_dev
 };
 
-static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_link = {
+static const pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_link = {
 	1, 0x14, pcieadm_cap_pcie_v1_link
 };
 
-static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_slot = {
+static const pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_slot = {
 	1, 0x1c, pcieadm_cap_pcie_v1_slot
 };
 
-static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_all = {
+static const pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v1_all = {
 	1, 0x24, pcieadm_cap_pcie_v1_all
 };
 
-static pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v2 = {
+static const pcieadm_cap_vers_t pcieadm_cap_vers_pcie_v2 = {
 	2, 0x4c, pcieadm_cap_pcie_v2
 };
 
@@ -4240,7 +4241,7 @@ pcieadm_cap_info_ht(pcieadm_cfgspace_walk_t *walkp,
     const pcieadm_subcap_t **subcap)
 {
 	uint32_t base = walkp->pcw_data->pcb_u32[off / 4];
-	uint32_t caplo = BITX(base, 31, 29);
+	uint32_t caplo = bitx32(base, 31, 29);
 	pcieadm_cap_ht_t *htcap = NULL;
 
 	*versp = NULL;
@@ -4248,7 +4249,7 @@ pcieadm_cap_info_ht(pcieadm_cfgspace_walk_t *walkp,
 	*subcap = NULL;
 
 	if (caplo > 1) {
-		uint32_t capid = BITX(base, 31, 27);
+		uint32_t capid = bitx32(base, 31, 27);
 
 		for (uint32_t i = 0; pcieadm_ht_caps[i].pch_capid != UINT32_MAX;
 		    i++) {
@@ -4265,7 +4266,7 @@ pcieadm_cap_info_ht(pcieadm_cfgspace_walk_t *walkp,
 
 	if (htcap == NULL) {
 		warnx("encountered unknown HyperTransport Capability 0x%x",
-		    BITX(base, 31, 27));
+		    bitx32(base, 31, 27));
 		return;
 	}
 
@@ -4279,7 +4280,7 @@ pcieadm_cap_info_ht(pcieadm_cfgspace_walk_t *walkp,
 /*
  * Root Complex Link Declaration
  */
-static pcieadm_regdef_t pcieadm_regdef_rcld_desc[] = {
+static const pcieadm_regdef_t pcieadm_regdef_rcld_desc[] = {
 	{ 0, 3, "type", "Element Type", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "Configuration Space Element",
 	    "System Egress Port or internal sink",
@@ -4290,7 +4291,7 @@ static pcieadm_regdef_t pcieadm_regdef_rcld_desc[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_rcld_link[] = {
+static const pcieadm_regdef_t pcieadm_regdef_rcld_link[] = {
 	{ 0, 0, "valid", "Link Valid", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
 	{ 1, 1, "type", "Link Type", PRDV_STRVAL,
@@ -4307,7 +4308,7 @@ static pcieadm_regdef_t pcieadm_regdef_rcld_link[] = {
  */
 static void
 pcieadm_cfgspace_print_rcld(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	uint_t nlinks = walkp->pcw_data->pcb_u8[walkp->pcw_capoff + 5];
 
@@ -4351,7 +4352,7 @@ pcieadm_cfgspace_print_rcld(pcieadm_cfgspace_walk_t *walkp,
 	}
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_rcld[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_rcld[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "desc", "Self Description",
@@ -4364,7 +4365,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_rcld[] = {
 /*
  * Physical Layer 32.0 GT/s Capability
  */
-static pcieadm_regdef_t pcieadm_regdef_32g_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_32g_cap[] = {
 	{ 0, 0, "eqbyp", "Equalization Bypass to Highest Rate", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "noeq", "No Equalization Needed", PRDV_STRVAL,
@@ -4383,7 +4384,7 @@ static pcieadm_regdef_t pcieadm_regdef_32g_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_32g_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_32g_ctl[] = {
 	{ 0, 0, "eqbyp", "Equalization Bypass to Highest Rate", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "enabled", "disabled" } } },
 	{ 1, 1, "noeq", "No Equalization Needed", PRDV_STRVAL,
@@ -4394,7 +4395,7 @@ static pcieadm_regdef_t pcieadm_regdef_32g_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_32g_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_32g_sts[] = {
 	{ 0, 0, "eqcomp", "Equalization 32.0 GT/s Complete", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "incomplete", "complete" } } },
 	{ 1, 1, "eqp1", "Equalization 32.0 GT/s Phase 1", PRDV_STRVAL,
@@ -4419,7 +4420,7 @@ static pcieadm_regdef_t pcieadm_regdef_32g_sts[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_32g_rxts1[] = {
+static const pcieadm_regdef_t pcieadm_regdef_32g_rxts1[] = {
 	{ 0, 2, "mts", "Modified TS Usage Mode Selected", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "PCIe", "training set messages",
 	    "alternate protocol negotiation" } } },
@@ -4428,7 +4429,7 @@ static pcieadm_regdef_t pcieadm_regdef_32g_rxts1[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_32g_rxts2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_32g_rxts2[] = {
 	{ 0, 23, "info", "Received Modified TS Information 2", PRDV_HEX },
 	{ 24, 25, "apnsts", "Alternate Protocol Negotiation Status",
 	    PRDV_STRVAL, .prd_val = { .prdv_strval = { "not supported",
@@ -4436,7 +4437,7 @@ static pcieadm_regdef_t pcieadm_regdef_32g_rxts2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_32g_txts1[] = {
+static const pcieadm_regdef_t pcieadm_regdef_32g_txts1[] = {
 	{ 0, 2, "mts", "Transmitted Modified TS Usage Mode", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "PCIe", "training set messages",
 	    "alternate protocol negotiation" } } },
@@ -4445,7 +4446,7 @@ static pcieadm_regdef_t pcieadm_regdef_32g_txts1[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_32g_txts2[] = {
+static const pcieadm_regdef_t pcieadm_regdef_32g_txts2[] = {
 	{ 0, 23, "info", "Transmitted Modified TS Information 2", PRDV_HEX },
 	{ 24, 25, "apnsts", "Alternate Protocol Negotiation Status",
 	    PRDV_STRVAL, .prd_val = { .prdv_strval = { "not supported",
@@ -4453,7 +4454,7 @@ static pcieadm_regdef_t pcieadm_regdef_32g_txts2[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_32g_eq[] = {
+static const pcieadm_regdef_t pcieadm_regdef_32g_eq[] = {
 	{ 0, 3, "dstxpre", "Downstream Port 32.0 GT/s Transmitter Preset",
 	    PRDV_HEX },
 	{ 4, 7, "ustxpre", "Upstream Port 32.0 GT/s Transmitter Preset",
@@ -4463,7 +4464,7 @@ static pcieadm_regdef_t pcieadm_regdef_32g_eq[] = {
 
 static void
 pcieadm_cfgspace_print_32geq(pcieadm_cfgspace_walk_t *walkp,
-    pcieadm_cfgspace_print_t *print, void *arg)
+    const pcieadm_cfgspace_print_t *print, const void *arg)
 {
 	if (walkp->pcw_nlanes == 0) {
 		warnx("failed to capture lane count, but somehow have "
@@ -4489,7 +4490,7 @@ pcieadm_cfgspace_print_32geq(pcieadm_cfgspace_walk_t *walkp,
 	}
 }
 
-static pcieadm_cfgspace_print_t pcieadm_cap_32g[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_32g[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "cap", "32.0 GT/s Capabilities",
@@ -4514,7 +4515,7 @@ static pcieadm_cfgspace_print_t pcieadm_cap_32g[] = {
 /*
  * Native PCIe Enclosure Management
  */
-static pcieadm_regdef_t pcieadm_regdef_npem_cap[] = {
+static const pcieadm_regdef_t pcieadm_regdef_npem_cap[] = {
 	{ 0, 0, "npem", "NPEM", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
 	{ 1, 1, "reset", "NPEM Reset", PRDV_STRVAL,
@@ -4543,7 +4544,7 @@ static pcieadm_regdef_t pcieadm_regdef_npem_cap[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_npem_ctl[] = {
+static const pcieadm_regdef_t pcieadm_regdef_npem_ctl[] = {
 	{ 0, 0, "npem", "NPEM", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 1, 1, "reset", "NPEM Initiate Reset", PRDV_STRVAL,
@@ -4572,14 +4573,14 @@ static pcieadm_regdef_t pcieadm_regdef_npem_ctl[] = {
 	{ -1, -1, NULL }
 };
 
-static pcieadm_regdef_t pcieadm_regdef_npem_sts[] = {
+static const pcieadm_regdef_t pcieadm_regdef_npem_sts[] = {
 	{ 0, 0, "ccmplt", "NPEM Command Complete", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "no", "yes" } } },
 	{ 24, 31, "es", "Enclosure-specific Status", PRDV_HEX },
 	{ -1, -1, NULL }
 };
 
-static pcieadm_cfgspace_print_t pcieadm_cap_npem[] = {
+static const pcieadm_cfgspace_print_t pcieadm_cap_npem[] = {
 	{ 0x0, 4, "caphdr", "Capability Header",
 	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
 	{ 0x4, 4, "cap", "NPEM Capability",
@@ -4591,8 +4592,82 @@ static pcieadm_cfgspace_print_t pcieadm_cap_npem[] = {
 	{ -1, -1, NULL }
 };
 
+/*
+ * Alternate Protocol Capability
+ */
+static const pcieadm_regdef_t pcieadm_regdef_ap_cap[] = {
+	{ 0, 7, "count", "Alternate Protocol Count", PRDV_HEX },
+	{ 8, 8, "sen", "Alternate Protocol Select Enable", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "unsupported", "supported" } } },
+	{ -1, -1, NULL }
+};
 
-static pcieadm_pci_cap_t pcieadm_pci_caps[] = {
+static const pcieadm_regdef_t pcieadm_regdef_ap_ctl[] = {
+	{ 0, 7, "index", "Alternate Protocol Index Select", PRDV_HEX },
+	{ 8, 8, "apngen", "Alternate Protocol Negotiation Global Enable",
+	    PRDV_STRVAL, .prd_val = { .prdv_strval = { "disabled",
+	    "enabled" } } },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_ap_data1[] = {
+	{ 0, 2, "use", "Alternate Protocol Usage Information", PRDV_HEX },
+	{ 5, 15, "detail", "Alternate Protocol Details", PRDV_HEX },
+	{ 16, 31, "vendor", "Alternate Protocol Vendor ID", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_ap_data2[] = {
+	{ 0, 23, "mts2", "Modified TS 2 Information", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_regdef_t pcieadm_regdef_ap_sen[] = {
+	{ 0, 0, "pcie", "Selective Enable Mask - PCIe", PRDV_STRVAL,
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
+	{ 1, 31, "other", "Selective Enable Mask - Other", PRDV_HEX },
+	{ -1, -1, NULL }
+};
+
+/*
+ * The Advanced Protocol Selective Enable Mask register is only present if a bit
+ * in the capabilities register is present. As such, we need to check if it is
+ * here before we try to read and print it.
+ */
+static void
+pcieadm_cfgspace_print_ap_sen(pcieadm_cfgspace_walk_t *walkp,
+    const pcieadm_cfgspace_print_t *print, const void *arg)
+{
+	uint32_t ap_cap = walkp->pcw_data->pcb_u32[walkp->pcw_capoff + 4];
+	pcieadm_cfgspace_print_t p;
+
+	if (bitx32(ap_cap, 8, 8) == 0)
+		return;
+
+	(void) memcpy(&p, print, sizeof (*print));
+	p.pcp_print = pcieadm_cfgspace_print_regdef;
+	p.pcp_arg = pcieadm_regdef_ap_sen;
+
+	p.pcp_print(walkp, &p, p.pcp_arg);
+}
+
+static const pcieadm_cfgspace_print_t pcieadm_cap_ap[] = {
+	{ 0x0, 4, "caphdr", "Capability Header",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_pcie_caphdr },
+	{ 0x4, 4, "cap", "Alternate Protocol Capabilities",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ap_cap },
+	{ 0x8, 4, "ctl", "Alternate Protocol Control",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ap_ctl },
+	{ 0xc, 4, "data1", "Alternate Protocol Data 1",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ap_data1 },
+	{ 0x10, 4, "data2", "Alternate Protocol Data 2",
+	    pcieadm_cfgspace_print_regdef, pcieadm_regdef_ap_data2 },
+	{ 0x14, 4, "sen", "Alternate Protocol Select Enable Mask",
+	    pcieadm_cfgspace_print_ap_sen },
+	{ -1, -1, NULL }
+};
+
+static const pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	{ PCI_CAP_ID_PM, "pcipm", "PCI Power Management",
 	    pcieadm_cap_info_pcipm, { { 2, 8, pcieadm_cap_pcipm_v3 },
 	    { 3, 8, pcieadm_cap_pcipm_v3 } } },
@@ -4631,7 +4706,7 @@ static pcieadm_pci_cap_t pcieadm_pci_caps[] = {
 	{ PCI_CAP_ID_FPB, "fpb", "Flattening Portal Bridge" }
 };
 
-static pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
+static const pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	{ 0, "null", "NULL Capability", pcieadm_cap_info_fixed,
 	    { { 0, 0x4, pcieadm_cap_null } } },
 	{ PCIE_EXT_CAP_ID_AER, "aer", "Advanced Error Reporting",
@@ -4717,7 +4792,8 @@ static pcieadm_pci_cap_t pcieadm_pcie_caps[] = {
 	 */
 	{ PCIE_EXT_CAP_ID_PL32GT, "pl32g", "Physical Layer 32.0 GT/s",
 	    pcieadm_cap_info_vers, { { 1, 0x24, pcieadm_cap_32g } } },
-	{ PCIE_EXT_CAP_ID_AP, "ap", "Alternative Protocol" },
+	{ PCIE_EXT_CAP_ID_AP, "ap", "Alternative Protocol",
+	    pcieadm_cap_info_vers, { { 1, 0x14, pcieadm_cap_ap } } },
 	{ PCIE_EXT_CAP_ID_SFI, "sfi", "System Firmware Intermediary" },
 	{ PCIE_EXT_CAP_ID_SHDW_FUNC, "sfunc", "Shadow Functions" },
 	{ PCIE_EXT_CAP_ID_DOE, "doe", "Data Object Exchange" },
@@ -4734,7 +4810,7 @@ static const pcieadm_pci_cap_t *
 pcieadm_cfgspace_match_cap(uint32_t capid, boolean_t pcie)
 {
 	uint_t ncaps;
-	pcieadm_pci_cap_t *caps;
+	const pcieadm_pci_cap_t *caps;
 
 	if (pcie) {
 		ncaps = ARRAY_SIZE(pcieadm_pcie_caps);
@@ -4820,7 +4896,7 @@ pcieadm_cfgspace_print_cap(pcieadm_cfgspace_walk_t *walkp, uint_t capid,
 	}
 
 	if (vers_info != NULL) {
-		pcieadm_cfgspace_print_t *print;
+		const pcieadm_cfgspace_print_t *print;
 
 		pcieadm_indent();
 		for (print = vers_info->ppr_print;
@@ -4875,7 +4951,7 @@ pcieadm_cfgspace(pcieadm_t *pcip, pcieadm_cfgspace_op_t op,
 	pcieadm_cfgspace_data_t data;
 	pcieadm_cfgspace_walk_t walk;
 	const char *headstr, *headshort;
-	pcieadm_cfgspace_print_t *header;
+	const pcieadm_cfgspace_print_t *header;
 	boolean_t capsup = B_FALSE, extcfg = B_FALSE;
 	uint_t ncaps;
 
@@ -4937,7 +5013,7 @@ pcieadm_cfgspace(pcieadm_t *pcip, pcieadm_cfgspace_op_t op,
 	if (op == PCIEADM_CFGSPACE_OP_WRITE) {
 		pcieadm_cfgspace_write(fd, &data.pcb_u8[0], PCI_CAP_PTR_OFF);
 	} else if (op == PCIEADM_CFGSPACE_OP_PRINT) {
-		pcieadm_cfgspace_print_t *print;
+		const pcieadm_cfgspace_print_t *print;
 
 		if (walk.pcw_ofmt == NULL &&
 		    pcieadm_cfgspace_filter(&walk, headshort)) {
