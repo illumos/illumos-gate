@@ -22,6 +22,8 @@ PROG =	mem_partial \
 	interface_version \
 	check_iommu \
 	auto_destruct \
+	legacy_destruct \
+	self_destruct \
 	drv_hold \
 	cpuid_ioctl
 

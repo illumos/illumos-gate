@@ -20,6 +20,9 @@ void name_test_vm(const char *, char *);
 struct vmctx *create_test_vm(const char *);
 int alloc_memseg(struct vmctx *, int, size_t, const char *);
 int open_drv_test(void);
+bool check_instance_usable(const char *);
+bool check_instance_exists(const char *);
+int destroy_instance(const char *);
 
 #define	PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
 

@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -182,17 +182,13 @@ vm_close(struct vmctx *vm)
 void
 vm_destroy(struct vmctx *vm)
 {
-	struct vm_destroy_req req;
-
 	assert(vm != NULL);
 
 	if (vm->fd >= 0) {
+		(void) ioctl(vm->fd, VM_DESTROY_SELF, 0);
 		(void) close(vm->fd);
 		vm->fd = -1;
 	}
-
-	(void) strncpy(req.name, vm->name, VM_MAX_NAMELEN);
-	(void) vm_do_ctl(VMM_DESTROY_VM, &req);
 
 	free(vm);
 }

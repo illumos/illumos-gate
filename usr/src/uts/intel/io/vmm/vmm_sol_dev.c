@@ -77,7 +77,6 @@ static sdev_plugin_hdl_t vmmdev_sdev_hdl;
 
 static kmutex_t		vmm_mtx;
 static list_t		vmm_list;
-static list_t		vmm_destroy_list;
 static id_space_t	*vmm_minors;
 static void		*vmm_statep;
 
@@ -115,22 +114,22 @@ struct vmm_lease {
 typedef enum vmm_destroy_opts {
 	VDO_DEFAULT		= 0,
 	/*
-	 * Request that zone-specific-data associated with this VM not be
+	 * Indicate that zone-specific-data associated with this VM not be
 	 * cleaned up as part of the destroy.  Skipping ZSD clean-up is
 	 * necessary when VM is being destroyed as part of zone destruction,
 	 * when said ZSD is already being cleaned up.
 	 */
 	VDO_NO_CLEAN_ZSD	= (1 << 0),
 	/*
-	 * Skip any attempt to wait for vmm_drv consumers when attempting to
-	 * purge them from the instance.  When performing an auto-destruct, it
-	 * is not desirable to wait, since said consumer might exist in a
-	 * "higher" file descriptor which has not yet been closed.
+	 * Attempt to wait for VM destruction to complete.  This is opt-in,
+	 * since there are many normal conditions which could lead to
+	 * destruction being stalled pending other clean-up.
 	 */
-	VDO_NO_PURGE_WAIT	= (1 << 1),
+	VDO_ATTEMPT_WAIT	= (1 << 1),
 } vmm_destroy_opts_t;
 
-static int vmm_destroy_locked(vmm_softc_t *, vmm_destroy_opts_t, boolean_t *);
+static void vmm_hma_release(void);
+static int vmm_destroy_locked(vmm_softc_t *, vmm_destroy_opts_t, bool *);
 static int vmm_drv_block_hook(vmm_softc_t *, boolean_t);
 static void vmm_lease_block(vmm_softc_t *);
 static void vmm_lease_unblock(vmm_softc_t *);
@@ -250,6 +249,10 @@ vmmdev_devmem_segid(vmm_softc_t *sc, off_t off, off_t len, int *segidp,
 	return (B_FALSE);
 }
 
+/*
+ * When an instance is being destroyed, the devmem list of named memory objects
+ * can be torn down, as no new mappings are allowed.
+ */
 static void
 vmmdev_devmem_purge(vmm_softc_t *sc)
 {
@@ -526,6 +529,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_SUSPEND:
 	case VM_DESC_FPU_AREA:
 	case VM_SET_AUTODESTRUCT:
+	case VM_DESTROY_SELF:
+	case VM_DESTROY_PENDING:
 	default:
 		break;
 	}
@@ -866,8 +871,41 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		 * than the vcpu-centric or rwlock exclusion mechanisms.
 		 */
 		mutex_enter(&vmm_mtx);
-		sc->vmm_autodestruct = (arg != 0);
+		if (arg != 0) {
+			sc->vmm_flags |= VMM_AUTODESTROY;
+		} else {
+			sc->vmm_flags &= ~VMM_AUTODESTROY;
+		}
 		mutex_exit(&vmm_mtx);
+		break;
+	}
+	case VM_DESTROY_SELF: {
+		bool hma_release = false;
+
+		/*
+		 * Just like VMM_DESTROY_VM, but on the instance file descriptor
+		 * itself, rather than having to perform a racy name lookup as
+		 * part of the destroy process.
+		 *
+		 * Since vmm_destroy_locked() performs vCPU lock acquisition in
+		 * order to kick the vCPUs out of guest context as part of any
+		 * destruction, we do not need to worry about it ourself using
+		 * the `lock_type` logic here.
+		 */
+		mutex_enter(&vmm_mtx);
+		VERIFY0(vmm_destroy_locked(sc, VDO_DEFAULT, &hma_release));
+		mutex_exit(&vmm_mtx);
+		if (hma_release) {
+			vmm_hma_release();
+		}
+		break;
+	}
+	case VM_DESTROY_PENDING: {
+		/*
+		 * If we have made it this far, then destruction of the instance
+		 * has not been initiated.
+		 */
+		*rvalp = 0;
 		break;
 	}
 
@@ -2045,7 +2083,7 @@ vmm_drv_hold(file_t *fp, cred_t *cr, vmm_hold_t **holdp)
 	}
 	/* XXXJOY: check cred permissions against instance */
 
-	if ((sc->vmm_flags & (VMM_CLEANUP|VMM_PURGED|VMM_DESTROY)) != 0) {
+	if ((sc->vmm_flags & VMM_DESTROY) != 0) {
 		err = EBUSY;
 		goto out;
 	}
@@ -2067,7 +2105,7 @@ void
 vmm_drv_rele(vmm_hold_t *hold)
 {
 	vmm_softc_t *sc;
-	boolean_t hma_release = B_FALSE;
+	bool hma_release = false;
 
 	ASSERT(hold != NULL);
 	ASSERT(hold->vmh_sc != NULL);
@@ -2076,24 +2114,22 @@ vmm_drv_rele(vmm_hold_t *hold)
 	mutex_enter(&vmm_mtx);
 	sc = hold->vmh_sc;
 	list_remove(&sc->vmm_holds, hold);
+	kmem_free(hold, sizeof (*hold));
+
 	if (list_is_empty(&sc->vmm_holds)) {
 		sc->vmm_flags &= ~VMM_HELD;
-		cv_broadcast(&sc->vmm_cv);
 
 		/*
-		 * If pending hold(s) had prevented an auto-destruct of the
-		 * instance when it was closed, finish that clean-up now.
+		 * Since outstanding holds would prevent instance destruction
+		 * from completing, attempt to finish it now if it was already
+		 * set in motion.
 		 */
-		if (sc->vmm_autodestruct && !sc->vmm_is_open) {
-			int err = vmm_destroy_locked(sc,
-			    VDO_NO_PURGE_WAIT, &hma_release);
-
-			VERIFY0(err);
-			VERIFY(hma_release);
+		if ((sc->vmm_flags & VMM_DESTROY) != 0) {
+			VERIFY0(vmm_destroy_locked(sc, VDO_DEFAULT,
+			    &hma_release));
 		}
 	}
 	mutex_exit(&vmm_mtx);
-	kmem_free(hold, sizeof (*hold));
 
 	if (hma_release) {
 		vmm_hma_release();
@@ -2389,15 +2425,14 @@ vmm_drv_ioport_unhook(vmm_hold_t *hold, void **cookie)
 	mutex_exit(&vmm_mtx);
 }
 
-static int
-vmm_drv_purge(vmm_softc_t *sc, boolean_t no_wait)
+static void
+vmm_drv_purge(vmm_softc_t *sc)
 {
 	ASSERT(MUTEX_HELD(&vmm_mtx));
 
 	if ((sc->vmm_flags & VMM_HELD) != 0) {
 		vmm_hold_t *hold;
 
-		sc->vmm_flags |= VMM_CLEANUP;
 		for (hold = list_head(&sc->vmm_holds); hold != NULL;
 		    hold = list_next(&sc->vmm_holds, hold)) {
 			hold->vmh_release_req = B_TRUE;
@@ -2415,28 +2450,7 @@ vmm_drv_purge(vmm_softc_t *sc, boolean_t no_wait)
 		vmm_lease_block(sc);
 		vmm_lease_unblock(sc);
 		mutex_enter(&vmm_mtx);
-
-		/*
-		 * With all of the leases broken, we can proceed in an orderly
-		 * fashion to waiting for any lingering holds to be dropped.
-		 */
-		while ((sc->vmm_flags & VMM_HELD) != 0) {
-			/*
-			 * Some holds remain, so wait (if acceptable) for them
-			 * to be cleaned up.
-			 */
-			if (no_wait ||
-			    cv_wait_sig(&sc->vmm_cv, &vmm_mtx) <= 0) {
-				sc->vmm_flags &= ~VMM_CLEANUP;
-				return (EINTR);
-			}
-		}
-		sc->vmm_flags &= ~VMM_CLEANUP;
 	}
-
-	VERIFY(list_is_empty(&sc->vmm_holds));
-	sc->vmm_flags |= VMM_PURGED;
-	return (0);
 }
 
 static int
@@ -2471,77 +2485,176 @@ done:
 	return (err);
 }
 
-static int
-vmm_destroy_locked(vmm_softc_t *sc, vmm_destroy_opts_t opts,
-    boolean_t *hma_release)
+
+static void
+vmm_destroy_begin(vmm_softc_t *sc, vmm_destroy_opts_t opts)
 {
-	dev_info_t	*pdip = ddi_get_parent(vmmdev_dip);
-	minor_t		minor;
-
 	ASSERT(MUTEX_HELD(&vmm_mtx));
+	ASSERT0(sc->vmm_flags & VMM_DESTROY);
 
-	*hma_release = B_FALSE;
+	sc->vmm_flags |= VMM_DESTROY;
 
-	if (vmm_drv_purge(sc, (opts & VDO_NO_PURGE_WAIT) != 0) != 0) {
-		return (EINTR);
+	/*
+	 * Lock and unlock all of the vCPUs to ensure that they are kicked out
+	 * of guest context, being unable to return now that the instance is
+	 * marked for destruction.
+	 */
+	const int maxcpus = vm_get_maxcpus(sc->vmm_vm);
+	for (int vcpu = 0; vcpu < maxcpus; vcpu++) {
+		vcpu_lock_one(sc, vcpu);
+		vcpu_unlock_one(sc, vcpu);
 	}
 
+	vmmdev_devmem_purge(sc);
 	if ((opts & VDO_NO_CLEAN_ZSD) == 0) {
+		/*
+		 * The ZSD should be cleaned up now, unless destruction of the
+		 * instance was initated by destruction of the containing zone,
+		 * in which case the ZSD has already been removed.
+		 */
 		vmm_zsd_rem_vm(sc);
 	}
-
-	/* Clean up devmem entries */
-	vmmdev_devmem_purge(sc);
-
-	list_remove(&vmm_list, sc);
-	ddi_remove_minor_node(vmmdev_dip, sc->vmm_name);
-	minor = sc->vmm_minor;
 	zone_rele(sc->vmm_zone);
-	if (sc->vmm_is_open) {
-		list_insert_tail(&vmm_destroy_list, sc);
-		sc->vmm_flags |= VMM_DESTROY;
-	} else {
-		vmm_kstat_fini(sc);
-		vm_destroy(sc->vmm_vm);
-		ddi_soft_state_free(vmm_statep, minor);
-		id_free(vmm_minors, minor);
-		*hma_release = B_TRUE;
-	}
-	(void) devfs_clean(pdip, NULL, DV_CLEAN_FORCE);
 
-	return (0);
+	vmm_drv_purge(sc);
 }
 
-int
+static bool
+vmm_destroy_ready(vmm_softc_t *sc)
+{
+	ASSERT(MUTEX_HELD(&vmm_mtx));
+
+	if ((sc->vmm_flags & (VMM_HELD | VMM_IS_OPEN)) == 0) {
+		VERIFY(list_is_empty(&sc->vmm_holds));
+		return (true);
+	}
+
+	return (false);
+}
+
+static void
+vmm_destroy_finish(vmm_softc_t *sc)
+{
+	ASSERT(MUTEX_HELD(&vmm_mtx));
+	ASSERT(vmm_destroy_ready(sc));
+
+	list_remove(&vmm_list, sc);
+	vmm_kstat_fini(sc);
+	vm_destroy(sc->vmm_vm);
+	ddi_remove_minor_node(vmmdev_dip, sc->vmm_name);
+	(void) devfs_clean(ddi_get_parent(vmmdev_dip), NULL, DV_CLEAN_FORCE);
+
+	const minor_t minor = sc->vmm_minor;
+	ddi_soft_state_free(vmm_statep, minor);
+	id_free(vmm_minors, minor);
+}
+
+/*
+ * Initiate or attempt to finish destruction of a VMM instance.
+ *
+ * This is called from several contexts:
+ * - An explicit destroy ioctl is made
+ * - A vmm_drv consumer releases its hold (being the last on the instance)
+ * - The vmm device is closed, and auto-destruct is enabled
+ */
+static int
+vmm_destroy_locked(vmm_softc_t *sc, vmm_destroy_opts_t opts,
+    bool *hma_release)
+{
+	ASSERT(MUTEX_HELD(&vmm_mtx));
+
+	*hma_release = false;
+
+	/*
+	 * When instance destruction begins, it is so marked such that any
+	 * further requests to operate the instance will fail.
+	 */
+	if ((sc->vmm_flags & VMM_DESTROY) == 0) {
+		vmm_destroy_begin(sc, opts);
+	}
+
+	if (vmm_destroy_ready(sc)) {
+
+		/*
+		 * Notify anyone waiting for the destruction to finish.  They
+		 * must be clear before we can safely tear down the softc.
+		 */
+		if (sc->vmm_destroy_waiters != 0) {
+			cv_broadcast(&sc->vmm_cv);
+			while (sc->vmm_destroy_waiters != 0) {
+				cv_wait(&sc->vmm_cv, &vmm_mtx);
+			}
+		}
+
+		/*
+		 * Finish destruction of instance.  After this point, the softc
+		 * is freed and cannot be accessed again.
+		 *
+		 * With destruction complete, the HMA hold can be released
+		 */
+		vmm_destroy_finish(sc);
+		*hma_release = true;
+		return (0);
+	} else if ((opts & VDO_ATTEMPT_WAIT) != 0) {
+		int err = 0;
+
+		sc->vmm_destroy_waiters++;
+		while (!vmm_destroy_ready(sc) && err == 0) {
+			if (cv_wait_sig(&sc->vmm_cv, &vmm_mtx) <= 0) {
+				err = EINTR;
+			}
+		}
+		sc->vmm_destroy_waiters--;
+
+		if (sc->vmm_destroy_waiters == 0) {
+			/*
+			 * If we were the last waiter, it could be that VM
+			 * destruction is waiting on _us_ to proceed with the
+			 * final clean-up.
+			 */
+			cv_signal(&sc->vmm_cv);
+		}
+		return (err);
+	} else {
+		/*
+		 * Since the instance is not ready for destruction, and the
+		 * caller did not ask to wait, consider it a success for now.
+		 */
+		return (0);
+	}
+}
+
+void
 vmm_zone_vm_destroy(vmm_softc_t *sc)
 {
-	boolean_t	hma_release = B_FALSE;
-	int		err;
+	bool hma_release = false;
+	int err;
 
 	mutex_enter(&vmm_mtx);
 	err = vmm_destroy_locked(sc, VDO_NO_CLEAN_ZSD, &hma_release);
 	mutex_exit(&vmm_mtx);
 
-	if (hma_release)
-		vmm_hma_release();
+	VERIFY0(err);
 
-	return (err);
+	if (hma_release) {
+		vmm_hma_release();
+	}
 }
 
-/* ARGSUSED */
 static int
 vmmdev_do_vm_destroy(const struct vm_destroy_req *req, cred_t *cr)
 {
-	boolean_t	hma_release = B_FALSE;
-	vmm_softc_t	*sc;
-	int		err;
+	vmm_softc_t *sc;
+	bool hma_release = false;
+	int err;
 
-	if (crgetuid(cr) != 0)
+	if (crgetuid(cr) != 0) {
 		return (EPERM);
+	}
 
 	mutex_enter(&vmm_mtx);
-
-	if ((sc = vmm_lookup(req->name)) == NULL) {
+	sc = vmm_lookup(req->name);
+	if (sc == NULL) {
 		mutex_exit(&vmm_mtx);
 		return (ENOENT);
 	}
@@ -2553,12 +2666,13 @@ vmmdev_do_vm_destroy(const struct vm_destroy_req *req, cred_t *cr)
 		mutex_exit(&vmm_mtx);
 		return (EPERM);
 	}
-	err = vmm_destroy_locked(sc, VDO_DEFAULT, &hma_release);
 
+	err = vmm_destroy_locked(sc, VDO_ATTEMPT_WAIT, &hma_release);
 	mutex_exit(&vmm_mtx);
 
-	if (hma_release)
+	if (hma_release) {
 		vmm_hma_release();
+	}
 
 	return (err);
 }
@@ -2720,7 +2834,7 @@ vmm_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 		return (ENXIO);
 	}
 
-	sc->vmm_is_open = B_TRUE;
+	sc->vmm_flags |= VMM_IS_OPEN;
 	mutex_exit(&vmm_mtx);
 
 	return (0);
@@ -2729,13 +2843,13 @@ vmm_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 static int
 vmm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
-	minor_t		minor;
-	vmm_softc_t	*sc;
-	boolean_t	hma_release = B_FALSE;
+	const minor_t minor = getminor(dev);
+	vmm_softc_t *sc;
+	bool hma_release = false;
 
-	minor = getminor(dev);
-	if (minor == VMM_CTL_MINOR)
+	if (minor == VMM_CTL_MINOR) {
 		return (0);
+	}
 
 	mutex_enter(&vmm_mtx);
 	sc = ddi_get_soft_state(vmm_statep, minor);
@@ -2744,35 +2858,23 @@ vmm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 		return (ENXIO);
 	}
 
-	VERIFY(sc->vmm_is_open);
-	sc->vmm_is_open = B_FALSE;
+	VERIFY3U(sc->vmm_flags & VMM_IS_OPEN, !=, 0);
+	sc->vmm_flags &= ~VMM_IS_OPEN;
 
 	/*
-	 * If this VM was destroyed while the vmm device was open, then
-	 * clean it up now that it is closed.
+	 * If instance was marked for auto-destruction begin that now.  Instance
+	 * destruction may have been initated already, so try to make progress
+	 * in that case, since closure of the device is one of its requirements.
 	 */
-	if (sc->vmm_flags & VMM_DESTROY) {
-		list_remove(&vmm_destroy_list, sc);
-		vmm_kstat_fini(sc);
-		vm_destroy(sc->vmm_vm);
-		ddi_soft_state_free(vmm_statep, minor);
-		id_free(vmm_minors, minor);
-		hma_release = B_TRUE;
-	} else if (sc->vmm_autodestruct) {
-		/*
-		 * Attempt auto-destruct on instance if requested.
-		 *
-		 * Do not wait for existing holds to be purged from the
-		 * instance, since there is no guarantee that will happen in a
-		 * timely manner.  Auto-destruction will resume when the last
-		 * hold is released. (See: vmm_drv_rele)
-		 */
-		(void) vmm_destroy_locked(sc, VDO_NO_PURGE_WAIT, &hma_release);
+	if ((sc->vmm_flags & VMM_DESTROY) != 0 ||
+	    (sc->vmm_flags & VMM_AUTODESTROY) != 0) {
+		VERIFY0(vmm_destroy_locked(sc, VDO_DEFAULT, &hma_release));
 	}
 	mutex_exit(&vmm_mtx);
 
-	if (hma_release)
+	if (hma_release) {
 		vmm_hma_release();
+	}
 
 	return (0);
 }
@@ -2879,10 +2981,19 @@ vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	}
 
 	sc = ddi_get_soft_state(vmm_statep, minor);
-	ASSERT(sc);
+	ASSERT(sc != NULL);
 
-	if (sc->vmm_flags & VMM_DESTROY)
+	/*
+	 * Turn away any ioctls against an instance when it is being destroyed.
+	 * (Except for the ioctl inquiring about that destroy-in-progress.)
+	 */
+	if ((sc->vmm_flags & VMM_DESTROY) != 0) {
+		if (cmd == VM_DESTROY_PENDING) {
+			*rvalp = 1;
+			return (0);
+		}
 		return (ENXIO);
+	}
 
 	return (vmmdev_do_ioctl(sc, cmd, arg, mode, credp, rvalp));
 }
@@ -3113,7 +3224,7 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	mutex_enter(&vmm_mtx);
-	if (!list_is_empty(&vmm_list) || !list_is_empty(&vmm_destroy_list)) {
+	if (!list_is_empty(&vmm_list)) {
 		mutex_exit(&vmm_mtx);
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
@@ -3198,8 +3309,6 @@ _init(void)
 	mutex_init(&vmmdev_mtx, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vmm_mtx, NULL, MUTEX_DRIVER, NULL);
 	list_create(&vmm_list, sizeof (vmm_softc_t),
-	    offsetof(vmm_softc_t, vmm_node));
-	list_create(&vmm_destroy_list, sizeof (vmm_softc_t),
 	    offsetof(vmm_softc_t, vmm_node));
 	vmm_minors = id_space_create("vmm_minors", VMM_CTL_MINOR + 1, MAXMIN32);
 

@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <strings.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/vmm.h>
@@ -78,4 +79,70 @@ int
 open_drv_test(void)
 {
 	return (open("/dev/vmm_drv_test", O_RDWR));
+}
+
+
+/*
+ * Test if VMM instance exists (and is not being destroyed).
+ */
+bool
+check_instance_usable(const char *suite_name)
+{
+	char vm_name[VM_MAX_NAMELEN];
+	char vm_path[MAXPATHLEN];
+
+	name_test_vm(suite_name, vm_name);
+	(void) snprintf(vm_path, sizeof (vm_path), "/dev/vmm/%s", vm_name);
+
+	int fd = open(vm_path, O_RDWR, 0);
+	if (fd < 0) {
+		return (false);
+	}
+
+	const int destroy_pending = ioctl(fd, VM_DESTROY_PENDING, 0);
+	(void) close(fd);
+
+	return (destroy_pending == 0);
+}
+
+/*
+ * Does an instance exist in /dev/vmm?  (No check for in-progress destroy)
+ */
+bool
+check_instance_exists(const char *suite_name)
+{
+	char vm_name[VM_MAX_NAMELEN];
+	char vm_path[MAXPATHLEN];
+
+	name_test_vm(suite_name, vm_name);
+	(void) snprintf(vm_path, sizeof (vm_path), "/dev/vmm/%s", vm_name);
+
+	return (access(vm_path, F_OK) == 0);
+}
+
+
+/*
+ * Destroy a VMM instance via the vmmctl device.
+ */
+int
+destroy_instance(const char *suite_name)
+{
+	int ctl_fd = open(VMM_CTL_DEV, O_EXCL | O_RDWR);
+	if (ctl_fd < 0) {
+		return (-1);
+	}
+
+	struct vm_destroy_req req;
+	name_test_vm(suite_name, req.name);
+
+	if (ioctl(ctl_fd, VMM_DESTROY_VM, &req) != 0) {
+		/* Preserve the destroy error across the close() */
+		int err = errno;
+		(void) close(ctl_fd);
+		errno = err;
+		return (-1);
+	} else {
+		(void) close(ctl_fd);
+		return (0);
+	}
 }
