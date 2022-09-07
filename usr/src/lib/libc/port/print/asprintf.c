@@ -5,6 +5,7 @@
 
 /*
  * Copyright (c) 2004 Darren Tucker.
+ * Copyright 2022 Oxide Computer Company
  *
  * Based originally on asprintf.c from OpenBSD:
  * Copyright (c) 1997 Todd C. Miller <Todd.Miller@courtesan.com>
@@ -32,7 +33,6 @@
 
 #define	INIT_SZ	128
 
-/* VARARGS2 */
 int
 vasprintf(char **str, const char *format, va_list ap)
 {
@@ -49,7 +49,13 @@ vasprintf(char **str, const char *format, va_list ap)
 		len = ret + 1;
 		if ((newstr = malloc(len)) == NULL)
 			return (-1);	/* retain errno from malloc() */
-		(void) strlcpy(newstr, string, len);
+		/*
+		 * Prior versions of this used strlcpy. This has two problems.
+		 * One, it doesn't handle embedded '\0' characters. Secondly,
+		 * it's recalculating the length we already know. Please do not
+		 * use a string-based copying function.
+		 */
+		(void) memcpy(newstr, string, len);
 		*str = newstr;
 		return (ret);
 	}
