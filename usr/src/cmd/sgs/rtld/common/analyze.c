@@ -45,7 +45,6 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
-#include	"_a.out.h"
 #include	"_inline_gen.h"
 #include	"msg.h"
 
@@ -1595,7 +1594,7 @@ find_file(Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp, Rej_desc *rej,
 	if ((olen + pdp->pd_plen + 1) >= PATH_MAX) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), oname,
 		    strerror(ENAMETOOLONG));
-			return (0);
+		return (0);
 	}
 	if ((fdp->fd_nname = (LM_GET_SO(clmp)(pdp->pd_pname, oname,
 	    pdp->pd_plen, olen))) == NULL)
@@ -1606,9 +1605,6 @@ find_file(Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp, Rej_desc *rej,
 
 static Fct	*Vector[] = {
 	&elf_fct,
-#ifdef	A_OUT
-	&aout_fct,
-#endif
 	0
 };
 
@@ -1781,12 +1777,6 @@ map_obj(Lm_list *lml, Fdesc *fdp, size_t fsize, const char *name, int fd,
 			fptr = elf_verify((mpp->mr_addr + mpp->mr_offset),
 			    mpp->mr_fsize, fdp, name, rej);
 		}
-#ifdef	A_OUT
-		if (flags == MR_HDR_AOUT) {
-			fptr = aout_verify((mpp->mr_addr + mpp->mr_offset),
-			    mpp->mr_fsize, fdp, name, rej);
-		}
-#endif
 		if (fptr) {
 			fdp->fd_mapn = mapnum;
 			fdp->fd_mapp = smpp;
@@ -1850,8 +1840,7 @@ load_file(Lm_list *lml, Aliste lmco, Rt_map *clmp, Fdesc *fdp, int *in_nfavl)
 			/* LINTED */
 			ehdr = (Ehdr *)(mpp->mr_addr + mpp->mr_offset);
 			hmpp = mpp;
-		} else if (flags == MR_HDR_AOUT)
-			hmpp = mpp;
+		}
 	}
 
 	/*
@@ -3223,10 +3212,6 @@ _lookup_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
  * search.  If successful, return a pointer to the symbol table entry, a
  * pointer to the link map of the enclosing object, and information relating
  * to the type of binding.  Else return a null pointer.
- *
- * To improve ELF performance, we first compute the ELF hash value and pass
- * it to each _lookup_sym() routine.  The ELF function will use this value to
- * locate the symbol, the a.out function will simply ignore it.
  */
 int
 lookup_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)

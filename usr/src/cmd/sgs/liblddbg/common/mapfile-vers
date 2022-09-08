@@ -153,8 +153,6 @@ SYMBOL_VERSION SUNWprivate_4.83 {
 
 	Dbg32_file_analyze;
 	Dbg64_file_analyze;
-	Dbg32_file_aout;
-	Dbg64_file_aout;
 	Dbg32_file_ar;
 	Dbg64_file_ar;
 	Dbg32_file_ar_rescan;
@@ -443,7 +441,6 @@ SYMBOL_VERSION SUNWprivate_4.83 {
 	Dbg64_syms_lazy_rescan;
 	Dbg32_syms_lookup;
 	Dbg64_syms_lookup;
-	Dbg32_syms_lookup_aout;
 	Dbg32_syms_new;
 	Dbg64_syms_new;
 	Dbg32_syms_old;

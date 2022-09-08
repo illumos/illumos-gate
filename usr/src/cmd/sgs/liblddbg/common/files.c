@@ -72,8 +72,6 @@ Dbg_file_mmapobj(Lm_list *lml, const char *name, mmapobj_result_t *ompp,
 			str = MSG_ORIG(MSG_MR_PADDING);
 		else if (type == MR_HDR_ELF)
 			str = MSG_ORIG(MSG_MR_HDR_ELF);
-		else if (type == MR_HDR_AOUT)
-			str = MSG_ORIG(MSG_MR_HDR_AOUT);
 		else
 			str = MSG_ORIG(MSG_STR_EMPTY);
 
@@ -83,18 +81,6 @@ Dbg_file_mmapobj(Lm_list *lml, const char *name, mmapobj_result_t *ompp,
 		    EC_OFF(mpp->mr_offset), EC_OFF(mpp->mr_msize));
 	}
 	Dbg_util_nl(lml, DBG_NL_STD);
-}
-
-void
-Dbg_file_aout(Lm_list *lml, const char *name, Addr addr, size_t size,
-    const char *lmid, Aliste lmco)
-{
-	if (DBG_NOTCLASS(DBG_C_FILES))
-		return;
-
-	dbg_print(lml, MSG_INTL(MSG_FIL_AOUT), name);
-	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_AS), EC_ADDR(addr), EC_OFF(size));
-	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_LL), lmid, EC_XWORD(lmco));
 }
 
 void

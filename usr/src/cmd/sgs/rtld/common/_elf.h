@@ -41,7 +41,7 @@ extern "C" {
 /*
  * Common extern functions for ELF file class.
  */
-extern	int	elf_config(Rt_map *, int);
+extern	int	elf_config(Rt_map *);
 extern	Rtc_obj	*elf_config_ent(const char *, Word, int, const char **);
 extern	void	elf_config_flt(Lm_list *, const char *, const char *,
 		    Alist **, Aliste);
@@ -118,7 +118,7 @@ typedef struct _rt_elf_private {
 	int		e_verneednum;	/*	their associated count */
 	Verdef		*e_verdef;	/* versions defined by this image and */
 	int		e_verdefnum;	/*	their associated count */
-	Versym 		*e_versym;	/* Per-symbol versions */
+	Versym		*e_versym;	/* Per-symbol versions */
 	ulong_t		e_syminent;	/* syminfo entry size */
 	void		*e_pltpad;	/* PLTpad table */
 	void		*e_pltpadend;	/* end of PLTpad table */

@@ -68,7 +68,7 @@
  * find the addr of the dynamic section of ld.so, of argv[0], and  of
  * the process' environment pointers - and pass the thing to _setup
  * to handle.  We then call _rtld - on return we jump to the entry
- * point for the a.out.
+ * point for the executable.
  */
 
 #if	defined(lint)
@@ -132,7 +132,7 @@ _rt_boot:
 	movl	%ebp,%esp		/ release stack frame
 
 	movl	atexit_fini@GOT(%ebx), %edx
-	jmp	*%eax 			/ transfer control to a.out
+	jmp	*%eax			/ transfer control to the executable
 	.size	_rt_boot,.-_rt_boot
 
 #endif

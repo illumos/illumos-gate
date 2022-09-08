@@ -52,7 +52,7 @@
  *
  *  -o dir	defines the output directory for any dldump(3dl) objects
  *		that follow.  For backward compatibility (RTC_VER_ONE only
- * 		allowed one output directory) allow the first occurrence of this
+ *		allowed one output directory) allow the first occurrence of this
  *		specification to catch any previous files.  If not specified,
  *		the configuration files parent directory is used).
  *
@@ -84,7 +84,7 @@
  *  -I name	same as -i, but in addition any ELF objects are dldump(3dl)'ed.
  *
  *  -g name	add the group name to the configuration cache.  Each object is
- * 		expanded to determine its dependencies and these are added to
+ *		expanded to determine its dependencies and these are added to
  *		the cache.  If name is a directory each shared object within the
  *		directory and its dependencies are added to the cache.
  *
@@ -93,8 +93,6 @@
  *  -l dir	library search directory
  *
  *  -s dir	trusted (secure) directory
- *
- *  -t type	search directory type (ELF or AOUT).
  */
 
 /*
@@ -118,7 +116,7 @@ main(int argc, char **argv, char **envp)
 	Alist		*objdirs = NULL;
 	Objdir		*objdir, *iobjdir;
 	struct stat	ostatus, nstatus;
-	int 		c_class;
+	int		c_class;
 
 	if ((objdir = iobjdir = alist_append(&objdirs, NULL, sizeof (Objdir),
 	    AL_CNT_CRLE)) == NULL)
@@ -210,11 +208,7 @@ main(int argc, char **argv, char **envp)
 			break;
 
 		case 'l':			/* library search path */
-			if (crle.c_flags & CRLE_AOUT)
-				crle.c_flags |= CRLE_ADLIB;
-			else
-				crle.c_flags |= CRLE_EDLIB;
-			crle.c_flags |= CRLE_CREAT;
+			crle.c_flags |= (CRLE_EDLIB | CRLE_CREAT);
 			break;
 
 		case 'o':			/* define an object directory */
@@ -227,21 +221,17 @@ main(int argc, char **argv, char **envp)
 			break;
 
 		case 's':			/* trusted (secure) path */
-			if (crle.c_flags & CRLE_AOUT)
-				crle.c_flags |= CRLE_ASLIB;
-			else
-				crle.c_flags |= CRLE_ESLIB;
-			crle.c_flags |= CRLE_CREAT;
+			crle.c_flags |= (CRLE_ESLIB | CRLE_CREAT);
 			break;
 
-		case 't':			/* search path type */
+		/*
+		 * Search path type, undocumented but left for compatibility.
+		 * Previously used to select between AOUT and ELF, now
+		 * anything other than ELF is an error.
+		 */
+		case 't':
 			if (strcmp((const char *)optarg,
-			    MSG_ORIG(MSG_STR_ELF)) == 0)
-				crle.c_flags &= ~CRLE_AOUT;
-			else if (strcmp((const char *)optarg,
-			    MSG_ORIG(MSG_STR_AOUT)) == 0)
-				crle.c_flags |= CRLE_AOUT;
-			else {
+			    MSG_ORIG(MSG_STR_ELF)) != 0) {
 				(void) fprintf(stderr, MSG_INTL(MSG_ARG_TYPE),
 				    crle.c_name, optarg);
 				error = 1;
@@ -559,13 +549,8 @@ main(int argc, char **argv, char **envp)
 			break;
 
 		case 'l':			/* library search path */
-			if (crle.c_flags & CRLE_AOUT) {
-				str = MSG_ORIG(MSG_STR_AOUT);
-				lib = &crle.c_adlibpath;
-			} else {
-				str = MSG_ORIG(MSG_STR_ELF);
-				lib = &crle.c_edlibpath;
-			}
+			str = MSG_ORIG(MSG_STR_ELF);
+			lib = &crle.c_edlibpath;
 			if (addlib(&crle, lib, (const char *)optarg) != 0)
 				error = 1;
 			else if (crle.c_flags & CRLE_VERBOSE)
@@ -578,13 +563,8 @@ main(int argc, char **argv, char **envp)
 			break;
 
 		case 's':			/* trusted (secure) path */
-			if (crle.c_flags & CRLE_AOUT) {
-				str = MSG_ORIG(MSG_STR_AOUT);
-				lib = &crle.c_aslibpath;
-			} else {
-				str = MSG_ORIG(MSG_STR_ELF);
-				lib = &crle.c_eslibpath;
-			}
+			str = MSG_ORIG(MSG_STR_ELF);
+			lib = &crle.c_eslibpath;
 			if (addlib(&crle, lib, (const char *)optarg) != 0)
 				error = 1;
 			else if (crle.c_flags & CRLE_VERBOSE)
@@ -592,12 +572,7 @@ main(int argc, char **argv, char **envp)
 				    str, (const char *)optarg);
 			break;
 
-		case 't':			/* search path type */
-			if (strcmp((const char *)optarg,
-			    MSG_ORIG(MSG_STR_ELF)) == 0)
-				crle.c_flags &= ~CRLE_AOUT;
-			else
-				crle.c_flags |= CRLE_AOUT;
+		case 't':
 			break;
 
 		case 'u':

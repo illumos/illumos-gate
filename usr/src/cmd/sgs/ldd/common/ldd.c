@@ -120,7 +120,6 @@
 #include	"machdep.h"
 #include	"sgs.h"
 #include	"conv.h"
-#include	"a.out.h"
 #include	"msg.h"
 
 static int	elf_check(int, char *, char *, Elf *, int);

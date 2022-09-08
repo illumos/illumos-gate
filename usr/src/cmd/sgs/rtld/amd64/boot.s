@@ -27,7 +27,6 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Bootstrap routine for run-time linker.
@@ -69,7 +68,7 @@
  * find the addr of the dynamic section of ld.so, of argv[0], and  of
  * the process' environment pointers - and pass the thing to _setup
  * to handle.  We then call _rtld - on return we jump to the entry
- * point for the a.out.
+ * point for the executable.
  */
 
 #if	defined(lint)
@@ -97,14 +96,14 @@ main()
 
 _rt_alias:
 	/ in case we were invoked from libc.so
-	jmp	.get_got			
+	jmp	.get_got
 _rt_boot:
 	/ save for referencing args
-	movq	%rsp,%rbp		
+	movq	%rsp,%rbp
 	/ make room for a max sized boot vector
 	subq	$EB_MAX_SIZE64,%rsp
 	/ use esi as a pointer to &eb[0]
-	movq	%rsp,%rsi		
+	movq	%rsp,%rsi
 	/ set up tag for argv
 	movq	$EB_ARGV,0(%rsi)
 	/ get address of argv
@@ -150,7 +149,7 @@ _rt_boot:
 	movq	%rbp,%rsp
 
 	movq	atexit_fini@GOTPCREL(%rip), %rdx
-	/ transfer control to a.out
+	/ transfer control to the executable
 	jmp	*%rax
 	.size	_rt_boot,.-_rt_boot
 #endif

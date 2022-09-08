@@ -35,7 +35,7 @@ include		$(SRC)/cmd/Makefile.cmd
 # all dependencies of an item have been built before the
 # item itself.
 #
-SUBDIRS-common= libconv		\
+SUBDIRS=	 libconv	\
 		.WAIT		\
 		libdl		\
 		libelf		\
@@ -81,8 +81,6 @@ SUBDIRS-common= libconv		\
 		yacc		\
 		.WAIT		\
 		demo_rdb
-
-SUBDIRS=	$(SUBDIRS-common)
 
 # Messaging support
 #

@@ -40,13 +40,13 @@
  * necessary), but other than this all object removal is driven by inspecting
  * the components of a handle.
  *
- * Things to note.  The creation of a link-map, and its addition to the link-map
- * list occurs in {elf|aout}_new_lm(), if this returns success the link-map is
- * valid and added, otherwise any steps (allocations) in the process of creating
- * the link-map would have been undone.  If a failure occurs between creating
- * the link-map and adding it to a handle, remove_so() is called to remove the
- * link-map.  If a failures occurs after a handle have been created,
- * remove_hdl() is called to remove the handle and the link-map.
+ * Things to note.  The creation of a link-map, and its addition to the
+ * link-map list occurs in elf_new_lm(), if this returns success the link-map
+ * is valid and added, otherwise any steps (allocations) in the process of
+ * creating the link-map would have been undone.  If a failure occurs between
+ * creating the link-map and adding it to a handle, remove_so() is called to
+ * remove the link-map.  If a failures occurs after a handle have been
+ * created, remove_hdl() is called to remove the handle and the link-map.
  */
 
 #include	<string.h>
@@ -256,7 +256,7 @@ remove_so(Lm_list *lml, Rt_map *lmp, Rt_map *clmp)
 		Aliste	idx1;
 
 		for (APLIST_TRAVERSE(dynlm_list, idx1, nlml)) {
-			Rt_map  	*hlmp = nlml->lm_head;
+			Rt_map		*hlmp = nlml->lm_head;
 			Audit_client	*acp;
 			Aliste		idx2;
 
@@ -1178,7 +1178,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 				continue;
 
 			for (APLIST_TRAVERSE(DEPENDS(lmp), idx3, bdp)) {
-				Aliste 		idx4;
+				Aliste		idx4;
 				Grp_desc	*gdp4;
 				Rt_map		*dlmp = bdp->b_depend;
 

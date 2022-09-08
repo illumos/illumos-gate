@@ -176,7 +176,7 @@ extern "C" {
 #define	DBG_STATE_IGNORED	3	/* ignored */
 #define	DBG_STATE_MOD_BEFORE	4	/* modify (before) */
 #define	DBG_STATE_MOD_AFTER	5	/* modify (after) */
-#define	DBG_STATE_NEW 		6	/* new */
+#define	DBG_STATE_NEW		6	/* new */
 #define	DBG_STATE_NEW_IMPLICIT	7	/* new (implicit) */
 #define	DBG_STATE_RESET		8	/* reset */
 #define	DBG_STATE_ORIGINAL	9	/* original */
@@ -326,7 +326,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_ent_print		Dbg64_ent_print
 
 #define	Dbg_file_analyze	Dbg64_file_analyze
-#define	Dbg_file_aout		Dbg64_file_aout
 #define	Dbg_file_ar		Dbg64_file_ar
 #define	Dbg_file_ar_rescan	Dbg64_file_ar_rescan
 #define	Dbg_file_bind_entry	Dbg64_file_bind_entry
@@ -558,7 +557,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_ent_print		Dbg32_ent_print
 
 #define	Dbg_file_analyze	Dbg32_file_analyze
-#define	Dbg_file_aout		Dbg32_file_aout
 #define	Dbg_file_ar		Dbg32_file_ar
 #define	Dbg_file_ar_rescan	Dbg32_file_ar_rescan
 #define	Dbg_file_bind_entry	Dbg32_file_bind_entry
@@ -710,7 +708,6 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_ignore_gnuver	Dbg32_syms_ignore_gnuver
 #define	Dbg_syms_lazy_rescan	Dbg32_syms_lazy_rescan
 #define	Dbg_syms_lookup		Dbg32_syms_lookup
-#define	Dbg_syms_lookup_aout	Dbg32_syms_lookup_aout
 #define	Dbg_syms_new		Dbg32_syms_new
 #define	Dbg_syms_old		Dbg32_syms_old
 #define	Dbg_syms_process	Dbg32_syms_process
@@ -836,8 +833,6 @@ extern	void	Dbg_ent_entry(Lm_list *, uchar_t, Half, Ent_desc *);
 extern	void	Dbg_ent_print(Lm_list *, uchar_t, Half, APlist *);
 
 extern	void	Dbg_file_analyze(Rt_map *);
-extern	void	Dbg_file_aout(Lm_list *, const char *, Addr, size_t,
-		    const char *, Aliste);
 extern	void	Dbg_file_ar(Lm_list *, const char *, Boolean);
 extern	void	Dbg_file_ar_rescan(Lm_list *, int, int);
 extern	void	Dbg_file_bind_entry(Lm_list *, Bnd_desc *);
@@ -914,17 +909,17 @@ extern	void	Dbg_map_sort_seg(Lm_list *, uchar_t, Half, Sg_desc *);
 extern	void	Dbg_map_symbol(Ofl_desc *, Sym_desc *);
 extern	void	Dbg_map_version(Lm_list *, const char *, const char *, int);
 
-extern 	void	Dbg_move_adjexpandreloc(Lm_list *, Xword, const char *);
-extern 	void	Dbg_move_adjmovereloc(Lm_list *, Xword, Xword, const char *);
+extern	void	Dbg_move_adjexpandreloc(Lm_list *, Xword, const char *);
+extern	void	Dbg_move_adjmovereloc(Lm_list *, Xword, Xword, const char *);
 extern	void	Dbg_move_bad(Lm_list *, ulong_t, const char *, Addr);
 extern	void	Dbg_move_data(Rt_map *);
-extern 	void	Dbg_move_entry1(Lm_list *, int, Move *, Sym_desc *);
-extern 	void	Dbg_move_entry2(Lm_list *, Move *, Word, const char *);
-extern 	void	Dbg_move_expand(Lm_list *, Move *, Addr);
-extern 	void	Dbg_move_input(Lm_list *, const char *);
-extern 	void	Dbg_move_outmove(Lm_list *, const char *);
-extern 	void	Dbg_move_outsctadj(Lm_list *, Sym_desc *);
-extern 	void	Dbg_move_parexpn(Lm_list *, const char *, const char *);
+extern	void	Dbg_move_entry1(Lm_list *, int, Move *, Sym_desc *);
+extern	void	Dbg_move_entry2(Lm_list *, Move *, Word, const char *);
+extern	void	Dbg_move_expand(Lm_list *, Move *, Addr);
+extern	void	Dbg_move_input(Lm_list *, const char *);
+extern	void	Dbg_move_outmove(Lm_list *, const char *);
+extern	void	Dbg_move_outsctadj(Lm_list *, Sym_desc *);
+extern	void	Dbg_move_parexpn(Lm_list *, const char *, const char *);
 
 extern	void	Dbg_reloc_apply_reg(Lm_list *, int, Half, Xword, Xword);
 extern	void	Dbg_reloc_apply_val(Lm_list *, int, Xword, Xword);
@@ -1015,9 +1010,6 @@ extern	void	Dbg_syms_ignore(Ofl_desc *, Sym_desc *);
 extern	void	Dbg_syms_ignore_gnuver(Rt_map *, const char *, Word, Versym);
 extern	void	Dbg_syms_lazy_rescan(Lm_list *, const char *);
 extern	void	Dbg_syms_lookup(Rt_map *, const char *, const char *);
-#if	!(defined(_ELF64))
-extern	void	Dbg_syms_lookup_aout(Lm_list *, const char *);
-#endif
 extern	void	Dbg_syms_new(Ofl_desc *, Sym *, Sym_desc *);
 extern	void	Dbg_syms_old(Ofl_desc *, Sym_desc *);
 extern	void	Dbg_syms_process(Lm_list *, Ifl_desc *);

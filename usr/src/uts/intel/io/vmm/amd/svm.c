@@ -2135,6 +2135,23 @@ svm_getreg(void *arg, int vcpu, int ident, uint64_t *val)
 		/* GDTR and IDTR don't have segment selectors */
 		return (EINVAL);
 
+	case VM_REG_GUEST_PDPTE0:
+	case VM_REG_GUEST_PDPTE1:
+	case VM_REG_GUEST_PDPTE2:
+	case VM_REG_GUEST_PDPTE3:
+		/*
+		 * Unlike VMX, where the PDPTEs are explicitly cached as part of
+		 * several well-defined events related to paging (such as
+		 * loading %cr3), SVM walks the PDPEs (their PDPTE) as part of
+		 * nested paging lookups.  This makes these registers
+		 * effectively irrelevant on SVM.
+		 *
+		 * Rather than tossing an error, emit zeroed values so casual
+		 * consumers do not need to be as careful about that difference.
+		 */
+		*val = 0;
+		break;
+
 	default:
 		return (EINVAL);
 	}
@@ -2207,6 +2224,17 @@ svm_setreg(void *arg, int vcpu, int ident, uint64_t val)
 	case VM_REG_GUEST_IDTR:
 		/* GDTR and IDTR don't have segment selectors */
 		return (EINVAL);
+
+	case VM_REG_GUEST_PDPTE0:
+	case VM_REG_GUEST_PDPTE1:
+	case VM_REG_GUEST_PDPTE2:
+	case VM_REG_GUEST_PDPTE3:
+		/*
+		 * PDPEs (AMD's PDPTE) are not cached under SVM, so we can
+		 * ignore attempts to set them.  See handler in svm_getreg() for
+		 * more details.
+		 */
+		break;
 
 	default:
 		return (EINVAL);

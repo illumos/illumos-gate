@@ -23,8 +23,6 @@
  * Copyright (c) 1993 by Sun Microsystems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
     /*
      *	opcodes of the call instructions
      */
@@ -35,14 +33,10 @@
 #define OFFSET_OF_CODE	0 /* there is no mask on a SPARC */
 #define	UNITS_TO_CODE	(OFFSET_OF_CODE / sizeof(UNIT))
     /*
-     *  address at which text begins N_TXTADDR is defined in a.out.h
+     * address at which text begins
      */
-#ifdef _SYS_ELF_H
-extern size_t 	textbegin;
+extern size_t	textbegin;
 #define TORIGIN (unsigned int)	textbegin
-#else
-#define TORIGIN ((unsigned long) N_TXTADDR(xbuf))
-#endif
     /*
      *  Macros for manipulating instruction fields.  These use the
      *  structures defined below
@@ -144,4 +138,3 @@ union instruct {
 	struct f_3d	f_3d;
 	struct f_3e	f_3e;
 };
-

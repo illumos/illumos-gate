@@ -150,9 +150,6 @@ extern "C" {
  *
  * MR_HDR_ELF being set indicates that the ELF header of the mapped object
  * is mapped at mr_addr + mr_offset.
- *
- * MR_HDR_AOUT being set indicates that the AOUT (4.x) header of the mapped
- * object is mapped at mr_addr + mr_offset.
  */
 
 /*
@@ -160,7 +157,6 @@ extern "C" {
  */
 #define	MR_PADDING	0x1
 #define	MR_HDR_ELF	0x2
-#define	MR_HDR_AOUT	0x3
 
 /*
  * Internal flags for mr_flags field below.
