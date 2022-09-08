@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -216,9 +217,7 @@ add_nvidia_isa_bridge_props(dev_info_t *dip, uchar_t bus, uchar_t dev,
 	pci_regspec_t regs[2] = {{0}};
 	pci_regspec_t assigned[2] = {{0}};
 
-	devloc = (uint_t)bus << PCI_REG_BUS_SHIFT |
-	    (uint_t)dev << PCI_REG_DEV_SHIFT |
-	    (uint_t)func << PCI_REG_FUNC_SHIFT;
+	devloc = PCI_REG_MAKE_BDFR(bus, dev, func, 0);
 	regs[0].pci_phys_hi = devloc;
 
 	/* System Control BAR i/o space */
