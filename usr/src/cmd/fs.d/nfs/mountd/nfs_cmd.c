@@ -185,7 +185,7 @@ nfscmd_charmap_lookup(door_desc_t *dp, nfscmd_arg_t *args)
 
 		name = charmap_search(&nb, sh->sh_opts);
 		if (name != NULL) {
-			strcpy(res.result.charmap.codeset, name);
+			(void) strcpy(res.result.charmap.codeset, name);
 			res.result.charmap.apply = B_TRUE;
 			res.error = NFSCMD_ERR_SUCCESS;
 			free(name);
@@ -231,7 +231,7 @@ nfscmd_vers_1(door_desc_t *dp, nfscmd_arg_t *args, size_t size)
 
 void
 nfscmd_func(void *cookie, char *dataptr, size_t arg_size,
-	door_desc_t *dp, uint_t n_desc)
+    door_desc_t *dp, uint_t n_desc)
 {
 	nfscmd_arg_t	*args;
 

@@ -86,8 +86,7 @@ extern	bool_t rpc_gss_qop_to_num(char *, char *, uint_t *);
  *  blank() returns true if the line is a blank line, 0 otherwise
  */
 static int
-blank(cp)
-char *cp;
+blank(char *cp)
 {
 	while (*cp && isspace(*cp)) {
 		cp++;
@@ -99,8 +98,7 @@ char *cp;
  *  comment() returns true if the line is a comment, 0 otherwise.
  */
 static int
-comment(cp)
-char *cp;
+comment(char *cp)
 {
 	while (*cp && isspace(*cp)) {
 		cp++;
@@ -114,9 +112,7 @@ char *cp;
  *	and returns the integer value associated with the string.
  */
 static unsigned long
-getvalue(cp, sc_data)
-char *cp;
-struct sc_data sc_data[];
+getvalue(char *cp, struct sc_data sc_data[])
 {
 	int i;	/* used to index through the given struct sc_data array */
 
@@ -133,8 +129,7 @@ struct sc_data sc_data[];
  *	the left.
  */
 static void
-shift1left(p)
-char *p;
+shift1left(char *p)
 {
 	for (; *p; p++)
 		*p = *(p + 1);
@@ -149,9 +144,7 @@ char *p;
  *	XXX We should make this MT-hot by making it more like strtok_r().
  */
 static char *
-gettoken(cp, skip)
-char	*cp;
-int skip;
+gettoken(char *cp, int skip)
 {
 	static char	*savep;	/* the place where we left off    */
 	register char	*p;	/* the beginning of the new token */
@@ -703,7 +696,7 @@ nfs_sec_nego(rpcprog_t vers, CLIENT *clnt, char *fspath, struct snego_t *snego)
 /* ARGSUSED */
 static int
 get_seconfig(int whichway, char *name, int num,
-		rpc_gss_service_t service, seconfig_t *entryp)
+    rpc_gss_service_t service, seconfig_t *entryp)
 {
 	char	line[BUFSIZ];	/* holds each line of NFSSEC_CONF */
 	FILE	*fp;		/* file stream for NFSSEC_CONF */
@@ -860,7 +853,7 @@ nfs_free_secdata(sec_data_t *secdata)
  */
 sec_data_t *
 nfs_clnt_secdata(seconfig_t *secp, char *hostname, struct knetconfig *knconf,
-		struct netbuf *syncaddr, int flags)
+    struct netbuf *syncaddr, int flags)
 {
 	char netname[MAXNETNAMELEN+1];
 	sec_data_t *secdata;
@@ -1058,16 +1051,16 @@ nfs_syslog_scerr(int scerror, char msg[])
 {
 	switch (scerror) {
 		case SC_NOMEM :
-			sprintf(msg, "%s : no memory", NFSSEC_CONF);
+			(void) sprintf(msg, "%s : no memory", NFSSEC_CONF);
 			return (0);
 		case SC_OPENFAIL :
-			sprintf(msg, "can not open %s", NFSSEC_CONF);
+			(void) sprintf(msg, "can not open %s", NFSSEC_CONF);
 			return (0);
 		case SC_NOTFOUND :
-			sprintf(msg, "has no entry in %s", NFSSEC_CONF);
+			(void) sprintf(msg, "has no entry in %s", NFSSEC_CONF);
 			return (0);
 		case SC_BADENTRIES :
-			sprintf(msg, "bad entry in %s", NFSSEC_CONF);
+			(void) sprintf(msg, "bad entry in %s", NFSSEC_CONF);
 			return (0);
 		default:
 			msg[0] = '\0';
