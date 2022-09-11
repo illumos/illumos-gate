@@ -26,7 +26,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Oxide Computer Company
  */
 
@@ -146,7 +146,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
 	struct user *up = PTOU(p);
-	long execsz;		/* temporary count of exec size */
+	size_t execsz;		/* temporary count of exec size */
 	int i;
 	int error;
 	char exec_file[MAXCOMLEN+1];
@@ -569,7 +569,7 @@ gexec(
 	struct uarg *args,
 	struct intpdata *idatap,
 	int level,
-	long *execsz,
+	size_t *execsz,
 	caddr_t exec_file,
 	struct cred *cred,
 	int brand_action)
@@ -1451,7 +1451,7 @@ noexec(
     struct uarg *args,
     struct intpdata *idatap,
     int level,
-    long *execsz,
+    size_t *execsz,
     int setid,
     caddr_t exec_file,
     struct cred *cred)

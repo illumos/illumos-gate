@@ -28,7 +28,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -83,7 +83,7 @@ extern void prgetcred(proc_t *, struct prcred *);
 extern void prgetpriv(proc_t *, struct prpriv *);
 extern size_t prgetprivsize(void);
 extern void prgetsecflags(proc_t *, struct prsecflags *);
-extern int  prnsegs(struct as *, int);
+extern uint_t prnsegs(struct as *, int);
 extern u_offset_t prgetfdinfosize(proc_t *, vnode_t *, cred_t *);
 extern int prgetfdinfo(proc_t *, vnode_t *, struct prfdinfo *, cred_t *,
     cred_t *, list_t *);

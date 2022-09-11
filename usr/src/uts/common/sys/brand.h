@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_BRAND_H
@@ -118,10 +119,9 @@ struct brand_ops {
 	void	(*b_forklwp)(klwp_t *, klwp_t *);
 	void	(*b_freelwp)(klwp_t *);
 	void	(*b_lwpexit)(klwp_t *);
-	int	(*b_elfexec)(struct vnode *vp, struct execa *uap,
-	    struct uarg *args, struct intpdata *idata, int level,
-	    long *execsz, int setid, caddr_t exec_file,
-	    struct cred *cred, int brand_action);
+	int	(*b_elfexec)(struct vnode *, struct execa *, struct uarg *,
+		struct intpdata *, int, size_t *, int, caddr_t, struct cred *,
+		int);
 	void	(*b_sigset_native_to_brand)(sigset_t *);
 	void	(*b_sigset_brand_to_native)(sigset_t *);
 	int	b_nsig;
@@ -132,7 +132,7 @@ struct brand_ops {
  */
 typedef struct brand {
 	int			b_version;
-	char    		*b_name;
+	char			*b_name;
 	struct brand_ops	*b_ops;
 	struct brand_mach_ops	*b_machops;
 } brand_t;
@@ -178,7 +178,7 @@ extern int	brand_solaris_cmd(int, uintptr_t, uintptr_t, uintptr_t,
 extern void	brand_solaris_copy_procdata(proc_t *, proc_t *,
 		    struct brand *);
 extern int	brand_solaris_elfexec(vnode_t *, execa_t *, uarg_t *,
-		    intpdata_t *, int, long *, int, caddr_t, cred_t *, int,
+		    intpdata_t *, int, size_t *, int, caddr_t, cred_t *, int,
 		    struct brand *, char *, char *, char *, char *, char *);
 extern void	brand_solaris_exec(struct brand *);
 extern int	brand_solaris_fini(char **, struct modlinkage *,
