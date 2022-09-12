@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -101,7 +101,8 @@ usmn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (EINVAL);
 		}
 
-		ret = amdzen_c_smn_read32(dfno, usr.usr_addr, &usr.usr_data);
+		ret = amdzen_c_smn_read32(dfno, SMN_MAKE_REG(usr.usr_addr),
+		    &usr.usr_data);
 		if (ret != 0) {
 			return (ret);
 		}
@@ -112,7 +113,8 @@ usmn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (EINVAL);
 		}
 
-		ret = amdzen_c_smn_write32(dfno, usr.usr_addr, usr.usr_data);
+		ret = amdzen_c_smn_write32(dfno, SMN_MAKE_REG(usr.usr_addr),
+		    usr.usr_data);
 		if (ret != 0) {
 			return (ret);
 		}

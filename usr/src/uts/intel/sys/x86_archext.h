@@ -282,7 +282,7 @@ extern "C" {
 #define	CPUID_INTC_EBX_7_0_BMI1		0x00000008	/* BMI1 instrs */
 #define	CPUID_INTC_EBX_7_0_HLE		0x00000010	/* HLE */
 #define	CPUID_INTC_EBX_7_0_AVX2		0x00000020	/* AVX2 supported */
-/* Bit 6 is reserved */
+#define	CPUID_INTC_EBX_7_0_FDP_EXCPN	0x00000040	/* FDP on exception */
 #define	CPUID_INTC_EBX_7_0_SMEP		0x00000080	/* SMEP in CR4 */
 #define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 instrs */
 #define	CPUID_INTC_EBX_7_0_ENH_REP_MOV	0x00000200	/* Enhanced REP MOVSB */
@@ -322,25 +322,27 @@ extern "C" {
 #define	CPUID_INTC_ECX_7_0_OSPKE	0x00000010	/* OSPKE */
 #define	CPUID_INTC_ECX_7_0_WAITPKG	0x00000020	/* WAITPKG */
 #define	CPUID_INTC_ECX_7_0_AVX512VBMI2	0x00000040	/* AVX512 VBMI2 */
-/* bit 7 is reserved */
+#define	CPUID_INTC_ECX_7_0_CET_SS	0x00000080	/* CET Shadow Stack */
 #define	CPUID_INTC_ECX_7_0_GFNI		0x00000100	/* GFNI */
 #define	CPUID_INTC_ECX_7_0_VAES		0x00000200	/* VAES */
 #define	CPUID_INTC_ECX_7_0_VPCLMULQDQ	0x00000400	/* VPCLMULQDQ */
 #define	CPUID_INTC_ECX_7_0_AVX512VNNI	0x00000800	/* AVX512 VNNI */
 #define	CPUID_INTC_ECX_7_0_AVX512BITALG	0x00001000	/* AVX512 BITALG */
-/* bit 13 is reserved */
+#define	CPUID_INTC_ECX_7_0_TME_EN	0x00002000	/* Total Memory Encr. */
 #define	CPUID_INTC_ECX_7_0_AVX512VPOPCDQ 0x00004000	/* AVX512 VPOPCNTDQ */
-/* bits 15-16 are reserved */
+/* bit 15 is reserved */
+#define	CPUID_INTC_ECX_7_0_LA57		0x00010000	/* 57-bit paging */
 /* bits 17-21 are the value of MAWAU */
 #define	CPUID_INTC_ECX_7_0_RDPID	0x00400000	/* RPID, IA32_TSC_AUX */
-/* bits 23-24 are reserved */
+#define	CPUID_INTC_ECX_7_0_KLSUP	0x00800000	/* Key Locker */
+/* bit 24 is reserved */
 #define	CPUID_INTC_ECX_7_0_CLDEMOTE	0x02000000	/* Cache line demote */
 /* bit 26 is resrved */
 #define	CPUID_INTC_ECX_7_0_MOVDIRI	0x08000000	/* MOVDIRI insn */
 #define	CPUID_INTC_ECX_7_0_MOVDIR64B	0x10000000	/* MOVDIR64B insn */
-/* bit 29 is reserved */
+#define	CPUID_INTC_ECX_7_0_ENQCMD	0x20000000	/* Enqueue Stores */
 #define	CPUID_INTC_ECX_7_0_SGXLC	0x40000000	/* SGX Launch config */
-/* bit 31 is reserved */
+#define	CPUID_INTC_ECX_7_0_PKS		0x80000000	/* protection keys */
 
 /*
  * While CPUID_INTC_ECX_7_0_GFNI, CPUID_INTC_ECX_7_0_VAES, and
@@ -356,11 +358,24 @@ extern "C" {
 #define	CPUID_INTC_EDX_7_0_AVX5124NNIW	0x00000004	/* AVX512 4NNIW */
 #define	CPUID_INTC_EDX_7_0_AVX5124FMAPS	0x00000008	/* AVX512 4FMAPS */
 #define	CPUID_INTC_EDX_7_0_FSREPMOV	0x00000010	/* fast short rep mov */
-/* bits 5-9 are reserved */
+#define	CPUID_INTC_EDX_7_0_UINTR	0x00000020	/* user interrupts */
+/* bits 6-7 are reserved */
+#define	CPUID_INTC_EDX_7_0_AVX512VP2INT	0x00000100	/* VP2INTERSECT */
+/* bit 9 is reserved */
 #define	CPUID_INTC_EDX_7_0_MD_CLEAR	0x00000400	/* MB VERW */
-/* bits 11-17 are reserved */
+/* bits 11-13 are reserved */
+#define	CPUID_INTC_EDX_7_0_SERIALIZE	0x00004000	/* Serialize instr */
+#define	CPUID_INTC_EDX_7_0_HYBRID	0x00008000	/* Hybrid CPU */
+#define	CPUID_INTC_EDX_7_0_TSXLDTRK	0x00010000	/* TSX load track */
+/* bit 17 is reserved */
 #define	CPUID_INTC_EDX_7_0_PCONFIG	0x00040000	/* PCONFIG */
-/* bits 19-26 are reserved */
+/* bit 19 is reserved */
+#define	CPUID_INTC_EDX_7_0_CET_IBT	0x00100000	/* CET ind. branch */
+/* bit 21 is reserved */
+#define	CPUID_INTC_EDX_7_0_AMX_BF16	0x00400000	/* Tile F16 */
+#define	CPUID_INTC_EDX_7_0_AVX512FP16	0x00800000	/* AVX512 FP16 */
+#define	CPUID_INTC_EDX_7_0_AMX_TILE	0x01000000	/* Tile arch */
+#define	CPUID_INTC_EDX_7_0_AMX_INT8	0x02000000	/* Tile INT8 */
 #define	CPUID_INTC_EDX_7_0_SPEC_CTRL	0x04000000	/* Spec, IBPB, IBRS */
 #define	CPUID_INTC_EDX_7_0_STIBP	0x08000000	/* STIBP */
 #define	CPUID_INTC_EDX_7_0_FLUSH_CMD	0x10000000	/* IA32_FLUSH_CMD */
@@ -368,7 +383,21 @@ extern "C" {
 #define	CPUID_INTC_EDX_7_0_SSBD		0x80000000	/* SSBD */
 
 #define	CPUID_INTC_EDX_7_0_ALL_AVX512 \
-	(CPUID_INTC_EDX_7_0_AVX5124NNIW | CPUID_INTC_EDX_7_0_AVX5124FMAPS)
+	(CPUID_INTC_EDX_7_0_AVX5124NNIW | CPUID_INTC_EDX_7_0_AVX5124FMAPS | \
+	CPUID_INTC_EDX_7_0_AVX512VP2INT | CPUID_INTC_EDX_7_0_AVX512FP16)
+
+/* bits 0-3 are reserved */
+#define	CPUID_INTC_EAX_7_1_AVXVNNI	0x00000010	/* VEX VNNI */
+#define	CPUID_INTC_EAX_7_1_AVX512_BF16	0x00000020	/* AVX512 BF16 */
+/* bits 6-9 are reserved */
+#define	CPUID_INTC_EAX_7_1_ZL_MOVSB	0x00000400	/* zero-length MOVSB */
+#define	CPUID_INTC_EAX_7_1_FS_STOSB	0x00000800	/* fast short STOSB */
+#define	CPUID_INTC_EAX_7_1_FS_CMPSB	0x00001000	/* fast CMPSB, SCASB */
+/* bits 13-21 are reserved */
+#define	CPUID_INTC_EAX_7_1_HRESET	0x00400000	/* History Reset leaf */
+/* bits 23-25 are reserved */
+#define	CPUID_INTC_EAX_7_1_LAM		0x02000000	/* Linear addr mask */
+/* bits 27-31 are reserved */
 
 /*
  * Intel also uses cpuid leaf 0xd to report additional instructions and features
@@ -762,6 +791,11 @@ extern "C" {
 #define	X86FSET_VAES		100
 #define	X86FSET_VPCLMULQDQ	101
 #define	X86FSET_LFENCE_SER	102
+#define	X86FSET_GFNI		103
+#define	X86FSET_AVX512_VP2INT	104
+#define	X86FSET_AVX512_BITALG	105
+#define	X86FSET_AVX512_VBMI2	106
+#define	X86FSET_AVX512_BF16	107
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -1349,7 +1383,7 @@ typedef enum x86_uarchrev {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	103
+#define	NUM_X86_FEATURES	108
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

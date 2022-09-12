@@ -23,6 +23,7 @@
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012, Joyent, Inc.  All rights reserved.
 # Copyright 2017 RackTop Systems.
+# Copyright 2022 Oxide Computer Company
 #
 
 @ _START_
@@ -693,6 +694,8 @@
 			 unsupported: %s"
 @ MSG_REJ_ARCHIVE	"file %s: invalid archive use"
 @ MSG_REJ_KMOD		"file %s: kernel modules can't be link-edit input"
+@ MSG_REJ_HWCAP_3	"file %s: hardware capability (CA_SUNW_HW_3) \
+			 unsupported: %s"
 
 # Guidance messages
 @ MSG_GUIDE_UNKNOWN	"unrecognized -z guidance item: %s"
@@ -1617,6 +1620,7 @@
 @ MSG_MAPKW_HW			"HW"
 @ MSG_MAPKW_HW_1		"HW_1"
 @ MSG_MAPKW_HW_2		"HW_2"
+@ MSG_MAPKW_HW_3		"HW_3"
 @ MSG_MAPKW_INTERPOSE		"INTERPOSE"
 @ MSG_MAPKW_IS_NAME		"IS_NAME"
 @ MSG_MAPKW_IS_ORDER		"IS_ORDER"

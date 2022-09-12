@@ -171,8 +171,14 @@ static const uint16_t amdzen_nb_ids[] = {
 	0x15d0,
 	/* Family 17h/19h Rome, Milan, Matisse, Vermeer Zen 2/Zen 3 uarch */
 	0x1480,
-	/* Family 17h/19h Renoir, Cezanne Zen 2/3 uarch) */
-	0x1630
+	/* Family 17h/19h Renoir, Cezanne, Van Gogh Zen 2/3 uarch */
+	0x1630,
+	/* Family 19h Genoa */
+	0x14a4,
+	/* Family 17h Mendocino, Family 19h Rembrandt */
+	0x14b5,
+	/* Family 19h Raphael */
+	0x14d8
 };
 
 typedef struct {
@@ -277,18 +283,19 @@ amdzen_df_read32_bcast(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def)
 
 
 static uint32_t
-amdzen_smn_read32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg)
+amdzen_smn_read32(amdzen_t *azn, amdzen_df_t *df, const smn_reg_t reg)
 {
 	VERIFY(MUTEX_HELD(&azn->azn_mutex));
-	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, reg);
+	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, SMN_REG_ADDR(reg));
 	return (amdzen_stub_get32(df->adf_nb, AMDZEN_NB_SMN_DATA));
 }
 
 static void
-amdzen_smn_write32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg, uint32_t val)
+amdzen_smn_write32(amdzen_t *azn, amdzen_df_t *df, const smn_reg_t reg,
+    const uint32_t val)
 {
 	VERIFY(MUTEX_HELD(&azn->azn_mutex));
-	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, reg);
+	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, SMN_REG_ADDR(reg));
 	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_DATA, val);
 }
 
@@ -321,7 +328,7 @@ amdzen_df_find(amdzen_t *azn, uint_t dfno)
  * Client functions that are used by nexus children.
  */
 int
-amdzen_c_smn_read32(uint_t dfno, uint32_t reg, uint32_t *valp)
+amdzen_c_smn_read32(uint_t dfno, const smn_reg_t reg, uint32_t *valp)
 {
 	amdzen_df_t *df;
 	amdzen_t *azn = amdzen_data;
@@ -344,7 +351,7 @@ amdzen_c_smn_read32(uint_t dfno, uint32_t reg, uint32_t *valp)
 }
 
 int
-amdzen_c_smn_write32(uint_t dfno, uint32_t reg, uint32_t val)
+amdzen_c_smn_write32(uint_t dfno, const smn_reg_t reg, const uint32_t val)
 {
 	amdzen_df_t *df;
 	amdzen_t *azn = amdzen_data;
@@ -486,17 +493,13 @@ amdzen_c_df_iter(uint_t dfno, zen_df_type_t type, amdzen_c_iter_f func,
 		}
 		break;
 	case ZEN_DF_TYPE_CCM_CPU:
-		df_type = DF_TYPE_CCM;
 		/*
-		 * In the Genoa/DFv4 timeframe, with the introduction of CXL and
-		 * related, a subtype was added here where as previously it was
-		 * always zero.
+		 * While the wording of the PPR is a little weird, the CCM still
+		 * has subtype 0 in DFv4 systems; however, what's said to be for
+		 * the CPU appears to apply to the ACM.
 		 */
-		if (df->adf_major >= 4) {
-			df_subtype = DF_CCM_SUBTYPE_CPU;
-		} else {
-			df_subtype = 0;
-		}
+		df_type = DF_TYPE_CCM;
+		df_subtype = 0;
 		break;
 	default:
 		return (EINVAL);

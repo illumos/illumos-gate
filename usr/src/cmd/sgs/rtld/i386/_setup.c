@@ -30,6 +30,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -64,7 +65,7 @@ _setup(Boot *ebp, Dyn *ld_dyn)
 	char		*_rt_name, **_envp, **_argv;
 	int		_syspagsz = 0, fd = -1;
 	uint_t		_flags = 0;
-	uint_t		hwcap[2] = { 0, 0 };
+	uint_t		hwcap[3] = { 0, 0, 0 };
 	Dyn		*dyn_ptr;
 	Phdr		*phdr = NULL;
 	Rt_map		*lmp;
@@ -158,6 +159,10 @@ _setup(Boot *ebp, Dyn *ld_dyn)
 		case AT_SUN_HWCAP2:
 			/* hardware capabilities */
 			hwcap[1] = (uint_t)auxv->a_un.a_val;
+			break;
+		case AT_SUN_HWCAP3:
+			/* hardware capabilities */
+			hwcap[2] = (uint_t)auxv->a_un.a_val;
 			break;
 		case AT_SUN_EMULATOR:
 			/* name of emulation library, if any */

@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -150,9 +150,8 @@ static logging_data *logging_tail = NULL;
 static long ngroups_max;	/* _SC_NGROUPS_MAX */
 static long pw_size;		/* _SC_GETPW_R_SIZE_MAX */
 
-/* ARGSUSED */
 static void *
-nfsauth_svc(void *arg)
+nfsauth_svc(void *arg __unused)
 {
 	int	doorfd = -1;
 	uint_t	darg;
@@ -327,7 +326,7 @@ do_logging_queue(logging_data *lq)
 }
 
 static void *
-logging_svc(void *arg)
+logging_svc(void *arg __unused)
 {
 	logging_data	*lq;
 
@@ -347,22 +346,6 @@ logging_svc(void *arg)
 	/*NOTREACHED*/
 	syslog(LOG_ERR, gettext("Logging server exited"));
 	return (NULL);
-}
-
-static int
-convert_int(int *val, char *str)
-{
-	long lval;
-
-	if (str == NULL || !isdigit(*str))
-		return (-1);
-
-	lval = strtol(str, &str, 10);
-	if (*str != '\0' || lval > INT_MAX)
-		return (-2);
-
-	*val = (int)lval;
-	return (0);
 }
 
 /*
@@ -396,7 +379,7 @@ md_svc_tp_create(struct netconfig *nconf)
 	    strcmp(nconf->nc_protofmly, NC_INET6) == 0)) {
 		int err;
 
-		snprintf(port_str, sizeof (port_str), "%u",
+		(void) snprintf(port_str, sizeof (port_str), "%u",
 		    (unsigned short)mountd_port);
 
 		hs.h_host = HOST_SELF_BIND;
@@ -460,7 +443,7 @@ main(int argc, char *argv[])
 	int tmp;
 	struct netconfig *nconf;
 	NCONF_HANDLE *nc;
-
+	const char *errstr;
 	int	pipe_fd = -1;
 
 	/*
@@ -523,19 +506,20 @@ main(int argc, char *argv[])
 			rejecting = 1;
 			break;
 		case 'm':
-			if (convert_int(&tmp, optarg) != 0 || tmp < 1) {
+			tmp = strtonum(optarg, 1, INT_MAX, &errstr);
+			if (errstr != NULL) {
 				(void) fprintf(stderr, "%s: invalid "
-				    "max_threads option, using defaults\n",
-				    argv[0]);
+				    "max_threads option: %s, using defaults\n",
+				    argv[0], errstr);
 				break;
 			}
 			max_threads = tmp;
 			break;
 		case 'p':
-			if (convert_int(&tmp, optarg) != 0 || tmp < 1 ||
-			    tmp > UINT16_MAX) {
+			tmp = strtonum(optarg, 1, UINT16_MAX, &errstr);
+			if (errstr != NULL) {
 				(void) fprintf(stderr, "%s: invalid port "
-				    "number\n", argv[0]);
+				    "number: %s\n", argv[0], errstr);
 				break;
 			}
 			mountd_port = tmp;
@@ -939,7 +923,7 @@ done:
 	if (!svc_sendreply(transp, xdr_ppathcnf, (char *)&p))
 		log_cant_reply(transp);
 	if (path != NULL)
-		svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
+		(void) svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
 }
 
 /*
@@ -1572,7 +1556,7 @@ reply:
 	}
 
 	if (path != NULL)
-		svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
+		(void) svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
 
 	if (sh)
 		sharefree(sh);
@@ -3230,7 +3214,7 @@ umount(struct svc_req *rqstp)
 		 * Without the hostname we can't do audit or delete
 		 * this host from the mount entries.
 		 */
-		svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
+		(void) svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
 		return;
 	}
 
@@ -3250,7 +3234,7 @@ umount(struct svc_req *rqstp)
 
 	cln_fini(&cln);
 
-	svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
+	(void) svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
 }
 
 /*

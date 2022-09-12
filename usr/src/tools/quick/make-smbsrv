@@ -152,6 +152,7 @@ do_kern() {
   *) targ=$1 ;;
   esac
   ( unset SOURCEDEBUG ;
+   export NO_GENUNIX_UNIQUIFY= ;
   (cd $SRC/uts/$x/smbsrv && $make $targ) )
 }
 
@@ -217,6 +218,7 @@ do_libs() {
 for lib in \
   libfakekernel \
   libads \
+  libidmap \
   libsmbfs \
   libmlrpc
 do
@@ -268,6 +270,16 @@ do
 
   done
 done
+}
+
+################################################################
+
+do_tests() {
+
+  for d in test/test-runner test/libmlrpc-tests test/smbsrv-tests
+  do
+       [ -f $SRC/$d/Makefile ] && (cd $SRC/$d && $make $1)
+  done
 }
 
 ################################################################
@@ -346,6 +358,7 @@ do
     do_kern $arg
     do_libs $arg
     do_cmds $arg
+    do_tests $arg
     ;;
   lint)
     do_hdrs $arg
@@ -354,17 +367,19 @@ do
     do_cmds $arg
     ;;
   clean)
-    # intentionally skip: lib1, hdrs, tools
+    # intentionally skip: deplib, hdrs, tools
+    do_tests $arg
     do_cmds $arg
     do_libs $arg
     do_kern $arg
     ;;
   clobber)
+    do_tests $arg
     do_cmds $arg
     do_libs $arg
+    do_deplibs $arg
     do_kern $arg
     do_hdrs $arg
-    do_deplibs $arg
     clobber_tools
     ;;
   deplibs)

@@ -22,6 +22,7 @@
 
 #include <sys/types.h>
 #include <sys/amdzen/df.h>
+#include <sys/amdzen/smn.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,8 +52,8 @@ extern int amdzen_c_df_fabric_decomp(df_fabric_decomp_t *);
 /*
  * SMN and DF access routines.
  */
-extern int amdzen_c_smn_read32(uint_t, uint32_t, uint32_t *);
-extern int amdzen_c_smn_write32(uint_t, uint32_t, uint32_t);
+extern int amdzen_c_smn_read32(uint_t, const smn_reg_t, uint32_t *);
+extern int amdzen_c_smn_write32(uint_t, const smn_reg_t, const uint32_t);
 extern int amdzen_c_df_read32(uint_t, uint8_t, const df_reg_def_t, uint32_t *);
 extern int amdzen_c_df_read64(uint_t, uint8_t, const df_reg_def_t, uint64_t *);
 

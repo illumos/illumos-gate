@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2021 Oxide Computer Company
+.\" Copyright 2022 Oxide Computer Company
 .\"
-.Dd September 26, 2020
+.Dd August 6, 2022
 .Dt AMDZEN 4D
 .Os
 .Sh NAME
@@ -34,10 +34,16 @@ AMD Zen Naples, Summit Ridge, Whitehaven
 AMD Zen+ Colfax, Picasso, and Pinnacle Ridge
 .Pq Family 17h
 .It
-AMD Zen 2 Castle Peak, Matisse, Rome, and Renoir
+AMD Zen 2 Castle Peak, Matisse, Mendocino, Rome, Renoir, and Van Gogh
 .Pq Family 17h
 .It
 AMD Zen 3 Cezanne, Milan, and Vermeer
+.Pq Family 19h
+.It
+AMD Zen 3+ Rembrandt
+.Pq Family 19h
+.It
+AMD Zen 4 Genoa and Raphael
 .Pq Family 19h
 .El
 .Pp

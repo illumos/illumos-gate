@@ -29,6 +29,7 @@
  */
 /*
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -407,6 +408,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		rtld_flags2 |= RT_FL2_HWCAP;
 		org_scapset->sc_hw_1 = (Xword)hwcap[0];
 		org_scapset->sc_hw_2 = (Xword)hwcap[1];
+		org_scapset->sc_hw_3 = (Xword)hwcap[2];
 	}
 
 	/*

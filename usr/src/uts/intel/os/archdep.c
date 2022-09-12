@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -876,18 +877,20 @@ uint_t auxv_hwcap32_exclude_2 = 0;	/* ditto for 32-bit apps */
  *
  * We use this seemingly complicated mechanism so that we can ensure
  * that /etc/system can be used to override what the system can or
- * cannot discover for itself.
+ * cannot discover for itself. Due to a lack of use, this has not
+ * been extended to the 3rd word.
  */
 void
 bind_hwcap(void)
 {
-	uint_t cpu_hwcap_flags[2];
+	uint_t cpu_hwcap_flags[3];
 	cpuid_execpass(NULL, CPUID_PASS_RESOLVE, cpu_hwcap_flags);
 
 	auxv_hwcap = (auxv_hwcap_include | cpu_hwcap_flags[0]) &
 	    ~auxv_hwcap_exclude;
 	auxv_hwcap_2 = (auxv_hwcap_include_2 | cpu_hwcap_flags[1]) &
 	    ~auxv_hwcap_exclude_2;
+	auxv_hwcap_3 = cpu_hwcap_flags[2];
 
 	/*
 	 * On AMD processors, sysenter just doesn't work at all
@@ -920,6 +923,8 @@ bind_hwcap(void)
 		cmn_err(CE_CONT, fmt, auxv_hwcap, FMT_AV_386);
 		fmt = "?user ABI extensions (word 2): %b\n";
 		cmn_err(CE_CONT, fmt, auxv_hwcap_2, FMT_AV_386_2);
+		fmt = "?user ABI extensions (word 2): %b\n";
+		cmn_err(CE_CONT, fmt, auxv_hwcap_3, FMT_AV_386_3);
 	}
 
 #if defined(_SYSCALL32_IMPL)
@@ -927,6 +932,7 @@ bind_hwcap(void)
 	    ~auxv_hwcap32_exclude;
 	auxv_hwcap32_2 = (auxv_hwcap32_include_2 | cpu_hwcap_flags[1]) &
 	    ~auxv_hwcap32_exclude_2;
+	auxv_hwcap32_3 = auxv_hwcap_3;
 
 	/*
 	 * If this is an amd64 architecture machine from Intel, then
@@ -956,6 +962,8 @@ bind_hwcap(void)
 		cmn_err(CE_CONT, fmt, auxv_hwcap32, FMT_AV_386);
 		fmt = "?32-bit user ABI extensions (word 2): %b\n";
 		cmn_err(CE_CONT, fmt, auxv_hwcap32_2, FMT_AV_386_2);
+		fmt = "?32-bit user ABI extensions (word 3): %b\n";
+		cmn_err(CE_CONT, fmt, auxv_hwcap32_3, FMT_AV_386_3);
 	}
 #endif
 }

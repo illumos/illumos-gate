@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include	<ctype.h>
@@ -60,6 +61,7 @@ typedef enum {
 	CAP_CMD_T_HW1 =		5,	/* cap:hw1 */
 	CAP_CMD_T_SF1 =		6,	/* cap:sf1 */
 	CAP_CMD_T_HW2 =		7,	/* cap:hw2 */
+	CAP_CMD_T_HW3 =		8,	/* cap:hw3 */
 } CAP_CMD_T;
 
 
@@ -532,6 +534,14 @@ print_cap(CAP_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 					    ELFEDIT_MSG_ERR, 0));
 					printed = 1;
 					continue;
+				case CA_SUNW_HW_3:
+					elfedit_printf(MSG_ORIG(MSG_FMT_STRNL),
+					    conv_cap_val_hw3(cap->c_un.c_val,
+					    argstate->obj_state->os_ehdr->
+					    e_machine, CONV_FMT_NOBKT,
+					    &cap_val_buf.cap_val_hw3_buf));
+					printed = 1;
+					continue;
 				}
 			}
 			elfedit_printf(MSG_ORIG(MSG_FMT_HEXXWORDNL),
@@ -843,6 +853,13 @@ cmd_body(CAP_CMD_T cmd, elfedit_obj_state_t *obj_state,
 		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
 		break;
 
+	case CAP_CMD_T_HW3:
+		print_only = (argstate.argc == 0);
+		ndx = arg_to_index(&argstate, elfedit_atoconst_value_to_str(
+		    ELFEDIT_CONST_CA, CA_SUNW_HW_3, 1),
+		    MSG_ORIG(MSG_STR_VALUE), print_only, &print_type);
+		break;
+
 	default:
 		/* Note expected: All commands should have been caught above */
 		elfedit_command_usage();
@@ -1024,6 +1041,14 @@ cmd_body(CAP_CMD_T cmd, elfedit_obj_state_t *obj_state,
 			    CA_SUNW_HW_2, ELFEDIT_CONST_HW2_SUNW);
 		}
 		break;
+
+	case CAP_CMD_T_HW3:
+		{
+			ret = cap_set(&argstate, cap, ndx, cap_ndx, cap_name,
+			    CA_SUNW_HW_3, ELFEDIT_CONST_HW3_SUNW);
+		}
+		break;
+
 	}
 
 	/*
@@ -1180,6 +1205,19 @@ cpl_hw2(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 	elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_HW2_SUNW);
 }
 
+static void
+cpl_hw3(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
+    const char *argv[], int num_opt)
+{
+	/* -capid id_name */
+	if (argc <= num_opt) {
+		cpl_capid_opt(obj_state, cpldata, argc, argv, num_opt);
+		return;
+	}
+
+	/* This routine allows multiple flags to be specified */
+	elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_HW3_SUNW);
+}
 /*
  * Implementation functions for the commands
  */
@@ -1229,6 +1267,12 @@ static elfedit_cmdret_t
 cmd_hw2(elfedit_obj_state_t *obj_state, int argc, const char *argv[])
 {
 	return (cmd_body(CAP_CMD_T_HW2, obj_state, argc, argv));
+}
+
+static elfedit_cmdret_t
+cmd_hw3(elfedit_obj_state_t *obj_state, int argc, const char *argv[])
+{
+	return (cmd_body(CAP_CMD_T_HW3, obj_state, argc, argv));
 }
 
 /*ARGSUSED*/
@@ -1406,6 +1450,15 @@ elfedit_init(elfedit_module_version_t version)
 		{ NULL }
 	};
 
+	/* cap:hw3 */
+	static const char *name_hw3[] = { MSG_ORIG(MSG_CMD_HW3), NULL };
+	static elfedit_cmd_optarg_t arg_hw3[] = {
+		{ MSG_ORIG(MSG_STR_VALUE),
+		    /* MSG_INTL(MSG_A1_HW3_VALUE) */
+		    ELFEDIT_I18NHDL(MSG_A1_HW3_VALUE),
+		    ELFEDIT_CMDOA_F_OPT | ELFEDIT_CMDOA_F_MULT },
+		{ NULL }
+	};
 
 	static elfedit_cmd_t cmds[] = {
 		/* cap:dump */
@@ -1471,6 +1524,14 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_HELP_HW2) */
 		    ELFEDIT_I18NHDL(MSG_HELP_HW2),
 		    opt_ostyle_capid_bitop, arg_hw2 },
+
+		/* cap:hw3 */
+		{ cmd_hw3, cpl_hw3, name_hw3,
+		    /* MSG_INTL(MSG_DESC_HW3) */
+		    ELFEDIT_I18NHDL(MSG_DESC_HW3),
+		    /* MSG_INTL(MSG_HELP_HW3) */
+		    ELFEDIT_I18NHDL(MSG_HELP_HW3),
+		    opt_ostyle_capid_bitop, arg_hw3 },
 
 		{ NULL }
 	};

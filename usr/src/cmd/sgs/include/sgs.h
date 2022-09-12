@@ -25,6 +25,7 @@
  *
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  *
  * Global include file for all sgs.
  */
@@ -195,7 +196,8 @@ typedef struct {
 #define	SGS_REJ_HWCAP_2		17	/* hardware capabilities mismatch */
 #define	SGS_REJ_ARCHIVE		18	/* archive used in invalid context */
 #define	SGS_REJ_KMOD		19	/* object is a kernel module */
-#define	SGS_REJ_NUM		20
+#define	SGS_REJ_HWCAP_3		20	/* hardware capabilities mismatch */
+#define	SGS_REJ_NUM		21
 
 
 #define	FLG_REJ_ALTER		0x01	/* object name is an alternative */

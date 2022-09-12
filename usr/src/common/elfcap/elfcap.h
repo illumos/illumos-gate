@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _ELFCAP_DOT_H
@@ -115,8 +116,19 @@ typedef enum {
 #define	ELFCAP_NUM_SF1			3
 #define	ELFCAP_NUM_HW1_SPARC		30
 #define	ELFCAP_NUM_HW1_386		32
-#define	ELFCAP_NUM_HW2_386		29
+#define	ELFCAP_NUM_HW2_386		32
+#define	ELFCAP_NUM_HW3_386		2
 
+/*
+ * String buffer lengths that should be sufficient for elfcap values today. This
+ * is used because this is compiled into programs. Do not assume it won't change
+ * or make it part of an ABI. This uses the worst case values as calculated by
+ * the elfcap_chk program that is run in sgs and checked as part of the build.
+ */
+#define	ELFCAP_SF1_BUFSIZE	73
+#define	ELFCAP_HW1_BUFSIZE	528
+#define	ELFCAP_HW2_BUFSIZE	632
+#define	ELFCAP_HW3_BUFSIZE	66
 
 /*
  * Given a capability section tag and value, call the proper underlying
@@ -134,6 +146,7 @@ typedef elfcap_err_t elfcap_to_str_func_t(elfcap_style_t, elfcap_mask_t, char *,
 
 extern elfcap_to_str_func_t elfcap_hw1_to_str;
 extern elfcap_to_str_func_t elfcap_hw2_to_str;
+extern elfcap_to_str_func_t elfcap_hw3_to_str;
 extern elfcap_to_str_func_t elfcap_sf1_to_str;
 
 /*
@@ -153,6 +166,7 @@ extern elfcap_mask_t elfcap_tag_from_str(elfcap_style_t, uint64_t,
 extern elfcap_from_str_func_t elfcap_hw1_from_str;
 extern elfcap_from_str_func_t elfcap_hw2_from_str;
 extern elfcap_from_str_func_t elfcap_sf1_from_str;
+extern elfcap_from_str_func_t elfcap_hw3_from_str;
 
 /*
  * These functions give access to the individual descriptor arrays.
@@ -161,8 +175,11 @@ extern elfcap_from_str_func_t elfcap_sf1_from_str;
  * of making the arrays directly visible to preclude copy relocations in
  * non-pic code.
  */
+extern const elfcap_str_t *elfcap_getdesc_formats(void);
 extern const elfcap_desc_t *elfcap_getdesc_hw1_sparc(void);
 extern const elfcap_desc_t *elfcap_getdesc_hw1_386(void);
+extern const elfcap_desc_t *elfcap_getdesc_hw2_386(void);
+extern const elfcap_desc_t *elfcap_getdesc_hw3_386(void);
 extern const elfcap_desc_t *elfcap_getdesc_sf1(void);
 
 #ifdef	__cplusplus

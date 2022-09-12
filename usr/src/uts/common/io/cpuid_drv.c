@@ -169,14 +169,17 @@ cpuid_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 		if (strcmp(areq, architecture) == 0) {
 			STRUCT_FSET(h, cgh_hwcap[0], auxv_hwcap);
 			STRUCT_FSET(h, cgh_hwcap[1], auxv_hwcap_2);
+			STRUCT_FSET(h, cgh_hwcap[2], auxv_hwcap_3);
 #if defined(_SYSCALL32_IMPL)
 		} else if (strcmp(areq, architecture_32) == 0) {
 			STRUCT_FSET(h, cgh_hwcap[0], auxv_hwcap32);
 			STRUCT_FSET(h, cgh_hwcap[1], auxv_hwcap32_2);
+			STRUCT_FSET(h, cgh_hwcap[2], auxv_hwcap32_3);
 #endif
 		} else {
 			STRUCT_FSET(h, cgh_hwcap[0], 0);
 			STRUCT_FSET(h, cgh_hwcap[1], 0);
+			STRUCT_FSET(h, cgh_hwcap[2], 0);
 		}
 		if (ddi_copyout(STRUCT_BUF(h),
 		    (void *)arg, STRUCT_SIZE(h), mode))

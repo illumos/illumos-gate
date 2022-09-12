@@ -27,6 +27,7 @@
 /*	All Rights Reserved	*/
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -93,9 +94,11 @@ static int hold_execsw(struct execsw *);
 
 uint_t auxv_hwcap = 0;	/* auxv AT_SUN_HWCAP value; determined on the fly */
 uint_t auxv_hwcap_2 = 0;	/* AT_SUN_HWCAP2 */
+uint_t auxv_hwcap_3 = 0;	/* AT_SUN_HWCAP3 */
 #if defined(_SYSCALL32_IMPL)
 uint_t auxv_hwcap32 = 0;	/* 32-bit version of auxv_hwcap */
 uint_t auxv_hwcap32_2 = 0;	/* 32-bit version of auxv_hwcap2 */
+uint_t auxv_hwcap32_3 = 0;	/* 32-bit version of auxv_hwcap3 */
 #endif
 
 #define	PSUIDFLAGS		(SNOCD|SUGID)

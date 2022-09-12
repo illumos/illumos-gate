@@ -13,7 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
-# Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2022 Oxide Computer Company
 #
 
@@ -29,6 +29,7 @@ SUBDIRS = \
 	os-tests \
 	smartos-test \
 	smbclient-tests \
+	smbsrv-tests \
 	test-runner \
 	util-tests \
 	zfs-tests

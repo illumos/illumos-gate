@@ -27,7 +27,7 @@
 /*	   All Rights Reserved	*/
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -550,11 +550,12 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 *	AT_SUN_AUXFLAGS
 		 *	AT_SUN_HWCAP
 		 *	AT_SUN_HWCAP2
-		 *	AT_SUN_PLATFORM	(added in stk_copyout)
-		 *	AT_SUN_EXECNAME	(added in stk_copyout)
+		 *	AT_SUN_HWCAP3
+		 *	AT_SUN_PLATFORM (added in stk_copyout)
+		 *	AT_SUN_EXECNAME (added in stk_copyout)
 		 *	AT_NULL
 		 *
-		 * total == 10
+		 * total == 11
 		 */
 		if (hasintp && hasu) {
 			/*
@@ -569,7 +570,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 *
 			 * total = 5
 			 */
-			args->auxsize = (10 + 5) * sizeof (aux_entry_t);
+			args->auxsize = (11 + 5) * sizeof (aux_entry_t);
 		} else if (hasintp) {
 			/*
 			 * Has PT_INTERP but no PT_PHDR
@@ -579,9 +580,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 *
 			 * total = 2
 			 */
-			args->auxsize = (10 + 2) * sizeof (aux_entry_t);
+			args->auxsize = (11 + 2) * sizeof (aux_entry_t);
 		} else {
-			args->auxsize = 10 * sizeof (aux_entry_t);
+			args->auxsize = 11 * sizeof (aux_entry_t);
 		}
 	} else {
 		args->auxsize = 0;
@@ -629,10 +630,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	if ((*brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		branded = 1;
 		/*
-		 * We will be adding 5 entries to the aux vectors.  One for
-		 * the the brandname and 4 for the brand specific aux vectors.
+		 * We will be adding 6 entries to the aux vectors.  One for
+		 * the the brandname and 5 for the brand specific aux vectors.
 		 */
-		args->auxsize += 5 * sizeof (aux_entry_t);
+		args->auxsize += 6 * sizeof (aux_entry_t);
 	}
 
 	/* If the binary has an explicit ASLR flag, it must be honoured */
@@ -1025,18 +1026,16 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * Used for choosing faster library routines.
 		 * (Potentially different between 32-bit and 64-bit ABIs)
 		 */
-#if defined(_LP64)
 		if (args->to_model == DATAMODEL_NATIVE) {
 			ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap)
 			ADDAUX(aux, AT_SUN_HWCAP2, auxv_hwcap_2)
+			ADDAUX(aux, AT_SUN_HWCAP3, auxv_hwcap_3)
 		} else {
 			ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap32)
 			ADDAUX(aux, AT_SUN_HWCAP2, auxv_hwcap32_2)
+			ADDAUX(aux, AT_SUN_HWCAP3, auxv_hwcap32_3)
 		}
-#else
-		ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap)
-		ADDAUX(aux, AT_SUN_HWCAP2, auxv_hwcap_2)
-#endif
+
 		if (branded) {
 			/*
 			 * Reserve space for the brand-private aux vectors,

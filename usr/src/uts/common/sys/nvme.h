@@ -21,10 +21,12 @@
 #define	_SYS_NVME_H
 
 #include <sys/types.h>
+#include <sys/debug.h>
 
 #ifdef _KERNEL
 #include <sys/types32.h>
 #else
+#include <sys/uuid.h>
 #include <stdint.h>
 #endif
 
@@ -41,8 +43,7 @@ extern "C" {
  */
 
 #define	NVME_IOC			(('N' << 24) | ('V' << 16) | ('M' << 8))
-#define	NVME_IOC_IDENTIFY_CTRL		(NVME_IOC | 1)
-#define	NVME_IOC_IDENTIFY_NSID		(NVME_IOC | 2)
+#define	NVME_IOC_IDENTIFY		(NVME_IOC | 1)
 #define	NVME_IOC_CAPABILITIES		(NVME_IOC | 3)
 #define	NVME_IOC_GET_LOGPAGE		(NVME_IOC | 4)
 #define	NVME_IOC_GET_FEATURES		(NVME_IOC | 5)
@@ -111,6 +112,19 @@ typedef struct {
  */
 
 #define	NVME_IDENTIFY_BUFSIZE	4096	/* buffer size for Identify */
+
+/* NVMe Identify parameters (cdw10) */
+#define	NVME_IDENTIFY_NSID		0x0	/* Identify Namespace */
+#define	NVME_IDENTIFY_CTRL		0x1	/* Identify Controller */
+#define	NVME_IDENTIFY_NSID_LIST		0x2	/* List Active Namespaces */
+#define	NVME_IDENTIFY_NSID_DESC		0x3	/* Namespace ID Descriptors */
+
+#define	NVME_IDENTIFY_NSID_ALLOC_LIST	0x10	/* List Allocated NSID */
+#define	NVME_IDENTIFY_NSID_ALLOC	0x11	/* Identify Allocated NSID */
+#define	NVME_IDENTIFY_NSID_CTRL_LIST	0x12	/* List Controllers on NSID */
+#define	NVME_IDENTIFY_CTRL_LIST		0x13	/* Controller List */
+#define	NVME_IDENTIFY_PRIMARY_CAPS	0x14	/* Primary Controller Caps */
+
 
 /* NVMe Queue Entry Size bitfield */
 typedef struct {
@@ -518,6 +532,37 @@ typedef struct {
 	uint8_t id_vs[4096 - 384];	/* Vendor Specific */
 } nvme_identify_nsid_t;
 
+/* NVMe Identify Namespace ID List */
+typedef struct {
+					/* Ordered list of Namespace IDs */
+	uint32_t nl_nsid[NVME_IDENTIFY_BUFSIZE / sizeof (uint32_t)];
+} nvme_identify_nsid_list_t;
+
+/* NVME Identify Controller ID List */
+typedef struct {
+	uint16_t	cl_nid;		/* Number of controller entries */
+					/* unique controller identifiers */
+	uint16_t	cl_ctlid[NVME_IDENTIFY_BUFSIZE / sizeof (uint16_t) - 1];
+} nvme_identify_ctrl_list_t;
+
+/* NVMe Identify Namespace Descriptor */
+typedef struct {
+	uint8_t nd_nidt;		/* Namespace Identifier Type */
+	uint8_t nd_nidl;		/* Namespace Identifier Length */
+	uint8_t nd_resv[2];
+	uint8_t nd_nid[];		/* Namespace Identifier */
+} nvme_identify_nsid_desc_t;
+
+#define	NVME_NSID_DESC_EUI64	1
+#define	NVME_NSID_DESC_NGUID	2
+#define	NVME_NSID_DESC_NUUID	3
+#define	NVME_NSID_DESC_MIN	NVME_NSID_DESC_EUI64
+#define	NVME_NSID_DESC_MAX	NVME_NSID_DESC_NUUID
+
+#define	NVME_NSID_DESC_LEN_EUI64	8
+#define	NVME_NSID_DESC_LEN_NGUID	16
+#define	NVME_NSID_DESC_LEN_NUUID	UUID_LEN
+
 /* NVMe Identify Primary Controller Capabilities */
 typedef struct {
 	uint16_t	nipc_cntlid;	/* Controller ID */
@@ -645,10 +690,7 @@ typedef struct {
 
 typedef struct {
 	uint32_t	nscl_ns[NVME_NSCHANGE_LIST_SIZE];
-} __packed nvme_nschange_list_t;
-
-/* CSTYLED */
-_Static_assert(sizeof (nvme_nschange_list_t) == 4096, "bad size for nvme_nschange_list_t");
+} nvme_nschange_list_t;
 
 /*
  * NVMe Format NVM

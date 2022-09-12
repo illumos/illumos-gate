@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /* LINTLIBRARY */
@@ -70,7 +71,8 @@
 
 /*
  * Define separators for output string processing. This must be kept in
- * sync with the elfcap_fmt_t values in elfcap.h.
+ * sync with the elfcap_fmt_t values in elfcap.h. If something is added here
+ * that is longer than ELFCAP_FMT_PIPSPACE, please update elfcap_chk.c.
  */
 static const elfcap_str_t format[] = {
 	STRDESC(" "),			/* ELFCAP_FMT_SNGSPACE */
@@ -488,6 +490,29 @@ static const elfcap_desc_t hw2_386[ELFCAP_NUM_HW2_386] = {
 	{						/* 0x10000000 */
 		AV_386_2_VAES, STRDESC("AV_386_2_VAES"),
 		STRDESC("VAES"), STRDESC("vaes")
+	},
+	{						/* 0x20000000 */
+		AV_386_2_GFNI, STRDESC("AV_386_2_GFNI"),
+		STRDESC("GFNI"), STRDESC("gfni")
+	},
+	{						/* 0x40000000 */
+		AV_386_2_AVX512_VP2INT, STRDESC("AV_386_2_AVX512_VP2INT"),
+		STRDESC("AVX512_VP2INT"), STRDESC("avx512_vp2int")
+	},
+	{						/* 0x80000000 */
+		AV_386_2_AVX512_BITALG, STRDESC("AV_386_2_AVX512_BITALG"),
+		STRDESC("AVX512_BITALG"), STRDESC("avx512_bitalg")
+	}
+};
+
+static const elfcap_desc_t hw3_386[ELFCAP_NUM_HW3_386] = {
+	{						/* 0x00000001 */
+		AV_386_3_AVX512_VBMI2, STRDESC("AV_386_3_AVX512_VBMI2"),
+		STRDESC("AVX512_VBMI2"), STRDESC("avx512_vbmi2")
+	},
+	{						/* 0x00000002 */
+		AV_386_3_AVX512_BF16, STRDESC("AV_386_3_AVX512_BF16"),
+		STRDESC("AVX512_BF16"), STRDESC("avx512_bf16")
 	}
 };
 
@@ -624,6 +649,27 @@ elfcap_hw2_to_str(elfcap_style_t style, elfcap_mask_t val, char *str,
 }
 
 /*
+ * Expand a CA_SUNW_HW_3 value.
+ */
+elfcap_err_t
+elfcap_hw3_to_str(elfcap_style_t style, elfcap_mask_t val, char *str,
+    size_t len, elfcap_fmt_t fmt, ushort_t mach)
+{
+	/*
+	 * Initialize the string buffer, and validate the format request.
+	 */
+	*str = '\0';
+	if ((fmt < 0) || (fmt >= FORMAT_NELTS))
+		return (ELFCAP_ERR_INVFMT);
+
+	if ((mach == EM_386) || (mach == EM_IA_64) || (mach == EM_AMD64))
+		return (expand(style, val, &hw3_386[0], ELFCAP_NUM_HW3_386,
+		    str, len, fmt));
+
+	return (expand(style, val, NULL, 0, str, len, fmt));
+}
+
+/*
  * Expand a CA_SUNW_SF_1 value.  Note, that at present these capabilities are
  * common across all platforms.  The use of "mach" is therefore redundant, but
  * is retained for compatibility with the interface of elfcap_hw1_to_str(), and
@@ -660,6 +706,9 @@ elfcap_tag_to_str(elfcap_style_t style, uint64_t tag, elfcap_mask_t val,
 
 	case CA_SUNW_HW_2:
 		return (elfcap_hw2_to_str(style, val, str, len, fmt, mach));
+
+	case CA_SUNW_HW_3:
+		return (elfcap_hw3_to_str(style, val, str, len, fmt, mach));
 
 	}
 
@@ -725,6 +774,15 @@ elfcap_hw2_from_str(elfcap_style_t style, const char *str, ushort_t mach)
 
 	return (0);
 }
+elfcap_mask_t
+elfcap_hw3_from_str(elfcap_style_t style, const char *str, ushort_t mach)
+{
+	if ((mach == EM_386) || (mach == EM_IA_64) || (mach == EM_AMD64))
+		return (value(style, str, &hw3_386[0], ELFCAP_NUM_HW3_386));
+
+	return (0);
+}
+
 
 /*
  * Given a capability tag type and value, return the capabilities values
@@ -743,6 +801,9 @@ elfcap_tag_from_str(elfcap_style_t style, uint64_t tag, const char *str,
 
 	case CA_SUNW_HW_2:
 		return (elfcap_hw2_from_str(style, str, mach));
+
+	case CA_SUNW_HW_3:
+		return (elfcap_hw3_from_str(style, str, mach));
 	}
 
 	return (0);
@@ -752,6 +813,12 @@ elfcap_tag_from_str(elfcap_style_t style, uint64_t tag, const char *str,
  * These functions allow the caller to get direct access to the
  * cap descriptors.
  */
+const elfcap_str_t *
+elfcap_getdesc_formats(void)
+{
+	return (format);
+}
+
 const elfcap_desc_t *
 elfcap_getdesc_hw1_sparc(void)
 {
@@ -768,4 +835,16 @@ const elfcap_desc_t *
 elfcap_getdesc_sf1(void)
 {
 	return (sf1);
+}
+
+const elfcap_desc_t *
+elfcap_getdesc_hw2_386(void)
+{
+	return (hw2_386);
+}
+
+const elfcap_desc_t *
+elfcap_getdesc_hw3_386(void)
+{
+	return (hw3_386);
 }

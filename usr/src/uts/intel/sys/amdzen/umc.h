@@ -17,6 +17,7 @@
 #define	_SYS_UMC_H
 
 #include <sys/bitext.h>
+#include <sys/amdzen/smn.h>
 
 /*
  * Various register definitions for accessing the AMD Unified Memory Controller
@@ -75,18 +76,38 @@ extern "C" {
  * UMC Channel registers. These are in SMN Space. DDR4 and DDR5 based UMCs share
  * the same base address, somewhat surprisingly. This constructs the appropriate
  * offset and ensures that a caller doesn't exceed the number of known instances
- * of the register.
+ * of the register.  See smn.h for additional details on SMN addressing.
  */
-static inline uint32_t
-amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
-    uint32_t reginst)
-{
-	ASSERT3U(umcno, <, 12);
-	ASSERT3U(nents, >, reginst);
 
-	uint32_t base = 0x50000;
-	uint32_t reg = base_reg + reginst * 4;
-	return ((umcno << 20) + base + reg);
+static inline smn_reg_t
+amdzen_umc_smn_reg(const uint8_t umcno, const smn_reg_def_t def,
+    const uint16_t reginst)
+{
+	const uint32_t APERTURE_BASE = 0x50000;
+	const uint32_t APERTURE_MASK = 0xffffe000;
+
+	const uint32_t umc32 = (const uint32_t)umcno;
+	const uint32_t reginst32 = (const uint32_t)reginst;
+
+	const uint32_t stride = (def.srd_stride == 0) ? 4 : def.srd_stride;
+	const uint32_t nents = (def.srd_nents == 0) ? 1 :
+	    (const uint32_t)def.srd_nents;
+
+	ASSERT3S(def.srd_unit, ==, SMN_UNIT_UMC);
+	ASSERT0(def.srd_reg & APERTURE_MASK);
+	ASSERT3U(umc32, <, 12);
+	ASSERT3U(nents, >, reginst32);
+
+	const uint32_t aperture_off = umc32 << 20;
+	ASSERT3U(aperture_off, <=, UINT32_MAX - APERTURE_BASE);
+
+	const uint32_t aperture = APERTURE_BASE + aperture_off;
+	ASSERT0(aperture & ~APERTURE_MASK);
+
+	const uint32_t reg = def.srd_reg + reginst32 * stride;
+	ASSERT0(reg & APERTURE_MASK);
+
+	return (SMN_MAKE_REG(aperture + reg));
 }
 
 /*
@@ -94,8 +115,20 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * to match a chip select. Instances 0/1 always refer to DIMM 0, while
  * instances 2/3 always refer to DIMM 1.
  */
-#define	UMC_BASE(u, i)		amdzen_umc_smn_addr(u, 0x00, 4, i)
-#define	UMC_BASE_SEC(u, i)	amdzen_umc_smn_addr(u, 0x10, 4, i)
+/*CSTYLED*/
+#define	D_UMC_BASE	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x00,	\
+	.srd_nents = 4	\
+}
+/*CSTYLED*/
+#define	D_UMC_BASE_SEC	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x10,	\
+	.srd_nents = 4	\
+}
+#define	UMC_BASE(u, i)		amdzen_umc_smn_reg(u, D_UMC_BASE, i)
+#define	UMC_BASE_SEC(u, i)	amdzen_umc_smn_reg(u, D_UMC_BASE_SEC, i)
 #define	UMC_BASE_GET_ADDR(r)	bitx32(r, 31, 1)
 #define	UMC_BASE_ADDR_SHIFT	9
 #define	UMC_BASE_GET_EN(r)	bitx32(r, 0, 0)
@@ -105,8 +138,21 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * registers that allow more address bits. Note, only present in some DDR5
  * capable SoCs.
  */
-#define	UMC_BASE_EXT_DDR5(u, i)		amdzen_umc_smn_addr(u, 0xb00, 4, i)
-#define	UMC_BASE_EXT_SEC_DDR5(u, i)	amdzen_umc_smn_addr(u, 0xb10, 4, i)
+/*CSTYLED*/
+#define	D_UMC_BASE_EXT_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xb00,	\
+	.srd_nents = 4	\
+}
+/*CSTYLED*/
+#define	D_UMC_BASE_EXT_SEC_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xb10,	\
+	.srd_nents = 4	\
+}
+#define	UMC_BASE_EXT_DDR5(u, i)	amdzen_umc_smn_reg(u, D_UMC_BASE_EXT_DDR5, i)
+#define	UMC_BASE_EXT_SEC_DDR5(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_BASE_EXT_SEC_DDR5, i)
 #define	UMC_BASE_EXT_GET_ADDR(r)	bitx32(r, 7, 0)
 #define	UMC_BASE_EXT_ADDR_SHIFT		40
 
@@ -116,18 +162,55 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * the incoming address to see it matches the base. Tweaking what is used for
  * match is often part of the interleaving strategy.
  */
-#define	UMC_MASK_DDR4(u, i)	amdzen_umc_smn_addr(u, 0x20, 2, i)
-#define	UMC_MASK_SEC_DDR4(u, i)	amdzen_umc_smn_addr(u, 0x28, 2, i)
-#define	UMC_MASK_DDR5(u, i)	amdzen_umc_smn_addr(u, 0x20, 4, i)
-#define	UMC_MASK_SEC_DDR5(u, i)	amdzen_umc_smn_addr(u, 0x30, 4, i)
+/*CSTYLED*/
+#define	D_UMC_MASK_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x20,	\
+	.srd_nents = 2	\
+}
+/*CSTYLED*/
+#define	D_UMC_MASK_SEC_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x28,	\
+	.srd_nents = 2	\
+}
+/*CSTYLED*/
+#define	D_UMC_MASK_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x20,	\
+	.srd_nents = 4	\
+}
+/*CSTYLED*/
+#define	D_UMC_MASK_SEC_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x30,	\
+	.srd_nents = 4	\
+}
+#define	UMC_MASK_DDR4(u, i)	amdzen_umc_smn_reg(u, D_UMC_MASK_DDR4, i)
+#define	UMC_MASK_SEC_DDR4(u, i)	amdzen_umc_smn_reg(u, D_UMC_MASK_SEC_DDR4, i)
+#define	UMC_MASK_DDR5(u, i)	amdzen_umc_smn_reg(u, D_UMC_MASK_DDR5, i)
+#define	UMC_MASK_SEC_DDR5(u, i)	amdzen_umc_smn_reg(u, D_UMC_MASK_SEC_DDR5, i)
 #define	UMC_MASK_GET_ADDR(r)	bitx32(r, 31, 1)
 #define	UMC_MASK_ADDR_SHIFT	9
 
 /*
  * UMC::AddrMaskExt, UMC::AddrMaskSecExt -- Extended mask addresses.
  */
-#define	UMC_MASK_EXT_DDR5(u, i)		amdzen_umc_smn_addr(u, 0xb20, 4, i)
-#define	UMC_MASK_EXT_SEC_DDR5(u, i)	amdzen_umc_smn_addr(u, 0xb30, 4, i)
+/*CSTYLED*/
+#define	D_UMC_MASK_EXT_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xb20,	\
+	.srd_nents = 4	\
+}
+/*CSTYLED*/
+#define	D_UMC_MASK_EXT_SEC_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xb30,	\
+	.srd_nents = 4	\
+}
+#define	UMC_MASK_EXT_DDR5(u, i)	amdzen_umc_smn_reg(u, D_UMC_MASK_EXT_DDR5, i)
+#define	UMC_MASK_EXT_SEC_DDR5(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_MASK_EXT_SEC_DDR5, i)
 #define	UMC_MASK_EXT_GET_ADDR(r)	bitx32(r, 7, 0)
 #define	UMC_MASK_EXT_ADDR_SHIFT		40
 
@@ -140,8 +223,20 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * banks/group you must subtract the number of bank group bits from the total
  * number of bank bits.
  */
-#define	UMC_ADDRCFG_DDR4(u, i)	amdzen_umc_smn_addr(u, 0x30, 2, i)
-#define	UMC_ADDRCFG_DDR5(u, i)	amdzen_umc_smn_addr(u, 0x40, 4, i)
+/*CSTYLED*/
+#define	D_UMC_ADDRCFG_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x30,	\
+	.srd_nents = 2	\
+}
+/*CSTYLED*/
+#define	D_UMC_ADDRCFG_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x40,	\
+	.srd_nents = 4	\
+}
+#define	UMC_ADDRCFG_DDR4(u, i)	amdzen_umc_smn_reg(u, D_UMC_ADDRCFG_DDR4, i)
+#define	UMC_ADDRCFG_DDR5(u, i)	amdzen_umc_smn_reg(u, D_UMC_ADDRCFG_DDR5, i)
 #define	UMC_ADDRCFG_GET_NBANK_BITS(r)		bitx32(r, 21, 20)
 #define	UMC_ADDRCFG_NBANK_BITS_BASE		3
 #define	UMC_ADDRCFG_GET_NCOL_BITS(r)		bitx32(r, 19, 16)
@@ -161,8 +256,20 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * which bits in the normalized address are used to construct the bank number,
  * row bits are contiguous from the starting number.
  */
-#define	UMC_ADDRSEL_DDR4(u, i)	amdzen_umc_smn_addr(u, 0x40, 2, i)
-#define	UMC_ADDRSEL_DDR5(u, i)	amdzen_umc_smn_addr(u, 0x50, 4, i)
+/*CSTYLED*/
+#define	D_UMC_ADDRSEL_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x40,	\
+	.srd_nents = 2	\
+}
+/*CSTYLED*/
+#define	D_UMC_ADDRSEL_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x50,	\
+	.srd_nents = 4	\
+}
+#define	UMC_ADDRSEL_DDR4(u, i)	amdzen_umc_smn_reg(u, D_UMC_ADDRSEL_DDR4, i)
+#define	UMC_ADDRSEL_DDR5(u, i)	amdzen_umc_smn_reg(u, D_UMC_ADDRSEL_DDR5, i)
 #define	UMC_ADDRSEL_GET_ROW_LO(r)	bitx32(r, 27, 24)
 #define	UMC_ADDRSEL_ROW_LO_BASE		12
 #define	UMC_ADDRSEL_GET_BANK4(r)	bitx32(r, 19, 16)
@@ -181,20 +288,43 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * the case of DDR4, it's 0x50, 0x54 for DIMM 0 lo, hi. Then 0x58, 0x5c for
  * DIMM1. DDR5 based entries do something similar; however, instead of being
  * per-DIMM, there is one of these for each CS.
- *
- * This leads to a somewhat odder construction for the maximum number of
- * instances. Because amdzen_umc_smn_addr() assumes each register instance is 4
- * bytes apart, we instead take the actual register instance and multiply it by
- * 2. This means that in the DDR4 case we will always access what
- * amdzen_umc_smn_addr() considers instance 0 and 2. In the DDR5 case this is 0,
- * 2, 4, and 6. This means our maximum instance for both cases has to be one
- * higher than this, 3 and 7 respectively. While technically you could use 4 and
- * 8, this is a tighter bind.
  */
-#define	UMC_COLSEL_LO_DDR4(u, i)	amdzen_umc_smn_addr(u, 0x50, 3, i * 2)
-#define	UMC_COLSEL_HI_DDR4(u, i)	amdzen_umc_smn_addr(u, 0x54, 3, i * 2)
-#define	UMC_COLSEL_LO_DDR5(u, i)	amdzen_umc_smn_addr(u, 0x60, 7, i * 2)
-#define	UMC_COLSEL_HI_DDR5(u, i)	amdzen_umc_smn_addr(u, 0x64, 7, i * 2)
+/*CSTYLED*/
+#define	D_UMC_COLSEL_LO_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x50,	\
+	.srd_nents = 2,	\
+	.srd_stride = 8	\
+}
+/*CSTYLED*/
+#define	D_UMC_COLSEL_HI_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x54,	\
+	.srd_nents = 2,	\
+	.srd_stride = 8	\
+}
+/*CSTYLED*/
+#define	D_UMC_COLSEL_LO_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x60,	\
+	.srd_nents = 4,	\
+	.srd_stride = 8	\
+}
+/*CSTYLED*/
+#define	D_UMC_COLSEL_HI_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x64,	\
+	.srd_nents = 4,	\
+	.srd_stride = 8	\
+}
+#define	UMC_COLSEL_LO_DDR4(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_COLSEL_LO_DDR4, i)
+#define	UMC_COLSEL_HI_DDR4(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_COLSEL_HI_DDR4, i)
+#define	UMC_COLSEL_LO_DDR5(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_COLSEL_LO_DDR5, i)
+#define	UMC_COLSEL_HI_DDR5(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_COLSEL_HI_DDR5, i)
 
 #define	UMC_COLSEL_REMAP_GET_COL(r, x)	bitx32(r, (3 + (4 * (x))), (4 * ((x))))
 #define	UMC_COLSEL_LO_BASE		2
@@ -210,8 +340,21 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * In general, APUs have some of the MSBS (most significant bit swap) related
  * fields; however, they do not have rank multiplication bits.
  */
-#define	UMC_RMSEL_DDR4(u, i)		amdzen_umc_smn_addr(u, 0x70, 2, i)
-#define	UMC_RMSEL_SEC_DDR4(u, i)	amdzen_umc_smn_addr(u, 0x78, 2, i)
+/*CSTYLED*/
+#define	D_UMC_RMSEL_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x70,	\
+	.srd_nents = 2	\
+}
+/*CSTYLED*/
+#define	D_UMC_RMSEL_SEC_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x78,	\
+	.srd_nents = 2	\
+}
+#define	UMC_RMSEL_DDR4(u, i)	amdzen_umc_smn_reg(u, D_UMC_RMSEL_DDR4, i)
+#define	UMC_RMSEL_SEC_DDR4(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_RMSEL_SEC_DDR4, i)
 #define	UMC_RMSEL_DDR4_GET_INV_MSBO(r)	bitx32(r, 19, 18)
 #define	UMC_RMSEL_DDR4_GET_INV_MSBE(r)	bitx32(r, 17, 16)
 #define	UMC_RMSEL_DDR4_GET_RM2(r)	bitx32(r, 11, 8)
@@ -219,7 +362,13 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
 #define	UMC_RMSEL_DDR4_GET_RM0(r)	bitx32(r, 3, 0)
 #define	UMC_RMSEL_BASE			12
 
-#define	UMC_RMSEL_DDR5(u, i)		amdzen_umc_smn_addr(u, 0x80, 4, i)
+/*CSTYLED*/
+#define	D_UMC_RMSEL_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x80,	\
+	.srd_nents = 4	\
+}
+#define	UMC_RMSEL_DDR5(u, i)	amdzen_umc_smn_reg(u, D_UMC_RMSEL_DDR5, i)
 #define	UMC_RMSEL_DDR5_GET_INV_MSBS_SEC(r)	bitx32(r, 31, 30)
 #define	UMC_RMSEL_DDR5_GET_INV_MSBS(r)		bitx32(r, 29, 28)
 #define	UMC_RMSEL_DDR5_GET_SUBCHAN(r)	bitx32(r, 19, 16)
@@ -234,8 +383,20 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * UMC::CH::DimmCfg -- This describes several properties of the DIMM that is
  * installed, such as its overall width or type.
  */
-#define	UMC_DIMMCFG_DDR4(u, i)	amdzen_umc_smn_addr(u, 0x80, 2, i)
-#define	UMC_DIMMCFG_DDR5(u, i)	amdzen_umc_smn_addr(u, 0x90, 2, i)
+/*CSTYLED*/
+#define	D_UMC_DIMMCFG_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x80,	\
+	.srd_nents = 2	\
+}
+/*CSTYLED*/
+#define	D_UMC_DIMMCFG_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x90,	\
+	.srd_nents = 2	\
+}
+#define	UMC_DIMMCFG_DDR4(u, i)	amdzen_umc_smn_reg(u, D_UMC_DIMMCFG_DDR4, i)
+#define	UMC_DIMMCFG_DDR5(u, i)	amdzen_umc_smn_reg(u, D_UMC_DIMMCFG_DDR5, i)
 #define	UMC_DIMMCFG_GET_PKG_RALIGN(r)	bitx32(r, 10, 10)
 #define	UMC_DIMMCFG_GET_REFRESH_DIS(r)	bitx32(r, 9, 9)
 #define	UMC_DIMMCFG_GET_DQ_SWAP_DIS(r)	bitx32(r, 8, 8)
@@ -258,8 +419,22 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * UMC::CH::AddrHashBank -- These registers contain various instructions about
  * how to hash an address across a bank to influence which bank is used.
  */
-#define	UMC_BANK_HASH_DDR4(u, i)	amdzen_umc_smn_addr(u, 0xc8, 5, i)
-#define	UMC_BANK_HASH_DDR5(u, i)	amdzen_umc_smn_addr(u, 0x98, 5, i)
+/*CSTYLED*/
+#define	D_UMC_BANK_HASH_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xc8,	\
+	.srd_nents = 5	\
+}
+/*CSTYLED*/
+#define	D_UMC_BANK_HASH_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x98,	\
+	.srd_nents = 5	\
+}
+#define	UMC_BANK_HASH_DDR4(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_BANK_HASH_DDR4, i)
+#define	UMC_BANK_HASH_DDR5(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_BANK_HASH_DDR5, i)
 #define	UMC_BANK_HASH_GET_ROW(r)	bitx32(r, 31, 14)
 #define	UMC_BANK_HASH_GET_COL(r)	bitx32(r, 13, 1)
 #define	UMC_BANK_HASH_GET_EN(r)		bitx32(r, 0, 0)
@@ -269,8 +444,22 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * address when trying to do rank hashing. Note, instance 3 is is reserved in
  * DDR5 modes.
  */
-#define	UMC_RANK_HASH_DDR4(u, i)	amdzen_umc_smn_addr(u, 0xdc, 3, i)
-#define	UMC_RANK_HASH_DDR5(u, i)	amdzen_umc_smn_addr(u, 0xb0, 4, i)
+/*CSTYLED*/
+#define	D_UMC_RANK_HASH_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xdc,	\
+	.srd_nents = 3	\
+}
+/*CSTYLED*/
+#define	D_UMC_RANK_HASH_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xb0,	\
+	.srd_nents = 4	\
+}
+#define	UMC_RANK_HASH_DDR4(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_RANK_HASH_DDR4, i)
+#define	UMC_RANK_HASH_DDR5(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_RANK_HASH_DDR5, i)
 #define	UMC_RANK_HASH_GET_ADDR(r)	bitx32(r, 31, 1)
 #define	UMC_RANK_HASH_SHIFT		9
 #define	UMC_RANK_HASH_GET_EN(r)		bitx32(r, 0, 0)
@@ -278,7 +467,14 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
 /*
  * UMC::AddrHashRMExt -- Extended rank hash addresses.
  */
-#define	UMC_RANK_HASH_EXT_DDR5(u, i)	amdzen_umc_smn_addr(u, 0xbb0, 4, i)
+/*CSTYLED*/
+#define	D_UMC_RANK_HASH_EXT_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xbb0,	\
+	.srd_nents = 4	\
+}
+#define	UMC_RANK_HASH_EXT_DDR5(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_RANK_HASH_EXT_DDR5, i)
 #define	UMC_RANK_HASH_EXT_GET_ADDR(r)	bitx32(r, 7, 0)
 #define	UMC_RANK_HASH_EXT_ADDR_SHIFT	40
 
@@ -288,10 +484,20 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * upper two rank hash registers defined above because on the systems where this
  * occurs for DDR4, they only have up to one rank hash.
  */
+/*CSTYLED*/
+#define	D_UMC_PC_HASH_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xc0	\
+}
+/*CSTYLED*/
+#define	D_UMC_PC_HASH2_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xc4	\
+}
 #define	UMC_PC_HASH_DDR4(u)	UMC_RANK_HASH_DDR4(u, 1)
 #define	UMC_PC_HASH2_DDR4(u)	UMC_RANK_HASH_DDR4(u, 2)
-#define	UMC_PC_HASH_DDR5(u)	amdzen_umc_smn_addr(u, 0xc0, 1, 0)
-#define	UMC_PC_HASH2_DDR5(u)	amdzen_umc_smn_addr(u, 0xc4, 1, 0)
+#define	UMC_PC_HASH_DDR5(u)	amdzen_umc_smn_reg(u, D_UMC_PC_HASH_DDR5, 0)
+#define	UMC_PC_HASH2_DDR5(u)	amdzen_umc_smn_reg(u, D_UMC_PC_HASH2_DDR5, 0)
 #define	UMC_PC_HASH_GET_ROW(r)		bitx32(r, 31, 14)
 #define	UMC_PC_HASH_GET_COL(r)		bitx32(r, 13, 1)
 #define	UMC_PC_HASH_GET_EN(r)		bitx32(r, 0, 0)
@@ -301,8 +507,20 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * UMC::CH::AddrHashCS -- Hashing: chip-select edition. Note, these can
  * ultimately cause you to change which DIMM is being actually accessed.
  */
-#define	UMC_CS_HASH_DDR4(u, i)	amdzen_umc_smn_addr(u, 0xe8, 2, i)
-#define	UMC_CS_HASH_DDR5(u, i)	amdzen_umc_smn_addr(u, 0xc8, 2, i)
+/*CSTYLED*/
+#define	D_UMC_CS_HASH_DDR4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xe8,	\
+	.srd_nents = 2	\
+}
+/*CSTYLED*/
+#define	D_UMC_CS_HASH_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xc8,	\
+	.srd_nents = 2	\
+}
+#define	UMC_CS_HASH_DDR4(u, i)	amdzen_umc_smn_reg(u, D_UMC_CS_HASH_DDR4, i)
+#define	UMC_CS_HASH_DDR5(u, i)	amdzen_umc_smn_reg(u, D_UMC_CS_HASH_DDR5, i)
 #define	UMC_CS_HASH_GET_ADDR(r)		bitx32(r, 31, 1)
 #define	UMC_CS_HASH_SHIFT		9
 #define	UMC_CS_HASH_GET_EN(r)		bitx32(r, 0, 0)
@@ -310,7 +528,14 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
 /*
  * UMC::AddrHashExtCS -- Extended chip-select hash addresses.
  */
-#define	UMC_CS_HASH_EXT_DDR5(u, i)	amdzen_umc_smn_addr(u, 0xbc8, 2, i)
+/*CSTYLED*/
+#define	D_UMC_CS_HASH_EXT_DDR5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xbc8,	\
+	.srd_nents = 2	\
+}
+#define	UMC_CS_HASH_EXT_DDR5(u, i)	\
+    amdzen_umc_smn_reg(u, D_UMC_CS_HASH_EXT_DDR5, i)
 #define	UMC_CS_HASH_EXT_GET_ADDR(r)	bitx32(r, 7, 0)
 #define	UMC_CS_HASH_EXT_ADDR_SHIFT	40
 
@@ -319,7 +544,12 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * For our purposes we mostly care about seeing if ECC is enabled and a DIMM
  * type.
  */
-#define	UMC_UMCCFG(u)	amdzen_umc_smn_addr(u, 0x100, 1, 0)
+/*CSTYLED*/
+#define	D_UMC_UMCCFG	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x100	\
+}
+#define	UMC_UMCCFG(u)	amdzen_umc_smn_reg(u, D_UMC_UMCCFG, 0)
 #define	UMC_UMCCFG_GET_READY(r)		bitx32(r, 31, 31)
 #define	UMC_UMCCFG_GET_ECC_EN(r)	bitx32(r, 12, 12)
 #define	UMC_UMCCFG_GET_BURST_CTL(r)	bitx32(r, 11, 10)
@@ -338,7 +568,12 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * scrambling is enabled. Note, this register really changes a bunch from family
  * to family.
  */
-#define	UMC_DATACTL(u)		amdzen_umc_smn_addr(u, 0x144, 1, 0)
+/*CSTYLED*/
+#define	D_UMC_DATACTL	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x144	\
+}
+#define	UMC_DATACTL(u)		amdzen_umc_smn_reg(u, D_UMC_DATACTL, 0)
 #define	UMC_DATACTL_GET_ENCR_EN(r)	bitx32(r, 8, 8)
 #define	UMC_DATACTL_GET_SCRAM_EN(r)	bitx32(r, 0, 0)
 
@@ -353,7 +588,12 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
 /*
  * UMC::CH:EccCtrl -- Various settings around how ECC operates.
  */
-#define	UMC_ECCCTL(u)	amdzen_umc_smn_addr(u, 0x14c, 1, 0)
+/*CSTYLED*/
+#define	D_UMC_ECCCTL	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0x14c	\
+}
+#define	UMC_ECCCTL(u)	amdzen_umc_smn_reg(u, D_UMC_ECCCTL, 0)
 #define	UMC_ECCCTL_GET_RD_EN(r)		bitx32(x, 10, 10)
 #define	UMC_ECCCTL_GET_X16(r)		bitx32(x, 9, 9)
 #define	UMC_ECCCTL_GET_UC_FATAL(r)	bitx32(x, 8, 8)
@@ -368,9 +608,9 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * systems, this is not always present on every SoC and seems to depend on
  * something else inside the chip.
  */
-#define	UMC_ECCCTL_DDR_GET_PI(r)		bitx32(r, 13, 13)
-#define	UMC_ECCCTL_DDR_GET_PF_DIS(r)		bitx32(r, 12, 12)
-#define	UMC_ECCCTL_DDR_GET_SDP_OVR(r)		bitx32(x, 11, 11)
+#define	UMC_ECCCTL_DDR_GET_PI(r)	bitx32(r, 13, 13)
+#define	UMC_ECCCTL_DDR_GET_PF_DIS(r)	bitx32(r, 12, 12)
+#define	UMC_ECCCTL_DDR_GET_SDP_OVR(r)	bitx32(x, 11, 11)
 #define	UMC_ECCCTL_DDR_GET_REPLAY_EN(r)	bitx32(x, 1, 1)
 
 #define	UMC_ECCCTL_DDR5_GET_PIN_RED(r)	bitx32(r, 14, 14)
@@ -380,8 +620,18 @@ amdzen_umc_smn_addr(uint8_t umcno, uint32_t base_reg, uint32_t nents,
  * feature disables. We mostly just record these for future us for debugging
  * purposes. They aren't used as part of memory decoding.
  */
-#define	UMC_UMCCAP(u)		amdzen_umc_smn_addr(u, 0xdf0, 1, 0)
-#define	UMC_UMCCAP_HI(u)	amdzen_umc_smn_addr(u, 0xdf4, 1, 0)
+/*CSTYLED*/
+#define	D_UMC_UMCCAP	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xdf0	\
+}
+/*CSTYLED*/
+#define	D_UMC_UMCCAP_HI	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC,	\
+	.srd_reg = 0xdf4	\
+}
+#define	UMC_UMCCAP(u)		amdzen_umc_smn_reg(u, D_UMC_UMCCAP, 0)
+#define	UMC_UMCCAP_HI(u)	amdzen_umc_smn_reg(u, D_UMC_UMCCAP_HI, 0)
 
 #ifdef __cplusplus
 }

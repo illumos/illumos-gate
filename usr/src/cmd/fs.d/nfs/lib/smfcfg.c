@@ -41,7 +41,7 @@ fs_smf_init(char *fmri, char *instance)
 	 * svc name is of the form svc://network/fs/server:instance1
 	 * FMRI portion is /network/fs/server
 	 */
-	snprintf(srv, MAXPATHLEN, "%s", fmri + strlen("svc:/"));
+	(void) snprintf(srv, MAXPATHLEN, "%s", fmri + strlen("svc:/"));
 	svcname = strrchr(srv, ':');
 	if (svcname != NULL)
 		*svcname = '\0';
@@ -97,7 +97,7 @@ fs_smf_fini(fs_smfhandle_t *handle)
 		scf_property_destroy(handle->fs_property);
 		scf_value_destroy(handle->fs_value);
 		if (handle->fs_handle != NULL) {
-			scf_handle_unbind(handle->fs_handle);
+			(void) scf_handle_unbind(handle->fs_handle);
 			scf_handle_destroy(handle->fs_handle);
 		}
 		free(handle);
@@ -126,15 +126,15 @@ fs_smf_set_prop(smf_fstype_t fstype, char *prop_name, char *valbuf,
 	 * The SVC names we are using currently are already
 	 * appended by default. Fix this for instances project.
 	 */
-	snprintf(srv, MAXPATHLEN, "%s", fmri);
+	(void) snprintf(srv, MAXPATHLEN, "%s", fmri);
 	p = strstr(fmri, ":default");
 	if (p == NULL) {
-		strcat(srv, ":");
+		(void) strcat(srv, ":");
 		if (instance == NULL)
 			instance = "default";
 		if (strlen(srv) + strlen(instance) > MAXPATHLEN)
 			goto out;
-		strncat(srv, instance, strlen(instance));
+		(void) strncat(srv, instance, strlen(instance));
 	}
 	svcname = srv;
 	phandle = fs_smf_init(fmri, instance);
@@ -224,9 +224,11 @@ fs_smf_set_prop(smf_fstype_t fstype, char *prop_name, char *valbuf,
 				ret = SMF_SYSTEM_ERR;
 			}
 			break;
+		default:
+			break;
 		}
 		if (ret != SMF_SYSTEM_ERR)
-			scf_transaction_commit(tran);
+			(void) scf_transaction_commit(tran);
 	}
 out:
 	if (tran != NULL)
@@ -257,15 +259,15 @@ fs_smf_get_prop(smf_fstype_t fstype, char *prop_name, char *cbuf,
 	 * The SVC names we are using currently are already
 	 * appended by default. Fix this for instances project.
 	 */
-	snprintf(srv, MAXPATHLEN, "%s", fmri);
+	(void) snprintf(srv, MAXPATHLEN, "%s", fmri);
 	p = strstr(fmri, ":default");
 	if (p == NULL) {
-		strcat(srv, ":");
+		(void) strcat(srv, ":");
 		if (instance == NULL)
 			instance = "default";
 		if (strlen(srv) + strlen(instance) > MAXPATHLEN)
 			goto out;
-		strncat(srv, instance, strlen(instance));
+		(void) strncat(srv, instance, strlen(instance));
 	}
 	svcname = srv;
 	phandle = fs_smf_init(fmri, instance);
@@ -313,7 +315,7 @@ fs_smf_get_prop(smf_fstype_t fstype, char *prop_name, char *cbuf,
 			}
 			ret = 0;
 			*bufsz = len;
-		break;
+			break;
 		case SCF_TYPE_INTEGER:
 			if (scf_value_get_integer(val, &valint) != 0) {
 				ret = scf_error();
@@ -325,7 +327,7 @@ fs_smf_get_prop(smf_fstype_t fstype, char *prop_name, char *cbuf,
 				goto out;
 			}
 			ret = 0;
-		break;
+			break;
 		case SCF_TYPE_BOOLEAN:
 			if (scf_value_get_boolean(val, &bval) != 0) {
 				ret = scf_error();
@@ -340,7 +342,9 @@ fs_smf_get_prop(smf_fstype_t fstype, char *prop_name, char *cbuf,
 				ret = SA_BAD_VALUE;
 				goto out;
 			}
-		break;
+			break;
+		default:
+			break;
 		}
 	} else {
 		ret = scf_error();

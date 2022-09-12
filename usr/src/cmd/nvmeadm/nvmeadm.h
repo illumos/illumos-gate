@@ -53,6 +53,7 @@ struct nvme_process_arg {
 	uint32_t npa_ns_state;
 	nvme_identify_ctrl_t *npa_idctl;
 	nvme_identify_nsid_t *npa_idns;
+	nvme_identify_nsid_list_t *npa_idnslist;
 	nvme_version_t *npa_version;
 	ofmt_handle_t npa_ofmt;
 };
@@ -68,6 +69,11 @@ extern void nvme_print_nsid_summary(nvme_identify_nsid_t *);
 extern void nvme_print_identify_ctrl(nvme_identify_ctrl_t *,
     nvme_capabilities_t *, nvme_version_t *);
 extern void nvme_print_identify_nsid(nvme_identify_nsid_t *, nvme_version_t *);
+extern void nvme_print_identify_nsid_list(const char *,
+    nvme_identify_nsid_list_t *);
+extern void nvme_print_identify_nsid_desc(void *);
+extern void nvme_print_identify_ctrl_list(const char *,
+    nvme_identify_ctrl_list_t *);
 extern void nvme_print_error_log(int, nvme_error_log_entry_t *,
     nvme_version_t *);
 extern void nvme_print_health_log(nvme_health_log_t *, nvme_identify_ctrl_t *,
@@ -107,8 +113,7 @@ extern int nvme_open(di_minor_t, boolean_t);
 extern void nvme_close(int);
 extern nvme_version_t *nvme_version(int);
 extern nvme_capabilities_t *nvme_capabilities(int);
-extern nvme_identify_ctrl_t *nvme_identify_ctrl(int);
-extern nvme_identify_nsid_t *nvme_identify_nsid(int);
+extern void *nvme_identify(int, uint8_t);
 extern void *nvme_get_logpage(int, uint8_t, size_t *);
 extern boolean_t nvme_get_feature(int, uint8_t, uint32_t, uint64_t *, size_t *,
     void **);

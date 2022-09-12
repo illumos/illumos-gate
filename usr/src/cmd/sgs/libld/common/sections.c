@@ -24,6 +24,7 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -1494,6 +1495,14 @@ is_cap_redundant(Objcapset *ocapset, Objcapset *scapset)
 	 * could be considered to be less important than lower ones.  However,
 	 * this is the only reasonable non-subjective definition.
 	 */
+	omsk = ocapset->oc_hw_3.cm_val;
+	smsk = scapset->oc_hw_3.cm_val;
+	if ((omsk > smsk) || (omsk && (omsk == smsk)))
+		return (1);
+	if (omsk < smsk)
+		return (0);
+
+
 	omsk = ocapset->oc_hw_2.cm_val;
 	smsk = scapset->oc_hw_2.cm_val;
 	if ((omsk > smsk) || (omsk && (omsk == smsk)))
@@ -1650,6 +1659,7 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 	 */
 	capstr_value(ofl->ofl_lml, CA_SUNW_PLAT, &ocapset->oc_plat, &title);
 	capstr_value(ofl->ofl_lml, CA_SUNW_MACH, &ocapset->oc_mach, &title);
+	capmask_value(ofl->ofl_lml, CA_SUNW_HW_3, &ocapset->oc_hw_3, &title);
 	capmask_value(ofl->ofl_lml, CA_SUNW_HW_2, &ocapset->oc_hw_2, &title);
 	capmask_value(ofl->ofl_lml, CA_SUNW_HW_1, &ocapset->oc_hw_1, &title);
 	capmask_value(ofl->ofl_lml, CA_SUNW_SF_1, &ocapset->oc_sf_1, &title);
@@ -1659,6 +1669,8 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 	 */
 	size += alist_nitems(ocapset->oc_plat.cl_val);
 	size += alist_nitems(ocapset->oc_mach.cl_val);
+	if (ocapset->oc_hw_3.cm_val)
+		size++;
 	if (ocapset->oc_hw_2.cm_val)
 		size++;
 	if (ocapset->oc_hw_1.cm_val)
@@ -1750,6 +1762,10 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 			CAP_UPDATE(cap, capndx, CA_SUNW_MACH, 0);
 		}
 	}
+	if (ocapset->oc_hw_3.cm_val) {
+		ofl->ofl_flags |= FLG_OF_PTCAP;
+		CAP_UPDATE(cap, capndx, CA_SUNW_HW_3, ocapset->oc_hw_3.cm_val);
+	}
 	if (ocapset->oc_hw_2.cm_val) {
 		ofl->ofl_flags |= FLG_OF_PTCAP;
 		CAP_UPDATE(cap, capndx, CA_SUNW_HW_2, ocapset->oc_hw_2.cm_val);
@@ -1829,6 +1845,10 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 					CAP_UPDATE(cap, capndx,
 					    CA_SUNW_MACH, 0);
 				}
+			}
+			if (scapset->oc_hw_3.cm_val) {
+				CAP_UPDATE(cap, capndx, CA_SUNW_HW_3,
+				    scapset->oc_hw_3.cm_val);
 			}
 			if (scapset->oc_hw_2.cm_val) {
 				CAP_UPDATE(cap, capndx, CA_SUNW_HW_2,

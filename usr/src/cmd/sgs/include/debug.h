@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_DEBUG_H
@@ -152,6 +153,7 @@ extern "C" {
 #define	DBG_CAP_HW_2		6
 #define	DBG_CAP_PLAT		7
 #define	DBG_CAP_MACH		8
+#define	DBG_CAP_HW_3		9
 
 #define	DBG_REL_START		1
 #define	DBG_REL_FINISH		2
