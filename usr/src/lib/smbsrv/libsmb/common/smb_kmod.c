@@ -225,6 +225,25 @@ smb_kmod_shareinfo(char *shrname, boolean_t *shortnames)
 	return (rc);
 }
 
+/*
+ * Does the client have any access in this share?
+ */
+int
+smb_kmod_shareaccess(smb_netuserinfo_t *ui, smb_share_t *si)
+{
+	smb_ioc_shareaccess_t ioc;
+	int rc;
+
+	bzero(&ioc, sizeof (ioc));
+	ioc.session_id	= ui->ui_session_id;
+	ioc.user_id	= ui->ui_user_id;
+	(void) strlcpy(ioc.shrname, si->shr_name, MAXNAMELEN);
+
+	rc = smb_kmod_ioctl(SMB_IOC_SHAREACCESS, &ioc.hdr, sizeof (ioc));
+
+	return (rc);
+}
+
 int
 smb_kmod_get_open_num(smb_opennum_t *opennum)
 {

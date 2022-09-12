@@ -473,6 +473,7 @@ int smb_server_share_lookup(smb_server_t *, const char *, smb_node_t **);
 int smb_server_unshare(const char *);
 
 void smb_server_logoff_ssnid(smb_request_t *, uint64_t);
+smb_user_t *smb_server_lookup_user(smb_server_t *, uint64_t, uint64_t);
 
 void smb_server_get_cfg(smb_server_t *, smb_kmod_cfg_t *);
 
@@ -961,6 +962,7 @@ void smb_kshare_stop(smb_server_t *);
 int smb_kshare_export_list(smb_ioc_share_t *);
 int smb_kshare_unexport_list(smb_ioc_share_t *);
 int smb_kshare_info(smb_ioc_shareinfo_t *);
+int smb_kshare_access(smb_ioc_shareaccess_t *);
 void smb_kshare_enum(smb_server_t *, smb_enumshare_info_t *);
 smb_kshare_t *smb_kshare_lookup(smb_server_t *, const char *);
 void smb_kshare_release(smb_server_t *, smb_kshare_t *);

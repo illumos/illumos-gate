@@ -52,7 +52,8 @@ extern "C" {
 #define	SMB_IOC_STOP		_IOW(SMB_IOC_BASE, 10, int)
 #define	SMB_IOC_EVENT		_IOW(SMB_IOC_BASE, 11, int)
 #define	SMB_IOC_SHAREINFO	_IOW(SMB_IOC_BASE, 12, int)
-#define	SMB_IOC_SPOOLDOC	_IOW(SMB_IOC_BASE, 13, int)
+#define	SMB_IOC_SHAREACCESS	_IOW(SMB_IOC_BASE, 13, int)
+#define	SMB_IOC_SPOOLDOC	_IOW(SMB_IOC_BASE, 14, int)
 
 typedef struct smb_ioc_header {
 	uint32_t	version;
@@ -85,6 +86,13 @@ typedef struct smb_ioc_shareinfo {
 	char		shrname[MAXNAMELEN];
 	uint32_t	shortnames;
 } smb_ioc_shareinfo_t;
+
+typedef struct smb_ioc_shareaccess {
+	smb_ioc_header_t hdr;
+	uint64_t	session_id;
+	uint64_t	user_id;
+	char		shrname[MAXNAMELEN];
+} smb_ioc_shareaccess_t;
 
 typedef	struct smb_ioc_start {
 	smb_ioc_header_t hdr;
@@ -205,6 +213,7 @@ typedef union smb_ioc {
 	smb_ioc_session_t	ioc_session;
 	smb_ioc_fileid_t	ioc_fileid;
 	smb_ioc_share_t		ioc_share;
+	smb_ioc_shareaccess_t	ioc_shareaccess;
 	smb_ioc_shareinfo_t	ioc_shareinfo;
 	smb_ioc_spooldoc_t	ioc_spooldoc;
 } smb_ioc_t;

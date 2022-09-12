@@ -913,6 +913,7 @@ void smb_kmod_unbind(void);
 int smb_kmod_share(nvlist_t *);
 int smb_kmod_unshare(nvlist_t *);
 int smb_kmod_shareinfo(char *, boolean_t *);
+int smb_kmod_shareaccess(smb_netuserinfo_t *, smb_share_t *);
 int smb_kmod_get_open_num(smb_opennum_t *);
 int smb_kmod_enum(smb_netsvc_t *);
 smb_netsvc_t *smb_kmod_enum_init(smb_svcenum_t *);

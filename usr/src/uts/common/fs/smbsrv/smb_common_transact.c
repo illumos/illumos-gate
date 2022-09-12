@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -757,8 +758,8 @@ smb_encode_SHARE_INFO_1(struct mbuf_chain *output, struct mbuf_chain *text,
 
 static void
 smb_encode_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
-	smb_request_t *sr, char *oem_name, uint16_t type,
-	char *comment, uint16_t access, char *path, char *password)
+    smb_request_t *sr, char *oem_name, uint16_t type,
+    char *comment, uint16_t access, char *path, char *password)
 {
 	unsigned char pword[9];
 
@@ -774,6 +775,14 @@ smb_encode_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
 	(void) smb_mbc_encodef(text, "s", path);
 }
 
+int smb_trans_share_enum = 0;
+
+/*
+ * This is a legacy interface, no longer supported.
+ * Clients now use MS-RPC for share enumeration.
+ * Does not implement access-based enumeration (ABE)
+ * so do not enable if you care about share list ABE.
+ */
 int
 smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 {
@@ -827,6 +836,9 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	char *sent_buf;
 
 	ASSERT(sr->uid_user);
+
+	if (smb_trans_share_enum == 0)
+		return (SDRC_NOT_IMPLEMENTED);
 
 	if (smb_mbc_decodef(&xa->req_param_mb, "ww", &level,
 	    &esi.es_bufsize) != 0)
@@ -962,6 +974,14 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	return (SDRC_NO_REPLY);
 }
 
+int smb_trans_share_getinfo = 0;
+
+/*
+ * This is a legacy interface, no longer supported.
+ * Clients now use MS-RPC to get share information.
+ * Does not implement access-based enumeration (ABE)
+ * so do not enable if you care about share list ABE.
+ */
 int
 smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 {
@@ -970,6 +990,9 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 	char			*share;
 	char			*password;
 	smb_kshare_t		*si;
+
+	if (smb_trans_share_getinfo == 0)
+		return (SDRC_NOT_IMPLEMENTED);
 
 	if (smb_mbc_decodef(&xa->req_param_mb, "%sww", sr,
 	    &share, &level, &max_bytes) != 0)

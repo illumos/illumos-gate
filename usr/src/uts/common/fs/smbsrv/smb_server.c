@@ -1853,6 +1853,41 @@ smb_server_release(smb_server_t *sv)
 }
 
 /*
+ * smb_server_lookup_user
+ *
+ * Find an smb_user by its user_id
+ * Optional ssn_id (if non-zero) restricts search to a specific session.
+ *
+ * Returns smb_user_t * held. Caller must smb_user_rele(user)
+ * Returns NULL if not found.
+ */
+smb_user_t *
+smb_server_lookup_user(smb_server_t *sv, uint64_t ssn_id, uint64_t user_id)
+{
+	smb_llist_t	*slist = &sv->sv_session_list;
+	smb_session_t	*sn;
+	smb_user_t	*user = NULL;
+
+	smb_llist_enter(slist, RW_READER);
+
+	for (sn = smb_llist_head(slist);
+	    sn != NULL && user == NULL;
+	    sn = smb_llist_next(slist, sn)) {
+		SMB_SESSION_VALID(sn);
+
+		if (ssn_id != 0 && ssn_id != sn->s_kid)
+			continue;
+		if (sn->s_state != SMB_SESSION_STATE_NEGOTIATED)
+			continue;
+
+		user = smb_session_lookup_ssnid(sn, user_id);
+	}
+	smb_llist_exit(slist);
+
+	return (user);
+}
+
+/*
  * Enumerate the users associated with a session list.
  */
 static void

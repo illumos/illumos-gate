@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef	_SMBSRV_SMB_XDR_H
@@ -127,6 +128,7 @@ typedef struct smb_doorhdr {
  */
 typedef struct smb_netuserinfo {
 	uint64_t	ui_session_id;
+	uint64_t	ui_user_id;
 	uint16_t	ui_domain_len;
 	char		*ui_domain;
 	uint16_t	ui_account_len;
@@ -352,7 +354,7 @@ bool_t smb_quota_set_xdr(XDR *, smb_quota_set_t *);
 
 typedef struct dfs_referral_query {
 	dfs_reftype_t	rq_type;
-	char 		*rq_path;
+	char		*rq_path;
 } dfs_referral_query_t;
 
 typedef struct dfs_referral_response {

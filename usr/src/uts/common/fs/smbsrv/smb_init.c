@@ -338,6 +338,9 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 		rc = smb_kshare_info(&ioc->ioc_shareinfo);
 		copyout = B_TRUE;
 		break;
+	case SMB_IOC_SHAREACCESS:
+		rc = smb_kshare_access(&ioc->ioc_shareaccess);
+		break;
 	case SMB_IOC_NUMOPEN:
 		rc = smb_server_numopen(&ioc->ioc_opennum);
 		copyout = B_TRUE;
