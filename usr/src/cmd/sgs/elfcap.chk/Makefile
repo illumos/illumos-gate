@@ -22,7 +22,14 @@ include ../Makefile.com
 
 CSTD =		$(GNU_C99)
 NATIVE_LIBS +=	libc.so
-CPPFLAGS =	$(CPPFLAGS.native)
+#
+# We reach into the tools include area which provides us with a snapshot
+# of all of the data that we need. This does mean that if someone is in
+# bldenv and does incremental builds that change the related ELF header
+# files they will need to rebuild that, but the same is true if we move
+# this into tools (and it becomes more annoying).
+#
+CPPFLAGS =	-I$(SRC)/tools/sgs/include $(CPPFLAGS.native)
 CFLAGS =	$(NATIVE_CFLAGS)
 CC =		$(NATIVECC)
 LDCHECKS =
