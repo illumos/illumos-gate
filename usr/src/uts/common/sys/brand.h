@@ -210,7 +210,7 @@ struct brand_ops {
  */
 typedef struct brand {
 	int			b_version;
-	char    		*b_name;
+	char			*b_name;
 	struct brand_ops	*b_ops;
 	struct brand_mach_ops	*b_machops;
 	size_t			b_data_size;

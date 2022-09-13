@@ -21,12 +21,12 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/param.h>
 #include <sys/types.h>

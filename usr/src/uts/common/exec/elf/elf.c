@@ -163,7 +163,6 @@ handle_secflag_dt(proc_t *p, uint_t dt, uint_t val)
 	return (0);
 }
 
-
 #ifndef _ELF32_COMPAT
 void
 elf_ctx_resize_scratch(elf_core_ctx_t *ctx, size_t sz)
@@ -329,7 +328,6 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 	return (error);
 }
 
-/*ARGSUSED*/
 int
 elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
     int level, size_t *execsz, int setid, caddr_t exec_file, cred_t *cred,
@@ -363,7 +361,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	int		hasauxv = 0;
 	int		hasintp = 0;
 	int		branded = 0;
-	int		dynuphdr = 0;
+	boolean_t	dynuphdr = B_FALSE;
 
 	struct proc *p = ttoproc(curthread);
 	struct user *up = PTOU(p);
@@ -740,6 +738,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	error = mapelfexec(vp, ehdrp, nphdrs, phdrbase, &uphdr, &intphdr,
 	    &stphdr, &dtrphdr, dataphdrp, &bssbase, &brkbase, &voffset, NULL,
 	    len, execsz, &brksize);
+
 	/*
 	 * Our uphdr has been dynamically allocated if (and only if) its
 	 * program header flags are clear.  To avoid leaks, this must be
@@ -747,9 +746,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 */
 	dynuphdr = (uphdr != NULL && uphdr->p_flags == 0);
 
-	if (error != 0) {
+	if (error != 0)
 		goto bad;
-	}
 
 	if (uphdr != NULL && intphdr == NULL)
 		goto bad;
@@ -1380,8 +1378,9 @@ getelfshdr(vnode_t *vp, cred_t *credp, const Ehdr *ehdr, uint_t nshdrs,
 	 * of the string table section must also be valid.
 	 */
 	if (ehdr->e_shentsize < MINSHDRSZ || (ehdr->e_shentsize & 3) ||
-	    nshdrs == 0 || shstrndx >= nshdrs)
+	    nshdrs == 0 || shstrndx >= nshdrs) {
 		return (EINVAL);
+	}
 
 	*shsizep = nshdrs * ehdr->e_shentsize;
 
@@ -1436,7 +1435,6 @@ getelfshdr(vnode_t *vp, cred_t *credp, const Ehdr *ehdr, uint_t nshdrs,
 	return (0);
 }
 
-
 int
 elfreadhdr(vnode_t *vp, cred_t *credp, Ehdr *ehdrp, uint_t *nphdrs,
     caddr_t *phbasep, size_t *phsizep)
@@ -1452,7 +1450,6 @@ elfreadhdr(vnode_t *vp, cred_t *credp, Ehdr *ehdrp, uint_t *nphdrs,
 	}
 	return (0);
 }
-
 
 static int
 mapelfexec(
@@ -1576,8 +1573,8 @@ mapelfexec(
 
 			addr = (caddr_t)((uintptr_t)phdr->p_vaddr + *voffset);
 
-			if ((*intphdr != NULL) && uphdr != NULL &&
-			    (*uphdr == NULL)) {
+			if (*intphdr != NULL && uphdr != NULL &&
+			    *uphdr == NULL) {
 				/*
 				 * The PT_PHDR program header is, strictly
 				 * speaking, optional.  If we find that this
@@ -2764,9 +2761,8 @@ exclude:
 done:
 	if (zeropg != NULL)
 		kmem_free(zeropg, elf_zeropg_sz);
-	if (ctx.ecc_bufsz != 0) {
+	if (ctx.ecc_bufsz != 0)
 		kmem_free(ctx.ecc_buf, ctx.ecc_bufsz);
-	}
 	kmem_free(bigwad, bigsize);
 	return (error);
 }
