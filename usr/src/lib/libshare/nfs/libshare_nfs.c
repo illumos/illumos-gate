@@ -23,6 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.
+ * Copyright 2022 RackTop Systems.
  */
 
 /*
@@ -2520,8 +2521,12 @@ struct proto_option_defs {
 #define	PROTO_OPT_MOUNTD_PORT			17
 	{"mountd_port",
 	    "mountd_port", PROTO_OPT_MOUNTD_PORT,
-	    OPT_TYPE_NUMBER, 0, SVC_MOUNTD, 1, UINT16_MAX},
-#define	PROTO_OPT_STATD_PORT			18
+	    OPT_TYPE_NUMBER, 0, SVC_NFSD|SVC_MOUNTD, 1, UINT16_MAX},
+#define	PROTO_OPT_MOUNTD_REMOTE_DUMP		18
+	{"mountd_remote_dump",
+	    "mountd_remote_dump", PROTO_OPT_MOUNTD_REMOTE_DUMP,
+	    OPT_TYPE_BOOLEAN, B_FALSE, SVC_NFSD|SVC_MOUNTD, B_FALSE, B_TRUE},
+#define	PROTO_OPT_STATD_PORT			19
 	{"statd_port",
 	    "statd_port", PROTO_OPT_STATD_PORT,
 	    OPT_TYPE_NUMBER, 0, SVC_STATD, 1, UINT16_MAX},

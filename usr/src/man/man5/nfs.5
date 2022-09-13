@@ -19,8 +19,9 @@
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\" Copyright 2020 Joyent, Inc.
+.\" Copyright 2022 RackTop Systems.
 .\"
-.Dd November 22, 2021
+.Dd September 15, 2022
 .Dt NFS 5
 .Os
 .Sh NAME
@@ -195,6 +196,15 @@ should listen.
 The default value is
 .Li 0 ,
 which means it should use a default binding.
+.It Sy mountd_remote_dump Ns = Ns Ar boolean
+Should
+.Nm mountd
+respond to remote
+.Sy MOUNTPROC_DUMP
+queries to read the list of remote mounts.
+The default value is
+.Li false ,
+which means only queries from local host will be allowed.
 .It Sy statd_port Ns = Ns Ar num
 The IP port number on which
 .Nm statd
