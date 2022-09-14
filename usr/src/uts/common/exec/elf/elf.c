@@ -628,10 +628,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	if ((*brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		branded = 1;
 		/*
-		 * We will be adding 6 entries to the aux vectors.  One for
-		 * the the brandname and 5 for the brand specific aux vectors.
+		 * We will be adding 5 entries to the aux vectors.  One for
+		 * the brandname and 4 for the brand specific aux vectors.
 		 */
-		args->auxsize += 6 * sizeof (aux_entry_t);
+		args->auxsize += 5 * sizeof (aux_entry_t);
 	}
 
 	/* If the binary has an explicit ASLR flag, it must be honoured */
