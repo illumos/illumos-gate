@@ -12,6 +12,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2019 by Western Digital Corporation
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -63,6 +64,34 @@ xhci_endpoint_pipe_to_epid(usba_pipe_handle_data_t *ph)
 	return (ep);
 }
 
+void
+xhci_endpoint_timeout_cancel(xhci_t *xhcip, xhci_endpoint_t *xep)
+{
+	xep->xep_state |= XHCI_ENDPOINT_TEARDOWN;
+	if (xep->xep_timeout != 0) {
+		mutex_exit(&xhcip->xhci_lock);
+		(void) untimeout(xep->xep_timeout);
+		mutex_enter(&xhcip->xhci_lock);
+		xep->xep_timeout = 0;
+	}
+}
+
+void
+xhci_endpoint_release(xhci_t *xhcip, xhci_endpoint_t *xep)
+{
+	VERIFY(MUTEX_HELD(&xhcip->xhci_lock));
+	VERIFY3U(xep->xep_num, !=, XHCI_DEFAULT_ENDPOINT);
+	VERIFY(list_is_empty(&xep->xep_transfers));
+
+	VERIFY(xep->xep_pipe != NULL);
+	xep->xep_pipe = NULL;
+
+	VERIFY(xep->xep_state & XHCI_ENDPOINT_OPEN);
+	xep->xep_state &= ~XHCI_ENDPOINT_OPEN;
+
+	xhci_endpoint_timeout_cancel(xhcip, xep);
+}
+
 /*
  * The assumption is that someone calling this owns this endpoint / device and
  * that it's in a state where it's safe to zero out that information.
@@ -74,6 +103,10 @@ xhci_endpoint_fini(xhci_device_t *xd, int endpoint)
 
 	VERIFY(xep != NULL);
 	xd->xd_endpoints[endpoint] = NULL;
+
+	if (endpoint != XHCI_DEFAULT_ENDPOINT) {
+		VERIFY(!(xep->xep_state & XHCI_ENDPOINT_OPEN));
+	}
 
 	xhci_ring_free(&xep->xep_ring);
 	cv_destroy(&xep->xep_state_cv);
@@ -429,13 +462,25 @@ xhci_endpoint_avg_trb(xhci_t *xhcip, usb_ep_descr_t *ep, int mps)
 	/* LINTED: E_FUNC_NO_RET_VAL */
 }
 
+/*
+ * Set up the input context for this endpoint.  If this endpoint is already
+ * open, just confirm that the current parameters and the originally programmed
+ * parameters match.
+ */
 int
 xhci_endpoint_setup_context(xhci_t *xhcip, xhci_device_t *xd,
     xhci_endpoint_t *xep)
 {
-	uint_t eptype, burst, ival, max_esit, avgtrb, mps, mult, cerr;
+	xhci_endpoint_params_t new_xepp;
 	xhci_endpoint_context_t *ectx;
 	uint64_t deq;
+
+	/*
+	 * Explicitly zero this entire struct to start so that we can compare
+	 * it with bcmp().
+	 */
+	bzero(&new_xepp, sizeof (new_xepp));
+	new_xepp.xepp_configured = B_TRUE;
 
 	/*
 	 * For a USB >=3.0 device we should always have its companion descriptor
@@ -464,9 +509,10 @@ xhci_endpoint_setup_context(xhci_t *xhcip, xhci_device_t *xd,
 	VERIFY(xd->xd_usbdev->usb_dev_descr != NULL);
 	VERIFY(xep->xep_pipe != NULL);
 
-	mps = xep->xep_pipe->p_ep.wMaxPacketSize & XHCI_CONTEXT_MPS_MASK;
-	mult = XHCI_CONTEXT_DEF_MULT;
-	cerr = XHCI_CONTEXT_DEF_CERR;
+	new_xepp.xepp_mps =
+	    xep->xep_pipe->p_ep.wMaxPacketSize & XHCI_CONTEXT_MPS_MASK;
+	new_xepp.xepp_mult = XHCI_CONTEXT_DEF_MULT;
+	new_xepp.xepp_cerr = XHCI_CONTEXT_DEF_CERR;
 
 	switch (xep->xep_type) {
 	case USB_EP_ATTR_ISOCH:
@@ -484,12 +530,13 @@ xhci_endpoint_setup_context(xhci_t *xhcip, xhci_device_t *xd,
 		if (xd->xd_usbdev->usb_port_status >= USBA_SUPER_SPEED_DEV) {
 			ASSERT(xep->xep_pipe->p_xep.uex_flags &
 			    USB_EP_XFLAGS_SS_COMP);
-			mult = xep->xep_pipe->p_xep.uex_ep_ss.bmAttributes &
+			new_xepp.xepp_mult =
+			    xep->xep_pipe->p_xep.uex_ep_ss.bmAttributes &
 			    USB_EP_SS_COMP_ISOC_MULT_MASK;
 		}
 
-		mps &= XHCI_CONTEXT_MPS_MASK;
-		cerr = XHCI_CONTEXT_ISOCH_CERR;
+		new_xepp.xepp_mps &= XHCI_CONTEXT_MPS_MASK;
+		new_xepp.xepp_cerr = XHCI_CONTEXT_ISOCH_CERR;
 		break;
 	default:
 		/*
@@ -500,37 +547,69 @@ xhci_endpoint_setup_context(xhci_t *xhcip, xhci_device_t *xd,
 		break;
 	}
 
-	eptype = xhci_endpoint_epdesc_to_type(&xep->xep_pipe->p_xep.uex_ep);
-	burst = xhci_endpoint_determine_burst(xd, xep);
-	ival = xhci_endpoint_interval(xd, &xep->xep_pipe->p_xep.uex_ep);
-	max_esit = xhci_endpoint_max_esit(xd, xep, mps, burst);
-	avgtrb = xhci_endpoint_avg_trb(xhcip, &xep->xep_pipe->p_xep.uex_ep,
-	    mps);
+	new_xepp.xepp_eptype = xhci_endpoint_epdesc_to_type(
+	    &xep->xep_pipe->p_xep.uex_ep);
+	new_xepp.xepp_burst = xhci_endpoint_determine_burst(xd, xep);
+	new_xepp.xepp_ival = xhci_endpoint_interval(xd,
+	    &xep->xep_pipe->p_xep.uex_ep);
+	new_xepp.xepp_max_esit = xhci_endpoint_max_esit(xd, xep,
+	    new_xepp.xepp_mps, new_xepp.xepp_burst);
+	new_xepp.xepp_avgtrb = xhci_endpoint_avg_trb(xhcip,
+	    &xep->xep_pipe->p_xep.uex_ep, new_xepp.xepp_mps);
 
 	/*
 	 * The multi field may be reserved as zero if the LEC feature flag is
 	 * set. See the description of mult in xHCI 1.1 / 6.2.3.
 	 */
 	if (xhcip->xhci_caps.xcap_flags2 & XCAP2_LEC)
-		mult = 0;
+		new_xepp.xepp_mult = 0;
+
+	if (xep->xep_params.xepp_configured) {
+		/*
+		 * The endpoint context has been configured already.  We are
+		 * reopening the pipe, so just confirm that the parameters are
+		 * the same.
+		 */
+		if (bcmp(&xep->xep_params, &new_xepp, sizeof (new_xepp)) == 0) {
+			/*
+			 * Everything matches up.
+			 */
+			return (0);
+		}
+
+		DTRACE_PROBE3(xhci__context__mismatch,
+		    xhci_t *, xhcip,
+		    xhci_endpoint_t *, xep,
+		    xhci_endpoint_params_t *, &new_xepp);
+
+		xhci_error(xhcip, "device input context on slot %d and "
+		    "port %d for endpoint %u was already initialized but "
+		    "with incompatible parameters",
+		    xd->xd_slot, xd->xd_port, xep->xep_num);
+		return (EINVAL);
+	}
 
 	bzero(ectx, sizeof (xhci_endpoint_context_t));
 
-	ectx->xec_info = LE_32(XHCI_EPCTX_SET_MULT(mult) |
-	    XHCI_EPCTX_SET_IVAL(ival));
-	if (xhcip->xhci_caps.xcap_flags2 & XCAP2_LEC)
-		ectx->xec_info |= LE_32(XHCI_EPCTX_SET_MAX_ESIT_HI(max_esit));
+	ectx->xec_info = LE_32(XHCI_EPCTX_SET_MULT(new_xepp.xepp_mult) |
+	    XHCI_EPCTX_SET_IVAL(new_xepp.xepp_ival));
+	if (xhcip->xhci_caps.xcap_flags2 & XCAP2_LEC) {
+		ectx->xec_info |=
+		    LE_32(XHCI_EPCTX_SET_MAX_ESIT_HI(new_xepp.xepp_max_esit));
+	}
 
-	ectx->xec_info2 = LE_32(XHCI_EPCTX_SET_CERR(cerr) |
-	    XHCI_EPCTX_SET_EPTYPE(eptype) | XHCI_EPCTX_SET_MAXB(burst) |
-	    XHCI_EPCTX_SET_MPS(mps));
+	ectx->xec_info2 = LE_32(XHCI_EPCTX_SET_CERR(new_xepp.xepp_cerr) |
+	    XHCI_EPCTX_SET_EPTYPE(new_xepp.xepp_eptype) |
+	    XHCI_EPCTX_SET_MAXB(new_xepp.xepp_burst) |
+	    XHCI_EPCTX_SET_MPS(new_xepp.xepp_mps));
 
 	deq = xhci_dma_pa(&xep->xep_ring.xr_dma) + sizeof (xhci_trb_t) *
 	    xep->xep_ring.xr_tail;
 	ectx->xec_dequeue = LE_64(deq | xep->xep_ring.xr_cycle);
 
-	ectx->xec_txinfo = LE_32(XHCI_EPCTX_MAX_ESIT_PAYLOAD(max_esit) |
-	    XHCI_EPCTX_AVG_TRB_LEN(avgtrb));
+	ectx->xec_txinfo = LE_32(
+	    XHCI_EPCTX_MAX_ESIT_PAYLOAD(new_xepp.xepp_max_esit) |
+	    XHCI_EPCTX_AVG_TRB_LEN(new_xepp.xepp_avgtrb));
 
 	XHCI_DMA_SYNC(xd->xd_ictx, DDI_DMA_SYNC_FORDEV);
 	if (xhci_check_dma_handle(xhcip, &xd->xd_ictx) != DDI_FM_OK) {
@@ -542,6 +621,8 @@ xhci_endpoint_setup_context(xhci_t *xhcip, xhci_device_t *xd,
 		return (EIO);
 	}
 
+	bcopy(&new_xepp, &xep->xep_params, sizeof (new_xepp));
+	VERIFY(xep->xep_params.xepp_configured);
 	return (0);
 }
 
@@ -613,7 +694,66 @@ xhci_endpoint_init(xhci_t *xhcip, xhci_device_t *xd,
 		return (ret);
 	}
 
+	xep->xep_state |= XHCI_ENDPOINT_OPEN;
 	return (0);
+}
+
+int
+xhci_endpoint_reinit(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep,
+    usba_pipe_handle_data_t *ph)
+{
+	VERIFY(MUTEX_HELD(&xhcip->xhci_lock));
+	VERIFY(ph != NULL);
+	VERIFY3U(xhci_endpoint_pipe_to_epid(ph), ==, xep->xep_num);
+	VERIFY3U(xep->xep_num, !=, XHCI_DEFAULT_ENDPOINT);
+
+	if (xep->xep_type != (ph->p_ep.bmAttributes & USB_EP_ATTR_MASK)) {
+		/*
+		 * The endpoint type should not change unless the device has
+		 * been torn down and recreated by the framework.
+		 */
+		return (EINVAL);
+	}
+
+	if (xep->xep_state & XHCI_ENDPOINT_OPEN) {
+		return (EBUSY);
+	}
+
+	VERIFY(xep->xep_state & XHCI_ENDPOINT_TEARDOWN);
+	xep->xep_state &= ~XHCI_ENDPOINT_TEARDOWN;
+
+	VERIFY3U(xep->xep_timeout, ==, 0);
+	VERIFY(list_is_empty(&xep->xep_transfers));
+
+	VERIFY3P(xep->xep_pipe, ==, NULL);
+	xep->xep_pipe = ph;
+
+	/*
+	 * Verify that the endpoint context parameters have not changed in a
+	 * way that requires us to tell the controller about it.
+	 */
+	int ret;
+	if ((ret = xhci_endpoint_setup_context(xhcip, xd, xep)) != 0) {
+		xep->xep_pipe = NULL;
+		xhci_endpoint_timeout_cancel(xhcip, xep);
+		return (ret);
+	}
+
+	xep->xep_state |= XHCI_ENDPOINT_OPEN;
+	return (0);
+}
+
+/*
+ * Wait until any ongoing resets or time outs are completed.
+ */
+void
+xhci_endpoint_serialize(xhci_t *xhcip, xhci_endpoint_t *xep)
+{
+	VERIFY(MUTEX_HELD(&xhcip->xhci_lock));
+
+	while ((xep->xep_state & XHCI_ENDPOINT_SERIALIZE) != 0) {
+		cv_wait(&xep->xep_state_cv, &xhcip->xhci_lock);
+	}
 }
 
 /*
