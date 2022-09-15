@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2022 MNX Cloud, Inc.
  */
 
 /*
@@ -831,7 +832,7 @@ varpd_svp_setprop(void *arg, const char *pname, const void *buf,
 		if (IN6_IS_ADDR_V4MAPPED(ipv6)) {
 			ipaddr_t v4;
 			IN6_V4MAPPED_TO_IPADDR(ipv6, v4);
-			if (IN_MULTICAST(v4))
+			if (IN_MULTICAST(ntohl(v4)))
 				return (EINVAL);
 		}
 
