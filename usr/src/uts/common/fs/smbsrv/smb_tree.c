@@ -963,6 +963,7 @@ smb_tree_alloc(smb_request_t *sr, const smb_kshare_t *si,
 
 	/* grab a ref for tree->t_owner */
 	smb_user_hold_internal(sr->uid_user);
+	smb_user_inc_trees(sr->uid_user);
 	tree->t_owner = sr->uid_user;
 
 	/* if FS is readonly, enforce that here */
@@ -1031,6 +1032,7 @@ smb_tree_dealloc(void *arg)
 	smb_idpool_destructor(&tree->t_odid_pool);
 
 	SMB_USER_VALID(tree->t_owner);
+	smb_user_dec_trees(tree->t_owner);
 	smb_user_release(tree->t_owner);
 
 	kmem_cache_free(smb_cache_tree, tree);

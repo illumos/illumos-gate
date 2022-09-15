@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -96,8 +96,8 @@ smb2_cancel_sync(smb_request_t *sr)
 	struct smb_session *session = sr->session;
 	int cnt = 0;
 
-	if (sr->smb2_messageid == 0)
-		goto failure;
+	if (sr->smb2_messageid == 0 || sr->smb2_messageid == UINT64_MAX)
+		return;
 
 	smb_slist_enter(&session->s_req_list);
 	for (req = smb_slist_head(&session->s_req_list); req != NULL;
@@ -117,7 +117,6 @@ smb2_cancel_sync(smb_request_t *sr)
 	smb_slist_exit(&session->s_req_list);
 
 	if (cnt != 1) {
-	failure:
 		DTRACE_PROBE2(smb2__cancel__error,
 		    uint64_t, sr->smb2_messageid, int, cnt);
 #ifdef	DEBUG
@@ -147,6 +146,9 @@ smb2_cancel_async(smb_request_t *sr)
 	struct smb_request *req;
 	struct smb_session *session = sr->session;
 	int cnt = 0;
+
+	if (sr->smb2_async_id == 0)
+		return;
 
 	smb_slist_enter(&session->s_req_list);
 	req = smb_slist_head(&session->s_req_list);

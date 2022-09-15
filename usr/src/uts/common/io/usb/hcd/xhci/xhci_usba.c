@@ -12,6 +12,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2019 by Western Digital Corporation
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -58,7 +59,7 @@ xhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 {
 	xhci_t *xhcip = xhci_hcdi_get_xhcip(ph);
 	xhci_pipe_t *pipe;
-	xhci_endpoint_t *xep;
+	xhci_endpoint_t *xep = NULL;
 	xhci_device_t *xd;
 	int kmflags = usb_flags & USB_FLAGS_SLEEP ? KM_SLEEP : KM_NOSLEEP;
 	int ret;
@@ -131,8 +132,21 @@ xhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 		goto add;
 	}
 
-	if (xd->xd_endpoints[epid] != NULL) {
+	/*
+	 * If we're opening an endpoint other than the default control endpoint,
+	 * then the device should have had a USB address assigned by the
+	 * controller. Sanity check that before continuing.
+	 */
+	VERIFY(xd->xd_addressed == B_TRUE);
+
+	/*
+	 * We may have already initialized the endpoint with a previous pipe
+	 * open.
+	 */
+	if ((xep = xd->xd_endpoints[epid]) != NULL &&
+	    (xep->xep_state & XHCI_ENDPOINT_OPEN)) {
 		mutex_exit(&xhcip->xhci_lock);
+
 		kmem_free(pipe, sizeof (xhci_pipe_t));
 		xhci_log(xhcip, "!asked to open endpoint %d on slot %d and "
 		    "port %d, but endpoint already exists", epid, xd->xd_slot,
@@ -140,19 +154,75 @@ xhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 		return (USB_FAILURE);
 	}
 
-	/*
-	 * If we're opening an endpoint other than the default control endpoint,
-	 * then the device should have had a USB address assigned by the
-	 * controller. Sanity check that before continuing.
-	 */
-	if (epid != XHCI_DEFAULT_ENDPOINT) {
-		VERIFY(xd->xd_addressed == B_TRUE);
+	if (xep != NULL) {
+		/*
+		 * The endpoint is already initialized but is not presently
+		 * open so we can take it over here.
+		 */
+		if ((ret = xhci_endpoint_reinit(xhcip, xd, xep, ph) != 0)) {
+			mutex_exit(&xhcip->xhci_lock);
+
+			kmem_free(pipe, sizeof (xhci_pipe_t));
+			xhci_log(xhcip, "!asked to reopen endpoint %d on "
+			    "slot %d and port %d, but reinit failed (%d)",
+			    epid, xd->xd_slot, xd->xd_port, ret);
+			return (ret);
+		}
+
+		/*
+		 * We need to ensure the endpoint is stopped before we try to
+		 * reset the transfer ring.
+		 */
+		xep->xep_state |= XHCI_ENDPOINT_QUIESCE;
+		if ((ret = xhci_endpoint_quiesce(xhcip, xd, xep)) !=
+		    USB_SUCCESS) {
+			/*
+			 * If we could not quiesce the endpoint, release it so
+			 * that another open can try again.
+			 */
+			xep->xep_state &= ~XHCI_ENDPOINT_QUIESCE;
+			xhci_endpoint_release(xhcip, xep);
+			mutex_exit(&xhcip->xhci_lock);
+
+			kmem_free(pipe, sizeof (xhci_pipe_t));
+			xhci_log(xhcip, "!asked to reopen endpoint %d on "
+			    "slot %d and port %d, but quiesce failed (%d)",
+			    epid, xd->xd_slot, xd->xd_port, ret);
+			return (ret);
+		}
+
+		/*
+		 * Reset the transfer ring dequeue pointer.  The initial
+		 * Configure Endpoint command leaves the endpoint in the
+		 * Running state (xHCI 1.2 / 4.6.6), so even though the ring is
+		 * still empty we ring the doorbell to end up in the same state
+		 * (Running but Inactive).
+		 */
+		mutex_exit(&xhcip->xhci_lock);
+		if ((ret = xhci_command_set_tr_dequeue(xhcip, xd, xep)) != 0 ||
+		    (ret = xhci_endpoint_ring(xhcip, xd, xep)) != 0) {
+			mutex_enter(&xhcip->xhci_lock);
+			xep->xep_state &= ~XHCI_ENDPOINT_QUIESCE;
+			xhci_endpoint_release(xhcip, xep);
+			mutex_exit(&xhcip->xhci_lock);
+
+			kmem_free(pipe, sizeof (xhci_pipe_t));
+			xhci_log(xhcip, "!asked to open endpoint %d on "
+			    "slot %d and port %d, but restart failed (%d)",
+			    epid, xd->xd_slot, xd->xd_port, ret);
+			return (USB_FAILURE);
+		}
+		mutex_enter(&xhcip->xhci_lock);
+		xep->xep_state &= ~XHCI_ENDPOINT_QUIESCE;
+		mutex_exit(&xhcip->xhci_lock);
+
+		goto add;
 	}
 
 	/*
-	 * Okay, at this point we need to go create and set up an endpoint.
-	 * Once we're done, we'll try to install it and make sure that it
-	 * doesn't conflict with something else going on.
+	 * Okay, at this point we need to go create and set up an endpoint from
+	 * scratch.  Once we're done, we'll try to install it and make sure
+	 * that it doesn't conflict with something else going on.
 	 */
 	ret = xhci_endpoint_init(xhcip, xd, ph);
 	if (ret != 0) {
@@ -337,9 +407,7 @@ xhci_hcdi_pipe_poll_fini(usba_pipe_handle_data_t *ph, boolean_t is_close)
 	/*
 	 * Ensure that no other resets or time outs are going on right now.
 	 */
-	while ((xep->xep_state & (XHCI_ENDPOINT_SERIALIZE)) != 0) {
-		cv_wait(&xep->xep_state_cv, &xhcip->xhci_lock);
-	}
+	xhci_endpoint_serialize(xhcip, xep);
 
 	if (xpp->xpp_poll_state == XHCI_PERIODIC_POLL_IDLE) {
 		mutex_exit(&xhcip->xhci_lock);
@@ -417,7 +485,6 @@ xhci_hcdi_pipe_poll_fini(usba_pipe_handle_data_t *ph, boolean_t is_close)
  * Tear down everything that we did in open. After this, the consumer of this
  * USB device is done.
  */
-/* ARGSUSED */
 static int
 xhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 {
@@ -425,8 +492,7 @@ xhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 	xhci_pipe_t *xp;
 	xhci_device_t *xd;
 	xhci_endpoint_t *xep;
-	uint32_t info;
-	int ret, i;
+	int ret;
 	uint_t epid;
 
 	if ((ph->p_ep.bmAttributes & USB_EP_ATTR_MASK) == USB_EP_ATTR_INTR &&
@@ -467,53 +533,29 @@ xhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 	}
 
 	/*
-	 * We need to clean up the endpoint. So the first thing we need to do is
-	 * stop it with a configure endpoint command. Once it's stopped, we can
-	 * free all associated resources.
+	 * We clean up the endpoint by stopping it and cancelling any transfers
+	 * that were in flight at the time.  The endpoint is not unconfigured
+	 * until the device is torn down later.
 	 */
-	mutex_enter(&xd->xd_imtx);
-
-	/*
-	 * Potentially update the slot input context about the current max
-	 * endpoint. Make sure to set that the slot context is being updated
-	 * here as it may be changing and some hardware requires it.
-	 */
-	xd->xd_input->xic_drop_flags = LE_32(XHCI_INCTX_MASK_DCI(epid + 1));
-	xd->xd_input->xic_add_flags = LE_32(XHCI_INCTX_MASK_DCI(0));
-	for (i = XHCI_NUM_ENDPOINTS - 1; i >= 0; i--) {
-		if (xd->xd_endpoints[i] != NULL &&
-		    xd->xd_endpoints[i] != xep)
-			break;
+	xhci_endpoint_timeout_cancel(xhcip, xep);
+	xep->xep_state |= XHCI_ENDPOINT_QUIESCE;
+	if ((ret = xhci_endpoint_quiesce(xhcip, xd, xep)) != USB_SUCCESS) {
+		/*
+		 * If we cannot stop the ring, it is not safe to proceed and we
+		 * must keep the pipe open.
+		 */
+		xep->xep_state &=
+		    ~(XHCI_ENDPOINT_TEARDOWN | XHCI_ENDPOINT_QUIESCE);
+		cv_broadcast(&xep->xep_state_cv);
+		mutex_exit(&xhcip->xhci_lock);
+		xhci_error(xhcip, "asked to do close pipe on slot %d, "
+		    "port %d, endpoint: %d, but quiesce failed %d",
+		    xd->xd_slot, xd->xd_port, epid, ret);
+		return (USB_FAILURE);
 	}
-	info = xd->xd_slotin->xsc_info;
-	info &= ~XHCI_SCTX_DCI_MASK;
-	info |= XHCI_SCTX_SET_DCI(i + 1);
-	xd->xd_slotin->xsc_info = info;
 
 	/*
-	 * Also zero out our context for this endpoint. Note that we don't
-	 * bother with syncing DMA memory here as it's not required to be synced
-	 * for this operation.
-	 */
-	bzero(xd->xd_endin[xep->xep_num], sizeof (xhci_endpoint_context_t));
-
-	/*
-	 * Stop the device and kill our timeout. Note, it is safe to hold the
-	 * device's input mutex across the untimeout, this lock should never be
-	 * referenced by the timeout code.
-	 */
-	xep->xep_state |= XHCI_ENDPOINT_TEARDOWN;
-	mutex_exit(&xhcip->xhci_lock);
-	(void) untimeout(xep->xep_timeout);
-
-	ret = xhci_command_configure_endpoint(xhcip, xd);
-	mutex_exit(&xd->xd_imtx);
-	if (ret != USB_SUCCESS)
-		return (ret);
-	mutex_enter(&xhcip->xhci_lock);
-
-	/*
-	 * Now that we've unconfigured the endpoint. See if we need to flush any
+	 * Now that we've stopped the endpoint, see if we need to flush any
 	 * transfers.
 	 */
 	xhci_hcdi_pipe_flush(xhcip, xep, USB_CR_PIPE_CLOSING);
@@ -521,7 +563,7 @@ xhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 		xhci_hcdi_periodic_free(xhcip, xp);
 	}
 
-	xhci_endpoint_fini(xd, epid);
+	xhci_endpoint_release(xhcip, xep);
 
 remove:
 	ph->p_hcd_private = NULL;
@@ -579,9 +621,7 @@ xhci_hcdi_pipe_reset(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 	/*
 	 * Ensure that no other resets or time outs are going on right now.
 	 */
-	while ((xep->xep_state & (XHCI_ENDPOINT_SERIALIZE)) != 0) {
-		cv_wait(&xep->xep_state_cv, &xhcip->xhci_lock);
-	}
+	xhci_endpoint_serialize(xhcip, xep);
 
 	xep->xep_state |= XHCI_ENDPOINT_QUIESCE;
 	ret = xhci_endpoint_quiesce(xhcip, xd, xep);
@@ -1679,8 +1719,7 @@ xhci_hcdi_device_init(usba_device_t *ud, usb_port_t port, void **hcdpp)
 }
 
 /*
- * We're tearing down a device now. That means that the only endpoint context
- * that's still valid would be endpoint zero.
+ * We're tearing down a device now.
  */
 static void
 xhci_hcdi_device_fini(usba_device_t *ud, void *hcdp)
@@ -1726,7 +1765,16 @@ xhci_hcdi_device_fini(usba_device_t *ud, void *hcdp)
 	}
 
 	xhci_context_slot_output_fini(xhcip, xd);
-	xhci_endpoint_fini(xd, XHCI_DEFAULT_ENDPOINT);
+
+	/*
+	 * Once the slot is disabled, we can free any endpoints that were
+	 * opened.
+	 */
+	for (uint_t n = 0; n < XHCI_NUM_ENDPOINTS; n++) {
+		if (xd->xd_endpoints[n] != NULL) {
+			xhci_endpoint_fini(xd, n);
+		}
+	}
 
 	mutex_enter(&xhcip->xhci_lock);
 	list_remove(&xhcip->xhci_usba.xa_devices, xd);

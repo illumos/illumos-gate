@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -387,11 +388,23 @@
  *
  * Endpoint management is one of the key parts to the xhci driver as every
  * endpoint is a pipe that a device driver uses, so they are our primary
- * currency. Endpoints are enabled and disabled when the client device drivers
- * open and close a pipe. When an endpoint is enabled, we have to fill in an
- * endpoint's context structure with information about the endpoint. These
- * basically tell the controller important properties which it uses to ensure
- * that there is adequate bandwidth for the device.
+ * currency. An endpoint is enabled when the client device driver opens the
+ * associated pipe for the first time. When an endpoint is enabled, we have to
+ * fill in an endpoint's context structure with information about the endpoint.
+ * These basically tell the controller important properties which it uses to
+ * ensure that there is adequate bandwidth for the device.
+ *
+ * If the client device closes the pipe again we explicitly stop the endpoint,
+ * moving it to the Halted state, and take ownership of any transfers
+ * previously submitted to the ring but which have not yet completed. A client
+ * may open and close a pipe several times -- ugen(4D) in particular is known
+ * for this -- and we will stop and start the ring accordingly.
+ *
+ * It is tempting to fully unconfigure an endpoint when a pipe is closed, but
+ * some host controllers appear to exhibit undefined behaviour each time the
+ * endpoint is re-enabled this way; e.g., silently dropped transfers. As such,
+ * we wait until the whole device is being torn down to disable all previously
+ * enabled endpoints at once, as part of disabling the device slot.
  *
  * Each endpoint has its own ring as described in the previous section. We place
  * TRBs (transfer request blocks) onto a given ring to request I/O be performed.
@@ -701,7 +714,7 @@
  * disappearing, we generally attempt to load the xHCI controller before the
  * EHCI controller. This logic is not done in the driver; however, it is done in
  * other parts of the kernel like in uts/common/io/consconfig_dacf.c in the
- * function consconfig_load_drivres().
+ * function consconfig_load_drivers().
  *
  * -----------
  * Future Work

@@ -365,7 +365,7 @@ smb2_lease_break_ack(smb_request_t *sr)
 	status = smb_oplock_ack_break(sr, ofile, &LeaseState);
 	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 		(void) smb2sr_go_async(sr);
-		(void) smb_oplock_wait_break(ofile->f_node, 0);
+		(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
 		status = NT_STATUS_SUCCESS;
 	}
 
@@ -641,7 +641,7 @@ done:
 		 */
 		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 			(void) smb2sr_go_async(sr);
-			(void) smb_oplock_wait_break(ofile->f_node, 0);
+			(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
 			status = NT_STATUS_SUCCESS;
 		}
 		ASSERT(status == NT_STATUS_SUCCESS);

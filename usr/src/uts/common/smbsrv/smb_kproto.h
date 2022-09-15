@@ -294,7 +294,8 @@ void smb_oplock_ind_break(smb_ofile_t *, uint32_t, boolean_t, uint32_t);
 void smb_oplock_ind_break_in_ack(smb_request_t *, smb_ofile_t *,
     uint32_t, boolean_t);
 void smb_oplock_send_brk(smb_request_t *);
-uint32_t smb_oplock_wait_break(smb_node_t *, int);
+uint32_t smb_oplock_wait_break(smb_request_t *, smb_node_t *, int);
+uint32_t smb_oplock_wait_break_fem(smb_node_t *, int);
 
 /*
  * range lock functions - node operations
@@ -664,6 +665,7 @@ void smb_ofile_flush(smb_request_t *, smb_ofile_t *);
 boolean_t smb_ofile_hold(smb_ofile_t *);
 boolean_t smb_ofile_hold_olbrk(smb_ofile_t *);
 void smb_ofile_release(smb_ofile_t *);
+void smb_ofile_release_LL(void *);
 void smb_ofile_close_all(smb_tree_t *, uint32_t);
 void smb_ofile_set_flags(smb_ofile_t *, uint32_t);
 boolean_t smb_ofile_is_open(smb_ofile_t *);
@@ -740,6 +742,9 @@ cred_t *smb_kcred_create(void);
 void smb_user_setcred(smb_user_t *, cred_t *, uint32_t);
 boolean_t smb_is_same_user(cred_t *, cred_t *);
 boolean_t smb_user_has_security_priv(smb_user_t *, cred_t *);
+void smb_user_inc_trees(smb_user_t *);
+void smb_user_dec_trees(smb_user_t *);
+void smb_user_wait_trees(smb_user_t *);
 
 /*
  * SMB tree functions (file smb_tree.c)

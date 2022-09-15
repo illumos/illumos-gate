@@ -715,8 +715,7 @@ smb_common_open(smb_request_t *sr)
 		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 			if (sr->session->dialect >= SMB_VERS_2_BASE)
 				(void) smb2sr_go_async(sr);
-			(void) smb_oplock_wait_break(fnode, 0);
-			status = 0;
+			status = smb_oplock_wait_break(sr, fnode, 0);
 		}
 		if (status != NT_STATUS_SUCCESS)
 			goto errout;
@@ -751,8 +750,7 @@ smb_common_open(smb_request_t *sr)
 			if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 				if (sr->session->dialect >= SMB_VERS_2_BASE)
 					(void) smb2sr_go_async(sr);
-				(void) smb_oplock_wait_break(fnode, 0);
-				status = 0;
+				status = smb_oplock_wait_break(sr, fnode, 0);
 			} else {
 				/*
 				 * Even when the oplock layer does NOT
@@ -820,8 +818,7 @@ smb_common_open(smb_request_t *sr)
 		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 			if (sr->session->dialect >= SMB_VERS_2_BASE)
 				(void) smb2sr_go_async(sr);
-			(void) smb_oplock_wait_break(fnode, 0);
-			status = 0;
+			status = smb_oplock_wait_break(sr, fnode, 0);
 		}
 		if (status != NT_STATUS_SUCCESS)
 			goto errout;

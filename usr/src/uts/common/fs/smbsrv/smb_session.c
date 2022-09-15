@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
  */
 
@@ -444,6 +444,7 @@ smb_request_cancel(smb_request_t *sr)
 	case SMB_REQ_STATE_WAITING_FCN1:
 	case SMB_REQ_STATE_WAITING_LOCK:
 	case SMB_REQ_STATE_WAITING_PIPE:
+	case SMB_REQ_STATE_WAITING_OLBRK:
 		/*
 		 * These are states that have a cancel_method.
 		 * Make the state change now, to ensure that

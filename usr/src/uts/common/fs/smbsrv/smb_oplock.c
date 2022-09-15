@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -110,7 +110,7 @@ smb1_oplock_acquire(smb_request_t *sr, boolean_t level2ok)
 	 * status code that says we should wait.
 	 */
 	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
-		(void) smb_oplock_wait_break(ofile->f_node, 0);
+		(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
 		status = 0;
 	}
 

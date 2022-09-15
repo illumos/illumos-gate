@@ -12,6 +12,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2019 by Western Digital Corporation
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _SYS_USB_XHCI_XHCI_H
@@ -497,17 +498,6 @@ typedef enum xhci_endpoint_state {
 	XHCI_ENDPOINT_QUIESCE		= 0x04,
 	XHCI_ENDPOINT_TIMED_OUT		= 0x08,
 	/*
-	 * This is a composite of states that we need to watch for. We don't
-	 * want to allow ourselves to set one of these flags while one of them
-	 * is currently active.
-	 */
-	XHCI_ENDPOINT_SERIALIZE		= 0x0c,
-	/*
-	 * This is a composite of states that we need to make sure that if set,
-	 * we do not schedule activity on the ring.
-	 */
-	XHCI_ENDPOINT_DONT_SCHEDULE	= 0x0e,
-	/*
 	 * This enpdoint is being torn down and should make sure it de-schedules
 	 * itself.
 	 */
@@ -516,14 +506,46 @@ typedef enum xhci_endpoint_state {
 	 * This endpoint is currently used in polled I/O mode by the
 	 * kernel debugger.
 	 */
-	XHCI_ENDPOINT_POLLED		= 0x20
+	XHCI_ENDPOINT_POLLED		= 0x20,
+	/*
+	 * This endpoint is open and in use by a pipe.
+	 */
+	XHCI_ENDPOINT_OPEN		= 0x40,
 } xhci_endpoint_state_t;
+
+/*
+ * This is a composite of states that we need to watch for. We don't
+ * want to allow ourselves to set one of these flags while one of them
+ * is currently active.
+ */
+#define	XHCI_ENDPOINT_SERIALIZE		(XHCI_ENDPOINT_QUIESCE |	\
+					XHCI_ENDPOINT_TIMED_OUT)
+
+/*
+ * This is a composite of states that we need to make sure that if set, we do
+ * not schedule activity on the ring.
+ */
+#define	XHCI_ENDPOINT_DONT_SCHEDULE	(XHCI_ENDPOINT_HALTED |		\
+					XHCI_ENDPOINT_QUIESCE |		\
+					XHCI_ENDPOINT_TIMED_OUT)
 
 /*
  * Forwards required for the endpoint
  */
 struct xhci_device;
 struct xhci;
+
+typedef struct xhci_endpoint_params {
+	boolean_t		xepp_configured;
+	uint_t			xepp_eptype;
+	uint_t			xepp_burst;
+	uint_t			xepp_ival;
+	uint_t			xepp_max_esit;
+	uint_t			xepp_avgtrb;
+	uint_t			xepp_mps;
+	uint_t			xepp_mult;
+	uint_t			xepp_cerr;
+} xhci_endpoint_params_t;
 
 typedef struct xhci_endpoint {
 	struct xhci		*xep_xhci;
@@ -536,6 +558,7 @@ typedef struct xhci_endpoint {
 	list_t			xep_transfers;
 	usba_pipe_handle_data_t	*xep_pipe;
 	xhci_ring_t		xep_ring;
+	xhci_endpoint_params_t	xep_params;
 } xhci_endpoint_t;
 
 typedef struct xhci_device {
@@ -828,9 +851,13 @@ extern void xhci_fm_runtime_reset(xhci_t *);
  */
 extern int xhci_endpoint_init(xhci_t *, xhci_device_t *,
     usba_pipe_handle_data_t *);
+extern int xhci_endpoint_reinit(xhci_t *, xhci_device_t *,
+    xhci_endpoint_t *, usba_pipe_handle_data_t *);
+extern void xhci_endpoint_release(xhci_t *, xhci_endpoint_t *);
 extern void xhci_endpoint_fini(xhci_device_t *, int);
 extern int xhci_endpoint_update_default(xhci_t *, xhci_device_t *,
     xhci_endpoint_t *);
+extern void xhci_endpoint_timeout_cancel(xhci_t *, xhci_endpoint_t *);
 
 extern int xhci_endpoint_setup_default_context(xhci_t *, xhci_device_t *,
     xhci_endpoint_t *);
@@ -838,6 +865,7 @@ extern int xhci_endpoint_setup_default_context(xhci_t *, xhci_device_t *,
 extern uint_t xhci_endpoint_pipe_to_epid(usba_pipe_handle_data_t *);
 extern boolean_t xhci_endpoint_is_periodic_in(xhci_endpoint_t *);
 
+extern void xhci_endpoint_serialize(xhci_t *, xhci_endpoint_t *);
 extern int xhci_endpoint_quiesce(xhci_t *, xhci_device_t *, xhci_endpoint_t *);
 extern int xhci_endpoint_schedule(xhci_t *, xhci_device_t *, xhci_endpoint_t *,
     xhci_transfer_t *, boolean_t);

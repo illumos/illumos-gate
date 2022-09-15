@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -305,6 +305,9 @@ smb2_sparse_copy(
 	int rc;
 
 	while (*residp > 0) {
+
+		if (sr->sr_state != SMB_REQ_STATE_ACTIVE)
+			break;
 
 		data = src_off;
 		rc = smb_fsop_next_alloc_range(src_ofile->f_cr,

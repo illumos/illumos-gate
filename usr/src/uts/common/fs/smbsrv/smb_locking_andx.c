@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -295,7 +295,7 @@ smb_com_locking_andx(smb_request_t *sr)
 			NewLevel = OPLOCK_LEVEL_TWO;
 		status = smb_oplock_ack_break(sr, ofile, &NewLevel);
 		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
-			(void) smb_oplock_wait_break(ofile->f_node, 0);
+			(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
 			status = 0;
 		}
 		if (unlock_num == 0 && lock_num == 0)

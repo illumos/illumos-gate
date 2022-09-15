@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2011-2020 Tintri by DDN, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
  */
 
@@ -1077,6 +1077,8 @@ typedef struct smb_user {
 	uint32_t		u_privileges;
 	uint16_t		u_uid;		/* unique per-session */
 	uint32_t		u_audit_sid;
+	uint32_t		u_owned_tree_cnt;
+	kcondvar_t		u_owned_tree_cv;
 
 	uint32_t		u_sign_flags;
 	struct smb_key		u_sign_key;	/* SMB2 signing */
@@ -1799,6 +1801,7 @@ typedef enum smb_req_state {
 	SMB_REQ_STATE_WAITING_FCN2,
 	SMB_REQ_STATE_WAITING_LOCK,
 	SMB_REQ_STATE_WAITING_PIPE,
+	SMB_REQ_STATE_WAITING_OLBRK,
 	SMB_REQ_STATE_COMPLETED,
 	SMB_REQ_STATE_CANCEL_PENDING,
 	SMB_REQ_STATE_CANCELLED,
