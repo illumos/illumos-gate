@@ -10,9 +10,9 @@
 #
 
 #
-# Copyright 2015 Nexenta Systems, Inc.
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2021 Oxide Computer Company
+# Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 #
 
 
@@ -27,7 +27,7 @@ include ../Makefile.ctf
 .KEEP_STATE:
 
 CFLAGS +=	$(CCVERBOSE) -I$(SRC)/uts/common/io/nvme
-LDLIBS +=	-ldevinfo -lofmt
+LDLIBS +=	-ldevinfo -lofmt -lcmdutils
 CSTD=	$(CSTD_GNU99)
 
 #
