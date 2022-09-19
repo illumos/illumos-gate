@@ -26,6 +26,7 @@
 	Copyright 2014 Nexenta Systems, Inc.  All rights reserved
 	Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 	Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+	Copyright 2022 RackTop Systems.
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -180,6 +181,7 @@
 	   <propval name='mountd_listen_backlog' type='integer' value='64'/>
 	   <propval name='mountd_max_threads' type='integer' value='16'/>
 	   <propval name='mountd_port' type='integer' value='0'/>
+	   <propval name='mountd_remote_dump' type='boolean' value='false'/>
 	 </property_group>
 	</instance>
 

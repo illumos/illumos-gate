@@ -24,6 +24,7 @@
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2022 RackTop Systems.
 
 FSTYPE	  =	nfs
 TYPEPROG  =	mountd
@@ -39,7 +40,8 @@ SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c \
 		../lib/sharetab.c ../lib/daemon.c ../lib/smfcfg.c
 DSRC	  =	mountd_dt.d
 DOBJ	  =	$(DSRC:%.d=%.o)
-LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ltsnet -ltsol -lnvpair -lscf -lumem
+LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -linetutil -ltsnet -ltsol
+LDLIBS	 +=	-lnvpair -lscf -lumem
 CPPFLAGS +=	-D_REENTRANT -I../lib
 
 CERRWARN +=	$(CNOWARN_UNINIT)

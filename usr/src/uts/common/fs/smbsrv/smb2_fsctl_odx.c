@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018-2021 Tintri by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -82,6 +82,7 @@ typedef struct smb_odx_token {
 			smb2fid_t	tn1_fid;
 			uint64_t	tn1_off;
 			uint64_t	tn1_eof;
+			uint32_t	tn1_tid;
 		} u_tok_native1;
 	} tok_u;
 } smb_odx_token_t;
@@ -136,8 +137,11 @@ uint32_t smb2_odx_write_max = (1<<24); /* 16M */
  * needs to be large enough to allow the copy to proceed with
  * reasonable efficiency.  1M is currently the largest possible
  * block size with ZFS, so that's what we'll use here.
+ *
+ * Actually, limit this to kmem_max_cached, to avoid contention
+ * allocating from kmem_oversize_arena.
  */
-uint32_t smb2_odx_buf_size = (1<<20); /* 1M */
+uint32_t smb2_odx_buf_size = (1<<17); /* 128k */
 
 
 /*
@@ -352,6 +356,7 @@ done:
 		tn1->tn1_fid.temporal = ofile->f_fid;
 		tn1->tn1_off = in_file_off;
 		tn1->tn1_eof = src_size;
+		tn1->tn1_tid = sr->smb_tid;
 	}
 
 	rc = smb_odx_put_token(fsctl->out_mbc, tok);
@@ -610,8 +615,37 @@ smb2_fsctl_odx_write_native1(smb_request_t *sr,
 	 * but different error code.
 	 */
 	tn1 = &tok->tok_u.u_tok_native1;
-	src_ofile = smb_ofile_lookup_by_fid(sr,
-	    (uint16_t)tn1->tn1_fid.temporal);
+
+	/*
+	 * If the source ofile came from another tree, we need to
+	 * get the other tree and use it for the fid lookup.
+	 * Do that by temporarily changing sr->tid_tree around
+	 * the call to smb_ofile_lookup_by_fid().
+	 */
+	if (tn1->tn1_tid != sr->smb_tid) {
+		smb_tree_t *saved_tree;
+		smb_tree_t *src_tree;
+
+		src_tree = smb_session_lookup_tree(sr->session,
+		    (uint16_t)tn1->tn1_tid);
+		if (src_tree == NULL) {
+			status = NT_STATUS_INVALID_TOKEN;
+			goto out;
+		}
+
+		saved_tree = sr->tid_tree;
+		sr->tid_tree = src_tree;
+
+		src_ofile = smb_ofile_lookup_by_fid(sr,
+		    (uint16_t)tn1->tn1_fid.temporal);
+
+		sr->tid_tree = saved_tree;
+		smb_tree_release(src_tree);
+	} else {
+		src_ofile = smb_ofile_lookup_by_fid(sr,
+		    (uint16_t)tn1->tn1_fid.temporal);
+	}
+
 	if (src_ofile == NULL ||
 	    src_ofile->f_persistid != tn1->tn1_fid.persistent) {
 		status = NT_STATUS_INVALID_TOKEN;
@@ -773,11 +807,12 @@ smb_odx_get_token_native1(mbuf_chain_t *mbc, struct tok_native1 *tn1)
 	int rc;
 
 	rc = smb_mbc_decodef(
-	    mbc, "qqqq",
+	    mbc, "qqqql",
 	    &tn1->tn1_fid.persistent,
 	    &tn1->tn1_fid.temporal,
 	    &tn1->tn1_off,
-	    &tn1->tn1_eof);
+	    &tn1->tn1_eof,
+	    &tn1->tn1_tid);
 
 	return (rc);
 }
@@ -839,11 +874,12 @@ smb_odx_put_token_native1(mbuf_chain_t *mbc, struct tok_native1 *tn1)
 	int rc;
 
 	rc = smb_mbc_encodef(
-	    mbc, "qqqq",
+	    mbc, "qqqql",
 	    tn1->tn1_fid.persistent,
 	    tn1->tn1_fid.temporal,
 	    tn1->tn1_off,
-	    tn1->tn1_eof);
+	    tn1->tn1_eof,
+	    tn1->tn1_tid);
 
 	return (rc);
 }
