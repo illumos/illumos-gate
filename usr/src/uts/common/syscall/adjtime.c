@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.78 */
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -43,7 +41,7 @@
 #include <sys/policy.h>
 
 int
-adjtime(struct timeval *delta, struct timeval *olddelta)
+adjtime(const struct timeval *delta, struct timeval *olddelta)
 {
 	struct timeval atv, oatv;
 	int64_t	ndelta;

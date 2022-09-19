@@ -388,7 +388,7 @@ extern	void		hrt2ts32(hrtime_t, timestruc32_t *);
 #endif /* _KERNEL */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-int adjtime(struct timeval *, struct timeval *);
+int adjtime(const struct timeval *, struct timeval *);
 #endif /* !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) ... */
 
 #if !defined(_KERNEL) && !defined(__XOPEN_OR_POSIX) || \
