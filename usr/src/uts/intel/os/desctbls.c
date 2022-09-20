@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc. All rights reserved.
+ * Copyright 2022 Oxide Computer Compnay
  */
 
 /*
@@ -841,47 +842,29 @@ init_idt(gate_desc_t *idt)
 	 * since it can only be generated on a 386 processor. 15 is also
 	 * unsupported and reserved.
 	 */
-#if !defined(__xpv)
 	for (i = 0; i < NIDT; i++) {
 		set_gatesegd(&idt[i],
 		    (kpti_enable == 1) ? &tr_resvtrap : &resvtrap,
 		    KCS_SEL, SDT_SYSIGT, TRP_KPL,
 		    idt_vector_to_ist(T_RESVTRAP));
 	}
-#else
-	for (i = 0; i < NIDT; i++) {
-		set_gatesegd(&idt[i], &resvtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-		    IST_NONE);
-	}
-#endif
 
 	/*
 	 * 20-31 reserved
 	 */
-#if !defined(__xpv)
 	for (i = 20; i < 32; i++) {
 		set_gatesegd(&idt[i],
 		    (kpti_enable == 1) ? &tr_invaltrap : &invaltrap,
 		    KCS_SEL, SDT_SYSIGT, TRP_KPL,
 		    idt_vector_to_ist(T_INVALTRAP));
 	}
-#else
-	for (i = 20; i < 32; i++) {
-		set_gatesegd(&idt[i], &invaltrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-		    IST_NONE);
-	}
-#endif
 
 	/*
 	 * interrupts 32 - 255
 	 */
 	for (i = 32; i < 256; i++) {
-#if !defined(__xpv)
 		(void) snprintf(ivctname, sizeof (ivctname),
 		    (kpti_enable == 1) ? "tr_ivct%d" : "ivct%d", i);
-#else
-		(void) snprintf(ivctname, sizeof (ivctname), "ivct%d", i);
-#endif
 		ivctptr = (void (*)(void))kobj_getsymvalue(ivctname, 0);
 		if (ivctptr == NULL)
 			panic("kobj_getsymvalue(%s) failed", ivctname);
