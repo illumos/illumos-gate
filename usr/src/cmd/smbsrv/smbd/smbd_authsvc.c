@@ -74,6 +74,7 @@ static int smbd_authsvc_clinfo(authsvc_context_t *);
 static int smbd_authsvc_esfirst(authsvc_context_t *);
 static int smbd_authsvc_esnext(authsvc_context_t *);
 static int smbd_authsvc_escmn(authsvc_context_t *);
+static int smbd_authsvc_newmech(authsvc_context_t *);
 static int smbd_authsvc_gettoken(authsvc_context_t *);
 static int smbd_raw_ntlmssp_esfirst(authsvc_context_t *);
 static int smbd_raw_ntlmssp_esnext(authsvc_context_t *);
@@ -731,9 +732,18 @@ smbd_authsvc_esfirst(authsvc_context_t *ctx)
 	}
 
 	/*
-	 * Common to LSA_MTYPE_ESFIRST, LSA_MTYPE_ESNEXT
+	 * If the best supported mech was not the first in the list,
+	 * we need to ask the client to use a different one, and
+	 * skip (ignore) the provided token body.
 	 */
-	rc = smbd_authsvc_escmn(ctx);
+	if (best_pref != 0) {
+		rc = smbd_authsvc_newmech(ctx);
+	} else {
+		/*
+		 * Common to LSA_MTYPE_ESFIRST, LSA_MTYPE_ESNEXT
+		 */
+		rc = smbd_authsvc_escmn(ctx);
+	}
 	return (rc);
 }
 
@@ -874,6 +884,62 @@ smbd_authsvc_escmn(authsvc_context_t *ctx)
 	    ctx->ctx_obodylen,
 	    NULL, 0,
 	    &ctx->ctx_otoken);
+	if (rc != 0)
+		return (NT_STATUS_INTERNAL_ERROR);
+
+	/*
+	 * Convert the SPNEGO token into binary form,
+	 * writing it to the output buffer.
+	 */
+	toklen = smbd_authsvc_bufsize;
+	rc = spnegoTokenGetBinary(ctx->ctx_otoken,
+	    (uchar_t *)ctx->ctx_orawbuf, &toklen);
+	if (rc != 0)
+		rc = NT_STATUS_INTERNAL_ERROR;
+	ctx->ctx_orawlen = (uint_t)toklen;
+
+	return (rc);
+}
+
+/*
+ * The first NegTokenInit we receive, handled in smbd_authsvc_esfirst,
+ * contains a list of supported mechanisms, in order from the client's
+ * most preferred to least preferred. The token also contains a body
+ * for the first mechanism listed, which is used immediately if the
+ * first mechanism is mutually agreeable.  If the first mechanism is
+ * not supported on our side, we must "propose a new mechanism" from
+ * the list.  Our caller has selected a mech and initialized the ctx
+ * mech functions.  Here compose a reply with an empty body and the
+ * proposed new mechanism OID.  The token body received is for some
+ * other mech, so we skip calling the work function with that token.
+ *
+ * Just send a NegTokenTarg with an empty body and the OID for the
+ * proposed mechanism.  The next message should be the real first
+ * token for this mechanism, handled in smbd_authsvc_exnext.
+ */
+static int
+smbd_authsvc_newmech(authsvc_context_t *ctx)
+{
+	ulong_t toklen;
+	int rc;
+
+	/*
+	 * Don't call mh_work here.
+	 * Just tell the clint the selected mech.
+	 */
+	ctx->ctx_ibodylen = 0;
+	ctx->ctx_orawtype = LSA_MTYPE_ES_CONT;
+	ctx->ctx_obodylen = 0;
+	ctx->ctx_negresult = spnego_negresult_request_mic;
+
+	rc = spnegoCreateNegTokenTarg(
+	    ctx->ctx_mech_oid,
+	    ctx->ctx_negresult,
+	    NULL, 0,
+	    NULL, 0,
+	    &ctx->ctx_otoken);
+	if (rc != 0)
+		return (NT_STATUS_INTERNAL_ERROR);
 
 	/*
 	 * Convert the SPNEGO token into binary form,
