@@ -26,6 +26,7 @@ function errexit {
 ucodetar="$1"
 
 FW=platform/i86pc/ucode/GenuineIntel
+LINKSF=intel/Makefile.links
 
 export LC_ALL=C.UTF-8
 
@@ -78,12 +79,12 @@ mv $mf $mf.tmp
 egrep -v "(file|hardlink) path=$FW" $mf.tmp > $mf
 rm -f $mf.tmp
 
-rm -f intel/*
+rm -f intel/*-*
 
 cp $tmp/$path/license intel/THIRDPARTYLICENSE
 echo Intel Processor Microcode Data Files > intel/THIRDPARTYLICENSE.descrip
 
-rm -f Makefile.links
+rm -f $LINKSF
 
 typeset -A seen
 typeset -A inodes
@@ -105,6 +106,7 @@ done
 for f in intel/*; do
 	bf=$(basename $f)
 	[[ $bf = THIRDPARTYLICENSE* ]] && continue
+	[[ $bf = Makefile* ]] && continue
 	echo "file path=$FW/$bf group=sys mode=0444 reboot-needed=true" >> $mf
 done
 
@@ -115,11 +117,11 @@ done
 		echo "\t$i \\"
 	done | sed '$s/ .*//'
 	echo
-) > Makefile.links
+) > $LINKSF
 
 for i in "${!links[@]}"; do
 	echo "hardlink path=$FW/$i target=${links[$i]}" >> $mf
-	cat << EOM >> Makefile.links
+	cat << EOM >> $LINKSF
 \$(ROOTINTELDIR)/$i: \$(ROOTINTELDIR)/${links[$i]}
 	\$(RM) \$@; \$(LN) \$^ \$@
 
