@@ -395,8 +395,23 @@ enum vm_cpuid_capability {
 	VCC_LAST
 };
 
-int x86_emulate_cpuid(struct vm *, int, uint64_t *, uint64_t *, uint64_t *,
+/* Possible flags and entry count limit definited in sys/vmm.h */
+typedef struct vcpu_cpuid_config {
+	uint32_t		vcc_flags;
+	uint32_t		vcc_nent;
+	struct vcpu_cpuid_entry	*vcc_entries;
+} vcpu_cpuid_config_t;
+
+vcpu_cpuid_config_t *vm_cpuid_config(struct vm *, int);
+int vm_get_cpuid(struct vm *, int, vcpu_cpuid_config_t *);
+int vm_set_cpuid(struct vm *, int, const vcpu_cpuid_config_t *);
+void vcpu_emulate_cpuid(struct vm *, int, uint64_t *, uint64_t *, uint64_t *,
     uint64_t *);
+void legacy_emulate_cpuid(struct vm *, int, uint32_t *, uint32_t *, uint32_t *,
+    uint32_t *);
+void vcpu_cpuid_init(vcpu_cpuid_config_t *);
+void vcpu_cpuid_cleanup(vcpu_cpuid_config_t *);
+
 bool vm_cpuid_capability(struct vm *, int, enum vm_cpuid_capability);
 bool validate_guest_xcr0(uint64_t, uint64_t);
 

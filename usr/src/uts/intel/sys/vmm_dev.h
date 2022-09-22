@@ -370,6 +370,23 @@ struct vm_data_xfer {
 	void		*vdx_data;
 };
 
+struct vm_vcpu_cpuid_config {
+	int		vvcc_vcpuid;
+	uint32_t	vvcc_flags;
+	uint32_t	vvcc_nent;
+	uint32_t	_pad;
+	void		*vvcc_entries;
+};
+
+/* Query the computed legacy cpuid value for a vcpuid with VM_LEGACY_CPUID */
+struct vm_legacy_cpuid {
+	int		vlc_vcpuid;
+	uint32_t	vlc_eax;
+	uint32_t	vlc_ebx;
+	uint32_t	vlc_ecx;
+	uint32_t	vlc_edx;
+};
+
 /*
  * VMM Interface Version
  *
@@ -385,7 +402,7 @@ struct vm_data_xfer {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	4
+#define	VMM_CURRENT_INTERFACE_VERSION	5
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
@@ -431,6 +448,9 @@ struct vm_data_xfer {
 #define	VM_SET_RUN_STATE		(VMM_CPU_IOC_BASE | 0x18)
 #define	VM_GET_FPU			(VMM_CPU_IOC_BASE | 0x19)
 #define	VM_SET_FPU			(VMM_CPU_IOC_BASE | 0x1a)
+#define	VM_GET_CPUID			(VMM_CPU_IOC_BASE | 0x1b)
+#define	VM_SET_CPUID			(VMM_CPU_IOC_BASE | 0x1c)
+#define	VM_LEGACY_CPUID			(VMM_CPU_IOC_BASE | 0x1d)
 
 /* Operations requiring write-locking the VM */
 #define	VM_REINIT		(VMM_LOCK_IOC_BASE | 0x01)

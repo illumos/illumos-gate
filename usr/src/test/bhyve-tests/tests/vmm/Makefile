@@ -25,7 +25,8 @@ PROG =	mem_partial \
 	interface_version \
 	check_iommu \
 	auto_destruct \
-	drv_hold
+	drv_hold \
+	cpuid_ioctl
 
 SCRIPT = vmm_drv_test_fini vmm_drv_test_init
 

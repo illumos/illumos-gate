@@ -27,6 +27,7 @@ user = root
 pre = vmm_drv_test_init
 tests = [
 	'auto_destruct',
+	'cpuid_ioctl',
 	'drv_hold',
 	'fpu_getset',
 	'interface_version',
@@ -51,6 +52,7 @@ tests = [
 [/opt/bhyve-tests/tests/inst_emul]
 user = root
 tests = [
+	'cpuid',
 	'rdmsr',
 	'wrmsr',
 	'triple_fault'

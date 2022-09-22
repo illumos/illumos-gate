@@ -448,6 +448,9 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_SET_RUN_STATE:
 	case VM_GET_FPU:
 	case VM_SET_FPU:
+	case VM_GET_CPUID:
+	case VM_SET_CPUID:
+	case VM_LEGACY_CPUID:
 		/*
 		 * Copy in the ID of the vCPU chosen for this operation.
 		 * Since a nefarious caller could update their struct between
@@ -1195,6 +1198,117 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = vm_set_fpu(sc->vmm_vm, vcpu, kbuf, req.len);
 		}
 		kmem_free(kbuf, req.len);
+		break;
+	}
+	case VM_GET_CPUID: {
+		struct vm_vcpu_cpuid_config cfg;
+		struct vcpu_cpuid_entry *entries = NULL;
+
+		if (ddi_copyin(datap, &cfg, sizeof (cfg), md)) {
+			error = EFAULT;
+			break;
+		}
+		if (cfg.vvcc_nent > VMM_MAX_CPUID_ENTRIES) {
+			error = EINVAL;
+			break;
+		}
+
+		const size_t entries_size =
+		    cfg.vvcc_nent * sizeof (struct vcpu_cpuid_entry);
+		if (entries_size != 0) {
+			entries = kmem_zalloc(entries_size, KM_SLEEP);
+		}
+
+		vcpu_cpuid_config_t vm_cfg = {
+			.vcc_nent = cfg.vvcc_nent,
+			.vcc_entries = entries,
+		};
+		error = vm_get_cpuid(sc->vmm_vm, vcpu, &vm_cfg);
+
+		/*
+		 * Only attempt to copy out the resultant entries if we were
+		 * able to query them from the instance.  The flags and number
+		 * of entries are emitted regardless.
+		 */
+		cfg.vvcc_flags = vm_cfg.vcc_flags;
+		cfg.vvcc_nent = vm_cfg.vcc_nent;
+		if (entries != NULL) {
+			if (error == 0 && ddi_copyout(entries, cfg.vvcc_entries,
+			    entries_size, md) != 0) {
+				error = EFAULT;
+			}
+
+			kmem_free(entries, entries_size);
+		}
+
+		if (ddi_copyout(&cfg, datap, sizeof (cfg), md) != 0) {
+			error = EFAULT;
+		}
+		break;
+	}
+	case VM_SET_CPUID: {
+		struct vm_vcpu_cpuid_config cfg;
+		struct vcpu_cpuid_entry *entries = NULL;
+		size_t entries_size = 0;
+
+		if (ddi_copyin(datap, &cfg, sizeof (cfg), md)) {
+			error = EFAULT;
+			break;
+		}
+		if (cfg.vvcc_nent > VMM_MAX_CPUID_ENTRIES) {
+			error = EFBIG;
+			break;
+		}
+		if ((cfg.vvcc_flags & VCC_FLAG_LEGACY_HANDLING) != 0) {
+			/*
+			 * If we are being instructed to use "legacy" handling,
+			 * then no entries should be provided, since the static
+			 * in-kernel masking will be used.
+			 */
+			if (cfg.vvcc_nent != 0) {
+				error = EINVAL;
+				break;
+			}
+		} else if (cfg.vvcc_nent != 0) {
+			entries_size =
+			    cfg.vvcc_nent * sizeof (struct vcpu_cpuid_entry);
+			entries = kmem_alloc(entries_size, KM_SLEEP);
+
+			if (ddi_copyin(cfg.vvcc_entries, entries, entries_size,
+			    md) != 0) {
+				error = EFAULT;
+				kmem_free(entries, entries_size);
+				break;
+			}
+		}
+
+		vcpu_cpuid_config_t vm_cfg = {
+			.vcc_flags = cfg.vvcc_flags,
+			.vcc_nent = cfg.vvcc_nent,
+			.vcc_entries = entries,
+		};
+		error = vm_set_cpuid(sc->vmm_vm, vcpu, &vm_cfg);
+
+		if (entries != NULL) {
+			kmem_free(entries, entries_size);
+		}
+		break;
+	}
+	case VM_LEGACY_CPUID: {
+		struct vm_legacy_cpuid vlc;
+		if (ddi_copyin(datap, &vlc, sizeof (vlc), md)) {
+			error = EFAULT;
+			break;
+		}
+		vlc.vlc_vcpuid = vcpu;
+
+		legacy_emulate_cpuid(sc->vmm_vm, vcpu, &vlc.vlc_eax,
+		    &vlc.vlc_ebx, &vlc.vlc_ecx, &vlc.vlc_edx);
+
+		if (ddi_copyout(&vlc, datap, sizeof (vlc), md)) {
+			error = EFAULT;
+			break;
+		}
 		break;
 	}
 

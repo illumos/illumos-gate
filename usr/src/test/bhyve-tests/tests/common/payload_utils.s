@@ -15,6 +15,7 @@
 
 #include <sys/asm_linkage.h>
 
+/* void outb(uint16_t port, uint8_t val) */
 ENTRY(outb)
 	movw    %di, %dx
 	movb    %sil, %al
@@ -22,6 +23,7 @@ ENTRY(outb)
 	ret
 SET_SIZE(outb)
 
+/* void outw(uint16_t port, uint16_t val) */
 ENTRY(outw)
 	movw    %di, %dx
 	movw    %si, %ax
@@ -29,6 +31,7 @@ ENTRY(outw)
 	ret
 SET_SIZE(outb)
 
+/* void outl(uint16_t port, uint32_t val) */
 ENTRY(outl)
 	movw    %di, %dx
 	movl    %esi, %eax
@@ -36,24 +39,28 @@ ENTRY(outl)
 	ret
 SET_SIZE(outl)
 
+/* uint8_t inb(uint16_t port) */
 ENTRY(inb)
 	movw    %di, %dx
 	inb    (%dx)
 	ret
 SET_SIZE(inb)
 
+/* uint16_t inw(uint16_t port) */
 ENTRY(inw)
 	movw    %di, %dx
 	inw    (%dx)
 	ret
 SET_SIZE(inw)
 
+/* uint32_t inl(uint16_t port) */
 ENTRY(inl)
 	movw    %di, %dx
 	inl    (%dx)
 	ret
 SET_SIZE(inl)
 
+/* uint64_t wrmsr(uint32_t msr) */
 ENTRY(rdmsr)
 	movl    %edi, %ecx
 	rdmsr
@@ -62,6 +69,7 @@ ENTRY(rdmsr)
 	ret
 SET_SIZE(rdmsr)
 
+/* void wrmsr(uint32_t msr, uint64_t val) */
 ENTRY(wrmsr)
 	movq    %rsi, %rdx
 	shrq    $32, %rdx
@@ -70,3 +78,18 @@ ENTRY(wrmsr)
 	wrmsr
 	ret
 SET_SIZE(wrmsr)
+
+/* void cpuid(uint32_t in_eax, uint32_t in_ecx, uint32_t *out_regs) */
+ENTRY(cpuid)
+	pushq   %rbx
+	movl    %edi, %eax
+	movl    %esi, %ecx
+	movq    %rdx, %r8
+	cpuid
+	movl    %eax, (%r8)
+	movl    %ebx, 4(%r8)
+	movl    %ecx, 8(%r8)
+	movl    %edx, 12(%r8)
+	popq    %rbx
+	ret
+SET_SIZE(cpuid)

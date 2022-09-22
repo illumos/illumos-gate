@@ -406,4 +406,51 @@ enum vm_create_flags {
 	VCF_RESERVOIR_MEM = (1 << 0),
 };
 
+/*
+ * Describes an entry for `cpuid` emulation.
+ * Used internally by bhyve (kernel) in addition to exposed ioctl(2) interface.
+ */
+struct vcpu_cpuid_entry {
+	uint32_t	vce_function;
+	uint32_t	vce_index;
+	uint32_t	vce_flags;
+	uint32_t	vce_eax;
+	uint32_t	vce_ebx;
+	uint32_t	vce_ecx;
+	uint32_t	vce_edx;
+	uint32_t	_pad;
+};
+
+/*
+ * Defined flags for vcpu_cpuid_entry`vce_flags are below.
+ */
+
+/* Use index (ecx) input value when matching entry */
+#define	VCE_FLAG_MATCH_INDEX		(1 << 0)
+
+/* All valid flacts for vcpu_cpuid_entry`vce_flags */
+#define	VCE_FLAGS_VALID		VCE_FLAG_MATCH_INDEX
+
+/*
+ * Defined flags for vcpu_cpuid configuration are below.
+ * These are used by both the ioctl(2) interface via vm_vcpu_cpuid_config and
+ * internally in the kernel vmm.
+ */
+
+/* Use legacy hard-coded cpuid masking tables applied to the host CPU */
+#define	VCC_FLAG_LEGACY_HANDLING	(1 << 0)
+/*
+ * Emulate Intel-style fallback behavior (emit highest "standard" entry) if the
+ * queried function/index do not match.  If not set, emulate AMD-style, where
+ * all zeroes are returned in such cases.
+ */
+#define	VCC_FLAG_INTEL_FALLBACK		(1 << 1)
+
+/* All valid flacts for vm_vcpu_cpuid_config`vvcc_flags */
+#define	VCC_FLAGS_VALID		\
+	(VCC_FLAG_LEGACY_HANDLING | VCC_FLAG_INTEL_FALLBACK)
+
+/* Maximum vcpu_cpuid_entry records per vCPU */
+#define	VMM_MAX_CPUID_ENTRIES		256
+
 #endif	/* _VMM_H_ */
