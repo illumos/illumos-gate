@@ -11,13 +11,14 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2017 RackTop Systems.
+ * Copyright 2018 RackTop Systems.
  */
 
 #include <sys/cmn_err.h>
 #include <sys/thread.h>
 #include <sys/zone.h>
 #include <sys/proc.h>
+#include <sys/atomic.h>
 
 #define	_SYNCH_H	/* keep out <synch.h> */
 #include <thread.h>
@@ -81,6 +82,14 @@ thread_create(
 void
 thread_exit(void)
 {
+	static thread_t reap_tid;
+	thread_t prev;
+
+	/* reap previous thread exit */
+	prev = atomic_swap_uint(&reap_tid, thr_self());
+	if (prev != 0)
+		(void) thr_join(prev, NULL, NULL); /* joinable thread */
+
 	thr_exit(NULL);
 }
 
