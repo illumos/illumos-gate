@@ -2935,9 +2935,6 @@ vmm_ctl_ioctl(int cmd, intptr_t arg, int md, cred_t *cr, int *rvalp)
 	}
 	case VMM_VM_SUPPORTED:
 		return (vmm_is_supported(arg));
-	case VMM_INTERFACE_VERSION:
-		*rvalp = VMM_CURRENT_INTERFACE_VERSION;
-		return (0);
 	case VMM_CHECK_IOMMU:
 		if (!vmm_check_iommu()) {
 			return (ENXIO);
@@ -2972,6 +2969,15 @@ vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	/* The structs in bhyve ioctls assume a 64-bit datamodel */
 	if (ddi_model_convert_from(mode & FMODELS) != DDI_MODEL_NONE) {
 		return (ENOTSUP);
+	}
+
+	/*
+	 * Regardless of minor (vmmctl or instance), we respond to queries of
+	 * the interface version.
+	 */
+	if (cmd == VMM_INTERFACE_VERSION) {
+		*rvalp = VMM_CURRENT_INTERFACE_VERSION;
+		return (0);
 	}
 
 	minor = getminor(dev);

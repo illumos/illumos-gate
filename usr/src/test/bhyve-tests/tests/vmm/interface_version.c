@@ -18,9 +18,13 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <libgen.h>
+#include <err.h>
 
 #include <sys/vmm.h>
 #include <sys/vmm_dev.h>
+#include <vmmapi.h>
+
+#include "common.h"
 
 int
 main(int argc, char *argv[])
@@ -41,8 +45,24 @@ main(int argc, char *argv[])
 		    version, VMM_CURRENT_INTERFACE_VERSION);
 		return (EXIT_FAILURE);
 	}
-
 	(void) close(ctl_fd);
+
+	/* Query the version via an instance fd as well */
+	struct vmctx *ctx = create_test_vm(suite_name);
+	if (ctx == NULL) {
+		err(EXIT_FAILURE, "could not open test VM");
+	}
+	version = ioctl(vm_get_device_fd(ctx), VMM_INTERFACE_VERSION, 0);
+	if (version < 0) {
+		err(EXIT_FAILURE,
+		    "VMM_INTERFACE_VERSION ioctl failed on vmm fd");
+	}
+	if (version != VMM_CURRENT_INTERFACE_VERSION) {
+		errx(EXIT_FAILURE, "kernel version %d != expected %d",
+		    version, VMM_CURRENT_INTERFACE_VERSION);
+	}
+	vm_destroy(ctx);
+
 	(void) printf("%s\tPASS\n", suite_name);
 	return (0);
 }
