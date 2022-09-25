@@ -23,7 +23,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2010, Richard Lowe
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright (c) 2017 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
@@ -1550,12 +1550,12 @@ fi
 
 if [[ "$t_FLAG" == "y" ]]; then
 	set_non_debug_build_flags
-	bootstrap_tools || fatal_error "Error: could not bootstrap tools"
-
 	# Switch ONBLD_TOOLS early if -t is specified so that
 	# we could use bootstrapped cw for compiler checks.
 	ONBLD_TOOLS=${TOOLS_PROTO}/opt/onbld
 	export ONBLD_TOOLS
+
+	bootstrap_tools || fatal_error "Error: could not bootstrap tools"
 fi
 
 echo "\n==== Build environment ====\n" | tee -a $build_environ_file >> $LOGFILE
