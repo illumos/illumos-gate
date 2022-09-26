@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -151,7 +152,8 @@ smb_pathname_reduce(
     char		*last_component)
 {
 	smb_node_t	*root_node;
-	pathname_t	ppn, mnt_pn;
+	pathname_t	ppn = {0};
+	pathname_t	mnt_pn = {0};
 	char		*usepath;
 	int		lookup_flags = FOLLOW;
 	int		trailing_slash = 0;
@@ -283,6 +285,10 @@ smb_pathname_reduce(
 			(void) strlcpy(last_component, ".", MAXNAMELEN);
 		} else {
 			(void) pn_setlast(&ppn);
+			if (ppn.pn_pathlen >= MAXNAMELEN) {
+				err = ENAMETOOLONG;
+				goto end_not_vss;
+			}
 			(void) strlcpy(last_component, ppn.pn_path, MAXNAMELEN);
 			ppn.pn_path[0] = '\0';
 		}
@@ -297,6 +303,7 @@ smb_pathname_reduce(
 		    chk_vss ? &mnt_pn : NULL);
 	}
 
+end_not_vss:
 	(void) pn_free(&ppn);
 	kmem_free(usepath, SMB_MAXPATHLEN);
 
@@ -327,6 +334,10 @@ smb_pathname_reduce(
 				(void) strlcpy(last_component, ".", MAXNAMELEN);
 			} else {
 				(void) pn_setlast(&mnt_pn);
+				if (ppn.pn_pathlen >= MAXNAMELEN) {
+					err = ENAMETOOLONG;
+					goto end_chk_vss;
+				}
 				(void) strlcpy(last_component, mnt_pn.pn_path,
 				    MAXNAMELEN);
 				mnt_pn.pn_path[0] = '\0';
@@ -344,6 +355,7 @@ smb_pathname_reduce(
 		}
 	}
 
+end_chk_vss:
 	if (chk_vss)
 		(void) pn_free(&mnt_pn);
 	if (gmttoken != NULL)

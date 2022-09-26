@@ -118,15 +118,13 @@ verify_bootfs $TESTPOOL
 log_must zpool create $TESTPOOL mirror $VDEV1 $VDEV2 spare $VDEV3
 verify_bootfs $TESTPOOL
 
-## the following configurations are not supported as bootable pools
-
 # stripe
 log_must zpool create $TESTPOOL $VDEV1 $VDEV2
-verify_no_bootfs $TESTPOOL
+verify_bootfs $TESTPOOL
 
 # stripe + hotspare
 log_must zpool create $TESTPOOL $VDEV1 $VDEV2 spare $VDEV3
-verify_no_bootfs $TESTPOOL
+verify_bootfs $TESTPOOL
 
 # raidz
 log_must zpool create $TESTPOOL raidz $VDEV1 $VDEV2

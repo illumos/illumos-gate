@@ -98,13 +98,13 @@ SYMBOL_VERSION SUNWprivate {
 	smb_codepage_init;
 	smb_common_decode;
 	smb_common_encode;
-	smb_config_check_protocol;
 	smb_config_get;
 	smb_config_get_ads_enable;
 	smb_config_get_debug;
 	smb_config_get_execinfo;
 	smb_config_get_fg_flag;
 	smb_config_get_localsid;
+	smb_config_get_require;
 	smb_config_get_secmode;
 	smb_config_get_version;
 	smb_config_getbool;
@@ -124,6 +124,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_config_setnum;
 	smb_config_setstr;
 	smb_config_upgrade;
+	smb_convert_version_str;
 	smb_crc_gen;
 	smb_ctxbuf_init;
 	smb_ctxbuf_len;

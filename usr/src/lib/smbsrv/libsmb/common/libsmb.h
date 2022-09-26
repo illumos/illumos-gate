@@ -220,9 +220,9 @@ extern void smb_config_get_version(smb_version_t *);
 uint32_t smb_config_get_execinfo(char *, char *, size_t);
 extern void smb_config_get_negtok(uchar_t *, uint32_t *);
 
-extern int smb_config_check_protocol(char *);
 extern uint32_t smb_config_get_max_protocol(void);
 extern uint32_t smb_config_get_min_protocol(void);
+extern uint32_t smb_convert_version_str(const char *);
 extern void smb_config_upgrade(void);
 extern uint16_t smb31_config_get_encrypt_cipher(void);
 
