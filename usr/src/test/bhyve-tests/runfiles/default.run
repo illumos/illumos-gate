@@ -52,7 +52,8 @@ tests = [
 	'cpuid',
 	'rdmsr',
 	'wrmsr',
-	'triple_fault'
+	'triple_fault',
+	'exit_paging'
 	]
 
 [/opt/bhyve-tests/tests/viona]

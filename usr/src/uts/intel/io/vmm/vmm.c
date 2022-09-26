@@ -1516,20 +1516,19 @@ vm_handle_paging(struct vm *vm, int vcpuid)
 	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 	vm_client_t *vmc = vcpu->vmclient;
 	struct vm_exit *vme = &vcpu->exitinfo;
-	int rv, ftype;
+	const int ftype = vme->u.paging.fault_type;
 
-	KASSERT(vme->inst_length == 0, ("%s: invalid inst_length %d",
-	    __func__, vme->inst_length));
+	ASSERT0(vme->inst_length);
+	ASSERT(ftype == PROT_READ || ftype == PROT_WRITE || ftype == PROT_EXEC);
 
-	ftype = vme->u.paging.fault_type;
-	KASSERT(ftype == PROT_READ ||
-	    ftype == PROT_WRITE || ftype == PROT_EXEC,
-	    ("vm_handle_paging: invalid fault_type %d", ftype));
+	if (vmc_fault(vmc, vme->u.paging.gpa, ftype) != 0) {
+		/*
+		 * If the fault cannot be serviced, kick it out to userspace for
+		 * handling (or more likely, halting the instance).
+		 */
+		return (-1);
+	}
 
-	rv = vmc_fault(vmc, vme->u.paging.gpa, ftype);
-
-	if (rv != 0)
-		return (EFAULT);
 	return (0);
 }
 

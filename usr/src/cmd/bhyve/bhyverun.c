@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -836,6 +836,18 @@ vmexit_run_state(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 	fprintf(stderr, "unexpected run-state VM exit");
 	return (VMEXIT_ABORT);
 }
+
+static int
+vmexit_paging(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
+{
+	fprintf(stderr, "vm exit[%d]\n", *pvcpu);
+	fprintf(stderr, "\treason\t\tPAGING\n");
+	fprintf(stderr, "\trip\t\t0x%016lx\n", vmexit->rip);
+	fprintf(stderr, "\tgpa\t\t0x%016lx\n", vmexit->u.paging.gpa);
+	fprintf(stderr, "\tfault_type\t\t%d\n", vmexit->u.paging.fault_type);
+
+	return (VMEXIT_ABORT);
+}
 #endif /* __FreeBSD__ */
 
 #ifdef __FreeBSD__
@@ -1109,6 +1121,7 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_SPINUP_AP] = vmexit_spinup_ap,
 #else
 	[VM_EXITCODE_RUN_STATE] = vmexit_run_state,
+	[VM_EXITCODE_PAGING] = vmexit_paging,
 #endif
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_TASK_SWITCH] = vmexit_task_switch,
