@@ -405,6 +405,8 @@ smb_ofile_open(
 	smb_node_t	*node = of->f_node;
 
 	ASSERT(of->f_state == SMB_OFILE_STATE_ALLOC);
+	ASSERT(of->f_fid != 0);
+
 	of->f_state = SMB_OFILE_STATE_OPEN;
 
 	switch (of->f_ftype) {

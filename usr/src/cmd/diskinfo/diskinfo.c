@@ -12,6 +12,7 @@
 /*
  * Copyright (c) 2018 Joyent Inc., All rights reserved.
  * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2022 Oxide Computer Company
  */
 
@@ -214,7 +215,7 @@ populate_physical(topo_hdl_t *hp, di_phys_t *pp)
 static void
 enumerate_disks(di_opts_t *opts)
 {
-	topo_hdl_t *hp;
+	topo_hdl_t *hp = NULL;
 	dm_descriptor_t *media;
 	int e, i;
 	int filter[] = { DM_DT_FIXED, -1 };
@@ -241,16 +242,25 @@ enumerate_disks(di_opts_t *opts)
 		err(-1, "failed to obtain media descriptors");
 	}
 
-	e = 0;
-	hp = topo_open(TOPO_VERSION, NULL, &e);
-	if (hp == NULL) {
-		errx(-1, "unable to obtain topo handle: %s", topo_strerror(e));
-	}
+	/*
+	 * We only need to walk topo if we're intending to display
+	 * condensed or physical information. If we don't need it, we leave
+	 * hp = NULL.
+	 */
+	if (opts->di_condensed || opts->di_physical) {
+		e = 0;
+		hp = topo_open(TOPO_VERSION, NULL, &e);
+		if (hp == NULL) {
+			errx(-1, "unable to obtain topo handle: %s",
+			    topo_strerror(e));
+		}
 
-	e = 0;
-	(void) topo_snap_hold(hp, NULL, &e);
-	if (e != 0) {
-		errx(-1, "unable to hold topo snapshot: %s", topo_strerror(e));
+		e = 0;
+		(void) topo_snap_hold(hp, NULL, &e);
+		if (e != 0) {
+			errx(-1, "unable to hold topo snapshot: %s",
+			    topo_strerror(e));
+		}
 	}
 
 	for (i = 0; media != NULL && media[i] != 0; i++) {
@@ -311,9 +321,27 @@ enumerate_disks(di_opts_t *opts)
 		    (device[len - 1] >= '0' && device[len - 1] <= '9'))
 			device[len - 2] = '\0';
 
-		bzero(&phys, sizeof (phys));
-		phys.dp_dev = device;
-		populate_physical(hp, &phys);
+		if (hp != NULL) {
+			bzero(&phys, sizeof (phys));
+			phys.dp_dev = device;
+			populate_physical(hp, &phys);
+
+			if (opts->di_parseable) {
+				(void) snprintf(slotname, sizeof (slotname),
+				    "%d,%d", phys.dp_chassis, phys.dp_slot);
+			} else if (phys.dp_slotname != NULL &&
+			    phys.dp_chassis != -1) {
+				(void) snprintf(slotname, sizeof (slotname),
+				    "[%d] %s", phys.dp_chassis,
+				    phys.dp_slotname);
+			} else if (phys.dp_slotname != NULL) {
+				(void) snprintf(slotname, sizeof (slotname),
+				    "%s", phys.dp_slotname);
+			} else {
+				slotname[0] = '-';
+				slotname[1] = '\0';
+			}
+		}
 
 		/*
 		 * The size is given in blocks, so multiply the number
@@ -330,20 +358,6 @@ enumerate_disks(di_opts_t *opts)
 			    1024.0 / 1024.0 / 1024.0;
 			(void) snprintf(sizestr, sizeof (sizestr),
 			    "%7.2f GiB", total_in_GiB);
-		}
-
-		if (opts->di_parseable) {
-			(void) snprintf(slotname, sizeof (slotname), "%d,%d",
-			    phys.dp_chassis, phys.dp_slot);
-		} else if (phys.dp_slotname != NULL && phys.dp_chassis != -1) {
-			(void) snprintf(slotname, sizeof (slotname),
-			    "[%d] %s", phys.dp_chassis, phys.dp_slotname);
-		} else if (phys.dp_slotname != NULL) {
-			(void) snprintf(slotname, sizeof (slotname),
-			    "%s", phys.dp_slotname);
-		} else {
-			slotname[0] = '-';
-			slotname[1] = '\0';
 		}
 
 		if (opts->di_condensed) {
@@ -405,8 +419,10 @@ enumerate_disks(di_opts_t *opts)
 	}
 
 	dm_free_descriptors(media);
-	topo_snap_release(hp);
-	topo_close(hp);
+	if (hp != NULL) {
+		topo_snap_release(hp);
+		topo_close(hp);
+	}
 }
 
 int
