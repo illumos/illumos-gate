@@ -515,6 +515,8 @@ struct vm_legacy_cpuid {
 #define	VM_DATA_WRITE			(VMM_IOC_BASE | 0x23)
 
 #define	VM_SET_AUTODESTRUCT		(VMM_IOC_BASE | 0x24)
+#define	VM_DESTROY_SELF			(VMM_IOC_BASE | 0x25)
+#define	VM_DESTROY_PENDING		(VMM_IOC_BASE | 0x26)
 
 #define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 

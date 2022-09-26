@@ -59,9 +59,11 @@ file path=opt/bhyve-tests/tests/vmm/cpuid_ioctl mode=0555
 file path=opt/bhyve-tests/tests/vmm/drv_hold mode=0555
 file path=opt/bhyve-tests/tests/vmm/fpu_getset mode=0555
 file path=opt/bhyve-tests/tests/vmm/interface_version mode=0555
+file path=opt/bhyve-tests/tests/vmm/legacy_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_devmem mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_partial mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_seg_map mode=0555
+file path=opt/bhyve-tests/tests/vmm/self_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/vmm_drv_test_fini mode=0555
 file path=opt/bhyve-tests/tests/vmm/vmm_drv_test_init mode=0555
 dir  path=usr/kernel/drv group=sys
