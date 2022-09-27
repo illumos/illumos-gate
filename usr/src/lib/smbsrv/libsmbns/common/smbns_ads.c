@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2021 RackTop Systems, Inc.
  */
 
@@ -482,7 +482,6 @@ again:
 	(void) mutex_lock(&smb_ads_cached_host_mtx);
 	if (!smb_ads_cached_host_info)
 		smb_ads_cached_host_info = smb_ads_dup_host_info(host);
-	host = smb_ads_dup_host_info(smb_ads_cached_host_info);
 	(void) mutex_unlock(&smb_ads_cached_host_mtx);
 
 out:

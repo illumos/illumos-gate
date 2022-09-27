@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -1604,7 +1604,6 @@ parse_sharetab(sa_handle_t handle)
 	sa_group_t lgroup;
 	xfs_sharelist_t *list = get_share_list(&err);
 
-	list = get_share_list(&err);
 	if (list == NULL)
 		return (legacy);
 
