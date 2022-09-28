@@ -17,7 +17,7 @@
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2022.2,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2022.4,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Timezone Information"
 set name=pkg.description value="timezone information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -535,7 +535,7 @@ file path=usr/share/lib/zoneinfo/Europe/Tallinn
 file path=usr/share/lib/zoneinfo/Europe/Tirane
 hardlink path=usr/share/lib/zoneinfo/Europe/Tiraspol target=Chisinau
 file path=usr/share/lib/zoneinfo/Europe/Ulyanovsk
-file path=usr/share/lib/zoneinfo/Europe/Uzhgorod
+hardlink path=usr/share/lib/zoneinfo/Europe/Uzhgorod target=Kyiv
 hardlink path=usr/share/lib/zoneinfo/Europe/Vaduz target=Zurich
 hardlink path=usr/share/lib/zoneinfo/Europe/Vatican target=Rome
 file path=usr/share/lib/zoneinfo/Europe/Vienna
@@ -543,7 +543,7 @@ file path=usr/share/lib/zoneinfo/Europe/Vilnius
 file path=usr/share/lib/zoneinfo/Europe/Volgograd
 file path=usr/share/lib/zoneinfo/Europe/Warsaw
 hardlink path=usr/share/lib/zoneinfo/Europe/Zagreb target=Belgrade
-file path=usr/share/lib/zoneinfo/Europe/Zaporozhye
+hardlink path=usr/share/lib/zoneinfo/Europe/Zaporozhye target=Kyiv
 file path=usr/share/lib/zoneinfo/Europe/Zurich
 file path=usr/share/lib/zoneinfo/Factory
 hardlink path=usr/share/lib/zoneinfo/GB target=Europe/London

@@ -425,8 +425,6 @@ UA	+5026+03031	Europe/Kyiv	-	Ukraine (most areas)
 # However, libzoneinfo relies on this file being sorted and so we place it in
 # the UA section.
 UA	+4457+03406	Europe/Simferopol	-	Crimea
-UA	+4837+02218	Europe/Uzhgorod	-	Transcarpathia
-UA	+4750+03510	Europe/Zaporozhye	-	Zaporozhye and east Lugansk
 UG	+0019+03225	Africa/Kampala	-
 UM	+2813-17722	Pacific/Midway	-	Midway Islands
 UM	+1917+16637	Pacific/Wake	-	Wake Island

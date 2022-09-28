@@ -11813,7 +11813,7 @@ f usr/share/lib/zoneinfo/Europe/Tallinn 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Tirane 0644 root bin
 h usr/share/lib/zoneinfo/Europe/Tiraspol=usr/share/lib/zoneinfo/Europe/Chisinau
 f usr/share/lib/zoneinfo/Europe/Ulyanovsk 0644 root bin
-f usr/share/lib/zoneinfo/Europe/Uzhgorod 0644 root bin
+h usr/share/lib/zoneinfo/Europe/Uzhgorod=usr/share/lib/zoneinfo/Europe/Kyiv
 h usr/share/lib/zoneinfo/Europe/Vaduz=usr/share/lib/zoneinfo/Europe/Zurich
 h usr/share/lib/zoneinfo/Europe/Vatican=usr/share/lib/zoneinfo/Europe/Rome
 f usr/share/lib/zoneinfo/Europe/Vienna 0644 root bin
@@ -11821,7 +11821,7 @@ f usr/share/lib/zoneinfo/Europe/Vilnius 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Volgograd 0644 root bin
 f usr/share/lib/zoneinfo/Europe/Warsaw 0644 root bin
 h usr/share/lib/zoneinfo/Europe/Zagreb=usr/share/lib/zoneinfo/Europe/Belgrade
-f usr/share/lib/zoneinfo/Europe/Zaporozhye 0644 root bin
+h usr/share/lib/zoneinfo/Europe/Zaporozhye=usr/share/lib/zoneinfo/Europe/Kyiv
 f usr/share/lib/zoneinfo/Europe/Zurich 0644 root bin
 f usr/share/lib/zoneinfo/Factory 0644 root bin
 f usr/share/lib/zoneinfo/GB 0644 root bin
