@@ -2,6 +2,7 @@
  *
  * sysevent.c : Solaris sysevents
  *
+ * Copyright 2022 Carsten Grzemba <grzemba@contac-dt.de>
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -184,7 +185,7 @@ sysevent_dev_handler(sysevent_t *ev)
 
 		snprintf(s, sizeof (s), "%s %s %s\n",
 		    class, subclass, phys_path);
-		nwritten = write(sysevent_pipe_fds[1], s, strlen(s) + 1);
+		nwritten = write(sysevent_pipe_fds[1], s, strlen(s));
 
 		HAL_INFO (("sysevent_dev_handler: wrote %d bytes", nwritten));
 		goto out;
@@ -233,7 +234,7 @@ sysevent_dev_handler(sysevent_t *ev)
 
 	snprintf(s, sizeof (s), "%s %s %s %s %s %s %d\n",
 	    class, subclass, phys_path, dev_name, dev_hid, dev_uid, dev_index);
-	nwritten = write(sysevent_pipe_fds[1], s, strlen(s) + 1);
+	nwritten = write(sysevent_pipe_fds[1], s, strlen(s));
 
 	HAL_INFO (("sysevent_dev_handler: wrote %d bytes", nwritten));
 
@@ -295,7 +296,7 @@ sysevent_iochannel_data (GIOChannel *source,
 			sysevent_dev_branch(phys_path);
 		} else if (strcmp(class, EC_PWRCTL) == 0) {
 			sysevent_pwrctl(class, subclass, phys_path,
-			    dev_name, dev_hid, dev_uid, dev_index); 
+			    dev_name, dev_hid, dev_uid, dev_index);
 		} else if (strcmp(class, EC_DEVFS) == 0) {
 			if (strcmp(subclass, ESC_DEVFS_DEVI_ADD) == 0) {
 				sysevent_devfs_add(phys_path);
@@ -477,7 +478,7 @@ sysevent_devfs_add(gchar *devfs_path)
 	di_fini (node);
 }
 
-static void 
+static void
 sysevent_pwrctl(gchar *class, gchar *subclass, gchar *phys_path,
     gchar *dev_name, gchar *dev_hid, gchar *dev_uid, uint_t dev_index)
 {
@@ -606,8 +607,8 @@ sysevent_dr_insert_cpu(di_node_t node, void *arg)
 static void
 sysevent_process_dr(gchar *ap_id, gchar *hint_val)
 {
-	cfga_err_t 		cfgerr;
-	cfga_list_data_t 	*cfg_stat;
+	cfga_err_t		cfgerr;
+	cfga_list_data_t	*cfg_stat;
 	int			nlist;
 	char			*errstr;
 	di_node_t		root_node;
