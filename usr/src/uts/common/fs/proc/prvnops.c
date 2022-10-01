@@ -25,6 +25,7 @@
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 MNX Cloud, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
@@ -886,7 +887,7 @@ pr_read_fdinfo(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 
 	error = prgetfdinfo(p, fp->f_vnode, fdinfo, cr, fp->f_cred, &data);
 
-	(void) closef(fp);
+	pr_releasef(fp);
 
 out:
 	if (error == 0)
@@ -3207,7 +3208,7 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		prunlock(pnp);
 		vap->va_size = prgetfdinfosize(p, fp->f_vnode, cr);
 		vap->va_nblocks = (fsblkcnt64_t)btod(vap->va_size);
-		(void) closef(fp);
+		pr_releasef(fp);
 		return (0);
 	}
 	case PR_LWPDIR:
@@ -4306,8 +4307,9 @@ pr_lookup_fddir(vnode_t *dp, char *comp)
 	}
 
 	prunlock(dpnp);
-	if (fp != NULL)
-		(void) closef(fp);
+	if (fp != NULL) {
+		pr_releasef(fp);
+	}
 
 	if (vp == NULL) {
 		prfreenode(pnp);

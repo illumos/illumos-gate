@@ -99,6 +99,8 @@ file path=opt/os-tests/tests/poll_test mode=0555
 dir  path=opt/os-tests/tests/portfs
 file path=opt/os-tests/tests/portfs/file_assoc.32 mode=0555
 file path=opt/os-tests/tests/portfs/file_assoc.64 mode=0555
+dir  path=opt/os-tests/tests/regression
+file path=opt/os-tests/tests/regression/illumos-15031 mode=0555
 dir  path=opt/os-tests/tests/sdevfs
 file path=opt/os-tests/tests/sdevfs/sdevfs_eisdir mode=0555
 dir  path=opt/os-tests/tests/secflags

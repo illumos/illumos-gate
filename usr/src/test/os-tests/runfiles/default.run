@@ -139,3 +139,6 @@ tests = ['coretests']
 
 [/opt/os-tests/tests/portfs]
 tests = ['file_assoc.32', 'file_assoc.64']
+
+[/opt/os-tests/tests/regression]
+tests = ['illumos-15031']
