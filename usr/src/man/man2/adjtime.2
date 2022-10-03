@@ -1,19 +1,16 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.   Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
-.TH ADJTIME 2 "Jan 20, 2003"
+.TH ADJTIME 2 "Sep 19, 2022"
 .SH NAME
 adjtime \- correct the time to allow synchronization of the system clock
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/time.h>
 
-\fBint\fR \fBadjtime\fR(\fBstruct timeval *\fR\fIdelta\fR, \fBstruct timeval *\fR\fIolddelta\fR);
+\fBint\fR \fBadjtime\fR(\fBconst struct timeval *\fR\fIdelta\fR, \fBstruct timeval *\fR\fIolddelta\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBadjtime()\fR function adjusts the system's notion of the current time as
 returned by \fBgettimeofday\fR(3C), advancing or retarding it by the amount of
 time specified in the \fBstruct\fR \fBtimeval\fR pointed to by \fIdelta\fR.
@@ -47,13 +44,9 @@ Only a processes with appropriate privileges can adjust the time of day.
 The adjustment value will be silently rounded to the resolution of the system
 clock.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBadjtime()\fR returns \fB0\fR. Otherwise, it
 returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBadjtime()\fR function will fail if:
 .sp
 .ne 2
@@ -100,8 +93,6 @@ by \fIolddelta\fR is too small to contain the correct number of seconds.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR date (1),
 .BR gettimeofday (3C),
 .BR privileges (7)
