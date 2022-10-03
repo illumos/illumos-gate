@@ -17,8 +17,12 @@ include $(SRC)/test/Makefile.com
 
 PROG =	rdmsr \
 	wrmsr \
-	triple_fault \
 	cpuid
+
+# These should probably go in the `vmm` tests, but since they depend on
+# in-guest payloads, it is easier to build them here.
+PROG +=	triple_fault \
+	exit_paging
 
 # C-based payloads need additional utils object
 CPAYLOADS =	cpuid
