@@ -53,6 +53,7 @@ tests = [
 user = root
 tests = [
 	'cpuid',
+	'imul',
 	'rdmsr',
 	'wrmsr',
 	'triple_fault',

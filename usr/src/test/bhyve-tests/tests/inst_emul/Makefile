@@ -17,6 +17,7 @@ include $(SRC)/test/Makefile.com
 
 PROG =	rdmsr \
 	wrmsr \
+	imul \
 	cpuid
 
 # These should probably go in the `vmm` tests, but since they depend on
