@@ -107,7 +107,7 @@
 
 	/* Query the CPU ID and stash it in r10 for later comparison */
 	movl	$GETCPU_GDT_OFFSET, %edx
-	lsl	%dx, %edx
+	lsl	%edx, %edx
 	movl	%edx, %r10d
 
 3:
@@ -163,7 +163,7 @@
 
 8:
 	movl	$GETCPU_GDT_OFFSET, %edx
-	lsl	%dx, %edx
+	lsl	%edx, %edx
 	cmpl	%edx, %r10d
 	jne	9f
 	movq	(%r9, %rdx, 8), %rdx
@@ -209,7 +209,7 @@
 	ret
 1:
 	mov	$GETCPU_GDT_OFFSET, %eax
-	lsl	%ax, %eax
+	lsl	%eax, %eax
 	ret
 	SET_SIZE(__cp_getcpu)
 
