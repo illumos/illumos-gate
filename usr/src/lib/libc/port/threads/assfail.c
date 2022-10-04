@@ -65,8 +65,6 @@ static void
 Abort(const char *msg, size_t buflen)
 {
 	ulwp_t *self;
-	struct sigaction act;
-	sigset_t sigmask;
 
 	/* to help with core file debugging */
 	panicstr = msg;

@@ -596,7 +596,7 @@ charswitch:	/* target of a goto 8-( */
 /* ****************************************************************** */
 static int
 number(int *chcount, int *flag_eof, int stow, int type, int len, int size,
-	FILE *iop, va_list *listp)
+    FILE *iop, va_list *listp)
 {
 	char	numbuf[64];
 	char	*np = numbuf;
@@ -841,7 +841,7 @@ readchar(FILE *iop, int *chcount)
 
 static int
 string(int *chcount, int *flag_eof, int stow, int type, int len, char *tab,
-	FILE *iop, va_list *listp)
+    FILE *iop, va_list *listp)
 {
 	int	ch;
 	char	*ptr;
@@ -927,7 +927,6 @@ _mkarglst(const char *fmt, stva_list args, stva_list arglst[])
 
 		fmt += STRSPN(fmt, SPNSTR2);
 		if (*fmt == '[') {
-			int	i;
 			fmt++; /* has to be at least on item in scan list */
 			if (*fmt == ']') {
 				fmt++;
@@ -943,6 +942,8 @@ _mkarglst(const char *fmt, stva_list args, stva_list arglst[])
 				} else if (isascii(*fmt)) {
 					fmt++;
 				} else {
+					int	i;
+
 					i = mblen((const char *)
 					    fmt, MB_CUR_MAX);
 					if (i <= 0) {
@@ -972,12 +973,11 @@ _mkarglst(const char *fmt, stva_list args, stva_list arglst[])
 #ifdef	_WIDE
 static int
 wstring(int *chcount, int *flag_eof, int stow, int type,
-	int len, FILE *iop, va_list *listp)
+    int len, FILE *iop, va_list *listp)
 {
 	wint_t	wch;
 	wchar_t	*ptr;
 	wchar_t	*wstart;
-	int	dummy;
 
 	wstart = ptr = stow ? va_arg(*listp, wchar_t *) : NULL;
 
@@ -1008,7 +1008,7 @@ wstring(int *chcount, int *flag_eof, int stow, int type,
 #else  /* _WIDE */
 static int
 wstring(int *chcount, int *flag_eof, int stow, int type, int len, FILE *iop,
-	va_list *listp)
+    va_list *listp)
 {
 	int	wch;
 	wchar_t	*ptr;
@@ -1118,7 +1118,7 @@ _watoi(wchar_t *fmt)
 /* ARGSUSED3 */
 static int
 wbrstring(int *chcount, int *flag_eof, int stow, int type,
-	int len, FILE *iop, unsigned char *brstr, va_list *listp)
+    int len, FILE *iop, unsigned char *brstr, va_list *listp)
 {
 	wint_t	wch;
 	int	i;
@@ -1182,7 +1182,7 @@ wbrstring(int *chcount, int *flag_eof, int stow, int type,
 #ifdef	_WIDE
 static int
 brstring(int *chcount, int *flag_eof, int stow, int type,
-	int len, FILE *iop, unsigned char *brstr, va_list *listp)
+    int len, FILE *iop, unsigned char *brstr, va_list *listp)
 {
 	wint_t	wch;
 	int	i;

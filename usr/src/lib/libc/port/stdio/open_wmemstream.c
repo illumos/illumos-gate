@@ -54,7 +54,7 @@ static ssize_t
 open_wmemstream_write(FILE *iop, const char *buf, size_t nbytes)
 {
 	wmemstream_t *wmemp = _xdata(iop);
-	size_t newsize, mbscount;
+	size_t newsize;
 	ssize_t nwritten = 0;
 	int ret;
 
@@ -165,7 +165,6 @@ open_wmemstream_close(FILE *iop)
 FILE *
 open_wmemstream(wchar_t **bufp, size_t *sizep)
 {
-	int err;
 	FILE *iop;
 	wmemstream_t *wmemp;
 
