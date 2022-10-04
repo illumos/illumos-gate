@@ -181,7 +181,7 @@ cgetattr(int fd, nvlist_t **response)
 	size_t nv_responselen;
 	struct stat buf;
 
-	if (error = attrat_init())
+	if ((error = attrat_init()) != 0)
 		return (error);
 	if ((error = fstat(fd, &buf)) != 0)
 		return (error);
@@ -214,7 +214,7 @@ csetattr(int fd, nvlist_t *request)
 	void *nv_request;
 	size_t nv_requestlen;
 
-	if (error = attrat_init())
+	if ((error = attrat_init()) != 0)
 		return (error);
 
 	if ((error = attr_nv_pack(request, &nv_request, &nv_requestlen)) != 0)

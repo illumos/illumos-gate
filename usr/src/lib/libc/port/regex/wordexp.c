@@ -85,7 +85,7 @@ static int append(wordexp_t *, char *);
 static char *
 mystpcpy(char *s1, const char *s2)
 {
-	while (*s1++ = *s2++)
+	while ((*s1++ = *s2++) != '\0')
 		;
 	return (s1-1);
 }

@@ -194,7 +194,7 @@ process_nls_path(char *name, int oflag)
 
 	s = _DFLT_LOC_PATH;
 	t = pathname;
-	while (*t++ = *s++)
+	while ((*t++ = *s++) != '\0')
 		continue;
 	t--;
 	s = locale;
@@ -217,7 +217,7 @@ process_nls_path(char *name, int oflag)
  */
 static char *
 replace_nls_option(char *s, char *name, char *pathname, char *locale,
-	char *lang, char *territory, char *codeset)
+    char *lang, char *territory, char *codeset)
 {
 	char	*t, *u;
 

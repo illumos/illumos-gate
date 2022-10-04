@@ -67,7 +67,7 @@ static const int	category_name_len[] = {
  *
  * INPUT
  * mp -	uses the following members:
- * 	msgfile  - buffer to store the pathname to the message file
+ *	msgfile  - buffer to store the pathname to the message file
  *	binding  - directory pathname bound to specified domain
  *	cblen    - length of binding
  *	locale   - locale name
@@ -96,7 +96,7 @@ mk_msgfile(struct msg_pack *mp)
 
 	p = mp->msgfile;
 	q = mp->binding;
-	while (*p = *q++)
+	while ((*p = *q++) != '\0')
 		p++;
 	cblen = (uint32_t)(p - mp->msgfile);
 	if (*(p - 1) != '/') {
@@ -126,17 +126,17 @@ mk_msgfile(struct msg_pack *mp)
 		return (NULL);
 
 	q = mp->locale;
-	while (*p++ = *q++)
+	while ((*p++ = *q++) != '\0')
 		;
 	*(p - 1) = '/';
-	while (*p++ = *catstr++)
+	while ((*p++ = *catstr++) != '\0')
 		;
 	*(p - 1) = '/';
 	q = mp->domain;
-	while (*p = *q++)
+	while ((*p = *q++) != '\0')
 		p++;
 	q = MSGFILESUFFIX;
-	while (*p++ = *q++)
+	while ((*p++ = *q++) != '\0')
 		;
 
 #ifdef GETTEXT_DEBUG

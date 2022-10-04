@@ -364,7 +364,7 @@ walk(char *component,
 	this.inode = statb.st_ino;
 	oldbase = vp->state.base;
 	vp->state.base = (int)(component - vp->tmppath);
-	while (dir = readdir(this.fd)) {
+	while ((dir = readdir(this.fd)) != NULL) {
 		if (dir->d_ino == 0)
 			continue;
 		q = dir->d_name;

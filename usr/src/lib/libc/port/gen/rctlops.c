@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include <sys/rctl_impl.h>
 #include <stdlib.h>
@@ -60,7 +58,8 @@ rctl_walk(int (*callback)(const char *rctlname, void *walk_data),
 	for (curr_name = ctl_names;
 	    curr_name < ctl_names + sz;
 	    curr_name += strlen(curr_name) + 1) {
-		if (ret = callback(curr_name, init_data)) {
+		ret = callback(curr_name, init_data);
+		if (ret != 0) {
 			free(ctl_names);
 			return (ret);
 		}

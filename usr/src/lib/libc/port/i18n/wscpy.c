@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1986 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * wcscpy(): copy string s2 to s1. S1 must be large enough.
@@ -46,7 +46,7 @@ wcscpy(wchar_t *s1, const wchar_t *s2)
 {
 	wchar_t *os1 = s1;
 
-	while (*s1++ = *s2++)
+	while ((*s1++ = *s2++) != 0)
 		continue;
 	return (os1);
 }
@@ -60,7 +60,7 @@ wscpy(wchar_t *s1, const wchar_t *s2)
 wchar_t *
 wcpcpy(wchar_t *s1, const wchar_t *s2)
 {
-	while (*s1++ = *s2++)
+	while ((*s1++ = *s2++) != 0)
 		continue;
 	return (s1 - 1);
 }
