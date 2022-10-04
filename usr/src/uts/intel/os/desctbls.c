@@ -178,12 +178,13 @@ static struct interposing_handler brand_tbl[2];
  * only the present bit is loaded.
  */
 void
-set_usegd(user_desc_t *dp, uint_t lmode, void *base, size_t size,
+set_usegd(user_desc_t *dp, uint_t lmode, void *base, uint32_t size,
     uint_t type, uint_t dpl, uint_t gran, uint_t defopsz)
 {
 	ASSERT(lmode == SDP_SHORT || lmode == SDP_LONG);
 	/* This should never be a "system" segment. */
 	ASSERT3U(type & SDT_S, !=, 0);
+	ASSERT3P(dp, !=, NULL);
 
 	/*
 	 * 64-bit long mode.
@@ -461,6 +462,10 @@ init_gdt_common(user_desc_t *gdt)
 {
 	int i;
 
+	ASSERT3P(gdt, !=, NULL);
+
+	init_boot_gdt(gdt);
+
 	/*
 	 * 64-bit kernel code segment.
 	 */
@@ -469,15 +474,15 @@ init_gdt_common(user_desc_t *gdt)
 
 	/*
 	 * 64-bit kernel data segment. The limit attribute is ignored in 64-bit
-	 * mode, but we set it here to 0xFFFF so that we can use the SYSRET
-	 * instruction to return from system calls back to 32-bit applications.
-	 * SYSRET doesn't update the base, limit, or attributes of %ss or %ds
-	 * descriptors. We therefore must ensure that the kernel uses something,
-	 * though it will be ignored by hardware, that is compatible with 32-bit
-	 * apps. For the same reason we must set the default op size of this
-	 * descriptor to 32-bit operands.
+	 * mode, but we set it here to SDP_LIMIT_MAX so that we can use the
+	 * SYSRET instruction to return from system calls back to 32-bit
+	 * applications.  SYSRET doesn't update the base, limit, or attributes
+	 * of %ss or %ds descriptors. We therefore must ensure that the kernel
+	 * uses something, though it will be ignored by hardware, that is
+	 * compatible with 32-bit apps. For the same reason we must set the
+	 * default op size of this descriptor to 32-bit operands.
 	 */
-	set_usegd(&gdt[GDT_KDATA], SDP_LONG, NULL, -1, SDT_MEMRWA,
+	set_usegd(&gdt[GDT_KDATA], SDP_LONG, NULL, SDP_LIMIT_MAX, SDT_MEMRWA,
 	    SEL_KPL, SDP_PAGES, SDP_OP32);
 	gdt[GDT_KDATA].usd_def32 = 1;
 
@@ -490,7 +495,7 @@ init_gdt_common(user_desc_t *gdt)
 	/*
 	 * 32-bit user code segment.
 	 */
-	set_usegd(&gdt[GDT_U32CODE], SDP_SHORT, NULL, -1, SDT_MEMERA,
+	set_usegd(&gdt[GDT_U32CODE], SDP_SHORT, NULL, SDP_LIMIT_MAX, SDT_MEMERA,
 	    SEL_UPL, SDP_PAGES, SDP_OP32);
 
 	/*
@@ -509,8 +514,8 @@ init_gdt_common(user_desc_t *gdt)
 	 * as in legacy mode so they must be set correctly for a 32-bit data
 	 * segment.
 	 */
-	set_usegd(&gdt[GDT_UDATA], SDP_SHORT, NULL, -1, SDT_MEMRWA, SEL_UPL,
-	    SDP_PAGES, SDP_OP32);
+	set_usegd(&gdt[GDT_UDATA], SDP_SHORT, NULL, SDP_LIMIT_MAX, SDT_MEMRWA,
+	    SEL_UPL, SDP_PAGES, SDP_OP32);
 
 #if !defined(__xpv)
 
@@ -532,9 +537,9 @@ init_gdt_common(user_desc_t *gdt)
 	 * Only attributes and limits are initialized, the effective
 	 * base address is programmed via fsbase/gsbase.
 	 */
-	set_usegd(&gdt[GDT_LWPFS], SDP_SHORT, NULL, -1, SDT_MEMRWA,
+	set_usegd(&gdt[GDT_LWPFS], SDP_SHORT, NULL, SDP_LIMIT_MAX, SDT_MEMRWA,
 	    SEL_UPL, SDP_PAGES, SDP_OP32);
-	set_usegd(&gdt[GDT_LWPGS], SDP_SHORT, NULL, -1, SDT_MEMRWA,
+	set_usegd(&gdt[GDT_LWPGS], SDP_SHORT, NULL, SDP_LIMIT_MAX, SDT_MEMRWA,
 	    SEL_UPL, SDP_PAGES, SDP_OP32);
 
 	/*
@@ -542,7 +547,7 @@ init_gdt_common(user_desc_t *gdt)
 	 * Only attributes and limits are initialized.
 	 */
 	for (i = GDT_BRANDMIN; i <= GDT_BRANDMAX; i++)
-		set_usegd(&gdt0[i], SDP_SHORT, NULL, -1, SDT_MEMRWA,
+		set_usegd(&gdt0[i], SDP_SHORT, NULL, SDP_LIMIT_MAX, SDT_MEMRWA,
 		    SEL_UPL, SDP_PAGES, SDP_OP32);
 
 	/*
@@ -552,8 +557,8 @@ init_gdt_common(user_desc_t *gdt)
 	 */
 	set_usegd(&zero_udesc, SDP_LONG, 0, 0, SDT_MEMRWA, SEL_UPL,
 	    SDP_BYTES, SDP_OP32);
-	set_usegd(&zero_u32desc, SDP_SHORT, 0, -1, SDT_MEMRWA, SEL_UPL,
-	    SDP_PAGES, SDP_OP32);
+	set_usegd(&zero_u32desc, SDP_SHORT, 0, SDP_LIMIT_MAX, SDT_MEMRWA,
+	    SEL_UPL, SDP_PAGES, SDP_OP32);
 }
 
 #if defined(__xpv)
@@ -573,6 +578,7 @@ init_gdt(void)
 #endif
 	gdt0 = (user_desc_t *)BOP_ALLOC(bootops, (caddr_t)GDT_VA,
 	    PAGESIZE, PAGESIZE);
+	ASSERT3P(gdt0, !=, NULL);
 	bzero(gdt0, PAGESIZE);
 
 	init_gdt_common(gdt0);
@@ -583,10 +589,10 @@ init_gdt(void)
 	 * selectors?
 	 */
 	if (boothowto & RB_DEBUG) {
-		set_usegd(&gdt0[GDT_B32DATA], SDP_LONG, NULL, -1, SDT_MEMRWA,
-		    SEL_KPL, SDP_PAGES, SDP_OP32);
-		set_usegd(&gdt0[GDT_B64CODE], SDP_LONG, NULL, -1, SDT_MEMERA,
-		    SEL_KPL, SDP_PAGES, SDP_OP32);
+		set_usegd(&gdt0[GDT_B32DATA], SDP_LONG, NULL, SDP_LIMIT_MAX,
+		    SDT_MEMRWA, SEL_KPL, SDP_PAGES, SDP_OP32);
+		set_usegd(&gdt0[GDT_B64CODE], SDP_LONG, NULL, SDP_LIMIT_MAX,
+		    SDT_MEMERA, SEL_KPL, SDP_PAGES, SDP_OP32);
 	}
 
 	/*
@@ -632,8 +638,7 @@ init_gdt(void)
 static user_desc_t *
 init_gdt(void)
 {
-	desctbr_t	r_bgdt, r_gdt;
-	user_desc_t	*bgdt;
+	desctbr_t	r_gdt;
 
 #if !defined(__lint)
 	/*
@@ -646,21 +651,6 @@ init_gdt(void)
 	bzero(gdt0, PAGESIZE);
 
 	init_gdt_common(gdt0);
-
-	/*
-	 * Copy in from boot's gdt to our gdt.
-	 * Entry 0 is the null descriptor by definition.
-	 */
-	rd_gdtr(&r_bgdt);
-	bgdt = (user_desc_t *)r_bgdt.dtr_base;
-	if (bgdt == NULL)
-		panic("null boot gdt");
-
-	gdt0[GDT_B32DATA] = bgdt[GDT_B32DATA];
-	gdt0[GDT_B32CODE] = bgdt[GDT_B32CODE];
-	gdt0[GDT_B16CODE] = bgdt[GDT_B16CODE];
-	gdt0[GDT_B16DATA] = bgdt[GDT_B16DATA];
-	gdt0[GDT_B64CODE] = bgdt[GDT_B64CODE];
 
 	/*
 	 * Install our new GDT
@@ -1080,17 +1070,51 @@ reset_gdtr_limit(void)
 #endif /* __xpv */
 
 /*
- * In the early kernel, we need to set up a simple GDT to run on.
+ * We need a GDT owned by the kernel and not the bootstrap relatively
+ * early in kernel initialization (e.g., to have segments we can reliably
+ * catch an exception on).
  *
- * XXPV	Can dboot use this too?  See dboot_gdt.s
+ * Initializes a GDT with segments normally defined in the boot loader.
  */
 void
 init_boot_gdt(user_desc_t *bgdt)
 {
-	set_usegd(&bgdt[GDT_B32DATA], SDP_LONG, NULL, -1, SDT_MEMRWA, SEL_KPL,
-	    SDP_PAGES, SDP_OP32);
-	set_usegd(&bgdt[GDT_B64CODE], SDP_LONG, NULL, -1, SDT_MEMERA, SEL_KPL,
-	    SDP_PAGES, SDP_OP32);
+	ASSERT3P(bgdt, !=, NULL);
+
+#ifdef	__xpv
+	/* XXX: It is unclear why this 32-bit data segment is marked long. */
+	set_usegd(&bgdt[GDT_B32DATA], SDP_LONG, NULL, SDP_LIMIT_MAX, SDT_MEMRWA,
+	    SEL_KPL, SDP_PAGES, SDP_OP32);
+#else
+	/*
+	 * Reset boot segments.  These ostensibly come from the boot loader,
+	 * but we reset them to match our expectations, particulary if we
+	 * are not using that loader.
+	 */
+	set_usegd(&bgdt[GDT_B32DATA], SDP_SHORT, NULL, SDP_LIMIT_MAX,
+	    SDT_MEMRWA, SEL_KPL, SDP_PAGES, SDP_OP32);
+	set_usegd(&bgdt[GDT_B32CODE], SDP_SHORT, NULL, SDP_LIMIT_MAX,
+	    SDT_MEMERA, SEL_KPL, SDP_PAGES, SDP_OP32);
+
+	/*
+	 * 16-bit segments for making BIOS calls (not applicable on all
+	 * architectures).
+	 */
+	set_usegd(&bgdt[GDT_B16CODE], SDP_SHORT, NULL, SDP_LIMIT_MAX,
+	    SDT_MEMERA, SEL_KPL, 0, 0);
+	/*
+	 * XXX: SDP_OP32 makes this a 32-bit segment, which seems wrong
+	 * here, but that's what boot_gdt.s used.
+	 */
+	set_usegd(&bgdt[GDT_B16DATA], SDP_SHORT, NULL, SDP_LIMIT_MAX,
+	    SDT_MEMRWA, SEL_KPL, 0, SDP_OP32);
+#endif	/* __xpv */
+
+	/*
+	 * A 64-bit code segment used in early boot.  Early IDTs refer to this.
+	 */
+	set_usegd(&bgdt[GDT_B64CODE], SDP_LONG, NULL, SDP_LIMIT_MAX, SDT_MEMERA,
+	    SEL_KPL, SDP_PAGES, SDP_OP32);
 }
 
 /*
