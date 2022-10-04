@@ -28,8 +28,6 @@
  * Copyright 2011, Richard Lowe.
  */
 
-/* Functions in this file are duplicated in locallibm.il.  Keep them in sync */
-
 #ifndef _LIBM_INLINES_H
 #define	_LIBM_INLINES_H
 
@@ -119,6 +117,7 @@ fp_class(double d)
 	enum fp_class_type ret;
 	uint32_t tmp;
 
+	/* BEGIN CSTYLED */
 	__asm__ __volatile__(
 	    "sethi %%hi(0x80000000),%1\n\t"	/* %1 gets 80000000 */
 	    "andn  %2,%1,%0\n\t"		/* %2-%0 gets abs(x) */
@@ -165,6 +164,7 @@ fp_class(double d)
 	    : "=&r" (ret), "=&r" (tmp)
 	    : "r" (_HI_WORD(d)), "r" (_LO_WORD(d))
 	    : "cc");
+	/* END CSTYLED */
 
 	return (ret);
 }
@@ -241,6 +241,7 @@ __swapTE(int i)
 	int ret;
 	uint32_t fsr, tmp1, tmp2;
 
+	/* BEGIN CSTYLED */
 	__asm__ __volatile__(
 	    "and  %4,0x1f,%0\n\t"
 	    "sll  %0,23,%2\n\t"		/* shift input to TEM bit location */
@@ -258,6 +259,7 @@ __swapTE(int i)
 	    : "=r" (ret), "=m" (fsr), "=r" (tmp1), "=r" (tmp2)
 	    : "r" (i)
 	    : "cc");
+	/* END CSTYLED */
 
 	return (ret);
 }

@@ -32,17 +32,6 @@
 #
 
 #
-#	All C objects depend on inline files. However, cc(1) doesn't generate
-#	the correct dependency info. Also, these Makefiles don't contain a
-#	separate list of C-derived object files (but it is light weight to
-#	let the assembler files think they depend upon this when they don't).
-#	Fortunately, the inline files won't change very often. So, for now,
-#	all objects depend on the inline files. Remove this when the inliner
-#	is fixed to drop correct dependency information.
-#
-$(OBJECTS): $(INLINES)
-
-#
 #	Partially link .o files to generate the kmod. The fake dependency
 #	on modstubs simplifies things...
 #

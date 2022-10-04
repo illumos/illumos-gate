@@ -25,7 +25,7 @@
 # Use is subject to license terms.
 #
 
-# This file brings down all that is needed to build just 
+# This file brings down all that is needed to build just
 # 1394 drivers.
 #
 
@@ -36,22 +36,22 @@ find_files "s.*.h"	\
 	usr/src/uts/common/sys
 
 find_files "s.*.h"	\
-	usr/src/uts/sparc/sys 
+	usr/src/uts/sparc/sys
 
 find_files "s.*.h"	\
-	usr/src/uts/sparc/v7/sys 
+	usr/src/uts/sparc/v7/sys
 
 find_files "s.*.h"	\
-	usr/src/uts/sparc/v9/sys 
+	usr/src/uts/sparc/v9/sys
 
 find_files "s.*.h"	\
-	usr/src/uts/sun/sys 
+	usr/src/uts/sun/sys
 
 find_files "s.*.h"	\
-	usr/src/uts/sun4u/sys 
+	usr/src/uts/sun4u/sys
 
 find_files "s.*.h"	\
-	usr/src/uts/common/vm 
+	usr/src/uts/common/vm
 
 find_files "s.*"	\
 	usr/src/uts/sparc/hci1394	\
@@ -75,6 +75,4 @@ echo_file  usr/src/uts/sparc/Makefile.files
 echo_file  usr/src/uts/sparc/Makefile.rules
 echo_file  usr/src/uts/sparc/Makefile.sparc
 echo_file  usr/src/uts/sparc/Makefile.targ
-echo_file  usr/src/uts/sparc/ml/sparc.il
 echo_file  usr/src/uts/sparc/req.flg
-

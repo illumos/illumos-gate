@@ -1182,49 +1182,6 @@ CLOBBERFILES +=	$(LIB_PIC)
 $(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
 
-# Files which need the threads .il inline template
-TIL=				\
-	aio.o			\
-	alloc.o			\
-	assfail.o		\
-	atexit.o		\
-	atfork.o		\
-	cancel.o		\
-	door_calls.o		\
-	err.o			\
-	errno.o			\
-	lwp.o			\
-	ma.o			\
-	machdep.o		\
-	posix_aio.o		\
-	pthr_attr.o		\
-	pthr_barrier.o		\
-	pthr_cond.o		\
-	pthr_mutex.o		\
-	pthr_rwlock.o		\
-	pthread.o		\
-	rand.o			\
-	rwlock.o		\
-	scalls.o		\
-	sched.o			\
-	sema.o			\
-	sigaction.o		\
-	sigev_thread.o		\
-	spawn.o			\
-	stack.o			\
-	synch.o			\
-	tdb_agent.o		\
-	thr.o			\
-	thread_interface.o	\
-	thread_pool.o		\
-	tls.o			\
-	tsd.o			\
-	tmem.o			\
-	unwind.o
-
-THREADS_INLINES = $(LIBCBASE)/threads/i386.il
-$(TIL:%=pics/%) := CFLAGS += $(THREADS_INLINES)
-
 # pics/mul64.o := CFLAGS += $(LIBCBASE)/crt/mul64.il
 
 # large-file-aware components that should be built large
@@ -1276,10 +1233,6 @@ STACKPROTECT = none
 .KEEP_STATE:
 
 all: $(LIBS) $(LIB_PIC)
-
-# object files that depend on inline template
-$(TIL:%=pics/%): $(LIBCBASE)/threads/i386.il
-# pics/mul64.o: $(LIBCBASE)/crt/mul64.il
 
 # include common libc targets
 include $(LIBCDIR)/Makefile.targ

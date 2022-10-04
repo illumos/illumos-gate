@@ -1133,82 +1133,8 @@ CLOBBERFILES +=	$(LIB_PIC)
 $(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
 
-# Files which need the threads .il inline template
-TIL=				\
-	aio.o			\
-	alloc.o			\
-	assfail.o		\
-	atexit.o		\
-	atfork.o		\
-	cancel.o		\
-	door_calls.o		\
-	err.o			\
-	errno.o			\
-	getctxt.o		\
-	lwp.o			\
-	ma.o			\
-	machdep.o		\
-	posix_aio.o		\
-	pthr_attr.o		\
-	pthr_barrier.o		\
-	pthr_cond.o		\
-	pthr_mutex.o		\
-	pthr_rwlock.o		\
-	pthread.o		\
-	rand.o			\
-	rwlock.o		\
-	scalls.o		\
-	sched.o			\
-	sema.o			\
-	sigaction.o		\
-	sigev_thread.o		\
-	spawn.o			\
-	stack.o			\
-	swapctxt.o		\
-	synch.o			\
-	tdb_agent.o		\
-	thr.o			\
-	thread_interface.o	\
-	thread_pool.o		\
-	tls.o			\
-	tsd.o			\
-	unwind.o
-
-$(TIL:%=pics/%) := CFLAGS64 += $(LIBCBASE)/threads/sparcv9.il
-
-# Files in fp, port/fp subdirectories that need base.il inline template
-IL=				\
-	__flt_decim.o		\
-	decimal_bin.o
-
-$(IL:%=pics/%) := CFLAGS64 += $(LIBCBASE)/fp/base.il
-
-# Files in fp subdirectory which need __quad.il inline template
-QIL=				\
-	_Q_add.o		\
-	_Q_cmp.o		\
-	_Q_cmpe.o		\
-	_Q_div.o		\
-	_Q_dtoq.o		\
-	_Q_fcc.o		\
-	_Q_mul.o		\
-	_Q_qtod.o		\
-	_Q_qtoi.o		\
-	_Q_qtos.o		\
-	_Q_qtou.o		\
-	_Q_sqrt.o		\
-	_Q_stoq.o		\
-	_Q_sub.o		\
-	_Qp_qtox.o		\
-	_Qp_qtoux.o
-
-$(QIL:%=pics/%) := CFLAGS64 += $(LIBCDIR)/$(MACH)/fp/__quad.il
 pics/_Qp%.o := CFLAGS64 += -I$(LIBCDIR)/$(MACH)/fp
 pics/_Q%.o := sparcv9_COPTFLAG = -xO4 -xchip=ultra
-
-# Files in crt subdirectory which need muldiv64.il inline template
-#CIL=	mul64.o divrem64.o
-#$(CIL:%=pics/%) := CFLAGS += $(LIBCBASE)/crt/mul64.il
 
 # large-file-aware components that should be built large
 
@@ -1250,12 +1176,6 @@ STACKPROTECT = none
 .KEEP_STATE:
 
 all: $(LIBS) $(LIB_PIC)
-
-# object files that depend on inline template
-$(TIL:%=pics/%): $(LIBCBASE)/threads/sparcv9.il
-$(IL:%=pics/%): $(LIBCBASE)/fp/base.il
-$(QIL:%=pics/%): $(LIBCDIR)/$(MACH)/fp/__quad.il
-#$(CIL:%=pics/%): $(LIBCBASE)/crt/muldiv64.il
 
 # include common libc targets
 include $(LIBCDIR)/Makefile.targ

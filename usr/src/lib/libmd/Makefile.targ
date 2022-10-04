@@ -36,7 +36,7 @@ pics/%.o: $(COMDIR)/md4/%.c
 		$(POST_PROCESS_O)
 
 pics/%.o: $(COMDIR)/md5/%.c
-		$(COMPILE.c) -I$(COMDIR)/md5 $(INLINES) -o $@ $<
+		$(COMPILE.c) -I$(COMDIR)/md5 -o $@ $<
 		$(POST_PROCESS_O)
 
 pics/%.o: $(COMDIR)/sha1/%.c

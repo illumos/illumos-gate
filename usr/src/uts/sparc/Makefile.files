@@ -117,8 +117,3 @@ INC_PATH	+= -I$(UTSBASE)/sparc/krtld
 # all files including this file.
 #
 ASSYM_DEPS +=	sparc_ddi.o
-
-#
-# Inlined assembler routines.
-#
-INLINES		+= $(UTSBASE)/sparc/ml/sparc.il
