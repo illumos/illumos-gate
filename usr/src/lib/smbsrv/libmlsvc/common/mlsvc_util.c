@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 /*
@@ -51,11 +52,11 @@
 
 static DWORD
 mlsvc_join_rpc(smb_domainex_t *dxi,
-	char *admin_user, char *admin_pw,
-	char *machine_name, char *machine_pw);
+    char *admin_user, char *admin_pw,
+    char *machine_name, char *machine_pw);
 static DWORD
 mlsvc_join_noauth(smb_domainex_t *dxi,
-	char *machine_name, char *machine_pw);
+    char *machine_name, char *machine_pw);
 
 /*
  * This is called by smbd_dc_update just after we've learned about a
@@ -96,6 +97,7 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 	char machine_name[SMB_SAMACCT_MAXLEN];
 	char machine_pw[NETR_MACHINE_ACCT_PASSWD_MAX];
 	unsigned char passwd_hash[SMBAUTH_HASH_SZ];
+	char addrbuf[INET6_ADDRSTRLEN];
 	smb_domainex_t dxi;
 	smb_domain_t *di = &dxi.d_primary;
 	DWORD status;
@@ -126,8 +128,11 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 	if (info->domain_username[0] != '\0') {
 		(void) smb_auth_ntlm_hash(info->domain_passwd, passwd_hash);
 		smb_ipc_set(info->domain_username, passwd_hash);
+		syslog(LOG_INFO, "smbd: joining with user %s",
+		    info->domain_username);
 	} else {
 		smb_ipc_set(MLSVC_ANON_USER, zero_hash);
+		syslog(LOG_INFO, "smbd: joining with anonymous");
 	}
 
 	/*
@@ -139,6 +144,7 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 		syslog(LOG_NOTICE, "Failed to set idmap domain name");
 	if (smb_config_refresh_idmap() != 0)
 		syslog(LOG_NOTICE, "Failed to refresh idmap service");
+	syslog(LOG_INFO, "smbd: set idmap domain %s", info->domain_name);
 
 	/* Clear DNS local (ADS) lookup cache. */
 	smb_ads_refresh(B_FALSE);
@@ -161,7 +167,11 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 	 * so that admin will know which AD server we were talking to.
 	 */
 	(void) strlcpy(res->dc_name, dxi.d_dci.dc_name, MAXHOSTNAMELEN);
-	syslog(LOG_INFO, "smbd: found AD server %s", dxi.d_dci.dc_name);
+	if (smb_inet_ntop(&dxi.d_dci.dc_addr,
+	    addrbuf, sizeof (addrbuf)) == NULL)
+		strcpy(addrbuf, "?");
+	syslog(LOG_INFO, "smbd: found AD server %s (%s)",
+	    dxi.d_dci.dc_name, addrbuf);
 
 	/*
 	 * Domain discovery needs to authenticate with the AD server.
@@ -190,6 +200,13 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 	 */
 
 	/*
+	 * Log info about the domain from ddiscover
+	 */
+	syslog(LOG_INFO, "smbd_join: domain FQN=%s", di->di_fqname);
+	syslog(LOG_INFO, "smbd_join: domain NBN=%s", di->di_nbname);
+	syslog(LOG_INFO, "smbd_join: domain SID=%s", di->di_sid);
+
+	/*
 	 * Create or update our machine account on the DC.
 	 * A non-null user means we do "secure join".
 	 */
@@ -199,6 +216,7 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 		 */
 		status = NT_STATUS_UNSUCCESSFUL;
 		if (ads_enabled) {
+			syslog(LOG_INFO, "use_ads=true (LDAP join)");
 			res->join_err = smb_ads_join(di->di_fqname,
 			    info->domain_username, info->domain_passwd,
 			    machine_pw);
@@ -206,7 +224,7 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 				status = NT_STATUS_SUCCESS;
 			}
 		} else {
-			syslog(LOG_DEBUG, "use_ads=false (do RPC join)");
+			syslog(LOG_INFO, "use_ads=false (RPC join)");
 
 			/*
 			 * If ADS was disabled, join using RPC.
@@ -294,8 +312,8 @@ out:
 
 static DWORD
 mlsvc_join_rpc(smb_domainex_t *dxi,
-	char *admin_user, char *admin_pw,
-	char *machine_name,  char *machine_pw)
+    char *admin_user, char *admin_pw,
+    char *machine_name,  char *machine_pw)
 {
 	mlsvc_handle_t samr_handle;
 	mlsvc_handle_t domain_handle;
@@ -388,7 +406,7 @@ out_samr_handle:
  */
 static DWORD
 mlsvc_join_noauth(smb_domainex_t *dxi,
-	char *machine_name, char *machine_pw)
+    char *machine_name, char *machine_pw)
 {
 	char old_pw[SMB_SAMACCT_MAXLEN];
 	DWORD status;

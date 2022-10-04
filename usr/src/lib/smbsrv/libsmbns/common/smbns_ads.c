@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -422,7 +423,7 @@ again:
 	    NULL,	/* ComputerName */
 	    domain,
 	    NULL,	/* DomainGuid */
-	    NULL, 	/* SiteName */
+	    NULL,	/* SiteName */
 	    flags,
 	    &dci);
 	switch (status) {
@@ -653,8 +654,10 @@ smb_ads_open_main(smb_ads_handle_t **hp, char *domain, char *user,
 
 	if (user != NULL) {
 		err = smb_kinit(domain, user, password);
-		if (err != 0)
+		if (err != 0) {
+			syslog(LOG_ERR, "smbns: kinit failed");
 			return (err);
+		}
 		user = NULL;
 		password = NULL;
 	}
@@ -729,6 +732,14 @@ smb_ads_open_main(smb_ads_handle_t **hp, char *domain, char *user,
 	}
 	(void) mutex_unlock(&smb_ads_cfg.c_mtx);
 
+	syslog(LOG_DEBUG, "smbns: smb_ads_open_main");
+	syslog(LOG_DEBUG, "smbns: domain: %s", ah->domain);
+	syslog(LOG_DEBUG, "smbns: domain_dn: %s", ah->domain_dn);
+	syslog(LOG_DEBUG, "smbns: ip_addr: %s", ah->ip_addr);
+	syslog(LOG_DEBUG, "smbns: hostname: %s", ah->hostname);
+	syslog(LOG_DEBUG, "smbns: site: %s",
+	    (ah->site != NULL) ? ah->site : "");
+
 	rc = ldap_sasl_interactive_bind_s(ah->ld, "", "GSSAPI", NULL, NULL,
 	    LDAP_SASL_INTERACTIVE, &smb_ads_saslcallback, NULL);
 	if (rc != LDAP_SUCCESS) {
@@ -738,6 +749,7 @@ smb_ads_open_main(smb_ads_handle_t **hp, char *domain, char *user,
 		free(ads_host);
 		return (SMB_ADS_LDAP_SASL_BIND);
 	}
+	syslog(LOG_DEBUG, "smbns: ldap_sasl_..._bind_s success");
 
 	free(ads_host);
 	*hp = ah;
@@ -1238,13 +1250,15 @@ smb_ads_get_dc_level(smb_ads_handle_t *ah)
 	LDAPMessage *res, *entry;
 	char *attr[2];
 	char **vals;
-	int rc = -1;
+	int rc;
 
 	res = NULL;
 	attr[0] = SMB_ADS_ATTR_DCLEVEL;
 	attr[1] = NULL;
-	if (ldap_search_s(ah->ld, "", LDAP_SCOPE_BASE, NULL, attr,
-	    0, &res) != LDAP_SUCCESS) {
+	rc = ldap_search_s(ah->ld, "", LDAP_SCOPE_BASE, NULL, attr, 0, &res);
+	if (rc != LDAP_SUCCESS) {
+		syslog(LOG_ERR, "smb_ads_get_dc_level: "
+		    "LDAP search,  error %s", ldap_err2string(rc));
 		(void) ldap_msgfree(res);
 		return (-1);
 	}
@@ -1255,6 +1269,7 @@ smb_ads_get_dc_level(smb_ads_handle_t *ah)
 		return (-1);
 	}
 
+	rc = -1;
 	entry = ldap_first_entry(ah->ld, res);
 	if (entry) {
 		if ((vals = ldap_get_values(ah->ld, entry,
@@ -1263,13 +1278,17 @@ smb_ads_get_dc_level(smb_ads_handle_t *ah)
 			 * Observed the values aren't populated
 			 * by the Windows 2000 server.
 			 */
+			syslog(LOG_DEBUG, "smb_ads_get_dc_level: "
+			    "LDAP values missing, assume W2K");
 			(void) ldap_msgfree(res);
 			return (SMB_ADS_DCLEVEL_W2K);
 		}
 
-		if (vals[0] != NULL)
+		if (vals[0] != NULL) {
 			rc = atoi(vals[0]);
-
+			syslog(LOG_DEBUG, "smb_ads_get_dc_level: "
+			    "LDAP value %d", rc);
+		}
 		ldap_value_free(vals);
 	}
 
@@ -1309,6 +1328,9 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	char encrypt_buf[16];
 	int max;
 	smb_krb5_pn_set_t spn, upn;
+
+	syslog(LOG_DEBUG, "smb_ads_computer_op, op=%s dn=%s",
+	    (op == LDAP_MOD_ADD) ? "add" : "replace", dn);
 
 	if (smb_getsamaccount(sam_acct, sizeof (sam_acct)) != 0)
 		return (-1);
@@ -1437,25 +1459,42 @@ smb_ads_getattr(LDAP *ld, LDAPMessage *entry, smb_ads_avpair_t *avpair)
 
 	assert(avpair);
 	avpair->avp_val = NULL;
-	vals = ldap_get_values(ld, entry, avpair->avp_attr);
-	if (!vals)
-		return (SMB_ADS_STAT_NOT_FOUND);
 
+	syslog(LOG_DEBUG, "smbns: ads_getattr (%s)", avpair->avp_attr);
+	vals = ldap_get_values(ld, entry, avpair->avp_attr);
+	if (!vals) {
+		syslog(LOG_DEBUG, "smbns: ads_getattr err: no vals");
+		return (SMB_ADS_STAT_NOT_FOUND);
+	}
 	if (!vals[0]) {
+		syslog(LOG_DEBUG, "smbns: ads_getattr err: no vals[0]");
 		ldap_value_free(vals);
 		return (SMB_ADS_STAT_NOT_FOUND);
 	}
 
 	avpair->avp_val = strdup(vals[0]);
-	if (!avpair->avp_val)
+	if (!avpair->avp_val) {
+		syslog(LOG_DEBUG, "smbns: ads_getattr err: no mem");
 		rc = SMB_ADS_STAT_ERR;
+	} else {
+		syslog(LOG_DEBUG, "smbns: ads_getattr (%s) OK, val=%s",
+		    avpair->avp_attr, avpair->avp_val);
+	}
 
 	ldap_value_free(vals);
 	return (rc);
 }
 
 /*
- * Process query's result.
+ * Process query's result, making sure we have what we need.
+ *
+ * There's some non-obvious logic here for checking the returned
+ * DNS name for the machine account, trying to avoid modifying
+ * someone else's machine account.  When we search for a machine
+ * account we always ask for the DNS name.  For a pre-created
+ * machine account, the DNS name will be not set, and that's OK.
+ * If we see a DNS name and it doesn't match our DNS name, we'll
+ * assume the account belongs to someone else and return "DUP".
  */
 static smb_ads_qstat_t
 smb_ads_get_qstat(smb_ads_handle_t *ah, LDAPMessage *res,
@@ -1469,37 +1508,50 @@ smb_ads_get_qstat(smb_ads_handle_t *ah, LDAPMessage *res,
 	if (smb_ads_getfqhostname(ah, fqhost, MAXHOSTNAMELEN))
 		return (SMB_ADS_STAT_ERR);
 
-	if (ldap_count_entries(ah->ld, res) == 0)
+	if (ldap_count_entries(ah->ld, res) == 0) {
+		syslog(LOG_DEBUG, "smbns: find_computer, "
+		    "ldap_count_entries zero");
 		return (SMB_ADS_STAT_NOT_FOUND);
+	}
 
-	if ((entry = ldap_first_entry(ah->ld, res)) == NULL)
+	if ((entry = ldap_first_entry(ah->ld, res)) == NULL) {
+		syslog(LOG_DEBUG, "smbns: find_computer, "
+		    "ldap_first_entry error");
 		return (SMB_ADS_STAT_ERR);
+	}
 
+	syslog(LOG_DEBUG, "smbns: find_computer, check DNS name");
 	dnshost_avp.avp_attr = SMB_ADS_ATTR_DNSHOST;
 	rc = smb_ads_getattr(ah->ld, entry, &dnshost_avp);
 
+	/*
+	 * Check the status of finding the DNS name
+	 */
 	switch (rc) {
 	case SMB_ADS_STAT_FOUND:
 		/*
-		 * Returns SMB_ADS_STAT_DUP to avoid overwriting
+		 * Found a DNS name.  If it doesn't match ours,
+		 * returns SMB_ADS_STAT_DUP to avoid overwriting
 		 * the computer account of another system whose
 		 * NetBIOS name collides with that of the current
 		 * system.
 		 */
-		if (strcasecmp(dnshost_avp.avp_val, fqhost))
+		if (strcasecmp(dnshost_avp.avp_val, fqhost)) {
+			syslog(LOG_DEBUG, "smbns: find_computer, "
+			    "duplicate name (%s)",
+			    dnshost_avp.avp_val);
 			rc = SMB_ADS_STAT_DUP;
-
+		}
 		free(dnshost_avp.avp_val);
 		break;
 
 	case SMB_ADS_STAT_NOT_FOUND:
 		/*
-		 * Pre-created computer account doesn't have
-		 * the dNSHostname attribute. It's been observed
-		 * that the dNSHostname attribute is only set after
-		 * a successful domain join.
-		 * Returns SMB_ADS_STAT_FOUND as the account is
-		 * pre-created for the current system.
+		 * No dNSHostname attribute, so probably a
+		 * pre-created computer account.  Use it.
+		 *
+		 * Returns SMB_ADS_STAT_FOUND for the status
+		 * of finding the machine account.
 		 */
 		rc = SMB_ADS_STAT_FOUND;
 		break;
@@ -1511,11 +1563,13 @@ smb_ads_get_qstat(smb_ads_handle_t *ah, LDAPMessage *res,
 	if (rc != SMB_ADS_STAT_FOUND)
 		return (rc);
 
-	if (avpair)
+	if (avpair) {
+		syslog(LOG_DEBUG, "smbns: find_computer, check %s",
+		    avpair->avp_attr);
 		rc = smb_ads_getattr(ah->ld, entry, avpair);
+	}
 
 	return (rc);
-
 }
 
 /*
@@ -1524,7 +1578,9 @@ smb_ads_get_qstat(smb_ads_handle_t *ah, LDAPMessage *res,
  * If avpair is NULL, checks the status of the specified computer account.
  * Otherwise, looks up the value of the specified computer account's attribute.
  * If found, the value field of the avpair will be allocated and set. The
- * caller should free the allocated buffer.
+ * caller should free the allocated buffer.  Caller avpair requests are:
+ *   smb_ads_find_computer() asks for SMB_ADS_ATTR_DN
+ *   smb_ads_lookup_computer_attr_kvno() SMB_ADS_ATTR_KVNO
  *
  * Return:
  *  SMB_ADS_STAT_FOUND  - if both the computer and the specified attribute is
@@ -1544,6 +1600,7 @@ smb_ads_lookup_computer_n_attr(smb_ads_handle_t *ah, smb_ads_avpair_t *avpair,
 	LDAPMessage *res;
 	char sam_acct[SMB_SAMACCT_MAXLEN], sam_acct2[SMB_SAMACCT_MAXLEN];
 	smb_ads_qstat_t rc;
+	int err;
 
 	if (smb_getsamaccount(sam_acct, sizeof (sam_acct)) != 0)
 		return (SMB_ADS_STAT_ERR);
@@ -1567,15 +1624,37 @@ smb_ads_lookup_computer_n_attr(smb_ads_handle_t *ah, smb_ads_avpair_t *avpair,
 	    "(&(objectClass=computer)(%s=%s))", SMB_ADS_ATTR_SAMACCT,
 	    sam_acct2);
 
-	if (ldap_search_s(ah->ld, dn, scope, filter, attrs, 0,
-	    &res) != LDAP_SUCCESS) {
+	syslog(LOG_DEBUG, "smbns: lookup_computer, "
+	    "dn=%s, scope=%d", dn, scope);
+	syslog(LOG_DEBUG, "smbns: lookup_computer, "
+	    "filter=%s", filter);
+	syslog(LOG_DEBUG, "smbns: lookup_computer, "
+	    "attrs[0]=%s", attrs[0]);
+	syslog(LOG_DEBUG, "smbns: lookup_computer, "
+	    "attrs[1]=%s", attrs[1] ? attrs[1] : "");
+
+	err = ldap_search_s(ah->ld, dn, scope, filter, attrs, 0, &res);
+	if (err != LDAP_SUCCESS) {
+		syslog(LOG_DEBUG, "smbns: lookup_computer, "
+		    "LDAP search failed, dn=(%s), scope=%d, err=%s",
+		    dn, scope, ldap_err2string(err));
 		(void) ldap_msgfree(res);
 		return (SMB_ADS_STAT_NOT_FOUND);
 	}
+	syslog(LOG_DEBUG, "smbns: find_computer, ldap_search OK");
 
 	rc = smb_ads_get_qstat(ah, res, avpair);
+	if (rc == SMB_ADS_STAT_FOUND) {
+		syslog(LOG_DEBUG, "smbns: find_computer, attr %s = %s",
+		    avpair->avp_attr, avpair->avp_val);
+	} else {
+		syslog(LOG_DEBUG, "smbns: find_computer, "
+		    "get query status, error %d", rc);
+	}
+
 	/* free the search results */
 	(void) ldap_msgfree(res);
+
 	return (rc);
 }
 
@@ -1594,6 +1673,8 @@ smb_ads_find_computer(smb_ads_handle_t *ah, char *dn)
 	smb_ads_avpair_t avpair;
 
 	avpair.avp_attr = SMB_ADS_ATTR_DN;
+	avpair.avp_val = NULL;
+
 	smb_ads_get_default_comp_container_dn(ah, dn, SMB_ADS_DN_MAX);
 	stat = smb_ads_lookup_computer_n_attr(ah, &avpair, LDAP_SCOPE_ONELEVEL,
 	    dn);
@@ -1659,6 +1740,7 @@ smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *ah, char *dn)
 	int kvno = 1;
 
 	avpair.avp_attr = SMB_ADS_ATTR_KVNO;
+	avpair.avp_val = NULL;
 	if (smb_ads_lookup_computer_n_attr(ah, &avpair,
 	    LDAP_SCOPE_BASE, dn) == SMB_ADS_STAT_FOUND) {
 		kvno = atoi(avpair.avp_val);
@@ -1713,6 +1795,8 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd)
 
 	rc = smb_ads_open_main(&ah, domain, user, usr_passwd);
 	if (rc != 0) {
+		const char *s = smb_ads_strerror(rc);
+		syslog(LOG_ERR, "smb_ads_join: open_main, error %s", s);
 		smb_ccache_remove(SMB_CCACHE_PATH);
 		return (rc);
 	}
@@ -1727,6 +1811,8 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd)
 	switch (qstat) {
 	case SMB_ADS_STAT_FOUND:
 		new_acct = B_FALSE;
+		syslog(LOG_INFO, "smb_ads_join: machine account found."
+		    " Updating: %s", dn);
 		if (smb_ads_modify_computer(ah, dclevel, dn) != 0) {
 			smb_ads_close(ah);
 			smb_ccache_remove(SMB_CCACHE_PATH);
@@ -1737,6 +1823,8 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd)
 	case SMB_ADS_STAT_NOT_FOUND:
 		new_acct = B_TRUE;
 		smb_ads_get_default_comp_dn(ah, dn, SMB_ADS_DN_MAX);
+		syslog(LOG_INFO, "smb_ads_join: machine account not found."
+		    " Creating: %s", dn);
 		if (smb_ads_add_computer(ah, dclevel, dn) != 0) {
 			smb_ads_close(ah);
 			smb_ccache_remove(SMB_CCACHE_PATH);
@@ -1745,6 +1833,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd)
 		break;
 
 	default:
+		syslog(LOG_INFO, "smb_ads_find_computer, rc=%d", qstat);
 		if (qstat == SMB_ADS_STAT_DUP)
 			rc = SMB_ADJOIN_ERR_DUP_TRUST_ACCT;
 		else

@@ -29,6 +29,7 @@ SUBDIRS =       \
 		pf_key \
 		poll \
 		portfs \
+		regression \
 		sdevfs \
 		secflags \
 		sigqueue \
