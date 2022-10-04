@@ -775,13 +775,12 @@ isa_path(const char *path)
 }
 
 
-/*ARGSUSED*/
 static char *
 _unix_crypt_gensalt(char *gsbuffer,
-    size_t gsbufflen,
-    const char *oldpuresalt,
-    const struct passwd *userinfo,
-    const char *argv[])
+    size_t gsbufflen __unused,
+    const char *oldpuresalt __unused,
+    const struct passwd *userinfo __unused,
+    const char *argv[] __unused)
 {
 	static const char saltchars[] =
 	    "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -1014,9 +1013,8 @@ static char f[32];
 
 static char preS[48];
 
-/*ARGSUSED*/
 static void
-unlocked_encrypt(char *block, int fake)
+unlocked_encrypt(char *block, int fake __unused)
 {
 	int	i;
 	int t, j, k;

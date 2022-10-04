@@ -70,18 +70,16 @@ set_constraint_handler_s(constraint_handler_t handler)
 	return (ret);
 }
 
-/*ARGSUSED*/
 void
 abort_handler_s(const char *_RESTRICT_KYWD msg,
-    void *_RESTRICT_KYWD ptr, errno_t error)
+    void *_RESTRICT_KYWD ptr __unused, errno_t error __unused)
 {
 	common_panic("abort_handler_s: ", msg);
 }
 
-/*ARGSUSED*/
 void
-ignore_handler_s(const char *_RESTRICT_KYWD msg,
-    void *_RESTRICT_KYWD ptr, errno_t error)
+ignore_handler_s(const char *_RESTRICT_KYWD msg __unused,
+    void *_RESTRICT_KYWD ptr __unused, errno_t error __unused)
 {
 }
 

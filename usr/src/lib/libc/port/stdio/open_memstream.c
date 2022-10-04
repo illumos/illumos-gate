@@ -114,7 +114,8 @@ memstream_newsize(size_t pos, size_t alloc, size_t nbytes, size_t *nallocp)
  * The SUSv4 spec says that this should not support reads.
  */
 static ssize_t
-open_memstream_read(FILE *iop, char *buf, size_t nbytes)
+open_memstream_read(FILE *iop __unused, char *buf __unused,
+    size_t nbytes __unused)
 {
 	errno = EBADF;
 	return (-1);

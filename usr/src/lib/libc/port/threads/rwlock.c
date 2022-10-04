@@ -198,9 +198,8 @@ rw_write_held(rwlock_t *rwlp)
 }
 
 #pragma weak _rwlock_init = rwlock_init
-/* ARGSUSED2 */
 int
-rwlock_init(rwlock_t *rwlp, int type, void *arg)
+rwlock_init(rwlock_t *rwlp, int type, void *arg __unused)
 {
 	ulwp_t *self = curthread;
 

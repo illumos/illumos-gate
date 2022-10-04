@@ -2182,7 +2182,7 @@ wide_S:
 			while (printn > 0) {
 				if ((cnt = wctomb(buf, *wp)) < 0)
 					cnt = 1;
-			PUT(bufp, cnt);
+				PUT(bufp, cnt);
 				wp++;
 				printn--;
 			}
@@ -2247,13 +2247,13 @@ _watoi(wchar_t *fmt)
 #define	FLAG_LONG_LONG	0x04
 #define	FLAG_LONG_DBL	0x08
 
-/* ARGSUSED3 */
 #ifdef	_WIDE
 static void
-_wmkarglst(wchar_t *fmt, stva_list args, stva_list arglst[], int prflag)
+_wmkarglst(wchar_t *fmt, stva_list args, stva_list arglst[],
+    int prflag __unused)
 #else  /* _WIDE */
 static void
-_mkarglst(char *fmt, stva_list args, stva_list arglst[], int prflag)
+_mkarglst(char *fmt, stva_list args, stva_list arglst[], int prflag __unused)
 #endif /* _WIDE */
 {
 #ifdef	_WIDE
@@ -2264,7 +2264,7 @@ _mkarglst(char *fmt, stva_list args, stva_list arglst[], int prflag)
 	static const char skips[] = "# +-.'0123456789h$";
 #endif /* _WIDE */
 	enum types {INT = 1, LONG, CHAR_PTR, DOUBLE, LONG_DOUBLE, VOID_PTR,
-		LONG_PTR, INT_PTR, LONG_LONG, LONG_LONG_PTR};
+	    LONG_PTR, INT_PTR, LONG_LONG, LONG_LONG_PTR};
 	enum types typelst[MAXARGS], curtype;
 	ssize_t n;
 	int  maxnum, curargno, flags;
@@ -2444,13 +2444,12 @@ _mkarglst(char *fmt, stva_list args, stva_list arglst[], int prflag)
  * unusual circumstances.
  * pargs is assumed to contain the value of arglst[MAXARGS - 1].
  */
-/* ARGSUSED3 */
 #ifdef	_WIDE
 static void
-_wgetarg(wchar_t *fmt, stva_list *pargs, long argno, int prflag)
+_wgetarg(wchar_t *fmt, stva_list *pargs, long argno, int prflag __unused)
 #else  /* _WIDE */
 void
-_getarg(char *fmt, stva_list *pargs, long argno, int prflag)
+_getarg(char *fmt, stva_list *pargs, long argno, int prflag __unused)
 #endif /* _WIDE */
 {
 

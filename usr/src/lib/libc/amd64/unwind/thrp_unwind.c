@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include "stack_unwind.h"
@@ -39,15 +37,13 @@
  */
 #define	CFA_ADJUST	16
 
-/* ARGSUSED */
 static _Unwind_Reason_Code
-posix_stop_func(
-	int version,
-	_Unwind_Action _Unwind_actions,
-	uint64_t exceptionClass,
-	struct _Unwind_Exception *exceptionObject,
-	struct _Unwind_Context *context,
-	void *func_arg)
+posix_stop_func(int version __unused,
+    _Unwind_Action _Unwind_actions __unused,
+    uint64_t exceptionClass __unused,
+    struct _Unwind_Exception *exceptionObject,
+    struct _Unwind_Context *context,
+    void *func_arg)
 {
 	__cleanup_t **headp = (__cleanup_t **)func_arg;
 	__cleanup_t *head;
@@ -82,9 +78,8 @@ posix_stop_func(
  * we just need to call the Posix cleanup handlers.
  */
 
-/* ARGSUSED */
 void
-_thrp_unwind(void *dummy)
+_thrp_unwind(void *dummy __unused)
 {
 	ulwp_t *self = curthread;
 	__cleanup_t **headp = &self->ul_clnup_hdr;

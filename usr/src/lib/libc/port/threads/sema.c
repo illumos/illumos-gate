@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 
@@ -42,9 +40,8 @@ sema_held(sema_t *sp)
 }
 
 #pragma weak _sema_init = sema_init
-/* ARGSUSED3 */
 int
-sema_init(sema_t *sp, unsigned int count, int type, void *arg)
+sema_init(sema_t *sp, unsigned int count, int type, void *arg __unused)
 {
 	if (_semvaluemax == 0)
 		_semvaluemax = (uint32_t)_sysconf(_SC_SEM_VALUE_MAX);

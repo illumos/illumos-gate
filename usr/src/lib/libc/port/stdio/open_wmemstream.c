@@ -44,7 +44,8 @@ typedef struct wmemstream {
  * The SUSv4 spec says that this should not support reads.
  */
 static ssize_t
-open_wmemstream_read(FILE *iop, char *buf, size_t nbytes)
+open_wmemstream_read(FILE *iop __unused, char *buf __unused,
+    size_t nbytes __unused)
 {
 	errno = EBADF;
 	return (-1);

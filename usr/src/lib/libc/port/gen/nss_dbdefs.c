@@ -129,19 +129,19 @@ _nss_XbyY_fgets(FILE *f, nss_XbyY_args_t *b)
  * CAUTION: (instr, instr+lenstr) and (buffer, buffer+buflen) are
  * non-intersecting memory areas. Since this is an internal interface,
  * we should be able to live with that.
+ *
+ * "instr" is the beginning of the aliases string
+ * "buffer" has the return val for success
+ * "buflen" is the length of the buffer available for aliases
  */
 char **
 _nss_netdb_aliases(const char *instr, int lenstr, char *buffer, int buflen)
-	/* "instr" is the beginning of the aliases string */
-	/* "buffer" has the return val for success */
-	/* "buflen" is the length of the buffer available for aliases */
 {
 	/*
 	 * Build the alias-list in the start of the buffer, and copy
 	 * the strings to the end of the buffer.
 	 */
-	const char
-		*instr_limit	= instr + lenstr;
+	const char *instr_limit	= instr + lenstr;
 	char	*copyptr	= buffer + buflen;
 	char	**aliasp	= (char **)ROUND_UP(buffer, sizeof (*aliasp));
 	char	**alias_start	= aliasp;
@@ -287,7 +287,7 @@ static getXbyY_to_dbop_t getXbyY_to_dbop[] = {
 	NSS_MK_GETXYDBOPC(SERVICES, BYNAME, "services", "str2servent", "s"),
 	NSS_MK_GETXYDBOPC(SERVICES, BYPORT, "services", "str2servent", "S"),
 	NSS_MK_GETXYDBOPB(SHADOW, PASSWD, PASSWD_BYNAME, "shadow",
-				"str2spwd", "n"),
+	    "str2spwd", "n"),
 	NSS_MK_GETXYDBOPC(TSOL_RH, BYADDR, "tsol_rh", "str_to_rhstr", "h"),
 	NSS_MK_GETXYDBOPC(TSOL_TP, BYNAME, "tsol_tp", "str_to_tpstr", "n"),
 	NSS_MK_GETXYDBOPC(TSOL_ZC, BYNAME, "tsol_zc", "str_to_zcstr", "n"),
@@ -386,14 +386,13 @@ nss_dbop_search(const char *name, uint32_t dbop)
  *   setnetgr_args		T
  */
 
-/*ARGSUSED*/
 static nss_status_t
 nss_pack_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
-	const char *dbname, int dbop, size_t *rlen, const char *typestr)
+    const char *dbname, int dbop __unused, size_t *rlen, const char *typestr)
 {
 	int				i, j;
 	size_t				len, len2, len3, len4, len5, slop;
-	nssuint_t 			*uptr, offv, offc;
+	nssuint_t			*uptr, offv, offc;
 	struct nss_setnetgrent_args	*sng;
 	struct nss_innetgr_args		*ing;
 	struct nss_groupsbymem		*gbm;
@@ -744,7 +743,7 @@ nss_pack_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
 
 nss_status_t
 nss_default_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
-	const char *dbname, int dbop, size_t *rlen)
+    const char *dbname, int dbop, size_t *rlen)
 {
 	int		index;
 
@@ -764,12 +763,11 @@ nss_default_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
 	    dbop, rlen, getXbyY_to_dbop[index].tostr));
 }
 
-/*ARGSUSED*/
 void
-nss_packed_set_status(void *buffer, size_t length, nss_status_t status,
-		nss_XbyY_args_t *arg)
+nss_packed_set_status(void *buffer, size_t length __unused, nss_status_t status,
+    nss_XbyY_args_t *arg)
 {
-	nss_pheader_t 	*pbuf = (nss_pheader_t *)buffer;
+	nss_pheader_t	*pbuf = (nss_pheader_t *)buffer;
 	nss_dbd_t	*pdbd;
 	char		*dbn;
 
@@ -866,14 +864,13 @@ nss_packed_set_status(void *buffer, size_t length, nss_status_t status,
  * Assumes arguments are all valid
  */
 
-/*ARGSUSED*/
 static nss_status_t
-nss_upack_key2arg(void *buffer, size_t length, char **dbname,
-		int *dbop, nss_XbyY_args_t *arg, int index)
+nss_upack_key2arg(void *buffer, size_t length __unused, char **dbname __unused,
+    int *dbop __unused, nss_XbyY_args_t *arg, int index)
 {
-	nss_pheader_t 			*pbuf = (nss_pheader_t *)buffer;
+	nss_pheader_t			*pbuf = (nss_pheader_t *)buffer;
 	const char			*strtype = NULL;
-	nssuint_t 			off, *uptr, keysize;
+	nssuint_t			off, *uptr, keysize;
 	size_t				len, slop;
 	int				i, j;
 	char				**cv, *bptr;
@@ -1116,11 +1113,11 @@ nss_pinit_funcs(int index, nss_db_initf_t *initf, nss_str2ent_t *s2e)
 
 nss_status_t
 nss_packed_getkey(void *buffer, size_t length, char **dbname,
-		int *dbop, nss_XbyY_args_t *arg)
+    int *dbop, nss_XbyY_args_t *arg)
 {
-	nss_pheader_t 	*pbuf = (nss_pheader_t *)buffer;
+	nss_pheader_t	*pbuf = (nss_pheader_t *)buffer;
 	nss_dbd_t	*pdbd;
-	nssuint_t 	off, dbdsize;
+	nssuint_t	off, dbdsize;
 	int		index;
 
 	if (buffer == NULL || length == 0 || dbop == NULL ||
@@ -1151,15 +1148,13 @@ nss_packed_getkey(void *buffer, size_t length, char **dbname,
  * store the entry in the buffer we were passed by the caller.
  */
 
-/*ARGSUSED*/
 static int
 str2packent(
     const char *instr,
     int lenstr,
-    void *ent,		/* really (char *) */
+    void *ent __unused,		/* really (char *) */
     char *buffer,
-    int buflen
-)
+    int buflen)
 {
 	if (buflen <= lenstr) {		/* not enough buffer */
 		return (NSS_STR_PARSE_ERANGE);
@@ -1174,12 +1169,12 @@ str2packent(
  * Initialize db_root, initf, dbop and arg from a packed buffer
  */
 
-/*ARGSUSED*/
 nss_status_t
-nss_packed_arg_init(void *buffer, size_t length, nss_db_root_t *db_root,
-		nss_db_initf_t *initf, int *dbop, nss_XbyY_args_t *arg)
+nss_packed_arg_init(void *buffer, size_t length,
+    nss_db_root_t *db_root __unused,
+    nss_db_initf_t *initf, int *dbop, nss_XbyY_args_t *arg)
 {
-	nss_pheader_t 		*pbuf = (nss_pheader_t *)buffer;
+	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
 	nss_str2ent_t		s2e = str2packent;
 	nss_str2ent_t		real_s2e = NULL;
 	nss_dbd_t		*pdbd;
@@ -1249,13 +1244,13 @@ nss_packed_arg_init(void *buffer, size_t length, nss_db_root_t *db_root,
  * Initialize db_root, initf, dbop, contextp and arg from a packed buffer
  */
 
-/*ARGSUSED*/
 nss_status_t
-nss_packed_context_init(void *buffer, size_t length, nss_db_root_t *db_root,
-		nss_db_initf_t *initf, nss_getent_t **contextp,
-		nss_XbyY_args_t *arg)
+nss_packed_context_init(void *buffer, size_t length __unused,
+    nss_db_root_t *db_root __unused,
+    nss_db_initf_t *initf __unused, nss_getent_t **contextp __unused,
+    nss_XbyY_args_t *arg)
 {
-	nss_pheader_t 	*pbuf = (nss_pheader_t *)buffer;
+	nss_pheader_t	*pbuf = (nss_pheader_t *)buffer;
 	nss_str2ent_t	s2e = str2packent;
 	char		*bptr;
 	size_t		len;

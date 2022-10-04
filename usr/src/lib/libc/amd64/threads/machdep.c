@@ -33,9 +33,8 @@
 extern int getlwpstatus(thread_t, lwpstatus_t *);
 extern int putlwpregs(thread_t, prgregset_t);
 
-/* ARGSUSED2 */
 void *
-setup_top_frame(void *stk, size_t stksize, ulwp_t *ulwp)
+setup_top_frame(void *stk, size_t stksize, ulwp_t *ulwp __unused)
 {
 	uint64_t *stack;
 	struct {
