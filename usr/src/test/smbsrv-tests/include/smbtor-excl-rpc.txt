@@ -1,0 +1,109 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+#
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+
+#
+# smbtorture tests we choose to skip, either because the
+# tests hang, or we disagree with the test, or whatever.
+#
+
+#Disabled by default
+rpc.spoolss
+
+
+###Unimplemented Services/Features
+
+rpc.atsvc
+rpc.autoidl
+rpc.backupkey
+rpc.bind
+rpc.browser
+rpc.clusapi
+rpc.cracknames
+rpc.drsuapi
+rpc.drsuapi_wk28
+rpc.dsgetinfo
+rpc.echo
+rpc.epmapper
+rpc.frsapi
+rpc.fsrvp
+rpc.handles.drsuapi
+rpc.initshutdown
+rpc.iremotewinspool
+rpc.mgmt
+rpc.ntsvcs
+rpc.oxidresolve
+rpc.remact
+rpc.scanner
+rpc.unixinfo
+rpc.witness
+
+
+###Unimplemented functions
+
+#GetDcAddress
+rpc.dfs.netdfs.DcAddress
+#FlushFtTable
+rpc.dfs.netdfs.FtRoot
+#ManagerInitialize
+rpc.dfs.netdfs.ManagerInitialize
+
+#QueryTrustedomainInfoByName
+rpc.lsa.forest
+#CreateAccount
+rpc.lsa.privileges
+#CreatedTrustedDomain, QueryInfoPolicy2 unimplemented
+#EnumTrustedDomains(Ex) are stubbed
+rpc.lsa.trusted
+
+#GetAliasMembership
+rpc.samba3.getaliasmembership
+
+#Connect5
+rpc.samr.accessmask.samr.Connect5
+rpc.samr.accessmask.samr.LookupDomain
+rpc.samr.accessmask.samr.OpenDomain
+rpc.samr.EnumDomains
+
+#Namesake function is unimplemented
+rpc.srvsvc.srvsvc (admin access).NetCharDevQEnum
+rpc.srvsvc.srvsvc (admin access).NetCharDevEnum
+rpc.srvsvc.srvsvc (admin access).NetDiskEnum
+rpc.srvsvc.srvsvc (admin access).NetTransportEnum
+rpc.wkssvc.wkssvc.NetWkstaEnumUsers
+rpc.wkssvc.wkssvc.NetrAddAlternateComputerName
+rpc.wkssvc.wkssvc.NetrEnumerateComputerNames
+rpc.wkssvc.wkssvc.NetrGetJoinInformation
+rpc.wkssvc.wkssvc.NetrGetJoinableOus
+rpc.wkssvc.wkssvc.NetrGetJoinableOus2
+rpc.wkssvc.wkssvc.NetrJoinDomain
+rpc.wkssvc.wkssvc.NetrLogonDomainNameAdd
+rpc.wkssvc.wkssvc.NetrLogonDomainNameDel
+rpc.wkssvc.wkssvc.NetrMessageBufferSend
+rpc.wkssvc.wkssvc.NetrRemoveAlternateComputerName
+rpc.wkssvc.wkssvc.NetrUnjoinDomain
+rpc.wkssvc.wkssvc.NetrUseAdd
+rpc.wkssvc.wkssvc.NetrUseDel
+rpc.wkssvc.wkssvc.NetrUseEnum
+rpc.wkssvc.wkssvc.NetrUseGetInfo
+rpc.wkssvc.wkssvc.NetrValidateName
+rpc.wkssvc.wkssvc.NetrValidateName2
+rpc.wkssvc.wkssvc.NetrWkstaTransportAdd
+rpc.wkssvc.wkssvc.NetrWkstaTransportDel
+rpc.wkssvc.wkssvc.NetrWkstaUserGetInfo
+rpc.wkssvc.wkssvc.NetrWorkstationStatisticsGet
+
+
+###Benchmarks
+
+rpc.bench-rpc
+rpc.bench-schannel1

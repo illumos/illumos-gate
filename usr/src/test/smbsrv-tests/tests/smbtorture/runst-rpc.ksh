@@ -19,7 +19,7 @@ export SMBSRV_TESTS="/opt/smbsrv-tests"
 export SMBTOR="/usr/bin/smbtorture"
 
 runsmbtor=$SMBSRV_TESTS/bin/run_smbtorture
-excl_file=$SMBSRV_TESTS/include/smbtor-excl-smb2.txt
+excl_file=$SMBSRV_TESTS/include/smbtor-excl-rpc.txt
 
 cfgfile=${CFGFILE:-$SMBSRV_TESTS/include/default.cfg}
 outdir=${OUTDIR:-/var/tmp/test_results/smbsrv-tests}
@@ -54,8 +54,8 @@ mkdir -p $outdir
 cd $outdir || fail "Could not cd to $outdir"
 
 tstamp=$(date +'%Y%m%dT%H%M%S')
-logfile=$outdir/smbtor-smb2-${tstamp}.log
-outfile=$outdir/smbtor-smb2-${tstamp}.summary
+logfile=$outdir/smbtor-rpc-${tstamp}.log
+outfile=$outdir/smbtor-rpc-${tstamp}.summary
 
 if [[ -z "$timeout" && -n "$TIMEOUT" ]]; then
 	timeout="-t $TIMEOUT"
@@ -63,21 +63,21 @@ fi
 
 # Non-option args taken as list of match patterns
 if [ -z "$1" ] ; then
-    match="-m smb2"
+    match="-m rpc"
 fi
 for m
 do
     match="$match -m $m"
 done
 
-# Make sure we can connect, otherwise we'll report every test as failing.
-$SMBTOR -U "$SMBT_USER%${SMBT_PASS}" //$SMBT_HOST/$SMBT_SHARE smb2.dir.find \
- > /dev/null 2>&1 || \
-    fail "Cannot connect to //$SMBT_HOST/$SMBT_SHARE"
+#It would be nice to have a generic 'Can I connect to this server/share?' test
+$SMBTOR -U "$SMBT_USER%${SMBT_PASS}" //$SMBT_HOST/IPC\$	\
+    rpc.wkssvc.wkssvc.NetWkstaGetInfo > /dev/null 2>&1 || \
+    fail "Cannot connect to //$SMBT_HOST/IPC\$"
 
-echo "Running smbtorture/smb2 tests with //$SMBT_HOST/$SMBT_SHARE"
+echo "Running smbtorture/RPC tests with //$SMBT_HOST/IPC\$"
 $runsmbtor $match -e $excl_file -o $logfile $timeout \
-    "$SMBT_HOST" "$SMBT_SHARE" "$SMBT_USER" "${SMBT_PASS}" |
+    "$SMBT_HOST" "IPC\$" "$SMBT_USER" "${SMBT_PASS}" |
      tee $outfile
 
 exit 0
