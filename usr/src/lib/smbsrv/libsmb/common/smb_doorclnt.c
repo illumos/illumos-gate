@@ -207,7 +207,14 @@ smb_get_dcinfo(char *namebuf, uint32_t namebuflen, smb_inaddr_t *ipaddr)
 bool_t
 smb_joininfo_xdr(XDR *xdrs, smb_joininfo_t *objp)
 {
+	if (!xdr_uint32_t(xdrs, &objp->mode))
+		return (FALSE);
+
 	if (!xdr_vector(xdrs, (char *)objp->domain_name, MAXHOSTNAMELEN,
+	    sizeof (char), (xdrproc_t)xdr_char))
+		return (FALSE);
+
+	if (!xdr_vector(xdrs, (char *)objp->container_name, MAXHOSTNAMELEN,
 	    sizeof (char), (xdrproc_t)xdr_char))
 		return (FALSE);
 
@@ -217,9 +224,6 @@ smb_joininfo_xdr(XDR *xdrs, smb_joininfo_t *objp)
 
 	if (!xdr_vector(xdrs, (char *)objp->domain_passwd,
 	    SMB_PASSWD_MAXLEN + 1, sizeof (char), (xdrproc_t)xdr_char))
-		return (FALSE);
-
-	if (!xdr_uint32_t(xdrs, &objp->mode))
 		return (FALSE);
 
 	return (TRUE);

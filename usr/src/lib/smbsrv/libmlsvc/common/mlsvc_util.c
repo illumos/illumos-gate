@@ -100,10 +100,21 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 	char addrbuf[INET6_ADDRSTRLEN];
 	smb_domainex_t dxi;
 	smb_domain_t *di = &dxi.d_primary;
+	char *container;
+	char *username;
 	DWORD status;
 	int rc;
 
 	bzero(&dxi, sizeof (dxi));
+
+	if (info->container_name[0] != '\0')
+		container = info->container_name;
+	else
+		container = NULL;
+	if (info->domain_username[0] != '\0')
+		username = info->domain_username;
+	else
+		username = NULL;
 
 	/*
 	 * Domain join support: AD (Kerberos+LDAP) or MS-RPC?
@@ -125,11 +136,10 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 	 */
 	(void) smb_config_setbool(SMB_CI_DOMAIN_MEMB, B_FALSE);
 
-	if (info->domain_username[0] != '\0') {
+	if (username != NULL) {
 		(void) smb_auth_ntlm_hash(info->domain_passwd, passwd_hash);
-		smb_ipc_set(info->domain_username, passwd_hash);
-		syslog(LOG_INFO, "smbd: joining with user %s",
-		    info->domain_username);
+		smb_ipc_set(username, passwd_hash);
+		syslog(LOG_INFO, "smbd: joining with user %s", username);
 	} else {
 		smb_ipc_set(MLSVC_ANON_USER, zero_hash);
 		syslog(LOG_INFO, "smbd: joining with anonymous");
@@ -210,14 +220,14 @@ mlsvc_join(smb_joininfo_t *info, smb_joinres_t *res)
 	 * Create or update our machine account on the DC.
 	 * A non-null user means we do "secure join".
 	 */
-	if (info->domain_username[0] != '\0') {
+	if (username != NULL) {
 		/*
 		 * If enabled, try to join using AD Services.
 		 */
 		status = NT_STATUS_UNSUCCESSFUL;
 		if (ads_enabled) {
 			syslog(LOG_INFO, "use_ads=true (LDAP join)");
-			res->join_err = smb_ads_join(di->di_fqname,
+			res->join_err = smb_ads_join(di->di_fqname, container,
 			    info->domain_username, info->domain_passwd,
 			    machine_pw);
 			if (res->join_err == SMB_ADS_SUCCESS) {

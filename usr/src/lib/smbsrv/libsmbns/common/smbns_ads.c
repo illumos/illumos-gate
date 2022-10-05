@@ -1187,33 +1187,22 @@ smb_ads_remove_share(smb_ads_handle_t *ah, const char *adsShareName,
 }
 
 /*
- * smb_ads_get_default_comp_container_dn
+ * smb_ads_get_new_comp_dn
  *
- * Build the distinguished name for the default computer conatiner (i.e. the
- * pre-defined Computers container).
+ * Build the distinguished name for a new machine account
+ * prepend: cn=SamAccountName, cn=Computers, ...domain_dn...
  */
 static void
-smb_ads_get_default_comp_container_dn(smb_ads_handle_t *ah, char *buf,
-    size_t buflen)
-{
-	(void) snprintf(buf, buflen, "cn=%s,%s", SMB_ADS_COMPUTERS_CN,
-	    ah->domain_dn);
-}
-
-/*
- * smb_ads_get_default_comp_dn
- *
- * Build the distinguished name for this system.
- */
-static void
-smb_ads_get_default_comp_dn(smb_ads_handle_t *ah, char *buf, size_t buflen)
+smb_ads_get_new_comp_dn(smb_ads_handle_t *ah, char *buf, size_t buflen,
+    char *container)
 {
 	char nbname[NETBIOS_NAME_SZ];
-	char container_dn[SMB_ADS_DN_MAX];
+	if (container == NULL)
+		container = "cn=" SMB_ADS_COMPUTERS_CN;
 
 	(void) smb_getnetbiosname(nbname, sizeof (nbname));
-	smb_ads_get_default_comp_container_dn(ah, container_dn, SMB_ADS_DN_MAX);
-	(void) snprintf(buf, buflen, "cn=%s,%s", nbname, container_dn);
+	(void) snprintf(buf, buflen, "cn=%s,%s,%s",
+	    nbname, container, ah->domain_dn);
 }
 
 /*
@@ -1495,18 +1484,16 @@ smb_ads_getattr(LDAP *ld, LDAPMessage *entry, smb_ads_avpair_t *avpair)
  * machine account, the DNS name will be not set, and that's OK.
  * If we see a DNS name and it doesn't match our DNS name, we'll
  * assume the account belongs to someone else and return "DUP".
+ *
+ * Only do the DNS name check for our initial search for the
+ * machine account, which has avpair->avp_attr = SMB_ADS_ATTR_DN
  */
 static smb_ads_qstat_t
 smb_ads_get_qstat(smb_ads_handle_t *ah, LDAPMessage *res,
     smb_ads_avpair_t *avpair)
 {
-	char fqhost[MAXHOSTNAMELEN];
-	smb_ads_avpair_t dnshost_avp;
 	smb_ads_qstat_t rc = SMB_ADS_STAT_FOUND;
 	LDAPMessage *entry;
-
-	if (smb_ads_getfqhostname(ah, fqhost, MAXHOSTNAMELEN))
-		return (SMB_ADS_STAT_ERR);
 
 	if (ldap_count_entries(ah->ld, res) == 0) {
 		syslog(LOG_DEBUG, "smbns: find_computer, "
@@ -1520,48 +1507,62 @@ smb_ads_get_qstat(smb_ads_handle_t *ah, LDAPMessage *res,
 		return (SMB_ADS_STAT_ERR);
 	}
 
-	syslog(LOG_DEBUG, "smbns: find_computer, check DNS name");
-	dnshost_avp.avp_attr = SMB_ADS_ATTR_DNSHOST;
-	rc = smb_ads_getattr(ah->ld, entry, &dnshost_avp);
+	/* Have an LDAP entry (found something) */
+	syslog(LOG_DEBUG, "smbns: find_computer, have LDAP resp.");
 
-	/*
-	 * Check the status of finding the DNS name
-	 */
-	switch (rc) {
-	case SMB_ADS_STAT_FOUND:
+	if (avpair != NULL &&
+	    strcmp(avpair->avp_attr, SMB_ADS_ATTR_DN) == 0) {
+		char fqhost[MAXHOSTNAMELEN];
+		smb_ads_avpair_t dnshost_avp;
+
+		syslog(LOG_DEBUG, "smbns: find_computer, check DNS name");
+
+		if (smb_ads_getfqhostname(ah, fqhost, MAXHOSTNAMELEN))
+			return (SMB_ADS_STAT_ERR);
+
+		dnshost_avp.avp_attr = SMB_ADS_ATTR_DNSHOST;
+		dnshost_avp.avp_val = NULL;
+		rc = smb_ads_getattr(ah->ld, entry, &dnshost_avp);
+
 		/*
-		 * Found a DNS name.  If it doesn't match ours,
-		 * returns SMB_ADS_STAT_DUP to avoid overwriting
-		 * the computer account of another system whose
-		 * NetBIOS name collides with that of the current
-		 * system.
+		 * Status from finding the DNS name value
 		 */
-		if (strcasecmp(dnshost_avp.avp_val, fqhost)) {
-			syslog(LOG_DEBUG, "smbns: find_computer, "
-			    "duplicate name (%s)",
-			    dnshost_avp.avp_val);
-			rc = SMB_ADS_STAT_DUP;
+		switch (rc) {
+		case SMB_ADS_STAT_FOUND:
+			/*
+			 * Found a DNS name.  If it doesn't match ours,
+			 * returns SMB_ADS_STAT_DUP to avoid overwriting
+			 * the computer account of another system whose
+			 * NetBIOS name collides with that of the current
+			 * system.
+			 */
+			if (strcasecmp(dnshost_avp.avp_val, fqhost)) {
+				syslog(LOG_DEBUG, "smbns: find_computer, "
+				    "duplicate name (%s)",
+				    dnshost_avp.avp_val);
+				rc = SMB_ADS_STAT_DUP;
+			}
+			free(dnshost_avp.avp_val);
+			break;
+
+		case SMB_ADS_STAT_NOT_FOUND:
+			/*
+			 * No dNSHostname attribute, so probably a
+			 * pre-created computer account.  Use it.
+			 *
+			 * Returns SMB_ADS_STAT_FOUND for the status
+			 * of finding the machine account.
+			 */
+			rc = SMB_ADS_STAT_FOUND;
+			break;
+
+		default:
+			break;
 		}
-		free(dnshost_avp.avp_val);
-		break;
 
-	case SMB_ADS_STAT_NOT_FOUND:
-		/*
-		 * No dNSHostname attribute, so probably a
-		 * pre-created computer account.  Use it.
-		 *
-		 * Returns SMB_ADS_STAT_FOUND for the status
-		 * of finding the machine account.
-		 */
-		rc = SMB_ADS_STAT_FOUND;
-		break;
-
-	default:
-		break;
+		if (rc != SMB_ADS_STAT_FOUND)
+			return (rc);
 	}
-
-	if (rc != SMB_ADS_STAT_FOUND)
-		return (rc);
 
 	if (avpair) {
 		syslog(LOG_DEBUG, "smbns: find_computer, check %s",
@@ -1661,10 +1662,9 @@ smb_ads_lookup_computer_n_attr(smb_ads_handle_t *ah, smb_ads_avpair_t *avpair,
 /*
  * smb_ads_find_computer
  *
- * Starts by searching for the system's AD computer object in the default
- * container (i.e. cn=Computers).  If not found, searches the entire directory.
- * If found, 'dn' will be set to the distinguished name of the system's AD
- * computer object.
+ * Searches the directory for the machine account (SamAccountName)
+ * If found, 'dn' will be set to the distinguished name of the system's
+ * AD computer object.
  */
 static smb_ads_qstat_t
 smb_ads_find_computer(smb_ads_handle_t *ah, char *dn)
@@ -1675,15 +1675,9 @@ smb_ads_find_computer(smb_ads_handle_t *ah, char *dn)
 	avpair.avp_attr = SMB_ADS_ATTR_DN;
 	avpair.avp_val = NULL;
 
-	smb_ads_get_default_comp_container_dn(ah, dn, SMB_ADS_DN_MAX);
-	stat = smb_ads_lookup_computer_n_attr(ah, &avpair, LDAP_SCOPE_ONELEVEL,
-	    dn);
-
-	if (stat == SMB_ADS_STAT_NOT_FOUND) {
-		(void) strlcpy(dn, ah->domain_dn, SMB_ADS_DN_MAX);
-		stat = smb_ads_lookup_computer_n_attr(ah, &avpair,
-		    LDAP_SCOPE_SUBTREE, dn);
-	}
+	(void) strlcpy(dn, ah->domain_dn, SMB_ADS_DN_MAX);
+	stat = smb_ads_lookup_computer_n_attr(ah, &avpair,
+	    LDAP_SCOPE_SUBTREE, dn);
 
 	if (stat == SMB_ADS_STAT_FOUND) {
 		(void) strlcpy(dn, avpair.avp_val, SMB_ADS_DN_MAX);
@@ -1776,7 +1770,8 @@ smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *ah, char *dn)
  * principal after the domain join operation.
  */
 smb_ads_status_t
-smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd)
+smb_ads_join(char *domain, char *container,
+    char *user, char *usr_passwd, char *machine_passwd)
 {
 	smb_ads_handle_t *ah = NULL;
 	krb5_context ctx = NULL;
@@ -1822,7 +1817,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd)
 
 	case SMB_ADS_STAT_NOT_FOUND:
 		new_acct = B_TRUE;
-		smb_ads_get_default_comp_dn(ah, dn, SMB_ADS_DN_MAX);
+		smb_ads_get_new_comp_dn(ah, dn, SMB_ADS_DN_MAX, container);
 		syslog(LOG_INFO, "smb_ads_join: machine account not found."
 		    " Creating: %s", dn);
 		if (smb_ads_add_computer(ah, dclevel, dn) != 0) {
