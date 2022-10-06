@@ -10,23 +10,23 @@
 #
 
 #
+# Copyright 2019 Joyent, Inc.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Oxide Computer Company
 #
 
-SUBDIRS = intel amd
+ROOTUCODEPATH = $(ROOT)/platform/i86pc/ucode
+INTEL_FILES :sh= (print *-*)
 
-all :=		TARGET=all
-clean :=	TARGET=clean
-clobber :=	TARGET=clobber
-install :=	TARGET=install
+include ../Makefile.com
+include Makefile.links
 
-.PARALLEL: $(SUBDIRS)
+ROOTINTELLINKS = $(INTEL_LINKS:%=$(ROOTINTELDIR)/%)
 
-.KEEP_STATE:
+.PARALLEL:
 
-all clean clobber install: $(SUBDIRS)
+all clean:
 
-$(SUBDIRS):	FRC
-		cd $@; pwd; $(MAKE) $(TARGET)
+install: $(ROOTINTELFILES) $(ROOTINTELLINKS)
 
-FRC:
+include $(SRC)/data/Makefile.targ
