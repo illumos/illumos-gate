@@ -483,7 +483,6 @@ typedef struct vmm_data_req {
 	void		*vdr_data;
 	uint32_t	*vdr_result_len;
 } vmm_data_req_t;
-typedef struct vmm_data_req vmm_data_req_t;
 
 typedef int (*vmm_data_writef_t)(void *, const vmm_data_req_t *);
 typedef int (*vmm_data_readf_t)(void *, const vmm_data_req_t *);
