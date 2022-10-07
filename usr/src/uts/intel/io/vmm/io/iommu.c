@@ -70,8 +70,6 @@ ddi_modhandle_t iommu_modhdl;
 static const struct iommu_ops *ops;
 static void *host_domain;
 
-static volatile uint_t iommu_initted;
-
 static int
 iommu_find_device(dev_info_t *dip, void *arg)
 {
