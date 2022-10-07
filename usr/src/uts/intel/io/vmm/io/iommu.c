@@ -75,7 +75,7 @@ static volatile uint_t iommu_initted;
 static int
 iommu_find_device(dev_info_t *dip, void *arg)
 {
-	boolean_t add = (boolean_t)arg;
+	boolean_t add = (boolean_t)(uintptr_t)arg;
 
 	if (pcie_is_pci_device(dip)) {
 		if (add)
