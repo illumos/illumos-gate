@@ -2075,7 +2075,7 @@ static int
 vie_emulate_clts(struct vie *vie, struct vm *vm, int vcpuid)
 {
 	uint64_t val;
-	int error;
+	int error __maybe_unused;
 
 	if (vie->paging.cpl != 0) {
 		vm_inject_gp(vm, vcpuid);
@@ -2588,7 +2588,7 @@ vie_cs_info(const struct vie *vie, struct vm *vm, int vcpuid, uint64_t *cs_base,
     int *cs_d)
 {
 	struct seg_desc cs_desc;
-	int error;
+	int error __maybe_unused;
 
 	error = vm_get_seg_desc(vm, vcpuid, VM_REG_GUEST_CS, &cs_desc);
 	ASSERT(error == 0);

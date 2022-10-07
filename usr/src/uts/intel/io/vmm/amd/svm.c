@@ -833,7 +833,7 @@ static void
 svm_handle_cr0_read(struct svm_softc *svm_sc, int vcpu, enum vm_reg_name reg)
 {
 	uint64_t val;
-	int err;
+	int err __maybe_unused;
 
 	svm_get_cr0(svm_sc, vcpu, &val);
 	err = svm_setreg(svm_sc, vcpu, reg, val);
@@ -845,7 +845,7 @@ svm_handle_cr0_write(struct svm_softc *svm_sc, int vcpu, enum vm_reg_name reg)
 {
 	struct vmcb_state *state;
 	uint64_t val;
-	int err;
+	int err __maybe_unused;
 
 	state = svm_get_vmcb_state(svm_sc, vcpu);
 
