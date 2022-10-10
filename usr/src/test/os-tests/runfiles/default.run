@@ -141,4 +141,7 @@ tests = ['coretests']
 tests = ['file_assoc.32', 'file_assoc.64']
 
 [/opt/os-tests/tests/regression]
-tests = ['illumos-15031']
+tests = [
+	'illumos-15031',
+	'illumos-15036'
+	]

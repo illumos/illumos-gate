@@ -233,9 +233,11 @@ struct polldat {
 /*
  * One cache for each thread that polls. Points to a bitmap (used by pollwakeup)
  * and a hash table of polldats.
- * The offset of pc_lock field must be kept in sync with the pc_lock offset
- * of port_fdcache_t, both structs implement pc_lock with offset 0 (see also
- * pollrelock()).
+ *
+ * Because of the handling required in pollrelock(), portfs abuses the notion of
+ * an active pollcache (t_pollcache), providing its own struct port_fdcache_t.
+ * It has matching pc_lock and pc_flag members at the correct offsets, but none
+ * of its other fields can be accessed (through t_pollcache) safetly.
  */
 struct pollcache {
 	kmutex_t	pc_lock;	/* lock to protect pollcache */
@@ -259,6 +261,13 @@ struct pollcache {
 /* pc_flag */
 #define	PC_POLLWAKE	0x02	/* pollwakeup() occurred */
 #define	PC_EPOLL	0x04	/* pollcache is epoll-enabled */
+/*
+ * PC_PORTFS is not a flag for "real" pollcaches, but rather an indicator for
+ * when portfs sets t_pollcache to a port_fdcache_t pointer.  If, while
+ * debugging a system, one sees PC_PORTFS in pc_flag, they will know to
+ * disregard the other fields, as it is not a pollcache.
+ */
+#define	PC_PORTFS	0x08
 
 #if defined(_KERNEL)
 /*
