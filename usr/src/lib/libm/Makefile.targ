@@ -19,24 +19,24 @@ pics/%.o: $(LIBMDIR)/$(TARGETMACH)/src/%.$(ASSUFFIX)
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_S_O)
 
-pics/%.o: $(SRCDIR)/C/%.c $(LM_IL)
+pics/%.o: $(SRCDIR)/C/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: $(SRCDIR)/$(LDBLDIR)/%.c $(LM_IL)
+pics/%.o: $(SRCDIR)/$(LDBLDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: $(SRCDIR)/R/%.c $(LM_IL)
+pics/%.o: $(SRCDIR)/R/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: $(SRCDIR)/complex/%.c $(LM_IL)
+pics/%.o: $(SRCDIR)/complex/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: $(SRCDIR)/m9x/%.c $(LM_IL) $(m9x_IL)
-	$(COMPILE.c) $(m9x_IL) -o $@ $<
+pics/%.o: $(SRCDIR)/m9x/%.c
+	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
 $(ROOTLIBDIR): $(ROOTFS_LIBDIR)

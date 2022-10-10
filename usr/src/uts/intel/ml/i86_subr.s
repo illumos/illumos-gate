@@ -745,7 +745,7 @@ str_valid:
 
 /*
  * Replacement functions for ones that are normally inlined.
- * In addition to the copy in i86.il, they are defined here just in case.
+ * In addition to the inline copies, they are defined here just in case.
  */
 
 	ENTRY(intr_clear)

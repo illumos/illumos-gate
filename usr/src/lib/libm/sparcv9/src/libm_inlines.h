@@ -28,8 +28,6 @@
  * Copyright 2011, Richard Lowe.
  */
 
-/* Functions in this file are duplicated in locallibm.il.  Keep them in sync */
-
 #ifndef _LIBM_INLINES_H
 #define	_LIBM_INLINES_H
 

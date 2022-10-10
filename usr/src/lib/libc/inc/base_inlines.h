@@ -33,10 +33,8 @@
 #if !defined(__lint) && defined(__GNUC__)
 
 /*
- * This file is intended to contain gcc-style inline assembly that corresponds
- * to base.il for all architectures.  At the moment these inlines exist only
- * for sparc and sparcv9 and these functions are implemented in C for x86.
- * They should be inlined here for gcc if a new x86 base.il is created.
+ * At the moment these inlines exist only for sparc and sparcv9 and these
+ * functions are implemented in C for x86.
  */
 
 #if defined(__sparc)

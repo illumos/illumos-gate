@@ -24,7 +24,5 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 echo_file usr/src/common/crypto/md5/md5.c
-echo_file usr/src/common/crypto/md5/sparc/sun4u/byteswap.il

@@ -33,9 +33,6 @@
  * This file has special definitions for UltraSPARC architectures,
  * which have a special address space identifier for loading 32 and 16 bit
  * integers in little-endian byte order.
- *
- * This file and common/crypto/md5/sparc/sun4[uv]/byteswap.il implement the
- * same thing and must be changed together.
  */
 
 #include <sys/types.h>
@@ -197,6 +194,7 @@ load_little_32_##__off(uint32_t *addr)		\
 	return (value);				\
 }
 
+/* BEGIN CSTYLED */
 LL_TEMPLATE(0)
 LL_TEMPLATE(1)
 LL_TEMPLATE(2)
@@ -213,6 +211,7 @@ LL_TEMPLATE(c)
 LL_TEMPLATE(d)
 LL_TEMPLATE(e)
 LL_TEMPLATE(f)
+/* END CSTYLED */
 #undef	LL_TEMPLATE
 
 #endif	/* !__lint && __GNUC__ */

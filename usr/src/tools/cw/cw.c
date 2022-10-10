@@ -21,12 +21,10 @@
  */
 
 /*
- * Copyright 2018, Richard Lowe.
- */
-/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2018 Richard Lowe.
  * Copyright 2019 Joyent, Inc.
  */
 
@@ -39,7 +37,7 @@
  */
 
 /* If you modify this file, you must increment CW_VERSION */
-#define	CW_VERSION	"6.1"
+#define	CW_VERSION	"7.1"
 
 /*
  * -#		Verbose mode
@@ -666,13 +664,6 @@ do_gcc(cw_ictx_t *ctx)
 		if (*arg == '-') {
 			arglen--;
 		} else {
-			/*
-			 * Discard inline files that gcc doesn't grok
-			 */
-			if (!in_output && arglen > 3 &&
-			    strcmp(arg + arglen - 3, ".il") == 0)
-				continue;
-
 			if (!in_output && is_source_file(arg))
 				c_files++;
 

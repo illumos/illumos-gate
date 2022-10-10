@@ -66,11 +66,6 @@ sparc_SPACEFLAG	= -W0,-Lt
 LDFLAGS		+= -Nmisc/kcf
 
 #
-# need extra inline file for here.
-#
-INLINES += $(SRC)/common/crypto/md5/sparc/sun4v/byteswap.il
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:

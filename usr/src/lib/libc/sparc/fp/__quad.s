@@ -26,12 +26,9 @@
  */
 
 /*
- * These are functions corresponding to the inlines in __quad.il
- * They are compiled as functions only when building sparc libc with gcc.
- * Someone may want to make them into gcc inlines (__inline__ + __asm__).
+ * These are functions corresponding to some which used to be inline, with Sun
+ * Studio.  Someone may want to make them into gcc inline asm.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 

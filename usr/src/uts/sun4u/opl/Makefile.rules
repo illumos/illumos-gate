@@ -64,10 +64,9 @@ $(SBDGENERR):			$(DR_IO)/sbdgenerr.pl
 IL_CPP=$(CPP) -P -DINLINE -D_ASM $(AS_INC_PATH) \
         $(CPP_DEFS) $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS)
 
-DRMACH_IL=              $(OBJS_DIR)/drmach.il
 $(OBJS_DIR)/drmach.o    := CC_XARCH_32 = -xarch=v8plusa
-$(OBJS_DIR)/drmach.o:   $(UTSBASE)/sun4u/opl/io/drmach.c $(DRMACH_IL)
-	$(COMPILE.c) $(DRMACH_IL) -o $@ $(UTSBASE)/sun4u/opl/io/drmach.c
+$(OBJS_DIR)/drmach.o:   $(UTSBASE)/sun4u/opl/io/drmach.c
+	$(COMPILE.c) -o $@ $(UTSBASE)/sun4u/opl/io/drmach.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/opl/io/%.c
@@ -100,10 +99,5 @@ CLEANFILES +=   $(OPL_IO)/drmach_err.c
 $(OPL_IO)/drmach_err.c: $(SBDGENERR) $(SBD_IOCTL)
 	$(RM) $@
 	$(SBDGENERR) EOPL < $(SBD_IOCTL) > $@
-
-CLEANFILES += $(DRMACH_IL)
-
-$(DRMACH_IL):   $(UTSBASE)/sun4u/opl/ml/drmach.il.cpp
-	$(IL_CPP) $(UTSBASE)/sun4u/opl/ml/drmach.il.cpp > $@
 
 .KEEP_STATE:

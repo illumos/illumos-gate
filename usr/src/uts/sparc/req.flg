@@ -36,7 +36,3 @@ echo_file usr/src/uts/sun/Makefile.rules
 
 echo_file usr/src/uts/common/Makefile.files
 echo_file usr/src/uts/common/Makefile.rules
-
-# uts/Makefile.targ (version 1.17) says "All C objects depend on
-# inline files".  
-echo_file usr/src/uts/sparc/ml/sparc.il

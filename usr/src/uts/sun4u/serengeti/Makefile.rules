@@ -38,11 +38,9 @@
 #
 #	Section 1a: C object build rules
 #
-SBDP_IL=$(OBJS_DIR)/sbdp.il
-
 $(OBJS_DIR)/sbdp_mem.o := CC_XARCH_32 = -xarch=v8plusa
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/io/%.c $(SBDP_IL)
-	$(COMPILE.c) $(SBDP_IL) -o $@ $<
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/io/%.c
+	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/ml/%.s
@@ -51,13 +49,3 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/ml/%.s
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-
-# inline stuff
-
-IL_CPP=$(CPP) -P -DINLINE -D_ASM $(AS_INC_PATH) \
-	$(CPP_DEFS) $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS)
-CLEANFILES += $(SBDP_IL)
-
-$(SBDP_IL):		$(UTSBASE)/sun4u/serengeti/ml/sbdp.il.cpp
-	$(IL_CPP) $(UTSBASE)/sun4u/serengeti/ml/sbdp.il.cpp >$@
