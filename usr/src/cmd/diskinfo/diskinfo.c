@@ -216,25 +216,10 @@ static void
 enumerate_disks(di_opts_t *opts)
 {
 	topo_hdl_t *hp = NULL;
-	dm_descriptor_t *media;
-	int e, i;
 	int filter[] = { DM_DT_FIXED, -1 };
-	dm_descriptor_t *disk, *controller;
-	nvlist_t *mattrs, *dattrs, *cattrs = NULL;
-
-	uint64_t size, total;
-	uint32_t blocksize;
-	double total_in_GiB;
-	char sizestr[32];
-	char slotname[32];
-	char statestr[8];
-
-	char *vid, *pid, *opath, *c, *ctype = NULL;
-	boolean_t removable;
-	boolean_t ssd;
-	char device[MAXPATHLEN];
-	di_phys_t phys;
-	size_t len;
+	dm_descriptor_t *media;
+	uint_t i;
+	int e;
 
 	e = 0;
 	if ((media = dm_get_descriptors(DM_MEDIA, filter, &e)) == NULL) {
@@ -264,6 +249,20 @@ enumerate_disks(di_opts_t *opts)
 	}
 
 	for (i = 0; media != NULL && media[i] != 0; i++) {
+		dm_descriptor_t *disk, *controller;
+		nvlist_t *mattrs, *dattrs;
+		char *vid, *pid, *opath, *ctype, *pctype, *c;
+		boolean_t removable, ssd;
+		char device[MAXPATHLEN];
+		di_phys_t phys;
+		size_t len;
+		uint64_t size, total;
+		uint32_t blocksize;
+		double total_in_GiB;
+		char sizestr[32];
+		char slotname[32];
+		char statestr[8];
+
 		if ((disk = dm_get_associated_descriptors(media[i],
 		    DM_DRIVE, &e)) == NULL) {
 			continue;
@@ -274,37 +273,50 @@ enumerate_disks(di_opts_t *opts)
 		 * info with DKIOCGMEDIAINFO which may not be the case for
 		 * disks which are failing.
 		 */
-		if ((mattrs = dm_get_attributes(media[i], &e)) == NULL) {
+		if ((mattrs = dm_get_attributes(media[i], &e)) == NULL)
 			continue;
-		}
 
 		e = nvlist_lookup_uint64(mattrs, DM_SIZE, &size);
 		assert(e == 0);
 		e = nvlist_lookup_uint32(mattrs, DM_BLOCKSIZE, &blocksize);
 		assert(e == 0);
-		nvlist_free(mattrs);
+
+		vid = pid = opath = "-";
+		removable = B_FALSE;
+		ssd = B_FALSE;
 
 		dattrs = dm_get_attributes(disk[0], &e);
+		if (dattrs != NULL) {
+			nvlist_query_string(dattrs, DM_VENDOR_ID, &vid);
+			nvlist_query_string(dattrs, DM_PRODUCT_ID, &pid);
+			nvlist_query_string(dattrs, DM_OPATH, &opath);
 
-		nvlist_query_string(dattrs, DM_VENDOR_ID, &vid);
-		nvlist_query_string(dattrs, DM_PRODUCT_ID, &pid);
-		nvlist_query_string(dattrs, DM_OPATH, &opath);
+			if (nvlist_lookup_boolean(dattrs, DM_REMOVABLE) == 0)
+				removable = B_TRUE;
 
-		removable = B_FALSE;
-		if (nvlist_lookup_boolean(dattrs, DM_REMOVABLE) == 0)
-			removable = B_TRUE;
+			if (nvlist_lookup_boolean(dattrs, DM_SOLIDSTATE) == 0)
+				ssd = B_TRUE;
+		}
 
-		ssd = B_FALSE;
-		if (nvlist_lookup_boolean(dattrs, DM_SOLIDSTATE) == 0)
-			ssd = B_TRUE;
-
+		pctype = "-";
+		ctype = NULL;
 		if ((controller = dm_get_associated_descriptors(disk[0],
 		    DM_CONTROLLER, &e)) != NULL) {
+			nvlist_t *cattrs;
+
 			cattrs = dm_get_attributes(controller[0], &e);
-			nvlist_query_string(cattrs, DM_CTYPE, &ctype);
-			ctype = strdup(ctype);
-			for (c = ctype; *c != '\0'; c++)
-				*c = toupper(*c);
+			if (cattrs != NULL) {
+				nvlist_query_string(cattrs, DM_CTYPE, &ctype);
+				ctype = strdup(ctype);
+				nvlist_free(cattrs);
+
+				if (ctype != NULL) {
+					for (c = ctype; *c != '\0'; c++)
+						*c = toupper(*c);
+					pctype = ctype;
+				}
+			}
+			dm_free_descriptors(controller);
 		}
 
 		/*
@@ -318,8 +330,9 @@ enumerate_disks(di_opts_t *opts)
 			(void) strlcpy(device, opath, sizeof (device));
 		len = strlen(device);
 		if (device[len - 2] == 's' &&
-		    (device[len - 1] >= '0' && device[len - 1] <= '9'))
+		    (device[len - 1] >= '0' && device[len - 1] <= '9')) {
 			device[len - 2] = '\0';
+		}
 
 		if (hp != NULL) {
 			bzero(&phys, sizeof (phys));
@@ -386,25 +399,25 @@ enumerate_disks(di_opts_t *opts)
 		} else if (opts->di_condensed) {
 			if (opts->di_scripted) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				    ctype, device, vid, pid,
+				    pctype, device, vid, pid,
 				    display_string(phys.dp_serial),
 				    sizestr, statestr, slotname);
 			} else {
 				printf("%-7s %-22s  %-8s %-16s "
 				    "%-20s\n\t%-13s %-4s %s\n",
-				    ctype, device, vid, pid,
+				    pctype, device, vid, pid,
 				    display_string(phys.dp_serial),
 				    sizestr, statestr, slotname);
 			}
 		} else {
 			if (opts->di_scripted) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				    ctype, device, vid, pid, sizestr,
+				    pctype, device, vid, pid, sizestr,
 				    display_tristate(removable),
 				    display_tristate(ssd));
 			} else {
 				printf("%-7s %-22s  %-8s %-16s "
-				    "%-13s %-3s %-3s\n", ctype, device,
+				    "%-13s %-3s %-3s\n", pctype, device,
 				    vid, pid, sizestr,
 				    display_tristate(removable),
 				    display_tristate(ssd));
@@ -412,9 +425,8 @@ enumerate_disks(di_opts_t *opts)
 		}
 
 		free(ctype);
-		nvlist_free(cattrs);
 		nvlist_free(dattrs);
-		dm_free_descriptors(controller);
+		nvlist_free(mattrs);
 		dm_free_descriptors(disk);
 	}
 
