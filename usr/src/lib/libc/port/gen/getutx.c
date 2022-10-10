@@ -877,7 +877,6 @@ updwtmpx(const char *filex, struct utmpx *utx)
 	utmpx_api2frec(utx, &futx);
 	(void) write(wfdx, &futx, sizeof (futx));
 
-done:
 	(void) close(wfdx);
 }
 

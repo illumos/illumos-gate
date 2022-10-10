@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ */
+
+/*
  * Threads:
  *
  * auditd is thread 0 and does signal handling
@@ -151,12 +155,12 @@ warn_or_fatal(int fatal, char *parting_shot)
 static void
 report_error(int rc, char *error_text, char *plugin_path)
 {
-	int		warn = 0;
 	char		rcbuf[100]; /* short error name string */
 	char		message[FATAL_MESSAGE_LEN];
 	int		bad_count = 0;
 	char		*name;
 	char		empty[] = "..";
+	boolean_t	warn = B_FALSE, discard = B_FALSE;
 
 	static int	no_plug = 0;
 	static int	no_load = 0;
@@ -174,17 +178,17 @@ report_error(int rc, char *error_text, char *plugin_path)
 
 	switch (rc) {
 	case INTERNAL_LOAD_ERROR:
-		warn = 1;
+		warn = B_TRUE;
 		bad_count = ++no_load;
 		(void) strcpy(rcbuf, "load_error");
 		break;
 	case INTERNAL_SYS_ERROR:
-		warn = 1;
+		warn = B_TRUE;
 		bad_count = ++no_thread;
 		(void) strcpy(rcbuf, "sys_error");
 		break;
 	case INTERNAL_CONFIG_ERROR:
-		warn = 1;
+		warn = B_TRUE;
 		bad_count = ++no_plug;
 		(void) strcpy(rcbuf, "config_error");
 		name = strdup("--");
@@ -192,17 +196,17 @@ report_error(int rc, char *error_text, char *plugin_path)
 	case AUDITD_SUCCESS:
 		break;
 	case AUDITD_NO_MEMORY:	/* no_memory */
-		warn = 1;
+		warn = B_TRUE;
 		bad_count = ++no_memory;
 		(void) strcpy(rcbuf, "no_memory");
 		break;
 	case AUDITD_INVALID:	/* invalid */
-		warn = 1;
+		warn = B_TRUE;
 		bad_count = ++invalid;
 		(void) strcpy(rcbuf, "invalid");
 		break;
 	case AUDITD_RETRY:
-		warn = 1;
+		warn = B_TRUE;
 		bad_count = ++retry;
 		(void) strcpy(rcbuf, "retry");
 		break;
@@ -210,9 +214,14 @@ report_error(int rc, char *error_text, char *plugin_path)
 		(void) strcpy(rcbuf, "comm_fail");
 		break;
 	case AUDITD_FATAL:	/* failure */
-		warn = 1;
+		warn = B_TRUE;
 		bad_count = ++fail;
 		(void) strcpy(rcbuf, "failure");
+		break;
+	case AUDITD_DISCARD:	/* discarded - shouldn't get here */
+		/* Don't report this one; it's a non-error. */
+		discard = B_TRUE;
+		(void) strcpy(rcbuf, "discarded");
 		break;
 	default:
 		(void) strcpy(rcbuf, "error");
@@ -222,7 +231,7 @@ report_error(int rc, char *error_text, char *plugin_path)
 	    bad_count, name, rcbuf, error_text));
 	if (warn)
 		__audit_dowarn2("plugin", name, rcbuf, error_text, bad_count);
-	else {
+	else if (!discard) {
 		(void) snprintf(message, FATAL_MESSAGE_LEN,
 		    gettext("audit plugin %s reported error = \"%s\": %s\n"),
 		    name, rcbuf, error_text);

@@ -22,6 +22,8 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2017 Tintri by DDN, Inc. All rights reserved.
+ *
  * This is an unstable interface; changes may be made without
  * notice.
  */
@@ -46,7 +48,8 @@ enum auditd_rc {
 	AUDITD_INVALID,	/*   bad input			(WARN invalid)	*/
 	AUDITD_COMM_FAIL, /* communications failure			*/
 	AUDITD_FATAL,	/*   other error		(WARN failure)	*/
-	AUDITD_FAIL	/*   other non-fatal error			*/
+	AUDITD_FAIL,	/*   other non-fatal error			*/
+	AUDITD_DISCARD	/*   Discarded message				*/
 };
 typedef enum auditd_rc auditd_rc_t;
 

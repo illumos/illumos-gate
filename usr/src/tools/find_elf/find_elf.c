@@ -229,7 +229,18 @@ process_arg(char *arg)
 		err(EXIT_FAILURE, "not a file or directory: %s", arg);
 	}
 
+#ifndef O_DIRECTORY
+	struct stat tsb;
+	if (stat(dir, &tsb) == -1) {
+		err(EXIT_FAILURE, "failed to stat %s", dir);
+	}
+	if (!S_ISDIR(tsb.st_mode)) {
+		errx(EXIT_FAILURE, "not a directory: %s", dir);
+	}
+	rootfd = open(dir, O_RDONLY);
+#else
 	rootfd = open(dir, O_RDONLY|O_DIRECTORY);
+#endif
 	if (rootfd < 0) {
 		err(EXIT_FAILURE, "%s", dir);
 	}

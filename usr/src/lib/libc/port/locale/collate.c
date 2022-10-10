@@ -380,7 +380,7 @@ _collate_wxfrm(const struct lc_collate *lcc, const wchar_t *src, wchar_t *xf,
 	wchar_t		*tr = NULL;
 	int		direc;
 	int		pass;
-	const int32_t 	*state;
+	const int32_t	*state;
 	size_t		want = 0;
 	size_t		need = 0;
 	int		ndir = lcc->lc_directive_count;
@@ -470,14 +470,11 @@ _collate_wxfrm(const struct lc_collate *lcc, const wchar_t *src, wchar_t *xf,
 		}
 	}
 
-end:
-	if (tr)
-		free(tr);
+	free(tr);
 	return (need);
 
 fail:
-	if (tr)
-		free(tr);
+	free(tr);
 	return ((size_t)(-1));
 }
 
@@ -531,7 +528,7 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room, locale_t loc)
 	wchar_t		*tr = NULL;
 	int		direc;
 	int		pass;
-	const int32_t 	*state;
+	const int32_t	*state;
 	size_t		want = 0;
 	size_t		need = 0;
 	int		b;
@@ -640,13 +637,10 @@ _collate_sxfrm(const wchar_t *src, char *xf, size_t room, locale_t loc)
 		}
 	}
 
-end:
-	if (tr)
-		free(tr);
+	free(tr);
 	return (need);
 
 fail:
-	if (tr)
-		free(tr);
+	free(tr);
 	return ((size_t)(-1));
 }
