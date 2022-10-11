@@ -394,6 +394,8 @@ if [[ $do_configure = true ]]; then
     add_test_accounts
     setup_pkgsrc
     install_required_pkgs
+    # Enable per-process coredumps, some tests assume they're pre-set.
+    log_must coreadm -e process
     log "This system is now configured to run the SmartOS tests."
 fi
 
