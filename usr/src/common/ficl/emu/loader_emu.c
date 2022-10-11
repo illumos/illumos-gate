@@ -720,6 +720,7 @@ bf_init(const char *rc, ficlOutputFunction out)
 	buf = get_currdev();
 	(void) setenv("currdev", buf, 1);
 	free(buf);
+	(void) setenv("console", "text", 1);
 
 	/* Put all private definitions in a "builtins" vocabulary */
 	rv = ficlVmEvaluate(bf_vm,
