@@ -25,7 +25,8 @@ PROG =	mem_partial \
 	legacy_destruct \
 	self_destruct \
 	drv_hold \
-	cpuid_ioctl
+	cpuid_ioctl \
+	default_capabs
 
 COMMON_OBJS =	common.o
 CLEAN_OBJS =	$(PROG:%=%.o)
