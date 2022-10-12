@@ -2904,7 +2904,7 @@ vmx_run(void *arg, int vcpu, uint64_t rip)
 	vmcs_clear(vmcs_pa);
 	vmx_msr_guest_exit(vmx, vcpu);
 
-	VERIFY(vmx->vmcs_state != VS_NONE && curthread->t_preempt != 0);
+	VERIFY(vmx->vmcs_state[vcpu] != VS_NONE && curthread->t_preempt != 0);
 	vmx->vmcs_state[vcpu] = VS_NONE;
 
 	return (0);

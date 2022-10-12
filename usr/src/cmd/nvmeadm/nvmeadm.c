@@ -109,7 +109,8 @@ struct nvmeadm_cmd {
 
 static void usage(const nvmeadm_cmd_t *);
 static void nvme_walk(nvme_process_arg_t *, di_node_t);
-static boolean_t nvme_match(nvme_process_arg_t *);
+static boolean_t nvme_match_ctrl(nvme_process_arg_t *);
+static boolean_t nvme_match_ns(nvme_process_arg_t *);
 
 static int nvme_process(di_node_t, di_minor_t, void *);
 
@@ -526,10 +527,9 @@ usage(const nvmeadm_cmd_t *cmd)
 }
 
 static boolean_t
-nvme_match(nvme_process_arg_t *npa)
+nvme_match_ctrl(nvme_process_arg_t *npa)
 {
 	char *name;
-	char *nsid = NULL;
 
 	if (npa->npa_name == NULL)
 		return (B_TRUE);
@@ -545,17 +545,66 @@ nvme_match(nvme_process_arg_t *npa)
 
 	free(name);
 
-	if (npa->npa_isns) {
-		if (npa->npa_nsid == NULL)
-			return (B_TRUE);
+	return (B_TRUE);
+}
 
-		nsid = di_minor_name(npa->npa_minor);
+static boolean_t
+nvme_match_ns(nvme_process_arg_t *npa)
+{
+	if (npa->npa_nsid == NULL)
+		return (B_TRUE);
 
-		if (nsid == NULL || strcmp(npa->npa_nsid, nsid) != 0)
-			return (B_FALSE);
+	if (strcasecmp(npa->npa_nsid, di_minor_name(npa->npa_minor)) ==
+	    0)
+		return (B_TRUE);
+
+	if (npa->npa_eui64 != NULL &&
+	    strcasecmp(npa->npa_nsid, npa->npa_eui64) == 0)
+		return (B_TRUE);
+
+	if (npa->npa_nguid != NULL &&
+	    strcasecmp(npa->npa_nsid, npa->npa_nguid) == 0)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+char *
+nvme_nguid(const nvme_process_arg_t *npa)
+{
+	char *ret = NULL;
+
+	if (*(uint64_t *)npa->npa_idns->id_nguid != 0 ||
+	    *((uint64_t *)npa->npa_idns->id_nguid + 1) != 0) {
+		uint8_t *guid = npa->npa_idns->id_nguid;
+
+		(void) asprintf(&ret,
+		    "%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X"
+		    "%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X",
+		    guid[0], guid[1], guid[2], guid[3],
+		    guid[4], guid[5], guid[6], guid[7],
+		    guid[8], guid[9], guid[10], guid[11],
+		    guid[12], guid[13], guid[14], guid[15]);
 	}
 
-	return (B_TRUE);
+	return (ret);
+}
+
+char *
+nvme_eui64(const nvme_process_arg_t *npa)
+{
+	char *ret = NULL;
+
+	if (*(uint64_t *)npa->npa_idns->id_eui64 != 0) {
+		uint8_t *eui64 = npa->npa_idns->id_eui64;
+
+		(void) asprintf(&ret,
+		    "%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X",
+		    eui64[0], eui64[1], eui64[2], eui64[3],
+		    eui64[4], eui64[5], eui64[6], eui64[7]);
+	}
+
+	return (ret);
 }
 
 char *
@@ -577,13 +626,30 @@ nvme_dskname(const nvme_process_arg_t *npa)
 		if (addr == NULL)
 			continue;
 
+		addr = strdup(addr);
+		if (addr == NULL)
+			goto fail;
+
 		if (addr[0] == 'w')
 			addr++;
 
-		if (strncasecmp(addr, di_minor_name(npa->npa_minor),
-		    strchrnul(addr, ',') - addr) != 0)
-			continue;
+		/* Chop off ,... from the bus address. */
+		*(strchrnul(addr, ',')) = '\0';
 
+		/*
+		 * If there's a EUI64, that's what was used for the bus address.
+		 * Otherwise it's just the numeric namespace id.
+		 */
+		if (npa->npa_eui64 != NULL &&
+		    strcasecmp(addr, npa->npa_eui64) == 0)
+			goto found;
+
+		if (strcasecmp(addr, di_minor_name(npa->npa_minor)) != 0) {
+			free(addr);
+			continue;
+		}
+
+found:
 		path = di_dim_path_dev(dim, di_driver_name(child),
 		    di_instance(child), "c");
 
@@ -604,6 +670,7 @@ nvme_dskname(const nvme_process_arg_t *npa)
 			goto fail;
 
 		free(path);
+		free(addr);
 		break;
 	}
 
@@ -613,6 +680,7 @@ nvme_dskname(const nvme_process_arg_t *npa)
 
 fail:
 	free(path);
+	free(addr);
 	err(-1, "nvme_dskname");
 }
 
@@ -625,17 +693,11 @@ nvme_process(di_node_t node, di_minor_t minor, void *arg)
 	npa->npa_node = node;
 	npa->npa_minor = minor;
 
-	if (!nvme_match(npa))
+	if (!nvme_match_ctrl(npa))
 		return (DI_WALK_CONTINUE);
 
 	if ((fd = nvme_open(minor, npa->npa_excl)) < 0)
 		return (DI_WALK_CONTINUE);
-
-	npa->npa_found++;
-
-	npa->npa_path = di_devfs_path(node);
-	if (npa->npa_path == NULL)
-		goto out;
 
 	npa->npa_version = nvme_version(fd);
 	if (npa->npa_version == NULL)
@@ -660,27 +722,44 @@ nvme_process(di_node_t node, di_minor_t minor, void *arg)
 	if (npa->npa_idns == NULL)
 		goto out;
 
+	npa->npa_eui64 = NULL;
+	npa->npa_nguid = NULL;
 	npa->npa_dsk = NULL;
+
 	if (npa->npa_isns) {
 		npa->npa_ns_state = nvme_namespace_state(fd);
-		if ((npa->npa_ns_state & NVME_NS_STATE_ATTACHED) != 0)
+
+		if ((npa->npa_ns_state & NVME_NS_STATE_ACTIVE) != 0) {
+			npa->npa_eui64 = nvme_eui64(npa);
+			npa->npa_nguid = nvme_nguid(npa);
+		}
+
+		if ((npa->npa_ns_state & NVME_NS_STATE_ATTACHED) != 0) {
 			npa->npa_dsk = nvme_dskname(npa);
+		}
+
+		if (!nvme_match_ns(npa))
+			goto out;
 	}
 
+	npa->npa_found++;
 
 	exitcode += npa->npa_cmd->c_func(fd, npa);
 
 out:
-	di_devfs_path_free(npa->npa_path);
 	free(npa->npa_version);
 	free(npa->npa_idctl);
 	free(npa->npa_idns);
 	free(npa->npa_dsk);
+	free(npa->npa_eui64);
+	free(npa->npa_nguid);
 
 	npa->npa_version = NULL;
 	npa->npa_idctl = NULL;
 	npa->npa_idns = NULL;
 	npa->npa_dsk = NULL;
+	npa->npa_eui64 = NULL;
+	npa->npa_nguid = NULL;
 
 	nvme_close(fd);
 

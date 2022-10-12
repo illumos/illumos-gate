@@ -834,11 +834,10 @@ cmd_start:
 		 * Otherwise, if signing is required, deny access.
 		 */
 		if ((sr->smb2_hdr_flags & SMB2_FLAGS_SIGNED) != 0) {
-			rc = smb2_sign_check_request(sr);
-			if (rc != 0) {
+			if (smb2_sign_check_request(sr) != 0) {
+				smb2sr_put_error(sr, NT_STATUS_ACCESS_DENIED);
 				DTRACE_PROBE1(smb2__sign__check,
 				    smb_request_t *, sr);
-				smb2sr_put_error(sr, NT_STATUS_ACCESS_DENIED);
 				goto cmd_done;
 			}
 		} else if (

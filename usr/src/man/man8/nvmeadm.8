@@ -139,9 +139,11 @@ The controller name consists of the driver name
 followed by an instance number.
 A namespace is specified by appending a single
 .Qq /
-followed by the namespace ID to the controller name.
-The namespace ID is the EUI64 of the namespace, or a positive non-zero
-decimal number if the namespace doesn't have an EUI64.
+to the controller name, followed by either the namespace ID or the namespace
+EUI64 or NGUID as reported by the
+.Cm identify
+command.
+The namespace ID is a positive non-zero decimal number.
 For commands that don't change the device state multiple controllers
 and namespaces can be specified as a comma-separated list.
 .Pp
