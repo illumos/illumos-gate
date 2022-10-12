@@ -3585,6 +3585,21 @@ pcie_fabric_feature_scan(dev_info_t *dip, void *arg)
 		fab->pfd_flags |= PCIE_FABRIC_F_COMPLEX;
 		return (DDI_WALK_TERMINATE);
 	}
+
+	/*
+	 * In a similar case, there is hardware out there which is a PCIe
+	 * device, but does not advertise a PCIe capability. An example of this
+	 * is the IDT Tsi382A which can hide its PCIe capability. If this is
+	 * the case, we immediately terminate scanning and flag this as a
+	 * 'complex' case which causes us to use guaranteed safe settings.
+	 */
+	if (bus_p->bus_pcie_off == 0) {
+		dev_err(dip, CE_WARN, "encountered PCIe device without PCIe "
+		    "capability");
+		fab->pfd_flags |= PCIE_FABRIC_F_COMPLEX;
+		return (DDI_WALK_TERMINATE);
+	}
+
 	rcdip = pcie_get_rc_dip(dip);
 
 	/*
@@ -3686,10 +3701,11 @@ pcie_fabric_feature_set(dev_info_t *dip, void *arg)
 	/*
 	 * The missing bus_t sent us into the complex case previously. We still
 	 * need to make sure all devices have values we expect here and thus
-	 * don't terminate like the above.
+	 * don't terminate like the above. The same is true for the case where
+	 * there is no PCIe capability.
 	 */
 	bus_p = PCIE_DIP2BUS(dip);
-	if (bus_p == NULL) {
+	if (bus_p == NULL || bus_p->bus_pcie_off == 0) {
 		return (DDI_WALK_CONTINUE);
 	}
 	rcdip = pcie_get_rc_dip(dip);
