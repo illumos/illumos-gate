@@ -263,10 +263,12 @@ export KEEP
 EOF
 
             if [[ -n "$DISKS" ]]; then
+		# NOTE: This will be enough to make this script's execute-tests
+		# invocation run the ZFS test suite.
                 echo "DISKS=\"$DISKS\"" >> $zprofile
 		echo "export DISKS" >> $zprofile
             else
-                msg="echo Please set \$DISKS appropriate before running zfstest"
+                msg='echo Please set \$DISKS appropriate before running zfstest'
                 echo $msg >> $zprofile
             fi
 
@@ -277,6 +279,37 @@ EOF
         mkdir -p /opt/tools/etc/sudoers.d
         echo "ztest ALL=(ALL) NOPASSWD: ALL" >> /opt/tools/etc/sudoers.d/ztest
     fi
+}
+
+function zfs_test_check {
+    # DISKS is set either in our environment, or in the .profile of ~ztest.
+    zprofile=/zones/global/ztest/.profile
+    zdisksvar=$(su - ztest -c 'echo $DISKS' | tail -1)
+
+    # Check for KEEP too.
+    grep -q ^KEEP= $zprofile || \
+	fatal "Cannot run ZFS test, you need KEEP set in your ztest's environment"
+
+    # If neither are set DO NOT RUN the ztests.
+    if [[ -z $DISKS && -z $zdisksvar ]]; then
+	fatal "Cannot run ZFS test, you need DISKS set in your or ztest's environment"
+    fi
+
+    # Check if they are both non-zero and different.
+    if [[ -n "$DISKS" && -n "$zdisksvar" && "$DISKS" != "$zdisksvar" ]]; then
+	log "DISKS in current root environment: $DISKS"
+	log "DISKS in user ztest's environment: $zdisksvar"
+	fatal "Pleast reconcile these two before running the ZFS tests."
+    fi
+
+    if [[ -z "$zdisksvar" ]]; then
+	# put DISKS into ztest's .profile.
+        echo "DISKS=\"$DISKS\"" >> $zprofile
+	echo "export DISKS" >> $zprofile
+    fi
+
+    # OKAY, now we can run it!
+    log_test zfstest su - ztest -c /opt/zfs-tests/bin/zfstest
 }
 
 #
@@ -296,6 +329,7 @@ function execute_tests {
     log_test vndtest /opt/vndtest/bin/vndtest -a
     log_testrunner util-tests /opt/util-tests/runfiles/default.run
     log_testrunner os-tests /opt/os-tests/runfiles/default.run
+    zfs_test_check
 
     if [[ -n "$FAILED_TESTS" ]]; then
         echo ""
