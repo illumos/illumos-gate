@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 /*
@@ -424,7 +425,7 @@ smbadm_confirm(const char *prompt, const char *dflt)
 }
 
 static boolean_t
-smbadm_join_prompt(const char *domain)
+smbadm_join_confirm(const char *domain)
 {
 	(void) printf(gettext("After joining %s the smb service will be "
 	    "restarted automatically.\n"), domain);
@@ -472,7 +473,7 @@ smbadm_join(int argc, char **argv)
 	char *username = NULL;
 	char *container = NULL;
 	uint32_t mode = 0;
-	boolean_t do_prompt = B_TRUE;
+	boolean_t confirm = B_TRUE;
 	char option;
 
 	while ((option = getopt(argc, argv, "c:pu:wy")) != -1) {
@@ -500,7 +501,7 @@ smbadm_join(int argc, char **argv)
 			break;
 
 		case 'y':
-			do_prompt = B_FALSE;
+			confirm = B_FALSE;
 			break;
 
 		default:
@@ -528,9 +529,9 @@ smbadm_join(int argc, char **argv)
 	}
 
 	if (mode == SMB_SECMODE_WORKGRP) {
-		return (smbadm_join_workgroup(domain, do_prompt));
+		return (smbadm_join_workgroup(domain, confirm));
 	}
-	return (smbadm_join_domain(domain, container, username, do_prompt));
+	return (smbadm_join_domain(domain, container, username, confirm));
 }
 
 /*
@@ -539,7 +540,7 @@ smbadm_join(int argc, char **argv)
  * with no formal membership mechanism.
  */
 static int
-smbadm_join_workgroup(const char *workgroup, boolean_t prompt)
+smbadm_join_workgroup(const char *workgroup, boolean_t confirm)
 {
 	smb_joininfo_t jdi;
 	smb_joinres_t jdres;
@@ -556,7 +557,7 @@ smbadm_join_workgroup(const char *workgroup, boolean_t prompt)
 		smbadm_usage(B_FALSE);
 	}
 
-	if (prompt && !smbadm_join_prompt(jdi.domain_name))
+	if (confirm && !smbadm_join_confirm(jdi.domain_name))
 		return (0);
 
 	if ((status = smb_join(&jdi, &jdres)) != NT_STATUS_SUCCESS) {
@@ -578,10 +579,11 @@ smbadm_join_workgroup(const char *workgroup, boolean_t prompt)
  *
  * The '+' character is invalid within a username.  We allow the password
  * to be appended to the username using '+' as a scripting convenience.
+ * See details above smbadm_join()
  */
 static int
 smbadm_join_domain(const char *domain, const char *container,
-    const char *username, boolean_t prompt)
+    const char *username, boolean_t confirm)
 {
 	smb_joininfo_t jdi;
 	smb_joinres_t jdres;
@@ -609,40 +611,48 @@ smbadm_join_domain(const char *domain, const char *container,
 		smbadm_usage(B_FALSE);
 	}
 
-	if (prompt && !smbadm_join_prompt(jdi.domain_name))
+	if (confirm && !smbadm_join_confirm(jdi.domain_name))
 		return (0);
 
 	/*
 	 * Note: username is null for "unsecure join"
 	 * (join using a pre-created computer account)
-	 * No password either.
+	 * Not implemented.
 	 */
-	if (username != NULL) {
-		if ((p = strchr(username, '+')) != NULL) {
-			++p;
+	if (username == NULL) {
+		(void) fprintf(stderr,
+		    gettext("username missing\n"));
+		smbadm_usage(B_FALSE);
+	}
 
-			len = (int)(p - username);
-			if (len > sizeof (jdi.domain_name))
-				len = sizeof (jdi.domain_name);
+	/*
+	 * Check for "username+password" as described above.
+	 */
+	if ((p = strchr(username, '+')) != NULL) {
+		++p;
 
-			(void) strlcpy(jdi.domain_username, username, len);
-			(void) strlcpy(jdi.domain_passwd, p,
-			    sizeof (jdi.domain_passwd));
-		} else {
-			(void) strlcpy(jdi.domain_username, username,
-			    sizeof (jdi.domain_username));
-		}
+		len = (int)(p - username);
+		if (len > sizeof (jdi.domain_name))
+			len = sizeof (jdi.domain_name);
 
-		if (smb_name_validate_account(jdi.domain_username)
-		    != ERROR_SUCCESS) {
-			(void) fprintf(stderr,
-			    gettext("username contains invalid characters\n"));
-			smbadm_usage(B_FALSE);
-		}
+		(void) strlcpy(jdi.domain_username, username, len);
+		(void) strlcpy(jdi.domain_passwd, p,
+		    sizeof (jdi.domain_passwd));
+	} else {
+		(void) strlcpy(jdi.domain_username, username,
+		    sizeof (jdi.domain_username));
+	}
 
-		if (*jdi.domain_passwd == '\0') {
+	if (smb_name_validate_account(jdi.domain_username)
+	    != ERROR_SUCCESS) {
+		(void) fprintf(stderr,
+		    gettext("username contains invalid characters\n"));
+		smbadm_usage(B_FALSE);
+	}
+
+	if (*jdi.domain_passwd == '\0') {
+		if (isatty(fileno(stdin))) {
 			passwd_prompt = gettext("Enter domain password: ");
-
 			if ((p = getpassphrase(passwd_prompt)) == NULL) {
 				(void) fprintf(stderr, gettext(
 				    "missing password\n"));
@@ -650,6 +660,24 @@ smbadm_join_domain(const char *domain, const char *container,
 			}
 
 			(void) strlcpy(jdi.domain_passwd, p,
+			    sizeof (jdi.domain_passwd));
+		} else {
+			/* Just read from stdin, no prompt. */
+			char *pbuf = NULL;
+			size_t pblen = 0;
+			len = getline(&pbuf, &pblen, stdin);
+
+			/* trim the ending newline if it exists */
+			if (len > 0 && pbuf[len - 1] == '\n') {
+				pbuf[len - 1] = '\0';
+				len--;
+			}
+			if (len <= 0) {
+				(void) fprintf(stderr, gettext(
+				    "missing password\n"));
+				smbadm_usage(B_FALSE);
+			}
+			(void) strlcpy(jdi.domain_passwd, pbuf,
 			    sizeof (jdi.domain_passwd));
 		}
 	}

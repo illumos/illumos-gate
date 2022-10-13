@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 
@@ -70,12 +71,19 @@ global_descriptor_table:
 
 	/*
 	 * GDT_B16DATA 16 bit data descriptor for doing BIOS calls
+	 * XXX: Note that this sets the B flag, which is not supposed to be
+	 * set for a 16-bit data segment that is not expand-down (Intel SDM
+	 * vol 3A sec 3.4.5).  AMD does not seem to care (AMD APM vol 2 sec
+	 * 2.7.4).  It is likely this is here for use with stack segments,
+	 * where it effects 32-bit operations.  Conceivably, we could be more
+	 * conservative and specify a 16-bit stack segment, but leave it for
+	 * now.
 	 */
 	.value  0xFFFF	/* segment limit 0..15 */
 	.value  0x0000	/* segment base 0..15 */
 	.byte   0x0	/* segment base 16..23 */
 	.byte   0x92	/* P = 1, read/write data */
-	.byte   0x4F	/* G=0, D=1, Limit (16..19)=1111 */
+	.byte   0x4F	/* G=0, B=1, Limit (16..19)=1111 */
 	.byte   0x0	/* segment base 24..32 */
 
 	/* GDT_B64CODE: 64 bit flat code descriptor - only L bit has meaning */

@@ -21,6 +21,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 
@@ -53,7 +55,7 @@ typedef union {
 
 /*
  * Determine whether a file has a trivial ACL
- * returns: 	0 = trivial
+ * returns:	0 = trivial
  *		1 = nontrivial
  *		<0 some other system failure, such as ENOENT or EPERM
  */
@@ -803,6 +805,54 @@ sid_to_id(char *sid, boolean_t user, uid_t *id)
 		*--domain_start = '@';
 		error = (error == IDMAP_SUCCESS) ? 0 : 1;
 	}
+
+	return (error);
+}
+
+/*
+ * Variant of sid_to_id() called when we don't know whether the SID
+ * is a user or group. 2nd arg gets the type (0:group, 1:user)
+ * Returns zero for success, 1 for errors.
+ */
+int
+sid_to_xid(char *sid, int *is_user, uid_t *id)
+{
+	idmap_get_handle_t *get_hdl = NULL;
+	char *rid_start = NULL;
+	char *end;
+	idmap_stat status;
+	idmap_rid_t rid;
+	int error = 1;
+
+	if ((strchr(sid, '@')) != NULL)
+		return (1);
+
+	if ((rid_start = strrchr(sid, '-')) == NULL)
+		return (1);
+	*rid_start++ = '\0';
+	errno = 0;
+	rid = strtoul(rid_start--, &end, 10);
+	if (errno == 0 && *end == '\0') {
+		if (idmap_get_create(&get_hdl) == IDMAP_SUCCESS) {
+			error = idmap_get_pidbysid(get_hdl,
+			    sid, rid, IDMAP_REQ_FLG_USE_CACHE,
+			    id, is_user, &status);
+			if (error == IDMAP_SUCCESS) {
+				error = idmap_get_mappings(get_hdl);
+				if (error == IDMAP_SUCCESS &&
+				    status != IDMAP_SUCCESS)
+					error = 1;
+				else
+					error = 0;
+			}
+		} else {
+			error = 1;
+		}
+		if (get_hdl)
+			idmap_get_destroy(get_hdl);
+	}
+
+	*rid_start = '-'; /* putback character removed earlier */
 
 	return (error);
 }
