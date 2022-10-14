@@ -23,6 +23,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2015 Gary Mills
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2020 Peter Tribble
  */
 
@@ -233,6 +234,8 @@ static struct lbuf	**flist;	/* ptr to list of lbuf pointers */
 static struct lbuf	*gstat(char *, int, struct ditem *);
 static char		*getname(uid_t);
 static char		*getgroup(gid_t);
+static char		*getusid(uid_t);
+static char		*getgsid(gid_t);
 static char		*makename(char *, char *);
 static void		pentry(struct lbuf *);
 static void		column(void);
@@ -1279,20 +1282,36 @@ pentry(struct lbuf *ap)
 		(void) putchar(p->acl);
 		curcol++;
 
+		/*
+		 * When handling owner/group options (-o -g) note -n:
+		 * With no -n options, getname/getroup converts any
+		 * ephemeral IDs to a winname (if possible) or a SID.
+		 * With just one -n option, convert ephemeral IDs to SIDs
+		 * With two or more -n options, show the ephemeral ID
+		 * (which is a lot less helpful than the SID).
+		 */
 		curcol += printf("%3lu ", (ulong_t)p->lnl);
 		if (oflg) {
-			if (!nflg) {
+			if (nflg == 0) {
 				cp = getname(p->luid);
 				curcol += printf("%-8s ", cp);
-			} else
+			} else if (nflg == 1 && p->luid > MAXUID) {
+				cp = getusid(p->luid);
+				curcol += printf("%-8s ", cp);
+			} else {
 				curcol += printf("%-8lu ", (ulong_t)p->luid);
+			}
 		}
 		if (gflg) {
-			if (!nflg) {
+			if (nflg == 0) {
 				cp = getgroup(p->lgid);
 				curcol += printf("%-8s ", cp);
-			} else
+			} else if (nflg == 1 && p->lgid > MAXUID) {
+				cp = getgsid(p->lgid);
+				curcol += printf("%-8s ", cp);
+			} else {
 				curcol += printf("%-8lu ", (ulong_t)p->lgid);
+			}
 		}
 		if (p->ltype == 'b' || p->ltype == 'c') {
 			curcol += printf("%3u, %2u",
@@ -1427,7 +1446,16 @@ pentry(struct lbuf *ap)
 	if (vflg) {
 		new_line();
 		if (p->aclp) {
-			acl_printacl(p->aclp, num_cols, Vflg);
+			int pa_flags = 0;
+
+			if (Vflg)
+				pa_flags |= ACL_COMPACT_FMT;
+			if (nflg)
+				pa_flags |= ACL_NORESOLVE;
+			if (nflg < 2)
+				pa_flags |= ACL_SID_FMT;
+
+			acl_printacl2(p->aclp, num_cols, pa_flags);
 		}
 	}
 	/* Free extended system attribute lists */
@@ -2162,25 +2190,18 @@ makename(char *dir, char *file)
 	return (dfile);
 }
 
-
-#include <pwd.h>
-#include <grp.h>
-#include <utmpx.h>
-
-struct	utmpx utmp;
-
-#define	NMAX	(sizeof (utmp.ut_name))
-#define	SCPYN(a, b)	(void) strncpy(a, b, NMAX)
-
+#define	NMAX		256	/* The maximum size of a SID in string format */
+#define	SCPYN(a, b)	(void) strlcpy(a, b, NMAX)
 
 struct cachenode {		/* this struct must be zeroed before using */
 	struct cachenode *lesschild;	/* subtree whose entries < val */
 	struct cachenode *grtrchild;	/* subtree whose entries > val */
 	long val;			/* the uid or gid of this entry */
 	int initted;			/* name has been filled in */
-	char name[NMAX+1];		/* the string that val maps to */
+	char name[NMAX];		/* the string that val maps to */
 };
 static struct cachenode *names, *groups;
+static struct cachenode *user_sids, *group_sids;
 
 static struct cachenode *
 findincache(struct cachenode **head, long val)
@@ -2215,19 +2236,28 @@ findincache(struct cachenode **head, long val)
 /*
  * get name from cache, or passwd file for a given uid;
  * lastuid is set to uid.
+ *
+ * If an ephemeral UID (> MAXUID) try to convert to either a
+ * name or a sid.
  */
 static char *
 getname(uid_t uid)
 {
 	struct passwd *pwent;
 	struct cachenode *c;
+	char *sid;
 
 	if ((uid == lastuid) && lastuname)
 		return (lastuname);
 
 	c = findincache(&names, uid);
 	if (c->initted == 0) {
-		if ((pwent = getpwuid(uid)) != NULL) {
+		sid = NULL;
+		if (uid > MAXUID &&
+		    sid_string_by_id(uid, B_TRUE, &sid, 0) == 0) {
+			SCPYN(&c->name[0], sid);
+			free(sid);
+		} else if ((pwent = getpwuid(uid)) != NULL) {
 			SCPYN(&c->name[0], pwent->pw_name);
 		} else {
 			(void) sprintf(&c->name[0], "%-8u", (int)uid);
@@ -2242,19 +2272,28 @@ getname(uid_t uid)
 /*
  * get name from cache, or group file for a given gid;
  * lastgid is set to gid.
+ *
+ * If an ephemeral GID (> MAXUID) try to convert to either a
+ * name or a sid.
  */
 static char *
 getgroup(gid_t gid)
 {
 	struct group *grent;
 	struct cachenode *c;
+	char *sid;
 
 	if ((gid == lastgid) && lastgname)
 		return (lastgname);
 
 	c = findincache(&groups, gid);
 	if (c->initted == 0) {
-		if ((grent = getgrgid(gid)) != NULL) {
+		sid = NULL;
+		if (gid > MAXUID &&
+		    sid_string_by_id(gid, B_FALSE, &sid, 0) == 0) {
+			SCPYN(&c->name[0], sid);
+			free(sid);
+		} else if ((grent = getgrgid(gid)) != NULL) {
 			SCPYN(&c->name[0], grent->gr_name);
 		} else {
 			(void) sprintf(&c->name[0], "%-8u", (int)gid);
@@ -2264,6 +2303,60 @@ getgroup(gid_t gid)
 	lastgid = gid;
 	lastgname = &c->name[0];
 	return (lastgname);
+}
+
+/*
+ * get SID from cache, or from idmap for a given (ephemeral) uid;
+ *
+ * Always an ephemeral UID (> MAXUID) here.
+ * Just convert to a SID (no winname lookup)
+ */
+static char *
+getusid(uid_t uid)
+{
+	struct cachenode *c;
+	char *sid;
+
+	c = findincache(&user_sids, uid);
+	if (c->initted == 0) {
+		sid = NULL;
+		if (sid_string_by_id(uid, B_TRUE, &sid, ACL_NORESOLVE) == 0) {
+			SCPYN(&c->name[0], sid);
+			free(sid);
+		} else {
+			(void) sprintf(&c->name[0], "%-8u", (int)uid);
+		}
+		c->initted = 1;
+	}
+
+	return (&c->name[0]);
+}
+
+/*
+ * get SID from cache, or from idmap for a given (ephemeral) gid;
+ *
+ * If an ephemeral UID (> MAXUID) try to convert to a SID
+ * (no winname lookup here)
+ */
+static char *
+getgsid(gid_t gid)
+{
+	struct cachenode *c;
+	char *sid;
+
+	c = findincache(&group_sids, gid);
+	if (c->initted == 0) {
+		sid = NULL;
+		if (sid_string_by_id(gid, B_FALSE, &sid, ACL_NORESOLVE) == 0) {
+			SCPYN(&c->name[0], sid);
+			free(sid);
+		} else {
+			(void) sprintf(&c->name[0], "%-8u", (int)gid);
+		}
+		c->initted = 1;
+	}
+
+	return (&c->name[0]);
 }
 
 /* return >0 if item pointed by pp2 should appear first */
