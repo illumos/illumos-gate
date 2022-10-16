@@ -21,12 +21,9 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-##
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/dfs.cmds/Makefile
 
-SUBDIRS=	general dfshares shareall unshareall sharemgr sharectl
+SUBDIRS=	dfshares shareall unshareall sharemgr sharectl
 MSGSUBDIRS=	sharectl sharemgr
 
 include ../Makefile.cmd
