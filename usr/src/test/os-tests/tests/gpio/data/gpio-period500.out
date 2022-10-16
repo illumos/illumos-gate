@@ -1,0 +1,4 @@
+CONTROLLER      GPIO                ID
+gpio_sim0       periodic-500ms      4
+gpio_sim1       periodic-500ms      4
+gpio_sim2       periodic-500ms      4

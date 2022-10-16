@@ -845,3 +845,8 @@ opt/os-tests/tests/cores/amd64/libdumper.so	i386
 # implementation -- which is fully controlled by gate.
 #
 usr/include/sys/ktest_impl.h
+
+#
+# Temporary exception until the ACPI nexus is sorted out.
+#
+usr/include/sys/gpio/zen_gpio.h

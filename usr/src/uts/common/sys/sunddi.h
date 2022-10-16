@@ -269,6 +269,12 @@ extern "C" {
 #define	DDI_NT_SENSOR_TEMP_PCH	"ddi_sensor:temperature:pch"
 
 /*
+ * Device types used for GPIOs
+ */
+#define	DDI_NT_GPIO_CTRL	"ddi_gpio:controller"
+#define	DDI_NT_GPIO_DPIO	"ddi_gpio:dpio"
+
+/*
  * DDI event definitions
  */
 #define	EC_DEVFS	"EC_devfs"	/* Event class devfs */

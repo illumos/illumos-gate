@@ -1,0 +1,4 @@
+ATTR                  VALUE
+name                  1v8
+sim:pull              40k-up
+sim:voltage           1.8V

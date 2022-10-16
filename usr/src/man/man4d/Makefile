@@ -80,6 +80,7 @@ _MANFILES=	aac.4d		\
 		iscsi.4d	\
 		iser.4d		\
 		ixgbe.4d	\
+		kgpio.4d	\
 		kmdb.4d		\
 		kstat.4d	\
 		ksensor.4d	\

@@ -1,0 +1,4 @@
+CONTROLLER      NGPIOS  NDPIOS  PROVIDER                                  PATH
+gpio_sim0       6       0       /pseudo/gpio_sim@0                        /pseudo/kgpio@0:gpio_sim0
+gpio_sim1       6       0       /pseudo/gpio_sim@1                        /pseudo/kgpio@0:gpio_sim1
+gpio_sim2       6       0       /pseudo/gpio_sim@2                        /pseudo/kgpio@0:gpio_sim2

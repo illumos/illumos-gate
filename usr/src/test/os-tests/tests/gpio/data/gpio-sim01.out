@@ -1,0 +1,13 @@
+CONTROLLER      GPIO                ID
+gpio_sim0       1v8                 0
+gpio_sim0       3v3                 1
+gpio_sim0       12V                 2
+gpio_sim0       54V                 3
+gpio_sim0       periodic-500ms      4
+gpio_sim0       open-drain          5
+gpio_sim1       1v8                 0
+gpio_sim1       3v3                 1
+gpio_sim1       12V                 2
+gpio_sim1       54V                 3
+gpio_sim1       periodic-500ms      4
+gpio_sim1       open-drain          5

@@ -156,6 +156,7 @@ _MANFILES=	6to4relay.8		\
 		getent.8		\
 		getty.8			\
 		getvol.8		\
+		gpioadm.8		\
 		groupadd.8		\
 		groupdel.8		\
 		groupmod.8		\

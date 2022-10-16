@@ -1,0 +1,3 @@
+gpioadmtestsim00::-:gpio_sim0:0
+gpioadmtestsim10:read,write:-:gpio_sim1:0
+gpioadmtestsim21:read:K:gpio_sim2:1

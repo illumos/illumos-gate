@@ -149,6 +149,18 @@ user = root
 tests = ['digraph-test']
 
 #
+# The GPIO tests require privileges.
+#
+[/opt/os-tests/tests/gpio]
+pre_user = root
+user = root
+post_user = root
+pre = gpio_init
+tests = [ 'dpio_test.32', 'dpio_test.64', 'gpio_attr.32', 'gpio_attr.64',
+    'gpio_lookup.32', 'gpio_lookup.64', 'gpioadm_test' ]
+post = gpio_fini
+
+#
 # Only the ksensor functional tests are included in the run file.
 # The stress test is designed to be run separately.
 #

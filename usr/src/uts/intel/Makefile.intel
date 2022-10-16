@@ -764,6 +764,11 @@ DRV_KMODS	+= vmm_vtd
 DRV_KMODS	+= vmm_drv_test
 
 #
+#	GPIO Related Modules
+#
+DRV_KMODS	+= kgpio gpio_sim
+
+#
 #	The kernel test driver.
 #
 DRV_KMODS	+= ktest

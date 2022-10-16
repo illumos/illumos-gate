@@ -72,7 +72,8 @@ LINK_OBJS_CMN =			\
 	vscan_link.o		\
 	zfs_link.o		\
 	zut_link.o		\
-	sensor_link.o
+	sensor_link.o		\
+	dpio_link.o
 
 LINK_OBJS =	$(LINK_OBJS_CMN) \
 		$(LINK_OBJS_$(MACH))

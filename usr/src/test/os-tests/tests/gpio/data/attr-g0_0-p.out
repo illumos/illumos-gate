@@ -1,0 +1,6 @@
+name:1v8:1v8:
+sim\:output:disabled:0x0:disabled,low,high
+sim\:input:high:0x1:low,high
+sim\:pull:40k-up:0x5:disabled,23k-down,5k-up,40k-up
+sim\:voltage:1.8V:0x0:1.8V
+sim\:speed:low:0x0:low,medium,high,very-high

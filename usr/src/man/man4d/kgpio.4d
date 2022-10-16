@@ -1,0 +1,48 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd September 17, 2022
+.Dt KGPIO 4D
+.Os
+.Sh NAME
+.Nm kgpio
+.Nd Kernel GPIO and DPIO driver
+.Sh SYNOPSIS
+.Pa /dev/dpio/
+.Sh DESCRIPTION
+The
+.Nm
+driver provides access to general purpose and dedicated purpose I/O
+.Pq GPIO and DPIO respectively
+devices that are built using the kernel's GPIO framework.
+See
+.Xr gpio 7
+for general background and an overview of the system's design.
+GPIO controllers that are registered with the framework are made
+available to the system through this driver.
+In addition, when a DPIO is created, this
+driver is responsible for providing that abstraction.
+.Pp
+GPIO controllers, GPIO attributes, and the manipulation of DPIOs can be
+explored through the
+.Xr gpioadm 8
+utility.
+.Pp
+In general, the specific programming interfaces and aspects of the
+.Nm
+driver are considered private to the system and
+.Sy Volatile ,
+subject to change without notice.
+.Sh SEE ALSO
+.Xr gpio 7 ,
+.Xr gpioadm 8

@@ -24,6 +24,8 @@ attributes.7
 	standard.7
 byteorder.7
 	endian.7
+gpio.7
+	dpio.7
 rbac.7
 	RBAC.7
 regexp.7

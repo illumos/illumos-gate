@@ -1,0 +1,89 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2022 Oxide Comptuer Company
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION ILLUMOSprivate {
+    global:
+	xpio_ctrl_discover;
+	xpio_ctrl_fini;
+	xpio_ctrl_info_devpath;
+	xpio_ctrl_info_free;
+	xpio_ctrl_info_ndpios;
+	xpio_ctrl_info_ngpios;
+	xpio_ctrl_info;
+	xpio_ctrl_init_by_name;
+	xpio_ctrl_init;
+	xpio_dpio_create;
+	xpio_dpio_destroy;
+	xpio_dpio_discover;
+	xpio_dpio_info;
+	xpio_dpio_info_caps;
+	xpio_dpio_info_ctrl;
+	xpio_dpio_info_flags;
+	xpio_dpio_info_free;
+	xpio_dpio_info_gpionum;
+	xpio_dpio_info_name;
+	xpio_err;
+	xpio_err2str;
+	xpio_errmsg;
+	xpio_fini;
+	xpio_gpio_attr_err_next;
+	xpio_gpio_attr_err_name;
+	xpio_gpio_attr_err_err;
+	xpio_gpio_attr_find;
+	xpio_gpio_attr_from_str;
+	xpio_gpio_attr_name;
+	xpio_gpio_attr_next;
+	xpio_gpio_attr_possible_string;
+	xpio_gpio_attr_possible_uint32;
+	xpio_gpio_attr_prot;
+	xpio_gpio_attr_set_str;
+	xpio_gpio_attr_set_uint32;
+	xpio_gpio_attr_type;
+	xpio_gpio_attr_value_string;
+	xpio_gpio_attr_value_uint32;
+	xpio_gpio_attr_xlate_to_str;
+	xpio_gpio_attr_xlate_uint32_to_str;
+	xpio_gpio_id;
+	xpio_gpio_info_free;
+	xpio_gpio_info;
+	xpio_gpio_lookup_id;
+	xpio_gpio_update_free;
+	xpio_gpio_update_init;
+	xpio_gpio_update;
+	xpio_init;
+	xpio_syserr;
+	xpio_update_err;
+	xpio_update_err2str;
+	xpio_update_errmsg;
+	xpio_update_syserr;
+    local:
+	*;
+};

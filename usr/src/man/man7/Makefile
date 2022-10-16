@@ -55,6 +55,7 @@ _MANFILES=	Intro.7			\
 		fnmatch.7		\
 		formats.7		\
 		fsattr.7		\
+		gpio.7			\
 		grub.7			\
 		gss_auth_rules.7	\
 		hal.7			\

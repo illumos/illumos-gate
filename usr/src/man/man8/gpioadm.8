@@ -1,0 +1,804 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd September 17, 2022
+.Dt GPIOADM 8
+.Os
+.Sh NAME
+.Nm gpioadm
+.Nd gpio and dpio administration
+.Sh SYNOPSIS
+.Nm
+.Cm controller
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Nm
+.Cm gpio
+.Cm list
+.Op Fl H
+.Op Fl 1
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Nm
+.Cm gpio
+.Cm attr
+.Cm get
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Ar controller/gpio
+.Op Ar filter Ns ...
+.Nm
+.Cm gpio
+.Cm attr
+.Cm set
+.Ar controller/gpio
+.Ar attr=value
+.Op Ar attr=value Ns ...
+.Nm
+.Cm dpio
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Nm
+.Cm dpio
+.Cm define
+.Op Fl r
+.Op Fl w
+.Op Fl K
+.Ar controller/gpio
+.Ar name
+.Nm
+.Cm dpio
+.Cm undefine
+.Ar controller/gpio
+.Sh DESCRIPTION
+The
+.Nm
+utility is used to enumerate and manipulate the general purpose and
+dedicated purpose I/Os
+.Pq GPIO and DPIO
+and their controllers that are present in the system.
+For more background on the GPIO and DPIO subsystem, please see
+.Xr gpio 7 .
+.Pp
+There are three top-level objects in
+.Nm :
+.Bl -tag -width Ds
+.It GPIOs
+General Purpose I/Os are software controllable pins that exist on
+various hardware devices.
+GPIOs are identified by a human-readable name and a controller-specific
+numeric ID
+.Po
+which has no relation to the hardware or datasheet's numbering of GPIOs,
+these are used by the kernel to identify GPIOs
+.Pc .
+All
+.Nm
+operations allow a GPIO to be named either by its human-readable name
+or its controller-specific ID.
+.Nm
+will always attempt to resolve a string as a GPIO's name first and will
+only attempt to parse it as a GPIO's ID if there is no GPIO with that
+name.
+.Pp
+GPIOs themselves contain a series of attributes which vary based on the
+controller.
+An attribute itself may be read-only or read-write and controls one
+aspect of the GPIO.
+For example, there are attributes for things such as the name of the
+device, which pin it corresponds to on the package, what the current
+input and output values are, whether there are pull-up or pull-down
+resistors enabled, and much more.
+.Pp
+GPIOs support the discovery and manipulation of their attributes through
+the
+.Cm attr
+.Cm get
+and
+.Cm attr
+.Cm set
+subcommands.
+Manipulating attributes can
+.Sy potentially damage
+your system.
+Documentation of specific attributes, may potentially be found in
+provider-specific driver manual pages in section 4D.
+.It Controllers
+These are hardware devices that provide access to GPIOs.
+.Nm
+provides the ability to list and get basic information about these
+controllers.
+Controllers are not manipulated directly but are indirectly used when
+getting information about and manipulating GPIOs and DPIOs.
+.It DPIOs
+Dedicated Purpose I/Os are devices which wrap up and constrain a GPIO
+while allowing one to indicate that there are particular semantics.
+Unlike a GPIO which has a full series of attributes, a DPIO provides
+generic access to reading the current input value and setting the output
+value, while freezing all other attributes of the underlying GPIO.
+For more background on DPIOs, how they work, and why the exist, please
+see
+.Xr dpio 7 .
+.Pp
+Specifically,
+.Nm
+supports the creation of DPIOs from a GPIO using the
+.Cm dpio
+.Cm define
+subcommand and release a GPIO from being a DPIO through the
+.Cm dpio
+.Cm undefine
+subcommand.
+.El
+.Pp
+All listing operations leverage the standard illumos output format
+library
+.Po
+.Xr ofmt 3OFMT
+.Pc
+allowing the selection of specific output fields, the omission of the
+header
+.Pq Fl H ,
+and a parsable mode intended for programmatic consumption
+.Pq Fl p .
+When requesting parsable output, the colon
+.Po
+.Do
+:
+.Dc
+.Pc
+character is used as a delimiter between fields and any delimiters that
+would appear in an output field will be escaped with a backslash
+character
+.Po
+.Do
+\e
+.Dc
+.Pc .
+.Pp
+Getting information about GPIOs, DPIOs, and controllers currently
+requires that a process have the
+.Brq Dv PRIV_SYS_DEVICES
+privilege.
+.Ss Persistence
+Currently there is no persistence across reboots of any changes that are
+made to GPIO attributes.
+Similarly, any DPIOs that are created and manipulated only last until
+the next reboot of the system.
+.Sh SUBCOMMANDS
+The following commands are supported by
+.Nm :
+.Bl -tag -width ""
+.It Xo
+.Nm
+.Cm controller
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Xc
+List all of the GPIO controllers in the system and basic information
+about them.
+.Pp
+The following fields are supported:
+.Bl -tag -width CONTROLLER
+.It Sy CONTROLLER
+This is the name of the GPIO controller in the system.
+.It Sy NGPIOS
+The number of GPIOs that the controller supports.
+This value will not change unless the controller driver changes somehow.
+.It Sy NDPIOS
+The number of DPIOs that the controller currently actively has.
+This value will change over time depending on the creation and removal
+of DPIOs.
+.It Sy PROVIDER
+The
+.Pa /devices
+path to the kernel provider for this GPIO controller.
+.It Sy PATH
+The
+.Pa /devices
+path to the GPIO controller minor node.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+.Pp
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar filter
+One or more filters may be specified that are used to constrain the list
+of GPIO controllers that are printed.
+Each
+.Ar filter
+is the name of a GPIO controller that matches the aforementioned
+.Sy CONTROLLER
+field.
+.Pp
+If any filter is specified and does not match, then that is treated as
+an error.
+.Pp
+Because these are filters, they do not control the order that items are
+printed out, only what is printed out.
+.El
+.It Xo
+.Nm
+.Cm gpio
+.Cm list
+.Op Fl H
+.Op Fl 1
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Xc
+List all of the GPIOs in the system across all controllers.
+.Pp
+The following fields are supported:
+.Bl -tag -width CONTROLLER
+.It Sy CONTROLLER
+This is the name of the GPIO controller in the system.
+.It Sy GPIO
+This is the name of the GPIO provided by its controller.
+GPIO names are not unique in the system and are scoped to their
+controller.
+.It Sy ID
+The numeric ID of the GPIO.
+This is used as part of getting and setting attributes as well as when
+defining and undefining DPIOs.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl 1
+Exit non-zero if the list operation outputs more than one item.
+This is generally used in conjunction with a specific
+.Ar filter
+that would include both a controller and a GPIO name.
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar filter
+One or more filters that are used to constrain the list of GPIOs that
+are printed.
+Each filter may combine a GPIO controller and a GPIO name.
+There are three general forms:
+.Bl -tag -width Ar
+.It Ar controller
+This filter matches all GPIOs that are present under the controller
+named by
+.Ar controller .
+.It Ar */gpio
+This filter matches all controllers, but only prints GPIOs with the
+specified name
+.Ar gpio .
+.It Ar controller/gpio
+This is the intersection of the prior two filters.
+This filter will only print if both a GPIO's controller and its name
+match the specified values.
+.El
+.Pp
+Like with other filters, this does not control the order that matches
+are printed in and
+.Nm
+will error if not all filters are used.
+The filters can be combined with the
+.Fl 1
+option to guarantee that only a single GPIO is matched.
+.El
+.It Xo
+.Nm
+.Cm gpio
+.Cm attr
+.Cm get
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Ar controller/gpio
+.Op Ar filter Ns ...
+.Xc
+The
+.Cm gpio
+.Cm attr
+.Cm get
+subcommand is used to display all of the attributes of a single GPIO
+that is specified by
+.Ar controller/gpio .
+The
+.Ar controller
+part of that is the name of the controller.
+The
+.Ar gpio
+part is either the name or ID of the GPIO.
+.Pp
+For each of a single GPIO's attributes, the name of the attribute, its
+current value, what permissions exist for its value, and then what
+values are possible to st for it are displayed.
+Filters can be used to limit which attributes are displayed.
+.Pp
+The following fields are supported:
+.Bl -tag -width POSSIBLE
+.It Sy ATTR
+This is the name of the attribute.
+It is split into a provider name and then a specific attribute name as
+all attributes are generally scoped to their provider.
+.It Sy PERM
+This indicates the current permissions for manipulating this attribute.
+This is treated as a two character field with
+.Sq r
+standing for reading the value and
+.Sq w
+standing for writing the value.
+.It Sy VALUE
+This is the current value of the attribute.
+It will generally be rendered as a human-readable string when
+appropriate so that way the value can be understood and does not require
+understanding the underlying provider's specific values.
+.It Sy POSSIBLE
+A list of all possible values that are supported for this field.
+This allows one to know what they can possibly set for this attribute.
+For some read-only attributes this field may not have a value.
+.It Sy RAW
+This provides the underlying provider's value for this attribute.
+For string based attributes, this is the same as the
+.Sy VALUE
+field.
+For other attributes, such as those which are uint32 values under the
+hood, these are the hexadecimal form of the integer.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl H
+Omit the column header when printing output.
+.It Fl o Ar field Ns [,...]
+A comma-delineated list of fields to output, selected from the ones
+above.
+.It Fl p
+Displays the output in a machine-parsable format.
+When requesting parsable output, the
+.Fl o
+option is required to specifically control which fields are included.
+.El
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar filter
+One or more filters may be specified that are used to constrain the list
+of GPIO attributes that are printed.
+Each
+.Ar filter
+is the name of a GPIO attributes that matches the aforementioned
+.Sy ATTR
+field.
+.El
+.It Xo
+.Nm
+.Cm gpio
+.Cm attr
+.Cm set
+.Ar controller/gpio
+.Ar attr=value
+.Op Ar attr=value Ns ...
+.Xc
+The
+.Cm gpio
+.Cm attr
+.Cm set
+subcommand is used to set one or more attributes of the GPIO that is
+named by
+.Ar controller/gpio .
+The
+.Ar controller
+part of that is the name of the controller.
+The
+.Ar gpio
+part is either the name or ID of the GPIO.
+.Pp
+All attributes that are specified are given to the hardware to apply at
+once which generally means that either all of them should be applied or
+none of them will be.
+This allows a change from one atomic state to another without worrying
+about how to construct an attribute by attribute path from one state to
+the next, which may not be safe.
+.Pp
+Attributes and values are separated with the equals character
+.Po
+.Do
+=
+.Dc
+.Pc .
+.Ar attr
+should be the full name of an attribute.
+.Ar value
+is the value to set.
+.Nm
+will automatically convert the human-readable strings that describe
+values into the appropriate underlying provider-specific form.
+To see which values are valid, look at the
+.Sy POSSIBLE
+column when getting the attributes.
+.It Xo
+.Nm
+.Cm dpio
+.Cm list
+.Op Fl H
+.Op Fl o Ar field Ns [,...] Op Fl p
+.Op Ar filter Ns ...
+.Xc
+The
+.Cm dpio
+.Cm list
+subcommand lists all the DPIOs that have been created from GPIOs in the
+system.
+.Pp
+The following fields are supported:
+.Bl -tag -width CONTROLLER
+.It Sy DPIO
+This is the name of a DPIO.
+DPIO names are unique in the system and a DPIO can be found in the
+filesystem at
+.Pa /dev/dpio/<name> .
+.It Sy CAPS
+This is a list of capabilities that a DPIO supports, which is a
+combination of what the underlying provider supports and what a user
+requested when creating the DPIO.
+The following are the current capabilities, though this list may expand
+in the future:
+.Bl -tag -width write
+.It read
+Indicates that the DPIO supports the various
+.Xr read 2
+family of functions.
+Reading a DPIO returns the current value the DPIO sees on its pin in the
+form of a 4 byte
+.Vt dpio_input_t .
+See
+.Xr dpio 7
+for more information.
+.It write
+Indicates that the DPIO supports the various
+.Xr write 2
+family of functions.
+Writing a DPIO changes the value that it is outputting on its pin.
+Writes must always be a 4 byte
+.Vt dpio_output_t
+value.
+See
+.Xr dpio 7
+for more information.
+.It poll
+This indicates that the DPIO can be polled for changes to its input
+value via the
+.Dv POLLIN
+event with functions such as
+.Xr poll 2 ,
+.Xr port_create 3C ,
+and others.
+In addition, the timestamp of when the last change was detected can be
+retrieved via a device-specific
+.Xr ioctl 2 .
+This capability will not show up if the read capability is not present.
+See
+.Xr dpio 7
+for more information.
+.El
+.It Sy FLAGS
+This is a series of different flags that describe different aspects of
+the DPIOs behavior.
+The flags are organized and printed a series of letters where a
+.Sq -
+character denotes that a flag is not set and a letter indicates that a
+flag is set.
+The currently defined flags are:
+.Bl -tag -width K
+.It K
+Indicates that the DPIO may only be used by the kernel in a layered
+fashion
+.Po
+e.g. it must be opened by
+.Xr ldi_open_by_name 9F
+or a similar LDI call
+.Pc .
+.Pp
+Users of this field should not assume that the number of flags is fixed.
+When additional flag are added, they will be appended to the current
+set, ensuring that the order does not change.
+The appearance of additional characters in the string is what allows
+callers to know that a new flag is present and gives software and humans
+the ability to distinguish changes.
+.El
+.It Sy CONTROLLER
+This is the name of the GPIO controller that the DPIO is leveraging.
+When combined with the
+.Sy GPIONUM
+field, this uniquely identifies the GPIO that powers the DPIO.
+This name is the same as would show up in the
+.Cm controller
+.Cm list
+subcommand.
+.It Sy GPIONUM
+This is the ID of the GPIO on the specified controller that the DPIO has
+wrapped up and constrained.
+.El
+.It Xo
+.Nm
+.Cm dpio
+.Cm define
+.Op Fl r
+.Op Fl w
+.Op Fl K
+.Ar controller/gpio
+.Ar name
+.Xc
+The
+.Cm dpio
+.Cm define
+subcommand creates a new DPIO named
+.Ar name
+from the specified GPIO
+.Ar controller/gpio .
+A DPIO's name may be up to 31 characters.
+The first character must be alphanumeric, after which, hyphens,
+underscores, periods, and plus signs are also allowed
+.Po
+.Sq - ,
+.Sq _ ,
+.Sq \&. ,
+.Sq +
+.Pc .
+Once created, a new character device will be present at
+.Pa /dev/dpio/<name>
+and the GPIOs attributes will be frozen other than those that are
+allowed for the DPIO to operate.
+After that point, the
+.Cm gpio
+.Cm attr
+.Cm set
+command will always fail until the DPIO is removed.
+.Pp
+The following options are supported, which modify the behavior of what the
+DPIO is allowed to do:
+.Bl -tag -width Fl
+.It Fl K
+The DPIO will be constrained such that only the kernel can open it.
+See the description of the
+.Dq K
+flag above.
+.It Fl r
+This allows the DPIO to be read and return the current logical value
+that the pin sees.
+See the description of the read capability above for more information.
+.It Fl w
+This allows the DPIO's logical output value to be set or disabled.
+See the description of the write capability above for more information.
+.El
+.Pp
+While it may seem weird, it is allowed to create a DPIO and not specify
+either of
+.Fl r
+or
+.Fl w .
+Such a DPIO will simply remain in its fixed state.
+For example, if its attributes have it set up to drive a particular
+output value
+.Pq or none at all for an open-drain based pin
+then that will remain constant throughout the life of the DPIO.
+.It Xo
+.Nm
+.Cm dpio
+.Cm undefine
+.Ar controller/gpio
+.Xc
+The
+.Cm dpio
+.Cm undefine
+subcommand releases the corresponding DPIO that was named by its GPIO
+controller and specific GPIO.
+If the DPIO is currently in use, this will fail.
+Once successfully completed, the
+.Pa /dev
+entry
+.Pa /dev/dpio/<name>
+will be removed and the GPIOs attributes will be unfrozen, allowing them
+to be manipulated again with the
+.Cm gpio
+.Cm attr
+.Cm set
+subcommand.
+.El
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success.
+If an error occurs, it exits 1, and provides additional details about
+the underlying cause of the error.
+If there was an invalid or missing command line options, then
+.Nm
+exits 2.
+.Pp
+When listing controllers, GPIOs, DPIOs, or attributes, if none are
+listed or if a filter is specified but is not matched, then these
+conditions are all treated as errors and
+.Nm
+exits 1.
+.Sh EXAMPLES
+.Sy Example 1
+Discovering Controllers
+.Pp
+This example shows how you discover what controllers exist.
+.Bd -literal -offset indent
+# gpioadm controller list
+CONTROLLER      NGPIOS  NDPIOS  PROVIDER
+gpio_sim0       6       0       /pseudo/gpio_sim@0
+gpio_sim1       6       0       /pseudo/gpio_sim@1
+gpio_sim2       6       0       /pseudo/gpio_sim@2
+.Ed
+.Pp
+The controller information can be changed by changing the fields or
+adding a filter.
+For example:
+.Bd -literal -offset indent
+# gpioadm controller list -o controller,ngpios,path gpio_sim2
+CONTROLLER      NGPIOS  PATH
+gpio_sim2       6       /pseudo/kgpio@0:gpio_sim2
+.Ed
+.Pp
+.Sy Example 2
+Listing GPIOs avialable on the system.
+.Pp
+This example allows you to discover which GPIOs exist on the system and
+which controllers that they belong to.
+First this shows listing all the GPIOs and then limiting the request to
+GPIOs on a specific controller.
+.Bd -literal -offset indent
+# gpioadm gpio list
+CONTROLLER      GPIO                ID
+gpio_sim0       1v8                 0
+gpio_sim0       3v3                 1
+gpio_sim0       12V                 2
+gpio_sim0       54V                 3
+gpio_sim0       periodic-500ms      4
+gpio_sim0       open-drain          5
+gpio_sim1       1v8                 0
+gpio_sim1       3v3                 1
+gpio_sim1       12V                 2
+gpio_sim1       54V                 3
+gpio_sim1       periodic-500ms      4
+gpio_sim1       open-drain          5
+gpio_sim2       1v8                 0
+gpio_sim2       3v3                 1
+gpio_sim2       12V                 2
+gpio_sim2       54V                 3
+gpio_sim2       periodic-500ms      4
+gpio_sim2       open-drain          5
+.Ed
+.Pp
+Next, to limit them, additional arguments may be passed as filters.
+This will specify everything on the controller gpio_sim1 and a specific
+GPIO on gpio_sim2.
+A reminder that the filters are based on names.
+.Bd -literal -offset indent
+# gpioadm gpio list gpio_sim1 gpio_sim2/periodic-500ms
+CONTROLLER      GPIO                ID
+gpio_sim1       1v8                 0
+gpio_sim1       3v3                 1
+gpio_sim1       12V                 2
+gpio_sim1       54V                 3
+gpio_sim1       periodic-500ms      4
+gpio_sim1       open-drain          5
+gpio_sim2       periodic-500ms      4
+.Ed
+.Pp
+.Sy Example 3
+Looking up a single GPIO by name and getting its attributes.
+.Pp
+These two commands could also be chained together through the use of a
+subshell.
+.Bd -literal -offset indent
+# gpioadm gpio list -1 -p -o id gpio_sim1/3v3
+1
+# gpioadm gpio attr get gpio_sim1/1
+ATTR                  PERM  VALUE                   POSSIBLE
+name                  r-    3v3                     --
+sim:output            rw    disabled                disabled,low,high
+sim:input             r-    low                     low,high
+sim:pull              rw    down
+disabled,down,up,up|down
+sim:voltage           r-    3.3V                    3.3V
+sim:speed             rw    low                     low,medium,high,
+                                                    very-high
+.Ed
+.Pp
+.Sy Example 4
+Setting GPIO attributes
+.Pp
+Multiple GPIO attributes can be set at the same time.
+They all will take effect at the same time.
+This example shows setting and then getting those same properties:
+.Bd -literal -offset indent
+# gpioadm gpio attr set gpio_sim1/1 sim:pull=up sim:speed=high
+# gpioadm gpio attr get gpio_sim1/1 sim:pull sim:speed
+ATTR                  PERM  VALUE                   POSSIBLE
+sim:pull              rw    up
+disabled,down,up,up|down
+sim:speed             rw    high                    low,medium,high,
+                                                    very-high
+.Ed
+.Pp
+.Sy Example 5
+Creating a DPIO
+.Pp
+This example shows the creation of a DPIO from a GPIO.
+.Bd -literal -offset indent
+# gpioadm dpio define -r -w gpio_sim2/2 example5
+# $ ls /dev/dpio/example5
+/dev/dpio/example5
+# gpioadm dpio list
+DPIO            CAPS            FLAGS   CONTROLLER      GPIONUM
+example5        read,write      -       gpio_sim2       2
+.Ed
+.Pp
+.Sy Example 6
+Removing a DPIO
+.Pp
+This example removes the DPIO that we created in the prior example.
+If the system has other DPIOs than the output of the final command will
+be different.
+.Bd -literal -offset indent
+# gpioadm dpio undefine gpio_sim2/2
+# ls /dev/dpio/example5
+/dev/dpio/example5: No such file or directory
+# gpioadm dpio list
+gpioadm: no DPIOs found
+.Ed
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Evolving .
+The output of
+.Nm
+is
+.Sy Not-An-Interface
+and may change at any time.
+.Sh SEE ALSO
+.Xr poll 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr port_get 3 C
+.Xr ofmt 3OFMT ,
+.Xr dpio 7 ,
+.Xr gpio 7 ,
+.Xr ldi_open_by_name 9F

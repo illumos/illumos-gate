@@ -238,6 +238,7 @@ SUBDIRS +=				\
 	libxcurses	\
 	libxcurses2	\
 	libxnet		\
+	libxpio		\
 	libzfs		\
 	libzfsbootenv	\
 	libzfs_core	\
@@ -475,6 +476,7 @@ HDRSUBDIRS=				\
 	libvscan	\
 	libwrap		\
 	libxcurses2	\
+	libxpio		\
 	libzfs		\
 	libzfs_core	\
 	libzfs_jni	\
@@ -686,6 +688,7 @@ libvmm:		libvmmapi
 libvolmgt:	libadm
 libvrrpadm:	libdladm libscf
 libvscan:	libscf libsecdb
+libxpio:	libdevinfo libnvpair
 libzfs:		libdevid libgen libuutil libavl libefi libidmap \
 		libumem libtsol libzfs_core libcryptoutil pkcs11 libmd libzutil
 libzfsbootenv:	libzfs libnvpair

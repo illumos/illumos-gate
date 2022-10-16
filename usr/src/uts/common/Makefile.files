@@ -2342,6 +2342,12 @@ MLXCX_OBJS +=	mlxcx.o mlxcx_dma.o mlxcx_cmd.o mlxcx_intr.o mlxcx_gld.o \
 ENA_OBJS +=	ena.o ena_admin.o ena_dma.o ena_aenq.o ena_gld.o ena_hw.o \
 		ena_intr.o ena_stats.o ena_tx.o ena_rx.o ena_watchdog.o
 
+#
+# GPIO Framwork and related drivers
+#
+KGPIO_OBJS +=		kgpio.o
+GPIO_SIM_OBJS +=	gpio_sim.o
+
 IGC_CORE_OBJS += igc_api.o igc_base.o igc_i225.o igc_mac.o igc_nvm.o igc_phy.o
 IGC_OBJS += $(IGC_CORE_OBJS) igc.o igc_osdep.o igc_gld.o igc_ring.o igc_stat.o
 

@@ -1,0 +1,9 @@
+ATTR                  PERM  VALUE                   POSSIBLE
+name                  r-    1v8                     --
+sim:output            rw    disabled                disabled,low,high
+sim:input             r-    high                    low,high
+sim:pull              rw    40k-up                  disabled,23k-down,5k-up,
+                                                    40k-up
+sim:voltage           r-    1.8V                    1.8V
+sim:speed             rw    low                     low,medium,high,
+                                                    very-high

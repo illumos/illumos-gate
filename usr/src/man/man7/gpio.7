@@ -1,0 +1,311 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2022 Oxide Computer Company
+.\"
+.Dd September 17, 2022
+.Dt GPIO 7
+.Os
+.Sh NAME
+.Nm gpio ,
+.Nm dpio
+.Nd General and Dedicated Purpose I/O
+.Sh DESCRIPTION
+General Purpose I/Os
+.Pq gpio
+are a common type of interface found in various microprocessors, ASICs,
+and other types of devices.
+A GPIO is functionality that hardware exposes that allows software to
+observe and control the state of a particular pin
+.Pq or set of pins
+on the device.
+These hardware pins may be connected to any number of different things
+ranging from enable and control lines, sensors, LEDs, or even a more
+complex hardware peripheral.
+.Pp
+Software control of a GPIO generally gives you the ability to do things
+like:
+.Bl -bullet
+.It
+Read the current logic value that the hardware sees on the pin
+.It
+Set the logical output value for a pin
+.It
+Control internal aspects such as integrated pull-up and pull-down
+resistors, interrupt generation, and more.
+.El
+.Pp
+The OS provides a dedicated subsystem for manipulating and interfacing
+with GPIOs in hardware.
+The rest of this manual goes into details about that subsystem, ways to
+constrain GPIOs for safety, and what tooling is available.
+.Ss GPIO Subsystem
+Device drivers register with the kernel GPIO subsystem which the OS
+organizes as a series of named GPIO Controllers.
+Each controller itself then enumerates a series of GPIOs that have a
+name and controller-specific ID which is used to manipulate the GPIO.
+In general, while tooling requires IDs, names are what GPIO controllers
+guarantee the stability of.
+.Pp
+Each GPIO has a series of attributes that describe the different
+properties of the GPIO.
+The attributes of a GPIO are specific to the device driver that provides
+it.
+While most GPIO controllers provide similar features, the specifics
+often vary quite particularly.
+Let's take the example of control over integrated pull-up and pull-down
+resistors.
+Some hardware offers a very simple option of indicating whether there is
+a pull-up, pull-down, or none while others require you to specify the
+strength of the resistor, which of course varies from part to part
+.Pq and some devices only let you control the strength in one direction ,
+and then some hardware actually lets you enable both the pull-up and
+pull-down.
+.Pp
+For concepts which are trickier to deal with, such as the drive strength
+or rise and fall times of signals, this turns into a larger mess.
+And of course, the last thing that is important to keep in mind is that
+not all GPIOs on a given controller are necessarily the same.
+As such, the OS does not try to commonize the different attributes.
+Instead, for each attribute, the following information is provided:
+.Bl -bullet
+.It
+The attribute's name.
+A colon character
+.Po
+.Do
+:
+.Dc
+.Pc
+separates the provider from the attribute itself.
+.It
+The attribute's current value.
+.It
+The set of possible values are for an attribute.
+This allows for discoverability of what is allowed.
+.It
+Whether the attribute is read-only or read-write.
+.El
+.Pp
+To make this concrete, here is an example of a GPIO's attributes as
+provided by the
+.Xr gpioadm 8
+utility:
+.Bd -literal -offset indent
+ATTR                  PERM  VALUE            POSSIBLE
+name                  r-    EGPIO9_3         --
+zen:pad_name          r-    BP_AGPIO9_3      --
+zen:pin               r-    CY41             --
+zen:pad_type          r-    gpio             --
+zen:caps              r-    --               --
+zen:output_driver     r-    push-pull        push-pull
+zen:voltage           r-    3.3V             3.3V
+zen:drive_strength    rw    40R              40R,80R
+zen:output            rw    disabled         disabled,low,high
+zen:input             r-    low              low,high
+zen:debounce_mode     rw    none             none,keep-low-glitch,
+                                             keep-high-glitch,
+                                             remove-glitch
+zen:debounce_unit     rw    61us             61us,244us,15.6ms,62.5ms
+zen:debounce_count    rw    0x0              --
+zen:trigger_mode      rw    edge/high        edge/high,edge/low,
+                                             edge/both,level/high,
+                                             level/low
+zen:status            r-    --               --
+zen:pull              rw    disabled         disabled,down,4k-up,
+                                             8k-up
+zen:raw_reg           r-    0x440000         --
+.Ed
+.Pp
+Multiple attributes of a GPIO may be set at once.
+.Ss Hardware Safety
+Incorrect usage of GPIOs
+.Sy will damage
+your system.
+The way that GPIOs are used will vary from product to product and just
+because a GPIO is used in some way on one system has no bearing on
+another.
+The GPIO subsystem on its own cannot know what the hardware designer
+intended for a pin and while one may have the ability to make a pin
+begin driving an output, if it is actually expected to be an input this
+can lead to two devices both trying to drive a connected signal and
+irreparably damaging both devices!
+.Ss Dedicated Purpose I/Os
+To deal with this more complicated reality and the fact that GPIO
+attributes vary wildly, the operating system has a second concept which
+are called Dedicated Purpose I/Os
+.Pq DPIO
+which is designed to be used more directly by both software in the
+platform
+.Pq e.g. fault management
+or by other end-user applications.
+.Pp
+A DPIO creates a named character device in
+.Pa /dev/dpio
+that has the following properties:
+.Bl -bullet
+.It
+Reading the device
+.Pq if allowed
+returns the current pin's status.
+In addition, if the controller supports interrupts, the device can be
+polled through
+.Xr poll 2 ,
+.Xr port_get 3C ,
+etc. for when its input changes.
+.It
+Writing to the device
+.Pq if allowed
+changes the output level, allowing one to set it to one of disabled,
+low, or high.
+.It
+The device can have a semantic name that reflects its actual usage and
+abstracts away the question of which pin on which GPIO controller it is
+found on.
+A DPIO's name is global to the system while a GPIO's name is scoped to a
+GPIO controller.
+.It
+Exclusive access to the device can be granted by using the
+.Dv O_EXCL
+flag with
+.Xr open 2 .
+If a process has exclusive access, then no one else will be able to open
+the device and read or write to it.
+Similarly, if one or more processes have the device open, a request for
+exclusive access will fail.
+In both cases
+.Er EBUSY
+is returned by the underlying kgpio driver.
+.It
+All other attributes of the underlying GPIO are frozen and cannot be
+manipulated.
+.It
+The DPIO can also be constrained such that it can only be used by the
+kernel and accessible by layered opens through functions such as
+.Xr ldi_open_by_name 9F .
+.El
+.Ss Utilities and Programming Interfaces
+The GPIO and DPIO subsystems are evolving interfaces in the operating
+system.
+To discover controllers, GPIOs, and DPIOs, privileged users can use the
+.Xr gpioadm 8
+utility.
+This allows for getting and setting the attributes of GPIOs as well as
+creating and destroying DPIOs from GPIOs.
+.Pp
+.Xr gpioadm 8
+is implemented in terms of a system internal library called libxpio
+which can be used to manipulate and get information about GPIOs and
+DPIOs.
+This is itself built on-top of private user/kernel interfaces provided by
+the
+.Xr kgpio 4D
+driver.
+.Pp
+The DPIO interface is provided in
+.In sys/gpio/dpio.h .
+All DPIOs show up under
+.Pa /dev/dpio
+in the file system and the character devices support the various
+.Xr read 2
+and
+.Xr write 2
+families of operations.
+Unlike normal files, the DPIO character devices are not seekable.
+Both reads and writes must be exactly 4 bytes in size.
+Reads return the
+.Vt dpio_input_t
+enumeration which currently has two values
+.Pq though more may be added in the future :
+.Bl -tag -width Dv
+.It Dv DPIO_INPUT_LOW
+This indicates that a logical low value was read in from the underlying
+GPIO.
+.It Dv DPIO_INPUT_HIGH
+This indicates that a logical high value was read in from the underlying
+GPIO.
+.El
+.Pp
+It's worth noting that any hardware-specific changes to the input values
+such as polarity inversion control will have already been applied to the
+value.
+The actual thresholds for what constitutes a logic high and low are
+device dependent.
+.Pp
+The write interface uses the
+.Vt dpio_output_t
+enumeration values which are:
+.Bl -tag -width Dv
+.It Dv DPIO_OUTPUT_LOW
+This indicates that a logical low value should be driven on the pin.
+.It Dv DPIO_OUTPUT_HIGH
+This indicates that a logical high value should be driven on the pin.
+.It Dv DPIO_OUTPUT_DISABLED
+Disables the generation of any output.
+This is particularly useful for open-drain based systems.
+.El
+.Pp
+Like with reads, the voltage values are device dependent.
+In addition, someone who has the device open may use the
+.Dv DPIO_IOC_CUROUT
+ioctl to obtain information about what the current output value is set
+to.
+.Pp
+All DPIO interfaces are still evolving and subject to change.
+.Ss I/O Multiplexing
+Many complex SoCs
+.Pq system-on-chip
+have a way of switching what internal peripheral is actually using a
+specific pin.
+This peripheral may be a GPIO or it could be an entirely different
+device like a SPI controller, serial port, I2C, or more.
+At this time, the GPIO subsystem on its own does not manipulate this
+underlying mux and consumers of the platform will need to be aware of
+that.
+In the future, where appropriate for the controller, this subsystem will
+be integrated with this underlying mux to create a more holistic and
+useful experience.
+.Ss GPIO Providers
+GPIO providers are kernel drivers that interface with a hardware GPIO
+controller.
+They expose the attributes, which are passed around as a series of
+.Vt nvlist_t
+.Po
+.Xr libnvpair 3LIB
+.Pc
+structures.
+Attributes are either passed as an nvlist string or uint32 and then each
+attribute also contains optional metadata around the attribute's
+permissions and what values are possible for this particular GPIO.
+Attributes are allowed to vary from GPIO to GPIO.
+libxpio provides logic to translate anything that isn't in a string-form
+into something that is human-readable.
+This was done to allow for providers and programmatic interfaces to work
+in a more natural way
+.Pq e.g. using enumerations and other numeric values
+while still providing consumers something useful to use.
+.Pp
+The core kernel GPIO driver,
+.Xr kgpio 4D ,
+takes care of dealing with the traditional character device interfaces,
+minor nodes, and all of the logic around creating, destroying, and
+managing DPIOs.
+This in turn allows the GPIO provider drivers to be simpler and focus on
+the interface to hardware.
+.Sh SEE ALSO
+.Xr poll 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr port_get 3C ,
+.Xr libnvpair 3LIB ,
+.Xr kgpio 4D ,
+.Xr gpioadm 8 ,
+.Xr ldi_open_by_name 9F

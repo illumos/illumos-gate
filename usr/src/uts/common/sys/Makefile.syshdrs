@@ -51,6 +51,9 @@ fm/io/%.check:	fm/io/%.h
 fs/%.check:	fs/%.h
 	$(DOT_H_CHECK)
 
+gpio/%.check:	gpio/%.h
+	$(DOT_H_CHECK)
+
 ib/%.check:		ib/%.h
 	$(DOT_H_CHECK)
 
@@ -195,6 +198,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/fm/fs	\
 	$(ROOTDIR)/fm/io	\
 	$(ROOTDIR)/fs		\
+	$(ROOTDIR)/gpio		\
 	$(ROOTDIR)/ib		\
 	$(ROOTDIR)/ib/adapters/tavor	\
 	$(ROOTDIR)/ib/adapters/hermon	\
@@ -282,6 +286,7 @@ ROOTFMIOHDRS= $(FMIOHDRS:%=$(ROOTDIR)/fm/io/%)
 ROOTFMFSHDRS= $(FMFSHDRS:%=$(ROOTDIR)/fm/fs/%)
 
 ROOTFSHDRS= $(FSHDRS:%=$(ROOTDIR)/fs/%)
+ROOTGPIOHDRS= $(GPIOHDRS:%=$(ROOTDIR)/gpio/%)
 
 ROOTNVMEHDRS= $(NVMEHDRS:%=$(ROOTDIR)/nvme/%)
 

@@ -192,6 +192,7 @@ COMMON_SUBDIRS=		\
 	getopt		\
 	gettext		\
 	gettxt		\
+	gpioadm		\
 	grep		\
 	groups		\
 	growfs		\

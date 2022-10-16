@@ -391,6 +391,7 @@ usr/src/test/crypto-tests/tests/digest/data/*.rsp
 usr/src/test/crypto-tests/tests/digest/data/README
 usr/src/test/libc-tests/tests/err/data/*
 usr/src/test/libmlrpc-tests/tests/netrlogon/krb5_pac_tests/krb5_pac.bin
+usr/src/test/os-tests/tests/gpio/data/*
 usr/src/test/os-tests/tests/hexdump/data/*
 usr/src/test/os-tests/tests/mac/data/*
 usr/src/test/os-tests/tests/xsave/data/*

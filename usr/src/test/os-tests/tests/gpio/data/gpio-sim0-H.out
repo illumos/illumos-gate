@@ -1,0 +1,6 @@
+gpio_sim0       1v8                 0
+gpio_sim0       3v3                 1
+gpio_sim0       12V                 2
+gpio_sim0       54V                 3
+gpio_sim0       periodic-500ms      4
+gpio_sim0       open-drain          5

@@ -27,7 +27,9 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/gpio_sim group=sys
 file path=kernel/drv/$(ARCH64)/ksensor_test group=sys
+file path=kernel/drv/gpio_sim.conf group=sys
 file path=kernel/drv/ksensor_test.conf group=sys
 dir  path=opt/os-tests
 file path=opt/os-tests/README mode=0444
@@ -77,6 +79,48 @@ file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.64 mode=0555
 file path=opt/os-tests/tests/getcontext_extd.32 mode=0555
 file path=opt/os-tests/tests/getcontext_extd.64 mode=0555
+dir  path=opt/os-tests/tests/gpio
+dir  path=opt/os-tests/tests/gpio/data
+file path=opt/os-tests/tests/gpio/data/attr-g0_0-H.out mode=0444
+file path=opt/os-tests/tests/gpio/data/attr-g0_0-Ho.out mode=0444
+file path=opt/os-tests/tests/gpio/data/attr-g0_0-o.out mode=0444
+file path=opt/os-tests/tests/gpio/data/attr-g0_0-p.out mode=0444
+file path=opt/os-tests/tests/gpio/data/attr-g0_0.out mode=0444
+file path=opt/os-tests/tests/gpio/data/attr-g0_0_filt-p.out mode=0444
+file path=opt/os-tests/tests/gpio/data/attr-g0_0_filt.out mode=0444
+file path=opt/os-tests/tests/gpio/data/ctrl-list-H-sim1.out mode=0444
+file path=opt/os-tests/tests/gpio/data/ctrl-list-H.out mode=0444
+file path=opt/os-tests/tests/gpio/data/ctrl-list-dpio-p.out mode=0444
+file path=opt/os-tests/tests/gpio/data/ctrl-list-p-sim1.out mode=0444
+file path=opt/os-tests/tests/gpio/data/ctrl-list-p.out mode=0444
+file path=opt/os-tests/tests/gpio/data/ctrl-list-sim1.out mode=0444
+file path=opt/os-tests/tests/gpio/data/ctrl-list.out mode=0444
+file path=opt/os-tests/tests/gpio/data/dpio-H.out mode=0444
+file path=opt/os-tests/tests/gpio/data/dpio-Ho.out mode=0444
+file path=opt/os-tests/tests/gpio/data/dpio-o.out mode=0444
+file path=opt/os-tests/tests/gpio/data/dpio-p.out mode=0444
+file path=opt/os-tests/tests/gpio/data/dpio.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-period500-H.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-period500-o.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-period500-p.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-period500.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-sim0-H.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-sim0-o.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-sim0-p.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-sim0.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-sim01-H.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-sim01-o.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-sim01-p.out mode=0444
+file path=opt/os-tests/tests/gpio/data/gpio-sim01.out mode=0444
+file path=opt/os-tests/tests/gpio/dpio_test.32 mode=0555
+file path=opt/os-tests/tests/gpio/dpio_test.64 mode=0555
+file path=opt/os-tests/tests/gpio/gpio_attr.32 mode=0555
+file path=opt/os-tests/tests/gpio/gpio_attr.64 mode=0555
+file path=opt/os-tests/tests/gpio/gpio_fini mode=0555
+file path=opt/os-tests/tests/gpio/gpio_init mode=0555
+file path=opt/os-tests/tests/gpio/gpio_lookup.32 mode=0555
+file path=opt/os-tests/tests/gpio/gpio_lookup.64 mode=0555
+file path=opt/os-tests/tests/gpio/gpioadm_test mode=0555
 dir  path=opt/os-tests/tests/hexdump
 dir  path=opt/os-tests/tests/hexdump/data
 file path=opt/os-tests/tests/hexdump/data/_input mode=0444
@@ -330,6 +374,9 @@ $(i386_ONLY)file path=opt/os-tests/tests/xsave/xsave_baducontext.64 mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/xsave/xsu_hwtype.32 mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/xsave/xsu_hwtype.64 mode=0555
 file path=opt/os-tests/tests/zen_umc_test mode=0555
+dir  path=usr/include/sys
+dir  path=usr/include/sys/gpio
+file path=usr/include/sys/gpio/gpio_sim.h mode=0644
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 depend type=require fmri=developer/dtrace

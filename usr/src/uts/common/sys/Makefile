@@ -884,6 +884,14 @@ FSHDRS=				\
 	zfs.h			\
 	zut.h
 
+GPIOHDRS=			\
+	dpio.h			\
+	gpio_sim.h		\
+	kgpio_attr.h		\
+	kgpio_provider.h	\
+	kgpio.h			\
+	zen_gpio.h
+
 NVMEHDRS=		\
 	discovery.h		\
 	kioxia.h		\
@@ -1182,6 +1190,7 @@ CHECKHDRS=						\
 	$(FMFSHDRS:%.h=fm/fs/%.check)			\
 	$(FMIOHDRS:%.h=fm/io/%.check)			\
 	$(FSHDRS:%.h=fs/%.check)			\
+	$(GPIOHDRS:%.h=gpio/%.check)			\
 	$(NVMEHDRS:%.h=nvme/%.check)			\
 	$(SCSIHDRS:%.h=scsi/%.check)			\
 	$(SCSIADHDRS:%.h=scsi/adapters/%.check)		\
@@ -1235,6 +1244,7 @@ CHECKHDRS=						\
 	$(ROOTFMIOHDRS)		\
 	$(ROOTFMFSHDRS)		\
 	$(ROOTFSHDRS)		\
+	$(ROOTGPIOHDRS)		\
 	$(ROOTIBDHDRS)		\
 	$(ROOTIBHDRS)		\
 	$(ROOTIBTLHDRS)		\
@@ -1306,6 +1316,7 @@ install_h:			\
 	$(ROOTFMFSHDRS)		\
 	$(ROOTFMIOHDRS)		\
 	$(ROOTFSHDRS)		\
+	$(ROOTGPIOHDRS)		\
 	$(ROOTIBDHDRS)		\
 	$(ROOTIBHDRS)		\
 	$(ROOTIBTLHDRS)		\

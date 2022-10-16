@@ -1,0 +1,53 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2022 Oxide Computer Company
+#
+
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/gpio@$(PKGVERS)
+set name=pkg.summary value="GPIO Framework and Utilities"
+set name=pkg.description value="GPIO Framework and Utilities"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+dir  path=kernel/drv group=sys
+dir  path=kernel/drv/$(ARCH64) group=sys
+file path=kernel/drv/$(ARCH64)/kgpio group=sys
+file path=kernel/drv/kgpio.conf group=sys
+dir  path=usr/include
+file path=usr/include/libxpio.h mode=0644
+dir  path=usr/include/sys
+dir  path=usr/include/sys/gpio
+file path=usr/include/sys/gpio/dpio.h mode=0644
+file path=usr/include/sys/gpio/kgpio.h mode=0644
+file path=usr/include/sys/gpio/kgpio_attr.h mode=0644
+file path=usr/include/sys/gpio/kgpio_provider.h mode=0644
+dir  path=usr/lib
+dir  path=usr/lib/$(ARCH64)
+link path=usr/lib/$(ARCH64)/libxpio.so target=./libxpio.so.1
+file path=usr/lib/$(ARCH64)/libxpio.so.1
+dir  path=usr/lib/devfsadm group=sys
+dir  path=usr/lib/devfsadm/linkmod group=sys
+file path=usr/lib/devfsadm/linkmod/SUNW_dpio_link.so group=sys
+link path=usr/lib/libxpio.so target=./libxpio.so.1
+file path=usr/lib/libxpio.so.1
+dir  path=usr/sbin
+file path=usr/sbin/gpioadm mode=0555
+dir  path=usr/share/man
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/kgpio.4d
+dir  path=usr/share/man/man7
+link path=usr/share/man/man7/dpio.7 target=gpio.7
+file path=usr/share/man/man7/gpio.7
+dir  path=usr/share/man/man8
+file path=usr/share/man/man8/gpioadm.8
+driver name=kgpio
+license lic_CDDL license=lic_CDDL
