@@ -55,8 +55,7 @@
 FILE *
 _endopen(const char *name, const char *type, FILE *iop, int largefile)
 {
-	int oflag, fd, fflag, eflag, plusflag, xflag;
-	const char *echr;
+	int oflag, fd, fflag;
 
 	if (iop == NULL)
 		return (NULL);

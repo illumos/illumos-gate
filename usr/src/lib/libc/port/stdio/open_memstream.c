@@ -203,7 +203,6 @@ open_memstream_close(FILE *iop)
 FILE *
 open_memstream(char **bufp, size_t *sizep)
 {
-	int err;
 	FILE *iop;
 	memstream_t *memp;
 
