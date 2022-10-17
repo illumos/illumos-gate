@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -21,6 +21,14 @@
 #include <smbsrv/smb2_kproto.h>
 #include <smbsrv/smb2.h>
 #include <sys/random.h>
+
+/*
+ * Note from [MS-SMB2] Sec. 2.2.3:  Windows servers return
+ * invalid parameter if the dialect count is greater than 64
+ * This is here (and not in smb2.h) because this is technically
+ * an implementation detail, not protocol specification.
+ */
+#define	SMB2_NEGOTIATE_MAX_DIALECTS	64
 
 static int smb2_negotiate_common(smb_request_t *, uint16_t);
 
@@ -83,127 +91,6 @@ static uint16_t smb2_versions[] = {
 static uint16_t smb2_nversions =
     sizeof (smb2_versions) / sizeof (smb2_versions[0]);
 
-static boolean_t
-smb2_supported_version(smb_session_t *s, uint16_t version)
-{
-	int i;
-
-	if (version > s->s_cfg.skc_max_protocol ||
-	    version < s->s_cfg.skc_min_protocol)
-		return (B_FALSE);
-	for (i = 0; i < smb2_nversions; i++)
-		if (version == smb2_versions[i])
-			return (B_TRUE);
-	return (B_FALSE);
-}
-
-/*
- * Helper for the (SMB1) smb_com_negotiate().  This is the
- * very unusual protocol interaction where an SMB1 negotiate
- * gets an SMB2 negotiate response.  This is the normal way
- * clients first find out if the server supports SMB2.
- *
- * Note: This sends an SMB2 reply _itself_ and then returns
- * SDRC_NO_REPLY so the caller will not send an SMB1 reply.
- * Also, this is called directly from the reader thread, so
- * we know this is the only thread using this session.
- *
- * The caller frees this request.
- */
-smb_sdrc_t
-smb1_negotiate_smb2(smb_request_t *sr)
-{
-	smb_session_t *s = sr->session;
-	smb_arg_negotiate_t *negprot = sr->sr_negprot;
-	uint16_t smb2_version;
-
-	/*
-	 * Note: In the SMB1 negotiate command handler, we
-	 * agreed with one of the SMB2 dialects.  If that
-	 * dialect was "SMB 2.002", we'll respond here with
-	 * version 0x202 and negotiation is done.  If that
-	 * dialect was "SMB 2.???", we'll respond here with
-	 * the "wildcard" version 0x2FF, and the client will
-	 * come back with an SMB2 negotiate.
-	 */
-	switch (negprot->ni_dialect) {
-	case DIALECT_SMB2002:	/* SMB 2.002 (a.k.a. SMB2.0) */
-		smb2_version = SMB_VERS_2_002;
-		s->dialect = smb2_version;
-		s->s_state = SMB_SESSION_STATE_NEGOTIATED;
-		/* Allow normal SMB2 requests now. */
-		s->newrq_func = smb2sr_newrq;
-		break;
-	case DIALECT_SMB2XXX:	/* SMB 2.??? (wildcard vers) */
-		/*
-		 * Expecting an SMB2 negotiate next, so keep the
-		 * initial s->newrq_func.
-		 */
-		smb2_version = 0x2FF;
-		break;
-	default:
-		return (SDRC_DROP_VC);
-	}
-
-	/*
-	 * We did not decode an SMB2 header, so make sure
-	 * the SMB2 header fields are initialized.
-	 * (Most are zero from smb_request_alloc.)
-	 * Also, the SMB1 common dispatch code reserved space
-	 * for an SMB1 header, which we need to undo here.
-	 */
-	sr->smb2_reply_hdr = sr->reply.chain_offset = 0;
-	sr->smb2_cmd_code = SMB2_NEGOTIATE;
-	sr->smb2_hdr_flags = SMB2_FLAGS_SERVER_TO_REDIR;
-
-	(void) smb2_encode_header(sr, B_FALSE);
-	if (smb2_negotiate_common(sr, smb2_version) != 0)
-		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
-	if (sr->smb2_status != 0)
-		smb2sr_put_error(sr, sr->smb2_status);
-	(void) smb2_encode_header(sr, B_TRUE);
-
-	smb2_send_reply(sr);
-
-	/*
-	 * We sent the reply, so tell the SMB1 dispatch
-	 * it should NOT (also) send a reply.
-	 */
-	return (SDRC_NO_REPLY);
-}
-
-static uint16_t
-smb2_find_best_dialect(smb_session_t *s, uint16_t cl_versions[],
-    uint16_t version_cnt)
-{
-	uint16_t best_version = 0;
-	int i;
-
-	for (i = 0; i < version_cnt; i++)
-		if (smb2_supported_version(s, cl_versions[i]) &&
-		    best_version < cl_versions[i])
-			best_version = cl_versions[i];
-
-	return (best_version);
-}
-
-/*
- * SMB2 Negotiate gets special handling.  This is called directly by
- * the reader thread (see smbsr_newrq_initial) with what _should_ be
- * an SMB2 Negotiate.  Only the "\feSMB" header has been checked
- * when this is called, so this needs to check the SMB command,
- * if it's Negotiate execute it, then send the reply, etc.
- *
- * Since this is called directly from the reader thread, we
- * know this is the only thread currently using this session.
- * This has to duplicate some of what smb2sr_work does as a
- * result of bypassing the normal dispatch mechanism.
- *
- * The caller always frees this request.
- *
- * Return value is 0 for success, and anything else will
- * terminate the reader thread (drop the connection).
- */
 enum smb2_neg_ctx_type {
 	SMB2_PREAUTH_INTEGRITY_CAPS		= 1,
 	SMB2_ENCRYPTION_CAPS			= 2,
@@ -272,6 +159,44 @@ typedef struct smb2_neg_ctxs {
 #define	SMB3_CIPHER_ENABLED(c, f)	((c) <= SMB3_CIPHER_MAX && \
     SMB3_CIPHER_BIT(c) & (f))
 
+typedef struct smb2_arg_negotiate {
+	struct smb2_neg_ctxs	neg_in_ctxs;
+	struct smb2_neg_ctxs	neg_out_ctxs;
+	uint16_t		neg_dialect_cnt;
+	uint16_t		neg_dialects[SMB2_NEGOTIATE_MAX_DIALECTS];
+	uint16_t		neg_highest_dialect;
+} smb2_arg_negotiate_t;
+
+
+static boolean_t
+smb2_supported_version(smb_session_t *s, uint16_t version)
+{
+	int i;
+
+	if (version > s->s_cfg.skc_max_protocol ||
+	    version < s->s_cfg.skc_min_protocol)
+		return (B_FALSE);
+	for (i = 0; i < smb2_nversions; i++)
+		if (version == smb2_versions[i])
+			return (B_TRUE);
+	return (B_FALSE);
+}
+
+static uint16_t
+smb2_find_best_dialect(smb_session_t *s, uint16_t cl_versions[],
+    uint16_t version_cnt)
+{
+	uint16_t best_version = 0;
+	int i;
+
+	for (i = 0; i < version_cnt; i++)
+		if (smb2_supported_version(s, cl_versions[i]) &&
+		    best_version < cl_versions[i])
+			best_version = cl_versions[i];
+
+	return (best_version);
+}
+
 /*
  * This function should be called only for dialect >= 0x311
  * Negotiate context list should contain exactly one
@@ -281,9 +206,11 @@ typedef struct smb2_neg_ctxs {
  * Otehrwise STATUS_SMB_NO_PREAUTH_INEGRITY_HASH_OVERLAP.
  */
 static uint32_t
-smb31_decode_neg_ctxs(smb_request_t *sr, smb2_neg_ctxs_t *neg_ctxs)
+smb31_decode_neg_ctxs(smb_request_t *sr)
 {
 	smb_session_t *s = sr->session;
+	smb2_arg_negotiate_t *nego = sr->arg.other;
+	smb2_neg_ctxs_t *neg_ctxs = &nego->neg_in_ctxs;
 	smb2_preauth_caps_t *picap = &neg_ctxs->preauth_ctx.preauth_caps;
 	smb2_encrypt_caps_t *encap = &neg_ctxs->encrypt_ctx.encrypt_caps;
 	boolean_t found_sha512 = B_FALSE;
@@ -296,15 +223,6 @@ smb31_decode_neg_ctxs(smb_request_t *sr, smb2_neg_ctxs_t *neg_ctxs)
 	int cnt, i;
 	int rc;
 
-	sr->command.chain_offset = NEG_CTX_INFO_OFFSET;
-
-	rc = smb_mbc_decodef(&sr->command, "lw2.",
-	    &neg_ctxs->offset,	/* l */
-	    &neg_ctxs->count);	/* w */
-	if (rc != 0) {
-		status = NT_STATUS_INVALID_PARAMETER;
-		goto errout;
-	}
 	/*
 	 * There should be exactly 1 SMB2_PREAUTH_INTEGRITY_CAPS negotiate ctx.
 	 * SMB2_ENCRYPTION_CAPS is optional one.
@@ -497,9 +415,11 @@ errout:
 }
 
 static int
-smb31_encode_neg_ctxs(smb_request_t *sr, smb2_neg_ctxs_t *neg_ctxs)
+smb31_encode_neg_ctxs(smb_request_t *sr)
 {
 	smb_session_t *s = sr->session;
+	smb2_arg_negotiate_t *nego = sr->arg.other;
+	smb2_neg_ctxs_t *neg_ctxs = &nego->neg_out_ctxs;
 	smb2_preauth_caps_t *picap = &neg_ctxs->preauth_ctx.preauth_caps;
 	smb2_encrypt_caps_t *encap = &neg_ctxs->encrypt_ctx.encrypt_caps;
 	uint16_t salt_len = sizeof (picap->picap_salt);
@@ -561,20 +481,121 @@ smb31_encode_neg_ctxs(smb_request_t *sr, smb2_neg_ctxs_t *neg_ctxs)
 	return (rc);
 }
 
+/*
+ * Helper for the (SMB1) smb_com_negotiate().  This is the
+ * very unusual protocol interaction where an SMB1 negotiate
+ * gets an SMB2 negotiate response.  This is the normal way
+ * clients first find out if the server supports SMB2.
+ *
+ * Note: This sends an SMB2 reply _itself_ and then returns
+ * SDRC_NO_REPLY so the caller will not send an SMB1 reply.
+ * Also, this is called directly from the reader thread, so
+ * we know this is the only thread using this session.
+ * Otherwise, this is similar to smb2_newrq_negotiate().
+ *
+ * The caller frees this request.
+ */
+smb_sdrc_t
+smb1_negotiate_smb2(smb_request_t *sr)
+{
+	smb_session_t *s = sr->session;
+	smb_arg_negotiate_t *negprot = sr->sr_negprot;
+	uint16_t smb2_version;
+
+	/*
+	 * Note: In the SMB1 negotiate command handler, we
+	 * agreed with one of the SMB2 dialects.  If that
+	 * dialect was "SMB 2.002", we'll respond here with
+	 * version 0x202 and negotiation is done.  If that
+	 * dialect was "SMB 2.???", we'll respond here with
+	 * the "wildcard" version 0x2FF, and the client will
+	 * come back with an SMB2 negotiate.
+	 */
+	switch (negprot->ni_dialect) {
+	case DIALECT_SMB2002:	/* SMB 2.002 (a.k.a. SMB2.0) */
+		smb2_version = SMB_VERS_2_002;
+		s->dialect = smb2_version;
+		s->s_state = SMB_SESSION_STATE_NEGOTIATED;
+		/* Allow normal SMB2 requests now. */
+		s->newrq_func = smb2sr_newrq;
+		break;
+	case DIALECT_SMB2XXX:	/* SMB 2.??? (wildcard vers) */
+		/*
+		 * Expecting an SMB2 negotiate next, so keep the
+		 * initial s->newrq_func.
+		 */
+		smb2_version = 0x2FF;
+		break;
+	default:
+		return (SDRC_DROP_VC);
+	}
+
+	/*
+	 * We did not decode an SMB2 header, so make sure
+	 * the SMB2 header fields are initialized.
+	 * (Most are zero from smb_request_alloc.)
+	 * Also, the SMB1 common dispatch code reserved space
+	 * for an SMB1 header, which we need to undo here.
+	 */
+	sr->smb2_reply_hdr = sr->reply.chain_offset = 0;
+	sr->smb2_cmd_code = SMB2_NEGOTIATE;
+	sr->smb2_hdr_flags = SMB2_FLAGS_SERVER_TO_REDIR;
+
+	/*
+	 * Also setup SMB2 negotiate args (empty here).
+	 * SMB1 args free'd by smb_srm_fini(sr)
+	 */
+	sr->arg.other = smb_srm_zalloc(sr, sizeof (smb2_arg_negotiate_t));
+
+	(void) smb2_encode_header(sr, B_FALSE);
+	if (smb2_negotiate_common(sr, smb2_version) != 0)
+		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
+	if (sr->smb2_status != 0)
+		smb2sr_put_error(sr, sr->smb2_status);
+	(void) smb2_encode_header(sr, B_TRUE);
+
+	smb2_send_reply(sr);
+
+	/*
+	 * We sent the reply, so tell the SMB1 dispatch
+	 * it should NOT (also) send a reply.
+	 */
+	return (SDRC_NO_REPLY);
+}
+
+/*
+ * SMB2 Negotiate gets special handling.  This is called directly by
+ * the reader thread (see smbsr_newrq_initial) with what _should_ be
+ * an SMB2 Negotiate.  Only the "\feSMB" header has been checked
+ * when this is called, so this needs to check the SMB command,
+ * if it's Negotiate execute it, then send the reply, etc.
+ *
+ * Since this is called directly from the reader thread, we
+ * know this is the only thread currently using this session.
+ * This has to duplicate some of what smb2sr_work does as a
+ * result of bypassing the normal dispatch mechanism.
+ *
+ * The caller always frees this request.
+ *
+ * Return value is 0 for success, and anything else will
+ * terminate the reader thread (drop the connection).
+ */
 int
 smb2_newrq_negotiate(smb_request_t *sr)
 {
 	smb_session_t *s = sr->session;
-	smb2_neg_ctxs_t neg_in_ctxs;
-	smb2_neg_ctxs_t neg_out_ctxs;
-	smb2_arg_negotiate_t *nego2 = &sr->sr_nego2;
+	smb2_arg_negotiate_t *nego;
 	int rc;
+	uint32_t nctx_status = 0;
 	uint32_t status = 0;
+	uint32_t neg_ctx_off;
+	uint16_t neg_ctx_cnt;
 	uint16_t struct_size;
+	uint16_t dialect_cnt;
 	uint16_t best_version;
 
-	bzero(&neg_in_ctxs, sizeof (neg_in_ctxs));
-	bzero(&neg_out_ctxs, sizeof (neg_out_ctxs));
+	nego = smb_srm_zalloc(sr, sizeof (smb2_arg_negotiate_t));
+	sr->arg.other = nego;	// for dtrace
 
 	sr->smb2_cmd_hdr = sr->command.chain_offset;
 	rc = smb2_decode_header(sr);
@@ -592,14 +613,16 @@ smb2_newrq_negotiate(smb_request_t *sr)
 	 * Decode SMB2 Negotiate (fixed-size part)
 	 */
 	rc = smb_mbc_decodef(
-	    &sr->command, "www..l16c8.",
+	    &sr->command, "www..l16clw..",
 	    &struct_size,	/* w */
-	    &s->cli_dialect_cnt,	/* w */
+	    &dialect_cnt,	/* w */
 	    &s->cli_secmode,	/* w */
 	    /* reserved		(..) */
 	    &s->capabilities,	/* l */
-	    s->clnt_uuid);	/* 16c */
-	    /* start_time	  8. */
+	    s->clnt_uuid,	/* 16c */
+	    &neg_ctx_off,	/* l */
+	    &neg_ctx_cnt);	/* w */
+	    /* reserverd	(..) */
 	if (rc != 0)
 		return (rc);
 	if (struct_size != 36)
@@ -611,56 +634,40 @@ smb2_newrq_negotiate(smb_request_t *sr)
 	 * Be somewhat tolerant while decoding the variable part
 	 * so we can return errors instead of dropping the client.
 	 * Will limit decoding to the size of cli_dialects here,
-	 * and do the error checks on s->cli_dialect_cnt after the
+	 * and do error checks on the decoded dialect_cnt after the
 	 * dtrace start probe.
 	 */
-	if (s->cli_dialect_cnt > 0 &&
-	    s->cli_dialect_cnt <= SMB2_NEGOTIATE_MAX_DIALECTS &&
-	    smb_mbc_decodef(&sr->command, "#w", s->cli_dialect_cnt,
-	    s->cli_dialects) != 0) {
-		/* decode error; force an error below */
-		s->cli_dialect_cnt = 0;
+	if (dialect_cnt > SMB2_NEGOTIATE_MAX_DIALECTS)
+		nego->neg_dialect_cnt = SMB2_NEGOTIATE_MAX_DIALECTS;
+	else
+		nego->neg_dialect_cnt = dialect_cnt;
+	if (nego->neg_dialect_cnt > 0) {
+		rc = smb_mbc_decodef(&sr->command, "#w",
+		    nego->neg_dialect_cnt,
+		    nego->neg_dialects);
+		if (rc != 0)
+			return (rc);	// short msg
 	}
 
-	/*
-	 * [MS-SMB2] 3.3.5.4 Receiving an SMB2 NEGOTIATE Request
-	 * "If the DialectCount of the SMB2 NEGOTIATE Request is 0, the
-	 * server MUST fail the request with STATUS_INVALID_PARAMETER."
-	 */
-	if (s->cli_dialect_cnt == 0 ||
-	    s->cli_dialect_cnt > SMB2_NEGOTIATE_MAX_DIALECTS) {
-		status = NT_STATUS_INVALID_PARAMETER;
-	}
+	best_version = smb2_find_best_dialect(s, nego->neg_dialects,
+	    nego->neg_dialect_cnt);
 
-	/*
-	 * The client offers an array of protocol versions it
-	 * supports, which we have decoded into s->cli_dialects[].
-	 * We walk the array and pick the highest supported.
-	 *
-	 * [MS-SMB2] 3.3.5.4 Receiving an SMB2 NEGOTIATE Request
-	 * "If a common dialect is not found, the server MUST fail
-	 * the request with STATUS_NOT_SUPPORTED."
-	 */
-
-	if (status == 0) {
-		best_version = smb2_find_best_dialect(s, s->cli_dialects,
-		    s->cli_dialect_cnt);
-		if (best_version >= SMB_VERS_3_11) {
-			status = smb31_decode_neg_ctxs(sr, &neg_in_ctxs);
-			nego2->neg_in_ctxs = &neg_in_ctxs;
-		} else if (best_version == 0) {
-			status = NT_STATUS_NOT_SUPPORTED;
-		}
+	if (best_version >= SMB_VERS_3_11) {
+		nego->neg_in_ctxs.offset = neg_ctx_off;
+		nego->neg_in_ctxs.count  = neg_ctx_cnt;
+		nctx_status = smb31_decode_neg_ctxs(sr);
+		/* check nctx_status below */
 	}
 
 	DTRACE_SMB2_START(op__Negotiate, smb_request_t *, sr);
-	nego2->neg_in_ctxs = NULL;
 
+	sr->smb2_credit_response = 1;
 	sr->smb2_hdr_flags |= SMB2_FLAGS_SERVER_TO_REDIR;
 	(void) smb2_encode_header(sr, B_FALSE);
 
-	if (status != 0)
-		goto errout;
+	/*
+	 * NOW start validating things (NOT before here)
+	 */
 
 	/*
 	 * [MS-SMB2] 3.3.5.2.4 Verifying the Signature
@@ -674,9 +681,41 @@ smb2_newrq_negotiate(smb_request_t *sr)
 		goto errout;
 	}
 
-	s->dialect = best_version;
+	/*
+	 * [MS-SMB2] 3.3.5.4 Receiving an SMB2 NEGOTIATE Request
+	 * "If the DialectCount of the SMB2 NEGOTIATE Request is 0, the
+	 * server MUST fail the request with STATUS_INVALID_PARAMETER."
+	 * Checking the decoded value here, not the constrained one.
+	 */
+	if (dialect_cnt == 0 ||
+	    dialect_cnt > SMB2_NEGOTIATE_MAX_DIALECTS) {
+		status = NT_STATUS_INVALID_PARAMETER;
+		goto errout;
+	}
+
+	/*
+	 * We decoded the offered dialects above, and
+	 * determined which was the highest we support.
+	 *
+	 * [MS-SMB2] 3.3.5.4 Receiving an SMB2 NEGOTIATE Request
+	 * "If a common dialect is not found, the server MUST fail
+	 * the request with STATUS_NOT_SUPPORTED."
+	 */
+	if (best_version == 0) {
+		status = NT_STATUS_NOT_SUPPORTED;
+		goto errout;
+	}
+
+	/*
+	 * Check for problems with the negotiate contexts.
+	 */
+	if (nctx_status != 0) {
+		status = nctx_status;
+		goto errout;
+	}
 
 	/* Allow normal SMB2 requests now. */
+	s->dialect = best_version;
 	s->s_state = SMB_SESSION_STATE_NEGOTIATED;
 	s->newrq_func = smb2sr_newrq;
 
@@ -684,15 +723,13 @@ smb2_newrq_negotiate(smb_request_t *sr)
 		status = NT_STATUS_INTERNAL_ERROR;
 
 	if (s->dialect >= SMB_VERS_3_11 && status == 0) {
-		if (smb31_encode_neg_ctxs(sr, &neg_out_ctxs) != 0)
+		if (smb31_encode_neg_ctxs(sr) != 0)
 			status = NT_STATUS_INTERNAL_ERROR;
-		nego2->neg_out_ctxs = &neg_out_ctxs;
 	}
 
 errout:
 	sr->smb2_status = status;
 	DTRACE_SMB2_DONE(op__Negotiate, smb_request_t *, sr);
-	nego2->neg_out_ctxs = NULL;
 
 	if (sr->smb2_status != 0)
 		smb2sr_put_error(sr, sr->smb2_status);
@@ -869,7 +906,6 @@ uint32_t
 smb2_nego_validate(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
 	smb_session_t *s = sr->session;
-	boolean_t smb311 = s->s_cfg.skc_max_protocol >= SMB_VERS_3_11;
 	int rc;
 
 	/*
@@ -911,8 +947,6 @@ smb2_nego_validate(smb_request_t *sr, smb_fsctl_t *fsctl)
 
 	if (num_dialects == 0 || num_dialects > SMB2_NEGOTIATE_MAX_DIALECTS)
 		goto drop;
-	if (smb311 && num_dialects != s->cli_dialect_cnt)
-		goto drop;
 	if (secmode != s->cli_secmode)
 		goto drop;
 	if (capabilities != s->capabilities)
@@ -920,23 +954,17 @@ smb2_nego_validate(smb_request_t *sr, smb_fsctl_t *fsctl)
 	if (memcmp(clnt_guid, s->clnt_uuid, sizeof (clnt_guid)) != 0)
 		goto drop;
 
-	if (fsctl->InputCount < (24 + num_dialects * sizeof (*dialects)))
-		goto drop;
-
 	rc = smb_mbc_decodef(fsctl->in_mbc, "#w", num_dialects, dialects);
 	if (rc != 0)
 		goto drop;
 
-	if (smb311) {
-		for (int i = 0; i < num_dialects; i++) {
-			if (dialects[i] != s->cli_dialects[i])
-				goto drop;
-		}
-	} else {
-		if (smb2_find_best_dialect(s, dialects, num_dialects) !=
-		    s->dialect)
-			goto drop;
-	}
+	/*
+	 * MS-SMB2 says we should compare the dialects array with the
+	 * one sent previously, but that appears to be unnecessary
+	 * as long as we end up with the same dialect.
+	 */
+	if (smb2_find_best_dialect(s, dialects, num_dialects) != s->dialect)
+		goto drop;
 
 	rc = smb_mbc_encodef(
 	    fsctl->out_mbc, "l#cww",
