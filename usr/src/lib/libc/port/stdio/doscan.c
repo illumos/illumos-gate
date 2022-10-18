@@ -84,10 +84,10 @@ static int readchar(FILE *, int *);
 static int string(int *, int *, int, int, int, char *, FILE *, va_list *);
 static int wstring(int *, int *, int, int, int, FILE *, va_list *);
 static int	wbrstring(int *, int *, int, int, int, FILE *,
-	unsigned char *, va_list *);
+    unsigned char *, va_list *);
 #ifdef	_WIDE
 static int	brstring(int *, int *, int, int, int, FILE *,
-	unsigned char *, va_list *);
+    unsigned char *, va_list *);
 #endif
 static int _bi_getwc(FILE *);
 static int _bi_ungetwc(wint_t, FILE *);
@@ -122,10 +122,11 @@ _doscan(FILE *iop, const char *fmt, va_list va_Alist)
 /* ARGSUSED3 */
 #ifdef	_WIDE
 int
-__wdoscan_u(FILE *iop, const wchar_t *fmt, va_list va_Alist, int scflag)
+__wdoscan_u(FILE *iop, const wchar_t *fmt, va_list va_Alist,
+    int scflag __unused)
 #else  /* _WIDE */
 int
-__doscan_u(FILE *iop, const char *sfmt, va_list va_Alist, int scflag)
+__doscan_u(FILE *iop, const char *sfmt, va_list va_Alist, int scflag __unused)
 #endif /* _WIDE */
 {
 #ifdef	_WIDE
@@ -840,8 +841,8 @@ readchar(FILE *iop, int *chcount)
 }
 
 static int
-string(int *chcount, int *flag_eof, int stow, int type, int len, char *tab,
-    FILE *iop, va_list *listp)
+string(int *chcount, int *flag_eof, int stow, int type, int len,
+    char *tab __unused, FILE *iop, va_list *listp)
 {
 	int	ch;
 	char	*ptr;
@@ -1115,9 +1116,8 @@ _watoi(wchar_t *fmt)
 }
 #endif /* _WIDE */
 
-/* ARGSUSED3 */
 static int
-wbrstring(int *chcount, int *flag_eof, int stow, int type,
+wbrstring(int *chcount, int *flag_eof, int stow, int type __unused,
     int len, FILE *iop, unsigned char *brstr, va_list *listp)
 {
 	wint_t	wch;
@@ -1181,7 +1181,7 @@ wbrstring(int *chcount, int *flag_eof, int stow, int type,
 
 #ifdef	_WIDE
 static int
-brstring(int *chcount, int *flag_eof, int stow, int type,
+brstring(int *chcount, int *flag_eof, int stow, int type __unused,
     int len, FILE *iop, unsigned char *brstr, va_list *listp)
 {
 	wint_t	wch;

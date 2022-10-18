@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "priv_private.h"
 #include "mtlib.h"
@@ -56,10 +54,9 @@ typedef struct klpd_ctxt {
 	int		kc_type;
 } klpd_ctxt_t;
 
-/* ARGSUSED */
 static void
-klpd_door_callback(void *kd_cookie, char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t ndesc)
+klpd_door_callback(void *kd_cookie, char *argp, size_t arg_size __unused,
+    door_desc_t *dp __unused, uint_t ndesc __unused)
 {
 	klpd_data_t *p = kd_cookie;
 	int res;
@@ -210,9 +207,8 @@ klpd_getport(void *context, int *proto)
 	return (p->kc_int);
 }
 
-/*ARGSUSED*/
 int
-klpd_getucred(ucred_t **uc, void *context)
+klpd_getucred(ucred_t **uc, void *context __unused)
 {
 	return (door_ucred(uc));
 }

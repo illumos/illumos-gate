@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include "asyncio.h"
@@ -495,9 +493,8 @@ aiocancel(aio_result_t *resultp)
 	return (ret);
 }
 
-/* ARGSUSED */
 static void
-_aiowait_cleanup(void *arg)
+_aiowait_cleanup(void *arg __unused)
 {
 	sig_mutex_lock(&__aio_mutex);
 	_aiowait_flag--;
@@ -974,7 +971,7 @@ _aio_create_worker(aio_req_t *reqp, int mode)
  * b) request is in progress (AIO_REQ_INPROGRESS) :
  *	- this function first allow the cancellation of the running
  *	  request with the flag "work_cancel_flg=1"
- * 		see _aio_req_get() -> _aio_cancel_on()
+ *		see _aio_req_get() -> _aio_cancel_on()
  *	  During this phase, it is allowed to interrupt the worker
  *	  thread running the request (this thread) using the SIGAIOCANCEL
  *	  signal.

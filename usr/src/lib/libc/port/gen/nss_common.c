@@ -249,14 +249,14 @@ static struct option nis_options[] = {
  */
 
 typedef struct nss_cfgparam {
-	char 		*name;
+	char		*name;
 	mutex_t		*lock;
 	void		*buffer;
 	size_t		length;
 } nss_cfgparam_t;
 
 typedef struct nss_cfglist {
-	char 		*name;
+	char		*name;
 	nss_cfgparam_t	*list;
 	int		count;
 	int		max;
@@ -562,7 +562,7 @@ nss_status_t
 nss_config(nss_config_t **plist, int cnt)
 {
 	nss_config_t	*next;
-	int 	i;
+	int	i;
 
 	/* interface is only available to nscd */
 	if (_nsc_proc_is_cache() <= 0) {
@@ -973,7 +973,6 @@ _nss_src_state_destr(struct nss_src_state *src, int max_dormant)
 void
 _nss_db_state_destr(struct nss_db_state *s)
 {
-
 	if (s == NULL)
 		return;
 
@@ -1282,16 +1281,10 @@ struct nss_getent_context {
 	nss_db_params_t		param;
 };
 
-static void		nss_setent_u(nss_db_root_t *,
-				    nss_db_initf_t,
-				    nss_getent_t *);
-static nss_status_t	nss_getent_u(nss_db_root_t *,
-				    nss_db_initf_t,
-				    nss_getent_t *,
-				    void *);
-static void		nss_endent_u(nss_db_root_t *,
-				    nss_db_initf_t,
-				    nss_getent_t *);
+static void nss_setent_u(nss_db_root_t *, nss_db_initf_t, nss_getent_t *);
+static nss_status_t nss_getent_u(nss_db_root_t *, nss_db_initf_t,
+    nss_getent_t *, void *);
+static void nss_endent_u(nss_db_root_t *, nss_db_initf_t, nss_getent_t *);
 
 void
 nss_setent(nss_db_root_t *rootp, nss_db_initf_t initf, nss_getent_t *contextpp)
@@ -1647,9 +1640,8 @@ nss_pack_dbd(void *buffer, size_t bufsize, nss_db_params_t *p, size_t *poff)
  * Return: NSS_SUCCESS (OK to proceed), NSS_ERROR, NSS_NOTFOUND
  */
 
-/*ARGSUSED*/
 nss_status_t
-nss_pack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
+nss_pack(void *buffer, size_t bufsize, nss_db_root_t *rootp __unused,
     nss_db_initf_t initf, int search_fnum, void *search_args)
 {
 	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
@@ -1755,9 +1747,8 @@ nss_pack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
  * Return: NSS_SUCCESS (OK to proceed), NSS_ERROR, NSS_NOTFOUND
  */
 
-/*ARGSUSED*/
 nss_status_t
-nss_pack_ent(void *buffer, size_t bufsize, nss_db_root_t *rootp,
+nss_pack_ent(void *buffer, size_t bufsize, nss_db_root_t *rootp __unused,
     nss_db_initf_t initf, nss_getent_t *contextpp)
 {
 	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
@@ -1829,10 +1820,9 @@ nss_pack_ent(void *buffer, size_t bufsize, nss_db_root_t *rootp,
  * quantities.  Store in an int array... Assume gid's are <= 32 bits...
  */
 
-/*ARGSUSED*/
 nss_status_t
-nss_unpack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
-    nss_db_initf_t initf, int search_fnum, void *search_args)
+nss_unpack(void *buffer, size_t bufsize __unused, nss_db_root_t *rootp __unused,
+    nss_db_initf_t initf __unused, int search_fnum, void *search_args)
 {
 	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
 	nss_XbyY_args_t		*in = (nss_XbyY_args_t *)search_args;
@@ -1930,10 +1920,10 @@ nss_unpack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
  * Return: status, errnos, cookie info and results from requested operation.
  */
 
-/*ARGSUSED*/
 nss_status_t
-nss_unpack_ent(void *buffer, size_t bufsize, nss_db_root_t *rootp,
-    nss_db_initf_t initf, nss_getent_t *contextpp, void *args)
+nss_unpack_ent(void *buffer, size_t bufsize __unused,
+    nss_db_root_t *rootp __unused, nss_db_initf_t initf __unused,
+    nss_getent_t *contextpp, void *args)
 {
 	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
 	nss_XbyY_args_t		*in = (nss_XbyY_args_t *)args;

@@ -120,18 +120,18 @@ _lio_listio_cleanup(aio_lio_t *head)
 
 int
 lio_listio(int mode, aiocb_t *_RESTRICT_KYWD const *_RESTRICT_KYWD list,
-	int nent, struct sigevent *_RESTRICT_KYWD sigevp)
+    int nent, struct sigevent *_RESTRICT_KYWD sigevp)
 {
-	int 		aio_ufs = 0;
-	int 		oerrno = 0;
+	int		aio_ufs = 0;
+	int		oerrno = 0;
 	aio_lio_t	*head = NULL;
 	aiocb_t		*aiocbp;
 	int		state = 0;
-	int 		EIOflg = 0;
-	int 		rw;
+	int		EIOflg = 0;
+	int		rw;
 	int		do_kaio = 0;
-	int 		error;
-	int 		i;
+	int		error;
+	int		i;
 
 	if (!_kaio_ok)
 		_kaio_init();
@@ -815,8 +815,8 @@ aio_fsync(int op, aiocb_t *aiocbp)
 
 	/*
 	 * re-use aio_offset as the op field.
-	 * 	O_DSYNC - fdatasync()
-	 * 	O_SYNC - fsync()
+	 *	O_DSYNC - fdatasync()
+	 *	O_SYNC - fsync()
 	 */
 	aiocbp->aio_offset = op;
 	aiocbp->aio_lio_opcode = AIOFSYNC;
@@ -902,9 +902,8 @@ aio_cancel(int fd, aiocb_t *aiocbp)
 /*
  * __aio_waitn() cancellation handler.
  */
-/* ARGSUSED */
 static void
-_aio_waitn_cleanup(void *arg)
+_aio_waitn_cleanup(void *arg __unused)
 {
 	ASSERT(MUTEX_HELD(&__aio_mutex));
 
@@ -1198,7 +1197,7 @@ out:
 
 int
 aio_waitn(aiocb_t *list[], uint_t nent, uint_t *nwait,
-	const timespec_t *timeout)
+    const timespec_t *timeout)
 {
 	return (__aio_waitn((void **)list, nent, nwait, timeout));
 }
@@ -1243,8 +1242,8 @@ _aio_waitn_wakeup(void)
 
 /*
  * timedwait values :
- * AIO_TIMEOUT_POLL 	: polling
- * AIO_TIMEOUT_WAIT 	: timeout
+ * AIO_TIMEOUT_POLL	: polling
+ * AIO_TIMEOUT_WAIT	: timeout
  * AIO_TIMEOUT_INDEF	: wait indefinitely
  */
 static int
@@ -1317,18 +1316,18 @@ aio_write64(aiocb64_t *aiocbp)
 
 int
 lio_listio64(int mode, aiocb64_t *_RESTRICT_KYWD const *_RESTRICT_KYWD list,
-	int nent, struct sigevent *_RESTRICT_KYWD sigevp)
+    int nent, struct sigevent *_RESTRICT_KYWD sigevp)
 {
-	int 		aio_ufs = 0;
-	int 		oerrno = 0;
+	int		aio_ufs = 0;
+	int		oerrno = 0;
 	aio_lio_t	*head = NULL;
 	aiocb64_t	*aiocbp;
 	int		state = 0;
-	int 		EIOflg = 0;
-	int 		rw;
+	int		EIOflg = 0;
+	int		rw;
 	int		do_kaio = 0;
-	int 		error;
-	int 		i;
+	int		error;
+	int		i;
 
 	if (!_kaio_ok)
 		_kaio_init();
@@ -1673,8 +1672,8 @@ aio_fsync64(int op, aiocb64_t *aiocbp)
 
 	/*
 	 * re-use aio_offset as the op field.
-	 * 	O_DSYNC - fdatasync()
-	 * 	O_SYNC - fsync()
+	 *	O_DSYNC - fdatasync()
+	 *	O_SYNC - fsync()
 	 */
 	aiocbp->aio_offset = op;
 	aiocbp->aio_lio_opcode = AIOFSYNC;
@@ -1759,7 +1758,7 @@ aio_cancel64(int fd, aiocb64_t *aiocbp)
 
 int
 aio_waitn64(aiocb64_t *list[], uint_t nent, uint_t *nwait,
-	const timespec_t *timeout)
+    const timespec_t *timeout)
 {
 	return (__aio_waitn((void **)list, nent, nwait, timeout));
 }

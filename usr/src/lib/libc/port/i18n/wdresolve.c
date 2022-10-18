@@ -164,7 +164,6 @@ wdchkind_C(wchar_t wc)
  *  strength of two characters represented by the first two arguments.
  * It returns -1 when either of the two character is not printable.
  */
-/*ARGSUSED*/
 int
 wdbindf(wchar_t wc1, wchar_t wc2, int type)
 {
@@ -181,9 +180,9 @@ wdbindf(wchar_t wc1, wchar_t wc2, int type)
 	callout_lock_exit();
 	return (i);
 }
-/*ARGSUSED*/
+
 static int
-wdbindf_C(wchar_t wc1, wchar_t wc2, int type)
+wdbindf_C(wchar_t wc1, wchar_t wc2, int type __unused)
 {
 	if (csetlen(wc1) > 1 && csetlen(wc2) > 1)
 		return (4);
@@ -197,7 +196,6 @@ wdbindf_C(wchar_t wc1, wchar_t wc2, int type)
  * with the second argument, with.  When either of the two character
  * is not printable it returns a pointer to a null wide character.
  */
-/*ARGSUSED*/
 wchar_t *
 wddelim(wchar_t wc1, wchar_t wc2, int type)
 {
@@ -214,9 +212,9 @@ wddelim(wchar_t wc1, wchar_t wc2, int type)
 	callout_lock_exit();
 	return (i);
 }
-/*ARGSUSED*/
+
 static wchar_t *
-wddelim_C(wchar_t wc1, wchar_t wc2, int type)
+wddelim_C(wchar_t wc1 __unused, wchar_t wc2 __unused, int type __unused)
 {
 	return ((wchar_t *)L" ");
 }

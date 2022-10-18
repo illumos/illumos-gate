@@ -458,9 +458,8 @@ name:		t = sp->fts_path + NAPPEND(p->fts_parent);
  * semantics to fts using fts_set.  An error return is allowed for similar
  * reasons.
  */
-/*ARGSUSED*/
 int
-fts_set(FTS *sp, FTSENT *p, int instr)
+fts_set(FTS *sp __unused, FTSENT *p, int instr)
 {
 	if (instr && instr != FTS_AGAIN && instr != FTS_FOLLOW &&
 	    instr != FTS_NOINSTR && instr != FTS_SKIP) {

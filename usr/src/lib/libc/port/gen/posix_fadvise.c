@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include <fcntl.h>
 #include <sys/types.h>
@@ -44,9 +42,8 @@
  * the kernel to optimize I/O operations based on the given advice.
  */
 
-/* ARGSUSED1 */
 int
-posix_fadvise(int fd, off_t offset, off_t len, int advice)
+posix_fadvise(int fd, off_t offset __unused, off_t len, int advice)
 {
 	struct stat64 statb;
 
@@ -72,9 +69,8 @@ posix_fadvise(int fd, off_t offset, off_t len, int advice)
 
 #if !defined(_LP64)
 
-/* ARGSUSED1 */
 int
-posix_fadvise64(int fd, off64_t offset, off64_t len, int advice)
+posix_fadvise64(int fd, off64_t offset __unused, off64_t len, int advice)
 {
 	struct stat64 statb;
 

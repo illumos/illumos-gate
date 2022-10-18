@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Default backend-finder(s) for the name-service-switch routines.
  * At present there is a single finder that uses dlopen() to do its thing.
@@ -59,10 +57,9 @@ static const char dlopen_format[] = NSS_DLOPEN_FORMAT;
 static const char dlsym_format [] = NSS_DLSYM_FORMAT;
 static const size_t  format_maxlen   = sizeof (dlsym_format) - 4;
 
-/*ARGSUSED*/
 static nss_backend_constr_t
-SO_per_src_lookup(void *dummy, const char *db_name, const char *src_name,
-	void **delete_privp)
+SO_per_src_lookup(void *dummy __unused, const char *db_name,
+    const char *src_name, void **delete_privp)
 {
 	char			*name;
 	void			*dlhandle;
@@ -85,9 +82,8 @@ SO_per_src_lookup(void *dummy, const char *db_name, const char *src_name,
 	return (res);
 }
 
-/*ARGSUSED*/
 static void
-SO_per_src_delete(void *delete_priv, nss_backend_constr_t dummy)
+SO_per_src_delete(void *delete_priv, nss_backend_constr_t dummy __unused)
 {
 	(void) dlclose(delete_priv);
 }

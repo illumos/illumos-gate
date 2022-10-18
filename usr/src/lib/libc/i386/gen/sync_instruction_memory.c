@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 
 /*
@@ -35,8 +33,7 @@
  * This is a no-op on x86 because it has a uniform cache.
  */
 
-/* ARGSUSED */
 void
-sync_instruction_memory(caddr_t addr, int len)
+sync_instruction_memory(caddr_t addr __unused, int len __unused)
 {
 }
