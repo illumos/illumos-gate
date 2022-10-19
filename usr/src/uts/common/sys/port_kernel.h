@@ -22,12 +22,11 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_SYS_PORT_KERNEL_H
 #define	_SYS_PORT_KERNEL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/vnode.h>
 #include <sys/list.h>
@@ -52,7 +51,7 @@ extern "C" {
 typedef	struct	port_kevent {
 	kmutex_t	portkev_lock;	/* used by PORT_SOURCE_FD source */
 	int	portkev_source;		/* event: source */
-	int	portkev_events; 	/* event: data */
+	int	portkev_events;		/* event: data */
 	int	portkev_flags;		/* internal flags */
 	pid_t	portkev_pid;		/* pid of process using this struct */
 	long	portkev_object;		/* event: object */
@@ -122,8 +121,10 @@ typedef struct portfop_cache {
 /*
  * PORT_SOURCE_FD cache per port.
  * One cache for each port that uses PORT_SOURCE_FD.
- * pc_lock must be the first element of port_fdcache_t to keep it
- * synchronized with the offset of pc_lock in pollcache_t (see pollrelock()).
+ *
+ * The types and offsets of pc_lock and pc_flag must exactly match their sibling
+ * fields in pollcache_t, as they are accessed as if the port_fdcache_t _was_ a
+ * pollcache via t_pollcache. (See: pollrelock() and fs_reject_epoll())
  */
 typedef struct port_fdcache {
 	kmutex_t	pc_lock;	/* lock to protect portcache */
@@ -131,6 +132,8 @@ typedef struct port_fdcache {
 	struct portfd	**pc_hash;	/* points to a hash table of ptrs */
 	int		pc_hashsize;	/* the size of current hash table */
 	int		pc_fdcount;	/* track how many fd's are hashed */
+	uintptr_t	_pc_pad;	/* pad to properly offset pc_flag */
+	int		pc_flag;	/* pollcache flags (compat) */
 } port_fdcache_t;
 
 /*

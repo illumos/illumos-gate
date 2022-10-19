@@ -279,6 +279,14 @@ pollunlock(int *lockstate)
 	return (0);
 }
 
+/*
+ * The pc_lock and pc_flag fields of port_fdcache_t must exactly match those of
+ * pollcache_t as they are accessed through t_pollcache as if they were part of
+ * a "real" pollcache.
+ */
+CTASSERT(offsetof(pollcache_t, pc_lock) == offsetof(port_fdcache_t, pc_lock));
+CTASSERT(offsetof(pollcache_t, pc_flag) == offsetof(port_fdcache_t, pc_flag));
+
 void
 pollrelock(int lockstate)
 {

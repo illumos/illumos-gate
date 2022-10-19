@@ -14,7 +14,8 @@
 #
 
 PROGS = \
-	illumos-15031
+	illumos-15031 \
+	illumos-15036
 
 ROOTOPTDIR = $(ROOT)/opt/os-tests/tests
 ROOTOPTREGRESSION = $(ROOTOPTDIR)/regression
