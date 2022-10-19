@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -104,6 +104,7 @@ static int smbadm_join_workgroup(const char *, boolean_t);
 static int smbadm_join_domain(const char *, const char *,
     const char *, boolean_t);
 static void smbadm_extract_domain(char *, char **, char **);
+static void smbadm_update_groups(smbadm_grp_action_t);
 
 static int smbadm_join(int, char **);
 static int smbadm_list(int, char **);
@@ -151,7 +152,7 @@ static smbadm_cmdinfo_t smbadm_cmdtable[] =
 	{ "enable-user",	smbadm_user_enable,	HELP_USER_ENABLE,
 		SMBADM_CMDF_USER,	SMBADM_ACTION_AUTH },
 	{ "join",		smbadm_join,		HELP_JOIN,
-		SMBADM_CMDF_NONE,	SMBADM_VALUE_AUTH },
+		SMBADM_CMDF_GROUP,	SMBADM_VALUE_AUTH },
 	{ "list",		smbadm_list,		HELP_LIST,
 		SMBADM_CMDF_NONE,	SMBADM_BASIC_AUTH },
 	{ "lookup",		smbadm_lookup,		HELP_LOOKUP,
@@ -560,6 +561,7 @@ smbadm_join_workgroup(const char *workgroup, boolean_t confirm)
 	if (confirm && !smbadm_join_confirm(jdi.domain_name))
 		return (0);
 
+	smbadm_update_groups(SMBADM_GRP_DELMEMBER); // before "un-join"
 	if ((status = smb_join(&jdi, &jdres)) != NT_STATUS_SUCCESS) {
 		(void) fprintf(stderr, gettext("failed to join %s: %s\n"),
 		    jdi.domain_name, xlate_nt_status(status));
@@ -702,6 +704,7 @@ smbadm_join_domain(const char *domain, const char *container,
 		    "Successfully joined domain %s using AD server %s\n"),
 		    jdi.domain_name, jdres.dc_name);
 		bzero(&jdi, sizeof (jdi));
+		smbadm_update_groups(SMBADM_GRP_ADDMEMBER); // after join
 		smbadm_restart_service();
 		return (0);
 
@@ -798,6 +801,70 @@ smbadm_extract_domain(char *arg, char **username, char **domain)
 			*username = p;
 			*domain = arg;
 		}
+	}
+}
+
+/*
+ * smbadm_update_groups
+ * Add or remove "Domain Admins@mydomain" to/from the
+ * local administrators group.
+ *
+ * Similar to: smbadm_group_add_del_member
+ */
+static void
+smbadm_update_groups(smbadm_grp_action_t act)
+{
+	char sidstr[SMB_SID_STRSZ];
+	char gname[] = "administrators"; // must be writable
+	smb_gsid_t msid;
+	int rc;
+
+	/*
+	 * Compose the (well-known) SID for "Domain Admins"
+	 * which is {domain-SID}-512
+	 */
+	rc = smb_config_getstr(SMB_CI_DOMAIN_SID, sidstr, sizeof (sidstr));
+	if (rc != 0) {
+		(void) fprintf(stderr,
+		    gettext("Update local groups: no domain SID\n"));
+		return;
+	}
+	(void) strlcat(sidstr, "-512", sizeof (sidstr));
+
+	msid.gs_type = SidTypeGroup;
+	msid.gs_sid = smb_sid_fromstr(sidstr);
+	if (msid.gs_sid == NULL) {
+		(void) fprintf(stderr,
+		    gettext("Update local groups: no memory for SID\n"));
+		return;
+	}
+
+	switch (act) {
+	case SMBADM_GRP_ADDMEMBER:
+		rc = smb_lgrp_add_member(gname,
+		    msid.gs_sid, msid.gs_type);
+		// suppress "already in group"
+		if (rc == SMB_LGRP_MEMBER_IN_GROUP)
+			rc = 0;
+		break;
+	case SMBADM_GRP_DELMEMBER:
+		rc = smb_lgrp_del_member(gname,
+		    msid.gs_sid, msid.gs_type);
+		// supress "not in group"
+		if (rc == SMB_LGRP_MEMBER_NOT_IN_GROUP)
+			rc = 0;
+		break;
+	default:
+		rc = SMB_LGRP_INTERNAL_ERROR;
+		break;
+	}
+
+	smb_sid_free(msid.gs_sid);
+
+	if (rc != SMB_LGRP_SUCCESS) {
+		(void) fprintf(stderr,
+		    gettext("Update local groups: can't update DB, %s\n"),
+		    smb_lgrp_strerror(rc));
 	}
 }
 

@@ -28,6 +28,7 @@ pre = vmm_drv_test_init
 tests = [
 	'auto_destruct',
 	'cpuid_ioctl',
+	'default_capabs',
 	'drv_hold',
 	'fpu_getset',
 	'interface_version',

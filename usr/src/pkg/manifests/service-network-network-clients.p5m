@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2022 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/service/network/network-clients@$(PKGVERS)
@@ -48,7 +49,6 @@ link path=usr/lib/sunw,rcp target=../bin/rcp
 dir  path=usr/sbin
 file path=usr/sbin/rmt mode=0555
 file path=usr/sbin/rwall mode=0555
-file path=usr/sbin/snoop mode=0555
 file path=usr/sbin/spray mode=0555
 dir  path=usr/share/man/man1
 file path=usr/share/man/man1/filesync.1
@@ -66,7 +66,6 @@ dir  path=usr/share/man/man8
 file path=usr/share/man/man8/rdate.8
 file path=usr/share/man/man8/rmt.8
 file path=usr/share/man/man8/rwall.8
-file path=usr/share/man/man8/snoop.8
 file path=usr/share/man/man8/spray.8
 legacy pkg=SUNWrcmdc \
     desc="Remote Network Client Commands (rsh, rlogin, rcp, rsh, ...)" \
@@ -83,3 +82,8 @@ license usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.whois \
     license=usr/src/cmd/cmd-inet/usr.bin/THIRDPARTYLICENSE.whois
 license usr/src/cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE \
     license=usr/src/cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE
+#
+# This package previously contained snoop(8), but it was split out into its
+# own package:
+#
+depend type=require fmri=network/snoop
