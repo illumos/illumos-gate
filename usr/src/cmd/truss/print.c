@@ -23,6 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -76,6 +77,8 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <netinet/sctp.h>
+#include <netinet/ip_mroute.h>
+#include <netinet/icmp6.h>
 #include <net/route.h>
 #include <sys/utrap.h>
 #include <sys/lgrp_user.h>
@@ -2109,6 +2112,127 @@ udp_optname(private_t *pri, long val)
 }
 
 
+const char *
+ip_optname(private_t *pri, long val)
+{
+	switch (val) {
+	case IP_OPTIONS:		return ("IP_OPTIONS");
+	case IP_HDRINCL:		return ("IP_HDRINCL");
+	case IP_TOS:			return ("IP_TOS");
+	case IP_TTL:			return ("IP_TTL");
+	case IP_RECVOPTS:		return ("IP_RECVOPTS");
+	case IP_RECVRETOPTS:		return ("IP_RECVRETOPTS");
+	case IP_RECVDSTADDR:		return ("IP_RECVDSTADDR");
+	case IP_RETOPTS:		return ("IP_RETOPTS");
+	case IP_RECVIF:			return ("IP_RECVIF");
+	case IP_RECVSLLA:		return ("IP_RECVSLLA");
+	case IP_RECVTTL:		return ("IP_RECVTTL");
+	case IP_RECVTOS:		return ("IP_RECVTOS");
+	case IP_MULTICAST_IF:		return ("IP_MULTICAST_IF");
+	case IP_MULTICAST_TTL:		return ("IP_MULTICAST_TTL");
+	case IP_MULTICAST_LOOP:		return ("IP_MULTICAST_LOOP");
+	case IP_ADD_MEMBERSHIP:		return ("IP_ADD_MEMBERSHIP");
+	case IP_DROP_MEMBERSHIP:	return ("IP_DROP_MEMBERSHIP");
+	case IP_BLOCK_SOURCE:		return ("IP_BLOCK_SOURCE");
+	case IP_UNBLOCK_SOURCE:		return ("IP_UNBLOCK_SOURCE");
+	case IP_ADD_SOURCE_MEMBERSHIP:	return ("IP_ADD_SOURCE_MEMBERSHIP");
+	case IP_DROP_SOURCE_MEMBERSHIP:	return ("IP_DROP_SOURCE_MEMBERSHIP");
+	case IP_NEXTHOP:		return ("IP_NEXTHOP");
+	/* IP_PKTINFO and IP_RECVPKTINFO share the same code */
+	case IP_PKTINFO:		return ("IP_PKTINFO/IP_RECVPKTINFO");
+	case IP_DONTFRAG:		return ("IP_DONTFRAG");
+	case IP_SEC_OPT:		return ("IP_SEC_OPT");
+	case MCAST_JOIN_GROUP:		return ("MCAST_JOIN_GROUP");
+	case MCAST_LEAVE_GROUP:		return ("MCAST_LEAVE_GROUP");
+	case MCAST_BLOCK_SOURCE:	return ("MCAST_BLOCK_SOURCE");
+	case MCAST_UNBLOCK_SOURCE:	return ("MCAST_UNBLOCK_SOURCE");
+	case MCAST_JOIN_SOURCE_GROUP:	return ("MCAST_JOIN_SOURCE_GROUP");
+	case MCAST_LEAVE_SOURCE_GROUP:	return ("MCAST_LEAVE_SOURCE_GROUP");
+	case MRT_INIT:			return ("MRT_INIT");
+	case MRT_DONE:			return ("MRT_DONE");
+	case MRT_ADD_VIF:		return ("MRT_ADD_VIF");
+	case MRT_DEL_VIF:		return ("MRT_DEL_VIF");
+	case MRT_ADD_MFC:		return ("MRT_ADD_MFC");
+	case MRT_DEL_MFC:		return ("MRT_DEL_MFC");
+	case MRT_VERSION:		return ("MRT_VERSION");
+	case MRT_ASSERT:		return ("MRT_ASSERT");
+	case IP_BOUND_IF:		return ("IP_BOUND_IF");
+	case IP_UNSPEC_SRC:		return ("IP_UNSPEC_SRC");
+	case IP_BROADCAST_TTL:		return ("IP_BROADCAST_TTL");
+	case IP_DHCPINIT_IF:		return ("IP_DHCPINIT_IF");
+	case IP_REUSEADDR:		return ("IP_REUSEADDR");
+	case IP_DONTROUTE:		return ("IP_DONTROUTE");
+	case IP_BROADCAST:		return ("IP_BROADCAST");
+
+	default:			(void) snprintf(pri->code_buf,
+					    sizeof (pri->code_buf), "0x%lx",
+					    val);
+					return (pri->code_buf);
+	}
+}
+
+const char *
+ipv6_optname(private_t *pri, long val)
+{
+	switch (val) {
+	case IPV6_UNICAST_HOPS:		return ("IPV6_UNICAST_HOPS");
+	case IPV6_MULTICAST_IF:		return ("IPV6_MULTICAST_IF");
+	case IPV6_MULTICAST_HOPS:	return ("IPV6_MULTICAST_HOPS");
+	case IPV6_MULTICAST_LOOP:	return ("IPV6_MULTICAST_LOOP");
+	case IPV6_JOIN_GROUP:		return ("IPV6_JOIN_GROUP");
+	case IPV6_LEAVE_GROUP:		return ("IPV6_LEAVE_GROUP");
+	case IPV6_PKTINFO:		return ("IPV6_PKTINFO");
+	case IPV6_HOPLIMIT:		return ("IPV6_HOPLIMIT");
+	case IPV6_NEXTHOP:		return ("IPV6_NEXTHOP");
+	case IPV6_HOPOPTS:		return ("IPV6_HOPOPTS");
+	case IPV6_DSTOPTS:		return ("IPV6_DSTOPTS");
+	case IPV6_RTHDR:		return ("IPV6_RTHDR");
+	case IPV6_RTHDRDSTOPTS:		return ("IPV6_RTHDRDSTOPTS");
+	case IPV6_RECVPKTINFO:		return ("IPV6_RECVPKTINFO");
+	case IPV6_RECVHOPLIMIT:		return ("IPV6_RECVHOPLIMIT");
+	case IPV6_RECVHOPOPTS:		return ("IPV6_RECVHOPOPTS");
+	case _OLD_IPV6_RECVDSTOPTS:	return ("_OLD_IPV6_RECVDSTOPTS");
+	case IPV6_RECVRTHDR:		return ("IPV6_RECVRTHDR");
+	case IPV6_RECVRTHDRDSTOPTS:	return ("IPV6_RECVRTHDRDSTOPTS");
+	case IPV6_CHECKSUM:		return ("IPV6_CHECKSUM");
+	case IPV6_RECVTCLASS:		return ("IPV6_RECVTCLASS");
+	case IPV6_USE_MIN_MTU:		return ("IPV6_USE_MIN_MTU");
+	case IPV6_DONTFRAG:		return ("IPV6_DONTFRAG");
+	case IPV6_SEC_OPT:		return ("IPV6_SEC_OPT");
+	case IPV6_SRC_PREFERENCES:	return ("IPV6_SRC_PREFERENCES");
+	case IPV6_RECVPATHMTU:		return ("IPV6_RECVPATHMTU");
+	case IPV6_PATHMTU:		return ("IPV6_PATHMTU");
+	case IPV6_TCLASS:		return ("IPV6_TCLASS");
+	case IPV6_V6ONLY:		return ("IPV6_V6ONLY");
+	case IPV6_RECVDSTOPTS:		return ("IPV6_RECVDSTOPTS");
+	case MCAST_JOIN_GROUP:		return ("MCAST_JOIN_GROUP");
+	case MCAST_LEAVE_GROUP:		return ("MCAST_LEAVE_GROUP");
+	case MCAST_BLOCK_SOURCE:	return ("MCAST_BLOCK_SOURCE");
+	case MCAST_UNBLOCK_SOURCE:	return ("MCAST_UNBLOCK_SOURCE");
+	case MCAST_JOIN_SOURCE_GROUP:	return ("MCAST_JOIN_SOURCE_GROUP");
+	case MCAST_LEAVE_SOURCE_GROUP:	return ("MCAST_LEAVE_SOURCE_GROUP");
+
+	default:			(void) snprintf(pri->code_buf,
+					    sizeof (pri->code_buf), "0x%lx",
+					    val);
+					return (pri->code_buf);
+	}
+}
+
+
+const char *
+icmpv6_optname(private_t *pri, long val)
+{
+	switch (val) {
+	case ICMP6_FILTER:		return ("ICMP6_FILTER");
+	default:			(void) snprintf(pri->code_buf,
+					    sizeof (pri->code_buf), "0x%lx",
+					    val);
+					return (pri->code_buf);
+	}
+}
+
+
 /*
  * Print setsockopt()/getsockopt() 3rd argument.
  */
@@ -2121,6 +2245,12 @@ prt_son(private_t *pri, int raw, long val)
 	case SOL_SOCKET:	outstring(pri, sol_optname(pri, val));
 				break;
 	case SOL_ROUTE:		outstring(pri, route_optname(pri, val));
+				break;
+	case IPPROTO_IP:	outstring(pri, ip_optname(pri, val));
+				break;
+	case IPPROTO_IPV6:	outstring(pri, ipv6_optname(pri, val));
+				break;
+	case IPPROTO_ICMPV6:	outstring(pri, icmpv6_optname(pri, val));
 				break;
 	case IPPROTO_TCP:	outstring(pri, tcp_optname(pri, val));
 				break;
