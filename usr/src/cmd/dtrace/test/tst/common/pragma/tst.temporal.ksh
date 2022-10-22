@@ -1,7 +1,5 @@
 #!/bin/ksh -p
 #
-# CDDL HEADER START
-#
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
 # You may only use this file in accordance with the terms of version
@@ -11,11 +9,10 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# CDDL HEADER END
-#
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2022 Oxide Computer Company
 #
 
 ############################################################################
@@ -74,7 +71,8 @@ fi
 
 # dtrace outputs a blank line at the end, which will sort to the beginning,
 # so use head to remove the blank line.
-head -n -1 $file > $file.2
+nlines=$(wc -l $file | awk '{ print $1 - 1}')
+head -n $nlines $file > $file.2
 
 sort -n $file.2 | diff $file.2 -
 status=$?
