@@ -105,4 +105,4 @@ usr/src/lib/lib9p/common/*
 # These bits form the mdb test suite are all literal output from mdb and
 # therefore trailing spaces may be part of what mdb does today.
 #
-usr/src/test/util-tests/tests/mdb/*/*.mdb.out
+usr/src/test/util-tests/tests/mdb/*/*.*.out

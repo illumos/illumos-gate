@@ -27,7 +27,7 @@
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
@@ -855,6 +855,28 @@ cmd_array(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 /*
+ * This is a shared implementation to determine if we should treat a type as a
+ * bitfield. The parameters are the CTF encoding and the bit offset of the
+ * integer. This also exists in mdb_print.c. We consider something a bitfield
+ * if:
+ *
+ *  o The type is more than 8 bytes. This is a bit of a historical choice from
+ *    mdb and is a stranger one. The normal integer handling code generally
+ *    doesn't handle integers more than 64-bits in size. Of course neither does
+ *    the bitfield code...
+ *  o The bit count is not a multiple of 8.
+ *  o The size in bytes is not a power of 2.
+ *  o The offset is not a multiple of 8.
+ */
+boolean_t
+is_bitfield(const ctf_encoding_t *ep, ulong_t off)
+{
+	size_t bsize = ep->cte_bits / NBBY;
+	return (bsize > 8 || (ep->cte_bits % NBBY) != 0 ||
+	    (bsize & (bsize - 1)) != 0 || (off % NBBY) != 0);
+}
+
+/*
  * Print an integer bitfield in hexadecimal by reading the enclosing byte(s)
  * and then shifting and masking the data in the lower bits of a uint64_t.
  */
@@ -862,13 +884,20 @@ static int
 print_bitfield(ulong_t off, printarg_t *pap, ctf_encoding_t *ep)
 {
 	mdb_tgt_addr_t addr = pap->pa_addr + off / NBBY;
-	size_t size = (ep->cte_bits + (NBBY - 1)) / NBBY;
 	uint64_t mask = (1ULL << ep->cte_bits) - 1;
 	uint64_t value = 0;
 	uint8_t *buf = (uint8_t *)&value;
 	uint8_t shift;
-
 	const char *format;
+
+	/*
+	 * Our bitfield may straddle a byte boundary. We explicitly take the
+	 * offset of the bitfield within its byte into account when determining
+	 * the overall amount of data to copy and mask off from the underlying
+	 * data.
+	 */
+	uint_t nbits = ep->cte_bits + (off % NBBY);
+	size_t size = P2ROUNDUP(nbits, NBBY) / NBBY;
 
 	if (!(pap->pa_flags & PA_SHOWVAL))
 		return (0);
@@ -878,17 +907,9 @@ print_bitfield(ulong_t off, printarg_t *pap, ctf_encoding_t *ep)
 		return (0);
 	}
 
-	/*
-	 * Our bitfield may stradle a byte boundary, if so, the calculation of
-	 * size may not correctly capture that. However, off is relative to the
-	 * entire bitfield, so we first have to make that relative to the byte.
-	 */
-	if ((off % 8) + ep->cte_bits > NBBY * size) {
-		size++;
-	}
-
 	if (size > sizeof (value)) {
 		mdb_printf("??? (total bitfield too large after alignment");
+		return (0);
 	}
 
 	/*
@@ -1002,14 +1023,8 @@ print_int_val(const char *type, ctf_encoding_t *ep, ulong_t off,
 		return (0);
 	}
 
-	/*
-	 * If the size is not a power-of-two number of bytes in the range 1-8 or
-	 * power-of-two number starts in the middle of a byte then we assume it
-	 * is a bitfield and print it as such.
-	 */
 	size = ep->cte_bits / NBBY;
-	if (size > 8 || (ep->cte_bits % NBBY) != 0 || (size & (size - 1) ||
-	    (off % NBBY) != 0) != 0) {
+	if (is_bitfield(ep, off)) {
 		return (print_bitfield(off, pap, ep));
 	}
 
@@ -1764,7 +1779,7 @@ static int
 pipe_print(mdb_ctf_id_t id, ulong_t off, void *data)
 {
 	printarg_t *pap = data;
-	ssize_t size;
+	size_t size;
 	static const char *const fsp[] = { "%#r", "%#r", "%#r", "%#llr" };
 	uintptr_t value;
 	uintptr_t addr = pap->pa_addr + off / NBBY;
@@ -1823,13 +1838,12 @@ again:
 		 * For immediate values, we just print out the value.
 		 */
 		size = e.cte_bits / NBBY;
-		if (size > 8 || (e.cte_bits % NBBY) != 0 ||
-		    (size & (size - 1)) != 0) {
+		if (is_bitfield(&e, off)) {
 			return (print_bitfield(off, pap, &e));
 		}
 
 		if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as, &u.i8, size,
-		    addr) != size) {
+		    addr) != (size_t)size) {
 			mdb_warn("failed to read %lu bytes at %p",
 			    (ulong_t)size, pap->pa_addr);
 			return (-1);
@@ -2578,7 +2592,7 @@ static int
 printf_signed(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt,
     boolean_t sign)
 {
-	ssize_t size;
+	size_t size;
 	mdb_ctf_id_t base;
 	ctf_encoding_t e;
 
@@ -2627,20 +2641,40 @@ printf_signed(mdb_ctf_id_t id, uintptr_t addr, ulong_t off, char *fmt,
 	 * particular, see the comments there for an explanation of the
 	 * endianness differences in this code.)
 	 */
-	if (size > 8 || (e.cte_bits % NBBY) != 0 ||
-	    (size & (size - 1)) != 0) {
+	if (is_bitfield(&e, off)) {
 		uint64_t mask = (1ULL << e.cte_bits) - 1;
 		uint64_t value = 0;
 		uint8_t *buf = (uint8_t *)&value;
 		uint8_t shift;
+		uint_t nbits;
 
 		/*
-		 * Round our size up one byte.
+		 * Our bitfield may straddle a byte boundary. We explicitly take
+		 * the offset of the bitfield within its byte into account when
+		 * determining the overall amount of data to copy and mask off
+		 * from the underlying data.
 		 */
-		size = (e.cte_bits + (NBBY - 1)) / NBBY;
+		nbits = e.cte_bits + (off % NBBY);
+		size = P2ROUNDUP(nbits, NBBY) / NBBY;
 
 		if (e.cte_bits > sizeof (value) * NBBY - 1) {
 			mdb_printf("invalid bitfield size %u", e.cte_bits);
+			return (DCMD_ABORT);
+		}
+
+		/*
+		 * Our bitfield may straddle a byte boundary, if so, the
+		 * calculation of size may not correctly capture that. However,
+		 * off is relative to the entire bitfield, so we first have to
+		 * make that relative to the byte.
+		 */
+		if ((off % NBBY) + e.cte_bits > NBBY * size) {
+			size++;
+		}
+
+		if (size > sizeof (value)) {
+			mdb_warn("??? (total bitfield too large after "
+			    "alignment\n");
 			return (DCMD_ABORT);
 		}
 
