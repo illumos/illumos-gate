@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/sysmacros.h>
@@ -908,4 +909,26 @@ dtrace_uaddr2str(dtrace_hdl_t *dtp, pid_t pid,
 	dt_proc_release(dtp, P);
 
 	return (dt_string2str(c, str, nbytes));
+}
+
+/*
+ * This is a shared implementation to determine if we should treat a type as a
+ * bitfield. The parameters are the CTF encoding and the bit offset of the
+ * integer. This also exists in mdb_print.c. We consider something a bitfield
+ * if:
+ *
+ *  o The type is more than 8 bytes. This is a bit of a historical choice from
+ *    mdb and is a stranger one. The normal integer handling code generally
+ *    doesn't handle integers more than 64-bits in size. Of course neither does
+ *    the bitfield code...
+ *  o The bit count is not a multiple of 8.
+ *  o The size in bytes is not a power of 2.
+ *  o The offset is not a multiple of 8.
+ */
+boolean_t
+dt_is_bitfield(const ctf_encoding_t *ep, ulong_t off)
+{
+	size_t bsize = ep->cte_bits / NBBY;
+	return (bsize > 8 || (ep->cte_bits % NBBY) != 0 ||
+	    (bsize & (bsize - 1)) != 0 || (off % NBBY) != 0);
 }

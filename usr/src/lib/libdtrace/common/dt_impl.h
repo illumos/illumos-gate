@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_DT_IMPL_H
@@ -166,7 +167,7 @@ typedef struct dt_ahash {
 } dt_ahash_t;
 
 typedef struct dt_aggregate {
-	dtrace_bufdesc_t dtat_buf; 	/* buf aggregation snapshot */
+	dtrace_bufdesc_t dtat_buf;	/* buf aggregation snapshot */
 	int dtat_flags;			/* aggregate flags */
 	processorid_t dtat_ncpus;	/* number of CPUs in aggregate */
 	processorid_t *dtat_cpus;	/* CPUs in aggregate */
@@ -651,6 +652,8 @@ extern int dt_handle_setopt(dtrace_hdl_t *, dtrace_setoptdata_t *);
 
 extern int dt_lib_depend_add(dtrace_hdl_t *, dt_list_t *, const char *);
 extern dt_lib_depend_t *dt_lib_depend_lookup(dt_list_t *, const char *);
+
+extern boolean_t dt_is_bitfield(const ctf_encoding_t *, ulong_t);
 
 extern dt_pcb_t *yypcb;		/* pointer to current parser control block */
 extern char yyintprefix;	/* int token prefix for macros (+/-) */

@@ -23,6 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 Joyent, Inc. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/sysmacros.h>
@@ -266,6 +267,7 @@ dt_idcook_func(dt_node_t *dnp, dt_ident_t *idp, int argc, dt_node_t *args)
 			if (strcmp(p1, "@") == 0 || strcmp(p1, "...") == 0) {
 				isp->dis_args[i].dn_ctfp = NULL;
 				isp->dis_args[i].dn_type = CTF_ERR;
+				isp->dis_args[i].dn_bitoff = 0;
 				if (*p1 == '.')
 					isp->dis_varargs = i;
 				continue;
