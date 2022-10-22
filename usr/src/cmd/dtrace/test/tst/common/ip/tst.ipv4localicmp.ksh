@@ -24,7 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Test ip:::{send,receive} of IPv4 ICMP to a local address.
@@ -45,7 +44,7 @@ fi
 dtrace=$1
 local=127.0.0.1
 
-$dtrace -c "/usr/sbin/ping $local 3" -qs /dev/stdin <<EOF | sort -n
+$dtrace -c "/usr/sbin/ping -D $local 3" -qs /dev/stdin <<EOF | sort -n
 ip:::send
 /args[2]->ip_saddr == "$local" && args[2]->ip_daddr == "$local" &&
     args[4]->ipv4_protocol == IPPROTO_ICMP/

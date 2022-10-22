@@ -24,7 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Test ip:::{send,receive} of IPv4 ICMP to a remote host.
@@ -55,7 +54,7 @@ if (( $? != 0 )); then
 	exit 4
 fi
 
-$dtrace -c "/usr/sbin/ping $dest 3" -qs /dev/stdin <<EOF | \
+$dtrace -c "/usr/sbin/ping -D $dest 3" -qs /dev/stdin <<EOF | \
     grep -v 'is alive' | sort -n
 ip:::send
 /args[2]->ip_saddr == "$source" && args[2]->ip_daddr == "$dest" &&

@@ -311,9 +311,9 @@ translator ipv4info_t < ipha_t *I > {
 	ipv4_length = I != NULL ? ntohs(I->ipha_length) : 0;
 	ipv4_ident = I != NULL ? ntohs(I->ipha_ident) : 0;
 	ipv4_flags = I != NULL ? ntohs(I->ipha_fragment_offset_and_flags) >>
-	    12 : 0;
+	    13 : 0;
 	ipv4_offset = I != NULL ? ntohs(I->ipha_fragment_offset_and_flags) &
-	    0x0fff : 0;
+	    0x1fff : 0;
 	ipv4_ttl = I != NULL ? I->ipha_ttl : 0;
 	ipv4_protocol = I != NULL ? I->ipha_protocol : 0;
 	ipv4_protostr = I == NULL ? "<null>" :
