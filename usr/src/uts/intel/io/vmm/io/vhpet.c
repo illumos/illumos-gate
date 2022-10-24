@@ -744,7 +744,7 @@ vhpet_data_read(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_HPET);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_hpet_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_hpet_v1));
 
 	struct vhpet *vhpet = datap;
 	struct vdi_hpet_v1 *out = req->vdr_data;
@@ -789,7 +789,7 @@ static enum vhpet_validation_error
 vhpet_data_validate(const vmm_data_req_t *req, struct vm *vm)
 {
 	ASSERT(req->vdr_version == 1 &&
-	    req->vdr_len == sizeof (struct vdi_hpet_v1));
+	    req->vdr_len >= sizeof (struct vdi_hpet_v1));
 	const struct vdi_hpet_v1 *src = req->vdr_data;
 
 	/* LegacyReplacement Routing is not supported */
@@ -859,7 +859,7 @@ vhpet_data_write(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_HPET);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_hpet_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_hpet_v1));
 
 	struct vhpet *vhpet = datap;
 

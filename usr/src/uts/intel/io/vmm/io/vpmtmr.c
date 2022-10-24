@@ -161,7 +161,7 @@ vpmtmr_data_read(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_PM_TIMER);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_pm_timer_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_pm_timer_v1));
 
 	struct vpmtmr *vpmtmr = datap;
 	struct vdi_pm_timer_v1 *out = req->vdr_data;
@@ -177,7 +177,7 @@ vpmtmr_data_write(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_PM_TIMER);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_pm_timer_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_pm_timer_v1));
 
 	struct vpmtmr *vpmtmr = datap;
 	const struct vdi_pm_timer_v1 *src = req->vdr_data;

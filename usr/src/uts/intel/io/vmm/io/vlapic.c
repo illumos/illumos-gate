@@ -1713,7 +1713,7 @@ vlapic_data_read(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_LAPIC);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_lapic_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_lapic_v1));
 
 	struct vlapic *vlapic = datap;
 	struct vdi_lapic_v1 *out = req->vdr_data;
@@ -1807,7 +1807,7 @@ static enum vlapic_validation_error
 vlapic_data_validate(const struct vlapic *vlapic, const vmm_data_req_t *req)
 {
 	ASSERT(req->vdr_version == 1 &&
-	    req->vdr_len == sizeof (struct vdi_lapic_v1));
+	    req->vdr_len >= sizeof (struct vdi_lapic_v1));
 	const struct vdi_lapic_v1 *src = req->vdr_data;
 
 	if ((src->vl_esr_pending & ~APIC_VALID_MASK_ESR) != 0 ||
@@ -1865,7 +1865,7 @@ vlapic_data_write(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_LAPIC);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_lapic_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_lapic_v1));
 
 	struct vlapic *vlapic = datap;
 	if (vlapic_data_validate(vlapic, req) != VVE_OK) {
