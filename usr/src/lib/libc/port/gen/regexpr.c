@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * routines to do regular expression matching
@@ -294,7 +292,8 @@ re_exec(const char *p1)
 		do {
 			if (*p1 != c)
 				continue;
-			if (rv = advance(p1, p2))
+			rv = advance(p1, p2);
+			if (rv != 0)
 				return (rv);
 		} while (*p1++);
 		return (0);
@@ -303,7 +302,8 @@ re_exec(const char *p1)
 	 * regular algorithm
 	 */
 	do {
-		if (rv = advance(p1, p2))
+		rv = advance(p1, p2);
+		if (rv != 0)
 			return (rv);
 	} while (*p1++);
 	return (0);
@@ -381,7 +381,8 @@ advance(const char *lp, char *ep)
 			while (backref(i, lp))
 				lp += ct;
 			while (lp >= curlp) {
-				if (rv = advance(lp, ep))
+				rv = advance(lp, ep);
+				if (rv != 0)
 					return (rv);
 				lp -= ct;
 			}
@@ -411,7 +412,8 @@ advance(const char *lp, char *ep)
 		star:
 			do {
 				lp--;
-				if (rv = advance(lp, ep))
+				rv = advance(lp, ep);
+				if (rv != 0)
 					return (rv);
 			} while (lp > curlp);
 			return (0);

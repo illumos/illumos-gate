@@ -29,7 +29,8 @@ PROG =	mem_partial \
 	self_destruct \
 	drv_hold \
 	cpuid_ioctl \
-	default_capabs
+	default_capabs \
+	datarw_constraints
 
 SCRIPT = vmm_drv_test_fini vmm_drv_test_init
 

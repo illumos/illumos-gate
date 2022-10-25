@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Compatibility routines to read and write alternate
@@ -64,7 +64,7 @@
 
 static void	utmp_frec2api(const struct futmp *, struct utmp *);
 static void	utmp_api2frec(const struct utmp *, struct futmp *);
-struct utmp 	*_compat_getutent(void);
+struct utmp	*_compat_getutent(void);
 struct utmp	*_compat_getutid(const struct utmp *);
 struct utmp	*_compat_getutline(const struct utmp *);
 struct utmp	*_compat_pututline(const struct utmp *);
@@ -553,7 +553,7 @@ _compat_modut(struct utmp *utp)
 	/* copy the supplied utmp structure someplace safe */
 	utmp = *utp;
 	_compat_setutent();
-	while (fup = getutent_frec()) {
+	while ((fup = getutent_frec()) != NULL) {
 		if (idcmp(ucp->ut_id, fup->ut_id))
 			continue;
 		break;

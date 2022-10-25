@@ -127,7 +127,7 @@ uint64_t interpret_ops(void *data, void *data_end,
  */
 void
 _Unw_Propagate_Registers(struct _Unwind_Context *old_ctx,
-	struct _Unwind_Context *new_ctx)
+    struct _Unwind_Context *new_ctx)
 {
 	new_ctx->current_regs[SP_RSP] = old_ctx->cfa;
 	new_ctx->pc = old_ctx->ra;
@@ -228,7 +228,7 @@ fix_reg(struct _Unwind_Context *ctx, struct register_state *rs, int index)
  */
 uint64_t
 _Unw_Rollback_Registers(struct eh_frame_fields *f,
-	struct _Unwind_Context *ctx)
+    struct _Unwind_Context *ctx)
 {
 	/* GPRs, RET_ADD, and CF_ADDR */
 	struct register_state func_state[18];
@@ -361,7 +361,7 @@ static uint64_t get_encoded_val(void **datap, ptrdiff_t reloc, int enc);
  */
 uint64_t
 _Unw_get_val(void **datap, ptrdiff_t reloc,
-	enum operand_desc opr, int daf, int caf, int enc)
+    enum operand_desc opr, int daf, int caf, int enc)
 {
 	intptr_t data = (intptr_t)*datap;
 	uint64_t res;
@@ -453,7 +453,7 @@ _Unw_get_val(void **datap, ptrdiff_t reloc,
 		/* max length of augmentation string is 4 */
 		rp = (char *)&res;
 		dp = (char *)data;
-		while (*rp++ = *dp++)
+		while ((*rp++ = *dp++) != '\0')
 			;
 		data = (intptr_t)dp;
 		break;
@@ -553,11 +553,11 @@ int interpret_op(void **datap, ptrdiff_t reloc,
 
 uint64_t
 interpret_ops(void *data, void *data_end,
-	ptrdiff_t reloc,
-	uint64_t start_pc, uint64_t pc,
-	struct register_state f_state[],
-	struct register_state f_start_state[],
-	int daf, int caf, int enc)
+    ptrdiff_t reloc,
+    uint64_t start_pc, uint64_t pc,
+    struct register_state f_state[],
+    struct register_state f_start_state[],
+    int daf, int caf, int enc)
 {
 	void *d = data;
 	uint64_t reached_pc = start_pc;
@@ -572,10 +572,10 @@ interpret_ops(void *data, void *data_end,
 
 int
 interpret_op(void **datap, ptrdiff_t reloc,
-	uint64_t *reached_pc_p, uint64_t pc,
-	struct register_state f_state[],
-	struct register_state f_start_state[],
-	int daf, int caf, int enc)
+    uint64_t *reached_pc_p, uint64_t pc,
+    struct register_state f_state[],
+    struct register_state f_start_state[],
+    int daf, int caf, int enc)
 {
 	enum CFA_ops op = separate_op(datap);
 	enum operand_desc opr1 = (cfa_operations[op]).op1;

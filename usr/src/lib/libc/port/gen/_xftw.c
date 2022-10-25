@@ -200,7 +200,7 @@ fwalk(const char *path, int (*fn)(const char *, const struct stat *, int),
 	 *	We must ignore "." and "..", but other than that,
 	 *	just create a path name and call self to check it out.
 	 */
-	while (direntp = readdir(dirp)) {
+	while ((direntp = readdir(dirp)) != NULL) {
 		long here;
 
 		if (strcmp(direntp->d_name, ".") == 0 ||

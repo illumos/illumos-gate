@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "file64.h"
 #include "mtlib.h"
@@ -48,7 +46,7 @@
 
 #include <syslog.h>
 
-#define	islabel(c) 	(isalnum(c) || (c) == '_')
+#define	islabel(c)	(isalnum(c) || (c) == '_')
 
 #define	LIBC_STRDUP(new, existing) \
 	if ((new = libc_strdup(existing)) == NULL) { \
@@ -112,7 +110,7 @@ static struct cons_cell *concell_list; /* stays with add_concell() */
  * not explicitly set by the admin in the conf file, we want the old "resolver
  * retry a few times" rather than no retries at all.
  */
-static int 	dns_tryagain_retry = 3;
+static int	dns_tryagain_retry = 3;
 
 /*
  * For backward compat (pre "lookup control"), the dns default behavior is
@@ -129,11 +127,12 @@ set_dns_default_lkp(struct __nsw_lookup_v1 *lkp)
 
 /*
  * Private interface used by nss_common.c, hence this function is not static
+ *
+ * linep   Nota Bene: not const char *
+ * errp  Meanings are abused a bit
  */
 struct __nsw_switchconfig_v1 *
 _nsw_getoneconfig_v1(const char *name, char *linep, enum __nsw_parse_err *errp)
-	/* linep   Nota Bene: not const char *	*/
-	/* errp  Meanings are abused a bit	*/
 {
 	struct __nsw_switchconfig_v1 *cfp;
 	struct __nsw_lookup_v1 *lkp, **lkq;
@@ -178,7 +177,8 @@ _nsw_getoneconfig_v1(const char *name, char *linep, enum __nsw_parse_err *errp)
 				lkp->actions[i] = __NSW_CONTINUE;
 
 		/* get criteria for the naming service */
-		if (tokenp = skip(&linep, '[')) { /* got criteria */
+		tokenp = skip(&linep, '[');
+		if (tokenp != NULL) { /* got criteria */
 
 			/* premature end, illegal char following [ */
 			if (!islabel(*linep))
@@ -224,12 +224,11 @@ _nsw_getoneconfig_v1(const char *name, char *linep, enum __nsw_parse_err *errp)
 				if (strcasecmp(linep, __NSW_STR_RETURN) == 0)
 					act = __NSW_RETURN;
 				else if (strcasecmp(linep,
-						    __NSW_STR_CONTINUE) == 0) {
+				    __NSW_STR_CONTINUE) == 0) {
 					if (strcasecmp(lkp->service_name,
-						    "dns") == 0 &&
-						strcasecmp(tokenp,
-							__NSW_STR_TRYAGAIN)
-							== 0) {
+					    "dns") == 0 &&
+					    strcasecmp(tokenp,
+					    __NSW_STR_TRYAGAIN) == 0) {
 						/*
 						 * Add one more condition
 						 * so it retries only if it's
@@ -240,7 +239,7 @@ _nsw_getoneconfig_v1(const char *name, char *linep, enum __nsw_parse_err *errp)
 					} else
 						act = __NSW_CONTINUE;
 				} else if (strcasecmp(linep,
-					    __NSW_STR_FOREVER) == 0)
+				    __NSW_STR_FOREVER) == 0)
 					act = __NSW_TRYAGAIN_FOREVER;
 				else if (alldigits(linep)) {
 					act = __NSW_TRYAGAIN_NTIMES;
@@ -253,29 +252,29 @@ _nsw_getoneconfig_v1(const char *name, char *linep, enum __nsw_parse_err *errp)
 
 				if (__NSW_SUCCESS_ACTION(act) &&
 				    strcasecmp(tokenp,
-					    __NSW_STR_SUCCESS) == 0) {
+				    __NSW_STR_SUCCESS) == 0) {
 					lkp->actions[__NSW_SUCCESS] = act;
 				} else if (__NSW_NOTFOUND_ACTION(act) &&
-					strcasecmp(tokenp,
-					    __NSW_STR_NOTFOUND) == 0) {
+				    strcasecmp(tokenp,
+				    __NSW_STR_NOTFOUND) == 0) {
 					lkp->actions[__NSW_NOTFOUND] = act;
 				} else if (__NSW_UNAVAIL_ACTION(act) &&
-					strcasecmp(tokenp,
-					    __NSW_STR_UNAVAIL) == 0) {
+				    strcasecmp(tokenp,
+				    __NSW_STR_UNAVAIL) == 0) {
 					lkp->actions[__NSW_UNAVAIL] = act;
 				} else if (__NSW_TRYAGAIN_ACTION(act) &&
-					strcasecmp(tokenp,
-					    __NSW_STR_TRYAGAIN) == 0) {
+				    strcasecmp(tokenp,
+				    __NSW_STR_TRYAGAIN) == 0) {
 					lkp->actions[__NSW_TRYAGAIN] = act;
 					if (strcasecmp(lkp->service_name,
-						    "nis") == 0)
+					    "nis") == 0)
 						lkp->actions[
 						    __NSW_NISSERVDNS_TRYAGAIN]
 						    = act;
 					if (act == __NSW_TRYAGAIN_NTIMES)
 						lkp->max_retries =
-						dns_continue ?
-						dns_tryagain_retry : ntimes;
+						    dns_continue ?
+						    dns_tryagain_retry : ntimes;
 				} else {
 					/*EMPTY*/
 					/*
@@ -323,11 +322,12 @@ barf_line:
 
 /*
  * Private interface used by nss_common.c, hence this function is not static
+ *
+ * linep   Nota Bene: not const char *
+ * errp  Meanings are abused a bit
  */
 struct __nsw_switchconfig *
 _nsw_getoneconfig(const char *name, char *linep, enum __nsw_parse_err *errp)
-	/* linep   Nota Bene: not const char *	*/
-	/* errp  Meanings are abused a bit	*/
 {
 	struct __nsw_switchconfig *cfp;
 	struct __nsw_lookup *lkp, **lkq;
@@ -370,7 +370,8 @@ _nsw_getoneconfig(const char *name, char *linep, enum __nsw_parse_err *errp)
 				lkp->actions[i] = 0;
 
 		/* get criteria for the naming service */
-		if (tokenp = skip(&linep, '[')) { /* got criteria */
+		tokenp = skip(&linep, '[');
+		if (tokenp != NULL) { /* got criteria */
 
 			/* premature end, illegal char following [ */
 			if (!islabel(*linep))
@@ -410,10 +411,10 @@ _nsw_getoneconfig(const char *name, char *linep, enum __nsw_parse_err *errp)
 				if (strcasecmp(linep, __NSW_STR_RETURN) == 0)
 					act = __NSW_RETURN;
 				else if (strcasecmp(linep,
-					    __NSW_STR_CONTINUE) == 0)
+				    __NSW_STR_CONTINUE) == 0)
 					act = __NSW_CONTINUE;
 				else if (strcasecmp(linep,
-					    __NSW_STR_FOREVER) == 0)
+				    __NSW_STR_FOREVER) == 0)
 					/*
 					 * =forever or =N might be in conf file
 					 * but old progs won't expect it.
@@ -424,16 +425,16 @@ _nsw_getoneconfig(const char *name, char *linep, enum __nsw_parse_err *errp)
 				else
 					goto barf_line;
 				if (strcasecmp(tokenp,
-					    __NSW_STR_SUCCESS) == 0) {
+				    __NSW_STR_SUCCESS) == 0) {
 					lkp->actions[__NSW_SUCCESS] = act;
 				} else if (strcasecmp(tokenp,
-					    __NSW_STR_NOTFOUND) == 0) {
+				    __NSW_STR_NOTFOUND) == 0) {
 					lkp->actions[__NSW_NOTFOUND] = act;
 				} else if (strcasecmp(tokenp,
-					    __NSW_STR_UNAVAIL) == 0) {
+				    __NSW_STR_UNAVAIL) == 0) {
 					lkp->actions[__NSW_UNAVAIL] = act;
 				} else if (strcasecmp(tokenp,
-					    __NSW_STR_TRYAGAIN) == 0) {
+				    __NSW_STR_TRYAGAIN) == 0) {
 					lkp->actions[__NSW_TRYAGAIN] = act;
 				} else {
 					/*EMPTY*/
@@ -521,7 +522,8 @@ __nsw_getconfig_v1(const char *dbase, enum __nsw_parse_err *errp)
 
 	lmutex_lock(&serialize_config_v1);
 top:
-	if (cfp = scrounge_cache_v1(dbase)) {
+	cfp = scrounge_cache_v1(dbase);
+	if (cfp != NULL) {
 		*errp = __NSW_CONF_PARSE_SUCCESS;
 		lmutex_unlock(&serialize_config_v1);
 		if (fp != NULL)
@@ -545,7 +547,7 @@ top:
 	}
 
 	*errp = __NSW_CONF_PARSE_NOPOLICY;
-	while (linep = fgets(lineq, BUFSIZ, fp)) {
+	while ((linep = fgets(lineq, BUFSIZ, fp)) != NULL) {
 		enum __nsw_parse_err	line_err;
 		char			*tokenp, *comment;
 
@@ -565,10 +567,12 @@ top:
 		if ((tokenp = skip(&linep, ':')) == NULL) {
 			continue; /* ignore this line */
 		}
-		if (cfp = scrounge_cache_v1(tokenp)) {
+		cfp = scrounge_cache_v1(tokenp);
+		if (cfp != NULL) {
 			continue; /* ? somehow this database is in the cache */
 		}
-		if (cfp = _nsw_getoneconfig_v1(tokenp, linep, &line_err)) {
+		cfp = _nsw_getoneconfig_v1(tokenp, linep, &line_err);
+		if (cfp != NULL) {
 			(void) add_concell_v1(cfp);
 			if (strcmp(cfp->dbase, dbase) == 0) {
 				*errp = __NSW_CONF_PARSE_SUCCESS;
@@ -619,7 +623,8 @@ __nsw_getconfig(const char *dbase, enum __nsw_parse_err *errp)
 
 	lmutex_lock(&serialize_config);
 top:
-	if (cfp = scrounge_cache(dbase)) {
+	cfp = scrounge_cache(dbase);
+	if (cfp != NULL) {
 		*errp = __NSW_CONF_PARSE_SUCCESS;
 		lmutex_unlock(&serialize_config);
 		if (fp != NULL)
@@ -642,7 +647,7 @@ top:
 	}
 
 	*errp = __NSW_CONF_PARSE_NOPOLICY;
-	while (linep = fgets(lineq, BUFSIZ, fp)) {
+	while ((linep = fgets(lineq, BUFSIZ, fp)) != NULL) {
 		enum __nsw_parse_err	line_err;
 		char			*tokenp, *comment;
 
@@ -659,13 +664,16 @@ top:
 		if ((*linep == '\0') || isspace(*linep)) {
 			continue;
 		}
-		if ((tokenp = skip(&linep, ':')) == NULL) {
+		tokenp = skip(&linep, ':');
+		if (tokenp == NULL) {
 			continue; /* ignore this line */
 		}
-		if (cfp = scrounge_cache(tokenp)) {
+		cfp = scrounge_cache(tokenp);
+		if (cfp != NULL) {
 			continue; /* ? somehow this database is in the cache */
 		}
-		if (cfp = _nsw_getoneconfig(tokenp, linep, &line_err)) {
+		cfp = _nsw_getoneconfig(tokenp, linep, &line_err);
+		if (cfp != NULL) {
 			(void) add_concell(cfp);
 			if (strcmp(cfp->dbase, dbase) == 0) {
 				*errp = __NSW_CONF_PARSE_SUCCESS;
