@@ -970,6 +970,23 @@ vrtc_localize_resources(struct vrtc *vrtc)
 	vmm_glue_callout_localize(&vrtc->callout);
 }
 
+void
+vrtc_pause(struct vrtc *vrtc)
+{
+	VRTC_LOCK(vrtc);
+	callout_stop(&vrtc->callout);
+	VRTC_UNLOCK(vrtc);
+}
+
+void
+vrtc_resume(struct vrtc *vrtc)
+{
+	VRTC_LOCK(vrtc);
+	ASSERT(!callout_active(&vrtc->callout));
+	vrtc_callout_reset(vrtc, vrtc_freq(vrtc));
+	VRTC_UNLOCK(vrtc);
+}
+
 static int
 vrtc_data_read(void *datap, const vmm_data_req_t *req)
 {
@@ -1020,8 +1037,9 @@ vrtc_data_write(void *datap, const vmm_data_req_t *req)
 	time_t curtime = vrtc_curtime(vrtc, NULL);
 	secs_to_rtc(curtime, vrtc, 1);
 
-	/* Make sure the callout is appropriately scheduled */
-	vrtc_callout_reset(vrtc, vrtc_freq(vrtc));
+	if (!vm_is_paused(vrtc->vm)) {
+		vrtc_callout_reset(vrtc, vrtc_freq(vrtc));
+	}
 
 	VRTC_UNLOCK(vrtc);
 	return (0);

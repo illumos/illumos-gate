@@ -402,7 +402,7 @@ struct vm_legacy_cpuid {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	6
+#define	VMM_CURRENT_INTERFACE_VERSION	7
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
@@ -462,6 +462,8 @@ struct vm_legacy_cpuid {
 #define	VM_PMTMR_LOCATE		(VMM_LOCK_IOC_BASE | 0x07)
 #define	VM_MUNMAP_MEMSEG	(VMM_LOCK_IOC_BASE | 0x08)
 #define	VM_UNMAP_PPTDEV_MMIO	(VMM_LOCK_IOC_BASE | 0x09)
+#define	VM_PAUSE		(VMM_LOCK_IOC_BASE | 0x0a)
+#define	VM_RESUME		(VMM_LOCK_IOC_BASE | 0x0b)
 
 #define	VM_WRLOCK_CYCLE		(VMM_LOCK_IOC_BASE | 0xff)
 
