@@ -1,5 +1,5 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -7,17 +7,13 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-/* 	Portions Copyright(c) 1988, Sun Microsystems Inc.	*/
+/*	Portions Copyright(c) 1988, Sun Microsystems Inc.	*/
 /*	All Rights Reserved					*/
 
 /*
  * Copyright (c) 1997, by Sun Microsystems, Inc.
  * All rights reserved.
  */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
-/* LINTLIBRARY */
 
 #include <stdio.h>
 #include <mp.h>
@@ -45,10 +41,8 @@ _mp_move(MINT *a, MINT *b)
 	}
 }
 
-/* ARGSUSED */
-/* VARARGS */
 short *
-_mp_xalloc(int nint, char *s)
+_mp_xalloc(int nint, char *s __unused)
 {
 	short *i;
 
@@ -226,7 +220,7 @@ mp_mtox(MINT *key)
 	} else {
 		size = -key->len;
 	}
-	hex = malloc((size_t) ((size * BASEBITS + 3)) / 4 + (size ? 1 : 2));
+	hex = malloc((size_t)((size * BASEBITS + 3)) / 4 + (size ? 1 : 2));
 	if (hex == NULL) {
 		return (NULL);
 	}
