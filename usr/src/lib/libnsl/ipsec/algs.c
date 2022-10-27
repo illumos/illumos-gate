@@ -591,7 +591,7 @@ void
 _build_internal_algs(ipsec_proto_t **alg_context, int *alg_nums)
 {
 	FILE *f;
-	int rc, trash_num;
+	int rc, trash_num = 0;
 	ipsec_proto_t *new_protos = NULL, *trash;
 	time_t filetime;
 	struct stat statbuf;
