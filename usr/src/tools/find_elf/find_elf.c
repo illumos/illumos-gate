@@ -808,7 +808,7 @@ maybe_obj(const char *name, mode_t mode)
 	size_t len = strlen(name);
 
 	/* If the file name ends in .so, we check */
-	if (len >= 3 && strcmp(&name[len - 4], ".so") == 0) {
+	if (len >= 3 && strcmp(&name[len - 3], ".so") == 0) {
 		return (true);
 	}
 
