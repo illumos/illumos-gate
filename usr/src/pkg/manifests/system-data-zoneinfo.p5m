@@ -17,7 +17,7 @@
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2022.4,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2022.6,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Timezone Information"
 set name=pkg.description value="timezone information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -208,7 +208,7 @@ hardlink path=usr/share/lib/zoneinfo/America/Montreal target=Toronto
 hardlink path=usr/share/lib/zoneinfo/America/Montserrat target=Puerto_Rico
 hardlink path=usr/share/lib/zoneinfo/America/Nassau target=Toronto
 file path=usr/share/lib/zoneinfo/America/New_York
-file path=usr/share/lib/zoneinfo/America/Nipigon
+hardlink path=usr/share/lib/zoneinfo/America/Nipigon target=Toronto
 file path=usr/share/lib/zoneinfo/America/Nome
 file path=usr/share/lib/zoneinfo/America/Noronha
 dir  path=usr/share/lib/zoneinfo/America/North_Dakota
@@ -227,7 +227,7 @@ hardlink path=usr/share/lib/zoneinfo/America/Porto_Acre target=Rio_Branco
 file path=usr/share/lib/zoneinfo/America/Porto_Velho
 file path=usr/share/lib/zoneinfo/America/Puerto_Rico
 file path=usr/share/lib/zoneinfo/America/Punta_Arenas
-file path=usr/share/lib/zoneinfo/America/Rainy_River
+hardlink path=usr/share/lib/zoneinfo/America/Rainy_River target=Winnipeg
 file path=usr/share/lib/zoneinfo/America/Rankin_Inlet
 file path=usr/share/lib/zoneinfo/America/Recife
 file path=usr/share/lib/zoneinfo/America/Regina
@@ -251,7 +251,7 @@ hardlink path=usr/share/lib/zoneinfo/America/St_Vincent target=Puerto_Rico
 file path=usr/share/lib/zoneinfo/America/Swift_Current
 file path=usr/share/lib/zoneinfo/America/Tegucigalpa
 file path=usr/share/lib/zoneinfo/America/Thule
-file path=usr/share/lib/zoneinfo/America/Thunder_Bay
+hardlink path=usr/share/lib/zoneinfo/America/Thunder_Bay target=Toronto
 file path=usr/share/lib/zoneinfo/America/Tijuana
 file path=usr/share/lib/zoneinfo/America/Toronto
 hardlink path=usr/share/lib/zoneinfo/America/Tortola target=Puerto_Rico

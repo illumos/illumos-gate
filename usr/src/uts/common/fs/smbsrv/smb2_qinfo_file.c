@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -72,7 +73,10 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 	case FileAllInformation:
 		mask = SMB_AT_ALL;
 		getstd = B_TRUE;
-		getname = B_TRUE;
+		if (sr->session->dialect < SMB_VERS_3_11) {
+			/* See smb2_qif_all() */
+			getname = B_TRUE;
+		}
 		break;
 
 	case FileNameInformation:
@@ -196,6 +200,8 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
  *	FileModeInformation
  *	FileAlignmentInformation
  *	FileNameInformation
+ *
+ * Note: FileNameInformation is all zero on Win2016 and later.
  */
 static uint32_t
 smb2_qif_all(smb_request_t *sr, smb_queryinfo_t *qi)
@@ -223,11 +229,24 @@ smb2_qif_all(smb_request_t *sr, smb_queryinfo_t *qi)
 	status = smb2_qif_alignment(sr, qi);
 	if (status)
 		return (status);
-	status = smb2_qif_name(sr, qi);
-	if (status)
-		return (status);
 
-	return (0);
+	/*
+	 * MS-SMB2 3.3.5.20.1 says (in a windows behavior note) that
+	 * 2012R2 and older fill in the FileNameInformation.
+	 * We could let this depend on sr->sr_cfg->skc_version
+	 * but doing it based on dialect is a lot easier and
+	 * has nearly the same effect.
+	 */
+	if (sr->session->dialect < SMB_VERS_3_11) {
+		/* Win2012r2 and earlier fill it in. (SMB 3.0) */
+		status = smb2_qif_name(sr, qi);
+	} else {
+		/* Win2016 and later just put zeros (SMB 3.11) */
+		int rc = smb_mbc_encodef(&sr->raw_data, "10.");
+		status = (rc == 0) ? 0 : NT_STATUS_BUFFER_OVERFLOW;
+	}
+
+	return (status);
 }
 
 /*

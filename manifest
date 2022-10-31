@@ -11492,7 +11492,7 @@ h usr/share/lib/zoneinfo/America/Montreal=usr/share/lib/zoneinfo/America/Toronto
 h usr/share/lib/zoneinfo/America/Montserrat=usr/share/lib/zoneinfo/America/Puerto_Rico
 h usr/share/lib/zoneinfo/America/Nassau=usr/share/lib/zoneinfo/America/Toronto
 f usr/share/lib/zoneinfo/America/New_York 0644 root bin
-f usr/share/lib/zoneinfo/America/Nipigon 0644 root bin
+h usr/share/lib/zoneinfo/America/Nipigon=usr/share/lib/zoneinfo/America/Toronto
 f usr/share/lib/zoneinfo/America/Nome 0644 root bin
 f usr/share/lib/zoneinfo/America/Noronha 0644 root bin
 d usr/share/lib/zoneinfo/America/North_Dakota 0755 root bin
@@ -11511,7 +11511,7 @@ h usr/share/lib/zoneinfo/America/Porto_Acre=usr/share/lib/zoneinfo/America/Rio_B
 f usr/share/lib/zoneinfo/America/Porto_Velho 0644 root bin
 f usr/share/lib/zoneinfo/America/Puerto_Rico 0644 root bin
 f usr/share/lib/zoneinfo/America/Punta_Arenas 0644 root bin
-f usr/share/lib/zoneinfo/America/Rainy_River 0644 root bin
+h usr/share/lib/zoneinfo/America/Rainy_River=usr/share/lib/zoneinfo/America/Winnipeg
 f usr/share/lib/zoneinfo/America/Rankin_Inlet 0644 root bin
 f usr/share/lib/zoneinfo/America/Recife 0644 root bin
 f usr/share/lib/zoneinfo/America/Regina 0644 root bin
@@ -11535,7 +11535,7 @@ f usr/share/lib/zoneinfo/America/St_Vincent 0644 root bin
 f usr/share/lib/zoneinfo/America/Swift_Current 0644 root bin
 f usr/share/lib/zoneinfo/America/Tegucigalpa 0644 root bin
 f usr/share/lib/zoneinfo/America/Thule 0644 root bin
-f usr/share/lib/zoneinfo/America/Thunder_Bay 0644 root bin
+h usr/share/lib/zoneinfo/America/Thunder_Bay=usr/share/lib/zoneinfo/America/Toronto
 f usr/share/lib/zoneinfo/America/Tijuana 0644 root bin
 f usr/share/lib/zoneinfo/America/Toronto 0644 root bin
 h usr/share/lib/zoneinfo/America/Tortola=usr/share/lib/zoneinfo/America/Puerto_Rico
