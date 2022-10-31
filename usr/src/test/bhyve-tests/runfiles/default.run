@@ -37,6 +37,7 @@ tests = [
 	'mem_devmem',
 	'mem_partial',
 	'mem_seg_map',
+	'npt_ops',
 	'pause_resume',
 	'self_destruct'
 	]

@@ -1370,8 +1370,63 @@ vm_set_run_state(struct vm *vm, int vcpuid, uint32_t state, uint8_t sipi_vec)
 int
 vm_track_dirty_pages(struct vm *vm, uint64_t gpa, size_t len, uint8_t *bitmap)
 {
-	vmspace_t *vms = vm_get_vmspace(vm);
-	return (vmspace_track_dirty(vms, gpa, len, bitmap));
+	ASSERT0(gpa & PAGEOFFSET);
+	ASSERT0(len & PAGEOFFSET);
+
+	/*
+	 * The only difference in expectations between this legacy interface and
+	 * an equivalent call to vm_npt_do_operation() is the check for
+	 * dirty-page-tracking being enabled on the vmspace.
+	 */
+	if (!vmspace_get_tracking(vm->vmspace)) {
+		return (EPERM);
+	}
+
+	vmspace_bits_operate(vm->vmspace, gpa, len,
+	    VBO_RESET_DIRTY | VBO_FLAG_BITMAP_OUT, bitmap);
+	return (0);
+}
+
+int
+vm_npt_do_operation(struct vm *vm, uint64_t gpa, size_t len, uint32_t oper,
+    uint8_t *bitmap, int *rvalp)
+{
+	ASSERT0(gpa & PAGEOFFSET);
+	ASSERT0(len & PAGEOFFSET);
+
+	/*
+	 * For now, the bits defined in vmm_dev.h are meant to match up 1:1 with
+	 * those in vmm_vm.h
+	 */
+	CTASSERT(VNO_OP_RESET_DIRTY == VBO_RESET_DIRTY);
+	CTASSERT(VNO_OP_SET_DIRTY == VBO_SET_DIRTY);
+	CTASSERT(VNO_OP_GET_DIRTY == VBO_GET_DIRTY);
+	CTASSERT(VNO_FLAG_BITMAP_IN == VBO_FLAG_BITMAP_IN);
+	CTASSERT(VNO_FLAG_BITMAP_OUT == VBO_FLAG_BITMAP_OUT);
+
+	const uint32_t oper_only =
+	    oper & ~(VNO_FLAG_BITMAP_IN | VNO_FLAG_BITMAP_OUT);
+	switch (oper_only) {
+	case VNO_OP_RESET_DIRTY:
+	case VNO_OP_SET_DIRTY:
+	case VNO_OP_GET_DIRTY:
+		if (len == 0) {
+			break;
+		}
+		vmspace_bits_operate(vm->vmspace, gpa, len, oper, bitmap);
+		break;
+	case VNO_OP_GET_TRACK_DIRTY:
+		ASSERT3P(rvalp, !=, NULL);
+		*rvalp = vmspace_get_tracking(vm->vmspace) ? 1 : 0;
+		break;
+	case VNO_OP_EN_TRACK_DIRTY:
+		return (vmspace_set_tracking(vm->vmspace, true));
+	case VNO_OP_DIS_TRACK_DIRTY:
+		return (vmspace_set_tracking(vm->vmspace, false));
+	default:
+		return (EINVAL);
+	}
+	return (0);
 }
 
 static void

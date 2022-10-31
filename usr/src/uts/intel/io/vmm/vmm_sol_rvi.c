@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -139,6 +139,22 @@ rvi_reset_accessed(uint64_t *entry, bool on)
 	return (rvi_reset_bits(entry, (PT_MOD | PT_REF), on ? PT_REF : 0));
 }
 
+static bool
+rvi_query(uint64_t *entry, vmm_gpt_query_t query)
+{
+	ASSERT(entry != NULL);
+
+	const uint64_t pte = *entry;
+	switch (query) {
+	case VGQ_ACCESSED:
+		return ((pte & PT_REF) != 0);
+	case VGQ_DIRTY:
+		return ((pte & PT_MOD) != 0);
+	default:
+		panic("unrecognized query: %d", query);
+	}
+}
+
 static uint64_t
 rvi_get_pmtp(pfn_t root_pfn, bool track_dirty)
 {
@@ -160,6 +176,7 @@ vmm_pte_ops_t rvi_pte_ops = {
 	.vpeo_pte_prot		= rvi_pte_prot,
 	.vpeo_reset_dirty	= rvi_reset_dirty,
 	.vpeo_reset_accessed	= rvi_reset_accessed,
+	.vpeo_query		= rvi_query,
 	.vpeo_get_pmtp		= rvi_get_pmtp,
 	.vpeo_hw_ad_supported	= rvi_hw_ad_supported,
 };

@@ -33,7 +33,8 @@ PROG =	mem_partial \
 	pause_resume \
 	import_vlapic \
 	time_data \
-	maxcpu
+	maxcpu \
+	npt_ops
 
 COMMON_OBJS =	common.o
 CLEAN_OBJS =	$(PROG:%=%.o)

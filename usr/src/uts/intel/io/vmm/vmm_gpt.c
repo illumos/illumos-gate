@@ -771,6 +771,9 @@ vmm_gpt_is_mapped(vmm_gpt_t *gpt, uint64_t *ptep, pfn_t *pfnp, uint_t *protp)
 {
 	uint64_t entry;
 
+	ASSERT(pfnp != NULL);
+	ASSERT(protp != NULL);
+
 	if (ptep == NULL) {
 		return (false);
 	}
@@ -808,6 +811,16 @@ vmm_gpt_reset_dirty(vmm_gpt_t *gpt, uint64_t *entry, bool on)
 }
 
 /*
+ * Query state from PTE pointed to by `entry`.
+ */
+bool
+vmm_gpt_query(vmm_gpt_t *gpt, uint64_t *entry, vmm_gpt_query_t query)
+{
+	ASSERT(entry != NULL);
+	return (gpt->vgpt_pte_ops->vpeo_query(entry, query));
+}
+
+/*
  * Get properly formatted PML4 (EPTP/nCR3) for GPT.
  */
 uint64_t
@@ -815,4 +828,13 @@ vmm_gpt_get_pmtp(vmm_gpt_t *gpt, bool track_dirty)
 {
 	const pfn_t root_pfn = gpt->vgpt_root->vgn_host_pfn;
 	return (gpt->vgpt_pte_ops->vpeo_get_pmtp(root_pfn, track_dirty));
+}
+
+/*
+ * Does the GPT hardware support dirty-page-tracking?
+ */
+bool
+vmm_gpt_can_track_dirty(vmm_gpt_t *gpt)
+{
+	return (gpt->vgpt_pte_ops->vpeo_hw_ad_supported());
 }
