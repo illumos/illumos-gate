@@ -609,12 +609,6 @@ uint32_t pcie_link_retrain_delay_ms = 10;
 taskq_t *pcie_link_tq;
 kmutex_t pcie_link_tq_mutex;
 
-static void pcie_scan_mps(dev_info_t *rc_dip, dev_info_t *dip,
-	int *max_supported);
-static int pcie_get_max_supported(dev_info_t *dip, void *arg);
-static int pcie_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
-    caddr_t *addrp, ddi_acc_handle_t *handlep);
-static void pcie_unmap_phys(ddi_acc_handle_t *handlep,	pci_regspec_t *ph);
 static int pcie_link_bw_intr(dev_info_t *);
 static void pcie_capture_speeds(dev_info_t *);
 
@@ -2808,79 +2802,6 @@ pcie_dev(dev_info_t *dip)
 
 	ddi_prop_free(device_type);
 	return (rc);
-}
-
-/*
- * Function to map in a device's memory space.
- */
-static int
-pcie_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
-    caddr_t *addrp, ddi_acc_handle_t *handlep)
-{
-	ddi_map_req_t mr;
-	ddi_acc_hdl_t *hp;
-	int result;
-	ddi_device_acc_attr_t attr;
-
-	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
-	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
-	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
-	attr.devacc_attr_access = DDI_CAUTIOUS_ACC;
-
-	*handlep = impl_acc_hdl_alloc(KM_SLEEP, NULL);
-	hp = impl_acc_hdl_get(*handlep);
-	hp->ah_vers = VERS_ACCHDL;
-	hp->ah_dip = dip;
-	hp->ah_rnumber = 0;
-	hp->ah_offset = 0;
-	hp->ah_len = 0;
-	hp->ah_acc = attr;
-
-	mr.map_op = DDI_MO_MAP_LOCKED;
-	mr.map_type = DDI_MT_REGSPEC;
-	mr.map_obj.rp = (struct regspec *)phys_spec;
-	mr.map_prot = PROT_READ | PROT_WRITE;
-	mr.map_flags = DDI_MF_KERNEL_MAPPING;
-	mr.map_handlep = hp;
-	mr.map_vers = DDI_MAP_VERSION;
-
-	result = ddi_map(dip, &mr, 0, 0, addrp);
-
-	if (result != DDI_SUCCESS) {
-		impl_acc_hdl_free(*handlep);
-		*handlep = (ddi_acc_handle_t)NULL;
-	} else {
-		hp->ah_addr = *addrp;
-	}
-
-	return (result);
-}
-
-/*
- * Map out memory that was mapped in with pcie_map_phys();
- */
-static void
-pcie_unmap_phys(ddi_acc_handle_t *handlep,  pci_regspec_t *ph)
-{
-	ddi_map_req_t mr;
-	ddi_acc_hdl_t *hp;
-
-	hp = impl_acc_hdl_get(*handlep);
-	ASSERT(hp);
-
-	mr.map_op = DDI_MO_UNMAP;
-	mr.map_type = DDI_MT_REGSPEC;
-	mr.map_obj.rp = (struct regspec *)ph;
-	mr.map_prot = PROT_READ | PROT_WRITE;
-	mr.map_flags = DDI_MF_KERNEL_MAPPING;
-	mr.map_handlep = hp;
-	mr.map_vers = DDI_MAP_VERSION;
-
-	(void) ddi_map(hp->ah_dip, &mr, hp->ah_offset,
-	    hp->ah_len, &hp->ah_addr);
-
-	impl_acc_hdl_free(*handlep);
-	*handlep = (ddi_acc_handle_t)NULL;
 }
 
 void
