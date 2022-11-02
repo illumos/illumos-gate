@@ -458,9 +458,14 @@ build_environment_module(void)
 	vm_offset_t laddr;
 
 	/* We can't load first */
-	if ((file_findfile(NULL, NULL)) == NULL) {
+	if (file_findfile(NULL, NULL) == NULL) {
 		printf("Can not load environment module: %s\n",
 		    "the kernel is not loaded");
+		return;
+	}
+
+	if (file_findfile(name, name) != NULL) {
+		printf("warning: '%s' is already loaded\n", name);
 		return;
 	}
 
@@ -522,9 +527,14 @@ build_font_module(void)
 		return;
 
 	/* We can't load first */
-	if ((file_findfile(NULL, NULL)) == NULL) {
+	if (file_findfile(NULL, NULL) == NULL) {
 		printf("Can not load font module: %s\n",
 		    "the kernel is not loaded");
+		return;
+	}
+
+	if (file_findfile(name, name) != NULL) {
+		printf("warning: '%s' is already loaded\n", name);
 		return;
 	}
 
