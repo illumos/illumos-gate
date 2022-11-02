@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -197,6 +198,9 @@ smb_notify_act1(smb_request_t *sr, uint32_t buflen, uint32_t filter)
 		/* Notify change is only valid on directories. */
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
+
+	if ((of->f_granted_access & FILE_LIST_DIRECTORY) == 0)
+		return (NT_STATUS_ACCESS_DENIED);
 
 	mutex_enter(&of->f_mutex);
 
