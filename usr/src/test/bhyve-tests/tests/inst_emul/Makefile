@@ -23,7 +23,8 @@ PROG =	rdmsr \
 # These should probably go in the `vmm` tests, but since they depend on
 # in-guest payloads, it is easier to build them here.
 PROG +=	triple_fault \
-	exit_paging
+	exit_paging \
+	page_dirty
 
 # C-based payloads need additional utils object
 CPAYLOADS =	cpuid
