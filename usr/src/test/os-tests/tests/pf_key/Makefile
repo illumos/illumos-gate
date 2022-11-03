@@ -11,13 +11,15 @@
 
 #
 # Copyright 2017 Joyent, Inc.
+# Copyright 2022 MNX Cloud, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
 # Shell scripts...
-PROG =	acquire-spray \
+PROG =	15146 \
+	acquire-spray \
 	acquire-compare \
 	kmc-update
 

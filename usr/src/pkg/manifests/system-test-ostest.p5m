@@ -16,6 +16,7 @@
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2022 Oxide Computer Company
+# Copyright 2022 MNX Cloud, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/ostest@$(PKGVERS)
@@ -90,6 +91,7 @@ file path=opt/os-tests/tests/libtopo/digraph-test-in.xml mode=0444
 file path=opt/os-tests/tests/odirectory.32 mode=0555
 file path=opt/os-tests/tests/odirectory.64 mode=0555
 dir  path=opt/os-tests/tests/pf_key
+file path=opt/os-tests/tests/pf_key/15146 mode=0555
 file path=opt/os-tests/tests/pf_key/acquire-compare mode=0555
 file path=opt/os-tests/tests/pf_key/acquire-spray mode=0555
 file path=opt/os-tests/tests/pf_key/eacq-enabler mode=0555

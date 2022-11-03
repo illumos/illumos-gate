@@ -15,6 +15,7 @@
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2022 Oxide Computer Company
+# Copyright 2022 MNX Cloud, Inc.
 #
 
 [DEFAULT]
@@ -82,7 +83,7 @@ tests = ['fchmodat.32', 'fchmodat.64', 'open.32', 'open.64']
 [/opt/os-tests/tests/pf_key]
 user = root
 timeout = 180
-tests = ['acquire-compare', 'kmc-update']
+tests = ['acquire-compare', 'kmc-update', '15146']
 
 [/opt/os-tests/tests/ddi_ufm]
 user = root
