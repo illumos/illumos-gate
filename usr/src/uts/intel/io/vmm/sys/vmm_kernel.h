@@ -131,6 +131,10 @@ void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
 int vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
     uint16_t threads, uint16_t maxcpus);
 
+int vm_pause_instance(struct vm *);
+int vm_resume_instance(struct vm *);
+bool vm_is_paused(struct vm *);
+
 /*
  * APIs that race against hardware.
  */

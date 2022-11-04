@@ -30,7 +30,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _VLAPIC_H_
@@ -104,5 +104,7 @@ void vlapic_lvt_write_handler(struct vlapic *vlapic, uint32_t offset);
 void vlapic_self_ipi_handler(struct vlapic *vlapic, uint32_t val);
 
 void vlapic_localize_resources(struct vlapic *vlapic);
+void vlapic_pause(struct vlapic *);
+void vlapic_resume(struct vlapic *);
 
 #endif	/* _VLAPIC_H_ */

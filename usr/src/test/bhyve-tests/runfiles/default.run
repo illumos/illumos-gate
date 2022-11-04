@@ -37,6 +37,7 @@ tests = [
 	'mem_devmem',
 	'mem_partial',
 	'mem_seg_map',
+	'pause_resume',
 	'self_destruct'
 	]
 post = vmm_drv_test_fini

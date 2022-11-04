@@ -220,6 +220,7 @@ struct vm {
 	struct ioport_config ioports;		/* (o) ioport handling */
 
 	bool		mem_transient;		/* (o) alloc transient memory */
+	bool		is_paused;		/* (i) instance is paused */
 };
 
 static int vmm_initialized;
@@ -725,6 +726,58 @@ vm_reinit(struct vm *vm, uint64_t flags)
 
 	vm_cleanup(vm, false);
 	vm_init(vm, false);
+	return (0);
+}
+
+bool
+vm_is_paused(struct vm *vm)
+{
+	return (vm->is_paused);
+}
+
+int
+vm_pause_instance(struct vm *vm)
+{
+	if (vm->is_paused) {
+		return (EALREADY);
+	}
+	vm->is_paused = true;
+
+	for (uint_t i = 0; i < vm->maxcpus; i++) {
+		struct vcpu *vcpu = &vm->vcpu[i];
+
+		if (!CPU_ISSET(i, &vm->active_cpus)) {
+			continue;
+		}
+		vlapic_pause(vcpu->vlapic);
+	}
+	vhpet_pause(vm->vhpet);
+	vatpit_pause(vm->vatpit);
+	vrtc_pause(vm->vrtc);
+
+	return (0);
+}
+
+int
+vm_resume_instance(struct vm *vm)
+{
+	if (!vm->is_paused) {
+		return (EALREADY);
+	}
+	vm->is_paused = false;
+
+	vrtc_resume(vm->vrtc);
+	vatpit_resume(vm->vatpit);
+	vhpet_resume(vm->vhpet);
+	for (uint_t i = 0; i < vm->maxcpus; i++) {
+		struct vcpu *vcpu = &vm->vcpu[i];
+
+		if (!CPU_ISSET(i, &vm->active_cpus)) {
+			continue;
+		}
+		vlapic_resume(vcpu->vlapic);
+	}
+
 	return (0);
 }
 

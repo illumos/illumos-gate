@@ -30,7 +30,8 @@ PROG =	mem_partial \
 	drv_hold \
 	cpuid_ioctl \
 	default_capabs \
-	datarw_constraints
+	datarw_constraints \
+	pause_resume
 
 SCRIPT = vmm_drv_test_fini vmm_drv_test_init
 
