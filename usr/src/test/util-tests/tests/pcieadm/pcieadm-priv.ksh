@@ -102,9 +102,9 @@ else
 fi
 
 #
-# Do the same based on the device name
+# Do the same based on the device instance.
 #
-pcieadm_dev=$($pcieadm_prog show-devs -p -o driver | \
+pcieadm_dev=$($pcieadm_prog show-devs -p -o instance | \
     awk '{ if ($1 != "--") { print $1; exit 0 } }')
 if [[ -z "$pcieadm_dev" ]]; then
 	warn "failed to obtain driver based filter"
