@@ -10,6 +10,7 @@
 .\"
 .\"
 .\" Copyright 2018, Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
 .\"
 .Dd September 20, 2021
 .Dt CTFDUMP 1
@@ -33,48 +34,30 @@ data contained inside of
 objects and raw
 .Sy CTF
 files.
-.Lp
+.Pp
 .Nm
-can dump information about the
-.Sy CTF header ,
-the
-.Sy labels
-encoded in the
-.Sy CTF
-container,
-the types of
-.Sy data objects ,
-the internal
-.Sy string
-table,
-the types of the return function and the arguments for
-.Sy functions ,
-and of course, it displays information about the
-.Sy types
-defined in the
-.Sy CTF
-container.
-.Lp
+can dump information about the CTF header, the labels encoded in the
+CTF container, the types of data objects, the internal string table,
+the types of the return function and the arguments for functions,
+and of course, it displays information about the types defined in the
+CTF container.
+.Pp
 .Nm
-can also be used to dump out the raw
-.Sy CTF
-data and send it to another file.
-When writing out data, it always ensures that the
-.Sy CTF
-data is decompressed.
-In this form, the
-.Sy CTF
-data can be inspected using
+can also be used to dump out the raw CTF data and send it to another
+file.
+When writing out data, it always ensures that the CTF data is
+decompressed.
+In this form, the CTF data can be inspected using
 .Nm
 and other tools such as
 .Xr mdb 1 .
-.Lp
+.Pp
 .Nm
 in
 .Fl c
 mode will generate C-style output, which can be used for comparison.
 Note that this output is not directly compilable.
-.Lp
+.Pp
 When no options are specified,
 .Nm
 displays all information, except the C-style output.
@@ -84,99 +67,58 @@ option is used, then no information is displayed by default, unless
 requested through the appropriate option.
 .Sh OPTIONS
 The following options are supported:
-.Bl -hang -width Ds
+.Bl -tag -width Ds
 .It Fl c
-.Bd -filled -compact
 Generate C-style output.
-.Ed
 .It Fl d
-.Bd -filled -compact
 Dump the types of symbols that correspond to objects.
-.Ed
 .It Fl f
-.Bd -filled -compact
 Dump the types of the return values and arguments of the functions.
-.Ed
 .It Fl h
-.Bd -filled -compact
-Dump the
-.Sy CTF
-header
-.Ed
+Dump the CTF header
 .It Fl l
-.Bd -filled -compact
-Dump all
-.Sy CTF
-labels associated with the file.
-.Ed
+Dump all CTF labels associated with the file.
 .It Fl p Ar parent
-.Bd -filled -compact
 Use the type information in
-.Em parent
+.Ar parent
 to supplement output.
 This is useful when a
-.Nm CTF
-container has been
-.Sy uniquified
-against
-.Em parent .
+.Nm
+CTF container has been uniquified against
+.Ar parent .
 This allows
 .Nm
 to use the names of types when used with
 .Fl t .
-.Ed
 .It Fl s
-.Bd -filled -compact
-Dump the internal
-.Sy CTF
-string table
-.Ed
+Dump the internal CTF string table
 .It Fl S
-.Bd -filled -compact
-Displays statistics about the
-.Sy CTF
-container.
-.Ed
+Displays statistics about the CTF container.
 .It Fl t
-.Bd -filled -compact
-Dump the type information contained in the
-.Sy CTF
-container.
-.Ed
+Dump the type information contained in the CTF container.
 .It Fl u Ar outfile
-.Bd -filled -compact
-Copies the uncompressed
-.Sy CTF
-data to the file specified by
-.Em outfile .
-This can be used to make it easier to inspect the raw
-.Sy CTF
-data.
-.Ed
+Copies the uncompressed CTF data to the file specified by
+.Ar outfile .
+This can be used to make it easier to inspect the raw CTF data.
 .El
 .Sh OUTPUT
 When the
 .Nm
 utility is executed with its default options, it prints out a textual
-representation of the
-.Sy CTF
-information.
+representation of the CTF information.
 Note, the output format of
 .Nm
 is subject to change at any time and should not be relied upon as a
 stable format to be used for parsing.
 .Ss CTF Header
-This section describes the values in the
-.Sy CTF
-header.
+This section describes the values in the CTF header.
 Each line in the section describes the value of one of the
 members of the header.
 For more information on the meaning and interpretation of these members,
 see
 .Xr ctf 5 .
 .Ss Label Table
-This section describes information about the labels present in the
-.Sy CTF
+This section describes information about the labels present in the CTF
 information.
 Each entry in this section, if present, starts with a
 number and is followed by a string.
@@ -196,8 +138,7 @@ is the name of the label.
 In this case, if there were no other labels,
 it would indicate that the label applied to all types up to, and
 including, the type number 2270.
-For more information on how labels are used with
-.Sy CTF
+For more information on how labels are used with CTF
 information, see the section
 .Em The Label Section
 in
@@ -260,8 +201,7 @@ symbol table.
 The following portions of this entry describe the return
 type and then all of the arguments, in positional order.
 .Ss Types
-The types section gives information about each type in the
-.Sy CTF
+The types section gives information about each type in the CTF
 container.
 Each entry begins with its type identifier.
 The type identifier may either be in square brackets or in angle
@@ -303,40 +243,43 @@ Structures and unions will be preceded with the corresponding C keyword,
 or
 .Sy union .
 After that, the size in bytes of the structure will be indicated.
-ON each subsequent line, a single member will be listed.
+On each subsequent line, a single member will be listed.
 That line will contain the member's name, it's type identifier, and the
-offset into the structure that it can be found in, in bits.
+offset into the structure that the member starts at.
+The first values is in bits, which is what CTF encodes.
+It is then followed by bytes and the bit offset into the byte.
+That is the value
+.Sq 2.5
+indicates that it starts at the 5th bit in the 2nd byte
+.Pq i.e. bit 21 .
 .Pp
 The following show examples of type information for all of these
 different types:
 .Bd -literal
 \&...
-  [5] char [12] contents: 1, index: 2
-  [6] short encoding=SIGNED offset=0 bits=16
-  <7> struct exit_status (4 bytes)
-        e_termination type=6 off=0
-        e_exit type=6 off=16
+  [155] struct ctf_merge_handle (80 bytes)
+        cmh_inputs type=165 off=0 bits (0.0 bytes)
+        cmh_ninputs type=6 off=256 bits (32.0 bytes)
+        cmh_nthreads type=6 off=288 bits (36.0 bytes)
+        cmh_unique type=65 off=320 bits (40.0 bytes)
+        cmh_msyms type=115 off=384 bits (48.0 bytes)
+        cmh_ofd type=34 off=416 bits (52.0 bytes)
+        cmh_flags type=34 off=448 bits (56.0 bytes)
+        cmh_label type=94 off=512 bits (64.0 bytes)
+        cmh_pname type=94 off=576 bits (72.0 bytes)
 
-  <8> typedef time_t refers to 2
-  <9> struct utmp (36 bytes)
-        ut_user type=3 off=0
-        ut_id type=4 off=64
-        ut_line type=5 off=96
-        ut_pid type=6 off=192
-        ut_type type=6 off=208
-        ut_exit type=7 off=224
-        ut_time type=8 off=256
+  <156> typedef ctf_merge_t refers to 155
+  [157] struct __va_list_tag (24 bytes)
+        gp_offset type=5 off=0 bits (0.0 bytes)
+        fp_offset type=5 off=32 bits (4.0 bytes)
+        overflow_arg_area type=41 off=64 bits (8.0 bytes)
+        reg_save_area type=41 off=128 bits (16.0 bytes)
 
-  <10> struct utmp * refers to 9
-  [11] const struct utmp refers to 9
-  [12] const struct utmp * refers to 11
-  <13> int encoding=SIGNED offset=0 bits=32
-  <14> typedef int32_t refers to 13
+  [158] struct __va_list_tag [1] contents: 157, index: 9
 \&...
 .Ed
 .Ss String Table
-This section describes all of the strings that are present in the
-.Sy CTF
+This section describes all of the strings that are present in the CTF
 container.
 Each line represents an entry in the string table.
 First the byte offset into the string table is shown in brackets and
@@ -351,25 +294,24 @@ Note the following examples:
   [35] short
 .Ed
 .Ss Statistics
-This section contains miscellaneous statistics about the
-.Sy CTF
-data present.
+This section contains miscellaneous statistics about the CTF data
+present.
 Each line contains a single statistic.
 A brief explanation of the statistic is placed first, followed by an
 equals sign, and then finally the value.
 .Sh EXIT STATUS
-.Bl -inset
+.Bl -tag -width Ds
 .It Sy 0
-.Dl Execution completed successfully.
+Execution completed successfully.
 .It Sy 1
-.Dl A fatal error occurred.
+A fatal error occurred.
 .It Sy 2
-.Dl Invalid command line options were specified.
+Invalid command line options were specified.
 .El
 .Sh EXAMPLES
 .Sy Example 1
 Displaying the Type Section of a Single File
-.Lp
+.Pp
 The following example dumps the type section of the file
 .Sy /usr/lib/libc.so.1 .
 .Bd -literal -offset 6n
@@ -385,10 +327,10 @@ $ ctfdump -t /usr/lib/libc.so.1
   <7> typedef uintptr_t refers to 4
 \&...
 .Ed
-.Lp
+.Pp
 .Sy Example 2
 Dumping the CTF data to Another File
-.Lp
+.Pp
 The following example dumps the entire CTF data from the file
 .Sy /usr/lib/libc.so.1
 and places it into the file
@@ -417,7 +359,7 @@ $ mdb ./ctf.out
     cth_strlen = 0x7c9c
 }
 .Ed
-.Lp
+.Pp
 .Sy Example 3
 Dumping C-style output
 .Bd -literal -offset 6n
