@@ -173,17 +173,15 @@ static void pci_vtcon_announce_port(struct pci_vtcon_port *);
 static void pci_vtcon_open_port(struct pci_vtcon_port *, bool);
 
 static struct virtio_consts vtcon_vi_consts = {
-	"vtcon",		/* our name */
-	VTCON_MAXQ,		/* we support VTCON_MAXQ virtqueues */
-	sizeof(struct pci_vtcon_config), /* config reg size */
-	pci_vtcon_reset,	/* reset */
-	NULL,			/* device-wide qnotify */
-	pci_vtcon_cfgread,	/* read virtio config */
-	pci_vtcon_cfgwrite,	/* write virtio config */
-	pci_vtcon_neg_features,	/* apply negotiated features */
-	VTCON_S_HOSTCAPS,	/* our capabilities */
+	.vc_name =	"vtcon",
+	.vc_nvq =	VTCON_MAXQ,
+	.vc_cfgsize =	sizeof(struct pci_vtcon_config),
+	.vc_reset =	pci_vtcon_reset,
+	.vc_cfgread =	pci_vtcon_cfgread,
+	.vc_cfgwrite =	pci_vtcon_cfgwrite,
+	.vc_apply_features = pci_vtcon_neg_features,
+	.vc_hv_caps =	VTCON_S_HOSTCAPS,
 };
-
 
 static void
 pci_vtcon_reset(void *vsc)
@@ -216,9 +214,9 @@ pci_vtcon_cfgread(void *vsc, int offset, int size, uint32_t *retval)
 }
 
 static int
-pci_vtcon_cfgwrite(void *vsc, int offset, int size, uint32_t val)
+pci_vtcon_cfgwrite(void *vsc __unused, int offset __unused, int size __unused,
+    uint32_t val __unused)
 {
-
 	return (0);
 }
 
@@ -279,11 +277,10 @@ static int
 pci_vtcon_sock_add(struct pci_vtcon_softc *sc, const char *port_name,
     const nvlist_t *nvl)
 {
+	struct pci_vtcon_sock *sock = NULL;
 #ifdef __FreeBSD__
-	struct pci_vtcon_sock *sock;
 	struct sockaddr_un sun;
 #else
-	struct pci_vtcon_sock *sock = NULL;
 	/* Our compiler #defines 'sun' as '1'.  Awesome. */
 	struct sockaddr_un addr;
 #endif
@@ -487,8 +484,8 @@ close:
 }
 
 static void
-pci_vtcon_sock_tx(struct pci_vtcon_port *port, void *arg, struct iovec *iov,
-    int niov)
+pci_vtcon_sock_tx(struct pci_vtcon_port *port __unused, void *arg __unused,
+    struct iovec *iov, int niov)
 {
 	struct pci_vtcon_sock *sock;
 	int i, ret;
@@ -517,8 +514,8 @@ pci_vtcon_sock_tx(struct pci_vtcon_port *port, void *arg, struct iovec *iov,
 }
 
 static void
-pci_vtcon_control_tx(struct pci_vtcon_port *port, void *arg, struct iovec *iov,
-    int niov)
+pci_vtcon_control_tx(struct pci_vtcon_port *port, void *arg __unused,
+    struct iovec *iov, int niov)
 {
 	struct pci_vtcon_softc *sc;
 	struct pci_vtcon_port *tmp;
@@ -612,8 +609,8 @@ pci_vtcon_control_send(struct pci_vtcon_softc *sc,
 
 	memcpy(iov.iov_base, ctrl, sizeof(struct pci_vtcon_control));
 	if (payload != NULL && len > 0)
-		memcpy(iov.iov_base + sizeof(struct pci_vtcon_control),
-		     payload, len);
+		memcpy((uint8_t *)iov.iov_base +
+		    sizeof(struct pci_vtcon_control), payload, len);
 
 	vq_relchain(vq, req.idx, sizeof(struct pci_vtcon_control) + len);
 	vq_endchains(vq, 1);
@@ -711,7 +708,8 @@ pci_vtcon_legacy_config(nvlist_t *nvl, const char *opts)
 }
 
 static int
-pci_vtcon_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_vtcon_init(struct vmctx *ctx __unused, struct pci_devinst *pi,
+    nvlist_t *nvl)
 {
 	struct pci_vtcon_softc *sc;
 	nvlist_t *ports_nvl;

@@ -5,11 +5,11 @@ The bhyve userland code in this directory, and its associated libraries and
 parts of the kernel module have been updated to the latest upstream FreeBSD
 sources as of:
 
-    commit fa46f3704b7618f9d9493c126df781faf59040a8
+    commit e53fcff1848bb5acafc3dc38cfeb34724d9b0b96
     Author: John Baldwin <jhb@FreeBSD.org>
-    Date:   Wed Aug 17 10:01:16 2022 -0700
+    Date:   Wed Dec 21 10:33:34 2022 -0800
 
-        bhyve e1000: Skip packets with a small header.
+        bhyve: Simplify spinup_ap_realmode slightly.
 
 Divergence Notes:
 

@@ -31,6 +31,7 @@ clobber	:=	TARGET = clobber
 
 SRCS =	acpi.c			\
 	atkbdc.c		\
+	basl.c			\
 	bhyvegc.c		\
 	bhyverun.c		\
 	block_if.c		\
@@ -39,6 +40,7 @@ SRCS =	acpi.c			\
 	config.c		\
 	fwctl.c			\
 	gdb.c			\
+	hexdump.c		\
 	inout.c			\
 	ioapic.c		\
 	mem.c			\
@@ -113,7 +115,7 @@ CLEANFILES =	$(OBJS) $(MEVENT_TEST_OBJS)
 CLOBBERFILES =	$(PROG) $(MEVENT_TEST_PROG)
 
 CFLAGS +=	$(CCVERBOSE)
-CFLAGS +=	-_gcc=-Wimplicit-function-declaration -_gcc=-Wno-parentheses
+CFLAGS +=	-_gcc=-Wimplicit-function-declaration
 CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
 		-I$(CONTRIB)/bhyve/dev/usb/controller \
@@ -126,21 +128,7 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(SRC)/uts/intel \
 		-DWITHOUT_CAPSICUM
 
-pci_nvme.o := CERRWARN += -_gcc=-Wno-pointer-sign
-pci_nvme.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
-pci_nvme.o := CERRWARN += -_gcc11=-Wno-address-of-packed-member
-pci_nvme.o := SMOFF += kmalloc_wrong_size
-
-pci_passthru.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
-pci_passthru.o := CERRWARN += -_gcc11=-Wno-address-of-packed-member
-
-pci_virtio_9p.o := SMOFF += kmalloc_wrong_size
-
-pci_xhci.o := CERRWARN += -_gcc10=-Wno-address-of-packed-member
-pci_xhci.o := CERRWARN += -_gcc11=-Wno-address-of-packed-member
-
-SMOFF += all_func_returns,leaks,no_if_block
-
+SMOFF += all_func_returns
 rfb.o := SMOFF=
 
 # Force c99 for everything

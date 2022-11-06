@@ -388,6 +388,7 @@ usr/src/cmd/bhyve/acpi.h
 usr/src/cmd/bhyve/ahci.h
 usr/src/cmd/bhyve/atkbdc.h
 usr/src/cmd/bhyve/audio.h
+usr/src/cmd/bhyve/basl.h
 usr/src/cmd/bhyve/bhyvegc.h
 usr/src/cmd/bhyve/bhyverun.h
 usr/src/cmd/bhyve/block_if.h

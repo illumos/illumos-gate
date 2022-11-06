@@ -39,6 +39,7 @@ usr/src/cmd/bhyve/acpi.[ch]
 usr/src/cmd/bhyve/ahci.h
 usr/src/cmd/bhyve/atkbdc.[ch]
 usr/src/cmd/bhyve/audio.[ch]
+usr/src/cmd/bhyve/basl.[ch]
 usr/src/cmd/bhyve/bhyvegc.[ch]
 usr/src/cmd/bhyve/bhyverun.[ch]
 usr/src/cmd/bhyve/block_if.[ch]

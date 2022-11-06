@@ -643,7 +643,7 @@ pci_viona_baraddr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
 }
 
 static void
-pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
+pci_viona_write(struct vmctx *ctx __unused, struct pci_devinst *pi,
     int baridx, uint64_t offset, int size, uint64_t value)
 {
 	struct pci_viona_softc *sc = pi->pi_arg;
@@ -747,7 +747,7 @@ pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 }
 
 static uint64_t
-pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
+pci_viona_read(struct vmctx *ctx __unused, struct pci_devinst *pi,
     int baridx, uint64_t offset, int size)
 {
 	struct pci_viona_softc *sc = pi->pi_arg;

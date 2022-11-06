@@ -1139,6 +1139,11 @@ ppt_map_mmio(struct vm *vm, int pptfd, vm_paddr_t gpa, size_t len,
 	struct pptdev *ppt;
 	int err = 0;
 
+	if ((len & PAGEOFFSET) != 0 || len == 0 || (gpa & PAGEOFFSET) != 0 ||
+	    (hpa & PAGEOFFSET) != 0 || gpa + len < gpa || hpa + len < hpa) {
+		return (EINVAL);
+	}
+
 	mutex_enter(&pptdev_mtx);
 	err = ppt_findf(vm, pptfd, &ppt);
 	if (err != 0) {

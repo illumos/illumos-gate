@@ -312,14 +312,14 @@ struct vqueue_info {
 
 	uint32_t vq_pfn;	/* PFN of virt queue (not shifted!) */
 
-	volatile struct vring_desc *vq_desc;	/* descriptor array */
-	volatile struct vring_avail *vq_avail;	/* the "avail" ring */
-	volatile struct vring_used *vq_used;	/* the "used" ring */
+	struct vring_desc *vq_desc;	/* descriptor array */
+	struct vring_avail *vq_avail;	/* the "avail" ring */
+	struct vring_used *vq_used;	/* the "used" ring */
 
 };
 /* as noted above, these are sort of backwards, name-wise */
 #define VQ_AVAIL_EVENT_IDX(vq) \
-	(*(volatile uint16_t *)&(vq)->vq_used->ring[(vq)->vq_qsize])
+	(*(uint16_t *)&(vq)->vq_used->ring[(vq)->vq_qsize])
 #define VQ_USED_EVENT_IDX(vq) \
 	((vq)->vq_avail->ring[(vq)->vq_qsize])
 
@@ -438,8 +438,8 @@ void	vq_relchain_publish(struct vqueue_info *vq);
 void	vq_relchain(struct vqueue_info *vq, uint16_t idx, uint32_t iolen);
 void	vq_endchains(struct vqueue_info *vq, int used_all_avail);
 
-uint64_t vi_pci_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
+uint64_t vi_pci_read(struct vmctx *ctx, struct pci_devinst *pi,
 		     int baridx, uint64_t offset, int size);
-void	vi_pci_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
+void	vi_pci_write(struct vmctx *ctx, struct pci_devinst *pi,
 		     int baridx, uint64_t offset, int size, uint64_t value);
 #endif	/* _BHYVE_VIRTIO_H_ */

@@ -1,22 +1,32 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-3-Clause
  *
- * Copyright (c) 2011 NetApp, Inc.
+ * Copyright (c) 1996  Peter Wemm <peter@FreeBSD.org>.
+ * All rights reserved.
+ * Copyright (c) 2002 Networks Associates Technology, Inc.
  * All rights reserved.
  *
+ * Portions of this software were developed for the FreeBSD Project by
+ * ThinkSec AS and NAI Labs, the Security Research Division of Network
+ * Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
+ * ("CBOSS"), as part of the DARPA CHATS research program.
+ *
  * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
+ * modification, is permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
  *
- * THIS SOFTWARE IS PROVIDED BY NETAPP, INC ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL NETAPP, INC OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -28,28 +38,15 @@
  * $FreeBSD$
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#ifndef _HEXDUMP_H_
+#define	_HEXDUMP_H_
 
-#include <sys/types.h>
+#define	HD_COLUMN_MASK		0xff
+#define	HD_DELIM_MASK		0xff00
+#define	HD_OMIT_COUNT		(1 << 16)
+#define	HD_OMIT_HEX		(1 << 17)
+#define	HD_OMIT_CHARS		(1 << 18)
 
-#include <assert.h>
+void	hexdump(const void *, int, const char *, int);
 
-#include "inout.h"
-#include "pci_lpc.h"
-
-static int
-post_data_handler(struct vmctx *ctx __unused, int in,
-    int port __unused, int bytes, uint32_t *eax, void *arg __unused)
-{
-	assert(in == 1);
-
-	if (bytes != 1)
-		return (-1);
-
-	*eax = 0xff;		/* return some garbage */
-	return (0);
-}
-
-INOUT_PORT(post, 0x84, IOPORT_F_IN, post_data_handler);
-SYSRES_IO(0x84, 1);
+#endif /* !_HEXDUMP_H_ */

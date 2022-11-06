@@ -31,10 +31,6 @@
 #ifndef	_SPINUP_AP_H_
 #define	_SPINUP_AP_H_
 
-#ifdef __FreeBSD__
-int spinup_ap(struct vmctx *ctx, int vcpu, int newcpu, uint64_t rip);
-#else
-void spinup_halted_ap(struct vmctx *ctx, int newcpu);
-#endif /* __FreeBSD__ */
+void spinup_ap(struct vmctx *ctx, int newcpu, uint64_t rip);
 
 #endif

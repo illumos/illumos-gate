@@ -363,7 +363,7 @@ static void e82545_tx_start(struct e82545_softc *sc);
 static void e82545_tx_enable(struct e82545_softc *sc);
 static void e82545_tx_disable(struct e82545_softc *sc);
 
-static inline int
+static inline int __unused
 e82545_size_stat_index(uint32_t size)
 {
 	if (size <= 64) {
@@ -406,15 +406,15 @@ e82545_init_eeprom(struct e82545_softc *sc)
 }
 
 static void
-e82545_write_mdi(struct e82545_softc *sc, uint8_t reg_addr,
-			uint8_t phy_addr, uint32_t data)
+e82545_write_mdi(struct e82545_softc *sc __unused, uint8_t reg_addr,
+    uint8_t phy_addr, uint32_t data)
 {
 	DPRINTF("Write mdi reg:0x%x phy:0x%x data: 0x%x", reg_addr, phy_addr, data);
 }
 
 static uint32_t
-e82545_read_mdi(struct e82545_softc *sc, uint8_t reg_addr,
-			uint8_t phy_addr)
+e82545_read_mdi(struct e82545_softc *sc __unused, uint8_t reg_addr,
+    uint8_t phy_addr)
 {
 	//DPRINTF("Read mdi reg:0x%x phy:0x%x", reg_addr, phy_addr);
 	switch (reg_addr) {
@@ -553,7 +553,7 @@ e82545_eecd_strobe(struct e82545_softc *sc)
 }
 
 static void
-e82545_itr_callback(int fd, enum ev_type type, void *param)
+e82545_itr_callback(int fd __unused, enum ev_type type __unused, void *param)
 {
 	uint32_t new;
 	struct e82545_softc *sc = param;
@@ -829,12 +829,13 @@ e82545_bufsz(uint32_t rctl)
 
 /* XXX one packet at a time until this is debugged */
 static void
-e82545_rx_callback(int fd, enum ev_type type, void *param)
+e82545_rx_callback(int fd __unused, enum ev_type type __unused, void *param)
 {
 	struct e82545_softc *sc = param;
 	struct e1000_rx_desc *rxd;
 	struct iovec vec[64];
-	int left, len, lim, maxpktsz, maxpktdesc, bufsz, i, n, size;
+	ssize_t len;
+	int left, lim, maxpktsz, maxpktdesc, bufsz, i, n, size;
 	uint32_t cause = 0;
 	uint16_t *tp, tag, head;
 
@@ -876,7 +877,7 @@ e82545_rx_callback(int fd, enum ev_type type, void *param)
 		}
 		len = netbe_recv(sc->esc_be, vec, maxpktdesc);
 		if (len <= 0) {
-			DPRINTF("netbe_recv() returned %d", len);
+			DPRINTF("netbe_recv() returned %zd", len);
 			goto done;
 		}
 
@@ -891,7 +892,7 @@ e82545_rx_callback(int fd, enum ev_type type, void *param)
 			len += ETHER_CRC_LEN;
 		n = (len + bufsz - 1) / bufsz;
 
-		DPRINTF("packet read %d bytes, %d segs, head %d",
+		DPRINTF("packet read %zd bytes, %d segs, head %d",
 		    len, n, head);
 
 		/* Apply VLAN filter. */
@@ -928,7 +929,7 @@ e82545_rx_callback(int fd, enum ev_type type, void *param)
 		    E1000_RXD_STAT_EOP | E1000_RXD_STAT_DD;
 
 		/* Schedule receive interrupts. */
-		if (len <= sc->esc_RSRPD) {
+		if ((uint32_t)len <= sc->esc_RSRPD) {
 			cause |= E1000_ICR_SRPD | E1000_ICR_RXT0;
 		} else {
 			/* XXX: RDRT and RADV timers should be here. */
@@ -975,7 +976,7 @@ e82545_buf_checksum(uint8_t *buf, int len)
 	uint32_t sum = 0;
 
 	/* Checksum all the pairs of bytes first... */
-	for (i = 0; i < (len & ~1U); i += 2)
+	for (i = 0; i < (len & ~1); i += 2)
 		sum += *((u_int16_t *)(buf + i));
 
 	/*
@@ -990,9 +991,10 @@ e82545_buf_checksum(uint8_t *buf, int len)
 }
 
 static uint16_t
-e82545_iov_checksum(struct iovec *iov, int iovcnt, int off, int len)
+e82545_iov_checksum(struct iovec *iov, int iovcnt, unsigned int off,
+    unsigned int len)
 {
-	int now, odd;
+	unsigned int now, odd;
 	uint32_t sum = 0, s;
 
 	/* Skip completely unneeded vectors. */
@@ -1006,11 +1008,7 @@ e82545_iov_checksum(struct iovec *iov, int iovcnt, int off, int len)
 	odd = 0;
 	while (len > 0 && iovcnt > 0) {
 		now = MIN(len, iov->iov_len - off);
-#ifdef __FreeBSD__
-		s = e82545_buf_checksum(iov->iov_base + off, now);
-#else
 		s = e82545_buf_checksum((uint8_t *)iov->iov_base + off, now);
-#endif
 		sum += odd ? (s << 8) : s;
 		odd ^= (now & 1);
 		len -= now;
@@ -1042,11 +1040,11 @@ static void
 e82545_transmit_checksum(struct iovec *iov, int iovcnt, struct ck_info *ck)
 {
 	uint16_t cksum;
-	int cklen;
+	unsigned int cklen;
 
 	DPRINTF("tx cksum: iovcnt/s/off/len %d/%d/%d/%d",
 	    iovcnt, ck->ck_start, ck->ck_off, ck->ck_len);
-	cklen = ck->ck_len ? ck->ck_len - ck->ck_start + 1 : INT_MAX;
+	cklen = ck->ck_len ? ck->ck_len - ck->ck_start + 1U : UINT_MAX;
 	cksum = e82545_iov_checksum(iov, iovcnt, ck->ck_start, cklen);
 	*(uint16_t *)((uint8_t *)iov[0].iov_base + ck->ck_off) = ~cksum;
 }
@@ -1087,9 +1085,8 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 	struct ck_info ckinfo[2];
 	struct iovec *iov;
 	union  e1000_tx_udesc *dsc;
-	int desc, dtype, len, ntype, iovcnt, tcp, tso;
-	int mss, paylen, seg, tiovcnt, left, now, nleft, nnow, pv, pvoff;
-	unsigned hdrlen, vlen, pktlen;
+	int desc, dtype, ntype, iovcnt, tcp, tso, paylen, seg, tiovcnt, pv;
+	unsigned hdrlen, vlen, pktlen, len, left, mss, now, nnow, nleft, pvoff;
 	uint32_t tcpsum, tcpseq;
 	uint16_t ipcs, tcpcs, ipid, ohead;
 	bool invalid;
@@ -1233,9 +1230,9 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 	if (!tso) {
 		/* Estimate required writable space for checksums. */
 		if (ckinfo[0].ck_valid)
-			hdrlen = MAX(hdrlen, ckinfo[0].ck_off + 2);
+			hdrlen = MAX(hdrlen, ckinfo[0].ck_off + 2U);
 		if (ckinfo[1].ck_valid)
-			hdrlen = MAX(hdrlen, ckinfo[1].ck_off + 2);
+			hdrlen = MAX(hdrlen, ckinfo[1].ck_off + 2U);
 		/* Round up writable space to the first vector. */
 		if (hdrlen != 0 && iov[0].iov_len > hdrlen &&
 		    iov[0].iov_len < hdrlen + 100)
@@ -1284,26 +1281,26 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 		 * TCP    | flags | 13     | 1
 		 * UDP    | len   | 4      | 4
 		 */
-		if (hdrlen < ckinfo[0].ck_start + 6 ||
-		    hdrlen < ckinfo[0].ck_off + 2) {
+		if (hdrlen < ckinfo[0].ck_start + 6U ||
+		    hdrlen < ckinfo[0].ck_off + 2U) {
 			WPRINTF("TSO hdrlen too small for IP fields (%d) "
 			    "-- dropped", hdrlen);
 			goto done;
 		}
 		if (sc->esc_txctx.cmd_and_length & E1000_TXD_CMD_TCP) {
-			if (hdrlen < ckinfo[1].ck_start + 14) {
+			if (hdrlen < ckinfo[1].ck_start + 14U) {
 				WPRINTF("TSO hdrlen too small for TCP fields "
 				    "(%d) -- dropped", hdrlen);
 				goto done;
 			}
 		} else {
-			if (hdrlen < ckinfo[1].ck_start + 8) {
+			if (hdrlen < ckinfo[1].ck_start + 8U) {
 				WPRINTF("TSO hdrlen too small for UDP fields "
 				    "(%d) -- dropped", hdrlen);
 				goto done;
 			}
 		}
-		if (ckinfo[1].ck_valid && hdrlen < ckinfo[1].ck_off + 2) {
+		if (ckinfo[1].ck_valid && hdrlen < ckinfo[1].ck_off + 2U) {
 			WPRINTF("TSO hdrlen too small for TCP/UDP fields "
 			    "(%d) -- dropped", hdrlen);
 			goto done;
@@ -1328,7 +1325,21 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 		    left -= now, hdrp += now) {
 			now = MIN(left, iov->iov_len);
 			memcpy(hdrp, iov->iov_base, now);
+#ifdef	__FreeBSD__
+			iov->iov_base = (uint8_t *)iov->iov_base + now;
+#else
+			/*
+			 * The type of iov_base changed in SUS (XPG4v2) from
+			 * caddr_t (char * - note signed) to 'void *'. On
+			 * illumos, bhyve is not currently compiled with XPG4v2
+			 * or higher, and so we can't cast the RHS to unsigned.
+			 * error: pointer targets in assignment differ in
+			 *	  signedness
+			 * This also means that we need to apply some casts to
+			 * (caddr_t) below.
+			 */
 			iov->iov_base += now;
+#endif
 			iov->iov_len -= now;
 			if (iov->iov_len == 0) {
 				iov++;
@@ -1387,7 +1398,7 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 	tcp = (sc->esc_txctx.cmd_and_length & E1000_TXD_CMD_TCP) != 0;
 	mss = sc->esc_txctx.tcp_seg_setup.fields.mss;
 	paylen = (sc->esc_txctx.cmd_and_length & 0x000fffff);
-	DPRINTF("tx %s segmentation offload %d+%d/%d bytes %d iovs",
+	DPRINTF("tx %s segmentation offload %d+%d/%u bytes %d iovs",
 	    tcp ? "TCP" : "UDP", hdrlen, paylen, mss, iovcnt);
 	ipid = ntohs(*(uint16_t *)&hdr[ckinfo[0].ck_start + 4]);
 	tcpseq = 0;
@@ -1414,7 +1425,12 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 		/* Include respective part of payload IOV. */
 		for (nleft = now; pv < iovcnt && nleft > 0; nleft -= nnow) {
 			nnow = MIN(nleft, iov[pv].iov_len - pvoff);
-			tiov[tiovcnt].iov_base = iov[pv].iov_base + pvoff;
+#ifdef	__FreeBSD__
+			tiov[tiovcnt].iov_base = (uint8_t *)iov[pv].iov_base +
+			    pvoff;
+#else
+			tiov[tiovcnt].iov_base += pvoff;
+#endif
 			tiov[tiovcnt++].iov_len = nnow;
 			if (pvoff + nnow == iov[pv].iov_len) {
 				pv++;
@@ -1486,9 +1502,12 @@ e82545_tx_run(struct e82545_softc *sc)
 	uint16_t head, rhead, tail, size;
 	int lim, tdwb, sent;
 
-	head = sc->esc_TDH;
-	tail = sc->esc_TDT;
 	size = sc->esc_TDLEN / 16;
+	if (size == 0)
+		return;
+
+	head = sc->esc_TDH % size;
+	tail = sc->esc_TDT % size;
 	DPRINTF("tx_run: head %x, rhead %x, tail %x",
 	    sc->esc_TDH, sc->esc_TDHr, sc->esc_TDT);
 
@@ -1754,12 +1773,17 @@ e82545_write_register(struct e82545_softc *sc, uint32_t offset, uint32_t value)
 			e82545_tx_update_tdba(sc);
 		break;
 	case E1000_TDH(0):
-		//assert(!sc->esc_tx_enabled);
-		/* XXX should only ever be zero ? Range check ? */
+		if (sc->esc_tx_enabled) {
+			WPRINTF("ignoring write to TDH while transmit enabled");
+			break;
+		}
+		if (value != 0) {
+			WPRINTF("ignoring non-zero value written to TDH");
+			break;
+		}
 		sc->esc_TDHr = sc->esc_TDH = value;
 		break;
 	case E1000_TDT(0):
-		/* XXX range check ? */
 		sc->esc_TDT = value;
 		if (sc->esc_tx_enabled)
 			e82545_tx_start(sc);
@@ -2122,8 +2146,9 @@ e82545_read_register(struct e82545_softc *sc, uint32_t offset)
 }
 
 static void
-e82545_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
-	     uint64_t offset, int size, uint64_t value)
+e82545_write(struct vmctx *ctx __unused,
+    struct pci_devinst *pi, int baridx, uint64_t offset, int size,
+    uint64_t value)
 {
 	struct e82545_softc *sc;
 
@@ -2172,8 +2197,8 @@ e82545_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 }
 
 static uint64_t
-e82545_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
-	    uint64_t offset, int size)
+e82545_read(struct vmctx *ctx __unused,
+    struct pci_devinst *pi, int baridx, uint64_t offset, int size)
 {
 	struct e82545_softc *sc;
 	uint64_t retval;

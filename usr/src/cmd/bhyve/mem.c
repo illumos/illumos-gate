@@ -320,6 +320,10 @@ register_mem_int(struct mmio_rb_tree *rbt, struct mem_range *memp)
 		pthread_rwlock_wrlock(&mmio_rwlock);
 		if (mmio_rb_lookup(rbt, memp->base, &entry) != 0)
 			err = mmio_rb_add(rbt, mrp);
+#ifndef	__FreeBSD__
+		else /* smatch warn: possible memory leak of 'mrp' */
+			free(mrp);
+#endif
 		perror = pthread_rwlock_unlock(&mmio_rwlock);
 		assert(perror == 0);
 		if (err)
