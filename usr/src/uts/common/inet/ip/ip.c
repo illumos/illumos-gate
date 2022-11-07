@@ -26,6 +26,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -3750,10 +3751,17 @@ ip_get_pmtu(ip_xmit_attr_t *ixa)
 
 	pmtu = IP_MAXPACKET;
 	/*
-	 * Decide whether whether IPv4 sets DF
-	 * For IPv6 "no DF" means to use the 1280 mtu
+	 * We need to determine if it is acceptable to set DF for IPv4 or not
+	 * and for IPv6 if we need to use the minimum MTU. If a connection has
+	 * opted into path MTU discovery, then we can use 'DF' in IPv4 and do
+	 * not have to constrain ourselves to the IPv6 minimum MTU. There is a
+	 * second consideration here: IXAF_DONTFRAG. This is set as a result of
+	 * someone setting the IP_DONTFRAG or IPV6_DONTFRAG socket option. In
+	 * such a case, it is acceptable to set DF for IPv4 and to use a larger
+	 * MTU. Note, the actual MTU is constrained by the ill_t later on in
+	 * this function.
 	 */
-	if (ixa->ixa_flags & IXAF_PMTU_DISCOVERY) {
+	if (ixa->ixa_flags & (IXAF_PMTU_DISCOVERY | IXAF_DONTFRAG)) {
 		ixa->ixa_flags |= IXAF_PMTU_IPV4_DF;
 	} else {
 		ixa->ixa_flags &= ~IXAF_PMTU_IPV4_DF;

@@ -765,7 +765,7 @@ pci_vtnet_neg_features(void *vsc, uint64_t negotiated_features)
 	pthread_mutex_unlock(&sc->rx_mtx);
 }
 
-static struct pci_devemu pci_de_vnet = {
+static const struct pci_devemu pci_de_vnet = {
 	.pe_emu = 	"virtio-net",
 	.pe_init =	pci_vtnet_init,
 	.pe_legacy_config = netbe_legacy_config,

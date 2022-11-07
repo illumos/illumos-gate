@@ -43,6 +43,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm.h>
 #include <vmmapi.h>
 
+#ifndef __FreeBSD__
+#include <sys/sysmacros.h>
+#endif
+
 #include "bhyverun.h"
 #include "config.h"
 #include "debug.h"
@@ -77,13 +81,18 @@ struct smbios_structure {
 	uint16_t	handle;
 } __packed;
 
+struct smbios_string {
+	const char *node;
+	const char *value;
+};
+
 typedef int (*initializer_func_t)(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size);
 
 struct smbios_template_entry {
 	struct smbios_structure	*entry;
-	const char		**strings;
+	struct smbios_string 	*strings;
 	initializer_func_t	initializer;
 };
 
@@ -351,11 +360,11 @@ struct smbios_table_type0 smbios_type0_template = {
 	0xff	/* embedded controller firmware minor release */
 };
 
-const char *smbios_type0_strings[] = {
-	"BHYVE",		/* vendor string */
-	FIRMWARE_VERSION,	/* bios version string */
-	FIRMWARE_RELEASE_DATE,	/* bios release date string */
-	NULL
+struct smbios_string smbios_type0_strings[] = {
+	{ "bios.vendor", "BHYVE" },			/* vendor string */
+	{ "bios.version", FIRMWARE_VERSION },		/* bios version string */
+	{ "bios.release_date", FIRMWARE_RELEASE_DATE },	/* bios release date string */
+	{ 0 }
 };
 
 struct smbios_table_type1 smbios_type1_template = {
@@ -371,17 +380,17 @@ struct smbios_table_type1 smbios_type1_template = {
 };
 
 static int smbios_type1_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size);
 
-const char *smbios_type1_strings[] = {
-	"illumos",		/* manufacturer string */
-	"BHYVE",		/* product name string */
-	"1.0",			/* version string */
-	"None",			/* serial number string */
-	"None",			/* sku string */
-	"Virtual Machine",	/* family name string */
-	NULL
+struct smbios_string smbios_type1_strings[] = {
+	{ "system.manufacturer", "illumos" },	     /* manufacturer string */
+	{ "system.product_name", "BHYVE" },	     /* product string */
+	{ "system.version", "1.0" },		     /* version string */
+	{ "system.serial_number", "None" },	     /* serial number string */
+	{ "system.sku", "None" },		     /* sku string */
+	{ "system.family_name", "Virtual Machine" }, /* family string */
+	{ 0 }
 };
 
 struct smbios_table_type2 smbios_type2_template = {
@@ -398,14 +407,14 @@ struct smbios_table_type2 smbios_type2_template = {
 	0
 };
 
-const char *smbios_type2_strings[] = {
-	"illumos",		/* manufacturer string */
-	"BHYVE",		/* product name string */
-	"1.0",			/* version string */
-	"None",			/* serial number string */
-	"None",			/* asset tag string */
-	"None",			/* location string */
-	NULL
+struct smbios_string smbios_type2_strings[] = {
+	{ "board.manufacturer", "illumos" },	/* manufacturer string */
+	{ "board.product_name", "BHYVE" },	/* product name string */
+	{ "board.version", "1.0" },		/* version string */
+	{ "board.serial_number", "None" },	/* serial number string */
+	{ "board.asset_tag", "None" },		/* asset tag string */
+	{ "board.location", "None" },		/* location string */
+	{ 0 }
 };
 
 struct smbios_table_type3 smbios_type3_template = {
@@ -427,13 +436,13 @@ struct smbios_table_type3 smbios_type3_template = {
 	5		/* sku number string */
 };
 
-const char *smbios_type3_strings[] = {
-	"illumos",	/* manufacturer string */
-	"1.0",		/* version string */
-	"None",		/* serial number string */
-	"None",		/* asset tag string */
-	"None",		/* sku number string */
-	NULL
+struct smbios_string smbios_type3_strings[] = {
+	{ "chassis.manufacturer", "illumos" },	/* manufacturer string */
+	{ "chassis.version", "1.0" },		/* version string */
+	{ "chassis.serial_number", "None" },	/* serial number string */
+	{ "chassis.asset_tag", "None" },	/* asset tag string */
+	{ "chassis.sku", "None" },		/* sku number string */
+	{ 0 }
 };
 
 struct smbios_table_type4 smbios_type4_template = {
@@ -463,18 +472,18 @@ struct smbios_table_type4 smbios_type4_template = {
 	SMBIOS_PRF_OTHER
 };
 
-const char *smbios_type4_strings[] = {
-	" ",		/* socket designation string */
-	" ",		/* manufacturer string */
-	" ",		/* version string */
-	"None",		/* serial number string */
-	"None",		/* asset tag string */
-	"None",		/* part number string */
-	NULL
+struct smbios_string smbios_type4_strings[] = {
+	{ NULL, " " },		/* socket designation string */
+	{ NULL, " " },		/* manufacturer string */
+	{ NULL, " " },		/* version string */
+	{ NULL, "None" },	/* serial number string */
+	{ NULL, "None" },	/* asset tag string */
+	{ NULL, "None" },	/* part number string */
+	{ 0 }
 };
 
 static int smbios_type4_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size);
 
 struct smbios_table_type16 smbios_type16_template = {
@@ -489,7 +498,7 @@ struct smbios_table_type16 smbios_type16_template = {
 };
 
 static int smbios_type16_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size);
 
 struct smbios_table_type17 smbios_type17_template = {
@@ -518,18 +527,18 @@ struct smbios_table_type17 smbios_type17_template = {
 	0		/* configured voltage in mv (0=unknown) */
 };
 
-const char *smbios_type17_strings[] = {
-	" ",		/* device locator string */
-	" ",		/* physical bank locator string */
-	" ",		/* manufacturer string */
-	"None",		/* serial number string */
-	"None",		/* asset tag string */
-	"None",		/* part number string */
-	NULL
+struct smbios_string smbios_type17_strings[] = {
+	{ NULL, " " },		/* device locator string */
+	{ NULL, " " },		/* physical bank locator string */
+	{ NULL, " " },		/* manufacturer string */
+	{ NULL, "None" },	/* serial number string */
+	{ NULL, "None" },	/* asset tag string */
+	{ NULL, "None" },	/* part number string */
+	{ 0 }
 };
 
 static int smbios_type17_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size);
 
 struct smbios_table_type19 smbios_type19_template = {
@@ -543,7 +552,7 @@ struct smbios_table_type19 smbios_type19_template = {
 };
 
 static int smbios_type19_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size);
 
 struct smbios_table_type32 smbios_type32_template = {
@@ -557,7 +566,7 @@ struct smbios_table_type127 smbios_type127_template = {
 };
 
 static int smbios_generic_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size);
 
 static struct smbios_template_entry smbios_template[] = {
@@ -599,7 +608,7 @@ static uint16_t type16_handle;
 
 static int
 smbios_generic_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size)
 {
 	struct smbios_structure *entry;
@@ -611,11 +620,20 @@ smbios_generic_initializer(struct smbios_structure *template_entry,
 	if (template_strings != NULL) {
 		int	i;
 
-		for (i = 0; template_strings[i] != NULL; i++) {
+		for (i = 0; template_strings[i].value != NULL; i++) {
 			const char *string;
 			int len;
 
-			string = template_strings[i];
+			if (template_strings[i].node == NULL) {
+				string = template_strings[i].value;
+			} else {
+				set_config_value_if_unset(
+				    template_strings[i].node,
+				    template_strings[i].value);
+				string = get_config_value(
+				    template_strings[i].node);
+			}
+
 			len = strlen(string) + 1;
 			memcpy(curaddr, string, len);
 			curaddr += len;
@@ -637,7 +655,7 @@ smbios_generic_initializer(struct smbios_structure *template_entry,
 
 static int
 smbios_type1_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size)
 {
 	struct smbios_table_type1 *type1;
@@ -653,8 +671,10 @@ smbios_type1_initializer(struct smbios_structure *template_entry,
 		uint32_t	status;
 
 		uuid_from_string(guest_uuid_str, &uuid, &status);
-		if (status != uuid_s_ok)
+		if (status != uuid_s_ok) {
+			EPRINTLN("Invalid UUID");
 			return (-1);
+		}
 
 		uuid_enc_le(&type1->uuid, &uuid);
 	} else {
@@ -693,7 +713,7 @@ smbios_type1_initializer(struct smbios_structure *template_entry,
 
 static int
 smbios_type4_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size)
 {
 	int i;
@@ -735,7 +755,7 @@ smbios_type4_initializer(struct smbios_structure *template_entry,
 
 static int
 smbios_type16_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size)
 {
 	struct smbios_table_type16 *type16;
@@ -752,7 +772,7 @@ smbios_type16_initializer(struct smbios_structure *template_entry,
 
 static int
 smbios_type17_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size)
 {
 	struct smbios_table_type17 *type17;
@@ -796,7 +816,7 @@ smbios_type17_initializer(struct smbios_structure *template_entry,
 
 static int
 smbios_type19_initializer(struct smbios_structure *template_entry,
-    const char **template_strings, char *curaddr, char **endaddr,
+    struct smbios_string *template_strings, char *curaddr, char **endaddr,
     uint16_t *n, uint16_t *size)
 {
 	struct smbios_table_type19 *type19;
@@ -862,6 +882,26 @@ smbios_ep_finalizer(struct smbios_entry_point *smbios_ep, uint16_t len,
 	smbios_ep->echecksum = checksum;
 }
 
+#ifndef __FreeBSD__
+/*
+ * bhyve on illumos previously used configuration keys starting with 'smbios.'
+ * to control type 1 SMBIOS information. Since these may still be present in
+ * bhyve configuration files, the following table is used to translate them
+ * to their new key names.
+ */
+static struct {
+	const char *oldkey;
+	const char *newkey;
+} smbios_legacy_config_map[] = {
+	{ "smbios.manufacturer",	"system.manufacturer" },
+	{ "smbios.family",		"system.family_name" },
+	{ "smbios.product",		"system.product_name" },
+	{ "smbios.serial",		"system.serial_number" },
+	{ "smbios.sku",			"system.sku" },
+	{ "smbios.version",		"system.version" },
+};
+#endif
+
 int
 smbios_build(struct vmctx *ctx)
 {
@@ -881,6 +921,19 @@ smbios_build(struct vmctx *ctx)
 		return (ENOMEM);
 	}
 
+#ifndef __FreeBSD__
+	/* Translate legacy illumos configuration keys */
+	for (uint_t i = 0; i < ARRAY_SIZE(smbios_legacy_config_map); i++) {
+		const char *v;
+
+		v = get_config_value(smbios_legacy_config_map[i].oldkey);
+		if (v != NULL) {
+			set_config_value_if_unset(
+			    smbios_legacy_config_map[i].newkey, v);
+		}
+	}
+#endif
+
 	curaddr = startaddr;
 
 	smbios_ep = (struct smbios_entry_point *)curaddr;
@@ -893,7 +946,7 @@ smbios_build(struct vmctx *ctx)
 	maxssize = 0;
 	for (i = 0; smbios_template[i].entry != NULL; i++) {
 		struct smbios_structure	*entry;
-		const char		**strings;
+		struct smbios_string	*strings;
 		initializer_func_t      initializer;
 		char			*endaddr;
 		uint16_t		size;
@@ -920,42 +973,39 @@ smbios_build(struct vmctx *ctx)
 }
 
 #ifndef __FreeBSD__
-struct {
+static struct {
+	uint_t type;
 	const char *key;
-	const char **targetp;
-} type1_map[] = {
-	{ "manufacturer", &smbios_type1_strings[0] },
-	{ "product", &smbios_type1_strings[1] },
-	{ "version", &smbios_type1_strings[2] },
-	{ "serial", &smbios_type1_strings[3] },
-	{ "sku", &smbios_type1_strings[4] },
-	{ "family", &smbios_type1_strings[5] },
-	{ 0 }
+	char *val;
+} smbios_legacy_map[] = {
+	{ 1, "product", "product_name" },
+	{ 1, "serial", "serial_number" },
+	{ 1, "family", "family_name" },
 };
 
-void
-smbios_apply(void)
-{
-	nvlist_t *nvl;
+static struct smbios_string *smbios_tbl_map[] = {
+	smbios_type0_strings,
+	smbios_type1_strings,
+	smbios_type2_strings,
+	smbios_type3_strings,
+};
 
-	nvl = find_config_node("smbios");
-	if (nvl == NULL)
-		return;
-
-	for (uint_t i = 0; type1_map[i].key != NULL; i++) {
-		const char *value;
-
-		value = get_config_value_node(nvl, type1_map[i].key);
-		if (value != NULL)
-			*type1_map[i].targetp = value;
-	}
-}
-
+/*
+ * This function accepts an option of the form
+ * 	type,[key=value][,key=value]...
+ * and sets smbios data for the given type. Keys for type X are defined in the
+ * smbios_typeX_strings tables above, but for type 1 there are also some
+ * legacy values which were accepted in earlier versions of bhyve on illumos
+ * which need to be mapped.
+ */
 int
 smbios_parse(const char *opts)
 {
-	char *buf, *lasts, *token, *end;
+	char *buf, *lasts, *token, *typekey = NULL;
+	const char *errstr;
+	struct smbios_string *tbl;
 	nvlist_t *nvl;
+	uint_t i;
 	long type;
 
 	if ((buf = strdup(opts)) == NULL) {
@@ -968,59 +1018,79 @@ smbios_parse(const char *opts)
 		goto fail;
 	}
 
-	errno = 0;
-	type = strtol(token, &end, 10);
-	if (errno != 0 || *end != '\0') {
-		(void) fprintf(stderr, "first token '%s' is not an integer\n",
-		    token);
+	type = strtonum(token, 0, 3, &errstr);
+	if (errstr != NULL) {
+		fprintf(stderr, "First token (type) is %s\n", errstr);
 		goto fail;
 	}
 
-	/* For now, only type 1 is supported. */
-	if (type != 1) {
-		(void) fprintf(stderr, "unsupported type %d\n", type);
+	tbl = smbios_tbl_map[type];
+
+	/* Extract the config key for this type */
+	typekey = strdup(tbl[0].node);
+	if (typekey == NULL) {
+		(void) fprintf(stderr, "out of memory\n");
 		goto fail;
 	}
 
-	nvl = create_config_node("smbios");
+	token = strchr(typekey, '.');
+	assert(token != NULL);
+	*token = '\0';
+
+	nvl = create_config_node(typekey);
 	if (nvl == NULL) {
 		(void) fprintf(stderr, "out of memory\n");
-		return (-1);
+		goto fail;
 	}
 
 	while ((token = strtok_r(NULL, ",", &lasts)) != NULL) {
 		char *val;
-		uint_t i;
 
-		if ((val = strchr(token, '=')) == NULL) {
+		if ((val = strchr(token, '=')) == NULL || val[1] == '\0') {
 			(void) fprintf(stderr, "invalid key=value: '%s'\n",
 			    token);
 			goto fail;
 		}
-		*val = '\0';
-		val++;
+		*val++ = '\0';
 
+		/* UUID is a top-level config item, but -U takes priority */
 		if (strcmp(token, "uuid") == 0) {
-			set_config_value_node(nvl, token, val);
+			set_config_value_if_unset(token, val);
 			continue;
 		}
 
-		for (i = 0; type1_map[i].key != NULL; i++) {
-			if (strcmp(token, type1_map[i].key) == 0) {
+		/* Translate legacy keys */
+		for (i = 0; i < ARRAY_SIZE(smbios_legacy_map); i++) {
+			if (type == smbios_legacy_map[i].type &&
+			    strcmp(token, smbios_legacy_map[i].key) == 0) {
+				token = smbios_legacy_map[i].val;
 				break;
 			}
 		}
-		if (type1_map[i].key == NULL) {
-			(void) fprintf(stderr, "invalid key '%s'\n", token);
+
+		for (i = 0; tbl[i].value != NULL; i++) {
+			if (strcmp(tbl[i].node + strlen(typekey) + 1,
+			    token) == 0) {
+				/* Found match */
+				break;
+			}
+		}
+
+		if (tbl[i].value == NULL) {
+			(void) fprintf(stderr,
+			    "Unknown SMBIOS key %s for type %d\n", token, type);
 			goto fail;
 		}
+
 		set_config_value_node(nvl, token, val);
 	}
 
+	free(typekey);
 	return (0);
 
 fail:
 	free(buf);
+	free(typekey);
 	return (-1);
 }
 #endif

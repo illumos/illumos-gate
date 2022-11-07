@@ -73,8 +73,11 @@
  */
 #define NVME_GLOBAL_NAMESPACE_TAG	((uint32_t)0xFFFFFFFF)
 
-/* Cap transfers by the maximum addressable by page-sized PRP (4KB -> 2MB). */
-#define NVME_MAX_XFER_SIZE		MIN(maxphys, (PAGE_SIZE/8*PAGE_SIZE))
+/* Host memory buffer sizes are always in 4096 byte chunks */
+#define	NVME_HMB_UNITS			4096
+
+/* Many items are expressed in terms of power of two times MPS */
+#define NVME_MPS_SHIFT			12
 
 /* Register field definitions */
 #define NVME_CAP_LO_REG_MQES_SHIFT			(0)
@@ -215,6 +218,7 @@
 #define NVME_STATUS_GET_P(st)				(((st) >> NVME_STATUS_P_SHIFT) & NVME_STATUS_P_MASK)
 #define NVME_STATUS_GET_SC(st)				(((st) >> NVME_STATUS_SC_SHIFT) & NVME_STATUS_SC_MASK)
 #define NVME_STATUS_GET_SCT(st)				(((st) >> NVME_STATUS_SCT_SHIFT) & NVME_STATUS_SCT_MASK)
+#define NVME_STATUS_GET_CRD(st)				(((st) >> NVME_STATUS_CRD_SHIFT) & NVME_STATUS_CRD_MASK)
 #define NVME_STATUS_GET_M(st)				(((st) >> NVME_STATUS_M_SHIFT) & NVME_STATUS_M_MASK)
 #define NVME_STATUS_GET_DNR(st)				(((st) >> NVME_STATUS_DNR_SHIFT) & NVME_STATUS_DNR_MASK)
 

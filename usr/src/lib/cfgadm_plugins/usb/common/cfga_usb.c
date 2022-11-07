@@ -22,8 +22,8 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
-
 
 #include "cfga_usb.h"
 
@@ -889,12 +889,14 @@ fill_in_ap_info(const char *ap_id, char *info_buf, size_t info_size)
 {
 	char			*mfg_str = NULL;	/* iManufacturer */
 	char			*prod_str = NULL;	/* iProduct */
+	char			*serial_str = NULL;	/* iSerialNumber */
 	char			*cfg_descr = NULL;	/* iConfiguration */
 	uint_t			config;			/* curr cfg index */
 	size_t			size;			/* tmp stuff */
 	boolean_t		flag;		/* wether to print ":" or not */
 	boolean_t		free_mfg_str = B_FALSE;
 	boolean_t		free_prod_str = B_FALSE;
+	boolean_t		free_serial_str = B_FALSE;
 	boolean_t		free_cfg_str = B_FALSE;
 	cfga_usb_ret_t		rv = CFGA_USB_OK;
 	usb_dev_descr_t		*dev_descrp = NULL;	/* device descriptor */
@@ -938,6 +940,22 @@ fill_in_ap_info(const char *ap_id, char *info_buf, size_t info_size)
 		free_prod_str = B_TRUE;
 	}
 
+	/* iSerialNumber */
+	serial_str = USB_UNDEF_STR;
+	if (dev_descrp->iSerialNumber != 0) {
+		if ((rv = do_control_ioctl(ap_id, USB_DESCR_TYPE_STRING,
+		    HUBD_SERIALNO_STR, (void **)&serial_str,
+		    &size)) != CFGA_USB_OK) {
+			if (rv == CFGA_USB_ZEROLEN) {
+				rv = CFGA_USB_OK;
+			} else {
+				DPRINTF("getting iSerialNumber failed\n");
+				goto bailout;
+			}
+		}
+		free_serial_str = B_TRUE;
+	}
+
 	/* Current conifguration */
 	if ((rv = get_config(ap_id, &config)) != CFGA_USB_OK) {
 		DPRINTF("get_config failed\n");
@@ -968,8 +986,9 @@ fill_in_ap_info(const char *ap_id, char *info_buf, size_t info_size)
 
 	/* Dump local buf into passed-in buf. */
 	(void) snprintf(info_buf, info_size,
-	    "Mfg: %s  Product: %s  NConfigs: %d  Config: %d  %s%s", mfg_str,
-	    prod_str, dev_descrp->bNumConfigurations, config,
+	    "Mfg: %s  Product: %s  Serial: %s  NConfigs: %d  Config: %d  %s%s",
+	    mfg_str, prod_str, serial_str,
+	    dev_descrp->bNumConfigurations, config,
 	    (flag == B_TRUE) ? ": " : "", cfg_descr);
 
 bailout:
@@ -983,6 +1002,10 @@ bailout:
 
 	if ((free_prod_str == B_TRUE) && prod_str) {
 		free(prod_str);
+	}
+
+	if ((free_serial_str == B_TRUE) && serial_str) {
+		free(serial_str);
 	}
 
 	if ((free_cfg_str == B_TRUE) && cfg_descr) {

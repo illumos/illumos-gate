@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2022 Oxide Computer Company
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2008 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
@@ -164,6 +165,21 @@ send the packet out.
 The following options are boolean switches controlling the reception of
 ancillary data. The option value is type \fBint\fR; a non-zero value
 enables the option whilst a zero value disables it.
+
+.sp
+.ne 2
+.na
+\fBIP_DONTFRAG\fR
+.ad
+.RS 22n
+This option controls the behavior of IP-level fragmentation. When this option
+is enabled (non-zero), then the IP Don't Fragment (DF) flag is always set in
+the IP header. At the same time, Path MTU discovery is disabled for the given
+socket. When this option is disabled, then the networking stack will determine
+when to insert the DF flag in the IP header based on the current state of Path
+MTU discovery. The system default is to treat this option as disabled, that is
+that Path MTU discovery is in effect.
+.RE
 
 .sp
 .ne 2

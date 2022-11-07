@@ -358,6 +358,7 @@ void vm_copyout(struct vm *vm, int vcpuid, const void *kaddr,
     struct vm_copyinfo *copyinfo, size_t len);
 
 int vcpu_trace_exceptions(struct vm *vm, int vcpuid);
+int vcpu_trap_wbinvd(struct vm *vm, int vcpuid);
 
 void vm_inject_ud(struct vm *vm, int vcpuid);
 void vm_inject_gp(struct vm *vm, int vcpuid);

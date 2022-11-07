@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -616,7 +616,7 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
  */
 uint32_t
 smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
-	smb_queryinfo_t *qinfo)
+    smb_queryinfo_t *qinfo)
 {
 	char *stream_name;
 	uint32_t next_offset;
@@ -646,7 +646,7 @@ smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
 	datasz = attr->sa_vattr.va_size;
 	allocsz = attr->sa_allocsz;
 
-	status = smb_odir_openat(sr, fnode, &od);
+	status = smb_odir_openat(sr, fnode, &od, B_TRUE);
 	switch (status) {
 	case 0:
 		break;
@@ -759,7 +759,7 @@ smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
  */
 static boolean_t
 smb_stream_fits(smb_request_t *sr, mbuf_chain_t *mbc,
-	char *name, uint32_t offset)
+    char *name, uint32_t offset)
 {
 	uint32_t len, pad;
 

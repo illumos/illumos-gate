@@ -585,7 +585,7 @@ pci_vtblk_apply_feats(void *vsc, uint64_t caps)
 }
 #endif /* __FreeBSD__ */
 
-struct pci_devemu pci_de_vblk = {
+static const struct pci_devemu pci_de_vblk = {
 	.pe_emu =	"virtio-blk",
 	.pe_init =	pci_vtblk_init,
 	.pe_legacy_config = blockif_legacy_config,

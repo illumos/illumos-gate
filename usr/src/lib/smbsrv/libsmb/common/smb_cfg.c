@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2021 RackTop Systems, Inc.
  */
 
@@ -904,6 +904,7 @@ int
 smb_config_get_localuuid(uuid_t uu)
 {
 	char *s;
+	int rc = 0;
 
 	uuid_clear(uu);
 	s = smb_config_getenv_generic(MACHINE_UUID, IDMAP_FMRI_PREFIX,
@@ -911,12 +912,11 @@ smb_config_get_localuuid(uuid_t uu)
 	if (s == NULL)
 		return (-1);
 
-	if (uuid_parse(s, uu) < 0) {
-		free(s);
-		return (-1);
-	}
+	if (uuid_parse(s, uu) < 0)
+		rc = -1;
 
-	return (0);
+	free(s);
+	return (rc);
 }
 
 static int
