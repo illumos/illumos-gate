@@ -31,41 +31,7 @@
  */
 
 #include <stdio.h>
-
-#define	MAKE_SET(set, sym)					\
-	__asm__(".globl __start_set_" #set);			\
-	__asm__(".globl __stop_set_" #set);			\
-	static __attribute__((section("set_" #set), used))	\
-	void const *__set_##set##_sym_##sym = &(sym)
-
-/*
- * Initialize before referring to a given linker set.
- */
-#define	SET_DECLARE(set, ptype)						\
-	extern  __attribute__((weak)) ptype *__start_set_ ## set;	\
-	extern __attribute__((weak)) ptype *__stop_set_ ## set
-
-#define	SET_BEGIN(set)	(&__start_set_ ## set)
-#define	SET_LIMIT(set)	(&__stop_set_ ## set)
-
-/*
- * Iterate over all the elements of a set.
- *
- * Sets always contain addresses of things, and "pvar" points to words
- * containing those addresses.  Thus is must be declared as "type **pvar",
- * and the address of each set item is obtained inside the loop by "*pvar".
- */
-#define	SET_FOREACH(pvar, set)						\
-	for (pvar = SET_BEGIN(set); pvar < SET_LIMIT(set); pvar++)
-
-#define	SET_ITEM(set, i)						\
-	((SET_BEGIN(set))[i])
-
-/*
- * Provide a count of the items in a set.
- */
-#define	SET_COUNT(set)							\
-	(SET_LIMIT(set) - SET_BEGIN(set))
+#include <sys/linker_set.h>
 
 struct foo {
 	char buf[128];
@@ -77,9 +43,9 @@ struct foo a = { "foo" };
 struct foo b = { "bar" };
 struct foo c = { "baz" };
 
-MAKE_SET(foo, a);
-MAKE_SET(foo, b);
-MAKE_SET(foo, c);
+SET_ENTRY(foo, a);
+SET_ENTRY(foo, b);
+SET_ENTRY(foo, c);
 
 int
 main(int __attribute__((unused)) argc, char __attribute__((unused)) **argv)
@@ -87,7 +53,7 @@ main(int __attribute__((unused)) argc, char __attribute__((unused)) **argv)
 	struct foo **c;
 	int i = 0;
 
-	printf("Set count: %d\n", SET_COUNT(foo));
+	printf("Set count: %d\n", (int)SET_COUNT(foo));
 
 
 	printf("a: %s\n", ((struct foo *)__set_foo_sym_a)->buf);

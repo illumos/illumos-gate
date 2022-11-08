@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  * Copyright 2015 Joyent, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -206,6 +207,16 @@ smb_fem_oplock_uninstall(smb_node_t *node)
  *
  * The FCN monitors intercept the respective VOP_* call regardless
  * of whether the call originates from CIFS, NFS, or a local process.
+ *
+ * Here we're only interested in operations that change the list of
+ * names contained in the directory.  SMB clients can also ask to be
+ * notified about events where a file in this directory has had its
+ * meta-data changed (size, times, etc) but that's outside of the
+ * design intent for these FEM hooks.  Those meta-data events DO
+ * happen when caused by SMB clients (via smb_node_notify_modified)
+ * but not by other FS activity because we don't have a good way to
+ * place all the FEM hooks that would be required for that, and if
+ * we did, the performance cost could be severe.
  */
 
 /*
