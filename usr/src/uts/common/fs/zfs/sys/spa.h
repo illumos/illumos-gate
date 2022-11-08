@@ -1104,6 +1104,7 @@ extern sysevent_t *spa_event_create(spa_t *spa, vdev_t *vd, nvlist_t *hist_nvl,
     const char *name);
 extern void spa_event_post(sysevent_t *ev);
 extern void spa_event_discard(sysevent_t *ev);
+extern void zfs_post_dle_sysevent(const char *);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_bp(bp, fmt, ...) do {				\
