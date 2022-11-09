@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -483,8 +484,8 @@ static int
 ctfdump_member_cb(const char *member, ctf_id_t type, ulong_t off, void *arg)
 {
 	int *count = arg;
-	ctfdump_printf(CTFDUMP_TYPES, "\t%s type=%ld off=%lu\n", member, type,
-	    off);
+	ctfdump_printf(CTFDUMP_TYPES, "\t%s type=%ld off=%lu bits (%lu.%lu "
+	    "bytes)\n", member, type, off, off / 8, off % 8);
 	*count = *count + 1;
 	return (0);
 }

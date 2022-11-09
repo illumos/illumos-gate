@@ -68,7 +68,7 @@ CSTD=	$(CSTD_GNU99)
 
 CFLAGS +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
 CFLAGS64 +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
-LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lsysevent -lmd \
+LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lmd \
 		-lfakekernel -lzutil
 NATIVE_LIBS +=	libz.so
 CPPFLAGS.first =	-I$(SRC)/lib/libfakekernel/common
