@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -743,14 +743,13 @@ smb_tree_connect_disk(smb_request_t *sr, smb_arg_tcon_t *tcon)
 	if (si->shr_flags & SMB_SHRF_DFSROOT)
 		tcon->optional_support |= SMB_SHARE_IS_IN_DFS;
 
-	/* if 'smb' zfs property: shortnames=disabled */
-	if (!smb_shortnames)
-		sr->arg.tcon.optional_support |= SMB_UNIQUE_FILE_NAME;
-
 	tree = smb_tree_alloc(sr, si, snode, access, sr->sr_cfg->skc_execflags);
 
 	if (tree == NULL)
 		return (NT_STATUS_INSUFF_SERVER_RESOURCES);
+
+	if (tree->t_flags & SMB_TREE_SHORTNAMES)
+		tcon->optional_support |= SMB_UNIQUE_FILE_NAME;
 
 	if (tree->t_execflags & SMB_EXEC_MAP) {
 		smb_tree_set_execinfo(tree, &execinfo, SMB_EXEC_MAP);
@@ -1097,6 +1096,7 @@ smb_tree_get_sharename(char *unc_path)
 
 /*
  * Obtain the tree attributes: volume name, typename and flags.
+ * Called only with DISK and PRINTQ shares.
  */
 static int
 smb_tree_getattr(const smb_kshare_t *si, smb_node_t *node, smb_tree_t *tree)
@@ -1187,6 +1187,9 @@ smb_tree_get_volname(vfs_t *vfsp, smb_tree_t *tree)
 }
 
 /*
+ * Get flags from the VFS (and other places) for a new tree.
+ * Called only with DISK and PRINTQ shares.
+ *
  * Always set "unicode on disk" because we always use utf8 names locally.
  * Always set ACL support because the VFS will fake ACLs for file systems
  * that don't support them.
@@ -1238,17 +1241,13 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	if (si->shr_flags & SMB_SHRF_FSO)
 		flags |= SMB_TREE_FORCE_L2_OPLOCK;
 
-	if (ssn->s_cfg.skc_oplock_enable) {
-		/* if 'smb' zfs property: oplocks=enabled */
+	if (ssn->s_cfg.skc_oplock_enable)
 		flags |= SMB_TREE_OPLOCKS;
-	}
 
-	/* Global config option for now.  Later make per-share. */
 	if (ssn->s_cfg.skc_traverse_mounts)
 		flags |= SMB_TREE_TRAVERSE_MOUNTS;
 
-	/* if 'smb' zfs property: shortnames=enabled */
-	if (smb_shortnames)
+	if (ssn->s_cfg.skc_short_names)
 		flags |= SMB_TREE_SHORTNAMES;
 
 	if (vfsp->vfs_flag & VFS_RDONLY)

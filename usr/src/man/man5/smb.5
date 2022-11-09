@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2017, Nexenta Systems, Inc. All Rights Reserved.
-.\" Copyright 2021, RackTop Systems, Inc. All Rights Reserved.
+.\" Copyright 2022, RackTop Systems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the
 .\" Common Development and Distribution License (the "License").
 .\" You may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.TH SMB 5 "December 28, 2020"
+.TH SMB 5 "January 17, 2022"
 .SH NAME
 smb \- configuration properties for Solaris CIFS server
 .SH DESCRIPTION
@@ -496,6 +496,19 @@ Disables anonymous access to IPC$, which requires that the client be
 authenticated to get access to MSRPC services through IPC$. A value of
 \fBtrue\fR disables anonymous access to IPC$, while a value of \fBfalse\fR
 enables anonymous access.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBshort_names\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enables use of "short names" by SMB clients.  The default value is
+\fBfalse\fR because modern SMB clients do not need short names, and
+using short names has some performance cost while listing directories
+and opening or renaming files.
 .RE
 
 .sp

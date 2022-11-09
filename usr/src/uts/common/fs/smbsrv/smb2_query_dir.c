@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -441,7 +442,7 @@ smb2_find_mbc_encode(smb_request_t *sr, smb2_find_args_t *args)
 	int		shortlen = 0;
 	int		rc, starting_offset;
 	uint32_t	next_entry_offset;
-	uint32_t	mb_flags = SMB_MSGBUF_UNICODE;
+	uint32_t	mb_flags = SMB_MSGBUF_UNICODE | SMB_MSGBUF_NOTERM;
 	uint32_t	resume_key;
 
 	namelen = smb_wcequiv_strlen(fileinfo->fi_name);
@@ -527,8 +528,11 @@ smb2_find_mbc_encode(smb_request_t *sr, smb2_find_args_t *args)
 	case FileBothDirectoryInformation:	/* 3 */
 		bzero(buf83, sizeof (buf83));
 		smb_msgbuf_init(&mb, buf83, sizeof (buf83), mb_flags);
-		if (!smb_msgbuf_encode(&mb, "U", fileinfo->fi_shortname))
-			shortlen = smb_wcequiv_strlen(fileinfo->fi_shortname);
+		shortlen = smb_msgbuf_encode(&mb, "U", fileinfo->fi_shortname);
+		if (shortlen < 0) {
+			shortlen = 0;
+			bzero(buf83, sizeof (buf83));
+		}
 
 		rc = smb_mbc_encodef(
 		    &sr->raw_data, "llTTTTqqlllb.24c",
@@ -553,8 +557,11 @@ smb2_find_mbc_encode(smb_request_t *sr, smb2_find_args_t *args)
 	case FileIdBothDirectoryInformation:	/* 37 */
 		bzero(buf83, sizeof (buf83));
 		smb_msgbuf_init(&mb, buf83, sizeof (buf83), mb_flags);
-		if (!smb_msgbuf_encode(&mb, "U", fileinfo->fi_shortname))
-			shortlen = smb_wcequiv_strlen(fileinfo->fi_shortname);
+		shortlen = smb_msgbuf_encode(&mb, "U", fileinfo->fi_shortname);
+		if (shortlen < 0) {
+			shortlen = 0;
+			bzero(buf83, sizeof (buf83));
+		}
 
 		rc = smb_mbc_encodef(
 		    &sr->raw_data, "llTTTTqqlllb.24c..q",

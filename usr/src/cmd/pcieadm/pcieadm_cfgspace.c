@@ -5244,7 +5244,11 @@ pcieadm_show_cfgspace_help(const char *fmt, ...)
 	    "\t-n\t\tshow printable short names\n"
 	    "\t-H\t\tomit the column header (for -L and -p)\n"
 	    "\t-p\t\tparsable output (requires -o)\n"
-	    "\t-o field\toutput fields to print (required for -p)\n");
+	    "\t-o field\toutput fields to print (required for -p)\n\n"
+	    "The following fields are supported:\n"
+	    "\thuman\t\ta human-readable description of the specific output\n"
+	    "\tshort\t\tthe short name of the value used for filters\n"
+	    "\tvalue\t\tthe value of a the given capability, register, etc.\n");
 }
 
 int
