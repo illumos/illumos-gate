@@ -3977,7 +3977,7 @@ ddi_is_pci_dip(dev_info_t *dip)
  * to ioc's bus_config entry point.
  */
 int
-resolve_pathname(char *pathname, dev_info_t **dipp, dev_t *devtp,
+resolve_pathname(const char *pathname, dev_info_t **dipp, dev_t *devtp,
     int *spectypep)
 {
 	int			error;

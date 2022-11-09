@@ -1704,7 +1704,7 @@ int
 ddi_uninitchild(dev_info_t *dip);
 
 major_t
-ddi_name_to_major(char *name);
+ddi_name_to_major(const char *name);
 
 char *
 ddi_major_to_name(major_t major);
@@ -2115,8 +2115,8 @@ int
 ddi_lyr_get_minor_name(dev_t dev, int spec_type, char **minor_name);
 
 int
-ddi_lyr_devid_to_devlist(ddi_devid_t devid, char *minor_name, int *retndevs,
-    dev_t **retdevs);
+ddi_lyr_devid_to_devlist(ddi_devid_t devid, const char *minor_name,
+    int *retndevs, dev_t **retdevs);
 
 void
 ddi_lyr_free_devlist(dev_t *devlist, int ndevs);

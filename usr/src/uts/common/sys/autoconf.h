@@ -251,7 +251,7 @@ extern void impl_rem_dev_props(dev_info_t *);
 extern void add_class(char *, char *);
 
 extern int make_mbind(char *, int, char *, struct bind **);
-extern void delete_mbind(char *, struct bind **);
+extern void delete_mbind(const char *, struct bind **);
 extern void purge_mbind(int, struct bind **);
 
 extern void configure(void);

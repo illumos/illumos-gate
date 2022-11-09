@@ -6473,7 +6473,7 @@ ddi_get_parent_data(dev_info_t *dip)
  *	major = ddi_driver_major(dev_info_t *)
  */
 major_t
-ddi_name_to_major(char *name)
+ddi_name_to_major(const char *name)
 {
 	return (mod_name_to_major(name));
 }
@@ -7531,7 +7531,7 @@ i_ddi_devtspectype_to_minorname(dev_info_t *dip, dev_t dev, int spec_type)
  * returning everything via arguments we can do the locking.
  */
 int
-i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
+i_ddi_minorname_to_devtspectype(dev_info_t *dip, const char *minor_name,
     dev_t *devtp, int *spectypep)
 {
 	struct ddi_minor_data	*dmdp;
@@ -7985,7 +7985,7 @@ ddi_lyr_get_minor_name(dev_t dev, int spec_type, char **minor_name)
 int
 ddi_lyr_devid_to_devlist(
 	ddi_devid_t	devid,
-	char		*minor_name,
+	const char	*minor_name,
 	int		*retndevs,
 	dev_t		**retdevs)
 {

@@ -65,8 +65,8 @@ struct mod_noload {
  * Function prototypes
  */
 static int init_stubs(struct modctl *, struct mod_modinfo *);
-static int nm_hash(char *);
-static void make_syscallname(char *, int);
+static int nm_hash(const char *);
+static void make_syscallname(const char *, int);
 static void hwc_hash_init();
 static void hwc_hash(struct hwc_spec *, major_t);
 static void hwc_unhash(struct hwc_spec *);
@@ -219,19 +219,20 @@ nomod_void()
  * Return zero if there were no errors or an errno value.
  */
 int
-install_stubs_by_name(struct modctl *modp, char *name)
+install_stubs_by_name(struct modctl *modp, const char *name)
 {
 	char *p;
-	char *filenamep;
+	const char *filenamep, *iter;
 	char namebuf[MODMAXNAMELEN + 12];
 	struct mod_modinfo *mp;
 
-	p = name;
+	iter = name;
 	filenamep = name;
 
-	while (*p)
-		if (*p++ == '/')
-			filenamep = p;
+	while (*iter) {
+		if (*iter++ == '/')
+			filenamep = iter;
+	}
 
 	/*
 	 * Concatenate "name" with "_modname" then look up this symbol
@@ -471,7 +472,7 @@ struct bind *mb_hashtab[MOD_BIND_HASHSIZE];
 struct bind *sb_hashtab[MOD_BIND_HASHSIZE];
 
 static int
-nm_hash(char *name)
+nm_hash(const char *name)
 {
 	char c;
 	int hash = 0;
@@ -506,7 +507,7 @@ clear_binding_hash(struct bind **bhash)
 
 /* Find an mbind by name match (caller can ask for deleted match) */
 static struct bind *
-find_mbind(char *name, struct bind **hashtab, int deleted)
+find_mbind(const char *name, struct bind **hashtab, int deleted)
 {
 	struct bind	*mb;
 
@@ -565,7 +566,7 @@ make_mbind(char *name, int num, char *bind_name, struct bind **hashtab)
  * of deleted entries, so we still need deleted items on the list.
  */
 void
-delete_mbind(char *name, struct bind **hashtab)
+delete_mbind(const char *name, struct bind **hashtab)
 {
 	struct bind	*mb;
 
@@ -609,7 +610,7 @@ purge_mbind(int num, struct bind **hashtab)
 }
 
 major_t
-mod_name_to_major(char *name)
+mod_name_to_major(const char *name)
 {
 	struct bind	*mbind;
 	major_t		maj;
@@ -700,7 +701,7 @@ init_devnamesp(int size)
 }
 
 int
-make_devname(char *name, major_t major, int dn_flags)
+make_devname(const char *name, major_t major, int dn_flags)
 {
 	struct devnames *dnp;
 	char *copy;
@@ -773,7 +774,7 @@ init_syscallnames(int size)
 }
 
 static void
-make_syscallname(char *name, int sysno)
+make_syscallname(const char *name, int sysno)
 {
 	char **cp = &syscallnames[sysno];
 
@@ -791,7 +792,7 @@ make_syscallname(char *name, int sysno)
  * Given a system call name, get its number.
  */
 int
-mod_getsysnum(char *name)
+mod_getsysnum(const char *name)
 {
 	struct bind *mbind;
 
@@ -863,7 +864,7 @@ hwc_hash_init()
  * Insert a spec into hash table. hwc_hash_lock must be held
  */
 static void
-hwc_hash_insert(struct hwc_spec *spec, char *name, mod_hash_t *hash)
+hwc_hash_insert(struct hwc_spec *spec, const char *name, mod_hash_t *hash)
 {
 	mod_hash_key_t key;
 	struct hwc_spec *entry = NULL;
@@ -897,7 +898,7 @@ hwc_hash_insert(struct hwc_spec *spec, char *name, mod_hash_t *hash)
  * destroyed external to this function.
  */
 static void
-hwc_hash_remove(struct hwc_spec *spec, char *name, mod_hash_t *hash)
+hwc_hash_remove(struct hwc_spec *spec, const char *name, mod_hash_t *hash)
 {
 	char *key;
 	struct hwc_spec *entry;

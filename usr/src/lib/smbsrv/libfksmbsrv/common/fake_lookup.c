@@ -60,7 +60,7 @@
 
 int
 lookupname(
-	char *fnamep,
+	const char *fnamep,
 	enum uio_seg seg,
 	int followlink,
 	vnode_t **dirvpp,
@@ -76,7 +76,7 @@ lookupname(
  */
 int
 lookupnameatcred(
-	char *fnamep,			/* user pathname */
+	const char *fnamep,		/* user pathname */
 	enum uio_seg seg,		/* addr space that name is in */
 	int followlink,			/* follow sym links */
 	vnode_t **dirvpp,		/* ret for ptr to parent dir vnode */

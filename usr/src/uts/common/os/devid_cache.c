@@ -742,7 +742,7 @@ devid_cache_cleanup(void)
 static void
 e_devid_minor_to_devlist(
 	dev_info_t	*dip,
-	char		*minor_name,
+	const char	*minor_name,
 	int		ndevts_alloced,
 	int		*devtcntp,
 	dev_t		*devtsp)
@@ -876,7 +876,7 @@ e_devid_cache_devi_path_lists(ddi_devid_t devid, int retmax,
  * Primary interface used by ddi_lyr_devid_to_devlist()
  */
 int
-e_devid_cache_to_devt_list(ddi_devid_t devid, char *minor_name,
+e_devid_cache_to_devt_list(ddi_devid_t devid, const char *minor_name,
     int *retndevts, dev_t **retdevts)
 {
 	char		*path, **paths;

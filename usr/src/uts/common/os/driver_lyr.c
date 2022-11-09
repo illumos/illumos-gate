@@ -545,7 +545,7 @@ ldi_vp_from_dev(dev_t dev, int otyp, vnode_t **vpp)
 
 /* get a vnode to a device by pathname */
 int
-ldi_vp_from_name(char *path, vnode_t **vpp)
+ldi_vp_from_name(const char *path, vnode_t **vpp)
 {
 	vnode_t			*vp = NULL;
 	int			ret;
@@ -680,7 +680,7 @@ ldi_devid_match(ddi_devid_t devid, dev_info_t *dip, dev_t dev)
 
 /* get a handle to a device by devid and minor name */
 int
-ldi_vp_from_devid(ddi_devid_t devid, char *minor_name, vnode_t **vpp)
+ldi_vp_from_devid(ddi_devid_t devid, const char *minor_name, vnode_t **vpp)
 {
 	dev_info_t		*dip;
 	vnode_t			*vp;
@@ -1637,7 +1637,7 @@ ldi_open_by_dev(dev_t *devp, int otyp, int flag, cred_t *cr,
 
 /* get a handle to a device by pathname */
 int
-ldi_open_by_name(char *pathname, int flag, cred_t *cr,
+ldi_open_by_name(const char *pathname, int flag, cred_t *cr,
     ldi_handle_t *lhp, ldi_ident_t li)
 {
 	struct ldi_ident	*lip = (struct ldi_ident *)li;
@@ -1662,7 +1662,7 @@ ldi_open_by_name(char *pathname, int flag, cred_t *cr,
 
 /* get a handle to a device by devid and minor_name */
 int
-ldi_open_by_devid(ddi_devid_t devid, char *minor_name,
+ldi_open_by_devid(ddi_devid_t devid, const char *minor_name,
     int flag, cred_t *cr, ldi_handle_t *lhp, ldi_ident_t li)
 {
 	struct ldi_ident	*lip = (struct ldi_ident *)li;

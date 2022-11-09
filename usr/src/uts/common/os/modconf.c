@@ -73,7 +73,7 @@ extern struct modctl *mod_getctl(struct modlinkage *);
 extern int errsys(), nodev(), nulldev();
 
 extern int findmodbyname(char *);
-extern int mod_getsysnum(char *);
+extern int mod_getsysnum(const char *);
 
 extern struct execsw execsw[];
 

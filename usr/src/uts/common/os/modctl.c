@@ -4193,9 +4193,9 @@ mod_release_mod(struct modctl *mp)
 }
 
 modid_t
-mod_name_to_modid(char *filename)
+mod_name_to_modid(const char *filename)
 {
-	char		*modname;
+	const char	*modname;
 	struct modctl	*mp;
 
 	mutex_enter(&mod_lock);
