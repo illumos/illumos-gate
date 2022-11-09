@@ -76,7 +76,8 @@ extern "C" {
  * UMC Channel registers. These are in SMN Space. DDR4 and DDR5 based UMCs share
  * the same base address, somewhat surprisingly. This constructs the appropriate
  * offset and ensures that a caller doesn't exceed the number of known instances
- * of the register.  See smn.h for additional details on SMN addressing.
+ * of the register.  See smn.h for additional details on SMN addressing.  All
+ * UMC registers are 32 bits wide; we check for violations.
  */
 
 static inline smn_reg_t
@@ -93,6 +94,7 @@ amdzen_umc_smn_reg(const uint8_t umcno, const smn_reg_def_t def,
 	const uint32_t nents = (def.srd_nents == 0) ? 1 :
 	    (const uint32_t)def.srd_nents;
 
+	ASSERT0(def.srd_size);
 	ASSERT3S(def.srd_unit, ==, SMN_UNIT_UMC);
 	ASSERT0(def.srd_reg & APERTURE_MASK);
 	ASSERT3U(umc32, <, 12);
