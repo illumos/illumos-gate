@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
  * Copyright (c) 2013 Joyent, Inc. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_DT_PARSER_H
@@ -50,6 +51,7 @@ extern "C" {
 typedef struct dt_node {
 	ctf_file_t *dn_ctfp;	/* CTF type container for node's type */
 	ctf_id_t dn_type;	/* CTF type reference for node's type */
+	ulong_t dn_bitoff;	/* Offset to the start of the CTF type */
 	uchar_t dn_kind;	/* node kind (DT_NODE_*, defined below) */
 	uchar_t dn_flags;	/* node flags (DT_NF_*, defined below) */
 	ushort_t dn_op;		/* operator (DT_TOK_*, defined by lex) */
@@ -239,6 +241,8 @@ extern void dt_node_link_free(dt_node_t **);
 
 extern void dt_node_attr_assign(dt_node_t *, dtrace_attribute_t);
 extern void dt_node_type_assign(dt_node_t *, ctf_file_t *, ctf_id_t, boolean_t);
+extern void dt_node_type_assign_bitfield(dt_node_t *, ctf_file_t *, ctf_id_t,
+    boolean_t, ulong_t);
 extern void dt_node_type_propagate(const dt_node_t *, dt_node_t *);
 extern const char *dt_node_type_name(const dt_node_t *, char *, size_t);
 extern size_t dt_node_type_size(const dt_node_t *);

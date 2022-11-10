@@ -28,6 +28,7 @@
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -160,15 +161,17 @@ dt_cg_load(dt_node_t *dnp, ctf_file_t *ctfp, ctf_id_t type)
 	ssize_t size;
 
 	/*
-	 * If we're loading a bit-field, the size of our load is found by
-	 * rounding cte_bits up to a byte boundary and then finding the
-	 * nearest power of two to this value (see clp2(), above).
+	 * If we're loading a bit-field, we find the power-of-two that spans the
+	 * full value. To do this we count the number of bytes that contain a
+	 * portion of the bit-field.
 	 */
 	if ((dnp->dn_flags & DT_NF_BITFIELD) &&
-	    ctf_type_encoding(ctfp, type, &e) != CTF_ERR)
-		size = clp2(P2ROUNDUP(e.cte_bits, NBBY) / NBBY);
-	else
+	    ctf_type_encoding(ctfp, type, &e) != CTF_ERR) {
+		uint_t nbits = e.cte_bits + (dnp->dn_bitoff % NBBY);
+		size = clp2(P2ROUNDUP(nbits, NBBY) / NBBY);
+	} else {
 		size = ctf_type_size(ctfp, type);
+	}
 
 	if (size < 1 || size > 8 || (size & (size - 1)) != 0) {
 		xyerror(D_UNKNOWN, "internal error -- cg cannot load "

@@ -21,3 +21,60 @@ broken6491_t {
     unsigned short:1 e :1 = 0x1
     unsigned short:1 f :1 = 0
 }
+brk_a = 0x3
+brk_b = 0x3
+brk_c = 0
+brk_d = 0x1
+brk_e = 0x1
+brk_f = 0x1
+brk_g = 0x3
+brk_h = 0x5
+brk_i = 0x3
+brk_j = 0x9
+brk_k = 0x13
+brk_l = 0
+brk_m = 0x1
+a = 0x1
+b = 0x2
+c = 0
+d = 0
+e = 0x1
+f = 0
+3
+3
+0
+1
+1
+1
+3
+5
+3
+9
+13
+0
+1
+1
+2
+0
+0
+1
+0
+                3               
+                3               
+                0               
+                1               
+                1               
+                1               
+                3               
+                5               
+                3               
+                9               
+                13              
+                0               
+                1               
+                1               
+                2               
+                0               
+                0               
+                1               
+                0               

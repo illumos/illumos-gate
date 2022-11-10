@@ -28,6 +28,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2018 Joyent, Inc.
+# Copyright 2022 Oxide Computer Company
 #
 
 #
@@ -90,9 +91,16 @@ json/tst.usdt.exe: json/tst.usdt.o json/usdt.o
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 #
-# Tests that use the next three programs rely on the binaries having
+# Tests that use the next four programs rely on the binaries having
 # valid CTF data.
 #
+bitfields/tst.bitfields.exe: bitfields/tst.bitfields.c
+	$(COMPILE.c) $(CTF_FLAGS) -o bitfields/tst.bitfields.o bitfields/tst.bitfields.c
+	$(CTFCONVERT) -i -L VERSION bitfields/tst.bitfields.o
+	$(LINK.c) -o bitfields/tst.bitfields.exe bitfields/tst.bitfields.o $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ bitfields/tst.bitfields.o
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
 uctf/tst.aouttype.exe: uctf/tst.aouttype.c
 	$(COMPILE.c) $(CTF_FLAGS) -o uctf/tst.aouttype.o uctf/tst.aouttype.c
 	$(CTFCONVERT) -i -L VERSION uctf/tst.aouttype.o

@@ -23,6 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent Inc. All rights reserved.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -517,6 +518,7 @@ dt_node_xalloc(dtrace_hdl_t *dtp, int kind)
 
 	dnp->dn_ctfp = NULL;
 	dnp->dn_type = CTF_ERR;
+	dnp->dn_bitoff = 0;
 	dnp->dn_kind = (uchar_t)kind;
 	dnp->dn_flags = 0;
 	dnp->dn_op = 0;
@@ -671,8 +673,8 @@ dt_node_attr_assign(dt_node_t *dnp, dtrace_attribute_t attr)
 }
 
 void
-dt_node_type_assign(dt_node_t *dnp, ctf_file_t *fp, ctf_id_t type,
-    boolean_t user)
+dt_node_type_assign_member(dt_node_t *dnp, ctf_file_t *fp, ctf_id_t type,
+    boolean_t user, ulong_t bitoff)
 {
 	ctf_id_t base = ctf_type_resolve(fp, type);
 	uint_t kind = ctf_type_kind(fp, base);
@@ -682,9 +684,7 @@ dt_node_type_assign(dt_node_t *dnp, ctf_file_t *fp, ctf_id_t type,
 	    ~(DT_NF_SIGNED | DT_NF_REF | DT_NF_BITFIELD | DT_NF_USERLAND);
 
 	if (kind == CTF_K_INTEGER && ctf_type_encoding(fp, base, &e) == 0) {
-		size_t size = e.cte_bits / NBBY;
-
-		if (size > 8 || (e.cte_bits % NBBY) != 0 || (size & (size - 1)))
+		if (dt_is_bitfield(&e, bitoff))
 			dnp->dn_flags |= DT_NF_BITFIELD;
 
 		if (e.cte_format & CTF_INT_SIGNED)
@@ -710,6 +710,15 @@ dt_node_type_assign(dt_node_t *dnp, ctf_file_t *fp, ctf_id_t type,
 	dnp->dn_flags |= DT_NF_COOKED;
 	dnp->dn_ctfp = fp;
 	dnp->dn_type = type;
+	dnp->dn_bitoff = bitoff;
+}
+
+
+void
+dt_node_type_assign(dt_node_t *dnp, ctf_file_t *fp, ctf_id_t type,
+    boolean_t user)
+{
+	return (dt_node_type_assign_member(dnp, fp, type, user, 0));
 }
 
 void
@@ -719,6 +728,7 @@ dt_node_type_propagate(const dt_node_t *src, dt_node_t *dst)
 	dst->dn_flags = src->dn_flags & ~DT_NF_LVALUE;
 	dst->dn_ctfp = src->dn_ctfp;
 	dst->dn_type = src->dn_type;
+	dst->dn_bitoff = src->dn_bitoff;
 }
 
 const char *
@@ -1369,7 +1379,8 @@ dt_node_type(dt_decl_t *ddp)
 	dnp->dn_op = DT_TOK_IDENT;
 	dnp->dn_string = name;
 
-	dt_node_type_assign(dnp, dtt.dtt_ctfp, dtt.dtt_type, dtt.dtt_flags);
+	dt_node_type_assign(dnp, dtt.dtt_ctfp, dtt.dtt_type,
+	    (dtt.dtt_flags & DTT_FL_USER) != 0);
 
 	if (dtt.dtt_ctfp == dtp->dt_cdefs->dm_ctfp ||
 	    dtt.dtt_ctfp == dtp->dt_ddefs->dm_ctfp)
@@ -1392,6 +1403,7 @@ dt_node_vatype(void)
 	dnp->dn_op = DT_TOK_IDENT;
 	dnp->dn_ctfp = yypcb->pcb_hdl->dt_cdefs->dm_ctfp;
 	dnp->dn_type = CTF_ERR;
+	dnp->dn_bitoff = 0;
 	dnp->dn_attr = _dtrace_defattr;
 
 	return (dnp);
@@ -3767,7 +3779,8 @@ asgn_common:
 		type = ctf_type_resolve(ctfp, m.ctm_type);
 		kind = ctf_type_kind(ctfp, type);
 
-		dt_node_type_assign(dnp, ctfp, m.ctm_type, B_FALSE);
+		dt_node_type_assign_member(dnp, ctfp, m.ctm_type, B_FALSE,
+		    m.ctm_offset);
 		dt_node_attr_assign(dnp, lp->dn_attr);
 
 		if (op == DT_TOK_PTR && (kind != CTF_K_ARRAY ||
@@ -4137,7 +4150,7 @@ dt_cook_aggregation(dt_node_t *dnp, uint_t idflags)
  * probe-description-list
  * /x++ && y == 0/
  * {
- * 	trace(x + y++);
+ *	trace(x + y++);
  * }
  *
  * but it doesn't seem worth the complexity to handle such rare cases.  The
@@ -4842,9 +4855,12 @@ dt_node_printr(dt_node_t *dnp, FILE *fp, int depth)
 		    (u_longlong_t)dnp->dn_value, buf);
 		break;
 
-	case DT_NODE_STRING:
-		(void) fprintf(fp, "STRING \"%s\" (%s)\n", dnp->dn_string, buf);
+	case DT_NODE_STRING: {
+		char *escd = strchr2esc(dnp->dn_string, strlen(dnp->dn_string));
+		(void) fprintf(fp, "STRING \"%s\" (%s)\n", escd, buf);
+		free(escd);
 		break;
+	}
 
 	case DT_NODE_IDENT:
 		(void) fprintf(fp, "IDENT %s (%s)\n", dnp->dn_string, buf);
