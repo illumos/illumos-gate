@@ -5479,6 +5479,21 @@ spa_import_rootpool(char *devpath, char *devid, uint64_t pool_guid,
 	char *pname;
 	int error;
 	const char *altdevpath = NULL;
+	const char *rdpath = NULL;
+
+	if ((rdpath = vdev_disk_preroot_force_path()) != NULL) {
+		/*
+		 * We expect to import a single-vdev pool from a specific
+		 * device such as a ramdisk device.  We don't care what the
+		 * pool label says.
+		 */
+		config = spa_generate_rootconf(rdpath, NULL, &guid, 0);
+		if (config != NULL) {
+			goto configok;
+		}
+		cmn_err(CE_NOTE, "Cannot use root disk device '%s'", rdpath);
+		return (SET_ERROR(EIO));
+	}
 
 	/*
 	 * Read the label from the boot device and generate a configuration.
@@ -5521,6 +5536,7 @@ spa_import_rootpool(char *devpath, char *devid, uint64_t pool_guid,
 		return (SET_ERROR(EIO));
 	}
 
+configok:
 	VERIFY(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
 	    &pname) == 0);
 	VERIFY(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG, &txg) == 0);
