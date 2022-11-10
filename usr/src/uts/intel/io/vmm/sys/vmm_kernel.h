@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -89,6 +89,7 @@ typedef struct vlapic *(*vmi_vlapic_init)(void *vmi, int vcpu);
 typedef void	(*vmi_vlapic_cleanup)(void *vmi, struct vlapic *vlapic);
 typedef void	(*vmi_savectx)(void *vmi, int vcpu);
 typedef void	(*vmi_restorectx)(void *vmi, int vcpu);
+typedef void	(*vmi_pause_t)(void *vmi, int vcpu);
 
 typedef int	(*vmi_get_msr_t)(void *vmi, int vcpu, uint32_t msr,
     uint64_t *valp);
@@ -111,6 +112,7 @@ struct vmm_ops {
 	vmi_set_cap_t		vmsetcap;
 	vmi_vlapic_init		vlapic_init;
 	vmi_vlapic_cleanup	vlapic_cleanup;
+	vmi_pause_t		vmpause;
 
 	vmi_savectx		vmsavectx;
 	vmi_restorectx		vmrestorectx;
@@ -491,6 +493,8 @@ typedef struct vmm_data_req {
 
 typedef int (*vmm_data_writef_t)(void *, const vmm_data_req_t *);
 typedef int (*vmm_data_readf_t)(void *, const vmm_data_req_t *);
+typedef int (*vmm_data_vcpu_writef_t)(struct vm *, int, const vmm_data_req_t *);
+typedef int (*vmm_data_vcpu_readf_t)(struct vm *, int, const vmm_data_req_t *);
 
 typedef struct vmm_data_version_entry {
 	uint16_t		vdve_class;
@@ -499,6 +503,8 @@ typedef struct vmm_data_version_entry {
 	uint16_t		vdve_len_per_item;
 	vmm_data_readf_t	vdve_readf;
 	vmm_data_writef_t	vdve_writef;
+	vmm_data_vcpu_readf_t	vdve_vcpu_readf;
+	vmm_data_vcpu_writef_t	vdve_vcpu_writef;
 } vmm_data_version_entry_t;
 
 #define	VMM_DATA_VERSION(sym)	SET_ENTRY(vmm_data_version_entries, sym)

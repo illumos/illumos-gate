@@ -419,7 +419,7 @@ struct vm_legacy_cpuid {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	9
+#define	VMM_CURRENT_INTERFACE_VERSION	10
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))

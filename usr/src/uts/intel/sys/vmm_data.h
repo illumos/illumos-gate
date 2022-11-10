@@ -11,7 +11,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _VMM_DATA_H_
@@ -111,12 +111,35 @@ struct vdi_lapic_v1 {
  * Version 1 identifiers:
  */
 
+/*
+ * VM-wide:
+ */
+
 /* Offset of guest TSC from system at time of boot */
 #define	VAI_TSC_BOOT_OFFSET	1
 /* Time that guest (nominally) booted, as hrtime */
 #define	VAI_BOOT_HRTIME		2
 /* Guest TSC frequency measured by hrtime (not effected by wall clock adj.) */
 #define	VAI_TSC_FREQ		3
+/* Is the VM currently in the "paused" state? (0 or 1) */
+#define	VAI_VM_IS_PAUSED	4
+
+/*
+ * per-vCPU:
+ *
+ * Note: While these are currently defined with values disjoint from those in
+ * the VM-wide category, it is not required that they be.  The VM-wide and
+ * per-vCPU identifiers are distinguished by vm_data_xfer`vdx_vcpuid.
+ */
+
+/* NMI pending injection for vCPU (0 or 1) */
+#define	VAI_PEND_NMI		10
+/* extint pending injection for vCPU (0 or 1) */
+#define	VAI_PEND_EXTINT		11
+/* HW exception pending injection for vCPU */
+#define	VAI_PEND_EXCP		12
+/* exception/interrupt pending injection for vCPU */
+#define	VAI_PEND_INTINFO	13
 
 
 /* VDC_IOAPIC: */

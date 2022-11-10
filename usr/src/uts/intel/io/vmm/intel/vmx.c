@@ -1048,10 +1048,16 @@ vmx_set_pcpu_defaults(struct vmx *vmx, int vcpu)
 	vmx_invvpid(vmx, vcpu, 1);
 }
 
+static __inline bool
+vmx_int_window_exiting(struct vmx *vmx, int vcpu)
+{
+	return ((vmx->cap[vcpu].proc_ctls & PROCBASED_INT_WINDOW_EXITING) != 0);
+}
+
 static __inline void
 vmx_set_int_window_exiting(struct vmx *vmx, int vcpu)
 {
-	if ((vmx->cap[vcpu].proc_ctls & PROCBASED_INT_WINDOW_EXITING) == 0) {
+	if (!vmx_int_window_exiting(vmx, vcpu)) {
 		/* Enable interrupt window exiting */
 		vmx->cap[vcpu].proc_ctls |= PROCBASED_INT_WINDOW_EXITING;
 		vmcs_write(VMCS_PRI_PROC_BASED_CTLS, vmx->cap[vcpu].proc_ctls);
@@ -1061,9 +1067,6 @@ vmx_set_int_window_exiting(struct vmx *vmx, int vcpu)
 static __inline void
 vmx_clear_int_window_exiting(struct vmx *vmx, int vcpu)
 {
-	KASSERT((vmx->cap[vcpu].proc_ctls & PROCBASED_INT_WINDOW_EXITING) != 0,
-	    ("intr_window_exiting not set: %x", vmx->cap[vcpu].proc_ctls));
-
 	/* Disable interrupt window exiting */
 	vmx->cap[vcpu].proc_ctls &= ~PROCBASED_INT_WINDOW_EXITING;
 	vmcs_write(VMCS_PRI_PROC_BASED_CTLS, vmx->cap[vcpu].proc_ctls);
@@ -1087,7 +1090,6 @@ vmx_set_nmi_window_exiting(struct vmx *vmx, int vcpu)
 static __inline void
 vmx_clear_nmi_window_exiting(struct vmx *vmx, int vcpu)
 {
-	ASSERT(vmx_nmi_window_exiting(vmx, vcpu));
 	vmx->cap[vcpu].proc_ctls &= ~PROCBASED_NMI_WINDOW_EXITING;
 	vmcs_write(VMCS_PRI_PROC_BASED_CTLS, vmx->cap[vcpu].proc_ctls);
 }
@@ -1122,7 +1124,7 @@ CTASSERT(VMCS_IDT_VEC_ERRCODE_VALID	== VM_INTINFO_DEL_ERRCODE);
 CTASSERT(VMCS_INTR_T_MASK		== VM_INTINFO_MASK_TYPE);
 
 static uint64_t
-vmx_idtvec_to_intinfo(uint32_t info)
+vmx_idtvec_to_intinfo(uint32_t info, uint32_t errcode)
 {
 	ASSERT(info & VMCS_IDT_VEC_VALID);
 
@@ -1143,11 +1145,37 @@ vmx_idtvec_to_intinfo(uint32_t info)
 
 	uint64_t intinfo = VM_INTINFO_VALID | type | vec;
 	if (info & VMCS_IDT_VEC_ERRCODE_VALID) {
-		const uint32_t errcode = vmcs_read(VMCS_IDT_VECTORING_ERROR);
 		intinfo |= (uint64_t)errcode << 32;
 	}
 
 	return (intinfo);
+}
+
+CTASSERT(VMCS_INTR_DEL_ERRCODE		== VMCS_IDT_VEC_ERRCODE_VALID);
+CTASSERT(VMCS_INTR_VALID		== VMCS_IDT_VEC_VALID);
+
+/*
+ * Store VMX-specific event injection info for later handling.  This depends on
+ * the bhyve-internal event definitions matching those in the VMCS, as ensured
+ * by the vmx_idtvec_to_intinfo() and the related CTASSERTs.
+ */
+static void
+vmx_stash_intinfo(struct vmx *vmx, int vcpu)
+{
+	uint64_t info = vmcs_read(VMCS_ENTRY_INTR_INFO);
+	if ((info & VMCS_INTR_VALID) != 0) {
+		uint32_t errcode = 0;
+
+		if ((info & VMCS_INTR_DEL_ERRCODE) != 0) {
+			errcode = vmcs_read(VMCS_ENTRY_EXCEPTION_ERROR);
+		}
+
+		VERIFY0(vm_exit_intinfo(vmx->vm, vcpu,
+		    vmx_idtvec_to_intinfo(info, errcode)));
+
+		vmcs_write(VMCS_ENTRY_INTR_INFO, 0);
+		vmcs_write(VMCS_ENTRY_EXCEPTION_ERROR, 0);
+	}
 }
 
 static void
@@ -2200,9 +2228,14 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	 */
 	idtvec_info = vmcs_read(VMCS_IDT_VECTORING_INFO);
 	if (idtvec_info & VMCS_IDT_VEC_VALID) {
+		uint32_t errcode = 0;
+		if (idtvec_info & VMCS_IDT_VEC_ERRCODE_VALID) {
+			errcode = vmcs_read(VMCS_IDT_VECTORING_ERROR);
+		}
+
 		/* Record exit intinfo */
 		VERIFY0(vm_exit_intinfo(vmx->vm, vcpu,
-		    vmx_idtvec_to_intinfo(idtvec_info)));
+		    vmx_idtvec_to_intinfo(idtvec_info, errcode)));
 
 		/*
 		 * If 'virtual NMIs' are being used and the VM-exit
@@ -2320,6 +2353,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	case EXIT_REASON_INTR_WINDOW:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_INTR_WINDOW, 1);
 		SDT_PROBE3(vmm, vmx, exit, intrwindow, vmx, vcpu, vmexit);
+		ASSERT(vmx_int_window_exiting(vmx, vcpu));
 		vmx_clear_int_window_exiting(vmx, vcpu);
 		return (1);
 	case EXIT_REASON_EXT_INTR:
@@ -2358,6 +2392,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		/* Exit to allow the pending virtual NMI to be injected */
 		if (vm_nmi_pending(vmx->vm, vcpu))
 			vmx_inject_nmi(vmx, vcpu);
+		ASSERT(vmx_nmi_window_exiting(vmx, vcpu));
 		vmx_clear_nmi_window_exiting(vmx, vcpu);
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_NMI_WINDOW, 1);
 		return (1);
@@ -3764,6 +3799,28 @@ vmx_vlapic_cleanup(void *arg, struct vlapic *vlapic)
 }
 
 static void
+vmx_pause(void *arg, int vcpuid)
+{
+	struct vmx *vmx = arg;
+
+	VERIFY(vmx_vmcs_access_ensure(vmx, vcpuid));
+
+	/* Stash any interrupt/exception pending injection. */
+	vmx_stash_intinfo(vmx, vcpuid);
+
+	/*
+	 * Now that no event is pending injection, interrupt-window exiting and
+	 * NMI-window exiting can be disabled.  If/when this vCPU is made to run
+	 * again, those conditions will be reinstated when the now-queued events
+	 * are re-injected.
+	 */
+	vmx_clear_nmi_window_exiting(vmx, vcpuid);
+	vmx_clear_int_window_exiting(vmx, vcpuid);
+
+	vmx_vmcs_access_done(vmx, vcpuid);
+}
+
+static void
 vmx_savectx(void *arg, int vcpu)
 {
 	struct vmx *vmx = arg;
@@ -3810,6 +3867,7 @@ struct vmm_ops vmm_ops_intel = {
 	.vmsetcap	= vmx_setcap,
 	.vlapic_init	= vmx_vlapic_init,
 	.vlapic_cleanup	= vmx_vlapic_cleanup,
+	.vmpause	= vmx_pause,
 
 	.vmsavectx	= vmx_savectx,
 	.vmrestorectx	= vmx_restorectx,

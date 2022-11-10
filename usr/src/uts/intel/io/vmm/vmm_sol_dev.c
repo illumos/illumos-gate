@@ -1739,14 +1739,15 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		const size_t len = vdx.vdx_len;
 		void *buf = NULL;
 		if (len != 0) {
+			const void *udata = vdx.vdx_data;
+
 			buf = kmem_alloc(len, KM_SLEEP);
-			if ((vdx.vdx_flags & VDX_FLAG_READ_COPYIN) != 0 &&
-			    ddi_copyin(vdx.vdx_data, buf, len, md) != 0) {
+			if ((vdx.vdx_flags & VDX_FLAG_READ_COPYIN) == 0) {
+				bzero(buf, len);
+			} else if (ddi_copyin(udata, buf, len, md) != 0) {
 				kmem_free(buf, len);
 				error = EFAULT;
 				break;
-			} else {
-				bzero(buf, len);
 			}
 		}
 
