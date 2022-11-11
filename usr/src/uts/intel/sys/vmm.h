@@ -404,6 +404,11 @@ enum vm_create_flags {
 	 * rather than attempting to create transient allocations.
 	 */
 	VCF_RESERVOIR_MEM = (1 << 0),
+
+	/*
+	 * Enable dirty page tracking for the guest.
+	 */
+	VCF_TRACK_DIRTY = (1 << 1),
 };
 
 /*

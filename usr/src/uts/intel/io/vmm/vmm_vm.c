@@ -292,9 +292,12 @@ vmspace_resident_count(vmspace_t *vms)
 	return (vms->vms_pages_mapped);
 }
 
-void
+int
 vmspace_track_dirty(vmspace_t *vms, uint64_t gpa, size_t len, uint8_t *bitmap)
 {
+	if (!vms->vms_track_dirty)
+		return (EPERM);
+
 	/*
 	 * Accumulate dirty bits into the given bit vector.  Note that this
 	 * races both against hardware writes from running vCPUs and
@@ -327,6 +330,8 @@ vmspace_track_dirty(vmspace_t *vms, uint64_t gpa, size_t len, uint8_t *bitmap)
 		vmc_space_invalidate(vmc, gpa, len, vms->vms_pt_gen);
 	}
 	vmspace_hold_exit(vms, true);
+
+	return (0);
 }
 
 static pfn_t
@@ -839,7 +844,7 @@ vmspace_client_alloc(vmspace_t *vms)
 uint64_t
 vmspace_table_root(vmspace_t *vms)
 {
-	return (vmm_gpt_get_pmtp(vms->vms_gpt));
+	return (vmm_gpt_get_pmtp(vms->vms_gpt, vms->vms_track_dirty));
 }
 
 /*

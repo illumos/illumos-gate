@@ -551,12 +551,6 @@ vm_init(struct vm *vm, bool create)
 uint_t cores_per_package = 1;
 uint_t threads_per_core = 1;
 
-/*
- * Debugging tunable to enable dirty-page-tracking.
- * (Remains off by default for now)
- */
-bool gpt_track_dirty = false;
-
 int
 vm_create(uint64_t flags, struct vm **retvm)
 {
@@ -570,7 +564,11 @@ vm_create(uint64_t flags, struct vm **retvm)
 	if (!vmm_initialized)
 		return (ENXIO);
 
-	vmspace = vmspace_alloc(VM_MAXUSER_ADDRESS, pte_ops, gpt_track_dirty);
+	bool track_dirty = (flags & VCF_TRACK_DIRTY) != 0;
+	if (track_dirty && !pte_ops->vpeo_hw_ad_supported())
+		return (ENOTSUP);
+
+	vmspace = vmspace_alloc(VM_MAXUSER_ADDRESS, pte_ops, track_dirty);
 	if (vmspace == NULL)
 		return (ENOMEM);
 
@@ -1357,11 +1355,11 @@ vm_set_run_state(struct vm *vm, int vcpuid, uint32_t state, uint8_t sipi_vec)
 	return (0);
 }
 
-void
+int
 vm_track_dirty_pages(struct vm *vm, uint64_t gpa, size_t len, uint8_t *bitmap)
 {
 	vmspace_t *vms = vm_get_vmspace(vm);
-	vmspace_track_dirty(vms, gpa, len, bitmap);
+	return (vmspace_track_dirty(vms, gpa, len, bitmap));
 }
 
 static void

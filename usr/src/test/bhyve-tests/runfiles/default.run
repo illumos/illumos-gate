@@ -57,7 +57,8 @@ tests = [
 	'rdmsr',
 	'wrmsr',
 	'triple_fault',
-	'exit_paging'
+	'exit_paging',
+	'page_dirty'
 	]
 
 [/opt/bhyve-tests/tests/viona]

@@ -1703,9 +1703,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 		len = roundup(tracker.vdt_len / PAGESIZE, 8) / 8;
 		bitmap = kmem_zalloc(len, KM_SLEEP);
-		vm_track_dirty_pages(sc->vmm_vm, tracker.vdt_start_gpa,
+		error = vm_track_dirty_pages(sc->vmm_vm, tracker.vdt_start_gpa,
 		    tracker.vdt_len, bitmap);
-		if (ddi_copyout(bitmap, tracker.vdt_pfns, len, md) != 0) {
+		if (error == 0 &&
+		    ddi_copyout(bitmap, tracker.vdt_pfns, len, md) != 0) {
 			error = EFAULT;
 		}
 		kmem_free(bitmap, len);

@@ -138,7 +138,7 @@ bool vm_is_paused(struct vm *);
 /*
  * APIs that race against hardware.
  */
-void vm_track_dirty_pages(struct vm *, uint64_t, size_t, uint8_t *);
+int vm_track_dirty_pages(struct vm *, uint64_t, size_t, uint8_t *);
 
 /*
  * APIs that modify the guest memory map require all vcpus to be frozen.

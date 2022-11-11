@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -39,6 +39,8 @@
 
 #define	EPT_MAX_LEVELS	4
 CTASSERT(EPT_MAX_LEVELS <= MAX_GPT_LEVEL);
+
+#define	EPTP_FLAG_ACCESSED_DIRTY	(1 << 6)
 
 CTASSERT(EPT_R == PROT_READ);
 CTASSERT(EPT_W == PROT_WRITE);
@@ -120,11 +122,18 @@ ept_reset_accessed(uint64_t *entry, bool on)
 }
 
 static uint64_t
-ept_get_pmtp(pfn_t root_pfn)
+ept_get_pmtp(pfn_t root_pfn, bool track_dirty)
 {
-	/* TODO: enable AD tracking when required */
-	return ((root_pfn << PAGESHIFT |
+	const uint64_t ad_flag = track_dirty ? EPTP_FLAG_ACCESSED_DIRTY : 0;
+	return ((root_pfn << PAGESHIFT | ad_flag |
 	    (EPT_MAX_LEVELS - 1) << 3 | MTRR_TYPE_WB));
+}
+
+static bool
+ept_hw_ad_supported(void)
+{
+	uint64_t ept_caps = rdmsr(MSR_IA32_VMX_EPT_VPID_CAP);
+	return ((ept_caps & IA32_VMX_EPT_VPID_HW_AD) != 0);
 }
 
 vmm_pte_ops_t ept_pte_ops = {
@@ -136,4 +145,5 @@ vmm_pte_ops_t ept_pte_ops = {
 	.vpeo_reset_dirty	= ept_reset_dirty,
 	.vpeo_reset_accessed	= ept_reset_accessed,
 	.vpeo_get_pmtp		= ept_get_pmtp,
+	.vpeo_hw_ad_supported	= ept_hw_ad_supported,
 };

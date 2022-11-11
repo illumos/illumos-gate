@@ -44,7 +44,8 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
 		$(CPPFLAGS.master) \
 		-I$(SRC)/uts/intel/io/vmm \
-		-I$(SRC)/uts/intel
+		-I$(SRC)/uts/intel \
+		-I../common
 $(PROG) :=	LDLIBS += -lvmmapi
 
 all: $(PROG)
@@ -65,6 +66,10 @@ $(TESTDIR):
 
 $(TESTDIR)/%: %
 	$(INS.file)
+
+%.o: ../common/%.c
+	$(COMPILE.c) -o $@ $^
+	$(POST_PROCESS)
 
 %: %.o
 	$(LINK.c) -o $@ $< $(COMMON_OBJS) $(LDLIBS)
