@@ -26,6 +26,7 @@
 /*
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -847,7 +848,7 @@ static const char *
 iob_addr2str(uintptr_t addr)
 {
 	static char buf[MDB_TGT_SYM_NAMLEN];
-	char *name = buf;
+	size_t buflen = sizeof (buf);
 	longlong_t offset;
 	GElf_Sym sym;
 
@@ -855,8 +856,27 @@ iob_addr2str(uintptr_t addr)
 	    MDB_TGT_SYM_FUZZY, buf, sizeof (buf), &sym, NULL) == -1)
 		return (NULL);
 
-	if (mdb.m_demangler != NULL && (mdb.m_flags & MDB_FL_DEMANGLE))
-		name = (char *)mdb_dem_convert(mdb.m_demangler, buf);
+	if (mdb.m_demangler != NULL && (mdb.m_flags & MDB_FL_DEMANGLE)) {
+		/*
+		 * The mdb demangler attempts to either return us our original
+		 * name or a pointer to something it has changed. If it has
+		 * returned our original name, we want to update buf with that
+		 * so we can later modify it. Unfortunately if we find we exceed
+		 * the buffer, there's not an easy way to warn the user about
+		 * this, so we just truncate the symbol with a '???' and return
+		 * it. To someone finding this due to having seen that in a
+		 * symbol, sorry.
+		 */
+		const char *dem = mdb_dem_convert(mdb.m_demangler, buf);
+		if (dem != buf) {
+			if (strlcpy(buf, dem, buflen) >= buflen) {
+				buf[buflen - 1] = '?';
+				buf[buflen - 2] = '?';
+				buf[buflen - 3] = '?';
+				return (buf);
+			}
+		}
+	}
 
 	/*
 	 * Here we provide a little cooperation between the %a formatting code
@@ -868,17 +888,25 @@ iob_addr2str(uintptr_t addr)
 	 * query for us with a different address.  We detect this case by
 	 * comparing the initial characters of buf to the special PLT= string.
 	 */
-	if (sym.st_value != addr && strncmp(name, "PLT=", 4) != 0) {
+	if (sym.st_value != addr && strncmp(buf, "PLT=", 4) != 0) {
 		if (sym.st_value > addr)
 			offset = -(longlong_t)(sym.st_value - addr);
 		else
 			offset = (longlong_t)(addr - sym.st_value);
 
-		(void) strcat(name, numtostr(offset, mdb.m_radix,
-		    NTOS_SIGNPOS | NTOS_SHOWBASE));
+		/*
+		 * See the earlier note in this function about how we handle
+		 * demangler output for why we've dealt with things this way.
+		 */
+		if (strlcat(buf, numtostr(offset, mdb.m_radix,
+		    NTOS_SIGNPOS | NTOS_SHOWBASE), buflen) >= buflen) {
+			buf[buflen - 1] = '?';
+			buf[buflen - 2] = '?';
+			buf[buflen - 3] = '?';
+		}
 	}
 
-	return (name);
+	return (buf);
 }
 
 /*
