@@ -25,7 +25,7 @@ timeout_cmd() {
     sleep 2
 }
 
-if [[ `id -u` -ne 0 ]]; then
+if [[ `id -u` != 0 ]]; then
     echo "Error: need to be root or have effective UID of root." >&2
     exit 255
 fi
