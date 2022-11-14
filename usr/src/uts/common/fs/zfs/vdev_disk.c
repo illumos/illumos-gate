@@ -304,6 +304,7 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	int otyp;
 	boolean_t validate_devid = B_FALSE;
 	uint64_t capacity = 0, blksz = 0, pbsize;
+	const char *rdpath = vdev_disk_preroot_force_path();
 
 	/*
 	 * We must have a pathname, and it must be absolute.
@@ -331,7 +332,8 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	/*
 	 * Allow bypassing the devid.
 	 */
-	if (vd->vdev_devid != NULL && vdev_disk_bypass_devid) {
+	if (vd->vdev_devid != NULL &&
+	    (vdev_disk_bypass_devid || rdpath != NULL)) {
 		vdev_dbgmsg(vd, "vdev_disk_open, devid %s bypassed",
 		    vd->vdev_devid);
 		spa_strfree(vd->vdev_devid);
@@ -366,6 +368,17 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	}
 
 	error = EINVAL;		/* presume failure */
+
+	if (rdpath != NULL) {
+		/*
+		 * We have been asked to open only a specific root device, and
+		 * to fail otherwise.
+		 */
+		error = ldi_open_by_name((char *)rdpath, spa_mode(spa), kcred,
+		    &dvd->vd_lh, zfs_li);
+		validate_devid = B_TRUE;
+		goto rootdisk_only;
+	}
 
 	if (vd->vdev_path != NULL) {
 		if (vd->vdev_wholedisk == -1ULL) {
@@ -504,6 +517,7 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 		}
 	}
 
+rootdisk_only:
 	if (error != 0) {
 		vd->vdev_stat.vs_aux = VDEV_AUX_OPEN_FAILED;
 		vdev_dbgmsg(vd, "vdev_disk_open: failed to open [error=%d]",
@@ -1166,6 +1180,7 @@ vdev_disk_read_rootlabel(const char *devpath, const char *devid,
 struct veb {
 	list_t veb_ents;
 	boolean_t veb_scanned;
+	char *veb_force_path;
 };
 
 struct veb_ent {
@@ -1277,8 +1292,22 @@ vdev_disk_preroot_lookup(uint64_t pool_guid, uint64_t vdev_guid)
 	return (path);
 }
 
+const char *
+vdev_disk_preroot_force_path(void)
+{
+	const char *force_path = NULL;
+
+	mutex_enter(&veb_lock);
+	if (veb != NULL) {
+		force_path = veb->veb_force_path;
+	}
+	mutex_exit(&veb_lock);
+
+	return (force_path);
+}
+
 void
-vdev_disk_preroot_init(void)
+vdev_disk_preroot_init(const char *force_path)
 {
 	mutex_init(&veb_lock, NULL, MUTEX_DEFAULT, NULL);
 
@@ -1287,6 +1316,9 @@ vdev_disk_preroot_init(void)
 	list_create(&veb->veb_ents, sizeof (struct veb_ent),
 	    offsetof(struct veb_ent, vebe_link));
 	veb->veb_scanned = B_FALSE;
+	if (force_path != NULL) {
+		veb->veb_force_path = spa_strdup(force_path);
+	}
 }
 
 void
@@ -1301,6 +1333,10 @@ vdev_disk_preroot_fini(void)
 			spa_strfree(vebe->vebe_devpath);
 
 			kmem_free(vebe, sizeof (*vebe));
+		}
+
+		if (veb->veb_force_path != NULL) {
+			spa_strfree(veb->veb_force_path);
 		}
 
 		kmem_free(veb, sizeof (*veb));

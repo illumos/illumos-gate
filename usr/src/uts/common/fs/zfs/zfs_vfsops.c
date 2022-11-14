@@ -1767,6 +1767,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 	vnode_t *vp = NULL;
 	char *zfs_bootfs;
 	char *zfs_devid;
+	char *zfs_rootdisk_path;
 	uint64_t zfs_bootpool;
 	uint64_t zfs_bootvdev;
 
@@ -1806,12 +1807,19 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 		zfs_bootvdev = spa_get_bootprop_uint64("zfs-bootvdev", 0);
 
 		/*
+		 * If we have been given a root disk override path, we want to
+		 * ignore device paths from the pool configuration and use only
+		 * the specific path we were given in the boot properties.
+		 */
+		zfs_rootdisk_path = spa_get_bootprop("zfs-rootdisk-path");
+
+		/*
 		 * Initialise the early boot device rescan mechanism.  A scan
 		 * will not actually be performed unless we need to do so in
 		 * order to find the correct /devices path for a relocated
 		 * device.
 		 */
-		vdev_disk_preroot_init();
+		vdev_disk_preroot_init(zfs_rootdisk_path);
 
 		error = spa_import_rootpool(rootfs.bo_name, zfs_devid,
 		    zfs_bootpool, zfs_bootvdev);
@@ -1820,6 +1828,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 
 		if (error != 0) {
 			spa_free_bootprop(zfs_bootfs);
+			spa_free_bootprop(zfs_rootdisk_path);
 			vdev_disk_preroot_fini();
 			cmn_err(CE_NOTE, "spa_import_rootpool: error %d",
 			    error);
@@ -1828,6 +1837,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 
 		if (error = zfs_parse_bootfs(zfs_bootfs, rootfs.bo_name)) {
 			spa_free_bootprop(zfs_bootfs);
+			spa_free_bootprop(zfs_rootdisk_path);
 			vdev_disk_preroot_fini();
 			cmn_err(CE_NOTE, "zfs_parse_bootfs: error %d",
 			    error);
@@ -1835,10 +1845,12 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 		}
 
 		spa_free_bootprop(zfs_bootfs);
-		vdev_disk_preroot_fini();
+		spa_free_bootprop(zfs_rootdisk_path);
 
-		if (error = vfs_lock(vfsp))
+		if ((error = vfs_lock(vfsp)) != 0) {
+			vdev_disk_preroot_fini();
 			return (error);
+		}
 
 		if (error = zfs_domount(vfsp, rootfs.bo_name)) {
 			cmn_err(CE_NOTE, "zfs_domount: error %d", error);
@@ -1864,6 +1876,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 		vfs_add((struct vnode *)0, vfsp,
 		    (vfsp->vfs_flag & VFS_RDONLY) ? MS_RDONLY : 0);
 out:
+		vdev_disk_preroot_fini();
 		vfs_unlock(vfsp);
 		return (error);
 	} else if (why == ROOT_REMOUNT) {
