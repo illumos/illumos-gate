@@ -1,155 +1,258 @@
-'\" te
-.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
 .\" Copyright (c) 1996-2001 Wolfram Schneider. Berlin.
 .\" Copyright (c) 1993-1995 Berkeley Software Design, Inc.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ERR 3C "Nov 24, 2014"
-.SH NAME
-err, verr, errx, verrx, warn, vwarn, warnx, vwarnx \- formatted error messages
-.SH SYNOPSIS
-.LP
-.nf
+.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
+.\" Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd November 15, 2022
+.Dt ERR 3C
+.Os
+.Sh NAME
+.Nm err ,
+.Nm errc ,
+.Nm errx ,
+.Nm warn ,
+.Nm warnc ,
+.Nm warnx ,
+.Nm verr ,
+.Nm verrc ,
+.Nm verrx ,
+.Nm vwarn ,
+.Nm vwarnc ,
+.Nm vwarnx
+.Nd formatted error messages
+.Sh SYNOPSIS
+.In err.h
+.Ft void
+.Fo err
+.Fa "int eval"
+.Fa "const char *fmt"
+.Fa "..."
+.Fc
+.Ft void
+.Fo errc
+.Fa "int eval"
+.Fa "int code"
+.Fa "const char *fmt"
+.Fa "..."
+.Fc
+.Ft void
+.Fo errx
+.Fa "int eval"
+.Fa "const char *fmt"
+.Fa "..."
+.Fc
+.Ft void
+.Fo warn
+.Fa "const char *fmt"
+.Fa "..."
+.Fc
+.Ft void
+.Fo warnc
+.Fa "int code"
+.Fa "const char *fmt"
+.Fa "..."
+.Fc
+.Ft void
+.Fo warnx
+.Fa "const char *fmt"
+.Fa "..."
+.Fc
+.Ft void
+.Fo verr
+.Fa "int eval"
+.Fa "const char *fmt"
+.Fa "va_list args"
+.Fc
+.Ft void
+.Fo verrc
+.Fa "int eval"
+.Fa "int code"
+.Fa "const char *fmt"
+.Fa "va_list args"
+.Fc
+.Ft void
+.Fo verrx
+.Fa "int eval"
+.Fa "const char *fmt"
+.Fa "va_list args"
+.Fc
+.Ft void
+.Fo vwarn
+.Fa "const char *fmt"
+.Fa "va_list args"
+.Fc
+.Ft void
+.Fo vwarnc
+.Fa "int code"
+.Fa "const char *fmt"
+.Fa "va_list args"
+.Fc
+.Ft void
+.Fo vwarnx
+.Fa "const char *fmt"
+.Fa "va_list args"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn err
+and
+.Fn warn
+family of functions display a formatted error message to standard error.
+In all cases, the last component of the program name, followed by a colon
+character and a space, are output.
+If the
+.Ar fmt
+argument is not
+.Dv NULL ,
+the formatted error message is output.
+.Pp
+In the case of the
+.Fn err ,
+.Fn errc ,
+.Fn warn ,
+.Fn warnc ,
+.Fn verr ,
+.Fn verrc ,
+.Fn vwarn
+and
+.Fn vwarnc
+functions, an error message obtained from
+.Xr strerror 3C
+is output next, preceded by a colon character and a space if
+.Ar fmt
+is not
+.Dv NULL .
+The
+.Fn err ,
+.Fn warn ,
+.Fn verr
+and
+.Fn vwarn
+functions produce the error string affiliated with the current value of the
+global variable
+.Va errno .
+The
+.Fn errc ,
+.Fn warnc ,
+.Fn verrc
+and
+.Fn vwarnc
+functions use the provided
+.Ar code
+value to look up the error message.
+.Pp
+The
+.Fn errx ,
+.Fn verrx ,
+.Fn warnx
+and
+.Fn vwarnx
+functions will not output this error message string.
+.Pp
+In all cases, the output is followed by a newline character.
+.Pp
+The
+.Fn err ,
+.Fn errc ,
+.Fn errx ,
+.Fn verr ,
+.Fn verrc
+and
+.Fn verrx
+functions do not return, but instead cause the program to terminate with the
+status value given by the
+.Ar eval
+argument.
+.Sh EXAMPLES
+.Sy Example 1
+Display the current
+.Va errno
+information string and terminate with status indicating failure.
+.Bd -literal -offset indent
 #include <err.h>
-
-\fBvoid\fR \fBerr\fR(\fBint\fR \fIeval\fR, \fBconst char *\fR\fIfmt\fR, ...);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBverr\fR(\fBint\fR \fIeval\fR, \fBconst char *\fR\fIfmt\fR, \fBva_list\fR \fIargs\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBerrx\fR(\fBint\fR \fIeval\fR, \fBconst char *\fR\fIfmt\fR, ...);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBverrx\fR\fB(int\fR \fIeval\fR, \fBconst char *\fR\fIfmt\fR, \fBva_list\fR \fIargs\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBwarn\fR(\fBconst char *\fR\fIfmt\fR, ...);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBvwarn\fR(\fBconst char *\fR\fIfmt\fR, \fBva_list\fR \fIargs\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBwarnx\fR(\fBconst char *\fR\fIfmt\fR, ...);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBvwarnx\fR(\fBconst char *\fR\fIfmt\fR, \fBva_list\fR \fIargs\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBerr()\fR and \fBwarn()\fR family of functions display a formatted error
-message on the standard error output. In all cases, the last component of the
-program name, followed by a colon character and a space, are output. If the
-\fIfmt\fR argument is not \fINULL\fR, the formatted error message is output. In
-the case of the \fBerr()\fR, \fBverr()\fR, \fBwarn()\fR, and \fBvwarn()\fR
-functions, the error message string affiliated with the current value of the
-global variable \fBerrno\fR is output next, preceded by a colon character and a
-space if \fIfmt\fR is not \fINULL\fR. In all cases, the output is followed by a
-newline character.  The \fBerrx()\fR, \fBverrx()\fR, \fBwarnx()\fR, and
-\fBvwarnx()\fR functions will not output this error message string.
-.sp
-.LP
-The \fBerr()\fR, \fBverr()\fR, \fBerrx()\fR, and \fBverrx()\fR functions do not
-return, but instead cause the program to terminate with the status value given
-by the argument \fIeval\fR.
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRDisplay the current \fBerrno\fR information string and
-terminate with status indicating failure.
-.sp
-.in +2
-.nf
+\&...
 if ((p = malloc(size)) == NULL)
-    err(EXIT_FAILURE, NULL);
+	err(EXIT_FAILURE, NULL);
 if ((fd = open(file_name, O_RDONLY, 0)) == -1)
-    err(EXIT_FAILURE, "%s", file_name);
-.fi
-.in -2
-
-.LP
-\fBExample 2 \fRDisplay an error message and terminate with status indicating
-failure.
-.sp
-.in +2
-.nf
+	err(EXIT_FAILURE, "%s", file_name);
+.Ed
+.Pp
+.Sy Example 2
+Display an error message and terminate with status indicating failure.
+.Bd -literal -offset indent
 if (tm.tm_hour < START_TIME)
-    errx(EXIT_FAILURE, "too early, wait until %s", start_time_string);
-.fi
-.in -2
-
-.LP
-\fBExample 3 \fRWarn of an error.
-.sp
-.in +2
-.nf
-if ((fd = open(raw_device, O_RDONLY, 0)) == -1)
-    warnx("%s: %s: trying the block device",
-        raw_device, strerror(errno));
+	errx(EXIT_FAILURE, "wait until %s", start_time_string);
+.Ed
+.Pp
+.Sy Example 3
+Warn of an error.
+.Bd -literal -offset indent
+if ((fd = open(raw_device, O_RDONLY, 0)) == -1) {
+     warnx("%s: %s: trying the block device",
+	 raw_device, strerror(errno));
+}
 if ((fd = open(block_device, O_RDONLY, 0)) == -1)
-    warn("%s", block_device);
-.fi
-.in -2
-
-.SH WARNINGS
-.LP
+	warn("%s", block_device);
+.Ed
+.Pp
+.Sy Example 4
+Warn of an error using a custom error code
+.Bd -literal -offset indent
+int error = function_returning_error_code();
+if (error != 0)
+	warnc(error, "%s", "function did not succeed");
+.Ed
+.Sh WARNINGS
 It is important never to pass a string with user-supplied data as a format
-without using `%s'. An attacker can put format specifiers in the string to
-mangle the stack, leading to a possible security hole. This holds true even if
-the string has been built ``by hand'' using a function like \fBsnprintf\fR(3C),
+without using
+.Sq %s .
+An attacker can put format specifiers in the string to mangle the stack,
+leading to a possible security hole.
+This holds true even if the string has been built by hand using a function
+like
+.Xr snprintf 3C ,
 as the resulting string can still contain user-supplied conversion specifiers
-for later interpolation by the \fBerr()\fR and \fBwarn()\fR functions.
-.sp
-.LP
+for later interpolation by the
+.Fn err
+and
+.Fn warn
+functions.
+.Pp
 Always be sure to use the proper secure idiom:
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 err(1, "%s", string);
-.fi
-.in -2
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-MT-Level	Safe with Exceptions
-.TE
-
-.sp
-.LP
+.Ed
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe with Exceptions
+.Pp
 These functions are safe to use in multithreaded applications as long as
-\fBsetlocale\fR(3C) is not being called to change the locale.
-.SH SEE ALSO
-.LP
-.BR exit (3C),
-.BR getexecname (3C),
-.BR setlocale (3C),
-.BR strerror (3C),
-.BR attributes (7)
+.Xr setlocale 3C
+is not being called to change the locale.
+.Sh SEE ALSO
+.Xr exit 3C ,
+.Xr getexecname 3C ,
+.Xr setlocale 3C ,
+.Xr strerror 3C ,
+.Xr attributes 7
+.Sh STANDARDS
+The functions described in this man page are
+.Bx
+extensions and should not be used in portable code.

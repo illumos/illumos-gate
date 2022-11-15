@@ -16,7 +16,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2020 Joyent, Inc.
 # Copyright 2018 Jason King
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
@@ -790,6 +790,7 @@ MANLINKS=	FD_CLR.3c				\
 		epoll_create1.3c			\
 		epoll_pwait.3c				\
 		erand48.3c				\
+		errc.3c					\
 		errno.3c				\
 		errx.3c					\
 		etext.3c				\
@@ -1369,6 +1370,7 @@ MANLINKS=	FD_CLR.3c				\
 		valloc.3c				\
 		vasprintf.3c				\
 		verr.3c					\
+		verrc.3c				\
 		verrx.3c				\
 		vfprintf.3c				\
 		vfscanf.3c				\
@@ -1380,11 +1382,13 @@ MANLINKS=	FD_CLR.3c				\
 		vswprintf.3c				\
 		vswscanf.3c				\
 		vwarn.3c				\
+		vwarnc.3c				\
 		vwarnx.3c				\
 		vwprintf.3c				\
 		vwscanf.3c				\
 		wait4.3c				\
 		warn.3c					\
+		warnc.3c				\
 		warnx.3c				\
 		watof.3c				\
 		watoi.3c				\
@@ -1746,12 +1750,16 @@ letoh64.3c				:= LINKSRC = endian.3c
 epoll_create1.3c			:= LINKSRC = epoll_create.3c
 epoll_pwait.3c				:= LINKSRC = epoll_wait.3c
 
+errc.3c					:= LINKSRC = err.3c
 errx.3c					:= LINKSRC = err.3c
 verr.3c					:= LINKSRC = err.3c
+verrc.3c				:= LINKSRC = err.3c
 verrx.3c				:= LINKSRC = err.3c
 vwarn.3c				:= LINKSRC = err.3c
+vwarnc.3c				:= LINKSRC = err.3c
 vwarnx.3c				:= LINKSRC = err.3c
 warn.3c					:= LINKSRC = err.3c
+warnc.3c				:= LINKSRC = err.3c
 warnx.3c				:= LINKSRC = err.3c
 
 euccol.3c				:= LINKSRC = euclen.3c

@@ -13,7 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 [DEFAULT]
@@ -108,6 +108,7 @@ timeout = 600
 [/opt/libc-tests/tests/endian.64]
 [/opt/libc-tests/tests/env-7076.32]
 [/opt/libc-tests/tests/env-7076.64]
+[/opt/libc-tests/tests/err/err.ksh]
 [/opt/libc-tests/tests/fnmatch.32]
 [/opt/libc-tests/tests/fnmatch.64]
 [/opt/libc-tests/tests/memchr.32]
