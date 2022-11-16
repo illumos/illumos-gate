@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -140,10 +140,17 @@ rvi_reset_accessed(uint64_t *entry, bool on)
 }
 
 static uint64_t
-rvi_get_pmtp(pfn_t root_pfn)
+rvi_get_pmtp(pfn_t root_pfn, bool track_dirty)
 {
 	return (root_pfn << PAGESHIFT);
 }
+
+static bool
+rvi_hw_ad_supported(void)
+{
+	return (true);
+}
+
 
 vmm_pte_ops_t rvi_pte_ops = {
 	.vpeo_map_table		= rvi_map_table,
@@ -154,4 +161,5 @@ vmm_pte_ops_t rvi_pte_ops = {
 	.vpeo_reset_dirty	= rvi_reset_dirty,
 	.vpeo_reset_accessed	= rvi_reset_accessed,
 	.vpeo_get_pmtp		= rvi_get_pmtp,
+	.vpeo_hw_ad_supported	= rvi_hw_ad_supported,
 };

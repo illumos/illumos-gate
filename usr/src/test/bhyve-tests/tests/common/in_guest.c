@@ -123,7 +123,7 @@ populate_desc_tables(struct vmctx *ctx)
 
 }
 
-static void
+void
 test_cleanup(bool is_failure)
 {
 	if (test_vmctx != NULL) {
@@ -144,6 +144,7 @@ test_cleanup(bool is_failure)
 		if (!is_failure || !keep_on_fail) {
 			vm_destroy(test_vmctx);
 		}
+		test_name = NULL;
 		test_vmctx = NULL;
 	}
 }
@@ -309,6 +310,12 @@ load_payload(struct vmctx *ctx)
 struct vmctx *
 test_initialize(const char *tname)
 {
+	return (test_initialize_flags(tname, 0));
+}
+
+struct vmctx *
+test_initialize_flags(const char *tname, uint64_t create_flags)
+{
 	char vm_name[VM_MAX_NAMELEN];
 	int err;
 	struct vmctx *ctx;
@@ -320,7 +327,7 @@ test_initialize(const char *tname)
 	(void) snprintf(vm_name, sizeof (vm_name), "bhyve-test-%s-%d",
 	    test_name, getpid());
 
-	err = vm_create(vm_name, 0);
+	err = vm_create(vm_name, create_flags);
 	if (err != 0) {
 		test_fail_errno(err, "Could not create VM");
 	}

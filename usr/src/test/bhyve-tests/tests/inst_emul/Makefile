@@ -32,7 +32,7 @@ CPAYLOADS =	cpuid
 PAYLOADS = $(PROG)
 include ../Makefile.in_guest
 
-COMMON_OBJS =	in_guest.o
+COMMON_OBJS =	in_guest.o common.o
 
 CLEANFILES =	$(COMMON_OBJS) $(PAYLOAD_CLEANFILES) payload_utils.o
 CLOBBERFILES =	$(PROG)

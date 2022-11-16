@@ -29,6 +29,7 @@
 #include <sys/vmm_dev.h>
 #include <vmmapi.h>
 
+#include "common.h"
 #include "in_guest.h"
 
 #define	PAGE_SZ	4096
@@ -70,6 +71,73 @@ count_dirty_pages(const uint8_t *bitmap)
 	return (count);
 }
 
+void
+check_supported(const char *test_suite_name)
+{
+	char name[VM_MAX_NAMELEN];
+	int err;
+
+	name_test_vm(test_suite_name, name);
+
+	err = vm_create(name, VCF_TRACK_DIRTY);
+	if (err == 0) {
+		/*
+		 * We created the VM successfully, so we know that dirty page
+		 * tracking is supported.
+		 */
+		err = destroy_instance(test_suite_name);
+		if (err != 0) {
+			(void) fprintf(stderr,
+			    "Could not destroy VM: %s\n", strerror(errno));
+			(void) printf("FAIL %s\n", test_suite_name);
+			exit(EXIT_FAILURE);
+		}
+	} else if (errno == ENOTSUP) {
+		(void) printf(
+		    "Skipping test: dirty page tracking not supported\n");
+		(void) printf("PASS %s\n", test_suite_name);
+		exit(EXIT_SUCCESS);
+	} else {
+		/*
+		 * Ignore any other errors, they'll be caught by subsequent
+		 * test routines.
+		 */
+	}
+}
+
+void
+test_dirty_tracking_disabled(const char *test_suite_name)
+{
+	struct vmctx *ctx = NULL;
+	int err;
+
+	uint8_t dirty_bitmap[DIRTY_BITMAP_SZ] = { 0 };
+	struct vmm_dirty_tracker track = {
+		.vdt_start_gpa = 0,
+		.vdt_len = MEM_TOTAL_SZ,
+		.vdt_pfns = (void *)dirty_bitmap,
+	};
+
+	/* Create VM without VCF_TRACK_DIRTY flag */
+	ctx = test_initialize_flags(test_suite_name, 0);
+
+	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
+	if (err != 0) {
+		test_fail_errno(err, "Could not initialize vcpu0");
+	}
+
+	/* Try to query for dirty pages */
+	err = ioctl(vm_get_device_fd(ctx), VM_TRACK_DIRTY_PAGES, &track);
+	if (err == 0) {
+		test_fail_msg("VM_TRACK_DIRTY_PAGES succeeded unexpectedly\n");
+	} else if (errno != EPERM) {
+		test_fail_errno(errno,
+		    "VM_TRACK_DIRTY_PAGES failed with unexpected error");
+	}
+
+	test_cleanup(false);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -77,12 +145,13 @@ main(int argc, char *argv[])
 	struct vmctx *ctx = NULL;
 	int err;
 
-	ctx = test_initialize(test_suite_name);
+	/* Skip test if CPU doesn't support HW A/D tracking */
+	check_supported(test_suite_name);
 
-	/* Until #14251 is fixed, warn the user of the test requirement */
-	(void) fprintf(stderr,
-	    "Ensure that 'gpt_track_dirty' is set to 1 via mdb -kw\n"
-	    "The reasoning is described in illumos #14251\n");
+	/* Test for expected error with dirty tracking disabled */
+	test_dirty_tracking_disabled(test_suite_name);
+
+	ctx = test_initialize_flags(test_suite_name, VCF_TRACK_DIRTY);
 
 	err = test_setup_vcpu(ctx, 0, MEM_LOC_PAYLOAD, MEM_LOC_STACK);
 	if (err != 0) {

@@ -133,9 +133,9 @@ struct ct_data {
 	ushort_t	ct_blocking_mode;
 	uint_t		ct_bufferSize; /* Total size of the buffer. */
 	uint_t		ct_bufferPendingSize; /* Size of unsent data. */
-	char 		*ct_buffer; /* Pointer to the buffer. */
-	char 		*ct_bufferWritePtr; /* Ptr to the first free byte. */
-	char 		*ct_bufferReadPtr; /* Ptr to the first byte of data. */
+	char		*ct_buffer; /* Pointer to the buffer. */
+	char		*ct_bufferWritePtr; /* Ptr to the first free byte. */
+	char		*ct_bufferReadPtr; /* Ptr to the first byte of data. */
 };
 
 struct nb_reg_node {
@@ -216,7 +216,7 @@ set_blocking_connection(struct ct_data *ct, bool_t blocking)
  */
 CLIENT *
 clnt_vc_create(const int fd, struct netbuf *svcaddr, const rpcprog_t prog,
-	const rpcvers_t vers, const uint_t sendsz, const uint_t recvsz)
+    const rpcvers_t vers, const uint_t sendsz, const uint_t recvsz)
 {
 	return (_clnt_vc_create_timed(fd, svcaddr, prog, vers, sendsz,
 	    recvsz, NULL));
@@ -235,7 +235,7 @@ clnt_vc_create(const int fd, struct netbuf *svcaddr, const rpcprog_t prog,
  */
 CLIENT *
 _clnt_vc_create_timed(int fd, struct netbuf *svcaddr, rpcprog_t prog,
-	rpcvers_t vers, uint_t sendsz, uint_t recvsz, const struct timeval *tp)
+    rpcvers_t vers, uint_t sendsz, uint_t recvsz, const struct timeval *tp)
 {
 	CLIENT *cl;			/* client handle */
 	struct ct_data *ct;		/* private data */
@@ -395,7 +395,6 @@ _set_tcp_conntime(int fd, int optval)
 	int *ip;
 	char buf[TCPOPT_BUFSIZE];
 
-	/* LINTED pointer cast */
 	opt = (struct opthdr *)buf;
 	opt->level =  IPPROTO_TCP;
 	opt->name = TCP_CONN_ABORT_THRESHOLD;
@@ -404,7 +403,6 @@ _set_tcp_conntime(int fd, int optval)
 	req.flags = T_NEGOTIATE;
 	req.opt.len = sizeof (struct opthdr) + opt->len;
 	req.opt.buf = (char *)opt;
-	/* LINTED pointer cast */
 	ip = (int *)((char *)buf + sizeof (struct opthdr));
 	*ip = optval;
 
@@ -429,7 +427,6 @@ _get_tcp_conntime(int fd)
 	int *ip, retval;
 	char buf[TCPOPT_BUFSIZE];
 
-	/* LINTED pointer cast */
 	opt = (struct opthdr *)buf;
 	opt->level =  IPPROTO_TCP;
 	opt->name = TCP_CONN_ABORT_THRESHOLD;
@@ -438,7 +435,6 @@ _get_tcp_conntime(int fd)
 	req.flags = T_CURRENT;
 	req.opt.len = sizeof (struct opthdr) + opt->len;
 	req.opt.buf = (char *)opt;
-	/* LINTED pointer cast */
 	ip = (int *)((char *)buf + sizeof (struct opthdr));
 	*ip = 0;
 
@@ -449,7 +445,6 @@ _get_tcp_conntime(int fd)
 		return (-1);
 	}
 
-	/* LINTED pointer cast */
 	ip = (int *)((char *)buf + sizeof (struct opthdr));
 	retval = *ip;
 	return (retval);
@@ -485,7 +480,6 @@ set_up_connection(int fd, struct netbuf *svcaddr, struct ct_data *ct,
 		/*
 		 * Connect only if state is IDLE and svcaddr known
 		 */
-/* LINTED pointer alignment */
 		rcvcall = (struct t_call *)t_alloc(fd, T_CALL, T_OPT|T_ADDR);
 		if (rcvcall == NULL) {
 			rpc_createerr.cf_stat = RPC_TLIERROR;
@@ -642,14 +636,12 @@ set_up_connection(int fd, struct netbuf *svcaddr, struct ct_data *ct,
 
 static enum clnt_stat
 clnt_vc_call(CLIENT *cl, rpcproc_t proc, xdrproc_t xdr_args, caddr_t args_ptr,
-	xdrproc_t xdr_results, caddr_t results_ptr, struct timeval timeout)
+    xdrproc_t xdr_results, caddr_t results_ptr, struct timeval timeout)
 {
-/* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
 	XDR *xdrs = &(ct->ct_xdrs);
 	struct rpc_msg reply_msg;
 	uint32_t x_id;
-/* LINTED pointer alignment */
 	uint32_t *msg_x_id = (uint32_t *)(ct->ct_mcall);	/* yuk */
 	bool_t shipnow;
 	int refreshes = 2;
@@ -702,7 +694,6 @@ call_again:
 			return (rpc_callerr.re_status);
 		}
 	} else {
-/* LINTED pointer alignment */
 		uint32_t *u = (uint32_t *)&ct->ct_mcall[ct->ct_mpos];
 		IXDR_PUT_U_INT32(u, proc);
 		if (!__rpc_gss_wrap(cl->cl_auth, ct->ct_mcall,
@@ -810,11 +801,9 @@ call_again:
 static enum clnt_stat
 clnt_vc_send(CLIENT *cl, rpcproc_t proc, xdrproc_t xdr_args, caddr_t args_ptr)
 {
-/* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
 	XDR *xdrs = &(ct->ct_xdrs);
 	uint32_t x_id;
-/* LINTED pointer alignment */
 	uint32_t *msg_x_id = (uint32_t *)(ct->ct_mcall);	/* yuk */
 
 	if (rpc_fd_lock(vctbl, ct->ct_fd)) {
@@ -847,7 +836,6 @@ clnt_vc_send(CLIENT *cl, rpcproc_t proc, xdrproc_t xdr_args, caddr_t args_ptr)
 			return (rpc_callerr.re_status);
 		}
 	} else {
-/* LINTED pointer alignment */
 		uint32_t *u = (uint32_t *)&ct->ct_mcall[ct->ct_mpos];
 		IXDR_PUT_U_INT32(u, proc);
 		if (!__rpc_gss_wrap(cl->cl_auth, ct->ct_mcall,
@@ -882,7 +870,6 @@ clnt_vc_geterr(CLIENT *cl, struct rpc_err *errp)
 static bool_t
 clnt_vc_freeres(CLIENT *cl, xdrproc_t xdr_res, caddr_t res_ptr)
 {
-/* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
 	XDR *xdrs = &(ct->ct_xdrs);
 	bool_t stat;
@@ -899,12 +886,10 @@ clnt_vc_abort(void)
 {
 }
 
-/*ARGSUSED*/
 static bool_t
 clnt_vc_control(CLIENT *cl, int request, char *info)
 {
 	bool_t ret;
-/* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
 
 	if (rpc_fd_lock(vctbl, ct->ct_fd)) {
@@ -925,9 +910,7 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 		if (ct->ct_io_mode == RPC_CL_NONBLOCKING) {
 			int res;
 			res = do_flush(ct, (info == NULL ||
-			    /* LINTED pointer cast */
 			    *(int *)info == RPC_CL_DEFAULT_FLUSH)?
-			    /* LINTED pointer cast */
 			    ct->ct_blocking_mode: *(int *)info);
 			ret = (0 == res);
 		} else {
@@ -944,31 +927,25 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 	}
 	switch (request) {
 	case CLSET_TIMEOUT:
-/* LINTED pointer alignment */
 		if (time_not_ok((struct timeval *)info)) {
 			rpc_fd_unlock(vctbl, ct->ct_fd);
 			return (FALSE);
 		}
-/* LINTED pointer alignment */
 		ct->ct_wait = __rpc_timeval_to_msec((struct timeval *)info);
 		ct->ct_waitset = TRUE;
 		break;
 	case CLGET_TIMEOUT:
-/* LINTED pointer alignment */
 		((struct timeval *)info)->tv_sec = ct->ct_wait / 1000;
-/* LINTED pointer alignment */
 		((struct timeval *)info)->tv_usec = (ct->ct_wait % 1000) * 1000;
 		break;
 	case CLGET_SERVER_ADDR:	/* For compatibility only */
 		(void) memcpy(info, ct->ct_addr.buf, (size_t)ct->ct_addr.len);
 		break;
 	case CLGET_FD:
-/* LINTED pointer alignment */
 		*(int *)info = ct->ct_fd;
 		break;
 	case CLGET_SVC_ADDR:
 		/* The caller should not free this memory area */
-/* LINTED pointer alignment */
 		*(struct netbuf *)info = ct->ct_addr;
 		break;
 	case CLSET_SVC_ADDR:		/* set to new address */
@@ -999,12 +976,10 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 		 * first element in the call structure
 		 * This will get the xid of the PREVIOUS call
 		 */
-/* LINTED pointer alignment */
 		*(uint32_t *)info = ntohl(*(uint32_t *)ct->ct_mcall);
 		break;
 	case CLSET_XID:
 		/* This will set the xid of the NEXT call */
-/* LINTED pointer alignment */
 		*(uint32_t *)ct->ct_mcall =  htonl(*(uint32_t *)info + 1);
 		/* increment by 1 as clnt_vc_call() decrements once */
 		break;
@@ -1015,15 +990,12 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 		 * begining of the RPC header. MUST be changed if the
 		 * call_struct is changed
 		 */
-/* LINTED pointer alignment */
 		*(uint32_t *)info = ntohl(*(uint32_t *)(ct->ct_mcall +
 		    4 * BYTES_PER_XDR_UNIT));
 		break;
 
 	case CLSET_VERS:
-/* LINTED pointer alignment */
 		*(uint32_t *)(ct->ct_mcall + 4 * BYTES_PER_XDR_UNIT) =
-/* LINTED pointer alignment */
 		    htonl(*(uint32_t *)info);
 		break;
 
@@ -1034,20 +1006,16 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 		 * begining of the RPC header. MUST be changed if the
 		 * call_struct is changed
 		 */
-/* LINTED pointer alignment */
 		*(uint32_t *)info = ntohl(*(uint32_t *)(ct->ct_mcall +
 		    3 * BYTES_PER_XDR_UNIT));
 		break;
 
 	case CLSET_PROG:
-/* LINTED pointer alignment */
 		*(uint32_t *)(ct->ct_mcall + 3 * BYTES_PER_XDR_UNIT) =
-/* LINTED pointer alignment */
 		    htonl(*(uint32_t *)info);
 		break;
 
 	case CLSET_IO_MODE:
-		/* LINTED pointer cast */
 		if (!set_io_mode(ct, *(int *)info)) {
 			rpc_fd_unlock(vctbl, ct->ct_fd);
 			return (FALSE);
@@ -1055,19 +1023,16 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 		break;
 	case CLSET_FLUSH_MODE:
 		/* Set a specific FLUSH_MODE */
-		/* LINTED pointer cast */
 		if (!set_flush_mode(ct, *(int *)info)) {
 			rpc_fd_unlock(vctbl, ct->ct_fd);
 			return (FALSE);
 		}
 		break;
 	case CLGET_FLUSH_MODE:
-		/* LINTED pointer cast */
 		*(rpcflushmode_t *)info = ct->ct_blocking_mode;
 		break;
 
 	case CLGET_IO_MODE:
-		/* LINTED pointer cast */
 		*(rpciomode_t *)info = ct->ct_io_mode;
 		break;
 
@@ -1076,7 +1041,6 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 		 * Returns the current amount of memory allocated
 		 * to pending requests
 		 */
-		/* LINTED pointer cast */
 		*(int *)info = ct->ct_bufferPendingSize;
 		break;
 
@@ -1090,11 +1054,9 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 		 * If the new size is equal to the current size,
 		 * there is nothing to do.
 		 */
-		/* LINTED pointer cast */
 		if (ct->ct_bufferSize == *(uint_t *)info)
 			break;
 
-		/* LINTED pointer cast */
 		ct->ct_bufferSize = *(uint_t *)info;
 		if (ct->ct_buffer) {
 			free(ct->ct_buffer);
@@ -1108,7 +1070,6 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 		 * Returns the size of buffer allocated
 		 * to pending requests
 		 */
-		/* LINTED pointer cast */
 		*(uint_t *)info = ct->ct_bufferSize;
 		break;
 
@@ -1123,7 +1084,6 @@ clnt_vc_control(CLIENT *cl, int request, char *info)
 static void
 clnt_vc_destroy(CLIENT *cl)
 {
-/* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
 	int ct_fd = ct->ct_fd;
 
@@ -1675,12 +1635,18 @@ do_flush(struct ct_data *ct, uint_t flush_mode)
  * Non blocking send.
  */
 
+/*
+ * Test if this is last fragment. See comment in front of xdr_rec.c
+ * for details.
+ */
+#define	LAST_FRAG(x)	((ntohl(*(uint32_t *)x) & (1U << 31)) == (1U << 31))
+
 static int
 nb_send(struct ct_data *ct, void *buff, unsigned int nBytes)
 {
 	int result;
 
-	if (!(ntohl(*(uint32_t *)buff) & 2^31)) {
+	if (!LAST_FRAG(buff)) {
 		return (-1);
 	}
 

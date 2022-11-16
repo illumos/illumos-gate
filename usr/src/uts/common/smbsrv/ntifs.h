@@ -24,6 +24,7 @@
  *
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef _SMBSRV_NTIFS_H
@@ -274,6 +275,11 @@ typedef enum _FILE_INFORMATION_CLASS {
 	FileInformationReserved52,		/* 52 */
 	FileInformationReserved53,		/* 53 */
 	FileStandardLinkInformation,		/* 54 */
+	FileInformationReserved55,		/* 55 */
+	FileInformationReserved56,		/* 56 */
+	FileInformationReserved57,		/* 57 */
+	FileInformationReserved58,		/* 58 */
+	FileIdInformation,			/* 59 */
 	FileMaximumInformation
 } FILE_INFORMATION_CLASS;
 
