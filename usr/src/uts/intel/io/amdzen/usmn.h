@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _USMN_H
@@ -32,6 +32,7 @@ extern "C" {
 typedef struct usmn_reg {
 	uint32_t usr_addr;
 	uint32_t usr_data;
+	uint32_t usr_size;
 } usmn_reg_t;
 
 #ifdef __cplusplus

@@ -17,6 +17,7 @@
 #define	_SYS_AMDZEN_SMN_H
 
 #include <sys/debug.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 
 /*
@@ -351,11 +352,72 @@ extern "C" {
  */
 typedef struct smn_reg {
 	uint32_t sr_addr;
+	uint8_t sr_size;	/* Not size_t: can't ever be that big. */
 } smn_reg_t;
 
-/*CSTYLED*/
-#define	SMN_MAKE_REG(x)	((const smn_reg_t){ .sr_addr = (x) })
-#define	SMN_REG_ADDR(x)	((x).sr_addr)
+/*
+ * These are intended to be macro-like (and indeed some used to be macros) but
+ * are implemented as inline functions so that we can use compound statements
+ * without extensions and don't have to worry about multiple evaluation.  Hence
+ * their capitalised names.
+ */
+static inline smn_reg_t
+SMN_MAKE_REG_SIZED(const uint32_t addr, const uint8_t size)
+{
+	const uint8_t size_always = (size == 0) ? 4 : size;
+	const smn_reg_t rv = {
+	    .sr_addr = addr,
+	    .sr_size = size_always
+	};
+
+	return (rv);
+}
+
+#define	SMN_MAKE_REG(x)		SMN_MAKE_REG_SIZED(x, 4)
+#define	SMN_REG_ADDR(x)		((x).sr_addr)
+#define	SMN_REG_SIZE(x)		((x).sr_size)
+
+static inline boolean_t
+SMN_REG_SIZE_IS_VALID(const smn_reg_t reg)
+{
+	return (reg.sr_size == 1 || reg.sr_size == 2 || reg.sr_size == 4);
+}
+
+/* Is this register suitably aligned for access of <size> bytes? */
+#define	SMN_REG_IS_ALIGNED(x, size)	IS_P2ALIGNED(SMN_REG_ADDR(x), size)
+
+/* Is this register naturally aligned with respect to its own width? */
+static inline boolean_t
+SMN_REG_IS_NATURALLY_ALIGNED(const smn_reg_t reg)
+{
+	return (SMN_REG_IS_ALIGNED(reg, reg.sr_size));
+}
+
+/* Does <val> fit into SMN register <x>? */
+#define	SMN_REG_VALUE_FITS(x, val)	\
+	(((val) & ~(0xffffffffU >> ((4 - SMN_REG_SIZE(x)) << 3))) == 0)
+
+/*
+ * Retrieve the base address of the register.  This is the address that will
+ * actually be set in the index register when performing a read or write of the
+ * underlying register via SMN.  It must always be 32-bit aligned.
+ */
+static inline uint32_t
+SMN_REG_ADDR_BASE(const smn_reg_t reg)
+{
+	return (reg.sr_addr & ~3);
+}
+
+/*
+ * The offset address is the byte offset into the 32-bit-wide data register that
+ * will be returned by a read or set by a write, if the register is smaller than
+ * 32 bits wide.  For registers that are 32 bits wide, this is always 0.
+ */
+static inline uint32_t
+SMN_REG_ADDR_OFF(const smn_reg_t reg)
+{
+	return (reg.sr_addr & 3);
+}
 
 /*
  * This exists so that address calculation functions can check that the register
@@ -396,10 +458,12 @@ typedef enum smn_unit {
  * aperture described above or a smaller one if a unit has been broken down
  * logically into smaller units).  srd_nents is optional; if not set, all
  * existing consumers assume a value of 0 is equivalent to 1: the register has
- * but a single instance in each unit.  srd_stride is ignored if srd_nents is 0
- * or 1 and optional otherwise; it describes the number of bytes to be added to
- * the previous instance's address to obtain that of the next instance.  If left
- * at 0 it is assumed to be 4 bytes.
+ * but a single instance in each unit.  srd_size is the width of the register in
+ * bytes, which must be 0, 1, 2, or 4.  If 0, the size is assumed to be 4 bytes.
+ * srd_stride is ignored if srd_nents is 0 or 1 and optional otherwise; it
+ * describes the number of bytes to be added to the previous instance's address
+ * to obtain that of the next instance.  If left at 0 it is assumed to be equal
+ * to the width of the register.
  *
  * There are units in which registers have more complicated collections of
  * instances that cannot be represented perfectly by this simple descriptor;
@@ -412,6 +476,7 @@ typedef struct smn_reg_def {
 	uint32_t	srd_reg;
 	uint32_t	srd_stride;
 	uint16_t	srd_nents;
+	uint8_t		srd_size;
 } smn_reg_def_t;
 
 /*
@@ -431,7 +496,12 @@ _fn(const uint8_t unitno, const smn_reg_def_t def, const uint16_t reginst) \
 {									\
 	const uint32_t unit32 = (const uint32_t)unitno;			\
 	const uint32_t reginst32 = (const uint32_t)reginst;		\
-	const uint32_t stride = (def.srd_stride == 0) ? 4 : def.srd_stride; \
+	const uint32_t size32 = (def.srd_size == 0) ? 4 :		\
+	    (const uint32_t)def.srd_size;				\
+	ASSERT(size32 == 1 || size32 == 2 || size32 == 4);		\
+	const uint32_t stride = (def.srd_stride == 0) ? size32 :	\
+	    def.srd_stride;						\
+	ASSERT3U(stride, >=, size32);					\
 	const uint32_t nents = (def.srd_nents == 0) ? 1 :		\
 	    (const uint32_t)def.srd_nents;				\
 									\
@@ -449,9 +519,9 @@ _fn(const uint8_t unitno, const smn_reg_def_t def, const uint16_t reginst) \
 	ASSERT0(aperture & ~(_mask));					\
 									\
 	const uint32_t reg = def.srd_reg + reginst32 * stride;		\
-	ASSERT0(reg & (_mask));				\
+	ASSERT0(reg & (_mask));						\
 									\
-	return (SMN_MAKE_REG(aperture + reg));				\
+	return (SMN_MAKE_REG_SIZED(aperture + reg, size32));		\
 }
 
 #ifdef __cplusplus

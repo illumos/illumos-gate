@@ -116,7 +116,7 @@ smntemp_temp_update(smntemp_t *smn, smntemp_temp_t *stt)
 
 	ASSERT(MUTEX_HELD((&stt->stt_mutex)));
 
-	if ((ret = amdzen_c_smn_read32(stt->stt_dfno, SMN_SMU_THERMAL_CURTEMP,
+	if ((ret = amdzen_c_smn_read(stt->stt_dfno, SMN_SMU_THERMAL_CURTEMP,
 	    &reg)) != 0) {
 		return (ret);
 	}

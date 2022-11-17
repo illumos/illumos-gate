@@ -94,6 +94,13 @@ usmn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		return (EFAULT);
 	}
 
+	/*
+	 * We don't need to check size and alignment here; the client access
+	 * routines do so for us and return EINVAL if violated.  The same goes
+	 * for the value to be written in the USMN_WRITE case below.
+	 */
+	const smn_reg_t reg = SMN_MAKE_REG_SIZED(usr.usr_addr, usr.usr_size);
+
 	if (cmd == USMN_READ) {
 		int ret;
 
@@ -101,8 +108,7 @@ usmn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (EINVAL);
 		}
 
-		ret = amdzen_c_smn_read32(dfno, SMN_MAKE_REG(usr.usr_addr),
-		    &usr.usr_data);
+		ret = amdzen_c_smn_read(dfno, reg, &usr.usr_data);
 		if (ret != 0) {
 			return (ret);
 		}
@@ -113,8 +119,7 @@ usmn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (EINVAL);
 		}
 
-		ret = amdzen_c_smn_write32(dfno, SMN_MAKE_REG(usr.usr_addr),
-		    usr.usr_data);
+		ret = amdzen_c_smn_write(dfno, reg, usr.usr_data);
 		if (ret != 0) {
 			return (ret);
 		}
