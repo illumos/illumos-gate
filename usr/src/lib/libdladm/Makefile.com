@@ -43,7 +43,6 @@ LDLIBS +=	-ldevinfo -lc -linetutil -lsocket -lscf -lrcm -lnvpair \
 SRCDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
-CERRWARN +=	$(CNOWARN_UNINIT)
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
 
 # not linted
