@@ -3883,7 +3883,6 @@ set_public_prop(dladm_handle_t handle, prop_desc_t *pdp,
 
 	status = i_dladm_macprop(handle, dip, B_TRUE);
 
-done:
 	free(dip);
 	return (status);
 }
