@@ -1148,7 +1148,7 @@ dladm_strs2range(char **prop_val, uint_t val_cnt, mac_propval_type_t type,
 				if (*endp++ != '-')
 					return (DLADM_STATUS_BADRANGE);
 				ur->mpur_max = strtol(endp, &endp, 10);
-				if (endp != NULL && *endp != '\0' ||
+				if ((endp != NULL && *endp != '\0') ||
 				    ur->mpur_max < ur->mpur_min)
 					return (DLADM_STATUS_BADRANGE);
 			}

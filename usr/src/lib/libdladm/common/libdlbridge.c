@@ -933,7 +933,7 @@ dladm_bridge_configure(dladm_handle_t handle, const char *name,
 	if ((tran = scf_transaction_create(sstate.ss_handle)) == NULL)
 		goto out;
 
-	if (cfg->field_mask & BR_CFG_ALL) {
+	if (cfg->field_mask & (BR_CFG_ALL)) {
 		if ((sstate.ss_pg = scf_pg_create(sstate.ss_handle)) == NULL)
 			goto out;
 		if (scf_instance_add_pg(sstate.ss_inst, "config",
