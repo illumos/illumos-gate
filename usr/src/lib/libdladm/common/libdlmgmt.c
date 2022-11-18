@@ -486,9 +486,8 @@ dladm_get_conf_field(dladm_handle_t handle, dladm_conf_t conf, const char *attr,
  * Get next property attribute from data link configuration repository.
  * If last_attr is "", return the first property.
  */
-/* ARGSUSED */
 dladm_status_t
-dladm_getnext_conf_linkprop(dladm_handle_t handle, dladm_conf_t conf,
+dladm_getnext_conf_linkprop(dladm_handle_t handle __unused, dladm_conf_t conf,
     const char *last_attr, char *attr, void *attrval, size_t attrsz,
     size_t *attrszp)
 {

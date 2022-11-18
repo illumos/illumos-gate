@@ -1049,9 +1049,8 @@ done:
 	return (rx_lane_stat_entry);
 }
 
-/*ARGSUSED*/
 static void *
-i_dlstat_rx_swlane_retrieve_stat(kstat_ctl_t *kcp, kstat_t *ksp, int i)
+i_dlstat_rx_swlane_retrieve_stat(kstat_ctl_t *kcp, kstat_t *ksp, int i __unused)
 {
 	rx_lane_stat_entry_t	*rx_lane_stat_entry;
 
@@ -1073,9 +1072,8 @@ done:
 	return (rx_lane_stat_entry);
 }
 
-/*ARGSUSED*/
 static void *
-i_dlstat_rx_local_retrieve_stat(kstat_ctl_t *kcp, kstat_t *ksp, int i)
+i_dlstat_rx_local_retrieve_stat(kstat_ctl_t *kcp, kstat_t *ksp, int i __unused)
 {
 	rx_lane_stat_entry_t	*local_stat_entry = NULL;
 	rx_lane_stat_entry_t	*rx_lane_stat_entry;
@@ -1225,9 +1223,8 @@ i_dlstat_rx_hwlane_stats(dladm_handle_t handle, const char *linkname)
 	    i_dlstat_rx_hwlane_retrieve_stat));
 }
 
-/*ARGSUSED*/
 static dladm_stat_chain_t *
-i_dlstat_rx_swlane_stats(dladm_handle_t dh, datalink_id_t linkid,
+i_dlstat_rx_swlane_stats(dladm_handle_t dh, datalink_id_t linkid __unused,
     const char *linkname)
 {
 	return (i_dlstat_query_stats(dh, linkname, DLSTAT_MAC_RX_SWLANE,
@@ -1327,9 +1324,8 @@ done:
 	return (tx_lane_stat_entry);
 }
 
-/*ARGSUSED*/
 static void *
-i_dlstat_tx_swlane_retrieve_stat(kstat_ctl_t *kcp, kstat_t *ksp, int i)
+i_dlstat_tx_swlane_retrieve_stat(kstat_ctl_t *kcp, kstat_t *ksp, int i __unused)
 {
 	tx_lane_stat_entry_t	*tx_lane_stat_entry;
 
@@ -1439,9 +1435,8 @@ i_dlstat_tx_hwlane_stats(dladm_handle_t handle, const char *linkname)
 	    i_dlstat_tx_hwlane_retrieve_stat));
 }
 
-/*ARGSUSED*/
 static dladm_stat_chain_t *
-i_dlstat_tx_swlane_stats(dladm_handle_t dh, datalink_id_t linkid,
+i_dlstat_tx_swlane_stats(dladm_handle_t dh, datalink_id_t linkid __unused,
     const char *linkname)
 {
 	return (i_dlstat_query_stats(dh, linkname, DLSTAT_MAC_TX_SWLANE,
@@ -2013,9 +2008,8 @@ done:
 }
 
 /* Summary statistic specific functions */
-/*ARGSUSED*/
 static boolean_t
-i_dlstat_total_match(void *arg1, void *arg2)
+i_dlstat_total_match(void *arg1 __unused, void *arg2 __unused)
 {
 	/* Always single entry for total */
 	return (B_TRUE);

@@ -159,7 +159,7 @@ dladm_walk_hwgrp(dladm_handle_t handle, datalink_id_t linkid, void *arg,
 	if (ret == 0) {
 		int			i;
 		int			j;
-		dld_hwgrpinfo_t 	*dhip;
+		dld_hwgrpinfo_t		*dhip;
 		dladm_hwgrp_attr_t	attr;
 
 		dhip = (dld_hwgrpinfo_t *)(iomp + 1);
@@ -255,9 +255,8 @@ typedef struct macadm_walk {
 /*
  * Local callback invoked for each DDI_NT_NET node.
  */
-/* ARGSUSED */
 static int
-i_dladm_mac_walk(di_node_t node, di_minor_t minor, void *arg)
+i_dladm_mac_walk(di_node_t node, di_minor_t minor __unused, void *arg)
 {
 	dladm_mac_walk_t	*dmwp = arg;
 	dladm_mac_dev_t		*dmdp = dmwp->dmd_dev_list;
@@ -624,7 +623,7 @@ dladm_rename_link(dladm_handle_t handle, const char *link1, const char *link2)
 	datalink_class_t	class1, class2;
 	uint32_t		media1, media2;
 	boolean_t		remphy2 = B_FALSE;
-	dladm_status_t  	status;
+	dladm_status_t		status;
 
 	(void) dladm_name2info(handle, link1, &linkid1, &flags1, &class1,
 	    &media1);
