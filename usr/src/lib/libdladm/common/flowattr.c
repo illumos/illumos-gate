@@ -235,14 +235,14 @@ dladm_flow_attrlist_extract(dladm_arg_list_t *attrlist, flow_desc_t *flowdesc)
 		dladm_arg_info_t	*aip = &attrlist->al_info[i];
 		int			j;
 
+		if (aip->ai_val[0] == NULL)
+			return (DLADM_STATUS_BADARG);
+
 		for (j = 0; j < DLADM_MAX_FLOWATTRS; j++) {
 			fattr_desc_t	*adp = &attr_table[j];
 
 			if (strcasecmp(aip->ai_name, adp->ad_name) != 0)
 				continue;
-
-			if ((aip->ai_val == NULL) || (*aip->ai_val == NULL))
-				return (DLADM_STATUS_BADARG);
 
 			if (adp->ad_check != NULL)
 				status = adp->ad_check(*aip->ai_val, flowdesc);
