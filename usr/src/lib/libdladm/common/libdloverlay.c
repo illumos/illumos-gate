@@ -453,10 +453,10 @@ static dladm_status_t
 dladm_overlay_walk_varpd_prop(dladm_handle_t handle, datalink_id_t linkid,
     uint64_t varpdid, dladm_overlay_prop_f func, void *arg)
 {
-	int ret, i;
+	int ret;
 	varpd_client_handle_t *chdl;
 	varpd_client_prop_handle_t *phdl;
-	uint_t nprops;
+	uint_t i, nprops;
 	dladm_status_t status;
 
 	if ((ret = libvarpd_c_create(&chdl, dladm_overlay_doorpath)) != 0)

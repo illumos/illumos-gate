@@ -612,7 +612,7 @@ static void
 i_dlstat_diff_stats(void *diff, void *op1, void *op2,
     stat_info_t stats_list[], uint_t size)
 {
-	int	i;
+	uint_t	i;
 
 	for (i = 0; i < size; i++) {
 		uint64_t *op1_val  = (void *)
@@ -644,7 +644,7 @@ static void
 i_dlstat_sum_stats(void *sum, void *op1, void *op2,
     stat_info_t stats_list[], uint_t size)
 {
-	int	i;
+	uint_t	i;
 
 	for (i = 0; i < size; i++) {
 		uint64_t *op1_val = (void *)
@@ -663,7 +663,7 @@ static void
 i_dlstat_get_stats(kstat_ctl_t *kcp, kstat_t *ksp, void *stats,
     stat_info_t stats_list[], uint_t size)
 {
-	int	i;
+	uint_t	i;
 
 	if (kstat_read(kcp, ksp, NULL) == -1)
 		return;
@@ -710,10 +710,12 @@ typedef enum {
 void
 dladm_sort_index_list(uint_t idlist[], uint_t size)
 {
-	int	i, j;
+	uint_t	j;
+	int i;
 
 	for (j = 1; j < size; j++) {
-		int key = idlist[j];
+		uint_t key = idlist[j];
+
 		for (i = j - 1; (i >= 0) && (idlist[i] > key); i--)
 			idlist[i + 1] = idlist[i];
 		idlist[i + 1] = key;
@@ -929,7 +931,7 @@ i_dlstat_query_stats(dladm_handle_t handle, const char *modname,
 {
 	kstat_t			*ksp;
 	char			statname[MAXLINKNAMELEN];
-	int			i = 0;
+	uint_t			i;
 	dladm_stat_chain_t	*head = NULL, *prev = NULL;
 	dladm_stat_chain_t	*curr;
 
@@ -1632,7 +1634,7 @@ i_dlstat_query_fanout_stats(dladm_handle_t dh, datalink_id_t linkid,
     uint_t idlist[], uint_t idlist_size,
     const char *modname, const char *prefix)
 {
-	int			i;
+	uint_t			i;
 	char			statprefix[MAXLINKNAMELEN];
 	char			linkname[MAXLINKNAMELEN];
 	dladm_stat_chain_t	*curr, *curr_head;
@@ -2201,7 +2203,7 @@ void *
 dlstat_aggr_port_stats(dladm_handle_t dh, datalink_id_t linkid)
 {
 	dladm_aggr_grp_attr_t	ginfo;
-	int			i;
+	uint_t			i;
 	dladm_aggr_port_attr_t	 *portp;
 	dladm_phys_attr_t	dpa;
 	aggr_port_stat_entry_t	*aggr_port_stat_entry;
@@ -2364,7 +2366,7 @@ dladm_link_stat_free(dladm_stat_chain_t *curr)
 static name_value_stat_t *
 i_dlstat_convert_stats(void *stats, stat_info_t stats_list[], uint_t size)
 {
-	int			i;
+	uint_t			i;
 	name_value_stat_t	*head_stat = NULL, *prev_stat = NULL;
 	name_value_stat_t	*curr_stat;
 

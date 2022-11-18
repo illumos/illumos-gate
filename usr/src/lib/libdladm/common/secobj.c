@@ -62,13 +62,13 @@ static secobj_class_info_t secobj_class_table[] = {
 static boolean_t
 dladm_check_secobjclass(dladm_secobj_class_t class)
 {
-	return (class >= 0 && class < NSECOBJCLASS);
+	return (class >= 0 && (uint_t)class < NSECOBJCLASS);
 }
 
 dladm_status_t
 dladm_str2secobjclass(const char *str, dladm_secobj_class_t *class)
 {
-	int			i;
+	uint_t			i;
 	secobj_class_info_t	*sp;
 
 	for (i = 0; i < NSECOBJCLASS; i++) {
@@ -110,7 +110,7 @@ static boolean_t
 dladm_convert_dldsecobjclass(dld_secobj_class_t dldclass,
     dladm_secobj_class_t *class)
 {
-	int			i;
+	uint_t			i;
 	secobj_class_info_t	*sp;
 
 	for (i = 0; i < NSECOBJCLASS; i++) {
@@ -325,7 +325,7 @@ process_secobj_set(dladm_handle_t handle __unused, secobj_db_state_t *ssp,
 	char	tmpbuf[MAXLINELEN];
 	char	classbuf[DLADM_STRSIZE];
 	char	*ptr = tmpbuf, *lim = tmpbuf + MAXLINELEN;
-	int	i;
+	uint_t	i;
 
 	sip = &ssp->ss_info;
 

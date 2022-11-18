@@ -483,8 +483,8 @@ typedef struct modify_db_state {
 static dladm_status_t
 i_dladm_flow_create_db(dld_flowinfo_t *attr, const char *root)
 {
-	FILE 	*fp;
-	char 	line[MAXLINELEN];
+	FILE	*fp;
+	char	line[MAXLINELEN];
 	char	*db_file;
 	char	db_file_buf[MAXPATHLEN];
 	int	lock_fd;
@@ -733,9 +733,9 @@ dladm_walk_flow(int (*fn)(dladm_handle_t, dladm_flow_attr_t *, void *),
     dladm_handle_t handle, datalink_id_t linkid, void *arg, boolean_t persist)
 {
 	dld_flowinfo_t		*flow;
-	int			i, bufsize;
+	uint_t			i, bufsize;
 	dld_ioc_walkflow_t	*ioc = NULL;
-	dladm_flow_attr_t 	attr;
+	dladm_flow_attr_t	attr;
 	dladm_status_t		status = DLADM_STATUS_OK;
 
 	if (fn == NULL)

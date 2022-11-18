@@ -121,7 +121,7 @@ process_prop_set(dladm_handle_t handle __unused, prop_db_state_t *lsp,
 	dladm_status_t	status;
 	prop_db_info_t	*lastp = NULL, *lip = listp, *nlip = NULL;
 	prop_val_t	**lvpp;
-	int		i;
+	uint_t		i;
 
 	if (lsp->ls_propname == NULL) {
 		buf[0] = '\0';
@@ -514,7 +514,7 @@ i_dladm_get_prop_temp(dladm_handle_t handle, const char *name, prop_type_t type,
     const char *prop_name, char **prop_val, uint_t *val_cntp,
     prop_table_t *prop_tbl)
 {
-	int		i;
+	uint_t		i;
 	dladm_status_t	status;
 	uint_t		cnt;
 	fprop_desc_t	*pdp;
@@ -619,7 +619,7 @@ i_dladm_set_prop_temp(dladm_handle_t handle, const char *name,
     const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags,
     char **errprop, prop_table_t *prop_tbl)
 {
-	int		i;
+	uint_t		i;
 	dladm_status_t	status = DLADM_STATUS_OK;
 	boolean_t	found = B_FALSE;
 
@@ -659,7 +659,7 @@ boolean_t
 i_dladm_is_prop_temponly(const char *prop_name, char **errprop,
     prop_table_t *prop_tbl)
 {
-	int		i;
+	uint_t		i;
 
 	if (prop_name == NULL)
 		return (B_FALSE);

@@ -160,7 +160,7 @@ i_dladm_aggr_iocp2grpattr(void **ptr, dladm_aggr_grp_attr_t *attrp)
 {
 	laioc_info_group_t	*grp;
 	laioc_info_port_t	*port;
-	int			i;
+	uint_t			i;
 	void			*where = (*ptr);
 
 	grp = (laioc_info_group_t *)where;
@@ -633,7 +633,7 @@ i_dladm_aggr_create_sys(dladm_handle_t handle, datalink_id_t linkid,
     uint32_t policy, boolean_t mac_addr_fixed, const uchar_t *mac_addr,
     aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer, boolean_t force)
 {
-	int i, len;
+	uint_t i, len;
 	laioc_create_t *iocp = NULL;
 	laioc_port_t *ioc_ports;
 	dladm_status_t status = DLADM_STATUS_OK;
@@ -681,7 +681,7 @@ i_dladm_aggr_up(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 	dladm_aggr_grp_attr_t attr;
 	dladm_aggr_port_attr_db_t *ports = NULL;
 	uint16_t key = 0;
-	int i, j;
+	uint_t i, j;
 	dladm_status_t status;
 
 	status = dladm_aggr_info(handle, linkid, &attr, DLADM_OPT_PERSIST);
@@ -777,7 +777,7 @@ dladm_aggr_up(dladm_handle_t handle, datalink_id_t linkid)
 boolean_t
 dladm_aggr_str2policy(const char *str, uint32_t *policy)
 {
-	int i;
+	uint_t i;
 	policy_t *pol;
 	char *token = NULL;
 	char *lasts;
@@ -808,7 +808,7 @@ dladm_aggr_str2policy(const char *str, uint32_t *policy)
 char *
 dladm_aggr_policy2str(uint32_t policy, char *str)
 {
-	int i, npolicies = 0;
+	uint_t i, npolicies = 0;
 	policy_t *pol;
 
 	if (str == NULL)
@@ -894,7 +894,7 @@ dladm_aggr_macaddr2str(const unsigned char *mac, char *buf)
 boolean_t
 dladm_aggr_str2lacpmode(const char *str, aggr_lacp_mode_t *lacp_mode)
 {
-	int i;
+	uint_t i;
 	dladm_aggr_lacpmode_t *mode;
 
 	for (i = 0; i < NLACP_MODES; i++) {
@@ -916,7 +916,7 @@ dladm_aggr_str2lacpmode(const char *str, aggr_lacp_mode_t *lacp_mode)
 const char *
 dladm_aggr_lacpmode2str(aggr_lacp_mode_t mode_id, char *buf)
 {
-	int i;
+	uint_t i;
 	dladm_aggr_lacpmode_t *mode;
 
 	if (buf == NULL)
@@ -942,7 +942,7 @@ dladm_aggr_lacpmode2str(aggr_lacp_mode_t mode_id, char *buf)
 boolean_t
 dladm_aggr_str2lacptimer(const char *str, aggr_lacp_timer_t *lacp_timer)
 {
-	int i;
+	uint_t i;
 	dladm_aggr_lacptimer_t *timer;
 
 	for (i = 0; i < NLACP_TIMERS; i++) {
@@ -964,7 +964,7 @@ dladm_aggr_str2lacptimer(const char *str, aggr_lacp_timer_t *lacp_timer)
 const char *
 dladm_aggr_lacptimer2str(aggr_lacp_timer_t timer_id, char *buf)
 {
-	int i;
+	uint_t i;
 	dladm_aggr_lacptimer_t *timer;
 
 	if (buf == NULL)
@@ -986,7 +986,7 @@ dladm_aggr_lacptimer2str(aggr_lacp_timer_t timer_id, char *buf)
 const char *
 dladm_aggr_portstate2str(aggr_port_state_t state_id, char *buf)
 {
-	int			i;
+	uint_t			i;
 	dladm_aggr_port_state_t *state;
 
 	if (buf == NULL)
@@ -1016,7 +1016,7 @@ dladm_aggr_persist_aggr_conf(dladm_handle_t handle, const char *link,
 	char *portstr = NULL;
 	char macstr[ETHERADDRL * 3];
 	dladm_status_t status;
-	int i, size;
+	uint_t i, size;
 	uint64_t u64;
 
 	if ((status = dladm_create_conf(handle, link, linkid,

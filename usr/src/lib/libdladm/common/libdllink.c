@@ -157,8 +157,8 @@ dladm_walk_hwgrp(dladm_handle_t handle, datalink_id_t linkid, void *arg,
 
 	ret = ioctl(dladm_dld_fd(handle), DLDIOC_GETHWGRP, iomp);
 	if (ret == 0) {
-		int			i;
-		int			j;
+		uint_t			i;
+		uint_t			j;
 		dld_hwgrpinfo_t		*dhip;
 		dladm_hwgrp_attr_t	attr;
 
@@ -210,7 +210,7 @@ dladm_walk_macaddr(dladm_handle_t handle, datalink_id_t linkid, void *arg,
 
 	ret = ioctl(dladm_dld_fd(handle), DLDIOC_MACADDRGET, iomp);
 	if (ret == 0) {
-		int i;
+		uint_t i;
 		dld_macaddrinfo_t *dmip;
 		dladm_macaddr_attr_t attr;
 
@@ -428,7 +428,7 @@ i_dladm_aggr_link_hold(dladm_handle_t handle, datalink_id_t aggrid, void *arg)
 	link_hold_arg_t		*hold_arg = arg;
 	dladm_aggr_grp_attr_t	ginfo;
 	dladm_status_t		status;
-	int			i;
+	uint_t			i;
 
 	status = dladm_aggr_info(handle, aggrid, &ginfo, hold_arg->flags);
 	if (status != DLADM_STATUS_OK)
@@ -711,7 +711,7 @@ i_dladm_aggr_link_del(dladm_handle_t handle, datalink_id_t aggrid, void *arg)
 	dladm_aggr_grp_attr_t		ginfo;
 	dladm_status_t			status;
 	dladm_aggr_port_attr_db_t	port[1];
-	int				i;
+	uint_t				i;
 
 	status = dladm_aggr_info(handle, aggrid, &ginfo, DLADM_OPT_PERSIST);
 	if (status != DLADM_STATUS_OK)
@@ -990,12 +990,16 @@ dladm_linkid2legacyname(dladm_handle_t handle, datalink_id_t linkid, char *dev,
 	if (vid != VLAN_ID_NONE) {
 		char		drv[MAXNAMELEN];
 		uint_t		ppa;
+		int		rv;
 
 		if (parse_devname(devname, drv, &ppa, MAXNAMELEN) != 0) {
 			status = DLADM_STATUS_BADARG;
 			goto done;
 		}
-		if (snprintf(dev, len, "%s%d", drv, vid * 1000 + ppa) >= len)
+		rv = snprintf(dev, len, "%s%d", drv, vid * 1000 + ppa);
+		if (rv < 0)
+			status = DLADM_STATUS_FAILED;
+		else if ((size_t)rv >= len)
 			status = DLADM_STATUS_TOOSMALL;
 	} else {
 		if (strlcpy(dev, devname, len) >= len)

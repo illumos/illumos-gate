@@ -244,7 +244,7 @@ fill_wlan_attr(wl_ess_conf_t *wlp, dladm_wlan_attr_t *attrp)
 
 	for (i = 0; i < MAX_SCAN_SUPPORT_RATES; i++) {
 		wlp->wl_supported_rates[i] &= IEEE80211_RATE;
-		if (wlp->wl_supported_rates[i] > attrp->wa_speed)
+		if ((uint_t)wlp->wl_supported_rates[i] > attrp->wa_speed)
 			attrp->wa_speed = wlp->wl_supported_rates[i];
 	}
 	if (attrp->wa_speed > 0)
@@ -259,7 +259,7 @@ dladm_status_t
 dladm_wlan_scan(dladm_handle_t handle, datalink_id_t linkid, void *arg,
     boolean_t (*func)(void *, dladm_wlan_attr_t *))
 {
-	int			i;
+	uint_t			i;
 	uint32_t		count;
 	wl_ess_conf_t		*wlp;
 	wl_ess_list_t		*wls = NULL;
@@ -557,7 +557,7 @@ dladm_wlan_connect(dladm_handle_t handle, datalink_id_t linkid,
     dladm_wlan_attr_t *attrp, int timeout, void *keys, uint_t key_count,
     uint_t flags)
 {
-	int			i;
+	uint_t			i;
 	char			buf[WLDP_BUFSIZE];
 	connect_state_t		state = {0, 0, NULL};
 	attr_node_t		*nodep = NULL;
@@ -789,7 +789,8 @@ dladm_wlan_get_linkattr(dladm_handle_t handle, datalink_id_t linkid,
 		goto done;
 
 	if (ratesp->wl_rates_num > 0) {
-		uint_t	i, r = 0;
+		uint_t	i;
+		int r = 0;
 
 		for (i = 0; i < ratesp->wl_rates_num; i++) {
 			if (ratesp->wl_rates_rates[i] > r)
@@ -876,7 +877,7 @@ dladm_wlan_validate(dladm_handle_t handle, datalink_id_t linkid)
 static boolean_t
 find_val_by_name(const char *str, val_desc_t *vdp, uint_t cnt, uint_t *valp)
 {
-	int	i;
+	uint_t	i;
 
 	for (i = 0; i < cnt; i++) {
 		if (strcasecmp(str, vdp[i].vd_name) == 0) {
@@ -890,7 +891,7 @@ find_val_by_name(const char *str, val_desc_t *vdp, uint_t cnt, uint_t *valp)
 static boolean_t
 find_name_by_val(uint_t val, val_desc_t *vdp, uint_t cnt, char **strp)
 {
-	int	i;
+	uint_t	i;
 
 	for (i = 0; i < cnt; i++) {
 		if (val == vdp[i].vd_val) {
@@ -1325,7 +1326,7 @@ static dladm_status_t
 do_set_key(dladm_handle_t handle, datalink_id_t linkid, dladm_wlan_key_t *keys,
     uint_t key_count)
 {
-	int			i;
+	uint_t			i;
 	wl_wep_key_t		*wkp;
 	wl_wep_key_tab_t	wepkey_tab;
 	dladm_wlan_key_t	*kp;
