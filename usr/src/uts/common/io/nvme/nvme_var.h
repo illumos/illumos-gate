@@ -240,6 +240,7 @@ struct nvme {
 	uint32_t n_abort_sq_del;
 	uint32_t n_nvm_cap_exc;
 	uint32_t n_nvm_ns_notrdy;
+	uint32_t n_nvm_ns_formatting;
 	uint32_t n_inv_cq_err;
 	uint32_t n_inv_qid_err;
 	uint32_t n_max_qsz_exc;

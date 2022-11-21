@@ -975,6 +975,7 @@ typedef union {
 #define	NVME_CQE_SC_GEN_NVM_CAP_EXC	0x81	/* Capacity Exceeded */
 #define	NVME_CQE_SC_GEN_NVM_NS_NOTRDY	0x82	/* Namespace Not Ready */
 #define	NVME_CQE_SC_GEN_NVM_RSV_CNFLCT	0x83	/* Reservation Conflict */
+#define	NVME_CQE_SC_GEN_NVM_FORMATTING	0x84	/* Format in progress (1.2) */
 
 /* NVMe completion status code (command specific) */
 #define	NVME_CQE_SC_SPC_INV_CQ		0x0	/* Completion Queue Invalid */

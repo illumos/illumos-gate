@@ -1536,6 +1536,15 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 			bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
 		return (EIO);
 
+	case NVME_CQE_SC_GEN_NVM_FORMATTING:
+		/* Format in progress (1.2) */
+		if (!NVME_VERSION_ATLEAST(&cmd->nc_nvme->n_version, 1, 2))
+			return (nvme_check_unknown_cmd_status(cmd));
+		atomic_inc_32(&cmd->nc_nvme->n_nvm_ns_formatting);
+		if (cmd->nc_xfer != NULL)
+			bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
+		return (EIO);
+
 	default:
 		return (nvme_check_unknown_cmd_status(cmd));
 	}
