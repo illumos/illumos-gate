@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -256,7 +257,7 @@ fs_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag, offset_t offset,
 		 * TBD we do not support remote OFD locks at this time.
 		 */
 		if (flag & (F_REMOTELOCK | F_PXFSLOCK)) {
-			error = EINVAL;
+			error = EOPNOTSUPP;
 			goto done;
 		}
 		skip_lock = B_TRUE;
@@ -331,7 +332,7 @@ fs_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag, offset_t offset,
 		 * TBD we do not support remote OFD locks at this time.
 		 */
 		if (flag & (F_REMOTELOCK | F_PXFSLOCK)) {
-			error = EINVAL;
+			error = EOPNOTSUPP;
 			goto done;
 		}
 		skip_lock = B_TRUE;
@@ -740,8 +741,8 @@ fs_acl_nontrivial(vnode_t *vp, cred_t *cr)
 {
 	ulong_t		acl_styles;
 	ulong_t		acl_flavor;
-	vsecattr_t 	vsecattr;
-	int 		error;
+	vsecattr_t	vsecattr;
+	int		error;
 	int		isnontrivial;
 
 	/* determine the forms of ACLs maintained */

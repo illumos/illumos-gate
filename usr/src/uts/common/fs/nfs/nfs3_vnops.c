@@ -31,6 +31,7 @@
 /*
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -275,7 +276,7 @@ const fs_operation_def_t nfs3_vnodeops_template[] = {
 	VOPNAME_SETSECATTR,	{ .vop_setsecattr = nfs3_setsecattr },
 	VOPNAME_GETSECATTR,	{ .vop_getsecattr = nfs3_getsecattr },
 	VOPNAME_SHRLOCK,	{ .vop_shrlock = nfs3_shrlock },
-	VOPNAME_VNEVENT, 	{ .vop_vnevent = fs_vnevent_support },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
 	NULL,			NULL
 };
 
@@ -342,7 +343,7 @@ nfs3_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 /* ARGSUSED */
 static int
 nfs3_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
-		caller_context_t *ct)
+    caller_context_t *ct)
 {
 	rnode_t *rp;
 	int error;
@@ -538,7 +539,7 @@ nfs3_directio_read(vnode_t *vp, struct uio *uiop, cred_t *cr)
 /* ARGSUSED */
 static int
 nfs3_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	rnode_t *rp;
 	u_offset_t off;
@@ -647,7 +648,7 @@ nfs3_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 /* ARGSUSED */
 static int
 nfs3_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	rlim64_t limit = uiop->uio_llimit;
 	rnode_t *rp;
@@ -928,7 +929,7 @@ bottom:
  */
 static int
 nfs3_rdwrlbn(vnode_t *vp, page_t *pp, u_offset_t off, size_t len,
-	int flags, cred_t *cr)
+    int flags, cred_t *cr)
 {
 	struct buf *bp;
 	int error;
@@ -1000,7 +1001,7 @@ nfs3_rdwrlbn(vnode_t *vp, page_t *pp, u_offset_t off, size_t len,
  */
 static int
 nfs3write(vnode_t *vp, caddr_t base, u_offset_t offset, int count, cred_t *cr,
-	stable_how *stab_comm)
+    stable_how *stab_comm)
 {
 	mntinfo_t *mi;
 	WRITE3args args;
@@ -1125,8 +1126,8 @@ nfs3write(vnode_t *vp, caddr_t base, u_offset_t offset, int count, cred_t *cr,
  * Read from a file.  Reads data in largest chunks our interface can handle.
  */
 static int
-nfs3read(vnode_t *vp, caddr_t base, offset_t offset, int count,
-	size_t *residp, cred_t *cr)
+nfs3read(vnode_t *vp, caddr_t base, offset_t offset, int count, size_t *residp,
+    cred_t *cr)
 {
 	mntinfo_t *mi;
 	READ3args args;
@@ -1235,7 +1236,7 @@ nfs3read(vnode_t *vp, caddr_t base, offset_t offset, int count,
 /* ARGSUSED */
 static int
 nfs3_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 
 	if (nfs_zone() != VTOMI(vp)->mi_zone)
@@ -1251,7 +1252,7 @@ nfs3_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp,
 /* ARGSUSED */
 static int
 nfs3_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	rnode_t *rp;
@@ -1312,7 +1313,7 @@ nfs3_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 /*ARGSUSED4*/
 static int
 nfs3_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
-		caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	struct vattr va;
@@ -1921,8 +1922,8 @@ redo:
 /* ARGSUSED */
 static int
 nfs3_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
-	int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
-	int *direntflags, pathname_t *realpnp)
+    int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
+    int *direntflags, pathname_t *realpnp)
 {
 	int error;
 	vnode_t *vp;
@@ -2006,7 +2007,7 @@ static int nfs3_lookup_dnlc_lookups = 0;
 /* ARGSUSED */
 int
 nfs3lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
-	int flags, vnode_t *rdir, cred_t *cr, int rfscall_flags)
+    int flags, vnode_t *rdir, cred_t *cr, int rfscall_flags)
 {
 	int error;
 	rnode_t *drp;
@@ -2140,7 +2141,7 @@ nfs3lookup_dnlc(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr)
 
 static int
 nfs3lookup_otw(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr,
-	int rfscall_flags)
+    int rfscall_flags)
 {
 	int error;
 	LOOKUP3args args;
@@ -2222,8 +2223,8 @@ static int nfs3_create_misses = 0;
 /* ARGSUSED */
 static int
 nfs3_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
-	int mode, vnode_t **vpp, cred_t *cr, int lfaware, caller_context_t *ct,
-	vsecattr_t *vsecp)
+    int mode, vnode_t **vpp, cred_t *cr, int lfaware, caller_context_t *ct,
+    vsecattr_t *vsecp)
 {
 	int error;
 	vnode_t *vp;
@@ -2396,7 +2397,7 @@ top:
 /* ARGSUSED */
 static int
 nfs3create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
-	int mode, vnode_t **vpp, cred_t *cr, int lfaware)
+    int mode, vnode_t **vpp, cred_t *cr, int lfaware)
 {
 	int error;
 	CREATE3args args;
@@ -2714,7 +2715,7 @@ nfs3excl_create_settimes(vnode_t *vp, struct vattr *vap, cred_t *cr)
 /* ARGSUSED */
 static int
 nfs3mknod(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
-	int mode, vnode_t **vpp, cred_t *cr)
+    int mode, vnode_t **vpp, cred_t *cr)
 {
 	int error;
 	MKNOD3args args;
@@ -2973,7 +2974,7 @@ nfs3_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct, int flags)
 /* ARGSUSED */
 static int
 nfs3_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr,
-	caller_context_t *ct, int flags)
+    caller_context_t *ct, int flags)
 {
 	int error;
 	LINK3args args;
@@ -3052,7 +3053,7 @@ nfs3_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr,
 /* ARGSUSED */
 static int
 nfs3_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
-	caller_context_t *ct, int flags)
+    caller_context_t *ct, int flags)
 {
 	vnode_t *realvp;
 
@@ -3372,7 +3373,7 @@ nfs3rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 /* ARGSUSED */
 static int
 nfs3_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr,
-	caller_context_t *ct, int flags, vsecattr_t *vsecp)
+    caller_context_t *ct, int flags, vsecattr_t *vsecp)
 {
 	int error;
 	MKDIR3args args;
@@ -3477,7 +3478,7 @@ nfs3_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr,
 /* ARGSUSED */
 static int
 nfs3_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
-	caller_context_t *ct, int flags)
+    caller_context_t *ct, int flags)
 {
 	int error;
 	RMDIR3args args;
@@ -3582,7 +3583,7 @@ nfs3_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 /* ARGSUSED */
 static int
 nfs3_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr,
-	caller_context_t *ct, int flags)
+    caller_context_t *ct, int flags)
 {
 	int error;
 	SYMLINK3args args;
@@ -3713,7 +3714,7 @@ static int nfs3_shrinkreaddir = 0;
 /* ARGSUSED */
 static int
 nfs3_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp,
-	caller_context_t *ct, int flags)
+    caller_context_t *ct, int flags)
 {
 	int error;
 	size_t count;
@@ -4529,8 +4530,8 @@ static int nfs3_lostpage = 0;	/* number of times we lost original page */
 /* ARGSUSED */
 static int
 nfs3_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
-	page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr,
-	enum seg_rw rw, cred_t *cr, caller_context_t *ct)
+    page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr,
+    enum seg_rw rw, cred_t *cr, caller_context_t *ct)
 {
 	rnode_t *rp;
 	int error;
@@ -4605,8 +4606,8 @@ retry:
 /* ARGSUSED */
 static int
 nfs3_getapage(vnode_t *vp, u_offset_t off, size_t len, uint_t *protp,
-	page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr,
-	enum seg_rw rw, cred_t *cr)
+    page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr,
+    enum seg_rw rw, cred_t *cr)
 {
 	rnode_t *rp;
 	uint_t bsize;
@@ -4874,7 +4875,7 @@ out:
 
 static void
 nfs3_readahead(vnode_t *vp, u_offset_t blkoff, caddr_t addr, struct seg *seg,
-	cred_t *cr)
+    cred_t *cr)
 {
 	int error;
 	page_t *pp;
@@ -4991,7 +4992,7 @@ nfs3_readahead(vnode_t *vp, u_offset_t blkoff, caddr_t addr, struct seg *seg,
 /* ARGSUSED */
 static int
 nfs3_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	rnode_t *rp;
@@ -5026,7 +5027,7 @@ nfs3_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
  */
 int
 nfs3_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
-	int flags, cred_t *cr)
+    int flags, cred_t *cr)
 {
 	u_offset_t io_off;
 	u_offset_t lbn_off;
@@ -5147,7 +5148,7 @@ nfs3_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
 
 static int
 nfs3_sync_putapage(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
-	int flags, cred_t *cr)
+    int flags, cred_t *cr)
 {
 	int error;
 	rnode_t *rp;
@@ -5210,8 +5211,8 @@ nfs3_sync_putapage(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 /* ARGSUSED */
 static int
 nfs3_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
-	size_t len, uchar_t prot, uchar_t maxprot, uint_t flags,
-	cred_t *cr, caller_context_t *ct)
+    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags,
+    cred_t *cr, caller_context_t *ct)
 {
 	struct segvn_crargs vn_a;
 	int error;
@@ -5324,8 +5325,8 @@ done:
 /* ARGSUSED */
 static int
 nfs3_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
-	size_t len, uchar_t prot, uchar_t maxprot, uint_t flags,
-	cred_t *cr, caller_context_t *ct)
+    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags,
+    cred_t *cr, caller_context_t *ct)
 {
 	rnode_t *rp;
 
@@ -5343,8 +5344,8 @@ nfs3_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 /* ARGSUSED */
 static int
 nfs3_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
-	offset_t offset, struct flk_callback *flk_cbp, cred_t *cr,
-	caller_context_t *ct)
+    offset_t offset, struct flk_callback *flk_cbp, cred_t *cr,
+    caller_context_t *ct)
 {
 	netobj lm_fh3;
 	int rc;
@@ -5354,9 +5355,22 @@ nfs3_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 
 	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
+
 	/* check for valid cmd parameter */
-	if (cmd != F_GETLK && cmd != F_SETLK && cmd != F_SETLKW)
+	switch (cmd) {
+	case F_FLOCK:
+	case F_FLOCKW:
+	case F_OFD_GETLK:
+	case F_OFD_SETLK:
+	case F_OFD_SETLKW:
+		return (EOPNOTSUPP);
+	case F_GETLK:
+	case F_SETLK:
+	case F_SETLKW:
+		break;
+	default:
 		return (EINVAL);
+	}
 
 	/* Verify l_type. */
 	switch (bfp->l_type) {
@@ -5493,7 +5507,7 @@ done:
 /* ARGSUSED */
 static int
 nfs3_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
-	offset_t offset, cred_t *cr, caller_context_t *ct)
+    offset_t offset, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 
@@ -5557,8 +5571,8 @@ nfs3_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 /* ARGSUSED */
 static int
 nfs3_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
-	size_t len, uint_t prot, uint_t maxprot, uint_t flags,
-	cred_t *cr, caller_context_t *ct)
+    size_t len, uint_t prot, uint_t maxprot, uint_t flags,
+    cred_t *cr, caller_context_t *ct)
 {
 	int			caller_found;
 	int			error;
@@ -5720,7 +5734,7 @@ static int nfs3_pathconf_cache_misses = 0;
 /* ARGSUSED */
 static int
 nfs3_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	PATHCONF3args args;
@@ -5918,7 +5932,7 @@ nfs3_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
  */
 static int
 nfs3_sync_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
-	int flags, cred_t *cr)
+    int flags, cred_t *cr)
 {
 	int error;
 
@@ -5934,7 +5948,7 @@ nfs3_sync_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 /* ARGSUSED */
 static int
 nfs3_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
-	int flags, cred_t *cr, caller_context_t *ct)
+    int flags, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 	rnode_t *rp;
@@ -5964,7 +5978,7 @@ nfs3_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 /* ARGSUSED */
 static void
 nfs3_dispose(vnode_t *vp, page_t *pp, int fl, int dn, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	rnode_t *rp;
@@ -6572,7 +6586,7 @@ nfs3_commit_vp(vnode_t *vp, u_offset_t poff, size_t plen, cred_t *cr)
 
 static int
 nfs3_sync_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
-	cred_t *cr)
+    cred_t *cr)
 {
 	int error;
 	page_t *pp;
@@ -6609,7 +6623,7 @@ nfs3_sync_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
 
 static void
 nfs3_async_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
-	cred_t *cr)
+    cred_t *cr)
 {
 	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
 	(void) nfs3_sync_commit(vp, plist, offset, count, cr);
@@ -6618,7 +6632,7 @@ nfs3_async_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
 /* ARGSUSED */
 static int
 nfs3_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	mntinfo_t *mi;
@@ -6640,7 +6654,7 @@ nfs3_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
 /* ARGSUSED */
 static int
 nfs3_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	mntinfo_t *mi;
@@ -6662,7 +6676,7 @@ nfs3_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
 /* ARGSUSED */
 static int
 nfs3_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	struct shrlock nshr;

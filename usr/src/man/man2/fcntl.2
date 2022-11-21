@@ -45,12 +45,12 @@
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 .\" Copyright 2015 Joyent, Inc.
+.\" Copyright 2022 Oxide Computer Company
 .\"
 .TH FCNTL 2 "Feb 16, 2015"
 .SH NAME
 fcntl \- file control
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <unistd.h>
@@ -60,7 +60,6 @@ fcntl \- file control
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBfcntl()\fR function provides for control over open files. The
 \fIfildes\fR argument is an open file descriptor.
 .sp
@@ -461,7 +460,6 @@ Remove an existing share reservation.
 .RE
 
 .SH FILE LOCKING
-.LP
 Two types of file locks are supported: POSIX-style and OFD-style. OFD-style
 locks are associated with the open file description (not descriptor) instead
 of with a process. Either type is advisory by default, but POSIX-style locks
@@ -616,7 +614,6 @@ and error value apply only to POSIX-style locks.  No deadlock detection is
 performed when attempting to set an OFD-style lock.
 
 .SH SHARE RESERVATIONS
-.LP
 File share reservations are an advisory form of access control among
 cooperating processes, on both local and remote machines. They are most often
 used by \fBDOS\fR or Windows emulators and \fBDOS based\fR \fBNFS\fR clients.
@@ -727,7 +724,6 @@ Do not deny read or write access to any other process.
 .RE
 
 .SH RETURN VALUES
-.LP
 Upon successful completion, the value returned depends on \fIcmd\fR as follows:
 .sp
 .ne 2
@@ -945,7 +941,6 @@ Value other than \fB\(mi1\fR\&.
 Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
-.LP
 The \fBfcntl()\fR function will fail if:
 .sp
 .ne 2
@@ -1140,8 +1135,19 @@ The \fIcmd\fR argument is \fBF_FREESP,\fR mandatory record locking is enabled,
 detected.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fBEOPNOTSUPP\fR
+.ad
+.RS 11n
+The \fIcmd\fR argument is \fBF_OFD_GETLK\fR, \fBF_OFD_GETLK64\fR,
+\fBF_OFD_SETLK\fR, \fBF_OFD_SETLK64\fR, \fBF_OFD_SETLKW\fR, or
+\fBF_OFD_SETLKW64\fR and the locking of files of the type indicated by the
+\fIfildes\fR argument is not supported.
+.RE
+
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -1158,7 +1164,6 @@ MT-Level	Async-Signal Safe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR chmod (2),
 .BR close (2),
 .BR creat (2),
@@ -1183,7 +1188,6 @@ MT-Level	Async-Signal Safe
 .LP
 \fIProgramming Interfaces Guide\fR
 .SH NOTES
-.LP
 In the past, the variable \fBerrno\fR was set to \fBEACCES\fR rather than
 \fBEAGAIN\fR when a section of a file is already locked by another process.
 Therefore, portable application programs should expect and test for either
