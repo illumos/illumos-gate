@@ -129,12 +129,8 @@ fmd_agent_nvl_ioctl(fmd_agent_hdl_t *hdl, int cmd, uint32_t ver,
 			if (errno == ENAMETOOLONG && outsz != 0 &&
 			    outsz < (FM_IOC_OUT_MAXBUFSZ / 2)) {
 				umem_free(outbuf, outsz);
+				outbuf = NULL;
 				outsz *= 2;
-				outbuf = umem_alloc(outsz, UMEM_DEFAULT);
-				if (outbuf == NULL) {
-					err = errno;
-					break;
-				}
 			} else {
 				err = errno;
 				break;
