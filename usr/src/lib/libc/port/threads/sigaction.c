@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include "lint.h"
 #include <sys/feature_tests.h>
 /*
@@ -563,7 +567,13 @@ setcontext(const ucontext_t *ucp)
 #if defined(__sparc)
 		uc.uc_mcontext.gregs[REG_G7] = (greg_t)self;
 #elif defined(__amd64)
-		uc.uc_mcontext.gregs[REG_FS] = (greg_t)0; /* null for fsbase */
+		/*
+		 * 64-bit processes must have a selector value of zero for %fs
+		 * in order to use the 64-bit fs_base (the full 64-bit address
+		 * range cannot be expressed in a long mode descriptor).
+		 */
+		uc.uc_mcontext.gregs[REG_FS] = (greg_t)0;
+		uc.uc_mcontext.gregs[REG_FSBASE] = (greg_t)self;
 #elif defined(__i386)
 		uc.uc_mcontext.gregs[GS] = (greg_t)LWPGS_SEL;
 #else

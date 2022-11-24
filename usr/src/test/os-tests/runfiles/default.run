@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2022 Oxide Computer Company
 # Copyright 2022 MNX Cloud, Inc.
@@ -38,6 +38,9 @@ tests = ['poll_test', 'epoll_test']
 
 [/opt/os-tests/tests/clock_gettime.32]
 [/opt/os-tests/tests/clock_gettime.64]
+
+[/opt/os-tests/tests/ucontext.32]
+[/opt/os-tests/tests/ucontext.64]
 
 [/opt/os-tests/tests/secflags]
 user = root

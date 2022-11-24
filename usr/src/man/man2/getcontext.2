@@ -43,98 +43,136 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH GETCONTEXT 2 "May 13, 2017"
-.SH NAME
-getcontext, setcontext \- get and set current user context
-.SH SYNOPSIS
-.LP
-.nf
-#include <ucontext.h>
-
-\fBint\fR \fBgetcontext\fR(\fBucontext_t *\fR\fIucp\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBsetcontext\fR(\fBconst ucontext_t *\fR\fIucp\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBgetcontext()\fR function initializes the structure pointed to by
-\fIucp\fR to the current user context of the calling process.  The
-\fBucontext_t\fR type that \fIucp\fR points to defines the user context and
-includes the contents of the calling process' machine registers, the signal
-mask, and the current execution stack.
-.sp
-.LP
-The \fBsetcontext()\fR function restores the user context pointed to by
-\fIucp\fR.  A successful call to \fBsetcontext()\fR does not return; program
-execution resumes at the point specified by the \fIucp\fR argument passed to
-\fBsetcontext()\fR. The \fIucp\fR argument should be created either by a prior
-call to \fBgetcontext()\fR, or by being passed as an argument to a signal
-handler. If the \fIucp\fR argument was created with \fBgetcontext()\fR, program
-execution continues as if the corresponding call of \fBgetcontext()\fR had just
-returned.  If the \fIucp\fR argument was created with \fBmakecontext\fR(3C),
-program execution continues with the function passed to \fBmakecontext\fR(3C).
+.Dd November 24, 2022
+.Dt GETCONTEXT 2
+.Os
+.Sh NAME
+.Nm getcontext ,
+.Nm setcontext
+.Nd get and set current user context
+.Sh SYNOPSIS
+.In ucontext.h
+.Ft int
+.Fo getcontext
+.Fa "ucontext_t *ucp"
+.Fc
+.Ft int
+.Fo setcontext
+.Fa "const ucontext_t *ucp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn getcontext
+function initializes the structure pointed to by
+.Fa ucp
+to the current user context of the calling process.
+The
+.Vt ucontext_t
+type that
+.Fa ucp
+points to defines the user context and includes the contents of the calling
+process' machine registers, the signal mask, and the current execution stack.
+.Pp
+The
+.Fn setcontext
+function restores the user context pointed to by
+.Fa ucp .
+A successful call to
+.Fn setcontext
+does not return; program execution resumes at the point specified by the
+.Fa ucp
+argument passed to
+.Fn setcontext .
+The
+.Fa ucp
+argument should be created either by a prior call to
+.Fn getcontext ,
+or by being passed as an argument to a signal handler.
+If the
+.Fa ucp
+argument was created with
+.Fn getcontext ,
+program execution continues as if the corresponding call of
+.Fn getcontext
+had just returned.
+If the
+.Fa ucp
+argument was created with
+.Xr makecontext 3C ,
+program execution continues with the function passed to
+.Xr makecontext 3C .
 When that function returns, the process continues as if after a call to
-\fBsetcontext()\fR with the \fIucp\fR argument that was input to
-\fBmakecontext\fR(3C). If the \fIucp\fR argument was passed to a signal
-handler, program execution continues with the program instruction following the
-instruction interrupted by the signal.  If the \fBuc_link\fR member of the
-\fBucontext_t\fR structure pointed to by the \fIucp\fR argument is equal to 0,
-then this context is the main context, and the process will exit when this
-context returns.  The effects of passing a \fIucp\fR argument obtained from any
-other source are unspecified.
-.SH RETURN VALUES
-.LP
-On successful completion, \fBsetcontext()\fR does not return and
-\fBgetcontext()\fR returns \fB0\fR. Otherwise, \fB\(mi1\fR is returned.
-.SH ERRORS
-.LP
+.Fn setcontext
+with the
+.Fa ucp
+argument that was input to
+.Xr makecontext 3C .
+If the
+.Fa ucp
+argument was passed to a signal handler, program execution continues with the
+program instruction following the instruction interrupted by the signal.
+If the
+.Fa uc_link
+member of the
+.Vt ucontext_t
+structure pointed to by the
+.Fa ucp
+argument is
+.Dv NULL ,
+then this context is the main context, and the process
+will exit when this context returns.
+The effects of passing a
+.Fa ucp
+argument obtained from any other source are unspecified.
+.Sh RETURN VALUES
+On successful completion,
+.Fn setcontext
+does not return and
+.Fn getcontext
+returns 0.
+Otherwise, -1 is returned.
+.Sh ERRORS
 No errors are defined.
-.SH USAGE
-.LP
+.Sh USAGE
 When a signal handler is executed, the current user context is saved and a new
-context is created.  If the thread leaves the signal handler via
-\fBlongjmp\fR(3C), then it is unspecified whether the context at the time of
-the corresponding \fBsetjmp\fR(3C) call is restored and thus whether future
-calls to \fBgetcontext()\fR will provide an accurate representation of the
-current context, since the context restored by \fBlongjmp\fR(3C) may not
-contain all the information that \fBsetcontext()\fR requires.  Signal handlers
-should use \fBsiglongjmp\fR(3C) instead.
-.sp
-.LP
-Portable applications should not modify or access the \fBuc_mcontext\fR member
-of \fBucontext_t\fR.  A portable application cannot assume that context
-includes any process-wide static data, possibly including \fBerrno\fR. Users
-manipulating contexts should take care to handle these explicitly when
+context is created.
+If the thread leaves the signal handler via
+.Xr longjmp 3C ,
+then it is unspecified whether the context at the time of the corresponding
+.Xr setjmp 3C
+call is restored and thus whether future calls to
+.Fn getcontext
+will provide an accurate representation of the current context, since the
+context restored by
+.Xr longjmp 3C
+may not contain all the information that
+.Fn setcontext
+requires.
+Signal handlers should use
+.Xr siglongjmp 3C
+instead.
+.Pp
+Portable applications should not modify or access the
+.Fa uc_mcontext
+member of
+.Vt ucontext_t .
+A portable application cannot assume that context includes any process-wide
+static data, possibly including
+.Va errno .
+Users manipulating contexts should take care to handle these explicitly when
 required.
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-.TE
-
-.SH SEE ALSO
-.LP
-.BR sigaction (2),
-.BR sigaltstack (2),
-.BR sigprocmask (2),
-.BR bsd_signal (3C),
-.BR makecontext (3C),
-.BR setjmp (3C),
-.BR sigsetjmp (3C),
-.BR ucontext.h (3HEAD),
-.BR attributes (7),
-.BR standards (7)
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr sigaction 2 ,
+.Xr sigaltstack 2 ,
+.Xr sigprocmask 2 ,
+.Xr bsd_signal 3C ,
+.Xr makecontext 3C ,
+.Xr setjmp 3C ,
+.Xr sigsetjmp 3C ,
+.Xr ucontext.h 3HEAD ,
+.Xr attributes 7 ,
+.Xr standards 7
