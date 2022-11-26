@@ -14,7 +14,7 @@
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Joyent, Inc.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/test/libctest@$(PKGVERS)
@@ -79,6 +79,22 @@ file path=opt/libc-tests/tests/env-7076.32 mode=0555
 file path=opt/libc-tests/tests/env-7076.64 mode=0555
 file path=opt/libc-tests/tests/env-OS-4089.32 mode=0555
 file path=opt/libc-tests/tests/env-OS-4089.64 mode=0555
+dir  path=opt/libc-tests/tests/err
+dir  path=opt/libc-tests/tests/err/data
+file path=opt/libc-tests/tests/err/data/E.0.3.4 mode=0444
+file path=opt/libc-tests/tests/err/data/E.1.5.6 mode=0444
+file path=opt/libc-tests/tests/err/data/E.2.7.8 mode=0444
+file path=opt/libc-tests/tests/err/data/E.3.9.10 mode=0444
+file path=opt/libc-tests/tests/err/data/E.4.11.12 mode=0444
+file path=opt/libc-tests/tests/err/data/E.5.13.14 mode=0444
+file path=opt/libc-tests/tests/err/data/W.0.3.4 mode=0444
+file path=opt/libc-tests/tests/err/data/W.1.5.6 mode=0444
+file path=opt/libc-tests/tests/err/data/W.2.7.8 mode=0444
+file path=opt/libc-tests/tests/err/data/W.3.9.10 mode=0444
+file path=opt/libc-tests/tests/err/data/W.4.11.12 mode=0444
+file path=opt/libc-tests/tests/err/data/W.5.13.14 mode=0444
+file path=opt/libc-tests/tests/err/err mode=0555
+file path=opt/libc-tests/tests/err/err.ksh mode=0555
 file path=opt/libc-tests/tests/fnmatch.32 mode=0555
 file path=opt/libc-tests/tests/fnmatch.64 mode=0555
 file path=opt/libc-tests/tests/fpround_test mode=0555

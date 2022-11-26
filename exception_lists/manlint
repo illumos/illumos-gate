@@ -11,6 +11,7 @@
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2020 Joyent, Inc.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 usr/src/boot/*
 # Not actually a manual page
@@ -25,6 +26,7 @@ usr/src/lib/libbsm/adt_record.dtd.1
 usr/src/lib/libbsm/adt_record.xsl.1
 usr/src/lib/libpool/dtd/rm_pool.dtd.1
 usr/src/lib/libzonecfg/dtd/zonecfg.dtd.1
+usr/src/test/libc-tests/tests/err/data/*
 usr/src/test/util-tests/tests/grep_xpg4/files/*
 usr/src/tools/smatch/src/*
 usr/src/contrib/ast/*

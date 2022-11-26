@@ -2363,6 +2363,7 @@ f platform/i86pc/ucode/GenuineIntel/000606A6-01 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000606A6-02=platform/i86pc/ucode/GenuineIntel/000606A6-01
 h platform/i86pc/ucode/GenuineIntel/000606A6-04=platform/i86pc/ucode/GenuineIntel/000606A6-01
 h platform/i86pc/ucode/GenuineIntel/000606A6-80=platform/i86pc/ucode/GenuineIntel/000606A6-01
+f platform/i86pc/ucode/GenuineIntel/000606C1-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000706A1-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000706A8-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000706E5-80 0444 root sys
@@ -2388,8 +2389,10 @@ h platform/i86pc/ucode/GenuineIntel/000806EC-80=platform/i86pc/ucode/GenuineInte
 f platform/i86pc/ucode/GenuineIntel/00090661-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/00090672-01 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/00090672-02=platform/i86pc/ucode/GenuineIntel/00090672-01
+h platform/i86pc/ucode/GenuineIntel/00090672-04=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/00090675-01=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/00090675-02=platform/i86pc/ucode/GenuineIntel/00090672-01
+h platform/i86pc/ucode/GenuineIntel/00090675-04=platform/i86pc/ucode/GenuineIntel/00090672-01
 f platform/i86pc/ucode/GenuineIntel/000906A3-80 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000906A4-80=platform/i86pc/ucode/GenuineIntel/000906A3-80
 f platform/i86pc/ucode/GenuineIntel/000906C0-01 0444 root sys
@@ -2411,10 +2414,15 @@ h platform/i86pc/ucode/GenuineIntel/000A0655-20=platform/i86pc/ucode/GenuineInte
 f platform/i86pc/ucode/GenuineIntel/000A0660-80 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000A0661-80 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000A0671-02 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000B0671-02 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000B0671-10=platform/i86pc/ucode/GenuineIntel/000B0671-02
+h platform/i86pc/ucode/GenuineIntel/000B0671-20=platform/i86pc/ucode/GenuineIntel/000B0671-02
 h platform/i86pc/ucode/GenuineIntel/000B06F2-01=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/000B06F2-02=platform/i86pc/ucode/GenuineIntel/00090672-01
+h platform/i86pc/ucode/GenuineIntel/000B06F2-04=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/000B06F5-01=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/000B06F5-02=platform/i86pc/ucode/GenuineIntel/00090672-01
+h platform/i86pc/ucode/GenuineIntel/000B06F5-04=platform/i86pc/ucode/GenuineIntel/00090672-01
 d proc 0755 root root
 d root 0755 root root
 f root/.bash_profile 0644 root root
@@ -13009,6 +13017,7 @@ s usr/share/man/man3c/epoll_pwait.3c=epoll_wait.3c
 f usr/share/man/man3c/epoll_wait.3c 0444 root bin
 s usr/share/man/man3c/erand48.3c=drand48.3c
 f usr/share/man/man3c/err.3c 0444 root bin
+s usr/share/man/man3c/errc.3c=err.3c
 s usr/share/man/man3c/errno.3c=perror.3c
 s usr/share/man/man3c/errx.3c=err.3c
 s usr/share/man/man3c/etext.3c=end.3c
@@ -14003,6 +14012,7 @@ s usr/share/man/man3c/utmpxname.3c=getutxent.3c
 s usr/share/man/man3c/valloc.3c=malloc.3c
 s usr/share/man/man3c/vasprintf.3c=vprintf.3c
 s usr/share/man/man3c/verr.3c=err.3c
+s usr/share/man/man3c/verrc.3c=err.3c
 s usr/share/man/man3c/verrx.3c=err.3c
 s usr/share/man/man3c/vfprintf.3c=vprintf.3c
 s usr/share/man/man3c/vfscanf.3c=scanf.3c
@@ -14019,6 +14029,7 @@ s usr/share/man/man3c/vswprintf.3c=vfwprintf.3c
 s usr/share/man/man3c/vswscanf.3c=fwscanf.3c
 f usr/share/man/man3c/vsyslog.3c 0444 root bin
 s usr/share/man/man3c/vwarn.3c=err.3c
+s usr/share/man/man3c/vwarnc.3c=err.3c
 s usr/share/man/man3c/vwarnx.3c=err.3c
 s usr/share/man/man3c/vwprintf.3c=vfwprintf.3c
 s usr/share/man/man3c/vwscanf.3c=fwscanf.3c
@@ -14028,6 +14039,7 @@ s usr/share/man/man3c/wait4.3c=wait3.3c
 f usr/share/man/man3c/waitpid.3c 0444 root bin
 f usr/share/man/man3c/walkcontext.3c 0444 root bin
 s usr/share/man/man3c/warn.3c=err.3c
+s usr/share/man/man3c/warnc.3c=err.3c
 s usr/share/man/man3c/warnx.3c=err.3c
 s usr/share/man/man3c/watof.3c=wcstod.3c
 s usr/share/man/man3c/watoi.3c=wcstol.3c

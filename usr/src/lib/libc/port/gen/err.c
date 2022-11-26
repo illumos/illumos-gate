@@ -23,6 +23,10 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include "lint.h"
 #include "file64.h"
 #include "mtlib.h"
@@ -111,6 +115,129 @@ warnfinish(FILE *fp, rmutex_t *lk)
 	FUNLOCKFILE(lk);
 }
 
+static void
+vwarnfp(FILE *fp, int code, const char *fmt, va_list args)
+{
+	rmutex_t *lk;
+
+	lk = warncore(fp, fmt, args);
+	if (fmt != NULL) {
+		(void) fputc(':', fp);
+		(void) fputc(' ', fp);
+	}
+	(void) fputs(strerror(code), fp);
+	warnfinish(fp, lk);
+}
+
+void
+vwarnx(const char *fmt, va_list args)
+{
+	rmutex_t *lk;
+
+	lk = warncore(stderr, fmt, args);
+	warnfinish(stderr, lk);
+}
+
+void
+vwarn(const char *fmt, va_list args)
+{
+	vwarnfp(stderr, errno, fmt, args);
+}
+
+void
+vwarnc(int code, const char *fmt, va_list args)
+{
+	vwarnfp(stderr, code, fmt, args);
+}
+
+void
+warnx(const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vwarnx(fmt, args);
+	va_end(args);
+}
+
+void
+warn(const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vwarn(fmt, args);
+	va_end(args);
+}
+
+void
+warnc(int code, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vwarnc(code, fmt, args);
+	va_end(args);
+}
+
+void
+err(int status, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vwarn(fmt, args);
+	va_end(args);
+	exit(status);
+}
+
+void
+errc(int status, int code, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vwarnc(code, fmt, args);
+	va_end(args);
+	exit(status);
+}
+
+void
+verr(int status, const char *fmt, va_list args)
+{
+	vwarn(fmt, args);
+	exit(status);
+}
+
+void
+verrc(int status, int code, const char *fmt, va_list args)
+{
+	vwarnc(code, fmt, args);
+	exit(status);
+}
+
+void
+errx(int status, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vwarnx(fmt, args);
+	va_end(args);
+	exit(status);
+}
+
+void
+verrx(int status, const char *fmt, va_list args)
+{
+	vwarnx(fmt, args);
+	exit(status);
+}
+
+/*
+ * The following functions are here as the targets of filters in libipsecutil.
+ */
+
 void
 _vwarnxfp(FILE *fp, const char *fmt, va_list args)
 {
@@ -121,41 +248,9 @@ _vwarnxfp(FILE *fp, const char *fmt, va_list args)
 }
 
 void
-vwarnx(const char *fmt, va_list args)
-{
-	_vwarnxfp(stderr, fmt, args);
-}
-
-void
 _vwarnfp(FILE *fp, const char *fmt, va_list args)
 {
-	int tmperr = errno;	/* Capture errno now. */
-	rmutex_t *lk;
-
-	lk = warncore(fp, fmt, args);
-	if (fmt != NULL) {
-		(void) fputc(':', fp);
-		(void) fputc(' ', fp);
-	}
-	(void) fputs(strerror(tmperr), fp);
-	warnfinish(fp, lk);
-}
-
-void
-vwarn(const char *fmt, va_list args)
-{
-	_vwarnfp(stderr, fmt, args);
-}
-
-/* PRINTFLIKE1 */
-void
-warnx(const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vwarnx(fmt, args);
-	va_end(args);
+	vwarnfp(fp, errno, fmt, args);
 }
 
 void
@@ -178,29 +273,6 @@ _warnxfp(FILE *fp, const char *fmt, ...)
 	va_end(args);
 }
 
-/* PRINTFLIKE1 */
-void
-warn(const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vwarn(fmt, args);
-	va_end(args);
-}
-
-/* PRINTFLIKE2 */
-void
-err(int status, const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vwarn(fmt, args);
-	va_end(args);
-	exit(status);
-}
-
 void
 _errfp(FILE *fp, int status, const char *fmt, ...)
 {
@@ -213,28 +285,9 @@ _errfp(FILE *fp, int status, const char *fmt, ...)
 }
 
 void
-verr(int status, const char *fmt, va_list args)
-{
-	vwarn(fmt, args);
-	exit(status);
-}
-
-void
 _verrfp(FILE *fp, int status, const char *fmt, va_list args)
 {
 	_vwarnfp(fp, fmt, args);
-	exit(status);
-}
-
-/* PRINTFLIKE2 */
-void
-errx(int status, const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vwarnx(fmt, args);
-	va_end(args);
 	exit(status);
 }
 
@@ -246,13 +299,6 @@ _errxfp(FILE *fp, int status, const char *fmt, ...)
 	va_start(args, fmt);
 	_vwarnxfp(fp, fmt, args);
 	va_end(args);
-	exit(status);
-}
-
-void
-verrx(int status, const char *fmt, va_list args)
-{
-	vwarnx(fmt, args);
 	exit(status);
 }
 

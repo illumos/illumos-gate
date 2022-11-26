@@ -1,0 +1,6 @@
+::STDOUT::
+
+::STDERR::
+err: E/3/10: Bad file number
+::EXIT::
+10

@@ -1,0 +1,6 @@
+::STDOUT::
+
+::STDERR::
+err: E/4/12: Resource temporarily unavailable
+::EXIT::
+12
