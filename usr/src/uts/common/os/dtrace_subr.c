@@ -27,7 +27,6 @@
 
 #include <sys/dtrace.h>
 #include <sys/cmn_err.h>
-#include <sys/tnf.h>
 #include <sys/atomic.h>
 #include <sys/prsystm.h>
 #include <sys/modctl.h>
@@ -195,12 +194,7 @@ dtrace_vtime_enable(void)
 			nstate = DTRACE_VTIME_ACTIVE;
 			break;
 
-		case DTRACE_VTIME_INACTIVE_TNF:
-			nstate = DTRACE_VTIME_ACTIVE_TNF;
-			break;
-
 		case DTRACE_VTIME_ACTIVE:
-		case DTRACE_VTIME_ACTIVE_TNF:
 			panic("DTrace virtual time already enabled");
 			/*NOTREACHED*/
 		}
@@ -223,69 +217,8 @@ dtrace_vtime_disable(void)
 			nstate = DTRACE_VTIME_INACTIVE;
 			break;
 
-		case DTRACE_VTIME_ACTIVE_TNF:
-			nstate = DTRACE_VTIME_INACTIVE_TNF;
-			break;
-
 		case DTRACE_VTIME_INACTIVE:
-		case DTRACE_VTIME_INACTIVE_TNF:
 			panic("DTrace virtual time already disabled");
-			/*NOTREACHED*/
-		}
-
-	} while	(atomic_cas_32((uint32_t *)&dtrace_vtime_active,
-	    state, nstate) != state);
-}
-
-void
-dtrace_vtime_enable_tnf(void)
-{
-	dtrace_vtime_state_t state, nstate;
-
-	nstate = DTRACE_VTIME_INACTIVE;
-	do {
-		state = dtrace_vtime_active;
-
-		switch (state) {
-		case DTRACE_VTIME_ACTIVE:
-			nstate = DTRACE_VTIME_ACTIVE_TNF;
-			break;
-
-		case DTRACE_VTIME_INACTIVE:
-			nstate = DTRACE_VTIME_INACTIVE_TNF;
-			break;
-
-		case DTRACE_VTIME_ACTIVE_TNF:
-		case DTRACE_VTIME_INACTIVE_TNF:
-			panic("TNF already active");
-			/*NOTREACHED*/
-		}
-
-	} while	(atomic_cas_32((uint32_t *)&dtrace_vtime_active,
-	    state, nstate) != state);
-}
-
-void
-dtrace_vtime_disable_tnf(void)
-{
-	dtrace_vtime_state_t state, nstate;
-
-	nstate = DTRACE_VTIME_INACTIVE;
-	do {
-		state = dtrace_vtime_active;
-
-		switch (state) {
-		case DTRACE_VTIME_ACTIVE_TNF:
-			nstate = DTRACE_VTIME_ACTIVE;
-			break;
-
-		case DTRACE_VTIME_INACTIVE_TNF:
-			nstate = DTRACE_VTIME_INACTIVE;
-			break;
-
-		case DTRACE_VTIME_ACTIVE:
-		case DTRACE_VTIME_INACTIVE:
-			panic("TNF already inactive");
 			/*NOTREACHED*/
 		}
 
@@ -298,13 +231,6 @@ dtrace_vtime_switch(kthread_t *next)
 {
 	dtrace_icookie_t cookie;
 	hrtime_t ts;
-
-	if (tnf_tracing_active) {
-		tnf_thread_switch(next);
-
-		if (dtrace_vtime_active == DTRACE_VTIME_INACTIVE_TNF)
-			return;
-	}
 
 	cookie = dtrace_interrupt_disable();
 	ts = dtrace_gethrtime();

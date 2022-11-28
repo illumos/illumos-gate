@@ -16,7 +16,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Jason King
 # Copyright 2020 Joyent, Inc.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 link path=usr/share/man/man3c/FD_CLR.3c target=select.3c
@@ -339,6 +339,7 @@ link path=usr/share/man/man3c/epoll_pwait.3c target=epoll_wait.3c
 file path=usr/share/man/man3c/epoll_wait.3c
 link path=usr/share/man/man3c/erand48.3c target=drand48.3c
 file path=usr/share/man/man3c/err.3c
+link path=usr/share/man/man3c/errc.3c target=err.3c
 link path=usr/share/man/man3c/errno.3c target=perror.3c
 link path=usr/share/man/man3c/errx.3c target=err.3c
 link path=usr/share/man/man3c/etext.3c target=end.3c
@@ -1399,6 +1400,7 @@ link path=usr/share/man/man3c/utmpxname.3c target=getutxent.3c
 link path=usr/share/man/man3c/valloc.3c target=malloc.3c
 link path=usr/share/man/man3c/vasprintf.3c target=vprintf.3c
 link path=usr/share/man/man3c/verr.3c target=err.3c
+link path=usr/share/man/man3c/verrc.3c target=err.3c
 link path=usr/share/man/man3c/verrx.3c target=err.3c
 link path=usr/share/man/man3c/vfprintf.3c target=vprintf.3c
 link path=usr/share/man/man3c/vfscanf.3c target=scanf.3c
@@ -1415,6 +1417,7 @@ link path=usr/share/man/man3c/vswprintf.3c target=vfwprintf.3c
 link path=usr/share/man/man3c/vswscanf.3c target=fwscanf.3c
 file path=usr/share/man/man3c/vsyslog.3c
 link path=usr/share/man/man3c/vwarn.3c target=err.3c
+link path=usr/share/man/man3c/vwarnc.3c target=err.3c
 link path=usr/share/man/man3c/vwarnx.3c target=err.3c
 link path=usr/share/man/man3c/vwprintf.3c target=vfwprintf.3c
 link path=usr/share/man/man3c/vwscanf.3c target=fwscanf.3c
@@ -1424,6 +1427,7 @@ link path=usr/share/man/man3c/wait4.3c target=wait3.3c
 file path=usr/share/man/man3c/waitpid.3c
 file path=usr/share/man/man3c/walkcontext.3c
 link path=usr/share/man/man3c/warn.3c target=err.3c
+link path=usr/share/man/man3c/warnc.3c target=err.3c
 link path=usr/share/man/man3c/warnx.3c target=err.3c
 link path=usr/share/man/man3c/watof.3c target=wcstod.3c
 link path=usr/share/man/man3c/watoi.3c target=wcstol.3c

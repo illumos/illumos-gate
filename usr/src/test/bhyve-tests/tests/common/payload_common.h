@@ -27,6 +27,7 @@
 #define	MEM_LOC_IDT		0x207000
 #define	MEM_LOC_STACK		0x400000
 #define	MEM_LOC_PAYLOAD		0x800000
+#define	MEM_LOC_ROM		0xffff000
 
 /* IO port set aside for emitting test result */
 #define	IOP_TEST_RESULT		0xef00U

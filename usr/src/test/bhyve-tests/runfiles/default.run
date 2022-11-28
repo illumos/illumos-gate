@@ -23,12 +23,18 @@ outputdir = /var/tmp/test_results
 user = root
 tests = [
 	'auto_destruct',
+	'cpuid_ioctl',
+	'datarw_constraints',
+	'default_capabs',
 	'drv_hold',
 	'fpu_getset',
 	'interface_version',
+	'legacy_destruct',
 	'mem_devmem',
 	'mem_partial',
-	'mem_seg_map'
+	'mem_seg_map',
+	'pause_resume',
+	'self_destruct'
 	]
 
 [/opt/bhyve-tests/tests/kdev]
@@ -46,9 +52,13 @@ tests = [
 [/opt/bhyve-tests/tests/inst_emul]
 user = root
 tests = [
+	'cpuid',
+	'imul',
 	'rdmsr',
 	'wrmsr',
-	'triple_fault'
+	'triple_fault',
+	'exit_paging',
+	'page_dirty'
 	]
 
 [/opt/bhyve-tests/tests/viona]

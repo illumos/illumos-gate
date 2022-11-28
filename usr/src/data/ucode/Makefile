@@ -10,45 +10,23 @@
 #
 
 #
-# Copyright 2019 Joyent, Inc.
-# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 Oxide Computer Company
 #
 
-include	$(SRC)/data/Makefile.data
+SUBDIRS = intel amd
 
-ROOTUCODEPATH = $(ROOT)/platform/i86pc/ucode
-ROOTAMDDIR = $(ROOTUCODEPATH)/AuthenticAMD
-ROOTINTELDIR = $(ROOTUCODEPATH)/GenuineIntel
+all :=		TARGET=all
+clean :=	TARGET=clean
+clobber :=	TARGET=clobber
+install :=	TARGET=install
 
-AMD_FILES :sh= (cd amd; print *-* container)
-INTEL_FILES :sh= (cd intel; print *-*)
-include $(SRC)/data/ucode/Makefile.links
+.PARALLEL: $(SUBDIRS)
 
-ROOTAMDFILES = $(AMD_FILES:%=$(ROOTAMDDIR)/%)
-ROOTINTELFILES = $(INTEL_FILES:%=$(ROOTINTELDIR)/%)
-ROOTINTELLINKS = $(INTEL_LINKS:%=$(ROOTINTELDIR)/%)
+.KEEP_STATE:
 
-$(ROOTAMDFILES) := FILEMODE = 444
-$(ROOTINTELFILES) := FILEMODE = 444
+all clean clobber install: $(SUBDIRS)
 
-.PARALLEL:
+$(SUBDIRS):	FRC
+		cd $@; pwd; $(MAKE) $(TARGET)
 
-all:
-
-install: $(ROOTAMDFILES) $(ROOTINTELFILES) $(ROOTINTELLINKS)
-
-clean:
-
-$(ROOTUCODEPATH):
-	$(INS.dir)
-
-$(ROOTINTELDIR) $(ROOTAMDDIR): $(ROOTUCODEPATH)
-	$(INS.dir)
-
-$(ROOTAMDDIR)/%: amd/% $(ROOTAMDDIR)
-	$(INS.file)
-
-$(ROOTINTELDIR)/%: intel/% $(ROOTINTELDIR)
-	$(INS.file)
-
-include	$(SRC)/data/Makefile.targ
+FRC:

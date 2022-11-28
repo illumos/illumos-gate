@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2022 Oxide Computer Company
 #
 
 @ _START_
@@ -193,6 +194,7 @@
 @ MSG_LDD_REJ_MACHCAP	"  - machine capability (CA_SUNW_MACH) unsupported: %s"
 @ MSG_LDD_REJ_PLATCAP	"  - platform capability (CA_SUNW_PLAT) unsupported: %s"
 @ MSG_LDD_REJ_HWCAP_2	"  - hardware capability (CA_SUNW_HW_2) unsupported: %s"
+@ MSG_LDD_REJ_HWCAP_3	"  - hardware capability (CA_SUNW_HW_3) unsupported: %s"
 @ MSG_LDD_REJ_ARCHIVE	"  - invalid archive use"
 @ MSG_LDD_REJ_KMOD	"  - invalid kernel module use"
 
@@ -206,6 +208,8 @@
 @ MSG_LDD_WARN_PLATCAP	"%s: warning: platform capability (CA_SUNW_PLAT) \
 			 unsupported: %s\n"
 @ MSG_LDD_WARN_HWCAP_2	"%s: warning: hardware capability (CA_SUNW_HW_2) \
+			 unsupported: %s\n"
+@ MSG_LDD_WARN_HWCAP_3	"%s: warning: hardware capability (CA_SUNW_HW_3) \
 			 unsupported: %s\n"
 
 # Error rejection messages.
@@ -229,6 +233,7 @@
 @ MSG_ERR_REJ_HWCAP_2	"%s: hardware capability (CA_SUNW_HW_2) unsupported: %s"
 @ MSG_ERR_REJ_ARCHIVE	"%s: invalid archive use"
 @ MSG_ERR_REJ_KMOD	"%s: invalid kernel module use"
+@ MSG_ERR_REJ_HWCAP_3	"%s: hardware capability (CA_SUNW_HW_3) unsupported: %s"
 
 # Error TLS failures
 
@@ -398,7 +403,6 @@
 @ MSG_LD_SIGNAL		"SIGNAL"
 @ MSG_LD_TRACE_OBJS	"TRACE_LOADED_OBJECTS"
 @ MSG_LD_TRACE_OBJS_E	"TRACE_LOADED_OBJECTS_E"
-@ MSG_LD_TRACE_OBJS_A	"TRACE_LOADED_OBJECTS_A"
 @ MSG_LD_TRACE_PTHS	"TRACE_SEARCH_PATHS"
 @ MSG_LD_UNREF		"UNREF"
 @ MSG_LD_UNUSED		"UNUSED"

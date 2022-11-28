@@ -803,7 +803,7 @@ vatpic_data_read(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_ATPIC);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_atpic_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_atpic_v1));
 
 	struct vatpic *vatpic = datap;
 	struct vdi_atpic_v1 *out = req->vdr_data;
@@ -864,7 +864,7 @@ vatpic_data_write(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_ATPIC);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_atpic_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_atpic_v1));
 
 	struct vatpic *vatpic = datap;
 	const struct vdi_atpic_v1 *src = req->vdr_data;

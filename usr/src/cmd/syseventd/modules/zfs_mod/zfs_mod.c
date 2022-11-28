@@ -23,6 +23,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -563,6 +564,13 @@ zfsdle_vdev_online(zpool_handle_t *zhp, void *data)
 	    &avail_spare, &l2cache, NULL)) != NULL) {
 		char *path, fullpath[MAXPATHLEN];
 		uint64_t wholedisk = 0ULL;
+
+		/*
+		 * If the /dev path of the device is invalid because the disk
+		 * has been moved to a new location, we need to try to refresh
+		 * that path before onlining the device.
+		 */
+		zpool_vdev_refresh_path(g_zfshdl, zhp, tgt);
 
 		verify(nvlist_lookup_string(tgt, ZPOOL_CONFIG_PATH,
 		    &path) == 0);

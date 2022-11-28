@@ -27,6 +27,7 @@
 #include <sys/sysmacros.h>
 #include <sys/varargs.h>
 #include <sys/debug.h>
+#include <sys/mman.h>
 
 #include <sys/vmm.h>
 #include <sys/vmm_dev.h>
@@ -60,6 +61,28 @@
  */
 static struct vmctx *test_vmctx = NULL;
 static const char *test_name = NULL;
+
+static int
+setup_rom(struct vmctx *ctx)
+{
+	const size_t seg_sz = 0x1000;
+	const uintptr_t seg_addr = MEM_LOC_ROM;
+	const int fd = vm_get_device_fd(ctx);
+	int err;
+
+	struct vm_memseg memseg = {
+		.segid = VM_BOOTROM,
+		.len = 0x1000,
+	};
+	(void) strlcpy(memseg.name, "testrom", sizeof (memseg.name));
+	err = ioctl(fd, VM_ALLOC_MEMSEG, &memseg);
+	if (err != 0) {
+		return (err);
+	}
+	err = vm_mmap_memseg(ctx, seg_addr, VM_BOOTROM, 0, seg_sz,
+	    PROT_READ | PROT_EXEC);
+	return (err);
+}
 
 static void
 populate_identity_table(struct vmctx *ctx)
@@ -100,7 +123,7 @@ populate_desc_tables(struct vmctx *ctx)
 
 }
 
-static void
+void
 test_cleanup(bool is_failure)
 {
 	if (test_vmctx != NULL) {
@@ -121,6 +144,7 @@ test_cleanup(bool is_failure)
 		if (!is_failure || !keep_on_fail) {
 			vm_destroy(test_vmctx);
 		}
+		test_name = NULL;
 		test_vmctx = NULL;
 	}
 }
@@ -286,6 +310,12 @@ load_payload(struct vmctx *ctx)
 struct vmctx *
 test_initialize(const char *tname)
 {
+	return (test_initialize_flags(tname, 0));
+}
+
+struct vmctx *
+test_initialize_flags(const char *tname, uint64_t create_flags)
+{
 	char vm_name[VM_MAX_NAMELEN];
 	int err;
 	struct vmctx *ctx;
@@ -297,7 +327,7 @@ test_initialize(const char *tname)
 	(void) snprintf(vm_name, sizeof (vm_name), "bhyve-test-%s-%d",
 	    test_name, getpid());
 
-	err = vm_create(vm_name, 0);
+	err = vm_create(vm_name, create_flags);
 	if (err != 0) {
 		test_fail_errno(err, "Could not create VM");
 	}
@@ -311,6 +341,11 @@ test_initialize(const char *tname)
 	err = vm_setup_memory(ctx, MEM_TOTAL_SZ, VM_MMAP_ALL);
 	if (err != 0) {
 		test_fail_errno(err, "Could not set up VM memory");
+	}
+
+	err = setup_rom(ctx);
+	if (err != 0) {
+		test_fail_errno(err, "Could not set up VM ROM segment");
 	}
 
 	populate_identity_table(ctx);

@@ -142,14 +142,14 @@ fcnname/**/_info:							\
 	.word	retfcn;			/* 1c */			\
 	.word   weak			/* 20 */
 
-/*	
+/*
  * The flag MODS_INSTALLED is stored in the stub data and is used to
  * indicate if a module is installed and initialized.  This flag is used
  * instead of the mod_stub_info->mods_modinfo->mod_installed flag
  * to minimize the number of pointer de-references for each function
  * call (and also to avoid possible TLB misses which could be induced
  * by dereferencing these pointers.)
- */	
+ */
 
 #define STUB_COMMON(module, fcnname, install_fcn, retfcn, weak)		\
 	ENTRY_NP(fcnname);						\
@@ -266,7 +266,7 @@ fcnname/**/_info:							\
 	restore
 	SET_SIZE(stubs_common_code)
 
-! this is just a marker for the area of text that contains stubs 
+! this is just a marker for the area of text that contains stubs
 	.seg ".text"
 	.global stubs_base
 stubs_base:
@@ -274,11 +274,11 @@ stubs_base:
 
 /*
  * WARNING WARNING WARNING!!!!!!
- * 
+ *
  * On the MODULE macro you MUST NOT use any spaces!!! They are
  * significant to the preprocessor.  With ansi c there is a way around this
  * but for some reason (yet to be investigated) ansi didn't work for other
- * reasons!  
+ * reasons!
  *
  * When zero is used as the return function, the system will call
  * panic if the stub can't be resolved.
@@ -475,7 +475,7 @@ stubs_base:
 	NO_UNLOAD_STUB(klmmod, lm_shutdown,	nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_unexport,	nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_cprresume,	nomod_zero);
-	NO_UNLOAD_STUB(klmmod, lm_cprsuspend,	nomod_zero); 
+	NO_UNLOAD_STUB(klmmod, lm_cprsuspend,	nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_safelock, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_safemap, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_has_sleep, nomod_zero);
@@ -483,8 +483,8 @@ stubs_base:
 	NO_UNLOAD_STUB(klmmod, lm_vp_active, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_get_sysid, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_rel_sysid, nomod_zero);
-	NO_UNLOAD_STUB(klmmod, lm_alloc_sysidt, nomod_minus_one); 
-	NO_UNLOAD_STUB(klmmod, lm_free_sysidt, nomod_zero); 
+	NO_UNLOAD_STUB(klmmod, lm_alloc_sysidt, nomod_minus_one);
+	NO_UNLOAD_STUB(klmmod, lm_free_sysidt, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_sysidt, nomod_minus_one);
 	END_MODULE(klmmod);
 #endif
@@ -564,7 +564,7 @@ stubs_base:
 	NO_UNLOAD_STUB(procfs, prgetcred,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetpriv,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetprivsize,	nomod_zero);
-	NO_UNLOAD_STUB(procfs, prgetsecflags,	nomod_zero);        
+	NO_UNLOAD_STUB(procfs, prgetsecflags,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetstatus,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetlwpstatus,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetpsinfo,	nomod_zero);
@@ -699,7 +699,7 @@ stubs_base:
 	WSTUB(FSS, fss_changeproj,		nomod_zero);
 	WSTUB(FSS, fss_changepset,		nomod_zero);
 	END_MODULE(FSS);
-#endif	
+#endif
 
 /*
  * Stubs for fx_dptbl
@@ -766,7 +766,7 @@ stubs_base:
 	END_MODULE(zs);
 #endif
 
-/* 
+/*
  * Stubs for accounting.
  */
 #ifndef SYSACCT_MODULE
@@ -961,20 +961,6 @@ stubs_base:
 #endif
 
 /*
- * Stubs for kernel probes (tnf module).  Not unloadable.
- */
-#ifndef TNF_MODULE
-	MODULE(tnf,drv);
-	NO_UNLOAD_STUB(tnf, tnf_ref32_1,	nomod_zero);
-	NO_UNLOAD_STUB(tnf, tnf_string_1,	nomod_zero);
-	NO_UNLOAD_STUB(tnf, tnf_opaque_array_1,	nomod_zero);
-	NO_UNLOAD_STUB(tnf, tnf_opaque32_array_1, nomod_zero);
-	NO_UNLOAD_STUB(tnf, tnf_struct_tag_1,	nomod_zero);
-	NO_UNLOAD_STUB(tnf, tnf_allocate,	nomod_zero);
-	END_MODULE(tnf);
-#endif
-
-/*
  * Clustering: stubs for bootstrapping.
  */
 #ifndef CL_BOOTSTRAP
@@ -992,7 +978,7 @@ stubs_base:
 
 /*
  * Clustering: stubs for cluster infrastructure.
- */	
+ */
 #ifndef CL_COMM_MODULE
 	MODULE(cl_comm,misc);
 	NO_UNLOAD_STUB(cl_comm, cladmin, nomod_minus_one);
@@ -1026,7 +1012,7 @@ stubs_base:
 	WSTUB(pcihp, pcihp_uninit, nomod_minus_one);
 	WSTUB(pcihp, pcihp_info, nomod_minus_one);
 	WSTUB(pcihp, pcihp_get_cb_ops, nomod_zero);
-	END_MODULE(pcihp); 
+	END_MODULE(pcihp);
 #endif
 
 /*

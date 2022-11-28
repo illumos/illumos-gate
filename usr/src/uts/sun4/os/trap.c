@@ -37,8 +37,6 @@
 #include <sys/archsystm.h>
 #include <sys/machsystm.h>
 #include <sys/fpu/fpusystm.h>
-#include <sys/tnf.h>
-#include <sys/tnf_probe.h>
 #include <sys/simulate.h>
 #include <sys/ftrace.h>
 #include <sys/ontrap.h>
@@ -216,9 +214,6 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 			mstate = LMS_TRAP;
 			break;
 		}
-		/* Kernel probe */
-		TNF_PROBE_1(thread_state, "thread", /* CSTYLED */,
-		    tnf_microstate, state, (char)mstate);
 		mstate = new_mstate(curthread, mstate);
 		siginfo.si_signo = 0;
 		stepped =
@@ -1223,9 +1218,6 @@ out:	/* We can't get here from a system trap */
 	ASSERT(type & T_USER);
 	trap_rtt();
 	(void) new_mstate(curthread, mstate);
-	/* Kernel probe */
-	TNF_PROBE_1(thread_state, "thread", /* CSTYLED */,
-		tnf_microstate, state, LMS_USER);
 
 	TRACE_0(TR_FAC_TRAP, TR_C_TRAP_HANDLER_EXIT, "C_trap_handler_exit");
 	return;

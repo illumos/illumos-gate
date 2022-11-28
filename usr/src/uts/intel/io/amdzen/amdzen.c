@@ -171,8 +171,14 @@ static const uint16_t amdzen_nb_ids[] = {
 	0x15d0,
 	/* Family 17h/19h Rome, Milan, Matisse, Vermeer Zen 2/Zen 3 uarch */
 	0x1480,
-	/* Family 17h/19h Renoir, Cezanne Zen 2/3 uarch) */
-	0x1630
+	/* Family 17h/19h Renoir, Cezanne, Van Gogh Zen 2/3 uarch */
+	0x1630,
+	/* Family 19h Genoa */
+	0x14a4,
+	/* Family 17h Mendocino, Family 19h Rembrandt */
+	0x14b5,
+	/* Family 19h Raphael */
+	0x14d8
 };
 
 typedef struct {
@@ -187,69 +193,16 @@ static const amdzen_child_data_t amdzen_children[] = {
 	{ "zen_umc", AMDZEN_C_ZEN_UMC }
 };
 
-/*
- * Provide a caller with the notion of what CPU family their device falls into.
- * This is useful for client drivers that want to make decisions based on model
- * ranges.
- */
-zen_family_t
-amdzen_c_family(void)
+static uint8_t
+amdzen_stub_get8(amdzen_stub_t *stub, off_t reg)
 {
-	uint_t vendor, family, model;
-	zen_family_t ret = ZEN_FAMILY_UNKNOWN;
+	return (pci_config_get8(stub->azns_cfgspace, reg));
+}
 
-	vendor = cpuid_getvendor(CPU);
-	family = cpuid_getfamily(CPU);
-	model = cpuid_getmodel(CPU);
-
-	switch (family) {
-	case 0x17:
-		if (vendor != X86_VENDOR_AMD)
-			break;
-		if (model < 0x10) {
-			ret = ZEN_FAMILY_NAPLES;
-		} else if (model >= 0x10 && model < 0x30) {
-			ret = ZEN_FAMILY_DALI;
-		} else if (model >= 0x30 && model < 0x40) {
-			ret = ZEN_FAMILY_ROME;
-		} else if (model >= 0x60 && model < 0x70) {
-			ret = ZEN_FAMILY_RENOIR;
-		} else if (model >= 0x70 && model < 0x80) {
-			ret = ZEN_FAMILY_MATISSE;
-		} else if (model >= 0x90 && model < 0xa0) {
-			ret = ZEN_FAMILY_VAN_GOGH;
-		} else if (model >= 0xa0 && model < 0xb0) {
-			ret = ZEN_FAMILY_MENDOCINO;
-		}
-		break;
-	case 0x18:
-		if (vendor != X86_VENDOR_HYGON)
-			break;
-		if (model < 0x10)
-			ret = ZEN_FAMILY_DHYANA;
-		break;
-	case 0x19:
-		if (vendor != X86_VENDOR_AMD)
-			break;
-		if (model < 0x10) {
-			ret = ZEN_FAMILY_MILAN;
-		} else if (model >= 0x10 && model < 0x20) {
-			ret = ZEN_FAMILY_GENOA;
-		} else if (model >= 0x20 && model < 0x30) {
-			ret = ZEN_FAMILY_VERMEER;
-		} else if (model >= 0x40 && model < 0x50) {
-			ret = ZEN_FAMILY_REMBRANDT;
-		} else if (model >= 0x50 && model < 0x60) {
-			ret = ZEN_FAMILY_CEZANNE;
-		} else if (model >= 0x60 && model < 0x70) {
-			ret = ZEN_FAMILY_RAPHAEL;
-		}
-		break;
-	default:
-		break;
-	}
-
-	return (ret);
+static uint16_t
+amdzen_stub_get16(amdzen_stub_t *stub, off_t reg)
+{
+	return (pci_config_get16(stub->azns_cfgspace, reg));
 }
 
 static uint32_t
@@ -262,6 +215,18 @@ static uint64_t
 amdzen_stub_get64(amdzen_stub_t *stub, off_t reg)
 {
 	return (pci_config_get64(stub->azns_cfgspace, reg));
+}
+
+static void
+amdzen_stub_put8(amdzen_stub_t *stub, off_t reg, uint8_t val)
+{
+	pci_config_put8(stub->azns_cfgspace, reg, val);
+}
+
+static void
+amdzen_stub_put16(amdzen_stub_t *stub, off_t reg, uint16_t val)
+{
+	pci_config_put16(stub->azns_cfgspace, reg, val);
 }
 
 static void
@@ -340,21 +305,59 @@ amdzen_df_read32_bcast(amdzen_t *azn, amdzen_df_t *df, const df_reg_def_t def)
 	return (amdzen_stub_get32(df->adf_funcs[def.drd_func], def.drd_reg));
 }
 
-
 static uint32_t
-amdzen_smn_read32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg)
+amdzen_smn_read(amdzen_t *azn, amdzen_df_t *df, const smn_reg_t reg)
 {
+	const uint32_t base_addr = SMN_REG_ADDR_BASE(reg);
+	const uint32_t addr_off = SMN_REG_ADDR_OFF(reg);
+
+	VERIFY(SMN_REG_IS_NATURALLY_ALIGNED(reg));
 	VERIFY(MUTEX_HELD(&azn->azn_mutex));
-	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, reg);
-	return (amdzen_stub_get32(df->adf_nb, AMDZEN_NB_SMN_DATA));
+	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, base_addr);
+
+	switch (SMN_REG_SIZE(reg)) {
+	case 1:
+		return ((uint32_t)amdzen_stub_get8(df->adf_nb,
+		    AMDZEN_NB_SMN_DATA + addr_off));
+	case 2:
+		return ((uint32_t)amdzen_stub_get16(df->adf_nb,
+		    AMDZEN_NB_SMN_DATA + addr_off));
+	case 4:
+		return (amdzen_stub_get32(df->adf_nb, AMDZEN_NB_SMN_DATA));
+	default:
+		panic("unreachable invalid SMN register size %u",
+		    SMN_REG_SIZE(reg));
+	}
 }
 
 static void
-amdzen_smn_write32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg, uint32_t val)
+amdzen_smn_write(amdzen_t *azn, amdzen_df_t *df, const smn_reg_t reg,
+    const uint32_t val)
 {
+	const uint32_t base_addr = SMN_REG_ADDR_BASE(reg);
+	const uint32_t addr_off = SMN_REG_ADDR_OFF(reg);
+
+	VERIFY(SMN_REG_IS_NATURALLY_ALIGNED(reg));
+	VERIFY(SMN_REG_VALUE_FITS(reg, val));
 	VERIFY(MUTEX_HELD(&azn->azn_mutex));
-	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, reg);
-	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_DATA, val);
+	amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_ADDR, base_addr);
+
+	switch (SMN_REG_SIZE(reg)) {
+	case 1:
+		amdzen_stub_put8(df->adf_nb, AMDZEN_NB_SMN_DATA + addr_off,
+		    (uint8_t)val);
+		break;
+	case 2:
+		amdzen_stub_put16(df->adf_nb, AMDZEN_NB_SMN_DATA + addr_off,
+		    (uint16_t)val);
+		break;
+	case 4:
+		amdzen_stub_put32(df->adf_nb, AMDZEN_NB_SMN_DATA, val);
+		break;
+	default:
+		panic("unreachable invalid SMN register size %u",
+		    SMN_REG_SIZE(reg));
+	}
 }
 
 static amdzen_df_t *
@@ -386,10 +389,15 @@ amdzen_df_find(amdzen_t *azn, uint_t dfno)
  * Client functions that are used by nexus children.
  */
 int
-amdzen_c_smn_read32(uint_t dfno, uint32_t reg, uint32_t *valp)
+amdzen_c_smn_read(uint_t dfno, const smn_reg_t reg, uint32_t *valp)
 {
 	amdzen_df_t *df;
 	amdzen_t *azn = amdzen_data;
+
+	if (!SMN_REG_SIZE_IS_VALID(reg))
+		return (EINVAL);
+	if (!SMN_REG_IS_NATURALLY_ALIGNED(reg))
+		return (EINVAL);
 
 	mutex_enter(&azn->azn_mutex);
 	df = amdzen_df_find(azn, dfno);
@@ -403,16 +411,23 @@ amdzen_c_smn_read32(uint_t dfno, uint32_t reg, uint32_t *valp)
 		return (ENXIO);
 	}
 
-	*valp = amdzen_smn_read32(azn, df, reg);
+	*valp = amdzen_smn_read(azn, df, reg);
 	mutex_exit(&azn->azn_mutex);
 	return (0);
 }
 
 int
-amdzen_c_smn_write32(uint_t dfno, uint32_t reg, uint32_t val)
+amdzen_c_smn_write(uint_t dfno, const smn_reg_t reg, const uint32_t val)
 {
 	amdzen_df_t *df;
 	amdzen_t *azn = amdzen_data;
+
+	if (!SMN_REG_SIZE_IS_VALID(reg))
+		return (EINVAL);
+	if (!SMN_REG_IS_NATURALLY_ALIGNED(reg))
+		return (EINVAL);
+	if (!SMN_REG_VALUE_FITS(reg, val))
+		return (EOVERFLOW);
 
 	mutex_enter(&azn->azn_mutex);
 	df = amdzen_df_find(azn, dfno);
@@ -426,11 +441,10 @@ amdzen_c_smn_write32(uint_t dfno, uint32_t reg, uint32_t val)
 		return (ENXIO);
 	}
 
-	amdzen_smn_write32(azn, df, reg, val);
+	amdzen_smn_write(azn, df, reg, val);
 	mutex_exit(&azn->azn_mutex);
 	return (0);
 }
-
 
 uint_t
 amdzen_c_df_count(void)
@@ -551,17 +565,13 @@ amdzen_c_df_iter(uint_t dfno, zen_df_type_t type, amdzen_c_iter_f func,
 		}
 		break;
 	case ZEN_DF_TYPE_CCM_CPU:
-		df_type = DF_TYPE_CCM;
 		/*
-		 * In the Genoa/DFv4 timeframe, with the introduction of CXL and
-		 * related, a subtype was added here where as previously it was
-		 * always zero.
+		 * While the wording of the PPR is a little weird, the CCM still
+		 * has subtype 0 in DFv4 systems; however, what's said to be for
+		 * the CPU appears to apply to the ACM.
 		 */
-		if (df->adf_major >= 4) {
-			df_subtype = DF_CCM_SUBTYPE_CPU;
-		} else {
-			df_subtype = 0;
-		}
+		df_type = DF_TYPE_CCM;
+		df_subtype = 0;
 		break;
 	default:
 		return (EINVAL);

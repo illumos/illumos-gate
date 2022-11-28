@@ -229,7 +229,7 @@ nls_safe_open(const char *path, struct stat64 *statbuf, int *trust, int safe)
  * allows one use, but we don't want to break existing functional code,
  * even if it's buggy.
  */
-#define	STORE(buf, size, arg, val) 	if (arg * FORMAT_SIZE + 1 >= size ||\
+#define	STORE(buf, size, arg, val)	if (arg * FORMAT_SIZE + 1 >= size ||\
 					    (strict ? \
 					    (buf[arg*FORMAT_SIZE] != '\0' && \
 					    buf[arg*FORMAT_SIZE] != val) \
@@ -547,7 +547,8 @@ check_format(const char *org, const char *new, int strict)
 
 			nlen *= FORMAT_SIZE;
 
-			for (n = nfmt; n = memchr(n, 'n', nfmt + nlen - n);
+			for (n = nfmt;
+			    (n = memchr(n, 'n', nfmt + nlen - n)) != NULL;
 			    n++) {
 				int off = (n - nfmt);
 

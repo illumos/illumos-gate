@@ -269,7 +269,7 @@ _canceloff_nocancel()
  */
 void
 __pthread_cleanup_push(void (*routine)(void *),
-	void *args, caddr_t fp, _cleanup_t *clnup_info)
+    void *args, caddr_t fp, _cleanup_t *clnup_info)
 {
 	ulwp_t *self = curthread;
 	__cleanup_t *infop = (__cleanup_t *)clnup_info;
@@ -286,9 +286,8 @@ __pthread_cleanup_push(void (*routine)(void *),
  * POSIX.1c pthread_cleanup_pop(). It calls this routine to pop the
  * handler off the curthread's struct and execute it if necessary.
  */
-/* ARGSUSED1 */
 void
-__pthread_cleanup_pop(int ex, _cleanup_t *clnup_info)
+__pthread_cleanup_pop(int ex, _cleanup_t *clnup_info __unused)
 {
 	ulwp_t *self = curthread;
 	__cleanup_t *infop = self->ul_clnup_hdr;

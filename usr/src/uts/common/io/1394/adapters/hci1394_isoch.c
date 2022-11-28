@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_isoch.c
  *    HCI HAL isochronous interface routines.  Contains routines used
@@ -71,8 +69,6 @@ hci1394_isoch_init(hci1394_drvinfo_t *drvinfo,  hci1394_ohci_handle_t ohci,
 
 	ASSERT(drvinfo != NULL);
 	ASSERT(isoch_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isoch_init_enter, HCI1394_TNF_HAL_STACK_ISOCH,
-	    "");
 
 	isochp = kmem_alloc(sizeof (hci1394_isoch_t), KM_SLEEP);
 
@@ -120,9 +116,6 @@ hci1394_isoch_init(hci1394_drvinfo_t *drvinfo,  hci1394_ohci_handle_t ohci,
 	    drvinfo->di_iblock_cookie);
 
 	*isoch_hdl = isochp;
-
-	TNF_PROBE_0_DEBUG(hci1394_isoch_init_exit, HCI1394_TNF_HAL_STACK_ISOCH,
-	    "");
 }
 
 /*
@@ -136,8 +129,6 @@ hci1394_isoch_fini(hci1394_isoch_handle_t *isoch_hdl)
 	int i;
 
 	ASSERT(isoch_hdl != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_isoch_fini_enter, HCI1394_TNF_HAL_STACK_ISOCH,
-	    "");
 
 	isochp = *isoch_hdl;
 
@@ -151,9 +142,6 @@ hci1394_isoch_fini(hci1394_isoch_handle_t *isoch_hdl)
 	mutex_destroy(&isochp->ctxt_list_mutex);
 	kmem_free(isochp, sizeof (hci1394_isoch_t));
 	*isoch_hdl = NULL;
-
-	TNF_PROBE_0_DEBUG(hci1394_isoch_fini_exit, HCI1394_TNF_HAL_STACK_ISOCH,
-	    "");
 }
 
 
@@ -165,10 +153,6 @@ hci1394_isoch_fini(hci1394_isoch_handle_t *isoch_hdl)
 int
 hci1394_isoch_resume(hci1394_state_t *soft_state)
 {
-	TNF_PROBE_0_DEBUG(hci1394_isoch_resume_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-	TNF_PROBE_0_DEBUG(hci1394_isoch_resume_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (DDI_SUCCESS);
 }
 
@@ -192,8 +176,6 @@ hci1394_alloc_isoch_dma(void *hal_private, id1394_isoch_dmainfo_t *idi,
 
 	ASSERT(soft_statep != NULL);
 	ASSERT(hal_idma_handlep != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_alloc_isoch_dma_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	isochp = soft_statep->isoch;
 	*hal_idma_handlep = NULL;
@@ -204,10 +186,6 @@ hci1394_alloc_isoch_dma(void *hal_private, id1394_isoch_dmainfo_t *idi,
 	mutex_enter(&isochp->ctxt_list_mutex);
 	if ((idi->idma_options & ID1394_TALK) != 0) {
 		/* TRANSMIT */
-
-		TNF_PROBE_1_DEBUG(hci1394_alloc_isoch_dma_transmit,
-		    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_string, msg,
-		    "Allocating isoch transmit context");
 
 		/*
 		 * search through list of hardware supported contexts for
@@ -222,19 +200,10 @@ hci1394_alloc_isoch_dma(void *hal_private, id1394_isoch_dmainfo_t *idi,
 
 		/* if there aren't any left, return an error */
 		if (i >= isochp->ctxt_xmit_count) {
-			TNF_PROBE_1(hci1394_alloc_isoch_dma_xmit_rsrc_error,
-			    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-			    "Out of isoch transmit resources");
-			TNF_PROBE_0_DEBUG(hci1394_alloc_isoch_dma_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 			mutex_exit(&isochp->ctxt_list_mutex);
 			*resultp = IXL1394_ENO_DMA_RESRCS;
 			return (DDI_FAILURE);
 		}
-
-		TNF_PROBE_1_DEBUG(t1394_alloc_isoch_dma_it_ctxtnum,
-		    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_int, it_ctxt_num, i);
 
 		/* mark inuse and set up handle to context */
 		isochp->ctxt_xmit[i].ctxt_flags |= HCI1394_ISO_CTXT_INUSE;
@@ -243,10 +212,6 @@ hci1394_alloc_isoch_dma(void *hal_private, id1394_isoch_dmainfo_t *idi,
 		    &soft_statep->ohci->ohci_regs->it[i];
 	} else {
 		/* RECEIVE */
-
-		TNF_PROBE_1_DEBUG(hci1394_alloc_isoch_dma_receive,
-		    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_string, msg,
-		    "Allocating isoch receive context");
 
 		/* search thru implemented contexts for one that's available */
 		for (i = 0; i < isochp->ctxt_recv_count; i++) {
@@ -259,13 +224,6 @@ hci1394_alloc_isoch_dma(void *hal_private, id1394_isoch_dmainfo_t *idi,
 		/* if there aren't any left, return an error */
 		/* XXX support for multi-chan could go here */
 		if (i >= isochp->ctxt_recv_count) {
-
-			TNF_PROBE_1(t1394_alloc_isoch_dma_ir_rsrc_error,
-			    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-			    "Out of isoch receive resources");
-			TNF_PROBE_0_DEBUG(hci1394_alloc_isoch_dma_exit,
-			    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 			mutex_exit(&isochp->ctxt_list_mutex);
 			*resultp = IXL1394_ENO_DMA_RESRCS;
 			return (DDI_FAILURE);
@@ -280,9 +238,6 @@ hci1394_alloc_isoch_dma(void *hal_private, id1394_isoch_dmainfo_t *idi,
 			isochp->ctxt_recv[i].ctxt_flags |=
 			    HCI1394_ISO_CTXT_RHDRS;
 		}
-
-		TNF_PROBE_1_DEBUG(hci1394_alloc_isoch_dma_recv_ctxtnum,
-		    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_int, recv_ctxt_num, i);
 
 		/* mark inuse and set up handle to context */
 		isochp->ctxt_recv[i].ctxt_flags |= HCI1394_ISO_CTXT_INUSE;
@@ -325,11 +280,6 @@ hci1394_alloc_isoch_dma(void *hal_private, id1394_isoch_dmainfo_t *idi,
 		ctxtp->ctxt_flags &= ~HCI1394_ISO_CTXT_INUSE;
 		mutex_exit(&isochp->ctxt_list_mutex);
 
-		TNF_PROBE_2(t1394_alloc_isoch_dma_compile_fail,
-		    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string, errmsg,
-		    "IXL compilation error", tnf_int, ixl_error, *resultp);
-		TNF_PROBE_0_DEBUG(hci1394_alloc_isoch_dma_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "");
 		return (DDI_FAILURE);
 	}
 
@@ -349,9 +299,6 @@ hci1394_alloc_isoch_dma(void *hal_private, id1394_isoch_dmainfo_t *idi,
 
 	/* No errors, so all set to go.  initialize interrupt/execution flags */
 	ctxtp->intr_flags = 0;
-
-	TNF_PROBE_0_DEBUG(hci1394_alloc_isoch_dma_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	*hal_idma_handlep = ctxtp;
 	return (DDI_SUCCESS);
@@ -374,20 +321,12 @@ hci1394_start_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 	hci1394_iso_ctxt_t  *ctxtp;
 	int		    tag0, tag1, tag2, tag3;
 
-	TNF_PROBE_0_DEBUG(hci1394_start_isoch_dma_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	/* pick up the context pointer from the private idma data */
 	ctxtp = (hci1394_iso_ctxt_t *)hal_isoch_dma_handle;
 
 	ASSERT(hal_private != NULL);
 	ASSERT(ctxtp != NULL);
 	ASSERT(idma_ctrlinfop != NULL);
-	TNF_PROBE_4_DEBUG(hci1394_start_isoch_dma_ctxt_info,
-	    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_opaque, ctxt_ptr, ctxtp,
-	    tnf_int, ctxt_index, ctxtp->ctxt_index, tnf_opaque, ctxt_flags,
-	    ctxtp->ctxt_flags, tnf_opaque, first_ixl, ctxtp->ixl_firstp);
-
 
 	/* if the context is already running, just exit.  else set running */
 	mutex_enter(&soft_statep->isoch->ctxt_list_mutex);
@@ -395,9 +334,6 @@ hci1394_start_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 
 		mutex_exit(&soft_statep->isoch->ctxt_list_mutex);
 
-		TNF_PROBE_1_DEBUG(hci1394_start_isoch_dma_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "context already running");
 		return (DDI_SUCCESS);
 	}
 	ctxtp->ctxt_flags |= HCI1394_ISO_CTXT_RUNNING;
@@ -424,10 +360,6 @@ hci1394_start_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 		/* set context's command ptr to the first descriptor */
 		hci1394_ohci_ir_cmd_ptr_set(soft_statep->ohci,
 		    ctxtp->ctxt_index, ctxtp->dma_mem_execp);
-
-		TNF_PROBE_2_DEBUG(hci1394_start_isoch_dma_index_info,
-		    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_string, msg,
-		    "starting IR ctxt", tnf_int, ctxt_num, ctxtp->ctxt_index);
 
 		/*
 		 * determine correct tag values.  map target's requested 2-bit
@@ -486,10 +418,6 @@ hci1394_start_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 		hci1394_ohci_it_cmd_ptr_set(soft_statep->ohci,
 		    ctxtp->ctxt_index, ctxtp->dma_mem_execp);
 
-		TNF_PROBE_2_DEBUG(hci1394_start_isoch_dma_index_info,
-		    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_string, msg,
-		    "starting IT ctxt", tnf_int, ctxt_num, ctxtp->ctxt_index);
-
 		/* set desired values in context control register */
 		HCI1394_ITCTXT_CTRL_SET(soft_statep, ctxtp->ctxt_index,
 		    ((flags & ID1394_START_ON_CYCLE) != 0) /* match enable */,
@@ -508,8 +436,6 @@ hci1394_start_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 		    (uint32_t)(0x1 << ctxtp->ctxt_index));
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_start_isoch_dma_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (DDI_SUCCESS);
 }
 
@@ -531,10 +457,6 @@ hci1394_update_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 	int		    ii;
 	int		    err = DDI_SUCCESS;
 
-
-	TNF_PROBE_0_DEBUG(hci1394_update_isoch_dma_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	/* pick up the context pointer from the private idma data */
 	ctxtp = (hci1394_iso_ctxt_t *)hal_isoch_dma_handle;
 
@@ -553,13 +475,6 @@ hci1394_update_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 	ASSERT(cur_new_ixlp != NULL);
 	ASSERT(cur_orig_ixlp != NULL);
 
-	/* lots of debug trace info */
-	TNF_PROBE_4_DEBUG(hci1394_update_isoch_dma_ctxt_info,
-	    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_opaque, ctxt_ptr, ctxtp,
-	    tnf_int, ixlcount, idma_updateinfop->ixl_count,
-	    tnf_opaque, new_ixl, cur_new_ixlp, tnf_opaque, orig_ixl,
-	    cur_orig_ixlp);
-
 	for (ii = 0; (ii < idma_updateinfop->ixl_count) && (err == DDI_SUCCESS);
 	    ii++) {
 
@@ -568,10 +483,6 @@ hci1394_update_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 			*resultp = IXL1394_ECOUNT_MISMATCH;
 			err = DDI_FAILURE;
 
-			TNF_PROBE_3_DEBUG(hci1394_update_isoch_dma_mismatch,
-			    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_opaque, new,
-			    cur_new_ixlp, tnf_opaque, orig, cur_orig_ixlp,
-			    tnf_int, iteration, ii);
 			break;
 		}
 
@@ -584,8 +495,6 @@ hci1394_update_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 		cur_orig_ixlp = cur_orig_ixlp->next_ixlp;
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_update_isoch_dma_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 	return (err);
 }
 
@@ -604,9 +513,6 @@ hci1394_stop_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 	hci1394_state_t	    *soft_statep = (hci1394_state_t *)hal_private;
 	hci1394_iso_ctxt_t  *ctxtp;
 
-	TNF_PROBE_0_DEBUG(hci1394_stop_isoch_dma_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	/* pick up the context pointer from the private idma data */
 	ctxtp = (hci1394_iso_ctxt_t *)hal_isoch_dma_handle;
 
@@ -621,9 +527,6 @@ hci1394_stop_isoch_dma(void *hal_private, void *hal_isoch_dma_handle,
 	 * store_timestamps upto date.  Don't care about errors.
 	 */
 	hci1394_ixl_interrupt(soft_statep, ctxtp, B_TRUE);
-
-	TNF_PROBE_0_DEBUG(hci1394_stop_isoch_dma_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }
 
 /*
@@ -645,23 +548,10 @@ hci1394_do_stop(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 	int	count;
 	clock_t	upto;
 
-	TNF_PROBE_0_DEBUG(hci1394_do_stop_enter, HCI1394_TNF_HAL_STACK_ISOCH,
-	    "");
-
-	TNF_PROBE_4_DEBUG(hci1394_do_stop_info,
-	    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_opaque, ctxt_ptr, ctxtp,
-	    tnf_int, ctxt_index, ctxtp->ctxt_index, tnf_opaque, ctxt_flags,
-	    ctxtp->ctxt_flags, tnf_string, reason,
-	    (stop_args == ID1394_DONE) ? "DONE":"FAIL");
-
 	/* already stopped? if yes, done, else set state to not-running */
 	mutex_enter(&soft_statep->isoch->ctxt_list_mutex);
 	if ((ctxtp->ctxt_flags & HCI1394_ISO_CTXT_RUNNING) == 0) {
 		mutex_exit(&soft_statep->isoch->ctxt_list_mutex);
-
-		TNF_PROBE_1_DEBUG(hci1394_do_stop_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "context already stopped");
 		return;
 	}
 	ctxtp->ctxt_flags &= ~HCI1394_ISO_CTXT_RUNNING;
@@ -706,12 +596,6 @@ hci1394_do_stop(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 				break;
 			}
 		}
-
-		if (ctxtp->intr_flags & HCI1394_ISO_CTXT_ININTR) {
-			TNF_PROBE_1(hci1394_do_stop_error,
-			    HCI1394_TNF_HAL_ERROR_ISOCH, "",
-			    tnf_string, msg, "intr completion timeout");
-		}
 	}
 	mutex_exit(&ctxtp->intrprocmutex);
 
@@ -739,9 +623,6 @@ hci1394_do_stop(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 		    soft_statep->drvinfo.di_instance);
 		hci1394_shutdown(soft_statep->drvinfo.di_dip);
 
-		TNF_PROBE_1_DEBUG(hci1394_do_stop_exit,
-		    HCI1394_TNF_HAL_STACK_ISOCH, "", tnf_string, msg,
-		    "context timed out trying to stop");
 		return;
 	}
 
@@ -757,8 +638,6 @@ hci1394_do_stop(hci1394_state_t *soft_statep, hci1394_iso_ctxt_t *ctxtp,
 			    ctxtp->idma_evt_arg, stop_args);
 		}
 	}
-	TNF_PROBE_0_DEBUG(hci1394_do_stop_exit, HCI1394_TNF_HAL_STACK_ISOCH,
-	    "");
 }
 
 /*
@@ -775,9 +654,6 @@ hci1394_free_isoch_dma(void *hal_private, void *hal_isoch_dma_handle)
 	hci1394_iso_ctxt_t  *ctxtp;
 	hci1394_isoch_t	    *isochp;
 
-	TNF_PROBE_0_DEBUG(hci1394_free_isoch_dma_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	/* pick up the context pointer from the private idma data */
 	ctxtp = (hci1394_iso_ctxt_t *)hal_isoch_dma_handle;
 
@@ -785,12 +661,6 @@ hci1394_free_isoch_dma(void *hal_private, void *hal_isoch_dma_handle)
 	ASSERT(ctxtp);
 
 	isochp = soft_statep->isoch;
-
-	/* lots of debug trace info */
-	TNF_PROBE_4_DEBUG(hci1394_free_isoch_dma_ctxt_info,
-	    HCI1394_TNF_HAL_INFO_ISOCH, "", tnf_opaque, ctxt_ptr, ctxtp,
-	    tnf_int, ctxt_index, ctxtp->ctxt_index, tnf_opaque, ctxt_flags,
-	    ctxtp->ctxt_flags, tnf_opaque, first_ixl, ctxtp->ixl_firstp);
 
 	mutex_enter(&soft_statep->isoch->ctxt_list_mutex);
 
@@ -816,9 +686,6 @@ hci1394_free_isoch_dma(void *hal_private, void *hal_isoch_dma_handle)
 	}
 
 	mutex_exit(&soft_statep->isoch->ctxt_list_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_free_isoch_dma_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }
 
 /*
@@ -875,9 +742,6 @@ hci1394_isoch_error_ints_enable(hci1394_state_t *soft_statep)
 {
 	ASSERT(soft_statep);
 
-	TNF_PROBE_0_DEBUG(hci1394_isoch_error_ints_enable_enter,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
-
 	mutex_enter(&soft_statep->isoch->ctxt_list_mutex);
 
 	if (soft_statep->isoch->isoch_dma_alloc_cnt != 0) {
@@ -889,7 +753,4 @@ hci1394_isoch_error_ints_enable(hci1394_state_t *soft_statep)
 		    OHCI_INTR_CYC_LOST | OHCI_INTR_CYC_INCONSISTENT);
 	}
 	mutex_exit(&soft_statep->isoch->ctxt_list_mutex);
-
-	TNF_PROBE_0_DEBUG(hci1394_isoch_error_ints_enable_exit,
-	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 }

@@ -24,48 +24,6 @@
 #
 
 set name=pkg.fmri value=pkg:/system/tnf@$(PKGVERS)
-set name=pkg.summary value="TNF Core Components"
-set name=pkg.description \
-    value="utilities needed to enable probe points, in the kernel and in applications, that can generate Trace Normal Format (TNF) records in a trace file"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Development/System
+set name=pkg.obsolete value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
-dir  path=usr group=sys
-dir  path=usr/bin
-dir  path=usr/bin/$(ARCH32)
-file path=usr/bin/$(ARCH32)/prex mode=0555
-$(i386_ONLY)file path=usr/bin/$(ARCH32)/tnfxtract mode=0555
-dir  path=usr/bin/$(ARCH64)
-file path=usr/bin/$(ARCH64)/prex mode=0555
-file path=usr/bin/$(ARCH64)/tnfxtract mode=0555
-hardlink path=usr/bin/prex target=../lib/isaexec
-hardlink path=usr/bin/tnfxtract target=../lib/isaexec
-dir  path=usr/include
-dir  path=usr/include/tnf
-file path=usr/include/tnf/tnfctl.h
-dir  path=usr/kernel group=sys
-dir  path=usr/kernel/drv group=sys
-dir  path=usr/kernel/drv/$(ARCH64) group=sys
-file path=usr/kernel/drv/$(ARCH64)/tnf group=sys
-file path=usr/kernel/drv/tnf.conf group=sys
-dir  path=usr/lib
-dir  path=usr/lib/$(ARCH64)
-link path=usr/lib/$(ARCH64)/libtnfctl.so target=libtnfctl.so.1
-file path=usr/lib/$(ARCH64)/libtnfctl.so.1
-link path=usr/lib/$(ARCH64)/libtnfprobe.so target=libtnfprobe.so.1
-file path=usr/lib/$(ARCH64)/libtnfprobe.so.1
-link path=usr/lib/libtnfctl.so target=./libtnfctl.so.1
-file path=usr/lib/libtnfctl.so.1
-link path=usr/lib/libtnfprobe.so target=./libtnfprobe.so.1
-file path=usr/lib/libtnfprobe.so.1
-dir  path=usr/share/man/man1
-file path=usr/share/man/man1/prex.1
-file path=usr/share/man/man1/tnfxtract.1
-dir  path=usr/share/man/man3lib
-file path=usr/share/man/man3lib/libtnfctl.3lib
-driver name=tnf perms="tnfctl 0600 root sys" perms="tnfmap 0600 root sys"
-legacy pkg=SUNWtnfc \
-    desc="utilities needed to enable probe points, in the kernel and in applications, that can generate Trace Normal Format (TNF) records in a trace file" \
-    name="TNF Core Components"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL

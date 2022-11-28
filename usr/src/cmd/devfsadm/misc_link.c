@@ -23,6 +23,7 @@
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright 2022 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <regex.h>
@@ -58,6 +59,7 @@ static int cpuid(di_minor_t minor, di_node_t node);
 static int glvc(di_minor_t minor, di_node_t node);
 static int ses_callback(di_minor_t minor, di_node_t node);
 static int kmdrv_create(di_minor_t minor, di_node_t node);
+static int vio9p_create(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "(^sad$)",
@@ -101,7 +103,7 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "pseudo", "ddi_pseudo",
 	    "(^lockstat$)|(^SUNW,rtvc$)|(^vol$)|(^log$)|(^sy$)|"
-	    "(^ksyms$)|(^clone$)|(^tl$)|(^tnf$)|(^kstat$)|(^mdesc$)|(^eeprom$)|"
+	    "(^ksyms$)|(^clone$)|(^tl$)|(^kstat$)|(^mdesc$)|(^eeprom$)|"
 	    "(^ptsl$)|(^mm$)|(^wc$)|(^dump$)|(^cn$)|(^svvslo$)|(^ptm$)|"
 	    "(^ptc$)|(^openeepr$)|(^poll$)|(^sysmsg$)|(^random$)|(^trapstat$)|"
 	    "(^cryptoadm$)|(^crypto$)|(^pool$)|(^poolctl$)|(^bl$)|(^kmdb$)|"
@@ -207,7 +209,10 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "pseudo", "ddi_pseudo", "overlay",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
-	}
+	},
+	{ "9p", "ddi_pseudo", "vio9p",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, vio9p_create,
+	},
 };
 
 DEVFSADM_CREATE_INIT_V0(misc_cbt);
@@ -246,7 +251,10 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 	},
 	{ "pseudo", "^sctp|sctp6$",
 	    RM_PRE | RM_ALWAYS, ILEVEL_0, devfsadm_rm_link
-	}
+	},
+	{ "9p", "^9p/[0-9]+$",
+	    RM_PRE | RM_HOT | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
+	},
 };
 
 /* Rules for gpio devices */
@@ -626,6 +634,26 @@ av_create(di_minor_t minor, di_node_t node)
 	(void) snprintf(path, sizeof (path), "av/%s/%s", buf, minor_str);
 	free(buf);
 
+	(void) devfsadm_mklink(path, node, minor, 0);
+
+	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ * Create device nodes for Virtio 9P channels:
+ *	/dev/9p/[0-9]+
+ */
+static int
+vio9p_create(di_minor_t minor, di_node_t node)
+{
+	char *minor_name = di_minor_name(minor);
+	char path[PATH_MAX + 1];
+
+	if (minor_name == NULL || strcmp(minor_name, "9p") != 0) {
+		return (DEVFSADM_CONTINUE);
+	}
+
+	(void) snprintf(path, sizeof (path), "9p/%d", di_instance(node));
 	(void) devfsadm_mklink(path, node, minor, 0);
 
 	return (DEVFSADM_CONTINUE);

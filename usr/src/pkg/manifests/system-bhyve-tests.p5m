@@ -31,6 +31,10 @@ dir  path=opt/bhyve-tests/runfiles
 file path=opt/bhyve-tests/runfiles/default.run mode=0444
 dir  path=opt/bhyve-tests/tests
 dir  path=opt/bhyve-tests/tests/inst_emul
+file path=opt/bhyve-tests/tests/inst_emul/cpuid mode=0555
+file path=opt/bhyve-tests/tests/inst_emul/exit_paging mode=0555
+file path=opt/bhyve-tests/tests/inst_emul/imul mode=0555
+file path=opt/bhyve-tests/tests/inst_emul/page_dirty mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/rdmsr mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/triple_fault mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/wrmsr mode=0555
@@ -54,12 +58,18 @@ file path=opt/bhyve-tests/tests/viona/interface_version mode=0555
 dir  path=opt/bhyve-tests/tests/vmm
 file path=opt/bhyve-tests/tests/vmm/auto_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/check_iommu mode=0555
+file path=opt/bhyve-tests/tests/vmm/cpuid_ioctl mode=0555
+file path=opt/bhyve-tests/tests/vmm/datarw_constraints mode=0555
+file path=opt/bhyve-tests/tests/vmm/default_capabs mode=0555
 file path=opt/bhyve-tests/tests/vmm/drv_hold mode=0555
 file path=opt/bhyve-tests/tests/vmm/fpu_getset mode=0555
 file path=opt/bhyve-tests/tests/vmm/interface_version mode=0555
+file path=opt/bhyve-tests/tests/vmm/legacy_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_devmem mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_partial mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_seg_map mode=0555
+file path=opt/bhyve-tests/tests/vmm/pause_resume mode=0555
+file path=opt/bhyve-tests/tests/vmm/self_destruct mode=0555
 dir  path=usr/kernel/drv group=sys
 dir  path=usr/kernel/drv/$(ARCH64) group=sys
 file path=usr/kernel/drv/$(ARCH64)/vmm_drv_test

@@ -154,6 +154,7 @@ struct vcpu {
 	vm_client_t	*vmclient;	/* (a) VM-system client */
 	uint64_t	tsc_offset;	/* (x) offset from host TSC */
 	struct vm_mtrr	mtrr;		/* (i) vcpu's MTRR */
+	vcpu_cpuid_config_t cpuid_cfg;	/* (x) cpuid configuration */
 
 	enum vcpu_ustate ustate;	/* (i) microstate for the vcpu */
 	hrtime_t	ustate_when;	/* (i) time of last ustate change */
@@ -219,6 +220,7 @@ struct vm {
 	struct ioport_config ioports;		/* (o) ioport handling */
 
 	bool		mem_transient;		/* (o) alloc transient memory */
+	bool		is_paused;		/* (i) instance is paused */
 };
 
 static int vmm_initialized;
@@ -284,10 +286,13 @@ SYSCTL_NODE(_hw, OID_AUTO, vmm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
  * Halt the guest if all vcpus are executing a HLT instruction with
  * interrupts disabled.
  */
-static int halt_detection_enabled = 1;
+int halt_detection_enabled = 1;
 
 /* Trap into hypervisor on all guest exceptions and reflect them back */
-static int trace_guest_exceptions;
+int trace_guest_exceptions;
+
+/* Trap WBINVD and ignore it */
+int trap_wbinvd = 1;
 
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
@@ -332,6 +337,8 @@ vcpu_cleanup(struct vm *vm, int i, bool destroy)
 	if (destroy) {
 		vmm_stat_free(vcpu->stats);
 
+		vcpu_cpuid_cleanup(&vcpu->cpuid_cfg);
+
 		hma_fpu_free(vcpu->guestfpu);
 		vcpu->guestfpu = NULL;
 
@@ -365,6 +372,7 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 		vcpu->guestfpu = hma_fpu_alloc(KM_SLEEP);
 		vcpu->stats = vmm_stat_alloc();
 		vcpu->vie_ctx = vie_alloc();
+		vcpu_cpuid_init(&vcpu->cpuid_cfg);
 
 		vcpu->ustate = VU_INIT;
 		vcpu->ustate_when = gethrtime();
@@ -398,8 +406,13 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 int
 vcpu_trace_exceptions(struct vm *vm, int vcpuid)
 {
-
 	return (trace_guest_exceptions);
+}
+
+int
+vcpu_trap_wbinvd(struct vm *vm, int vcpuid)
+{
+	return (trap_wbinvd);
 }
 
 struct vm_exit *
@@ -538,12 +551,6 @@ vm_init(struct vm *vm, bool create)
 uint_t cores_per_package = 1;
 uint_t threads_per_core = 1;
 
-/*
- * Debugging tunable to enable dirty-page-tracking.
- * (Remains off by default for now)
- */
-bool gpt_track_dirty = false;
-
 int
 vm_create(uint64_t flags, struct vm **retvm)
 {
@@ -557,7 +564,11 @@ vm_create(uint64_t flags, struct vm **retvm)
 	if (!vmm_initialized)
 		return (ENXIO);
 
-	vmspace = vmspace_alloc(VM_MAXUSER_ADDRESS, pte_ops, gpt_track_dirty);
+	bool track_dirty = (flags & VCF_TRACK_DIRTY) != 0;
+	if (track_dirty && !pte_ops->vpeo_hw_ad_supported())
+		return (ENOTSUP);
+
+	vmspace = vmspace_alloc(VM_MAXUSER_ADDRESS, pte_ops, track_dirty);
 	if (vmspace == NULL)
 		return (ENOMEM);
 
@@ -721,6 +732,58 @@ vm_reinit(struct vm *vm, uint64_t flags)
 
 	vm_cleanup(vm, false);
 	vm_init(vm, false);
+	return (0);
+}
+
+bool
+vm_is_paused(struct vm *vm)
+{
+	return (vm->is_paused);
+}
+
+int
+vm_pause_instance(struct vm *vm)
+{
+	if (vm->is_paused) {
+		return (EALREADY);
+	}
+	vm->is_paused = true;
+
+	for (uint_t i = 0; i < vm->maxcpus; i++) {
+		struct vcpu *vcpu = &vm->vcpu[i];
+
+		if (!CPU_ISSET(i, &vm->active_cpus)) {
+			continue;
+		}
+		vlapic_pause(vcpu->vlapic);
+	}
+	vhpet_pause(vm->vhpet);
+	vatpit_pause(vm->vatpit);
+	vrtc_pause(vm->vrtc);
+
+	return (0);
+}
+
+int
+vm_resume_instance(struct vm *vm)
+{
+	if (!vm->is_paused) {
+		return (EALREADY);
+	}
+	vm->is_paused = false;
+
+	vrtc_resume(vm->vrtc);
+	vatpit_resume(vm->vatpit);
+	vhpet_resume(vm->vhpet);
+	for (uint_t i = 0; i < vm->maxcpus; i++) {
+		struct vcpu *vcpu = &vm->vcpu[i];
+
+		if (!CPU_ISSET(i, &vm->active_cpus)) {
+			continue;
+		}
+		vlapic_resume(vcpu->vlapic);
+	}
+
 	return (0);
 }
 
@@ -1292,11 +1355,11 @@ vm_set_run_state(struct vm *vm, int vcpuid, uint32_t state, uint8_t sipi_vec)
 	return (0);
 }
 
-void
+int
 vm_track_dirty_pages(struct vm *vm, uint64_t gpa, size_t len, uint8_t *bitmap)
 {
 	vmspace_t *vms = vm_get_vmspace(vm);
-	vmspace_track_dirty(vms, gpa, len, bitmap);
+	return (vmspace_track_dirty(vms, gpa, len, bitmap));
 }
 
 static void
@@ -1512,20 +1575,19 @@ vm_handle_paging(struct vm *vm, int vcpuid)
 	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 	vm_client_t *vmc = vcpu->vmclient;
 	struct vm_exit *vme = &vcpu->exitinfo;
-	int rv, ftype;
+	const int ftype = vme->u.paging.fault_type;
 
-	KASSERT(vme->inst_length == 0, ("%s: invalid inst_length %d",
-	    __func__, vme->inst_length));
+	ASSERT0(vme->inst_length);
+	ASSERT(ftype == PROT_READ || ftype == PROT_WRITE || ftype == PROT_EXEC);
 
-	ftype = vme->u.paging.fault_type;
-	KASSERT(ftype == PROT_READ ||
-	    ftype == PROT_WRITE || ftype == PROT_EXEC,
-	    ("vm_handle_paging: invalid fault_type %d", ftype));
+	if (vmc_fault(vmc, vme->u.paging.gpa, ftype) != 0) {
+		/*
+		 * If the fault cannot be serviced, kick it out to userspace for
+		 * handling (or more likely, halting the instance).
+		 */
+		return (-1);
+	}
 
-	rv = vmc_fault(vmc, vme->u.paging.gpa, ftype);
-
-	if (rv != 0)
-		return (EFAULT);
 	return (0);
 }
 
@@ -3041,6 +3103,15 @@ vm_set_capability(struct vm *vm, int vcpu, int type, int val)
 		return (EINVAL);
 
 	return (VMSETCAP(vm->cookie, vcpu, type, val));
+}
+
+vcpu_cpuid_config_t *
+vm_cpuid_config(struct vm *vm, int vcpuid)
+{
+	ASSERT3S(vcpuid, >=, 0);
+	ASSERT3S(vcpuid, <, VM_MAXCPU);
+
+	return (&vm->vcpu[vcpuid].cpuid_cfg);
 }
 
 struct vlapic *

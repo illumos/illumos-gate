@@ -28,6 +28,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -626,14 +627,15 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 			    PRUPANIC_BUFLEN);
 		}
 
+		mutex_exit(&p->p_lock);
 		error = elfnote(vp, &offset, NT_UPANIC, sizeof (prupanic_t),
 		    &bigwad->upanic, rlimit, credp);
 		if (error != 0) {
-			mutex_exit(&p->p_lock);
 			goto done;
 		}
+	} else {
+		mutex_exit(&p->p_lock);
 	}
-	mutex_exit(&p->p_lock);
 
 done:
 	kmem_free(bigwad, bigsize);

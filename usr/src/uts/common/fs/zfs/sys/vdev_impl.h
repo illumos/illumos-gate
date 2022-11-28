@@ -588,9 +588,10 @@ typedef struct vdev_buf {
  * Support routines used during boot from a ZFS pool
  */
 extern int vdev_disk_read_rootlabel(const char *, const char *, nvlist_t **);
-extern void vdev_disk_preroot_init(void);
+extern void vdev_disk_preroot_init(const char *);
 extern void vdev_disk_preroot_fini(void);
 extern const char *vdev_disk_preroot_lookup(uint64_t, uint64_t);
+extern const char *vdev_disk_preroot_force_path(void);
 
 #ifdef	__cplusplus
 }

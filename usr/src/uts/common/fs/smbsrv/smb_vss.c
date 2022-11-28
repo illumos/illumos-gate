@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -303,6 +304,8 @@ smb_vss_encode_gmttokens(smb_request_t *sr, smb_fsctl_t *fsctl,
 				status = NT_STATUS_INVALID_PARAMETER;
 			gmttokens++;
 		}
+		// WPTS says there should be a final unicode null.
+		(void) smb_mbc_encodef(fsctl->out_mbc, "..");
 	}
 
 	return (status);

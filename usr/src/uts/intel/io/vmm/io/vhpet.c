@@ -31,6 +31,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -96,6 +97,7 @@ struct vhpet {
 
 #define	VHPET_LOCK(vhp)		mutex_enter(&((vhp)->lock))
 #define	VHPET_UNLOCK(vhp)	mutex_exit(&((vhp)->lock))
+#define	VHPET_LOCKED(vhp)	MUTEX_HELD(&((vhp)->lock))
 
 static void vhpet_start_timer(struct vhpet *vhpet, int n, uint32_t counter,
     hrtime_t now);
@@ -271,43 +273,45 @@ vhpet_adjust_compval(struct vhpet *vhpet, int n, uint32_t counter)
 }
 
 static void
-vhpet_handler(void *a)
+vhpet_handler(void *arg)
 {
-	int n;
-	uint32_t counter;
-	hrtime_t now;
-	struct vhpet *vhpet;
-	struct callout *callout;
-	struct vhpet_callout_arg *arg;
-
-	arg = a;
-	vhpet = arg->vhpet;
-	n = arg->timer_num;
-	callout = &vhpet->timer[n].callout;
+	const struct vhpet_callout_arg *vca = arg;
+	struct vhpet *vhpet = vca->vhpet;
+	const int n = vca->timer_num;
+	struct callout *callout = &vhpet->timer[n].callout;
 
 	VHPET_LOCK(vhpet);
 
-	if (callout_pending(callout))		/* callout was reset */
-		goto done;
-
-	if (!callout_active(callout))		/* callout was stopped */
-		goto done;
+	if (callout_pending(callout) || !callout_active(callout)) {
+		VHPET_UNLOCK(vhpet);
+		return;
+	}
 
 	callout_deactivate(callout);
+	ASSERT(vhpet_counter_enabled(vhpet));
 
-	if (!vhpet_counter_enabled(vhpet))
-		panic("vhpet(%p) callout with counter disabled", vhpet);
+	if (vhpet_periodic_timer(vhpet, n)) {
+		hrtime_t now;
+		uint32_t counter = vhpet_counter(vhpet, &now);
 
-	counter = vhpet_counter(vhpet, &now);
-	vhpet_start_timer(vhpet, n, counter, now);
+		vhpet_start_timer(vhpet, n, counter, now);
+	} else {
+		/*
+		 * Zero out the expiration time to distinguish a fired timer
+		 * from one which is held due to a VM pause.
+		 */
+		vhpet->timer[n].callout_expire = 0;
+	}
 	vhpet_timer_interrupt(vhpet, n);
-done:
+
 	VHPET_UNLOCK(vhpet);
 }
 
 static void
 vhpet_stop_timer(struct vhpet *vhpet, int n, hrtime_t now)
 {
+	ASSERT(VHPET_LOCKED(vhpet));
+
 	callout_stop(&vhpet->timer[n].callout);
 
 	/*
@@ -320,12 +324,15 @@ vhpet_stop_timer(struct vhpet *vhpet, int n, hrtime_t now)
 	if (vhpet->timer[n].callout_expire < now) {
 		vhpet_timer_interrupt(vhpet, n);
 	}
+	vhpet->timer[n].callout_expire = 0;
 }
 
 static void
 vhpet_start_timer(struct vhpet *vhpet, int n, uint32_t counter, hrtime_t now)
 {
 	struct vhpet_timer *timer = &vhpet->timer[n];
+
+	ASSERT(VHPET_LOCKED(vhpet));
 
 	if (timer->comprate != 0)
 		vhpet_adjust_compval(vhpet, n, counter);
@@ -739,12 +746,40 @@ vhpet_localize_resources(struct vhpet *vhpet)
 	}
 }
 
+void
+vhpet_pause(struct vhpet *vhpet)
+{
+	VHPET_LOCK(vhpet);
+	for (uint_t i = 0; i < VHPET_NUM_TIMERS; i++) {
+		struct vhpet_timer *timer = &vhpet->timer[i];
+
+		callout_stop(&timer->callout);
+	}
+	VHPET_UNLOCK(vhpet);
+}
+
+void
+vhpet_resume(struct vhpet *vhpet)
+{
+	VHPET_LOCK(vhpet);
+	for (uint_t i = 0; i < VHPET_NUM_TIMERS; i++) {
+		struct vhpet_timer *timer = &vhpet->timer[i];
+
+		if (timer->callout_expire != 0) {
+			callout_reset_hrtime(&timer->callout,
+			    timer->callout_expire, vhpet_handler,
+			    &timer->arg, C_ABSOLUTE);
+		}
+	}
+	VHPET_UNLOCK(vhpet);
+}
+
 static int
 vhpet_data_read(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_HPET);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_hpet_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_hpet_v1));
 
 	struct vhpet *vhpet = datap;
 	struct vdi_hpet_v1 *out = req->vdr_data;
@@ -762,7 +797,7 @@ vhpet_data_read(void *datap, const vmm_data_req_t *req)
 		timer_out->vht_msi = timer->msireg;
 		timer_out->vht_comp_val = timer->compval;
 		timer_out->vht_comp_rate = timer->comprate;
-		if (callout_pending(&timer->callout)) {
+		if (timer->callout_expire != 0) {
 			timer_out->vht_time_target =
 			    vm_normalize_hrtime(vhpet->vm,
 			    timer->callout_expire);
@@ -789,7 +824,7 @@ static enum vhpet_validation_error
 vhpet_data_validate(const vmm_data_req_t *req, struct vm *vm)
 {
 	ASSERT(req->vdr_version == 1 &&
-	    req->vdr_len == sizeof (struct vdi_hpet_v1));
+	    req->vdr_len >= sizeof (struct vdi_hpet_v1));
 	const struct vdi_hpet_v1 *src = req->vdr_data;
 
 	/* LegacyReplacement Routing is not supported */
@@ -859,7 +894,7 @@ vhpet_data_write(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_HPET);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_hpet_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_hpet_v1));
 
 	struct vhpet *vhpet = datap;
 
@@ -895,10 +930,15 @@ vhpet_data_write(void *datap, const vmm_data_req_t *req)
 		 * from the HPET would come along for the ride.
 		 */
 
-		/* TODO: properly configure timer */
 		if (timer_src->vht_time_target != 0) {
 			timer->callout_expire = vm_denormalize_hrtime(vhpet->vm,
 			    timer_src->vht_time_target);
+
+			if (!vm_is_paused(vhpet->vm)) {
+				callout_reset_hrtime(&timer->callout,
+				    timer->callout_expire, vhpet_handler,
+				    &timer->arg, C_ABSOLUTE);
+			}
 		} else {
 			timer->callout_expire = 0;
 		}

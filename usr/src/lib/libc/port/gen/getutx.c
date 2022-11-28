@@ -877,7 +877,6 @@ updwtmpx(const char *filex, struct utmpx *utx)
 	utmpx_api2frec(utx, &futx);
 	(void) write(wfdx, &futx, sizeof (futx));
 
-done:
 	(void) close(wfdx);
 }
 
@@ -926,7 +925,7 @@ modutx(const struct utmpx *utp)
 	 */
 	(void) memcpy(&utmp, utp, sizeof (utmp));
 	setutxent();
-	while (fup = getutxent_frec()) {
+	while ((fup = getutxent_frec()) != NULL) {
 		if (idcmp(ucp->ut_id, fup->ut_id))
 			continue;
 
@@ -1167,7 +1166,7 @@ makeutx(const struct utmpx *utmp)
 		 */
 		(void) memset(saveid, falphanum, IDLEN);
 
-		while (ut = getoneutx(&offset))
+		while ((ut = getoneutx(&offset)) != NULL)
 			if (idcmp(utmp->ut_id, ut->ut_id)) {
 				continue;
 			} else {

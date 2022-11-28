@@ -24,9 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include	<libelf.h>
 #include	<sys/regset.h>
 #include	<rtld_db.h>
@@ -75,9 +72,9 @@ rli_func(const rd_loadobj_t *rl, void *data)
 		return (0);
 	}
 	if (ehdr.e_type == ET_EXEC)
-	    baseaddr = 0;
+		baseaddr = 0;
 	else
-	    baseaddr = rl->rl_base;
+		baseaddr = rl->rl_base;
 
 	off = rl->rl_base + ehdr.e_phoff;
 	for (i = 0; i < ehdr.e_phnum; i++) {
@@ -138,13 +135,14 @@ rli_func(const rd_loadobj_t *rl, void *data)
  *	first time resolution to go thru PLT's first entry (which is a call)
  *  The nth time around, the OFFSET_INTO_GOT actually contains the resolved
  *	address of the symbol(name), so the jmp is direct  [VT]
- *  The only complication is when going from a .so to an a.out or to another
- *	.so, we must resolve where the GOT table is for the given object.
+ *  The only complication is when going from a .so to an executable or to
+ *      another .so, we must resolve where the GOT table is for the given
+ *      object.
  */
 /* ARGSUSED 3 */
 rd_err_e
 plt32_resolution(rd_agent_t *rap, psaddr_t pc, lwpid_t lwpid,
-	psaddr_t pltbase, rd_plt_info_t *rpi)
+    psaddr_t pltbase, rd_plt_info_t *rpi)
 {
 	unsigned	addr;
 	unsigned	ebx;
@@ -158,7 +156,7 @@ plt32_resolution(rd_agent_t *rap, psaddr_t pc, lwpid_t lwpid,
 
 	pltoff = pc - pltbase;
 	pltaddr = pltbase +
-		((pltoff / M_PLT_ENTSIZE) * M_PLT_ENTSIZE);
+	    ((pltoff / M_PLT_ENTSIZE) * M_PLT_ENTSIZE);
 	/*
 	 * This is the target of the jmp instruction
 	 */

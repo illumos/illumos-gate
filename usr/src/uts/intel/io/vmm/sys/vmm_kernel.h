@@ -131,10 +131,14 @@ void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
 int vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
     uint16_t threads, uint16_t maxcpus);
 
+int vm_pause_instance(struct vm *);
+int vm_resume_instance(struct vm *);
+bool vm_is_paused(struct vm *);
+
 /*
  * APIs that race against hardware.
  */
-void vm_track_dirty_pages(struct vm *, uint64_t, size_t, uint8_t *);
+int vm_track_dirty_pages(struct vm *, uint64_t, size_t, uint8_t *);
 
 /*
  * APIs that modify the guest memory map require all vcpus to be frozen.
@@ -354,6 +358,7 @@ void vm_copyout(struct vm *vm, int vcpuid, const void *kaddr,
     struct vm_copyinfo *copyinfo, size_t len);
 
 int vcpu_trace_exceptions(struct vm *vm, int vcpuid);
+int vcpu_trap_wbinvd(struct vm *vm, int vcpuid);
 
 void vm_inject_ud(struct vm *vm, int vcpuid);
 void vm_inject_gp(struct vm *vm, int vcpuid);
@@ -395,8 +400,23 @@ enum vm_cpuid_capability {
 	VCC_LAST
 };
 
-int x86_emulate_cpuid(struct vm *, int, uint64_t *, uint64_t *, uint64_t *,
+/* Possible flags and entry count limit definited in sys/vmm.h */
+typedef struct vcpu_cpuid_config {
+	uint32_t		vcc_flags;
+	uint32_t		vcc_nent;
+	struct vcpu_cpuid_entry	*vcc_entries;
+} vcpu_cpuid_config_t;
+
+vcpu_cpuid_config_t *vm_cpuid_config(struct vm *, int);
+int vm_get_cpuid(struct vm *, int, vcpu_cpuid_config_t *);
+int vm_set_cpuid(struct vm *, int, const vcpu_cpuid_config_t *);
+void vcpu_emulate_cpuid(struct vm *, int, uint64_t *, uint64_t *, uint64_t *,
     uint64_t *);
+void legacy_emulate_cpuid(struct vm *, int, uint32_t *, uint32_t *, uint32_t *,
+    uint32_t *);
+void vcpu_cpuid_init(vcpu_cpuid_config_t *);
+void vcpu_cpuid_cleanup(vcpu_cpuid_config_t *);
+
 bool vm_cpuid_capability(struct vm *, int, enum vm_cpuid_capability);
 bool validate_guest_xcr0(uint64_t, uint64_t);
 
@@ -468,7 +488,6 @@ typedef struct vmm_data_req {
 	void		*vdr_data;
 	uint32_t	*vdr_result_len;
 } vmm_data_req_t;
-typedef struct vmm_data_req vmm_data_req_t;
 
 typedef int (*vmm_data_writef_t)(void *, const vmm_data_req_t *);
 typedef int (*vmm_data_readf_t)(void *, const vmm_data_req_t *);

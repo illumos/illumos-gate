@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 
 #define	VATPIT_LOCK(vatpit)		mutex_enter(&((vatpit)->lock))
 #define	VATPIT_UNLOCK(vatpit)		mutex_exit(&((vatpit)->lock))
+#define	VATPIT_LOCKED(vatpit)		MUTEX_HELD(&((vatpit)->lock))
 
 #define	TIMER_SEL_MASK		0xc0
 #define	TIMER_RW_MASK		0x30
@@ -170,6 +171,13 @@ vatpit_callout_handler(void *a)
 
 	if (c->mode == TIMER_RATEGEN || c->mode == TIMER_SQWAVE) {
 		pit_timer_start_cntr0(vatpit);
+	} else {
+		/*
+		 * For non-periodic timers, clear the time target to distinguish
+		 * between a fired timer (thus a zero value) and a pending one
+		 * awaiting VM resumption (holding a non-zero value).
+		 */
+		c->time_target = 0;
 	}
 
 	(void) vatpic_pulse_irq(vatpit->vm, 0);
@@ -177,6 +185,16 @@ vatpit_callout_handler(void *a)
 
 done:
 	VATPIT_UNLOCK(vatpit);
+}
+
+static void
+vatpit_callout_reset(struct vatpit *vatpit)
+{
+	struct channel *c = &vatpit->channel[0];
+
+	ASSERT(VATPIT_LOCKED(vatpit));
+	callout_reset_hrtime(&c->callout, c->time_target,
+	    vatpit_callout_handler, &c->callout_arg, C_ABSOLUTE);
 }
 
 static void
@@ -206,8 +224,7 @@ pit_timer_start_cntr0(struct vatpit *vatpit)
 		    hrt_freq_interval(PIT_8254_FREQ, c->total_target);
 	}
 
-	callout_reset_hrtime(&c->callout, c->time_target,
-	    vatpit_callout_handler, &c->callout_arg, C_ABSOLUTE);
+	vatpit_callout_reset(vatpit);
 }
 
 static uint16_t
@@ -497,12 +514,35 @@ vatpit_localize_resources(struct vatpit *vatpit)
 	}
 }
 
+void
+vatpit_pause(struct vatpit *vatpit)
+{
+	struct channel *c = &vatpit->channel[0];
+
+	VATPIT_LOCK(vatpit);
+	callout_stop(&c->callout);
+	VATPIT_UNLOCK(vatpit);
+}
+
+void
+vatpit_resume(struct vatpit *vatpit)
+{
+	struct channel *c = &vatpit->channel[0];
+
+	VATPIT_LOCK(vatpit);
+	ASSERT(!callout_active(&c->callout));
+	if (c->time_target != 0) {
+		vatpit_callout_reset(vatpit);
+	}
+	VATPIT_UNLOCK(vatpit);
+}
+
 static int
 vatpit_data_read(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_ATPIT);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_atpit_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_atpit_v1));
 
 	struct vatpit *vatpit = datap;
 	struct vdi_atpit_v1 *out = req->vdr_data;
@@ -526,7 +566,7 @@ vatpit_data_read(void *datap, const vmm_data_req_t *req)
 		    (src->ol_sel ? (1 << 3) : 0) |
 		    (src->fr_sel ? (1 << 4) : 0);
 		/* Only channel 0 has the timer configured */
-		if (i == 0) {
+		if (i == 0 && src->time_target != 0) {
 			chan->vac_time_target =
 			    vm_normalize_hrtime(vatpit->vm, src->time_target);
 		} else {
@@ -556,7 +596,7 @@ vatpit_data_write(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_ATPIT);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_atpit_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_atpit_v1));
 
 	struct vatpit *vatpit = datap;
 	const struct vdi_atpit_v1 *src = req->vdr_data;
@@ -605,8 +645,10 @@ vatpit_data_write(void *datap, const vmm_data_req_t *req)
 		out->time_target = time_target;
 		out->time_loaded = time_target -
 		    hrt_freq_interval(PIT_8254_FREQ, out->initial);
-		callout_reset_hrtime(callout, out->time_target,
-		    vatpit_callout_handler, &out->callout_arg, C_ABSOLUTE);
+
+		if (!vm_is_paused(vatpit->vm)) {
+			vatpit_callout_reset(vatpit);
+		}
 	}
 	VATPIT_UNLOCK(vatpit);
 

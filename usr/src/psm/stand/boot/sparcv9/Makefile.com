@@ -92,7 +92,6 @@ CPPINCS		+= -I$(BOOT_DIR)/sparc/common
 CPPFLAGS	= $(CPPDEFS) $(CPPINCS)
 CPPFLAGS	+= $(CCYFLAG)$(STANDDIR)
 ASFLAGS		+= $(CPPDEFS) -P -D_ASM $(CPPINCS)
-CFLAGS64	+= ../../sparc/common/sparc.il
 
 #
 # Where to look for libraries.

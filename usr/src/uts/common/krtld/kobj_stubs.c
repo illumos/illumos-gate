@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>
 #include <sys/errno.h>
@@ -249,7 +247,4 @@ kobj_boot_unmountroot(void)
  * Dummy declarations for variables in
  * the stand-alone linker/loader.
  */
-void *__tnf_probe_list_head;
-void *__tnf_tag_list_head;
-int tnf_changed_probe_list;
 char *boot_cpu_compatible_list;

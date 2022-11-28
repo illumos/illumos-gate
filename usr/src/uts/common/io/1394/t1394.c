@@ -37,8 +37,6 @@
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/disp.h>
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
 #include <sys/1394/h1394.h>
@@ -82,24 +80,14 @@ t1394_attach(dev_info_t *dip, int version, uint_t flags,
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(attachinfo != NULL);
 
-	TNF_PROBE_0_DEBUG(t1394_attach_enter, S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	*t1394_hdl = NULL;
 
 	if (version != T1394_VERSION_V1) {
-		TNF_PROBE_1(t1394_attach_error, S1394_TNF_SL_HOTPLUG_ERROR, "",
-		    tnf_string, msg, "Invalid version");
-		TNF_PROBE_0_DEBUG(t1394_attach_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	hal = s1394_dip_to_hal(ddi_get_parent(dip));
 	if (hal == NULL) {
-		TNF_PROBE_1(t1394_attach_error, S1394_TNF_SL_HOTPLUG_ERROR, "",
-		    tnf_string, msg, "No parent dip found for target");
-		TNF_PROBE_0_DEBUG(t1394_attach_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -134,11 +122,6 @@ t1394_attach(dev_info_t *dip, int version, uint_t flags,
 			rw_exit(&target->on_hal->target_list_rwlock);
 			mutex_exit(&hal->topology_tree_mutex);
 			kmem_free(target, sizeof (s1394_target_t));
-			TNF_PROBE_1(t1394_attach_error,
-			    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-			    "on_node == NULL");
-			TNF_PROBE_0_DEBUG(t1394_attach_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -190,7 +173,6 @@ t1394_attach(dev_info_t *dip, int version, uint_t flags,
 
 	mutex_exit(&hal->topology_tree_mutex);
 
-	TNF_PROBE_0_DEBUG(t1394_attach_exit, S1394_TNF_SL_HOTPLUG_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -214,8 +196,6 @@ t1394_detach(t1394_handle_t *t1394_hdl, uint_t flags)
 	s1394_target_t	*target;
 	uint_t		num_cmds;
 
-	TNF_PROBE_0_DEBUG(t1394_detach_enter, S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	target = (s1394_target_t *)(*t1394_hdl);
@@ -231,10 +211,6 @@ t1394_detach(t1394_handle_t *t1394_hdl, uint_t flags)
 	if (num_cmds != 0) {
 		rw_exit(&target->on_hal->target_list_rwlock);
 		mutex_exit(&target->on_hal->topology_tree_mutex);
-		TNF_PROBE_1(t1394_detach_error, S1394_TNF_SL_HOTPLUG_ERROR, "",
-		    tnf_string, msg, "Must free all commands before detach()");
-		TNF_PROBE_0_DEBUG(t1394_detach_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -267,7 +243,6 @@ t1394_detach(t1394_handle_t *t1394_hdl, uint_t flags)
 
 	*t1394_hdl = NULL;
 
-	TNF_PROBE_0_DEBUG(t1394_detach_exit, S1394_TNF_SL_HOTPLUG_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -296,8 +271,6 @@ t1394_alloc_cmd(t1394_handle_t t1394_hdl, uint_t flags, cmd1394_cmd_t **cmdp)
 	s1394_cmd_priv_t *s_priv;
 	uint_t		 num_cmds;
 
-	TNF_PROBE_0_DEBUG(t1394_alloc_cmd_enter, S1394_TNF_SL_ATREQ_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	target = (s1394_target_t *)t1394_hdl;
@@ -312,11 +285,6 @@ t1394_alloc_cmd(t1394_handle_t t1394_hdl, uint_t flags, cmd1394_cmd_t **cmdp)
 
 	if (num_cmds >= MAX_NUMBER_ALLOC_CMDS) {
 		rw_exit(&hal->target_list_rwlock);
-		TNF_PROBE_1(t1394_alloc_cmd_error, S1394_TNF_SL_ATREQ_ERROR,
-		    "", tnf_string, msg, "Attempted to alloc > "
-		    "MAX_NUMBER_ALLOC_CMDS");
-		TNF_PROBE_0_DEBUG(t1394_alloc_cmd_exit,
-		    S1394_TNF_SL_ATREQ_STACK, "");
 		/* kstats - cmd alloc failures */
 		hal->hal_kstats->cmd_alloc_fail++;
 		return (DDI_FAILURE);
@@ -328,10 +296,6 @@ t1394_alloc_cmd(t1394_handle_t t1394_hdl, uint_t flags, cmd1394_cmd_t **cmdp)
 	if (s1394_alloc_cmd(hal, flags, cmdp) != DDI_SUCCESS) {
 		target->target_num_cmds = num_cmds;	/* Undo increment */
 		rw_exit(&hal->target_list_rwlock);
-		TNF_PROBE_1(t1394_alloc_cmd_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Failed to allocate command structure");
-		TNF_PROBE_0_DEBUG(t1394_alloc_cmd_exit,
-		    S1394_TNF_SL_ATREQ_STACK, "");
 		/* kstats - cmd alloc failures */
 		hal->hal_kstats->cmd_alloc_fail++;
 		return (DDI_FAILURE);
@@ -349,7 +313,6 @@ t1394_alloc_cmd(t1394_handle_t t1394_hdl, uint_t flags, cmd1394_cmd_t **cmdp)
 	/* Initialize the command's blocking condition variable */
 	cv_init(&s_priv->blocking_cv, NULL, CV_DRIVER, NULL);
 
-	TNF_PROBE_0_DEBUG(t1394_alloc_cmd_exit, S1394_TNF_SL_ATREQ_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -377,8 +340,6 @@ t1394_free_cmd(t1394_handle_t t1394_hdl, uint_t flags, cmd1394_cmd_t **cmdp)
 	s1394_cmd_priv_t *s_priv;
 	uint_t		 num_cmds;
 
-	TNF_PROBE_0_DEBUG(t1394_free_cmd_enter, S1394_TNF_SL_ATREQ_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	target = (s1394_target_t *)t1394_hdl;
@@ -393,11 +354,6 @@ t1394_free_cmd(t1394_handle_t t1394_hdl, uint_t flags, cmd1394_cmd_t **cmdp)
 
 	if (num_cmds == 0) {
 		rw_exit(&hal->target_list_rwlock);
-		TNF_PROBE_2(t1394_free_cmd_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "No commands left to be freed "
-		    "(num_cmds <= 0)", tnf_uint, num_cmds, num_cmds);
-		TNF_PROBE_0_DEBUG(t1394_free_cmd_exit,
-		    S1394_TNF_SL_ATREQ_STACK, "");
 		ASSERT(num_cmds != 0);
 		return (DDI_FAILURE);
 	}
@@ -408,10 +364,6 @@ t1394_free_cmd(t1394_handle_t t1394_hdl, uint_t flags, cmd1394_cmd_t **cmdp)
 	/* Check that command isn't in use */
 	if (s_priv->cmd_in_use == B_TRUE) {
 		rw_exit(&hal->target_list_rwlock);
-		TNF_PROBE_1(t1394_free_cmd_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Attempted to free an in-use command");
-		TNF_PROBE_0_DEBUG(t1394_free_cmd_exit,
-		    S1394_TNF_SL_ATREQ_STACK, "");
 		ASSERT(s_priv->cmd_in_use == B_FALSE);
 		return (DDI_FAILURE);
 	}
@@ -435,7 +387,6 @@ t1394_free_cmd(t1394_handle_t t1394_hdl, uint_t flags, cmd1394_cmd_t **cmdp)
 	/* kstats - number of cmd frees */
 	hal->hal_kstats->cmd_free++;
 
-	TNF_PROBE_0_DEBUG(t1394_free_cmd_exit, S1394_TNF_SL_ATREQ_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -461,8 +412,6 @@ t1394_read(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	int		  ret;
 	int		  err;
 
-	TNF_PROBE_0_DEBUG(t1394_read_enter, S1394_TNF_SL_ATREQ_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(cmd != NULL);
 
@@ -471,10 +420,6 @@ t1394_read(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 
 	/* Is this command currently in use? */
 	if (s_priv->cmd_in_use == B_TRUE) {
-		TNF_PROBE_1(t1394_read_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Attempted to resend an in-use command");
-		TNF_PROBE_0_DEBUG(t1394_read_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		ASSERT(s_priv->cmd_in_use == B_FALSE);
 		return (DDI_FAILURE);
 	}
@@ -491,10 +436,6 @@ t1394_read(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	if ((cmd->cmd_type != CMD1394_ASYNCH_RD_QUAD) &&
 	    (cmd->cmd_type != CMD1394_ASYNCH_RD_BLOCK)) {
 		cmd->cmd_result = CMD1394_EINVALID_COMMAND;
-		TNF_PROBE_1(t1394_read_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Invalid command type specified");
-		TNF_PROBE_0_DEBUG(t1394_read_exit,
-		    S1394_TNF_SL_ATREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -502,11 +443,6 @@ t1394_read(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	if ((cmd->cmd_options & CMD1394_BLOCKING) &&
 	    (servicing_interrupt())) {
 		cmd->cmd_result = CMD1394_EINVALID_CONTEXT;
-		TNF_PROBE_1(t1394_read_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Tried to use CMD1394_BLOCKING in "
-		    "intr context");
-		TNF_PROBE_0_DEBUG(t1394_read_exit,
-		    S1394_TNF_SL_ATREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -529,10 +465,6 @@ t1394_read(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 		/* Copy error code into result */
 		cmd->cmd_result = err;
 		mutex_exit(&to_hal->topology_tree_mutex);
-		TNF_PROBE_1(t1394_read_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Failed in s1394_setup_asynch_command()");
-		TNF_PROBE_0_DEBUG(t1394_read_exit,
-		    S1394_TNF_SL_ATREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -550,12 +482,6 @@ t1394_read(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 				mutex_exit(&to_hal->topology_tree_mutex);
 				s_priv->cmd_in_use = B_FALSE;
 				cmd->cmd_result	   = CMD1394_EINVALID_CONTEXT;
-				TNF_PROBE_1(t1394_read_error,
-				    S1394_TNF_SL_ATREQ_ERROR, "", tnf_string,
-				    msg, "CMD1394_BLOCKING in bus reset "
-				    "context");
-				TNF_PROBE_0_DEBUG(t1394_read_exit,
-				    S1394_TNF_SL_ATREQ_STACK, "");
 				return (DDI_FAILURE);
 			}
 		}
@@ -590,11 +516,6 @@ t1394_read(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 			/* Copy error code into result */
 			cmd->cmd_result    = err;
 
-			TNF_PROBE_1(t1394_read_error, S1394_TNF_SL_ATREQ_ERROR,
-			    "", tnf_string, msg, "Failed in "
-			    "s1394_xfer_asynch_command()");
-			TNF_PROBE_0_DEBUG(t1394_read_exit,
-			    S1394_TNF_SL_ATREQ_STACK, "");
 			return (DDI_FAILURE);
 		}
 	} else {
@@ -605,8 +526,6 @@ t1394_read(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 block_on_asynch_cmd:
 	s1394_block_on_asynch_cmd(cmd);
 
-	TNF_PROBE_0_DEBUG(t1394_read_exit,
-	    S1394_TNF_SL_ATREQ_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -632,8 +551,6 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	int		  ret;
 	int		  err;
 
-	TNF_PROBE_0_DEBUG(t1394_write_enter, S1394_TNF_SL_ATREQ_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(cmd != NULL);
 
@@ -642,10 +559,6 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 
 	/* Is this command currently in use? */
 	if (s_priv->cmd_in_use == B_TRUE) {
-		TNF_PROBE_1(t1394_write_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Attempted to resend an in-use command");
-		TNF_PROBE_0_DEBUG(t1394_write_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		ASSERT(s_priv->cmd_in_use == B_FALSE);
 		return (DDI_FAILURE);
 	}
@@ -659,8 +572,6 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	if (s_priv->cmd_ext_type == S1394_CMD_EXT_FA) {
 		if (S1394_IS_CMD_FCP(s_priv) &&
 		    (s1394_fcp_write_check_cmd(cmd) != DDI_SUCCESS)) {
-			TNF_PROBE_0_DEBUG(t1394_write_exit,
-			    S1394_TNF_SL_ATREQ_STACK, "");
 			return (DDI_FAILURE);
 		}
 		s1394_fa_convert_cmd(to_hal, cmd);
@@ -674,10 +585,6 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	    (cmd->cmd_type != CMD1394_ASYNCH_WR_BLOCK)) {
 		cmd->cmd_result = CMD1394_EINVALID_COMMAND;
 		s1394_fa_check_restore_cmd(to_hal, cmd);
-		TNF_PROBE_1(t1394_write_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Invalid command type specified");
-		TNF_PROBE_0_DEBUG(t1394_write_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -686,11 +593,6 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	    (servicing_interrupt())) {
 		cmd->cmd_result = CMD1394_EINVALID_CONTEXT;
 		s1394_fa_check_restore_cmd(to_hal, cmd);
-		TNF_PROBE_1(t1394_write_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Tried to use CMD1394_BLOCKING in intr "
-		    "context");
-		TNF_PROBE_0_DEBUG(t1394_write_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -715,10 +617,6 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 		cmd->cmd_result = err;
 		mutex_exit(&to_hal->topology_tree_mutex);
 		s1394_fa_check_restore_cmd(to_hal, cmd);
-		TNF_PROBE_1(t1394_write_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Failed in s1394_setup_asynch_command()");
-		TNF_PROBE_0_DEBUG(t1394_write_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -737,11 +635,6 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 				s_priv->cmd_in_use = B_FALSE;
 				cmd->cmd_result    = CMD1394_EINVALID_CONTEXT;
 				s1394_fa_check_restore_cmd(to_hal, cmd);
-				TNF_PROBE_1(t1394_write_error,
-				    S1394_TNF_SL_ATREQ_ERROR, "", tnf_string,
-				    msg, "CMD1394_BLOCKING in bus reset cntxt");
-				TNF_PROBE_0_DEBUG(t1394_write_exit,
-				    S1394_TNF_SL_ATREQ_STACK, "");
 				return (DDI_FAILURE);
 			}
 		}
@@ -752,8 +645,6 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 		/* Block (if necessary) */
 		s1394_block_on_asynch_cmd(cmd);
 
-		TNF_PROBE_0_DEBUG(t1394_write_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		return (DDI_SUCCESS);
 	}
 	mutex_exit(&to_hal->topology_tree_mutex);
@@ -771,8 +662,6 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 			/* Block (if necessary) */
 			s1394_block_on_asynch_cmd(cmd);
 
-			TNF_PROBE_0_DEBUG(t1394_write_exit,
-			    S1394_TNF_SL_ATREQ_STACK, "");
 			return (DDI_SUCCESS);
 		} else {
 			/* Remove cmd from outstanding request Q */
@@ -784,19 +673,12 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 			cmd->cmd_result = err;
 
 			s1394_fa_check_restore_cmd(to_hal, cmd);
-			TNF_PROBE_1(t1394_write_error,
-			    S1394_TNF_SL_ATREQ_ERROR, "", tnf_string, msg,
-			    "Failed in s1394_xfer_asynch_command()");
-			TNF_PROBE_0_DEBUG(t1394_write_exit,
-			    S1394_TNF_SL_ATREQ_STACK, "");
 			return (DDI_FAILURE);
 		}
 	} else {
 		/* Block (if necessary) */
 		s1394_block_on_asynch_cmd(cmd);
 
-		TNF_PROBE_0_DEBUG(t1394_write_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		return (DDI_SUCCESS);
 	}
 }
@@ -824,8 +706,6 @@ t1394_lock(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	uint_t		    num_retries;
 	int		    ret;
 
-	TNF_PROBE_0_DEBUG(t1394_lock_enter, S1394_TNF_SL_ATREQ_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(cmd != NULL);
 
@@ -834,10 +714,6 @@ t1394_lock(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 
 	/* Is this command currently in use? */
 	if (s_priv->cmd_in_use == B_TRUE) {
-		TNF_PROBE_1(t1394_lock_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Attempted to resend an in-use command");
-		TNF_PROBE_0_DEBUG(t1394_lock_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		ASSERT(s_priv->cmd_in_use == B_FALSE);
 		return (DDI_FAILURE);
 	}
@@ -863,11 +739,6 @@ t1394_lock(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	if ((cmd->cmd_type != CMD1394_ASYNCH_LOCK_32) &&
 	    (cmd->cmd_type != CMD1394_ASYNCH_LOCK_64)) {
 		cmd->cmd_result = CMD1394_EINVALID_COMMAND;
-		TNF_PROBE_1(t1394_lock_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Invalid command type sent to "
-		    "t1394_lock()");
-		TNF_PROBE_0_DEBUG(t1394_lock_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -878,11 +749,6 @@ t1394_lock(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 	if ((cmd->cmd_options & CMD1394_BLOCKING) &&
 	    (servicing_interrupt())) {
 		cmd->cmd_result = CMD1394_EINVALID_CONTEXT;
-		TNF_PROBE_1(t1394_lock_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Tried to use CMD1394_BLOCKING in intr "
-		    "context");
-		TNF_PROBE_0_DEBUG(t1394_lock_exit, S1394_TNF_SL_ATREQ_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -922,14 +788,11 @@ t1394_lock(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 		break;
 
 	default:
-		TNF_PROBE_1(t1394_lock_error, S1394_TNF_SL_ATREQ_ERROR, "",
-		    tnf_string, msg, "Invalid lock_type in command");
 		cmd->cmd_result = CMD1394_EINVALID_COMMAND;
 		ret = DDI_FAILURE;
 		break;
 	}
 
-	TNF_PROBE_0_DEBUG(t1394_lock_exit, S1394_TNF_SL_ATREQ_STACK, "");
 	return (ret);
 }
 
@@ -967,9 +830,6 @@ t1394_alloc_addr(t1394_handle_t t1394_hdl, t1394_alloc_addr_t *addr_allocp,
 	uint64_t	addr_hi;
 	int		err;
 
-	TNF_PROBE_0_DEBUG(t1394_alloc_addr_enter, S1394_TNF_SL_ARREQ_STACK,
-	    "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(addr_allocp != NULL);
 
@@ -996,13 +856,6 @@ t1394_alloc_addr(t1394_handle_t t1394_hdl, t1394_alloc_addr_t *addr_allocp,
 			 */
 			*result = T1394_EINVALID_PARAM;
 
-			TNF_PROBE_1(t1394_alloc_addr_error,
-			    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-			    "Invalid flags "
-			    "(RDs on, notify off, no backing store)");
-			TNF_PROBE_0_DEBUG(t1394_alloc_addr_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
-
 			/* kstats - addr alloc failures */
 			hal->hal_kstats->addr_alloc_fail++;
 			return (DDI_FAILURE);
@@ -1023,13 +876,6 @@ t1394_alloc_addr(t1394_handle_t t1394_hdl, t1394_alloc_addr_t *addr_allocp,
 			 * be notified and hasn't given backing store
 			 */
 			*result = T1394_EINVALID_PARAM;
-
-			TNF_PROBE_1(t1394_alloc_addr_error,
-			    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-			    "Invalid flags "
-			    "(WRs on, notify off, no backing store)");
-			TNF_PROBE_0_DEBUG(t1394_alloc_addr_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
 
 			/* kstats - addr alloc failures */
 			hal->hal_kstats->addr_alloc_fail++;
@@ -1052,13 +898,6 @@ t1394_alloc_addr(t1394_handle_t t1394_hdl, t1394_alloc_addr_t *addr_allocp,
 			 */
 			*result = T1394_EINVALID_PARAM;
 
-			TNF_PROBE_1(t1394_alloc_addr_error,
-			    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-			    "Invalid flags "
-			    "(LKs on, notify off, no backing store)");
-			TNF_PROBE_0_DEBUG(t1394_alloc_addr_exit,
-			    S1394_TNF_SL_ARREQ_STACK, "");
-
 			/* kstats - addr alloc failures */
 			hal->hal_kstats->addr_alloc_fail++;
 			return (DDI_FAILURE);
@@ -1078,8 +917,6 @@ t1394_alloc_addr(t1394_handle_t t1394_hdl, t1394_alloc_addr_t *addr_allocp,
 		} else {
 			*result = T1394_NOERROR;
 		}
-		TNF_PROBE_0_DEBUG(t1394_alloc_addr_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (err);
 	} else {
 		err = s1394_claim_addr_blk((s1394_hal_t *)target->on_hal,
@@ -1100,8 +937,6 @@ t1394_alloc_addr(t1394_handle_t t1394_hdl, t1394_alloc_addr_t *addr_allocp,
 				s1394_physical_arreq_set_one(target);
 			}
 		}
-		TNF_PROBE_0_DEBUG(t1394_alloc_addr_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (err);
 	}
 }
@@ -1129,8 +964,6 @@ t1394_free_addr(t1394_handle_t t1394_hdl, t1394_addr_handle_t *addr_hdl,
 	s1394_hal_t		*hal;
 	s1394_target_t		*target;
 
-	TNF_PROBE_0_DEBUG(t1394_free_addr_enter, S1394_TNF_SL_ARREQ_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(addr_hdl != NULL);
 
@@ -1142,8 +975,6 @@ t1394_free_addr(t1394_handle_t t1394_hdl, t1394_addr_handle_t *addr_hdl,
 	curr_blk = (s1394_addr_space_blk_t *)(*addr_hdl);
 
 	if (s1394_free_addr_blk(hal, curr_blk) != DDI_SUCCESS) {
-		TNF_PROBE_0_DEBUG(t1394_free_addr_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1158,7 +989,6 @@ t1394_free_addr(t1394_handle_t t1394_hdl, t1394_addr_handle_t *addr_hdl,
 	/* kstats - number of addr frees */
 	hal->hal_kstats->addr_space_free++;
 
-	TNF_PROBE_0_DEBUG(t1394_free_addr_exit, S1394_TNF_SL_ARREQ_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -1200,9 +1030,6 @@ t1394_recv_request_done(t1394_handle_t t1394_hdl, cmd1394_cmd_t *resp,
 	boolean_t	 write_cmd = B_FALSE;
 	boolean_t	 mblk_too_small;
 
-	TNF_PROBE_0_DEBUG(t1394_recv_request_done_enter,
-	    S1394_TNF_SL_ARREQ_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(resp != NULL);
 
@@ -1242,8 +1069,6 @@ t1394_recv_request_done(t1394_handle_t t1394_hdl, cmd1394_cmd_t *resp,
 		/* Free the command - Pass it back to the HAL */
 		HAL_CALL(hal).response_complete(hal->halinfo.hal_private, resp,
 		    h_priv);
-		TNF_PROBE_0_DEBUG(t1394_recv_request_done_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -1260,11 +1085,6 @@ t1394_recv_request_done(t1394_handle_t t1394_hdl, cmd1394_cmd_t *resp,
 			mblk_too_small = B_TRUE;
 
 			if (curr_blk == NULL) {
-				TNF_PROBE_1(t1394_recv_request_done_error,
-				    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string,
-				    msg, "mblk_t is NULL in response");
-				TNF_PROBE_0_DEBUG(t1394_recv_request_done_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				/*
 				 * Free the command - Pass it back
 				 * to the HAL
@@ -1287,11 +1107,6 @@ t1394_recv_request_done(t1394_handle_t t1394_hdl, cmd1394_cmd_t *resp,
 			}
 
 			if (mblk_too_small == B_TRUE) {
-				TNF_PROBE_1(t1394_recv_request_done_error,
-				    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string,
-				    msg, "mblk_t too small in response");
-				TNF_PROBE_0_DEBUG(t1394_recv_request_done_exit,
-				    S1394_TNF_SL_ARREQ_STACK, "");
 				/*
 				 * Free the command - Pass it back
 				 * to the HAL
@@ -1308,16 +1123,9 @@ t1394_recv_request_done(t1394_handle_t t1394_hdl, cmd1394_cmd_t *resp,
 	case IEEE1394_RESP_TYPE_ERROR:
 	case IEEE1394_RESP_ADDRESS_ERROR:
 		ret = s1394_send_response(hal, resp);
-		TNF_PROBE_0_DEBUG(t1394_recv_request_done_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (ret);
 
 	default:
-		TNF_PROBE_1(t1394_recv_request_done_error,
-		    S1394_TNF_SL_ARREQ_ERROR, "", tnf_string, msg,
-		    "Invalid response code");
-		TNF_PROBE_0_DEBUG(t1394_recv_request_done_exit,
-		    S1394_TNF_SL_ARREQ_STACK, "");
 		return (DDI_FAILURE);
 	}
 }
@@ -1346,15 +1154,10 @@ t1394_fcp_register_controller(t1394_handle_t t1394_hdl, t1394_fcp_evts_t *evts,
 {
 	int		result;
 
-	TNF_PROBE_0_DEBUG(t1394_fcp_register_controller_enter,
-	    S1394_TNF_SL_FCP_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	result = s1394_fcp_register_ctl((s1394_target_t *)t1394_hdl, evts);
 
-	TNF_PROBE_0_DEBUG(t1394_fcp_register_controller_exit,
-	    S1394_TNF_SL_FCP_STACK, "");
 	return (result);
 }
 
@@ -1375,15 +1178,10 @@ t1394_fcp_unregister_controller(t1394_handle_t t1394_hdl)
 {
 	int		result;
 
-	TNF_PROBE_0_DEBUG(t1394_fcp_unregister_controller_enter,
-	    S1394_TNF_SL_FCP_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	result = s1394_fcp_unregister_ctl((s1394_target_t *)t1394_hdl);
 
-	TNF_PROBE_0_DEBUG(t1394_fcp_unregister_controller_exit,
-	    S1394_TNF_SL_FCP_STACK, "");
 	return (result);
 }
 
@@ -1410,15 +1208,10 @@ t1394_fcp_register_target(t1394_handle_t t1394_hdl, t1394_fcp_evts_t *evts,
 {
 	int		result;
 
-	TNF_PROBE_0_DEBUG(t1394_fcp_register_target_enter,
-	    S1394_TNF_SL_FCP_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	result = s1394_fcp_register_tgt((s1394_target_t *)t1394_hdl, evts);
 
-	TNF_PROBE_0_DEBUG(t1394_fcp_register_target_exit,
-	    S1394_TNF_SL_FCP_STACK, "");
 	return (result);
 }
 
@@ -1439,15 +1232,10 @@ t1394_fcp_unregister_target(t1394_handle_t t1394_hdl)
 {
 	int		result;
 
-	TNF_PROBE_0_DEBUG(t1394_fcp_unregister_target_enter,
-	    S1394_TNF_SL_FCP_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	result = s1394_fcp_unregister_tgt((s1394_target_t *)t1394_hdl);
 
-	TNF_PROBE_0_DEBUG(t1394_fcp_unregister_target_exit,
-	    S1394_TNF_SL_FCP_STACK, "");
 	return (result);
 }
 
@@ -1472,13 +1260,10 @@ t1394_cmp_register(t1394_handle_t t1394_hdl, t1394_cmp_evts_t *evts,
 {
 	int		result;
 
-	TNF_PROBE_0_DEBUG(t1394_cmp_register_enter, S1394_TNF_SL_CMP_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	result = s1394_cmp_register((s1394_target_t *)t1394_hdl, evts);
 
-	TNF_PROBE_0_DEBUG(t1394_cmp_register_exit, S1394_TNF_SL_CMP_STACK, "");
 	return (result);
 }
 
@@ -1501,15 +1286,10 @@ t1394_cmp_unregister(t1394_handle_t t1394_hdl)
 {
 	int		result;
 
-	TNF_PROBE_0_DEBUG(t1394_cmp_unregister_enter, S1394_TNF_SL_CMP_STACK,
-	    "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	result = s1394_cmp_unregister((s1394_target_t *)t1394_hdl);
 
-	TNF_PROBE_0_DEBUG(t1394_cmp_unregister_exit, S1394_TNF_SL_CMP_STACK,
-	    "");
 	return (result);
 }
 
@@ -1531,13 +1311,10 @@ t1394_cmp_read(t1394_handle_t t1394_hdl, t1394_cmp_reg_t reg, uint32_t *valp)
 {
 	int		result;
 
-	TNF_PROBE_0_DEBUG(t1394_cmp_read_enter, S1394_TNF_SL_CMP_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	result = s1394_cmp_read((s1394_target_t *)t1394_hdl, reg, valp);
 
-	TNF_PROBE_0_DEBUG(t1394_cmp_read_exit, S1394_TNF_SL_CMP_STACK, "");
 	return (result);
 }
 
@@ -1562,14 +1339,11 @@ t1394_cmp_cas(t1394_handle_t t1394_hdl, t1394_cmp_reg_t reg, uint32_t arg_val,
 {
 	int		result;
 
-	TNF_PROBE_0_DEBUG(t1394_cmp_read_enter, S1394_TNF_SL_CMP_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	result = s1394_cmp_cas((s1394_target_t *)t1394_hdl, reg, arg_val,
 				new_val, old_valp);
 
-	TNF_PROBE_0_DEBUG(t1394_cmp_read_exit, S1394_TNF_SL_CMP_STACK, "");
 	return (result);
 }
 
@@ -1609,9 +1383,6 @@ t1394_alloc_isoch_single(t1394_handle_t t1394_hdl,
 	int			ret;
 	int			err;
 
-	TNF_PROBE_0_DEBUG(t1394_alloc_isoch_single_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_single_hdl != NULL);
 	ASSERT(sii != NULL);
@@ -1620,32 +1391,17 @@ t1394_alloc_isoch_single(t1394_handle_t t1394_hdl,
 
 	/* Check for invalid channel_mask */
 	if (sii->si_channel_mask == 0) {
-		TNF_PROBE_1(t1394_alloc_isoch_single_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Invalid channel mask");
-		TNF_PROBE_0_DEBUG(t1394_alloc_isoch_single_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* Check for invalid bandwidth */
 	if ((sii->si_bandwidth <= IEEE1394_BANDWIDTH_MIN) ||
 	    (sii->si_bandwidth > IEEE1394_BANDWIDTH_MAX)) {
-		TNF_PROBE_1(t1394_alloc_isoch_single_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Invalid bandwidth requirements");
-		TNF_PROBE_0_DEBUG(t1394_alloc_isoch_single_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* Verify that rsrc_fail_target() callback is non-NULL */
 	if (sii->rsrc_fail_target == NULL) {
-		TNF_PROBE_1(t1394_alloc_isoch_single_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Invalid callback specified");
-		TNF_PROBE_0_DEBUG(t1394_alloc_isoch_single_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1705,25 +1461,16 @@ t1394_alloc_isoch_single(t1394_handle_t t1394_hdl,
 	    (t1394_isoch_cec_handle_t)cec_new, 0, &jii);
 
 	if (ret != DDI_SUCCESS) {
-		TNF_PROBE_1(t1394_alloc_isoch_single_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Unexpected error from t1394_join_isoch_cec()");
-
 		ret = t1394_free_isoch_cec(t1394_hdl, flags,
 		    (t1394_isoch_cec_handle_t *)&cec_new);
 		if (ret != DDI_SUCCESS) {
 			/* Unable to free the Isoch CEC */
-			TNF_PROBE_1(t1394_alloc_isoch_single_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unexpected error from t1394_free_isoch_cec()");
 			ASSERT(0);
 		}
 
 		/* Handle is nulled out before returning */
 		*t1394_single_hdl = NULL;
 
-		TNF_PROBE_0_DEBUG(t1394_alloc_isoch_single_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1734,10 +1481,6 @@ t1394_alloc_isoch_single(t1394_handle_t t1394_hdl,
 	    (t1394_isoch_cec_handle_t)cec_new, 0, &err);
 
 	if (ret != DDI_SUCCESS) {
-		TNF_PROBE_1(t1394_alloc_isoch_single_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Unexpected error from t1394_setup_isoch_cec()");
-
 		*result = err;
 
 		/* Leave the Isoch CEC */
@@ -1745,9 +1488,6 @@ t1394_alloc_isoch_single(t1394_handle_t t1394_hdl,
 		    (t1394_isoch_cec_handle_t)cec_new, 0);
 		if (ret != DDI_SUCCESS) {
 			/* Unable to leave the Isoch CEC */
-			TNF_PROBE_1(t1394_alloc_isoch_single_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unexpected error from t1394_leave_isoch_cec()");
 			ASSERT(0);
 		}
 
@@ -1756,17 +1496,12 @@ t1394_alloc_isoch_single(t1394_handle_t t1394_hdl,
 		    (t1394_isoch_cec_handle_t *)&cec_new);
 		if (ret != DDI_SUCCESS) {
 			/* Unable to free the Isoch CEC */
-			TNF_PROBE_1(t1394_alloc_isoch_single_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unexpected error from t1394_free_isoch_cec()");
 			ASSERT(0);
 		}
 
 		/* Handle is nulled out before returning */
 		*t1394_single_hdl = NULL;
 
-		TNF_PROBE_0_DEBUG(t1394_alloc_isoch_single_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1778,8 +1513,6 @@ t1394_alloc_isoch_single(t1394_handle_t t1394_hdl,
 	/* Update the handle */
 	*t1394_single_hdl = (t1394_isoch_single_handle_t)cec_new;
 
-	TNF_PROBE_0_DEBUG(t1394_alloc_isoch_single_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -1805,9 +1538,6 @@ t1394_free_isoch_single(t1394_handle_t t1394_hdl,
 	s1394_isoch_cec_t *cec_curr;
 	int		  ret;
 
-	TNF_PROBE_0_DEBUG(t1394_free_isoch_single_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_single_hdl != NULL);
 
@@ -1821,9 +1551,6 @@ t1394_free_isoch_single(t1394_handle_t t1394_hdl,
 	    (t1394_isoch_cec_handle_t)cec_curr, 0);
 	if (ret != DDI_SUCCESS) {
 		/* Unable to teardown the Isoch CEC */
-		TNF_PROBE_1(t1394_free_isoch_single_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Unexpected error from t1394_teardown_isoch_cec()");
 		ASSERT(0);
 	}
 
@@ -1834,9 +1561,6 @@ t1394_free_isoch_single(t1394_handle_t t1394_hdl,
 	    (t1394_isoch_cec_handle_t)cec_curr, 0);
 	if (ret != DDI_SUCCESS) {
 		/* Unable to leave the Isoch CEC */
-		TNF_PROBE_1(t1394_free_isoch_single_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Unexpected error from t1394_leave_isoch_cec()");
 		ASSERT(0);
 	}
 
@@ -1847,17 +1571,11 @@ t1394_free_isoch_single(t1394_handle_t t1394_hdl,
 	    (t1394_isoch_cec_handle_t *)&cec_curr);
 	if (ret != DDI_SUCCESS) {
 		/* Unable to free the Isoch CEC */
-		TNF_PROBE_1(t1394_free_isoch_single_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Unexpected error from t1394_free_isoch_cec()");
 		ASSERT(0);
 	}
 
 	/* Handle is nulled out before returning */
 	*t1394_single_hdl = NULL;
-
-	TNF_PROBE_0_DEBUG(t1394_free_isoch_single_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 }
 
 /*
@@ -1885,9 +1603,6 @@ t1394_alloc_isoch_cec(t1394_handle_t t1394_hdl, t1394_isoch_cec_props_t *props,
 	s1394_isoch_cec_t *cec_new;
 	uint64_t	  temp;
 
-	TNF_PROBE_0_DEBUG(t1394_alloc_isoch_cec_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_isoch_cec_hdl != NULL);
 	ASSERT(props != NULL);
@@ -1896,11 +1611,6 @@ t1394_alloc_isoch_cec(t1394_handle_t t1394_hdl, t1394_isoch_cec_props_t *props,
 
 	/* Check for invalid channel_mask */
 	if (props->cec_channel_mask == 0) {
-		TNF_PROBE_1(t1394_alloc_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Invalid channel mask");
-		TNF_PROBE_0_DEBUG(t1394_alloc_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1909,21 +1619,11 @@ t1394_alloc_isoch_cec(t1394_handle_t t1394_hdl, t1394_isoch_cec_props_t *props,
 	if (props->cec_options & T1394_NO_IRM_ALLOC) {
 		/* If T1394_NO_IRM_ALLOC, then only one bit should be set */
 		if (!ISP2(temp)) {
-			TNF_PROBE_1(t1394_alloc_isoch_cec_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Invalid channel mask");
-			TNF_PROBE_0_DEBUG(t1394_alloc_isoch_cec_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 
 		/* If T1394_NO_IRM_ALLOC, then speeds should be equal */
 		if (props->cec_min_speed != props->cec_max_speed) {
-			TNF_PROBE_1(t1394_alloc_isoch_cec_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Invalid speeds (min != max)");
-			TNF_PROBE_0_DEBUG(t1394_alloc_isoch_cec_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
@@ -1931,11 +1631,6 @@ t1394_alloc_isoch_cec(t1394_handle_t t1394_hdl, t1394_isoch_cec_props_t *props,
 	/* Check for invalid bandwidth */
 	if ((props->cec_bandwidth <= IEEE1394_BANDWIDTH_MIN) ||
 	    (props->cec_bandwidth > IEEE1394_BANDWIDTH_MAX)) {
-		TNF_PROBE_1(t1394_alloc_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Invalid bandwidth requirements");
-		TNF_PROBE_0_DEBUG(t1394_alloc_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1975,8 +1670,6 @@ t1394_alloc_isoch_cec(t1394_handle_t t1394_hdl, t1394_isoch_cec_props_t *props,
 	/* Update the handle and return */
 	*t1394_isoch_cec_hdl = (t1394_isoch_cec_handle_t)cec_new;
 
-	TNF_PROBE_0_DEBUG(t1394_alloc_isoch_cec_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2003,9 +1696,6 @@ t1394_free_isoch_cec(t1394_handle_t t1394_hdl, uint_t flags,
 	s1394_hal_t	  *hal;
 	s1394_isoch_cec_t *cec_curr;
 
-	TNF_PROBE_0_DEBUG(t1394_free_isoch_cec_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_isoch_cec_hdl != NULL);
 
@@ -2021,11 +1711,6 @@ t1394_free_isoch_cec(t1394_handle_t t1394_hdl, uint_t flags,
 	if (CEC_IN_ANY_CALLBACKS(cec_curr)) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_free_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to free Isoch CEC (in callbacks)");
-		TNF_PROBE_0_DEBUG(t1394_free_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2033,11 +1718,6 @@ t1394_free_isoch_cec(t1394_handle_t t1394_hdl, uint_t flags,
 	if (CEC_TRANSITION_LEGAL(cec_curr, ISOCH_CEC_FREE) == 0) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_free_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to free Isoch CEC");
-		TNF_PROBE_0_DEBUG(t1394_free_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 	mutex_exit(&cec_curr->isoch_cec_mutex);
@@ -2059,8 +1739,6 @@ t1394_free_isoch_cec(t1394_handle_t t1394_hdl, uint_t flags,
 	/* Update the handle and return */
 	*t1394_isoch_cec_hdl = NULL;
 
-	TNF_PROBE_0_DEBUG(t1394_free_isoch_cec_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2098,9 +1776,6 @@ t1394_join_isoch_cec(t1394_handle_t t1394_hdl,
 	uint64_t		 check_mask;
 	uint_t			 curr_max_speed;
 
-	TNF_PROBE_0_DEBUG(t1394_join_isoch_cec_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_isoch_cec_hdl != NULL);
 
@@ -2127,11 +1802,6 @@ t1394_join_isoch_cec(t1394_handle_t t1394_hdl,
 		kmem_free(member_new, sizeof (s1394_isoch_cec_member_t));
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_join_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to join Isoch CEC");
-		TNF_PROBE_0_DEBUG(t1394_join_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2142,11 +1812,6 @@ t1394_join_isoch_cec(t1394_handle_t t1394_hdl,
 		kmem_free(member_new, sizeof (s1394_isoch_cec_member_t));
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_join_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Inconsistent channel mask specified");
-		TNF_PROBE_0_DEBUG(t1394_join_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2155,11 +1820,6 @@ t1394_join_isoch_cec(t1394_handle_t t1394_hdl,
 		kmem_free(member_new, sizeof (s1394_isoch_cec_member_t));
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_join_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Inconsistent speed specified");
-		TNF_PROBE_0_DEBUG(t1394_join_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	} else if (join_isoch_info->req_max_speed <
 	    cec_curr->filter_current_speed) {
@@ -2174,11 +1834,6 @@ t1394_join_isoch_cec(t1394_handle_t t1394_hdl,
 		kmem_free(member_new, sizeof (s1394_isoch_cec_member_t));
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_join_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Multiple talkers specified");
-		TNF_PROBE_0_DEBUG(t1394_join_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2191,11 +1846,6 @@ t1394_join_isoch_cec(t1394_handle_t t1394_hdl,
 	    (join_isoch_info->isoch_cec_evts.teardown_target	== NULL))) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_join_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Invalid callbacks specified");
-		TNF_PROBE_0_DEBUG(t1394_join_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2228,8 +1878,6 @@ t1394_join_isoch_cec(t1394_handle_t t1394_hdl,
 	/* Unlock the Isoch CEC member list */
 	mutex_exit(&cec_curr->isoch_cec_mutex);
 
-	TNF_PROBE_0_DEBUG(t1394_join_isoch_cec_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2264,9 +1912,6 @@ t1394_leave_isoch_cec(t1394_handle_t t1394_hdl,
 	uint64_t		 temp_channel_mask;
 	uint_t			 temp_max_speed;
 
-	TNF_PROBE_0_DEBUG(t1394_leave_isoch_cec_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_isoch_cec_hdl != NULL);
 
@@ -2289,11 +1934,6 @@ t1394_leave_isoch_cec(t1394_handle_t t1394_hdl,
 	if (CEC_TRANSITION_LEGAL(cec_curr, ISOCH_CEC_LEAVE) == 0) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_leave_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to leave Isoch CEC");
-		TNF_PROBE_0_DEBUG(t1394_leave_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2320,11 +1960,6 @@ t1394_leave_isoch_cec(t1394_handle_t t1394_hdl,
 	if (found == B_FALSE) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_leave_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Target not found in Isoch CEC member list");
-		TNF_PROBE_0_DEBUG(t1394_leave_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	} else {
 		/* This member's departure may change filter constraints */
@@ -2358,8 +1993,6 @@ t1394_leave_isoch_cec(t1394_handle_t t1394_hdl,
 	/* Free the Isoch CEC member structure */
 	kmem_free(member_temp, sizeof (s1394_isoch_cec_member_t));
 
-	TNF_PROBE_0_DEBUG(t1394_leave_isoch_cec_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2403,9 +2036,6 @@ t1394_setup_isoch_cec(t1394_handle_t t1394_hdl,
 	int	(*setup_callback)(t1394_isoch_cec_handle_t, opaque_t,
 			    t1394_setup_target_args_t *);
 
-	TNF_PROBE_0_DEBUG(t1394_setup_isoch_cec_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_isoch_cec_hdl != NULL);
 
@@ -2421,11 +2051,6 @@ t1394_setup_isoch_cec(t1394_handle_t t1394_hdl,
 	if (CEC_IN_ANY_CALLBACKS(cec_curr)) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_setup_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to setup Isoch CEC (in callbacks)");
-		TNF_PROBE_0_DEBUG(t1394_setup_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2433,11 +2058,6 @@ t1394_setup_isoch_cec(t1394_handle_t t1394_hdl,
 	if (CEC_TRANSITION_LEGAL(cec_curr, ISOCH_CEC_SETUP) == 0) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_setup_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to setup Isoch CEC");
-		TNF_PROBE_0_DEBUG(t1394_setup_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2481,11 +2101,6 @@ t1394_setup_isoch_cec(t1394_handle_t t1394_hdl,
 				*result = T1394_ENO_BANDWIDTH;
 				/* Unlock the Isoch CEC member list */
 				mutex_exit(&cec_curr->isoch_cec_mutex);
-				TNF_PROBE_1(t1394_setup_isoch_cec_error,
-				    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string,
-				    msg, "Unable to allocate isoch bandwidth");
-				TNF_PROBE_0_DEBUG(t1394_setup_isoch_cec_exit,
-				    S1394_TNF_SL_ISOCH_STACK, "");
 				return (DDI_FAILURE);
 			}
 		}
@@ -2566,21 +2181,11 @@ t1394_setup_isoch_cec(t1394_handle_t t1394_hdl,
 			if (ret == DDI_FAILURE) {
 				if (err == CMD1394_EBUSRESET) {
 					continue;
-				} else {
-					TNF_PROBE_1(t1394_setup_isoch_cec_error,
-					    S1394_TNF_SL_ISOCH_ERROR, "",
-					    tnf_string, msg,
-					    "Unable to free isoch bandwidth");
 				}
 			}
 
 			/* Unlock the Isoch CEC member list */
 			mutex_exit(&cec_curr->isoch_cec_mutex);
-			TNF_PROBE_1(t1394_setup_isoch_cec_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unable to allocate isoch channel");
-			TNF_PROBE_0_DEBUG(t1394_setup_isoch_cec_exit,
-			    S1394_TNF_SL_ISOCH_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -2596,11 +2201,6 @@ t1394_setup_isoch_cec(t1394_handle_t t1394_hdl,
 		*result = T1394_ENO_BANDWIDTH;
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_setup_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Unable to allocate isoch channel");
-		TNF_PROBE_0_DEBUG(t1394_setup_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2657,16 +2257,9 @@ setup_do_callbacks:
 
 	/* Return DDI_FAILURE if any targets failed setup */
 	if (*result != 0) {
-		TNF_PROBE_1(t1394_setup_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Target returned error in setup_target()");
-		TNF_PROBE_0_DEBUG(t1394_setup_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
-	TNF_PROBE_0_DEBUG(t1394_setup_isoch_cec_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2698,9 +2291,6 @@ t1394_start_isoch_cec(t1394_handle_t t1394_hdl,
 	boolean_t		 err;
 	int	(*start_callback)(t1394_isoch_cec_handle_t, opaque_t);
 
-	TNF_PROBE_0_DEBUG(t1394_start_isoch_cec_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_isoch_cec_hdl != NULL);
 
@@ -2714,11 +2304,6 @@ t1394_start_isoch_cec(t1394_handle_t t1394_hdl,
 	if (CEC_IN_ANY_CALLBACKS(cec_curr)) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_start_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to start Isoch CEC (in callbacks)");
-		TNF_PROBE_0_DEBUG(t1394_start_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2726,11 +2311,6 @@ t1394_start_isoch_cec(t1394_handle_t t1394_hdl,
 	if (CEC_TRANSITION_LEGAL(cec_curr, ISOCH_CEC_START) == 0) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_start_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to start Isoch CEC");
-		TNF_PROBE_0_DEBUG(t1394_start_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2781,16 +2361,9 @@ t1394_start_isoch_cec(t1394_handle_t t1394_hdl,
 
 	/* Return DDI_FAILURE if any targets failed start */
 	if (err == B_TRUE) {
-		TNF_PROBE_1(t1394_start_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Target returned error in start_target()");
-		TNF_PROBE_0_DEBUG(t1394_start_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
-	TNF_PROBE_0_DEBUG(t1394_start_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2822,9 +2395,6 @@ t1394_stop_isoch_cec(t1394_handle_t t1394_hdl,
 	s1394_isoch_cec_member_t *member_curr;
 	void	(*stop_callback)(t1394_isoch_cec_handle_t, opaque_t);
 
-	TNF_PROBE_0_DEBUG(t1394_stop_isoch_cec_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_isoch_cec_hdl != NULL);
 
@@ -2838,11 +2408,6 @@ t1394_stop_isoch_cec(t1394_handle_t t1394_hdl,
 	if (CEC_IN_ANY_CALLBACKS(cec_curr)) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_stop_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to stop Isoch CEC (in callbacks)");
-		TNF_PROBE_0_DEBUG(t1394_stop_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2850,11 +2415,6 @@ t1394_stop_isoch_cec(t1394_handle_t t1394_hdl,
 	if (CEC_TRANSITION_LEGAL(cec_curr, ISOCH_CEC_STOP) == 0) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_stop_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to stop Isoch CEC");
-		TNF_PROBE_0_DEBUG(t1394_stop_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2900,8 +2460,6 @@ t1394_stop_isoch_cec(t1394_handle_t t1394_hdl,
 	/* Unlock the Isoch CEC member list */
 	mutex_exit(&cec_curr->isoch_cec_mutex);
 
-	TNF_PROBE_0_DEBUG(t1394_stop_isoch_cec_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2941,9 +2499,6 @@ t1394_teardown_isoch_cec(t1394_handle_t t1394_hdl,
 	int			 err;
 	void	(*teardown_callback)(t1394_isoch_cec_handle_t, opaque_t);
 
-	TNF_PROBE_0_DEBUG(t1394_teardown_isoch_cec_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_isoch_cec_hdl != NULL);
 
@@ -2959,11 +2514,6 @@ t1394_teardown_isoch_cec(t1394_handle_t t1394_hdl,
 	if (CEC_IN_ANY_CALLBACKS(cec_curr)) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_teardown_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to teardown Isoch CEC (in callbacks)");
-		TNF_PROBE_0_DEBUG(t1394_teardown_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -2971,11 +2521,6 @@ t1394_teardown_isoch_cec(t1394_handle_t t1394_hdl,
 	if (CEC_TRANSITION_LEGAL(cec_curr, ISOCH_CEC_TEARDOWN) == 0) {
 		/* Unlock the Isoch CEC member list */
 		mutex_exit(&cec_curr->isoch_cec_mutex);
-		TNF_PROBE_1(t1394_teardown_isoch_cec_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "Not allowed to teardown Isoch CEC");
-		TNF_PROBE_0_DEBUG(t1394_teardown_isoch_cec_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -3019,10 +2564,6 @@ t1394_teardown_isoch_cec(t1394_handle_t t1394_hdl,
 	if (ret == DDI_FAILURE) {
 		if (err == CMD1394_EBUSRESET) {
 			goto teardown_do_callbacks;
-		} else {
-			TNF_PROBE_1(t1394_teardown_isoch_cec_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unable to free allocated bandwidth");
 		}
 	}
 
@@ -3040,16 +2581,6 @@ t1394_teardown_isoch_cec(t1394_handle_t t1394_hdl,
 	}
 	/* Lock the Isoch CEC member list */
 	mutex_enter(&cec_curr->isoch_cec_mutex);
-
-	if (ret == DDI_FAILURE) {
-		if (err == CMD1394_EBUSRESET) {
-			goto teardown_do_callbacks;
-		} else {
-			TNF_PROBE_1(t1394_teardown_isoch_cec_error,
-			    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-			    "Unable to free allocated bandwidth");
-		}
-	}
 
 teardown_do_callbacks:
 	/* From here on reallocation is unnecessary */
@@ -3100,8 +2631,6 @@ teardown_do_callbacks:
 
 	/* Unlock the Isoch CEC member list */
 	mutex_exit(&cec_curr->isoch_cec_mutex);
-	TNF_PROBE_0_DEBUG(t1394_teardown_isoch_cec_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -3134,9 +2663,6 @@ t1394_alloc_isoch_dma(t1394_handle_t t1394_hdl,
 	s1394_hal_t	*hal;
 	int		ret;
 
-	TNF_PROBE_0_DEBUG(t1394_alloc_isoch_dma_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(idi != NULL);
 	ASSERT(t1394_idma_hdl != NULL);
@@ -3147,12 +2673,6 @@ t1394_alloc_isoch_dma(t1394_handle_t t1394_hdl,
 	/* Sanity check dma options.  If talk enabled, listen should be off */
 	if ((idi->idma_options & ID1394_TALK) &&
 	    (idi->idma_options != ID1394_TALK)) {
-		TNF_PROBE_1(t1394_alloc_isoch_dma_talk_conflict_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "conflicting idma options; talker and listener");
-		TNF_PROBE_0_DEBUG(t1394_alloc_isoch_dma_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
-
 		*result = T1394_EIDMA_CONFLICT;
 		return (DDI_FAILURE);
 	}
@@ -3160,12 +2680,6 @@ t1394_alloc_isoch_dma(t1394_handle_t t1394_hdl,
 	/* Only one listen mode allowed */
 	if ((idi->idma_options & ID1394_LISTEN_PKT_MODE) &&
 	    (idi->idma_options & ID1394_LISTEN_BUF_MODE)) {
-		TNF_PROBE_1(t1394_alloc_isoch_dma_listen_conflict_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "conflicting idma options; both listener modes set");
-		TNF_PROBE_0_DEBUG(t1394_alloc_isoch_dma_exit,
-		    S1394_TNF_SL_ISOCH_STACK, "");
-
 		*result = T1394_EIDMA_CONFLICT;
 		return (DDI_FAILURE);
 	}
@@ -3175,16 +2689,11 @@ t1394_alloc_isoch_dma(t1394_handle_t t1394_hdl,
 	    (void **)t1394_idma_hdl, result);
 
 	if (ret != DDI_SUCCESS) {
-		TNF_PROBE_1(t1394_alloc_isoch_dma_hal_error,
-		    S1394_TNF_SL_ISOCH_ERROR, "", tnf_string, msg,
-		    "HAL alloc_isoch_dma error, maybe IXL compilation");
 		if (*result == IXL1394_ENO_DMA_RESRCS) {
 			*result = T1394_EIDMA_NO_RESRCS;
 		}
 	}
 
-	TNF_PROBE_0_DEBUG(t1394_alloc_isoch_dma_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (ret);
 }
 
@@ -3208,9 +2717,6 @@ t1394_free_isoch_dma(t1394_handle_t t1394_hdl, uint_t flags,
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(t1394_free_isoch_dma_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(*t1394_idma_hdl != NULL);
 
@@ -3222,9 +2728,6 @@ t1394_free_isoch_dma(t1394_handle_t t1394_hdl, uint_t flags,
 
 	/* Null out isoch handle */
 	*t1394_idma_hdl = NULL;
-
-	TNF_PROBE_0_DEBUG(t1394_free_isoch_dma_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 }
 
 /*
@@ -3254,9 +2757,6 @@ t1394_start_isoch_dma(t1394_handle_t t1394_hdl,
 	s1394_hal_t	*hal;
 	int		ret;
 
-	TNF_PROBE_0_DEBUG(t1394_start_isoch_dma_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_idma_hdl != NULL);
 	ASSERT(idma_ctrlinfo != NULL);
@@ -3267,8 +2767,6 @@ t1394_start_isoch_dma(t1394_handle_t t1394_hdl,
 	ret = HAL_CALL(hal).start_isoch_dma(hal->halinfo.hal_private,
 	    (void *)t1394_idma_hdl, idma_ctrlinfo, flags, result);
 
-	TNF_PROBE_0_DEBUG(t1394_start_isoch_dma_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (ret);
 }
 
@@ -3293,9 +2791,6 @@ t1394_stop_isoch_dma(t1394_handle_t t1394_hdl,
 	s1394_hal_t	*hal;
 	int		result;
 
-	TNF_PROBE_0_DEBUG(t1394_stop_isoch_dma_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_idma_hdl != NULL);
 
@@ -3304,9 +2799,6 @@ t1394_stop_isoch_dma(t1394_handle_t t1394_hdl,
 
 	HAL_CALL(hal).stop_isoch_dma(hal->halinfo.hal_private,
 	    (void *)t1394_idma_hdl, &result);
-
-	TNF_PROBE_0_DEBUG(t1394_stop_isoch_dma_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 }
 
 /*
@@ -3337,9 +2829,6 @@ t1394_update_isoch_dma(t1394_handle_t t1394_hdl,
 	s1394_hal_t	*hal;
 	int		ret;
 
-	TNF_PROBE_0_DEBUG(t1394_update_isoch_dma_enter,
-	    S1394_TNF_SL_ISOCH_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 	ASSERT(t1394_idma_hdl != NULL);
 	ASSERT(idma_updateinfo != NULL);
@@ -3350,8 +2839,6 @@ t1394_update_isoch_dma(t1394_handle_t t1394_hdl,
 	ret = HAL_CALL(hal).update_isoch_dma(hal->halinfo.hal_private,
 	    (void *)t1394_idma_hdl, idma_updateinfo, flags, result);
 
-	TNF_PROBE_0_DEBUG(t1394_update_isoch_dma_exit,
-	    S1394_TNF_SL_ISOCH_STACK, "");
 	return (ret);
 }
 
@@ -3372,10 +2859,6 @@ void
 t1394_initiate_bus_reset(t1394_handle_t t1394_hdl, uint_t flags)
 {
 	s1394_hal_t	*hal;
-	int		ret;
-
-	TNF_PROBE_0_DEBUG(t1394_initiate_bus_reset_enter,
-	    S1394_TNF_SL_BR_STACK, "");
 
 	ASSERT(t1394_hdl != NULL);
 
@@ -3384,23 +2867,10 @@ t1394_initiate_bus_reset(t1394_handle_t t1394_hdl, uint_t flags)
 
 	/* Reset the bus */
 	if (hal->halinfo.phy == H1394_PHY_1394A) {
-		ret = HAL_CALL(hal).short_bus_reset(hal->halinfo.hal_private);
-		if (ret != DDI_SUCCESS) {
-			TNF_PROBE_1(t1394_initiate_bus_reset_error,
-			    S1394_TNF_SL_ERROR, "", tnf_string, msg,
-			    "Error initiating short bus reset");
-		}
+		(void) HAL_CALL(hal).short_bus_reset(hal->halinfo.hal_private);
 	} else {
-		ret = HAL_CALL(hal).bus_reset(hal->halinfo.hal_private);
-		if (ret != DDI_SUCCESS) {
-			TNF_PROBE_1(t1394_initiate_bus_reset_error,
-			    S1394_TNF_SL_ERROR, "", tnf_string, msg,
-			    "Error initiating bus reset");
-		}
+		(void) HAL_CALL(hal).bus_reset(hal->halinfo.hal_private);
 	}
-
-	TNF_PROBE_0_DEBUG(t1394_initiate_bus_reset_exit,
-	    S1394_TNF_SL_BR_STACK, "");
 }
 
 /*
@@ -3429,9 +2899,6 @@ t1394_get_topology_map(t1394_handle_t t1394_hdl, uint_t bus_generation,
 	uint32_t	*tm_ptr;
 	uint_t		length;
 
-	TNF_PROBE_0_DEBUG(t1394_get_topology_map_enter, S1394_TNF_SL_CSR_STACK,
-	    "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	/* Find the HAL this target resides on */
@@ -3444,11 +2911,6 @@ t1394_get_topology_map(t1394_handle_t t1394_hdl, uint_t bus_generation,
 	if (bus_generation != hal->generation_count) {
 		/* Unlock the topology tree */
 		mutex_exit(&hal->topology_tree_mutex);
-		TNF_PROBE_1(t1394_get_topology_map_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "Generation mismatch");
-		TNF_PROBE_0_DEBUG(t1394_get_topology_map_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -3461,11 +2923,6 @@ t1394_get_topology_map(t1394_handle_t t1394_hdl, uint_t bus_generation,
 	if (length > (uint_t)tm_length) {
 		/* Unlock the topology tree */
 		mutex_exit(&hal->topology_tree_mutex);
-		TNF_PROBE_1(t1394_get_topology_map_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "Buffer size too small");
-		TNF_PROBE_0_DEBUG(t1394_get_topology_map_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -3474,8 +2931,6 @@ t1394_get_topology_map(t1394_handle_t t1394_hdl, uint_t bus_generation,
 
 	/* Unlock the topology tree */
 	mutex_exit(&hal->topology_tree_mutex);
-	TNF_PROBE_0_DEBUG(t1394_get_topology_map_exit, S1394_TNF_SL_CSR_STACK,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -3499,11 +2954,8 @@ t1394_CRC16(uint32_t *d, size_t crc_length, uint_t flags)
 	/* ANSI/IEEE Std 1212, 1994 - 8.1.5	*/
 	uint_t	ret;
 
-	TNF_PROBE_0_DEBUG(t1394_CRC16_enter, S1394_TNF_SL_STACK, "");
-
 	ret = s1394_CRC16((uint_t *)d, (uint_t)crc_length);
 
-	TNF_PROBE_0_DEBUG(t1394_CRC16_exit, S1394_TNF_SL_STACK, "");
 	return (ret);
 }
 
@@ -3539,9 +2991,6 @@ t1394_add_cfgrom_entry(t1394_handle_t t1394_hdl,
 	uint_t		size;
 	uint32_t	*buffer;
 
-	TNF_PROBE_0_DEBUG(t1394_add_cfgrom_entry_enter,
-	    S1394_TNF_SL_CFGROM_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	target = (s1394_target_t *)t1394_hdl;
@@ -3553,22 +3002,12 @@ t1394_add_cfgrom_entry(t1394_handle_t t1394_hdl,
 	/* Check for a valid size */
 	if (size == 0) {
 		*result = T1394_EINVALID_PARAM;
-		TNF_PROBE_1_DEBUG(t1394_add_cfgrom_entry_error,
-		    S1394_TNF_SL_CFGROM_ERROR, "", tnf_string, msg,
-		    "Invalid size of Config ROM buffer (== 0)");
-		TNF_PROBE_0_DEBUG(t1394_add_cfgrom_entry_exit,
-		    S1394_TNF_SL_CFGROM_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* Check for a valid key type */
 	if (((key << IEEE1212_KEY_VALUE_SHIFT) & IEEE1212_KEY_TYPE_MASK) == 0) {
 		*result = T1394_EINVALID_PARAM;
-		TNF_PROBE_1_DEBUG(t1394_add_cfgrom_entry_error,
-		    S1394_TNF_SL_CFGROM_ERROR, "", tnf_string, msg,
-		    "Invalid key_type in Config ROM key");
-		TNF_PROBE_0_DEBUG(t1394_add_cfgrom_entry_exit,
-		    S1394_TNF_SL_CFGROM_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -3578,8 +3017,6 @@ t1394_add_cfgrom_entry(t1394_handle_t t1394_hdl,
 	/* Is this on the interrupt stack? */
 	if (servicing_interrupt()) {
 		*result = T1394_EINVALID_CONTEXT;
-		TNF_PROBE_0_DEBUG(t1394_add_cfgrom_entry_exit,
-		    S1394_TNF_SL_CFGROM_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -3593,11 +3030,6 @@ t1394_add_cfgrom_entry(t1394_handle_t t1394_hdl,
 			*result = T1394_ECFGROM_FULL;
 		mutex_exit(&hal->local_config_rom_mutex);
 
-		TNF_PROBE_1(t1394_add_cfgrom_entry_error,
-		    S1394_TNF_SL_CFGROM_ERROR, "", tnf_string, msg,
-		    "Failed in s1394_add_cfgrom_entry()");
-		TNF_PROBE_0_DEBUG(t1394_add_cfgrom_entry_exit,
-		    "stacktrace 1394 s1394", "");
 		return (ret);
 	}
 
@@ -3612,8 +3044,6 @@ t1394_add_cfgrom_entry(t1394_handle_t t1394_hdl,
 		mutex_exit(&hal->local_config_rom_mutex);
 	}
 
-	TNF_PROBE_0_DEBUG(t1394_add_cfgrom_entry_exit,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 	return (ret);
 }
 
@@ -3640,9 +3070,6 @@ t1394_rem_cfgrom_entry(t1394_handle_t t1394_hdl, uint_t flags,
 	s1394_target_t	*target;
 	int		ret;
 
-	TNF_PROBE_0_DEBUG(t1394_rem_cfgrom_entry_enter,
-	    S1394_TNF_SL_CFGROM_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	target = (s1394_target_t *)t1394_hdl;
@@ -3653,8 +3080,6 @@ t1394_rem_cfgrom_entry(t1394_handle_t t1394_hdl, uint_t flags,
 	/* Is this on the interrupt stack? */
 	if (servicing_interrupt()) {
 		*result = T1394_EINVALID_CONTEXT;
-		TNF_PROBE_0_DEBUG(t1394_rem_cfgrom_entry_exit,
-		    S1394_TNF_SL_CFGROM_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -3665,11 +3090,6 @@ t1394_rem_cfgrom_entry(t1394_handle_t t1394_hdl, uint_t flags,
 	    result);
 	if (ret != DDI_SUCCESS) {
 		mutex_exit(&hal->local_config_rom_mutex);
-		TNF_PROBE_1(t1394_rem_cfgrom_entry_error,
-		    S1394_TNF_SL_CFGROM_ERROR, "", tnf_string, msg,
-		    "Failed in s1394_remove_cfgrom_entry()");
-		TNF_PROBE_0_DEBUG(t1394_rem_cfgrom_entry_exit,
-		    "stacktrace 1394 s1394", "");
 		return (ret);
 	}
 
@@ -3684,8 +3104,6 @@ t1394_rem_cfgrom_entry(t1394_handle_t t1394_hdl, uint_t flags,
 		mutex_exit(&hal->local_config_rom_mutex);
 	}
 
-	TNF_PROBE_0_DEBUG(t1394_rem_cfgrom_entry_exit,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 	return (ret);
 }
 
@@ -3715,8 +3133,6 @@ t1394_get_targetinfo(t1394_handle_t t1394_hdl, uint_t bus_generation,
 	uint_t		from_node;
 	uint_t		to_node;
 
-	TNF_PROBE_0_DEBUG(t1394_get_targetinfo_enter, S1394_TNF_SL_STACK, "");
-
 	ASSERT(t1394_hdl != NULL);
 
 	/* Find the HAL this target resides on */
@@ -3731,10 +3147,6 @@ t1394_get_targetinfo(t1394_handle_t t1394_hdl, uint_t bus_generation,
 	if (bus_generation != hal->generation_count) {
 		/* Unlock the topology tree */
 		mutex_exit(&hal->topology_tree_mutex);
-		TNF_PROBE_3(t1394_get_targetinfo_error, S1394_TNF_SL_STACK, "",
-		    tnf_string, msg, "Generation mismatch",
-		    tnf_uint, gen, bus_generation,
-		    tnf_uint, current_gen, hal->generation_count);
 		return (DDI_FAILURE);
 	}
 
@@ -3747,8 +3159,6 @@ t1394_get_targetinfo(t1394_handle_t t1394_hdl, uint_t bus_generation,
 	if (((target->target_state & S1394_TARG_GONE) != 0) ||
 	    (target->on_node == NULL)) {
 		targetinfo->target_nodeID = T1394_INVALID_NODEID;
-		TNF_PROBE_1_DEBUG(t1394_get_targetinfo_exit,
-		    S1394_TNF_SL_STACK, "", tnf_string, msg, "No device");
 	} else {
 		targetinfo->target_nodeID =
 		    (target->on_hal->node_id & IEEE1394_BUS_NUM_MASK) |
@@ -3763,12 +3173,6 @@ t1394_get_targetinfo(t1394_handle_t t1394_hdl, uint_t bus_generation,
 		/* Get current_max_payload */
 		s1394_get_maxpayload(target, &dev, &curr);
 		targetinfo->current_max_payload	= curr;
-
-		TNF_PROBE_3_DEBUG(t1394_get_targetinfo_exit,
-		    S1394_TNF_SL_STACK, "",
-		    tnf_uint, payload, targetinfo->current_max_payload,
-		    tnf_uint, speed, targetinfo->current_max_speed,
-		    tnf_uint, nodeid, targetinfo->target_nodeID);
 	}
 
 	rw_exit(&hal->target_list_rwlock);

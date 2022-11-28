@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * cfree - clear memory block
@@ -37,9 +35,8 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
-/* ARGSUSED1 */
 void
-cfree(void *p, size_t num, size_t size)
+cfree(void *p, size_t num __unused, size_t size __unused)
 {
 	free(p);
 }

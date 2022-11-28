@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  */
 
 #include <sys/sunddi.h>
@@ -486,7 +486,7 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 	 */
 	status = smb_oplock_break_DELETE(node, NULL);
 	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
-		(void) smb_oplock_wait_break(node, 0);
+		(void) smb_oplock_wait_break(sr, node, 0);
 		status = 0;
 	}
 	if (status != 0) {

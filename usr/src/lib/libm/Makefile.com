@@ -505,8 +505,6 @@ LIBS		= $(DYNLIB)
 CFLAGS		+= $(C_BIGPICFLAGS)
 CFLAGS64	+= $(C_BIGPICFLAGS)
 
-m9x_IL		= $(LIBMDIR)/common/m9x/__fenv_$(TARGET_ARCH).il
-
 SRCS_LD_i386_amd64 = \
 	../common/LD/finitel.c \
 	../common/LD/isnanl.c \
@@ -1013,5 +1011,3 @@ SRCS	= \
 .KEEP_STATE:
 
 all:	$(LIBS)
-
-

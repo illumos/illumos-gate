@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -33,6 +34,12 @@
 #include <smbsrv/ntifs.h>
 
 /*
+ * MS-FSA 2.1.5.21 Server Requests Setting Quota Information
+ *
+ * Support for this operation is optional. If the object store does not
+ * implement this functionality, the operation MUST be failed with
+ * STATUS_INVALID_DEVICE_REQUEST
+ *
  * Similar to smb_nt_transact_set_quota()
  */
 uint32_t
@@ -44,18 +51,18 @@ smb2_setinfo_quota(smb_request_t *sr, smb_setinfo_t *si)
 	smb_node_t	*tnode;
 	smb_quota_set_t request;
 	uint32_t	reply;
-	list_t 		*quota_list;
+	list_t		*quota_list;
 
 	bzero(&request, sizeof (smb_quota_set_t));
 
 	if (!smb_tree_has_feature(sr->tid_tree, SMB_TREE_QUOTA))
-		return (NT_STATUS_NOT_SUPPORTED);
-
-	if (!smb_user_is_admin(sr->uid_user))
-		return (NT_STATUS_ACCESS_DENIED);
+		return (NT_STATUS_INVALID_DEVICE_REQUEST);
 
 	if ((ofile->f_node == NULL) ||
 	    (ofile->f_ftype != SMB_FTYPE_DISK))
+		return (NT_STATUS_INVALID_DEVICE_REQUEST);
+
+	if (!smb_user_is_admin(sr->uid_user))
 		return (NT_STATUS_ACCESS_DENIED);
 
 	tnode = sr->tid_tree->t_snode;

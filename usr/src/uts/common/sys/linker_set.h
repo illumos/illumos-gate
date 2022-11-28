@@ -41,14 +41,17 @@
 #define	__CONCAT1(x, y)	x ## y
 #define	__CONCAT(x, y)	__CONCAT1(x, y)
 
-#define	__GLOBL1(sym)	__asm__(".globl " #sym)
-#define	__GLOBL(sym)	__GLOBL1(sym)
+#define	__STRING(x)	#x		/* stringify without expanding x */
+#define	__XSTRING(x)	__STRING(x)	/* expand x, then stringify */
+
+#define	__GLOBL(sym)	__asm__(".globl " __XSTRING(sym))
+#define	__WEAK(sym)	__asm__(".weak " __XSTRING(sym))
 /*
  * Private macros, not to be used outside this header file.
  */
 #define	__MAKE_SET(set, sym)				\
-	__GLOBL(__CONCAT(__start_set_, set));		\
-	__GLOBL(__CONCAT(__stop_set_, set));		\
+	__WEAK(__CONCAT(__start_set_, set));		\
+	__WEAK(__CONCAT(__stop_set_, set));		\
 	static void const * __MAKE_SET_CONST		\
 	__set_##set##_sym_##sym __section("set_" #set)	\
 	__used = &(sym)

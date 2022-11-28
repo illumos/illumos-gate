@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s1394_fa.c
  *    1394 Services Layer Fixed Address Support Routines
@@ -38,7 +36,6 @@
 #include <sys/cmn_err.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
-#include <sys/tnf_probe.h>
 
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
@@ -58,12 +55,8 @@ s1394_fa_claim_addr(s1394_hal_t *hal, s1394_fa_type_t type,
 	s1394_fa_hal_t		*falp = &hal->hal_fa[type];
 	int			ret;
 
-	TNF_PROBE_0_DEBUG(s1394_fa_claim_addr_enter, S1394_TNF_SL_FA_STACK, "");
-
 	/* Might have been claimed already */
 	if (falp->fal_addr_blk != NULL) {
-		TNF_PROBE_0_DEBUG(s1394_fa_claim_addr_exit,
-		    S1394_TNF_SL_FA_STACK, "");
 		return (DDI_SUCCESS);
 	}
 
@@ -78,14 +71,10 @@ s1394_fa_claim_addr(s1394_hal_t *hal, s1394_fa_type_t type,
 	addr.aa_arg = hal;
 
 	ret = s1394_claim_addr_blk(hal, &addr);
-	if (ret != DDI_SUCCESS) {
-		TNF_PROBE_2(s1394_fa_claim_addr_error, S1394_TNF_SL_FA_ERROR,
-		    "", tnf_int, type, type, tnf_int, ret, ret);
-	} else {
+	if (ret == DDI_SUCCESS) {
 		falp->fal_addr_blk = (s1394_addr_space_blk_t *)addr.aa_hdl;
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_fa_claim_addr_exit, S1394_TNF_SL_FA_STACK, "");
 	return (ret);
 }
 
@@ -97,21 +86,12 @@ void
 s1394_fa_free_addr(s1394_hal_t *hal, s1394_fa_type_t type)
 {
 	s1394_fa_hal_t		*falp = &hal->hal_fa[type];
-	int			ret;
-
-	TNF_PROBE_0_DEBUG(s1394_fa_free_addr_enter, S1394_TNF_SL_FA_STACK, "");
 
 	/* Might have been freed already */
 	if (falp->fal_addr_blk != NULL) {
-		ret = s1394_free_addr_blk(hal, falp->fal_addr_blk);
-		if (ret != DDI_SUCCESS) {
-			TNF_PROBE_1(s1394_fa_free_addr_error,
-			    S1394_TNF_SL_FA_STACK, "", tnf_int, ret, ret);
-		}
+		(void) s1394_free_addr_blk(hal, falp->fal_addr_blk);
 		falp->fal_addr_blk = NULL;
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_fa_free_addr_exit, S1394_TNF_SL_FA_STACK, "");
 }
 
 /*
@@ -254,15 +234,9 @@ s1394_fa_completion_cb(cmd1394_cmd_t *cmd)
 {
 	s1394_hal_t	*hal = cmd->cmd_callback_arg;
 
-	TNF_PROBE_0_DEBUG(s1394_fa_completion_cb_enter,
-	    S1394_TNF_SL_FA_STACK, "");
-
 	s1394_fa_restore_cmd(hal, cmd);
 
 	if (cmd->completion_callback) {
 		cmd->completion_callback(cmd);
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_fa_completion_cb_exit,
-	    S1394_TNF_SL_FA_STACK, "");
 }

@@ -170,10 +170,11 @@ ctx_who(struct _Unwind_Context *ctx)
 	return (ctx->pfn);
 }
 
-/* ARGSUSED */
 _Unwind_Reason_Code
-_Unw_very_boring_personality(int version, int actions, uint64_t exclass,
-    struct _Unwind_Exception *exception_object, struct _Unwind_Context *ctx)
+_Unw_very_boring_personality(int version __unused, int actions __unused,
+    uint64_t exclass __unused,
+    struct _Unwind_Exception *exception_object __unused,
+    struct _Unwind_Context *ctx)
 {
 	_Unwind_Reason_Code res = _URC_CONTINUE_UNWIND;
 	uint64_t fp;
@@ -454,7 +455,6 @@ _Unwind_ForcedUnwind(struct _Unwind_Exception *exception_object,
 void
 _Unwind_Resume(struct _Unwind_Exception *exception_object)
 {
-
 	struct _Unwind_Context context;
 	struct _Unwind_Context *ctx = &context;
 

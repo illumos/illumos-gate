@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #pragma weak _getpass = getpass
 #pragma weak _getpassphrase = getpassphrase
@@ -116,9 +116,8 @@ __getpass(const char *prompt, int size)
 	return (pbuf);
 }
 
-/* ARGSUSED */
 static void
-catch(int x)
+catch(int x __unused)
 {
 	intrupt = 1;
 }

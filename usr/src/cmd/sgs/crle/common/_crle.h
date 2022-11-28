@@ -92,7 +92,7 @@ struct hash_ent {
  */
 struct hash_tbl {
 	ulong_t		t_ident;		/* dev no. for inode cache */
-	int 		t_size;			/* no. of buckets */
+	int		t_size;			/* no. of buckets */
 	Hash_type	t_type;			/* HASH_INT or HASH_STR */
 	Hash_ent	**t_entry;		/* entries */
 };
@@ -146,9 +146,7 @@ typedef	struct crle_desc {
 	APlist		*c_inotbls;	/* list of inode tables */
 	const char	*c_app;		/* specific application */
 	char		*c_edlibpath;	/* ELF default library path */
-	char		*c_adlibpath;	/* AOUT default library path */
 	char		*c_eslibpath;	/* ELF secure library path */
-	char		*c_aslibpath;	/* AOUT secure library path */
 	APlist		*c_env;		/* environment variables */
 	uint_t		c_envnum;	/*	and associated number */
 	APlist		*c_flt;		/* filter/filtee associations */
@@ -161,7 +159,7 @@ typedef	struct crle_desc {
 #define	CRLE_DUMP	0x0004		/* alternative create by dldump(3dl) */
 #define	CRLE_ADDID	0x0008		/* Add Rtc_id to head of new files */
 #define	CRLE_VERBOSE	0x0010		/* verbose mode */
-#define	CRLE_AOUT	0x0020		/* AOUT flag in effect */
+/* 0x20 was previously used for a.out support */
 #define	CRLE_EXISTS	0x0040		/* config file already exists */
 #define	CRLE_DIFFDEV	0x0080		/* config file and temporary exist on */
 					/*	different filesystems */
@@ -172,8 +170,6 @@ typedef	struct crle_desc {
 
 #define	CRLE_EDLIB	0x1000		/* default elf search path supplied */
 #define	CRLE_ESLIB	0x2000		/* default elf secure path supplied */
-#define	CRLE_ADLIB	0x4000		/* default AOUT search path supplied */
-#define	CRLE_ASLIB	0x8000		/* default AOUT secure path supplied */
 
 #define	AL_CNT_CRLE	10
 

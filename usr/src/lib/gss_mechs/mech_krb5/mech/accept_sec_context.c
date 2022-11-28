@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 /*
  * Copyright 2000, 2004  by the Massachusetts Institute of Technology.
@@ -1142,6 +1143,9 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
        *delegated_cred_handle = (gss_cred_id_t) deleg_cred;
    }
 
+   if (server_name)
+	krb5_free_principal(context, server_name);
+
    /* finally! */
 
    *minor_status = 0;
@@ -1149,10 +1153,6 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 
  fail:
    if (mech_type) {
-	unsigned int min;
-	gss_buffer_desc oidstr;
-	oidstr.value = NULL;
-
 	/*
 	 * This needs to be set/returned even on fail so
 	 * gss_accept_sec_context() can map_error_oid() the correct
@@ -1160,8 +1160,6 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 	 * (needed in CIFS/SPNEGO case)
 	 */
 	*mech_type = (gss_OID) mech_used;
-
-	(void) gss_oid_to_str(&min, *mech_type, &oidstr);
    }
 
    if (authdat)

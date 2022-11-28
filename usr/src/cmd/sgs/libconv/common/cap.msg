@@ -2,6 +2,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2022 Oxide Computer Company
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -38,6 +40,8 @@
 @ MSG_CA_SUNW_MACH_NF			"mach"
 @ MSG_CA_SUNW_ID_CF		  "CA_SUNW_ID"			# 6
 @ MSG_CA_SUNW_ID_NF			  "id"
+@ MSG_CA_SUNW_HW_3_CF		"CA_SUNW_HW_3"			# 7
+@ MSG_CA_SUNW_HW_3_NF			"hw_3"
 
 @ MSG_GBL_ZERO		"0"
 @ MSG_GBL_OSQBRKT	"0x%llx  [ "

@@ -27,6 +27,7 @@
  */
 /*
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -41,13 +42,13 @@
  *
  * This implementation differs from MDB's in the following ways:
  *
- * 	- We do not expose any options or flags.  The behavior of print() is
+ *	- We do not expose any options or flags.  The behavior of print() is
  *	  equivalent to "::print -tn".
  *
- * 	- MDB will display "holes" in structures (unused padding between
+ *	- MDB will display "holes" in structures (unused padding between
  *	  members).
  *
- * 	- When printing arrays of structures, MDB will leave a trailing ','
+ *	- When printing arrays of structures, MDB will leave a trailing ','
  *	  after the last element.
  *
  *	- MDB will print time_t types as date and time.
@@ -149,7 +150,8 @@ dt_print_indent(dt_printarg_t *pap)
  * Print a bitfield.  It's worth noting that the D compiler support for
  * bitfields is currently broken; printing "D`user_desc_t" (pulled in by the
  * various D provider files) will produce incorrect results compared to
- * "genunix`user_desc_t".
+ * "genunix`user_desc_t". However, bitfields that are built via CTF will be
+ * fine. Note, this is derived from mdb's print_bifield in mdb_print.c.
  */
 static void
 print_bitfield(dt_printarg_t *pap, ulong_t off, ctf_encoding_t *ep)
@@ -158,9 +160,30 @@ print_bitfield(dt_printarg_t *pap, ulong_t off, ctf_encoding_t *ep)
 	caddr_t addr = pap->pa_addr + off / NBBY;
 	uint64_t mask = (1ULL << ep->cte_bits) - 1;
 	uint64_t value = 0;
-	size_t size = (ep->cte_bits + (NBBY - 1)) / NBBY;
 	uint8_t *buf = (uint8_t *)&value;
 	uint8_t shift;
+
+	/*
+	 * Our bitfield may straddle a byte boundary. We explicitly take the
+	 * offset of the bitfield within its byte into account when determining
+	 * the overall amount of data to copy and mask off from the underlying
+	 * data.
+	 */
+	uint_t nbits = ep->cte_bits + (off % NBBY);
+	size_t size = P2ROUNDUP(nbits, NBBY) / NBBY;
+
+	/*
+	 * The resulting size must fit within the 64-bit value that we're using
+	 * to store the value, otherwise the bcopy below could destroy our
+	 * stack. This could be handled, but is not practically worth
+	 * addressing. This choice apes mdb, so if you're considering fixing
+	 * this, fix mdb as well.
+	 */
+	if (size > sizeof (value)) {
+		(void) fprintf(fp, "??? (total bitfield too large after "
+		    "alignment");
+		return;
+	}
 
 	/*
 	 * On big-endian machines, we need to adjust the buf pointer to refer
@@ -248,12 +271,8 @@ dt_print_int(ctf_id_t base, ulong_t off, dt_printarg_t *pap)
 		return;
 	}
 
-	/*
-	 * We print this as a bitfield if the bit encoding indicates it's not
-	 * an even power of two byte size, or is larger than 8 bytes.
-	 */
 	size = e.cte_bits / NBBY;
-	if (size > 8 || (e.cte_bits % NBBY) != 0 || (size & (size - 1)) != 0) {
+	if (dt_is_bitfield(&e, off)) {
 		print_bitfield(pap, off, &e);
 		return;
 	}
@@ -341,7 +360,7 @@ dt_print_ptr(ctf_id_t base, ulong_t off, dt_printarg_t *pap)
  * each member, and recursively invoke ctf_type_visit() for each member.  If
  * the members are non-structs, then we print them out directly:
  *
- * 	[ 0x14, 0x2e, 0 ]
+ *	[ 0x14, 0x2e, 0 ]
  *
  * If they are structs, then we print out the necessary leading and trailing
  * braces, to end up with:
@@ -408,7 +427,7 @@ dt_print_array(ctf_id_t base, ulong_t off, dt_printarg_t *pap)
 	 * don't bother printing out the brackets.  This lets print("foo") look
 	 * like:
 	 *
-	 * 	string "foo"
+	 *	string "foo"
 	 *
 	 * As D will internally represent this as a char[256] array.
 	 */

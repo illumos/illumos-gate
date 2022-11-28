@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Co.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1125,7 +1126,6 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	uint64_t cap;
 	uint_t vendor = cmi_hdl_vendor(hdl);
 	uint_t family = cmi_hdl_family(hdl);
-	uint_t rev = cmi_hdl_chiprev(hdl);
 	gcpu_mca_t *mca = &gcpu->gcpu_mca;
 	int mcg_ctl_present;
 	uint_t nbanks;
@@ -1141,7 +1141,7 @@ gcpu_mca_init(cmi_hdl_t hdl)
 		return;
 
 	/* We add MCi_ADDR always for AMD Family 0xf and above */
-	if (X86_CHIPFAM_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B))
+	if (family >= 0xf)
 		gcpu_force_addr_in_payload = 1;
 
 	/*

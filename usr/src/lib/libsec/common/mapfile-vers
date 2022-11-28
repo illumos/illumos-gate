@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -83,10 +84,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	acl_modifyentries;
 	acl_parse;
 	acl_printacl;
+	acl_printacl2;
 	acl_removeentries;
 	acl_strerror;
 	acl_to_aclp;
 	acl_type;
+	sid_string_by_id;
 	sid_to_id;
     local:
 	*;

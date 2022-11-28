@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -457,8 +457,11 @@ netr_gen_skey128(netr_info_t *netr_info)
 	}
 
 	rc = smb_auth_ntlm_hash((char *)netr_info->password, ntlmhash);
-	if (rc != SMBAUTH_SUCCESS)
+	if (rc != SMBAUTH_SUCCESS) {
+		explicit_bzero(&netr_info->password,
+		    sizeof (netr_info->password));
 		return (SMBAUTH_FAILURE);
+	}
 
 	bzero(zerobuf, NETR_SESSKEY_ZEROBUF_SZ);
 
@@ -467,8 +470,10 @@ netr_gen_skey128(netr_info_t *netr_info)
 	mechanism.ulParameterLen = 0;
 
 	rv = SUNW_C_GetMechSession(mechanism.mechanism, &hSession);
-	if (rv != CKR_OK)
-		return (SMBAUTH_FAILURE);
+	if (rv != CKR_OK) {
+		rc = SMBAUTH_FAILURE;
+		goto errout;
+	}
 
 	rv = C_DigestInit(hSession, &mechanism);
 	if (rv != CKR_OK)
@@ -499,6 +504,11 @@ netr_gen_skey128(netr_info_t *netr_info)
 	netr_info->session_key.len = NETR_SESSKEY128_SZ;
 cleanup:
 	(void) C_CloseSession(hSession);
+
+errout:
+	explicit_bzero(&netr_info->password, sizeof (netr_info->password));
+	explicit_bzero(ntlmhash, sizeof (ntlmhash));
+
 	return (rc);
 
 }
@@ -563,8 +573,10 @@ netr_gen_skey64(netr_info_t *netr_info)
 
 	rc = smb_auth_ntlm_hash((char *)netr_info->password, md4hash);
 
-	if (rc != SMBAUTH_SUCCESS)
-		return (SMBAUTH_FAILURE);
+	if (rc != SMBAUTH_SUCCESS) {
+		rc = SMBAUTH_FAILURE;
+		goto out;
+	}
 
 	data[0] = LE_IN32(&client_challenge[0]) + LE_IN32(&server_challenge[0]);
 	data[1] = LE_IN32(&client_challenge[1]) + LE_IN32(&server_challenge[1]);
@@ -574,13 +586,17 @@ netr_gen_skey64(netr_info_t *netr_info)
 	    (unsigned char *)le_data, 8);
 
 	if (rc != SMBAUTH_SUCCESS)
-		return (rc);
+		goto out;
 
 	netr_info->session_key.len = NETR_SESSKEY64_SZ;
 	rc = smb_auth_DES(netr_info->session_key.key,
 	    netr_info->session_key.len, &md4hash[9], NETR_DESKEY_LEN, buffer,
 	    8);
 
+out:
+	explicit_bzero(&netr_info->password, sizeof (netr_info->password));
+	explicit_bzero(md4hash, sizeof (md4hash));
+	explicit_bzero(buffer, sizeof (buffer));
 	return (rc);
 }
 

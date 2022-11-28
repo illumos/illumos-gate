@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -100,8 +101,10 @@ static boolean_t smbadm_checkauth(const char *);
 
 static void smbadm_usage(boolean_t);
 static int smbadm_join_workgroup(const char *, boolean_t);
-static int smbadm_join_domain(const char *, const char *, boolean_t);
+static int smbadm_join_domain(const char *, const char *,
+    const char *, boolean_t);
 static void smbadm_extract_domain(char *, char **, char **);
+static void smbadm_update_groups(smbadm_grp_action_t);
 
 static int smbadm_join(int, char **);
 static int smbadm_list(int, char **);
@@ -149,7 +152,7 @@ static smbadm_cmdinfo_t smbadm_cmdtable[] =
 	{ "enable-user",	smbadm_user_enable,	HELP_USER_ENABLE,
 		SMBADM_CMDF_USER,	SMBADM_ACTION_AUTH },
 	{ "join",		smbadm_join,		HELP_JOIN,
-		SMBADM_CMDF_NONE,	SMBADM_VALUE_AUTH },
+		SMBADM_CMDF_GROUP,	SMBADM_VALUE_AUTH },
 	{ "list",		smbadm_list,		HELP_LIST,
 		SMBADM_CMDF_NONE,	SMBADM_BASIC_AUTH },
 	{ "lookup",		smbadm_lookup,		HELP_LOOKUP,
@@ -246,11 +249,12 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 	case HELP_JOIN:
 #if 0	/* Don't document "-p" yet, still needs work (NEX-11960) */
 		(void) fprintf(fp, gettext("\t%s [-y] -p <domain>\n"
-		    "\t%s [-y] -u <username domain>\n"
+		    "\t%s [-y] [-c container] -u <username domain>\n"
 		    "\t%s [-y] -w <workgroup>\n"),
 		    cmd->name, cmd->name, cmd->name);
 #else
-		(void) fprintf(fp, gettext("\t%s [-y] -u <username> <domain>\n"
+		(void) fprintf(fp, gettext(
+		    "\t%s [-y] [-c container] -u <username> <domain>\n"
 		    "\t%s [-y] -w <workgroup>\n"), cmd->name, cmd->name);
 #endif
 		return;
@@ -422,7 +426,7 @@ smbadm_confirm(const char *prompt, const char *dflt)
 }
 
 static boolean_t
-smbadm_join_prompt(const char *domain)
+smbadm_join_confirm(const char *domain)
 {
 	(void) printf(gettext("After joining %s the smb service will be "
 	    "restarted automatically.\n"), domain);
@@ -468,17 +472,21 @@ smbadm_join(int argc, char **argv)
 	char buf[MAXHOSTNAMELEN * 2];
 	char *domain = NULL;
 	char *username = NULL;
+	char *container = NULL;
 	uint32_t mode = 0;
-	boolean_t do_prompt = B_TRUE;
+	boolean_t confirm = B_TRUE;
 	char option;
 
-	while ((option = getopt(argc, argv, "pu:wy")) != -1) {
+	while ((option = getopt(argc, argv, "c:pu:wy")) != -1) {
 		if (mode != 0) {
 			(void) fprintf(stderr, gettext(
 			    "join options are mutually exclusive\n"));
 			smbadm_usage(B_FALSE);
 		}
 		switch (option) {
+		case 'c':
+			container = optarg;
+			break;
 		case 'p':
 			mode = SMB_SECMODE_DOMAIN;
 			/* leave username = NULL */
@@ -494,7 +502,7 @@ smbadm_join(int argc, char **argv)
 			break;
 
 		case 'y':
-			do_prompt = B_FALSE;
+			confirm = B_FALSE;
 			break;
 
 		default:
@@ -522,9 +530,9 @@ smbadm_join(int argc, char **argv)
 	}
 
 	if (mode == SMB_SECMODE_WORKGRP) {
-		return (smbadm_join_workgroup(domain, do_prompt));
+		return (smbadm_join_workgroup(domain, confirm));
 	}
-	return (smbadm_join_domain(domain, username, do_prompt));
+	return (smbadm_join_domain(domain, container, username, confirm));
 }
 
 /*
@@ -533,7 +541,7 @@ smbadm_join(int argc, char **argv)
  * with no formal membership mechanism.
  */
 static int
-smbadm_join_workgroup(const char *workgroup, boolean_t prompt)
+smbadm_join_workgroup(const char *workgroup, boolean_t confirm)
 {
 	smb_joininfo_t jdi;
 	smb_joinres_t jdres;
@@ -550,9 +558,10 @@ smbadm_join_workgroup(const char *workgroup, boolean_t prompt)
 		smbadm_usage(B_FALSE);
 	}
 
-	if (prompt && !smbadm_join_prompt(jdi.domain_name))
+	if (confirm && !smbadm_join_confirm(jdi.domain_name))
 		return (0);
 
+	smbadm_update_groups(SMBADM_GRP_DELMEMBER); // before "un-join"
 	if ((status = smb_join(&jdi, &jdres)) != NT_STATUS_SUCCESS) {
 		(void) fprintf(stderr, gettext("failed to join %s: %s\n"),
 		    jdi.domain_name, xlate_nt_status(status));
@@ -572,9 +581,11 @@ smbadm_join_workgroup(const char *workgroup, boolean_t prompt)
  *
  * The '+' character is invalid within a username.  We allow the password
  * to be appended to the username using '+' as a scripting convenience.
+ * See details above smbadm_join()
  */
 static int
-smbadm_join_domain(const char *domain, const char *username, boolean_t prompt)
+smbadm_join_domain(const char *domain, const char *container,
+    const char *username, boolean_t confirm)
 {
 	smb_joininfo_t jdi;
 	smb_joinres_t jdres;
@@ -587,46 +598,63 @@ smbadm_join_domain(const char *domain, const char *username, boolean_t prompt)
 	jdi.mode = SMB_SECMODE_DOMAIN;
 	(void) strlcpy(jdi.domain_name, domain, sizeof (jdi.domain_name));
 	(void) strtrim(jdi.domain_name, " \t\n");
+	if (container != NULL) {
+		if (strlcpy(jdi.container_name, container,
+		    sizeof (jdi.container_name)) >=
+		    sizeof (jdi.container_name)) {
+			(void) fprintf(stderr, gettext("container name is "
+			    "too long\n"));
+			smbadm_usage(B_FALSE);
+		}
+	}
 
 	if (smb_name_validate_domain(jdi.domain_name) != ERROR_SUCCESS) {
 		(void) fprintf(stderr, gettext("domain name is invalid\n"));
 		smbadm_usage(B_FALSE);
 	}
 
-	if (prompt && !smbadm_join_prompt(jdi.domain_name))
+	if (confirm && !smbadm_join_confirm(jdi.domain_name))
 		return (0);
 
 	/*
 	 * Note: username is null for "unsecure join"
 	 * (join using a pre-created computer account)
-	 * No password either.
+	 * Not implemented.
 	 */
-	if (username != NULL) {
-		if ((p = strchr(username, '+')) != NULL) {
-			++p;
+	if (username == NULL) {
+		(void) fprintf(stderr,
+		    gettext("username missing\n"));
+		smbadm_usage(B_FALSE);
+	}
 
-			len = (int)(p - username);
-			if (len > sizeof (jdi.domain_name))
-				len = sizeof (jdi.domain_name);
+	/*
+	 * Check for "username+password" as described above.
+	 */
+	if ((p = strchr(username, '+')) != NULL) {
+		++p;
 
-			(void) strlcpy(jdi.domain_username, username, len);
-			(void) strlcpy(jdi.domain_passwd, p,
-			    sizeof (jdi.domain_passwd));
-		} else {
-			(void) strlcpy(jdi.domain_username, username,
-			    sizeof (jdi.domain_username));
-		}
+		len = (int)(p - username);
+		if (len > sizeof (jdi.domain_name))
+			len = sizeof (jdi.domain_name);
 
-		if (smb_name_validate_account(jdi.domain_username)
-		    != ERROR_SUCCESS) {
-			(void) fprintf(stderr,
-			    gettext("username contains invalid characters\n"));
-			smbadm_usage(B_FALSE);
-		}
+		(void) strlcpy(jdi.domain_username, username, len);
+		(void) strlcpy(jdi.domain_passwd, p,
+		    sizeof (jdi.domain_passwd));
+	} else {
+		(void) strlcpy(jdi.domain_username, username,
+		    sizeof (jdi.domain_username));
+	}
 
-		if (*jdi.domain_passwd == '\0') {
+	if (smb_name_validate_account(jdi.domain_username)
+	    != ERROR_SUCCESS) {
+		(void) fprintf(stderr,
+		    gettext("username contains invalid characters\n"));
+		smbadm_usage(B_FALSE);
+	}
+
+	if (*jdi.domain_passwd == '\0') {
+		if (isatty(fileno(stdin))) {
 			passwd_prompt = gettext("Enter domain password: ");
-
 			if ((p = getpassphrase(passwd_prompt)) == NULL) {
 				(void) fprintf(stderr, gettext(
 				    "missing password\n"));
@@ -634,6 +662,24 @@ smbadm_join_domain(const char *domain, const char *username, boolean_t prompt)
 			}
 
 			(void) strlcpy(jdi.domain_passwd, p,
+			    sizeof (jdi.domain_passwd));
+		} else {
+			/* Just read from stdin, no prompt. */
+			char *pbuf = NULL;
+			size_t pblen = 0;
+			len = getline(&pbuf, &pblen, stdin);
+
+			/* trim the ending newline if it exists */
+			if (len > 0 && pbuf[len - 1] == '\n') {
+				pbuf[len - 1] = '\0';
+				len--;
+			}
+			if (len <= 0) {
+				(void) fprintf(stderr, gettext(
+				    "missing password\n"));
+				smbadm_usage(B_FALSE);
+			}
+			(void) strlcpy(jdi.domain_passwd, pbuf,
 			    sizeof (jdi.domain_passwd));
 		}
 	}
@@ -658,6 +704,7 @@ smbadm_join_domain(const char *domain, const char *username, boolean_t prompt)
 		    "Successfully joined domain %s using AD server %s\n"),
 		    jdi.domain_name, jdres.dc_name);
 		bzero(&jdi, sizeof (jdi));
+		smbadm_update_groups(SMBADM_GRP_ADDMEMBER); // after join
 		smbadm_restart_service();
 		return (0);
 
@@ -754,6 +801,70 @@ smbadm_extract_domain(char *arg, char **username, char **domain)
 			*username = p;
 			*domain = arg;
 		}
+	}
+}
+
+/*
+ * smbadm_update_groups
+ * Add or remove "Domain Admins@mydomain" to/from the
+ * local administrators group.
+ *
+ * Similar to: smbadm_group_add_del_member
+ */
+static void
+smbadm_update_groups(smbadm_grp_action_t act)
+{
+	char sidstr[SMB_SID_STRSZ];
+	char gname[] = "administrators"; // must be writable
+	smb_gsid_t msid;
+	int rc;
+
+	/*
+	 * Compose the (well-known) SID for "Domain Admins"
+	 * which is {domain-SID}-512
+	 */
+	rc = smb_config_getstr(SMB_CI_DOMAIN_SID, sidstr, sizeof (sidstr));
+	if (rc != 0) {
+		(void) fprintf(stderr,
+		    gettext("Update local groups: no domain SID\n"));
+		return;
+	}
+	(void) strlcat(sidstr, "-512", sizeof (sidstr));
+
+	msid.gs_type = SidTypeGroup;
+	msid.gs_sid = smb_sid_fromstr(sidstr);
+	if (msid.gs_sid == NULL) {
+		(void) fprintf(stderr,
+		    gettext("Update local groups: no memory for SID\n"));
+		return;
+	}
+
+	switch (act) {
+	case SMBADM_GRP_ADDMEMBER:
+		rc = smb_lgrp_add_member(gname,
+		    msid.gs_sid, msid.gs_type);
+		// suppress "already in group"
+		if (rc == SMB_LGRP_MEMBER_IN_GROUP)
+			rc = 0;
+		break;
+	case SMBADM_GRP_DELMEMBER:
+		rc = smb_lgrp_del_member(gname,
+		    msid.gs_sid, msid.gs_type);
+		// supress "not in group"
+		if (rc == SMB_LGRP_MEMBER_NOT_IN_GROUP)
+			rc = 0;
+		break;
+	default:
+		rc = SMB_LGRP_INTERNAL_ERROR;
+		break;
+	}
+
+	smb_sid_free(msid.gs_sid);
+
+	if (rc != SMB_LGRP_SUCCESS) {
+		(void) fprintf(stderr,
+		    gettext("Update local groups: can't update DB, %s\n"),
+		    smb_lgrp_strerror(rc));
 	}
 }
 

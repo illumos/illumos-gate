@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -824,6 +825,7 @@ port_init(port_t *pp)
 	/* Allocate cache skeleton for PORT_SOURCE_FD events */
 	portq->portq_pcp = kmem_zalloc(sizeof (port_fdcache_t), KM_SLEEP);
 	mutex_init(&portq->portq_pcp->pc_lock, NULL, MUTEX_DEFAULT, NULL);
+	portq->portq_pcp->pc_flag = PC_PORTFS;
 
 	/*
 	 * Allocate cache skeleton for association of event sources.

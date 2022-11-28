@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * This routine converts time as follows.
@@ -117,7 +115,7 @@ __posix_asctime_r(const struct tm *t, char *cbuf)
 	int year = t->tm_year + 1900;
 
 	cp = cbuf;
-	for (ncp = Date; *cp++ = *ncp++; /* */)
+	for (ncp = Date; (*cp++ = *ncp++) != '\0'; /* */)
 		;
 	ncp = Day + (3 * t->tm_wday);
 	cp = cbuf;

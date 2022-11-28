@@ -21,6 +21,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 
@@ -53,7 +55,7 @@ typedef union {
 
 /*
  * Determine whether a file has a trivial ACL
- * returns: 	0 = trivial
+ * returns:	0 = trivial
  *		1 = nontrivial
  *		<0 some other system failure, such as ENOENT or EPERM
  */
@@ -744,65 +746,110 @@ acl_error(const char *fmt, ...)
 	va_end(va);
 }
 
+typedef enum id_type {
+	UID_TYPE,
+	GID_TYPE,
+	PID_TYPE
+} id_type_t;
+
+static int
+sid_to_id_impl(char *sid, id_type_t type, int *is_user, uid_t *id)
+{
+	idmap_get_handle_t *get_hdl;
+	char *rid_start;
+	idmap_stat rv;
+	idmap_rid_t rid;
+	const char *errstr;
+	idmap_stat status;
+	int error = 1;
+
+	rid_start = strrchr(sid, '-');
+	if (rid_start == NULL)
+		return (error);
+
+	rid = strtonum(rid_start + 1, 0, UINT32_MAX, &errstr);
+	if (errstr != NULL)
+		return (error);
+
+	if (idmap_get_create(&get_hdl) != IDMAP_SUCCESS)
+		return (error);
+
+	/*
+	 * When these functions return success, the &status output is
+	 * indeterminate. We only care about rv==success in this caller,
+	 * so just ignore &status.
+	 */
+	/* We need sid prefix. Insert NUL on '-', restore it later. */
+	*rid_start = '\0';
+	switch (type) {
+	case UID_TYPE:
+		rv = idmap_get_uidbysid(get_hdl,
+		    sid, rid, IDMAP_REQ_FLG_USE_CACHE,
+		    id, &status);
+		break;
+
+	case GID_TYPE:
+		rv = idmap_get_gidbysid(get_hdl,
+		    sid, rid, IDMAP_REQ_FLG_USE_CACHE,
+		    id, &status);
+		break;
+
+	case PID_TYPE:
+		rv = idmap_get_pidbysid(get_hdl, sid, rid,
+		    IDMAP_REQ_FLG_USE_CACHE, id, is_user,
+		    &status);
+		break;
+	}
+
+	*rid_start = '-';	/* putback character removed earlier */
+	if (rv == IDMAP_SUCCESS &&
+	    idmap_get_mappings(get_hdl) == IDMAP_SUCCESS) {
+		error = 0;
+	}
+	idmap_get_destroy(get_hdl);
+
+	return (error);
+}
+
 int
 sid_to_id(char *sid, boolean_t user, uid_t *id)
 {
-	idmap_get_handle_t *get_hdl = NULL;
-	char *rid_start = NULL;
-	idmap_stat status;
-	char *end;
-	int error = 1;
 	char *domain_start;
+	int error = 1;
 
 	if ((domain_start = strchr(sid, '@')) == NULL) {
-		idmap_rid_t rid;
-
-		if ((rid_start = strrchr(sid, '-')) == NULL)
-			return (1);
-		*rid_start++ = '\0';
-		errno = 0;
-		rid = strtoul(rid_start--, &end, 10);
-		if (errno == 0 && *end == '\0') {
-			if (idmap_get_create(&get_hdl) ==
-			    IDMAP_SUCCESS) {
-				if (user)
-					error = idmap_get_uidbysid(get_hdl,
-					    sid, rid, IDMAP_REQ_FLG_USE_CACHE,
-					    id, &status);
-				else
-					error = idmap_get_gidbysid(get_hdl,
-					    sid, rid, IDMAP_REQ_FLG_USE_CACHE,
-					    id, &status);
-				if (error == IDMAP_SUCCESS) {
-					error = idmap_get_mappings(get_hdl);
-					if (error == IDMAP_SUCCESS &&
-					    status != IDMAP_SUCCESS)
-						error = 1;
-					else
-						error = 0;
-				}
-			} else {
-				error = 1;
-			}
-			if (get_hdl)
-				idmap_get_destroy(get_hdl);
-		} else {
-			error = 1;
-		}
-		*rid_start = '-'; /* putback character removed earlier */
+		error = sid_to_id_impl(sid, user ? UID_TYPE : GID_TYPE,
+		    NULL, id);
 	} else {
 		char *name = sid;
+		idmap_stat rv;
+
 		*domain_start++ = '\0';
 
 		if (user)
-			error = idmap_getuidbywinname(name, domain_start,
+			rv = idmap_getuidbywinname(name, domain_start,
 			    IDMAP_REQ_FLG_USE_CACHE, id);
 		else
-			error = idmap_getgidbywinname(name, domain_start,
+			rv = idmap_getgidbywinname(name, domain_start,
 			    IDMAP_REQ_FLG_USE_CACHE, id);
 		*--domain_start = '@';
-		error = (error == IDMAP_SUCCESS) ? 0 : 1;
+		if (rv == IDMAP_SUCCESS)
+			error = 0;
 	}
 
 	return (error);
+}
+
+/*
+ * Variant of sid_to_id() called when we don't know whether the SID
+ * is a user or group. 2nd arg gets the type (0:group, 1:user)
+ * Returns zero for success, 1 for errors.
+ */
+int
+sid_to_xid(char *sid, int *is_user, uid_t *id)
+{
+	if ((strchr(sid, '@')) != NULL)
+		return (1);
+
+	return (sid_to_id_impl(sid, PID_TYPE, is_user, id));
 }

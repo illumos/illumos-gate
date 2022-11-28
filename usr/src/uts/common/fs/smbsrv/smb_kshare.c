@@ -23,6 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2022 RackTop Systems.
  */
 
 #include <smbsrv/smb_door.h>
@@ -508,8 +509,14 @@ out:
 int
 smb_kshare_info(smb_ioc_shareinfo_t *ioc)
 {
-	ioc->shortnames = smb_shortnames;
-	return (0);
+	smb_server_t	*sv;
+	int		rc;
+
+	if ((rc = smb_server_lookup(&sv)) == 0) {
+		ioc->shortnames = sv->sv_cfg.skc_short_names;
+		smb_server_release(sv);
+	}
+	return (rc);
 }
 
 /*

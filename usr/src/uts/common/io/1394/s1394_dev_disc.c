@@ -54,8 +54,6 @@
 #include <sys/kstat.h>
 #include <sys/varargs.h>
 
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
 #include <sys/1394/h1394.h>
@@ -177,9 +175,6 @@ static int s1394_enable_rio_pass1_workarounds = 0;
 void
 s1394_br_thread(s1394_hal_t *hal)
 {
-	TNF_PROBE_0_DEBUG(s1394_br_thread_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
 	/* Initialize the Bus Mgr timers */
@@ -196,16 +191,9 @@ s1394_br_thread(s1394_hal_t *hal)
 	for (;;) {
 		ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
-		TNF_PROBE_0_DEBUG(s1394_br_thread_wait,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 		s1394_wait_for_events(hal, 0);
 
 		ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
-
-		TNF_PROBE_1_DEBUG(s1394_br_thread_restart,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_int, hal_instance, ddi_get_instance(hal->halinfo.dip));
 
 		/* stop bus manager timeouts, if needed */
 		s1394_bus_mgr_timers_stop(hal, &hal->bus_mgr_query_timeout_id,
@@ -221,36 +209,18 @@ s1394_br_thread(s1394_hal_t *hal)
 		s1394_isoch_rsrc_realloc(hal);
 
 		if (s1394_cfgrom_scan_phase1(hal) != DDI_SUCCESS) {
-			TNF_PROBE_0_DEBUG(br_thread_phase1_restart,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			continue;
 		}
-
-		TNF_PROBE_1_DEBUG(s1394_br_thread_phase1_done,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_int, hal_instance, ddi_get_instance(hal->halinfo.dip));
 
 		if (s1394_bus_mgr_processing(hal) != DDI_SUCCESS) {
-			TNF_PROBE_0_DEBUG(br_thread_bus_mgr_restart,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			continue;
 		}
-
-		TNF_PROBE_1_DEBUG(s1394_br_thread_bus_mgr_proc_done,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_int, hal_instance, ddi_get_instance(hal->halinfo.dip));
 
 		ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
 		if (s1394_cfgrom_scan_phase2(hal) != DDI_SUCCESS) {
-			TNF_PROBE_0_DEBUG(br_thread_phase2_restart,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			continue;
 		}
-
-		TNF_PROBE_1_DEBUG(s1394_br_thread_done,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_int, hal_instance, ddi_get_instance(hal->halinfo.dip));
 
 		ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 	}
@@ -272,9 +242,6 @@ s1394_wait_for_events(s1394_hal_t *hal, int firsttime)
 {
 	uint_t event;
 
-	TNF_PROBE_0_DEBUG(s1394_wait_for_events_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	ASSERT(MUTEX_NOT_HELD(&hal->br_thread_mutex));
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
@@ -291,37 +258,22 @@ s1394_wait_for_events(s1394_hal_t *hal, int firsttime)
 	}
 
 	if (event & BR_THR_GO_AWAY) {
-		TNF_PROBE_1(s1394_wait_for_events, S1394_TNF_SL_HOTPLUG_STACK,
-		    "", tnf_string, msg, "Go away set");
 		s1394_br_thread_exit(hal);
-		TNF_PROBE_0_DEBUG(s1394_wait_for_events_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		/*NOTREACHED*/
 		return;
 	}
 
 	if (firsttime) {
-		TNF_PROBE_0_DEBUG(s1394_wait_for_events_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		mutex_exit(&hal->br_thread_mutex);
 		return;
 	}
 
 	mutex_enter(&hal->topology_tree_mutex);
-	if (event & BR_THR_CFGROM_SCAN) {
-		TNF_PROBE_2_DEBUG(s1394_wait_for_events_scan,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_int, br_thread_gen, hal->br_cfgrom_read_gen,
-		    tnf_int, hal_generation, hal->generation_count);
-	}
 	hal->br_cfgrom_read_gen = hal->generation_count;
 
 	hal->br_thread_ev_type &= ~BR_THR_CFGROM_SCAN;
 	mutex_exit(&hal->topology_tree_mutex);
 	mutex_exit(&hal->br_thread_mutex);
-
-	TNF_PROBE_0_DEBUG(s1394_wait_for_events_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -347,9 +299,6 @@ s1394_wait_for_cfgrom_callbacks(s1394_hal_t *hal, uint_t wait_gen,
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
-	TNF_PROBE_1_DEBUG(s1394_wait_for_cfgrom_callbacks_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, wait_gen, wait_gen);
-
 	ret = DDI_SUCCESS;
 
 	while (!done) {
@@ -365,17 +314,9 @@ s1394_wait_for_cfgrom_callbacks(s1394_hal_t *hal, uint_t wait_gen,
 		ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 		if (wait_gen != hal->generation_count ||
 		    (hal->br_thread_ev_type & BR_THR_GO_AWAY) != 0) {
-
-#if !defined(NPROBE) && defined(TNF_DEBUG)
-			int hal_gen = hal->generation_count;
-#endif
-
 			mutex_exit(&hal->topology_tree_mutex);
 			mutex_exit(&hal->br_cmplq_mutex);
 			s1394_flush_cmplq(hal);
-			TNF_PROBE_1_DEBUG(s1394_wait_for_cfgrom_callbacks_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int, hal_gen,
-			    hal_gen);
 			return (DDI_FAILURE);
 		}
 		mutex_exit(&hal->topology_tree_mutex);
@@ -391,19 +332,10 @@ s1394_wait_for_cfgrom_callbacks(s1394_hal_t *hal, uint_t wait_gen,
 
 		if (cmd != NULL) {
 			if (cmd->bus_generation != wait_gen) {
-				TNF_PROBE_3(
-				    s1394_wait_for_cfgrom_callbacks,
-				    S1394_TNF_SL_HOTPLUG_STACK, "",
-				    tnf_string, msg, "command gen != wait_gen",
-				    tnf_uint, cmd_gen, cmd->bus_generation,
-				    tnf_uint, wait_gen, wait_gen);
 				(void) s1394_free_cmd(hal, &cmd);
 				continue;
 			}
 			cmdret = (*handle_cmd_fn)(hal, cmd);
-			TNF_PROBE_2_DEBUG(s1394_wait_for_cfgrom_callbacks,
-			    S1394_TNF_SL_HOTPLUG_STACK, "",
-			    tnf_opaque, cmd, cmd, tnf_int, cmdret, cmdret);
 			ASSERT(cmdret != S1394_HCMD_INVALID);
 			if (cmdret == S1394_HCMD_LOCK_FAILED) {
 				/* flush completion queue */
@@ -422,9 +354,6 @@ s1394_wait_for_cfgrom_callbacks(s1394_hal_t *hal, uint_t wait_gen,
 		}
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_wait_for_cfgrom_callbacks_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	return (ret);
 }
 
@@ -440,9 +369,6 @@ s1394_flush_cmplq(s1394_hal_t *hal)
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
-	TNF_PROBE_0_DEBUG(s1394_flush_cmplq_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 	cmd = NULL;
 
 	do {
@@ -455,9 +381,6 @@ s1394_flush_cmplq(s1394_hal_t *hal)
 			s_priv = S1394_GET_CMD_PRIV(cmd);
 
 			tcmd = s_priv->cmd_priv_next;
-			TNF_PROBE_2_DEBUG(s1394_flush_cmplq,
-			    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_opaque, cmd,
-			    cmd, tnf_uint, cmd_gen, cmd->bus_generation);
 			(void) s1394_free_cmd(hal, &cmd);
 			cmd = tcmd;
 		}
@@ -467,10 +390,6 @@ s1394_flush_cmplq(s1394_hal_t *hal)
 		mutex_exit(&hal->br_cmplq_mutex);
 
 	} while (cmd != NULL);
-
-	TNF_PROBE_0_DEBUG(s1394_flush_cmplq_exit, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 }
 
 /*
@@ -483,7 +402,6 @@ s1394_br_thread_exit(s1394_hal_t *hal)
 {
 	ASSERT(MUTEX_HELD(&hal->br_thread_mutex));
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
-	TNF_PROBE_0(s1394_br_thread_exit_enter, S1394_TNF_SL_HOTPLUG_STACK, "");
 	s1394_flush_cmplq(hal);
 #ifndef	__lock_lint
 	CALLB_CPR_EXIT(&hal->hal_cprinfo);
@@ -505,19 +423,12 @@ s1394_target_bus_reset_notifies(s1394_hal_t *hal, t1394_localinfo_t *localinfo)
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
-	TNF_PROBE_2_DEBUG(s1394_target_bus_reset_notifies_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, bus_gen,
-	    localinfo->bus_generation, tnf_uint, node_id,
-	    localinfo->local_nodeID);
-
 	if (ndi_event_retrieve_cookie(hal->hal_ndi_event_hdl, NULL,
 	    DDI_DEVI_BUS_RESET_EVENT, &cookie, NDI_EVENT_NOPASS) ==
 	    NDI_SUCCESS) {
 		(void) ndi_event_run_callbacks(hal->hal_ndi_event_hdl, NULL,
 		    cookie, localinfo);
 	}
-	TNF_PROBE_0_DEBUG(s1394_target_bus_reset_notifies_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -533,9 +444,6 @@ s1394_alloc_cfgrom(s1394_hal_t *hal, s1394_node_t *node, s1394_status_t *status)
 	uint32_t *cfgrom;
 
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
-
-	TNF_PROBE_0_DEBUG(s1394_alloc_cfgrom_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
 
 	*status = S1394_NOSTATUS;
 
@@ -559,19 +467,12 @@ s1394_alloc_cfgrom(s1394_hal_t *hal, s1394_node_t *node, s1394_status_t *status)
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
 		kmem_free(cfgrom, IEEE1394_CONFIG_ROM_SZ);
 		*status |= S1394_LOCK_FAILED;
-		TNF_PROBE_1(s1394_alloc_cfgrom, S1394_TNF_SL_HOTPLUG_ERROR,
-		    "", tnf_string, msg, "cannot relock the tree");
-		TNF_PROBE_0_DEBUG(s1394_alloc_cfgrom_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 	node->cfgrom = cfgrom;
 	node->cfgrom_size = IEEE1394_CONFIG_ROM_QUAD_SZ;
 	SET_CFGROM_NEW_ALLOC(node);
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
-	TNF_PROBE_3(s1394_alloc_cfgrom_exit, S1394_TNF_SL_HOTPLUG_STACK,
-	    "cfgrom alloc", tnf_uint, hal_gen, hal->generation_count, tnf_uint,
-	    node_num, node->node_num, tnf_opaque, cfgrom, cfgrom);
 	return (DDI_SUCCESS);
 }
 
@@ -586,9 +487,6 @@ s1394_free_cfgrom(s1394_hal_t *hal, s1394_node_t *node,
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 	ASSERT(node->cfgrom != NULL);
 
-	TNF_PROBE_0_DEBUG(s1394_free_cfgrom_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 	if (options == S1394_FREE_CFGROM_BOTH) {
 		/*
 		 * free in both old and new trees; will be called with
@@ -598,12 +496,6 @@ s1394_free_cfgrom(s1394_hal_t *hal, s1394_node_t *node,
 
 		if (NODE_MATCHED(node) == B_TRUE && onode->cfgrom != NULL)
 			ASSERT(onode->cfgrom == node->cfgrom);
-
-		TNF_PROBE_4(s1394_free_cfgrom_both,
-		    S1394_TNF_SL_HOTPLUG_STACK, "cfgrom free", tnf_uint,
-		    hal_gen, hal->generation_count, tnf_int, node_num,
-		    node->node_num, tnf_opaque, old_cfgrom, onode->cfgrom,
-		    tnf_opaque, cfgrom, node->cfgrom);
 
 		if (onode != NULL && onode->cfgrom != NULL && onode->cfgrom !=
 		    node->cfgrom)
@@ -618,11 +510,6 @@ s1394_free_cfgrom(s1394_hal_t *hal, s1394_node_t *node,
 
 	} else if (options == S1394_FREE_CFGROM_NEW) {
 
-		TNF_PROBE_2(s1394_free_cfgrom_new,
-		    S1394_TNF_SL_HOTPLUG_STACK, "cfgrom free",
-		    tnf_int, node_num, node->node_num,
-		    tnf_opaque, cfgrom, node->cfgrom);
-
 		ASSERT(CFGROM_NEW_ALLOC(node) == B_TRUE);
 		kmem_free(node->cfgrom, IEEE1394_CONFIG_ROM_SZ);
 		CLEAR_CFGROM_NEW_ALLOC(node);
@@ -632,17 +519,10 @@ s1394_free_cfgrom(s1394_hal_t *hal, s1394_node_t *node,
 	} else if (options == S1394_FREE_CFGROM_OLD) {
 
 		/* freeing in old tree */
-		TNF_PROBE_2_DEBUG(s1394_free_cfgrom_old,
-		    S1394_TNF_SL_HOTPLUG_STACK, "cfgrom free",
-		    tnf_int, node_num, node->node_num,
-		    tnf_opaque, cfgrom, node->cfgrom);
 		kmem_free(node->cfgrom, IEEE1394_CONFIG_ROM_SZ);
 		node->cfgrom = NULL;
 		CLEAR_CFGROM_STATE(node);
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_free_cfgrom_exit, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
 }
 
 /*
@@ -656,10 +536,6 @@ s1394_free_cfgrom(s1394_hal_t *hal, s1394_node_t *node,
 void
 s1394_copy_cfgrom(s1394_node_t *to, s1394_node_t *from)
 {
-	TNF_PROBE_3_DEBUG(s1394_copy_cfgrom_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "", tnf_int, to_node, to->node_num, tnf_int,
-	    from_node, from->node_num, tnf_opaque, from_cfgrom, from->cfgrom);
-
 	ASSERT(to->cfgrom == NULL);
 
 	to->cfgrom = from->cfgrom;
@@ -687,8 +563,6 @@ s1394_copy_cfgrom(s1394_node_t *to, s1394_node_t *from)
 		 * have been config rom allocated.
 		 */
 		ASSERT(from->cfgrom == NULL);
-		TNF_PROBE_0_DEBUG(s1394_copy_cfgrom_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return;
 	} else {
 		s1394_selfid_pkt_t *selfid_pkt = to->selfid_packet;
@@ -696,9 +570,6 @@ s1394_copy_cfgrom(s1394_node_t *to, s1394_node_t *from)
 		if (IEEE1394_SELFID_ISLINKON(selfid_pkt))
 			SET_LINK_ACTIVE(to);
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_copy_cfgrom_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -720,10 +591,6 @@ s1394_read_bus_info_blk(s1394_hal_t *hal, s1394_node_t *node,
 
 	node_num = node->node_num;
 
-	TNF_PROBE_2_DEBUG(s1394_read_bus_info_blk_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, hal_gen,
-	    hal->generation_count, tnf_int, node_num, node_num);
-
 	/*
 	 * drop the topology lock around command allocation. Return failure
 	 * if either command allocation fails or cannot reacquire the lock
@@ -732,21 +599,15 @@ s1394_read_bus_info_blk(s1394_hal_t *hal, s1394_node_t *node,
 	*status = S1394_NOSTATUS;
 
 	if (s1394_alloc_cmd(hal, 0, &cmd) != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_read_bus_info_blk, S1394_TNF_SL_HOTPLUG_ERROR,
-		    "", tnf_string, msg, "command allocation failed");
 		*status |= S1394_CMD_ALLOC_FAILED;
 	}
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
 		*status |= S1394_LOCK_FAILED;
-		TNF_PROBE_1(s1394_read_bus_info_blk, S1394_TNF_SL_HOTPLUG_ERROR,
-		    "", tnf_string, msg, "unable to relock the tree");
 		/* free the cmd allocated above */
 		if (((*status) & S1394_CMD_ALLOC_FAILED) != 0)
 			(void) s1394_free_cmd(hal, (cmd1394_cmd_t **)&cmd);
 	}
 	if (((*status) & (S1394_CMD_ALLOC_FAILED | S1394_LOCK_FAILED)) != 0) {
-		TNF_PROBE_0_DEBUG(s1394_read_bus_info_blk_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -756,10 +617,6 @@ s1394_read_bus_info_blk(s1394_hal_t *hal, s1394_node_t *node,
 		ASSERT(((*status) & S1394_LOCK_FAILED) != 0);
 		(void) s1394_free_cmd(hal, (cmd1394_cmd_t **)&cmd);
 		ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
-		TNF_PROBE_1(s1394_read_bus_info_blk, S1394_TNF_SL_HOTPLUG_ERROR,
-		    "", tnf_string, msg, "config rom allocation failed");
-		TNF_PROBE_0_DEBUG(s1394_read_bus_info_blk_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -784,22 +641,8 @@ s1394_read_bus_info_blk(s1394_hal_t *hal, s1394_node_t *node,
 	QUAD_TO_CFGROM_ADDR(IEEE1394_LOCAL_BUS, node_num,
 	    quadlet, cmd->cmd_addr);
 
-	TNF_PROBE_3_DEBUG(s1394_read_bus_info_blk,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, hal_gen,
-	    hal->generation_count, tnf_int, node_num, node_num, tnf_uint,
-	    quadlet, quadlet);
-
-	TNF_PROBE_5_DEBUG(s1394_read_bus_info_blk,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int,
-	    node_num, node_num, tnf_int, parsed, CFGROM_PARSED(node), tnf_int,
-	    matched, NODE_MATCHED(node), tnf_int, visited,
-	    NODE_VISITED(node), tnf_int, generation_changed,
-	    CFGROM_GEN_CHANGED(node));
-
 	SETUP_QUAD_READ(node, 1, quadlet, 1);
 	if (s1394_read_config_quadlet(hal, cmd, status) != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_read_bus_info_blk, S1394_TNF_SL_HOTPLUG_ERROR,
-		    "", tnf_string, msg, "Unable to start read");
 		/* free the command if it wasn't handed over to the HAL */
 		if (((*status) & S1394_CMD_INFLIGHT) == 0) {
 			(void) s1394_free_cmd(hal, (cmd1394_cmd_t **)&cmd);
@@ -807,17 +650,11 @@ s1394_read_bus_info_blk(s1394_hal_t *hal, s1394_node_t *node,
 		if (((*status) & S1394_LOCK_FAILED) != 0) {
 			ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 		}
-		TNF_PROBE_0_DEBUG(s1394_read_bus_info_blk_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	hal->cfgroms_being_read++;
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
-
-	TNF_PROBE_1_DEBUG(s1394_read_bus_info_blk_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int, cfgrom_read_cnt,
-	    hal->cfgroms_being_read);
 
 	return (DDI_SUCCESS);
 }
@@ -838,10 +675,6 @@ s1394_read_rest_of_cfgrom(s1394_hal_t *hal, s1394_node_t *node,
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 	ASSERT(LINK_ACTIVE(node) == B_TRUE);
 
-	TNF_PROBE_2_DEBUG(s1394_read_rest_of_cfgrom_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, hal_gen,
-	    hal->generation_count, tnf_int, node_num, node_num);
-
 	/*
 	 * drop the topology lock around command allocation. Return failure
 	 * if either command allocation fails or cannot reacquire the lock
@@ -851,22 +684,14 @@ s1394_read_rest_of_cfgrom(s1394_hal_t *hal, s1394_node_t *node,
 
 	if (s1394_alloc_cmd(hal, 0, &cmd) != DDI_SUCCESS) {
 		*status |= S1394_CMD_ALLOC_FAILED;
-		TNF_PROBE_1(s1394_read_rest_of_cfgrom,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "command allocation failed");
 	}
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
 		*status |= S1394_LOCK_FAILED;
 		/* free if we allocated a cmd above */
 		if (((*status) & S1394_CMD_ALLOC_FAILED) == 0)
 			(void) s1394_free_cmd(hal, (cmd1394_cmd_t **)&cmd);
-		TNF_PROBE_1(s1394_read_rest_of_cfgrom,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "unable to relock the tree");
 	}
 	if (((*status) & (S1394_CMD_ALLOC_FAILED | S1394_LOCK_FAILED)) != 0) {
-		TNF_PROBE_0_DEBUG(s1394_read_rest_of_cfgrom_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -876,17 +701,10 @@ s1394_read_rest_of_cfgrom(s1394_hal_t *hal, s1394_node_t *node,
 	    CMD1394_OVERRIDE_ADDR);
 	cmd->cmd_type = CMD1394_ASYNCH_RD_QUAD;
 
-	TNF_PROBE_2_DEBUG(s1394_read_rest_of_cfgrom, S1394_TNF_SL_HOTPLUG_STACK,
-	    "", tnf_uint, hal_gen, hal->generation_count, tnf_int, node_num,
-	    node->node_num);
-
 	QUAD_TO_CFGROM_ADDR(IEEE1394_LOCAL_BUS, node_num,
 	    node->cfgrom_quad_to_read, cmd->cmd_addr);
 	SETUP_QUAD_READ(node, 1, node->cfgrom_quad_to_read, 1);
 	if (s1394_read_config_quadlet(hal, cmd, status) != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_read_rest_of_cfgrom_exit,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "unable to start read");
 		/* free the command if it wasn't handed over to the HAL */
 		if (((*status) & S1394_CMD_INFLIGHT) == 0) {
 			(void) s1394_free_cmd(hal, (cmd1394_cmd_t **)&cmd);
@@ -894,17 +712,11 @@ s1394_read_rest_of_cfgrom(s1394_hal_t *hal, s1394_node_t *node,
 		if (((*status) & S1394_LOCK_FAILED) != 0) {
 			ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 		}
-		TNF_PROBE_0_DEBUG(s1394_read_rest_of_cfgrom_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	hal->cfgroms_being_read++;
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
-
-	TNF_PROBE_1_DEBUG(s1394_read_rest_of_cfgrom_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int, cfgrom_read_cnt,
-	    hal->cfgroms_being_read);
 
 	return (DDI_SUCCESS);
 }
@@ -930,14 +742,9 @@ s1394_cfgrom_scan_phase1(s1394_hal_t *hal)
 	s1394_selfid_pkt_t *selfid_pkt;
 	s1394_status_t status;
 
-	TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase1_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase1_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 	wait_for_cbs = 0;
@@ -1007,12 +814,6 @@ s1394_cfgrom_scan_phase1(s1394_hal_t *hal)
 				if (NODE_MATCHED(nnode) == B_TRUE &&
 				    LINK_ACTIVE(onode) == B_TRUE) {
 					CLEAR_CFGROM_STATE(nnode);
-					TNF_PROBE_3(s1394_cfgrom_scan_phase1,
-					    S1394_TNF_SL_HOTPLUG_ERROR,
-					    "", tnf_string, msg,
-					    "link lost power", tnf_int, node,
-					    node, tnf_int, onode,
-					    onode->node_num);
 				}
 			}
 		} else {
@@ -1033,9 +834,6 @@ s1394_cfgrom_scan_phase1(s1394_hal_t *hal)
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
 	if ((status & S1394_LOCK_FAILED) != 0) {
-		TNF_PROBE_1(s1394_cfrom_scan_phase1_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_string, msg, "Generations changed");
 		return (DDI_FAILURE);
 	}
 
@@ -1048,9 +846,6 @@ s1394_cfgrom_scan_phase1(s1394_hal_t *hal)
 	}
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
-
-	TNF_PROBE_0_DEBUG(s1394_cfrom_scan_phase1_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	return (ret);
 }
@@ -1088,18 +883,12 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 	s1394_get_quad_info(cmd, &node_num, &quadlet, &data);
 	ASSERT(quadlet == 0 || quadlet < IEEE1394_BIB_QUAD_SZ);
 
-	TNF_PROBE_0_DEBUG(s1394_br_thread_handle_cmd_phase1_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	cmdret = S1394_HCMD_NODE_EXPECT_MORE;
 
 	locked = 1;
 	freecmd = 1;
 
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_br_thread_handle_cmd_phase1,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-		    "unable to lock tree");
 		locked = 0;
 		goto bail;
 	}
@@ -1146,13 +935,6 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 				    IEEE1394_BIB_QUAD_SZ;
 				done++;
 			} else {
-
-				TNF_PROBE_4(s1394_br_thread_handle_cmd_phase1,
-				    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string,
-				    msg, "config rom generation changed",
-				    tnf_int, node_num, node_num,
-				    tnf_int, cur_gen, cur_gen, tnf_int, old_gen,
-				    CONFIG_ROM_GEN(node->cfgrom));
 
 				SET_CFGROM_GEN_CHANGED(node);
 				if (onode != NULL)
@@ -1217,13 +999,6 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 				CFGROM_READ_PAUSE(readdelay);
 				/* get next quadlet */
 				if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-					TNF_PROBE_3(
-					    s1394_br_thread_handle_cmd_phase1,
-					    S1394_TNF_SL_HOTPLUG_STACK, "",
-					    tnf_string, msg,
-					    "unable to relock tree", tnf_uint,
-					    node_num, node_num, tnf_int,
-					    quad_to_read, quadlet);
 					locked = 0;
 				} else if (s1394_read_config_quadlet(hal, cmd,
 				    &status) != DDI_SUCCESS) {
@@ -1233,13 +1008,6 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 					 * don't free it (it will get freed
 					 * later in the callback).
 					 */
-					TNF_PROBE_3(
-					    s1394_br_thread_handle_cmd_phase1,
-					    S1394_TNF_SL_HOTPLUG_STACK, "",
-					    tnf_string, msg,
-					    "unable to read", tnf_uint,
-					    node_num, node_num, tnf_int,
-					    quad_to_read, quadlet);
 					if ((status & S1394_CMD_INFLIGHT) !=
 					    0) {
 						freecmd = 0;
@@ -1268,12 +1036,6 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 				    SET_CFGROM_ALL_READ(node);
 				node->cfgrom_quad_to_read = quadlet;
 				done++;
-				TNF_PROBE_3_DEBUG(
-				    s1394_br_thread_handle_cmd_phase1,
-				    S1394_TNF_SL_HOTPLUG_STACK,
-				    "", tnf_string, msg, "read bus info blk",
-				    tnf_int, node_num, node->node_num,
-				    tnf_opaque, cfgrom, node->cfgrom);
 			}
 		}
 	} else {
@@ -1288,13 +1050,6 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 			s1394_unlock_tree(hal);
 			CFGROM_READ_PAUSE(readdelay);
 			if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-				TNF_PROBE_3(
-				    s1394_br_thread_handle_cmd_phase1,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "",
-				    tnf_string, msg,
-				    "unable to relock tree", tnf_uint,
-				    node_num, node_num, tnf_int,
-				    quad_to_read, quadlet);
 				locked = 0;
 			} else if (s1394_read_config_quadlet(hal, cmd,
 			    &status) != DDI_SUCCESS) {
@@ -1304,12 +1059,6 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 				 * don't free it (it will get freed
 				 * later in the callback).
 				 */
-				TNF_PROBE_3(
-				    s1394_br_thread_handle_cmd_phase1,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string,
-				    msg, "unable to re-read", tnf_uint,
-				    node_num, node_num, tnf_int, quad_to_read,
-				    quadlet);
 				if ((status & S1394_CMD_INFLIGHT) != 0) {
 					freecmd = 0;
 				}
@@ -1328,11 +1077,6 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 				freecmd = 0;
 			}
 		} else {
-			TNF_PROBE_4(s1394_br_thread_handle_cmd_phase1,
-			    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-			    "retries exceeded", tnf_int, node_num, node_num,
-			    tnf_int, quadlet, quadlet, tnf_opaque, cfgrom,
-			    node->cfgrom);
 			if (CFGROM_NEW_ALLOC(node) == B_TRUE) {
 				s1394_free_cfgrom(hal, node,
 				    S1394_FREE_CFGROM_NEW);
@@ -1348,9 +1092,6 @@ bail:
 
 	if (done) {
 		cmdret = S1394_HCMD_NODE_DONE;
-		TNF_PROBE_2_DEBUG(s1394_br_thread_handle_cmd_phase1,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-		    "done with node", tnf_int, node_num, node_num);
 	}
 
 	/* if we are bailing out because locking failed, locked == 0 */
@@ -1358,9 +1099,6 @@ bail:
 		cmdret = S1394_HCMD_LOCK_FAILED;
 	else
 		s1394_unlock_tree(hal);
-
-	TNF_PROBE_0_DEBUG(s1394_br_thread_handle_cmd_phase1_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	return (cmdret);
 }
@@ -1392,12 +1130,7 @@ s1394_cfgrom_scan_phase2(s1394_hal_t *hal)
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
-	TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase2_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase2_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1407,20 +1140,10 @@ s1394_cfgrom_scan_phase2(s1394_hal_t *hal)
 
 	if (s1394_process_old_tree(hal) != DDI_SUCCESS) {
 		ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
-		TNF_PROBE_1(s1394_cfgrom_scan_phase2,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "non-success return from process_old_tree");
-		TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase2_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_cfgrom_scan_phase2,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "unable to relock the tree");
-		TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase2_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1435,11 +1158,6 @@ s1394_cfgrom_scan_phase2(s1394_hal_t *hal)
 
 	/* Notify targets of the end of bus reset processing */
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_cfgrom_scan_phase2,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "unable to relock the tree after isoch notify");
-		TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase2_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1449,11 +1167,6 @@ s1394_cfgrom_scan_phase2(s1394_hal_t *hal)
 	s1394_unlock_tree(hal);
 	s1394_target_bus_reset_notifies(hal, &localinfo);
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_cfgrom_scan_phase2,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "unable to relock the tree after reset notify");
-		TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase2_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1469,21 +1182,11 @@ s1394_cfgrom_scan_phase2(s1394_hal_t *hal)
 	s1394_resend_pending_cmds(hal);
 
 	if (s1394_process_topology_tree(hal, &wait_for_cbs, &wait_gen)) {
-		TNF_PROBE_1(s1394_cfgrom_scan_phase2,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "non-success return from process_topology_tree");
-		TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase2_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 		return (DDI_FAILURE);
 	}
 
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_cfgrom_scan_phase2,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "unable to relock after processing topology tree");
-		TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase2_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1501,17 +1204,9 @@ s1394_cfgrom_scan_phase2(s1394_hal_t *hal)
 	if (wait_for_cbs != 0) {
 		ret = s1394_wait_for_cfgrom_callbacks(hal, wait_gen,
 		    s1394_br_thread_handle_cmd_phase2);
-
-		TNF_PROBE_2_DEBUG(s1394_cfgrom_scan_phase2,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-		    "returned from waiting for cfgrom callbacks", tnf_int, ret,
-		    ret);
 	}
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
-
-	TNF_PROBE_0_DEBUG(s1394_cfgrom_scan_phase2_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	return (ret);
 }
@@ -1539,9 +1234,6 @@ s1394_br_thread_handle_cmd_phase2(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 	uchar_t readdelay;
 	s1394_status_t status;
 
-	TNF_PROBE_0_DEBUG(s1394_br_thread_handle_cmd_phase2_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	/*
 	 * we end up here if this is a brand new node or if it is a known node
 	 * but the config ROM changed (and triggered a re-read).
@@ -1556,10 +1248,6 @@ s1394_br_thread_handle_cmd_phase2(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 	update_devinfo = 0;
 
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
-		TNF_PROBE_3(s1394_br_thread_handle_cmd_phase2,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "unable to lock tree", tnf_int, node_num, node_num,
-		    tnf_int, quadlet, quadlet);
 		locked = 0;
 		goto bail;
 	}
@@ -1577,12 +1265,6 @@ s1394_br_thread_handle_cmd_phase2(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 			 * Done with this node. Mark config rom valid and
 			 * update the devinfo tree for this node.
 			 */
-			TNF_PROBE_4_DEBUG(s1394_br_thread_handle_cmd_phase2,
-			    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-			    "all read", tnf_int, node_num, node->node_num,
-			    tnf_opaque, cfgrom, node->cfgrom, tnf_int, quadlet,
-			    quadlet);
-
 			node->cfgrom_valid_size = quadlet + 1;
 			if (s1394_valid_cfgrom(hal, node) == B_TRUE) {
 				SET_CFGROM_ALL_READ(node);
@@ -1598,20 +1280,9 @@ s1394_br_thread_handle_cmd_phase2(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 			CFGROM_READ_PAUSE(readdelay);
 			if (s1394_lock_tree(hal) != DDI_SUCCESS) {
 				locked = 0;
-				TNF_PROBE_3(s1394_br_thread_handle_cmd_phase2,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string,
-				    msg, "unable to relock the tree",
-				    tnf_int, node_num, node->node_num,
-				    tnf_int, quadlet, quadlet);
 			} else if (s1394_read_config_quadlet(hal, cmd,
 			    &status) != DDI_SUCCESS) {
 				/* give up on this guy */
-				TNF_PROBE_3(s1394_br_thread_handle_cmd_phase2,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string,
-				    msg, "cannot start quadlet read", tnf_int,
-				    node_num, node_num, tnf_int, quadlet,
-				    quadlet);
-
 				if ((status & S1394_CMD_INFLIGHT) != 0) {
 					freecmd = 0;
 				}
@@ -1646,11 +1317,6 @@ s1394_br_thread_handle_cmd_phase2(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 			CFGROM_READ_PAUSE(readdelay);
 			if (s1394_lock_tree(hal) != DDI_SUCCESS) {
 				locked = 0;
-				TNF_PROBE_3(s1394_br_thread_handle_cmd_phase2,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string,
-				    msg, "unable to relock for reread",
-				    tnf_int, node_num, node->node_num,
-				    tnf_int, quadlet, quadlet);
 			} else if (s1394_read_config_quadlet(hal, cmd,
 			    &status) != DDI_SUCCESS) {
 				if ((status & S1394_CMD_INFLIGHT) != 0) {
@@ -1660,13 +1326,6 @@ s1394_br_thread_handle_cmd_phase2(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 					locked = 0;
 				} else {
 					/* stop further reads */
-					TNF_PROBE_4(
-					    s1394_br_thread_handle_cmd_phase2,
-					    S1394_TNF_SL_HOTPLUG_ERROR, "",
-					    tnf_string, msg, "unable to retry",
-					    tnf_int, node_num, node->node_num,
-					    tnf_int, quadlet, quadlet,
-					    tnf_opaque, cfgrom, node->cfgrom);
 					node->cfgrom_valid_size = quadlet + 1;
 					if (s1394_valid_cfgrom(hal, node) ==
 					    B_TRUE) {
@@ -1683,13 +1342,6 @@ s1394_br_thread_handle_cmd_phase2(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 				freecmd = 0;
 			}
 		} else {
-
-			TNF_PROBE_4(s1394_br_thread_handle_cmd_phase2,
-			    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-			    "retries exceeded", tnf_int, node_num, node_num,
-			    tnf_int, quadlet, quadlet, tnf_opaque, cfgrom,
-			    node->cfgrom);
-
 			node->cfgrom_valid_size = quadlet + 1;
 			if (s1394_valid_cfgrom(hal, node) == B_TRUE) {
 				SET_CFGROM_ALL_READ(node);
@@ -1707,9 +1359,6 @@ bail:
 
 	if (done) {
 		cmdret = S1394_HCMD_NODE_DONE;
-		TNF_PROBE_2_DEBUG(s1394_br_thread_handle_cmd_phase2,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-		    "done with a node", tnf_int, node_num, node_num);
 	}
 
 	if (update_devinfo) {
@@ -1723,10 +1372,6 @@ bail:
 		if (s1394_update_devinfo_tree(hal, node) != DDI_SUCCESS) {
 			ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 			locked = 0;
-			TNF_PROBE_2(s1394_br_thread_handle_cmd_phase2,
-			    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-			    "update devinfo returned failure", tnf_int,
-			    node_num, node_num);
 		}
 	}
 
@@ -1735,9 +1380,6 @@ bail:
 		cmdret = S1394_HCMD_LOCK_FAILED;
 	else
 		s1394_unlock_tree(hal);
-
-	TNF_PROBE_1_DEBUG(s1394_br_thread_handle_cmd_phase2_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int, cmdret, (int)cmdret);
 
 	return (cmdret);
 }
@@ -1760,10 +1402,6 @@ s1394_read_config_quadlet(s1394_hal_t *hal, cmd1394_cmd_t *cmd,
 	node = &hal->topology_tree[node_num];
 	quadlet = node->cfgrom_quad_to_read;
 
-	TNF_PROBE_2_DEBUG(s1394_read_config_quadlet_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, node_num, node_num,
-	    tnf_uint, quadlet, quadlet);
-
 	/* Calculate the 64-bit address */
 	QUAD_TO_CFGROM_ADDR(IEEE1394_LOCAL_BUS, node_num, quadlet,
 	    cmd->cmd_addr);
@@ -1775,12 +1413,6 @@ s1394_read_config_quadlet(s1394_hal_t *hal, cmd1394_cmd_t *cmd,
 	if (ret != DDI_SUCCESS) {
 		*status |= S1394_UNKNOWN;
 		ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
-		TNF_PROBE_3(s1394_read_config_quadlet,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "failure from setup asynch command", tnf_uint, node_num,
-		    node_num, tnf_uint, quadlet, quadlet);
-		TNF_PROBE_0_DEBUG(s1394_read_config_quadlet_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1793,11 +1425,6 @@ s1394_read_config_quadlet(s1394_hal_t *hal, cmd1394_cmd_t *cmd,
 	} else {
 
 		s1394_cmd_priv_t *s_priv;
-
-		TNF_PROBE_3(s1394_read_config_quadlet,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "failure from xfer asynch command",
-		    tnf_int, quadlet, quadlet, tnf_int, node_num, node_num);
 
 		/* Remove from queue */
 		s1394_remove_q_asynch_cmd(hal, cmd);
@@ -1812,13 +1439,7 @@ s1394_read_config_quadlet(s1394_hal_t *hal, cmd1394_cmd_t *cmd,
 	if (s1394_lock_tree(hal) != DDI_SUCCESS) {
 		*status |= S1394_LOCK_FAILED;
 		ret = DDI_FAILURE;
-		TNF_PROBE_1(s1394_read_config_quadlet,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-		    "unable to relock the tree");
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_read_config_quadlet_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	return (ret);
 }
@@ -1840,9 +1461,6 @@ s1394_cfgrom_read_callback(cmd1394_cmd_t *cmd)
 	uint32_t node_num, quadlet, data;
 #endif
 
-	TNF_PROBE_0_DEBUG(s1394_cfgrom_read_callback_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	/* Get the Services Layer private area */
 	s_priv = S1394_GET_CMD_PRIV(cmd);
 
@@ -1852,11 +1470,6 @@ s1394_cfgrom_read_callback(cmd1394_cmd_t *cmd)
 
 	s1394_get_quad_info(cmd, &node_num, &quadlet, &data);
 
-	TNF_PROBE_5_DEBUG(s1394_cfgrom_read_callback,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, gen, cmd->bus_generation,
-	    tnf_int, quadlet, quadlet,
-	    tnf_int, node_num, node_num,
-	    tnf_int, data, data, tnf_int, result, cmd->cmd_result);
 #endif
 
 	if (cmd->cmd_result == CMD1394_EBUSRESET) {
@@ -1880,9 +1493,6 @@ s1394_cfgrom_read_callback(cmd1394_cmd_t *cmd)
 		cv_signal(&hal->br_cmplq_cv);
 		mutex_exit(&hal->br_cmplq_mutex);
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_cfgrom_read_callback_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -1897,11 +1507,7 @@ void
 s1394_cfgrom_parse_unit_dir(uint32_t *unit_dir, uint32_t *addr_hi,
     uint32_t *addr_lo, uint32_t *size_hi, uint32_t *size_lo)
 {
-	TNF_PROBE_0_DEBUG(s1394_cfgrom_parse_unit_dir_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 	*addr_hi = *addr_lo = *size_hi = *size_lo = 0;
-	TNF_PROBE_0_DEBUG(s1394_cfgrom_parse_unit_dir_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -1914,18 +1520,12 @@ s1394_get_quad_info(cmd1394_cmd_t *cmd, uint32_t *node_num, uint32_t *quadlet,
 {
 	uint64_t addr;
 
-	TNF_PROBE_0_DEBUG(s1394_get_quad_info_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	addr = cmd->cmd_addr;
 	*node_num = IEEE1394_ADDR_PHY_ID(addr);
 	*quadlet = ((addr & IEEE1394_ADDR_OFFSET_MASK) -
 	    IEEE1394_CONFIG_ROM_ADDR);
 	*quadlet = (*quadlet >> 2);
 	*data = T1394_DATA32(cmd->cmd_u.q.quadlet_data);
-
-	TNF_PROBE_0_DEBUG(s1394_get_quad_info_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -1948,9 +1548,6 @@ s1394_match_GUID(s1394_hal_t *hal, s1394_node_t *nnode)
 	s1394_target_t *t;
 	int	ret = DDI_SUCCESS;
 
-	TNF_PROBE_0_DEBUG(s1394_match_GUID_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 	ASSERT(nnode->cfgrom != NULL);
 	ASSERT(CFGROM_BIB_READ(nnode));
 
@@ -1969,12 +1566,6 @@ s1394_match_GUID(s1394_hal_t *hal, s1394_node_t *nnode)
 		if ((old_a == new_a) && (old_b == new_b)) {
 
 			if (NODE_MATCHED(onode) == B_TRUE) {
-				TNF_PROBE_4(s1394_match_GUID_duplicate,
-				    S1394_TNF_SL_HOTPLUG_ERROR, "",
-				    tnf_uint, guid_hi, old_a,
-				    tnf_uint, guid_lo, old_b,
-				    tnf_uint, old_node_num, old_node,
-				    tnf_uint, node_num, nnode->node_num);
 				cmn_err(CE_NOTE, "!Duplicate GUIDs: %08x%08x",
 				    old_a, old_b);
 				/* offline the new node that last matched */
@@ -1996,13 +1587,6 @@ s1394_match_GUID(s1394_hal_t *hal, s1394_node_t *nnode)
 			    (CONFIG_ROM_GEN(onode->cfgrom) !=
 			    CONFIG_ROM_GEN(nnode->cfgrom))) {
 				gen_changed = 1;
-				TNF_PROBE_4_DEBUG(s1394_match_GUID_gen_change,
-				    S1394_TNF_SL_HOTPLUG_STACK, "",
-				    tnf_opaque, old_cfgrom, onode->cfgrom,
-				    tnf_int, old_gen,
-				    CONFIG_ROM_GEN(onode->cfgrom), tnf_opaque,
-				    cfgrom, nnode->cfgrom, tnf_int, new_gen,
-				    CONFIG_ROM_GEN(nnode->cfgrom));
 			} else {
 				gen_changed = 0;
 			}
@@ -2026,10 +1610,6 @@ s1394_match_GUID(s1394_hal_t *hal, s1394_node_t *nnode)
 					ret = DDI_FAILURE;
 					break;
 				}
-				TNF_PROBE_2(s1394_match_GUID_gen_freecfg,
-				    S1394_TNF_SL_HOTPLUG_STACK, "",
-				    tnf_opaque, old_cfgrom, onode->cfgrom,
-				    tnf_opaque, new_cfgrom, nnode->cfgrom);
 				s1394_free_cfgrom(hal, onode,
 				    S1394_FREE_CFGROM_OLD);
 				CLEAR_CFGROM_PARSED(nnode);
@@ -2045,16 +1625,6 @@ s1394_match_GUID(s1394_hal_t *hal, s1394_node_t *nnode)
 			 * point it at the same config rom as the old one.
 			 */
 			if (onode->cfgrom != nnode->cfgrom) {
-
-				TNF_PROBE_5_DEBUG(s1394_match_GUID,
-				    S1394_TNF_SL_HOTPLUG_STACK, "",
-				    tnf_int, node_num, nnode->node_num,
-				    tnf_opaque, cfgrom, nnode->cfgrom,
-				    tnf_int, old_node_num, old_node,
-				    tnf_opaque, old_cfgrom, onode->cfgrom,
-				    tnf_uint, cfgrom_state,
-				    nnode->cfgrom_state);
-
 				ASSERT(CFGROM_NEW_ALLOC(nnode) == B_TRUE);
 				s1394_free_cfgrom(hal, nnode,
 				    S1394_FREE_CFGROM_NEW);
@@ -2086,9 +1656,6 @@ s1394_match_GUID(s1394_hal_t *hal, s1394_node_t *nnode)
 		}
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_match_GUID_exit, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 	return (ret);
 }
 
@@ -2104,9 +1671,6 @@ s1394_match_all_GUIDs(s1394_hal_t *hal)
 	int node;
 	int ret = DDI_SUCCESS;
 	s1394_node_t *nnode;
-
-	TNF_PROBE_0_DEBUG(s1394_match_all_GUIDs_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 
@@ -2137,9 +1701,6 @@ s1394_match_all_GUIDs(s1394_hal_t *hal)
 		}
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_match_all_GUIDs_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	return (ret);
 }
 
@@ -2154,16 +1715,10 @@ s1394_valid_cfgrom(s1394_hal_t *hal, s1394_node_t *node)
 {
 	uint32_t crc_len, crc_value, CRC, CRC_old, quad0;
 
-	TNF_PROBE_0_DEBUG(s1394_valid_cfgrom_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 	ASSERT(node->cfgrom);
 
 	if (s1394_enable_crc_validation == 0) {
-		TNF_PROBE_1_DEBUG(s1394_valid_cfgrom_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-		    "validation turned off");
 		return (B_TRUE);
 	}
 
@@ -2173,14 +1728,6 @@ s1394_valid_cfgrom(s1394_hal_t *hal, s1394_node_t *node)
 	crc_value = quad0 & IEEE1394_CFG_ROM_CRC_VALUE_MASK;
 
 	if (node->cfgrom_valid_size < crc_len + 1) {
-		TNF_PROBE_4(s1394_valid_cfgrom_not_enough,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "",
-		    tnf_uint, node_guid_hi, node->node_guid_hi,
-		    tnf_uint, node_guid_lo, node->node_guid_lo,
-		    tnf_uint, crc_len, crc_len,
-		    tnf_uint, valid_size, node->cfgrom_valid_size);
-		TNF_PROBE_0_DEBUG(s1394_valid_cfgrom_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (B_FALSE);
 	}
 
@@ -2189,14 +1736,6 @@ s1394_valid_cfgrom(s1394_hal_t *hal, s1394_node_t *node)
 	if (CRC != crc_value) {
 		CRC_old = s1394_CRC16_old(&node->cfgrom[1], crc_len);
 		if (CRC_old == crc_value) {
-			TNF_PROBE_4_DEBUG(s1394_valid_cfgrom_busted_crc,
-			    S1394_TNF_SL_HOTPLUG_ERROR, "",
-			    tnf_uint, node_guid_hi, node->node_guid_hi,
-			    tnf_uint, node_guid_lo, node->node_guid_lo,
-			    tnf_uint, node_num, node->node_num,
-			    tnf_uint, crc_len, crc_len);
-			TNF_PROBE_0_DEBUG(s1394_valid_cfgrom_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			return (B_TRUE);
 		}
 
@@ -2204,20 +1743,8 @@ s1394_valid_cfgrom(s1394_hal_t *hal, s1394_node_t *node)
 		    "!Bad CRC in config rom (node's GUID %08x%08x)",
 		    node->node_guid_hi, node->node_guid_lo);
 
-		TNF_PROBE_5(s1394_valid_cfgrom_bad_crc,
-		    S1394_TNF_SL_HOTPLUG_ERROR, "",
-		    tnf_uint, node_guid_hi, node->node_guid_hi,
-		    tnf_uint, node_guid_lo, node->node_guid_lo,
-		    tnf_uint, crc_len, crc_len,
-		    tnf_uint, crc, crc_value, tnf_uint, crc_computed, CRC);
-		TNF_PROBE_0_DEBUG(s1394_valid_cfgrom_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (B_FALSE);
 	}
-
-	TNF_PROBE_3_DEBUG(s1394_valid_cfgrom_exit, S1394_TNF_SL_HOTPLUG_STACK,
-	    "", tnf_uint, node_num, node->node_num, tnf_uint, crc_len, crc_len,
-	    tnf_uint, crc, crc_value);
 
 	return (B_TRUE);
 }
@@ -2234,9 +1761,6 @@ s1394_valid_dir(s1394_hal_t *hal, s1394_node_t *node,
 {
 	uint32_t dir_len, crc_value, CRC, CRC_old, quad0;
 
-	TNF_PROBE_0_DEBUG(s1394_valid_dir_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 	/*
 	 * Ideally, we would like to do crc validations for the entire cfgrom
 	 * as well as the individual directories. However, we have seen devices
@@ -2245,9 +1769,6 @@ s1394_valid_dir(s1394_hal_t *hal, s1394_node_t *node,
 	 * is sad, but unfortunately, real world!
 	 */
 	if (s1394_enable_crc_validation == 0) {
-		TNF_PROBE_1_DEBUG(s1394_valid_dir_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-		    "validation turned off");
 		return (B_TRUE);
 	}
 
@@ -2263,34 +1784,11 @@ s1394_valid_dir(s1394_hal_t *hal, s1394_node_t *node,
 	if (CRC != crc_value) {
 		CRC_old = s1394_CRC16_old(&dir[1], dir_len);
 		if (CRC_old == crc_value) {
-			TNF_PROBE_5_DEBUG(s1394_valid_dir_crc_old,
-			    S1394_TNF_SL_HOTPLUG_STACK, "",
-			    tnf_uint, node_guid_hi, node->node_guid_hi,
-			    tnf_uint, node_guid_lo, node->node_guid_lo,
-			    tnf_uint, node_num, node->node_num,
-			    tnf_uint, key, key, tnf_uint, dir_len, dir_len);
-			TNF_PROBE_0_DEBUG(s1394_valid_dir_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			return (B_TRUE);
 		}
 
-		TNF_PROBE_5(s1394_valid_dir_bad_crc,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_uint, node_guid_hi, node->node_guid_hi,
-		    tnf_uint, node_guid_lo, node->node_guid_lo,
-		    tnf_uint, node_num, node->node_num,
-		    tnf_uint, key, key, tnf_uint, dir_len, dir_len);
-
-		TNF_PROBE_0_DEBUG(s1394_valid_dir_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (B_FALSE);
 	}
-
-	TNF_PROBE_4_DEBUG(s1394_valid_dir,
-	    S1394_TNF_SL_HOTPLUG_STACK, "",
-	    tnf_uint, node_guid_hi, node->node_guid_hi,
-	    tnf_uint, node_guid_lo, node->node_guid_lo,
-	    tnf_uint, node_num, node->node_num, tnf_uint, key, key);
 
 	return (B_TRUE);
 }
@@ -2322,9 +1820,6 @@ s1394_become_bus_mgr(void *arg)
 	int		 err;
 	int		 ret;
 
-	TNF_PROBE_0_DEBUG(s1394_become_bus_mgr_enter, S1394_TNF_SL_BR_STACK,
-	    "");
-
 	hal = (s1394_hal_t *)arg;
 
 	/* Lock the topology tree */
@@ -2343,8 +1838,6 @@ s1394_become_bus_mgr(void *arg)
 
 	/* Make sure we aren't already the Bus Manager */
 	if (bm_node != -1) {
-		TNF_PROBE_0_DEBUG(s1394_become_bus_mgr_exit,
-		    S1394_TNF_SL_BR_STACK, "");
 		return;
 	}
 
@@ -2357,11 +1850,6 @@ s1394_become_bus_mgr(void *arg)
 		    IEEE1394_CSR_OFFSET_MASK), S1394_INVALID_NODE_NUM,
 		    hal_node_num, &old_value);
 		if (ret != DDI_SUCCESS) {
-			TNF_PROBE_1(s1394_become_bus_mgr_error,
-			    S1394_TNF_SL_BR_ERROR, "", tnf_string, msg,
-			    "Error in cswap32");
-			TNF_PROBE_0_DEBUG(s1394_become_bus_mgr_exit,
-			    S1394_TNF_SL_BR_STACK, "");
 			return;
 		}
 		curr_bus_mgr = IEEE1394_NODE_NUM(old_value);
@@ -2382,11 +1870,6 @@ s1394_become_bus_mgr(void *arg)
 		/* Remote */
 		if (s1394_alloc_cmd(hal, T1394_ALLOC_CMD_NOSLEEP, &cmd) !=
 		    DDI_SUCCESS) {
-			TNF_PROBE_1(s1394_become_bus_mgr_error,
-			    S1394_TNF_SL_BR_ERROR, "", tnf_string, msg,
-			    "Error in s1394_alloc_cmd()");
-			TNF_PROBE_0_DEBUG(s1394_become_bus_mgr_exit,
-			    S1394_TNF_SL_BR_STACK, "");
 			return;
 		}
 
@@ -2421,11 +1904,6 @@ s1394_become_bus_mgr(void *arg)
 		if (ret != DDI_SUCCESS) {
 			/* Need to free the command */
 			(void) s1394_free_cmd(hal, (cmd1394_cmd_t **)&cmd);
-			TNF_PROBE_1(s1394_become_bus_mgr_error,
-			    S1394_TNF_SL_BR_ERROR, "", tnf_string, msg,
-			    "Error in s1394_setup_asynch_command()");
-			TNF_PROBE_0_DEBUG(s1394_become_bus_mgr_exit,
-			    S1394_TNF_SL_BR_STACK, "");
 			return;
 		}
 
@@ -2451,9 +1929,6 @@ s1394_become_bus_mgr(void *arg)
 			(void) s1394_free_cmd(hal, (cmd1394_cmd_t **)&cmd);
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_become_bus_mgr_exit, S1394_TNF_SL_BR_STACK,
-	    "");
 }
 
 /*
@@ -2473,9 +1948,6 @@ s1394_become_bus_mgr_callback(cmd1394_cmd_t *cmd)
 	uint32_t hal_node_num;
 	uint32_t temp;
 	uint_t curr_bus_mgr;
-
-	TNF_PROBE_0_DEBUG(s1394_become_bus_mgr_callback_enter,
-	    S1394_TNF_SL_BR_STACK, "");
 
 	/* Get the Services Layer private area */
 	s_priv = S1394_GET_CMD_PRIV(cmd);
@@ -2506,11 +1978,6 @@ s1394_become_bus_mgr_callback(cmd1394_cmd_t *cmd)
 		mutex_exit(&hal->bus_mgr_node_mutex);
 
 	} else {
-		TNF_PROBE_2(s1394_become_bus_mgr_callback_error,
-		    S1394_TNF_SL_BR_ERROR, "", tnf_string, msg,
-		    "Error while attempting to become bus manager",
-		    tnf_uint, status, cmd->cmd_result);
-
 		mutex_enter(&hal->bus_mgr_node_mutex);
 
 		/* Don't know who the bus_mgr is */
@@ -2526,9 +1993,6 @@ s1394_become_bus_mgr_callback(cmd1394_cmd_t *cmd)
 
 	/* Unlock the topology tree */
 	mutex_exit(&hal->topology_tree_mutex);
-
-	TNF_PROBE_0_DEBUG(s1394_become_bus_mgr_callback_exit,
-	    S1394_TNF_SL_BR_STACK, "");
 }
 
 /*
@@ -2545,9 +2009,6 @@ s1394_bus_mgr_processing(s1394_hal_t *hal)
 {
 	int ret;
 	int IRM_node_num;
-
-	TNF_PROBE_0_DEBUG(s1394_bus_mgr_processing_enter,
-	    S1394_TNF_SL_BR_STACK, "");
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
@@ -2570,8 +2031,6 @@ s1394_bus_mgr_processing(s1394_hal_t *hal)
 
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
-	TNF_PROBE_0_DEBUG(s1394_bus_mgr_processing_exit,
-	    S1394_TNF_SL_BR_STACK, "");
 	return (ret);
 }
 
@@ -2597,9 +2056,6 @@ s1394_do_bus_mgr_processing(s1394_hal_t *hal)
 	uint_t	hal_node_num, number_of_nodes;
 	int	new_root, new_gap_cnt;
 
-	TNF_PROBE_0_DEBUG(s1394_do_bus_mgr_processing_enter,
-	    S1394_TNF_SL_BR_STACK, "");
-
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
 	/* Wait for Bus Manager to be determined */
@@ -2615,8 +2071,6 @@ s1394_do_bus_mgr_processing(s1394_hal_t *hal)
 		mutex_exit(&hal->br_thread_mutex);
 		mutex_exit(&hal->bus_mgr_node_mutex);
 
-		TNF_PROBE_0_DEBUG(s1394_do_bus_mgr_processing_exit,
-		    S1394_TNF_SL_BR_STACK, "");
 		return (1);
 	}
 	mutex_exit(&hal->br_thread_mutex);
@@ -2670,15 +2124,11 @@ s1394_do_bus_mgr_processing(s1394_hal_t *hal)
 			ret = s1394_do_phy_config_pkt(hal, new_root,
 			    new_gap_cnt, IRM_flags);
 		}
-		TNF_PROBE_0_DEBUG(s1394_do_bus_mgr_processing_exit,
-		    S1394_TNF_SL_BR_STACK, "");
 		return (ret);
 	}
 
 	s1394_unlock_tree(hal);
 
-	TNF_PROBE_0_DEBUG(s1394_do_bus_mgr_processing_exit,
-	    S1394_TNF_SL_BR_STACK, "");
 	return (ret);
 }
 
@@ -2691,9 +2141,6 @@ static void
 s1394_bus_mgr_timers_stop(s1394_hal_t *hal, timeout_id_t *bus_mgr_query_tid,
     timeout_id_t *bus_mgr_tid)
 {
-	TNF_PROBE_0_DEBUG(s1394_bus_mgr_timers_stop_enter,
-	    S1394_TNF_SL_BR_STACK, "");
-
 	/* Cancel the Bus Mgr timeouts (if necessary) */
 	if (*bus_mgr_tid != 0) {
 		(void) untimeout(*bus_mgr_tid);
@@ -2703,9 +2150,6 @@ s1394_bus_mgr_timers_stop(s1394_hal_t *hal, timeout_id_t *bus_mgr_query_tid,
 		(void) untimeout(*bus_mgr_query_tid);
 		*bus_mgr_query_tid = 0;
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_bus_mgr_timers_stop_exit,
-	    S1394_TNF_SL_BR_STACK, "");
 }
 
 /*
@@ -2719,9 +2163,6 @@ s1394_bus_mgr_timers_start(s1394_hal_t *hal, timeout_id_t *bus_mgr_query_tid,
 	boolean_t incumbant;
 	uint_t	  hal_node_num;
 	int	  IRM_node_num;
-
-	TNF_PROBE_0_DEBUG(s1394_bus_mgr_timers_start_enter,
-	    S1394_TNF_SL_BR_STACK, "");
 
 	mutex_enter(&hal->topology_tree_mutex);
 
@@ -2739,9 +2180,6 @@ s1394_bus_mgr_timers_start(s1394_hal_t *hal, timeout_id_t *bus_mgr_query_tid,
 		 * before checking BUS_MANAGER_ID register
 		 */
 		if (IRM_node_num == IEEE1394_NODE_NUM(hal_node_num)) {
-
-			TNF_PROBE_0_DEBUG(s1394_bus_mgr_timers_625ms,
-			    S1394_TNF_SL_BR_STACK, "");
 
 			mutex_exit(&hal->topology_tree_mutex);
 
@@ -2765,9 +2203,6 @@ s1394_bus_mgr_timers_start(s1394_hal_t *hal, timeout_id_t *bus_mgr_query_tid,
 			} else {
 				hal->abdicate_bus_mgr_bit = 0;
 
-				TNF_PROBE_0_DEBUG(s1394_bus_mgr_timers_125ms,
-				    S1394_TNF_SL_BR_STACK, "");
-
 				mutex_exit(&hal->topology_tree_mutex);
 
 				/* Wait 125ms, then try to become bus manager */
@@ -2785,9 +2220,6 @@ s1394_bus_mgr_timers_start(s1394_hal_t *hal, timeout_id_t *bus_mgr_query_tid,
 	}
 
 	mutex_exit(&hal->topology_tree_mutex);
-
-	TNF_PROBE_0_DEBUG(s1394_bus_mgr_timers_start_exit,
-	    S1394_TNF_SL_BR_STACK, "");
 }
 
 /*
@@ -2815,9 +2247,6 @@ s1394_get_maxpayload(s1394_target_t *target, uint_t *dev_max_payload,
 	uint_t curr_speed;
 	uint_t speed_max_blk;
 	uint_t temp;
-
-	TNF_PROBE_0_DEBUG(s1394_get_maxpayload_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	/* Find the HAL this target resides on */
 	hal = target->on_hal;
@@ -2869,9 +2298,6 @@ s1394_get_maxpayload(s1394_target_t *target, uint_t *dev_max_payload,
 		(*dev_max_payload) = local_max_blk;
 		(*current_max_payload) = local_max_blk;
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_get_maxpayload_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -2888,9 +2314,6 @@ s1394_cycle_master_capable(s1394_hal_t *hal)
 	int		cycle_master_capable;
 	uint_t		hal_node_num;
 
-	TNF_PROBE_0_DEBUG(s1394_cycle_master_capable_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 
 	hal_node_num = IEEE1394_NODE_NUM(hal->node_id);
@@ -2900,9 +2323,6 @@ s1394_cycle_master_capable(s1394_hal_t *hal)
 
 	/* Ignore, if we are already root */
 	if (root == &hal->topology_tree[hal_node_num]) {
-		TNF_PROBE_2_DEBUG(s1394_cmstr_capable_hal,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int,
-		    node_num, hal_node_num, tnf_int, ret, 1);
 		return (1);
 	}
 
@@ -2913,12 +2333,6 @@ s1394_cycle_master_capable(s1394_hal_t *hal)
 	if (LINK_ACTIVE(root) == B_FALSE || root->cfgrom == NULL ||
 	    CFGROM_BIB_READ(root) == 0) {
 
-		TNF_PROBE_4_DEBUG(s1394_cmstr_capable_not_hal,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int,
-		    root, root->node_num, tnf_int, link_active,
-		    LINK_ACTIVE(root), tnf_opaque, cfgrom, root->cfgrom,
-		    tnf_int, bib, CFGROM_BIB_READ(root));
-
 		return (0);
 	}
 
@@ -2927,14 +2341,8 @@ s1394_cycle_master_capable(s1394_hal_t *hal)
 	    IEEE1394_BIB_CMC_MASK;
 
 	if (cycle_master_capable) {
-		TNF_PROBE_1_DEBUG(s1394_cmstr_capable_root,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int,
-		    root, root->node_num);
 		return (1);
 	} else {
-		TNF_PROBE_1(s1394_cmstr_not_capable_root,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int,
-		    root, root->node_num);
 		return (0);
 	}
 }
@@ -2961,9 +2369,6 @@ s1394_do_phy_config_pkt(s1394_hal_t *hal, int new_root, int new_gap_cnt,
 	uint32_t	 root = 0;
 	int		 ret, result;
 	uint_t		 flags = 0;
-
-	TNF_PROBE_0_DEBUG(s1394_do_phy_config_pkt_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	/* Gap count needs to be optimized */
 	if (IRM_flags & GAP_COUNT) {
@@ -2994,19 +2399,12 @@ s1394_do_phy_config_pkt(s1394_hal_t *hal, int new_root, int new_gap_cnt,
 
 	if (IRM_flags) {
 		if (s1394_alloc_cmd(hal, flags, &cmd) != DDI_SUCCESS) {
-			TNF_PROBE_1_DEBUG(s1394_do_phy_config_pkt_error,
-			    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-			    "Unable to allocate PHY config packet");
-			TNF_PROBE_0_DEBUG(s1394_do_phy_config_pkt_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			return (0);
 		}
 
 		if (s1394_lock_tree(hal) != DDI_SUCCESS) {
 			/* lock tree failure indicates a bus gen change */
 			(void) s1394_free_cmd(hal, (cmd1394_cmd_t **)&cmd);
-			TNF_PROBE_0_DEBUG(s1394_do_phy_config_pkt_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			return (1);
 		}
 
@@ -3045,15 +2443,8 @@ s1394_do_phy_config_pkt(s1394_hal_t *hal, int new_root, int new_gap_cnt,
 		    (h1394_cmd_priv_t *)&s_priv->hal_cmd_private, &result);
 
 		if (ret != DDI_SUCCESS) {
-			TNF_PROBE_2_DEBUG(s1394_do_phy_config_pkt_error,
-			    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-			    "Unable to send PHY config packet",
-			    tnf_int, result, result);
-
 			(void) s1394_free_cmd(hal, (cmd1394_cmd_t **)&cmd);
 
-			TNF_PROBE_0_DEBUG(s1394_do_phy_config_pkt_exit,
-			    S1394_TNF_SL_HOTPLUG_STACK, "");
 			return (0);
 
 		} else {
@@ -3066,8 +2457,6 @@ s1394_do_phy_config_pkt(s1394_hal_t *hal, int new_root, int new_gap_cnt,
 		}
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_do_phy_config_pkt_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 	return (0);
 }
 
@@ -3085,9 +2474,6 @@ s1394_phy_config_callback(cmd1394_cmd_t *cmd)
 	s1394_hal_t *hal;
 	uint32_t IRM_flags;
 
-	TNF_PROBE_0_DEBUG(s1394_phy_config_callback_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
-
 	/* Get the Services Layer private area */
 	s_priv = S1394_GET_CMD_PRIV(cmd);
 
@@ -3096,10 +2482,6 @@ s1394_phy_config_callback(cmd1394_cmd_t *cmd)
 	IRM_flags = (uint32_t)(uintptr_t)cmd->cmd_callback_arg;
 
 	if (cmd->cmd_result != CMD1394_CMDSUCCESS) {
-		TNF_PROBE_2_DEBUG(s1394_do_phy_config_pkt_error,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-		    "Error sending PHY config packet",
-		    tnf_int, result, cmd->cmd_result);
 		(void) s1394_free_cmd(hal, &cmd);
 	} else {
 		(void) s1394_free_cmd(hal, &cmd);
@@ -3109,9 +2491,6 @@ s1394_phy_config_callback(cmd1394_cmd_t *cmd)
 			s1394_initiate_hal_reset(hal, NON_CRITICAL);
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_phy_config_callback_exit,
-	    S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*
@@ -3128,32 +2507,16 @@ s1394_lock_tree(s1394_hal_t *hal)
 	ASSERT(MUTEX_NOT_HELD(&hal->br_thread_mutex));
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
-	TNF_PROBE_0_DEBUG(s1394_lock_tree_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 	mutex_enter(&hal->br_thread_mutex);
 	ndi_devi_enter(hal->halinfo.dip, &circular);
 	mutex_enter(&hal->topology_tree_mutex);
 
 	if ((hal->br_thread_ev_type & BR_THR_GO_AWAY) != 0) {
-		TNF_PROBE_2(s1394_lock_tree_go_away,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_int, hal_generation, hal->generation_count,
-		    tnf_int, br_thread_gen, hal->br_cfgrom_read_gen);
-		TNF_PROBE_0_DEBUG(s1394_lock_tree_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		mutex_exit(&hal->br_thread_mutex);
 		mutex_exit(&hal->topology_tree_mutex);
 		ndi_devi_exit(hal->halinfo.dip, circular);
 		return (DDI_FAILURE);
 	} else if (hal->br_cfgrom_read_gen != hal->generation_count) {
-		TNF_PROBE_2(s1394_lock_tree_gen_changed,
-		    S1394_TNF_SL_HOTPLUG_STACK, "",
-		    tnf_int, hal_generation, hal->generation_count,
-		    tnf_int, br_thread_gen, hal->br_cfgrom_read_gen);
-
-		TNF_PROBE_0_DEBUG(s1394_lock_tree_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		mutex_exit(&hal->br_thread_mutex);
 		mutex_exit(&hal->topology_tree_mutex);
 		ndi_devi_exit(hal->halinfo.dip, circular);
@@ -3161,8 +2524,6 @@ s1394_lock_tree(s1394_hal_t *hal)
 	}
 
 	mutex_exit(&hal->br_thread_mutex);
-
-	TNF_PROBE_0_DEBUG(s1394_lock_tree_exit, S1394_TNF_SL_HOTPLUG_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -3174,15 +2535,9 @@ s1394_lock_tree(s1394_hal_t *hal)
 void
 s1394_unlock_tree(s1394_hal_t *hal)
 {
-	TNF_PROBE_0_DEBUG(s1394_unlock_tree_enter, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
-
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 	mutex_exit(&hal->topology_tree_mutex);
 	ndi_devi_exit(hal->halinfo.dip, 0);
-
-	TNF_PROBE_0_DEBUG(s1394_unlock_tree_exit, S1394_TNF_SL_HOTPLUG_STACK,
-	    "");
 }
 
 /*
@@ -3206,16 +2561,9 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 
-	TNF_PROBE_4_DEBUG(s1394_calc_next_quad_enter,
-	    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_uint, node_num, node->node_num,
-	    tnf_uint, quadlet, quadlet, tnf_int, cfgrom_size, node->cfgrom_size,
-	    tnf_uint, hal_gen, hal->generation_count);
-
 	if (((quadlet + 1) >= node->cfgrom_size) ||
 	    (CFGROM_SIZE_IS_CRCSIZE(node) == B_TRUE && (quadlet + 1) >=
 		node->cfgrom_valid_size)) {
-		TNF_PROBE_0_DEBUG(s1394_calc_next_quad_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "");
 		return (1);
 	}
 
@@ -3223,10 +2571,6 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 	    B_TRUE) {
 		quadlet++;
 		*nextquadp = quadlet;
-		TNF_PROBE_3_DEBUG(s1394_calc_next_quad_exit,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string, msg,
-		    "dir stack turned off", tnf_uint, quadlet, quadlet,
-		    tnf_opaque, cfgrom, node->cfgrom);
 		return (0);
 	}
 
@@ -3246,10 +2590,6 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 	 */
 	if (node->expected_dir_quad == quadlet) {
 		if (type != 0 || key != 0) {
-			TNF_PROBE_3_DEBUG(s1394_calc_next_quad,
-			    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string, msg,
-			    "bad directory turning off stack", tnf_uint,
-			    quadlet, quadlet, tnf_uint, data, data);
 			SET_CFGROM_DIR_STACK_OFF(node);
 			quadlet = IEEE1212_ROOT_DIR_QUAD;
 		} else {
@@ -3278,10 +2618,6 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 			if (node->expected_type == IEEE1212_LEAF_TYPE) {
 				node->expected_type = IEEE1212_IMMEDIATE_TYPE;
 				done_with_cur_dir = B_TRUE;
-				TNF_PROBE_2_DEBUG(s1394_calc_next_quad,
-				    S1394_TNF_SL_HOTPLUG_STACK, "",
-				    tnf_string, msg, "done with a leaf",
-				    tnf_uint, quadlet, quadlet);
 				goto donewithcurdir;
 			}
 
@@ -3305,16 +2641,7 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 					    ((node->cfgrom[0] >>
 					    IEEE1394_CFG_ROM_CRC_LEN_SHIFT) &
 					    IEEE1394_CFG_ROM_CRC_LEN_MASK);
-					TNF_PROBE_2(s1394_calc_next_quad,
-					    S1394_TNF_SL_HOTPLUG_ERROR, "",
-					    tnf_string, msg, "crc sz is cfg sz",
-					    tnf_uint, size,
-					    node->cfgrom_valid_size);
 				}
-				TNF_PROBE_2_DEBUG(s1394_calc_next_quad_exit,
-				    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_string,
-				    msg, "crc error", tnf_uint, quadlet,
-				    quadlet);
 				*nextquadp = IEEE1212_ROOT_DIR_QUAD;
 				return (0);
 			}
@@ -3340,25 +2667,11 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 					 */
 					top = ++node->dir_stack_top;
 					if (top == S1394_DIR_STACK_SIZE) {
-
-						TNF_PROBE_2_DEBUG(
-						    s1394_calc_next_quad_exit,
-						    S1394_TNF_SL_HOTPLUG_STACK,
-						    "", tnf_string, msg,
-						    "dir stack overflow",
-						    tnf_uint, quadlet, quadlet);
 						SET_CFGROM_DIR_STACK_OFF(node);
 						*nextquadp =
 						    IEEE1212_ROOT_DIR_QUAD;
 						return (0);
 					}
-
-					TNF_PROBE_3_DEBUG(
-					    s1394_calc_next_quad,
-					    S1394_TNF_SL_HOTPLUG_STACK, "",
-					    tnf_string, msg, "push dir stack",
-					    tnf_uint, quadlet, quadlet,
-					    tnf_int, top, top);
 
 					node->dir_stack[top].dir_start =
 					    node->cur_dir_start;
@@ -3383,12 +2696,6 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 				 * all done with cur dir; pop it off the stack
 				 */
 				if (node->dir_stack_top >= 0) {
-					TNF_PROBE_3_DEBUG(
-					    s1394_calc_next_quad_exit,
-					    S1394_TNF_SL_HOTPLUG_STACK, "",
-					    tnf_string, msg, "pop dir stack",
-					    tnf_uint, quadlet, quadlet,
-					    tnf_int, top, node->dir_stack_top);
 					top = node->dir_stack_top--;
 					node->cur_dir_start =
 					    node->dir_stack[top].dir_start;
@@ -3401,10 +2708,6 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 					 * if empty stack, we are at the top
 					 * level; declare done.
 					 */
-					TNF_PROBE_1_DEBUG(
-					    s1394_calc_next_quad_exit,
-					    S1394_TNF_SL_HOTPLUG_STACK, "",
-					    tnf_string, msg, "all done");
 					return (1);
 				}
 			}
@@ -3414,9 +2717,6 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 		}
 	}
 	*nextquadp = quadlet;
-
-	TNF_PROBE_1_DEBUG(s1394_calc_next_quad_exit, S1394_TNF_SL_HOTPLUG_STACK,
-	    "", tnf_uint, next_quad, quadlet);
 
 	return (0);
 }

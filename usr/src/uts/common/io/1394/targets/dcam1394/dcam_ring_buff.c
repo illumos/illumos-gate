@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * dcam_ring_buff.c
  *
@@ -37,7 +35,6 @@
 #include <sys/ddidmareq.h>
 #include <sys/types.h>
 #include <sys/inttypes.h>
-#include <sys/tnf_probe.h>
 #include <sys/cmn_err.h>
 
 #include <sys/1394/targets/dcam1394/dcam.h>

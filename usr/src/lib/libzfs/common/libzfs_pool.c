@@ -28,6 +28,7 @@
  * Copyright (c) 2017 Datto Inc.
  * Copyright (c) 2017, Intel Corporation.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <ctype.h>
@@ -3960,17 +3961,70 @@ set_path(zpool_handle_t *zhp, nvlist_t *nv, const char *path)
 }
 
 /*
- * Given a vdev, return the name to display in iostat.  If the vdev has a path,
- * we use that, stripping off any leading "/dev/dsk/"; if not, we use the type.
- * We also check if this is a whole disk, in which case we strip off the
- * trailing 's0' slice name.
- *
- * This routine is also responsible for identifying when disks have been
+ * This routine is responsible for identifying when disks have been
  * reconfigured in a new location.  The kernel will have opened the device by
  * devid, but the path will still refer to the old location.  To catch this, we
- * first do a path -> devid translation (which is fast for the common case).  If
- * the devid matches, we're done.  If not, we do a reverse devid -> path
- * translation and issue the appropriate ioctl() to update the path of the vdev.
+ * first do a path -> devid translation (which is fast for the common case).
+ * If the devid matches, we're done.  If not, we do a reverse devid -> path
+ * translation and issue the appropriate ioctl() to update the path of the
+ * vdev.
+ */
+void
+zpool_vdev_refresh_path(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv)
+{
+	char *path = NULL;
+	char *newpath = NULL;
+	char *physpath = NULL;
+	char *devid = NULL;
+
+	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) != 0) {
+		return;
+	}
+
+	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_DEVID, &devid) == 0) {
+		/*
+		 * This vdev has a devid.  We can use it to check the current
+		 * path.
+		 */
+		char *newdevid = path_to_devid(path);
+
+		if (newdevid == NULL || strcmp(devid, newdevid) != 0) {
+			newpath = devid_to_path(devid);
+		}
+
+		if (newdevid != NULL) {
+			devid_str_free(newdevid);
+		}
+
+	} else if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PHYS_PATH,
+	    &physpath) == 0) {
+		/*
+		 * This vdev does not have a devid, but it does have a physical
+		 * path.  Attempt to translate this to a /dev path.
+		 */
+		newpath = path_from_physpath(hdl, path, physpath);
+	}
+
+	if (newpath == NULL) {
+		/*
+		 * No path update is required.
+		 */
+		return;
+	}
+
+	set_path(zhp, nv, newpath);
+	fnvlist_add_string(nv, ZPOOL_CONFIG_PATH, newpath);
+
+	free(newpath);
+}
+
+/*
+ * Given a vdev, return the name to display in iostat.  If the vdev has a path,
+ * we use that, stripping off any leading "/dev/dsk/"; if not, we use the type.
+ * We will confirm that the path and name of the vdev are current, and update
+ * them if not.  We also check if this is a whole disk, in which case we strip
+ * off the trailing 's0' slice name.
+ *
  * If 'zhp' is NULL, then this is an exported pool, and we don't need to do any
  * of these checks.
  */
@@ -4013,9 +4067,6 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 	} else if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
 		vdev_stat_t *vs;
 		uint_t vsc;
-		char *newpath = NULL;
-		char *physpath = NULL;
-		char *devid = NULL;
 
 		/*
 		 * If the device is dead (faulted, offline, etc) then don't
@@ -4030,42 +4081,12 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 			goto after_open;
 		}
 
-		if (nvlist_lookup_string(nv, ZPOOL_CONFIG_DEVID, &devid) == 0) {
-			/*
-			 * This vdev has a devid.  We can use it to check the
-			 * current path.
-			 */
-			char *newdevid = path_to_devid(path);
-
-			if (newdevid == NULL || strcmp(devid, newdevid) != 0) {
-				newpath = devid_to_path(devid);
-			}
-
-			if (newdevid != NULL)
-				devid_str_free(newdevid);
-
-		} else if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PHYS_PATH,
-		    &physpath) == 0) {
-			/*
-			 * This vdev does not have a devid, but it does have a
-			 * physical path.  Attempt to translate this to a /dev
-			 * path.
-			 */
-			newpath = path_from_physpath(hdl, path, physpath);
-		}
-
-		if (newpath != NULL) {
-			/*
-			 * Update the path appropriately.
-			 */
-			set_path(zhp, nv, newpath);
-			if (nvlist_add_string(nv, ZPOOL_CONFIG_PATH,
-			    newpath) == 0) {
-				verify(nvlist_lookup_string(nv,
-				    ZPOOL_CONFIG_PATH, &path) == 0);
-			}
-			free(newpath);
-		}
+		/*
+		 * Refresh the /dev path for this vdev if required, then ensure
+		 * we're using the latest path value:
+		 */
+		zpool_vdev_refresh_path(hdl, zhp, nv);
+		path = fnvlist_lookup_string(nv, ZPOOL_CONFIG_PATH);
 
 		if (name_flags & VDEV_NAME_FOLLOW_LINKS) {
 			char *rp = realpath(path, NULL);

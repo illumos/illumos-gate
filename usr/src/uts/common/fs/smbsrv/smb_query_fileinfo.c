@@ -21,7 +21,8 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -88,8 +89,6 @@ static boolean_t smb_query_pipe_valid_infolev(smb_request_t *, uint16_t);
 
 static int smb_query_encode_response(smb_request_t *, smb_xa_t *,
     uint16_t, smb_queryinfo_t *);
-static boolean_t smb_stream_fits(smb_request_t *, mbuf_chain_t *,
-    char *, uint32_t);
 static int smb_query_pathname(smb_request_t *, smb_node_t *, boolean_t,
     smb_queryinfo_t *);
 
@@ -599,10 +598,9 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
  *    those streams but there should not be an entry for the unnamed
  *    stream.
  *
- * Note that the stream name lengths exclude the null terminator but
- * the field lengths (i.e. next offset calculations) need to include
- * the null terminator and be padded to a multiple of 8 bytes. The
- * last entry does not seem to need any padding.
+ * Note that the stream names are NOT null terminated, and the lengths
+ * reflect that.  Entries are aligned on 8-byte boundaries with padding
+ * and the "next offset" tells where the next entry begins.
  *
  * If an error is encountered when trying to read the stream entries
  * (smb_odir_read_streaminfo) it is treated as if there are no [more]
@@ -616,22 +614,17 @@ smb_query_encode_response(smb_request_t *sr, smb_xa_t *xa,
  */
 uint32_t
 smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
-	smb_queryinfo_t *qinfo)
+    smb_queryinfo_t *qinfo)
 {
 	char *stream_name;
-	uint32_t next_offset;
 	uint32_t stream_nlen;
-	uint32_t pad;
-	u_offset_t datasz, allocsz;
-	smb_streaminfo_t *sinfo, *sinfo_next;
+	smb_streaminfo_t *sinfo;
 	int rc = 0;
-	boolean_t done = B_FALSE;
-	boolean_t eos = B_FALSE;
+	int prev_ent_off;
+	int cur_ent_off;
 	smb_odir_t *od = NULL;
 	uint32_t status = 0;
-
 	smb_node_t *fnode = qinfo->qi_node;
-	smb_attr_t *attr = &qinfo->qi_attr;
 
 	ASSERT(fnode);
 	if (SMB_IS_STREAM(fnode)) {
@@ -641,12 +634,52 @@ smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
 	ASSERT(fnode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(fnode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	sinfo = kmem_alloc(sizeof (smb_streaminfo_t), KM_SLEEP);
-	sinfo_next = kmem_alloc(sizeof (smb_streaminfo_t), KM_SLEEP);
-	datasz = attr->sa_vattr.va_size;
-	allocsz = attr->sa_allocsz;
+	sinfo = smb_srm_alloc(sr, sizeof (smb_streaminfo_t));
 
-	status = smb_odir_openat(sr, fnode, &od);
+	/*
+	 * Keep track of where the last entry starts so we can
+	 * come back and poke the NextEntryOffset field.  Also,
+	 * after enumeration finishes, the caller uses this to
+	 * poke the last entry again with zero to mark it as
+	 * the end of the enumeration.
+	 */
+	ASSERT(mbc->chain_offset == 0);
+	cur_ent_off = prev_ent_off = 0;
+
+	/*
+	 * If the unnamed stream is a file, encode an entry for
+	 * the unnamed stream.  Note we can't generally get the
+	 * size or allocsize from qi_attr because those may be
+	 * from one of the named streams.  Get the sizes.
+	 */
+	if (smb_node_is_file(fnode)) {
+		smb_attr_t attr;
+		uint64_t datasz, allocsz;
+
+		bzero(&attr, sizeof (attr));
+		attr.sa_mask = SMB_AT_SIZE | SMB_AT_ALLOCSZ;
+		rc = smb_node_getattr(sr, fnode, sr->user_cr, NULL, &attr);
+		if (rc != 0) {
+			status = smb_errno2status(rc);
+			goto out;
+		}
+
+		stream_name = "::$DATA";
+		stream_nlen = smb_ascii_or_unicode_strlen(sr, stream_name);
+		datasz = attr.sa_vattr.va_size;
+		allocsz = attr.sa_allocsz;
+		/* Leave NextEntryOffset=0, set later. */
+		rc = smb_mbc_encodef(mbc, "%llqq#u", sr,
+		    0, stream_nlen, datasz, allocsz,
+		    stream_nlen, stream_name);
+		if (rc != 0) {
+			/* Ran out of room. */
+			status = NT_STATUS_BUFFER_OVERFLOW;
+			goto out;
+		}
+	}
+
+	status = smb_odir_openat(sr, fnode, &od, B_TRUE);
 	switch (status) {
 	case 0:
 		break;
@@ -655,121 +688,67 @@ smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
 	case NT_STATUS_NOT_SUPPORTED:
 		/* No streams. */
 		status = 0;
-		done = B_TRUE;
-		break;
+		goto out;
 	default:
-		return (status);
+		goto out;
 	}
 
-	if (!done) {
+	for (;;) {
+		boolean_t eos = B_FALSE;
 		rc = smb_odir_read_streaminfo(sr, od, sinfo, &eos);
-		if ((rc != 0) || (eos))
-			done = B_TRUE;
-	}
-
-	/* If not a directory, encode an entry for the unnamed stream. */
-	if (qinfo->qi_isdir == 0) {
-		stream_name = "::$DATA";
-		stream_nlen = smb_ascii_or_unicode_strlen(sr, stream_name);
-		next_offset = SMB_STREAM_ENCODE_FIXED_SZ + stream_nlen +
-		    smb_ascii_or_unicode_null_len(sr);
-
-		/* Can unnamed stream fit in response buffer? */
-		if (MBC_ROOM_FOR(mbc, next_offset) == 0) {
-			done = B_TRUE;
-			status = NT_STATUS_BUFFER_OVERFLOW;
-		} else {
-			/* Can first named stream fit in rsp buffer? */
-			if (!done && !smb_stream_fits(sr, mbc, sinfo->si_name,
-			    next_offset)) {
-				done = B_TRUE;
-				status = NT_STATUS_BUFFER_OVERFLOW;
-			}
-
-			if (done)
-				next_offset = 0;
-
-			(void) smb_mbc_encodef(mbc, "%llqqu", sr,
-			    next_offset, stream_nlen, datasz, allocsz,
-			    stream_name);
-		}
-	}
-
-	/*
-	 * If there is no next entry, or there is not enough space in
-	 * the response buffer for the next entry, the next_offset and
-	 * padding are 0.
-	 */
-	while (!done) {
-		stream_nlen = smb_ascii_or_unicode_strlen(sr, sinfo->si_name);
-		sinfo_next->si_name[0] = 0;
-
-		rc = smb_odir_read_streaminfo(sr, od, sinfo_next, &eos);
 		if ((rc != 0) || (eos)) {
-			done = B_TRUE;
-		} else {
-			next_offset = SMB_STREAM_ENCODE_FIXED_SZ +
-			    stream_nlen +
-			    smb_ascii_or_unicode_null_len(sr);
-			pad = smb_pad_align(next_offset, 8);
-			next_offset += pad;
-
-			/* Can next named stream fit in response buffer? */
-			if (!smb_stream_fits(sr, mbc, sinfo_next->si_name,
-			    next_offset)) {
-				done = B_TRUE;
-				status = NT_STATUS_BUFFER_OVERFLOW;
-			}
+			status = 0;
+			break; // normal termination
 		}
 
-		if (done) {
-			next_offset = 0;
-			pad = 0;
+		/*
+		 * We have a directory entry to process.
+		 * Align before encoding.
+		 */
+		rc = smb_mbc_put_align(mbc, 8);
+		if (rc != 0) {
+			status = NT_STATUS_BUFFER_OVERFLOW;
+			break;
 		}
+		cur_ent_off = mbc->chain_offset;
 
-		(void) smb_mbc_encodef(mbc, "%llqqu#.",
-		    sr, next_offset, stream_nlen,
+		/*
+		 * Encode it.
+		 */
+		stream_name = sinfo->si_name;
+		stream_nlen = smb_ascii_or_unicode_strlen(sr, stream_name);
+		/* Leave NextEntryOffset=0, set later. */
+		rc = smb_mbc_encodef(mbc, "%llqq#u", sr,
+		    0, stream_nlen,
 		    sinfo->si_size, sinfo->si_alloc_size,
-		    sinfo->si_name, pad);
+		    stream_nlen, stream_name);
+		if (rc != 0) {
+			status = NT_STATUS_BUFFER_OVERFLOW;
+			break;
+		}
 
-		(void) memcpy(sinfo, sinfo_next, sizeof (smb_streaminfo_t));
+		/*
+		 * We succeeded encoding the current entry, so
+		 * fill in NextEntryOffset in the previous entry.
+		 * When listing streams on a file, we're always at
+		 * the 2nd or later entry due to "::$DATA" above.
+		 * However, when listing streams on a directory,
+		 * there might not be previous entry.
+		 */
+		if (cur_ent_off > 0) {
+			(void) smb_mbc_poke(mbc, prev_ent_off, "l",
+			    cur_ent_off - prev_ent_off);
+		}
+		prev_ent_off = cur_ent_off;
 	}
 
-	kmem_free(sinfo, sizeof (smb_streaminfo_t));
-	kmem_free(sinfo_next, sizeof (smb_streaminfo_t));
+out:
 	if (od) {
 		smb_odir_close(od);
 		smb_odir_release(od);
 	}
 
 	return (status);
-}
-
-/*
- * smb_stream_fits
- *
- * Check if the named stream entry can fit in the response buffer.
- *
- * Required space =
- *	offset (size of current entry)
- *	+ SMB_STREAM_ENCODE_FIXED_SIZE
- *      + length of encoded stream name
- *	+ length of null terminator
- *	+ alignment padding
- */
-static boolean_t
-smb_stream_fits(smb_request_t *sr, mbuf_chain_t *mbc,
-	char *name, uint32_t offset)
-{
-	uint32_t len, pad;
-
-	len = SMB_STREAM_ENCODE_FIXED_SZ +
-	    smb_ascii_or_unicode_strlen(sr, name) +
-	    smb_ascii_or_unicode_null_len(sr);
-	pad = smb_pad_align(len, 8);
-	len += pad;
-
-	return (MBC_ROOM_FOR(mbc, offset + len) != 0);
 }
 
 /*

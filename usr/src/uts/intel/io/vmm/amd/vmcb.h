@@ -172,6 +172,7 @@ struct svm_softc;
 #define	VMCB_EXIT_STGI			0x84
 #define	VMCB_EXIT_CLGI			0x85
 #define	VMCB_EXIT_SKINIT		0x86
+#define	VMCB_EXIT_WBINVD		0x89
 #define	VMCB_EXIT_MONITOR		0x8A
 #define	VMCB_EXIT_MWAIT			0x8B
 #define	VMCB_EXIT_NPF			0x400

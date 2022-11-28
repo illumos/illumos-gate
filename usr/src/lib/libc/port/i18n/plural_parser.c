@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include <ctype.h>
 #include <stdio.h>
@@ -108,8 +106,7 @@ stack_push(struct stack *stk, struct expr *exp)
 }
 
 static struct expr *
-stack_pop(struct stack *stk,
-	struct expr *exp_a, struct expr *exp_b)
+stack_pop(struct stack *stk, struct expr *exp_a, struct expr *exp_b)
 {
 	if (stk->index == 0) {
 		/* no item */
@@ -123,9 +120,9 @@ stack_pop(struct stack *stk,
 #ifdef	PARSE_DEBUG
 	printf("--- stack_pop ---\n");
 	printf("   type: %s\n",
-		type_name[GETTYPE((stk->ptr[stk->index - 1])->op)]);
+	    type_name[GETTYPE((stk->ptr[stk->index - 1])->op)]);
 	printf("   flag: %s\n",
-		type_name[GETTYPE((stk->ptr[stk->index - 1])->flag)]);
+	    type_name[GETTYPE((stk->ptr[stk->index - 1])->flag)]);
 	printf("-----------------\n");
 #endif
 	return (stk->ptr[--stk->index]);
@@ -160,7 +157,7 @@ freeexpr(struct expr *e)
 
 static struct expr *
 setop1(unsigned int op, unsigned int num,
-	struct stack *stk, unsigned int flag)
+    struct stack *stk, unsigned int flag)
 {
 	struct expr	*newitem;
 	unsigned int	type;
@@ -187,7 +184,7 @@ setop1(unsigned int op, unsigned int num,
 
 static struct expr *
 setop_reduce(unsigned int n, unsigned int op, struct stack *stk,
-	struct expr *exp1, struct expr *exp2, struct expr *exp3)
+    struct expr *exp1, struct expr *exp2, struct expr *exp3)
 {
 	struct expr	*newitem;
 #ifdef	PARSE_DEBUG
@@ -199,14 +196,11 @@ setop_reduce(unsigned int n, unsigned int op, struct stack *stk,
 	printf("   op type: %s\n", type_name[type]);
 	switch (n) {
 	case TRINARY:
-		printf("   exp3 type: %s\n",
-			type_name[GETTYPE(exp3->op)]);
+		printf("   exp3 type: %s\n", type_name[GETTYPE(exp3->op)]);
 	case BINARY:
-		printf("   exp2 type: %s\n",
-			type_name[GETTYPE(exp2->op)]);
+		printf("   exp2 type: %s\n", type_name[GETTYPE(exp2->op)]);
 	case UNARY:
-		printf("   exp1 type: %s\n",
-			type_name[GETTYPE(exp1->op)]);
+		printf("   exp1 type: %s\n", type_name[GETTYPE(exp1->op)]);
 	case NARY:
 		break;
 	}
@@ -464,8 +458,7 @@ plural_expr(struct expr **e, const char *plural_string)
 
 	stk = &stkbuf;
 	stk->index = 0;
-	stk->ptr = (struct expr **)malloc(
-		sizeof (struct expr *) * MAX_STACK_SIZE);
+	stk->ptr = malloc(sizeof (struct expr *) * MAX_STACK_SIZE);
 	if (!stk->ptr) {
 		/* malloc failed */
 		return (-1);
@@ -495,7 +488,7 @@ plural_expr(struct expr **e, const char *plural_string)
 				/* parse failed */
 #ifdef	PARSE_DEBUG
 				printf("ERR: T_EXP is not followed by %s\n",
-					type_name[type]);
+				    type_name[type]);
 #endif
 				STACKFREE;
 				return (1);
@@ -516,7 +509,7 @@ plural_expr(struct expr **e, const char *plural_string)
 				/* parse failed */
 #ifdef	PARSE_DEBUG
 				printf("ERR: T_EXP is not followed by %s\n",
-					type_name[type]);
+				    type_name[type]);
 #endif
 				STACKFREE;
 				return (1);
@@ -536,7 +529,7 @@ plural_expr(struct expr **e, const char *plural_string)
 				/* parse failed */
 #ifdef	PARSE_DEBUG
 				printf("ERR: T_EXP is not followed by %s\n",
-					type_name[type]);
+				    type_name[type]);
 #endif
 				STACKFREE;
 				return (1);
@@ -557,7 +550,7 @@ plural_expr(struct expr **e, const char *plural_string)
 				/* parse failed */
 #ifdef	PARSE_DEBUG
 				printf("ERR: T_EXP is followed by %s\n",
-					type_name[type]);
+				    type_name[type]);
 #endif
 				STACKFREE;
 				return (1);
@@ -578,7 +571,7 @@ plural_expr(struct expr **e, const char *plural_string)
 				/* parse failed */
 #ifdef	PARSE_DEBUG
 				printf("ERR: T_EXP is not followed by %s\n",
-					type_name[type]);
+				    type_name[type]);
 #endif
 				STACKFREE;
 				return (1);
@@ -605,7 +598,7 @@ plural_expr(struct expr **e, const char *plural_string)
 
 #ifdef	PARSE_DEBUG
 				printf("=========== exp->flag: %s\n",
-					type_name[ptype]);
+				    type_name[ptype]);
 #endif
 				if (ptype == T_LPAR) {
 					exp_op = stack_pop(stk, exp, NULL);
@@ -621,10 +614,10 @@ plural_expr(struct expr **e, const char *plural_string)
 				}
 
 				if ((popnum == BINARY) ||
-					(ptype == T_LNOT) ||
-					(ptype == T_CONDC)) {
+				    (ptype == T_LNOT) ||
+				    (ptype == T_CONDC)) {
 					result = reduce(&nexp, popnum,
-						exp, stk);
+					    exp, stk);
 					if (result)
 						return (result);
 					exp = nexp;
@@ -634,7 +627,7 @@ plural_expr(struct expr **e, const char *plural_string)
 				freeexpr(exp);
 				STACKFREE;
 				return (1);
-			} 		/* for-loop */
+			}		/* for-loop */
 
 #ifdef	PARSE_DEBUG
 printf("========================= RPAR for loop out\n");
@@ -650,7 +643,7 @@ printf("========================= RPAR for loop out\n");
 				/* parse failed */
 #ifdef	PARSE_DEBUG
 				printf("ERR: T_EXP is followed by %s\n",
-					type_name[type]);
+				    type_name[type]);
 #endif
 				STACKFREE;
 				return (1);
@@ -711,7 +704,7 @@ printf("========================== T_NUM/T_VAR for loop in\n");
 				fprio = GETPRIO(flag);
 #ifdef	PARSE_DEBUG
 				printf("========= flag: %s\n",
-					type_name[ftype]);
+				    type_name[ftype]);
 #endif
 				if ((ftype == T_INIT) || (ftype == T_LPAR)) {
 					exp->flag = flag;
@@ -739,10 +732,10 @@ printf("========================== T_NUM/T_VAR for loop in\n");
 					 * T_EQ,  T_LAND, T_LOR
 					 */
 					if ((ntype == T_RPAR) ||
-						(nprio <= fprio)) {
+					    (nprio <= fprio)) {
 						/* reduce */
 						result = reduce(&nexp, BINARY,
-							exp, stk);
+						    exp, stk);
 						if (result)
 							return (result);
 						exp = nexp;
@@ -774,7 +767,7 @@ printf("========================== T_NUM/T_VAR for loop in\n");
 					if (nprio <= fprio) {
 						/* reduce */
 						result = reduce(&nexp, TRINARY,
-							exp, stk);
+						    exp, stk);
 						if (result)
 							return (result);
 						exp = nexp;
@@ -803,7 +796,7 @@ printf("======================= T_NUM/T_VAR for loop out\n");
 		/* parse failed */
 		STACKFREE;
 		return (1);
-	} 	/* while-loop */
+	}	/* while-loop */
 
 	if (GETTYPE(flag) != T_EXP) {
 		/* parse failed */
@@ -823,7 +816,7 @@ printf("======================= T_NUM/T_VAR for loop out\n");
 #ifdef	PARSE_DEBUG
 			printf("ERR: flag for the result is not T_INIT\n");
 			printf("      %s observed\n",
-				type_name[GETTYPE(exp->flag)]);
+			    type_name[GETTYPE(exp->flag)]);
 #endif
 			freeexpr(exp);
 			STACKFREE;
@@ -834,7 +827,7 @@ printf("======================= T_NUM/T_VAR for loop out\n");
 			 * exp still remains in stack.
 			 * parse failed
 			 */
-			while (nexp = stack_pop(stk, NULL, NULL))
+			while ((nexp = stack_pop(stk, NULL, NULL)) != NULL)
 				freeexpr(nexp);
 			freeexpr(exp);
 			return (1);
@@ -853,8 +846,7 @@ plural_eval(struct expr *exp, unsigned int n)
 	unsigned int	e1, e2;
 	unsigned int	type, opnum;
 #ifdef GETTEXT_DEBUG
-	(void) printf("*************** plural_eval(%p, %d)\n",
-		exp, n);
+	(void) printf("*************** plural_eval(%p, %d)\n", exp, n);
 	printexpr(exp, 0);
 #endif
 

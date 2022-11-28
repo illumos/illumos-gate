@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Advanced Micro Devices, Inc.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -43,8 +43,7 @@ pci_check_amd_ioecs(void)
 	struct cpuid_regs cp;
 	int family;
 
-	if (!is_x86_feature(x86_featureset, X86FSET_CPUID))
-		return (B_FALSE);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
 
 	/*
 	 * Get the CPU vendor string from CPUID.

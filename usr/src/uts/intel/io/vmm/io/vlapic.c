@@ -772,6 +772,14 @@ vlapic_callout_handler(void *arg)
 			vlapic->timer_fire_when += vlapic->timer_period;
 		}
 		vlapic_callout_reset(vlapic);
+	} else {
+		/*
+		 * Clear the target time so that logic can distinguish from a
+		 * timer which has fired (where the value is zero) from one
+		 * which is held pending due to the instance being paused (where
+		 * the value is non-zero, but the callout is not pending).
+		 */
+		vlapic->timer_fire_when = 0;
 	}
 done:
 	VLAPIC_TIMER_UNLOCK(vlapic);
@@ -1708,12 +1716,31 @@ vlapic_localize_resources(struct vlapic *vlapic)
 	vmm_glue_callout_localize(&vlapic->callout);
 }
 
+void
+vlapic_pause(struct vlapic *vlapic)
+{
+	VLAPIC_TIMER_LOCK(vlapic);
+	callout_stop(&vlapic->callout);
+	VLAPIC_TIMER_UNLOCK(vlapic);
+
+}
+
+void
+vlapic_resume(struct vlapic *vlapic)
+{
+	VLAPIC_TIMER_LOCK(vlapic);
+	if (vlapic->timer_fire_when != 0) {
+		vlapic_callout_reset(vlapic);
+	}
+	VLAPIC_TIMER_UNLOCK(vlapic);
+}
+
 static int
 vlapic_data_read(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_LAPIC);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_lapic_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_lapic_v1));
 
 	struct vlapic *vlapic = datap;
 	struct vdi_lapic_v1 *out = req->vdr_data;
@@ -1726,7 +1753,7 @@ vlapic_data_read(void *datap, const vmm_data_req_t *req)
 
 	out->vl_msr_apicbase = vlapic->msr_apicbase;
 	out->vl_esr_pending = vlapic->esr_pending;
-	if (callout_pending(&vlapic->callout)) {
+	if (vlapic->timer_fire_when != 0) {
 		out->vl_timer_target =
 		    vm_normalize_hrtime(vlapic->vm, vlapic->timer_fire_when);
 	} else {
@@ -1807,7 +1834,7 @@ static enum vlapic_validation_error
 vlapic_data_validate(const struct vlapic *vlapic, const vmm_data_req_t *req)
 {
 	ASSERT(req->vdr_version == 1 &&
-	    req->vdr_len == sizeof (struct vdi_lapic_v1));
+	    req->vdr_len >= sizeof (struct vdi_lapic_v1));
 	const struct vdi_lapic_v1 *src = req->vdr_data;
 
 	if ((src->vl_esr_pending & ~APIC_VALID_MASK_ESR) != 0 ||
@@ -1865,7 +1892,7 @@ vlapic_data_write(void *datap, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_LAPIC);
 	VERIFY3U(req->vdr_version, ==, 1);
-	VERIFY3U(req->vdr_len, ==, sizeof (struct vdi_lapic_v1));
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_lapic_v1));
 
 	struct vlapic *vlapic = datap;
 	if (vlapic_data_validate(vlapic, req) != VVE_OK) {
@@ -1923,7 +1950,12 @@ vlapic_data_write(void *datap, const vmm_data_req_t *req)
 	if (src->vl_timer_target != 0) {
 		vlapic->timer_fire_when =
 		    vm_denormalize_hrtime(vlapic->vm, src->vl_timer_target);
-		vlapic_callout_reset(vlapic);
+
+		if (!vm_is_paused(vlapic->vm)) {
+			vlapic_callout_reset(vlapic);
+		}
+	} else {
+		vlapic->timer_fire_when = 0;
 	}
 
 	if (vlapic->ops.sync_state) {

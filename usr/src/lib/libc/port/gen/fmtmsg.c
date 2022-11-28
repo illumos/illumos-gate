@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * fmtmsg.c
@@ -251,9 +251,9 @@ static	struct sevstr  *penvsevs	= (struct sevstr *)NULL;
 
 static	struct sevstr	sevstrs[]	= {
 	{ MM_HALT,	"", SV_HALT,	&sevstrs[1]},
-	{ MM_ERROR,    "", SV_ERROR,	&sevstrs[2]},
-	{ MM_WARNING,  "", SV_WARN, 	&sevstrs[3]},
-	{ MM_INFO,	"", SV_INF,  	(struct sevstr *)NULL},
+	{ MM_ERROR,	"", SV_ERROR,	&sevstrs[2]},
+	{ MM_WARNING,	"", SV_WARN,	&sevstrs[3]},
+	{ MM_INFO,	"", SV_INF,	(struct sevstr *)NULL},
 };
 static	struct sevstr  *pstdsevs	= &sevstrs[0];
 
@@ -359,7 +359,7 @@ noesc(char *str)
 
 	if (*p) {
 		q = p++;
-		while (*q++ = *p++) {
+		while ((*q++ = *p++) != '\0') {
 			if (*p == '\\')
 				p++;
 		}
@@ -628,7 +628,7 @@ sevstrset(void)
 
 
 	/* Look for SEV_LEVEL definition */
-	if ((value = getenv(SEV_LEVEL)) != (char *)NULL) {
+	if ((value = getenv(SEV_LEVEL)) != NULL) {
 
 		/* Allocate space and make a copy of the value of SEV_LEVEL */
 		if ((sevspace = libc_malloc(strlen(value) + 1)) != NULL) {
@@ -636,11 +636,11 @@ sevstrset(void)
 
 			/* Continue for all severity descriptions */
 			psev = getauxsevs(sevspace);
-			plast = (struct sevstr *)NULL;
-			if (psev != (struct sevstr *)NULL) {
+			plast = NULL;
+			if (psev != NULL) {
 				penvsevs = psev;
 				plast = psev;
-				while (psev = getauxsevs((char *)NULL)) {
+				while ((psev = getauxsevs(NULL)) != NULL) {
 					plast->sevnext = psev;
 					plast = psev;
 				}
@@ -786,13 +786,13 @@ itoa(int n, char *s)
  * Arguments:
  *	char	*buf		The buffer in which to format the message
  *	size_t	size		The size of the buffer
- * 	int	verbosity	A bit-string that indicates which components
+ *	int	verbosity	A bit-string that indicates which components
  *				are to be written
- * 	const char   *label	The address of the label-component
- * 	int	severity	The severity value of the message
- * 	const char   *text	The address of the text-component
- * 	const char   *action	The address of the action-component
- * 	const char   *tag	The address of the tag-component
+ *	const char   *label	The address of the label-component
+ *	int	severity	The severity value of the message
+ *	const char   *text	The address of the text-component
+ *	const char   *action	The address of the action-component
+ *	const char   *tag	The address of the tag-component
  *
  *	This function formats the message consisting of the label-component,
  *	severity-component, text-component, action-component, and tag-
@@ -807,8 +807,8 @@ itoa(int n, char *s)
 
 static void
 writemsg(char *buf, size_t size,
-	int verbosity, const char *label, int severity,
-	const char *text, const char *action, const char *tag)
+    int verbosity, const char *label, int severity,
+    const char *text, const char *action, const char *tag)
 {
 	struct sevstr  *psev;		/* Ptr for severity str list */
 	char		*p;		/* General purpose pointer */
@@ -1084,7 +1084,7 @@ writemsg(char *buf, size_t size,
 
 int
 fmtmsg(long class, const char *label, int severity,
-const char *text, const char *action, const char *tag)
+    const char *text, const char *action, const char *tag)
 {
 	int	rtnval;		/* Value to return */
 	FILE	*console;	/* Ptr to "console" stream */

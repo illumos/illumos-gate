@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s1394_csr.c
  *    1394 Services Layer CSR and Config ROM Routines
@@ -40,8 +38,6 @@
 #include <sys/sunddi.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
 #include <sys/1394/h1394.h>
@@ -96,9 +92,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	t1394_addr_enable_t	rw_flags;
 	int			result;
 
-	TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_enter, S1394_TNF_SL_CSR_STACK,
-	    "");
-
 	/*
 	 * Although they are not freed up in this routine, if
 	 * one of the s1394_claim_addr_blk() routines fails,
@@ -125,11 +118,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "STATE_CLEAR: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -149,11 +137,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "STATE_SET: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -173,11 +156,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "NODE_IDS: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -197,11 +175,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "RESET_START: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -221,11 +194,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "SPLIT_TIMEOUT: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -245,11 +213,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "ARGUMENT registers: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -269,11 +232,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "TEST registers: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -293,11 +251,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "INTERRUPT registers: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -317,11 +270,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "CLOCK registers: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -341,11 +289,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "MESSAGE registers: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -364,11 +307,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "CYCLE_TIME: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -387,11 +325,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "BUS_TIME: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -410,11 +343,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "BUSY_TIMEOUT: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -435,11 +363,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_arg	  = hal;
 	result = s1394_claim_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "IRM registers: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -451,11 +374,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_length	= IEEE1394_CONFIG_ROM_SZ;
 	result = s1394_reserve_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "Unable to reserve Config ROM");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -478,11 +396,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	if (result != DDI_SUCCESS) {
 		kmem_free((void *)hal->CSR_topology_map,
 		    IEEE1394_UCSR_TOPOLOGY_MAP_SZ);
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "TOPOLOGY_MAP: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 	curr_blk = (s1394_addr_space_blk_t *)(addr.aa_hdl);
@@ -498,11 +411,6 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_length	= IEEE1394_UCSR_SPEED_MAP_SZ;
 	result = s1394_reserve_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "SPEED_MAP: CSR setup failed");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -519,16 +427,9 @@ s1394_setup_CSR_space(s1394_hal_t *hal)
 	addr.aa_length	= IEEE1394_QUADLET;
 	result = s1394_reserve_addr_blk(hal, &addr);
 	if (result != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_setup_CSR_space_error,
-		    S1394_TNF_SL_CSR_ERROR, "", tnf_string, msg,
-		    "Unable to reserve boundary quadlet");
-		TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit,
-		    "stacktrace 1394 s1394", "");
 		return (DDI_FAILURE);
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_setup_CSR_space_exit, S1394_TNF_SL_CSR_STACK,
-	    "");
 	return (DDI_SUCCESS);
 }
 
@@ -548,9 +449,6 @@ s1394_CSR_state_clear(cmd1394_cmd_t *req)
 	uint_t		should_be_from;
 	int		result;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_state_clear_enter, S1394_TNF_SL_CSR_STACK,
-	    "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	/* Register offset */
@@ -560,8 +458,6 @@ s1394_CSR_state_clear(cmd1394_cmd_t *req)
 	if ((offset & 0x3) != 0) {
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(s1394_CSR_state_clear_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return;
 	}
 
@@ -639,8 +535,6 @@ s1394_CSR_state_clear(cmd1394_cmd_t *req)
 	}
 
 	(void) s1394_send_response(hal, req);
-	TNF_PROBE_0_DEBUG(s1394_CSR_state_clear_exit, S1394_TNF_SL_CSR_STACK,
-	    "");
 }
 
 /*
@@ -661,9 +555,6 @@ s1394_CSR_state_set(cmd1394_cmd_t *req)
 	uint_t		hal_number_of_nodes;
 	int		result;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_state_set_enter, S1394_TNF_SL_CSR_STACK,
-	    "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	/* Register offset */
@@ -673,8 +564,6 @@ s1394_CSR_state_set(cmd1394_cmd_t *req)
 	if ((offset & 0x3) != 0) {
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(s1394_CSR_state_set_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return;
 	}
 
@@ -739,8 +628,6 @@ s1394_CSR_state_set(cmd1394_cmd_t *req)
 	}
 
 	(void) s1394_send_response(hal, req);
-	TNF_PROBE_0_DEBUG(s1394_CSR_state_set_exit, S1394_TNF_SL_CSR_STACK,
-	    "");
 }
 
 /*
@@ -753,13 +640,9 @@ s1394_CSR_node_ids(cmd1394_cmd_t *req)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_node_ids_enter, S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	s1394_common_CSR_routine(hal, req);
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_node_ids_exit, S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -774,9 +657,6 @@ s1394_CSR_reset_start(cmd1394_cmd_t *req)
 	uint32_t	data;
 	uint_t		offset;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_reset_start_enter, S1394_TNF_SL_CSR_STACK,
-	    "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	/* RESET_START register offset */
@@ -786,8 +666,6 @@ s1394_CSR_reset_start(cmd1394_cmd_t *req)
 	if ((offset & 0x3) != 0) {
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(s1394_CSR_reset_start_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return;
 	}
 
@@ -811,8 +689,6 @@ s1394_CSR_reset_start(cmd1394_cmd_t *req)
 	}
 
 	(void) s1394_send_response(hal, req);
-	TNF_PROBE_0_DEBUG(s1394_CSR_reset_start_exit, S1394_TNF_SL_CSR_STACK,
-	    "");
 }
 
 /*
@@ -825,15 +701,9 @@ s1394_CSR_split_timeout(cmd1394_cmd_t *req)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_split_timeout_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	s1394_common_CSR_routine(hal, req);
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_split_timeout_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -846,15 +716,9 @@ s1394_CSR_argument_regs(cmd1394_cmd_t *req)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_argument_regs_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	s1394_common_CSR_routine(hal, req);
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_argument_regs_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -867,9 +731,6 @@ s1394_CSR_test_regs(cmd1394_cmd_t *req)
 {
 	s1394_hal_t	*hal;
 	uint_t		offset;
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_test_regs_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
 
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
@@ -884,9 +745,6 @@ s1394_CSR_test_regs(cmd1394_cmd_t *req)
 	} else {
 		s1394_common_CSR_routine(hal, req);
 	}
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_test_regs_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -899,15 +757,9 @@ s1394_CSR_interrupt_regs(cmd1394_cmd_t *req)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_interrupt_regs_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	s1394_common_CSR_routine(hal, req);
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_interrupt_regs_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -920,15 +772,9 @@ s1394_CSR_clock_regs(cmd1394_cmd_t *req)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_clock_regs_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	s1394_common_CSR_routine(hal, req);
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_clock_regs_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -941,15 +787,9 @@ s1394_CSR_message_regs(cmd1394_cmd_t *req)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_message_regs_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	s1394_common_CSR_routine(hal, req);
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_message_regs_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -964,9 +804,6 @@ s1394_CSR_cycle_time(cmd1394_cmd_t *req)
 	uint_t		offset;
 	int		result;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_cycle_time_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	/* CYCLE_TIME register offset */
@@ -976,8 +813,6 @@ s1394_CSR_cycle_time(cmd1394_cmd_t *req)
 	if ((offset & 0x3) != 0) {
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(s1394_CSR_cycle_time_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return;
 	}
 
@@ -1028,8 +863,6 @@ s1394_CSR_cycle_time(cmd1394_cmd_t *req)
 	}
 
 	(void) s1394_send_response(hal, req);
-	TNF_PROBE_0_DEBUG(s1394_CSR_cycle_time_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -1048,8 +881,6 @@ s1394_CSR_bus_time(cmd1394_cmd_t *req)
 	uint_t		should_be_from;
 	int		result;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_bus_time_enter, S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	/* BUS_TIME register offset */
@@ -1059,8 +890,6 @@ s1394_CSR_bus_time(cmd1394_cmd_t *req)
 	if ((offset & 0x3) != 0) {
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(s1394_CSR_bus_time_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return;
 	}
 
@@ -1126,7 +955,6 @@ s1394_CSR_bus_time(cmd1394_cmd_t *req)
 	}
 
 	(void) s1394_send_response(hal, req);
-	TNF_PROBE_0_DEBUG(s1394_CSR_bus_time_exit, S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -1139,15 +967,9 @@ s1394_CSR_busy_timeout(cmd1394_cmd_t *req)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_busy_timeout_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	s1394_common_CSR_routine(hal, req);
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_busy_timeout_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -1168,8 +990,6 @@ s1394_CSR_IRM_regs(cmd1394_cmd_t *req)
 	uint_t		offset;
 	int		result;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_IRM_regs_enter, S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	/* IRM register offset */
@@ -1179,8 +999,6 @@ s1394_CSR_IRM_regs(cmd1394_cmd_t *req)
 	if ((offset & 0x3) != 0) {
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 		(void) s1394_send_response(hal, req);
-		TNF_PROBE_0_DEBUG(s1394_CSR_IRM_regs_exit,
-		    S1394_TNF_SL_CSR_STACK, "");
 		return;
 	}
 
@@ -1241,7 +1059,6 @@ s1394_CSR_IRM_regs(cmd1394_cmd_t *req)
 	}
 
 	(void) s1394_send_response(hal, req);
-	TNF_PROBE_0_DEBUG(s1394_CSR_IRM_regs_exit, S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -1255,9 +1072,6 @@ s1394_CSR_topology_map(cmd1394_cmd_t *req)
 {
 	s1394_hal_t	*hal;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_topology_map_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
-
 	hal = (s1394_hal_t *)req->cmd_callback_arg;
 
 	/* Make sure it's a quadlet read request */
@@ -1267,9 +1081,6 @@ s1394_CSR_topology_map(cmd1394_cmd_t *req)
 		req->cmd_result = IEEE1394_RESP_TYPE_ERROR;
 
 	(void) s1394_send_response(hal, req);
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_topology_map_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -1290,9 +1101,6 @@ s1394_CSR_topology_map_update(s1394_hal_t *hal)
 	uint_t		   CRC;
 	uint32_t	   length;
 	int		   i, j, c;
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_topology_map_update_enter,
-	    S1394_TNF_SL_BR_CSR_STACK, "");
 
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 
@@ -1324,9 +1132,6 @@ s1394_CSR_topology_map_update(s1394_hal_t *hal)
 	length = self_id_count + 2;
 	CRC = s1394_CRC16(&(tm_ptr[1]), length);
 	tm_ptr[0] = (length << IEEE1394_TOP_MAP_LEN_SHIFT) | CRC;
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_topology_map_update_exit,
-	    S1394_TNF_SL_BR_CSR_STACK, "");
 }
 
 /*
@@ -1340,18 +1145,12 @@ s1394_CSR_topology_map_disable(s1394_hal_t *hal)
 {
 	uint32_t *tm_ptr;
 
-	TNF_PROBE_0_DEBUG(s1394_CSR_topology_map_disable_enter,
-	    S1394_TNF_SL_BR_CSR_STACK, "");
-
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 
 	tm_ptr = (uint32_t *)hal->CSR_topology_map;
 
 	/* Set length = 0 */
 	tm_ptr[0] = tm_ptr[0] & IEEE1394_TOP_MAP_LEN_MASK;
-
-	TNF_PROBE_0_DEBUG(s1394_CSR_topology_map_disable_exit,
-	    S1394_TNF_SL_BR_CSR_STACK, "");
 }
 
 /*
@@ -1366,9 +1165,6 @@ s1394_common_CSR_routine(s1394_hal_t *hal, cmd1394_cmd_t *req)
 	uint32_t data;
 	uint_t	 offset;
 	int	 result;
-
-	TNF_PROBE_0_DEBUG(s1394_common_CSR_routine_enter,
-	    S1394_TNF_SL_CSR_STACK, "");
 
 	/* Register offset */
 	offset = (req->cmd_addr & IEEE1394_CSR_OFFSET_MASK);
@@ -1419,8 +1215,6 @@ s1394_common_CSR_routine(s1394_hal_t *hal, cmd1394_cmd_t *req)
 	}
 
 	(void) s1394_send_response(hal, req);
-	TNF_PROBE_0_DEBUG(s1394_common_CSR_routine_exit,
-	    S1394_TNF_SL_CSR_STACK, "");
 }
 
 /*
@@ -1446,9 +1240,6 @@ s1394_init_local_config_rom(s1394_hal_t *hal)
 	uint32_t root_dir_len;
 	uint32_t CRC;
 	int	 status, i, ret;
-
-	TNF_PROBE_0_DEBUG(s1394_init_local_config_rom_enter,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 
 	/* Setup Config ROM mutex */
 	mutex_init(&hal->local_config_rom_mutex,
@@ -1477,11 +1268,6 @@ s1394_init_local_config_rom(s1394_hal_t *hal)
 		kmem_free((void *)hal->local_config_rom,
 		    IEEE1394_CONFIG_ROM_SZ);
 		mutex_destroy(&hal->local_config_rom_mutex);
-		TNF_PROBE_1(s1394_init_local_config_rom_error,
-		    S1394_TNF_SL_CFGROM_ERROR, "", tnf_string, msg,
-		    "Failed in s1394_init_config_rom_structures()");
-		TNF_PROBE_0_DEBUG(s1394_init_local_config_rom_exit,
-		    S1394_TNF_SL_CFGROM_STACK, "");
 		return (DDI_FAILURE);
 	}
 	/* Build the Bus_Info_Block - see IEEE 1394-1995, Section 8.3.2.5.4 */
@@ -1577,11 +1363,6 @@ s1394_init_local_config_rom(s1394_hal_t *hal)
 		kmem_free((void *)hal->local_config_rom,
 		    IEEE1394_CONFIG_ROM_SZ);
 		mutex_destroy(&hal->local_config_rom_mutex);
-		TNF_PROBE_1(s1394_init_local_config_rom_error,
-		    S1394_TNF_SL_CFGROM_ERROR, "", tnf_string, msg,
-		    "Failure in kmem_zalloc");
-		TNF_PROBE_0_DEBUG(s1394_init_local_config_rom_exit,
-		    S1394_TNF_SL_CFGROM_STACK, "");
 		return (DDI_FAILURE);
 	}
 	kmem_free((void *)text_leaf, S1394_ROOT_TEXT_LEAF_SZ);
@@ -1614,11 +1395,6 @@ s1394_init_local_config_rom(s1394_hal_t *hal)
 		kmem_free((void *)hal->local_config_rom,
 		    IEEE1394_CONFIG_ROM_SZ);
 		mutex_destroy(&hal->local_config_rom_mutex);
-		TNF_PROBE_1(s1394_init_local_config_rom_error,
-		    S1394_TNF_SL_CFGROM_ERROR, "", tnf_string, msg,
-		    "Failure in kmem_zalloc");
-		TNF_PROBE_0_DEBUG(s1394_init_local_config_rom_exit,
-		    S1394_TNF_SL_CFGROM_STACK, "");
 		return (DDI_FAILURE);
 	}
 	kmem_free((void *)node_unique_id_leaf, S1394_NODE_UNIQUE_ID_SZ);
@@ -1666,11 +1442,6 @@ s1394_init_local_config_rom(s1394_hal_t *hal)
 		kmem_free((void *)hal->local_config_rom,
 		    IEEE1394_CONFIG_ROM_SZ);
 		mutex_destroy(&hal->local_config_rom_mutex);
-		TNF_PROBE_1(s1394_init_local_config_rom_error,
-		    S1394_TNF_SL_CFGROM_ERROR, "", tnf_string, msg,
-		    "Failure in kmem_zalloc");
-		TNF_PROBE_0_DEBUG(s1394_init_local_config_rom_exit,
-		    S1394_TNF_SL_CFGROM_STACK, "");
 		return (DDI_FAILURE);
 	}
 	kmem_free((void *)unit_dir, S1394_UNIT_DIR_SZ);
@@ -1688,8 +1459,6 @@ s1394_init_local_config_rom(s1394_hal_t *hal)
 	(void) HAL_CALL(hal).update_config_rom(hal->halinfo.hal_private,
 	    config_rom, IEEE1394_CONFIG_ROM_QUAD_SZ);
 
-	TNF_PROBE_0_DEBUG(s1394_init_local_config_rom_exit,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -1703,9 +1472,6 @@ s1394_init_local_config_rom(s1394_hal_t *hal)
 void
 s1394_destroy_local_config_rom(s1394_hal_t *hal)
 {
-	TNF_PROBE_0_DEBUG(s1394_destroy_local_config_rom_enter,
-	    S1394_TNF_SL_CFGROM_STACK, "");
-
 	/* Lock the Config ROM buffer */
 	mutex_enter(&hal->local_config_rom_mutex);
 
@@ -1722,9 +1488,6 @@ s1394_destroy_local_config_rom(s1394_hal_t *hal)
 
 	/* Setup Config ROM mutex */
 	mutex_destroy(&hal->local_config_rom_mutex);
-
-	TNF_PROBE_0_DEBUG(s1394_destroy_local_config_rom_exit,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 }
 
 /*
@@ -1737,9 +1500,6 @@ s1394_init_config_rom_structures(s1394_hal_t *hal)
 {
 	s1394_config_rom_t *root_directory;
 	s1394_config_rom_t *rest_of_config_rom;
-
-	TNF_PROBE_0_DEBUG(s1394_init_config_rom_structures_enter,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 
 	ASSERT(MUTEX_HELD(&hal->local_config_rom_mutex));
 
@@ -1766,8 +1526,6 @@ s1394_init_config_rom_structures(s1394_hal_t *hal)
 	hal->free_space = IEEE1394_CONFIG_ROM_QUAD_SZ -
 	    (rest_of_config_rom->cfgrom_addr_lo);
 
-	TNF_PROBE_0_DEBUG(s1394_init_config_rom_structures_exit,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -1782,9 +1540,6 @@ s1394_destroy_config_rom_structures(s1394_hal_t *hal)
 	s1394_config_rom_t *curr_blk;
 	s1394_config_rom_t *next_blk;
 
-	TNF_PROBE_0_DEBUG(s1394_destroy_config_rom_structures_enter,
-	    S1394_TNF_SL_CFGROM_STACK, "");
-
 	ASSERT(MUTEX_HELD(&hal->local_config_rom_mutex));
 
 	curr_blk = hal->root_directory;
@@ -1795,8 +1550,6 @@ s1394_destroy_config_rom_structures(s1394_hal_t *hal)
 		curr_blk = next_blk;
 	}
 
-	TNF_PROBE_0_DEBUG(s1394_destroy_config_rom_structures_exit,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -1824,16 +1577,11 @@ s1394_add_config_rom_entry(s1394_hal_t *hal, uint8_t key, uint32_t *buffer,
 	uint_t		   last_entry_offset;
 	int		   i;
 
-	TNF_PROBE_0_DEBUG(s1394_add_config_rom_entry_enter,
-	    "stacktrace 1394 s1394", "");
-
 	ASSERT(MUTEX_HELD(&hal->local_config_rom_mutex));
 
 	if (size > hal->free_space) {
 		/* Out of space */
 		*status = CMD1394_ERSRC_CONFLICT;
-		TNF_PROBE_0_DEBUG(s1394_add_config_rom_entry_exit,
-		    S1394_TNF_SL_CFGROM_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -1891,8 +1639,6 @@ s1394_add_config_rom_entry(s1394_hal_t *hal, uint8_t key, uint32_t *buffer,
 		new_blk = (s1394_config_rom_t *)kmem_zalloc(
 		    sizeof (s1394_config_rom_t), KM_SLEEP);
 		if (new_blk == NULL) {
-			TNF_PROBE_0_DEBUG(s1394_add_config_rom_entry_exit,
-			    S1394_TNF_SL_CFGROM_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -1943,8 +1689,6 @@ s1394_add_config_rom_entry(s1394_hal_t *hal, uint8_t key, uint32_t *buffer,
 
 	*status = T1394_NOERROR;
 
-	TNF_PROBE_0_DEBUG(s1394_add_config_rom_entry_exit,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -1972,9 +1716,6 @@ s1394_remove_config_rom_entry(s1394_hal_t *hal, void **handle, int *status)
 	uint_t		   tmp_offset;
 	uint_t		   tmp_size;
 	int		   i;
-
-	TNF_PROBE_0_DEBUG(s1394_remove_config_rom_entry_enter,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 
 	ASSERT(MUTEX_HELD(&hal->local_config_rom_mutex));
 
@@ -2060,8 +1801,6 @@ s1394_remove_config_rom_entry(s1394_hal_t *hal, void **handle, int *status)
 		free_blk = (s1394_config_rom_t *)kmem_zalloc(
 		    sizeof (s1394_config_rom_t), KM_SLEEP);
 		if (free_blk == NULL) {
-			TNF_PROBE_0_DEBUG(s1394_remove_config_rom_entry_exit,
-			    S1394_TNF_SL_CFGROM_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -2107,8 +1846,6 @@ s1394_remove_config_rom_entry(s1394_hal_t *hal, void **handle, int *status)
 
 	*status = T1394_NOERROR;
 
-	TNF_PROBE_0_DEBUG(s1394_remove_config_rom_entry_exit,
-	    S1394_TNF_SL_CFGROM_STACK, "");
 	return (DDI_SUCCESS);
 }
 
@@ -2129,10 +1866,7 @@ s1394_update_config_rom_callback(void *arg)
 	uint32_t	g;
 	uint_t		CRC;
 	uint_t		last_entry_offset;
-	int		i, ret;
-
-	TNF_PROBE_0_DEBUG(s1394_update_config_rom_callback_enter,
-	    S1394_TNF_SL_CFGROM_STACK, "");
+	int		i;
 
 	hal = (s1394_hal_t *)arg;
 
@@ -2186,13 +1920,5 @@ s1394_update_config_rom_callback(void *arg)
 	    config_rom, last_entry_offset);
 
 	/* Initiate a bus reset */
-	ret = HAL_CALL(hal).bus_reset(hal->halinfo.hal_private);
-	if (ret != DDI_SUCCESS) {
-		TNF_PROBE_1(s1394_update_config_rom_callback_error,
-		    S1394_TNF_SL_ERROR, "", tnf_string, msg,
-		    "Error initiating bus reset");
-	}
-
-	TNF_PROBE_0_DEBUG(s1394_update_config_rom_callback_exit,
-	    S1394_TNF_SL_CFGROM_STACK, "");
+	(void) HAL_CALL(hal).bus_reset(hal->halinfo.hal_private);
 }

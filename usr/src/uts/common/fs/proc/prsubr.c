@@ -21,8 +21,10 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 MNX Cloud, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1408,10 +1410,10 @@ prgetaction32(proc_t *p, user_t *up, uint_t sig, struct sigaction32 *sp)
 /*
  * Count the number of segments in this process's address space.
  */
-int
+uint_t
 prnsegs(struct as *as, int reserved)
 {
-	int n = 0;
+	uint_t n = 0;
 	struct seg *seg;
 
 	ASSERT(as != &kas && AS_WRITE_HELD(as));
@@ -1428,8 +1430,21 @@ prnsegs(struct as *as, int reserved)
 		for (saddr = seg->s_base; saddr < eaddr; saddr = naddr) {
 			(void) pr_getprot(seg, reserved, &tmp,
 			    &saddr, &naddr, eaddr);
-			if (saddr != naddr)
+			if (saddr != naddr) {
 				n++;
+				/*
+				 * prnsegs() was formerly designated to return
+				 * an 'int' despite having no ability or use
+				 * for negative results.  As part of changing
+				 * it to 'uint_t', keep the old effective limit
+				 * of INT_MAX in place.
+				 */
+				if (n == INT_MAX) {
+					pr_getprot_done(&tmp);
+					ASSERT(tmp == NULL);
+					return (n);
+				}
+			}
 		}
 
 		ASSERT(tmp == NULL);
@@ -1492,15 +1507,56 @@ pr_u64tos(uint64_t n, char *s)
 	return (len);
 }
 
+/*
+ * Similar to getf() / getf_gen(), but for the specified process.  On success,
+ * returns the fp with fp->f_count incremented.  The caller MUST call
+ * closef(fp) on the returned fp after completing any actions using that fp.
+ * We return a reference-held (fp->f_count bumped) file_t so no other closef()
+ * can invoke destructive VOP_CLOSE actions while we're inspecting the
+ * process's FD.
+ *
+ * Returns NULL for errors: either an empty process-table slot post-fi_lock
+ * and UF_ENTER, or too many mutex_tryenter() failures on the file_t's f_tlock.
+ * Both failure modes have DTrace probes.
+ *
+ * The current design of the procfs "close" code path uses the following lock
+ * order of:
+ *
+ *   1: (file_t) f_tlock
+ *   2: (proc_t) p_lock AND setting p->p_proc_flag's P_PR_LOCK
+ *
+ * That happens because closef() holds f_tlock while calling fop_close(),
+ * which can be prclose(), which currently waits on and sets P_PR_LOCK at its
+ * beginning.
+ *
+ * That lock order creates a challenge for pr_getf, which needs to take those
+ * locks in the opposite order when the fd points to a procfs file descriptor.
+ * The solution chosen here is to use mutex_tryenter on f_tlock and retry some
+ * (limited) number of times, failing if we don't get both locks.
+ *
+ * The cases where this can fail are rare, and all involve a procfs caller
+ * asking for info (eg. FDINFO) on another procfs FD.  In these cases,
+ * returning EBADF (which results from a NULL return from pr_getf()) is
+ * acceptable.
+ *
+ * One can increase the number of tries in pr_getf_maxtries if one is worried
+ * about the contentuous case.
+ */
+
+uint64_t pr_getf_tryfails; /* Bumped for statistic purposes. */
+int pr_getf_maxtries = 3;  /* So you can tune it from /etc/system */
+
 file_t *
 pr_getf(proc_t *p, uint_t fd, short *flag)
 {
 	uf_entry_t *ufp;
 	uf_info_t *fip;
 	file_t *fp;
+	int tries = 0;
 
 	ASSERT(MUTEX_HELD(&p->p_lock) && (p->p_proc_flag & P_PR_LOCK));
 
+retry:
 	fip = P_FINFO(p);
 
 	if (fd >= fip->fi_nfiles)
@@ -1510,37 +1566,102 @@ pr_getf(proc_t *p, uint_t fd, short *flag)
 	mutex_enter(&fip->fi_lock);
 	UF_ENTER(ufp, fip, fd);
 	if ((fp = ufp->uf_file) != NULL && fp->f_count > 0) {
-		if (flag != NULL)
-			*flag = ufp->uf_flag;
-		ufp->uf_refcnt++;
+		if (mutex_tryenter(&fp->f_tlock)) {
+			ASSERT(fp->f_count > 0);
+			fp->f_count++;
+			mutex_exit(&fp->f_tlock);
+			if (flag != NULL)
+				*flag = ufp->uf_flag;
+		} else {
+			/*
+			 * Note the number of mutex_trylock attempts.
+			 *
+			 * The exit path will catch this and try again if we
+			 * are below the retry threshhold (pr_getf_maxtries).
+			 */
+			tries++;
+			pr_getf_tryfails++;
+			/*
+			 * If we hit pr_getf_maxtries, we'll return NULL.
+			 * DTrace scripts looking for this sort of failure
+			 * should check when arg1 is pr_getf_maxtries.
+			 */
+			DTRACE_PROBE2(pr_getf_tryfail, file_t *, fp, int,
+			    tries);
+			fp = NULL;
+		}
 	} else {
 		fp = NULL;
+		/* If we fail here, someone else closed this FD. */
+		DTRACE_PROBE1(pr_getf_emptyslot, int, tries);
+		tries = pr_getf_maxtries; /* Don't bother retrying. */
 	}
 	UF_EXIT(ufp);
 	mutex_exit(&fip->fi_lock);
 	mutex_enter(&p->p_lock);
 
+	/* Use goto instead of tail-recursion so we can keep "tries" around. */
+	if (fp == NULL) {
+		/* "tries" starts at 1. */
+		if (tries < pr_getf_maxtries)
+			goto retry;
+	} else {
+		/*
+		 * Probes here will detect successes after arg1's number of
+		 * mutex_tryenter() calls.
+		 */
+		DTRACE_PROBE2(pr_getf_trysuccess, file_t *, fp, int, tries + 1);
+	}
+
 	return (fp);
 }
 
+
+/*
+ * Just as pr_getf() is a little unusual in how it goes about making the file_t
+ * safe for procfs consumers to access it, so too is pr_releasef() for safely
+ * releasing that "hold".  The "hold" is unlike normal file descriptor activity
+ * -- procfs is just an interloper here, wanting access to the vnode_t without
+ * risk of a racing close() disrupting the state.  Just as pr_getf() avoids some
+ * of the typical file_t behavior (such as auditing) when establishing its hold,
+ * so too should pr_releasef().  It should not go through the motions of
+ * closef() (since it is not a true close()) unless racing activity causes it to
+ * be the last actor holding the refcount above zero.
+ *
+ * Under normal circumstances, we expect to find file_t`f_count > 1 after
+ * the successful pr_getf() call.  We are, after all, accessing a resource
+ * already held by the process in question.  We would also expect to rarely race
+ * with a close() of the underlying fd, meaning that file_t`f_count > 1 would
+ * still holds at pr_releasef() time.  That would mean we only need to decrement
+ * f_count, leaving it to the process to later close the fd (thus triggering
+ * VOP_CLOSE(), etc).
+ *
+ * It is only when that process manages to close() the fd while we have it
+ * "held" in procfs that we must make a trip through the traditional closef()
+ * logic to ensure proper tear-down of the file_t.
+ */
 void
-pr_releasef(proc_t *p, uint_t fd)
+pr_releasef(file_t *fp)
 {
-	uf_entry_t *ufp;
-	uf_info_t *fip;
-
-	ASSERT(MUTEX_HELD(&p->p_lock) && (p->p_proc_flag & P_PR_LOCK));
-
-	fip = P_FINFO(p);
-
-	mutex_exit(&p->p_lock);
-	mutex_enter(&fip->fi_lock);
-	UF_ENTER(ufp, fip, fd);
-	ASSERT3U(ufp->uf_refcnt, >, 0);
-	ufp->uf_refcnt--;
-	UF_EXIT(ufp);
-	mutex_exit(&fip->fi_lock);
-	mutex_enter(&p->p_lock);
+	mutex_enter(&fp->f_tlock);
+	if (fp->f_count > 1) {
+		/*
+		 * This is the most common case: The file is still held open by
+		 * the process, and we simply need to release our hold by
+		 * decrementing f_count
+		 */
+		fp->f_count--;
+		mutex_exit(&fp->f_tlock);
+	} else {
+		/*
+		 * A rare occasion: The process snuck a close() of this file
+		 * while we were doing our business in procfs.  Given that
+		 * f_count == 1, we are the only one with a reference to the
+		 * file_t and need to take a trip through closef() to free it.
+		 */
+		mutex_exit(&fp->f_tlock);
+		(void) closef(fp);
+	}
 }
 
 void

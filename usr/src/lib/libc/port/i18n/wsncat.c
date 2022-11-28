@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1986 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * Concatenate s2 on the end of s1. S1's space must be large enough.
@@ -51,7 +49,7 @@ wcsncat(wchar_t *s1, const wchar_t *s2, size_t n)
 		;
 	++n;
 	--s1;
-	while (*s1++ = *s2++) /* copy s2 to s1 */
+	while ((*s1++ = *s2++) != 0) /* copy s2 to s1 */
 		if (--n == 0) {  /* at most n chars */
 			*--s1 = 0;
 			break;

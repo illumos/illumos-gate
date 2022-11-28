@@ -40,9 +40,6 @@
 #include <sys/cmn_err.h>
 #include <sys/types.h>
 #include <sys/ddi_impldefs.h>
-
-#include <sys/tnf_probe.h>
-
 #include <sys/1394/t1394.h>
 #include <sys/1394/s1394.h>
 #include <sys/1394/h1394.h>
@@ -137,16 +134,12 @@ nx1394_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op, void *arg,
 {
 	int status;
 
-	TNF_PROBE_0_DEBUG(nx1394_bus_ctl_enter, S1394_TNF_SL_NEXUS_STACK, "");
-
 	switch (op) {
 	case DDI_CTLOPS_REPORTDEV: {
 		dev_info_t *pdip = ddi_get_parent(rdip);
 		cmn_err(CE_CONT, "?%s%d at %s%d",
 		    ddi_node_name(rdip), ddi_get_instance(rdip),
 		    ddi_node_name(pdip), ddi_get_instance(pdip));
-		TNF_PROBE_0_DEBUG(nx1394_bus_ctl_exit, S1394_TNF_SL_NEXUS_STACK,
-		    "");
 		return (DDI_SUCCESS);
 	}
 
@@ -157,9 +150,6 @@ nx1394_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op, void *arg,
 		uint32_t *regptr;
 		char addr[MAXNAMELEN];
 
-		TNF_PROBE_1(nx1394_bus_ctl_init_child,
-		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_opaque, dip, cdip);
-
 		i = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, cdip,
 		    DDI_PROP_DONTPASS, "reg", (int **)&regptr,
 		    (uint_t *)&reglen);
@@ -167,12 +157,6 @@ nx1394_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op, void *arg,
 		if (i != DDI_PROP_SUCCESS) {
 			cmn_err(CE_NOTE, "!%s(%d): \"reg\" property not found",
 			    ddi_node_name(cdip), ddi_get_instance(cdip));
-			TNF_PROBE_2(nx1394_bus_ctl,
-			    S1394_TNF_SL_NEXUS_ERROR, "", tnf_string, msg,
-			    "Reg property not found", tnf_int, reason, i);
-			TNF_PROBE_1_DEBUG(nx1394_bus_ctl_exit,
-			    S1394_TNF_SL_NEXUS_STACK, "", tnf_string, op,
-			    "initchild");
 			return (DDI_NOT_WELL_FORMED);
 		}
 
@@ -200,12 +184,6 @@ nx1394_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op, void *arg,
 			    "!%s(%d): Duplicate dev_info node found %s@%s",
 			    ddi_node_name(cdip), ddi_get_instance(cdip),
 			    ddi_node_name(ocdip), addr);
-			TNF_PROBE_1(nx1394_bus_ctl,
-			    S1394_TNF_SL_NEXUS_ERROR, "", tnf_string, msg,
-			    "Duplicate nodes");
-			TNF_PROBE_1_DEBUG(nx1394_bus_ctl_exit,
-			    S1394_TNF_SL_NEXUS_STACK, "", tnf_string, op,
-			    "initchild");
 			ddi_set_name_addr(cdip, NULL);
 			return (DDI_NOT_WELL_FORMED);
 		}
@@ -224,35 +202,22 @@ nx1394_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op, void *arg,
 				    "\"active-dma-flush\" property",
 				    ddi_node_name(cdip),
 				    ddi_get_instance(cdip));
-				TNF_PROBE_1(nx1394_bus_ctl,
-				    S1394_TNF_SL_NEXUS_ERROR, "", tnf_string,
-				    msg, "Unable to add \"active-dma-flush\" "
-				    "property");
-				TNF_PROBE_1_DEBUG(nx1394_bus_ctl_exit,
-				    S1394_TNF_SL_NEXUS_STACK, "", tnf_string,
-				    op, "initchild");
 				ddi_set_name_addr(cdip, NULL);
 				return (DDI_NOT_WELL_FORMED);
 			}
 		}
 
-		TNF_PROBE_1_DEBUG(nx1394_bus_ctl_exit,
-		    S1394_TNF_SL_NEXUS_STACK, "", tnf_string, op, "initchild");
 		return (DDI_SUCCESS);
 	}
 
 	case DDI_CTLOPS_UNINITCHILD: {
 		ddi_prop_remove_all((dev_info_t *)arg);
 		ddi_set_name_addr((dev_info_t *)arg, NULL);
-		TNF_PROBE_1_DEBUG(nx1394_bus_ctl_exit, S1394_TNF_SL_NEXUS_STACK,
-		    "", tnf_string, op, "uninitchild");
 		return (DDI_SUCCESS);
 	}
 
 	case DDI_CTLOPS_IOMIN: {
 		status = ddi_ctlops(dip, rdip, op, arg, result);
-		TNF_PROBE_1_DEBUG(nx1394_bus_ctl_exit, S1394_TNF_SL_NEXUS_STACK,
-		    "", tnf_string, op, "iomin");
 		return (status);
 	}
 
@@ -276,10 +241,6 @@ nx1394_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op, void *arg,
 		cmn_err(CE_CONT, "!%s(%d): invalid op (%d) from %s(%d)",
 		    ddi_node_name(dip), ddi_get_instance(dip),
 		    op, ddi_node_name(rdip), ddi_get_instance(rdip));
-		TNF_PROBE_2(nx1394_bus_ctl, S1394_TNF_SL_NEXUS_ERROR, "",
-		    tnf_string, msg, "invalid op", tnf_int, op, op);
-		TNF_PROBE_0_DEBUG(nx1394_bus_ctl_exit, S1394_TNF_SL_NEXUS_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -288,8 +249,6 @@ nx1394_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op, void *arg,
 	 */
 	default: {
 		status = ddi_ctlops(dip, rdip, op, arg, result);
-		TNF_PROBE_0_DEBUG(nx1394_bus_ctl_exit, S1394_TNF_SL_NEXUS_STACK,
-		    "");
 		return (status);
 	}
 	}
@@ -311,9 +270,6 @@ nx1394_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
 
 	_NOTE(SCHEME_PROTECTS_DATA("unique (per thread)", ddi_dma_attr_t))
 
-	TNF_PROBE_0_DEBUG(nx1394_dma_allochdl_enter, S1394_TNF_SL_NEXUS_STACK,
-	    "");
-
 	/*
 	 * If hal calls ddi_dma_alloc_handle, dip == rdip == hal dip.
 	 * Unfortunately, we cannot verify this (by way of looking up for hal
@@ -327,8 +283,6 @@ nx1394_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
 		ddi_dma_attr_merge(attr, hal_attr);
 	}
 	status = ddi_dma_allochdl(dip, rdip, attr, waitfnp, arg, handlep);
-	TNF_PROBE_1_DEBUG(nx1394_dma_allochdl_exit, S1394_TNF_SL_NEXUS_STACK,
-	    "", tnf_int, status, status);
 	return (status);
 }
 
@@ -344,19 +298,11 @@ nx1394_get_event_cookie(dev_info_t *dip, dev_info_t *rdip, char *name,
 	int ret;
 	s1394_hal_t *hal;
 
-	TNF_PROBE_1_DEBUG(nx1394_get_event_cookie_enter,
-	    S1394_TNF_SL_NEXUS_STACK, "", tnf_string, name, name);
-
 	hal = s1394_dip_to_hal(dip);
 	ASSERT(hal);
 
 	ret = ndi_event_retrieve_cookie(hal->hal_ndi_event_hdl,
 	    rdip, name, event_cookiep, 0);
-
-	TNF_PROBE_4_DEBUG(nx1394_get_event_cookie_exit,
-	    S1394_TNF_SL_NEXUS_STACK, "", tnf_opaque, parent_dip, (void *)dip,
-	    tnf_opaque, requestor_dip, (void *)rdip, tnf_string, event_name,
-	    name, tnf_int, request_status, ret);
 
 	return (ret);
 
@@ -384,9 +330,6 @@ nx1394_add_eventcall(dev_info_t *dip, dev_info_t *rdip,
 	hal = s1394_dip_to_hal(dip);
 	ASSERT(hal);
 
-	TNF_PROBE_0_DEBUG(nx1394_add_eventcall_enter, S1394_TNF_SL_NEXUS_STACK,
-	    "");
-
 	ret = ndi_event_add_callback(hal->hal_ndi_event_hdl, rdip, cookie,
 	    callback, arg, NDI_NOSLEEP, cb_id);
 #if defined(DEBUG)
@@ -394,10 +337,6 @@ nx1394_add_eventcall(dev_info_t *dip, dev_info_t *rdip,
 	if (event_name == NULL)
 		event_name = "";
 #endif
-	TNF_PROBE_4_DEBUG(nx1394_add_eventcall_exit, S1394_TNF_SL_NEXUS_STACK,
-	    "", tnf_opaque, parent_dip, (void *)dip, tnf_opaque, requestor_dip,
-	    (void *)rdip, tnf_string, event_name, event_name, tnf_int,
-	    request_status, ret);
 
 	return (ret);
 }
@@ -423,9 +362,6 @@ nx1394_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
 	hal = s1394_dip_to_hal(dip);
 	ASSERT(hal);
 
-	TNF_PROBE_0_DEBUG(nx1394_remove_eventcall_enter,
-	    S1394_TNF_SL_NEXUS_STACK, "");
-
 	ret = ndi_event_remove_callback(hal->hal_ndi_event_hdl, cb_id);
 
 #if defined(DEBUG)
@@ -433,10 +369,6 @@ nx1394_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
 	if (event_name == NULL)
 		event_name = "";
 
-	TNF_PROBE_4_DEBUG(nx1394_remove_eventcall_exit,
-	    S1394_TNF_SL_NEXUS_STACK, "", tnf_opaque, parent_dip, (void *)dip,
-	    tnf_opaque, callback_id, (void *)cb_id, tnf_string, event_name,
-	    event_name, tnf_int, request_status, ret);
 #endif
 
 	return (ret);
@@ -464,9 +396,6 @@ nx1394_post_event(dev_info_t *dip, dev_info_t *rdip, ddi_eventcookie_t cookie,
 	hal = s1394_dip_to_hal(dip);
 	ASSERT(hal);
 
-	TNF_PROBE_0_DEBUG(nx1394_post_event_enter, S1394_TNF_SL_NEXUS_STACK,
-	    "");
-
 	name = ndi_event_cookie_to_name(hal->hal_ndi_event_hdl, cookie);
 	/* name is NULL if we don't generate the event */
 	if (name != NULL) {
@@ -480,18 +409,11 @@ nx1394_post_event(dev_info_t *dip, dev_info_t *rdip, ddi_eventcookie_t cookie,
 		ret = ndi_event_run_callbacks(hal->hal_ndi_event_hdl,
 		    rdip, cookie, impl_data);
 
-		TNF_PROBE_4_DEBUG(nx1394_post_event_exit,
-		    S1394_TNF_SL_NEXUS_STACK, "", tnf_opaque, parent_dip,
-		    (void *)dip, tnf_opaque, requestor_dip, (void *)rdip,
-		    tnf_string, event_name, name, tnf_int, request_status, ret);
 		return (ret);
 
 	} else {
 		ret = ndi_post_event(ddi_get_parent(dip), rdip, cookie,
 		    impl_data);
-		TNF_PROBE_2_DEBUG(nx1394_post_event_exit,
-		    S1394_TNF_SL_NEXUS_STACK, "", tnf_string, msg,
-		    "Not our event", tnf_int, ret, ret);
 		return (ret);
 	}
 }
@@ -505,31 +427,18 @@ nx1394_define_events(s1394_hal_t *hal)
 {
 	int ret;
 
-	TNF_PROBE_0_DEBUG(nx1394_define_events_enter, S1394_TNF_SL_NEXUS_STACK,
-	    "");
-
 	/* get event handle */
 	ret = ndi_event_alloc_hdl(hal->halinfo.dip, hal->halinfo.hw_interrupt,
 	    &hal->hal_ndi_event_hdl, NDI_SLEEP);
-	if (ret != NDI_SUCCESS) {
-		TNF_PROBE_1(nx1394_define_events_alloc_fail,
-		    S1394_TNF_SL_NEXUS_ERROR, "", tnf_int, ret, ret);
-	} else {
+	if (ret == NDI_SUCCESS) {
 		/* and bind to it */
 		ret = ndi_event_bind_set(hal->hal_ndi_event_hdl, &nx1394_events,
 		    NDI_SLEEP);
 		if (ret != NDI_SUCCESS) {
-			TNF_PROBE_1(nx1394_define_events_bind_fail,
-			    S1394_TNF_SL_NEXUS_ERROR, "", tnf_int, ret, ret);
 			(void) ndi_event_free_hdl(hal->hal_ndi_event_hdl);
-			TNF_PROBE_0_DEBUG(nx1394_define_events_exit,
-			    S1394_TNF_SL_NEXUS_STACK, "");
 			return (DDI_FAILURE);
 		}
 	}
-
-	TNF_PROBE_0_DEBUG(nx1394_define_events_exit, S1394_TNF_SL_NEXUS_STACK,
-	    "");
 
 	return (DDI_SUCCESS);
 }
@@ -543,22 +452,8 @@ nx1394_undefine_events(s1394_hal_t *hal)
 {
 	int ret;
 
-	TNF_PROBE_0_DEBUG(nx1394_undefine_events_enter,
-	    S1394_TNF_SL_NEXUS_STACK, "");
-
 	ret = ndi_event_unbind_set(hal->hal_ndi_event_hdl, &nx1394_events,
 	    NDI_SLEEP);
-	if (ret != NDI_SUCCESS) {
-		TNF_PROBE_1(nx1394_undefine_events_unbind_fail,
-		    S1394_TNF_SL_NEXUS_ERROR, "", tnf_int, ret, ret);
-	} else {
+	if (ret == NDI_SUCCESS)
 		ret = ndi_event_free_hdl(hal->hal_ndi_event_hdl);
-		if (ret != NDI_SUCCESS) {
-			TNF_PROBE_1(nx1394_undefine_events_free_hdl_fail,
-			    S1394_TNF_SL_NEXUS_ERROR, "", tnf_int, ret, ret);
-		}
-	}
-
-	TNF_PROBE_0_DEBUG(nx1394_undefine_events_exit,
-	    S1394_TNF_SL_NEXUS_STACK, "");
 }

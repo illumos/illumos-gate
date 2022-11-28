@@ -23,7 +23,7 @@
 # therefore not reliable under this kind of load.
 #
 
-if [ `id -u` -ne 0 ]; then
+if [ `id -u` != 0 ]; then
 	echo "Need to be root or have effective UID of root."
 	exit 255
 fi
@@ -99,7 +99,7 @@ svcadm restart ipsec/policy
 i=1
 while [ $i -le 254 ]; do
 	c=$(grep -c "^DST: AF_INET: port 0, 10\.21\.12\.$i\." $MONITOR_LOG)
-	if [[ "$c" -ne 2 ]]; then
+	if [[ "$c" != 2 ]]; then
 		echo "One or more log entries missing for 10.21.12.$i" >&2
 		exit 1
 	fi

@@ -22,7 +22,7 @@
 extern int __clock_gettime_sys(clockid_t, timespec_t *);
 
 int
-gettimeofday(struct timeval *tv, void *tz)
+gettimeofday(struct timeval *tv, void *tz __unused)
 {
 	comm_page_t *cp = (comm_page_t *)__uberdata.ub_comm_page;
 

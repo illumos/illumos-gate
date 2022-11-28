@@ -25,8 +25,9 @@
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  * Copyright (c) 2020 Carlos Neira <cneirabustos@gmail.com>
+ * Copyright 2022 Oxide Computer Co.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -785,7 +786,7 @@ startup_init()
 	/*
 	 * Complete the extraction of cpuid data
 	 */
-	cpuid_pass2(CPU);
+	cpuid_execpass(CPU, CPUID_PASS_EXTENDED, NULL);
 
 	(void) check_boot_version(BOP_GETVERSION(bootops));
 
@@ -1965,7 +1966,7 @@ startup_vm(void)
 	/*
 	 * Mangle the brand string etc.
 	 */
-	cpuid_pass3(CPU);
+	cpuid_execpass(CPU, CPUID_PASS_DYNAMIC, NULL);
 
 	/*
 	 * Create the device arena for toxic (to dtrace/kmdb) mappings.
@@ -2125,9 +2126,9 @@ startup_end(void)
 	 */
 	cpu_event_init();
 
-#if defined(OPTERON_WORKAROUND_6323525)
-	if (opteron_workaround_6323525)
-		patch_workaround_6323525();
+#if defined(OPTERON_ERRATUM_147)
+	if (opteron_erratum_147)
+		patch_erratum_147();
 #endif
 	/*
 	 * If needed, load TOD module now so that ddi_get_time(9F) etc. work
@@ -3106,16 +3107,11 @@ setx86isalist(void)
 		}
 		/*FALLTHROUGH*/
 	case X86_VENDOR_Cyrix:
-		/*
-		 * The Cyrix 6x86 does not have any Pentium features
-		 * accessible while not at privilege level 0.
-		 */
-		if (is_x86_feature(x86_featureset, X86FSET_CPUID)) {
-			(void) strcat(tp, "pentium");
-			(void) strcat(tp,
-			    is_x86_feature(x86_featureset, X86FSET_MMX) ?
-			    "+mmx pentium " : " ");
-		}
+		ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
+		(void) strcat(tp, "pentium");
+		(void) strcat(tp,
+		    is_x86_feature(x86_featureset, X86FSET_MMX) ?
+		    "+mmx pentium " : " ");
 		break;
 	default:
 		break;

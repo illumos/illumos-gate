@@ -1,0 +1,28 @@
+bit0_t {
+    unsigned int:3 a :3 = 0x3
+    unsigned int:2 b :2 = 0x3
+    unsigned int:1 c :1 = 0
+    unsigned int:1 d :1 = 0x1
+    unsigned int:1 e :1 = 0x1
+    unsigned int:1 f :1 = 0x1
+    unsigned int:3 g :3 = 0x3
+    unsigned int:3 h :3 = 0x5
+    unsigned int:5 i :5 = 0x3
+    unsigned int:4 j :4 = 0x9
+    unsigned int:6 k :6 = 0x13
+    unsigned int:1 l :1 = 0
+    unsigned int:1 m :1 = 0x1
+}
+bit1_t {
+    unsigned short:1 a :1 = 0x1
+    unsigned short:8 b :8 = 0xb
+    unsigned short:3 c :3 = 0x2
+    unsigned short:2 d :2 = 0x2
+    unsigned short:1 e :1 = 0x1
+    unsigned short:1 f :1 = 0x1
+}
+11
+0x1 0xb 0x2 0x2 0x1 0x1
+3
+0x3 0x5 0x3 0x9
+

@@ -579,7 +579,8 @@ vmm_gpt_reset_dirty(vmm_gpt_t *gpt, uint64_t *entry, bool on)
  * Get properly formatted PML4 (EPTP/nCR3) for GPT.
  */
 uint64_t
-vmm_gpt_get_pmtp(vmm_gpt_t *gpt)
+vmm_gpt_get_pmtp(vmm_gpt_t *gpt, bool track_dirty)
 {
-	return (gpt->vgpt_pte_ops->vpeo_get_pmtp(gpt->vgpt_root->vgn_host_pfn));
+	const pfn_t root_pfn = gpt->vgpt_root->vgn_host_pfn;
+	return (gpt->vgpt_pte_ops->vpeo_get_pmtp(root_pfn, track_dirty));
 }

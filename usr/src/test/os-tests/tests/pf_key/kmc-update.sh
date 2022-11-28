@@ -15,7 +15,7 @@
 # Copyright (c) 2018, Joyent, Inc.
 #
 
-if [[ `id -u` -ne 0 ]]; then
+if [[ `id -u` != 0 ]]; then
 	echo "Need to be root or have effective UID of root."
 	exit 255
 fi

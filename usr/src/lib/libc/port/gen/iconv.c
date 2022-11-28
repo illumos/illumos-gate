@@ -45,7 +45,7 @@ static iconv_p	iconv_open_all(const char *, const char *, char *);
 static iconv_p	iconv_open_private(const char *, const char *);
 static iconv_p	iconv_search_alias(const char *, const char *, char *);
 static size_t	passthru_icv_iconv(iconv_t, const char **, size_t *, char **,
-	size_t *);
+    size_t *);
 static void	passthru_icv_close(iconv_t);
 
 #define	PASSTHRU_MAGIC_NUMBER	(0x53756e)
@@ -153,7 +153,7 @@ static size_t
 search_alias(char **paddr, size_t size, const char *variant)
 {
 	char	*addr = *paddr;
-	char 	*p, *sp, *q;
+	char	*p, *sp, *q;
 	size_t	var_len, can_len;
 
 	var_len = strlen(variant);
@@ -425,14 +425,13 @@ iconv_close(iconv_t cd)
  * we supply a dummy passthru_icv_close() that will just return.
  */
 static void
-/*LINTED E_FUNC_ARG_UNUSED*/
-passthru_icv_close(iconv_t cd)
+passthru_icv_close(iconv_t cd __unused)
 {
 }
 
 size_t
 iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
-	char **outbuf, size_t *outbytesleft)
+    char **outbuf, size_t *outbytesleft)
 {
 	/* check if cd is valid */
 	if (cd == NULL || cd == (iconv_t)-1) {
@@ -447,7 +446,7 @@ iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
 
 static size_t
 passthru_icv_iconv(iconv_t cd, const char **inbuf, size_t *inbufleft,
-	char **outbuf, size_t *outbufleft)
+    char **outbuf, size_t *outbufleft)
 {
 	size_t ibl;
 	size_t obl;

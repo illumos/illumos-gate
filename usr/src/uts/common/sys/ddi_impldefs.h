@@ -23,6 +23,7 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _SYS_DDI_IMPLDEFS_H
@@ -1119,6 +1120,12 @@ typedef struct impl_devid {
  *			'E' |	// DEVID_ENCAP		<ascii_id>
  *			'a' |	// DEVID_ATA_SERIAL	<hex_id>
  *			'A' |	// DEVID_ATA_SERIAL	<ascii_id>
+ *			'd' |	// DEVID_NVME_NSID	<hex_id>
+ *			'D' |	// DEVID_NVME_NSID	<ascii_id>
+ *			'i' |	// DEVID_NVME_EUI64	<hex_id>
+ *			'I' |	// DEVID_NVME_EUI64	<ascii_id>
+ *			'g' |	// DEVID_NVME_NGUID	<hex_id>
+ *			'G' |	// DEVID_NVME_NGUID	<ascii_id>
  *			'u' |	// unknown		<hex_id>
  *			'U'	// unknown		<ascii_id>
  *				// NOTE:lower case -> <hex_id>
@@ -1179,6 +1186,9 @@ typedef struct impl_devid {
 	((b) == DEVID_FAB)		? 'f' :				\
 	((b) == DEVID_ENCAP)		? 'e' :				\
 	((b) == DEVID_ATA_SERIAL)	? 'a' :				\
+	((b) == DEVID_NVME_NSID)	? 'd' :				\
+	((b) == DEVID_NVME_EUI64)	? 'i' :				\
+	((b) == DEVID_NVME_NGUID)	? 'g' :				\
 	'u')						/* unknown */
 
 /* convert type field from ascii to binary */
@@ -1191,6 +1201,9 @@ typedef struct impl_devid {
 	(((c) == 'f') || ((c) == 'F'))	? DEVID_FAB :			\
 	(((c) == 'e') || ((c) == 'E'))	? DEVID_ENCAP :			\
 	(((c) == 'a') || ((c) == 'A'))	? DEVID_ATA_SERIAL :		\
+	(((c) == 'd') || ((c) == 'D'))	? DEVID_NVME_NSID :		\
+	(((c) == 'i') || ((c) == 'I'))	? DEVID_NVME_EUI64 :		\
+	(((c) == 'g') || ((c) == 'G'))	? DEVID_NVME_NGUID :		\
 	DEVID_MAXTYPE +1)				/* unknown */
 
 /* determine if the type should be forced to hex encoding (non-ascii) */
@@ -1198,6 +1211,8 @@ typedef struct impl_devid {
 	((b) == DEVID_SCSI3_WWN) ||	\
 	((b) == DEVID_SCSI3_VPD_EUI) ||	\
 	((b) == DEVID_SCSI3_VPD_NAA) ||	\
+	((b) == DEVID_NVME_EUI64) ||	\
+	((b) == DEVID_NVME_NGUID) ||	\
 	((b) == DEVID_FAB))
 
 /* determine if the type is from a scsi3 vpd */

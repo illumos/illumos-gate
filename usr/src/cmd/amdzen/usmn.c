@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -51,11 +51,13 @@ usmn_parse_uint32(const char *str, uint32_t *valp)
 }
 
 static boolean_t
-usmn_op(boolean_t do_write, int fd, const char *addr, uint32_t value)
+usmn_op(boolean_t do_write, int fd, const char *addr, uint32_t length,
+    uint32_t value)
 {
 	usmn_reg_t usr;
 
 	usr.usr_data = value;
+	usr.usr_size = length;
 	if (!usmn_parse_uint32(addr, &usr.usr_addr)) {
 		return (B_FALSE);
 	}
@@ -78,11 +80,22 @@ main(int argc, char *argv[])
 	const char *device = NULL;
 	boolean_t do_write = B_FALSE;
 	uint32_t wval = 0;
+	uint32_t length = 4;
 
-	while ((c = getopt(argc, argv, "d:w:")) != -1) {
+	while ((c = getopt(argc, argv, "d:L:w:")) != -1) {
 		switch (c) {
 		case 'd':
 			device = optarg;
+			break;
+		case 'L':
+			if (!usmn_parse_uint32(optarg, &length)) {
+				return (EXIT_FAILURE);
+			}
+			if (length != 1 && length != 2 && length != 4) {
+				warnx("length %u is out of range {1,2,4}",
+				    length);
+				return (EXIT_FAILURE);
+			}
 			break;
 		case 'w':
 			do_write = B_TRUE;
@@ -92,7 +105,7 @@ main(int argc, char *argv[])
 			break;
 		default:
 			(void) fprintf(stderr, "Usage: usmn -d device "
-			    "[-w value] addr [addr]...\n"
+			    "[-L length] [-w value] addr [addr]...\n"
 			    "Note: All addresses are interpreted as hex\n");
 			return (2);
 		}
@@ -119,7 +132,7 @@ main(int argc, char *argv[])
 
 	ret = EXIT_SUCCESS;
 	for (i = 0; i < argc; i++) {
-		if (!usmn_op(do_write, fd, argv[i], wval)) {
+		if (!usmn_op(do_write, fd, argv[i], length, wval)) {
 			ret = EXIT_FAILURE;
 		}
 	}

@@ -17,8 +17,9 @@
 .\"
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+.\" Copyright 2021 RackTop Systems, Inc.
 .\"
-.Dd June 6, 2019
+.Dd Oct 15, 2021
 .Dt SMBADM 8
 .Os
 .Sh NAME
@@ -69,6 +70,7 @@ membership
 .Nm
 .Cm join
 .Op Fl y
+.Op Fl c Ar container
 .Fl u Ar username
 .Ar domain
 .Nm
@@ -349,6 +351,7 @@ module has been added to the system's PAM configuration.
 .It Xo
 .Cm join
 .Op Fl y
+.Op Fl c Ar container
 .Fl u Ar username
 .Ar domain
 .Xc
@@ -377,6 +380,16 @@ username@domain
 \&...where
 .Ar domain
 can be the NetBIOS or DNS domain name.
+.Pp
+The optional
+.Ar container
+string specifies the Relative Distinguished Name (RDN) of the
+Active Directory Container in which the machine trust account
+should be created.
+If unspecified, the RDN used is:
+.Bd -literal -offset indent
+CN=Computers
+.Ed
 .Pp
 If a machine trust account for the system already exists on a domain controller,
 any authenticated user account can be used when joining the domain.

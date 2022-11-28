@@ -22,10 +22,11 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /* from S5R4 1.6 */
@@ -54,7 +55,7 @@
 #include <sys/modctl.h>
 
 extern int intpexec(struct vnode *, struct execa *, struct uarg *,
-    struct intpdata *, int, long *, int, caddr_t, struct cred *, int);
+    struct intpdata *, int, size_t *, int, caddr_t, struct cred *, int);
 
 static struct execsw esw = {
 	intpmagicstr,
@@ -132,7 +133,7 @@ getintphead(struct vnode *vp, struct intpdata *idatap)
 	 * arguments provided on the command line.  Thus, for
 	 * example, you can say
 	 *
-	 * 	#! /usr/bin/awk -f
+	 *	#! /usr/bin/awk -f
 	 */
 	for (cp = &linep[2]; *cp == ' '; cp++)
 		;
@@ -184,7 +185,7 @@ intpexec(
 	struct uarg *args,
 	struct intpdata *idatap,
 	int level,
-	long *execsz,
+	size_t *execsz,
 	int setid,
 	caddr_t exec_file,
 	struct cred *cred,

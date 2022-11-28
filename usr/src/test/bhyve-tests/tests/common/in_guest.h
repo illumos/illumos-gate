@@ -19,6 +19,8 @@
 #include "payload_common.h"
 
 struct vmctx *test_initialize(const char *);
+struct vmctx *test_initialize_flags(const char *, uint64_t);
+void test_cleanup(bool);
 void test_fail_errno(int err, const char *msg);
 void test_fail_msg(const char *fmt, ...);
 void test_fail_vmexit(const struct vm_exit *vexit);

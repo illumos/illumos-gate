@@ -80,6 +80,10 @@ vdt_close(dev_t dev, int flag, int otype, cred_t *cr)
 		return (ENXIO);
 	}
 
+	if (ss->vss_hold != NULL) {
+		vmm_drv_rele(ss->vss_hold);
+		ss->vss_hold = NULL;
+	}
 	mutex_destroy(&ss->vss_lock);
 	ddi_soft_state_free(vdt_state, minor);
 	id_free(vdt_minors, minor);

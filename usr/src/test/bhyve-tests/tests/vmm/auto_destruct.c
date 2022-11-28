@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <libgen.h>
-#include <sys/stat.h>
 #include <errno.h>
+#include <err.h>
 #include <assert.h>
 
 #include <sys/vmm.h>
@@ -29,41 +29,6 @@
 
 #include "common.h"
 
-bool
-test_for_instance(const char *suite_name)
-{
-	char vm_name[VM_MAX_NAMELEN];
-	char vm_path[MAXPATHLEN];
-
-	name_test_vm(suite_name, vm_name);
-	(void) snprintf(vm_path, sizeof (vm_path), "/dev/vmm/%s", vm_name);
-
-	struct stat buf;
-	return (stat(vm_path, &buf) == 0);
-}
-
-int
-destroy_instance(const char *suite_name)
-{
-	int ctl_fd = open(VMM_CTL_DEV, O_EXCL | O_RDWR);
-	if (ctl_fd < 0) {
-		return (-1);
-	}
-
-	struct vm_destroy_req req;
-	name_test_vm(suite_name, req.name);
-
-	if (ioctl(ctl_fd, VMM_DESTROY_VM, &req) != 0) {
-		/* Preserve the destroy error across the close() */
-		int err = errno;
-		(void) close(ctl_fd);
-		errno = err;
-		return (-1);
-	} else {
-		(void) close(ctl_fd);
-		return (0);
-	}
-}
 
 int
 main(int argc, char *argv[])
@@ -73,51 +38,44 @@ main(int argc, char *argv[])
 
 	ctx = create_test_vm(suite_name);
 	if (ctx == NULL) {
-		perror("could open test VM");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could open test VM");
 	}
 
 	/*
 	 * It would be odd if we had the freshly created VM instance, but it did
 	 * not appear to exist.
 	 */
-	assert(test_for_instance(suite_name));
+	assert(check_instance_usable(suite_name));
 
 	/* Make sure that auto-destruct is off */
 	if (ioctl(vm_get_device_fd(ctx), VM_SET_AUTODESTRUCT, 0) != 0) {
-		perror("could not disable auto-destruct");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could not disable auto-destruct");
 	}
 
 	vm_close(ctx);
-	if (!test_for_instance(suite_name)) {
-		perror("instance missing after close");
-		return (EXIT_FAILURE);
+	if (!check_instance_usable(suite_name)) {
+		err(EXIT_FAILURE, "instance missing after close");
 	}
 	ctx = NULL;
 
 	if (destroy_instance(suite_name) != 0) {
-		perror("could not clean up instance");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could not clean up instance");
 	}
 
 	/* Now repeat that process, but enable auto-destruct */
 	ctx = create_test_vm(suite_name);
 	if (ctx == NULL) {
-		perror("could open test VM");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could open test VM");
 	}
 	if (ioctl(vm_get_device_fd(ctx), VM_SET_AUTODESTRUCT, 1) != 0) {
-		perror("could not enable auto-destruct");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could not enable auto-destruct");
 	}
 	vm_close(ctx);
 	ctx = NULL;
 	/* At this point, the instance should be gone */
-	if (test_for_instance(suite_name)) {
-		(void) fprintf(stderr,
+	if (check_instance_usable(suite_name)) {
+		err(EXIT_FAILURE,
 		    "instance did not auto-destruct as expected");
-		return (EXIT_FAILURE);
 	}
 
 	/*
@@ -126,37 +84,40 @@ main(int argc, char *argv[])
 	 */
 	ctx = create_test_vm(suite_name);
 	if (ctx == NULL) {
-		perror("could open test VM");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could open test VM");
 	}
 	if (ioctl(vm_get_device_fd(ctx), VM_SET_AUTODESTRUCT, 1) != 0) {
-		perror("could not enable auto-destruct");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could not enable auto-destruct");
 	}
 	int vdtfd = open_drv_test();
 	if (vdtfd < 0) {
-		perror("could open drv_test device");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could open drv_test device");
 	}
 	if (ioctl(vdtfd, VDT_IOC_HOLD, vm_get_device_fd(ctx)) != 0) {
-		perror("could not hold VM from vmm_drv device");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could not hold VM from vmm_drv device");
 	}
 	vm_close(ctx);
 	ctx = NULL;
-	if (!test_for_instance(suite_name)) {
-		(void) fprintf(stderr,
-		    "instance auto-destructed despite existing vmm_drv hold");
-		return (EXIT_FAILURE);
+
+	/*
+	 * With the vmm_drv hold remaining on the instance, we expect it to
+	 * exist, but not be usable (due to in-progress destroy).
+	 */
+	if (!check_instance_exists(suite_name)) {
+		err(EXIT_FAILURE, "instance completed auto-destruct despite "
+		    "existing vmm_drv hold");
 	}
+	if (check_instance_usable(suite_name)) {
+		err(EXIT_FAILURE, "instance still usable despite close() after "
+		    "auto-destroy configured");
+	}
+
 	if (ioctl(vdtfd, VDT_IOC_RELE, 0) != 0) {
-		perror("could not release VM from vmm_drv device");
-		return (EXIT_FAILURE);
+		errx(EXIT_FAILURE, "could not release VM from vmm_drv device");
 	}
-	if (test_for_instance(suite_name)) {
-		(void) fprintf(stderr,
-		    "instance did not auto-destructed after vmm_drv release");
-		return (EXIT_FAILURE);
+	if (check_instance_usable(suite_name)) {
+		err(EXIT_FAILURE, "instance did not complete destruction "
+		    "after vmm_drv release");
 	}
 
 	(void) printf("%s\tPASS\n", suite_name);

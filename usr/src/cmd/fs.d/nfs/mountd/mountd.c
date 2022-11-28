@@ -23,10 +23,11 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -88,6 +89,8 @@
 #include <pwd.h>
 #include <grp.h>
 #include <alloca.h>
+#include <libinetutil.h>
+#include <libsocket_priv.h>
 
 extern int daemonize_init(void);
 extern void daemonize_fini(int);
@@ -124,6 +127,7 @@ static int rejecting;
 static int mount_vers_min = MOUNTVERS;
 static int mount_vers_max = MOUNTVERS3;
 static int mountd_port = 0;
+static boolean_t mountd_remote_dump = B_FALSE;
 
 extern void nfscmd_func(void *, char *, size_t, door_desc_t *, uint_t);
 
@@ -150,9 +154,11 @@ static logging_data *logging_tail = NULL;
 static long ngroups_max;	/* _SC_NGROUPS_MAX */
 static long pw_size;		/* _SC_GETPW_R_SIZE_MAX */
 
-/* ARGSUSED */
+/* Cached address info for this host. */
+static struct addrinfo *host_ai = NULL;
+
 static void *
-nfsauth_svc(void *arg)
+nfsauth_svc(void *arg __unused)
 {
 	int	doorfd = -1;
 	uint_t	darg;
@@ -327,7 +333,7 @@ do_logging_queue(logging_data *lq)
 }
 
 static void *
-logging_svc(void *arg)
+logging_svc(void *arg __unused)
 {
 	logging_data	*lq;
 
@@ -347,22 +353,6 @@ logging_svc(void *arg)
 	/*NOTREACHED*/
 	syslog(LOG_ERR, gettext("Logging server exited"));
 	return (NULL);
-}
-
-static int
-convert_int(int *val, char *str)
-{
-	long lval;
-
-	if (str == NULL || !isdigit(*str))
-		return (-1);
-
-	lval = strtol(str, &str, 10);
-	if (*str != '\0' || lval > INT_MAX)
-		return (-2);
-
-	*val = (int)lval;
-	return (0);
 }
 
 /*
@@ -396,7 +386,7 @@ md_svc_tp_create(struct netconfig *nconf)
 	    strcmp(nconf->nc_protofmly, NC_INET6) == 0)) {
 		int err;
 
-		snprintf(port_str, sizeof (port_str), "%u",
+		(void) snprintf(port_str, sizeof (port_str), "%u",
 		    (unsigned short)mountd_port);
 
 		hs.h_host = HOST_SELF_BIND;
@@ -452,7 +442,7 @@ main(int argc, char *argv[])
 	bool_t	exclbind = TRUE;
 	bool_t	can_do_mlp;
 	long	thr_flags = (THR_NEW_LWP|THR_DAEMON);
-	char defval[4];
+	char defval[5];
 	int defvers, ret, bufsz;
 	struct rlimit rl;
 	int listen_backlog = 0;
@@ -460,8 +450,9 @@ main(int argc, char *argv[])
 	int tmp;
 	struct netconfig *nconf;
 	NCONF_HANDLE *nc;
-
+	const char *errstr;
 	int	pipe_fd = -1;
+	char	hostbuf[256];
 
 	/*
 	 * Mountd requires uid 0 for:
@@ -523,19 +514,20 @@ main(int argc, char *argv[])
 			rejecting = 1;
 			break;
 		case 'm':
-			if (convert_int(&tmp, optarg) != 0 || tmp < 1) {
+			tmp = strtonum(optarg, 1, INT_MAX, &errstr);
+			if (errstr != NULL) {
 				(void) fprintf(stderr, "%s: invalid "
-				    "max_threads option, using defaults\n",
-				    argv[0]);
+				    "max_threads option: %s, using defaults\n",
+				    argv[0], errstr);
 				break;
 			}
 			max_threads = tmp;
 			break;
 		case 'p':
-			if (convert_int(&tmp, optarg) != 0 || tmp < 1 ||
-			    tmp > UINT16_MAX) {
+			tmp = strtonum(optarg, 1, UINT16_MAX, &errstr);
+			if (errstr != NULL) {
 				(void) fprintf(stderr, "%s: invalid port "
-				    "number\n", argv[0]);
+				    "number: %s\n", argv[0], errstr);
 				break;
 			}
 			mountd_port = tmp;
@@ -549,7 +541,7 @@ main(int argc, char *argv[])
 	/*
 	 * Read in the NFS version values from config file.
 	 */
-	bufsz = 4;
+	bufsz = sizeof (defval);
 	ret = nfs_smf_get_prop("server_versmin", defval, DEFAULT_INSTANCE,
 	    SCF_TYPE_INTEGER, NFSD, &bufsz);
 	if (ret == SA_OK) {
@@ -566,7 +558,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	bufsz = 4;
+	bufsz = sizeof (defval);
 	ret = nfs_smf_get_prop("server_versmax", defval, DEFAULT_INSTANCE,
 	    SCF_TYPE_INTEGER, NFSD, &bufsz);
 	if (ret == SA_OK) {
@@ -582,6 +574,24 @@ main(int argc, char *argv[])
 	if (ret != SA_OK) {
 		syslog(LOG_ERR, "Reading of mountd_listen_backlog from SMF "
 		    "failed, using default value");
+	}
+
+	bufsz = sizeof (defval);
+	ret = nfs_smf_get_prop("mountd_remote_dump", defval, DEFAULT_INSTANCE,
+	    SCF_TYPE_BOOLEAN, NFSD, &bufsz);
+	if (ret == SA_OK) {
+		mountd_remote_dump = string_to_boolean(defval);
+	}
+	if (!mountd_remote_dump) {
+		/* Cache host address list */
+		if (gethostname(hostbuf, sizeof (hostbuf)) < 0) {
+			syslog(LOG_ERR, "gethostname() failed");
+			exit(1);
+		}
+		if (getaddrinfo(hostbuf, NULL, NULL, &host_ai) != 0) {
+			syslog(LOG_ERR, "getaddrinfo() failed");
+			exit(1);
+		}
 	}
 
 	/*
@@ -797,6 +807,55 @@ main(int argc, char *argv[])
 }
 
 /*
+ * copied from usr/src/uts/common/klm/nlm_impl.c
+ */
+static bool_t
+caller_is_local(SVCXPRT *transp)
+{
+	struct addrinfo *a;
+	char *netid;
+	struct netbuf *rtaddr;
+	struct sockaddr_storage addr;
+	bool_t rv = FALSE;
+
+	netid = transp->xp_netid;
+	rtaddr = svc_getrpccaller(transp);
+
+	if (netid == NULL)
+		return (FALSE);
+
+	if (strcmp(netid, "ticlts") == 0 ||
+	    strcmp(netid, "ticotsord") == 0)
+		return (TRUE);
+
+	if (strcmp(netid, "tcp") == 0 || strcmp(netid, "udp") == 0) {
+		struct sockaddr_in *sin = (void *)rtaddr->buf;
+
+		if (sin->sin_addr.s_addr == htonl(INADDR_LOOPBACK))
+			return (TRUE);
+
+		memmove(&addr, sin, sizeof (*sin));
+	}
+	if (strcmp(netid, "tcp6") == 0 || strcmp(netid, "udp6") == 0) {
+		struct sockaddr_in6 *sin6 = (void *)rtaddr->buf;
+
+		if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr))
+			return (TRUE);
+
+		memmove(&addr, sin6, sizeof (*sin6));
+	}
+
+	for (a = host_ai; a != NULL; a = a->ai_next) {
+		if (sockaddrcmp(&addr,
+		    (struct sockaddr_storage *)a->ai_addr)) {
+			rv = TRUE;
+			break;
+		}
+	}
+	return (rv);
+}
+
+/*
  * Server procedure switch routine
  */
 void
@@ -814,7 +873,10 @@ mnt(struct svc_req *rqstp, SVCXPRT *transp)
 		return;
 
 	case MOUNTPROC_DUMP:
-		mntlist_send(transp);
+		if (mountd_remote_dump || caller_is_local(transp))
+			mntlist_send(transp);
+		else
+			svcerr_noproc(transp);
 		return;
 
 	case MOUNTPROC_UMNT:
@@ -939,7 +1001,7 @@ done:
 	if (!svc_sendreply(transp, xdr_ppathcnf, (char *)&p))
 		log_cant_reply(transp);
 	if (path != NULL)
-		svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
+		(void) svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
 }
 
 /*
@@ -1572,7 +1634,7 @@ reply:
 	}
 
 	if (path != NULL)
-		svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
+		(void) svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
 
 	if (sh)
 		sharefree(sh);
@@ -3230,7 +3292,7 @@ umount(struct svc_req *rqstp)
 		 * Without the hostname we can't do audit or delete
 		 * this host from the mount entries.
 		 */
-		svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
+		(void) svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
 		return;
 	}
 
@@ -3250,7 +3312,7 @@ umount(struct svc_req *rqstp)
 
 	cln_fini(&cln);
 
-	svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
+	(void) svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
 }
 
 /*

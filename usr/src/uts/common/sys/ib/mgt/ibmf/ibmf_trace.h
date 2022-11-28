@@ -27,8 +27,6 @@
 #ifndef _SYS_IB_MGT_IBMF_IBMF_TRACE_H
 #define	_SYS_IB_MGT_IBMF_IBMF_TRACE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the IBMF trace/debug macros.
  */
@@ -36,11 +34,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <sys/tnf_probe.h>
-
-#define	IBMF_TNF_ERROR		"ibmf ibmf_error"
-#define	IBMF_TNF_TRACE		"ibmf ibmf_trace"
 
 /*
  * Trace levels for printing
@@ -54,10 +47,6 @@ extern "C" {
 /*
  * Trace probe macros
  */
-#define	IBMF_TNF_NODEBUG	0
-#define	IBMF_TNF_DEBUG		1
-
-#ifdef NPROBE /* NPROBE */
 
 #define	IBMF_TRACE_0(debug, trlevel, arg01, arg02, arg03, arg04)	\
 	if (ibmf_trace_level > 0) {				\
@@ -94,105 +83,6 @@ extern "C" {
 		ibmf_dprintf(trlevel, arg04, arg13, arg23, arg33, \
 		    arg43, arg53);				\
 	}
-
-#else
-
-#define	IBMF_TRACE_0(debug, trlevel, arg01, arg02, arg03, arg04)	\
-{								\
-	boolean_t	use_debug = debug;			\
-	if (use_debug) {					\
-		TNF_PROBE_0_DEBUG(arg01, arg02, arg03);		\
-	} else {						\
-		TNF_PROBE_0(arg01, arg02, arg03);		\
-	}							\
-	if (ibmf_trace_level > 0) {				\
-		ibmf_dprintf(trlevel, arg04);			\
-	}							\
-}
-
-/* CSTYLED */
-#define	IBMF_TRACE_1(debug, trlevel, arg01, arg02, arg03, arg04, arg11, arg12, arg13) 								\
-{								\
-	boolean_t	use_debug = debug;			\
-	if (use_debug) {					\
-		TNF_PROBE_1_DEBUG(arg01, arg02, arg03, arg11, arg12, arg13);\
-	} else {						\
-		TNF_PROBE_1(arg01, arg02, arg03, arg11, arg12, arg13);	\
-	}							\
-	if (ibmf_trace_level > 0) {				\
-		ibmf_dprintf(trlevel, arg04, arg13);		\
-	}							\
-}
-
-/* CSTYLED */
-#define	IBMF_TRACE_2(debug, trlevel, arg01, arg02, arg03, arg04, arg11, arg12, arg13, arg21, arg22, arg23) 					\
-{								\
-	boolean_t	use_debug = debug;			\
-	if (use_debug) {					\
-		TNF_PROBE_2_DEBUG(arg01, arg02, arg03, arg11, arg12, \
-		    arg13, arg21, arg22, arg23);		\
-	} else {						\
-		TNF_PROBE_2(arg01, arg02, arg03, arg11, arg12, arg13, \
-		    arg21, arg22, arg23);			\
-	}							\
-	if (ibmf_trace_level > 0) {				\
-		ibmf_dprintf(trlevel, arg04, arg13, arg23);	\
-	}							\
-}
-
-/* CSTYLED */
-#define	IBMF_TRACE_3(debug, trlevel, arg01, arg02, arg03, arg04, arg11, arg12, arg13, arg21, arg22, arg23, arg31, arg32, arg33) 		\
-{								\
-	boolean_t	use_debug = debug;			\
-	if (use_debug) {					\
-		TNF_PROBE_3_DEBUG(arg01, arg02, arg03, arg11, arg12, arg13, \
-		    arg21, arg22, arg23, arg31, arg32, arg33);	\
-	} else {						\
-		TNF_PROBE_3(arg01, arg02, arg03, arg11, arg12, arg13, arg21, \
-		    arg22, arg23, arg31, arg32, arg33);		\
-	}							\
-	if (ibmf_trace_level > 0) {				\
-		ibmf_dprintf(trlevel, arg04, arg13, arg23, arg33);	\
-	}							\
-}
-
-/* CSTYLED */
-#define	IBMF_TRACE_4(debug, trlevel, arg01, arg02, arg03, arg04, arg11, arg12, arg13, arg21, arg22, arg23, arg31, arg32, arg33, arg41, arg42, arg43) \
-{								\
-	boolean_t	use_debug = debug;			\
-	if (use_debug) {					\
-		TNF_PROBE_4_DEBUG(arg01, arg02, arg03, arg11, arg12, arg13, \
-		    arg21, arg22, arg23, arg31, arg32, arg33, arg41, arg42, \
-		    arg43);						\
-	} else {						\
-		TNF_PROBE_4(arg01, arg02, arg03, arg11, arg12, arg13, arg21, \
-		    arg22, arg23, arg31, arg32, arg33, arg41, arg42, arg43); \
-	}							\
-	if (ibmf_trace_level > 0) {				\
-		ibmf_dprintf(trlevel, arg04, arg13, arg23, arg33, arg43);\
-	}							\
-}
-
-/* CSTYLED */
-#define	IBMF_TRACE_5(debug, trlevel, arg01, arg02, arg03, arg04, arg11, arg12, arg13, arg21, arg22, arg23, arg31, arg32, arg33, arg41, arg42, arg43, arg51, arg52, arg53) 							\
-{								\
-	boolean_t	use_debug = debug;			\
-	if (use_debug) {					\
-		TNF_PROBE_5_DEBUG(arg01, arg02, arg03, arg11, arg12, arg13, \
-		    arg21, arg22, arg23, arg31, arg32, arg33, arg41, arg42, \
-		    arg43, arg51, arg52, arg53);		\
-	} else {						\
-		TNF_PROBE_5(arg01, arg02, arg03, arg11, arg12, arg13, arg21, \
-		    arg22, arg23, arg31, arg32, arg33, arg41, arg42, arg43, \
-		    arg51, arg52, arg53);			\
-	}							\
-	if (ibmf_trace_level > 0) {				\
-		ibmf_dprintf(trlevel, arg04, arg13, arg23, arg33, arg43, \
-		    arg53);					\
-	}							\
-}
-
-#endif
 
 void
 ibmf_dprintf(int l, const char *fmt, ...);

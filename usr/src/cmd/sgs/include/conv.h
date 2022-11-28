@@ -27,7 +27,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2016 RackTop Systems.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_CONV_H
@@ -53,6 +53,9 @@ extern "C" {
  * Configuration features available - maintained here (instead of debug.h)
  * to save libconv from having to include debug.h which results in numerous
  * "declared but not used or defined" lint errors.
+ *
+ * AOUT flags (ADLIBPATH, ASLIBPATH) are unused, but retained so they may
+ * still be fully dumped under LD_DEBUG.
  */
 #define	CONF_EDLIBPATH	0x000100	/* ELF default library path */
 #define	CONF_ESLIBPATH	0x000200	/* ELF secure library path */
@@ -163,23 +166,29 @@ typedef union {
  * These sizes are based on the maximum number of capabilities that exist.
  * See common/elfcap.
  */
-#define	CONV_CAP_VAL_HW1_BUFSIZE	195
+#define	CONV_CAP_VAL_HW1_BUFSIZE	528
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_CAP_VAL_HW1_BUFSIZE];
 } Conv_cap_val_hw1_buf_t;
 
-#define	CONV_CAP_VAL_HW2_BUFSIZE	350
+#define	CONV_CAP_VAL_HW2_BUFSIZE	632
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_CAP_VAL_HW2_BUFSIZE];
 } Conv_cap_val_hw2_buf_t;
 
-#define	CONV_CAP_VAL_SF1_BUFSIZE	45
+#define	CONV_CAP_VAL_SF1_BUFSIZE	73
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_CAP_VAL_SF1_BUFSIZE];
 } Conv_cap_val_sf1_buf_t;
+
+#define	CONV_CAP_VAL_HW3_BUFSIZE	66
+typedef union {
+	Conv_inv_buf_t			inv_buf;
+	char				buf[CONV_CAP_VAL_HW3_BUFSIZE];
+} Conv_cap_val_hw3_buf_t;
 
 /* conv_cap_val_buf() */
 typedef union {
@@ -187,6 +196,7 @@ typedef union {
 	Conv_cap_val_hw1_buf_t		cap_val_hw1_buf;
 	Conv_cap_val_sf1_buf_t		cap_val_sf1_buf;
 	Conv_cap_val_hw2_buf_t		cap_val_hw2_buf;
+	Conv_cap_val_hw3_buf_t		cap_val_hw3_buf;
 } Conv_cap_val_buf_t;
 
 /* conv_config_feat() */
@@ -959,6 +969,8 @@ extern	conv_iter_ret_t	conv_iter_cap_val_hw2(Half, Conv_fmt_flags_t,
 			    conv_iter_cb_t, void *);
 extern	conv_iter_ret_t	conv_iter_cap_val_sf1(Conv_fmt_flags_t, conv_iter_cb_t,
 			    void *);
+extern	conv_iter_ret_t	conv_iter_cap_val_hw3(Half, Conv_fmt_flags_t,
+			    conv_iter_cb_t, void *);
 
 extern	conv_iter_ret_t	conv_iter_dyn_feature1(Conv_fmt_flags_t, conv_iter_cb_t,
 			    void *);
@@ -1024,6 +1036,7 @@ extern	conv_iter_ret_t	conv_iter_syminfo_flags(Conv_fmt_flags_t,
 #define	conv_cap_val		conv64_cap_val
 #define	conv_cap_val_hw1	conv64_cap_val_hw1
 #define	conv_cap_val_hw2	conv64_cap_val_hw2
+#define	conv_cap_val_hw3	conv64_cap_val_hw3
 #define	conv_cap_val_sf1	conv64_cap_val_sf1
 #define	conv_dyn_feature1	conv64_dyn_feature1
 #define	conv_dyn_flag1		conv64_dyn_flag1
@@ -1042,6 +1055,7 @@ extern	conv_iter_ret_t	conv_iter_syminfo_flags(Conv_fmt_flags_t,
 #define	conv_cap_val		conv32_cap_val
 #define	conv_cap_val_hw1	conv32_cap_val_hw1
 #define	conv_cap_val_hw2	conv32_cap_val_hw2
+#define	conv_cap_val_hw3	conv32_cap_val_hw3
 #define	conv_cap_val_sf1	conv32_cap_val_sf1
 #define	conv_dyn_feature1	conv32_dyn_feature1
 #define	conv_dyn_flag1		conv32_dyn_flag1
@@ -1079,6 +1093,8 @@ extern	const char	*conv_cap_val_hw1(Xword, Half, Conv_fmt_flags_t,
 			    Conv_cap_val_hw1_buf_t *);
 extern	const char	*conv_cap_val_hw2(Xword, Half, Conv_fmt_flags_t,
 			    Conv_cap_val_hw2_buf_t *);
+extern	const char	*conv_cap_val_hw3(Xword, Half, Conv_fmt_flags_t,
+			    Conv_cap_val_hw3_buf_t *);
 extern	const char	*conv_cap_val_sf1(Xword, Half, Conv_fmt_flags_t,
 			    Conv_cap_val_sf1_buf_t *);
 extern	const char	*conv_dyn_flag1(Xword, Conv_fmt_flags_t,

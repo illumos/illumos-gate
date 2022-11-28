@@ -33,7 +33,18 @@
 .Nm
 .Op Fl dv
 .Cm identify
+.Op Fl C | c | d | Oo Fl a Oc Fl n
 .Ar ctl[/ns] Ns [,...]
+.Nm
+.Op Fl dv
+.Cm identify-controller
+.Op Fl C | c | Oo Fl a Oc Fl n
+.Ar ctl Ns [,...]
+.Nm
+.Op Fl dv
+.Cm identify-namespace
+.Op Fl c | d
+.Ar ctl/ns Ns [,...]
 .Nm
 .Op Fl dv
 .Cm get-logpage
@@ -128,9 +139,11 @@ The controller name consists of the driver name
 followed by an instance number.
 A namespace is specified by appending a single
 .Qq /
-followed by the namespace ID to the controller name.
-The namespace ID is the EUI64 of the namespace, or a positive non-zero
-decimal number if the namespace doesn't have an EUI64.
+to the controller name, followed by either the namespace ID or the namespace
+EUI64 or NGUID as reported by the
+.Cm identify
+command.
+The namespace ID is a positive non-zero decimal number.
 For commands that don't change the device state multiple controllers
 and namespaces can be specified as a comma-separated list.
 .Pp
@@ -247,17 +260,87 @@ The name of the disk device that corresponds to the namespace, if any.
 .El
 .It Xo
 .Nm
-.Cm identify
-.Ar ctl[/ns] Ns [,...]
+.Cm identify-controller
+.Op Fl C | c | Oo Fl a Oc Fl n
+.Ar ctl Ns [,...]
 .Xc
-Print detailed information about the specified controllers and/or
-namespaces.
-The information returned differs depending on whether a controller or
-a namespace is specified.
-For an explanation of the data printed by this command refer to the
-description of the
+Print detailed information about the specified controllers.
+For an explanation of the data printed by this command refer to the description
+of the
 .Qq IDENTIFY
 admin command in the NVMe specification.
+.Pp
+By default, a relevant subset of the
+.Qq IDENTIFY CONTROLLER
+data structure is printed.
+The full data structure is only printed when verbose output is requested.
+.Pp
+The following options can be used to print other
+.Qq IDENTIFY
+information:
+.Bl -tag -width Fl
+.It Fl C
+Print the Common Namespace Identification of the controller.
+.It Fl a
+Alter the output of the
+.Fl n
+option to print the list allocated namespace identifiers.
+Can only be specified together with the
+.Fl n
+option.
+.It Fl c
+Print the list of all unique controller identifiers in the NVMe subsystem the
+specified controller belongs to.
+.It Fl n
+Print the list of active namespace identifiers of the controller.
+.El
+.It Xo
+.Nm
+.Cm identify-namespace
+.Op Fl c | d
+.Ar ctl/ns Ns [,...]
+.Xc
+Print detailed information about the specified namespace.
+For an explanation of the data printed by this command refer to the description
+of the
+.Qq IDENTIFY
+admin command in the NVMe specification.
+.Pp
+By default, a relevant subset of the
+.Qq IDENTIFY NAMESPACE
+data structure is printed.
+The full data structure is only printed when verbose output is requested.
+.Pp
+The following options can be used to print other
+.Qq IDENTIFY
+information:
+.Bl -tag -width Fl
+.It Fl c
+Print the list of all unique controller identifiers in the NVMe subsystem the
+specified namespace belongs to and which are currently attached to this
+namespace.
+.It Fl d
+Print the list of namespace identification descriptors of the namespace.
+.El
+.It Xo
+.Nm
+.Cm identify
+.Op Fl C | c | d | Oo Fl a Oc Fl n
+.Ar ctl[/ns] Ns [,...]
+.Xc
+Short-hand for the
+.Cm identify-controller
+and
+.Cm identify-namespace
+commands, prints the same information about the specified controllers and/or
+namespaces, depending on whether a controller or a namespace was specified.
+.Pp
+For a description of the various optional flags refer to the above description
+of the
+.Cm identify-controller
+and
+.Cm identify-namespace
+commands.
 .It Xo
 .Nm
 .Cm get-logpage

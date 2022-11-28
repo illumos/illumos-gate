@@ -9,55 +9,82 @@
 # source. A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019 Joyent, Inc.
 
 # A simple update script that extracts an Intel microcode download file
 # into the intel/ directory, and updates the hardlinks in the
 # system/kernel/platform manifest.
 
-set -e
-set -o pipefail
-
-[[ -z "$1" ]] || [[ ! -f "$1" ]] && {
-	echo "Syntax: $0 <path to microcode tar>" >&2
+function errexit {
+	echo "$@" >&2
 	exit 1
 }
+
+[[ -n "$1" && -f "$1" ]] || errexit "Syntax: $0 <path to microcode tar>"
 
 ucodetar="$1"
 
+FW=platform/i86pc/ucode/GenuineIntel
+LINKSF=intel/Makefile.links
+
+export LC_ALL=C.UTF-8
+
+set -e
+set -o pipefail
+
 mf=../../pkg/manifests/system-microcode-intel.p5m
-[[ -f $mf ]] || {
-	echo "Run from usr/src/data/ucode" 2>&1
-	exit 1
+[[ -f $mf ]] || errexit "Run from usr/src/data/ucode"
+
+function find_cmd {
+	typeset cmd="$1"
+	typeset var=$(echo $cmd | tr '[:lower:]' '[:upper:]')
+	typeset -n path="$var"
+	path=$(whence -fp "$cmd")
+	if (($? != 0)) || [ ! -x "$path" ]; then
+		errexit "Cannot find executable '$cmd' in PATH"
+	fi
 }
 
-fw=platform/i86pc/ucode/GenuineIntel
+# This script uses a few commands which are not part of illumos and are
+# expected to be available in the path.
+find_cmd gtar
+find_cmd pkgfmt
+# Search for 'ucodeadm'. If you need to use an updated ucodeadm to handle this
+# firmware update, as is occasionally necessary, ensure it occurs earlier in
+# the path than /usr/sbin.
+find_cmd ucodeadm
 
 tmp=$(mktemp -d)
-mkdir $tmp/out
+[[ -n "$tmp" && -d "$tmp" ]]
+mkdir $tmp/out || errexit "Failed to create temporary directory"
+trap 'rm -rf $tmp' EXIT
 
-gtar -C $tmp -xvf "$ucodetar"
+# The distributed microcode archive uses GNU extensions
+$GTAR -C $tmp -xvf "$ucodetar"
 
-find $tmp/Intel-Linux-Processor-Microcode-Data*/intel-ucode*/ -type f \
-    | while read f; do
+path=$({ cd $tmp; echo Intel-Linux-Processor-Microcode-Data*; })
+ver=${path##*-}
+echo "** Updating to microcode version $ver"
+
+find $tmp/$path/intel-ucode*/ -type f | while read f; do
 	echo "Converting $(basename $f)"
 	cp $f $tmp/intel-fw
-	ucodeadm -i -R $tmp/out $tmp/intel-fw
+	$UCODEADM -i -R $tmp/out $tmp/intel-fw
 	rm -f $tmp/intel-fw
 done
 
-pkgfmt -u $mf
+$PKGFMT -u $mf
 mv $mf $mf.tmp
-egrep -v "(file|hardlink) path=$fw" $mf.tmp > $mf
+egrep -v "(file|hardlink) path=$FW" $mf.tmp > $mf
 rm -f $mf.tmp
 
-rm -f intel/*
+rm -f intel/*-*
 
-cp $tmp/Intel-Linux-Processor-Microcode-Data*/license intel/THIRDPARTYLICENSE
+cp $tmp/$path/license intel/THIRDPARTYLICENSE
 echo Intel Processor Microcode Data Files > intel/THIRDPARTYLICENSE.descrip
 
-rm -f Makefile.links
+rm -f $LINKSF
 
 typeset -A seen
 typeset -A inodes
@@ -79,7 +106,8 @@ done
 for f in intel/*; do
 	bf=$(basename $f)
 	[[ $bf = THIRDPARTYLICENSE* ]] && continue
-	echo "file path=$fw/$bf group=sys mode=0444 reboot-needed=true" >> $mf
+	[[ $bf = Makefile* ]] && continue
+	echo "file path=$FW/$bf group=sys mode=0444 reboot-needed=true" >> $mf
 done
 
 (
@@ -89,17 +117,18 @@ done
 		echo "\t$i \\"
 	done | sed '$s/ .*//'
 	echo
-) > Makefile.links
+) > $LINKSF
 
 for i in "${!links[@]}"; do
-	echo "hardlink path=$fw/$i target=${links[$i]}" >> $mf
-	cat << EOM >> Makefile.links
+	echo "hardlink path=$FW/$i target=${links[$i]}" >> $mf
+	cat << EOM >> $LINKSF
 \$(ROOTINTELDIR)/$i: \$(ROOTINTELDIR)/${links[$i]}
 	\$(RM) \$@; \$(LN) \$^ \$@
 
 EOM
 done
 
-pkgfmt -fv2 $mf
+sed -i "/pkg.fmri.*microcode\/intel@/s/@[0-9]*/@$ver/" $mf
 
-rm -rf $tmp
+$PKGFMT -fv2 $mf
+

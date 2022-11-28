@@ -12,6 +12,8 @@
 /*
  * Copyright (c) 2018 Joyent Inc., All rights reserved.
  * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -26,6 +28,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <strings.h>
+#include <err.h>
 
 #include <libdiskmgt.h>
 #include <sys/nvpair.h>
@@ -54,18 +57,6 @@ typedef struct di_phys {
 	int dp_faulty;
 	int dp_locate;
 } di_phys_t;
-
-static void __NORETURN
-fatal(int rv, const char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	(void) vfprintf(stderr, fmt, ap);
-	va_end(ap);
-
-	exit(rv);
-}
 
 static void
 usage(const char *execname)
@@ -115,7 +106,7 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 	tnode_t *ppnp;
 	topo_faclist_t fl;
 	topo_faclist_t *lp;
-	int err;
+	int e;
 	topo_led_state_t mode;
 	topo_led_type_t type;
 	char *name, *slotname, *serial;
@@ -124,7 +115,7 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 		return (TOPO_WALK_NEXT);
 
 	if (topo_prop_get_string(np, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_LOGICAL_DISK_NAME, &name, &err) != 0) {
+	    TOPO_STORAGE_LOGICAL_DISK_NAME, &name, &e) != 0) {
 		return (TOPO_WALK_NEXT);
 	}
 
@@ -132,7 +123,7 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 		return (TOPO_WALK_NEXT);
 
 	if (topo_prop_get_string(np, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_SERIAL_NUM, &serial, &err) == 0) {
+	    TOPO_STORAGE_SERIAL_NUM, &serial, &e) == 0) {
 		pp->dp_serial = serial;
 	}
 
@@ -141,21 +132,21 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 	pp->dp_chassis = topo_node_instance(ppnp);
 	if (strcmp(topo_node_name(pnp), BAY) == 0) {
 		if (topo_node_facility(hp, pnp, TOPO_FAC_TYPE_INDICATOR,
-		    TOPO_FAC_TYPE_ANY, &fl, &err) == 0) {
+		    TOPO_FAC_TYPE_ANY, &fl, &e) == 0) {
 			for (lp = topo_list_next(&fl.tf_list); lp != NULL;
 			    lp = topo_list_next(lp)) {
 				uint32_t prop;
 
 				if (topo_prop_get_uint32(lp->tf_node,
 				    TOPO_PGROUP_FACILITY, TOPO_FACILITY_TYPE,
-				    &prop, &err) != 0) {
+				    &prop, &e) != 0) {
 					continue;
 				}
 				type = (topo_led_type_t)prop;
 
 				if (topo_prop_get_uint32(lp->tf_node,
 				    TOPO_PGROUP_FACILITY, TOPO_LED_MODE,
-				    &prop, &err) != 0) {
+				    &prop, &e) != 0) {
 					continue;
 				}
 				mode = (topo_led_state_t)prop;
@@ -174,14 +165,14 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 		}
 
 		if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_LABEL, &slotname, &err) == 0) {
+		    TOPO_PROP_LABEL, &slotname, &e) == 0) {
 			pp->dp_slotname = slotname;
 		}
 
 		pp->dp_slot = topo_node_instance(pnp);
 	} else if (strcmp(topo_node_name(pnp), USB_DEVICE) == 0) {
 		if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_LABEL, &slotname, &err) == 0) {
+		    TOPO_PROP_LABEL, &slotname, &e) == 0) {
 			pp->dp_slotname = slotname;
 		}
 
@@ -199,24 +190,24 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 static void
 populate_physical(topo_hdl_t *hp, di_phys_t *pp)
 {
-	int err;
+	int e;
 	topo_walk_t *wp;
 
 	pp->dp_faulty = pp->dp_locate = -1;
 	pp->dp_chassis = pp->dp_slot = -1;
 
-	err = 0;
-	wp = topo_walk_init(hp, FM_FMRI_SCHEME_HC, disk_walker, pp, &err);
+	e = 0;
+	wp = topo_walk_init(hp, FM_FMRI_SCHEME_HC, disk_walker, pp, &e);
 	if (wp == NULL) {
-		fatal(-1, "unable to initialise topo walker: %s",
-		    topo_strerror(err));
+		errx(-1, "unable to initialise topo walker: %s",
+		    topo_strerror(e));
 	}
 
-	while ((err = topo_walk_step(wp, TOPO_WALK_CHILD)) == TOPO_WALK_NEXT)
+	while ((e = topo_walk_step(wp, TOPO_WALK_CHILD)) == TOPO_WALK_NEXT)
 		;
 
-	if (err == TOPO_WALK_ERR)
-		fatal(-1, "topo walk failed");
+	if (e == TOPO_WALK_ERR)
+		errx(-1, "topo walk failed");
 
 	topo_walk_fini(wp);
 }
@@ -224,50 +215,56 @@ populate_physical(topo_hdl_t *hp, di_phys_t *pp)
 static void
 enumerate_disks(di_opts_t *opts)
 {
-	topo_hdl_t *hp;
-	dm_descriptor_t *media;
-	int err, i;
+	topo_hdl_t *hp = NULL;
 	int filter[] = { DM_DT_FIXED, -1 };
-	dm_descriptor_t *disk, *controller;
-	nvlist_t *mattrs, *dattrs, *cattrs = NULL;
+	dm_descriptor_t *media;
+	uint_t i;
+	int e;
 
-	uint64_t size, total;
-	uint32_t blocksize;
-	double total_in_GiB;
-	char sizestr[32];
-	char slotname[32];
-	char statestr[8];
-
-	char *vid, *pid, *opath, *c, *ctype = NULL;
-	boolean_t removable;
-	boolean_t ssd;
-	char device[MAXPATHLEN];
-	di_phys_t phys;
-	size_t len;
-
-	err = 0;
-	if ((media = dm_get_descriptors(DM_MEDIA, filter, &err)) == NULL) {
-		fatal(-1, "failed to obtain media descriptors: %s\n",
-		    strerror(err));
+	e = 0;
+	if ((media = dm_get_descriptors(DM_MEDIA, filter, &e)) == NULL) {
+		errno = e;
+		err(-1, "failed to obtain media descriptors");
 	}
 
-	err = 0;
-	hp = topo_open(TOPO_VERSION, NULL, &err);
-	if (hp == NULL) {
-		fatal(-1, "unable to obtain topo handle: %s",
-		    topo_strerror(err));
-	}
+	/*
+	 * We only need to walk topo if we're intending to display
+	 * condensed or physical information. If we don't need it, we leave
+	 * hp = NULL.
+	 */
+	if (opts->di_condensed || opts->di_physical) {
+		e = 0;
+		hp = topo_open(TOPO_VERSION, NULL, &e);
+		if (hp == NULL) {
+			errx(-1, "unable to obtain topo handle: %s",
+			    topo_strerror(e));
+		}
 
-	err = 0;
-	(void) topo_snap_hold(hp, NULL, &err);
-	if (err != 0) {
-		fatal(-1, "unable to hold topo snapshot: %s",
-		    topo_strerror(err));
+		e = 0;
+		(void) topo_snap_hold(hp, NULL, &e);
+		if (e != 0) {
+			errx(-1, "unable to hold topo snapshot: %s",
+			    topo_strerror(e));
+		}
 	}
 
 	for (i = 0; media != NULL && media[i] != 0; i++) {
+		dm_descriptor_t *disk, *controller;
+		nvlist_t *mattrs, *dattrs;
+		char *vid, *pid, *opath, *ctype, *pctype, *c;
+		boolean_t removable, ssd;
+		char device[MAXPATHLEN];
+		di_phys_t phys;
+		size_t len;
+		uint64_t size, total;
+		uint32_t blocksize;
+		double total_in_GiB;
+		char sizestr[32];
+		char slotname[32];
+		char statestr[8];
+
 		if ((disk = dm_get_associated_descriptors(media[i],
-		    DM_DRIVE, &err)) == NULL) {
+		    DM_DRIVE, &e)) == NULL) {
 			continue;
 		}
 
@@ -276,37 +273,50 @@ enumerate_disks(di_opts_t *opts)
 		 * info with DKIOCGMEDIAINFO which may not be the case for
 		 * disks which are failing.
 		 */
-		if ((mattrs = dm_get_attributes(media[i], &err)) == NULL) {
+		if ((mattrs = dm_get_attributes(media[i], &e)) == NULL)
 			continue;
+
+		e = nvlist_lookup_uint64(mattrs, DM_SIZE, &size);
+		assert(e == 0);
+		e = nvlist_lookup_uint32(mattrs, DM_BLOCKSIZE, &blocksize);
+		assert(e == 0);
+
+		vid = pid = opath = "-";
+		removable = B_FALSE;
+		ssd = B_FALSE;
+
+		dattrs = dm_get_attributes(disk[0], &e);
+		if (dattrs != NULL) {
+			nvlist_query_string(dattrs, DM_VENDOR_ID, &vid);
+			nvlist_query_string(dattrs, DM_PRODUCT_ID, &pid);
+			nvlist_query_string(dattrs, DM_OPATH, &opath);
+
+			if (nvlist_lookup_boolean(dattrs, DM_REMOVABLE) == 0)
+				removable = B_TRUE;
+
+			if (nvlist_lookup_boolean(dattrs, DM_SOLIDSTATE) == 0)
+				ssd = B_TRUE;
 		}
 
-		err = nvlist_lookup_uint64(mattrs, DM_SIZE, &size);
-		assert(err == 0);
-		err = nvlist_lookup_uint32(mattrs, DM_BLOCKSIZE, &blocksize);
-		assert(err == 0);
-		nvlist_free(mattrs);
-
-		dattrs = dm_get_attributes(disk[0], &err);
-
-		nvlist_query_string(dattrs, DM_VENDOR_ID, &vid);
-		nvlist_query_string(dattrs, DM_PRODUCT_ID, &pid);
-		nvlist_query_string(dattrs, DM_OPATH, &opath);
-
-		removable = B_FALSE;
-		if (nvlist_lookup_boolean(dattrs, DM_REMOVABLE) == 0)
-			removable = B_TRUE;
-
-		ssd = B_FALSE;
-		if (nvlist_lookup_boolean(dattrs, DM_SOLIDSTATE) == 0)
-			ssd = B_TRUE;
-
+		pctype = "-";
+		ctype = NULL;
 		if ((controller = dm_get_associated_descriptors(disk[0],
-		    DM_CONTROLLER, &err)) != NULL) {
-			cattrs = dm_get_attributes(controller[0], &err);
-			nvlist_query_string(cattrs, DM_CTYPE, &ctype);
-			ctype = strdup(ctype);
-			for (c = ctype; *c != '\0'; c++)
-				*c = toupper(*c);
+		    DM_CONTROLLER, &e)) != NULL) {
+			nvlist_t *cattrs;
+
+			cattrs = dm_get_attributes(controller[0], &e);
+			if (cattrs != NULL) {
+				nvlist_query_string(cattrs, DM_CTYPE, &ctype);
+				ctype = strdup(ctype);
+				nvlist_free(cattrs);
+
+				if (ctype != NULL) {
+					for (c = ctype; *c != '\0'; c++)
+						*c = toupper(*c);
+					pctype = ctype;
+				}
+			}
+			dm_free_descriptors(controller);
 		}
 
 		/*
@@ -320,12 +330,31 @@ enumerate_disks(di_opts_t *opts)
 			(void) strlcpy(device, opath, sizeof (device));
 		len = strlen(device);
 		if (device[len - 2] == 's' &&
-		    (device[len - 1] >= '0' && device[len - 1] <= '9'))
+		    (device[len - 1] >= '0' && device[len - 1] <= '9')) {
 			device[len - 2] = '\0';
+		}
 
-		bzero(&phys, sizeof (phys));
-		phys.dp_dev = device;
-		populate_physical(hp, &phys);
+		if (hp != NULL) {
+			bzero(&phys, sizeof (phys));
+			phys.dp_dev = device;
+			populate_physical(hp, &phys);
+
+			if (opts->di_parseable) {
+				(void) snprintf(slotname, sizeof (slotname),
+				    "%d,%d", phys.dp_chassis, phys.dp_slot);
+			} else if (phys.dp_slotname != NULL &&
+			    phys.dp_chassis != -1) {
+				(void) snprintf(slotname, sizeof (slotname),
+				    "[%d] %s", phys.dp_chassis,
+				    phys.dp_slotname);
+			} else if (phys.dp_slotname != NULL) {
+				(void) snprintf(slotname, sizeof (slotname),
+				    "%s", phys.dp_slotname);
+			} else {
+				slotname[0] = '-';
+				slotname[1] = '\0';
+			}
+		}
 
 		/*
 		 * The size is given in blocks, so multiply the number
@@ -342,20 +371,6 @@ enumerate_disks(di_opts_t *opts)
 			    1024.0 / 1024.0 / 1024.0;
 			(void) snprintf(sizestr, sizeof (sizestr),
 			    "%7.2f GiB", total_in_GiB);
-		}
-
-		if (opts->di_parseable) {
-			(void) snprintf(slotname, sizeof (slotname), "%d,%d",
-			    phys.dp_chassis, phys.dp_slot);
-		} else if (phys.dp_slotname != NULL && phys.dp_chassis != -1) {
-			(void) snprintf(slotname, sizeof (slotname),
-			    "[%d] %s", phys.dp_chassis, phys.dp_slotname);
-		} else if (phys.dp_slotname != NULL) {
-			(void) snprintf(slotname, sizeof (slotname),
-			    "%s", phys.dp_slotname);
-		} else {
-			slotname[0] = '-';
-			slotname[1] = '\0';
 		}
 
 		if (opts->di_condensed) {
@@ -384,25 +399,25 @@ enumerate_disks(di_opts_t *opts)
 		} else if (opts->di_condensed) {
 			if (opts->di_scripted) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				    ctype, device, vid, pid,
+				    pctype, device, vid, pid,
 				    display_string(phys.dp_serial),
 				    sizestr, statestr, slotname);
 			} else {
 				printf("%-7s %-22s  %-8s %-16s "
 				    "%-20s\n\t%-13s %-4s %s\n",
-				    ctype, device, vid, pid,
+				    pctype, device, vid, pid,
 				    display_string(phys.dp_serial),
 				    sizestr, statestr, slotname);
 			}
 		} else {
 			if (opts->di_scripted) {
 				printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				    ctype, device, vid, pid, sizestr,
+				    pctype, device, vid, pid, sizestr,
 				    display_tristate(removable),
 				    display_tristate(ssd));
 			} else {
 				printf("%-7s %-22s  %-8s %-16s "
-				    "%-13s %-3s %-3s\n", ctype, device,
+				    "%-13s %-3s %-3s\n", pctype, device,
 				    vid, pid, sizestr,
 				    display_tristate(removable),
 				    display_tristate(ssd));
@@ -410,15 +425,16 @@ enumerate_disks(di_opts_t *opts)
 		}
 
 		free(ctype);
-		nvlist_free(cattrs);
 		nvlist_free(dattrs);
-		dm_free_descriptors(controller);
+		nvlist_free(mattrs);
 		dm_free_descriptors(disk);
 	}
 
 	dm_free_descriptors(media);
-	topo_snap_release(hp);
-	topo_close(hp);
+	if (hp != NULL) {
+		topo_snap_release(hp);
+		topo_close(hp);
+	}
 }
 
 int
@@ -438,7 +454,7 @@ main(int argc, char *argv[])
 		case 'c':
 			if (opts.di_physical) {
 				usage(argv[0]);
-				fatal(1, "-c and -P are mutually exclusive\n");
+				errx(1, "-c and -P are mutually exclusive");
 			}
 			opts.di_condensed = B_TRUE;
 			break;
@@ -448,7 +464,7 @@ main(int argc, char *argv[])
 		case 'P':
 			if (opts.di_condensed) {
 				usage(argv[0]);
-				fatal(1, "-c and -P are mutually exclusive\n");
+				errx(1, "-c and -P are mutually exclusive");
 			}
 			opts.di_physical = B_TRUE;
 			break;
@@ -457,9 +473,9 @@ main(int argc, char *argv[])
 			break;
 		case '?':
 			usage(argv[0]);
-			fatal(1, "unknown option -%c\n", optopt);
+			errx(1, "unknown option -%c", optopt);
 		default:
-			fatal(-1, "unexpected error on option -%c\n", optopt);
+			errx(-1, "unexpected error on option -%c", optopt);
 		}
 	}
 

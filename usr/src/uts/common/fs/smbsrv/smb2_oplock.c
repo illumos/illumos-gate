@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Nexenta by DDN, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  * Copyright 2019 RackTop Systems.
  */
 
@@ -131,7 +131,7 @@ smb2_oplock_break_ack(smb_request_t *sr)
 		status = smb2sr_go_async(sr);
 		if (status != 0)
 			goto errout;
-		(void) smb_oplock_wait_break(ofile->f_node, 0);
+		(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
 		status = 0;
 	}
 	if (status != 0) {
@@ -320,7 +320,7 @@ smb2_oplock_acquire(smb_request_t *sr)
 	 */
 	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 		(void) smb2sr_go_async(sr);
-		(void) smb_oplock_wait_break(ofile->f_node, 0);
+		(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
 		status = 0;
 	}
 

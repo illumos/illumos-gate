@@ -22,7 +22,8 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Syneto S.R.L.  All rights reserved.
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2011-2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -294,7 +295,8 @@ void smb_oplock_ind_break(smb_ofile_t *, uint32_t, boolean_t, uint32_t);
 void smb_oplock_ind_break_in_ack(smb_request_t *, smb_ofile_t *,
     uint32_t, boolean_t);
 void smb_oplock_send_brk(smb_request_t *);
-uint32_t smb_oplock_wait_break(smb_node_t *, int);
+uint32_t smb_oplock_wait_break(smb_request_t *, smb_node_t *, int);
+uint32_t smb_oplock_wait_break_fem(smb_node_t *, int);
 
 /*
  * range lock functions - node operations
@@ -536,6 +538,7 @@ boolean_t smb_node_share_check(smb_node_t *);
 void smb_node_fcn_subscribe(smb_node_t *);
 void smb_node_fcn_unsubscribe(smb_node_t *);
 void smb_node_notify_change(smb_node_t *, uint_t, const char *);
+void smb_node_notify_modified(smb_node_t *);
 
 int smb_node_getattr(smb_request_t *, smb_node_t *, cred_t *,
     smb_ofile_t *, smb_attr_t *);
@@ -664,6 +667,7 @@ void smb_ofile_flush(smb_request_t *, smb_ofile_t *);
 boolean_t smb_ofile_hold(smb_ofile_t *);
 boolean_t smb_ofile_hold_olbrk(smb_ofile_t *);
 void smb_ofile_release(smb_ofile_t *);
+void smb_ofile_release_LL(void *);
 void smb_ofile_close_all(smb_tree_t *, uint32_t);
 void smb_ofile_set_flags(smb_ofile_t *, uint32_t);
 boolean_t smb_ofile_is_open(smb_ofile_t *);
@@ -696,7 +700,8 @@ uint32_t smb_odir_openpath(smb_request_t *, char *, uint16_t, uint32_t,
     smb_odir_t **);
 uint32_t smb_odir_openfh(smb_request_t *, const char *, uint16_t,
     smb_odir_t **);
-uint32_t smb_odir_openat(smb_request_t *, smb_node_t *, smb_odir_t **);
+uint32_t smb_odir_openat(smb_request_t *, smb_node_t *, smb_odir_t **,
+    boolean_t);
 void smb_odir_reopen(smb_odir_t *, const char *, uint16_t);
 void smb_odir_close(smb_odir_t *);
 boolean_t smb_odir_hold(smb_odir_t *);
@@ -740,6 +745,9 @@ cred_t *smb_kcred_create(void);
 void smb_user_setcred(smb_user_t *, cred_t *, uint32_t);
 boolean_t smb_is_same_user(cred_t *, cred_t *);
 boolean_t smb_user_has_security_priv(smb_user_t *, cred_t *);
+void smb_user_inc_trees(smb_user_t *);
+void smb_user_dec_trees(smb_user_t *);
+void smb_user_wait_trees(smb_user_t *);
 
 /*
  * SMB tree functions (file smb_tree.c)

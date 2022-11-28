@@ -318,10 +318,9 @@ getallifaddrs(sa_family_t af, struct ifaddrs **ifap, int64_t flags)
 	*ifap = NULL;
 
 	if ((sock4 = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ||
-	    (sock6 = socket(AF_INET6, SOCK_DGRAM, 0)) < 0 ||
-	    (door_fd = open(DLMGMT_DOOR, O_RDONLY)) < 0 ||
-	    (dld_fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+	    (sock6 = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		goto fail;
+	}
 
 	bufsize = sizeof (dld_ioc_macaddrget_t) + nmacaddr *
 	    sizeof (dld_macaddrinfo_t);
@@ -416,6 +415,19 @@ retry:
 
 	/* add AF_LINK entries */
 	if (af == AF_UNSPEC || af == AF_LINK) {
+		/*
+		 * A datalink management door may not be available (for example
+		 * in a shared IP zone). Only enumerate AF_LINK entries if the
+		 * door exists.
+		 */
+		door_fd = open(DLMGMT_DOOR, O_RDONLY);
+		if (door_fd < 0) {
+			if (errno == ENOENT)
+				goto nolink;
+			goto fail;
+		}
+		if ((dld_fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+			goto fail;
 
 		linkid = DATALINK_INVALID_LINKID;
 		for (;;) {
@@ -501,12 +513,15 @@ retry:
 			}
 		}
 	}
+nolink:
 	free(buf);
 	free(iomp);
 	(void) close(sock4);
 	(void) close(sock6);
-	(void) close(door_fd);
-	(void) close(dld_fd);
+	if (door_fd >= 0)
+		(void) close(door_fd);
+	if (dld_fd >= 0)
+		(void) close(dld_fd);
 	return (0);
 fail:
 	err = errno;
@@ -517,13 +532,13 @@ fail:
 	if (err == ENXIO)
 		goto retry;
 
-	if (sock4 != -1)
+	if (sock4 >= 0)
 		(void) close(sock4);
-	if (sock6 != -1)
+	if (sock6 >= 0)
 		(void) close(sock6);
-	if (door_fd != -1)
+	if (door_fd >= 0)
 		(void) close(door_fd);
-	if (dld_fd != -1)
+	if (dld_fd >= 0)
 		(void) close(dld_fd);
 	errno = err;
 	return (-1);

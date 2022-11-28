@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Co.
  */
 
 
@@ -114,8 +115,7 @@ cpuid_read(dev_t dev, uio_t *uio, cred_t *cr)
 	struct cpuid_regs crs;
 	int error = 0;
 
-	if (!is_x86_feature(x86_featureset, X86FSET_CPUID))
-		return (ENXIO);
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
 
 	if (uio->uio_resid & (sizeof (crs) - 1))
 		return (EINVAL);
@@ -169,14 +169,17 @@ cpuid_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 		if (strcmp(areq, architecture) == 0) {
 			STRUCT_FSET(h, cgh_hwcap[0], auxv_hwcap);
 			STRUCT_FSET(h, cgh_hwcap[1], auxv_hwcap_2);
+			STRUCT_FSET(h, cgh_hwcap[2], auxv_hwcap_3);
 #if defined(_SYSCALL32_IMPL)
 		} else if (strcmp(areq, architecture_32) == 0) {
 			STRUCT_FSET(h, cgh_hwcap[0], auxv_hwcap32);
 			STRUCT_FSET(h, cgh_hwcap[1], auxv_hwcap32_2);
+			STRUCT_FSET(h, cgh_hwcap[2], auxv_hwcap32_3);
 #endif
 		} else {
 			STRUCT_FSET(h, cgh_hwcap[0], 0);
 			STRUCT_FSET(h, cgh_hwcap[1], 0);
+			STRUCT_FSET(h, cgh_hwcap[2], 0);
 		}
 		if (ddi_copyout(STRUCT_BUF(h),
 		    (void *)arg, STRUCT_SIZE(h), mode))

@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <sys/asm_linkage.h>
@@ -60,9 +61,6 @@
 	pushq	%rbp
 	movq	%rsp, %rbp
 	lgdt	(%rdi)
-	jmp	1f
-	nop
-1:
 	leave
 	ret
 	SET_SIZE(wr_gdtr)

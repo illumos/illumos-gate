@@ -48,7 +48,6 @@
 #include <sys/door.h>
 #include <vm/seg_kp.h>
 #include <sys/debug.h>
-#include <sys/tnf.h>
 #include <sys/schedctl.h>
 #include <sys/poll.h>
 #include <sys/copyops.h>
@@ -986,12 +985,6 @@ lwp_exit(void)
 
 	t->t_proc_flag |= TP_LWPEXIT;
 	term_mstate(t);
-
-#ifndef NPROBE
-	/* Kernel probe */
-	if (t->t_tnf_tpdp)
-		tnf_thread_exit();
-#endif /* NPROBE */
 
 	t->t_forw->t_back = t->t_back;
 	t->t_back->t_forw = t->t_forw;

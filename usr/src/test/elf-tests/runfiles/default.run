@@ -22,6 +22,9 @@ outputdir = /var/tmp/test_results
 [/opt/elf-tests/tests/assert-deflib]
 tests = ['test-deflib']
 
+[/opt/elf-tests/tests/capabilities]
+tests = ['objcap', 'symcap']
+
 [/opt/elf-tests/tests/groups/no-relobj-group-merge]
 tests = ['no-relobj-group-merge']
 

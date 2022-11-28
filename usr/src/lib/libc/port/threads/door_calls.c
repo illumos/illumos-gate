@@ -823,9 +823,8 @@ door_create_func(void *arg)
 /*
  * The default door_server_func_t.
  */
-/* ARGSUSED */
 static void
-door_create_server(door_info_t *dip)
+door_create_server(door_info_t *dip __unused)
 {
 	(void) thr_create(NULL, 0, door_create_func, NULL, THR_DETACHED, NULL);
 	yield();	/* Gives server thread a chance to run */

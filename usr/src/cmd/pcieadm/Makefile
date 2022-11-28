@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2021 Oxide Computer Company
+# Copyright 2022 Oxide Computer Company
 #
 
 PROG= pcieadm
@@ -22,7 +22,7 @@ include ../Makefile.ctf
 CFLAGS += $(CCVERBOSE)
 CSTD = $(CSTD_GNU99)
 LDLIBS += -ldevinfo -lpcidb -lofmt
-OBJS = pcieadm.o pcieadm_cfgspace.o pcieadm_devs.o
+OBJS = pcieadm.o pcieadm_cfgspace.o pcieadm_devs.o bitext.o
 ROOTCMDDIR = $(ROOTLIB)/pci
 
 .KEEP_STATE:
@@ -32,6 +32,10 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS)
 
 %.o: %.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/bitext/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 

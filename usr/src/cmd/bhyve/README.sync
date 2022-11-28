@@ -5,13 +5,11 @@ The bhyve userland code in this directory, and its associated libraries and
 parts of the kernel module have been updated to the latest upstream FreeBSD
 sources as of:
 
-    commit 3ebe1109348f53f64b395293578416abedef4090
-    Author: Robert Wing <rew@FreeBSD.org>
-    Date:   Thu Mar 17 21:55:52 2022 -0800
+    commit fa46f3704b7618f9d9493c126df781faf59040a8
+    Author: John Baldwin <jhb@FreeBSD.org>
+    Date:   Wed Aug 17 10:01:16 2022 -0700
 
-        bhyve: sweep MAX_VMNAME
-
-        MAX_VMNAME is no longer used.
+        bhyve e1000: Skip packets with a small header.
 
 Divergence Notes:
 

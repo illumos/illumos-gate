@@ -30,12 +30,5 @@ include		../Makefile.com
 
 .KEEP_STATE:
 
-LLDFLAGS =	$(LLDFLAGS64)
-CONVLIBDIR =	$(CONVLIBDIR64)
-ELFLIBDIR =	$(ELFLIBDIR64)
-LDDBGLIBDIR =	$(LDDBGLIBDIR64)
-
-ROOTPROG =	$(ROOTPROG64)
-
 include		../Makefile.targ
 include		$(SRC)/Makefile.master.64

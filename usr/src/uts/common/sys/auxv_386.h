@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_SYS_AUXV_386_H
@@ -115,14 +116,27 @@ extern "C" {
 #define	AV_386_2_AVX512_VNNI	0x04000000 /* AVX512_VNNI */
 #define	AV_386_2_VPCLMULQDQ	0x08000000 /* VPCLMULQDQ */
 #define	AV_386_2_VAES		0x10000000 /* VAES */
+#define	AV_386_2_GFNI		0x20000000 /* GFNI */
+#define	AV_386_2_AVX512_VP2INT	0x40000000 /* AVX512 VP2INTERESECT */
+#define	AV_386_2_AVX512_BITALG	0x80000000 /* AVX512 BITALG */
 
 #define	FMT_AV_386_2							\
-	"\035vaes\034vpclmulqdq\033avx512_vnni"				\
+	"\040avx512_vbmi2\037avx512_vp2intersect"			\
+	"\036gfni\035vaes\034vpclmulqdq\033avx512_vnni"			\
 	"\032clzero\031monitorx\030clwb\027clflushopt\026fsgsbase"	\
 	"\025sha\024avx512_4fmaps\023avx512_4nniw\022avx512vpopcntdq"	\
 	"\021avx512vbmi\020avx512vl\017avx512bw\016avx512cd"		\
 	"\015avx512er\014avx512pf\013avx512ifma\012avx512dq\011avx512f"	\
 	"\010rdseed\07adx\06avx2\05fma\04bmi2\03bmi1\02rdrand\01f16c"
+
+/*
+ * Flags used in AT_SUN_HWCAP3 elements
+ */
+#define	AV_386_3_AVX512_VBMI2		0x00000001 /* AVX512_VBMI2 */
+#define	AV_386_3_AVX512_BF16		0x00000002 /* AVX512_BF16 */
+
+#define	FMT_AV_386_3							\
+	"\02avx512_bf16\01avx512_vbmi2"
 
 /*
  * Flags used in AT_SUN_FPTYPE on x86.

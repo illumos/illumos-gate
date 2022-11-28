@@ -42,7 +42,6 @@
 #include <sys/fs/snode.h>
 #include <sys/siginfo.h>
 #include <sys/cpuvar.h>
-#include <sys/tnf_probe.h>
 #include <sys/conf.h>
 #include <sys/sdt.h>
 
@@ -99,13 +98,6 @@ aphysio(
 	if (uio->uio_loffset > SPEC_MAXOFFSET_T)
 		return (EINVAL);
 #endif	/* _ILP32 */
-
-	TNF_PROBE_5(aphysio_start, "kaio", /* CSTYLED */,
-	    tnf_opaque, bp, bp,
-	    tnf_device, device, dev,
-	    tnf_offset, blkno, btodt(uio->uio_loffset),
-	    tnf_size, size, uio->uio_iov->iov_len,
-	    tnf_bioflags, rw, rw);
 
 	if (rw == B_READ) {
 		CPU_STATS_ADD_K(sys, phread, 1);
@@ -213,13 +205,6 @@ aio_done(struct buf *bp)
 	as = p->p_as;
 	reqp = (aio_req_t *)bp->b_forw;
 	fd = reqp->aio_req_fd;
-
-	TNF_PROBE_5(aphysio_end, "kaio", /* CSTYLED */,
-	    tnf_opaque, bp, bp,
-	    tnf_device, device, bp->b_edev,
-	    tnf_offset, blkno, btodt(reqp->aio_req_uio.uio_loffset),
-	    tnf_size, size, reqp->aio_req_uio.uio_iov->iov_len,
-	    tnf_bioflags, rw, (bp->b_flags & (B_READ|B_WRITE)));
 
 	/*
 	 * mapout earlier so that more kmem is available when aio is

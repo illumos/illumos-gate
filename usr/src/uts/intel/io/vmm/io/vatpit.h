@@ -28,6 +28,9 @@
  *
  * $FreeBSD$
  */
+/*
+ * Copyright 2022 Oxide Computer Company
+ */
 
 #ifndef _VATPIT_H_
 #define	_VATPIT_H_
@@ -45,5 +48,7 @@ int vatpit_nmisc_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
     uint32_t *eax);
 
 void vatpit_localize_resources(struct vatpit *);
+void vatpit_pause(struct vatpit *);
+void vatpit_resume(struct vatpit *);
 
 #endif	/* _VATPIT_H_ */

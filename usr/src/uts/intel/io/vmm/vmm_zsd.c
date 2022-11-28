@@ -141,7 +141,7 @@ vmm_zsd_create(zoneid_t zid)
 }
 
 /*
- * Tells all runing VMs in the zone to poweroff.  This does not reclaim guest
+ * Tells all running VMs in the zone to poweroff.  This does not reclaim guest
  * resources (memory, etc.).
  */
 static void
@@ -183,14 +183,7 @@ vmm_zsd_destroy(zoneid_t zid, void *data)
 	ASSERT(!zsd->vz_active);
 
 	while ((sc = list_remove_head(&zsd->vz_vmms)) != NULL) {
-		int err;
-
-		/*
-		 * This frees all resources associated with the vm, including
-		 * sc.
-		 */
-		err = vmm_zone_vm_destroy(sc);
-		ASSERT3S(err, ==, 0);
+		vmm_zone_vm_destroy(sc);
 	}
 
 	mutex_exit(&zsd->vz_lock);

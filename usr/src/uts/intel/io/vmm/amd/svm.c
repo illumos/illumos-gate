@@ -355,6 +355,9 @@ vmcb_init(struct svm_softc *sc, int vcpu, uint64_t iopm_base_pa,
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT,
 	    VMCB_INTCPT_FERR_FREEZE);
 
+	/* Enable exit-on-hlt by default */
+	svm_enable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_HLT);
+
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_MONITOR);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_MWAIT);
 
@@ -375,6 +378,10 @@ vmcb_init(struct svm_softc *sc, int vcpu, uint64_t iopm_base_pa,
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_STGI);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_CLGI);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_SKINIT);
+	if (vcpu_trap_wbinvd(sc->vm, vcpu) != 0) {
+		svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT,
+		    VMCB_INTCPT_WBINVD);
+	}
 
 	/*
 	 * The ASID will be set to a non-zero value just before VMRUN.
@@ -833,7 +840,7 @@ static void
 svm_handle_cr0_read(struct svm_softc *svm_sc, int vcpu, enum vm_reg_name reg)
 {
 	uint64_t val;
-	int err;
+	int err __maybe_unused;
 
 	svm_get_cr0(svm_sc, vcpu, &val);
 	err = svm_setreg(svm_sc, vcpu, reg, val);
@@ -845,7 +852,7 @@ svm_handle_cr0_write(struct svm_softc *svm_sc, int vcpu, enum vm_reg_name reg)
 {
 	struct vmcb_state *state;
 	uint64_t val;
-	int err;
+	int err __maybe_unused;
 
 	state = svm_get_vmcb_state(svm_sc, vcpu);
 
@@ -1445,7 +1452,6 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		(void) vm_suspend(svm_sc->vm, VM_SUSPEND_TRIPLEFAULT);
 		handled = 1;
 		break;
-	case VMCB_EXIT_INVD:
 	case VMCB_EXIT_INVLPGA:
 		/* privileged invalidation instructions */
 		vm_inject_ud(svm_sc->vm, vcpu);
@@ -1461,6 +1467,11 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		vm_inject_ud(svm_sc->vm, vcpu);
 		handled = 1;
 		break;
+	case VMCB_EXIT_INVD:
+	case VMCB_EXIT_WBINVD:
+		/* ignore exit */
+		handled = 1;
+		break;
 	case VMCB_EXIT_VMMCALL:
 		/* No handlers make use of VMMCALL for now */
 		vm_inject_ud(svm_sc->vm, vcpu);
@@ -1468,8 +1479,9 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		break;
 	case VMCB_EXIT_CPUID:
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_CPUID, 1);
-		handled = x86_emulate_cpuid(svm_sc->vm, vcpu, &state->rax,
+		vcpu_emulate_cpuid(svm_sc->vm, vcpu, &state->rax,
 		    &ctx->sctx_rbx, &ctx->sctx_rcx, &ctx->sctx_rdx);
+		handled = 1;
 		break;
 	case VMCB_EXIT_HLT:
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_HLT, 1);
@@ -2135,6 +2147,23 @@ svm_getreg(void *arg, int vcpu, int ident, uint64_t *val)
 		/* GDTR and IDTR don't have segment selectors */
 		return (EINVAL);
 
+	case VM_REG_GUEST_PDPTE0:
+	case VM_REG_GUEST_PDPTE1:
+	case VM_REG_GUEST_PDPTE2:
+	case VM_REG_GUEST_PDPTE3:
+		/*
+		 * Unlike VMX, where the PDPTEs are explicitly cached as part of
+		 * several well-defined events related to paging (such as
+		 * loading %cr3), SVM walks the PDPEs (their PDPTE) as part of
+		 * nested paging lookups.  This makes these registers
+		 * effectively irrelevant on SVM.
+		 *
+		 * Rather than tossing an error, emit zeroed values so casual
+		 * consumers do not need to be as careful about that difference.
+		 */
+		*val = 0;
+		break;
+
 	default:
 		return (EINVAL);
 	}
@@ -2207,6 +2236,17 @@ svm_setreg(void *arg, int vcpu, int ident, uint64_t val)
 	case VM_REG_GUEST_IDTR:
 		/* GDTR and IDTR don't have segment selectors */
 		return (EINVAL);
+
+	case VM_REG_GUEST_PDPTE0:
+	case VM_REG_GUEST_PDPTE1:
+	case VM_REG_GUEST_PDPTE2:
+	case VM_REG_GUEST_PDPTE3:
+		/*
+		 * PDPEs (AMD's PDPTE) are not cached under SVM, so we can
+		 * ignore attempts to set them.  See handler in svm_getreg() for
+		 * more details.
+		 */
+		break;
 
 	default:
 		return (EINVAL);

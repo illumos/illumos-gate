@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include <mtlib.h>
@@ -274,9 +274,8 @@ getmntent(FILE *fp, struct mnttab *mp)
 	return (getmntent_common(fp, (struct extmnttab *)mp, MNTIOC_GETMNTENT));
 }
 
-/*ARGSUSED*/
 int
-getextmntent(FILE *fp, struct extmnttab *emp, size_t len)
+getextmntent(FILE *fp, struct extmnttab *emp, size_t len __unused)
 {
 	return (getmntent_common(fp, emp, MNTIOC_GETEXTMNTENT));
 }

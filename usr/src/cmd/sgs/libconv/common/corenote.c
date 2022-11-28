@@ -26,7 +26,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -107,7 +107,7 @@ conv_cnote_auxv_type(Word type, Conv_fmt_flags_t fmt_flags,
 	static const conv_ds_msg_t ds_types_2000_2011 = {
 	    CONV_DS_MSG_INIT(2000, types_2000_2011) };
 
-	static const Msg	types_2014_2028[] = {
+	static const Msg	types_2014_2029[] = {
 		MSG_AUXV_AT_SUN_EXECNAME,	MSG_AUXV_AT_SUN_MMU,
 		MSG_AUXV_AT_SUN_LDDATA,		MSG_AUXV_AT_SUN_AUXFLAGS,
 		MSG_AUXV_AT_SUN_EMULATOR,	MSG_AUXV_AT_SUN_BRANDNAME,
@@ -115,14 +115,14 @@ conv_cnote_auxv_type(Word type, Conv_fmt_flags_t fmt_flags,
 		MSG_AUXV_AT_SUN_BRAND_AUX3,	MSG_AUXV_AT_SUN_HWCAP2,
 		0,				0,
 		MSG_AUXV_AT_SUN_COMMPAGE,	MSG_AUXV_AT_SUN_FPTYPE,
-		MSG_AUXV_AT_SUN_FPSIZE
+		MSG_AUXV_AT_SUN_FPSIZE,		MSG_AUXV_AT_SUN_HWCAP3
 	};
-	static const conv_ds_msg_t ds_types_2014_2028 = {
-	    CONV_DS_MSG_INIT(2014, types_2014_2028) };
+	static const conv_ds_msg_t ds_types_2014_2029 = {
+	    CONV_DS_MSG_INIT(2014, types_2014_2029) };
 
 	static const conv_ds_t	*ds[] = {
 		CONV_DS_ADDR(ds_types_0_22), CONV_DS_ADDR(ds_types_2000_2011),
-		CONV_DS_ADDR(ds_types_2014_2028), NULL };
+		CONV_DS_ADDR(ds_types_2014_2029), NULL };
 
 	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, type, ds, fmt_flags,
 	    inv_buf));

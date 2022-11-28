@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _IO_PCIE_PCIEB_IOCTL_H
@@ -56,6 +57,8 @@ typedef struct pcieb_ioctl_target_speed {
 #define	PCIEB_LINK_SPEED_GEN2		0x02
 #define	PCIEB_LINK_SPEED_GEN3		0x03
 #define	PCIEB_LINK_SPEED_GEN4		0x04
+#define	PCIEB_LINK_SPEED_GEN5		0x05
+#define	PCIEB_LINK_SPEED_GEN6		0x06
 
 #ifdef __cplusplus
 }

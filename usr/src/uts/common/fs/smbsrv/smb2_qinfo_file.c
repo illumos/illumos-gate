@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -31,6 +32,7 @@ static uint32_t smb2_qif_internal(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_ea_size(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_access(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_name(smb_request_t *, smb_queryinfo_t *);
+static uint32_t smb2_qif_normalized_name(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_position(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_full_ea(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_mode(smb_request_t *, smb_queryinfo_t *);
@@ -44,6 +46,7 @@ static uint32_t smb2_qif_pipe_rem(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_compr(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_opens(smb_request_t *, smb_queryinfo_t *);
 static uint32_t smb2_qif_tags(smb_request_t *, smb_queryinfo_t *);
+static uint32_t smb2_qif_id_info(smb_request_t *, smb_queryinfo_t *);
 
 
 uint32_t
@@ -72,10 +75,14 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 	case FileAllInformation:
 		mask = SMB_AT_ALL;
 		getstd = B_TRUE;
-		getname = B_TRUE;
+		if (sr->session->dialect < SMB_VERS_3_11) {
+			/* See smb2_qif_all() */
+			getname = B_TRUE;
+		}
 		break;
 
 	case FileNameInformation:
+	case FileNormalizedNameInformation:
 		getname = B_TRUE;
 		break;
 
@@ -95,6 +102,11 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 
 	case FileNetworkOpenInformation:
 		mask = SMB_AT_BASIC | SMB_AT_STANDARD;
+		break;
+
+	case FileIdInformation:
+		mask = SMB_AT_NODEID;
+		break;
 
 	default:
 		break;
@@ -137,6 +149,9 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 	case FileNameInformation:
 		status = smb2_qif_name(sr, qi);
 		break;
+	case FileNormalizedNameInformation:
+		status = smb2_qif_normalized_name(sr, qi);
+		break;
 	case FilePositionInformation:
 		status = smb2_qif_position(sr, qi);
 		break;
@@ -176,6 +191,9 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 	case FileAttributeTagInformation:
 		status = smb2_qif_tags(sr, qi);
 		break;
+	case FileIdInformation:
+		status = smb2_qif_id_info(sr, qi);
+		break;
 	default:
 		status = NT_STATUS_INVALID_INFO_CLASS;
 		break;
@@ -196,6 +214,8 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
  *	FileModeInformation
  *	FileAlignmentInformation
  *	FileNameInformation
+ *
+ * Note: FileNameInformation is all zero on Win2016 and later.
  */
 static uint32_t
 smb2_qif_all(smb_request_t *sr, smb_queryinfo_t *qi)
@@ -223,11 +243,24 @@ smb2_qif_all(smb_request_t *sr, smb_queryinfo_t *qi)
 	status = smb2_qif_alignment(sr, qi);
 	if (status)
 		return (status);
-	status = smb2_qif_name(sr, qi);
-	if (status)
-		return (status);
 
-	return (0);
+	/*
+	 * MS-SMB2 3.3.5.20.1 says (in a windows behavior note) that
+	 * 2012R2 and older fill in the FileNameInformation.
+	 * We could let this depend on sr->sr_cfg->skc_version
+	 * but doing it based on dialect is a lot easier and
+	 * has nearly the same effect.
+	 */
+	if (sr->session->dialect < SMB_VERS_3_11) {
+		/* Win2012r2 and earlier fill it in. (SMB 3.0) */
+		status = smb2_qif_name(sr, qi);
+	} else {
+		/* Win2016 and later just put zeros (SMB 3.11) */
+		int rc = smb_mbc_encodef(&sr->raw_data, "10.");
+		status = (rc == 0) ? 0 : NT_STATUS_BUFFER_OVERFLOW;
+	}
+
+	return (status);
 }
 
 /*
@@ -373,15 +406,51 @@ smb2_qif_access(smb_request_t *sr, smb_queryinfo_t *qi)
 static uint32_t
 smb2_qif_name(smb_request_t *sr, smb_queryinfo_t *qi)
 {
+	char *name;
+	uint32_t nlen;
 	int rc;
 
-	ASSERT(qi->qi_namelen > 0);
+	/* SMB2 leaves off the leading / */
+	nlen = qi->qi_namelen;
+	name = qi->qi_name;
+	if (qi->qi_name[0] == '\\') {
+		name++;
+		nlen -= 2;
+	}
 
 	rc = smb_mbc_encodef(
 	    &sr->raw_data, "llU",
 	    0, /* FileIndex	 (l) */
-	    qi->qi_namelen,	/* l */
-	    qi->qi_name);	/* U */
+	    nlen,	/* l */
+	    name);	/* U */
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_OVERFLOW);
+
+	return (0);
+}
+
+/*
+ * FileNormalizedNameInformation
+ */
+static uint32_t
+smb2_qif_normalized_name(smb_request_t *sr, smb_queryinfo_t *qi)
+{
+	char *name;
+	uint32_t nlen;
+	int rc;
+
+	/* SMB2 leaves off the leading / */
+	nlen = qi->qi_namelen;
+	name = qi->qi_name;
+	if (qi->qi_name[0] == '\\') {
+		name++;
+		nlen -= 2;
+	}
+
+	rc = smb_mbc_encodef(
+	    &sr->raw_data, "lU",
+	    nlen,	/* l */
+	    name);	/* U */
 	if (rc != 0)
 		return (NT_STATUS_BUFFER_OVERFLOW);
 
@@ -623,6 +692,49 @@ smb2_qif_tags(smb_request_t *sr, smb_queryinfo_t *qi)
 	    &sr->raw_data, "ll", 0, 0);
 	if (rc != 0)
 		return (NT_STATUS_BUFFER_OVERFLOW);
+
+	return (0);
+}
+
+/*
+ * FileIdInformation
+ *
+ * Returns a A FILE_ID_INFORMATION
+ *	VolumeSerialNumber (8 bytes)
+ *	FileId (16 bytes)
+ *
+ * Take the volume serial from the share root,
+ * and compose the FileId from the nodeid and fsid
+ * of the file (in case we crossed mounts)
+ */
+static uint32_t
+smb2_qif_id_info(smb_request_t *sr, smb_queryinfo_t *qi)
+{
+	smb_attr_t *sa = &qi->qi_attr;
+	smb_ofile_t *of = sr->fid_ofile;
+	smb_tree_t *tree = sr->tid_tree;
+	vfs_t	*f_vfs;	// file
+	vfs_t	*s_vfs;	// share
+	uint64_t nodeid;
+	int rc;
+
+	ASSERT((sa->sa_mask & SMB_AT_NODEID) != 0);
+	if (of->f_ftype != SMB_FTYPE_DISK)
+		return (NT_STATUS_INVALID_INFO_CLASS);
+
+	s_vfs = SMB_NODE_VFS(tree->t_snode);
+	f_vfs = SMB_NODE_VFS(of->f_node);
+	nodeid = (uint64_t)sa->sa_vattr.va_nodeid;
+
+	rc = smb_mbc_encodef(
+	    &sr->raw_data, "llqll",
+	    s_vfs->vfs_fsid.val[0],	/* l */
+	    s_vfs->vfs_fsid.val[1],	/* l */
+	    nodeid,			/* q */
+	    f_vfs->vfs_fsid.val[0],	/* l */
+	    f_vfs->vfs_fsid.val[1]);	/* l */
+	if (rc != 0)
+		return (NT_STATUS_INFO_LENGTH_MISMATCH);
 
 	return (0);
 }

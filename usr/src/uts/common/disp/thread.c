@@ -54,7 +54,6 @@
 #include <sys/vtrace.h>
 #include <sys/callb.h>
 #include <c2/audit.h>
-#include <sys/tnf.h>
 #include <sys/sobject.h>
 #include <sys/cpupart.h>
 #include <sys/pset.h>
@@ -446,10 +445,6 @@ thread_create(
 	t->t_dtrace_vtime = 1;	/* assure vtimestamp is always non-zero */
 
 	CPU_STATS_ADDQ(CPU, sys, nthreads, 1);
-#ifndef NPROBE
-	/* Kernel probe */
-	tnf_thread_create(t);
-#endif /* NPROBE */
 	LOCK_INIT_CLEAR(&t->t_lock);
 
 	/*
@@ -602,12 +597,6 @@ thread_exit(void)
 	if (t->t_door)
 		door_slam();	/* in case thread did an upcall */
 
-#ifndef NPROBE
-	/* Kernel probe */
-	if (t->t_tnf_tpdp)
-		tnf_thread_exit();
-#endif /* NPROBE */
-
 	thread_rele(t);
 	t->t_preempt++;
 
@@ -747,10 +736,6 @@ thread_free(kthread_t *t)
 	}
 	if (audit_active)
 		audit_thread_free(t);
-#ifndef NPROBE
-	if (t->t_tnf_tpdp)
-		tnf_thread_free(t);
-#endif /* NPROBE */
 	if (t->t_cldata) {
 		CL_EXITCLASS(t->t_cid, (caddr_t *)t->t_cldata);
 	}

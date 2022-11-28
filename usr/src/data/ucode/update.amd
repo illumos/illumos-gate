@@ -28,6 +28,11 @@ typeset -a GPGKEYS=(
 	0x916A770823A7B27AADE01565A5E8DBC98C0108B4
 )
 
+function errexit {
+	echo "$@" >&2
+	exit 1
+}
+
 FW=platform/i86pc/ucode/AuthenticAMD
 
 export LC_ALL=C.UTF-8
@@ -36,10 +41,7 @@ set -e
 set -o pipefail
 
 mf=../../pkg/manifests/system-microcode-amd.p5m
-[[ -f $mf ]] || {
-	echo "Run from usr/src/data/ucode" 2>&1
-	exit 1
-}
+[[ -f $mf ]] || errexit "Run from usr/src/data/ucode"
 
 function find_cmd {
 	typeset cmd="$1"
@@ -47,8 +49,7 @@ function find_cmd {
 	typeset -n path="$var"
 	path=$(whence -fp "$cmd")
 	if (($? != 0)) || [ ! -x "$path" ]; then
-		echo "Cannot find executable '$cmd' in PATH"
-		exit 1
+		errexit "Cannot find executable '$cmd' in PATH"
 	fi
 }
 
@@ -64,11 +65,8 @@ find_cmd stat
 find_cmd ucodeadm
 
 tmp=$(mktemp -d)
-mkdir -p $tmp/out || {
-	echo "Failed to create temporary directory" 2>&1
-	exit 1
-}
-
+[[ -n "$tmp" && -d "$tmp" ]]
+mkdir $tmp/out || errexit "Failed to create temporary directory"
 trap 'rm -rf $tmp' EXIT
 
 echo "** Adding AMD GPG signing keys to temporary keyring"
@@ -92,7 +90,7 @@ done
 
 # Now that everything is in place and verified, begin modifying the tree.
 
-rm -f amd/*
+rm -f amd/*-* amd/container
 
 cp $tmp/ucode/LICENSE.amd-ucode amd/THIRDPARTYLICENSE
 echo AMD Processor Microcode Data Files > amd/THIRDPARTYLICENSE.descrip
@@ -101,10 +99,7 @@ for f in $tmp/ucode/amd-ucode/*.bin; do
 	bf=${f##*/}
 	bf=${bf#microcode_}
 	bf=${bf%.bin}
-	[[ $bf = amd* ]] || {
-		echo "$f does not look like a firmware file"
-		exit 1
-	}
+	[[ $bf = amd* ]] || errexit "$f does not look like a firmware file"
 	echo "Converting $bf"
 	mkdir $tmp/out/$bf
 	cp $f $tmp/amd-fw
@@ -141,8 +136,8 @@ rm -f $mf.tmp
 for f in amd/*; do
 	bf=${f##*/}
 	[[ $bf = THIRDPARTYLICENSE* ]] && continue
-	echo "file path=$FW/$bf group=sys mode=0444"\
-	    "reboot-needed=true preserve=true" >> $mf
+	[[ $bf = Makefile* ]] && continue
+	echo "file path=$FW/$bf group=sys mode=0444 reboot-needed=true" >> $mf
 done
 
 sed -i "/pkg.fmri.*microcode\/amd@/s/@[0-9]*/@$ver/" $mf

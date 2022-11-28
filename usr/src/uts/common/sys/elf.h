@@ -21,7 +21,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
@@ -956,7 +956,8 @@ typedef	Elf64_Word	Elf64_Capchain;
 #define	CA_SUNW_PLAT	4		/* platform capability entry */
 #define	CA_SUNW_MACH	5		/* machine capability entry */
 #define	CA_SUNW_ID	6		/* capability identifier */
-#define	CA_SUNW_NUM	7
+#define	CA_SUNW_HW_3	7		/* third hardware capabilities entry */
+#define	CA_SUNW_NUM	8
 
 /*
  * Define software capabilities (CA_SUNW_SF_1 values).  Note, hardware

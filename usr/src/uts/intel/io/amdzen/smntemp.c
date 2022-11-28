@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -31,6 +31,7 @@
 #include <sys/cpuvar.h>
 #include <sys/sensors.h>
 #include <sys/sysmacros.h>
+#include <sys/amdzen/smn.h>
 #include <amdzen_client.h>
 
 /*
@@ -39,7 +40,7 @@
  * accessed through the northbridge. They are not addresses in PCI configuration
  * space.
  */
-#define	SMN_SMU_THERMAL_CURTEMP			0x00059800
+#define	SMN_SMU_THERMAL_CURTEMP			SMN_MAKE_REG(0x00059800)
 #define	SMN_SMU_THERMAL_CURTEMP_TEMPERATURE(x)	((x) >> 21)
 #define	SMN_SMU_THERMAL_CURTEMP_RANGE_SEL		(1 << 19)
 
@@ -115,7 +116,7 @@ smntemp_temp_update(smntemp_t *smn, smntemp_temp_t *stt)
 
 	ASSERT(MUTEX_HELD((&stt->stt_mutex)));
 
-	if ((ret = amdzen_c_smn_read32(stt->stt_dfno, SMN_SMU_THERMAL_CURTEMP,
+	if ((ret = amdzen_c_smn_read(stt->stt_dfno, SMN_SMU_THERMAL_CURTEMP,
 	    &reg)) != 0) {
 		return (ret);
 	}

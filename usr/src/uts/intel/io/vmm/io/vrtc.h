@@ -30,6 +30,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _VRTC_H_
@@ -54,5 +55,7 @@ int vrtc_data_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
     uint32_t *val);
 
 void vrtc_localize_resources(struct vrtc *);
+void vrtc_pause(struct vrtc *);
+void vrtc_resume(struct vrtc *);
 
 #endif

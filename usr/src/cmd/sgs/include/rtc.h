@@ -97,6 +97,9 @@ extern "C" {
 
 /*
  * Configuration header.
+ *
+ * AOUT sections (ch_adlibpath, ch_aslibpath) are obsolete and retained only
+ * for file-format compatibility.
  */
 typedef struct {
 	Word	ch_version;		/* version of config file */

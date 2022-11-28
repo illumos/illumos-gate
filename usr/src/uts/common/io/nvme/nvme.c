@@ -93,9 +93,10 @@
  * namespaces that have these attributes.
  *
  * As of NVMe 1.1 namespaces can have an 64bit Extended Unique Identifier
- * (EUI64). This driver uses the EUI64 if present to generate the devid and
- * passes it to blkdev to use it in the device node names. As this is currently
- * untested namespaces with EUI64 are ignored by default.
+ * (EUI64), and NVMe 1.2 introduced an additional 128bit Namespace Globally
+ * Unique Identifier (NGUID). This driver uses either the NGUID or the EUI64
+ * if present to generate the devid, and passes the EUI64 to blkdev to use it
+ * in the device node names.
  *
  * We currently support only (2 << NVME_MINOR_INST_SHIFT) - 2 namespaces in a
  * single controller. This is an artificial limit imposed by the driver to be
@@ -136,9 +137,9 @@
  * Blkdev also supports querying device/media information and generating a
  * devid. The driver reports the best block size as determined by the namespace
  * format back to blkdev as physical block size to support partition and block
- * alignment. The devid is either based on the namespace EUI64, if present, or
- * composed using the device vendor ID, model number, serial number, and the
- * namespace ID.
+ * alignment. The devid is either based on the namespace GUID or EUI64, if
+ * present, or composed using the device vendor ID, model number, serial number,
+ * and the namespace ID.
  *
  *
  * Error Handling:
@@ -352,7 +353,7 @@
  * Assertions to make sure that we've properly captured various aspects of the
  * packed structures and haven't broken them during updates.
  */
-CTASSERT(sizeof (nvme_identify_ctrl_t) == 0x1000);
+CTASSERT(sizeof (nvme_identify_ctrl_t) == NVME_IDENTIFY_BUFSIZE);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_oacs) == 256);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_sqes) == 512);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_oncs) == 520);
@@ -361,16 +362,21 @@ CTASSERT(offsetof(nvme_identify_ctrl_t, id_nvmof) == 1792);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_psd) == 2048);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_vs) == 3072);
 
-CTASSERT(sizeof (nvme_identify_nsid_t) == 0x1000);
+CTASSERT(sizeof (nvme_identify_nsid_t) == NVME_IDENTIFY_BUFSIZE);
 CTASSERT(offsetof(nvme_identify_nsid_t, id_fpi) == 32);
 CTASSERT(offsetof(nvme_identify_nsid_t, id_anagrpid) == 92);
 CTASSERT(offsetof(nvme_identify_nsid_t, id_nguid) == 104);
 CTASSERT(offsetof(nvme_identify_nsid_t, id_lbaf) == 128);
 CTASSERT(offsetof(nvme_identify_nsid_t, id_vs) == 384);
 
-CTASSERT(sizeof (nvme_identify_primary_caps_t) == 0x1000);
+CTASSERT(sizeof (nvme_identify_nsid_list_t) == NVME_IDENTIFY_BUFSIZE);
+CTASSERT(sizeof (nvme_identify_ctrl_list_t) == NVME_IDENTIFY_BUFSIZE);
+
+CTASSERT(sizeof (nvme_identify_primary_caps_t) == NVME_IDENTIFY_BUFSIZE);
 CTASSERT(offsetof(nvme_identify_primary_caps_t, nipc_vqfrt) == 32);
 CTASSERT(offsetof(nvme_identify_primary_caps_t, nipc_vifrt) == 64);
+
+CTASSERT(sizeof (nvme_nschange_list_t) == 4096);
 
 
 /* NVMe spec version supported */
@@ -435,7 +441,7 @@ static int nvme_format_nvm(nvme_t *, boolean_t, uint32_t, uint8_t, boolean_t,
     uint8_t, boolean_t, uint8_t);
 static int nvme_get_logpage(nvme_t *, boolean_t, void **, size_t *, uint8_t,
     ...);
-static int nvme_identify(nvme_t *, boolean_t, uint32_t, void **);
+static int nvme_identify(nvme_t *, boolean_t, uint32_t, uint8_t, void **);
 static int nvme_set_features(nvme_t *, boolean_t, uint32_t, uint8_t, uint32_t,
     uint32_t *);
 static int nvme_get_features(nvme_t *, boolean_t, uint32_t, uint8_t, uint32_t *,
@@ -1530,6 +1536,15 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 			bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
 		return (EIO);
 
+	case NVME_CQE_SC_GEN_NVM_FORMATTING:
+		/* Format in progress (1.2) */
+		if (!NVME_VERSION_ATLEAST(&cmd->nc_nvme->n_version, 1, 2))
+			return (nvme_check_unknown_cmd_status(cmd));
+		atomic_inc_32(&cmd->nc_nvme->n_nvm_ns_formatting);
+		if (cmd->nc_xfer != NULL)
+			bd_error(cmd->nc_xfer, BD_ERR_NTRDY);
+		return (EIO);
+
 	default:
 		return (nvme_check_unknown_cmd_status(cmd));
 	}
@@ -2007,8 +2022,9 @@ nvme_async_event_task(void *arg)
 					break;
 
 				dev_err(nvme->n_dip, CE_NOTE,
-				    "!namespace %u (%s) has changed.", nsid,
-				    NVME_NSID2NS(nvme, nsid)->ns_name);
+				    "!namespace nvme%d/%u has changed.",
+				    ddi_get_instance(nvme->n_dip), nsid);
+
 
 				if (nvme_init_ns(nvme, nsid) != DDI_SUCCESS)
 					continue;
@@ -2265,7 +2281,8 @@ fail:
 }
 
 static int
-nvme_identify(nvme_t *nvme, boolean_t user, uint32_t nsid, void **buf)
+nvme_identify(nvme_t *nvme, boolean_t user, uint32_t nsid, uint8_t cns,
+    void **buf)
 {
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
 	int ret;
@@ -2277,7 +2294,7 @@ nvme_identify(nvme_t *nvme, boolean_t user, uint32_t nsid, void **buf)
 	cmd->nc_callback = nvme_wakeup_cmd;
 	cmd->nc_sqe.sqe_opc = NVME_OPC_IDENTIFY;
 	cmd->nc_sqe.sqe_nsid = nsid;
-	cmd->nc_sqe.sqe_cdw10 = nsid ? NVME_IDENTIFY_NSID : NVME_IDENTIFY_CTRL;
+	cmd->nc_sqe.sqe_cdw10 = cns;
 
 	if (nvme_zalloc_dma(nvme, NVME_IDENTIFY_BUFSIZE, DDI_DMA_READ,
 	    &nvme->n_prp_dma_attr, &cmd->nc_dma) != DDI_SUCCESS) {
@@ -2973,7 +2990,8 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 
 	ASSERT(MUTEX_HELD(&nvme->n_mgmt_mutex));
 
-	if (nvme_identify(nvme, B_FALSE, nsid, (void **)&idns) != 0) {
+	if (nvme_identify(nvme, B_FALSE, nsid, NVME_IDENTIFY_NSID,
+	    (void **)&idns) != 0) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!failed to identify namespace %d", nsid);
 		return (DDI_FAILURE);
@@ -2996,25 +3014,22 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 	ns->ns_best_block_size = ns->ns_block_size;
 
 	/*
-	 * Get the EUI64 if present. Use it for devid and device node names.
+	 * Get the EUI64 if present.
 	 */
 	if (NVME_VERSION_ATLEAST(&nvme->n_version, 1, 1))
 		bcopy(idns->id_eui64, ns->ns_eui64, sizeof (ns->ns_eui64));
 
+	/*
+	 * Get the NGUID if present.
+	 */
+	if (NVME_VERSION_ATLEAST(&nvme->n_version, 1, 2))
+		bcopy(idns->id_nguid, ns->ns_nguid, sizeof (ns->ns_nguid));
+
 	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
-	if (*(uint64_t *)ns->ns_eui64 != 0) {
-		uint8_t *eui64 = ns->ns_eui64;
-
-		(void) snprintf(ns->ns_name, sizeof (ns->ns_name),
-		    "%02x%02x%02x%02x%02x%02x%02x%02x",
-		    eui64[0], eui64[1], eui64[2], eui64[3],
-		    eui64[4], eui64[5], eui64[6], eui64[7]);
-	} else {
-		(void) snprintf(ns->ns_name, sizeof (ns->ns_name), "%d",
-		    ns->ns_id);
-
+	if (*(uint64_t *)ns->ns_eui64 == 0)
 		nvme_prepare_devid(nvme, ns->ns_id);
-	}
+
+	(void) snprintf(ns->ns_name, sizeof (ns->ns_name), "%u", ns->ns_id);
 
 	/*
 	 * Find the LBA format with no metadata and the best relative
@@ -3325,7 +3340,8 @@ nvme_init(nvme_t *nvme)
 	/*
 	 * Identify Controller
 	 */
-	if (nvme_identify(nvme, B_FALSE, 0, (void **)&nvme->n_idctl) != 0) {
+	if (nvme_identify(nvme, B_FALSE, 0, NVME_IDENTIFY_CTRL,
+	    (void **)&nvme->n_idctl) != 0) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!failed to identify controller");
 		goto fail;
@@ -4647,12 +4663,15 @@ nvme_bd_devid(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
 		return (EIO);
 	}
 
-	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
-	if (*(uint64_t *)ns->ns_eui64 != 0) {
-		return (ddi_devid_init(devinfo, DEVID_SCSI3_WWN,
+	if (*(uint64_t *)ns->ns_nguid != 0 ||
+	    *(uint64_t *)(ns->ns_nguid + 8) != 0) {
+		return (ddi_devid_init(devinfo, DEVID_NVME_NGUID,
+		    sizeof (ns->ns_nguid), ns->ns_nguid, devid));
+	} else if (*(uint64_t *)ns->ns_eui64 != 0) {
+		return (ddi_devid_init(devinfo, DEVID_NVME_EUI64,
 		    sizeof (ns->ns_eui64), ns->ns_eui64, devid));
 	} else {
-		return (ddi_devid_init(devinfo, DEVID_ENCAP,
+		return (ddi_devid_init(devinfo, DEVID_NVME_NSID,
 		    strlen(ns->ns_devid), ns->ns_devid, devid));
 	}
 }
@@ -4789,7 +4808,94 @@ nvme_ioctl_identify(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nioc->n_len < NVME_IDENTIFY_BUFSIZE)
 		return (EINVAL);
 
-	if ((rv = nvme_identify(nvme, B_TRUE, nsid, (void **)&idctl)) != 0)
+	switch (nioc->n_arg) {
+	case NVME_IDENTIFY_NSID:
+		/*
+		 * If we support namespace management, set the nsid to -1 to
+		 * retrieve the common namespace capabilities. Otherwise
+		 * have a best guess by returning identify data for namespace 1.
+		 */
+		if (nsid == 0)
+			nsid = nvme->n_idctl->id_oacs.oa_nsmgmt == 1 ? -1 : 1;
+		break;
+
+	case NVME_IDENTIFY_CTRL:
+		/*
+		 * Let NVME_IDENTIFY_CTRL work the same on devctl and attachment
+		 * point nodes.
+		 */
+		nsid = 0;
+		break;
+
+	case NVME_IDENTIFY_NSID_LIST:
+		if (!NVME_VERSION_ATLEAST(&nvme->n_version, 1, 1))
+			return (ENOTSUP);
+
+		/*
+		 * For now, always try to get the list of active NSIDs starting
+		 * at the first namespace. This will have to be revisited should
+		 * the need arise to support more than 1024 namespaces.
+		 */
+		nsid = 0;
+		break;
+
+	case NVME_IDENTIFY_NSID_DESC:
+		if (!NVME_VERSION_ATLEAST(&nvme->n_version, 1, 3))
+			return (ENOTSUP);
+		break;
+
+	case NVME_IDENTIFY_NSID_ALLOC:
+		if (!NVME_VERSION_ATLEAST(&nvme->n_version, 1, 2) ||
+		    (nvme->n_idctl->id_oacs.oa_nsmgmt == 0))
+			return (ENOTSUP);
+
+		/*
+		 * To make this work on a devctl node, make this return the
+		 * identify data for namespace 1. We assume that any NVMe
+		 * device supports at least one namespace, which has ID 1.
+		 */
+		if (nsid == 0)
+			nsid = 1;
+		break;
+
+	case NVME_IDENTIFY_NSID_ALLOC_LIST:
+		if (!NVME_VERSION_ATLEAST(&nvme->n_version, 1, 2) ||
+		    (nvme->n_idctl->id_oacs.oa_nsmgmt == 0))
+			return (ENOTSUP);
+
+		/*
+		 * For now, always try to get the list of allocated NSIDs
+		 * starting at the first namespace. This will have to be
+		 * revisited should the need arise to support more than 1024
+		 * namespaces.
+		 */
+		nsid = 0;
+		break;
+
+	case NVME_IDENTIFY_NSID_CTRL_LIST:
+		if (!NVME_VERSION_ATLEAST(&nvme->n_version, 1, 2) ||
+		    (nvme->n_idctl->id_oacs.oa_nsmgmt == 0))
+			return (ENOTSUP);
+
+		if (nsid == 0)
+			return (EINVAL);
+		break;
+
+	case NVME_IDENTIFY_CTRL_LIST:
+		if (!NVME_VERSION_ATLEAST(&nvme->n_version, 1, 2) ||
+		    (nvme->n_idctl->id_oacs.oa_nsmgmt == 0))
+			return (ENOTSUP);
+
+		if (nsid != 0)
+			return (EINVAL);
+		break;
+
+	default:
+		return (EINVAL);
+	}
+
+	if ((rv = nvme_identify(nvme, B_TRUE, nsid, nioc->n_arg & 0xff,
+	    (void **)&idctl)) != 0)
 		return (rv);
 
 	if (ddi_copyout(idctl, (void *)nioc->n_buf, NVME_IDENTIFY_BUFSIZE, mode)
@@ -5718,7 +5824,7 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	int (*nvme_ioctl[])(nvme_t *, int, nvme_ioctl_t *, int, cred_t *) = {
 		NULL,
 		nvme_ioctl_identify,
-		nvme_ioctl_identify,
+		NULL,
 		nvme_ioctl_capabilities,
 		nvme_ioctl_get_logpage,
 		nvme_ioctl_get_features,
@@ -5766,21 +5872,6 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 
 	if (nvme->n_dead && cmd != NVME_IOC_DETACH)
 		return (EIO);
-
-
-	if (cmd == NVME_IOC_IDENTIFY_CTRL) {
-		/*
-		 * This makes NVME_IOC_IDENTIFY_CTRL work the same on devctl and
-		 * attachment point nodes.
-		 */
-		nsid = 0;
-	} else if (cmd == NVME_IOC_IDENTIFY_NSID && nsid == 0) {
-		/*
-		 * This makes NVME_IOC_IDENTIFY_NSID work on a devctl node, it
-		 * will always return identify data for namespace 1.
-		 */
-		nsid = 1;
-	}
 
 	if (IS_NVME_IOC(cmd) && nvme_ioctl[NVME_IOC_CMD(cmd)] != NULL)
 		rv = nvme_ioctl[NVME_IOC_CMD(cmd)](nvme, nsid, &nioc, mode,

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 Oxide Computer Co.
  */
 
 #include <sys/x86_archext.h>
@@ -240,8 +241,8 @@ pwrnow_supported()
 	struct cpuid_regs cpu_regs;
 
 	/* Required features */
-	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
-	    !is_x86_feature(x86_featureset, X86FSET_MSR)) {
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
+	if (!is_x86_feature(x86_featureset, X86FSET_MSR)) {
 		PWRNOW_DEBUG(("No CPUID or MSR support."));
 		return (B_FALSE);
 	}
@@ -279,8 +280,8 @@ pwrnow_cpb_supported(void)
 	struct cpuid_regs cpu_regs;
 
 	/* Required features */
-	if (!is_x86_feature(x86_featureset, X86FSET_CPUID) ||
-	    !is_x86_feature(x86_featureset, X86FSET_MSR)) {
+	ASSERT(is_x86_feature(x86_featureset, X86FSET_CPUID));
+	if (!is_x86_feature(x86_featureset, X86FSET_MSR)) {
 		PWRNOW_DEBUG(("No CPUID or MSR support."));
 		return (B_FALSE);
 	}

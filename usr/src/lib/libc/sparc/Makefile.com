@@ -1202,78 +1202,10 @@ CLOBBERFILES +=	$(LIB_PIC)
 $(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
 
-# Files which need the threads .il inline template
-TIL=				\
-	aio.o			\
-	alloc.o			\
-	assfail.o		\
-	atexit.o		\
-	atfork.o		\
-	cancel.o		\
-	door_calls.o		\
-	err.o			\
-	errno.o			\
-	getctxt.o		\
-	lwp.o			\
-	ma.o			\
-	machdep.o		\
-	posix_aio.o		\
-	pthr_attr.o		\
-	pthr_barrier.o		\
-	pthr_cond.o		\
-	pthr_mutex.o		\
-	pthr_rwlock.o		\
-	pthread.o		\
-	rand.o			\
-	rwlock.o		\
-	scalls.o		\
-	sched.o			\
-	sema.o			\
-	sigaction.o		\
-	sigev_thread.o		\
-	spawn.o			\
-	stack.o			\
-	swapctxt.o		\
-	synch.o			\
-	tdb_agent.o		\
-	thr.o			\
-	thread_interface.o	\
-	thread_pool.o		\
-	tls.o			\
-	tsd.o			\
-	unwind.o
-
-$(TIL:%=pics/%) := CFLAGS += $(LIBCBASE)/threads/sparc.il
-
 # special kludge for inlines with 'cas':
 pics/rwlock.o pics/synch.o pics/lwp.o pics/door_calls.o := \
 	sparc_CFLAGS += -_gcc=-Wa,-xarch=v8plus
 
-# Files in port/fp subdirectory that need base.il inline template
-IL=				\
-	__flt_decim.o		\
-	decimal_bin.o
-
-$(IL:%=pics/%) := CFLAGS += $(LIBCBASE)/fp/base.il
-
-# Files in fp subdirectory which need __quad.il inline template
-QIL=				\
-	_Q_add.o		\
-	_Q_cmp.o		\
-	_Q_cmpe.o		\
-	_Q_div.o		\
-	_Q_dtoq.o		\
-	_Q_fcc.o		\
-	_Q_mul.o		\
-	_Q_qtod.o		\
-	_Q_qtoi.o		\
-	_Q_qtos.o		\
-	_Q_qtou.o		\
-	_Q_sqrt.o		\
-	_Q_stoq.o		\
-	_Q_sub.o
-
-$(QIL:%=pics/%) := CFLAGS += $(LIBCDIR)/$(MACH)/fp/__quad.il
 pics/_Q%.o := sparc_COPTFLAG = -xO4 -dalign
 pics/__quad%.o := sparc_COPTFLAG = -xO4 -dalign
 
@@ -1327,11 +1259,6 @@ STACKPROTECT = none
 .KEEP_STATE:
 
 all: $(LIBS) $(LIB_PIC)
-
-# object files that depend on inline template
-$(TIL:%=pics/%): $(LIBCBASE)/threads/sparc.il
-$(IL:%=pics/%): $(LIBCBASE)/fp/base.il
-$(QIL:%=pics/%): $(LIBCDIR)/$(MACH)/fp/__quad.il
 
 # include common libc targets
 include $(LIBCDIR)/Makefile.targ

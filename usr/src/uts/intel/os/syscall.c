@@ -54,8 +54,6 @@
 #include <c2/audit.h>
 #include <sys/modctl.h>
 #include <sys/aio_impl.h>
-#include <sys/tnf.h>
-#include <sys/tnf_probe.h>
 #include <sys/copyops.h>
 #include <sys/priv.h>
 #include <sys/msacct.h>
@@ -368,16 +366,6 @@ pre_syscall()
 			repost = 1;
 		}
 	}
-
-#ifndef NPROBE
-	/* Kernel probe */
-	if (tnf_tracing_active) {
-		TNF_PROBE_1(syscall_start, "syscall thread", /* CSTYLED */,
-			tnf_sysnum,	sysnum,		t->t_sysnum);
-		t->t_post_sys = 1;	/* make sure post_syscall runs */
-		repost = 1;
-	}
-#endif /* NPROBE */
 
 #ifdef SYSCALLTRACE
 	if (syscalltrace) {
@@ -699,17 +687,6 @@ sig_check:
 	}
 
 	lwp->lwp_errno = 0;		/* clear error for next time */
-
-#ifndef NPROBE
-	/* Kernel probe */
-	if (tnf_tracing_active) {
-		TNF_PROBE_3(syscall_end, "syscall thread", /* CSTYLED */,
-		    tnf_long,	rval1,		rval1,
-		    tnf_long,	rval2,		rval2,
-		    tnf_long,	errno,		(long)error);
-		repost = 1;
-	}
-#endif /* NPROBE */
 
 	/*
 	 * Set state to LWP_USER here so preempt won't give us a kernel

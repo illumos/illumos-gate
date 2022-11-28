@@ -43,7 +43,7 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
+.\" Copyright 2016 Nexenta Systems, Inc.  All Rights Reserved.
 .\"
 .TH LS 1 "Apr 25, 2020"
 .SH NAME
@@ -1183,7 +1183,12 @@ Streams output format. Files are listed across the page, separated by commas.
 .sp .6
 .RS 4n
 The same as \fB-l\fR, except that the owner's \fBUID\fR and group's \fBGID\fR
-numbers are printed, rather than the associated character strings.
+numbers are printed, rather than the associated character strings. For files
+which owner and/or group is a Windows Security Identifier (\fBSID\fR), \fB-n\fR
+suppresses any lookups for the Windows Name string and prints only the raw SID.
+Moreover, a second instance of this flag (\fB-nn\fR) can be used to further
+suppress \fBidmapd\fR(1M) lookups of the file's owner and/or group SID, thus
+forcing \fBls\fR into printing the raw ephemeral numeric identifiers.
 .RE
 
 .sp
@@ -2829,3 +2834,9 @@ overridden by the \fBLC_COLLATE\fR environment variable. For example, if
 beginning with upper-case letters, then followed by names beginning with
 lower-case letters. But if \fBLC_COLLATE\fR equals \fBen_US.ISO8859-1\fR, then
 leading dots as well as case are ignored in determining the sort order.
+.sp
+.LP
+For additional information regarding Windows Security Identifiers, consult
+Microsoft support document, \fIWell-known security identifiers in Windows
+operating systems\fR, which can be found at Microsoft's support site:
+https://support.microsoft.com/en-us/kb/243330/.

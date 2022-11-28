@@ -29,6 +29,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -53,7 +54,6 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
-#include	"_a.out.h"
 #include	"msg.h"
 
 
@@ -193,7 +193,7 @@ Rt_map *
 setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
     char *_rtldname, ulong_t ld_base, ulong_t interp_base, int fd, Phdr *phdr,
     char *execname, char **argv, uid_t uid, uid_t euid, gid_t gid, gid_t egid,
-    void *aoutdyn, int auxflags, uint_t *hwcap)
+    int auxflags, uint_t *hwcap)
 {
 	Rt_map			*rlmp, *mlmp, *clmp, **tobj = NULL;
 	Ehdr			*ehdr;
@@ -367,7 +367,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 * arguments.
 		 */
 		if (rtld_getopt(argv, &envp, &auxv, &(lml_main.lm_flags),
-		    &(lml_main.lm_tflags), (aoutdyn != 0)) == 1) {
+		    &(lml_main.lm_tflags)) == 1) {
 			eprintf(&lml_main, ERR_NONE, MSG_INTL(MSG_USG_BADOPT));
 			return (0);
 		}
@@ -393,7 +393,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	if (ealp) {
 		if (((rtld_flags & RT_FL_NOENVIRON) == 0) &&
 		    (procenv_user(ealp, &(lml_main.lm_flags),
-		    &(lml_main.lm_tflags), (aoutdyn != 0)) == 1))
+		    &(lml_main.lm_tflags)) == 1))
 			return (0);
 		free(ealp);
 	}
@@ -408,6 +408,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		rtld_flags2 |= RT_FL2_HWCAP;
 		org_scapset->sc_hw_1 = (Xword)hwcap[0];
 		org_scapset->sc_hw_2 = (Xword)hwcap[1];
+		org_scapset->sc_hw_3 = (Xword)hwcap[2];
 	}
 
 	/*
@@ -524,67 +525,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			}
 		}
 	} else {
-		/*
-		 * Set up function ptr and arguments according to the type
-		 * of file class the executable is. (Currently only supported
-		 * types are ELF and a.out format.)  Then create a link map
-		 * for the executable.
-		 */
-		if (aoutdyn) {
-#ifdef A_OUT
-			mmapobj_result_t	*mpp;
-
-			/*
-			 * Create a mapping structure sufficient to describe
-			 * a single two segments.  The ADDR() of the a.out is
-			 * established as 0, which is required but the AOUT
-			 * relocation code.
-			 */
-			if ((mpp =
-			    calloc(sizeof (mmapobj_result_t), 2)) == NULL)
-				return (0);
-
-			if ((fdm.fd_nname =
-			    stravl_insert(execname, 0, 0, 0)) == NULL)
-				return (0);
-			if ((mlmp = aout_new_lmp(&lml_main, ALIST_OFF_DATA,
-			    &fdm, 0, 0, aoutdyn, NULL, NULL)) == NULL)
-				return (0);
-
-			/*
-			 * Establish the true mapping information for the a.out.
-			 */
-			if (aout_get_mmap(&lml_main, mpp)) {
-				free(mpp);
-				return (0);
-			}
-
-			MSIZE(mlmp) =
-			    (size_t)(mpp[1].mr_addr + mpp[1].mr_msize) -
-			    S_ALIGN((size_t)mpp[0].mr_addr, syspagsz);
-			MMAPS(mlmp) = mpp;
-			MMAPCNT(mlmp) = 2;
-			PADSTART(mlmp) = (ulong_t)mpp->mr_addr;
-			PADIMLEN(mlmp) = mpp->mr_msize;
-
-			/*
-			 * Disable any object configuration cache (BCP apps
-			 * bring in sbcp which can benefit from any object
-			 * cache, but both the app and sbcp can't use the same
-			 * objects).
-			 */
-			rtld_flags |= RT_FL_NOOBJALT;
-
-			/*
-			 * Make sure no-direct bindings are in effect.
-			 */
-			lml_main.lm_tflags |= LML_TFLG_NODIRECT;
-#else
-			eprintf(&lml_main, ERR_FATAL,
-			    MSG_INTL(MSG_ERR_REJ_UNKFILE), argvname);
-			return (0);
-#endif
-		} else if (phdr) {
+		if (phdr != NULL) {
 			Phdr			*pptr;
 			Off			i_offset = 0;
 			Addr			base = 0;
@@ -802,7 +743,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 	/*
 	 * Determine the dev/inode information for the executable to complete
-	 * load_so() checking for those who might dlopen(a.out).
+	 * load_so() checking for those who might call dlopen(3c) on the
+	 * executable .
 	 */
 	if (rtld_stat(PATHNAME(mlmp), &status) == 0) {
 		STDEV(mlmp) = status.st_dev;
@@ -813,7 +755,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Initialize any configuration information.
 	 */
 	if (!(rtld_flags & RT_FL_NOCFG)) {
-		if ((features = elf_config(mlmp, (aoutdyn != 0))) == -1)
+		if ((features = elf_config(mlmp)) == -1)
 			return (0);
 	}
 
@@ -926,10 +868,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 		if (THIS_IS_ELF(mlmp)) {
 			DBG_CALL(Dbg_file_elf(&lml_main, PATHNAME(mlmp),
-			    ADDR(mlmp), MSIZE(mlmp), LIST(mlmp)->lm_lmidstr,
-			    ALIST_OFF_DATA));
-		} else {
-			DBG_CALL(Dbg_file_aout(&lml_main, PATHNAME(mlmp),
 			    ADDR(mlmp), MSIZE(mlmp), LIST(mlmp)->lm_lmidstr,
 			    ALIST_OFF_DATA));
 		}

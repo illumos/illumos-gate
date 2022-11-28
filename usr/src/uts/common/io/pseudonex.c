@@ -42,7 +42,7 @@
  * that for their collection of device nodes.  To do so, add a driver alias
  * for the name of the nexus child and a line in pseudo.conf such as:
  *
- * 	name="foo" parent="/pseudo" instance=<n> valid-children="bar","baz";
+ *	name="foo" parent="/pseudo" instance=<n> valid-children="bar","baz";
  *
  * Setting 'valid-children' is important because we have an annoying problem;
  * we need to prevent pseudo devices with 'parent="pseudo"' set from binding
@@ -83,6 +83,8 @@ static int pseudonex_detach(dev_info_t *, ddi_detach_cmd_t);
 static int pseudonex_open(dev_t *, int, int, cred_t *);
 static int pseudonex_close(dev_t, int, int, cred_t *);
 static int pseudonex_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+static int pseudonex_fm_init(dev_info_t *, dev_info_t *, int,
+    ddi_iblock_cookie_t *);
 static int pseudonex_ctl(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *,
     void *);
 
@@ -90,6 +92,8 @@ static void *pseudonex_state;
 
 typedef struct pseudonex_state {
 	dev_info_t *pnx_devi;
+	int pnx_fmcap;
+	ddi_iblock_cookie_t pnx_fm_ibc;
 } pseudonex_state_t;
 
 static struct bus_ops pseudonex_bus_ops = {
@@ -116,7 +120,7 @@ static struct bus_ops pseudonex_bus_ops = {
 	NULL,			/* bus_intr_ctl */
 	NULL,			/* bus_config */
 	NULL,			/* bus_unconfig */
-	NULL,			/* bus_fm_init */
+	pseudonex_fm_init,	/* bus_fm_init */
 	NULL,			/* bus_fm_fini */
 	NULL,			/* bus_fm_access_enter */
 	NULL,			/* bus_fm_access_exit */
@@ -228,6 +232,9 @@ pseudonex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pnx_state = ddi_get_soft_state(pseudonex_state, instance);
 	pnx_state->pnx_devi = devi;
 
+	pnx_state->pnx_fmcap = DDI_FM_EREPORT_CAPABLE;
+	ddi_fm_init(devi, &pnx_state->pnx_fmcap, &pnx_state->pnx_fm_ibc);
+
 	if (ddi_create_minor_node(devi, "devctl", S_IFCHR, instance,
 	    DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
 		ddi_remove_minor_node(devi, NULL);
@@ -247,6 +254,10 @@ pseudonex_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	if (cmd == DDI_SUSPEND)
 		return (DDI_SUCCESS);
 
+	if (cmd != DDI_DETACH)
+		return (DDI_FAILURE);
+
+	ddi_fm_fini(devi);
 	ddi_remove_minor_node(devi, NULL);
 	ddi_soft_state_free(pseudonex_state, instance);
 	return (DDI_SUCCESS);
@@ -316,7 +327,7 @@ pseudonex_check_assignment(dev_info_t *child, int test_inst)
 {
 	dev_info_t	*tdip;
 	kmutex_t	*dmp;
-	const char 	*childname = ddi_driver_name(child);
+	const char	*childname = ddi_driver_name(child);
 	major_t		childmaj = ddi_name_to_major((char *)childname);
 
 	dmp = &devnamesp[childmaj].dn_lock;
@@ -349,7 +360,7 @@ pseudonex_auto_assign(dev_info_t *child)
 {
 	dev_info_t	*tdip;
 	kmutex_t	*dmp;
-	const char 	*childname = ddi_driver_name(child);
+	const char	*childname = ddi_driver_name(child);
 	major_t		childmaj = ddi_name_to_major((char *)childname);
 	int inst = 0;
 
@@ -372,6 +383,19 @@ pseudonex_auto_assign(dev_info_t *child)
 	}
 	UNLOCK_DEV_OPS(dmp);
 	return (-1);
+}
+
+static int
+pseudonex_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
+    ddi_iblock_cookie_t *ibc)
+{
+	pseudonex_state_t *pnx_state;
+
+	pnx_state = ddi_get_soft_state(pseudonex_state, ddi_get_instance(dip));
+	ASSERT(pnx_state != NULL);
+	ASSERT(ibc != NULL);
+	*ibc = pnx_state->pnx_fm_ibc;
+	return (pnx_state->pnx_fmcap & cap);
 }
 
 static int

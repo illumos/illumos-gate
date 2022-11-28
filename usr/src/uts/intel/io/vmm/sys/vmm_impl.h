@@ -50,10 +50,10 @@ typedef struct vmm_zsd vmm_zsd_t;
 
 enum vmm_softc_state {
 	VMM_HELD	= 1,	/* external driver(s) possess hold on the VM */
-	VMM_CLEANUP	= 2,	/* request that holds are released */
-	VMM_PURGED	= 4,	/* all hold have been released */
-	VMM_BLOCK_HOOK	= 8,	/* mem hook install temporarily blocked */
-	VMM_DESTROY	= 16	/* VM is destroyed, softc still around */
+	VMM_BLOCK_HOOK	= 2,	/* mem hook install temporarily blocked */
+	VMM_DESTROY	= 4,	/* VM destruction initiated */
+	VMM_IS_OPEN	= 8,	/* VM device is open */
+	VMM_AUTODESTROY	= 16,	/* auto-destroy instance on close */
 };
 
 struct vmm_softc {
@@ -66,8 +66,7 @@ struct vmm_softc {
 	kcondvar_t	vmm_cv;
 	list_t		vmm_holds;
 	uint_t		vmm_flags;
-	boolean_t	vmm_is_open;
-	boolean_t	vmm_autodestruct;
+	uint_t		vmm_destroy_waiters;
 
 	kmutex_t	vmm_lease_lock;
 	list_t		vmm_lease_list;
@@ -89,7 +88,7 @@ void vmm_zsd_init(void);
 void vmm_zsd_fini(void);
 int vmm_zsd_add_vm(vmm_softc_t *sc);
 void vmm_zsd_rem_vm(vmm_softc_t *sc);
-int vmm_zone_vm_destroy(vmm_softc_t *);
+void vmm_zone_vm_destroy(vmm_softc_t *);
 
 #define	VMM_MODULE_NAME	"vmm"
 

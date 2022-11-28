@@ -26,6 +26,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -1435,6 +1436,13 @@ zfs_domount(vfs_t *vfsp, char *osname)
 		error = zfsvfs_setup(zfsvfs, B_TRUE);
 	}
 
+	/* cache the root vnode for this mount */
+	znode_t *rootzp;
+	if (error = zfs_zget(zfsvfs, zfsvfs->z_root, &rootzp)) {
+		goto out;
+	}
+	zfsvfs->z_rootdir = ZTOV(rootzp);
+
 	if (!zfsvfs->z_issnap)
 		zfsctl_create(zfsvfs);
 out:
@@ -1759,6 +1767,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 	vnode_t *vp = NULL;
 	char *zfs_bootfs;
 	char *zfs_devid;
+	char *zfs_rootdisk_path;
 	uint64_t zfs_bootpool;
 	uint64_t zfs_bootvdev;
 
@@ -1798,12 +1807,19 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 		zfs_bootvdev = spa_get_bootprop_uint64("zfs-bootvdev", 0);
 
 		/*
+		 * If we have been given a root disk override path, we want to
+		 * ignore device paths from the pool configuration and use only
+		 * the specific path we were given in the boot properties.
+		 */
+		zfs_rootdisk_path = spa_get_bootprop("zfs-rootdisk-path");
+
+		/*
 		 * Initialise the early boot device rescan mechanism.  A scan
 		 * will not actually be performed unless we need to do so in
 		 * order to find the correct /devices path for a relocated
 		 * device.
 		 */
-		vdev_disk_preroot_init();
+		vdev_disk_preroot_init(zfs_rootdisk_path);
 
 		error = spa_import_rootpool(rootfs.bo_name, zfs_devid,
 		    zfs_bootpool, zfs_bootvdev);
@@ -1812,6 +1828,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 
 		if (error != 0) {
 			spa_free_bootprop(zfs_bootfs);
+			spa_free_bootprop(zfs_rootdisk_path);
 			vdev_disk_preroot_fini();
 			cmn_err(CE_NOTE, "spa_import_rootpool: error %d",
 			    error);
@@ -1820,6 +1837,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 
 		if (error = zfs_parse_bootfs(zfs_bootfs, rootfs.bo_name)) {
 			spa_free_bootprop(zfs_bootfs);
+			spa_free_bootprop(zfs_rootdisk_path);
 			vdev_disk_preroot_fini();
 			cmn_err(CE_NOTE, "zfs_parse_bootfs: error %d",
 			    error);
@@ -1827,36 +1845,38 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 		}
 
 		spa_free_bootprop(zfs_bootfs);
-		vdev_disk_preroot_fini();
+		spa_free_bootprop(zfs_rootdisk_path);
 
-		if (error = vfs_lock(vfsp))
+		if ((error = vfs_lock(vfsp)) != 0) {
+			vdev_disk_preroot_fini();
 			return (error);
+		}
 
 		if (error = zfs_domount(vfsp, rootfs.bo_name)) {
 			cmn_err(CE_NOTE, "zfs_domount: error %d", error);
 			goto out;
 		}
 
+		/* zfs_domount has already cached the root vnode for us */
 		zfsvfs = (zfsvfs_t *)vfsp->vfs_data;
 		ASSERT(zfsvfs);
-		if (error = zfs_zget(zfsvfs, zfsvfs->z_root, &zp)) {
-			cmn_err(CE_NOTE, "zfs_zget: error %d", error);
-			goto out;
-		}
+		ASSERT(zfsvfs->z_rootdir);
 
-		vp = ZTOV(zp);
+		vp = zfsvfs->z_rootdir;
 		mutex_enter(&vp->v_lock);
 		vp->v_flag |= VROOT;
 		mutex_exit(&vp->v_lock);
-		rootvp = vp;
 
 		/*
 		 * Leave rootvp held.  The root file system is never unmounted.
 		 */
+		VN_HOLD(vp);
+		rootvp = vp;
 
 		vfs_add((struct vnode *)0, vfsp,
 		    (vfsp->vfs_flag & VFS_RDONLY) ? MS_RDONLY : 0);
 out:
+		vdev_disk_preroot_fini();
 		vfs_unlock(vfsp);
 		return (error);
 	} else if (why == ROOT_REMOUNT) {
@@ -2085,17 +2105,24 @@ static int
 zfs_root(vfs_t *vfsp, vnode_t **vpp)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
-	znode_t *rootzp;
+	struct vnode *vp;
 	int error;
 
 	ZFS_ENTER(zfsvfs);
 
-	error = zfs_zget(zfsvfs, zfsvfs->z_root, &rootzp);
-	if (error == 0)
-		*vpp = ZTOV(rootzp);
+	vp = zfsvfs->z_rootdir;
+	if (vp != NULL) {
+		VN_HOLD(vp);
+		error = 0;
+	} else {
+		/* forced unmount */
+		error = EIO;
+	}
+	*vpp = vp;
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
+
 }
 
 /*
@@ -2167,9 +2194,20 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 	 * other vops will fail with EIO.
 	 */
 	if (unmounting) {
+		/*
+		 * Clear the cached root vnode now that we are unmounted.
+		 * Its release must be performed outside the teardown locks to
+		 * avoid recursive lock entry via zfs_inactive().
+		 */
+		vnode_t *vp = zfsvfs->z_rootdir;
+		zfsvfs->z_rootdir = NULL;
+
 		zfsvfs->z_unmounted = B_TRUE;
 		rw_exit(&zfsvfs->z_teardown_inactive_lock);
 		rrm_exit(&zfsvfs->z_teardown_lock, FTAG);
+
+		/* Drop the cached root vp now that it is safe */
+		VN_RELE(vp);
 	}
 
 	/*
@@ -2237,14 +2275,24 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 		 */
 		boolean_t draining;
 		uint_t thresh = 1;
+		vnode_t *ctlvp, *rvp;
+
+		/*
+		 * The cached vnode for the root directory of the mount also
+		 * maintains a hold on the vfs structure.
+		 */
+		rvp = zfsvfs->z_rootdir;
+		thresh++;
 
 		/*
 		 * The '.zfs' directory maintains a reference of its own, and
 		 * any active references underneath are reflected in the vnode
 		 * count. Allow one additional reference for it.
 		 */
-		if (zfsvfs->z_ctldir != NULL)
+		ctlvp = zfsvfs->z_ctldir;
+		if (ctlvp != NULL) {
 			thresh++;
+		}
 
 		/*
 		 * If it's running, the asynchronous unlinked drain task needs
@@ -2255,8 +2303,8 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 		if (draining)
 			zfs_unlinked_drain_stop_wait(zfsvfs);
 
-		if (vfsp->vfs_count > thresh || (zfsvfs->z_ctldir != NULL &&
-		    zfsvfs->z_ctldir->v_count > 1)) {
+		if (vfsp->vfs_count > thresh || rvp->v_count > 1 ||
+		    (ctlvp != NULL && ctlvp->v_count > 1)) {
 			if (draining) {
 				/* If it was draining, restart the task */
 				zfs_unlinked_drain(zfsvfs);

@@ -22,6 +22,8 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2017 Tintri by DDN, Inc. All rights reserved.
+ *
  * convert binary audit records to syslog messages and
  * send them off to syslog
  *
@@ -226,7 +228,7 @@ tossit(au_event_t id, int passfail)
 
 static size_t
 fromleft(char *p, size_t avail, char *attrname, size_t attrlen, char *txt,
-	size_t txtlen)
+    size_t txtlen)
 {
 	size_t	len;
 
@@ -253,7 +255,7 @@ fromleft(char *p, size_t avail, char *attrname, size_t attrlen, char *txt,
 
 static size_t
 fromright(char *p, size_t avail, char *attrname, size_t attrlen, char *txt,
-	size_t txtlen)
+    size_t txtlen)
 {
 	size_t	len;
 
@@ -650,7 +652,7 @@ filter(const char *input, uint64_t sequence, char *output,
 				ctx.out.sf_zonelen = 0;
 			}
 
-			return (-1);	/* tell caller it was tossed */
+			return (AUDITD_DISCARD);
 		}
 		bp = output;
 		remaining = out_len;
@@ -823,16 +825,16 @@ auditd_plugin(const char *input, size_t in_len, uint64_t sequence, char **error)
 			DPRINT((dbfp, "syslog: write_count=%llu, "
 			    "buffer=%llu, tossed=%llu\n",
 			    ++write_count, sequence, toss_count));
-		} else if (rc > 0) {	/* -1 == discard it */
+		} else if (rc != AUDITD_DISCARD) {
 			DPRINT((dbfp, "syslog: parse failed for buffer %llu\n",
 			    sequence));
 			*error = strdup(gettext(
 			    "Unable to parse audit record"));
 		} else {
-			DPRINT((dbfp, "syslog: rc = %d (-1 is discard), "
+			DPRINT((dbfp, "syslog: rc = %d (%d is discard), "
 			    "sequence=%llu, toss_count=%llu\n",
-			    rc, sequence, ++toss_count));
-			rc = 0;
+			    rc, AUDITD_DISCARD, sequence, ++toss_count));
+			rc = AUDITD_SUCCESS;
 		}
 		free(outbuf);
 	}

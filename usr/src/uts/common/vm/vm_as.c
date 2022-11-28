@@ -56,7 +56,6 @@
 #include <sys/vmsystm.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/tnf_probe.h>
 #include <sys/vtrace.h>
 
 #include <vm/hat.h>
@@ -877,12 +876,6 @@ retry:
 		CPU_STATS_EXIT_K();
 		break;
 	}
-
-	/* Kernel probe */
-	TNF_PROBE_3(address_fault, "vm pagefault", /* CSTYLED */,
-	    tnf_opaque,	address,	addr,
-	    tnf_fault_type,	fault_type,	type,
-	    tnf_seg_access,	access,		rw);
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -

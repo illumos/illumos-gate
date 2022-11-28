@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  *	_xftw - file tree walk the uses expanded stat structure
@@ -114,10 +114,9 @@ static const char *get_unrooted(const char *);
 static int fwalk(const char *, int (*)(const char *, const struct stat *, int),
 	int, struct Var *);
 
-/*ARGSUSED*/
 int
-_xftw(int ver, const char *path,
-	int (*fn)(const char *, const struct stat *, int), int depth)
+_xftw(int ver __unused, const char *path,
+    int (*fn)(const char *, const struct stat *, int), int depth)
 {
 	struct Var var;
 	int rc;
@@ -133,7 +132,7 @@ _xftw(int ver, const char *path,
  */
 static int
 fwalk(const char *path, int (*fn)(const char *, const struct stat *, int),
-	int depth, struct Var *vp)
+    int depth, struct Var *vp)
 {
 	size_t	n;
 	int rc;
@@ -201,7 +200,7 @@ fwalk(const char *path, int (*fn)(const char *, const struct stat *, int),
 	 *	We must ignore "." and "..", but other than that,
 	 *	just create a path name and call self to check it out.
 	 */
-	while (direntp = readdir(dirp)) {
+	while ((direntp = readdir(dirp)) != NULL) {
 		long here;
 
 		if (strcmp(direntp->d_name, ".") == 0 ||
@@ -287,23 +286,23 @@ nocdopendir(const char *path, struct Var *vp)
 			return (NULL);
 		}
 		if ((token = strtok_r(dirp, "/", &ptr)) != NULL) {
-		    if ((fd = openat(AT_FDCWD, dirp, O_RDONLY)) < 0) {
-			(void) free(dirp);
-			errno = ENAMETOOLONG;
-			return (NULL);
-		    }
-		    while ((token = strtok_r(NULL, "/", &ptr)) != NULL) {
-			if ((cfd = openat(fd, token, O_RDONLY)) < 0) {
-			    (void) close(fd);
-			    (void) free(dirp);
-			    errno = ENAMETOOLONG;
-			    return (NULL);
+			if ((fd = openat(AT_FDCWD, dirp, O_RDONLY)) < 0) {
+				(void) free(dirp);
+				errno = ENAMETOOLONG;
+				return (NULL);
 			}
-			(void) close(fd);
-			fd = cfd;
-		    }
-		    (void) free(dirp);
-		    return (fdopendir(fd));
+			while ((token = strtok_r(NULL, "/", &ptr)) != NULL) {
+				if ((cfd = openat(fd, token, O_RDONLY)) < 0) {
+					(void) close(fd);
+					(void) free(dirp);
+					errno = ENAMETOOLONG;
+					return (NULL);
+				}
+				(void) close(fd);
+				fd = cfd;
+			}
+			(void) free(dirp);
+			return (fdopendir(fd));
 		}
 		(void) free(dirp);
 		errno = ENAMETOOLONG;
@@ -334,29 +333,29 @@ nocdstat(const char *path, struct stat *statp, struct Var *vp, int sym)
 			return (-1);
 		}
 		if ((token = strtok_r(dirp, "/", &ptr)) != NULL) {
-		    if ((fd = openat(AT_FDCWD, dirp, O_RDONLY)) < 0) {
-			(void) free(dirp);
-			errno = ENAMETOOLONG;
-			return (-1);
-		    }
-		    unrootp = get_unrooted(path);
-		    while (((token = strtok_r(NULL, "/", &ptr)) != NULL) &&
-			(strcmp(token, unrootp) != 0)) {
-			    if ((cfd = openat(fd, token, O_RDONLY)) < 0) {
-				(void) close(fd);
+			if ((fd = openat(AT_FDCWD, dirp, O_RDONLY)) < 0) {
 				(void) free(dirp);
 				errno = ENAMETOOLONG;
-				return (0);
-			    }
-			    (void) close(fd);
-			    fd = cfd;
-		    }
-		    (void) free(dirp);
-		    rc = fstatat(fd, unrootp, statp, sym);
-		    save_err = errno;
-		    (void) close(fd);
-		    errno = save_err;
-		    return (rc);
+				return (-1);
+			}
+			unrootp = get_unrooted(path);
+			while (((token = strtok_r(NULL, "/", &ptr)) != NULL) &&
+			    (strcmp(token, unrootp) != 0)) {
+				if ((cfd = openat(fd, token, O_RDONLY)) < 0) {
+					(void) close(fd);
+					(void) free(dirp);
+					errno = ENAMETOOLONG;
+					return (0);
+				}
+				(void) close(fd);
+				fd = cfd;
+			}
+			(void) free(dirp);
+			rc = fstatat(fd, unrootp, statp, sym);
+			save_err = errno;
+			(void) close(fd);
+			errno = save_err;
+			return (rc);
 		}
 		(void) free(dirp);
 		errno = ENAMETOOLONG;

@@ -83,9 +83,6 @@ tavor_ah_alloc(tavor_state_t *state, tavor_pdhdl_t pd,
 	uint64_t		data;
 	uint32_t		size;
 	int			status, i, flag;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_ah_alloc);
 
 	/*
 	 * Someday maybe the "ibt_adds_vect_t *attr_p" will be NULL to
@@ -95,8 +92,6 @@ tavor_ah_alloc(tavor_state_t *state, tavor_pdhdl_t pd,
 
 	/* Validate that specified port number is legal */
 	if (!tavor_portnum_is_valid(state, attr_p->av_port_num)) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_PORT_INVALID, "invalid port num");
 		goto ahalloc_fail;
 	}
 
@@ -108,8 +103,6 @@ tavor_ah_alloc(tavor_state_t *state, tavor_pdhdl_t pd,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_UDAV, 1, sleepflag, &udav);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed UDAV");
 		goto ahalloc_fail;
 	}
 
@@ -120,8 +113,6 @@ tavor_ah_alloc(tavor_state_t *state, tavor_pdhdl_t pd,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_AHHDL, 1, sleepflag, &rsrc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed AH handler");
 		goto ahalloc_fail1;
 	}
 	ah = (tavor_ahhdl_t)rsrc->tr_addr;
@@ -144,8 +135,6 @@ tavor_ah_alloc(tavor_state_t *state, tavor_pdhdl_t pd,
 		tavor_pd_refcnt_dec(pd);
 		tavor_rsrc_free(state, &rsrc);
 		tavor_rsrc_free(state, &udav);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(status, "failed in tavor_set_addr_path");
 		goto ahalloc_fail;
 	}
 	udav_entry.pd	  = pd->pd_pdnum;
@@ -168,8 +157,6 @@ tavor_ah_alloc(tavor_state_t *state, tavor_pdhdl_t pd,
 	op.mro_bind_override_addr = 0;
 	status = tavor_mr_register(state, pd, &mr_attr, &mr, &op);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed register mr");
 		goto ahalloc_fail2;
 	}
 
@@ -220,7 +207,6 @@ tavor_ah_alloc(tavor_state_t *state, tavor_pdhdl_t pd,
 	/* Sync the UDAV for use by the hardware */
 	tavor_udav_sync(ah, udav->tr_addr, DDI_DMA_SYNC_FORDEV);
 
-	TAVOR_TNF_EXIT(tavor_ah_alloc);
 	return (DDI_SUCCESS);
 
 ahalloc_fail2:
@@ -229,9 +215,6 @@ ahalloc_fail2:
 ahalloc_fail1:
 	tavor_rsrc_free(state, &udav);
 ahalloc_fail:
-	TNF_PROBE_1(tavor_ah_alloc_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_ah_alloc);
 	return (status);
 }
 
@@ -249,8 +232,6 @@ tavor_ah_free(tavor_state_t *state, tavor_ahhdl_t *ahhdl, uint_t sleepflag)
 	tavor_mrhdl_t		mr;
 	tavor_ahhdl_t		ah;
 	int			status;
-
-	TAVOR_TNF_ENTER(tavor_ah_free);
 
 	/*
 	 * Pull all the necessary information from the Tavor Address Handle
@@ -275,8 +256,6 @@ tavor_ah_free(tavor_state_t *state, tavor_ahhdl_t *ahhdl, uint_t sleepflag)
 	status = tavor_mr_deregister(state, &mr, TAVOR_MR_DEREG_ALL,
 	    sleepflag);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_ah_free_dereg_mr_fail, TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ah_free);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -303,7 +282,6 @@ tavor_ah_free(tavor_state_t *state, tavor_ahhdl_t *ahhdl, uint_t sleepflag)
 	/* Set the ahhdl pointer to NULL and return success */
 	*ahhdl = NULL;
 
-	TAVOR_TNF_EXIT(tavor_ah_free);
 	return (DDI_SUCCESS);
 }
 
@@ -322,8 +300,6 @@ tavor_ah_query(tavor_state_t *state, tavor_ahhdl_t ah, tavor_pdhdl_t *pd,
 	uint64_t		data;
 	uint32_t		size;
 	int			i;
-
-	TAVOR_TNF_ENTER(tavor_ah_query);
 
 	mutex_enter(&ah->ah_lock);
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*attr_p))
@@ -363,7 +339,6 @@ tavor_ah_query(tavor_state_t *state, tavor_ahhdl_t ah, tavor_pdhdl_t *pd,
 	attr_p->av_srate = ah->ah_save_srate;
 
 	mutex_exit(&ah->ah_lock);
-	TAVOR_TNF_EXIT(tavor_ah_query);
 	return (DDI_SUCCESS);
 }
 
@@ -383,13 +358,8 @@ tavor_ah_modify(tavor_state_t *state, tavor_ahhdl_t ah,
 	uint32_t		udav_pd, size, portnum_new;
 	int			i, status;
 
-	TAVOR_TNF_ENTER(tavor_ah_modify);
-
 	/* Validate that specified port number is legal */
 	if (!tavor_portnum_is_valid(state, attr_p->av_port_num)) {
-		TNF_PROBE_1(tavor_ah_modify_inv_portnum,
-		    TAVOR_TNF_ERROR, "", tnf_uint, port, attr_p->av_port_num);
-		TAVOR_TNF_EXIT(tavor_ah_modify);
 		return (IBT_HCA_PORT_INVALID);
 	}
 
@@ -421,9 +391,6 @@ tavor_ah_modify(tavor_state_t *state, tavor_ahhdl_t ah,
 	    (tavor_hw_addr_path_t *)&udav_entry, TAVOR_ADDRPATH_UDAV, NULL);
 	if (status != DDI_SUCCESS) {
 		mutex_exit(&ah->ah_lock);
-		TNF_PROBE_0(tavor_ah_modify_setaddrpath_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_ah_modify);
 		return (status);
 	}
 	ah->ah_save_guid = attr_p->av_dgid.gid_guid;
@@ -498,7 +465,6 @@ tavor_ah_modify(tavor_state_t *state, tavor_ahhdl_t ah,
 	tavor_udav_sync(ah, udav->tr_addr, DDI_DMA_SYNC_FORDEV);
 
 	mutex_exit(&ah->ah_lock);
-	TAVOR_TNF_EXIT(tavor_ah_modify);
 	return (DDI_SUCCESS);
 }
 
@@ -515,13 +481,10 @@ tavor_udav_sync(tavor_ahhdl_t ah, tavor_hw_udav_t *udav, uint_t flag)
 	off_t			offset;
 	int			status;
 
-	TAVOR_TNF_ENTER(tavor_udav_sync);
-
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*ah))
 
 	/* Determine if AH needs to be synced or not */
 	if (ah->ah_sync == 0) {
-		TAVOR_TNF_EXIT(tavor_udav_sync);
 		return;
 	}
 
@@ -532,13 +495,8 @@ tavor_udav_sync(tavor_ahhdl_t ah, tavor_hw_udav_t *udav, uint_t flag)
 	offset = (off_t)0;
 	status = ddi_dma_sync(dmahdl, offset, sizeof (tavor_hw_udav_t), flag);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_udav_sync_getnextentry_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_udav_sync);
 		return;
 	}
-
-	TAVOR_TNF_EXIT(tavor_udav_sync);
 }
 
 
@@ -558,17 +516,12 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	uint32_t		end_indx;
 	int			status;
 	uint_t			qp_found;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_mcg_attach);
 
 	/*
 	 * It is only allowed to attach MCG to UD queue pairs.  Verify
 	 * that the intended QP is of the appropriate transport type
 	 */
 	if (qp->qp_serv_type != TAVOR_QP_UD) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_QP_SRV_TYPE_INVALID, "invalid service type");
 		goto mcgattach_fail;
 	}
 
@@ -578,8 +531,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	 * is outside of that range, then return an error.
 	 */
 	if (tavor_mlid_is_valid(lid) == 0) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_MC_MLID_INVALID, "invalid MLID");
 		goto mcgattach_fail;
 	}
 	/*
@@ -588,8 +539,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	 * the specified GID does not meet the criteria, then return an error.
 	 */
 	if (tavor_mgid_is_valid(gid) == 0) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_MC_MGID_INVALID, "invalid MGID");
 		goto mcgattach_fail;
 	}
 
@@ -606,9 +555,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: MGID_HASH command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_mcg_attach_mgid_hash_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status);
-		TAVOR_TNF_EXIT(tavor_mcg_attach);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -665,8 +611,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		if (status != DDI_SUCCESS) {
 			bzero(mcg, sizeof (struct tavor_sw_mcg_list_s));
 			mutex_exit(&state->ts_mcglock);
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(status, "failed qplist add");
 			goto mcgattach_fail;
 		}
 
@@ -688,10 +632,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 			TAVOR_WARNING(state, "failed to write MCG entry");
 			cmn_err(CE_CONT, "Tavor: WRITE_MGM command failed: "
 			    "%08x\n", status);
-			TNF_PROBE_2(tavor_mcg_attach_write_mgm_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-			    tnf_uint, indx, end_indx);
-			TAVOR_TNF_EXIT(tavor_mcg_attach);
 			return (ibc_get_ci_failure(0));
 		}
 
@@ -719,7 +659,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		 * We drop the lock and return success.
 		 */
 		mutex_exit(&state->ts_mcglock);
-		TAVOR_TNF_EXIT(tavor_mcg_attach);
 		return (DDI_SUCCESS);
 	}
 
@@ -747,10 +686,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 			TAVOR_WARNING(state, "failed to read MCG entry");
 			cmn_err(CE_CONT, "Tavor: READ_MGM command failed: "
 			    "%08x\n", status);
-			TNF_PROBE_2(tavor_mcg_attach_read_mgm_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-			    tnf_uint, indx, end_indx);
-			TAVOR_TNF_EXIT(tavor_mcg_attach);
 			return (ibc_get_ci_failure(0));
 		}
 
@@ -771,7 +706,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		if (status != DDI_SUCCESS) {
 			mutex_exit(&state->ts_mcglock);
 			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(status, "failed qplist add");
 			goto mcgattach_fail;
 		}
 
@@ -790,10 +724,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 			TAVOR_WARNING(state, "failed to write MCG entry");
 			cmn_err(CE_CONT, "Tavor: WRITE_MGM command failed: "
 			    "%08x\n", status);
-			TNF_PROBE_2(tavor_mcg_attach_write_mgm_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-			    tnf_uint, indx, end_indx);
-			TAVOR_TNF_EXIT(tavor_mcg_attach);
 			return (ibc_get_ci_failure(0));
 		}
 
@@ -821,7 +751,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		 * We drop the lock and return success.
 		 */
 		mutex_exit(&state->ts_mcglock);
-		TAVOR_TNF_EXIT(tavor_mcg_attach);
 		return (DDI_SUCCESS);
 	}
 
@@ -840,8 +769,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	status = tavor_rsrc_alloc(state, TAVOR_MCG, 1, TAVOR_NOSLEEP, &rsrc);
 	if (status != DDI_SUCCESS) {
 		mutex_exit(&state->ts_mcglock);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed MCG");
 		goto mcgattach_fail;
 	}
 
@@ -872,8 +799,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		bzero(newmcg, sizeof (struct tavor_sw_mcg_list_s));
 		tavor_rsrc_free(state, &rsrc);
 		mutex_exit(&state->ts_mcglock);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(status, "failed qplist add");
 		goto mcgattach_fail;
 	}
 
@@ -894,10 +819,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		TAVOR_WARNING(state, "failed to write MCG entry");
 		cmn_err(CE_CONT, "Tavor: WRITE_MGM command failed: %08x\n",
 		    status);
-		TNF_PROBE_2(tavor_mcg_attach_write_mgm_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-		    tnf_uint, indx, rsrc->tr_indx);
-		TAVOR_TNF_EXIT(tavor_mcg_attach);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -921,10 +842,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		TAVOR_WARNING(state, "failed to read MCG entry");
 		cmn_err(CE_CONT, "Tavor: READ_MGM command failed: %08x\n",
 		    status);
-		TNF_PROBE_2(tavor_mcg_attach_read_mgm_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-		    tnf_uint, indx, end_indx);
-		TAVOR_TNF_EXIT(tavor_mcg_attach);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -950,10 +867,6 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		TAVOR_WARNING(state, "failed to write MCG entry");
 		cmn_err(CE_CONT, "Tavor: WRITE_MGM command failed: %08x\n",
 		    status);
-		TNF_PROBE_2(tavor_mcg_attach_write_mgm_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-		    tnf_uint, indx, end_indx);
-		TAVOR_TNF_EXIT(tavor_mcg_attach);
 		return (ibc_get_ci_failure(0));
 	}
 	mcg = &state->ts_mcghdl[end_indx];
@@ -975,13 +888,9 @@ tavor_mcg_attach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	tavor_qp_mcg_refcnt_inc(qp);
 
 	mutex_exit(&state->ts_mcglock);
-	TAVOR_TNF_EXIT(tavor_mcg_attach);
 	return (DDI_SUCCESS);
 
 mcgattach_fail:
-	TNF_PROBE_1(tavor_mcg_attach_fail, TAVOR_TNF_ERROR, "", tnf_string,
-	    msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_mcg_attach);
 	return (status);
 }
 
@@ -1001,16 +910,12 @@ tavor_mcg_detach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	uint32_t		end_indx, prev_indx;
 	int			status;
 
-	TAVOR_TNF_ENTER(tavor_mcg_detach);
-
 	/*
 	 * Check for invalid Multicast DLID.  Specifically, all Multicast
 	 * LIDs should be within a well defined range.  If the specified LID
 	 * is outside of that range, then return an error.
 	 */
 	if (tavor_mlid_is_valid(lid) == 0) {
-		TNF_PROBE_0(tavor_mcg_detach_invmlid_fail, TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_mcg_detach);
 		return (IBT_MC_MLID_INVALID);
 	}
 
@@ -1028,9 +933,6 @@ tavor_mcg_detach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: MGID_HASH command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_mcg_detach_mgid_hash_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status);
-		TAVOR_TNF_EXIT(tavor_mcg_attach);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -1064,8 +966,6 @@ tavor_mcg_detach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	    ((mcg->mcg_mgid_h != gid.gid_prefix) ||
 	    (mcg->mcg_mgid_l != gid.gid_guid))) {
 		mutex_exit(&state->ts_mcglock);
-		TNF_PROBE_0(tavor_mcg_detach_invmgid_fail, TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_mcg_detach);
 		return (IBT_MC_MGID_INVALID);
 	}
 
@@ -1082,10 +982,6 @@ tavor_mcg_detach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		TAVOR_WARNING(state, "failed to read MCG entry");
 		cmn_err(CE_CONT, "Tavor: READ_MGM command failed: %08x\n",
 		    status);
-		TNF_PROBE_2(tavor_mcg_detach_read_mgm_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-		    tnf_uint, indx, end_indx);
-		TAVOR_TNF_EXIT(tavor_mcg_attach);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -1097,7 +993,6 @@ tavor_mcg_detach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 	status = tavor_mcg_qplist_remove(mcg, mcg_entry_qplist, qp);
 	if (status != DDI_SUCCESS) {
 		mutex_exit(&state->ts_mcglock);
-		TAVOR_TNF_EXIT(tavor_mcg_detach);
 		return (status);
 	}
 
@@ -1125,7 +1020,6 @@ tavor_mcg_detach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 		    mcg_entry);
 		if (status != DDI_SUCCESS) {
 			mutex_exit(&state->ts_mcglock);
-			TAVOR_TNF_EXIT(tavor_mcg_detach);
 			return (status);
 		}
 
@@ -1146,17 +1040,12 @@ tavor_mcg_detach(tavor_state_t *state, tavor_qphdl_t qp, ib_gid_t gid,
 			TAVOR_WARNING(state, "failed to write MCG entry");
 			cmn_err(CE_CONT, "Tavor: WRITE_MGM command failed: "
 			    "%08x\n", status);
-			TNF_PROBE_2(tavor_mcg_detach_write_mgm_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-			    tnf_uint, indx, end_indx);
-			TAVOR_TNF_EXIT(tavor_mcg_detach);
 			return (ibc_get_ci_failure(0));
 		}
 		mcg->mcg_num_qps--;
 	}
 
 	mutex_exit(&state->ts_mcglock);
-	TAVOR_TNF_EXIT(tavor_mcg_detach);
 	return (DDI_SUCCESS);
 }
 
@@ -1170,8 +1059,6 @@ tavor_qp_mcg_refcnt_inc(tavor_qphdl_t qp)
 	/* Increment the QP's MCG reference count */
 	mutex_enter(&qp->qp_lock);
 	qp->qp_mcg_refcnt++;
-	TNF_PROBE_1_DEBUG(tavor_qp_mcg_refcnt_inc, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, qp->qp_mcg_refcnt);
 	mutex_exit(&qp->qp_lock);
 }
 
@@ -1186,8 +1073,6 @@ tavor_qp_mcg_refcnt_dec(tavor_qphdl_t qp)
 	/* Decrement the QP's MCG reference count */
 	mutex_enter(&qp->qp_lock);
 	qp->qp_mcg_refcnt--;
-	TNF_PROBE_1_DEBUG(tavor_qp_mcg_refcnt_dec, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, qp->qp_mcg_refcnt);
 	mutex_exit(&qp->qp_lock);
 }
 
@@ -1203,8 +1088,6 @@ tavor_mcg_qplist_add(tavor_state_t *state, tavor_mcghdl_t mcg,
 {
 	uint_t		qplist_indx;
 
-	TAVOR_TNF_ENTER(tavor_mcg_qplist_add);
-
 	ASSERT(MUTEX_HELD(&state->ts_mcglock));
 
 	qplist_indx = mcg->mcg_num_qps;
@@ -1214,9 +1097,6 @@ tavor_mcg_qplist_add(tavor_state_t *state, tavor_mcghdl_t mcg,
 	 * multicast group.  If we have, then return an error
 	 */
 	if (qplist_indx >= state->ts_cfg_profile->cp_num_qp_per_mcg) {
-		TNF_PROBE_0(tavor_mcg_qplist_add_too_many_qps,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_mcg_qplist_add);
 		return (IBT_HCA_MCG_QP_EXCEEDED);
 	}
 
@@ -1254,7 +1134,6 @@ tavor_mcg_qplist_add(tavor_state_t *state, tavor_mcghdl_t mcg,
 		*qp_found = 0;
 	}
 
-	TAVOR_TNF_EXIT(tavor_mcg_qplist_add);
 	return (DDI_SUCCESS);
 }
 
@@ -1270,8 +1149,6 @@ tavor_mcg_qplist_remove(tavor_mcghdl_t mcg, tavor_hw_mcg_qp_list_t *mcg_qplist,
 {
 	uint_t		i, qplist_indx;
 
-	TAVOR_TNF_ENTER(tavor_mcg_qplist_remove);
-
 	/*
 	 * Search the MCG QP list for a matching QPN.  When
 	 * it's found, we swap the last entry with the current
@@ -1286,13 +1163,10 @@ tavor_mcg_qplist_remove(tavor_mcghdl_t mcg, tavor_hw_mcg_qp_list_t *mcg_qplist,
 			mcg_qplist[qplist_indx - 1].q = TAVOR_MCG_QPN_INVALID;
 			mcg_qplist[qplist_indx - 1].qpn = 0;
 
-			TAVOR_TNF_EXIT(tavor_mcg_qplist_remove);
 			return (DDI_SUCCESS);
 		}
 	}
 
-	TNF_PROBE_0(tavor_mcg_qplist_remove_invqphdl_fail, TAVOR_TNF_ERROR, "");
-	TAVOR_TNF_EXIT(tavor_mcg_qplist_remove);
 	return (IBT_QP_HDL_INVALID);
 }
 
@@ -1307,8 +1181,6 @@ tavor_mcg_walk_mgid_hash(tavor_state_t *state, uint64_t start_indx,
 {
 	tavor_mcghdl_t	curr_mcghdl;
 	uint_t		curr_indx, prev_indx;
-
-	TAVOR_TNF_ENTER(tavor_mcg_walk_mgid_hash);
 
 	ASSERT(MUTEX_HELD(&state->ts_mcglock));
 
@@ -1351,7 +1223,6 @@ end_mgid_hash_walk:
 	if (p_indx != NULL) {
 		*p_indx = prev_indx;
 	}
-	TAVOR_TNF_EXIT(tavor_mcg_walk_mgid_hash);
 	return (curr_indx);
 }
 
@@ -1364,8 +1235,6 @@ static void
 tavor_mcg_setup_new_hdr(tavor_mcghdl_t mcg, tavor_hw_mcg_t *mcg_hdr,
     ib_gid_t mgid, tavor_rsrc_t *mcg_rsrc)
 {
-	TAVOR_TNF_ENTER(tavor_mcg_setup_new_hdr);
-
 	/*
 	 * Fill in the fields of the "shadow" entry used by software
 	 * to track MCG hardware entry
@@ -1382,8 +1251,6 @@ tavor_mcg_setup_new_hdr(tavor_mcghdl_t mcg, tavor_hw_mcg_t *mcg_hdr,
 	mcg_hdr->mgid_h		= mgid.gid_prefix;
 	mcg_hdr->mgid_l		= mgid.gid_guid;
 	mcg_hdr->next_gid_indx	= 0;
-
-	TAVOR_TNF_EXIT(tavor_mcg_setup_new_hdr);
 }
 
 
@@ -1423,7 +1290,6 @@ tavor_mcg_hash_list_remove(tavor_state_t *state, uint_t curr_indx,
 			status = tavor_mcg_entry_invalidate(state, mcg_entry,
 			    curr_indx);
 			bzero(curr_mcg, sizeof (struct tavor_sw_mcg_list_s));
-			TAVOR_TNF_EXIT(tavor_mcg_hash_list_remove);
 			return (status);
 		}
 
@@ -1445,10 +1311,6 @@ tavor_mcg_hash_list_remove(tavor_state_t *state, uint_t curr_indx,
 			TAVOR_WARNING(state, "failed to read MCG entry");
 			cmn_err(CE_CONT, "Tavor: READ_MGM command failed: "
 			    "%08x\n", status);
-			TNF_PROBE_2(tavor_mcg_hash_list_rem_read_mgm_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-			    tnf_uint, indx, next_indx);
-			TAVOR_TNF_EXIT(tavor_mcg_hash_list_remove);
 			return (ibc_get_ci_failure(0));
 		}
 
@@ -1470,10 +1332,6 @@ tavor_mcg_hash_list_remove(tavor_state_t *state, uint_t curr_indx,
 			TAVOR_WARNING(state, "failed to write MCG entry");
 			cmn_err(CE_CONT, "Tavor: WRITE_MGM command failed: "
 			    "%08x\n", status);
-			TNF_PROBE_2(tavor_mcg_hash_list_rem_write_mgm_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-			    tnf_uint, indx, curr_indx);
-			TAVOR_TNF_EXIT(tavor_mcg_hash_list_remove);
 			return (ibc_get_ci_failure(0));
 		}
 
@@ -1494,7 +1352,6 @@ tavor_mcg_hash_list_remove(tavor_state_t *state, uint_t curr_indx,
 		 */
 		tavor_rsrc_free(state, &curr_mcg->mcg_rsrcp);
 
-		TAVOR_TNF_EXIT(tavor_mcg_hash_list_remove);
 		return (DDI_SUCCESS);
 	}
 
@@ -1521,10 +1378,6 @@ tavor_mcg_hash_list_remove(tavor_state_t *state, uint_t curr_indx,
 		TAVOR_WARNING(state, "failed to read MCG entry");
 		cmn_err(CE_CONT, "Tavor: READ_MGM command failed: %08x\n",
 		    status);
-		TNF_PROBE_2(tavor_mcg_hash_list_rem_read_mgm_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-		    tnf_uint, indx, prev_indx);
-		TAVOR_TNF_EXIT(tavor_mcg_hash_list_remove);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -1545,10 +1398,6 @@ tavor_mcg_hash_list_remove(tavor_state_t *state, uint_t curr_indx,
 		TAVOR_WARNING(state, "failed to write MCG entry");
 		cmn_err(CE_CONT, "Tavor: WRITE_MGM command failed: %08x\n",
 		    status);
-		TNF_PROBE_2(tavor_mcg_hash_list_rem_write_mgm_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-		    tnf_uint, indx, prev_indx);
-		TAVOR_TNF_EXIT(tavor_mcg_hash_list_remove);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -1570,7 +1419,6 @@ tavor_mcg_hash_list_remove(tavor_state_t *state, uint_t curr_indx,
 	tavor_rsrc_free(state, &curr_mcg->mcg_rsrcp);
 	bzero(curr_mcg, sizeof (struct tavor_sw_mcg_list_s));
 
-	TAVOR_TNF_EXIT(tavor_mcg_hash_list_remove);
 	return (DDI_SUCCESS);
 }
 
@@ -1584,8 +1432,6 @@ tavor_mcg_entry_invalidate(tavor_state_t *state, tavor_hw_mcg_t *mcg_entry,
     uint_t indx)
 {
 	int		status;
-
-	TAVOR_TNF_ENTER(tavor_mcg_entry_invalidate);
 
 	/*
 	 * Invalidate the hardware MCG entry by zeroing out this temporary
@@ -1601,14 +1447,9 @@ tavor_mcg_entry_invalidate(tavor_state_t *state, tavor_hw_mcg_t *mcg_entry,
 		TAVOR_WARNING(state, "failed to write MCG entry");
 		cmn_err(CE_CONT, "Tavor: WRITE_MGM command failed: %08x\n",
 		    status);
-		TNF_PROBE_2(tavor_mcg_entry_invalidate_write_mgm_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status,
-		    tnf_uint, indx, indx);
-		TAVOR_TNF_EXIT(tavor_mcg_entry_invalidate);
 		return (ibc_get_ci_failure(0));
 	}
 
-	TAVOR_TNF_EXIT(tavor_mcg_entry_invalidate);
 	return (DDI_SUCCESS);
 }
 
@@ -1622,8 +1463,6 @@ tavor_mgid_is_valid(ib_gid_t gid)
 {
 	uint_t		topbits, flags, scope;
 
-	TAVOR_TNF_ENTER(tavor_mgid_is_valid);
-
 	/*
 	 * According to IBA 1.1 specification (section 4.1.1) a valid
 	 * "multicast GID" must have its top eight bits set to all ones
@@ -1631,9 +1470,6 @@ tavor_mgid_is_valid(ib_gid_t gid)
 	topbits = (gid.gid_prefix >> TAVOR_MCG_TOPBITS_SHIFT) &
 	    TAVOR_MCG_TOPBITS_MASK;
 	if (topbits != TAVOR_MCG_TOPBITS) {
-		TNF_PROBE_0(tavor_mgid_is_valid_invbits_fail, TAVOR_TNF_ERROR,
-		    "");
-		TAVOR_TNF_EXIT(tavor_mgid_is_valid);
 		return (0);
 	}
 
@@ -1647,9 +1483,6 @@ tavor_mgid_is_valid(ib_gid_t gid)
 	    TAVOR_MCG_FLAGS_MASK;
 	if (!((flags == TAVOR_MCG_FLAGS_PERM) ||
 	    (flags == TAVOR_MCG_FLAGS_NONPERM))) {
-		TNF_PROBE_1(tavor_mgid_is_valid_invflags_fail, TAVOR_TNF_ERROR,
-		    "", tnf_uint, flags, flags);
-		TAVOR_TNF_EXIT(tavor_mgid_is_valid);
 		return (0);
 	}
 
@@ -1665,9 +1498,6 @@ tavor_mgid_is_valid(ib_gid_t gid)
 	    (scope == TAVOR_MCG_SCOPE_SITELOC)	 ||
 	    (scope == TAVOR_MCG_SCOPE_ORGLOC)	 ||
 	    (scope == TAVOR_MCG_SCOPE_GLOBAL))) {
-		TNF_PROBE_1(tavor_mgid_is_valid_invscope_fail, TAVOR_TNF_ERROR,
-		    "", tnf_uint, scope, scope);
-		TAVOR_TNF_EXIT(tavor_mgid_is_valid);
 		return (0);
 	}
 
@@ -1675,7 +1505,6 @@ tavor_mgid_is_valid(ib_gid_t gid)
 	 * If it passes all of the above checks, then we will consider it
 	 * a valid multicast GID.
 	 */
-	TAVOR_TNF_EXIT(tavor_mgid_is_valid);
 	return (1);
 }
 
@@ -1687,20 +1516,14 @@ tavor_mgid_is_valid(ib_gid_t gid)
 static int
 tavor_mlid_is_valid(ib_lid_t lid)
 {
-	TAVOR_TNF_ENTER(tavor_mlid_is_valid);
-
 	/*
 	 * According to IBA 1.1 specification (section 4.1.1) a valid
 	 * "multicast DLID" must be between 0xC000 and 0xFFFE.
 	 */
 	if ((lid < IB_LID_MC_FIRST) || (lid > IB_LID_MC_LAST)) {
-		TNF_PROBE_1(tavor_mlid_is_valid_invdlid_fail, TAVOR_TNF_ERROR,
-		    "", tnf_uint, mlid, lid);
-		TAVOR_TNF_EXIT(tavor_mlid_is_valid);
 		return (0);
 	}
 
-	TAVOR_TNF_EXIT(tavor_mlid_is_valid);
 	return (1);
 }
 
@@ -1716,8 +1539,6 @@ tavor_pd_alloc(tavor_state_t *state, tavor_pdhdl_t *pdhdl, uint_t sleepflag)
 	tavor_pdhdl_t	pd;
 	int		status;
 
-	TAVOR_TNF_ENTER(tavor_pd_alloc);
-
 	/*
 	 * Allocate the software structure for tracking the protection domain
 	 * (i.e. the Tavor Protection Domain handle).  By default each PD
@@ -1727,8 +1548,6 @@ tavor_pd_alloc(tavor_state_t *state, tavor_pdhdl_t *pdhdl, uint_t sleepflag)
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_PDHDL, 1, sleepflag, &rsrc);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_pd_alloc_rsrcalloc_fail, TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_pd_alloc);
 		return (IBT_INSUFF_RESOURCE);
 	}
 	pd = (tavor_pdhdl_t)rsrc->tr_addr;
@@ -1737,7 +1556,6 @@ tavor_pd_alloc(tavor_state_t *state, tavor_pdhdl_t *pdhdl, uint_t sleepflag)
 	pd->pd_refcnt = 0;
 	*pdhdl = pd;
 
-	TAVOR_TNF_EXIT(tavor_pd_alloc);
 	return (DDI_SUCCESS);
 }
 
@@ -1751,8 +1569,6 @@ tavor_pd_free(tavor_state_t *state, tavor_pdhdl_t *pdhdl)
 {
 	tavor_rsrc_t	*rsrc;
 	tavor_pdhdl_t	pd;
-
-	TAVOR_TNF_ENTER(tavor_pd_free);
 
 	/*
 	 * Pull all the necessary information from the Tavor Protection Domain
@@ -1771,9 +1587,6 @@ tavor_pd_free(tavor_state_t *state, tavor_pdhdl_t *pdhdl)
 	 * Tavor resource and return success.
 	 */
 	if (pd->pd_refcnt != 0) {
-		TNF_PROBE_1(tavor_pd_free_refcnt_fail, TAVOR_TNF_ERROR, "",
-		    tnf_int, refcnt, pd->pd_refcnt);
-		TAVOR_TNF_EXIT(tavor_pd_free);
 		return (IBT_PD_IN_USE);
 	}
 
@@ -1783,7 +1596,6 @@ tavor_pd_free(tavor_state_t *state, tavor_pdhdl_t *pdhdl)
 	/* Set the pdhdl pointer to NULL and return success */
 	*pdhdl = (tavor_pdhdl_t)NULL;
 
-	TAVOR_TNF_EXIT(tavor_pd_free);
 	return (DDI_SUCCESS);
 }
 
@@ -1797,8 +1609,6 @@ tavor_pd_refcnt_inc(tavor_pdhdl_t pd)
 {
 	/* Increment the protection domain's reference count */
 	mutex_enter(&pd->pd_lock);
-	TNF_PROBE_1_DEBUG(tavor_pd_refcnt_inc, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, pd->pd_refcnt);
 	pd->pd_refcnt++;
 	mutex_exit(&pd->pd_lock);
 
@@ -1815,8 +1625,6 @@ tavor_pd_refcnt_dec(tavor_pdhdl_t pd)
 	/* Decrement the protection domain's reference count */
 	mutex_enter(&pd->pd_lock);
 	pd->pd_refcnt--;
-	TNF_PROBE_1_DEBUG(tavor_pd_refcnt_dec, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, pd->pd_refcnt);
 	mutex_exit(&pd->pd_lock);
 
 }
@@ -1836,15 +1644,10 @@ tavor_port_query(tavor_state_t *state, uint_t port, ibt_hca_portinfo_t *pi)
 	uint_t			sgid_max, pkey_max, tbl_size;
 	int			i, j, indx, status;
 
-	TAVOR_TNF_ENTER(tavor_port_query);
-
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*pi))
 
 	/* Validate that specified port number is legal */
 	if (!tavor_portnum_is_valid(state, port)) {
-		TNF_PROBE_1(tavor_port_query_inv_portnum_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, port, port);
-		TAVOR_TNF_EXIT(tavor_port_query);
 		return (IBT_HCA_PORT_INVALID);
 	}
 
@@ -1860,9 +1663,6 @@ tavor_port_query(tavor_state_t *state, uint_t port, ibt_hca_portinfo_t *pi)
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: GetPortInfo (port %02d) command "
 		    "failed: %08x\n", port, status);
-		TNF_PROBE_1(tavor_port_query_getportinfo_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status);
-		TAVOR_TNF_EXIT(tavor_port_query);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -1923,9 +1723,6 @@ tavor_port_query(tavor_state_t *state, uint_t port, ibt_hca_portinfo_t *pi)
 		if (status != TAVOR_CMD_SUCCESS) {
 			cmn_err(CE_CONT, "Tavor: GetGUIDInfo (port %02d) "
 			    "command failed: %08x\n", port, status);
-			TNF_PROBE_1(tavor_port_query_getguidinfo_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status);
-			TAVOR_TNF_EXIT(tavor_port_query);
 			return (ibc_get_ci_failure(0));
 		}
 
@@ -1954,9 +1751,6 @@ tavor_port_query(tavor_state_t *state, uint_t port, ibt_hca_portinfo_t *pi)
 		if (status != TAVOR_CMD_SUCCESS) {
 			cmn_err(CE_CONT, "Tavor: GetPKeyTable (port %02d) "
 			    "command failed: %08x\n", port, status);
-			TNF_PROBE_1(tavor_port_query_getpkeytable_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status);
-			TAVOR_TNF_EXIT(tavor_port_query);
 			return (ibc_get_ci_failure(0));
 		}
 
@@ -1968,7 +1762,6 @@ tavor_port_query(tavor_state_t *state, uint_t port, ibt_hca_portinfo_t *pi)
 		}
 	}
 
-	TAVOR_TNF_EXIT(tavor_port_query);
 	return (DDI_SUCCESS);
 }
 
@@ -1986,16 +1779,11 @@ tavor_port_modify(tavor_state_t *state, uint8_t port,
 	uint32_t	capmask, reset_qkey;
 	int		status;
 
-	TAVOR_TNF_ENTER(tavor_port_modify);
-
 	/*
 	 * Return an error if either of the unsupported flags are set
 	 */
 	if ((flags & IBT_PORT_SHUTDOWN) ||
 	    (flags & IBT_PORT_SET_INIT_TYPE)) {
-		TNF_PROBE_1(tavor_port_modify_inv_flags_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, flags, flags);
-		TAVOR_TNF_EXIT(tavor_port_modify);
 		return (IBT_NOT_SUPPORTED);
 	}
 
@@ -2006,9 +1794,6 @@ tavor_port_modify(tavor_state_t *state, uint8_t port,
 
 	/* Validate that specified port number is legal */
 	if (!tavor_portnum_is_valid(state, port)) {
-		TNF_PROBE_1(tavor_port_modify_inv_portnum_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, port, port);
-		TAVOR_TNF_EXIT(tavor_port_modify);
 		return (IBT_HCA_PORT_INVALID);
 	}
 
@@ -2023,9 +1808,6 @@ tavor_port_modify(tavor_state_t *state, uint8_t port,
 	status = tavor_getportinfo_cmd_post(state, port,
 	    TAVOR_SLEEPFLAG_FOR_CONTEXT(), &portinfo);
 	if (status != TAVOR_CMD_SUCCESS) {
-		TNF_PROBE_1(tavor_port_modify_getportinfo_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status);
-		TAVOR_TNF_EXIT(tavor_port_modify);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -2069,13 +1851,9 @@ tavor_port_modify(tavor_state_t *state, uint8_t port,
 		TAVOR_WARNING(state, "failed to modify port capabilities");
 		cmn_err(CE_CONT, "Tavor: SET_IB (port %02d) command failed: "
 		    "%08x\n", port, status);
-		TNF_PROBE_1(tavor_port_modify_set_ib_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, cmd_status, status);
-		TAVOR_TNF_EXIT(tavor_port_modify);
 		return (ibc_get_ci_failure(0));
 	}
 
-	TAVOR_TNF_EXIT(tavor_port_modify);
 	return (DDI_SUCCESS);
 }
 
@@ -2095,8 +1873,6 @@ tavor_set_addr_path(tavor_state_t *state, ibt_adds_vect_t *av,
     tavor_hw_addr_path_t *path, uint_t type, tavor_qphdl_t qp)
 {
 	uint_t		gidtbl_sz;
-
-	TAVOR_TNF_ENTER(tavor_set_addr_path);
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*av))
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*path))
@@ -2128,9 +1904,6 @@ tavor_set_addr_path(tavor_state_t *state, ibt_adds_vect_t *av,
 		} else if (av->av_srate == IBT_SRATE_NOT_SPECIFIED) {
 			path->max_stat_rate = 0; /* Max */
 		} else {
-			TNF_PROBE_1(tavor_set_addr_path_inv_srate_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, srate, av->av_srate);
-			TAVOR_TNF_EXIT(tavor_set_addr_path);
 			return (IBT_STATIC_RATE_INVALID);
 		}
 	} else {
@@ -2141,9 +1914,6 @@ tavor_set_addr_path(tavor_state_t *state, ibt_adds_vect_t *av,
 		} else if (av->av_srate == IBT_SRATE_NOT_SPECIFIED) {
 			path->max_stat_rate = 0; /* Max */
 		} else {
-			TNF_PROBE_1(tavor_set_addr_path_inv_srate_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, srate, av->av_srate);
-			TAVOR_TNF_EXIT(tavor_set_addr_path);
 			return (IBT_STATIC_RATE_INVALID);
 		}
 	}
@@ -2159,9 +1929,6 @@ tavor_set_addr_path(tavor_state_t *state, ibt_adds_vect_t *av,
 	/* If "grh" flag is set, then check for valid SGID index too */
 	gidtbl_sz = (1 << state->ts_devlim.log_max_gid);
 	if ((av->av_send_grh) && (av->av_sgid_ix > gidtbl_sz)) {
-		TNF_PROBE_1(tavor_set_addr_path_inv_sgid_ix_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, sgid_ix, av->av_sgid_ix);
-		TAVOR_TNF_EXIT(tavor_set_addr_path);
 		return (IBT_SGID_INVALID);
 	}
 
@@ -2207,7 +1974,6 @@ tavor_set_addr_path(tavor_state_t *state, ibt_adds_vect_t *av,
 		path->rgid_l = 0x2;
 	}
 
-	TAVOR_TNF_EXIT(tavor_set_addr_path);
 	return (DDI_SUCCESS);
 }
 
@@ -2349,8 +2115,6 @@ tavor_queue_alloc(tavor_state_t *state, tavor_qalloc_info_t *qa_info,
 	uint_t			dma_xfer_mode, type;
 	int			flag, status;
 
-	TAVOR_TNF_ENTER(tavor_queue_alloc);
-
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*qa_info))
 
 	/* Set the callback flag appropriately */
@@ -2373,8 +2137,6 @@ tavor_queue_alloc(tavor_state_t *state, tavor_qalloc_info_t *qa_info,
 	status = ddi_dma_alloc_handle(state->ts_dip, &dma_attr, callback, NULL,
 	    &qa_info->qa_dmahdl);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_queue_alloc_dmahdl_fail, TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_queue_alloc);
 		return (DDI_FAILURE);
 	}
 
@@ -2421,9 +2183,6 @@ tavor_queue_alloc(tavor_state_t *state, tavor_qalloc_info_t *qa_info,
 		    (size_t *)&qa_info->qa_buf_realsz, &qa_info->qa_acchdl);
 		if (status != DDI_SUCCESS) {
 			ddi_dma_free_handle(&qa_info->qa_dmahdl);
-			TNF_PROBE_0(tavor_queue_alloc_dma_memalloc_fail,
-			    TAVOR_TNF_ERROR, "");
-			TAVOR_TNF_EXIT(tavor_queue_alloc);
 			return (DDI_FAILURE);
 		}
 
@@ -2442,9 +2201,6 @@ tavor_queue_alloc(tavor_state_t *state, tavor_qalloc_info_t *qa_info,
 		    &qa_info->qa_umemcookie);
 		if (qa_info->qa_buf_real == NULL) {
 			ddi_dma_free_handle(&qa_info->qa_dmahdl);
-			TNF_PROBE_0(tavor_queue_alloc_umem_fail,
-			    TAVOR_TNF_ERROR, "");
-			TAVOR_TNF_EXIT(tavor_queue_alloc);
 			return (DDI_FAILURE);
 		}
 
@@ -2463,9 +2219,6 @@ tavor_queue_alloc(tavor_state_t *state, tavor_qalloc_info_t *qa_info,
 		    NULL, NULL, flag);
 		if (qa_info->qa_buf_real == NULL) {
 			ddi_dma_free_handle(&qa_info->qa_dmahdl);
-			TNF_PROBE_0(tavor_queue_alloc_vmxa_fail,
-			    TAVOR_TNF_ERROR, "");
-			TAVOR_TNF_EXIT(tavor_queue_alloc);
 			return (DDI_FAILURE);
 		}
 
@@ -2493,7 +2246,6 @@ tavor_queue_alloc(tavor_state_t *state, tavor_qalloc_info_t *qa_info,
 		    qa_info->qa_buf_aligned + alloc_mask) & ~alloc_mask);
 	}
 
-	TAVOR_TNF_EXIT(tavor_queue_alloc);
 	return (DDI_SUCCESS);
 }
 
@@ -2505,8 +2257,6 @@ tavor_queue_alloc(tavor_state_t *state, tavor_qalloc_info_t *qa_info,
 void
 tavor_queue_free(tavor_state_t *state, tavor_qalloc_info_t *qa_info)
 {
-	TAVOR_TNF_ENTER(tavor_queue_free);
-
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*qa_info))
 
 	/*
@@ -2530,8 +2280,6 @@ tavor_queue_free(tavor_state_t *state, tavor_qalloc_info_t *qa_info)
 
 	/* Always free the dma handle */
 	ddi_dma_free_handle(&qa_info->qa_dmahdl);
-
-	TAVOR_TNF_EXIT(tavor_queue_free);
 }
 
 

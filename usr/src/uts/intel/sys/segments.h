@@ -3,6 +3,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_SYS_SEGMENTS_H
@@ -391,7 +392,7 @@ typedef struct gate_desc {
  */
 #if defined(__amd64)
 
-extern void set_usegd(user_desc_t *, uint_t, void *, size_t, uint_t, uint_t,
+extern void set_usegd(user_desc_t *, uint_t, void *, uint32_t, uint_t, uint_t,
     uint_t, uint_t);
 
 #elif defined(__i386)
@@ -434,6 +435,14 @@ void init_boot_gdt(user_desc_t *);
 #define	SDP_OP32	1	/* code and data default operand = 32 bits */
 #define	SDP_LONG	1	/* long mode code segment (64 bits) */
 #define	SDP_SHORT	0	/* compat/legacy code segment (32 bits) */
+
+/*
+ * The maximum segment limit that can be put into a segment descriptor for
+ * 16-bit and 32-bit segments.  In 64-bit mode, segment base addresses are
+ * fixed to 0 and the segment limit is ignored.
+ */
+#define	SDP_LIMIT_MAX	0xFFFFFU
+
 /*
  * System segments and gate types.
  *
@@ -529,6 +538,12 @@ void init_boot_gdt(user_desc_t *);
 #define	GDT_B64CODE	5	/* dboot 64 bit code descriptor */
 #define	GDT_BGSTMP	7	/* kmdb descriptor only used early in boot */
 #define	GDT_CPUID	16	/* store numeric id of current CPU */
+
+/*
+ * Early boot code may need to create a temporary GDT;
+ * this is the minimum length required.
+ */
+#define	LEN_MIN_GDT_BOOT	(GDT_B64CODE + 1)
 
 #if defined(__amd64)
 

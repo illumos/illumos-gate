@@ -292,8 +292,6 @@
 .if '\\$2'3socket' .ds ]D Sockets Library Functions
 .if '\\$2'3THR' .ds ]D Threads Library Functions
 .if '\\$2'3thr' .ds ]D Threads Library Functions
-.if '\\$2'3TNF' .ds ]D TNF Library Functions
-.if '\\$2'3tnf' .ds ]D TNF Library Functions
 .if '\\$2'3UCB' .ds ]D SunOS/BSD Compatibility Library Functions
 .if '\\$2'3ucb' .ds ]D SunOS/BSD Compatibility Library Functions
 .if '\\$2'3VOLMGT' .ds ]D Volume Management Library Functions

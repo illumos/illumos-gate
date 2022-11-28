@@ -206,7 +206,7 @@ int	getpmsg(int, struct strbuf *, struct strbuf *, int *, int *);
 int	putpmsg(int, struct strbuf *, struct strbuf *, int, int);
 int	memcntl(caddr_t, size_t, int, caddr_t, int, int);
 long	sysconfig(int);
-int	adjtime(struct timeval *, struct timeval *);
+int	adjtime(const struct timeval *, struct timeval *);
 long	systeminfo(int, char *, long);
 int	setegid(gid_t);
 int	seteuid(uid_t);

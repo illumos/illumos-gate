@@ -23,7 +23,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2008, 2010, Richard Lowe
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright (c) 2017 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
@@ -378,11 +378,11 @@ function bootstrap_tools {
 }
 
 #
-# Build and install the onbld tools.
+# Build and install the tools.
 #
 # usage: build_tools DESTROOT
 #
-# returns non-zero status if the build was successful.
+# returns zero status if the build was successful.
 #
 function build_tools {
 	DESTROOT=$1
@@ -1550,12 +1550,12 @@ fi
 
 if [[ "$t_FLAG" == "y" ]]; then
 	set_non_debug_build_flags
-	bootstrap_tools || fatal_error "Error: could not bootstrap tools"
-
 	# Switch ONBLD_TOOLS early if -t is specified so that
 	# we could use bootstrapped cw for compiler checks.
 	ONBLD_TOOLS=${TOOLS_PROTO}/opt/onbld
 	export ONBLD_TOOLS
+
+	bootstrap_tools || fatal_error "Error: could not bootstrap tools"
 fi
 
 echo "\n==== Build environment ====\n" | tee -a $build_environ_file >> $LOGFILE
@@ -1633,31 +1633,32 @@ if [[ "$t_FLAG" == "y" ]]; then
 	build_tools ${TOOLS_PROTO}
 	if (( $? != 0 )); then
 		build_ok=n
-	else
-		STABS=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/stabs
-		export STABS
-		CTFSTABS=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfstabs
-		export CTFSTABS
-		GENOFFSETS=${TOOLS_PROTO}/opt/onbld/bin/genoffsets
-		export GENOFFSETS
-
-		CTFCONVERT=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert
-		export CTFCONVERT
-		CTFMERGE=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge
-		export CTFMERGE
-
-		PATH="${TOOLS_PROTO}/opt/onbld/bin/${MACH}:${PATH}"
-		PATH="${TOOLS_PROTO}/opt/onbld/bin:${PATH}"
-		export PATH
-
-		echo "\n==== New environment settings. ====\n" >> $LOGFILE
-		echo "STABS=${STABS}" >> $LOGFILE
-		echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
-		echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
-		echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
-		echo "PATH=${PATH}" >> $LOGFILE
-		echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE
+		exit 1
 	fi
+
+	STABS=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/stabs
+	export STABS
+	CTFSTABS=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfstabs
+	export CTFSTABS
+	GENOFFSETS=${TOOLS_PROTO}/opt/onbld/bin/genoffsets
+	export GENOFFSETS
+
+	CTFCONVERT=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert
+	export CTFCONVERT
+	CTFMERGE=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge
+	export CTFMERGE
+
+	PATH="${TOOLS_PROTO}/opt/onbld/bin/${MACH}:${PATH}"
+	PATH="${TOOLS_PROTO}/opt/onbld/bin:${PATH}"
+	export PATH
+
+	echo "\n==== New environment settings. ====\n" >> $LOGFILE
+	echo "STABS=${STABS}" >> $LOGFILE
+	echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
+	echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
+	echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
+	echo "PATH=${PATH}" >> $LOGFILE
+	echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE
 fi
 
 # timestamp the start of the normal build; the findunref tool uses it.

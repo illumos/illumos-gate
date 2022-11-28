@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <sys/sdt.h>
@@ -513,14 +514,22 @@ smb_common_write(smb_request_t *sr, smb_rw_param_t *param)
 
 		rc = smb_fsop_write(sr, sr->user_cr, node, ofile,
 		    &param->rw_vdb.vdb_uio, &lcount, stability);
-
 		if (rc)
 			return (rc);
-
+		param->rw_count = lcount;
 		/* This revokes read cache delegations. */
 		(void) smb_oplock_break_WRITE(node, ofile);
-
-		param->rw_count = lcount;
+		/*
+		 * Don't want the performance cost of generating
+		 * change notify events on every write.  Instead:
+		 * Keep track of the fact that we have written
+		 * data via this handle, and do change notify
+		 * work on the first write, and during close.
+		 */
+		if (ofile->f_written == B_FALSE) {
+			ofile->f_written = B_TRUE;
+			smb_node_notify_modified(node);
+		}
 		break;
 
 	case STYPE_IPC:

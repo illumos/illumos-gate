@@ -1,0 +1,38 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2022 Tintri by DDN, Inc.  All rights reserved.
+
+set name=pkg.fmri value=pkg:/system/test/smbsrvtest@$(PKGVERS)
+set name=pkg.summary value="SMB Server Functional Tests"
+set name=pkg.description value="SMB Server Test Suite"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir  path=opt/smbsrv-tests
+file path=opt/smbsrv-tests/README mode=0444
+dir  path=opt/smbsrv-tests/bin
+file path=opt/smbsrv-tests/bin/run_smbtorture mode=0555
+file path=opt/smbsrv-tests/bin/smbsrvtests mode=0555
+dir  path=opt/smbsrv-tests/include
+file path=opt/smbsrv-tests/include/default.cfg mode=0444
+file path=opt/smbsrv-tests/include/smbtor-excl-rpc.txt mode=0444
+file path=opt/smbsrv-tests/include/smbtor-excl-smb2.txt mode=0444
+dir  path=opt/smbsrv-tests/tests
+dir  path=opt/smbsrv-tests/tests/smb_sid
+file path=opt/smbsrv-tests/tests/smb_sid/large_sids_kern mode=0555
+file path=opt/smbsrv-tests/tests/smb_sid/large_sids_lib mode=0555
+dir  path=opt/smbsrv-tests/tests/smbtorture
+file path=opt/smbsrv-tests/tests/smbtorture/runst-rpc mode=0555
+file path=opt/smbsrv-tests/tests/smbtorture/runst-smb2 mode=0555
+license lic_CDDL license=lic_CDDL
+depend type=optional fmri=service/network/samba
+depend type=require fmri=runtime/python$(PYTHON3_PKGVERS)

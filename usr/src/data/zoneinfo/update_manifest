@@ -30,6 +30,21 @@ if [[ ! -f "$MANIFEST" ]]; then
 	exit 1
 fi
 
+function find_cmd {
+	typeset cmd="$1"
+	typeset var=$(echo $cmd | tr '[:lower:]' '[:upper:]')
+	typeset -n path="$var"
+	path=$(whence -fp "$cmd")
+	if (($? != 0)) || [ ! -x "$path" ]; then
+		echo "Cannot find executable '$cmd' in PATH"
+		exit 1
+	fi
+}
+
+# This script uses a few commands which are not part of illumos and are
+# expected to be available in the path.
+find_cmd pkgfmt
+
 typeset -A links
 typeset -A targets
 for f in "$@"; do
@@ -69,7 +84,7 @@ trap 'rm -f $tmpf1 $tmpf2' EXIT
 [[ -n "$tmpf2" && -f "$tmpf2" ]]
 
 cp $MANIFEST $tmpf1
-pkgfmt -u $tmpf1
+$PKGFMT -u $tmpf1
 
 echo "+++ Removing existing hardlinks from manifest"
 egrep -v "^hardlink " $tmpf1 > $tmpf2
@@ -92,7 +107,7 @@ echo "+++ Adding new entries to manifest"
 } >> $tmpf1
 
 echo "+++ Formatting manifest"
-pkgfmt -fv2 $tmpf1
+$PKGFMT -fv2 $tmpf1
 
 mv $tmpf1 $MANIFEST
 

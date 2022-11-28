@@ -192,8 +192,10 @@ fast_crc32(void *buf, int len, uint32_t crcval)
 static void
 rfb_send_client_status(rfb_client_t *c, uint32_t status, const char *msg)
 {
-	status = htonl(status);
+	rfb_printf(c, RFB_LOGDEBUG, "sending client status %u (%s)",
+	    status, msg ? msg : "NULL");
 
+	status = htonl(status);
 	(void) stream_write(c->rc_fd, &status, sizeof (status));
 
 	if (msg != NULL && status != 0 && c->rc_cver == RFB_CVER_3_8) {
@@ -213,7 +215,7 @@ rfb_handshake_version(rfb_client_t *c)
 	unsigned char buf[RFB_VERSION_LEN];
 	ssize_t l;
 
-	rfb_printf(c, RFB_LOGDEBUG,  "handshake version");
+	rfb_printf(c, RFB_LOGDEBUG, "handshake version");
 
 	if (stream_write(c->rc_fd, RFB_VERSION, RFB_VERSION_LEN) !=
 	    RFB_VERSION_LEN) {
@@ -367,12 +369,19 @@ rfb_handshake_auth(rfb_client_t *c)
 
 	/* Initialize a 16-byte random challenge. */
 	arc4random_buf(challenge, sizeof (challenge));
-	(void) stream_write(c->rc_fd, challenge, RFBP_SECURITY_VNC_AUTH_LEN);
+
+	/* Send the challenge to the client. */
+	if (stream_write(c->rc_fd, challenge, RFBP_SECURITY_VNC_AUTH_LEN)
+	    != RFBP_SECURITY_VNC_AUTH_LEN) {
+		rfb_printf(c, RFB_LOGERR,
+		    "failed to send challenge to client");
+		return (false);
+	}
 
 	/* Receive the 16-byte challenge response. */
 	if (stream_read(c->rc_fd, buf, RFBP_SECURITY_VNC_AUTH_LEN)
 	    != RFBP_SECURITY_VNC_AUTH_LEN) {
-		rfb_send_client_status(c, 1, "response read failed");
+		rfb_send_client_status(c, 1, "Challenge response read failed");
 		return (false);
 	}
 
@@ -1215,8 +1224,10 @@ rfb_client_tx_thread(void *arg)
 	c->rc_sinfo.rsi_pixfmt = c->rc_s->rs_pixfmt;
 	c->rc_encodings = RFB_ENCODING_RAW;
 
-	if (!rfb_handshake(c))
+	if (!rfb_handshake(c)) {
+		rfb_printf(c, RFB_LOGWARN, "handshake failure");
 		goto out;
+	}
 
 	c->rc_cells = howmany(RFB_MAX_WIDTH * RFB_MAX_HEIGHT, RFB_PIX_PER_CELL);
 	if ((c->rc_crc = calloc(c->rc_cells, sizeof (uint32_t))) == NULL ||
@@ -1274,9 +1285,9 @@ rfb_client_tx_thread(void *arg)
 		}
 	}
 
-	rfb_printf(c, RFB_LOGWARN, "disconnected");
-
 out:
+
+	rfb_printf(c, RFB_LOGWARN, "disconnected");
 
 	(void) pthread_join(c->rc_rx_tid, &status);
 	pthread_mutex_lock(&s->rs_clientlock);

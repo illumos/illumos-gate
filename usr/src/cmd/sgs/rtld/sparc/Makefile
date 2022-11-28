@@ -25,7 +25,7 @@
 #
 
 # Object lists are organized into primary (most frequently used code) and
-# secondary lists (less frequently used code, ie. a.out support).
+# secondary lists (less frequently used code)
 
 P_COMOBJS=	debugdata.o \
 		analyze.o	elf.o		external.o	globals.o \
@@ -33,8 +33,7 @@ P_COMOBJS=	debugdata.o \
 		dlfcns.o	config_elf.o	locale.o	tsort.o \
 		remove.o	move.o		tls.o		cap.o
 
-S_COMOBJS=	debug.o		audit.o		object.o	cache_a.out.o \
-		a.out.o
+S_COMOBJS=	debug.o		audit.o		object.o
 
 G_MACHOBJS=	doreloc.o
 
@@ -42,11 +41,7 @@ P_MACHOBJS=	sparc_elf.o	_setup.o
 
 CP_MACHOBJS=	common_sparc.o
 
-S_MACHOBJS=	sparc_a.out.o
-
 P_ASOBJS=	boot.o		boot_elf.o	caller.o
-
-S_ASOBJS=	boot_a.out.o
 
 CRTSRCS=	../../../../lib/crt/sparc
 CRTI=		pics/crti.o
@@ -65,9 +60,9 @@ $(__GNUC)MAPFILE-ORDER =	../common/mapfile-order-gcc
 
 include		$(SRC)/cmd/sgs/rtld/Makefile.com
 
-# Add any a.out and machine specific flags.
+# Add any machine specific flags.
 
-CPPFLAGS +=	-I../../../../uts/sparc/krtld -DA_OUT
+CPPFLAGS +=	-I../../../../uts/sparc/krtld
 CFLAGS +=	-xregs=no%appl
 ASFLAGS +=	$(AS_PICFLAGS)
 ADBGENCFLAGS +=	-erroff=%all

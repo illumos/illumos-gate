@@ -28,6 +28,8 @@ SUBDIRS =       \
 		libtopo \
 		pf_key \
 		poll \
+		portfs \
+		regression \
 		sdevfs \
 		secflags \
 		sigqueue \

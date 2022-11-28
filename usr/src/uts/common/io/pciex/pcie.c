@@ -609,12 +609,6 @@ uint32_t pcie_link_retrain_delay_ms = 10;
 taskq_t *pcie_link_tq;
 kmutex_t pcie_link_tq_mutex;
 
-static void pcie_scan_mps(dev_info_t *rc_dip, dev_info_t *dip,
-	int *max_supported);
-static int pcie_get_max_supported(dev_info_t *dip, void *arg);
-static int pcie_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
-    caddr_t *addrp, ddi_acc_handle_t *handlep);
-static void pcie_unmap_phys(ddi_acc_handle_t *handlep,	pci_regspec_t *ph);
 static int pcie_link_bw_intr(dev_info_t *);
 static void pcie_capture_speeds(dev_info_t *);
 
@@ -1538,6 +1532,10 @@ pcie_speed_to_int(pcie_link_speed_t speed)
 		return (8000000000LL);
 	case PCIE_LINK_SPEED_16:
 		return (16000000000LL);
+	case PCIE_LINK_SPEED_32:
+		return (32000000000LL);
+	case PCIE_LINK_SPEED_64:
+		return (64000000000LL);
 	default:
 		return (0);
 	}
@@ -1585,7 +1583,7 @@ pcie_speeds_to_devinfo(dev_info_t *dip, pcie_bus_t *bus_p)
 	}
 
 	if (bus_p->bus_sup_speed != PCIE_LINK_SPEED_UNKNOWN) {
-		int64_t speeds[4];
+		int64_t speeds[PCIE_NSPEEDS];
 		uint_t nspeeds = 0;
 
 		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_2_5) {
@@ -1606,6 +1604,16 @@ pcie_speeds_to_devinfo(dev_info_t *dip, pcie_bus_t *bus_p)
 		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_16) {
 			speeds[nspeeds++] =
 			    pcie_speed_to_int(PCIE_LINK_SPEED_16);
+		}
+
+		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_32) {
+			speeds[nspeeds++] =
+			    pcie_speed_to_int(PCIE_LINK_SPEED_32);
+		}
+
+		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_64) {
+			speeds[nspeeds++] =
+			    pcie_speed_to_int(PCIE_LINK_SPEED_64);
 		}
 
 		(void) ndi_prop_update_int64_array(DDI_DEV_T_NONE, dip,
@@ -1706,6 +1714,12 @@ pcie_capture_speeds(dev_info_t *dip)
 	case PCIE_LINKSTS_SPEED_16:
 		bus_p->bus_cur_speed = PCIE_LINK_SPEED_16;
 		break;
+	case PCIE_LINKSTS_SPEED_32:
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_32;
+		break;
+	case PCIE_LINKSTS_SPEED_64:
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_64;
+		break;
 	default:
 		bus_p->bus_cur_speed = PCIE_LINK_SPEED_UNKNOWN;
 		break;
@@ -1782,6 +1796,10 @@ pcie_capture_speeds(dev_info_t *dip)
 			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_8;
 		if (cap2 & PCIE_LINKCAP2_SPEED_16)
 			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_16;
+		if (cap2 & PCIE_LINKCAP2_SPEED_32)
+			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_32;
+		if (cap2 & PCIE_LINKCAP2_SPEED_64)
+			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_64;
 
 		switch (cap & PCIE_LINKCAP_MAX_SPEED_MASK) {
 		case PCIE_LINKCAP_MAX_SPEED_2_5:
@@ -1795,6 +1813,12 @@ pcie_capture_speeds(dev_info_t *dip)
 			break;
 		case PCIE_LINKCAP_MAX_SPEED_16:
 			bus_p->bus_max_speed = PCIE_LINK_SPEED_16;
+			break;
+		case PCIE_LINKCAP_MAX_SPEED_32:
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_32;
+			break;
+		case PCIE_LINKCAP_MAX_SPEED_64:
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_64;
 			break;
 		default:
 			bus_p->bus_max_speed = PCIE_LINK_SPEED_UNKNOWN;
@@ -1823,6 +1847,12 @@ pcie_capture_speeds(dev_info_t *dip)
 		break;
 	case PCIE_LINKCTL2_TARGET_SPEED_16:
 		bus_p->bus_target_speed = PCIE_LINK_SPEED_16;
+		break;
+	case PCIE_LINKCTL2_TARGET_SPEED_32:
+		bus_p->bus_target_speed = PCIE_LINK_SPEED_32;
+		break;
+	case PCIE_LINKCTL2_TARGET_SPEED_64:
+		bus_p->bus_target_speed = PCIE_LINK_SPEED_64;
 		break;
 	default:
 		bus_p->bus_target_speed = PCIE_LINK_SPEED_UNKNOWN;
@@ -2774,79 +2804,6 @@ pcie_dev(dev_info_t *dip)
 	return (rc);
 }
 
-/*
- * Function to map in a device's memory space.
- */
-static int
-pcie_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
-    caddr_t *addrp, ddi_acc_handle_t *handlep)
-{
-	ddi_map_req_t mr;
-	ddi_acc_hdl_t *hp;
-	int result;
-	ddi_device_acc_attr_t attr;
-
-	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
-	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
-	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
-	attr.devacc_attr_access = DDI_CAUTIOUS_ACC;
-
-	*handlep = impl_acc_hdl_alloc(KM_SLEEP, NULL);
-	hp = impl_acc_hdl_get(*handlep);
-	hp->ah_vers = VERS_ACCHDL;
-	hp->ah_dip = dip;
-	hp->ah_rnumber = 0;
-	hp->ah_offset = 0;
-	hp->ah_len = 0;
-	hp->ah_acc = attr;
-
-	mr.map_op = DDI_MO_MAP_LOCKED;
-	mr.map_type = DDI_MT_REGSPEC;
-	mr.map_obj.rp = (struct regspec *)phys_spec;
-	mr.map_prot = PROT_READ | PROT_WRITE;
-	mr.map_flags = DDI_MF_KERNEL_MAPPING;
-	mr.map_handlep = hp;
-	mr.map_vers = DDI_MAP_VERSION;
-
-	result = ddi_map(dip, &mr, 0, 0, addrp);
-
-	if (result != DDI_SUCCESS) {
-		impl_acc_hdl_free(*handlep);
-		*handlep = (ddi_acc_handle_t)NULL;
-	} else {
-		hp->ah_addr = *addrp;
-	}
-
-	return (result);
-}
-
-/*
- * Map out memory that was mapped in with pcie_map_phys();
- */
-static void
-pcie_unmap_phys(ddi_acc_handle_t *handlep,  pci_regspec_t *ph)
-{
-	ddi_map_req_t mr;
-	ddi_acc_hdl_t *hp;
-
-	hp = impl_acc_hdl_get(*handlep);
-	ASSERT(hp);
-
-	mr.map_op = DDI_MO_UNMAP;
-	mr.map_type = DDI_MT_REGSPEC;
-	mr.map_obj.rp = (struct regspec *)ph;
-	mr.map_prot = PROT_READ | PROT_WRITE;
-	mr.map_flags = DDI_MF_KERNEL_MAPPING;
-	mr.map_handlep = hp;
-	mr.map_vers = DDI_MAP_VERSION;
-
-	(void) ddi_map(hp->ah_dip, &mr, hp->ah_offset,
-	    hp->ah_len, &hp->ah_addr);
-
-	impl_acc_hdl_free(*handlep);
-	*handlep = (ddi_acc_handle_t)NULL;
-}
-
 void
 pcie_set_rber_fatal(dev_info_t *dip, boolean_t val)
 {
@@ -3399,6 +3356,10 @@ pcie_link_set_target(dev_info_t *dip, pcie_link_speed_t speed)
 		return (ENOTSUP);
 	}
 
+	if (bus_p->bus_pcie_vers < 2) {
+		return (ENOTSUP);
+	}
+
 	switch (speed) {
 	case PCIE_LINK_SPEED_2_5:
 		rval = PCIE_LINKCTL2_TARGET_SPEED_2_5;
@@ -3412,11 +3373,22 @@ pcie_link_set_target(dev_info_t *dip, pcie_link_speed_t speed)
 	case PCIE_LINK_SPEED_16:
 		rval = PCIE_LINKCTL2_TARGET_SPEED_16;
 		break;
+	case PCIE_LINK_SPEED_32:
+		rval = PCIE_LINKCTL2_TARGET_SPEED_32;
+		break;
+	case PCIE_LINK_SPEED_64:
+		rval = PCIE_LINKCTL2_TARGET_SPEED_64;
+		break;
 	default:
 		return (EINVAL);
 	}
 
 	mutex_enter(&bus_p->bus_speed_mutex);
+	if ((bus_p->bus_sup_speed & speed) == 0) {
+		mutex_exit(&bus_p->bus_speed_mutex);
+		return (ENOTSUP);
+	}
+
 	bus_p->bus_target_speed = speed;
 	bus_p->bus_speed_flags |= PCIE_LINK_F_ADMIN_TARGET;
 
@@ -3534,6 +3506,21 @@ pcie_fabric_feature_scan(dev_info_t *dip, void *arg)
 		fab->pfd_flags |= PCIE_FABRIC_F_COMPLEX;
 		return (DDI_WALK_TERMINATE);
 	}
+
+	/*
+	 * In a similar case, there is hardware out there which is a PCIe
+	 * device, but does not advertise a PCIe capability. An example of this
+	 * is the IDT Tsi382A which can hide its PCIe capability. If this is
+	 * the case, we immediately terminate scanning and flag this as a
+	 * 'complex' case which causes us to use guaranteed safe settings.
+	 */
+	if (bus_p->bus_pcie_off == 0) {
+		dev_err(dip, CE_WARN, "encountered PCIe device without PCIe "
+		    "capability");
+		fab->pfd_flags |= PCIE_FABRIC_F_COMPLEX;
+		return (DDI_WALK_TERMINATE);
+	}
+
 	rcdip = pcie_get_rc_dip(dip);
 
 	/*
@@ -3635,10 +3622,11 @@ pcie_fabric_feature_set(dev_info_t *dip, void *arg)
 	/*
 	 * The missing bus_t sent us into the complex case previously. We still
 	 * need to make sure all devices have values we expect here and thus
-	 * don't terminate like the above.
+	 * don't terminate like the above. The same is true for the case where
+	 * there is no PCIe capability.
 	 */
 	bus_p = PCIE_DIP2BUS(dip);
-	if (bus_p == NULL) {
+	if (bus_p == NULL || bus_p->bus_pcie_off == 0) {
 		return (DDI_WALK_CONTINUE);
 	}
 	rcdip = pcie_get_rc_dip(dip);

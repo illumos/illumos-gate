@@ -292,11 +292,6 @@ typedef struct	proc {
 	char			p_unref_thread;	/* unref thread created */
 
 	/*
-	 * Kernel probes
-	 */
-	uchar_t			p_tnf_flags;
-
-	/*
 	 * Solaris Audit
 	 */
 	struct p_audit_data	*p_audit_data; /* per process audit structure */

@@ -32,6 +32,7 @@
  * Copyright (c) 2017, Intel Corporation.
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -5478,6 +5479,21 @@ spa_import_rootpool(char *devpath, char *devid, uint64_t pool_guid,
 	char *pname;
 	int error;
 	const char *altdevpath = NULL;
+	const char *rdpath = NULL;
+
+	if ((rdpath = vdev_disk_preroot_force_path()) != NULL) {
+		/*
+		 * We expect to import a single-vdev pool from a specific
+		 * device such as a ramdisk device.  We don't care what the
+		 * pool label says.
+		 */
+		config = spa_generate_rootconf(rdpath, NULL, &guid, 0);
+		if (config != NULL) {
+			goto configok;
+		}
+		cmn_err(CE_NOTE, "Cannot use root disk device '%s'", rdpath);
+		return (SET_ERROR(EIO));
+	}
 
 	/*
 	 * Read the label from the boot device and generate a configuration.
@@ -5520,6 +5536,7 @@ spa_import_rootpool(char *devpath, char *devid, uint64_t pool_guid,
 		return (SET_ERROR(EIO));
 	}
 
+configok:
 	VERIFY(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
 	    &pname) == 0);
 	VERIFY(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG, &txg) == 0);
@@ -5592,6 +5609,12 @@ spa_import_rootpool(char *devpath, char *devid, uint64_t pool_guid,
 		error = SET_ERROR(EINVAL);
 		goto out;
 	}
+
+	/*
+	 * The root disk may have been expanded while the system was offline.
+	 * Kick off an async task to check for and handle expansion.
+	 */
+	spa_async_request(spa, SPA_ASYNC_AUTOEXPAND);
 
 	error = 0;
 out:
@@ -7517,8 +7540,6 @@ spa_async_probe(spa_t *spa, vdev_t *vd)
 static void
 spa_async_autoexpand(spa_t *spa, vdev_t *vd)
 {
-	sysevent_id_t eid;
-	nvlist_t *attr;
 	char *physpath;
 
 	if (!spa->spa_autoexpand)
@@ -7535,13 +7556,8 @@ spa_async_autoexpand(spa_t *spa, vdev_t *vd)
 	physpath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 	(void) snprintf(physpath, MAXPATHLEN, "/devices%s", vd->vdev_physpath);
 
-	VERIFY(nvlist_alloc(&attr, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-	VERIFY(nvlist_add_string(attr, DEV_PHYS_PATH, physpath) == 0);
+	zfs_post_dle_sysevent(physpath);
 
-	(void) ddi_log_sysevent(zfs_dip, SUNW_VENDOR, EC_DEV_STATUS,
-	    ESC_DEV_DLE, attr, &eid, DDI_SLEEP);
-
-	nvlist_free(attr);
 	kmem_free(physpath, MAXPATHLEN);
 }
 

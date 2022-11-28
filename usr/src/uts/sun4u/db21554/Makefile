@@ -54,9 +54,6 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-# Turn this on once compiler understands v9 in it's backend
-#INLINES		+= $(UTSBASE)/sun4u/io/pci.il
-
 #
 # Turn on doubleword alignment for 64 bit registers
 #

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -122,7 +122,7 @@ smb_set_eof_info(smb_request_t *sr, smb_setinfo_t *si)
 	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 		if (sr->session->dialect >= SMB_VERS_2_BASE)
 			(void) smb2sr_go_async(sr);
-		(void) smb_oplock_wait_break(node, 0);
+		(void) smb_oplock_wait_break(sr, node, 0);
 		status = 0;
 	}
 	if (status != 0)
@@ -164,7 +164,7 @@ smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *si)
 	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 		if (sr->session->dialect >= SMB_VERS_2_BASE)
 			(void) smb2sr_go_async(sr);
-		(void) smb_oplock_wait_break(node, 0);
+		(void) smb_oplock_wait_break(sr, node, 0);
 		status = 0;
 	}
 	if (status != 0)
@@ -245,7 +245,7 @@ smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *si)
 	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 		if (sr->session->dialect >= SMB_VERS_2_BASE)
 			(void) smb2sr_go_async(sr);
-		(void) smb_oplock_wait_break(node, 0);
+		(void) smb_oplock_wait_break(sr, node, 0);
 		status = 0;
 	}
 	if (status != 0)

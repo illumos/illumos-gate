@@ -56,7 +56,7 @@ LD_LIBRARY_PATH=$ROOT/usr/lib/smbsrv:$ROOT/usr/lib:$ROOT/lib
 export LD_LIBRARY_PATH
 
 # Enable everything, for debugging
-export SMB_MAX_PROTOCOL=300
+export SMB_MAX_PROTOCOL=311
 export SMB_SIGNING=require
 
 # normally runs with cwd=/ but this is more careful

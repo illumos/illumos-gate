@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  *	nftw - new file tree walk
@@ -366,7 +364,7 @@ walk(char *component,
 	this.inode = statb.st_ino;
 	oldbase = vp->state.base;
 	vp->state.base = (int)(component - vp->tmppath);
-	while (dir = readdir(this.fd)) {
+	while ((dir = readdir(this.fd)) != NULL) {
 		if (dir->d_ino == 0)
 			continue;
 		q = dir->d_name;
@@ -608,9 +606,9 @@ done:
 /*
  * Get stat info on path when FTW_CHDIR is set.
  */
-/*ARGSUSED1*/
 static int
-cdstat(const char *path, struct stat *statp, struct Save *lp, int flags)
+cdstat(const char *path, struct stat *statp, struct Save *lp __unused,
+    int flags)
 {
 	return (fstatat(AT_FDCWD, path, statp, flags));
 }
@@ -618,9 +616,9 @@ cdstat(const char *path, struct stat *statp, struct Save *lp, int flags)
 /*
  * Get lstat info on path when FTW_CHDIR is set.
  */
-/*ARGSUSED1*/
 static int
-cdlstat(const char *path, struct stat *statp, struct Save *lp, int flags)
+cdlstat(const char *path, struct stat *statp, struct Save *lp __unused,
+    int flags)
 {
 	return (fstatat(AT_FDCWD, path, statp,
 	    flags | AT_SYMLINK_NOFOLLOW));

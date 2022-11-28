@@ -23,6 +23,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2022 Oxide Computer Company
+#
 
 @ _START_
 
@@ -76,6 +78,7 @@
 @ MSG_DESC_HW1		"Hardware capabilities (CA_SUNW_HW_1) bit values"
 @ MSG_DESC_SF1		"Software capabilities (CA_SUNW_SF_1) bit values"
 @ MSG_DESC_HW2		"Hardware capabilities (CA_SUNW_HW_2) bit values"
+@ MSG_DESC_HW3		"Hardware capabilities (CA_SUNW_HW_3) bit values"
 
 
 # Command option description strings
@@ -160,9 +163,14 @@
    /usr/include/sys/elf.h.\n"
 
 @ MSG_A1_HW2_VALUE	"\
-   Hardware capability (CA_SUNW_HW_2) values. This is available for\n\
-   future expansion.\n"
+   Hardware capability (CA_SUNW_HW_2) values. This can be an integer\n\
+   value, any of the AV_386_2_ symbolic constants defined in\n\
+   /usr/include/sys/auxv_386.h.\n"
 
+@ MSG_A1_HW3_VALUE	"\
+   Hardware capability (CA_SUNW_HW_3) values. This can be an integer\n\
+   value, any of the AV_386_3_ symbolic constants defined in\n\
+   /usr/include/sys/auxv_386.h.\n"
 
 # Help strings
 
@@ -266,6 +274,26 @@
    \tspecified, the new value is OR'd against the existing\n\
    \tvalue. If neither -and or -or are specified, the new value\n\
    \treplaces the existing value.\n"
+
+@ MSG_HELP_HW3	"   \
+   The cap:hw3 command is used to display or alter the\n\
+   value of the hardware capabilities element (CA_SUNW_HW_3).\n\
+   \n\
+   If cap:hw3 is called without arguments, the current\n\
+   value is shown. If one or more value arguments are present,\n\
+   the following steps are taken:\n\
+   \n   \
+   o\tAll the value arguments are OR'd together.\n\
+   \n   \
+   o\tIf the -cmp option has been specified, the new value\n\
+   \tis complemented.\n\
+   \n   \
+   o\tThe CA_SUNW_HW_3 element of the capabilities section is\n\
+   \tupdated with the new value. If -and is specified, the new\n\
+   \tvalue is AND'd against the existing value. If -or is\n\
+   \tspecified, the new value is OR'd against the existing\n\
+   \tvalue. If neither -and or -or are specified, the new value\n\
+   \treplaces the existing value.\n"
 @ _END_
 
 
@@ -306,3 +334,4 @@
 @ MSG_CMD_HW1		"hw1"
 @ MSG_CMD_SF1		"sf1"
 @ MSG_CMD_HW2		"hw2"
+@ MSG_CMD_HW3		"hw3"

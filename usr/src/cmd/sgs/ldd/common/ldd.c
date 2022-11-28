@@ -120,7 +120,6 @@
 #include	"machdep.h"
 #include	"sgs.h"
 #include	"conv.h"
-#include	"a.out.h"
 #include	"msg.h"
 
 static int	elf_check(int, char *, char *, Elf *, int);
@@ -161,16 +160,6 @@ main(int argc, char **argv, char **envp)
 	int	Dflag = 0, pflag = 0, vflag = 0, wflag = 0;
 	int	nfile, var, error = 0;
 	Aliste	idx;
-
-	/*
-	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of
-	 * the binary.  If successful, conv_check_native() won't return.
-	 *
-	 * This is done to ensure that ldd can handle objects >2GB.
-	 * ldd uses libelf, which is not large file capable. The
-	 * 64-bit ldd can handle any sized object.
-	 */
-	(void) conv_check_native(argv, envp);
 
 	/*
 	 * Establish locale.

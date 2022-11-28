@@ -40,6 +40,8 @@ typedef enum pcieadm_show_devs_otype {
 	PCIEADM_SDO_BDF_DEV,
 	PCIEADM_SDO_BDF_FUNC,
 	PCIEADM_SDO_DRIVER,
+	PCIEADM_SDO_INSTANCE,
+	PCIEADM_SDO_INSTNUM,
 	PCIEADM_SDO_TYPE,
 	PCIEADM_SDO_VENDOR,
 	PCIEADM_SDO_DEVICE,
@@ -135,11 +137,26 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 			return (B_FALSE);
 		}
 		break;
-	case PCIEADM_SDO_DRIVER:
+	case PCIEADM_SDO_INSTANCE:
 		if (psdo->psdo_driver == NULL || psdo->psdo_instance == -1) {
 			(void) snprintf(buf, buflen, "--");
 		} else if (snprintf(buf, buflen, "%s%d", psdo->psdo_driver,
 		    psdo->psdo_instance) >= buflen) {
+			return (B_FALSE);
+		}
+		break;
+	case PCIEADM_SDO_DRIVER:
+		if (psdo->psdo_driver == NULL) {
+			(void) snprintf(buf, buflen, "--");
+		} else if (strlcpy(buf, psdo->psdo_driver, buflen) >= buflen) {
+			return (B_FALSE);
+		}
+		break;
+	case PCIEADM_SDO_INSTNUM:
+		if (psdo->psdo_instance == -1) {
+			(void) snprintf(buf, buflen, "--");
+		} else if (snprintf(buf, buflen, "%d", psdo->psdo_instance) >=
+		    buflen) {
 			return (B_FALSE);
 		}
 		break;
@@ -248,7 +265,7 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 	return (B_TRUE);
 }
 
-static const char *pcieadm_show_dev_fields = "bdf,type,driver,device";
+static const char *pcieadm_show_dev_fields = "bdf,type,instance,device";
 static const char *pcieadm_show_dev_speeds =
 	"bdf,driver,maxspeed,curspeed,maxwidth,curwidth,supspeeds";
 static const ofmt_field_t pcieadm_show_dev_ofmt[] = {
@@ -256,6 +273,8 @@ static const ofmt_field_t pcieadm_show_dev_ofmt[] = {
 	{ "DID", 6, PCIEADM_SDO_DID, pcieadm_show_devs_ofmt_cb },
 	{ "BDF", 8, PCIEADM_SDO_BDF, pcieadm_show_devs_ofmt_cb },
 	{ "DRIVER", 15, PCIEADM_SDO_DRIVER, pcieadm_show_devs_ofmt_cb },
+	{ "INSTANCE", 15, PCIEADM_SDO_INSTANCE, pcieadm_show_devs_ofmt_cb },
+	{ "INSTNUM", 8, PCIEADM_SDO_INSTNUM, pcieadm_show_devs_ofmt_cb },
 	{ "TYPE", 15, PCIEADM_SDO_TYPE, pcieadm_show_devs_ofmt_cb },
 	{ "VENDOR", 30, PCIEADM_SDO_VENDOR, pcieadm_show_devs_ofmt_cb },
 	{ "DEVICE", 30, PCIEADM_SDO_DEVICE, pcieadm_show_devs_ofmt_cb },
@@ -487,8 +506,26 @@ pcieadm_show_devs_help(const char *fmt, ...)
 	    "\t-H\t\tomit the column header\n"
 	    "\t-o field\toutput fields to print\n"
 	    "\t-p\t\tparsable output (requires -o)\n"
-	    "\t-s\t\tlist speeds and widths\n");
-
+	    "\t-s\t\tlist speeds and widths\n\n"
+	    "The following fields are supported:\n"
+	    "\tvid\t\tthe PCI vendor ID in hex\n"
+	    "\tdid\t\tthe PCI device ID in hex\n"
+	    "\tvendor\t\tthe name of the PCI vendor\n"
+	    "\tdevice\t\tthe name of the PCI device\n"
+	    "\tinstance\tthe name of this particular instance, e.g. igb0\n"
+	    "\tdriver\t\tthe name of the driver attached to the device\n"
+	    "\tinstnum\t\tthe instance number of a device, e.g. 2 for nvme2\n"
+	    "\tpath\t\tthe /devices path of the device\n"
+	    "\tbdf\t\tthe PCI bus/device/function, with values in hex\n"
+	    "\tbus\t\tthe PCI bus number of the device in hex\n"
+	    "\tdev\t\tthe PCI device number of the device in hex\n"
+	    "\tfunc\t\tthe PCI function number of the device in hex\n"
+	    "\ttype\t\ta string describing the PCIe generation and width\n"
+	    "\tmaxspeed\tthe maximum supported PCIe speed of the device\n"
+	    "\tcurspeed\tthe current PCIe speed of the device\n"
+	    "\tmaxwidth\tthe maximum supported PCIe lane count of the device\n"
+	    "\tcurwidth\tthe current lane count of the PCIe device\n"
+	    "\tsupspeeds\tthe list of speeds the device supports\n");
 }
 
 int

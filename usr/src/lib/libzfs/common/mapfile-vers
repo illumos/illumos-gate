@@ -279,6 +279,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_vdev_name;
 	zpool_vdev_offline;
 	zpool_vdev_online;
+	zpool_vdev_refresh_path;
 	zpool_vdev_remove;
 	zpool_vdev_remove_cancel;
 	zpool_vdev_split;

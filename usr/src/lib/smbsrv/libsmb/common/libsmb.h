@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef	_LIBSMB_H
@@ -163,6 +163,7 @@ typedef enum {
 	SMB_CI_BYPASS_TRAVERSE_CHECKING,
 	SMB_CI_ENCRYPT_CIPHER,
 	SMB_CI_NETLOGON_FLAGS,
+	SMB_CI_SHORT_NAMES,
 
 	SMB_CI_MAX
 } smb_cfg_id_t;
@@ -220,9 +221,9 @@ extern void smb_config_get_version(smb_version_t *);
 uint32_t smb_config_get_execinfo(char *, char *, size_t);
 extern void smb_config_get_negtok(uchar_t *, uint32_t *);
 
-extern int smb_config_check_protocol(char *);
 extern uint32_t smb_config_get_max_protocol(void);
 extern uint32_t smb_config_get_min_protocol(void);
+extern uint32_t smb_convert_version_str(const char *);
 extern void smb_config_upgrade(void);
 extern uint16_t smb31_config_get_encrypt_cipher(void);
 
@@ -241,10 +242,11 @@ extern void smb_update_netlogon_seqnum(void);
 
 /* See also: smb_joininfo_xdr() */
 typedef struct smb_joininfo {
+	uint32_t mode;
 	char domain_name[MAXHOSTNAMELEN];
+	char container_name[MAXHOSTNAMELEN];
 	char domain_username[SMB_USERNAME_MAXLEN + 1];
 	char domain_passwd[SMB_PASSWD_MAXLEN + 1];
-	uint32_t mode;
 } smb_joininfo_t;
 
 /* See also: smb_joinres_xdr() */

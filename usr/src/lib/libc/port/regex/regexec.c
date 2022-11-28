@@ -50,14 +50,10 @@
 #include <regex.h>
 #include <wchar.h>
 #include <wctype.h>
-#include <note.h>
 #include <assert.h>
 
 #include "utils.h"
 #include "regex2.h"
-
-/* we want _NOTE, but not NOTE (which collides with our own use) */
-#undef	NOTE
 
 static size_t
 xmbrtowc(wint_t *wi, const char *s, size_t n, mbstate_t *mbs, wint_t dummy)
@@ -80,13 +76,9 @@ xmbrtowc(wint_t *wi, const char *s, size_t n, mbstate_t *mbs, wint_t dummy)
 }
 
 static size_t
-xmbrtowc_dummy(wint_t *wi, const char *s, size_t n, mbstate_t *mbs,
-    wint_t dummy)
+xmbrtowc_dummy(wint_t *wi, const char *s, size_t n __unused,
+    mbstate_t *mbs __unused, wint_t dummy __unused)
 {
-	_NOTE(ARGUNUSED(n));
-	_NOTE(ARGUNUSED(mbs));
-	_NOTE(ARGUNUSED(dummy));
-
 	if (wi != NULL)
 		*wi = (unsigned char)*s;
 	return (1);

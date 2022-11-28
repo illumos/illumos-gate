@@ -34,6 +34,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifndef	__FreeBSD__
+#include <sys/socket.h>
+#endif
+
 #include <errno.h>
 
 #include "sockstream.h"
@@ -72,7 +76,11 @@ stream_write(int fd, const void *buf, ssize_t nbytes)
 	p = buf;
 
 	while (len < nbytes) {
+#ifdef	__FreeBSD__
 		n = write(fd, p + len, nbytes - len);
+#else
+		n = send(fd, p + len, nbytes - len, MSG_NOSIGNAL);
+#endif
 		if (n == 0)
 			break;
 		if (n < 0) {

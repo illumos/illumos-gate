@@ -27,6 +27,7 @@ set name=variant.arch value=$(ARCH)
 dir  path=opt/zfs-tests
 file path=opt/zfs-tests/README mode=0444
 dir  path=opt/zfs-tests/bin
+file path=opt/zfs-tests/bin/btree_test mode=0555
 file path=opt/zfs-tests/bin/chg_usr_exec mode=0555
 file path=opt/zfs-tests/bin/devname2devid mode=0555
 file path=opt/zfs-tests/bin/dir_rd_update mode=0555
@@ -62,7 +63,7 @@ file path=opt/zfs-tests/include/math.shlib mode=0444
 file path=opt/zfs-tests/include/properties.shlib mode=0444
 file path=opt/zfs-tests/include/zpool_script.shlib mode=0444
 dir  path=opt/zfs-tests/runfiles
-file path=opt/zfs-tests/runfiles/delphix.run mode=0444
+file path=opt/zfs-tests/runfiles/common.run mode=0444
 file path=opt/zfs-tests/runfiles/longevity.run mode=0444
 file path=opt/zfs-tests/runfiles/omnios.run mode=0444
 file path=opt/zfs-tests/runfiles/openindiana.run mode=0444
@@ -252,6 +253,9 @@ file path=opt/zfs-tests/tests/functional/bootfs/bootfs_007_pos mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_008_pos mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/setup mode=0555
+dir  path=opt/zfs-tests/tests/functional/btree
+file path=opt/zfs-tests/tests/functional/btree/btree_negative mode=0555
+file path=opt/zfs-tests/tests/functional/btree/btree_positive mode=0555
 dir  path=opt/zfs-tests/tests/functional/cache
 file path=opt/zfs-tests/tests/functional/cache/cache.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/cache/cache.kshlib mode=0444

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_vendor.c
  *   These routines provide initialization, cleanup, and general access to
@@ -87,7 +85,6 @@ hci1394_vendor_init(hci1394_drvinfo_t *drvinfo,  hci1394_ohci_handle_t ohci,
 	ASSERT(drvinfo != NULL);
 	ASSERT(vendor_info != NULL);
 	ASSERT(vendor_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_vendor_init_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * alloc the space to keep track of the vendor registers.
@@ -114,11 +111,6 @@ hci1394_vendor_init(hci1394_drvinfo_t *drvinfo,  hci1394_ohci_handle_t ohci,
 				kmem_free(vendor,
 				    sizeof (hci1394_vendor_t));
 				*vendor_handle = NULL;
-				TNF_PROBE_1(hci1394_vendor_init_rio_fail,
-				    HCI1394_TNF_HAL_ERROR, "", tnf_string,
-				    errmsg, "hci1394_rio_init() failed");
-				TNF_PROBE_0_DEBUG(hci1394_vendor_init_exit,
-				    HCI1394_TNF_HAL_STACK, "");
 				return (DDI_FAILURE);
 			}
 			break;
@@ -139,8 +131,6 @@ hci1394_vendor_init(hci1394_drvinfo_t *drvinfo,  hci1394_ohci_handle_t ohci,
 	}
 
 	vendor_info->vendor_reg_count = vendor->ve_reg_count;
-
-	TNF_PROBE_0_DEBUG(hci1394_vendor_init_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -165,7 +155,6 @@ hci1394_vendor_fini(hci1394_vendor_handle_t *vendor_handle)
 
 
 	ASSERT(vendor_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_vendor_fini_enter, HCI1394_TNF_HAL_STACK, "");
 
 	for (index = 0; index < (*vendor_handle)->ve_reg_count; index++) {
 		ddi_regs_map_free(&(*vendor_handle)->
@@ -175,8 +164,6 @@ hci1394_vendor_fini(hci1394_vendor_handle_t *vendor_handle)
 
 	/* Set the vendor_handle to NULL to help catch bugs */
 	*vendor_handle = NULL;
-
-	TNF_PROBE_0_DEBUG(hci1394_vendor_fini_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -193,8 +180,6 @@ hci1394_vendor_resume(hci1394_vendor_handle_t vendor_handle)
 
 
 	ASSERT(vendor_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_vendor_resume_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	vendor_info = &vendor_handle->ve_info;
 
@@ -209,11 +194,6 @@ hci1394_vendor_resume(hci1394_vendor_handle_t vendor_handle)
 		case VENDOR_DID_RIO_1394:
 			status = hci1394_rio_resume(vendor_handle);
 			if (status != DDI_SUCCESS) {
-				TNF_PROBE_1(hci1394_vendor_resume_rio_fail,
-				    HCI1394_TNF_HAL_ERROR, "", tnf_string,
-				    errmsg, "hci1394_rio_resume() failed");
-				TNF_PROBE_0_DEBUG(hci1394_vendor_resume_exit,
-				    HCI1394_TNF_HAL_STACK, "");
 				return (DDI_FAILURE);
 			}
 			break;
@@ -230,9 +210,6 @@ hci1394_vendor_resume(hci1394_vendor_handle_t vendor_handle)
 	default:
 		break;
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_vendor_resume_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (DDI_SUCCESS);
 }
@@ -255,15 +232,8 @@ hci1394_vendor_reg_write(hci1394_vendor_handle_t vendor_handle,
 
 
 	ASSERT(vendor_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_vendor_reg_write_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	if (vendor_handle->ve_reg_count < (reg_set + 1)) {
-		TNF_PROBE_1(hci1394_vendor_reg_write_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-		    "reg_set not present");
-		TNF_PROBE_0_DEBUG(hci1394_vendor_reg_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -272,9 +242,6 @@ hci1394_vendor_reg_write(hci1394_vendor_handle_t vendor_handle,
 	    (uintptr_t)VENDOR_ALIGN_ADDR(offset));
 
 	ddi_put32(venreg->vr_reg_handle, regaddr, data);
-
-	TNF_PROBE_0_DEBUG(hci1394_vendor_reg_write_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -298,15 +265,8 @@ hci1394_vendor_reg_read(hci1394_vendor_handle_t vendor_handle, uint_t reg_set,
 
 	ASSERT(vendor_handle != NULL);
 	ASSERT(data != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_vendor_reg_read_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	if (vendor_handle->ve_reg_count < (reg_set + 1)) {
-		TNF_PROBE_1(hci1394_vendor_reg_read_fail,
-		    HCI1394_TNF_HAL_ERROR, "", tnf_string, errmsg,
-		    "reg_set not present");
-		TNF_PROBE_0_DEBUG(hci1394_vendor_reg_read_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -315,9 +275,6 @@ hci1394_vendor_reg_read(hci1394_vendor_handle_t vendor_handle, uint_t reg_set,
 	    (uintptr_t)VENDOR_ALIGN_ADDR(offset));
 
 	*data = ddi_get32(venreg->vr_reg_handle, regaddr);
-
-	TNF_PROBE_0_DEBUG(hci1394_vendor_reg_read_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -333,7 +290,6 @@ hci1394_rio_init(hci1394_vendor_t *vendor)
 
 
 	ASSERT(vendor != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_rio_init_enter, HCI1394_TNF_HAL_STACK, "");
 
 	vendor->ve_reg_count = 1;
 	vendor->ve_reg_array[0] = kmem_alloc(sizeof (hci1394_vendor_reg_t),
@@ -347,10 +303,6 @@ hci1394_rio_init(hci1394_vendor_t *vendor)
 		vendor->ve_reg_count = 0;
 		kmem_free(vendor->ve_reg_array[0],
 		    sizeof (hci1394_vendor_reg_t));
-		TNF_PROBE_0(hci1394_rio_init_rms_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_rio_init_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -363,17 +315,11 @@ hci1394_rio_init(hci1394_vendor_t *vendor)
 		kmem_free(vendor->ve_reg_array[0],
 		    sizeof (hci1394_vendor_reg_t));
 		vendor->ve_reg_array[0] = NULL;
-		TNF_PROBE_0(hci1394_rio_init_vrw_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_rio_init_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
 	/* Setup GUID on RIO without firmware support */
 	hci1394_rio_guid_init(vendor);
-
-	TNF_PROBE_0_DEBUG(hci1394_rio_init_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -390,23 +336,16 @@ hci1394_rio_resume(hci1394_vendor_t *vendor)
 
 
 	ASSERT(vendor != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_rio_init_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* Setup RIO Host Control Register */
 	status = hci1394_vendor_reg_write(vendor, 0, RIOREG_HOST_CONTROL,
 	    RIOREG_HOST_CONTROL_SETTING);
 	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(hci1394_rio_resume_vrw_fail, HCI1394_TNF_HAL_ERROR,
-		    "");
-		TNF_PROBE_0_DEBUG(hci1394_rio_init_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
 	/* Setup GUID on RIO PPX */
 	hci1394_rio_guid_init(vendor);
-
-	TNF_PROBE_0_DEBUG(hci1394_rio_init_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -425,8 +364,6 @@ hci1394_rio_guid_init(hci1394_vendor_t *vendor)
 	hrtime_t guid_timestamp;
 
 	ASSERT(vendor != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_rio_guid_init_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	if (hci1394_set_rio_guid != 0) {
 		guid_timestamp = gethrtime();
@@ -445,7 +382,4 @@ hci1394_rio_guid_init(hci1394_vendor_t *vendor)
 		    &vendor->ve_ohci->ohci_regs->guid_lo,
 		    (uint32_t)(guid_timestamp & 0xFFFFFFFF));
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_rio_guid_init_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }

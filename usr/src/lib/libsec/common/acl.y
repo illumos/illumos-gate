@@ -21,6 +21,8 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <acl_common.h>
@@ -39,9 +41,9 @@ extern acl_t *yyacl;
 	acl_t *acl;
 }
 
-
+%token BARE_SID_TOK
 %token USER_TOK USER_SID_TOK GROUP_TOK GROUP_SID_TOK MASK_TOK OTHER_TOK
-%token OWNERAT_TOK GROUPAT_TOK EVERYONEAT_TOK DEFAULT_USER_TOK 
+%token OWNERAT_TOK GROUPAT_TOK EVERYONEAT_TOK DEFAULT_USER_TOK
 %token DEFAULT_GROUP_TOK DEFAULT_MASK_TOK DEFAULT_OTHER_TOK
 %token COLON COMMA NL SLASH
 %token <str> ID IDNAME PERM_TOK INHERIT_TOK SID
@@ -50,7 +52,7 @@ extern acl_t *yyacl;
 %type <str> idname id
 %type <acl_perm> perms perm aclent_perm ace_perms
 %type <acl> acl_entry
-%type <ace> ace 
+%type <ace> ace
 %type <aclent> aclent
 %type <val> iflags verbose_iflag compact_iflag access_type entry_type
 
@@ -58,25 +60,25 @@ extern acl_t *yyacl;
 
 %%
 
-acl:	acl_entry NL 
-	{ 
-		yyacl = $1;
-		return (0);
-	} 
-
-	/* This seems illegal, but the old aclfromtext() allows it */
-	| acl_entry COMMA NL	
+acl:	acl_entry NL
 	{
 		yyacl = $1;
 		return (0);
 	}
-	| acl_entry COMMA acl 
-	{ 
+
+	/* This seems illegal, but the old aclfromtext() allows it */
+	| acl_entry COMMA NL
+	{
 		yyacl = $1;
 		return (0);
 	}
-	
-acl_entry: ace 
+	| acl_entry COMMA acl
+	{
+		yyacl = $1;
+		return (0);
+	}
+
+acl_entry: ace
 	{
 		ace_t *acep;
 
@@ -86,7 +88,7 @@ acl_entry: ace
 				yycleanup();
 				return (EACL_MEM_ERROR);
 			}
-		} 
+		}
 
 		$$ = yyacl;
 		if ($$->acl_type == ACLENT_T) {
@@ -98,13 +100,13 @@ acl_entry: ace
 			yycleanup();
 			return (EACL_DIFF_TYPE);
 		}
-			
+
 		$$->acl_aclp = realloc($$->acl_aclp,
 		    ($$->acl_entry_size * ($$->acl_cnt + 1)));
 		if ($$->acl_aclp == NULL) {
 			free (yyacl);
 			yycleanup();
-			return (EACL_MEM_ERROR);	
+			return (EACL_MEM_ERROR);
 		}
 		acep = $$->acl_aclp;
 		acep[$$->acl_cnt] = $1;
@@ -121,7 +123,7 @@ acl_entry: ace
 				yycleanup();
 				return (EACL_MEM_ERROR);
 			}
-		} 
+		}
 
 		$$ = yyacl;
 		if ($$->acl_type == ACE_T) {
@@ -139,7 +141,7 @@ acl_entry: ace
 		if ($$->acl_aclp == NULL) {
 			free (yyacl);
 			yycleanup();
-			return (EACL_MEM_ERROR);	
+			return (EACL_MEM_ERROR);
 		}
 		aclent = $$->acl_aclp;
 		aclent[$$->acl_cnt] = $1;
@@ -159,7 +161,7 @@ ace:	entry_type idname ace_perms access_type
 			yycleanup();
 			return (EACL_INVALID_USER_GROUP);
 		}
-			
+
 		$$.a_who = id;
 		$$.a_flags = ace_entry_type($1);
 		error = ace_perm_mask(&$3, &$$.a_access_mask);
@@ -196,7 +198,7 @@ ace:	entry_type idname ace_perms access_type
 		}
 		$$.a_type = $4;
 	}
-	| entry_type idname ace_perms iflags access_type 
+	| entry_type idname ace_perms iflags access_type
 	{
 		int error;
 		uid_t id;
@@ -207,7 +209,7 @@ ace:	entry_type idname ace_perms access_type
 			yycleanup();
 			return (EACL_INVALID_USER_GROUP);
 		}
-		
+
 		$$.a_who = id;
 		$$.a_flags = ace_entry_type($1);
 		error = ace_perm_mask(&$3, &$$.a_access_mask);
@@ -248,7 +250,7 @@ ace:	entry_type idname ace_perms access_type
 		$$.a_flags |= $4;
 	}
 	| entry_type ace_perms access_type
-	{ 
+	{
 		int error;
 
 		$$.a_who = -1;
@@ -259,7 +261,7 @@ ace:	entry_type idname ace_perms access_type
 			return (error);
 		}
 		$$.a_type = $3;
-	} 
+	}
 	| entry_type ace_perms access_type COLON id
 	{
 		yycleanup();
@@ -272,7 +274,7 @@ ace:	entry_type idname ace_perms access_type
 
 		return (EACL_ENTRY_ERROR);
 	}
-	| entry_type ace_perms iflags access_type 
+	| entry_type ace_perms iflags access_type
 	{
 		int error;
 
@@ -352,7 +354,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		}
 	}
 	| entry_type COLON aclent_perm COLON id
-	{ 
+	{
 		yycleanup();
 		if (yyinteractive) {
 			acl_error(dgettext(TEXT_DOMAIN,
@@ -361,8 +363,8 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		}
 		return (EACL_ENTRY_ERROR);
 	}
-	| entry_type idname aclent_perm COLON id 	/* user or group */
-	{	
+	| entry_type idname aclent_perm COLON id	/* user or group */
+	{
 		int error;
 		uid_t id;
 
@@ -383,7 +385,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		error = get_id($1, $2, &id);
 		if (error) {
 			$$.a_id = get_id_nofail($1, $5);
-		} else 
+		} else
 			$$.a_id = id;
 
 		error = aclent_entry_type($1, 0, &$$.a_type);
@@ -478,14 +480,14 @@ verbose_iflag: ACE_INHERIT	{$$ |= $1;}
 		yycleanup();
 		return ($3);
 	}
-	
+
 aclent_perm: PERM_TOK
 	{
 		$$.perm_style = PERM_TYPE_UNKNOWN;
 		$$.perm_str = $1;
 		$$.perm_val = 0;
 	}
-	| PERM_TOK ERROR 
+	| PERM_TOK ERROR
 	{
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "ACL entry permissions are incorrectly specified.\n"));
@@ -493,7 +495,7 @@ aclent_perm: PERM_TOK
 		return ($2);
 	}
 
-access_type: ACCESS_TYPE {$$ = $1;}	
+access_type: ACCESS_TYPE {$$ = $1;}
 	| ERROR
 	{
 		yycleanup();
@@ -502,11 +504,11 @@ access_type: ACCESS_TYPE {$$ = $1;}
 
 id: ID {$$ = $1;}
 	| SID {$$ = $1;}
-  	| COLON
+	| COLON
 	{
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "Invalid uid/gid specified.\nThe field"
-		    " should be a numeric value.\n")); 
+		    " should be a numeric value.\n"));
 		yycleanup();
 		return (EACL_UNKNOWN_DATA);
 	}
@@ -525,10 +527,10 @@ ace_perms: perm {$$ = $1;}
 	}
 
 perm: perms COLON {$$ = $1;}
-    	| COLON {$$.perm_style = PERM_TYPE_EMPTY;}
+	| COLON {$$.perm_style = PERM_TYPE_EMPTY;}
 
-perms: ACE_PERM 
-     	{
+perms: ACE_PERM
+	{
 		$$.perm_style = PERM_TYPE_ACE;
 		$$.perm_val |= $1;
 	}
@@ -552,7 +554,7 @@ perms: ACE_PERM
 		yycleanup();
 		return ($3);
 	}
-		
+
 
 idname: IDNAME {$$ = $1;}
 
@@ -579,7 +581,7 @@ bad_entry_type(int toketype, char *str)
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "Invalid group %s specified.\n"), str);
 		break;
-	
+
 	case USER_SID_TOK:
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "Invalid user SID %s specified.\n"), str);
@@ -588,6 +590,11 @@ bad_entry_type(int toketype, char *str)
 	case GROUP_SID_TOK:
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "Invalid group SID %s specified.\n"), str);
-	}
+		break;
 
+	case BARE_SID_TOK:
+		acl_error(dgettext(TEXT_DOMAIN,
+		    "Invalid SID %s specified.\n"), str);
+		break;
+	}
 }

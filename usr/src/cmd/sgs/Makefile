@@ -35,7 +35,7 @@ include		$(SRC)/cmd/Makefile.cmd
 # all dependencies of an item have been built before the
 # item itself.
 #
-SUBDIRS-common= libconv		\
+SUBDIRS=	 libconv	\
 		.WAIT		\
 		libdl		\
 		libelf		\
@@ -60,6 +60,7 @@ SUBDIRS-common= libconv		\
 		crle		\
 		ar		\
 		dump		\
+		elfcap.chk	\
 		elfdump		\
 		elfedit		\
 		elfwrap		\
@@ -82,8 +83,6 @@ SUBDIRS-common= libconv		\
 		.WAIT		\
 		demo_rdb
 
-SUBDIRS=	$(SUBDIRS-common)
-
 # Messaging support
 #
 POSUBDIRS=	m4		nm	tsort		yacc
@@ -96,6 +95,8 @@ MSGSUBDIRS=	ld		ldd		libld		liblddbg \
 		elfedit		crle		moe		lari \
 		librtld_db	elfwrap		ar
 
+CHKSUBDIRS=	elfcap.chk
+
 MSGDIR=		messages
 
 all :=		TARGET= all
@@ -106,6 +107,7 @@ _msg :=		TARGET= catalog
 _msg_gettext :=	TARGET= catalog
 _msg_sgsmsg :=	TARGET= catalog
 chkmsg :=	TARGET= chkmsg
+check :=	TARGET= check
 
 
 .KEEP_STATE:
@@ -136,7 +138,7 @@ $(MSGDIR):	$(MSGSUBDIRS) FRC
 
 chkmsg:		libconv $(MSGSUBDIRS) FRC
 
-check:		chkmsg
+check:		chkmsg $(CHKSUBDIRS)
 
 # built from lib/Makefile
 install_lib:	FRC

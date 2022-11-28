@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -277,7 +277,7 @@ static void smb_odir_delete(void *);
  */
 uint32_t
 smb_odir_openpath(smb_request_t *sr, char *path, uint16_t sattr,
-	uint32_t flags, smb_odir_t **odp)
+    uint32_t flags, smb_odir_t **odp)
 {
 	int		rc;
 	smb_tree_t	*tree;
@@ -338,7 +338,7 @@ smb_odir_openpath(smb_request_t *sr, char *path, uint16_t sattr,
  */
 uint32_t
 smb_odir_openfh(smb_request_t *sr, const char *pattern, uint16_t sattr,
-	smb_odir_t **odp)
+    smb_odir_t **odp)
 {
 	smb_ofile_t	*of = sr->fid_ofile;
 
@@ -365,7 +365,8 @@ smb_odir_openfh(smb_request_t *sr, const char *pattern, uint16_t sattr,
  *    NT status
  */
 uint32_t
-smb_odir_openat(smb_request_t *sr, smb_node_t *unode, smb_odir_t **odp)
+smb_odir_openat(smb_request_t *sr, smb_node_t *unode, smb_odir_t **odp,
+    boolean_t restricted)
 {
 	char		pattern[SMB_STREAM_PREFIX_LEN + 2];
 	vnode_t		*xattr_dvp;
@@ -400,6 +401,10 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode, smb_odir_t **odp)
 	(void) snprintf(pattern, sizeof (pattern), "%s*", SMB_STREAM_PREFIX);
 	*odp = smb_odir_create(sr, xattr_dnode, pattern,
 	    SMB_SEARCH_ATTRIBUTES, 0, cr);
+
+	/* Causes restricted stream names to be hidden from the caller */
+	if (restricted)
+		(*odp)->d_flags |= SMB_ODIR_FLAG_RESTRICTED;
 
 	smb_node_release(xattr_dnode);
 	return (0);
@@ -724,6 +729,14 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 			continue;
 		}
 
+		/*
+		 * Hide streams that would be restricted if the caller
+		 * is also restricted.
+		 */
+		if ((od->d_flags & SMB_ODIR_FLAG_RESTRICTED) != 0 &&
+		    smb_strname_restricted(odirent->od_name))
+			continue;
+
 		rc = smb_fsop_lookup(sr, od->d_cred, 0, od->d_tree->t_snode,
 		    od->d_dnode, odirent->od_name, &fnode);
 		if (rc == 0) {
@@ -896,7 +909,7 @@ smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
  */
 static smb_odir_t *
 smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
-	const char *pattern, uint16_t sattr, uint16_t odid, cred_t *cr)
+    const char *pattern, uint16_t sattr, uint16_t odid, cred_t *cr)
 {
 	smb_odir_t	*od;
 	smb_tree_t	*tree;

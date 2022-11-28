@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 
 
@@ -184,6 +185,8 @@ cmd_dsgetdcname(char *domname)
 	(void) printf("  DC Site Name:  %s \n", dcinfo->DcSiteName);
 	(void) printf("  Client Site Name:  %s \n", dcinfo->ClientSiteName);
 
+	DsFreeDcInfo(dcinfo);
+
 	return (0);
 }
 
@@ -214,7 +217,8 @@ cmd_kick(char *domname)
  */
 
 static void
-help(void) {
+help(void)
+{
 	(void) printf("\n");
 	/*
 	 * TODO: We may want to revise this help text.  It's basically
@@ -225,17 +229,17 @@ help(void) {
 	    (char *)getexecname());
 	(void) printf(gettext("where subcommands are:\n"
 #if 0	/* not yet */
-		" dclist        Lists all domain controllers in the domain.\n"
-		" dcname        Lists the PDC or PDC emulator.\n"
-		" dsgetdc       Queries DNS server for list of DCs and"
-			" their IP addresses and contacts each DC to check"
-			" for connectivity.\n"
+	    " dclist        Lists all domain controllers in the domain.\n"
+	    " dcname        Lists the PDC or PDC emulator.\n"
+	    " dsgetdc       Queries DNS server for list of DCs and"
+	    " their IP addresses and contacts each DC to check"
+	    " for connectivity.\n"
 #endif
-		" dsgetdcname   returns the name of a domain controller in a"
-			" specified domain\n"
-		" help          display help on specified subcommand\n"
-		" kick          trigger domain controller re-discovery\n"
-		"\n"));
+	    " dsgetdcname   returns the name of a domain controller in a"
+	    " specified domain\n"
+	    " help          display help on specified subcommand\n"
+	    " kick          trigger domain controller re-discovery\n"
+	    "\n"));
 	exit(1);
 }
 

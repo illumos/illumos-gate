@@ -74,13 +74,10 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	uint32_t		uarpg;
 	uint_t			wq_location, dma_xfer_mode, srq_is_umap;
 	int			flag, status;
-	char			*errormsg;
 	uint_t			max_sgl;
 	uint_t			wqesz;
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*sizes))
-
-	TAVOR_TNF_ENTER(tavor_srq_alloc);
 
 	/*
 	 * Check the "options" flag.  Currently this flag tells the driver
@@ -116,8 +113,6 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 		status = tavor_umap_db_find(state->ts_instance, ddi_get_pid(),
 		    MLNX_UMAP_UARPG_RSRC, &value, 0, NULL);
 		if (status != DDI_SUCCESS) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "failed UAR page");
 			goto srqalloc_fail3;
 		}
 		uarpg = ((tavor_rsrc_t *)(uintptr_t)value)->tr_indx;
@@ -129,16 +124,12 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	/* Allocate an SRQ context entry */
 	status = tavor_rsrc_alloc(state, TAVOR_SRQC, 1, sleepflag, &srqc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed SRQ context");
 		goto srqalloc_fail1;
 	}
 
 	/* Allocate the SRQ Handle entry */
 	status = tavor_rsrc_alloc(state, TAVOR_SRQHDL, 1, sleepflag, &rsrc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed SRQ handle");
 		goto srqalloc_fail2;
 	}
 
@@ -159,8 +150,6 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 		    srq->srq_srqnum, MLNX_UMAP_SRQMEM_RSRC,
 		    (uint64_t)(uintptr_t)rsrc);
 		if (umapdb == NULL) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed umap add");
 			goto srqalloc_fail3;
 		}
 	}
@@ -183,8 +172,6 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	 * then obviously we have a lot of cleanup to do before returning.
 	 */
 	if (log_srq_size > state->ts_cfg_profile->cp_log_max_srq_sz) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_WR_EXCEEDED, "max SRQ size");
 		goto srqalloc_fail4;
 	}
 
@@ -195,8 +182,6 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	 */
 	max_sgl = state->ts_cfg_profile->cp_srq_max_sgl;
 	if (sizes->srq_sgl_sz > max_sgl) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_SGL_EXCEEDED, "max SRQ SGL");
 		goto srqalloc_fail4;
 	}
 
@@ -252,8 +237,6 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	}
 	status = tavor_queue_alloc(state, &srq->srq_wqinfo, sleepflag);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed srq");
 		goto srqalloc_fail4;
 	}
 	buf = (uint32_t *)srq->srq_wqinfo.qa_buf_aligned;
@@ -297,8 +280,6 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	mr_op.mro_bind_override_addr = 1;
 	status = tavor_mr_register(state, pd, &mr_attr, &mr, &mr_op);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed register mr");
 		goto srqalloc_fail5;
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
@@ -318,16 +299,12 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	 */
 	srq->srq_wrid_wql = tavor_wrid_wql_create(state);
 	if (srq->srq_wrid_wql == NULL) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed wql create");
 		goto srqalloc_fail6;
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(srq->srq_wrid_wql)))
 
 	srq->srq_wridlist = tavor_wrid_get_list(1 << log_srq_size);
 	if (srq->srq_wridlist == NULL) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed wridlist create");
 		goto srqalloc_fail7;
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*(srq->srq_wridlist)))
@@ -379,10 +356,6 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: SW2HW_SRQ command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_srq_alloc_sw2hw_srq_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_FAILURE, "tavor SW2HW_SRQ command");
 		goto srqalloc_fail8;
 	}
 
@@ -433,7 +406,6 @@ tavor_srq_alloc(tavor_state_t *state, tavor_srq_info_t *srqinfo,
 
 	*srqhdl = srq;
 
-	TAVOR_TNF_EXIT(tavor_srq_alloc);
 	return (status);
 
 /*
@@ -463,9 +435,6 @@ srqalloc_fail2:
 srqalloc_fail1:
 	tavor_pd_refcnt_dec(pd);
 srqalloc_fail:
-	TNF_PROBE_1(tavor_srq_alloc_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_srq_alloc);
 	return (status);
 }
 
@@ -490,8 +459,6 @@ tavor_srq_free(tavor_state_t *state, tavor_srqhdl_t *srqhdl, uint_t sleepflag)
 	uint_t			maxprot;
 	int			status;
 
-	TAVOR_TNF_ENTER(tavor_srq_free);
-
 	/*
 	 * Pull all the necessary information from the Tavor Shared Receive
 	 * Queue handle.  This is necessary here because the resource for the
@@ -511,9 +478,6 @@ tavor_srq_free(tavor_state_t *state, tavor_srqhdl_t *srqhdl, uint_t sleepflag)
 	 */
 	if (srq->srq_refcnt != 0) {
 		mutex_exit(&srq->srq_lock);
-		TNF_PROBE_1(tavor_srq_free_refcnt_fail, TAVOR_TNF_ERROR, "",
-		    tnf_int, refcnt, srq->srq_refcnt);
-		TAVOR_TNF_EXIT(tavor_srq_free);
 		return (IBT_SRQ_IN_USE);
 	}
 
@@ -532,7 +496,6 @@ tavor_srq_free(tavor_state_t *state, tavor_srqhdl_t *srqhdl, uint_t sleepflag)
 		if (status != DDI_SUCCESS) {
 			mutex_exit(&srq->srq_lock);
 			TAVOR_WARNING(state, "failed to find in database");
-			TAVOR_TNF_EXIT(tavor_srq_free);
 			return (ibc_get_ci_failure(0));
 		}
 		tavor_umap_db_free(umapdb);
@@ -545,7 +508,6 @@ tavor_srq_free(tavor_state_t *state, tavor_srqhdl_t *srqhdl, uint_t sleepflag)
 				mutex_exit(&srq->srq_lock);
 				TAVOR_WARNING(state, "failed in SRQ memory "
 				    "devmap_devmem_remap()");
-				TAVOR_TNF_EXIT(tavor_srq_free);
 				return (ibc_get_ci_failure(0));
 			}
 			srq->srq_umap_dhp = (devmap_cookie_t)NULL;
@@ -575,9 +537,6 @@ tavor_srq_free(tavor_state_t *state, tavor_srqhdl_t *srqhdl, uint_t sleepflag)
 		TAVOR_WARNING(state, "failed to reclaim SRQC ownership");
 		cmn_err(CE_CONT, "Tavor: HW2SW_SRQ command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_srq_free_hw2sw_srq_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_srq_free);
 		return (IBT_FAILURE);
 	}
 
@@ -591,8 +550,6 @@ tavor_srq_free(tavor_state_t *state, tavor_srqhdl_t *srqhdl, uint_t sleepflag)
 	    sleepflag);
 	if (status != DDI_SUCCESS) {
 		TAVOR_WARNING(state, "failed to deregister SRQ memory");
-		TNF_PROBE_0(tavor_srq_free_dereg_mr_fail, TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_srq_free);
 		return (IBT_FAILURE);
 	}
 
@@ -626,7 +583,6 @@ tavor_srq_free(tavor_state_t *state, tavor_srqhdl_t *srqhdl, uint_t sleepflag)
 	/* Set the srqhdl pointer to NULL and return success */
 	*srqhdl = NULL;
 
-	TAVOR_TNF_EXIT(tavor_srq_free);
 	return (DDI_SUCCESS);
 }
 
@@ -656,9 +612,6 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 	uint_t			srq_sync, log_srq_size, maxprot;
 	uint_t			wq_location;
 	int			status;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_srq_modify);
 
 	/*
 	 * Check the "inddr" flag.  This flag tells the driver whether or not
@@ -673,9 +626,6 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 	 */
 	max_srq_size = (1 << state->ts_cfg_profile->cp_log_max_srq_sz);
 	if (size > max_srq_size) {
-		TNF_PROBE_0(tavor_srq_modify_size_larger_than_maxsize,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_srq_modify);
 		return (IBT_HCA_WR_EXCEEDED);
 	}
 
@@ -696,8 +646,6 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 	 * with the device limits and/or software-configured limits).
 	 */
 	if (log_srq_size > state->ts_cfg_profile->cp_log_max_srq_sz) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_WR_EXCEEDED, "max SRQ size");
 		goto srqmodify_fail;
 	}
 
@@ -724,8 +672,6 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 	}
 	status = tavor_queue_alloc(state, &new_srqinfo, sleepflag);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed srq");
 		goto srqmodify_fail;
 	}
 	buf = (uint32_t *)new_srqinfo.qa_buf_aligned;
@@ -738,9 +684,6 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 	wre_new = (tavor_wrid_entry_t *)kmem_zalloc((1 << log_srq_size) *
 	    sizeof (tavor_wrid_entry_t), sleepflag);
 	if (wre_new == NULL) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE,
-		    "failed wre_new alloc");
 		goto srqmodify_fail;
 	}
 
@@ -778,8 +721,6 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 	status = tavor_mr_mtt_bind(state, &bind, new_srqinfo.qa_dmahdl, &mtt,
 	    &mtt_pgsize_bits);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(status, "failed mtt bind");
 		kmem_free(wre_new, srq->srq_wq_bufsz *
 		    sizeof (tavor_wrid_entry_t));
 		tavor_queue_free(state, &new_srqinfo);
@@ -863,9 +804,6 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: MODIFY_MPT command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_mr_common_reg_sw2hw_mpt_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		TAVOR_TNF_FAIL(status, "MODIFY_MPT command failed");
 		(void) tavor_mr_mtt_unbind(state, &srq->srq_mrhdl->mr_bindinfo,
 		    srq->srq_mrhdl->mr_mttrsrcp);
 		kmem_free(wre_new, srq->srq_wq_bufsz *
@@ -966,7 +904,6 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 				kmem_free(wre_old, srq_old_bufsz *
 				    sizeof (tavor_wrid_entry_t));
 			}
-			TAVOR_TNF_EXIT(tavor_srq_modify);
 			return (ibc_get_ci_failure(0));
 		}
 		srq->srq_umap_dhp = (devmap_cookie_t)NULL;
@@ -984,9 +921,6 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 	status = tavor_mr_mtt_unbind(state, &old_bind, old_mtt);
 	if (status != DDI_SUCCESS) {
 		TAVOR_WARNING(state, "failed to unbind old SRQ memory");
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(ibc_get_ci_failure(0),
-		    "failed to unbind (old)");
 		goto srqmodify_fail;
 	}
 
@@ -1007,13 +941,9 @@ tavor_srq_modify(tavor_state_t *state, tavor_srqhdl_t srq, uint_t size,
 		*real_size = (1 << log_srq_size);
 	}
 
-	TAVOR_TNF_EXIT(tavor_srq_modify);
 	return (DDI_SUCCESS);
 
 srqmodify_fail:
-	TNF_PROBE_1(tavor_srq_modify_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_srq_modify);
 	return (status);
 }
 
@@ -1026,8 +956,6 @@ void
 tavor_srq_refcnt_inc(tavor_srqhdl_t srq)
 {
 	mutex_enter(&srq->srq_lock);
-	TNF_PROBE_1_DEBUG(tavor_srq_refcnt_inc, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, srq->srq_refcnt);
 	srq->srq_refcnt++;
 	mutex_exit(&srq->srq_lock);
 }
@@ -1042,8 +970,6 @@ tavor_srq_refcnt_dec(tavor_srqhdl_t srq)
 {
 	mutex_enter(&srq->srq_lock);
 	srq->srq_refcnt--;
-	TNF_PROBE_1_DEBUG(tavor_srq_refcnt_dec, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, srq->srq_refcnt);
 	mutex_exit(&srq->srq_lock);
 }
 
@@ -1089,8 +1015,6 @@ tavor_srq_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
 {
 	uint_t	max_size, log2, actual_sgl;
 
-	TAVOR_TNF_ENTER(tavor_srq_sgl_to_logwqesz);
-
 	switch (wq_type) {
 	case TAVOR_QP_WQ_TYPE_RECVQ:
 		/*
@@ -1113,14 +1037,10 @@ tavor_srq_sgl_to_logwqesz(tavor_state_t *state, uint_t num_sgl,
 
 	default:
 		TAVOR_WARNING(state, "unexpected work queue type");
-		TNF_PROBE_0(tavor_srq_sgl_to_logwqesz_inv_wqtype_fail,
-		    TAVOR_TNF_ERROR, "");
 		break;
 	}
 
 	/* Fill in the return values */
 	*logwqesz = log2;
 	*max_sgl  = min(state->ts_cfg_profile->cp_srq_max_sgl, actual_sgl);
-
-	TAVOR_TNF_EXIT(tavor_qp_sgl_to_logwqesz);
 }

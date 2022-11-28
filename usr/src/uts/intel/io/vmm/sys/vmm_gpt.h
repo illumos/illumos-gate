@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _VMM_GPT_H
@@ -52,6 +52,7 @@ enum vmm_gpt_node_level {
  *   cleared.  Returns non-zero if the previous value of the bit was set.
  * vpeo_get_pmtp: Generate a properly formatted PML4 (EPTP/nCR3), given the root
  *   PFN for the GPT.
+ * vpeo_hw_ad_supported: Returns true IFF hardware A/D tracking is supported.
  */
 typedef struct vmm_pte_ops vmm_pte_ops_t;
 struct vmm_pte_ops {
@@ -62,7 +63,8 @@ struct vmm_pte_ops {
 	uint_t		(*vpeo_pte_prot)(uint64_t);
 	uint_t		(*vpeo_reset_dirty)(uint64_t *, bool);
 	uint_t		(*vpeo_reset_accessed)(uint64_t *, bool);
-	uint64_t	(*vpeo_get_pmtp)(pfn_t);
+	uint64_t	(*vpeo_get_pmtp)(pfn_t, bool);
+	bool		(*vpeo_hw_ad_supported)(void);
 };
 
 extern vmm_pte_ops_t ept_pte_ops;
@@ -82,7 +84,7 @@ void vmm_gpt_vacate_region(vmm_gpt_t *, uint64_t, uint64_t);
 bool vmm_gpt_map(vmm_gpt_t *, uint64_t, pfn_t, uint_t, uint8_t);
 bool vmm_gpt_unmap(vmm_gpt_t *, uint64_t);
 size_t vmm_gpt_unmap_region(vmm_gpt_t *, uint64_t, uint64_t);
-uint64_t vmm_gpt_get_pmtp(vmm_gpt_t *);
+uint64_t vmm_gpt_get_pmtp(vmm_gpt_t *, bool);
 
 bool vmm_gpt_is_mapped(vmm_gpt_t *, uint64_t *, pfn_t *, uint_t *);
 uint_t vmm_gpt_reset_accessed(vmm_gpt_t *, uint64_t *, bool);

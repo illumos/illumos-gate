@@ -30,7 +30,7 @@
 	.file	"adjtime.s"
 
 /* C Library -- adjtime						*/
-/* int adjtime(struct timeval *delta, struct timeval *olddelta)	*/
+/* int adjtime(const struct timeval *delta, struct timeval *olddelta) */
 
 #include "SYS.h"
 

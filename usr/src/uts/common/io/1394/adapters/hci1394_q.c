@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_q.c
  *    This code decouples some of the OpenHCI async descriptor logic/structures
@@ -101,7 +99,6 @@ hci1394_q_init(hci1394_drvinfo_t *drvinfo,
 	ASSERT(drvinfo != NULL);
 	ASSERT(qinfo != NULL);
 	ASSERT(q_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_init_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * allocate the memory to track this Q.  Initialize the internal Q
@@ -130,9 +127,6 @@ hci1394_q_init(hci1394_drvinfo_t *drvinfo,
 		mutex_destroy(&q->q_mutex);
 		kmem_free(q, sizeof (hci1394_q_t));
 		*q_handle = NULL;
-		TNF_PROBE_0(hci1394_q_init_bae_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_q_init_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -162,9 +156,6 @@ hci1394_q_init(hci1394_drvinfo_t *drvinfo,
 		mutex_destroy(&q->q_mutex);
 		kmem_free(q, sizeof (hci1394_q_t));
 		*q_handle = NULL;
-		TNF_PROBE_0(hci1394_q_init_baa_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_q_init_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -220,8 +211,6 @@ hci1394_q_init(hci1394_drvinfo_t *drvinfo,
 
 	*q_handle = q;
 
-	TNF_PROBE_0_DEBUG(hci1394_q_init_exit, HCI1394_TNF_HAL_STACK, "");
-
 	return (DDI_SUCCESS);
 }
 
@@ -238,7 +227,6 @@ hci1394_q_fini(hci1394_q_handle_t *q_handle)
 	hci1394_q_t *q;
 
 	ASSERT(q_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_fini_enter, HCI1394_TNF_HAL_STACK, "");
 
 	q = *q_handle;
 	if (q->q_info.qi_mode == HCI1394_ATQ) {
@@ -249,8 +237,6 @@ hci1394_q_fini(hci1394_q_handle_t *q_handle)
 	hci1394_buf_free(&q->q_data.qb_buf_handle);
 	kmem_free(q, sizeof (hci1394_q_t));
 	*q_handle = NULL;
-
-	TNF_PROBE_0_DEBUG(hci1394_q_fini_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -263,7 +249,6 @@ static void
 hci1394_q_buf_setup(hci1394_q_buf_t *qbuf)
 {
 	ASSERT(qbuf != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_buf_setup_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* start with the first cookie */
 	qbuf->qb_ptrs.qp_current_buf = 0;
@@ -285,8 +270,6 @@ hci1394_q_buf_setup(hci1394_q_buf_t *qbuf)
 	 * hci1394_q_reserve() before calling hci1394_q_at_write_O*().
 	 */
 	qbuf->qb_ptrs.qp_resv_size = 0;
-
-	TNF_PROBE_0_DEBUG(hci1394_q_buf_setup_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -303,7 +286,6 @@ hci1394_q_reset(hci1394_q_handle_t q_handle)
 	int index;
 
 	ASSERT(q_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_reset_enter, HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&q_handle->q_mutex);
 	desc = &q_handle->q_desc;
@@ -340,7 +322,6 @@ hci1394_q_reset(hci1394_q_handle_t q_handle)
 	}
 
 	mutex_exit(&q_handle->q_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_q_reset_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -354,9 +335,7 @@ void
 hci1394_q_resume(hci1394_q_handle_t q_handle)
 {
 	ASSERT(q_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_resume_enter, HCI1394_TNF_HAL_STACK, "");
 	hci1394_q_reset(q_handle);
-	TNF_PROBE_0_DEBUG(hci1394_q_resume_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -370,11 +349,9 @@ void
 hci1394_q_stop(hci1394_q_handle_t q_handle)
 {
 	ASSERT(q_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_stop_enter, HCI1394_TNF_HAL_STACK, "");
 	mutex_enter(&q_handle->q_mutex);
 	q_handle->q_dma_running = B_FALSE;
 	mutex_exit(&q_handle->q_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_q_stop_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -400,7 +377,6 @@ hci1394_q_reserve(hci1394_q_buf_t *qbuf, uint_t size, uint32_t *io_addr)
 
 
 	ASSERT(qbuf != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_reserve_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* Save backup of pointers in case we have to unreserve */
 	qbuf->qb_backup_ptrs = qbuf->qb_ptrs;
@@ -436,10 +412,6 @@ hci1394_q_reserve(hci1394_q_buf_t *qbuf, uint_t size, uint32_t *io_addr)
 		 */
 		} else {
 			qbuf->qb_ptrs.qp_resv_size = 0;
-			TNF_PROBE_0(hci1394_q_reserve_ns_fail,
-			    HCI1394_TNF_HAL_ERROR, "");
-			TNF_PROBE_0_DEBUG(hci1394_q_reserve_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return (DDI_FAILURE);
 		}
 
@@ -464,10 +436,6 @@ hci1394_q_reserve(hci1394_q_buf_t *qbuf, uint_t size, uint32_t *io_addr)
 			if ((qbuf->qb_ptrs.qp_current + aligned_size) >
 			    qbuf->qb_ptrs.qp_free) {
 				qbuf->qb_ptrs.qp_resv_size = 0;
-				TNF_PROBE_0(hci1394_q_reserve_ns_fail,
-				    HCI1394_TNF_HAL_ERROR, "");
-				TNF_PROBE_0_DEBUG(hci1394_q_reserve_exit,
-				    HCI1394_TNF_HAL_STACK, "");
 				return (DDI_FAILURE);
 			/*
 			 * The free pointer is in this buffer. We have enough
@@ -508,8 +476,6 @@ hci1394_q_reserve(hci1394_q_buf_t *qbuf, uint_t size, uint32_t *io_addr)
 		    qbuf->qb_ptrs.qp_offset);
 	}
 
-	TNF_PROBE_0_DEBUG(hci1394_q_reserve_exit, HCI1394_TNF_HAL_STACK, "");
-
 	return (DDI_SUCCESS);
 }
 
@@ -522,12 +488,9 @@ static void
 hci1394_q_unreserve(hci1394_q_buf_t *qbuf)
 {
 	ASSERT(qbuf != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_unreserve_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/* Go back to pointer setting before the reserve */
 	qbuf->qb_ptrs = qbuf->qb_backup_ptrs;
-
-	TNF_PROBE_0_DEBUG(hci1394_q_unreserve_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -540,7 +503,6 @@ void
 hci1394_q_next_buf(hci1394_q_buf_t *qbuf)
 {
 	ASSERT(qbuf != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_next_buf_enter, HCI1394_TNF_HAL_STACK, "");
 
 	/*
 	 * go to the next cookie, if we are >= the cookie count, go back to the
@@ -560,8 +522,6 @@ hci1394_q_next_buf(hci1394_q_buf_t *qbuf)
 	    qbuf->qb_cookie[qbuf->qb_ptrs.qp_current_buf].dmac_size - 1;
 	qbuf->qb_ptrs.qp_current = qbuf->qb_ptrs.qp_begin;
 	qbuf->qb_ptrs.qp_offset = 0;
-
-	TNF_PROBE_0_DEBUG(hci1394_q_next_buf_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -582,7 +542,6 @@ hci1394_q_at(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	ASSERT(q_handle != NULL);
 	ASSERT(cmd != NULL);
 	ASSERT(hdr != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_enter, HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&q_handle->q_mutex);
 
@@ -596,9 +555,6 @@ hci1394_q_at(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	    cmd->qc_generation)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
 		mutex_exit(&q_handle->q_mutex);
-		TNF_PROBE_0(hci1394_q_at_st_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_q_at_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -614,9 +570,6 @@ hci1394_q_at(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	if (status != DDI_SUCCESS) {
 		*result = H1394_STATUS_NOMORE_SPACE;
 		mutex_exit(&q_handle->q_mutex);
-		TNF_PROBE_0(hci1394_q_at_qre_fail, HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_q_at_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return (DDI_FAILURE);
 	}
 
@@ -627,7 +580,6 @@ hci1394_q_at(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	hci1394_tlist_add(q_handle->q_queued_list, &cmd->qc_node);
 
 	mutex_exit(&q_handle->q_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (DDI_SUCCESS);
 }
@@ -676,8 +628,6 @@ hci1394_q_at_with_data(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	ASSERT(cmd != NULL);
 	ASSERT(hdr != NULL);
 	ASSERT(data != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_with_data_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	mutex_enter(&q_handle->q_mutex);
 
@@ -691,8 +641,6 @@ hci1394_q_at_with_data(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	    cmd->qc_generation)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
 		mutex_exit(&q_handle->q_mutex);
-		TNF_PROBE_0_DEBUG(hci1394_q_at_wd_st_fail,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -709,10 +657,6 @@ hci1394_q_at_with_data(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	if (status != DDI_SUCCESS) {
 		*result = H1394_STATUS_NOMORE_SPACE;
 		mutex_exit(&q_handle->q_mutex);
-		TNF_PROBE_0(hci1394_q_at_wd_qre_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_q_at_with_data_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -722,10 +666,6 @@ hci1394_q_at_with_data(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 		*result = H1394_STATUS_NOMORE_SPACE;
 		hci1394_q_unreserve(&q_handle->q_desc);
 		mutex_exit(&q_handle->q_mutex);
-		TNF_PROBE_0(hci1394_q_at_wd_qra_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_q_at_with_data_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -743,8 +683,6 @@ hci1394_q_at_with_data(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	hci1394_tlist_add(q_handle->q_queued_list, &cmd->qc_node);
 
 	mutex_exit(&q_handle->q_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_with_data_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (DDI_SUCCESS);
 }
@@ -773,8 +711,6 @@ hci1394_q_at_with_mblk(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	ASSERT(cmd != NULL);
 	ASSERT(hdr != NULL);
 	ASSERT(mblk != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_with_mblk_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	mutex_enter(&q_handle->q_mutex);
 
@@ -788,8 +724,6 @@ hci1394_q_at_with_mblk(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	    cmd->qc_generation)) {
 		*result = H1394_STATUS_INVALID_BUSGEN;
 		mutex_exit(&q_handle->q_mutex);
-		TNF_PROBE_0_DEBUG(hci1394_q_at_wm_st_fail,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -806,10 +740,6 @@ hci1394_q_at_with_mblk(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	if (status != DDI_SUCCESS) {
 		*result = H1394_STATUS_NOMORE_SPACE;
 		mutex_exit(&q_handle->q_mutex);
-		TNF_PROBE_0(hci1394_q_at_wm_qre_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_q_at_with_mblk_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -820,10 +750,6 @@ hci1394_q_at_with_mblk(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 		*result = H1394_STATUS_NOMORE_SPACE;
 		hci1394_q_unreserve(&q_handle->q_desc);
 		mutex_exit(&q_handle->q_mutex);
-		TNF_PROBE_0(hci1394_q_at_wm_qra_fail,
-		    HCI1394_TNF_HAL_ERROR, "");
-		TNF_PROBE_0_DEBUG(hci1394_q_at_with_mblk_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return (DDI_FAILURE);
 	}
 
@@ -841,8 +767,6 @@ hci1394_q_at_with_mblk(hci1394_q_handle_t q_handle, hci1394_q_cmd_t *cmd,
 	hci1394_tlist_add(q_handle->q_queued_list, &cmd->qc_node);
 
 	mutex_exit(&q_handle->q_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_with_mblk_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	return (DDI_SUCCESS);
 }
@@ -866,7 +790,6 @@ hci1394_q_at_next(hci1394_q_handle_t q_handle, boolean_t flush_q,
 
 	ASSERT(q_handle != NULL);
 	ASSERT(cmd != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_next_enter, HCI1394_TNF_HAL_STACK, "");
 
 	mutex_enter(&q_handle->q_mutex);
 
@@ -883,8 +806,6 @@ hci1394_q_at_next(hci1394_q_handle_t q_handle, boolean_t flush_q,
 		/* There are no more commands left on the queued list */
 		*cmd = NULL;
 		mutex_exit(&q_handle->q_mutex);
-		TNF_PROBE_0_DEBUG(hci1394_q_at_next_exit, HCI1394_TNF_HAL_STACK,
-		    "");
 		return;
 	}
 
@@ -907,8 +828,6 @@ hci1394_q_at_next(hci1394_q_handle_t q_handle, boolean_t flush_q,
 		if (cmd_status == 0) {
 			*cmd = NULL;
 			mutex_exit(&q_handle->q_mutex);
-			TNF_PROBE_0_DEBUG(hci1394_q_at_next_exit,
-			    HCI1394_TNF_HAL_STACK, "");
 			return;
 		}
 	}
@@ -936,7 +855,6 @@ hci1394_q_at_next(hci1394_q_handle_t q_handle, boolean_t flush_q,
 	(*cmd)->qc_status = cmd_status;
 
 	mutex_exit(&q_handle->q_mutex);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_next_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -958,8 +876,6 @@ hci1394_q_at_write_OMI(hci1394_q_handle_t q_handle, hci1394_q_buf_t *qbuf,
 	ASSERT(cmd != NULL);
 	ASSERT(hdr != NULL);
 	ASSERT(MUTEX_HELD(&q_handle->q_mutex));
-	TNF_PROBE_0_DEBUG(hci1394_q_at_write_OMI_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	/* The only valid "header" sizes for an OMI are 8 bytes or 16 bytes */
 	ASSERT((hdrsize == 8) || (hdrsize == 16));
@@ -993,9 +909,6 @@ hci1394_q_at_write_OMI(hci1394_q_handle_t q_handle, hci1394_q_buf_t *qbuf,
 	q_handle->q_block_cnt += 2;
 	qbuf->qb_ptrs.qp_resv_size -= sizeof (hci1394_desc_imm_t);
 	qbuf->qb_ptrs.qp_current += sizeof (hci1394_desc_imm_t);
-
-	TNF_PROBE_0_DEBUG(hci1394_q_at_write_OMI_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -1019,8 +932,6 @@ hci1394_q_at_write_OLI(hci1394_q_handle_t q_handle, hci1394_q_buf_t *qbuf,
 	ASSERT(cmd != NULL);
 	ASSERT(hdr != NULL);
 	ASSERT(MUTEX_HELD(&q_handle->q_mutex));
-	TNF_PROBE_0_DEBUG(hci1394_q_at_write_OLI_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	/* The only valid "header" sizes for an OLI are 8, 12, 16 bytes */
 	ASSERT((hdrsize == 8) || (hdrsize == 12) || (hdrsize == 16));
@@ -1119,9 +1030,6 @@ hci1394_q_at_write_OLI(hci1394_q_handle_t q_handle, hci1394_q_buf_t *qbuf,
 	} else {
 		q_handle->q_info.qi_wake(q_handle->q_info.qi_callback_arg);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_q_at_write_OLI_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -1145,8 +1053,6 @@ hci1394_q_at_write_OL(hci1394_q_handle_t q_handle, hci1394_q_buf_t *qbuf,
 	ASSERT(qbuf != NULL);
 	ASSERT(cmd != NULL);
 	ASSERT(MUTEX_HELD(&q_handle->q_mutex));
-	TNF_PROBE_0_DEBUG(hci1394_q_at_write_OL_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	/* make sure enough room for OL */
 	ASSERT(qbuf->qb_ptrs.qp_resv_size >= sizeof (hci1394_desc_t));
@@ -1219,9 +1125,6 @@ hci1394_q_at_write_OL(hci1394_q_handle_t q_handle, hci1394_q_buf_t *qbuf,
 	} else {
 		q_handle->q_info.qi_wake(q_handle->q_info.qi_callback_arg);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_q_at_write_OL_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -1238,8 +1141,6 @@ hci1394_q_at_rep_put8(hci1394_q_buf_t *qbuf, hci1394_q_cmd_t *cmd,
 	ASSERT(qbuf != NULL);
 	ASSERT(cmd != NULL);
 	ASSERT(data != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_rep_put8_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	/* Make sure enough room for data */
 	ASSERT(qbuf->qb_ptrs.qp_resv_size >= datasize);
@@ -1262,9 +1163,6 @@ hci1394_q_at_rep_put8(hci1394_q_buf_t *qbuf, hci1394_q_cmd_t *cmd,
 	/* Sync data buffer */
 	(void) ddi_dma_sync(qbuf->qb_buf.bi_dma_handle, 0,
 	    qbuf->qb_buf.bi_length, DDI_DMA_SYNC_FORDEV);
-
-	TNF_PROBE_0_DEBUG(hci1394_q_at_rep_put8_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -1288,8 +1186,6 @@ hci1394_q_at_copy_from_mblk(hci1394_q_buf_t *qbuf, hci1394_q_cmd_t *cmd,
 	ASSERT(qbuf != NULL);
 	ASSERT(cmd != NULL);
 	ASSERT(mblk != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_at_copy_from_mblk_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* We return these variables to the Services Layer when we are done */
 	mblk->next_offset = mblk->curr_offset;
@@ -1347,9 +1243,6 @@ hci1394_q_at_copy_from_mblk(hci1394_q_buf_t *qbuf, hci1394_q_cmd_t *cmd,
 			mblk->next_offset = mblk->next_mblk->b_rptr;
 		}
 	} while (bytes_left > 0);
-
-	TNF_PROBE_0_DEBUG(hci1394_q_at_copy_from_mblk_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -1369,7 +1262,6 @@ hci1394_q_ar_next(hci1394_q_handle_t q_handle, uint32_t **q_addr)
 
 	ASSERT(q_handle != NULL);
 	ASSERT(q_addr != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_ar_next_enter, HCI1394_TNF_HAL_STACK, "");
 
 	descb = &q_handle->q_desc;
 	datab = &q_handle->q_data;
@@ -1388,8 +1280,6 @@ hci1394_q_ar_next(hci1394_q_handle_t q_handle, uint32_t **q_addr)
 	if (residual_count >= q_handle->q_space_left) {
 		/* No new packets received */
 		*q_addr = NULL;
-		TNF_PROBE_0_DEBUG(hci1394_q_ar_next_exit,
-		    HCI1394_TNF_HAL_STACK, "");
 		return;
 	}
 
@@ -1402,8 +1292,6 @@ hci1394_q_ar_next(hci1394_q_handle_t q_handle, uint32_t **q_addr)
 	 * packet.
 	 */
 	*q_addr = (uint32_t *)datab->qb_ptrs.qp_current;
-
-	TNF_PROBE_0_DEBUG(hci1394_q_ar_next_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -1422,7 +1310,6 @@ hci1394_q_ar_free(hci1394_q_handle_t q_handle, uint_t size)
 
 
 	ASSERT(q_handle != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_ar_free_enter, HCI1394_TNF_HAL_STACK, "");
 
 	descb = &q_handle->q_desc;
 	datab = &q_handle->q_data;
@@ -1462,8 +1349,6 @@ hci1394_q_ar_free(hci1394_q_handle_t q_handle, uint_t size)
 		q_handle->q_space_left -= size;
 		datab->qb_ptrs.qp_current += size;
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_q_ar_free_exit, HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -1485,7 +1370,6 @@ hci1394_q_ar_get32(hci1394_q_handle_t q_handle, uint32_t *addr)
 
 	ASSERT(q_handle != NULL);
 	ASSERT(addr != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_get32_enter, HCI1394_TNF_HAL_STACK, "");
 
 	data = &q_handle->q_data;
 
@@ -1502,8 +1386,6 @@ hci1394_q_ar_get32(hci1394_q_handle_t q_handle, uint32_t *addr)
 	} else {
 		data32 = ddi_get32(data->qb_buf.bi_handle, addr);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_q_get32_exit, HCI1394_TNF_HAL_STACK, "");
 
 	return (data32);
 }
@@ -1531,8 +1413,6 @@ hci1394_q_ar_rep_get8(hci1394_q_handle_t q_handle, uint8_t *dest,
 	ASSERT(q_handle != NULL);
 	ASSERT(dest != NULL);
 	ASSERT(q_addr != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_ar_rep_get8_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	data = &q_handle->q_data;
 
@@ -1575,9 +1455,6 @@ hci1394_q_ar_rep_get8(hci1394_q_handle_t q_handle, uint8_t *dest,
 		ddi_rep_get8(data->qb_buf.bi_handle, dest, q_addr, size,
 		    DDI_DEV_AUTOINCR);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_q_ar_rep_get8_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }
 
 
@@ -1605,8 +1482,6 @@ hci1394_q_ar_copy_to_mblk(hci1394_q_handle_t q_handle, uint8_t *addr,
 	ASSERT(q_handle != NULL);
 	ASSERT(addr != NULL);
 	ASSERT(mblk != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_copy_to_mblk_enter,
-	    HCI1394_TNF_HAL_STACK, "");
 
 	/* We return these variables to the Services Layer when we are done */
 	mblk->next_offset = mblk->curr_offset;
@@ -1675,9 +1550,6 @@ hci1394_q_ar_copy_to_mblk(hci1394_q_handle_t q_handle, uint8_t *addr,
 			mblk->next_offset = mblk->next_mblk->b_wptr;
 		}
 	} while (bytes_left > 0);
-
-	TNF_PROBE_0_DEBUG(hci1394_q_copy_to_mblk_exit,
-	    HCI1394_TNF_HAL_STACK, "");
 }
 
 
@@ -1698,8 +1570,6 @@ hci1394_q_ar_write_IM(hci1394_q_handle_t q_handle, hci1394_q_buf_t *qbuf,
 
 	ASSERT(q_handle != NULL);
 	ASSERT(qbuf != NULL);
-	TNF_PROBE_0_DEBUG(hci1394_q_ar_write_IM_enter, HCI1394_TNF_HAL_STACK,
-	    "");
 
 	/* Make sure enough room for IM */
 	if ((qbuf->qb_ptrs.qp_current + sizeof (hci1394_desc_t)) >
@@ -1760,7 +1630,4 @@ hci1394_q_ar_write_IM(hci1394_q_handle_t q_handle, hci1394_q_buf_t *qbuf,
 	} else {
 		q_handle->q_info.qi_wake(q_handle->q_info.qi_callback_arg);
 	}
-
-	TNF_PROBE_0_DEBUG(hci1394_q_ar_write_IM_exit, HCI1394_TNF_HAL_STACK,
-	    "");
 }

@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef	_ERR_H
 #define	_ERR_H
 
@@ -37,10 +41,14 @@ extern "C" {
 /* Program exit and warning calls */
 void err(int, const char *, ...) __NORETURN;
 void verr(int, const char *, va_list) __NORETURN;
+void errc(int, int, const char *, ...) __NORETURN;
+void verrc(int, int, const char *, va_list) __NORETURN;
 void errx(int, const char *, ...) __NORETURN;
 void verrx(int, const char *, va_list) __NORETURN;
 void warn(const char *, ...);
 void vwarn(const char *, va_list);
+void warnc(int, const char *, ...);
+void vwarnc(int, const char *, va_list);
 void warnx(const char *, ...);
 void vwarnx(const char *, va_list);
 

@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2018 Joyent, Inc.
+ * Copyright 2022 MNX Cloud, Inc.
  */
 
 #include <sys/types.h>
@@ -327,13 +328,16 @@ sadb_unlinkassoc(ipsa_t *ipsa)
 	ASSERT(ipsa->ipsa_linklock != NULL);
 	ASSERT(MUTEX_HELD(ipsa->ipsa_linklock));
 
+	/* Sometimes someone beats us here with the same SA. Check now. */
+	if (ipsa->ipsa_ptpn == NULL)
+		return;
+
 	/* These fields are protected by the link lock. */
 	*(ipsa->ipsa_ptpn) = ipsa->ipsa_next;
 	if (ipsa->ipsa_next != NULL) {
 		ipsa->ipsa_next->ipsa_ptpn = ipsa->ipsa_ptpn;
 		ipsa->ipsa_next = NULL;
 	}
-
 	ipsa->ipsa_ptpn = NULL;
 
 	/* This may destroy the SA. */
@@ -3770,7 +3774,8 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 	}
 
 	alloclen = sizeof (*samsg) + sizeof (*current) + sizeof (*expire) +
-	    2 * sizeof (sadb_address_t) + sizeof (*saext);
+	    2 * sizeof (sadb_address_t) + sizeof (*saext) +
+	    sizeof (sadb_x_kmc_t);
 
 	af = assoc->ipsa_addrfam;
 	switch (af) {
@@ -3898,6 +3903,10 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 		    assoc->ipsa_innerdstpfx);
 		ASSERT(mp->b_wptr != NULL);
 	}
+
+	mp->b_wptr = sadb_make_kmc_ext(mp->b_wptr, end, assoc->ipsa_kmp,
+	    assoc->ipsa_kmc);
+	ASSERT(mp->b_wptr != NULL);
 
 	/* Can just putnext, we're ready to go! */
 	putnext(pfkey_q, mp1);

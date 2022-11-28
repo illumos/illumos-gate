@@ -18,6 +18,10 @@ PAYLOAD_CLEANFILES =	payload_start.o	\
 		$(PAYLOADS:%=pobj_%.s)
 
 $(PAYLOADS:%=payload_%.o) := AS_CPPFLAGS += -I../common
+# Without a real runtime in the payload, the stack protector must be disabled
+$(PAYLOADS:%=payload_%.o) := STACKPROTECT = none
+# Like our own kernel, prevent the compiler from using the FPU via SIMD
+$(PAYLOADS:%=payload_%.o) := CFLAGS64 += $(STAND_FLAGS_64)
 
 payload_%: payload_start.o payload_%.o
 	$(LD) -dn -e _start -M ../common/Mapfile.payload -o $@ $^

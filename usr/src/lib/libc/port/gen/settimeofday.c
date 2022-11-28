@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include <sys/types.h>
@@ -41,9 +39,8 @@
  * Don't do anything with the timezone information.
  */
 
-/*ARGSUSED1*/
 int
-settimeofday(struct timeval *tp, void *tzp)
+settimeofday(struct timeval *tp, void *tzp __unused)
 {
 	time_t t;		/* time in seconds */
 

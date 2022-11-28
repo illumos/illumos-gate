@@ -84,7 +84,7 @@
 
 	movl	$0, (%esp)
 	mov	$GETCPU_GDT_OFFSET, %eax
-	lsl	%ax, %eax
+	lsl	%eax, %eax
 	movl	%eax, 0x4(%esp)
 	movl	CP_TSC_TYPE(%edi), %eax
 
@@ -131,7 +131,7 @@
 	 * since the cpu_id was first checked.
 	 */
 	movl	$GETCPU_GDT_OFFSET, %ecx
-	lsl	%cx, %ecx
+	lsl	%ecx, %ecx
 	movl	0x4(%esp), %esi
 	cmpl	%ecx, %esi
 	jne	9f
@@ -196,6 +196,6 @@
 	ret
 1:
 	mov	$GETCPU_GDT_OFFSET, %eax
-	lsl	%ax, %eax
+	lsl	%eax, %eax
 	ret
 	SET_SIZE(__cp_getcpu)

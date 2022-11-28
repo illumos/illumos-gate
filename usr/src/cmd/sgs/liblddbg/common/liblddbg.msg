@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2022 Oxide Computer Company
 #
 
 @ _START_
@@ -663,7 +664,6 @@
 @ MSG_FIL_FIXNAME	"file=%s;  required name=%s"
 @ MSG_FIL_PROMOTE	"file=%s;  promoting mode to %s"
 @ MSG_FIL_DEFERRED	"file=%s;  deferred dependency exchanged for file=%s"
-@ MSG_FIL_AOUT		"file=%s  [ AOUT ]; generating link map"
 @ MSG_FIL_ELF		"file=%s  [ ELF ]; generating link map%s"
 @ MSG_FIL_LDSO		"file=%s  [ ELF ]"
 
@@ -751,6 +751,10 @@
 @ MSG_REJ_PLATCAP	"obj=%s;  rejected: platform capability (CA_SUNW_PLAT) \
 			 unsupported: %s"
 @ MSG_REJ_HWCAP_2	"obj=%s;  rejected: hardware capability (CA_SUNW_HW_2) \
+			 unsupported: %s"
+@ MSG_REJ_ARCHIVE	"obj=%s;  rejected: archive unsed incorrectly"
+@ MSG_REJ_KMOD		"obj=%s;  rejected: kernel module"
+@ MSG_REJ_HWCAP_3	"obj=%s;  rejected: hardware capability (CA_SUNW_HW_3) \
 			 unsupported: %s"
 
 # Libs messages
@@ -977,7 +981,6 @@
 @ MSG_SYM_COPY_DST	"symbol=%s;  copy destination: alignment: 0x%x"
 @ MSG_SYM_COPY_REF	"symbol=%s;  copy reference"
 
-@ MSG_SYM_AOUT		"symbol=%s;  (original AOUT name)"
 @ MSG_SYM_LOOKUP	"symbol=%s;  lookup in file=%s  [ %s ]"
 
 @ MSG_DLSYM_1		"symbol=%s;  dlsym() called from file=%s %s %s"
@@ -998,6 +1001,8 @@
 			 (CA_SUNW_PLAT):  [ %s ]"
 @ MSG_CAP_SYM_HW_2	"  symbol=%s[%u]:  capability specific \
 			 (CA_SUNW_HW_2):  [ %s ]"
+@ MSG_CAP_SYM_HW_3	"  symbol=%s[%u]:  capability specific \
+			 (CA_SUNW_HW_3):  [ %s ]"
 
 @ MSG_SYM_LAZY_RESCAN	"rescanning for lazy dependencies for symbol: %s"
 
@@ -1183,12 +1188,14 @@
 @ MSG_CAP_SYS_MACH	"machine capability (CA_SUNW_MACH) - %s"
 @ MSG_CAP_SYS_PLAT	"platform capability (CA_SUNW_PLAT) - %s"
 @ MSG_CAP_SYS_HW_2	"hardware capabilities (CA_SUNW_HW_2) - %s"
+@ MSG_CAP_SYS_HW_3	"hardware capabilities (CA_SUNW_HW_3) - %s"
 
 @ MSG_CAP_ALT_HW_1	"alternative hardware capabilities (CA_SUNW_HW_1) - %s"
 @ MSG_CAP_ALT_SF_1	"alternative software capabilities (CA_SUNW_SF_1) - %s"
 @ MSG_CAP_ALT_MACH	"alternative machine capability (CA_SUNW_MACH) - %s"
 @ MSG_CAP_ALT_PLAT	"alternative platform capability (CA_SUNW_PLAT) - %s"
 @ MSG_CAP_ALT_HW_2	"alternative hardware capabilities (CA_SUNW_HW_2) - %s"
+@ MSG_CAP_ALT_HW_3	"alternative hardware capabilities (CA_SUNW_HW_3) - %s"
 
 @ MSG_CAP_SEC_TITLE	"capabilities; input file=%s"
 @ MSG_CAP_SEC_ENTRY     "%12.12s  %-15.15s  %s"
@@ -1759,7 +1766,6 @@
 
 @ MSG_MR_PADDING	"[ PADDING ]"
 @ MSG_MR_HDR_ELF	"[ HDR_ELF ]"
-@ MSG_MR_HDR_AOUT	"[ HDR_AOUT ]"
 
 # audit originator
 

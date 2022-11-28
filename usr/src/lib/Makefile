@@ -222,9 +222,6 @@ SUBDIRS +=				\
 	libtecla	\
 	libtermcap	\
 	libthread	\
-	libtnf		\
-	libtnfctl	\
-	libtnfprobe	\
 	libtsnet	\
 	libtsol		\
 	libumem		\
@@ -465,9 +462,6 @@ HDRSUBDIRS=				\
 	libsysevent	\
 	libtecla	\
 	libtermcap	\
-	libtnf		\
-	libtnfctl	\
-	libtnfprobe	\
 	libtsnet	\
 	libtsol		\
 	libumem		\
@@ -600,7 +594,7 @@ libcontract:	libnvpair
 libcmdutils:	libavl libnvpair
 libcpc:		libpctx
 libcrypt:	libgen
-libctf:		libdwarf
+libctf:		libavl libdwarf
 libdemangle:	libcustr
 libdevice:	libnvpair
 libdevid:	libdevinfo
@@ -678,7 +672,6 @@ libsun_ima:	libdevinfo libsysevent
 libsysevent:	libsecdb
 libtecla:	libcurses
 libtermcap:	libcurses
-libtnfctl:	../cmd/sgs/libelf
 libtsalarm:	libpcp
 libtsnet:	libtsol libsecdb
 libtsol:	libsecdb

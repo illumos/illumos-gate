@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_ELFEDIT_H
@@ -455,7 +457,7 @@ typedef struct {
 	elfedit_i18nhdl_t	oa_help;	/* Help text for option */
 	elfedit_cmd_oa_flag_t	oa_flags;	/* Additional attributes */
 	elfedit_cmd_oa_mask_t	oa_idmask;	/* Unique id, returned by */
-						/* 	elfedit_getopt */
+						/*	elfedit_getopt */
 						/*	for use by caller */
 	elfedit_cmd_oa_mask_t	oa_excmask;	/* Mutual exclusion mask */
 } elfedit_cmd_optarg_t;
@@ -739,8 +741,9 @@ typedef enum {
 	ELFEDIT_CONST_HW1_SUNW =	33,	/* hardware capabilities */
 	ELFEDIT_CONST_SF1_SUNW =	34,	/* software capabilities */
 	ELFEDIT_CONST_HW2_SUNW =	35,	/* hardware capabilities */
+	ELFEDIT_CONST_HW3_SUNW =	36,	/* hardware capabilities */
 
-	ELFEDIT_CONST_NUM =		36,	/* # of constant types */
+	ELFEDIT_CONST_NUM =		37,	/* # of constant types */
 } elfedit_const_t;
 
 /*

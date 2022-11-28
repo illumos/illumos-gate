@@ -352,6 +352,9 @@ file \
     mode=0444
 file path=opt/SUNWdtrt/tst/common/bitfields/tst.BitFieldPromotion.d mode=0444
 file path=opt/SUNWdtrt/tst/common/bitfields/tst.SizeofBitField.d mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/tst.bitfields.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/bitfields/tst.bitfields.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/bitfields/tst.bitfields.ksh.out mode=0444
 dir  path=opt/SUNWdtrt/tst/common/buffering
 file path=opt/SUNWdtrt/tst/common/buffering/err.end.d mode=0444
 file path=opt/SUNWdtrt/tst/common/buffering/err.resize1.d mode=0444
@@ -2044,5 +2047,6 @@ legacy pkg=SUNWdtrt category=internal \
     hotline="Contact the DTrace discussion forum" name="DTrace Test Suite"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+depend type=require fmri=diagnostic/cpu-counters
 depend type=require fmri=runtime/java
 depend type=require fmri=runtime/java/runtime64

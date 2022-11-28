@@ -77,9 +77,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	uint32_t		log_cq_size, lkey, uarpg;
 	uint_t			dma_xfer_mode, cq_sync, cq_is_umap;
 	int			status, i, flag;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_cq_alloc);
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*cq_attr))
 
@@ -96,8 +93,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 		status = tavor_umap_db_find(state->ts_instance, ddi_get_pid(),
 		    MLNX_UMAP_UARPG_RSRC, &value, 0, NULL);
 		if (status != DDI_SUCCESS) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INVALID_PARAM, "failed UAR page");
 			goto cqalloc_fail;
 		}
 		uarpg = ((tavor_rsrc_t *)(uintptr_t)value)->tr_indx;
@@ -118,8 +113,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_CQC, 1, sleepflag, &cqc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed CQ context");
 		goto cqalloc_fail1;
 	}
 
@@ -131,8 +124,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	 */
 	status = tavor_rsrc_alloc(state, TAVOR_CQHDL, 1, sleepflag, &rsrc);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed CQ handle");
 		goto cqalloc_fail2;
 	}
 	cq = (tavor_cqhdl_t)rsrc->tr_addr;
@@ -153,8 +144,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 		umapdb = tavor_umap_db_alloc(state->ts_instance, cq->cq_cqnum,
 		    MLNX_UMAP_CQMEM_RSRC, (uint64_t)(uintptr_t)rsrc);
 		if (umapdb == NULL) {
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed umap add");
 			goto cqalloc_fail3;
 		}
 	}
@@ -173,8 +162,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	 * with the device limits and/or software-configured limits)
 	 */
 	if (log_cq_size > state->ts_cfg_profile->cp_log_max_cq_sz) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_CQ_EXCEEDED, "max CQ size");
 		goto cqalloc_fail4;
 	}
 
@@ -203,8 +190,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	}
 	status = tavor_queue_alloc(state, &cq->cq_cqinfo, sleepflag);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed completion queue");
 		goto cqalloc_fail4;
 	}
 	buf = (tavor_hw_cqe_t *)cq->cq_cqinfo.qa_buf_aligned;
@@ -244,8 +229,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	op.mro_bind_override_addr = 0;
 	status = tavor_mr_register(state, pd, &mr_attr, &mr, &op);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed register mr");
 		goto cqalloc_fail5;
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
@@ -300,10 +283,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	if (status != TAVOR_CMD_SUCCESS) {
 		cmn_err(CE_CONT, "Tavor: SW2HW_CQ command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_cq_alloc_sw2hw_cq_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(ibc_get_ci_failure(0), "tavor SW2HW_CQ command");
 		goto cqalloc_fail6;
 	}
 
@@ -356,7 +335,6 @@ tavor_cq_alloc(tavor_state_t *state, ibt_cq_hdl_t ibt_cqhdl,
 	}
 	*cqhdl = cq;
 
-	TAVOR_TNF_EXIT(tavor_cq_alloc);
 	return (DDI_SUCCESS);
 
 /*
@@ -380,9 +358,6 @@ cqalloc_fail2:
 cqalloc_fail1:
 	tavor_pd_refcnt_dec(pd);
 cqalloc_fail:
-	TNF_PROBE_1(tavor_cq_alloc_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_cq_alloc);
 	return (status);
 }
 
@@ -406,8 +381,6 @@ tavor_cq_free(tavor_state_t *state, tavor_cqhdl_t *cqhdl, uint_t sleepflag)
 	uint_t			maxprot;
 	int			status;
 
-	TAVOR_TNF_ENTER(tavor_cq_free);
-
 	/*
 	 * Pull all the necessary information from the Tavor Completion Queue
 	 * handle.  This is necessary here because the resource for the
@@ -427,9 +400,6 @@ tavor_cq_free(tavor_state_t *state, tavor_cqhdl_t *cqhdl, uint_t sleepflag)
 	 */
 	if (cq->cq_refcnt != 0) {
 		mutex_exit(&cq->cq_lock);
-		TNF_PROBE_1(tavor_cq_free_refcnt_fail, TAVOR_TNF_ERROR, "",
-		    tnf_int, refcnt, cq->cq_refcnt);
-		TAVOR_TNF_EXIT(tavor_cq_free);
 		return (IBT_CQ_BUSY);
 	}
 
@@ -448,7 +418,6 @@ tavor_cq_free(tavor_state_t *state, tavor_cqhdl_t *cqhdl, uint_t sleepflag)
 		if (status != DDI_SUCCESS) {
 			mutex_exit(&cq->cq_lock);
 			TAVOR_WARNING(state, "failed to find in database");
-			TAVOR_TNF_EXIT(tavor_cq_free);
 			return (ibc_get_ci_failure(0));
 		}
 		tavor_umap_db_free(umapdb);
@@ -461,7 +430,6 @@ tavor_cq_free(tavor_state_t *state, tavor_cqhdl_t *cqhdl, uint_t sleepflag)
 				mutex_exit(&cq->cq_lock);
 				TAVOR_WARNING(state, "failed in CQ memory "
 				    "devmap_devmem_remap()");
-				TAVOR_TNF_EXIT(tavor_cq_free);
 				return (ibc_get_ci_failure(0));
 			}
 			cq->cq_umap_dhp = (devmap_cookie_t)NULL;
@@ -498,9 +466,6 @@ tavor_cq_free(tavor_state_t *state, tavor_cqhdl_t *cqhdl, uint_t sleepflag)
 		TAVOR_WARNING(state, "failed to reclaim CQC ownership");
 		cmn_err(CE_CONT, "Tavor: HW2SW_CQ command failed: %08x\n",
 		    status);
-		TNF_PROBE_1(tavor_cq_free_hw2sw_cq_cmd_fail,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-		TAVOR_TNF_EXIT(tavor_cq_free);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -514,8 +479,6 @@ tavor_cq_free(tavor_state_t *state, tavor_cqhdl_t *cqhdl, uint_t sleepflag)
 	    sleepflag);
 	if (status != DDI_SUCCESS) {
 		TAVOR_WARNING(state, "failed to deregister CQ memory");
-		TNF_PROBE_0(tavor_cq_free_dereg_mr_fail, TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_cq_free);
 		return (ibc_get_ci_failure(0));
 	}
 
@@ -534,7 +497,6 @@ tavor_cq_free(tavor_state_t *state, tavor_cqhdl_t *cqhdl, uint_t sleepflag)
 	/* Set the cqhdl pointer to NULL and return success */
 	*cqhdl = NULL;
 
-	TAVOR_TNF_EXIT(tavor_cq_free);
 	return (DDI_SUCCESS);
 }
 
@@ -557,9 +519,6 @@ tavor_cq_resize(tavor_state_t *state, tavor_cqhdl_t cq, uint_t req_size,
 	uint32_t		new_prod_indx, old_cons_indx;
 	uint_t			dma_xfer_mode, cq_sync, log_cq_size, maxprot;
 	int			status, i, flag;
-	char			*errormsg;
-
-	TAVOR_TNF_ENTER(tavor_cq_resize);
 
 	/* Use the internal protection domain (PD) for CQs */
 	pd = state->ts_pdhdl_internal;
@@ -578,8 +537,6 @@ tavor_cq_resize(tavor_state_t *state, tavor_cqhdl_t cq, uint_t req_size,
 	 * with the device limits and/or software-configured limits)
 	 */
 	if (log_cq_size > state->ts_cfg_profile->cp_log_max_cq_sz) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_HCA_CQ_EXCEEDED, "max CQ size");
 		goto cqresize_fail;
 	}
 
@@ -609,8 +566,6 @@ tavor_cq_resize(tavor_state_t *state, tavor_cqhdl_t cq, uint_t req_size,
 	}
 	status = tavor_queue_alloc(state, &new_cqinfo, sleepflag);
 	if (status != DDI_SUCCESS) {
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed completion queue");
 		goto cqresize_fail;
 	}
 	buf = (tavor_hw_cqe_t *)new_cqinfo.qa_buf_aligned;
@@ -649,8 +604,6 @@ tavor_cq_resize(tavor_state_t *state, tavor_cqhdl_t cq, uint_t req_size,
 	status = tavor_mr_register(state, pd, &mr_attr, &mr, &op);
 	if (status != DDI_SUCCESS) {
 		tavor_queue_free(state, &new_cqinfo);
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed register mr");
 		goto cqresize_fail;
 	}
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mr))
@@ -707,9 +660,6 @@ tavor_cq_resize(tavor_state_t *state, tavor_cqhdl_t cq, uint_t req_size,
 			tavor_queue_free(state, &new_cqinfo);
 			TAVOR_WARNING(state, "failed to find in database");
 
-			/* Set "status" and "errormsg" and goto failure */
-			TAVOR_TNF_FAIL(ibc_get_ci_failure(0),
-			    "failed umap lookup");
 			goto cqresize_fail;
 		}
 		old_cons_indx = cqc_entry.cons_indx;
@@ -748,14 +698,10 @@ tavor_cq_resize(tavor_state_t *state, tavor_cqhdl_t cq, uint_t req_size,
 		}
 		tavor_queue_free(state, &new_cqinfo);
 		if (status == TAVOR_CMD_BAD_SIZE) {
-			TAVOR_TNF_EXIT(tavor_cq_resize);
 			return (IBT_CQ_SZ_INSUFFICIENT);
 		} else {
 			cmn_err(CE_CONT, "Tavor: RESIZE_CQ command failed: "
 			    "%08x\n", status);
-			TNF_PROBE_1(tavor_cq_resize_cq_cmd_fail,
-			    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
-			TAVOR_TNF_EXIT(tavor_cq_resize);
 			return (ibc_get_ci_failure(0));
 		}
 	}
@@ -806,7 +752,6 @@ tavor_cq_resize(tavor_state_t *state, tavor_cqhdl_t cq, uint_t req_size,
 			mutex_exit(&cq->cq_lock);
 			TAVOR_WARNING(state, "failed in CQ memory "
 			    "devmap_devmem_remap()");
-			TAVOR_TNF_EXIT(tavor_cq_free);
 			return (ibc_get_ci_failure(0));
 		}
 		cq->cq_umap_dhp = (devmap_cookie_t)NULL;
@@ -830,9 +775,6 @@ tavor_cq_resize(tavor_state_t *state, tavor_cqhdl_t cq, uint_t req_size,
 	    sleepflag);
 	if (status != DDI_SUCCESS) {
 		TAVOR_WARNING(state, "failed to deregister old CQ memory");
-		/* Set "status" and "errormsg" and goto failure */
-		TAVOR_TNF_FAIL(ibc_get_ci_failure(0),
-		    "failed deregister mr (old)");
 		goto cqresize_fail;
 	}
 
@@ -847,13 +789,9 @@ tavor_cq_resize(tavor_state_t *state, tavor_cqhdl_t cq, uint_t req_size,
 		*actual_size = (1 << log_cq_size) - 1;
 	}
 
-	TAVOR_TNF_EXIT(tavor_cq_resize);
 	return (DDI_SUCCESS);
 
 cqresize_fail:
-	TNF_PROBE_1(tavor_cq_resize_fail, TAVOR_TNF_ERROR, "",
-	    tnf_string, msg, errormsg);
-	TAVOR_TNF_EXIT(tavor_cq_resize);
 	return (status);
 }
 
@@ -867,8 +805,6 @@ tavor_cq_notify(tavor_state_t *state, tavor_cqhdl_t cq,
     ibt_cq_notify_flags_t flags)
 {
 	uint_t		cqnum;
-
-	TAVOR_TNF_ENTER(tavor_cq_notify);
 
 	/*
 	 * Determine if we are trying to get the next completion or the next
@@ -888,13 +824,9 @@ tavor_cq_notify(tavor_state_t *state, tavor_cqhdl_t cq,
 		    cqnum, TAVOR_CQDB_DEFAULT_PARAM);
 
 	} else {
-		TNF_PROBE_1(tavor_cq_notify_invflags_fail, TAVOR_TNF_ERROR, "",
-		    tnf_int, flags, flags);
-		TAVOR_TNF_EXIT(tavor_cq_notify);
 		return (IBT_CQ_NOTIFY_TYPE_INVALID);
 	}
 
-	TAVOR_TNF_EXIT(tavor_cq_notify);
 	return (DDI_SUCCESS);
 }
 
@@ -912,17 +844,12 @@ tavor_cq_poll(tavor_state_t *state, tavor_cqhdl_t cq, ibt_wc_t *wc_p,
 	uint32_t	polled_cnt, num_to_increment;
 	int		status;
 
-	TAVOR_TNF_ENTER(tavor_cq_poll);
-
 	/*
 	 * Check for user-mappable CQ memory.  Note:  We do not allow kernel
 	 * clients to poll CQ memory that is accessible directly by the user.
 	 * If the CQ memory is user accessible, then return an error.
 	 */
 	if (cq->cq_is_umap) {
-		TNF_PROBE_0(tavor_cq_poll_inv_usrmapped_type,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_cq_poll);
 		return (IBT_CQ_HDL_INVALID);
 	}
 
@@ -1039,7 +966,6 @@ tavor_cq_poll(tavor_state_t *state, tavor_cqhdl_t cq, ibt_wc_t *wc_p,
 		(void) tavor_isr((caddr_t)state, (caddr_t)NULL);
 	}
 
-	TAVOR_TNF_EXIT(tavor_cq_poll);
 	return (status);
 }
 
@@ -1056,19 +982,14 @@ tavor_cq_handler(tavor_state_t *state, tavor_eqhdl_t eq,
 	uint_t			cqnum;
 	uint_t			eqe_evttype;
 
-	TAVOR_TNF_ENTER(tavor_cq_handler);
-
 	eqe_evttype = TAVOR_EQE_EVTTYPE_GET(eq, eqe);
 
 	ASSERT(eqe_evttype == TAVOR_EVT_COMPLETION ||
 	    eqe_evttype == TAVOR_EVT_EQ_OVERFLOW);
 
 	if (eqe_evttype == TAVOR_EVT_EQ_OVERFLOW) {
-		TNF_PROBE_0(tavor_cq_handler_eq_overflow_condition,
-		    TAVOR_TNF_ERROR, "");
 		tavor_eq_overflow_handler(state, eq, eqe);
 
-		TAVOR_TNF_EXIT(tavor_cq_handler);
 		return (DDI_FAILURE);
 	}
 
@@ -1107,13 +1028,8 @@ tavor_cq_handler(tavor_state_t *state, tavor_eqhdl_t eq,
 	if ((cq != NULL) && (cq->cq_cqnum == cqnum) &&
 	    (state->ts_ibtfpriv != NULL)) {
 		TAVOR_DO_IBTF_CQ_CALLB(state, cq);
-	} else {
-		TNF_PROBE_2(tavor_cq_handler_dropped_event,
-		    TAVOR_TNF_ERROR, "", tnf_uint, ev_cqnum, cqnum,
-		    tnf_uint, hdl_cqnum, cqnum);
 	}
 
-	TAVOR_TNF_EXIT(tavor_cq_handler);
 	return (DDI_SUCCESS);
 }
 
@@ -1132,19 +1048,14 @@ tavor_cq_err_handler(tavor_state_t *state, tavor_eqhdl_t eq,
 	ibt_async_code_t	type;
 	uint_t			eqe_evttype;
 
-	TAVOR_TNF_ENTER(tavor_cq_err_handler);
-
 	eqe_evttype = TAVOR_EQE_EVTTYPE_GET(eq, eqe);
 
 	ASSERT(eqe_evttype == TAVOR_EVT_CQ_ERRORS ||
 	    eqe_evttype == TAVOR_EVT_EQ_OVERFLOW);
 
 	if (eqe_evttype == TAVOR_EVT_EQ_OVERFLOW) {
-		TNF_PROBE_0(tavor_cq_err_handler_eq_overflow_condition,
-		    TAVOR_TNF_ERROR, "");
 		tavor_eq_overflow_handler(state, eq, eqe);
 
-		TAVOR_TNF_EXIT(tavor_cq_err_handler);
 		return (DDI_FAILURE);
 	}
 
@@ -1180,13 +1091,8 @@ tavor_cq_err_handler(tavor_state_t *state, tavor_eqhdl_t eq,
 		type		= IBT_ERROR_CQ;
 
 		TAVOR_DO_IBTF_ASYNC_CALLB(state, type, &event);
-	} else {
-		TNF_PROBE_2(tavor_cq_err_handler_dropped_event,
-		    TAVOR_TNF_ERROR, "", tnf_uint, ev_cqnum, cqnum,
-		    tnf_uint, hdl_cqnum, cqnum);
 	}
 
-	TAVOR_TNF_EXIT(tavor_cq_err_handler);
 	return (DDI_SUCCESS);
 }
 
@@ -1206,8 +1112,6 @@ tavor_cq_refcnt_inc(tavor_cqhdl_t cq, uint_t is_special)
 	 * CQ is being used.
 	 */
 	mutex_enter(&cq->cq_lock);
-	TNF_PROBE_1_DEBUG(tavor_cq_refcnt_inc, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, cq->cq_refcnt);
 	if (cq->cq_refcnt == 0) {
 		cq->cq_is_special = is_special;
 	} else {
@@ -1232,8 +1136,6 @@ tavor_cq_refcnt_dec(tavor_cqhdl_t cq)
 	/* Decrement the completion queue's reference count */
 	mutex_enter(&cq->cq_lock);
 	cq->cq_refcnt--;
-	TNF_PROBE_1_DEBUG(tavor_cq_refcnt_dec, TAVOR_TNF_TRACE, "",
-	    tnf_uint, refcnt, cq->cq_refcnt);
 	mutex_exit(&cq->cq_lock);
 }
 
@@ -1251,9 +1153,6 @@ tavor_cq_doorbell(tavor_state_t *state, uint32_t cq_cmd, uint32_t cqn,
 	/* Build the doorbell from the parameters */
 	doorbell = ((uint64_t)cq_cmd << TAVOR_CQDB_CMD_SHIFT) |
 	    ((uint64_t)cqn << TAVOR_CQDB_CQN_SHIFT) | cq_param;
-
-	TNF_PROBE_1_DEBUG(tavor_cq_doorbell, TAVOR_TNF_TRACE, "",
-	    tnf_ulong, doorbell, doorbell);
 
 	/* Write the doorbell to UAR */
 	TAVOR_UAR_DOORBELL(state, (uint64_t *)&state->ts_uar->cq,
@@ -1303,8 +1202,6 @@ tavor_cq_cqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
 	uint_t		flags, type, opcode, qpnum, qp1_indx;
 	int		status;
 
-	TAVOR_TNF_ENTER(tavor_cq_cqe_consume);
-
 	/*
 	 * Determine if this is an "error" CQE by examining "opcode".  If it
 	 * is an error CQE, then call tavor_cq_errcqe_consume() and return
@@ -1315,7 +1212,6 @@ tavor_cq_cqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
 	if ((opcode == TAVOR_CQE_SEND_ERR_OPCODE) ||
 	    (opcode == TAVOR_CQE_RECV_ERR_OPCODE)) {
 		status = tavor_cq_errcqe_consume(state, cq, cqe, wc);
-		TAVOR_TNF_EXIT(tavor_cq_cqe_consume);
 		return (status);
 	}
 
@@ -1368,9 +1264,6 @@ tavor_cq_cqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
 		default:
 			TAVOR_WARNING(state, "unknown send CQE type");
 			wc->wc_status = IBT_WC_LOCAL_QP_OP_ERR;
-			TNF_PROBE_1(tavor_cq_cqe_consume_unknown_send_type,
-			    TAVOR_TNF_ERROR, "", tnf_uint, opcode, opcode);
-			TAVOR_TNF_EXIT(tavor_cq_cqe_consume);
 			return (TAVOR_CQ_SYNC_AND_DB);
 		}
 	} else {
@@ -1409,9 +1302,6 @@ tavor_cq_cqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
 		default:
 			TAVOR_WARNING(state, "unknown recv CQE type");
 			wc->wc_status = IBT_WC_LOCAL_QP_OP_ERR;
-			TNF_PROBE_1(tavor_cq_cqe_consume_unknown_rcv_type,
-			    TAVOR_TNF_ERROR, "", tnf_uint, opcode, opcode);
-			TAVOR_TNF_EXIT(tavor_cq_cqe_consume);
 			return (TAVOR_CQ_SYNC_AND_DB);
 		}
 	}
@@ -1459,7 +1349,6 @@ tavor_cq_cqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
 		wc->wc_bytes_xfer = TAVOR_CQE_BYTECNT_GET(cq, cqe);
 	}
 
-	TAVOR_TNF_EXIT(tavor_cq_cqe_consume);
 	return (TAVOR_CQ_SYNC_AND_DB);
 }
 
@@ -1477,8 +1366,6 @@ tavor_cq_errcqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
 	uint_t			nextwqesize, dbd;
 	uint_t			doorbell_cnt, status;
 	tavor_wrid_entry_t	wre;
-
-	TAVOR_TNF_ENTER(tavor_cq_errcqe_consume);
 
 	/*
 	 * Fetch the Work Request ID using the information in the CQE.
@@ -1556,8 +1443,6 @@ tavor_cq_errcqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
 	default:
 		TAVOR_WARNING(state, "unknown error CQE status");
 		status = IBT_WC_LOCAL_QP_OP_ERR;
-		TNF_PROBE_1(tavor_cq_errcqe_consume_unknown_status,
-		    TAVOR_TNF_ERROR, "", tnf_uint, status, status);
 		break;
 	}
 	wc->wc_status = status;
@@ -1599,7 +1484,6 @@ tavor_cq_errcqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
 		 *    Return status to indicate that doorbell and sync may be
 		 *    necessary.
 		 */
-		TAVOR_TNF_EXIT(tavor_cq_errcqe_consume);
 		return (TAVOR_CQ_SYNC_AND_DB);
 
 	} else {
@@ -1622,7 +1506,6 @@ tavor_cq_errcqe_consume(tavor_state_t *state, tavor_cqhdl_t cq,
 		TAVOR_CQE_WQEADDRSZ_SET(cq, cqe,
 		    TAVOR_QP_WQEADDRSZ(next_wqeaddr, nextwqesize));
 
-		TAVOR_TNF_EXIT(tavor_cq_errcqe_consume);
 		return (TAVOR_CQ_RECYCLE_ENTRY);
 	}
 }
@@ -1637,30 +1520,17 @@ tavor_cqe_sync(tavor_cqhdl_t cq, tavor_hw_cqe_t *cqe, uint_t flag)
 {
 	ddi_dma_handle_t	dmahdl;
 	off_t			offset;
-	int			status;
-
-	TAVOR_TNF_ENTER(tavor_cqe_sync);
 
 	/* Determine if CQ needs to be synced or not */
-	if (cq->cq_sync == 0) {
-		TAVOR_TNF_EXIT(tavor_cqe_sync);
+	if (cq->cq_sync == 0)
 		return;
-	}
 
 	/* Get the DMA handle from CQ context */
 	dmahdl = cq->cq_mrhdl->mr_bindinfo.bi_dmahdl;
 
 	/* Calculate offset of next CQE */
 	offset = (off_t)((uintptr_t)cqe - (uintptr_t)&cq->cq_buf[0]);
-	status = ddi_dma_sync(dmahdl, offset, sizeof (tavor_hw_cqe_t), flag);
-	if (status != DDI_SUCCESS) {
-		TNF_PROBE_0(tavor_cqe_sync_getnextentry_fail,
-		    TAVOR_TNF_ERROR, "");
-		TAVOR_TNF_EXIT(tavor_cqe_sync);
-		return;
-	}
-
-	TAVOR_TNF_EXIT(tavor_cqe_sync);
+	(void) ddi_dma_sync(dmahdl, offset, sizeof (tavor_hw_cqe_t), flag);
 }
 
 
@@ -1675,8 +1545,6 @@ tavor_cq_resize_helper(tavor_cqhdl_t cq, tavor_hw_cqe_t *new_cqbuf,
 	tavor_hw_cqe_t	*old_cqe, *new_cqe;
 	uint32_t	new_cons_indx, wrap_around_mask;
 	int		i;
-
-	TAVOR_TNF_ENTER(tavor_cq_resize_helper);
 
 	ASSERT(MUTEX_HELD(&cq->cq_lock));
 
@@ -1720,8 +1588,6 @@ tavor_cq_resize_helper(tavor_cqhdl_t cq, tavor_hw_cqe_t *new_cqbuf,
 		old_cqe = &cq->cq_buf[old_cons_indx];
 		new_cqe = &new_cqbuf[new_cons_indx];
 	}
-
-	TAVOR_TNF_EXIT(tavor_cq_resize_helper);
 }
 
 /*

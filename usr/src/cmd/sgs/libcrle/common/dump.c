@@ -23,9 +23,6 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/* LINTLIBRARY */
 
 #include	<sys/mman.h>
 #include	<sys/types.h>
@@ -234,10 +231,11 @@ filladdr(void)
 
 	/*
 	 * Round the process heap to the next page boundary so that it can be
-	 * used to isolated the a.out mappings (pr_brkbase typically occurs
-	 * at the end, but within, the a.out's data segment).  As libcrle is
-	 * used as an audit library, no process user code has run so there
-	 * can't be any heap. pr_brksize is added here for completeness.
+	 * used to isolated the executable's mappings (pr_brkbase typically
+	 * occurs at the end, but within, the executable's data segment).  As
+	 * libcrle is used as an audit library, no process user code has run
+	 * so there can't be any heap. pr_brksize is added here for
+	 * completeness.
 	 */
 	syspagsz = sysconf(_SC_PAGESIZE);
 	saddr = M_PROUND(prstatus.pr_brkbase + prstatus.pr_brksize);
@@ -300,8 +298,8 @@ filladdr(void)
 	 */
 	for (_num = 0, _maps = maps; _num < num; _num++, _maps++) {
 		/*
-		 * Skip all mappings below brkbase, these represent the a.out
-		 * (and the stack on intel).
+		 * Skip all mappings below brkbase, these represent the
+		 * executable (and the stack on intel).
 		 */
 		if ((laddr == 0) &&
 		    ((_maps->pr_vaddr + _maps->pr_size) <= saddr))

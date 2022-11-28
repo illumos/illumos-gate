@@ -13,11 +13,12 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 SUBDIRS = \
 	catopen \
+	err \
 	fpround \
 	i18n \
 	newlocale \
@@ -36,6 +37,7 @@ SUBDIRS = \
 
 PROGS = \
 	aligned_alloc \
+	asprintf-14933 \
 	c11_threads \
 	c11_tss \
 	call_once \
@@ -73,6 +75,9 @@ aligned_alloc.32 :=	LDLIBS += -lproc
 aligned_alloc.64 :=	LDLIBS64 += -lproc
 posix_memalign.32 :=	LDLIBS += -lproc
 posix_memalign.64 :=	LDLIBS64 += -lproc
+
+asprintf-14933.32 :=	CSTD=$(GNU_C99)
+asprintf-14933.64 :=	CSTD=$(GNU_C99)
 
 memset_s.32 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 memset_s.64 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1

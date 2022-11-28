@@ -49,7 +49,6 @@
 #include <sys/vmsystm.h>
 #include <sys/policy.h>
 #include <sys/project.h>
-#include <sys/tnf_probe.h>
 #include <sys/zone.h>
 
 #define	SEGSPTADDR	(caddr_t)0x0
@@ -344,10 +343,6 @@ sptcreate(size_t size, struct seg **sptseg, struct anon_map *amp,
 	struct	as	*newas;
 	struct	segspt_crargs sptcargs;
 
-#ifdef DEBUG
-	TNF_PROBE_1(sptcreate, "spt", /* CSTYLED */,
-			tnf_ulong, size, size );
-#endif
 	if (segspt_minfree == 0)
 		spt_setminfree();
 
@@ -379,9 +374,6 @@ void
 sptdestroy(struct as *as, struct anon_map *amp)
 {
 
-#ifdef DEBUG
-	TNF_PROBE_0(sptdestroy, "spt", /* CSTYLED */);
-#endif
 	(void) as_unmap(as, SEGSPTADDR, amp->size);
 	as_free(as);
 }
@@ -553,10 +545,6 @@ segspt_create(struct seg **segpp, void *argsp)
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as));
 	ASSERT(sp != NULL);
 
-#ifdef DEBUG
-	TNF_PROBE_2(segspt_create, "spt", /* CSTYLED */,
-	    tnf_opaque, addr, addr, tnf_ulong, len, seg->s_size);
-#endif
 	if ((sptcargs->flags & SHM_PAGEABLE) == 0) {
 		if (err = anon_swap_adjust(npages))
 			return (err);

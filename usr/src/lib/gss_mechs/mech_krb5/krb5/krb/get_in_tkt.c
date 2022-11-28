@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 /*
  * lib/krb5/krb/get_in_tkt.c
@@ -1306,6 +1306,10 @@ krb5_get_init_creds(krb5_context context,
 
 	err_reply = NULL;
 	local_as_reply = 0;
+
+	free(hostname_used);
+	hostname_used = NULL;
+
 	if ((ret = send_as_request2(context, &request, &err_reply,
 				    &local_as_reply, use_master,
 				    &hostname_used)))

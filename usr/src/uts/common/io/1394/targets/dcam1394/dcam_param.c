@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * dcam_param.c
  *
@@ -35,7 +33,6 @@
 #include <sys/1394/targets/dcam1394/dcam.h>
 #include <sys/1394/targets/dcam1394/dcam_param.h>
 #include <sys/1394/targets/dcam1394/dcam_reg.h>
-#include <sys/tnf_probe.h>
 
 /* index by vid_mode */
 int g_frame_num_bytes[] = {

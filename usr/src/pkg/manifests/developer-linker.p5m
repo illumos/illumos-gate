@@ -41,9 +41,9 @@ dir  path=usr/bin/$(ARCH64)
 file path=usr/bin/$(ARCH64)/elfwrap mode=0555
 file path=usr/bin/$(ARCH64)/gcore mode=0555
 link path=usr/bin/$(ARCH64)/ld target=../../bin/ld
-file path=usr/bin/$(ARCH64)/ldd mode=0555
+link path=usr/bin/$(ARCH64)/ldd target=../../bin/ldd
 file path=usr/bin/$(ARCH64)/plimit mode=0555
-file path=usr/bin/$(ARCH64)/pvs mode=0555
+link path=usr/bin/$(ARCH64)/pvs target=../../bin/pvs
 file path=usr/bin/$(ARCH64)/strings mode=0555
 file path=usr/bin/$(ARCH64)/truss mode=0555
 link path=usr/bin/ctags target=../has/bin/ctags mediator=ctags \

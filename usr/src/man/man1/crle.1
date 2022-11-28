@@ -3,14 +3,14 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CRLE 1 "Apr 15, 2020"
+.TH CRLE 1 "Aug 19, 2022"
 .SH NAME
 crle \- configure runtime linking environment
 .SH SYNOPSIS
 .nf
 \fBcrle\fR [\fB-64\fR] [\fB-a\fR \fIname\fR] [\fB-A\fR \fIname\fR] [\fB-c\fR \fIconf\fR] [\fB-e\fR \fIenv\fR] [\fB-E\fR \fIenv\fR]
      [\fB-f\fR \fIflags\fR] [\fB-i\fR \fIname\fR] [\fB-I\fR \fIname\fR] [\fB-g\fR \fIname\fR] [\fB-G\fR \fIname\fR]
-     [\fB-l\fR \fIdir\fR] [\fB-o\fR \fIdir\fR] [\fB-s\fR \fIdir\fR] [\fB-t\fR [ ELF | AOUT]] [\fB-u\fR] [\fB-v\fR]
+     [\fB-l\fR \fIdir\fR] [\fB-o\fR \fIdir\fR] [\fB-s\fR \fIdir\fR] [\fB-u\fR] [\fB-v\fR]
 .fi
 
 .SH DESCRIPTION
@@ -371,17 +371,12 @@ specific to this application.
 .ad
 .sp .6
 .RS 4n
-Specify a new default search directory \fIdir\fR for \fBELF\fR or \fBAOUT\fR
-objects. Multiple occurrences of this option are permitted. The type of object
-that is applicable to the search, is specified by the preceding \fB-t\fR
-option, or defaults to \fBELF\fR.
+Specify a new default search directory \fIdir\fR for \fBELF\fR
+objects. Multiple occurrences of this option are permitted.
 .sp
 The default search paths for 32-bit \fBELF\fR objects are \fB/lib\fR followed
 by \fB/usr/lib\fR. For 64-bit \fBELF\fR objects, the default search paths are
 \fB/lib/64\fR followed by \fB/usr/lib/64\fR.
-.sp
-The default search paths for \fBAOUT\fR objects are \fB/usr/lib\fR and
-\fB/usr/local/lib\fR.
 .sp
 Use of this option \fBreplaces\fR the default search path. Therefore, a
 \fB-l\fR option is normally required to specify the original system default in
@@ -417,19 +412,17 @@ Typically, this option is used with the \fB-a\fR or \fB-A\fR options.
 .ad
 .sp .6
 .RS 4n
-Specify a new trusted directory \fIdir\fR for \fIsecure\fR \fBELF\fR or
-\fBAOUT\fR objects. See \fBSECURITY\fR in \fBld.so.1\fR(1) for a definition of
-secure objects. See \fISecurity\fR in \fILinker and Libraries Guide\fR for a
+Specify a new trusted directory \fIdir\fR for \fIsecure\fR \fBELF\fR
+objects. See \fBSECURITY\fR in \fBld.so.1\fR(1) for a definition of secure
+objects. See \fISecurity\fR in \fILinker and Libraries Guide\fR for a
 discussion of runtime restrictions imposed on secure applications.
 .sp
-Multiple occurrences of this option are permitted. The type of object that is
-applicable to the search is specified by the preceding \fB-t\fR option, or
-defaults to \fBELF\fR.
+Multiple occurrences of this option are permitted.
 .sp
-The default trusted directories for secure 32-bit \fBELF\fR objects, and
-\fBAOUT\fR objects, are \fB/lib/secure\fR followed by \fB/usr/lib/secure\fR.
-For 64-bit secure \fBELF\fR objects, the default trusted directories are
-\fB/lib/secure/64\fR followed by \fB/usr/lib/secure/64\fR.
+The default trusted directories for secure 32-bit \fBELF\fR objects is
+\fB/lib/secure\fR followed by \fB/usr/lib/secure\fR.  For 64-bit secure
+\fBELF\fR objects, the default trusted directories are \fB/lib/secure/64\fR
+followed by \fB/usr/lib/secure/64\fR.
 .sp
 Use of this option \fBreplaces\fR the default trusted directories. Therefore, a
 \fB-s\fR option is normally required to specify the original system default in
@@ -437,17 +430,6 @@ relation to any new directories that are being applied. However, if the
 \fB-u\fR option is in effect, and a configuration file does \fBnot\fR exist,
 the system defaults are added to the new configuration file. These defaults are
 added before the new directories specified with the \fB-l\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-t\fR \fBELF\fR | \fBAOUT\fR\fR
-.ad
-.sp .6
-.RS 4n
-Toggle the object type that is applicable to any \fB-l\fR or \fB-s\fR options
-that follow. The default object type is \fBELF\fR.
 .RE
 
 .sp

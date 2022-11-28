@@ -80,7 +80,7 @@
 
 static int optreset = 0;	/* keep track of first entry to getopt() */
 #define	PRINT_ERROR	((opterr) && (*options != ':'))
-#define	FLAG_IS_SET(flag) 	((flags & flag) != 0)	/* is flag turned on? */
+#define	FLAG_IS_SET(flag)	((flags & flag) != 0)	/* is flag turned on? */
 
 /* Determine if an argument is required for this long option */
 #define	LONGOPT_REQUIRES_ARG(longopt) \
@@ -93,14 +93,14 @@ static int optreset = 0;	/* keep track of first entry to getopt() */
 #define	FLAG_LONGONLY	0x04	/* operate as getopt_long_only() */
 #define	FLAG_OPTIONAL_ARGS 0x08	/* allow optional arguments to options */
 #define	FLAG_REQUIRE_EQUIVALENTS 0x10 /* require short<->long equivalents */
-#define	FLAG_ABBREV	0x20 	/* long option abbreviation allowed. */
-#define	FLAG_W_SEMICOLON 0x40 	/* Support for W; in optstring */
+#define	FLAG_ABBREV	0x20	/* long option abbreviation allowed. */
+#define	FLAG_W_SEMICOLON 0x40	/* Support for W; in optstring */
 #define	FLAG_PLUS_DASH_START 0x80	/* leading '+' or '-' in optstring */
 
 /* return values */
 #define	BADCH		(int)'?'
 #define	BADARG		((*options == ':') ? (int)':' : (int)'?')
-#define	INORDER 	(int)1
+#define	INORDER		(int)1
 
 #define	EMSG		""
 
@@ -128,7 +128,8 @@ static int nonopt_end = -1;   /* first option after non options (for permute) */
  * being passed to warnx_getopt().
  */
 static void
-warnx_getopt(const char *argv0, const char *msg, const char *arg) {
+warnx_getopt(const char *argv0, const char *msg, const char *arg)
+{
 	char errbuf[256];
 	(void) snprintf(errbuf, sizeof (errbuf), msg, argv0, arg);
 	(void) write(2, errbuf, strlen(errbuf));
@@ -139,7 +140,8 @@ warnx_getopt(const char *argv0, const char *msg, const char *arg) {
  * Generalized error message output.
  */
 static void
-warnxchar(const char *argv0, const char *msg, const char c) {
+warnxchar(const char *argv0, const char *msg, const char c)
+{
 	char charbuf[2];
 	charbuf[0] = c;
 	charbuf[1] = '\0';
@@ -150,7 +152,8 @@ warnxchar(const char *argv0, const char *msg, const char c) {
  * Generalized error message output.
  */
 static void
-warnxlen(const char *argv0, const char *msg, int argLen, const char *arg) {
+warnxlen(const char *argv0, const char *msg, int argLen, const char *arg)
+{
 	char argbuf[256];
 	(void) strncpy(argbuf, arg, argLen);
 	argbuf[argLen < (sizeof (argbuf)-1)? argLen:(sizeof (argbuf)-1)] = '\0';
@@ -182,7 +185,7 @@ gcd(int a, int b)
  */
 static void
 permute_args(int panonopt_start, int panonopt_end, int opt_end,
-	char * const *nargv)
+    char * const *nargv)
 {
 	int cstart, cyclelen, i, j, ncycle, nnonopts, nopts, pos;
 	char *swap;
@@ -230,12 +233,9 @@ permute_args(int panonopt_start, int panonopt_end, int opt_end,
  * Returns >= 0 on success
  */
 static int
-/* LINTED: argument unused in function: nargc */
-verify_short_long_equivalents(int nargc,
-				char *const *nargv,
-				const char *options,
-				const struct option *long_options,
-				uint_t flags) {
+verify_short_long_equivalents(int nargc __unused, char *const *nargv,
+    const char *options, const struct option *long_options, uint_t flags)
+{
 	int short_i = 0;
 	int long_i = 0;
 	int equivFound = 0;
@@ -252,7 +252,7 @@ verify_short_long_equivalents(int nargc,
 			continue;
 		}
 		if (FLAG_IS_SET(FLAG_W_SEMICOLON) &&
-			(ch == 'W') && (options[short_i+1] == ';')) {
+		    (ch == 'W') && (options[short_i+1] == ';')) {
 			/* W; is a special case */
 			++short_i;
 			continue;
@@ -261,16 +261,16 @@ verify_short_long_equivalents(int nargc,
 		equivFound = 0;
 		if (long_options != NULL) {
 			for (long_i = 0; ((!equivFound) &&
-					(long_options[long_i].name != NULL));
-								++long_i) {
+			    (long_options[long_i].name != NULL));
+			    ++long_i) {
 				equivFound = (ch == long_options[long_i].val);
 			}
 		}
 		if ((!equivFound) && (PRINT_ERROR)) {
 			warnxchar(nargv[0],
-				_libc_gettext(
-				"%s: equivalent long option required -- %s"),
-				ch);
+			    _libc_gettext(
+			    "%s: equivalent long option required -- %s"),
+			    ch);
 		}
 	} /* short_i */
 
@@ -280,17 +280,17 @@ verify_short_long_equivalents(int nargc,
 	 */
 	if (equivFound && (long_options != NULL)) {
 		for (long_i = 0; (equivFound &&
-				(long_options[long_i].name != NULL));
-								++long_i) {
+		    (long_options[long_i].name != NULL));
+		    ++long_i) {
 			equivFound = ((long_options[long_i].val != 0) &&
-				(strchr(options, long_options[long_i].val)
-								!= NULL));
+			    (strchr(options, long_options[long_i].val)
+			    != NULL));
 
 			if ((!equivFound) && (PRINT_ERROR)) {
 				warnx_getopt(nargv[0],
-					_libc_gettext(
-				"%s: equivalent short option required -- %s"),
-					long_options[long_i].name);
+				    _libc_gettext("%s: equivalent short "
+				    "option required -- %s"),
+				    long_options[long_i].name);
 			}
 		} /* for long_i */
 	}
@@ -305,8 +305,8 @@ verify_short_long_equivalents(int nargc,
  */
 static int
 parse_long_options(int nargc, char * const *nargv, const char *options,
-	const struct option *long_options, int *idx, int short_too,
-	uint_t flags)
+    const struct option *long_options, int *idx, int short_too,
+    uint_t flags)
 {
 	char *current_argv = NULL;
 	char *argv_equal_ptr = NULL;
@@ -454,7 +454,7 @@ parse_long_options(int nargc, char * const *nargv, const char *options,
  */
 static int
 getopt_internal(int nargc, char * const *nargv, const char *options,
-	const struct option *long_options, int *idx, uint_t flags)
+    const struct option *long_options, int *idx, uint_t flags)
 {
 	char *oli;				/* option letter list index */
 	int optchar, short_too;
@@ -718,8 +718,8 @@ start:
  */
 int
 getopt_long(int nargc, char *const *nargv,
-		const char *optstring,
-		const struct option *long_options, int *long_index)
+    const char *optstring,
+    const struct option *long_options, int *long_index)
 {
 
 	return (getopt_internal(
@@ -739,8 +739,8 @@ getopt_long(int nargc, char *const *nargv,
  */
 int
 getopt_long_only(int nargc, char *const *nargv,
-		const char *optstring,
-		const struct option *long_options, int *long_index)
+    const char *optstring,
+    const struct option *long_options, int *long_index)
 {
 
 	return (getopt_internal(
@@ -756,7 +756,7 @@ getopt_long_only(int nargc, char *const *nargv,
 /*
  * getopt_clip() --
  *	Parse argc/argv argument vector, requiring compliance with
- * 	Sun's CLIP specification (11/12/02)
+ *	Sun's CLIP specification (11/12/02)
  *
  * o Does not allow arguments to be optional (optional_argument is
  *   treated as required_argument).
@@ -778,9 +778,8 @@ getopt_long_only(int nargc, char *const *nargv,
  *   treated as if it began after the + or - .
  */
 int
-getopt_clip(int nargc, char *const *nargv,
-		const char *optstring,
-		const struct option *long_options, int *long_index)
+getopt_clip(int nargc, char *const *nargv, const char *optstring,
+    const struct option *long_options, int *long_index)
 {
 	return getopt_internal(
 	    nargc, nargv, optstring, long_options, long_index,
