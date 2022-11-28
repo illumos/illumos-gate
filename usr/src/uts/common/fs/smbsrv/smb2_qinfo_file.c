@@ -482,17 +482,35 @@ smb2_qif_position(smb_request_t *sr, smb_queryinfo_t *qi)
 
 /*
  * FileModeInformation [MS-FSA 2.4.24]
- * XXX: These mode flags are supposed to be on the open handle,
- * XXX: or I think so.  Not yet...  (just put zero for now)
  */
 static uint32_t
 smb2_qif_mode(smb_request_t *sr, smb_queryinfo_t *qi)
 {
 	_NOTE(ARGUNUSED(qi))
+	smb_ofile_t *of = sr->fid_ofile;
+	uint32_t mode;
 	int rc;
 
+	/*
+	 * See MS-FSA description of Open.Mode
+	 * For now, we have these in...
+	 */
+	mode = of->f_create_options &
+	    (FILE_WRITE_THROUGH | FILE_SEQUENTIAL_ONLY |
+	    FILE_NO_INTERMEDIATE_BUFFERING | FILE_DELETE_ON_CLOSE);
+
+	/*
+	 * The ofile level DoC flag is currently in of->f_flags
+	 * (SMB_OFLAGS_SET_DELETE_ON_CLOSE) though probably it
+	 * should be in f_create_options (and perhaps rename
+	 * that field to f_mode or something closer to the
+	 * Open.Mode terminology used in MS-FSA).
+	 */
+	if (of->f_flags & SMB_OFLAGS_SET_DELETE_ON_CLOSE)
+		mode |= FILE_DELETE_ON_CLOSE;
+
 	rc = smb_mbc_encodef(
-	    &sr->raw_data, "l", 0);
+	    &sr->raw_data, "l", mode);
 	if (rc != 0)
 		return (NT_STATUS_BUFFER_OVERFLOW);
 

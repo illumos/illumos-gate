@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -179,7 +180,7 @@ smb2_setf_seek(smb_request_t *sr, smb_setinfo_t *si)
 	uint64_t newoff;
 
 	if (smb_mbc_decodef(&si->si_data, "q", &newoff) != 0)
-		return (NT_STATUS_INVALID_PARAMETER);
+		return (NT_STATUS_INFO_LENGTH_MISMATCH);
 
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
 	mutex_enter(&of->f_mutex);
@@ -214,7 +215,7 @@ smb2_setf_mode(smb_request_t *sr, smb_setinfo_t *si)
 	uint32_t	Mode;
 
 	if (smb_mbc_decodef(&si->si_data, "l", &Mode) != 0)
-		return (NT_STATUS_INVALID_PARAMETER);
+		return (NT_STATUS_INFO_LENGTH_MISMATCH);
 
 #if 0	/* XXX - todo */
 	if (Mode & FILE_WRITE_THROUGH) {

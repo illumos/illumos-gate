@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -935,6 +936,12 @@ create:
 		if ((op->create_disposition == FILE_OPEN) ||
 		    (op->create_disposition == FILE_OVERWRITE)) {
 			status = NT_STATUS_OBJECT_NAME_NOT_FOUND;
+			goto errout;
+		}
+
+		if (is_dir != 0 &&
+		    (op->dattr & FILE_ATTRIBUTE_TEMPORARY) != 0) {
+			status = NT_STATUS_INVALID_PARAMETER;
 			goto errout;
 		}
 
