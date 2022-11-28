@@ -90,9 +90,9 @@ typeset -A ip ip6 netmask gateway gateway6 mtu mac
         name=${var%_lacp_mode}
         aggr_mode[$name]="$value"
     elif [[ "$var" =~ _mtu$ ]]; then
-        (( value < 1500 || value > 9000 )) &&
+        (( value < 1500 || value > 65535 )) &&
             fatal "ERROR: $var MTU value \'$value\' is not in" \
-            "range [1500, 9000]"
+            "range [1500, 65535]"
 
         name=${var%_mtu}
         mtu[$name]="$value"
