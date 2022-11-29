@@ -15,13 +15,14 @@
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2017 Jason King
 # Copyright 2020 Joyent, Inc.
-# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 SUBDIRS =		\
 	ar		\
 	awk		\
 	chown		\
+	cpio		\
 	ctf		\
 	date		\
 	demangle	\
