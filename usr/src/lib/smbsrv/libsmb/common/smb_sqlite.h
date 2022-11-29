@@ -38,86 +38,78 @@ extern "C" {
  * has some problems.
  */
 
-/*ARGSUSED*/
 sqlite *
-sqlite_open(const char *filename, int mode, char **errmsg)
+sqlite_open(const char *filename __unused, int mode __unused,
+    char **errmsg __unused)
 {
 	return (NULL);
 }
 
-/*ARGSUSED*/
 void
-sqlite_close(sqlite *db)
+sqlite_close(sqlite *db __unused)
 {
 }
 
-/*ARGSUSED*/
 char *
-sqlite_mprintf(const char *fmt, ...)
+sqlite_mprintf(const char *fmt __unused, ...)
 {
 	return (NULL);
 }
 
-/*ARGSUSED*/
 void
-sqlite_freemem(void *p)
+sqlite_freemem(void *p __unused)
 {
 }
 
-/*ARGSUSED*/
 int
-sqlite_compile(sqlite *db, const char *zSql, const char **pzTail,
-    sqlite_vm **ppVm, char **pzErrmsg)
+sqlite_compile(sqlite *db __unused, const char *zSql __unused,
+    const char **pzTail __unused, sqlite_vm **ppVm __unused,
+    char **pzErrmsg __unused)
 {
 	return (SQLITE_ERROR);
 }
 
-/*ARGSUSED*/
 void
-sqlite_free_table(char **res)
+sqlite_free_table(char **res __unused)
 {
 }
 
-/*ARGSUSED*/
 int
-sqlite_last_insert_rowid(sqlite *db)
+sqlite_last_insert_rowid(sqlite *db __unused)
 {
 	return (-1);
 }
 
-/*ARGSUSED*/
 void
-sqlite_busy_timeout(sqlite *db, int ms)
+sqlite_busy_timeout(sqlite *db __unused, int ms __unused)
 {
 }
 
-/*ARGSUSED*/
 int
-sqlite_get_table(sqlite *db, const char *zSql, char ***pazResult, int *pnRow,
-    int *pnColumn, char **pzErrMsg)
-{
-	return (SQLITE_ERROR);
-}
-
-/*ARGSUSED*/
-int
-sqlite_step(sqlite_vm *pVm, int *pN, const char ***pazValue,
-    const char ***pazColName)
+sqlite_get_table(sqlite *db __unused, const char *zSql __unused,
+    char ***pazResult __unused, int *pnRow __unused,
+    int *pnColumn __unused, char **pzErrMsg __unused)
 {
 	return (SQLITE_ERROR);
 }
 
-/*ARGSUSED*/
 int
-sqlite_exec(sqlite *db, const char *zSql, sqlite_callback xCallback, void *pArg,
-    char **pzErrMsg)
+sqlite_step(sqlite_vm *pVm __unused, int *pN __unused,
+    const char ***pazValue __unused, const char ***pazColName __unused)
 {
 	return (SQLITE_ERROR);
 }
 
-/*ARGSUSED*/
 int
-sqlite_finalize(sqlite_vm *pVm, char **pzErrMsg)
+sqlite_exec(sqlite *db __unused, const char *zSql __unused,
+    sqlite_callback xCallback __unused, void *pArg __unused,
+    char **pzErrMsg __unused)
+{
+	return (SQLITE_ERROR);
+}
+
+int
+sqlite_finalize(sqlite_vm *pVm __unused, char **pzErrMsg __unused)
 {
 	return (SQLITE_ERROR);
 }

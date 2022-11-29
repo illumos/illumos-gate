@@ -108,9 +108,8 @@ smb_acl_len(smb_acl_t *acl)
 	return ((acl) ? acl->sl_bsize : 0);
 }
 
-/*ARGSUSED*/
 boolean_t
-smb_acl_isvalid(smb_acl_t *acl, int which_acl)
+smb_acl_isvalid(smb_acl_t *acl, int which_acl __unused)
 {
 	if (acl->sl_bsize < SMB_ACL_HDRSIZE)
 		return (B_FALSE);

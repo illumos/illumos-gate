@@ -604,9 +604,8 @@ smb_tracef(const char *fmt, ...)
  * Outside of dtrace, the messages passed to this function usually
  * lack sufficient context to be useful, so we don't log them.
  */
-/* ARGSUSED */
 void
-smb_trace(const char *s)
+smb_trace(const char *s __unused)
 {
 }
 
