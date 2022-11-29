@@ -885,6 +885,7 @@ smb_dcache_updating(void)
 		break;
 
 	default:
+		rc = SMB_DOMAIN_SUCCESS;
 		break;
 	}
 

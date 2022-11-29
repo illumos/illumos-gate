@@ -150,11 +150,11 @@ smb_acl_isvalid(smb_acl_t *acl, int which_acl)
  * is enforced regardless of any inherited ACE that allows access.
  * Within the groups of noninherited ACEs and inherited ACEs, order ACEs
  * according to ACE type, as the following shows:
- * 	. Access-denied ACEs that apply to the object itself
- * 	. Access-denied ACEs that apply to a subobject of the
+ *	. Access-denied ACEs that apply to the object itself
+ *	. Access-denied ACEs that apply to a subobject of the
  *	  object, such as a property set or property
- * 	. Access-allowed ACEs that apply to the object itself
- * 	. Access-allowed ACEs that apply to a subobject of the object
+ *	. Access-allowed ACEs that apply to the object itself
+ *	. Access-allowed ACEs that apply to a subobject of the object
  *
  * So, here is the desired ACE order
  *
@@ -424,6 +424,7 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 
 	for (i = 0, zace = zacl->acl_aclp; i < zacl->acl_cnt;
 	    zace++, i++, sim++) {
+		id = (uid_t)-1;	/* some types do not need id */
 		switch (zace->a_flags & ACE_TYPE_FLAGS) {
 		case ACE_OWNER:
 			idtype = SMB_IDMAP_OWNERAT;
