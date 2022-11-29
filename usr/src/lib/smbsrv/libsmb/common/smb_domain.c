@@ -144,7 +144,7 @@ smb_domain_add(smb_domain_type_t type, smb_domain_t *di)
 {
 	uint32_t res;
 
-	if ((di == NULL) || (di->di_sid == NULL))
+	if (di == NULL || di->di_sid[0] == '\0')
 		return (SMB_DOMAIN_INVALID_ARG);
 
 	if ((res = smb_dcache_lock(SMB_DCACHE_WRLOCK)) == SMB_DOMAIN_SUCCESS) {
