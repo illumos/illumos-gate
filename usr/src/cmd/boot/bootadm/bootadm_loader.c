@@ -766,6 +766,11 @@ bam_mount_be(menu_entry_t *entry, char **dir)
 		if (strcmp(be_node->be_root_ds, entry->me_bootfs) == 0)
 			break;
 
+	if (be_node == NULL) {
+		ret = BE_ERR_BE_NOENT;
+		goto out;
+	}
+
 	if (nvlist_add_string(be_attrs, BE_ATTR_ORIG_BE_NAME,
 	    be_node->be_node_name) != 0) {
 		ret = BE_ERR_NOMEM;
@@ -843,7 +848,8 @@ list_menu_entry(menu_entry_t *entry, char *setting)
 			(void) rmdir(dir);
 			free(dir);
 		}
-		bam_error(_("%s is not mounted\n"), entry->me_title);
+		bam_error(_("%s is not mounted: %s\n"), entry->me_title,
+		    be_err_to_str(mounted));
 		return (BAM_ERROR);
 	}
 
