@@ -325,29 +325,34 @@ menu_read(struct menu_lst *menu, char *menu_path)
 				ret = BAM_ERROR;
 			goto done;
 		}
+		if (buf[0] == '\n')	/* Skip empty lines */
+			continue;
+
 		key = strtok(buf, " \n");
-		if (strcmp(key, "title") != 0) {
+		if (key == NULL || strcmp(key, "title") != 0) {
 			ret = BAM_ERROR;
 			goto done;
 		}
 		value = strtok(NULL, " \n");
-		if ((title = strdup(value)) == NULL) {
+		if (value == NULL || (title = strdup(value)) == NULL) {
 			ret = BAM_ERROR;
 			goto done;
 		}
 
-		if (fgets(buf, PATH_MAX, fp) == NULL) {
-			ret = BAM_ERROR;
-			goto done;
-		}
+		do {
+			if (fgets(buf, PATH_MAX, fp) == NULL) {
+				ret = BAM_ERROR;
+				goto done;
+			}
+		} while (buf[0] == '\n');	/* Skip empty lines */
 
 		key = strtok(buf, " \n");
-		if ((type = strdup(key)) == NULL) {
+		if (key == NULL || (type = strdup(key)) == NULL) {
 			ret = BAM_ERROR;
 			goto done;
 		}
 		value = strtok(NULL, " \n");
-		if ((bootfs = strdup(value)) == NULL) {
+		if (value == NULL || (bootfs = strdup(value)) == NULL) {
 			ret = BAM_ERROR;
 			goto done;
 		}
