@@ -90,12 +90,13 @@
 
 system/svc/restarter.xml	enabled
 network/dlmgmt.xml		enabled
+network/routing/ndp.xml		disabled
 system/filesystem/root-fs.xml	enabled
 #
 # This was running, but not in our set of manifests. Maybe it came in
 # from /var.
 #
-system/boot-archive.xml		enabled 
+system/boot-archive.xml		enabled
 network/network-ipmgmt.xml	enabled
 system/filesystem/usr-fs.xml	enabled
 network/network-loopback.xml	enabled
