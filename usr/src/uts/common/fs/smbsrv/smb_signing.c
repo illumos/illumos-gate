@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 /*
  * These routines provide the SMB MAC signing for the SMB server.
@@ -352,7 +353,7 @@ smb_sign_check_request(smb_request_t *sr)
 		return (0);
 	}
 
-	DTRACE_PROBE2(smb__signature__mismatch, smb_request_t, sr,
+	DTRACE_PROBE2(smb__signature__mismatch, smb_request_t *, sr,
 	    unsigned char *, mac_sig);
 	cmn_err(CE_NOTE, "smb_sign_check_request: bad signature");
 

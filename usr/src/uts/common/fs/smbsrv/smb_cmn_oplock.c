@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2020 Nexenta by DDN, Inc.  All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -650,7 +650,7 @@ smb_oplock_req_excl(
 				ASSERT(node->n_oplock.cnt_II >= 0);
 				if (o == ofile)
 					continue;
-				DTRACE_PROBE1(unexpected, smb_ofile_t, o);
+				DTRACE_PROBE1(unexpected, smb_ofile_t *, o);
 				smb_oplock_ind_break(o,
 				    LEVEL_NONE, B_FALSE,
 				    NT_STATUS_SUCCESS);
@@ -3594,7 +3594,7 @@ smb_oplock_move(smb_node_t *node,
 		cmn_err(CE_NOTE, "smb_oplock_move: not empty?");
 #endif
 		DTRACE_PROBE2(dst__not__empty,
-		    smb_node_t, node, smb_ofile_t, to_ofile);
+		    smb_node_t *, node, smb_ofile_t *, to_ofile);
 	}
 
 	og_tmp = to_ofile->f_oplock;

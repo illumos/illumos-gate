@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2021 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -185,8 +185,8 @@ smb2_lease_create(smb_request_t *sr, uint8_t *clnt)
 			    (void *) lease->ls_node,
 			    lease->ls_node->od_name);
 #endif
-			DTRACE_PROBE2(dup_lease, smb_request_t, sr,
-			    smb_lease_t, lease);
+			DTRACE_PROBE2(dup_lease, smb_request_t *, sr,
+			    smb_lease_t *, lease);
 			lease = NULL; /* error */
 		}
 	} else {

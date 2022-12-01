@@ -1415,7 +1415,7 @@ smb_ofile_save_dh(void *arg)
 	 * flushes the delete queue before we do).  Synchronize.
 	 */
 	mutex_enter(&of->f_mutex);
-	DTRACE_PROBE1(ofile__exit, smb_ofile_t, of);
+	DTRACE_PROBE1(ofile__exit, smb_ofile_t *, of);
 	mutex_exit(&of->f_mutex);
 
 	/*
@@ -1509,7 +1509,7 @@ smb_ofile_delete(void *arg)
 	 */
 	mutex_enter(&of->f_mutex);
 	of->f_state = SMB_OFILE_STATE_ALLOC;
-	DTRACE_PROBE1(ofile__exit, smb_ofile_t, of);
+	DTRACE_PROBE1(ofile__exit, smb_ofile_t *, of);
 	mutex_exit(&of->f_mutex);
 
 	switch (of->f_ftype) {
