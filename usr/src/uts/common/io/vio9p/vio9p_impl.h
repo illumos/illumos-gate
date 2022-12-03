@@ -62,8 +62,18 @@ extern "C" {
 /*
  * DRIVER PARAMETERS
  */
-#define	VIRTIO_9P_MAX_REQS		16
-#define	VIRTIO_9P_REQ_SIZE		8192
+
+/*
+ * A limit on the number of requests that can be allocated for a vio9p device.
+ */
+#define	VIRTIO_9P_MAX_REQS		8
+
+/*
+ * This parameter defines an upper bound on 9P protocol message size (msize). 9P
+ * servers may negotiate an msize up to this value. An attempt to transfer a
+ * message larger than this will result in a EMSGISZE error.
+ */
+#define	VIRTIO_9P_REQ_SIZE		65536
 
 /*
  * It is not clear that there is a well-defined number of cookies for this
@@ -72,7 +82,7 @@ extern "C" {
  * number that's large enough to ensure we'll be able to allocate without
  * requiring contiguous pages.
  */
-#define	VIRTIO_9P_MAX_SGL		8
+#define	VIRTIO_9P_MAX_SGL		64
 
 /*
  * TYPE DEFINITIONS
