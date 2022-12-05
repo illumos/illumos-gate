@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2019 RackTop Systems.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -828,10 +828,22 @@ smb2_decode_create_ctx(smb_request_t *sr, smb2_create_ctx_t *cc)
 			cc->cc_in_flags |= CCTX_DH_RECONNECT_V2;
 			cce = &cc->cc_in_dh_reconnect_v2;
 			break;
+
+		/*
+		 * Known but not implemented context IDs.
+		 * Here just to silence the debug below.
+		 *
+		 * Note: all three of these IDs are actually longer,
+		 * but we start by decoding just the first 4 bytes.
+		 * If/when we recognize these, do another match on
+		 * the full ID after we take this switch case.
+		 */
+		case 0x45bca66a: /* SMB2_CREATE_APP_INSTANCE_ID */
+		case 0xB982D0B7: /* SMB2_CREATE_APP_INSTANCE_VERSION */
 		case 0x9ccbcf9e: /* SVHDX_OPEN_DEVICE_CONTEXT */
-			/* 9ccbcf9e 04c1e643 980e158d a1f6ec83 */
-			/* silently ignore */
+			cce = NULL;
 			break;
+
 		default:
 			/*
 			 * Unknown create context values are normal, and

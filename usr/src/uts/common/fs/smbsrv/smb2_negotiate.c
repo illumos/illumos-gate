@@ -38,7 +38,10 @@ uint32_t smb2srv_capabilities =
 	SMB2_CAP_LEASING |
 	SMB2_CAP_LARGE_MTU |
 	SMB2_CAP_PERSISTENT_HANDLES |
-	SMB2_CAP_ENCRYPTION;
+#ifndef	_FAKE_KERNEL
+	SMB2_CAP_ENCRYPTION |
+#endif
+	0;
 
 /* These are the only capabilities defined for SMB2.X */
 #define	SMB_2X_CAPS (SMB2_CAP_DFS | SMB2_CAP_LEASING | SMB2_CAP_LARGE_MTU)
