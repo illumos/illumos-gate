@@ -46,6 +46,8 @@ SYMBOL_VERSION ILLUMOSprivate {
 	vmm_drv_lease_break;
 	vmm_drv_lease_expired;
 	vmm_drv_page_hold;
+	vmm_drv_page_hold_ext;
+	vmm_drv_page_mark_dirty;
 	vmm_drv_page_release;
 	vmm_drv_page_release_chain;
 	vmm_drv_page_readable;
