@@ -71,7 +71,7 @@ typedef struct ofmt_state_s {
 	struct winsize	os_winsize;
 	int		os_nrow;
 	uint_t		os_flags;
-	int		os_nbad;
+	uint_t		os_nbad;
 	char		**os_badfields;
 	int		os_maxnamelen;	/* longest name (f. multiline) */
 	char		os_fs;		/* field seperator */
@@ -141,7 +141,7 @@ static split_t *
 split_fields(const ofmt_field_t *template, uint_t maxfields, uint_t maxcols)
 {
 	split_t	*sp;
-	int i, cols;
+	uint_t i, cols;
 
 	sp = calloc(sizeof (split_t), 1);
 	if (sp == NULL)
@@ -311,7 +311,7 @@ void
 ofmt_close(ofmt_handle_t ofmt)
 {
 	ofmt_state_t *os = ofmt;
-	int i;
+	uint_t i;
 
 	if (os == NULL)
 		return;
@@ -402,7 +402,7 @@ ofmt_fit_width(split_t **spp, uint_t width, char *value, uint_t bufsize)
 {
 	split_t		*sp = *spp;
 	char		*ptr = value, *lim = ptr + bufsize;
-	int		i, nextlen;
+	uint_t		i, nextlen;
 
 	if (sp == NULL) {
 		sp = split_str(value, OFMT_MAX_ROWS);
@@ -436,7 +436,7 @@ void
 ofmt_print(ofmt_handle_t ofmt, void *arg)
 {
 	ofmt_state_t *os = ofmt;
-	int i;
+	uint_t i;
 	char value[1024];
 	ofmt_field_t *of;
 	boolean_t escsep, more_rows;
@@ -525,7 +525,7 @@ void
 ofmt_print_header(ofmt_handle_t ofmt)
 {
 	ofmt_state_t *os = ofmt;
-	int i;
+	uint_t i;
 	ofmt_field_t *of = os->os_fields;
 	boolean_t escsep = (os->os_nfields > 1);
 
@@ -560,7 +560,7 @@ ofmt_strerror(ofmt_handle_t ofmt, ofmt_status_t error, char *buf,
     uint_t bufsize)
 {
 	ofmt_state_t *os = ofmt;
-	int i;
+	uint_t i;
 	const char *s;
 	char ebuf[OFMT_BUFSIZE];
 	boolean_t parsable;

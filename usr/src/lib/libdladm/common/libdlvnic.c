@@ -148,6 +148,8 @@ i_dladm_vnic_create_sys(dladm_handle_t handle, dladm_vnic_attr_t *attr)
 		bcopy(ioc.vc_mac_addr, attr->va_mac_addr, MAXMACADDRLEN);
 		attr->va_mac_len = ioc.vc_mac_len;
 		break;
+	default:
+		break;
 	}
 	return (status);
 }

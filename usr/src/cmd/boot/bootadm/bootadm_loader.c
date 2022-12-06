@@ -325,29 +325,34 @@ menu_read(struct menu_lst *menu, char *menu_path)
 				ret = BAM_ERROR;
 			goto done;
 		}
+		if (buf[0] == '\n')	/* Skip empty lines */
+			continue;
+
 		key = strtok(buf, " \n");
-		if (strcmp(key, "title") != 0) {
+		if (key == NULL || strcmp(key, "title") != 0) {
 			ret = BAM_ERROR;
 			goto done;
 		}
 		value = strtok(NULL, " \n");
-		if ((title = strdup(value)) == NULL) {
+		if (value == NULL || (title = strdup(value)) == NULL) {
 			ret = BAM_ERROR;
 			goto done;
 		}
 
-		if (fgets(buf, PATH_MAX, fp) == NULL) {
-			ret = BAM_ERROR;
-			goto done;
-		}
+		do {
+			if (fgets(buf, PATH_MAX, fp) == NULL) {
+				ret = BAM_ERROR;
+				goto done;
+			}
+		} while (buf[0] == '\n');	/* Skip empty lines */
 
 		key = strtok(buf, " \n");
-		if ((type = strdup(key)) == NULL) {
+		if (key == NULL || (type = strdup(key)) == NULL) {
 			ret = BAM_ERROR;
 			goto done;
 		}
 		value = strtok(NULL, " \n");
-		if ((bootfs = strdup(value)) == NULL) {
+		if (value == NULL || (bootfs = strdup(value)) == NULL) {
 			ret = BAM_ERROR;
 			goto done;
 		}
@@ -761,6 +766,11 @@ bam_mount_be(menu_entry_t *entry, char **dir)
 		if (strcmp(be_node->be_root_ds, entry->me_bootfs) == 0)
 			break;
 
+	if (be_node == NULL) {
+		ret = BE_ERR_BE_NOENT;
+		goto out;
+	}
+
 	if (nvlist_add_string(be_attrs, BE_ATTR_ORIG_BE_NAME,
 	    be_node->be_node_name) != 0) {
 		ret = BE_ERR_NOMEM;
@@ -838,7 +848,8 @@ list_menu_entry(menu_entry_t *entry, char *setting)
 			(void) rmdir(dir);
 			free(dir);
 		}
-		bam_error(_("%s is not mounted\n"), entry->me_title);
+		bam_error(_("%s is not mounted: %s\n"), entry->me_title,
+		    be_err_to_str(mounted));
 		return (BAM_ERROR);
 	}
 

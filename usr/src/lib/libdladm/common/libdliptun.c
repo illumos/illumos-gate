@@ -122,6 +122,8 @@ i_iptun_kparams(dladm_handle_t handle, const iptun_params_t *params,
 		case IPTUN_TYPE_IPV6:
 			hints.ai_family = AF_INET6;
 			break;
+		case IPTUN_TYPE_UNKNOWN:
+			return (DLADM_STATUS_BADIPTUNLADDR);
 		}
 	}
 
