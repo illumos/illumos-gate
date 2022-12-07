@@ -150,7 +150,7 @@ static void smb_oplock_wait_break_cancel(smb_request_t *sr);
  * This is mostly the same as smb_oplock_ind_break() except:
  * - The only CompletionStatus possible is STATUS_CANT_GRANT.
  * - Instead of taskq_dispatch this appends the new SR to
- *   the "post work" queue on the current SR.
+ *   the "post work" queue on the current SR (if possible).
  *
  * Note called with the node ofile list rwlock held and
  * the oplock mutex entered.
@@ -159,7 +159,13 @@ void
 smb_oplock_ind_break_in_ack(smb_request_t *ack_sr, smb_ofile_t *ofile,
     uint32_t NewLevel, boolean_t AckRequired)
 {
-	smb_request_t *new_sr;
+	smb_server_t *sv = ofile->f_server;
+	smb_node_t *node = ofile->f_node;
+	smb_request_t *sr = NULL;
+	boolean_t use_postwork = B_TRUE;
+
+	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
+	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
 
 	/*
 	 * This should happen only with SMB2 or later,
@@ -183,42 +189,59 @@ smb_oplock_ind_break_in_ack(smb_request_t *ack_sr, smb_ofile_t *ofile,
 
 	/*
 	 * When called from Ack processing, we want to use a
-	 * request on the session doing the ack.  If we can't
+	 * request on the session doing the ack, so we can
+	 * append "post work" to that session.  If we can't
 	 * allocate a request on that session (because it's
-	 * now disconnecting) just fall-back to the normal
-	 * oplock break code path which deals with that.
-	 * Once we have a request on the ack session, that
-	 * session won't go away until the request is done.
+	 * now disconnecting) use a request from the server
+	 * session like smb_oplock_ind_break does, and then
+	 * use taskq_dispatch instead of postwork.
 	 */
-	new_sr = smb_request_alloc(ack_sr->session, 0);
-	if (new_sr == NULL) {
-		smb_oplock_ind_break(ofile, NewLevel,
-		    AckRequired, STATUS_CANT_GRANT);
-		smb_ofile_release(ofile);
+	sr = smb_request_alloc(ack_sr->session, 0);
+	if (sr == NULL) {
+		use_postwork = B_FALSE;
+		sr = smb_request_alloc(sv->sv_session, 0);
+	}
+	if (sr == NULL) {
+		/*
+		 * Server must be shutting down.  We took a
+		 * hold on the ofile that must be released,
+		 * but we can't release here because we're
+		 * called with the node ofile list entered.
+		 * See smb_ofile_release_LL.
+		 */
+		smb_llist_post(&node->n_ofile_list, ofile,
+		    smb_ofile_release_LL);
 		return;
 	}
 
-	new_sr->sr_state = SMB_REQ_STATE_SUBMITTED;
-	new_sr->smb2_async = B_TRUE;
-	new_sr->user_cr = zone_kcred();
-	new_sr->fid_ofile = ofile;
+	sr->sr_state = SMB_REQ_STATE_SUBMITTED;
+	sr->smb2_async = B_TRUE;
+	sr->user_cr = zone_kcred();
+	sr->fid_ofile = ofile;
 	if (ofile->f_tree != NULL) {
-		new_sr->tid_tree = ofile->f_tree;
-		smb_tree_hold_internal(ofile->f_tree);
+		sr->tid_tree = ofile->f_tree;
+		smb_tree_hold_internal(sr->tid_tree);
 	}
 	if (ofile->f_user != NULL) {
-		new_sr->uid_user = ofile->f_user;
-		smb_user_hold_internal(ofile->f_user);
+		sr->uid_user = ofile->f_user;
+		smb_user_hold_internal(sr->uid_user);
 	}
-	new_sr->arg.olbrk.NewLevel = NewLevel;
-	new_sr->arg.olbrk.AckRequired = AckRequired;
+	sr->arg.olbrk.NewLevel = NewLevel;
+	sr->arg.olbrk.AckRequired = AckRequired;
 
-	/*
-	 * Using smb2_cmd_code to indicate what to call.
-	 * work func. will call smb_oplock_send_brk
-	 */
-	new_sr->smb2_cmd_code = SMB2_OPLOCK_BREAK;
-	smb2sr_append_postwork(ack_sr, new_sr);
+	if (use_postwork) {
+		/*
+		 * Using smb2_cmd_code to indicate what to call.
+		 * work func. will call smb_oplock_send_brk
+		 */
+		sr->smb2_cmd_code = SMB2_OPLOCK_BREAK;
+		smb2sr_append_postwork(ack_sr, sr);
+	} else {
+		/* Will call smb_oplock_send_break */
+		sr->smb2_status = STATUS_CANT_GRANT;
+		(void) taskq_dispatch(sv->sv_worker_pool,
+		    smb_oplock_async_break, sr, TQ_SLEEP);
+	}
 }
 
 /*
@@ -240,6 +263,9 @@ smb_oplock_ind_break(smb_ofile_t *ofile, uint32_t NewLevel,
 	smb_server_t *sv = ofile->f_server;
 	smb_node_t *node = ofile->f_node;
 	smb_request_t *sr = NULL;
+
+	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
+	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
 
 	/*
 	 * See notes at smb_oplock_async_break re. CompletionStatus

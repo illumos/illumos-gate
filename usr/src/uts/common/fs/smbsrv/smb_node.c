@@ -188,33 +188,31 @@ smb_node_fini(void)
 	if (smb_node_cache == NULL)
 		return;
 
-#ifdef DEBUG
 	for (i = 0; i <= SMBND_HASH_MASK; i++) {
 		smb_llist_t	*bucket;
 		smb_node_t	*node;
 
 		/*
-		 * The following sequence is just intended for sanity check.
-		 * This will have to be modified when the code goes into
-		 * production.
+		 * The SMB node hash table should be empty at this point.
+		 * If the hash table is not empty, clean it up.
 		 *
-		 * The SMB node hash table should be emtpy at this point. If the
-		 * hash table is not empty a panic will be triggered.
-		 *
-		 * The reason why SMB nodes are still remaining in the hash
-		 * table is problably due to a mismatch between calls to
-		 * smb_node_lookup() and smb_node_release(). You must track that
-		 * down.
+		 * The reason why SMB nodes might remain in this table is
+		 * generally forgotten references somewhere, perhaps on
+		 * open files, etc.  Those are defects.
 		 */
 		bucket = &smb_node_hash_table[i];
 		node = smb_llist_head(bucket);
 		while (node != NULL) {
+#ifdef DEBUG
 			cmn_err(CE_NOTE, "leaked node: 0x%p %s",
 			    (void *)node, node->od_name);
-			node = smb_llist_next(bucket, node);
+			cmn_err(CE_NOTE, "...bucket: 0x%p", bucket);
+			debug_enter("leaked_node");
+#endif
+			smb_llist_remove(bucket, node);
+			node = smb_llist_head(bucket);
 		}
 	}
-#endif
 
 	for (i = 0; i <= SMBND_HASH_MASK; i++) {
 		smb_llist_destructor(&smb_node_hash_table[i]);

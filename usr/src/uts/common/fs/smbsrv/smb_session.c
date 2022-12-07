@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <sys/atomic.h>
@@ -1194,6 +1194,8 @@ smb_session_disconnect_share(
 	smb_llist_exit(ll);
 }
 
+int smb_session_logoff_maxwait = 2 * MILLISEC;	/* 2 sec. */
+
 /*
  * Logoff all users associated with the specified session.
  *
@@ -1207,6 +1209,8 @@ smb_session_logoff(smb_session_t *session)
 {
 	smb_llist_t	*ulist;
 	smb_user_t	*user;
+	int		count;
+	int		timeleft = smb_session_logoff_maxwait;
 
 	SMB_SESSION_VALID(session);
 
@@ -1244,52 +1248,40 @@ top:
 		user = smb_llist_next(ulist, user);
 	}
 
-	/* Needed below (Was the list empty?) */
-	user = smb_llist_head(ulist);
+	count = smb_llist_get_count(ulist);
 
+	/* drop the lock and flush the dtor queue */
 	smb_llist_exit(ulist);
 
 	/*
-	 * It's possible for user objects to remain due to references
-	 * obtained via smb_server_lookup_ssnid(), when an SMB2
-	 * session setup is destroying a previous session.
-	 *
-	 * Wait for user objects to clear out (last refs. go away,
-	 * then smb_user_delete takes them out of the list).  When
-	 * the last user object is removed, the session state is
-	 * set to SHUTDOWN and s_lock is signaled.
-	 *
-	 * Not all places that call smb_user_release necessarily
-	 * flush the delete queue, so after we wait for the list
-	 * to empty out, go back to the top and recheck the list
-	 * delete queue to make sure smb_user_delete happens.
+	 * Wait (briefly) for user objects to go away.
+	 * They might linger, eg. if some ofile ref has been
+	 * forgotten, which holds, a tree and a user.
+	 * See smb_session_destroy.
 	 */
-	if (user == NULL) {
+	if (count == 0) {
 		/* User list is empty. */
 		smb_rwx_rwenter(&session->s_lock, RW_WRITER);
 		session->s_state = SMB_SESSION_STATE_SHUTDOWN;
 		smb_rwx_rwexit(&session->s_lock);
 	} else {
 		smb_rwx_rwenter(&session->s_lock, RW_READER);
-		if (session->s_state != SMB_SESSION_STATE_SHUTDOWN) {
+		if (session->s_state != SMB_SESSION_STATE_SHUTDOWN &&
+		    timeleft > 0) {
+			/* May be signaled in smb_user_delete */
 			(void) smb_rwx_cvwait(&session->s_lock,
 			    MSEC_TO_TICK(200));
+			timeleft -= 200;
 			smb_rwx_rwexit(&session->s_lock);
 			goto top;
 		}
 		smb_rwx_rwexit(&session->s_lock);
 	}
-	ASSERT(session->s_state == SMB_SESSION_STATE_SHUTDOWN);
 
 	/*
 	 * User list should be empty now.
+	 * (Checked in smb_session_destroy)
 	 */
-#ifdef	DEBUG
-	if (ulist->ll_count != 0) {
-		cmn_err(CE_WARN, "user list not empty?");
-		debug_enter("s_user_list");
-	}
-#endif
 
 	/*
 	 * User logoff happens first so we'll set preserve_opens
