@@ -38,7 +38,51 @@ To install the full suite, run:
 
 --------------------------------------------------------------------------------
 
-2. Running the SMB Server Test Suite
+2. Preparing the SMB Server Share
+
+When workgroup mode is used, make sure the pam_smb_passwd module is
+configured in /etc/pam.conf or in /etc/pam.d:
+
+other   password required       pam_smb_passwd.so.1 nowarn
+
+Add test user:
+# useradd test
+# smbadm enable-user test
+# passwd test
+
+If needed, add admin user as shown above, and add it to smb group:
+# smbadm add-member -m admin@<hostname> administrators
+
+Set smb default settings:
+
+# sharectl set -p signing_required=false smb
+# sharectl set -p signing_enabled=true smb
+# svcadm restart network/smb/server
+
+Create dataset(s):
+
+Some smbtorture tests do rely on recordsize 4k.
+
+# zfs create -o recordsize=4k -o casesensitivity=mixed -o nbmand=on \
+  <pool>/test
+
+Set permissions:
+
+# chmod A=everyone@:full_set:fd:allow /<path to mounpoint>/test
+
+Create required snapshots (WPTS needs exactly 3 snapshots):
+
+# zfs snapshot <pool>/test@a
+# zfs snapshot <pool>/test@b
+# zfs snapshot <pool>/test@c
+
+Activate smb share:
+
+# zfs set sharesmb=name=test <pool>/test
+
+--------------------------------------------------------------------------------
+
+3. Running the SMB Server Test Suite
 
 The default configuration:
 	/opt/smbsrv-tests/include/default.cfg
@@ -68,7 +112,7 @@ as additional arguments to the individual test, eg
 
 --------------------------------------------------------------------------------
 
-3. Test Results
+4. Test Results
 
 While the SMB Server Test Suite is running, one informational line is
 printed for each test, ending with one of:
