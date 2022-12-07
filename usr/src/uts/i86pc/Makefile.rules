@@ -24,6 +24,7 @@
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 Oxide Computer Company
 #
 
 #	This Makefile defines the build rules for the directory uts/i86pc
@@ -170,6 +171,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/os/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/os/cpupm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/promif/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
