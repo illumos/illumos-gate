@@ -140,8 +140,13 @@ while getopts ac:l:qT: c; do
 		auto_detect=true
 		;;
 	'c')
-		runfiles=$OPTARG
-		[[ -f $runfiles ]] || fail "Cannot read file: $runfiles"
+		runfile=$OPTARG
+		[[ -f $runfile ]] || fail "Cannot read file: $runfile"
+		if [[ -z $runfiles ]]; then
+			runfiles=$runfile
+		else
+			runfiles+=",$runfile"
+		fi
 		;;
 	'l')
 		logfile=$OPTARG
