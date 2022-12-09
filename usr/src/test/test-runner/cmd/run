@@ -869,6 +869,7 @@ class TestRun(object):
 
     def summary(self):
         if Result.total == 0:
+            print('No tests to run')
             return
 
         print('\nResults Summary')

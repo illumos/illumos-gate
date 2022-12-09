@@ -74,7 +74,6 @@ GENUNIX_OBJS +=		\
 	lwp_private.o	\
 	prom_enter.o	\
 	prom_exit.o	\
-	prom_panic.o	\
 	sendsig.o	\
 	syscall.o
 
@@ -91,7 +90,6 @@ GENUNIX_OBJS +=		\
 	prom_printf.o	\
 	prom_prop.o	\
 	prom_putchar.o	\
-	prom_reboot.o	\
 	prom_version.o
 
 #

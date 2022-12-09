@@ -220,7 +220,7 @@ fs=$TESTPOOL/$TESTFS1
 log_must zfs create $fs
 log_must zfs snapshot $fs@snap
 while((i < 7)); do
-	log_must zfs clone $fs@snap $fs/$TESTCLONE$(python -c 'print "x" * 200').$i
+	log_must zfs clone $fs@snap $fs/$TESTCLONE$(printf %0.sx {1..200}).$i
 	((i=i+1))
 	((j=j+200))
 done

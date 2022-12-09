@@ -113,6 +113,8 @@ CORE_OBJS +=			\
 	pci_orion.o		\
 	pmem.o			\
 	ppage.o			\
+	prom_panic.o		\
+	prom_reboot.o		\
 	pwrnow.o		\
 	speedstep.o		\
 	ssp.o			\

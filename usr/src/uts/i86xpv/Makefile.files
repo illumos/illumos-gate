@@ -23,6 +23,7 @@
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2022 Oxide Computer Company
 #
 
 #	This Makefile defines file modules in the directory uts/i86xpv
@@ -95,6 +96,8 @@ CORE_OBJS +=			\
 	pci_orion.o		\
 	pmem.o			\
 	ppage.o			\
+	prom_reboot.o		\
+	prom_panic.o		\
 	startup.o		\
 	ssp.o			\
 	xpv_timestamp.o		\
