@@ -477,6 +477,7 @@ typeset target
 typeset -i passthrough=0
 typeset -i flag=0
 
+cd $TESTDIR
 for mode in "${aclmode_flag[@]}"; do
 	log_must zfs set aclmode=$mode $TESTPOOL/$TESTFS
 
@@ -512,7 +513,7 @@ for mode in "${aclmode_flag[@]}"; do
 				done
 			done
 			# Archive the file and directory
-			log_must tar cpf@ $TARFILE $basedir
+			log_must tar cpf@ $TARFILE ${basedir#$TESTDIR/}
 
 			if [[ -d $obj ]]; then
 				target=$odir
