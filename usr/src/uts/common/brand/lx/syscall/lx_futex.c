@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -1384,7 +1385,8 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 
 	case FUTEX_WAIT_BITSET:
 		rval = futex_wait(&memid, (void *)addr, val, tptr, val3,
-		    (op & FUTEX_CLOCK_REALTIME) ? B_FALSE : B_TRUE);
+		    (tptr == NULL || (op & FUTEX_CLOCK_REALTIME) != 0) ?
+		    B_FALSE : B_TRUE);
 		break;
 
 	case FUTEX_WAKE:
