@@ -54,7 +54,6 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE)
 #
 CPPFLAGS	+= -I$(SRCDIR) -I$(OBJS_DIR)
 ASFLAGS		+= -I$(SRCDIR) -I$(OBJS_DIR)
-LDFLAGS		+= -N misc/acpica
 
 #
 #       Default build targets.
