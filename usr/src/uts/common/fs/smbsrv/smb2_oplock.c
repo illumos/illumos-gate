@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2019 RackTop Systems.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -19,6 +19,7 @@
  */
 
 #include <smbsrv/smb2_kproto.h>
+#include <smbsrv/smb_oplock.h>
 
 #define	BATCH_OR_EXCL	(OPLOCK_LEVEL_BATCH | OPLOCK_LEVEL_ONE)
 
@@ -30,11 +31,15 @@
  * SMB2 Oplock Break Acknowledgement
  * [MS-SMB2] 3.3.5.22.1 Processing an Oplock Acknowledgment
  * Called via smb2_disp_table[]
+ * This is an "Ack" from the client.
  */
 smb_sdrc_t
 smb2_oplock_break_ack(smb_request_t *sr)
 {
+	smb_arg_olbrk_t	*olbrk = &sr->arg.olbrk;
+	smb_node_t  *node;
 	smb_ofile_t *ofile;
+	smb_oplock_grant_t *og;
 	smb2fid_t smb2fid;
 	uint32_t status;
 	uint32_t NewLevel;
@@ -72,16 +77,8 @@ smb2_oplock_break_ack(smb_request_t *sr)
 	if (rc != 0)
 		return (SDRC_ERROR);
 
-	/* Find the ofile */
-	status = smb2sr_lookup_fid(sr, &smb2fid);
-	/* Success or NT_STATUS_FILE_CLOSED */
-
-	DTRACE_SMB2_START(op__OplockBreak, smb_request_t *, sr);
-	if (status != 0)
-		goto errout;
-
 	/*
-	 * Process an (old-style) oplock break ack.
+	 * Convert SMB oplock level to internal form.
 	 */
 	switch (smbOplockLevel) {
 	case SMB2_OPLOCK_LEVEL_NONE:	/* 0x00 */
@@ -96,50 +93,91 @@ smb2_oplock_break_ack(smb_request_t *sr)
 	case SMB2_OPLOCK_LEVEL_BATCH:	/* 0x09 */
 		NewLevel = OPLOCK_LEVEL_BATCH;
 		break;
+
+	/* Note: _LEVEL_LEASE is not valid here. */
 	case SMB2_OPLOCK_LEVEL_LEASE:	/* 0xFF */
-		NewLevel = OPLOCK_LEVEL_NONE;
-		break;
 	default:
+		/*
+		 * Impossible NewLevel here, will cause
+		 * NT_STATUS_INVALID_PARAMETER below.
+		 */
+		NewLevel = OPLOCK_LEVEL_GRANULAR;
+		break;
+	}
+
+	/* for dtrace */
+	olbrk->NewLevel = NewLevel;
+
+	/* Find the ofile */
+	status = smb2sr_lookup_fid(sr, &smb2fid);
+	/* Success or NT_STATUS_FILE_CLOSED */
+
+	DTRACE_SMB2_START(op__OplockBreak, smb_request_t *, sr);
+
+	if (status != 0) {
+		/* lookup fid failed */
+		goto errout;
+	}
+
+	if (NewLevel == OPLOCK_LEVEL_GRANULAR) {
+		/* Switch above got invalid smbOplockLevel */
 		status = NT_STATUS_INVALID_PARAMETER;
 		goto errout;
 	}
 
+	/* Success, so have sr->fid_ofile */
 	ofile = sr->fid_ofile;
-	if (ofile->f_oplock.og_breaking == 0) {
+	og = &ofile->f_oplock;
+	node = ofile->f_node;
+
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	mutex_enter(&node->n_oplock.ol_mutex);
+
+	if (og->og_breaking == B_FALSE) {
 		/*
 		 * This is an unsolicited Ack. (There is no
 		 * outstanding oplock break in progress now.)
 		 * There are WPTS tests that care which error
 		 * is returned.  See [MS-SMB2] 3.3.5.22.1
 		 */
-		if (smbOplockLevel == SMB2_OPLOCK_LEVEL_LEASE) {
-			status = NT_STATUS_INVALID_PARAMETER;
-			goto errout;
-		}
-		if (NewLevel >= (ofile->f_oplock.og_state &
-		    OPLOCK_LEVEL_TYPE_MASK)) {
+		if (NewLevel >= (og->og_state & OPLOCK_LEVEL_TYPE_MASK)) {
 			status = NT_STATUS_INVALID_OPLOCK_PROTOCOL;
-			goto errout;
+			goto unlock_out;
 		}
 		status = NT_STATUS_INVALID_DEVICE_STATE;
-		goto errout;
+		goto unlock_out;
 	}
-	ofile->f_oplock.og_breaking = 0;
+
+	/*
+	 * Process the oplock break ack.
+	 *
+	 * Clear breaking flags before we ack,
+	 * because ack might set those.
+	 */
+	ofile->f_oplock.og_breaking = B_FALSE;
+	cv_broadcast(&ofile->f_oplock.og_ack_cv);
 
 	status = smb_oplock_ack_break(sr, ofile, &NewLevel);
-	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
-		status = smb2sr_go_async(sr);
-		if (status != 0)
-			goto errout;
-		(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
-		status = 0;
-	}
-	if (status != 0) {
-		NewLevel = OPLOCK_LEVEL_NONE;
-		goto errout;
-	}
 
 	ofile->f_oplock.og_state = NewLevel;
+	if (ofile->dh_persist)
+		smb2_dh_update_oplock(sr, ofile);
+
+unlock_out:
+	mutex_exit(&node->n_oplock.ol_mutex);
+	smb_llist_exit(&node->n_ofile_list);
+
+errout:
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__OplockBreak, smb_request_t *, sr);
+	if (status) {
+		smb2sr_put_error(sr, status);
+		return (SDRC_SUCCESS);
+	}
+
+	/*
+	 * Convert internal oplock state back to SMB form.
+	 */
 	switch (NewLevel & OPLOCK_LEVEL_TYPE_MASK) {
 	case OPLOCK_LEVEL_NONE:
 		smbOplockLevel = SMB2_OPLOCK_LEVEL_NONE;
@@ -157,14 +195,6 @@ smb2_oplock_break_ack(smb_request_t *sr)
 	default:
 		smbOplockLevel = SMB2_OPLOCK_LEVEL_NONE;
 		break;
-	}
-
-errout:
-	sr->smb2_status = status;
-	DTRACE_SMB2_DONE(op__OplockBreak, smb_request_t *, sr);
-	if (status) {
-		smb2sr_put_error(sr, status);
-		return (SDRC_SUCCESS);
 	}
 
 	/*
@@ -187,7 +217,7 @@ errout:
  * the SMB2 header and everything, in sr->reply.
  * The caller will send it and free the request.
  */
-void
+static void
 smb2_oplock_break_notification(smb_request_t *sr, uint32_t NewLevel)
 {
 	smb_ofile_t *ofile = sr->fid_ofile;
@@ -234,6 +264,137 @@ smb2_oplock_break_notification(smb_request_t *sr, uint32_t NewLevel)
 	    /* reserved		  5. */
 	    smb2fid.persistent,	/* q */
 	    smb2fid.temporal);	/* q */
+}
+
+/*
+ * Send an oplock break over the wire, or if we can't,
+ * then process the oplock break locally.
+ *
+ * [MS-SMB2] 3.3.4.6 Object Store Indicates an Oplock Break
+ *
+ * Note: When "AckRequired" is set, and we're for any reason
+ * unable to communicate with the client so that they do an
+ * "oplock break ACK", then we absolutely MUST do a local ACK
+ * for this break indication (or close the ofile).
+ *
+ * The file-system level oplock code (smb_cmn_oplock.c)
+ * requires these ACK calls to clear "breaking" flags.
+ *
+ * This is called either from smb_oplock_async_break via a
+ * taskq job scheduled in smb_oplock_ind_break, or from the
+ * smb2sr_append_postwork() mechanism when we're doing a
+ * "break in ack", via smb_oplock_ind_break_in_ack.
+ *
+ * This runs much like other smb_request_t handlers, in the
+ * context of a worker task that calls with no locks held.
+ *
+ * Note that we have sr->fid_ofile here but all the other
+ * normal sr members may be NULL:  uid_user, tid_tree.
+ * Also sr->session may or may not be the same session as
+ * the ofile came from (ofile->f_session) depending on
+ * whether this is a "live" open or an orphaned DH,
+ * where ofile->f_session will be NULL.
+ */
+void
+smb2_oplock_send_break(smb_request_t *sr)
+{
+	smb_ofile_t	*ofile = sr->fid_ofile;
+	smb_node_t	*node = ofile->f_node;
+	uint32_t	NewLevel = sr->arg.olbrk.NewLevel;
+	boolean_t	AckReq = sr->arg.olbrk.AckRequired;
+	uint32_t	status;
+	int		rc;
+
+	/*
+	 * Build the break message in sr->reply.
+	 * It's free'd in smb_request_free().
+	 * Always SMB2 oplock here (no lease)
+	 */
+	sr->reply.max_bytes = MLEN;
+	smb2_oplock_break_notification(sr, NewLevel);
+
+	/*
+	 * Try to send the break message to the client.
+	 * If connected, this IF body will be true.
+	 */
+	if (sr->session == ofile->f_session)
+		rc = smb_session_send(sr->session, 0, &sr->reply);
+	else
+		rc = ENOTCONN;
+
+	if (rc != 0) {
+		/*
+		 * We were unable to send the oplock break request,
+		 * presumably because the connection is gone.
+		 *
+		 * [MS-SMB2] 3.3.4.6 Object Store Indicates an Oplock Break
+		 * If no connection is available, Open.IsResilient is FALSE,
+		 * Open.IsDurable is FALSE, and Open.IsPersistent is FALSE,
+		 * the server SHOULD close the Open as specified in...
+		 */
+		if (ofile->dh_persist == B_FALSE &&
+		    ofile->dh_vers != SMB2_RESILIENT &&
+		    (ofile->dh_vers == SMB2_NOT_DURABLE ||
+		    (NewLevel & OPLOCK_LEVEL_BATCH) == 0)) {
+			smb_ofile_close(ofile, 0);
+			return;
+		}
+		/* Keep this (durable) open. */
+		if (!AckReq)
+			return;
+		/* Do local Ack below. */
+	} else {
+		/*
+		 * OK, we were able to send the break message.
+		 * If no ack. required, we're done.
+		 */
+		if (!AckReq)
+			return;
+
+		/*
+		 * We're expecting an ACK.  Wait in this thread
+		 * so we can log clients that don't respond.
+		 */
+		status = smb_oplock_wait_ack(sr, NewLevel);
+		if (status == 0)
+			return;
+
+		cmn_err(CE_NOTE, "clnt %s oplock break timeout",
+		    sr->session->ip_addr_str);
+		DTRACE_PROBE1(ack_timeout, smb_request_t *, sr);
+
+		/*
+		 * Will do local ack below.  Note, after timeout,
+		 * do a break to none or "no caching" regardless
+		 * of what the passed in cache level was.
+		 */
+		NewLevel = OPLOCK_LEVEL_NONE;
+	}
+
+	/*
+	 * Do the ack locally.
+	 */
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	mutex_enter(&node->n_oplock.ol_mutex);
+
+	ofile->f_oplock.og_breaking = B_FALSE;
+	cv_broadcast(&ofile->f_oplock.og_ack_cv);
+
+	status = smb_oplock_ack_break(sr, ofile, &NewLevel);
+
+	ofile->f_oplock.og_state = NewLevel;
+	if (ofile->dh_persist)
+		smb2_dh_update_oplock(sr, ofile);
+
+	mutex_exit(&node->n_oplock.ol_mutex);
+	smb_llist_exit(&node->n_ofile_list);
+
+#ifdef	DEBUG
+	if (status != 0) {
+		cmn_err(CE_NOTE, "clnt %s local oplock ack, status=0x%x",
+		    sr->session->ip_addr_str, status);
+	}
+#endif
 }
 
 /*
@@ -289,6 +450,8 @@ smb2_oplock_acquire(smb_request_t *sr)
 	/*
 	 * Tree options may force shared oplocks,
 	 * in which case we reduce the request.
+	 * Can't get here with LEVEL_NONE, so
+	 * this can only decrease the level.
 	 */
 	if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_FORCE_L2_OPLOCK)) {
 		op->op_oplock_state = OPLOCK_LEVEL_TWO;
@@ -315,41 +478,39 @@ smb2_oplock_acquire(smb_request_t *sr)
 	}
 
 	/*
-	 * Either of the above may have returned the
-	 * status code that says we should wait.
-	 */
-	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
-		(void) smb2sr_go_async(sr);
-		(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
-		status = 0;
-	}
-
-	/*
-	 * Keep track of what we got (in ofile->f_oplock.og_state)
+	 * Keep track of what we got (ofile->f_oplock.og_state etc)
 	 * so we'll know what we had when sending a break later.
 	 * The og_dialect here is the oplock dialect, not the
 	 * SMB dialect.  No lease here, so SMB 2.0.
 	 */
-	ofile->f_oplock.og_dialect = SMB_VERS_2_002;
 	switch (status) {
 	case NT_STATUS_SUCCESS:
-		ofile->f_oplock.og_state = op->op_oplock_state;
+	case NT_STATUS_OPLOCK_BREAK_IN_PROGRESS:
+		ofile->f_oplock.og_dialect = SMB_VERS_2_002;
+		ofile->f_oplock.og_state   = op->op_oplock_state;
+		ofile->f_oplock.og_breakto = op->op_oplock_state;
+		ofile->f_oplock.og_breaking = B_FALSE;
+		if (ofile->dh_persist) {
+			smb2_dh_update_oplock(sr, ofile);
+		}
 		break;
+
 	case NT_STATUS_OPLOCK_NOT_GRANTED:
-		ofile->f_oplock.og_state = 0;
 		op->op_oplock_level = SMB2_OPLOCK_LEVEL_NONE;
 		return;
+
 	default:
 		/* Caller did not check args sufficiently? */
 		cmn_err(CE_NOTE, "clnt %s oplock req. err 0x%x",
 		    sr->session->ip_addr_str, status);
-		ofile->f_oplock.og_state = 0;
+		DTRACE_PROBE2(other__error, smb_request_t *, sr,
+		    uint32_t, status);
 		op->op_oplock_level = SMB2_OPLOCK_LEVEL_NONE;
 		return;
 	}
 
 	/*
-	 * Have STATUS_SUCCESS
+	 * Only success cases get here
 	 * Convert internal oplock state to SMB2
 	 */
 	if (op->op_oplock_state & OPLOCK_LEVEL_GRANULAR) {
@@ -363,6 +524,15 @@ smb2_oplock_acquire(smb_request_t *sr)
 		op->op_oplock_level = SMB2_OPLOCK_LEVEL_II;
 	} else {
 		op->op_oplock_level = SMB2_OPLOCK_LEVEL_NONE;
+	}
+
+	/*
+	 * An smb_oplock_reqest call may have returned the
+	 * status code that says we should wait.
+	 */
+	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+		(void) smb2sr_go_async(sr);
+		(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
 	}
 }
 

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -250,7 +251,6 @@ smb_com_locking_andx(smb_request_t *sr)
 	DWORD		result;
 	int		rc;
 	uint32_t	ltype;
-	uint32_t	status;
 	smb_ofile_t	*ofile;
 	uint16_t	tmp_pid;	/* locking uses 16-bit pids */
 	uint32_t	lrv_tot;
@@ -288,18 +288,16 @@ smb_com_locking_andx(smb_request_t *sr)
 		ltype = SMB_LOCK_TYPE_READWRITE;
 
 	if (lock_type & LOCKING_ANDX_OPLOCK_RELEASE) {
-		uint32_t NewLevel;
-		if (oplock_level == 0)
-			NewLevel = OPLOCK_LEVEL_NONE;
-		else
-			NewLevel = OPLOCK_LEVEL_TWO;
-		status = smb_oplock_ack_break(sr, ofile, &NewLevel);
-		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
-			(void) smb_oplock_wait_break(sr, ofile->f_node, 0);
-			status = 0;
-		}
+		smb1_oplock_ack_break(sr, oplock_level);
 		if (unlock_num == 0 && lock_num == 0)
 			return (SDRC_NO_REPLY);
+		/*
+		 * Don't allow combining other lock/unlock actions
+		 * with an oplock ACK (normally don't get here).
+		 */
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
+		    ERRDOS, ERROR_INVALID_PARAMETER);
+		return (SDRC_ERROR);
 	}
 
 	/*
@@ -412,58 +410,4 @@ out:
 	    2, sr->andx_com, 0x27, 0) != 0)
 		return (SDRC_ERROR);
 	return (SDRC_SUCCESS);
-}
-
-/*
- * Compose an SMB1 Oplock Break Notification packet, including
- * the SMB1 header and everything, in sr->reply.
- * The caller will send it and free the request.
- */
-void
-smb1_oplock_break_notification(smb_request_t *sr, uint32_t NewLevel)
-{
-	smb_ofile_t *ofile = sr->fid_ofile;
-	uint16_t fid;
-	uint8_t lock_type;
-	uint8_t oplock_level;
-
-	/*
-	 * Convert internal level to SMB1
-	 */
-	switch (NewLevel) {
-	default:
-		ASSERT(0);
-		/* FALLTHROUGH */
-	case OPLOCK_LEVEL_NONE:
-		oplock_level = 0;
-		break;
-
-	case OPLOCK_LEVEL_TWO:
-		oplock_level = 1;
-		break;
-	}
-
-	sr->smb_com = SMB_COM_LOCKING_ANDX;
-	sr->smb_tid = ofile->f_tree->t_tid;
-	sr->smb_pid = 0xFFFF;
-	sr->smb_uid = 0;
-	sr->smb_mid = 0xFFFF;
-	fid = ofile->f_fid;
-	lock_type = LOCKING_ANDX_OPLOCK_RELEASE;
-
-	(void) smb_mbc_encodef(
-	    &sr->reply, "Mb19.wwwwbb3.wbb10.",
-	    /*  "\xffSMB"		   M */
-	    sr->smb_com,		/* b */
-	    /* status, flags, signature	 19. */
-	    sr->smb_tid,		/* w */
-	    sr->smb_pid,		/* w */
-	    sr->smb_uid,		/* w */
-	    sr->smb_mid,		/* w */
-	    8,		/* word count	   b */
-	    0xFF,	/* AndX cmd	   b */
-	    /*  AndX reserved, offset	  3. */
-	    fid,
-	    lock_type,
-	    oplock_level);
 }

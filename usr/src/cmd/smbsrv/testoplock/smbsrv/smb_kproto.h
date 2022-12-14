@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -70,6 +71,7 @@ int	smb_account_connected(smb_user_t *user);
  * Common oplock functions
  */
 uint32_t smb_oplock_request(smb_request_t *, smb_ofile_t *, uint32_t *);
+uint32_t smb_oplock_request_LH(smb_request_t *, smb_ofile_t *, uint32_t *);
 uint32_t smb_oplock_ack_break(smb_request_t *, smb_ofile_t *, uint32_t *);
 uint32_t smb_oplock_break_PARENT(smb_node_t *, smb_ofile_t *);
 uint32_t smb_oplock_break_OPEN(smb_node_t *, smb_ofile_t *,
@@ -83,22 +85,23 @@ uint32_t smb_oplock_break_WRITE(smb_node_t *, smb_ofile_t *);
 uint32_t smb_oplock_break_SETINFO(smb_node_t *,
     smb_ofile_t *ofile, uint32_t InfoClass);
 uint32_t smb_oplock_break_DELETE(smb_node_t *, smb_ofile_t *);
+void smb_oplock_close(smb_ofile_t *);
+
+void smb_oplock_ind_break(smb_ofile_t *, uint32_t, boolean_t, uint32_t);
+void smb_oplock_ind_break_in_ack(smb_request_t *, smb_ofile_t *,
+    uint32_t, boolean_t);
+void smb_oplock_send_break(smb_request_t *);
+
+uint32_t smb_oplock_wait_ack(smb_request_t *, uint32_t);
+uint32_t smb_oplock_wait_break(smb_request_t *, smb_node_t *, int);
+uint32_t smb_oplock_wait_break_fem(smb_node_t *, int);
 
 void smb_oplock_move(smb_node_t *, smb_ofile_t *, smb_ofile_t *);
 
 /*
  * Protocol-specific oplock functions
- * (and "server-level" functions)
+ * (not needed here)
  */
-void smb1_oplock_acquire(smb_request_t *, boolean_t);
-void smb1_oplock_break_notification(smb_request_t *, uint32_t);
-void smb2_oplock_break_notification(smb_request_t *, uint32_t);
-void smb2_lease_break_notification(smb_request_t *, uint32_t, boolean_t);
-void smb_oplock_ind_break(smb_ofile_t *, uint32_t, boolean_t, uint32_t);
-void smb_oplock_ind_break_in_ack(smb_request_t *, smb_ofile_t *,
-    uint32_t, boolean_t);
-void smb_oplock_send_brk(smb_request_t *);
-uint32_t smb_oplock_wait_break(smb_node_t *, int);
 
 int smb_lock_range_access(smb_request_t *, smb_node_t *,
     uint64_t, uint64_t, boolean_t);

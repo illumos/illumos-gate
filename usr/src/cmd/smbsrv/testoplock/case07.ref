@@ -6,7 +6,7 @@ show
  ol_state=0x3 ( HANDLE_CACHING READ_CACHING )
  Excl=n cnt_II=0 cnt_R=0 cnt_RH=1 cnt_RHBQ=0
  ofile_cnt=1
-  fid=1 Lease=3 OgState=0x803 Brk=0x0 Excl=N onlist:   RH
+  fid=1 Lease=3 State=0x803 Excl=N onlist: RH
 open 2 3
  open 2 OK
 req 2 0x807
@@ -16,5 +16,5 @@ show
  ol_state=0x17 ( EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
  Excl=Y (FID=2) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
  ofile_cnt=2
-  fid=1 Lease=3 OgState=0x0 Brk=0x0 Excl=N onlist:   
-  fid=2 Lease=3 OgState=0x807 Brk=0x0 Excl=Y onlist:   
+  fid=1 Lease=3 State=0x0 Excl=N onlist:
+  fid=2 Lease=3 State=0x807 Excl=Y onlist:

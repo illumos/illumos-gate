@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Nexenta by DDN, Inc.  All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -96,9 +96,11 @@ typedef struct smb_oplock {
  */
 typedef struct smb_oplock_grant {
 	/* smb protocol-level state */
-	uint32_t		og_state;	/* latest sent to client */
-	uint32_t		og_breaking;	/* BREAK_TO... flags */
+	uint32_t		og_state;	/* what client has now */
+	uint32_t		og_breakto;	/* level breaking to */
+	boolean_t		og_breaking;
 	uint16_t		og_dialect;	/* how to send breaks */
+	kcondvar_t		og_ack_cv;	/* Wait for ACK */
 	/* File-system level state */
 	uint8_t			onlist_II;
 	uint8_t			onlist_R;
@@ -108,6 +110,8 @@ typedef struct smb_oplock_grant {
 } smb_oplock_grant_t;
 
 #define	SMB_LEASE_KEY_SZ	16
+
+struct smb_lease;
 
 #define	SMB_NODE_MAGIC		0x4E4F4445	/* 'NODE' */
 #define	SMB_NODE_VALID(p)	ASSERT((p)->n_magic == SMB_NODE_MAGIC)

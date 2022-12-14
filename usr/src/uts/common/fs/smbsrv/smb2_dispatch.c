@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 
@@ -1815,7 +1815,7 @@ smb2sr_run_postwork(smb_request_t *top_sr)
 
 		switch (post_sr->smb2_cmd_code) {
 		case SMB2_OPLOCK_BREAK:
-			smb_oplock_send_brk(post_sr);
+			smb_oplock_send_break(post_sr);
 			break;
 		default:
 			ASSERT(0);

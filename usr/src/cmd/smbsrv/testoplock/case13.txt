@@ -12,6 +12,8 @@ req 2 0x807
 show
 
 move 2 1
+show
+
 close 2
 show
 

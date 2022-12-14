@@ -227,7 +227,7 @@
  * Transition T7
  *
  *    This transition occurs in smb_session_durable_timers() and
- *    smb_oplock_send_brk(). The ofile will soon be closed.
+ *    smb_oplock_send_break(). The ofile will soon be closed.
  *    In the former case, f_timeout_offset nanoseconds have passed since
  *    the ofile was orphaned. In the latter, an oplock break occured
  *    on the ofile while it was orphaned.
@@ -444,6 +444,10 @@ smb_ofile_open(
  *   SMB_OFILE_STATE_OPEN  protocol close, smb_ofile_drop
  *   SMB_OFILE_STATE_EXPIRED  called via smb2_dh_expire
  *   SMB_OFILE_STATE_ORPHANED  smb2_dh_shutdown
+ *
+ * Not that this enters the of->node->n_ofile_list rwlock as reader,
+ * (via smb_oplock_close) so this must not be called while holding
+ * that rwlock.
  */
 void
 smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
@@ -453,21 +457,7 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 	SMB_OFILE_VALID(of);
 
 	if (of->f_ftype == SMB_FTYPE_DISK) {
-		smb_node_t *node = of->f_node;
-
-		smb_llist_enter(&node->n_ofile_list, RW_READER);
-		mutex_enter(&node->n_oplock.ol_mutex);
-
-		if (of->f_oplock_closing == B_FALSE) {
-			of->f_oplock_closing = B_TRUE;
-
-			if (of->f_lease != NULL)
-				smb2_lease_ofile_close(of);
-			smb_oplock_break_CLOSE(node, of);
-		}
-
-		mutex_exit(&node->n_oplock.ol_mutex);
-		smb_llist_exit(&node->n_ofile_list);
+		smb_oplock_close(of);
 	}
 
 	mutex_enter(&of->f_mutex);
@@ -743,7 +733,7 @@ smb_ofile_enum(smb_ofile_t *of, smb_svcenum_t *svcenum)
 
 /*
  * Take a reference on an open file, in any of the states:
- *   RECONNECT, SAVE_DH, OPEN, ORPHANED.
+ *   RECONNECT, SAVE_DH, OPEN, ORPHANED, EXPIRED.
  * Return TRUE if ref taken.  Used for oplock breaks.
  *
  * Note: When the oplock break code calls this, it holds the
@@ -774,13 +764,20 @@ again:
 		goto again;
 
 	case SMB_OFILE_STATE_OPEN:
-	case SMB_OFILE_STATE_ORPHANED:
 	case SMB_OFILE_STATE_SAVE_DH:
+	case SMB_OFILE_STATE_ORPHANED:
+	case SMB_OFILE_STATE_EXPIRED:
 		of->f_refcnt++;
 		ret = B_TRUE;
 		break;
 
+	/*
+	 * This is called only when an ofile has an oplock,
+	 * so if we come across states that should not have
+	 * an oplock, let's debug how that happened.
+	 */
 	default:
+		ASSERT(0);
 		break;
 	}
 	mutex_exit(&of->f_mutex);

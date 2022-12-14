@@ -36,6 +36,8 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_oplock.h>
 
+extern const char *xlate_nt_status(uint32_t);
+
 #define	OPLOCK_CACHE_RWH	(READ_CACHING | HANDLE_CACHING | WRITE_CACHING)
 #define	OPLOCK_TYPE	(LEVEL_TWO_OPLOCK | LEVEL_ONE_OPLOCK |\
 			BATCH_OPLOCK | OPLOCK_LEVEL_GRANULAR)
@@ -48,7 +50,7 @@ smb_request_t test_sr;
 uint32_t last_ind_break_level;
 char cmdbuf[100];
 
-extern const char *xlate_nt_status(uint32_t);
+static void run_ind_break_in_ack(smb_ofile_t *);
 
 #define	BIT_DEF(name) { name, #name }
 
@@ -134,16 +136,20 @@ do_show(void)
 	printf(" ofile_cnt=%d\n", node->n_ofile_list.ll_count);
 	FOREACH_NODE_OFILE(node, f) {
 		smb_oplock_grant_t *og = &f->f_oplock;
-		printf("  fid=%d Lease=%s OgState=0x%x Brk=0x%x",
+		printf("  fid=%d Lease=%s State=0x%x",
 		    f->f_fid,
 		    f->TargetOplockKey,	/* lease */
-		    f->f_oplock.og_state,
-		    f->f_oplock.og_breaking);
-		printf(" Excl=%s onlist: %s %s %s",
-		    (ol->excl_open == f) ? "Y" : "N",
-		    og->onlist_II ? "II" : "",
-		    og->onlist_R  ? "R" : "",
-		    og->onlist_RH ? "RH" : "");
+		    og->og_state);
+		if (og->og_breaking)
+			printf(" BreakTo=0x%x", og->og_breakto);
+		printf(" Excl=%s onlist:",
+		    (ol->excl_open == f) ? "Y" : "N");
+		if (og->onlist_II)
+			printf(" II");
+		if (og->onlist_R)
+			printf(" R");
+		if (og->onlist_RH)
+			printf(" RH");
 		if (og->onlist_RHBQ) {
 			printf(" RHBQ(to %s)",
 			    og->BreakingToRead ?
@@ -224,8 +230,13 @@ do_req(int fid, char *arg2)
 	 * Request an oplock
 	 */
 	status = smb_oplock_request(&test_sr, ofile, &oplock);
-	if (status == 0)
+	if (status == 0 ||
+	    status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 		ofile->f_oplock.og_state = oplock;
+		/* When no break pending, breakto=state */
+		ofile->f_oplock.og_breakto = oplock;
+		ofile->f_oplock.og_breaking = B_FALSE;
+	}
 	printf(" req oplock fid=%d ret oplock=0x%x status=0x%x (%s)\n",
 	    fid, oplock, status, xlate_nt_status(status));
 }
@@ -234,6 +245,7 @@ do_req(int fid, char *arg2)
 static void
 do_ack(int fid, char *arg2)
 {
+	smb_node_t *node = &test_node;
 	smb_ofile_t *ofile = &ofile_array[fid];
 	uint32_t oplock;
 	uint32_t status;
@@ -243,17 +255,27 @@ do_ack(int fid, char *arg2)
 	if (arg2 != NULL)
 		oplock = strtol(arg2, NULL, 16);
 
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	mutex_enter(&node->n_oplock.ol_mutex);
+
 	ofile->f_oplock.og_breaking = 0;
 	status = smb_oplock_ack_break(&test_sr, ofile, &oplock);
-	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
-		printf(" ack: break fid=%d, break-in-progress\n", fid);
-		ofile->f_oplock.og_state = oplock;
-	}
 	if (status == 0)
 		ofile->f_oplock.og_state = oplock;
 
+	mutex_exit(&node->n_oplock.ol_mutex);
+	smb_llist_exit(&node->n_ofile_list);
+
+	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+		/* should not get this status */
+		printf(" ack: break fid=%d, break-in-progress\n", fid);
+		ASSERT(0);
+	}
+
 	printf(" ack: break fid=%d, newstate=0x%x, status=0x%x (%s)\n",
 	    fid, oplock, status, xlate_nt_status(status));
+
+	run_ind_break_in_ack(ofile);
 }
 
 static void
@@ -328,8 +350,8 @@ do_brk_setinfo(int fid, char *arg2)
 
 	status = smb_oplock_break_SETINFO(
 	    &test_node, ofile, infoclass);
-	printf(" brk-setinfo %d ret status=0x%x (%s)\n",
-	    fid, status, xlate_nt_status(status));
+	printf(" brk-setinfo %d 0x%x ret status=0x%x (%s)\n",
+	    fid, infoclass, status, xlate_nt_status(status));
 
 }
 
@@ -550,45 +572,41 @@ smb_lock_range_access(
 }
 
 /*
- * Test code replacement for: smb_oplock_send_brk()
+ * Test code replacement for combination of:
+ *	smb_oplock_hdl_update()
+ *	smb_oplock_send_break()
+ *
+ * In a real server, we would send a break to the client,
+ * and keep track (at the SMB level) whether this oplock
+ * was obtained via a lease or an old-style oplock.
  */
 static void
-test_oplock_send_brk(smb_ofile_t *ofile,
+test_oplock_send_break(smb_ofile_t *ofile,
     uint32_t NewLevel, boolean_t AckReq)
 {
 	smb_oplock_grant_t *og = &ofile->f_oplock;
+	uint32_t OldLevel;
 
 	/* Skip building a message. */
 
 	if ((og->og_state & OPLOCK_LEVEL_GRANULAR) != 0)
 		NewLevel |= OPLOCK_LEVEL_GRANULAR;
 
-	/*
-	 * In a real server, we would send a break to the client,
-	 * and keep track (at the SMB level) whether this oplock
-	 * was obtained via a lease or an old-style oplock.
-	 */
-	if (AckReq) {
-		uint32_t BreakTo;
+	OldLevel = og->og_state;
+	og->og_breakto = NewLevel;
+	og->og_breaking = B_TRUE;
 
-		if ((og->og_state & OPLOCK_LEVEL_GRANULAR) != 0) {
+	printf("*smb_oplock_send_break fid=%d "
+	    "NewLevel=0x%x, OldLevel=0x%x, AckReq=%d)\n",
+	    ofile->f_fid, NewLevel, OldLevel, AckReq);
 
-			BreakTo = (NewLevel & CACHE_RWH) << BREAK_SHIFT;
-			if (BreakTo == 0)
-				BreakTo = BREAK_TO_NO_CACHING;
-		} else {
-			if ((NewLevel & LEVEL_TWO_OPLOCK) != 0)
-				BreakTo = BREAK_TO_TWO;
-			else
-				BreakTo = BREAK_TO_NONE;
-		}
-		og->og_breaking = BreakTo;
-		last_ind_break_level = NewLevel;
-		/* Set og_state in  do_ack */
-	} else {
+	if (!AckReq) {
 		og->og_state = NewLevel;
-		/* Clear og_breaking in do_ack */
+		og->og_breaking = B_FALSE;
 	}
+
+	/* Next, smb_oplock_send_break() would send a break. */
+	last_ind_break_level = NewLevel;
 }
 
 /*
@@ -614,31 +632,62 @@ smb_oplock_ind_break(smb_ofile_t *ofile, uint32_t NewLevel,
 
 	case NT_STATUS_SUCCESS:
 	case NT_STATUS_CANNOT_GRANT_REQUESTED_OPLOCK:
-		test_oplock_send_brk(ofile, NewLevel, AckReq);
+		test_oplock_send_break(ofile, NewLevel, AckReq);
 		break;
 
 	case NT_STATUS_OPLOCK_SWITCHED_TO_NEW_HANDLE:
 	case NT_STATUS_OPLOCK_HANDLE_CLOSED:
 		og->og_state = OPLOCK_LEVEL_NONE;
+		og->og_breakto = OPLOCK_LEVEL_NONE;
+		og->og_breaking = B_FALSE;
 		break;
 
 	default:
-		/* Checked by caller. */
 		ASSERT(0);
 		break;
 	}
 }
+
+/* Arrange for break_in_ack to run after ack completes. */
+static uint32_t break_in_ack_NewLevel;
+static boolean_t break_in_ack_AckReq;
+static boolean_t break_in_ack_called;
 
 void
 smb_oplock_ind_break_in_ack(smb_request_t *sr, smb_ofile_t *ofile,
     uint32_t NewLevel, boolean_t AckRequired)
 {
 	ASSERT(sr == &test_sr);
-	smb_oplock_ind_break(ofile, NewLevel, AckRequired, STATUS_CANT_GRANT);
+
+	/* Process these after ack */
+	ASSERT(!break_in_ack_called);
+	break_in_ack_called = B_TRUE;
+	break_in_ack_NewLevel = NewLevel;
+	break_in_ack_AckReq = AckRequired;
+}
+
+static void
+run_ind_break_in_ack(smb_ofile_t *ofile)
+{
+	uint32_t NewLevel;
+	boolean_t AckReq;
+
+	/* Process these after ack */
+	if (!break_in_ack_called)
+		return;
+	break_in_ack_called = B_FALSE;
+	NewLevel = break_in_ack_NewLevel;
+	AckReq = break_in_ack_AckReq;
+
+	printf("*smb_oplock_ind_break_in_ack fid=%d NewLevel=0x%x,"
+	    " AckReq=%d\n",
+	    ofile->f_fid, NewLevel, AckReq);
+
+	test_oplock_send_break(ofile, NewLevel, AckReq);
 }
 
 uint32_t
-smb_oplock_wait_break(smb_node_t *node, int timeout)
+smb_oplock_wait_break(smb_request_t *sr, smb_node_t *node, int timeout)
 {
 	printf("*smb_oplock_wait_break (state=0x%x)\n",
 	    node->n_oplock.ol_state);
