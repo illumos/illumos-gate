@@ -924,6 +924,9 @@ def filter_tests(testrun, options):
             if not m:
                 continue
             group, test = m.group(1, 2)
+            m = re.match(re.escape(options.testdir) + r'(.*)', group)
+            if m:
+                group = m.group(1)
             try:
                 failed[group].append(test)
             except KeyError:
