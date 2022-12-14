@@ -1246,8 +1246,8 @@ string current_file_name_ref	\ used to print the file name
   then
 		( addr len addr' len' total taddr )
   dup rot	( addr len addr' len' taddr taddr total )
-  swap !	( addr len addr' len' taddr )	\ store length
-  dup >r					\ save reference
+  swap !	( addr len addr' len' taddr )	\ store length
+  dup >r					\ save reference
   cell+						\ point to string area
   2dup 2>r	( addr len addr' len' taddr' )	( R: taddr len' taddr' )
   swap move	( addr len )
@@ -1700,9 +1700,9 @@ also builtins
     1 ['] load catch dup if
       ( addr0 len0 addr1 len1 ... args 1 error )
       >r			\ error code to R
-      drop			\ drop 1
+      drop			\ drop 1
       0 do 2drop loop		\ drop addr len pairs
-      r>			\ set flag for while
+      r>			\ set flag for while
     then
   while
     dup 0=
