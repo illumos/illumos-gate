@@ -9,31 +9,36 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
-# Copyright 2018 Joyent, Inc.
-#
+# Copyright 2022, Richard Lowe.
 
 include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/test/Makefile.com
 
-SUBDIRS = no-relobj-group-merge strip-groups
+PROG = strip-one-section strip-two-sections strip-all-sections
 
-DATAFILES =	common.sh
+DATAFILES = strip-one-section.s strip-two-sections.s strip-all-sections.s \
+    README.md
 
 ROOTOPTPKG = $(ROOT)/opt/elf-tests
-TESTDIR = $(ROOTOPTPKG)/tests/groups/
+TESTDIR = $(ROOTOPTPKG)/tests/groups/strip-groups
+
+CMDS = $(PROG:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
 
 DATA = $(DATAFILES:%=$(TESTDIR)/%)
 $(DATA) := FILEMODE = 0444
 
 all:
 
-install: all $(DATA)
+install: all $(CMDS) $(DATA)
+
+clobber: clean
+	-$(RM) $(PROG)
 
 clean:
 	-$(RM) $(CLEANFILES)
 
-$(DATA): $(TESTDIR)
+$(CMDS): $(TESTDIR)
 
 $(TESTDIR):
 	$(INS.dir)
@@ -43,5 +48,3 @@ $(TESTDIR)/%: %.sh
 
 $(TESTDIR)/%: %
 	$(INS.file)
-
-include $(SRC)/test/Makefile.com

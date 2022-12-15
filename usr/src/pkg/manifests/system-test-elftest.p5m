@@ -31,12 +31,21 @@ dir  path=opt/elf-tests/tests/capabilities
 file path=opt/elf-tests/tests/capabilities/objcap mode=0555
 file path=opt/elf-tests/tests/capabilities/symcap mode=0555
 dir  path=opt/elf-tests/tests/groups
+file path=opt/elf-tests/tests/groups/common.sh mode=0444
 dir  path=opt/elf-tests/tests/groups/no-relobj-group-merge
 file path=opt/elf-tests/tests/groups/no-relobj-group-merge/README.md mode=0444
 file \
     path=opt/elf-tests/tests/groups/no-relobj-group-merge/no-relobj-group-merge \
     mode=0555
 file path=opt/elf-tests/tests/groups/no-relobj-group-merge/sections.s mode=0444
+dir  path=opt/elf-tests/tests/groups/strip-groups
+file path=opt/elf-tests/tests/groups/strip-groups/README.md mode=0444
+file path=opt/elf-tests/tests/groups/strip-groups/strip-all-sections mode=0555
+file path=opt/elf-tests/tests/groups/strip-groups/strip-all-sections.s mode=0444
+file path=opt/elf-tests/tests/groups/strip-groups/strip-one-section mode=0555
+file path=opt/elf-tests/tests/groups/strip-groups/strip-one-section.s mode=0444
+file path=opt/elf-tests/tests/groups/strip-groups/strip-two-sections mode=0555
+file path=opt/elf-tests/tests/groups/strip-groups/strip-two-sections.s mode=0444
 dir  path=opt/elf-tests/tests/linker-sets
 file path=opt/elf-tests/tests/linker-sets/in-use-check mode=0555
 file path=opt/elf-tests/tests/linker-sets/simple mode=0555
