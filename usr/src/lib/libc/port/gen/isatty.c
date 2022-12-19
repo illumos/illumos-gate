@@ -22,12 +22,11 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved   */
 
 #pragma weak _isatty = isatty
 
@@ -44,11 +43,27 @@ int
 isatty(int f)
 {
 	struct termio tty;
-	int err;
 
-	err = errno;
 	if (ioctl(f, TCGETA, &tty) < 0) {
-		errno = err;
+		/*
+		 * POSIX stipulates that systems may return an error here and if
+		 * they do, it should either be EBADF or ENOTTY. In general, we
+		 * assume that a driver that receives this ioctl is not going to
+		 * return EBADF say due to an fd that's not open with the right
+		 * mode and will instead return something else. It is possible
+		 * to get many other errors here and we assume anything else
+		 * that's returned means it's not a TTY and thus transform that.
+		 *
+		 * In the past, errno was preserved around this, which was
+		 * incorrect because that meant that on failure there was no way
+		 * to know whether it was meaningful or not. As pretty much
+		 * every other system always returns an errno and there are
+		 * consumers in the wild which assume they'll get something, we
+		 * opt to always return an error.
+		 */
+		if (errno != EBADF) {
+			errno = ENOTTY;
+		}
 		return (0);
 	}
 	return (1);
