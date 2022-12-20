@@ -4898,6 +4898,9 @@ i_dladm_link_proplist_extract_one(dladm_handle_t handle,
 	if (i == proplist->al_count)
 		return (status);
 
+	if (aip->ai_val[0] == NULL)
+		return (DLADM_STATUS_BADARG);
+
 	for (i = 0; i < DLADM_MAX_PROPS; i++) {
 		prop_desc_t	*pdp = &prop_table[i];
 		val_desc_t	*vdp;
@@ -4908,9 +4911,6 @@ i_dladm_link_proplist_extract_one(dladm_handle_t handle,
 
 		if (strcasecmp(aip->ai_name, pdp->pd_name) != 0)
 			continue;
-
-		if (aip->ai_val == NULL)
-			return (DLADM_STATUS_BADARG);
 
 		/* Check property value */
 		if (pdp->pd_check != NULL) {
