@@ -484,7 +484,7 @@ static dladm_status_t
 i_dladm_flow_proplist_extract_one(dladm_arg_list_t *proplist,
     const char *name, void *arg)
 {
-	dladm_status_t		status;
+	dladm_status_t		status = DLADM_STATUS_OK;
 	dladm_arg_info_t	*aip = NULL;
 	int			i, j;
 

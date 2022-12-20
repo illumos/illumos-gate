@@ -164,6 +164,9 @@ i_dladm_part_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 	datalink_class_t class;
 	boolean_t force = B_FALSE;
 
+	conf.ds_readonly = B_FALSE;
+	conf.ds_confid = DLADM_INVALID_CONF;
+
 	/* Get the IB partition's datalink ID */
 	if ((status = dladm_datalink_id2info(handle, linkid, NULL, &class,
 	    NULL, NULL, 0)) != DLADM_STATUS_OK)
@@ -362,7 +365,7 @@ dladm_part_persist_conf(dladm_handle_t handle, const char *pname,
 
 	dladm_conf_t	conf;
 	dladm_status_t	status;
-	char 		linkover[MAXLINKNAMELEN];
+	char		linkover[MAXLINKNAMELEN];
 	uint64_t	u64;
 
 	status = dladm_create_conf(handle, pname, pattr->dia_partlinkid,

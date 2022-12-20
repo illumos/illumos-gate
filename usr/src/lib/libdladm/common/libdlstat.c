@@ -1077,7 +1077,7 @@ done:
 static void *
 i_dlstat_rx_local_retrieve_stat(kstat_ctl_t *kcp, kstat_t *ksp, int i)
 {
-	rx_lane_stat_entry_t	*local_stat_entry;
+	rx_lane_stat_entry_t	*local_stat_entry = NULL;
 	rx_lane_stat_entry_t	*rx_lane_stat_entry;
 
 	rx_lane_stat_entry = calloc(1, sizeof (rx_lane_stat_entry_t));
@@ -2101,7 +2101,7 @@ void *
 dlstat_aggr_total_stats(dladm_stat_chain_t *head)
 {
 	dladm_stat_chain_t	*curr;
-	dladm_stat_chain_t	*total_head;
+	dladm_stat_chain_t	*total_head = NULL;
 	aggr_port_stat_entry_t	*total_stats;
 
 	total_stats = calloc(1, sizeof (aggr_port_stat_entry_t));
