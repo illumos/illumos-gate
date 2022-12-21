@@ -617,7 +617,7 @@ atoi(const char *p)
 		if (!isdigit(c))
 			return (0);
 	}
-	for (n = '0' - c; isdigit(c = *++up); ) {
+	for (n = '0' - c; isdigit(c = *++up);) {
 		n *= 10; /* two steps to avoid unnecessary overflow */
 		n += '0' - c; /* accum neg to avoid surprises at MAX */
 	}
@@ -1005,6 +1005,33 @@ btem_chkparam(btem_state_t *btem, int c)
 }
 
 static void
+btem_chkparam_qmark(btem_state_t *btem, int c)
+{
+	/*
+	 * This code is intentionally NOP, we do process
+	 * \E[?25h and \E[?25l, but our cursor is always shown.
+	 */
+	switch (c) {
+	case 'h': /* DEC private mode set */
+		btem_setparam(btem, 1, 1);
+		switch (btem->btem_params[0]) {
+		case 25: /* show cursor */
+			break;
+		}
+		break;
+	case 'l':
+		/* DEC private mode reset */
+		btem_setparam(btem, 1, 1);
+		switch (btem->btem_params[0]) {
+		case 25: /* hide cursor */
+			break;
+		}
+		break;
+	}
+	btem->btem_state = A_STATE_START;
+}
+
+static void
 btem_getparams(btem_state_t *btem, int c)
 {
 	if (isdigit(c)) {
@@ -1026,7 +1053,10 @@ btem_getparams(btem_state_t *btem, int c)
 		btem->btem_gotparam = B_FALSE;
 		btem->btem_paramval = 0;
 	} else {
-		btem_chkparam(btem, c);
+		if (btem->btem_state == A_STATE_CSI_QMARK)
+			btem_chkparam_qmark(btem, c);
+		else
+			btem_chkparam(btem, c);
 	}
 }
 
@@ -1047,8 +1077,19 @@ btem_parse(btem_state_t *btem, int c)
 
 	/* In <ESC> sequence */
 	if (btem->btem_state != A_STATE_ESC) {
-		btem_getparams(btem, c);
-		return;
+		if (btem->btem_state != A_STATE_CSI) {
+			btem_getparams(btem, c);
+			return;
+		}
+
+		switch (c) {
+		case '?':
+			btem->btem_state = A_STATE_CSI_QMARK;
+			return;
+		default:
+			btem_getparams(btem, c);
+			return;
+		}
 	}
 
 	/* Previous char was <ESC> */
