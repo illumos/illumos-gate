@@ -107,7 +107,7 @@ variable page_remainder
 	drop
 ;
 
-\ we are called with strings be_name menu_file, to simplify the stack
+\ we are called with strings be_name menu_file, to simplify the stack
 \ management, we open the menu and free the menu_file.
 : beadm_bootfs ( be_addr be_len maddr mlen -- addr len taddr tlen flag | flag )
 	0 to end_of_file?
@@ -450,7 +450,7 @@ builtin: beadm
 				\ set device name
 				name_buffer strget s" chain" compare
 				0= if
-					\ for chain, use the value as is
+					\ for chain, use the value as is
 					value_buffer strget
 				else
 					\ check last char in the name

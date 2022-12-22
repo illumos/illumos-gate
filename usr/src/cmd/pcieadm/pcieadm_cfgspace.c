@@ -1511,16 +1511,16 @@ static const pcieadm_regdef_t pcieadm_regdef_pcie_slotcap[] = {
 };
 
 static const pcieadm_regdef_t pcieadm_regdef_pcie_slotctl[] = {
-	{ 0, 0, "attnbtn", "Attention Button Pressed", PRDV_STRVAL,
+	{ 0, 0, "attnbtn", "Attention Button Pressed Reporting", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
-	{ 1, 1, "pwrflt", "Power Fault Detected", PRDV_STRVAL,
+	{ 1, 1, "pwrflt", "Power Fault Detected Reporting", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
-	{ 2, 2, "mrlchg", "MRL Sensor Changed", PRDV_STRVAL,
+	{ 2, 2, "mrlchg", "MRL Sensor Changed Reporting", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
-	{ 3, 3, "preschg", "Presence Detect Changed", PRDV_STRVAL,
+	{ 3, 3, "preschg", "Presence Detect Changed Reporting", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 4, 4, "ccmpltint", "Command Complete Interrupt", PRDV_STRVAL,
-	    .prd_val = { .prdv_strval = { "disabled", "Enabled" } } },
+	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 5, 5, "hpi", "Hot Plug Interrupt Enable", PRDV_STRVAL,
 	    .prd_val = { .prdv_strval = { "disabled", "enabled" } } },
 	{ 6, 7, "attnind", "Attention Indicator Control", PRDV_STRVAL,

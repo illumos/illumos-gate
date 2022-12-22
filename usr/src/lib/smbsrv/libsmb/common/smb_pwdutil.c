@@ -773,6 +773,7 @@ smb_pwd_lock(void)
 {
 	int res;
 
+	res = SMB_PWE_SUCCESS;
 	if (smb_pwd_flck()) {
 		switch (errno) {
 		case EINTR:
@@ -781,12 +782,12 @@ smb_pwd_lock(void)
 		case EACCES:
 			res = SMB_PWE_DENIED;
 			break;
-		case 0:
-			res = SMB_PWE_SUCCESS;
+		default:
+			/* Should not happen */
+			res = SMB_PWE_SYSTEM_ERROR;
 			break;
 		}
-	} else
-		res = SMB_PWE_SUCCESS;
+	}
 
 	return (res);
 }
