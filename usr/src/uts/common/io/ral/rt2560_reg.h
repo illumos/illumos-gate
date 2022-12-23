@@ -23,8 +23,6 @@
 #ifndef _RT2560_REG_H
 #define	_RT2560_REG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

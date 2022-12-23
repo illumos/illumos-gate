@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module switches the read and write flush bits for each
  * M_FLUSH control message it receives. It's intended usage is to

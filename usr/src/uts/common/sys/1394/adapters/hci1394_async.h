@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_ASYNC_H
 #define	_SYS_1394_ADAPTERS_HCI1394_ASYNC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_async.h
  *   These routines the 1394 asynchronous dma engines.  These include incoming

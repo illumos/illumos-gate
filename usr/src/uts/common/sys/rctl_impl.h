@@ -26,8 +26,6 @@
 #ifndef	_SYS_RCTL_IMPL_H
 #define	_SYS_RCTL_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/rctl.h>
 #include <sys/time.h>
 #include <sys/types.h>

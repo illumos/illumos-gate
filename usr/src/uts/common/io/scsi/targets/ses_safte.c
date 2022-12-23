@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/modctl.h>
 #include <sys/file.h>
 #include <sys/scsi/scsi.h>

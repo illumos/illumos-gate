@@ -29,8 +29,6 @@
 #ifndef	_SYS_FS_HSFS_NODE_H
 #define	_SYS_FS_HSFS_NODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

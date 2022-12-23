@@ -26,8 +26,6 @@
 #ifndef _SYS_TICOTSORD_H
 #define	_SYS_TICOTSORD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4 1.5 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

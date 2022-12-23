@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* espi.c */
-
 #include "common.h"
 #include "regs.h"
 #include "espi.h"
@@ -104,7 +102,7 @@ static int tricn_init(adapter_t *adapter)
 	 }
 
 	t1_write_reg_4(adapter, A_ESPI_RX_RESET, F_ESPI_RX_CORE_RST);
-	
+
 	if (sme) {
 		(void) tricn_write(adapter, 0, 0, 0, TRICN_CNFG, 0x81);
 		(void) tricn_write(adapter, 0, 1, 0, TRICN_CNFG, 0x81);
@@ -302,7 +300,7 @@ int t1_espi_init(struct peespi *espi, int mac_type, int nports)
 		if (adapter->params.nports == 1)
 			espi->misc_ctrl |= F_MONITORED_INTERFACE;
 		t1_write_reg_4(adapter, A_ESPI_MISC_CONTROL, espi->misc_ctrl);
-		SPIN_LOCK_INIT(espi->lock);    
+		SPIN_LOCK_INIT(espi->lock);
 	}
 
 	return 0;

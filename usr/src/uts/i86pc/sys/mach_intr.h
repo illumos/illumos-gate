@@ -27,8 +27,6 @@
 #ifndef _SYS_MACH_INTR_H
 #define	_SYS_MACH_INTR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Platform-dependent interrupt data structures
  *

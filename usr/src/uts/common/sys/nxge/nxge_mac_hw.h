@@ -26,8 +26,6 @@
 #ifndef	_SYS_MAC_NXGE_MAC_HW_H
 #define	_SYS_MAC_NXGE_MAC_HW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

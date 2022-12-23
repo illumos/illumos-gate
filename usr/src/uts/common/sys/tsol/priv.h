@@ -26,8 +26,6 @@
 #ifndef	_SYS_TSOL_PRIV_H
 #define	_SYS_TSOL_PRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/priv.h>
 
 #ifdef	__cplusplus

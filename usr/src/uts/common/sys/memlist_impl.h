@@ -27,8 +27,6 @@
 #ifndef	_SYS_MEMLIST_IMPL_H
 #define	_SYS_MEMLIST_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Common memlist routines.
  */

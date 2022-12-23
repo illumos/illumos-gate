@@ -27,8 +27,6 @@
 #ifndef _SYS_PLATFORM_MODULE_H
 #define	_SYS_PLATFORM_MODULE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sunddi.h>
 
 #ifdef	__cplusplus

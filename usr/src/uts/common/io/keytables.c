@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-		/* SunOS-4.0 1.19	*/
-
 /*
  * This module contains the translation tables for the up-down encoded
  * Sun keyboards.

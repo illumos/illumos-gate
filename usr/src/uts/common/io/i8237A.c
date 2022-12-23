@@ -31,8 +31,6 @@
 /*	Copyright (c) 1988, 1989 Intel Corp.			*/
 /*	All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Set features for each architecture.  List of features:
  *	ADDR_32:	Address is 32 bits

@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_HASH_TABLE_H
 #define	_SMBSRV_HASH_TABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * Interface definition for the hash table library. The hash table is a

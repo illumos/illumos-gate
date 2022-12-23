@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_ADAPTERS_HCI1394_TLIST_H
 #define	_SYS_1394_ADAPTERS_HCI1394_TLIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_tlist.h
  *   This implements a timed double linked list.

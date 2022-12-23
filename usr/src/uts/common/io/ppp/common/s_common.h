@@ -8,8 +8,6 @@
 #ifndef	_S_COMMON_H
 #define	_S_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <net/ppp_defs.h>
 #include <net/pppio.h>
 

@@ -27,8 +27,6 @@
 #ifndef _CS_TYPES_H
 #define	_CS_TYPES_H
 
-#pragma ident	"%W%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

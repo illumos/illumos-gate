@@ -27,8 +27,6 @@
 #ifndef	_VM_SEG_KP_H
 #define	_VM_SEG_KP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * segkp (as in kernel pageable) is a segment driver that supports allocation
  * of page-aligned variable size of vm resources.

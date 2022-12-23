@@ -26,8 +26,6 @@
 #ifndef	_SSERVICE_H
 #define	_SSERVICE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

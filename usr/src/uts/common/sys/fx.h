@@ -26,8 +26,6 @@
 #ifndef _SYS_FX_H
 #define	_SYS_FX_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/ddi.h>

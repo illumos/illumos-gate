@@ -30,8 +30,6 @@
 #ifndef _SYS_PIT_H
 #define	_SYS_PIT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

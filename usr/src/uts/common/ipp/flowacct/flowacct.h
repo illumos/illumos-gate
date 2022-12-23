@@ -27,8 +27,6 @@
 #ifndef _IPP_FLOWACCT_FLOWACCT_H
 #define	_IPP_FLOWACCT_FLOWACCT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

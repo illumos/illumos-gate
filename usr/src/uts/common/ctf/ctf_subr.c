@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctf_impl.h>
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>

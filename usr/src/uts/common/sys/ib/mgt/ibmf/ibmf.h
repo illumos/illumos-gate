@@ -27,8 +27,6 @@
 #ifndef _SYS_IB_MGT_IBMF_IBMF_H
 #define	_SYS_IB_MGT_IBMF_IBMF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file defines the IBMF client interface.
  */

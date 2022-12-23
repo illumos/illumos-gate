@@ -27,8 +27,6 @@
 #ifndef _SYS_BUSTYPES_H
 #define	_SYS_BUSTYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

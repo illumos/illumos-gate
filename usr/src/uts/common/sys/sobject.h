@@ -27,8 +27,6 @@
 #ifndef	_SYS_SOBJECT_H
 #define	_SYS_SOBJECT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/thread.h>
 

@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_TARGETS_DCAM1394_FRAME_H
 #define	_SYS_1394_TARGETS_DCAM1394_FRAME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

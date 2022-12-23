@@ -26,8 +26,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_OHCI_H
 #define	_SYS_1394_ADAPTERS_HCI1394_OHCI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_ohci.h
  *    Provides access macros and routines to the OpenHCI HW.

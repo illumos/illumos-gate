@@ -27,8 +27,6 @@
 #ifndef _ATA_DISK_H
 #define	_ATA_DISK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

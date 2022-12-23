@@ -36,7 +36,6 @@
  * requirements.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
 %
 %/* Copyright (c)  1990, 1991 Sun Microsystems, Inc. */
 %
@@ -110,7 +109,7 @@ typedef int keynum_t;
 typedef des_block deskeyarray<>;
 
 /*
- * Argument to ENCRYPT or DECRYPT 
+ * Argument to ENCRYPT or DECRYPT
  */
 struct cryptkeyarg {
 	netnamestr remotename;
@@ -160,12 +159,12 @@ default:
 const MAXGIDS  = 16;	/* max number of gids in gid list */
 
 /*
- * Unix credential 
- */	
+ * Unix credential
+ */
 struct unixcred {
 	u_int uid;
 	u_int gid;
-	u_int gids<MAXGIDS>;	
+	u_int gids<MAXGIDS>;
 };
 
 /*
@@ -174,7 +173,7 @@ struct unixcred {
 struct unixcred3 {
 	u_int uid;
 	u_int gid;
-	u_int gids<>;	
+	u_int gids<>;
 };
 
 /*
@@ -220,14 +219,14 @@ case KEY_SUCCESS:
 	key_netstarg knet;
 default:
 	void;
-};	
+};
 
 union key_netstres3 switch (keystatus status){
 case KEY_SUCCESS:
 	key_netstarg3 knet;
 default:
 	void;
-};  
+};
 
 /*
  * Argument to KEY_GET_CONV_3
@@ -263,15 +262,15 @@ program KEY_PROG {
 		 * This is my secret key.
 	 	 * Store it for me.
 		 */
-		keystatus 
-		KEY_SET(keybuf) = 1;	
-	
+		keystatus
+		KEY_SET(keybuf) = 1;
+
 		/*
 		 * I want to talk to X.
 		 * Encrypt a conversation key for me.
 	 	 */
 		cryptkeyres
-		KEY_ENCRYPT(cryptkeyarg) = 2;	
+		KEY_ENCRYPT(cryptkeyarg) = 2;
 
 		/*
 		 * X just sent me a message.
@@ -283,7 +282,7 @@ program KEY_PROG {
 		/*
 		 * Generate a secure conversation key for me
 		 */
-		des_block 
+		des_block
 		KEY_GEN(void) = 4;
 
 		/*
@@ -305,15 +304,15 @@ program KEY_PROG {
 		 * This is my secret key.
 	 	 * Store it for me.
 		 */
-		keystatus 
-		KEY_SET(keybuf) = 1;	
-	
+		keystatus
+		KEY_SET(keybuf) = 1;
+
 		/*
 		 * I want to talk to X.
 		 * Encrypt a conversation key for me.
 	 	 */
 		cryptkeyres
-		KEY_ENCRYPT(cryptkeyarg) = 2;	
+		KEY_ENCRYPT(cryptkeyarg) = 2;
 
 		/*
 		 * X just sent me a message.
@@ -325,7 +324,7 @@ program KEY_PROG {
 		/*
 		 * Generate a secure conversation key for me
 		 */
-		des_block 
+		des_block
 		KEY_GEN(void) = 4;
 
 		/*
@@ -334,13 +333,13 @@ program KEY_PROG {
 		 */
 		getcredres
 		KEY_GETCRED(netnamestr) = 5;
-		
+
 		/*
 		 * I want to talk to X. and I know X's public key
 		 * Encrypt a conversation key for me.
 	 	 */
 		cryptkeyres
-		KEY_ENCRYPT_PK(cryptkeyarg2) = 6;	
+		KEY_ENCRYPT_PK(cryptkeyarg2) = 6;
 
 		/*
 		 * X just sent me a message. and I know X's public key
@@ -348,25 +347,25 @@ program KEY_PROG {
 		 */
 		cryptkeyres
 		KEY_DECRYPT_PK(cryptkeyarg2) = 7;
-		
-		/* 
-		 * Store my public key, netname and private key. 
+
+		/*
+		 * Store my public key, netname and private key.
 		 */
 		keystatus
 		KEY_NET_PUT(key_netstarg) = 8;
-		
+
 		/*
-		 * Retrieve my public key, netname and private key. 
+		 * Retrieve my public key, netname and private key.
 		 */
  		key_netstres
 		KEY_NET_GET(void) = 9;
-		
+
 		/*
-		 * Return me the conversation (common) key that is constructed 
-		 * from my secret key and this publickey. 
+		 * Return me the conversation (common) key that is constructed
+		 * from my secret key and this publickey.
 		 */
-		cryptkeyres 
-		KEY_GET_CONV(keybuf) = 10; 
+		cryptkeyres
+		KEY_GET_CONV(keybuf) = 10;
 	} = 2;
 	version KEY_VERS3 {
 
@@ -380,15 +379,15 @@ program KEY_PROG {
 		 * This is my secret key.
 	 	 * Store it for me.
 		 */
-		keystatus 
-		KEY_SET(keybuf) = 1;	
-	
+		keystatus
+		KEY_SET(keybuf) = 1;
+
 		/*
 		 * I want to talk to X.
 		 * Encrypt a conversation key for me.
 	 	 */
 		cryptkeyres
-		KEY_ENCRYPT(cryptkeyarg) = 2;	
+		KEY_ENCRYPT(cryptkeyarg) = 2;
 
 		/*
 		 * X just sent me a message.
@@ -400,7 +399,7 @@ program KEY_PROG {
 		/*
 		 * Generate a secure conversation key for me
 		 */
-		des_block 
+		des_block
 		KEY_GEN(void) = 4;
 
 		/*
@@ -409,13 +408,13 @@ program KEY_PROG {
 		 */
 		getcredres
 		KEY_GETCRED(netnamestr) = 5;
-		
+
 		/*
 		 * I want to talk to X. and I know X's public key
 		 * Encrypt a conversation key for me.
 	 	 */
 		cryptkeyres
-		KEY_ENCRYPT_PK(cryptkeyarg2) = 6;	
+		KEY_ENCRYPT_PK(cryptkeyarg2) = 6;
 
 		/*
 		 * X just sent me a message. and I know X's public key
@@ -423,25 +422,25 @@ program KEY_PROG {
 		 */
 		cryptkeyres
 		KEY_DECRYPT_PK(cryptkeyarg2) = 7;
-		
-		/* 
-		 * Store my public key, netname and private key. 
+
+		/*
+		 * Store my public key, netname and private key.
 		 */
 		keystatus
 		KEY_NET_PUT(key_netstarg) = 8;
-		
+
 		/*
-		 * Retrieve my public key, netname and private key. 
+		 * Retrieve my public key, netname and private key.
 		 */
  		key_netstres
 		KEY_NET_GET(void) = 9;
-		
+
 		/*
-		 * Return me the conversation (common) key that is constructed 
-		 * from my secret key and this publickey. 
+		 * Return me the conversation (common) key that is constructed
+		 * from my secret key and this publickey.
 		 */
-		cryptkeyres 
-		KEY_GET_CONV(keybuf) = 10; 
+		cryptkeyres
+		KEY_GET_CONV(keybuf) = 10;
 
 		/*
 		 * #######
@@ -453,9 +452,9 @@ program KEY_PROG {
 		 * This is my secret key.
 	 	 * Store it for me.
 		 */
-		keystatus 
+		keystatus
 		KEY_SET_3(setkeyarg3) = 11;
-	
+
 		/*
 		 * I want to talk to X.
 		 * Encrypt a conversation key for me.
@@ -473,7 +472,7 @@ program KEY_PROG {
 		/*
 		 * Generate secure conversation key(s) for me
 		 */
-		deskeyarray 
+		deskeyarray
 		KEY_GEN_3(keynum_t) = 14;
 
 		/*
@@ -482,7 +481,7 @@ program KEY_PROG {
 		 */
 		getcredres3
 		KEY_GETCRED_3(netnamestr) = 15;
-		
+
 		/*
 		 * I want to talk to X. and I know X's public key
 		 * Encrypt a conversation key for me.
@@ -496,24 +495,24 @@ program KEY_PROG {
 		 */
 		cryptkeyres3
 		KEY_DECRYPT_PK_3(cryptkeyarg3) = 17;
-		
-		/* 
-		 * Store my public key, netname and private key. 
+
+		/*
+		 * Store my public key, netname and private key.
 		 */
 		keystatus
 		KEY_NET_PUT_3(key_netstarg3) = 18;
-		
+
 		/*
-		 * Retrieve my public key, netname and private key. 
+		 * Retrieve my public key, netname and private key.
 		 */
  		key_netstres3
 		KEY_NET_GET_3(key_netstarg3) = 19;
-		
+
 		/*
-		 * Return me the conversation (common) key that is constructed 
-		 * from my secret key and this publickey. 
+		 * Return me the conversation (common) key that is constructed
+		 * from my secret key and this publickey.
 		 */
-		cryptkeyres3 
+		cryptkeyres3
 		KEY_GET_CONV_3(deskeyarg3) = 20;
 
 		/*

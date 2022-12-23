@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains an array of structures, each of which refers to
  *	a tuple that we are prepared to handle.  The last structure

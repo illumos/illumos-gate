@@ -27,8 +27,6 @@
 #ifndef	_SYS_FS_PC_LABEL_H
 #define	_SYS_FS_PC_LABEL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

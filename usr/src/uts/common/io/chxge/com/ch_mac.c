@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* ch_mac.c */
-
 #include "gmac.h"
 #include "regs.h"
 #include "fpga_defs.h"

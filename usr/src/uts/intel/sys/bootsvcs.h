@@ -27,8 +27,6 @@
 #ifndef _SYS_BOOTSVCS_H
 #define	_SYS_BOOTSVCS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

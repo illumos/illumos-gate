@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <hpi_vir.h>
 #include <hxge_defs.h>
 #include <hxge_impl.h>

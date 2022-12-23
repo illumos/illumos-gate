@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_ADAPTERS_HCI1394_RIO_REGS_H
 #define	_SYS_1394_ADAPTERS_HCI1394_RIO_REGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_rio_regs.h
  *    Sun Microsystems RIO chipset

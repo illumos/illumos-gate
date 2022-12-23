@@ -35,8 +35,6 @@
 #ifndef _RAL_RATE_H
 #define	_RAL_RATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -6,9 +6,6 @@
 #ifndef	__MD4_H
 #define	__MD4_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * MD4C.C - RSA Data Security, Inc., MD4 message-digest algorithm
  */

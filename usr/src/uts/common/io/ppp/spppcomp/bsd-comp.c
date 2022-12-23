@@ -40,8 +40,6 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This version is for use with STREAMS in Solaris 2
  *

@@ -27,8 +27,6 @@
 #ifndef	_KBOOT_MMU_H
 #define	_KBOOT_MMU_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel TLI-like function to allocate memory for the various TLI
  * primitives.

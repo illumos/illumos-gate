@@ -27,8 +27,6 @@
 #ifndef	_SYS_VUID_WHEEL_H
 #define	_SYS_VUID_WHEEL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/vuid_event.h>	/* for VUIOC definition */
 
 #ifdef	__cplusplus

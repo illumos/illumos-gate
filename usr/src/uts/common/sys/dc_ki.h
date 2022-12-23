@@ -27,8 +27,6 @@
 #ifndef _DC_KI_H
 #define	_DC_KI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #include <sys/modctl.h>

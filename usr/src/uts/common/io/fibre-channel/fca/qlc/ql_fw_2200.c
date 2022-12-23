@@ -25,8 +25,6 @@
  * **********************************************************************
  */
 
-#pragma ident	"Copyright 2008 QLogic Corporation; ql_fw_2200.c"
-
 /*
  *	Firmware Version 2.01.145 (21:47 Apr 10, 2007)
  */

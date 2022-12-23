@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ipp/ipgpc/trie.h>
 #include <ipp/ipgpc/filters.h>
 #include <ipp/ipgpc/classifier.h>

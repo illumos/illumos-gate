@@ -31,8 +31,6 @@
 #ifndef	_XEN_SYS_PRIVCMD_H
 #define	_XEN_SYS_PRIVCMD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING:
  *	These numbers and structure are built into the ON privcmd

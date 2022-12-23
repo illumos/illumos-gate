@@ -26,8 +26,6 @@
 #ifndef	_SYS_FS_HSFS_SPEC_H
 #define	_SYS_FS_HSFS_SPEC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * High Sierra filesystem specification
  */

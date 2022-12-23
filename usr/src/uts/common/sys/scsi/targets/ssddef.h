@@ -27,9 +27,6 @@
 #ifndef	_SYS_SCSI_TARGETS_SSDDEF_H
 #define	_SYS_SCSI_TARGETS_SSDDEF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

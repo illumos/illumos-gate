@@ -25,8 +25,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>

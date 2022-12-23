@@ -27,8 +27,6 @@
 #ifndef	_NETINET_INETUTIL_H
 #define	_NETINET_INETUTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

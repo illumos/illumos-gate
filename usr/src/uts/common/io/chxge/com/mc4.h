@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* mc4.h */
-
 #ifndef CHELSIO_MC4_H
 #define CHELSIO_MC4_H
 

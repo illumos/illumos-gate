@@ -36,8 +36,6 @@
 #ifndef _SYS_VUID_STATE_H
 #define	_SYS_VUID_STATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS 1.5 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -26,8 +26,6 @@
 #ifndef _SYS_FM_IO_OPL_MC_FM_H
 #define	_SYS_FM_IO_OPL_MC_FM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

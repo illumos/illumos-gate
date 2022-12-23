@@ -28,8 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/pic.h>
 #include <sys/sunddi.h>

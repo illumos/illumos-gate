@@ -25,8 +25,6 @@
  * **********************************************************************
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_fw_6322.c"
-
 /*
  *	Firmware Version 3.03.28 (15:00 Sep 26, 2008)
  */

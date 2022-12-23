@@ -27,8 +27,6 @@
 #ifndef _SYS_FRAME_H
 #define	_SYS_FRAME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/regset.h>
 
 #ifdef	__cplusplus

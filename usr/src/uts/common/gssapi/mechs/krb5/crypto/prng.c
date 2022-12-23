@@ -3,18 +3,16 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -48,7 +46,7 @@ krb5_c_random_seed(krb5_context context, krb5_data *data)
 	/*
 	 * We can't do much if this fails, so ignore the
 	 * return code.  /dev/urandom has its own entropy
-	 * source, so seeding it from here is of questionable 
+	 * source, so seeding it from here is of questionable
 	 * value in the first place.
 	 */
 	(void) C_SeedRandom(krb_ctx_hSession(context),

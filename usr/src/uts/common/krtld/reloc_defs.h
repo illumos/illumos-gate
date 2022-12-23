@@ -27,8 +27,6 @@
 #ifndef	_RELOC_DEFS_DOT_H
 #define	_RELOC_DEFS_DOT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/machelf.h>
 
 #ifdef	__cplusplus

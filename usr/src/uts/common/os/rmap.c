@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/vmem.h>
 #include <sys/cmn_err.h>

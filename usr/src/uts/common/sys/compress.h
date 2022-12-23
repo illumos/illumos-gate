@@ -27,8 +27,6 @@
 #ifndef _SYS_COMPRESS_H
 #define	_SYS_COMPRESS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

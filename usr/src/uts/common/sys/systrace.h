@@ -27,8 +27,6 @@
 #ifndef _SYS_SYSTRACE_H
 #define	_SYS_SYSTRACE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dtrace.h>
 
 #ifdef	__cplusplus

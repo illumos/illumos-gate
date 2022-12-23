@@ -27,8 +27,6 @@
 #ifndef _SYS_SCSI_ADAPTERS_EMUL64VAR_H
 #define	_SYS_SCSI_ADAPTERS_EMUL64VAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/avl.h>
 #include <sys/note.h>
 #include <sys/emul64.h>

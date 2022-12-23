@@ -28,8 +28,6 @@
 #ifndef	_NETINET_IGMP_H
 #define	_NETINET_IGMP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

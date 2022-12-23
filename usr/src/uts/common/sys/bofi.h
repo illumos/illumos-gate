@@ -27,8 +27,6 @@
 #ifndef	_SYS_BOFI_H
 #define	_SYS_BOFI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * header file for bus_ops fault injector
  */

@@ -26,8 +26,6 @@
 #ifndef	_HXGE_RDC_HW_H
 #define	_HXGE_RDC_HW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

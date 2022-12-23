@@ -26,8 +26,6 @@
 #ifndef	_SYS_CONTRACT_DEVICE_H
 #define	_SYS_CONTRACT_DEVICE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/contract.h>
 
 #ifdef	__cplusplus

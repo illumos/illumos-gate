@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_TARGETS_DCAM1394_REG_H
 #define	_SYS_1394_TARGETS_DCAM1394_REG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/1394/targets/dcam1394/dcam.h>
 
 #ifdef	__cplusplus

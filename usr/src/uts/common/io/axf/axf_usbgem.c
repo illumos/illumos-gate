@@ -31,8 +31,6 @@
  * DAMAGE.
  */
 
-#pragma ident "@(#)axf_usbgem.c	1.3 12/02/09"
-
 /*
  *  Changelog:
  */

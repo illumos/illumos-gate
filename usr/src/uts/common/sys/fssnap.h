@@ -27,8 +27,6 @@
 #ifndef	_SYS_FSSNAP_H
 #define	_SYS_FSSNAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 #include <sys/devops.h>
 

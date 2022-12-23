@@ -29,8 +29,6 @@
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  */
 
-#pragma ident	"Copyright 2010 QLogic Corporation; ql_xioctl.c"
-
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
  *

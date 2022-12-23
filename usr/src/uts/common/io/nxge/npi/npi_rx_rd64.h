@@ -26,8 +26,6 @@
 #ifndef _NPI_RX_RD64_H
 #define	_NPI_RX_RD64_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -27,8 +27,6 @@
 #ifndef	_SYS_FASTTRAP_H
 #define	_SYS_FASTTRAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fasttrap_isa.h>
 #include <sys/dtrace.h>
 #include <sys/types.h>

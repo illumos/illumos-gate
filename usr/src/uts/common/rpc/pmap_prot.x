@@ -27,8 +27,6 @@
 
 #ifdef RPC_HDR
 %
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%
 %#ifndef _KERNEL
 %
 #endif

@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_MAILSLOT_H
 #define	_SMBSRV_MAILSLOT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Mailslots are a one-way, unreliable IPC mechanism that allows a
  * client to send or broadcast messages to a server. The names follow

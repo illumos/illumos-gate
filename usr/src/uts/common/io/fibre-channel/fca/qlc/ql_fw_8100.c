@@ -22,8 +22,6 @@
  * ******************************************************************** *
  */
 
-#pragma ident	"Copyright 2010 QLogic Corporation; ql_fw_8100.c"
-
 /*
  * Copyright 2010 QLogic Corporation.  All rights reserved.
  * Use is subject to license terms.

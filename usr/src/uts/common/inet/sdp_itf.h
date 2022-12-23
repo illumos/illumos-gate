@@ -26,8 +26,6 @@
 #ifndef	_INET_SDP_ITF_H
 #define	_INET_SDP_ITF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

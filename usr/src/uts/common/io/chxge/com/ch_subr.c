@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* ch_subr.c */
-
 #include "common.h"
 #include "elmer0.h"
 #include "regs.h"
@@ -547,7 +545,7 @@ static struct board_info t1_board[] = {
   CHBT_MAC_PM3393, CHBT_PHY_88X2010,
   125000000/*clk-core*/, 133000000/*clk-mc3*/, 125000000/*clk-mc4*/,
   1/*espi-ports*/, 0/*clk-cspi*/, 44/*clk-elmer0*/, 0/*mdien*/,
-  0/*mdiinv*/, 1/*mdc*/, 0/*phybaseaddr*/, &t1_pm3393_ops, 
+  0/*mdiinv*/, 1/*mdc*/, 0/*phybaseaddr*/, &t1_pm3393_ops,
   &t1_mv88x201x_ops, &mi1_mdio_ext_ops,
   "Chelsio T210 1x10GBaseX TOE" },
 
@@ -612,17 +610,17 @@ static struct board_info t1_board[] = {
   SUPPORTED_100baseT_Full | SUPPORTED_1000baseT_Full | SUPPORTED_Autoneg |
   SUPPORTED_TP | SUPPORTED_PAUSE | SUPPORTED_LOOPBACK /*caps*/, CHBT_TERM_T1, CHBT_MAC_IXF1010, CHBT_PHY_88E1111,
   83300000/*clk-core*/, 83300000/*clk-mc3*/, 83300000/*clk-mc4*/,
-  2/*espi-ports*/, 0/*clk-cspi*/, 40/*clk-elmer0*/, 0/*mdien*/, 
-  0/*mdiinv*/, 4/*mdc*/, 4/*phybaseaddr*/, &t1_ixf1010_ops, 
+  2/*espi-ports*/, 0/*clk-cspi*/, 40/*clk-elmer0*/, 0/*mdien*/,
+  0/*mdiinv*/, 4/*mdc*/, 4/*phybaseaddr*/, &t1_ixf1010_ops,
   &t1_mv88e1xxx_ops, &mi1_mdio_ops,
   "Chelsio T101 1x100/1000BaseT TOE" },
 
 { CHBT_BOARD_CHT101, 1/*ports#*/,
   SUPPORTED_1000baseT_Full | SUPPORTED_Autoneg | SUPPORTED_FIBRE | SUPPORTED_PAUSE | SUPPORTED_LOOPBACK /*caps*/,
-  CHBT_TERM_T1, CHBT_MAC_IXF1010, CHBT_PHY_88E1111, 
+  CHBT_TERM_T1, CHBT_MAC_IXF1010, CHBT_PHY_88E1111,
   83300000/*clk-core*/, 83300000/*clk-mc3*/, 83300000/*clk-mc4*/,
-  2/*espi-ports*/, 0/*clk-cspi*/, 40/*clk-elmer0*/, 0/*mdien*/, 
-  0/*mdiinv*/, 4/*mdc*/, 4/*phybaseaddr*/, &t1_ixf1010_ops, 
+  2/*espi-ports*/, 0/*clk-cspi*/, 40/*clk-elmer0*/, 0/*mdien*/,
+  0/*mdiinv*/, 4/*mdc*/, 4/*phybaseaddr*/, &t1_ixf1010_ops,
   &t1_mv88e1xxx_ops, &mi1_mdio_ops,
   "Chelsio T101 1x1000BaseX TOE" },
 #endif
@@ -653,7 +651,7 @@ static struct board_info t1_board[] = {
   SUPPORTED_1000baseT_Full | SUPPORTED_Autoneg | SUPPORTED_TP /*caps*/,
   CHBT_TERM_T1, CHBT_MAC_VSC7321, CHBT_PHY_88E1041,
   87500000/*clk-core*/, 87500000/*clk-mc3*/, 87500000/*clk-mc4*/,
-  4/*espi-ports*/, 333300000/*clk-cspi*/, 40/*clk-elmer0*/, 0/*mdien*/, 
+  4/*espi-ports*/, 333300000/*clk-cspi*/, 40/*clk-elmer0*/, 0/*mdien*/,
   0/*mdiinv*/, 4/*mdc*/, 0/*phybaseaddr*/, &t1_vsc7321_ops,
   &t1_mv88e1xxx_ops, &mi1_mdio_ops,
   "Chelsio Cougar 4x100/1000BaseT TOE" },
@@ -661,9 +659,9 @@ static struct board_info t1_board[] = {
 
 { CHBT_BOARD_COUGAR, 1/*ports#*/,
   SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE /*caps*/, CHBT_TERM_T1,
-  CHBT_MAC_VSC7321, CHBT_PHY_XPAK, 
+  CHBT_MAC_VSC7321, CHBT_PHY_XPAK,
   87500000/*clk-core*/, 87500000/*clk-mc3*/, 87500000/*clk-mc4*/,
-  1/*espi-ports*/, 333300000/*clk-cspi*/, 40/*clk-elmer0*/, 1/*mdien*/, 
+  1/*espi-ports*/, 333300000/*clk-cspi*/, 40/*clk-elmer0*/, 1/*mdien*/,
   1/*mdiinv*/, 1/*mdc*/, 0/*phybaseaddr*/, &t1_vsc7321_ops,
   &t1_xpak_ops, &mi1_mdio_ext_ops,
   "Chelsio Cougar 1x10GBaseX TOE" },
@@ -671,9 +669,9 @@ static struct board_info t1_board[] = {
 
 #ifdef CONFIG_USERMODE
 { CHBT_BOARD_SIMUL, 1/*ports#*/,
-  0/*caps*/, CHBT_TERM_T1, CHBT_MAC_DUMMY, CHBT_PHY_DUMMY, 
+  0/*caps*/, CHBT_TERM_T1, CHBT_MAC_DUMMY, CHBT_PHY_DUMMY,
   125000000/*clk-core*/, 125000000/*clk-mc3*/, 125000000/*clk-mc4*/,
-  1/*espi-ports*/, 0/*clk-cspi*/, 0/*clk-elmer0*/, 0/*mdien*/, 
+  1/*espi-ports*/, 0/*clk-cspi*/, 0/*clk-elmer0*/, 0/*mdien*/,
   0/*mdiinv*/, 0/*mdc*/, 0/*phybaseaddr*/, &t1_dummy_mac_ops,
   &t1_dummy_phy_ops, NULL, "Chelsio simulation environment TOE" },
 #endif
@@ -874,7 +872,7 @@ elmer0_ext_intr_handler(adapter_t *adapter)
 	switch (board_info(adapter)->board) {
 #ifdef CONFIG_CHELSIO_T1_1G
         case CHBT_BOARD_CHT204:
-        case CHBT_BOARD_CHT204V: { 
+        case CHBT_BOARD_CHT204V: {
                 int i, port_bit;
 		for_each_port(adapter, i) {
 			port_bit = i ? i + 1 : 0;

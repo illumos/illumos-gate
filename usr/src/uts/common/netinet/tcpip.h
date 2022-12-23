@@ -11,7 +11,6 @@
 #ifndef	_NETINET_TCPIP_H
 #define	_NETINET_TCPIP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* tcpip.h 1.7 88/08/19 SMI; from UCB 7.1 6/5/85	*/
 
 #ifdef	__cplusplus

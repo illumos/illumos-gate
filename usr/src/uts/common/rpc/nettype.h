@@ -39,8 +39,6 @@
 #ifndef	_RPC_NETTYPE_H
 #define	_RPC_NETTYPE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <netconfig.h>
 
 #ifdef	__cplusplus

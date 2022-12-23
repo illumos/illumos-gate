@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains interface definitions and wrappers for file
  * system snapshot support.  File systems may depend on this module

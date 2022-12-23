@@ -26,8 +26,6 @@
 #ifndef	_SYS_CONTRACT_PROCESS_H
 #define	_SYS_CONTRACT_PROCESS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/contract.h>
 #include <sys/time.h>
 

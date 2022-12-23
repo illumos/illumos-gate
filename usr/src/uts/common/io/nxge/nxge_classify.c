@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <npi_fflp.h>
 #include <nxge_defs.h>
 #include <nxge_fflp.h>

@@ -27,8 +27,6 @@
 #ifndef	_SYS_FM_CPU_GENAMD_H
 #define	_SYS_FM_CPU_GENAMD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Ereport class subcategory - same as in GMCA.h */
 #define	FM_EREPORT_CPU_GENAMD	"generic-x86"
 

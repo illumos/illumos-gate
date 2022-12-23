@@ -32,8 +32,6 @@
 #ifndef	_MXFE_H
 #define	_MXFE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * These are conveniently defined to have the same values
  * as are used by the NDD utility, which is an undocumented

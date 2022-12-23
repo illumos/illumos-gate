@@ -39,8 +39,6 @@
 #ifndef	_SYS_FS_UFS_FS_H
 #define	_SYS_FS_UFS_FS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 #include <sys/types32.h>
 #include <sys/t_lock.h>		/* for kmutex_t */

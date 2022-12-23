@@ -27,8 +27,6 @@
 #ifndef	_SYS_POOL_PSET_H
 #define	_SYS_POOL_PSET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/cpupart.h>
 #include <sys/procset.h>

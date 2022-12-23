@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr3.2H 	*/
-
 /*
  * Dump STREAMS module.  Could be used anywhere on a stream to
  * print all message headers and data on to the console.

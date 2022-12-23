@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  glue routine for gss_release_oid_set
  */

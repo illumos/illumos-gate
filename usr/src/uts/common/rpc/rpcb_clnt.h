@@ -52,8 +52,6 @@
 #ifndef _RPC_RPCB_CLNT_H
 #define	_RPC_RPCB_CLNT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/types.h>
 #include <rpc/rpcb_prot.h>
 #include <sys/netconfig.h>

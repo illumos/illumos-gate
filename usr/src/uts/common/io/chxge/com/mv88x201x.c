@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* mv88x201x.c */
-
 #include "cphy.h"
 #include "elmer0.h"
 
@@ -116,7 +114,7 @@ static int mv88x201x_interrupt_clear(struct cphy *cphy)
 	(void) mdio_read(cphy, 0x1, 0x9005, &val);
 
 	/* Read this register after the others above it else
-	 * the register doesn't clear correctly. 
+	 * the register doesn't clear correctly.
 	 */
 	(void) mdio_read(cphy, 0x1, 0x1, &val);
 #endif

@@ -27,8 +27,6 @@
 #ifndef _SYS_TPICOMMON_H
 #define	_SYS_TPICOMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 
 #ifdef	__cplusplus

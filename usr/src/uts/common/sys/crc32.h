@@ -27,8 +27,6 @@
 #ifndef _SYS_CRC32_H
 #define	_SYS_CRC32_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * CRC32, the 32-bit Cyclic Redundancy Check, is a well-known way to
  * generate checksums or hashes.  Extensive literature on the theory

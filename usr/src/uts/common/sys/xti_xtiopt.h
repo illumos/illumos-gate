@@ -27,8 +27,6 @@
 #ifndef _SYS_XTI_XTIOPT_H
 #define	_SYS_XTI_XTIOPT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

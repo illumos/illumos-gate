@@ -26,8 +26,6 @@
 #ifndef _SYS_IB_IB_TYPES_H
 #define	_SYS_IB_IB_TYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ib_types.h
  *

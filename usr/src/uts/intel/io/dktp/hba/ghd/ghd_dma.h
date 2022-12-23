@@ -26,8 +26,6 @@
 #ifndef _GHD_DMA_H
 #define	_GHD_DMA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

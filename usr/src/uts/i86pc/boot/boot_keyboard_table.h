@@ -26,8 +26,6 @@
 #ifndef _BOOT_KEYBOARD_TABLE_H
 #define	_BOOT_KEYBOARD_TABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Structure of the keyboard table for the bootstrap simple
  * keyboard driver.

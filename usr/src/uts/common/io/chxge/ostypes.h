@@ -33,8 +33,6 @@
 #ifndef _CHELSIO_OSTYPES_H
 #define	_CHELSIO_OSTYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

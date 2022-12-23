@@ -27,8 +27,6 @@
 #ifndef _SYS_VMEM_IMPL_H
 #define	_SYS_VMEM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/vmem.h>
 #include <sys/kstat.h>
 #include <sys/mutex.h>

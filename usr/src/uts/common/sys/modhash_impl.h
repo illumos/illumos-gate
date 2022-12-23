@@ -26,8 +26,6 @@
 #ifndef _SYS_MODHASH_IMPL_H
 #define	_SYS_MODHASH_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Internal details for the kernel's generic hash implementation.
  */

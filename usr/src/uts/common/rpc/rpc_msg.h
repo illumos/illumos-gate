@@ -34,8 +34,6 @@
 #ifndef _RPC_RPC_MSG_H
 #define	_RPC_RPC_MSG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/clnt.h>
 /*
  * rpc_msg.h

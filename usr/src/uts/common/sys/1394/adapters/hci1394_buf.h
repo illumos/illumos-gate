@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_BUF_H
 #define	_SYS_1394_ADAPTERS_HCI1394_BUF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_buf.h
  *   These routines handle IO bound memory.  They include routines to alloc and

@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-/* SunOS-4.1 1.16	*/
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/vfs.h>

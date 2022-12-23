@@ -26,8 +26,6 @@
 #ifndef	_SYS_BOOTSTAT_H
 #define	_SYS_BOOTSTAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stat.h>
 
 #ifdef	__cplusplus

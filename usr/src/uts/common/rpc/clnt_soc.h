@@ -38,8 +38,6 @@
 #ifndef _RPC_CLNT_SOC_H
 #define	_RPC_CLNT_SOC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * All the following declarations are only for backward compatibility
  * with SUNOS 4.0.

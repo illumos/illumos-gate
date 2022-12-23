@@ -30,8 +30,6 @@
 #ifndef	_SYS_SEM_IMPL_H
 #define	_SYS_SEM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ipc_impl.h>
 #if defined(_KERNEL) || defined(_KMEMUSER)
 #include <sys/sem.h>

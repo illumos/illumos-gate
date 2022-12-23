@@ -23,7 +23,6 @@
 #ifndef	_NETINET_IP_H
 #define	_NETINET_IP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* ip.h 1.13 88/08/19 SMI; from UCB 7.6.1.1 3/15/88	*/
 
 #include <sys/isa_defs.h>

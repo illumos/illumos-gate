@@ -29,8 +29,6 @@
 #ifndef	_ISCSI_AUTHCLIENTGLUE_H
 #define	_ISCSI_AUTHCLIENTGLUE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

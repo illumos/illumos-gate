@@ -26,8 +26,6 @@
 #ifndef _NPI_IPP_H
 #define	_NPI_IPP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

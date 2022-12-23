@@ -37,9 +37,6 @@
  * contributors.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines used in checking limits on file system usage.
  */

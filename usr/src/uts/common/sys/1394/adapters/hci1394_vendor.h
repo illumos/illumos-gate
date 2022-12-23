@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_ADAPTERS_HCI1394_VERSION_H
 #define	_SYS_1394_ADAPTERS_HCI1394_VERSION_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_vendor.h
  *   These routines provide initialization, cleanup, and general

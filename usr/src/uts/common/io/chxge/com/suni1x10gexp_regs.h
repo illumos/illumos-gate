@@ -27,31 +27,28 @@
  * policies, either expressed or implied, of the FreeBSD Project.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* suni1x10gexp_regs.h */
-
 #ifndef _SUNI1x10GEXP_REGS_H
 #define _SUNI1x10GEXP_REGS_H
 
 
-/* 
-** Space allocated for each Exact Match Filter  
-**     There are 8 filter configurations 
+/*
+** Space allocated for each Exact Match Filter
+**     There are 8 filter configurations
 */
 #define SUNI1x10GEXP_REG_SIZEOF_MAC_FILTER 0x0003
 
 #define mSUNI1x10GEXP_MAC_FILTER_OFFSET(filterId)       ( (filterId) * SUNI1x10GEXP_REG_SIZEOF_MAC_FILTER )
 
-/* 
-** Space allocated for VLAN-Id Filter  
-**      There are 8 filter configurations 
+/*
+** Space allocated for VLAN-Id Filter
+**      There are 8 filter configurations
 */
 #define SUNI1x10GEXP_REG_SIZEOF_MAC_VID_FILTER 0x0001
 
 #define mSUNI1x10GEXP_MAC_VID_FILTER_OFFSET(filterId)   ( (filterId) * SUNI1x10GEXP_REG_SIZEOF_MAC_VID_FILTER )
 
 /*
-** Space allocated for each MSTAT Counter 
+** Space allocated for each MSTAT Counter
 */
 #define SUNI1x10GEXP_REG_SIZEOF_MSTAT_COUNT 0x0004
 
@@ -548,7 +545,7 @@
 #define mSUNI1x10GEXP_CLR_MSBITS_13(v) ((v) & SUNI1x10GEXP_BITMSK_BITS_3)
 #define mSUNI1x10GEXP_CLR_MSBITS_14(v) ((v) & SUNI1x10GEXP_BITMSK_BITS_2)
 #define mSUNI1x10GEXP_CLR_MSBITS_15(v) ((v) & SUNI1x10GEXP_BITMSK_BITS_1)
- 
+
 #define mSUNI1x10GEXP_GET_BIT(val, bitMsk) (((val)&(bitMsk)) ? 1:0)
 
 
@@ -929,7 +926,7 @@
 
 /*----------------------------------------------------------------------------
  * Register 0x2081: XRF Control Register 2
- *    Bit 6   EN_PKT_GEN 
+ *    Bit 6   EN_PKT_GEN
  *    Bit 4-2 PATT
  *----------------------------------------------------------------------------*/
 #define SUNI1x10GEXP_BITMSK_EN_PKT_GEN  0x0040
@@ -1021,7 +1018,7 @@
 #define SUNI1x10GEXP_BITOFF_RXOAM_PX_EN        0
 
 /*----------------------------------------------------------------------------
- * Register 0x20C1,0x20C2: RXOAM Filter Configuration 
+ * Register 0x20C1,0x20C2: RXOAM Filter Configuration
  *    Bit 15-8 RXOAM_FX_MASK
  *    Bit 7-0  RXOAM_FX_VAL
  *----------------------------------------------------------------------------*/
@@ -1376,7 +1373,7 @@
  *    Bit 4    TXXG_CRCEN
  *    Bit 3    TXXG_FCTX
  *    Bit 2    TXXG_FCRX
- *    Bit 1    TXXG_PADEN 
+ *    Bit 1    TXXG_PADEN
  *    Bit 0    TXXG_SPRE
  *----------------------------------------------------------------------------*/
 #define SUNI1x10GEXP_BITMSK_TXXG_TXEN0        0x8000
@@ -1562,13 +1559,13 @@
 #define SUNI1x10GEXP_BITMSK_EFLX_RDWRB  0x4000
 
 /*----------------------------------------------------------------------------
- * Register 0x3203: EFLX Indirect Logical FIFO Low Limit                      
+ * Register 0x3203: EFLX Indirect Logical FIFO Low Limit
  *----------------------------------------------------------------------------*/
 #define SUNI1x10GEXP_BITMSK_EFLX_LOLIM                    0x03FF
 #define SUNI1x10GEXP_BITOFF_EFLX_LOLIM                    0
 
 /*----------------------------------------------------------------------------
- * Register 0x3204: EFLX Indirect Logical FIFO High Limit                     
+ * Register 0x3204: EFLX Indirect Logical FIFO High Limit
  *----------------------------------------------------------------------------*/
 #define SUNI1x10GEXP_BITMSK_EFLX_HILIM                    0x03FF
 #define SUNI1x10GEXP_BITOFF_EFLX_HILIM                    0
@@ -1596,7 +1593,7 @@
 #define SUNI1x10GEXP_BITOFF_EFLX_AETH    0
 
 /*----------------------------------------------------------------------------
- * Register 0x3207: EFLX Indirect FIFO Cut-Through Threshold                  
+ * Register 0x3207: EFLX Indirect FIFO Cut-Through Threshold
  *----------------------------------------------------------------------------*/
 #define SUNI1x10GEXP_BITMSK_EFLX_CUT_THRU                 0x3FFF
 #define SUNI1x10GEXP_BITOFF_EFLX_CUT_THRU                 0

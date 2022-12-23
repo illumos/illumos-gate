@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_DRVINFO_H
 #define	_SYS_1394_ADAPTERS_HCI1394_DRVINFO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_drvinfo.h
  *     drvinfo contains the core information which is shared amoung the various

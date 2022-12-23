@@ -27,8 +27,6 @@
 #ifndef _SYS_MSIO_H
 #define	_SYS_MSIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS4.0 1.6 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

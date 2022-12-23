@@ -27,8 +27,6 @@
 #ifndef	_SYS_FC4_FCP_H
 #define	_SYS_FC4_FCP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Frame format and protocol definitions for transferring
  * commands and data between a SCSI initiator and target

@@ -26,8 +26,6 @@
 #ifndef _SYS_ASYNCH_H
 #define	_SYS_ASYNCH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 #include <sys/types.h>
 #include <sys/aio.h>

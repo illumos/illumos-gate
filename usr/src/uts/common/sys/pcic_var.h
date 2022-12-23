@@ -31,8 +31,6 @@
 #ifndef _PCIC_VAR_H
 #define	_PCIC_VAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

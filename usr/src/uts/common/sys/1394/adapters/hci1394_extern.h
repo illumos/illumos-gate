@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_ADAPTERS_HCI1394_EXTERN_H
 #define	_SYS_1394_ADAPTERS_HCI1394_EXTERN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_extern.h
  *    Provides common location for extern definitions

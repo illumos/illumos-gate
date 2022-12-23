@@ -27,8 +27,6 @@
 #ifndef	_SYS_PRIV_IMPL_H
 #define	_SYS_PRIV_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/priv_const.h>
 #include <sys/priv.h>
 

@@ -34,8 +34,6 @@
 #ifndef _RPC_PMAP_RMT_H
 #define	_RPC_PMAP_RMT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _KERNEL
 
 #include <rpc/pmap_prot.h>

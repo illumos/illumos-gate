@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_CSR_H
 #define	_SYS_1394_ADAPTERS_HCI1394_CSR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_csr.h
  *    This file contains the code for the CSR registers handled by the HAL in

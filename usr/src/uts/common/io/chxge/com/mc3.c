@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* mc3.c */
-
 #include "common.h"
 #include "regs.h"
 #include "mc3.h"
@@ -324,7 +322,7 @@ int t1_mc3_init(struct pemc3 *mc3, unsigned int mc3_clock)
  out_fail:
 	return -1;
 }
-	
+
 static unsigned int __devinit mc3_calc_size(const adapter_t *adapter, u32 cfg)
 {
 	unsigned int banks = !!(cfg & F_BANKS) + 1;

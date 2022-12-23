@@ -26,8 +26,6 @@
 #ifndef	_OBJFS_IMPL_H
 #define	_OBJFS_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/modctl.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>

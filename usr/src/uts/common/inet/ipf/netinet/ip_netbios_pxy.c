@@ -35,8 +35,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	IPF_NETBIOS_PROXY
 
 typedef struct ifs_netbiospxy {

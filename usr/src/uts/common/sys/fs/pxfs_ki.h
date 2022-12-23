@@ -27,8 +27,6 @@
 #ifndef _PXFS_KI_H
 #define	_PXFS_KI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/aio_req.h>

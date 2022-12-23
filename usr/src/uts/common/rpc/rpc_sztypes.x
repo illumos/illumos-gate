@@ -23,11 +23,9 @@
  * CDDL HEADER END
  */
 
-/* 
+/*
  * Definitions for primitive types that are explicitly sized.
  */
-
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 typedef unsigned hyper	uint64;
 typedef hyper		int64;

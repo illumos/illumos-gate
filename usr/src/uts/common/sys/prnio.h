@@ -27,8 +27,6 @@
 #ifndef	_SYS_PRNIO_H
 #define	_SYS_PRNIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Printing system I/O interface
  */

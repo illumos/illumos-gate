@@ -26,8 +26,6 @@
 #ifndef _SYS_DEBUG_INFO_H
 #define	_SYS_DEBUG_INFO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

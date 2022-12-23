@@ -33,8 +33,6 @@
 #ifndef _PPP_DEFS_H_
 #define	_PPP_DEFS_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

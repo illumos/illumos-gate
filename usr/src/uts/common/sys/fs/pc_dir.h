@@ -26,8 +26,6 @@
 #ifndef	_SYS_FS_PC_DIR_H
 #define	_SYS_FS_PC_DIR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dirent.h>
 
 #ifdef	__cplusplus

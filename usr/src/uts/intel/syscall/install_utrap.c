@@ -23,7 +23,6 @@
  *	Copyright (c) 1995,1999 by Sun Microsystems, Inc.
  *	All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>

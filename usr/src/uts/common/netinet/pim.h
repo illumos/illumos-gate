@@ -60,8 +60,6 @@
 #ifndef _NETINET_PIM_H
 #define	_NETINET_PIM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

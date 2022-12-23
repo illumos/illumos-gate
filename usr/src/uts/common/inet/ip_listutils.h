@@ -27,8 +27,6 @@
 #ifndef	_INET_IP_LISTUTILS_H
 #define	_INET_IP_LISTUTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

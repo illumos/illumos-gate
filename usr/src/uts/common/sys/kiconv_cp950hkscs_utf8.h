@@ -68,8 +68,6 @@
 #ifndef _SYS_KICONV_CP950HKSCS_UTF8_H
 #define	_SYS_KICONV_CP950HKSCS_UTF8_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

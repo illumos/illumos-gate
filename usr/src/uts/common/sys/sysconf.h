@@ -30,8 +30,6 @@
 #ifndef _SYS_SYSCONF_H
 #define	_SYS_SYSCONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

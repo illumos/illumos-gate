@@ -27,8 +27,6 @@
 #ifndef _KMDB_H
 #define	_KMDB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/modctl.h>
 
 #ifdef __cplusplus

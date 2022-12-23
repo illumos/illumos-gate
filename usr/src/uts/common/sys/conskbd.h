@@ -27,8 +27,6 @@
 #ifndef	_SYS_CONSKBD_H
 #define	_SYS_CONSKBD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/consdev.h>

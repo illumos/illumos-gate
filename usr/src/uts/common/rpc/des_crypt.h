@@ -38,8 +38,6 @@
 #ifndef _DES_DES_CRYPT_H
 #define	_DES_DES_CRYPT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef __cplusplus

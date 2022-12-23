@@ -33,8 +33,6 @@
 #ifndef _PCCARD_H
 #define	_PCCARD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -27,8 +27,6 @@
 #ifndef _SYS_SYSEVENT_DOMAIN_H
 #define	_SYS_SYSEVENT_DOMAIN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

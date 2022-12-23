@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_S1394_IMPL_H
 #define	_SYS_1394_S1394_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s1394_impl.h
  *    Typedefs and defines used by all 1394 Software Framework files

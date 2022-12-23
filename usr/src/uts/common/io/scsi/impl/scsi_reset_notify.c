@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * support functions for hba drivers to handle scsi reset notifications.
  */

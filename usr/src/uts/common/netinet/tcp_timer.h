@@ -21,7 +21,6 @@
 #ifndef	_NETINET_TCP_TIMER_H
 #define	_NETINET_TCP_TIMER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* tcp_timer.h 1.13 89/06/16 SMI; from UCB 7.6 6/29/88 */
 
 #ifdef	__cplusplus

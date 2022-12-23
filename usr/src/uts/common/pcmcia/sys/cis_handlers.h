@@ -27,8 +27,6 @@
 #ifndef _CIS_HANDLERS_H
 #define	_CIS_HANDLERS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

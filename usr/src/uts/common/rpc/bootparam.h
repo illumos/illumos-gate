@@ -26,8 +26,6 @@
 #ifndef	_RPC_BOOTPARAM_H
 #define	_RPC_BOOTPARAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _KERNEL
 #include <rpc/types.h>
 #include <sys/time.h>

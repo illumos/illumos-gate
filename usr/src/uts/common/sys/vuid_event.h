@@ -27,8 +27,6 @@
 #ifndef _SYS_VUID_EVENT_H
 #define	_SYS_VUID_EVENT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/types32.h>
 

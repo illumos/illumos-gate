@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Config dependent data structures for the Streams Administrative Driver
  * (or "Ballad of the SAD Cafe").

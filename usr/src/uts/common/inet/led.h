@@ -28,8 +28,6 @@
 #ifndef _INET_LED_H
 #define	_INET_LED_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING: This file contains implementation-specific constants, typedefs
  *	    and macros which may change from release to release.

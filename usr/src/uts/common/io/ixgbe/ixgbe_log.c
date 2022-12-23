@@ -26,8 +26,6 @@
  * Use is subject to license terms of the CDDL.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ixgbe_sw.h"
 
 #define	LOG_BUF_LEN	128

@@ -26,8 +26,6 @@
 #ifndef _SYS_ELF_NOTES_H
 #define	_SYS_ELF_NOTES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

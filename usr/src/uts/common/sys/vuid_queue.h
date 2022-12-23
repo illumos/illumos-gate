@@ -35,8 +35,6 @@
 #ifndef _SYS_VUID_QUEUE_H
 #define	_SYS_VUID_QUEUE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS 1.6 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

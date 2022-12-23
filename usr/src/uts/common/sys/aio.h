@@ -27,8 +27,6 @@
 #ifndef _SYS_AIO_H
 #define	_SYS_AIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

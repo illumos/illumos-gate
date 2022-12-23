@@ -7,7 +7,6 @@
 #ifndef	_NETINET_TCP_SEQ_H
 #define	_NETINET_TCP_SEQ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* tcp_seq.h 1.7 88/08/19 SMI; from UCB 7.1 6/5/85	*/
 
 #ifdef	__cplusplus

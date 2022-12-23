@@ -32,8 +32,6 @@
 #ifndef _NETINET_PPPOE_H
 #define	_NETINET_PPPOE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef __cplusplus

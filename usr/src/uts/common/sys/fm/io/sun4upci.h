@@ -27,8 +27,6 @@
 #ifndef	_SYS_FM_IO_SUN4UPCI_H
 #define	_SYS_FM_IO_SUN4UPCI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

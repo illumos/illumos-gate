@@ -27,8 +27,6 @@
 #ifndef _SYS_IB_IB_PKT_HDRS_H
 #define	_SYS_IB_IB_PKT_HDRS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

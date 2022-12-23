@@ -27,8 +27,6 @@
 #ifndef	_SYS_CLOCK_TICK_H
 #define	_SYS_CLOCK_TICK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/mutex.h>
 #include <sys/cpuvar.h>

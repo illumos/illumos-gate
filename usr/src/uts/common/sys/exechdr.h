@@ -27,8 +27,6 @@
 #ifndef _SYS_EXECHDR_H
 #define	_SYS_EXECHDR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/inttypes.h>
 
 #ifdef	__cplusplus

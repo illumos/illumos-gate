@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * av1394 queue
  *    Based on av1394 list, plus locking, works only with mblk's,

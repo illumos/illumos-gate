@@ -12,7 +12,6 @@
 #ifndef	_NETINET_ICMP_VAR_H
 #define	_NETINET_ICMP_VAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* icmp_var.h 1.10 88/08/19 SMI; from UCB 7.2 1/13/87	*/
 
 #ifdef	__cplusplus

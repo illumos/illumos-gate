@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_H1394_H
 #define	_SYS_1394_H1394_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * h1394.h
  *    Contains the structure and error codes used to communicate

@@ -26,8 +26,6 @@
 #ifndef	_BOOT_SERIAL_H
 #define	_BOOT_SERIAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

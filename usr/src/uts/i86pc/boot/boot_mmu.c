@@ -28,8 +28,6 @@
  * WARNING: This file is used by both dboot and the kernel.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/machparam.h>
 #include <sys/mach_mmu.h>
