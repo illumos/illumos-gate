@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stropts.h>
 #include <sys/isa_defs.h>
 #include <sys/nvpair.h>

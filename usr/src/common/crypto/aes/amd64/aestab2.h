@@ -26,8 +26,6 @@
 #ifndef _AESTAB2_H
 #define	_AESTAB2_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

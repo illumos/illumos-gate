@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -45,14 +45,12 @@
 #ifndef _ECL_CURVE_H
 #define _ECL_CURVE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecl-exp.h"
 #ifndef _KERNEL
 #include <stdlib.h>
 #endif
 
-/* NIST prime curves */                                                         
+/* NIST prime curves */
 static const ECCurveParams ecCurve_NIST_P192 = {
 	"NIST-P192", ECField_GFp, 192,
 	"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFFF",
@@ -105,7 +103,7 @@ static const ECCurveParams ecCurve_NIST_P521 = {
 	1
 };
 
-/* NIST binary curves */                                                        
+/* NIST binary curves */
 static const ECCurveParams ecCurve_NIST_K163 = {
 	"NIST-K163", ECField_GF2m, 163,
 	"0800000000000000000000000000000000000000C9",
@@ -164,7 +162,7 @@ static const ECCurveParams ecCurve_NIST_B283 = {
 	"05F939258DB7DD90E1934F8C70B0DFEC2EED25B8557EAC9C80E2E198F8CDBECD86B12053",
 	"03676854FE24141CB98FE6D4B20D02B4516FF702350EDDB0826779C813F0DF45BE8112F4",
 	"03FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEF90399660FC938A90165B042A7CEFADB307", 2
-};                                                                              
+};
 
 static const ECCurveParams ecCurve_NIST_K409 = {
 	"NIST-K409", ECField_GF2m, 409,

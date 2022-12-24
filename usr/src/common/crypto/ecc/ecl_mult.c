@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -42,8 +42,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mpi.h"
 #include "mplogic.h"
 #include "ecl.h"
@@ -52,8 +50,8 @@
 #include <stdlib.h>
 #endif
 
-/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k * P(x, 
- * y).  If x, y = NULL, then P is assumed to be the generator (base point) 
+/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k * P(x,
+ * y).  If x, y = NULL, then P is assumed to be the generator (base point)
  * of the group of points on the elliptic curve. Input and output values
  * are assumed to be NOT field-encoded. */
 mp_err
@@ -106,7 +104,7 @@ ECPoint_mul(const ECGroup *group, const mp_int *k, const mp_int *px,
 	return res;
 }
 
-/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k1 * G + 
+/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k1 * G +
  * k2 * P(x, y), where G is the generator (base point) of the group of
  * points on the elliptic curve. Allows k1 = NULL or { k2, P } = NULL.
  * Input and output values are assumed to be NOT field-encoded. */
@@ -158,7 +156,7 @@ ec_pts_mul_basic(const mp_int *k1, const mp_int *k2, const mp_int *px,
 	return res;
 }
 
-/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k1 * G + 
+/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k1 * G +
  * k2 * P(x, y), where G is the generator (base point) of the group of
  * points on the elliptic curve. Allows k1 = NULL or { k2, P } = NULL.
  * Input and output values are assumed to be NOT field-encoded. Uses
@@ -311,7 +309,7 @@ ec_pts_mul_simul_w2(const mp_int *k1, const mp_int *k2, const mp_int *px,
 	return res;
 }
 
-/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k1 * G + 
+/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k1 * G +
  * k2 * P(x, y), where G is the generator (base point) of the group of
  * points on the elliptic curve. Allows k1 = NULL or { k2, P } = NULL.
  * Input and output values are assumed to be NOT field-encoded. */

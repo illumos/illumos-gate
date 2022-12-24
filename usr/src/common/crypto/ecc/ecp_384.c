@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -42,8 +42,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecp.h"
 #include "mpi.h"
 #include "mplogic.h"
@@ -52,8 +50,8 @@
 #include <stdlib.h>
 #endif
 
-/* Fast modular reduction for p384 = 2^384 - 2^128 - 2^96 + 2^32 - 1.  a can be r. 
- * Uses algorithm 2.30 from Hankerson, Menezes, Vanstone. Guide to 
+/* Fast modular reduction for p384 = 2^384 - 2^128 - 2^96 + 2^32 - 1.  a can be r.
+ * Uses algorithm 2.30 from Hankerson, Menezes, Vanstone. Guide to
  * Elliptic Curve Cryptography. */
 mp_err
 ec_GFp_nistp384_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
@@ -84,7 +82,7 @@ ec_GFp_nistp384_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 #endif
 
 #ifdef ECL_THIRTY_TWO_BIT
-	/* for polynomials larger than twice the field size or polynomials 
+	/* for polynomials larger than twice the field size or polynomials
 	 * not using all words, use regular reduction */
 	if ((a_bits > 768) || (a_bits <= 736)) {
 		MP_CHECKOK(mp_mod(a, &meth->irr, r));
@@ -186,7 +184,7 @@ ec_GFp_nistp384_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		s_mp_clamp(r);
 	}
 #else
-	/* for polynomials larger than twice the field size or polynomials 
+	/* for polynomials larger than twice the field size or polynomials
 	 * not using all words, use regular reduction */
 	if ((a_bits > 768) || (a_bits <= 736)) {
 		MP_CHECKOK(mp_mod(a, &meth->irr, r));
@@ -261,7 +259,7 @@ ec_GFp_nistp384_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 }
 
 /* Compute the square of polynomial a, reduce modulo p384. Store the
- * result in r.  r could be a.  Uses optimized modular reduction for p384. 
+ * result in r.  r could be a.  Uses optimized modular reduction for p384.
  */
 mp_err
 ec_GFp_nistp384_sqr(const mp_int *a, mp_int *r, const GFMethod *meth)

@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -42,8 +42,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecp.h"
 #include "mpi.h"
 #include "mplogic.h"
@@ -55,7 +53,7 @@
 #define ECP521_DIGITS ECL_CURVE_DIGITS(521)
 
 /* Fast modular reduction for p521 = 2^521 - 1.  a can be r. Uses
- * algorithm 2.31 from Hankerson, Menezes, Vanstone. Guide to 
+ * algorithm 2.31 from Hankerson, Menezes, Vanstone. Guide to
  * Elliptic Curve Cryptography. */
 mp_err
 ec_GFp_nistp521_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
@@ -78,14 +76,14 @@ ec_GFp_nistp521_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		if (a==r) return MP_OKAY;
 		return mp_copy(a, r);
 	}
-	/* for polynomials larger than twice the field size or polynomials 
+	/* for polynomials larger than twice the field size or polynomials
 	 * not using all words, use regular reduction */
 	if (a_bits > (521*2)) {
 		MP_CHECKOK(mp_mod(a, &meth->irr, r));
 	} else {
 #define FIRST_DIGIT (ECP521_DIGITS-1)
 		for (i = FIRST_DIGIT; i < MP_USED(a)-1; i++) {
-			s1[i-FIRST_DIGIT] = (MP_DIGIT(a, i) >> 9) 
+			s1[i-FIRST_DIGIT] = (MP_DIGIT(a, i) >> 9)
 				| (MP_DIGIT(a, 1+i) << (MP_DIGIT_BIT-9));
 		}
 		s1[i-FIRST_DIGIT] = MP_DIGIT(a, i) >> 9;
@@ -112,7 +110,7 @@ ec_GFp_nistp521_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 }
 
 /* Compute the square of polynomial a, reduce modulo p521. Store the
- * result in r.  r could be a.  Uses optimized modular reduction for p521. 
+ * result in r.  r could be a.  Uses optimized modular reduction for p521.
  */
 mp_err
 ec_GFp_nistp521_sqr(const mp_int *a, mp_int *r, const GFMethod *meth)
@@ -153,7 +151,7 @@ ec_GFp_nistp521_div(const mp_int *a, const mp_int *b, mp_int *r,
 	if (a == NULL) {
 		return mp_invmod(b, &meth->irr, r);
 	} else {
-		/* MPI doesn't support divmod, so we implement it using invmod and 
+		/* MPI doesn't support divmod, so we implement it using invmod and
 		 * mulmod. */
 		MP_CHECKOK(mp_init(&t, FLAG(b)));
 		MP_CHECKOK(mp_invmod(b, &meth->irr, &t));

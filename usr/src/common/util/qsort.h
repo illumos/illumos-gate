@@ -27,8 +27,6 @@
 #ifndef	_QSORT_H
 #define	_QSORT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Declarations for qsort().
  */

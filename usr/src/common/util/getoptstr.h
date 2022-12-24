@@ -27,8 +27,6 @@
 #ifndef _GETOPTSTR_H
 #define	_GETOPTSTR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Declarations for getoptstr().
  */

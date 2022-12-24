@@ -27,8 +27,6 @@
 #ifndef	_COMMON_UTIL_MEMCPY_H
 #define	_COMMON_UTIL_MEMCPY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef __cplusplus

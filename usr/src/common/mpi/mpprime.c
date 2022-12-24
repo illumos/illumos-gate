@@ -47,8 +47,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mpi-priv.h"
 #include "mpprime.h"
 #include "mplogic.h"
@@ -114,7 +112,7 @@ mp_err  mpp_random_size(mp_int *a, mp_size prec)
   mp_err   res;
 
   ARGCHK(a != NULL && prec > 0, MP_BADARG);
-  
+
   if((res = s_mp_pad(a, prec)) != MP_OKAY)
     return res;
 

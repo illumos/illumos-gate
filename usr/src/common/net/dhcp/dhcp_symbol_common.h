@@ -26,8 +26,6 @@
 #ifndef _DHCP_SYMBOL_COMMON_H
 #define	_DHCP_SYMBOL_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains DHCP symbol definitions that are shared between userland
  * (libdhcputil) and standalone.  The sharing is just for convenience; there's

@@ -22,8 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Given a unum including an offset calculate the associated system
  * address.  This may be different to when the original PA to unum

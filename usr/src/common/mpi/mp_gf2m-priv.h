@@ -46,8 +46,6 @@
 #ifndef _MP_GF2M_PRIV_H_
 #define _MP_GF2M_PRIV_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mpi-priv.h"
 
 extern const mp_digit mp_gf2m_sqr_tb[16];
@@ -85,26 +83,26 @@ extern const mp_digit mp_gf2m_sqr_tb[16];
  */
 void s_bmul_1x1(mp_digit *rh, mp_digit *rl, const mp_digit a, const mp_digit b);
 
-/* Compute xor-multiply of two binary polynomials  (a1, a0) x (b1, b0)  
+/* Compute xor-multiply of two binary polynomials  (a1, a0) x (b1, b0)
  * result is a binary polynomial in 4 mp_digits r[4].
  * The caller MUST ensure that r has the right amount of space allocated.
  */
 void s_bmul_2x2(mp_digit *r, const mp_digit a1, const mp_digit a0, const mp_digit b1,
 	const mp_digit b0);
 
-/* Compute xor-multiply of two binary polynomials  (a2, a1, a0) x (b2, b1, b0)  
+/* Compute xor-multiply of two binary polynomials  (a2, a1, a0) x (b2, b1, b0)
  * result is a binary polynomial in 6 mp_digits r[6].
  * The caller MUST ensure that r has the right amount of space allocated.
  */
-void s_bmul_3x3(mp_digit *r, const mp_digit a2, const mp_digit a1, const mp_digit a0, 
+void s_bmul_3x3(mp_digit *r, const mp_digit a2, const mp_digit a1, const mp_digit a0,
 	const mp_digit b2, const mp_digit b1, const mp_digit b0);
 
-/* Compute xor-multiply of two binary polynomials  (a3, a2, a1, a0) x (b3, b2, b1, b0)  
+/* Compute xor-multiply of two binary polynomials  (a3, a2, a1, a0) x (b3, b2, b1, b0)
  * result is a binary polynomial in 8 mp_digits r[8].
  * The caller MUST ensure that r has the right amount of space allocated.
  */
-void s_bmul_4x4(mp_digit *r, const mp_digit a3, const mp_digit a2, const mp_digit a1, 
-	const mp_digit a0, const mp_digit b3, const mp_digit b2, const mp_digit b1, 
+void s_bmul_4x4(mp_digit *r, const mp_digit a3, const mp_digit a2, const mp_digit a1,
+	const mp_digit a0, const mp_digit b3, const mp_digit b2, const mp_digit b1,
 	const mp_digit b0);
 
 #endif /* _MP_GF2M_PRIV_H_ */

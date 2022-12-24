@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -41,8 +41,6 @@
  *
  * Sun elects to use this software under the MPL license.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mpi.h"
 #include "mplogic.h"
@@ -419,11 +417,11 @@ ECGroup_fromName(const ECCurveName name, int kmflag)
 }
 
 /* Validates an EC public key as described in Section 5.2.2 of X9.62. */
-mp_err ECPoint_validate(const ECGroup *group, const mp_int *px, const 
+mp_err ECPoint_validate(const ECGroup *group, const mp_int *px, const
 					mp_int *py)
 {
     /* 1: Verify that publicValue is not the point at infinity */
-    /* 2: Verify that the coordinates of publicValue are elements 
+    /* 2: Verify that the coordinates of publicValue are elements
      *    of the field.
      */
     /* 3: Verify that publicValue is on the curve. */

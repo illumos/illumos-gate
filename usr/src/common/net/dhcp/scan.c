@@ -26,8 +26,6 @@
  * as they are called from different threads.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include "dhcp_impl.h"
 #if defined(_KERNEL) && !defined(_BOOT)

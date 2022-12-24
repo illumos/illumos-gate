@@ -44,8 +44,6 @@
 #ifndef _SECOIDT_H_
 #define _SECOIDT_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * secoidt.h - public data structures for ASN.1 OID functions
  *
@@ -81,7 +79,7 @@ struct SECOidDataStr {
     ECCurveName        offset;
     const char *       desc;
     unsigned long      mechanism;
-    SECSupportExtenTag supportedExtension;	
+    SECSupportExtenTag supportedExtension;
     				/* only used for x.509 v3 extensions, so
 				   that we can print the names of those
 				   extensions that we don't even support */

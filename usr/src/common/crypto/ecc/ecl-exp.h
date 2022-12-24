@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -44,8 +44,6 @@
 
 #ifndef _ECL_EXP_H
 #define _ECL_EXP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Curve field type */
 typedef enum {

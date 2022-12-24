@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -46,8 +46,6 @@
  *
  * Sun elects to use this software under the MPL license.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ecp.h"
 #include "mplogic.h"
@@ -228,14 +226,14 @@ ec_GFp_pt_add_jac_aff(const mp_int *px, const mp_int *py, const mp_int *pz,
 	return res;
 }
 
-/* Computes R = 2P.  Elliptic curve points P and R can be identical.  Uses 
+/* Computes R = 2P.  Elliptic curve points P and R can be identical.  Uses
  * Jacobian coordinates.
  *
- * Assumes input is already field-encoded using field_enc, and returns 
+ * Assumes input is already field-encoded using field_enc, and returns
  * output that is still field-encoded.
  *
- * This routine implements Point Doubling in the Jacobian Projective 
- * space as described in the paper "Efficient elliptic curve exponentiation 
+ * This routine implements Point Doubling in the Jacobian Projective
+ * space as described in the paper "Efficient elliptic curve exponentiation
  * using mixed coordinates", by H. Cohen, A Miyaji, T. Ono.
  */
 mp_err
@@ -329,7 +327,7 @@ ec_GFp_pt_dbl_jac(const mp_int *px, const mp_int *py, const mp_int *pz,
  * a, b and p are the elliptic curve coefficients and the prime that
  * determines the field GFp.  Elliptic curve points P and R can be
  * identical.  Uses mixed Jacobian-affine coordinates. Assumes input is
- * already field-encoded using field_enc, and returns output that is still 
+ * already field-encoded using field_enc, and returns output that is still
  * field-encoded. Uses 4-bit window method. */
 mp_err
 ec_GFp_pt_mul_jac(const mp_int *n, const mp_int *px, const mp_int *py,
@@ -405,7 +403,7 @@ ec_GFp_pt_mul_jac(const mp_int *n, const mp_int *px, const mp_int *py,
 }
 #endif
 
-/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k1 * G + 
+/* Elliptic curve scalar-point multiplication. Computes R(x, y) = k1 * G +
  * k2 * P(x, y), where G is the generator (base point) of the group of
  * points on the elliptic curve. Allows k1 = NULL or { k2, P } = NULL.
  * Uses mixed Jacobian-affine coordinates. Input and output values are

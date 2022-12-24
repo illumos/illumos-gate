@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -44,8 +44,6 @@
 
 #ifndef _ECP_H
 #define _ECP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ecl-priv.h"
 
@@ -139,7 +137,7 @@ mp_err
  * additions. Assumes input is already field-encoded using field_enc, and
  * returns output that is still field-encoded. Uses 5-bit window NAF
  * method (algorithm 11) for scalar-point multiplication from Brown,
- * Hankerson, Lopez, Menezes. Software Implementation of the NIST Elliptic 
+ * Hankerson, Lopez, Menezes. Software Implementation of the NIST Elliptic
  * Curves Over Prime Fields. */
 mp_err
  ec_GFp_pt_mul_jm_wNAF(const mp_int *n, const mp_int *px, const mp_int *py,

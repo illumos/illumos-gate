@@ -79,8 +79,6 @@
 #ifndef _AESTAB_H
 #define	_AESTAB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

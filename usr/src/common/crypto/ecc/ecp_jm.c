@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -42,8 +42,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecp.h"
 #include "ecl-priv.h"
 #include "mplogic.h"
@@ -53,10 +51,10 @@
 
 #define MAX_SCRATCH 6
 
-/* Computes R = 2P.  Elliptic curve points P and R can be identical.  Uses 
+/* Computes R = 2P.  Elliptic curve points P and R can be identical.  Uses
  * Modified Jacobian coordinates.
  *
- * Assumes input is already field-encoded using field_enc, and returns 
+ * Assumes input is already field-encoded using field_enc, and returns
  * output that is still field-encoded.
  *
  */
@@ -218,7 +216,7 @@ CLEANUP:
  * additions. Assumes input is already field-encoded using field_enc, and
  * returns output that is still field-encoded. Uses 5-bit window NAF
  * method (algorithm 11) for scalar-point multiplication from Brown,
- * Hankerson, Lopez, Menezes. Software Implementation of the NIST Elliptic 
+ * Hankerson, Lopez, Menezes. Software Implementation of the NIST Elliptic
  * Curves Over Prime Fields. */
 mp_err
 ec_GFp_pt_mul_jm_wNAF(const mp_int *n, const mp_int *px, const mp_int *py,
@@ -307,7 +305,7 @@ ec_GFp_pt_mul_jm_wNAF(const mp_int *n, const mp_int *px, const mp_int *py,
 	/* wNAF method */
 	for (i = orderBitSize; i >= 0; i--) {
 		/* R = 2R */
-		ec_GFp_pt_dbl_jm(rx, ry, &rz, &raz4, rx, ry, &rz, 
+		ec_GFp_pt_dbl_jm(rx, ry, &rz, &raz4, rx, ry, &rz,
 					     &raz4, scratch, group);
 		if (naf[i] != 0) {
 			ec_GFp_pt_add_jm_aff(rx, ry, &rz, &raz4,

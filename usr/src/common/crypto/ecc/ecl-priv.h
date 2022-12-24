@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -46,8 +46,6 @@
 #ifndef _ECL_PRIV_H
 #define _ECL_PRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecl.h"
 #include "mpi.h"
 #include "mplogic.h"
@@ -65,7 +63,7 @@
 #define ECL_BITS (sizeof(mp_digit)*8)
 #define ECL_MAX_FIELD_SIZE_DIGITS (80/sizeof(mp_digit))
 
-/* Gets the i'th bit in the binary representation of a. If i >= length(a), 
+/* Gets the i'th bit in the binary representation of a. If i >= length(a),
  * then return 0. (The above behaviour differs from mpl_get_bit, which
  * causes an error if i >= length(a).) */
 #define MP_GET_BIT(a, i) \
@@ -85,7 +83,7 @@
     bout = (w >> MP_DIGIT_BIT) & 1; }
 
 #else
-/* NOTE, 
+/* NOTE,
  * cin and cout could be the same variable.
  * bin and bout could be the same variable.
  * a1 or a2 and s could be the same variable.
@@ -112,14 +110,14 @@
 struct GFMethodStr;
 typedef struct GFMethodStr GFMethod;
 struct GFMethodStr {
-	/* Indicates whether the structure was constructed from dynamic memory 
+	/* Indicates whether the structure was constructed from dynamic memory
 	 * or statically created. */
 	int constructed;
 	/* Irreducible that defines the field. For prime fields, this is the
 	 * prime p. For binary polynomial fields, this is the bitstring
 	 * representation of the irreducible polynomial. */
 	mp_int irr;
-	/* For prime fields, the value irr_arr[0] is the number of bits in the 
+	/* For prime fields, the value irr_arr[0] is the number of bits in the
 	 * field. For binary polynomial fields, the irreducible polynomial
 	 * f(t) is represented as an array of unsigned int[], where f(t) is
 	 * of the form: f(t) = t^p[0] + t^p[1] + ... + t^p[4] where m = p[0]
@@ -158,7 +156,7 @@ GFMethod *GFMethod_consGF2m(const mp_int *irr,
 void GFMethod_free(GFMethod *meth);
 
 struct ECGroupStr {
-	/* Indicates whether the structure was constructed from dynamic memory 
+	/* Indicates whether the structure was constructed from dynamic memory
 	 * or statically created. */
 	int constructed;
 	/* Field definition and arithmetic. */
@@ -264,7 +262,7 @@ mp_err ec_pts_mul_simul_w2(const mp_int *k1, const mp_int *k2,
 						   mp_int *ry, const ECGroup *group);
 
 /* Computes the windowed non-adjacent-form (NAF) of a scalar. Out should
- * be an array of signed char's to output to, bitsize should be the number 
+ * be an array of signed char's to output to, bitsize should be the number
  * of bits of out, in is the original scalar, and w is the window size.
  * NAF is discussed in the paper: D. Hankerson, J. Hernandez and A.
  * Menezes, "Software implementation of elliptic curve cryptography over
