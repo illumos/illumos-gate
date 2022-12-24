@@ -34,8 +34,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <limits.h>
 
 #define	ctrl(x)	(x & 037)	/* control character macro */

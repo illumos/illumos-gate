@@ -35,7 +35,5 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	FILEVERSION	13	/* symbol database file format version */
 #define	FIXVERSION	".4"	/* feature and bug fix version */

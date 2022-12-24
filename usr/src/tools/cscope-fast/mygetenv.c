@@ -28,8 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* return the non-null environment value or the default argument */
 
 #include <stdlib.h>

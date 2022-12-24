@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* common mouse interface functions */
 
 #include <stdio.h>	/* NULL */

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 extern int read_in_protodir(const char *, elem_list *, int);
 extern int process_dependencies(const char *pkgname, const char *parentdir,
     elem_list *list, int verbose);

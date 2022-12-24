@@ -35,8 +35,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <limits.h>
 
 #define	MAXPATH	PATH_MAX	/* max length for entire name */

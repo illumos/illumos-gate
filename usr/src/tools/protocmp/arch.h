@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(i386)
 #define	PROTO_EXT "_i386"
 #elif defined(sparc)

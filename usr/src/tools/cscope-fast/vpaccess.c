@@ -28,8 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* vpaccess - view path version of the access system call */
 
 #include <sys/types.h>

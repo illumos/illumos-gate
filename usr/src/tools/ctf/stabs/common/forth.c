@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * In this mode, we generate forthdebug macros as requested by the input
  * template, the format of which is given below.

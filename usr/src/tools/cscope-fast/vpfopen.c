@@ -28,8 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* vpfopen - view path version of the fopen library function */
 
 #include <sys/types.h>

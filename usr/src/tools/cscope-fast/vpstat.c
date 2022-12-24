@@ -28,8 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* vpstat - view path version of the stat system call */
 
 #include <sys/types.h>
