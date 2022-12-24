@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef lint
 static char
 sccsid[] = "@(#)curses.c 1.8 88/02/08 SMI"; /* from UCB 5.2 85/11/08 */

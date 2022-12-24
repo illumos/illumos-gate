@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -48,8 +45,8 @@ char *
 sttyparse(argc, argv, term, ocb, cb, termiox, winsize)
 int	argc;
 char	*argv[];
-int	term; /* type of tty device, -1 means allow all options, 
-	       * no sanity check 
+int	term; /* type of tty device, -1 means allow all options,
+	       * no sanity check
 	       */
 struct	termio	*ocb;
 struct	termios	*cb;
@@ -157,7 +154,7 @@ struct	winsize	*winsize;
 				cb->c_cc[VEOL] = CNUL;
 							   /* SWTCH purposely not set */
 			}
-			else if((term & TERMIOS) && eqarg("ospeed", argc) && --argc) { 
+			else if((term & TERMIOS) && eqarg("ospeed", argc) && --argc) {
 				s_arg = *++argv;
 				match = 0;
 				for(i=0; speeds[i].string; i++)
@@ -167,7 +164,7 @@ struct	winsize	*winsize;
 					return s_arg;
 				continue;
 			}
-			else if((term & TERMIOS) && eqarg("ispeed", argc) && --argc) { 
+			else if((term & TERMIOS) && eqarg("ispeed", argc) && --argc) {
 				s_arg = *++argv;
 				match = 0;
 				for(i=0; speeds[i].string; i++)
@@ -196,7 +193,7 @@ struct	winsize	*winsize;
 			(void) fprintf(stderr, "stty: No argument for \"%s\"\n", s_arg);
 			exit(1);
 		}
-			
+
 		for(i=0; imodes[i].string; i++)
 			if(eq(imodes[i].string)) {
 				cb->c_iflag &= ~imodes[i].reset;
@@ -252,7 +249,7 @@ struct	winsize	*winsize;
 					termiox->x_cflag &= ~clkmodes[i].reset;
 					termiox->x_cflag |= clkmodes[i].set;
 				}
-			
+
 		}
 		if(eqarg("rows", argc) && --argc)
 			winsize->ws_row = atoi(*++argv);
@@ -329,7 +326,7 @@ int term;
 }
 
 /* get modes of tty device and fill in applicable structures */
-int 
+int
 get_ttymode(fd, termio, termios, stermio, termiox, winsize)
 int fd;
 struct termio *termio;
@@ -343,7 +340,7 @@ struct winsize *winsize;
 	if(ioctl(fd, STGET, stermio) == -1) {
 		term |= ASYNC;
 		if(ioctl(fd, TCGETS, termios) == -1) {
-			if(ioctl(fd, TCGETA, termio) == -1) 
+			if(ioctl(fd, TCGETA, termio) == -1)
 				return -1;
 			termios->c_lflag = termio->c_lflag;
 			termios->c_oflag = termio->c_oflag;
@@ -360,7 +357,7 @@ struct winsize *winsize;
 		termios->c_oflag = stermio->omode;
 		termios->c_iflag = stermio->imode;
 	}
-	
+
 	if(ioctl(fd, TCGETX, termiox) == 0)
 		term |= FLOW;
 
@@ -370,7 +367,7 @@ struct winsize *winsize;
 }
 
 /* set tty modes */
-int 
+int
 set_ttymode(fd, term, termio, termios, stermio, termiox, winsize, owinsize)
 int fd, term;
 struct termio *termio;
@@ -394,7 +391,7 @@ struct winsize *winsize, *owinsize;
 			if(ioctl(fd, TCSETAW, termio) == -1)
 				return -1;
 		}
-			
+
 	} else {
 		stermio->imode = termios->c_iflag;
 		stermio->omode = termios->c_oflag;
@@ -407,8 +404,8 @@ struct winsize *winsize, *owinsize;
 		if(ioctl(fd, TCSETXW, termiox) == -1)
 			return -1;
 	}
-	if((owinsize->ws_col != winsize->ws_col  
-	   || owinsize->ws_row != winsize->ws_row) 
+	if((owinsize->ws_col != winsize->ws_col
+	   || owinsize->ws_row != winsize->ws_row)
 	   && ioctl(0, TIOCSWINSZ, winsize) != 0)
 		return -1;
 	return 0;
@@ -420,14 +417,14 @@ int term;
 {
 	unsigned long grab[20], i;
 	int last;
-	i = sscanf(s_arg, 
+	i = sscanf(s_arg,
 	"%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx:%lx",
 	&grab[0],&grab[1],&grab[2],&grab[3],&grab[4],&grab[5],&grab[6],
 	&grab[7],&grab[8],&grab[9],&grab[10],&grab[11],
-	&grab[12], &grab[13], &grab[14], &grab[15], 
+	&grab[12], &grab[13], &grab[14], &grab[15],
 	&grab[16], &grab[17], &grab[18], &grab[19]);
 
-	if((term & TERMIOS) && i < 20 && term != -1 || i < 12) 
+	if((term & TERMIOS) && i < 20 && term != -1 || i < 12)
 		return(0);
 	cb->c_iflag = grab[0];
 	cb->c_oflag = grab[1];

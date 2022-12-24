@@ -39,8 +39,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * clnt_udp.c, Implements a UDP/IP based, client side RPC.
  */

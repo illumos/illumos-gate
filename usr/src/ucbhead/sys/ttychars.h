@@ -21,8 +21,6 @@
 #ifndef _SYS_TTYCHARS_H
 #define	_SYS_TTYCHARS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

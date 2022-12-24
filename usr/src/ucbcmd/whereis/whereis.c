@@ -9,9 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <sys/param.h>
 #include <dirent.h>
 #include <stdio.h>

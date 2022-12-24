@@ -40,8 +40,6 @@
 #ifndef _SYS_FILE_H
 #define	_SYS_FILE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _SYS_TYPES_H
 #include <sys/types.h>
 #endif

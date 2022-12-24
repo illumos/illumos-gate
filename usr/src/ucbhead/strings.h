@@ -45,8 +45,6 @@
 #ifndef	_STRINGS_H
 #define	_STRINGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 
 #ifdef __cplusplus

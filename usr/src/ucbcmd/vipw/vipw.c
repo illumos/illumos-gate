@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -87,7 +85,7 @@ main(void)
 	if (stat(passwd, &osbuf) < 0) {
                 (void)fprintf(stderr,"vipw: can't stat passwd file.\n");
                 goto bad;
-        } 
+        }
 
 	if (copyfile(passwd, ptemp))
 		goto bad;
@@ -387,5 +385,5 @@ bad_root:		(void)fprintf(stderr,
 		    "vipw: you mangled the %s file, %s unchanged\n",
 		    temp, orig);
 		return(1);
-	}			
+	}
 }
