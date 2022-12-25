@@ -24,9 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * ASSERTION:
  *	bcopy should not allow a copy to memory that is not scratch memory.

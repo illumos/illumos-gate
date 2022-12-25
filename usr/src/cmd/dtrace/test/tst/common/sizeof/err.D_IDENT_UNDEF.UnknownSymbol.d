@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: The D compiler throws a D_IDENT_UNDEF error when sizeof is passed
  * an unknown symbol.

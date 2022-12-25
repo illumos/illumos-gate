@@ -24,9 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * ASSERTION:
  *   Test the use of a dynamic expression as an aggregation key.

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION:
  *	Checks that buffer space for an END enabling is always reserved in a

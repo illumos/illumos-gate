@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION:
  * print non assigned value and make sure it fails.

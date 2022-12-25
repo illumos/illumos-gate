@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION:
  *	bcopy should not copy from one memory location to another

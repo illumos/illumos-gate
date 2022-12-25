@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION:
  * 	Bitwise operators not supported on all types

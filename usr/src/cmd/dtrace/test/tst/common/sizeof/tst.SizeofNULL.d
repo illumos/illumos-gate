@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: The size of the inbuilt variable NULL is the same as that of an
  * integer.

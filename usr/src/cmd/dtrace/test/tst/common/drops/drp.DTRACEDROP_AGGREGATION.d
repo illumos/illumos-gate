@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma D option quiet
 #pragma D option strsize=1024
 #pragma D option aggsize=512

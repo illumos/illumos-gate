@@ -24,15 +24,11 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: test for assertion failure in the ring buffer code
  *
  * SECTION: Buffers and Buffering/ring Policy; Misc
  */
-
-#pragma ident	"@(#)tst.roch.d	1.2	03/08/11 SMI"
 
 /*
  * A script from Roch Bourbonnais that induced an assertion failure in the

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION:
  *    Calling copyoutstr() with less than 2 arguments will generate an error

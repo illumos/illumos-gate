@@ -24,9 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * ASSERTION:
  *   denormalize() should work even if normalize() isn't called.

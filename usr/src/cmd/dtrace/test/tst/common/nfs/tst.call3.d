@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Make sure nfsv3 provider probes are firing, and that the
  * arguments are properly visible.

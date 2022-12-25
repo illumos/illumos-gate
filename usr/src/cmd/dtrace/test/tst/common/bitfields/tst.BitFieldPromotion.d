@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Bit-field will be automatically promoted to the next largest
  * integer type for use in any expression and then the value assigned will

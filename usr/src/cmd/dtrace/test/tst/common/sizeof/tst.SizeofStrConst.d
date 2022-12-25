@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: sizeof returns the size in bytes of any D expression or data
  * type. When a raw string is passed to the sizeof operator, the compiler

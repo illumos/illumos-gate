@@ -24,10 +24,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * ASSERTION:
  *  An aggregation must have an aggregating function applied.

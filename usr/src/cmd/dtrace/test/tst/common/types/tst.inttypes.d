@@ -31,9 +31,6 @@
  * SECTION: Types, Operators, and Expressions/Data Types and Sizes
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
-
 BEGIN
 {
 	printf("sizeof (int8_t) = %u\n", sizeof (int8_t));

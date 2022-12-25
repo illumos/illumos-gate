@@ -24,10 +24,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * ASSERTION:
  *	The first argument to normalize() should be an aggregation.

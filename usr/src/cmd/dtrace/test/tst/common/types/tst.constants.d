@@ -32,8 +32,6 @@
  * SECTION: Types, Operators, and Expressions/Constants
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma D option quiet
 
 

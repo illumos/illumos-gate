@@ -24,10 +24,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * ASSERTION:
  *	The second argument to normalize() should be a scalar.

@@ -24,9 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * ASSERTION:
  * 	Make sure that the caller variable is safe to use at every fbt probe

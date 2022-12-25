@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Test a clause that has a body and a predicate where the
  *            predicate must be cooked first because it creates a variable.

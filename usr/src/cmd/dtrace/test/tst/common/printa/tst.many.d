@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma D option bufsize=32m
 #pragma D option bufpolicy=fill
 #pragma D option destructive

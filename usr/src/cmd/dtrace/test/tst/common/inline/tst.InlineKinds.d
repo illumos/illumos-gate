@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Test the code generation and results of the various kinds of inlines.
  * In particular, we test constant and expression-based scalar inlines,

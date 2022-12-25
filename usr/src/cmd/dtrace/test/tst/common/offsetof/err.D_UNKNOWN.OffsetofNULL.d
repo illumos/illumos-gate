@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Querying the offsetof an non-member variable of a struct throws
  * a D_UNKNOWN error.

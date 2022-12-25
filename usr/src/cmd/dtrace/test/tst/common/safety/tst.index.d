@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma D option bufsize=1000
 #pragma D option bufpolicy=ring
 #pragma D option statusrate=10ms

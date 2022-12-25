@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Test that a strtok(NULL, ...) without first calling strtok(string, ...)
  * produces an error

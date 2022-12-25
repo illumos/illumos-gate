@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Assert that a void parameter in a declaration where void is permitted
  * may not have a parameter formal name associated with it.

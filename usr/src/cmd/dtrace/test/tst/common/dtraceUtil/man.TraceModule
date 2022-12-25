@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION:
  * Tracing a module using the -m option.
@@ -62,7 +60,7 @@
  * /usr/sbin/dtrace -m profile:::profile-97
  * RESULT: not a valid probe description.
  *
- * 8) 
+ * 8)
  * /usr/sbin/dtrace -m genunix -m unix
  * RESULT: tracing of both genunix and unix probes.
  *

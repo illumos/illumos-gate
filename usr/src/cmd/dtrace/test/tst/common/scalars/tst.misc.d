@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
  * ASSERTION:
  *  Test the different kinds of integer scalar references.  In particular, we

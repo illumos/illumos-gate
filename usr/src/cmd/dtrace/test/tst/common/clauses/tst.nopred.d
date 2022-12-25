@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Test a clause that has a body but no predicate.
  * SECTION:   Program Structure / Probe Clauses and Declarations

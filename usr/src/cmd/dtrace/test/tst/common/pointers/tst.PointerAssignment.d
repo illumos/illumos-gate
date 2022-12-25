@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Pointers assignment simply copies over the pointer address in the
  * variable on the right hand side into the variable on the left hand side.

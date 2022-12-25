@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Trying to access the members of a user defined union by means of
  * a pointer to it should throw a D_ADDROF_VAR compiler error.
