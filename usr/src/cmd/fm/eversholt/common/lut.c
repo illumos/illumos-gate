@@ -31,8 +31,6 @@
  * replaced.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include "alloc.h"
 #include "out.h"

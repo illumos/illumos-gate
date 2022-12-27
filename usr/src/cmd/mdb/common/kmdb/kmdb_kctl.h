@@ -26,8 +26,6 @@
 #ifndef _KMDB_KCTL_H
 #define	_KMDB_KCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Interfaces used by the driver and mdb to interact with kmdb, and vice versa
  */

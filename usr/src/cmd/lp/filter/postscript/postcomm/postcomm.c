@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * A simple program that can be used to filter jobs for PostScript
@@ -264,7 +262,7 @@ options(int argc, char *argv[])
  * Reads and processes the command line options.  The -t option should
  * only be used when absolutely necessary.  It's slow and doesn't do
  * flow control properly.  Selecting a small block size (eg. 512 or
- * less) with with the -B option may help when you need the -t option. 
+ * less) with with the -B option may help when you need the -t option.
  *
  */
 
@@ -396,7 +394,7 @@ filter(void)
  * Responsible for sending the next file to the printer.
  * Most of the hard stuff is done in getstatus() and readline().
  * All this routine really does is control what happens for the
- * different printer states. 
+ * different printer states.
  *
  */
 
@@ -488,7 +486,7 @@ readblock(int fd_in)
  * block.  head is adjusted in writeblock() after each successful
  * write, while head and tail are reset here each time a new block is
  * read.  Returns the number of bytes left in the current block.   Read
- * errors cause the program to abort. 
+ * errors cause the program to abort.
  *
  */
 

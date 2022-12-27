@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "lpsched.h"
@@ -122,7 +119,7 @@ printer_fault(register PSTATUS *pps, register RSTATUS *prs, char *alert_text,
 	if (pps->status & PS_SHOW_FAULT)
 		schedule (EV_MESSAGE, pps);
 	else {
-		alert(A_PRINTER, pps, prs, shortWhy); 
+		alert(A_PRINTER, pps, prs, shortWhy);
 	}
 	if (why != alert_text)
 		Free (why);

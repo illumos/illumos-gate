@@ -32,8 +32,6 @@
 #ifndef	_PRIOCNTL_H
 #define	_PRIOCNTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

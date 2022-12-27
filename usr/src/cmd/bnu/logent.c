@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 static FILE	*_Lf = NULL;
@@ -120,7 +117,7 @@ register char	*text;
 }
 
 /*
- * Make entry for a command 
+ * Make entry for a command
  *	argc	-> number of command arguments
  *	argv	-> pointer array to command arguments
  * Returns:

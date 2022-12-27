@@ -8,8 +8,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 SM_RCSID("@(#)$Id: strl.c,v 1.31 2002/01/20 01:41:25 gshapiro Exp $")
 #include <sm/config.h>

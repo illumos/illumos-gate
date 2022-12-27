@@ -10,8 +10,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  This is in transition. Changed from the original bf_torek.c code
 **  to use sm_io function calls directly rather than through stdio

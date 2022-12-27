@@ -27,8 +27,6 @@
 #ifndef _KMDB_FAULT_H
 #define	_KMDB_FAULT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_kreg.h>
 
 #ifdef __cplusplus

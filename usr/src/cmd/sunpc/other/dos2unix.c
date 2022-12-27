@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
  *	Converts files from one char set to another
  *
@@ -175,8 +173,8 @@ main(int argc, char **argv)
 					usage();
 			}
 		}
-		
-	
+
+
 	argv++;
 	}
 
@@ -221,7 +219,7 @@ main(int argc, char **argv)
 			fprintf(stderr,"could not obtain system information\n");
 			(void) unlink(out_file_name);
 			exit(1);
-		
+
 		}
 		if (strcmp(sysinfo_str,"i386")) {
 			if ((kbdfd = open("/dev/kbd", O_WRONLY)) < 0) {
@@ -239,60 +237,60 @@ main(int argc, char **argv)
 			case	1:	/* United States */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	2:	/* Belgian French */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	3:	/* Canadian French */
 				dos_to_iso = &dos_to_iso_cp_863[0];
 			break;
-	
+
 			case	4:	/* Danish */
 				dos_to_iso = &dos_to_iso_cp_865[0];
 			break;
-	
+
 			case	5:	/* German */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	6:	/* Italian */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	7:	/* Netherlands Dutch */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	8:	/* Norwegian */
 				dos_to_iso = &dos_to_iso_cp_865[0];
 			break;
-	
+
 			case	9:	/* Portuguese */
 				dos_to_iso = &dos_to_iso_cp_860[0];
 			break;
-	
+
 			case	10:	/* Spanish */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	11:	/* Swedish Finnish */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	12:	/* Swiss French */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	13:	/* Swiss German */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	14:	/* United Kingdom */
 				dos_to_iso = &dos_to_iso_cp_437[0];
-	
+
 			break;
-			
+
 			default:
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
@@ -302,25 +300,25 @@ main(int argc, char **argv)
 			case CODE_PAGE_US:
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-			
+
 			case CODE_PAGE_MULTILINGUAL:
 				dos_to_iso = &dos_to_iso_cp_850[0];
 			break;
-			
+
 			case CODE_PAGE_PORTUGAL:
 				dos_to_iso = &dos_to_iso_cp_860[0];
 			break;
-			
+
 			case CODE_PAGE_CANADA_FRENCH:
 				dos_to_iso = &dos_to_iso_cp_863[0];
 			break;
-			
+
 			case CODE_PAGE_NORWAY:
 				dos_to_iso = &dos_to_iso_cp_865[0];
 			break;
 		}
-	}	
-	
+	}
+
 #endif
 #ifdef DOS_BUILD
 	if(!code_page_overide){
@@ -335,23 +333,23 @@ main(int argc, char **argv)
 			case	437:	/* United States */
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-	
+
 			case	850:	/* Multilingual */
 				dos_to_iso = &dos_to_iso_cp_850[0];
 			break;
-			
+
 			case	860:	/* Portuguese */
 				dos_to_iso = &dos_to_iso_cp_860[0];
 			break;
-			
+
 			case	863:	/* Canadian French */
 				dos_to_iso = &dos_to_iso_cp_863[0];
 			break;
-	
+
 			case	865:	/* Danish */
 				dos_to_iso = &dos_to_iso_cp_865[0];
 			break;
-	
+
 			default:
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
@@ -361,26 +359,26 @@ main(int argc, char **argv)
 			case CODE_PAGE_US:
 				dos_to_iso = &dos_to_iso_cp_437[0];
 			break;
-			
+
 			case CODE_PAGE_MULTILINGUAL:
 				dos_to_iso = &dos_to_iso_cp_850[0];
 			break;
-			
+
 			case CODE_PAGE_PORTUGAL:
 				dos_to_iso = &dos_to_iso_cp_860[0];
 			break;
-			
+
 			case CODE_PAGE_CANADA_FRENCH:
 				dos_to_iso = &dos_to_iso_cp_863[0];
 			break;
-			
+
 			case CODE_PAGE_NORWAY:
 				dos_to_iso = &dos_to_iso_cp_865[0];
 			break;
 		}
-	}	
-	
-	
+	}
+
+
 #endif
 
     /*	While not EOF, read in chars and send them to out_stream

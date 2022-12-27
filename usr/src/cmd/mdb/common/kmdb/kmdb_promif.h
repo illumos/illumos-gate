@@ -26,8 +26,6 @@
 #ifndef _KMDB_PROMIF_H
 #define	_KMDB_PROMIF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/obpdefs.h>
 #include <sys/termios.h>
 

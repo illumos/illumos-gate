@@ -32,8 +32,6 @@
  * that return lists of strings return a struct fn_list.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <libintl.h>
 #include <strings.h>

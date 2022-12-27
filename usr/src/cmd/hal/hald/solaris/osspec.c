@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
 #endif
@@ -57,7 +55,7 @@ hotplug_queue_now_empty (void)
 	}
 }
 
-void 
+void
 osspec_probe (void)
 {
 	/* add entire device tree */

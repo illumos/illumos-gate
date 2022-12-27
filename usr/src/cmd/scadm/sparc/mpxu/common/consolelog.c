@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * consolelog.c: support for the scadm consolelog option (to display the
  * service processor console log)

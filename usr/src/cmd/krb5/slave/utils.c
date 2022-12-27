@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <k5-int.h>
 #include <socket-utils.h>
 #include <inet/ip.h>

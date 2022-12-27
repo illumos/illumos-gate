@@ -3,8 +3,6 @@
 % * Use is subject to license terms.
 % */
 %
-/* %#pragma ident	"%Z%%M%	%I%	%E% SMI" *
-%
 %/*
 % *  RPC protocol information for kwarnd, the usermode daemon that
 % *  assists kinit, kdestroy with kwarnapi. It is kwarnd that executes all

@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Use of this object by a utility (so far chmod, mkdir and mkfifo use
  * it) requires that the utility implement an error-processing routine

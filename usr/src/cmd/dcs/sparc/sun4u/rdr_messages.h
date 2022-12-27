@@ -27,8 +27,6 @@
 #ifndef _RDR_MESSAGES_H
 #define	_RDR_MESSAGES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING: The contents of this file are shared by all projects
  * that  wish to  perform  remote  Dynamic Reconfiguration  (DR)

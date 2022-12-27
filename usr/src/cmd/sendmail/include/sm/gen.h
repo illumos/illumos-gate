@@ -9,8 +9,6 @@
  *	$Id: gen.h,v 1.23 2003/11/04 18:51:54 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  libsm general definitions
 **  See libsm/gen.html for documentation.

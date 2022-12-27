@@ -27,11 +27,10 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *      acctprc
- *      reads std. input (acct.h format), 
+ *      reads std. input (acct.h format),
  *      writes std. output (tacct format)
  *      sorted by uid
  *      adds login names
@@ -56,7 +55,7 @@ struct  utab    {
         float   ut_cpu[2];      /* cpu time (mins) */
         float   ut_kcore[2];    /* kcore-mins */
         long    ut_pc;          /* # processes */
-} * ub; 
+} * ub;
 static int usize;
 void **root = NULL;
 
@@ -109,7 +108,7 @@ int node_compare(const void *node1, const void *node2)
 {
 	if (((const struct utab *)node1)->ut_uid > \
 		((const struct utab *)node2)->ut_uid)
-		return(1); 
+		return(1);
 	else if (((const struct utab *)node1)->ut_uid < \
 		((const struct utab *)node2)->ut_uid)
 		return(-1);
@@ -121,7 +120,7 @@ enter(struct ptmp *p)
 {
         double memk;
         struct utab **pt;
-         
+
 	if ((ub = (struct utab *)malloc(sizeof (struct utab))) == NULL) {
 		fprintf(stderr, "acctprc: malloc fail!\n");
 		exit(2);
@@ -131,11 +130,11 @@ enter(struct ptmp *p)
         CPYN(ub->ut_name, p->pt_name);
         ub->ut_cpu[0] = MINT(p->pt_cpu[0]);
         ub->ut_cpu[1] = MINT(p->pt_cpu[1]);
-        memk = KCORE(pb.pt_mem);  
+        memk = KCORE(pb.pt_mem);
         ub->ut_kcore[0] = memk * MINT(p->pt_cpu[0]);
         ub->ut_kcore[1] = memk * MINT(p->pt_cpu[1]);
         ub->ut_pc = 1;
-         
+
         if (*(pt = (struct utab **)tsearch((void *)ub, (void **)&root,  \
                 node_compare)) == NULL) {
                 fprintf(stderr, "Not enough space available to build tree\n");
@@ -165,7 +164,7 @@ void print_node(const void *node, VISIT order, int level) {
                 fwrite(&tb, sizeof(tb), 1, stdout);
 	}
 }
- 
+
 void
 output(void)
 {

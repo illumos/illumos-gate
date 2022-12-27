@@ -27,8 +27,6 @@
 #ifndef _DISK_MONITOR_H
 #define	_DISK_MONITOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Externs for disk monitor
  */

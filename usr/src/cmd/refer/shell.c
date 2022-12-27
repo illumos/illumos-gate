@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SORTS UP.
  * IF THERE ARE NO EXCHANGES (IEX=0) ON A SWEEP

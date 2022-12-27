@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
@@ -57,7 +55,7 @@ static int parse_pw_hist_ent(current, hist)
 	  krb5_key_data *key_data = &hist->key_data[i];
 
 	  key_data->key_data_ver = 1;
-	  
+
 	  if((cp = nstrtok((char *) NULL, "\t")) == NULL) {
 	       com_err(NULL, IMPORT_BAD_RECORD, "%s", current);
 	       ret = IMPORT_FAILED;
@@ -71,7 +69,7 @@ static int parse_pw_hist_ent(current, hist)
 	       goto done;
 	  }
 	  key_data->key_data_length[0] = atoi(cp);
-	  
+
 	  if((cp = nstrtok((char *) NULL, "\t")) == NULL) {
 	       com_err(NULL, IMPORT_BAD_RECORD, "%s", current);
 	       ret = IMPORT_FAILED;
@@ -92,14 +90,14 @@ static int parse_pw_hist_ent(current, hist)
 	       cp = strchr(cp, ' ') + 1;
 	  }
      }
-     
+
 done:
      return ret;
 }
 
 /*
  * Function: parse_principal
- * 
+ *
  * Purpose: parse principal line in db dump file
  *
  * Arguments:
@@ -108,13 +106,13 @@ done:
  * Requires:
  *	principal database to be opened.
  *	nstrtok(3) to have a valid buffer in memory.
- * 
+ *
  * Effects:
  *	[effects]
  *
  * Modifies:
  *	[modifies]
- * 
+ *
  */
 int process_ov_principal(fname, kcontext, filep, verbose, linenop)
     char		*fname;
@@ -143,7 +141,7 @@ int process_ov_principal(fname, kcontext, filep, verbose, linenop)
     if((rec = (osa_princ_ent_t) malloc(sizeof(osa_princ_ent_rec))) == NULL)
 	return ENOMEM;
     memset(rec, 0, sizeof(osa_princ_ent_rec));
-    if((ret = krb5_parse_name(kcontext, cp, &princ))) 
+    if((ret = krb5_parse_name(kcontext, cp, &princ)))
 	goto done;
     krb5_unparse_name(kcontext, princ, &current);
     if((cp = nstrtok((char *) NULL, "\t")) == NULL) {
@@ -212,7 +210,7 @@ int process_ov_principal(fname, kcontext, filep, verbose, linenop)
     ret = krb5_db_get_principal(kcontext, princ, &kdb, &one, &more);
     if (ret)
 	 goto done;
-    
+
     ret = krb5_dbe_update_tl_data(kcontext, &kdb, &tl_data);
     if (ret)
 	 goto done;

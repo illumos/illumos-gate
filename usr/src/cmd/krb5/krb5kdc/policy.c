@@ -7,7 +7,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -21,13 +21,10 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Policy decision routines for KDC.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include "k5-int.h"
 #include "kdc_util.h"
@@ -44,7 +41,7 @@ against_local_policy_as(register krb5_kdc_req *request, krb5_db_entry client,
 	return KRB5KDC_ERR_POLICY;
     }
 #endif
-    
+
     return 0;			/* not against policy */
 }
 
@@ -60,13 +57,13 @@ against_local_policy_tgs(register krb5_kdc_req *request, krb5_db_entry server,
      * For example, if your site wants to disallow ticket forwarding,
      * you might do something like this:
      */
-    
+
     if (isflagset(request->kdc_options, KDC_OPT_FORWARDED)) {
 	*status = "FORWARD POLICY";
 	return KRB5KDC_ERR_POLICY;
     }
 #endif
-    
+
     return 0;				/* not against policy */
 }
 

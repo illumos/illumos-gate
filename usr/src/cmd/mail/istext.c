@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include "mail.h"
 
 /*
@@ -40,7 +37,7 @@ istext(unsigned char *s, int size)
 {
 	unsigned char *ep;
 	int c;
-	
+
 	for (ep = s+size; --ep >= s; ) {
 		c = *ep;
 		if ((!isprint(c)) && (!isspace(c)) &&

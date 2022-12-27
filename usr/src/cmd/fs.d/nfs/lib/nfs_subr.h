@@ -29,8 +29,6 @@
 #ifndef	_NFS_SUBR_H
 #define	_NFS_SUBR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef __cplusplus

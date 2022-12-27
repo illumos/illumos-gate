@@ -27,8 +27,6 @@
 #ifndef _TFTP_PRIVATE_H
 #define	_TFTP_PRIVATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Global definitions for the implementation of tftp(1).
  */

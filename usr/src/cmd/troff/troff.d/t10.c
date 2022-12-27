@@ -37,14 +37,12 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tdef.h"
 #include <ctype.h>
 #include "ext.h"
 /*
  * troff10.c
- * 
+ *
  * typesetter interface
  */
 
@@ -300,7 +298,7 @@ tchar	*pi;
 			j = -j;
 		if (isvmot(i))
 			lead += j;
-		else 
+		else
 			esc += j;
 		return(pi+outsize);
 	}
@@ -312,7 +310,7 @@ tchar	*pi;
 		if (lead)
 			ptlead();
 		fdprintf(ptid, "x X ");
-		/* 
+		/*
 	     * not guaranteed of finding a XOFF if a word overflow
 		 * error occured, so also bound this loop by olinep
 		 */
@@ -351,7 +349,7 @@ tchar	*pi;
 	if (sfbits(i) == oldbits) {
 		xfont = pfont;
 		xpts = ppts;
-	} else 
+	} else
 		xbits(i, 2);
 	if (k < 040 && k != DRAWFCN)
 		return(pi+outsize);
@@ -375,8 +373,8 @@ tchar	*pi;
 		}
 		if (iszbit(i)) {
 			if (cs)
-				w = -j; 
-			else 
+				w = -j;
+			else
 				w = 0;
 			z = 1;
 		}

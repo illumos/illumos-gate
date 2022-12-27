@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * RCM module for managing the OS Quiesce event (SUNW_OS) in a
  * clustered environment.

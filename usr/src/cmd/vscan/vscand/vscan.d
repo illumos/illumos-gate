@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 #pragma D option flowindent
 */
@@ -40,7 +38,7 @@
 sdt:vscan::vscan-req-counts
 {
 	printf("%s reql: %d, node: %d, taskq: %d",
-	    stringof(arg0), 
+	    stringof(arg0),
 	    ((vscan_svc_counts_t *)arg1)->vsc_reql,
 	    ((vscan_svc_counts_t *)arg1)->vsc_node,
 	    ((vscan_svc_counts_t *)arg1)->vsc_tq);
@@ -250,7 +248,7 @@ sdt:vscan::vscan-drv-state-violation
 		arg0 == 0 ? "UNCONFIG" :
 		arg0 == 1 ? "IDLE" :
 		arg0 == 2 ? "CONNECTED" :
-		arg0 == 3 ? "ENABLED" : 
+		arg0 == 3 ? "ENABLED" :
 		arg0 == 4 ? "DELAYED_DISABLE" : "UNKNOWN");
 }
 

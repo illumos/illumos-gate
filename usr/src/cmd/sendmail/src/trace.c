@@ -11,8 +11,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sendmail.h>
 #include <sm/debug.h>
 #include <sm/string.h>

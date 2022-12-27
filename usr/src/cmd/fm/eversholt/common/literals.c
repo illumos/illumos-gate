@@ -33,8 +33,6 @@
  * and avoid repeated calls to stable().
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include "out.h"
 #include "stable.h"

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The plgrp utility allows a user to display and modify the home lgroup and
  * lgroup affinities of the specified threads

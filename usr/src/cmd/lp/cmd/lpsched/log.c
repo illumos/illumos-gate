@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "stdarg.h"
 #include "lpsched.h"
 #include <syslog.h>
@@ -59,7 +56,7 @@ void
 fail(char *format, ...)
 {
 	va_list			ap;
-    
+
 	va_start (ap, format);
 	log (format, ap);
 	va_end (ap);
@@ -130,7 +127,7 @@ log(char *format, va_list ap)
 
 		time(&curtime);
 		if ((tm = localtime(&curtime)) != NULL)
-			fdprintf (fd, "%.2d/%.2d %.2d:%.2d:%.2d: ", 
+			fdprintf (fd, "%.2d/%.2d %.2d:%.2d:%.2d: ",
 			 	tm->tm_mon+1, tm->tm_mday, tm->tm_hour,
 				tm->tm_min, tm->tm_sec);
 		else

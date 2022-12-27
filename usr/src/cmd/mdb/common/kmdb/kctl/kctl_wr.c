@@ -24,8 +24,6 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Implements the kernel side of the debugger/kernel work queue.
  */

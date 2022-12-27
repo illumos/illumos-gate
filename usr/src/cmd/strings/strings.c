@@ -37,8 +37,6 @@
  *	Copyright (c) 1979 Regents of the University of California
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include "a.out.h"
 #include <ctype.h>

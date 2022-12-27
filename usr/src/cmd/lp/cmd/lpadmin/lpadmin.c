@@ -32,8 +32,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "stdio.h"
 #include "ctype.h"
 #include "errno.h"
@@ -98,7 +96,7 @@ main(int argc, char *argv[])
 
 	uname(&un);
 	Local_System = strdup(un.nodename);
-    
+
 	options (argc, argv);	/* process command line options */
 
 	chkopts ();		/* check for legality of options */
@@ -146,7 +144,7 @@ main(int argc, char *argv[])
 				/*NOTREACHED*/
 			}
 
-		} else 
+		} else
 			rmdest (isclass(x), x);
 
 	} else if (!p && S) {

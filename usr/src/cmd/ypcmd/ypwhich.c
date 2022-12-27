@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is a user command which tells which yp server is being used by a
  * given machine, or which yp server is the master for a named map.

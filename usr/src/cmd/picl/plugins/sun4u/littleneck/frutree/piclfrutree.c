@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PICL plug-in that creates the FRU Hierarchy for the
  * SUNW,Sun-Fire-280R (Littleneck) platform

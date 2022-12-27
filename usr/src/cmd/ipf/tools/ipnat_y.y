@@ -8,8 +8,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef  __FreeBSD__
 # ifndef __FreeBSD_cc_version
 #  include <osreldate.h>
@@ -93,7 +91,7 @@ static	void	setnatproto __P((int));
 
 %token  <num>   YY_NUMBER YY_HEX
 %token  <str>   YY_STR
-%token	  YY_COMMENT 
+%token	  YY_COMMENT
 %token	  YY_CMP_EQ YY_CMP_NE YY_CMP_LE YY_CMP_GE YY_CMP_LT YY_CMP_GT
 %token	  YY_RANGE_OUT YY_RANGE_IN
 %token  <ip6>   YY_IPV6
@@ -745,7 +743,7 @@ hostname:
 					  if ($$.v != 0)
 						nat->in_v = $$.v;
 					}
-	| ipv4				{ $$ = $1; 
+	| ipv4				{ $$ = $1;
 					  nat->in_v = 4;
 					}
 	| YY_IPV6			{ $$.a = $1;

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 /* add sitedep() and sysmatch() to list when ifdefs are removed below */
@@ -81,8 +78,8 @@ struct limits *limitval;
 	SIflag = FALSE;
 	SDflag = TRUE;
 
-/* The following #if (0 == 1) and #endif lines should be deleted when 
- * we expand the functionality of the Limits file to include the 
+/* The following #if (0 == 1) and #endif lines should be deleted when
+ * we expand the functionality of the Limits file to include the
  * limit per site, and the mode for uucico.
  */
 #if (0 == 1)
@@ -99,8 +96,8 @@ struct limits *limitval;
 		    SIflag = TRUE;
 	    }
 
-/* The following #if (0 == 1) and #endif lines should be deleted when 
- * we expand the functionality of the Limits file to include the 
+/* The following #if (0 == 1) and #endif lines should be deleted when
+ * we expand the functionality of the Limits file to include the
  * limit per site, and the mode for uucico.
  */
 #if (0 == 1)
@@ -174,8 +171,8 @@ struct limits *limitval;
 	return(SUCCESS);
 }
 
-/* The following #if (0 == 1) and #endif lines should be deleted when 
- * we expand the functionality of the Limits file to include the 
+/* The following #if (0 == 1) and #endif lines should be deleted when
+ * we expand the functionality of the Limits file to include the
  * limit per site, and the mode for uucico.
  */
 #if (0 == 1)
@@ -186,7 +183,7 @@ struct limits *limitval;
  *
  * return:
  *	SUCCESS - OK
- *	FAIL - not uucico, no system name in Limits, 
+ *	FAIL - not uucico, no system name in Limits,
  *		system's name does not match
  */
 static int
@@ -196,7 +193,7 @@ struct limits *limitval;
 {
 
 	if (!EQUALS(flds[U_SERVICE],"uucico"))
-		return FAIL; 
+		return FAIL;
 	if ((flds[U_SYSTEM] == CNULL) || (sysmatch(flds[U_SYSTEM]) != 0))
 		return FAIL;
 	if (flds[U_MAX] == CNULL)
@@ -226,7 +223,7 @@ char *p;
 
 	while (p && *p) {
 		p = nextarg(p, &arg);
-	    	if (EQUALS(arg, Rmtname)) 
+	    	if (EQUALS(arg, Rmtname))
 			return(SUCCESS);
 	}
 	return FAIL;

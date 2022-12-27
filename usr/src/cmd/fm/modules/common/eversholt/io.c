@@ -26,8 +26,6 @@
  * io.c -- input/output routines for the eft DE
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/fmd_api.h>
 #include "io.h"
 

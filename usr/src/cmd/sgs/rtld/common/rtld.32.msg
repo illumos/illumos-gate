@@ -22,7 +22,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 # Message file for cmd/sgs/rtld (ld.so.1) - 32bit specific.
 

@@ -4,7 +4,6 @@
  * Use is subject to license terms.
  *
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include <stdio.h>
 #include <sys/types.h>
 #include "lber.h"

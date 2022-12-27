@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef DEVINFO_PCI_H
 #define DEVINFO_PCI_H
 

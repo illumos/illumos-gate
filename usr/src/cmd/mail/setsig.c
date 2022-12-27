@@ -22,12 +22,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 2.	*/
 #include "mail.h"
 /*
 	Signal reset
-	signals that are not being ignored will be 
+	signals that are not being ignored will be
 	caught by function f
 		i	-> signal number
 		f	-> signal routine

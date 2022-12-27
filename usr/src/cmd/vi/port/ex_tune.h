@@ -29,7 +29,7 @@
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * Definitions of editor parameters and limits
  */

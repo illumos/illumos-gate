@@ -27,8 +27,6 @@
 #ifndef _SNOOP_VLAN_H
 #define	_SNOOP_VLAN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ethernet.h>
 
 #ifdef __cplusplus

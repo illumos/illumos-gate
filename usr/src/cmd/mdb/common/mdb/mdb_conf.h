@@ -27,8 +27,6 @@
 #ifndef	_MDB_CONF_H
 #define	_MDB_CONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/utsname.h>
 
 #ifdef	__cplusplus

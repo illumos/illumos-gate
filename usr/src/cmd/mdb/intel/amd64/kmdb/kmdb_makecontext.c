@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Context-saving routine used for pipelines.  Designed for use only
  * with kmdb_setcontext.

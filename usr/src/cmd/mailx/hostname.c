@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mailx -- a modified version of a University of California at Berkeley
  *	mail program
@@ -59,7 +57,7 @@ char domain[128];
 /*
  * Initialize the network name of the current host.
  */
-void 
+void
 inithost(void)
 {
 	register struct netmach *np;

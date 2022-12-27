@@ -26,9 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4.1.2	*/
-
 # include	<time.h>
 
 # include	"lpsched.h"
@@ -80,7 +77,7 @@ void		s_unmount_tray ( char *, MESG *);
 void		s_paper_changed ( char *, MESG *);
 void		s_paper_allowed ( char *, MESG *);
 void		s_pass_peer_connection ( char * , MESG * );
-	
+
 /**
  ** dispatch_table[]
  **/

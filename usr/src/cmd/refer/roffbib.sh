@@ -9,10 +9,6 @@
 #	All rights reserved. The Berkeley software License Agreement
 #	specifies the terms and conditions for redistribution.
 
-#! /usr/bin/sh
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #
 #	roffbib sh script
 #

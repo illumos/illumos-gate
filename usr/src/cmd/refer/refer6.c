@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "refer..c"
 #define	dsde (macro? "de" : "ds")
 #define	ifnl (macro? sep : ' ')

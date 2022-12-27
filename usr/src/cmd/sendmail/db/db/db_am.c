@@ -5,8 +5,6 @@
  *	Sleepycat Software.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 
 #ifndef lint
@@ -106,7 +104,7 @@ __db_cursor(dbp, txn, dbcp, flags)
  				if ((ret = lock_id(dbp->dbenv->lk_info,
  				    &dbc->lid)) != 0)
  					goto err;
- 
+
 			memcpy(dbc->lock.fileid, dbp->fileid, DB_FILE_ID_LEN);
 			if (F_ISSET(dbp, DB_AM_CDB)) {
 				dbc->lock_dbt.size = DB_FILE_ID_LEN;

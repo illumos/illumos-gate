@@ -33,8 +33,6 @@
  * $Id: upap.h,v 1.7 1999/11/15 01:51:54 paulus Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef __UPAP_H__
 #define __UPAP_H__
 

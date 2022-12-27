@@ -27,8 +27,6 @@
 #ifndef _TALKD_IMPL_H
 #define	_TALKD_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the header, function and global variable definitions
  * used throughout the in.talkd source.

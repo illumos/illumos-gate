@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* ctl.h describes the structure that talk and talkd pass back
    and forth
  */
@@ -54,7 +52,7 @@
 
 #define MAX_LIFE 60 /* maximum time an invitation is saved by the
 			 talk daemons */
-#define RING_WAIT 30  /* time to wait before refreshing invitation 
+#define RING_WAIT 30  /* time to wait before refreshing invitation
 			 should be 10's of seconds less than MAX_LIFE */
 
     /* the values for type */

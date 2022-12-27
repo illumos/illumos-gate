@@ -27,8 +27,6 @@
 #ifndef	_VFS_H
 #define	_VFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus

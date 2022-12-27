@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
@@ -20,7 +18,7 @@
 
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
- * 
+ *
  */
 
 /* String table of messages for kadm5_create */
@@ -103,7 +101,7 @@ gettext("%s: Created %s principal.\n");	/* whoami, princ_name */
 
 char *str_INIT_KDB = gettext("while initializing kdb.");
 
-char *str_NO_KDB = 
+char *str_NO_KDB =
 gettext("while initializing kdb.\nThe Kerberos KDC database "
 	"needs to exist in /krb5.\nIf you haven't run "
 	"kdb5_create you need to do so before running this command.");
@@ -112,14 +110,14 @@ gettext("while initializing kdb.\nThe Kerberos KDC database "
 char *str_INIT_RANDOM_KEY =
 gettext("while initializing random key generator.");
 
-char *str_TOO_MANY_ADMIN_PRINC = 
+char *str_TOO_MANY_ADMIN_PRINC =
 gettext("while fetching admin princ. Can only have one admin principal.");
 
-char *str_TOO_MANY_CHANGEPW_PRINC = 
+char *str_TOO_MANY_CHANGEPW_PRINC =
 gettext("while fetching changepw princ. "
 	"Can only have one changepw principal.");
 
-char *str_TOO_MANY_HIST_PRINC = 
+char *str_TOO_MANY_HIST_PRINC =
 gettext("while fetching history princ. "
 	"Can only have one history principal.");
 

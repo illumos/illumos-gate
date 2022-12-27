@@ -11,8 +11,6 @@
 
 #include "config.h"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef lint
 static const char sccsid[] = "@(#)db_byteorder.c	10.4 (Sleepycat) 9/4/97";
 static const char sccsi2[] = "%W% (Sun) %G%";

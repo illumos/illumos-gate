@@ -31,8 +31,6 @@
 #ifndef _TRUSS_SYSTABLE_H
 #define	_TRUSS_SYSTABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/socket.h>
 
 

@@ -38,8 +38,6 @@
  * Copyright 2019 Joyent, Inc.
  */
 
-#pragma ident	"Copyright 2010 QLogic Corporation; ql_mdb.c"
-
 #include <sys/mdb_modapi.h>
 #include <ql_apps.h>
 #include <ql_api.h>

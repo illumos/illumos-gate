@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Callback facility designed to allow interested parties (dmods, targets, or
  * even the core debugger framework) to register for notification when certain

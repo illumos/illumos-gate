@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tip.h"
 
 #define	MAXRETRY	3		/* sync up retry count */

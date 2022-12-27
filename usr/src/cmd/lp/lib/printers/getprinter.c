@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "stdio.h"
@@ -87,15 +85,15 @@ getprinter(char *name)
 	 * wherever we left off.
 	 */
 	isNameAll = STREQU(NAME_ALL, name);
-	for (; ; ) {  
-		/* fix for bug 1117241 
+	for (; ; ) {
+		/* fix for bug 1117241
 		 * occasionally when a printer is removed, a printer directory
 		 * is left behind, but the CONFIGFILE is removed.  In this
 		 * case this directory terminates the search for additional
 		 * printers as we have been returning 0 in this case.
 		 * Now, we loop back and try the next directory until
 		 * we have no more directories or we find a directory with
-		 * a CONFIGFILE 
+		 * a CONFIGFILE
 		 */
 		if (isNameAll) {
 			if (!(name = next_dir(Lp_A_Printers, &lastdir)))
@@ -176,7 +174,7 @@ getprinter(char *name)
 		 * using old versions of this routine, ignore strange
 		 * fields.
 		 */
-		if (fld >= PR_MAX) 
+		if (fld >= PR_MAX)
 			continue;
 
 		switch (fld) {

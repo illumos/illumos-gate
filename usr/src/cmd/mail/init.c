@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /*
   * All global externs defined in mail.h. All variables are initialized
   * here!
@@ -173,7 +171,7 @@ char		*home;		/* pointer to $HOME */
 time_t		iop;
 int		interactive = 0;	/* 1 says user is interactive */
 int		ismail = TRUE;		/* default to program=mail */
-int             deliverflag = FALSE;    /* -d flag, skip sendmail 
+int             deliverflag = FALSE;    /* -d flag, skip sendmail
 					 * deliver directly to mailbox
 					 */
 int             fromflag = FALSE;   /* -f from_user, set a user

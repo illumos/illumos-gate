@@ -37,9 +37,6 @@
 #include <getopt.h>
 #include "cmdparse.h"
 
-#pragma ident	"@(#)cmdparse.c	1.1	07/09/21 SMI"
-
-
 /* Usage types */
 #define	GENERAL_USAGE	1
 #define	DETAIL_USAGE	2

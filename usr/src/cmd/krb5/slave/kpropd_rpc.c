@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <iprop_hdr.h>
 #include "iprop.h"
 #include <stdio.h>

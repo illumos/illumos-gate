@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  Multi-process streaming 4.3bsd /etc/rmt server.
  *  Has three locks (for stdin, stdout, and the tape)

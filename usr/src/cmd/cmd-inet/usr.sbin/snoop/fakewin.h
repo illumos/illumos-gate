@@ -26,8 +26,6 @@
 #ifndef _FAKEWIN_H
 #define	_FAKEWIN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file defines appropriate macros so that
  * we can use the same codebase for Unix, DOS, and Windows.

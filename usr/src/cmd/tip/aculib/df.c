@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Dial the DF02-AC or DF03-AC
  */

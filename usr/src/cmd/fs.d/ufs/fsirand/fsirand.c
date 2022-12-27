@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * fsirand installs random inode generation numbers on all the inodes on
  * device <special>, and also installs a file system ID in the superblock.

@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is a user command which asks a particular ypserv which version of a
  * map it is using.  Usage is:

@@ -26,8 +26,6 @@
 #ifndef _MEMUTILS_H
 #define	_MEMUTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <note.h>
 
 #ifdef	__cplusplus

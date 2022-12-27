@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 /*
@@ -40,7 +37,7 @@
  *	fo 	-> standard output
  *	fe 	-> standard error
  * return:
- *	0		-> success 
+ *	0		-> success
  *	non zero	-> failure  -  status from child
 			(Note - -1 means the fork failed)
  */
@@ -87,7 +84,7 @@ char *cmd, *fi, *fo, *fe;
 	 */
 	if (pid == -1)
 		return(-1);
-	
+
 	while ((ret = wait(&status)) != pid)
 	    if (ret == -1 && errno != EINTR)
 		return(-1);

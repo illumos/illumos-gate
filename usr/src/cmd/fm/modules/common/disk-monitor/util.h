@@ -27,8 +27,6 @@
 #ifndef _UTIL_H
 #define	_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utility functions and macros
  */

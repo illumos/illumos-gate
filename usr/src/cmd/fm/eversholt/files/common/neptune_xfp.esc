@@ -23,12 +23,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma dictionary "NXGE"
 
 /*
- * Eversholt rules for the XFP optical transceiver inserted into 
+ * Eversholt rules for the XFP optical transceiver inserted into
  * a Neptune based NIC card.
  */
 
@@ -50,7 +48,7 @@ event ereport.io.device.nxge.xfp-err@pciexbus/pciexdev/pciexfn {within(10s)};
 event ereport.io.service.lost@pciexbus/pciexdev/pciexfn {within(10s)};
 
 /*
- * Events ereport.io.device.nxge.xfp-err and ereport.io.service.lost are 
+ * Events ereport.io.device.nxge.xfp-err and ereport.io.service.lost are
  * related because the driver calls ddi_fm_service_impact right after
  * generating the xfp-err ereport. A internal error.io.device.nxge.xfp-err
  * is generated only after the FMD has received both ereport.io.device.

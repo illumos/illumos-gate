@@ -26,8 +26,6 @@
 #ifndef	_RCAPD_CONF_H
 #define	_RCAPD_CONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <stdio.h>
 

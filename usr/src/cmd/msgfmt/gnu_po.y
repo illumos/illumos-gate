@@ -23,7 +23,6 @@
  * Copyright (c) 2001 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "gnu_msgfmt.h"
 #include "gnu_lex.h"
@@ -104,7 +103,7 @@ body	: MSGID message_string MSGSTR message_string
 		(void) memcpy(id_str + $2.len, $4.str, $4.len);
 		free($2.str);
 		free($4.str);
-		
+
 		pos1 = (struct loc *)Xmalloc(2 * sizeof (struct loc));
 		pos1[0].off = 0;
 		pos1[0].len = $2.len;
@@ -117,7 +116,7 @@ body	: MSGID message_string MSGSTR message_string
 		och1.str = id_str;
 		och1.len = len;
 		och1.pos = pos1;
-		
+
 		och2 = $6;
 		handle_message(&och1, &och2);
 		clear_state();

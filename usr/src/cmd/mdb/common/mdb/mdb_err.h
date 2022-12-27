@@ -27,8 +27,6 @@
 #ifndef	_MDB_ERR_H
 #define	_MDB_ERR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdarg.h>
 #include <errno.h>
 #include <sys/types.h>

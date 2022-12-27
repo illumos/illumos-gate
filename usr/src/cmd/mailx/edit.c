@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rcv.h"
 #include <locale.h>
 
@@ -57,7 +55,7 @@ static void edit1(int *msgvec, char *ed);
  * Edit a message list.
  */
 
-int 
+int
 editor(int *msgvec)
 {
 	char *edname;
@@ -72,7 +70,7 @@ editor(int *msgvec)
  * Invoke the visual editor on a message list.
  */
 
-int 
+int
 visual(int *msgvec)
 {
 	char *edname;
@@ -89,7 +87,7 @@ visual(int *msgvec)
  * We get the editor from the stuff above.
  */
 
-static void 
+static void
 edit1(int *msgvec, char *ed)
 {
 	register int c, lastc = '\n';
@@ -109,7 +107,7 @@ edit1(int *msgvec, char *ed)
 	 */
 
 	sigint = sigset(SIGINT, SIG_IGN);
-	sigquit = sigset(SIGQUIT, SIG_IGN); 
+	sigquit = sigset(SIGQUIT, SIG_IGN);
 	ed = safeexpand(ed);
 
 	/*

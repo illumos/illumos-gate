@@ -26,8 +26,6 @@
 #ifndef	_LIST_H
 #define	_LIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus

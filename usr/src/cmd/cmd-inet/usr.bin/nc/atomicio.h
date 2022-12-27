@@ -29,8 +29,6 @@
 #ifndef	_ATOMICIO_H
 #define	_ATOMICIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Ensure all of data on socket comes through. f==read || f==vwrite
  */

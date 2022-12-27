@@ -27,8 +27,6 @@
 #ifndef _KCTL_WR_H
 #define	_KCTL_WR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <kmdb/kmdb_wr_impl.h>
 
 #ifdef __cplusplus

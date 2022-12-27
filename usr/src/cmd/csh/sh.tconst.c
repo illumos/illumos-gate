@@ -12,15 +12,13 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * C shell
  */
 
 /*
  * These tchar constants used to be defined as
- * character string constants. 
+ * character string constants.
  */
 
 #include "sh.h"
@@ -52,7 +50,7 @@ tchar S_LBRA[] = {'{', 0};	/* { */
 tchar S_LBRASP[] = {'(', ' ', 0};	/*( */
 tchar S_LC_ALL[]={'L', 'C', '_', 'A', 'L', 'L',  0}; /*LC_ALL*/
 tchar S_LC_CTYPE[]={'L', 'C', '_', 'C', 'T', 'Y', 'P',  'E', 0}; /*LC_CTYPE*/
-tchar S_LC_MESSAGES[]={'L', 'C', '_', 
+tchar S_LC_MESSAGES[]={'L', 'C', '_',
 		   'M', 'E', 'S', 'S', 'A', 'G', 'E', 'S', 0}; /*LC_MESSAGES*/
 tchar S_LESLES[]={'<', '<', 0};
 tchar S_LPAR[] = {'(', 0};	/* ( */

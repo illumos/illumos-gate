@@ -27,8 +27,6 @@
 #ifndef	_FMD_CTL_H
 #define	_FMD_CTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <libnvpair.h>
 

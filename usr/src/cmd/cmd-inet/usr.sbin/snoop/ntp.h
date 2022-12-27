@@ -37,8 +37,6 @@
 #ifndef	_NTP_H
 #define	_NTP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

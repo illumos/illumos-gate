@@ -9,8 +9,6 @@
  *	$Id: exc.h,v 1.23 2001/06/07 20:04:53 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  libsm exception handling
 **  See libsm/exc.html for documentation.

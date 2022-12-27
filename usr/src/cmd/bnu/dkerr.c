@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Convert an error number from the Common Control into a string
  */
@@ -98,7 +95,7 @@ dkerr(err)
 
 	if ((err >= 0 && err <= 99) && err < NDKMSGS && dk_msgs[err] != 0)
 		return(dk_msgs[err]);
-	if ((err >= 100) && (err < (NDKHOMSGS + 130)) && (dk_hostmsgs[err-130] != 0)) 
+	if ((err >= 100) && (err < (NDKHOMSGS + 130)) && (dk_hostmsgs[err-130] != 0))
 		return(dk_hostmsgs[err-130]);
 	sprintf(generalmsg, "Error code %d", err) ;
 	return(generalmsg);

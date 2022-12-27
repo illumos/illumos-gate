@@ -26,8 +26,6 @@
 #ifndef	_CONF_H
 #define	_CONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -27,8 +27,6 @@
 #ifndef	_MDB_WCB_H
 #define	_MDB_WCB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_module.h>
 
 #ifdef	__cplusplus

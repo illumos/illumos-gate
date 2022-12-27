@@ -9,8 +9,6 @@
  *	$Id: misc.h,v 1.1 2006/06/28 23:57:59 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef SM_MISC_H
 # define SM_MISC_H 1
 

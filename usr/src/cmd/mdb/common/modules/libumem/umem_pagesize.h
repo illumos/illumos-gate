@@ -27,8 +27,6 @@
 #ifndef	_UMEM_PAGESIZE_H
 #define	_UMEM_PAGESIZE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

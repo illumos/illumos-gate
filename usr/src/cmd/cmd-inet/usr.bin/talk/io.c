@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * this file contains the I/O handling and the exchange of
  * edit characters. This connection itself is established in ctl.c

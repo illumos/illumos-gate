@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	acctcms [-a] [-c] [-j] [-n] [-s] [-p] [-o] [-t] [file...]
  *	summarize per-process accounting
@@ -336,7 +333,7 @@ dofile(char *fname)
 			fprintf(stderr, "acctcms: encountered bad version number\n");
 			return;
 		case 1 :
-	
+
 			while (fread(&acct.oab, sizeof(acct.oab), 1, stdin) == 1) {
 				CPYN(pcmt.pcm_comm, acct.oab.ac_comm);
 			/*

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	"uucp.h"
 
 int
@@ -67,9 +64,9 @@ char **argv;
 
 	/* find the default directory to queue to */
 
-	if (eaccess(GRADES, 04) != -1) 
+	if (eaccess(GRADES, 04) != -1)
 		svdcfile.grade = fdgrade();
-	else 
+	else
 		svdcfile.grade = D_QUEUE;
 
 	DEBUG(5, "All jobs will be placed in directory (%c) ", svdcfile.grade);

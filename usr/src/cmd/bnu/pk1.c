@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 #include "pk.h"
@@ -44,7 +41,7 @@ void xlatecntl(int, int);
 
 /*
  * Code added to allow translation of states from numbers to
- * letters, to be done in such a way as to be meaningful to 
+ * letters, to be done in such a way as to be meaningful to
  * John Q. Public
  */
 struct {
@@ -147,7 +144,7 @@ int ifn, ofn;
 /*
  * input framing and block checking.
  * frame layout for most devices is:
- *	
+ *
  *	S|K|X|Y|C|Z|  ... data ... |
  *
  *	where 	S	== initial synch byte
@@ -229,7 +226,7 @@ struct pack *ipk;
 				goto retransmit;
 			}
 		}
-		/* Validate the header */		
+		/* Validate the header */
 		Connodata++;
 		hdchk = p[1] ^ p[2] ^ p[3] ^ p[4];
 		sum = ((unsigned) p[2] & 0377) | ((unsigned) p[3] << 8);
@@ -400,7 +397,7 @@ char cntl;
 			/* NOT REACHED */
 		}
 	} else {
-		char buf[MAXPACKSIZE + HDRSIZ]; 
+		char buf[MAXPACKSIZE + HDRSIZ];
 
 		memcpy(buf, p, HDRSIZ);
 		memcpy(buf+HDRSIZ, pk->p_ob[x], pk->p_xsize);
@@ -423,7 +420,7 @@ char cntl;
  *	b	-> buffer for characters
  *	fn	-> file descriptor
  *	n	-> requested number of characters
- * return: 
+ * return:
  *	SUCCESS	-> n chars successfully read
  *	FAIL	-> o.w.
  */

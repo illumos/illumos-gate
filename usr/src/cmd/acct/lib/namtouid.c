@@ -26,7 +26,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
+
 /*
  *	namtouid converts login names to uids
  *	maintains ulist for speed only

@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "stdio.h"
 #include "string.h"
 #include "pwd.h"
@@ -185,7 +183,7 @@ void			chkopts ()
 		}
 		if (S[0] && S[1])
 			LP_ERRMSG (WARNING, E_ADM_ASINGLES);
-		if (!STREQU(NAME_ALL, *S) && !STREQU(NAME_ANY, *S)) 
+		if (!STREQU(NAME_ALL, *S) && !STREQU(NAME_ANY, *S))
 			chkopts3(1);
 		return;
 	}
@@ -300,7 +298,7 @@ void			chkopts ()
 		LP_ERRMSG (ERROR, E_ADM_ANYALLNONE);
 		done (1);
 
-	} 
+	}
 
 	/*
 	 * Allow giving -v or -U option as way of making
@@ -319,7 +317,7 @@ void			chkopts ()
 	 * to get into "chkopts2()" where a special check is made.
 	 * After "chkopts2()", "s == 0" means local.
 	 */
-	if (!STREQU(NAME_ALL, p) && !STREQU(NAME_ANY, p)) 
+	if (!STREQU(NAME_ALL, p) && !STREQU(NAME_ANY, p))
 		/*
 		 * If old printer, make sure it exists. If new printer,
 		 * check that the name is okay, and that enough is given.
@@ -420,7 +418,7 @@ void			chkopts ()
 
 	} else
 		if (
-			A || a || e || H || h || i || l || m || ( t && !M) || ( M && !t) 
+			A || a || e || H || h || i || l || m || ( t && !M) || ( M && !t)
 		     || o || U || v || Q != -1 || W != -1
 #ifdef LP_USE_PAPI_ATTR
 		     || n_opt
@@ -843,7 +841,7 @@ int			verify_form (form)
 			}
 		}
 		else {
-			
+
 		cpi_f = unpack_sdn(formbuf.cpi);
 		lpi_f = unpack_sdn(formbuf.lpi);
 		width_f = unpack_sdn(formbuf.pwid);
@@ -919,7 +917,7 @@ int			verify_form (form)
 /*
 	Second phase of parsing for -p option.
 	In a seperate routine so we can call it from other
-	routines. This is used when any or all are used as 
+	routines. This is used when any or all are used as
 	a printer name. main() loops over each printer, and
 	must call this function for each printer found.
 */
@@ -929,7 +927,7 @@ int	called_from_chkopts;
 {
 	/*
 		Only do the getprinter() if we are not being called
-		from lpadmin.c. Otherwise we mess up our arena for 
+		from lpadmin.c. Otherwise we mess up our arena for
 		"all" processing.
 	*/
 	if (!called_from_chkopts)
@@ -990,7 +988,7 @@ int	called_from_chkopts;
 #ifdef LP_USE_PAPI_ATTR
 		/*
 		 * New printer - if no model and a PPD file is defined then
-		 *               use 'standard_foomatic' otherwise use 
+		 *               use 'standard_foomatic' otherwise use
 		 *               the 'standard' model.
 		 */
 		if (!(e || i || m) && !s) {
@@ -1041,7 +1039,7 @@ int	called_from_chkopts;
 /*
 	Second phase of parsing for -S option.
 	In a seperate routine so we can call it from other
-	routines. This is used when any or all are used as 
+	routines. This is used when any or all are used as
 	a print wheel name. main() loops over each print wheel,
 	and must call this function for each print wheel found.
 */
@@ -1051,7 +1049,7 @@ int	called_from_chkopts;
 {
 	/*
 		Only do the getpwheel() if we are not being called
-		from lpadmin.c. Otherwise we mess up our arena for 
+		from lpadmin.c. Otherwise we mess up our arena for
 		"all" processing.
 	*/
 	if (!called_from_chkopts)

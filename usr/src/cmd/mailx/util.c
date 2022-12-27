@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rcv.h"
 #include <locale.h>
 
@@ -91,7 +89,7 @@ panic(char *str)
  * back to the system mailbox on exit.
  */
 
-void 
+void
 touch(int mesg)
 {
 	register struct message *mp;
@@ -109,7 +107,7 @@ touch(int mesg)
  * Return true if it is.
  */
 
-int 
+int
 isdir(char name[])
 {
 	struct stat sbuf;
@@ -123,13 +121,13 @@ isdir(char name[])
  * Count the number of arguments in the given string raw list.
  */
 
-int 
+int
 argcount(char **argv)
 {
 	register char **ap;
 
 	for (ap = argv; *ap != NOSTR; ap++)
-		;	
+		;
 	return(ap-argv);
 }
 
@@ -235,7 +233,7 @@ gethfield(
  * the desired breed.
  */
 
-int 
+int
 ishfield(char linebuf[], char field[])
 {
 	register char *cp;
@@ -275,7 +273,7 @@ hcontents(char hfield[])
  * Compare two strings, ignoring case.
  */
 
-int 
+int
 icequal(register char *s1, register char *s2)
 {
 
@@ -289,7 +287,7 @@ icequal(register char *s1, register char *s2)
  * Copy a string, lowercasing it as we go. Here dstsize is the size of
  * the destination buffer dst.
  */
-void 
+void
 istrcpy(char *dst, int dstsize, char *src)
 {
 	register char *cp, *cp2;
@@ -321,7 +319,7 @@ static struct sstack {
  * that they are no longer reading from a tty (in all probability).
  */
 
-int 
+int
 source(char name[])
 {
 	register FILE *fi;
@@ -364,7 +362,7 @@ source(char name[])
  * Update the "sourcing" flag as appropriate.
  */
 
-int 
+int
 unstack(void)
 {
 	if (ssp < 0) {
@@ -391,7 +389,7 @@ unstack(void)
  * On non-utime systems, we must sleep a second, then read.
  */
 
-void 
+void
 alter(char name[])
 {
 	int rc = utime(name, utimep);
@@ -409,7 +407,7 @@ name);
  * return true if it is all blanks and tabs.
  */
 
-int 
+int
 blankline(const char linebuf[])
 {
 	register const char *cp;
@@ -579,7 +577,7 @@ yankword(char *name, char *word, int sz, int comma)
 	return cp;
 }
 
-int 
+int
 docomma(char *s)
 {
 	return s && strpbrk(s, "(<,");
@@ -699,7 +697,7 @@ ripoff(register char *buf)
  * Are any of the characters in the two strings the same?
  */
 
-int 
+int
 anyof(register char *s1, register char *s2)
 {
 	register int c;
@@ -714,7 +712,7 @@ anyof(register char *s1, register char *s2)
  * See if the given header field is supposed to be ignored.
  * Fields of the form "Content-*" can't be ignored when saving.
  */
-int 
+int
 isign(char *field, int saving)
 {
 	char realfld[BUFSIZ];
@@ -734,7 +732,7 @@ isign(char *field, int saving)
 		return (member(realfld, ignore));
 }
 
-int 
+int
 member(register char *realfield, register struct ignore **table)
 {
 	register struct ignore *igp;
@@ -751,7 +749,7 @@ member(register char *realfield, register struct ignore **table)
  * If found, it returns the position string2 is found at,
  * otherwise it returns a -1.
  */
-int 
+int
 substr(char *string1, char *string2)
 {
 	int i, j, len1, len2;

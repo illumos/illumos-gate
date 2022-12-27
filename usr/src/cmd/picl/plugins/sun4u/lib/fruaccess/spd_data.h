@@ -27,8 +27,6 @@
 #ifndef	_SPD_DATA_H
 #define	_SPD_DATA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
-
 # include	<unistd.h>
 # include	<errno.h>
 # include	<stdlib.h>
@@ -124,7 +121,7 @@ int mputm (md, type, va_alist)
     va_end(vp);
     if (needsize <= 0)
 	return(-1);
-    
+
     if (needsize > MBPSize)
     {
 	if (MBP)
@@ -148,7 +145,7 @@ int mputm (md, type, va_alist)
     va_end(vp);
     if (needsize <= 0)
 	return(-1);
-    
+
 
     return(mwrite(md, MBP));
 }

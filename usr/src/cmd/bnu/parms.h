@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* go through this carefully, configuring for your site */
 
 /* If running SVR4, #define all of ATTSVR4, ATTSVR3, and ATTSV */
@@ -266,7 +263,7 @@
 /* define USRSPOOLLOCKS if you like your lock files in /var/spool/locks
  * be sure other programs such as 'cu' and 'ct' know about this
  *
- * WARNING: if you do not define USRSPOOLLOCKS, then $LOCK in 
+ * WARNING: if you do not define USRSPOOLLOCKS, then $LOCK in
  * uudemon.cleanup must be changed.
  */
 #define USRSPOOLLOCKS  /* define to use /var/spool/locks for LCK files */

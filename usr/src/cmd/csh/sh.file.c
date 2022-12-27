@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef FILEC
 /*
  * Tenex style file name recognition, .. and more.

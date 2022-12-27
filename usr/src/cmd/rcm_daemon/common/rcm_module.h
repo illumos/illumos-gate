@@ -27,8 +27,6 @@
 #ifndef _RCM_MODULE_H
 #define	_RCM_MODULE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

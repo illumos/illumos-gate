@@ -27,8 +27,6 @@
 #ifndef	_IPQOS_CONF_H
 #define	_IPQOS_CONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/nvpair.h>

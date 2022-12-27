@@ -11,8 +11,6 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tc.c: find character not in table to delimit fields */
 # include "t..c"
@@ -39,7 +37,7 @@ for(ilin=0;ilin<nlin;ilin++)
 		if (point(s))
 		while (*s)
 			{
-			if (*s > 0 && (unsigned char)*s <= 127)	
+			if (*s > 0 && (unsigned char)*s <= 127)
 				had[*s++]=1;
 			else
 				s++;
@@ -48,7 +46,7 @@ for(ilin=0;ilin<nlin;ilin++)
 		if (point(s))
 		while (*s)
 			{
-			if (*s > 0 && (unsigned char)*s <= 127)	
+			if (*s > 0 && (unsigned char)*s <= 127)
 				had[*s++]=1;
 			else
 				s++;

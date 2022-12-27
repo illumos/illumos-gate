@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<libelf.h>
 #include	<sys/reg.h>
 #include	<rtld_db.h>

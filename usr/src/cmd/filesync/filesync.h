@@ -33,8 +33,6 @@
 #ifndef	_FILESYNC_H
 #define	_FILESYNC_H
 
-#pragma ident	"%W%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

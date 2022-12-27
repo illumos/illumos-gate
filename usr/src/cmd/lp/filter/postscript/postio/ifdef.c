@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *
  * Conditionally compiled routines for setting up and reading the line. Things
@@ -130,7 +128,7 @@ setupline(void)
 
     	termios.c_iflag = IXON | IGNCR;
     	termios.c_oflag = 0;
-    	termios.c_cflag = HUPCL | CREAD | CS8 | stopbits | 
+    	termios.c_cflag = HUPCL | CREAD | CS8 | stopbits |
 		((line != NULL) ? baudrate : cfgetospeed(&termios));
     	termios.c_lflag = 0;
     	termios.c_cc[VMIN] = termios.c_cc[VTIME] = 0;

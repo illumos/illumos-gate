@@ -26,9 +26,6 @@
 
 /*    Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*      All Rights Reserved   */
-  
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  listdgrp.c
@@ -69,7 +66,7 @@
  *	M_DGRPTAB	Device-group table not found
  *	M_ERROR		Internal error
  */
- 
+
 #define	M_USAGE		"usage: listdgrp dgroup"
 #define	M_NODGRP	"Device group not found: %s"
 #define	M_DGRPTAB	"Cannot open device-group table: %s"
@@ -92,7 +89,7 @@
 
 /*
  *  Macros
- *	stdmsg(r,l,s,t)	    Write a message in standard format 
+ *	stdmsg(r,l,s,t)	    Write a message in standard format
  *				r	Recoverability flag
  *				l	Label
  *				s	Severity
@@ -133,7 +130,7 @@ int
 main(int argc, char **argv)
 {
 
-	/* 
+	/*
 	 *  Automatic data
 	 */
 
@@ -156,25 +153,25 @@ main(int argc, char **argv)
 	/* Only write the text component of a message (this goes away in SVR4.1) */
 	(void) putenv("MSGVERB=text");
 
-	/* 
+	/*
 	 *  Parse the command line:
 	 *	- Options
 	 *	- Device group to display
 	 */
 
-	/* 
-	 *  Extract options from the command line 
+	/*
+	 *  Extract options from the command line
 	 */
 
 	/* Initializations */
 	usageerr = FALSE;	/* No errors on the command line (yet) */
 
-	/* 
-	 *  Loop until all of the command line options have been parced 
-	 *  (and don't let getopt() write messages) 
+	/*
+	 *  Loop until all of the command line options have been parced
+	 *  (and don't let getopt() write messages)
 	 */
 
-	opterr = FALSE;	
+	opterr = FALSE;
 	while ((optchar = getopt(argc, argv, "")) != EOF) switch (optchar) {
 
 	/* Default case -- command usage error */

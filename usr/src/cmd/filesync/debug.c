@@ -49,7 +49,6 @@
  *
  *	a flaglist is merely a list of paired bits and name strings.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>

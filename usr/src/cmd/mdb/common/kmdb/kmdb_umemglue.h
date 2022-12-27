@@ -27,8 +27,6 @@
 #ifndef _KMDB_UMEMGLUE_H
 #define	_KMDB_UMEMGLUE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * kmdb interface to libumem
  */

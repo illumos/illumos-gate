@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* DO NOT EDIT: automatically built by dist/distrib. */
 #ifndef _xa_ext_h_
 #define _xa_ext_h_

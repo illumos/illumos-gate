@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mdescplugin.h"
 
 static	di_prom_handle_t	ph = DI_PROM_HANDLE_NIL;

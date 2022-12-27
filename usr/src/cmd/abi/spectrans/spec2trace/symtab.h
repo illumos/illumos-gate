@@ -27,9 +27,6 @@
 #ifndef _SYMTAB_H
 #define	_SYMTAB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

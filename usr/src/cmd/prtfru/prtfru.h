@@ -27,8 +27,6 @@
 #ifndef	_PRTFRU_H
 #define	_PRTFRU_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

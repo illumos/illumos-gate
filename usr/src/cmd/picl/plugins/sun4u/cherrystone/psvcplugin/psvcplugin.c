@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PICL Cherrystone platform plug-in to remove environment tree nodes
  * if corresponding physical device is not present.  For creating

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_types.h>
 #include <mdb/mdb_argvec.h>
 #include <mdb/mdb_string.h>

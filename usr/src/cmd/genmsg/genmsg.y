@@ -24,11 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <libintl.h>
-#include <limits.h>	
+#include <limits.h>
 #include "genmsg.h"
 extern int is_cat_found;		/* from main.c */
 extern int lineno;			/* genmsg.l */

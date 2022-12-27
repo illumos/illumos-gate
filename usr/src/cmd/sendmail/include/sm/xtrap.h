@@ -9,8 +9,6 @@
  *	$Id: xtrap.h,v 1.7 2001/04/03 01:53:01 gshapiro Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  scaffolding for testing exception handler code
 */

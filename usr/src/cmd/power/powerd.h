@@ -26,8 +26,6 @@
 #ifndef _POWERD_H
 #define	_POWERD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

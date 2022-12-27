@@ -11,8 +11,6 @@
 #ifndef __L2_PACKET_H
 #define	__L2_PACKET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

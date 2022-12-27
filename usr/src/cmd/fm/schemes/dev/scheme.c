@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/fmd_fmri.h>
 #include <fm/libtopo.h>
 #include <fm/topo_mod.h>

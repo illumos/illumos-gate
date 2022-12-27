@@ -37,8 +37,6 @@
 #ifndef	_MESSAGES_H
 #define	_MESSAGES_H
 
-#pragma ident	"%W%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -32,8 +32,6 @@
 #ifndef _KDB5_LDAP_SERVICES_H_
 #define _KDB5_LDAP_SERVICES_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ldap_misc.h"
 
 #define MAX_DN_CHARS 		256

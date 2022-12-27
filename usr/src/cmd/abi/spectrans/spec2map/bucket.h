@@ -27,8 +27,6 @@
 #ifndef	_BUCKET_H
 #define	_BUCKET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

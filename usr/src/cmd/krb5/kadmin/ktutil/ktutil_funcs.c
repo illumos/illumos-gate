@@ -3,9 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * kadmin/ktutil/ktutil_funcs.c
  *
@@ -16,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -30,7 +27,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * Utility functions for ktutil.
  */
 
@@ -130,7 +127,7 @@ krb5_error_code ktutil_add(context, list, princ_str, kvno,
     if (retval)
         return retval;
     retval = krb5_string_to_enctype(enctype_str, &enctype);
-    if (retval) 
+    if (retval)
         return KRB5_BAD_ENCTYPE;
     retval = krb5_timeofday(context, &now);
     if (retval)
@@ -158,7 +155,7 @@ krb5_error_code ktutil_add(context, list, princ_str, kvno,
 	}
 	prev = lp;
 	lp = lp->next;
-    }          
+    }
     lp->next = NULL;
     lp->entry = entry;
 
@@ -203,7 +200,7 @@ krb5_error_code ktutil_add(context, list, princ_str, kvno,
 	    retval = 0;
 	    goto cleanup;
 	}
-	
+
         lp->entry->key.enctype = enctype;
 	lp->entry->key.contents = (krb5_octet *) malloc((strlen(buf) + 1) / 2);
 	if (!lp->entry->key.contents) {

@@ -26,8 +26,6 @@
 #ifndef _KCTL_H
 #define	_KCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <kmdb/kmdb_auxv.h>
 #include <kmdb/kmdb_wr.h>
 

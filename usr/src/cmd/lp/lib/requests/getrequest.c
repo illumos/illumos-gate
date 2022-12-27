@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "stdio.h"
@@ -97,7 +95,7 @@ getrequest (file)
 	 */
 	} else if (!(path = makepath(Lp_Temp, file, (char *)0)))
 		return (0);
-    
+
 
 	if ((fd = open_locked(path, "r", 0)) < 0) {
 		Free (path);

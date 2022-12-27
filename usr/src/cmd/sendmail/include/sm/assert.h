@@ -9,8 +9,6 @@
  *	$Id: assert.h,v 1.10 2001/06/07 20:04:53 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  libsm abnormal program termination and assertion checking
 **  See libsm/assert.html for documentation.

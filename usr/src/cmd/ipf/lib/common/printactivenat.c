@@ -4,8 +4,6 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ipf.h"
 
 

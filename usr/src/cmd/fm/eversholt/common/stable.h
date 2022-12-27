@@ -35,8 +35,6 @@
 #ifndef	_ESC_COMMON_STABLE_H
 #define	_ESC_COMMON_STABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

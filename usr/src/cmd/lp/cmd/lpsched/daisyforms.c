@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lpsched.h"
 #include <syslog.h>
 
@@ -140,7 +138,7 @@ check_form_alert(FSTATUS *pfs, _FORM *pf)
 	 */
 
 	syslog(LOG_DEBUG, "check_form_alert:\n");
-	if (pfs) 
+	if (pfs)
 		syslog(LOG_DEBUG, "check_form_alert: pfs->name <%s>\n",
 			(pfs->form->name != NULL) ? pfs->form->name : "null");
 	if (pf)
@@ -198,7 +196,7 @@ check_form_alert(FSTATUS *pfs, _FORM *pf)
 
 Return:	if (pf) {
 
-		 pfs->form = pf; 
+		 pfs->form = pf;
 
 		pfs->trigger = trigger;
 	}
@@ -311,9 +309,9 @@ trayWithForm(PSTATUS *pps, FSTATUS *pfs, int startingTray, int checkAvail)
 	if (startingTray < 0)
 		startingTray = 0;
 
-	if (ppfs) { 
+	if (ppfs) {
 		for (i = startingTray; i < pps->numForms; i++)
-			if ((!checkAvail || ppfs[i].isAvailable) && 
+			if ((!checkAvail || ppfs[i].isAvailable) &&
 			    (ppfs[i].form == pfs))
 					return(i);
 	}
@@ -451,7 +449,7 @@ max_requests_needing_pwheel_mounted(char *pwheel_name)
 }
 
 /**
- ** one_printer_with_charsets() 
+ ** one_printer_with_charsets()
  **/
 
 int

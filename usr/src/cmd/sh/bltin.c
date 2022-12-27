@@ -27,7 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *
  * UNIX shell
@@ -48,7 +47,7 @@ builtin(int type, int argc, unsigned char **argv, struct trenod *t)
 	short index = initio(t->treio, (type != SYSEXEC));
 	unsigned char *a1 = argv[1];
 
-	switch (type)		
+	switch (type)
 	{
 
 	case SYSSUSP:
@@ -214,12 +213,12 @@ builtin(int type, int argc, unsigned char **argv, struct trenod *t)
 						case ENOLINK:
 							failed(a1, enolink);
 							break;
-						default: 
+						default:
 						failed(a1, baddir);
 						break;
 						}
 			}
-			else 
+			else
 			{
 				cwd(curstak());
 				if (cf(nullstr, dir) &&
@@ -233,7 +232,7 @@ builtin(int type, int argc, unsigned char **argv, struct trenod *t)
 			}
 			zapcd();
 		}
-		else 
+		else
 		{
 			if (a1)
 				error(nulldir);
@@ -256,7 +255,7 @@ builtin(int type, int argc, unsigned char **argv, struct trenod *t)
 			}
 			else
 				dolv += places;
-		}			
+		}
 
 		break;
 
@@ -328,14 +327,14 @@ builtin(int type, int argc, unsigned char **argv, struct trenod *t)
 			execexp(a1, &argv[2]);
 		break;
 
-#ifndef RES	
+#ifndef RES
 	case SYSULIMIT:
 		sysulimit(argc, argv);
 		break;
-			
+
 	case SYSUMASK:
 		if (a1)
-		{ 
+		{
 			int c;
 			mode_t i;
 
@@ -407,7 +406,7 @@ builtin(int type, int argc, unsigned char **argv, struct trenod *t)
 		execbrk = 1;
 		exitval = (a1 ? stoi(a1) : retval);
 		break;
-	
+
 	case SYSTYPE:
 		exitval = 0;
 		if (a1)

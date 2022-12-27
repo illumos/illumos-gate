@@ -27,8 +27,6 @@
 #ifndef _KMDB_CONTEXT_IMPL_H
 #define	_KMDB_CONTEXT_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_context_impl.h>
 
 #include <sys/types.h>

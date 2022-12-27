@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<stdio.h>
 #include	<math.h>
 #define	PI	3.141592654
@@ -301,8 +299,8 @@ conicarc(x, y, x0, y0, x1, y1, a, b)
 			xstep = 1;
 			ystep = (float)b / a;
 			radius = a;
-		} 
-	else {	/* a circular arc; radius is computed from center and first point */	
+		}
+	else {	/* a circular arc; radius is computed from center and first point */
 		xstep = ystep = 1;
 		radius = sqrt((float)(sqr(x0 - x) + sqr(y0 - y)));
 	}
@@ -352,7 +350,7 @@ conicarc(x, y, x0, y0, x1, y1, a, b)
 			M2y = -1;
 			M3x = 0;
 			M3y = -1;
-		} 
+		}
 	else if (ys < 0) {
 		Xs = abs(xs);
 		Ys = abs(ys);
@@ -387,7 +385,7 @@ conicarc(x, y, x0, y0, x1, y1, a, b)
 			Xt = abs(xt);
 			Yt = abs(yt);
 			qt = 2;
-		} 
+		}
 	else if (yt < 0) {
 		Xt = abs(xt);
 		Yt = abs(yt);

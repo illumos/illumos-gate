@@ -26,9 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 #ifdef	E_PROTOCOL
@@ -244,7 +241,7 @@ FILE *fp2;
 		msglen -= Erdlen;
 		Erdlen = 0;
 		DEBUG(7, "erddata remainder is %ld bytes\n", msglen);
-	}	
+	}
 
 	for (;;) {
 		len = erdblk(bufr, (int) MIN(msglen, EBUFSIZ), fn);

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* static char	elsieid[] = "@(#)ialloc.c	8.29"; */
 
 /*LINTLIBRARY*/

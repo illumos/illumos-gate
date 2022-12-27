@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * user.c: support for the scadm useradd, userdel, usershow, userpassword,
  * userperm options (administration of service processor users)

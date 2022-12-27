@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * daytime inetd service - both stream and dgram based.
  * Return human-readable time of day.

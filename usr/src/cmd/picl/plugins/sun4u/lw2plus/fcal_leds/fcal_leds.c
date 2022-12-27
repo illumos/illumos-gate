@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This plugin checks the status of FC-AL disks periodically and
  * in response to PICL events. It adjusts the state of the FC-AL LEDs

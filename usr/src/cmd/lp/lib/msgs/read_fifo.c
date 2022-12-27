@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* LINTLIBRARY */
 
 # include	<errno.h>
@@ -198,8 +196,8 @@ SyncUp:
 
     if
     (
-	   *(fbp->psave + TAIL_ENDSYNC(real_size)) != Endsync[0] 
-	|| *(fbp->psave + TAIL_ENDSYNC(real_size) + 1) != Endsync[1] 
+	   *(fbp->psave + TAIL_ENDSYNC(real_size)) != Endsync[0]
+	|| *(fbp->psave + TAIL_ENDSYNC(real_size) + 1) != Endsync[1]
     )
     {
 #if	defined(TRACE_MESSAGES)

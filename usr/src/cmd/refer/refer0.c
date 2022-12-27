@@ -13,8 +13,6 @@
  * All Rights Reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include "refer..c"
 
 FILE *in = stdin;

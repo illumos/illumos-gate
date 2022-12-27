@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Code to maintain the runtime and on-disk filehandle mapping table for
  * nfslog.

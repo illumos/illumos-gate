@@ -12,8 +12,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  The shared memory part of statusd.
 **

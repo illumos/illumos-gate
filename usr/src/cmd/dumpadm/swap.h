@@ -27,8 +27,6 @@
 #ifndef	_SWAP_H
 #define	_SWAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/swap.h>
 

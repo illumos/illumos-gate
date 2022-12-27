@@ -34,8 +34,6 @@
 #ifndef _ETM_XPORT_API_H
 #define	_ETM_XPORT_API_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

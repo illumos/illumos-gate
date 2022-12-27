@@ -28,8 +28,6 @@
 #ifndef	_FMD_CKPT_H
 #define	_FMD_CKPT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

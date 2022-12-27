@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * kmdb_terminfo_skel.c is the skeleton used to generate
  * kmdb_terminfo.c, which contains the kmdb-specific version

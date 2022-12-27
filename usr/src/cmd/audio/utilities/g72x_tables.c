@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 unsigned char	_fmultanexp[32768] = {
 	0,	1,	2,	2,	3,	3,	3,	3,
 	4,	4,	4,	4,	4,	4,	4,	4,

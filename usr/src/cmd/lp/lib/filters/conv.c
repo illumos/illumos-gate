@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.13	*/
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "string.h"
@@ -88,7 +86,7 @@ s_to_filtertype (str)
 }
 
 /**
- ** s_to_type() - CONVERT (char *) TO (TYPE) 
+ ** s_to_type() - CONVERT (char *) TO (TYPE)
  **/
 
 TYPE
@@ -126,7 +124,7 @@ s_to_template (str)
 
 	register char		*p,
 				c;
-	
+
 
 	if (!*(str += strspn(str, " "))) {
 		lp_errno = LP_ETEMPLATE;
@@ -199,7 +197,7 @@ s_to_template (str)
 		ret.keyword = 0;
 	}
 
-Done:	return (ret);		
+Done:	return (ret);
 }
 
 /**

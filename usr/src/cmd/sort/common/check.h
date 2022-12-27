@@ -27,8 +27,6 @@
 #ifndef	_SORT_CHECK_H
 #define	_SORT_CHECK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

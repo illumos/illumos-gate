@@ -21,8 +21,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Power Management Configuration File
 #
 # This entry keeps removable media from being powered down unless the

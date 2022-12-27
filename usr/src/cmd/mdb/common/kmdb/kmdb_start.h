@@ -27,8 +27,6 @@
 #ifndef _KMDB_START_H
 #define	_KMDB_START_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Used for initial initialization of kmdb
  */

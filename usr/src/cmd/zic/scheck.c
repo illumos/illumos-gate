@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* static char	elsieid[] = "@(#)scheck.c	8.17"; */
 
 /*LINTLIBRARY*/

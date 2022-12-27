@@ -27,8 +27,6 @@
 #ifndef	__RTLD_DB_H
 #define	__RTLD_DB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <proc_service.h>
 #include <thread.h>
 #include <synch.h>

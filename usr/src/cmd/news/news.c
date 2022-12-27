@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 	news foo	prints /var/news/foo
 	news -a		prints all news items, latest first
@@ -291,7 +289,7 @@ print_item(char *f)
 			printf ("(%s)", pw->pw_name);
 		else
 			printf (".....");
-		cftime(time_buf, DATE_FMT, &sbuf.st_mtime); 
+		cftime(time_buf, DATE_FMT, &sbuf.st_mtime);
 		printf (" %s\n", time_buf);
 		op = 0;
 		ip = INDENT;

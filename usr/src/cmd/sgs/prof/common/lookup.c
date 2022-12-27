@@ -23,7 +23,6 @@
  * Copyright (c) 1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Search routines for processing new-style mon.out files.

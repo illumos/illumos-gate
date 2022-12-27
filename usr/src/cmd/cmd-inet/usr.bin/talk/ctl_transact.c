@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "talk_ctl.h"
 #include <sys/time.h>
 #include <libintl.h>

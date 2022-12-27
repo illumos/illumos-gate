@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "lpsched.h"
@@ -518,7 +516,7 @@ geterrbuf(RSTATUS *prs)
 		if ((buf = Malloc(statbuf.st_size + 1)))
 			if ((n = Read(fd, buf, statbuf.st_size)) > 0) {
 				buf[n] = 0;
-				
+
 				/*
 				 * NOTE: Ignore error output with no
 				 * printable text. This hides problems we
@@ -580,7 +578,7 @@ void
 check_children(void)
 {
 	register int		i;
-    
+
 	for (i = 0; Exec_Table[i] != NULL; i++)
 		if (Exec_Table[i]->pid > 0)
 			break;

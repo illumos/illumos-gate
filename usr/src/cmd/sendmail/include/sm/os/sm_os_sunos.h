@@ -9,8 +9,6 @@
  *	$Id: sm_os_sunos.h,v 1.14 2001/08/14 18:09:42 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  platform definitions for SunOS 4.0.3, SunOS 4.1.x and Solaris 2.x
 */

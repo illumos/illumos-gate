@@ -26,8 +26,6 @@
 #ifndef	_FMADM_H
 #define	_FMADM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/fmd_adm.h>
 #include <stdio.h>
 

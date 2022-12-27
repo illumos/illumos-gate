@@ -12,8 +12,6 @@
  *	$Id: clock.h,v 1.12 2004/08/03 19:57:21 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  CLOCK.H -- for co-ordinating timed events
 */

@@ -27,8 +27,6 @@
 #ifndef	_ASN1_H
 #define	_ASN1_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

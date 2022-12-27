@@ -23,11 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma	dictionary "NXGE"
 /*
- * Eversholt rules for a XAUI card inserted in a PCI-Express slot. 
+ * Eversholt rules for a XAUI card inserted in a PCI-Express slot.
  */
 
 #define	PCIEX_DEV_FIT	1000

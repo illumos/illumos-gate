@@ -22,15 +22,13 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stddef.h>
 #include <string.h>
 #include "nstrtok.h"
 
 /*
  * Function: nstrtok
- * 
+ *
  * Purpose: the same as strtok ... just different. does not deal with
  *	    multiple tokens in row.
  *
@@ -41,13 +39,13 @@
  *
  * Requires:
  *	nuttin
- * 
+ *
  * Effects:
  *	sets last to string
  *
  * Modifies:
  *	last
- * 
+ *
  */
 
 char *
@@ -67,7 +65,7 @@ nstrtok(s, delim)
 	/*
 	 * Skip (span) leading delimiters (s += strspn(s, delim), sort of).
 	 */
-#ifdef OLD	 
+#ifdef OLD
 cont:
 	c = *s++;
 	for (spanp = delim; (sc = *spanp++) != 0;) {
@@ -82,7 +80,7 @@ cont:
 	tok = s - 1;
 #else
 	tok = s;
-#endif	
+#endif
 
 	/*
 	 * Scan token (scan for delimiters: s += strcspn(s, delim), sort of).

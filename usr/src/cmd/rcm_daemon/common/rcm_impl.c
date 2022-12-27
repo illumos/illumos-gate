@@ -22,8 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <librcm_impl.h>
 #include "rcm_impl.h"
 

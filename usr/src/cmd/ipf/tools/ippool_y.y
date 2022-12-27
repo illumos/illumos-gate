@@ -8,8 +8,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/param.h>
@@ -70,7 +68,7 @@ static	int		set_ipv6_addr = 0;
 
 %token  <num>   YY_NUMBER YY_HEX
 %token  <str>   YY_STR
-%token	  YY_COMMENT 
+%token	  YY_COMMENT
 %token	  YY_CMP_EQ YY_CMP_NE YY_CMP_LE YY_CMP_GE YY_CMP_LT YY_CMP_GT
 %token	  YY_RANGE_OUT YY_RANGE_IN
 %token  <ip6>   YY_IPV6
@@ -345,9 +343,9 @@ addrmask:
 	ipaddr '/' mask		{ $$[0] = $1; $$[1] = $3;
 				  yyexpectaddr = 0;
 				}
-	| ipaddr		{ $$[0] = $1; 
+	| ipaddr		{ $$[0] = $1;
 				  yyexpectaddr = 0;
-				  if (set_ipv6_addr) 
+				  if (set_ipv6_addr)
 				  	fill6bits(128, (u_32_t *)$$[1].in6.s6_addr);
 				  else
 				  	$$[1].in4.s_addr = 0xffffffff;

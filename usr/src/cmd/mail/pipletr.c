@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include "mail.h"
 
 int
@@ -39,7 +37,7 @@ dowait(pid_t pidval)
 	void (*istat)(), (*qstat)();
 
 	/*
-		Parent temporarily ignores signals so it will remain 
+		Parent temporarily ignores signals so it will remain
 		around for command to finish
 	*/
 	istat = signal(SIGINT, SIG_IGN);
@@ -71,8 +69,8 @@ systm(char *s)
 	pid_t	pid;
 
 	/*
-		Spawn the shell to execute command, however, since the 
-		mail command runs setgid mode reset the effective group 
+		Spawn the shell to execute command, however, since the
+		mail command runs setgid mode reset the effective group
 		id to the real group id so that the command does not
 		acquire any special privileges
 	*/

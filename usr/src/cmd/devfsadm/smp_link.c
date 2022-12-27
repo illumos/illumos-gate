@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <devfsadm.h>
 #include <strings.h>
 #include <stdlib.h>

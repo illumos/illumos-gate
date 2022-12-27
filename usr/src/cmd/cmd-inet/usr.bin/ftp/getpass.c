@@ -37,8 +37,6 @@
  *	contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ftp_var.h"
 
 static	struct termios termios_b;

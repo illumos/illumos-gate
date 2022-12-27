@@ -28,8 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 	/*
 	 *	sdiff [-l] [-s] [-w #] [-o output] file1 file2
 	 *	does side by side diff listing

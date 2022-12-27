@@ -11,8 +11,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 
 SM_IDSTR(copyright,

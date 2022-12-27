@@ -27,8 +27,6 @@
 #ifndef	_SYSEVENTD_H
 #define	_SYSEVENTD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

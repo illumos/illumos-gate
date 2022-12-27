@@ -27,8 +27,6 @@
 #ifndef _KMDB_ASMUTIL_H
 #define	_KMDB_ASMUTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef __cplusplus

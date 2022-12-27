@@ -27,8 +27,6 @@
 #ifndef _KMDB_DPI_H
 #define	_KMDB_DPI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Retargetable Kmdb/PROM interface
  */

@@ -27,8 +27,6 @@
 #ifndef	__LIBRTLD_H
 #define	__LIBRTLD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libelf.h>
 #include <rtld.h>
 #include <machdep.h>

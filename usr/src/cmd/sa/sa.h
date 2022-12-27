@@ -30,8 +30,6 @@
 #ifndef _SA_H
 #define	_SA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sa.h contains struct sa and defines variables used in sadc.c and sar.c.
  * RESTRICTION: the data types defined in this file must not be changed.

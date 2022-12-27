@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * zmalloc	- use mmap(2) to allocate memory from /dev/zero.
  * zfree	- use munmap(2) to unmap (free) memory.

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 #define MSYNC	'\020'
@@ -40,7 +37,7 @@
  * read message routine used before a
  * protocol is agreed upon.
  *	msg	-> address of input buffer
- *	fn	-> input file descriptor 
+ *	fn	-> input file descriptor
  * returns:
  *	EOF	-> no more messages
  *	0	-> message returned
@@ -95,7 +92,7 @@ int fn;
  *	type	-> message type
  *	msg	-> message body address
  *	fn	-> file descriptor
- * return: 
+ * return:
  *	Must always return 0 - wmesg (WMESG) looks for zero
  */
 int

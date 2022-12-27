@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *      test expression
  *      [ expression ]
@@ -154,7 +152,7 @@ e3(void)
 		if (eq(a, "-f"))
 			if (ucb_builtins) {
 				struct stat statb;
-			
+
 				return(stat((char *)nxtarg(0), &statb) >= 0 &&
 					(statb.st_mode & S_IFMT) != S_IFDIR);
 			}

@@ -37,11 +37,9 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * troff3.c
- * 
+ *
  * macro and string routines, storage allocation
  */
 
@@ -122,7 +120,7 @@ struct contab *rp;
 int
 munhash(mp)
 struct contab *mp;
-{	
+{
 	struct contab *p;
 	struct contab **lp;
 
@@ -226,7 +224,7 @@ casede()
 		goto de1;
 	if (ds)
 		copys();
-	else 
+	else
 		req = copyb();
 	wbfl();
 	clrmn(oldmn);
@@ -676,9 +674,9 @@ int mname;
 	lastpbp = pbp;
 	pendt = ch = 0;
 	frame = nxf;
-	if (nxf->nargs == 0) 
+	if (nxf->nargs == 0)
 		nxf += 1;
-	else 
+	else
 		nxf = (struct s *)argtop;
 	return(ip = newip);
 }
@@ -722,7 +720,7 @@ getsn()
 		return(0);
 	if (i == '(')
 		return(getrq());
-	else 
+	else
 		return(i);
 }
 
@@ -775,7 +773,7 @@ collect()
 		/*
 		 *	CPERMAC (the total # of characters for ALL arguments)
 		 *	to a macros, has been carefully chosen
-		 *	so that the distance between stack frames is < DELTA 
+		 *	so that the distance between stack frames is < DELTA
 		 */
 #define	CPERMAC	200
 #define	APERMAC	9
@@ -804,7 +802,7 @@ collect()
 		quote = 0;
 		if (cbits(i = getch()) == '"')
 			quote++;
-		else 
+		else
 			ch = i;
 		while (1) {
 			i = getch();
@@ -934,7 +932,7 @@ casetl()
 	if (ismot(delim = getch())) {
 		ch = delim;
 		delim = '\'';
-	} else 
+	} else
 		delim = cbits(delim);
 	tp = buf;
 	numtab[HP].val = 0;
@@ -1019,7 +1017,7 @@ casepm()
 		j = (filep) contab[i].mx;
 		k = 1;
 		while ((j = blist[blisti(j)]) != (unsigned) ~0) {
-			k++; 
+			k++;
 		}
 		cnt++;
 		kk += k;

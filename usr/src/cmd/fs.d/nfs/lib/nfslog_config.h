@@ -27,8 +27,6 @@
 #ifndef _NFS_NFSLOG_CONFIG_H
 #define	_NFS_NFSLOG_CONFIG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Internal configuration file API for NFS logging.
  *

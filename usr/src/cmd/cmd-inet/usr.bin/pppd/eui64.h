@@ -14,11 +14,9 @@
     IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
     WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
-    
+
     $Id: eui64.h,v 1.3 1999/09/30 19:56:37 masputra Exp $
 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef __EUI64_H__
 #define __EUI64_H__

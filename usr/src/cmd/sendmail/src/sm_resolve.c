@@ -41,8 +41,6 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sendmail.h>
 #if DNSMAP
 # if NAMED_BIND

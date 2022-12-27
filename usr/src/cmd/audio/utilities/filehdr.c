@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains a set of Very Paranoid routines to convert
  * audio file headers to in-core audio headers and vice versa.

@@ -27,8 +27,6 @@
 #ifndef	_BYTEORDER_H
 #define	_BYTEORDER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <sys/fs/ufs_fsdir.h>
 #include <sys/fs/ufs_acl.h>

@@ -30,8 +30,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ex.h"
 #include "ex_tty.h"
 
@@ -44,7 +42,7 @@
  * to confuse xstr so it will leave them alone.
  */
 unsigned char	direct[ONMSZ] =
-	{'/', 'v', 'a', 'r', '/', 't', 'm', 'p'}; 
+	{'/', 'v', 'a', 'r', '/', 't', 'm', 'p'};
 unsigned char	paragraphs[ONMSZ] = {
 #ifdef XPG4
 	'I', 'P', 'L', 'P', 'P', 'P', 'Q', 'P',		/* -ms macros */

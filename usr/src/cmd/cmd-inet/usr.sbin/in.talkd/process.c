@@ -37,9 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * process.c handles the requests, which can be of three types:
  *

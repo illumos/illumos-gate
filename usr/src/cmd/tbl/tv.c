@@ -11,8 +11,6 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-  
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tv.c: draw vertical lines */
 # include "t..c"

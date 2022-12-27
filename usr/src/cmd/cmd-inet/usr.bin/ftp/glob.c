@@ -37,8 +37,6 @@
  *	contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * C-shell glob for random programs.
  */

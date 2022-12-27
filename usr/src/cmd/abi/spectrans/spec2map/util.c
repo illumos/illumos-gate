@@ -23,7 +23,6 @@
  * Copyright (c) 1997-1999 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * util.c -- low-level utilities used by map*.c

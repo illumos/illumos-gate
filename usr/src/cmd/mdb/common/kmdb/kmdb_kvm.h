@@ -27,8 +27,6 @@
 #ifndef _KMDB_KVM_H
 #define	_KMDB_KVM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * External, non-constructor interfaces for kmdb_kvm.
  */

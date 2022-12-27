@@ -31,9 +31,6 @@
 %{
 /*	  All Rights Reserved  	*/
 %}
-%{
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%}
 
 %Start A str chc sc reg comment
 

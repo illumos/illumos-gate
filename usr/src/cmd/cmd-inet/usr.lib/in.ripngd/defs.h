@@ -35,8 +35,6 @@
 #ifndef	_IN_RIPNGD_DEFS_H
 #define	_IN_RIPNGD_DEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

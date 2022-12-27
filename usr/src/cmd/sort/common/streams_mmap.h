@@ -27,8 +27,6 @@
 #ifndef	_SORT_STREAMS_MMAP_H
 #define	_SORT_STREAMS_MMAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <regex.h>
 #include <devfsadm.h>
 #include <stdio.h>

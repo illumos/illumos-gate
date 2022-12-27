@@ -28,8 +28,6 @@
 #ifndef	_FMD_USTAT_H
 #define	_FMD_USTAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pthread.h>
 
 #ifdef	__cplusplus

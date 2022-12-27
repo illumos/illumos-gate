@@ -25,12 +25,6 @@
 
 %/* from smed.x */
 
-#ifdef RPC_HDR
-%
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%
-#endif
-
 struct	smserver_info {
 	int32_t		status;
 	int32_t		vernum;

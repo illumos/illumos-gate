@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The DPI, or debugger/PROM interface, is used to isolate the debugger from the
  * means by which we use the PROM to control the machine.

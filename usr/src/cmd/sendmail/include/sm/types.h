@@ -9,8 +9,6 @@
  *	$Id: types.h,v 1.13 2001/04/03 01:53:01 gshapiro Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  This header file defines standard integral types.
 **  - It includes <sys/types.h>, and fixes portability problems that

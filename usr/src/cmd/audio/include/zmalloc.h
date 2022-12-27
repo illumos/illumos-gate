@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_ZMALLOC_H
 #define	_MULTIMEDIA_ZMALLOC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <audio_types.h>
 
 #ifdef __cplusplus

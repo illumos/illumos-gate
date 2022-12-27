@@ -35,8 +35,6 @@
 #ifndef	__YPDEFS_H
 #define	__YPDEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

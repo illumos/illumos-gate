@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 ###########
 ##
@@ -541,7 +540,7 @@ then
 	case "$TERM" in
 		PS )
 			# make the "postscript" printers use postio to
-			# talk to the printer and periodically get a 
+			# talk to the printer and periodically get a
 			# status from them
 			FILTER="/usr/lib/lp/postscript/postio"
 		;;
@@ -881,7 +880,7 @@ fi
 
 ###########
 ##
-## Surround the job by PostScript code to produce banner 
+## Surround the job by PostScript code to produce banner
 ## and trailerpages and page headers and footers.
 ##
 ###########

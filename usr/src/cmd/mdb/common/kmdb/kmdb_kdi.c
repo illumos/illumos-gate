@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The KDI, or kernel/debugger interface, is used to allow the kernel and the
  * debugger to communicate.  These communications take two forms:

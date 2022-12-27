@@ -6,8 +6,6 @@
 #ifndef _STRING_TABLE_H
 #define	_STRING_TABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
@@ -38,7 +36,7 @@ extern "C" {
  */
 
 #ifndef _OVSEC_ADM_STRINGS_
- 
+
 extern char *str_PARSE_NAME;
 extern char *str_HISTORY_PARSE_NAME;
 extern char *str_ADMIN_PRINC_EXISTS;
@@ -67,7 +65,7 @@ extern char *str_TOO_MANY_ADMIN_PRINC;
 extern char *str_TOO_MANY_CHANGEPW_PRINC;
 extern char *str_TOO_MANY_HIST_PRINC;
 extern char *str_WHILE_DESTROYING_ADMIN_SESSION;
- 
+
 #endif /* _OVSEC_ADM_STRINGS_ */
 
 #ifdef	__cplusplus

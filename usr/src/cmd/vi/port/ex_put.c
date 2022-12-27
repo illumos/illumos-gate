@@ -29,7 +29,6 @@
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_tty.h"
@@ -206,7 +205,7 @@ normline(void)
 		slobber(linebuf[0]);
 	/* pdp-11 doprnt is not reentrant so can't use "printf" here
 	   in case we are tracing */
-	for (cp = linebuf; *cp;) 
+	for (cp = linebuf; *cp;)
 		if((n = mbtowc(&wchar, (char *)cp, MULTI_BYTE_MAX)) < 0) {
 			putoctal = 1;
 			putchar(*cp++);
@@ -504,7 +503,7 @@ fgoto(void)
 	if (destline < outline && !(cursor_address && !holdcm || cursor_up || cursor_home))
 		destline = outline;
 	if (cursor_address && !holdcm)
-		if (plod(costCM) > 0) 
+		if (plod(costCM) > 0)
 			plod(0);
 		else
 			tputs(tparm(cursor_address, destline, destcol), 0, putch);
@@ -914,7 +913,7 @@ int
 putch(char c)
 {
 
-#ifdef OLD3BTTY		
+#ifdef OLD3BTTY
 	if(c == '\n')	/* Fake "\n\r" for '\n' til fix in 3B firmware */
 		(void) putch('\r'); /* vi does "stty -icanon" => -onlcr !! */
 #endif

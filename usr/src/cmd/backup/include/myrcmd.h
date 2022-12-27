@@ -29,8 +29,6 @@
 #ifndef _MYRCMD_H
 #define	_MYRCMD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

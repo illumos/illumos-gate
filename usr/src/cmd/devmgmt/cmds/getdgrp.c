@@ -26,9 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  Implements the main body of the "getdgrp" command.
  */
@@ -79,7 +76,7 @@
  *	M_DEVTAB	Device table couldn't be opened
  *	M_DGROUP	Device-group table couldn't be opened
  */
- 
+
 #define	M_USAGE		"usage: getdgrp [-ael] [criterion [...]] [dgroup [...]]"
 #define	M_ERROR		"Internal error, errno=%d"
 #define	M_DEVTAB	"Cannot open the device table: %s"
@@ -131,7 +128,7 @@ static	char	txt[MM_MXTXTLN+1];
  *	-a	A device must meet all criteria before the device-group in
  *		which it is a member can be selected for inclusion in the
  *		generated list.  If this option is missing, a device must
- *		meet at least one criterion before it's group can be 
+ *		meet at least one criterion before it's group can be
  *		selected.  This option has no affect if there are no criterion
  *		on the command-line.
  *	-e	The list of device groups specifies groups to exclude from
@@ -145,7 +142,7 @@ static	char	txt[MM_MXTXTLN+1];
  *  Arguments:
  *	criterion	A device criterion of the form <attr><op><val> where
  *			<attr> is the name of an attribute, <op> is "=", "!=",
- *			":", or "!:" for "is equal to", "is not equal to", 
+ *			":", or "!:" for "is equal to", "is not equal to",
  *			"is defined," or "is not defined."  <val> is the value
  *			that the attribute must be equal to or not equal to.
  *			(<val> must be "*" if <op> is ":" or "!:").
@@ -164,7 +161,7 @@ int
 main(int argc, char **argv)
 {
 
-	/* 
+	/*
 	 *  Automatic data
 	 */
 
@@ -193,15 +190,15 @@ main(int argc, char **argv)
 	/* Only write the text-component of messages (this goes away in SVR4.1) */
 	(void) putenv("MSGVERB=text");
 
-	/* 
+	/*
 	 *  Parse the command line:
 	 *	- Options
 	 *	- Selection criteria
 	 *	- Device groups to include or exclude
 	 */
 
-	/* 
-	 *  Extract options from the command line 
+	/*
+	 *  Extract options from the command line
 	 */
 
 	/* Initializations */
@@ -210,14 +207,14 @@ main(int argc, char **argv)
 	allflag = FALSE;		/* No -l */
 	usageerr = FALSE;		/* No errors yet */
 
-	/* 
-	 *  Loop until all of the command line options have been parced 
+	/*
+	 *  Loop until all of the command line options have been parced
 	 */
 	opterr = FALSE;			/* Don't let getopt() write messages */
 	while ((optchar = getopt(argc, argv, "ael")) != EOF) switch (optchar) {
 
 	/* -a  List device groups that fit all of the criteria listed */
-	case 'a': 
+	case 'a':
 	    if (andflag) usageerr = TRUE;
 	    else andflag = TRUE;
 	    break;
@@ -281,13 +278,13 @@ main(int argc, char **argv)
 	arglist = argv + optind;
 	criterialist = buildcriterialist(arglist);
 	dgrouplist = builddgrouplist(arglist);
-	options = (excludeflag ? DTAB_EXCLUDEFLAG : 0) | 
-		  (andflag ? DTAB_ANDCRITERIA : 0) | 
+	options = (excludeflag ? DTAB_EXCLUDEFLAG : 0) |
+		  (andflag ? DTAB_ANDCRITERIA : 0) |
 		  (allflag ? DTAB_LISTALL : 0) ;
 
-	/* 
-	 *  Get the list of device groups that meets the criteria requested.  
-	 *  If we got a list (that might be empty), write that list to the 
+	/*
+	 *  Get the list of device groups that meets the criteria requested.
+	 *  If we got a list (that might be empty), write that list to the
 	 *  standard output file (stdout).
 	 */
 
@@ -305,9 +302,9 @@ main(int argc, char **argv)
 /*
  *  char **buildcriterialist(arglist)
  *	char **arglist
- *	
- *	This function builds a list of criteria descriptions from the 
- *	list of arguments given.  The list returned is in malloc()ed 
+ *
+ *	This function builds a list of criteria descriptions from the
+ *	list of arguments given.  The list returned is in malloc()ed
  *	space.
  *
  *  Arguments:
@@ -322,21 +319,21 @@ main(int argc, char **argv)
  */
 
 static char  **
-buildcriterialist(arglist) 
+buildcriterialist(arglist)
 	char  **arglist;	/* Pointer to the list of argument pointers */
 {
 	/*
 	 *  Automatic data
 	 */
-	
+
 	char	      **pp; 		/* Pointer to a criteria */
 	void	       *allocbuf;	/* Pointer to the allocated data */
 	int		ncriteria;	/* Number of criteria found */
 
 
 	/*
-	 *  Search the argument list, looking for the end of the list or 
-	 *  the first thing that's not a criteria.  (A criteria is a 
+	 *  Search the argument list, looking for the end of the list or
+	 *  the first thing that's not a criteria.  (A criteria is a
 	 *  character-string that contains a colon (':') or an equal-sign ('=')
 	 */
 
@@ -364,25 +361,25 @@ buildcriterialist(arglist)
  *	char  **arglist
  *
  *	This function returns a pointer to the first element in a list of
- *	device-groups (i.e. not criteria) specified in the list of arguments 
+ *	device-groups (i.e. not criteria) specified in the list of arguments
  *	whose first element is pointed to by <arglist>.
  *
  *  Arguments:
  *	arglist		The address of the first element in the list of
  *			arguments to be searched for non-criteria
- *	
+ *
  *  Returns:  char **
  *	The address of the first item in the list of arguments that are
  *	not criteria.  If none, the function returns a pointer to a
  *	null list.
- *	
+ *
  *  Note:
  *	- The current implementation returns a pointer to an element in
  *	  <arglist>.
  */
 
 static char  **
-builddgrouplist(arglist) 
+builddgrouplist(arglist)
 	char  **arglist;	/* First item in the list of arguments */
 {
 	/*
@@ -390,8 +387,8 @@ builddgrouplist(arglist)
 	 */
 
 	/*
-	 *  Search the argument list, looking for the end of the list or 
-	 *  the first thing that's not a criteria.  It is the first device 
+	 *  Search the argument list, looking for the end of the list or
+	 *  the first thing that's not a criteria.  It is the first device
 	 *  group in the list of device groups (if any).
 	 */
 

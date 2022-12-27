@@ -26,8 +26,6 @@
 #ifndef _RCAPD_H
 #define	_RCAPD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -5,8 +5,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef bam_AUTO_H
 #define bam_AUTO_H
 

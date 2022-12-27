@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is the environmental plug-in configuration file for
  * Taco platform.
@@ -54,7 +52,7 @@ VERBOSE 1
 #define	SENSOR_SYS_OUT		sys-out
 #define	SENSOR_INT_AMB_1	int-amb1
 
-/* 
+/*
  * Hard disk sensor ids
  */
 #define	ENV_DISK0		hard-disk0

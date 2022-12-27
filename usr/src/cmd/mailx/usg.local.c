@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mailx -- a modified version of a University of California at Berkeley
  *	mail program
@@ -56,7 +54,7 @@ static	int ismailbox(char *file);
  * mail is queued).  In SVr4 UNIX, it is in /var/mail/name.
  * In preSVr4 UNIX, it is in either /usr/mail/name or /usr/spool/mail/name.
  */
-void 
+void
 findmail(char *name)
 {
 	register char *cp;

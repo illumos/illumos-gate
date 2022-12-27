@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define UUCHECK
 int Uerrors = 0;	/* error count */
 
@@ -137,7 +134,7 @@ char *argv[];
 
     if (verbose) printf("*** uucheck:  Check Required Files and Directories\n");
     for (tabptr = tab; tabptr->name != NULL; tabptr++) {
-        if (stat(tabptr->value, &statbuf) < 0) { 
+        if (stat(tabptr->value, &statbuf) < 0) {
 	    fprintf(stderr, "%s - ", tabptr->name);
 	    perror(tabptr->value);
 	    Uerrors++;

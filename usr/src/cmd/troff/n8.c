@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<ctype.h>
 #include	"tdef.h"
 #include "ext.h"
@@ -46,7 +44,7 @@
 
 /*
  * troff8.c
- * 
+ *
  * hyphenation
  */
 
@@ -84,7 +82,7 @@ hyphen(wp)
 	if (!exword() && !suffix())
 		digram();
 	*hyp++ = 0;
-	if (*hyptr) 
+	if (*hyptr)
 		for (j = 1; j; ) {
 			j = 0;
 			for (hyp = hyptr + 1; *hyp != 0; hyp++) {
@@ -192,7 +190,7 @@ exword()
 			return(0);
 		w = wdstart;
 		while (*e && w <= hyend && (*e & 0177) == maplow(cbits(*w))) {
-			e++; 
+			e++;
 			w++;
 		};
 		if (!*e) {
@@ -207,10 +205,10 @@ exword()
 				}
 				return(1);
 			} else {
-				e++; 
+				e++;
 				continue;
 			}
-		} else 
+		} else
 			while (*e++)
 				;
 	}
@@ -250,7 +248,7 @@ again:
 	}
 	s = s0 + i - 1;
 	w = hyend;
-	if (*s0 & HY_BIT) 
+	if (*s0 & HY_BIT)
 		goto mark;
 	while (s > s0) {
 		w--;
@@ -276,7 +274,7 @@ int
 maplow(i)
 int	i;
 {
-	if (ischar(i) && isupper(i)) 
+	if (ischar(i) && isupper(i))
 		i = tolower(i);
 	return(i);
 }
@@ -311,7 +309,7 @@ tchar *w;
 
 
 int
-digram() 
+digram()
 {
 	tchar *w;
 	int	val;
@@ -334,7 +332,7 @@ again:
 			val *= dilook('a', cbits(*w), bxh);
 		else if (w == wdstart + 1)
 			val *= dilook(cbits(*(w-1)), cbits(*w), bxxh);
-		else 
+		else
 			val *= dilook(cbits(*(w-1)), cbits(*w), xxh);
 		val *= dilook(cbits(*w), cbits(*(w+1)), xhx);
 		val *= dilook(cbits(*(w+1)), cbits(*(w+2)), hxx);

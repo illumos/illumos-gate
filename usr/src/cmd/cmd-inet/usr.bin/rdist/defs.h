@@ -18,8 +18,6 @@
 #ifndef	_DEFS_H
 #define	_DEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

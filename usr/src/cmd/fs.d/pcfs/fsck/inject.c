@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * fsck_pcfs -- inject.c
  *	Debugging routine that will insert random errors into the reads,

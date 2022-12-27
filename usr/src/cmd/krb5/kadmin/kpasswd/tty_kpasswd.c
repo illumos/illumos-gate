@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
@@ -25,7 +23,7 @@
 
 /*
  * Copyright 1993-1994 OpenVision Technologies, Inc., All Rights Reserved.
- * 
+ *
  * $Header: /cvs/krbdev/krb5/src/kadmin/passwd/tty_kpasswd.c,v 1.9 2001/02/26 18:22:08 epeisach Exp $
  *
  *

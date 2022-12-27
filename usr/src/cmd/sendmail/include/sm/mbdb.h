@@ -9,8 +9,6 @@
  *	$Id: mbdb.h,v 1.6 2002/05/24 20:50:14 gshapiro Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef SM_MBDB_H
 # define SM_MBDB_H
 

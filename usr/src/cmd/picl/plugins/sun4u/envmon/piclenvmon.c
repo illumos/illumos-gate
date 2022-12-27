@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This plugin creates PICL nodes and properties for objects handled through
  * the enhanced LOMV system-processor interface.

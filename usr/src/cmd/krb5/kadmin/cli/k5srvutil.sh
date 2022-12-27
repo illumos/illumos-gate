@@ -4,10 +4,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 TEXTDOMAIN=SUNW_OST_OSCMD
 export TEXTDOMAIN
@@ -52,7 +48,7 @@ interactive_prompt() {
     esac
     return 1
     }
-    
+
 cmd_error() {
     echo $@ 2>&1
     }
@@ -126,7 +122,7 @@ while [ $# -gt 0 ] ; do
 	;;
 	esac
 done
-	
+
 
 case $command in
     $CHANGE)

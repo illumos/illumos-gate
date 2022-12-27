@@ -26,8 +26,6 @@
 #ifndef	_DM_PLATFORM_H
 #define	_DM_PLATFORM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dm_types.h"
 
 #ifdef	__cplusplus

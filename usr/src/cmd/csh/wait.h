@@ -13,8 +13,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file holds definitions relevant to the wait system call.
  * Some of the options here are available only through the ``wait3''

@@ -32,8 +32,6 @@
  * $Id: login.c,v 1.8 2004/03/19 01:49:48 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/stat.h>

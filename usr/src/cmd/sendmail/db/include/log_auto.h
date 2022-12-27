@@ -5,8 +5,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef log_AUTO_H
 #define log_AUTO_H
 

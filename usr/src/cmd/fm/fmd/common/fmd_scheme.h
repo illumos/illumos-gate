@@ -27,8 +27,6 @@
 #ifndef	_FMD_SCHEME_H
 #define	_FMD_SCHEME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libnvpair.h>
 #include <pthread.h>
 

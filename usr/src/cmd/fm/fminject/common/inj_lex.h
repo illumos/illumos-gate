@@ -27,8 +27,6 @@
 #ifndef _INJ_LEX_H
 #define	_INJ_LEX_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -23,12 +23,10 @@
  * Copyright 1995 Sun Microsystems Inc.
  * All rights reserved.
  */
-							    
+
 
 #ifndef	__TABLE_H
 #define	__TABLE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"        /* SMI4.1 1.4 */
 
 #ifdef	__cplusplus
 extern "C" {

@@ -19,7 +19,5 @@
  * $Id: magic.h,v 1.3 1994/09/21 06:47:37 paulus Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 void magic_init __P((void));	/* Initialize the magic number generator */
 u_int32_t magic __P((void));	/* Returns the next magic number */

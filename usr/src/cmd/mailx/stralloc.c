@@ -39,8 +39,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mailx -- a modified version of a University of California at Berkeley
  *	mail program
@@ -155,7 +153,7 @@ srealloc(void *optr, unsigned size)
  * Called to free all strings allocated
  * since last reset.
  */
-void 
+void
 sreset(void)
 {
 	register struct strings *sp;

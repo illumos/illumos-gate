@@ -9,8 +9,6 @@
  *	$Id: debug.h,v 1.16 2003/01/10 00:26:06 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  libsm debugging and tracing
 **  See libsm/debug.html for documentation.

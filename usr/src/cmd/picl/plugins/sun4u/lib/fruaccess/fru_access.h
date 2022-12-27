@@ -27,8 +27,6 @@
 #ifndef _FRU_ACCESS_H
 #define	_FRU_ACCESS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <picl.h>
 #include <door.h>

@@ -27,8 +27,6 @@
 #ifndef	_LOG_H
 #define	_LOG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus

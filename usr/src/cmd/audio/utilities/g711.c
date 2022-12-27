@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* 8-bit A-law to 16-bit signed PCM */
 short	_alaw2linear[256] = {
 	-5504,	-5248,	-6016,	-5760,	-4480,	-4224,	-4992,	-4736,

@@ -26,8 +26,6 @@
 #ifndef	_KVM_ISADEP_H
 #define	_KVM_ISADEP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus

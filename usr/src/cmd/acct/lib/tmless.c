@@ -26,7 +26,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
+
 /*
  *	return 1 if t1 earlier than t2 (times in localtime format)
  *	assumed that t1 and t2 are in same day

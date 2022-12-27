@@ -28,8 +28,6 @@
 #ifndef	_FMD_BUF_H
 #define	_FMD_BUF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

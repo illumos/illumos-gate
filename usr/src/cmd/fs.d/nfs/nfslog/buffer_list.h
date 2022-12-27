@@ -27,8 +27,6 @@
 #ifndef _BUFFER_LIST_H
 #define	_BUFFER_LIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

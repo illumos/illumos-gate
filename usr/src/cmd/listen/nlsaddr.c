@@ -29,8 +29,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * nlsaddr.c:
  *
@@ -98,7 +96,7 @@
 /*
  * nlscalloc:	allocate a call structure large enough to hold the
  *		external representation of the addr, opt and udata fields.
- *		similar to the way t_alloc works for the internal 
+ *		similar to the way t_alloc works for the internal
  *		representation of an address.
  *
  *		returns a pointer to the t_call strucure if successful,
@@ -196,7 +194,7 @@ int len;
  *		buffers contents are undefined if:
  *
  *		A.  The receiving buffer is not large enough. (rc = -1)
- *		B.  If 'charaddr' does not contain a series of octets 
+ *		B.  If 'charaddr' does not contain a series of octets
  *		    (strlen(charaddr) must be even). (rc = -2)
  *		C.  Any character in 'charaddr' is not an ASCII hex digit.
  *		    (rc = -3)

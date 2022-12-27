@@ -27,8 +27,6 @@
 #ifndef	_FMD_IDSPACE_H
 #define	_FMD_IDSPACE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <pthread.h>
 

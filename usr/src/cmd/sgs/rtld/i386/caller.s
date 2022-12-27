@@ -25,7 +25,6 @@
  *
  * Return the pc of the calling routine.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	defined(lint)
 

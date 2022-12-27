@@ -35,8 +35,6 @@
 #ifndef	SM_TAILQ_H_
 #define	SM_TAILQ_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * $Id: tailq.h,v 1.2 2007/06/29 23:09:57 ca Exp $
  *
@@ -71,8 +69,8 @@ struct {								\
 	struct type **tqe_prev;	/* address of previous next element */	\
 }
 
-/* 
- * tail queue access methods 
+/*
+ * tail queue access methods
  */
 #define	SM_TAILQ_FIRST(head)		((head)->tqh_first)
 #define	SM_TAILQ_END(head)		NULL

@@ -34,8 +34,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * rwall_subr.c
  *	The server procedure for rwalld

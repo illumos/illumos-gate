@@ -27,8 +27,6 @@
 #ifndef	_FMD_TIMERQ_H
 #define	_FMD_TIMERQ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pthread.h>
 #include <time.h>
 

@@ -26,7 +26,6 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"machdep.h"
 #include	"_audit.h"
@@ -115,7 +114,7 @@ elf_rtbndr(Rt_map *lmp, unsigned long pltoff, caddr_t from)
 	ldx	[%o1 + 0x40], %o0	! ld PLT2[X] into third arg
 	srl	%i0, 10, %o1		! shift offset set by sethi
 	call	elf_bndr		! returns function address in %o0
-	mov	%i3, %o2		! Callers address is arg 3	
+	mov	%i3, %o2		! Callers address is arg 3
 	mov	%o0, %g1		! save address of routine binded
 	mov	%l5, %g4		! restore g4
 	restore				! how many restores needed ? 2
@@ -250,14 +249,14 @@ elf_plt_init(void *plt, caddr_t bindfunc)
 	or	%o4, %lo(M_MOV_G1O0), %o4
 	st	%o4, [%i0 + 0x1c]	! Store instruction in plt[7]
 	iflush	%i0 + 0x18		! .. and flush
-	
+
 	ret
 	restore
 	SET_SIZE(elf_plt_init)
 #endif
 
 
-	
+
 
 #if	defined(lint)
 /*
@@ -278,7 +277,7 @@ elf_plt2_init(unsigned int *plt2, Rt_map * lmp)
 	SET_SIZE(elf_plt2_init)
 #endif
 
-	
+
 
 /*
  * After the first call to a plt, elf_bndr() will have determined the true
@@ -427,7 +426,7 @@ plt_upper_32(uintptr_t pc, uintptr_t symval)
 	iflush	%o0			! .. and flush
 	SET_SIZE(plt_upper_32)
 #endif	/* defined lint */
-	
+
 
 #if	defined(lint)
 
@@ -614,8 +613,8 @@ elf_plt_trace()
  *	0x20			symdef.st_value
  *	0x28			symdef.st_size
  */
-#define	REFLMP_OFF		0x0	
-#define	DEFLMP_OFF		0x8	
+#define	REFLMP_OFF		0x0
+#define	DEFLMP_OFF		0x8
 #define	SYMNDX_OFF		0x10
 #define	SBFLAGS_OFF		0x14
 #define	SYMDEF_OFF		0x18
@@ -623,7 +622,7 @@ elf_plt_trace()
 
 #define	LAREGSSZ	0x40	/* sizeof (La_sparcv9_regs) */
 
-	
+
 elf_plt_trace:
 1:	call	2f
 	sethi	%hi(_GLOBAL_OFFSET_TABLE_ - (1b - .)), %l7
@@ -634,7 +633,7 @@ elf_plt_trace:
 	lduw	[%l1 + SBFLAGS_OFF], %l2		! l2 = sb_flags
 	andcc	%l2, LA_SYMB_NOPLTENTER, %g0
 	be,pt	%icc, .start_pltenter
-	ldx	[%l1 + SYMDEF_VALUE_OFF], %l0	! l0 = 
+	ldx	[%l1 + SYMDEF_VALUE_OFF], %l0	! l0 =
 						!  sym.st_value(calling address)
 	ba,a,pt	%icc, .end_pltenter
 	nop
@@ -734,7 +733,7 @@ elf_plt_trace:
 	ble,pn	%icc, .grow_stack
 	sub	%l2, 6, %l2
 	sllx	%l2, CLONGSHIFT, %l2		! arg count * 8
-	cmp	%l1, %l2			! 
+	cmp	%l1, %l2			!
 	ble,a,pn	%icc, .grow_stack
 	nop
 	mov	%l2, %l1

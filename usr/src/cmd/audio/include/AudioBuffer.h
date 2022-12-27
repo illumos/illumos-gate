@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOBUFFER_H
 #define	_MULTIMEDIA_AUDIOBUFFER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <AudioStream.h>
 
 #ifdef __cplusplus

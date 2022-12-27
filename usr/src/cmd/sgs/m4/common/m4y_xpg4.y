@@ -31,7 +31,6 @@
 /*	  All Rights Reserved  	*/
 
 %{
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 extern long	evalval;
 #define	YYSTYPE	long
 %}

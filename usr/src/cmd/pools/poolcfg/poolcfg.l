@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #pragma       error_messages(off, E_STATEMENT_NOT_REACHED)
 
 /*
@@ -61,7 +60,7 @@
  * matched, the stored state is entered and the additional state specific
  * matching regular expressions become available. Once a state specific
  * token is matched, the default state is restored.
- * 
+ *
  */
 #include <stdlib.h>
 #include <sys/types.h>

@@ -23,8 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= biosdev
 
@@ -40,7 +38,7 @@ LDLIBS +=	-ldevinfo
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 .PARALLEL: $(OBJS)
 
@@ -48,7 +46,7 @@ $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $(PROG)  $(LDLIBS)
 	$(POST_PROCESS)
 
-install: $(ROOTSBINPROG) 
+install: $(ROOTSBINPROG)
 
 clean:
 	$(RM) $(OBJS)

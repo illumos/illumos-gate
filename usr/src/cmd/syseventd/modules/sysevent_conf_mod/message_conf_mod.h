@@ -28,8 +28,6 @@
 #ifndef	_MESSAGE_CONF_MOD_H
 #define	_MESSAGE_CONF_MOD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

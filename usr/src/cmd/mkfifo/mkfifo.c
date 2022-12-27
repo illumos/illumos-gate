@@ -28,8 +28,6 @@
 /*	  All Rights Reserved					*/
 /*								*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<stdlib.h>
 #include	<sys/types.h>
 #include	<sys/stat.h>

@@ -7,8 +7,6 @@
  * the sendmail distribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  SENDMAIL.H -- MTA-specific definitions for sendmail.
 */

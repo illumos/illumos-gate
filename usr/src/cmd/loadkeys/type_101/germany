@@ -1,6 +1,4 @@
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -40,7 +38,7 @@ key 8 base 7 shift / caps 7 ctrl 7 altg {
 key 9 base 8 shift ( caps 8 ctrl ^[ altg [
 key 10 base 9 shift ) caps 9 ctrl ^] altg ]
 key 11 base 0 shift = caps 0 ctrl 0 altg }
-key 12 base ß shift ? caps ß ctrl ^\ altg '\\' 
+key 12 base ß shift ? caps ß ctrl ^\ altg '\\'
 key 13 base fa_acute shift fa_grave caps fa_acute ctrl fa_acute altg nop
 key 14 all hole
 key 15 base '\b' shift '\b' caps '\b' ctrl '\b' altg nop

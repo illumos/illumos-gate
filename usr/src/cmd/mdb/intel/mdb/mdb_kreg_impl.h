@@ -27,8 +27,6 @@
 #ifndef _MDB_KREG_IMPL_H
 #define	_MDB_KREG_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_kreg.h>
 
 #ifdef __cplusplus

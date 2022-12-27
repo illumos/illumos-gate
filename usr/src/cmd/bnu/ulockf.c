@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 #include <unistd.h>
@@ -142,7 +139,7 @@ register char *name;
 	    DEBUG(4, "--ok to remove lock file (%s)\n", name);
 	}
 unlk:
-	
+
 	if (unlink(name) != 0) {
 		DEBUG(4,"ulockf failed in unlink()\n%s", "");
 		return(FAIL);
@@ -264,10 +261,10 @@ char *name;
 	/*
 	 * if name has a '/' in it, then it's a device name and it's
 	 * not in /dev (i.e., it's a remotely-mounted device or it's
-	 * in a subdirectory of /dev).  in either case, creating our normal 
+	 * in a subdirectory of /dev).  in either case, creating our normal
 	 * lockfile (/var/spool/locks/LCK..<dev>) is going to bomb if
-	 * <dev> is "/remote/dev/term/14" or "/dev/net/foo/clone", so never 
-	 * mind.  since we're using advisory filelocks on the devices 
+	 * <dev> is "/remote/dev/term/14" or "/dev/net/foo/clone", so never
+	 * mind.  since we're using advisory filelocks on the devices
 	 * themselves, it'll be safe.
 	 *
 	 * of course, programs and people who are used to looking at the
@@ -297,7 +294,7 @@ static int
 onelock(pid,tempfile,name)
 char *pid;
 char *tempfile, *name;
-{	
+{
 	register int fd;
 	char	cb[100];
 
@@ -360,8 +357,8 @@ int fd;
 
     if ( mklock(lockname) == FAIL )
 	return(FAIL);
- 
-    while ( lockf(fd, F_TLOCK, 0L) != 0 ) {	
+
+    while ( lockf(fd, F_TLOCK, 0L) != 0 ) {
 	DEBUG(7, "fd_mklock: lockf returns %d\n", errno);
 	if ( (++tries >= MAX_LOCKTRY) || (errno != EAGAIN) ) {
 	    rmlock(lockname);
@@ -431,7 +428,7 @@ int fd;
  *
  * return -
  *	SUCCESS - both BNU lock file and advisory locks removed
- *	FAIL - 
+ *	FAIL -
  */
 
 GLOBAL void

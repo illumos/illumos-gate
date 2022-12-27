@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "errno.h"
@@ -75,7 +73,7 @@ open_filtertable(char *file, char *mode)
 		freeit = 1;
 	} else
 		freeit = 0;
-	
+
 	fd = open_locked(file, mode, MODE_READ);
 
 	if (freeit)

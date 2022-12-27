@@ -9,8 +9,6 @@
  *	$Id: limits.h,v 1.6 2001/03/08 03:23:08 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  <sm/limits.h>
 **  This header file is a portability wrapper for <limits.h>.

@@ -34,8 +34,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * rwall.c
  *	The client rwall program

@@ -27,8 +27,6 @@
 #ifndef	_MY_ALLOC_H
 #define	_MY_ALLOC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

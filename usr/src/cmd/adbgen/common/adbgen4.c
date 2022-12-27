@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Post-process adb scripts to move increment and decrement around.
  * The reason is that at the start of each +/ line, adb prints out

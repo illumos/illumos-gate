@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	uucleanup - This is a program based on the heuristics
  *	for cleaning up and doing something
@@ -92,7 +89,7 @@
 
 extern int _age();		/* find the age of a file */
 extern void procdtype(), oprocess(), xprocess(), cprocess();
-extern void dXprocess(), dNprocess(), dMprocess(), dDprocess(), wprocess(); 
+extern void dXprocess(), dNprocess(), dMprocess(), dDprocess(), wprocess();
 extern int toWho(), sendMail(), execRnews();
 extern void logit();
 
@@ -1035,7 +1032,7 @@ char *line, *user, *system;
 
 	if (!PREFIX("From ", line) && !PREFIX(">From ", line))
 		return(0);
-	
+
 	s = strchr(line, ' ') + 1;
 	for (i = 0;  *s && *s != ' ' && *s != '\n'; i++)
 		user[i] = *s++;
@@ -1109,5 +1106,5 @@ cleanworkspace(void)
 		if (_age(f) >= 1)
 			if (unlink(f) != 0)
 				(void) fprintf(stderr, "CAN'T UNLINK (%s): errno (%d)\n", f, errno);
-				
+
 }

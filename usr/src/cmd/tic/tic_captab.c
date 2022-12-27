@@ -33,8 +33,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	comp_captab.c -- The names of the capabilities in a form ready for
  *		         the making of a hash table for the compiler.

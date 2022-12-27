@@ -5,8 +5,6 @@
  *	Sleepycat Software.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 
 #ifndef lint
@@ -81,7 +79,7 @@ __db_rmid_to_env(rmid, envp, open_ok)
 	if (__os_calloc(1, sizeof(DB_ENV), &env) != 0)
 		return (1);
 
-	if (db_appinit(dbhome, NULL, env, XA_FLAGS) != 0) 
+	if (db_appinit(dbhome, NULL, env, XA_FLAGS) != 0)
 		goto err;
 
 	if (__db_map_rmid(rmid, env) != 0)

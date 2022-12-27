@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.17	*/
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "stdio.h"
@@ -125,7 +123,7 @@ rdform(char *name, FORM *formp, int fd, int (*error_handler)( int , int , int ),
 
 		fld = _search_fheading(buf);
 		if (fld >= FO_MAX) {
-			lp_errno = LP_EBADHDR; 
+			lp_errno = LP_EBADHDR;
 BadFile:		errno = EBADF;
 			if (error_handler) {
 				if ((*error_handler)(errno, lp_errno, linenum) == -1)

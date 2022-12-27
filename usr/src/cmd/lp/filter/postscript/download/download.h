@@ -30,8 +30,6 @@
 #ifndef	_DOWNLOAD_H
 #define	_DOWNLOAD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cpluplus
 extern {
 #endif

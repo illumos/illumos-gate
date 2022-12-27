@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines to handle getipnode* calls in nscd. Note that the
  * getnodeby* APIs were renamed getipnodeby*. The interfaces

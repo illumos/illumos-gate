@@ -24,8 +24,6 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * file_object.c - enter objects into and load them from the backend
  *

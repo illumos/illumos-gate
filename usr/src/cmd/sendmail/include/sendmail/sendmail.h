@@ -13,8 +13,6 @@
  *	$Id: sendmail.h,v 8.68 2002/07/01 22:18:53 gshapiro Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  SENDMAIL.H -- Global definitions for sendmail.
 */

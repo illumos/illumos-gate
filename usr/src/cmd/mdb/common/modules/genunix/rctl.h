@@ -27,8 +27,6 @@
 #ifndef	_MDB_RCTL_H
 #define	_MDB_RCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus

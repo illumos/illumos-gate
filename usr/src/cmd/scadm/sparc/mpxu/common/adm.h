@@ -27,8 +27,6 @@
 #ifndef __ADM_H__
 #define	__ADM_H__
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

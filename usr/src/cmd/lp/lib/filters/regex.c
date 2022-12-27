@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "sys/types.h"
@@ -112,7 +110,7 @@ replace (pp, result, value)
 				ncount += strlen(SRC)
 
 
-	if (pp)   
+	if (pp)
 		p = *pp;
 
 	for (q = result; *q; q++)  switch (*q) {

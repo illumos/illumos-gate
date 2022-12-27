@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 # include	<stdarg.h>
 # include	<limits.h>
 # include	<sys/types.h>
@@ -81,7 +78,7 @@ void take_message(void)
 	      default:
 		fail ("Unexpected streams error in mlisten (%s).\n" , PERROR);
 	    }
-	
+
 	/*
 	 * Check for a dropped connection to a child.
 	 * Normally a child should tell us that it is dying
@@ -225,11 +222,11 @@ init_messages(void)
     Message = (char *)Malloc(MSGMAX);
 
     (void) Chmod(Lp_Tmp, 0711);
-    
+
     if ((md = mcreate(Lp_FIFO)) == NULL)
 	fail ("Can't create public message device (%s).\n", PERROR);
     mon_discon(md, conn_shutdown);
-    
+
     if (mlisteninit(md) != 0)
 	if (errno == ENOMEM)
 	    mallocfail();
@@ -240,12 +237,12 @@ init_messages(void)
     return;
 }
 
-    
+
 void
 shutdown_messages(void)
 {
     MESG	*md;
-    
+
     (void) Chmod(Lp_Tmp, 0700);
     (void) Chmod(Lp_FIFO, 0600);
     md = mlistenreset();

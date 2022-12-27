@@ -30,13 +30,11 @@
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
  * All Rights Reserved
- * 
+ *
  * University Acknowledgment- Portions of this document are derived from
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 *************************************************************************

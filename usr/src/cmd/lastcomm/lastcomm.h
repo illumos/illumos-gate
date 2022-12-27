@@ -27,8 +27,6 @@
 #ifndef	_LASTCOMM_H
 #define	_LASTCOMM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

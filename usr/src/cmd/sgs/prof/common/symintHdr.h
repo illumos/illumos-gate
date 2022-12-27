@@ -26,9 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * symintHdr.h -- symbol information interface, Header file.
  *

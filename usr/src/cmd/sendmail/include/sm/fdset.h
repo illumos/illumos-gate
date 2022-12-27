@@ -9,8 +9,6 @@
  *	$Id: fdset.h,v 1.3.10.2 2002/12/10 04:02:25 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	SM_FDSET_H
 # define SM_FDSET_H
 

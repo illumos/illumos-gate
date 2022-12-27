@@ -27,8 +27,6 @@
 #ifndef	_TOPO_GATHER_H
 #define	_TOPO_GATHER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * bay/disk libtopo plugin property consumer
  * (creates diskmon configuration objects)

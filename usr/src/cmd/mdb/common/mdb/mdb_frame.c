@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utility routines to manage debugger frames and commands.  A debugger frame
  * is used by each invocation of mdb_run() (the main parsing loop) to manage

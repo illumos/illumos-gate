@@ -26,8 +26,6 @@
 #ifndef _FMD_DR_H
 #define	_FMD_DR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysevent.h>
 
 #ifdef __cplusplus

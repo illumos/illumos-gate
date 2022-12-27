@@ -11,8 +11,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 SM_RCSID("@(#)$Id: clock.c,v 1.47 2005/06/14 23:07:20 ca Exp $")
 #include <unistd.h>

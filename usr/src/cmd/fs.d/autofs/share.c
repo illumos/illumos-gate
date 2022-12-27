@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * autofs share - dummy utility to accomodate autofs inclusion in
  * /etc/dfs/fstypes

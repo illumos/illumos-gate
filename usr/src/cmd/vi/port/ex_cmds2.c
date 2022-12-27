@@ -29,8 +29,6 @@
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ex.h"
 #include "ex_argv.h"
 #include "ex_temp.h"
@@ -121,7 +119,7 @@ error(str, i)
 }
 
 /*
- * noerror(): like error(), but doesn't inc errcnt. 
+ * noerror(): like error(), but doesn't inc errcnt.
  * the reason why we created this routine, instead of fixing up errcnt
  * after error() is called, is because we will do a longjmp, and
  * not a return. it does other things closing file i/o, reset, etc;
@@ -259,7 +257,7 @@ error1(unsigned char *str)
 		close(io);
 		io = -1;
 	}
-	
+
 	die = (getpid() != ppid);	/* Only children die */
 	inappend = inglobal = 0;
 	globp = vglobp = vmacp = 0;
@@ -313,7 +311,7 @@ fixol(void)
 		Outchar = vputchar;
 		vcontin(1);
 		/*
-		 * Outchar could be set to termchar() through vcontin(). 
+		 * Outchar could be set to termchar() through vcontin().
 		 * So reset it again.
 		 */
 		Outchar = vputchar;

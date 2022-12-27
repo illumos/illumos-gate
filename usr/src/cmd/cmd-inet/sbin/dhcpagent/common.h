@@ -27,8 +27,6 @@
 #ifndef _COMMON_H
 #define	_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 /*

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mconnect.c - A program to test out SMTP connections.
  * Usage: mconnect [host]

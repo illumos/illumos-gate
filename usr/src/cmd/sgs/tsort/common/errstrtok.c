@@ -28,9 +28,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	This is exactly strtok(3C).
  *	It is here, with a different name, because using strtok() within

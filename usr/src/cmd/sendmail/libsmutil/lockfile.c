@@ -11,8 +11,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sendmail.h>
 
 SM_RCSID("@(#)$Id: lockfile.c,v 8.21 2003/11/10 22:57:38 ca Exp $")

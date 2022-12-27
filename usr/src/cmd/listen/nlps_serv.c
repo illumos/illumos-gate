@@ -28,8 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* system include files	*/
 
 #include <fcntl.h>
@@ -79,7 +77,7 @@ char	*Server_cmd_lines;
 
 extern int t_errno;
 
-/* 
+/*
  * These global symbols are used for logging.
  * Pid, NLPS_proc, and Lastmsg are significant here; the others aren't used.
  */
@@ -110,14 +108,14 @@ main(int argc, char **argv)
 	sprintf(Basedir, "%s/%s/", BASEDIR, provider);
 	sprintf(msgbuf, "%s/%s", Altbasedir, LOGNAME);
 	if (!(Logfp = fopen(msgbuf, "a+")))  {
-		(void)exit(1);  
+		(void)exit(1);
 	}
 
 #ifdef DEBUGMODE
 	sprintf(msgbuf, "%s/%s", Altbasedir, PDEBUGNAME);
 	if (!(Debugfp = fopen(msgbuf, "a")))  {
 		logmessage("NLPS: Unable to open DEBUG file");
-		(void)exit(1);  
+		(void)exit(1);
 	}
 #endif
 
@@ -136,7 +134,7 @@ main(int argc, char **argv)
 }
 
 /*
- *  nlps_server: 
+ *  nlps_server:
  */
 
 int
@@ -171,7 +169,7 @@ nlps_server()
 	if ((!strncmp(bp,NLPSIDSTR,NLPSIDSZ))  && 	/* NLPS request	*/
 	    (*(bp + NLPSIDSZ) == NLPSSEPCHAR)) {
 		nls_service(bp, size);
-		(void)sleep(10);	/* if returned to here, then 
+		(void)sleep(10);	/* if returned to here, then
 				 * must sleep for a short period of time to
 				 * insure that the client received any possible
 				 * exit response message from the listener.
@@ -495,20 +493,20 @@ char *bp;
 				sprintf(scratch, disabledmsg, svc_code_p);
 				logmessage(scratch);
 				nls_reply(NLSDISABLED, scratch);
-			}  
+			}
 			else {
 				if (dbp->dbf_sflags & CFLAG) {
 					exec_cmd(dbp, (char **)0);
 					/* return is an error	*/
 				}
 				else {
-					sprintf(msgbuf,"NLPS (%s) passfd: %s", 
-						dbp->dbf_svc_code, 
+					sprintf(msgbuf,"NLPS (%s) passfd: %s",
+						dbp->dbf_svc_code,
 						dbp->dbf_cmd_line);
 					nls_reply(NLSSTART, msgbuf);
 					logmessage(msgbuf);
 					/* open pipe to pass fd through */
-					if ((passfd = open(dbp->dbf_cmd_line, 
+					if ((passfd = open(dbp->dbf_cmd_line,
 							O_WRONLY)) < 0) {
 						sprintf(scratch,"NLPS open failed: %s", dbp->dbf_cmd_line);
 						logmessage(scratch);
@@ -525,7 +523,7 @@ char *bp;
 
 					if ((i = doconfig(0, msgbuf, NOASSIGN)) != 0) {
 						DEBUG((9, "doconfig exited with code %d", i));
-						sprintf(scratch, "doconfig failed on line %d of script %s", 
+						sprintf(scratch, "doconfig failed on line %d of script %s",
 								i, msgbuf);
 						logmessage(scratch);
 						(void)exit(2);
@@ -609,7 +607,7 @@ nls_reply(int code, char *text)
  * if optional argv is given, info comes from o_argv, else pointer
  * to dbf struct is used.  In either case, first argument in argv is
  * full pathname of server. Before exec-ing the server, the caller's
- * logical address, opt and udata are added to the environment. 
+ * logical address, opt and udata are added to the environment.
  */
 
 static char homeenv[BUFSIZ];
@@ -647,7 +645,7 @@ exec_cmd(dbf_t *dbp, char **o_argv)
 		argvp = mkdbfargv(dbp);
 	path = *argvp;
 
-	sprintf(msgbuf,"NLPS (%s) exec: %s", 
+	sprintf(msgbuf,"NLPS (%s) exec: %s",
 			(dbp)?dbp->dbf_svc_code:DBF_SMB_CODE, path);
 	nls_reply(NLSSTART, msgbuf);
 	logmessage(msgbuf);
@@ -659,7 +657,7 @@ exec_cmd(dbf_t *dbp, char **o_argv)
 		char	device[20];
 		struct	utmpx utline;
 
-		/* 
+		/*
 		 * create a utmpx entry.  extra fork makes parent init,
 		 * which will clean up the entry.
 		 */
@@ -672,7 +670,7 @@ exec_cmd(dbf_t *dbp, char **o_argv)
 		if (tmp)
 			exit(0);	/* kill parent */
 
-		/* 
+		/*
 		 * child continues processing, creating utmpx and exec'ing
 		 * the service
 		 */
@@ -684,7 +682,7 @@ exec_cmd(dbf_t *dbp, char **o_argv)
 			*device = '\0';
 		}
 		else {
-			/* 
+			/*
 			 * MPREFIX is added to the environment by the parent
 			 * listener process.
 			 */
@@ -718,7 +716,7 @@ exec_cmd(dbf_t *dbp, char **o_argv)
 	DEBUG((9, "Running doconfig on %s", wdbp->dbf_svc_code));
 	if ((i = doconfig(NETFD, wdbp->dbf_svc_code, 0)) != 0) {
 		DEBUG((9, "doconfig exited with code %d", i));
-		sprintf(msgbuf, "doconfig failed on line %d of script %s", 
+		sprintf(msgbuf, "doconfig failed on line %d of script %s",
 				i, wdbp->dbf_svc_code);
 		logmessage(msgbuf);
 	}
@@ -727,12 +725,12 @@ exec_cmd(dbf_t *dbp, char **o_argv)
 		logmessage("NLPS: No database entry");
 		exit(2); /* server, don't log */
 	}
-	
+
 	if ((pwdp = getpwnam(wdbp->dbf_id)) == NULL)  {
 		sprintf(msgbuf, "NLPS: Missing or bad passwd entry for <%s>",wdbp->dbf_id);
 		logmessage(msgbuf);
 		exit(2); /* server, don't log */
-	}		
+	}
 
 
 	if (setgid(pwdp->pw_gid)) {
@@ -818,10 +816,10 @@ int *flagp;
 	do {
 		*flagp = 0;
 		n = t_rcv(0, bp, count, flagp);
-		DEBUG((9, "l_rcv, after t_rcv call, n =  %d",n));   
+		DEBUG((9, "l_rcv, after t_rcv call, n =  %d",n));
 
 		if (n < 0) {
-			DEBUG((9, "l_rcv, t_errno is %d", t_errno));   
+			DEBUG((9, "l_rcv, t_errno is %d", t_errno));
 #ifdef DEBUGMODE
 			if (t_errno == TLOOK) {
 				DEBUG((9, "l_rcv, t_look returns %d", t_look(0)));
@@ -862,11 +860,11 @@ register char *svc_code_p;
 	}
 
 	DEBUG((9, "database file opened, looking for %s", svc_code_p));
-	while (rd_dbf_line(dbfp, Dbf_line_buf, &Dbf_entry.dbf_svc_code, 
+	while (rd_dbf_line(dbfp, Dbf_line_buf, &Dbf_entry.dbf_svc_code,
 		&Dbf_entry.dbf_flags, &Dbf_entry.dbf_id, &Dbf_entry.dbf_res1,
 		&Dbf_entry.dbf_res2, &Dbf_entry.dbf_res3,&Dbf_entry.dbf_prv_adr,
-		&Dbf_entry.dbf_prognum, &Dbf_entry.dbf_version, 
-		&Dbf_entry.dbf_modules, &Dbf_entry.dbf_sflags, 
+		&Dbf_entry.dbf_prognum, &Dbf_entry.dbf_version,
+		&Dbf_entry.dbf_modules, &Dbf_entry.dbf_sflags,
 		&Dbf_entry.dbf_cmd_line) > 0) {
 
 		/* see if this line is the one we want (svc_code match) */

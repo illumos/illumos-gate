@@ -8,8 +8,6 @@
 
 #include "ipf.h"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(lint)
 static const char rcsid[] = "@(#)$Id: printactiveaddr.c,v 1.1 2008/02/12 16:11:49 darren_r Exp $";
 #endif

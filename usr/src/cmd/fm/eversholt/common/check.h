@@ -33,8 +33,6 @@
 #ifndef	_ESC_COMMON_CHECK_H
 #define	_ESC_COMMON_CHECK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

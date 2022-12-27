@@ -27,8 +27,6 @@
 #ifndef	_SUN_MSGFMT_H
 #define	_SUN_MSGFMT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <locale.h>
 #include <stdio.h>

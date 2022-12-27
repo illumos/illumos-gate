@@ -27,8 +27,6 @@
 #ifndef _DM_TYPES_H
 #define	_DM_TYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Common types for the disk monitor
  */

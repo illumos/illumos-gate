@@ -9,8 +9,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ipf.h"
 
 /*
@@ -373,7 +371,7 @@ ioctlfunc_t	iocfunc;
 			if (fp->fr_flags & FR_FRSTRICT)
 				printf(" strict");
 			printf(" )");
-				
+
 		}
 	}
 	if (fp->fr_isc != (struct ipscan *)-1) {

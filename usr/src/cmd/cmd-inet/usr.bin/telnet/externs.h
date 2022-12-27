@@ -41,8 +41,6 @@
 #ifndef _EXTERNS_H
 #define	_EXTERNS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

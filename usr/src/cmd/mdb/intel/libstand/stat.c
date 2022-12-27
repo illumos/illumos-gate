@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * We've cleverly designed things such that an #include of <sys/stat.h>
  * on Intel brings in stat_impl.h, which defines *static* copies of

@@ -26,8 +26,6 @@
 #ifndef	_MDB_KVM_H
 #define	_MDB_KVM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/machelf.h>
 #include <sys/dumphdr.h>

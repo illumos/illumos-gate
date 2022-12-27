@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8	*/
 /* LINTLIBRARY */
 
 # include	<errno.h>
@@ -64,7 +62,7 @@ mflush(MESG *md)
 	while ((p = md->mque) != NULL) {
 		if (_mwrite(md, p->dat->buf, p->dat->len) != 0)
 			return (errno == EAGAIN ? 0 : -1);
-		
+
 		/* mwrite successful, get the next and free this entry */
 		md->mque = p->next;
 		Free(p->dat->buf);

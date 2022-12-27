@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * postio - RS-232 serial interface for PostScript printers
@@ -248,7 +246,7 @@ main(int agc, char *agv[])
 	options();		/* get command line options */
 
 	setbuf(stderr, NULL);   /* unbuffer io for stderr */
-	
+
 
 	if (line) {
 		close(1);
@@ -274,7 +272,7 @@ main(int agc, char *agv[])
 		initialize_parallel();
 		x_stat = parallel_comm(1, nop);
 	}
-	
+
 
 	return (x_stat);		/* everything probably went OK */
 }
@@ -790,7 +788,7 @@ done(void)
 	    /* 03/24/95 - bob golden
 	     * During print data transmission, the HP LJ3 stays in
 	     * status busy. So give it a rest.
-	     * 
+	     *
 	     */
 	    case BUSY:
 	    case PRINTING:

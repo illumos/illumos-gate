@@ -34,8 +34,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/rpc.h>
 #include <rpcsvc/spray.h>
 

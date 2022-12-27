@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * 4.2BSD, 2.9BSD, or ATTSVR4 TCP/IP server for uucico
  * uucico's TCP channel causes this server to be run at the remote end.

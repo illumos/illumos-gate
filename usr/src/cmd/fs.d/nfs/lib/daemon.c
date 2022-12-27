@@ -26,8 +26,6 @@
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* NFS server */
 
 #include <sys/param.h>

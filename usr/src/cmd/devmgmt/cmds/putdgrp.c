@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Implements the "putdgrp" command.
  */
@@ -61,11 +58,11 @@
 /*
  * Exit codes
  *	EX_OK		All went well
- *	EX_ERROR	Usage or internal error 
- *	EX_DGROUP	Had trouble accessing/reading/writing the 
+ *	EX_ERROR	Usage or internal error
+ *	EX_DGROUP	Had trouble accessing/reading/writing the
  *			device-group table
  *	EX_NODGRP	The specified device-group does not exist
- *	EX_NOMEM	One or more device-group members requested for 
+ *	EX_NOMEM	One or more device-group members requested for
  *			removal was not defined for the device
  */
 
@@ -123,7 +120,7 @@ static	char		msg[256];	/* Space for text of message */
  *	Pointer to malloc()ed space containing the standard label,
  *	or (char *) NULL if an error occurred.
  */
-  
+
 static char *
 mklbl(cmd)
 	char   *cmd;
@@ -158,7 +155,7 @@ mklbl(cmd)
  * putdgrp [-d] dgroup [device [...]]
  *
  * Options:
- *	-d		
+ *	-d
  *
  * Arguments:
  *	dgroup
@@ -181,7 +178,7 @@ main(int argc, char *argv[])
 	int		exitcd;		/* Value to return at exit */
 	int		nmems;		/* Number of members on the cmd */
 
-	
+
 	/* Generate the label for messages */
 	lbl = mklbl(argv[0]);
 
@@ -192,7 +189,7 @@ main(int argc, char *argv[])
 	while ((optchar = getopt(argc, argv, "d:")) != EOF) switch (optchar) {
 
 	case 'd':
-	    if (!d_seen) 
+	    if (!d_seen)
 	    {
 		d_seen = TRUE;
 		dgroup = optarg;
@@ -207,7 +204,7 @@ main(int argc, char *argv[])
 
 
 	/* Write a usage message if we've seen a blatant error */
-	if (!noerr || (!d_seen && ((nmems = argc - optind - 1) < 0)) || 
+	if (!noerr || (!d_seen && ((nmems = argc - optind - 1) < 0)) ||
 		      (d_seen && ((nmems = argc - optind) < 0))) {
 	    stdmsg(MM_NRECOV, lbl, MM_ERROR, E_USAGE);
 	    exit(EX_ERROR);
@@ -221,7 +218,7 @@ main(int argc, char *argv[])
 	/* -d on the command line ? */
 	if (d_seen) {
 
-	    /* 
+	    /*
 	     * Determine case (removing a device group or members
 	     * of that device group.
 	     */
@@ -252,11 +249,11 @@ main(int argc, char *argv[])
 		case ENOENT:
 		    (void) snprintf(msg, sizeof(msg), E_NODGRPTAB, _dgrptabpath());
 		    stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-		    exitcd = EX_DGROUP; 
+		    exitcd = EX_DGROUP;
 		    break;
 
 		    /*
-		     * EACCES indicates that there was a problem reading the 
+		     * EACCES indicates that there was a problem reading the
 		     * old device-group table or creating the new table.  If the
 		     * old table is readable, assume that we can't create the
 		     * new table.  Otherwise, assume that the old table isn't
@@ -265,12 +262,12 @@ main(int argc, char *argv[])
 
 		case EACCES:
 		    p = _dgrptabpath();
-		    if (access(p, R_OK) == 0) 
+		    if (access(p, R_OK) == 0)
 			(void) snprintf(msg, sizeof(msg), E_NOMKTAB, p);
-		    else 
+		    else
 			(void) snprintf(msg, sizeof(msg), E_NODGRPTAB, p);
 		    stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-		    exitcd = EX_DGROUP; 
+		    exitcd = EX_DGROUP;
 		    break;
 
 		    /*
@@ -288,7 +285,7 @@ main(int argc, char *argv[])
 
 		/* putdgrp -d dgroup device [device [...]] */
 
-		/* 
+		/*
 		 * Attempt to remove the specified devices from the
 		 * specified device-group.
 		 */
@@ -308,7 +305,7 @@ main(int argc, char *argv[])
 		    break;
 
 		    /*
-		     * EINVAL indicates that the named device-group is not 
+		     * EINVAL indicates that the named device-group is not
 		     * defined in the device-group table.
 		     */
 
@@ -326,11 +323,11 @@ main(int argc, char *argv[])
 		case ENOENT:
 		    (void) snprintf(msg, sizeof(msg), E_NODGRPTAB, _dgrptabpath());
 		    stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-		    exitcd = EX_DGROUP; 
+		    exitcd = EX_DGROUP;
 		    break;
 
 		    /*
-		     * EACCES indicates that there was a problem reading the 
+		     * EACCES indicates that there was a problem reading the
 		     * old device table or creating the new table.  If the
 		     * old table is readable, assume that we can't create the
 		     * new table.  Otherwise, assume that the old table isn't
@@ -339,12 +336,12 @@ main(int argc, char *argv[])
 
 		case EACCES:
 		    p = _dgrptabpath();
-		    if (access(p, R_OK) == 0) 
+		    if (access(p, R_OK) == 0)
 			(void) snprintf(msg, sizeof(msg), E_NOMKTAB, p);
-		    else 
+		    else
 			(void) snprintf(msg, sizeof(msg), E_NODGRPTAB, p);
 		    stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-		    exitcd = EX_DGROUP; 
+		    exitcd = EX_DGROUP;
 		    break;
 
 		    /*
@@ -374,7 +371,7 @@ main(int argc, char *argv[])
 	    case ENOENT:
 		(void) snprintf(msg, sizeof(msg), E_NODGRPTAB, _dgrptabpath());
 		stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-		exitcd = EX_DGROUP; 
+		exitcd = EX_DGROUP;
 		break;
 
 		/*
@@ -389,11 +386,11 @@ main(int argc, char *argv[])
 		else
 			(void) snprintf(msg, sizeof(msg), E_NODGRPTAB, p);
 		stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
-		exitcd = EX_DGROUP; 
+		exitcd = EX_DGROUP;
 		break;
 
-		/* 
-		 * Some strange error (memory?) 
+		/*
+		 * Some strange error (memory?)
 		 */
 
 	    default:

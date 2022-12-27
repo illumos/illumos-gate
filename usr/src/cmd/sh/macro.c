@@ -26,7 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -61,11 +60,11 @@ copyto(unsigned char endch, int trimflag)
 						     character is not $, `, ", or \*/
 					if (staktop >= brkend)
 						growstak(staktop);
-					pushstak('\\'); 
+					pushstak('\\');
 					if (staktop >= brkend)
 						growstak(staktop);
 					pushstak('\\');
-					pc = readw(d); 
+					pc = readw(d);
 					/* push entire multibyte char */
 					while(*pc) {
 						if (staktop >= brkend)
@@ -91,7 +90,7 @@ copyto(unsigned char endch, int trimflag)
 			} else { /* push escapes onto stack to quote characters */
 				pc = readw(c);
 				if (staktop >= brkend)
-					growstak(staktop); 
+					growstak(staktop);
 				pushstak('\\');
 				while(*pc) {
 					if (staktop >= brkend)
@@ -102,7 +101,7 @@ copyto(unsigned char endch, int trimflag)
 		} else if(c == '\\') {
 			c = readwc(); /* get character to be escaped */
 			if (staktop >= brkend)
-				growstak(staktop); 
+				growstak(staktop);
 			pushstak('\\');
 			pc = readw(c);
 			/* c might be NULL */
@@ -110,7 +109,7 @@ copyto(unsigned char endch, int trimflag)
 			if (*pc) {
 				while (*pc) {
 					if (staktop >= brkend)
-						growstak(staktop); 
+						growstak(staktop);
 					pushstak(*pc++);
 				}
 			} else {
@@ -122,12 +121,12 @@ copyto(unsigned char endch, int trimflag)
 			pc = readw(c);
 			while (*pc) {
 				if (staktop >= brkend)
-					growstak(staktop); 
+					growstak(staktop);
 				pushstak(*pc++);
 			}
 		}
 	if (staktop >= brkend)
-			growstak(staktop); 
+			growstak(staktop);
 	zerostak();
 	if (c != endch)
 		error(badsub);
@@ -170,7 +169,7 @@ int trimflag; /* flag to check if an argument is going to be trimmed, here docum
 	 */
 {
 	unsigned int	d;
-	int atflag;  /* flag to check if $@ has already been seen within double 
+	int atflag;  /* flag to check if $@ has already been seen within double
 		        quotes */
 retry:
 	d = readwc();
@@ -347,7 +346,7 @@ retry:
 						unsigned char *newargp;
 					/*
 					 * copy word onto stack, trim it, and then
-					 * do assignment 
+					 * do assignment
 					 */
 						usestak();
 						while(c = *argp) {
@@ -356,7 +355,7 @@ retry:
 
 							if ((len = mbtowc(&wc, (char *)argp, MB_LEN_MAX)) <= 0)
 								len = 1;
-								
+
 							if(c == '\\' && trimflag) {
 								argp++;
 								if (*argp == 0) {
@@ -488,7 +487,7 @@ comsubst(int trimflag)
 	{
 		unsigned char	*argc;
 
-		argc = fixstak(); 
+		argc = fixstak();
 		push(&cb);
 		estabf(argc);  /* read from string */
 	}
@@ -514,7 +513,7 @@ comsubst(int trimflag)
 	while (d = readwc()) {
 		if(quote || (d == '\\' && trimflag)) {
 			unsigned char *rest;
-			/* quote output from command subst. if within double 
+			/* quote output from command subst. if within double
 			   quotes or backslash part of output */
 			rest = readw(d);
 			if (staktop >= brkend)
@@ -564,7 +563,7 @@ comsubst(int trimflag)
 			++staktop;
 			break;
 		} else if(quote)
-			staktop--; /* skip past backslashes if quoting */ 
+			staktop--; /* skip past backslashes if quoting */
 	}
 	pop();
 }
@@ -584,11 +583,11 @@ subst(int in, int ot)
 	/*
 	 * DQUOTE used to stop it from quoting
 	 */
-	while (c = (getch(DQUOTE, 0))) /* read characters from here document 
+	while (c = (getch(DQUOTE, 0))) /* read characters from here document
 				       and interpret them */
 	{
 		if(c == '\\') {
-			c = readwc(); /* check if character in here document is 
+			c = readwc(); /* check if character in here document is
 					escaped */
 			if(!escchar(c) || c == '"') {
 				if (staktop >= brkend)

@@ -9,13 +9,11 @@
  *	$Id: daemon.h,v 8.3 2006/07/13 22:57:03 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef DAEMON_H
 #define DAEMON_H 1
 
 #if DAEMON_C
-# define EXTERN 
+# define EXTERN
 #else
 # define EXTERN extern
 #endif

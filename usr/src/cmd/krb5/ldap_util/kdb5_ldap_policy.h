@@ -32,8 +32,6 @@
 #ifndef _KDB5_LDAP_POLICY_H_
 #define _KDB5_LDAP_POLICY_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 extern void kdb5_ldap_create_policy(int argc, char **argv);
 extern void kdb5_ldap_destroy_policy(int argc, char **argv);
 extern void kdb5_ldap_modify_policy(int argc, char **argv);

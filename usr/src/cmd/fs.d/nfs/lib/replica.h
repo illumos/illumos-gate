@@ -29,8 +29,6 @@
 #ifndef _REPLICA_H
 #define	_REPLICA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

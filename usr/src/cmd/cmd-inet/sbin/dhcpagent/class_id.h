@@ -27,8 +27,6 @@
 #ifndef	CLASS_ID_H
 #define	CLASS_ID_H
 
-#pragma ident	"%W%	%E% SMI"
-
 /*
  * class_id.[ch] provides an interface for retrieving the class id
  * from the prom.  see class_id.c for more details on how to use the

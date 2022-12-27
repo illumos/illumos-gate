@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include "limits.h"
 #include "ulimit.h"
 #include "sys/utsname.h"
@@ -157,7 +155,7 @@ main(int argc, char *argv[])
 	(void) enable_extended_FILE_stdio(-1, -1);
 	syslog(LOG_DEBUG, "file descriptor resource limit is %d (~%d printers)",
 		rlim.rlim_cur, (rlim.rlim_cur - 12)/ 2);
-    
+
     lp_alloc_fail_handler = mallocfail;
 
     startup();
@@ -174,7 +172,7 @@ startup()
 {
     struct passwd		*p;
 
-    
+
     Starting = 1;
     getpaths();
 
@@ -198,11 +196,11 @@ startup()
     Local_System = Strdup("localhost");
 
     /*
-     * Make sure that all critical directories are present and that 
+     * Make sure that all critical directories are present and that
      * symbolic links are correct.
      */
     lpfsck();
-    
+
     /*
      * Try setting the lock file to see if another Spooler is running.
      * We'll release it immediately; this allows us to fork the child
@@ -278,7 +276,7 @@ lpshut(int immediate)
 		 * normal operation, not just during shutdown phase).
 		 */
 		shutdown_messages();
-    
+
 		(void) close(lock_fd);
 		(void) Unlink(Lp_Schedlock);
 
@@ -309,7 +307,7 @@ process()
 
     for (i = 0; PWStatus != NULL && PWStatus[i] != NULL; i++)
 	check_pwheel_alert (PWStatus[i], (PWHEEL *)0);
-    
+
     /*
      * Clear the alarm, then schedule an EV_ALARM. This will clear
      * all events that had been scheduled for later without waiting
@@ -349,7 +347,7 @@ ticktock(int sig)
 	(void)signal (SIGALRM, ticktock);
 	return;
 }
-			    
+
 static void
 background()
 {
@@ -357,7 +355,7 @@ background()
     if (debug & DB_SDB)
 	return;
 #endif
-    
+
     switch(fork())
     {
 	case -1:
@@ -368,7 +366,7 @@ background()
 	    (void) setpgrp();
 	    am_in_background = 1;
 	    return;
-	    
+
 	default:
 	    note ("Print services started.\n");
 	    exit(0);
@@ -418,7 +416,7 @@ disable_signals()
 	for (i = 0; i < NSIG; i++)
 		if (signal(i, SIG_IGN) != SIG_IGN)
 			signal (i, Exit);
-    
+
     (void) signal(SIGHUP, SIG_IGN);
     (void) signal(SIGINT, SIG_IGN);
     (void) signal(SIGQUIT, SIG_IGN);

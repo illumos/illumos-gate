@@ -27,8 +27,6 @@
 #ifndef	_GNU_LEX_H
 #define	_GNU_LEX_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <limits.h>
 
 #ifdef	__cplusplus

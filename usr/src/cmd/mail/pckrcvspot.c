@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mail.h"
 /*
  * If any H_RECEIVED lines in msg, decide where to put them.
@@ -40,7 +38,7 @@ int
 pckrcvspot(void)
 {
 	static char pn[] = "pckrcvspot";
-	int	rc;	
+	int	rc;
 
 	if (hdrlines[H_RECEIVED].head == (struct hdrs *)NULL) {
 		rc = -1;

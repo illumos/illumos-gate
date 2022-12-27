@@ -11,8 +11,6 @@
 #ifndef __ELOOP_H
 #define	__ELOOP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

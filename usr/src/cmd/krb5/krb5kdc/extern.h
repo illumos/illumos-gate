@@ -6,8 +6,6 @@
 #ifndef	__KRB5_KDC_EXTERN__
 #define	__KRB5_KDC_EXTERN__
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <netinet/in.h>
 
 #ifdef	__cplusplus
@@ -21,7 +19,7 @@ extern "C" {
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -35,7 +33,7 @@ extern "C" {
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * <<< Description >>>
  */
@@ -45,9 +43,9 @@ typedef struct __kdc_realm_data {
      * General Kerberos per-realm data.
      */
     char *		realm_name;	/* Realm name			    */
-/* XXX the real context should go away once the db_context is done. 
- * The db_context is then associated with the realm keytab using 
- * krb5_ktkdb_resolv(). There should be nothing in the context which 
+/* XXX the real context should go away once the db_context is done.
+ * The db_context is then associated with the realm keytab using
+ * krb5_ktkdb_resolv(). There should be nothing in the context which
  * cannot span multiple realms -- proven */
     krb5_context	realm_context;	/* Context to be used for realm	    */
     krb5_keytab		realm_keytab; 	/* keytab to be used for this realm */
@@ -108,7 +106,7 @@ extern krb5_keyblock	psr_key;	/* key for predicted sam response */
 extern volatile int signal_requests_exit;
 extern volatile int signal_requests_hup;
 
-/* libbsm */ 
+/* libbsm */
 extern void audit_krb5kdc_as_req(struct in_addr *, in_port_t, in_port_t,
 				char *, char *, int);
 extern void audit_krb5kdc_tgs_req(struct in_addr *, in_port_t, in_port_t,

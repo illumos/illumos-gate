@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * callback.c: callback routine called whenever a BP message is received from
  * the service processor (BP messages are received ONLY in a firmware download

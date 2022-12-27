@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file handles haggling with the various talk daemons to
  * get a socket to talk to. sockt is opened and connected in

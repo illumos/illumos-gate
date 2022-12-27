@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Lgrp.xs contains XS wrappers for the system locality group library
  * liblgrp(3LIB).
@@ -277,7 +275,7 @@ lgrp_version(int version = LGRP_VER_NONE)
  #
  # lgrp_latency_cookie calls our internal wrapper  _lgrp_latency_cookie() which
  # works for both old and new versions of liblgrp.
- # 
+ #
 int
 lgrp_latency_cookie(lgrp_cookie_t cookie, lgrp_id_t from, lgrp_id_t to, int between = 0)
   CODE:

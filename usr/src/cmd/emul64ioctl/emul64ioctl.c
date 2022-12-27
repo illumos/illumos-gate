@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This program provides a command line interface to the
  * three new ioctls for the emul64 driver - EMUL64_WRITE_OFF,

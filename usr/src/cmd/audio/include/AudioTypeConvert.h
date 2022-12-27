@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOTYPECONVERT_H
 #define	_MULTIMEDIA_AUDIOTYPECONVERT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <AudioBuffer.h>
 
 #ifdef __cplusplus

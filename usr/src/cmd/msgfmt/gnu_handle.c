@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "gnu_msgfmt.h"
 
 static int	next_entry_is_fuzzy = 0;

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sca500.esc: Deimos eversholt source code
  */
@@ -33,7 +31,7 @@
 #pragma dictionary "SCA500"
 
 /*
- * For Deimos, there is one ASRU that includes both the driver and the card, 
+ * For Deimos, there is one ASRU that includes both the driver and the card,
  * and there are two FRUs, the driver and the card.
  */
 
@@ -46,7 +44,7 @@ fru P;
  * The hardware card may generate faults.
  * The driver passes the user data to the hardware and returns the hardware
  * generated results to the user. It does check input and output data errors.
- * However, it returns these errors to the calling application. Since the 
+ * However, it returns these errors to the calling application. Since the
  * driver itself does not do any data manipulation or generation, it does not
  * have upsets.
  */

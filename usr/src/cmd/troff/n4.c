@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<ctype.h>
 #include "tdef.h"
 #ifdef NROFF
@@ -47,7 +45,7 @@
 #include "ext.h"
 /*
  * troff4.c
- * 
+ *
  * number registers, conversion, arithmetic
  */
 
@@ -69,7 +67,7 @@ setn()
 		f = 1;
 	else if (i == '-')
 		f = -1;
-	else 
+	else
 		ch = ii;
 	if (falsef)
 		f = 0;
@@ -77,96 +75,96 @@ setn()
 		return (0);
 	if ((i & 0177) == '.')
 		switch (i >> BYTE) {
-		case 's': 
-			i = pts;	
+		case 's':
+			i = pts;
 			break;
-		case 'v': 
-			i = lss;		
+		case 'v':
+			i = lss;
 			break;
-		case 'f': 
-			i = font;	
+		case 'f':
+			i = font;
 			break;
-		case 'p': 
-			i = pl;		
+		case 'p':
+			i = pl;
 			break;
-		case 't':  
-			i = findt1();	
+		case 't':
+			i = findt1();
 			break;
-		case 'o': 
-			i = po;		
+		case 'o':
+			i = po;
 			break;
-		case 'l': 
-			i = ll;		
+		case 'l':
+			i = ll;
 			break;
-		case 'i': 
-			i = in;		
+		case 'i':
+			i = in;
 			break;
-		case '$': 
-			i = frame->nargs;		
+		case '$':
+			i = frame->nargs;
 			break;
-		case 'A': 
-			i = ascii;		
+		case 'A':
+			i = ascii;
 			break;
-		case 'c': 
-			i = numtab[CD].val;		
+		case 'c':
+			i = numtab[CD].val;
 			break;
-		case 'n': 
-			i = lastl;		
+		case 'n':
+			i = lastl;
 			break;
-		case 'a': 
-			i = ralss;		
+		case 'a':
+			i = ralss;
 			break;
-		case 'h': 
-			i = dip->hnl;	
+		case 'h':
+			i = dip->hnl;
 			break;
 		case 'd':
 			if (dip != d)
-				i = dip->dnl; 
-			else 
+				i = dip->dnl;
+			else
 				i = numtab[NL].val;
 			break;
-		case 'u': 
-			i = fi;		
+		case 'u':
+			i = fi;
 			break;
-		case 'j': 
-			i = ad + 2 * admod;	
+		case 'j':
+			i = ad + 2 * admod;
 			break;
-		case 'w': 
+		case 'w':
 			i = widthp;
 			break;
-		case 'x': 
-			i = nel;	
+		case 'x':
+			i = nel;
 			break;
-		case 'y': 
-			i = un;		
+		case 'y':
+			i = un;
 			break;
-		case 'T': 
-			i = dotT;		
+		case 'T':
+			i = dotT;
 			break; /*-Tterm used in nroff*/
-		case 'V': 
-			i = VERT;		
+		case 'V':
+			i = VERT;
 			break;
-		case 'H': 
-			i = HOR;		
+		case 'H':
+			i = HOR;
 			break;
-		case 'k': 
-			i = ne;		
+		case 'k':
+			i = ne;
 			break;
-		case 'P': 
-			i = print;		
+		case 'P':
+			i = print;
 			break;
-		case 'L': 
-			i = ls;		
+		case 'L':
+			i = ls;
 			break;
-		case 'R': 
-			i = NN - regcnt;	
+		case 'R':
+			i = NN - regcnt;
 			break;
-		case 'z': 
+		case 'z':
 			i = dip->curd;
 			*pbp++ = (i >> BYTE) & BYTEMASK;
 			*pbp++ = i & BYTEMASK;
 			return (0);
-		case 'b': 
+		case 'b':
 			i = bdtab[font];
 			break;
 		case 'F':
@@ -248,7 +246,7 @@ nrehash()
 int
 nunhash(rp)
 struct numtab *rp;
-{	
+{
 	struct numtab *p;
 	struct numtab **lp;
 
@@ -290,7 +288,7 @@ int	i;
 		}
 	}
 	errprint(gettext("too many number registers (%d)."), NN);
-	done2(04); 
+	done2(04);
 	/* NOTREACHED */
 
 	return (0);
@@ -325,15 +323,15 @@ int	i, (*f)();
 	switch (nform) {
 	default:
 	case '1':
-	case 0: 
+	case 0:
 		return decml(i, f) + j;
 		break;
 	case 'i':
-	case 'I': 
+	case 'I':
 		return roman(i, f) + j;
 		break;
 	case 'a':
-	case 'A': 
+	case 'A':
 		return abc(i, f) + j;
 		break;
 	}
@@ -365,7 +363,7 @@ int	i, (*f)();
 		return((*f)('0' | nrbits));
 	if (nform == 'i')
 		return(roman0(i, f, "ixcmz", "vldw"));
-	else 
+	else
 		return(roman0(i, f, "IXCMZ", "VLDW"));
 }
 
@@ -387,7 +385,7 @@ char	*onesp, *fivesp;
 		k += (*f)(*onesp | nrbits);
 		if (q)
 			i = *(onesp + 1);
-		else 
+		else
 			i = *fivesp;
 		return(k += (*f)(i | nrbits));
 	}
@@ -405,7 +403,7 @@ int	i, (*f)();
 {
 	if (!i)
 		return((*f)('0' | nrbits));
-	else 
+	else
 		return(abc0(i - 1, f));
 }
 
@@ -429,7 +427,7 @@ long	atoi0()
 	long	i, acc;
 	extern long	ckph();
 
-	i = 0; 
+	i = 0;
 	acc = 0;
 	nonumb = 0;
 	cnt = -1;
@@ -468,7 +466,7 @@ a0:
 			flusho();
 			errprint(gettext("divide by zero."));
 			acc = 0;
-		} else 
+		} else
 			acc /= i;
 		goto a0;
 	case '%':
@@ -482,8 +480,8 @@ a0:
 		if (nonumb)
 			break;
 		if ((acc > 0) && (i > 0))
-			acc = 1; 
-		else 
+			acc = 1;
+		else
 			acc = 0;
 		goto a0;
 	case ':':	/*or*/
@@ -491,8 +489,8 @@ a0:
 		if (nonumb)
 			break;
 		if ((acc > 0) || (i > 0))
-			acc = 1; 
-		else 
+			acc = 1;
+		else
 			acc = 0;
 		goto a0;
 	case '=':
@@ -500,47 +498,47 @@ a0:
 			ch = ii;
 		i = ckph();
 		if (nonumb) {
-			acc = 0; 
+			acc = 0;
 			break;
 		}
 		if (i == acc)
 			acc = 1;
-		else 
+		else
 			acc = 0;
 		goto a0;
 	case '>':
 		k = 0;
 		if (cbits(ii = getch()) == '=')
-			k++; 
-		else 
+			k++;
+		else
 			ch = ii;
 		i = ckph();
 		if (nonumb) {
-			acc = 0; 
+			acc = 0;
 			break;
 		}
 		if (acc > (i - k))
-			acc = 1; 
-		else 
+			acc = 1;
+		else
 			acc = 0;
 		goto a0;
 	case '<':
 		k = 0;
 		if (cbits(ii = getch()) == '=')
-			k++; 
-		else 
+			k++;
+		else
 			ch = ii;
 		i = ckph();
 		if (nonumb) {
-			acc = 0; 
+			acc = 0;
 			break;
 		}
 		if (acc < (i + k))
-			acc = 1; 
-		else 
+			acc = 1;
+		else
 			acc = 0;
 		goto a0;
-	case ')': 
+	case ')':
 		break;
 	case '(':
 		acc = atoi0();
@@ -657,7 +655,7 @@ a1:
 		ch = ii;
 		i = dfactd;
 	}
-	if (neg) 
+	if (neg)
 		acc = -acc;
 	if (!noscale) {
 		acc = (acc * j) / i;
@@ -667,8 +665,8 @@ a1:
 			acc /= 10;
 	if (abs) {
 		if (dip != d)
-			j = dip->dnl; 
-		else 
+			j = dip->dnl;
+		else
 			j = numtab[NL].val;
 		if (!vflag) {
 			j = numtab[HP].val;
@@ -803,7 +801,7 @@ int	*n;
 			f = 1;
 		else if (j == '-')
 			f = -1;
-		else 
+		else
 			ch = ii;
 	}
 	i = atoi();

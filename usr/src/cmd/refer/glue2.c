@@ -12,9 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 char refdir[50];
 
 extern int corout();

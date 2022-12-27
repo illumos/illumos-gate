@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "signal.h"
 #include "stdio.h"
 #include "errno.h"
@@ -151,7 +149,7 @@ main(int argc, char *argv[])
 					doDebug,
 					first,
 				oldalarm;
-		
+
 
 	short			status;
 
@@ -182,7 +180,7 @@ main(int argc, char *argv[])
 	 *  Do we have a key?
 	 */
 	if (
-		argc < 2 
+		argc < 2
 	     || !(s_key = getenv("SPOOLER_KEY"))
 	     || !*s_key
 	     || (key = atol(s_key)) <= 0
@@ -216,14 +214,14 @@ main(int argc, char *argv[])
 	clearKey = key;
 
 	prefixString = PREFIX_STRING; pLen = strlen(prefixString);
-	suffixString = SUFFIX_STRING; 
-	printerErrorString = PRINTER_ERROR_STRING; 
+	suffixString = SUFFIX_STRING;
+	printerErrorString = PRINTER_ERROR_STRING;
 	  peLen = strlen(printerErrorString);
 	statusString = STATUS_STRING; sLen = strlen(statusString);
 	jobString = JOB_STRING; jLen = strlen(jobString);
-	paperChangedString = PAPER_CHANGED_STRING; 
+	paperChangedString = PAPER_CHANGED_STRING;
 	  pcLen = strlen(paperChangedString);
-	statusOkString = STATUS_OK_STRING; 
+	statusOkString = STATUS_OK_STRING;
 
    while ((optsw = getopt(argc, argv, "le:s:c:okdO:S:P:")) != EOF) {
 		switch ( optsw ) {
@@ -273,7 +271,7 @@ main(int argc, char *argv[])
 		exit (90);
 		  }
 	if (doDebug) {
-		printf( "start lp.tell for %s key %d mode %s %s\n", 
+		printf( "start lp.tell for %s key %d mode %s %s\n",
 				printer,key,(useLaserWriterMessages ? "LW" : "standard"),
 				(doStdOut ? "doStdOut" : "no output"));
 		printf( "prefix (%s) suffix (%s) printerError (%s)\n",
@@ -301,7 +299,7 @@ main(int argc, char *argv[])
 				bufPtr += pLen;
 				while (*bufPtr == ' ')
 					bufPtr++;
-					
+
 				if (strncmp(printerErrorString, bufPtr,
 						peLen) == 0) {
 					bufPtr += peLen;
@@ -309,12 +307,12 @@ main(int argc, char *argv[])
 						bufPtr++;
 
 					if ((strncmp(bufPtr,paperChangedString,pcLen) == 0) &&
-							 (ptr1 = bufPtr +pcLen) && 
-							 (ptr2 = strchr(ptr1+1,':')) && 
+							 (ptr1 = bufPtr +pcLen) &&
+							 (ptr2 = strchr(ptr1+1,':')) &&
 							 (ptr3 = strchr(ptr2+1,':')) &&
-							 (ptr4 = strchr(ptr3+1,':')) && 
+							 (ptr4 = strchr(ptr3+1,':')) &&
 							 (ptr5 = strchr(ptr4+1,'\n'))) {
-						if (doStdOut) printf("%s",buf); 
+						if (doStdOut) printf("%s",buf);
 						*ptr2 =0;
 						*ptr3= 0;
 						*ptr4= 0;
@@ -332,8 +330,8 @@ main(int argc, char *argv[])
 						(void)putmessage ( msgbuf, S_PAPER_CHANGED, printer, trayNum,
 							paperType, mode, pagesPrinted);
 					} else {
-						if (doStdOut)  printf("%s",buf); 
-						if (ptr1 = strstr(bufPtr,suffixString))  *ptr1 = 0; 
+						if (doStdOut)  printf("%s",buf);
+						if (ptr1 = strstr(bufPtr,suffixString))  *ptr1 = 0;
 						if ( doDebug ) {
 							printf("Send fault: %s key %d (%s)\n",printer,key,bufPtr);
 						}
@@ -355,7 +353,7 @@ main(int argc, char *argv[])
 					(void)putmessage( msgbuf,S_CLEAR_FAULT,printer,clearKey,
 						statusOkString);
 				} else {
-					if (doStdOut)  printf("%s",buf); 
+					if (doStdOut)  printf("%s",buf);
 					if (ptr1 = strstr(bufPtr,suffixString))  *ptr1 = 0;
 					if ( doDebug ) {
 						printf("Server error: %s key %d (%s)\n",printer,key,
@@ -364,7 +362,7 @@ main(int argc, char *argv[])
 					mesgRetType = 0;
 				}
 			} else {
-				if (doStdOut) printf("%s",buf); 
+				if (doStdOut) printf("%s",buf);
 				if (ptr1 = strstr(bufPtr,suffixString))
 					*ptr1 = 0;
 				if (doDebug) {
@@ -388,9 +386,9 @@ main(int argc, char *argv[])
 					alert_text[0] = 0;
 				}
 				strcat (alert_text, buf);
-	 
+
 			} while (fgets(buf, BUFSIZ, stdin));
-	 
+
 			alarm (oldalarm);
 			signal (SIGALRM, oldsignal);
 
@@ -412,8 +410,8 @@ main(int argc, char *argv[])
          			mesgRetType = R_SEND_FAULT;
 				startup ();
 				(void)putmessage(msgbuf, S_SEND_FAULT, printer,
-						key, alert_text); 
-			}  
+						key, alert_text);
+			}
 		}
 
 		if (mesgRetType) {
@@ -433,7 +431,7 @@ main(int argc, char *argv[])
 			if ((status != MOK) && (mesgRetType != R_CLEAR_FAULT))
 				done (94);
 		}
-		
+
 	}
 	done (0);
 
@@ -457,7 +455,7 @@ void			startup ()
 	 */
 	if (!have_contacted_spooler) {
 		if (mopen() == -1) {
-	
+
 			switch (errno) {
 			case ENOMEM:
 			case ENOSPC:

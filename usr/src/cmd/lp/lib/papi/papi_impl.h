@@ -26,8 +26,6 @@
 #ifndef _PAPI_IMPL_H
 #define	_PAPI_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <papi.h>
 
 #ifdef __cplusplus

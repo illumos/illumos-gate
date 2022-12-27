@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Copyright (c) 1979 Regents of the University of California	*/
 /* Modified to:							*/
 /* 1) remember the name of the first tc= parameter		*/

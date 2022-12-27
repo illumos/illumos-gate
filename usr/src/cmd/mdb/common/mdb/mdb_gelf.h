@@ -26,8 +26,6 @@
 #ifndef	_MDB_GELF_H
 #define	_MDB_GELF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_nv.h>
 #include <mdb/mdb_io.h>
 

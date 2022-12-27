@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<proc_service.h>
 #include	<link.h>
 #include	<rtld_db.h>

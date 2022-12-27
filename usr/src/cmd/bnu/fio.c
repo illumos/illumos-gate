@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * flow control protocol.
@@ -45,7 +43,7 @@
  * PAD X.28 command mode, be sure to disable that access
  * (PAD par 1). Also make sure both flow control pars
  * (5 and 12) are set. The CR used in this proto is meant
- * to trigger packet transmission, hence par 3 should be 
+ * to trigger packet transmission, hence par 3 should be
  * set to 2; a good value for the Idle Timer (par 4) is 10.
  * All other pars should be set to 0.
  *
@@ -82,7 +80,7 @@ static int frdblk(), fwrblk();
 
 #define FOBUFSIZ	4096	/* for X.25 interfaces: set equal to packet size;
 				 * otherwise make as large as feasible to reduce
-				 * number of write system calls 
+				 * number of write system calls
 				 */
 
 #ifndef MAXMSGLEN

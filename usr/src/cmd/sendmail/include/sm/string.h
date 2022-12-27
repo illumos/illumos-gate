@@ -9,8 +9,6 @@
  *	$Id: string.h,v 1.38 2003/10/10 17:56:57 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  libsm string manipulation
 */

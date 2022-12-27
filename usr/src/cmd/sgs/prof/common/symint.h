@@ -33,8 +33,6 @@
 #ifndef _SYMINT_H
 #define	_SYMINT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "symintHdr.h"
 
 #ifdef  __cplusplus

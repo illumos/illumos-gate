@@ -27,8 +27,6 @@
 #ifndef _RMT_H
 #define	_RMT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mtio.h>
 
 #ifdef	__cplusplus

@@ -26,9 +26,6 @@
 
 /*    Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*      All Rights Reserved   */
-  
-  
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	<sys/param.h>
@@ -104,7 +101,7 @@
  *			l	Label
  *			s	Severity
  *			m	Message
- *	
+ *
  *	lbl		Buffer for the label-component of a message
  *	txt		Buffer for the text-component of a message
  */
@@ -125,7 +122,7 @@ static	char	txt[MM_MXTXTLN+1];
  *	management system.  It reserves a device from each of the device
  *	lists presented to it, reserving them on the key (<key>).  If no
  *	device-lists are provided, the command lists those devices reserved
- *	on the given key (<key>).  If no key (<key>) is provided, the 
+ *	on the given key (<key>).  If no key (<key>) is provided, the
  *	command lists all devices currently reserved.
  *
  *  Options:  None
@@ -142,7 +139,7 @@ static	char	txt[MM_MXTXTLN+1];
  *	EX_ERROR	1	A syntax or other error occurred
  *	EX_TABLES	2	Either the device-table or the device-
  *				reservation table couldn't be opened as needed
- *	EX_NOALLOC	3	The device-reservation request couldn't be 
+ *	EX_NOALLOC	3	The device-reservation request couldn't be
  *				fulfilled.
  */
 
@@ -169,7 +166,7 @@ main(int argc, char *argv[])
 	int			c;		/* Option character */
 	int			i;		/* Temp counter */
 
-	
+
 	/*
 	 * Initializations
 	 */
@@ -180,13 +177,13 @@ main(int argc, char *argv[])
 	(void) strlcat(strcpy(lbl, "UX:"), p, sizeof(lbl));
 
 
-	/* 
-	 * Allow only the text component of messages to be written 
-	 * (this will probably go away in SVR4.1) 
+	/*
+	 * Allow only the text component of messages to be written
+	 * (this will probably go away in SVR4.1)
 	 */
 
 	(void) putenv("MSGVERB=text");
-	
+
 
 	/*
 	 * Parse the options from the command line
@@ -344,7 +341,7 @@ main(int argc, char *argv[])
 	    /* Attempt to allocate the devices */
 	    if (alloclist = devreserv(key, reqlist)) {
 
-		/* 
+		/*
 		 * For each allocated device, write the alias to stdout
 		 * and free the space allocated for the string.
 		 */
@@ -389,7 +386,7 @@ main(int argc, char *argv[])
  *
  *  Arguments:
  *	char **args	The address of the first argument of the list of
- *			lists of devices to allocate.   (This list is 
+ *			lists of devices to allocate.   (This list is
  *			terminated with a (char *) NULL.)
  *
  *  Returns:  char ***
@@ -451,7 +448,7 @@ buildreqlist(args)
  *  void freereqlist(list)
  *	char ***list
  *
- *	This function frees the space allocated to the list of lists 
+ *	This function frees the space allocated to the list of lists
  *	referenced by <list>
  *
  *  Arguments:
@@ -460,7 +457,7 @@ buildreqlist(args)
  *  Returns:  void
  */
 
-static void 
+static void
 freereqlist(list)
 	char ***list;
 {
@@ -492,7 +489,7 @@ freereqlist(list)
  *	a,b,,,,c,,d contains 4 elememts (if delims contains a ',')
  */
 
-static int 
+static int
 ndevsin(list, delims)
 	char   *list;			/* List to scan */
 	char   *delims;			/* Delimiters */

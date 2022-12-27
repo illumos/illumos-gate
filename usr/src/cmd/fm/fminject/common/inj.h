@@ -27,8 +27,6 @@
 #ifndef _INJ_H
 #define	_INJ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * FMA Error injector
  */

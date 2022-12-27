@@ -26,9 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -509,7 +506,7 @@ register struct sacmsg *sm;
 
 /*
  * sendsig - send a signal to the port monitor
- * 
+ *
  *	args:	sp - pointer to sac's port monitor infomation for
  *		     designated port monitor
  *		signo - signal number to send

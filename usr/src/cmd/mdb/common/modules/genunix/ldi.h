@@ -28,8 +28,6 @@
 #ifndef	_MDB_LDI_H
 #define	_MDB_LDI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

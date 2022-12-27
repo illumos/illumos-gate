@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "nscd_db.h"
 
 static nscd_seq_num_t		acc_seq = 1;

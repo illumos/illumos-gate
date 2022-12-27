@@ -8,8 +8,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 SM_IDSTR(id, "@(#)$Id: t-strl.c,v 1.13 2001/08/27 23:00:05 gshapiro Exp $")
 

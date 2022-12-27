@@ -28,8 +28,6 @@
  * this module contains routines to print portions of the parse tree.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

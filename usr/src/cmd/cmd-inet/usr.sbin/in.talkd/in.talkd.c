@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Invoked by the Internet daemon to handle talk requests
  * Processes talk requests until MAX_LIFE seconds go by with

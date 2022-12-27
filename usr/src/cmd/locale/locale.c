@@ -31,8 +31,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * locale: get locale-specific information
  * usage:  locale [-a|-m]

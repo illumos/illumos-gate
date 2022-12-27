@@ -27,8 +27,6 @@
 #ifndef	_RES_H
 #define	_RES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/acctctl.h>
 
 #ifdef	__cplusplus

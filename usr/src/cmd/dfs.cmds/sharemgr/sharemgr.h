@@ -27,8 +27,6 @@
 #ifndef _SHAREMGR_H
 #define	_SHAREMGR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

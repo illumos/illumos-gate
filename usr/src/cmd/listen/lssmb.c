@@ -28,9 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lssmb.c:	Contains all code specific to the  MS-NET file server.
  *		Undef SMBSERVER to remove SMB support.
@@ -114,7 +111,7 @@ char **argv;		/* server arguments */
 	 */
 
 	if (*(bp+FSP_COM) != FSPnegprot){
-		sprintf(logbuf, "%s: Bad Command Code, 0x%x", 
+		sprintf(logbuf, "%s: Bad Command Code, 0x%x",
 			Msnet, *(bp+FSP_COM));
 		goto badexit;
 	}
@@ -191,7 +188,7 @@ char **argv;		/* server arguments */
 
 	m_size = sizeof(char *) * (twos + i + 4);
 	if((args = (char **)malloc((unsigned)m_size)) == 0){
-		sprintf(logbuf, "%s: Can't malloc arg space, %d bytes", 
+		sprintf(logbuf, "%s: Can't malloc arg space, %d bytes",
 			Msnet, m_size);
 		goto badexit;
 	}
@@ -212,7 +209,7 @@ char **argv;		/* server arguments */
 
 		m_size = strlen(++q) + 1 + 2;
 		if((args[i] = malloc((unsigned)m_size)) == 0){
-			sprintf(logbuf, 
+			sprintf(logbuf,
 				"%s: Can't malloc Server Path buf, %d bytes",
 				Msnet, m_size);
 			goto badexit;

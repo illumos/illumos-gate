@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <fcntl.h>
 #include "sh.h"
@@ -168,7 +166,7 @@ execute(t, wanttty, pipein, pipeout)
 				struct sigvec sigv;
 			} sv;
 
-			/* 
+			/*
 			 * Prepare for the vfork by saving everything
 			 * that the child corrupts before it exec's.
 			 * Note that in some signal implementations
@@ -221,7 +219,7 @@ execute(t, wanttty, pipein, pipeout)
 				if (setintr)
 					ignint =
 					    (tpgrp == -1 && (t->t_dflg&FINT))
-					    || gointr 
+					    || gointr
 						&& eq(gointr, S_MINUS/*"-"*/);
 				pgrp = pcurrjob ? pcurrjob->p_jobid : getpid();
 				child++;

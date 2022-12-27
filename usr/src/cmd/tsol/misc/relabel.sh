@@ -22,12 +22,10 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This program is invoked to do the actual file transfer
 # associated with an invocation of the setflabel(3TSOL) function.
 #
-# It executes in the global zone with the user's identity and 
+# It executes in the global zone with the user's identity and
 # basic privileges plus the file_dac_search privilege.  This
 # script should not not assume that stdio is available or that
 # any particular environment variables are set.  In particular,

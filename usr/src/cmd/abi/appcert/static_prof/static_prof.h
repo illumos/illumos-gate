@@ -27,8 +27,6 @@
 #ifndef	_STATIC_PROF_H
 #define	_STATIC_PROF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

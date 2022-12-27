@@ -26,8 +26,6 @@
  * constrained environments, such as within a DE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
 

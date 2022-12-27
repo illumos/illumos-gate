@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * eventlog.c: support for the scadm loghistory option (to display the
  * service processor log history)

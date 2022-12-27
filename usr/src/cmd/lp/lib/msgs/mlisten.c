@@ -26,8 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
 # include	<unistd.h>
 # include	<stdlib.h>
 # include	<string.h>
@@ -214,7 +212,7 @@ mlisten()
 		errno = EINTR;
 		return(NULL);
 	    }
-	    
+
 	    /*
 	    **	Scan the connection table and remove any holes
 	    */
@@ -336,14 +334,14 @@ mlisten()
 		 * privilege are print administrators
 		 */
 		md->admin = (md->uid == 0 || md->uid == Lp_Uid);
-		if (md->admin == 0) { 
+		if (md->admin == 0) {
 			struct passwd *pw = NULL;
 
 			if ((pw = getpwuid(md->uid)) != NULL)
 				md->admin = chkauthattr("solaris.print.admin",
 							pw->pw_name);
 		}
-	
+
 		get_peer_label(md->readfd, &md->slabel);
 
 		if (mlistenadd(md, POLLIN) != 0)
@@ -411,7 +409,7 @@ mlisten()
 		    }
 
 		    /*
-		    **	POLLERR means an error message is on the 
+		    **	POLLERR means an error message is on the
 		    **	stream.  Since this is totally unexpected,
 		    **	the assumption is made that this stream will
 		    **	be flagged POLLNVAL next time through poll
@@ -546,7 +544,7 @@ mon_discon(MESG * md, void (*fn)())
 	    errno = ENOMEM;
 	    return(-1);
 	}
-    
+
     size--;
     md->on_discon[size] = NULL;
     size--;

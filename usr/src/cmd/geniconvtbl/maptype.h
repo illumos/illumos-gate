@@ -27,9 +27,6 @@
 #ifndef	_ICONV_TM_MAPTYPE_H
 #define	_ICONV_TM_MAPTYPE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

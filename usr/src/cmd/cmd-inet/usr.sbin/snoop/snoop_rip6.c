@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
-
 #include <ctype.h>
 #include <fcntl.h>
 #include <sys/socket.h>

@@ -27,8 +27,6 @@
 #ifndef	_MDB_SIGNAL_H
 #define	_MDB_SIGNAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -27,8 +27,6 @@
 #ifndef	__CRLE_H
 #define	__CRLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "machdep.h"
 
 #ifdef	__cplusplus

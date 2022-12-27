@@ -15,8 +15,6 @@
 #ifndef CSH_SIGNAL_H
 #define CSH_SIGNAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * 4.3BSD signal compatibility header
  *

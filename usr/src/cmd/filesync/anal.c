@@ -56,7 +56,6 @@
  *	pass ... since we don't have complete information about files that
  *	were not evaluated in the previous pass.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -32,8 +32,6 @@
 #ifndef _KDB5_LDAP_REALM_H_
 #define _KDB5_LDAP_REALM_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define BUFF_LEN 		64      /* Max len of enctype string */
 #define MAX_PRINC_SIZE 		256
 

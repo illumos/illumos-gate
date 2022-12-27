@@ -27,8 +27,6 @@
 #ifndef	_UTILS_H
 #define	_UTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <libintl.h>

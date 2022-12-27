@@ -27,8 +27,6 @@
 #ifndef _OSPF_H
 #define	_OSPF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Definitions for parsing OSPF packets (RFC 2328 and RFC 2740)
  */

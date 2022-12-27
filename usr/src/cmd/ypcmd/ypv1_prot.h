@@ -26,8 +26,6 @@
 #ifndef	__YPV1_PROT_H
 #define	__YPV1_PROT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -35,10 +33,10 @@ extern "C" {
 /*
  * This contains symbol and structure definitions used in supporting the old
  * "v1" protocol.  They were previously defined in yp_prot.h.
- * 
+ *
  * This file exists so that the NIS system can provide backward compatibility.
  * Normal NIS client processes should not use this interface:  the old
- * protocol will not be supported in the next release.  
+ * protocol will not be supported in the next release.
  */
 #define YPOLDVERS		(YPVERS - 1)
 #define YPOLDPROC_NULL		((u_long)0)

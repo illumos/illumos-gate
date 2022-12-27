@@ -27,8 +27,6 @@
 #ifndef	_PSEXP_H
 #define	_PSEXP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <procfs.h>
 #include <regex.h>

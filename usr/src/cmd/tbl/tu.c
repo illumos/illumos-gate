@@ -11,8 +11,6 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tu.c: draws horizontal lines */
 # include "t..c"

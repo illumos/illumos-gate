@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOPIPE_H
 #define	_MULTIMEDIA_AUDIOPIPE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <AudioUnixfile.h>
 
 #ifdef __cplusplus

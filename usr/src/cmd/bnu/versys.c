@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 extern int getsysline();
@@ -39,7 +36,7 @@ extern void sysreset();
  * verify system name
  * input:
  *	name	-> system name (char name[NAMESIZE])
- * returns:  
+ * returns:
  *	0	-> success
  *	FAIL	-> failure
  */
@@ -68,7 +65,7 @@ char *name;
 	}
 
 	while (getsysline(line, sizeof(line))) {
-		if((line[0] == '#') || (line[0] == ' ') || (line[0] == '\t') || 
+		if((line[0] == '#') || (line[0] == ' ') || (line[0] == '\t') ||
 			(line[0] == '\n'))
 			continue;
 

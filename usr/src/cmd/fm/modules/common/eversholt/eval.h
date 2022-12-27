@@ -29,8 +29,6 @@
 #ifndef	_EFT_EVAL_H
 #define	_EFT_EVAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
