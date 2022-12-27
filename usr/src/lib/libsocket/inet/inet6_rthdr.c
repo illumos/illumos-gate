@@ -24,8 +24,6 @@
  * All rights reserved.  Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This code is conformant to revision 7 of 2292bis.  Some of these functions
  * were provided (named inet6_rthdr_) in a very similar form in RFC 2292.

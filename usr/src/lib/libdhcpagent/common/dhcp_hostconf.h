@@ -26,8 +26,6 @@
 #ifndef	_DHCP_HOSTCONF_H
 #define	_DHCP_HOSTCONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <time.h>
 #include <netinet/in.h>

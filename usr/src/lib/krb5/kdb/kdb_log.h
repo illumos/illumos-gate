@@ -6,8 +6,6 @@
 #ifndef	_KDB_LOG_H
 #define	_KDB_LOG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <k5-int.h>
 #include <iprop_hdr.h>
 #include <iprop.h>

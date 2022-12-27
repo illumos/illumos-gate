@@ -27,8 +27,6 @@
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * uses wcspbrk and wcsspn to break string into tokens on
  * sequentially subsequent calls. returns WNULL when no

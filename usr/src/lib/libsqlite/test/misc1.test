@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -411,7 +409,7 @@ do_test misc1-12.13 {
 } {1 2 2 3 4 2}
 
 # There was a problem with realloc() in the OP_MemStore operation of
-# the VDBE.  A buffer was being reallocated but some pointers into 
+# the VDBE.  A buffer was being reallocated but some pointers into
 # the old copy of the buffer were not being moved over to the new copy.
 # The following code tests for the problem.
 #
@@ -529,7 +527,7 @@ do_test misc1-17.1 {
     CREATE TABLE RealTable(TestID INTEGER PRIMARY KEY, TestString TEXT);
     CREATE TEMP TABLE TempTable(TestID INTEGER PRIMARY KEY, TestString TEXT);
     CREATE TEMP TRIGGER trigTest_1 AFTER UPDATE ON TempTable BEGIN
-      INSERT INTO RealTable(TestString) 
+      INSERT INTO RealTable(TestString)
          SELECT new.TestString FROM TempTable LIMIT 1;
     END;
     INSERT INTO TempTable(TestString) VALUES ('1');

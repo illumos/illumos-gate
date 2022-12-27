@@ -27,8 +27,6 @@
 #ifndef _LIBZFS_JNI_DISKMGT_H
 #define	_LIBZFS_JNI_DISKMGT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libdiskmgt.h>
 #include <sys/varargs.h>
 

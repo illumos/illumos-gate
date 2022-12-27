@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by Mortice Kern Systems Inc.  All rights reserved.
  *
@@ -34,7 +32,7 @@
 
  /*
  * For EBCDIC support:
- *    the variant structure that contains the 13 POSIX.2 portable characters 
+ *    the variant structure that contains the 13 POSIX.2 portable characters
  *    that are variant in EBCDIC based code pages.
  */
 

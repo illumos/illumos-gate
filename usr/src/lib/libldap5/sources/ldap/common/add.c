@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -30,7 +28,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -48,7 +46,7 @@ static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of 
  *			filled in.
  *
  * Example:
- *	LDAPMod	*attrs[] = { 
+ *	LDAPMod	*attrs[] = {
  *			{ 0, "cn", { "babs jensen", "babs", 0 } },
  *			{ 0, "sn", { "jensen", 0 } },
  *			{ 0, "objectClass", { "person", 0 } },
@@ -102,7 +100,7 @@ ldap_add_ext( LDAP *ld, const char *dn, LDAPMod **attrs,
 		return( LDAP_PARAM_ERROR );
 	}
 
-	if ( !NSLDAPI_VALID_LDAPMESSAGE_POINTER( msgidp )) 
+	if ( !NSLDAPI_VALID_LDAPMESSAGE_POINTER( msgidp ))
         {
 		LDAP_SET_LDERRNO( ld, LDAP_PARAM_ERROR, NULL, NULL );
 		return( LDAP_PARAM_ERROR );

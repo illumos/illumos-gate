@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * delay.c
  *
@@ -44,7 +42,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/delay.c 1.1 1995/06/05 
 #include <private.h>
 
 /*
- * Insert an N milli-second delay by inserting pad characters 
+ * Insert an N milli-second delay by inserting pad characters
  * into the output stream.
  */
 int
@@ -57,7 +55,7 @@ int ms;
 #ifdef M_CURSES_TRACE
 	__m_trace("delay_output(%d)", ms);
 #endif
-	
+
 	baud = baudrate();
 
 	if (!no_pad_char) {

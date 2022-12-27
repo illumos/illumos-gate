@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2003 April 6
 **
@@ -37,7 +34,7 @@ static int getBoolean(const char *z){
 
 /*
 ** Interpret the given string as a safety level.  Return 0 for OFF,
-** 1 for ON or NORMAL and 2 for FULL.  Return 1 for an empty or 
+** 1 for ON or NORMAL and 2 for FULL.  Return 1 for an empty or
 ** unrecognized string argument.
 **
 ** Note that the values returned are one less that the values that
@@ -149,7 +146,7 @@ static int flagPragma(Parse *pParse, const char *zLeft, const char *zRight){
 }
 
 /*
-** Process a pragma statement.  
+** Process a pragma statement.
 **
 ** Pragmas are of this form:
 **
@@ -180,7 +177,7 @@ void sqlitePragma(Parse *pParse, Token *pLeft, Token *pRight, int minusFlag){
     sqliteFree(zRight);
     return;
   }
- 
+
   /*
   **  PRAGMA default_cache_size
   **  PRAGMA default_cache_size=N
@@ -428,7 +425,7 @@ void sqlitePragma(Parse *pParse, Token *pLeft, Token *pRight, int minusFlag){
       pIdx = pTab->pIndex;
     }
     if( pTab && pIdx ){
-      int i = 0; 
+      int i = 0;
       static VdbeOpList indexListPreface[] = {
         { OP_ColumnName,  0, 0,       "seq"},
         { OP_ColumnName,  1, 0,       "name"},
@@ -456,7 +453,7 @@ void sqlitePragma(Parse *pParse, Token *pLeft, Token *pRight, int minusFlag){
       pFK = pTab->pFKey;
     }
     if( pTab && pFK ){
-      int i = 0; 
+      int i = 0;
       static VdbeOpList indexListPreface[] = {
         { OP_ColumnName,  0, 0,       "id"},
         { OP_ColumnName,  1, 0,       "seq"},
@@ -703,7 +700,7 @@ void sqlitePragma(Parse *pParse, Token *pLeft, Token *pRight, int minusFlag){
           sqliteVdbeChangeP2(v, addr+7, addr+ArraySize(cntIdx));
           sqliteVdbeChangeP3(v, addr+10, pIdx->zName, P3_STATIC);
         }
-      } 
+      }
     }
     addr = sqliteVdbeAddOpList(v, ArraySize(endCode), endCode);
     sqliteVdbeChangeP2(v, addr+2, addr+ArraySize(endCode));

@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /*
   * Routine to disable IP-level socket options. This code was taken from 4.4BSD
   * rlogind and kernel source, but all mistakes in it are my fault.
@@ -70,14 +68,14 @@ struct request_info *request;
 	 * does the right thing with 4.[34]BSD derivatives and Solaris 2, but
 	 * may occasionally miss source routing options on incompatible
 	 * systems such as Linux. Their choice.
-	 * 
+	 *
 	 * Look for source routing options. Drop the connection when one is
 	 * found. Just wiping the IP options is insufficient: we would still
 	 * help the attacker by providing a real TCP sequence number, and the
 	 * attacker would still be able to send packets (blind spoofing). I
 	 * discussed this attack with Niels Provos, half a year before the
 	 * attack was described in open mailing lists.
-	 * 
+	 *
 	 * It would be cleaner to just return a yes/no reply and let the caller
 	 * decide how to deal with it. Resident servers should not terminate.
 	 * However I am not prepared to make changes to internal interfaces

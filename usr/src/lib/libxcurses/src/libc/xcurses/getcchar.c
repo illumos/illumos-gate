@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * getcchar.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -57,10 +55,10 @@ getcchar(const cchar_t *c, wchar_t *wcs, attr_t *at, short *co, void *opts)
 
 	*at = c->_at;
 	*co = (short) c->_co;
-	
+
 	for (i = 0; i < c->_n; ++i)
 		*wcs++ = c->_wc[i];
 	*wcs = M_MB_L('\0');
-		
+
 	return __m_return_code("getcchar", OK);
 }

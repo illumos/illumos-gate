@@ -3,10 +3,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  *
  * The contents of this file are subject to the Netscape Public License
@@ -256,10 +252,10 @@ int nslberi_ber_realloc( BerElement *ber, ber_len_t len );
 
 
 
-/* blame: dboreham 
+/* blame: dboreham
  * slapd spends much of its time doing memcpy's for the ber code.
  * Most of these are single-byte, so we special-case those and speed
- * things up considerably. 
+ * things up considerably.
  */
 
 #ifdef sunos4

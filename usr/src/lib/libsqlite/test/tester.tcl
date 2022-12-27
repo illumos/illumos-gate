@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -78,7 +76,7 @@ set nProb 0
 set skip_test 0
 set failList {}
 
-# Invoke the do_test procedure to run a single test 
+# Invoke the do_test procedure to run a single test
 #
 proc do_test {name cmd expected} {
   global argv nErr nTest skip_test
@@ -86,7 +84,7 @@ proc do_test {name cmd expected} {
     set skip_test 0
     return
   }
-  if {[llength $argv]==0} { 
+  if {[llength $argv]==0} {
     set go 1
   } else {
     set go 0
@@ -125,7 +123,7 @@ proc do_probtest {name cmd expected} {
     set skip_test 0
     return
   }
-  if {[llength $argv]==0} { 
+  if {[llength $argv]==0} {
     set go 1
   } else {
     set go 0
@@ -148,7 +146,7 @@ proc do_probtest {name cmd expected} {
     puts "NOTE: The results of the previous test depend on system load"
     puts "and processor speed.  The test may sometimes fail even if the"
     puts "library is working correctly."
-    incr nProb	
+    incr nProb
   } else {
     puts " Ok"
   }

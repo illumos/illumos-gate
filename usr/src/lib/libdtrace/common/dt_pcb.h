@@ -27,8 +27,6 @@
 #ifndef	_DT_PCB_H
 #define	_DT_PCB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <dtrace.h>
 #include <setjmp.h>
 #include <stdio.h>

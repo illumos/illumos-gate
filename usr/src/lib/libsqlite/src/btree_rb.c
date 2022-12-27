@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2003 Feb 4
 **
@@ -16,7 +13,7 @@
 **
 ** This file implements an in-core database using Red-Black balanced
 ** binary trees.
-** 
+**
 ** It was contributed to SQLite by anonymous on 2003-Feb-04 23:24:49 UTC.
 */
 #include "btree.h"
@@ -58,7 +55,7 @@ static BtCursorOps sqliteRbtreeCursorOps;
 struct BtRollbackOp {
   u8 eOp;
   int iTab;
-  int nKey; 
+  int nKey;
   void *pKey;
   int nData;
   void *pData;
@@ -82,7 +79,7 @@ struct Rbtree {
   u8 isAnonymous; /* True if this Rbtree is to be deleted when closed */
   u8 eTransState; /* State of this Rbtree wrt transactions */
 
-  BtRollbackOp *pTransRollback; 
+  BtRollbackOp *pTransRollback;
   BtRollbackOp *pCheckRollback;
   BtRollbackOp *pCheckRollbackTail;
 };
@@ -153,10 +150,10 @@ static int memRbtreePrevious(RbtCursor* pCur, int *pRes);
 ** cursors point to the same table were opened with wrFlag==1
 ** then this routine returns SQLITE_OK.
 **
-** In addition to checking for read-locks (where a read-lock 
+** In addition to checking for read-locks (where a read-lock
 ** means a cursor opened with wrFlag==0) this routine also NULLs
 ** out the pNode field of all other cursors.
-** This is necessary because an insert 
+** This is necessary because an insert
 ** or delete might change erase the node out from under
 ** another cursor.
 */
@@ -176,7 +173,7 @@ static int checkReadLocks(RbtCursor *pCur){
  * The key-compare function for the red-black trees. Returns as follows:
  *
  * (key1 < key2)             -1
- * (key1 == key2)             0 
+ * (key1 == key2)             0
  * (key1 > key2)              1
  *
  * Keys are compared using memcmp(). If one key is an exact prefix of the
@@ -320,11 +317,11 @@ static void print_node(BtRbNode *pNode)
     (void)print_node;
 }
 
-/* 
+/*
  * Check the following properties of the red-black tree:
  * (1) - If a node is red, both of it's children are black
  * (2) - Each path from a given node to a leaf (NULL) node passes thru the
- *       same number of black nodes 
+ *       same number of black nodes
  *
  * If there is a problem, append a description (using append_val() ) to *msg.
  */
@@ -332,7 +329,7 @@ static void check_redblack_tree(BtRbTree * tree, char ** msg)
 {
   BtRbNode *pNode;
 
-  /* 0 -> came from parent 
+  /* 0 -> came from parent
    * 1 -> came from left
    * 2 -> came from right */
   int prev_step = 0;
@@ -343,7 +340,7 @@ static void check_redblack_tree(BtRbTree * tree, char ** msg)
       case 0:
         if( pNode->pLeft ){
           pNode = pNode->pLeft;
-        }else{ 
+        }else{
           prev_step = 1;
         }
         break;
@@ -369,7 +366,7 @@ static void check_redblack_tree(BtRbTree * tree, char ** msg)
         }
 
         /* Check red-black property (2) */
-        { 
+        {
           int leftHeight = 0;
           int rightHeight = 0;
           if( pNode->pLeft ){
@@ -399,12 +396,12 @@ static void check_redblack_tree(BtRbTree * tree, char ** msg)
       default: assert(0);
     }
   }
-} 
+}
 
 /*
  * Node pX has just been inserted into pTree (by code in sqliteRbtreeInsert()).
  * It is possible that pX is a red node with a red parent, which is a violation
- * of the red-black tree properties. This function performs rotations and 
+ * of the red-black tree properties. This function performs rotations and
  * color changes to rebalance the tree
  */
 static void do_insert_balancing(BtRbTree *pTree, BtRbNode *pX)
@@ -427,15 +424,15 @@ static void do_insert_balancing(BtRbTree *pTree, BtRbNode *pX)
     assert( pGrandparent->isBlack );
 
     /* Uncle of pX may or may not exist. */
-    if( pX->pParent == pGrandparent->pLeft ) 
+    if( pX->pParent == pGrandparent->pLeft )
       pUncle = pGrandparent->pRight;
-    else 
+    else
       pUncle = pGrandparent->pLeft;
 
     /* If the uncle of pX exists and is red, we do the following:
      *       |                 |
      *      G(b)              G(r)
-     *      /  \              /  \        
+     *      /  \              /  \
      *   U(r)   P(r)       U(b)  P(b)
      *            \                \
      *           X(r)              X(r)
@@ -453,10 +450,10 @@ static void do_insert_balancing(BtRbTree *pTree, BtRbNode *pX)
       if( pX->pParent == pGrandparent->pLeft ){
         if( pX == pX->pParent->pRight ){
           /* If pX is a right-child, do the following transform, essentially
-           * to change pX into a left-child: 
-           *       |                  | 
+           * to change pX into a left-child:
+           *       |                  |
            *      G(b)               G(b)
-           *      /  \               /  \        
+           *      /  \               /  \
            *   P(r)   U(b)        X(r)  U(b)
            *      \                /
            *     X(r)            P(r) <-- new X
@@ -467,10 +464,10 @@ static void do_insert_balancing(BtRbTree *pTree, BtRbNode *pX)
           leftRotate(pTree, pX);
         }
 
-        /* Do the following transform, which balances the tree :) 
-         *       |                  | 
+        /* Do the following transform, which balances the tree :)
+         *       |                  |
          *      G(b)               P(b)
-         *      /  \               /  \        
+         *      /  \               /  \
          *   P(r)   U(b)        X(r)  G(r)
          *    /                         \
          *  X(r)                        U(b)
@@ -499,9 +496,9 @@ static void do_insert_balancing(BtRbTree *pTree, BtRbNode *pX)
 }
 
 /*
- * A child of pParent, which in turn had child pX, has just been removed from 
+ * A child of pParent, which in turn had child pX, has just been removed from
  * pTree (the figure below depicts the operation, Z is being removed). pParent
- * or pX, or both may be NULL.  
+ * or pX, or both may be NULL.
  *                |           |
  *                P           P
  *               / \         / \
@@ -510,13 +507,13 @@ static void do_insert_balancing(BtRbTree *pTree, BtRbNode *pX)
  *            X  nil
  *
  * This function is only called if Z was black. In this case the red-black tree
- * properties have been violated, and pX has an "extra black". This function 
+ * properties have been violated, and pX has an "extra black". This function
  * performs rotations and color-changes to re-balance the tree.
  */
-static 
+static
 void do_delete_balancing(BtRbTree *pTree, BtRbNode *pX, BtRbNode *pParent)
 {
-  BtRbNode *pSib; 
+  BtRbNode *pSib;
 
   /* TODO: Comment this code! */
   while( pX != pTree->pHead && (!pX || pX->isBlack) ){
@@ -530,7 +527,7 @@ void do_delete_balancing(BtRbTree *pTree, BtRbNode *pX, BtRbNode *pParent)
       }
       if( !pSib ){
         pX = pParent;
-      }else if( 
+      }else if(
           (!pSib->pLeft  || pSib->pLeft->isBlack) &&
           (!pSib->pRight || pSib->pRight->isBlack) ) {
         pSib->isBlack = 0;
@@ -558,7 +555,7 @@ void do_delete_balancing(BtRbTree *pTree, BtRbNode *pX, BtRbNode *pParent)
       }
       if( !pSib ){
         pX = pParent;
-      }else if( 
+      }else if(
           (!pSib->pLeft  || pSib->pLeft->isBlack) &&
           (!pSib->pRight || pSib->pRight->isBlack) ){
         pSib->isBlack = 0;
@@ -632,7 +629,7 @@ int sqliteRbtreeOpen(
   ** think that the database in uninitialised and refuse to attach
   */
   (*ppRbtree)->aMetaData[2] = 4;
-  
+
   return SQLITE_OK;
 
 open_no_mem:
@@ -666,7 +663,7 @@ static int memRbtreeCreateTable(Rbtree* tree, int* n)
 }
 
 /*
- * Delete table n from the supplied Rbtree. 
+ * Delete table n from the supplied Rbtree.
  */
 static int memRbtreeDropTable(Rbtree* tree, int n)
 {
@@ -701,7 +698,7 @@ static int memRbtreeKeyCompare(RbtCursor* pCur, const void *pKey, int nKey,
     if( (pCur->pNode->nKey - nIgnore) < 0 ){
       *pRes = -1;
     }else{
-      *pRes = key_compare(pCur->pNode->pKey, pCur->pNode->nKey-nIgnore, 
+      *pRes = key_compare(pCur->pNode->pKey, pCur->pNode->nKey-nIgnore,
           pKey, nKey);
     }
   }
@@ -743,7 +740,7 @@ static int memRbtreeCursor(
  * define what database the record should be inserted into.  The cursor
  * is left pointing at the new record.
  *
- * If the key exists already in the tree, just replace the data. 
+ * If the key exists already in the tree, just replace the data.
  */
 static int memRbtreeInsert(
   RbtCursor* pCur,
@@ -764,7 +761,7 @@ static int memRbtreeInsert(
     return SQLITE_LOCKED; /* The table pCur points to has a read lock */
   }
 
-  /* Take a copy of the input data now, in case we need it for the 
+  /* Take a copy of the input data now, in case we need it for the
    * replace case */
   pData = sqliteMallocRaw(nData);
   if( sqlite_malloc_failed ) return SQLITE_NOMEM;
@@ -773,12 +770,12 @@ static int memRbtreeInsert(
   /* Move the cursor to a node near the key to be inserted. If the key already
    * exists in the table, then (match == 0). In this case we can just replace
    * the data associated with the entry, we don't need to manipulate the tree.
-   * 
+   *
    * If there is no exact match, then the cursor points at what would be either
    * the predecessor (match == -1) or successor (match == 1) of the
    * searched-for key, were it to be inserted. The new node becomes a child of
    * this node.
-   * 
+   *
    * The new node is initially red.
    */
   memRbtreeMoveto( pCur, pKey, nKey, &match);
@@ -790,7 +787,7 @@ static int memRbtreeInsert(
     if( sqlite_malloc_failed ) return SQLITE_NOMEM;
     memcpy(pNode->pKey, pKey, nKey);
     pNode->nData = nData;
-    pNode->pData = pData; 
+    pNode->pData = pData;
     if( pCur->pNode ){
       switch( match ){
         case -1:
@@ -829,7 +826,7 @@ static int memRbtreeInsert(
       btreeLogRollbackOp(pCur->pRbtree, pOp);
     }
 
-  }else{ 
+  }else{
     /* No need to insert a new node in the tree, as the key already exists.
      * Just clobber the current nodes data. */
 
@@ -892,7 +889,7 @@ static int memRbtreeMoveto(
         pCur->pNode = pCur->pNode->pRight;
         break;
     }
-  } 
+  }
 
   /* If (pCur->pNode == NULL), then we have failed to find a match. Set
    * pCur->pNode to pTmp, which is either NULL (if the tree is empty) or the
@@ -910,8 +907,8 @@ static int memRbtreeMoveto(
 ** Delete the entry that the cursor is pointing to.
 **
 ** The cursor is left pointing at either the next or the previous
-** entry.  If the cursor is left pointing to the next entry, then 
-** the pCur->eSkip flag is set to SKIP_NEXT which forces the next call to 
+** entry.  If the cursor is left pointing to the next entry, then
+** the pCur->eSkip flag is set to SKIP_NEXT which forces the next call to
 ** sqliteRbtreeNext() to be a no-op.  That way, you can always call
 ** sqliteRbtreeNext() after a delete and the cursor will be left
 ** pointing to the first entry after the deleted entry.  Similarly,
@@ -939,7 +936,7 @@ static int memRbtreeDelete(RbtCursor* pCur)
     return SQLITE_OK;
   }
 
-  /* If we are not currently doing a rollback, set up a rollback op for this 
+  /* If we are not currently doing a rollback, set up a rollback op for this
    * deletion */
   if( pCur->pRbtree->eTransState != TRANS_ROLLBACK ){
     BtRollbackOp *pOp = sqliteMalloc( sizeof(BtRollbackOp) );
@@ -993,7 +990,7 @@ static int memRbtreeDelete(RbtCursor* pCur)
     }
   }
 
-  /* pZ now points at the node to be spliced out. This block does the 
+  /* pZ now points at the node to be spliced out. This block does the
    * splicing. */
   {
     BtRbNode **ppParentSlot = 0;
@@ -1015,7 +1012,7 @@ static int memRbtreeDelete(RbtCursor* pCur)
    * will have violated the "same number of black nodes in every path to a
    * leaf" property of the red-black tree. The code in do_delete_balancing()
    * repairs this. */
-  if( pZ->isBlack ){ 
+  if( pZ->isBlack ){
     do_delete_balancing(pCur->pTree, pChild, pZ->pParent);
   }
 
@@ -1239,8 +1236,8 @@ static int memRbtreeUpdateMeta(Rbtree* tree, int* aMeta)
 
 /*
  * Check that each table in the Rbtree meets the requirements for a red-black
- * binary tree. If an error is found, return an explanation of the problem in 
- * memory obtained from sqliteMalloc(). Parameters aRoot and nRoot are ignored. 
+ * binary tree. If an error is found, return an explanation of the problem in
+ * memory obtained from sqliteMalloc(). Parameters aRoot and nRoot are ignored.
  */
 static char *memRbtreeIntegrityCheck(Rbtree* tree, int* aRoot, int nRoot)
 {
@@ -1266,7 +1263,7 @@ static int memRbtreeSetSafetyLevel(Rbtree *pBt, int level){
 
 static int memRbtreeBeginTrans(Rbtree* tree)
 {
-  if( tree->eTransState != TRANS_NONE ) 
+  if( tree->eTransState != TRANS_NONE )
     return SQLITE_ERROR;
 
   assert( tree->pTransRollback == 0 );
@@ -1375,7 +1372,7 @@ static int memRbtreeRollback(Rbtree* tree)
 
 static int memRbtreeBeginCkpt(Rbtree* tree)
 {
-  if( tree->eTransState != TRANS_INTRANSACTION ) 
+  if( tree->eTransState != TRANS_INTRANSACTION )
     return SQLITE_ERROR;
 
   assert( tree->pCheckRollback == 0 );
@@ -1386,7 +1383,7 @@ static int memRbtreeBeginCkpt(Rbtree* tree)
 
 static int memRbtreeCommitCkpt(Rbtree* tree)
 {
-  if( tree->eTransState == TRANS_INCHECKPOINT ){ 
+  if( tree->eTransState == TRANS_INCHECKPOINT ){
     if( tree->pCheckRollback ){
       tree->pCheckRollbackTail->pNext = tree->pTransRollback;
       tree->pTransRollback = tree->pCheckRollback;

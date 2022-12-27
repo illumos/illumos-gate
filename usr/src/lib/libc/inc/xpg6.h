@@ -27,8 +27,6 @@
 #ifndef _XPG6_H
 #define	_XPG6_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is an OS/Net Consolidation PRIVATE header.
  */

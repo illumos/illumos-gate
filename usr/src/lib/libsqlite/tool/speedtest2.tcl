@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #!/usr/bin/tclsh
 #
 # Run this script using TCLSH to do a speed comparison between

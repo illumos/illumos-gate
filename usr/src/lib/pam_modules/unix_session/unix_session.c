@@ -25,8 +25,6 @@
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <strings.h>
 #include <sys/types.h>
 #include <sys/wait.h>

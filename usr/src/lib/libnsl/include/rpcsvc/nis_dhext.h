@@ -31,8 +31,6 @@
 #ifndef _NIS_DHEXT_H
 #define	_NIS_DHEXT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

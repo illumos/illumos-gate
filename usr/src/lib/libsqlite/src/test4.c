@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2003 December 18
 **
@@ -61,7 +58,7 @@ static Thread threadset[N_THREAD];
 
 
 /*
-** The main loop for a thread.  Threads use busy waiting. 
+** The main loop for a thread.  Threads use busy waiting.
 */
 static void *thread_main(void *pArg){
   Thread *p = (Thread*)pArg;

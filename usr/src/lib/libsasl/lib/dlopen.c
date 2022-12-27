@@ -2,14 +2,13 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* dlopen.c--Unix dlopen() dynamic loader interface
  * Rob Siemborski
  * Rob Earhart
  * $Id: dlopen.c,v 1.45 2003/07/14 20:08:50 rbraun Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -17,7 +16,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -27,7 +26,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -96,7 +95,7 @@
 #  define NAME_MAX 16
 # endif
 #endif
- 
+
 #if NAME_MAX < 8
 #  define NAME_MAX 8
 #endif
@@ -112,7 +111,7 @@ dlopen(char *fname, int mode)
 {
     shl_t h = shl_load(fname, BIND_DEFERRED, 0L);
     shl_t *hp = NULL;
-    
+
     if (h) {
 	hp = (shl_t *)malloc(sizeof (shl_t));
 	if (!hp) {
@@ -137,10 +136,10 @@ dll_func
 dlsym(dll_handle h, char *n)
 {
     dll_func handle;
-    
+
     if (shl_findsym ((shl_t *)h, n, TYPE_PROCEDURE, &handle))
 	return NULL;
-    
+
     return (dll_func)handle;
 }
 
@@ -161,7 +160,7 @@ char *dlerror()
 #endif /* DO_DLOPEN */
 
 #if defined DO_DLOPEN || defined WIN_PLUG /* _SUN_SDK_ */
-typedef struct lib_list 
+typedef struct lib_list
 {
     struct lib_list *next;
     void *library;
@@ -176,7 +175,7 @@ DEFINE_STATIC_MUTEX(global_mutex);
 #endif /* DO_DLOPEN || WIN_PLUG */ /* _SUN_SDK_ */
 
 int _sasl_locate_entry(void *library, const char *entryname,
-		       void **entry_point) 
+		       void **entry_point)
 {
 #ifdef DO_DLOPEN
 /* note that we still check for known problem systems in
@@ -239,16 +238,16 @@ static int _sasl_plugin_load(_sasl_global_context_t *gctx,
 			     char *plugin, void *library,
 			     const char *entryname,
 			     int (*add_plugin)(_sasl_global_context_t *gctx,
-					       const char *, void *)) 
+					       const char *, void *))
 #else
 static int _sasl_plugin_load(char *plugin, void *library,
 			     const char *entryname,
-			     int (*add_plugin)(const char *, void *)) 
+			     int (*add_plugin)(const char *, void *))
 #endif /* _SUN_SDK_ */
 {
     void *entry_point;
     int result;
-    
+
     result = _sasl_locate_entry(library, entryname, &entry_point);
     if(result == SASL_OK) {
 #ifdef _SUN_SDK_
@@ -282,7 +281,7 @@ static int _sasl_plugin_load(char *plugin, void *library,
 /* We'll use a static buffer for speed unless someone complains */
 #define MAX_LINE 2048
 
-static int _parse_la(const char *prefix, const char *in, char *out) 
+static int _parse_la(const char *prefix, const char *in, char *out)
 {
     FILE *file;
     size_t length;
@@ -325,7 +324,7 @@ static int _parse_la(const char *prefix, const char *in, char *out)
 		  "unable to open LA file: %s", line);
 	return SASL_FAIL;
     }
-    
+
     while(!feof(file)) {
 	if(!fgets(line, MAX_LINE, file)) break;
 	if(line[strlen(line) - 1] != '\n') {
@@ -394,7 +393,7 @@ int _sasl_get_plugin(const char *file,
     int flag;
     void *library;
     lib_list_t *newhead;
-    
+
     r = ((sasl_verifyfile_t *)(verifyfile_cb->proc))
 		    (verifyfile_cb->context, file, SASL_VRFY_PLUGIN);
     if (r != SASL_OK) return r;
@@ -581,7 +580,7 @@ int _sasl_load_plugins(const add_plugin_list_t *entrypoints,
 #endif /* !PIC */
 
 /* only do the following if:
- * 
+ *
  * we support dlopen()
  *  AND we are not staticly compiled
  *      OR we are staticly compiled and TRY_DLOPEN_WHEN_STATIC is defined
@@ -645,7 +644,7 @@ int _sasl_load_plugins(const add_plugin_list_t *entrypoints,
 	}
 #endif /* _SUN_SDK_ */
 
-	if ((dp=opendir(str)) !=NULL) /* ignore errors */    
+	if ((dp=opendir(str)) !=NULL) /* ignore errors */
 	{
 	    while ((dir=readdir(dp)) != NULL)
 	    {
@@ -659,7 +658,7 @@ int _sasl_load_plugins(const add_plugin_list_t *entrypoints,
 
 		length = NAMLEN(dir);
 #ifndef _SUN_SDK_
-		if (length < 4) 
+		if (length < 4)
 		    continue; /* can not possibly be what we're looking for */
 #endif /* !_SUN_SDK_ */
 
@@ -686,7 +685,7 @@ int _sasl_load_plugins(const add_plugin_list_t *entrypoints,
 		if(result != SASL_OK)
 		    continue;
 #endif /* _SUN_SDK_ */
-		
+
 #ifdef _SUN_SDK_
 		if (stat(tmp, &b))
 			continue;	/* Can't stat it */
@@ -757,7 +756,7 @@ _sasl_done_with_plugins(void)
 {
 #if defined DO_DLOPEN || defined WIN_PLUG /* _SUN_SDK_ */
     lib_list_t *libptr, *libptr_next;
-    
+
 #ifdef _SUN_SDK_
     if (LOCK_MUTEX(&global_mutex) < 0)
 	return (SASL_FAIL);
@@ -797,7 +796,7 @@ static HANDLE global_mutex = NULL;
 
 int win_global_mutex_lock()
 {
-    DWORD dwWaitResult; 
+    DWORD dwWaitResult;
 
     if (global_mutex == NULL) {
 	global_mutex = CreateMutex(NULL, FALSE, NULL);
@@ -808,13 +807,13 @@ int win_global_mutex_lock()
     dwWaitResult = WaitForSingleObject(global_mutex, INFINITE);
 
     switch (dwWaitResult) {
-	case WAIT_OBJECT_0: 
+	case WAIT_OBJECT_0:
 		return (0);
 
-           case WAIT_TIMEOUT: 
+           case WAIT_TIMEOUT:
                return (-1); /* Shouldn't happen */
 
-           case WAIT_ABANDONED: 
+           case WAIT_ABANDONED:
                return (-1); /* Shouldn't happen */
     }
     return (-1); /* Unexpected result */
@@ -828,8 +827,8 @@ int win_global_mutex_unlock()
     return (ReleaseMutex(global_mutex) ? 0 : -1);
 }
 
-BOOL APIENTRY DllMain(HANDLE hModule, 
-                         DWORD  ul_reason_for_call, 
+BOOL APIENTRY DllMain(HANDLE hModule,
+                         DWORD  ul_reason_for_call,
                          LPVOID lpReserved)
 {
     switch( ul_reason_for_call ) {

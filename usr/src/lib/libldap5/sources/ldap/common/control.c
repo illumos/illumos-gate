@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  *
  * The contents of this file are subject to the Netscape Public License
@@ -200,7 +198,7 @@ nsldapi_get_controls( BerElement *ber, LDAPControl ***controlsp )
 			rc = LDAP_NO_MEMORY;
 			goto free_and_return;
 		}
-		
+
 		(*controlsp)[curcontrols++] = newctrl;
 		(*controlsp)[curcontrols] = NULL;
 
@@ -471,14 +469,14 @@ nsldapi_build_control( char *oid, BerElement *ber, int freeber, char iscritical,
 	}
 
 	/* fill in the fields of this new control */
-	(*ctrlp)->ldctl_iscritical = iscritical;  
+	(*ctrlp)->ldctl_iscritical = iscritical;
 	if (( (*ctrlp)->ldctl_oid = nsldapi_strdup( oid )) == NULL ) {
-		NSLDAPI_FREE( *ctrlp ); 
+		NSLDAPI_FREE( *ctrlp );
 		if ( bvp != NULL ) {
 			ber_bvfree( bvp );
 		}
 		return( LDAP_NO_MEMORY );
-	}				
+	}
 
 	if ( bvp == NULL ) {
 		(*ctrlp)->ldctl_value.bv_len = 0;

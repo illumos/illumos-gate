@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * win_wchn.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -57,7 +55,7 @@ int n;
 #endif
 
 	eol = (n < 0 || w->_maxx < w->_curx + n) ? w->_maxx : w->_curx + n;
- 
+
         for (cp = w->_line[w->_cury], x = w->_curx; x < eol; ++ccs) {
 		*ccs = *cp;
 		ccs->_f = 1;
@@ -68,7 +66,7 @@ int n;
 	/* For an unbounded buffer or a buffer with room remaining,
 	 * null terminate the buffer.
 	 */
-	if (n < 0 || eol < w->_curx + n) 
+	if (n < 0 || eol < w->_curx + n)
 		*ccs = null;
 
 	return __m_return_code("win_wchnstr", OK);

@@ -28,8 +28,6 @@
  * lib/libsocket/inet/getservent.c
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <netdb.h>
 #include <nss_dbdefs.h>
 

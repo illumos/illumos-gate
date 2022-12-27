@@ -35,8 +35,6 @@
 #ifndef _ARPA_NAMESER_H
 #define	_ARPA_NAMESER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 
 #ifdef	__cplusplus

@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * winsdel.c		
+ * winsdel.c
  *
  * XCurses Library
  *
@@ -51,7 +49,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/winsdel.c 1.4 1995/06/2
  * window remains fixed so that rows insert/deleted will cause rows to
  * disappear/appear at the end of the window.
  *
- * NOTE: This routine called in doupdate.c with curscr as window.  
+ * NOTE: This routine called in doupdate.c with curscr as window.
  */
 int
 winsdelln(w, n)
@@ -72,7 +70,7 @@ int n;
 	if (n < 0) {
 		/* Delete n lines from current cursor line. */
 		(void) __m_ptr_move(
-			(void **) w->_line, w->_maxy, 
+			(void **) w->_line, w->_maxy,
 			w->_cury, w->_cury - (n+1), w->_maxy
 		);
 
@@ -81,7 +79,7 @@ int n;
 	} else {
 		/* Insert n lines before current cursor line. */
 		(void) __m_ptr_move(
-			(void **) w->_line, w->_maxy, 
+			(void **) w->_line, w->_maxy,
 			w->_maxy - n, w->_maxy-1, w->_cury
 		);
 
@@ -89,10 +87,10 @@ int n;
 		row = w->_cury;
 	}
 
-	/* Clear inserted/deleted lines. */ 
+	/* Clear inserted/deleted lines. */
 	(void) __m_cc_erase(w, row, 0, row + abs(n), w->_maxx-1);
 
-	/* Mark from the cursor line to the end of window as dirty. */ 
+	/* Mark from the cursor line to the end of window as dirty. */
 	(void) wtouchln(w, w->_cury, w->_maxy - w->_cury, 1);
 
 	/* If we insert/delete lines at the top of the screen and we're,

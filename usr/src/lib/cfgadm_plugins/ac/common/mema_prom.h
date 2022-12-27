@@ -27,8 +27,6 @@
 #ifndef _MEMA_SF_PROM_H
 #define	_MEMA_SF_PROM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

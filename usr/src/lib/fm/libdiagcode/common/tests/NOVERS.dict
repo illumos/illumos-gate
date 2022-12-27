@@ -22,9 +22,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
 # NOVERS diagcode dictionary -- used by "make test" target only
 #
 # this sample dictionary tests the error path where the dictionary

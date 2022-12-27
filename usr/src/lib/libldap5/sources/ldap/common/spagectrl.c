@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 
@@ -32,7 +30,7 @@ int ldap_create_page_control(LDAP *ld, unsigned int pagesize, struct berval *coo
 	if ((ber = ber_alloc_t(LBER_USE_DER)) == NULLBER){
 		return (LDAP_NO_MEMORY);
 	}
-	
+
 	if (ber_printf(ber, "{io}", pagesize,
 			(cookie && cookie->bv_val) ? cookie->bv_val : "",
 			(cookie && cookie->bv_val) ? cookie->bv_len : 0)
@@ -53,7 +51,7 @@ int ldap_parse_page_control(LDAP *ld, LDAPControl **controls, unsigned int *tota
 	int i, rc;
 	BerElement *theBer;
 	LDAPControl *listCtrlp;
-	
+
 	for (i = 0; controls[i] != NULL; i++){
 		if (strcmp(controls[i]->ldctl_oid, "1.2.840.113556.1.4.319") == 0) {
 			listCtrlp = controls[i];

@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Subdirectory detection: needed by exportfs and rpc.mountd.
  * The above programs call issubdir() frequently, so we make

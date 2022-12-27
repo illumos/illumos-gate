@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -255,14 +253,14 @@ do_test rowid-4.5 {
   execsql {CREATE INDEX idxt2 ON t2(y)}
   set sqlite_search_count 0
   concat [execsql {
-    SELECT t1.x FROM t2, t1 
+    SELECT t1.x FROM t2, t1
     WHERE t2.y==256 AND t1.rowid==t2.rowid
   }] $sqlite_search_count
 } {4 3}
 do_test rowid-4.5.1 {
   set sqlite_search_count 0
   concat [execsql {
-    SELECT t1.x FROM t2, t1 
+    SELECT t1.x FROM t2, t1
     WHERE t1.OID==t2.rowid AND t2.y==81
   }] $sqlite_search_count
 } {3 3}

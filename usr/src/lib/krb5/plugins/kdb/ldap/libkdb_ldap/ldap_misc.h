@@ -36,8 +36,6 @@
 #ifndef _HAVE_LDAP_MISC_H
 #define _HAVE_LDAP_MISC_H 1
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ldap_services.h"
 
 /* misc functions */
@@ -88,7 +86,7 @@ krb5_error_code
 is_principal_in_realm(krb5_ldap_context *, krb5_const_principal);
 
 krb5_error_code
-krb5_get_subtree_info(krb5_ldap_context *, char ***, unsigned int *); 
+krb5_get_subtree_info(krb5_ldap_context *, char ***, unsigned int *);
 
 krb5_error_code
 krb5_ldap_read_server_params(krb5_context , char *, int);
@@ -102,16 +100,16 @@ copy_arrays(char **, char ***, int);
 krb5_error_code
 krb5_ldap_list(krb5_context, char ***, char *, char *);
 
-krb5_error_code 
+krb5_error_code
 krb5_ldap_get_value(LDAP *, LDAPMessage *, char *, int *);
 
-krb5_error_code 
+krb5_error_code
 krb5_ldap_get_string(LDAP *, LDAPMessage *, char *, char **, krb5_boolean *);
 
-krb5_error_code 
+krb5_error_code
 krb5_ldap_get_strings(LDAP *, LDAPMessage *, char *, char ***, krb5_boolean *);
 
-krb5_error_code 
+krb5_error_code
 krb5_ldap_get_time(LDAP *, LDAPMessage *, char *, krb5_timestamp *, krb5_boolean *);
 
 krb5_error_code

@@ -27,8 +27,6 @@
 #ifndef	_PAYLOADREADER_H
 #define	_PAYLOADREADER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

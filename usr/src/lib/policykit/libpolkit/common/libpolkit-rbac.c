@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
 #endif
@@ -84,13 +82,13 @@ libpolkit_free_context (LibPolKitContext *ctx)
 
 	ctx->magic = 0;
 	g_free (ctx);
-	return TRUE;		
+	return TRUE;
 }
 
-LibPolKitResult 
+LibPolKitResult
 libpolkit_get_allowed_resources_for_privilege_for_uid (LibPolKitContext    *ctx,
-						       const char          *user, 
-						       const char          *privilege, 
+						       const char          *user,
+						       const char          *privilege,
 						       GList              **resources,
 						       GList              **restrictions,
 						       int                 *num_non_temporary)
@@ -112,11 +110,11 @@ libpolkit_get_allowed_resources_for_privilege_for_uid (LibPolKitContext    *ctx,
 	return res;
 }
 
-LibPolKitResult 
+LibPolKitResult
 libpolkit_is_uid_allowed_for_privilege (LibPolKitContext   *ctx,
-					const char         *system_bus_unique_name, 
-					const char         *user, 
-					const char         *privilege, 
+					const char         *system_bus_unique_name,
+					const char         *user,
+					const char         *privilege,
 					const char         *resource,
 					gboolean           *out_is_allowed,
 					gboolean           *out_is_temporary,

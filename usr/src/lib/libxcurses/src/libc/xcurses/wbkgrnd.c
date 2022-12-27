@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wbkgrnd.c
  *
@@ -65,7 +63,7 @@ const cchar_t *bg;
 
 	old_bg = w->_bg;
 	w->_bg = *bg;
-	
+
 	for (y = 0; y < w->_maxy; ++y) {
 		for (cp = w->_line[y], x = 0; x < w->_maxx; ++x) {
 			old_bg._f = cp->_f;

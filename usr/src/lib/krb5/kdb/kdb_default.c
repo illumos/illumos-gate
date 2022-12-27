@@ -3,19 +3,17 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/kdb/kdb_helper.c
  *
- * Copyright 1995 by the Massachusetts Institute of Technology. 
+ * Copyright 1995 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,7 +27,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 
 #include "k5-int.h"
@@ -67,10 +65,10 @@ krb5_dbe_def_search_enctype(kcontext, dbentp, start, ktype, stype, kvno, kdatap)
     if (kvno == -1 && stype == -1 && ktype == -1)
 	kvno = 0;
 
-    if (kvno == 0) { 
+    if (kvno == 0) {
 	/* Get the max key version */
 	for (i = 0; i < dbentp->n_key_data; i++) {
-	    if (kvno < dbentp->key_data[i].key_data_kvno) { 
+	    if (kvno < dbentp->key_data[i].key_data_kvno) {
 		kvno = dbentp->key_data[i].key_data_kvno;
 	    }
 	}
@@ -97,7 +95,7 @@ krb5_dbe_def_search_enctype(kcontext, dbentp, start, ktype, stype, kvno, kdatap)
 	    ret = KRB5_KDB_NO_PERMITTED_KEY;
 	    continue;
 	}
-	
+
 
 	if (ktype > 0) {
 	    if ((ret = krb5_c_enctype_compare(kcontext, (krb5_enctype) ktype,
@@ -131,7 +129,7 @@ krb5_dbe_def_search_enctype(kcontext, dbentp, start, ktype, stype, kvno, kdatap)
     *start = idx+1;
     return 0;
 }
-    
+
 /*
  *  kdb default functions. Ideally, some other file should have this functions. For now, TBD.
  */
@@ -190,7 +188,7 @@ krb5_def_store_mkey(context, keyfile, mname, key, master_pwd)
 	(fwrite((krb5_pointer) &key->length,
 		sizeof(key->length), 1, kf) != 1) ||
 	(fwrite((krb5_pointer) key->contents,
-		sizeof(key->contents[0]), (unsigned) key->length, 
+		sizeof(key->contents[0]), (unsigned) key->length,
 		kf) != key->length)) {
 	retval = errno;
 	(void) fclose(kf);
@@ -224,7 +222,7 @@ krb5_db_def_fetch_mkey( krb5_context   context,
 		   min(sizeof(defkeyfile)-sizeof(DEFAULT_KEYFILE_STUB)-1,
 		       realm->length));
     defkeyfile[sizeof(defkeyfile) - 1] = '\0';
-	
+
 #ifdef ANSI_STDIO
     /* Solaris Kerberos: using F to deal with 256 open file limit */
     if (!(kf = fopen((db_args) ? db_args : defkeyfile, "rbF")))
@@ -255,14 +253,14 @@ krb5_db_def_fetch_mkey( krb5_context   context,
 	retval = KRB5_KDB_BADSTORED_MKEY;
 	goto errout;
     }
-	
+
     if (!(key->contents = (krb5_octet *)malloc(key->length))) {
 	retval = ENOMEM;
 	goto errout;
     }
 
     if (fread((krb5_pointer) key->contents,
-	      sizeof(key->contents[0]), key->length, kf) 
+	      sizeof(key->contents[0]), key->length, kf)
 	!= key->length) {
 	retval = KRB5_KDB_CANTREAD_STORED;
 	memset(key->contents, 0,  key->length);
@@ -296,7 +294,7 @@ krb5_def_verify_master_key(context, mprinc, mkey)
     if ((retval = krb5_db_get_principal(context, mprinc,
 					&master_entry, &nprinc, &more)))
 	return(retval);
-	
+
     if (nprinc != 1) {
 	if (nprinc)
 	    krb5_db_free_principal(context, &master_entry, nprinc);
@@ -304,9 +302,9 @@ krb5_def_verify_master_key(context, mprinc, mkey)
     } else if (more) {
 	krb5_db_free_principal(context, &master_entry, nprinc);
 	return(KRB5KDC_ERR_PRINCIPAL_NOT_UNIQUE);
-    }	
+    }
 
-    if ((retval = krb5_dbekd_decrypt_key_data(context, mkey, 
+    if ((retval = krb5_dbekd_decrypt_key_data(context, mkey,
 					      &master_entry.key_data[0],
 					      &tempkey, NULL))) {
 	krb5_db_free_principal(context, &master_entry, nprinc);
@@ -322,7 +320,7 @@ krb5_def_verify_master_key(context, mprinc, mkey)
     memset((char *)tempkey.contents, 0, tempkey.length);
     krb5_xfree(tempkey.contents);
     krb5_db_free_principal(context, &master_entry, nprinc);
-    
+
     return retval;
 }
 

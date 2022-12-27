@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
-
 #include "mt.h"
 #include <xti.h>
 #include <errno.h>

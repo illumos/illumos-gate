@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -93,9 +90,9 @@ void sqliteDeleteFrom(
   */
   pTab = sqliteSrcListLookup(pParse, pTabList);
   if( pTab==0 )  goto delete_from_cleanup;
-  before_triggers = sqliteTriggersExist(pParse, pTab->pTrigger, 
+  before_triggers = sqliteTriggersExist(pParse, pTab->pTrigger,
                          TK_DELETE, TK_BEFORE, TK_ROW, 0);
-  after_triggers = sqliteTriggersExist(pParse, pTab->pTrigger, 
+  after_triggers = sqliteTriggersExist(pParse, pTab->pTrigger,
                          TK_DELETE, TK_AFTER, TK_ROW, 0);
   row_triggers_exist = before_triggers || after_triggers;
   isView = pTab->pSelect!=0;
@@ -116,7 +113,7 @@ void sqliteDeleteFrom(
 
   /* Allocate a cursor used to store the old.* data for a trigger.
   */
-  if( row_triggers_exist ){ 
+  if( row_triggers_exist ){
     oldIdx = pParse->nTab++;
   }
 
@@ -243,7 +240,7 @@ void sqliteDeleteFrom(
         sqliteVdbeAddOp(v, OP_Close, iCur, 0);
       }
 
-      sqliteCodeRowTrigger(pParse, TK_DELETE, 0, TK_BEFORE, pTab, -1, 
+      sqliteCodeRowTrigger(pParse, TK_DELETE, 0, TK_BEFORE, pTab, -1,
           oldIdx, (pParse->trigStack)?pParse->trigStack->orconf:OE_Default,
 	  addr);
     }
@@ -260,7 +257,7 @@ void sqliteDeleteFrom(
 
       /* This is the beginning of the delete loop when there are no
       ** row triggers */
-      if( !row_triggers_exist ){ 
+      if( !row_triggers_exist ){
         addr = sqliteVdbeAddOp(v, OP_ListRead, 0, end);
       }
 
@@ -278,7 +275,7 @@ void sqliteDeleteFrom(
         }
         sqliteVdbeAddOp(v, OP_Close, iCur, 0);
       }
-      sqliteCodeRowTrigger(pParse, TK_DELETE, 0, TK_AFTER, pTab, -1, 
+      sqliteCodeRowTrigger(pParse, TK_DELETE, 0, TK_AFTER, pTab, -1,
           oldIdx, (pParse->trigStack)?pParse->trigStack->orconf:OE_Default,
 	  addr);
     }

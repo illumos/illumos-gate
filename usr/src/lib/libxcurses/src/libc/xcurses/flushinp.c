@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * flushinp.c
  *
@@ -44,7 +42,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/flushinp.c 1.1 1995/06/
 #include <private.h>
 
 /*f
- * Throw away any typeahead that has been typed by the user 
+ * Throw away any typeahead that has been typed by the user
  * and has not yet been read by the program.
  */
 int

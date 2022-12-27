@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * wbrdr.c		
+ * wbrdr.c
  *
  * XCurses Library
  *
@@ -45,13 +43,13 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/wbrdr.c 1.2 1995/07/07 
 
 /*f
  * Draw a border around the edges of the window. The parms correspond to
- * a character and attribute for the left, right, top, and bottom sides, 
+ * a character and attribute for the left, right, top, and bottom sides,
  * top left, top right, bottom left, and bottom right corners. A zero in
  * any character parm means to take the default.
  */
 int
 wborder(WINDOW *w,
-	chtype ls, chtype rs, chtype ts, chtype bs, 
+	chtype ls, chtype rs, chtype ts, chtype bs,
 	chtype tl, chtype tr, chtype bl, chtype br)
 {
 	int code;

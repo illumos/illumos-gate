@@ -27,8 +27,6 @@
 #ifndef	_LEGACY_HC_H
 #define	_LEGACY_HC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

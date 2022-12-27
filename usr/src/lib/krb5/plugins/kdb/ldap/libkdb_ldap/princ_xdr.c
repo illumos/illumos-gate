@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "kdb_ldap.h"
 #include "ldap_principal.h"
 #include "princ_xdr.h"
@@ -111,7 +109,7 @@ ldap_xdr_krb5_key_data(XDR *xdrs, krb5_key_data *objp)
 	return(FALSE);
     if (!ldap_xdr_krb5_int16(xdrs, &objp->key_data_type[1]))
 	return(FALSE);
-    /* 
+    /*
      * Solaris kerberos: need this cast for now, should go away when kdb.h is
      * resynced.
      */

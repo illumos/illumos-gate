@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * prompt.c: Routines for retrieving and setting a prompt.
  *

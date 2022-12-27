@@ -26,8 +26,6 @@
  * Much of this was taken directly from the files_common.c source.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * An implementation that used mmap() sensibly would be a wonderful thing,
  *   but this here is just yer standard fgets() thang.

@@ -33,8 +33,6 @@
  * colon in a line.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>

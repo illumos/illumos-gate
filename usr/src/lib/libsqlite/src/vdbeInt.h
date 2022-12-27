@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2003 September 6
 **
@@ -54,7 +51,7 @@ typedef unsigned char Bool;
 ** loop over all entries of the Btree.  You can also insert new BTree
 ** entries or retrieve the key or data from the entry that the cursor
 ** is currently pointing to.
-** 
+**
 ** Every cursor that the virtual machine has open is represented by an
 ** instance of the following structure.
 **
@@ -96,8 +93,8 @@ struct Sorter {
   Sorter *pNext;      /* Next in the list */
 };
 
-/* 
-** Number of buckets used for merge-sort.  
+/*
+** Number of buckets used for merge-sort.
 */
 #define NSORT 30
 
@@ -110,7 +107,7 @@ struct Sorter {
 
 /*
 ** A single level of the stack or a single memory cell
-** is an instance of the following structure. 
+** is an instance of the following structure.
 */
 struct Mem {
   int i;              /* Integer value */
@@ -277,7 +274,7 @@ struct Vdbe {
   int returnStack[100];   /* Return address stack for OP_Gosub & OP_Return */
   int returnDepth;        /* Next unused element in returnStack[] */
   int nResColumn;         /* Number of columns in one row of the result set */
-  char **azResColumn;     /* Values for one row of result */ 
+  char **azResColumn;     /* Values for one row of result */
   int popStack;           /* Pop the stack this much on entry to VdbeExec() */
   char *zErrMsg;          /* Error message written here */
   u8 explain;             /* True if EXPLAIN present on SQL command */

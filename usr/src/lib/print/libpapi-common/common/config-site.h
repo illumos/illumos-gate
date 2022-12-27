@@ -30,8 +30,6 @@
 
 /* $Id: config-site.h.in 171 2006-05-20 06:00:32Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <config.h>
 
 #ifdef __cplusplus

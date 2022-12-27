@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * dupwin.c
  *
@@ -49,8 +47,8 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/dupwin.c 1.1 1995/05/26
 /*f
  * Make an exact duplicate of the window.
  */
-WINDOW * 
-dupwin(w) 
+WINDOW *
+dupwin(w)
 WINDOW *w;
 {
 	int i;
@@ -61,14 +59,14 @@ WINDOW *w;
 #endif
 
 	/* Create (sub)window with same dimensions. */
-	v = __m_newwin(w->_parent, w->_maxy, w->_maxx, w->_begy, w->_begx);	
+	v = __m_newwin(w->_parent, w->_maxy, w->_maxx, w->_begy, w->_begx);
 	if (v == (WINDOW *) 0)
 		return __m_return_pointer("dupwin", (WINDOW *) 0);
 
         /* Same software scroll region. */
         v->_top = w->_top;
         v->_bottom = w->_bottom;
-                
+
         /* Same window input settings. */
         v->_vmin = w->_vmin;
         v->_vtime = w->_vtime;
@@ -83,14 +81,14 @@ WINDOW *w;
 	);
 
 	if (v->_parent == (WINDOW *) 0) {
-		/* For a regular window, copy source window lines in the 
-		 * correct order, because the pointers in _line[] may have 
-		 * been shuffled.  A subwindow is not subject to this, 
+		/* For a regular window, copy source window lines in the
+		 * correct order, because the pointers in _line[] may have
+		 * been shuffled.  A subwindow is not subject to this,
 		 * because it shares its data with its parent window.
 		 */
 		for (i = 0; i < w->_maxy; ++i) {
 			(void) memcpy(
-				v->_line[i], w->_line[i], 
+				v->_line[i], w->_line[i],
 				v->_maxx * sizeof **v->_line
 			);
 		}

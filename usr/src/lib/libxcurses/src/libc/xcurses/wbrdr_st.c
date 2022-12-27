@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * wbrdr_st.c		
+ * wbrdr_st.c
  *
  * XCurses Library
  *
@@ -45,7 +43,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/wbrdr_st.c 1.6 1995/07/
 
 /*f
  * Draw a border around the edges of the window. The parms correspond to
- * a character and attribute for the left, right, top, and bottom sides, 
+ * a character and attribute for the left, right, top, and bottom sides,
  * top left, top right, bottom left, and bottom right corners. A zero in
  * any character parm means to take the default.
  */
@@ -76,7 +74,7 @@ const cchar_t *ls, *rs, *ts, *bs, *tl, *tr, *bl, *br;
 	(void) wvline_set(w, ls, w->_maxy);
 	(void) wmove(w, 0, w->_maxx-1);
 	(void) wvline_set(w, rs, w->_maxy);
-	
+
 	/* Horizontals. */
 	(void) wmove(w, 0, 1);
 	(void) whline_set(w, ts, w->_maxx-2);

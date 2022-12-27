@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Implementation of the mks M_INVARIANT family of mapping macros.
  * Based on the IBM C/370 getsyntx() and variant.h implementation.

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  *
  * The contents of this file are subject to the Netscape Public License
@@ -21,27 +19,27 @@
 
 /* ldap_create_sort_control:
 
-   Parameters are  
+   Parameters are
 
-   ld              LDAP pointer to the desired connection 
+   ld              LDAP pointer to the desired connection
 
-   sortKeyList     an array of sortkeys 
+   sortKeyList     an array of sortkeys
 
    ctl_iscritical  Indicates whether the control is critical of not. If
                    this field is non-zero, the operation will only be car-
                    ried out if the control is recognized by the server
                    and/or client
 
-   ctrlp           the address of a place to put the constructed control 
+   ctrlp           the address of a place to put the constructed control
 */
 
 int
 LDAP_CALL
-ldap_create_sort_control ( 	
-     LDAP *ld, 
+ldap_create_sort_control (
+     LDAP *ld,
      LDAPsortkey **sortKeyList,
      const char ctl_iscritical,
-     LDAPControl **ctrlp   
+     LDAPControl **ctrlp
 )
 {
 	BerElement		*ber;
@@ -68,7 +66,7 @@ ldap_create_sort_control (
 	}
 
 	/* the sort control value will be encoded as a sequence of sequences
-	   which are each encoded as one of the following: {s} or {sts} or {stb} or {ststb} 
+	   which are each encoded as one of the following: {s} or {sts} or {stb} or {ststb}
 	   since the orderingRule and reverseOrder flag are both optional */
 	for ( i = 0; sortKeyList[i] != NULL; i++ ) {
 
@@ -77,7 +75,7 @@ ldap_create_sort_control (
 		    == -1 ) {
 			goto encoding_error_exit;
 		}
-		
+
 		/* encode the optional orderingRule into the ber */
 		if ( (sortKeyList[i])->sk_matchruleoid != NULL ) {
 			if ( ber_printf( ber, "ts", LDAP_TAG_SK_MATCHRULE,
@@ -85,7 +83,7 @@ ldap_create_sort_control (
 			    == -1 ) {
 				goto encoding_error_exit;
 			}
-		} 
+		}
 
 		/* Encode the optional reverseOrder flag into the ber. */
 		/* If the flag is false, it should be absent. */
@@ -120,25 +118,25 @@ encoding_error_exit:
 
 /* ldap_parse_sort_control:
 
-   Parameters are  
+   Parameters are
 
-   ld              LDAP pointer to the desired connection 
+   ld              LDAP pointer to the desired connection
 
-   ctrlp           An array of controls obtained from calling  
-                   ldap_parse_result on the set of results returned by 
-                   the server     
+   ctrlp           An array of controls obtained from calling
+                   ldap_parse_result on the set of results returned by
+                   the server
 
-   result          the address of a place to put the result code 
+   result          the address of a place to put the result code
 
-   attribute       the address of a place to put the name of the 
-                   attribute which cause the operation to fail, optionally 
+   attribute       the address of a place to put the name of the
+                   attribute which cause the operation to fail, optionally
                    returned by the server */
 
 int
 LDAP_CALL
-ldap_parse_sort_control ( 	
-     LDAP *ld, 
-     LDAPControl **ctrlp,  
+ldap_parse_sort_control (
+     LDAP *ld,
+     LDAPControl **ctrlp,
      unsigned long *result,
      char **attribute
 )
@@ -160,7 +158,7 @@ ldap_parse_sort_control (
 	if ( ctrlp == NULL ) {
 		LDAP_SET_LDERRNO( ld, LDAP_CONTROL_NOT_FOUND, NULL, NULL );
 		return ( LDAP_CONTROL_NOT_FOUND );
-	} 
+	}
 	foundSortControl = 0;
 	for ( i = 0; (( ctrlp[i] != NULL ) && ( !foundSortControl )); i++ ) {
 		foundSortControl = !strcmp( ctrlp[i]->ldctl_oid, LDAP_CONTROL_SORTRESPONSE );
@@ -170,14 +168,14 @@ ldap_parse_sort_control (
 		return ( LDAP_CONTROL_NOT_FOUND );
 	} else {
 		/* let local var point to the sortControl */
-		sortCtrlp = ctrlp[i-1];			
+		sortCtrlp = ctrlp[i-1];
 	}
 
 	/*  allocate a Ber element with the contents of the sort_control's struct berval */
 	if ( ( ber = ber_init( &sortCtrlp->ldctl_value ) ) == NULL ) {
 		LDAP_SET_LDERRNO( ld, LDAP_NO_MEMORY, NULL, NULL );
 		return( LDAP_NO_MEMORY );
-	}		
+	}
 
 	/* decode the result from the Berelement */
 	if ( ber_scanf( ber, "{i", result ) == LBER_ERROR ) {
@@ -193,7 +191,7 @@ ldap_parse_sort_control (
 			ber_free( ber, 1 );
 			return( LDAP_DECODING_ERROR );
 		}
-		*attribute = attr;		  
+		*attribute = attr;
 	} else {
 		*attribute = NULL;
 	}
@@ -252,7 +250,7 @@ static int read_next_token(const char **s,LDAPsortkey **key)
 	int reverse = 0;
 
 	int state = 0;
-	
+
 	while ( ((c = *pos++) != '\0') && (state != 4) ) {
 		switch (state) {
 		case 0:
@@ -279,7 +277,7 @@ static int read_next_token(const char **s,LDAPsortkey **key)
 				} else {
 					state = 4;
 				}
-			} 
+			}
 			break;
 		case 2:
 		/* case where we've seen the end of the attr and want the beginning of match rule */
@@ -301,7 +299,7 @@ static int read_next_token(const char **s,LDAPsortkey **key)
 			break;
 		}
 	}
-	
+
 	if (3 == state) {
 		/* means we fell off the end of the string looking for the end of the marching rule */
 		matchrule_size = (pos - matchrule_source) - 1;
@@ -321,7 +319,7 @@ static int read_next_token(const char **s,LDAPsortkey **key)
 	if (0 == new_key) {
 		return LDAP_NO_MEMORY;
 	}
-	
+
 	/* Allocate the strings */
 	new_key->sk_attrtype = (char *)NSLDAPI_MALLOC(attrdesc_size + 1);
 	if (NULL != matchrule_source) {

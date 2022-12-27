@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * nonl.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -44,7 +42,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/nonl.c 1.1 1995/05/15 1
 #include <private.h>
 
 /*
- * Enable mappnig of cr -> nl on input and nl -> crlf on output. 
+ * Enable mappnig of cr -> nl on input and nl -> crlf on output.
  */
 int
 nl()
@@ -68,7 +66,7 @@ nl()
 }
 
 /*
- * Disable mappnig of cr -> nl on input and nl -> crlf on output. 
+ * Disable mappnig of cr -> nl on input and nl -> crlf on output.
  */
 int
 nonl()

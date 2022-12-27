@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/get_krbhst.c
  *
@@ -9,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_get_krbhst() function.
  */
@@ -35,7 +34,7 @@
 /*
  Figures out the Kerberos server names for the given realm, filling in a
  pointer to an argv[] style list of names, terminated with a null pointer.
- 
+
  If the realm is unknown, the filled-in pointer is set to NULL.
 
  The pointer array and strings pointed to are all in allocated storage,
@@ -46,10 +45,10 @@
 
 /*
  * Implementation:  the server names for given realms are stored in a
- * configuration file, 
+ * configuration file,
  * named by krb5_config_file;  the first token (on the first line) in
  * this file is taken as the default local realm name.
- * 
+ *
  * Each succeeding line has a realm name as the first token, and a server name
  * as a second token.  Additional tokens may be present on the line, but
  * are ignored by this function.

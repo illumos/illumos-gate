@@ -27,8 +27,6 @@
 #ifndef	_LIBC_PORT_I18N_PLURAL_PARSER_H
 #define	_LIBC_PORT_I18N_PLURAL_PARSER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

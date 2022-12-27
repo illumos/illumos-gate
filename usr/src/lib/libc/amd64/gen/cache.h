@@ -6,8 +6,6 @@
 #ifndef	_AMD64CACHE_H
 #define	_AMD64CACHE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

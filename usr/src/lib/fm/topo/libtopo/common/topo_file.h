@@ -27,8 +27,6 @@
 #ifndef _TOPO_FILE_H
 #define	_TOPO_FILE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <topo_parse.h>
 
 #ifdef	__cplusplus

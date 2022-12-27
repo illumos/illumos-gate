@@ -26,8 +26,6 @@
 #ifndef	_DHCPMSG_H
 #define	_DHCPMSG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <stdarg.h>
 #include <syslog.h>

@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * waddnstr.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -61,7 +59,7 @@ int n;
 	if (n < 0)
 		n = INT_MAX;
 
-	/* Disable window flushing until the entire string has 
+	/* Disable window flushing until the entire string has
 	 * been written into the window.
 	 */
 	oflags = w->_flags & (W_FLUSH | W_SYNC_UP);

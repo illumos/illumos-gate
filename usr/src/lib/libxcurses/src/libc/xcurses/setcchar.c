@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * setcchar.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -51,7 +49,7 @@ setcchar(cchar_t *cc, const wchar_t *wcs, attr_t at, short co, const void *opts)
 #ifdef M_CURSES_TRACE
 	__m_trace("setcchar(%p, %p, %x, %d, %p)", cc, wcs, at, co, opts);
 #endif
-	
+
 	i = __m_wcs_cc(wcs, at, co, cc);
 
 	return __m_return_code("setcchar", i < 0 || wcs[i] != '\0' ? ERR : OK);

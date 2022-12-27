@@ -2,14 +2,13 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* SASL server API implementation
  * Rob Siemborski
  * Tim Martin
  * $Id: checkpw.c,v 1.62 2003/03/19 18:25:27 rjs3 Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -17,7 +16,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -27,7 +26,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -114,7 +113,7 @@ static int _sasl_make_plain_secret(const sasl_utils_t *utils, const char *salt,
 				const char *passwd, size_t passlen,
 				sasl_secret_t **secret)
 #else
-static int _sasl_make_plain_secret(const char *salt, 
+static int _sasl_make_plain_secret(const char *salt,
 				   const char *passwd, size_t passlen,
 				   sasl_secret_t **secret)
 #endif /* _SUN_SDK_ */
@@ -141,7 +140,7 @@ static int _sasl_make_plain_secret(const char *salt,
     (*secret)->data[16] = '\0';
     _sasl_MD5Final((*secret)->data + 17, &ctx);
     (*secret)->len = sec_len;
-    
+
     return SASL_OK;
 }
 
@@ -164,15 +163,15 @@ static int auxprop_verify_password(sasl_conn_t *conn,
 				       "*cmusaslsecretPLAIN",
 				       NULL };
     struct propval auxprop_values[3];
-    
+
     if (!conn || !userstr)
 	return SASL_BADPARAM;
 
-    /* We need to clear any previous results and re-canonify to 
+    /* We need to clear any previous results and re-canonify to
      * ensure correctness */
 
     prop_clear(sconn->sparams->propctx, 0);
-	
+
     /* ensure its requested */
     result = prop_request(sconn->sparams->propctx, password_request);
 
@@ -182,7 +181,7 @@ static int auxprop_verify_password(sasl_conn_t *conn,
 			      SASL_CU_AUTHID | SASL_CU_AUTHZID,
 			      &(conn->oparams));
     if(result != SASL_OK) return result;
-    
+
     result = prop_getnames(sconn->sparams->propctx, password_request,
 			   auxprop_values);
     if(result < 0)
@@ -193,7 +192,7 @@ static int auxprop_verify_password(sasl_conn_t *conn,
        && (!auxprop_values[1].name
          || !auxprop_values[1].values || !auxprop_values[1].values[0]))
 	    return SASL_NOUSER;
-        
+
     /* It is possible for us to get useful information out of just
      * the lookup, so we won't check that we have a password until now */
     if(!passwd) {
@@ -214,7 +213,7 @@ static int auxprop_verify_password(sasl_conn_t *conn,
 	      && auxprop_values[1].values[0]) {
 	const char *db_secret = auxprop_values[1].values[0];
 	sasl_secret_t *construct;
-	
+
 #ifdef _SUN_SDK_
 	ret = _sasl_make_plain_secret(sconn->sparams->utils, db_secret,
 				passwd, strlen(passwd),
@@ -294,7 +293,7 @@ int _sasl_auxprop_verify_apop(sasl_conn_t *conn,
 #endif /* _SUN_SDK_ */
 	goto done;
     }
-    
+
     if(!auxprop_values[0].name ||
        !auxprop_values[0].values ||
        !auxprop_values[0].values[0]) {
@@ -306,7 +305,7 @@ int _sasl_auxprop_verify_apop(sasl_conn_t *conn,
 	ret = SASL_NOUSER;
 	goto done;
     }
-    
+
     _sasl_MD5Init(&ctx);
     _sasl_MD5Update(&ctx, challenge, strlen(challenge));
     _sasl_MD5Update(&ctx, auxprop_values[0].values[0],
@@ -365,7 +364,7 @@ static int retry_writev(int fd, struct iovec *iov, int iovcnt)
 #endif
 #endif
 	;
-    
+
     for (;;) {
 	while (iovcnt && iov[0].iov_len == 0) {
 	    iov++;
@@ -405,10 +404,10 @@ static int retry_writev(int fd, struct iovec *iov, int iovcnt)
 #ifdef HAVE_PWCHECK
 /* pwcheck daemon-authenticated login */
 static int pwcheck_verify_password(sasl_conn_t *conn,
-				   const char *userid, 
+				   const char *userid,
 				   const char *passwd,
 				   const char *service __attribute__((unused)),
-				   const char *user_realm 
+				   const char *user_realm
 				               __attribute__((unused)))
 {
     int s;
@@ -495,7 +494,7 @@ static int retry_read(int fd, void *buf0, unsigned nbyte)
 
 /* saslauthd-authenticated login */
 static int saslauthd_verify_password(sasl_conn_t *conn,
-				     const char *userid, 
+				     const char *userid,
 				     const char *passwd,
 				     const char *service,
 				     const char *user_realm)
@@ -534,7 +533,7 @@ static int saslauthd_verify_password(sasl_conn_t *conn,
      */
     {
  	unsigned short u_len, p_len, s_len, r_len;
- 
+
  	u_len = (strlen(userid));
  	p_len = (strlen(passwd));
 	s_len = (strlen(service));
@@ -616,7 +615,7 @@ static int saslauthd_verify_password(sasl_conn_t *conn,
 
     {
  	struct iovec iov[8];
- 
+
 	iov[0].iov_len = query_end - query;
 	iov[0].iov_base = query;
 
@@ -638,14 +637,14 @@ static int saslauthd_verify_password(sasl_conn_t *conn,
 	    sasl_seterror(conn, 0, "size read failed");
 	    return SASL_FAIL;
 	}
-	
+
 	count = ntohs(count);
 	if (count < 2) { /* MUST have at least "OK" or "NO" */
 	    close(s);
 	    sasl_seterror(conn, 0, "bad response from saslauthd");
 	    return SASL_FAIL;
 	}
-	
+
 	count = (int)sizeof(response) < count ? sizeof(response) : count;
 	if (retry_read(s, response, count) < count) {
 	    close(s);
@@ -657,11 +656,11 @@ static int saslauthd_verify_password(sasl_conn_t *conn,
 
     close(s);
 #endif /* USE_DOORS */
-  
+
     if (!strncmp(response, "OK", 2)) {
 	return SASL_OK;
     }
-  
+
     sasl_seterror(conn, SASL_NOLOG, "authentication failed");
     return SASL_BADAUTH;
 }
@@ -673,7 +672,7 @@ static int always_true(sasl_conn_t *conn,
 		       const char *userstr,
 		       const char *passwd __attribute__((unused)),
 		       const char *service __attribute__((unused)),
-		       const char *user_realm __attribute__((unused))) 
+		       const char *user_realm __attribute__((unused)))
 {
     _sasl_log(conn, SASL_LOG_WARN, "AlwaysTrue Password Verifier Verified: %s",
 	      userstr);
@@ -691,6 +690,6 @@ struct sasl_verify_password_s _sasl_verify_password[] = {
 #endif
 #ifdef HAVE_ALWAYSTRUE
     { "alwaystrue", &always_true },
-#endif     
+#endif
     { NULL, NULL }
 };

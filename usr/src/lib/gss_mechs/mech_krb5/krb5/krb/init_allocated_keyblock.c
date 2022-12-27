@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "k5-int.h"
 
 krb5_error_code KRB5_CALLCONV

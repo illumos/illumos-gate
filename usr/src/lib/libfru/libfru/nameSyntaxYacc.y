@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* This is the yacc grammar for the libfru NamingSyntax */
 #include <assert.h>
 #include <stdio.h>
@@ -162,7 +160,7 @@ element    : NAME
               $$ = pathDef;
            }
            ;
- 
+
 itercount : NUMBER
             { $$ = $1; }
           | LAST

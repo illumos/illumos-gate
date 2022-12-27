@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/crc32.h>
 
 static unsigned int crc32_tab[] = { CRC32_TABLE };

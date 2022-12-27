@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Signing and MACing Functions
  * (as defined in PKCs#11 spec section 11.11)

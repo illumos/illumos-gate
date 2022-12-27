@@ -27,8 +27,6 @@
 #ifndef _THREAD_POOL_IMPL_H
 #define	_THREAD_POOL_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <thread_pool.h>
 
 #ifdef	__cplusplus

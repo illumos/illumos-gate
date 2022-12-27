@@ -36,8 +36,6 @@
 #ifndef LDAP_MAIN_H
 #define LDAP_MAIN_H 1
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "kdb_ldap.h"
 #include "ldap_misc.h"
 #include "ldap_handle.h"

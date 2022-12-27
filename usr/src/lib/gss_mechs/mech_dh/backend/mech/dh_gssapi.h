@@ -30,8 +30,6 @@
 #ifndef _DH_GSSAPI_H_
 #define	_DH_GSSAPI_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

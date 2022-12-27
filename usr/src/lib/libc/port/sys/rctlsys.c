@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _getrctl = getrctl
 #pragma weak _setrctl = setrctl
 

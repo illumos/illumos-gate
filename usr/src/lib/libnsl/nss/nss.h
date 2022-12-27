@@ -26,8 +26,6 @@
 #ifndef	_NSS_H
 #define	_NSS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <nss_common.h>

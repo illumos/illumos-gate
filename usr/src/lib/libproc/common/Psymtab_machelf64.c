@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Defining _ELF64 causes the code in Psymtab_machelf32.c to generate
  * the ELFCLASS64 version of the code contained in that file.

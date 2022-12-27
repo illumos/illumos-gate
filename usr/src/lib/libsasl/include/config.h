@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
@@ -13,7 +11,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -23,7 +21,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -106,7 +104,7 @@
 #else
 #error Unsupported 64-bit architecture!
 #endif
-#else 
+#else
 #define PLUGINDIR "/usr/lib/sasl"
 #endif
 
@@ -345,7 +343,7 @@
 /* #undef HAVE_GSSAPI_H */
 
 /* Define if your GSSAPI implimentation defines GSS_C_NT_HOSTBASED_SERVICE */
-#define HAVE_GSS_C_NT_HOSTBASED_SERVICE 
+#define HAVE_GSS_C_NT_HOSTBASED_SERVICE
 
 
 /* Create a struct iovec if we need one */
@@ -480,7 +478,7 @@ struct sockaddr_storage {
 
 /* HAVE_GSS_C_NT_USER_NAME is not needed for Solaris 10 since libgss has been
  * updated.
- */	
+ */
 #undef HAVE_GSS_C_NT_USER_NAME
 
 #define	HAVE_RPC_GSS_MECH_TO_OID 1

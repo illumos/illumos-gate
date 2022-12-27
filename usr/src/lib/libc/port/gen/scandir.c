@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Based on usr/src/ucblib/libucb/port/gen/scandir.c
  */

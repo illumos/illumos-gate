@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2003 April 4
 #
 # The author disclaims copyright to this source code.  In place of
@@ -264,7 +262,7 @@ do_test attach-2.10 {
   } db2
 } {table t2 t2 table tx tx trigger r1 t2 index i2 t2}
 #do_test attach-2.11 {
-#  catchsql { 
+#  catchsql {
 #    SELECT * FROM t2 WHERE x>5;
 #  }
 #} {1 {database schema has changed}}

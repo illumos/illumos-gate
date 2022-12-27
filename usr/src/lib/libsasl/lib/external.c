@@ -2,14 +2,13 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* SASL server API implementation
  * Rob Siemborski
  * Tim Martin
  * $Id: external.c,v 1.19 2003/04/08 17:30:54 rjs3 Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -17,7 +16,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -27,7 +26,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -81,10 +80,10 @@ external_server_mech_new(void *glob_context __attribute__((unused)),
 	|| !sparams->utils
 	|| !sparams->utils->conn)
 	return SASL_BADPARAM;
-    
+
     if (!sparams->utils->conn->external.auth_id)
 	return SASL_NOMECH;
-    
+
     *conn_context = NULL;
 
     return SASL_OK;
@@ -100,7 +99,7 @@ external_server_mech_step(void *conn_context __attribute__((unused)),
 			  sasl_out_params_t *oparams)
 {
     int result;
-    
+
     if (!sparams
 	|| !sparams->utils
 	|| !sparams->utils->conn
@@ -109,10 +108,10 @@ external_server_mech_step(void *conn_context __attribute__((unused)),
 	|| !serveroutlen
 	|| !oparams)
 	return SASL_BADPARAM;
-    
+
     if (!sparams->utils->conn->external.auth_id)
 	return SASL_BADPROT;
-    
+
     if ((sparams->props.security_flags & SASL_SEC_NOANONYMOUS) &&
 	(!strcmp(sparams->utils->conn->external.auth_id, "anonymous"))) {
 #ifdef _INTEGRATED_SOLARIS_
@@ -123,23 +122,23 @@ external_server_mech_step(void *conn_context __attribute__((unused)),
 #endif /* _INTEGRATED_SOLARIS_ */
 	return SASL_NOAUTHZ;
     }
-    
+
     *serverout = NULL;
     *serveroutlen = 0;
-    
+
     if (!clientin) {
 	/* No initial data; we're in a protocol which doesn't support it.
 	 * So we let the server app know that we need some... */
 	return SASL_CONTINUE;
     }
-    
+
     if (clientinlen) {		/* if we have a non-zero authorization id */
 	/* The user's trying to authorize as someone they didn't
 	 * authenticate as */
 	result = sparams->canon_user(sparams->utils->conn,
 				     clientin, 0, SASL_CU_AUTHZID, oparams);
 	if(result != SASL_OK) return result;
-	
+
 	result = sparams->canon_user(sparams->utils->conn,
 				     sparams->utils->conn->external.auth_id, 0,
 				     SASL_CU_AUTHID, oparams);
@@ -148,9 +147,9 @@ external_server_mech_step(void *conn_context __attribute__((unused)),
 				     sparams->utils->conn->external.auth_id, 0,
 				     SASL_CU_AUTHID | SASL_CU_AUTHZID, oparams);
     }
-    
+
     if (result != SASL_OK) return result;
-    
+
     /* set oparams */
     oparams->doneflag = 1;
     oparams->mech_ssf = 0;
@@ -205,7 +204,7 @@ int external_server_plug_init(const sasl_utils_t *utils,
 {
     if (!out_version || !pluglist || !plugcount)
 	return SASL_BADPARAM;
-    
+
     if (max_version != SASL_SERVER_PLUG_VERSION) {
 #ifdef _SUN_SDK_
 	utils->log(utils->conn, SASL_LOG_ERR, "EXTERNAL version mismatch");
@@ -214,7 +213,7 @@ int external_server_plug_init(const sasl_utils_t *utils,
 #endif /* _SUN_SDK_ */
 	return SASL_BADVERS;
     }
-    
+
     *out_version = SASL_SERVER_PLUG_VERSION;
     *pluglist = external_server_plugins;
     *plugcount = 1;
@@ -223,7 +222,7 @@ int external_server_plug_init(const sasl_utils_t *utils,
 
 /*****************************  Client Section  *****************************/
 
-typedef struct client_context 
+typedef struct client_context
 {
     char *out_buf;
 #ifdef _SUN_SDK_
@@ -241,25 +240,25 @@ static int external_client_mech_new(void *glob_context __attribute__((unused)),
 				    void **conn_context)
 {
     client_context_t *text;
-    
+
     if (!params
 	|| !params->utils
 	|| !params->utils->conn
 	|| !conn_context)
 	return SASL_BADPARAM;
-    
+
     if (!params->utils->conn->external.auth_id)
 	return SASL_NOMECH;
-    
+
 #ifdef _SUN_SDK_
     text = params->utils->malloc(sizeof(client_context_t));
 #else
     text = sasl_ALLOC(sizeof(client_context_t));
 #endif /* _SUN_SDK_ */
     if(!text) return SASL_NOMEM;
-    
+
     memset(text, 0, sizeof(client_context_t));
-    
+
     *conn_context = text;
 
     return SASL_OK;
@@ -279,7 +278,7 @@ external_client_mech_step(void *conn_context,
     const char *user = NULL;
     int user_result = SASL_OK;
     int result;
-    
+
     if (!params
 	|| !params->utils
 	|| !params->utils->conn
@@ -288,30 +287,30 @@ external_client_mech_step(void *conn_context,
 	|| !clientoutlen
 	|| !oparams)
 	return SASL_BADPARAM;
-    
+
     if (!params->utils->conn->external.auth_id)
 	return SASL_BADPROT;
-    
+
     if (serverinlen != 0)
 	return SASL_BADPROT;
-    
+
     *clientout = NULL;
     *clientoutlen = 0;
-    
+
     /* try to get the userid */
     if (user == NULL) {
 	user_result = _plug_get_userid(params->utils, &user, prompt_need);
-	
+
 	if ((user_result != SASL_OK) && (user_result != SASL_INTERACT))
 	    return user_result;
     }
-    
+
     /* free prompts we got */
     if (prompt_need && *prompt_need) {
 	params->utils->free(*prompt_need);
 	*prompt_need = NULL;
     }
-    
+
     /* if there are prompts not filled in */
     if (user_result == SASL_INTERACT) {
 	/* make the prompt list */
@@ -333,31 +332,31 @@ external_client_mech_step(void *conn_context,
 			       NULL, NULL, NULL,
 			       NULL, NULL, NULL);
 	if (result != SASL_OK) return result;
-	
+
 	return SASL_INTERACT;
     }
-    
+
     *clientoutlen = user ? strlen(user) : 0;
-    
+
 #ifdef _SUN_SDK_
     result = _plug_buf_alloc(params->utils, &text->out_buf,
         &text->out_buf_len, *clientoutlen + 1);
 #else
     result = _buf_alloc(&text->out_buf, &text->out_buf_len, *clientoutlen + 1);
 #endif /* _SUN_SDK_ */
-    
+
     if (result != SASL_OK) return result;
-    
+
     if (user && *user) {
 	result = params->canon_user(params->utils->conn,
 				    user, 0, SASL_CU_AUTHZID, oparams);
 	if (result != SASL_OK) return result;
-	
+
 	result = params->canon_user(params->utils->conn,
 				    params->utils->conn->external.auth_id, 0,
 				    SASL_CU_AUTHID, oparams);
 	if (result != SASL_OK) return result;
-	
+
 	memcpy(text->out_buf, user, *clientoutlen);
     } else {
 	result = params->canon_user(params->utils->conn,
@@ -365,11 +364,11 @@ external_client_mech_step(void *conn_context,
 				    SASL_CU_AUTHID | SASL_CU_AUTHZID, oparams);
 	if (result != SASL_OK) return result;
     }
-    
+
     text->out_buf[*clientoutlen] = '\0';
-    
+
     *clientout = text->out_buf;
-    
+
     /* set oparams */
     oparams->doneflag = 1;
     oparams->mech_ssf = 0;
@@ -379,18 +378,18 @@ external_client_mech_step(void *conn_context,
     oparams->decode_context = NULL;
     oparams->decode = NULL;
     oparams->param_version = 0;
-    
+
     return SASL_OK;
 }
 
 static void
 external_client_mech_dispose(void *conn_context,
-			     const sasl_utils_t *utils __attribute__((unused))) 
+			     const sasl_utils_t *utils __attribute__((unused)))
 {
     client_context_t *text = (client_context_t *) conn_context;
-    
+
     if (!text) return;
-    
+
 #ifdef _INTEGRATED_SOLARIS_
     convert_prompt(utils, &text->h, NULL);
 #endif /* _INTEGRATED_SOLARIS_ */
@@ -401,7 +400,7 @@ external_client_mech_dispose(void *conn_context,
     utils->free(text);
 #else
     if(text->out_buf) sasl_FREE(text->out_buf);
-    
+
     sasl_FREE(text);
 #endif /* _SUN_SDK_ */
 }
@@ -444,7 +443,7 @@ int external_client_plug_init(const sasl_utils_t *utils,
 {
     if (!utils || !out_version || !pluglist || !plugcount)
 	return SASL_BADPARAM;
-    
+
     if (max_version != SASL_CLIENT_PLUG_VERSION) {
 #ifdef _SUN_SDK_
 	utils->log(utils->conn, SASL_LOG_ERR, "EXTERNAL version mismatch");
@@ -453,10 +452,10 @@ int external_client_plug_init(const sasl_utils_t *utils,
 #endif /* _SUN_SDK_ */
 	return SASL_BADVERS;
     }
-    
+
     *out_version = SASL_CLIENT_PLUG_VERSION;
     *pluglist = external_client_plugins;
     *plugcount = 1;
-    
+
     return SASL_OK;
 }

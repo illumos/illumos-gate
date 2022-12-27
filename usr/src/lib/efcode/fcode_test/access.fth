@@ -1,4 +1,3 @@
-\ #pragma ident	"%Z%%M%	%I%	%E% SMI"
 \ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
@@ -38,7 +37,7 @@ create access-test
 	here to end-test
 	h# a55aa55a ,
 	here to end-test2
-	
+
 
 	" l,+"  access-test  la1+     word-test = .passed?
         " w,+"  word-test   2 wa+     char-test = .passed?

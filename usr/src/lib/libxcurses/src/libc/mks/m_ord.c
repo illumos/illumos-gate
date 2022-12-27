@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * m_ord.c
  *
@@ -72,7 +70,7 @@ m_ord(c)
 wint_t c;
 {
 	/*  note: this implementation is code set independent  */
-	switch (towupper(c)) { 	
+	switch (towupper(c)) {
 		case 'A': return 1;
 		case 'B': return 2;
 		case 'C': return 3;
@@ -115,7 +113,7 @@ m_chr(i)
 int i;
 {
 	/*  note: this implementation is code set independent  */
-	switch (i) { 	
+	switch (i) {
 		case 1: return 'A';
 		case 2: return 'B';
 		case 3: return 'C';

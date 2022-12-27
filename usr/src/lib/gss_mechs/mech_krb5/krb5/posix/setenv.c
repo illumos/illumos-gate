@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright (c) 1987, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -46,7 +45,7 @@
 #ifndef	__P
 #define __P(x)	()
 #endif
-static char *__findenv __P((const char *, int *)); 
+static char *__findenv __P((const char *, int *));
 
 /*
  * setenv --

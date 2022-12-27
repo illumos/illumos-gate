@@ -27,8 +27,6 @@
 #ifndef	_LIBC_SPARC_INC_SYS_H
 #define	_LIBC_SPARC_INC_SYS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file defines common code sequences for system calls.  Note that
  * it is assumed that __cerror is within the short branch distance from

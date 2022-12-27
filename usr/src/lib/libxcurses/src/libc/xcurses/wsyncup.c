@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wsyncup.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -71,8 +69,8 @@ wsyncup(WINDOW *w)
 		/* Update the parent's dirty region from the child's. */
 		for (py = w->_begy - p->_begy, y = 0; y < w->_maxy; ++y, ++py) {
 			if (0 <= w->_last[y]) {
-				p->_first[py] = w->_begx + w->_first[y]; 
-				p->_last[py] = w->_begx + w->_last[y]; 
+				p->_first[py] = w->_begx + w->_first[y];
+				p->_last[py] = w->_begx + w->_last[y];
 			}
 		}
 	}

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * gethostbyname_r() is defined in this file.  It is implemented on top of
  *   _get_hostserv_inetnetdir_byname() which is also used to implement

@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -20,7 +18,7 @@
 set testdir [file dirname $argv0]
 source $testdir/tester.tcl
 
-if {[info commands btree_open]!="" && $SQLITE_PAGE_SIZE==1024 
+if {[info commands btree_open]!="" && $SQLITE_PAGE_SIZE==1024
      && $SQLITE_USABLE_SIZE==1024} {
 
 # Basic functionality.  Open and close a database.
@@ -311,7 +309,7 @@ do_test btree-4.4 {
     lappend r [btree_data $::c1]
     btree_next $::c1
   }
-  set r   
+  set r
 } {five 5.00 four 4.00 six 6.00 three 3.00 two 2.00}
 
 # Commit and make sure the delete is still there.
@@ -327,7 +325,7 @@ do_test btree-4.5 {
     lappend r [btree_data $::c1]
     btree_next $::c1
   }
-  set r   
+  set r
 } {five 5.00 four 4.00 six 6.00 three 3.00 two 2.00}
 
 # Completely close the database and reopen it.  Then check
@@ -356,7 +354,7 @@ do_test btree-4.9 {
     lappend r [btree_data $::c1]
     btree_next $::c1
   }
-  set r   
+  set r
 } {five 5.00 four 4.00 six 6.00 three 3.00 two 2.00}
 
 # Try to read and write meta data
@@ -501,9 +499,9 @@ do_test btree-6.13 {
 } {2}
 
 # Check to see that pages defragment properly.  To do this test we will
-# 
+#
 #   1.  Fill the first page table 2 with data.
-#   2.  Delete every other entry of table 2. 
+#   2.  Delete every other entry of table 2.
 #   3.  Insert a single entry that requires more contiguous
 #       space than is available.
 #

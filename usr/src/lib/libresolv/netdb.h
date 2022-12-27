@@ -41,8 +41,6 @@
 #ifndef _NETDB_H
 #define	_NETDB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

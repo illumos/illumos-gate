@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * pecho_wc.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -52,7 +50,7 @@ pecho_wchar(WINDOW *pad, const cchar_t *cc)
 	__m_trace("pecho_wchar(%p, %p)", pad, cc);
 #endif
 
-	/* Compute height and width of inclusive region. */ 
+	/* Compute height and width of inclusive region. */
 	dy = pad->_smaxy - pad->_sminy;
 	dx = pad->_smaxx - pad->_sminx;
 

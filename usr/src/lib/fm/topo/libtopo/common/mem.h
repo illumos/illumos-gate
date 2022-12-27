@@ -27,8 +27,6 @@
 #ifndef	_MEM_H
 #define	_MEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

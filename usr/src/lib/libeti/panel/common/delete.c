@@ -30,8 +30,6 @@
 
 /* A panels subsystem built on curses--Delete panel routines */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
-
 /*LINTLIBRARY*/
 
 #include <sys/types.h>

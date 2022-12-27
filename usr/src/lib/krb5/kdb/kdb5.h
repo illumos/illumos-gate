@@ -1,8 +1,6 @@
 #ifndef _KRB5_KDB5_H_
 #define _KRB5_KDB5_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif

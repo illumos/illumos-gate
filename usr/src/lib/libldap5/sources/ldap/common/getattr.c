@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -35,7 +33,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -73,7 +71,7 @@ ldap_first_attribute( LDAP *ld, LDAPMessage *entry, BerElement **ber )
 		LDAP_SET_LDERRNO( ld, LDAP_PARAM_ERROR, NULL, NULL );
 		return( NULL );
 	}
-	
+
 	if ( nsldapi_alloc_ber_with_options( ld, ber ) != LDAP_SUCCESS ) {
 		return( NULL );
 	}
@@ -83,7 +81,7 @@ ldap_first_attribute( LDAP *ld, LDAPMessage *entry, BerElement **ber )
 	attr = NULL;			/* pessimistic */
 	err = LDAP_DECODING_ERROR;	/* ditto */
 
-	/* 
+	/*
 	 * Skip past the sequence, dn, and sequence of sequence.
 	 * Reset number of bytes remaining so we confine the rest of our
 	 * decoding to the current sequence.

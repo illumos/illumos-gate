@@ -27,8 +27,6 @@
 #ifndef _VMEM_STAND_H
 #define	_VMEM_STAND_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * additional functions defined by the standalone backend
  */

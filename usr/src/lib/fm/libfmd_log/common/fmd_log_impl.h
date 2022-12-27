@@ -27,8 +27,6 @@
 #ifndef	_FMD_LOG_IMPL_H
 #define	_FMD_LOG_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <exacct.h>

@@ -31,8 +31,6 @@
 #ifndef _REG_NUM_H
 #define	_REG_NUM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Dwarf register numbers for AMD64
  * Only those with trailing comments are actually tracked

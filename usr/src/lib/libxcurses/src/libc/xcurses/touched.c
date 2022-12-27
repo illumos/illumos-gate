@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * touched.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -47,7 +45,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/touched.c 1.2 1995/06/1
  * Return true if line has been touched.  See wtouchln().
  *
  *	touched 	0 <= _first[y] <= _last[y] <= _maxx
- * 	untouched	_last[y] < 0 < _maxx <= _first[y].  
+ * 	untouched	_last[y] < 0 < _maxx <= _first[y].
  */
 bool
 (is_linetouched)(w, y)
@@ -74,7 +72,7 @@ WINDOW *w;
 	for (y = 0; y < w->_maxy; ++y)
 		if ((value = 0 <= w->_last[y]))
 			break;
-	
+
 	return __m_return_int("is_linetouched", value);
 }
 

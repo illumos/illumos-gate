@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
     Routines to convert terminfo string parameters to termcap form.
     Not all terminfo strings will be, or could be, converted.

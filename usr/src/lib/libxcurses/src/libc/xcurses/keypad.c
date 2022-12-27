@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * keypad.c
  *
@@ -80,10 +78,10 @@ short code;
 	} else {
 		/* Find node to insert function key sequence into the tree. */
 		for (node = *root; *str != '\0'; ++str, node = node->child) {
-			while (node->ch != *str 
+			while (node->ch != *str
 			&& node->sibling != (t_decode *)0)
 				node = node->sibling;
-	    
+
 			if (node->ch != *str) {
 				node->sibling = (t_decode *) malloc(
 					sizeof *node
@@ -169,7 +167,7 @@ keypad(WINDOW *w, bool bf)
 #endif
 
 	w->_flags &= ~W_USE_KEYPAD;
-	
+
 	if (bf)
 		w->_flags |= W_USE_KEYPAD;
 

@@ -41,8 +41,6 @@
 #ifndef	_OBJECT_H
 #define	_OBJECT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 /*

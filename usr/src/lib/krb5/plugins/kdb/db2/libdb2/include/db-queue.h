@@ -6,13 +6,11 @@
 #ifndef _KRB5_DB2_DBQUEUE_H
 #define	_KRB5_DB2_DBQUEUE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-/* 
+/*
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *

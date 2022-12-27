@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Compatibility lib for BSD's getrusgae(). Only the
  * CPU time usage is supported for RUSAGE_CHILDREN, and hence does not

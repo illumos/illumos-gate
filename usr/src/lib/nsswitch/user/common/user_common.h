@@ -31,8 +31,6 @@
 #ifndef _USER_COMMON_H
 #define	_USER_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <nss_common.h>
 #include <nss_dbdefs.h>
 #include <stdio.h>

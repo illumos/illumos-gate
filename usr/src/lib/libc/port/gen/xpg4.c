@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * __xpg4 == 0 by default. The xpg4 cc driver will add an object
  * file that contains int __xpg4 = 1". The symbol interposition

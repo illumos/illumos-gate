@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * wgetn_ws.c		
+ * wgetn_ws.c
  *
  * XCurses Library
  *
@@ -135,7 +133,7 @@ int n, mb_flag;
 	} else {
 		fld_buffer = (wint_t *) s;
 	}
-	
+
 	(void) __m_tty_wc(VEOL, &wc);
 	key_table[EOL_KEY].code = (wint_t) wc;
 	(void) __m_tty_wc(VEOF, &wc);
@@ -225,7 +223,7 @@ fld_erase()
 		x = fld_window->_maxx - 1;
 
 		/* Find end of previous character, skipping any background
-		 * character that may have been written by auto-wrap. 
+		 * character that may have been written by auto-wrap.
 		 */
 		while (fld_buffer[fld_index] != fld_window->_line[y][x]._wc[0])
 			--x;
@@ -285,7 +283,7 @@ fld_insert()
 			(void) beep();
 			return 1;
 		}
-		
+
 		/* Completely full, terminate input. */
 		return 0;
 	}

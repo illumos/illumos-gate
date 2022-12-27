@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/kdb/kdb_ldap/ldap_principal2.c
  *
@@ -247,11 +245,11 @@ process_db_args(context, db_args, xargs, optype)
 		dptr = &xargs->tktpolicydn;
 	    } else {
 		if (strcmp(arg, USERDN_ARG) == 0) {
-		    if (optype == MODIFY_PRINCIPAL || 
-			xargs->dn != NULL || xargs->containerdn != NULL || 
+		    if (optype == MODIFY_PRINCIPAL ||
+			xargs->dn != NULL || xargs->containerdn != NULL ||
 			xargs->linkdn != NULL) {
 			st = EINVAL;
-			snprintf(errbuf, sizeof(errbuf), 
+			snprintf(errbuf, sizeof(errbuf),
 				 gettext("%s option not supported"), arg);
 			krb5_set_error_message(context, st, "%s", errbuf);
 			goto cleanup;
@@ -261,7 +259,7 @@ process_db_args(context, db_args, xargs, optype)
 		    if (optype == MODIFY_PRINCIPAL ||
 			xargs->dn != NULL || xargs->containerdn != NULL) {
 			st = EINVAL;
-			snprintf(errbuf, sizeof(errbuf), 
+			snprintf(errbuf, sizeof(errbuf),
 				 gettext("%s option not supported"), arg);
 			krb5_set_error_message(context, st, "%s", errbuf);
 			goto cleanup;
@@ -270,7 +268,7 @@ process_db_args(context, db_args, xargs, optype)
 		} else if (strcmp(arg, LINKDN_ARG) == 0) {
 		    if (xargs->dn != NULL || xargs->linkdn != NULL) {
 			st = EINVAL;
-			snprintf(errbuf, sizeof(errbuf), 
+			snprintf(errbuf, sizeof(errbuf),
 				 gettext("%s option not supported"), arg);
 			krb5_set_error_message(context, st, "%s", errbuf);
 			goto cleanup;
@@ -282,11 +280,11 @@ process_db_args(context, db_args, xargs, optype)
 		    krb5_set_error_message(context, st, "%s", errbuf);
 		    goto cleanup;
 		}
-		
+
 		xargs->dn_from_kbd = TRUE;
 		if (arg_val == NULL || strlen(arg_val) == 0) {
 		    st = EINVAL;
-		    snprintf(errbuf, sizeof(errbuf), 
+		    snprintf(errbuf, sizeof(errbuf),
 			     gettext("%s option value missing"), arg);
 		    krb5_set_error_message(context, st, "%s", errbuf);
 		    goto cleanup;
@@ -295,7 +293,7 @@ process_db_args(context, db_args, xargs, optype)
 
 	    if (arg_val == NULL) {
 		st = EINVAL;
-		snprintf(errbuf, sizeof(errbuf), 
+		snprintf(errbuf, sizeof(errbuf),
 			 gettext("%s option value missing"), arg);
 		krb5_set_error_message(context, st, "%s", errbuf);
 		goto cleanup;
@@ -303,8 +301,8 @@ process_db_args(context, db_args, xargs, optype)
 	    arg_val_len = strlen(arg_val) + 1;
 
 	    if (strcmp(arg, TKTPOLICY_ARG) == 0) {
-		if ((st = krb5_ldap_name_to_policydn (context, 
-						      arg_val, 
+		if ((st = krb5_ldap_name_to_policydn (context,
+						      arg_val,
 						      dptr)) != 0)
 		    goto cleanup;
 	    } else {
@@ -591,7 +589,7 @@ krb5_ldap_put_principal(context, entries, nentries, db_args)
 		    free(filter);
 		    goto cleanup;
 		}
-		/* 
+		/*
 		 * If it isn't found then assume a standalone princ entry is to
 		 * be created.
 		 */
@@ -600,7 +598,7 @@ krb5_ldap_put_principal(context, entries, nentries, db_args)
 	    free(filter);
 
 	    if (found_entry == FALSE && principal_dn != NULL) {
-		/* 
+		/*
 		 * if principal_dn is null then there is code further down to
 		 * deal with setting standalone_principal_dn.  Also note that
 		 * this will set create_standalone_prinicipal true for
@@ -925,7 +923,7 @@ krb5_ldap_put_principal(context, entries, nentries, db_args)
 		goto cleanup;
 	    }
 	} else if (entries->mask & KADM5_LOAD && found_entry == TRUE) {
-	    /* 
+	    /*
 	     * a load is special in that existing entries must have attrs that
 	     * removed.
 	     */
@@ -997,7 +995,7 @@ krb5_ldap_put_principal(context, entries, nentries, db_args)
 		/* Solaris Kerberos: fix key history issue */
 		if (ptr->tl_data_type == KRB5_TL_KADM_DATA && ! entries->mask & KADM5_KEY_HIST)
 		    continue;
-		    
+
 		count++;
 	    }
 	    if (count != 0) {

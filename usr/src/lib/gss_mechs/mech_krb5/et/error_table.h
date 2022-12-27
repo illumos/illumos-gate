@@ -7,8 +7,6 @@
 
 #ifndef _ET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 
 #define ET_EBUFSIZ 64

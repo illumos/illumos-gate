@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * m_nls.h: mks NLS (National Language Support) header file
  * The client may choose to use a different messaging scheme than the xpg

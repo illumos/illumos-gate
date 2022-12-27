@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2003 April 6
 **
@@ -24,7 +21,7 @@
 
 /*
 ** A structure for holding a dynamic string - a string that can grow
-** without bound. 
+** without bound.
 */
 typedef struct dynStr dynStr;
 struct dynStr {
@@ -91,7 +88,7 @@ static void appendQuoted(dynStr *p, const char *zText){
 ** Execute statements of SQL.  If an error occurs, write the error
 ** message into *pzErrMsg and return non-zero.
 */
-static int execsql(char **pzErrMsg, sqlite *db, const char *zSql){ 
+static int execsql(char **pzErrMsg, sqlite *db, const char *zSql){
   char *zErrMsg = 0;
   int rc;
 
@@ -138,7 +135,7 @@ static int vacuumCallback2(void *pArg, int argc, char **argv, char **NotUsed){
 ** arguments where are taken from the SQLITE_MASTER table of the original
 ** database:  (1) the entry type, (2) the entry name, and (3) the SQL for
 ** the entry.  In all cases, execute the SQL of the third argument.
-** For tables, run a query to select all entries in that table and 
+** For tables, run a query to select all entries in that table and
 ** transfer them to the second-stage callback.
 */
 static int vacuumCallback1(void *pArg, int argc, char **argv, char **NotUsed){
@@ -238,7 +235,7 @@ int sqliteRunVacuum(char **pzErrMsg, sqlite *db){
   };
 
   if( db->flags & SQLITE_InTrans ){
-    sqliteSetString(pzErrMsg, "cannot VACUUM from within a transaction", 
+    sqliteSetString(pzErrMsg, "cannot VACUUM from within a transaction",
        (char*)0);
     return SQLITE_ERROR;
   }
@@ -271,7 +268,7 @@ int sqliteRunVacuum(char **pzErrMsg, sqlite *db){
     goto end_of_vacuum;
   }
 
-  
+
   dbNew = sqlite_open(zTemp, 0, &zErrMsg);
   if( dbNew==0 ){
     sqliteSetString(pzErrMsg, "unable to open a temporary database at ",
@@ -282,7 +279,7 @@ int sqliteRunVacuum(char **pzErrMsg, sqlite *db){
   if( (rc = execsql(pzErrMsg, dbNew, "PRAGMA synchronous=off; BEGIN"))!=0 ){
     goto end_of_vacuum;
   }
-  
+
   sVac.dbOld = db;
   sVac.dbNew = dbNew;
   sVac.pzErrMsg = pzErrMsg;
@@ -294,7 +291,7 @@ int sqliteRunVacuum(char **pzErrMsg, sqlite *db){
     rc = sqlite_exec(db, zBuf, vacuumCallback3, &sVac, &zErrMsg);
   }
   if( rc==SQLITE_OK ){
-    rc = sqlite_exec(db, 
+    rc = sqlite_exec(db,
       "SELECT type, name, sql FROM sqlite_master "
       "WHERE sql NOT NULL AND type!='view' "
       "UNION ALL "
@@ -310,11 +307,11 @@ int sqliteRunVacuum(char **pzErrMsg, sqlite *db){
 
 end_of_vacuum:
   if( rc && zErrMsg!=0 ){
-    sqliteSetString(pzErrMsg, "unable to vacuum database - ", 
+    sqliteSetString(pzErrMsg, "unable to vacuum database - ",
        zErrMsg, (char*)0);
   }
   sqlite_exec(db, "ROLLBACK", 0, 0, 0);
-  if( (dbNew && (dbNew->flags & SQLITE_Interrupt)) 
+  if( (dbNew && (dbNew->flags & SQLITE_Interrupt))
          || (db->flags & SQLITE_Interrupt) ){
     rc = SQLITE_INTERRUPT;
   }

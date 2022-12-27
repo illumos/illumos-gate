@@ -27,8 +27,6 @@
 #ifndef	_FCDRIVER_FCDRIVER_H
 #define	_FCDRIVER_FCDRIVER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fcode.h>
 
 #ifdef	__cplusplus

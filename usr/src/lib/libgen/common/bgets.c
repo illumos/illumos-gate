@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Read no more than <count> characters into <buf> from stream <fp>,
  * stopping at any characters listed in <stopstr>.

@@ -26,8 +26,6 @@
 #ifndef _KMFMAPPER_H
 #define	_KMFMAPPER_H
 
-#pragma ident	"@(#)kmfmapper.h	1.1	08/02/27 SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

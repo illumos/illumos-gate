@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 $num_bays = 4;
 $bay_label = "HD";
@@ -52,7 +51,7 @@ for ($bay = 0; $bay < $num_bays; $bay++) {
       </propgroup>
       <propgroup name='binding' version='1' name-stability='Private'
         data-stability='Private'>
-	<propval name='occupant-path' type='string' 
+	<propval name='occupant-path' type='string'
 	  value='$hpath$tpath' />
       </propgroup>
     </node>

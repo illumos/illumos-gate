@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * isendwin.c
  *
@@ -44,7 +42,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/isendwin.c 1.1 1995/05/
 #include <private.h>
 
 /*f
- * Return TRUE if endwin() has been called without any subsequent 
+ * Return TRUE if endwin() has been called without any subsequent
  * calls to wrefresh()/doupdate(), else FALSE.
  *
  * This function is not a macro because the structure of SCREEN is

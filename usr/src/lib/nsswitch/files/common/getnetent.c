@@ -25,9 +25,6 @@
  * files/getnetent.c -- "files" backend for nsswitch "networks" database
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

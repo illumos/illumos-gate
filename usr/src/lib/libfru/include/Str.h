@@ -27,8 +27,6 @@
 #ifndef	_STR_H
 #define	_STR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

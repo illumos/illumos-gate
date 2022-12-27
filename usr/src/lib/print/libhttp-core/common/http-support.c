@@ -34,8 +34,6 @@
  *   http_copy_decode() - Copy and decode a URI.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Include necessary headers...
  */
@@ -326,7 +324,7 @@ cups_hstrerror(int error)		/* I - Error number */
  */
 
 static const char *			/* O - New source pointer */
-http_copy_decode(char       *dst,	/* O - Destination buffer */ 
+http_copy_decode(char       *dst,	/* O - Destination buffer */
                  const char *src,	/* I - Source pointer */
 		 int        dstsize,	/* I - Destination size */
 		 const char *term)	/* I - Terminating characters */

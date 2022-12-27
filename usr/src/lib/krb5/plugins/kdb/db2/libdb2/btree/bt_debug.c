@@ -3,9 +3,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*-
  * Copyright (c) 1990, 1993, 1994, 1995
  *	The Regents of the University of California.  All rights reserved.

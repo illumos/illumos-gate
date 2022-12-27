@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -423,8 +421,8 @@ test_expr expr-case.11 {i1=null} \
 test_expr expr-case.12 {i1=1} \
 	{CASE i1 WHEN 1 THEN null WHEN 2 THEN 'two' ELSE 3 END} {{}}
 test_expr expr-case.13 {i1=7} \
-	{ CASE WHEN i1 < 5 THEN 'low' 
-	       WHEN i1 < 10 THEN 'medium' 
+	{ CASE WHEN i1 < 5 THEN 'low'
+	       WHEN i1 < 10 THEN 'medium'
                WHEN i1 < 15 THEN 'high' ELSE 'error' END} medium
 
 

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -27,9 +25,9 @@
 
    Create a "version 1" proxied authorization control.
 
-   Parameters are  
+   Parameters are
 
-   ld              LDAP pointer to the desired connection 
+   ld              LDAP pointer to the desired connection
 
    dn		   The dn used in the proxy auth
 
@@ -38,16 +36,16 @@
                    ried out if the control is recognized by the server
                    and/or client
 
-   ctrlp           the address of a place to put the constructed control 
+   ctrlp           the address of a place to put the constructed control
 */
 
 int
 LDAP_CALL
 ldap_create_proxyauth_control (
-     LDAP *ld, 
-     const char *dn, 
+     LDAP *ld,
+     const char *dn,
      const char ctl_iscritical,
-     LDAPControl **ctrlp   
+     LDAPControl **ctrlp
 )
 {
 	BerElement		*ber;
@@ -74,9 +72,9 @@ ldap_create_proxyauth_control (
 
 
 
-        if ( LBER_ERROR == ber_printf( ber, 
-                                       "{s}", 
-                                       dn ) ) 
+        if ( LBER_ERROR == ber_printf( ber,
+                                       "{s}",
+                                       dn ) )
         {
             LDAP_SET_LDERRNO( ld, LDAP_ENCODING_ERROR, NULL, NULL );
             ber_free( ber, 1 );
@@ -96,22 +94,22 @@ ldap_create_proxyauth_control (
 
    Create a "version 2" proxied authorization control.
 
-   Parameters are  
+   Parameters are
 
-   ld              LDAP pointer to the desired connection 
+   ld              LDAP pointer to the desired connection
 
    authzid		   The authorization identity used in the proxy auth,
                    e.g., dn:uid=bjensen,dc=example,dc=com
 
-   ctrlp           the address of a place to put the constructed control 
+   ctrlp           the address of a place to put the constructed control
 */
 
 int
 LDAP_CALL
 ldap_create_proxiedauth_control (
-     LDAP *ld, 
-     const char *authzid, 
-     LDAPControl **ctrlp   
+     LDAP *ld,
+     const char *authzid,
+     LDAPControl **ctrlp
 )
 {
 	BerElement		*ber;
@@ -134,9 +132,9 @@ ldap_create_proxiedauth_control (
 
 
 
-        if ( LBER_ERROR == ber_printf( ber, 
-                                       "s", 
-                                       authzid ) ) 
+        if ( LBER_ERROR == ber_printf( ber,
+                                       "s",
+                                       authzid ) )
         {
             LDAP_SET_LDERRNO( ld, LDAP_ENCODING_ERROR, NULL, NULL );
             ber_free( ber, 1 );

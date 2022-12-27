@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _getpgrp = getpgrp
 #pragma weak _setpgrp = setpgrp
 #pragma weak _getsid = getsid

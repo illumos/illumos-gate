@@ -26,8 +26,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <psvc_objects.h>
 #include <libprtdiag.h>
 #include <sys/mc.h>

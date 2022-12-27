@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include <k5-int.h>
 
 void KRB5_CALLCONV

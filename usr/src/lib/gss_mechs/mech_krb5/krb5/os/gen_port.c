@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/gen_port.c
  *
@@ -9,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Take an IP addr & port and generate a full IP address.
  */
@@ -41,7 +40,7 @@ krb5_gen_portaddr(krb5_context context, const krb5_address *addr, krb5_const_poi
     if (addr->addrtype != ADDRTYPE_INET)
 	return KRB5_PROG_ATYPE_NOSUPP;
     port = *(const krb5_int16 *)ptr;
-    
+
     memcpy((char *)&adr, (char *)addr->contents, sizeof(adr));
     return krb5_make_full_ipaddr(context, adr, port, outaddr);
 #else

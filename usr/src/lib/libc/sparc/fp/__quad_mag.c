@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains __quad_mag_add and __quad_mag_sub, the core
  * of the quad precision add and subtract operations.

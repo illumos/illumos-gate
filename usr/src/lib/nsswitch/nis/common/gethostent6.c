@@ -25,8 +25,6 @@
  *	nis/gethostent.c -- "nis" backend for nsswitch "ipnodes" database
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <netdb.h>
 #include <stdio.h>

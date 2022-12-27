@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -246,7 +243,7 @@ static Index *findSortingIndex(
       return 0;
     }
   }
-  
+
   /* If we get this far, it means the ORDER BY clause consists only of
   ** ascending columns in the left-most table of the FROM clause.  Now
   ** check for a matching index.
@@ -418,7 +415,7 @@ WhereInfo *sqliteWhereBegin(
        "than %d terms allowed", (int)ARRAYSIZE(aExpr)-1);
     return 0;
   }
-  
+
   /* Allocate and initialize the WhereInfo structure that will become the
   ** return value.
   */
@@ -468,7 +465,7 @@ WhereInfo *sqliteWhereBegin(
   /* Figure out what index to use (if any) for each nested loop.
   ** Make pWInfo->a[i].pIdx point to the index to use for the i-th nested
   ** loop where i==0 is the outer loop and i==pTabList->nSrc-1 is the inner
-  ** loop. 
+  ** loop.
   **
   ** If terms exist that use the ROWID of any table, then set the
   ** iDirectEq[], iDirectLt[], or iDirectGt[] elements for that table
@@ -566,7 +563,7 @@ WhereInfo *sqliteWhereBegin(
 
       if( pIdx->nColumn>32 ) continue;  /* Ignore indices too many columns */
       for(j=0; j<nExpr; j++){
-        if( aExpr[j].idxLeft==iCur 
+        if( aExpr[j].idxLeft==iCur
              && (aExpr[j].prereqRight & loopMask)==aExpr[j].prereqRight ){
           int iColumn = aExpr[j].p->pLeft->iColumn;
           int k;
@@ -601,7 +598,7 @@ WhereInfo *sqliteWhereBegin(
             }
           }
         }
-        if( aExpr[j].idxRight==iCur 
+        if( aExpr[j].idxRight==iCur
              && (aExpr[j].prereqLeft & loopMask)==aExpr[j].prereqLeft ){
           int iColumn = aExpr[j].p->pRight->iColumn;
           int k;
@@ -685,7 +682,7 @@ WhereInfo *sqliteWhereBegin(
        pSortIdx = 0;
      }else{
        int nEqCol = (pWInfo->a[0].score+4)/8;
-       pSortIdx = findSortingIndex(pTab, pTabList->a[0].iCursor, 
+       pSortIdx = findSortingIndex(pTab, pTabList->a[0].iCursor,
                                    *ppOrderBy, pIdx, nEqCol, &bRev);
      }
      if( pSortIdx && (pIdx==0 || pIdx==pSortIdx) ){
@@ -789,7 +786,7 @@ WhereInfo *sqliteWhereBegin(
           Expr *pX = aExpr[k].p;
           if( pX==0 ) continue;
           if( aExpr[k].idxLeft==iCur
-             && (aExpr[k].prereqRight & loopMask)==aExpr[k].prereqRight 
+             && (aExpr[k].prereqRight & loopMask)==aExpr[k].prereqRight
              && pX->pLeft->iColumn==pIdx->aiColumn[j]
           ){
             if( pX->op==TK_EQ ){
@@ -961,7 +958,7 @@ WhereInfo *sqliteWhereBegin(
           if( aExpr[k].p==0 ) continue;
           if( aExpr[k].idxLeft==iCur
              && aExpr[k].p->op==TK_EQ
-             && (aExpr[k].prereqRight & loopMask)==aExpr[k].prereqRight 
+             && (aExpr[k].prereqRight & loopMask)==aExpr[k].prereqRight
              && aExpr[k].p->pLeft->iColumn==pIdx->aiColumn[j]
           ){
             sqliteExprCode(pParse, aExpr[k].p->pRight);
@@ -1006,7 +1003,7 @@ WhereInfo *sqliteWhereBegin(
           if( pExpr==0 ) continue;
           if( aExpr[k].idxLeft==iCur
              && (pExpr->op==TK_LT || pExpr->op==TK_LE)
-             && (aExpr[k].prereqRight & loopMask)==aExpr[k].prereqRight 
+             && (aExpr[k].prereqRight & loopMask)==aExpr[k].prereqRight
              && pExpr->pLeft->iColumn==pIdx->aiColumn[j]
           ){
             sqliteExprCode(pParse, pExpr->pRight);
@@ -1065,7 +1062,7 @@ WhereInfo *sqliteWhereBegin(
           if( pExpr==0 ) continue;
           if( aExpr[k].idxLeft==iCur
              && (pExpr->op==TK_GT || pExpr->op==TK_GE)
-             && (aExpr[k].prereqRight & loopMask)==aExpr[k].prereqRight 
+             && (aExpr[k].prereqRight & loopMask)==aExpr[k].prereqRight
              && pExpr->pLeft->iColumn==pIdx->aiColumn[j]
           ){
             sqliteExprCode(pParse, pExpr->pRight);
@@ -1156,7 +1153,7 @@ WhereInfo *sqliteWhereBegin(
     brk = cont;
 
     /* For a LEFT OUTER JOIN, generate code that will record the fact that
-    ** at least one row of the right table has matched the left table.  
+    ** at least one row of the right table has matched the left table.
     */
     if( pLevel->iLeftJoin ){
       pLevel->top = sqliteVdbeCurrentAddr(v);
@@ -1187,7 +1184,7 @@ WhereInfo *sqliteWhereBegin(
 }
 
 /*
-** Generate the end of the WHERE loop.  See comments on 
+** Generate the end of the WHERE loop.  See comments on
 ** sqliteWhereBegin() for additional information.
 */
 void sqliteWhereEnd(WhereInfo *pWInfo){

@@ -1,8 +1,6 @@
 H
 !rm -f tifget.c
 0a
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines to retrieve a value based on the short terminfo name.
  * This file is created from tifget.ed. DO NOT EDIT ME!

@@ -27,8 +27,6 @@
 #ifndef	_MIDLEVEL_IMPL_H
 #define	_MIDLEVEL_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libscf_impl.h"
 
 #ifdef	__cplusplus

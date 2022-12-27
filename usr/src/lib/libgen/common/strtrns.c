@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Copy `str' to `result' replacing any character found
  *	in both `str' and `old' with the corresponding character from `new'.

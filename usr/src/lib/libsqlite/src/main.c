@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -136,7 +133,7 @@ int sqliteInitCallback(void *pInit, int argc, char **argv, char **azColName){
 ** copying a table out to a temporary file.
 **
 ** The change from version 2 to version 3 occurred between SQLite
-** version 2.5.6 and 2.6.0 on 2002-July-18.  
+** version 2.5.6 and 2.6.0 on 2002-July-18.
 */
 static
 int upgrade_3_callback(void *pInit, int argc, char **argv, char **NotUsed){
@@ -203,7 +200,7 @@ static int sqliteInitOne(sqlite *db, int iDb, char **pzErrMsg){
   /*
   ** The master database table has a structure like this
   */
-  static char master_schema[] = 
+  static char master_schema[] =
      "CREATE TABLE sqlite_master(\n"
      "  type text,\n"
      "  name text,\n"
@@ -212,7 +209,7 @@ static int sqliteInitOne(sqlite *db, int iDb, char **pzErrMsg){
      "  sql text\n"
      ")"
   ;
-  static char temp_master_schema[] = 
+  static char temp_master_schema[] =
      "CREATE TEMP TABLE sqlite_temp_master(\n"
      "  type text,\n"
      "  name text,\n"
@@ -335,16 +332,16 @@ static int sqliteInitOne(sqlite *db, int iDb, char **pzErrMsg){
   ** have to make sure the CREATE TABLEs occur before their corresponding
   ** CREATE INDEXs.  (We don't have to deal with CREATE VIEW or
   ** CREATE TRIGGER in file format 1 because those constructs did
-  ** not exist then.) 
+  ** not exist then.)
   */
   if( db->file_format>=2 ){
-    sqliteSetString(&zSql, 
+    sqliteSetString(&zSql,
         "SELECT type, name, rootpage, sql, ", zDbNum, " FROM \"",
        db->aDb[iDb].zName, "\".", zMasterName, (char*)0);
   }else{
-    sqliteSetString(&zSql, 
+    sqliteSetString(&zSql,
         "SELECT type, name, rootpage, sql, ", zDbNum, " FROM \"",
-       db->aDb[iDb].zName, "\".", zMasterName, 
+       db->aDb[iDb].zName, "\".", zMasterName,
        " WHERE type IN ('table', 'index')"
        " ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END", (char*)0);
   }
@@ -381,7 +378,7 @@ static int sqliteInitOne(sqlite *db, int iDb, char **pzErrMsg){
 */
 int sqliteInit(sqlite *db, char **pzErrMsg){
   int i, rc;
-  
+
   if( db->init.busy ) return SQLITE_OK;
   assert( (db->flags & SQLITE_Initialized)==0 );
   rc = SQLITE_OK;
@@ -437,7 +434,7 @@ int sqliteInit(sqlite *db, char **pzErrMsg){
       sqlite_exec(db, "COMMIT", 0, 0, 0);
     }
     if( rc!=SQLITE_OK ){
-      sqliteSetString(pzErrMsg, 
+      sqliteSetString(pzErrMsg,
         "unable to upgrade database to the version 2.6 format",
         zErr ? ": " : 0, zErr, (char*)0);
     }
@@ -496,7 +493,7 @@ sqlite *sqlite_open(const char *zFilename, int mode, char **pzErrMsg){
     sqliteHashInit(&db->aDb[i].trigHash, SQLITE_HASH_STRING, 0);
     sqliteHashInit(&db->aDb[i].aFKey, SQLITE_HASH_STRING, 1);
   }
-  
+
   /* Open the backend database driver */
   if( zFilename[0]==':' && strcmp(zFilename,":memory:")==0 ){
     db->temp_store = 2;
@@ -746,10 +743,10 @@ int sqlite_compile(
         ** trace entire SQL string and fall through to the
         ** sqlite_malloc_failed test to report the error.
         */
-        db->xTrace(db->pTraceArg, zSql); 
+        db->xTrace(db->pTraceArg, zSql);
       }
     }else{
-      db->xTrace(db->pTraceArg, zSql); 
+      db->xTrace(db->pTraceArg, zSql);
     }
   }
   if( sqlite_malloc_failed ){
@@ -922,9 +919,9 @@ void sqlite_busy_handler(
 ** be invoked every nOps opcodes.
 */
 void sqlite_progress_handler(
-  sqlite *db, 
+  sqlite *db,
   int nOps,
-  int (*xProgress)(void*), 
+  int (*xProgress)(void*),
   void *pArg
 ){
   if( nOps>0 ){
@@ -1045,7 +1042,7 @@ int sqlite_create_aggregate(
 int sqlite_function_type(sqlite *db, const char *zName, int dataType){
   FuncDef *p = (FuncDef*)sqliteHashFind(&db->aFunc, zName, strlen(zName));
   while( p ){
-    p->dataType = dataType; 
+    p->dataType = dataType;
     p = p->pNext;
   }
   return SQLITE_OK;
@@ -1053,7 +1050,7 @@ int sqlite_function_type(sqlite *db, const char *zName, int dataType){
 
 /*
 ** Register a trace function.  The pArg from the previously registered trace
-** is returned.  
+** is returned.
 **
 ** A NULL trace function means that no tracing is executes.  A non-NULL
 ** trace is a pointer to a function that is invoked at the start of each

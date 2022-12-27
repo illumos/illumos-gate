@@ -27,8 +27,6 @@
 #ifndef _THR_DEBUG_H
 #define	_THR_DEBUG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(THREAD_DEBUG)
 
 extern void __assfail(const char *, const char *, int);

@@ -3,9 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -48,7 +45,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1996 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -175,7 +172,7 @@ ldap_url_parse_nodn(const char *url, LDAPURLDesc **ludpp)
  *   2) no defaults are set for lud_scope and lud_filter (they are set to -1
  *	and NULL respectively if no SCOPE or FILTER are present in the URL).
  *   3) when there is a zero-length DN in a URL we do not set lud_dn to NULL.
- *   4) if an LDAPv3 URL extensions are included, 
+ *   4) if an LDAPv3 URL extensions are included,
  */
 int
 nsldapi_url_parse( const char *url, LDAPURLDesc **ludpp, int dn_required )

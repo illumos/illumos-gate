@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utility functions for buffering output to stdout, stderr while
  * process is grabbed.  Prevents infamous deadlocks due to pfiles `pgrep xterm`

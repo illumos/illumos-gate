@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _SEC_H_
 #define _SEC_H_
 

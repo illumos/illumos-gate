@@ -32,8 +32,6 @@
 #ifndef _UDAT_REDIRECTION_H_
 #define	_UDAT_REDIRECTION_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * HEADER: udat_redirection.h

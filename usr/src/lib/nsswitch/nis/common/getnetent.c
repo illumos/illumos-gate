@@ -27,8 +27,6 @@
  *	nis/getnetent.c -- "nis" backend for nsswitch "networks" database
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "nis_common.h"
 #include <synch.h>
 #include <netdb.h>

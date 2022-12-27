@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is the DNS backend for IPv6 addresses.
  * getbyname() is a local routine, but getbyaddr() actually shares the

@@ -1,8 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -12,7 +10,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -56,7 +54,7 @@ static const char * const calling_error_string[] = {
    "A required input parameter could not be written",
    "A parameter was malformed",
 };
- 
+
 static const char * const calling_error = "calling error";
 
 #define GSS_CALLING_ERROR_STR(x) \
@@ -84,7 +82,7 @@ static const char * const routine_error_string[] = {
    "The quality-of-protection requested could not be provided",
    "The operation is forbidden by the local security policy",
    "The operation or option is not available",
-};   
+};
 
 static const char * const routine_error = "routine error";
 
@@ -120,7 +118,7 @@ static const char * const unknown_error = "Unknown %s (field = %d)";
 
 /**/
 
-static int 
+static int
 display_unknown(kind, value, buffer)
      const char *kind;
      OM_uint32 value;
@@ -223,7 +221,7 @@ static OM_uint32 display_bit(minor_status, code, status_string)
      message_context > 2  : print supplementary info bit (message_context-2)
      */
 
-OM_uint32 g_display_major_status(minor_status, status_value, 
+OM_uint32 g_display_major_status(minor_status, status_value,
 				 message_context, status_string)
      OM_uint32 *minor_status;
      OM_uint32 status_value;

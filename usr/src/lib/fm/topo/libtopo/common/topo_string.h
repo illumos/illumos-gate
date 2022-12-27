@@ -27,8 +27,6 @@
 #ifndef	_TOPO_STRING_H
 #define	_TOPO_STRING_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

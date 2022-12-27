@@ -27,8 +27,6 @@
 #ifndef	_SMBIOS_H
 #define	_SMBIOS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/smbios.h>
 
 #ifdef	__cplusplus

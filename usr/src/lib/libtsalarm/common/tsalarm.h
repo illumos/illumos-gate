@@ -26,8 +26,6 @@
 #ifndef	_TSALARM_H
 #define	_TSALARM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define ERRCODE_RANGE 8
 
 extern const char *

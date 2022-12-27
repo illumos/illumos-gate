@@ -26,8 +26,6 @@
  * 	Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if RPC_HDR
 %#ifndef _DB_DICTLOG_H
 %#define _DB_DICTLOG_H
@@ -128,7 +126,7 @@ typedef  struct db_dictlog_entry* db_dictlog_entry_p;
 struct db_dictlog_list {
   db_dictlog_entry_p list<>;
 };
-  
+
 #ifndef USINGC
 #ifdef RPC_HDR
 %class db_dictlog: public pickle_file {
@@ -145,7 +143,7 @@ struct db_dictlog_list {
 %  }
 %
 %/* Execute given function 'func' on log.
-%  function takes as arguments: pointer to log entry, character pointer to 
+%  function takes as arguments: pointer to log entry, character pointer to
 %  another argument, and pointer to an integer, which is used as a counter.
 %  'func' should increment this value for each successful application.
 %  The log is traversed until either 'func' returns FALSE, or when the log
@@ -153,7 +151,7 @@ struct db_dictlog_list {
 %  second argument to 'func'. The third argument, 'clean' determines whether
 %  the log entry is deleted after the function has been applied.
 %  Returns the number of times that 'func' incremented its third argument. */
-%  int execute_on_log( bool_t(* func) (db_dictlog_entry *, char *, int *), 
+%  int execute_on_log( bool_t(* func) (db_dictlog_entry *, char *, int *),
 %		      char *, bool_t = TRUE );
 %
 %/* Print contents of log file to stdout */

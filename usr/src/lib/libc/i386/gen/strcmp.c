@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Fast strcmp.  This works one int at a time, using aligned pointers
  * if possible, misaligned pointers if necessary.  To avoid taking

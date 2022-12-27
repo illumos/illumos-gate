@@ -3,9 +3,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -116,7 +113,7 @@ str_parse_line(
 		/*
 #endif
 		 LDAPDebug( LDAP_DEBUG_PARSE, "str_parse_line: missing ':' "
-			"on line \"%s\"\n", line, 0, 0 ); 
+			"on line \"%s\"\n", line, 0, 0 );
 #if defined( _WIN32 )
 		*/
 #endif
@@ -144,7 +141,7 @@ str_parse_line(
 		s++;
 	}
 
-	/* 
+	/*
 	 * If no value is present, return a zero-length string for
 	 * *value, with *vlen set to zero.
 	 */
@@ -172,7 +169,7 @@ str_parse_line(
 #endif
 			 LDAPDebug( LDAP_DEBUG_ANY,
 			    "str_parse_line: invalid base 64 char on line \"%s\"\n",
-			    line, 0, 0 ); 
+			    line, 0, 0 );
 #if defined( _WIN32 )
 		*/
 #endif
@@ -378,7 +375,7 @@ ldif_put_type_and_value_with_options( char **out, char *t, char *val,
 				b64 = 1;
 				break;
 			}
-			
+
 			if ( wraplen != -1 && len > wraplen ) {
 				*(*out)++ = '\n';
 				*(*out)++ = ' ';
@@ -400,13 +397,13 @@ ldif_put_type_and_value_with_options( char **out, char *t, char *val,
 	*(*out)++ = '\n';
 }
 
-void 
+void
 ldif_put_type_and_value( char **out, char *t, char *val, int vlen )
 {
     ldif_put_type_and_value_with_options( out, t, val, vlen, 0 );
 }
 
-void 
+void
 ldif_put_type_and_value_nowrap( char **out, char *t, char *val, int vlen )
 {
     ldif_put_type_and_value_with_options( out, t, val, vlen, LDIF_OPT_NOWRAP );

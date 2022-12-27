@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * whln.c		
+ * whln.c
  *
  * XCurses Library
  *

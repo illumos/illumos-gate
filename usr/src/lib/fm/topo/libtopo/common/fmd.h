@@ -27,8 +27,6 @@
 #ifndef	_FMD_H
 #define	_FMD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -72,8 +72,6 @@
  *   CDSAReadFunc()       - Read function for CDSA decryption code.
  *   CDSAWriteFunc()      - Write function for CDSA encryption code.
  */
- 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Include necessary headers...
@@ -580,9 +578,9 @@ httpReconnect(http_t *http)		/* I - HTTP data */
 
   val = 1;
 #ifdef WIN32
-  setsockopt(http->fd, IPPROTO_TCP, TCP_NODELAY, (char *)&val, sizeof(val)); 
+  setsockopt(http->fd, IPPROTO_TCP, TCP_NODELAY, (char *)&val, sizeof(val));
 #else
-  setsockopt(http->fd, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val)); 
+  setsockopt(http->fd, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
 #endif /* WIN32 */
 
  /*
@@ -1151,7 +1149,7 @@ httpWait(http_t *http,			/* I - HTTP data */
 /*
  * 'httpWrite()' - Write data to a HTTP connection.
  */
- 
+
 int					/* O - Number of bytes written */
 httpWrite(http_t     *http,		/* I - HTTP data */
           const char *buffer,		/* I - Buffer for data */
@@ -1382,7 +1380,7 @@ httpGets(char   *line,			/* I - Line to read into */
  /*
   * Read a line from the buffer...
   */
-    
+
   lineptr = line;
   bufptr  = http->buffer;
   bytes   = 0;

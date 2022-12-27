@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <secdb.h>
 #include <auth_attr.h>
 #include "ldap_common.h"

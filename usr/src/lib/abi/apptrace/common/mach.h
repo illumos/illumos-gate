@@ -27,8 +27,6 @@
 #ifndef _MACH_H
 #define	_MACH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

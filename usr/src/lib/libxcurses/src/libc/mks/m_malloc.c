@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * MKS interface extension.
  * Ensure that errno is set if malloc() fails.
@@ -52,7 +50,7 @@ static char rcsID[] = "$Header: /rd/src/libc/mks/rcs/m_malloc.c 1.4 1993/12/17 1
 #undef m_malloc	   /* in case <mks.h> included in <errno.h> or <stdlib.h> */
 
 /*f
- * m_malloc: 
+ * m_malloc:
  *   Portable replacement for malloc().
  *   If malloc() fails (e.g returns NULL)
  *   then return ENOMEM unless malloc() sets errno for us on this system

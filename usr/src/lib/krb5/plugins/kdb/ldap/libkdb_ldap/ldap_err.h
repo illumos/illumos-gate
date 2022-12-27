@@ -1,8 +1,6 @@
 #ifndef _LDAP_ERR_H_
 #define _LDAP_ERR_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define OP_INIT 1
 #define OP_BIND 2
 #define OP_UNBIND 3

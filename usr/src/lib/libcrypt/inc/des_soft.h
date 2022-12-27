@@ -27,8 +27,6 @@
 #ifndef _DES_SOFT_H
 #define	_DES_SOFT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/des.h>
 
 #ifdef	__cplusplus

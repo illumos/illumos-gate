@@ -26,8 +26,6 @@
 #ifndef	_LOWLEVEL_IMPL_H
 #define	_LOWLEVEL_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libscf_impl.h"
 
 #include <door.h>

@@ -27,8 +27,6 @@
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Returns a pointer to the first occurrnce of ws1 in ws2.
  */

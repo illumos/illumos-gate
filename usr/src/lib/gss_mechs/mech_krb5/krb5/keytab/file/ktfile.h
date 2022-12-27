@@ -11,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -25,7 +25,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * This header file contains information needed by internal routines
  * of the file-based ticket cache implementation.
@@ -33,8 +33,6 @@
 
 #ifndef	_KRB5_KTFILE
 #define	_KRB5_KTFILE
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/mman.h>
@@ -50,7 +48,7 @@
 
 #define KRB5_KT_DEFAULT_VNO KRB5_KT_VNO
 
-/* 
+/*
  * Types
  */
 typedef struct _krb5_ktfile_data {
@@ -78,27 +76,27 @@ typedef struct _krb5_ktfile_data {
 extern struct _krb5_kt_ops krb5_ktf_ops;
 extern struct _krb5_kt_ops krb5_ktf_writable_ops;
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_resolve 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_resolve
 	(krb5_context,
 		   const char *,
 		   krb5_keytab *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_wresolve 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_wresolve
 	(krb5_context,
 		   const char *,
 		   krb5_keytab *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_get_name 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_get_name
 	(krb5_context,
 		   krb5_keytab,
 		   char *,
 		   int);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_close 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_close
 	(krb5_context,
 		   krb5_keytab);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_get_entry 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_get_entry
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_const_principal,
@@ -106,72 +104,72 @@ krb5_error_code KRB5_CALLCONV krb5_ktfile_get_entry
 		   krb5_enctype,
 		   krb5_keytab_entry *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_start_seq_get 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_start_seq_get
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_kt_cursor *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_get_next 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_get_next
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *,
 		   krb5_kt_cursor *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_end_get 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_end_get
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_kt_cursor *);
 
 /* routines to be included on extended version (write routines) */
-krb5_error_code KRB5_CALLCONV krb5_ktfile_add 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_add
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *);
 
-krb5_error_code KRB5_CALLCONV krb5_ktfile_remove 
+krb5_error_code KRB5_CALLCONV krb5_ktfile_remove
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *);
 
-krb5_error_code krb5_ktfileint_openr 
+krb5_error_code krb5_ktfileint_openr
 	(krb5_context,
 		   krb5_keytab);
 
-krb5_error_code krb5_ktfileint_openw 
+krb5_error_code krb5_ktfileint_openw
 	(krb5_context,
 		   krb5_keytab);
 
-krb5_error_code krb5_ktfileint_close 
+krb5_error_code krb5_ktfileint_close
 	(krb5_context,
 		   krb5_keytab);
 
-krb5_error_code krb5_ktfileint_read_entry 
+krb5_error_code krb5_ktfileint_read_entry
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *);
 
-krb5_error_code krb5_ktfileint_write_entry 
+krb5_error_code krb5_ktfileint_write_entry
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *);
 
-krb5_error_code krb5_ktfileint_delete_entry 
+krb5_error_code krb5_ktfileint_delete_entry
 	(krb5_context,
 		   krb5_keytab,
                    krb5_int32);
 
-krb5_error_code krb5_ktfileint_internal_read_entry 
+krb5_error_code krb5_ktfileint_internal_read_entry
 	(krb5_context,
 		   krb5_keytab,
 		   krb5_keytab_entry *,
                    krb5_int32 *);
 
-krb5_error_code krb5_ktfileint_size_entry 
+krb5_error_code krb5_ktfileint_size_entry
 	(krb5_context,
 		   krb5_keytab_entry *,
                    krb5_int32 *);
 
-krb5_error_code krb5_ktfileint_find_slot 
+krb5_error_code krb5_ktfileint_find_slot
 	(krb5_context,
 		   krb5_keytab,
                    krb5_int32 *,

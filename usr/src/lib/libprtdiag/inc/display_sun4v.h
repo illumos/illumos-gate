@@ -26,8 +26,6 @@
 #ifndef	_DISPLAY_SUN4V_H
 #define	_DISPLAY_SUN4V_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

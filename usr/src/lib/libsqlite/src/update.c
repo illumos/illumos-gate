@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -69,13 +66,13 @@ void sqliteUpdate(
   assert( pTabList->nSrc==1 );
   iStackDepth = pParse->nMem++;
 
-  /* Locate the table which we want to update. 
+  /* Locate the table which we want to update.
   */
   pTab = sqliteSrcListLookup(pParse, pTabList);
   if( pTab==0 ) goto update_cleanup;
-  before_triggers = sqliteTriggersExist(pParse, pTab->pTrigger, 
+  before_triggers = sqliteTriggersExist(pParse, pTab->pTrigger,
             TK_UPDATE, TK_BEFORE, TK_ROW, pChanges);
-  after_triggers = sqliteTriggersExist(pParse, pTab->pTrigger, 
+  after_triggers = sqliteTriggersExist(pParse, pTab->pTrigger,
             TK_UPDATE, TK_AFTER, TK_ROW, pChanges);
   row_triggers_exist = before_triggers || after_triggers;
   isView = pTab->pSelect!=0;
@@ -304,16 +301,16 @@ void sqliteUpdate(
 
     /* Fire the BEFORE and INSTEAD OF triggers
     */
-    if( sqliteCodeRowTrigger(pParse, TK_UPDATE, pChanges, TK_BEFORE, pTab, 
+    if( sqliteCodeRowTrigger(pParse, TK_UPDATE, pChanges, TK_BEFORE, pTab,
           newIdx, oldIdx, onError, loopStart) ){
       goto update_cleanup;
     }
   }
 
   if( !isView ){
-    /* 
+    /*
     ** Open every index that needs updating.  Note that if any
-    ** index could potentially invoke a REPLACE conflict resolution 
+    ** index could potentially invoke a REPLACE conflict resolution
     ** action, then we need to open all indices because we might need
     ** to be deleting some records.
     */
@@ -360,7 +357,7 @@ void sqliteUpdate(
       sqliteVdbeAddOp(v, OP_MustBeInt, 0, 0);
     }
 
-    /* Compute new data for this record.  
+    /* Compute new data for this record.
     */
     for(i=0; i<pTab->nCol; i++){
       if( i==pTab->iPKey ){
@@ -395,7 +392,7 @@ void sqliteUpdate(
     sqliteCompleteInsertion(pParse, pTab, iCur, aIdxUsed, chngRecno, 1, -1);
   }
 
-  /* Increment the row counter 
+  /* Increment the row counter
   */
   if( db->flags & SQLITE_CountRows && !pParse->trigStack){
     sqliteVdbeAddOp(v, OP_AddImm, 1, 0);
@@ -413,7 +410,7 @@ void sqliteUpdate(
       sqliteVdbeAddOp(v, OP_Close, iCur, 0);
       pParse->nTab = iCur;
     }
-    if( sqliteCodeRowTrigger(pParse, TK_UPDATE, pChanges, TK_AFTER, pTab, 
+    if( sqliteCodeRowTrigger(pParse, TK_UPDATE, pChanges, TK_AFTER, pTab,
           newIdx, oldIdx, onError, loopStart) ){
       goto update_cleanup;
     }

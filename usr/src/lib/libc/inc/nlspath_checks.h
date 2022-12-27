@@ -27,8 +27,6 @@
 #ifndef _NLSPATH_CHECKS_H
 #define	_NLSPATH_CHECKS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stat.h>
 
 #ifdef	__cplusplus

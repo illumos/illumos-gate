@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * xdr_stdio.c, XDR implementation on standard i/o file.
  *

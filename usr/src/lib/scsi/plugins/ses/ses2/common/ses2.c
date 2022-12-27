@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <scsi/libses.h>
 #include <scsi/libses_plugin.h>
 #include <string.h>

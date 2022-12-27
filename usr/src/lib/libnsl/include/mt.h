@@ -27,8 +27,6 @@
 #ifndef	_LIBNSL_INCLUDE_MT_H
 #define	_LIBNSL_INCLUDE_MT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Threading and mutual exclusion declarations of primitives used for
  *	MT operation of libnsl code.

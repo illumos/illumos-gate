@@ -29,8 +29,6 @@
  *	All Rights Reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * NOTE: The environment symbol pair may also occur in crt1.o.  The definitions
  * within crt1.o are required for the generation of ABI compliant applications

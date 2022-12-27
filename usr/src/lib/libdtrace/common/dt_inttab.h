@@ -27,8 +27,6 @@
 #ifndef	_DT_INTTAB_H
 #define	_DT_INTTAB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <dtrace.h>
 
 #ifdef	__cplusplus

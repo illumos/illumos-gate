@@ -24,10 +24,6 @@
  * All rights reserved.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <stdio.h>				/* for fprintf() */
 #include <stdlib.h>				/* for malloc() */
 #include <rpc/types.h>

@@ -27,8 +27,6 @@
 #ifndef	_LIBCPC_IMPL_H
 #define	_LIBCPC_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libcpc.h>
 #include <inttypes.h>
 #include <thread.h>

@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -86,6 +84,6 @@ do_test quote-1.6 {
   } msg ]
   lappend r $msg
 } {0 {}}
- 
+
 
 finish_test

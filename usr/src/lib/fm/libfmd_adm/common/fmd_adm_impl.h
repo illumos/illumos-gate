@@ -26,8 +26,6 @@
 #ifndef	_FMD_ADM_IMPL_H
 #define	_FMD_ADM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/rpc.h>
 
 #ifdef	__cplusplus

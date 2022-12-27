@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
- 
 #include <locale.h>
 const char *
 ss_error_table(long errorno) {

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Dual-Function Cryptographic Functions
  * (as defined in PKCS#11 spec section 11.13)

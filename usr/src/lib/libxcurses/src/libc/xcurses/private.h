@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * private.h
  *
@@ -41,11 +39,11 @@
 #ifndef M_CURSES_VERSION
 #define M_CURSES_VERSION        "MKS XCurses"
 #endif
- 
+
 #ifndef M_TERM_NAME
 #define M_TERM_NAME             "dumb"
 #endif
- 
+
 #ifndef M_TERMINFO_DIR
 #define M_TERMINFO_DIR          "/usr/lib/terminfo"
 #endif
@@ -60,13 +58,13 @@
 /*
  * Maximum number of lines that can be ripped off.
  */
-#ifndef M_CURSES_MAX_RIPOFFLINE	
+#ifndef M_CURSES_MAX_RIPOFFLINE
 #define M_CURSES_MAX_RIPOFFLINE		5
 #endif
 
 /*
  * See copywin() and wrefresh() case 4.  It is unclear whether XPG4 V2
- * disallows supporting case 4 (expanding characters straddling a window 
+ * disallows supporting case 4 (expanding characters straddling a window
  * boundary).
  */
 #define M_CURSES_SENSIBLE_WINDOWS
@@ -108,7 +106,7 @@
 /*
  * Configurable WINDOW options.
  */
-#define W_FLUSH		0x0080	/* immedok() update when window changes. */ 
+#define W_FLUSH		0x0080	/* immedok() update when window changes. */
 #define W_CAN_SCROLL	0x0100	/* scrollok() window can software scroll. */
 #define W_LEAVE_CURSOR	0x0200	/* leaveok() don't fuss with the cursor. */
 #define W_SYNC_UP	0x0400	/* syncok() update ancestors when changed. */
@@ -198,8 +196,8 @@ extern int __m_cc_ins(WINDOW *, int, int, const cchar_t *);
 extern void __m_mvcur_cost(void);
 
 /*
- * Unique callback functions to initialize a SCREEN's wide_io_t structure, 
- * which is used by __m_wio_get().   The __xc_ denotes XCurses and is used 
+ * Unique callback functions to initialize a SCREEN's wide_io_t structure,
+ * which is used by __m_wio_get().   The __xc_ denotes XCurses and is used
  * instead of __m_ to avoid possible name conflicts else-where in MKS
  * libraries and applications.  Note that wgetch() is used for the get
  * function.

@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * newwin.c		
+ * newwin.c
  *
  * XCurses Library
  *
@@ -68,7 +66,7 @@ int nlines, ncols, begy, begx;
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"__m_newwin(%p, %d, %d, %d, %d)", 
+		"__m_newwin(%p, %d, %d, %d, %d)",
 		parent, nlines, ncols, begy, begx
 	);
 #endif
@@ -114,7 +112,7 @@ int nlines, ncols, begy, begx;
 		if (columns < begx + ncols)
 			goto error_1;
 	}
-	
+
 	w = (WINDOW *) calloc(1, sizeof *w);
 	if (w == (WINDOW *) 0)
 		goto error_1;
@@ -183,9 +181,9 @@ int nlines, ncols, begy, begx;
 	w->_vmin = 1;
 	w->_vtime = 0;
 	w->_flags = W_USE_TIMEOUT;
-	
+
 	/* Determine window properties. */
-	if ((begy < 0 && begx < 0) 
+	if ((begy < 0 && begx < 0)
 	|| (parent != (WINDOW *) 0 && (parent->_flags & W_IS_PAD))) {
 		w->_flags |= W_IS_PAD;
 		w->_begy = w->_begx = 0;
@@ -258,7 +256,7 @@ int nlines, ncols, begy, begx;
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"derwin(%p, %d, %d, %d, %d)", 
+		"derwin(%p, %d, %d, %d, %d)",
 		parent, nlines, ncols, begy, begx
 	);
 #endif
@@ -299,7 +297,7 @@ int nlines, ncols, begy, begx;
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"subwin(%p, %d, %d, %d, %d)", 
+		"subwin(%p, %d, %d, %d, %d)",
 		parent, nlines, ncols, begy, begx
 	);
 #endif

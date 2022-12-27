@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -71,12 +69,12 @@ ldap_get_option( LDAP *ld, int option, void *optdata )
 		}
 		return( 0 );
 	}
-    /* 
-     * LDAP_OPT_DEBUG_LEVEL is global 
+    /*
+     * LDAP_OPT_DEBUG_LEVEL is global
      */
-    if (LDAP_OPT_DEBUG_LEVEL == option) 
+    if (LDAP_OPT_DEBUG_LEVEL == option)
     {
-#ifdef LDAP_DEBUG	  
+#ifdef LDAP_DEBUG
         *((int *) optdata) = ldap_debug;
 #endif /* LDAP_DEBUG */
         return ( 0 );
@@ -147,7 +145,7 @@ ldap_get_option( LDAP *ld, int option, void *optdata )
 		break;
 	case LDAP_OPT_SIZELIMIT:
 		*((int *) optdata) = ld->ld_sizelimit;
-                break;  
+                break;
 	case LDAP_OPT_TIMELIMIT:
 		*((int *) optdata) = ld->ld_timelimit;
                 break;
@@ -201,7 +199,7 @@ ldap_get_option( LDAP *ld, int option, void *optdata )
 		      LDAP_X_EXTIO_FNS_SIZE ) {
 	    /* struct copy */
 	    *((struct ldap_x_ext_io_fns *) optdata) = ld->ld_ext_io_fns;
-	  } else {       
+	  } else {
 	    LDAP_SET_LDERRNO( ld, LDAP_PARAM_ERROR, NULL, NULL );
 	    rc = -1;
 	  }

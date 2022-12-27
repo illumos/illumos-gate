@@ -1,8 +1,5 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 # This AWK script reads the output of testfixture when compiled for memory
-# debugging.  It generates SQL commands that can be fed into an sqlite 
+# debugging.  It generates SQL commands that can be fed into an sqlite
 # instance to determine what memory is never freed.  A typical usage would
 # be as follows:
 #

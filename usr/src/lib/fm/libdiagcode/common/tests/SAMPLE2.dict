@@ -22,9 +22,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
 # SAMPLE2 diagcode dictionary -- used by "make test" target only
 #
 # this sample dictionary tests code type 2.

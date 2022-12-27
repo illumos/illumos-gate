@@ -25,8 +25,6 @@
  * files/getprotoent.c -- "files" backend for nsswitch "protocols" database
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <netdb.h>
 #include "files_common.h"
 #include <strings.h>

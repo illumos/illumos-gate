@@ -34,8 +34,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include <rpcsvc/ypclnt.h>
 #include <sys/types.h>

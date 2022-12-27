@@ -3,9 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -91,9 +88,9 @@ typedef struct prldap_tpd_map {
     struct prldap_tpd_map	*prtm_next;
 } PRLDAP_TPDMap;
 
-#ifdef _SOLARIS_SDK 
-extern  mutex_t         inited_mutex; 
-#endif  /* _SOLARIS_SDK */ 
+#ifdef _SOLARIS_SDK
+extern  mutex_t         inited_mutex;
+#endif  /* _SOLARIS_SDK */
 
 /*
  * Static Variables:
@@ -525,7 +522,7 @@ prldap_set_thread_private( PRInt32 tpdindex, void *priv )
     PRLDAP_TPDHeader	*tsdhdr;
 
     if ( tpdindex > prldap_tpd_maxindex ) {
-	return( -1 );	/* bad index */ 
+	return( -1 );	/* bad index */
     }
 
     tsdhdr = (PRLDAP_TPDHeader *)PR_GetThreadPrivate( prldap_tpdindex );

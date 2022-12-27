@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ftruncate() and truncate() set a file to a specified
  * length using fcntl(F_FREESP) system call. If the file

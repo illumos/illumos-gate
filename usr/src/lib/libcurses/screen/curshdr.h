@@ -41,8 +41,6 @@
 #ifndef _CURSHDR_H
 #define	_CURSHDR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

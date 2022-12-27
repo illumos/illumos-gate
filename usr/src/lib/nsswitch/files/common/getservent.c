@@ -25,8 +25,6 @@
  * files/getservent.c -- "files" backend for nsswitch "services" database
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <netdb.h>
 #include "files_common.h"
 #include <sys/types.h>

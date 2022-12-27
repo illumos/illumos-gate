@@ -32,8 +32,6 @@
 #ifndef _LIB_GEN_H
 #define	_LIB_GEN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

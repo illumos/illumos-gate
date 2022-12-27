@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Define and initialize MT data for libnsl.
  *	The _libnsl_lock_init() function below is the library's .init handler.

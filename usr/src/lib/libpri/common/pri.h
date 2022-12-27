@@ -26,8 +26,6 @@
 #ifndef	_PRI_H
 #define	_PRI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <sys/types.h>
 

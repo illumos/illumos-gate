@@ -25,8 +25,6 @@
  * Contributor(s):
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ldapsinit.c
  */
@@ -140,7 +138,7 @@ typedef struct ldapssl_socket_info {
 } LDAPSSLSocketInfo;
 
 
-/* 
+/*
  * XXXceb  This is a hack until the new IO functions are done.
  * this function MUST be called before ldap_enable_clienauth.
  * right now, this function is called in ldapssl_pkcs_init();
@@ -162,7 +160,7 @@ static void ldapssl_free_socket_info( LDAPSSLSocketInfo **soipp );
 
 
 /*
- *  SSL Stuff 
+ *  SSL Stuff
  */
 
 static int ldapssl_AuthCertificate(void *sessionarg, PRFileDesc *fd,
@@ -208,7 +206,7 @@ ldapssl_init( const char *defhost, int defport, int defsecure )
 #else
     if (0 ==defport)
 	defport = LDAPS_PORT;
-    
+
     if (( ld = ldap_init( defhost, defport )) == NULL ) {
 	return( NULL );
     }
@@ -296,7 +294,7 @@ do_ldapssl_connect(const char *hostlist, int defport, int timeout,
 	return( -1 );
     }
     sseip = (LDAPSSLSessionInfo *)sei.seinfo_appdata;
-    
+
     /*
      * Call the standard connect() callback to make the TCP connection.
      * If it succeeds, *socketargp is set.
@@ -423,7 +421,7 @@ do_ldapssl_connect(const char *hostlist, int defport, int timeout,
      * Install certificate hook function.
      */
     SSL_AuthCertificateHook( soi.soinfo_prfd,
-			     (SSLAuthCertificate)ldapssl_AuthCertificate, 
+			     (SSLAuthCertificate)ldapssl_AuthCertificate,
                              (void *)sseip);
 
     if ( SSL_GetClientAuthDataHook( soi.soinfo_prfd,
@@ -725,9 +723,9 @@ ldapssl_free_socket_info( LDAPSSLSocketInfo **soipp )
 }
 
 
-/* this function provides cert authentication.  This is called during 
+/* this function provides cert authentication.  This is called during
  * the SSL_Handshake process.  Once the cert has been retrieved from
- * the server, the it is checked, using VerifyCertNow(), then 
+ * the server, the it is checked, using VerifyCertNow(), then
  * the cn is checked against the host name, set with SSL_SetURL()
  */
 
@@ -740,7 +738,7 @@ ldapssl_AuthCertificate(void *sessionarg, PRFileDesc *fd, PRBool checkSig,
     CERTCertificate	*cert;
     SECCertUsage	certUsage;
     char		*hostname = (char *)0;
-    
+
     if (!sessionarg || !socket)
 	return rv;
 
@@ -756,18 +754,18 @@ ldapssl_AuthCertificate(void *sessionarg, PRFileDesc *fd, PRBool checkSig,
 	certUsage = certUsageSSLServer;
     }
     cert = SSL_PeerCertificate( fd );
-    
+
     rv = CERT_VerifyCertNow(sseip->lssei_certdbh, cert, checkSig,
 			certUsage, NULL);
 
     if ( rv != SECSuccess || isServer )
 	return rv;
-  
+
     if ( LDAPSSL_AUTH_CNCHECK == sseip->lssei_ssl_strength )
       {
 	/* cert is OK.  This is the client side of an SSL connection.
 	 * Now check the name field in the cert against the desired hostname.
-	 * NB: This is our only defense against Man-In-The-Middle (MITM) 
+	 * NB: This is our only defense against Man-In-The-Middle (MITM)
 	 * attacks!
 	 */
 
@@ -828,7 +826,7 @@ get_keyandcert( LDAPSSLSessionInfo *ssip,
     {
 	PK11_SetPasswordFunc( get_keypassword );
     }
-    
+
 
 
     if (( key = PK11_FindKeyByAnyCert( cert, (void *)ssip )) == NULL ) {
@@ -845,11 +843,11 @@ get_keyandcert( LDAPSSLSessionInfo *ssip,
 }
 
 
-/* 
+/*
  * This function returns the password to NSS.
  * This function is enable through PK11_SetPasswordFunc
  * only if pkcs functions are not being used.
- */ 
+ */
 
 static char *
 get_keypassword( PK11SlotInfo *slot, PRBool retry, void *sessionarg )
@@ -905,14 +903,14 @@ check_clientauth_nicknames_and_passwd( LDAP *ld, LDAPSSLSessionInfo *ssip )
 
 
 #if 0	/* NOT_NEEDED_IN_LIBLDAP */
-/* there are patches and kludges.  this is both.  force some linkers to 
+/* there are patches and kludges.  this is both.  force some linkers to
  * link this stuff in
  */
 int stubs_o_stuff( void )
 {
     PRExplodedTime exploded;
     PLArenaPool pool;
-  
+
     const char *name ="t";
     PRUint32 size = 0, align = 0;
 
@@ -1084,7 +1082,7 @@ free_session_info:
             rc = -1;
         }
     } /* if ( sseip && *sseip ) */
-       
+
     if ( ldap_set_option( ld, LDAP_OPT_SSL, LDAP_OPT_OFF ) < 0 ) {
         return (-1);
     }
@@ -1128,7 +1126,7 @@ _switch_gethostbyaddr_r(const char *addr, int len, int type,
 	if (AF_INET == type) {
 		str2ent		= str2hostent;
 		nss_initf	= _nss_initf_hosts;
-		nss_db_root	= &db_root_hosts; 
+		nss_db_root	= &db_root_hosts;
 	} else if (AF_INET6 == type) {
 		str2ent		= str2hostent6;
 		nss_initf	= _nss_initf_ipnodes;
@@ -1215,7 +1213,7 @@ ns_gethostbyaddr(const char *addr, int len, int type,
  * ldapssl_install_gethostbyaddr attempts to prevent recursion in
  * gethostbyaddr calls when an ip address is given to ssl. This ip address
  * must be resolved to a host name.
- * 
+ *
  * For example, libsldap cannot use LDAP to resolve this address to a
  * name because of recursion. The caller is instructing libldap to skip
  * the specified name service when resolving addresses for the specified

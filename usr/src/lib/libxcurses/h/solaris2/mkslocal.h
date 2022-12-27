@@ -27,9 +27,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #define	_ALL_SOURCE
 
 #include <sys/types.h>

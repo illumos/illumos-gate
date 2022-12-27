@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* seterror.c - sasl_seterror split out because glue libraries
  *              can't pass varargs lists
  * Rob Siemborski
@@ -13,7 +11,7 @@
  * $Id: seterror.c,v 1.7 2003/02/13 19:55:55 rjs3 Exp $
  */
 
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,7 +19,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -31,7 +29,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -96,10 +94,10 @@ static int _sasl_seterror_usererr(int saslerr)
     return saslerr;
 }
 
-/* set the error string which will be returned by sasl_errdetail() using  
+/* set the error string which will be returned by sasl_errdetail() using
  *  syslog()-style formatting (e.g. printf-style with %m as the string form
  *  of an errno error)
- * 
+ *
  *  primarily for use by server callbacks such as the sasl_authorize_t
  *  callback and internally to plug-ins
  *
@@ -109,12 +107,12 @@ static int _sasl_seterror_usererr(int saslerr)
  * Messages should be sensitive to the current language setting.  If there
  * is no SASL_CB_LANGUAGE callback messages MUST be US-ASCII otherwise UTF-8
  * is used and use of RFC 2482 for mixed-language text is encouraged.
- * 
+ *
  * if conn is NULL, function does nothing
  */
 void sasl_seterror(sasl_conn_t *conn,
 		   unsigned flags,
-		   const char *fmt, ...) 
+		   const char *fmt, ...)
 {
   size_t outlen=0; /* current length of output buffer */
   int pos=0; /* current position in format string */
@@ -151,13 +149,13 @@ void sasl_seterror(sasl_conn_t *conn,
 	      result = SASL_FAIL;
 	  if (result != SASL_OK)
 	      return;
-	  
+
 	  log_cb(log_ctx, SASL_LOG_FAIL,
 		 "No sasl_conn_t passed to sasl_seterror");
-      }  
+      }
 #endif /* SASL_OSX_CFMGLUE */
       return;
-  } else if(!fmt) return;    
+  } else if(!fmt) return;
 
 #ifdef _SUN_SDK_
   gctx = conn->gctx;
@@ -231,7 +229,7 @@ void sasl_seterror(sasl_conn_t *conn,
 	    cval = va_arg(ap, char *); /* get the next arg */
 	    result = _sasl_add_string(error_buf, error_buf_len,
 				      &outlen, cval);
-	      
+
 	    if (result != SASL_OK) /* add the string */
 	      return;
 
@@ -278,7 +276,7 @@ void sasl_seterror(sasl_conn_t *conn,
 #endif /* _SUN_SDK_ */
 	    tempbuf[0] = (char) va_arg(ap, int); /* get the next arg */
 	    tempbuf[1]='\0';
-	    
+
 	    /* now add the character */
 	    result = _sasl_add_string(error_buf, error_buf_len,
 				      &outlen, tempbuf);
@@ -302,13 +300,13 @@ void sasl_seterror(sasl_conn_t *conn,
 	    done=1;
 
 	    break;
-	  default: 
+	  default:
 	    frmt[frmtpos++]=fmt[pos]; /* add to the formating */
-	    frmt[frmtpos]=0;	    
+	    frmt[frmtpos]=0;
 #ifdef _SUN_SDK_
-	    if (frmtpos > sizeof (frmt) - 2) 
+	    if (frmtpos > sizeof (frmt) - 2)
 #else
-	    if (frmtpos>9) 
+	    if (frmtpos>9)
 #endif	/* _SUN_SDK_ */
 	      done=1;
 	  }
@@ -322,7 +320,7 @@ void sasl_seterror(sasl_conn_t *conn,
 
   (*error_buf)[outlen]='\0'; /* put 0 at end */
 
-  va_end(ap);  
+  va_end(ap);
 
 #ifdef _INTEGRATED_SOLARIS_
   if (orig_fmt != fmt) {
@@ -350,7 +348,7 @@ void sasl_seterror(sasl_conn_t *conn,
 	  result = SASL_FAIL;
       if (result != SASL_OK)
 	  return;
-      
+
       result = log_cb(log_ctx, SASL_LOG_FAIL, conn->error_buf);
   }
 #endif /* SASL_OSX_CFMGLUE */

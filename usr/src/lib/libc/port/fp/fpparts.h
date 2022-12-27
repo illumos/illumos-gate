@@ -27,9 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Macros to pull apart parts of single and  double precision
  * floating point numbers in IEEE format

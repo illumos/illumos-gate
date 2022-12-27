@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wtimeout.c
  *
@@ -65,7 +63,7 @@ int delay;
 		w->_vmin = 0;
 
 		/* VTIME is in 1/10 of second */
-		w->_vtime = (delay+50)/100;	
+		w->_vtime = (delay+50)/100;
 	}
 
 	__m_return_void("wtimeout");

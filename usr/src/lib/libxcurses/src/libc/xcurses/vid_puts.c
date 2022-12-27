@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * vid_puts.c
  *
@@ -55,10 +53,10 @@ STATIC attr_t turn_on(int (*)(int), attr_t);
 #define ISATTR(a,x)	(((a) & ~no_color_video & (x)) == (x))
 
 /*f
- * Set the desired attribute state for a terminal screen.  
+ * Set the desired attribute state for a terminal screen.
  *
- * Using set_attributes is the prefered method but requires some care 
- * in writing the proper terminfo string.  Using exit_attribute_mode and 
+ * Using set_attributes is the prefered method but requires some care
+ * in writing the proper terminfo string.  Using exit_attribute_mode and
  * the assorted enter_ attribute mode capabilities is the next best method.
  * Finally using the assorted exit_ and enter_ attribute mode capabilities
  * is the last method available and is not necessarily efficent (or smart
@@ -87,14 +85,14 @@ vid_puts(attr_t attr, short pair, void *opts, int (*putout)(int))
 				(long) ISATTR(attr, WA_INVIS),
 				(long) ISATTR(attr, WA_PROTECT),
 				(long) ISATTR(attr, WA_ALTCHARSET)
-			), 
+			),
 			1, putout
 		);
 
 		ATTR_STATE &= ~WA_SGR_MASK;
 		ATTR_STATE |= attr & WA_SGR_MASK;
 
-		/* Only use <set_a_attributes> when <set_attributes> 
+		/* Only use <set_a_attributes> when <set_attributes>
 		 * is defined.  <set_a_attributes> should not disable
 		 * attributes, as this will have been handled by
 		 * <set_attributes>.
@@ -110,7 +108,7 @@ vid_puts(attr_t attr, short pair, void *opts, int (*putout)(int))
 					(long) ISATTR(attr, WA_TOP),
 					(long) ISATTR(attr, WA_VERTICAL),
 					0L, 0L, 0L
-				), 
+				),
 				1, putout
 			);
 
@@ -119,18 +117,18 @@ vid_puts(attr_t attr, short pair, void *opts, int (*putout)(int))
 		}
 	} else if (ATTR_STATE != attr) {
 		/* Turn off only those attributes that are on. */
-		(void) turn_off(putout, ATTR_STATE);		
+		(void) turn_off(putout, ATTR_STATE);
 
-		/* Turn on attributes regardless if they are already 
+		/* Turn on attributes regardless if they are already
 		 * on, because terminals with ceol_standout_glitch, like
-		 * HP terminals, will have to re-enforce the current 
-		 * attributes in order to change existing attribute 
+		 * HP terminals, will have to re-enforce the current
+		 * attributes in order to change existing attribute
 		 * cookies on the screen.
 		 */
 		ATTR_STATE = turn_on(putout, attr);
 	}
 
-	/* A_NORMAL equals 0, which is all attributes off and 
+	/* A_NORMAL equals 0, which is all attributes off and
 	 * COLOR_PAIR(0).  This implies that colour pair 0 is
 	 * the orig_pair.
 	 */
@@ -146,24 +144,24 @@ vid_puts(attr_t attr, short pair, void *opts, int (*putout)(int))
 			(void) tputs(
 				tparm(
 					set_color_pair, (long) pair,
-					0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L 
-				), 
+					0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
+				),
 				1, putout
 			);
 		} else if (pair_content(pair, &fg, &bg) == OK) {
 			if (set_foreground != (char *) 0) {
 				(void) tputs(
 					tparm(set_foreground, (long) fg,
-						0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L 
-					), 
+						0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
+					),
 					1, putout
 				);
 			} else if (set_a_foreground != (char *) 0) {
 				(void) tputs(
 					tparm(
 						set_a_foreground, (long) fg,
-						0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L 
-					), 
+						0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
+					),
 					1, putout
 				);
 			}
@@ -171,16 +169,16 @@ vid_puts(attr_t attr, short pair, void *opts, int (*putout)(int))
 			if (set_background != (char *) 0) {
 				(void) tputs(
 					tparm(set_background, (long) bg,
-						0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L 
-					), 
+						0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
+					),
 					1, putout
 				);
 			} else if (set_a_background != (char *) 0) {
 				(void) tputs(
 					tparm(
 						set_a_background, (long) bg,
-						0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L 
-					), 
+						0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L
+					),
 					1, putout
 				);
 			}
@@ -203,19 +201,19 @@ turn_off(int (*putout)(int), attr_t attr)
 		(void) tputs(exit_attribute_mode, 1, putout);
 		new = WA_NORMAL;
 	} else {
-		if (ISATTR(attr, WA_UNDERLINE) 
+		if (ISATTR(attr, WA_UNDERLINE)
 		&& exit_underline_mode != (char *) 0) {
 			(void) tputs(exit_underline_mode, 1, putout);
 			new &= ~WA_UNDERLINE;
 		}
 
-		if (ISATTR(attr, WA_STANDOUT) 
+		if (ISATTR(attr, WA_STANDOUT)
 		&& exit_standout_mode != (char *) 0) {
 			(void) tputs(exit_standout_mode, 1, putout);
 			new &= ~WA_STANDOUT;
 		}
 
-		if (ISATTR(attr, WA_ALTCHARSET) 
+		if (ISATTR(attr, WA_ALTCHARSET)
 		&& exit_alt_charset_mode != (char *) 0) {
 			(void) tputs(exit_alt_charset_mode, 1, putout);
 			new &= ~WA_ALTCHARSET;
@@ -230,7 +228,7 @@ turn_on(int (*putout)(int), attr_t attr)
 {
 	attr_t new = attr;
 
-	if (ISATTR(attr, WA_ALTCHARSET) 
+	if (ISATTR(attr, WA_ALTCHARSET)
 	&& enter_alt_charset_mode != (char *) 0) {
 		(void) tputs(enter_alt_charset_mode, 1, putout);
 		new |= WA_ALTCHARSET;
@@ -276,7 +274,7 @@ turn_on(int (*putout)(int), attr_t attr)
 		new |= WA_UNDERLINE;
 	}
 
-	if (ISATTR(attr, WA_HORIZONTAL) 
+	if (ISATTR(attr, WA_HORIZONTAL)
 	&& enter_horizontal_hl_mode != (char *) 0) {
 		(void) tputs(enter_horizontal_hl_mode, 1, putout);
 		new |= WA_HORIZONTAL;

@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -67,7 +65,7 @@ do_test select6-1.5 {
 
 do_test select6-1.6 {
   execsql {
-    SELECT * 
+    SELECT *
     FROM (SELECT count(*),y FROM t1 GROUP BY y) AS a,
          (SELECT max(x),y FROM t1 GROUP BY y) as b
     WHERE a.y=b.y ORDER BY a.y
@@ -123,7 +121,7 @@ do_test select6-2.5 {
 
 do_test select6-2.6 {
   execsql {
-    SELECT * 
+    SELECT *
     FROM (SELECT count(*),b FROM t2 GROUP BY b) AS a,
          (SELECT max(a),b FROM t2 GROUP BY b) as b
     WHERE a.b=b.b ORDER BY a.b
@@ -216,21 +214,21 @@ do_test select6-3.10 {
 } {1 1 2 2.5 2 4.5 5.5 3 8.5 11.5 4 15.5 18 5 23}
 do_test select6-3.11 {
   execsql {
-    SELECT a,b,a+b FROM 
+    SELECT a,b,a+b FROM
        (SELECT avg(x) as 'a', y as 'b' FROM t1 GROUP BY b)
     WHERE b<4 ORDER BY a
   }
 } {1 1 2 2.5 2 4.5 5.5 3 8.5}
 do_test select6-3.12 {
   execsql {
-    SELECT a,b,a+b FROM 
+    SELECT a,b,a+b FROM
        (SELECT avg(x) as 'a', y as 'b' FROM t1 GROUP BY b HAVING a>1)
     WHERE b<4 ORDER BY a
   }
 } {2.5 2 4.5 5.5 3 8.5}
 do_test select6-3.13 {
   execsql {
-    SELECT a,b,a+b FROM 
+    SELECT a,b,a+b FROM
        (SELECT avg(x) as 'a', y as 'b' FROM t1 GROUP BY b HAVING a>1)
     ORDER BY a
   }
@@ -250,7 +248,7 @@ do_test select6-3.15 {
 
 do_test select6-4.1 {
   execsql {
-    SELECT a,b,c FROM 
+    SELECT a,b,c FROM
       (SELECT x AS 'a', y AS 'b', x+y AS 'c' FROM t1 WHERE y=4)
     WHERE a<10 ORDER BY a;
   }
@@ -413,7 +411,7 @@ do_test select6-8.4 {
 } {1 1 11 111 2 2 22 222}
 do_test select6-8.5 {
   execsql {
-    SELECT * FROM 
+    SELECT * FROM
       (SELECT y, p, q, r FROM
          (SELECT t1.y AS y, t2.b AS b FROM t1, t2 WHERE t1.x=t2.a) AS m,
          (SELECT t3.p AS p, t3.q AS q, t4.r AS r FROM t3 NATURAL JOIN t4) as n
@@ -424,7 +422,7 @@ do_test select6-8.5 {
 } {1 1 11 111 111}
 do_test select6-8.6 {
   is_flat {
-    SELECT * FROM 
+    SELECT * FROM
       (SELECT y, p, q, r FROM
          (SELECT t1.y AS y, t2.b AS b FROM t1, t2 WHERE t1.x=t2.a) AS m,
          (SELECT t3.p AS p, t3.q AS q, t4.r AS r FROM t3 NATURAL JOIN t4) as n

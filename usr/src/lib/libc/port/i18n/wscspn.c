@@ -27,8 +27,6 @@
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Return the number of characters in the maximum leading segment
  * of string which consists solely of characters NOT from charset.

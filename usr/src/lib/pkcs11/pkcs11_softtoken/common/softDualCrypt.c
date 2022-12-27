@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <security/cryptoki.h>
 #include "softGlobal.h"
 #include "softSession.h"

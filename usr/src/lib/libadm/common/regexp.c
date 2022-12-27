@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	INIT		char *sp = instring;
 #define	GETC()		(*sp++)
 #define	PEEKC()		(*sp)

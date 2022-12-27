@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * _D_cplx_div_rx(a, w) returns a / w with infinities handled according
  * to C99.

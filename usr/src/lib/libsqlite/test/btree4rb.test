@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2002 December 03
 #
 # The author disclaims copyright to this source code.  In place of
@@ -14,7 +12,7 @@
 # This file implements regression tests for SQLite library.  The
 # focus of this script is btree database backend
 #
-# This file focuses on testing the sqliteBtreeNext() and 
+# This file focuses on testing the sqliteBtreeNext() and
 # sqliteBtreePrevious() procedures and making sure they are able
 # to step through an entire table from either direction.
 #
@@ -90,7 +88,7 @@ foreach N {10 100 1000} {
   btree_close_cursor $::c1
 }
 
-btree_rollback $::b1    
+btree_rollback $::b1
 btree_close $::b1
 
 } ;# end if( not mem: and has pager_open command );

@@ -25,25 +25,23 @@
  * Contributor(s):
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * errormap.c - map NSPR and OS errors to strings
  *
  * CONFIDENTIAL AND PROPRIETARY SOURCE CODE OF NETSCAPE COMMUNICATIONS
- * CORPORATION 
- * 
- * Copyright (C) 1998-9 Netscape Communications Corporation. All Rights Reserved. 
+ * CORPORATION
+ *
+ * Copyright (C) 1998-9 Netscape Communications Corporation. All Rights Reserved.
  *
  * Use of this Source Code is subject to the terms of the applicable license
- * agreement from Netscape Communications Corporation. 
+ * agreement from Netscape Communications Corporation.
  *
  * The copyright notice(s) in this Source Code does not indicate actual or
- * intended publication of this Source Code. 
+ * intended publication of this Source Code.
  */
 
 /* XXX ceb
- * This code was stolen from Directory server.  
+ * This code was stolen from Directory server.
  * ns/netsite/ldap/servers/slapd/errormap.c
  * OS errors are not handled, so the os error has been removed.
  */
@@ -96,7 +94,7 @@ ldapssl_err2string( const int prerrno )
  *	Taken from the file ns/security/cmd/lib/secerror.c on NSS_1_BRANCH.
  *	Last updated from there: 24-July-1998 by Mark Smith <mcs>
  *	Last updated from there: 14-July-1999 by chuck boatwright <cboatwri>
- *      
+ *
  *
  * All of the Directory Server specific changes are enclosed inside
  *	#ifdef NS_DIRECTORY.
@@ -138,8 +136,8 @@ tuple_str errStrings[] = {
 #include "sslerrstrs.h"
 #include "secerrstrs.h"
 #include "prerrstrs.h"
-/* 
- * XXXceb -- LDAPSDK won't care about disconnect 
+/*
+ * XXXceb -- LDAPSDK won't care about disconnect
 #include "disconnect_error_strings.h"
  */
 
@@ -194,12 +192,12 @@ SECU_Strerror(PRErrorCode errNum) {
 			"error %d (%s)\n",
 			num, errStrings[i].errString, 0 );
 #else /* NS_DIRECTORY */
-	    	fprintf(stderr, 
+	    	fprintf(stderr,
 "sequence error in error strings at item %d\n"
 "error %d (%s)\n"
 "should come after \n"
 "error %d (%s)\n",
-		        i, lastNum, errStrings[i-1].errString, 
+		        i, lastNum, errStrings[i-1].errString,
 			num, errStrings[i].errString);
 #endif /* NS_DIRECTORY */
 #endif /* 0 */
@@ -213,11 +211,11 @@ SECU_Strerror(PRErrorCode errNum) {
     while (low + 1 < high) {
     	i = (low + high) / 2;
 	num = errStrings[i].errNum;
-	if (errNum == num) 
+	if (errNum == num)
 	    return errStrings[i].errString;
         if (errNum < num)
 	    high = i;
-	else 
+	else
 	    low = i;
     }
     if (errNum == errStrings[low].errNum)
@@ -279,11 +277,11 @@ SECU_Strerror(PRErrorCode errNum) {
     while (low + 1 < high) {
     	i = (low + high) / 2;
 	num = errStrings[i].errNum;
-	if (errNum == num) 
+	if (errNum == num)
 	    return getErrString(i, errNum);
         if (errNum < num)
 	    high = i;
-	else 
+	else
 	    low = i;
     }
     if (errNum == errStrings[low].errNum)

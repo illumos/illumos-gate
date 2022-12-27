@@ -6,8 +6,6 @@
 #ifndef _KRB5_KDB_KDB_COMPAT_H
 #define	_KRB5_KDB_KDB_COMPAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -23,7 +21,7 @@ extern "C" {
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -37,7 +35,7 @@ extern "C" {
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * KDC Database interface definitions.
  */
@@ -71,15 +69,15 @@ typedef struct _old_krb5_db_entry {
     krb5_deltat	max_life;
     krb5_deltat	max_renewable_life;
     krb5_kvno mkvno;			/* master encryption key vno */
-    
+
     krb5_timestamp expiration;		/* This is when the client expires */
     krb5_timestamp pw_expiration; 	/* This is when its password does */
     krb5_timestamp last_pwd_change; 	/* Last time of password change  */
     krb5_timestamp last_success;	/* Last successful password */
-    
+
     krb5_timestamp last_failed;		/* Last failed password attempt */
     krb5_kvno fail_auth_count; 		/* # of failed password attempts */
-    
+
     old_krb5_principal mod_name;
     krb5_timestamp mod_date;
     krb5_flags attributes;
@@ -90,7 +88,7 @@ typedef struct _old_krb5_db_entry {
     krb5_int32 alt_salt_type:8,
  	       alt_salt_length:24;
     krb5_octet *alt_salt;
-    
+
     krb5_int32 expansion[8];
 } old_krb5_db_entry;
 

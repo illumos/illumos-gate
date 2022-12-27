@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -134,7 +132,7 @@ do_test where-1.25 {
   count {SELECT w FROM t1 WHERE x=3 AND 121<=y AND 196>=y}
 } {10 11 12 13 9}
 
-# Need to work on optimizing the BETWEEN operator.  
+# Need to work on optimizing the BETWEEN operator.
 #
 # do_test where-1.26 {
 #   count {SELECT w FROM t1 WHERE x=3 AND y BETWEEN 121 AND 196}
@@ -301,28 +299,28 @@ do_test where-5.4 {
 } {1 0 4 2 1 9 3 1 16 199}
 do_test where-5.5 {
   count {
-    SELECT * FROM t1 WHERE rowid IN 
+    SELECT * FROM t1 WHERE rowid IN
        (select rowid from t1 where rowid IN (-1,2,4))
     ORDER BY 1;
   }
 } {2 1 9 4 2 25 1}
 do_test where-5.6 {
   count {
-    SELECT * FROM t1 WHERE rowid+0 IN 
+    SELECT * FROM t1 WHERE rowid+0 IN
        (select rowid from t1 where rowid IN (-1,2,4))
     ORDER BY 1;
   }
 } {2 1 9 4 2 25 199}
 do_test where-5.7 {
   count {
-    SELECT * FROM t1 WHERE w IN 
+    SELECT * FROM t1 WHERE w IN
        (select rowid from t1 where rowid IN (-1,2,4))
     ORDER BY 1;
   }
 } {2 1 9 4 2 25 7}
 do_test where-5.8 {
   count {
-    SELECT * FROM t1 WHERE w+0 IN 
+    SELECT * FROM t1 WHERE w+0 IN
        (select rowid from t1 where rowid IN (-1,2,4))
     ORDER BY 1;
   }

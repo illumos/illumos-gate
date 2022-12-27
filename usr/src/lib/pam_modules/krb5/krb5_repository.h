@@ -27,8 +27,6 @@
 #ifndef	_KRB5_REPOSITORY_H
 #define	_KRB5_REPOSITORY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

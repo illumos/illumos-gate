@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include "lber.h"
@@ -66,20 +64,20 @@ int ldap_sasl_cram_md5_bind_s(
 	char *dn,
 	struct berval *cred,
 	LDAPControl **serverctrls,
-	LDAPControl **clientctrls ) 
+	LDAPControl **clientctrls )
 {
 	int res;
 	struct berval *challenge = NULL;
 	struct berval resp;
 	unsigned char digest[16];
 	char *theHDigest;
-	
+
 	if (dn == NULL){
 		return (LDAP_PARAM_ERROR);
 	}
 
 	bzero(digest, sizeof (digest));
-	
+
 	if ((res = ldap_sasl_bind_s(ld, NULL, LDAP_SASL_CRAM_MD5, NULL, serverctrls, clientctrls, &challenge))
 		!= LDAP_SASL_BIND_IN_PROGRESS){
 		return (res);
@@ -87,14 +85,14 @@ int ldap_sasl_cram_md5_bind_s(
 	if (challenge == NULL){
 		return (LDAP_PARAM_ERROR);
 	}
-	
+
 	LDAPDebug (LDAP_DEBUG_TRACE, "SASL challenge: %s\n", challenge->bv_val, 0, 0);
-	
-	hmac_md5((unsigned char *)challenge->bv_val, challenge->bv_len, 
+
+	hmac_md5((unsigned char *)challenge->bv_val, challenge->bv_len,
 					 (unsigned char *)cred->bv_val, cred->bv_len,  digest);
 	ber_bvfree(challenge);
 	challenge = NULL;
-	
+
 	theHDigest = hexa_print(digest, 16);
 	if (theHDigest == NULL){
 		return (LDAP_NO_MEMORY);
@@ -104,7 +102,7 @@ int ldap_sasl_cram_md5_bind_s(
 	if ((resp.bv_val = (char *)malloc(resp.bv_len+1)) == NULL) {
 		return(LDAP_NO_MEMORY);
 	}
-	
+
 	sprintf(resp.bv_val, "%s %s", dn, theHDigest);
 	free(theHDigest);
 

@@ -27,8 +27,6 @@
 #ifndef	_POS4OBJ_H
 #define	_POS4OBJ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * pos4obj.h - Header file for POSIX.4 related object names
  */

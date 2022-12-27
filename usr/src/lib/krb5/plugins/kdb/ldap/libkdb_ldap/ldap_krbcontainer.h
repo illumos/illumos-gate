@@ -31,8 +31,6 @@
 #ifndef _LDAP_KRBCONTAINER_H_
 #define _LDAP_KRBCONTAINER_H_ 1
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define MAX_KRB_CONTAINER_LEN	256
 
 /* kerberos container structure */

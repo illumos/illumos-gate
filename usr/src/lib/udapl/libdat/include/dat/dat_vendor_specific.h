@@ -31,8 +31,6 @@
 #ifndef _DAT_VENDOR_SPECIFIC_H_
 #define	_DAT_VENDOR_SPECIFIC_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * HEADER: dat_vendor_specific.h

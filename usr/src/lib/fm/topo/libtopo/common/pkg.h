@@ -27,8 +27,6 @@
 #ifndef	_PKG_H
 #define	_PKG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

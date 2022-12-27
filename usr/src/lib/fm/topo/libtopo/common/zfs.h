@@ -27,8 +27,6 @@
 #ifndef	_ZFS_H
 #define	_ZFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

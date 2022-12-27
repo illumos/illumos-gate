@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wgetch.c
  *
@@ -46,7 +44,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/wgetch.c 1.5 1995/06/19
 /*
  * Push single-byte character back onto the input queue.
  *
- * MKS EXTENSION permits the return value of wgetch(), which 
+ * MKS EXTENSION permits the return value of wgetch(), which
  * can be a KEY_ value, to be pushed back.
  */
 int
@@ -108,7 +106,7 @@ __xc_clearerr(void *w)
 	clearerr(__m_screen->_if);
 }
 
-int 
+int
 wgetch(w)
 WINDOW *w;
 {
@@ -124,18 +122,18 @@ WINDOW *w;
 	if (!ISEMPTY())
 		return __m_return_int("wgetch", POP());
 
-	/* Only change the terminal's input method if the window 
+	/* Only change the terminal's input method if the window
 	 * requires different settings from what is currently set.
 	 * We do this because tcsetattr() on some systems can be
-	 * _really_ slow to do for each character. 
+	 * _really_ slow to do for each character.
 	 *
 	 * NOTE that halfdelay() overrides nodelay() and wtimeout().
-	 */ 
-	if (!(cur_term->_flags & __TERM_HALF_DELAY) 
+	 */
+	if (!(cur_term->_flags & __TERM_HALF_DELAY)
 	&& (cur_term->_prog.c_cc[VMIN] != w->_vmin
 	|| cur_term->_prog.c_cc[VTIME] != w->_vtime)) {
-		cur_term->_prog.c_cc[VMIN] = w->_vmin; 
-		cur_term->_prog.c_cc[VTIME] = w->_vtime; 
+		cur_term->_prog.c_cc[VMIN] = w->_vmin;
+		cur_term->_prog.c_cc[VTIME] = w->_vtime;
 
 		if (__m_tty_set(&cur_term->_prog) == ERR)
 			return __m_return_int("wgetch", EOF);
@@ -147,24 +145,24 @@ WINDOW *w;
 	clearerr(__m_screen->_if);
 	ch = fgetc(__m_screen->_if);
 
-	/* Only check for function keys if keypad is true and we 
+	/* Only check for function keys if keypad is true and we
 	 * did not read a KEY_ value (which are < 0), nor EOF.
-	 * It is conceivable that a KEY_ was pushed back with 
+	 * It is conceivable that a KEY_ was pushed back with
 	 * ungetch().
 	 */
 	if ((w->_flags & W_USE_KEYPAD) && 0 <= ch && ch != EOF) {
-		/* Treat the termios ERASE key the same as key_backspace. 
+		/* Treat the termios ERASE key the same as key_backspace.
 		 *
 		 * We used to change the key_backspace entry to be a string
 		 * containing the ERASE key in setupterm(), but this would
 		 * then disable the real terminfo entry for the backspace key.
 		 * Apparently VT300 terminals change the key code/sequence
-		 * of the backspace key in application keypad mode.  
+		 * of the backspace key in application keypad mode.
 		 * See SR 6014.
 		 *
-		 * Refer to _shell instead of _prog, since _shell will 
-		 * correctly reflect the user's prefered settings, whereas 
-		 * _prog may not have been initialised if both input and 
+		 * Refer to _shell instead of _prog, since _shell will
+		 * correctly reflect the user's prefered settings, whereas
+		 * _prog may not have been initialised if both input and
 		 * output have been redirected.
 		 */
 #ifdef _POSIX_VDISABLE
@@ -193,13 +191,13 @@ WINDOW *w;
 				return __m_return_int("wgetch", node->key);
 			}
 
-			/* Setup interbyte timer (once only).  fgetc() will 
-			 * return EOF if no input received, which may not be 
+			/* Setup interbyte timer (once only).  fgetc() will
+			 * return EOF if no input received, which may not be
 			 * a true EOF.
 			 */
 			if (timeout) {
-				cur_term->_prog.c_cc[VMIN] = 0;	
-				cur_term->_prog.c_cc[VTIME] = 
+				cur_term->_prog.c_cc[VMIN] = 0;
+				cur_term->_prog.c_cc[VTIME] =
 					M_CURSES_INTERBYTE_TIME;
 				(void) __m_tty_set(&cur_term->_prog);
 			}
@@ -216,11 +214,11 @@ invalid:
 		/* Reverse contents of the input queue to form a stack. */
 		for (i = 0, j = __m_screen->_unget._count; i < --j; ++i) {
 			ch = __m_screen->_unget._stack[i];
-			__m_screen->_unget._stack[i] = 
+			__m_screen->_unget._stack[i] =
 				__m_screen->_unget._stack[j];
 			__m_screen->_unget._stack[j] = ch;
 		}
-			
+
 		/* Return first byte received or EOF. */
 		ch = POP();
 	}

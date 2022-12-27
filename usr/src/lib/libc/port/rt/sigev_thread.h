@@ -27,8 +27,6 @@
 #ifndef	_SIGEV_THREAD_H
 #define	_SIGEV_THREAD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

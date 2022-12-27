@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2003 October 31
 #
 # The author disclaims copyright to this source code.  In place of
@@ -117,7 +115,7 @@ datetest 3.13 {strftime('%%','2003-10-31 12:34:56.432')} %
 datetest 3.14 {strftime('%_','2003-10-31 12:34:56.432')} NULL
 datetest 3.15 {strftime('%Y-%m-%d','2003-10-31')} 2003-10-31
 proc repeat {n txt} {
-  set x {} 
+  set x {}
   while {$n>0} {
     append x $txt
     incr n -1

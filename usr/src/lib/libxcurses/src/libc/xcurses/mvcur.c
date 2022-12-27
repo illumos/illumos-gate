@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mvcur.c
  *
@@ -50,7 +48,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/mvcur.c 1.4 1995/06/15 
 /*
  * #define
  * Make_seq_best(s1, s2)
- * 
+ *
  * Make_seq_best() swaps the values of the pointers if s1->cost > s2->cost.
  */
 #define Make_seq_best(s1, s2)		\
@@ -58,9 +56,9 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/mvcur.c 1.4 1995/06/15 
 	    struct Sequence* temp = s1; \
 	    s1 = s2;			\
 	    s2 = temp;			\
-	}				
+	}
 
-#define zero_seq(seq)		((seq)->end = (seq)->vec, (seq)->cost = 0) 
+#define zero_seq(seq)		((seq)->end = (seq)->vec, (seq)->cost = 0)
 
 struct Sequence {
 	int vec[VECTOR_SIZE];	/* vector of operations */
@@ -89,12 +87,12 @@ struct Sequence	*seq1, *seq2;
 
 /*f
  * add_op() adds the operator op and the appropriate
- * number of paramaters to seq.  It also increases the 
+ * number of paramaters to seq.  It also increases the
  * cost appropriately.
  *
  * If op takes no parameters then p0 is taken to be a count.
  */
-STATIC void 
+STATIC void
 add_op(seq, op, p1, p2)
 struct Sequence *seq;
 int op, p1, p2;
@@ -115,7 +113,7 @@ int op, p1, p2;
 }
 
 /*f
- * row() adds the best sequence for moving the cursor from orow 
+ * row() adds the best sequence for moving the cursor from orow
  * to nrow to seq.
  *
  * row() considers row_address, parm_up/down_cursor and cursor_up/down.
@@ -123,7 +121,7 @@ int op, p1, p2;
 STATIC void
 row(outseq, orow, nrow)
 struct Sequence	*outseq;
-int orow, nrow;	
+int orow, nrow;
 {
 	struct Sequence	seqA, seqB;
 	struct Sequence* best = &seqA;
@@ -172,8 +170,8 @@ typedef struct {
 /*f
  * simp_col(outseq, oldcol, newcol)
  *
- * simp_col() adds the best simple sequence for getting from oldcol 
- * to newcol to outseq. simp_col() considers (back_)tab and 
+ * simp_col() adds the best simple sequence for getting from oldcol
+ * to newcol to outseq. simp_col() considers (back_)tab and
  * cursor_left/right.
  */
 STATIC void
@@ -204,7 +202,7 @@ int oc, nc;
 			tabs = tabstop - oc / init_tabs;
 			if (0 < tabs)
 				/* Set oc to tabstop before nc : oc <= nc. */
-				oc = tabstop * init_tabs; 
+				oc = tabstop * init_tabs;
 
 			/* Distance from next tabstop to nc in columns. */
 			tabstop = init_tabs - nc % init_tabs;
@@ -252,7 +250,7 @@ int oc, nc;
 	add_op(best, dir->_one, dist, 0);
 
 	/* 2. Over tab by one tabstop, then single-step back to location. */
-	if (0 < tabstop 
+	if (0 < tabstop
 	&& (nc < columns-init_tabs || auto_left_margin || eat_newline_glitch)) {
 		zero_seq(try);
 		add_op(try, dir->_tab, 1, 0);
@@ -275,16 +273,16 @@ int oc, nc;
 }
 
 /*f
- * column() adds the best sequence for moving the cursor from oldcol 
+ * column() adds the best sequence for moving the cursor from oldcol
  * to newcol to outseq.
  *
- * column() considers column_address, parm_left/right_cursor, 
+ * column() considers column_address, parm_left/right_cursor,
  * simp_col() and carriage_return + simp_col().
  */
 STATIC void
 column(outseq, ocol, ncol)
 struct Sequence* outseq;
-int ocol, ncol;	
+int ocol, ncol;
 {
 	struct Sequence	seqA, seqB;
 	struct Sequence* best = &seqA;
@@ -307,7 +305,7 @@ int ocol, ncol;
 		dist = ncol - ocol;
 	}
 	zero_seq(try);
-	add_op(try, parm_cursor, dist, 0); 
+	add_op(try, parm_cursor, dist, 0);
 	Make_seq_best(best, try);
 
 	if (ncol < ocol || !relative) {
@@ -364,8 +362,8 @@ int (*putout) ANSI((int));
 }
 
 /*f
- * Low-level relative cursor motion.  __m_mvcur() looks for the optimal 
- * way to move the cursor from point A to point B.  If either of the 
+ * Low-level relative cursor motion.  __m_mvcur() looks for the optimal
+ * way to move the cursor from point A to point B.  If either of the
  * coordinates for point A are -1 then only absolute addressing is used.
  * If the coordinates are out-of-bounds then they are MODed into bounds.
  *
@@ -383,7 +381,7 @@ int oldrow, oldcol, newrow, newcol, (*putout)(int);
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"__m_mvcur(%d, %d, %d, %d, %p)", 
+		"__m_mvcur(%d, %d, %d, %d, %p)",
 		oldrow, oldcol, newrow, newcol, putout
 	);
 #endif
@@ -409,7 +407,7 @@ int oldrow, oldcol, newrow, newcol, (*putout)(int);
 	if (newcol < oldcol || !relative){
 		zero_seq(&col0seq);
 		column(&col0seq, 0, newcol);
-		if (col0seq.cost < __MOVE_INFINITY) {	
+		if (col0seq.cost < __MOVE_INFINITY) {
 			/* try out homing and then row/column */
 			if (newrow < oldrow || !relative) {
 				zero_seq(try);
@@ -470,8 +468,8 @@ int index, p1, p2;
 void
 __m_mvcur_cost()
 {
-	/* Relative cursor motion that will be costed on a per 
-	 * character basis in __m_mvcur(). 
+	/* Relative cursor motion that will be costed on a per
+	 * character basis in __m_mvcur().
 	 */
 	cost(cursor_up, __MOVE_UP, 0, 0);
 	cost(cursor_down, __MOVE_DOWN, 0, 0);
@@ -479,7 +477,7 @@ __m_mvcur_cost()
 	cost(cursor_right, __MOVE_RIGHT, 0, 0);
 	cost(dest_tabs_magic_smso ? (char *) 0 : tab, __MOVE_TAB, 0, 0);
 	cost(
-		dest_tabs_magic_smso ? (char *) 0 
+		dest_tabs_magic_smso ? (char *) 0
 		: back_tab, __MOVE_BACK_TAB, 0, 0
 	);
 

@@ -2,13 +2,12 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Generic SASL plugin utility functions
  * Rob Siemborski
  * $Id: plugin_common.c,v 1.13 2003/02/13 19:56:05 rjs3 Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -16,7 +15,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -26,7 +25,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -98,13 +97,13 @@ static void sockaddr_unmapped(
 
     if (sa->sa_family != AF_INET6)
 	return;
-/* LINTED pointer alignment */ 
+/* LINTED pointer alignment */
     sin6 = (struct sockaddr_in6 *)sa;
     if (!IN6_IS_ADDR_V4MAPPED((&sin6->sin6_addr)))
 	return;
-/* LINTED pointer alignment */ 
+/* LINTED pointer alignment */
     sin4 = (struct sockaddr_in *)sa;
-/* LINTED pointer alignment */ 
+/* LINTED pointer alignment */
     addr = *(uint32_t *)&sin6->sin6_addr.s6_addr[12];
     port = sin6->sin6_port;
     memset(sin4, 0, sizeof(struct sockaddr_in));
@@ -121,7 +120,7 @@ static void sockaddr_unmapped(
 }
 
 int _plug_ipfromstring(const sasl_utils_t *utils, const char *addr,
-		       struct sockaddr *out, socklen_t outlen) 
+		       struct sockaddr *out, socklen_t outlen)
 {
     int i, j;
     socklen_t len;
@@ -135,7 +134,7 @@ int _plug_ipfromstring(const sasl_utils_t *utils, const char *addr,
 #ifdef _SUN_SDK_
     const char *start, *end, *p;
 #endif	/* _SUN_SDK_ */
-    
+
     if(!utils || !addr || !out) {
 	if(utils) PARAMERROR( utils );
 	return SASL_BADPARAM;
@@ -208,9 +207,9 @@ int _plug_ipfromstring(const sasl_utils_t *utils, const char *addr,
     hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST;
 
 #ifdef _SUN_SDK_
-    if (getaddrinfo(hbuf, p, &hints, &ai) != 0) {	
+    if (getaddrinfo(hbuf, p, &hints, &ai) != 0) {
 #else
-    if (getaddrinfo(hbuf, &addr[i], &hints, &ai) != 0) {	
+    if (getaddrinfo(hbuf, &addr[i], &hints, &ai) != 0) {
 #endif /* _SUN_SDK_ */
 	PARAMERROR( utils );
 	return SASL_BADPARAM;
@@ -235,7 +234,7 @@ int _plug_ipfromstring(const sasl_utils_t *utils, const char *addr,
 }
 
 int _plug_iovec_to_buf(const sasl_utils_t *utils, const struct iovec *vec,
-		       unsigned numiov, buffer_info_t **output) 
+		       unsigned numiov, buffer_info_t **output)
 {
     unsigned i;
     int ret;
@@ -246,7 +245,7 @@ int _plug_iovec_to_buf(const sasl_utils_t *utils, const struct iovec *vec,
 	if(utils) PARAMERROR( utils );
 	return SASL_BADPARAM;
     }
-    
+
     if(!(*output)) {
 	*output = utils->malloc(sizeof(buffer_info_t));
 	if(!*output) {
@@ -257,7 +256,7 @@ int _plug_iovec_to_buf(const sasl_utils_t *utils, const struct iovec *vec,
     }
 
     out = *output;
-    
+
     out->curlen = 0;
     for(i=0; i<numiov; i++)
 	out->curlen += vec[i].iov_len;
@@ -268,10 +267,10 @@ int _plug_iovec_to_buf(const sasl_utils_t *utils, const struct iovec *vec,
 	MEMERROR(utils);
 	return SASL_NOMEM;
     }
-    
+
     memset(out->data, 0, out->reallen);
     pos = out->data;
-    
+
     for(i=0; i<numiov; i++) {
 	memcpy(pos, vec[i].iov_base, vec[i].iov_len);
 	pos += vec[i].iov_len;
@@ -282,7 +281,7 @@ int _plug_iovec_to_buf(const sasl_utils_t *utils, const struct iovec *vec,
 
 /* Basically a conditional call to realloc(), if we need more */
 int _plug_buf_alloc(const sasl_utils_t *utils, char **rwbuf,
-		    unsigned *curlen, unsigned newlen) 
+		    unsigned *curlen, unsigned newlen)
 {
     if(!utils || !rwbuf || !curlen) {
 	PARAMERROR(utils);
@@ -314,7 +313,7 @@ int _plug_buf_alloc(const sasl_utils_t *utils, char **rwbuf,
 	    return SASL_NOMEM;
 	}
 	*curlen = needed;
-    } 
+    }
 
     return SASL_OK;
 }
@@ -365,7 +364,7 @@ void _plug_free_string(const sasl_utils_t *utils, char **str)
   *str=NULL;
 }
 
-void _plug_free_secret(const sasl_utils_t *utils, sasl_secret_t **secret) 
+void _plug_free_secret(const sasl_utils_t *utils, sasl_secret_t **secret)
 {
     if(!utils || !secret || !(*secret)) return;
 
@@ -378,7 +377,7 @@ void _plug_free_secret(const sasl_utils_t *utils, sasl_secret_t **secret)
     *secret = NULL;
 }
 
-/* 
+/*
  * Trys to find the prompt with the lookingfor id in the prompt list
  * Returns it if found. NULL otherwise
  */
@@ -415,7 +414,7 @@ int _plug_get_simple(const sasl_utils_t *utils, unsigned int id, int required,
     prompt = _plug_find_prompt(prompt_need, id);
     if (prompt != NULL) {
 	/* We prompted, and got.*/
-	
+
 	if (required && !prompt->result) {
 	    SETERROR(utils, "Unexpectedly missing a prompt result");
 	    return SASL_BADPARAM;
@@ -424,7 +423,7 @@ int _plug_get_simple(const sasl_utils_t *utils, unsigned int id, int required,
 	*result = prompt->result;
 	return SASL_OK;
     }
-  
+
     /* Try to get the callback... */
     ret = utils->getcallback(utils->conn, id, &simple_cb, &simple_context);
 
@@ -441,7 +440,7 @@ int _plug_get_simple(const sasl_utils_t *utils, unsigned int id, int required,
 	    return SASL_BADPARAM;
 	}
     }
-  
+
     return ret;
 }
 
@@ -463,12 +462,12 @@ int _plug_get_password(const sasl_utils_t *utils, sasl_secret_t **password,
     prompt = _plug_find_prompt(prompt_need, SASL_CB_PASS);
     if (prompt != NULL) {
 	/* We prompted, and got.*/
-	
+
 	if (!prompt->result) {
 	    SETERROR(utils, "Unexpectedly missing a prompt result");
 	    return SASL_BADPARAM;
 	}
-      
+
 	/* copy what we got into a secret_t */
 	*password = (sasl_secret_t *) utils->malloc(sizeof(sasl_secret_t) +
 						    prompt->len + 1);
@@ -476,7 +475,7 @@ int _plug_get_password(const sasl_utils_t *utils, sasl_secret_t **password,
 	    MEMERROR(utils);
 	    return SASL_NOMEM;
 	}
-      
+
 	(*password)->len=prompt->len;
 	memcpy((*password)->data, prompt->result, prompt->len);
 	(*password)->data[(*password)->len]=0;
@@ -522,12 +521,12 @@ int _plug_challenge_prompt(const sasl_utils_t *utils, unsigned int id,
     prompt = _plug_find_prompt(prompt_need, id);
     if (prompt != NULL) {
 	/* We prompted, and got.*/
-	
+
 	if (!prompt->result) {
 	    SETERROR(utils, "Unexpectedly missing a prompt result");
 	    return SASL_BADPARAM;
 	}
-      
+
 	*result = prompt->result;
 	return SASL_OK;
     }
@@ -568,7 +567,7 @@ int _plug_get_realm(const sasl_utils_t *utils, const char **availrealms,
     prompt = _plug_find_prompt(prompt_need, SASL_CB_GETREALM);
     if (prompt != NULL) {
 	/* We prompted, and got.*/
-	
+
 	if (!prompt->result) {
 	    SETERROR(utils, "Unexpectedly missing a prompt result");
 	    return SASL_BADPARAM;
@@ -592,7 +591,7 @@ int _plug_get_realm(const sasl_utils_t *utils, const char **availrealms,
 	    return SASL_BADPARAM;
 	}
     }
-  
+
     return ret;
 }
 
@@ -634,7 +633,7 @@ int _plug_make_prompts(const sasl_utils_t *utils,
 	return SASL_NOMEM;
     }
     memset(prompts, 0, alloc_size);
-  
+
     *prompts_res = prompts;
 
     if (user_prompt) {
@@ -722,7 +721,7 @@ int _plug_decode(const sasl_utils_t *utils,
     char *tmp = NULL;
     unsigned tmplen = 0;
     int ret;
-    
+
     *outputlen = 0;
 
     while (inputlen!=0)
@@ -747,12 +746,12 @@ int _plug_decode(const sasl_utils_t *utils,
       }
     }
 
-    return SASL_OK;    
+    return SASL_OK;
 }
 
 /* returns the realm we should pretend to be in */
 int _plug_parseuser(const sasl_utils_t *utils,
-		    char **user, char **realm, const char *user_realm, 
+		    char **user, char **realm, const char *user_realm,
 		    const char *serverFQDN, const char *input)
 {
     int ret;
@@ -776,7 +775,7 @@ int _plug_parseuser(const sasl_utils_t *utils,
 	    /* Default to serverFQDN */
 	    ret = _plug_strdup(utils, serverFQDN, realm, NULL);
 	}
-	
+
 	if (ret == SASL_OK) {
 	    ret = _plug_strdup(utils, input, user, NULL);
 	}
@@ -891,7 +890,7 @@ convert_prompt(const sasl_utils_t *utils, void **h, const char *s)
 	ret = SASL_FAIL;
     if (ret == SASL_OK && !use_locale(result, 1))
 	return s;
-    
+
     s_locale = dgettext(TEXT_DOMAIN, s);
     if (s == s_locale) {
 	return s;

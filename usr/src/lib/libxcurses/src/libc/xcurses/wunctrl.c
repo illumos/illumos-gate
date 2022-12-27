@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wunctrl.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -74,7 +72,7 @@ static const wchar_t *carat[] = {
 	M_MB_L("^Y"),
 	M_MB_L("^Z"),
 	M_MB_L("^["),
-	M_MB_L("^\\"), 
+	M_MB_L("^\\"),
 	M_MB_L("^]"),
 	M_MB_L("^^"),
 	M_MB_L("^_")

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * collate.h will declare all the following routines in their header
  * files -- if they conform to the mks extentions.
@@ -52,7 +50,7 @@
  */
 /*
  * change this to "unsigned short" when we fix the rest of the code
- * to use M_COLL_ERR 
+ * to use M_COLL_ERR
  */
 typedef /* unsigned */ short m_collel_t;	/* Collating element */
 

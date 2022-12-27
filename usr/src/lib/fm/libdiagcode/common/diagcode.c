@@ -35,8 +35,6 @@
  * note that this environment variable is only examined in fm_dc_opendict().
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

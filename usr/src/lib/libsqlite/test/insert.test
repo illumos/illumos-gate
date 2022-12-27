@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -94,7 +92,7 @@ do_test insert-1.6c {
 do_test insert-2.1 {
   execsql {
     CREATE TABLE test2(
-      f1 int default -111, 
+      f1 int default -111,
       f2 real default +4.32,
       f3 int default +222,
       f4 int default 7.89
@@ -118,7 +116,7 @@ do_test insert-2.10 {
   execsql {
     DROP TABLE test2;
     CREATE TABLE test2(
-      f1 int default 111, 
+      f1 int default 111,
       f2 real default -4.32,
       f3 text default hi,
       f4 text default 'abc-123',

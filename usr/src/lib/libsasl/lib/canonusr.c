@@ -2,13 +2,12 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* canonusr.c - user canonicalization support
  * Rob Siemborski
  * $Id: canonusr.c,v 1.12 2003/02/13 19:55:53 rjs3 Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -16,7 +15,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -26,7 +25,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -57,7 +56,7 @@
 
 #include "saslint.h"
 
-typedef struct canonuser_plug_list 
+typedef struct canonuser_plug_list
 {
     struct canonuser_plug_list *next;
 #ifdef _SUN_SDK_
@@ -95,7 +94,7 @@ int _sasl_canon_user(sasl_conn_t *conn,
     char *user_buf;
     unsigned *lenp;
 
-    if(!conn) return SASL_BADPARAM;    
+    if(!conn) return SASL_BADPARAM;
     if(!user || !oparams) return SASL_BADPARAM;
 
     if(flags & SASL_CU_AUTHID) {
@@ -107,13 +106,13 @@ int _sasl_canon_user(sasl_conn_t *conn,
     } else {
 	return SASL_BADPARAM;
     }
-    
+
     if(conn->type == SASL_CONN_SERVER) sconn = (sasl_server_conn_t *)conn;
     else if(conn->type == SASL_CONN_CLIENT) cconn = (sasl_client_conn_t *)conn;
     else return SASL_FAIL;
-    
+
     if(!ulen) ulen = (unsigned int)strlen(user);
-    
+
     /* check to see if we have a callback to make*/
     result = _sasl_getcallback(conn, SASL_CB_CANON_USER,
 			       &cuser_cb, &context);
@@ -124,7 +123,7 @@ int _sasl_canon_user(sasl_conn_t *conn,
 				((sasl_server_conn_t *)conn)->user_realm :
 				NULL),
 			user_buf, CANON_BUF_SIZE, lenp);
-	
+
 
 	if (result != SASL_OK) return result;
 
@@ -144,7 +143,7 @@ int _sasl_canon_user(sasl_conn_t *conn,
 	/* Use Defualt */
 	plugin_name = "INTERNAL";
     }
-    
+
 #ifdef _SUN_SDK_
     for(ptr = conn->gctx->canonuser_head; ptr; ptr = ptr->next) {
 #else
@@ -173,7 +172,7 @@ int _sasl_canon_user(sasl_conn_t *conn,
 #endif /* _INTEGRATED_SOLARIS_ */
 	return SASL_NOMECH;
     }
-    
+
     if(sconn) {
 	/* we're a server */
 	result = ptr->plug->canon_user_server(ptr->plug->glob_context,
@@ -200,7 +199,7 @@ int _sasl_canon_user(sasl_conn_t *conn,
 	memcpy(conn->user_buf, conn->authid_buf, CANON_BUF_SIZE);
 	oparams->ulen = oparams->alen;
     }
-	
+
     /* Set the appropriate oparams (lengths have already been set by lenp) */
     if(flags & SASL_CU_AUTHID) {
 	oparams->authid = conn->authid_buf;
@@ -251,10 +250,10 @@ void _sasl_canonuser_free(_sasl_global_context_t *gctx)
     gctx->canonuser_head = NULL;
 }
 #else
-void _sasl_canonuser_free() 
+void _sasl_canonuser_free()
 {
     canonuser_plug_list_t *ptr, *ptr_next;
-    
+
     for(ptr = canonuser_head; ptr; ptr = ptr_next) {
 	ptr_next = ptr->next;
 	if(ptr->plug->canon_user_free)
@@ -280,7 +279,7 @@ int _sasl_canonuser_add_plugin(void *ctx,
                                sasl_canonuser_init_t *canonuserfunc)
 #else
 int sasl_canonuser_add_plugin(const char *plugname,
-			      sasl_canonuser_init_t *canonuserfunc) 
+			      sasl_canonuser_init_t *canonuserfunc)
 #endif /* _SUN_SDK_ */
 {
     int result, out_version;
@@ -305,7 +304,7 @@ int sasl_canonuser_add_plugin(const char *plugname,
 		      "bad plugname passed to sasl_canonuser_add_plugin\n");
 	return SASL_BADPARAM;
     }
-    
+
     result = canonuserfunc(sasl_global_utils, SASL_CANONUSER_PLUG_VERSION,
 			   &out_version, &plug, plugname);
 
@@ -334,7 +333,7 @@ int sasl_canonuser_add_plugin(const char *plugname,
 #endif /* _SUN_SDK_ */
 	return SASL_BADPROT;
     }
-    
+
 #ifdef _SUN_SDK_
     /* Check plugin to make sure name is non-NULL */
     if (plug->name == NULL) {
@@ -379,7 +378,7 @@ static int _canonuser_internal(const sasl_utils_t *utils,
 			       const char *user, unsigned ulen,
 			       unsigned flags __attribute__((unused)),
 			       char *out_user,
-			       unsigned out_umax, unsigned *out_ulen) 
+			       unsigned out_umax, unsigned *out_ulen)
 {
     unsigned i;
     char *in_buf, *userin;
@@ -400,7 +399,7 @@ static int _canonuser_internal(const sasl_utils_t *utils,
 
     memcpy(userin, user, ulen);
     userin[ulen] = '\0';
-    
+
     /* Strip User ID */
     for(i=0;isspace((int)userin[i]) && i<ulen;i++);
     begin_u = &(userin[i]);
@@ -428,7 +427,7 @@ static int _canonuser_internal(const sasl_utils_t *utils,
     if(sconn && sconn->user_realm && !strchr(user, '@')) {
 	u_apprealm = strlen(sconn->user_realm) + 1;
     }
-    
+
     /* Now Copy */
     memcpy(out_user, begin_u, MIN(ulen, out_umax));
     if(sconn && u_apprealm) {
@@ -442,7 +441,7 @@ static int _canonuser_internal(const sasl_utils_t *utils,
     if(ulen + u_apprealm > out_umax) return SASL_BUFOVER;
 
     if(out_ulen) *out_ulen = MIN(ulen + u_apprealm,out_umax);
-    
+
 #ifdef _SUN_SDK_
     utils->free(in_buf);
 #else
@@ -456,7 +455,7 @@ static int _cu_internal_server(void *glob_context __attribute__((unused)),
 			       const char *user, unsigned ulen,
 			       unsigned flags,
 			       char *out_user,
-			       unsigned out_umax, unsigned *out_ulen) 
+			       unsigned out_umax, unsigned *out_ulen)
 {
     return _canonuser_internal(sparams->utils,
 			       user, ulen,
@@ -468,7 +467,7 @@ static int _cu_internal_client(void *glob_context __attribute__((unused)),
 			       const char *user, unsigned ulen,
 			       unsigned flags,
 			       char *out_user,
-			       unsigned out_umax, unsigned *out_ulen) 
+			       unsigned out_umax, unsigned *out_ulen)
 {
     return _canonuser_internal(cparams->utils,
 			       user, ulen,
@@ -492,12 +491,12 @@ int internal_canonuser_init(const sasl_utils_t *utils __attribute__((unused)),
                             int max_version,
                             int *out_version,
                             sasl_canonuser_plug_t **plug,
-                            const char *plugname __attribute__((unused))) 
+                            const char *plugname __attribute__((unused)))
 {
     if(!out_version || !plug) return SASL_BADPARAM;
 
     if(max_version < SASL_CANONUSER_PLUG_VERSION) return SASL_BADVERS;
-    
+
     *out_version = SASL_CANONUSER_PLUG_VERSION;
 
     *plug = &canonuser_internal_plugin;

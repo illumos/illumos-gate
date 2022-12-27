@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -68,7 +66,7 @@ extern "C" {
     + ((LDIF_BASE64_LEN(vlen) + tlen + 3) / LDIF_MAX_LINE_WIDTH * 2 ))
 
 /*
- * Options for ldif_put_type_and_value_with_options() and 
+ * Options for ldif_put_type_and_value_with_options() and
  * ldif_type_and_value_with_options().
  */
 #define LDIF_OPT_NOWRAP			0x01UL

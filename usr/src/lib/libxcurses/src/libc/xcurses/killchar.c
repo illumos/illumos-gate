@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * killchar.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -52,9 +50,9 @@ erasechar()
 	__m_trace("erasechar(void)");
 #endif
 
-	/* Refer to _shell instead of _prog, since _shell will 
-	 * correctly reflect the user's prefered settings, whereas 
-	 * _prog may not have been initialised if both input and 
+	/* Refer to _shell instead of _prog, since _shell will
+	 * correctly reflect the user's prefered settings, whereas
+	 * _prog may not have been initialised if both input and
 	 * output have been redirected.
 	 */
 	ch = cur_term->_shell.c_cc[VERASE];
@@ -71,9 +69,9 @@ killchar()
 	__m_trace("killchar(void)");
 #endif
 
-	/* Refer to _shell instead of _prog, since _shell will 
-	 * correctly reflect the user's prefered settings, whereas 
-	 * _prog may not have been initialised if both input and 
+	/* Refer to _shell instead of _prog, since _shell will
+	 * correctly reflect the user's prefered settings, whereas
+	 * _prog may not have been initialised if both input and
 	 * output have been redirected.
 	 */
 	ch = cur_term->_shell.c_cc[VKILL];

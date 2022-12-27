@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*-
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -94,7 +92,7 @@ __rec_search(t, recno, op)
 		}
 
 		BT_PUSH(t, pg, idx - 1);
-		
+
 		pg = r->pgno;
 		switch (op) {
 		case SDELETE:

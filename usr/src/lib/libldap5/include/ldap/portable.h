@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -142,7 +140,7 @@
  * Are sys_errlist and sys_nerr declared in stdio.h?
  */
 #ifndef SYSERRLIST_IN_STDIO
-#if defined( freebsd ) 
+#if defined( freebsd )
 #define SYSERRLIST_IN_STDIO
 #endif
 #endif
@@ -159,7 +157,7 @@
 
 
 /*
- * Async IO.  Use a non blocking implementation of connect() and 
+ * Async IO.  Use a non blocking implementation of connect() and
  * dns functions
  */
 #if !defined(LDAP_ASYNC_IO)
@@ -194,7 +192,7 @@
  */
 #if !defined(LDAP_CONNECT_MUST_NOT_BE_INTERRUPTED) && \
 	( defined(AIX) || defined(IRIX) || defined(HPUX) || defined(SUNOS4) \
-	|| defined(SOLARIS) || defined(OSF1) ||defined(freebsd)) 
+	|| defined(SOLARIS) || defined(OSF1) ||defined(freebsd))
 #define LDAP_CONNECT_MUST_NOT_BE_INTERRUPTED
 #endif
 

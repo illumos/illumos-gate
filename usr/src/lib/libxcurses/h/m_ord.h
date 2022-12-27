@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * m_ord.h
  *
@@ -43,7 +41,7 @@
 
 /*
  * Used with CURSES in order to decern whether or not 'x' is a byte
- * or a KEY_xxxx macro, which are defined to be values greater than 
+ * or a KEY_xxxx macro, which are defined to be values greater than
  * UCHAR_MAX.
  */
 #define m_ischarset(x)	((unsigned)(x) <= UCHAR_MAX)
@@ -64,7 +62,7 @@ LEXTERN wint_t m_chr ANSI((int));
  */
 #include <ctype.h>
 #define m_ord(c) \
-	(m_ischarset(c)&&('A'<=towupper(c)&&towupper(c)<='Z')?towupper(c)-'@':-1) 
+	(m_ischarset(c)&&('A'<=towupper(c)&&towupper(c)<='Z')?towupper(c)-'@':-1)
 #define m_chr(c)	(1 <= c && c <= 26 ? c+'@' : -1)
 #endif /* _POSIX_SOURCE */
 

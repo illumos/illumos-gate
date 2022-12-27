@@ -20,8 +20,6 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1997, by Sun Microsystems, Inc.
  * All rights reserved.
  *
@@ -38,7 +36,6 @@
 % * Diffie-Hellman GSS protocol descriptions
 % */
 %
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
 %#include <rpc/key_prot.h>
 #endif
 

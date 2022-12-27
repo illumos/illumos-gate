@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "k5-int.h"
 
 krb5_error_code KRB5_CALLCONV
@@ -45,7 +43,7 @@ cleanup:
     flags = KRB5_TC_OPENCLOSE;
 
     /* If set then we are in an error pathway */
-    if (cur) 
+    if (cur)
       krb5_cc_end_seq_get(context, incc, &cur);
 
     if (code)

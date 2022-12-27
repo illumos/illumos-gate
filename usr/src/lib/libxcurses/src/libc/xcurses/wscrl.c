@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wscrl.c
  *
@@ -53,7 +51,7 @@ wscrl(w, n)
 WINDOW *w;
 int n;
 {
-	int y, x, width, start, finish, to; 
+	int y, x, width, start, finish, to;
 
 #ifdef M_CURSES_TRACE
 	__m_trace("wscrl(%p, %d)", w, n);
@@ -62,7 +60,7 @@ int n;
 	if (n == 0)
 		return __m_return_code("wscrl", OK);
 
-	/* Shuffle pointers in order to scroll.  The region 
+	/* Shuffle pointers in order to scroll.  The region
 	 * from start to finish inclusive will be moved to
 	 * either the top or bottom of _line[].
 	 */

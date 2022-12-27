@@ -30,8 +30,6 @@
 
 #ifndef _LDAP_KRBPWDPOLICY_H_
 #define _LDAP_KRBPWDPOLICY_H_
- 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 krb5_error_code
 krb5_ldap_get_password_policy (krb5_context , char *, osa_policy_ent_t *, int *);
@@ -46,7 +44,7 @@ krb5_error_code
 krb5_ldap_delete_password_policy ( krb5_context kcontext, char *policy );
 
 krb5_error_code
-krb5_ldap_iterate_password_policy(krb5_context, char *, 
+krb5_ldap_iterate_password_policy(krb5_context, char *,
 				  void (*) (krb5_pointer, osa_policy_ent_t ),
 				  krb5_pointer);
 

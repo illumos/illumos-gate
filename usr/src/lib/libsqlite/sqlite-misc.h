@@ -6,8 +6,6 @@
 #ifndef	_SQLITE_MISC_H
 #define	_SQLITE_MISC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

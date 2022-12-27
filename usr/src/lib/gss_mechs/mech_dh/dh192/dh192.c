@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dh_gssapi.h"
 
 static gss_OID_desc  OID = {9, "\053\006\004\001\052\002\032\002\003" };

@@ -26,8 +26,6 @@
  *	All Rights Reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * All routines necessary to deal with the netmasks NIS maps.  The maps
  * contain mapping between 32 bit network internet addresses and their

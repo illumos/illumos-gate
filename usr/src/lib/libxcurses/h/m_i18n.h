@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * m_i18n.h: Header file dealing with all i18n issues.  #included from mks.h,
  * no program should ever #include any i18n-specific header (i.e. this

@@ -31,8 +31,6 @@
 #ifndef _MENU_PRIVATE_H
 #define	_MENU_PRIVATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
-
 #include <menu.h>
 
 #ifdef __cplusplus

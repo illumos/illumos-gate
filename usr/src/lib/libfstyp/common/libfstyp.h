@@ -26,8 +26,6 @@
 #ifndef	_LIBFSTYP_H
 #define	_LIBFSTYP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * libfstyp: filesystem identification library
  */

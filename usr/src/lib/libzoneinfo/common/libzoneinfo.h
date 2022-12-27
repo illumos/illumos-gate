@@ -27,8 +27,6 @@
 #ifndef	_LIBZONEINFO_H
 #define	_LIBZONEINFO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING:
  *

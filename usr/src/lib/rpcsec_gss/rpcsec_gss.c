@@ -32,8 +32,6 @@
  * 1.14 1995/03/22 22:07:55 jik Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>

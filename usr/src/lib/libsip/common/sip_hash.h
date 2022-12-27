@@ -27,8 +27,6 @@
 #ifndef	_SIP_HASH_H
 #define	_SIP_HASH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

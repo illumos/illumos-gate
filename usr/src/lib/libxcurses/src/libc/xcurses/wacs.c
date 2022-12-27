@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wacs.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -47,55 +45,55 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/wacs.c 1.8 1995/10/02 1
 /*
  * Mapping defined in Xcurses Section 6.2.12 (p260).
  */
-const cchar_t __WACS_VLINE = 
+const cchar_t __WACS_VLINE =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("x") };
-const cchar_t __WACS_HLINE = 
+const cchar_t __WACS_HLINE =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("q") };
-const cchar_t __WACS_ULCORNER = 
+const cchar_t __WACS_ULCORNER =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("l") };
-const cchar_t __WACS_URCORNER = 
+const cchar_t __WACS_URCORNER =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("k") };
-const cchar_t __WACS_LLCORNER = 
+const cchar_t __WACS_LLCORNER =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("m") };
-const cchar_t __WACS_LRCORNER = 
+const cchar_t __WACS_LRCORNER =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("j") };
-const cchar_t __WACS_RTEE = 
+const cchar_t __WACS_RTEE =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("u") };
-const cchar_t __WACS_LTEE = 
+const cchar_t __WACS_LTEE =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("t") };
-const cchar_t __WACS_BTEE = 
+const cchar_t __WACS_BTEE =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("v") };
-const cchar_t __WACS_TTEE = 
+const cchar_t __WACS_TTEE =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("w") };
-const cchar_t __WACS_PLUS = 
+const cchar_t __WACS_PLUS =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("n") };
-const cchar_t __WACS_S1 = 
+const cchar_t __WACS_S1 =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("o") };
-const cchar_t __WACS_S9 = 
+const cchar_t __WACS_S9 =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("s") };
-const cchar_t __WACS_DIAMOND = 
+const cchar_t __WACS_DIAMOND =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("`") };
-const cchar_t __WACS_CKBOARD = 
+const cchar_t __WACS_CKBOARD =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("a") };
-const cchar_t __WACS_DEGREE = 
+const cchar_t __WACS_DEGREE =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("f") };
-const cchar_t __WACS_PLMINUS = 
+const cchar_t __WACS_PLMINUS =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("g") };
-const cchar_t __WACS_BULLET = 
+const cchar_t __WACS_BULLET =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("~") };
-const cchar_t __WACS_LARROW = 
+const cchar_t __WACS_LARROW =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L(",") };
-const cchar_t __WACS_RARROW = 
+const cchar_t __WACS_RARROW =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("+") };
-const cchar_t __WACS_DARROW = 
+const cchar_t __WACS_DARROW =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L(".") };
-const cchar_t __WACS_UARROW = 
+const cchar_t __WACS_UARROW =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("-") };
-const cchar_t __WACS_BOARD = 
+const cchar_t __WACS_BOARD =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("h") };
-const cchar_t __WACS_LANTERN = 
+const cchar_t __WACS_LANTERN =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("i") };
-const cchar_t __WACS_BLOCK = 
+const cchar_t __WACS_BLOCK =
 	{ 1, 1, WA_ALTCHARSET, 0, M_MB_L("0") };
 
 #ifdef NOT_NOW
@@ -127,7 +125,7 @@ const cchar_t *WACS_BLOCK = (const cchar_t *) &__WACS_BLOCK;
 #endif
 
 /* The default characters are from the _primary_ character set. */
-static unsigned char acs_defaults[] = 
+static unsigned char acs_defaults[] =
 	"x|q-l+k+m+j+u+t+v+w+n+o-s_`+a:f\'g#~o,<+>.v-^h#i#0#";
 
 int
@@ -142,7 +140,7 @@ __m_acs_cc(chtype acs, cchar_t *cc)
 
 	if (!(acs & A_ALTCHARSET))
 		return 0;
-		
+
 	/* Pick the acs mapping string to use. */
 	if (acs_chars == (char *) 0) {
 		/* Use primary character set. */

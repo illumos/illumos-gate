@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * winnstr.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -75,6 +73,6 @@ int n;
 
         /* Return to initial shift state and terminate string. */
         (void) __m_cc_mbs((const cchar_t *) 0, (char *) 0, 0);
- 
+
 	return __m_return_code("winnstr", OK);
 }

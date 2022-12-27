@@ -27,8 +27,6 @@
 #ifndef _SHA2_H
 #define	_SHA2_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sha2.h>
 
 #endif	/* _SHA2_H */

@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -43,7 +41,7 @@ puts $f "11|22|33"
 puts $f "22|33|11"
 close $f
 set f [open dataX.txt w]
-fconfigure $f -translation binary 
+fconfigure $f -translation binary
 puts -nonewline $f "11|22|33\r"
 puts -nonewline $f "22|33|44\r\n"
 puts -nonewline $f "33|44|55\n"
@@ -260,7 +258,7 @@ do_test copy-6.1 {
 
 integrity_check copy-7.1
 
-# Cleanup 
+# Cleanup
 #
 #file delete -force data1.txt data2.txt data3.txt data4.txt data5.txt \
                    data6.txt dataX.txt

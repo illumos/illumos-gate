@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/krb5/os/ccdefname.c
  *
@@ -82,7 +80,7 @@ krb5_cc_set_default_name(
 		return KV5M_CONTEXT;
 
 	os_ctx = context->os_context;
-	
+
 	/*
 	 * Solaris kerberos:
 	 * Use the following in this order
@@ -122,7 +120,7 @@ krb5_cc_set_default_name(
 	return 0;
 }
 
-	
+
 const char * KRB5_CALLCONV
 krb5_cc_default_name(krb5_context context)
 {

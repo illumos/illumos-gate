@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/krb5/ccache/ser_rc.c
  *
@@ -132,7 +130,7 @@ krb5_ccache_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **bu
 		/* Put the length of the file name */
 		(void) krb5_ser_pack_int32((krb5_int32) strlen(ccname),
 					   &bp, &remain);
-		
+
 		/* Put the name */
 		(void) krb5_ser_pack_bytes((krb5_octet *) ccname,
 					   strlen(ccname),

@@ -31,8 +31,6 @@
 #ifndef _DAT_REGISTRY_H_
 #define	_DAT_REGISTRY_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * HEADER: dat_registry.h

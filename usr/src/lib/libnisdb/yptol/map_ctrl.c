@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * DESCRIPTION:	Contains functions relating to the creation and manipulation
  *		of map_ctrl structures. These are used to hold information

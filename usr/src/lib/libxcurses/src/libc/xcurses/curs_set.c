@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * curs_set.c
  *
@@ -46,7 +44,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/curs_set.c 1.1 1995/06/
 /*f
  * Turn cursor off/on.  Assume cursor is on to begin with.
  */
-int 
+int
 curs_set(visibility)
 int visibility;
 {

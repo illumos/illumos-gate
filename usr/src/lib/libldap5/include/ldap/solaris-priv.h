@@ -6,8 +6,6 @@
 #ifndef _SOLARISPRIV_H
 #define	_SOLARISPRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * solaris-priv.h - items not exposed to outside but used by solaris clients
  * of ldap

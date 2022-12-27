@@ -6,8 +6,6 @@
 #ifndef _PEM_ENCODE_H
 #define	_PEM_ENCODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

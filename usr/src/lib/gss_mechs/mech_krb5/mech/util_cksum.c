@@ -3,11 +3,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -17,7 +15,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -55,7 +53,7 @@ kg_checksum_channel_bindings(context, cb, cksum, bigend)
 
    cksum->checksum_type = CKSUMTYPE_RSA_MD5;
    cksum->length = sumlen;
- 
+
    /* generate a buffer full of zeros if no cb specified */
 
    if (cb == GSS_C_NO_CHANNEL_BINDINGS) {
@@ -123,15 +121,15 @@ kg_checksum_channel_bindings(context, cb, cksum, bigend)
        xfree(buf);
 #endif /* 0 */
 
-   if (code = krb5_c_make_checksum(context, CKSUMTYPE_RSA_MD5, 0, 0, 
-                                   &plaind, cksum)) { 
+   if (code = krb5_c_make_checksum(context, CKSUMTYPE_RSA_MD5, 0, 0,
+                                   &plaind, cksum)) {
       xfree(cksum->contents); /* SUNW15resync -just in case not already free */
-      xfree(buf); 
-      return(code); 
-   } 
- 
-   /* success */ 
- 
-   xfree(buf); 
+      xfree(buf);
+      return(code);
+   }
+
+   /* success */
+
+   xfree(buf);
    return code;
 }

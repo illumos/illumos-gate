@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Traverses /etc/vfstab in order to find default mount information about
  * file systems on the current host.

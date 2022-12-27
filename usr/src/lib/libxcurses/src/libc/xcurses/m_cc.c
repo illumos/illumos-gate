@@ -24,11 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * m_cc.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -67,9 +65,9 @@ t_string *sp;
 }
 
 /*
- * Convert a wint_t string into a multibyte string.  
+ * Convert a wint_t string into a multibyte string.
  *
- * The conversion stops at the end of string or the first WEOF.  
+ * The conversion stops at the end of string or the first WEOF.
  * Return the number of bytes successfully placed into mbs.
  */
 int
@@ -81,7 +79,7 @@ int n;
 	int last;
 	t_string string = { 0 };
 	t_wide_io convert = { 0 };
-	
+
 	string.max = n;
 	string.mbs = mbs;
 	convert.object = (void *) &string;
@@ -96,8 +94,8 @@ int n;
 			break;
 		}
 
-		/* Test for end of string AFTER trying to copy into the 
-		 * buffer, because m_wio_put() has to handle state changes 
+		/* Test for end of string AFTER trying to copy into the
+		 * buffer, because m_wio_put() has to handle state changes
 		 * back to the initial state on '\0' or WEOF.
 		 */
 		if (*wis == '\0' || *wis == WEOF)
@@ -189,17 +187,17 @@ const cchar_t *cc;
  * Convert a complex character's "character" into a multibyte string.
  * The attribute and colour are ignored.
  *
- * If 0 < n, set a new multibyte string and convert the first character, 
+ * If 0 < n, set a new multibyte string and convert the first character,
  * returning either -1 on error or the number of bytes used to convert the
  * character.
  *
  * If n == 0, continue appending to the current multibyte string and return
  * a value as for 0 < n case.
  *
- * If n < 0, return the accumulated byte length of the current multibyte 
+ * If n < 0, return the accumulated byte length of the current multibyte
  * string and do nothing else.
  *
- * When converting a character, a null cchar_t pointer will force the initial 
+ * When converting a character, a null cchar_t pointer will force the initial
  * shift state and append a '\0' to the multibyte string.  The return value
  * will instead by the number of bytes used to shift to the initial state,
  * and exclude the '\0'.
@@ -265,9 +263,9 @@ wchar_t *wcp;
 	char mb;
 	int code;
 
-	/* Refer to _shell instead of _prog, since _shell will 
-	 * correctly reflect the user's prefered settings, whereas 
-	 * _prog may not have been initialised if both input and 
+	/* Refer to _shell instead of _prog, since _shell will
+	 * correctly reflect the user's prefered settings, whereas
+	 * _prog may not have been initialised if both input and
 	 * output have been redirected.
 	 */
 	mb = cur_term->_shell.c_cc[index];
@@ -277,7 +275,7 @@ wchar_t *wcp;
 }
 
 /*
- * Build a cchar_t from the leading spacing and non-spacing characters 
+ * Build a cchar_t from the leading spacing and non-spacing characters
  * in the multibyte character string.  Only one spacing character is copied
  * from the multibyte character string.
  *
@@ -308,7 +306,7 @@ __m_mbs_cc(const char *mbs, attr_t at, short co, cchar_t *cc)
 			width = 1;
 		else if ((width = wcwidth(wc)) < 0)
 			return -1;
-		
+
 		/* Do we have a spacing character? */
 		if (0 < width) {
 			if (have_one)
@@ -330,7 +328,7 @@ __m_mbs_cc(const char *mbs, attr_t at, short co, cchar_t *cc)
 }
 
 /*
- * Build a cchar_t from the leading spacing and non-spacing characters 
+ * Build a cchar_t from the leading spacing and non-spacing characters
  * in the wide character string.  Only one spacinig character is copied
  * from the wide character string.
  *
@@ -389,8 +387,8 @@ __m_wc_cc(wint_t wc, cchar_t *cc)
 }
 
 /*
- * Sort a complex character into a spacing character followed 
- * by any non-spacing characters in increasing order of oridinal 
+ * Sort a complex character into a spacing character followed
+ * by any non-spacing characters in increasing order of oridinal
  * values.  This facilitates both comparision and writting of
  * complex characters.  More than one spacing character is
  * considered an error.
@@ -433,7 +431,7 @@ cchar_t *cc;
 			}
 		}
 	}
-		
+
 	return width;
 }
 
@@ -511,18 +509,18 @@ int y, x;
 int
 __m_cc_replace(w, y, x, cc, as_is)
 WINDOW *w;
-int y, x; 
+int y, x;
 const cchar_t *cc;
 int as_is;
 {
-	int i, width; 
+	int i, width;
 	cchar_t *cp, *np;
 
 	width = __m_cc_width(cc);
 
         /* If we try to write a broad character that would exceed the
          * right margin, then write the background character instead.
-         */     
+         */
 	if (0 < width && w->_maxx < x + width) {
 		(void) __m_cc_erase(w, y, x, y, w->_maxx-1);
 		return -1;
@@ -531,7 +529,7 @@ int as_is;
 	/* Erase the region to be occupied by the new character.
 	 * __m_cc_erase() will erase whole characters so that
 	 * writing a multicolumn character that overwrites the
-	 * trailing and leading portions of two already existing 
+	 * trailing and leading portions of two already existing
 	 * multicolumn characters, erases the remaining portions.
 	 */
 	(void) __m_cc_erase(w, y, x, y, x + width - 1);
@@ -582,7 +580,7 @@ __m_do_scroll(WINDOW *w, int y, int x, int *yp, int *xp)
 		y = w->_maxy-1;
 	} else {
 		/* The cursor wraps for any line (in and out of the scroll
-		 * region) except for the last line of the scroll region.  
+		 * region) except for the last line of the scroll region.
 		 */
 		x = 0;
 	}
@@ -595,7 +593,7 @@ __m_do_scroll(WINDOW *w, int y, int x, int *yp, int *xp)
 
 /*
  * Add the character at the current cursor location
- * according to the column width of the character.  
+ * according to the column width of the character.
  * The cursor will be advanced.
  *
  * Return ERR if adding the character causes the
@@ -604,7 +602,7 @@ __m_do_scroll(WINDOW *w, int y, int x, int *yp, int *xp)
 int
 __m_cc_add(w, y, x, cc, as_is, yp, xp)
 WINDOW *w;
-int y, x; 
+int y, x;
 const cchar_t *cc;
 int as_is, *yp, *xp;
 {
@@ -612,7 +610,7 @@ int as_is, *yp, *xp;
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"__m_cc_add(%p, %d, %d, %p, %d, %p, %p)", 
+		"__m_cc_add(%p, %d, %d, %p, %d, %p, %p)",
 		w, y, x, cc, as_is, yp, xp
 	);
 #endif
@@ -632,7 +630,7 @@ int as_is, *yp, *xp;
 	case '\n':
 		if (__m_cc_erase(w, y, x, y, w->_maxx-1) == -1)
 			goto error;
- 
+
 		if (__m_do_scroll(w, y, x, &y, &x) == ERR)
 			goto error;
 		break;
@@ -670,7 +668,7 @@ error:
  * region is extended left and right in the case where
  * the portions of a multicolumn characters are erased.
  *
- * Return -1 if the region is not an integral multiple 
+ * Return -1 if the region is not an integral multiple
  * of the background character, else zero for success.
  */
 int
@@ -689,13 +687,13 @@ int y, x, ly, lx;
 	if (w->_maxx <= lx)
 		lx = w->_maxx - 1;
 
-	/* Erase from first whole character (inclusive) to next 
+	/* Erase from first whole character (inclusive) to next
 	 * character (exclusive).
 	 */
 	x = __m_cc_first(w, y, x);
 	lx = __m_cc_next(w, ly, lx) - 1;
 
-	/* Is the region to blank out an integral width of the 
+	/* Is the region to blank out an integral width of the
 	 * background character?
 	 */
 	width = __m_cc_width(&w->_bg);
@@ -708,7 +706,7 @@ int y, x, ly, lx;
 	for (; y < ly; ++y, x = 0) {
 		if (x < w->_first[y])
 			w->_first[y] = (short) x;
-		
+
 		for (cp = w->_line[y], i = 0; x < w->_maxx; ++x, ++i) {
 			cp[x] = w->_bg;
 
@@ -718,7 +716,7 @@ int y, x, ly, lx;
 			 */
 			cp[x]._f = (short) (i % width == 0);
 		}
-			
+
 		if (w->_last[y] < x)
 			w->_last[y] = (short) x;
 	}
@@ -763,7 +761,7 @@ int y, x, side;
 	else
 		return -1;
 
-	/* __m_cc_replace() will erase the region containing 
+	/* __m_cc_replace() will erase the region containing
 	 * the character we want to expand.
 	 */
 	cc = w->_line[y][x];
@@ -772,7 +770,7 @@ int y, x, side;
 }
 
 /*
- * Return true if characters are equal.  
+ * Return true if characters are equal.
  *
  * NOTE to guarantee correct results, make sure that both
  * characters have been passed through __m_cc_sort().

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <umem.h>
 #include <topo_alloc.h>
 #include <topo_module.h>

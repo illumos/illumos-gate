@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # The author disclaims copyright to this source code.  In place of
 # a legal notice, here is a blessing:
 #
@@ -38,14 +36,14 @@ do_test trigger1-1.1.2 {
      CREATE TRIGGER trig UPDATE ON no_such_table BEGIN
        SELECT * from sqlite_master;
      END;
-   } 
+   }
 } {1 {no such table: no_such_table}}
 do_test trigger1-1.1.2 {
    catchsql {
      CREATE TEMP TRIGGER trig UPDATE ON no_such_table BEGIN
        SELECT * from sqlite_master;
      END;
-   } 
+   }
 } {1 {no such table: no_such_table}}
 
 execsql {
@@ -115,7 +113,7 @@ do_test trigger1-1.8 {
 	    SELECT * from sqlite_master;
 	END;
 	SELECT count(*) FROM sqlite_master WHERE name = 'temp_trig';
-  } 
+  }
 } {0}
 
 do_test trigger1-1.9 {
@@ -427,7 +425,7 @@ execsql {
 #
 # Also verify that references within trigger programs are resolved at
 # statement compile time, not trigger installation time. This means, for
-# example, that you can drop and re-create tables referenced by triggers. 
+# example, that you can drop and re-create tables referenced by triggers.
 do_test trigger-10.0 {
   file delete -force test2.db
   file delete -force test2.db-journal
@@ -447,13 +445,13 @@ do_test trigger-10.1 {
 } {}
 do_test trigger-10.2 {
   execsql {
-    CREATE TEMP TRIGGER trig1 AFTER INSERT ON t1 BEGIN 
+    CREATE TEMP TRIGGER trig1 AFTER INSERT ON t1 BEGIN
       INSERT INTO insert_log VALUES('main', new.a, new.b, new.c);
     END;
-    CREATE TEMP TRIGGER trig2 AFTER INSERT ON t2 BEGIN 
+    CREATE TEMP TRIGGER trig2 AFTER INSERT ON t2 BEGIN
       INSERT INTO insert_log VALUES('temp', new.a, new.b, new.c);
     END;
-    CREATE TEMP TRIGGER trig3 AFTER INSERT ON t3 BEGIN 
+    CREATE TEMP TRIGGER trig3 AFTER INSERT ON t3 BEGIN
       INSERT INTO insert_log VALUES('aux', new.a, new.b, new.c);
     END;
   }

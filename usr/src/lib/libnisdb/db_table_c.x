@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if RPC_HDR
 %#ifndef _DB_TABLE_H
 %#define _DB_TABLE_H
@@ -82,7 +80,7 @@ typedef struct db_free_list * db_free_list_p;
 %	count = 0;
 %	INITRW(free_list);
 %  }
-% 
+%
 %  ~db_free_list();
 %
 %  void reset();   /* empty contents of free list */
@@ -92,7 +90,7 @@ typedef struct db_free_list * db_free_list_p;
 %/* Returns the location of a free entry, or NULL, if there aren't any. */
 %  entryp pop();
 %
-%/* Adds given location to the free list.  
+%/* Adds given location to the free list.
 %   Returns TRUE if successful, FALSE otherwise (when out of memory). */
 %  bool_t push( entryp );
 %
@@ -159,7 +157,7 @@ typedef struct db_table * db_table_p;
 %  __nisdb_ptr_t  enumIndex;
 %  __nisdb_ptr_t  enumArray;
 %
-%  void grow();           /* Expand the table.  
+%  void grow();           /* Expand the table.
 %			    Fatal error if insufficient error. */
 %
 %/* Allocate expiration time array */
@@ -243,15 +241,15 @@ typedef struct db_table * db_table_p;
 %   as a side-effect of the addition. Copy is made of the input. */
 %  entryp add_entry(entry_object_p, int);
 %
-% /* Replaces object at specified location by given entry.  
+% /* Replaces object at specified location by given entry.
 %   Returns TRUE if replacement successful; FALSE otherwise.
 %   There must something already at the specified location, otherwise,
-%   replacement fails. Copy is not made of the input. 
+%   replacement fails. Copy is not made of the input.
 %   The pre-existing entry is freed.*/
 %  bool_t replace_entry( entryp, entry_object_p );
 %
 %/* Deletes entry at specified location.  Returns TRUE if location is valid;
-%   FALSE if location is invalid, or the freed location cannot be added to 
+%   FALSE if location is invalid, or the freed location cannot be added to
 %   the freelist.  'count' is decremented if the deletion occurs.  The object
 %   at that location is freed. */
 %  bool_t delete_entry( entryp );

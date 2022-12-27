@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2003 April 6
 **
@@ -44,7 +41,7 @@ void sqliteAttach(Parse *pParse, Token *pFilename, Token *pDbname, Token *pKey){
     return;
   }
   if( db->nDb>=MAX_ATTACHED+2 ){
-    sqliteErrorMsg(pParse, "too many attached databases - max %d", 
+    sqliteErrorMsg(pParse, "too many attached databases - max %d",
        MAX_ATTACHED);
     pParse->rc = SQLITE_ERROR;
     return;

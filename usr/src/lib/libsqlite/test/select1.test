@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -408,32 +406,32 @@ do_test select1-6.5.1 {
   lappend v $msg
 } {0 {test1.f1+F2 33 test1.f1+F2 77}}
 do_test select1-6.6 {
-  set v [catch {execsql2 {SELECT test1.f1+F2, t1 FROM test1, test2 
+  set v [catch {execsql2 {SELECT test1.f1+F2, t1 FROM test1, test2
          ORDER BY f2}} msg]
   lappend v $msg
 } {0 {test1.f1+F2 33 t1 abc test1.f1+F2 77 t1 abc}}
 do_test select1-6.7 {
-  set v [catch {execsql2 {SELECT A.f1, t1 FROM test1 as A, test2 
+  set v [catch {execsql2 {SELECT A.f1, t1 FROM test1 as A, test2
          ORDER BY f2}} msg]
   lappend v $msg
 } {0 {A.f1 11 t1 abc A.f1 33 t1 abc}}
 do_test select1-6.8 {
-  set v [catch {execsql2 {SELECT A.f1, f1 FROM test1 as A, test1 as B 
+  set v [catch {execsql2 {SELECT A.f1, f1 FROM test1 as A, test1 as B
          ORDER BY f2}} msg]
   lappend v $msg
 } {1 {ambiguous column name: f1}}
 do_test select1-6.8b {
-  set v [catch {execsql2 {SELECT A.f1, B.f1 FROM test1 as A, test1 as B 
+  set v [catch {execsql2 {SELECT A.f1, B.f1 FROM test1 as A, test1 as B
          ORDER BY f2}} msg]
   lappend v $msg
 } {1 {ambiguous column name: f2}}
 do_test select1-6.8c {
-  set v [catch {execsql2 {SELECT A.f1, f1 FROM test1 as A, test1 as A 
+  set v [catch {execsql2 {SELECT A.f1, f1 FROM test1 as A, test1 as A
          ORDER BY f2}} msg]
   lappend v $msg
 } {1 {ambiguous column name: A.f1}}
 do_test select1-6.9 {
-  set v [catch {execsql2 {SELECT A.f1, B.f1 FROM test1 as A, test1 as B 
+  set v [catch {execsql2 {SELECT A.f1, B.f1 FROM test1 as A, test1 as B
          ORDER BY A.f1, B.f1}} msg]
   lappend v $msg
 } {0 {A.f1 11 B.f1 11 A.f1 11 B.f1 33 A.f1 33 B.f1 11 A.f1 33 B.f1 33}}

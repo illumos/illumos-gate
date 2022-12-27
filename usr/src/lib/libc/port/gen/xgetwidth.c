@@ -27,8 +27,6 @@
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * _Xgetwidth calls _getwidth to get the values of environment variables
  * CSWIDTH, SCRWIDTH and PCWIDTH, and checks the values to fit C process

@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -52,7 +50,7 @@ extern "C" {
 #ifndef LDAP_CALL
 #if defined( _WINDOWS ) || defined( _WIN32 )
 #define LDAP_C __cdecl
-#ifndef _WIN32 
+#ifndef _WIN32
 #define __stdcall _far _pascal
 #define LDAP_CALLBACK _loadds
 #else
@@ -68,7 +66,7 @@ extern "C" {
 #endif /* _WINDOWS */
 #endif /* LDAP_CALL */
 
-#ifndef _SOLARIS_SDK 
+#ifndef _SOLARIS_SDK
 
 #define LDAP_TEMPLATE_VERSION	1
 
@@ -88,7 +86,7 @@ extern "C" {
 #define LDAP_SYN_OPT_DEFER		0x00010000L
 
 
-/* 
+/*
  * display template item syntax ids (defined by common agreement)
  * these are the valid values for the ti_syntaxid of the tmplitem
  * struct (defined below).  A general type is encoded in the
@@ -132,7 +130,7 @@ extern "C" {
 #define LDAP_DISP_OPT_HTMLBODYONLY	0x00000002L
 
 /*
- * perform search actions (applies to ldap_entry2text_search only) 
+ * perform search actions (applies to ldap_entry2text_search only)
  */
 #define LDAP_DISP_OPT_DOSEARCHACTIONS	0x00000002L
 

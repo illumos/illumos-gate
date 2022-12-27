@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 November 6
 #
 # The author disclaims copyright to this source code.  In place of
@@ -292,7 +290,7 @@ do_test limit-7.11 {
 } {31}
 do_test limit-7.12 {
   execsql {
-    SELECT a+27 FROM t6 INTERSECT SELECT x FROM t2 
+    SELECT a+27 FROM t6 INTERSECT SELECT x FROM t2
        ORDER BY 1 DESC LIMIT 1 OFFSET 1;
   }
 } {30}

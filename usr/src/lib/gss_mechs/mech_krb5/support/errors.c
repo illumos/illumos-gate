@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Can't include krb5.h here, or k5-int.h which includes it, because
    krb5.h needs to be generated with error tables, after util/et,
    which builds after this directory.  */

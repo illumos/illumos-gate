@@ -1,8 +1,7 @@
-/* 
+/*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* MD5C.C - RSA Data Security, Inc., MD5 message-digest algorithm
  */
@@ -74,15 +73,15 @@ documentation and/or software.
 #else
 static void MD5Transform PROTO_LIST ((UINT4 [4], unsigned char [64]));
 static void Encode PROTO_LIST
-       ((unsigned char *, UINT4 *, unsigned int)); 
+       ((unsigned char *, UINT4 *, unsigned int));
 static void Decode PROTO_LIST
-       ((UINT4 *, unsigned char *, unsigned int)); 
+       ((UINT4 *, unsigned char *, unsigned int));
 static void MD5_memcpy PROTO_LIST ((POINTER, POINTER, unsigned int));
 static void MD5_memset PROTO_LIST ((POINTER, int, unsigned int));
 
 static unsigned char PADDING[64] = {
        0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 
+       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 #endif /* _HAVE_LIB_MD5 */
 
@@ -109,10 +108,10 @@ static unsigned char PADDING[64] = {
 Rotation is separate from addition to prevent recomputation.
 */
 
-#define FF(a, b, c, d, x, s, ac) { (a) += F ((b), (c), (d)) + (x) + (UINT4)(ac); (a) = ROTATE_LEFT ((a), (s));        (a) += (b);        } 
-#define GG(a, b, c, d, x, s, ac) {        (a) += G ((b), (c), (d)) + (x) + (UINT4)(ac);        (a) = ROTATE_LEFT ((a), (s));        (a) += (b);         } 
-#define HH(a, b, c, d, x, s, ac) {        (a) += H ((b), (c), (d)) + (x) + (UINT4)(ac);        (a) = ROTATE_LEFT ((a), (s));        (a) += (b);        } 
-#define II(a, b, c, d, x, s, ac) {        (a) += I ((b), (c), (d)) + (x) + (UINT4)(ac);        (a) = ROTATE_LEFT ((a), (s));        (a) += (b);        } 
+#define FF(a, b, c, d, x, s, ac) { (a) += F ((b), (c), (d)) + (x) + (UINT4)(ac); (a) = ROTATE_LEFT ((a), (s));        (a) += (b);        }
+#define GG(a, b, c, d, x, s, ac) {        (a) += G ((b), (c), (d)) + (x) + (UINT4)(ac);        (a) = ROTATE_LEFT ((a), (s));        (a) += (b);         }
+#define HH(a, b, c, d, x, s, ac) {        (a) += H ((b), (c), (d)) + (x) + (UINT4)(ac);        (a) = ROTATE_LEFT ((a), (s));        (a) += (b);        }
+#define II(a, b, c, d, x, s, ac) {        (a) += I ((b), (c), (d)) + (x) + (UINT4)(ac);        (a) = ROTATE_LEFT ((a), (s));        (a) += (b);        }
 
 /* MD5 initialization. Begins an MD5 operation, writing a new context.
 */
@@ -121,17 +120,17 @@ Rotation is separate from addition to prevent recomputation.
 void _sasl_MD5Init (context)
 MD5_CTX *context; /* context */
 {
-       context->count[0] = context->count[1] = 0; 
+       context->count[0] = context->count[1] = 0;
 
        /* Load magic initialization constants. */
-       context->state[0] = 0x67452301; 
-       context->state[1] = 0xefcdab89; 
-       context->state[2] = 0x98badcfe; 
-       context->state[3] = 0x10325476; 
+       context->state[0] = 0x67452301;
+       context->state[1] = 0xefcdab89;
+       context->state[2] = 0x98badcfe;
+       context->state[3] = 0x10325476;
 }
 
 /* MD5 block update operation. Continues an MD5 message-digest
-       operation, processing another message block, and updating the context. 
+       operation, processing another message block, and updating the context.
 */
 
 void _sasl_MD5Update (context, input, inputLen)
@@ -139,7 +138,7 @@ MD5_CTX *context; /* context */
 unsigned char *input; /* input block */
 unsigned int inputLen; /* length of input block */
 {
-       unsigned int i, index, partLen; 
+       unsigned int i, index, partLen;
 
          /* Compute number of bytes mod 64 */
          index = (unsigned int)((context->count[0] >> 3) & 0x3F);
@@ -150,23 +149,23 @@ unsigned int inputLen; /* length of input block */
         context->count[1]++;
          context->count[1] += ((UINT4)inputLen >> 29);
 
-       partLen = 64 - index; 
+       partLen = 64 - index;
 
          /* Transform as many times as possible.
 
 */
-       if (inputLen >= partLen) { 
-       MD5_memcpy 
+       if (inputLen >= partLen) {
+       MD5_memcpy
        ((POINTER)&context->buffer[index], (POINTER)input, partLen); MD5Transform
-       (context->state, context->buffer); 
+       (context->state, context->buffer);
 
-       for (i = partLen; i + 63 < inputLen; i += 64) 
-       MD5Transform (context->state, &input[i]); 
+       for (i = partLen; i + 63 < inputLen; i += 64)
+       MD5Transform (context->state, &input[i]);
 
-       index = 0; 
-       } 
-       else 
-       i = 0; 
+       index = 0;
+       }
+       else
+       i = 0;
 
          /* Buffer remaining input */
          MD5_memcpy
@@ -176,23 +175,23 @@ unsigned int inputLen; /* length of input block */
 }
 
 /* MD5 finalization. Ends an MD5 message-digest operation, writing the
-       the message digest and zeroizing the context. 
+       the message digest and zeroizing the context.
 */
 
 void _sasl_MD5Final (digest, context)
 unsigned char digest[16]; /* message digest */
 MD5_CTX *context; /* context */
 {
-       unsigned char bits[8]; 
-       unsigned int index, padLen; 
+       unsigned char bits[8];
+       unsigned int index, padLen;
 
          /* Save number of bits */
          Encode (bits, context->count, 8);
 
          /* Pad out to 56 mod 64. */
-	 index = (unsigned int)((context->count[0] >> 3) & 0x3f); 
-	 padLen = (index < 56) ? (56 - index) : (120 - index); 
-	 _sasl_MD5Update (context, PADDING, padLen); 
+	 index = (unsigned int)((context->count[0] >> 3) & 0x3f);
+	 padLen = (index < 56) ? (56 - index) : (120 - index);
+	 _sasl_MD5Update (context, PADDING, padLen);
 
          /* Append length (before padding) */
          _sasl_MD5Update (context, bits, 8);
@@ -201,7 +200,7 @@ MD5_CTX *context; /* context */
          Encode (digest, context->state, 16);
 
          /* Zeroize sensitive information. */
-       MD5_memset ((POINTER)context, 0, sizeof (*context)); 
+       MD5_memset ((POINTER)context, 0, sizeof (*context));
 }
 
 /* MD5 basic transformation. Transforms state based on block. */
@@ -210,9 +209,9 @@ static void MD5Transform (state, block)
 UINT4 state[4];
 unsigned char block[64];
 {
-       UINT4 a = state[0], b = state[1], c = state[2], d = state[3], x[16]; 
+       UINT4 a = state[0], b = state[1], c = state[2], d = state[3], x[16];
 
-       Decode (x, block, 64); 
+       Decode (x, block, 64);
 
          /* Round 1 */
          FF (a, b, c, d, x[ 0], S11, 0xd76aa478); /* 1 */
@@ -244,11 +243,11 @@ unsigned char block[64];
          GG (a, b, c, d, x[ 9], S21, 0x21e1cde6); /* 25 */
          GG (d, a, b, c, x[14], S22, 0xc33707d6); /* 26 */
          GG (c, d, a, b, x[ 3], S23, 0xf4d50d87); /* 27 */
-	 GG (b, c, d, a, x[ 8], S24, 0x455a14ed); /* 28 */ 
-	 GG (a, b, c, d, x[13], S21, 0xa9e3e905); /* 29 */ 
-	 GG (d, a, b, c, x[ 2], S22, 0xfcefa3f8); /* 30 */ 
-	 GG (c, d, a, b, x[ 7], S23, 0x676f02d9); /* 31 */ 
-	 GG (b, c, d, a, x[12], S24, 0x8d2a4c8a); /* 32 */ 
+	 GG (b, c, d, a, x[ 8], S24, 0x455a14ed); /* 28 */
+	 GG (a, b, c, d, x[13], S21, 0xa9e3e905); /* 29 */
+	 GG (d, a, b, c, x[ 2], S22, 0xfcefa3f8); /* 30 */
+	 GG (c, d, a, b, x[ 7], S23, 0x676f02d9); /* 31 */
+	 GG (b, c, d, a, x[12], S24, 0x8d2a4c8a); /* 32 */
 
          /* Round 3 */
          HH (a, b, c, d, x[ 5], S31, 0xfffa3942); /* 33 */
@@ -286,18 +285,18 @@ unsigned char block[64];
          II (c, d, a, b, x[ 2], S43, 0x2ad7d2bb); /* 63 */
          II (b, c, d, a, x[ 9], S44, 0xeb86d391); /* 64 */
 
-       state[0] += a; 
-       state[1] += b; 
-       state[2] += c; 
-       state[3] += d; 
+       state[0] += a;
+       state[1] += b;
+       state[2] += c;
+       state[3] += d;
 
          /* Zeroize sensitive information.
 	 */
-       MD5_memset ((POINTER)x, 0, sizeof (x)); 
+       MD5_memset ((POINTER)x, 0, sizeof (x));
 }
 
 /* Encodes input (UINT4) into output (unsigned char). Assumes len is
-       a multiple of 4. 
+       a multiple of 4.
 
         */
 
@@ -306,18 +305,18 @@ unsigned char *output;
 UINT4 *input;
 unsigned int len;
 {
-       unsigned int i, j; 
+       unsigned int i, j;
 
-       for (i = 0, j = 0; j < len; i++, j += 4) { 
-       output[j] = (unsigned char)(input[i] & 0xff); 
-       output[j+1] = (unsigned char)((input[i] >> 8) & 0xff); 
-       output[j+2] = (unsigned char)((input[i] >> 16) & 0xff); 
-       output[j+3] = (unsigned char)((input[i] >> 24) & 0xff); 
-       } 
+       for (i = 0, j = 0; j < len; i++, j += 4) {
+       output[j] = (unsigned char)(input[i] & 0xff);
+       output[j+1] = (unsigned char)((input[i] >> 8) & 0xff);
+       output[j+2] = (unsigned char)((input[i] >> 16) & 0xff);
+       output[j+3] = (unsigned char)((input[i] >> 24) & 0xff);
+       }
 }
 
 /* Decodes input (unsigned char) into output (UINT4). Assumes len is
-       a multiple of 4. 
+       a multiple of 4.
 
         */
 
@@ -326,11 +325,11 @@ UINT4 *output;
 unsigned char *input;
 unsigned int len;
 {
-       unsigned int i, j; 
+       unsigned int i, j;
 
-       for (i = 0, j = 0; j < len; i++, j += 4) 
+       for (i = 0, j = 0; j < len; i++, j += 4)
        output[i] = ((UINT4)input[j]) | (((UINT4)input[j+1]) << 8) | (((UINT4)input[j+2]) << 16)
-       | (((UINT4)input[j+3]) << 24); 
+       | (((UINT4)input[j+3]) << 24);
 }
 
 /* Note: Replace "for loop" with standard memcpy if possible.
@@ -342,10 +341,10 @@ POINTER output;
 POINTER input;
 unsigned int len;
 {
-       unsigned int i; 
+       unsigned int i;
 
-       for (i = 0; i < len; i++) 
-	      output[i] = input[i]; 
+       for (i = 0; i < len; i++)
+	      output[i] = input[i];
 }
 
 /* Note: Replace "for loop" with standard memset if possible.
@@ -356,10 +355,10 @@ POINTER output;
 int value;
 unsigned int len;
 {
-       unsigned int i; 
+       unsigned int i;
 
-       for (i = 0; i < len; i++) 
-       ((char *)output)[i] = (char)value; 
+       for (i = 0; i < len; i++)
+       ((char *)output)[i] = (char)value;
 }
 #endif /* !_HAVE_LIB_MD5 */
 
@@ -377,16 +376,16 @@ void _sasl_hmac_md5_init(HMAC_MD5_CTX *hmac,
   int i;
   /* if key is longer than 64 bytes reset it to key=MD5(key) */
   if (key_len > 64) {
-    
+
     MD5_CTX      tctx;
 
-    _sasl_MD5Init(&tctx); 
-    _sasl_MD5Update(&tctx, key, key_len); 
-    _sasl_MD5Final(tk, &tctx); 
+    _sasl_MD5Init(&tctx);
+    _sasl_MD5Update(&tctx, key, key_len);
+    _sasl_MD5Final(tk, &tctx);
 
-    key = tk; 
-    key_len = 16; 
-  } 
+    key = tk;
+    key_len = 16;
+  }
 
   /*
    * the HMAC_MD5 transform looks like:
@@ -480,7 +479,7 @@ const unsigned char* key; /* pointer to authentication key */
 int key_len; /* length of authentication key */
 unsigned char *digest; /* caller digest to be filled in */
 {
-  MD5_CTX context; 
+  MD5_CTX context;
 
   unsigned char k_ipad[65];    /* inner padding -
 				* key XORd with ipad
@@ -492,16 +491,16 @@ unsigned char *digest; /* caller digest to be filled in */
   int i;
   /* if key is longer than 64 bytes reset it to key=MD5(key) */
   if (key_len > 64) {
-    
+
     MD5_CTX      tctx;
 
-    _sasl_MD5Init(&tctx); 
-    _sasl_MD5Update(&tctx, key, key_len); 
-    _sasl_MD5Final(tk, &tctx); 
+    _sasl_MD5Init(&tctx);
+    _sasl_MD5Update(&tctx, key, key_len);
+    _sasl_MD5Final(tk, &tctx);
 
-    key = tk; 
-    key_len = 16; 
-  } 
+    key = tk;
+    key_len = 16;
+  }
 
   /*
    * the HMAC_MD5 transform looks like:

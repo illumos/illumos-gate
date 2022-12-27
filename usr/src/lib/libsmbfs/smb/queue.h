@@ -33,8 +33,6 @@
  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file [used to define] five types of data structures:
  *   singly-linked lists, ...

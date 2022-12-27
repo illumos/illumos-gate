@@ -26,8 +26,6 @@
 #ifndef	_TOPO_ERROR_H
 #define	_TOPO_ERROR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <topo_tree.h>
 #include <topo_module.h>
 

@@ -27,8 +27,6 @@
 #ifndef _LIBZFS_JNI_DATASET_H
 #define	_LIBZFS_JNI_DATASET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libzfs_jni_util.h>
 #include <libzfs.h>
 

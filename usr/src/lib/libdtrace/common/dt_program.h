@@ -27,8 +27,6 @@
 #ifndef	_DT_PROGRAM_H
 #define	_DT_PROGRAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

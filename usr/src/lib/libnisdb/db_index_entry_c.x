@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if RPC_HDR
 
 %#ifndef _DB_INDEX_ENTRY_H
@@ -65,12 +63,12 @@
 struct db_index_entry {
   unsigned long hashval;
   item *key;
-  entryp location;  
+  entryp location;
   db_index_entry* next;
 #ifdef USINGC
-  nullptr next_result; 
+  nullptr next_result;
 #else
-  db_index_entry* next_result; 
+  db_index_entry* next_result;
 #endif
 };
 typedef struct db_index_entry * db_index_entry_p;
@@ -82,30 +80,30 @@ typedef struct db_index_entry * db_index_entry_p;
 %class db_index_entry {
 %  unsigned long hashval;
 %  item *key;
-%  entryp location;  
+%  entryp location;
 %  db_index_entry* next;
-%  db_index_entry* next_result; 
+%  db_index_entry* next_result;
 % public:
 %
 %/* Constructor:  create an entry using given string and location info. */
 %  db_index_entry( char* name, int nlen, entryp location );
 %
-%/* Constructor:  create an entry using the given info.  
+%/* Constructor:  create an entry using the given info.
 %   A copy of the key is made.  New entry is added to head of list of 'n'. */
 %  db_index_entry( unsigned long hval, item *, entryp, db_index_entry *n);
 %
-%/* Destructor:  deletes key and itself.  Assumes that deletion of 
+%/* Destructor:  deletes key and itself.  Assumes that deletion of
 %   object at location is done elsewhere (beforehand) */
-%  ~db_index_entry() {delete key; } 
+%  ~db_index_entry() {delete key; }
 %
 %/* Relocate bucket starting with this entry to new hashtable 'new_tab'. */
 %  void relocate( db_index_entry**, unsigned long );
 %
 %/* Join two lists (entry as identified by its 'location' occurs on both list,
-%   then it is included in the list returned).  
+%   then it is included in the list returned).
 %   Returns pointer to resulting list; size of list
 %   returned in 'newsize'.  List is chained using the 'nextresult' pointer. */
-%  db_index_entry* join( long size1, long size2, db_index_entry *list2, 
+%  db_index_entry* join( long size1, long size2, db_index_entry *list2,
 %		       long * newsize );
 %
 %/* Returns pointer to a list of index entries with the same hash value and
@@ -150,7 +148,7 @@ typedef struct db_index_entry * db_index_entry_p;
 %/* Replace the 'location' field of the index entry with the given one. */
 %  void replace( entryp ep ) {location = ep;}
 %
-%/* Create and add an entry with the given hashvalue, key value, and record 
+%/* Create and add an entry with the given hashvalue, key value, and record
 %   location, to the bucket pointed to by 'hashvalue'.
 %   If an entry with the same identical information is found, no addition
 %   is done.  If an entry with the same hashvalue and key value is found,
@@ -158,9 +156,9 @@ typedef struct db_index_entry * db_index_entry_p;
 %   the entry is added to the head of the bucket.  This way, entries
 %   with the same hashvalue and key are not scattered throughout the bucket
 %   but they occur together. Copy is made of given key. */
-%  bool_t add( db_index_entry **oldhead, bool_t, unsigned long hval, item *, 
+%  bool_t add( db_index_entry **oldhead, bool_t, unsigned long hval, item *,
 %	    entryp );
-%		      
+%
 %/* Print this entry to stdout. */
 %  void print();
 %

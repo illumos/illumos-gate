@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1987, 1988, 1989 by MIT Student Information Processing
  * Board
@@ -23,7 +21,7 @@ char * ss_name(sci_idx)
 {
     register char *ret_val;
     register ss_data *infop;
-    
+
     infop = ss_info(sci_idx);
     if (infop->current_request == (char const *)NULL) {
 	ret_val = malloc((unsigned)
@@ -37,7 +35,7 @@ char * ss_name(sci_idx)
     else {
 	register char *cp;
 	register char const *cp1;
-	ret_val = malloc((unsigned)sizeof(char) * 
+	ret_val = malloc((unsigned)sizeof(char) *
 			 (strlen(infop->subsystem_name)+
 			  strlen(infop->current_request)+
 			  4));

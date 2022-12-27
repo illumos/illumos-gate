@@ -41,8 +41,6 @@
  *		preexisting code structure.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <syslog.h>
 #include <sys/mman.h>

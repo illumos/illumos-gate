@@ -26,8 +26,6 @@
  *	All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Entry points for key generation for libnsl. This file should
  * be included in the file that defines the MODULUS, ROOT, and KEYLEN

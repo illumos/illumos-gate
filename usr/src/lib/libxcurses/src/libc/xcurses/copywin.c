@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * copywin.c
  *
@@ -77,7 +75,7 @@ int transparent;
 		sminc = t->_begx - s->_begx;
 		tminc = 0;
 	} else {
-		sminc = 0; 
+		sminc = 0;
 		tminc = s->_begx- t->_begx;
 	}
 	code = copywin(
@@ -120,14 +118,14 @@ int sminr, sminc, tminr, tminc, tmaxr, tmaxc, transparent;
 
 		/* Copy source region to target. */
 		for (tc = tminc; tc <= tmaxc; ++tc, ++tt, ++st) {
-			if (transparent) 
+			if (transparent)
 				if (iswspace(st->_wc[0]))
 					continue;
 			*tt = *st;
 		}
 
 #ifdef M_CURSES_SENSIBLE_WINDOWS
-		/* Case 4 - 
+		/* Case 4 -
 		 * Expand incomplete glyph from source into target window.
 		 */
 		if (0 < tminc && !t->_line[tminr][tminc]._f)

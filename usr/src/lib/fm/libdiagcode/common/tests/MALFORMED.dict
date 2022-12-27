@@ -22,9 +22,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
 # MALFORMED diagcode dictionary -- used by "make test" target only
 #
 # this sample dictionary tests how well we handle malformed entries.

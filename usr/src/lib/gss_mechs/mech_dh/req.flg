@@ -20,9 +20,5 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 
 echo_file usr/src/lib/libnsl/include/rpcsvc/nis_dhext.h

@@ -26,8 +26,6 @@
 #ifndef	_ERRFP_H
 #define	_ERRFP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Headers and definitions for support functions that are shared by
  * the ipsec utilities ipseckey and ikeadm.

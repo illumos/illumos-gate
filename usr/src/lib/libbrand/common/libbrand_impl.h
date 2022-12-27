@@ -26,8 +26,6 @@
 #ifndef	_LIBBRAND_IMPL_H
 #define	_LIBBRAND_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #include <libbrand.h>

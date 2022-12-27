@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -24,8 +22,8 @@
 /* charray.c - routines for dealing with char * arrays */
 
 
-#include "ldap-int.h" 
- 
+#include "ldap-int.h"
+
 /*
  * Add s at the end of the array of strings *a.
  * Return 0 for success, -1 for failure.

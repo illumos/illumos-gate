@@ -27,8 +27,6 @@
 
 /* $Id: printer.c 151 2006-04-25 16:55:34Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <stdlib.h>

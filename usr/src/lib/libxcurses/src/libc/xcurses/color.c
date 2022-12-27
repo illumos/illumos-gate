@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * color.c
  *
@@ -54,7 +52,7 @@ start_color()
 #endif
 
 	COLORS = max_colors;
-	COLOR_PAIRS = max_pairs; 
+	COLOR_PAIRS = max_pairs;
 
 	if (orig_colors != (char *) 0)
 		(void) tputs(orig_colors, 1, __m_outc);
@@ -67,10 +65,10 @@ start_color()
 		if (cur_term->_color == (short (*)[3]) 0)
 			goto error1;
 	}
-		
+
 	if (0 < max_pairs) {
 		cur_term->_pair = calloc(max_pairs, sizeof *cur_term->_pair);
-		if (cur_term->_pair == (short (*)[2]) 0) 
+		if (cur_term->_pair == (short (*)[2]) 0)
 			goto error2;
 	}
 
@@ -96,7 +94,7 @@ init_color(short color, short r, short g, short b)
 	|| g < 0 || 1000 < g
 	|| b < 0 || 1000 < b)
 		goto error;
-		
+
 	/* Remember color settings for future queries. */
 	cur_term->_color[color][0] = r;
 	cur_term->_color[color][1] = g;
@@ -109,7 +107,7 @@ init_color(short color, short r, short g, short b)
 		code = tputs(
 			tparm(
 				initialize_color, (long) color,
-				(long) r, (long) g, (long) b, 
+				(long) r, (long) g, (long) b,
 				0L, 0L, 0L, 0L, 0L
 			), 1, __m_outc
 		);
@@ -127,7 +125,7 @@ init_pair(short pair, short f, short b)
 	__m_trace("init_pair(%d, %d, %d)", pair, f, b);
 #endif
 
-	if (pair < 0 || max_pairs <= pair 
+	if (pair < 0 || max_pairs <= pair
 	|| f < 0 || max_colors <= f
 	|| b < 0 || max_colors <= b)
 		goto error;
@@ -142,10 +140,10 @@ init_pair(short pair, short f, short b)
 	if (initialize_pair == (char *) 0) {
 		code = tputs(
 			tparm(
-				initialize_pair, 
-				(long) cur_term->_pair[f][0], 
-				(long) cur_term->_pair[f][1], 
-				(long) cur_term->_pair[f][2], 
+				initialize_pair,
+				(long) cur_term->_pair[f][0],
+				(long) cur_term->_pair[f][1],
+				(long) cur_term->_pair[f][2],
 				(long) cur_term->_pair[b][0],
 				(long) cur_term->_pair[b][1],
 				(long) cur_term->_pair[b][2],

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * MKS header file.  Defines that make programming easier for us.
  * Includes MKS-specific things and posix routines.

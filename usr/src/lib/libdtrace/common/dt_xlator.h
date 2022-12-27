@@ -27,8 +27,6 @@
 #ifndef	_DT_XLATOR_H
 #define	_DT_XLATOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libctf.h>
 #include <dtrace.h>
 #include <dt_ident.h>

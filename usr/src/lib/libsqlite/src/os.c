@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 16
 **
@@ -164,7 +161,7 @@ static unsigned int elapse;
 ** cnt>0 means there are cnt shared locks on the file.
 **
 ** Any attempt to lock or unlock a file first checks the locking
-** structure.  The fcntl() system call is only invoked to set a 
+** structure.  The fcntl() system call is only invoked to set a
 ** POSIX lock if the internal lock structure transitions between
 ** a locked and an unlocked state.
 **
@@ -195,7 +192,7 @@ static unsigned int elapse;
 ** (I'm beginning to think that linux threads is an abomination too.)
 ** The consequence of this all is that the hash table for the lockInfo
 ** structure has to include the process id as part of its key because
-** locks in different threads are treated as distinct.  But the 
+** locks in different threads are treated as distinct.  But the
 ** openCnt structure should not include the process id in its
 ** key because close() clears lock on all threads, not just the current
 ** thread.  Were it not for this goofiness in linux threads, we could
@@ -255,7 +252,7 @@ struct openCnt {
   int *aPending;        /* Malloced space holding fd's awaiting a close() */
 };
 
-/* 
+/*
 ** These hash table maps inodes and process IDs into lockInfo and openCnt
 ** structures.  Access to these hash tables must be protected by a mutex.
 */
@@ -474,7 +471,7 @@ int sqliteOsOpenReadWrite(
 #endif
     id->fd = open(zFilename, O_RDONLY|O_LARGEFILE|O_BINARY);
     if( id->fd<0 ){
-      return SQLITE_CANTOPEN; 
+      return SQLITE_CANTOPEN;
     }
     *pReadonly = 1;
   }else{
@@ -621,7 +618,7 @@ int sqliteOsOpenExclusive(const char *zFilename, OsFile *id, int delFlag){
   HANDLE h;
   int fileflags;
   if( delFlag ){
-    fileflags = FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_RANDOM_ACCESS 
+    fileflags = FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_RANDOM_ACCESS
                      | FILE_FLAG_DELETE_ON_CLOSE;
   }else{
     fileflags = FILE_FLAG_RANDOM_ACCESS;
@@ -774,7 +771,7 @@ int sqliteOsOpenDirectory(
   assert( id->dirfd<0 );
   id->dirfd = open(zDirname, O_RDONLY|O_BINARY, 0644);
   if( id->dirfd<0 ){
-    return SQLITE_CANTOPEN; 
+    return SQLITE_CANTOPEN;
   }
   TRACE3("OPENDIR %-3d %s\n", id->dirfd, zDirname);
 #endif
@@ -903,7 +900,7 @@ int sqliteOsTempFileName(char *zBuf){
     if( !sqliteOsFileExists(zBuf) ) break;
   }
 #endif
-  return SQLITE_OK; 
+  return SQLITE_OK;
 }
 
 /*
@@ -1268,16 +1265,16 @@ int isNT(void){
 ** end of the file where it is unlikely to ever interfere with an
 ** actual read attempt.
 **
-** A database read lock is obtained by locking a single randomly-chosen 
-** byte out of a specific range of bytes. The lock byte is obtained at 
-** random so two separate readers can probably access the file at the 
+** A database read lock is obtained by locking a single randomly-chosen
+** byte out of a specific range of bytes. The lock byte is obtained at
+** random so two separate readers can probably access the file at the
 ** same time, unless they are unlucky and choose the same lock byte.
 ** A database write lock is obtained by locking all bytes in the range.
 ** There can only be one writer.
 **
 ** A lock is obtained on the first byte of the lock range before acquiring
 ** either a read lock or a write lock.  This prevents two processes from
-** attempting to get a lock at a same time.  The semantics of 
+** attempting to get a lock at a same time.  The semantics of
 ** sqliteOsReadLock() require that if there is already a write lock, that
 ** lock is converted into a read lock atomically.  The lock on the first
 ** byte allows us to drop the old write lock and get the read lock without
@@ -1370,7 +1367,7 @@ int sqliteOsReadLock(OsFile *id){
         ovlp.Offset = FIRST_LOCKBYTE+1;
         ovlp.OffsetHigh = 0;
         ovlp.hEvent = 0;
-        res = LockFileEx(id->h, LOCKFILE_FAIL_IMMEDIATELY, 
+        res = LockFileEx(id->h, LOCKFILE_FAIL_IMMEDIATELY,
                           0, N_LOCKBYTE, 0, &ovlp);
       }else{
         res = LockFile(id->h, FIRST_LOCKBYTE+lk, 0, 1, 0);
@@ -1515,7 +1512,7 @@ int sqliteOsWriteLock(OsFile *id){
     if( res == noErr ){
       params.ioParam.ioPosOffset = FIRST_LOCKBYTE + id->locked;
       params.ioParam.ioReqCount = 1;
-      if( id->locked==0 
+      if( id->locked==0
             || PBUnlockRangeSync(&params)==noErr ){
         params.ioParam.ioPosOffset = FIRST_LOCKBYTE+1;
         params.ioParam.ioReqCount = N_LOCKBYTE;
@@ -1831,12 +1828,12 @@ int sqliteOsCurrentTime(double *prNow){
 #endif
 #if OS_WIN
   FILETIME ft;
-  /* FILETIME structure is a 64-bit value representing the number of 
-     100-nanosecond intervals since January 1, 1601 (= JD 2305813.5). 
+  /* FILETIME structure is a 64-bit value representing the number of
+     100-nanosecond intervals since January 1, 1601 (= JD 2305813.5).
   */
   double now;
   GetSystemTimeAsFileTime( &ft );
-  now = ((double)ft.dwHighDateTime) * 4294967296.0; 
+  now = ((double)ft.dwHighDateTime) * 4294967296.0;
   *prNow = (now + ft.dwLowDateTime)/864000000000.0 + 2305813.5;
 #endif
 #ifdef SQLITE_TEST

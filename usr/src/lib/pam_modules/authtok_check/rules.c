@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This program is copyright Alec Muffett 1993. The author disclaims all
  * responsibility or liability with respect to it's usage or its effect

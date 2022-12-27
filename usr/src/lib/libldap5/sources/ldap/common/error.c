@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  *
  * The contents of this file are subject to the Netscape Public License
@@ -69,7 +67,7 @@ static struct ldaperror ldap_errlist[] = {
 	{ LDAP_UNWILLING_TO_PERFORM, 		0 },
 	{ LDAP_LOOP_DETECT, 			0 },
 	{ LDAP_SORT_CONTROL_MISSING,    	0 },
-	{ LDAP_INDEX_RANGE_ERROR,		0 }, 
+	{ LDAP_INDEX_RANGE_ERROR,		0 },
 
 	{ LDAP_NAMING_VIOLATION, 		0 },
 	{ LDAP_OBJECT_CLASS_VIOLATION, 		0 },
@@ -140,8 +138,8 @@ static struct ldaperror ldap_errlist[] = {
 	{ LDAP_UNWILLING_TO_PERFORM, 		"DSA is unwilling to perform" },
 	{ LDAP_LOOP_DETECT, 			"Loop detected" },
     { LDAP_SORT_CONTROL_MISSING,    "Sort Control is missing"  },
-    { LDAP_INDEX_RANGE_ERROR,              "Search results exceed the range specified by the offsets" }, 
-    
+    { LDAP_INDEX_RANGE_ERROR,              "Search results exceed the range specified by the offsets" },
+
     { LDAP_NAMING_VIOLATION, 		"Naming violation" },
 	{ LDAP_OBJECT_CLASS_VIOLATION, 		"Object class violation" },
 	{ LDAP_NOT_ALLOWED_ON_NONLEAF, 		"Operation not allowed on nonleaf" },
@@ -444,7 +442,7 @@ ldap_get_lderrno( LDAP *ld, char **m, char **s )
  * between threads they *must* perform their own locking around the
  * session handle or they must install a "set lderrno" thread callback
  * function.
- * 
+ *
  */
 int
 LDAP_CALL
@@ -498,7 +496,7 @@ ldap_parse_result( LDAP *ld, LDAPMessage *res, int *errcodep, char **matchednp,
 	}
 
 	/* skip over entries and references to find next result in this chain */
-	for ( lm = res; lm != NULL; lm = lm->lm_chain ) {	
+	for ( lm = res; lm != NULL; lm = lm->lm_chain ) {
 		if ( lm->lm_msgtype != LDAP_RES_SEARCH_ENTRY &&
 		    lm->lm_msgtype != LDAP_RES_SEARCH_REFERENCE ) {
 			break;
@@ -529,7 +527,7 @@ ldap_parse_result( LDAP *ld, LDAPMessage *res, int *errcodep, char **matchednp,
 		 * if there are more result messages in the chain, arrange to
 		 * return the special LDAP_MORE_RESULTS_TO_RETURN "error" code.
 		 */
-		for ( lm = lm->lm_chain; lm != NULL; lm = lm->lm_chain ) {	
+		for ( lm = lm->lm_chain; lm != NULL; lm = lm->lm_chain ) {
 			if ( lm->lm_msgtype != LDAP_RES_SEARCH_ENTRY &&
 			    lm->lm_msgtype != LDAP_RES_SEARCH_REFERENCE ) {
 				err = LDAP_MORE_RESULTS_TO_RETURN;
@@ -635,7 +633,7 @@ nsldapi_parse_result( LDAP *ld, int msgtype, BerElement *rber, int *errcodep,
 			 *   extendedop results -  OID plus value
 			 */
 			if ( msgtype == LDAP_RES_BIND ) {
-				if ( ber_peek_tag( &ber, &len ) == 
+				if ( ber_peek_tag( &ber, &len ) ==
 				    LDAP_TAG_SASL_RES_CREDS ) {
 					berrc = ber_scanf( &ber, "x" );
 				}

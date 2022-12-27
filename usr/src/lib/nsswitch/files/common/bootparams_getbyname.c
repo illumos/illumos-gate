@@ -26,8 +26,6 @@
  *	nsswitch "bootparams" database.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 static const char *bootparams = "/etc/bootparams";
 
 #include "files_common.h"

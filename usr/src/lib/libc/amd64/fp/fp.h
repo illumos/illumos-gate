@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Useful asm routines and data types for grungy 87 hacking */
 
 #define	EXCPMASK	(FP_X_INV|FP_X_DNML|FP_X_DZ|FP_X_OFL|FP_X_UFL|FP_X_IMP)

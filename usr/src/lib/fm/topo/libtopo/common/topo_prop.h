@@ -26,8 +26,6 @@
 #ifndef _TOPO_PROP_H
 #define	_TOPO_PROP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/libtopo.h>
 
 #include <topo_list.h>

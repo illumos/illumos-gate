@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include "../rpc/rpc_mt.h"		/* for MT declarations only */
 #include <rpc/types.h>

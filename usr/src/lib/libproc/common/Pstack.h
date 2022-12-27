@@ -27,8 +27,6 @@
 #ifndef	_PSTACK_H
 #define	_PSTACK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

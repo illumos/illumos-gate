@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * tputs.c
  *
@@ -89,17 +87,17 @@ int (*putout)(int);
 
 	for (len = 0; *string; ++string){
 		/* Look for "$<num.????>" */
-		if (*string == '$' 
-		&& string[1] == '<' 
+		if (*string == '$'
+		&& string[1] == '<'
 		&& (isdigit(string[2]) || string[2] == '.')
 		&& (mark = strchr(string, '>'))){
 			number = atoi(string+2) * 10;
 			if ((string = strchr(string, '.')) != (char *) 0)
-				number += *++string-'0';	
+				number += *++string-'0';
 			string = mark;
 			if (*--mark == '*')
 				number *= affcnt;
-			if (padding_baud_rate &&  baud >= padding_baud_rate 
+			if (padding_baud_rate &&  baud >= padding_baud_rate
 			&& !xon_xoff) {
 				number = (baud/10 * number)/1000;
 				len += number;

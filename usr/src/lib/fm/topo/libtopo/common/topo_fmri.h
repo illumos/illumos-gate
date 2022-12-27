@@ -27,8 +27,6 @@
 #ifndef _TOPO_FMRI_H
 #define	_TOPO_FMRI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/nvpair.h>
 #include <stdio.h>
 

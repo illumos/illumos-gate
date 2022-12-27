@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -330,7 +327,7 @@ char *sqliteStrNDup(const char *z, int n){
 ** Create a string from the 2nd and subsequent arguments (up to the
 ** first NULL argument), store the string in memory obtained from
 ** sqliteMalloc() and make the pointer indicated by the 1st argument
-** point to that string.  The 1st argument must either be NULL or 
+** point to that string.  The 1st argument must either be NULL or
 ** point to memory obtained from sqliteMalloc().
 */
 void sqliteSetString(char **pz, const char *zFirst, ...){
@@ -368,9 +365,9 @@ void sqliteSetString(char **pz, const char *zFirst, ...){
 
 /*
 ** Works like sqliteSetString, but each string is now followed by
-** a length integer which specifies how much of the source string 
-** to copy (in bytes).  -1 means use the whole string.  The 1st 
-** argument must either be NULL or point to memory obtained from 
+** a length integer which specifies how much of the source string
+** to copy (in bytes).  -1 means use the whole string.  The 1st
+** argument must either be NULL or point to memory obtained from
 ** sqliteMalloc().
 */
 void sqliteSetNString(char **pz, ...){
@@ -464,7 +461,7 @@ void sqliteDequote(char *z){
 }
 
 /* An array to map all upper-case characters into their corresponding
-** lower-case character. 
+** lower-case character.
 */
 static unsigned char UpperToLower[] = {
       0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17,
@@ -633,10 +630,10 @@ int sqliteFitsIn32Bits(const char *zNum){
 ** do not necessarily contain numbers.  They could contain text.
 **
 ** If the input strings both look like actual numbers then they
-** compare in numerical order.  Numerical strings are always less 
+** compare in numerical order.  Numerical strings are always less
 ** than non-numeric strings so if one input string looks like a
 ** number and the other does not, then the one that looks like
-** a number is the smaller.  Non-numeric strings compare in 
+** a number is the smaller.  Non-numeric strings compare in
 ** lexigraphical order (the same order as strcmp()).
 */
 int sqliteCompare(const char *atext, const char *btext){
@@ -669,7 +666,7 @@ int sqliteCompare(const char *atext, const char *btext){
   }else {
     result = strcmp(atext, btext);
   }
-  return result; 
+  return result;
 }
 
 /*
@@ -702,7 +699,7 @@ int sqliteCompare(const char *atext, const char *btext){
 ** above generates.
 **
 ** The last point is a change from version 2.6.3 to version 2.7.0.  In
-** version 2.6.3 and earlier, substrings of digits compare in numerical 
+** version 2.6.3 and earlier, substrings of digits compare in numerical
 ** and case was used only to break a tie.
 **
 ** Elements that begin with 'A' or 'D' compare in memcmp() order regardless
@@ -806,7 +803,7 @@ void sqliteRealToSortable(double r, char *z){
   /* This array maps integers between 0 and 63 into base-64 digits.
   ** The digits must be chosen such at their ASCII codes are increasing.
   ** This means we can not use the traditional base-64 digit set. */
-  static const char zDigit[] = 
+  static const char zDigit[] =
      "0123456789"
      "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
      "abcdefghijklmnopqrstuvwxyz"
@@ -942,7 +939,7 @@ static int sqlite_utf8_to_int(const unsigned char *z){
 **
 **         abc[*]xyz        Matches "abc*xyz" only
 */
-int 
+int
 sqliteGlobCompare(const unsigned char *zPattern, const unsigned char *zString){
   register int c;
   int invert;
@@ -1031,7 +1028,7 @@ sqliteGlobCompare(const unsigned char *zPattern, const unsigned char *zString){
 ** This routine is just an adaptation of the sqliteGlobCompare()
 ** routine above.
 */
-int 
+int
 sqliteLikeCompare(const unsigned char *zPattern, const unsigned char *zString){
   register int c;
   int c2;
@@ -1079,7 +1076,7 @@ sqliteLikeCompare(const unsigned char *zPattern, const unsigned char *zString){
 ** when this routine is called.
 **
 ** This routine is a attempt to detect if two threads use the
-** same sqlite* pointer at the same time.  There is a race 
+** same sqlite* pointer at the same time.  There is a race
 ** condition so it is possible that the error is not detected.
 ** But usually the problem will be seen.  The result will be an
 ** error which can be used to debug the application that is

@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * meta.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -54,10 +52,10 @@ meta(WINDOW *w, bool bf)
 	__m_trace("meta(%p, %d)", w, bf);
 #endif
 	cur_term->_prog.c_cflag &= ~CSIZE;
-	cur_term->_prog.c_cflag |= bf ? CS8 : CS7; 
+	cur_term->_prog.c_cflag |= bf ? CS8 : CS7;
 
 	if (__m_tty_set(&cur_term->_prog) == ERR)
-		return __m_return_code("meta", ERR); 
+		return __m_return_code("meta", ERR);
 
 	__m_screen->_flags &= ~S_USE_META;
 
@@ -69,6 +67,6 @@ meta(WINDOW *w, bool bf)
 		(void) tputs(meta_off, 1, __m_outc);
 	}
 
-	return __m_return_code("meta", OK); 
+	return __m_return_code("meta", OK);
 }
 

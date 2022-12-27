@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2003 April 6
 **
@@ -89,7 +86,7 @@ void sqliteCopy(
         sqliteVdbeAddOp(v, OP_FileColumn, i, 0);
       }
     }
-    sqliteGenerateConstraintChecks(pParse, pTab, 0, 0, pTab->iPKey>=0, 
+    sqliteGenerateConstraintChecks(pParse, pTab, 0, 0, pTab->iPKey>=0,
                                    0, onError, addr);
     sqliteCompleteInsertion(pParse, pTab, 0, 0, 0, 0, -1);
     if( (db->flags & SQLITE_CountRows)!=0 ){
@@ -105,7 +102,7 @@ void sqliteCopy(
       sqliteVdbeAddOp(v, OP_Callback, 1, 0);
     }
   }
-  
+
 copy_cleanup:
   sqliteSrcListDelete(pTableName);
   sqliteFree(zFile);

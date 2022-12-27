@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1987, 1988, 1989 Massachusetts Institute of Technology
  * (Student Information Processing Board)

@@ -28,8 +28,6 @@
 #ifndef _CUPS_HTTP_H_
 #define _CUPS_HTTP_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Include necessary headers...
  */
@@ -277,7 +275,7 @@ typedef enum
 
 /*
  * HTTP address structure (makes using IPv6 a little easier and more portable.)
- */  
+ */
 
 typedef union
 {

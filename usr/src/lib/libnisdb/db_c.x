@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if RPC_HDR
 %#ifndef _DB_DB_H
 %#define _DB_DB_H
@@ -46,7 +44,7 @@
 #endif /* USINGC */
 #endif /* RPC_HDR */
 
-#if RPC_HDR || RPC_XDR 
+#if RPC_HDR || RPC_XDR
 #ifdef USINGC
 struct db {
   char* logfilename;
@@ -62,7 +60,7 @@ struct db {
 #endif /* RPC_HDR */
 
 #ifndef USINGC
-#ifdef RPC_HDR 
+#ifdef RPC_HDR
 %class db {
 %  char* logfilename;
 %  char* dbfilename;
@@ -85,7 +83,7 @@ struct db {
 %
 %/* Execute the specified action using the rest of the arguments as input.
 %   Return  a structure db_result containing the result. */
-%  db_result * exec_action( db_action, db_query *, entry_object *, 
+%  db_result * exec_action( db_action, db_query *, entry_object *,
 %			  db_next_desc *previous );
 % public:
 %/*  Log the given action and execute it.
@@ -105,7 +103,7 @@ struct db {
 %   A temporary file 'dbname'.tmp is also used.   */
 %  db( char * );
 %
-%/* Destructor:  deletes filenames and logfile descriptor. 
+%/* Destructor:  deletes filenames and logfile descriptor.
 %   Note that associated files should be removed separately.  */
 %  ~db();
 %
@@ -113,7 +111,7 @@ struct db {
 %   1.  Update major version.
 %   2.  Dump contents to temporary file.
 %   3.  Rename temporary file to real database file.
-%   4.  Remove log file. 
+%   4.  Remove log file.
 %   A checkpoint is done only if it has changed since the previous checkpoint.
 %   Returns TRUE if checkpoint was successful; FALSE otherwise. */
 %  bool_t checkpoint();
@@ -122,7 +120,7 @@ struct db {
 %   Return TRUE if load succeeds; FALSE otherwise. */
 %  bool_t load();
 %
-%/* Dump this database to a file. 
+%/* Dump this database to a file.
 %   Return TRUE if dump succeeds; FALSE otherwise. */
 %  bool_t dump(char *outfile) {return (internal_db.dump(outfile));};
 %
@@ -146,7 +144,7 @@ struct db {
 %   Return the result of the operation in a db_result structure;
 %   Return NULL if the request is unknown.
 %   If the action involves updates (ADD and REMOVE), it is logged first. */
-%  db_result* execute( db_action, db_query *, entry_object *, 
+%  db_result* execute( db_action, db_query *, entry_object *,
 %			  db_next_desc* previous );
 %
 %/* Execute log entry 'j' on this db.  'j' is executed if its version is

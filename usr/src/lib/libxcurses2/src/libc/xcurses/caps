@@ -22,8 +22,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # caps
 #
 # Terminfo Capability Database
@@ -51,9 +49,9 @@
 # terminfo-name		Name used by TIC or DUMP for terminfo definitions.
 # termcap-code		Old termcap code name
 # type			One of bool, number, str
-# comment		
+# comment
 #
-# Each field is <blank> separated.  All blank lines and lines beginning 
+# Each field is <blank> separated.  All blank lines and lines beginning
 # with '#' are ignored.
 #
 #
@@ -409,7 +407,7 @@ key_f62			kf62	Fq	str	Sent by function key 62
 key_f63			kf63	Fr	str	Sent by function key 63
 clr_bol			el1	cb	str	Clear to beginning of line, inclusive
 clear_margins		mgc	MC	str	Clear all margins top, bottom, and sides
-set_left_margin		smgl	ML	str	Set left margin at current column 
+set_left_margin		smgl	ML	str	Set left margin at current column
 set_right_margin	smgr	MR	str	Set right margin at current column
 label_format		fln	Lf	str	Label format
 set_clock		sclk	SC	str	Set clock to hours #1, minutes #2, seconds #3

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wins_nws.c
  *
@@ -50,13 +48,13 @@ const wchar_t *wcs;
 int n;
 {
 	cchar_t cc;
-	int i, y, x;  
+	int i, y, x;
 
 #ifdef M_CURSES_TRACE
 	__m_trace("wins_nwstr(%p, %p, n)", w, wcs, n);
 #endif
 
-	y = w->_cury; 
+	y = w->_cury;
 	x = w->_curx;
 
 	if (n < 0)

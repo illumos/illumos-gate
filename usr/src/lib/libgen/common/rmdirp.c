@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * rmdirp() removes directories in path "d". Removal starts from the
  * right most directory in the path and goes backward as far as possible.

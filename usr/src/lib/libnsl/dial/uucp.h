@@ -31,8 +31,6 @@
 #ifndef _UUCP_H
 #define	_UUCP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>

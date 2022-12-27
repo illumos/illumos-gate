@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wclreol.c
  *
@@ -44,7 +42,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/wclreol.c 1.3 1995/06/2
 #include <private.h>
 
 /*f
- * Erase from the current cursor position in the window to the right 
+ * Erase from the current cursor position in the window to the right
  * margin.
  */
 int
@@ -54,7 +52,7 @@ WINDOW *w;
 	int x;
 
 #ifdef M_CURSES_TRACE
-	__m_trace("wclrtoeol(%p) from (%d, %d)", w, w->_cury, w->_curx); 
+	__m_trace("wclrtoeol(%p) from (%d, %d)", w, w->_cury, w->_curx);
 #endif
 
 	x = __m_cc_first(w, w->_cury, w->_curx);

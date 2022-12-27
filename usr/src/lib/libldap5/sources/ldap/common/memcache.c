@@ -2,7 +2,6 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The contents of this file are subject to the Netscape Public
@@ -183,7 +182,7 @@ struct ldapmemcache {
 static int memcache_exist(LDAP *ld);
 static int memcache_add_to_ld(LDAP *ld, int msgid, LDAPMessage *pMsg);
 static int memcache_compare_dn(const char *main_dn, const char *dn, int scope);
-static int memcache_dup_message(LDAPMessage *res, int msgid, int fromcache, 
+static int memcache_dup_message(LDAPMessage *res, int msgid, int fromcache,
 				LDAPMessage **ppResCopy, unsigned long *pSize);
 static BerElement* memcache_ber_dup(BerElement* pBer, unsigned long *pSize);
 
@@ -195,13 +194,13 @@ static void memcache_append_ctrls(char *buf, LDAPControl **serverCtrls,
 static int memcache_adj_size(LDAPMemCache *cache, unsigned long size,
                              int usageFlags, int bAdd);
 static int memcache_free_entry(LDAPMemCache *cache, ldapmemcacheRes *pRes);
-static int memcache_expired(LDAPMemCache *cache, ldapmemcacheRes *pRes, 
+static int memcache_expired(LDAPMemCache *cache, ldapmemcacheRes *pRes,
 			    unsigned long curTime);
-static int memcache_add_to_list(LDAPMemCache *cache, ldapmemcacheRes *pRes, 
+static int memcache_add_to_list(LDAPMemCache *cache, ldapmemcacheRes *pRes,
 				int index);
-static int memcache_add_res_to_list(ldapmemcacheRes *pRes, LDAPMessage *pMsg, 
+static int memcache_add_res_to_list(ldapmemcacheRes *pRes, LDAPMessage *pMsg,
 				    unsigned long size);
-static int memcache_free_from_list(LDAPMemCache *cache, ldapmemcacheRes *pRes, 
+static int memcache_free_from_list(LDAPMemCache *cache, ldapmemcacheRes *pRes,
 				   int index);
 static int memcache_search(LDAP *ld, unsigned long key, LDAPMessage **ppRes);
 static int memcache_add(LDAP *ld, unsigned long key, int msgid,
@@ -212,7 +211,7 @@ static int memcache_remove(LDAP *ld, int msgid);
 #if 0	/* function not used */
 static int memcache_remove_all(LDAP *ld);
 #endif /* 0 */
-static int memcache_access(LDAPMemCache *cache, int mode, 
+static int memcache_access(LDAPMemCache *cache, int mode,
 			   void *pData1, void *pData2, void *pData3);
 #ifdef LDAP_DEBUG
 static void memcache_print_list( LDAPMemCache *cache, int index );
@@ -277,10 +276,10 @@ ldap_memcache_init( unsigned long ttl, unsigned long size,
     size = (size ? size : MEMCACHE_DEF_SIZE);
 
     if (thread_fns) {
-	memcpy(&((*cachep)->ldmemc_lock_fns), thread_fns, 
+	memcpy(&((*cachep)->ldmemc_lock_fns), thread_fns,
            sizeof(struct ldap_thread_fns));
     } else {
-	memset(&((*cachep)->ldmemc_lock_fns), 0, 
+	memset(&((*cachep)->ldmemc_lock_fns), 0,
 	   sizeof(struct ldap_thread_fns));
     }
 
@@ -328,7 +327,7 @@ ldap_memcache_init( unsigned long ttl, unsigned long size,
     total_size += htable_sizeinbytes((*cachep)->ldmemc_resTmp);
 
     /* Create hash table for primary cache */
-    if (htable_create(size, attrkey_hashf, attrkey_putdata, 
+    if (htable_create(size, attrkey_hashf, attrkey_putdata,
 	              attrkey_getdata, attrkey_removedata, attrkey_clearnode,
 		      NULL, &((*cachep)->ldmemc_resLookup)) != LDAP_SUCCESS) {
 	ldap_memcache_destroy(*cachep);
@@ -337,7 +336,7 @@ ldap_memcache_init( unsigned long ttl, unsigned long size,
     }
 
     total_size += htable_sizeinbytes((*cachep)->ldmemc_resLookup);
-    
+
     /* See if there is enough room so far */
     if (memcache_adj_size(*cachep, total_size, MEMCACHE_SIZE_NON_ENTRIES,
 	                  MEMCACHE_SIZE_ADD) != LDAP_SUCCESS) {
@@ -425,7 +424,7 @@ ldap_memcache_set( LDAP *ld, LDAPMemCache *cache )
 
 	pCur = (ldapmemcacheld*)NSLDAPI_CALLOC(1, sizeof(ldapmemcacheld));
 	if (pCur == NULL) {
-	    memcache_adj_size(cache, sizeof(ldapmemcacheld), 
+	    memcache_adj_size(cache, sizeof(ldapmemcacheld),
 		              MEMCACHE_SIZE_NON_ENTRIES, MEMCACHE_SIZE_DEDUCT);
 	    nRes = LDAP_NO_MEMORY;
 	} else {
@@ -450,7 +449,7 @@ ldap_memcache_get( LDAP *ld, LDAPMemCache **cachep )
 {
     LDAPDebug( LDAP_DEBUG_TRACE, "ldap_memcache_get ld: 0x%x\n", ld, 0, 0 );
 
-    if ( !NSLDAPI_VALID_LDAP_POINTER( ld ) || cachep == NULL ) { 
+    if ( !NSLDAPI_VALID_LDAP_POINTER( ld ) || cachep == NULL ) {
 	return( LDAP_PARAM_ERROR );
     }
 
@@ -500,7 +499,7 @@ ldap_memcache_flush( LDAPMemCache *cache, char *dn, int scope )
     if (!dn) {
 	memcache_access(cache, MEMCACHE_ACCESS_FLUSH_ALL, NULL, NULL, NULL);
     } else {
-	memcache_access(cache, MEMCACHE_ACCESS_FLUSH, 
+	memcache_access(cache, MEMCACHE_ACCESS_FLUSH,
 	                (void*)dn, (void*)(uintptr_t)scope, NULL);
     }
 
@@ -563,7 +562,7 @@ ldap_memcache_destroy( LDAPMemCache *cache )
 	htable_free(cache->ldmemc_resLookup);
     }
 
-    memcache_adj_size(cache, size, MEMCACHE_SIZE_NON_ENTRIES, 
+    memcache_adj_size(cache, size, MEMCACHE_SIZE_NON_ENTRIES,
 	              MEMCACHE_SIZE_DEDUCT);
 
     LDAP_MEMCACHE_MUTEX_FREE( cache );
@@ -579,9 +578,9 @@ ldap_memcache_destroy( LDAPMemCache *cache )
    entries.  It is assumed that the CRC algorithm will generate
    different integers from different byte strings. */
 int
-ldap_memcache_createkey(LDAP *ld, const char *base, int scope, 
-			const char *filter, char **attrs, 
-                        int attrsonly, LDAPControl **serverctrls, 
+ldap_memcache_createkey(LDAP *ld, const char *base, int scope,
+			const char *filter, char **attrs,
+                        int attrsonly, LDAPControl **serverctrls,
                         LDAPControl **clientctrls, unsigned long *keyp)
 {
     int nRes, i, j, i_smallest;
@@ -642,7 +641,7 @@ ldap_memcache_createkey(LDAP *ld, const char *base, int scope,
 	len += 1;
     }
 
-    len += memcache_get_ctrls_len(serverctrls) + 
+    len += memcache_get_ctrls_len(serverctrls) +
 	   memcache_get_ctrls_len(clientctrls) + 1;
 
     if ((keystr = (char*)NSLDAPI_CALLOC(len, sizeof(char))) == NULL) {
@@ -653,7 +652,7 @@ ldap_memcache_createkey(LDAP *ld, const char *base, int scope,
     }
 
     sprintf(keystr, "%s\n%s\n%s\n%s\n%s\n", binddn, tmpbase,
-	    NSLDAPI_STR_NONNULL(defhost), NSLDAPI_STR_NONNULL(filter), 
+	    NSLDAPI_STR_NONNULL(defhost), NSLDAPI_STR_NONNULL(filter),
 	    NSLDAPI_STR_NONNULL(buf));
 
     if (attrs) {
@@ -665,7 +664,7 @@ ldap_memcache_createkey(LDAP *ld, const char *base, int scope,
 	strcat(keystr, "\n");
     }
 
-    for (tmp = keystr; *tmp; 
+    for (tmp = keystr; *tmp;
          *tmp += (*tmp >= 'a' && *tmp <= 'z' ? 'A'-'a' : 0), tmp++) {
 		;
 	}
@@ -836,7 +835,7 @@ memcache_trim_basedn_spaces(char *basedn)
 {
     char *pRead, *pWrite;
 
-    if (!basedn) 
+    if (!basedn)
 	return;
 
     for (pWrite = pRead = basedn; *pRead; ) {
@@ -876,7 +875,7 @@ memcache_validate_basedn(LDAPMemCache *cache, const char *basedn)
 #endif
 
     for (i = 0; cache->ldmemc_basedns[i]; i++) {
-	if (memcache_compare_dn(basedn, cache->ldmemc_basedns[i], 
+	if (memcache_compare_dn(basedn, cache->ldmemc_basedns[i],
 	                        LDAP_SCOPE_SUBTREE) == LDAP_COMPARE_TRUE) {
 	    return( LDAP_SUCCESS );
 	}
@@ -920,7 +919,7 @@ memcache_append_ctrls(char *buf, LDAPControl **serverCtrls,
 	    sprintf(pCh, "%s\n", NSLDAPI_STR_NONNULL(ctrls[i]->ldctl_oid));
 	    pCh += strlen(NSLDAPI_STR_NONNULL(ctrls[i]->ldctl_oid)) + 1;
 	    if ((ctrls[i]->ldctl_value).bv_len > 0) {
-		memcpy(pCh, (ctrls[i]->ldctl_value).bv_val, 
+		memcpy(pCh, (ctrls[i]->ldctl_value).bv_val,
 		       (ctrls[i]->ldctl_value).bv_len);
 		pCh += (ctrls[i]->ldctl_value).bv_len;
 	    }
@@ -1126,7 +1125,7 @@ memcache_add_to_ld(LDAP *ld, int msgid, LDAPMessage *pMsg)
 	}
 
     *r = pCopy;
-    
+
     return nRes;
 }
 
@@ -1169,7 +1168,7 @@ memcache_compare_dn(const char *main_dn, const char *dn, int scope)
 	    nRes = LDAP_COMPARE_FALSE;
 	}
 	else {
-	    if (scope == LDAP_SCOPE_BASE) 
+	    if (scope == LDAP_SCOPE_BASE)
 		nRes = LDAP_COMPARE_FALSE;
 	    else if (scope == LDAP_SCOPE_SUBTREE)
 		nRes = LDAP_COMPARE_TRUE;
@@ -1241,10 +1240,10 @@ memcache_dup_message(LDAPMessage *res, int msgid, int fromcache,
 	*pSize = 0;
 
     /* Make a copy of res */
-    for (pCur = res, ppCurNew = ppResCopy; pCur; 
+    for (pCur = res, ppCurNew = ppResCopy; pCur;
          pCur = pCur->lm_chain, ppCurNew = &((*ppCurNew)->lm_chain)) {
 
-	if ((*ppCurNew = (LDAPMessage*)NSLDAPI_CALLOC(1, 
+	if ((*ppCurNew = (LDAPMessage*)NSLDAPI_CALLOC(1,
 	                                     sizeof(LDAPMessage))) == NULL) {
 	    nRes = LDAP_NO_MEMORY;
 	    break;
@@ -1278,7 +1277,7 @@ memcache_free_entry(LDAPMemCache *cache, ldapmemcacheRes *pRes)
 {
     if (pRes) {
 
-	unsigned long size = sizeof(ldapmemcacheRes); 
+	unsigned long size = sizeof(ldapmemcacheRes);
 
 	if (pRes->ldmemcr_basedn) {
 	    size += strlen(pRes->ldmemcr_basedn) + 1;
@@ -1304,11 +1303,11 @@ static int
 memcache_free_from_list(LDAPMemCache *cache, ldapmemcacheRes *pRes, int index)
 {
     if (pRes->ldmemcr_prev[index])
-	pRes->ldmemcr_prev[index]->ldmemcr_next[index] = 
+	pRes->ldmemcr_prev[index]->ldmemcr_next[index] =
 	                                     pRes->ldmemcr_next[index];
 
     if (pRes->ldmemcr_next[index])
-	pRes->ldmemcr_next[index]->ldmemcr_prev[index] = 
+	pRes->ldmemcr_next[index]->ldmemcr_prev[index] =
 	                                     pRes->ldmemcr_prev[index];
 
     if (cache->ldmemc_resHead[index] == pRes)
@@ -1409,14 +1408,14 @@ memcache_expired(LDAPMemCache *cache, ldapmemcacheRes *pRes,
 	return 0;
 
     return ((unsigned long)difftime(
-	                     (time_t)curTime, 
+	                     (time_t)curTime,
 			     (time_t)(pRes->ldmemcr_timestamp)) >=
 			                          cache->ldmemc_ttl);
 }
 
 /* Operates the cache in a central place. */
 static int
-memcache_access(LDAPMemCache *cache, int mode, 
+memcache_access(LDAPMemCache *cache, int mode,
 			   void *pData1, void *pData2, void *pData3)
 {
     int nRes = LDAP_SUCCESS;
@@ -1494,7 +1493,7 @@ memcache_access(LDAPMemCache *cache, int mode,
 	(pRes->ldmemcr_req_id).ldmemcrid_msgid = -1;
 	pRes->ldmemcr_timestamp = (unsigned long)time(NULL);
 
-	if ((nRes = htable_put(cache->ldmemc_resLookup, 
+	if ((nRes = htable_put(cache->ldmemc_resLookup,
 	                       (void*)&(pRes->ldmemcr_crc_key),
                                (void*)pRes)) == LDAP_SUCCESS) {
 	    memcache_add_to_list(cache, pRes, LIST_TTL);
@@ -1553,7 +1552,7 @@ memcache_access(LDAPMemCache *cache, int mode,
 	    if (!memcache_expired(cache, pCurRes, curTime))
 		break;
 
-	    nRes = htable_remove(cache->ldmemc_resLookup, 
+	    nRes = htable_remove(cache->ldmemc_resLookup,
 		          (void*)&(pCurRes->ldmemcr_crc_key), NULL);
 	    assert(nRes == LDAP_SUCCESS);
 	    memcache_free_from_list(cache, pCurRes, LIST_TTL);
@@ -1570,7 +1569,7 @@ memcache_access(LDAPMemCache *cache, int mode,
 
 	for (; pCurRes; pCurRes = cache->ldmemc_resHead[LIST_TTL]) {
 	    memcache_free_from_list(cache, pCurRes, LIST_LRU);
-	    cache->ldmemc_resHead[LIST_TTL] = 
+	    cache->ldmemc_resHead[LIST_TTL] =
 		      cache->ldmemc_resHead[LIST_TTL]->ldmemcr_next[LIST_TTL];
 	    memcache_free_entry(cache, pCurRes);
 	}
@@ -1589,9 +1588,9 @@ memcache_access(LDAPMemCache *cache, int mode,
 
 	if (cache->ldmemc_basedns) {
 	    for (i = 0; cache->ldmemc_basedns[i]; i++) {
-		if ((memcache_compare_dn(cache->ldmemc_basedns[i], dn, 
+		if ((memcache_compare_dn(cache->ldmemc_basedns[i], dn,
 			    LDAP_SCOPE_SUBTREE) == LDAP_COMPARE_TRUE) ||
-		    (memcache_compare_dn(dn, cache->ldmemc_basedns[i], 
+		    (memcache_compare_dn(dn, cache->ldmemc_basedns[i],
 			    LDAP_SCOPE_SUBTREE) == LDAP_COMPARE_TRUE))
 		    break;
 	    }
@@ -1603,16 +1602,16 @@ memcache_access(LDAPMemCache *cache, int mode,
 
 	    list_id = (i == 0 ? LIST_TTL : LIST_TMP);
 
-	    for (pRes = cache->ldmemc_resHead[list_id]; pRes != NULL; 
+	    for (pRes = cache->ldmemc_resHead[list_id]; pRes != NULL;
 		 pRes = pRes->ldmemcr_next[list_id]) {
 
-		if ((memcache_compare_dn(pRes->ldmemcr_basedn, dn, 
+		if ((memcache_compare_dn(pRes->ldmemcr_basedn, dn,
 				 LDAP_SCOPE_SUBTREE) != LDAP_COMPARE_TRUE) &&
-		    (memcache_compare_dn(dn, pRes->ldmemcr_basedn, 
+		    (memcache_compare_dn(dn, pRes->ldmemcr_basedn,
 				 LDAP_SCOPE_SUBTREE) != LDAP_COMPARE_TRUE))
 		    continue;
 
-		for (pMsg = pRes->ldmemcr_resHead, bDone = 0; 
+		for (pMsg = pRes->ldmemcr_resHead, bDone = 0;
 		     !bDone && pMsg; pMsg = pMsg->lm_chain) {
 
 		    if (!NSLDAPI_IS_SEARCH_ENTRY( pMsg->lm_msgtype ))
@@ -1620,7 +1619,7 @@ memcache_access(LDAPMemCache *cache, int mode,
 
 		    ber = *(pMsg->lm_ber);
 		    if (ber_scanf(&ber, "{a", &dnTmp) != LBER_ERROR) {
-			bDone = (memcache_compare_dn(dnTmp, dn, scope) == 
+			bDone = (memcache_compare_dn(dnTmp, dn, scope) ==
 							    LDAP_COMPARE_TRUE);
 			ldap_memfree(dnTmp);
 		    }
@@ -1630,13 +1629,13 @@ memcache_access(LDAPMemCache *cache, int mode,
 		    continue;
 
 		if (list_id == LIST_TTL) {
-		    nRes = htable_remove(cache->ldmemc_resLookup, 
+		    nRes = htable_remove(cache->ldmemc_resLookup,
 			  	 (void*)&(pRes->ldmemcr_crc_key), NULL);
 		    assert(nRes == LDAP_SUCCESS);
 		    memcache_free_from_list(cache, pRes, LIST_TTL);
 		    memcache_free_from_list(cache, pRes, LIST_LRU);
 		} else {
-		    nRes = htable_remove(cache->ldmemc_resTmp, 
+		    nRes = htable_remove(cache->ldmemc_resTmp,
 				  (void*)&(pRes->ldmemcr_req_id), NULL);
 		    assert(nRes == LDAP_SUCCESS);
 		    memcache_free_from_list(cache, pRes, LIST_TMP);
@@ -1707,7 +1706,7 @@ static int
 htable_calculate_size(int sizelimit)
 {
     int i, j;
-    int size = (int)(((double)sizelimit / 
+    int size = (int)(((double)sizelimit /
 	                (double)(sizeof(BerElement) + EXTRA_SIZE)) / 1.5);
 
     /* Get a prime # */
@@ -1811,7 +1810,7 @@ htable_create(int size_limit, HashFuncPtr hashf,
     if ((*ppTable = (HashTable*)NSLDAPI_CALLOC(1, sizeof(HashTable))) == NULL)
 	return( LDAP_NO_MEMORY );
 
-    (*ppTable)->table = (HashTableNode*)NSLDAPI_CALLOC(size_limit, 
+    (*ppTable)->table = (HashTableNode*)NSLDAPI_CALLOC(size_limit,
 	                                       sizeof(HashTableNode));
     if ((*ppTable)->table == NULL) {
 	NSLDAPI_FREE(*ppTable);
@@ -1866,8 +1865,8 @@ msgid_putdata(void **ppTableData, void *key, void *pData)
     }
 
     if (pCurRes) {
-	for (; pCurRes; pCurRes = pCurRes->ldmemcr_next[LIST_TTL]) { 
-	    if ((pCurRes->ldmemcr_req_id).ldmemcrid_msgid == 
+	for (; pCurRes; pCurRes = pCurRes->ldmemcr_next[LIST_TTL]) {
+	    if ((pCurRes->ldmemcr_req_id).ldmemcrid_msgid ==
 		                               pReqId->ldmemcrid_msgid)
 		return( LDAP_ALREADY_EXISTS );
 	    pPrev = pCurRes;
@@ -1894,7 +1893,7 @@ msgid_getdata(void *pTableData, void *key, void **ppData)
     ldapmemcacheRes *pCurRes = (ldapmemcacheRes*)pTableData;
 
     *ppData = NULL;
-    
+
     for (; pCurRes; pCurRes = pCurRes->ldmemcr_htable_next) {
 	if ((pCurRes->ldmemcr_req_id).ldmemcrid_ld == pReqId->ldmemcrid_ld)
 	    break;
@@ -1903,8 +1902,8 @@ msgid_getdata(void *pTableData, void *key, void **ppData)
     if (!pCurRes)
 	return( LDAP_NO_SUCH_OBJECT );
 
-    for (; pCurRes; pCurRes = pCurRes->ldmemcr_next[LIST_TTL]) { 
-	if ((pCurRes->ldmemcr_req_id).ldmemcrid_msgid == 
+    for (; pCurRes; pCurRes = pCurRes->ldmemcr_next[LIST_TTL]) {
+	if ((pCurRes->ldmemcr_req_id).ldmemcrid_msgid ==
 	                                  pReqId->ldmemcrid_msgid) {
 	    *ppData = (void*)pCurRes;
 	    return( LDAP_SUCCESS );
@@ -1935,8 +1934,8 @@ msgid_removedata(void **ppTableData, void *key, void **ppData)
     if (!pHead)
 	return( LDAP_NO_SUCH_OBJECT );
 
-    for (pCurRes = pHead; pCurRes; pCurRes = pCurRes->ldmemcr_next[LIST_TTL]) { 
-	if ((pCurRes->ldmemcr_req_id).ldmemcrid_msgid == 
+    for (pCurRes = pHead; pCurRes; pCurRes = pCurRes->ldmemcr_next[LIST_TTL]) {
+	if ((pCurRes->ldmemcr_req_id).ldmemcrid_msgid ==
 	                                        pReqId->ldmemcrid_msgid)
 	    break;
     }
@@ -1953,10 +1952,10 @@ msgid_removedata(void **ppTableData, void *key, void **ppData)
 
     if (pCurRes != pHead) {
 	if (pCurRes->ldmemcr_prev[LIST_TTL])
-	    pCurRes->ldmemcr_prev[LIST_TTL]->ldmemcr_next[LIST_TTL] = 
+	    pCurRes->ldmemcr_prev[LIST_TTL]->ldmemcr_next[LIST_TTL] =
 	                                     pCurRes->ldmemcr_next[LIST_TTL];
 	if (pCurRes->ldmemcr_next[LIST_TTL])
-	    pCurRes->ldmemcr_next[LIST_TTL]->ldmemcr_prev[LIST_TTL] = 
+	    pCurRes->ldmemcr_next[LIST_TTL]->ldmemcr_prev[LIST_TTL] =
 	                                     pCurRes->ldmemcr_prev[LIST_TTL];
 	return( LDAP_SUCCESS );
     }
@@ -1964,7 +1963,7 @@ msgid_removedata(void **ppTableData, void *key, void **ppData)
     if (pPrev) {
 	if (pHead->ldmemcr_next[LIST_TTL]) {
 	    pPrev->ldmemcr_htable_next = pHead->ldmemcr_next[LIST_TTL];
-	    pHead->ldmemcr_next[LIST_TTL]->ldmemcr_htable_next = 
+	    pHead->ldmemcr_next[LIST_TTL]->ldmemcr_htable_next =
 			                   pHead->ldmemcr_htable_next;
 	} else {
 	    pPrev->ldmemcr_htable_next = pHead->ldmemcr_htable_next;
@@ -1972,13 +1971,13 @@ msgid_removedata(void **ppTableData, void *key, void **ppData)
     } else {
 	if (pHead->ldmemcr_next[LIST_TTL]) {
 	    *((ldapmemcacheRes**)ppTableData) = pHead->ldmemcr_next[LIST_TTL];
-	    pHead->ldmemcr_next[LIST_TTL]->ldmemcr_htable_next = 
+	    pHead->ldmemcr_next[LIST_TTL]->ldmemcr_htable_next =
 			                   pHead->ldmemcr_htable_next;
 	} else {
 	    *((ldapmemcacheRes**)ppTableData) = pHead->ldmemcr_htable_next;
 	}
     }
-    
+
     return( LDAP_SUCCESS );
 }
 
@@ -1992,7 +1991,7 @@ msgid_clear_ld_items(void **ppTableData, void *key, void *pData)
     ldapmemcacheRes *pPrev = NULL;
     ldapmemcacheRes *pCurRes = NULL;
     ldapmemcacheReqId *pReqId = (ldapmemcacheReqId*)key;
-    
+
     for (; pHead; pHead = pHead->ldmemcr_htable_next) {
 	if ((pHead->ldmemcr_req_id).ldmemcrid_ld == pReqId->ldmemcrid_ld)
 	    break;
@@ -2070,7 +2069,7 @@ attrkey_getdata(void *pTableData, void *key, void **ppData)
 {
     unsigned long attrkey = *((unsigned long*)key);
     ldapmemcacheRes *pRes = (ldapmemcacheRes*)pTableData;
-    
+
     for (; pRes; pRes = pRes->ldmemcr_htable_next) {
 	if (pRes->ldmemcr_crc_key == attrkey) {
 	    *ppData = (void*)pRes;
@@ -2091,7 +2090,7 @@ attrkey_removedata(void **ppTableData, void *key, void **ppData)
     ldapmemcacheRes **ppHead = (ldapmemcacheRes**)ppTableData;
     ldapmemcacheRes *pRes = *ppHead;
     ldapmemcacheRes *pPrev = NULL;
-    
+
     for (; pRes; pRes = pRes->ldmemcr_htable_next) {
 	if (pRes->ldmemcr_crc_key == attrkey) {
 	    if (ppData)
@@ -2136,49 +2135,49 @@ attrkey_clearnode(void **ppTableData, void *pData)
  */
 #define NSLDAPI_CRC32_POLY 0x04c11db7     /* AUTODIN II, Ethernet, & FDDI */
 
-static unsigned long crc32_table[256] = { 
-    0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b, 
-    0x1a864db2, 0x1e475005, 0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61, 
-    0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd, 0x4c11db70, 0x48d0c6c7, 
-    0x4593e01e, 0x4152fda9, 0x5f15adac, 0x5bd4b01b, 0x569796c2, 0x52568b75, 
-    0x6a1936c8, 0x6ed82b7f, 0x639b0da6, 0x675a1011, 0x791d4014, 0x7ddc5da3, 
-    0x709f7b7a, 0x745e66cd, 0x9823b6e0, 0x9ce2ab57, 0x91a18d8e, 0x95609039, 
-    0x8b27c03c, 0x8fe6dd8b, 0x82a5fb52, 0x8664e6e5, 0xbe2b5b58, 0xbaea46ef, 
-    0xb7a96036, 0xb3687d81, 0xad2f2d84, 0xa9ee3033, 0xa4ad16ea, 0xa06c0b5d, 
-    0xd4326d90, 0xd0f37027, 0xddb056fe, 0xd9714b49, 0xc7361b4c, 0xc3f706fb, 
-    0xceb42022, 0xca753d95, 0xf23a8028, 0xf6fb9d9f, 0xfbb8bb46, 0xff79a6f1, 
-    0xe13ef6f4, 0xe5ffeb43, 0xe8bccd9a, 0xec7dd02d, 0x34867077, 0x30476dc0, 
-    0x3d044b19, 0x39c556ae, 0x278206ab, 0x23431b1c, 0x2e003dc5, 0x2ac12072, 
-    0x128e9dcf, 0x164f8078, 0x1b0ca6a1, 0x1fcdbb16, 0x018aeb13, 0x054bf6a4, 
-    0x0808d07d, 0x0cc9cdca, 0x7897ab07, 0x7c56b6b0, 0x71159069, 0x75d48dde, 
-    0x6b93dddb, 0x6f52c06c, 0x6211e6b5, 0x66d0fb02, 0x5e9f46bf, 0x5a5e5b08, 
-    0x571d7dd1, 0x53dc6066, 0x4d9b3063, 0x495a2dd4, 0x44190b0d, 0x40d816ba, 
-    0xaca5c697, 0xa864db20, 0xa527fdf9, 0xa1e6e04e, 0xbfa1b04b, 0xbb60adfc, 
-    0xb6238b25, 0xb2e29692, 0x8aad2b2f, 0x8e6c3698, 0x832f1041, 0x87ee0df6, 
-    0x99a95df3, 0x9d684044, 0x902b669d, 0x94ea7b2a, 0xe0b41de7, 0xe4750050, 
-    0xe9362689, 0xedf73b3e, 0xf3b06b3b, 0xf771768c, 0xfa325055, 0xfef34de2, 
-    0xc6bcf05f, 0xc27dede8, 0xcf3ecb31, 0xcbffd686, 0xd5b88683, 0xd1799b34, 
-    0xdc3abded, 0xd8fba05a, 0x690ce0ee, 0x6dcdfd59, 0x608edb80, 0x644fc637, 
-    0x7a089632, 0x7ec98b85, 0x738aad5c, 0x774bb0eb, 0x4f040d56, 0x4bc510e1, 
-    0x46863638, 0x42472b8f, 0x5c007b8a, 0x58c1663d, 0x558240e4, 0x51435d53, 
-    0x251d3b9e, 0x21dc2629, 0x2c9f00f0, 0x285e1d47, 0x36194d42, 0x32d850f5, 
-    0x3f9b762c, 0x3b5a6b9b, 0x0315d626, 0x07d4cb91, 0x0a97ed48, 0x0e56f0ff, 
-    0x1011a0fa, 0x14d0bd4d, 0x19939b94, 0x1d528623, 0xf12f560e, 0xf5ee4bb9, 
-    0xf8ad6d60, 0xfc6c70d7, 0xe22b20d2, 0xe6ea3d65, 0xeba91bbc, 0xef68060b, 
-    0xd727bbb6, 0xd3e6a601, 0xdea580d8, 0xda649d6f, 0xc423cd6a, 0xc0e2d0dd, 
-    0xcda1f604, 0xc960ebb3, 0xbd3e8d7e, 0xb9ff90c9, 0xb4bcb610, 0xb07daba7, 
-    0xae3afba2, 0xaafbe615, 0xa7b8c0cc, 0xa379dd7b, 0x9b3660c6, 0x9ff77d71, 
-    0x92b45ba8, 0x9675461f, 0x8832161a, 0x8cf30bad, 0x81b02d74, 0x857130c3, 
-    0x5d8a9099, 0x594b8d2e, 0x5408abf7, 0x50c9b640, 0x4e8ee645, 0x4a4ffbf2, 
-    0x470cdd2b, 0x43cdc09c, 0x7b827d21, 0x7f436096, 0x7200464f, 0x76c15bf8, 
-    0x68860bfd, 0x6c47164a, 0x61043093, 0x65c52d24, 0x119b4be9, 0x155a565e, 
-    0x18197087, 0x1cd86d30, 0x029f3d35, 0x065e2082, 0x0b1d065b, 0x0fdc1bec, 
-    0x3793a651, 0x3352bbe6, 0x3e119d3f, 0x3ad08088, 0x2497d08d, 0x2056cd3a, 
-    0x2d15ebe3, 0x29d4f654, 0xc5a92679, 0xc1683bce, 0xcc2b1d17, 0xc8ea00a0, 
-    0xd6ad50a5, 0xd26c4d12, 0xdf2f6bcb, 0xdbee767c, 0xe3a1cbc1, 0xe760d676, 
-    0xea23f0af, 0xeee2ed18, 0xf0a5bd1d, 0xf464a0aa, 0xf9278673, 0xfde69bc4, 
-    0x89b8fd09, 0x8d79e0be, 0x803ac667, 0x84fbdbd0, 0x9abc8bd5, 0x9e7d9662, 
-    0x933eb0bb, 0x97ffad0c, 0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668, 
+static unsigned long crc32_table[256] = {
+    0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b,
+    0x1a864db2, 0x1e475005, 0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61,
+    0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd, 0x4c11db70, 0x48d0c6c7,
+    0x4593e01e, 0x4152fda9, 0x5f15adac, 0x5bd4b01b, 0x569796c2, 0x52568b75,
+    0x6a1936c8, 0x6ed82b7f, 0x639b0da6, 0x675a1011, 0x791d4014, 0x7ddc5da3,
+    0x709f7b7a, 0x745e66cd, 0x9823b6e0, 0x9ce2ab57, 0x91a18d8e, 0x95609039,
+    0x8b27c03c, 0x8fe6dd8b, 0x82a5fb52, 0x8664e6e5, 0xbe2b5b58, 0xbaea46ef,
+    0xb7a96036, 0xb3687d81, 0xad2f2d84, 0xa9ee3033, 0xa4ad16ea, 0xa06c0b5d,
+    0xd4326d90, 0xd0f37027, 0xddb056fe, 0xd9714b49, 0xc7361b4c, 0xc3f706fb,
+    0xceb42022, 0xca753d95, 0xf23a8028, 0xf6fb9d9f, 0xfbb8bb46, 0xff79a6f1,
+    0xe13ef6f4, 0xe5ffeb43, 0xe8bccd9a, 0xec7dd02d, 0x34867077, 0x30476dc0,
+    0x3d044b19, 0x39c556ae, 0x278206ab, 0x23431b1c, 0x2e003dc5, 0x2ac12072,
+    0x128e9dcf, 0x164f8078, 0x1b0ca6a1, 0x1fcdbb16, 0x018aeb13, 0x054bf6a4,
+    0x0808d07d, 0x0cc9cdca, 0x7897ab07, 0x7c56b6b0, 0x71159069, 0x75d48dde,
+    0x6b93dddb, 0x6f52c06c, 0x6211e6b5, 0x66d0fb02, 0x5e9f46bf, 0x5a5e5b08,
+    0x571d7dd1, 0x53dc6066, 0x4d9b3063, 0x495a2dd4, 0x44190b0d, 0x40d816ba,
+    0xaca5c697, 0xa864db20, 0xa527fdf9, 0xa1e6e04e, 0xbfa1b04b, 0xbb60adfc,
+    0xb6238b25, 0xb2e29692, 0x8aad2b2f, 0x8e6c3698, 0x832f1041, 0x87ee0df6,
+    0x99a95df3, 0x9d684044, 0x902b669d, 0x94ea7b2a, 0xe0b41de7, 0xe4750050,
+    0xe9362689, 0xedf73b3e, 0xf3b06b3b, 0xf771768c, 0xfa325055, 0xfef34de2,
+    0xc6bcf05f, 0xc27dede8, 0xcf3ecb31, 0xcbffd686, 0xd5b88683, 0xd1799b34,
+    0xdc3abded, 0xd8fba05a, 0x690ce0ee, 0x6dcdfd59, 0x608edb80, 0x644fc637,
+    0x7a089632, 0x7ec98b85, 0x738aad5c, 0x774bb0eb, 0x4f040d56, 0x4bc510e1,
+    0x46863638, 0x42472b8f, 0x5c007b8a, 0x58c1663d, 0x558240e4, 0x51435d53,
+    0x251d3b9e, 0x21dc2629, 0x2c9f00f0, 0x285e1d47, 0x36194d42, 0x32d850f5,
+    0x3f9b762c, 0x3b5a6b9b, 0x0315d626, 0x07d4cb91, 0x0a97ed48, 0x0e56f0ff,
+    0x1011a0fa, 0x14d0bd4d, 0x19939b94, 0x1d528623, 0xf12f560e, 0xf5ee4bb9,
+    0xf8ad6d60, 0xfc6c70d7, 0xe22b20d2, 0xe6ea3d65, 0xeba91bbc, 0xef68060b,
+    0xd727bbb6, 0xd3e6a601, 0xdea580d8, 0xda649d6f, 0xc423cd6a, 0xc0e2d0dd,
+    0xcda1f604, 0xc960ebb3, 0xbd3e8d7e, 0xb9ff90c9, 0xb4bcb610, 0xb07daba7,
+    0xae3afba2, 0xaafbe615, 0xa7b8c0cc, 0xa379dd7b, 0x9b3660c6, 0x9ff77d71,
+    0x92b45ba8, 0x9675461f, 0x8832161a, 0x8cf30bad, 0x81b02d74, 0x857130c3,
+    0x5d8a9099, 0x594b8d2e, 0x5408abf7, 0x50c9b640, 0x4e8ee645, 0x4a4ffbf2,
+    0x470cdd2b, 0x43cdc09c, 0x7b827d21, 0x7f436096, 0x7200464f, 0x76c15bf8,
+    0x68860bfd, 0x6c47164a, 0x61043093, 0x65c52d24, 0x119b4be9, 0x155a565e,
+    0x18197087, 0x1cd86d30, 0x029f3d35, 0x065e2082, 0x0b1d065b, 0x0fdc1bec,
+    0x3793a651, 0x3352bbe6, 0x3e119d3f, 0x3ad08088, 0x2497d08d, 0x2056cd3a,
+    0x2d15ebe3, 0x29d4f654, 0xc5a92679, 0xc1683bce, 0xcc2b1d17, 0xc8ea00a0,
+    0xd6ad50a5, 0xd26c4d12, 0xdf2f6bcb, 0xdbee767c, 0xe3a1cbc1, 0xe760d676,
+    0xea23f0af, 0xeee2ed18, 0xf0a5bd1d, 0xf464a0aa, 0xf9278673, 0xfde69bc4,
+    0x89b8fd09, 0x8d79e0be, 0x803ac667, 0x84fbdbd0, 0x9abc8bd5, 0x9e7d9662,
+    0x933eb0bb, 0x97ffad0c, 0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668,
     0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4 };
 
 /* Initialized first time "crc32()" is called. If you prefer, you can

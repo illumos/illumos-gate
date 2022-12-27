@@ -26,8 +26,6 @@
 #ifndef _CLNT_H
 #define	_CLNT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

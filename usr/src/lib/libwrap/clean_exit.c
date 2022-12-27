@@ -3,15 +3,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /*
   * clean_exit() cleans up and terminates the program. It should be called
   * instead of exit() when for some reason the real network daemon will not or
   * cannot be run. Reason: in the case of a datagram-oriented service we must
   * discard the not-yet received data from the client. Otherwise, inetd will
   * see the same datagram again and again, and go into a loop.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

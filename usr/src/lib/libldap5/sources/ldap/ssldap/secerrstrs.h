@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -195,7 +193,7 @@ dgettext(TEXT_DOMAIN,
 ER3(SEC_ERROR_CA_CERT_INVALID,			(SEC_ERROR_BASE + 36),
 dgettext(TEXT_DOMAIN,
 "Issuer certificate is invalid."))
-   
+
 ER3(SEC_ERROR_PATH_LEN_CONSTRAINT_INVALID,	(SEC_ERROR_BASE + 37),
 dgettext(TEXT_DOMAIN,
 "Certificate path length constraint is invalid."))
@@ -495,7 +493,7 @@ dgettext(TEXT_DOMAIN,
 ER3(SEC_ERROR_OLD_KRL,	     			(SEC_ERROR_BASE + 110),
 dgettext(TEXT_DOMAIN,
 "New KRL is not later than the current one."))
- 
+
 ER3(SEC_ERROR_CKL_CONFLICT,	     		(SEC_ERROR_BASE + 111),
 dgettext(TEXT_DOMAIN,
 "New CKL has different issuer than current CKL.  Delete current CKL."))

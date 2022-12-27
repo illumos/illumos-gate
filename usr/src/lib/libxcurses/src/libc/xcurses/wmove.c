@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wmove.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -53,7 +51,7 @@ int y, x;
 #endif
 	if (y < 0 || w->_maxy <= y || x < 0 || w->_maxx <= x)
 		return __m_return_code("wmove", ERR);
-	
+
 	w->_cury = y;
 	w->_curx = x;
 

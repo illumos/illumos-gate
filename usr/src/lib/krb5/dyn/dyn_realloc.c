@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is part of libdyn.a, the C Dynamic Object library.  It
  * contains the source code for the internal function _DynRealloc().
@@ -25,7 +23,7 @@ int _DynResize(obj, req)
    int req;
 {
      int cnt, size;
-     
+
      if (obj->size > req)
 	  return DYN_OK;
      else if (obj->inc > 0)
@@ -33,9 +31,9 @@ int _DynResize(obj, req)
      else {
 	  if (obj->size == 0)
 	       size = -obj->inc;
-	  else 
+	  else
 	       size = obj->size;
-	  
+
 	  while (size <= req)
 	       size <<= 1;
 
@@ -47,7 +45,7 @@ int _DynResize(obj, req)
  * Resize the array by num_incs units.  If obj->inc is positive, this
  * means make it obj->inc*num_incs elements larger.  If obj->inc is
  * negative, this means make the array num_incs elements long.
- * 
+ *
  * Ideally, this function should not be called from outside the
  * library.  However, nothing will break if it is.
  */
@@ -62,13 +60,13 @@ int _DynRealloc(obj, num_incs)
 	  new_size_in_bytes = obj->el_size*(obj->size + obj->inc*num_incs);
      else
 	  new_size_in_bytes = obj->el_size*num_incs;
-     
+
      if (obj->debug)
 	  fprintf(stderr,
 		  "dyn: alloc: Increasing object by %d bytes (%d incs).\n",
 		  new_size_in_bytes - obj->el_size*obj->size,
 		  num_incs);
-     
+
      temp = (DynPtr) realloc(obj->array, new_size_in_bytes);
      if (temp == NULL) {
 	  if (obj->debug)
@@ -85,6 +83,6 @@ int _DynRealloc(obj, num_incs)
 
      if (obj->debug)
 	  fprintf(stderr, "dyn: alloc: done.\n");
-	  
+
      return DYN_OK;
 }

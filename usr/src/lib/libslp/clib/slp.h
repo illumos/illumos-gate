@@ -27,8 +27,6 @@
 #ifndef	_SLP_H
 #define	_SLP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains definitions for the Service Location Protocol
  * C API bindings. More detailed descriptions can be found in the

@@ -1,16 +1,14 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  Copyright (c) 2001 Carnegie Mellon University.  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
  are met:
 
  1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer. 
+    notice, this list of conditions and the following disclaimer.
 
  2. Redistributions in binary form must reproduce the above copyright
     notice, this list of conditions and the following disclaimer in
@@ -20,7 +18,7 @@
  3. The name "Carnegie Mellon University" must not be used to
     endorse or promote products derived from this software without
     prior written permission. For permission or any other legal
-    details, please contact  
+    details, please contact
       Office of Technology Transfer
       Carnegie Mellon University
       5000 Forbes Avenue
@@ -64,20 +62,20 @@ These notices must be retained in any copies of any part of this
 documentation and/or software.
 
 
- This module contains code made available by IBM 
- Corporation on an AS IS basis.  Any one receiving the 
- module is considered to be licensed under IBM copyrights 
- to use the IBM-provided source code in any way he or she 
- deems fit, including copying it, compiling it, modifying 
- it, and redistributing it, with or without 
- modifications.  No license under any IBM patents or 
- patent applications is to be implied from this copyright 
- license. 
+ This module contains code made available by IBM
+ Corporation on an AS IS basis.  Any one receiving the
+ module is considered to be licensed under IBM copyrights
+ to use the IBM-provided source code in any way he or she
+ deems fit, including copying it, compiling it, modifying
+ it, and redistributing it, with or without
+ modifications.  No license under any IBM patents or
+ patent applications is to be implied from this copyright
+ license.
 
- A user of the module should understand that IBM cannot 
- provide technical support for the module and will not be 
- responsible for any consequences of use of the program. 
+ A user of the module should understand that IBM cannot
+ provide technical support for the module and will not be
+ responsible for any consequences of use of the program.
 
- Any notices, including this one, are not to be removed 
- from the module without the prior written consent of 
- IBM. 
+ Any notices, including this one, are not to be removed
+ from the module without the prior written consent of
+ IBM.

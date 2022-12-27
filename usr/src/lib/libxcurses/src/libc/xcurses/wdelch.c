@@ -24,14 +24,12 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wdelch.c
  *
  * XCurses Library
  *
- * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved. 
+ * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
  *
  */
 
@@ -68,14 +66,14 @@ WINDOW *w;
 
 	/* Determine the character width to delete. */
 	width = __m_cc_width(&w->_line[y][x]);
-	
+
 	/* Shift line left to erase the character under the cursor. */
 	(void) memcpy(
 		&w->_line[y][x], &w->_line[y][next],
 		(w->_maxx - next) * sizeof **w->_line
 	);
 
-	/* Add blank(s) to the end of line based on the width 
+	/* Add blank(s) to the end of line based on the width
 	 * of the character that was deleted.
 	 */
 	(void) __m_cc_erase(w, y, w->_maxx - width, y, w->_maxx - 1);

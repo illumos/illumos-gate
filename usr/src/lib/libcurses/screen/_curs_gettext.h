@@ -27,8 +27,6 @@
 #ifndef	_CURS_GETTEXT_H
 #define	_CURS_GETTEXT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libintl.h>
 
 #ifdef	__cplusplus

@@ -35,8 +35,6 @@
  * the buffer will always be null terminated.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdarg.h>
 #include <smbsrv/libsmb.h>

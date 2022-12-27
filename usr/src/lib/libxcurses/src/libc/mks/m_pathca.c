@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * m_pathcat: mks specific library routine.
- * 
+ *
  * Copyright 1992 by Mortice Kern Systems Inc.  All rights reserved.
  *
  */
@@ -101,7 +99,7 @@ err:
 #ifdef	ENAMETOOLONG
 		errno = ENAMETOOLONG;
 #else
-		/* 
+		/*
 		 * we need to return an errno. So pick EINVAL.
 		 * This should be common on all systems.
 		 */

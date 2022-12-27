@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -38,16 +36,16 @@
 ** on Ptr(N+1) and its subpages have values greater than Key(N).  And
 ** so forth.
 **
-** Finding a particular key requires reading O(log(M)) pages from the 
+** Finding a particular key requires reading O(log(M)) pages from the
 ** disk where M is the number of entries in the tree.
 **
-** In this implementation, a single file can hold one or more separate 
+** In this implementation, a single file can hold one or more separate
 ** BTrees.  Each BTree is identified by the index of its root page.  The
 ** key and data for any entry are combined to form the "payload".  Up to
 ** MX_LOCAL_PAYLOAD bytes of payload can be carried directly on the
 ** database page.  If the payload is larger than MX_LOCAL_PAYLOAD bytes
 ** then surplus bytes are stored on overflow pages.  The payload for an
-** entry and the preceding pointer are combined to form a "Cell".  Each 
+** entry and the preceding pointer are combined to form a "Cell".  Each
 ** page has a small header which contains the Ptr(N+1) pointer.
 **
 ** The first page of the file contains a magic string used to verify that
@@ -116,7 +114,7 @@ typedef struct FreelistInfo FreelistInfo;
 ** This is a magic string that appears at the beginning of every
 ** SQLite database in order to identify the file as a real database.
 */
-static const char zMagicHeader[] = 
+static const char zMagicHeader[] =
    "** This file contains an SQLite 2.1 database **";
 #define MAGIC_SIZE (sizeof(zMagicHeader))
 
@@ -160,8 +158,8 @@ struct PageOne {
 ** structure.
 **
 ** PageHdr.firstFree is 0 if there is no free space on this page.
-** Otherwise, PageHdr.firstFree is the index in MemPage.u.aDisk[] of a 
-** FreeBlk structure that describes the first block of free space.  
+** Otherwise, PageHdr.firstFree is the index in MemPage.u.aDisk[] of a
+** FreeBlk structure that describes the first block of free space.
 ** All free space is defined by a linked list of FreeBlk structures.
 **
 ** Data is stored in a linked list of Cell structures.  PageHdr.firstCell
@@ -215,7 +213,7 @@ struct CellHdr {
 
 /*
 ** The maximum number of database entries that can be held in a single
-** page of the database. 
+** page of the database.
 */
 #define MX_CELL ((SQLITE_USABLE_SIZE-sizeof(PageHdr))/MIN_CELL_SIZE)
 
@@ -308,7 +306,7 @@ struct FreelistInfo {
 ** Of particular interest in the auxiliary info is the apCell[] entry.  Each
 ** apCell[] entry is a pointer to a Cell structure in u.aDisk[].  The cells are
 ** put in this array so that they can be accessed in constant time, rather
-** than in linear time which would be needed if we had to walk the linked 
+** than in linear time which would be needed if we had to walk the linked
 ** list on every access.
 **
 ** Note that apCell[] contains enough space to hold up to two more Cells
@@ -422,7 +420,7 @@ static int cellSize(Btree *pBt, Cell *pCell){
 
 /*
 ** Defragment the page given.  All Cells are moved to the
-** beginning of the page and all free space is collected 
+** beginning of the page and all free space is collected
 ** into one big FreeBlk at the end of the page.
 */
 static void defragmentPage(Btree *pBt, MemPage *pPage){
@@ -462,7 +460,7 @@ static void defragmentPage(Btree *pBt, MemPage *pPage){
 }
 
 /*
-** Allocate nByte bytes of space on a page.  nByte must be a 
+** Allocate nByte bytes of space on a page.  nByte must be a
 ** multiple of 4.
 **
 ** Return the index into pPage->u.aDisk[] of the first byte of
@@ -471,7 +469,7 @@ static void defragmentPage(Btree *pBt, MemPage *pPage){
 **
 ** If the page contains nBytes of free space but does not contain
 ** nBytes of contiguous free space, then this routine automatically
-** calls defragementPage() to consolidate all free space before 
+** calls defragementPage() to consolidate all free space before
 ** allocating the new chunk.
 */
 static int allocateSpace(Btree *pBt, MemPage *pPage, int nByte){
@@ -575,11 +573,11 @@ static void freeSpace(Btree *pBt, MemPage *pPage, int start, int size){
 **
 ** The pParent parameter must be a pointer to the MemPage which
 ** is the parent of the page being initialized.  The root of the
-** BTree (usually page 2) has no parent and so for that page, 
+** BTree (usually page 2) has no parent and so for that page,
 ** pParent==NULL.
 **
 ** Return SQLITE_OK on success.  If we see that the page does
-** not contain a well-formed database page, then return 
+** not contain a well-formed database page, then return
 ** SQLITE_CORRUPT.  Note that a return of SQLITE_OK does not
 ** guarantee that the page is well-formed.  It only shows that
 ** we failed to detect any corruption.
@@ -677,7 +675,7 @@ static void pageDestructor(void *pData){
 ** Open a new database.
 **
 ** Actually, this routine just sets up the internal data structures
-** for accessing the database.  We do not open the database file 
+** for accessing the database.  We do not open the database file
 ** until the first page is loaded.
 **
 ** zFilename is the name of the database file.  If zFilename is NULL
@@ -794,7 +792,7 @@ static int lockBtree(Btree *pBt){
   if( rc!=SQLITE_OK ) return rc;
 
   /* Do some checking to help insure the file we opened really is
-  ** a valid database file. 
+  ** a valid database file.
   */
   if( sqlitepager_pagecount(pBt->pPager)>0 ){
     PageOne *pP1 = pBt->page1;
@@ -816,7 +814,7 @@ page1_init_failed:
 /*
 ** If there are no outstanding cursors and we are not in the middle
 ** of a transaction but there is a read lock on the database, then
-** this routine unrefs the first page of the database file which 
+** this routine unrefs the first page of the database file which
 ** has the effect of releasing the read lock.
 **
 ** If there are any outstanding cursors, this routine is a no-op.
@@ -1004,7 +1002,7 @@ static int fileBtreeRollbackCkpt(Btree *pBt){
 
 /*
 ** Create a new cursor for the BTree whose root is on the page
-** iTable.  The act of acquiring a cursor gets a read lock on 
+** iTable.  The act of acquiring a cursor gets a read lock on
 ** the database file.
 **
 ** If wrFlag==0, then the cursor can only be used for reading.
@@ -1033,12 +1031,12 @@ static int fileBtreeRollbackCkpt(Btree *pBt){
 ** intend to use the sqliteBtreeNext() system call.  All other cursors
 ** should be opened with wrFlag==1 even if they never really intend
 ** to write.
-** 
+**
 ** No checking is done to make sure that page iTable really is the
 ** root page of a b-tree.  If it is not, then the cursor acquired
 ** will not work correctly.
 */
-static 
+static
 int fileBtreeCursor(Btree *pBt, int iTable, int wrFlag, BtCursor **ppCur){
   int rc;
   BtCursor *pCur, *pRing;
@@ -1237,7 +1235,7 @@ static int getPayload(BtCursor *pCur, int offset, int amt, char *zBuf){
 ** Read part of the key associated with cursor pCur.  A maximum
 ** of "amt" bytes will be transfered into zBuf[].  The transfer
 ** begins at "offset".  The number of bytes actually read is
-** returned. 
+** returned.
 **
 ** Change:  It used to be that the amount returned will be smaller
 ** than the amount requested if there are not enough bytes in the key
@@ -1444,9 +1442,9 @@ static void moveToParent(BtCursor *pCur){
   assert( pParent->idxShift==0 );
   if( pParent->idxShift==0 ){
     pCur->idx = idxParent;
-#ifndef NDEBUG  
+#ifndef NDEBUG
     /* Verify that pCur->idx is the correct index to point back to the child
-    ** page we just came from 
+    ** page we just came from
     */
     oldPgno = SWAB32(pCur->pBt, sqlitepager_pagenumber(pPage));
     if( pCur->idx<pParent->nCell ){
@@ -1456,7 +1454,7 @@ static void moveToParent(BtCursor *pCur){
     }
 #endif
   }else{
-    /* The MemPage.idxShift flag indicates that cell indices might have 
+    /* The MemPage.idxShift flag indicates that cell indices might have
     ** changed since idxParent was set and hence idxParent might be out
     ** of date.  So recompute the parent cell index by scanning all cells
     ** and locating the one that points to the child we just came from.
@@ -1751,7 +1749,7 @@ static int fileBtreePrevious(BtCursor *pCur, int *pRes){
 ** an error.  *ppPage and *pPgno are undefined in the event of an error.
 ** Do not invoke sqlitepager_unref() on *ppPage if an error is returned.
 **
-** If the "nearby" parameter is not 0, then a (feeble) effort is made to 
+** If the "nearby" parameter is not 0, then a (feeble) effort is made to
 ** locate a page close to the page number "nearby".  This can be used in an
 ** attempt to keep related pages close to each other in the database file,
 ** which in turn can make database access faster.
@@ -1816,7 +1814,7 @@ static int allocatePage(Btree *pBt, MemPage **ppPage, Pgno *pPgno, Pgno nearby){
 
 /*
 ** Add a page of the database file to the freelist.  Either pgno or
-** pPage but not both may be 0. 
+** pPage but not both may be 0.
 **
 ** sqlitepager_unref() is NOT called for pPage.
 */
@@ -1911,7 +1909,7 @@ static int clearCell(Btree *pBt, Cell *pCell){
 
 /*
 ** Create a new cell from key and data.  Overflow pages are allocated as
-** necessary and linked to this cell.  
+** necessary and linked to this cell.
 */
 static int fillInCell(
   Btree *pBt,              /* The whole Btree.  Needed to allocate pages */
@@ -2031,8 +2029,8 @@ static void reparentChildPages(Btree *pBt, MemPage *pPage){
 ** "sz" must be the number of bytes in the cell.
 **
 ** Do not bother maintaining the integrity of the linked list of Cells.
-** Only the pPage->apCell[] array is important.  The relinkCellList() 
-** routine will be called soon after this routine in order to rebuild 
+** Only the pPage->apCell[] array is important.  The relinkCellList()
+** routine will be called soon after this routine in order to rebuild
 ** the linked list.
 */
 static void dropCell(Btree *pBt, MemPage *pPage, int idx, int sz){
@@ -2054,11 +2052,11 @@ static void dropCell(Btree *pBt, MemPage *pPage, int idx, int sz){
 **
 ** If the cell content will fit on the page, then put it there.  If it
 ** will not fit, then just make pPage->apCell[i] point to the content
-** and set pPage->isOverfull.  
+** and set pPage->isOverfull.
 **
 ** Do not bother maintaining the integrity of the linked list of Cells.
-** Only the pPage->apCell[] array is important.  The relinkCellList() 
-** routine will be called soon after this routine in order to rebuild 
+** Only the pPage->apCell[] array is important.  The relinkCellList()
+** routine will be called soon after this routine in order to rebuild
 ** the linked list.
 */
 static void insertCell(Btree *pBt, MemPage *pPage, int i, Cell *pCell, int sz){
@@ -2083,7 +2081,7 @@ static void insertCell(Btree *pBt, MemPage *pPage, int i, Cell *pCell, int sz){
 
 /*
 ** Rebuild the linked list of cells on a page so that the cells
-** occur in the order specified by the pPage->apCell[] array.  
+** occur in the order specified by the pPage->apCell[] array.
 ** Invoke this routine once to repair damage after one or more
 ** invocations of either insertCell() or dropCell().
 */
@@ -2149,12 +2147,12 @@ static void copyPage(MemPage *pTo, MemPage *pFrom){
 ** Usually one sibling on either side of pPage is used in the balancing,
 ** though both siblings might come from one side if pPage is the first
 ** or last child of its parent.  If pPage has fewer than two siblings
-** (something which can only happen if pPage is the root page or a 
+** (something which can only happen if pPage is the root page or a
 ** child of root) then all available siblings participate in the balancing.
 **
 ** The number of siblings of pPage might be increased or decreased by
 ** one in an effort to keep pages between 66% and 100% full. The root page
-** is special and is allowed to be less than 66% full. If pPage is 
+** is special and is allowed to be less than 66% full. If pPage is
 ** the root page, then the depth of the tree might be increased
 ** or decreased by one, as necessary, to keep the root page from being
 ** overfull or empty.
@@ -2210,12 +2208,12 @@ static int balance(Btree *pBt, MemPage *pPage, BtCursor *pCur){
   Cell *apCell[(MX_CELL+2)*NB]; /* All cells from pages being balanced */
   int szCell[(MX_CELL+2)*NB];  /* Local size of all cells */
 
-  /* 
+  /*
   ** Return without doing any work if pPage is neither overfull nor
   ** underfull.
   */
   assert( sqlitepager_iswriteable(pPage) );
-  if( !pPage->isOverfull && pPage->nFree<SQLITE_USABLE_SIZE/2 
+  if( !pPage->isOverfull && pPage->nFree<SQLITE_USABLE_SIZE/2
         && pPage->nCell>=2){
     relinkCellList(pBt, pPage);
     return SQLITE_OK;
@@ -2296,11 +2294,11 @@ static int balance(Btree *pBt, MemPage *pPage, BtCursor *pCur){
   rc = sqlitepager_write(pParent);
   if( rc ) return rc;
   assert( pParent->isInit );
-  
+
   /*
   ** Find the Cell in the parent page whose h.leftChild points back
   ** to pPage.  The "idx" variable is the index of that cell.  If pPage
-  ** is the rightmost child of pParent then set idx to pParent->nCell 
+  ** is the rightmost child of pParent then set idx to pParent->nCell
   */
   if( pParent->idxShift ){
     Pgno pgno, swabPgno;
@@ -2419,11 +2417,11 @@ static int balance(Btree *pBt, MemPage *pPage, BtCursor *pCur){
   ** Figure out the number of pages needed to hold all nCell cells.
   ** Store this number in "k".  Also compute szNew[] which is the total
   ** size of all cells on the i-th page and cntNew[] which is the index
-  ** in apCell[] of the cell that divides path i from path i+1.  
+  ** in apCell[] of the cell that divides path i from path i+1.
   ** cntNew[k] should equal nCell.
   **
   ** This little patch of code is critical for keeping the tree
-  ** balanced. 
+  ** balanced.
   */
   for(subtotal=k=i=0; i<nCell; i++){
     subtotal += szCell[i];
@@ -2596,12 +2594,12 @@ balance_cleanup:
 ** cursors point to the same table were opened with wrFlag==1
 ** then this routine returns SQLITE_OK.
 **
-** In addition to checking for read-locks (where a read-lock 
+** In addition to checking for read-locks (where a read-lock
 ** means a cursor opened with wrFlag==0) this routine also moves
-** all cursors other than pCur so that they are pointing to the 
-** first Cell on root page.  This is necessary because an insert 
+** all cursors other than pCur so that they are pointing to the
+** first Cell on root page.  This is necessary because an insert
 ** or delete might change the number of cells on a page or delete
-** a page entirely and we do not want to leave any cursors 
+** a page entirely and we do not want to leave any cursors
 ** pointing to non-existant pages or cells.
 */
 static int checkReadLocks(BtCursor *pCur){
@@ -2682,8 +2680,8 @@ static int fileBtreeInsert(
 ** Delete the entry that the cursor is pointing to.
 **
 ** The cursor is left pointing at either the next or the previous
-** entry.  If the cursor is left pointing to the next entry, then 
-** the pCur->eSkip flag is set to SKIP_NEXT which forces the next call to 
+** entry.  If the cursor is left pointing to the next entry, then
+** the pCur->eSkip flag is set to SKIP_NEXT which forces the next call to
 ** sqliteBtreeNext() to be a no-op.  That way, you can always call
 ** sqliteBtreeNext() after a delete and the cursor will be left
 ** pointing to the first entry after the deleted entry.  Similarly,
@@ -2758,7 +2756,7 @@ static int fileBtreeDelete(BtCursor *pCur){
     dropCell(pBt, pPage, pCur->idx, cellSize(pBt, pCell));
     if( pCur->idx>=pPage->nCell ){
       pCur->idx = pPage->nCell-1;
-      if( pCur->idx<0 ){ 
+      if( pCur->idx<0 ){
         pCur->idx = 0;
         pCur->eSkip = SKIP_NEXT;
       }else{
@@ -2776,7 +2774,7 @@ static int fileBtreeDelete(BtCursor *pCur){
 ** Create a new BTree table.  Write into *piTable the page
 ** number for the root page of the new table.
 **
-** In the current implementation, BTree tables and BTree indices are the 
+** In the current implementation, BTree tables and BTree indices are the
 ** the same.  In the future, we may change this so that BTree tables
 ** are restricted to having a 4-byte integer key and arbitrary data and
 ** BTree indices are restricted to having an arbitrary key and no data.
@@ -2891,7 +2889,7 @@ static int fileBtreeDropTable(Btree *pBt, int iTable){
     zeroPage(pBt, pPage);
   }
   sqlitepager_unref(pPage);
-  return rc;  
+  return rc;
 }
 
 #if 0 /* UNTESTED */
@@ -2982,7 +2980,7 @@ static int copyDatabasePage(
     }
     if( pPage->u.hdr.rightChild ){
       Pgno newChld;
-      rc = copyDatabasePage(pBtFrom, SWAB32(pBtFrom, pPage->u.hdr.rightChild), 
+      rc = copyDatabasePage(pBtFrom, SWAB32(pBtFrom, pPage->u.hdr.rightChild),
                             pBtTo, &newChld);
       if( rc ) return rc;
       pPage->u.hdr.rightChild = SWAB32(pBtTo, newChild);
@@ -3022,7 +3020,7 @@ static int fileBtreeUpdateMeta(Btree *pBt, int *aMeta){
   }
   pP1 = pBt->page1;
   rc = sqlitepager_write(pP1);
-  if( rc ) return rc;   
+  if( rc ) return rc;
   for(i=0; i<sizeof(pP1->aMeta)/sizeof(pP1->aMeta[0]); i++){
     pP1->aMeta[i] = SWAB32(pBt, aMeta[i+1]);
   }
@@ -3068,7 +3066,7 @@ static int fileBtreePageDump(Btree *pBt, int pgno, int recursive){
     payload[sz] = 0;
     printf(
       "cell %2d: i=%-10s chld=%-4d nk=%-4d nd=%-4d payload=%s\n",
-      i, range, (int)pCell->h.leftChild, 
+      i, range, (int)pCell->h.leftChild,
       NKEY(pBt, pCell->h), NDATA(pBt, pCell->h),
       payload
     );
@@ -3115,7 +3113,7 @@ static int fileBtreePageDump(Btree *pBt, int pgno, int recursive){
 /*
 ** Fill aResult[] with information about the entry and page that the
 ** cursor is pointing to.
-** 
+**
 **   aResult[0] =  The page number
 **   aResult[1] =  The entry number
 **   aResult[2] =  Total number of entries on this page
@@ -3274,7 +3272,7 @@ static int keyCompare(
 ** Do various sanity checks on a single page of a tree.  Return
 ** the tree depth.  Root pages return 0.  Parents of root pages
 ** return 1, and so forth.
-** 
+**
 ** These checks are done:
 **
 **      1.  Make sure that cells and freeblocks do not overlap
@@ -3377,7 +3375,7 @@ static int checkTreePage(
   sprintf(zContext, "On page %d at right child: ", iPage);
   checkTreePage(pCheck, pgno, pPage, zContext, zKey1,nKey1,zUpperBound,nUpper);
   sqliteFree(zKey1);
- 
+
   /* Check for complete coverage of the page
   */
   memset(hit, 0, sizeof(hit));
@@ -3478,7 +3476,7 @@ char *fileBtreeIntegrityCheck(Btree *pBt, int *aRoot, int nRoot){
   unlockBtreeIfUnused(pBt);
   if( nRef != *sqlitepager_stats(pBt->pPager) ){
     char zBuf[100];
-    sprintf(zBuf, 
+    sprintf(zBuf,
       "Outstanding page count goes from %d to %d during this analysis",
       nRef, *sqlitepager_stats(pBt->pPager)
     );
@@ -3539,7 +3537,7 @@ static int fileBtreeCopyFile(Btree *pBtTo, Btree *pBtFrom){
   if( rc ){
     fileBtreeRollback(pBtTo);
   }
-  return rc;  
+  return rc;
 }
 
 /*

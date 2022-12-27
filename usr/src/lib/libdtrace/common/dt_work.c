@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <dt_impl.h>
 #include <stddef.h>
 #include <errno.h>

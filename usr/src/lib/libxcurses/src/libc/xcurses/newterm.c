@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * newterm.c		
+ * newterm.c
  *
  * XCurses Library
  *
@@ -58,9 +56,9 @@ SCREEN *__m_screen;
 static short assume_one_line = FALSE;
 
 /*
- * Assume terminal has only one screen line by restricting those 
+ * Assume terminal has only one screen line by restricting those
  * capabilities that assume more than one line.  This function must
- * be called before initscr() or newterm().  
+ * be called before initscr() or newterm().
  *
  * This flag will reset after initscr() or newterm() so that subsequent
  * calls to newterm(), without a preceding call to filter(), will load
@@ -85,11 +83,11 @@ tstp(signo)
 int signo;
 {
 #ifdef SIGTSTP
-	/* Only permit SIGTSTP if the curent process is the process 
-	 * group leader.  If the process is not the current group 
+	/* Only permit SIGTSTP if the curent process is the process
+	 * group leader.  If the process is not the current group
 	 * leader, then suspending the current process will suspend
 	 * other members of the process group, such as the parent
-	 * process. 
+	 * process.
 	 */
 	if (getpid() == getpgrp()) {
 		(void) endwin();
@@ -140,7 +138,7 @@ __m_slk_init(SCREEN *sp, int style)
 		code = OK;
 		goto done;
 	}
-		
+
 	/* We have to fake it. */
 	if (lines < 2)
 		goto done;
@@ -163,7 +161,7 @@ done:
 static t_rip rip = { 0 };
 
 /*
- * If line is positive (1), one line is removed from the beginning of 
+ * If line is positive (1), one line is removed from the beginning of
  * stdscr; else if line is negative (-1), one line is removed from the end.
  */
 int
@@ -197,7 +195,7 @@ ripoffline(int line, int (*init)(WINDOW *, int))
  * If newterm() is called more than once for the same terminal, the first
  * terminal referred to must be the last one for which endwin() is called.
  */
-SCREEN * 
+SCREEN *
 newterm(term, out_fp, in_fp)
 char *term;
 FILE *out_fp, *in_fp;
@@ -209,7 +207,7 @@ FILE *out_fp, *in_fp;
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"newterm(%s, %p, %p)", 
+		"newterm(%s, %p, %p)",
 		term == (char *) 0 ? "NULL" : term, out_fp, in_fp
 	);
 #endif
@@ -322,14 +320,14 @@ FILE *out_fp, *in_fp;
 		goto error2;
 
 	/* doupdate() will perform the final screen preparations like
-	 * enter_ca_mode, reset_prog_mode() (to assert the termios 
+	 * enter_ca_mode, reset_prog_mode() (to assert the termios
 	 * changes), etc.
-	 */ 
+	 */
 	sp->_flags |= S_ENDWIN;
 
 #ifdef SIGTSTP
 	(void) signal(SIGTSTP, tstp);
-#endif 
+#endif
 	/* Assert that __m_screen is set to the new terminal. */
 	osp = set_term(sp);
 
@@ -359,14 +357,14 @@ FILE *out_fp, *in_fp;
 		if (stdscr == (WINDOW *) 0)
 			goto error3;
 
-		/* Create and initialise ripped off line windows. 
+		/* Create and initialise ripped off line windows.
 		 * It is the application's responsiblity to free the
 		 * windows when the application terminates.
 		 */
 		for (i = 0; i < n; ++i) {
 			y = rip.line[i].dy;
 			if (y < 0)
-				y += lines; 
+				y += lines;
 
 			w = newwin(1, 0, y, 0);
 			if (rip.line[i].init != (int (*)(WINDOW *, int)) 0)

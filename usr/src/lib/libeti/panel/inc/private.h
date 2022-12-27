@@ -31,8 +31,6 @@
 #ifndef _PRIVATE_H
 #define	_PRIVATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

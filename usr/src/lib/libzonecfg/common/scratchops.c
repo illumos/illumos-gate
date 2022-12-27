@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module contains functions used for reading and writing the scratch zone
  * translation files.  These files are used by Live Upgrade to keep track of

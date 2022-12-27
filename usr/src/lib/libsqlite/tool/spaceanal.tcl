@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 # Run this TCL script using "testfixture" in order get a report that shows
 # how much disk space is used by a particular data to actually store data
 # versus how much space is unused.
@@ -54,7 +51,7 @@ mem eval $tabledef
 # table in the database.
 #
 set sql {
-  SELECT name, tbl_name, type, rootpage 
+  SELECT name, tbl_name, type, rootpage
     FROM sqlite_master WHERE type IN ('table','index')
   UNION ALL
   SELECT 'sqlite_master', 'sqlite_master', 'table', 2
@@ -412,8 +409,8 @@ Unused bytes on overflow pages
 
 Unused bytes on all pages
 
-    The total number of bytes of unused space on all primary and overflow 
-    pages.  The percentage at the right is the number of unused bytes 
+    The total number of bytes of unused space on all primary and overflow
+    pages.  The percentage at the right is the number of unused bytes
     divided by the total number of bytes.
 }
 

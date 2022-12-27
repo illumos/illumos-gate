@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <security/pam_appl.h>
 #include <string.h>
 #include <stdlib.h>

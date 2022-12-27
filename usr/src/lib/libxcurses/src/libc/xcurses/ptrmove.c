@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ptrmove.c
  *
@@ -45,7 +43,7 @@ static void reverse(void **, int, int);
 
 /*
  * Move range start..finish inclusive before the given location.
- * Return -1 if the region to move is out of bounds or the target 
+ * Return -1 if the region to move is out of bounds or the target
  * falls within the region; 0 for success.
  *
  * (See Software Tools chapter 6.)
@@ -57,7 +55,7 @@ unsigned length, start, finish, to;
 {
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"__m_ptr_move(%p, %d, %d, %d, %d)", 
+		"__m_ptr_move(%p, %d, %d, %d, %d)",
 		array, length, start, finish, to
 	);
 #endif

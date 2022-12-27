@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2003 April 4
 #
 # The author disclaims copyright to this source code.  In place of
@@ -329,7 +327,7 @@ do_test auth-1.40 {
   }
   catchsql {SELECT a,c FROM t2 WHERE b IS NULL}
 } {1 {access to t2.b is prohibited}}
-  
+
 do_test auth-1.41 {
   proc auth {code arg1 arg2 arg3 arg4} {
     if {$code=="SQLITE_UPDATE" && $arg1=="t2" && $arg2=="b"} {
@@ -573,7 +571,7 @@ do_test auth-1.78 {
 do_test auth-1.79 {
   proc auth {code arg1 arg2 arg3 arg4} {
     if {$code=="SQLITE_CREATE_VIEW"} {
-      set ::authargs [list $arg1 $arg2 $arg3 $arg4] 
+      set ::authargs [list $arg1 $arg2 $arg3 $arg4]
       return SQLITE_DENY
     }
     return SQLITE_OK
@@ -589,7 +587,7 @@ do_test auth-1.81 {
 do_test auth-1.82 {
   proc auth {code arg1 arg2 arg3 arg4} {
     if {$code=="SQLITE_CREATE_VIEW"} {
-      set ::authargs [list $arg1 $arg2 $arg3 $arg4] 
+      set ::authargs [list $arg1 $arg2 $arg3 $arg4]
       return SQLITE_IGNORE
     }
     return SQLITE_OK
@@ -606,7 +604,7 @@ do_test auth-1.84 {
 do_test auth-1.85 {
   proc auth {code arg1 arg2 arg3 arg4} {
     if {$code=="SQLITE_CREATE_TEMP_VIEW"} {
-      set ::authargs [list $arg1 $arg2 $arg3 $arg4] 
+      set ::authargs [list $arg1 $arg2 $arg3 $arg4]
       return SQLITE_DENY
     }
     return SQLITE_OK
@@ -622,7 +620,7 @@ do_test auth-1.87 {
 do_test auth-1.88 {
   proc auth {code arg1 arg2 arg3 arg4} {
     if {$code=="SQLITE_CREATE_TEMP_VIEW"} {
-      set ::authargs [list $arg1 $arg2 $arg3 $arg4] 
+      set ::authargs [list $arg1 $arg2 $arg3 $arg4]
       return SQLITE_IGNORE
     }
     return SQLITE_OK
@@ -943,7 +941,7 @@ do_test auth-1.136.3 {
   execsql {
     INSERT INTO t2 VALUES(1,2,3);
   }
-  set ::authargs 
+  set ::authargs
 } {SQLITE_INSERT t2 {} main {} SQLITE_INSERT tx {} main r2 SQLITE_READ t2 ROWID main r2}
 do_test auth-1.136.4 {
   execsql {

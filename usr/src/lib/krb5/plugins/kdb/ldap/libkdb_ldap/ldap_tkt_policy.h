@@ -31,8 +31,6 @@
 #ifndef _LDAP_POLICY_H
 #define _LDAP_POLICY_H 1
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* policy specific mask */
 
 #define LDAP_POLICY_MAXTKTLIFE        0x0001

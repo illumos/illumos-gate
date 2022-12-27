@@ -2,7 +2,6 @@
  * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /*
   * hosts_ctl() combines common applications of the host access control
@@ -10,10 +9,10 @@
   * access control checker. The host name and user name arguments should be
   * empty strings, STRING_UNKNOWN or real data. If a match is found, the
   * optional shell command is executed.
-  * 
+  *
   * Restriction: this interface does not pass enough information to support
   * selective remote username lookups or selective hostname double checks.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

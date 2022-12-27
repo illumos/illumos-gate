@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * MKS interface extension.
  * A version of getenv() that doesn't overwrite it's return value
@@ -84,5 +82,5 @@ __m_getenv(char const *name) {
 	}
 	return NULL;
 }
-	
+
 #endif /* M_NON_STATIC_GETENV */

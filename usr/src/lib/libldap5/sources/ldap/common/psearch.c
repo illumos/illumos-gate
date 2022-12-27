@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  *
  * The contents of this file are subject to the Netscape Public License
@@ -46,7 +44,7 @@ ldap_create_persistentsearch_control( LDAP *ld, int changetypes,
      *
      *	PersistentSearch ::= SEQUENCE {
      *		changeTypes INTEGER,
-     *		-- the changeTypes field is the logical OR of 
+     *		-- the changeTypes field is the logical OR of
      *		-- one or more of these values: add (1), delete (2),
      *		-- modify (4), modDN (8).  It specifies which types of
      *		-- changes will cause an entry to be returned.
@@ -122,7 +120,7 @@ ldap_parse_entrychange_control( LDAP *ld, LDAPControl **ctrls, int *chgtypep,
     if (( ber = ber_init( &(ctrls[i]->ldctl_value))) == NULL ) {
 	rc = LDAP_NO_MEMORY;
 	goto report_error_and_return;
-    }		
+    }
 
     if ( ber_scanf( ber, "{e", &along ) == LBER_ERROR ) {
 	ber_free( ber, 1 );

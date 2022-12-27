@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _MDNS_COMMON_H
 #define	_MDNS_COMMON_H
 

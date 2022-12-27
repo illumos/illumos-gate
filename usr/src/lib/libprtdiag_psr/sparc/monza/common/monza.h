@@ -34,8 +34,6 @@
 #ifndef _MONZA_H
 #define	_MONZA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

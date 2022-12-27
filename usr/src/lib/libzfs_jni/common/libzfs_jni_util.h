@@ -27,8 +27,6 @@
 #ifndef _LIBZFS_JNI_UTIL_H
 #define	_LIBZFS_JNI_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <jni.h>
 #include <regex.h>
 #include <libnvpair.h>

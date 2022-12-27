@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the common part of the functions string_to_decimal,
  * func_to_decimal, and file_to_decimal.  Much of this code has been dupli-

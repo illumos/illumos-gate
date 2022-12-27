@@ -27,8 +27,6 @@
 
 /* $Id: status.c 146 2006-03-24 00:26:54Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <papi.h>
 #include <libintl.h>
