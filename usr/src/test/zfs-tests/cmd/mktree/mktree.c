@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2022 MNX Cloud, Inc.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -107,10 +111,11 @@ mktree(char *pdir, int level)
 		(void) strcpy(dname, getfdname(pdir, TYPE_D, level, d, 0));
 
 		if (mkdir(dname, 0777) != 0) {
+			int exitcode = errno;
 			(void) fprintf(stderr, "mkdir(%s) failed."
 			    "\n[%d]: %s.\n",
 			    dname, errno, strerror(errno));
-			exit(errno);
+			exit(exitcode);
 		}
 
 		/*
@@ -149,6 +154,7 @@ crtfile(char *pname)
 	int fd = -1;
 	int afd = -1;
 	int i, size;
+	int exitcode;
 	char *context = "0123456789ABCDF";
 	char *pbuf;
 
@@ -164,25 +170,29 @@ crtfile(char *pname)
 	}
 
 	if ((fd = open(pname, O_CREAT|O_RDWR, 0777)) < 0) {
+		exitcode = errno;
 		(void) fprintf(stderr, "open(%s, O_CREAT|O_RDWR, 0777) failed."
 		    "\n[%d]: %s.\n", pname, errno, strerror(errno));
-		exit(errno);
+		exit(exitcode);
 	}
 	if (write(fd, pbuf, 1024) < 1024) {
+		exitcode = errno;
 		(void) fprintf(stderr, "write(fd, pbuf, 1024) failed."
 		    "\n[%d]: %s.\n", errno, strerror(errno));
-		exit(errno);
+		exit(exitcode);
 	}
 
 	if ((afd = openat(fd, "xattr", O_CREAT | O_RDWR | O_XATTR, 0777)) < 0) {
+		exitcode = errno;
 		(void) fprintf(stderr, "openat failed.\n[%d]: %s.\n",
 		    errno, strerror(errno));
-		exit(errno);
+		exit(exitcode);
 	}
 	if (write(afd, pbuf, 1024) < 1024) {
+		exitcode = errno;
 		(void) fprintf(stderr, "write(afd, pbuf, 1024) failed."
 		    "\n[%d]: %s.\n", errno, strerror(errno));
-		exit(errno);
+		exit(exitcode);
 	}
 
 	(void) close(afd);
