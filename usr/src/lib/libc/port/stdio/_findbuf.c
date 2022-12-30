@@ -29,6 +29,7 @@
 
 /*
  * Copyright 2020 Robert Mustacchi
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 
@@ -36,6 +37,7 @@
 
 #include "lint.h"
 #include "file64.h"
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -57,7 +59,16 @@ _findbuf(FILE *iop)
 	Uchar *buf;
 	int size = BUFSIZ;
 	Uchar *endbuf;
-	int tty = -1;
+	int tty, err;
+
+	/*
+	 * isatty(3C) will set errno as a side-effect of returning 0. Hide this
+	 * from callers so that they do not see errno changing for no apparent
+	 * reason.
+	 */
+	err = errno;
+	tty = isatty(fd);
+	errno = err;
 
 	if (iop->_flag & _IONBF) {	/* need a small buffer, at least */
 	trysmall:
@@ -68,7 +79,7 @@ _findbuf(FILE *iop)
 		    NULL) {
 			iop->_flag |= _IOMYBUF;
 		}
-	} else if (fd >= 0 && fd < 2 && (tty = isatty(fd))) {
+	} else if (fd >= 0 && fd < 2 && tty != 0) {
 		/* Use special buffers for standard in and standard out */
 		buf = (fd == 0) ? _sibuf : _sobuf;
 	} else {
@@ -98,7 +109,7 @@ _findbuf(FILE *iop)
 	iop->_ptr = buf + PUSHBACK;
 	endbuf = iop->_base + size;
 	_setbufend(iop, endbuf);
-	if (!(iop->_flag & _IONBF) && ((tty != -1) ? tty : isatty(fd)))
+	if (!(iop->_flag & _IONBF) && tty != 0)
 		iop->_flag |= _IOLBF;
 	return (endbuf);
 }
