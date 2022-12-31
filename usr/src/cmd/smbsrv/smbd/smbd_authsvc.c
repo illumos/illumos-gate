@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -40,6 +41,9 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <syslog.h>
+#include <ucred.h>
+#include <priv.h>
+
 #include <smbsrv/libsmb.h>
 #include <netsmb/spnego.h>
 
@@ -220,6 +224,56 @@ smbd_authsock_destroy(void)
 	}
 }
 
+#ifndef FKSMBD
+static boolean_t
+authsock_has_priv(int sock)
+{
+	ucred_t *uc = NULL;
+	const priv_set_t *ps = NULL;
+	boolean_t ret = B_FALSE;
+	pid_t  clpid;
+
+	if (getpeerucred(sock, &uc) != 0) {
+		smbd_report("authsvc: getpeerucred err %d", errno);
+		return (B_FALSE);
+	}
+	clpid = ucred_getpid(uc);
+	if (clpid == 0) {
+		/* in-kernel caller: OK */
+		ret = B_TRUE;
+		goto out;
+	}
+
+	ps = ucred_getprivset(uc, PRIV_EFFECTIVE);
+	if (ps == NULL) {
+		smbd_report("authsvc: ucred_getprivset failed");
+		goto out;
+	}
+
+	/*
+	 * Otherwise require sys_smb priv.
+	 */
+	if (priv_ismember(ps, PRIV_SYS_SMB)) {
+		ret = B_TRUE;
+		goto out;
+	}
+
+	if (smbd.s_debug) {
+		smbd_report("authsvc: non-privileged client "
+		    "PID = %d UID = %d",
+		    (int)clpid, ucred_getruid(uc));
+	}
+
+out:
+	/* ps is free'd with the ucred */
+	if (uc != NULL)
+		ucred_free(uc);
+
+	return (ret);
+}
+#endif
+
+
 static void *
 smbd_authsvc_listen(void *arg)
 {
@@ -252,6 +306,13 @@ smbd_authsvc_listen(void *arg)
 				goto out;
 			}
 		}
+
+#ifndef FKSMBD
+		if (!authsock_has_priv(ns)) {
+			close(ns);
+			continue;
+		}
+#endif
 
 		/*
 		 * Limit the number of auth. sockets

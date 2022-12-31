@@ -22,9 +22,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 Oxide Computer Company
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* helper functions for using libscf with CIFS */
 
@@ -50,12 +50,10 @@
 static void
 smb_smf_scf_log_error(char *msg)
 {
-	if (!msg) {
-		syslog(LOG_ERR, " SMBC SMF problem: %s\n",
-		    scf_strerror(scf_error()));
-	} else { /*LINTED E_SEC_PRINTF_E_VAR_FMT*/
-		syslog(LOG_ERR, msg, scf_strerror(scf_error()));
-	}
+	if (msg == NULL)
+		msg = "SMBC SMF problem";
+
+	syslog(LOG_ERR, "%s: %s", msg, scf_strerror(scf_error()));
 }
 
 /*
@@ -135,7 +133,7 @@ smb_smf_instance_exists(smb_scfhandle_t *handle, char *inst_name)
  */
 int
 smb_smf_instance_create(smb_scfhandle_t *handle, char *serv_prefix,
-	char *inst_name)
+    char *inst_name)
 {
 	char *instance;
 	int ret = SMBC_SMF_OK;
@@ -240,8 +238,8 @@ smb_smf_scf_init(char *svc_name)
 		} else {
 			free(handle);
 			handle = NULL;
-			smb_smf_scf_log_error("Could not access SMF "
-			    "repository: %s\n");
+			smb_smf_scf_log_error(
+			    "Could not access SMF repository");
 		}
 	}
 	return (handle);
@@ -249,7 +247,7 @@ smb_smf_scf_init(char *svc_name)
 	/* error handling/unwinding */
 err:
 	(void) smb_smf_scf_fini(handle);
-	(void) smb_smf_scf_log_error("SMF initialization problem: %s\n");
+	(void) smb_smf_scf_log_error("SMF initialization problem");
 	return (NULL);
 }
 
@@ -382,14 +380,13 @@ smb_smf_delete_service_pgroup(smb_scfhandle_t *handle, char *pgroup)
 			ret = SMBC_SMF_SYSTEM_ERR;
 			err = scf_error();
 			if (err != SCF_ERROR_NONE) {
-				smb_smf_scf_log_error("SMF delpg "
-				    "problem: %s\n");
+				smb_smf_scf_log_error("SMF delpg problem");
 			}
 		}
 	} else {
 		err = scf_error();
 		if (err != SCF_ERROR_NONE)
-			smb_smf_scf_log_error("SMF getpg problem: %s\n");
+			smb_smf_scf_log_error("SMF getpg problem");
 		ret = SMBC_SMF_SYSTEM_ERR;
 	}
 	if (ret == SMBC_SMF_SYSTEM_ERR &&
@@ -433,14 +430,13 @@ smb_smf_delete_instance_pgroup(smb_scfhandle_t *handle, char *pgroup)
 			ret = SMBC_SMF_SYSTEM_ERR;
 			err = scf_error();
 			if (err != SCF_ERROR_NONE) {
-				smb_smf_scf_log_error("SMF delpg "
-				    "problem: %s\n");
+				smb_smf_scf_log_error("SMF delpg problem");
 			}
 		}
 	} else {
 		err = scf_error();
 		if (err != SCF_ERROR_NONE)
-			smb_smf_scf_log_error("SMF getpg problem: %s\n");
+			smb_smf_scf_log_error("SMF getpg problem");
 		ret = SMBC_SMF_SYSTEM_ERR;
 	}
 	if (ret == SMBC_SMF_SYSTEM_ERR &&
@@ -512,8 +508,7 @@ smb_smf_end_transaction(smb_scfhandle_t *handle)
 	} else {
 		if (scf_transaction_commit(handle->scf_trans) < 0) {
 			ret = SMBC_SMF_SYSTEM_ERR;
-			smb_smf_scf_log_error("Failed to commit "
-			    "transaction: %s");
+			smb_smf_scf_log_error("Failed to commit transaction");
 		}
 		scf_transaction_destroy_children(handle->scf_trans);
 		scf_transaction_destroy(handle->scf_trans);

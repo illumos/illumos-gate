@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <assert.h>
@@ -297,7 +298,7 @@ smb_find_ads_server(char *fqdn, char *buf, int buflen)
 	return (found);
 }
 
-void
+int
 smb_notify_dc_changed(void)
 {
 	int rc;
@@ -305,8 +306,14 @@ smb_notify_dc_changed(void)
 	rc = smb_door_call(SMB_DR_NOTIFY_DC_CHANGED,
 	    NULL, NULL, NULL, NULL);
 
-	if (rc != 0)
-		syslog(LOG_DEBUG, "smb_notify_dc_changed: %m");
+	if (rc != 0) {
+		rc = errno;
+		if (rc == 0)
+			rc = EPERM;
+		syslog(LOG_DEBUG, "smb_notify_dc_changed: rc=%d", rc);
+		return (rc);
+	}
+	return (0);
 }
 
 

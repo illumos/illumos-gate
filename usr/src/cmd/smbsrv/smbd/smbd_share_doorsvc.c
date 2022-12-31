@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -37,6 +38,8 @@
 #include <string.h>
 #include <strings.h>
 #include <pthread.h>
+#include <priv.h>
+
 #include <smbsrv/libsmb.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/smbinfo.h>
@@ -134,6 +137,51 @@ smbd_share_stop(void)
 	(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
 }
 
+static boolean_t
+have_priv_sys_smb(void)
+{
+	ucred_t *uc = NULL;
+	const priv_set_t *ps = NULL;
+	boolean_t ret = B_FALSE;
+	pid_t pid;
+
+	if (door_ucred(&uc) != 0) {
+		syslog(LOG_DEBUG, "%s: door_ucred failed", __func__);
+		goto out;
+	}
+
+	/*
+	 * in-kernel callers have pid==0
+	 * If we have pid zero, that's sufficient.
+	 * If not, allow with sys_smb priv (below)
+	 */
+	pid = ucred_getpid(uc);
+	if (pid == 0) {
+		ret = B_TRUE;
+		goto out;
+	}
+
+	ps = ucred_getprivset(uc, PRIV_EFFECTIVE);
+	if (ps == NULL) {
+		syslog(LOG_DEBUG, "%s: ucred_getprivset failed", __func__);
+		goto out;
+	}
+	if (priv_ismember(ps, PRIV_SYS_SMB)) {
+		ret = B_TRUE;
+		goto out;
+	}
+
+	syslog(LOG_DEBUG, "smbd_share_dispatch: missing privilege, "
+	    "PID = %d UID = %d", (int)pid, ucred_getruid(uc));
+
+out:
+	/* ps is free'd with the ucred */
+	if (uc != NULL)
+		ucred_free(uc);
+
+	return (ret);
+}
+
 /*
  * This function with which the LMSHARE door is associated
  * will invoke the appropriate CIFS share management function
@@ -167,6 +215,13 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	dec_ctx = smb_dr_decode_start(ptr, size);
 	enc_ctx = smb_dr_encode_start(buf, sizeof (buf));
 	req_type = smb_dr_get_uint32(dec_ctx);
+
+	if (req_type != SMB_SHROP_NUM_SHARES &&
+	    req_type != SMB_SHROP_LIST &&
+	    !have_priv_sys_smb()) {
+		dec_status = EPERM;
+		goto decode_error;
+	}
 
 	switch (req_type) {
 	case SMB_SHROP_NUM_SHARES:

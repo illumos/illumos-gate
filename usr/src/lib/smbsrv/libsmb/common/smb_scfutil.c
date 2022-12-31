@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /* helper functions for using libscf with CIFS */
@@ -50,9 +51,9 @@ static void
 smb_smf_scf_log_error(char *msg)
 {
 	if (msg == NULL)
-		msg = "SMBD SMF problem";
+		msg = "SMBD SMF problems";
 
-	syslog(LOG_ERR, " %s: %s", msg, scf_strerror(scf_error()));
+	syslog(LOG_ERR, "%s: %s", msg, scf_strerror(scf_error()));
 }
 
 /*
@@ -168,12 +169,12 @@ smb_smf_end_transaction(smb_scfhandle_t *handle)
 			ret = SMBD_SMF_OK;
 		} else if (rc == 0) {
 			ret = SMBD_SMF_INVALID_ARG;
-			smb_smf_scf_log_error("Failed to commit, old pg: "
-			    "transaction: %s");
+			smb_smf_scf_log_error(
+			    "Failed to commit, old pg: transaction");
 		} else {
 			ret = SMBD_SMF_SYSTEM_ERR;
-			smb_smf_scf_log_error("Failed to commit, error: "
-			    "transaction: %s");
+			smb_smf_scf_log_error(
+			    "Failed to commit, error: transaction");
 		}
 		scf_transaction_destroy_children(handle->scf_trans);
 		scf_transaction_destroy(handle->scf_trans);
@@ -687,8 +688,8 @@ smb_smf_scf_init(char *svc_name)
 		} else {
 			free(handle);
 			handle = NULL;
-			smb_smf_scf_log_error("Could not access SMF "
-			    "repository: %s\n");
+			smb_smf_scf_log_error(
+			    "Could not access SMF repository");
 		}
 	}
 	return (handle);
@@ -696,7 +697,7 @@ smb_smf_scf_init(char *svc_name)
 	/* error handling/unwinding */
 err:
 	(void) smb_smf_scf_fini(handle);
-	(void) smb_smf_scf_log_error("SMF initialization problem: %s\n");
+	(void) smb_smf_scf_log_error("SMF initialization problem");
 	return (NULL);
 }
 
