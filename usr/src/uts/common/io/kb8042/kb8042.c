@@ -599,15 +599,11 @@ kb8042_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 }
 
-/*ARGSUSED*/
 static int
-kb8042_getinfo(
-    dev_info_t *dip,
-    ddi_info_cmd_t infocmd,
-    void *arg,
-    void **result)
+kb8042_getinfo(dev_info_t *dip __unused, ddi_info_cmd_t infocmd,
+    void *arg __unused, void **result)
 {
-	register int error;
+	int error;
 
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
@@ -619,8 +615,15 @@ kb8042_getinfo(
 		}
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)0;
-		error = DDI_SUCCESS;
+		if (kb8042_dip == NULL) {
+			error = DDI_FAILURE;
+		} else {
+			int instance;
+
+			instance = ddi_get_instance(kb8042_dip);
+			*result = (void *)(uintptr_t)instance;
+			error = DDI_SUCCESS;
+		}
 		break;
 	default:
 		error = DDI_FAILURE;
