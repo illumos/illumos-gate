@@ -125,6 +125,7 @@ _MANFILES=	Intro.7			\
 		smf_template.7		\
 		standards.7		\
 		sticky.7		\
+		style.7			\
 		tbl.7			\
 		tecla.7			\
 		term.7			\
