@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef	_SYS_POLICY_H
@@ -161,6 +162,7 @@ int secpolicy_vnode_create_gid(const cred_t *);
 int secpolicy_vnode_owner(const cred_t *, uid_t);
 int secpolicy_vnode_remove(const cred_t *);
 int secpolicy_vnode_setdac(const cred_t *, uid_t);
+int secpolicy_vnode_setdac3(const cred_t *, uid_t, boolean_t);
 int secpolicy_vnode_setid_retain(const cred_t *, boolean_t);
 int secpolicy_vnode_setids_setgids(const cred_t *, gid_t);
 int secpolicy_vnode_stky_modify(const cred_t *);

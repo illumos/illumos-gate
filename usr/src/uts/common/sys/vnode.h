@@ -23,7 +23,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
- * Copyright 2017 RackTop Systems.
+ * Copyright 2016-2023 RackTop Systems, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1511,6 +1511,7 @@ typedef enum {
 #define	ATTR_REAL	0x10	/* yield attributes of the real vp */
 #define	ATTR_NOACLCHECK	0x20	/* Don't check ACL when checking permissions */
 #define	ATTR_TRIGGER	0x40	/* Mount first if vnode is a trigger mount */
+#define	ATTR_NOIMPLICIT	0x80	/* Disable any implicit owner rights */
 /*
  * Generally useful macros.
  */

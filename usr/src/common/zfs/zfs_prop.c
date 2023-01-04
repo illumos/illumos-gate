@@ -298,6 +298,9 @@ zfs_prop_init(void)
 	    ZFS_ACL_RESTRICTED, PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "discard | noallow | restricted | passthrough | passthrough-x",
 	    "ACLINHERIT", acl_inherit_table);
+	zprop_register_index(ZFS_PROP_ACLIMPLICIT, "aclimplicit", 1,
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM, "on | off", "ACLIMPL",
+	    boolean_table);
 	zprop_register_index(ZFS_PROP_COPIES, "copies", 1, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "1 | 2 | 3", "COPIES", copies_table);

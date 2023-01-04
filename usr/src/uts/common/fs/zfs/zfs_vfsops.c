@@ -402,6 +402,14 @@ acl_inherit_changed_cb(void *arg, uint64_t newval)
 	zfsvfs->z_acl_inherit = newval;
 }
 
+static void
+acl_implicit_changed_cb(void *arg, uint64_t newval)
+{
+	zfsvfs_t *zfsvfs = arg;
+
+	zfsvfs->z_acl_implicit = (boolean_t)newval;
+}
+
 static int
 zfs_register_callbacks(vfs_t *vfsp)
 {
@@ -537,6 +545,9 @@ zfs_register_callbacks(vfs_t *vfsp)
 	error = error ? error : dsl_prop_register(ds,
 	    zfs_prop_to_name(ZFS_PROP_ACLINHERIT), acl_inherit_changed_cb,
 	    zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    zfs_prop_to_name(ZFS_PROP_ACLIMPLICIT),
+	    acl_implicit_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
 	    zfs_prop_to_name(ZFS_PROP_VSCAN), vscan_changed_cb, zfsvfs);
 	dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
