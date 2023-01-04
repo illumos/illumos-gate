@@ -27,8 +27,6 @@
 #ifndef	_SYS_FS_UFS_PANIC_H
 #define	_SYS_FS_UFS_PANIC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/vfs.h>
 #include <sys/fs/ufs_inode.h>

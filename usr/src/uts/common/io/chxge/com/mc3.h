@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* mc3.h */
-
 #ifndef CHELSIO_MC3_H
 #define CHELSIO_MC3_H
 
@@ -36,7 +34,7 @@ struct pemc3_intr_counts {
 	unsigned int parity_err;
 	unsigned int addr_err;
 };
-	
+
 struct pemc3;
 
 struct pemc3 *t1_mc3_create(adapter_t * adapter);

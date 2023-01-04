@@ -27,8 +27,6 @@
 #ifndef	_SYS_WINLOCKIO_H
 #define	_SYS_WINLOCKIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/ioccom.h>
 

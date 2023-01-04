@@ -2,9 +2,8 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/* 
+/*
  * Copyright (c) 2000 by Computer Science Laboratory,
  *                       Rensselaer Polytechnic Institute
  * #include STD_DISCLAIMER
@@ -76,7 +75,7 @@ k5_arcfour_decrypt(krb5_context context,
 {
   krb5_error_code ret = 0;
 
-#ifndef _KERNEL 
+#ifndef _KERNEL
   CK_RV rv;
   KRB5_MECH_TO_PKCS algos;
   CK_OBJECT_HANDLE *kptr = NULL, hKey = CK_INVALID_HANDLE;
@@ -98,7 +97,7 @@ k5_arcfour_decrypt(krb5_context context,
     * the keys for encrypt and decrypt must be kept separate
     * so that their associated state data doesn't get mixed up
     * between operations.    The r-cmds (rlogin, rsh, rcp) use
-    * the  "init_state" function (see bottom of this module) 
+    * the  "init_state" function (see bottom of this module)
     * to set up and prepare for stream encryption.
     *
     * Normally, the RC4 key is used as a single operation
@@ -180,7 +179,7 @@ cleanup:
     ret = k5_ef_crypto((const char *)input->data, (char *)output->data,
 		input->length, (krb5_keyblock *)key, NULL, 0);
 #endif /* !_KERNEL */
-  
+
   KRB5_LOG0(KRB5_INFO, "k5_arcfour_docrypt end");
   return (ret);
 }
@@ -287,7 +286,7 @@ final_cleanup:
     ret = k5_ef_crypto((const char *)input->data, (char *)output->data,
 			input->length, (krb5_keyblock *)key, NULL, 1);
 #endif /* !_KERNEL */
-  
+
   KRB5_LOG0(KRB5_INFO, "k5_arcfour_docrypt end");
   return (ret);
 }
@@ -346,7 +345,7 @@ k5_arcfour_init_state (krb5_context context,
   return (retval);
 }
 
-/* Since the arcfour cipher is identical going forwards and backwards, 
+/* Since the arcfour cipher is identical going forwards and backwards,
    we just call "docrypt" directly
 */
 const struct krb5_enc_provider krb5int_enc_arcfour = {

@@ -26,8 +26,6 @@
  * Derived from pseudocode supplied by Intel.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Workaround for Intel Orion chipset bug
  *

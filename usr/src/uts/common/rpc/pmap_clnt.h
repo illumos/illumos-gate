@@ -34,9 +34,6 @@
 #ifndef _RPC_PMAP_CLNT_H
 #define	_RPC_PMAP_CLNT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * pmap_clnt.h
  * Supplies C routines to get to portmap services.

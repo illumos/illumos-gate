@@ -27,8 +27,6 @@
 #ifndef _SYS_SCSI_ADAPTERS_EMUL64CMD_H
 #define	_SYS_SCSI_ADAPTERS_EMUL64CMD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/scsi/scsi_types.h>
 
 #ifdef	__cplusplus

@@ -7,13 +7,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#ifndef __hpux
-#pragma ident "@(#)$Id: misc.c,v 1.12 2003/11/29 07:11:03 darrenr Exp $"
-#else
+#ifdef __hpux
 struct uio;
 #endif
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/types.h>

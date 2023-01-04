@@ -27,8 +27,6 @@
 #ifndef _CS_PRIV_H
 #define	_CS_PRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

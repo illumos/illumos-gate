@@ -48,8 +48,6 @@
 #ifndef __SPPPCOMP_H
 #define	__SPPPCOMP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

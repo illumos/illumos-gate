@@ -68,8 +68,6 @@
 #ifndef	_SYS_KICONV_JA_JIS_TO_UNICODE_H
 #define	_SYS_KICONV_JA_JIS_TO_UNICODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

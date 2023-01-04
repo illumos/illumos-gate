@@ -27,8 +27,6 @@
 #ifndef	_SYS_KSYMS_H
 #define	_SYS_KSYMS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/kobj.h>
 
 #ifdef	__cplusplus

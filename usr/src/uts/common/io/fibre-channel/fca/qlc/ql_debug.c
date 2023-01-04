@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2009 QLogic Corporation; ql_debug.c"
-
 /*
  * Qlogic ISP22xx/ISP23xx/ISP24xx FCA driver source
  *

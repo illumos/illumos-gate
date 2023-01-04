@@ -40,8 +40,6 @@
 #ifndef _RPC_RPC_H
 #define	_RPC_RPC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/types.h>		/* some typedefs */
 
 #ifndef _KERNEL

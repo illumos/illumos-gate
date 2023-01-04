@@ -29,8 +29,6 @@
 #ifndef RADIX_IPF_H
 #define RADIX_IPF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if SOLARIS2 > 10
 #include <net/radix.h>
 #else

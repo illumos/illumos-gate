@@ -7,8 +7,6 @@
 #ifndef __USBGEM_H__
 #define	__USBGEM_H__
 
-#pragma	ident	"@(#)usbgem.h	1.4 12/02/09"
-
 #include <sys/mac.h>
 #ifndef MAC_VERSION
 #include <sys/mac_provider.h>

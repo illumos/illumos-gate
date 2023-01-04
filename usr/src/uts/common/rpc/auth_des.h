@@ -34,8 +34,6 @@
 #ifndef	_RPC_AUTH_DES_H
 #define	_RPC_AUTH_DES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * auth_des.h, Protocol for DES style authentication for RPC
  *

@@ -27,8 +27,6 @@
 #ifndef _SYS_LWP_UPIMUTEX_IMPL_H
 #define	_SYS_LWP_UPIMUTEX_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/thread.h>
 #include <sys/lwp.h>
 

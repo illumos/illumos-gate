@@ -3,11 +3,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -17,7 +15,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -64,7 +62,7 @@
 Note that the token type field is a feature of RFC 1964 mechanisms and
 is not used by other GSSAPI mechanisms.  As such, a token type of -1
 is interpreted to mean that no token type should be expected or
-generated. 
+generated.
 
 For the purposes of this abstraction, the token "header" consists of
 the sequence tag and length octets, the mech OID DER encoding, and the
@@ -219,7 +217,7 @@ gss_int32 g_verify_token_header(mech, body_size, buf_in, tok_type, toksize_in,
       return(G_BAD_TOK_HEADER);
    if (*buf++ != 0x06)
       return(G_BAD_TOK_HEADER);
- 
+
    if ((toksize-=1) < 0)
       return(G_BAD_TOK_HEADER);
    toid.length = *buf++;
@@ -229,7 +227,7 @@ gss_int32 g_verify_token_header(mech, body_size, buf_in, tok_type, toksize_in,
    toid.elements = buf;
    buf+=toid.length;
 
-   if (! g_OID_equal(&toid, mech)) 
+   if (! g_OID_equal(&toid, mech))
        return  G_WRONG_MECH;
 skip_wrapper:
    if (tok_type != -1) {

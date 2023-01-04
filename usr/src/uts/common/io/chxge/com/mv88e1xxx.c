@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* mv88e1xxx.c */
-
 #include "common.h"
 #include "mv88e1xxx.h"
 #include "cphy.h"
@@ -66,7 +64,7 @@ static void mdio_clear_bit(struct cphy *cphy, int reg, u32 bitval)
  *         chip reset.
  *
  * PARAMS: cphy     - Pointer to PHY instance data.
- * 
+ *
  * RETURN:  0 - Successfull reset.
  *         -1 - Timeout.
  */
@@ -307,7 +305,7 @@ static int mv88e1xxx_downshift_set(struct cphy *cphy, int downshift_enable)
 	 * twice before downshifting.
 	 */
 	val &= ~(V_DOWNSHIFT_ENABLE | V_DOWNSHIFT_CNT(M_DOWNSHIFT_CNT));
-	
+
 	if (downshift_enable)
 		val |= V_DOWNSHIFT_ENABLE | V_DOWNSHIFT_CNT(2);
 	(void) simple_mdio_write(cphy, MV88E1XXX_EXT_PHY_SPECIFIC_CNTRL_REGISTER, val);
@@ -321,7 +319,7 @@ static int mv88e1xxx_interrupt_handler(struct cphy *cphy)
 
 	/*
 	 * Loop until cause reads zero. Need to handle bouncing interrupts.
-         */ 
+         */
 	/*CONSTCOND*/
 	while (1) {
 		u32 cause;

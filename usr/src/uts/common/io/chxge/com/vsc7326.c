@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Driver for Vitesse VSC7326 (Schaumburg) MAC */
 
 #include "gmac.h"
@@ -418,7 +416,7 @@ static int mac_set_address(struct cmac* mac, u8 addr[6])
 	vsc_read(mac->adapter, REG_ING_FFILT_UM_EN, &val);
 	val &= ~0xf0000000;
 	vsc_write(mac->adapter, REG_ING_FFILT_UM_EN, val | (port << 28));
-	
+
 	vsc_write(mac->adapter, REG_ING_FFILT_MASK0,
 		  0xffff0000 | (addr[4] << 8) | addr[5]);
 	vsc_write(mac->adapter, REG_ING_FFILT_MASK1,
@@ -463,7 +461,7 @@ static int mac_set_rx_mode(struct cmac *mac, struct t1_rx_mode *rm)
 
 	vsc_read(mac->adapter, REG_ING_FFILT_UM_EN, &v);
 	v |= 1 << 12;
-	
+
 	if (t1_rx_mode_promisc(rm))
 		v &= ~(1 << (port + 16));
 	else
@@ -506,13 +504,13 @@ static int mac_set_speed_duplex_fc(struct cmac *mac, int speed, int duplex,
 			v |= 8;             /* GigE */
 		enable |= v;
 		vsc_write(mac->adapter, REG_MODE_CFG(port), v);
-		
+
 		if (speed == SPEED_1000)
 			v = 0x82;
 		else if (speed == SPEED_100)
 			v = 0x84;
 		else	/* SPEED_10 */
-			v = 0x86; 
+			v = 0x86;
 		vsc_write(mac->adapter, REG_DEV_SETUP(port), v | 1); /* reset */
 		vsc_write(mac->adapter, REG_DEV_SETUP(port), v);
 		vsc_read(mac->adapter, REG_DBG(port), &v);
@@ -538,7 +536,7 @@ static int mac_set_speed_duplex_fc(struct cmac *mac, int speed, int duplex,
 		enable |= 0x1 << 4;	/* VLAN */
 		enable |= 0x3;		/* RX/TX EN */
 		vsc_write(mac->adapter, REG_MODE_CFG(port), enable);
-		
+
 	}
 
 	vsc_read(mac->adapter, REG_PAUSE_CFG(port), &v);
@@ -631,7 +629,7 @@ static void port_stats_update(struct cmac *mac)
 	rmon_update(mac, REG_RX_UNDERSIZE(port), &mac->stats.RxRuntErrors);
 	rmon_update(mac, REG_RX_SYMBOL_CARRIER(port),
 		    &mac->stats.RxSymbolErrors);
-	rmon_update(mac, REG_RX_SIZE_1519_TO_MAX(port), 
+	rmon_update(mac, REG_RX_SIZE_1519_TO_MAX(port),
             &mac->stats.RxJumboFramesOK);
 
 	/* Tx stats (skip collision stats as we are full-duplex only) */
@@ -643,7 +641,7 @@ static void port_stats_update(struct cmac *mac)
 		    &mac->stats.TxBroadcastFramesOK);
 	rmon_update(mac, REG_TX_PAUSE(port), &mac->stats.TxPauseFrames);
 	rmon_update(mac, REG_TX_UNDERRUN(port), &mac->stats.TxUnderrun);
-	rmon_update(mac, REG_TX_SIZE_1519_TO_MAX(port), 
+	rmon_update(mac, REG_TX_SIZE_1519_TO_MAX(port),
             &mac->stats.TxJumboFramesOK);
 }
 

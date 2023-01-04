@@ -27,8 +27,6 @@
 #ifndef _SYS_LIBC_KERNEL_H
 #define	_SYS_LIBC_KERNEL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains definitions for miscellaneous consolidation-private
  * interfaces that are private, exclusively between libc and the kernel.

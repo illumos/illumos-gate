@@ -34,8 +34,6 @@
 #ifndef	_SYS_G711_H
 #define	_SYS_G711_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

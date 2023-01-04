@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_ADAPTERS_HCI1394_IOCTL_H
 #define	_SYS_1394_ADAPTERS_HCI1394_IOCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_ioctl.h
  *   Test ioctl's to support test/debug of the 1394 HW. hci1394_ioctl_enum_t is

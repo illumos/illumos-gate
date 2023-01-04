@@ -28,8 +28,6 @@
 #ifndef	_TZMON_H
 #define	_TZMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

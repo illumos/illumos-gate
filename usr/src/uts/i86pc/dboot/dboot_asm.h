@@ -27,8 +27,6 @@
 #ifndef	_DBOOT_ASM_H
 #define	_DBOOT_ASM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel iconv code conversion module (kiconv_emea) for Europe, Middle East,
  * and South East Asia (PSARC/2007/173).

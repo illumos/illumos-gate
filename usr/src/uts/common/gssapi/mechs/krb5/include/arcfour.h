@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef ARCFOUR_H
 #define ARCFOUR_H
 
@@ -16,7 +14,7 @@ krb5_arcfour_encrypt_length(const struct krb5_enc_provider *,
 			size_t,
 			size_t *);
 
-extern 
+extern
 krb5_error_code krb5_arcfour_encrypt(krb5_context,
 			const struct krb5_enc_provider *,
 			const struct krb5_hash_provider *,
@@ -26,7 +24,7 @@ krb5_error_code krb5_arcfour_encrypt(krb5_context,
      			const krb5_data *,
 			krb5_data *);
 
-extern 
+extern
 krb5_error_code krb5_arcfour_decrypt(krb5_context,
 			const struct krb5_enc_provider *,
 			const struct krb5_hash_provider *,

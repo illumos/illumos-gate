@@ -48,8 +48,6 @@
 #ifndef __SPPPASYN_H
 #define	__SPPPASYN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

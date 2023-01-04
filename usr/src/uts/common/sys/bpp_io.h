@@ -27,8 +27,6 @@
 #ifndef	_SYS_BPP_IO_H
 #define	_SYS_BPP_IO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	I/O header file for the bidirectional parallel port
  *	driver (bpp) for the Zebra SBus card.

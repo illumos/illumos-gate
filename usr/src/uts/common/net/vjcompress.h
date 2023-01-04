@@ -28,8 +28,6 @@
 #ifndef _VJCOMPRESS_H_
 #define	_VJCOMPRESS_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

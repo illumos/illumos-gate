@@ -33,8 +33,6 @@
 #ifndef	_SYS_KIDMAP_H
 #define	_SYS_KIDMAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/idmap.h>
 #include <sys/door.h>
 #include <sys/zone.h>

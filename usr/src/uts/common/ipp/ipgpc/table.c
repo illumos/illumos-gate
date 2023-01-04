@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ipp/ipgpc/filters.h>
 
 /* table structure used for exact-match classification of selectors */

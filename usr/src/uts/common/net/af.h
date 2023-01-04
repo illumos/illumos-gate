@@ -12,7 +12,6 @@
 #ifndef	_NET_AF_H
 #define	_NET_AF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* af.h 1.10 88/08/19 SMI; from UCB 7.1	*/
 
 #ifdef	__cplusplus

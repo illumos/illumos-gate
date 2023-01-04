@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* cspi.c */
-
 #include "common.h"
 #include "regs.h"
 #include "cspi.h"

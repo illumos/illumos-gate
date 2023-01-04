@@ -31,9 +31,6 @@
 #ifndef _SYS_MSREG_H
 #define	_SYS_MSREG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS4.0 4.24 */
-
-
 #include <sys/types.h>
 #include <sys/types32.h>
 

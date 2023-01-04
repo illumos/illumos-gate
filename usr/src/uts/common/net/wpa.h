@@ -30,8 +30,6 @@
 #ifndef	__WPA_H
 #define	__WPA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <inet/wifi_ioctl.h>
 #include <sys/net80211_crypto.h>
 

@@ -95,7 +95,7 @@ struct vq_held_region {
 };
 typedef struct vq_held_region vq_held_region_t;
 
-static boolean_t viona_ring_map(viona_vring_t *);
+static bool viona_ring_map(viona_vring_t *, bool);
 static void viona_ring_unmap(viona_vring_t *);
 static kthread_t *viona_create_worker(viona_vring_t *);
 
@@ -243,7 +243,7 @@ viona_ring_lease_renew(viona_vring_t *ring)
 			 * If new mappings cannot be established, consider the
 			 * lease renewal a failure.
 			 */
-			if (!viona_ring_map(ring)) {
+			if (!viona_ring_map(ring, ring->vr_state == VRS_INIT)) {
 				viona_ring_lease_drop(ring);
 				return (B_FALSE);
 			}
@@ -318,7 +318,7 @@ viona_ring_init(viona_link_t *link, uint16_t idx,
 	ring->vr_size = qsz;
 	ring->vr_mask = (ring->vr_size - 1);
 	ring->vr_pa = pa;
-	if (!viona_ring_map(ring)) {
+	if (!viona_ring_map(ring, true)) {
 		err = EINVAL;
 		goto fail;
 	}
@@ -426,8 +426,8 @@ viona_ring_reset(viona_vring_t *ring, boolean_t heed_signals)
 	return (0);
 }
 
-static boolean_t
-viona_ring_map(viona_vring_t *ring)
+static bool
+viona_ring_map(viona_vring_t *ring, bool defer_dirty)
 {
 	const uint16_t qsz = ring->vr_size;
 	uintptr_t pa = ring->vr_pa;
@@ -443,15 +443,35 @@ viona_ring_map(viona_vring_t *ring)
 	const uint_t npages = LEGACY_VQ_PAGES(qsz);
 	ring->vr_map_pages = kmem_zalloc(npages * sizeof (void *), KM_SLEEP);
 
-	vmm_page_t *prev = NULL;
+	int page_flags = 0;
+	if (defer_dirty) {
+		/*
+		 * During initialization, and when entering the paused state,
+		 * the page holds for a virtqueue are established with the
+		 * DEFER_DIRTY flag set.
+		 *
+		 * This prevents those page holds from immediately marking the
+		 * underlying pages as dirty, since the viona emulation is not
+		 * yet performing any accesses.  Once the ring transitions to
+		 * the VRS_RUN state, the held pages will be marked as dirty.
+		 *
+		 * Any ring mappings performed outside those state conditions,
+		 * such as those part of vmm_lease renewal during steady-state
+		 * operation, will map the ring pages normally (as considered
+		 * immediately dirty).
+		 */
+		page_flags |= VMPF_DEFER_DIRTY;
+	}
 
+	vmm_page_t *prev = NULL;
 	for (uint_t i = 0; i < npages; i++, pa += PAGESIZE) {
 		vmm_page_t *vmp;
 
-		vmp = vq_page_hold(ring, pa, true);
+		vmp = vmm_drv_page_hold_ext(ring->vr_lease, pa,
+		    PROT_READ | PROT_WRITE, page_flags);
 		if (vmp == NULL) {
 			viona_ring_unmap(ring);
-			return (B_FALSE);
+			return (false);
 		}
 
 		/*
@@ -467,7 +487,19 @@ viona_ring_map(viona_vring_t *ring)
 		ring->vr_map_pages[i] = vmm_drv_page_writable(vmp);
 	}
 
-	return (B_TRUE);
+	return (true);
+}
+
+static void
+viona_ring_mark_dirty(viona_vring_t *ring)
+{
+	ASSERT(MUTEX_HELD(&ring->vr_lock));
+	ASSERT(ring->vr_map_hold != NULL);
+
+	for (vmm_page_t *vp = ring->vr_map_hold; vp != NULL;
+	    vp = vmm_drv_page_next(vp)) {
+		vmm_drv_page_mark_dirty(vp);
+	}
 }
 
 static void
@@ -678,6 +710,7 @@ ring_init:
 	ASSERT((ring->vr_state_flags & VRSF_REQ_START) != 0);
 	ring->vr_state = VRS_RUN;
 	ring->vr_state_flags &= ~VRSF_REQ_START;
+	viona_ring_mark_dirty(ring);
 
 	/* Ensure ring lease is valid first */
 	if (vmm_drv_lease_expired(ring->vr_lease)) {
@@ -702,9 +735,25 @@ ring_init:
 	if (vring_pause_req(ring)) {
 		ring->vr_state_flags &= ~VRSF_REQ_PAUSE;
 
-		if (!vring_need_bail_ext(ring, true)) {
+		if (vring_need_bail_ext(ring, true)) {
+			goto ring_reset;
+		}
+
+		/*
+		 * To complete pausing of the ring, unmap and re-map the pages
+		 * underpinning the virtqueue.  This is to synchronize their
+		 * dirty state in the backing page tables and restore the
+		 * defer-dirty state on the held pages.
+		 */
+		viona_ring_unmap(ring);
+		if (viona_ring_map(ring, true)) {
 			goto ring_init;
 		}
+
+		/*
+		 * If the ring pages failed to be mapped, fallthrough to
+		 * ring-reset like any other failure.
+		 */
 	}
 
 ring_reset:

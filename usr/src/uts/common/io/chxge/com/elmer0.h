@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* elmer0.h */
-
 #ifndef CHELSIO_ELMER0_H
 #define CHELSIO_ELMER0_H
 

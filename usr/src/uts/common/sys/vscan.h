@@ -26,8 +26,6 @@
 #ifndef	_VSCAN_H
 #define	_VSCAN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

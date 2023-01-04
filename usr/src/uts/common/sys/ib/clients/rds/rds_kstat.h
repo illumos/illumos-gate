@@ -26,8 +26,6 @@
 #ifndef	_RDS_KSTAT_H
 #define	_RDS_KSTAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

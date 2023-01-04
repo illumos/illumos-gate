@@ -27,8 +27,6 @@
 #ifndef _CS_STUBS_H
 #define	_CS_STUBS_H
 
-#pragma ident	"%W%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

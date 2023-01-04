@@ -27,8 +27,6 @@
 #ifndef	_SYS_SERIALIZER_H
 #define	_SYS_SERIALIZER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is used for building Solaris kernel. It does not provide any public
  * interface, its content is unstable and subject to change without notice at

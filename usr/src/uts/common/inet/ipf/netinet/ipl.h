@@ -10,9 +10,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #ifndef	__IPL_H__
 #define	__IPL_H__
 

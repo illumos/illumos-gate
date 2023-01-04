@@ -26,8 +26,6 @@
 #ifndef	_SYS_STRSUN_H
 #define	_SYS_STRSUN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stream.h>
 #include <sys/types.h>
 

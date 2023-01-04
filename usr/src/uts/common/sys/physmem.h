@@ -26,8 +26,6 @@
 #ifndef	_PHYSMEM_H
 #define	_PHYSMEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _VMM_DRV_H_
@@ -37,6 +37,9 @@ typedef struct vmm_lease vmm_lease_t;
 struct vmm_page;
 typedef struct vmm_page vmm_page_t;
 
+/* Flags defined for vmm_drv_page_hold_ext(), mirror those for vmc_hold(): */
+#define	VMPF_DEFER_DIRTY		(1 << 0)
+
 /*
  * Because of tangled headers, this definitions mirrors its ioport_handler_t
  * counterpart in vmm_kernel.h.
@@ -53,10 +56,12 @@ extern void vmm_drv_lease_break(vmm_hold_t *, vmm_lease_t *);
 extern boolean_t vmm_drv_lease_expired(vmm_lease_t *);
 
 extern vmm_page_t *vmm_drv_page_hold(vmm_lease_t *, uintptr_t, int);
+extern vmm_page_t *vmm_drv_page_hold_ext(vmm_lease_t *, uintptr_t, int, int);
 extern void vmm_drv_page_release(vmm_page_t *);
 extern void vmm_drv_page_release_chain(vmm_page_t *);
 extern const void *vmm_drv_page_readable(const vmm_page_t *);
 extern void *vmm_drv_page_writable(const vmm_page_t *);
+extern void vmm_drv_page_mark_dirty(vmm_page_t *);
 extern void vmm_drv_page_chain(vmm_page_t *, vmm_page_t *);
 extern vmm_page_t *vmm_drv_page_next(const vmm_page_t *);
 

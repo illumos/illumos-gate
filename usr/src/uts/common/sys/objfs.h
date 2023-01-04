@@ -27,8 +27,6 @@
 #ifndef	_OBJFS_H
 #define	_OBJFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

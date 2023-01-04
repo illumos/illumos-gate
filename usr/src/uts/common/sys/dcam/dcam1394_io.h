@@ -27,8 +27,6 @@
 #ifndef _SYS_DCAM_DCAM1394_IO_H
 #define	_SYS_DCAM_DCAM1394_IO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/time.h>
 
 #ifdef __cplusplus

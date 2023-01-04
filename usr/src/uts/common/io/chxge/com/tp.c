@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* tp.c */
-
 #include "common.h"
 #include "regs.h"
 #include "tp.h"
@@ -142,12 +140,12 @@ int t1_tp_set_coalescing_size(struct petp *tp, unsigned int size)
 
 	if (tp->adapter->params.nports > 1)
 		size = 9904;
-	
+
 	if (size) {
 		u32 v = t1_is_T1B(tp->adapter) ? 0 : V_MAX_RX_SIZE(size);
 
 		/* Set coalescing size. */
-		t1_write_reg_4(tp->adapter, A_TP_PARA_REG2, 
+		t1_write_reg_4(tp->adapter, A_TP_PARA_REG2,
 			       V_RX_COALESCE_SIZE(size) | v);
 
 		val |= (F_RX_COALESCING_PSH_DELIVER | F_RX_COALESCING_ENABLE);
@@ -198,7 +196,7 @@ static void tp_init(adapter_t *ap, const struct tp_params *p,
                  */
                 if (is_T2(ap) && ap->params.nports > 1) {
                         u32 drop_ticks = DROP_MSEC * (tp_clk / 1000);
-                                                                                
+
                         t1_write_reg_4(ap, A_TP_TX_DROP_CONFIG,
                                        F_ENABLE_TX_DROP | F_ENABLE_TX_ERROR |
                                        V_DROP_TICKS_CNT(drop_ticks) |
@@ -208,7 +206,7 @@ static void tp_init(adapter_t *ap, const struct tp_params *p,
 #ifdef CONFIG_CHELSIO_T1_OFFLOAD
 		t1_write_reg_4(ap, A_TP_GLOBAL_RX_CREDITS, 0xffffffff);
 		val = V_WINDOW_SCALE(1) | F_MSS | V_DEFAULT_PEER_MSS(576);
-		
+
 		/* We don't want timestamps for T204, otherwise we don't know
 		 * the MSS.
 		 */
@@ -221,9 +219,9 @@ static void tp_init(adapter_t *ap, const struct tp_params *p,
 		t1_write_reg_4(ap, A_TP_BACKOFF1, 0x7060504);
 		t1_write_reg_4(ap, A_TP_BACKOFF2, 0xb0a0908);
 		t1_write_reg_4(ap, A_TP_BACKOFF3, 0xf0e0d0c);
-		
+
 		/* We do scheduling in software for T204, increase the cong.
-		 * window to avoid TP holding on to payload longer than we 
+		 * window to avoid TP holding on to payload longer than we
 		 * expect.
 		 */
 		if (ap->params.nports == 1)
@@ -345,7 +343,7 @@ void t1_tp_intr_disable(struct petp *tp)
 		t1_write_reg_4(tp->adapter, FPGA_TP_ADDR_INTERRUPT_ENABLE, 0);
 		t1_write_reg_4(tp->adapter, A_PL_ENABLE,
 			       tp_intr & ~FPGA_PCIX_INTERRUPT_TP);
-	} else 
+	} else
 #endif
 	{
 		t1_write_reg_4(tp->adapter, A_TP_INT_ENABLE, 0);

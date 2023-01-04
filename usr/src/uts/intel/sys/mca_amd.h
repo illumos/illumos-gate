@@ -27,8 +27,6 @@
 #ifndef _SYS_MCA_AMD_H
 #define	_SYS_MCA_AMD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mca_x86.h>
 
 /*

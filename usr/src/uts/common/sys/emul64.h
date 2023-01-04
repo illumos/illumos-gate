@@ -27,8 +27,6 @@
 #ifndef _SYS_SCSI_ADAPTERS_EMUL64_H
 #define	_SYS_SCSI_ADAPTERS_EMUL64_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file defines the commands and structures for three emul64 ioctls,
  * that may be useful in speeding up tests involving large devices.  The

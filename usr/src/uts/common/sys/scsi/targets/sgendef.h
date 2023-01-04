@@ -32,8 +32,6 @@
 #ifndef _SYS_SCSI_TARGETS_SGENDEF_H
 #define	_SYS_SCSI_TARGETS_SGENDEF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/kstat.h>
 #include <sys/condvar.h>

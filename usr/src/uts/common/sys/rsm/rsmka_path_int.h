@@ -27,8 +27,6 @@
 #ifndef	_SYS_RSM_RSMKA_PATH_INT_H
 #define	_SYS_RSM_RSMKA_PATH_INT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

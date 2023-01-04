@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* xpak.c */
-
 #include "cphy.h"
 #include "elmer0.h"
 
@@ -152,4 +150,4 @@ struct gphy t1_xpak_ops = {
 	xpak_phy_create,
 	xpak_phy_reset
 };
- 
+

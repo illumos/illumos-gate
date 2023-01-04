@@ -27,8 +27,6 @@
 #ifndef _SYS_AV_IEC61883_H
 #define	_SYS_AV_IEC61883_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IEC 61883 interfaces
  */

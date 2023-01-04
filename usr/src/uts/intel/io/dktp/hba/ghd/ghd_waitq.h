@@ -27,8 +27,6 @@
 #ifndef _GHD_WAITQ_H
 #define	_GHD_WAITQ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -27,8 +27,6 @@
 #ifndef _SYS_FS_UFS_BIO_H
 #define	_SYS_FS_UFS_BIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/t_lock.h>
 #include <sys/kstat.h>
 

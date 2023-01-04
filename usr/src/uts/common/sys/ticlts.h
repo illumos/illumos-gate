@@ -26,8 +26,6 @@
 #ifndef _SYS_TICLTS_H
 #define	_SYS_TICLTS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

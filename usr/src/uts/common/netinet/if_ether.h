@@ -18,7 +18,6 @@
 #ifndef	_NETINET_IF_ETHER_H
 #define	_NETINET_IF_ETHER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* if_ether.h 1.28 89/08/04 SMI; from UCB 7.2 12/7/87 */
 
 #include <sys/ethernet.h>

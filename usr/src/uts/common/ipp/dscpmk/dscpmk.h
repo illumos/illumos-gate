@@ -27,8 +27,6 @@
 #ifndef _IPP_DSCPMK_DSCPMK_H
 #define	_IPP_DSCPMK_DSCPMK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

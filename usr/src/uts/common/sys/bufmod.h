@@ -27,8 +27,6 @@
 #ifndef	_SYS_BUFMOD_H
 #define	_SYS_BUFMOD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/types32.h>
 

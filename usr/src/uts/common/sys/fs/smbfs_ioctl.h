@@ -27,8 +27,6 @@
 #ifndef _SMBFS_IOCTL_H
 #define	_SMBFS_IOCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Project private IOCTL interface provided by SMBFS.
  */

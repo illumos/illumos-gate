@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* mc5.c */
-
 #include "common.h"
 #include "regs.h"
 #include "mc5.h"
@@ -510,7 +508,7 @@ void t1_mc5_intr_enable(struct pemc5 *mc5)
 		/*
 		 * Enable child block for MC5.
 		 *
-		 * NOTE: Assumes TP parent interrupt block is enabled. 
+		 * NOTE: Assumes TP parent interrupt block is enabled.
 		 *       MC5 requires TP parent block to be enabled.
 		 */
 		t1_write_reg_4(mc5->adapter, A_MC5_INT_ENABLE, mask);
@@ -548,7 +546,7 @@ void t1_mc5_intr_clear(struct pemc5 *mc5)
 #ifdef CONFIG_CHELSIO_T1_1G
 	if (!t1_is_asic(mc5->adapter)) {
 		t1_write_reg_4(mc5->adapter, A_MC5_INT_CAUSE, 0xffffffff);
-	} else 
+	} else
 #endif
 	{
 		t1_write_reg_4(mc5->adapter, A_PL_CAUSE, F_PL_INTR_MC5);
@@ -691,7 +689,7 @@ static int mc5_set_lip_entries(struct pemc5 *mc5, u32 *p,
 
 	/*
 	 * Disable compression and M bus mode so that the TP core
-	 * doesn't access the TCAM  while we are writing. 
+	 * doesn't access the TCAM  while we are writing.
 	 */
 	u32 cfg = t1_read_reg_4(mc5->adapter, A_MC5_CONFIG);
 	t1_write_reg_4(mc5->adapter, A_MC5_CONFIG,

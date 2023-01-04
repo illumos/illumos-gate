@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SUNW15resync
  * This file (mglueP.h) is the MIT name for the mech glue

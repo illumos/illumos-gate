@@ -27,8 +27,6 @@
 #ifndef	_VM_KPM_H
 #define	_VM_KPM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

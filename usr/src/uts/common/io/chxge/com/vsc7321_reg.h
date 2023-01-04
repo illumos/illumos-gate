@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* vsc7321_reg.h */
-
 #ifndef _VSC7321_REG_H_
 #define _VSC7321_REG_H_
 

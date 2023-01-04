@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_CMD1394_H
 #define	_SYS_1394_CMD1394_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * cmd1394.h
  *    Contains the enums, command structures, and error codes used with

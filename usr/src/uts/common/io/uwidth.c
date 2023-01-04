@@ -53,8 +53,6 @@
 #include <sys/eucioctl.h>
 #include <sys/ldterm.h>
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Private use area characters' width. We set it to two since PU will be
  * used mostly by Asian locales.

@@ -44,7 +44,6 @@
 #ifndef	_NETINET_IP_ICMP_H
 #define	_NETINET_IP_ICMP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* ip_icmp.h 1.9 88/08/19 SMI; from UCB 7.3 12/7/87	*/
 
 #ifdef	__cplusplus

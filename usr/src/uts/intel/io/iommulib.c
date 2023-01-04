@@ -23,8 +23,6 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
-#pragma ident	"@(#)iommulib.c	1.6	08/09/07 SMI"
-
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/errno.h>

@@ -27,8 +27,6 @@
 #ifndef _SYS_DCOPY_DEVICE_H
 #define	_SYS_DCOPY_DEVICE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

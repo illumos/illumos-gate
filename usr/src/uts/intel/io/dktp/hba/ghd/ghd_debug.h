@@ -27,8 +27,6 @@
 #ifndef _GHD_DEBUG_H
 #define	_GHD_DEBUG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

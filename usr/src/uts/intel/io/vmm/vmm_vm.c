@@ -196,6 +196,9 @@ struct vm_object {
 	uint8_t		vmo_attr;
 };
 
+/* Convenience consolidation of all flag(s) for validity checking */
+#define	VPF_ALL		(VPF_DEFER_DIRTY)
+
 struct vm_page {
 	vm_client_t	*vmp_client;
 	list_node_t	vmp_node;
@@ -204,7 +207,8 @@ struct vm_page {
 	pfn_t		vmp_pfn;
 	uint64_t	*vmp_ptep;
 	vm_object_t	*vmp_obj_ref;
-	int		vmp_prot;
+	uint8_t		vmp_prot;
+	uint8_t		vmp_flags;
 };
 
 static vmspace_mapping_t *vm_mapping_find(vmspace_t *, uintptr_t, size_t);
@@ -1112,7 +1116,7 @@ vmc_space_orphan(vm_client_t *vmc, vmspace_t *vms)
  * Attempt to hold a page at `gpa` inside the referenced vmspace.
  */
 vm_page_t *
-vmc_hold(vm_client_t *vmc, uintptr_t gpa, int prot)
+vmc_hold_ext(vm_client_t *vmc, uintptr_t gpa, int prot, int flags)
 {
 	vmspace_t *vms = vmc->vmc_space;
 	vm_page_t *vmp;
@@ -1121,6 +1125,8 @@ vmc_hold(vm_client_t *vmc, uintptr_t gpa, int prot)
 
 	ASSERT0(gpa & PAGEOFFSET);
 	ASSERT((prot & (PROT_READ | PROT_WRITE)) != PROT_NONE);
+	ASSERT0(prot & ~PROT_ALL);
+	ASSERT0(flags & ~VPF_ALL);
 
 	vmp = kmem_alloc(sizeof (*vmp), KM_SLEEP);
 	if (vmc_activate(vmc) != 0) {
@@ -1141,11 +1147,21 @@ vmc_hold(vm_client_t *vmc, uintptr_t gpa, int prot)
 	vmp->vmp_pfn = pfn;
 	vmp->vmp_ptep = ptep;
 	vmp->vmp_obj_ref = NULL;
-	vmp->vmp_prot = prot;
+	vmp->vmp_prot = (uint8_t)prot;
+	vmp->vmp_flags = (uint8_t)flags;
 	list_insert_tail(&vmc->vmc_held_pages, vmp);
 	vmc_deactivate(vmc);
 
 	return (vmp);
+}
+
+/*
+ * Attempt to hold a page at `gpa` inside the referenced vmspace.
+ */
+vm_page_t *
+vmc_hold(vm_client_t *vmc, uintptr_t gpa, int prot)
+{
+	return (vmc_hold_ext(vmc, gpa, prot, VPF_DEFAULT));
 }
 
 int
@@ -1296,6 +1312,18 @@ vmp_get_pfn(const vm_page_t *vmp)
 }
 
 /*
+ * If this page was deferring dirty-marking in the corresponding vmspace page
+ * tables, clear such a state so it is considered dirty from now on.
+ */
+void
+vmp_mark_dirty(vm_page_t *vmp)
+{
+	ASSERT((vmp->vmp_prot & PROT_WRITE) != 0);
+
+	atomic_and_8(&vmp->vmp_flags, ~VPF_DEFER_DIRTY);
+}
+
+/*
  * Store a pointer to `to_chain` in the page-chaining slot of `vmp`.
  */
 void
@@ -1331,7 +1359,17 @@ vmp_release_inner(vm_page_t *vmp, vm_client_t *vmc)
 	} else {
 		ASSERT3P(vmp->vmp_ptep, !=, NULL);
 
-		if ((vmp->vmp_prot & PROT_WRITE) != 0 && vmc->vmc_track_dirty) {
+		/*
+		 * Track appropriate (accessed/dirty) bits for the guest-virtual
+		 * address corresponding to this page, if it is from the vmspace
+		 * rather than a direct reference to an underlying object.
+		 *
+		 * The protection and/or configured flags may obviate the need
+		 * for such an update.
+		 */
+		if ((vmp->vmp_prot & PROT_WRITE) != 0 &&
+		    (vmp->vmp_flags & VPF_DEFER_DIRTY) == 0 &&
+		    vmc->vmc_track_dirty) {
 			vmm_gpt_t *gpt = vmc->vmc_space->vms_gpt;
 			(void) vmm_gpt_reset_dirty(gpt, vmp->vmp_ptep, true);
 		}

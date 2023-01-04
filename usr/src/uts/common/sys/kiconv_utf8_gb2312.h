@@ -68,8 +68,6 @@
 #ifndef _SYS_KICONV_UTF8_GB2312_H
 #define	_SYS_KICONV_UTF8_GB2312_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

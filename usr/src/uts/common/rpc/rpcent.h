@@ -39,8 +39,6 @@
 #ifndef _RPC_RPCENT_H
 #define	_RPC_RPCENT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

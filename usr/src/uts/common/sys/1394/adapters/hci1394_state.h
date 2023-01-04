@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_STATE_H
 #define	_SYS_1394_ADAPTERS_HCI1394_STATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_state.h
  *    The hci1394 driver soft state structure.

@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_DEF_H
 #define	_SYS_1394_ADAPTERS_HCI1394_DEF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_def.h
  *    This should be the first file included before any other hci1394

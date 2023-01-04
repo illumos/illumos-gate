@@ -26,8 +26,6 @@
 #ifndef _NPI_TX_WR64_H
 #define	_NPI_TX_WR64_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

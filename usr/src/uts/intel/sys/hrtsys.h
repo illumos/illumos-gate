@@ -31,8 +31,6 @@
 #ifndef _SYS_HRTSYS_H
 #define	_SYS_HRTSYS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/hrtcntl.h>
 
 #ifdef	__cplusplus

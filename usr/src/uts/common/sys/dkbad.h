@@ -27,8 +27,6 @@
 #ifndef	_SYS_DKBAD_H
 #define	_SYS_DKBAD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* UCB 4.3 81/05/10 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

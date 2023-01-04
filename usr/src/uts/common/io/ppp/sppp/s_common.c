@@ -16,7 +16,6 @@
  * DISTRIBUTING THIS SOFTWARE OR ITS DERIVATIVES
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define	RCSID	"$Id: s_common.c,v 1.0 2000/05/08 01:10:12 masputra Exp $"
 
 #include <sys/types.h>

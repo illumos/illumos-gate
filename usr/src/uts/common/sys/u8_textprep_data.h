@@ -68,8 +68,6 @@
 #ifndef _SYS_U8_TEXTPREP_DATA_H
 #define	_SYS_U8_TEXTPREP_DATA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

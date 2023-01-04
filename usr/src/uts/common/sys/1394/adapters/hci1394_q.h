@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_Q_H
 #define	_SYS_1394_ADAPTERS_HCI1394_Q_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_q.h
  *    This code decouples some of the OpenHCI async descriptor logic/structures

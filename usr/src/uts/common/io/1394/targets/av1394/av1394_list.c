@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Yet another list implementation
  *    This is a multipurpose double-linked list. It requires that the first

@@ -42,8 +42,6 @@
  * $Id: ppp_ahdlc.c,v 1.16 2000/03/06 19:38:12 masputra Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/stream.h>

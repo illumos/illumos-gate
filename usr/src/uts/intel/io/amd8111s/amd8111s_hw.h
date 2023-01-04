@@ -6,8 +6,6 @@
 #ifndef AMD8111S_HW_H
 #define	AMD8111S_HW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (c) 2001-2006 Advanced Micro Devices, Inc.  All rights reserved.
  *

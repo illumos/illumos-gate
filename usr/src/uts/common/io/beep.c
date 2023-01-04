@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is the Beep module for supporting keyboard beep for keyboards
  * that do not have the beeping feature within themselves

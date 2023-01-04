@@ -31,8 +31,6 @@
 #ifndef __GNUC_VA_LIST
 #define __GNUC_VA_LIST
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __sparc_v9__
 typedef long long __va_greg;
 typedef double __va_freg;

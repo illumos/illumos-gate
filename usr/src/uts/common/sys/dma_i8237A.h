@@ -27,8 +27,6 @@
 #ifndef _SYS_DMA_I8237A_H
 #define	_SYS_DMA_I8237A_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

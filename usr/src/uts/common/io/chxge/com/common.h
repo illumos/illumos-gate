@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* common.h */
-
 #ifndef CHELSIO_COMMON_H
 #define CHELSIO_COMMON_H
 
@@ -123,7 +121,7 @@ struct pci_params {
 	unsigned char  width;
 	unsigned char  is_pcix;
 };
-	
+
 struct adapter_params {
 	struct sge_params sge;
 	struct mc5_params mc5;
@@ -139,7 +137,7 @@ struct adapter_params {
 	unsigned char  chip_version;
 	unsigned char  is_asic;
 };
-	
+
 struct pci_err_cnt {
 	unsigned int master_parity_err;
 	unsigned int sig_target_abort;

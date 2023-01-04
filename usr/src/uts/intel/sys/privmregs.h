@@ -26,8 +26,6 @@
 #ifndef	_SYS_PRIVMREGS_H
 #define	_SYS_PRIVMREGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/privregs.h>
 
 #if defined(__amd64)

@@ -9,8 +9,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	__IP_AUTH_H__
 #define	__IP_AUTH_H__
 

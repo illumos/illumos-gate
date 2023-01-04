@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_IEEE1212_H
 #define	_SYS_1394_IEEE1212_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ieee1212.h
  *     This file contains various defines for config rom entries

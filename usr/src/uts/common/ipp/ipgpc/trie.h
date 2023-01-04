@@ -27,8 +27,6 @@
 #ifndef _IPP_IPGPC_TRIE_H
 #define	_IPP_IPGPC_TRIE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ipp/ipgpc/classifier-objects.h>
 
 #ifdef	__cplusplus

@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_IEEE1394_H
 #define	_SYS_1394_IEEE1394_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ieee1394.h
  *    This file contains various defines that go with IEEE 1394

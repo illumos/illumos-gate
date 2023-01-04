@@ -27,8 +27,6 @@
 #ifndef _INET_SCTP_CRC32_H
 #define	_INET_SCTP_CRC32_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

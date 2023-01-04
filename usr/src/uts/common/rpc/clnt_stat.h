@@ -32,8 +32,6 @@
 #ifndef	_RPC_CLNT_STAT_H
 #define	_RPC_CLNT_STAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

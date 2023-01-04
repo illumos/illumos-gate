@@ -27,8 +27,6 @@
 #ifndef	_SYS_DEVPOLICY_H
 #define	_SYS_DEVPOLICY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/priv.h>
 #include <sys/param.h>

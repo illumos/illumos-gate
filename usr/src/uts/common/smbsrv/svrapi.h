@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_SVRAPI_H
 #define	_SMBSRV_SVRAPI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file provides definitions for the SMB Net interface. On Windows
  * this would be NetAccess, NetConnection, NetFile, NetServer,

@@ -24,7 +24,5 @@
 # Copyright (c) 1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 find_files "s.*" usr/src/common/net/dhcp

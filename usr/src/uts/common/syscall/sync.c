@@ -23,10 +23,6 @@
 /*	Copyright (c) 1994 Sun Microsystems, Inc.  */
 /*	  All Rights Reserved  	*/
 
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4 1.42	*/
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/errno.h>

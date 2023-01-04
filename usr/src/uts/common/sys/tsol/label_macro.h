@@ -26,8 +26,6 @@
 #ifndef	_LABEL_MACRO_H
 #define	_LABEL_MACRO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

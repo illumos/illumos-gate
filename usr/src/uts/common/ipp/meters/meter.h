@@ -27,8 +27,6 @@
 #ifndef _IPP_METERS_METER_H
 #define	_IPP_METERS_METER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

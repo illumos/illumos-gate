@@ -26,8 +26,6 @@
 #ifndef _KDI_H
 #define	_KDI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 /*

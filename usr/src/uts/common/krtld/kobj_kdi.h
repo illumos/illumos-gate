@@ -27,8 +27,6 @@
 #ifndef _KOBJ_KDI_H
 #define	_KOBJ_KDI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/kdi.h>
 #include <sys/consdev.h>
 #include <sys/kobj.h>

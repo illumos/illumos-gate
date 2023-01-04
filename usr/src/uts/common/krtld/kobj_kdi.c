@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The KDI is used to allow the kernel debugger to directly invoke various
  * kernel functions.  In some cases, such as with kdi_mod_iter(), the

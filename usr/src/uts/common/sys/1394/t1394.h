@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_T1394_H
 #define	_SYS_1394_T1394_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * t1394.h
  *    Contains all of the prototypes, defines, and structures necessary

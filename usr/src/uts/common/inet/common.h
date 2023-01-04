@@ -27,8 +27,6 @@
 #ifndef	_INET_COMMON_H
 #define	_INET_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING: This file contains implementation-specific constants, typedefs
  *	    and macros which may change from release to release.

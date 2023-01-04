@@ -31,8 +31,6 @@
 #ifndef	_GSSAPI_ERR_GENERIC_H
 #define	_GSSAPI_ERR_GENERIC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

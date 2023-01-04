@@ -41,8 +41,6 @@
 #ifndef _RPC_SVC_SOC_H
 #define	_RPC_SVC_SOC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _KERNEL
 
 #include <sys/socket.h>

@@ -44,6 +44,7 @@ int vmspace_track_dirty(vmspace_t *, uint64_t, size_t, uint8_t *);
 
 /* vm_client_t operations */
 vm_page_t *vmc_hold(vm_client_t *, uintptr_t, int);
+vm_page_t *vmc_hold_ext(vm_client_t *, uintptr_t, int, int);
 uint64_t vmc_table_enter(vm_client_t *);
 void vmc_table_exit(vm_client_t *);
 int vmc_fault(vm_client_t *, uintptr_t, int);
@@ -62,10 +63,28 @@ pfn_t vm_object_pfn(vm_object_t *, uintptr_t);
 const void *vmp_get_readable(const vm_page_t *);
 void *vmp_get_writable(const vm_page_t *);
 pfn_t vmp_get_pfn(const vm_page_t *);
+void vmp_mark_dirty(vm_page_t *);
 void vmp_chain(vm_page_t *, vm_page_t *);
 vm_page_t *vmp_next(const vm_page_t *);
 bool vmp_release(vm_page_t *);
 bool vmp_release_chain(vm_page_t *);
+
+/*
+ * Flags for vmc_hold_ext():
+ */
+
+/* The default flags are empty */
+#define	VPF_DEFAULT		0
+
+/*
+ * When a page is held for potential writes, the consumer may not perform those
+ * writes immediately, or in some cases ever.  They may wish to defer the page
+ * being considered dirty until such a determination is made.  By establishing a
+ * page hold with this flag, the consumer commits to a later vmp_mark_dirty()
+ * call if they write any data though the vm_page.  Doing so will effectively
+ * clear the flag and subject the page to expected dirty-tracking logic.
+ */
+#define	VPF_DEFER_DIRTY		(1 << 0)
 
 /* seg_vmm mapping */
 struct vm;

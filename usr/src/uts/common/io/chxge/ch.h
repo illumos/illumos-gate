@@ -33,8 +33,6 @@
 #ifndef _CHELSIO_CH_H
 #define	_CHELSIO_CH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/debug.h>
 
 #ifdef __cplusplus

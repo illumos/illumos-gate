@@ -6,8 +6,6 @@
 #ifndef _SYS_MPI_H
 #define	_SYS_MPI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

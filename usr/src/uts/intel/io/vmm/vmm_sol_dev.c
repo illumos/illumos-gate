@@ -2336,6 +2336,21 @@ vmm_drv_page_hold(vmm_lease_t *lease, uintptr_t gpa, int prot)
 	return ((vmm_page_t *)vmc_hold(lease->vml_vmclient, gpa, prot));
 }
 
+
+/* Ensure that flags mirrored by vmm_drv interface properly match up */
+CTASSERT(VMPF_DEFER_DIRTY == VPF_DEFER_DIRTY);
+
+vmm_page_t *
+vmm_drv_page_hold_ext(vmm_lease_t *lease, uintptr_t gpa, int prot, int flags)
+{
+	ASSERT(lease != NULL);
+	ASSERT0(gpa & PAGEOFFSET);
+
+	vmm_page_t *page =
+	    (vmm_page_t *)vmc_hold_ext(lease->vml_vmclient, gpa, prot, flags);
+	return (page);
+}
+
 void
 vmm_drv_page_release(vmm_page_t *vmmp)
 {
@@ -2358,6 +2373,12 @@ void *
 vmm_drv_page_writable(const vmm_page_t *vmmp)
 {
 	return (vmp_get_writable((const vm_page_t *)vmmp));
+}
+
+void
+vmm_drv_page_mark_dirty(vmm_page_t *vmmp)
+{
+	return (vmp_mark_dirty((vm_page_t *)vmmp));
 }
 
 void

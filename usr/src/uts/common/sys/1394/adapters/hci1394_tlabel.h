@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_TLABEL_H
 #define	_SYS_1394_ADAPTERS_HCI1394_TLABEL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_tlabel.h
  *   These routines track the tlabel usage for a 1394 adapter.

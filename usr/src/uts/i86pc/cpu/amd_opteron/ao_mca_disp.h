@@ -25,8 +25,6 @@
 #ifndef _AO_MCA_DISP_H
 #define	_AO_MCA_DISP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/mca_amd.h>
 #include <sys/fm/cpu/AMD.h>

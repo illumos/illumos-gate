@@ -31,8 +31,6 @@
 #ifndef _SYS_PIC_H
 #define	_SYS_PIC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/avintr.h>
 
 #ifdef	__cplusplus

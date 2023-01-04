@@ -27,8 +27,6 @@
 #ifndef	_SYS_1394_IXL1394_H
 #define	_SYS_1394_IXL1394_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ixl1394.h
  *    Contains all defines and structures necessary for Isochronous Transfer

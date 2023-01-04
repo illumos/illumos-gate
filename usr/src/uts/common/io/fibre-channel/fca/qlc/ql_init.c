@@ -25,8 +25,6 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident	"Copyright 2010 QLogic Corporation; ql_init.c"
-
 /*
  * ISP2xxx Solaris Fibre Channel Adapter (FCA) driver source file.
  *

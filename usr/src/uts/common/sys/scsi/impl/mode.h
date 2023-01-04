@@ -27,8 +27,6 @@
 #ifndef	_SYS_SCSI_IMPL_MODE_H
 #define	_SYS_SCSI_IMPL_MODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

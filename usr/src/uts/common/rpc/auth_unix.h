@@ -37,8 +37,6 @@
 #ifndef _RPC_AUTH_UNIX_H
 #define	_RPC_AUTH_UNIX_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is now obsolete. Users should switch to <rpc/auth_sys.h>
  */

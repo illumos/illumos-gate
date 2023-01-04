@@ -27,8 +27,6 @@
 #ifndef	_SYS_GNTTAB_H
 #define	_SYS_GNTTAB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * gnttab.h
  *

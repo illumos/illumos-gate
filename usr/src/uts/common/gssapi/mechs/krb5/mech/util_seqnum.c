@@ -1,9 +1,7 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
   * Copyright2001 by the Massachusetts Institute of Technology.
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -13,7 +11,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -51,13 +49,13 @@ kg_make_seq_num(context, key, direction, seqnum, cksum, buf)
      plain[1] = (seqnum>>16) & 0xff;
      plain[2] = (seqnum>>8) & 0xff;
      plain[3] = seqnum & 0xff;
-     return kg_arcfour_docrypt (context, key, 0, 
+     return kg_arcfour_docrypt (context, key, 0,
 				cksum, 8,
 				&plain[0], 8,
 				buf);
-     
+
    }
-     
+
    plain[0] = (unsigned char) (seqnum&0xff);
    plain[1] = (unsigned char) ((seqnum>>8)&0xff);
    plain[2] = (unsigned char) ((seqnum>>16)&0xff);

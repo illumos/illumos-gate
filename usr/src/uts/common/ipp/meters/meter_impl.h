@@ -27,8 +27,6 @@
 #ifndef _IPP_METERS_METER_IMPL_H
 #define	_IPP_METERS_METER_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>

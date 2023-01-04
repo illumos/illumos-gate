@@ -31,8 +31,6 @@
 #ifndef _SYS_LLC1_H
 #define	_SYS_LLC1_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

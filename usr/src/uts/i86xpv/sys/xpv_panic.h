@@ -26,8 +26,6 @@
 #ifndef _SYS_XPV_PANIC_H
 #define	_SYS_XPV_PANIC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -27,8 +27,6 @@
 #ifndef _SYS_REFSTR_IMPL_H
 #define	_SYS_REFSTR_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

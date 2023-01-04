@@ -34,8 +34,6 @@
 #ifndef	_SYS_MTIO_H
 #define	_SYS_MTIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

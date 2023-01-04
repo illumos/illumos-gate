@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.15 */
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>

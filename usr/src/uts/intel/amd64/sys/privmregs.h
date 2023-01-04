@@ -27,8 +27,6 @@
 #ifndef	_AMD64_SYS_PRIVMREGS_H
 #define	_AMD64_SYS_PRIVMREGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

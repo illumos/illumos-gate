@@ -26,8 +26,6 @@
 #ifndef	_SYS_BALLOON_IMPL_H
 #define	_SYS_BALLOON_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/balloon.h>
 #include <sys/types.h>
 #include <vm/page.h>

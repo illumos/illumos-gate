@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"Copyright 2010 QLogic Corporation; ql_fw_2400.c"
-
 #include <sys/types.h>
 
 /*

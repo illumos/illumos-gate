@@ -27,8 +27,6 @@
 #ifndef	_KGSSAPI_DEFS_H
 #define	_KGSSAPI_DEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

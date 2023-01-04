@@ -18,8 +18,6 @@
  * is provided ``as is'' without express or implied warranty.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/ethernet.h>

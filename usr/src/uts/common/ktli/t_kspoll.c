@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This function waits for timo clock ticks for something to arrive on
  * the specified stream. If more than one client is hanging off of a

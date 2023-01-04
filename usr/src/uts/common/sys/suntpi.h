@@ -27,8 +27,6 @@
 #ifndef	_SYS_SUNTPI_H
 #define	_SYS_SUNTPI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/ksynch.h>
 #include <sys/stream.h>

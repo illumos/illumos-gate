@@ -26,8 +26,6 @@
 #ifndef	_SYS_PSM_MODCTL_H
 #define	_SYS_PSM_MODCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * loadable module support.
  */

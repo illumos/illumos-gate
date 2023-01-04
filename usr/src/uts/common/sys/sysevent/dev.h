@@ -26,8 +26,6 @@
 #ifndef	_SYS_SYSEVENT_DEV_H
 #define	_SYS_SYSEVENT_DEV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysevent/eventdefs.h>
 
 #ifdef	__cplusplus

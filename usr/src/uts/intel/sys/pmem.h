@@ -27,8 +27,6 @@
 #ifndef	_SYS_PMEM_H
 #define	_SYS_PMEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

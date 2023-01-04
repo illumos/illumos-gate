@@ -33,8 +33,6 @@
 #ifndef	_SYS_XENBUS_COMMS_H
 #define	_SYS_XENBUS_COMMS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sunddi.h>
 
 #ifdef __cplusplus

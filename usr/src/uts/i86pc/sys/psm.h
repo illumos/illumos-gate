@@ -27,8 +27,6 @@
 #ifndef	_SYS_PSM_H
 #define	_SYS_PSM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Platform Specific Module (PSM)
  */

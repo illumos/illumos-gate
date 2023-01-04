@@ -27,8 +27,6 @@
 #ifndef	_SYS_SER_SYNC_H
 #define	_SYS_SER_SYNC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Initial port setup parameters for sync lines
  */

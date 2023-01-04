@@ -28,8 +28,6 @@
 /*	  All Rights Reserved	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/proc.h>
 #include <sys/param.h>
 #include <sys/cmn_err.h>

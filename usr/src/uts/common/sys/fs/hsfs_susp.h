@@ -27,8 +27,6 @@
 #ifndef	_SYS_FS_HSFS_SUSP_H
 #define	_SYS_FS_HSFS_SUSP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

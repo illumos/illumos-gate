@@ -26,8 +26,6 @@
 #ifndef	_SYS_1394_TARGETS_SCSA1394_CMD_H
 #define	_SYS_1394_TARGETS_SCSA1394_CMD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * scsa1394 command
  */

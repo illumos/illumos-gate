@@ -26,8 +26,6 @@
  *	All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * A homegrown reader/writer lock implementation.  It addresses
  * two requirements not addressed by the system primitives.  They

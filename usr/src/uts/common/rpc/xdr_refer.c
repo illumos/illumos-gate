@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * #if !defined(lint) && defined(SCCSIDS)
  * static char sccsid[] = "@(#)xdr_refer.c 1.21 89/02/28 SMI";

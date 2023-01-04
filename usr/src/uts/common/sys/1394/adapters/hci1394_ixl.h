@@ -27,8 +27,6 @@
 #ifndef _SYS_1394_ADAPTERS_HCI1394_IXL_H
 #define	_SYS_1394_ADAPTERS_HCI1394_IXL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_ixl.h
  *    Structures and defines for IXL processing.

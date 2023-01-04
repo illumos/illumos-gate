@@ -27,8 +27,6 @@
 #ifndef _SYS_IB_MGT_IBCM_IBCM_TRACE_H
 #define	_SYS_IB_MGT_IBCM_IBCM_TRACE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

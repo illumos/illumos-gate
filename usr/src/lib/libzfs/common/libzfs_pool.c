@@ -4038,7 +4038,6 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 {
 	char *path, *type, *env;
 	uint64_t value;
-	char buf[64];
 
 	/*
 	 * vdev_name will be "root"/"root-0" for the root vdev, but it is the
@@ -4066,8 +4065,7 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT, &value) == 0 ||
 	    name_flags & VDEV_NAME_GUID) {
 		nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &value);
-		(void) snprintf(buf, sizeof (buf), "%llu", (u_longlong_t)value);
-		path = buf;
+		path = zfs_asprintf(hdl, "%llu", (u_longlong_t)value);
 	} else if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
 		vdev_stat_t *vs;
 		uint_t vsc;
@@ -4082,6 +4080,7 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 		    (uint64_t **)&vs, &vsc) != 0 ||
 		    vs->vs_state < VDEV_STATE_DEGRADED ||
 		    zhp == NULL) {
+			path = zfs_strdup(hdl, path);
 			goto after_open;
 		}
 
@@ -4094,16 +4093,19 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 
 		if (name_flags & VDEV_NAME_FOLLOW_LINKS) {
 			char *rp = realpath(path, NULL);
-			if (rp) {
-				strlcpy(buf, rp, sizeof (buf));
-				path = buf;
-				free(rp);
-			}
+			if (rp == NULL)
+				no_memory(hdl);
+			path = rp;
+		} else {
+			path = zfs_strdup(hdl, path);
 		}
 
 after_open:
-		if (strncmp(path, ZFS_DISK_ROOTD, strlen(ZFS_DISK_ROOTD)) == 0)
-			path += strlen(ZFS_DISK_ROOTD);
+		if (strncmp(path, ZFS_DISK_ROOTD,
+		    sizeof (ZFS_DISK_ROOTD) - 1) == 0) {
+			memmove(path, path + sizeof (ZFS_DISK_ROOTD) - 1,
+			    strlen(path) - sizeof (ZFS_DISK_ROOTD));
+		}
 
 		/*
 		 * Remove the partition from the path it this is a whole disk.
@@ -4111,38 +4113,38 @@ after_open:
 		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK, &value)
 		    == 0 && value && !(name_flags & VDEV_NAME_PATH)) {
 			int pathlen = strlen(path);
-			char *tmp = zfs_strdup(hdl, path);
 
 			/*
 			 * If it starts with c#, and ends with "s0" or "s1",
 			 * chop the slice off, or if it ends with "s0/old" or
 			 * "s1/old", remove the slice from the middle.
 			 */
-			if (CTD_CHECK(tmp)) {
-				if (strcmp(&tmp[pathlen - 2], "s0") == 0 ||
-				    strcmp(&tmp[pathlen - 2], "s1") == 0) {
-					tmp[pathlen - 2] = '\0';
+			if (CTD_CHECK(path)) {
+				if (strcmp(&path[pathlen - 2], "s0") == 0 ||
+				    strcmp(&path[pathlen - 2], "s1") == 0) {
+					path[pathlen - 2] = '\0';
 				} else if (pathlen > 6 &&
-				    (strcmp(&tmp[pathlen - 6], "s0/old") == 0 ||
-				    strcmp(&tmp[pathlen - 6], "s1/old") == 0)) {
-					(void) strcpy(&tmp[pathlen - 6],
+				    (strcmp(&path[pathlen - 6],
+				    "s0/old") == 0 ||
+				    strcmp(&path[pathlen - 6],
+				    "s1/old") == 0)) {
+					(void) strcpy(&path[pathlen - 6],
 					    "/old");
 				}
 			}
-			return (tmp);
+			return (path);
 		}
 	} else {
-		path = type;
-
 		/*
 		 * If it's a raidz device, we need to stick in the parity level.
 		 */
-		if (strcmp(path, VDEV_TYPE_RAIDZ) == 0) {
+		if (strcmp(type, VDEV_TYPE_RAIDZ) == 0) {
 			verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NPARITY,
 			    &value) == 0);
-			(void) snprintf(buf, sizeof (buf), "%s%llu", path,
+			path = zfs_asprintf(hdl, "%s%llu", type,
 			    (u_longlong_t)value);
-			path = buf;
+		} else {
+			path = zfs_strdup(hdl, type);
 		}
 
 		/*
@@ -4151,16 +4153,18 @@ after_open:
 		 */
 		if (name_flags & VDEV_NAME_TYPE_ID) {
 			uint64_t id;
+			char *tmp;
 
 			verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ID,
 			    &id) == 0);
-			(void) snprintf(buf, sizeof (buf), "%s-%llu", path,
+			tmp = zfs_asprintf(hdl, "%s-%llu", path,
 			    (u_longlong_t)id);
-			path = buf;
+			free(path);
+			path = tmp;
 		}
 	}
 
-	return (zfs_strdup(hdl, path));
+	return (path);
 }
 
 static int

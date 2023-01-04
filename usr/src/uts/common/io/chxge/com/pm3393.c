@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* pm3393.c */
-
 #include "common.h"
 #include "regs.h"
 #include "gmac.h"
@@ -113,7 +111,7 @@ static int pm3393_reset(struct cmac *cmac)
 
 /*
  * Enable interrupts for the PM3393
- 
+
     1. Enable PM3393 BLOCK interrupts.
     2. Enable PM3393 Master Interrupt bit(INTE)
     3. Enable ELMER's PM3393 bit.
@@ -234,7 +232,7 @@ static int pm3393_interrupt_clear(struct cmac *cmac)
 	(void) pmread(cmac, SUNI1x10GEXP_REG_PL4IO_LOCK_DETECT_STATUS, &val32);
 	(void) pmread(cmac, SUNI1x10GEXP_REG_PL4IO_LOCK_DETECT_CHANGE, &val32);
 
-	/* PM3393 - Global interrupt status 
+	/* PM3393 - Global interrupt status
 	 */
 	(void) pmread(cmac, SUNI1x10GEXP_REG_MASTER_INTERRUPT_STATUS, &val32);
 
@@ -244,7 +242,7 @@ static int pm3393_interrupt_clear(struct cmac *cmac)
 	elmer |= ELMER0_GP_BIT1;
 	(void) t1_tpi_write(cmac->adapter, A_ELMER0_INT_CAUSE, elmer);
 
-	/* TERMINATOR - PL_INTERUPTS_EXT 
+	/* TERMINATOR - PL_INTERUPTS_EXT
 	 */
 	pl_intr = t1_read_reg_4(cmac->adapter, A_PL_CAUSE);
 	pl_intr |= F_PL_INTR_EXT;
@@ -576,12 +574,12 @@ static const struct cmac_statistics *pm3393_update_statistics(struct cmac *mac,
 	(void) pmwrite(mac, SUNI1x10GEXP_REG_MSTAT_CONTROL,
 		SUNI1x10GEXP_BITMSK_MSTAT_SNAP);
 
-	/* Counter rollover, clear on read */ 
+	/* Counter rollover, clear on read */
 	(void) pmread(mac, SUNI1x10GEXP_REG_MSTAT_COUNTER_ROLLOVER_0, &val0);
 	(void) pmread(mac, SUNI1x10GEXP_REG_MSTAT_COUNTER_ROLLOVER_1, &val1);
 	(void) pmread(mac, SUNI1x10GEXP_REG_MSTAT_COUNTER_ROLLOVER_2, &val2);
 	(void) pmread(mac, SUNI1x10GEXP_REG_MSTAT_COUNTER_ROLLOVER_3, &val3);
-	ro = (u16)val0 | (((u16)val1) << 16) | ((u64)((u16)val2) << 32) 
+	ro = (u16)val0 | (((u16)val1) << 16) | ((u64)((u16)val2) << 32)
 	     | ((u64)((u16)val3) << 48);
 
 	/* Rx stats */
@@ -631,7 +629,7 @@ static int pm3393_macaddress_set(struct cmac *cmac, u8 ma[6])
 	 * ma[1] = 0x07
 	 * ma[0] = 0x00
 	 *
-	 * The PM3393 requires byte swapping and reverse order entry 
+	 * The PM3393 requires byte swapping and reverse order entry
 	 * when programming MAC addresses:
 	 *
 	 * low_bits[15:0]    = ma[1]:ma[0]
@@ -855,7 +853,7 @@ static int pm3393_mac_reset(adapter_t * adapter)
 	 * 4. Wait minimum of 1ms. (after external clocks and REFEL are stable)
 	 * 5. De-assert RSTB ( write 1 )
 	 * 6. Wait until internal timers to expires after ~14ms.
-	 *    - Allows analog clock synthesizer(PL4CSU) to stabilize to 
+	 *    - Allows analog clock synthesizer(PL4CSU) to stabilize to
 	 *      selected reference frequency before allowing the digital
 	 *      portion of the device to operate.
 	 * 7. Wait at least 200us for XAUI interface to stabilize.
