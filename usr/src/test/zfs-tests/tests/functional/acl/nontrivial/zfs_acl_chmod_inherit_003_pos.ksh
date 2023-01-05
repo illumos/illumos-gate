@@ -130,7 +130,7 @@ function verify_inherit #<aclinherit> <object> [strategy]
 			inherited=1
 		fi
 
-		while ((i < $maxaces)); do
+		while ((i < maxaces)); do
 			# If current node isn't in inherit list, there's
 			# nothing to check, skip to checking trivial ACL
 			if ((inherited == 0)); then
@@ -207,7 +207,7 @@ function verify_inherit #<aclinherit> <object> [strategy]
 				compare_acls $node $ofile
 			fi
 
-			if [[ $? -ne 0 ]]; then
+			if (( $? != 0 )); then
 				ls -Vd $basedir
 				ls -Vd $node
 				log_fail "unexpected acl: $node," \
@@ -240,7 +240,7 @@ for inherit in "${aclinherit_flag[@]}"; do
 
 				# deny - to verify "noallow"
 				# write_acl/write_owner - to verify "restricted"
-				acl0="$ace_prefix1:-------A-W-Co-:$inh_a:allow"
+				acl0="$ace_prefix1:rwxp---A-W-Co-:$inh_a:allow"
 				acl1="$ace_prefix2:-------A-W-Co-:$inh_a:deny"
 				acl2="$ace_prefix3:-------A-W-Co-:$inh_a:allow"
 				acl3="$ace_prefix1:-------A-W----:$inh_a:deny"
@@ -248,7 +248,7 @@ for inherit in "${aclinherit_flag[@]}"; do
 				acl5="$ace_prefix3:-------A-W----:$inh_a:deny"
 
 				# ACEs filtered by write_acl/write_owner
-				acls0="$ace_prefix1:-------A-W----:$inh_b:allow"
+				acls0="$ace_prefix1:rwxp---A-W----:$inh_b:allow"
 				acls1="$ace_prefix2:-------A-W-Co-:$inh_b:deny"
 				acls2="$ace_prefix3:-------A-W----:$inh_b:allow"
 				acls3="$ace_prefix1:-------A-W----:$inh_b:deny"
