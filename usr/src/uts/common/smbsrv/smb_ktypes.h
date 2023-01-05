@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011-2022 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2017-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -268,6 +268,7 @@ typedef struct _smb_thread {
 	uint32_t		sth_magic;
 	char			sth_name[32];
 	smb_thread_state_t	sth_state;
+	struct smb_server	*sth_server;
 	kthread_t		*sth_th;
 	kt_did_t		sth_did;
 	smb_thread_ep_t		sth_ep;
@@ -2125,6 +2126,13 @@ typedef struct smb_server {
 	smb_listener_daemon_t	sv_tcp_daemon;
 	krwlock_t		sv_cfg_lock;
 	smb_kmod_cfg_t		sv_cfg;
+
+	kmutex_t		sv_proc_lock;
+	kcondvar_t		sv_proc_cv;
+	smb_thread_state_t	sv_proc_state;
+	uint64_t		sv_proc_did;
+	struct proc		*sv_proc_p;
+
 	smb_session_t		*sv_session;
 	smb_user_t		*sv_rootuser;
 	smb_llist_t		sv_session_list;

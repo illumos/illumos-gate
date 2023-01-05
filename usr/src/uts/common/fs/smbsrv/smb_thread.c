@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -84,7 +85,7 @@ smb_thread_entry_point(
 	thread->sth_state = SMB_THREAD_STATE_EXITING;
 	cv_broadcast(&thread->sth_cv);
 	mutex_exit(&thread->sth_mtx);
-	zthread_exit();
+	thread_exit();
 }
 
 /*
@@ -96,13 +97,15 @@ smb_thread_init(
     char		*name,
     smb_thread_ep_t	ep,
     void		*ep_arg,
-    pri_t		pri)
+    pri_t		pri,
+    smb_server_t	*sv)
 {
 	ASSERT(thread->sth_magic != SMB_THREAD_MAGIC);
 
 	bzero(thread, sizeof (*thread));
 
 	(void) strlcpy(thread->sth_name, name, sizeof (thread->sth_name));
+	thread->sth_server = sv;
 	thread->sth_ep = ep;
 	thread->sth_ep_arg = ep_arg;
 	thread->sth_state = SMB_THREAD_STATE_EXITED;
@@ -137,18 +140,23 @@ int
 smb_thread_start(
     smb_thread_t	*thread)
 {
-	int		rc = 0;
 	kthread_t	*tmpthread;
+	struct proc	*procp;
+	smb_server_t	*sv = thread->sth_server;
+	int		rc = 0;
 
 	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
+
+	procp = (sv->sv_proc_p != NULL) ?
+	    sv->sv_proc_p : curzone->zone_zsched;
 
 	mutex_enter(&thread->sth_mtx);
 	switch (thread->sth_state) {
 	case SMB_THREAD_STATE_EXITED:
 		thread->sth_state = SMB_THREAD_STATE_STARTING;
 		mutex_exit(&thread->sth_mtx);
-		tmpthread = zthread_create(NULL, 0, smb_thread_entry_point,
-		    thread, 0, thread->sth_pri);
+		tmpthread = thread_create(NULL, 0, smb_thread_entry_point,
+		    thread, 0, procp, TS_RUN, thread->sth_pri);
 		ASSERT(tmpthread != NULL);
 		mutex_enter(&thread->sth_mtx);
 		thread->sth_th = tmpthread;

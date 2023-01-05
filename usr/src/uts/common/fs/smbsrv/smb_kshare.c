@@ -23,7 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 Joyent, Inc.
- * Copyright 2022 RackTop Systems.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 
 #include <smbsrv/smb_door.h>
@@ -319,7 +319,7 @@ int
 smb_kshare_start(smb_server_t *sv)
 {
 	smb_thread_init(&sv->sv_export.e_unexport_thread, "smb_kshare_unexport",
-	    smb_kshare_unexport_thread, sv, smbsrv_base_pri);
+	    smb_kshare_unexport_thread, sv, smbsrv_base_pri, sv);
 
 	return (smb_thread_start(&sv->sv_export.e_unexport_thread));
 }

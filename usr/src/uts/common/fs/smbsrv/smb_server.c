@@ -22,7 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2021-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -206,6 +206,10 @@
 #include <sys/cmn_err.h>
 #include <sys/priv.h>
 #include <sys/zone.h>
+#include <sys/sysmacros.h>
+#include <sys/callb.h>
+#include <sys/class.h>
+#include <sys/disp.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
@@ -250,6 +254,13 @@ static void smb_server_destroy_session(smb_session_t *);
 static uint16_t smb_spool_get_fid(smb_server_t *);
 static boolean_t smb_spool_lookup_doc_byfid(smb_server_t *, uint16_t,
     smb_kspooldoc_t *);
+
+#ifdef	_KERNEL
+int smb_create_process = 1;
+static void smb_server_delproc(smb_server_t *);
+static int smb_server_newproc(smb_server_t *);
+static void smb_server_proc_main(void *);
+#endif
 
 /*
  * How many "buckets" should our hash tables use?  On a "real" server,
@@ -394,8 +405,14 @@ smb_server_g_fini(void)
 /*
  * smb_server_create
  *
+ * Called by driver open
+ *
  * This function will fail if there's already a server associated with the
  * caller's zone.
+ *
+ * This object is one-to-one with zones, so we could instead
+ * create/destroy this via zone_key_create callbacks.
+ * See smb_server_delete() for destruction.
  */
 int
 smb_server_create(void)
@@ -422,6 +439,7 @@ smb_server_create(void)
 	sv->sv_state = SMB_SERVER_STATE_CREATED;
 	sv->sv_zid = zid;
 	sv->sv_pid = ddi_get_pid();
+	sv->sv_proc_state = SMB_THREAD_STATE_EXITED;
 
 	mutex_init(&sv->sv_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&sv->sv_cv, NULL, CV_DEFAULT, NULL);
@@ -452,7 +470,7 @@ smb_server_create(void)
 	    sizeof (smb_disp_stats_t), KM_SLEEP);
 
 	smb_thread_init(&sv->si_thread_timers, "smb_timers",
-	    smb_server_timers, sv, smbsrv_timer_pri);
+	    smb_server_timers, sv, smbsrv_timer_pri, sv);
 
 	smb_srqueue_init(&sv->sv_srqueue);
 
@@ -475,6 +493,8 @@ smb_server_create(void)
 
 /*
  * smb_server_delete
+ *
+ * Called by driver close
  *
  * This function will delete the server passed in. It will make sure that all
  * activity associated that server has ceased before destroying it.
@@ -553,6 +573,8 @@ smb_server_delete(smb_server_t	*sv)
 
 /*
  * smb_server_configure
+ *
+ * Called via SMB_IOC_CONFIG, for smbd startup or refresh.
  */
 int
 smb_server_configure(smb_ioc_cfg_t *ioc)
@@ -602,6 +624,9 @@ smb_server_configure(smb_ioc_cfg_t *ioc)
 
 /*
  * smb_server_start
+ *
+ * Called via SMB_IOC_START during smbd startup.
+ * Bring up the activities requried for SMB service.
  */
 int
 smb_server_start(smb_ioc_start_t *ioc)
@@ -610,6 +635,7 @@ smb_server_start(smb_ioc_start_t *ioc)
 	int		family;
 	smb_server_t	*sv;
 	cred_t		*ucr;
+	struct proc	*tqproc;
 
 	rc = smb_server_lookup(&sv);
 	if (rc)
@@ -618,6 +644,14 @@ smb_server_start(smb_ioc_start_t *ioc)
 	mutex_enter(&sv->sv_mutex);
 	switch (sv->sv_state) {
 	case SMB_SERVER_STATE_CONFIGURED:
+
+#ifdef	_KERNEL
+		if (smb_create_process) {
+			rc = smb_server_newproc(sv);
+			if (rc != 0)
+				break;
+		}
+#endif	/* _KERNEL */
 
 		if ((rc = smb_server_fsop_start(sv)) != 0)
 			break;
@@ -654,15 +688,18 @@ smb_server_start(smb_ioc_start_t *ioc)
 		 * NB: the proc passed here has to be a "system" one.
 		 * Normally that's p0, or the NGZ eqivalent.
 		 */
+		tqproc = (sv->sv_proc_p != NULL) ?
+		    sv->sv_proc_p : curzone->zone_zsched;
+
 		sv->sv_worker_pool = taskq_create_proc("smb_workers",
 		    sv->sv_cfg.skc_maxworkers, smbsrv_worker_pri,
 		    sv->sv_cfg.skc_maxworkers, INT_MAX,
-		    curzone->zone_zsched, TASKQ_DYNAMIC);
+		    tqproc, TASKQ_DYNAMIC);
 
 		sv->sv_receiver_pool = taskq_create_proc("smb_receivers",
 		    sv->sv_cfg.skc_maxconnections, smbsrv_receive_pri,
 		    sv->sv_cfg.skc_maxconnections, INT_MAX,
-		    curzone->zone_zsched, TASKQ_DYNAMIC);
+		    tqproc, TASKQ_DYNAMIC);
 
 		if (sv->sv_worker_pool == NULL ||
 		    sv->sv_receiver_pool == NULL) {
@@ -1127,6 +1164,130 @@ smb_server_disconnect_share(smb_server_t *sv, const char *sharename)
 	smb_llist_exit(ll);
 }
 
+#ifdef	_KERNEL
+
+/*
+ * Create a process to own SMB server threads.
+ */
+static int
+smb_server_newproc(smb_server_t *sv)
+{
+	int rc;
+
+	mutex_enter(&sv->sv_proc_lock);
+	if (sv->sv_proc_p != NULL) {
+		/* restart? re-use proc */
+		rc = 0;
+		goto out;
+	}
+
+	sv->sv_proc_state = SMB_THREAD_STATE_STARTING;
+	rc = newproc(smb_server_proc_main, (caddr_t)sv,
+	    syscid, smbsrv_base_pri, NULL, 0);
+	if (rc != 0) {
+		cmn_err(CE_WARN, "newproc failed, rc=%d", rc);
+		goto out;
+	}
+
+	/* Rendez-vous with new proc thread. */
+	while (sv->sv_proc_state == SMB_THREAD_STATE_STARTING) {
+		cv_wait(&sv->sv_proc_cv, &sv->sv_proc_lock);
+
+	}
+	if (sv->sv_proc_state != SMB_THREAD_STATE_RUNNING) {
+		rc = ESRCH;
+		goto out;
+	}
+	ASSERT(sv->sv_proc_p != NULL);
+
+out:
+	mutex_exit(&sv->sv_proc_lock);
+	return (rc);
+}
+
+/*
+ * Main thread for the process we create to own SMB server threads.
+ */
+static void
+smb_server_proc_main(void *arg)
+{
+	callb_cpr_t	cprinfo;
+	smb_server_t	*sv = arg;
+	user_t		*pu = PTOU(curproc);
+	zoneid_t	zid = getzoneid();
+
+	ASSERT(curproc != &p0);
+	ASSERT(zid == sv->sv_zid);
+
+	(void) strlcpy(pu->u_comm, "smbsrv", sizeof (pu->u_comm));
+	(void) snprintf(pu->u_psargs, sizeof (pu->u_psargs),
+	    "smbsrv %d", (int)zid);
+
+	CALLB_CPR_INIT(&cprinfo, &sv->sv_proc_lock, callb_generic_cpr,
+	    pu->u_psargs);
+
+	mutex_enter(&sv->sv_proc_lock);
+	ASSERT(sv->sv_proc_state == SMB_THREAD_STATE_STARTING);
+
+	sv->sv_proc_p = curproc;
+	sv->sv_proc_did = curthread->t_did;
+
+	sv->sv_proc_state = SMB_THREAD_STATE_RUNNING;
+	cv_broadcast(&sv->sv_proc_cv);
+
+	CALLB_CPR_SAFE_BEGIN(&cprinfo);
+	while (sv->sv_proc_state == SMB_THREAD_STATE_RUNNING)
+		cv_wait(&sv->sv_proc_cv, &sv->sv_proc_lock);
+	CALLB_CPR_SAFE_END(&cprinfo, &sv->sv_proc_lock);
+
+	ASSERT(sv->sv_proc_state == SMB_THREAD_STATE_EXITING);
+	sv->sv_proc_state = SMB_THREAD_STATE_EXITED;
+	sv->sv_proc_p = NULL;
+	cv_broadcast(&sv->sv_proc_cv);
+	CALLB_CPR_EXIT(&cprinfo);	/* mutex_exit sv_proc_lock */
+
+	/* Note: lwp_exit() expects p_lock entered. */
+	mutex_enter(&curproc->p_lock);
+	lwp_exit();
+}
+
+/*
+ * Delete the server proc (if any)
+ */
+static void
+smb_server_delproc(smb_server_t *sv)
+{
+
+	mutex_enter(&sv->sv_proc_lock);
+
+	if (sv->sv_proc_state != SMB_THREAD_STATE_RUNNING)
+		goto out;
+	ASSERT(sv->sv_proc_p != NULL);
+
+	sv->sv_proc_state = SMB_THREAD_STATE_EXITING;
+	cv_broadcast(&sv->sv_proc_cv);
+
+	/* Rendez-vous with proc thread. */
+	while (sv->sv_proc_state == SMB_THREAD_STATE_EXITING) {
+		cv_wait(&sv->sv_proc_cv, &sv->sv_proc_lock);
+
+	}
+	if (sv->sv_proc_state != SMB_THREAD_STATE_EXITED) {
+		cmn_err(CE_WARN, "smb_server_delproc, state=%d",
+		    sv->sv_proc_state);
+		goto out;
+	}
+	if (sv->sv_proc_did != 0) {
+		thread_join(sv->sv_proc_did);
+		sv->sv_proc_did = 0;
+	}
+
+out:
+	mutex_exit(&sv->sv_proc_lock);
+}
+
+#endif	/* _KERNEL */
+
 /*
  * *****************************************************************************
  * **************** Functions called from the internal layers ******************
@@ -1564,6 +1725,12 @@ smb_server_shutdown(smb_server_t *sv)
 	smb2_dh_shutdown(sv);
 
 	smb_server_fsop_stop(sv);
+
+#ifdef	_KERNEL
+	if (sv->sv_proc_p != NULL) {
+		smb_server_delproc(sv);
+	}
+#endif
 }
 
 /*
@@ -1599,7 +1766,7 @@ smb_server_listener_init(
 	}
 
 	smb_thread_init(&ld->ld_thread, name, smb_server_listener, ld,
-	    smbsrv_listen_pri);
+	    smbsrv_listen_pri, sv);
 	ld->ld_magic = SMB_LISTENER_MAGIC;
 }
 

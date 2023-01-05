@@ -20,7 +20,8 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -28,6 +29,8 @@
  */
 
 #include <sys/types.h>
+#include <sys/cred.h>
+#include <sys/cred_impl.h>
 #include <sys/sid.h>
 #include <sys/priv_names.h>
 #include <sys/socket.h>
@@ -70,6 +73,12 @@ smb_cred_create(smb_token_t *token)
 
 	cr = crget();
 	ASSERT(cr != NULL);
+
+	/*
+	 * Add (preserve) PRIV_SYS_SMB in the permitted set.
+	 * See the privilege check in smbd:pipe_has_priv
+	 */
+	priv_addset(&CR_PPRIV(cr), PRIV_SYS_SMB);
 
 	if (!IDMAP_ID_IS_EPHEMERAL(token->tkn_user.i_id) &&
 	    (posix_grps->pg_ngrps != 0)) {
