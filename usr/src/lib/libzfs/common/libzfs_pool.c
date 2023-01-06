@@ -4099,8 +4099,9 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 after_open:
 		if (strncmp(path, ZFS_DISK_ROOTD,
 		    sizeof (ZFS_DISK_ROOTD) - 1) == 0) {
-			memmove(path, path + sizeof (ZFS_DISK_ROOTD) - 1,
-			    strlen(path) - sizeof (ZFS_DISK_ROOTD));
+			const char *p2 = path + sizeof (ZFS_DISK_ROOTD) - 1;
+
+			memmove(path, p2, strlen(p2) + 1);
 		}
 
 		/*
