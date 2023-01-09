@@ -27,6 +27,7 @@
 
 #
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2023 RackTop Systems, Inc.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -241,7 +242,7 @@ for inherit in "${aclinherit_flag[@]}"; do
 				# deny - to verify "noallow"
 				# write_acl/write_owner - to verify "restricted"
 				acl0="$ace_prefix1:rwxp---A-W-Co-:$inh_a:allow"
-				acl1="$ace_prefix2:-------A-W-Co-:$inh_a:deny"
+				acl1="$ace_prefix2:-------A-W--o-:$inh_a:deny"
 				acl2="$ace_prefix3:-------A-W-Co-:$inh_a:allow"
 				acl3="$ace_prefix1:-------A-W----:$inh_a:deny"
 				acl4="$ace_prefix2:-------A-W----:$inh_a:allow"
@@ -249,7 +250,7 @@ for inherit in "${aclinherit_flag[@]}"; do
 
 				# ACEs filtered by write_acl/write_owner
 				acls0="$ace_prefix1:rwxp---A-W----:$inh_b:allow"
-				acls1="$ace_prefix2:-------A-W-Co-:$inh_b:deny"
+				acls1="$ace_prefix2:-------A-W--o-:$inh_b:deny"
 				acls2="$ace_prefix3:-------A-W----:$inh_b:allow"
 				acls3="$ace_prefix1:-------A-W----:$inh_b:deny"
 				acls4="$ace_prefix2:-------A-W----:$inh_b:allow"

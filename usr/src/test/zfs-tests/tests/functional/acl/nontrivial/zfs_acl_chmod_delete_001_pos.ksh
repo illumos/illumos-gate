@@ -27,6 +27,7 @@
 
 #
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2023 RackTop Systems, Inc.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -198,16 +199,13 @@ function test_chmod_basic_access #node g_usr o_usr
 	typeset g_usr=$2
 	typeset o_usr=$3
 	typeset flag acl_p acl_t parent
-	typeset -i i=0
 
 	parent=${node%/*}
 
 	for flag in ${a_flag[@]}; do
 	for acl_p in "${access_parent[@]}"; do
-		i=0
 		for acl in $acl_p ; do
 			log_must usr_exec chmod A+$flag:$acl $parent
-			(( i = i + 1))
 		done
 
 		for acl_t in "${access_target[@]}"; do
@@ -223,9 +221,8 @@ function test_chmod_basic_access #node g_usr o_usr
 				log_must usr_exec chmod A0- $node
 		done
 
-		while (( i > 0 )); do
-			log_must usr_exec chmod A0- $parent
-			(( i = i - 1 ))
+		for acl in $acl_p ; do
+			log_pos usr_exec chmod A-$flag:$acl $parent
 		done
 	done
 	done

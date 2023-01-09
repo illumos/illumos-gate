@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2023 RackTop Systems, Inc.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -43,7 +44,7 @@
 # 4. Verify that the owner/group are correct. Follow these rules:
 #	(1) If uid is granted the write_owner permission, then it can only do
 #	    chown to its own uid, or a group that they are a member of.
-#	(2) Owner will ignore permission of (1) even write_owner not granted.
+#	(2) chown/chgrp will fail when write_owner not granted.
 #	(3) Superuser will always permit whatever they do.
 #
 
@@ -197,7 +198,13 @@ function logname
 		ret="log_must"
 	elif [[ $user == $new ]] ; then
 		if [[ $user == $old || $acl_target == *:allow ]]; then
-			ret="log_must"
+			# with aclimplicit=on, the write_owner:deny
+			# will have no effect and chown/chgrp commands
+			# needs to succeed.
+			if [[ $aclimplicit == on ||
+			    $acl_target != *@:write_owner:deny ]]; then
+				ret="log_must"
+			fi
 		fi
 	fi
 
@@ -303,22 +310,44 @@ function setup_test_files
 }
 
 typeset ARCHIVEFILE=archive.tar
+typeset a_prop="on off"
 typeset a_access="write_owner:allow write_owner:deny"
 typeset a_flag="owner@ group@ everyone@"
 typeset basedir="$TESTDIR/basedir"
 typeset file="$basedir/file"
 typeset dir="$basedir/dir"
+typeset aclimplicit=$(zfs get -Ho value aclimplicit $TESTPOOL/$TESTFS)
+typeset val
 
 cd $TESTDIR
-setup_test_files $basedir 'root' 'root'
-test_chmod_basic_access 'root' $file $ZFS_ACL_ADMIN  $ZFS_ACL_OTHER1
-test_chmod_basic_access 'root' $dir $ZFS_ACL_ADMIN  $ZFS_ACL_OTHER1
-rm -rf $basedir
 
-setup_test_files $basedir $ZFS_ACL_STAFF1 $ZFS_ACL_STAFF_GROUP
-test_chmod_basic_access $ZFS_ACL_STAFF1 $file $ZFS_ACL_STAFF2 $ZFS_ACL_OTHER1
-test_chmod_basic_access $ZFS_ACL_STAFF1 $dir $ZFS_ACL_STAFF2 $ZFS_ACL_OTHER1
-rm -rf $basedir
+for val in $a_prop; do
+	log_must zfs set aclimplicit=$val $TESTPOOL/$TESTFS
+	aclimplicit=$(zfs get -Ho value aclimplicit $TESTPOOL/$TESTFS)
+	if [[ $val == off ]]; then
+		# aclimplicit=off also needs aclmode=passthrough and
+		# aclinherit=passthrough
+		log_must zfs set aclmode=passthrough $TESTPOOL/$TESTFS
+		log_must zfs set aclinherit=passthrough $TESTPOOL/$TESTFS
+	fi
+
+	setup_test_files $basedir 'root' 'root'
+	test_chmod_basic_access 'root' $file $ZFS_ACL_ADMIN  $ZFS_ACL_OTHER1
+	test_chmod_basic_access 'root' $dir $ZFS_ACL_ADMIN  $ZFS_ACL_OTHER1
+	rm -rf $basedir
+
+	setup_test_files $basedir $ZFS_ACL_STAFF1 $ZFS_ACL_STAFF_GROUP
+	test_chmod_basic_access $ZFS_ACL_STAFF1 $file $ZFS_ACL_STAFF2 \
+		$ZFS_ACL_OTHER1
+	test_chmod_basic_access $ZFS_ACL_STAFF1 $dir $ZFS_ACL_STAFF2 \
+		$ZFS_ACL_OTHER1
+	rm -rf $basedir
+done
+
+# restore defaults, so next test is not affected.
+log_must zfs inherit aclmode $TESTPOOL/$TESTFS
+log_must zfs inherit aclinherit $TESTPOOL/$TESTFS
+log_must zfs inherit aclimplicit $TESTPOOL/$TESTFS
 
 log_pass "Verify that the chown/chgrp could take owner/group " \
     "while permission is granted."
