@@ -436,8 +436,17 @@ out_err:
 	cur_term->_strtab = strtab;
 	cur_term->sgr_mode = cur_term->sgr_faked = A_NORMAL;
 
-	if (filenum == 1 && !isatty(filenum))
-		filenum = 2;	/* Allow output redirect */
+	if (filenum == 1) {
+		/*
+		 * isatty(3C) will set errno as a side-effect of returning 0.
+		 * Hide this from callers so that they do not see errno
+		 * changing for no apparent reason.
+		 */
+		int err = errno;
+		if (isatty(filenum) == 0)
+			filenum = 2;	/* Allow output redirect */
+		errno = err;
+	}
 	/* LINTED */
 	cur_term->Filedes = (short)filenum;
 	_blast_keys(cur_term);

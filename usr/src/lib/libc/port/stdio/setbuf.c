@@ -29,12 +29,14 @@
 
 /*
  * Copyright 2020 Robert Mustacchi
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include "lint.h"
 #include "file64.h"
 #include "mtlib.h"
 #include <sys/types.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <thread.h>
@@ -68,8 +70,17 @@ setbuf(FILE *iop, char *abuf)
 			size = _SMBFSZ - PUSHBACK;
 		}
 	} else {	/* regular buffered I/O, standard buffer size */
-		if (fno != -1 && isatty(fno))
-			iop->_flag |= _IOLBF;
+		if (fno != -1) {
+			/*
+			 * isatty(3C) will set errno as a side-effect of
+			 * returning 0. Hide this from callers so that they do
+			 * not see errno changing for no apparent reason.
+			 */
+			int err = errno;
+			if (isatty(fno) != 0)
+				iop->_flag |= _IOLBF;
+			errno = err;
+		}
 	}
 	if (buf == NULL) {
 		FUNLOCKFILE(lk);

@@ -3325,7 +3325,7 @@ static int gl_read_unmasked(GetLine *gl, int fd, char *c)
   case 1:
     return GL_READ_OK;
   case 0:
-    return (isatty(fd) || errno != 0) ? GL_READ_BLOCKED : GL_READ_EOF;
+    return (errno != 0 || isatty(fd)) ? GL_READ_BLOCKED : GL_READ_EOF;
   default:
     return GL_READ_ERROR;
   };

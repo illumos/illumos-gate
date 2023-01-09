@@ -30,53 +30,7 @@
 #include <sys/stropts.h>
 #include <sys/sysmacros.h>
 
-/*
- * This is named this way with the hope that it'll be replaced someday by
- * openpty.
- */
-bool
-openpty(int *mfdp, int *sfdp)
-{
-	int sfd;
-	int mfd = posix_openpt(O_RDWR | O_NOCTTY);
-	const char *name;
-
-	if (mfd < 0) {
-		warn("failed to open a pseudo-terminal");
-		return (false);
-	}
-
-	if (grantpt(mfd) != 0 || unlockpt(mfd) != 0) {
-		warn("failed to grant and unlock the manager fd");
-		(void) close(mfd);
-		return (false);
-	}
-
-	name = ptsname(mfd);
-	if (name == NULL) {
-		warnx("failed to get ptsname for fd %d", mfd);
-		(void) close(mfd);
-		return (false);
-	}
-
-	sfd = open(name, O_RDWR | O_NOCTTY);
-	if (sfd < 0) {
-		warn("failed to open pty %s", name);
-		(void) close(mfd);
-		return (false);
-	}
-
-	if (ioctl(sfd, __I_PUSH_NOCTTY, "ptem") < 0 ||
-	    ioctl(sfd, __I_PUSH_NOCTTY, "ldterm") < 0) {
-		warn("failed to push streams modules");
-		(void) close(mfd);
-		(void) close(sfd);
-	}
-
-	*sfdp = sfd;
-	*mfdp = mfd;
-	return (true);
-}
+#include "common/openpty.c"
 
 int
 main(void)

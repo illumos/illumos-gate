@@ -49,6 +49,7 @@ PROGS = \
 	memchr \
 	memset_s \
 	posix_memalign \
+	printf-15294 \
 	printf-9511 \
 	psignal-5097 \
 	quick_exit_order \
