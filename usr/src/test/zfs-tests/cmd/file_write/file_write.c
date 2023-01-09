@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2022 MNX Cloud, Inc.
+ */
+
 #include "../file_common.h"
 #include <libgen.h>
 
@@ -59,6 +63,7 @@ main(int argc, char **argv)
 	int		verbose = 0;
 	int		rsync = 0;
 	int		wsync = 0;
+	int		exitcode;
 
 	/*
 	 * Process Arguments
@@ -166,15 +171,17 @@ main(int argc, char **argv)
 	 * accordingly and perform a write of the appropriate type.
 	 */
 	if ((bigfd = open(filename, oflag, 0666)) == -1) {
+		exitcode = errno;
 		(void) printf("open %s: failed [%s]%d. Aborting!\n", filename,
 		    strerror(errno), errno);
-		exit(errno);
+		exit(exitcode);
 	}
 	noffset = llseek(bigfd, offset, SEEK_SET);
 	if (noffset != offset) {
+		exitcode = errno;
 		(void) printf("llseek %s (%lld/%lld) failed [%s]%d.Aborting!\n",
 		    filename, offset, noffset, strerror(errno), errno);
-		exit(errno);
+		exit(exitcode);
 	}
 
 	if (verbose) {
@@ -189,11 +196,12 @@ main(int argc, char **argv)
 		ssize_t n;
 
 		if ((n = write(bigfd, &bigbuffer, block_size)) == -1) {
+			exitcode = errno;
 			(void) printf("write failed (%ld), good_writes = %lld, "
 			    "error: %s[%d]\n", (long)n, good_writes,
 			    strerror(errno),
 			    errno);
-			exit(errno);
+			exit(exitcode);
 		}
 		good_writes++;
 	}

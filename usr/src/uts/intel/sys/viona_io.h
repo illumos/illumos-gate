@@ -12,7 +12,7 @@
 /*
  * Copyright 2013 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_VIONA_IO_H_
@@ -52,7 +52,7 @@
  * change when the version is modified.  It follows no rules like semver.
  *
  */
-#define	VIONA_CURRENT_INTERFACE_VERSION	1
+#define	VIONA_CURRENT_INTERFACE_VERSION	2
 
 typedef struct vioc_create {
 	datalink_id_t	c_linkid;

@@ -684,8 +684,8 @@ pt_step_out(mdb_tgt_t *t, uintptr_t *p)
 	if (Pstate(t->t_pshandle) != PS_STOP)
 		return (set_errno(EMDB_TGTBUSY));
 
-	return (mdb_amd64_step_out(t, p, psp->pr_reg[EIP], psp->pr_reg[EBP],
-	    psp->pr_reg[UESP], psp->pr_instr));
+	return (mdb_amd64_step_out(t, p, psp->pr_reg[REG_RIP],
+	    psp->pr_reg[REG_RBP], psp->pr_reg[REG_RSP], psp->pr_instr));
 }
 
 /*

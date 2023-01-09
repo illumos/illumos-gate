@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2022 MNX Cloud, Inc.
+ */
+
 #include "../file_common.h"
 
 static unsigned char bigbuffer[BIGBUFFERSIZE];
@@ -66,9 +70,12 @@ main(int argc, char **argv)
 	}
 
 	do {
+		int exitcode;
+
 		if ((n = read(bigfd, &bigbuffer, bigbuffersize)) == -1) {
+			exitcode = errno;
 			(void) printf("read failed (%ld), %d\n", n, errno);
-			exit(errno);
+			exit(exitcode);
 		}
 
 		for (i = 0; i < n; i++) {
