@@ -22,12 +22,16 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#ifndef	_PCITOOL_USAGE_TEXT_H
-#define	_PCITOOL_USAGE_TEXT_H
-
 #include <stdio.h>
 
-static char *pcitool_usage_reg[] = {
+static char *pcitool_usage_text[] = {
+"Usage:",
+"Probe mode:",
+" %s [ <PCI nexus node> ] [ -a ] [ -p ] [ -v ] [ -q ]",
+"",
+" %s <PCI nexus node> [ -p [ bus=<bus>,dev=<dev>,func=<func> ] [ -v ] [ -q ]",
+" %s <PCI nexus node> [ -p [ bdf=<bus>.<dev>.<func> ] [ -v ] [-q ]",
+"",
 "Register peek/poke mode:",
 " %s <PCI nexus node>",
 "  [   -n bank=<register bank>",
@@ -61,11 +65,30 @@ static char *pcitool_usage_reg[] = {
 "",
 "  [ -y ]",
 "",
-"Probe mode:",
-" %s [ <PCI nexus node> ] [ -a ] [ -p ] [ -v ] [ -q ]",
+"Interrupt mode:",
+" X86:",
+" %s pci@<unit-address> -i <cpu#,ino#> | all",
+"       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
+" SPARC:",
+" %s pci@<unit-address> -i <ino#> | all",
+"       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
+" %s pci@<unit-address> -m <msi#> | all",
+"       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
 "",
-" %s <PCI nexus node> [ -p [ bus=<bus>,dev=<dev>,func=<func> ] [ -v ] [ -q ]",
-" %s <PCI nexus node> [ -p [ bdf=<bus>.<dev>.<func> ] [ -v ] [-q ]",
+"where",
+"",
+"pci@<unit-address> is a node from /devices, with \"/devices\" stripped off.",
+"For example: /pci@0,0",
+"",
+"-v gives verbose output for all modes.",
+"",
+"-q suppresses error output (except for commandline parsing errors) for all "
+	"modes",
+"   (Note that errno status is returned to the shell upon termination.)",
+"",
+"Online help mode:",
+" %s -h",
+"   Prints this message.",
 "",
 "Probe mode",
 "----------",
@@ -141,35 +164,6 @@ static char *pcitool_usage_reg[] = {
 "    Other platforms (i.e. X86) return peek/poke errors as FF values.",
 "",
 "All numeric values are in HEX",
-NULL
-};
-
-static char *pcitool_usage_intr[] = {
-"Usage:",
-"Interrupt mode:",
-" X86:",
-" %s pci@<unit-address> -i <cpu#,ino#> | all",
-"       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
-" SPARC:",
-" %s pci@<unit-address> -i <ino#> | all",
-"       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
-" %s pci@<unit-address> -m <msi#> | all",
-"       [ -r [ -c ] |  -w <cpu#> [ -g ] ] [ -v ] [ -q ]",
-"",
-"where",
-"",
-"pci@<unit-address> is a node from /devices, with \"/devices\" stripped off.",
-"For example: /pci@0,0",
-"",
-"-v gives verbose output for all modes.",
-"",
-"-q suppresses error output (except for commandline parsing errors) for all "
-	"modes",
-"   (Note that errno status is returned to the shell upon termination.)",
-"",
-"Online help mode:",
-" %s -h",
-"   Prints this message.",
 "",
 "Interrupt mode",
 "--------------",
@@ -227,11 +221,8 @@ usage(char *name)
 {
 	int i;
 
-	for (i = 0; pcitool_usage_intr[i] != NULL; i++) {
-		/*LINTED*/
-		(void) printf(pcitool_usage_intr[i], name);
+	for (i = 0; pcitool_usage_text[i] != NULL; i++) {
+		(void) printf(pcitool_usage_text[i], name);
 		(void) printf("\n");
 	}
 }
-
-#endif	/* _PCITOOL_USAGE_TEXT_H */
