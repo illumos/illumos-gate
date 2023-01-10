@@ -40,7 +40,7 @@
  *
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -255,8 +255,17 @@ vlapic_get_ccr(struct vlapic *vlapic)
 			    vlapic->timer_cur_freq);
 		}
 	}
-	KASSERT(ccr <= lapic->icr_timer, ("vlapic_get_ccr: invalid ccr %x, "
-	    "icr_timer is %x", ccr, lapic->icr_timer));
+
+	/*
+	 * Clamp CCR value to that programmed in ICR - its theoretical maximum.
+	 * Normal operation should never result in this being necessary.  Only
+	 * strange circumstances due to state importation as part of instance
+	 * save/restore or live-migration require such wariness.
+	 */
+	if (ccr > lapic->icr_timer) {
+		ccr = lapic->icr_timer;
+		vlapic->stats.vs_clamp_ccr++;
+	}
 	VLAPIC_TIMER_UNLOCK(vlapic);
 	return (ccr);
 }
@@ -1905,7 +1914,6 @@ vlapic_data_write(void *datap, const vmm_data_req_t *req)
 	VLAPIC_TIMER_LOCK(vlapic);
 
 	/* Already ensured by vlapic_data_validate() */
-	VERIFY3U(page->vlp_id, ==, lapic->id);
 	VERIFY3U(page->vlp_version, ==, lapic->version);
 
 	vlapic->msr_apicbase = src->vl_msr_apicbase;
@@ -1950,6 +1958,25 @@ vlapic_data_write(void *datap, const vmm_data_req_t *req)
 	if (src->vl_timer_target != 0) {
 		vlapic->timer_fire_when =
 		    vm_denormalize_hrtime(vlapic->vm, src->vl_timer_target);
+
+		/*
+		 * Check to see if timer expiration would result computed CCR
+		 * values in excess of what is configured in ICR/DCR.
+		 */
+		const hrtime_t now = gethrtime();
+		if (vlapic->timer_fire_when > now) {
+			const uint32_t ccr = hrt_freq_count(
+			    vlapic->timer_fire_when - now,
+			    vlapic->timer_cur_freq);
+
+			/*
+			 * Until we have a richer event/logging system
+			 * available, just note such an overage as a stat.
+			 */
+			if (ccr > lapic->icr_timer) {
+				vlapic->stats.vs_import_timer_overage++;
+			}
+		}
 
 		if (!vm_is_paused(vlapic->vm)) {
 			vlapic_callout_reset(vlapic);

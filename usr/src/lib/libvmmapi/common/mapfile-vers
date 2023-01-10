@@ -12,7 +12,7 @@
 #
 # Copyright 2013 Pluribus Networks Inc.
 # Copyright 2019 Joyent, Inc.
-# Copyright 2020 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -96,6 +96,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_open;
 		vm_parse_memsize;
 		vm_pmtmr_set_location;
+		vm_readwrite_kernemu_device;
 		vm_reinit;
 		vm_restart_instruction;
 		vm_resume_cpu;

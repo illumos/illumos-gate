@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2022 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
@@ -28,7 +28,8 @@ PROG =	mem_partial \
 	cpuid_ioctl \
 	default_capabs \
 	datarw_constraints \
-	pause_resume
+	pause_resume \
+	import_vlapic
 
 COMMON_OBJS =	common.o
 CLEAN_OBJS =	$(PROG:%=%.o)
