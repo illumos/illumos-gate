@@ -24,8 +24,6 @@
 #ifndef	_SYS_FS_ZFS_ACL_H
 #define	_SYS_FS_ZFS_ACL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _UID_T
 #define	_UID_T
 typedef	unsigned int uid_t;			/* UID type */

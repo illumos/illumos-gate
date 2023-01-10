@@ -24,8 +24,6 @@
 #ifndef	_SYS_DSL_DATASET_H
 #define	_SYS_DSL_DATASET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 typedef struct dsl_dataset_phys {
 	uint64_t ds_dir_obj;
 	uint64_t ds_prev_snap_obj;

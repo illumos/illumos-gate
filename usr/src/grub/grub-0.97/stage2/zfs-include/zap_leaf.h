@@ -24,8 +24,6 @@
 #ifndef	_SYS_ZAP_LEAF_H
 #define	_SYS_ZAP_LEAF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	ZAP_LEAF_MAGIC 0x2AB1EAF
 
 /* chunk size = 24 bytes */
@@ -77,7 +75,7 @@ typedef struct zap_leaf_phys {
 
 typedef union zap_leaf_chunk {
 	struct zap_leaf_entry {
-		uint8_t le_type; 		/* always ZAP_CHUNK_ENTRY */
+		uint8_t le_type;		/* always ZAP_CHUNK_ENTRY */
 		uint8_t le_int_size;		/* size of ints */
 		uint16_t le_next;		/* next entry in hash chain */
 		uint16_t le_name_chunk;		/* first chunk of the name */

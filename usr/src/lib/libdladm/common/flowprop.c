@@ -316,9 +316,8 @@ do_set_maxbw(dladm_handle_t handle, const char *flow, val_desc_t *vdp,
 	return (DLADM_STATUS_OK);
 }
 
-/* ARGSUSED */
 static dladm_status_t
-do_check_maxbw(fprop_desc_t *pdp, char **prop_val, uint_t val_cnt,
+do_check_maxbw(fprop_desc_t *pdp __unused, char **prop_val, uint_t val_cnt,
     val_desc_t **vdpp)
 {
 	uint64_t	*maxbw;
@@ -410,9 +409,8 @@ do_set_priority(dladm_handle_t handle, const char *flow, val_desc_t *vdp,
 	return (DLADM_STATUS_OK);
 }
 
-/* ARGSUSED */
 static dladm_status_t
-do_check_priority(fprop_desc_t *pdp, char **prop_val, uint_t val_cnt,
+do_check_priority(fprop_desc_t *pdp __unused, char **prop_val, uint_t val_cnt,
     val_desc_t **vdpp)
 {
 	mac_priority_level_t	pri;

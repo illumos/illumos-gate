@@ -77,7 +77,8 @@ varpd_enable_service(void)
 }
 
 static int
-dladm_overlay_count_cb(dladm_handle_t handle, datalink_id_t linkid, void *arg)
+dladm_overlay_count_cb(dladm_handle_t handle __unused,
+    datalink_id_t linkid __unused, void *arg)
 {
 	(*(uint32_t *)arg)++;
 	return (DLADM_WALK_CONTINUE);
@@ -232,9 +233,9 @@ i_dladm_overlay_setprop_db(dladm_handle_t handle, datalink_id_t linkid,
 }
 
 static dladm_status_t
-dladm_overlay_varpd_setprop(dladm_handle_t handle,
-    varpd_client_handle_t *chdl, uint64_t inst, datalink_id_t linkid,
-    const char *name, char *const *valp, uint_t cnt)
+dladm_overlay_varpd_setprop(dladm_handle_t handle __unused,
+    varpd_client_handle_t *chdl, uint64_t inst, datalink_id_t linkid __unused,
+    const char *name, char *const *valp, uint_t cnt __unused)
 {
 	int ret;
 	uint32_t size;
@@ -839,9 +840,9 @@ typedef struct overlay_walk_cb {
 } overlay_walk_cb_t;
 
 static int
-dladm_overlay_walk_cache_cb(varpd_client_handle_t *chdl, uint64_t varpdid,
-    const struct ether_addr *key, const varpd_client_cache_entry_t *entry,
-    void *arg)
+dladm_overlay_walk_cache_cb(varpd_client_handle_t *chdl __unused,
+    uint64_t varpdid __unused, const struct ether_addr *key,
+    const varpd_client_cache_entry_t *entry, void *arg)
 {
 	overlay_walk_cb_t *owc = arg;
 	dladm_overlay_point_t point;
@@ -900,7 +901,7 @@ dladm_overlay_walk_cache(dladm_handle_t handle, datalink_id_t linkid,
 }
 
 dladm_status_t
-dladm_overlay_cache_flush(dladm_handle_t handle, datalink_id_t linkid)
+dladm_overlay_cache_flush(dladm_handle_t handle __unused, datalink_id_t linkid)
 {
 	int ret;
 	uint64_t varpdid;
@@ -921,7 +922,7 @@ dladm_overlay_cache_flush(dladm_handle_t handle, datalink_id_t linkid)
 }
 
 dladm_status_t
-dladm_overlay_cache_delete(dladm_handle_t handle, datalink_id_t linkid,
+dladm_overlay_cache_delete(dladm_handle_t handle __unused, datalink_id_t linkid,
     const struct ether_addr *key)
 {
 	int ret;
@@ -943,7 +944,7 @@ dladm_overlay_cache_delete(dladm_handle_t handle, datalink_id_t linkid,
 }
 
 dladm_status_t
-dladm_overlay_cache_set(dladm_handle_t handle, datalink_id_t linkid,
+dladm_overlay_cache_set(dladm_handle_t handle __unused, datalink_id_t linkid,
     const struct ether_addr *key, char *val)
 {
 	int ret;
@@ -1056,7 +1057,7 @@ send:
 }
 
 dladm_status_t
-dladm_overlay_cache_get(dladm_handle_t handle, datalink_id_t linkid,
+dladm_overlay_cache_get(dladm_handle_t handle __unused, datalink_id_t linkid,
     const struct ether_addr *key, dladm_overlay_point_t *point)
 {
 	int ret;
@@ -1132,7 +1133,8 @@ dladm_overlay_status(dladm_handle_t handle, datalink_id_t linkid,
  * is finished with, this function takes care of freeing the memory.
  */
 static void
-i_dladm_overlay_props_free(dladm_handle_t handle, dladm_arg_list_t *props)
+i_dladm_overlay_props_free(dladm_handle_t handle __unused,
+    dladm_arg_list_t *props)
 {
 	uint_t i, j;
 

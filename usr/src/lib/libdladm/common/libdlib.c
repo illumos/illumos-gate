@@ -247,10 +247,9 @@ dladm_part_info(dladm_handle_t handle, datalink_id_t linkid,
  * Get the configuration information for the IB Phys link given by the datalink
  * ID 'linkid'.
  */
-/* ARGSUSED */
 dladm_status_t
 dladm_ib_info(dladm_handle_t handle, datalink_id_t linkid,
-    dladm_ib_attr_t *attrp, uint32_t flags)
+    dladm_ib_attr_t *attrp, uint32_t flags __unused)
 {
 	uint_t instance;
 	ibport_ioctl_t ioc;
@@ -607,9 +606,9 @@ dladm_part_delete(dladm_handle_t handle, datalink_id_t partid, int flags)
  * Call into the IP over IB driver to create the active instances of one or all
  * IB partitions present in the persistent configuration.
  */
-/* ARGSUSED */
 static int
-i_dladm_part_up(dladm_handle_t handle, datalink_id_t plinkid, void *arg)
+i_dladm_part_up(dladm_handle_t handle, datalink_id_t plinkid,
+    void *arg __unused)
 {
 	dladm_conf_t	conf;
 	datalink_id_t	linkid;
@@ -694,9 +693,9 @@ done:
  * database. If we need to bring up one IB Partition, its datalink ID is
  * provided in 'linkid'.
  */
-/* ARGSUSED */
 dladm_status_t
-dladm_part_up(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
+dladm_part_up(dladm_handle_t handle, datalink_id_t linkid,
+    uint32_t flags __unused)
 {
 	dladm_status_t status = DLADM_STATUS_OK;
 

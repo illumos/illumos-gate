@@ -114,10 +114,9 @@ generate_prop_line(const char *name, char *buf,
  * will be NULL; a new entry will be generated in this case and it will
  * contain only the property information in lsp.
  */
-/* ARGSUSED */
 boolean_t
-process_prop_set(dladm_handle_t handle, prop_db_state_t *lsp, char *buf,
-    prop_db_info_t *listp, dladm_status_t *statusp)
+process_prop_set(dladm_handle_t handle __unused, prop_db_state_t *lsp,
+    char *buf, prop_db_info_t *listp, dladm_status_t *statusp)
 {
 	dladm_status_t	status;
 	prop_db_info_t	*lastp = NULL, *lip = listp, *nlip = NULL;
@@ -207,10 +206,9 @@ fail:
  * for the specified property name; if a matching property exists, its
  * associated values are copied to the array lsp->ls_propval.
  */
-/* ARGSUSED */
 boolean_t
-process_prop_get(dladm_handle_t handle, prop_db_state_t *lsp, char *buf,
-    prop_db_info_t *listp, dladm_status_t *statusp)
+process_prop_get(dladm_handle_t handle __unused, prop_db_state_t *lsp,
+    char *buf __unused, prop_db_info_t *listp, dladm_status_t *statusp)
 {
 	prop_db_info_t	*lip = listp;
 	prop_val_t	*lvp;
@@ -253,10 +251,9 @@ process_prop_get(dladm_handle_t handle, prop_db_state_t *lsp, char *buf,
  * database. lsp->ls_name is not user-specified but instead is set to
  * the current name being processed.
  */
-/* ARGSUSED */
 boolean_t
-process_prop_init(dladm_handle_t handle, prop_db_state_t *lsp, char *buf,
-    prop_db_info_t *listp, dladm_status_t *statusp)
+process_prop_init(dladm_handle_t handle, prop_db_state_t *lsp,
+    char *buf __unused, prop_db_info_t *listp, dladm_status_t *statusp)
 {
 	dladm_status_t	status = DLADM_STATUS_OK;
 	prop_db_info_t	*lip = listp;
@@ -517,7 +514,7 @@ i_dladm_get_prop_temp(dladm_handle_t handle, const char *name, prop_type_t type,
     const char *prop_name, char **prop_val, uint_t *val_cntp,
     prop_table_t *prop_tbl)
 {
-	int 		i;
+	int		i;
 	dladm_status_t	status;
 	uint_t		cnt;
 	fprop_desc_t	*pdp;
@@ -622,7 +619,7 @@ i_dladm_set_prop_temp(dladm_handle_t handle, const char *name,
     const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags,
     char **errprop, prop_table_t *prop_tbl)
 {
-	int 		i;
+	int		i;
 	dladm_status_t	status = DLADM_STATUS_OK;
 	boolean_t	found = B_FALSE;
 
@@ -662,7 +659,7 @@ boolean_t
 i_dladm_is_prop_temponly(const char *prop_name, char **errprop,
     prop_table_t *prop_tbl)
 {
-	int 		i;
+	int		i;
 
 	if (prop_name == NULL)
 		return (B_FALSE);
