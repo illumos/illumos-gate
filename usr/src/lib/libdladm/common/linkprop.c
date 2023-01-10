@@ -2998,11 +2998,10 @@ extract_dynamic_methods(val_desc_t *vdp, uint_t cnt, void *arg)
 	return (DLADM_STATUS_OK);
 }
 
-/* ARGSUSED */
 static dladm_status_t
-get_allowallcids(dladm_handle_t handle, prop_desc_t *pdp,
+get_allowallcids(dladm_handle_t handle, prop_desc_t *pdp __unused,
     datalink_id_t linkid, char **prop_val, uint_t *val_cnt,
-    datalink_media_t media, uint_t flags, uint_t *perm_flags)
+    datalink_media_t media __unused, uint_t flags, uint_t *perm_flags)
 {
 	mac_resource_props_t	mrp;
 	mac_protect_t		*p;
@@ -3023,9 +3022,8 @@ get_allowallcids(dladm_handle_t handle, prop_desc_t *pdp,
 	return (DLADM_STATUS_OK);
 }
 
-/* ARGSUSED */
 dladm_status_t
-extract_allowallcids(val_desc_t *vdp, uint_t cnt, void *arg)
+extract_allowallcids(val_desc_t *vdp, uint_t cnt __unused, void *arg)
 {
 	mac_resource_props_t	*mrp = arg;
 	mac_protect_t		*p = &mrp->mrp_protect;
