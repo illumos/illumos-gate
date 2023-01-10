@@ -32,6 +32,7 @@
 # Copyright 2019 RackTop Systems.
 # Copyright 2020 Oxide Computer Company
 # Copyright 2020 Peter Tribble
+# Copyright 2023 MNX Cloud, Inc.
 #
 
 #
@@ -1124,8 +1125,9 @@ UTS_LABEL=	$(RELEASE)
 # bootbanner_expand_template() for more details about the template string
 # format.
 #
-BOOTBANNER1=	^o Version ^v ^w-bit
-BOOTBANNER2=
+BOOTBANNER1=	SmartOS Version ^v ^w-bit
+# XXX SmartOS: BANNER_YEAR in environment set in smartos-live's build_illumos.
+BOOTBANNER2=	Copyright 2022-$(BANNER_YEAR) MNX Cloud, Inc.
 BOOTBANNER3=
 BOOTBANNER4=
 BOOTBANNER5=
