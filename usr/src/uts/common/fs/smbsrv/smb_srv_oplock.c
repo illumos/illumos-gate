@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2021-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -254,7 +254,7 @@ smb_oplock_ind_break_in_ack(smb_request_t *ack_sr, smb_ofile_t *ofile,
 
 	/* Will call smb_oplock_send_break */
 	sr->smb2_status = STATUS_CANT_GRANT;
-	tqid = taskq_dispatch(sv->sv_worker_pool,
+	tqid = taskq_dispatch(sv->sv_notify_pool,
 	    smb_oplock_async_break, sr, TQ_SLEEP);
 	VERIFY(tqid != TASKQID_INVALID);
 }
@@ -379,7 +379,7 @@ smb_oplock_ind_break(smb_ofile_t *ofile, uint32_t NewLevel,
 	smb_oplock_hdl_update(sr);
 
 	/* Will call smb_oplock_send_break */
-	tqid = taskq_dispatch(sv->sv_worker_pool,
+	tqid = taskq_dispatch(sv->sv_notify_pool,
 	    smb_oplock_async_break, sr, TQ_SLEEP);
 	VERIFY(tqid != TASKQID_INVALID);
 }

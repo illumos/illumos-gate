@@ -2153,6 +2153,7 @@ typedef struct smb_server {
 
 	smb_thread_t		si_thread_timers;
 
+	taskq_t			*sv_notify_pool;
 	taskq_t			*sv_worker_pool;
 	taskq_t			*sv_receiver_pool;
 

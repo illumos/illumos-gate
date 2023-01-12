@@ -685,11 +685,21 @@ smb_server_start(smb_ioc_start_t *ioc)
 			break;
 
 		/*
+		 * Create our taskq's (thread pools)
+		 *
 		 * NB: the proc passed here has to be a "system" one.
 		 * Normally that's p0, or the NGZ eqivalent.
+		 *
+		 * The notify pool is sized at a quarter the number of
+		 * worker threads (instead of another config item).
 		 */
 		tqproc = (sv->sv_proc_p != NULL) ?
 		    sv->sv_proc_p : curzone->zone_zsched;
+
+		sv->sv_notify_pool = taskq_create_proc("smb_notify",
+		    sv->sv_cfg.skc_maxworkers / 4, smbsrv_notify_pri,
+		    sv->sv_cfg.skc_maxworkers / 4, INT_MAX,
+		    tqproc, TASKQ_DYNAMIC);
 
 		sv->sv_worker_pool = taskq_create_proc("smb_workers",
 		    sv->sv_cfg.skc_maxworkers, smbsrv_worker_pri,
@@ -701,7 +711,8 @@ smb_server_start(smb_ioc_start_t *ioc)
 		    sv->sv_cfg.skc_maxconnections, INT_MAX,
 		    tqproc, TASKQ_DYNAMIC);
 
-		if (sv->sv_worker_pool == NULL ||
+		if (sv->sv_notify_pool == NULL ||
+		    sv->sv_worker_pool == NULL ||
 		    sv->sv_receiver_pool == NULL) {
 			rc = ENOMEM;
 			break;
@@ -1716,6 +1727,11 @@ smb_server_shutdown(smb_server_t *sv)
 	if (sv->sv_worker_pool != NULL) {
 		taskq_destroy(sv->sv_worker_pool);
 		sv->sv_worker_pool = NULL;
+	}
+
+	if (sv->sv_notify_pool != NULL) {
+		taskq_destroy(sv->sv_notify_pool);
+		sv->sv_notify_pool = NULL;
 	}
 
 	/*

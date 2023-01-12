@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2020-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -563,7 +563,7 @@ smb_notify_dispatch2(smb_request_t *sr)
 	else
 		tq_func = smb_nt_transact_notify_finish;
 
-	tqid = taskq_dispatch(sr->sr_server->sv_worker_pool,
+	tqid = taskq_dispatch(sr->sr_server->sv_notify_pool,
 	    tq_func, sr, TQ_SLEEP);
 	VERIFY(tqid != TASKQID_INVALID);
 }
