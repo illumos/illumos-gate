@@ -413,7 +413,7 @@ run_legacy_cmds(int fd, char *device, int vflag)
 	char		*path;
 	long		name_max;
 	DIR		*dirp;
-	struct dirent	*dp_mem, *dp;
+	struct dirent	*dp;
 	struct stat	st;
 	fstyp_handle_t	h;
 	int		error;
@@ -433,12 +433,11 @@ run_legacy_cmds(int fd, char *device, int vflag)
 
 	name_max = pathconf(lib_dir, _PC_NAME_MAX);
 	path = calloc(1, name_max + 1);
-	dp = dp_mem = calloc(1, sizeof (struct dirent) + name_max + 1);
-	if ((path == NULL) || (dp_mem == NULL)) {
+	if ((path == NULL)) {
 		goto out;
 	}
 
-	while ((readdir_r(dirp, dp, &dp) == 0) && (dp != NULL)) {
+	while ((dp = readdir(dirp)) != NULL) {
 		if (dp->d_name[0] == '.') {
 			continue;
 		}
@@ -467,9 +466,6 @@ run_legacy_cmds(int fd, char *device, int vflag)
 	}
 
 out:
-	if (dp_mem != NULL) {
-		free(dp_mem);
-	}
 	if (path != NULL) {
 		free(path);
 	}

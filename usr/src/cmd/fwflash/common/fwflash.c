@@ -304,16 +304,6 @@ flash_load_plugins()
 		return (errno);
 	}
 
-	if ((plugdir = calloc(1, sizeof (struct dirent) + MAXPATHLEN + 1))
-	    == NULL) {
-		logmsg(MSG_ERROR,
-		    gettext("Unable to malloc %d bytes while "
-		    "trying to load plugins: %s\n"),
-		    MAXPATHLEN + 1 + sizeof (struct dirent),
-		    strerror(errno));
-		return (FWFLASH_FAILURE);
-	}
-
 	if ((fw_pluginlist = calloc(1, sizeof (struct fw_plugin)))
 	    == NULL) {
 		logmsg(MSG_ERROR,
@@ -325,7 +315,7 @@ flash_load_plugins()
 
 	TAILQ_INIT(fw_pluginlist);
 
-	while ((readdir_r(dirp, plugdir, &plugdir) == 0) && (plugdir != NULL)) {
+	while ((plugdir = readdir(dirp)) != NULL) {
 
 		errno = 0; /* remove chance of false results */
 
@@ -504,7 +494,6 @@ flash_load_plugins()
 	}
 
 	free(fwplugdirpath);
-	free(plugdir);
 	(void) closedir(dirp);
 	return (rval);
 }
