@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -113,6 +114,7 @@ mac_drop_chain(mblk_t *chain, const char *fmt, ...)
 	for (mblk_t *mp = chain, *next; mp != NULL; ) {
 		next = mp->b_next;
 		DTRACE_PROBE2(mac__drop, mblk_t *, mp, char *, msgp);
+		mp->b_next = NULL;
 		freemsg(mp);
 		mp = next;
 	}

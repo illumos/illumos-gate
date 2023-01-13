@@ -26,6 +26,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2016 Joyent, Inc.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 Oxide Computer Company
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -34,14 +35,17 @@
 #ifndef	_ASSERT_H
 #define	_ASSERT_H
 
+#include <sys/feature_tests.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #if __STDC_VERSION__ - 0 >= 199901L
-extern void __assert_c99(const char *, const char *, int, const char *);
+extern _NORETURN_KYWD void __assert_c99(const char *, const char *, int,
+    const char *) __NORETURN;
 #else
-extern void __assert(const char *, const char *, int);
+extern _NORETURN_KYWD void __assert(const char *, const char *, int) __NORETURN;
 #endif /* __STDC_VERSION__ - 0 >= 199901L */
 
 /*
