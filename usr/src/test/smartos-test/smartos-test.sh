@@ -13,7 +13,7 @@
 
 #
 # Copyright 2020 Joyent, Inc.
-# Copyright 2022 MNX Cloud, Inc.
+# Copyright 2023 MNX Cloud, Inc.
 #
 
 #
@@ -183,6 +183,20 @@ function add_loopback_mounts {
         fi
         log_must mount -O -F lofs $mount_opts $lofs_home/usr /usr
     fi
+}
+
+#
+# The ZFS test suite often will invoke user{add,del,mod}(8). Move /etc/shadow
+# into /etc's normal ramdisk volume.  The link(2) calls the above utilities
+# use will start working, unlocking a great deal of tests.
+#
+function shadow_fix {
+    FS=$(/bin/df -n /etc/shadow | awk '{print $NF'})
+    if [[ "$FS" == "lofs" ]]; then
+	log_must umount /etc/shadow
+	log_must cp -pf /usbkey/shadow /etc/shadow
+    fi
+    # Else leave it alone.
 }
 
 #
@@ -423,6 +437,7 @@ if [[ $do_rollback = true ]]; then
 fi
 
 if [[ $do_configure = true ]]; then
+    shadow_fix
     add_loopback_mounts $test_archive
     extract_remaining_test_bits $test_archive
     add_test_accounts
