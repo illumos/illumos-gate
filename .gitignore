@@ -7,6 +7,7 @@ ncscope.out
 cscope.in.out
 cscope.po.out
 .make.state*
+/.vscode
 /log
 /packages
 /proto
