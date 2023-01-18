@@ -44,8 +44,9 @@
 .\" Copyright 2016 Joyent, Inc.
 .\" Copyright 2020 RackTop Systems, Inc.
 .\" Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.TH DLADM 8 "February 01, 2022"
+.TH DLADM 8 "January 23, 2023"
 .SH NAME
 dladm \- administer data links
 .SH SYNOPSIS
@@ -469,6 +470,18 @@ class of datalink.
 .RS 4n
 A virtual network interface. The \fBshow-vnic\fR subcommand displays more
 detail for this class of datalink.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmisc\fR\fR
+.ad
+.sp .6
+.RS 4n
+A generic datalink without any other class-specific properties. Generally used
+to indicate a pseudo device that doesn't otherwise correspond to one of the
+above classes.
 .RE
 
 .RE
