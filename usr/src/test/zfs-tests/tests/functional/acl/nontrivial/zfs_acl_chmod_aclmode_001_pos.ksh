@@ -141,47 +141,31 @@ function cal_bits # isdir bits bits_limit acl_access ctrl
 
 	if ((flagr != 0)); then
 		if [[ $acl_access == *"read_data"* ]]; then
-			if [[ $acl_access == *"allow"* &&
-			    $passthrough == 0 ]]; then
-				tmpstr=${tmpstr}
-			elif ((isdir == 0)); then
-				tmpstr=${tmpstr}/read_data
-			else
-				tmpstr=${tmpstr}/list_directory/read_data
+			if ((isdir != 0)); then
+				tmpstr=${tmpstr}/list_directory
 			fi
+			tmpstr=${tmpstr}/read_data
 		fi
 	fi
 
 	if ((flagw != 0)); then
-		if [[ $acl_access == *"allow"* && $passthrough == 0 ]]; then
-			tmpstr=${tmpstr}
-		else
-			if [[ $acl_access == *"write_data"* ]]; then
-				if ((isdir == 0)); then
-					tmpstr=${tmpstr}/write_data
-				else
-					tmpstr=${tmpstr}/add_file/write_data
-				fi
+		if [[ $acl_access == *"write_data"* ]]; then
+			if ((isdir != 0)); then
+				tmpstr=${tmpstr}/write_data
 			fi
-			if [[ $acl_access == *"append_data"* ]]; then
-				if ((isdir == 0)); then
-					tmpstr=${tmpstr}/append_data
-				else
-					tmpstr=${tmpstr}/add_subdirectory
-					tmpstr=${tmpstr}/append_data
-				fi
+			tmpstr=${tmpstr}/write_data
+		fi
+		if [[ $acl_access == *"append_data"* ]]; then
+			if ((isdir != 0)); then
+				tmpstr=${tmpstr}/add_subdirectory
 			fi
+			tmpstr=${tmpstr}/append_data
 		fi
 	fi
 
 	if ((flagx != 0)); then
 		if [[ $acl_access == *"execute"* ]]; then
-			if [[ $acl_access == *"allow"* &&
-			    $passthrough == 0 ]]; then
-				tmpstr=${tmpstr}
-			else
-				tmpstr=${tmpstr}/execute
-			fi
+			tmpstr=${tmpstr}/execute
 		fi
 	fi
 
@@ -298,11 +282,10 @@ function verify_aclmode # <aclmode> <node> <newmode>
 	typeset newmode=$3
 
 	# count: the ACE item to fetch
-	# pass: to mark if the current ACE should apply to the target
 	# passcnt: counter, if it achieves to maxnumber,
 	#	then no additional ACE should apply.
 
-	typeset -i count=0 pass=0 passcnt=0
+	typeset -i count=0 passcnt=0
 	typeset -i bits=0 obits=0 bits_owner=0 isdir=0
 	typeset -i total_acl
 	typeset -i acl_count=$(count_ACE $node)
@@ -318,7 +301,6 @@ function verify_aclmode # <aclmode> <node> <newmode>
 	passcnt=0
 	flag=0
 	while ((i >= 0)); do
-		pass=0
 		expect1=${acls[$i]}
 		passthrough=0
 		#
@@ -414,12 +396,12 @@ function verify_aclmode # <aclmode> <node> <newmode>
 				if ((bits < obits)) && [[ -n $acltemp ]]; then
 					expect2=$prefix:
 					new_bit=$(cal_bits $isdir $obits \
-					    $bits_owner $expect1 1)
+					    $bits_owner $expect1 0)
 					expect2=${expect2}${new_bit}:allow
 				else
 					expect2=$prefix:
 					new_bit=$(cal_bits $isdir $obits \
-					    $obits $expect1 1)
+					    $obits $expect1 0)
 					expect2=${expect2}${new_bit}:allow
 				fi
 
@@ -436,18 +418,16 @@ function verify_aclmode # <aclmode> <node> <newmode>
 			;;
 		esac
 
-		if ((pass == 0)) ; then
-			# Get the first ACE to do comparison
-			aclcur=$(get_ACE $node $count)
-			aclcur=${aclcur#$count:}
-			if [[ -n $expect1 && $expect1 != $aclcur ]]; then
-				ls -vd $node
-				log_fail "$aclmode $i #$count " \
-					"ACE: $aclcur, expect to be " \
-					"$expect1"
-			fi
-		((count = count + 1))
+		# Get the first ACE to do comparison
+		aclcur=$(get_ACE $node $count)
+		aclcur=${aclcur#$count:}
+		if [[ -n $expect1 && $expect1 != $aclcur ]]; then
+			ls -vd $node
+			log_fail "$aclmode $i #$count " \
+				"ACE: $aclcur, expect to be " \
+				"$expect1"
 		fi
+		((count = count + 1))
 		((i = i - 1))
 	done
 
