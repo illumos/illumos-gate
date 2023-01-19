@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2023 Racktop Systems, Inc.
  */
 /*
  * This file contains SM-HBA support for MPT SAS driver
@@ -41,12 +42,12 @@
 #include <sys/scsi/impl/scsi_sas.h>
 
 #pragma pack(1)
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_type.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_ioc.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_sas.h>
+#include <sys/scsi/adapters/mpi/mpi2_type.h>
+#include <sys/scsi/adapters/mpi/mpi2.h>
+#include <sys/scsi/adapters/mpi/mpi2_cnfg.h>
+#include <sys/scsi/adapters/mpi/mpi2_init.h>
+#include <sys/scsi/adapters/mpi/mpi2_ioc.h>
+#include <sys/scsi/adapters/mpi/mpi2_sas.h>
 #pragma pack()
 
 /*
@@ -378,8 +379,8 @@ mptsas_update_phy_stats(kstat_t *ks, int rw)
 	int			ret = DDI_FAILURE;
 	smhba_info_t		*pptr = NULL;
 	sas_phy_stats_t		*ps = ks->ks_data;
-	uint32_t 		page_address;
-	mptsas_t 		*mpt;
+	uint32_t		page_address;
+	mptsas_t		*mpt;
 
 	_NOTE(ARGUNUSED(rw));
 

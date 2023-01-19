@@ -11,6 +11,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2023 Racktop Systems, Inc.
 #
 syntax: glob
 
@@ -32,6 +33,7 @@ usr/src/uts/common/io/e1000api/*
 usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/i40e/core/*
 usr/src/uts/common/io/ixgbe/core/*
+usr/src/uts/common/sys/scsi/adapters/mpi/*
 usr/src/contrib/*
 usr/src/cmd/ast/libshell/misc/shell_styleguide.docbook
 

@@ -24,6 +24,7 @@
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
+ * Copyright 2023 Racktop Systems, Inc.
  */
 
 /*
@@ -64,8 +65,8 @@
 #include <sys/mdi_impldefs.h>
 #include <sys/ddi_ufm.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
-#include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>
+#include <sys/scsi/adapters/mpi/mpi2_tool.h>
+#include <sys/scsi/adapters/mpi/mpi2_cnfg.h>
 
 #ifdef	__cplusplus
 extern "C" {
