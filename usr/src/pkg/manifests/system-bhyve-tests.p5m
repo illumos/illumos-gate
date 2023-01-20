@@ -15,7 +15,7 @@
 
 #
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/bhyve/tests@$(PKGVERS)
@@ -63,6 +63,7 @@ file path=opt/bhyve-tests/tests/vmm/datarw_constraints mode=0555
 file path=opt/bhyve-tests/tests/vmm/default_capabs mode=0555
 file path=opt/bhyve-tests/tests/vmm/drv_hold mode=0555
 file path=opt/bhyve-tests/tests/vmm/fpu_getset mode=0555
+file path=opt/bhyve-tests/tests/vmm/import_vlapic mode=0555
 file path=opt/bhyve-tests/tests/vmm/interface_version mode=0555
 file path=opt/bhyve-tests/tests/vmm/legacy_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/mem_devmem mode=0555

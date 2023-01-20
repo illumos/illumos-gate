@@ -37,7 +37,7 @@
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
  *
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _VLAPIC_PRIV_H_
@@ -117,6 +117,13 @@ struct vlapic_ops {
 	void (*enable_x2apic_mode)(struct vlapic *vlapic);
 };
 
+struct vlapic_stats {
+	/* Result of a CCR read was clamped due to being > ICR */
+	uint64_t	vs_clamp_ccr;
+	/* Imported timer expiration further in future than ICR equiv */
+	uint64_t	vs_import_timer_overage;
+};
+
 struct vlapic {
 	struct vm		*vm;
 	int			vcpuid;
@@ -142,6 +149,9 @@ struct vlapic {
 	 */
 	uint32_t	svr_last;
 	uint32_t	lvt_last[VLAPIC_MAXLVT_INDEX + 1];
+
+	/* Occurrences of unusual events are tracked in this stats struct. */
+	struct vlapic_stats	stats;
 };
 
 void vlapic_init(struct vlapic *vlapic);
