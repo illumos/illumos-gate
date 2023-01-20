@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -1375,9 +1375,9 @@ nvme_print_identify_ctrl(nvme_identify_ctrl_t *idctl,
 	    nvme_version_check(version, 1, 4),
 	    idctl->id_sgls.sgl_tport, NULL, NULL);
 	if (verbose) {
-		if (idctl->id_mnam != 0) {
+		if (idctl->id_mnan != 0) {
 			nvme_print_uint64(4, "Maximum Number of Allowed "
-			    "Namespaces", idctl->id_mnam, NULL, NULL);
+			    "Namespaces", idctl->id_mnan, NULL, NULL);
 		} else {
 			nvme_print(4, "Maximum Number of Allowed "
 			    "Namespaces", -1, "at most %u", idctl->id_nn);

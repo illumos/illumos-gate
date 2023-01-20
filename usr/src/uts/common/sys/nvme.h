@@ -388,7 +388,7 @@ typedef struct {
 		uint16_t sgl_tport:1;	/* Transport SGL Data Block (1.4) */
 		uint16_t sgl_rsvd2:10;
 	} id_sgls;
-	uint32_t id_mnam;		/* Maximum Number of Allowed NSes */
+	uint32_t id_mnan;		/* Maximum Number of Allowed NSes */
 	uint8_t id_rsvd_nc_4[768 - 544];
 
 	/* I/O Command Set Attributes */

@@ -14,7 +14,7 @@
  * Copyright 2019 Unix Software Ltd.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Racktop Systems.
- * Copyright 2022 Oxide Computer Company.
+ * Copyright 2023 Oxide Computer Company.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -3054,11 +3054,14 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 	was_ignored = ns->ns_ignore;
 
 	/*
-	 * We currently don't support namespaces that use either:
+	 * We currently don't support namespaces that are inactive, or use
+	 * either:
 	 * - protection information
 	 * - illegal block size (< 512)
 	 */
-	if (idns->id_dps.dp_pinfo) {
+	if (!ns->ns_active) {
+		ns->ns_ignore = B_TRUE;
+	} else if (idns->id_dps.dp_pinfo) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!ignoring namespace %d, unsupported feature: "
 		    "pinfo = %d", nsid, idns->id_dps.dp_pinfo);
