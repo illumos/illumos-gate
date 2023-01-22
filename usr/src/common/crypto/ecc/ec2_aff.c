@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -42,8 +42,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ec2.h"
 #include "mplogic.h"
 #include "mp_gf2m.h"
@@ -73,7 +71,7 @@ ec_GF2m_pt_set_inf_aff(mp_int *px, mp_int *py)
 	return MP_OKAY;
 }
 
-/* Computes R = P + Q based on IEEE P1363 A.10.2. Elliptic curve points P, 
+/* Computes R = P + Q based on IEEE P1363 A.10.2. Elliptic curve points P,
  * Q, and R can all be identical. Uses affine coordinates. */
 mp_err
 ec_GF2m_pt_add_aff(const mp_int *px, const mp_int *py, const mp_int *qx,
@@ -186,7 +184,7 @@ ec_GF2m_pt_dbl_aff(const mp_int *px, const mp_int *py, mp_int *rx,
 
 /* by default, this routine is unused and thus doesn't need to be compiled */
 #ifdef ECL_ENABLE_GF2M_PT_MUL_AFF
-/* Computes R = nP based on IEEE P1363 A.10.3. Elliptic curve points P and 
+/* Computes R = nP based on IEEE P1363 A.10.3. Elliptic curve points P and
  * R can be identical. Uses affine coordinates. */
 mp_err
 ec_GF2m_pt_mul_aff(const mp_int *n, const mp_int *px, const mp_int *py,
@@ -281,7 +279,7 @@ ec_GF2m_pt_mul_aff(const mp_int *n, const mp_int *px, const mp_int *py,
 #endif
 
 /* Validates a point on a GF2m curve. */
-mp_err 
+mp_err
 ec_GF2m_validate_point(const mp_int *px, const mp_int *py, const ECGroup *group)
 {
 	mp_err res = MP_NO;
@@ -303,10 +301,10 @@ ec_GF2m_validate_point(const mp_int *px, const mp_int *py, const ECGroup *group)
 		res = MP_NO;
 		goto CLEANUP;
 	}
-    /* 2: Verify that the coordinates of publicValue are elements 
+    /* 2: Verify that the coordinates of publicValue are elements
      *    of the field.
      */
-	if ((MP_SIGN(px) == MP_NEG) || (mp_cmp(px, &group->meth->irr) >= 0) || 
+	if ((MP_SIGN(px) == MP_NEG) || (mp_cmp(px, &group->meth->irr) >= 0) ||
 		(MP_SIGN(py) == MP_NEG) || (mp_cmp(py, &group->meth->irr) >= 0)) {
 		res = MP_NO;
 		goto CLEANUP;

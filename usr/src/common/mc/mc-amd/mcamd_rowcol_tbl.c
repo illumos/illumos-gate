@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mcamd_api.h>
 #include <mcamd_err.h>
 #include <mcamd_rowcol_impl.h>

@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -42,11 +42,9 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecl-priv.h"
 
-/* Returns 2^e as an integer. This is meant to be used for small powers of 
+/* Returns 2^e as an integer. This is meant to be used for small powers of
  * two. */
 int
 ec_twoTo(int e)
@@ -61,7 +59,7 @@ ec_twoTo(int e)
 }
 
 /* Computes the windowed non-adjacent-form (NAF) of a scalar. Out should
- * be an array of signed char's to output to, bitsize should be the number 
+ * be an array of signed char's to output to, bitsize should be the number
  * of bits of out, in is the original scalar, and w is the window size.
  * NAF is discussed in the paper: D. Hankerson, J. Hernandez and A.
  * Menezes, "Software implementation of elliptic curve cryptography over

@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(_KMDB) && !defined(_BOOT)
 #include "lint.h"
 #endif /* !_KMDB && !_BOOT */

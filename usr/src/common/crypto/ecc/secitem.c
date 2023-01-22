@@ -40,8 +40,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Support routines for SECItem data structure.
  *
@@ -141,7 +139,7 @@ SECITEM_CopyItem(PRArenaPool *arena, SECItem *to, const SECItem *from,
 	} else {
 	    to->data = (unsigned char*) PORT_Alloc(from->len, kmflag);
 	}
-	
+
 	if (!to->data) {
 	    return SECFailure;
 	}

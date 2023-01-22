@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -45,8 +45,6 @@
 #ifndef _EC2_H
 #define _EC2_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecl-priv.h"
 
 /* Checks if point P(px, py) is at infinity.  Uses affine coordinates. */
@@ -76,7 +74,7 @@ mp_err ec_GF2m_validate_point(const mp_int *px, const mp_int *py, const ECGroup 
 /* by default, this routine is unused and thus doesn't need to be compiled */
 #ifdef ECL_ENABLE_GF2M_PT_MUL_AFF
 /* Computes R = nP where R is (rx, ry) and P is (px, py). The parameters
- * a, b and p are the elliptic curve coefficients and the irreducible that 
+ * a, b and p are the elliptic curve coefficients and the irreducible that
  * determines the field GF2m.  Uses affine coordinates. */
 mp_err ec_GF2m_pt_mul_aff(const mp_int *n, const mp_int *px,
 						  const mp_int *py, mp_int *rx, mp_int *ry,
@@ -84,7 +82,7 @@ mp_err ec_GF2m_pt_mul_aff(const mp_int *n, const mp_int *px,
 #endif
 
 /* Computes R = nP where R is (rx, ry) and P is (px, py). The parameters
- * a, b and p are the elliptic curve coefficients and the irreducible that 
+ * a, b and p are the elliptic curve coefficients and the irreducible that
  * determines the field GF2m.  Uses Montgomery projective coordinates. */
 mp_err ec_GF2m_pt_mul_mont(const mp_int *n, const mp_int *px,
 						   const mp_int *py, mp_int *rx, mp_int *ry,

@@ -26,8 +26,6 @@
 #ifndef	_BLOWFISH_IMPL_H
 #define	_BLOWFISH_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Common definitions used by Blowfish.
  */

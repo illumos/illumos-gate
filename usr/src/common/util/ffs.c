@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Common implementation of ffs for kernel, mdb, and libc.  Note that mdb
  * renames ffs into mdb_ffs to avoid user-space clashes with the signature of

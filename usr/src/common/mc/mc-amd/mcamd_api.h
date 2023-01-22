@@ -27,8 +27,6 @@
 #ifndef _MCAMD_API_H
 #define	_MCAMD_API_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Primary header file for mcamd_* routines in $SRC/common/mc.  The
  * routines not implemented there are required to be implemented in the

@@ -27,8 +27,6 @@
 #ifndef	_V4_SUM_IMPL_H
 #define	_V4_SUM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>

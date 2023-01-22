@@ -43,8 +43,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mp_gf2m.h"
 #include "mp_gf2m-priv.h"
 #include "mplogic.h"
@@ -61,11 +59,11 @@ const mp_digit mp_gf2m_sqr_tb[16] =
  * Output in two mp_digits rh, rl.
  */
 #if MP_DIGIT_BITS == 32
-void 
+void
 s_bmul_1x1(mp_digit *rh, mp_digit *rl, const mp_digit a, const mp_digit b)
 {
     register mp_digit h, l, s;
-    mp_digit tab[8], top2b = a >> 30; 
+    mp_digit tab[8], top2b = a >> 30;
     register mp_digit a1, a2, a4;
 
     a1 = a & (0x3FFFFFFF); a2 = a1 << 1; a4 = a2 << 1;
@@ -87,20 +85,20 @@ s_bmul_1x1(mp_digit *rh, mp_digit *rl, const mp_digit a, const mp_digit b)
 
     /* compensate for the top two bits of a */
 
-    if (top2b & 01) { l ^= b << 30; h ^= b >> 2; } 
-    if (top2b & 02) { l ^= b << 31; h ^= b >> 1; } 
+    if (top2b & 01) { l ^= b << 30; h ^= b >> 2; }
+    if (top2b & 02) { l ^= b << 31; h ^= b >> 1; }
 
     *rh = h; *rl = l;
-} 
+}
 #else
-void 
+void
 s_bmul_1x1(mp_digit *rh, mp_digit *rl, const mp_digit a, const mp_digit b)
 {
     register mp_digit h, l, s;
     mp_digit tab[16], top3b = a >> 61;
     register mp_digit a1, a2, a4, a8;
 
-    a1 = a & (0x1FFFFFFFFFFFFFFFULL); a2 = a1 << 1; 
+    a1 = a & (0x1FFFFFFFFFFFFFFFULL); a2 = a1 << 1;
     a4 = a2 << 1; a8 = a4 << 1;
     tab[ 0] = 0;     tab[ 1] = a1;       tab[ 2] = a2;       tab[ 3] = a1^a2;
     tab[ 4] = a4;    tab[ 5] = a1^a4;    tab[ 6] = a2^a4;    tab[ 7] = a1^a2^a4;
@@ -126,19 +124,19 @@ s_bmul_1x1(mp_digit *rh, mp_digit *rl, const mp_digit a, const mp_digit b)
 
     /* compensate for the top three bits of a */
 
-    if (top3b & 01) { l ^= b << 61; h ^= b >> 3; } 
-    if (top3b & 02) { l ^= b << 62; h ^= b >> 2; } 
-    if (top3b & 04) { l ^= b << 63; h ^= b >> 1; } 
+    if (top3b & 01) { l ^= b << 61; h ^= b >> 3; }
+    if (top3b & 02) { l ^= b << 62; h ^= b >> 2; }
+    if (top3b & 04) { l ^= b << 63; h ^= b >> 1; }
 
     *rh = h; *rl = l;
-} 
+}
 #endif
 
-/* Compute xor-multiply of two binary polynomials  (a1, a0) x (b1, b0)  
+/* Compute xor-multiply of two binary polynomials  (a1, a0) x (b1, b0)
  * result is a binary polynomial in 4 mp_digits r[4].
  * The caller MUST ensure that r has the right amount of space allocated.
  */
-void 
+void
 s_bmul_2x2(mp_digit *r, const mp_digit a1, const mp_digit a0, const mp_digit b1,
            const mp_digit b0)
 {
@@ -152,12 +150,12 @@ s_bmul_2x2(mp_digit *r, const mp_digit a1, const mp_digit a0, const mp_digit b1,
     r[1]  = r[3] ^ r[2] ^ r[0] ^ m1 ^ m0;  /* l1 ^= l0 ^ h0 ^ m0; */
 }
 
-/* Compute xor-multiply of two binary polynomials  (a2, a1, a0) x (b2, b1, b0)  
+/* Compute xor-multiply of two binary polynomials  (a2, a1, a0) x (b2, b1, b0)
  * result is a binary polynomial in 6 mp_digits r[6].
  * The caller MUST ensure that r has the right amount of space allocated.
  */
-void 
-s_bmul_3x3(mp_digit *r, const mp_digit a2, const mp_digit a1, const mp_digit a0, 
+void
+s_bmul_3x3(mp_digit *r, const mp_digit a2, const mp_digit a1, const mp_digit a0,
 	const mp_digit b2, const mp_digit b1, const mp_digit b0)
 {
 	mp_digit zm[4];
@@ -167,7 +165,7 @@ s_bmul_3x3(mp_digit *r, const mp_digit a2, const mp_digit a1, const mp_digit a0,
 	s_bmul_2x2(r, a1, a0, b1, b0);        /* fill bottom 4 words */
 
 	zm[3] ^= r[3];
-	zm[2] ^= r[2]; 
+	zm[2] ^= r[2];
 	zm[1] ^= r[1] ^ r[5];
 	zm[0] ^= r[0] ^ r[4];
 
@@ -177,12 +175,12 @@ s_bmul_3x3(mp_digit *r, const mp_digit a2, const mp_digit a1, const mp_digit a0,
 	r[2]  ^= zm[0];
 }
 
-/* Compute xor-multiply of two binary polynomials  (a3, a2, a1, a0) x (b3, b2, b1, b0)  
+/* Compute xor-multiply of two binary polynomials  (a3, a2, a1, a0) x (b3, b2, b1, b0)
  * result is a binary polynomial in 8 mp_digits r[8].
  * The caller MUST ensure that r has the right amount of space allocated.
  */
-void s_bmul_4x4(mp_digit *r, const mp_digit a3, const mp_digit a2, const mp_digit a1, 
-	const mp_digit a0, const mp_digit b3, const mp_digit b2, const mp_digit b1, 
+void s_bmul_4x4(mp_digit *r, const mp_digit a3, const mp_digit a2, const mp_digit a1,
+	const mp_digit a0, const mp_digit b3, const mp_digit b2, const mp_digit b1,
 	const mp_digit b0)
 {
 	mp_digit zm[4];
@@ -191,19 +189,19 @@ void s_bmul_4x4(mp_digit *r, const mp_digit a3, const mp_digit a2, const mp_digi
 	s_bmul_2x2(zm, a3^a1, a2^a0, b3^b1, b2^b0); /* fill middle 4 words */
 	s_bmul_2x2(r, a1, a0, b1, b0);              /* fill bottom 4 words */
 
-	zm[3] ^= r[3] ^ r[7]; 
-	zm[2] ^= r[2] ^ r[6]; 
-	zm[1] ^= r[1] ^ r[5]; 
-	zm[0] ^= r[0] ^ r[4]; 
+	zm[3] ^= r[3] ^ r[7];
+	zm[2] ^= r[2] ^ r[6];
+	zm[1] ^= r[1] ^ r[5];
+	zm[0] ^= r[0] ^ r[4];
 
-	r[5]  ^= zm[3];    
+	r[5]  ^= zm[3];
 	r[4]  ^= zm[2];
-	r[3]  ^= zm[1];    
+	r[3]  ^= zm[1];
 	r[2]  ^= zm[0];
 }
 
 /* Compute addition of two binary polynomials a and b,
- * store result in c; c could be a or b, a and b could be equal; 
+ * store result in c; c could be a or b, a and b could be equal;
  * c is the bitwise XOR of a and b.
  */
 mp_err
@@ -249,12 +247,12 @@ mp_badd(const mp_int *a, const mp_int *b, mp_int *c)
 
 CLEANUP:
     return res;
-} 
+}
 
 #define s_mp_div2(a) MP_CHECKOK( mpl_rsh((a), (a), 1) );
 
 /* Compute binary polynomial multiply d = a * b */
-static void 
+static void
 s_bmul_d(const mp_digit *a, mp_size a_len, mp_digit b, mp_digit *d)
 {
     mp_digit a_i, a0b0, a1b1, carry = 0;
@@ -268,7 +266,7 @@ s_bmul_d(const mp_digit *a, mp_size a_len, mp_digit b, mp_digit *d)
 }
 
 /* Compute binary polynomial xor multiply accumulate d ^= a * b */
-static void 
+static void
 s_bmul_d_add(const mp_digit *a, mp_size a_len, mp_digit b, mp_digit *d)
 {
     mp_digit a_i, a0b0, a1b1, carry = 0;
@@ -281,10 +279,10 @@ s_bmul_d_add(const mp_digit *a, mp_size a_len, mp_digit b, mp_digit *d)
     *d ^= carry;
 }
 
-/* Compute binary polynomial xor multiply c = a * b.  
+/* Compute binary polynomial xor multiply c = a * b.
  * All parameters may be identical.
  */
-mp_err 
+mp_err
 mp_bmul(const mp_int *a, const mp_int *b, mp_int *c)
 {
     mp_digit *pb, b_i;
@@ -342,10 +340,10 @@ CLEANUP:
 }
 
 
-/* Compute modular reduction of a and store result in r.  
- * r could be a. 
- * For modular arithmetic, the irreducible polynomial f(t) is represented 
- * as an array of int[], where f(t) is of the form: 
+/* Compute modular reduction of a and store result in r.
+ * r could be a.
+ * For modular arithmetic, the irreducible polynomial f(t) is represented
+ * as an array of int[], where f(t) is of the form:
  *     f(t) = t^p[0] + t^p[1] + ... + t^p[k]
  * where m = p[0] > p[1] > ... > p[k] = 0.
  */
@@ -358,7 +356,7 @@ mp_bmod(const mp_int *a, const unsigned int p[], mp_int *r)
     mp_size used;
     mp_err res = MP_OKAY;
 
-    /* The algorithm does the reduction in place in r, 
+    /* The algorithm does the reduction in place in r,
      * if a != r, copy a into r first so reduction can be done in r
      */
     if (a != r) {
@@ -381,20 +379,20 @@ mp_bmod(const mp_int *a, const unsigned int p[], mp_int *r)
         for (k = 1; p[k] > 0; k++) {
             /* reducing component t^p[k] */
             n = p[0] - p[k];
-            d0 = n % MP_DIGIT_BITS;  
+            d0 = n % MP_DIGIT_BITS;
             d1 = MP_DIGIT_BITS - d0;
             n /= MP_DIGIT_BITS;
             z[j-n] ^= (zz>>d0);
-            if (d0) 
+            if (d0)
                 z[j-n-1] ^= (zz<<d1);
         }
 
         /* reducing component t^0 */
-        n = dN;  
+        n = dN;
         d0 = p[0] % MP_DIGIT_BITS;
         d1 = MP_DIGIT_BITS - d0;
         z[j-n] ^= (zz >> d0);
-        if (d0) 
+        if (d0)
             z[j-n-1] ^= (zz << d1);
 
     }
@@ -403,12 +401,12 @@ mp_bmod(const mp_int *a, const unsigned int p[], mp_int *r)
     while (j == dN) {
 
         d0 = p[0] % MP_DIGIT_BITS;
-        zz = z[dN] >> d0;  
+        zz = z[dN] >> d0;
         if (zz == 0) break;
         d1 = MP_DIGIT_BITS - d0;
 
         /* clear up the top d1 bits */
-        if (d0) z[dN] = (z[dN] << d1) >> d1; 
+        if (d0) z[dN] = (z[dN] << d1) >> d1;
         *z ^= zz; /* reduction t^0 component */
 
         for (k = 1; p[k] > 0; k++) {
@@ -428,25 +426,25 @@ CLEANUP:
     return res;
 }
 
-/* Compute the product of two polynomials a and b, reduce modulo p, 
+/* Compute the product of two polynomials a and b, reduce modulo p,
  * Store the result in r.  r could be a or b; a could be b.
  */
-mp_err 
+mp_err
 mp_bmulmod(const mp_int *a, const mp_int *b, const unsigned int p[], mp_int *r)
 {
     mp_err res;
-    
+
     if (a == b) return mp_bsqrmod(a, p, r);
     if ((res = mp_bmul(a, b, r) ) != MP_OKAY)
 	return res;
     return mp_bmod(r, p, r);
 }
 
-/* Compute binary polynomial squaring c = a*a mod p .  
+/* Compute binary polynomial squaring c = a*a mod p .
  * Parameter r and a can be identical.
  */
 
-mp_err 
+mp_err
 mp_bsqrmod(const mp_int *a, const unsigned int p[], mp_int *r)
 {
     mp_digit *pa, *pr, a_i;
@@ -487,12 +485,12 @@ CLEANUP:
 
 /* Compute binary polynomial y/x mod p, y divided by x, reduce modulo p.
  * Store the result in r. r could be x or y, and x could equal y.
- * Uses algorithm Modular_Division_GF(2^m) from 
- *     Chang-Shantz, S.  "From Euclid's GCD to Montgomery Multiplication to 
+ * Uses algorithm Modular_Division_GF(2^m) from
+ *     Chang-Shantz, S.  "From Euclid's GCD to Montgomery Multiplication to
  *     the Great Divide".
  */
-int 
-mp_bdivmod(const mp_int *y, const mp_int *x, const mp_int *pp, 
+int
+mp_bdivmod(const mp_int *y, const mp_int *x, const mp_int *pp,
     const unsigned int p[], mp_int *r)
 {
     mp_int aa, bb, uu;
@@ -591,7 +589,7 @@ mp_bpoly2arr(const mp_int *a, unsigned int p[], int max)
     return k;
 }
 
-/* Convert the coefficient array representation of a polynomial to a 
+/* Convert the coefficient array representation of a polynomial to a
  * bit-string.  The array must be terminated by 0.
  */
 mp_err
@@ -606,7 +604,7 @@ mp_barr2poly(const unsigned int p[], mp_int *a)
 	MP_CHECKOK( mpl_set_bit(a, p[i], 1) );
     }
     MP_CHECKOK( mpl_set_bit(a, 0, 1) );
-	
+
 CLEANUP:
     return res;
 }

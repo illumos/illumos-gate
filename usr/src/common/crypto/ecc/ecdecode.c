@@ -43,8 +43,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -75,7 +73,7 @@ hexString2SECItem(PRArenaPool *arena, SECItem *item, const char *str,
     int tmp = strlen(str);
 
     if ((tmp % 2) != 0) return NULL;
-    
+
     /* skip leading 00's unless the hex string is "00" */
     while ((tmp > 2) && (str[0] == '0') && (str[1] == '0')) {
         str += 2;
@@ -123,15 +121,15 @@ gf_populate_params(ECCurveName name, ECFieldType field_type, ECParams *params,
     params->fieldID.size = curveParams->size;
     params->fieldID.type = field_type;
     if (field_type == ec_field_GFp) {
-	CHECK_OK(hexString2SECItem(NULL, &params->fieldID.u.prime, 
+	CHECK_OK(hexString2SECItem(NULL, &params->fieldID.u.prime,
 	    curveParams->irr, kmflag));
     } else {
-	CHECK_OK(hexString2SECItem(NULL, &params->fieldID.u.poly, 
+	CHECK_OK(hexString2SECItem(NULL, &params->fieldID.u.poly,
 	    curveParams->irr, kmflag));
     }
-    CHECK_OK(hexString2SECItem(NULL, &params->curve.a, 
+    CHECK_OK(hexString2SECItem(NULL, &params->curve.a,
 	curveParams->curvea, kmflag));
-    CHECK_OK(hexString2SECItem(NULL, &params->curve.b, 
+    CHECK_OK(hexString2SECItem(NULL, &params->curve.b,
 	curveParams->curveb, kmflag));
     genenc[0] = '0';
     genenc[1] = '4';
@@ -139,7 +137,7 @@ gf_populate_params(ECCurveName name, ECFieldType field_type, ECParams *params,
     strcat(genenc, curveParams->genx);
     strcat(genenc, curveParams->geny);
     CHECK_OK(hexString2SECItem(NULL, &params->base, genenc, kmflag));
-    CHECK_OK(hexString2SECItem(NULL, &params->order, 
+    CHECK_OK(hexString2SECItem(NULL, &params->order,
     	curveParams->order, kmflag));
     params->cofactor = curveParams->cofactor;
 
@@ -152,7 +150,7 @@ cleanup:
 ECCurveName SECOID_FindOIDTag(const SECItem *);
 
 SECStatus
-EC_FillParams(PRArenaPool *arena, const SECItem *encodedParams, 
+EC_FillParams(PRArenaPool *arena, const SECItem *encodedParams,
     ECParams *params, int kmflag)
 {
     SECStatus rv = SECFailure;
@@ -178,7 +176,7 @@ EC_FillParams(PRArenaPool *arena, const SECItem *encodedParams,
     oid.len = encodedParams->len - 2;
     oid.data = encodedParams->data + 2;
     if ((encodedParams->data[0] != SEC_ASN1_OBJECT_ID) ||
-	((tag = SECOID_FindOIDTag(&oid)) == ECCurve_noName)) { 
+	((tag = SECOID_FindOIDTag(&oid)) == ECCurve_noName)) {
 	    PORT_SetError(SEC_ERROR_UNSUPPORTED_ELLIPTIC_CURVE);
 	    return SECFailure;
     }
@@ -298,7 +296,7 @@ EC_FillParams(PRArenaPool *arena, const SECItem *encodedParams,
 	CHECK_SEC_OK( gf_populate_params(ECCurve_X9_62_CHAR2_TNB431R1, ec_field_GF2m,
 	    params, kmflag) );
 	break;
-	
+
     case ECCurve_SECG_CHAR2_113R1:
 	/* Populate params for sect113r1 */
 	CHECK_SEC_OK( gf_populate_params(ECCurve_SECG_CHAR2_113R1, ec_field_GF2m,
@@ -430,7 +428,7 @@ EC_FillParams(PRArenaPool *arena, const SECItem *encodedParams,
     /* Prime curves */
 
     case ECCurve_X9_62_PRIME_192V1:
-	/* Populate params for prime192v1 aka secp192r1 
+	/* Populate params for prime192v1 aka secp192r1
 	 * (the NIST P-192 curve)
 	 */
 	CHECK_SEC_OK( gf_populate_params(ECCurve_X9_62_PRIME_192V1, ec_field_GFp,
@@ -448,7 +446,7 @@ EC_FillParams(PRArenaPool *arena, const SECItem *encodedParams,
 	CHECK_SEC_OK( gf_populate_params(ECCurve_X9_62_PRIME_192V3, ec_field_GFp,
 	    params, kmflag) );
 	break;
-	
+
     case ECCurve_X9_62_PRIME_239V1:
 	/* Populate params for prime239v1 */
 	CHECK_SEC_OK( gf_populate_params(ECCurve_X9_62_PRIME_239V1, ec_field_GFp,
@@ -498,7 +496,7 @@ EC_FillParams(PRArenaPool *arena, const SECItem *encodedParams,
 	CHECK_SEC_OK( gf_populate_params(ECCurve_SECG_PRIME_128R2, ec_field_GFp,
 	    params, kmflag) );
 	break;
-	
+
     case ECCurve_SECG_PRIME_160K1:
         /* Populate params for secp160k1 */
 	CHECK_SEC_OK( gf_populate_params(ECCurve_SECG_PRIME_160K1, ec_field_GFp,
@@ -530,7 +528,7 @@ EC_FillParams(PRArenaPool *arena, const SECItem *encodedParams,
 	break;
 
     case ECCurve_SECG_PRIME_224R1:
-	/* Populate params for secp224r1 
+	/* Populate params for secp224r1
 	 * (the NIST P-224 curve)
 	 */
 	CHECK_SEC_OK( gf_populate_params(ECCurve_SECG_PRIME_224R1, ec_field_GFp,
@@ -552,7 +550,7 @@ EC_FillParams(PRArenaPool *arena, const SECItem *encodedParams,
 	break;
 
     case ECCurve_SECG_PRIME_521R1:
-	/* Populate params for secp521r1 
+	/* Populate params for secp521r1
 	 * (the NIST P-521 curve)
 	 */
 	CHECK_SEC_OK( gf_populate_params(ECCurve_SECG_PRIME_521R1, ec_field_GFp,
@@ -596,12 +594,12 @@ EC_DecodeParams(const SECItem *encodedParams, ECParams **ecparams, int kmflag)
 	kmflag);
     memcpy(params->DEREncoding.data, encodedParams->data, encodedParams->len);
 
-    /* Fill out the rest of the ECParams structure based on 
-     * the encoded params 
+    /* Fill out the rest of the ECParams structure based on
+     * the encoded params
      */
     rv = EC_FillParams(NULL, encodedParams, params, kmflag);
     if (rv == SECFailure) {
-	PORT_FreeArena(NULL, B_TRUE);	
+	PORT_FreeArena(NULL, B_TRUE);
 	return SECFailure;
     } else {
 	*ecparams = params;;

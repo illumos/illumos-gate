@@ -28,8 +28,6 @@
 #ifndef _MULDIV_H
 #define	_MULDIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Helper routines for Sun and GCC compilers in 32-bit mode,
  * doing 64-bit math.  These routines should not be called directly;

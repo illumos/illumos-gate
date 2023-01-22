@@ -49,8 +49,6 @@
 #ifndef _MP_PRIME_H
 #define _MP_PRIME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mpi.h"
 
 extern const int prime_tab_size;   /* number of primes available */
@@ -70,7 +68,7 @@ mp_err  mpp_divis_primes(mp_int *a, mp_digit *np);
 mp_err  mpp_fermat(mp_int *a, mp_digit w);
 mp_err mpp_fermat_list(mp_int *a, const mp_digit *primes, mp_size nPrimes);
 mp_err  mpp_pprime(mp_int *a, int nt);
-mp_err mpp_sieve(mp_int *trial, const mp_digit *primes, mp_size nPrimes, 
+mp_err mpp_sieve(mp_int *trial, const mp_digit *primes, mp_size nPrimes,
 		 unsigned char *sieve, mp_size nSieve);
 mp_err mpp_make_prime(mp_int *start, mp_size nBits, mp_size strong,
 		      unsigned long * nTries);

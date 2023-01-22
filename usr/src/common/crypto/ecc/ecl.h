@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -45,8 +45,6 @@
 #ifndef _ECL_H
 #define _ECL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Although this is not an exported header file, code which uses elliptic
  * curve point operations will need to include it. */
 
@@ -74,14 +72,14 @@ ECCurveParams *ECCurveParams_dup(const ECCurveParams * params, int kmflag);
 /* Free an allocated ECCurveParams */
 void EC_FreeCurveParams(ECCurveParams * params);
 
-/* Elliptic curve scalar-point multiplication. Computes Q(x, y) = k * P(x, 
- * y).  If x, y = NULL, then P is assumed to be the generator (base point) 
+/* Elliptic curve scalar-point multiplication. Computes Q(x, y) = k * P(x,
+ * y).  If x, y = NULL, then P is assumed to be the generator (base point)
  * of the group of points on the elliptic curve. Input and output values
  * are assumed to be NOT field-encoded. */
 mp_err ECPoint_mul(const ECGroup *group, const mp_int *k, const mp_int *px,
 				   const mp_int *py, mp_int *qx, mp_int *qy);
 
-/* Elliptic curve scalar-point multiplication. Computes Q(x, y) = k1 * G + 
+/* Elliptic curve scalar-point multiplication. Computes Q(x, y) = k1 * G +
  * k2 * P(x, y), where G is the generator (base point) of the group of
  * points on the elliptic curve. Input and output values are assumed to
  * be NOT field-encoded. */
@@ -93,7 +91,7 @@ mp_err ECPoints_mul(const ECGroup *group, const mp_int *k1,
  * Returns MP_YES if the public key is valid, MP_NO if the public key
  * is invalid, or an error code if the validation could not be
  * performed. */
-mp_err ECPoint_validate(const ECGroup *group, const mp_int *px, const 
+mp_err ECPoint_validate(const ECGroup *group, const mp_int *px, const
 					mp_int *py);
 
 #endif /* _ECL_H */

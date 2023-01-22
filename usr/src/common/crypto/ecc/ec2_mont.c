@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -44,8 +44,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ec2.h"
 #include "mplogic.h"
 #include "mp_gf2m.h"
@@ -54,7 +52,7 @@
 #endif
 
 /* Compute the x-coordinate x/z for the point 2*(x/z) in Montgomery
- * projective coordinates. Uses algorithm Mdouble in appendix of Lopez, J. 
+ * projective coordinates. Uses algorithm Mdouble in appendix of Lopez, J.
  * and Dahab, R.  "Fast multiplication on elliptic curves over GF(2^m)
  * without precomputation". modified to not require precomputation of
  * c=b^{2^{m-1}}. */
@@ -187,7 +185,7 @@ gf2m_Mxy(const mp_int *x, const mp_int *y, mp_int *x1, mp_int *z1,
 	}
 }
 
-/* Computes R = nP based on algorithm 2P of Lopex, J. and Dahab, R.  "Fast 
+/* Computes R = nP based on algorithm 2P of Lopex, J. and Dahab, R.  "Fast
  * multiplication on elliptic curves over GF(2^m) without
  * precomputation". Elliptic curve points P and R can be identical. Uses
  * Montgomery projective coordinates. */
@@ -221,11 +219,11 @@ ec_GF2m_pt_mul_mont(const mp_int *n, const mp_int *px, const mp_int *py,
 																 * x1^2 =
 																 * px^2 */
 	MP_CHECKOK(group->meth->field_sqr(&z2, &x2, group->meth));
-	MP_CHECKOK(group->meth->field_add(&x2, &group->curveb, &x2, group->meth));	/* x2 
-																				 * = 
-																				 * px^4 
-																				 * + 
-																				 * b 
+	MP_CHECKOK(group->meth->field_add(&x2, &group->curveb, &x2, group->meth));	/* x2
+																				 * =
+																				 * px^4
+																				 * +
+																				 * b
 																				 */
 
 	/* find top-most bit and go one past it */

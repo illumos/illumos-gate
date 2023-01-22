@@ -1,4 +1,4 @@
-/* Default configuration for MPI library 
+/* Default configuration for MPI library
  *
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
@@ -46,12 +46,10 @@
 #ifndef _MPI_CONFIG_H
 #define _MPI_CONFIG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* $Id: mpi-config.h,v 1.5 2004/04/25 15:03:10 gerv%gerv.net Exp $ */
 
 /*
-  For boolean options, 
+  For boolean options,
   0 = no
   1 = yes
 

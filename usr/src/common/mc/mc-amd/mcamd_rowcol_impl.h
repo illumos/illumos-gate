@@ -25,8 +25,6 @@
 #ifndef _MCAMD_ROWCOL_IMPL_H
 #define	_MCAMD_ROWCOL_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mcamd_api.h>
 #include <sys/mc_amd.h>
 

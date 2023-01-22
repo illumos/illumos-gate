@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Unicode encoding conversion functions among UTF-8, UTF-16, and UTF-32.
  * (PSARC/2005/446, PSARC/2007/038, PSARC/2007/517)

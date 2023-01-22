@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -41,8 +41,6 @@
  *
  * Sun elects to use this software under the MPL license.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Uses Montgomery reduction for field arithmetic.  See mpi/mpmontg.c for
  * code implementation. */
@@ -116,7 +114,7 @@ ec_GFp_mul_mont(const mp_int *a, const mp_int *b, mp_int *r,
 
 #ifdef MP_MONT_USE_MP_MUL
 	/* if MP_MONT_USE_MP_MUL is defined, then the function s_mp_mul_mont
-	 * is not implemented and we have to use mp_mul and s_mp_redc directly 
+	 * is not implemented and we have to use mp_mul and s_mp_redc directly
 	 */
 	MP_CHECKOK(mp_mul(a, b, r));
 	MP_CHECKOK(s_mp_redc(r, (mp_mont_modulus *) meth->extra1));
@@ -153,7 +151,7 @@ ec_GFp_div_mont(const mp_int *a, const mp_int *b, mp_int *r,
 {
 	mp_err res = MP_OKAY;
 
-	/* if A=aZ represents a encoded in montgomery coordinates with Z and # 
+	/* if A=aZ represents a encoded in montgomery coordinates with Z and #
 	 * and \ respectively represent multiplication and division in
 	 * montgomery coordinates, then A\B = (a/b)Z = (A/B)Z and Binv =
 	 * (1/b)Z = (1/B)(Z^2) where B # Binv = Z */
