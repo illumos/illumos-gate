@@ -2927,6 +2927,8 @@ file path=opt/zfs-tests/tests/functional/rsend/send-c_zstreamdump mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send-cpL_varied_recsize mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send-wDR_encrypted_zvol mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_files mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_freeobjects \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_hierarchy \
     mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_props mode=0555
