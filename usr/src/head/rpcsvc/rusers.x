@@ -21,7 +21,6 @@
  */
 /*
  * Copyright 1991 Sun Microsystems, Inc.
- * #ident	"%Z%%M%	%I%	%E% SMI"
  */
 
 %/*

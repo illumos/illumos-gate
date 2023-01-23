@@ -27,8 +27,6 @@
 #ifndef	_PROCFS_H
 #define	_PROCFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -27,8 +27,6 @@
 #ifndef	_PORT_H
 #define	_PORT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/port.h>
 

@@ -26,12 +26,6 @@
 
 %/* from bootparam_prot.x */
 
-#ifdef RPC_HDR
-%
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%
-#endif
-
 /*
  * RPC for bootparms service.
  * There are two procedures:
@@ -76,7 +70,7 @@ struct bp_getfile_arg {
 	bp_machine_name_t	client_name;
 	bp_fileid_t		file_id;
 };
-	
+
 struct bp_getfile_res {
 	bp_machine_name_t	server_name;
 	bp_address		server_address;

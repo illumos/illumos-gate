@@ -31,8 +31,6 @@
 #ifndef	_PRIV_UTILS_H
 #define	_PRIV_UTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <priv.h>
 
 

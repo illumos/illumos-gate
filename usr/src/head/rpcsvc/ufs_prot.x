@@ -24,8 +24,6 @@
  *	  All Rights Reserved
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 %#include <sys/fs/ufs_fs.h>
 %#include <sys/types.h>
 %#include <sys/errno.h>

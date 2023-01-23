@@ -27,8 +27,6 @@
 #ifndef	_EXACCT_H
 #define	_EXACCT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * exacct item, group, and object definitions as well as structure manipulation
  * and conversion routines are given in sys/exacct.h.

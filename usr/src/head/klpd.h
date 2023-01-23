@@ -26,8 +26,6 @@
 #ifndef	_KLPD_H
 #define	_KLPD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/klpd.h>
 #include <priv.h>
 #include <ucred.h>
