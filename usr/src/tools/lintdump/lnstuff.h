@@ -31,8 +31,6 @@
  *	Based on @(#)lnstuff.h 1.5 02/06/05 from lint
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	LNSTUFF_H
 #define	LNSTUFF_H
 

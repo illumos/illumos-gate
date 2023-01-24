@@ -27,8 +27,6 @@
 #ifndef _SYS_STABS_H
 #define	_SYS_STABS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <setjmp.h>
 #include <string.h>

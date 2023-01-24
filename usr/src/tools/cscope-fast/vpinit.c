@@ -28,8 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* vpinit - initialize vpdirs or update vpdirs based on currentdir */
 
 #include <sys/types.h>

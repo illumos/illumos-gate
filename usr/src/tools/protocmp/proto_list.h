@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	SYM_F		1
 #define	PERM_F		2
 #define	REF_F		4

@@ -27,8 +27,6 @@
 #ifndef _MEMORY_H
 #define	_MEMORY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines for memory management
  */

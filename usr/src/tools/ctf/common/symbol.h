@@ -27,8 +27,6 @@
 #ifndef _SYMBOL_H
 #define	_SYMBOL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <gelf.h>
 
 #ifdef __cplusplus

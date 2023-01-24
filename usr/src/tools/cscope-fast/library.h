@@ -30,9 +30,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /* private library */
 char	*compath(char *pathname);
 char	*getwd(char *dir);

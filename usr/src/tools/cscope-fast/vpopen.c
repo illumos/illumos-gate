@@ -28,8 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* vpopen - view path version of the open system call */
 
 #include <sys/types.h>
