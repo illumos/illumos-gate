@@ -151,7 +151,7 @@ function cal_bits # isdir bits bits_limit acl_access ctrl
 	if ((flagw != 0)); then
 		if [[ $acl_access == *"write_data"* ]]; then
 			if ((isdir != 0)); then
-				tmpstr=${tmpstr}/write_data
+				tmpstr=${tmpstr}/add_file
 			fi
 			tmpstr=${tmpstr}/write_data
 		fi
