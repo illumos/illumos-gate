@@ -25,6 +25,7 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2023 Oxide Computer Company
 #
 
 #
@@ -76,6 +77,9 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	Ldstop;
 	Lfree;
 	Lgetareg;
+	Lgetfpregs;
+	Lgetregs;
+	Lgetxregs;
 	Lgrab;
 	Lgrab_error;
 	_libproc_debug	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
@@ -83,7 +87,10 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	Lprochandle;
 	Lpsinfo;
 	Lputareg;
+	Lsetfpregs;
+	Lsetregs;
 	Lsetrun;
+	Lsetxregs;
 	Lstack;
 	Lstate;
 	Lstatus;
@@ -137,16 +144,19 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	Plookup_by_addr;
 	Plookup_by_name;
 	Plwp_alt_stack;
+	Plwp_freexregs;
 	Plwp_getfpregs;
 	Plwp_getname;
 	Plwp_getpsinfo;
 	Plwp_getregs;
 	Plwp_getspymaster;
+	Plwp_getxregs;
 	Plwp_iter;
 	Plwp_iter_all;
 	Plwp_main_stack;
 	Plwp_setfpregs;
 	Plwp_setregs;
+	Plwp_setxregs;
 	Plwp_stack;
 	Pmapping_iter;
 	Pmapping_iter_resolved;
@@ -272,8 +282,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ps_lcontinue;
 	ps_lgetfpregs;
 	ps_lgetregs;
+	ps_lgetxregs;
+	ps_lgetxregsize;
 	ps_lsetfpregs;
 	ps_lsetregs;
+	ps_lsetxregs;
 	ps_lstop;
 	ps_pauxv;
 	ps_pbrandname;
@@ -332,12 +345,6 @@ $endif
 
 $if _sparc
 	Plwp_getgwindows;
-	Plwp_getxregs;
-	Plwp_setxregs;
-	ps_lgetxregs;
-	ps_lgetxregsize;
-	ps_lsetxregs;
-
 $if _ELF64
 	Plwp_getasrs;
 	Plwp_setasrs;

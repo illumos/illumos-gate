@@ -27,7 +27,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -239,48 +239,7 @@ fpregset_32ton(const fpregset32_t *src, fpregset_t *dst)
 void
 setfpregs(klwp_t *lwp, fpregset_t *fp)
 {
-	struct fpu_ctx *fpu = &lwp->lwp_pcb.pcb_fpu;
-
-	if (fpu->fpu_flags & FPU_EN) {
-		if (!(fpu->fpu_flags & FPU_VALID)) {
-			/*
-			 * FPU context is still active, release the
-			 * ownership.
-			 */
-			fp_free(fpu);
-		}
-	}
-	/*
-	 * Else: if we are trying to change the FPU state of a thread which
-	 * hasn't yet initialized floating point, store the state in
-	 * the pcb and indicate that the state is valid.  When the
-	 * thread enables floating point, it will use this state instead
-	 * of the default state.
-	 */
-
-	switch (fp_save_mech) {
-	case FP_FXSAVE:
-		fpregset_to_fxsave(fp, fpu->fpu_regs.kfpu_u.kfpu_fx);
-		fpu->fpu_regs.kfpu_xstatus =
-		    fp->fp_reg_set.fpchip_state.xstatus;
-		break;
-
-	case FP_XSAVE:
-		fpregset_to_fxsave(fp,
-		    &fpu->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave);
-		fpu->fpu_regs.kfpu_xstatus =
-		    fp->fp_reg_set.fpchip_state.xstatus;
-		fpu->fpu_regs.kfpu_u.kfpu_xs->xs_header.xsh_xstate_bv |=
-		    (XFEATURE_LEGACY_FP | XFEATURE_SSE);
-		break;
-	default:
-		panic("Invalid fp_save_mech");
-		/*NOTREACHED*/
-	}
-
-	fpu->fpu_regs.kfpu_status = fp->fp_reg_set.fpchip_state.status;
-	fpu->fpu_flags |= FPU_VALID;
-	PCB_SET_UPDATE_FPU(&lwp->lwp_pcb);
+	fpu_set_fpregset(lwp, fp);
 }
 
 /*
@@ -289,74 +248,8 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 void
 getfpregs(klwp_t *lwp, fpregset_t *fp)
 {
-	struct fpu_ctx *fpu = &lwp->lwp_pcb.pcb_fpu;
-
-	kpreempt_disable();
-	if (fpu->fpu_flags & FPU_EN) {
-		/*
-		 * If we have FPU hw and the thread's pcb doesn't have
-		 * a valid FPU state then get the state from the hw.
-		 */
-		if (fpu_exists && ttolwp(curthread) == lwp &&
-		    !(fpu->fpu_flags & FPU_VALID))
-			fp_save(fpu); /* get the current FPU state */
-	}
-
-	/*
-	 * There are 3 possible cases we have to be aware of here:
-	 *
-	 * 1. FPU is enabled.  FPU state is stored in the current LWP.
-	 *
-	 * 2. FPU is not enabled, and there have been no intervening /proc
-	 *    modifications.  Return initial FPU state.
-	 *
-	 * 3. FPU is not enabled, but a /proc consumer has modified FPU state.
-	 *    FPU state is stored in the current LWP.
-	 */
-	if ((fpu->fpu_flags & FPU_EN) || (fpu->fpu_flags & FPU_VALID)) {
-		/*
-		 * Cases 1 and 3.
-		 */
-		switch (fp_save_mech) {
-		case FP_FXSAVE:
-			fxsave_to_fpregset(fpu->fpu_regs.kfpu_u.kfpu_fx, fp);
-			fp->fp_reg_set.fpchip_state.xstatus =
-			    fpu->fpu_regs.kfpu_xstatus;
-			break;
-		case FP_XSAVE:
-			fxsave_to_fpregset(
-			    &fpu->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave, fp);
-			fp->fp_reg_set.fpchip_state.xstatus =
-			    fpu->fpu_regs.kfpu_xstatus;
-			break;
-		default:
-			panic("Invalid fp_save_mech");
-			/*NOTREACHED*/
-		}
-		fp->fp_reg_set.fpchip_state.status = fpu->fpu_regs.kfpu_status;
-	} else {
-		/*
-		 * Case 2.
-		 */
-		switch (fp_save_mech) {
-		case FP_FXSAVE:
-		case FP_XSAVE:
-			/*
-			 * For now, we don't have any AVX specific field in ABI.
-			 * If we add any in the future, we need to initial them
-			 * as well.
-			 */
-			fxsave_to_fpregset(&sse_initial, fp);
-			fp->fp_reg_set.fpchip_state.xstatus =
-			    fpu->fpu_regs.kfpu_xstatus;
-			break;
-		default:
-			panic("Invalid fp_save_mech");
-			/*NOTREACHED*/
-		}
-		fp->fp_reg_set.fpchip_state.status = fpu->fpu_regs.kfpu_status;
-	}
-	kpreempt_enable();
+	bzero(fp, sizeof (*fp));
+	fpu_get_fpregset(lwp, fp);
 }
 
 #if defined(_SYSCALL32_IMPL)
@@ -521,6 +414,12 @@ ucontext_32ton(const ucontext32_t *src, ucontext_t *dst)
 	if (src->uc_flags & UC_FPU)
 		fpregset_32ton(&src->uc_mcontext.fpregs,
 		    &dst->uc_mcontext.fpregs);
+
+	if (src->uc_flags & UC_XSAVE) {
+		dst->uc_xsave = (long)(uint32_t)src->uc_xsave;
+	} else {
+		dst->uc_xsave = 0;
+	}
 }
 
 #endif	/* _SYSCALL32_IMPL */
@@ -530,7 +429,7 @@ ucontext_32ton(const ucontext32_t *src, ucontext_t *dst)
  * If in a system call, return the address of the syscall trap.
  */
 greg_t
-getuserpc()
+getuserpc(void)
 {
 	greg_t upc = lwptoregs(ttolwp(curthread))->r_pc;
 	uint32_t insn;

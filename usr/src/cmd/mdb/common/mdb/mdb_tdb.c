@@ -183,7 +183,11 @@ mdb_tdb_load(const char *path)
 	if (t->tdb_ops.td_thr_tlsbase == NULL)
 		t->tdb_ops.td_thr_tlsbase = (td_err_e (*)())tdb_notsup;
 
-#ifdef __sparc
+	t->tdb_ops.td_thr_getxregsize = (td_err_e (*)())
+	    dlsym(hdl, "td_thr_getxregsize");
+	if (t->tdb_ops.td_thr_getxregsize == NULL)
+		t->tdb_ops.td_thr_getxregsize = (td_err_e (*)())tdb_notsup;
+
 	t->tdb_ops.td_thr_getxregs = (td_err_e (*)())
 	    dlsym(hdl, "td_thr_getxregs");
 	if (t->tdb_ops.td_thr_getxregs == NULL)
@@ -193,7 +197,6 @@ mdb_tdb_load(const char *path)
 	    dlsym(hdl, "td_thr_setxregs");
 	if (t->tdb_ops.td_thr_setxregs == NULL)
 		t->tdb_ops.td_thr_setxregs = (td_err_e (*)())tdb_notsup;
-#endif	/* __sparc */
 
 	return (&t->tdb_ops);
 }

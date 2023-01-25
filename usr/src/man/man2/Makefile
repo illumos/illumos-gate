@@ -202,6 +202,7 @@ MANLINKS=	_Exit.2				\
 		futimesat.2			\
 		futimens.2			\
 		getaudit_addr.2			\
+		getcontext_extd.2		\
 		getegid.2			\
 		geteuid.2			\
 		getgid.2			\
@@ -320,6 +321,7 @@ setaudit_addr.2			:= LINKSRC = getaudit.2
 
 setauid.2			:= LINKSRC = getauid.2
 
+getcontext_extd.2		:= LINKSRC = getcontext.2
 setcontext.2			:= LINKSRC = getcontext.2
 
 setgroups.2			:= LINKSRC = getgroups.2

@@ -1,0 +1,129 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd January 24, 2023
+.Dt UCONTEXT_ALLOC 3C
+.Os
+.Sh NAME
+.Nm ucontext_alloc ,
+.Nm ucontext_free
+.Nd allocate and free ucontext structures
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In ucontext.h
+.Ft "ucontext_t *"
+.Fo ucontext_alloc
+.Fa "uint32_t flags"
+.Fc
+.Ft void
+.Fo ucontext_free
+.Fa "ucontext_t *ucp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn ucontext_alloc
+function allocates and initializes a
+.Vt ucontext_t
+structure for subsequent use with functions such as
+.Xr getcontext_extd 2
+or
+.Xr swapcontext_extd 2 .
+.Pp
+Traditionally applications declare the
+.Vt ucontext_t
+structure on the stack, as part of another structure, or in other global data.
+Due to the advent of extended states
+.Pq such as the x86 xsave state
+the traditional structure is not sufficient to capture all state.
+The
+.Fn ucontext_alloc
+function determines the correct size for the current process to cover all of its
+extended states in addition to the standard
+.Vt ucontext_t
+and then proceeds to set up the other members of the
+.Vt ucontext_t
+to point at the additional memory.
+.Pp
+It is not recommended that the returned
+.Vt ucontext
+structure be used with either
+.Xr getcontext 2
+or
+.Xr swapcontext 2 .
+While the resulting calls will work, they will not preserve that space for the
+extended state has been allocated.
+No memory will be leaked as a result of that.
+.Pp
+The
+.Fn ucontext_free
+function is used to release all the memory associated with
+.Fa ucp .
+.Fa ucp
+must have come from a prior call to
+.Fn ucontext_alloc .
+If it is not, then it is undefined as to what will happen to the program, but it
+will result in eventual memory corruption.
+If
+.Fa ucp
+was declared on the stack, as a structure member, as global data, or allocated
+in some way that wasn't calling
+.Fn ucontext_alloc ,
+do not pass it to
+.Fn ucontext_free .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn ucontext_alloc
+function returns a pointer to an allocated
+.Vt ucontext_t .
+Otherwise
+.Dv NULL
+is returned and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn ucontext_alloc
+function will set
+.Va errno
+based on the failure of the underlying memory allocator.
+For more information and details on these errors, see
+.Xr malloc 3C ,
+the list of errors below may not be exhaustive.
+.Pp
+The
+.Fn ucontext_alloc
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The
+.Fa flags
+argument had unknown or unsupported values.
+.It Er ENOMEM
+There was insufficient memory to allocate an extended ucontext
+structure.
+See
+.Xr malloc 3C
+for more information.
+.It Er EAGAIN
+There was insufficient memory to allocate an extended ucontext
+structure, but the application could try again later.
+See
+.Xr malloc 3C
+for more information.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Safe
+.Sh SEE ALSO

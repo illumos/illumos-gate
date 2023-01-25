@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -81,10 +82,18 @@ struct	__ucontext {
 #endif
 	unsigned long	uc_flags;
 	ucontext_t	*uc_link;
-	sigset_t   	uc_sigmask;
-	stack_t 	uc_stack;
-	mcontext_t 	uc_mcontext;
-	long		uc_filler[5];	/* see ABI spec for Intel386 */
+	sigset_t	uc_sigmask;
+	stack_t		uc_stack;
+	mcontext_t	uc_mcontext;
+	/*
+	 * The first three entries have been borrowed by the lx brand right now.
+	 * That should be consolidated into a single uc_brand entry with a
+	 * UC_BRAND flag. Until such time, to help folks downstream who have the
+	 * lx brand, we leave them as is.
+	 */
+	long		uc_filler[3];
+	long		uc_xsave;
+	long		uc_filler1;
 };
 
 #if defined(_SYSCALL32)
@@ -97,7 +106,9 @@ typedef struct ucontext32 {
 	sigset_t	uc_sigmask;
 	stack32_t	uc_stack;
 	mcontext32_t	uc_mcontext;
-	int32_t		uc_filler[5];
+	int32_t		uc_filler[3];
+	int32_t		uc_xsave;
+	int32_t		uc_filler1;
 } ucontext32_t;
 
 #if defined(_KERNEL)
@@ -112,6 +123,7 @@ extern void ucontext_32ton(const ucontext32_t *src, ucontext_t *dest);
 #define	SETCONTEXT	1
 #define	GETUSTACK	2
 #define	SETUSTACK	3
+#define	GETCONTEXT_EXTD	4
 
 /*
  * values for uc_flags
@@ -125,6 +137,7 @@ extern void ucontext_32ton(const ucontext32_t *src, ucontext_t *dest);
 #define	UC_CPU		0x04
 #define	UC_MAU		0x08
 #define	UC_FPU		UC_MAU
+#define	UC_XSAVE	0x10
 
 #define	UC_MCONTEXT	(UC_CPU|UC_FPU)
 
@@ -136,11 +149,46 @@ extern void ucontext_32ton(const ucontext32_t *src, ucontext_t *dest);
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 
 #ifdef _KERNEL
-void savecontext(ucontext_t *, const k_sigset_t *);
+/*
+ * This structure is the private header for the xsave data that we end up
+ * sending to the stack. This is basically our own compressed form. See,
+ * uts/intel/os/fpu.c for more information. To help maintain the private nature,
+ * this is unfortunately duplicated in the xsave tests. If you change this you
+ * must update test/os-tests/tests/xsave/xsave_util.h.
+ */
+#define	UC_XSAVE_VERS	(('u' << 24) | ('c' << 16) | 0x01)
+typedef struct uc_xsave {
+	uint32_t ucx_vers;
+	uint32_t ucx_len;
+	uint64_t ucx_bv;
+} uc_xsave_t;
+
+typedef enum {
+	/*
+	 * Do a boring old savecontext() where we assume that only the data
+	 * structure that we're given must be filled in.
+	 */
+	SAVECTXT_F_NONE = 0,
+	/*
+	 * Indicate that we should treat the ucontext_t as having valid user
+	 * pointers for copying out extended state. Currently this means that we
+	 * treat the uc_xsave member as something that points to a user address.
+	 */
+	SAVECTXT_F_EXTD	= 1 << 0,
+	/*
+	 * This indicates that we shouldn't do normal copyout handling and need
+	 * to actually avoid potentially triggering a watchpoint because we're
+	 * probably in signal handling context.
+	 */
+	SAVECTXT_F_ONFAULT = 1 << 1
+} savecontext_flags_t;
+
+int savecontext(ucontext_t *, const k_sigset_t *, savecontext_flags_t);
 void restorecontext(ucontext_t *);
 
 #ifdef _SYSCALL32
-extern void savecontext32(ucontext32_t *, const k_sigset_t *);
+extern int savecontext32(ucontext32_t *, const k_sigset_t *,
+    savecontext_flags_t);
 #endif
 #endif
 

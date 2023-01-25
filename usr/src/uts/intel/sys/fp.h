@@ -21,7 +21,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -135,8 +135,19 @@ extern "C" {
  * - round to nearest or even
  * - 64-bit double precision
  * - all exceptions masked
+ *
+ * The 4th ed. SVR4 ABI didn't discuss the value of reserved bits. The ISA
+ * defines bit 6 (0x40) as reserved, but also that it is set (rather than clear,
+ * like many other Reserved bits). We preserve that in our value here.
  */
-#define	FPU_CW_INIT	0x133f
+#define	FPU_CW_INIT	0x137f
+
+/*
+ * This is the Intel mandated form of the default value of the x87 control word.
+ * This is different from what we use and should only be used in the context of
+ * representing that default state (e.g. in /proc xregs).
+ */
+#define	FPU_CW_INIT_HW	0x037f
 
 /*
  * masks and flags for SSE/SSE2 MXCSR
@@ -301,18 +312,17 @@ typedef struct {
 	union _kfpu_u {
 		void *kfpu_generic;
 		struct fxsave_state *kfpu_fx;
-#if defined(__i386)
-		struct fnsave_state *kfpu_fn;
-#endif
 		struct xsave_state *kfpu_xs;
 	} kfpu_u;
 	uint32_t kfpu_status;		/* saved at #mf exception */
 	uint32_t kfpu_xstatus;		/* saved at #xm exception */
 } kfpu_t;
 
-extern int fp_kind;		/* kind of fp support			*/
-extern int fp_save_mech;	/* fp save/restore mechanism		*/
-extern int fpu_exists;		/* FPU hw exists			*/
+extern int fp_kind;		/* kind of fp support */
+extern int fp_save_mech;	/* fp save/restore mechanism */
+extern int fpu_exists;		/* FPU hw exists */
+extern int fp_elf;		/* FP elf type */
+extern uint64_t xsave_bv_all;	/* Set of enabed xcr0 values */
 
 #ifdef _KERNEL
 
@@ -325,6 +335,7 @@ extern void fpu_probe(void);
 extern uint_t fpu_initial_probe(void);
 
 extern void fpu_auxv_info(int *, size_t *);
+extern boolean_t fpu_xsave_enabled(void);
 
 extern void fpnsave_ctxt(void *);
 extern void fpxsave_ctxt(void *);
@@ -341,8 +352,6 @@ extern void xrestore_ctxt(void *);
 extern void (*fprestore_ctxt)(void *);
 
 extern void fxsave_insn(struct fxsave_state *);
-extern void fpsave(struct fnsave_state *);
-extern void fprestore(struct fnsave_state *);
 extern void fpxsave(struct fxsave_state *);
 extern void fpxrestore(struct fxsave_state *);
 extern void xsave(struct xsave_state *, uint64_t);
@@ -372,6 +381,22 @@ extern void fp_lwp_dup(struct _klwp *);
 
 extern const struct fxsave_state sse_initial;
 extern const struct xsave_state avx_initial;
+
+struct proc;
+struct ucontext;
+extern void fpu_proc_xregs_info(struct proc *, uint32_t *, uint32_t *,
+    uint32_t *);
+extern size_t fpu_proc_xregs_max_size(void);
+extern void fpu_proc_xregs_get(struct _klwp *, void *);
+extern int fpu_proc_xregs_set(struct _klwp *, void *);
+extern int fpu_signal_copyin(struct _klwp *, struct ucontext *);
+typedef int (*fpu_copyout_f)(const void *, void *, size_t);
+extern int fpu_signal_copyout(struct _klwp *, uintptr_t, fpu_copyout_f);
+extern void fpu_set_xsave(struct _klwp *, const void *);
+extern size_t fpu_signal_size(struct _klwp *);
+
+extern void fpu_get_fpregset(struct _klwp *, fpregset_t *);
+extern void fpu_set_fpregset(struct _klwp *, const fpregset_t *);
 
 #endif	/* _KERNEL */
 

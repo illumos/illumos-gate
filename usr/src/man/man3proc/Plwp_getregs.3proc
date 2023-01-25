@@ -10,15 +10,20 @@
 .\"
 .\"
 .\" Copyright 2015 Joyent, Inc.
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd May 02, 2020
+.Dd January 19, 2023
 .Dt PLWP_GETREGS 3PROC
 .Os
 .Sh NAME
 .Nm Plwp_getfpregs ,
 .Nm Plwp_setfpregs ,
 .Nm Plwp_getregs ,
-.Nm Plwp_setregs
+.Nm Plwp_setregs ,
+.Nm Lgetfpregs ,
+.Nm Lsetfpregs ,
+.Nm Lgetregs ,
+.Nm Lsetregs
 .Nd get and set thread registers
 .Sh LIBRARY
 .Lb libproc
@@ -46,6 +51,26 @@
 .Fo Plwp_setregs
 .Fa "struct ps_prochandle *P"
 .Fa "lwpid_t lwpid"
+.Fa "const prgregset_t gregs"
+.Fc
+.Ft int
+.Fo Lgetfpregs
+.Fa "struct ps_lwphandle *L"
+.Fa "prfpregset_t *fpregs"
+.Fc
+.Ft int
+.Fo Lsetfpregs
+.Fa "struct ps_lwphandle *L"
+.Fa "const prfpregset_t *fpregs"
+.Fc
+.Ft int
+.Fo Lgetregs
+.Fa "struct ps_lwphandle *L"
+.Fa "prgregset_t gregs"
+.Fc
+.Ft int
+.Fo Lsetregs
+.Fa "struct ps_lwphandle *L"
 .Fa "const prgregset_t gregs"
 .Fc
 .Sh DESCRIPTION
@@ -105,23 +130,59 @@ the system and the running process.
 .Pp
 One may not set the register values of a process that is not an active
 process, e.g. a process handle that refers to a file or a core file.
+.Pp
+The
+.Fn Lgetfpregs ,
+.Fn Lsetfpregs ,
+.Fn Lgetregs ,
+and
+.Fn Lsetregs
+functions behave in a same way as the corresponding process-handle
+specific functions, with the following differences:
+.Bl -dash
+.It
+Rather than take a specified thread id via
+.Fa lwpid ,
+they operate on the thread that the thread-handle,
+.Fa L ,
+refers to.
+.It
+The process-handle functions will require that the entire process is
+stopped before performing a set operation.
+In these cases, only the specific thread identified by the handle
+.Fa L
+must be stopped through a call to
+.Xr Lstop 3PROC
+or similar.
+Note, a suspended thread
+.Po
+.Xr thr_suspend 3C
+.Pc
+is not considered stopped for these purposes.
+.El
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Plwp_getregs ,
 .Fn Plwp_setregs ,
 .Fn Plwp_getfpregs ,
+.Fn Plwp_setfpregs ,
+.Fn Lgetfpregs ,
+.Fn Lsetfpregs ,
+.Fn Lgetregs ,
 and
-.Fn Plwp_setfpregs
+.Fn Lsetregs
 functions return
 .Sy 0
 and obtain or set the register state.
 Otherwise,
 .Sy -1
 is returned,
-.Sy errno
+.Va errno
 is set to indicate the error, and the register state is not updated nor
 are the data pointers changed.
 .Sh ERRORS
+The implementations of these functions may use standard system and
+library calls that can fail.
 For a full list of possible errors also see the
 .Sy DIAGNOSTICS
 section in
@@ -144,6 +205,19 @@ There is no thread in
 .Fa P
 with id
 .Fa lwpid .
+.El
+The
+.Fn Lgetfpregs ,
+.Fn Lsetfpregs ,
+.Fn Lgetregs ,
+and
+.Fn Lsetregs
+will fail if:
+.Bl -tag -width Er
+.It Er EBUSY
+The thread handle
+.Fa L
+is not currently stopped.
 .El
 .Sh INTERFACE STABILITY
 .Sy Uncommitted

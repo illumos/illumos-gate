@@ -24,10 +24,12 @@
  */
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdarg.h>
 #include <string.h>
+#include <errno.h>
 #include "Pcontrol.h"
 
 /*
@@ -167,8 +169,6 @@ ps_lsetfpregs(struct ps_prochandle *P, lwpid_t lwpid, const prfpregset_t *regs)
 	return (PS_BADLID);
 }
 
-#if defined(sparc) || defined(__sparc)
-
 ps_err_e
 ps_lgetxregsize(struct ps_prochandle *P, lwpid_t lwpid, int *xrsize)
 {
@@ -182,10 +182,16 @@ ps_lgetxregsize(struct ps_prochandle *P, lwpid_t lwpid, int *xrsize)
 		for (lwp = list_head(&core->core_lwp_head); lwp != NULL;
 		    lwp = list_next(&core->core_lwp_head, lwp)) {
 			if (lwp->lwp_id == lwpid) {
-				if (lwp->lwp_xregs != NULL)
-					*xrsize = sizeof (prxregset_t);
-				else
+				if (lwp->lwp_xregs != NULL &&
+				    lwp->lwp_xregsize > 0) {
+					if (lwp->lwp_xregsize >= INT_MAX) {
+						return (PS_ERR);
+					}
+
+					*xrsize = (int)lwp->lwp_xregsize;
+				} else {
 					*xrsize = 0;
+				}
 				return (PS_OK);
 			}
 		}
@@ -199,6 +205,9 @@ ps_lgetxregsize(struct ps_prochandle *P, lwpid_t lwpid, int *xrsize)
 	if (stat(fname, &statb) != 0)
 		return (PS_BADLID);
 
+	if (statb.st_size > INT_MAX)
+		return (PS_ERR);
+
 	*xrsize = (int)statb.st_size;
 	return (PS_OK);
 }
@@ -206,16 +215,58 @@ ps_lgetxregsize(struct ps_prochandle *P, lwpid_t lwpid, int *xrsize)
 ps_err_e
 ps_lgetxregs(struct ps_prochandle *P, lwpid_t lwpid, caddr_t xregs)
 {
+	size_t xregsize;
+	prxregset_t *prx;
+
 	if (P->state != PS_STOP && P->state != PS_DEAD)
 		return (PS_ERR);
 
-	/* LINTED - alignment */
-	if (Plwp_getxregs(P, lwpid, (prxregset_t *)xregs) == 0)
+	if (Plwp_getxregs(P, lwpid, &prx, &xregsize) == 0) {
+		(void) memcpy(xregs, prx, xregsize);
+		Plwp_freexregs(P, prx, xregsize);
 		return (PS_OK);
+	}
 
-	return (PS_BADLID);
+	if (errno == ENODATA)
+		return (PS_NOXREGS);
+	else if (errno == ENOENT)
+		return (PS_BADLID);
+	return (PS_ERR);
 }
 
+ps_err_e
+ps_lsetxregs(struct ps_prochandle *P, lwpid_t lwpid, caddr_t xregs)
+{
+	size_t xregsize = 0;
+
+	if (P->state != PS_STOP)
+		return (PS_ERR);
+
+	/*
+	 * libproc asks the caller for the size of the extended register set.
+	 * Unfortunately, right now we aren't given the actual size of this
+	 * ourselves and we don't want to break the ABI that folks have used
+	 * historically. Therefore, we reach in and ask the structure in a
+	 * platform-specific way about what this should be. Sorry, this is a bit
+	 * unfortunate. This really shouldn't be a platform-specific #ifdef.
+	 *
+	 * Platforms without xregs can leave xregsize set to zero the kernel
+	 * will fail with EINVAL.
+	 */
+#if defined(__i386) || defined(__amd64)
+	prxregset_hdr_t *hdr = (prxregset_hdr_t *)xregs;
+	xregsize = hdr->pr_size;
+#endif
+
+	if (Plwp_setxregs(P, lwpid, (prxregset_t *)xregs, xregsize) == 0)
+		return (PS_OK);
+
+	if (errno == ENOENT)
+		return (PS_BADLID);
+	return (PS_ERR);
+}
+
+#if defined(sparc) || defined(__sparc)
 ps_err_e
 ps_lsetxregs(struct ps_prochandle *P, lwpid_t lwpid, caddr_t xregs)
 {

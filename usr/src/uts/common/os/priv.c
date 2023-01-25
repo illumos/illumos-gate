@@ -112,7 +112,7 @@ priv_init(void)
  * Guts of prgetprivsize.
  */
 int
-priv_prgetprivsize(prpriv_t *tmpl)
+priv_prgetprivsize(const prpriv_t *tmpl)
 {
 	return (sizeof (prpriv_t) +
 	    PRIV_SETBYTES - sizeof (priv_chunk_t) +

@@ -25,7 +25,7 @@
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 MNX Cloud, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
@@ -1660,24 +1660,44 @@ pr_read_lwpname(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 static int
 pr_read_xregs(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
-#if defined(__sparc)
 	proc_t *p;
 	kthread_t *t;
 	int error;
-	char *xreg;
+	void *xreg;
 	size_t size;
 
 	ASSERT(pnp->pr_type == PR_XREGS);
 
-	xreg = kmem_zalloc(sizeof (prxregset_t), KM_SLEEP);
-
 	if ((error = prlock(pnp, ZNO)) != 0)
-		goto out;
+		return (error);
 
 	p = pnp->pr_common->prc_proc;
 	t = pnp->pr_common->prc_thread;
 
-	size = prhasx(p)? prgetprxregsize(p) : 0;
+	/*
+	 * While we would prefer to do the allocation without holding the
+	 * process under a prlock(), we can only determine this size while
+	 * holding the process as the hold guarantees us:
+	 *
+	 *  o That the process in question actualy exists.
+	 *  o That the process in question cannot change the set of FPU features
+	 *    it has enabled.
+	 *
+	 * We will drop p_lock across the allocation call itself. This should be
+	 * safe as the enabled feature set should not change while the process
+	 * is locked (e.g. enabling extending FPU state like AMX on x86 should
+	 * require the process to be locked).
+	 */
+	size = prhasx(p) ? prgetprxregsize(p) : 0;
+	if (size == 0) {
+		prunlock(pnp);
+		return (0);
+	}
+	mutex_exit(&p->p_lock);
+	xreg = kmem_zalloc(size, KM_SLEEP);
+	mutex_enter(&p->p_lock);
+	ASSERT3U(size, ==, prgetprxregsize(p));
+
 	if (uiop->uio_offset >= size) {
 		prunlock(pnp);
 		goto out;
@@ -1691,11 +1711,8 @@ pr_read_xregs(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 
 	error = pr_uioread(xreg, size, uiop);
 out:
-	kmem_free(xreg, sizeof (prxregset_t));
+	kmem_free(xreg, size);
 	return (error);
-#else
-	return (0);
-#endif
 }
 
 static int

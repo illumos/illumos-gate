@@ -44,12 +44,14 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd November 24, 2022
+.Dd January 24, 2023
 .Dt GETCONTEXT 2
 .Os
 .Sh NAME
 .Nm getcontext ,
+.Nm getcontext_extd ,
 .Nm setcontext
 .Nd get and set current user context
 .Sh SYNOPSIS
@@ -57,6 +59,11 @@
 .Ft int
 .Fo getcontext
 .Fa "ucontext_t *ucp"
+.Fc
+.Ft int
+.Fo getcontext_extd
+.Fa "ucontext_t *ucp"
+.Fa "uint32_t flags"
 .Fc
 .Ft int
 .Fo setcontext
@@ -74,6 +81,74 @@ type that
 .Fa ucp
 points to defines the user context and includes the contents of the calling
 process' machine registers, the signal mask, and the current execution stack.
+.Pp
+The
+.Vt ucontext_t
+structure is a part of the system ABI.
+However, most architectures have added additional register states such as the
+extended vector and floating point registers that are not part of that.
+To facilitate getting that state
+.Pq such as the x86 xsave area
+the
+.Fn getcontext_extd
+function exists.
+Once called, the context will be initialized and is suitable for use in other
+context operations just as though one had called
+.Fn getcontext .
+.Pp
+When calling the
+.Fn getcontext
+function the
+.Vt ucontext_t
+is completely overwritten without regards for what is currently present.
+This is different when using
+.Fn getcontext_extd .
+Instead, the
+.Vt ucontext_t
+structure is read by the kernel and it assumes that the user has
+initialized it.
+This allows the system to consider members of the
+.Vt ucontext_T
+.Po
+such as the
+.Fa uc_xsave
+member on x86
+.Pc
+to point to properly sized memory.
+.Pp
+To allow for all extended states to be copied out,
+.Fa ucp
+must be allocated with
+.Xr ucontext_alloc 3C .
+Otherwise whether it is declared on the stack, as global data, allocated
+dynamically, or part of a structure,
+.Fa ucp
+must be zeroed through a call to
+.Xr bzero 3C
+or
+.Xr memset 3C
+prior to calling
+.Fn getcontext_extd .
+Improper initialization can lead to memory safety bugs, making it critical that
+this is done.
+.Pp
+The
+.Fa flags
+member must be zero and is present to allow for what is copied out to change in
+the future.
+This indicates that the system should attempt to copy out all extended states,
+though if the
+.Vt ucontext_t
+was not allocated with
+.Xr ucontext_alloc 3C ,
+some extended states may not be.
+This happens because
+.Xr ucontext_alloc 3C
+takes care of allocating and setting up the
+.Vt ucontext_t
+to indicate that memory beyond the
+.Vt ucontext_t
+is valid and the corresponding flags in the structure are set.
 .Pp
 The
 .Fn setcontext
@@ -131,10 +206,27 @@ On successful completion,
 .Fn setcontext
 does not return and
 .Fn getcontext
+and
+.Fn getcontext_extd
 returns 0.
 Otherwise, -1 is returned.
 .Sh ERRORS
-No errors are defined.
+No errors are defined for
+.Fn getcontext
+or
+.Fn setcontext .
+.Pp
+The
+.Fn getcontext_extd
+function only sets
+.Va errno
+in some circumstances when it fails.
+The function may fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+.Fa flags
+had invalid values.
+.El
 .Sh USAGE
 When a signal handler is executed, the current user context is saved and a new
 context is created.
@@ -173,6 +265,7 @@ required.
 .Xr makecontext 3C ,
 .Xr setjmp 3C ,
 .Xr sigsetjmp 3C ,
+.Xr ucontext_alloc 3C ,
 .Xr ucontext.h 3HEAD ,
 .Xr attributes 7 ,
 .Xr standards 7

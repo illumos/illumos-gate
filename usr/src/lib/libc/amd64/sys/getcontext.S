@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 	.file	"getcontext.s"
 
 #include <sys/asm_linkage.h>
@@ -42,10 +46,9 @@
  * swapcontext() shares the most code with getcontext().
  */
 
-#define	GETCONTEXT_IMPL(offset)						\
+#define	GETCONTEXT_IMPL(offset, func)						\
 	pushq	%rdi;		/* preserve the ucontext_t pointer */	\
-	call	__getcontext;						\
-				/* call getcontext: syscall */		\
+	call	func;		/* call syscall */			\
 	popq	%rdx;							\
 	andl	%eax, %eax;	/* if (error_return_from_syscall) */	\
 	je	1f;							\
@@ -69,26 +72,58 @@
 	movq	%rax, RAX_OFF (%rdx);					\
 				/* getcontext returns 0 after setcontext */
 
-/*	
- * getcontext(ucontext_t *ucp)
+/*
+ * int getcontext(ucontext_t *ucp)
  */
 
 	ENTRY(getcontext)
-	GETCONTEXT_IMPL(0)
+	GETCONTEXT_IMPL(0, __getcontext)
 	ret
 	SET_SIZE(getcontext)
 
 /*
- * swapcontext(ucontext_t *oucp, const ucontext_t *ucp)
+ * int swapcontext(ucontext_t *oucp, const ucontext_t *ucp)
  */
 
 	ENTRY(swapcontext)
 	pushq	%rsi			/* preserve the 2nd argument */
-	
-	GETCONTEXT_IMPL(8)
+
+	GETCONTEXT_IMPL(8, __getcontext)
 
 	/* call setcontext */
 	popq	%rdi
 	call	setcontext
 	ret
 	SET_SIZE(swapcontext)
+
+/*
+ * int getcontext_extd(ucontext_t *ctx, uint32_t flags)
+ */
+	ENTRY(getcontext_extd)
+	cmpl	$0, %esi
+	jne	2f
+	GETCONTEXT_IMPL(0, __getcontext_extd)
+	ret
+2:
+	movl	$EINVAL, %eax		/* errno = EINVAL */
+	jmp	__cerror		/* return (-1) */
+	SET_SIZE(getcontext_extd)
+
+/*
+ * int swapcontext_extd(ucontext_t *oucp, uint32_t flags, const ucontext_t *ucp)
+ */
+	ENTRY(swapcontext_extd)
+	cmpl	$0, %esi
+	jne	2f
+	pushq	%rdx			/* preserve the 3rd argument */
+
+	GETCONTEXT_IMPL(8, __getcontext_extd)
+
+	/* call setcontext */
+	popq	%rdi
+	call	setcontext
+	ret
+2:
+	movl	$EINVAL, %eax		/* errno = EINVAL */
+	jmp	__cerror		/* return (-1) */
+	SET_SIZE(swapcontext_extd)

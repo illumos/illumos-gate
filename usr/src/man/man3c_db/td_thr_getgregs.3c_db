@@ -1,184 +1,127 @@
-'\" te
+.\"
 .\"  Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TD_THR_GETGREGS 3C_DB "Oct 20, 1998"
-.SH NAME
-td_thr_getgregs, td_thr_setgregs, td_thr_getfpregs, td_thr_setfpregs,
-td_thr_getxregsize, td_thr_getxregs, td_thr_setxregs \- reading and writing
-thread registers in libc_db
-.SH SYNOPSIS
-.LP
-.nf
-cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
-#include <proc_service.h>
-#include <thread_db.h>
-
-\fBtd_err_e\fR \fBtd_thr_getgregs\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBprgregset_t\fR\fIgregset\fR);
-.fi
-
-.LP
-.nf
-\fBtd_err_e\fR \fBtd_thr_setgregs\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBprgregset_t\fR\fIgregset\fR);
-.fi
-
-.LP
-.nf
-\fBtd_err_e\fR \fBtd_thr_getfpregs\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBprfpregset_t *\fR\fIfpregset\fR);
-.fi
-
-.LP
-.nf
-\fBtd_err_e\fR \fBtd_thr_setfpregs\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBprfpregset_t *\fR\fIfpregset\fR);
-.fi
-
-.LP
-.nf
-\fBtd_err_e\fR \fBtd_thr_getxregsize\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBint *\fR\fIxregsize\fR);
-.fi
-
-.LP
-.nf
-\fBtd_err_e\fR \fBtd_thr_getxregs\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBprxregset_t *\fR\fIxregset\fR);
-.fi
-
-.LP
-.nf
-\fBtd_err_e\fR \fBtd_thr_setxregs\fR(\fBconst td_thrhandle_t *\fR\fIth_p\fR, \fBprxregset_t *\fR\fIxregset\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
+.\" Copyright 2023 Oxide Computer Company
+.Dd January 23, 2023
+.Dt TD_THR_GETGREGS 3C_DB
+.Os
+.Sh NAME
+.Nm td_thr_getgregs ,
+.Nm td_thr_setgregs ,
+.Nm td_thr_getfpregs ,
+.Nm td_thr_setfpregs ,
+.Nm td_thr_getxregsize ,
+.Nm td_thr_getxregs ,
+.Nm td_thr_setxregs
+.Nd reading and writing thread registers in libc_db
+.Sh LIBRARY
+.Lb libc_db
+.Sh SYNOPSIS
+.In proc_service.h
+.In thread_db.h
+.Ft td_err_e
+.Fo td_thr_getgregs
+.Fa "const td_thrhandle_t *th_p"
+.Fa "prgregset_t gregset"
+.Fc
+.Ft td_err_e
+.Fo td_thr_setgregs
+.Fa "const td_thrhandle_t *th_p"
+.Fa "prgregset_t gregset"
+.Fc
+.Ft td_err_e
+.Fo td_thr_getfpregs
+.Fa "const td_thrhandle_t *th_p"
+.Fa "prfpregset_t *fpregset"
+.Fc
+.Ft td_err_e
+.Fo td_thr_setfpregs
+.Fa "const td_thrhandle_t *th_p"
+.Fa "prfpregset_t *fpregset"
+.Fc
+.Ft td_err_e
+.Fo td_thr_getxregsize
+.Fa "const td_thrhandle_t *th_p"
+.Fa "int *xregsize"
+.Fc
+.Ft td_err_e
+.Fo td_thr_getxregs
+.Fa "const td_thrhandle_t *th_p"
+.Fa "prxregset_t *xregset"
+.Fc
+.Ft td_err_e
+.Fo td_thr_setxregs
+.Fa "const td_thrhandle_t *th_p"
+.Fa "prxregset_t *xregset"
+.Fc
+.Sh DESCRIPTION
 These functions read and write the register sets associated with thread
-\fIth_p\fR. The \fBtd_thr_getgregs()\fR and \fBtd_thr_setgregs()\fR functions
-get and set, respectively, the general registers of thread \fIth_p\fR. The
-\fBtd_thr_getfpregs()\fR and \fBtd_thr_setfpregs()\fR functions get and set,
-respectively, the thread's floating point register set. The
-\fBtd_thr_getxregsize()\fR, \fBtd_thr_getxregs()\fR, and
-\fBtd_thr_setxregs()\fR functions are SPARC-specific. The
-\fBtd_thr_getxregsize()\fR function returns in *\fIxregsize\fR the size of the
-architecture-dependent extra state registers. The \fBtd_thr_getxregs()\fR and
-\fBtd_thr_setxregs()\fR functions get and set, respectively, those extra state
-registers. On non-SPARC architectures, these functions return \fBTD_NOXREGS\fR.
-.sp
-.LP
-If the thread specified by \fIth_p\fR is currently executing on a lightweight
-process ( \fBLWP),\fR these functions read or write, respectively, the
-appropriate register set to the \fBLWP\fR using the imported interface. If the
-thread is not  currently executing on an \fBLWP\fR, the floating point and
-extra state registers may cannot be read or written. Some of the general
-registers might also not be readable or writable, depending on the
-architecture, in which case \fBtd_thr_getfpregs()\fR and
-\fBtd_thr_setfpregs()\fR return  \fBTD_NOFPREGS\fR and \fBtd_thr_getxregs()\fR
-and \fBtd_thr_setxregs()\fR will \fBTD_NOXREGS\fR. Calls to
-\fBtd_thr_getgregs()\fR and \fBtd_thr_setgregs()\fR succeed, but values
-returned for unreadable registers are undefined, values specified for
-unwritable registers are ignored. In this instance, and \fBTD_PARTIALREGS\fR is
-returned.  See the architecture-specific notes that follow regarding the
-registers that may be read and written for a thread not currently executing on
-an \fBLWP\fR.
-.SS "SPARC"
-.sp
-.LP
-On a thread not currently assigned to an \fBLWP\fR, only %i0-%i7, %l0-%l7, %g7,
-%pc, and %sp (%o6) can be read or written.  %pc and %sp refer to the program
-counter and stack pointer that the thread will have when it resumes execution.
-.SS "x86 Architecture"
-.sp
-.LP
-On a thread not currently assigned to an \fBLWP,\fR only %pc, %sp, %ebp, %edi,
-%edi, and %ebx can be read.
-.SH RETURN VALUES
-.sp
-.ne 2
-.na
-\fB\fBTD_OK\fR\fR
-.ad
-.RS 18n
+.Fa th_p .
+The
+.Fn td_thr_getgregs
+and
+.Fn td_thr_setgregs
+functions get and set, respectively, the general registers of thread
+.Fa th_p .
+The
+.Fn td_thr_getfpregs
+and
+.Fn td_thr_setfpregs
+functions get and set, respectively, the thread's floating point register set.
+.Pp
+The
+.Fn td_thr_getxregsize
+function returns in
+.Fa *xregsize
+the size of the
+architecture-dependent extra state registers.
+The
+.Fn td_thr_getxregs
+and
+.Fn td_thr_setxregs
+functions get and set, respectively, those extra state registers.
+The buffer passed to
+.Fn td_thr_getxregs
+must be at least the size indicated by
+.Fn td_thr_getxregsize .
+This size must not be assumed and may change between processes.
+Failure to do so, will result in the system overwriting memory.
+Not all platforms implement extended registers.
+When they are not implemented, these functions return
+.Dv TD_NOXREGS .
+.Sh RETURN VALUES
+The
+.Fn td_thr_getgregs ,
+.Fn td_thr_setgregs ,
+.Fn td_thr_getfpregs ,
+.Fn td_thr_setfpregs ,
+.Fn td_thr_getxregsize ,
+.Fn td_thr_getxregs ,
+and
+.Fn td_thr_setxregs
+functions return one of the following values:
+.Bl -tag -width Ds
+.It Dv TD_OK
 The call completed successfully.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTD_BADTH\fR\fR
-.ad
-.RS 18n
+.It Dv TD_BADTH
 An invalid thread handle was passed in.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTD_DBERR\fR\fR
-.ad
-.RS 18n
+.It Dv TD_DBERR
 A call to one of the imported interface routines failed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTD_PARTIALREGS\fR\fR
-.ad
-.RS 18n
-Because the thread is not currently assigned to a \fBLWP,\fR not all registers
-were read or written. See \fBDESCRIPTION\fR for a discussion about which
-registers are not saved when a thread is not assigned to an \fBLWP\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTD_NOFPREGS\fR\fR
-.ad
-.RS 18n
-Floating point registers could not be read or written, either because the
-thread is not currently assigned to an \fBLWP\fR, or because the architecture
+.It Dv TD_NOFPREGS
+Floating point registers could not be read or written because the architecture
 does not have such registers.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTD_NOXREGS\fR\fR
-.ad
-.RS 18n
+.It Dv TD_NOXREGS
 Architecture-dependent extra state registers could not be read or written,
-either because the thread is not currently assigned to an \fBLWP\fR, or because
-the architecture does not have such registers, or because the architecture is
-not a SPARC architecture.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTD_ERR\fR\fR
-.ad
-.RS 18n
-A \fBlibc_db\fR internal error occurred.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-MT-Level	Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR libc_db (3LIB),
-.BR attributes (7)
+because the architecture does not have such registers.
+.It Dv TD_ERR
+A
+.Sy libc_db
+internal error occurred.
+.El
+.Sh MT-LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr libc_db 3LIB ,
+.Xr attributes 7

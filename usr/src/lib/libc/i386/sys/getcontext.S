@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 	.file	"getcontext.s"
 
 #include <sys/asm_linkage.h>
@@ -44,10 +48,10 @@
  */
 
 
-#define	GETCONTEXT_IMPL							\
+#define	GETCONTEXT_IMPL(func)						\
 	movl	4(%esp), %eax;		/* %eax <-- first arg: ucp */	\
 	pushl	%eax;			/* push ucp for system call */	\
-	call	__getcontext;		/* call getcontext: syscall */	\
+	call	func;			/* call syscall */		\
 	addl	$4, %esp;		/* pop arg */			\
 	andl	%eax, %eax;		/* if (err_ret_from_syscall) */	\
 	je	1f;							\
@@ -70,23 +74,57 @@
 				/* getcontext returns 0 after a setcontext */
 
 /*
- * getcontext(ucontext_t *ucp)
+ * int getcontext(ucontext_t *ucp)
  */
 	ENTRY(getcontext)
-	GETCONTEXT_IMPL
+	GETCONTEXT_IMPL(__getcontext)
 	ret
 	SET_SIZE(getcontext)
 
 
 /*
- * swapcontext(ucontext_t *oucp, const ucontext_t *ucp)
+ * int swapcontext(ucontext_t *oucp, const ucontext_t *ucp)
  */
 	ENTRY(swapcontext)
-	GETCONTEXT_IMPL
-	/ call setcontext
+	GETCONTEXT_IMPL(__getcontext)
+	/* call setcontext */
 	movl	8(%esp), %eax		/* %eax <-- second arg: ucp */
 	pushl	%eax			/* push ucp for setcontext */
 	call	setcontext
 	addl	$4, %esp		/* pop arg: just in case */
 	ret
 	SET_SIZE(swapcontext)
+
+/*
+ * int getcontext_extd(ucontext_t *ucp, uint32_t flags)
+ */
+	ENTRY(getcontext_extd)
+	movl	8(%esp), %eax
+	cmpl	$0, %eax		/* if (flags != 0) */
+	jne	2f
+	GETCONTEXT_IMPL(__getcontext_extd)
+	ret
+2:
+	movl	$EINVAL, %eax		/* errno = EINVAL; */
+	jmp	__cerror		/* return (-1) */
+	SET_SIZE(getcontext_extd)
+
+
+/*
+ * int swapcontext_extd(ucontext_t *oucp, const ucontext_t *ucp)
+ */
+	ENTRY(swapcontext_extd)
+	movl	8(%esp), %eax
+	cmpl	$0, %eax		/* if (flags != 0) */
+	jne	2f
+	GETCONTEXT_IMPL(__getcontext_extd)
+	/* call setcontext */
+	movl	12(%esp), %eax		/* %eax <-- second arg: ucp */
+	pushl	%eax			/* push ucp for setcontext */
+	call	setcontext
+	addl	$4, %esp		/* pop arg: just in case */
+	ret
+2:
+	movl	$EINVAL, %eax		/* errno = EINVAL; */
+	jmp	__cerror		/* return (-1) */
+	SET_SIZE(swapcontext_extd)

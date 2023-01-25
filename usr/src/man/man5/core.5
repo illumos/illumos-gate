@@ -3,7 +3,7 @@
 .\" Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-.\" Copyright 2021 Oxide Computer Company
+.\" Copyright 2023 Oxide Computer Company
 .\" Copyright 1989 AT&T
 .\"
 .\" The contents of this file are subject to the terms of the
@@ -21,7 +21,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd August 3, 2021
+.Dd January 24, 2023
 .Dt CORE 5
 .Os
 .Sh NAME
@@ -193,7 +193,7 @@ files.
 It contains structures defined in
 .In sys/old_procfs.h .
 New programs should recognize and skip this
-.Sy BNOTE
+.Sy NOTE
 segment, advancing instead to the new
 .Sy NOTE
 segment.
@@ -261,7 +261,7 @@ structure is defined in
 .Fa n_type :
 .Dv NT_PRFPREG .
 This entry is present only if the
-.Sy BLWP
+.Sy LWP
 used the floating-point hardware.
 It contains the floating-point registers.
 The
@@ -281,13 +281,12 @@ structure is defined in
 .It Vt prxregset_t
 .Fa n_type :
 .Dv NT_PRXREG .
-This entry is present only if the machine has extra register state associated
-with it.
-It contains the extra register state.
-The
+This entry is no longer included in core files, but is of historical note
+because in the past it was included on SPARC-based systems.
+While since then the
 .Vt prxregset_t
-structure is defined in
-.Vt sys/procfs_isa.h .
+and extended register sets have been defined on other architectures, they do not
+emit this in the old note section because there is no binary compatibility.
 .El
 .Pp
 The new
@@ -521,7 +520,16 @@ It contains the extra register state.
 The
 .Vt prxregset_t
 structure is defined in
-.In sys/procfs_isa.h .
+.In sys/procfs_isa.h ;
+however applications should include
+.In procfs.h
+to get access to it.
+On most architectures the
+.Vt prxregset_t
+is opaque and of variable size.
+.Xr proc 5
+discusses the structure of the extended register set for each supported
+architecture.
 .It Vt asrset_t
 \fB\fBasrset_t\fR\fR
 .Fa n_type :

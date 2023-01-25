@@ -29,6 +29,7 @@
 /*
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SYS_PROC_PRDATA_H
@@ -404,17 +405,88 @@ extern	void	prpokethread(kthread_t *t);
 extern	int	prgetrvals(klwp_t *, long *, long *);
 extern	void	prgetprfpregs(klwp_t *, prfpregset_t *);
 extern	void	prsetprfpregs(klwp_t *, prfpregset_t *);
-extern	void	prgetprxregs(klwp_t *, caddr_t);
-extern	void	prsetprxregs(klwp_t *, caddr_t);
-extern	int	prgetprxregsize(proc_t *);
 extern	int	prhasfp(void);
-extern	int	prhasx(proc_t *);
 extern	caddr_t	prgetstackbase(proc_t *);
 extern	caddr_t	prgetpsaddr(proc_t *);
 extern	int	prisstep(klwp_t *);
 extern	void	prsvaddr(klwp_t *, caddr_t);
 extern	int	prfetchinstr(klwp_t *, ulong_t *);
 extern	ushort_t prgetpctcpu(uint64_t);
+
+/*
+ * This set of routines is used by platforms to implement support for the
+ * 'xregs' or extended registers in /proc. Unlike other registers which
+ * generally have a well-defined value determined by the ABI that never changes,
+ * we expect these to change.
+ *
+ * An important thing to note is that you'll see we have moved away from a
+ * traditional version of a fixed size, non-opaque definition of the
+ * prxregset_t. This is because the size varies and we don't want applications
+ * to incorrectly bake a real definition in and cause problems where extending
+ * it becomes very hard to do (ala the prgregset_t and prfregset_t). This is a
+ * little more work for everyone implementing it, but it does ensure that we are
+ * generally in better shape.
+ *
+ * Here are the semantics of what these are required to do and how the fit
+ * together:
+ *
+ *   o prhasx		Determine if the process in question supports the
+ *			extended register sets. Note, this is may be a
+ *			process-specific setting due to things like whether or
+ *			not the FPU is enabled or other things.
+ *
+ *   o prgetxregsize	This returns the size of the actual xregs file for a
+ *			given process. This may change between processes because
+ *			not every process may have the same set of extended
+ *			features enabled (e.g. AMX on x86). If xregs is not
+ *			supported then this should return 0. If xregs are
+ *			supported, then returning zero will lead other
+ *			operations to fail.
+ *
+ *   o prwriteminxreg	This is used by the prwritectl() and related worlds to
+ *			determine the minimum amount of data that much be
+ *			present to determine if the actual size of a write is
+ *			valid. If xregs is not supported, then this should
+ *			return B_FALSE. If xregs is supported, this may return 0
+ *			if no additional information is required to determine
+ *			the appropriate size to copy in. This would be the case
+ *			if the xregs structure is a fixed size.
+ *
+ *   o prwritesizexreg	This is meant to indicate how much data is required to
+ *			be copied in for a given xregs write. The base data will
+ *			already be present from having called prwriteminxreg
+ *			previously. If xregs are not supported this should
+ *			return B_FALSE.
+ *
+ *			There is a wrinkle in this which is not true of other
+ *			callers. The data that we are given is not guaranteed to
+ *			be aligned in the slightest due to the need to support
+ *			both ILP32 and LP64!
+ *
+ *   o prgetprxregs	This is a request to fill in the xregs data. Right now
+ *			the system guarantees that the buffer size is at least
+ *			the result of the prgetprxregs() call for this process.
+ *			Callers may assume that the process remains locked
+ *			between the two so that the size doesn't change. This
+ *			will not be called for processes where prhasx() return
+ *			false.
+ *
+ *   o prsetprxregs	This is a request to set the xregs data. The only
+ *			assumption that should be made is that the validation of
+ *			the size in prwritesizexreg() has been performed. Users
+ *			can and will potentially try to trick us with invalid
+ *			values. Do not blindly apply the supplied xregs.
+ *
+ *			If xregs are not supported this should return EINVAL.
+ *			While yes other errnos may make more sense, that is what
+ *			we have always returned in /proc for this case.
+ */
+extern	int	prhasx(proc_t *);
+extern	size_t	prgetprxregsize(proc_t *);
+extern	void	prgetprxregs(klwp_t *, prxregset_t *);
+extern	boolean_t prwriteminxreg(size_t *);
+extern	boolean_t prwritesizexreg(const void *, size_t *);
+extern	int	prsetprxregs(klwp_t *, prxregset_t *);
 
 #endif	/* _KERNEL */
 

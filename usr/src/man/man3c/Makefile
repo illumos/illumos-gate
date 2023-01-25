@@ -525,6 +525,7 @@ MANFILES=	__fbufsize.3c					\
 		u8_validate.3c					\
 		ualarm.3c					\
 		uconv_u16tou32.3c				\
+		ucontext_alloc.3c				\
 		ucred.3c					\
 		ungetc.3c					\
 		ungetwc.3c					\
@@ -1302,6 +1303,7 @@ MANLINKS=	FD_CLR.3c				\
 		strtoumax.3c				\
 		strxfrm_l.3c				\
 		swapcontext.3c				\
+		swapcontext_extd.3c			\
 		swprintf.3c				\
 		swscanf.3c				\
 		tdelete.3c				\
@@ -1344,6 +1346,7 @@ MANLINKS=	FD_CLR.3c				\
 		uconv_u32tou8.3c			\
 		uconv_u8tou16.3c			\
 		uconv_u8tou32.3c			\
+		ucontext_free.3c			\
 		ucred_free.3c				\
 		ucred_get.3c				\
 		ucred_getegid.3c			\
@@ -2016,6 +2019,7 @@ ulckpwdf.3c				:= LINKSRC = lckpwdf.3c
 lfind.3c				:= LINKSRC = lsearch.3c
 
 swapcontext.3c				:= LINKSRC = makecontext.3c
+swapcontext_extd.3c			:= LINKSRC = makecontext.3c
 
 major.3c				:= LINKSRC = makedev.3c
 minor.3c				:= LINKSRC = makedev.3c
@@ -2495,6 +2499,8 @@ tss_get.3c				:= LINKSRC = tss.3c
 tss_set.3c				:= LINKSRC = tss.3c
 
 ttyname_r.3c				:= LINKSRC = ttyname.3c
+
+ucontext_free.3c			:= LINKSRC = ucontext_alloc.3c
 
 uconv_u16tou8.3c			:= LINKSRC = uconv_u16tou32.3c
 uconv_u32tou16.3c			:= LINKSRC = uconv_u16tou32.3c

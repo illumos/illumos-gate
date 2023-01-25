@@ -1264,6 +1264,7 @@ file path=usr/share/man/man3c/strxfrm.3c
 link path=usr/share/man/man3c/strxfrm_l.3c target=strxfrm.3c
 file path=usr/share/man/man3c/swab.3c
 link path=usr/share/man/man3c/swapcontext.3c target=makecontext.3c
+link path=usr/share/man/man3c/swapcontext_extd.3c target=makecontext.3c
 link path=usr/share/man/man3c/swprintf.3c target=fwprintf.3c
 link path=usr/share/man/man3c/swscanf.3c target=fwscanf.3c
 file path=usr/share/man/man3c/sync_instruction_memory.3c
@@ -1361,6 +1362,8 @@ file path=usr/share/man/man3c/u8_strcmp.3c
 file path=usr/share/man/man3c/u8_textprep_str.3c
 file path=usr/share/man/man3c/u8_validate.3c
 file path=usr/share/man/man3c/ualarm.3c
+file path=usr/share/man/man3c/ucontext_alloc.3c
+link path=usr/share/man/man3c/ucontext_free.3c target=ucontext_alloc.3c
 file path=usr/share/man/man3c/uconv_u16tou32.3c
 link path=usr/share/man/man3c/uconv_u16tou8.3c target=uconv_u16tou32.3c
 link path=usr/share/man/man3c/uconv_u32tou16.3c target=uconv_u16tou32.3c

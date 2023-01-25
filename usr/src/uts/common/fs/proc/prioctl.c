@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -209,12 +210,20 @@ prioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 		return (EBADF);
 
 	/*
+	 * The following command is no longer supported. It was present on SPARC
+	 * and would always error on other platforms. We now explicitly return
+	 * ENOTSUP to make this more explicit.
+	 */
+	if (cmd == PIOCSXREG)
+		return (ENOTSUP);
+
+	/*
 	 * Perform any necessary copyin() operations before
 	 * locking the process.  Helps avoid deadlocks and
 	 * improves performance.
 	 *
 	 * Also, detect invalid ioctl codes here to avoid
-	 * locking a process unnnecessarily.
+	 * locking a process unnecessarily.
 	 *
 	 * Also, prepare to allocate space that will be needed below,
 	 * case by case.
@@ -245,13 +254,8 @@ prioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 	case PIOCMAXSIG:
 	case PIOCGXREGSIZE:
 		break;
-	case PIOCSXREG:		/* set extra registers */
 	case PIOCGXREG:		/* get extra registers */
-#if defined(__sparc)
-		thingsize = sizeof (prxregset_t);
-#else
-		thingsize = 0;
-#endif
+		thingsize = prgetprxregsize(p);
 		break;
 	case PIOCACTION:
 		thingsize = (nsig-1) * sizeof (struct sigaction);
@@ -392,17 +396,6 @@ startover:
 	case PIOCLUSAGE:
 		zdisp = ZYES;
 		break;
-	case PIOCSXREG:		/* set extra registers */
-		/*
-		 * perform copyin before grabbing the process lock
-		 */
-		if (thing) {
-			if (copyin(cmaddr, thing, thingsize)) {
-				kmem_free(thing, thingsize);
-				return (EFAULT);
-			}
-		}
-		/* fall through... */
 	default:
 		zdisp = ZNO;
 		break;
@@ -789,12 +782,19 @@ startover:
 
 	case PIOCGXREGSIZE:	/* get the size of the extra registers */
 	{
-		int xregsize;
-
 		if (prhasx(p)) {
+			size_t xregsize;
+			int abisize;
+
 			xregsize = prgetprxregsize(p);
 			prunlock(pnp);
-			if (copyout(&xregsize, cmaddr, sizeof (xregsize)))
+			if (xregsize > INT_MAX) {
+				error = EOVERFLOW;
+				break;
+			}
+
+			abisize = (int)xregsize;
+			if (copyout(&abisize, cmaddr, sizeof (abisize)))
 				error = EFAULT;
 		} else {
 			prunlock(pnp);
@@ -819,24 +819,6 @@ startover:
 			prunlock(pnp);
 			error = EINVAL;	/* No extra register support */
 		}
-		if (thing) {
-			kmem_free(thing, thingsize);
-			thing = NULL;
-		}
-		break;
-
-	case PIOCSXREG:		/* set extra registers */
-		if (!ISTOPPED(t) && !VSTOPPED(t) && !DSTOPPED(t))
-			error = EBUSY;
-		else if (!prhasx(p))
-			error = EINVAL;	/* No extra register support */
-		else if (thing) {
-			/* drop p_lock while touching the lwp's stack */
-			mutex_exit(&p->p_lock);
-			prsetprxregs(lwp, thing);
-			mutex_enter(&p->p_lock);
-		}
-		prunlock(pnp);
 		if (thing) {
 			kmem_free(thing, thingsize);
 			thing = NULL;
@@ -1764,12 +1746,20 @@ prioctl32(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 		return (EBADF);
 
 	/*
+	 * The following command is no longer supported. It was present on SPARC
+	 * and would always error on other platforms. We now explicitly return
+	 * ENOTSUP to make this more explicit.
+	 */
+	if (cmd == PIOCSXREG)
+		return (ENOTSUP);
+
+	/*
 	 * Perform any necessary copyin() operations before
 	 * locking the process.  Helps avoid deadlocks and
 	 * improves performance.
 	 *
 	 * Also, detect invalid ioctl codes here to avoid
-	 * locking a process unnnecessarily.
+	 * locking a process unnecessarily.
 	 *
 	 * Also, prepare to allocate space that will be needed below,
 	 * case by case.
@@ -1800,13 +1790,8 @@ prioctl32(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 	case PIOCMAXSIG:
 	case PIOCGXREGSIZE:
 		break;
-	case PIOCSXREG:		/* set extra registers */
 	case PIOCGXREG:		/* get extra registers */
-#if defined(__sparc)
-		thingsize = sizeof (prxregset_t);
-#else
-		thingsize = 0;
-#endif
+		thingsize = prgetprxregsize(p);
 		break;
 	case PIOCACTION:
 		thingsize = (nsig-1) * sizeof (struct sigaction32);
@@ -1947,17 +1932,6 @@ startover:
 	case PIOCLUSAGE:
 		zdisp = ZYES;
 		break;
-	case PIOCSXREG:		/* set extra registers */
-		/*
-		 * perform copyin before grabbing the process lock
-		 */
-		if (thing) {
-			if (copyin(cmaddr, thing, thingsize)) {
-				kmem_free(thing, thingsize);
-				return (EFAULT);
-			}
-		}
-		/* fall through... */
 	default:
 		zdisp = ZNO;
 		break;
@@ -2384,12 +2358,19 @@ startover:
 
 	case PIOCGXREGSIZE:	/* get the size of the extra registers */
 	{
-		int xregsize;
-
 		if (prhasx(p)) {
+			size_t xregsize;
+			int abisize;
+
 			xregsize = prgetprxregsize(p);
 			prunlock(pnp);
-			if (copyout(&xregsize, cmaddr, sizeof (xregsize)))
+			if (xregsize > INT_MAX) {
+				error = EOVERFLOW;
+				break;
+			}
+
+			abisize = (int)xregsize;
+			if (copyout(&abisize, cmaddr, sizeof (abisize)))
 				error = EFAULT;
 		} else {
 			prunlock(pnp);
@@ -2416,26 +2397,6 @@ startover:
 		if (error == 0 &&
 		    copyout(thing, cmaddr, thingsize))
 			error = EFAULT;
-		if (thing) {
-			kmem_free(thing, thingsize);
-			thing = NULL;
-		}
-		break;
-
-	case PIOCSXREG:		/* set extra registers */
-		if (PROCESS_NOT_32BIT(p))
-			error = EOVERFLOW;
-		else if (!ISTOPPED(t) && !VSTOPPED(t) && !DSTOPPED(t))
-			error = EBUSY;
-		else if (!prhasx(p))
-			error = EINVAL;	/* No extra register support */
-		else if (thing) {
-			/* drop p_lock while touching the lwp's stack */
-			mutex_exit(&p->p_lock);
-			prsetprxregs(lwp, thing);
-			mutex_enter(&p->p_lock);
-		}
-		prunlock(pnp);
 		if (thing) {
 			kmem_free(thing, thingsize);
 			thing = NULL;

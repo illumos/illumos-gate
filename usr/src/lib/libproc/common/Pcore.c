@@ -28,7 +28,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2015 Gary Mills
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -1081,31 +1081,40 @@ note_auxv(struct ps_prochandle *P, size_t nbytes)
 	return (0);
 }
 
-#ifdef __sparc
+/*
+ * The xregs are not a fixed size on all architectures (notably x86) and in
+ * general the prxregset_t has become opaque to deal with this. This means that
+ * validating the note itself can be a little more challenging. Especially as
+ * this can change across time. In this case we require that our consumers
+ * perform this validation.
+ */
 static int
 note_xreg(struct ps_prochandle *P, size_t nbytes)
 {
 	core_info_t *core = P->data;
 	lwp_info_t *lwp = core->core_lwp;
-	size_t xbytes = sizeof (prxregset_t);
 	prxregset_t *xregs;
+	ssize_t sret;
 
-	if (lwp == NULL || lwp->lwp_xregs != NULL || nbytes < xbytes)
+	if (lwp == NULL || lwp->lwp_xregs != NULL)
 		return (0);	/* No lwp yet, already seen, or bad size */
 
-	if ((xregs = malloc(xbytes)) == NULL)
+	if ((xregs = malloc(nbytes)) == NULL)
 		return (-1);
 
-	if (read(P->asfd, xregs, xbytes) != xbytes) {
+	sret = read(P->asfd, xregs, nbytes);
+	if (sret < 0 || (size_t)sret != nbytes) {
 		dprintf("Pgrab_core: failed to read NT_PRXREG\n");
 		free(xregs);
 		return (-1);
 	}
 
 	lwp->lwp_xregs = xregs;
+	lwp->lwp_xregsize = nbytes;
 	return (0);
 }
 
+#ifdef __sparc
 static int
 note_gwindows(struct ps_prochandle *P, size_t nbytes)
 {
@@ -1254,11 +1263,7 @@ static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 #else
 	note_notsup,		/*  3	NT_PRPSINFO (old)	*/
 #endif
-#ifdef __sparc
 	note_xreg,		/*  4	NT_PRXREG		*/
-#else
-	note_notsup,		/*  4	NT_PRXREG		*/
-#endif
 	note_platform,		/*  5	NT_PLATFORM		*/
 	note_auxv,		/*  6	NT_AUXV			*/
 #ifdef __sparc

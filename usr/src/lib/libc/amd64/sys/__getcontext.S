@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 	.file	"__getcontext.s"
 
 /*
@@ -41,3 +45,11 @@
 	SYSCERROR
 	RETC
 	SET_SIZE(__getcontext)
+
+	ENTRY(__getcontext_extd)
+	movq	%rdi, %rsi
+	movq	$4, %rdi
+	SYSTRAP_RVAL1(context)
+	SYSCERROR
+	RETC
+	SET_SIZE(__getcontext_extd)

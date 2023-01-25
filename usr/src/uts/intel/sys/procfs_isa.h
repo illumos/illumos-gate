@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #ifndef _SYS_PROCFS_ISA_H
 #define	_SYS_PROCFS_ISA_H
 
@@ -111,6 +115,141 @@ typedef	uchar_t		instr32_t;
 #define	R_R0	EAX
 #define	R_R1	EDX
 #endif
+
+/*
+ * The x86 xregs structure is a blob of data that contains a header with several
+ * descriptors that describe the region of additional data that corresponds to
+ * it. Effectively this looks like:
+ *
+ * 0  +-----------------+
+ *    | prxregset_hdr_t |
+ *    +-----------------+
+ *    | Info 0 (XCR)    |-------+
+ *    +-----------------+       |
+ *    | Info 1 (XSAVE)  |----------+
+ *    +-----------------+       |  |
+ *           ...                |  |
+ *    +-----------------+       |  |
+ *    | Info n (Hi ZMM) |-------------+
+ *    +-----------------+       |  |  |
+ *    +-----------------+       |  |  |
+ *    | prxregset_xcr_t |<------+  |  |
+ *    +-----------------+          |  |
+ *    +-------------------+        |  |
+ *    | prxregset_xsave_t |<-------+  |
+ *    |                   |           |
+ *    | XMM + xsave       |           |
+ *    +-------------------+           |
+ *           ...                      |
+ *    +---------------------+         |
+ *    | prxregset_hi_zmm_t  |<--------+
+ *    |                     |
+ *    | 1 KiB %zmm16-%zmm31 |
+ *    +---------------------+
+ *
+ * The actual structure size will vary based on the CPU features present. For
+ * more information, see proc(5). When adding structures, please make sure all
+ * structures are multiples of 16 bytes (0x10) so as to ensure alignment.
+ */
+typedef struct prxregset prxregset_t;
+
+#define	PRX_INFO_XCR	0x01
+#define	PRX_INFO_XSAVE	0x02
+#define	PRX_INFO_YMM	0x03
+#define	PRX_INFO_OPMASK	0x04
+#define	PRX_INFO_ZMM	0x05
+#define	PRX_INFO_HI_ZMM	0x06
+
+typedef struct prxregset_info {
+	uint32_t pri_type;
+	uint32_t pri_flags;
+	uint32_t pri_size;
+	uint32_t pri_offset;
+} prxregset_info_t;
+
+#define	PR_TYPE_XSAVE	0x01
+
+typedef struct prxregset_hdr {
+	uint32_t	pr_type;
+	uint32_t	pr_size;
+	uint32_t	pr_flags;
+	uint32_t	pr_pad[4];
+	uint32_t	pr_ninfo;
+#if defined(_STDC_C99) || defined(__C99FEATURES__)
+	prxregset_info_t pr_info[];
+#endif
+} prxregset_hdr_t;
+
+typedef struct prxregset_xcr {
+	uint64_t	prx_xcr_xcr0;
+	uint64_t	prx_xcr_xfd;
+	uint64_t	prx_xcr_pad[2];
+} prxregset_xcr_t;
+
+typedef struct prxregset_xsave {
+	uint16_t	prx_fx_fcw;
+	uint16_t	prx_fx_fsw;
+	uint16_t	prx_fx_fctw;	/* compressed tag word */
+	uint16_t	prx_fx_fop;
+#if defined(__amd64)
+	uint64_t	prx_fx_rip;
+	uint64_t	prx_fx_rdp;
+#else
+	uint32_t	prx_fx_eip;
+	uint16_t	prx_fx_cs;
+	uint16_t	__prx_fx_ign0;
+	uint32_t	prx_fx_dp;
+	uint16_t	prx_fx_ds;
+	uint16_t	__prx_fx_ign1;
+#endif
+	uint32_t	prx_fx_mxcsr;
+	uint32_t	prx_fx_mxcsr_mask;
+	union {
+		uint16_t prx_fpr_16[5];	/* 80-bits of x87 state */
+		u_longlong_t prx_fpr_mmx;	/* 64-bit mmx register */
+		uint32_t _prx__fpr_pad[4];	/* (pad out to 128-bits) */
+	} fx_st[8];
+#if defined(__amd64)
+	upad128_t	prx_fx_xmm[16];	/* 128-bit registers */
+	upad128_t	__prx_fx_ign2[6];
+#else
+	upad128_t	prx_fx_xmm[8];	/* 128-bit registers */
+	upad128_t	__prx_fx_ign2[14];
+#endif
+	uint64_t	prx_xsh_xstate_bv;
+	uint64_t	prx_xsh_xcomp_bv;
+	uint64_t	prx_xsh_reserved[6];
+} prxregset_xsave_t;
+
+typedef struct prxregset_ymm {
+#if defined(__amd64)
+	upad128_t	prx_ymm[16];
+#else
+	upad128_t	prx_ymm[8];
+	upad128_t	prx_rsvd[8];
+#endif
+} prxregset_ymm_t;
+
+typedef struct prxregset_opmask {
+	uint64_t	prx_opmask[8];
+} prxregset_opmask_t;
+
+typedef struct prxregset_zmm {
+#if defined(__amd64)
+	upad256_t	prx_zmm[16];
+#else
+	upad256_t	prx_zmm[8];
+	upad256_t	prx_rsvd[8];
+#endif
+} prxregset_zmm_t;
+
+typedef struct prxregset_hi_zmm {
+#if defined(__amd64)
+	upad512_t	prx_hi_zmm[16];
+#else
+	upad512_t	prx_rsvd[16];
+#endif
+} prxregset_hi_zmm_t;
 
 #ifdef	__cplusplus
 }

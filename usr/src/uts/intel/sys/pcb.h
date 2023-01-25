@@ -41,10 +41,8 @@ extern "C" {
 typedef struct fpu_ctx {
 	kfpu_t		fpu_regs;	/* kernel save area for FPU */
 	uint64_t	fpu_xsave_mask;	/* xsave mask for FPU/SSE/AVX */
-#if defined(__i386)
-	uint64_t	fpu_padding;	/* fix 32bit libmicro regression */
-#endif
 	uint_t		fpu_flags;	/* FPU state flags */
+	void		*fpu_signal;	/* copyin area for signal handling */
 } fpu_ctx_t;
 
 typedef struct pcb {

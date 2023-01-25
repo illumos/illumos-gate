@@ -28,7 +28,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -138,7 +138,7 @@ setup_note_header(Phdr *v, proc_t *p)
 		v[0].p_filesz += sizeof (Note) + roundup(size, sizeof (Word));
 #endif	/* __i386_COMPAT */
 
-	if ((size = prhasx(p)? prgetprxregsize(p) : 0) != 0)
+	if ((size = prhasx(p) ? prgetprxregsize(p) : 0) != 0)
 		v[0].p_filesz += nlwp * sizeof (Note)
 		    + nlwp * roundup(size, sizeof (Word));
 
@@ -197,7 +197,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		prupanic_t	upanic;
 	} *bigwad;
 
-	size_t xregsize = prhasx(p)? prgetprxregsize(p) : 0;
+	size_t xregsize = prhasx(p) ? prgetprxregsize(p) : 0;
 	size_t crsize = sizeof (prcred_t) + sizeof (gid_t) * (ngroups_max - 1);
 	size_t psize = prgetprivsize();
 	size_t bigsize = MAX(psize, MAX(sizeof (*bigwad),
@@ -572,7 +572,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 #endif /* __sparc */
 
 		if (xregsize) {
-			prgetprxregs(lwp, bigwad->xregs);
+			prgetprxregs(lwp, (prxregset_t *)bigwad->xregs);
 			error = elfnote(vp, &offset, NT_PRXREG,
 			    xregsize, bigwad->xregs, rlimit, credp);
 			if (error)

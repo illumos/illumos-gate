@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -60,13 +61,11 @@
 #include <vm/seg.h>
 #include <fs/proc/prdata.h>
 #include <sys/contract/process_impl.h>
+#include <sys/stdalign.h>
 
 static	void	pr_settrace(proc_t *, sigset_t *);
 static	int	pr_setfpregs(prnode_t *, prfpregset_t *);
-#if defined(__sparc)
 static	int	pr_setxregs(prnode_t *, prxregset_t *);
-static	int	pr_setasrs(prnode_t *, asrset_t);
-#endif
 static	int	pr_setvaddr(prnode_t *, caddr_t);
 static	int	pr_clearsig(prnode_t *);
 static	int	pr_clearflt(prnode_t *);
@@ -79,6 +78,13 @@ static	int	pr_szoneid(proc_t *, zoneid_t, cred_t *);
 static	void	pauselwps(proc_t *);
 static	void	unpauselwps(proc_t *);
 
+/*
+ * This union represents the size of commands that are generally fixed size in
+ * /proc. There are some commands that are variable size because the actual data
+ * is structured. Of things in the latter category, some of these are the same
+ * across all architectures (e.g. prcred_t, prpriv_t) and some vary and are
+ * opaque (e.g. the prxregset_t).
+ */
 typedef union {
 	long		sig;		/* PCKILL, PCUNKILL */
 	long		nice;		/* PCNICE */
@@ -91,10 +97,6 @@ typedef union {
 	sysset_t	sysset;		/* PCSENTRY, PCSEXIT */
 	prgregset_t	prgregset;	/* PCSREG, PCAGENT */
 	prfpregset_t	prfpregset;	/* PCSFPREG */
-#if defined(__sparc)
-	prxregset_t	prxregset;	/* PCSXREG */
-	asrset_t	asrset;		/* PCSASRS */
-#endif
 	prwatch_t	prwatch;	/* PCWATCH */
 	priovec_t	priovec;	/* PCREAD, PCWRITE */
 	prcred_t	prcred;		/* PCSCRED */
@@ -102,198 +104,477 @@ typedef union {
 	long		przoneid;	/* PCSZONE */
 } arg_t;
 
-static	int	pr_control(long, arg_t *, prnode_t *, cred_t *);
-
-static size_t
-ctlsize(long cmd, size_t resid, arg_t *argp)
+static boolean_t
+prwritectl_pcscredx_sizef(const void *datap, size_t *sizep)
 {
-	size_t size = sizeof (long);
-	size_t rnd;
-	int ngrp;
+	const prcred_t *cred = datap;
 
-	switch (cmd) {
-	case PCNULL:
-	case PCSTOP:
-	case PCDSTOP:
-	case PCWSTOP:
-	case PCCSIG:
-	case PCCFAULT:
-		break;
-	case PCSSIG:
-		size += sizeof (siginfo_t);
-		break;
-	case PCTWSTOP:
-		size += sizeof (long);
-		break;
-	case PCKILL:
-	case PCUNKILL:
-	case PCNICE:
-		size += sizeof (long);
-		break;
-	case PCRUN:
-	case PCSET:
-	case PCUNSET:
-		size += sizeof (ulong_t);
-		break;
-	case PCSVADDR:
-		size += sizeof (caddr_t);
-		break;
-	case PCSTRACE:
-	case PCSHOLD:
-		size += sizeof (sigset_t);
-		break;
-	case PCSFAULT:
-		size += sizeof (fltset_t);
-		break;
-	case PCSENTRY:
-	case PCSEXIT:
-		size += sizeof (sysset_t);
-		break;
-	case PCSREG:
-	case PCAGENT:
-		size += sizeof (prgregset_t);
-		break;
-	case PCSFPREG:
-		size += sizeof (prfpregset_t);
-		break;
-#if defined(__sparc)
-	case PCSXREG:
-		size += sizeof (prxregset_t);
-		break;
-	case PCSASRS:
-		size += sizeof (asrset_t);
-		break;
+	if (cred->pr_ngroups < 0 || cred->pr_ngroups > ngroups_max) {
+		return (B_FALSE);
+	}
+
+	if (cred->pr_ngroups == 0) {
+		*sizep = 0;
+	} else {
+		*sizep = (cred->pr_ngroups - 1) * sizeof (gid_t);
+	}
+	return (B_TRUE);
+}
+
+static boolean_t
+prwritectl_pcspriv_sizef(const void *datap, size_t *sizep)
+{
+	const prpriv_t *priv = datap;
+	*sizep = priv_prgetprivsize(priv) - sizeof (prpriv_t);
+	return (B_TRUE);
+}
+
+/*
+ * This structure represents a single /proc write command that we support and
+ * metadata about how to ensure we have sufficient data for it. To determine the
+ * data that we need to read, this combines information from three different
+ * sources for a given named command in 'pcs_cmd'. The main goal is to first
+ * make sure we have the right minimum amount of information so we can read and
+ * validate the data around variable length structures.
+ *
+ *   o Most commands have a fixed static size. This is represented in the
+ *     pcs_size member. This also is used to represent the base structure size
+ *     in the case of entries like PCSCREDX.
+ *
+ *   o Other commands have an unknown minimum size to determine how much data
+ *     there is and they use the pcs_minf() function to determine the right
+ *     value. This is often unknown at compile time because it is say a
+ *     machdep or ISA based feature (ala PCSXREGS) and we'd rather not #ifdef
+ *     this code to death. This may be skipped and is for most things. The value
+ *     it returns is added to the static value.
+ *
+ *   o The final piece is the pcs_sizef() function pointer which determines the
+ *     total required size for this. It is given a pointer that has at least
+ *     pcs_size and pcs_minf() bytes. This is used to determine the total
+ *     expected size of the structure. Callers must not dereference data beyond
+ *     what they've indicated previously. This should only return extra bytes
+ *     that are required beyond what was already indicated between the two
+ *     functions.
+ *
+ * In all cases, the core prwritectl() logic will determine if there is
+ * sufficient step along the way for each of these to proceed.
+ */
+typedef struct proc_control_info {
+	long	pcs_cmd;
+	size_t	pcs_size;
+	boolean_t (*pcs_minf)(size_t *);
+	boolean_t (*pcs_sizef)(const void *, size_t *);
+} proc_control_info_t;
+
+static const proc_control_info_t proc_ctl_info[] = {
+	{ PCNULL,	0,			NULL,		NULL },
+	{ PCSTOP,	0,			NULL,		NULL },
+	{ PCDSTOP,	0,			NULL,		NULL },
+	{ PCWSTOP,	0,			NULL,		NULL },
+	{ PCCSIG,	0,			NULL,		NULL },
+	{ PCCFAULT,	0,			NULL,		NULL },
+	{ PCSSIG,	sizeof (siginfo_t),	NULL,		NULL },
+	{ PCTWSTOP,	sizeof (long),		NULL,		NULL },
+	{ PCKILL,	sizeof (long),		NULL,		NULL },
+	{ PCUNKILL,	sizeof (long),		NULL,		NULL },
+	{ PCNICE,	sizeof (long),		NULL,		NULL },
+	{ PCRUN,	sizeof (ulong_t),	NULL,		NULL },
+	{ PCSET,	sizeof (ulong_t),	NULL,		NULL },
+	{ PCUNSET,	sizeof (ulong_t),	NULL,		NULL },
+	{ PCSTRACE,	sizeof (sigset_t),	NULL,		NULL },
+	{ PCSHOLD,	sizeof (sigset_t),	NULL,		NULL },
+	{ PCSFAULT,	sizeof (fltset_t),	NULL,		NULL },
+	{ PCSENTRY,	sizeof (sysset_t),	NULL,		NULL },
+	{ PCSEXIT,	sizeof (sysset_t),	NULL,		NULL },
+	{ PCSREG,	sizeof (prgregset_t),	NULL,		NULL },
+	{ PCAGENT,	sizeof (prgregset_t),	NULL,		NULL },
+	{ PCSFPREG,	sizeof (prfpregset_t),	NULL,		NULL },
+	{ PCSXREG,	0,			prwriteminxreg,
+	    prwritesizexreg },
+	{ PCWATCH,	sizeof (prwatch_t),	NULL,		NULL },
+	{ PCREAD,	sizeof (priovec_t),	NULL,		NULL },
+	{ PCWRITE,	sizeof (priovec_t),	NULL,		NULL },
+	{ PCSCRED,	sizeof (prcred_t),	NULL,		NULL },
+	{ PCSCREDX,	sizeof (prcred_t),	NULL,
+	    prwritectl_pcscredx_sizef },
+	{ PCSPRIV,	sizeof (prpriv_t),	NULL,
+	    prwritectl_pcspriv_sizef },
+	{ PCSZONE,	sizeof (long),		NULL,		NULL },
+};
+
+/*
+ * We need a default buffer that we're going to allocate when we need memory to
+ * read control operations. This is on average large enough to hold multiple
+ * control operations. We leave this as a smaller value on debug builds just
+ * to exercise our reallocation logic.
+ */
+#ifdef	DEBUG
+#define	PROC_CTL_DEFSIZE	32
+#else
+#define	PROC_CTL_DEFSIZE	1024
 #endif
-	case PCWATCH:
-		size += sizeof (prwatch_t);
-		break;
-	case PCREAD:
-	case PCWRITE:
-		size += sizeof (priovec_t);
-		break;
-	case PCSCRED:
-		size += sizeof (prcred_t);
-		break;
-	case PCSCREDX:
-		/*
-		 * We cannot derefence the pr_ngroups fields if it
-		 * we don't have enough data.
-		 */
-		if (resid < size + sizeof (prcred_t) - sizeof (gid_t))
-			return (0);
-		ngrp = argp->prcred.pr_ngroups;
-		if (ngrp < 0 || ngrp > ngroups_max)
-			return (0);
 
-		/* The result can be smaller than sizeof (prcred_t) */
-		size += sizeof (prcred_t) - sizeof (gid_t);
-		size += ngrp * sizeof (gid_t);
-		break;
-	case PCSPRIV:
-		if (resid >= size + sizeof (prpriv_t))
-			size += priv_prgetprivsize(&argp->prpriv);
-		else
-			return (0);
-		break;
-	case PCSZONE:
-		size += sizeof (long);
-		break;
-	default:
+/*
+ * This structure is used to track all of the information that we have around a
+ * prwritectl call. This is used to reduce function parameters and make state
+ * clear.
+ */
+typedef struct {
+	void	*prwc_buf;
+	size_t	prwc_buflen;
+	size_t	prwc_curvalid;
+	uio_t	*prwc_uiop;
+	prnode_t *prwc_pnp;
+	boolean_t prwc_locked;
+	boolean_t prwc_need32;
+	void	*prwc_buf32;
+} prwritectl_t;
+
+/*
+ * Ensure that we have at least "needed" data marked as valid and present. If we
+ * require additional data, then we will read that in from uio_t. When we read
+ * data, we try to buffer as much data as will fit in our internal buffers in
+ * one go.
+ */
+static int
+prwritectl_readin(prwritectl_t *prwc, size_t needed)
+{
+	int ret;
+	size_t toread;
+	void *start;
+
+	/*
+	 * If we have as much data as we need then we're good to go.
+	 */
+	if (prwc->prwc_curvalid > needed) {
+		ASSERT3U(prwc->prwc_buflen, >=, prwc->prwc_curvalid);
+		ASSERT3U(prwc->prwc_buflen, >=, needed);
 		return (0);
 	}
 
-	/* Round up to a multiple of long, unless exact amount written */
-	if (size < resid) {
-		rnd = size & (sizeof (long) - 1);
-
-		if (rnd != 0)
-			size += sizeof (long) - rnd;
+	/*
+	 * We don't have all of our data. We must make sure of several things:
+	 *
+	 *   1. That there actually is enough data in the uio_t for what we
+	 *	need, considering what we've already read.
+	 *   2. If the process is locked, at this point, we want to unlock it
+	 *	before we deal with any I/O or memory allocation. Otherwise we
+	 *	can wreak havoc with p_lock / paging.
+	 *   3. We need to make sure that our buffer is large enough to actually
+	 *	fit it all.
+	 *   4. Only at that point can we actually perform the read.
+	 */
+	if (needed - prwc->prwc_curvalid > prwc->prwc_uiop->uio_resid) {
+		return (EINVAL);
 	}
 
-	if (size > resid)
-		return (0);
-	return (size);
+	if (prwc->prwc_locked) {
+		prunlock(prwc->prwc_pnp);
+		prwc->prwc_locked = B_FALSE;
+	}
+
+	if (needed > prwc->prwc_buflen) {
+		size_t new_len = P2ROUNDUP(needed, PROC_CTL_DEFSIZE);
+		prwc->prwc_buf = kmem_rezalloc(prwc->prwc_buf,
+		    prwc->prwc_buflen, new_len, KM_SLEEP);
+		if (prwc->prwc_need32) {
+			prwc->prwc_buf32 = kmem_rezalloc(prwc->prwc_buf32,
+			    prwc->prwc_buflen, new_len, KM_SLEEP);
+		}
+		prwc->prwc_buflen = new_len;
+	}
+
+	toread = MIN(prwc->prwc_buflen - prwc->prwc_curvalid,
+	    prwc->prwc_uiop->uio_resid);
+	ASSERT3U(toread, >=, needed - prwc->prwc_curvalid);
+	start = (void *)((uintptr_t)prwc->prwc_buf + prwc->prwc_curvalid);
+	if ((ret = uiomove(start, toread, UIO_WRITE, prwc->prwc_uiop)) != 0) {
+		return (ret);
+	}
+
+	prwc->prwc_curvalid += toread;
+	return (0);
+}
+
+static const proc_control_info_t *
+prwritectl_cmd_identify(const prwritectl_t *prwc,
+    const proc_control_info_t *info, size_t ninfo, size_t cmdsize)
+{
+	long cmd;
+
+	ASSERT(cmdsize == sizeof (int32_t) || cmdsize == sizeof (long));
+	if (cmdsize == 4) {
+		cmd = (long)*(int32_t *)prwc->prwc_buf;
+	} else {
+		cmd = *(long *)prwc->prwc_buf;
+	}
+
+
+	for (size_t i = 0; i < ninfo; i++) {
+		if (info[i].pcs_cmd == cmd) {
+			return (&info[i]);
+		}
+	}
+
+	return (NULL);
 }
 
 /*
  * Control operations (lots).
+ *
+ * Users can submit one or more commands to us in the uio_t. They are required
+ * to always be complete messages. The first one that fails will cause all
+ * subsequent things to fail. Processing this can be a little tricky as the
+ * actual data size that may be required is variable, not all structures are
+ * fixed sizes and some vary based on the instructing set (e.g. x86 vs.
+ * something else).
+ *
+ * The way that we handle process locking deserves some consideration. Prior to
+ * the colonization of prwritectl and the support for dynamic sizing of data,
+ * the logic would try to read in a large chunk of data and keep a process
+ * locked throughout that period and then unlock it before reading more data. As
+ * such, we mimic that logically and basically lock it before executing the
+ * first (or any subsequent) command and then only unlock it either when we're
+ * done entirely or we need to allocate memory or read from the process.
+ *
+ * This function is a common implementation for both the ILP32 and LP64 entry
+ * points as they are mostly the same except for the sizing and control function
+ * we call.
  */
 int
-prwritectl(vnode_t *vp, uio_t *uiop, cred_t *cr)
+prwritectl_common(vnode_t *vp, uio_t *uiop, cred_t *cr,
+    const proc_control_info_t *proc_info, size_t ninfo, size_t cmdsize,
+    int (*pr_controlf)(long, void *, prnode_t *, cred_t *))
 {
-#define	MY_BUFFER_SIZE \
-		100 > 1 + sizeof (arg_t) / sizeof (long) ? \
-		100 : 1 + sizeof (arg_t) / sizeof (long)
-	long buf[MY_BUFFER_SIZE];
-	long *bufp;
-	size_t resid = 0;
-	size_t size;
-	prnode_t *pnp = VTOP(vp);
-	int error;
-	int locked = 0;
+	int ret;
+	prwritectl_t prwc;
 
-	while (uiop->uio_resid) {
+	VERIFY(cmdsize == sizeof (int32_t) || cmdsize == sizeof (long));
+
+	bzero(&prwc, sizeof (prwc));
+	prwc.prwc_pnp = VTOP(vp);
+	prwc.prwc_uiop = uiop;
+	prwc.prwc_need32 = (cmdsize == sizeof (int32_t));
+
+	/*
+	 * We may have multiple commands to read and want to try to minimize the
+	 * amount of reading that we do. Our callers expect us to have a
+	 * contiguous buffer for a command's actual implementation. However, we
+	 * must have at least a single long worth of data, otherwise it's not
+	 * worth continuing.
+	 */
+	while (uiop->uio_resid > 0 || prwc.prwc_curvalid > 0) {
+		const proc_control_info_t *proc_cmd;
+		void *data;
+
 		/*
-		 * Read several commands in one gulp.
+		 * Check if we have enough data to identify a command. If not,
+		 * we read as much as we can in one gulp.
 		 */
-		bufp = buf;
-		if (resid) {	/* move incomplete command to front of buffer */
-			long *tail;
-
-			if (resid >= sizeof (buf))
-				break;
-			tail = (long *)((char *)buf + sizeof (buf) - resid);
-			do {
-				*bufp++ = *tail++;
-			} while ((resid -= sizeof (long)) != 0);
+		if ((ret = prwritectl_readin(&prwc, cmdsize)) != 0) {
+			goto out;
 		}
-		resid = sizeof (buf) - ((char *)bufp - (char *)buf);
-		if (resid > uiop->uio_resid)
-			resid = uiop->uio_resid;
-		if (error = uiomove((caddr_t)bufp, resid, UIO_WRITE, uiop))
-			return (error);
-		resid += (char *)bufp - (char *)buf;
-		bufp = buf;
 
-		do {		/* loop over commands in buffer */
-			long cmd = bufp[0];
-			arg_t *argp = (arg_t *)&bufp[1];
+		/*
+		 * Identify the command and figure out how how much data we
+		 * should have read in the kernel. Some commands have a variable
+		 * length and we need to make sure the minimum is met before
+		 * asking how much there is in general. Most things know what
+		 * the minimum length is and this pcs_minf() is not implemented.
+		 * However things that are ISA-specific require us to ask that
+		 * first.
+		 *
+		 * We also must be aware that there may not actually be enough
+		 * data present in the uio_t.
+		 */
+		if ((proc_cmd = prwritectl_cmd_identify(&prwc, proc_info,
+		    ninfo, cmdsize)) == NULL) {
+			ret = EINVAL;
+			goto out;
+		}
 
-			size = ctlsize(cmd, resid, argp);
-			if (size == 0)	/* incomplete or invalid command */
-				break;
+		size_t needed_data = cmdsize + proc_cmd->pcs_size;
+		if (proc_cmd->pcs_minf != NULL) {
+			size_t min;
+
+			if (!proc_cmd->pcs_minf(&min)) {
+				ret = EINVAL;
+				goto out;
+			}
+
+			needed_data += min;
+		}
+
+		if (proc_cmd->pcs_sizef != NULL) {
+			size_t extra;
+
 			/*
-			 * Perform the specified control operation.
+			 * Make sure we have the minimum amount of data that
+			 * they asked us to between the static and minf
+			 * function.
 			 */
-			if (!locked) {
-				if ((error = prlock(pnp, ZNO)) != 0)
-					return (error);
-				locked = 1;
+			if ((ret = prwritectl_readin(&prwc, needed_data)) !=
+			    0) {
+				goto out;
 			}
-			if (error = pr_control(cmd, argp, pnp, cr)) {
-				if (error == -1)	/* -1 is timeout */
-					locked = 0;
-				else
-					return (error);
-			}
-			bufp = (long *)((char *)bufp + size);
-		} while ((resid -= size) != 0);
 
-		if (locked) {
-			prunlock(pnp);
-			locked = 0;
+			VERIFY3U(prwc.prwc_curvalid, >, cmdsize);
+			data = (void *)((uintptr_t)prwc.prwc_buf + cmdsize);
+			if (!proc_cmd->pcs_sizef(data, &extra)) {
+				ret = EINVAL;
+				goto out;
+			}
+
+			needed_data += extra;
 		}
+
+		/*
+		 * Now that we know how much data we're supposed to have,
+		 * finally ensure we have the total amount we need.
+		 */
+		if ((ret = prwritectl_readin(&prwc, needed_data)) != 0) {
+			goto out;
+		}
+
+		/*
+		 * /proc has traditionally assumed control writes come in
+		 * multiples of a long. This is 4 bytes for ILP32 and 8 bytes
+		 * for LP64. When calculating the required size for a structure,
+		 * it would always round that up to the next long. However, the
+		 * exact combination of circumstances changes with the
+		 * introduction of the 64-bit kernel. For 64-bit processes we
+		 * round up when the current command we're processing isn't the
+		 * last one.
+		 *
+		 * Because of our tracking structures and caching we need to
+		 * look beyond the uio_t to make this determination. In
+		 * particular, the uio_t can have a zero resid, but we may still
+		 * have additional data to read as indicated by prwc_curvalid
+		 * exceeding the current command size. In the end, we must check
+		 * both of these cases.
+		 */
+		if ((needed_data % cmdsize) != 0) {
+			if (cmdsize == sizeof (int32_t) ||
+			    prwc.prwc_curvalid > needed_data ||
+			    prwc.prwc_uiop->uio_resid > 0) {
+				needed_data = P2ROUNDUP(needed_data,
+				    cmdsize);
+				if ((ret = prwritectl_readin(&prwc,
+				    needed_data)) != 0) {
+					goto out;
+				}
+			}
+		}
+
+		if (!prwc.prwc_locked) {
+			ret = prlock(prwc.prwc_pnp, ZNO);
+			if (ret != 0) {
+				goto out;
+			}
+			prwc.prwc_locked = B_TRUE;
+		}
+
+		/*
+		 * Run our actual command. When there is an error, then the
+		 * underlying pr_control call will have unlocked the prnode_t
+		 * on our behalf. pr_control can return -1, which is a special
+		 * error indicating a timeout occurred. In such a case the node
+		 * is unlocked; however, that we are supposed to continue
+		 * processing commands regardless.
+		 *
+		 * Finally, we must deal with with one actual wrinkle. The LP64
+		 * based logic always guarantees that we have data that is
+		 * 8-byte aligned. However, the ILP32 logic is 4-byte aligned
+		 * and the rest of the /proc code assumes it can always
+		 * dereference it. If we're not aligned, we have to bcopy it to
+		 * a temporary buffer.
+		 */
+		data = (void *)((uintptr_t)prwc.prwc_buf + cmdsize);
+#ifdef	DEBUG
+		if (cmdsize == sizeof (long)) {
+			ASSERT0((uintptr_t)data % alignof (long));
+		}
+#endif
+		if (prwc.prwc_need32 && ((uintptr_t)data % alignof (long)) !=
+		    0 && needed_data > cmdsize) {
+			bcopy(data, prwc.prwc_buf32, needed_data - cmdsize);
+			data = prwc.prwc_buf32;
+		}
+		ret = pr_controlf(proc_cmd->pcs_cmd, data, prwc.prwc_pnp, cr);
+		if (ret != 0) {
+			prwc.prwc_locked = B_FALSE;
+			if (ret > 0) {
+				goto out;
+			}
+		}
+
+		/*
+		 * Finally, now that we have processed this command, we need to
+		 * move on. To make our life simple, we basically shift all the
+		 * data in our buffer over to indicate it's been consumed. While
+		 * a little wasteful, this simplifies buffer management and
+		 * guarantees that command processing uses a semi-sanitized
+		 * state. Visually, this is the following transformation:
+		 *
+		 *  0			20		prwc.prwc_curvalid
+		 *   +------------------+----------------+
+		 *   |   needed_data    | remaining_data |
+		 *   +------------------+----------------+
+		 *
+		 * In the above example we are shifting all the data over by 20,
+		 * so remaining data starts at 0. This leaves us needed_data
+		 * bytes to clean up from what was valid.
+		 */
+		if (prwc.prwc_buf32 != NULL) {
+			bzero(prwc.prwc_buf32, needed_data - cmdsize);
+		}
+
+		if (prwc.prwc_curvalid > needed_data) {
+			size_t save_size = prwc.prwc_curvalid - needed_data;
+			void *first_save = (void *)((uintptr_t)prwc.prwc_buf +
+			    needed_data);
+			memmove(prwc.prwc_buf, first_save, save_size);
+			void *first_zero = (void *)((uintptr_t)prwc.prwc_buf +
+			    save_size);
+			bzero(first_zero, needed_data);
+		} else {
+			bzero(prwc.prwc_buf, prwc.prwc_curvalid);
+		}
+		prwc.prwc_curvalid -= needed_data;
 	}
-	return (resid? EINVAL : 0);
+
+	/*
+	 * We've managed to successfully process everything. We can actually say
+	 * this was successful now.
+	 */
+	ret = 0;
+
+out:
+	if (prwc.prwc_locked) {
+		prunlock(prwc.prwc_pnp);
+		prwc.prwc_locked = B_FALSE;
+	}
+
+	if (prwc.prwc_buf != NULL) {
+		kmem_free(prwc.prwc_buf, prwc.prwc_buflen);
+	}
+
+	if (prwc.prwc_buf32 != NULL) {
+		VERIFY(prwc.prwc_need32);
+		kmem_free(prwc.prwc_buf32, prwc.prwc_buflen);
+	}
+
+	return (ret);
 }
 
 static int
-pr_control(long cmd, arg_t *argp, prnode_t *pnp, cred_t *cr)
+pr_control(long cmd, void *generic, prnode_t *pnp, cred_t *cr)
 {
 	prcommon_t *pcp;
 	proc_t *p;
 	int unlocked;
 	int error = 0;
+	arg_t *argp = generic;
 
 	if (cmd == PCNULL)
 		return (0);
@@ -422,18 +703,8 @@ pr_control(long cmd, arg_t *argp, prnode_t *pnp, cred_t *cr)
 		break;
 
 	case PCSXREG:	/* set extra registers */
-#if defined(__sparc)
-		error = pr_setxregs(pnp, &argp->prxregset);
-#else
-		error = EINVAL;
-#endif
+		error = pr_setxregs(pnp, (prxregset_t *)argp);
 		break;
-
-#if defined(__sparc)
-	case PCSASRS:	/* set ancillary state registers */
-		error = pr_setasrs(pnp, argp->asrset);
-		break;
-#endif
 
 	case PCSVADDR:	/* set virtual address at which to resume */
 		error = pr_setvaddr(pnp, argp->vaddr);
@@ -493,6 +764,13 @@ pr_control(long cmd, arg_t *argp, prnode_t *pnp, cred_t *cr)
 	return (error);
 }
 
+int
+prwritectl(vnode_t *vp, uio_t *uiop, cred_t *cr)
+{
+	return (prwritectl_common(vp, uiop, cr, proc_ctl_info,
+	    ARRAY_SIZE(proc_ctl_info), sizeof (long), pr_control));
+}
+
 #ifdef _SYSCALL32_IMPL
 
 typedef union {
@@ -507,9 +785,6 @@ typedef union {
 	sysset_t	sysset;		/* PCSENTRY, PCSEXIT */
 	prgregset32_t	prgregset;	/* PCSREG, PCAGENT */
 	prfpregset32_t	prfpregset;	/* PCSFPREG */
-#if defined(__sparc)
-	prxregset_t	prxregset;	/* PCSXREG */
-#endif
 	prwatch32_t	prwatch;	/* PCWATCH */
 	priovec32_t	priovec;	/* PCREAD, PCWRITE */
 	prcred32_t	prcred;		/* PCSCRED */
@@ -517,213 +792,75 @@ typedef union {
 	int32_t		przoneid;	/* PCSZONE */
 } arg32_t;
 
-static	int	pr_control32(int32_t, arg32_t *, prnode_t *, cred_t *);
 static	int	pr_setfpregs32(prnode_t *, prfpregset32_t *);
 
-/*
- * Note that while ctlsize32() can use argp, it must do so only in a way
- * that assumes 32-bit rather than 64-bit alignment as argp is a pointer
- * to an array of 32-bit values and only 32-bit alignment is ensured.
- */
-static size_t
-ctlsize32(int32_t cmd, size_t resid, arg32_t *argp)
+static boolean_t
+prwritectl_pcscredx32_sizef(const void *datap, size_t *sizep)
 {
-	size_t size = sizeof (int32_t);
-	size_t rnd;
-	int ngrp;
+	const prcred32_t *cred = datap;
 
-	switch (cmd) {
-	case PCNULL:
-	case PCSTOP:
-	case PCDSTOP:
-	case PCWSTOP:
-	case PCCSIG:
-	case PCCFAULT:
-		break;
-	case PCSSIG:
-		size += sizeof (siginfo32_t);
-		break;
-	case PCTWSTOP:
-		size += sizeof (int32_t);
-		break;
-	case PCKILL:
-	case PCUNKILL:
-	case PCNICE:
-		size += sizeof (int32_t);
-		break;
-	case PCRUN:
-	case PCSET:
-	case PCUNSET:
-		size += sizeof (uint32_t);
-		break;
-	case PCSVADDR:
-		size += sizeof (caddr32_t);
-		break;
-	case PCSTRACE:
-	case PCSHOLD:
-		size += sizeof (sigset_t);
-		break;
-	case PCSFAULT:
-		size += sizeof (fltset_t);
-		break;
-	case PCSENTRY:
-	case PCSEXIT:
-		size += sizeof (sysset_t);
-		break;
-	case PCSREG:
-	case PCAGENT:
-		size += sizeof (prgregset32_t);
-		break;
-	case PCSFPREG:
-		size += sizeof (prfpregset32_t);
-		break;
-#if defined(__sparc)
-	case PCSXREG:
-		size += sizeof (prxregset_t);
-		break;
-#endif
-	case PCWATCH:
-		size += sizeof (prwatch32_t);
-		break;
-	case PCREAD:
-	case PCWRITE:
-		size += sizeof (priovec32_t);
-		break;
-	case PCSCRED:
-		size += sizeof (prcred32_t);
-		break;
-	case PCSCREDX:
-		/*
-		 * We cannot derefence the pr_ngroups fields if it
-		 * we don't have enough data.
-		 */
-		if (resid < size + sizeof (prcred32_t) - sizeof (gid32_t))
-			return (0);
-		ngrp = argp->prcred.pr_ngroups;
-		if (ngrp < 0 || ngrp > ngroups_max)
-			return (0);
-
-		/* The result can be smaller than sizeof (prcred32_t) */
-		size += sizeof (prcred32_t) - sizeof (gid32_t);
-		size += ngrp * sizeof (gid32_t);
-		break;
-	case PCSPRIV:
-		if (resid >= size + sizeof (prpriv_t))
-			size += priv_prgetprivsize(&argp->prpriv);
-		else
-			return (0);
-		break;
-	case PCSZONE:
-		size += sizeof (int32_t);
-		break;
-	default:
-		return (0);
+	if (cred->pr_ngroups < 0 || cred->pr_ngroups > ngroups_max) {
+		return (B_FALSE);
 	}
 
-	/* Round up to a multiple of int32_t */
-	rnd = size & (sizeof (int32_t) - 1);
-
-	if (rnd != 0)
-		size += sizeof (int32_t) - rnd;
-
-	if (size > resid)
-		return (0);
-	return (size);
+	if (cred->pr_ngroups == 0) {
+		*sizep = 0;
+	} else {
+		*sizep = (cred->pr_ngroups - 1) * sizeof (gid32_t);
+	}
+	return (B_TRUE);
 }
 
 /*
- * Control operations (lots).
+ * When dealing with ILP32 code, we are not at a point where we can assume
+ * 64-bit aligned data. Any functions that are operating here must be aware of
+ * that.
  */
-int
-prwritectl32(struct vnode *vp, struct uio *uiop, cred_t *cr)
-{
-#define	MY_BUFFER_SIZE32 \
-		100 > 1 + sizeof (arg32_t) / sizeof (int32_t) ? \
-		100 : 1 + sizeof (arg32_t) / sizeof (int32_t)
-	int32_t buf[MY_BUFFER_SIZE32];
-	int32_t *bufp;
-	arg32_t arg;
-	size_t resid = 0;
-	size_t size;
-	prnode_t *pnp = VTOP(vp);
-	int error;
-	int locked = 0;
-
-	while (uiop->uio_resid) {
-		/*
-		 * Read several commands in one gulp.
-		 */
-		bufp = buf;
-		if (resid) {	/* move incomplete command to front of buffer */
-			int32_t *tail;
-
-			if (resid >= sizeof (buf))
-				break;
-			tail = (int32_t *)((char *)buf + sizeof (buf) - resid);
-			do {
-				*bufp++ = *tail++;
-			} while ((resid -= sizeof (int32_t)) != 0);
-		}
-		resid = sizeof (buf) - ((char *)bufp - (char *)buf);
-		if (resid > uiop->uio_resid)
-			resid = uiop->uio_resid;
-		if (error = uiomove((caddr_t)bufp, resid, UIO_WRITE, uiop))
-			return (error);
-		resid += (char *)bufp - (char *)buf;
-		bufp = buf;
-
-		do {		/* loop over commands in buffer */
-			int32_t cmd = bufp[0];
-			arg32_t *argp = (arg32_t *)&bufp[1];
-
-			size = ctlsize32(cmd, resid, argp);
-			if (size == 0)	/* incomplete or invalid command */
-				break;
-			/*
-			 * Perform the specified control operation.
-			 */
-			if (!locked) {
-				if ((error = prlock(pnp, ZNO)) != 0)
-					return (error);
-				locked = 1;
-			}
-
-			/*
-			 * Since some members of the arg32_t union contain
-			 * 64-bit values (which must be 64-bit aligned), we
-			 * can't simply pass a pointer to the structure as
-			 * it may be unaligned. Note that we do pass the
-			 * potentially unaligned structure to ctlsize32()
-			 * above, but that uses it a way that makes no
-			 * assumptions about alignment.
-			 */
-			ASSERT(size - sizeof (cmd) <= sizeof (arg));
-			bcopy(argp, &arg, size - sizeof (cmd));
-
-			if (error = pr_control32(cmd, &arg, pnp, cr)) {
-				if (error == -1)	/* -1 is timeout */
-					locked = 0;
-				else
-					return (error);
-			}
-			bufp = (int32_t *)((char *)bufp + size);
-		} while ((resid -= size) != 0);
-
-		if (locked) {
-			prunlock(pnp);
-			locked = 0;
-		}
-	}
-	return (resid? EINVAL : 0);
-}
+static const proc_control_info_t proc_ctl_info32[] = {
+	{ PCNULL,	0,			NULL,		NULL },
+	{ PCSTOP,	0,			NULL,		NULL },
+	{ PCDSTOP,	0,			NULL,		NULL },
+	{ PCWSTOP,	0,			NULL,		NULL },
+	{ PCCSIG,	0,			NULL,		NULL },
+	{ PCCFAULT,	0,			NULL,		NULL },
+	{ PCSSIG,	sizeof (siginfo32_t),	NULL,		NULL },
+	{ PCTWSTOP,	sizeof (int32_t),	NULL,		NULL },
+	{ PCKILL,	sizeof (int32_t),	NULL,		NULL },
+	{ PCUNKILL,	sizeof (int32_t),	NULL,		NULL },
+	{ PCNICE,	sizeof (int32_t),	NULL,		NULL },
+	{ PCRUN,	sizeof (uint32_t),	NULL,		NULL },
+	{ PCSET,	sizeof (uint32_t),	NULL,		NULL },
+	{ PCUNSET,	sizeof (uint32_t),	NULL,		NULL },
+	{ PCSVADDR,	sizeof (caddr32_t),	NULL,		NULL },
+	{ PCSTRACE,	sizeof (sigset_t),	NULL,		NULL },
+	{ PCSHOLD,	sizeof (sigset_t),	NULL,		NULL },
+	{ PCSFAULT,	sizeof (fltset_t),	NULL,		NULL },
+	{ PCSENTRY,	sizeof (sysset_t),	NULL,		NULL },
+	{ PCSEXIT,	sizeof (sysset_t),	NULL,		NULL },
+	{ PCSREG,	sizeof (prgregset32_t),	NULL,		NULL },
+	{ PCAGENT,	sizeof (prgregset32_t),	NULL,		NULL },
+	{ PCSFPREG,	sizeof (prfpregset32_t), NULL,		NULL },
+	{ PCSXREG,	0,			prwriteminxreg,
+	    prwritesizexreg },
+	{ PCWATCH,	sizeof (prwatch32_t),	NULL,		NULL },
+	{ PCREAD,	sizeof (priovec32_t),	NULL,		NULL },
+	{ PCWRITE,	sizeof (priovec32_t),	NULL,		NULL },
+	{ PCSCRED,	sizeof (prcred32_t),	NULL,		NULL },
+	{ PCSCREDX,	sizeof (prcred32_t),	NULL,
+	    prwritectl_pcscredx32_sizef },
+	{ PCSPRIV,	sizeof (prpriv_t),	NULL,
+	    prwritectl_pcspriv_sizef },
+	{ PCSZONE,	sizeof (long),		NULL,		NULL },
+};
 
 static int
-pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
+pr_control32(long cmd, void *generic, prnode_t *pnp, cred_t *cr)
 {
 	prcommon_t *pcp;
 	proc_t *p;
 	int unlocked;
 	int error = 0;
+	arg32_t *argp = generic;
 
 	if (cmd == PCNULL)
 		return (0);
@@ -870,14 +1007,10 @@ pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
 		break;
 
 	case PCSXREG:	/* set extra registers */
-#if defined(__sparc)
 		if (PROCESS_NOT_32BIT(p))
 			error = EOVERFLOW;
 		else
-			error = pr_setxregs(pnp, &argp->prxregset);
-#else
-		error = EINVAL;
-#endif
+			error = pr_setxregs(pnp, (prxregset_t *)argp);
 		break;
 
 	case PCSVADDR:	/* set virtual address at which to resume */
@@ -987,6 +1120,12 @@ pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
 	return (error);
 }
 
+int
+prwritectl32(struct vnode *vp, struct uio *uiop, cred_t *cr)
+{
+	return (prwritectl_common(vp, uiop, cr, proc_ctl_info32,
+	    ARRAY_SIZE(proc_ctl_info32), sizeof (int32_t), pr_control32));
+}
 #endif	/* _SYSCALL32_IMPL */
 
 /*
@@ -1302,8 +1441,8 @@ pr_setrun(prnode_t *pnp, ulong_t flags)
  */
 int
 pr_wait(prcommon_t *pcp,	/* prcommon referring to process/lwp */
-	timestruc_t *ts,	/* absolute time of timeout, if any */
-	int timecheck)
+    timestruc_t *ts,		/* absolute time of timeout, if any */
+    int timecheck)
 {
 	int rval;
 
@@ -1710,11 +1849,11 @@ pr_setfpregs32(prnode_t *pnp, prfpregset32_t *prfpregset)
 }
 #endif	/* _SYSCALL32_IMPL */
 
-#if defined(__sparc)
 /* ARGSUSED */
 static int
 pr_setxregs(prnode_t *pnp, prxregset_t *prxregset)
 {
+	int error;
 	proc_t *p = pnp->pr_common->prc_proc;
 	kthread_t *t = pr_thread(pnp);	/* returns locked thread */
 
@@ -1729,32 +1868,11 @@ pr_setxregs(prnode_t *pnp, prxregset_t *prxregset)
 
 	/* drop p_lock while touching the lwp's stack */
 	mutex_exit(&p->p_lock);
-	prsetprxregs(ttolwp(t), (caddr_t)prxregset);
+	error = prsetprxregs(ttolwp(t), prxregset);
 	mutex_enter(&p->p_lock);
 
-	return (0);
+	return (error);
 }
-
-static int
-pr_setasrs(prnode_t *pnp, asrset_t asrset)
-{
-	proc_t *p = pnp->pr_common->prc_proc;
-	kthread_t *t = pr_thread(pnp);	/* returns locked thread */
-
-	if (!ISTOPPED(t) && !VSTOPPED(t) && !DSTOPPED(t)) {
-		thread_unlock(t);
-		return (EBUSY);
-	}
-	thread_unlock(t);
-
-	/* drop p_lock while touching the lwp's stack */
-	mutex_exit(&p->p_lock);
-	prsetasregs(ttolwp(t), asrset);
-	mutex_enter(&p->p_lock);
-
-	return (0);
-}
-#endif
 
 static int
 pr_setvaddr(prnode_t *pnp, caddr_t vaddr)

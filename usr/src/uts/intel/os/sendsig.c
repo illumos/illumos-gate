@@ -28,6 +28,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T   */
 /*	All Rights Reserved   */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
@@ -107,9 +111,10 @@
  *		<128 bytes of untouched stack space>
  *		<a siginfo_t [optional]>
  *		<a ucontext_t>
- *		<siginfo_t *>
- *		<signal number>
- * new %rsp:	<return address (deliberately invalid)>
+ *		<a ucontext_t's xsave state>
+ *		<siginfo_t *>                             ---+
+ *		<signal number>                              | sigframe
+ * new %rsp:	<return address (deliberately invalid)>   ---+
  *
  * The signal number and siginfo_t pointer are only pushed onto the stack in
  * order to allow stack backtraces.  The actual signal handling code expects the
@@ -125,8 +130,10 @@ struct sigframe {
 int
 sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 {
-	volatile int minstacksz;
-	int newstack;
+	volatile size_t minstacksz;
+	boolean_t newstack;
+	size_t xsave_size;
+	int ret;
 	label_t ljb;
 	volatile caddr_t sp;
 	caddr_t fp;
@@ -166,14 +173,26 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	 * which must be 16-byte aligned. Because of this, for correct
 	 * alignment, sigframe must be a multiple of 8-bytes in length, but
 	 * not 16-bytes. This will place ucontext_t at a nice 16-byte boundary.
+	 *
+	 * When we move onto the xsave state, right now, we don't guarantee any
+	 * alignment of the resulting data, but we will ensure that the
+	 * resulting sp does have proper alignment. This will ensure that the
+	 * guarantee on the ucontex_t is not violated.
 	 */
 
-	/* LINTED: logical expression always true: op "||" */
-	ASSERT((sizeof (struct sigframe) % 16) == 8);
+	CTASSERT((sizeof (struct sigframe) % 16) == 8);
 
 	minstacksz = sizeof (struct sigframe) + SA(sizeof (*uc));
 	if (sip != NULL)
 		minstacksz += SA(sizeof (siginfo_t));
+
+	if (fpu_xsave_enabled()) {
+		xsave_size = SA(fpu_signal_size(lwp));
+		minstacksz += xsave_size;
+	} else {
+		xsave_size = 0;
+	}
+
 	ASSERT((minstacksz & (STACK_ENTRY_ALIGN - 1ul)) == 0);
 
 	/*
@@ -279,16 +298,26 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	} else
 		sip_addr = NULL;
 
-	/*
-	 * save the current context on the user stack directly after the
-	 * sigframe. Since sigframe is 8-byte-but-not-16-byte aligned,
-	 * and since sizeof (struct sigframe) is 24, this guarantees
-	 * 16-byte alignment for ucontext_t and its %xmm registers.
-	 */
-	uc = (ucontext_t *)(sp + sizeof (struct sigframe));
-	tuc = kmem_alloc(sizeof (*tuc), KM_SLEEP);
 	no_fault();
-	savecontext(tuc, &lwp->lwp_sigoldmask);
+
+	/*
+	 * Save the current context on the user stack directly after the
+	 * sigframe. Since sigframe is 8-byte-but-not-16-byte aligned, and since
+	 * sizeof (struct sigframe) is 24, this guarantees 16-byte alignment for
+	 * ucontext_t and its %xmm registers. The xsave state part of the
+	 * ucontext_t may be inbetween these two. However, we have ensured that
+	 * the size of the stack space is 16-byte aligned as the actual size may
+	 * vary.
+	 */
+	tuc = kmem_alloc(sizeof (*tuc), KM_SLEEP);
+	if (xsave_size != 0) {
+		tuc->uc_xsave = (unsigned long)(sp + sizeof (struct sigframe));
+	}
+	uc = (ucontext_t *)(sp + sizeof (struct sigframe) + xsave_size);
+	ret = savecontext(tuc, &lwp->lwp_sigoldmask, SAVECTXT_F_EXTD |
+	    SAVECTXT_F_ONFAULT);
+	if (ret != 0)
+		goto postfault;
 	if (on_fault(&ljb))
 		goto badstack;
 	copyout_noerr(tuc, uc, sizeof (*tuc));
@@ -352,6 +381,7 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 
 badstack:
 	no_fault();
+postfault:
 	if (watched)
 		watch_enable_addr((caddr_t)sp, minstacksz, S_WRITE);
 	if (tuc)
@@ -373,6 +403,7 @@ badstack:
  * old %esp:
  *		<a siginfo32_t [optional]>
  *		<a ucontext32_t>
+ *		<a ucontext32_t's xsave state>
  *		<pointer to that ucontext32_t>
  *		<pointer to that siginfo32_t>
  *		<signo>
@@ -388,8 +419,10 @@ struct sigframe32 {
 int
 sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 {
-	volatile int minstacksz;
-	int newstack;
+	volatile size_t minstacksz;
+	boolean_t newstack;
+	size_t xsave_size;
+	int ret;
 	label_t ljb;
 	volatile caddr_t sp;
 	caddr_t fp;
@@ -408,6 +441,13 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	minstacksz = SA32(sizeof (struct sigframe32)) + SA32(sizeof (*uc));
 	if (sip != NULL)
 		minstacksz += SA32(sizeof (siginfo32_t));
+
+	if (fpu_xsave_enabled()) {
+		xsave_size = SA32(fpu_signal_size(lwp));
+		minstacksz += xsave_size;
+	} else {
+		xsave_size = 0;
+	}
 	ASSERT((minstacksz & (STACK_ALIGN32 - 1)) == 0);
 
 	/*
@@ -503,13 +543,20 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 		}
 	} else
 		sip_addr = NULL;
+	no_fault();
 
 	/* save the current context on the user stack */
+	tuc = kmem_alloc(sizeof (*tuc), KM_SLEEP);
 	fp -= SA32(sizeof (*tuc));
 	uc = (ucontext32_t *)fp;
-	tuc = kmem_alloc(sizeof (*tuc), KM_SLEEP);
-	no_fault();
-	savecontext32(tuc, &lwp->lwp_sigoldmask);
+	if (xsave_size != 0) {
+		fp -= xsave_size;
+		tuc->uc_xsave = (int32_t)(uintptr_t)fp;
+	}
+	ret = savecontext32(tuc, &lwp->lwp_sigoldmask, SAVECTXT_F_EXTD |
+	    SAVECTXT_F_ONFAULT);
+	if (ret != 0)
+		goto postfault;
 	if (on_fault(&ljb))
 		goto badstack;
 	copyout_noerr(tuc, uc, sizeof (*tuc));
@@ -573,6 +620,7 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 
 badstack:
 	no_fault();
+postfault:
 	if (watched)
 		watch_enable_addr((caddr_t)sp, minstacksz, S_WRITE);
 	if (tuc)

@@ -27,7 +27,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_PCONTROL_H
@@ -143,9 +143,10 @@ typedef struct lwp_info {	/* per-lwp information from core file */
 	lwpsinfo_t lwp_psinfo;	/* /proc/<pid>/lwp/<lwpid>/lwpsinfo data */
 	lwpstatus_t lwp_status;	/* /proc/<pid>/lwp/<lwpid>/lwpstatus data */
 	char lwp_name[THREAD_NAME_MAX];
+	prxregset_t *lwp_xregs;	/* /proc/<pid>/lwp/<lwpid>/xregs data */
+	size_t lwp_xregsize;
 #if defined(sparc) || defined(__sparc)
 	gwindows_t *lwp_gwins;	/* /proc/<pid>/lwp/<lwpid>/gwindows data */
-	prxregset_t *lwp_xregs;	/* /proc/<pid>/lwp/<lwpid>/xregs data */
 	int64_t *lwp_asrs;	/* /proc/<pid>/lwp/<lwpid>/asrs data */
 #endif
 } lwp_info_t;
@@ -297,6 +298,8 @@ extern	char	*Pfindmap(struct ps_prochandle *, map_info_t *, char *,
 extern	int	Padd_mapping(struct ps_prochandle *, off64_t, file_info_t *,
     prmap_t *);
 extern	void	Psort_mappings(struct ps_prochandle *);
+extern	struct ps_lwphandle *Lfind(struct ps_prochandle *, lwpid_t);
+extern	int	Lstopstatus(struct ps_lwphandle *, long, uint_t);
 
 extern char	procfs_path[PATH_MAX];
 

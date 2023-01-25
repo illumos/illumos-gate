@@ -24,6 +24,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2023 Oxide Computer Company
  *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -47,6 +48,7 @@
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 #include <sys/regset.h>
 #include <sys/siginfo.h>
+#include <inttypes.h>
 #endif
 
 #ifdef	__cplusplus
@@ -63,12 +65,18 @@ extern "C" {
 
 extern int getcontext(ucontext_t *) __RETURNS_TWICE;
 #pragma unknown_control_flow(getcontext)
-extern int setcontext(const ucontext_t *) __NORETURN;
+extern int setcontext(const ucontext_t *);
 extern int swapcontext(ucontext_t *_RESTRICT_KYWD,
 		const ucontext_t *_RESTRICT_KYWD);
 extern void makecontext(ucontext_t *, void(*)(), int, ...);
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
+extern ucontext_t *ucontext_alloc(uint32_t);
+extern void ucontext_free(ucontext_t *);
+extern int getcontext_extd(ucontext_t *, uint32_t) __RETURNS_TWICE;
+#pragma unknown_control_flow(getcontext_extd)
+extern int swapcontext_extd(ucontext_t *_RESTRICT_KYWD, uint32_t,
+		const ucontext_t *_RESTRICT_KYWD);
 extern int walkcontext(const ucontext_t *, int (*)(uintptr_t, int, void *),
     void *);
 extern int printstack(int);

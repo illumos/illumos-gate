@@ -53,9 +53,6 @@ static	char	*prflags(int);
 static	char	*prwhy(int);
 static	char	*prwhat(int, int);
 static	void	dumpregs(const prgregset_t, int);
-#if defined(__sparc) && defined(_ILP32)
-static	void	dumpregs_v8p(const prgregset_t, const prxregset_t *, int);
-#endif
 
 static	char	*command;
 static	struct	ps_prochandle *Pr;
@@ -349,22 +346,10 @@ lwplook(look_arg_t *arg, const lwpstatus_t *psp, const lwpsinfo_t *pip)
 
 	if (rflag) {
 		if (Pstate(Pr) == PS_DEAD || (arg->pflags & PR_STOPPED)) {
-#if defined(__sparc) && defined(_ILP32)
-			/*
-			 * If we're SPARC/32-bit, see if we can get extra
-			 * register state for this lwp.  If it's a v8plus
-			 * program, print the 64-bit register values.
-			 */
-			prxregset_t prx;
-
-			if (Plwp_getxregs(Pr, psp->pr_lwpid, &prx) == 0 &&
-			    prx.pr_type == XR_TYPE_V8P)
-				dumpregs_v8p(psp->pr_reg, &prx, is64);
-			else
-#endif	/* __sparc && _ILP32 */
-				dumpregs(psp->pr_reg, is64);
-		} else
+			dumpregs(psp->pr_reg, is64);
+		} else {
 			(void) printf("\tNot stopped, can't show registers\n");
+		}
 	}
 
 	return (0);
@@ -504,20 +489,6 @@ prwhat(int why, int what)
 	return (str);
 }
 
-#if defined(__sparc)
-static const char * const regname[NPRGREG] = {
-	" %g0", " %g1", " %g2", " %g3", " %g4", " %g5", " %g6", " %g7",
-	" %o0", " %o1", " %o2", " %o3", " %o4", " %o5", " %sp", " %o7",
-	" %l0", " %l1", " %l2", " %l3", " %l4", " %l5", " %l6", " %l7",
-	" %i0", " %i1", " %i2", " %i3", " %i4", " %i5", " %fp", " %i7",
-#ifdef __sparcv9
-	"%ccr", " %pc", "%npc", "  %y", "%asi", "%fprs"
-#else
-	"%psr", " %pc", "%npc", "  %y", "%wim", "%tbr"
-#endif
-};
-#endif	/* __sparc */
-
 #if defined(__amd64)
 static const char * const regname[NPRGREG] = {
 	"%r15", "%r14", "%r13", "%r12", "%r11", "%r10", " %r9", " %r8",
@@ -565,7 +536,7 @@ static const char * const regname[NPRGREG] = {
 };
 #endif /* __i386 */
 
-#if defined(__amd64) && defined(_LP64)
+#if defined(__amd64)
 static void
 dumpregs32(const prgregset_t reg)
 {
@@ -583,7 +554,7 @@ dumpregs32(const prgregset_t reg)
 	if (i % 4 != 0)
 		(void) putchar('\n');
 }
-#endif
+#endif	/* __amd64 */
 
 static void
 dumpregs(const prgregset_t reg, int is64)
@@ -592,12 +563,12 @@ dumpregs(const prgregset_t reg, int is64)
 	int cols = is64? 2 : 4;
 	int i;
 
-#if defined(__amd64) && defined(_LP64)
+#if defined(__amd64)
 	if (!is64) {
 		dumpregs32(reg);
 		return;
 	}
-#endif
+#endif	/* __amd64 */
 
 	for (i = 0; i < NPRGREG; i++) {
 		(void) printf("  %s = 0x%.*lX",
@@ -608,45 +579,3 @@ dumpregs(const prgregset_t reg, int is64)
 	if (i % cols != 0)
 		(void) putchar('\n');
 }
-
-#if defined(__sparc) && defined(_ILP32)
-static void
-dumpregs_v8p(const prgregset_t reg, const prxregset_t *xreg, int is64)
-{
-	static const uint32_t zero[8] = { 0 };
-	int gr, xr, cols = 2;
-	uint64_t xval;
-
-	if (memcmp(xreg->pr_un.pr_v8p.pr_xg, zero, sizeof (zero)) == 0 &&
-	    memcmp(xreg->pr_un.pr_v8p.pr_xo, zero, sizeof (zero)) == 0) {
-		dumpregs(reg, is64);
-		return;
-	}
-
-	for (gr = R_G0, xr = XR_G0; gr <= R_G7; gr++, xr++) {
-		xval = (uint64_t)xreg->pr_un.pr_v8p.pr_xg[xr] << 32 |
-		    (uint64_t)(uint32_t)reg[gr];
-		(void) printf("  %s = 0x%.16" PRIX64, regname[gr], xval);
-		if ((gr + 1) % cols == 0)
-			(void) putchar('\n');
-	}
-
-	for (gr = R_O0, xr = XR_O0; gr <= R_O7; gr++, xr++) {
-		xval = (uint64_t)xreg->pr_un.pr_v8p.pr_xo[xr] << 32 |
-		    (uint64_t)(uint32_t)reg[gr];
-		(void) printf("  %s = 0x%.16" PRIX64, regname[gr], xval);
-		if ((gr + 1) % cols == 0)
-			(void) putchar('\n');
-	}
-
-	for (gr = R_L0; gr < NPRGREG; gr++) {
-		(void) printf("  %s =         0x%.8lX",
-		    regname[gr], (long)reg[gr]);
-		if ((gr + 1) % cols == 0)
-			(void) putchar('\n');
-	}
-
-	if (gr % cols != 0)
-		(void) putchar('\n');
-}
-#endif	/* __sparc && _ILP32 */

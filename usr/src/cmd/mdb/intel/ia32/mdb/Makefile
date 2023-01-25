@@ -22,11 +22,11 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 SRCS =	kvm_ia32dep.c \
 	kvm_isadep.c \
 	mdb_ia32util.c \
+	proc_x86util.c \
 	proc_ia32dep.c
 
 %.o: ../../mdb/%.c

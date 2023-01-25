@@ -12,8 +12,9 @@
 .\" Copyright 2018 Joyent, Inc.
 .\" Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd March 10, 2023
+.Dd March 20, 2023
 .Dt LIBPROC 3LIB
 .Os
 .Sh NAME
@@ -218,11 +219,6 @@ manipulation of the process itself.
 .It Sy Pissyscall_prev Ta Sy Plmid
 .It Sy Plmid_to_loadobj Ta Sy Plmid_to_map
 .It Sy Plookup_by_addr Ta Sy Plookup_by_name
-.It Sy Plwp_alt_stack Ta Sy Plwp_getfpregs
-.It Sy Plwp_getname Ta Sy Plwp_getpsinfo
-.It Sy Plwp_getregs Ta Sy Plwp_getspymaster
-.It Sy Plwp_main_stack Ta Sy Plwp_setfpregs
-.It Sy Plwp_setregs Ta Sy Plwp_stack
 .It Sy Pname_to_ctf Ta Sy Pname_to_loadobj
 .It Sy Pname_to_map Ta Sy Pobjname
 .It Sy Pobjname_resolved Ta Sy Pplatform
@@ -256,13 +252,25 @@ manipulation of the thread itself.
 .It Sy Lalt_stack Ta Sy Lclearfault
 .It Sy Lclearsig Ta Sy Lctlfd
 .It Sy Ldstop Ta Sy Lgetareg
-.It Sy Lmain_stack Ta Sy Lprochandle
-.It Sy Lpsinfo Ta Sy Lputareg
-.It Sy Lsetrun Ta Sy Lstack
+.It Sy Lgetfpregs Ta Sy Lgetregs
+.It Sy Lgetxregs Ta Sy Lmain_stack
+.It Sy Lprochandle Ta Sy Lpsinfo
+.It Sy Lputareg Ta Sy Lsetrun
+.It Sy Lsetfpregs Ta Sy Lsetregs
+.It Sy Lsetxregs Ta Sy Lstack
 .It Sy Lstate Ta Sy Lstatus
 .It Sy Lstop Ta Sy Lsync
 .It Sy Lwait Ta Sy Lxecbkpt
-.It Sy Lxecwapt Ta ""
+.It Sy Lxecwapt Ta Sy ""
+.El
+.Bl -column -offset indent ".Sy Pmapping_iter_resolved" ".Sy Psymbol_iter_by_addr"
+.It Sy Plwp_alt_stack Ta Sy Plwp_freexregs
+.It Sy Plwp_getfpregs Ta Sy Plwp_getname
+.It Sy Plwp_getpsinfo Ta Sy Plwp_getregs
+.It Sy Plwp_getspymaster Ta Sy Plwp_main_stack
+.It Sy Plwp_getxregs Ta Sy Plwp_setfpregs
+.It Sy Plwp_setregs Ta Sy Plwp_setxregs
+.It Sy Plwp_stack Ta Sy ""
 .El
 .Ss System Call Injection
 The following routines are used to inject specific system calls and have
@@ -338,8 +346,7 @@ versions of the
 .Nm
 library.
 .Bl -column -offset indent ".Sy Pmapping_iter_resolved" ".Sy Psymbol_iter_by_addr"
-.It Sy Plwp_getgwindows Ta Sy Plwp_getxregs
-.It Sy Plwp_setxregs Ta Sy ""
+.It Sy Plwp_getgwindows Ta Sy ""
 .El
 .Pp
 The following functions are specific to the 64-bit SPARC version of the

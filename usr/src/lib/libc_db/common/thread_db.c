@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -1989,7 +1990,6 @@ __td_thr_setfpregs(td_thrhandle_t *th_p, const prfpregset_t *fpregset)
 td_err_e
 __td_thr_getxregsize(td_thrhandle_t *th_p, int *xregsize)
 {
-#if defined(__sparc)
 	struct ps_prochandle *ph_p;
 	td_err_e return_val;
 
@@ -2003,25 +2003,24 @@ __td_thr_getxregsize(td_thrhandle_t *th_p, int *xregsize)
 	if (ps_lgetxregsize(ph_p, thr_to_lwpid(th_p), xregsize) != PS_OK)
 		return_val = TD_DBERR;
 
+	if (*xregsize == 0)
+		return_val = TD_NOXREGS;
+
 	(void) ps_pcontinue(ph_p);
 	ph_unlock(th_p->th_ta_p);
 	return (return_val);
-#else	/* __sparc */
-	return (TD_NOXREGS);
-#endif	/* __sparc */
 }
 
 /*
  * Get a thread's extra state register set.
  */
 #pragma weak td_thr_getxregs = __td_thr_getxregs
-/* ARGSUSED */
 td_err_e
 __td_thr_getxregs(td_thrhandle_t *th_p, void *xregset)
 {
-#if defined(__sparc)
 	struct ps_prochandle *ph_p;
 	td_err_e return_val;
+	ps_err_e ps_err;
 
 	if ((ph_p = ph_lock_th(th_p, &return_val)) == NULL)
 		return (return_val);
@@ -2030,26 +2029,24 @@ __td_thr_getxregs(td_thrhandle_t *th_p, void *xregset)
 		return (TD_DBERR);
 	}
 
-	if (ps_lgetxregs(ph_p, thr_to_lwpid(th_p), (caddr_t)xregset) != PS_OK)
+	ps_err = ps_lgetxregs(ph_p, thr_to_lwpid(th_p), (caddr_t)xregset);
+	if (ps_err == PS_NOXREGS)
+		return_val = TD_NOXREGS;
+	else if (ps_err != PS_OK)
 		return_val = TD_DBERR;
 
 	(void) ps_pcontinue(ph_p);
 	ph_unlock(th_p->th_ta_p);
 	return (return_val);
-#else	/* __sparc */
-	return (TD_NOXREGS);
-#endif	/* __sparc */
 }
 
 /*
  * Set a thread's extra state register set.
  */
 #pragma weak td_thr_setxregs = __td_thr_setxregs
-/* ARGSUSED */
 td_err_e
 __td_thr_setxregs(td_thrhandle_t *th_p, const void *xregset)
 {
-#if defined(__sparc)
 	struct ps_prochandle *ph_p;
 	td_err_e return_val;
 
@@ -2066,9 +2063,6 @@ __td_thr_setxregs(td_thrhandle_t *th_p, const void *xregset)
 	(void) ps_pcontinue(ph_p);
 	ph_unlock(th_p->th_ta_p);
 	return (return_val);
-#else	/* __sparc */
-	return (TD_NOXREGS);
-#endif	/* __sparc */
 }
 
 struct searcher {

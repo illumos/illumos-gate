@@ -88,6 +88,7 @@ file path=usr/share/man/man2/getaudit.2
 link path=usr/share/man/man2/getaudit_addr.2 target=getaudit.2
 file path=usr/share/man/man2/getauid.2
 file path=usr/share/man/man2/getcontext.2
+link path=usr/share/man/man2/getcontext_extd.2 target=getcontext.2
 file path=usr/share/man/man2/getdents.2
 link path=usr/share/man/man2/getegid.2 target=getuid.2
 link path=usr/share/man/man2/geteuid.2 target=getuid.2

@@ -53,10 +53,9 @@ typedef struct mdb_tdb_ops {
 	td_err_e (*td_thr_setfpregs)(const td_thrhandle_t *,
 	    const prfpregset_t *);
 	td_err_e (*td_thr_tlsbase)(const td_thrhandle_t *, ulong_t, psaddr_t *);
-#ifdef __sparc
+	td_err_e (*td_thr_getxregsize)(const td_thrhandle_t *, int *);
 	td_err_e (*td_thr_getxregs)(const td_thrhandle_t *, void *);
 	td_err_e (*td_thr_setxregs)(const td_thrhandle_t *, const void *);
-#endif
 } mdb_tdb_ops_t;
 
 typedef struct mdb_tdb_lib {

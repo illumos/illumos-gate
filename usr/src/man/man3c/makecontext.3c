@@ -43,86 +43,144 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.TH MAKECONTEXT 3C "February 17, 2023"
-.SH NAME
-makecontext, swapcontext \- manipulate user contexts
-.SH SYNOPSIS
-.nf
-#include <ucontext.h>
-
-\fBvoid\fR \fBmakecontext\fR(\fBucontext_t *\fR\fIucp\fR, \fBvoid (*\fR\fIfunc\fR)(), \fBint\fR \fIargc\fR...);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBswapcontext\fR(\fBucontext_t *restrict\fR \fIoucp\fR,
-     \fBconst ucontext_t *restrict\fR \fIucp\fR);
-.fi
-
-.SH DESCRIPTION
-The \fBmakecontext()\fR function modifies the context specified by \fIucp\fR,
-which has been initialized using \fBgetcontext\fR(2). When this context is
-resumed using \fBswapcontext()\fR or \fBsetcontext\fR(2), execution continues
-by calling the function \fIfunc\fR, passing it the arguments that follow
-\fIargc\fR in the \fBmakecontext()\fR call. The value of \fIargc\fR must match
-the number of pointer-sized integer arguments passed to \fIfunc\fR, otherwise
-the behavior is undefined.
-.sp
-.LP
-Before a call is made to \fBmakecontext()\fR, the context being modified should
-have a stack allocated for it. The stack is assigned to the context by
-initializing the \fBuc_stack\fR member.
-.sp
-.LP
-The \fBuc_link\fR member is used to determine the context that will be resumed
-when the context being modified by \fBmakecontext()\fR returns.  The
-\fBuc_link\fR member should be initialized prior to the call to
-\fBmakecontext()\fR. If the \fBuc_link\fR member is initialized to \fINULL\fR,
-the thread executing \fIfunc\fR will exit when \fIfunc\fR returns. See
-\fBpthread_exit\fR(3C).
-.sp
-.LP
-The \fBswapcontext()\fR function saves the current context in the context
-structure pointed to by \fIoucp\fR and sets the context to the context
-structure pointed to by \fIucp\fR.
-.sp
-.LP
-If the \fIucp\fR or \fIoucp\fR argument points to an invalid address, the
-behavior is undefined and \fBerrno\fR may be set to \fBEFAULT\fR.
-.SH RETURN VALUES
-On successful completion, \fBswapcontext()\fR returns \fB0\fR. Otherwise,
-\fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
-.SH ERRORS
-The \fBswapcontext()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
-The \fIucp\fR argument does not have enough stack left to complete the
-operation.
-.RE
-
-.sp
-.LP
-The \fBswapcontext()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-The \fIucp\fR or \fIoucp\fR argument points to an invalid address.
-.RE
-
-.SH EXAMPLES
-\fBExample 1 \fRAlternate execution context on a stack whose memory was
-allocated using \fBmmap()\fR.
-.sp
-.in +2
-.nf
+.Dd March 20, 2023
+.Dt MAKECONTEXT 3C
+.Os
+.Sh NAME
+.Nm makecontext ,
+.Nm swapcontext ,
+.Nm swapcontext_extd
+.Nd manipulate user contexts
+.Sh SYNOPSIS
+.In ucontext.h
+.Ft void
+.Fo makecontext
+.Fa "ucontext_t *ucp"
+.Fa "void (*ifunc)()"
+.Fa "int argc"
+.Fa "..."
+.Fc
+.Ft int
+.Fo swapcontext
+.Fa "ucontext_t *restrict oucp"
+.Fa "const ucontext_t *restrict ucp"
+.Fc
+.Ft int
+.Fo swapcontext_extd
+.Fa "ucontext_t *restrict oucp"
+.Fa "uint32_t flags"
+.Fa "const ucontext_t *restrict ucp"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn makecontext
+function modifies the context specified by
+.Fa ucp ,
+which has been initialized using
+.Xr getcontext 2 or
+.Xr getcontext_extd 2 .
+When this context is resumed using
+.Fn swapcontext ,
+.Fn swapcontext_extd ,
+or
+.Xr setcontext 2 ,
+execution continues by calling the function
+.Fa func ,
+passing it the arguments that follow
+.Fa argc
+in the
+.Fn makecontext
+call.
+The value of
+.Fa argc
+must match the number of pointer-sized integer arguments passed to
+.Fa func ,
+otherwise the behavior is undefined.
+.Pp
+Before a call is made to
+.Fn makecontext ,
+the context being modified should have a stack allocated for it.
+The stack is assigned to the context by initializing the
+.Fa uc_stack
+member.
+.Pp
+The
+.Fa uc_link
+member is used to determine the context that will be resumed when the context
+being modified by
+.Fn makecontext
+returns.
+The
+.Fa uc_link
+member should be initialized prior to the call to
+.Fn makecontext .
+If the
+.Fa uc_link
+member is initialized to
+.Dv NULL ,
+the thread executing
+.Fa func
+will exit when
+.Fa func returns.
+See
+.Xr pthread_exit 3C .
+.Pp
+The
+.Fn swapcontext
+function saves the current context in the context structure pointed to by
+.Fa oucp
+and sets the context to the context structure pointed to by
+.Fa ucp .
+.Pp
+If the
+.Fa ucp
+or
+.Fa oucp
+argument points to an invalid address, the behavior is undefined and
+.Va errno
+may be set to
+.Er EFAULT .
+.Pp
+The
+.Fn swapcontext_extd
+function is similar to
+.Fn swapcontext
+except that it performs a call to
+.Xr getcontext_extd 2
+to get and save the current context, passing the
+.Fa flags
+argument to
+.Xr getcontext_extd 2 .
+Note, the same constraints around the initialization of the
+.Vt ucontext_t
+that are discussed in
+.Xr getcontext_extd 2
+still apply.
+Mainly, the context must either have originally come from
+.Xr ucontext_alloc 3C
+or prior to its first use been zeroed.
+See
+.Xr getcontext_extd 2
+for more information.
+.Sh RETURN VALUES
+On successful completion,
+.Fn swapcontext
+and
+.Fn swapcontext_extd
+return
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned and
+.Va errno
+is set to indicate the error.
+.Sh EXAMPLES
+.Sy Example 1
+Alternate execution context on a stack whose memory was allocated using
+.Fn mmap .
+.Bd -literal -offset 2
 #include <stdio.h>
 #include <ucontext.h>
 #include <sys/mman.h>
@@ -157,61 +215,95 @@ main(int argc, char **argv)
 
         return (0);
 }
-.fi
-.in -2
-
-.SH USAGE
+.Ed
+.Sh ERRORS
+The
+.Fn swapcontext
+and
+.Fn swapcontext_extd
+function will fail if:
+.Bl -tag -width Er
+.It Er ENOMEM
+The
+.Fa ucp
+argument does not have enough stack left to complete the operation.
+.El
+.Pp
+The
+.Fn swapcontext
+and
+.Fn swapcontext_extd
+functions may fail if:
+.Bl -tag -width Er
+.It Er EFAULT
+The
+.Fa ucp
+or
+.Fa oucp
+argument points to an invalid address.
+.El
+.Pp
+The
+.Fn swapcontext_extd
+function may additionally fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The
+.Fa flags
+argument contains invalid values.
+.El
+.Sh USAGE
 These functions are useful for implementing user-level context switching
-between multiple threads of control within a process (co-processing). More
-effective multiple threads of control can be obtained by using native support
-for multithreading. See \fBthreads\fR(7).
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.BR getcontext (2),
-.BR mmap (2),
-.BR sigaction (2),
-.BR sigprocmask (2),
-.BR pthread_exit (3C),
-.BR ucontext.h (3HEAD),
-.BR attributes (7),
-.BR standards (7),
-.BR threads (7)
-.SH NOTES
-The semantics of the \fBuc_stack\fR member of the \fBucontext_t\fR structure
-have changed as they apply to inputs to \fBmakecontext()\fR. Prior to Solaris
-10, the \fBss_sp\fR member of the \fBuc_stack\fR structure represented the high
-memory address of the area reserved for the stack. The \fBss_sp\fR member now
-represents the base (low memory address), in keeping with other uses of
-\fBss_sp\fR.
-.sp
-.LP
-This change in the meaning of \fBss_sp\fR is now the default behavior. The
-\fB-D__MAKECONTEXT_V2_SOURCE\fR compilation flag used in Solaris 9 update
-releases to access this behavior is obsolete.
-.sp
-.LP
+between multiple threads of control within a process
+.Pq co-processing .
+More effective multiple threads of control can be obtained by using native
+support for multithreading.
+See
+.Xr threads 7 .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr getcontext 2 ,
+.Xr getcontext_extd 2 ,
+.Xr mmap 2 ,
+.Xr sigaction 2 ,
+.Xr sigprocmask 2 ,
+.Xr pthread_exit 3C ,
+.Xr ucontext_alloc 3C ,
+.Xr ucontext.h 3HEAD ,
+.Xr attributes 7 ,
+.Xr standards 7 ,
+.Xr threads 7
+.Sh NOTES
+The semantics of the
+.Fa uc_stack
+member of the
+.Fa ucontext_t
+structure have changed as they apply to inputs to
+.Fn makecontext .
+Prior to Solaris 10, the
+.Fa ss_sp
+member of the
+.Fa uc_stack
+tructure represented the high memory address of the area reserved for the stack.
+The
+.Fa ss_sp
+member now represents the base
+.Pq low memory address ,
+in keeping with other uses of
+.Fa ss_sp .
+This change in the meaning of
+.Fa ss_sp
+is the default behavior.
+.Pp
 Binary compatibility has been preserved with releases prior to Solaris 10.
-Before recompiling, applications that use \fBmakecontext()\fR must be updated
-to reflect this behavior change. The example below demonstrates a typical change
-that must be applied:
-.sp
-.in +2
-.nf
+Before recompiling, applications that use
+.Fn makecontext
+must be updated to reflect this behavior change.
+The example below demonstrates a typical change that must be applied:
+.Bd -literal -offset 2
 --- example1_s9.c       Thu Oct  3 11:58:17 2002
 +++ example1.c  Thu Jun 27 13:28:16 2002
 @@ -27,12 +27,9 @@
@@ -226,5 +318,4 @@ that must be applied:
 
         makecontext(&uc, assign, 2, 100L, &value);
 .fi
-.in -2
-
+.Ed
