@@ -75,7 +75,6 @@ file path=opt/onbld/bin/$(ARCH)/tic mode=0555
 file path=opt/onbld/bin/$(ARCH)/zic mode=0555
 file path=opt/onbld/bin/Install mode=0555
 file path=opt/onbld/bin/bldenv mode=0555
-file path=opt/onbld/bin/bringovercheck mode=0555
 file path=opt/onbld/bin/build_cscope mode=0555
 file path=opt/onbld/bin/cddlchk mode=0555 \
     pkg.depend.bypass-generate=.*(?:Checks|onbld|Cddl).*
@@ -101,7 +100,6 @@ file path=opt/onbld/bin/mapfilechk mode=0555 \
 file path=opt/onbld/bin/nightly mode=0555
 file path=opt/onbld/bin/onu mode=0555
 file path=opt/onbld/bin/protocmp.terse mode=0555
-file path=opt/onbld/bin/sccscheck mode=0555
 file path=opt/onbld/bin/signit mode=0555
 file path=opt/onbld/bin/signproto mode=0555
 file path=opt/onbld/bin/validate_flg mode=0555
@@ -245,7 +243,6 @@ dir  path=opt/onbld/man
 dir  path=opt/onbld/man/man1onbld
 file path=opt/onbld/man/man1onbld/Install.1onbld
 file path=opt/onbld/man/man1onbld/bldenv.1onbld
-file path=opt/onbld/man/man1onbld/bringovercheck.1onbld
 $(i386_ONLY)file path=opt/onbld/man/man1onbld/btxld.1onbld
 file path=opt/onbld/man/man1onbld/cddlchk.1onbld
 file path=opt/onbld/man/man1onbld/check_rtime.1onbld
@@ -267,7 +264,6 @@ file path=opt/onbld/man/man1onbld/mapfilechk.1onbld
 file path=opt/onbld/man/man1onbld/ndrgen.1onbld
 file path=opt/onbld/man/man1onbld/nightly.1onbld
 file path=opt/onbld/man/man1onbld/onu.1onbld
-file path=opt/onbld/man/man1onbld/sccscheck.1onbld
 file path=opt/onbld/man/man1onbld/signit.1onbld
 file path=opt/onbld/man/man1onbld/signproto.1onbld
 file path=opt/onbld/man/man1onbld/webrev.1onbld
