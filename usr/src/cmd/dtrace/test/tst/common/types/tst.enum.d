@@ -43,6 +43,16 @@ enum my_enum {
 	maximum = 2147483647
 };
 
+enum my_enum2 {
+	zero,
+	one = 1,
+	two,
+	three,
+	four = 4,
+	minimum = -2147483648,
+	maximum = 2147483647,
+};
+
 BEGIN
 {
 	exit(0);
