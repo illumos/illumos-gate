@@ -40,8 +40,6 @@
 #ifndef _SYS_DIR_H
 #define	_SYS_DIR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 #include <sys/int_types.h>
 

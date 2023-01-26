@@ -20,7 +20,5 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 
 echo_file usr/src/ucblib/Makefile.ucbtarg

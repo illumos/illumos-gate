@@ -34,8 +34,6 @@
 
 #ifndef _SYS_IOCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
 #include <sys/ioctl.h>
 
 #ifdef __cplusplus

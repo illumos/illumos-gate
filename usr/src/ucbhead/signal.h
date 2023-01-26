@@ -43,8 +43,6 @@
 
 #ifndef _SIGNAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/signal.h>
 
 #endif /* _SIGNAL_H */

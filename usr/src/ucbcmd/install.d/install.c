@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -144,7 +142,7 @@ main(int argc, char **argv)
 			exit(1);
 		}
 		if ((stb.st_mode&S_IFMT) != S_IFDIR) {
-			fprintf(stderr, gettext("install: %s is not a directory\n"), dirname);	
+			fprintf(stderr, gettext("install: %s is not a directory\n"), dirname);
 		}
 		/* make sure directory setgid bit is inherited */
 		mode = (mode & ~S_ISGID) | (stb.st_mode & S_ISGID);
@@ -175,7 +173,7 @@ main(int argc, char **argv)
         if (argc > 2) {		/* last arg must be a directory */
                 if (stat(argv[argc-1], &stb) < 0)
                         usage();
-                if ((stb.st_mode&S_IFMT) != S_IFDIR) 
+                if ((stb.st_mode&S_IFMT) != S_IFDIR)
                         usage();
         }
         rc = 0;
@@ -301,9 +299,9 @@ copy_done:
 int
 atoo(str)
         char   *str;
-{        
+{
         int    val;
- 
+
         for (val = 0; isdigit(*str); ++str)
                 val = val * 8 + *str - '0';
         return(val);

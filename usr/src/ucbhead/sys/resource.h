@@ -40,8 +40,6 @@
 #ifndef _SYS_RESOURCE_H
 #define	_SYS_RESOURCE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _SYS_RUSAGE_H
 #include <sys/rusage.h>
 #endif

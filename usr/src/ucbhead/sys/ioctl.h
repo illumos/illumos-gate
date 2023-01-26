@@ -58,8 +58,6 @@
 #ifndef _SYS_IOCTL_H
 #define	_SYS_IOCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	IOCTYPE	0xff00
 
 #define	LIOC	('l'<<8)

@@ -29,10 +29,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-%{
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%}
-
 /* Yacc productions for "expr" command: */
 
 %{
@@ -399,7 +395,7 @@ ltoa(long l)
 		i = l % 10;
 		*--sp = '0' + i;
 		l /= 10;
-	} 
+	}
 	while(l);
 	if(neg)
 		*--sp = '-';

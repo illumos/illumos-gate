@@ -24,10 +24,6 @@
  * Use is subject to license terms.
  */
 
-#ifndef lint
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#endif
-
 #include <stdio.h>
 #include <ctype.h>
 #include <sys/types.h>

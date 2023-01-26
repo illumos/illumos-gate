@@ -31,9 +31,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
 #define	LC_NAMELEN	15		/* maximum part name length (inc. \0) */
 #define	SZ_CTYPE	(257 + 257)	/* is* and to{upp,low}er tables */
 #define	SZ_CODESET	7		/* bytes for codeset information */

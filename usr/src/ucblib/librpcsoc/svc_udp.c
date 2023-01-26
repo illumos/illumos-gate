@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * svc_udp.c,
  * Server side for UDP/IP based RPC.  (Does some caching in the hopes of

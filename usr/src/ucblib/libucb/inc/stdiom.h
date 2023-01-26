@@ -36,8 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * stdiom.h - shared guts of stdio therefore it doesn't need
  * a surrounding #ifndef
