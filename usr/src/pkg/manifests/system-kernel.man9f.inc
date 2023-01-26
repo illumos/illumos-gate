@@ -16,7 +16,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 RackTop Systems, Inc.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 #
 
 file path=usr/share/man/man9f/ASSERT.9f
@@ -793,14 +793,17 @@ link path=usr/share/man/man9f/list_remove_head.9f target=list_create.9f
 link path=usr/share/man/man9f/list_remove_tail.9f target=list_create.9f
 link path=usr/share/man/man9f/list_tail.9f target=list_create.9f
 file path=usr/share/man/man9f/mac_alloc.9f
+file path=usr/share/man/man9f/mac_devt_to_instance.9f
 link path=usr/share/man/man9f/mac_fini_ops.9f target=mac_init_ops.9f
 link path=usr/share/man/man9f/mac_free.9f target=mac_alloc.9f
+file path=usr/share/man/man9f/mac_getinfo.9f
 file path=usr/share/man/man9f/mac_hcksum_get.9f
 link path=usr/share/man/man9f/mac_hcksum_set.9f target=mac_hcksum_get.9f
 file path=usr/share/man/man9f/mac_init_ops.9f
 file path=usr/share/man/man9f/mac_link_update.9f
 file path=usr/share/man/man9f/mac_lso_get.9f
 file path=usr/share/man/man9f/mac_maxsdu_update.9f
+file path=usr/share/man/man9f/mac_private_minor.9f
 file path=usr/share/man/man9f/mac_prop_info.9f
 link path=usr/share/man/man9f/mac_prop_info_set_default_fec.9f \
     target=mac_prop_info.9f

@@ -24,6 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -915,6 +916,18 @@ int
 mac_devt_to_instance(dev_t devt)
 {
 	return (dld_devt_to_instance(devt));
+}
+
+/*
+ * Drivers that make use of the private minor number space are expected to
+ * provide their own getinfo(9e) entry point. This function simply forwards
+ * to the default MAC framework getinfo(9e) implementation as a convenience
+ * if they don't need any special mapping (mac instance != ddi_get_instance())
+ */
+int
+mac_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resp)
+{
+	return (dld_getinfo(dip, cmd, arg, resp));
 }
 
 /*

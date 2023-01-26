@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -227,7 +228,7 @@ dld_devt_to_instance(dev_t dev)
  * NB: This may be called for a provider before the provider's
  * instances are attached.  Hence, if a particular provider needs a
  * special mapping (the mac instance != ddi_get_instance()), then it
- * may need to provide its own implmentation using the
+ * may need to provide its own implementation using the
  * mac_devt_to_instance() function, and translating the returned mac
  * instance to a devinfo instance.  For dev_t's where the minor number
  * is too large (i.e. > MAC_MAX_MINOR), the provider can call this
@@ -278,6 +279,19 @@ dld_str_open(queue_t *rq, dev_t *devp, void *private)
 
 	major = getmajor(*devp);
 	minor = getminor(*devp);
+
+	/*
+	 * Half the 32-bit minor space is reserved for private use by the driver
+	 * so we bail out here with `ENOSTR` to indicate specfs should retry the
+	 * open with the driver's character based `open(9E)`. For a typical
+	 * STREAMS driver, that would just be `nodev` which would simply return
+	 * `ENODEV`. But a dual-personality device can choose to implement the
+	 * character based `open(9E)` for some minor nodes. A driver wanting a
+	 * separate STREAMS interface altogether would presumably have already
+	 * provided its own `streamtab`.
+	 */
+	if (minor >= mac_private_minor())
+		return (ENOSTR);
 
 	/*
 	 * Create a new dld_str_t for the stream. This will grab a new minor

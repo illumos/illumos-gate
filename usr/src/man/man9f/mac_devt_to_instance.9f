@@ -1,0 +1,74 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd January 30, 2023
+.Dt MAC_DEVT_TO_INSTANCE 9F
+.Os
+.Sh NAME
+.Nm mac_devt_to_instance
+.Nd return the instance number for the given device number
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo mac_devt_to_instance
+.Fa "dev_t devt"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa "devt"
+Device number.
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_devt_to_instance
+function returns the device instance number associated with the given device
+number managed by the
+.Xr mac 9E
+framework.
+.Pp
+Generally the MAC framework is responsible for managing device instance
+mapping and provides a default
+.Xr getinfo 9E
+implementation to that effect.
+.Pp
+However, if a driver wants to expose additional device nodes or relies on some
+special mapping of device instance to MAC instance then it must provide its own
+.Xr getinfo 9E
+entry point.
+In that case, the driver can call the
+.Fn mac_devt_to_instance
+function to obtain the MAC specific instance number and translate it as
+appropriate to a devinfo instance.
+.Sh CONTEXT
+The
+.Fn mac_devt_to_instance
+function should be called from a
+.Sy kernel
+context and is generally used during the execution of a driver's
+.Xr getinfo 9E
+entry point.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn mac_devt_to_instance
+function returns the instance number associated with the minor.
+Otherwise
+.Sy -1
+is returned to indicate failure.
+.Sh SEE ALSO
+.Xr getinfo 9E ,
+.Xr mac 9E ,
+.Xr ddi_get_instance 9F ,
+.Xr mac_getinfo 9F ,
+.Xr mac_private_minor 9F

@@ -11,9 +11,9 @@
 .\"
 .\" Copyright 2019 Joyent, Inc.
 .\" Copyright 2020 RackTop Systems, Inc.
-.\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd July 2, 2022
+.Dd January 30, 2023
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -143,7 +143,11 @@ structure should have a
 structure defined for it; however, it does not need to implement any of
 the standard
 .Xr cb_ops 9S
-entry points.
+entry points unless it also exposes a custom set of device nodes not
+otherwise managed by the MAC framework.
+See the
+.Sx Custom Device Nodes
+section for more details.
 .Pp
 Normally, in a driver's
 .Xr _init 9E
@@ -172,6 +176,32 @@ and
 .Xr mac_fini_ops 9F
 functions, see the examples section in
 .Xr mac_init_ops 9F .
+.Ss Custom Device Nodes
+A device may want to provide its own minor nodes as simple character or block
+devices backed by the usual
+.Xr cb_ops 9S
+routines.
+The MAC framework allows for this by leaving a portion of the minor
+number space available for private driver use.
+.Xr mac_private_minor 9F
+returns the first minor number a driver may use for its own purposes,
+e.g., to pass to
+.Xr ddi_create_minor_node 9F .
+.Pp
+A driver making use of this ability must provide its own
+.Xr getinfo 9E
+implementation that is aware of any such minor nodes.
+It must also delegate back to the MAC framework as appropriate via either
+calls to
+.Xr mac_getinfo 9F
+or
+.Xr mac_devt_to_instance 9F
+for MAC reserved minor nodes.
+It should also take care to not affect MAC reserved minors, e.g.,
+removing all minor nodes associated with a device:
+.Bd -literal -offset indent
+    ddi_remove_minor_node(dip, NULL);
+.Ed
 .Ss Registering with MAC
 Every instance of a device should register separately with MAC.
 To register with MAC, a driver must allocate a
@@ -633,7 +663,7 @@ fail the call to
 Administrators always interact with devices through the
 .Xr dladm 8
 command line interface.
-The state of devices such as whether the link is considered up or down ,
+The state of devices such as whether the link is considered up or down,
 various link properties such as the MTU, auto-negotiation state, and
 flow control state, are all exposed.
 It is also the preferred way that these properties are set and configured.
@@ -2213,14 +2243,17 @@ a given platform.
 .Xr freemsg 9F ,
 .Xr kstat_create 9F ,
 .Xr mac_alloc 9F ,
+.Xr mac_devt_to_instance 9F ,
 .Xr mac_fini_ops 9F ,
 .Xr mac_free 9F ,
+.Xr mac_getinfo 9F ,
 .Xr mac_hcksum_get 9F ,
 .Xr mac_hcksum_set 9F ,
 .Xr mac_init_ops 9F ,
 .Xr mac_link_update 9F ,
 .Xr mac_lso_get 9F ,
 .Xr mac_maxsdu_update 9F ,
+.Xr mac_private_minor 9F ,
 .Xr mac_prop_info_set_default_link_flowctrl 9F ,
 .Xr mac_prop_info_set_default_str 9F ,
 .Xr mac_prop_info_set_default_uint32 9F ,

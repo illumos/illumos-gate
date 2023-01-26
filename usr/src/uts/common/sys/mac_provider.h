@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_SYS_MAC_PROVIDER_H
@@ -604,6 +605,8 @@ extern int			mac_margin_add(mac_handle_t, uint32_t *,
 extern void			mac_init_ops(struct dev_ops *, const char *);
 extern void			mac_fini_ops(struct dev_ops *);
 extern int			mac_devt_to_instance(dev_t);
+extern int			mac_getinfo(dev_info_t *, ddi_info_cmd_t,
+				    void *, void **);
 extern minor_t			mac_private_minor(void);
 extern void			mac_ring_intr_set(mac_ring_handle_t,
 				    ddi_intr_handle_t);

@@ -15,7 +15,7 @@
 # Copyright 2020-2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2022 RackTop Systems, Inc.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 # Copyright 2022 Garrett D'Amore
 #
 
@@ -332,11 +332,14 @@ MANFILES=	ASSERT.9f				\
 		linkb.9f				\
 		list_create.9f				\
 		mac_alloc.9f				\
+		mac_devt_to_instance.9f			\
+		mac_getinfo.9f				\
 		mac_hcksum_get.9f			\
 		mac_init_ops.9f				\
 		mac_link_update.9f			\
 		mac_lso_get.9f				\
 		mac_maxsdu_update.9f			\
+		mac_private_minor.9f			\
 		mac_prop_info.9f			\
 		mac_register.9f				\
 		mac_rx.9f				\
