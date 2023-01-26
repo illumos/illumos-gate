@@ -1190,11 +1190,11 @@ print_symtab(obj_list * com,
 	c = (obj_list *) malloc(sizeof (obj_list));
 	c->obj = (obj_com *) malloc(sizeof (obj_com));
 	fullname = (char *)malloc(strlen(com->obj->ename)
-	    + strlen(filename) + 2);
-	(void *) strcpy(fullname, com->obj->ename);
-	(void *) strcat(fullname, "(");
-	(void *) strcat(fullname, filename);
-	(void *) strcat(fullname, ")");
+	    + strlen(filename) + 3);
+	(void) strcpy(fullname, com->obj->ename);
+	(void) strcat(fullname, "(");
+	(void) strcat(fullname, filename);
+	(void) strcat(fullname, ")");
 	c->obj->ename = fullname;
 
 	if ((data = elf_getdata(p_sd, NULL)) == NULL) {

@@ -217,7 +217,7 @@ init_disks(void)
 			disk->next = NULLDISK;
 		}
 		disk->ks = ksp;
-		(void *) memset((void *)&disk->new_kios, 0,
+		(void) memset((void *)&disk->new_kios, 0,
 			sizeof (kstat_io_t));
 		disk->new_kios.wlastupdate = disk->ks->ks_crtime;
 		disk->new_kios.rlastupdate = disk->ks->ks_crtime;
@@ -612,7 +612,7 @@ safe_zalloc(void **ptr, int size, int free_first)
 	if ((*ptr = (void *) malloc(size)) == NULL) {
 		fail("malloc failed");
 	}
-	(void *) memset(*ptr, 0, size);
+	(void) memset(*ptr, 0, size);
 }
 
 static void *

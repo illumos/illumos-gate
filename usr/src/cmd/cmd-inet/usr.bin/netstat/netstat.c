@@ -1360,7 +1360,7 @@ mib_item_dup(mib_item_t *item)
 				mib_item_destroy(&localp);
 				return (NULL);
 			}
-			(void *) memcpy((localp[c]).valp,
+			(void) memcpy((localp[c]).valp,
 			    item->valp,
 			    item->length);
 			tempp = &(localp[c]);

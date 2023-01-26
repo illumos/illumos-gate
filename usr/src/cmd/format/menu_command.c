@@ -1941,7 +1941,7 @@ c_backup(void)
 			continue;
 		}
 
-		(void *) memcpy((char *)&label, buf, sizeof (struct dk_label));
+		(void) memcpy((char *)&label, buf, sizeof (struct dk_label));
 
 		/*
 		 * Verify that it is a reasonable label.
@@ -2216,7 +2216,7 @@ Warning: Primary label on disk appears to be different from\ncurrent label.\n");
 		    1, buf, F_NORMAL, NULL))
 			continue;
 
-		(void *) memcpy((char *)&b_label, buf,
+		(void) memcpy((char *)&b_label, buf,
 		    sizeof (struct dk_label));
 
 		/*
