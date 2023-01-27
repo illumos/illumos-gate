@@ -36,7 +36,7 @@ CMDS = $(SRCS:%=$(ROOTBIN)/%)
 
 $(CMDS) := FILEMODE = 0555
 
-all clean clobber lint:
+all clean clobber:
 
 install: $(CMDS)
 

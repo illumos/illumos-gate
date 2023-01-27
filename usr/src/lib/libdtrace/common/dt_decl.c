@@ -572,8 +572,31 @@ dt_decl_member(dt_node_t *dnp)
 		    n, sizeof (n)), ident);
 	}
 
-	if (size == 0)
-		xyerror(D_DECL_VOIDOBJ, "cannot have void member: %s\n", ident);
+	if (size == 0) {
+		dt_decl_t *pdp;
+		dtrace_typeinfo_t pdt;
+		ctf_id_t pbase;
+		uint_t pkind;
+
+		pdp = dsp->ds_decl;
+		if (pdp == NULL)
+			longjmp(yypcb->pcb_jmpbuf, EDT_NODECL);
+		if (dt_decl_type(pdp, &pdt) != 0)
+			longjmp(yypcb->pcb_jmpbuf, EDT_COMPILER);
+
+		pbase = ctf_type_resolve(pdt.dtt_ctfp, pdt.dtt_type);
+		pkind = ctf_type_kind(pdt.dtt_ctfp, pbase);
+
+		/*
+		 * Last member of structure may be flexible array.
+		 * Please note, here we actually do allow any array
+		 * in structure to have size 0, this is because
+		 * the structure declaration is still incomplete.
+		 */
+		if (pkind != CTF_K_STRUCT || kind != CTF_K_ARRAY)
+			xyerror(D_DECL_VOIDOBJ,
+			    "cannot have void member: %s\n", ident);
+	}
 
 	/*
 	 * If a bit-field qualifier was part of the member declaration, create
