@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma D option quiet=yes
 #pragma D option quiet=YES
 #pragma D option quiet=true

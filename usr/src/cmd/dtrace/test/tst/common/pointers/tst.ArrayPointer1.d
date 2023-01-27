@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Declare arrays of different data types and verify that the
  * addresses of the individual elements differ by an amount equal to the number

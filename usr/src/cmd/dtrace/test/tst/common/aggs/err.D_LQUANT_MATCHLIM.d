@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 BEGIN
 {
 	@ = lquantize(0, 10, 20, 1);

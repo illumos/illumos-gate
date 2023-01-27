@@ -31,8 +31,6 @@
  * SECTION: Type and Constant Definitions/Inlines
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma D option quiet
 
 

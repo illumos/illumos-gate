@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: sizeof returns the size in bytes of any D expression or data
  * type. For a simpler array, the sizeof on the array variable itself gives

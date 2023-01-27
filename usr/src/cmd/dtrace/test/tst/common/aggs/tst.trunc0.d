@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma D option quiet
 #pragma D option aggrate=1ms
 #pragma D option switchrate=50ms

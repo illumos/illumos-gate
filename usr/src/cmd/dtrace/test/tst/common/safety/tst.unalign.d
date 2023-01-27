@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * We set our buffer size absurdly low to prevent a flood of errors that we
  * don't care about.  Note that this test (unlike some other safety tests)

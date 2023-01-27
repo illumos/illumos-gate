@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Test that there is no value of 'size' which can be passed to copyin
  * to cause mischief.  The somewhat odd order of operations ensures

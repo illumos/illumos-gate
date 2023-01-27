@@ -24,7 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Test ip:::{send,receive} of IPv6 ICMP to a local address.  This creates a

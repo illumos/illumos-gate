@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma D option nspec=1
 #pragma D option specsize=32
 #pragma D option strsize=512

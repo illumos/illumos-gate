@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: If an integer representation contains an invalid digit
  * a D_INT_DIGIT is thrown.

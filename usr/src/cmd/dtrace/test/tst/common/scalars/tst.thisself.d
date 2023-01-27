@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
  * ASSERTION:
  * Declare a self value and assign value of 'this' variable to that.

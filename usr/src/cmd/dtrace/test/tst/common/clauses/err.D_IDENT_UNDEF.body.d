@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Test a clause where an unknown identifier appears in a clause.
  * SECTION:   Program Structure / Probe Clauses and Declarations

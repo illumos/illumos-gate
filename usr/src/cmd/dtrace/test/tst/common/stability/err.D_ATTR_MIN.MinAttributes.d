@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: If a program has a set of attributes less than the predefined
  * minimum a D_ATTR_MIN is thrown

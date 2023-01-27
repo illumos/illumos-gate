@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Assert that a function parameter in a declaration may not use a dynamic
  * DTrace type such as an associative array type.

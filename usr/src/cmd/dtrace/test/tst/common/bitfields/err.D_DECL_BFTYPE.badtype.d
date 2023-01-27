@@ -24,9 +24,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION:
  *	Non-integer types used for bitfields will result in a D_DECL_BFTYPE

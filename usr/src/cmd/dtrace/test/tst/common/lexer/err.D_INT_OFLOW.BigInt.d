@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ASSERTION: Using an integer constant that cannot be represented in any of the
  * builtin integral types throws a D_INT_OFLOW error.
