@@ -885,6 +885,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		ddi_taskq_dispatch.9f				\
 		ddi_taskq_resume.9f				\
 		ddi_taskq_suspend.9f				\
+		ddi_taskq_suspended.9f				\
 		ddi_taskq_wait.9f				\
 		ddi_trigger_softintr.9f				\
 		ddi_ufm_fini.9f					\
@@ -1220,7 +1221,6 @@ MANLINKS=	AVL_NEXT.9f					\
 		strnlen.9f					\
 		strrchr.9f					\
 		strspn.9f					\
-		taskq_suspended.9f				\
 		uconv_u16tou8.9f				\
 		uconv_u32tou16.9f				\
 		uconv_u32tou8.9f				\
@@ -2108,8 +2108,8 @@ ddi_taskq_destroy.9f			:= LINKSRC = taskq.9f
 ddi_taskq_dispatch.9f			:= LINKSRC = taskq.9f
 ddi_taskq_resume.9f			:= LINKSRC = taskq.9f
 ddi_taskq_suspend.9f			:= LINKSRC = taskq.9f
+ddi_taskq_suspended.9f			:= LINKSRC = taskq.9f
 ddi_taskq_wait.9f			:= LINKSRC = taskq.9f
-taskq_suspended.9f			:= LINKSRC = taskq.9f
 
 uconv_u16tou8.9f			:= LINKSRC = uconv_u16tou32.9f
 uconv_u32tou16.9f			:= LINKSRC = uconv_u16tou32.9f

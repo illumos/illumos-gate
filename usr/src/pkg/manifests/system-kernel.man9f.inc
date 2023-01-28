@@ -601,6 +601,7 @@ link path=usr/share/man/man9f/ddi_taskq_destroy.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_taskq_dispatch.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_taskq_resume.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_taskq_suspend.9f target=taskq.9f
+link path=usr/share/man/man9f/ddi_taskq_suspended.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_taskq_wait.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_trigger_softintr.9f target=ddi_add_softintr.9f
 file path=usr/share/man/man9f/ddi_ufm.9f
@@ -1289,7 +1290,6 @@ link path=usr/share/man/man9f/strrchr.9f target=string.9f
 link path=usr/share/man/man9f/strspn.9f target=string.9f
 file path=usr/share/man/man9f/swab.9f
 file path=usr/share/man/man9f/taskq.9f
-link path=usr/share/man/man9f/taskq_suspended.9f target=taskq.9f
 file path=usr/share/man/man9f/testb.9f
 file path=usr/share/man/man9f/timeout.9f
 file path=usr/share/man/man9f/u8_strcmp.9f
