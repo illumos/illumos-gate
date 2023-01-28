@@ -16,8 +16,7 @@ inb, inw, inl \- read from an I/O port
 
 .LP
 .nf
-\fBunsigned short\fR \fBinw\fR(\fBint\fR
-\fIport\fR);
+\fBunsigned short\fR \fBinw\fR(\fBint\fR \fIport\fR);
 .fi
 
 .LP
