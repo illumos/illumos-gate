@@ -1107,7 +1107,7 @@ get_prom(int prom_fd, prom_node_t node_name,
 
 	switch (node_name) {
 	case root:
-		(void *) memset(oppbuf.buf, 0, PBUFSIZE);
+		(void) memset(oppbuf.buf, 0, PBUFSIZE);
 		opp->oprom_size = PBUFSIZE;
 		if (ioctl(prom_fd, OPROMNEXT, opp) < 0) {
 			return (0);
@@ -1116,7 +1116,7 @@ get_prom(int prom_fd, prom_node_t node_name,
 		/*
 		 * Passing null string will give us the first property.
 		 */
-		(void *) memset(oppbuf.buf, 0, PBUFSIZE);
+		(void) memset(oppbuf.buf, 0, PBUFSIZE);
 		do {
 			opp->oprom_size = PBUFSIZE;
 			if (ioctl(prom_fd, OPROMNXTPROP, opp) < 0) {

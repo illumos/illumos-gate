@@ -207,14 +207,14 @@ sas_util_list_hba(int hbaCount, char **hba_argv, cmdOptions_t *options)
 	}
 
 	if ((status = HBA_LoadLibrary()) != HBA_STATUS_OK) {
-		(void *) fprintf(stderr, "%s %s\n",
+		(void) fprintf(stderr, "%s %s\n",
 		    gettext("Failed to load SM-HBA libraries."
 		    "Reason:"), getHBAStatus(status));
 		err_cnt++;
 		return (err_cnt);
 	}
 
-	(void *) memset(&input, 0, sizeof (input));
+	(void) memset(&input, 0, sizeof (input));
 	/* utilize wwnCount and wwn_argv for hbaCount and hba_argv */
 	input.wwnCount = hbaCount;
 	input.wwn_argv = hba_argv;
@@ -259,7 +259,7 @@ sas_util_list_hbaport(int wwnCount, char **wwn_argv, cmdOptions_t *options)
 	for (; options->optval; options++) {
 		switch (options->optval) {
 		case 'a':
-			(void *) strlcpy(hbaName,
+			(void) strlcpy(hbaName,
 			    options->optarg, sizeof (hbaName));
 			break;
 		case 'y':
@@ -277,14 +277,14 @@ sas_util_list_hbaport(int wwnCount, char **wwn_argv, cmdOptions_t *options)
 	}
 
 	if ((status = HBA_LoadLibrary()) != HBA_STATUS_OK) {
-		(void *) fprintf(stderr, "%s %s\n",
+		(void) fprintf(stderr, "%s %s\n",
 		    gettext("Failed to load SM-HBA libraries."
 		    "Reason:"), getHBAStatus(status));
 		err_cnt++;
 		return (err_cnt);
 	}
 
-	(void *) memset(&input, 0, sizeof (input));
+	(void) memset(&input, 0, sizeof (input));
 	input.wwnCount = wwnCount;
 	input.wwn_argv = wwn_argv;
 	input.hbaName = hbaName;
@@ -345,14 +345,14 @@ sas_util_list_expander(int wwnCount, char **wwn_argv, cmdOptions_t *options)
 	}
 
 	if ((status = HBA_LoadLibrary()) != HBA_STATUS_OK) {
-		(void *) fprintf(stderr, "%s %s\n",
+		(void) fprintf(stderr, "%s %s\n",
 		    gettext("Failed to load SM-HBA libraries."
 		    "Reason:"), getHBAStatus(status));
 		err_cnt++;
 		return (err_cnt);
 	}
 
-	(void *) memset(&input, 0, sizeof (input));
+	(void) memset(&input, 0, sizeof (input));
 	input.wwnCount = wwnCount;
 	input.wwn_argv = wwn_argv;
 	input.pflag = processHBA_flags;
@@ -411,14 +411,14 @@ sas_util_list_targetport(int tpCount, char **tpArgv, cmdOptions_t *options)
 	}
 
 	if ((status = HBA_LoadLibrary()) != HBA_STATUS_OK) {
-		(void *) fprintf(stderr, "%s %s\n",
+		(void) fprintf(stderr, "%s %s\n",
 		    gettext("Failed to load SM-HBA libraries."
 		    "Reason:"), getHBAStatus(status));
 		err_cnt++;
 		return (err_cnt);
 	}
 
-	(void *) memset(&input, 0, sizeof (input));
+	(void) memset(&input, 0, sizeof (input));
 	input.wwnCount = tpCount;
 	input.wwn_argv = tpArgv;
 	input.pflag = processHBA_flags;
@@ -462,7 +462,7 @@ sas_util_list_targetport(int tpCount, char **tpArgv, cmdOptions_t *options)
 				}
 			}
 			if (tpFound == B_FALSE) {
-				(void *) fprintf(stderr,
+				(void) fprintf(stderr,
 				    "Error: Target Port %s Not Found \n",
 				    tpArgv[tp]);
 				err_cnt++;
@@ -526,7 +526,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 
 	numAdapters = HBA_GetNumberOfAdapters();
 	if (numAdapters == 0) {
-		(void *) fprintf(stderr, "%s\n",
+		(void) fprintf(stderr, "%s\n",
 		    gettext("Error: No Adapters Found."));
 		return (++ret);
 	}
@@ -539,7 +539,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 	    (processPort != handleLogicalUnit)) {
 		input->wwn_flag = calloc(input->wwnCount, sizeof (int));
 		if (input->wwn_flag == NULL) {
-			(void *) fprintf(stderr, "%s\n",
+			(void) fprintf(stderr, "%s\n",
 			    gettext("No enough memory on heap"));
 			return (++ret);
 		}
@@ -547,7 +547,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 
 	adpt_array = calloc(numAdapters, sizeof (sas_elem_t));
 	if (adpt_array == NULL) {
-		(void *) fprintf(stderr, "%s\n",
+		(void) fprintf(stderr, "%s\n",
 		    gettext("No enough memory on heap"));
 		if (input->wwn_flag) {
 			free(input->wwn_flag);
@@ -567,7 +567,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 		}
 		status = HBA_GetAdapterName(i, adpt_array[i].name);
 		if (status != HBA_STATUS_OK) {
-			(void *) fprintf(stderr, "%s %d %s %s\n",
+			(void) fprintf(stderr, "%s %d %s %s\n",
 			    gettext("Error: Failed to get the name for"
 			    " HBA index"),
 			    i, gettext("Reason:"),
@@ -585,7 +585,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 		if (adpt_array[i].name[0] != '\0') {
 			if ((handle = HBA_OpenAdapter(adpt_array[i].name))
 			    == 0) {
-				(void *) fprintf(stderr, "%s %s.\n",
+				(void) fprintf(stderr, "%s %s.\n",
 				    gettext("Error: Failed to open adapter"),
 				    adpt_array[i].name);
 				ret++;
@@ -599,7 +599,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 		 * We need to support an adapter without hba port.
 		 * So get attributes anyway.
 		 */
-		(void *) memset(&attrs, 0, sizeof (attrs));
+		(void) memset(&attrs, 0, sizeof (attrs));
 		status = SMHBA_GetAdapterAttributes(handle, &attrs);
 		while ((status == HBA_STATUS_ERROR_TRY_AGAIN ||
 		    status == HBA_STATUS_ERROR_BUSY) &&
@@ -609,7 +609,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 			    &attrs);
 		}
 		if (status != HBA_STATUS_OK) {
-			(void *) fprintf(stderr, "%s %s %s %s\n",
+			(void) fprintf(stderr, "%s %s %s %s\n",
 			    gettext("Error: Failed to get attributes"
 			    " for HBA "), adpt_array[i].name,
 			    gettext("Reason:"),
@@ -622,7 +622,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 
 		status = SMHBA_GetNumberOfPorts(handle, &numberOfPorts);
 		if (status != HBA_STATUS_OK) {
-			(void *) fprintf(stderr, "%s %s %s %s\n",
+			(void) fprintf(stderr, "%s %s %s %s\n",
 			    gettext("Error: Failed to get number of ports "
 			    "for HBA"), adpt_array[i].name,
 			    gettext("Reason:"),
@@ -666,7 +666,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 		for (portIndex = 0; portIndex < numberOfPorts; portIndex++) {
 			if ((status = SMHBA_GetPortType(handle,
 			    portIndex, &porttype)) != HBA_STATUS_OK) {
-				(void *) fprintf(stderr, "%s %s %s %s\n",
+				(void) fprintf(stderr, "%s %s %s %s\n",
 				    gettext("Failed to get adapter port type "
 				    "for HBA"), adpt_array[i].name,
 				    gettext("Reason:"),
@@ -678,8 +678,8 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 				/* skip any non-sas hba port */
 				continue;
 			}
-			(void *) memset(&port, 0, sizeof (port));
-			(void *) memset(&sasattrs, 0, sizeof (sasattrs));
+			(void) memset(&port, 0, sizeof (port));
+			(void) memset(&sasattrs, 0, sizeof (sasattrs));
 			port.PortSpecificAttribute.SASPort = &sasattrs;
 			if ((status = SMHBA_GetAdapterPortAttributes(
 			    handle, portIndex, &port)) != HBA_STATUS_OK) {
@@ -688,7 +688,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 				 * print out error message and
 				 * move on to the next port
 				 */
-				(void *) fprintf(stderr, "%s %s %s %d %s %s\n",
+				(void) fprintf(stderr, "%s %s %s %d %s %s\n",
 				    gettext("Error: Failed to get port "
 				    "attributes for HBA"), adpt_array[i].name,
 				    gettext("port index"), portIndex,
@@ -726,8 +726,8 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 			if (port_array[portIndex].name[0] == '\0') {
 				continue;
 			}
-			(void *) memset(&port, 0, sizeof (port));
-			(void *) memset(&sasattrs, 0, sizeof (sasattrs));
+			(void) memset(&port, 0, sizeof (port));
+			(void) memset(&sasattrs, 0, sizeof (sasattrs));
 			port.PortSpecificAttribute.SASPort = &sasattrs;
 
 			(void) SMHBA_GetAdapterPortAttributes(handle,
@@ -750,7 +750,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 					    port.OSDeviceName)) {
 						hbaPortExist = 1;
 						if (g_printHBA == 0) {
-							(void *) fprintf(stdout,
+							(void) fprintf(stdout,
 							    "%s %s\n",
 							    "HBA Name:",
 							    adpt_array[i].name);
@@ -760,7 +760,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 				} else {
 					hbaPortExist = 1;
 					if (g_printHBA == 0) {
-						(void *) fprintf(stdout,
+						(void) fprintf(stdout,
 						    "%s %s\n",
 						    "HBA Name:",
 						    adpt_array[i].name);
@@ -832,7 +832,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 	 * When we are here, we have traversed all the hba and hba ports.
 	 */
 	if (matchedHBAs == 0) {
-		(void *) fprintf(stderr, "%s\n",
+		(void) fprintf(stderr, "%s\n",
 		    gettext("Error: Matching HBA not found."));
 		if (input->wwn_flag) {
 			free(input->wwn_flag);
@@ -847,7 +847,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 		 */
 		for (i = 0; i < input->wwnCount; i++) {
 			if (input->wwn_flag[i] == 0) {
-				(void *) fprintf(stderr, "%s %s %s\n",
+				(void) fprintf(stderr, "%s %s %s\n",
 				    gettext("Error: HBA"),
 				    input->wwn_argv[i],
 				    gettext("not found."));
@@ -856,7 +856,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 		}
 	} else {
 		if (local_avail > 0 && matchedHBAPorts == 0) {
-			(void *) fprintf(stderr, "%s\n",
+			(void) fprintf(stderr, "%s\n",
 			    gettext("Error: Matching HBA Port "
 			    "not found."));
 			if (input->wwn_flag) {
@@ -865,7 +865,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 			}
 			return (++ret);
 		} else if (local_avail == 0) {
-			(void *) fprintf(stderr, "%s\n",
+			(void) fprintf(stderr, "%s\n",
 			    gettext("Error: No HBA Port Configured."));
 			if (input->wwn_flag) {
 				free(input->wwn_flag);
@@ -880,7 +880,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 			 */
 			for (i = 0; i < input->wwnCount; i++) {
 				if (input->wwn_flag[i] == 0) {
-					(void *) fprintf(stderr, "%s %s %s\n",
+					(void) fprintf(stderr, "%s %s %s\n",
 					    gettext("Error: HBA Port"),
 					    input->wwn_argv[i],
 					    gettext("not found."));
@@ -906,7 +906,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 			 * specified SAS address exist actually.
 			 */
 			if (sum == 0) {
-				(void *) fprintf(stderr, gettext("Error: "
+				(void) fprintf(stderr, gettext("Error: "
 				    "Matching SAS Address not found.\n"));
 				free(input->wwn_flag);
 				input->wwn_flag = NULL;
@@ -920,7 +920,7 @@ processHBA(inputArg_t *input, processPortFunc processPort)
 			 */
 			for (i = 0; i < input->wwnCount; i++) {
 				if (input->wwn_flag[i] == 0) {
-					(void *) fprintf(stderr, "%s %s %s\n",
+					(void) fprintf(stderr, "%s %s %s\n",
 					    gettext("Error: SAS Address"),
 					    input->wwn_argv[i],
 					    gettext("not found."));
@@ -967,17 +967,17 @@ processHBAPortPhyInfo(HBA_HANDLE handle, HBA_UINT32 portIndex,
 		return (0);
 
 	if ((pflag & PRINT_PHY) || (pflag & PRINT_PHY_LINKSTAT))
-		(void *) fprintf(stdout, "%s\n", "    Phy Information:");
+		(void) fprintf(stdout, "%s\n", "    Phy Information:");
 	else
 		return (0);
 
 
 	for (phyIndex = 0; phyIndex < numphys; phyIndex++) {
-		(void *) memset(&phyattrs, 0, sizeof (phyattrs));
+		(void) memset(&phyattrs, 0, sizeof (phyattrs));
 		status = SMHBA_GetSASPhyAttributes(
 		    handle, portIndex, phyIndex, &phyattrs);
 		if (status != HBA_STATUS_OK) {
-			(void *) fprintf(stderr, "%s %d %s %s\n",
+			(void) fprintf(stderr, "%s %d %s %s\n",
 			    gettext("Failed to get SAS Phy attributes"
 			    "phyIndex"), phyIndex,
 			    gettext("Reason:"),
@@ -1016,18 +1016,18 @@ processHBAPortPhyStat(HBA_HANDLE handle, HBA_UINT32 portIndex, int phyIndex,
 	SMHBA_SASPHYSTATISTICS	sasphystat;
 
 	if ((pflag & PRINT_PHY) == 0) {
-		(void *) fprintf(stdout, "%s %d\n",
+		(void) fprintf(stdout, "%s %d\n",
 		    "      Identifier:", phyattrs->PhyIdentifier);
 	}
 
-	(void *) memset(&phystat, 0, sizeof (phystat));
-	(void *) memset(&sasphystat, 0, sizeof (sasphystat));
+	(void) memset(&phystat, 0, sizeof (phystat));
+	(void) memset(&sasphystat, 0, sizeof (sasphystat));
 	phystat.SASPhyStatistics = &sasphystat;
 	status = SMHBA_GetPhyStatistics(handle, portIndex, phyIndex, &phystat);
 	if (status != HBA_STATUS_OK) {
-		(void *) fprintf(stdout, "%s\n",
+		(void) fprintf(stdout, "%s\n",
 		    "        Link Error Statistics:");
-		(void *) fprintf(stderr, "%s\n",
+		(void) fprintf(stderr, "%s\n",
 		    gettext("            Failed to retrieve Link "
 		    "Error Statistics!"));
 		return (1);
@@ -1196,8 +1196,8 @@ static int handleExpander(HBA_HANDLE handle, char *adapterName,
 	int			disco_port_fail = 0;
 	boolean_t		firstPrinted = B_FALSE;
 
-	(void *) memset(&attr, 0, sizeof (attr));
-	(void *) memset(&sasport, 0, sizeof (sasport));
+	(void) memset(&attr, 0, sizeof (attr));
+	(void) memset(&sasport, 0, sizeof (sasport));
 	attr.PortSpecificAttribute.SASPort = &sasport;
 
 	/*
@@ -1260,7 +1260,7 @@ static int handleExpander(HBA_HANDLE handle, char *adapterName,
 	}
 
 	if (disco_port_fail) {
-		(void *) fprintf(stderr, "%s %d %s %s\n",
+		(void) fprintf(stderr, "%s %d %s %s\n",
 		    gettext("Error: Failed to get attributes for"),
 		    disco_port_fail,
 		    gettext("connected ports of HBA port"),
@@ -1340,15 +1340,15 @@ static int handleExpander(HBA_HANDLE handle, char *adapterName,
 	/* check if there is left out discovered ports. */
 	if (unsolved_left) {
 		ret++;
-		(void *) fprintf(stderr, "%s %s\n",
+		(void) fprintf(stderr, "%s %s\n",
 		    gettext("Error: Failed to establish expander topology on"),
 		    port->OSDeviceName);
-		(void *) fprintf(stderr, "%s\n",
+		(void) fprintf(stderr, "%s\n",
 		    gettext("       Folowing port(s) are unresolved."));
 		while (unsolved_head) {
 			unsolved_tail =
 			    unsolved_head->sibling;
-			(void *) fprintf(stderr, "%s%016llx ",
+			(void) fprintf(stderr, "%s%016llx ",
 			    firstPrinted ? "" : "\t",
 			    wwnConversion(unsolved_head->sasattr.
 			    LocalSASAddress.wwn));
@@ -1356,7 +1356,7 @@ static int handleExpander(HBA_HANDLE handle, char *adapterName,
 			free(unsolved_head);
 			unsolved_head = unsolved_tail;
 		}
-		(void *) fprintf(stderr, "\n");
+		(void) fprintf(stderr, "\n");
 		/* still print what we have */
 		ret += sas_rp_tree_print(handle, adapterName, portIndex,
 		    port, rproot, input, 2 * TABLEN, &printPort);
@@ -1415,7 +1415,7 @@ static int handleTargetPort(HBA_HANDLE handle, char *adapterName,
 
 	if (disco_port_fail) {
 		ret++;
-		(void *) fprintf(stderr, "%s %d %s %s\n",
+		(void) fprintf(stderr, "%s %d %s %s\n",
 		    gettext("Error: Failed to get attributes for"),
 		    disco_port_fail,
 		    gettext("connected ports of HBA port"),
@@ -1517,14 +1517,14 @@ sas_util_list_logicalunit(int luCount, char **luArgv, cmdOptions_t *options)
 
 	/* HBA_LoadLibrary() */
 	if ((status = HBA_LoadLibrary()) != HBA_STATUS_OK) {
-		(void *) fprintf(stderr, "%s %s\n",
+		(void) fprintf(stderr, "%s %s\n",
 		    gettext("Failed to load SM-HBA libraries."
 		    "Reason:"), getHBAStatus(status));
 		err_cnt++;
 		return (err_cnt);
 	}
 
-	(void *) memset(&input, 0, sizeof (input));
+	(void) memset(&input, 0, sizeof (input));
 	input.pflag = processHBA_flags;
 	input.wwnCount = luCount;
 	input.wwn_argv = luArgv;
@@ -1559,7 +1559,7 @@ sas_util_list_logicalunit(int luCount, char **luArgv, cmdOptions_t *options)
 				}
 			}
 			if (pathFound == B_FALSE) {
-				(void *) fprintf(stderr,
+				(void) fprintf(stderr,
 				    "Error: Logical Unit %s Not Found \n",
 				    luArgv[lu]);
 				err_cnt++;
@@ -1625,7 +1625,7 @@ static int handleLogicalUnit(HBA_HANDLE handle, char *adapterName,
 	}
 
 	if ((map = calloc(1, sizeof (*map))) == NULL) {
-		(void *) fprintf(stderr, "%s\n",
+		(void) fprintf(stderr, "%s\n",
 		    gettext("No enough memory on heap."));
 		return (++ret);
 	}
@@ -1644,7 +1644,7 @@ static int handleLogicalUnit(HBA_HANDLE handle, char *adapterName,
 		map = calloc(1, sizeof (HBA_UINT32) +
 		    (numentries * sizeof (SMHBA_SCSIENTRY)));
 		if (map == NULL) {
-			(void *) fprintf(stderr, "%s\n",
+			(void) fprintf(stderr, "%s\n",
 			    gettext("No enough memory on heap."));
 			return (++ret);
 		}
@@ -1654,7 +1654,7 @@ static int handleLogicalUnit(HBA_HANDLE handle, char *adapterName,
 	}
 
 	if (status != HBA_STATUS_OK) {
-		(void *) fprintf(stderr, "%s %016llx %s %s\n",
+		(void) fprintf(stderr, "%s %016llx %s %s\n",
 		    gettext("Error: Failed to get SCSI mapping data for "
 		    "the HBA port"), wwnConversion(hbaPortWWN.wwn),
 		    gettext("Reason:"),
@@ -1722,7 +1722,7 @@ searchTargetPortMappingData(HBA_HANDLE handle, HBA_UINT32 portIndex,
 	status = get_domainPort(handle, portIndex, port, &domainPortWWN);
 	if (status == HBA_STATUS_OK) {
 		if ((map = calloc(1, sizeof (*map))) == NULL) {
-			(void *) fprintf(stderr, "%s\n",
+			(void) fprintf(stderr, "%s\n",
 			gettext("No enough memory on heap."));
 			return (++ret);
 		}
@@ -1737,7 +1737,7 @@ searchTargetPortMappingData(HBA_HANDLE handle, HBA_UINT32 portIndex,
 			map = calloc(1, sizeof (HBA_UINT32) +
 			    (numentries * sizeof (SMHBA_SCSIENTRY)));
 			if (map == NULL) {
-				(void *) fprintf(stderr, "%s\n",
+				(void) fprintf(stderr, "%s\n",
 				    gettext("No enough memory on heap."));
 				return (++ret);
 			}
@@ -1789,7 +1789,7 @@ searchTargetPortMappingData(HBA_HANDLE handle, HBA_UINT32 portIndex,
 					TPMapData = calloc(1,
 					    sizeof (targetPortMappingData_t));
 					if (TPMapData == NULL) {
-						(void *) fprintf(stderr, "%s\n",
+						(void) fprintf(stderr, "%s\n",
 						    gettext("No enough "
 						    "memory."));
 						free(map);
@@ -1828,7 +1828,7 @@ searchTargetPortMappingData(HBA_HANDLE handle, HBA_UINT32 portIndex,
 		TPMapData = calloc(1,
 		    sizeof (targetPortMappingData_t));
 		if (TPMapData == NULL) {
-			(void *) fprintf(stderr, "%s\n",
+			(void) fprintf(stderr, "%s\n",
 			    gettext("No enough memory."));
 			free(map);
 			return (++ret);
@@ -1865,9 +1865,9 @@ searchTargetPortMappingData(HBA_HANDLE handle, HBA_UINT32 portIndex,
 			/* indicate that inquiry for this lun is failed */
 			TPMapData->inquiryFailed = B_TRUE;
 		} else {
-			(void *) memcpy(TPMapData->inq_vid, inq.inq_vid,
+			(void) memcpy(TPMapData->inq_vid, inq.inq_vid,
 			    sizeof (TPMapData->inq_vid));
-			(void *) memcpy(TPMapData->inq_pid, inq.inq_pid,
+			(void) memcpy(TPMapData->inq_pid, inq.inq_pid,
 			    sizeof (TPMapData->inq_pid));
 			TPMapData->inq_dtype = inq.inq_dtype;
 		}
@@ -2009,8 +2009,8 @@ searchTargetPort(HBA_HANDLE handle, HBA_UINT32 portIndex,
 				    (void *)sasattr->AttachedSASAddress.wwn,
 				    sizeof (HBA_WWN));
 
-				(void *) memset(&tgtattr, 0, sizeof (tgtattr));
-				(void *) memset(&tgtsasport, 0,
+				(void) memset(&tgtattr, 0, sizeof (tgtattr));
+				(void) memset(&tgtsasport, 0,
 				    sizeof (tgtsasport));
 				tgtattr.PortSpecificAttribute.SASPort
 				    = &tgtsasport;
@@ -2045,7 +2045,7 @@ searchTargetPort(HBA_HANDLE handle, HBA_UINT32 portIndex,
 			newConfig = (targetPortConfig_t *)calloc(1,
 			    sizeof (targetPortConfig_t));
 			if (newConfig == NULL) {
-				(void *) fprintf(stderr,
+				(void) fprintf(stderr,
 				    "%s\n", strerror(errno));
 				return (++ret);
 			}
@@ -2094,7 +2094,7 @@ searchTargetPort(HBA_HANDLE handle, HBA_UINT32 portIndex,
 		    sizeof (targetPortList_t));
 
 		if (newTP == NULL) {
-			(void *) fprintf(stderr, "%s\n", strerror(errno));
+			(void) fprintf(stderr, "%s\n", strerror(errno));
 			return (++ret);
 		}
 
@@ -2107,7 +2107,7 @@ searchTargetPort(HBA_HANDLE handle, HBA_UINT32 portIndex,
 		    sizeof (targetPortConfig_t));
 
 		if (newConfig == NULL) {
-			(void *) fprintf(stderr, "%s\n", strerror(errno));
+			(void) fprintf(stderr, "%s\n", strerror(errno));
 			free(newTP);
 			return (++ret);
 		}
@@ -2126,8 +2126,8 @@ searchTargetPort(HBA_HANDLE handle, HBA_UINT32 portIndex,
 			    (void *)sasattr->AttachedSASAddress.wwn,
 			    sizeof (HBA_WWN));
 
-			(void *) memset(&tgtattr, 0, sizeof (tgtattr));
-			(void *) memset(&tgtsasport, 0, sizeof (tgtsasport));
+			(void) memset(&tgtattr, 0, sizeof (tgtattr));
+			(void) memset(&tgtsasport, 0, sizeof (tgtsasport));
 			tgtattr.PortSpecificAttribute.SASPort = &tgtsasport;
 			status = SMHBA_GetPortAttributesByWWN(handle,
 			    sasattr->AttachedSASAddress, domainPortWWN,
@@ -2239,8 +2239,7 @@ searchDevice(PSMHBA_SCSIENTRY entryP,
 		if (foundPort == B_FALSE) {
 			newPort = (portList *)calloc(1, sizeof (portList));
 			if (newPort == NULL) {
-				(void *) fprintf(stderr,
-				    "%s\n", strerror(errno));
+				(void) fprintf(stderr, "%s\n", strerror(errno));
 				return (++ret);
 			}
 			(void) strlcpy(newPort->portName, portName,
@@ -2266,11 +2265,10 @@ searchDevice(PSMHBA_SCSIENTRY entryP,
 			newPort->tgtPortWWN = (tgtPortWWNList *)calloc(1,
 			    sizeof (tgtPortWWNList));
 			if (newPort->tgtPortWWN == NULL) {
-				(void *) fprintf(stderr,
-				    "%s\n", strerror(errno));
+				(void) fprintf(stderr, "%s\n", strerror(errno));
 				return (++ret);
 			}
-			(void *) memcpy((void *)&(newPort->tgtPortWWN->portWWN),
+			(void) memcpy((void *)&(newPort->tgtPortWWN->portWWN),
 			    (void *)&(entryP->PortLun.PortWWN),
 			    sizeof (HBA_WWN));
 			/* Set LUN data */
@@ -2293,14 +2291,13 @@ searchDevice(PSMHBA_SCSIENTRY entryP,
 			newTgtWWN = (tgtPortWWNList *)calloc(1,
 			    sizeof (tgtPortWWNList));
 			if (newTgtWWN == NULL) {
-				(void *) fprintf(stderr,
-				    "%s\n", strerror(errno));
+				(void) fprintf(stderr, "%s\n", strerror(errno));
 				return (++ret);
 			}
 			/* insert at head */
 			newTgtWWN->next = portElem->tgtPortWWN;
 			portElem->tgtPortWWN = newTgtWWN;
-			(void *) memcpy((void *)&(newTgtWWN->portWWN),
+			(void) memcpy((void *)&(newTgtWWN->portWWN),
 			    (void *)&(entryP->PortLun.PortWWN),
 			    sizeof (HBA_WWN));
 			/* Set LUN data */
@@ -2317,14 +2314,14 @@ searchDevice(PSMHBA_SCSIENTRY entryP,
 		    sizeof (discoveredDevice));
 
 		if (newDevice == NULL) {
-			(void *) fprintf(stderr, "%s\n", strerror(errno));
+			(void) fprintf(stderr, "%s\n", strerror(errno));
 			return (++ret);
 		}
 		newDevice->next = LUList; /* insert at head */
 		LUList = newDevice; /* set new head */
 
 		/* copy device name */
-		(void *) strlcpy(newDevice->OSDeviceName,
+		(void) strlcpy(newDevice->OSDeviceName,
 		    entryP->ScsiId.OSDeviceName,
 		    sizeof (newDevice->OSDeviceName));
 
@@ -2337,7 +2334,7 @@ searchDevice(PSMHBA_SCSIENTRY entryP,
 		newDevice->HBAPortList = (portList *)calloc(1,
 		    sizeof (portList));
 		if (newDevice->HBAPortList == NULL) {
-			(void *) fprintf(stderr, "%s\n", strerror(errno));
+			(void) fprintf(stderr, "%s\n", strerror(errno));
 			return (++ret);
 		}
 		(void) strlcpy(newDevice->HBAPortList->portName,
@@ -2346,11 +2343,11 @@ searchDevice(PSMHBA_SCSIENTRY entryP,
 		newDevice->HBAPortList->tgtPortWWN =
 		    (tgtPortWWNList *)calloc(1, sizeof (tgtPortWWNList));
 		if (newDevice->HBAPortList->tgtPortWWN == NULL) {
-			(void *) fprintf(stderr, "%s\n", strerror(errno));
+			(void) fprintf(stderr, "%s\n", strerror(errno));
 			return (++ret);
 		}
 
-		(void *) memcpy((void *)&(newDevice->HBAPortList->\
+		(void) memcpy((void *)&(newDevice->HBAPortList->\
 		    tgtPortWWN->portWWN),
 		    (void *)&(entryP->PortLun.PortWWN),
 		    sizeof (HBA_WWN));
@@ -2359,9 +2356,9 @@ searchDevice(PSMHBA_SCSIENTRY entryP,
 
 		responseSize = sizeof (struct scsi_inquiry);
 		senseSize = sizeof (struct scsi_extended_sense);
-		(void *) memset(&inq, 0, sizeof (struct scsi_inquiry));
-		(void *) memset(&sense, 0, sizeof (sense));
-		(void *) memcpy(&smhbaLUN, &entryP->PortLun.TargetLun,
+		(void) memset(&inq, 0, sizeof (struct scsi_inquiry));
+		(void) memset(&sense, 0, sizeof (sense));
+		(void) memcpy(&smhbaLUN, &entryP->PortLun.TargetLun,
 		    sizeof (smhbaLUN));
 
 		/*
@@ -2388,9 +2385,9 @@ searchDevice(PSMHBA_SCSIENTRY entryP,
 			newDevice->inquiryFailed = B_TRUE;
 			ret++;
 		} else {
-			(void *) memcpy(newDevice->VID, inq.inq_vid,
+			(void) memcpy(newDevice->VID, inq.inq_vid,
 			    sizeof (newDevice->VID));
-			(void *) memcpy(newDevice->PID, inq.inq_pid,
+			(void) memcpy(newDevice->PID, inq.inq_pid,
 			    sizeof (newDevice->PID));
 			newDevice->dType = inq.inq_dtype;
 			/* initialize inq status */
@@ -2415,13 +2412,13 @@ sas_rp_tree_insert(rp_tree_t **rproot,
 	int ret = 0;
 
 	if (rproot == NULL) {
-		(void *) fprintf(stderr, "%s\n",
+		(void) fprintf(stderr, "%s\n",
 		    gettext("Error: NULL rproot"));
 		return (1);
 	}
 
 	if (rpnode == NULL) {
-		(void *) fprintf(stderr, "%s\n",
+		(void) fprintf(stderr, "%s\n",
 		    gettext("Error: NULL rpnode"));
 		return (1);
 	}
@@ -2545,13 +2542,13 @@ sas_rp_tree_print(HBA_HANDLE handle, char *adapterName,
 		 * print the header from the beginning of the output.
 		 */
 		if (g_printHBA == 0) {
-			(void *) fprintf(stdout, "%s %s\n",
+			(void) fprintf(stdout, "%s %s\n",
 			    "HBA Name:", adapterName);
 			g_printHBA = 1;
 		}
 
 		if (*printPort == 0) {
-			(void *) fprintf(stdout, "%s%s %s\n",
+			(void) fprintf(stdout, "%s%s %s\n",
 			    getIndentSpaces(TABLEN),
 			    "HBA Port Name:", port->OSDeviceName);
 			*printPort = 1;
@@ -2672,30 +2669,30 @@ sas_print_rpnode(inputArg_t *input,
 	int ret = 0;
 
 	if (rpnode->portattr.PortType == HBA_PORTTYPE_SASEXPANDER) {
-		(void *) fprintf(stdout, "%s%s(Tier %d): %016llx\n",
+		(void) fprintf(stdout, "%s%s(Tier %d): %016llx\n",
 		    getIndentSpaces(lident),
 		    "Expander SAS Address",
 		    gident / (2 * TABLEN),
 		    wwnConversion(rpnode->sasattr.LocalSASAddress.wwn));
 	} else {
-		(void *) fprintf(stdout, "%s%s %016llx\n",
+		(void) fprintf(stdout, "%s%s %016llx\n",
 		    getIndentSpaces(lident),
 		    "Target Port SAS Address:",
 		    wwnConversion(rpnode->sasattr.LocalSASAddress.wwn));
 	}
 	if (input->pflag & PRINT_VERBOSE) {
 		if (rpnode->portattr.PortType != HBA_PORTTYPE_SASEXPANDER) {
-			(void *) fprintf(stdout, "%s%s %s\n",
+			(void) fprintf(stdout, "%s%s %s\n",
 			    getIndentSpaces(TABLEN + lident),
 			    "Type:",
 			    getStateString(rpnode->portattr.PortType,
 			    porttype_string));
 		} else {
-			(void *) fprintf(stdout, "%s%s %s\n",
+			(void) fprintf(stdout, "%s%s %s\n",
 			    getIndentSpaces(TABLEN + lident),
 			    "OS Device Name:",
 			    rpnode->portattr.OSDeviceName);
-			(void *) fprintf(stdout, "%s%s %s\n",
+			(void) fprintf(stdout, "%s%s %s\n",
 			    getIndentSpaces(TABLEN + lident),
 			    "State: ",
 			    getStateString(rpnode->portattr.PortState,
@@ -2724,7 +2721,7 @@ get_domainPort(HBA_HANDLE handle,
 	SMHBA_SAS_PHY phyattr;
 
 	sasport = port->PortSpecificAttribute.SASPort;
-	(void *) memset(pdomainPort, 0, sizeof (HBA_WWN));
+	(void) memset(pdomainPort, 0, sizeof (HBA_WWN));
 	/*
 	 * Since iport can exist without any phys,
 	 * sasinfo hba-port -v has indicated numberOfPhys;
@@ -2735,7 +2732,7 @@ get_domainPort(HBA_HANDLE handle,
 		    0, &phyattr);
 		if (status != HBA_STATUS_OK)
 			return (status);
-		(void *) memcpy(pdomainPort, &phyattr.domainPortWWN,
+		(void) memcpy(pdomainPort, &phyattr.domainPortWWN,
 		    sizeof (HBA_WWN));
 	} else {
 		/* return not supported for no phy configured */

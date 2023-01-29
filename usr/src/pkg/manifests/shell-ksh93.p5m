@@ -21,6 +21,7 @@ set name=pkg.summary \
 set name=pkg.description value="ksh93 - the AT&T Korn Shell"
 set name=info.classification value=org.opensolaris.category.2008:System/Shells
 set name=org.opensolaris.incorp-facet value=true
+set name=variant.arch value=$(ARCH)
 file path=etc/ksh.kshrc group=sys original_name=SUNWcs:etc/ksh.kshrc \
     preserve=renameold
 file path=etc/skel/.kshrc group=other original_name=SUNWcs:etc/skel/.kshrc \

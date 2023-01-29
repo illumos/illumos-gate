@@ -28,6 +28,7 @@ set name=pkg.summary value="iconv modules extra files"
 set name=pkg.description value="iconv modules extra files"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Internationalization
+set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
 dir  path=usr/lib
 dir  path=usr/lib/iconv

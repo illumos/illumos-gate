@@ -18,6 +18,7 @@ set name=pkg.fmri value=pkg:/system/ksensor@$(PKGVERS)
 set name=pkg.summary value="Kernel Sensor Framework"
 set name=pkg.description value="Kernel Sensor Framework"
 set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=$(ARCH)
 dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/ksensor group=sys

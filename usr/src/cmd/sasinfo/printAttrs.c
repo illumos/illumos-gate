@@ -155,7 +155,7 @@ getStateString(HBA_UINT32 key, SAS_STATE *stat_string)
 		}
 		stat_string++;
 	}
-	(void *) sprintf(ret, "Undefined value (%d)", key);
+	(void) sprintf(ret, "Undefined value (%d)", key);
 	return (ret);
 }
 
@@ -215,7 +215,7 @@ uint64_t
 wwnConversion(uchar_t *wwn)
 {
 	uint64_t tmp;
-	(void *) memcpy(&tmp, wwn, sizeof (uint64_t));
+	(void) memcpy(&tmp, wwn, sizeof (uint64_t));
 	return (ntohll(tmp));
 }
 
@@ -227,42 +227,42 @@ printHBAInfo(SMHBA_ADAPTERATTRIBUTES *attrs, int pflag, int numberOfPorts,
     const char *adapterName)
 {
 
-	(void *) fprintf(stdout, "%s %s\n", "HBA Name:", adapterName);
+	(void) fprintf(stdout, "%s %s\n", "HBA Name:", adapterName);
 
 	if (pflag & PRINT_VERBOSE) {
-		(void *) fprintf(stdout, "%s%s %s\n",
+		(void) fprintf(stdout, "%s%s %s\n",
 		    getIndentSpaces(4), "Manufacturer:",
 		    attrs->Manufacturer[0] == 0?
 		    "not available":attrs->Manufacturer);
-		(void *) fprintf(stdout, "%s%s %s\n",
+		(void) fprintf(stdout, "%s%s %s\n",
 		    getIndentSpaces(4), "Model: ",
 		    attrs->Model[0] == 0? "not available":attrs->Model);
-		(void *) fprintf(stdout, "%s%s %s\n",
+		(void) fprintf(stdout, "%s%s %s\n",
 		    getIndentSpaces(4),
 		    "Firmware Version:",
 		    attrs->FirmwareVersion[0] == 0? "not available":
 		    attrs->FirmwareVersion);
-		(void *) fprintf(stdout, "%s%s %s\n",
+		(void) fprintf(stdout, "%s%s %s\n",
 		    getIndentSpaces(4),
 		    "FCode/BIOS Version:",
 		    attrs->OptionROMVersion[0] == 0? "not available":
 		    attrs->OptionROMVersion);
-		(void *) fprintf(stdout, "%s%s %s\n",
+		(void) fprintf(stdout, "%s%s %s\n",
 		    getIndentSpaces(4),
 		    "Serial Number:",
 		    attrs->SerialNumber[0] == 0? "not available":
 		    attrs->SerialNumber);
-		(void *) fprintf(stdout, "%s%s %s\n",
+		(void) fprintf(stdout, "%s%s %s\n",
 		    getIndentSpaces(4),
 		    "Driver Name:",
 		    attrs->DriverName[0] == 0? "not available":
 		    attrs->DriverName);
-		(void *) fprintf(stdout, "%s%s %s\n",
+		(void) fprintf(stdout, "%s%s %s\n",
 		    getIndentSpaces(4),
 		    "Driver Version:",
 		    attrs->DriverVersion[0] == 0? "not available":
 		    attrs->DriverVersion);
-		(void *) fprintf(stdout, "%s%s %d\n",
+		(void) fprintf(stdout, "%s%s %d\n",
 		    getIndentSpaces(4),
 		    "Number of HBA Ports:",
 		    numberOfPorts);
@@ -280,7 +280,7 @@ printHBAPortInfo(SMHBA_PORTATTRIBUTES *port,
 		return;
 	}
 
-	(void *) fprintf(stdout, "%s%s %s\n",
+	(void) fprintf(stdout, "%s%s %s\n",
 	    getIndentSpaces(2),
 	    "HBA Port Name:",
 	    port->OSDeviceName);
@@ -292,28 +292,28 @@ printHBAPortInfo(SMHBA_PORTATTRIBUTES *port,
 	if (port->PortType != HBA_PORTTYPE_SASDEVICE)
 		return;
 
-	(void *) fprintf(stdout, "%s%s %s\n",
+	(void) fprintf(stdout, "%s%s %s\n",
 	    getIndentSpaces(4),
 	    "Type:",
 	    getStateString(port->PortType, porttype_string));
-	(void *) fprintf(stdout, "%s%s %s\n",
+	(void) fprintf(stdout, "%s%s %s\n",
 	    getIndentSpaces(4),
 	    "State:",
 	    getStateString(port->PortState, portstate_string));
 
-	(void *) fprintf(stdout, "%s%s %016llx\n",
+	(void) fprintf(stdout, "%s%s %016llx\n",
 	    getIndentSpaces(4),
 	    "Local SAS Address:",
 	    wwnConversion(port->PortSpecificAttribute.SASPort->\
 	    LocalSASAddress.wwn));
 
-	(void *) fprintf(stdout, "%s%s %016llx\n",
+	(void) fprintf(stdout, "%s%s %016llx\n",
 	    getIndentSpaces(4),
 	    "Attached SAS Address:",
 	    wwnConversion(port->PortSpecificAttribute.SASPort->\
 	    AttachedSASAddress.wwn));
 
-	(void *) fprintf(stdout, "%s%s %d\n",
+	(void) fprintf(stdout, "%s%s %d\n",
 	    getIndentSpaces(4),
 	    "Number of Phys:",
 	    port->PortSpecificAttribute.SASPort->NumberofPhys);
@@ -325,26 +325,26 @@ printHBAPortPhyInfo(SMHBA_SAS_PHY *phyinfo)
 	if (phyinfo == NULL)
 		return;
 
-	(void *) fprintf(stdout, "%s%s %u\n",
+	(void) fprintf(stdout, "%s%s %u\n",
 	    getIndentSpaces(6),
 	    "Identifier:",
 	    phyinfo->PhyIdentifier);
 
-	(void *) fprintf(stdout, "%s%s %s\n",
+	(void) fprintf(stdout, "%s%s %s\n",
 	    getIndentSpaces(8),
 	    "State: ",
 	    getPhyStateString(phyinfo->NegotiatedLinkRate, PHY_STATE));
-	(void *) fprintf(stdout, "%s%s %s/%s\n",
+	(void) fprintf(stdout, "%s%s %s/%s\n",
 	    getIndentSpaces(8),
 	    "HardwareLinkRate(Min/Max):",
 	    getPhyStateString(phyinfo->HardwareMinLinkRate, PHY_SPEED),
 	    getPhyStateString(phyinfo->HardwareMaxLinkRate, PHY_SPEED));
-	(void *) fprintf(stdout, "%s%s %s/%s\n",
+	(void) fprintf(stdout, "%s%s %s/%s\n",
 	    getIndentSpaces(8),
 	    "ProgrammedLinkRate(Min/Max):",
 	    getPhyStateString(phyinfo->ProgrammedMinLinkRate, PHY_SPEED),
 	    getPhyStateString(phyinfo->ProgrammedMaxLinkRate, PHY_SPEED));
-	(void *) fprintf(stdout, "%s%s %s\n",
+	(void) fprintf(stdout, "%s%s %s\n",
 	    getIndentSpaces(8),
 	    "NegotiatedLinkRate:",
 	    getPhyStateString(phyinfo->NegotiatedLinkRate, PHY_SPEED));
@@ -356,22 +356,22 @@ printHBAPortPhyStatistics(SMHBA_SASPHYSTATISTICS *phystat)
 	if (phystat == NULL)
 		return;
 
-	(void *) fprintf(stdout, "%s%s\n",
+	(void) fprintf(stdout, "%s%s\n",
 	    getIndentSpaces(8),
 	    "Link Error Statistics:");
-	(void *) fprintf(stdout, "%s%s %llu\n",
+	(void) fprintf(stdout, "%s%s %llu\n",
 	    getIndentSpaces(12),
 	    "Invalid Dword:",
 	    phystat->InvalidDwordCount);
-	(void *) fprintf(stdout, "%s%s %llu\n",
+	(void) fprintf(stdout, "%s%s %llu\n",
 	    getIndentSpaces(12),
 	    "Running Disparity Error:",
 	    phystat->RunningDisparityErrorCount);
-	(void *) fprintf(stdout, "%s%s %llu\n",
+	(void) fprintf(stdout, "%s%s %llu\n",
 	    getIndentSpaces(12),
 	    "Loss of Dword Sync:",
 	    phystat->LossofDwordSyncCount);
-	(void *) fprintf(stdout, "%s%s %llu\n",
+	(void) fprintf(stdout, "%s%s %llu\n",
 	    getIndentSpaces(12),
 	    "Reset Problem:",
 	    phystat->PhyResetProblemCount);
@@ -396,27 +396,27 @@ printTargetPortInfo(targetPortList_t *TPListWalk, int pflag)
 	int			count, i;
 	int			ret = 0;
 
-	(void *) fprintf(stdout, "Target Port SAS Address: %016llx\n",
+	(void) fprintf(stdout, "Target Port SAS Address: %016llx\n",
 	    wwnConversion(TPListWalk->sasattr.LocalSASAddress.wwn));
 	if ((pflag & PRINT_VERBOSE) || (pflag & PRINT_TARGET_SCSI)) {
-		(void *) fprintf(stdout, "%sType: %s\n", getIndentSpaces(4),
+		(void) fprintf(stdout, "%sType: %s\n", getIndentSpaces(4),
 		    getStateString(TPListWalk->targetattr.PortType,
 		    porttype_string));
 		for (configList = TPListWalk->configEntry;
 		    configList != NULL; configList = configList->next) {
-			(void *) fprintf(stdout, "%sHBA Port Name: %s\n",
+			(void) fprintf(stdout, "%sHBA Port Name: %s\n",
 			    getIndentSpaces(4), configList->hbaPortName);
 			if (wwnConversion(configList->expanderSASAddr.wwn) !=
 			    0) {
 				if (configList->expanderValid) {
-					(void *) fprintf(stdout,
+					(void) fprintf(stdout,
 					    "%sExpander Device SAS Address:"
 					    " %016llx",
 					    getIndentSpaces(8),
 					    wwnConversion(configList->
 					    expanderSASAddr.wwn));
 				} else {
-					(void *) fprintf(stdout,
+					(void) fprintf(stdout,
 					    "%sExpander Device SAS Address:"
 					    " %016llx (Failed to Validate"
 					    " Attached Port.)",
@@ -427,23 +427,23 @@ printTargetPortInfo(targetPortList_t *TPListWalk, int pflag)
 				}
 			} else {
 				if (configList->expanderValid) {
-					(void *) fprintf(stdout,
+					(void) fprintf(stdout,
 					    "%sExpander Device SAS Address: %s",
 					    getIndentSpaces(8),
 					    "None (direct attached)");
 				} else {
-					(void *) fprintf(stdout,
+					(void) fprintf(stdout,
 					    "%sExpander Device SAS Address: %s",
 					    getIndentSpaces(8),
 					    "None (Failed to Get"
 					    " Attached Port)");
 				}
 			}
-			(void *) fprintf(stdout, "\n");
+			(void) fprintf(stdout, "\n");
 			if (pflag & PRINT_TARGET_SCSI) {
 
 				if (configList->reportLUNsFailed) {
-					(void *) fprintf(stdout,
+					(void) fprintf(stdout,
 					    "%s %016llx\n",
 					    gettext("Error: Failed to get "
 					    "ReportLun Data on"),
@@ -455,18 +455,18 @@ printTargetPortInfo(targetPortList_t *TPListWalk, int pflag)
 
 				for (mapList = configList->map;
 				    mapList != NULL; mapList = mapList->next) {
-					(void *) fprintf(stdout, "%sLUN : %d\n",
+					(void) fprintf(stdout, "%sLUN : %d\n",
 					    getIndentSpaces(12),
 					    mapList->osLUN);
 					if (mapList->mappingExist) {
-						(void *) fprintf(stdout,
+						(void) fprintf(stdout,
 						    "%sOS Device Name : %s\n",
 						    getIndentSpaces(14),
 						    (mapList->osDeviceName[0] ==
 						    '\0') ?  "Not avaialble" :
 						    mapList->osDeviceName);
 					} else {
-						(void *) fprintf(stdout,
+						(void) fprintf(stdout,
 						    "%sOS Device Name : %s\n",
 						    getIndentSpaces(14), "No "
 						    "matching OS Device "
@@ -475,30 +475,30 @@ printTargetPortInfo(targetPortList_t *TPListWalk, int pflag)
 					}
 		/* indentation changed here */
 		if (mapList->inquiryFailed) {
-			(void *) fprintf(stdout, "%s %s LUN %d\n",
+			(void) fprintf(stdout, "%s %s LUN %d\n",
 			    gettext("Error: Failed to get Inquiry Data on"),
 			    mapList->osDeviceName, mapList->osLUN);
 			ret++;
 		} else {
-			(void *) fprintf(stdout, "%sVendor: ",
+			(void) fprintf(stdout, "%sVendor: ",
 			    getIndentSpaces(14));
 			for (count = sizeof (mapList->inq_vid), i = 0;
 			    i < count; i++) {
 				if (isprint(mapList->inq_vid[i]))
-					(void *) fprintf(stdout, "%c",
+					(void) fprintf(stdout, "%c",
 					    mapList->inq_vid[i]);
 			}
 
-			(void *) fprintf(stdout, "\n%sProduct: ",
+			(void) fprintf(stdout, "\n%sProduct: ",
 			    getIndentSpaces(14));
 			for (count = sizeof (mapList->inq_pid), i = 0;
 			    i < count; i++) {
 				if (isprint(mapList->inq_pid[i]))
-					(void *) fprintf(stdout, "%c",
+					(void) fprintf(stdout, "%c",
 					    mapList->inq_pid[i]);
 			}
 
-			(void *) fprintf(stdout, "\n%sDevice Type: %s\n",
+			(void) fprintf(stdout, "\n%sDevice Type: %s\n",
 			    getIndentSpaces(14),
 			    getDTypeString(mapList->inq_dtype));
 		}
@@ -529,53 +529,53 @@ printOSDeviceNameInfo(discoveredDevice *devListWalk, boolean_t verbose)
 	int			i, count;
 	int			ret = 0;
 
-	(void *) fprintf(stdout, "OS Device Name: %s\n",
+	(void) fprintf(stdout, "OS Device Name: %s\n",
 	    devListWalk->OSDeviceName);
 	if (verbose == B_TRUE) {
 		for (portElem = devListWalk->HBAPortList;
 		    portElem != NULL; portElem = portElem->next) {
-			(void *) fprintf(stdout, "%sHBA Port Name: ",
+			(void) fprintf(stdout, "%sHBA Port Name: ",
 			    getIndentSpaces(4));
-			(void *) fprintf(stdout, "%s", portElem->portName);
+			(void) fprintf(stdout, "%s", portElem->portName);
 			for (tgtWWNList = portElem->tgtPortWWN;
 			    tgtWWNList != NULL; tgtWWNList = tgtWWNList->next) {
-				(void *) fprintf(stdout,
+				(void) fprintf(stdout,
 				    "\n%sTarget Port SAS Address: ",
 				    getIndentSpaces(8));
-				(void *) fprintf(stdout, "%016llx",
+				(void) fprintf(stdout, "%016llx",
 				    wwnConversion(tgtWWNList->portWWN.wwn));
-				(void *) fprintf(stdout, "\n%sLUN: %u",
+				(void) fprintf(stdout, "\n%sLUN: %u",
 				    getIndentSpaces(12),
 				    tgtWWNList->scsiOSLun);
 			}
-			(void *) fprintf(stdout, "\n");
+			(void) fprintf(stdout, "\n");
 		}
 
 		if (devListWalk->inquiryFailed) {
-			(void *) fprintf(stdout, "%s %s\n",
+			(void) fprintf(stdout, "%s %s\n",
 			    gettext("Error: Failed to get Inquiry data "
 			    "on device"), devListWalk->OSDeviceName);
 			ret++;
 		} else {
-			(void *) fprintf(stdout, "%sVendor: ",
+			(void) fprintf(stdout, "%sVendor: ",
 			    getIndentSpaces(4));
 			for (count = sizeof (devListWalk->VID), i = 0;
 			    i < count; i++) {
 				if (isprint(devListWalk->VID[i]))
-					(void *) fprintf(stdout, "%c",
+					(void) fprintf(stdout, "%c",
 					    devListWalk->VID[i]);
 			}
 
-			(void *) fprintf(stdout, "\n%sProduct: ",
+			(void) fprintf(stdout, "\n%sProduct: ",
 			    getIndentSpaces(4));
 			for (count = sizeof (devListWalk->PID), i = 0;
 			    i < count; i++) {
 				if (isprint(devListWalk->PID[i]))
-					(void *) fprintf(stdout, "%c",
+					(void) fprintf(stdout, "%c",
 					    devListWalk->PID[i]);
 			}
 
-			(void *) fprintf(stdout, "\n%sDevice Type: %s\n",
+			(void) fprintf(stdout, "\n%sDevice Type: %s\n",
 			    getIndentSpaces(4),
 			    getDTypeString(devListWalk->dType));
 		}

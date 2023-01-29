@@ -189,12 +189,12 @@ main(int argc, char *argv[])
 
 	/* check if is global zone */
 	if (getzoneid() != GLOBAL_ZONEID) {
-		(void *) fprintf(stdout, "%s %s\n",
+		(void) fprintf(stdout, "%s %s\n",
 		    cmdName, gettext("does not support non-global zone."));
 		return (1);
 	}
 
-	(void *) snprintf(versionString, sizeof (versionString), "%s.%s",
+	(void) snprintf(versionString, sizeof (versionString), "%s.%s",
 	    VERSION_STRING_MAJOR, VERSION_STRING_MINOR);
 	synTables.versionString = versionString;
 
@@ -204,12 +204,11 @@ main(int argc, char *argv[])
 	/* call the CLI parser */
 	ret = cmdParse(argc, argv, synTables, subcommandArgs, &funcRet);
 	if (ret == 1) {
-		(void *) fprintf(stdout, "%s %s(8)\n",
+		(void) fprintf(stdout, "%s %s(8)\n",
 		    gettext("For more information, please see"), cmdName);
 		return (1);
 	} else if (ret == -1) {
-		(void *) fprintf(stderr, "%s %s\n",
-		    cmdName, strerror(errno));
+		(void) fprintf(stderr, "%s %s\n", cmdName, strerror(errno));
 		return (1);
 	}
 
