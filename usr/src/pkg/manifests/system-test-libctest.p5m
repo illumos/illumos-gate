@@ -15,6 +15,7 @@
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
 #
 
 set name=pkg.fmri value=pkg:/system/test/libctest@$(PKGVERS)
@@ -73,6 +74,8 @@ file path=opt/libc-tests/tests/c11_tss.64 mode=0555
 file path=opt/libc-tests/tests/call_once.32 mode=0555
 file path=opt/libc-tests/tests/call_once.64 mode=0555
 file path=opt/libc-tests/tests/catopen mode=0555
+file path=opt/libc-tests/tests/closefrom.32 mode=0555
+file path=opt/libc-tests/tests/closefrom.64 mode=0555
 file path=opt/libc-tests/tests/endian.32 mode=0555
 file path=opt/libc-tests/tests/endian.64 mode=0555
 file path=opt/libc-tests/tests/env-7076.32 mode=0555

@@ -14,6 +14,7 @@
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
 #
 
 SUBDIRS = \
@@ -41,6 +42,7 @@ PROGS = \
 	c11_threads \
 	c11_tss \
 	call_once \
+	closefrom \
 	endian \
 	env-7076 \
 	fnmatch \
