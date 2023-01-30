@@ -36,7 +36,6 @@ SCRIPTS= \
 SHFILES= \
 	Install \
 	build_cscope \
-	bringovercheck \
 	checkpaths \
 	cstyle \
 	elfcmp \
@@ -44,7 +43,6 @@ SHFILES= \
 	genoffsets \
 	onu \
 	protocmp.terse \
-	sccscheck \
 	webrev \
 	which_scm \
 	ws \
@@ -80,7 +78,6 @@ SCRIPTLINKS= \
 MAN1ONBLDFILES= \
 	Install.1onbld \
 	bldenv.1onbld \
-	bringovercheck.1onbld \
 	cddlchk.1onbld \
 	checkpaths.1onbld \
 	check_rtime.1onbld \
@@ -95,7 +92,6 @@ MAN1ONBLDFILES= \
 	mapfilechk.1onbld \
 	nightly.1onbld \
 	onu.1onbld \
-	sccscheck.1onbld \
 	webrev.1onbld \
 	which_scm.1onbld \
 	ws.1onbld \
