@@ -554,15 +554,23 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 
 				/*
 				 * Emulation of LSO requires that cksum offload
-				 * be enabled on the mblk.  Since only IPv4 is
-				 * supported by the LSO emulation, the v4 cksum
-				 * is enabled unconditionally.
+				 * be enabled on the mblk.
 				 */
 				if ((DB_CKSUMFLAGS(mp) &
 				    (HCK_FULLCKSUM | HCK_PARTIALCKSUM)) == 0) {
 					DB_CKSUMFLAGS(mp) |= HCK_FULLCKSUM;
 				}
-				DB_CKSUMFLAGS(mp) |= HCK_IPV4_HDRCKSUM;
+
+				/*
+				 * IPv4 packets should have the offload enabled
+				 * for the IPv4 header checksum.
+				 */
+				mac_ether_offload_info_t meoi;
+				mac_ether_offload_info(mp, &meoi);
+				if ((meoi.meoi_flags & MEOI_L2INFO_SET) != 0 &&
+				    meoi.meoi_l3proto == ETHERTYPE_IP) {
+					DB_CKSUMFLAGS(mp) |= HCK_IPV4_HDRCKSUM;
+				}
 
 				mac_hw_emul(&mp, &tail, &n_pkts, MAC_ALL_EMULS);
 				if (mp == NULL) {

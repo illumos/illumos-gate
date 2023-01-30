@@ -22,6 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 RackTop Systems.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -395,15 +396,29 @@ mac_srs_client_poll_enable(mac_client_impl_t *mcip,
 
 	softring = mac_srs->srs_soft_ring_head;
 	while (softring != NULL) {
-		if (softring->s_ring_type & (ST_RING_TCP | ST_RING_UDP)) {
+		if (mcip->mci_direct_rx.mdrx_v4 != NULL &&
+		    softring->s_ring_type & (ST_RING_TCP | ST_RING_UDP)) {
 			/*
 			 * TCP and UDP support DLS bypass. Squeue polling
 			 * support implies DLS bypass since the squeue poll
 			 * path does not have DLS processing.
 			 */
 			mac_soft_ring_dls_bypass(softring,
-			    mcip->mci_direct_rx_fn, mcip->mci_direct_rx_arg);
+			    mcip->mci_direct_rx.mdrx_v4,
+			    mcip->mci_direct_rx.mdrx_arg_v4);
 		}
+		if (mcip->mci_direct_rx.mdrx_v6 != NULL &&
+		    softring->s_ring_type & (ST_RING_TCP6 | ST_RING_UDP6)) {
+			/*
+			 * TCP and UDP support DLS bypass. Squeue polling
+			 * support implies DLS bypass since the squeue poll
+			 * path does not have DLS processing.
+			 */
+			mac_soft_ring_dls_bypass(softring,
+			    mcip->mci_direct_rx.mdrx_v6,
+			    mcip->mci_direct_rx.mdrx_arg_v6);
+		}
+
 		/*
 		 * Non-TCP protocols don't support squeues. Hence we don't
 		 * make any ring addition callbacks for non-TCP rings
@@ -1207,7 +1222,13 @@ mac_srs_fanout_list_alloc(mac_soft_ring_set_t *mac_srs)
 		mac_srs->srs_tcp_soft_rings = (mac_soft_ring_t **)
 		    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT,
 		    KM_SLEEP);
+		mac_srs->srs_tcp6_soft_rings = (mac_soft_ring_t **)
+		    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT,
+		    KM_SLEEP);
 		mac_srs->srs_udp_soft_rings = (mac_soft_ring_t **)
+		    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT,
+		    KM_SLEEP);
+		mac_srs->srs_udp6_soft_rings = (mac_soft_ring_t **)
 		    kmem_zalloc(sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT,
 		    KM_SLEEP);
 		mac_srs->srs_oth_soft_rings = (mac_soft_ring_t **)
@@ -1668,7 +1689,9 @@ mac_client_update_classifier(mac_client_impl_t *mcip, boolean_t enable)
 static void
 mac_srs_update_fanout_list(mac_soft_ring_set_t *mac_srs)
 {
-	int tcp_count = 0, udp_count = 0, oth_count = 0, tx_count = 0;
+	int tcp_count = 0, tcp6_count = 0, udp_count = 0, udp6_count = 0,
+	    oth_count = 0, tx_count = 0;
+
 	mac_soft_ring_t *softring;
 
 	softring = mac_srs->srs_soft_ring_head;
@@ -1676,6 +1699,8 @@ mac_srs_update_fanout_list(mac_soft_ring_set_t *mac_srs)
 		ASSERT(mac_srs->srs_soft_ring_count == 0);
 		mac_srs->srs_tcp_ring_count = 0;
 		mac_srs->srs_udp_ring_count = 0;
+		mac_srs->srs_tcp6_ring_count = 0;
+		mac_srs->srs_udp6_ring_count = 0;
 		mac_srs->srs_oth_ring_count = 0;
 		mac_srs->srs_tx_ring_count = 0;
 		return;
@@ -1684,8 +1709,12 @@ mac_srs_update_fanout_list(mac_soft_ring_set_t *mac_srs)
 	while (softring != NULL) {
 		if (softring->s_ring_type & ST_RING_TCP) {
 			mac_srs->srs_tcp_soft_rings[tcp_count++] = softring;
+		} else if (softring->s_ring_type & ST_RING_TCP6) {
+			mac_srs->srs_tcp6_soft_rings[tcp6_count++] = softring;
 		} else if (softring->s_ring_type & ST_RING_UDP) {
 			mac_srs->srs_udp_soft_rings[udp_count++] = softring;
+		} else if (softring->s_ring_type & ST_RING_UDP6) {
+			mac_srs->srs_udp6_soft_rings[udp6_count++] = softring;
 		} else if (softring->s_ring_type & ST_RING_OTH) {
 			mac_srs->srs_oth_soft_rings[oth_count++] = softring;
 		} else {
@@ -1695,10 +1724,12 @@ mac_srs_update_fanout_list(mac_soft_ring_set_t *mac_srs)
 		softring = softring->s_ring_next;
 	}
 
-	ASSERT(mac_srs->srs_soft_ring_count ==
-	    (tcp_count + udp_count + oth_count + tx_count));
+	ASSERT(mac_srs->srs_soft_ring_count == (tcp_count + tcp6_count +
+	    udp_count + udp6_count + oth_count + tx_count));
 	mac_srs->srs_tcp_ring_count = tcp_count;
+	mac_srs->srs_tcp6_ring_count = tcp6_count;
 	mac_srs->srs_udp_ring_count = udp_count;
+	mac_srs->srs_udp6_ring_count = udp6_count;
 	mac_srs->srs_oth_ring_count = oth_count;
 	mac_srs->srs_tx_ring_count = tx_count;
 }
@@ -1728,10 +1759,11 @@ mac_srs_create_proto_softrings(int id, uint16_t type, pri_t pri,
 	 * TCP and UDP support DLS bypass. In addition TCP
 	 * squeue can also poll their corresponding soft rings.
 	 */
-	if (set_bypass && (mcip->mci_resource_arg != NULL)) {
+	if (set_bypass && mcip->mci_direct_rx.mdrx_v4 != NULL &&
+	    (mcip->mci_resource_arg != NULL)) {
 		mac_soft_ring_dls_bypass(softring,
-		    mcip->mci_direct_rx_fn,
-		    mcip->mci_direct_rx_arg);
+		    mcip->mci_direct_rx.mdrx_v4,
+		    mcip->mci_direct_rx.mdrx_arg_v4);
 
 		mrf.mrf_rx_arg = softring;
 		mrf.mrf_intr_handle = (mac_intr_handle_t)softring;
@@ -1759,13 +1791,47 @@ mac_srs_create_proto_softrings(int id, uint16_t type, pri_t pri,
 	    cpuid, rx_func, x_arg1, x_arg2);
 	softring->s_ring_rx_arg2 = NULL;
 
-	if (set_bypass && (mcip->mci_resource_arg != NULL)) {
+	if (set_bypass && mcip->mci_direct_rx.mdrx_v4 != NULL &&
+	    (mcip->mci_resource_arg != NULL)) {
 		mac_soft_ring_dls_bypass(softring,
-		    mcip->mci_direct_rx_fn,
-		    mcip->mci_direct_rx_arg);
+		    mcip->mci_direct_rx.mdrx_v4,
+		    mcip->mci_direct_rx.mdrx_arg_v4);
 	}
 
-	/* Create the Oth softrings which has to go through the DLS */
+	/* TCP for IPv6. */
+	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
+	    (type|ST_RING_TCP6), pri, mcip, mac_srs,
+	    cpuid, rx_func, x_arg1, x_arg2);
+	softring->s_ring_rx_arg2 = NULL;
+
+	if (set_bypass && mcip->mci_direct_rx.mdrx_v6 != NULL &&
+	    (mcip->mci_resource_arg != NULL)) {
+		mac_soft_ring_dls_bypass(softring,
+		    mcip->mci_direct_rx.mdrx_v6,
+		    mcip->mci_direct_rx.mdrx_arg_v6);
+
+		mrf.mrf_rx_arg = softring;
+		mrf.mrf_intr_handle = (mac_intr_handle_t)softring;
+
+		softring->s_ring_rx_arg2 =
+		    mcip->mci_resource_add((void *)mcip->mci_resource_arg,
+		    (mac_resource_t *)&mrf);
+	}
+
+	/* UDP for IPv6. */
+	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
+	    (type|ST_RING_UDP6), pri, mcip, mac_srs,
+	    cpuid, rx_func, x_arg1, x_arg2);
+	softring->s_ring_rx_arg2 = NULL;
+
+	if (set_bypass && mcip->mci_direct_rx.mdrx_v6 != NULL &&
+	    (mcip->mci_resource_arg != NULL)) {
+		mac_soft_ring_dls_bypass(softring,
+		    mcip->mci_direct_rx.mdrx_v6,
+		    mcip->mci_direct_rx.mdrx_arg_v6);
+	}
+
+	/* Create the Oth softrings which has to go through the DLS. */
 	softring = mac_soft_ring_create(id, mac_soft_ring_worker_wait,
 	    (type|ST_RING_OTH), pri, mcip, mac_srs,
 	    cpuid, rx_func, x_arg1, x_arg2);
@@ -1840,10 +1906,20 @@ mac_srs_fanout_modify(mac_client_impl_t *mcip, mac_direct_rx_t rx_func,
 				    (void *)mcip->mci_resource_arg,
 				    softring->s_ring_rx_arg2);
 			}
+			softring = mac_rx_srs->srs_tcp6_soft_rings[i];
+			if (softring->s_ring_rx_arg2 != NULL) {
+				mcip->mci_resource_remove(
+				    (void *)mcip->mci_resource_arg,
+				    softring->s_ring_rx_arg2);
+			}
 			mac_soft_ring_remove(mac_rx_srs,
 			    mac_rx_srs->srs_tcp_soft_rings[i]);
 			mac_soft_ring_remove(mac_rx_srs,
+			    mac_rx_srs->srs_tcp6_soft_rings[i]);
+			mac_soft_ring_remove(mac_rx_srs,
 			    mac_rx_srs->srs_udp_soft_rings[i]);
+			mac_soft_ring_remove(mac_rx_srs,
+			    mac_rx_srs->srs_udp6_soft_rings[i]);
 			mac_soft_ring_remove(mac_rx_srs,
 			    mac_rx_srs->srs_oth_soft_rings[i]);
 		}
@@ -1856,11 +1932,20 @@ mac_srs_fanout_modify(mac_client_impl_t *mcip, mac_direct_rx_t rx_func,
 		cpuid = srs_cpu->mc_rx_fanout_cpus[i];
 		(void) mac_soft_ring_bind(mac_rx_srs->srs_udp_soft_rings[i],
 		    cpuid);
+		(void) mac_soft_ring_bind(mac_rx_srs->srs_udp6_soft_rings[i],
+		    cpuid);
 		(void) mac_soft_ring_bind(mac_rx_srs->srs_oth_soft_rings[i],
 		    cpuid);
 		(void) mac_soft_ring_bind(mac_rx_srs->srs_tcp_soft_rings[i],
 		    cpuid);
+		(void) mac_soft_ring_bind(mac_rx_srs->srs_tcp6_soft_rings[i],
+		    cpuid);
 		softring = mac_rx_srs->srs_tcp_soft_rings[i];
+		if (softring->s_ring_rx_arg2 != NULL) {
+			mcip->mci_resource_bind((void *)mcip->mci_resource_arg,
+			    softring->s_ring_rx_arg2, cpuid);
+		}
+		softring = mac_rx_srs->srs_tcp6_soft_rings[i];
 		if (softring->s_ring_rx_arg2 != NULL) {
 			mcip->mci_resource_bind((void *)mcip->mci_resource_arg,
 			    softring->s_ring_rx_arg2, cpuid);
@@ -3420,6 +3505,8 @@ mac_srs_fanout_list_free(mac_soft_ring_set_t *mac_srs)
 
 		ASSERT(mac_srs->srs_tcp_soft_rings == NULL);
 		ASSERT(mac_srs->srs_udp_soft_rings == NULL);
+		ASSERT(mac_srs->srs_tcp6_soft_rings == NULL);
+		ASSERT(mac_srs->srs_udp6_soft_rings == NULL);
 		ASSERT(mac_srs->srs_oth_soft_rings == NULL);
 		ASSERT(mac_srs->srs_tx_soft_rings != NULL);
 		kmem_free(mac_srs->srs_tx_soft_rings,
@@ -3432,14 +3519,27 @@ mac_srs_fanout_list_free(mac_soft_ring_set_t *mac_srs)
 		}
 	} else {
 		ASSERT(mac_srs->srs_tx_soft_rings == NULL);
+
 		ASSERT(mac_srs->srs_tcp_soft_rings != NULL);
 		kmem_free(mac_srs->srs_tcp_soft_rings,
 		    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
 		mac_srs->srs_tcp_soft_rings = NULL;
+
 		ASSERT(mac_srs->srs_udp_soft_rings != NULL);
 		kmem_free(mac_srs->srs_udp_soft_rings,
 		    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
 		mac_srs->srs_udp_soft_rings = NULL;
+
+		ASSERT(mac_srs->srs_tcp6_soft_rings != NULL);
+		kmem_free(mac_srs->srs_tcp6_soft_rings,
+		    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
+		mac_srs->srs_tcp6_soft_rings = NULL;
+
+		ASSERT(mac_srs->srs_udp6_soft_rings != NULL);
+		kmem_free(mac_srs->srs_udp6_soft_rings,
+		    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);
+		mac_srs->srs_udp6_soft_rings = NULL;
+
 		ASSERT(mac_srs->srs_oth_soft_rings != NULL);
 		kmem_free(mac_srs->srs_oth_soft_rings,
 		    sizeof (mac_soft_ring_t *) * MAX_SR_FANOUT);

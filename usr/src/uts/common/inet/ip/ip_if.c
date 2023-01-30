@@ -24,7 +24,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2016, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -2011,10 +2011,14 @@ ill_capability_direct_enable(ill_t *ill)
 	dld_capab_direct_t	direct;
 	int			rc;
 
-	ASSERT(!ill->ill_isv6 && IAM_WRITER_ILL(ill));
+	ASSERT(IAM_WRITER_ILL(ill));
 
 	bzero(&direct, sizeof (direct));
-	direct.di_rx_cf = (uintptr_t)ip_input;
+	if (ill->ill_isv6) {
+		direct.di_rx_cf = (uintptr_t)ip_input_v6;
+	} else {
+		direct.di_rx_cf = (uintptr_t)ip_input;
+	}
 	direct.di_rx_ch = ill;
 
 	rc = idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_DIRECT, &direct,
@@ -2050,7 +2054,7 @@ ill_capability_poll_enable(ill_t *ill)
 	dld_capab_poll_t	poll;
 	int			rc;
 
-	ASSERT(!ill->ill_isv6 && IAM_WRITER_ILL(ill));
+	ASSERT(IAM_WRITER_ILL(ill));
 
 	bzero(&poll, sizeof (poll));
 	poll.poll_ring_add_cf = (uintptr_t)ip_squeue_add_ring;
@@ -2118,10 +2122,8 @@ ill_capability_dld_enable(ill_t *ill)
 	ASSERT(IAM_WRITER_ILL(ill));
 
 	ill_mac_perim_enter(ill, &mph);
-	if (!ill->ill_isv6) {
-		ill_capability_direct_enable(ill);
-		ill_capability_poll_enable(ill);
-	}
+	ill_capability_direct_enable(ill);
+	ill_capability_poll_enable(ill);
 	ill_capability_lso_enable(ill);
 	ill->ill_capabilities |= ILL_CAPAB_DLD;
 	ill_mac_perim_exit(ill, mph);

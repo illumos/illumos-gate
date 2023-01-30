@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2021 Joyent, Inc.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2025 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -179,6 +180,7 @@ ip_cksum(mblk_t *mp, int offset, uint_t sum)
 	if (dp->db_struioflag & STRUIO_IP)
 		psum = *(ushort_t *)dp->db_struioun.data;
 slow:
+	DTRACE_PROBE(ip_cksum_slow);
 	pmp = 0;
 slow1:
 	mlen = 0;
@@ -436,7 +438,7 @@ ip_csum_hdr(ipha_t *ipha)
  *             transport header. This argument may be set to NULL if
  *             only the length is desired.
  *
- * return: Whether or not the header was malformed.
+ * return: Whether or not the header is well formed.
  *
  * This function assumes the IPv6 header along with all extensions are
  * contained solely in this mblk: i.e., there is no b_cont walking.

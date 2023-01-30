@@ -19,16 +19,23 @@ unalias -a
 mac_test_dir="$(dirname $0)"
 mac_data_dir="$mac_test_dir/data"
 mac_cksum="$mac_test_dir/mac_cksum"
+mac_lso="$mac_test_dir/mac_lso"
 mac_exit=0
 
 run_one()
 {
-	typeset input="$mac_data_dir/$1"
-	shift
+	typeset prog="$1"
+	typeset input="$mac_data_dir/$2"
+	shift 2
 
-	echo "$mac_cksum $* $input"
-	$mac_cksum $* $input
-	if (( $? != 0 )); then
+	typeset output=""
+	if [[ $prog == $mac_lso ]]; then
+		output="$mac_data_dir/$1"
+		shift
+	fi
+
+	echo "$prog $* $input $output"
+	if ! $prog $* $input $output; then
 		mac_exit=1
 	fi
 }
@@ -45,24 +52,40 @@ run_test()
 	run_one $* -e -s 8
 }
 
+run_cso()
+{
+	run_test $mac_cksum $*
+}
+
+run_lso()
+{
+	run_test $mac_lso $*
+}
+
 # The bad-L4-proto case should only try getting a IPv4 checksum.
 # It would fail to get an L4 checksum
-run_test ipv4_bad_proto.snoop -4
+run_cso ipv4_bad_proto.snoop -4
 
 ipv4_cases="ipv4_icmp.snoop ipv4_tcp.snoop ipv4_udp.snoop"
 for c in $ipv4_cases; do
-	run_test $c -4 -p
-	run_test $c -4 -f
+	run_cso $c -4 -p
+	run_cso $c -4 -f
 done
 
 ipv6_cases="ipv6_icmp.snoop ipv6_tcp.snoop ipv6_udp.snoop ipv6_eh_udp.snoop"
 for c in $ipv6_cases; do
-	run_test $c -p
-	run_test $c -f
+	run_cso $c -p
+	run_cso $c -f
 done
 
 # Only full checksums are supported for SCTP
-run_test "ipv4_sctp.snoop" -4 -f
-run_test "ipv6_sctp.snoop" -f
+run_cso "ipv4_sctp.snoop" -4 -f
+run_cso "ipv6_sctp.snoop" -f
+
+# Only TCP is supported for LSO.
+run_lso "ipv4_tcp_lso_in.snoop" "ipv4_tcp_lso_out.snoop" -4 -f -m 8948
+run_lso "ipv4_tcp_lso_in.snoop" "ipv4_tcp_lso_out.snoop" -4 -p -m 8948
+run_lso "ipv6_tcp_lso_in.snoop" "ipv6_tcp_lso_out.snoop" -f -m 8928
+run_lso "ipv6_tcp_lso_in.snoop" "ipv6_tcp_lso_out.snoop" -p -m 8928
 
 exit $mac_exit

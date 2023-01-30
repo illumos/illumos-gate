@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2025 Oxide Computer Company
  */
 /*
  * Copyright 2018 Joyent, Inc.
@@ -119,8 +120,7 @@ struct mac_client_impl_s {			/* Protected by */
 	uint32_t		mci_state_flags;	/* WO */
 	mac_rx_t		mci_rx_fn;		/* Rx Quiescence */
 	void			*mci_rx_arg;		/* Rx Quiescence */
-	mac_direct_rx_t		mci_direct_rx_fn;	/* SL */
-	void			*mci_direct_rx_arg;	/* SL */
+	mac_direct_rxs_t	mci_direct_rx;		/* SL */
 	mac_rx_t		mci_rx_p_fn;		/* Rx Quiescence */
 	void			*mci_rx_p_arg;		/* Rx Quiescence */
 	void			*mci_p_unicast_list;

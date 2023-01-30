@@ -170,26 +170,6 @@ extern "C" {
 	(((ill)->ill_capabilities & ILL_CAPAB_DLD_DIRECT) != 0)
 
 /*
- * Determine if a mblk needs to take the "slow path", aka OTH
- * softring. There are multiple reasons why a mblk might take the slow
- * path.
- *
- * o The mblk is not a data message.
- *
- * o There is more than one outstanding reference to the mblk.
- *
- * o The IP header is not aligned (we assume alignment in the checksum
- *   routine).
- *
- * o The mblk doesn't contain enough data to populate a simple IP header.
- */
-#define	MBLK_RX_FANOUT_SLOWPATH(mp, ipha)				\
-	(DB_TYPE(mp) != M_DATA ||					\
-	(DB_REF(mp) != 1) ||						\
-	!OK_32PTR(ipha) ||						\
-	(((uchar_t *)ipha + IP_SIMPLE_HDR_LENGTH) >= (mp)->b_wptr))
-
-/*
  * In non-global zone exclusive IP stacks, data structures such as IRE
  * entries pretend that they're in the global zone.  The following
  * macro evaluates to the real zoneid instead of a pretend

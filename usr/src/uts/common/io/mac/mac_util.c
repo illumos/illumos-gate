@@ -700,23 +700,27 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 {
 	uint32_t ocsum_flags, ocsum_start, ocsum_stuff;
 	uint32_t mss;
-	uint32_t oehlen, oiphlen, otcphlen, ohdrslen, opktlen, odatalen;
-	uint32_t oleft;
+	uint32_t oehlen, oiphlen, otcphlen, ohdrslen, opktlen;
+	uint32_t odatalen, oleft;
 	uint_t nsegs, seg;
 	int len;
 
-	struct ether_vlan_header *oevh;
-	const ipha_t *oiph;
+	const void *oiph;
 	const tcph_t *otcph;
 	ipha_t *niph;
 	tcph_t *ntcph;
 	uint16_t ip_id;
 	uint32_t tcp_seq, tcp_sum, otcp_sum;
 
-	uint32_t offset;
+	boolean_t is_v6 = B_FALSE;
+	ip6_t *niph6;
+
+	uint32_t offset = 0;
 	mblk_t *odatamp;
 	mblk_t *seg_chain, *prev_nhdrmp, *next_nhdrmp, *nhdrmp, *ndatamp;
 	mblk_t *tmptail;
+
+	mac_ether_offload_info_t meoi = { 0 };
 
 	ASSERT3P(head, !=, NULL);
 	ASSERT3P(tail, !=, NULL);
@@ -726,38 +730,50 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 	/* Assume we are dealing with a single LSO message. */
 	ASSERT3P(omp->b_next, ==, NULL);
 
+	mac_ether_offload_info(omp, &meoi);
+	opktlen = meoi.meoi_len;
+	oehlen = meoi.meoi_l2hlen;
+	oiphlen = meoi.meoi_l3hlen;
+	otcphlen = meoi.meoi_l4hlen;
+	ohdrslen = oehlen + oiphlen + otcphlen;
+
+	/* Performing LSO requires that we successfully read fully up to L4 */
+	if ((MEOI_L4INFO_SET & meoi.meoi_flags) == 0) {
+		mac_drop_pkt(omp, "unable to fully parse packet to L4");
+		goto fail;
+	}
+
+	if (meoi.meoi_l3proto != ETHERTYPE_IP &&
+	    meoi.meoi_l3proto != ETHERTYPE_IPV6) {
+		mac_drop_pkt(omp, "LSO'd packet has non-IP L3 header: %x",
+		    meoi.meoi_l3proto);
+		goto fail;
+	}
+
+	if (meoi.meoi_l4proto != IPPROTO_TCP) {
+		mac_drop_pkt(omp, "LSO unsupported protocol: %x",
+		    meoi.meoi_l4proto);
+		goto fail;
+	}
+
+	is_v6 = meoi.meoi_l3proto == ETHERTYPE_IPV6;
+
+	mss = DB_LSOMSS(omp);
+	if (mss == 0) {
+		mac_drop_pkt(omp, "packet misconfigured for LSO (MSS == 0)");
+		goto fail;
+	}
+	ASSERT3U(opktlen, <=, IP_MAXPACKET + oehlen);
+
 	/*
-	 * XXX: This is a hack to deal with mac_add_vlan_tag().
-	 *
-	 * When VLANs are in play, mac_add_vlan_tag() creates a new
-	 * mblk with just the ether_vlan_header and tacks it onto the
-	 * front of 'omp'. This breaks the assumptions made below;
-	 * namely that the TCP/IP headers are in the first mblk. In
-	 * this case, since we already have to pay the cost of LSO
-	 * emulation, we simply pull up everything. While this might
-	 * seem irksome, keep in mind this will only apply in a couple
-	 * of scenarios: a) an LSO-capable VLAN client sending to a
-	 * non-LSO-capable client over the "MAC/bridge loopback"
-	 * datapath or b) an LSO-capable VLAN client is sending to a
-	 * client that, for whatever reason, doesn't have DLS-bypass
-	 * enabled. Finally, we have to check for both a tagged and
-	 * untagged sized mblk depending on if the mblk came via
-	 * mac_promisc_dispatch() or mac_rx_deliver().
-	 *
-	 * In the future, two things should be done:
-	 *
-	 * 1. This function should make use of some yet to be
-	 *    implemented "mblk helpers". These helper functions would
-	 *    perform all the b_cont walking for us and guarantee safe
-	 *    access to the mblk data.
-	 *
-	 * 2. We should add some slop to the mblks so that
-	 *    mac_add_vlan_tag() can just edit the first mblk instead
-	 *    of allocating on the hot path.
+	 * Ensure the headers are contiguous. The IP header is used only for the
+	 * benefit of DTrace SDTs, whereas the TCP header is actively read.
+	 * This small pullup should only practically happen when
+	 * mac_add_vlan_tag is in play, which prepends a new mblk in front
+	 * containing the amended Ethernet header.
 	 */
-	if (MBLKL(omp) == sizeof (struct ether_vlan_header) ||
-	    MBLKL(omp) == sizeof (struct ether_header)) {
-		mblk_t *tmp = msgpullup(omp, -1);
+	if (MBLKL(omp) < ohdrslen) {
+		mblk_t *tmp = msgpullup(omp, ohdrslen);
 
 		if (tmp == NULL) {
 			mac_drop_pkt(omp, "failed to pull up");
@@ -769,69 +785,15 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		omp = tmp;
 	}
 
-	mss = DB_LSOMSS(omp);
-	ASSERT3U(msgsize(omp), <=, IP_MAXPACKET +
-	    sizeof (struct ether_vlan_header));
-	opktlen = msgsize(omp);
-
-	/*
-	 * First, get references to the IP and TCP headers and
-	 * determine the total TCP length (header + data).
-	 *
-	 * Thanks to mac_hw_emul() we know that the first mblk must
-	 * contain (at minimum) the full L2 header. However, this
-	 * function assumes more than that. It assumes the L2/L3/L4
-	 * headers are all contained in the first mblk of a message
-	 * (i.e., no b_cont walking for headers). While this is a
-	 * current reality (our native TCP stack and viona both
-	 * enforce this) things may become more nuanced in the future
-	 * (e.g. when introducing encap support or adding new
-	 * clients). For now we guard against this case by dropping
-	 * the packet.
-	 */
-	oevh = (struct ether_vlan_header *)omp->b_rptr;
-	if (oevh->ether_tpid == htons(ETHERTYPE_VLAN))
-		oehlen = sizeof (struct ether_vlan_header);
-	else
-		oehlen = sizeof (struct ether_header);
-
-	ASSERT3U(MBLKL(omp), >=, (oehlen + sizeof (ipha_t) + sizeof (tcph_t)));
-	if (MBLKL(omp) < (oehlen + sizeof (ipha_t) + sizeof (tcph_t))) {
-		mac_drop_pkt(omp, "mblk doesn't contain TCP/IP headers");
-		goto fail;
-	}
-
-	oiph = (ipha_t *)(omp->b_rptr + oehlen);
-	oiphlen = IPH_HDR_LENGTH(oiph);
+	oiph = (void *)(omp->b_rptr + oehlen);
 	otcph = (tcph_t *)(omp->b_rptr + oehlen + oiphlen);
-	otcphlen = TCP_HDR_LENGTH(otcph);
-
-	/*
-	 * Currently we only support LSO for TCP/IPv4.
-	 */
-	if (IPH_HDR_VERSION(oiph) != IPV4_VERSION) {
-		mac_drop_pkt(omp, "LSO unsupported IP version: %uhh",
-		    IPH_HDR_VERSION(oiph));
-		goto fail;
-	}
-
-	if (oiph->ipha_protocol != IPPROTO_TCP) {
-		mac_drop_pkt(omp, "LSO unsupported protocol: %uhh",
-		    oiph->ipha_protocol);
-		goto fail;
-	}
 
 	if (otcph->th_flags[0] & (TH_SYN | TH_RST | TH_URG)) {
 		mac_drop_pkt(omp, "LSO packet has SYN|RST|URG set");
 		goto fail;
 	}
 
-	ohdrslen = oehlen + oiphlen + otcphlen;
-	if ((len = MBLKL(omp)) < ohdrslen) {
-		mac_drop_pkt(omp, "LSO packet too short: %d < %u", len,
-		    ohdrslen);
-		goto fail;
-	}
+	len = MBLKL(omp);
 
 	/*
 	 * Either we have data in the first mblk or it's just the
@@ -848,10 +810,11 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 	}
 
 	/* Make sure we still have enough data. */
-	ASSERT3U(msgsize(odatamp), >=, opktlen - ohdrslen);
+	odatalen = opktlen - ohdrslen;
+	ASSERT3U(msgsize(odatamp), >=, odatalen);
 
 	/*
-	 * If a MAC negotiated LSO then it must negotioate both
+	 * If a MAC negotiated LSO then it must negotiate both
 	 * HCKSUM_IPHDRCKSUM and either HCKSUM_INET_FULL_V4 or
 	 * HCKSUM_INET_PARTIAL; because both the IP and TCP headers
 	 * change during LSO segmentation (only the 3 fields of the
@@ -871,7 +834,6 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 	 */
 	ASSERT3S(DB_TYPE(omp), ==, M_DATA);
 	ocsum_flags = DB_CKSUMFLAGS(omp);
-	ASSERT3U(ocsum_flags & HCK_IPV4_HDRCKSUM, !=, 0);
 	ASSERT3U(ocsum_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM), !=, 0);
 
 	/*
@@ -901,8 +863,6 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		ocsum_stuff = (uint32_t)DB_CKSUMSTUFF(omp);
 	}
 
-	odatalen = opktlen - ohdrslen;
-
 	/*
 	 * Subtract one to account for the case where the data length
 	 * is evenly divisble by the MSS. Add one to account for the
@@ -916,8 +876,8 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 	}
 
 	DTRACE_PROBE6(sw__lso__start, mblk_t *, omp, void_ip_t *, oiph,
-	    __dtrace_tcp_tcph_t *, otcph, uint_t, odatalen, uint_t, mss, uint_t,
-	    nsegs);
+	    __dtrace_tcp_tcph_t *, otcph, uint_t, odatalen, uint_t, mss,
+	    uint_t, nsegs);
 
 	seg_chain = NULL;
 	tmptail = seg_chain;
@@ -939,6 +899,10 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		}
 		ASSERT3P(nhdrmp->b_cont, ==, NULL);
 
+		/* Copy over the header stack. */
+		bcopy(omp->b_rptr, nhdrmp->b_rptr, ohdrslen);
+		nhdrmp->b_wptr += ohdrslen;
+
 		if (seg_chain == NULL) {
 			seg_chain = nhdrmp;
 		} else {
@@ -949,7 +913,7 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		tmptail = nhdrmp;
 
 		/*
-		 * Calculate this segment's lengh. It's either the MSS
+		 * Calculate this segment's length. It's either the MSS
 		 * or whatever remains for the last segment.
 		 */
 		seg_len = last_seg ? oleft : mss;
@@ -967,6 +931,13 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		DB_CKSUMFLAGS(ndatamp) &= ~HW_LSO;
 		ASSERT3U(seg_len, <=, oleft);
 		oleft -= seg_len;
+
+		/* Setup partial checksum offsets. */
+		if (ocsum_flags & HCK_PARTIALCKSUM) {
+			DB_CKSUMSTART(nhdrmp) = ocsum_start;
+			DB_CKSUMEND(nhdrmp) = oiphlen + otcphlen + seg_len;
+			DB_CKSUMSTUFF(nhdrmp) = ocsum_stuff;
+		}
 	}
 
 	/* We should have consumed entire LSO msg. */
@@ -983,13 +954,30 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 	 * Set headers and checksum for first segment.
 	 */
 	nhdrmp = seg_chain;
-	bcopy(omp->b_rptr, nhdrmp->b_rptr, ohdrslen);
-	nhdrmp->b_wptr = nhdrmp->b_rptr + ohdrslen;
-	niph = (ipha_t *)(nhdrmp->b_rptr + oehlen);
 	ASSERT3U(msgsize(nhdrmp->b_cont), ==, mss);
-	niph->ipha_length = htons(oiphlen + otcphlen + mss);
-	niph->ipha_hdr_checksum = 0;
-	ip_id = ntohs(niph->ipha_ident);
+
+	if (is_v6) {
+		niph6 = (ip6_t *)(nhdrmp->b_rptr + oehlen);
+		niph6->ip6_plen = htons(
+		    (oiphlen - IPV6_HDR_LEN) + otcphlen + mss);
+	} else {
+		niph = (ipha_t *)(nhdrmp->b_rptr + oehlen);
+		niph->ipha_length = htons(oiphlen + otcphlen + mss);
+		/*
+		 * If the v4 checksum was filled, we won't have a v4 offload
+		 * flag. We can't write zero checksums without inserting said
+		 * flag, but our output frames won't necessarily be rechecked by
+		 * the caller! As a compromise, we need to force emulation to
+		 * uphold the same contracts the packet already agreed to.
+		 */
+		if (niph->ipha_hdr_checksum != 0) {
+			emul |= MAC_IPCKSUM_EMUL;
+			ocsum_flags |= HCK_IPV4_HDRCKSUM;
+		}
+		niph->ipha_hdr_checksum = 0;
+		ip_id = ntohs(niph->ipha_ident);
+	}
+
 	ntcph = (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen);
 	tcp_seq = BE32_TO_U32(ntcph->th_seq);
 	tcp_seq += mss;
@@ -1011,9 +999,6 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 	 * we need to calculate it here.
 	 */
 	if (ocsum_flags & HCK_PARTIALCKSUM) {
-		DB_CKSUMSTART(nhdrmp) = ocsum_start;
-		DB_CKSUMEND(nhdrmp) = ntohs(niph->ipha_length);
-		DB_CKSUMSTUFF(nhdrmp) = ocsum_stuff;
 		tcp_sum = BE16_TO_U16(ntcph->th_sum);
 		otcp_sum = tcp_sum;
 		tcp_sum += mss + otcphlen;
@@ -1021,8 +1006,7 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		U16_TO_BE16(tcp_sum, ntcph->th_sum);
 	}
 
-	if ((ocsum_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM)) &&
-	    (emul & MAC_HWCKSUM_EMULS)) {
+	if ((ocsum_flags & HCK_TX_FLAGS) && (emul & MAC_HWCKSUM_EMULS)) {
 		next_nhdrmp = nhdrmp->b_next;
 		nhdrmp->b_next = NULL;
 		nhdrmp = mac_sw_cksum(nhdrmp, emul);
@@ -1051,9 +1035,8 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 
 	seg = 1;
 	DTRACE_PROBE5(sw__lso__seg, mblk_t *, nhdrmp, void_ip_t *,
-	    (ipha_t *)(nhdrmp->b_rptr + oehlen), __dtrace_tcp_tcph_t *,
-	    (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen), uint_t, mss,
-	    uint_t, seg);
+	    (is_v6 ? (void *)niph6 : (void *)niph),
+	    __dtrace_tcp_tcph_t *, ntcph, uint_t, mss, int_t, seg);
 	seg++;
 
 	/* There better be at least 2 segs. */
@@ -1082,13 +1065,17 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		 * their original to make sure we produce the correct
 		 * value.
 		 */
-		bcopy(seg_chain->b_rptr, nhdrmp->b_rptr, ohdrslen);
-		nhdrmp->b_wptr = nhdrmp->b_rptr + ohdrslen;
-		niph = (ipha_t *)(nhdrmp->b_rptr + oehlen);
-		niph->ipha_ident = htons(++ip_id);
 		ASSERT3P(msgsize(nhdrmp->b_cont), ==, mss);
-		niph->ipha_length = htons(oiphlen + otcphlen + mss);
-		niph->ipha_hdr_checksum = 0;
+		if (is_v6) {
+			niph6 = (ip6_t *)(nhdrmp->b_rptr + oehlen);
+			niph6->ip6_plen = htons(
+			    (oiphlen - IPV6_HDR_LEN) + otcphlen + mss);
+		} else {
+			niph = (ipha_t *)(nhdrmp->b_rptr + oehlen);
+			niph->ipha_ident = htons(++ip_id);
+			niph->ipha_length = htons(oiphlen + otcphlen + mss);
+			niph->ipha_hdr_checksum = 0;
+		}
 		ntcph = (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen);
 		U32_TO_BE32(tcp_seq, ntcph->th_seq);
 		tcp_seq += mss;
@@ -1099,18 +1086,14 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		ntcph->th_flags[0] &= ~(TH_FIN | TH_PUSH);
 		DB_CKSUMFLAGS(nhdrmp) = (uint16_t)(ocsum_flags & ~HW_LSO);
 
-		if (ocsum_flags & HCK_PARTIALCKSUM) {
-			/*
-			 * First and middle segs have same
-			 * pseudo-header checksum.
-			 */
+		/*
+		 * First and middle segs have same
+		 * pseudo-header checksum.
+		 */
+		if (ocsum_flags & HCK_PARTIALCKSUM)
 			U16_TO_BE16(tcp_sum, ntcph->th_sum);
-			DB_CKSUMSTART(nhdrmp) = ocsum_start;
-			DB_CKSUMEND(nhdrmp) = ntohs(niph->ipha_length);
-			DB_CKSUMSTUFF(nhdrmp) = ocsum_stuff;
-		}
 
-		if ((ocsum_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM)) &&
+		if ((ocsum_flags & HCK_TX_FLAGS) &&
 		    (emul & MAC_HWCKSUM_EMULS)) {
 			next_nhdrmp = nhdrmp->b_next;
 			nhdrmp->b_next = NULL;
@@ -1139,9 +1122,8 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 		}
 
 		DTRACE_PROBE5(sw__lso__seg, mblk_t *, nhdrmp, void_ip_t *,
-		    (ipha_t *)(nhdrmp->b_rptr + oehlen), __dtrace_tcp_tcph_t *,
-		    (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen),
-		    uint_t, mss, uint_t, seg);
+		    (is_v6 ? (void *)niph6 : (void *)niph),
+		    __dtrace_tcp_tcph_t *, ntcph, uint_t, mss, uint_t, seg);
 
 		ASSERT3P(nhdrmp->b_next, !=, NULL);
 		prev_nhdrmp = nhdrmp;
@@ -1156,30 +1138,30 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 	 * Now we set the last segment header. The difference being
 	 * that FIN/PSH/RST flags are allowed.
 	 */
-	bcopy(seg_chain->b_rptr, nhdrmp->b_rptr, ohdrslen);
-	nhdrmp->b_wptr = nhdrmp->b_rptr + ohdrslen;
-	niph = (ipha_t *)(nhdrmp->b_rptr + oehlen);
-	niph->ipha_ident = htons(++ip_id);
 	len = msgsize(nhdrmp->b_cont);
 	ASSERT3S(len, >, 0);
-	niph->ipha_length = htons(oiphlen + otcphlen + len);
-	niph->ipha_hdr_checksum = 0;
+	if (is_v6) {
+		niph6 = (ip6_t *)(nhdrmp->b_rptr + oehlen);
+		niph6->ip6_plen = htons(
+		    (oiphlen - IPV6_HDR_LEN) + otcphlen + len);
+	} else {
+		niph = (ipha_t *)(nhdrmp->b_rptr + oehlen);
+		niph->ipha_ident = htons(++ip_id);
+		niph->ipha_length = htons(oiphlen + otcphlen + len);
+		niph->ipha_hdr_checksum = 0;
+	}
 	ntcph = (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen);
 	U32_TO_BE32(tcp_seq, ntcph->th_seq);
 
 	DB_CKSUMFLAGS(nhdrmp) = (uint16_t)(ocsum_flags & ~HW_LSO);
 	if (ocsum_flags & HCK_PARTIALCKSUM) {
-		DB_CKSUMSTART(nhdrmp) = ocsum_start;
-		DB_CKSUMEND(nhdrmp) = ntohs(niph->ipha_length);
-		DB_CKSUMSTUFF(nhdrmp) = ocsum_stuff;
 		tcp_sum = otcp_sum;
 		tcp_sum += len + otcphlen;
 		tcp_sum = (tcp_sum >> 16) + (tcp_sum & 0xFFFF);
 		U16_TO_BE16(tcp_sum, ntcph->th_sum);
 	}
 
-	if ((ocsum_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM)) &&
-	    (emul & MAC_HWCKSUM_EMULS)) {
+	if ((ocsum_flags & HCK_TX_FLAGS) && (emul & MAC_HWCKSUM_EMULS)) {
 		/* This should be the last mblk. */
 		ASSERT3P(nhdrmp->b_next, ==, NULL);
 		nhdrmp = mac_sw_cksum(nhdrmp, emul);
@@ -1193,9 +1175,8 @@ mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
 	}
 
 	DTRACE_PROBE5(sw__lso__seg, mblk_t *, nhdrmp, void_ip_t *,
-	    (ipha_t *)(nhdrmp->b_rptr + oehlen), __dtrace_tcp_tcph_t *,
-	    (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen), uint_t, len,
-	    uint_t, seg);
+	    (is_v6 ? (void *)niph6 : (void *)niph),
+	    __dtrace_tcp_tcph_t *, ntcph, uint_t, len, uint_t, seg);
 
 	/*
 	 * Free the reference to the original LSO message as it is

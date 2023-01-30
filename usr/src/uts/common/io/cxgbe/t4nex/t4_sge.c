@@ -2523,8 +2523,8 @@ csum_to_ctrl(const struct txinfo *txinfo, uint32_t chip_version,
 {
 	const mac_ether_offload_info_t *meoi = &txinfo->meoi;
 	const uint32_t tx_flags = txinfo->flags;
-	const boolean_t needs_l3_csum = (tx_flags & HW_LSO) != 0 ||
-	    (tx_flags & HCK_IPV4_HDRCKSUM) != 0;
+	const boolean_t needs_l3_csum = ((tx_flags & HW_LSO) != 0 || (tx_flags &
+	    HCK_IPV4_HDRCKSUM) != 0) && meoi->meoi_l3proto == ETHERTYPE_IP;
 	const boolean_t needs_l4_csum = (tx_flags & HW_LSO) != 0 ||
 	    (tx_flags & (HCK_FULLCKSUM | HCK_PARTIALCKSUM)) != 0;
 
@@ -2541,8 +2541,7 @@ csum_to_ctrl(const struct txinfo *txinfo, uint32_t chip_version,
 
 	if (needs_l3_csum) {
 		/* Only IPv4 checksums are supported (for L3) */
-		if ((meoi->meoi_flags & MEOI_L3INFO_SET) == 0 ||
-		    meoi->meoi_l3proto != ETHERTYPE_IP) {
+		if ((meoi->meoi_flags & MEOI_L3INFO_SET) == 0) {
 			*ctrlp = ctrl;
 			return (COS_FAIL);
 		}

@@ -13,7 +13,7 @@
 # Copyright 2025 Oxide Computer Company
 #
 
-include $(SRC)/Makefile.master
+include $(SRC)/Makefile.master.64
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 TESTDIR = $(ROOTOPTPKG)/tests/mac
@@ -21,7 +21,10 @@ DATADIR = $(TESTDIR)/data
 
 PROGS = \
 	mac_cksum \
+	mac_lso \
 	mac_parsing
+
+COMMON_OBJS = mac_ktest_common.o
 
 SCRIPTS = mac_ktest
 
@@ -30,10 +33,14 @@ DATAFILES = \
 	ipv4_icmp.snoop \
 	ipv4_sctp.snoop \
 	ipv4_tcp.snoop \
+	ipv4_tcp_lso_in.snoop \
+	ipv4_tcp_lso_out.snoop \
 	ipv4_udp.snoop \
 	ipv6_icmp.snoop \
 	ipv6_sctp.snoop \
 	ipv6_tcp.snoop \
+	ipv6_tcp_lso_in.snoop \
+	ipv6_tcp_lso_out.snoop \
 	ipv6_udp.snoop \
 	ipv6_eh_udp.snoop
 
@@ -64,6 +71,14 @@ clobber: clean
 	-$(RM) $(PROGS)
 
 clean:
+
+mac_lso: mac_lso.o $(COMMON_OBJS)
+	$(LINK.c) $^ -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+mac_cksum: mac_cksum.o $(COMMON_OBJS)
+	$(LINK.c) $^ -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
 $(CMDS): $(TESTDIR) $(PROGS)
 

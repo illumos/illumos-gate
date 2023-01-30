@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_SYS_MAC_SOFT_RING_H
@@ -74,9 +75,9 @@ struct mac_soft_ring_s {
 	mblk_t		*s_ring_first;	/* first mblk chain or NULL */
 	mblk_t		*s_ring_last;	/* last mblk chain or NULL */
 
-	mac_direct_rx_t	s_ring_rx_func;
-	void		*s_ring_rx_arg1;
-	mac_resource_handle_t  s_ring_rx_arg2;
+	mac_direct_rx_t		s_ring_rx_func;
+	void			*s_ring_rx_arg1;
+	mac_resource_handle_t	s_ring_rx_arg2;
 
 	/*
 	 * Threshold after which packets get dropped.
@@ -326,6 +327,10 @@ struct mac_soft_ring_set_s {
 	int		srs_tcp_ring_count;
 	mac_soft_ring_t	**srs_udp_soft_rings;
 	int		srs_udp_ring_count;
+	mac_soft_ring_t	**srs_tcp6_soft_rings;
+	int		srs_tcp6_ring_count;
+	mac_soft_ring_t	**srs_udp6_soft_rings;
+	int		srs_udp6_ring_count;
 	mac_soft_ring_t	**srs_oth_soft_rings;
 	int		srs_oth_ring_count;
 	/*
@@ -394,6 +399,9 @@ struct mac_soft_ring_set_s {
 
 #define	ST_RING_BW_CTL		0x0020
 #define	ST_RING_TX		0x0040
+
+#define	ST_RING_TCP6		0x0080
+#define	ST_RING_UDP6		0x0100
 
 /*
  * State flags.
@@ -684,7 +692,7 @@ extern mac_tx_cookie_t mac_tx_srs_no_desc(mac_soft_ring_set_t *, mblk_t *,
 
 /* Subflow specific stuff */
 extern int mac_srs_flow_create(struct mac_client_impl_s *, flow_entry_t *,
-    mac_resource_props_t *, int, int, mac_direct_rx_t);
+    mac_resource_props_t *, int, int, mac_direct_rxs_t *);
 extern void mac_srs_update_bwlimit(flow_entry_t *, mac_resource_props_t *);
 extern void mac_srs_adjust_subflow_bwlimit(struct mac_client_impl_s *);
 extern void mac_srs_update_drv(struct mac_client_impl_s *);

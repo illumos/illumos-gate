@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -50,7 +51,7 @@ extern "C" {
 #endif
 
 extern boolean_t mac_rx_bypass_set(mac_client_handle_t, mac_direct_rx_t,
-    void *);
+    void *, boolean_t);
 extern void mac_rx_bypass_enable(mac_client_handle_t);
 extern void mac_rx_bypass_disable(mac_client_handle_t);
 

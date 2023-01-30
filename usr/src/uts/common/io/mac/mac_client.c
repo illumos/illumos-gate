@@ -24,6 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 RackTop Systems.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -1363,8 +1364,10 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	mcip->mci_rx_p_fn = NULL;
 	mcip->mci_rx_p_arg = NULL;
 	mcip->mci_p_unicast_list = NULL;
-	mcip->mci_direct_rx_fn = NULL;
-	mcip->mci_direct_rx_arg = NULL;
+	mcip->mci_direct_rx.mdrx_v4 = NULL;
+	mcip->mci_direct_rx.mdrx_v6 = NULL;
+	mcip->mci_direct_rx.mdrx_arg_v4 = NULL;
+	mcip->mci_direct_rx.mdrx_arg_v6 = NULL;
 	mcip->mci_vidcache = MCIP_VIDCACHE_INVALID;
 
 	mcip->mci_unicast_list = NULL;
@@ -1549,7 +1552,8 @@ mac_client_close(mac_client_handle_t mch, uint16_t flags)
  * B_FALSE if it's not possible to enable bypass.
  */
 boolean_t
-mac_rx_bypass_set(mac_client_handle_t mch, mac_direct_rx_t rx_fn, void *arg1)
+mac_rx_bypass_set(mac_client_handle_t mch, mac_direct_rx_t rx_fn, void *arg1,
+    boolean_t v6)
 {
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
 	mac_impl_t		*mip = mcip->mci_mip;
@@ -1568,8 +1572,13 @@ mac_rx_bypass_set(mac_client_handle_t mch, mac_direct_rx_t rx_fn, void *arg1)
 	 * These are not accessed directly in the data path, and hence
 	 * don't need any protection
 	 */
-	mcip->mci_direct_rx_fn = rx_fn;
-	mcip->mci_direct_rx_arg = arg1;
+	if (v6) {
+		mcip->mci_direct_rx.mdrx_v6 = rx_fn;
+		mcip->mci_direct_rx.mdrx_arg_v6 = arg1;
+	} else {
+		mcip->mci_direct_rx.mdrx_v4 = rx_fn;
+		mcip->mci_direct_rx.mdrx_arg_v4 = arg1;
+	}
 	return (B_TRUE);
 }
 
@@ -4331,21 +4340,7 @@ i_mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
 	if (mip->mi_bridge_link != NULL) {
 		return (cap == MAC_CAPAB_NO_ZCOPY);
 	} else if (mip->mi_callbacks->mc_callbacks & MC_GETCAPAB) {
-		boolean_t res;
-
-		res = mip->mi_getcapab(mip->mi_driver, cap, cap_data);
-		/*
-		 * Until we have suppport for TSOv6 emulation in the MAC
-		 * loopback path, do not allow the TSOv6 capability to be
-		 * advertised to consumers.
-		 */
-		if (res && cap == MAC_CAPAB_LSO) {
-			mac_capab_lso_t *cap_lso = cap_data;
-
-			cap_lso->lso_flags &= ~LSO_TX_BASIC_TCP_IPV6;
-			cap_lso->lso_basic_tcp_ipv6.lso_max = 0;
-		}
-		return (res);
+		return (mip->mi_getcapab(mip->mi_driver, cap, cap_data));
 	} else {
 		return (B_FALSE);
 	}

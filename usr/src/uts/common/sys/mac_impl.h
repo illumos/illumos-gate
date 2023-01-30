@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_SYS_MAC_IMPL_H
@@ -906,6 +907,13 @@ extern int mac_transceiver_read(mac_handle_t, uint_t, uint_t, void *, size_t,
 extern void mac_led_init(mac_impl_t *);
 extern int mac_led_get(mac_handle_t, mac_led_mode_t *, mac_led_mode_t *);
 extern int mac_led_set(mac_handle_t, mac_led_mode_t);
+
+typedef struct mac_direct_rxs_s {
+	mac_direct_rx_t	mdrx_v4;
+	mac_direct_rx_t	mdrx_v6;
+	void		*mdrx_arg_v4;
+	void		*mdrx_arg_v6;
+} mac_direct_rxs_t;
 
 #ifdef	__cplusplus
 }

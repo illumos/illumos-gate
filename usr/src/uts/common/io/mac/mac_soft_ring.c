@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -161,9 +162,15 @@ mac_soft_ring_create(int id, clock_t wait, uint16_t type,
 	if (type & ST_RING_TCP) {
 		(void) snprintf(name, sizeof (name),
 		    "mac_tcp_soft_ring_%d_%p", id, (void *)mac_srs);
+	} else if (type & ST_RING_TCP6) {
+		(void) snprintf(name, sizeof (name),
+		    "mac_tcp6_soft_ring_%d_%p", id, (void *)mac_srs);
 	} else if (type & ST_RING_UDP) {
 		(void) snprintf(name, sizeof (name),
 		    "mac_udp_soft_ring_%d_%p", id, (void *)mac_srs);
+	} else if (type & ST_RING_UDP6) {
+		(void) snprintf(name, sizeof (name),
+		    "mac_udp6_soft_ring_%d_%p", id, (void *)mac_srs);
 	} else if (type & ST_RING_OTH) {
 		(void) snprintf(name, sizeof (name),
 		    "mac_oth_soft_ring_%d_%p", id, (void *)mac_srs);
