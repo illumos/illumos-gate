@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 
@@ -72,7 +73,7 @@
 #define	REDISCOVERY_INTERVAL_DEFAULT	3600
 
 /*
- * Mininum time between rediscovery runs, in case adutils gives us a
+ * Minimum time between rediscovery runs, in case adutils gives us a
  * really short TTL (which it never should, but be defensive)
  * (not configurable) seconds.
  */
@@ -82,6 +83,22 @@
  * Max number of concurrent door calls
  */
 #define	MAX_THREADS_DEFAULT	40
+
+/*
+ * Number of failed discovery attempts before we mark the service degraded.
+ */
+#define	DISCOVERY_RETRY_DEGRADE_CUTOFF	6
+
+/*
+ * Default maximum time between discovery attempts when we don't have a DC.
+ * config/discovery_retry_max_delay = count: seconds
+ */
+#define	DISCOVERY_RETRY_MAX_DELAY_DEFAULT	30
+
+/*
+ * Initial retry delay when discovery fails. Doubles on every failure.
+ */
+#define	DISCOVERY_RETRY_INITIAL_DELAY	1
 
 enum event_type {
 	EVENT_NOTHING,	/* Woke up for no good reason */
@@ -238,7 +255,7 @@ destruction:
 
 static int
 get_val_bool(idmap_cfg_handles_t *handles, const char *name,
-	boolean_t *val, boolean_t default_val)
+    boolean_t *val, boolean_t default_val)
 {
 	int rc = 0;
 
@@ -285,7 +302,7 @@ destruction:
 
 static int
 get_val_int(idmap_cfg_handles_t *handles, const char *name,
-	void *val, scf_type_t type)
+    void *val, scf_type_t type)
 {
 	int rc = 0;
 
@@ -376,7 +393,7 @@ scf_value2string(const char *name, scf_value_t *value)
 
 static int
 get_val_ds(idmap_cfg_handles_t *handles, const char *name, int defport,
-		ad_disc_ds_t **val)
+    ad_disc_ds_t **val)
 {
 	char port_str[8];
 	struct addrinfo hints;
@@ -965,7 +982,7 @@ update_dirs(ad_disc_ds_t **value, ad_disc_ds_t **new, char *name)
  */
 static int
 update_trusted_domains(ad_disc_trusteddomains_t **value,
-			ad_disc_trusteddomains_t **new, char *name)
+    ad_disc_trusteddomains_t **new, char *name)
 {
 	int i;
 
@@ -1011,7 +1028,7 @@ update_trusted_domains(ad_disc_trusteddomains_t **value,
  */
 static int
 update_domains_in_forest(ad_disc_domainsinforest_t **value,
-			ad_disc_domainsinforest_t **new, char *name)
+    ad_disc_domainsinforest_t **new, char *name)
 {
 	int i;
 
@@ -1068,7 +1085,7 @@ free_trusted_forests(idmap_trustedforest_t **value, int *num_values)
 
 static int
 compare_trusteddomainsinforest(ad_disc_domainsinforest_t *df1,
-			ad_disc_domainsinforest_t *df2)
+    ad_disc_domainsinforest_t *df2)
 {
 	int		i, j;
 	int		num_df1 = 0;
@@ -1112,7 +1129,7 @@ compare_trusteddomainsinforest(ad_disc_domainsinforest_t *df1,
  */
 static int
 update_trusted_forest(idmap_trustedforest_t **value, int *num_value,
-			idmap_trustedforest_t **new, int *num_new, char *name)
+    idmap_trustedforest_t **new, int *num_new, char *name)
 {
 	int i, j;
 	boolean_t match;
@@ -1333,8 +1350,9 @@ idmap_cfg_update_thread(void *arg)
 {
 	NOTE(ARGUNUSED(arg))
 	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
-	const ad_disc_t		ad_ctx = _idmapdstate.cfg->handles.ad_ctx;
+	const ad_disc_t	ad_ctx = _idmapdstate.cfg->handles.ad_ctx;
 	int flags = CFG_DISCOVER;
+	uint_t retry_count = 0;
 
 	for (;;) {
 		struct timespec timeout;
@@ -1356,28 +1374,53 @@ idmap_cfg_update_thread(void *arg)
 		}
 
 		/*
+		 * If we don't know our domain name, we're not in a domain;
+		 * don't bother with rediscovery until the next config change.
+		 * Avoids hourly noise in workgroup mode.
+		 *
+		 * If we don't have a DC currently, use a greatly reduced TTL
+		 * until we get one. Degrade if that takes too long.
+		 */
+		if (pgcfg->domain_name == NULL) {
+			ttl = -1;
+			/* We don't need a DC if we're no longer in a domain. */
+			if (retry_count >= DISCOVERY_RETRY_DEGRADE_CUTOFF)
+				restore_svc();
+			retry_count = 0;
+		} else if (pgcfg->domain_controller == NULL) {
+			if (retry_count == 0)
+				ttl = DISCOVERY_RETRY_INITIAL_DELAY;
+			else
+				ttl *= 2;
+
+			if (ttl > pgcfg->discovery_retry_max_delay)
+				ttl = pgcfg->discovery_retry_max_delay;
+
+			if (++retry_count >= DISCOVERY_RETRY_DEGRADE_CUTOFF) {
+				degrade_svc(B_FALSE,
+				    "Too many DC discovery failures");
+			}
+		} else {
+			ttl = ad_disc_get_TTL(ad_ctx);
+			max_ttl = (int)pgcfg->rediscovery_interval;
+			if (ttl > max_ttl)
+				ttl = max_ttl;
+			if (ttl < MIN_REDISCOVERY_INTERVAL)
+				ttl = MIN_REDISCOVERY_INTERVAL;
+			if (retry_count >= DISCOVERY_RETRY_DEGRADE_CUTOFF)
+				restore_svc();
+			retry_count = 0;
+		}
+
+		/*
 		 * Wait for an interesting event.  Note that we might get
 		 * boring events between interesting events.  If so, we loop.
 		 */
 		flags = CFG_DISCOVER;
 		for (;;) {
-			/*
-			 * If we don't know our domain name, don't bother
-			 * with rediscovery until the next config change.
-			 * Avoids hourly noise in workgroup mode.
-			 */
-			if (pgcfg->domain_name == NULL)
-				ttl = -1;
-			else
-				ttl = ad_disc_get_TTL(ad_ctx);
 			if (ttl < 0) {
 				timeoutp = NULL;
 			} else {
-				max_ttl = (int)pgcfg->rediscovery_interval;
-				if (ttl > max_ttl)
-					ttl = max_ttl;
-				if (ttl < MIN_REDISCOVERY_INTERVAL)
-					ttl = MIN_REDISCOVERY_INTERVAL;
 				timeout.tv_sec = ttl;
 				timeout.tv_nsec = 0;
 				timeoutp = &timeout;
@@ -1544,7 +1587,7 @@ check_smf_debug_mode(idmap_cfg_handles_t *handles)
  */
 static int
 idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
-	int * const errors)
+    int * const errors)
 {
 	int rc;
 	char *s;
@@ -1616,6 +1659,14 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		pgcfg->max_threads = MAX_THREADS_DEFAULT;
 	if (pgcfg->max_threads > UINT_MAX)
 		pgcfg->max_threads = UINT_MAX;
+
+	rc = get_val_int(handles, "discovery_retry_max_delay",
+	    &pgcfg->discovery_retry_max_delay, SCF_TYPE_COUNT);
+	if (rc != 0)
+		(*errors)++;
+	if (pgcfg->discovery_retry_max_delay == 0)
+		pgcfg->discovery_retry_max_delay =
+		    DISCOVERY_RETRY_MAX_DELAY_DEFAULT;
 
 	rc = get_val_int(handles, "id_cache_timeout",
 	    &pgcfg->id_cache_timeout, SCF_TYPE_COUNT);
@@ -2231,6 +2282,9 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	changed += update_uint64(&live_pgcfg->max_threads,
 	    &new_pgcfg.max_threads, "max_threads");
+
+	changed += update_uint64(&live_pgcfg->discovery_retry_max_delay,
+	    &new_pgcfg.discovery_retry_max_delay, "discovery_retry_max_delay");
 
 	changed += update_uint64(&live_pgcfg->id_cache_timeout,
 	    &new_pgcfg.id_cache_timeout, "id_cache_timeout");

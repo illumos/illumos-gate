@@ -3,6 +3,7 @@
 <!--
  Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ Copyright 2023 RackTop Systems, Inc.
 
  CDDL HEADER START
 
@@ -101,6 +102,10 @@
 			name='value_authorization'
 			type='astring'
 			value='solaris.smf.value.idmap' />
+		<propval
+			name='discovery_retry_max_delay'
+			type='count'
+			value='30' />
 		<propval
 			name='id_cache_timeout'
 			type='count'
