@@ -386,7 +386,7 @@ function rwx_node #user node acl_spec|access
 			chgusr_exec $user cat $node > /dev/null 2>&1
 			return $? ;;
 		*:write_data:*|write_data)
-			chgusr_exec $user dd if=/usr/bin/ls of=$node > \
+			chgusr_exec $user dd if=/usr/bin/true of=$node > \
 				/dev/null 2>&1
 			return $? ;;
 		*"execute:"*|execute)
