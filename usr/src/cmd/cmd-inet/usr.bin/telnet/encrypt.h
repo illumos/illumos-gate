@@ -64,8 +64,6 @@
 #ifndef	_ENCRYPT_H
 #define	_ENCRYPT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

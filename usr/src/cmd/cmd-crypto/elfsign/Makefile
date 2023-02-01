@@ -22,16 +22,14 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG = elfsign
 
 OBJS =	elfsign.o
 
-SRCS = $(OBJS:.o=.c) 
+SRCS = $(OBJS:.o=.c)
 
-include $(SRC)/cmd/Makefile.cmd 
+include $(SRC)/cmd/Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
 

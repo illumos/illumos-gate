@@ -29,8 +29,6 @@
 #ifndef PPPOED_H
 #define	PPPOED_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include "common.h"
 

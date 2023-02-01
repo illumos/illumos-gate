@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 const WNL_PORT          = 2049;
 const WNL_MAXDATA       = 8192;
 const WNL_MAXNAMLEN	= 255;
@@ -104,7 +102,7 @@ struct wnl_fh {
 	opaque data[WNL_FHSIZE];
 };
 
-/* 
+/*
  * Timeval
  */
 struct wnl_time {
@@ -133,7 +131,7 @@ struct wnl_fattr {
 	wnl_time	ctime;		/* time of last change */
 };
 
-typedef string wnl_filename<WNL_MAXNAMLEN>; 
+typedef string wnl_filename<WNL_MAXNAMLEN>;
 
 /*
  * Arguments for directory operations
@@ -240,7 +238,7 @@ struct wnl_fh3 {
 	opaque data<WNL3_FHSIZE>;
 };
 
-/* 
+/*
  * Timeval
  */
 struct wnl_time3 {
@@ -275,7 +273,7 @@ case TRUE:
 	wnl_fattr3 attributes;
 case FALSE:
 	void;
-};	
+};
 
 union wln_post_op_fh3 switch (bool handle_follows) {
 case TRUE:
@@ -338,18 +336,18 @@ enum snego_stat {
  */
 program WNL_PROGRAM {
 	version WNL_V2 {
-		void 
+		void
 		WNLPROC_NULL(void) = 0;
 
-		wnl_diropres 
+		wnl_diropres
 		WNLPROC_LOOKUP(wnl_diropargs) = 4;
 	} = 2;
 
 	version WNL_V3 {
-		void 
+		void
 		WNLPROC3_NULL(void) = 0;
 
-		WNL_LOOKUP3res 
+		WNL_LOOKUP3res
 		WNLPROC3_LOOKUP(WNL_LOOKUP3args) = 3;
 	} = 3;
 

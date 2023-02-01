@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef OSSPEC_SOLARIS_H
 #define OSSPEC_SOLARIS_H
 

@@ -27,10 +27,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/* 
+/*
  * Create message files in a specific format.
  * the gettxt message retrieval function must know the format of
  * the data file created by this utility.
@@ -77,7 +74,7 @@
 #include <errno.h>
 #include <libgen.h>
 
-/* 
+/*
  * Definitions
  */
 
@@ -127,7 +124,7 @@ char *argv[];
 	char *pathoutp;			/* full-path name of output file */
 	struct stat buf;		/* buffer to stat the work file */
 	unsigned size;			/* used for argument to malloc */
-	int i;				
+	int i;
 
 	/* Initializations */
 
@@ -210,7 +207,7 @@ char *argv[];
 				exit(1);
 			}
 		}
-		else  
+		else
 			if (access(ofilep, 0) == 0) {
 				(void)fprintf(stderr, "%s: Message file \"%s\" already exists;\ndid not overwrite it\n", cmdname, ofilep);
 				if (localep)
@@ -218,7 +215,7 @@ char *argv[];
 				exit(1);
 			}
 	}
-	
+
 	/* Open input file */
 	if ((fp_inp = fopen(ifilep, "r")) == NULL) {
 		(void)fprintf(stderr, "%s: %s: %s\n",
@@ -249,7 +246,7 @@ char *argv[];
 		exit(1);
 	}
 
-	/* Search for C-escape sequences in input file and 
+	/* Search for C-escape sequences in input file and
 	 * replace them by the appropriate characters.
 	 * The modified lines are copied to the work area
 	 * and written to the work file */
@@ -294,7 +291,7 @@ char *argv[];
 		(void)fprintf(stderr, "%s: %s: %s\n", cmdname, workp, syserr());
 	}
 
-	/* Find the size of the output message file 
+	/* Find the size of the output message file
 	 * and copy the control information and the messages
 	 * to the output file */
 
@@ -322,7 +319,7 @@ char *argv[];
 		msgp = msgp + strlen(msgp) + 1;
 	}
 
-	if (iflag) { 
+	if (iflag) {
 		outfilep = pathoutp;
 		if (mymkdir(localedirp) == 0) {
 			free(bufinp);
@@ -395,7 +392,7 @@ char	*localdir;
 		if (access(path, 3) == 0)
 			continue;
 		if (mkdir(path, 0777) == -1) {
-			(void)fprintf(stderr, "%s: %s: %s\n", 
+			(void)fprintf(stderr, "%s: %s: %s\n",
 					cmdname, path, syserr());
 			free(path);
 			return(0);

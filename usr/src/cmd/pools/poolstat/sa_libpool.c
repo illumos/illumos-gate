@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sa_libpool - libpool statistic adapter, collect statistic data provided
  * by libpool.

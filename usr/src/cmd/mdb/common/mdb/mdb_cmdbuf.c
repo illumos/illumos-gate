@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The MDB command buffer is a simple structure that keeps track of the
  * command history list, and provides operations to manipulate the current

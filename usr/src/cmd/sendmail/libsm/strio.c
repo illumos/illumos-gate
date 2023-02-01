@@ -12,8 +12,6 @@
  * the sendmail distribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 SM_IDSTR(id, "@(#)$Id: strio.c,v 1.44 2005/06/09 21:40:19 ca Exp $")
 #include <stdlib.h>

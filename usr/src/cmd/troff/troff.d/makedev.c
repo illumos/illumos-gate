@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Note added 9/25/83
 	Setting the parameter biggestfont in the DESC file
 	to be at least as big as the number of characters

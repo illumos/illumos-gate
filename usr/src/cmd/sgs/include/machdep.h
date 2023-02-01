@@ -34,8 +34,6 @@
 #ifndef	_MACHDEP_H
 #define	_MACHDEP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(__sparc)
 
 #include <sparc/machdep_sparc.h>

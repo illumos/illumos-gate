@@ -27,8 +27,6 @@
 #ifndef	_CPUCMDS_H
 #define	_CPUCMDS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdarg.h>

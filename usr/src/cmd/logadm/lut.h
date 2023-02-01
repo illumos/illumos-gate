@@ -29,8 +29,6 @@
 #ifndef	_LOGADM_LUT_H
 #define	_LOGADM_LUT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

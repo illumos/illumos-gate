@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Initialize and re-initialize synchronous serial clocking and loopback
  * options.  Interfaces through the S_IOCGETMODE and S_IOCSETMODE ioctls.

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(__lint)
 #include <kmdb/kmdb_start.h>
 #endif
@@ -52,7 +50,7 @@ kmdb_first_start(void)
 	subq	$1, %rsp
 	andq	$_BITNOT(STACK_ALIGN-1), %rsp
 
-	call	kmdb_main	
+	call	kmdb_main
 
 	ret
 	SET_SIZE(kmdb_first_start)

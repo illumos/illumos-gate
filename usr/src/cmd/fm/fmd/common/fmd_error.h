@@ -28,8 +28,6 @@
 #ifndef	_FMD_ERROR_H
 #define	_FMD_ERROR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 
 #ifdef	__cplusplus

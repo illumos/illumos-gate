@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * a package to display what is happening every MSG_INTERVAL seconds
  * if we are slow connecting.

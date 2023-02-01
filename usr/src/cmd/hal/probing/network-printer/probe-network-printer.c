@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
 #endif
@@ -32,7 +30,7 @@
 
 #include "printer.h"
 
-int 
+int
 main(int argc, char *argv[])
 {
 	int ret = 1;

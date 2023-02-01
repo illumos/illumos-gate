@@ -4,12 +4,10 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: printmask.c,v 1.5 2002/06/15 04:48:33 darrenr Exp $
- * 
+ *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
 

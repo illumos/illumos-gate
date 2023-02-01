@@ -5,8 +5,6 @@
  * Licensed under the Academic Free License version 2.1
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef NETWORK_DEVICE_COMMON_H
 #define	NETWORK_DEVICE_COMMON_H
 

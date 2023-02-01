@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Stub file for ldd(1).  Provides for preloading shared libraries.
  */
@@ -34,7 +32,7 @@
 	.set	EXIT,1
 #define	syscall	.byte 0xf, 0x5
 
-	.text	
+	.text
 	.globl	stub
 stub:
 	movq	$0, %rdi

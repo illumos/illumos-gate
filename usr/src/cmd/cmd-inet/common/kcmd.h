@@ -27,8 +27,6 @@
 #ifndef	_KCMD_H
 #define	_KCMD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

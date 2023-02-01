@@ -30,8 +30,6 @@
 #ifndef	_EFT_EVNV_H
 #define	_EFT_EVNV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

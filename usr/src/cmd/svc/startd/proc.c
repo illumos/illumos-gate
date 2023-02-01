@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is in a separate file because procfs.h cannot be included if
  * _FILE_OFFSET_BITES=64 is defined.

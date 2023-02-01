@@ -27,9 +27,6 @@
 #ifndef	_BUSSTAT_H
 #define	_BUSSTAT_H
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * busstat works by reading and writing from/to kstat's which are
  * exported by drivers on the system.

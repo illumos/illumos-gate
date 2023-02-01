@@ -27,8 +27,6 @@
 #ifndef	_INTERNAL_SORT_H
 #define	_INTERNAL_SORT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

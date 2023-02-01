@@ -37,10 +37,8 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- *	drive hp2621 terminal 
+ *	drive hp2621 terminal
  *	just to see stuff quickly. like troff -a
  */
 
@@ -426,7 +424,7 @@ char *s;
 }
 
 int
-error(f, s, a1, a2, a3, a4, a5, a6, a7) 
+error(f, s, a1, a2, a3, a4, a5, a6, a7)
 char *s;
 {
 	fprintf(stderr, "ta: ");

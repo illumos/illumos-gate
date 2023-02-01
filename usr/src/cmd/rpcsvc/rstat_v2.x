@@ -29,12 +29,6 @@
 
 %/* from rstat_v2.x */
 
-#ifdef RPC_HDR
-%
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%
-#endif
-
 const RSTAT_V2_CPUSTATES = 4;
 const RSTAT_V2_DK_NDRIVE = 4;
 

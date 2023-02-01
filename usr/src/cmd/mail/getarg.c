@@ -22,8 +22,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 2.	*/
 #include "mail.h"
 /*
 	get next token
@@ -35,7 +33,7 @@
 		NULL	-> no token
 */
 char *
-getarg(s, p)	
+getarg(s, p)
 register char *s, *p;
 {
 	while (*p == ' ' || *p == '\t') p++;

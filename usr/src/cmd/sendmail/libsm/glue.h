@@ -14,8 +14,6 @@
  * $Id: glue.h,v 1.6 2001/01/22 23:09:49 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  The first few FILEs are statically allocated; others are dynamically
 **  allocated and linked in via this glue structure.

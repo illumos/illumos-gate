@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Active walks are tracked using a WCB (Walk Control Block), which is a simple
  * data structure that contains the mdb_walk_state_t passed to the various

@@ -24,7 +24,6 @@
 # Copyright (c) 1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 echo_file usr/src/lib/libcurses/screen/curses_inc.h
 echo_file usr/src/lib/libcurses/screen/compiler.h

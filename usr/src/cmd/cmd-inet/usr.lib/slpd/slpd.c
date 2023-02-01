@@ -24,9 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * This is a proxy daemon for the real Java slpd. This deamon starts
  * at boot time, and listens for any incoming SLP messages only on

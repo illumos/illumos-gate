@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
@@ -33,7 +31,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -47,7 +45,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * SS user interface for ktutil.
  */
 
@@ -203,7 +201,7 @@ void ktutil_add_entry(argc, argv)
     char *princ = NULL;
     char *enctype = NULL;
     krb5_kvno kvno = 0;
-    int use_pass = 0, use_key = 0, i;    
+    int use_pass = 0, use_key = 0, i;
 
     for (i = 1; i < argc; i++) {
 	if ((strlen(argv[i]) == 2) && !strncmp(argv[i], "-p", 2)) {
@@ -330,7 +328,7 @@ void ktutil_list(argc, argv)
 		}
 	    printf(" (%s) ", buf);
 	}
-	
+
 	if (show_keys) {
 	    printf(" (0x");
 	    for (j = 0; j < lp->entry->key.length; j++)

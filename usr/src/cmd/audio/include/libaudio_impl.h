@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_LIBAUDIO_IMPL_H
 #define	_MULTIMEDIA_LIBAUDIO_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <malloc.h>
 #include <unistd.h>
 #include <stdlib.h>

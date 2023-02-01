@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include "mail.h"
 /*
 	Parse the command line.
@@ -75,7 +72,7 @@ parse(int argc, char **argv)
 		case 's':
 			/* ignore this option */
 			break;
-                /* 
+                /*
 		 * Deliver directly to a mailbox. Do Not go to sendmail
 		 */
 		case 'd':
@@ -129,7 +126,7 @@ parse(int argc, char **argv)
 			optcnt++;
 			break;
 
-		/* 
+		/*
 			print without prompting
 		*/
 		case 'p':
@@ -152,7 +149,7 @@ parse(int argc, char **argv)
 			optcnt++;
 			break;
 
-		/* 
+		/*
 			terminate on deletes
 		*/
 		case 'q':
@@ -164,7 +161,7 @@ parse(int argc, char **argv)
 			optcnt++;
 			break;
 
-		/* 
+		/*
 			print by first in, first out order
 		*/
 		case 'r':

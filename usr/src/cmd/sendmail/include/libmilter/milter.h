@@ -10,8 +10,6 @@
  *	$Id: milter.h,v 8.41 2006/05/22 23:23:55 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  MILTER.H -- Global definitions for mail filter.
 */

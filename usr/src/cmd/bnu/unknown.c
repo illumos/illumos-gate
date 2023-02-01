@@ -27,12 +27,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	logs attempts by unknown remote machines to run uucico in FOREIGN
  *	("/var/uucp/.Admin/Foreign").  if anything goes wrong,
- *	sends mail to login MAILTO ("uucp").  the executable should be 
+ *	sends mail to login MAILTO ("uucp").  the executable should be
  *	placed in /usr/lib/uucp/remote.unknown, and should run setuid-uucp.
  */
 
@@ -111,7 +109,7 @@ char	*errmsg, *logmsg;
 	/* stdin and then execl mail (which will read the error	*/
 	/* message we just wrote).				*/
 
-	if ( setuid(getuid()) == -1 || pipe(fds) != 0 
+	if ( setuid(getuid()) == -1 || pipe(fds) != 0
 	|| write(fds[1], ebuf, strlen(ebuf)) != strlen(ebuf)
 	|| close(fds[1]) != 0 )
 		exit(errno);

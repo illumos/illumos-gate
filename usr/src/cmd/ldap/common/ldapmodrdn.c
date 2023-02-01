@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* ldapmodrdn.c - generic program to modify an entry's RDN using LDAP */
 
 #include <stdio.h>
@@ -20,8 +18,8 @@
 static int	contoper, remove_oldrdn;
 static LDAP	*ld;
 
-static int domodrdn( LDAP *ld, char *dn, char *rdn, char *newsuperior, 
-			int remove_oldrdn); 
+static int domodrdn( LDAP *ld, char *dn, char *rdn, char *newsuperior,
+			int remove_oldrdn);
 static void options_callback( int option, char *optarg );
 
 static void usage( void )
@@ -35,7 +33,7 @@ static void usage( void )
 	exit(LDAP_PARAM_ERROR );
 }
 
-int 
+int
 main(int argc, char **argv )
 {
 	char *myname, *entrydn, *rdn, buf[ 4096 ];
@@ -47,7 +45,7 @@ main(int argc, char **argv )
 
 	char *locale = setlocale(LC_ALL, "");
 	textdomain(TEXT_DOMAIN);
-	ldaplogconfigf(NULL); 
+	ldaplogconfigf(NULL);
 
 
 	contoper =  remove_oldrdn = 0;
@@ -58,7 +56,7 @@ main(int argc, char **argv )
 		++myname;
 
 	optind = ldaptool_process_args( argc, argv, "cr", 0, options_callback);
-	
+
 	if ( optind == -1 ) {
 		usage();
 	}
@@ -70,41 +68,41 @@ main(int argc, char **argv )
 	havedn = 0;
 	if (argc - optind == 3) 		/* accept as arguments: dn rdn newsuperior */
 	{
-		if (( L_newParent = strdup( argv[argc - 1] )) == NULL ) 
+		if (( L_newParent = strdup( argv[argc - 1] )) == NULL )
 		{
 			perror( "strdup" );
 			exit( LDAP_NO_MEMORY );
 		}
 
-		if (( rdn = strdup( argv[argc - 2] )) == NULL ) 
+		if (( rdn = strdup( argv[argc - 2] )) == NULL )
 		{
 			perror( "strdup" );
 			exit( LDAP_NO_MEMORY );
 		}
 
-		if (( entrydn = strdup( argv[argc - 3] )) == NULL ) 
+		if (( entrydn = strdup( argv[argc - 3] )) == NULL )
 		{
 			perror( "strdup" );
 			exit( LDAP_NO_MEMORY );
 		}
 		++havedn;
-	} 
+	}
 	else if (argc - optind == 2) 		/* accept as arguments: dn rdn */
 	{
-		if (( rdn = strdup( argv[argc - 1] )) == NULL ) 
+		if (( rdn = strdup( argv[argc - 1] )) == NULL )
 		{
 			perror( "strdup" );
 			exit( LDAP_NO_MEMORY );
 		}
 
-		if (( entrydn = strdup( argv[argc - 2] )) == NULL ) 
+		if (( entrydn = strdup( argv[argc - 2] )) == NULL )
 		{
 			perror( "strdup" );
 			exit( 1 );
 		}
 		++havedn;
-	} 
-	else if ( argc - optind != 0 ) 
+	}
+	else if ( argc - optind != 0 )
 	{
 		fprintf( stderr, gettext("%s: invalid number of arguments, only two or three allowed\n"), myname);
 		usage();
@@ -125,11 +123,11 @@ main(int argc, char **argv )
 	{
 		rc = domodrdn(ld, entrydn, rdn, L_newParent, remove_oldrdn);
 	}
-	else while (	(rc == 0 || contoper) && 
+	else while (	(rc == 0 || contoper) &&
 					(fgets(buf, sizeof(buf), ldaptool_fp) != NULL) )
 
 	{
-		/* 
+		/*
 		 * The format of the file is one of the following:
 		 * 	dn
 		 * 	rdn
@@ -141,7 +139,7 @@ main(int argc, char **argv )
 		 * 	<blank lines...>
 		 * both types of sequences can be found in the file
 		 */
-		
+
 		if ( (strlen(buf) == 1) && (ldaptool_fp == stdin) )
 			break;
 
@@ -150,7 +148,7 @@ main(int argc, char **argv )
 		{
 			if ( haverdn )		/* first type of sequence */
 			{
-				if (( L_newParent = strdup( buf )) == NULL ) 
+				if (( L_newParent = strdup( buf )) == NULL )
 				{
 					perror( "strdup" );
 					exit( LDAP_NO_MEMORY );
@@ -165,7 +163,7 @@ main(int argc, char **argv )
 			}
 			else if ( havedn ) 		/* have DN, get RDN */
 			{
-				if (( rdn = strdup( buf )) == NULL ) 
+				if (( rdn = strdup( buf )) == NULL )
 				{
 					perror( "strdup" );
 					exit( LDAP_NO_MEMORY );
@@ -227,11 +225,11 @@ domodrdn( LDAP *ld, char *dn, char *rdn, char *newsuperior, int remove_oldrdn )
 	if ( ldaptool_verbose )
 		printf( gettext("new RDN: %1$s (%2$skeep existing values)\n"),
 						rdn, remove_oldrdn ? "do not " : "" );
- 
-	printf( gettext("%1$srenaming entry %2$s\n"), 
+
+	printf( gettext("%1$srenaming entry %2$s\n"),
 			ldaptool_not ? "!" : "", dn );
 
-	if ( !ldaptool_not ) 
+	if ( !ldaptool_not )
 	{
 		rc = ldap_rename_s( ld, dn, rdn, newsuperior, remove_oldrdn, NULL, NULL );
 		if ( rc != LDAP_SUCCESS )

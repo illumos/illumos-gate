@@ -32,8 +32,6 @@
 #ifndef	_DEBUG_H
 #define	_DEBUG_H
 
-#pragma ident	"%W%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

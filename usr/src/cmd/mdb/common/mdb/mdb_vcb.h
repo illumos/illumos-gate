@@ -27,8 +27,6 @@
 #ifndef	_MDB_VCB_H
 #define	_MDB_VCB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_addrvec.h>
 #include <mdb/mdb_nv.h>
 

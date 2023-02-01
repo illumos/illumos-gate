@@ -9,8 +9,6 @@
  *	$Id: time.h,v 1.1 2005/06/14 23:07:19 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef SM_TIME_H
 # define SM_TIME_H 1
 

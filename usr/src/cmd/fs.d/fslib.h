@@ -27,8 +27,6 @@
 #ifndef	_FSLIB_H
 #define	_FSLIB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

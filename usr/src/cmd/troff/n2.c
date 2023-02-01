@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * n2.c
  *
@@ -90,7 +88,7 @@ pchar(i)
 		return (0);
 	}
 	if (ismot(i)) {
-		pchar1(i); 
+		pchar1(i);
 		return (0);
 	}
 	switch (j = cbits(i)) {
@@ -252,7 +250,7 @@ flusho()
 
 
 int
-done(x) 
+done(x)
 int	x;
 {
 	int	i;
@@ -291,8 +289,8 @@ int	x;
 
 
 int
-done1(x) 
-int	x; 
+done1(x)
+int	x;
 {
 	error |= x;
 	if (numtab[NL].val) {
@@ -315,8 +313,8 @@ int	x;
 
 
 int
-done2(x) 
-int	x; 
+done2(x)
+int	x;
 {
 	ptlead();
 #ifndef NROFF
@@ -330,7 +328,7 @@ int	x;
 }
 
 int
-done3(x) 
+done3(x)
 int	x;
 {
 	error |= x;
@@ -349,7 +347,7 @@ int	x;
 
 
 int
-edone(x) 
+edone(x)
 int	x;
 {
 	frame = stk;

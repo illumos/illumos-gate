@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <dlfcn.h>
 #include <sys/modctl.h>
 #include <sys/kobj.h>

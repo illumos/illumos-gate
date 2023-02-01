@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma	ident	"%W%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <setjmp.h>

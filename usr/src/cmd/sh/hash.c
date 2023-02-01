@@ -28,9 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	"hash.h"
 #include	"defs.h"
 
@@ -70,14 +67,14 @@ hcreate(void)
 
 	table = (struct node **)alloc(TABLENGTH * sizeof(struct node *));
 
-	for (j=0; j < TABLENGTH; ++j)  
+	for (j=0; j < TABLENGTH; ++j)
 	{
 		table[j] = 0;
 	}
 
 	bitsper = 0;
 
-	while (c)		
+	while (c)
 	{
 		c = (unsigned int)c >> 1;
 		bitsper++;
@@ -87,7 +84,7 @@ hcreate(void)
 }
 
 
-void hscan(uscan)	
+void hscan(uscan)
 	void	(*uscan)();
 {
 	struct node		*p, *nxt;
@@ -114,27 +111,27 @@ hfind(str)
 	struct node 	*p;
 	struct node 	**q;
 	unsigned int 	i;
-	int 			res;		
+	int 			res;
 
 	i = hash(str);
 
 	if(table[i] == 0)
-	{			
+	{
 		last = &table[i];
 		next = 0;
 		return(0);
 	}
-	else 
+	else
 	{
 		q = &table[i];
 		p = table[i];
-		while (p != 0 && (res = STRCMP(str, p->item.key))) 
+		while (p != 0 && (res = STRCMP(str, p->item.key)))
 		{
 			q = &(p->next);
 			p = p->next;
 		}
 
-		if (p != 0 && res == 0)	
+		if (p != 0 && res == 0)
 			return(&(p->item));
 		else
 		{
@@ -158,11 +155,11 @@ henter(item)
 }
 
 
-static unsigned int 
-crunch(key)	
+static unsigned int
+crunch(key)
 	unsigned char	*key;
 {
-	unsigned int 	sum = 0;	
+	unsigned int 	sum = 0;
 	int s;
 
 	for (s = 0; *key; s++)				/* Simply add up the bytes */

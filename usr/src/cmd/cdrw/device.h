@@ -26,8 +26,6 @@
 #ifndef	_DEVICE_H
 #define	_DEVICE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -23,11 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  dos_iso
- *  
+ *
  *  created by eddy bell 8-14-89
  */
 

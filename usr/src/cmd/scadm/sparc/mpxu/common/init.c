@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * init.c: initialization of scadm (access to the device driver for the
  * communication with the service processor - rscp_init)

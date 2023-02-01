@@ -27,8 +27,6 @@
  * $Id: ccp.h,v 1.9 1998/11/07 06:59:26 paulus Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 typedef struct ccp_options {
     bool bsd_compress;		/* do BSD Compress? */
     bool deflate;		/* do Deflate? */

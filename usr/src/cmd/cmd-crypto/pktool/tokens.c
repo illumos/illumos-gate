@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file implements the token list operation for this tool.
  * It loads the PKCS#11 modules, gets the list of slots with

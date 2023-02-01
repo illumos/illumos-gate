@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "talk_ctl.h"
 #include <libintl.h>
 #include <sys/isa_defs.h>

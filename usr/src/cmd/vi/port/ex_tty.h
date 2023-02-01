@@ -33,8 +33,6 @@
 #ifndef _EX_TTY_H
 #define	_EX_TTY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -160,7 +158,7 @@ var	unsigned char	ttynbuf[20];	/* result of ttyname() */
 var	int	ttymesg;	/* original mode of users tty */
 
 #ifdef XPG4
-/* 
+/*
  * For POSIX.2, we need to make $LINES and $COLUMNS override whatever the
  * system thinks are the appropriate real values.  The points of support
  * for this feature lie scattered about in the fossil record, so we

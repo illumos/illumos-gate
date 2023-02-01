@@ -9,8 +9,6 @@
  *	$Id: test.h,v 1.6 2001/04/03 01:53:01 gshapiro Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  Abstractions for writing a libsm test program.
 */

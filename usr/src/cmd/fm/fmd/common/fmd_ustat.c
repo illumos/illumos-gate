@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fmd_ustat.h>
 #include <fmd_alloc.h>
 #include <fmd_subr.h>

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 WPA Supplicant
 ==============
 
@@ -72,7 +70,7 @@ Supported WPA/IEEE 802.11i features:
 	authentication)
   (following methods are supported, but since they do not generate keying
    material, they cannot be used with WPA or IEEE 802.1X WEP keying)
-  * EAP-MD5-Challenge 
+  * EAP-MD5-Challenge
   * EAP-MSCHAPv2
   * EAP-GTC
   * EAP-OTP

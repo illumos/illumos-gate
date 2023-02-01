@@ -39,8 +39,6 @@
 #ifndef _GENERAL_H
 #define	_GENERAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

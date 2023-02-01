@@ -27,8 +27,6 @@
 #ifndef	_AUDIO_H
 #define	_AUDIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Contains the audio files information for cdrw.
  */

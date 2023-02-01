@@ -27,8 +27,6 @@
 #ifndef	_PICLD_PLUGINUTIL_IMPL_H
 #define	_PICLD_PLUGINUTIL_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

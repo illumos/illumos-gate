@@ -27,8 +27,6 @@
 #ifndef	_DIS_LIST_H
 #define	_DIS_LIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libuutil.h>
 
 /* #include "dis_target.h" */

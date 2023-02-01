@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines to support fssnap subcommand of switchout.  See switchout.c for
  * the real fssnap command.

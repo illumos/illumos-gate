@@ -31,8 +31,6 @@
 #ifndef _UUCP_H
 #define _UUCP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -179,7 +177,7 @@ extern "C" {
 /* define the last characters for ACU  (used for 801/212 dialers) */
 #define ACULAST "<"
 
-/*  caution - the fillowing names are also in Makefile 
+/*  caution - the fillowing names are also in Makefile
  *    any changes here have to also be made there
  *
  * it's a good idea to make directories .foo, since this ensures
@@ -190,7 +188,7 @@ extern "C" {
  *  LOGDIR=/var/uucp/.Log
  *  SEQDIR=/var/uucp/.Sequence
  *  STATDIR=/var/uucp/.Status
- *  
+ *
  */
 
 /* where to put the STST. files? */
@@ -279,8 +277,8 @@ extern "C" {
 #define	MAX_LOCKTRY	5	/* number of attempts to lock device */
 
 /*
- * CDEBUG is for communication line debugging 
- * DEBUG is for program debugging 
+ * CDEBUG is for communication line debugging
+ * DEBUG is for program debugging
  * #define SMALL to compile without the DEBUG code
  */
 
@@ -294,7 +292,7 @@ extern "C" {
 #ifndef SMALL
 #define DEBUG(l, f, s) if (Debug >= l) fprintf(stderr, f, s)
 #else
-#define DEBUG(l, f, s) 
+#define DEBUG(l, f, s)
 #endif /* SMALL */
 
 /*
@@ -548,7 +546,7 @@ EXTERN char *UerrorText[];	/* text for error code */
 
 #ifdef ATTSV
 #define index strchr
-#define rindex strrchr 
+#define rindex strrchr
 #else /*!ATTSV*/
 #define strchr index
 #define strrchr rindex

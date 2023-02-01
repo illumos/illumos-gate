@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOTYPESAMPLERATE_H
 #define	_MULTIMEDIA_AUDIOTYPESAMPLERATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <AudioTypeConvert.h>
 #include <Resample.h>
 

@@ -27,8 +27,6 @@
 #ifndef	_PDU_H
 #define	_PDU_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

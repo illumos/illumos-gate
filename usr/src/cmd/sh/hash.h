@@ -31,7 +31,6 @@
 #ifndef	_HASH_H
 #define	_HASH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	UNIX shell
  */

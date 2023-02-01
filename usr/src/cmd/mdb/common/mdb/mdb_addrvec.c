@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_addrvec.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_modapi.h>

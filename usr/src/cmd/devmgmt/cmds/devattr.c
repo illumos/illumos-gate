@@ -26,9 +26,6 @@
 
  /*    Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
  /*      All Rights Reserved   */
-  
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  devattr.c
@@ -42,14 +39,14 @@
  *  devattr [-v] device [attr [...]]
  *
  *	This command searches the device table file for the device specified.
- *	If it finds the device (matched either by alias or major and minor 
- *	device number), it extracts the attribute(s) specified and writes 
+ *	If it finds the device (matched either by alias or major and minor
+ *	device number), it extracts the attribute(s) specified and writes
  *	that value to the standard output stream (stdout).
  *
- *	The command writes the values of the attributes to stdout one per 
- *	line, in the order that they were requested.  If the -v option is 
+ *	The command writes the values of the attributes to stdout one per
+ *	line, in the order that they were requested.  If the -v option is
  *	requested, it writes the attributes in the form <attr>='<value>' where
- *	<attr> is the name of the attribute and <value> is the value of that 
+ *	<attr> is the name of the attribute and <value> is the value of that
  *	attribute.
  *
  *  Returns:
@@ -102,7 +99,7 @@
 #define	M_DEVTAB	"Cannot open the device table: %s"
 
 
-/* 
+/*
  * Exit codes:
  *	EX_OK		All's well that ends well
  *	EX_ERROR	Some problem caused termination
@@ -142,8 +139,8 @@ static char	txt[MM_MXTXTLN+1];
 /*
  *  main()
  *
- *	Implements the command "devattr".   This function parses the command 
- *	line, then calls the devattr() function looking for the specified 
+ *	Implements the command "devattr".   This function parses the command
+ *	line, then calls the devattr() function looking for the specified
  *	device and the requested attribute.  It writes the information to
  *	the standard output file in the requested format.
  *
@@ -207,11 +204,11 @@ main(int argc, char *argv[])
 	/* Make only the text-component of messages appear (remove this in SVR4.1) */
 	(void) putenv("MSGVERB=text");
 
-	/* 
-	 * Check for a usage error 
+	/*
+	 * Check for a usage error
 	 *  - invalid option
 	 *  - arg count < 2
-	 *  - arg count < 3 && -v used 
+	 *  - arg count < 3 && -v used
 	 */
 
 	if (syntaxerr || (argc < (optind+1))) {
@@ -235,12 +232,12 @@ main(int argc, char *argv[])
 	}
 
 
-	/* 
-	 *  Get the list of known attributes for the device.  This does 
-	 *  two things.  First, it verifies that the device is known in the 
-	 *  device table.  Second, it gets the attributes to list just in 
-	 *  case no attributes were specified.  Then, set a pointer to the 
-	 *  list of attributes to be extracted and listed...  
+	/*
+	 *  Get the list of known attributes for the device.  This does
+	 *  two things.  First, it verifies that the device is known in the
+	 *  device table.  Second, it gets the attributes to list just in
+	 *  case no attributes were specified.  Then, set a pointer to the
+	 *  list of attributes to be extracted and listed...
 	 */
 
 	device = argv[optind];
@@ -261,8 +258,8 @@ main(int argc, char *argv[])
 
 
 	/*
-	 *  List attributes.  If a requested attribute is not defined, 
-	 *  list the value of that attribute as null.  (Using shell 
+	 *  List attributes.  If a requested attribute is not defined,
+	 *  list the value of that attribute as null.  (Using shell
 	 *  variables as the model for this.)
 	 */
 

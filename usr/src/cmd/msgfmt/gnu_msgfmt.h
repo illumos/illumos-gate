@@ -27,8 +27,6 @@
 #ifndef	_GNU_MSGFMT_H
 #define	_GNU_MSGFMT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <limits.h>
 #include <stdarg.h>

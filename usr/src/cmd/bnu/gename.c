@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 static struct {
@@ -44,7 +41,7 @@ static int sysseq();
  /* generate file name
   *	pre	-> file prefix
   *	sys	-> system name
-  *	grade	-> service grade 
+  *	grade	-> service grade
   *	file	-> buffer to return filename must be of size MAXBASENAME+1
   * return:
   *	none
@@ -65,11 +62,11 @@ char pre, *sys, grade, *file;
 	n = sysseq(sys);
 	if (pre == CMDPRE || pre == XQTPRE) {
 		(void) sprintf(file, "%c.%.*s%c%.4x",
-			pre, SYSNSIZE, sys, grade, syslst[n].job); 
+			pre, SYSNSIZE, sys, grade, syslst[n].job);
 	} else
 		(void) sprintf(file, "%c.%.5s%.4x%.3x",
 			pre, sys, syslst[n].job & 0xffff,
-				++syslst[n].subjob & 0xfff); 
+				++syslst[n].subjob & 0xfff);
 	DEBUG(4, "file - %s\n", file);
 	return;
 }
@@ -81,7 +78,7 @@ char pre, *sys, grade, *file;
 
  /*
   * get next sequence number
-  * returns:  
+  * returns:
   *	number between 1 and 0xffff
   *
   * sequence number 0 is reserved for polling
@@ -157,7 +154,7 @@ initSeq()
 	return;
 }
 
-/* 
+/*
  * 	retseq() is used to get the sequence number of a job
  *	for functions outside of this file.
  *

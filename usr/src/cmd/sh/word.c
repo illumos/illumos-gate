@@ -28,7 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -362,7 +361,7 @@ retry:
 			c = (unsigned char)*f->fnxt;
 			mlen = 1;
 		}
-		
+
 		f->fnxt += mlen;
 		f->nxtoff += mlen;
 		if (flags & readpr && standin->fstak == 0)
@@ -414,7 +413,7 @@ readb(struct fileblk *f, int toread, int rest)
 			return (rest);
 		}
 	}
-		
+
 retry:
 	do {
 		if (trapnote & SIGSET) {

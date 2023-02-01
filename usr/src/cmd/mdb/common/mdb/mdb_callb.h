@@ -27,8 +27,6 @@
 #ifndef _MDB_CALLB_H
 #define	_MDB_CALLB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_list.h>
 #include <mdb/mdb_module.h>
 

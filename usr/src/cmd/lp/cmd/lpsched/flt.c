@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 # include	<stdarg.h>
 # include	"lpsched.h"
 
@@ -60,12 +58,12 @@ add_flt_act(MESG * md, ...)
     va_start (arg, md);
 
     f = (FLT *)Malloc(sizeof(FLT));
-    
+
     (void) memset((char *)f, 0, sizeof(FLT));
-    
+
     f->type = (int)va_arg(arg, int);
     f->ident = md;
-    
+
     if (md->on_discon == NULL)
 	if (mon_discon(md, do_flt_acts))
 	    mallocfail();
@@ -76,7 +74,7 @@ add_flt_act(MESG * md, ...)
 	f->s1 = Strdup((char *)va_arg(arg, char *));
 	f->i1 = (int)va_arg(arg, int);
 	break;
-	
+
 	case FLT_CHANGE:
 	f->r1 = (RSTATUS *)va_arg(arg, RSTATUS *);
 	break;
@@ -100,7 +98,7 @@ del_flt_act(MESG *md, ...)
     va_start(arg, md);
 
     type = (int)va_arg(arg, int);
-    
+
     for (f = Fault_List; f->next; f = f->next)
 	if (f->next->type == type && f->next->ident == md)
 	{
@@ -124,7 +122,7 @@ do_flt_acts(MESG *md)
     struct stat	tmpBuf;
     char	attrFile[BUFSIZ];
 #endif
-    
+
     for (f = Fault_List; f && f->next; f = f->next)
 	if (f->next->ident == md)
 	{
@@ -158,7 +156,7 @@ do_flt_acts(MESG *md)
 		Free(file);
 #endif
 		break;
-		
+
 
 		case FLT_CHANGE:
 		/* clear RS_CHANGE bit, write request file, and schedule */

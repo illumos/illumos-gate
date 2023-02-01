@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -22,24 +22,21 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Prototypes for the kpasswd program callback functions.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #ifndef __KPASSWD_H__
 #define __KPASSWD_H__
 
 int kpasswd(krb5_context context, int argc, char *argv[]);
 
-long read_old_password(krb5_context context, char *password, 
+long read_old_password(krb5_context context, char *password,
 		       unsigned int *pwsize);
 
-long read_new_password(void *server_handle, char *password, 
-		       unsigned int *pwsize, char *msg_ret, 
+long read_new_password(void *server_handle, char *password,
+		       unsigned int *pwsize, char *msg_ret,
 		       int msg_len, krb5_principal princ);
 
 void display_intro_message(const char *fmt_string, const char *arg_string);

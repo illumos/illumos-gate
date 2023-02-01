@@ -27,8 +27,6 @@
 #ifndef _COMPAT_H
 #define	_COMPAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Definitions for IPv4 compat defaults file reader.
  */

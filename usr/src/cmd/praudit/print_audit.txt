@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 This describes some private interfaces currently provided by praudit.
 In the future these may be provided by libbsm instead.  Note that
 these interfaces are MT-Safe.

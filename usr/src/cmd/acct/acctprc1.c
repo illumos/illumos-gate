@@ -27,7 +27,6 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	acctprc1 [ctmpfile]
@@ -114,7 +113,7 @@ main(int argc, char **argv)
 		exit(1);
 	else if (ab.ac_flag & AEXPND)
 		ver = 2;	/* 4.0 acct structure */
-	else 
+	else
 		ver = 1;	/* 3.x acct structure */
 
 	rewind(stdin);
@@ -150,7 +149,7 @@ main(int argc, char **argv)
 		    pb.pt_cpu[0], pb.pt_cpu[1],
 		    pb.pt_mem);
 	}
-	
+
 	exit(0);
 }
 
@@ -213,8 +212,8 @@ readctmp(char *fname)
 			up->ur_srec = sp;
 			up->ur_cnt = 0;
 		}
-		
-		if (sp >= &sr[a_ssize-1]) { 
+
+		if (sp >= &sr[a_ssize-1]) {
 			a_ssize = a_ssize + A_SSIZE;
 			if ((sr = (struct srec *) realloc(sr, a_ssize *
 				sizeof (struct srec))) == NULL) {
@@ -300,7 +299,7 @@ aread(int ver)
 		}
 	} else
 		ret = fread((char *)&ab, sizeof(struct acct), 1, stdin);
-	
+
 
 	return(ret != 1 ? 0 : 1);
 }

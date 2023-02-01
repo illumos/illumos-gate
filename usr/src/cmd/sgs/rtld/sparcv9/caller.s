@@ -25,7 +25,6 @@
  *
  * Return the pc of the calling routine.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	defined(lint)
 
@@ -85,7 +84,7 @@ set_sparc_g7(ulong_t val)
 {
 	return;
 }
-	
+
 #else
 
 #include	<sys/asm_linkage.h>
@@ -121,7 +120,7 @@ set_sparc_g7(ulong_t val)
 	retl
 	mov	%o0, %g5
 	SET_SIZE(set_sparc_g5)
-	
+
 	ENTRY(set_sparc_g6)
 	retl
 	mov	%o0, %g6

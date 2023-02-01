@@ -27,8 +27,6 @@
 #ifndef _NFSLOGTAB_H
 #define	_NFSLOGTAB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Defines logtab
  */

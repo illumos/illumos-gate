@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mailx -- a modified version of a University of California at Berkeley
  *	mail program
@@ -163,7 +160,7 @@ tackon(char *sys, char *rest)
 /*
  * Check equality of the first host in a uucp address.
  */
-int 
+int
 ishost(char *sys, char *rest)
 {
 	while (*sys && *sys == *rest)
@@ -225,7 +222,7 @@ unuucp(char *name)
 /*
  * Turn a network machine name into a unique character
  */
-static int 
+static int
 netlook(char machine[], int attnet)
 {
 	register struct netmach *np;
@@ -363,7 +360,7 @@ makeremote(char name[], char from[])
  * Take a network machine descriptor and find the types of connected
  * nets and return it.
  */
-static int 
+static int
 nettype(int mid)
 {
 	register struct netmach *np;
@@ -398,7 +395,7 @@ static short	midfree;			/* Next free machine id */
  * Initialize the extra host hash table.
  * Called by sreset.
  */
-void 
+void
 minit(void)
 {
 	register struct xtrahash *xp, **tp;
@@ -421,7 +418,7 @@ minit(void)
  * If the machine is already known, add the given attached
  * net to those already known.
  */
-static int 
+static int
 mstash(char name[], int attnet)
 {
 	register struct xtrahash *xp;
@@ -513,7 +510,7 @@ mlook(int mid)
  * Return the bit mask of net's that the given extra host machine
  * id has so far.
  */
-static int 
+static int
 mtype(int mid)
 {
 	register int m;
@@ -621,13 +618,13 @@ cp[-1]);
  * optimizer and concatenating the results.
  */
 
-static void 
+static void
 optim1(char netstr[], char name[])
 {
 	char path[STSIZ], rpath[STSIZ];
 	register char *cp, *cp2;
 	register int tp, nc;
-	
+
 	cp = netstr;
 	prefer(cp);
 	*name  = '\0';
@@ -676,7 +673,7 @@ optim1(char netstr[], char name[])
  *	SN for Schmidt net	(Berknet)
  *	0 if we don't know.
  */
-static int 
+static int
 ntype(register int nc)
 {
 	register struct ntypetab *np;
@@ -695,7 +692,7 @@ ntype(register int nc)
  * 0 means don't know
  */
 
-static int 
+static int
 netkind(register int nt)
 {
 	register struct nkindtab *np;
@@ -710,7 +707,7 @@ netkind(register int nt)
  * Do name optimization for an explicitly routed network (eg uucp).
  */
 
-static int 
+static int
 optimex(char net[], char name[])
 {
 	register char *cp, *rp;
@@ -737,7 +734,7 @@ optimex(char net[], char name[])
  * Do name optimization for implicitly routed network (eg, arpanet).
  */
 
-static int 
+static int
 optimimp(char net[], char name[])
 {
 	register char *cp;
@@ -764,7 +761,7 @@ optimimp(char net[], char name[])
  * type must match.
  */
 
-static void 
+static void
 optiboth(char net[])
 {
 	register char *cp, *cp2;
@@ -808,7 +805,7 @@ rpair(char str[], int mach)
  * to the preferred network transmission means.
  */
 
-static void 
+static void
 prefer(char name[])
 {
 	register char *cp, n;
@@ -827,7 +824,7 @@ prefer(char name[])
  * Return the best network separator for the given machine pair.
  */
 
-static char 
+static char
 best(int src, int dest)
 {
 	register int dtype, stype;
@@ -891,7 +888,7 @@ revarpa(char str[])
  *		string of characters.
  */
 
-static int 
+static int
 name(void)
 {
 	register int t;
@@ -914,7 +911,7 @@ name(void)
 				return(-1);
 			stradd(netbuf, sizeof (netbuf), '@');
 			nstrcat(netbuf, sizeof (netbuf), cp);
-			return(0);	
+			return(0);
 		case WORD:
 			return(-1);
 
@@ -936,7 +933,7 @@ static	int nexttok;			/* Salted away next token */
  * Initialize the network name scanner.
  */
 
-int 
+int
 yyinit(char str[])
 {
 	static char lexbuf[BUFSIZ];
@@ -955,7 +952,7 @@ yyinit(char str[])
  * yylval is set to point to a scanned string.
  */
 
-int 
+int
 yylex(void)
 {
 	register char *cp, *dotp;
@@ -991,11 +988,11 @@ yylex(void)
 #endif
 
 /*
- * Add a single character onto a string. Here dstsize is the size of the 
+ * Add a single character onto a string. Here dstsize is the size of the
  * destnation buffer.
  */
 
-static void 
+static void
 stradd(register char *dst, int dstsize, register int c)
 {
 	while (*dst != '\0') {

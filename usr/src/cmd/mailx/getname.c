@@ -33,8 +33,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mailx -- a modified version of a University of California at Berkeley
  *	mail program
@@ -53,7 +51,7 @@ extern struct passwd *getpwuid();
  * If -1 is passed as the user id, close the passwd file.
  */
 
-int 
+int
 getname(uid_t uid, char namebuf[])
 {
 	struct passwd *pw;
@@ -76,7 +74,7 @@ getname(uid_t uid, char namebuf[])
  * on error.  Iff the name passed is 0, close the passwd file.
  */
 
-uid_t 
+uid_t
 getuserid(char name[])
 {
 	struct passwd *pw;

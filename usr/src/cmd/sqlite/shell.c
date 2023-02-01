@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -299,7 +297,7 @@ static int callback(void *pArg, int nArg, char **azArg, char **azCol){
       }
       if( p->cnt++>0 ) fprintf(p->out,"\n");
       for(i=0; i<nArg; i++){
-        fprintf(p->out,"%*s = %s\n", w, azCol[i], 
+        fprintf(p->out,"%*s = %s\n", w, azCol[i],
                 azArg[i] ? azArg[i] : p->nullvalue);
       }
       break;
@@ -527,7 +525,7 @@ static void open_db(struct callback_data *p){
 #endif
     if( p->db==0 ){
       if( zErrMsg ){
-        fprintf(stderr,"Unable to open database \"%s\": %s\n", 
+        fprintf(stderr,"Unable to open database \"%s\": %s\n",
            p->zDbFilename, zErrMsg);
       }else{
         fprintf(stderr,"Unable to open database %s\n", p->zDbFilename);
@@ -1174,7 +1172,7 @@ static void process_sqliterc(
 /*
 ** Show available command line options
 */
-static const char zOptions[] = 
+static const char zOptions[] =
   "   -init filename       read/process named file\n"
   "   -echo                print commands before execution\n"
   "   -[no]header          turn headers on or off\n"
@@ -1182,7 +1180,7 @@ static const char zOptions[] =
   "   -html                set output mode to HTML\n"
 #ifdef SQLITE_HAS_CODEC
   "   -key KEY             encryption key\n"
-#endif                 
+#endif
   "   -line                set output mode to 'line'\n"
   "   -list                set output mode to 'list'\n"
   "   -separator 'x'       set output field separator (|)\n"

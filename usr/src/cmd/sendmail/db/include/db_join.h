@@ -7,8 +7,6 @@
  *	@(#)db_join.h	10.2 (Sleepycat) 10/4/98
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _DB_JOIN_H
 #define _DB_JOIN_H
 /*

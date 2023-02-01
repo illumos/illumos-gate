@@ -27,7 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* LINTLIBRARY */
 
 # include	<unistd.h>
@@ -99,7 +98,7 @@ Again:	if (stat(path, &stbuf) == -1)
 		return(NULL);
 	    else
 		wronly = 1;
-	
+
 	if (isastream(fd) && !wronly)
 	{
 #if	defined(NOCONNLD)
@@ -112,7 +111,7 @@ Again:	if (stat(path, &stbuf) == -1)
 		return(NULL);
 
 	    (void)_Close(fd);
-	    
+
 	    fd = fds[0];
 	    (void)_Close(fds[1]);
 #endif

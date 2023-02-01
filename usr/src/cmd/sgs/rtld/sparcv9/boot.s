@@ -26,12 +26,11 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Bootstrap routine for ld.so.  Control arrives here directly from
  * exec() upon invocation of a dynamically linked program specifying ld.so
- * as its interpreter. 
+ * as its interpreter.
  *
  * On entry, the stack appears as:
  *
@@ -112,7 +111,7 @@ _elf_start:
 ! construct an Elf64_Boot attribute value vector.
 
 	save	%sp, -SA(MINFRAME + (EB_MAX * 16)), %sp
-	
+
 _alias_start:
 
 1:					! PIC prologue
@@ -127,9 +126,9 @@ _alias_start:
 
 ! %fp points to the root of our ELF bootstrap vector, use it to construct
 ! the vector and send it to _setup.
-! 
+!
 ! The resulting Elf64_Boot vector looks like this:
-! 
+!
 !	Offset		Contents
 !	+0x0		EB_ARGV
 !	+0x8		argv[]
@@ -161,7 +160,7 @@ _alias_start:
 	brnz,pt	%l1, 3b			! if not at end, go back and look again
 	add	%l0, 8, %l0		!	incrementing pointer in delay
 	stx	%l0, [%o0 + 0x28]	! store aux vector pointer
-	
+
 	mov	EB_NULL, %l0		! set up for the last pointer
 	stx	%l0, [%o0 + 0x30]	!   and store it
 	mov	%g0, %g2		! clear globals
@@ -176,7 +175,7 @@ _alias_start:
 
 ! On return, give callee the exit function in %g1, and jump to the
 ! target program, clearing out the reserved globals as we go.
-	
+
 	ldx	[%l7 + atexit_fini], %g1! get function address
 	restore	%o0, %g0, %l1		! release frame
 	jmpl	%l1, %g0		! call main program

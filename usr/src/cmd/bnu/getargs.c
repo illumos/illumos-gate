@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 /*
@@ -80,7 +77,7 @@ register int count;
  *	\n gets replaced by a newline
  *	\r gets replaced by a carriage return
  *	\b gets replaced by a backspace
- *	\s gets replaced by a blank 
+ *	\s gets replaced by a blank
  *	any other unknown \ sequence is left intact for further processing
  *	downline.
  */
@@ -132,7 +129,7 @@ char **args;
 					*to++ = '\t';
 					break;
 
-				case 's':	
+				case 's':
 					*to++ = ' ';
 					break;
 
@@ -165,7 +162,7 @@ char **args;
 
 /*
 ** This routine is used so that the current
-** locale can be saved and then restored. 
+** locale can be saved and then restored.
 */
 char *
 _uu_setlocale(int category, char *locale)
@@ -175,7 +172,7 @@ _uu_setlocale(int category, char *locale)
 
 	/* get current locale */
 	if ((tmp = setlocale(category, NULL)) == NULL)
-		return (NULL); 
+		return (NULL);
 
 	/* allocate space for the current locale and copy it */
 	len = strlen(tmp) + 1;

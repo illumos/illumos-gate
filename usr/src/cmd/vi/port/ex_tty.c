@@ -30,8 +30,6 @@
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ex.h"
 #include "ex_tty.h"
 
@@ -70,7 +68,7 @@ gettmode(void)
 void
 setterm(unsigned char *type)
 {
-	char *tparm(); 
+	char *tparm();
 	unsigned char *chrptr;
 	int unknown, i;
 	int l;
@@ -259,7 +257,7 @@ setterm(unsigned char *type)
 
 #ifndef sun
 /*
- * Map both map1 and map2 as below.  map2 surrounded by esc and 
+ * Map both map1 and map2 as below.  map2 surrounded by esc and
  * the 'i', 'R', or 'a' mode.  However, because we don't know
  * the mode here we put in the escape and when the map() routine
  * is called for immacs mapping the mode is appended to the

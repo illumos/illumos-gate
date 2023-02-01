@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
 * This module is intended to collect performance statistics about the
 * operation of uucico.  All instances of uucico will write their log
@@ -121,7 +119,7 @@
 *	trmuser	t|	6
 *	trmsys	t|	6
 *	text	t|	12	"PARTIAL FILE" if the data is being transmitted
-*				before breaking the transmission; blank if the 
+*				before breaking the transmission; blank if the
 *				partial file after the breakpoint or the whole
 *				file is being transmitted completely.
 *
@@ -860,7 +858,7 @@ time_t	intoQue;
 	LOGCHECK;
 	grabTimes(&xptr->xf_times[XT_FOUND]);
 	copyText(xptr->xf_jobname, sizeof(xptr->xf_jobname), jobid);
-  	xptr->xf_jobgrade[0] = jobid[strlen(jobid)-5]; 
+  	xptr->xf_jobgrade[0] = jobid[strlen(jobid)-5];
   	xptr->xf_jobgrade[1] = NULLCHAR;/* get job grade from jobid */
 	copyText(xptr->xf_flags, sizeof(xptr->xf_flags), flags);
 

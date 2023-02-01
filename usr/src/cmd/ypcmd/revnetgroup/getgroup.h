@@ -23,18 +23,16 @@
  * Copyright 1995 Sun Microsystems Inc.
  * All rights reserved.
  */
-							    
+
 
 #ifndef	__GETGROUP_H
 #define	__GETGROUP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"        /* SMI4.1 1.4 */
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-struct grouplist {		
+struct grouplist {
 	char *gl_machine;
 	char *gl_name;
 	char *gl_domain;

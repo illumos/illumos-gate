@@ -19,8 +19,6 @@ static char copyright[] =
 	The Regents of the University of California.  All rights reserved.\n";
 #endif /* not lint */
 
-#pragma ident  "%Z%%M% %I%     %E% SMI"
-
 #ifndef lint
 static char sccsid[] = "@(#)mail.local.c	8.83 (Berkeley) 12/17/98";
 static char sccsi2[] = "%W% (Sun) %G%";
@@ -391,7 +389,7 @@ dolmtp(bouncequota)
 					p = strchr(rcpt_addr[i], '+');
 					if (p != NULL)
 						*p++ = '\0';
-					deliver(hfd, bfd, rcpt_addr[i], 
+					deliver(hfd, bfd, rcpt_addr[i],
 						bouncequota);
 				}
 				close(bfd);

@@ -27,8 +27,6 @@
 #ifndef _RCAPD_MAPPING_H
 #define	_RCAPD_MAPPING_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

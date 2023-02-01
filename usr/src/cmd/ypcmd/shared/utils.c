@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * DESCRIPTION:	This file contains various functions used by more than one NIS
  *		components. A lot of this code started off in ypxfr and then

@@ -28,8 +28,6 @@
  * stats using the fmd's stats API.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <strings.h>
 #include "stats.h"

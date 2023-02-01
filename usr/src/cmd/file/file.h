@@ -27,8 +27,6 @@
 #ifndef _FILE_H
 #define	_FILE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * header for the file command
  */

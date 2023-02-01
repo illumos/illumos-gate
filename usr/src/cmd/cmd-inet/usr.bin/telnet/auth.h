@@ -64,8 +64,6 @@
 #ifndef	_AUTH_H
 #define	_AUTH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

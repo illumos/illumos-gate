@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utils.xs contains XS wrappers for utility functions needed initially by
  * Sun::Solaris::Kstat, but that should prove generally useful as well.

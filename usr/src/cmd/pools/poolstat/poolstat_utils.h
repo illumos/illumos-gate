@@ -27,8 +27,6 @@
 #ifndef	_POOLSTAT_UTILS_H
 #define	_POOLSTAT_UTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 
 #ifdef	__cplusplus

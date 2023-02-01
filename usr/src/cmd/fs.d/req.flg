@@ -20,7 +20,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 echo_file usr/src/cmd/fs.d/Makefile.fstype
 echo_file usr/src/cmd/fs.d/preenlib.c

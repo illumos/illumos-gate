@@ -29,8 +29,6 @@
 /*	  All Rights Reserved					*/
 /*								*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * make directory.
  * If -m is used with a valid mode, directories will be

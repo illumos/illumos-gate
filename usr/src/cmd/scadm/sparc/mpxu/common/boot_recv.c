@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * boot_recv.c: retrieve a BP (Boot Protocol) message from the receive queue
  * (BP messages received from the service processor are queued in

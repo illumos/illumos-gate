@@ -9,8 +9,6 @@
  *	$Id: rpool.h,v 1.16 2003/09/05 23:07:49 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  libsm resource pools
 **  See libsm/rpool.html for documentation.

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
-
 # include	<unistd.h>
 # include	<string.h>
 # include	<stropts.h>
@@ -62,7 +59,7 @@ MESG * mcreate (path)
 
     if ((md = (MESG *)Malloc(MDSIZE)) == NULL)
 	return(NULL);
-    
+
     memset(md, 0, sizeof (MESG));
     md->admin = 1;
     md->file = Strdup(path);
@@ -77,6 +74,6 @@ MESG * mcreate (path)
     md->writefd = fds[0];
     close(fds[1]);
 #endif
-    
+
     return(md);
 }

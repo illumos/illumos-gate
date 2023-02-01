@@ -27,8 +27,6 @@
 #ifndef	_PICLENVMON_H
 #define	_PICLENVMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

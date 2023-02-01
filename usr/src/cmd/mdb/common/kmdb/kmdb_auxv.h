@@ -26,8 +26,6 @@
 #ifndef _KMDB_AUXV_H
 #define	_KMDB_AUXV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The kmdb_auxv is the interface between the driver and the debugger portions
  * of kmdb.  It is used for three purposes:

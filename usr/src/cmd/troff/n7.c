@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef EUC
 #ifdef NROFF
 #include <stdlib.h>
@@ -60,7 +58,7 @@ tchar	gettch();
 
 /*
  * troff7.c
- * 
+ *
  * text
  */
 
@@ -142,8 +140,8 @@ tbreak()
 	horiz(un);
 #ifdef NROFF
 	if (adrem % t.Adj)
-		resol = t.Hor; 
-	else 
+		resol = t.Hor;
+	else
 		resol = t.Adj;
 #else
 	resol = HOR;
@@ -198,7 +196,7 @@ tbreak()
 	}
 	if (icf)
 		icf++;
-	else 
+	else
 		ic = 0;
 	ne = nwd = 0;
 	un = in;
@@ -261,7 +259,7 @@ text()
 	nflush++;
 	numtab[HP].val = 0;
 	if ((dip == d) && (numtab[NL].val == -1)) {
-		newline(1); 
+		newline(1);
 		return (0);
 	}
 	setnel();
@@ -273,8 +271,8 @@ text()
 		goto t4;
 	if (pendt)
 		if (spcnt)
-			goto t2; 
-		else 
+			goto t2;
+		else
 			goto t3;
 	pendt++;
 	if (spcnt)
@@ -319,8 +317,8 @@ t5:
 	adsp = adrem = 0;
 	if (ad) {
 		if (nwd == 1)
-			adsp = nel; 
-		else 
+			adsp = nel;
+		else
 			adsp = nel / (nwd - 1);
 		adsp = (adsp / HOR) * HOR;
 		adrem = nel - adsp*(nwd-1);
@@ -399,8 +397,8 @@ callsp()
 	int	i;
 
 	if (flss)
-		i = flss; 
-	else 
+		i = flss;
+	else
 		i = lss;
 	flss = 0;
 	casesp(i);
@@ -480,7 +478,7 @@ int	a;
 		}
 		if (dip->ditrap && !dip->ditf && dip->dnl >= dip->ditrap && dip->dimac)
 			if (control(dip->dimac, 0)) {
-				trap++; 
+				trap++;
 				dip->ditf++;
 			}
 		return (0);
@@ -626,7 +624,7 @@ findt1()
 
 	if (dip != d)
 		i = dip->dnl;
-	else 
+	else
 		i = numtab[NL].val;
 	return(findt(i));
 }
@@ -643,7 +641,7 @@ struct s *a;
 	ejf++;
 	if (a)
 		ejl = a;
-	else 
+	else
 		ejl = frame;
 	if (trap)
 		return (0);
@@ -756,7 +754,7 @@ m5:
 }
 
 
-int		
+int
 horiz(i)
 int	i;
 {

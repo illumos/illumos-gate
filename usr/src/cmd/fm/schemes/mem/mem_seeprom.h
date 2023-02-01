@@ -27,8 +27,6 @@
 #ifndef _MEM_SEEPROM_H
 #define	_MEM_SEEPROM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Layout of SEEPROM data
  *

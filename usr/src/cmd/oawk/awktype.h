@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * There are additional "wctype" and "ctype" function(macros) to
  * support blank character without dependecy to locale.  This should

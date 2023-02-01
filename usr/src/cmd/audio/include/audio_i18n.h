@@ -27,8 +27,6 @@
 #ifndef _AUDIO_I18N_H
 #define	_AUDIO_I18N_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

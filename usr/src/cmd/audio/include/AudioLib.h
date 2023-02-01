@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOLIB_H
 #define	_MULTIMEDIA_AUDIOLIB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef NO_EXTERN_C
 
 #ifdef __cplusplus

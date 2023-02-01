@@ -28,10 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.2	*/
-
-
-
 /*
  * Member handling
  *	Archive members have an ASCII header.  A Member structure

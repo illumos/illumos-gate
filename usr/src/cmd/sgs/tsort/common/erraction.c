@@ -28,9 +28,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Routine called after error message has been printed.
  *	Dependent upon the return code of errafter.

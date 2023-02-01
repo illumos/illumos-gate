@@ -26,8 +26,6 @@
 #ifndef	_MDB_KB_H
 #define	_MDB_KB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * A KVM backend is used by the KVM target to interrogate the address space of
  * the subject binary.  This is almost always via direct calls into libkvm,

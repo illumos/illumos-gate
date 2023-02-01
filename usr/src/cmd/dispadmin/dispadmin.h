@@ -34,8 +34,6 @@
  *	copyright is propagated.  SVr4.0 1.9
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The following is an excerpt from <sys/hrtcntl.h>. HRT timers are not
  * supported by SunOS (which will support the POSIX definition). Dispadmin

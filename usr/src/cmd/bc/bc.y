@@ -30,9 +30,6 @@
 /*	  All Rights Reserved  	*/
 
 %{
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%}
-%{
 #include <stdio.h>
 #include <stdarg.h>
 #include <limits.h>

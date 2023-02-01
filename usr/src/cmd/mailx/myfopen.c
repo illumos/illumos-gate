@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rcv.h"
 
 #undef	fopen
@@ -77,13 +75,13 @@ static NODE *
 search(FILE *fp)
 {
 	register NODE *tmp;
-	
+
 	for (tmp = fplist; tmp != (NODE *)NULL; tmp = tmp->next)
 		if (tmp->fp == fp)
 			break;
 	return( tmp != (NODE *)NULL ? tmp : NOFP);
 }
-	
+
 static NODE *
 append(FILE *fp)
 {

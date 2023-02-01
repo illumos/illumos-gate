@@ -33,8 +33,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mailx -- a modified version of a University of California at Berkeley
  *	mail program
@@ -103,7 +101,7 @@ jmp_buf	_pause;				/* For doing sigpause() */
  * the real sigset() library.  We don't bother here, assuming that
  * you are either ignoring or defaulting a signal in the child.
  */
-sigtype 
+sigtype
 sigsys(int sig, sigtype func)
 {
 	sigtype old;
@@ -119,7 +117,7 @@ sigsys(int sig, sigtype func)
  * If the signal is subsequently (or even now) held,
  * the action you set here can be enabled using sigrelse().
  */
-sigtype 
+sigtype
 sigset(int sig, sigtype func)
 {
 	sigtype old;
@@ -167,7 +165,7 @@ sigset(int sig, sigtype func)
  * This CAN be tricky if the signal's disposition is SIG_DFL.
  * In that case, we still catch the signal so we can note it
  */
-sigtype 
+sigtype
 sighold(int sig)
 {
 	sigtype old;
@@ -195,7 +193,7 @@ sighold(int sig)
  * Release a signal
  * If the signal occurred while we had it held, cause the signal.
  */
-sigtype 
+sigtype
 sigrelse(int sig)
 {
 	sigtype old;
@@ -222,7 +220,7 @@ sigrelse(int sig)
 /*
  * Ignore a signal.
  */
-sigtype 
+sigtype
 sigignore(int sig)
 {
 	return(sigset(sig, SIG_IGN));
@@ -235,7 +233,7 @@ sigignore(int sig)
  * occurred.  It will actually cause something when
  * the signal is released.
  */
-int 
+int
 sigpause(int sig)
 {
 	if (sig < 1 || sig > NSIG) {
@@ -254,7 +252,7 @@ sigpause(int sig)
  * signals to SIG_IGN.  This is a new procedure not in the real sigset()
  * package, provided for retrofitting purposes.
  */
-int 
+int
 sigchild(void)
 {
 	register int i;
@@ -270,7 +268,7 @@ sigchild(void)
  * If we have not set this signal before, we have to
  * ask the system
  */
-sigtype 
+sigtype
 sigdisp(int sig)
 {
 	sigtype old;
@@ -302,7 +300,7 @@ sigdisp(int sig)
  * The following routine gets called for any signal
  * that is to be trapped to a user function.
  */
-void 
+void
 _Sigtramp(int sig)
 {
 	sigtype old;
@@ -339,7 +337,7 @@ top:
 	/*
 	 * If the signal is SIG_DFL, then we probably got here
 	 * by holding the signal, having it happen, then releasing
-	 * the signal. 
+	 * the signal.
 	 */
 	if (sigtable[sig].s_func == SIG_DFL) {
 		signal(sig, SIG_DFL);

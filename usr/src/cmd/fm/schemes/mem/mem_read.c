@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Retrieval of the DIMM serial number from data encoded in the SPD and
  * SEEPROM formats.

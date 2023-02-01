@@ -8,8 +8,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ipf.h"
 
 char *getsumd(sum)

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Debugger co-routine context support.  kmdb co-routines are essentially the
  * same as the ones used by mdb, with the exception that we allocate the stack

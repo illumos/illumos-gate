@@ -26,9 +26,6 @@
 
 /*    Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*      All Rights Reserved   */
-  
-  
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	devfree key [device [...]]
@@ -164,7 +161,7 @@ main(int argc, char *argv[])
 	/* Make only the text component of messages appear (remove this in SVR4.1) */
 	(void) putenv("MSGVERB=text");
 
-	
+
 	/*
 	 * Parse the options from the command line
 	 */
@@ -211,8 +208,8 @@ main(int argc, char *argv[])
 	    if (rsvd = reservdev()) {
 		exitcd = EX_OK;
 		for (plk = rsvd ; *plk ; plk++) {
-		    if ((*plk)->key == key) 
-			if (devfree(key, (*plk)->devname) != 0) 
+		    if ((*plk)->key == key)
+			if (devfree(key, (*plk)->devname) != 0)
 			    exitcd = EX_NOFREE;
 		}
 	    } else {
@@ -272,7 +269,7 @@ main(int argc, char *argv[])
 	    /* Try to free the device */
 	    if (devfree(key, *argp) != 0) {
 		if ((errno == EACCES) || (errno == ENOENT)) {
-		    
+
 		    /* Can't get at reservation file */
 		    if (rsvtab = _rsvtabpath()) {
 			exitcode = EX_TBLERR;
@@ -301,7 +298,7 @@ main(int argc, char *argv[])
 		    stdmsg(MM_NRECOV, lbl, MM_ERROR, msg);
 		    exitcode = EX_NOFREE;
 		}
-	
+
 		else {
 
 		    /* Some other strange error occurred */

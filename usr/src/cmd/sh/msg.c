@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	UNIX shell
  */
@@ -41,7 +39,7 @@
  * error messages
  */
 #ifndef __STDC__
-#define const 
+#define const
 #endif
 
 const char	badopt[]	= "bad option(s)";
@@ -233,7 +231,7 @@ const struct sysnod commands[] =
 	{ "type",	SYSTYPE },
 
 
-#ifndef RES		
+#ifndef RES
 	{ "ulimit",	SYSULIMIT },
 	{ "umask",	SYSUMASK },
 #endif

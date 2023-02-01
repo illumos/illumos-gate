@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
@@ -38,7 +36,7 @@
  */
 
 kadm5_ret_t kadm5_get_principal_v1(void *server_handle,
-				  krb5_principal principal, 
+				  krb5_principal principal,
 				  kadm5_principal_ent_t_v1 *ent)
 {
      return kadm5_get_principal(server_handle, principal,(kadm5_principal_ent_t) ent, 0);

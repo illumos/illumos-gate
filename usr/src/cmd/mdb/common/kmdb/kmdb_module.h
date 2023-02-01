@@ -27,8 +27,6 @@
 #ifndef _KMDB_MODULE_H
 #define	_KMDB_MODULE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/modctl.h>
 #include <sys/kobj.h>
 

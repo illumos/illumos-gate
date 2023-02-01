@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_RESAMPLE_H
 #define	_MULTIMEDIA_RESAMPLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * To convert the sampling rate of fi of input signal to fo of output signal,
  * the least common multiple fm = L * fi = M * fo needs to be derived first.

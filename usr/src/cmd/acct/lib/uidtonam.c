@@ -26,7 +26,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+
 /*
  * convert uid to login name; interface to getpwuid that keeps up to USIZE1
  * names to avoid unnecessary accesses to passwd file

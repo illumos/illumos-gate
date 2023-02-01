@@ -54,8 +54,6 @@ static char conf_header[] =
 "# Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.\n"
 "# Use is subject to license terms.\n"
 "#\n"
-"#pragma ident	\"@(#)power.conf	2.1	02/03/04 SMI\"\n"
-"#\n"
 "# Power Management Configuration File\n"
 "#\n\n";
 

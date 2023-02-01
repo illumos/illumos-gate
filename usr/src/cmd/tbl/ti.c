@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /* ti.c: classify line intersections */
 # include "t..c"
 /* determine local environment for intersections */

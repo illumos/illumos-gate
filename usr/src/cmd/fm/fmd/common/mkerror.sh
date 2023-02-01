@@ -24,9 +24,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 input="`cat`"
 [ -z "$input" ] && exit 1
@@ -36,8 +33,6 @@ echo "\
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.\n\
  * Use is subject to license terms.\n\
  */\n\
-\n\
-#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n\
 \n\
 #include <strings.h>
 #include <fmd_error.h>

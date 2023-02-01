@@ -39,8 +39,6 @@
  * "The Regents of the University of California.  All rights reserved.\n";
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "defs.h"
 #include <sys/types.h>
 #include <sys/param.h>

@@ -22,9 +22,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define FATAL   1
 #define HEX     0
 #define OCTAL   1

@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is a user command which dumps each entry in a yp data base.  It gets
  * the stuff using the normal ypclnt package; the user doesn't get to choose

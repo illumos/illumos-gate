@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/acct.h>
@@ -56,7 +53,7 @@ expand(comp_t ct)
 	e = (ct >> 13) & 07;
 	f = ct & 017777;
 
-	while (e-- > 0) 
+	while (e-- > 0)
 #ifdef uts
 		f *= 8.0;		/* can't shift a float */
 #else

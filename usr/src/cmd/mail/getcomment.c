@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include "mail.h"
 /*
  * Get comment field, if any, from line.
@@ -44,7 +41,7 @@ getcomment(char *s, char *q)
 {
 	char	*p, *sav_q;
 	int	depth = 0;
-	
+
 	if ((p = strchr(s, '(')) == (char *)NULL) {
 		/* no comment found */
 		return (0);

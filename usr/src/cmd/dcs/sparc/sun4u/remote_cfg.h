@@ -27,8 +27,6 @@
 #ifndef _REMOTE_CFG_H
 #define	_REMOTE_CFG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING: The contents of this file are shared by all projects
  * that  wish to  perform  remote  Dynamic Reconfiguration  (DR)

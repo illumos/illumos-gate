@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rstat.h"
 #include "rstat_v2.h"
 #include <stdio.h>

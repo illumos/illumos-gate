@@ -27,8 +27,6 @@
 #ifndef	_PROC_KLUDGES_H
 #define	_PROC_KLUDGES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

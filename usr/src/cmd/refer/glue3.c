@@ -12,9 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include "refer..c"
 #include <string.h>
 #define	move(x, y) close(y); dup(x); close(x);

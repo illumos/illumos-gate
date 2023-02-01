@@ -10,9 +10,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/* line below is from UCB 5.4 12/11/85 */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <myrcmd.h>
 #include <stdio.h>
 #include <locale.h>

@@ -32,8 +32,6 @@
 #ifndef	_DATABASE_H
 #define	_DATABASE_H
 
-#pragma ident	"%W%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

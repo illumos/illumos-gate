@@ -8,8 +8,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef CBCP_H
 #define CBCP_H
 

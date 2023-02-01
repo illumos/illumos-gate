@@ -10,8 +10,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _SMDB_H_
 # define _SMDB_H_
 

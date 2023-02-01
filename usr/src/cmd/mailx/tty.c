@@ -33,8 +33,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mailx -- a modified version of a University of California at Berkeley
  *	mail program
@@ -84,7 +82,7 @@ typedef int	sig_atomic_t;
 static	sig_atomic_t	hadcont;		/* Saw continue signal */
 
 /*ARGSUSED*/
-static void 
+static void
 #ifdef	__cplusplus
 ttycont(int)
 #else
@@ -98,7 +96,7 @@ ttycont(int s)
 
 #ifndef TIOCSTI
 /*ARGSUSED*/
-static void 
+static void
 ttystop(int s)
 {
 	resetty();
@@ -111,7 +109,7 @@ ttystop(int s)
  * Read all relevant header fields.
  */
 
-int 
+int
 grabh(register struct header *hp, int gflags, int subjtop)
 {
 #ifdef SIGCONT
@@ -309,7 +307,7 @@ readtty(char pr[], char src[])
 	}
 }
 
-static int 
+static int
 savetty(void)
 {
 	if (ioctl(fileno(stdout), TCGETA, &savtty) < 0)
@@ -337,7 +335,7 @@ savetty(void)
 }
 
 #ifndef TIOCSTI
-static int 
+static int
 setty(void)
 {
 	if (ioctl(Out, TCSETAW, &ttybuf) < 0) {
@@ -347,21 +345,21 @@ setty(void)
 	return(0);
 }
 
-static void 
+static void
 resetty(void)
 {
 	if (ioctl(Out, TCSETAW, &savtty) < 0)
 		perror("ioctl");
 }
 
-static void 
+static void
 outstr(register char *s)
 {
 	while (*s)
 		Echo(*s++);
 }
 
-static void 
+static void
 rubout(register char *cp)
 {
 	register int oldcol;
@@ -391,7 +389,7 @@ rubout(register char *cp)
 	}
 }
 
-static int 
+static int
 countcol(void)
 {
 	register int col;
@@ -413,7 +411,7 @@ countcol(void)
 	return(col);
 }
 
-static void 
+static void
 Echo(int cc)
 {
 	char c = (char)cc;
@@ -462,7 +460,7 @@ static	int	ttyset;			/* We must now do erase/kill */
  * Read all relevant header fields.
  */
 
-int 
+int
 grabh(struct header *hp, int gflags, int subjtop)
 {
 	struct sgttyb ttybuf;
@@ -662,7 +660,7 @@ redo:
  * Receipt continuation.
  */
 /*ARGSUSED*/
-void 
+void
 ttycont(int)
 {
 
@@ -674,7 +672,7 @@ ttycont(int)
  * Null routine to allow us to hold SIGCONT
  */
 /*ARGSUSED*/
-static void 
+static void
 signull(int)
 {}
 #endif

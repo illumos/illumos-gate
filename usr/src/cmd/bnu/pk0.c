@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 #include "pk.h"
@@ -228,7 +225,7 @@ free:
 				pk->p_ipool = bp;
 				pk->p_is[x] = 0;
 				skip++;
-			} else 
+			} else
 				accept++;
 		} else if (t<0)
 			t = x;
@@ -421,9 +418,9 @@ int i;
 	if (pk->p_msg) {
 		if (pk->p_msg & ~M_RR || !(bstate&B_READY) ) {
 			x = pk->p_msg;
-			for(i=0; i<8; i++) 
+			for(i=0; i<8; i++)
 				if (x&1)
-					break; 
+					break;
 else
 				x >>= 1;
 			x = i;

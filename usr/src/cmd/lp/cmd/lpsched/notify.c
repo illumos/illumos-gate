@@ -26,9 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lpsched.h"
 
 static char		*N_Msg[] = {
@@ -85,14 +82,14 @@ static struct reason {
     }
 };
 
-	
+
 static void print_reason(int, int);
 
 
 /**
  ** notify() - NOTIFY USER OF FINISHED REQUEST
  **/
-	
+
 void
 notify(register RSTATUS *prs, char *errbuf, int k, int e, int slow)
 {
@@ -126,7 +123,7 @@ notify(register RSTATUS *prs, char *errbuf, int k, int e, int slow)
 
 		if (prs->request) {
 			char file[BUFSIZ];
-			
+
 			GetRequestFiles(prs->request, file, sizeof(file));
 			fdprintf(fd, "\nThe job title was:\t%s\n", file);
 			fdprintf(fd, "     submitted by:\t%s\n",
@@ -134,7 +131,7 @@ notify(register RSTATUS *prs, char *errbuf, int k, int e, int slow)
 			fdprintf(fd, "               at:\t%s\n",
 				ctime(&prs->secure->date));
 		}
-	
+
 		if (prs->request->outcome & RS_PRINTED)
 			fdprintf(fd, N_Msg[1], prs->printer->printer->name);
 
@@ -142,21 +139,21 @@ notify(register RSTATUS *prs, char *errbuf, int k, int e, int slow)
 			fdprintf(fd, N_Msg[2],
 				(prs->request->outcome & RS_FAILED)? ", and"
 					: ".");
-		
-	
+
+
 		if (prs->request->outcome & RS_FAILED) {
 			if (slow)
 				fdprintf(fd, N_Msg[3]);
 			else
 				fdprintf(fd, N_Msg[4],
 					prs->printer->printer->name);
-	
+
 			if (e > 0)
 				fdprintf(fd, N_Msg[slow? 5 : 6], e);
 			else if (k)
 				fdprintf(fd, N_Msg[slow? 7 : 8], k);
 		}
-	
+
 		if (errbuf) {
 			for (cp = errbuf; *cp && *cp == '\n'; cp++)
 				;

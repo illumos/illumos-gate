@@ -27,8 +27,6 @@
 #ifndef	__ELFWRAP_H
 #define	__ELFWRAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Local include file for elfwrap.
  */

@@ -3,7 +3,6 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* $OrigRevision: 2.1 $
 **
@@ -48,7 +47,7 @@ static char RCS[] =
 #define HOURN(x)	(x * 60)
 #define SECSPERDAY	(24L * 60L * 60L)
 
-#define CHECK_TM(y) (((y) % 100) < 70 ? (y) + 2000 : (y) + 1900) 
+#define CHECK_TM(y) (((y) % 100) < 70 ? (y) + 2000 : (y) + 1900)
 
 /*
 **  An entry in the lexical lookup table.
@@ -537,7 +536,7 @@ Convert(Month, Day, Year, Hours, Minutes, Seconds, Meridian, DSTmode)
 	Year += 1900;
     DaysInMonth[1] = Year % 4 == 0 && (Year % 100 != 0 || Year % 400 == 0)
 		    ? 29 : 28;
-    if (Year < EPOCH || Year > 2037 
+    if (Year < EPOCH || Year > 2037
      || Month < 1 || Month > 12
      /* LINTED Month is a time_t so intermediate results aren't truncated */
      || Day < 1 || Day > DaysInMonth[(int)--Month])

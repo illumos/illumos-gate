@@ -27,8 +27,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <fm/fmd_api.h>
 #include <unistd.h>

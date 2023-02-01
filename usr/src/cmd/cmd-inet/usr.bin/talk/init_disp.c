@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * init_disp contains the initialization code for the display package,
  * as well as the signal handling routines

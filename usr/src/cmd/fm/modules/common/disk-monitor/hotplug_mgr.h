@@ -27,8 +27,6 @@
 #ifndef _HOTPLUG_MGR_H
 #define	_HOTPLUG_MGR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Hotplug Manager declarations
  */

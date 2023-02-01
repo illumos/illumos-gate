@@ -27,8 +27,6 @@
 #ifndef	_MDB_DISASM_H
 #define	_MDB_DISASM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_modapi.h>
 

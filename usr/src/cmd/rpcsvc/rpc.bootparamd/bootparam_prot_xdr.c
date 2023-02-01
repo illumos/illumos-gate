@@ -28,9 +28,6 @@
  * It was generated using rpcgen.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <rpc/rpc.h>
 #include <rpcsvc/bootparam_prot.h>
 

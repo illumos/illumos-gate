@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "refer..c"
 #define	SAME 0
 #define	NFLAB 3000		/* number of bytes to record all labels */

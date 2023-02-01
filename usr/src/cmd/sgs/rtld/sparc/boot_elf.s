@@ -26,7 +26,6 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<link.h>
 #include	"machdep.h"
@@ -257,7 +256,7 @@ elf_plt_trace:
 	sub	%sp, 0x20, %sp		! create space for La_sparcv8_regs
 					! storage on the stack.
 
-	sub	%fp, 0x28, %o4		
+	sub	%fp, 0x28, %o4
 
 	st	%i0, [%o4]
 	st	%i1, [%o4 + 0x4]

@@ -22,7 +22,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 ###########
 ##
 ## Network Standard printer interface program.
@@ -79,20 +78,20 @@ then
                 return 1
         }
         LPTELL=fake_lptell
-fi       
- 
+fi
+
 #####
 # Error message formatter:
 #
 # Invoke as
 #
 #       errmsg severity message-number problem help
-#                                                   
+#
 # where severity is "ERROR" or "WARNING", message-number is
 # a unique identifier, problem is a short description of the
 # problem, and help is a short suggestion for fixing the problem.
 #####
- 
+
 LP_ERR_LABEL="UX:lp"
 E_IP_ARGS=1
 E_IP_OPTS=2
@@ -100,7 +99,7 @@ E_IP_OPTS=2
 E_IP_UNKNOWN=5
 E_IP_BADFILE=6
 E_IP_ERRORS=12 	# (in slow.filter)
- 
+
 errmsg () {
 
         case $1 in
@@ -114,17 +113,17 @@ errmsg () {
 
         echo "${LP_ERR_LABEL}:$2 ${sev}: $3
         TO FIX: $4" >&5
-}                       
- 
+}
+
 ###########
 ##
 ## Check arguments
 ###########
- 
+
 parse () {
         echo "`expr \"$1\" : \"^[^=]*=\(.*\)\"`"
-}         
- 
+}
+
 #####
 ##
 ## Error Cleanup and Exit
@@ -164,7 +163,7 @@ exit_clean()
 # of user or Spooler supplied options (without the -o prefix),
 # and the last arguments are the files to print.
 #####
- 
+
 if [ $# -lt 5 ]
 then
 
@@ -172,22 +171,22 @@ then
                 "wrong number of arguments to interface program" \
                 "consult your system administrator"
         exit 1
-fi      
- 
+fi
+
 printer=`basename $0`
 request_id=$1
 user_name=$2
 title=$3
 copies=$4
 option_list=$5
- 
+
 shift 5
 files="$*"
 
 
 #
 # debug sent to file if defined in /etc/syslog.conf
-# syslog.conf entry: 
+# syslog.conf entry:
 #	lpr.debug	/path/filename
 #
 logger -p lpr.debug -t "netstandard: ${request_id}" " "
@@ -229,25 +228,25 @@ do
 #       simple )
 #               simple="yes"
 # 		;;
-                   
+
         cpi=pica )
                 cpi=10
                 ;;
         cpi=elite )
                 cpi=12
-                ;; 
+                ;;
         cpi=* )
                 cpi=`parse ${i}`
                 ;;
- 
+
         lpi=* )
                 lpi=`parse ${i}`
                 ;;
- 
+
         length=* )
                 length=`parse ${i}`
                 ;;
- 
+
         width=* )
                 width=`parse ${i}`
                 ;;
@@ -280,14 +279,14 @@ do
 
         #####
         #
-        # If you want to add options that, 
+        # If you want to add options that,
         # take a list (e.g. -o lopt='a b c'), identif
         # them here and below (look for LOPT).
         #####
-                                   
+
 #	flist=* | lpd=* | options=* )
         flist=* | lpd=* )
-#LOPT   stty=* | flist=* | lpd=* | lopt=* )    
+#LOPT   stty=* | flist=* | lpd=* | lopt=* )
 
                 inlist=`expr "${inlist}${i}" : "^\([^=]*=\)"`
                 case "${i}" in
@@ -331,7 +330,7 @@ do
 #			options="${options} ${item}"
 #			;;
                 esac
-                     
+
                 case "${i}" in
                 ${inlist}\'*\' )
                         inlist=
@@ -351,7 +350,7 @@ do
                 printing continues"
                 ;;
         esac
-done         
+done
 
 logger -p lpr.debug -t "netstandard: ${request_id}"  "term : ${TERM}"
 
@@ -366,7 +365,7 @@ then
 
         case "$TERM" in
                 PS )
-                        # make the "postscript" printers use netpr 
+                        # make the "postscript" printers use netpr
                         FILTER=
                 ;;
                 PSR )
@@ -384,7 +383,7 @@ then
                 ;;
         esac
 fi
- 
+
 ####
 # sets default value for ordering of data and control files with
 # bsd protocol. Default: data files first. Administrator
@@ -412,7 +411,7 @@ pid=$$
 tmpfile=${LPTMPDIR}/${node}.${pid}
 
 logger -p lpr.debug -t "netstandard: ${request_id}" "tmpfile : ${tmpfile}"
- 
+
 #####
 #
 # Set up filter for banner page
@@ -424,7 +423,7 @@ PS | PSR )
 	banner_filter=" | /usr/lib/lp/postscript/postprint "
 	LPTELL_OPTS="-l"
 	;;
-esac 
+esac
 
 #####
 #
@@ -462,7 +461,7 @@ banner=small_banner
 
 if [ "no" = "${nobanner}" ]
 then
-	eval "${banner} ${banner_filter}" 2>&1 1>${LPTMPDIR}/small_banner.$$ 
+	eval "${banner} ${banner_filter}" 2>&1 1>${LPTMPDIR}/small_banner.$$
 fi
 
 #####
@@ -503,14 +502,14 @@ do
 					# clever users from giving a file name that
 					# evaluates as something to execute.
 					# Redirect stderr to stdout so LPTELL will
-					# get error messages from pipe. 
+					# get error messages from pipe.
 					#####
 
 					0<${file} eval ${FILTER} 2>&1 1>${tmpfile}
 					echo $? > ${LPTMPDIR}/pr_eexit_code.$$
 				) | ${LPTELL} ${LPTELL_OPTS} ${printer}
 
-				exit_code=`cat ${LPTMPDIR}/pr_eexit_code.$$` 
+				exit_code=`cat ${LPTMPDIR}/pr_eexit_code.$$`
 				logger -p lpr.debug -t "netstandard: ${request_id}" \
 					"filter exit_code : ${exit_code}"
 
@@ -533,7 +532,7 @@ do
 
 			logger -p lpr.debug -t "netstandard: ${request_id}" \
 				"printfile : ${printfile}"
-			
+
 			#####
 			# Print the file
 			#####
@@ -545,7 +544,7 @@ do
 					echo $? > ${LPTMPDIR}/pr_eexit_code.$$
 				) | ${LPTELL} ${LPTELL_OPTS} ${printer}
 
-				exit_code=`cat ${LPTMPDIR}/pr_eexit_code.$$` 
+				exit_code=`cat ${LPTMPDIR}/pr_eexit_code.$$`
 				logger -p lpr.debug -t "netstandard: ${request_id}" \
 					"netpr exit_code : ${exit_code}"
 
@@ -568,9 +567,9 @@ do
 						fi
 					fi
 				fi
-				
 
-			else	
+
+			else
 
 				errmsg WARNING ${E_IP_BADFILE} \
 				"cannot read temporary file \"${printfile}\""\

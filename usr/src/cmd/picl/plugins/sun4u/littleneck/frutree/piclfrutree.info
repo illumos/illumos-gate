@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is a fragment of a config file, used by FMD as a temporary measure for
  * serial number retrieval.  PICL frutree generation for littleneck is handled

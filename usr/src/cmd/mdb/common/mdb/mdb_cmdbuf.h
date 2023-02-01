@@ -26,8 +26,6 @@
 #ifndef	_MDB_CMDBUF_H
 #define	_MDB_CMDBUF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

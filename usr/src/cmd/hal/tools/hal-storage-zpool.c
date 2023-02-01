@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
 #endif
@@ -97,9 +95,9 @@ out:
 
 
 void
-handle_zpool (LibHalContext *hal_ctx, 
+handle_zpool (LibHalContext *hal_ctx,
 #ifdef HAVE_POLKIT
-	      LibPolKitContext *pol_ctx, 
+	      LibPolKitContext *pol_ctx,
 #endif
 	      char *subcmd, const char *pool, const char *device,
 	      const char *invoked_by_uid, const char *invoked_by_syscon_name,

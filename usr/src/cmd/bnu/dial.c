@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:dial.c 1.3 */
-
 /*LINTLIBRARY*/
 /***************************************************************
  *      dial() returns an fd for an open tty-line connected to the
@@ -159,7 +157,7 @@ int Cn;		/*fd for remote comm line */
 	}
 
 
-	rmlock((char*) NULL);	/*uucp routine in ulockf.c*/	
+	rmlock((char*) NULL);	/*uucp routine in ulockf.c*/
 	return;		/* code=negative for signal causing disconnect*/
 }
 
@@ -222,13 +220,13 @@ char speed[10];		/* character value of speed passed to dial */
 			else
 				Myline = call.line;
 		}
-	
+
 #ifdef forfutureuse
 		if (call->class != NULL)
 			alt[F_TYPE] = call->class;
 #endif
-	
-	
+
+
 		rlfd = getto(alt);
 	}
 	if (rlfd < 0)
@@ -253,7 +251,7 @@ char speed[10];		/* character value of speed passed to dial */
 }
 
 /*
-* undial(fd) 
+* undial(fd)
 */
 void
 undial(fd)

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sa_kstat - kstat statistic adapter, collects statistic data provided
  * by kstat.

@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOLIST_H
 #define	_MULTIMEDIA_AUDIOLIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <Audio.h>
 
 #ifdef __cplusplus

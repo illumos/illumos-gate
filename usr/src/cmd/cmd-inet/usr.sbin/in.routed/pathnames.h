@@ -41,8 +41,6 @@
 #ifndef _PATHNAMES_H
 #define	_PATHNAMES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * All remotely requested trace files must either start with this prefix
  * or be the same as the tracefile specified when the daemon was started.

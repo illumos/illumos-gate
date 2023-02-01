@@ -7,8 +7,6 @@
  * the sendmail distribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 SM_RCSID("@(#)$Id: strexit.c,v 1.3 2001/01/15 18:39:11 ca Exp $")
 #include <sm/string.h>

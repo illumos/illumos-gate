@@ -7,8 +7,6 @@
  *	@(#)os_jump.h	10.1 (Sleepycat) 10/17/98
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Calls which can be replaced by the application. */
 struct __db_jumptab {
 	int	(*j_close) __P((int));			/* DB_FUNC_CLOSE */

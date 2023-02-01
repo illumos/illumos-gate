@@ -27,8 +27,6 @@
 #ifndef	_PGREP_H
 #define	_PGREP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

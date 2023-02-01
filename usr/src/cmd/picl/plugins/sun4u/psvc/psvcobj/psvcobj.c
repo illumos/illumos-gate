@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file consists of routines to manage objects in the
  * "Platform Environment Services Framework". The classes

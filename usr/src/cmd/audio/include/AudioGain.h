@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOGAIN_H
 #define	_MULTIMEDIA_AUDIOGAIN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <AudioTypePcm.h>
 
 #ifdef __cplusplus

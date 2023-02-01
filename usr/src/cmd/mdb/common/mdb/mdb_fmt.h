@@ -27,8 +27,6 @@
 #ifndef	_MDB_FMT_H
 #define	_MDB_FMT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_target.h>
 
 #ifdef	__cplusplus

@@ -46,8 +46,6 @@
  * a parse error.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>

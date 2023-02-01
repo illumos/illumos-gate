@@ -22,11 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-
-# Script to wrap a non-windowing clean script to provide a prompt 
+# Script to wrap a non-windowing clean script to provide a prompt
 # before the dtterm window closes, and to catch abnormal terminations.
 
 # For any abnormal termination of the clean script, kill our parent
@@ -53,7 +50,7 @@ SCRIPT=$1
 shift
 
 if [ ! -e $SCRIPT ]; then
-	echo **** Clean script $SCRIPT not found **** 
+	echo **** Clean script $SCRIPT not found ****
 	echo "**** Press RETURN to close window ****"
 	read
 	kill -9 $PPID

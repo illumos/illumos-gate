@@ -28,8 +28,6 @@
  * this module provides a cache of fully instantized expressions.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include "alloc.h"

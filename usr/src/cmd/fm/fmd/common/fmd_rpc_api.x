@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 program FMD_API {
 	version FMD_API_VERSION_1 {
 		void FMD_HDL_CREATE(int) = 1;

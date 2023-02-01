@@ -4,9 +4,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 5.1 (Berkeley) 6/5/85 */
-
 #include <ctype.h>
 
 int l_onecase = 0;

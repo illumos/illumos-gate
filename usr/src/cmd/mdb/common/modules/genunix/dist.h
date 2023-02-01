@@ -26,8 +26,6 @@
 #ifndef	_DIST_H
 #define	_DIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

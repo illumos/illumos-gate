@@ -12,8 +12,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef TIMERS_H
 #define TIMERS_H 1
 

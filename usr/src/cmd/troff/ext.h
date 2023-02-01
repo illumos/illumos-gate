@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 extern	char	**argp;
 extern	char	*chname;
 extern	char	*eibuf;

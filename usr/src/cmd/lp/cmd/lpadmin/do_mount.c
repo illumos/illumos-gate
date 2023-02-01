@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
-
 #include "stdio.h"
 #include "string.h"
 #include "sys/types.h"
@@ -100,7 +97,7 @@ void			do_mount (printer, form, pwheel)
 	 * into a global that we can use for subsequent checks.
 	 */
 	if (!s) { /* a local printer */
-		
+
 	if (form && *form)
 		switch (verify_form(form)) {
 		case -1:

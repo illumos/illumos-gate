@@ -27,8 +27,6 @@
 #ifndef	_MDB_PROC_H
 #define	_MDB_PROC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_target_impl.h>
 #include <mdb/mdb_io_impl.h>
 #include <mdb/mdb_addrvec.h>

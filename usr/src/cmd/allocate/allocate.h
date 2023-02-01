@@ -27,8 +27,6 @@
 #ifndef	_ALLOCATE_H
 #define	_ALLOCATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

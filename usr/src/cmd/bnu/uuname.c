@@ -27,11 +27,8 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
- 
+
 /*
  * returns a list of remote systems accessible to uucico
  * option:
@@ -67,7 +64,7 @@ char **argv;
 			(void) fprintf(stderr, gettext("usage: uuname [-l|-c]\n"));
 			exit(1);
 		}
- 
+
 	if (lflg) {
 		if ( cflg )
 			(void) fprintf(stderr,
@@ -77,7 +74,7 @@ char **argv;
 		puts(name);
 		exit(0);
 	}
- 
+
 	if ( cflg )
 		setservice("cu");
 	else
@@ -90,7 +87,7 @@ char **argv;
 	}
 
 	while ( getsysline(s, sizeof(s)) ) {
-		if((s[0] == '#') || (s[0] == ' ') || (s[0] == '\t') || 
+		if((s[0] == '#') || (s[0] == ' ') || (s[0] == '\t') ||
 		    (s[0] == '\n'))
 			continue;
 		(void) sscanf(s, "%s", name);
@@ -109,7 +106,7 @@ char **argv;
 void
 assert(s1, s2, i1, file, line)
 char *s1, *s2, *file; int i1, line;
-{	
+{
 	(void)fprintf(stderr, "uuname: %s %s\n", s2, s1);
 	return;
 }

@@ -20,15 +20,9 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-
-sccsid=`echo '#pragma ident	"@Z@@M@	@I@	@E@ SMI"' | sed 's/@/%/g'`
-
 
 markrow()
 {
@@ -57,8 +51,6 @@ sorted=/tmp/sorted.$$
 for i
 do
 	echo "#" > $header
-	echo "$sccsid" >> $header
-	echo "#" >> $header
 	echo "# Copyright (c) `date +%Y` by Sun Microsystems, Inc." >> $header
 	echo "# All rights reserved." >> $header
 	echo "#" >> $header

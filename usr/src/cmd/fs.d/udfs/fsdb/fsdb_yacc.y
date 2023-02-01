@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <locale.h>
 #include <sys/param.h>
@@ -750,7 +748,7 @@ check_and_get_int(uint8_t *str, uint64_t *value)
 					(str[index] <= '9')) {
 				cvalue = str[index] - '0';
 			} else if ((str[index] >= 'a') &&
-					(str[index] <= 'f')) {	
+					(str[index] <= 'f')) {
 				cvalue = str[index] - 'a' + 10;
 			} else if ((str[index] >= 'A') &&
 					(str[index] <= 'F')) {

@@ -27,8 +27,6 @@
 #ifndef	_STORE_FORW_CREDS_H
 #define	_STORE_FORW_CREDS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

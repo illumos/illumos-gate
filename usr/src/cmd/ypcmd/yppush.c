@@ -31,7 +31,6 @@
 /*
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	_SVID_GETTOD
 #include	<sys/time.h>

@@ -27,8 +27,6 @@
 #ifndef	_SORT_STREAMS_ARRAY_H
 #define	_SORT_STREAMS_ARRAY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

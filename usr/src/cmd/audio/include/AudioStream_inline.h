@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOSTREAM_INLINE_H
 #define	_MULTIMEDIA_AUDIOSTREAM_INLINE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

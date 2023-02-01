@@ -26,10 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include "uucp.h"
 
 #if defined(BSD4_2) || defined(ATTSVR4)
@@ -380,7 +376,7 @@ char *flds[], *dev[];
 			dev[D_ARG+1] = NULL; /* needed for for loop to mark the end */
 			dev[D_ARG] = "\\D";
 		}
-		
+
 		phonecl = repphone(dev[D_ARG], flds[F_PHONE], args[1]);
 		exphone(phonecl, phoneex);
 		translate(args[1], phoneex);
@@ -971,7 +967,7 @@ char *dcname, *dnname, *phone;
 		(void) close(dcf);
 		Uerror = SS_DIAL_FAILED;
 		return(FAIL);
-	} else 
+	} else
 		DEBUG(4, "ACU write ok\n%s", "");
 
 	(void) close(dnf);
@@ -1024,7 +1020,7 @@ char *flds[];
  * AT&T Transport Layer Interface
  *
  * expected in Devices
- *	TLI line1 - - TLI 
+ *	TLI line1 - - TLI
  * or
  *	TLIS line1 - - TLIS
  *
@@ -1093,9 +1089,9 @@ char *dev[];
 
 	/* allocate tli structures	*/
 	errno = t_errno = 0;
-	if ( (bind_ret = (struct t_bind *)t_alloc(fd, T_BIND, T_ALL)) == 
+	if ( (bind_ret = (struct t_bind *)t_alloc(fd, T_BIND, T_ALL)) ==
 	    (struct t_bind *)NULL
-	|| (sndcall = (struct t_call *)t_alloc(fd, T_CALL, T_ALL)) == 
+	|| (sndcall = (struct t_call *)t_alloc(fd, T_CALL, T_ALL)) ==
 	    (struct t_call *)NULL
 	|| (rcvcall = (struct t_call *)t_alloc(fd, T_CALL, T_ALL)) ==
 	    (struct t_call *)NULL ) {

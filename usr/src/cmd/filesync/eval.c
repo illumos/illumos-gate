@@ -52,8 +52,6 @@
  *	flags in each file description structure.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <libgen.h>

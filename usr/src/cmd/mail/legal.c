@@ -28,7 +28,6 @@
  *      All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *  NAME
  *	legal - check existence of file

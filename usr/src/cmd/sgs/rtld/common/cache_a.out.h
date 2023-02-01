@@ -25,8 +25,6 @@
 #ifndef	_CACHE_DOT_H
 #define	_CACHE_DOT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ld.so directory caching
  */

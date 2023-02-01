@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* starting values for typesetting parameters: */
 
 #define	PS	10	/* default point size */
@@ -90,7 +88,7 @@
  * 0 and 040 don't have any graphic or other function.
  * The few that do have a purpose (e.g., \n, \b, \t, ...
  * are avoided by the ad hoc choices here.
- * See ifilt[] in n1.c for others -- 1, 2, 3, 5, 6, 7, 010, 011, 012 
+ * See ifilt[] in n1.c for others -- 1, 2, 3, 5, 6, 7, 010, 011, 012
  */
 
 #define	LEADER	001

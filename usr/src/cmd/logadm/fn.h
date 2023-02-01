@@ -28,8 +28,6 @@
 #ifndef	_LOGADM_FN_H
 #define	_LOGADM_FN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

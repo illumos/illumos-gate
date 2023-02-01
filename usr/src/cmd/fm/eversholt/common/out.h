@@ -33,8 +33,6 @@
 #ifndef	_ESC_COMMON_OUT_H
 #define	_ESC_COMMON_OUT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <sys/ccompile.h>
 #include <inttypes.h>

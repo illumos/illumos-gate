@@ -26,8 +26,6 @@
 #ifndef _KAIF_START_H
 #define	_KAIF_START_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <kmdb/kaif.h>
 

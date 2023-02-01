@@ -29,8 +29,6 @@
 #ifndef PPPOE_LOGGING_H
 #define	PPPOE_LOGGING_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

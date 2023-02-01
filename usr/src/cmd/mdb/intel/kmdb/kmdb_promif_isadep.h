@@ -27,8 +27,6 @@
 #ifndef _KMDB_PROMIF_ISADEP_H
 #define	_KMDB_PROMIF_ISADEP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

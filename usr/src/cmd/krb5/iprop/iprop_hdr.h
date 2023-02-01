@@ -7,8 +7,6 @@
 #ifndef	_IPROP_HDR_H
 #define	_IPROP_HDR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

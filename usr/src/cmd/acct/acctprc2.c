@@ -26,7 +26,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  *	acctprc2 <ptmp1 >ptacct
  *	reads std. input (in ptmp.h/ascii format)
@@ -83,7 +83,7 @@ int node_compare(const void *node1, const void *node2)
 		return(-1);
 	else	return(strcmp(((const struct utab *) node1)->ut_name,
 			((const struct utab *) node2)->ut_name));
-	
+
 }
 
 void
@@ -92,7 +92,7 @@ enter(struct ptmp *p)
 	unsigned int i;
 	double memk;
 	struct utab **pt;
- 
+
 	/* clear end of short users' names */
 	for(i = strlen(p->pt_name) + 1; i < NSZ; p->pt_name[i++] = '\0') ;
 
@@ -109,13 +109,13 @@ enter(struct ptmp *p)
 	ub->ut_kcore[0] = memk * MINT(p->pt_cpu[0]);
 	ub->ut_kcore[1] = memk * MINT(p->pt_cpu[1]);
 	ub->ut_pc = 1;
- 
+
 	if (*(pt = (struct utab **)tsearch((void *)ub, (void **)&root,  \
 		node_compare)) == NULL) {
 		fprintf(stderr, "Not enough space available to build tree\n");
 		exit(1);
 	}
-	
+
 	if (*pt != ub) {
 		(*pt)->ut_cpu[0] += MINT(p->pt_cpu[0]);
 		(*pt)->ut_cpu[1] += MINT(p->pt_cpu[1]);

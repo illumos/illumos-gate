@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sun_msgfmt.h"
 
 static const char	*mandatory_fields[] = {

@@ -25,8 +25,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	All Rights Reserved  	*/
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<sys/types.h>
 #include	<time.h>
 #include	<users.h>
@@ -48,7 +46,7 @@ time_t *expire;
 		return( INVALID );
 
 	now = time( (time_t *)0 );
-	
+
 	/* Make a time_t for midnight tonight */
 	tm = localtime( &now );
 	now -= tm->tm_hour * 60*60 + tm->tm_min * 60 + tm->tm_sec;

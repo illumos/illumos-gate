@@ -11,8 +11,6 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tt.c: subroutines for drawing horizontal lines */
 # include "t..c"
@@ -47,7 +45,7 @@ lspan(int i, int c)
 int k;
 if (ctype(i,c) != 's') return(0);
 c++;
-if (c < ncol && ctype(i,c)== 's') 
+if (c < ncol && ctype(i,c)== 's')
 	return(0);
 for(k=0; ctype(i,--c) == 's'; k++);
 return(k);

@@ -36,8 +36,6 @@
  * $FreeBSD: src/sbin/routed/output.c,v 1.7 2000/08/11 08:24:38 sheldonh Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "defs.h"
 #include <md5.h>
 #include <alloca.h>

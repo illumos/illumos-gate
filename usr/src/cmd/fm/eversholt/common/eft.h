@@ -29,8 +29,6 @@
 #ifndef	_ESC_COMMON_EFT_H
 #define	_ESC_COMMON_EFT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

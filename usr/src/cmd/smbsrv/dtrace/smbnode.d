@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 BEGIN
 {
     printf("-->SMB Server Node Trace Started");

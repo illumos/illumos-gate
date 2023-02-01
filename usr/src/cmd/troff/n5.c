@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef 	EUC
 #ifdef	NROFF
 #include <stddef.h>
@@ -52,7 +50,7 @@
 
 /*
  * troff5.c
- * 
+ *
  * misc processing requests
  */
 
@@ -78,16 +76,16 @@ casead()
 	case 'c':	/*centered adj*/
 		admod = 1;
 		break;
-	case 'b': 
+	case 'b':
 	case 'n':
 		admod = 0;
 		break;
-	case '0': 
-	case '2': 
+	case '0':
+	case '2':
 	case '4':
 		ad = 0;
-	case '1': 
-	case '3': 
+	case '1':
+	case '3':
 	case '5':
 		admod = (i - '0') / 2;
 	}
@@ -154,7 +152,7 @@ int	c;
 	if (skip() || ismot(i = getch()) || cbits(i) == ' ' || cbits(i) == '\n') {
 		ch = i;
 		return(c);
-	} else 
+	} else
 		return(i & BYTEMASK);
 }
 
@@ -238,7 +236,7 @@ int	aa, bb;
 {
 	if (aa > bb)
 		return(aa);
-	else 
+	else
 		return(bb);
 }
 
@@ -268,7 +266,7 @@ casein()
 
 	if (skip())
 		i = in1;
-	else 
+	else
 		i = max(hnumb(&in), 0);
 	tbreak();
 	in1 = in;
@@ -289,7 +287,7 @@ casell()
 
 	if (skip())
 		i = ll1;
-	else 
+	else
 		i = max(hnumb(&ll), INCH / 10);
 	ll1 = ll;
 	ll = i;
@@ -306,7 +304,7 @@ caselt()
 
 	if (skip())
 		i = lt1;
-	else 
+	else
 		i = max(hnumb(&lt), 0);
 	lt1 = lt;
 	lt = i;
@@ -339,7 +337,7 @@ casels()
 	noscale++;
 	if (skip())
 		i = ls1;
-	else 
+	else
 		i = max(inumb(&ls), 1);
 	ls1 = ls;
 	ls = i;
@@ -356,7 +354,7 @@ casepo()
 
 	if (skip())
 		i = po1;
-	else 
+	else
 		i = max(hnumb(&po), 0);
 	po1 = po;
 	po = i;
@@ -376,7 +374,7 @@ casepl()
 	skip();
 	if ((i = vnumb(&pl)) == 0)
 		pl = 11 * INCH; /*11in*/
-	else 
+	else
 		pl = i;
 	if (numtab[NL].val > pl)
 		numtab[NL].val = pl;
@@ -425,7 +423,7 @@ casech()
 	skip();
 	if (!(j = getrq()))
 		return (0);
-	else 
+	else
 		for (k = 0; k < NTRAP; k++)
 			if (mlist[k] == j)
 				break;
@@ -497,7 +495,7 @@ casebp()
 
 
 int
-casetm(ab) 
+casetm(ab)
 	int ab;
 {
 	int	i;
@@ -539,7 +537,7 @@ int	a;
 		j = vnumb((int *)0);
 		if (nonumb)
 			j = lss;
-	} else 
+	} else
 		j = a;
 	if (j == 0)
 		return (0);
@@ -547,8 +545,8 @@ int	a;
 		j = i;
 	savlss = lss;
 	if (dip != d)
-		i = dip->dnl; 
-	else 
+		i = dip->dnl;
+	else
 		i = numtab[NL].val;
 	if ((i + j) < 0)
 		j = -i;
@@ -567,8 +565,8 @@ casert()
 
 	skip();
 	if (dip != d)
-		p = &dip->dnl; 
-	else 
+		p = &dip->dnl;
+	else
 		p = &numtab[NL].val;
 	a = vnumb(p);
 	if (nonumb)
@@ -626,7 +624,7 @@ e0:
 		errprint(gettext("cannot do ev."));
 		if (error)
 			done2(040);
-		else 
+		else
 			edone(040);
 		return (0);
 	}
@@ -893,7 +891,7 @@ rdtty()
 	if (read(0, &onechar, 1) == 1) {
 		if (onechar == '\n')
 			tty++;
-		else 
+		else
 			tty = 1;
 #ifndef EUC
 		if (tty != 3)
@@ -976,7 +974,7 @@ caseta()
 		if (skip())
 			break;
 		tabtab[i] = max(hnumb(&tabtab[max(i-1,0)]), 0) & TABMASK;
-		if (!nonumb) 
+		if (!nonumb)
 			switch (cbits(ch)) {
 			case 'C':
 				tabtab[i] |= CTAB;
@@ -1056,7 +1054,7 @@ caseul()
 	noscale++;
 	if (skip())
 		i = 1;
-	else 
+	else
 		i = atoi();
 	if (ul && (i == 0)) {
 		font = sfont;
@@ -1083,7 +1081,7 @@ caseuf()
 
 	if (skip() || !(i = getrq()) || i == 'S' ||  (j = findft(i))  == -1)
 		ulfont = ULFONT; /*default underline position*/
-	else 
+	else
 		ulfont = j;
 #ifdef NROFF
 	if (ulfont == FT)
@@ -1139,8 +1137,8 @@ casemk()
 	int	i, j;
 
 	if (dip != d)
-		j = dip->dnl; 
-	else 
+		j = dip->dnl;
+	else
 		j = numtab[NL].val;
 	if (skip()) {
 		dip->mkline = j;

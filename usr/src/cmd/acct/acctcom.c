@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <time.h>
 #include <string.h>
 #include <stdio.h>
@@ -311,11 +308,11 @@ dofile(char *fname)
 		return;
 	else if (ab.ac_flag & AEXPND)
 		ver = 2;	/* 4.0 acct structure */
-	else 
+	else
 		ver = 1;	/* 3.x acct structure */
 
 	rewind(stdin);
-		
+
 
 	if(backward) {
 		if (ver == 2)
@@ -343,7 +340,7 @@ dofile(char *fname)
 		dst_secs = 3600;
 	else
 		dst_secs = 0;
-	daystart = (a->ac_btime - timezone + dst_secs) - 
+	daystart = (a->ac_btime - timezone + dst_secs) -
 	    ((a->ac_btime - timezone + dst_secs) % SECSINDAY);
 	if (Sflg) {
 		ts_a = tstrt_a + daystart - dst_secs;
@@ -470,7 +467,7 @@ aread(int ver)
 		}
 	} else
 		ret = fread((char *)&ab, sizeof(struct acct), 1, stdin);
-	
+
 
 	if(backward) {
 		if(ok) {
@@ -622,7 +619,7 @@ cmatch(char *comm, char *cstr)
 		xcomm[i] = comm[i];
 	}
 	xcomm[i] = '\0';
-	
+
 	return (regex(cstr,xcomm) ? 1 : 0);
 }
 

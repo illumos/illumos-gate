@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Simple minded read-ahead/write-behind subroutines for tftp user and
  * server.  Written originally with multiple buffers in mind, but current

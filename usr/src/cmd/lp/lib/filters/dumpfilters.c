@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "stdio.h"
@@ -164,14 +162,14 @@ q_print(int fd, char *str)
 
 /*********************************************************
 
-	fw_zDblQte	
+	fw_zDblQte
 
 	Duplicates the given string allocating memory
 	using malloc.
 
 	Double quotes are used to encase the string
 	and a backslash s put infront of any embedded
-	quotes. 
+	quotes.
 
 	returns a pointer to the string provided.
 
@@ -194,8 +192,8 @@ static char *fw_zDblQte (char *zBuf)
 		}
 	}
 
-	/* 
-		Allocate a new buffer 
+	/*
+		Allocate a new buffer
 		add 3 extra bytes for:
 			the new leading double quote
 			the new trailing double quote
@@ -212,10 +210,10 @@ static char *fw_zDblQte (char *zBuf)
 	for (i = 0; zBuf[i]; i++) {
 		if (zBuf[i] == '"') {
 			zT[j++] = '\\';
-		} 
+		}
 		zT[j++] = zBuf[i];
 	}
-				
+
 	zT[j++] = '"'; /* add a trailing double quote */
 	zT[j] = '\0';
 

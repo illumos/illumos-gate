@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The communication mechanism for requesting that the driver perform work on
  * behalf of the debugger.  Messages are passed and processed in FIFO order,

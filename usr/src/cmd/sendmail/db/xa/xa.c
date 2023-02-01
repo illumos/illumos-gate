@@ -5,8 +5,6 @@
  *	Sleepycat Software.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* XXX Remove the global transaction and hang it off the environment. */
 #include "config.h"
 

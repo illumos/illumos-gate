@@ -6,8 +6,6 @@
 #ifndef _KDB5_UTIL_H
 #define	_KDB5_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
@@ -39,7 +37,7 @@ extern "C" {
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -53,7 +51,7 @@ extern "C" {
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 #include <kdb/kdb_log.h>
 #define MAX_HEADER      1024
@@ -78,9 +76,9 @@ extern int add_db_arg(char *arg);
 
 extern void usage(void);
 
-extern void add_key 
-	(char const *, char const *, 
-		   krb5_const_principal, const krb5_keyblock *, 
+extern void add_key
+	(char const *, char const *,
+		   krb5_const_principal, const krb5_keyblock *,
 		   krb5_kvno, krb5_keysalt *);
 extern int set_dbname_help
 	(char *, char *);
@@ -100,8 +98,8 @@ extern int create_db_entry (krb5_principal, krb5_db_entry *);
 extern int kadm5_create_magic_princs (kadm5_config_params *params,
 						krb5_context context);
 
-extern int process_ov_principal (char *fname, krb5_context kcontext, 
-					   FILE *filep, int verbose, 
+extern int process_ov_principal (char *fname, krb5_context kcontext,
+					   FILE *filep, int verbose,
 					   int *linenop);
 
 extern void load_db (int argc, char **argv);

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Events, FMRIs and authorities must be declared before they can be used.
  * Routines in this file, driven by the parser, create the data structures

@@ -24,8 +24,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains routines to support the Platform Services Plugin
  * These routines implement the platform independent environment monitoring

@@ -26,8 +26,6 @@
 #ifndef	_KGREP_H
 #define	_KGREP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus

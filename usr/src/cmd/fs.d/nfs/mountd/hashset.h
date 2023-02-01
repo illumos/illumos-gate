@@ -27,8 +27,6 @@
 #ifndef	_HASHSET_H
 #define	_HASHSET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

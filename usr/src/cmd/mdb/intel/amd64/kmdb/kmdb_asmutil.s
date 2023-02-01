@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(__lint)
 #include <kmdb/kmdb_asmutil.h>
 #endif
@@ -130,7 +128,7 @@ kmt_out(void *buf, size_t nbytes, uintptr_t addr)
 
 	ENTRY_NP(kmt_in)
 	cmpq	$4, %rsi
-	je	4f	
+	je	4f
 	cmpq	$2, %rsi
 	je	2f
 

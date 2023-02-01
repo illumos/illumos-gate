@@ -5,8 +5,6 @@
  * Licensed under the Academic Free License version 2.1
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _PRINTER_H
 #define	_PRINTER_H
 

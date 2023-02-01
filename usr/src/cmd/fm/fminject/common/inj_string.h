@@ -27,8 +27,6 @@
 #ifndef _INJ_STRING_H
 #define	_INJ_STRING_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #include <inj_list.h>

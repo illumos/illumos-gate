@@ -27,8 +27,6 @@
 #ifndef	_XLATOR_H
 #define	_XLATOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <parser.h>
 #include <errlog.h>
 

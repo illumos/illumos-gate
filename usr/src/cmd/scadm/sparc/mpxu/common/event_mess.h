@@ -27,8 +27,6 @@
 #ifndef	_EVENT_MESS_H
 #define	_EVENT_MESS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

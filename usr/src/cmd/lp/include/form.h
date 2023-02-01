@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
-
 #if	!defined(_LP_FORM_H)
 #define	_LP_FORM_H
 
@@ -48,9 +45,9 @@
 # define FO_CPI		4
 # define FO_CHSET	5
 # define FO_RCOLOR	6
-# define FO_CMT	 	7	
-# define FO_ALIGN	8	
-# define FO_PAPER	9	
+# define FO_CMT	 	7
+# define FO_ALIGN	8
+# define FO_PAPER	9
 
 /**
  ** The internal copy of a form as seen by the rest of the world:

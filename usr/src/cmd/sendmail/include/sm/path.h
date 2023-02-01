@@ -9,8 +9,6 @@
  *	$Id: path.h,v 1.6 2001/04/03 01:53:00 gshapiro Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  Portable names for standard filesystem paths
 **  and macros for directories.

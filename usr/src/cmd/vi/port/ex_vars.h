@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	vi_AUTOINDENT		0
 #define	vi_AUTOPRINT		1
 #define	vi_AUTOWRITE		2
@@ -86,7 +84,7 @@
 #define vi_WRAPSCAN             42
 #define vi_WRAPMARGIN           43
 #define vi_WRITEANY             44
- 
+
 #define vi_NOPTS        45
 #else
 #define vi_TERM                 35
@@ -98,7 +96,7 @@
 #define vi_WRAPSCAN             41
 #define vi_WRAPMARGIN           42
 #define vi_WRITEANY             43
- 
+
 #define vi_NOPTS        44
 #endif
 

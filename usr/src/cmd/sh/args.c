@@ -28,8 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	UNIX shell
  */
@@ -51,15 +49,15 @@ unsigned char	flagadr[16];
 unsigned char	flagchar[] =
 {
 	'x',
-	'n', 
-	'v', 
-	't', 
-	STDFLG, 
-	'i', 
-	'e', 
-	'r', 
-	'k', 
-	'u', 
+	'n',
+	'v',
+	't',
+	STDFLG,
+	'i',
+	'e',
+	'r',
+	'k',
+	'u',
 	'h',
 	'f',
 	'a',
@@ -70,16 +68,16 @@ unsigned char	flagchar[] =
 
 long	flagval[]  =
 {
-	execpr,	
-	noexec,	
-	readpr,	
-	oneflg,	
-	stdflg,	
-	intflg,	
-	errflg,	
-	rshflg,	
-	keyflg,	
-	setflg,	
+	execpr,
+	noexec,
+	readpr,
+	oneflg,
+	stdflg,
+	intflg,
+	errflg,
+	rshflg,
+	keyflg,
+	setflg,
 	hashflg,
 	nofngflg,
 	exportflg,
@@ -105,7 +103,7 @@ options(int argc, unsigned char **argv)
 	{
 		/*
 		 * if first argument is "--" then options are not
-		 * to be changed. Fix for problems getting 
+		 * to be changed. Fix for problems getting
 		 * $1 starting with a "-"
 		 */
 
@@ -264,7 +262,7 @@ freeargs(blk)
 				return(argblk);
 		}
 		else
-		{			
+		{
 			if (cnt == 0)
 			{
 				for (argp = argblk->dolarg; *argp != (unsigned char *)ENDARGS; argp++)
@@ -289,7 +287,7 @@ copyargs(from, n)
 	np->doluse = 1;	/* use count */
 	pp = np->dolarg = (unsigned char **)alloc((n+1)*sizeof(char *));
 	dolv = pp;
-	
+
 	while (n--)
 		*pp++ = make(*fp++);
 	*pp++ = ENDARGS;
@@ -328,7 +326,7 @@ clearup(void)
 	/*
 	 * force `for' $* lists to go away
 	 */
-	if(globdolv) 
+	if(globdolv)
 		dolv = globdolv;
 	if(globdolc)
 		dolc = globdolc;
@@ -349,7 +347,7 @@ clearup(void)
 	 * Clean up pipe file descriptor
 	 * from command substitution
 	 */
-	
+
 	if(savpipe != -1) {
 		close(savpipe);
 		savpipe = -1;
@@ -363,10 +361,10 @@ clearup(void)
 }
 
 /*
- * Save positiional parameters before outermost function invocation 
- * in case we are interrupted. 
+ * Save positiional parameters before outermost function invocation
+ * in case we are interrupted.
  * Increment use count for current positional parameters so that they aren't thrown
- * away. 
+ * away.
  */
 
 struct dolnod *savargs(funcnt)
@@ -381,7 +379,7 @@ int funcnt;
 	return(dolh);
 }
 
-/* After function invocation, free positional parameters, 
+/* After function invocation, free positional parameters,
  * restore old positional parameters, and restore
  * use count.
  */
@@ -398,7 +396,7 @@ struct dolnod *olddolh;
 	if(dolh)
 		dolh -> doluse++; /* increment use count so arguments aren't freed */
 	argfor = freeargs(dolh);
-	if(funcnt == 1) { 
+	if(funcnt == 1) {
 		globdolh = 0;
 		globdolv = 0;
 		globdolc = 0;

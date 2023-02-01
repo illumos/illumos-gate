@@ -30,15 +30,13 @@
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
- * The Regents of the University of California   
+ * The Regents of the University of California
  * All Rights Reserved
  *
  * University Acknowledgment- Portions of this document are derived from
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "rcv.h"
 #include <locale.h>
@@ -55,7 +53,7 @@ static struct var	*lookup(char name[]);
 /*
  * Assign a value to a variable.
  */
-void 
+void
 assign(char name[], char value[])
 {
 	register struct var *vp;
@@ -89,7 +87,7 @@ assign(char name[], char value[])
 	}
 }
 
-int 
+int
 deassign(register char *s)
 {
 	register struct var *vp, *vp2;
@@ -129,7 +127,7 @@ deassign(register char *s)
  * strings whose value is "" since they are expected to be frequent.
  * Thus, we cannot free same!
  */
-void 
+void
 vfree(register char *cp)
 {
 	if (!equal(cp, ""))
@@ -214,7 +212,7 @@ findgroup(char name[])
 /*
  * Print a group out on stdout
  */
-void 
+void
 printgroup(char name[])
 {
 	register struct grouphead *gh;
@@ -235,7 +233,7 @@ printgroup(char name[])
  * the variable or group hash table.
  */
 
-int 
+int
 hash(char name[])
 {
 	register unsigned h;

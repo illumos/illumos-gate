@@ -26,8 +26,6 @@
 #ifndef	_VOLD_H
 #define	_VOLD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

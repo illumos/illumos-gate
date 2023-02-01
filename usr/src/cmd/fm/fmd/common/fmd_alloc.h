@@ -27,8 +27,6 @@
 #ifndef	_FMD_ALLOC_H
 #define	_FMD_ALLOC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

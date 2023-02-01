@@ -26,7 +26,6 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	acctmerg [-a] [-i] [-p] [-t] [-u] [-v] [file...]
@@ -138,7 +137,7 @@ main(int argc, char **argv)
 }
 
 /*
- *	getleast returns ptr to least (lowest uid)  element of current 
+ *	getleast returns ptr to least (lowest uid)  element of current
  *	avail, NULL if none left; always returns 1st of equals
  */
 struct tacct *

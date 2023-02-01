@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 int Retries;
@@ -54,13 +51,13 @@ char		*breakmsg; /* "PARTIAL FILE" or "" */
 	/* so millisecs may be zero.  just use 1 as best guess */
 	if ( millisecs == 0 )
 		millisecs = 1;
-		
-		
+
+
 	if (bytes < 1<<22)
 		bytes1000 = (bytes*1000/millisecs);
 	else
 		bytes1000 = ((bytes/millisecs)*1000);
-		
+
 	(void) sprintf(text, "%s %lu / %lu.%.3lu secs, %lu bytes/sec %s",
 		direction, bytes, millisecs/1000, millisecs%1000,
 		bytes1000, breakmsg );
@@ -74,7 +71,7 @@ char		*breakmsg; /* "PARTIAL FILE" or "" */
 	return;
 }
 
-static unsigned long	filesize;	/* size of file been 
+static unsigned long	filesize;	/* size of file been
 					transferred or received */
 /*
 	return the size of file been transferred or received

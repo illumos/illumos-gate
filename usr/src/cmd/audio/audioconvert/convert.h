@@ -27,8 +27,6 @@
 #ifndef _AUDIOCONVERT_CONVERT_H
 #define	_AUDIOCONVERT_CONVERT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <audio_i18n.h>
 #include <Audio.h>
 #include <AudioUnixfile.h>

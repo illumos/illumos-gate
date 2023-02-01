@@ -27,8 +27,6 @@
 #ifndef	_PCIDR_H
 #define	_PCIDR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libnvpair.h>
 #include <config_admin.h>
 

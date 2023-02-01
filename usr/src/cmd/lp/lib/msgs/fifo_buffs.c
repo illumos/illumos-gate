@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
 /* LINTLIBRARY */
 
 
@@ -61,7 +59,7 @@ ResetFifoBuffer(int fd)
 	if (FifoBufferTable [fd]) {
 		FifoBufferTable [fd]->full = 0;
 		FifoBufferTable [fd]->psave =
-		FifoBufferTable [fd]->psave_end = 
+		FifoBufferTable [fd]->psave_end =
 			FifoBufferTable [fd]->save;
 	}
 	return	0;
@@ -81,13 +79,13 @@ GetFifoBuffer(int fd)
 	if (!FifoBufferTable [fd]) {
 		if (!NewFifoBuffer (fd))
 			return	NULL;
-		
+
 		FifoBufferTable [fd]->full = 0;
 		FifoBufferTable [fd]->psave =
-		FifoBufferTable [fd]->psave_end = 
+		FifoBufferTable [fd]->psave_end =
 			FifoBufferTable [fd]->save;
 	}
-	
+
 	return	FifoBufferTable [fd];
 }
 

@@ -14,8 +14,6 @@
  *	$Id: local.h,v 1.58 2006/12/19 19:44:23 ca Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  Information local to this implementation of stdio,
 **  in particular, macros and private variables.

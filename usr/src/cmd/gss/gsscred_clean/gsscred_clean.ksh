@@ -20,11 +20,9 @@
 #
 # CDDL HEADER END
 #
-# 
+#
 # Copyright (c) 1998 by Sun Microsystems, Inc.
 # All rights reserved.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
 #
 # gsscred_db clean up script
 #
@@ -57,7 +55,7 @@ then
 #
 	cat -n $FILE_TO_CLEAN | sort -k 2,2 -k 1,1nr 2> /dev/null \
 		| cut -f2- | \
-		awk ' (NR > 1 && $1 != key) || NR == 1 { 
+		awk ' (NR > 1 && $1 != key) || NR == 1 {
 				key = $1;
 				print $0;
 			}

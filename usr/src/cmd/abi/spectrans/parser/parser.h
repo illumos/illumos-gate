@@ -27,8 +27,6 @@
 #ifndef _PARSER_H
 #define	_PARSER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 
 #ifdef	__cplusplus

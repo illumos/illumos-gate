@@ -27,9 +27,6 @@
 /*      Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*        All Rights Reserved   */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  getdev.c
  *
@@ -54,7 +51,7 @@
  *	EX_OK		Exit Value if all went well
  *	EX_ERROR	Exit Value if an error occurred
  *	EX_DEVTAB	Exit Value if the device table couldn't be opened
- 
+
  */
 
 #ifndef	TRUE
@@ -110,7 +107,7 @@ static	char	txt[MM_MXTXTLN+1];
  *
  *	This command generates a list of devices that match the
  *	specified criteria.
- *  
+ *
  *  Options:
  *	-a		A device must meet all of the criteria to be
  *			included in the generated list instead of just
@@ -121,10 +118,10 @@ static	char	txt[MM_MXTXTLN+1];
  *
  *  Arguments:
  *	criterion	An <attr><op><value> expression that describes
- *			a device attribute.  
+ *			a device attribute.
  *			<attr>	is a device attribute
  *			<op> 	may be = != : !: indicating equals, does not
- *				equal, is defined, and is not defined 
+ *				equal, is defined, and is not defined
  *				respectively
  *			<value>	is the attribute value.  Currently, the only
  *				value supported for the : and !: operators
@@ -142,7 +139,7 @@ int
 main(int argc, char **argv)
 {
 
-	/* 
+	/*
 	 *  Automatic data
 	 */
 
@@ -170,15 +167,15 @@ main(int argc, char **argv)
 	/* Write text-component of messages only (goes away in SVR4.1) */
 	(void) putenv("MSGVERB=text");
 
-	/* 
+	/*
 	 *  Parse the command line:
 	 *	- Options
 	 *	- Selection criteria
 	 *	- Devices to include or exclude
 	 */
 
-	/* 
-	 *  Extract options from the command line 
+	/*
+	 *  Extract options from the command line
 	 */
 
 	/* Initializations */
@@ -186,14 +183,14 @@ main(int argc, char **argv)
 	excludeflag = FALSE;	/* No -e -- Include only mentioned devices */
 	usageerr = FALSE;	/* No errors on the command line (yet) */
 
-	/* 
-	 *  Loop until all of the command line options have been parced 
+	/*
+	 *  Loop until all of the command line options have been parced
 	 */
 	opterr = FALSE;			/* Don't let getopt() write messages */
 	while ((optchar = getopt(argc, argv, "ae")) != EOF) switch (optchar) {
 
 	/* -a  List devices that fit all of the criteria listed */
-	case 'a': 
+	case 'a':
 	    if (andflag) usageerr = TRUE;
 	    else andflag = TRUE;
 	    break;
@@ -238,9 +235,9 @@ main(int argc, char **argv)
 	devicelist = builddevlist(arglist);
 	options = (excludeflag?DTAB_EXCLUDEFLAG:0)|(andflag?DTAB_ANDCRITERIA:0);
 
-	/* 
-	 *  Get the list of devices that meets the criteria requested.  If we 
-	 *  got a list (that might be empty), write that list to the standard 
+	/*
+	 *  Get the list of devices that meets the criteria requested.  If we
+	 *  got a list (that might be empty), write that list to the standard
 	 *  output file (stdout).
 	 */
 
@@ -263,28 +260,28 @@ main(int argc, char **argv)
  *
  *  Arguments:
  *	arglist		The list of arguments on the command-line
- *	
+ *
  *  Returns:  char **
  *	The address of the first item of the list of criterion on the
  *	command-line.  This is a pointer to malloc()ed space.
  */
 
 static char  **
-buildcriterialist(arglist) 
+buildcriterialist(arglist)
 	char  **arglist;	/* Pointer to the list of argument pointers */
 {
 	/*
 	 *  Automatic data
 	 */
-	
+
 	char  **pp;			/* Pointer to a criteria */
 	char  **allocbuf;		/* Pointer to the allocated data */
 	int	ncriteria;		/* Number of criteria found */
 
 
 	/*
-	 *  Search the argument list, looking for the end of the list or 
-	 *  the first thing that's not a criteria.  (A criteria is a 
+	 *  Search the argument list, looking for the end of the list or
+	 *  the first thing that's not a criteria.  (A criteria is a
 	 *  character-string that contains a colon (':') or an equal-sign ('=')
 	 */
 
@@ -300,8 +297,8 @@ buildcriterialist(arglist)
 	    /* Allocate space for the list of criteria pointers */
 	    allocbuf = (char **) malloc((ncriteria+1)*sizeof(char **));
 
-	    /* 
-	     *  Build the list of criteria arguments 
+	    /*
+	     *  Build the list of criteria arguments
 	     */
 	    pp = allocbuf;	/* Beginning of the list */
 	    while (*arglist &&			/* If there's more to do ... */
@@ -311,7 +308,7 @@ buildcriterialist(arglist)
 	    *pp = (char *) NULL;	/* Terminate the list */
 
 	} else allocbuf = (char **) NULL;	/* NO criteria */
-	
+
 
 	return (allocbuf);
 }
@@ -333,7 +330,7 @@ buildcriterialist(arglist)
  */
 
 static char  **
-builddevlist(arglist) 
+builddevlist(arglist)
 	char  **arglist;	/* Pointer to the list of pointers to args */
 {
 	/*
@@ -341,8 +338,8 @@ builddevlist(arglist)
 	 */
 
 	/*
-	 *  Search the argument list, looking for the end of the list or the 
-	 *  first thing that's not a criteria.  It is the first device in the 
+	 *  Search the argument list, looking for the end of the list or the
+	 *  first thing that's not a criteria.  It is the first device in the
 	 *  list of devices (if any).
 	 */
 

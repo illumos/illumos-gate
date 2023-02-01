@@ -27,8 +27,6 @@
 #ifndef	_PSVC_OBJECTS_CLASS_H
 #define	_PSVC_OBJECTS_CLASS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

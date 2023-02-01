@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef RPC_XDR
 %#include "iprop.h"
 #endif /* RPC_XDR */

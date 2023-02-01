@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lpsched.h"
 
 
@@ -47,7 +44,7 @@ insertr(RSTATUS *r)
 		Request_List = r;
 		return;
 	}
-	
+
 	for (prs = Request_List; prs; prs = prs->next) {
 		if (rsort(&r, &prs) < 0) {
 			r->prev = prs->prev;
@@ -78,13 +75,13 @@ remover(RSTATUS *r)
 {
 	if (r == Request_List)		/* on the request chain */
 		Request_List = r->next;
-	
+
 	if (r->next)
 		r->next->prev = r->prev;
-	
+
 	if (r->prev)
 		r->prev->next = r->next;
-	
+
 	r->next = 0;
 	r->prev = 0;
 	return;
@@ -98,7 +95,7 @@ RSTATUS *
 request_by_id(char *id)
 {
 	register RSTATUS	*prs;
-	
+
 	for (prs = Request_List; prs; prs = prs->next)
 		if (STREQU(id, prs->secure->req_id))
 			return (prs);

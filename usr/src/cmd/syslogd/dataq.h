@@ -27,8 +27,6 @@
 #ifndef	_DATAQ_H
 #define	_DATAQ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "llt.h"
 
 typedef struct dataq_data {

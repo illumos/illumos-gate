@@ -23,8 +23,6 @@
 Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 This file is usr/src/cmd/fma/modules/common/eversholt/README.
 
 The files in this directory build the "eft.so" plugin to the

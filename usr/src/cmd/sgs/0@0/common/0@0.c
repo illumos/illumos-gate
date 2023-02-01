@@ -29,8 +29,6 @@
  *	LD_PRELOAD=0@0.so.1 program args ...
  *
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* LINTLIBRARY */
 
 #include <sys/types.h>

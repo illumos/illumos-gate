@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	factor	COMPILE:	cc -O factor.c -s -i -lm -o factor	*/
 /*
  * works up to 14 digit numbers

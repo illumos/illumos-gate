@@ -26,8 +26,6 @@
 #ifndef _KMDB_IO_H
 #define	_KMDB_IO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * KMDB-specific I/O functions
  */

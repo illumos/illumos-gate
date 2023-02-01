@@ -12,8 +12,6 @@
  *	$Id: signal.h,v 1.16 2001/07/20 19:48:21 gshapiro Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  SIGNAL.H -- libsm (and sendmail) signal facilities
 **		Extracted from sendmail/conf.h and focusing

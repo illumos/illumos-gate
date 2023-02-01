@@ -27,8 +27,6 @@
 #ifndef _INJ_EVENT_H
 #define	_INJ_EVENT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <inj.h>
 #include <inj_string.h>
 

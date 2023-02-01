@@ -22,9 +22,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.1	*/
-
 /*
  * C++ Demangler Source Code
  * @(#)master	1.5

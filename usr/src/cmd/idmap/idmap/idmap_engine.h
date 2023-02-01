@@ -27,8 +27,6 @@
 #ifndef _IDMAP_ENGINE_H
 #define	_IDMAP_ENGINE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Debug macros */
 #define	DPTR(a) printf("%s::%d  %s = %p\n", __FILE__, __LINE__, #a, a);
 #define	DSTRING(a) printf("%s::%d  %s = \"%s\"\n", __FILE__, __LINE__, #a, \

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
-
 #include "stdio.h"
 #include "string.h"
 #include "sys/types.h"
@@ -104,7 +101,7 @@ int			output (type)
 			LP_ERRMSG (ERROR, E_LP_MRECV);
 			done (1);
 		}
-			
+
 		switch(type) {
 
 		case R_MOUNT_TRAY:

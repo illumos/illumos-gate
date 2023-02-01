@@ -22,8 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **  Originally written by Steven M. Bellovin <smb@research.att.com> while
 **  at the University of North Carolina at Chapel Hill.  Later tweaked by
@@ -960,7 +958,7 @@ get_date(p)
     yyHaveZone = 0;
 
     /*
-     * When yyparse returns, zero or more of yyHave{Time,Zone,Date,Day,Rel} 
+     * When yyparse returns, zero or more of yyHave{Time,Zone,Date,Day,Rel}
      * will have been incremented.  The value is number of items of
      * that type that were found; for all but Rel, more than one is
      * illegal.

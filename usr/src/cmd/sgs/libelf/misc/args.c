@@ -27,7 +27,6 @@
  *	Copyright (c) 1998 by Sun Microsystems, Inc.
  *	All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.2	*/
 
 #include	<ctype.h>
 #include	<stdlib.h>
@@ -351,7 +350,7 @@ char *c;
 	while(*c && (i = demangle_doarg(sptr,c)) > 0) {
 		c += i;
 		n += i;
-		(*sptr) = app_String(*sptr,(*c && *c == 'e') ? 
+		(*sptr) = app_String(*sptr,(*c && *c == 'e') ?
 		    MSG_ORIG(MSG_STR_SPACE) : MSG_ORIG(MSG_STR_COMMA));
 	}
 

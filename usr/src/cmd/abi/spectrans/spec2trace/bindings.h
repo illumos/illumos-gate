@@ -27,8 +27,6 @@
 #ifndef _BINDINGS_H
 #define	_BINDINGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

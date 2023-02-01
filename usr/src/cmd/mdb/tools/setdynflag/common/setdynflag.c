@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Set bits in the DT_FLAGS_1 member of the .dynamic section of an object.
  */

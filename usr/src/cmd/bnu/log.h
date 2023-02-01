@@ -30,8 +30,6 @@
 #ifndef LOG_H
 #define	LOG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	MCHAR		'M'	/* Indicates master */
 #define SCHAR		'S'	/* Indicates slave */
 

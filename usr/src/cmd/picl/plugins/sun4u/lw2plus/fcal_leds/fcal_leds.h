@@ -27,8 +27,6 @@
 #ifndef	_FCAL_LEDS_H
 #define	_FCAL_LEDS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <picl.h>
 #include <picltree.h>
 #include <picldefs.h>

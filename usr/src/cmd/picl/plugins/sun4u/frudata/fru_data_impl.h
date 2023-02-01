@@ -28,8 +28,6 @@
 #ifndef	_FRU_DATA_IMPL_H
 #define	_FRU_DATA_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

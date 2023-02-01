@@ -23,8 +23,6 @@
 % * Use is subject to license terms.
 % */
 %
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%
 %/*
 % * Compiled from ypupdate_prot.x using rpcgen
 % * This is NOT source code!

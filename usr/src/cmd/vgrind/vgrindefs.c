@@ -4,8 +4,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	BUFSIZ	1024
 #define MAXHOP	32	/* max number of tc= indirections */
 

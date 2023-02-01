@@ -27,8 +27,6 @@
 #ifndef	_MDB_IO_IMPL_H
 #define	_MDB_IO_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_io.h>
 
 #ifdef	__cplusplus

@@ -27,8 +27,6 @@
 #ifndef	_FMD_TIME_H
 #define	_FMD_TIME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

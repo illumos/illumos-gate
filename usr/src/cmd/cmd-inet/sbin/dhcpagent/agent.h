@@ -26,8 +26,6 @@
 #ifndef	AGENT_H
 #define	AGENT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <libinetutil.h>
 #include <dhcpagent_ipc.h>

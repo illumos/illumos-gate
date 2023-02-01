@@ -26,8 +26,6 @@
 #ifndef	_MDBMOD_UMEM_H
 #define	_MDBMOD_UMEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 #include <umem_impl.h>
 

@@ -27,8 +27,6 @@
 #ifndef	_CACHEMGR_DOOR_H
 #define	_CACHEMGR_DOOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Definitions for server side of doors-based name service caching
  */

@@ -12,8 +12,6 @@
  * the sendmail distribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 SM_RCSID("@(#)$Id: fread.c,v 1.26 2001/02/28 20:54:03 ca Exp $")
 #include <string.h>

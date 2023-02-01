@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * valid_srecord.c: to get and check an S-record string from a file
  * (firmware image to be downloaded to the service processor)

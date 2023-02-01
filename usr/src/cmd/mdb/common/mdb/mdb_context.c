@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Debugger co-routine context support:  In order to implement the context-
  * switching necessary for MDB pipes, we need the ability to establish a

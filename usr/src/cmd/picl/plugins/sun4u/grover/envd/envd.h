@@ -27,8 +27,6 @@
 #ifndef	_ENVD_H
 #define	_ENVD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <libintl.h>
 

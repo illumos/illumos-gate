@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <Audio.h>
 #include <AudioFile.h>
 #include <AudioList.h>

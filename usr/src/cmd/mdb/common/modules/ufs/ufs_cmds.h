@@ -27,10 +27,6 @@
 #ifndef	_UFS_CMDS_H
 #define	_UFS_CMDS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
-
 #ifdef __cplusplus
 extern "C" {
 #endif

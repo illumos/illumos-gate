@@ -27,8 +27,6 @@
 #ifndef	_ROLL_LOG_H
 #define	_ROLL_LOG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fs/ufs_fs.h>
 
 #ifdef	__cplusplus

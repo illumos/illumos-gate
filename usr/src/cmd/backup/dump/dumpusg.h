@@ -26,8 +26,6 @@
 #ifndef	_DUMPUSG_H
 #define	_DUMPUSG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Translate from BSD to System V, where possible.
  */

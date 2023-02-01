@@ -27,8 +27,6 @@
 #ifndef	_MDB_TYPES_H
 #define	_MDB_TYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

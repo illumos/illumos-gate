@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SMI4.1 1.7  */
-
 #include <stdio.h>
 #include <ndbm.h>
 #include <netdb.h>

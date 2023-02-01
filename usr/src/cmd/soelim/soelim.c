@@ -14,8 +14,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 /*
  * soelim - a filter to process n/troff input eliminating .so's

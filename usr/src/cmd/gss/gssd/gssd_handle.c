@@ -30,7 +30,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*	from kerbd_handle.c	1.3	92/01/29 SMI */
 
 /*

@@ -27,7 +27,6 @@
  *	Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	defined(lint)
 
@@ -217,7 +216,7 @@ elf_plt_trace:
 	 * original caller.
 	 */
 .grow_stack:
-	subl	%edx, %esp			/    grow the stack 
+	subl	%edx, %esp			/    grow the stack
 	movl	%edx, -88(%ebp)			/    -88(%ebp) == prev frame sz
 	movl	%esp, %ecx			/    %ecx = dest
 	addl	%ecx, %edx			/    %edx == tail of dest
@@ -253,7 +252,7 @@ elf_plt_trace:
 	pushl	%eax				/ arg0 (retval)
 	call	audit_pltexit@PLT
 	addl	$20, %esp			/ cleanup stack
-	
+
 	/*
 	 * Clean up after ourselves and return to the
 	 * original calling procedure.

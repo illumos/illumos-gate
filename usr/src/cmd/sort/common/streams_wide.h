@@ -27,8 +27,6 @@
 #ifndef	_STREAMS_WIDE_H
 #define	_STREAMS_WIDE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

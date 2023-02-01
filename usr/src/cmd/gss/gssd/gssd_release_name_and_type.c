@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  glue routine for gssd_release_name_and_type -- this is a hack,
  *  it is only used by the client-side rpc library.  Perhaps it should

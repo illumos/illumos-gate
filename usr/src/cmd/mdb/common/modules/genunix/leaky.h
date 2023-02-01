@@ -27,8 +27,6 @@
 #ifndef	_LEAKY_H
 #define	_LEAKY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/systm.h>
 
 #ifdef	__cplusplus

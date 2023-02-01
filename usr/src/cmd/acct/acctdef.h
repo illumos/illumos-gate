@@ -26,8 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <utmpx.h>
 
 static struct utmpx utdummy;	/* dummy - used to get member sizes */
@@ -140,7 +138,7 @@ struct	tacct	{
 
 
 /*
- *	connect time record 
+ *	connect time record
  */
 struct ctmp {
 	dev_t	ct_tty;			/* major minor */
@@ -158,4 +156,4 @@ struct ptmp {
 	char	pt_name[NSZ];		/* login name */
 	ulong_t	pt_cpu[2];		/* CPU (sys+usr) P/NP time tics */
 	unsigned pt_mem;		/* avg. memory size (64byte clicks) */
-};	
+};

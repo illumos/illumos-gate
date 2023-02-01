@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "fru_access_impl.h"
 
 static uchar_t			sp_sec_hdr[] = SP_SEC_HDR;

@@ -9,8 +9,6 @@
  *
  ***************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -87,7 +85,7 @@ get_audit_export_data(DBusConnection *bus, const char *invoked_by_syscon_name, s
 				return NULL;
 			}
 		}
-		
+
 		dbus_message_iter_get_basic (&subiter, &value);
 		buf[count++] = value;
 		dbus_message_iter_next(&subiter);

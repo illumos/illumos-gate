@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * In order to implement walk iteration variables (that is, ::walk walk varname)
  * we need to keep track of the active walk variables as the pipeline is

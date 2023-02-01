@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -148,7 +146,7 @@
 %token COMMA
 %token COLON
 
-%right ASSIGN 
+%right ASSIGN
 %left LOR
 %left LAND
 %left OR

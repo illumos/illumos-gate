@@ -27,8 +27,6 @@
 #ifndef	_FMD_STRING_H
 #define	_FMD_STRING_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <strings.h>
 

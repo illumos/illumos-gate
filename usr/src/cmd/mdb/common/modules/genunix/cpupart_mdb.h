@@ -27,8 +27,6 @@
 #ifndef	_MDB_CPUPART_MDB_H
 #define	_MDB_CPUPART_MDB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus

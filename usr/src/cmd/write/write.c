@@ -30,8 +30,6 @@
  * Copyright (c) 2018, Joyent, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<ctype.h>
 #include	<string.h>
 #include	<stdio.h>

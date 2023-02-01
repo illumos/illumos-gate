@@ -25,8 +25,6 @@
 #ifndef	_NETDEBUG_H
 #define	_NETDEBUG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
