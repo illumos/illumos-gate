@@ -24,7 +24,7 @@
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -95,6 +95,10 @@
  * nominated by the device to cover the corresponding capability. The interrupt
  * is allocated on a per-capability basis. Therefore, one interrupt would cover
  * AERs, while another interrupt would cover the rest of the desired functions.
+ * Importantly, there is no guarantee that a bridge supports more than one
+ * vector; in particular, at least some AMD bridges do not.  In this case,
+ * interrupts associated with all the available capabilities will be routed to
+ * the same shared vector.
  *
  * To track which interrupts cover which behaviors, each driver state
  * (pcieb_devstate_t) has a member called 'pcieb_isr_tab'. Each index represents
@@ -1693,11 +1697,19 @@ pcieb_intr_handler(caddr_t arg1, caddr_t arg2)
 	/* AER Error */
 	if (isrc & PCIEB_INTR_SRC_AER) {
 		/*
-		 *  If MSI is shared with PME/hotplug then check Root Error
-		 *  Status Reg before claiming it. For now it's ok since
-		 *  we know we get 2 MSIs.
+		 * AERs can interrupt on this vector, so if error reporting is
+		 * possible we need to scan the fabric to determine whether to
+		 * claim it.  This process will also generate ereports if the
+		 * bridge has error data for us.  Checking for EREPORT_CAPABLE
+		 * is perhaps a bit of a formality here but if it's not set we
+		 * aren't going to be able to do much that's useful with the AER
+		 * data; we initialise sts to 0 rather than PF_ERR_NO_ERROR so
+		 * that we'll claim this interrupt in that case, since we aren't
+		 * going to do the scan.  It may be more correct to check the
+		 * root port status ourselves in that case, but we aren't
+		 * terribly worried about the case where we don't have FMA
+		 * capabilities.
 		 */
-		ret = DDI_INTR_CLAIMED;
 		bzero(&derr, sizeof (ddi_fm_error_t));
 		derr.fme_version = DDI_FME_VERSION;
 		mutex_enter(&pcieb_p->pcieb_peek_poke_mutex);
@@ -1713,9 +1725,13 @@ pcieb_intr_handler(caddr_t arg1, caddr_t arg2)
 
 		mutex_exit(&pcieb_p->pcieb_err_mutex);
 		mutex_exit(&pcieb_p->pcieb_peek_poke_mutex);
-		if (pcieb_die & sts)
+		if ((pcieb_die & sts) != 0) {
 			fm_panic("%s-%d: PCI(-X) Express Fatal Error. (0x%x)",
 			    ddi_driver_name(dip), ddi_get_instance(dip), sts);
+		}
+
+		if ((sts & ~PF_ERR_NO_ERROR) != 0)
+			ret = DDI_INTR_CLAIMED;
 	}
 FAIL:
 	return (ret);
