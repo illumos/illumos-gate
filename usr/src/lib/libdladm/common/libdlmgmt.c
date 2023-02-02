@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <door.h>
@@ -122,8 +124,21 @@ dladm_create_datalink_id(dladm_handle_t handle, const char *link,
 		return (DLADM_STATUS_BADARG);
 	}
 
+	if (getzoneid() != GLOBAL_ZONEID) {
+		/*
+		 * If we're creating this link in a non-global zone, then do
+		 * not allow it to be persistent, and flag it as transient so
+		 * that it will be automatically cleaned up on zone shutdown,
+		 * rather than being moved to the GZ.
+		 */
+		if (flags & DLADM_OPT_PERSIST)
+			return (DLADM_STATUS_TEMPONLY);
+		flags |= DLADM_OPT_TRANSIENT;
+	}
+
 	dlmgmt_flags = (flags & DLADM_OPT_ACTIVE) ? DLMGMT_ACTIVE : 0;
 	dlmgmt_flags |= (flags & DLADM_OPT_PERSIST) ? DLMGMT_PERSIST : 0;
+	dlmgmt_flags |= (flags & DLADM_OPT_TRANSIENT) ? DLMGMT_TRANSIENT : 0;
 
 	(void) strlcpy(createid.ld_link, link, MAXLINKNAMELEN);
 	createid.ld_class = class;
@@ -285,6 +300,7 @@ dladm_walk_datalink_id(int (*fn)(dladm_handle_t, datalink_id_t, void *),
 
 	dlmgmt_flags = (flags & DLADM_OPT_ACTIVE) ? DLMGMT_ACTIVE : 0;
 	dlmgmt_flags |= ((flags & DLADM_OPT_PERSIST) ? DLMGMT_PERSIST : 0);
+	dlmgmt_flags |= ((flags & DLADM_OPT_TRANSIENT) ? DLMGMT_TRANSIENT : 0);
 
 	getnext.ld_cmd = DLMGMT_CMD_GETNEXT;
 	getnext.ld_class = class;
@@ -562,9 +578,12 @@ dladm_name2info(dladm_handle_t handle, const char *link, datalink_id_t *linkidp,
 	if (linkidp != NULL)
 		*linkidp = linkid;
 	if (flagp != NULL) {
-		*flagp = retval.lr_flags & DLMGMT_ACTIVE ? DLADM_OPT_ACTIVE : 0;
+		*flagp = (retval.lr_flags & DLMGMT_ACTIVE) ?
+		    DLADM_OPT_ACTIVE : 0;
 		*flagp |= (retval.lr_flags & DLMGMT_PERSIST) ?
 		    DLADM_OPT_PERSIST : 0;
+		*flagp |= (retval.lr_flags & DLMGMT_TRANSIENT) ?
+		    DLADM_OPT_TRANSIENT : 0;
 	}
 	if (classp != NULL)
 		*classp = retval.lr_class;
@@ -620,10 +639,12 @@ dladm_datalink_id2info(dladm_handle_t handle, datalink_id_t linkid,
 	if (mediap != NULL)
 		*mediap = retval.lr_media;
 	if (flagp != NULL) {
-		*flagp = retval.lr_flags & DLMGMT_ACTIVE ?
+		*flagp = (retval.lr_flags & DLMGMT_ACTIVE) ?
 		    DLADM_OPT_ACTIVE : 0;
 		*flagp |= (retval.lr_flags & DLMGMT_PERSIST) ?
 		    DLADM_OPT_PERSIST : 0;
+		*flagp |= (retval.lr_flags & DLMGMT_TRANSIENT) ?
+		    DLADM_OPT_TRANSIENT : 0;
 	}
 	return (DLADM_STATUS_OK);
 }

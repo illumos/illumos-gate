@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -77,6 +78,10 @@ extern "C" {
  *  - DLADM_OPT_BOOT:
  *    Bypass check functions during boot (used by pool property since pools
  *    can come up after link properties are set)
+ *
+ *  - DLADM_OPT_TRANSIENT:
+ *    Indicates that the link assigned to a zone is transient and will be
+ *    removed when the zone shuts down.
  */
 #define	DLADM_OPT_ACTIVE	0x00000001
 #define	DLADM_OPT_PERSIST	0x00000002
@@ -87,6 +92,7 @@ extern "C" {
 #define	DLADM_OPT_VLAN		0x00000040
 #define	DLADM_OPT_NOREFRESH	0x00000080
 #define	DLADM_OPT_BOOT		0x00000100
+#define	DLADM_OPT_TRANSIENT	0x00000200
 
 #define	DLADM_WALK_TERMINATE	0
 #define	DLADM_WALK_CONTINUE	-1

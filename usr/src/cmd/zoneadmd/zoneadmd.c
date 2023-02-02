@@ -772,8 +772,13 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr)
 
 	while (fgets(inbuf, 1024, file) != NULL) {
 		if (retstr == NULL) {
-			if (zlogp != &logsys)
+			if (zlogp != &logsys) {
+				int last = strlen(inbuf) - 1;
+
+				if (inbuf[last] == '\n')
+					inbuf[last] = '\0';
 				zerror(zlogp, B_FALSE, "%s", inbuf);
+			}
 		} else {
 			char *p;
 

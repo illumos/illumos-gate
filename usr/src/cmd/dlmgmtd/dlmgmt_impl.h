@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -60,6 +62,16 @@ typedef struct dlmgmt_link_s {
 	datalink_class_t	ll_class;
 	uint32_t		ll_media;
 	datalink_id_t		ll_linkid;
+	/*
+	 * The zone that owns the link. If this is set to the id of
+	 * an NGZ and ll_onloan is set then the link was created and
+	 * is owned by the GZ but is currently being loaned out to an
+	 * NGZ. E.g., when the GZ admin creates a VNIC for exclusive
+	 * use by an NGZ. If ll_onloan is set then ll_zoneid cannot be 0.
+	 *
+	 * If ll_zoneid is set to the id of an NGZ but ll_onloan is
+	 * not set then the link was created by, and is owned by, the NGZ.
+	 */
 	zoneid_t		ll_zoneid;
 	boolean_t		ll_onloan;
 	avl_node_t		ll_name_node;
@@ -67,6 +79,13 @@ typedef struct dlmgmt_link_s {
 	avl_node_t		ll_loan_node;
 	uint32_t		ll_flags;
 	uint32_t		ll_gen;		/* generation number */
+	/*
+	 * A transient link is one that is created and destroyed along with the
+	 * lifetime of a zone. It is a non-persistent link that is owned by the
+	 * zone (ll_zoneid is set to the id of the NGZ). It is specifically not
+	 * on-loan from the GZ.
+	 */
+	boolean_t		ll_transient;
 } dlmgmt_link_t;
 
 /*
@@ -138,7 +157,7 @@ void		dlmgmt_handler(void *, char *, size_t, door_desc_t *, uint_t);
 void		dlmgmt_log(int, const char *, ...);
 int		dlmgmt_write_db_entry(const char *, dlmgmt_link_t *, uint32_t);
 int		dlmgmt_delete_db_entry(dlmgmt_link_t *, uint32_t);
-int 		dlmgmt_db_init(zoneid_t);
+int		dlmgmt_db_init(zoneid_t, char *);
 void		dlmgmt_db_fini(zoneid_t);
 
 #ifdef  __cplusplus

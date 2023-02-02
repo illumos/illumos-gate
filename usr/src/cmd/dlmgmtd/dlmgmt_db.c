@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -549,8 +550,20 @@ dlmgmt_db_update(dlmgmt_db_op_t op, const char *entryname, dlmgmt_link_t *linkp,
 	assert((flags == DLMGMT_PERSIST) || (flags == DLMGMT_ACTIVE));
 
 	if ((req = dlmgmt_db_req_alloc(op, entryname, linkp->ll_linkid,
-	    linkp->ll_zoneid, flags, &err)) == NULL)
+	    linkp->ll_zoneid, flags, &err)) == NULL) {
 		return (err);
+	}
+
+	/*
+	 * If this is a transient link, then use the global zone cache file.
+	 * This is in order to allow recovery from a dlmgmtd failure that
+	 * leaves a zone in a 'down' state. In that state it is not possible
+	 * to read the zone's cache file (since it is always done from a sub
+	 * process running in the zone's context). As a result, datalinks would
+	 * otherwise remain stuck in the zone.
+	 */
+	if (flags == DLMGMT_ACTIVE && linkp->ll_transient)
+		req->ls_zoneid = GLOBAL_ZONEID;
 
 	/*
 	 * If the return error is EINPROGRESS, this request is handled
@@ -722,6 +735,7 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 		char		c = buf[i];
 		boolean_t	match = (c == '=' ||
 		    (c == ',' && !found_type) || c == ';');
+		boolean_t	rename = B_FALSE;
 
 		/*
 		 * Move to the next character if there is no match and
@@ -768,6 +782,25 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 					goto parse_fail;
 				linkp->ll_media =
 				    (uint32_t)*(int64_t *)attr_buf;
+			} else if (strcmp(attr_name, "zone") == 0) {
+				if (read_str(curr, &attr_buf) == 0)
+					goto parse_fail;
+				linkp->ll_zoneid = getzoneidbyname(attr_buf);
+				if (linkp->ll_zoneid == -1) {
+					if (errno == EFAULT)
+						abort();
+					/*
+					 * If we can't find the zone, assign the
+					 * link to the GZ and mark it for being
+					 * renamed.
+					 */
+					linkp->ll_zoneid = 0;
+					rename = B_TRUE;
+				}
+			} else if (strcmp(attr_name, "transient") == 0) {
+				if (read_boolean(curr, &attr_buf) == 0)
+					goto parse_fail;
+				linkp->ll_transient = *(boolean_t *)attr_buf;
 			} else {
 				attr_buf_len = translators[type].read_func(curr,
 				    &attr_buf);
@@ -811,6 +844,17 @@ parse_linkprops(char *buf, dlmgmt_link_t *linkp)
 
 			(void) snprintf(attr_name, MAXLINKATTRLEN, "%s", curr);
 		}
+
+		/*
+		 * The zone that this link belongs to has died, we are
+		 * reparenting it to the GZ and renaming it to avoid name
+		 * collisions.
+		 */
+		if (rename) {
+			(void) snprintf(linkp->ll_link, MAXLINKNAMELEN,
+			    "SUNWorphan%u", (uint16_t)(gethrtime() / 1000));
+		}
+
 		curr = buf + i + 1;
 	}
 
@@ -1124,7 +1168,8 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 			continue;
 		}
 
-		link_in_file.ll_zoneid = req->ls_zoneid;
+		assert(req->ls_zoneid == 0 ||
+		    link_in_file.ll_zoneid == req->ls_zoneid);
 		link_in_db = link_by_name(link_in_file.ll_link,
 		    link_in_file.ll_zoneid);
 		if (link_in_db != NULL) {
@@ -1222,17 +1267,30 @@ generate_link_line(dlmgmt_link_t *linkp, boolean_t persist, char *buf)
 
 	ptr += snprintf(ptr, BUFLEN(lim, ptr), "%s\t", linkp->ll_link);
 	if (!persist) {
+		char zname[ZONENAME_MAX];
+
 		/*
-		 * We store the linkid in the active database so that dlmgmtd
-		 * can recover in the event that it is restarted.
+		 * We store the linkid and the zone name in the active database
+		 * so that dlmgmtd can recover in the event that it is
+		 * restarted.
 		 */
 		u64 = linkp->ll_linkid;
 		ptr += write_uint64(ptr, BUFLEN(lim, ptr), "linkid", &u64);
+
+		if (getzonenamebyid(linkp->ll_zoneid, zname,
+		    sizeof (zname)) != -1) {
+			ptr += write_str(ptr, BUFLEN(lim, ptr), "zone", zname);
+		}
 	}
 	u64 = linkp->ll_class;
 	ptr += write_uint64(ptr, BUFLEN(lim, ptr), "class", &u64);
 	u64 = linkp->ll_media;
 	ptr += write_uint64(ptr, BUFLEN(lim, ptr), "media", &u64);
+
+	if (!persist && linkp->ll_transient) {
+		boolean_t b = B_TRUE;
+		ptr += write_boolean(ptr, BUFLEN(lim, ptr), "transient", &b);
+	}
 
 	/*
 	 * The daemon does not keep any active link attribute. Only store the
@@ -1382,13 +1440,49 @@ dlmgmt_db_walk(zoneid_t zoneid, datalink_class_t class, db_walk_func_t *func)
 }
 
 /*
+ * Attempt to mitigate one of the deadlocks in the dlmgmtd architecture.
+ *
+ * dlmgmt_db_init() calls dlmgmt_process_db_req() which eventually gets to
+ * dlmgmt_zfop() which tries to fork, enter the zone and read the file.
+ * Because of the upcall architecture of dlmgmtd this can lead to deadlock
+ * with the following scenario:
+ *    a) the thread preparing to fork will have acquired the malloc locks
+ *       then attempt to suspend every thread in preparation to fork.
+ *    b) all of the upcalls will be blocked in door_ucred() trying to malloc()
+ *       and get the credentials of their caller.
+ *    c) we can't suspend the in-kernel thread making the upcall.
+ *
+ * Thus, we cannot serve door requests because we're blocked in malloc()
+ * which fork() owns, but fork() is in turn blocked on the in-kernel thread
+ * making the door upcall.  This is a fundamental architectural problem with
+ * any server handling upcalls and also trying to fork().
+ *
+ * To minimize the chance of this deadlock occuring, we check ahead of time to
+ * see if the file we want to read actually exists in the zone (which it almost
+ * never does), so we don't need fork in that case (i.e. rarely to never).
+ */
+static boolean_t
+zone_file_exists(char *zoneroot, char *filename)
+{
+	struct stat	sb;
+	char		fname[MAXPATHLEN];
+
+	(void) snprintf(fname, sizeof (fname), "%s/%s", zoneroot, filename);
+
+	if (stat(fname, &sb) == -1)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
  * Initialize the datalink <link name, linkid> mapping and the link's
  * attributes list based on the configuration file /etc/dladm/datalink.conf
  * and the active configuration cache file
  * /etc/svc/volatile/dladm/datalink-management:default.cache.
  */
 int
-dlmgmt_db_init(zoneid_t zoneid)
+dlmgmt_db_init(zoneid_t zoneid, char *zoneroot)
 {
 	dlmgmt_db_req_t	*req;
 	int		err;
@@ -1398,22 +1492,28 @@ dlmgmt_db_init(zoneid_t zoneid)
 	    DATALINK_INVALID_LINKID, zoneid, DLMGMT_ACTIVE, &err)) == NULL)
 		return (err);
 
-	if ((err = dlmgmt_process_db_req(req)) != 0) {
-		/*
-		 * If we get back ENOENT, that means that the active
-		 * configuration file doesn't exist yet, and is not an error.
-		 * We'll create it down below after we've loaded the
-		 * persistent configuration.
-		 */
-		if (err != ENOENT)
-			goto done;
+	if (zone_file_exists(zoneroot, cachefile)) {
+		if ((err = dlmgmt_process_db_req(req)) != 0) {
+			/*
+			 * If we get back ENOENT, that means that the active
+			 * configuration file doesn't exist yet, and is not an
+			 * error.  We'll create it down below after we've
+			 * loaded the persistent configuration.
+			 */
+			if (err != ENOENT)
+				goto done;
+			boot = B_TRUE;
+		}
+	} else {
 		boot = B_TRUE;
 	}
 
-	req->ls_flags = DLMGMT_PERSIST;
-	err = dlmgmt_process_db_req(req);
-	if (err != 0 && err != ENOENT)
-		goto done;
+	if (zone_file_exists(zoneroot, DLMGMT_PERSISTENT_DB_PATH)) {
+		req->ls_flags = DLMGMT_PERSIST;
+		err = dlmgmt_process_db_req(req);
+		if (err != 0 && err != ENOENT)
+			goto done;
+	}
 	err = 0;
 	if (rewrite_needed) {
 		/*

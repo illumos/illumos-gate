@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -359,9 +360,9 @@ link_destroy(dlmgmt_link_t *linkp)
 }
 
 /*
- * Set the DLMGMT_ACTIVE flag on the link to note that it is active.  When a
- * link becomes active and it belongs to a non-global zone, it is also added
- * to that zone.
+ * Set the DLMGMT_ACTIVE flag on the link to note that it is active.
+ * When a link is active and owned by an NGZ then it is added to
+ * that zone's datalink list.
  */
 int
 link_activate(dlmgmt_link_t *linkp)
@@ -369,27 +370,73 @@ link_activate(dlmgmt_link_t *linkp)
 	int		err = 0;
 	zoneid_t	zoneid = ALL_ZONES;
 
+	/*
+	 * If zone_check_datalink() returns 0 it means we found the
+	 * link in one of the NGZ's datalink lists. Otherwise the link
+	 * is under the GZ.
+	 */
 	if (zone_check_datalink(&zoneid, linkp->ll_linkid) == 0) {
 		/*
-		 * This link was already added to a non-global zone.  This can
-		 * happen if dlmgmtd is restarted.
+		 * This is a bit subtle. If the following expression
+		 * is true then the link was found in one of the NGZ's
+		 * datalink lists but the link structure has it under
+		 * the GZ. This means that the link is supposed to be
+		 * loaned out to an NGZ but the dlmgmtd state is out
+		 * of sync -- possibly due to the process restarting.
+		 * In this case we need to sync the dlmgmtd state by
+		 * marking it as on-loan to the NGZ it's currently
+		 * under.
 		 */
 		if (zoneid != linkp->ll_zoneid) {
+			assert(linkp->ll_zoneid == 0);
+			assert(linkp->ll_onloan == B_FALSE);
+			assert(linkp->ll_transient == 0);
+
+			/*
+			 * If dlmgmtd already has a link with this
+			 * name under the NGZ then we have a problem.
+			 */
 			if (link_by_name(linkp->ll_link, zoneid) != NULL) {
 				err = EEXIST;
 				goto done;
 			}
 
+			/*
+			 * Remove the current linkp entry from the
+			 * list because it's under the wrong zoneid.
+			 * We don't have to update the dlmgmt_id_avl
+			 * because it compares entries by ll_linkid
+			 * only.
+			 */
 			if (avl_find(&dlmgmt_name_avl, linkp, NULL) != NULL)
 				avl_remove(&dlmgmt_name_avl, linkp);
 
+			/*
+			 * Update the link to reflect the fact that
+			 * it's on-loan to an NGZ and re-add it to the
+			 * list.
+			 */
 			linkp->ll_zoneid = zoneid;
 			avl_add(&dlmgmt_name_avl, linkp);
+
+			/*
+			 * Since the link was found to be in a zone but
+			 * recorded as a GZ link in the link structure, and
+			 * we've now updated that, also mark it as on-loan to
+			 * the NGZ.
+			 */
 			avl_add(&dlmgmt_loan_avl, linkp);
 			linkp->ll_onloan = B_TRUE;
 		}
 	} else if (linkp->ll_zoneid != GLOBAL_ZONEID) {
+		/*
+		 * In this case the link was not found under any NGZ
+		 * but according to its ll_zoneid member it is owned
+		 * by an NGZ. Add the datalink to the appropriate zone
+		 * datalink list.
+		 */
 		err = zone_add_datalink(linkp->ll_zoneid, linkp->ll_linkid);
+		assert(linkp->ll_onloan == B_FALSE);
 	}
 done:
 	if (err == 0)
@@ -449,6 +496,11 @@ dlmgmt_create_common(const char *name, datalink_class_t class, uint32_t media,
 		return (EINVAL);
 	if (dlmgmt_nextlinkid == DATALINK_INVALID_LINKID)
 		return (ENOSPC);
+	if (flags & ~(DLMGMT_ACTIVE | DLMGMT_PERSIST | DLMGMT_TRANSIENT) ||
+	    ((flags & DLMGMT_PERSIST) && (flags & DLMGMT_TRANSIENT)) ||
+	    flags == 0) {
+		return (EINVAL);
+	}
 
 	if ((linkp = calloc(1, sizeof (dlmgmt_link_t))) == NULL) {
 		err = ENOMEM;
@@ -461,6 +513,15 @@ dlmgmt_create_common(const char *name, datalink_class_t class, uint32_t media,
 	linkp->ll_linkid = dlmgmt_nextlinkid;
 	linkp->ll_zoneid = zoneid;
 	linkp->ll_gen = 0;
+
+	/*
+	 * While DLMGMT_TRANSIENT starts off as a flag it is converted
+	 * into a link field since it is really a substate of
+	 * DLMGMT_ACTIVE -- it should not survive as a flag beyond
+	 * this point.
+	 */
+	linkp->ll_transient = (flags & DLMGMT_TRANSIENT) ? B_TRUE : B_FALSE;
+	flags &= ~DLMGMT_TRANSIENT;
 
 	if (avl_find(&dlmgmt_name_avl, linkp, &name_where) != NULL ||
 	    avl_find(&dlmgmt_id_avl, linkp, &id_where) != NULL) {
@@ -490,6 +551,12 @@ done:
 int
 dlmgmt_destroy_common(dlmgmt_link_t *linkp, uint32_t flags)
 {
+	/*
+	 * After dlmgmt_create_common() the link flags should only
+	 * ever include ACTIVE or PERSIST.
+	 */
+	assert((linkp->ll_flags & ~(DLMGMT_ACTIVE | DLMGMT_PERSIST)) == 0);
+
 	if ((linkp->ll_flags & flags) == 0) {
 		/*
 		 * The link does not exist in the specified space.
