@@ -13,6 +13,7 @@
 # Copyright (c) 2013 by Chelsio Communications, Inc. All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2023 Oxide Computer Company
 
 #
 # This makefile drives the production of the Chelsio Terminator 4 10G Ethernet
@@ -29,7 +30,6 @@ UTSBASE = ../../..
 #
 MODULE		= t4nex
 OBJECTS		= $(CXGBE_COM_OBJS:%=$(OBJS_DIR)/%) \
-		  $(CXGBE_FW_OBJS:%=$(OBJS_DIR)/%) \
 		  $(CXGBE_NEX_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 

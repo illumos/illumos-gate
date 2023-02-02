@@ -22,6 +22,7 @@
 
 /*
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef __CHELSIO_COMMON_H
@@ -29,9 +30,6 @@
 
 #include "t4_hw.h"
 #include "t4_chip_type.h"
-#include "t4fw_version.h"
-#include "t5fw_version.h"
-#include "t6fw_version.h"
 
 #define GLBL_INTR_MASK (F_CIM | F_MPS | F_PL | F_PCIE | F_MC0 | F_EDC0 | \
 		F_EDC1 | F_LE | F_TP | F_MA | F_PM_TX | F_PM_RX | F_ULP_RX | \
@@ -468,11 +466,6 @@ struct mbox_cmd *mbox_cmd_log_entry(struct mbox_cmd_log *log,
 
 #include <t4fw_interface.h>
 
-#define FW_VERSION(chip) ( \
-	V_FW_HDR_FW_VER_MAJOR(chip##FW_VERSION_MAJOR) | \
-	V_FW_HDR_FW_VER_MINOR(chip##FW_VERSION_MINOR) | \
-	V_FW_HDR_FW_VER_MICRO(chip##FW_VERSION_MICRO) | \
-	V_FW_HDR_FW_VER_BUILD(chip##FW_VERSION_BUILD))
 #define FW_INTFVER(chip, intf) (FW_HDR_INTFVER_##intf)
 
 struct fw_info {

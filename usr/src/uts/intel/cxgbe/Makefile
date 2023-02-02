@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2013 by Chelsio Communications, Inc. All rights reserved.
+# Copyright 2023 Oxide Computer Company
 #
 
 #
@@ -24,9 +25,10 @@ include $(UTSBASE)/intel/Makefile.intel
 
 .KEEP_STATE:
 
-SUBDIRS= t4nex cxgbe
+SUBDIRS= t4nex cxgbe firmware
 
-all def clean clobber install: $(SUBDIRS)
+# Keep 'def' first as the default target
+def all clean clobber install: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
