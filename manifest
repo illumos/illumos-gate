@@ -20792,14 +20792,17 @@ s usr/share/man/man9f/list_remove_head.9f=list_create.9f
 s usr/share/man/man9f/list_remove_tail.9f=list_create.9f
 s usr/share/man/man9f/list_tail.9f=list_create.9f
 f usr/share/man/man9f/mac_alloc.9f 0444 root bin
+f usr/share/man/man9f/mac_devt_to_instance.9f 0444 root bin
 s usr/share/man/man9f/mac_fini_ops.9f=mac_init_ops.9f
 s usr/share/man/man9f/mac_free.9f=mac_alloc.9f
+f usr/share/man/man9f/mac_getinfo.9f 0444 root bin
 f usr/share/man/man9f/mac_hcksum_get.9f 0444 root bin
 s usr/share/man/man9f/mac_hcksum_set.9f=mac_hcksum_get.9f
 f usr/share/man/man9f/mac_init_ops.9f 0444 root bin
 f usr/share/man/man9f/mac_link_update.9f 0444 root bin
 f usr/share/man/man9f/mac_lso_get.9f 0444 root bin
 f usr/share/man/man9f/mac_maxsdu_update.9f 0444 root bin
+f usr/share/man/man9f/mac_private_minor.9f 0444 root bin
 f usr/share/man/man9f/mac_prop_info.9f 0444 root bin
 s usr/share/man/man9f/mac_prop_info_set_default_fec.9f=mac_prop_info.9f
 s usr/share/man/man9f/mac_prop_info_set_default_link_flowctrl.9f=mac_prop_info.9f

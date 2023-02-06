@@ -1,0 +1,64 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd January 30, 2023
+.Dt MAC_PRIVATE_MINOR 9F
+.Os
+.Sh NAME
+.Nm mac_private_minor
+.Nd return the first minor number that is available for driver private use
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft minor_t
+.Fo mac_private_minor
+.Fa "void"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+None.
+.Sh DESCRIPTION
+The
+.Fn mac_private_minor
+function is used by MAC device drivers to determine the lower bound of the
+minor number space that is available for driver private use.
+The driver is free to use any minor number greater than or equal to the
+returned value.
+All other
+values are reserved for use by the
+.Xr mac 9E
+framework.
+.Pp
+The
+.Fn mac_private_minor
+function may be called from a driver's
+.Xr attach 9E
+entry point, e.g., to create minor nodes for use by the driver.
+See the
+.Sx Custom Device Nodes
+section of
+.Xr mac 9E
+for more details.
+.Sh CONTEXT
+.Fn mac_private_minor
+function can be called from
+.Sy user
+or
+.Sy kernel
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn mac_private_minor
+function returns a valid minor number.
+.Sh SEE ALSO
+.Xr mac 9E

@@ -97,9 +97,9 @@ static boolean_t	have_ripv1_in;
 static void		if_bad(struct interface *, boolean_t);
 static boolean_t	addrouteforif(struct interface *);
 static int	get_if_kstats(struct interface *, struct phyi_data *);
-static uint_t	ahash(const void *, uint_t);
-static uint_t	ihash(const void *, uint_t);
-static uint_t	nhash(const void *, uint_t);
+static uint_t	ahash(const void *, size_t);
+static uint_t	ihash(const void *, size_t);
+static uint_t	nhash(const void *, size_t);
 static void	htbl_grow(struct htbl *);
 
 /*

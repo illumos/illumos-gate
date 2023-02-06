@@ -1,0 +1,86 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd January 30, 2023
+.Dt MAC_GETINFO 9F
+.Os
+.Sh NAME
+.Nm mac_getinfo
+.Nd get device driver information for a MAC provider
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft int
+.Fo mac_getinfo
+.Fa "dev_info_t *dip"
+.Fa "ddi_info_cmd_t cmd"
+.Fa "void *arg"
+.Fa "void **resp"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa "dip"
+The MAC driver's dip.
+.It Fa "cmd"
+Command argument to
+.Xr getinfo 9E .
+.It Fa "arg"
+Command specific argument.
+.It Fa "resp"
+Pointer to store the command specific response.
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_getinfo
+function is the default
+.Xr getinfo 9E
+entry point provided by the
+.Xr mac 9E
+framework.
+.Pp
+Generally a MAC provider is free to leave the
+.Xr getinfo 9E
+entry point unset and allow the framework to provide a default implementation.
+.Pp
+However, if a driver wants to expose additional device nodes or relies on some
+special mapping of device instance to MAC instance then it must provide its own
+.Xr getinfo 9E
+entry point.
+Such a driver may then call the
+.Fn mac_getinfo
+function to handle requests for MAC reserved nodes, propagating the return
+value.
+See the
+.Sy Custom Device Nodes
+section of
+.Xr mac 9E
+for more details.
+.Sh CONTEXT
+The
+.Fn mac_getinfo
+function should be used during the execution of a driver's
+.Xr getinfo 9E
+entry point.
+.Sh RETURN VALUES
+.Fn mac_getinfo
+returns
+.Dv DDI_SUCCESS
+on success or
+.Dv DDI_FAILURE
+otherwise.
+.Sh SEE ALSO
+.Xr getinfo 9E ,
+.Xr mac 9E ,
+.Xr mac_devt_to_instance 9F ,
+.Xr mac_private_minor 9F
