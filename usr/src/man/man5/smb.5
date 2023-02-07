@@ -2,6 +2,7 @@
 .\" Copyright 2017, Nexenta Systems, Inc. All Rights Reserved.
 .\" Copyright 2022, RackTop Systems, Inc. All Rights Reserved.
 .\" Copyright 2022 Jason King
+.\" Copyright 2023 Bill Sommerfeld
 .\" The contents of this file are subject to the terms of the
 .\" Common Development and Distribution License (the "License").
 .\" You may not use this file except in compliance with the License.
@@ -17,7 +18,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd October 27, 2022
+.Dd February 8, 2023
 .Dt SMB 5
 .Os
 .Sh NAME
@@ -193,7 +194,7 @@ Specifies the LAN Manager (LM) authentication level.
 The LM compatibility level
 controls the type of user authentication to use in workgroup mode or domain
 mode.
-The default value is 3.
+The default value is 4.
 .Pp
 The following describes the behavior at each level.
 .Bl -tag -width "1"
@@ -371,7 +372,7 @@ Valid values are
 and
 .Ql false .
 The default value is
-.Ql false .
+.Ql true .
 .It Sy signing_required
 .Pp
 When SMB signing is required, all packets must be signed or they will be
@@ -388,7 +389,7 @@ Valid values are
 and
 .Ql false .
 The default value is
-.Ql false .
+.Ql true .
 .It Sy system_comment
 .Pp
 Specifies an optional description for the system, which is a text string.
@@ -424,6 +425,7 @@ property.
 Specifies a comma-separated list of network interfaces that should not be
 registered with WINS.
 NetBIOS host announcements are made on excluded interfaces.
+By default, no value is set.
 .It Sy wins_server_1
 .Pp
 Specifies the IP address of the primary WINS server.
