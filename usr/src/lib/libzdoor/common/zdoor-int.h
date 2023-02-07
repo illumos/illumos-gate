@@ -26,8 +26,6 @@
 #ifndef _ZDOOR_INT_H
 #define	_ZDOOR_INT_H
 
-#pragma ident "%Z%%M% %I% %E% SMI"
-
 #include <pthread.h>
 #include <zdoor.h>
 

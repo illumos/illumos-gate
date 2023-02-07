@@ -38,8 +38,6 @@
  *	@(#)err.h	8.1 (Berkeley) 6/2/93
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _ERR_H_
 #define	_ERR_H_
 

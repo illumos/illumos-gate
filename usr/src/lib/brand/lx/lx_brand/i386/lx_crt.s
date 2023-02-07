@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 
 #if defined(lint)
