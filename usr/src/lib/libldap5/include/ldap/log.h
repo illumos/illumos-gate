@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _LLOG_H
 #define _LLOG_H
 
@@ -39,9 +37,9 @@ nl_catd	sundscat;
 extern nl_catd	slapdcat;
 extern void 	ldaplogconfig(char * logf, int size);
 extern void	ldaplogconfigf(FILE *fd);
-extern void	ldaploginit(char *name, 
+extern void	ldaploginit(char *name,
 			int facility);
-extern void	ldaploginitlevel(char *name, 
+extern void	ldaploginitlevel(char *name,
 			    int facility,
 			    int log_level);
 extern void 	ldaplog(int level,char *fmt,...);

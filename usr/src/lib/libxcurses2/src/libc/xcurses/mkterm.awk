@@ -22,8 +22,6 @@
 # Copyright (c) 1995-1998 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # mkterm.awk
 #
 # XCurses Library
@@ -34,7 +32,7 @@
 #
 # USAGE:
 # 	awk -f mkterm.awk caps >term.h
-# 
+#
 
 BEGIN {
 print "/*"
@@ -44,8 +42,6 @@ print " */"
 print ""
 print "#ifndef	_TERM_H"
 print "#define	_TERM_H"
-print ""
-print "#pragma ident	\"@(#)term.h	%I%	%E% SMI\""
 print ""
 print "/*"
 print " * term.h"

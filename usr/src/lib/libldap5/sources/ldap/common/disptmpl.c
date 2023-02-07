@@ -3,9 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -187,7 +184,7 @@ ldap_init_templates_buf( char *buf, long buflen,
 
     return( rc );
 }
-	    
+
 
 
 void
@@ -610,7 +607,7 @@ read_next_tmpl( char **bufp, long *blenp, struct ldap_disptmpl **tmplp,
 	    free_disptmpl( tmpl );
 	    return( LDAP_TMPL_ERR_SYNTAX );
 	}
-		
+
 	if (( adp = (struct ldap_adddeflist *)NSLDAPI_CALLOC( 1,
 		sizeof( struct ldap_adddeflist ))) == NULL ) {
 	    ldap_free_strarray( toks );
@@ -743,7 +740,7 @@ struct tmplerror {
 #ifdef SUN
 static struct tmplerror ldap_tmplerrlist[] = {
 	{ LDAP_TMPL_ERR_VERSION, 0},
-	{ LDAP_TMPL_ERR_MEM,     0}, 
+	{ LDAP_TMPL_ERR_MEM,     0},
 	{ LDAP_TMPL_ERR_SYNTAX,  0},
 	{ LDAP_TMPL_ERR_FILE,    0},
 	{ -1, 0 }
@@ -751,7 +748,7 @@ static struct tmplerror ldap_tmplerrlist[] = {
 #else
 static struct tmplerror ldap_tmplerrlist[] = {
 	{ LDAP_TMPL_ERR_VERSION, "Bad template version"		},
-	{ LDAP_TMPL_ERR_MEM,     "Out of memory"		}, 
+	{ LDAP_TMPL_ERR_MEM,     "Out of memory"		},
 	{ LDAP_TMPL_ERR_SYNTAX,  "Bad template syntax"		},
 	{ LDAP_TMPL_ERR_FILE,    "File error reading template"	},
 	{ -1, 0 }

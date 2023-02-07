@@ -26,8 +26,6 @@
 #ifndef	_PKCS11_SESSION_H
 #define	_PKCS11_SESSION_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

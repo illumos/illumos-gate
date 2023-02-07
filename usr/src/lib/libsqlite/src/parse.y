@@ -32,8 +32,6 @@
 %name sqliteParser
 %include {
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sqliteInt.h"
 #include "parse.h"
 
@@ -110,7 +108,7 @@ columnlist ::= column.
 // column.  The type is always just "text".  But the code will accept
 // an elaborate typename.  Perhaps someday we'll do something with it.
 //
-column ::= columnid type carglist. 
+column ::= columnid type carglist.
 columnid ::= nm(X).                {sqliteAddColumn(pParse,&X);}
 
 // An IDENTIFIER can be a generic identifier, or one of several
@@ -183,7 +181,7 @@ carg ::= DEFAULT MINUS INTEGER(X).   {sqliteAddDefaultValue(pParse,&X,1);}
 carg ::= DEFAULT FLOAT(X).           {sqliteAddDefaultValue(pParse,&X,0);}
 carg ::= DEFAULT PLUS FLOAT(X).      {sqliteAddDefaultValue(pParse,&X,0);}
 carg ::= DEFAULT MINUS FLOAT(X).     {sqliteAddDefaultValue(pParse,&X,1);}
-carg ::= DEFAULT NULL. 
+carg ::= DEFAULT NULL.
 
 // In addition to the type name, we also care about the primary key and
 // UNIQUE constraints.
@@ -471,9 +469,9 @@ having_opt(A) ::= HAVING expr(X).  {A = X;}
 %type limit_opt {struct LimitVal}
 limit_opt(A) ::= .                     {A.limit = -1; A.offset = 0;}
 limit_opt(A) ::= LIMIT signed(X).      {A.limit = X; A.offset = 0;}
-limit_opt(A) ::= LIMIT signed(X) OFFSET signed(Y). 
+limit_opt(A) ::= LIMIT signed(X) OFFSET signed(Y).
                                        {A.limit = X; A.offset = Y;}
-limit_opt(A) ::= LIMIT signed(X) COMMA signed(Y). 
+limit_opt(A) ::= LIMIT signed(X) COMMA signed(Y).
                                        {A.limit = Y; A.offset = X;}
 
 /////////////////////////// The DELETE statement /////////////////////////////
@@ -502,7 +500,7 @@ setlist(A) ::= nm(X) EQ expr(Y).   {A = sqliteExprListAppend(0,Y,&X);}
 
 ////////////////////////// The INSERT command /////////////////////////////////
 //
-cmd ::= insert_cmd(R) INTO nm(X) dbnm(D) inscollist_opt(F) 
+cmd ::= insert_cmd(R) INTO nm(X) dbnm(D) inscollist_opt(F)
         VALUES LP itemlist(Y) RP.
             {sqliteInsert(pParse, sqliteSrcListAppend(0,&X,&D), Y, 0, F, R);}
 cmd ::= insert_cmd(R) INTO nm(X) dbnm(D) inscollist_opt(F) select(S).
@@ -713,17 +711,17 @@ case_exprlist(A) ::= WHEN expr(Y) THEN expr(Z). {
 }
 %type case_else {Expr*}
 case_else(A) ::=  ELSE expr(X).         {A = X;}
-case_else(A) ::=  .                     {A = 0;} 
+case_else(A) ::=  .                     {A = 0;}
 %type case_operand {Expr*}
-case_operand(A) ::= expr(X).            {A = X;} 
-case_operand(A) ::= .                   {A = 0;} 
+case_operand(A) ::= expr(X).            {A = X;}
+case_operand(A) ::= .                   {A = 0;}
 
 %type exprlist {ExprList*}
 %destructor exprlist {sqliteExprListDelete($$);}
 %type expritem {Expr*}
 %destructor expritem {sqliteExprDelete($$);}
 
-exprlist(A) ::= exprlist(X) COMMA expritem(Y). 
+exprlist(A) ::= exprlist(X) COMMA expritem(Y).
    {A = sqliteExprListAppend(X,Y,0);}
 exprlist(A) ::= expritem(X).            {A = sqliteExprListAppend(0,X,0);}
 expritem(A) ::= expr(X).                {A = X;}
@@ -837,13 +835,13 @@ trigger_cmd_list(A) ::= . { A = 0; }
 
 %type trigger_cmd {TriggerStep *}
 %destructor trigger_cmd {sqliteDeleteTriggerStep($$);}
-// UPDATE 
-trigger_cmd(A) ::= UPDATE orconf(R) nm(X) SET setlist(Y) where_opt(Z).  
+// UPDATE
+trigger_cmd(A) ::= UPDATE orconf(R) nm(X) SET setlist(Y) where_opt(Z).
                { A = sqliteTriggerUpdateStep(&X, Y, Z, R); }
 
 // INSERT
-trigger_cmd(A) ::= insert_cmd(R) INTO nm(X) inscollist_opt(F) 
-  VALUES LP itemlist(Y) RP.  
+trigger_cmd(A) ::= insert_cmd(R) INTO nm(X) inscollist_opt(F)
+  VALUES LP itemlist(Y) RP.
 {A = sqliteTriggerInsertStep(&X, F, Y, 0, R);}
 
 trigger_cmd(A) ::= insert_cmd(R) INTO nm(X) inscollist_opt(F) select(S).
@@ -858,22 +856,22 @@ trigger_cmd(A) ::= select(X).  {A = sqliteTriggerSelectStep(X); }
 
 // The special RAISE expression that may occur in trigger programs
 expr(A) ::= RAISE(X) LP IGNORE RP(Y).  {
-  A = sqliteExpr(TK_RAISE, 0, 0, 0); 
+  A = sqliteExpr(TK_RAISE, 0, 0, 0);
   A->iColumn = OE_Ignore;
   sqliteExprSpan(A, &X, &Y);
 }
 expr(A) ::= RAISE(X) LP ROLLBACK COMMA nm(Z) RP(Y).  {
-  A = sqliteExpr(TK_RAISE, 0, 0, &Z); 
+  A = sqliteExpr(TK_RAISE, 0, 0, &Z);
   A->iColumn = OE_Rollback;
   sqliteExprSpan(A, &X, &Y);
 }
 expr(A) ::= RAISE(X) LP ABORT COMMA nm(Z) RP(Y).  {
-  A = sqliteExpr(TK_RAISE, 0, 0, &Z); 
+  A = sqliteExpr(TK_RAISE, 0, 0, &Z);
   A->iColumn = OE_Abort;
   sqliteExprSpan(A, &X, &Y);
 }
 expr(A) ::= RAISE(X) LP FAIL COMMA nm(Z) RP(Y).  {
-  A = sqliteExpr(TK_RAISE, 0, 0, &Z); 
+  A = sqliteExpr(TK_RAISE, 0, 0, &Z);
   A->iColumn = OE_Fail;
   sqliteExprSpan(A, &X, &Y);
 }

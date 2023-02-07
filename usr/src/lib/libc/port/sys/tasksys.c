@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _settaskid = settaskid
 #pragma weak _gettaskid = gettaskid
 #pragma weak _getprojid = getprojid

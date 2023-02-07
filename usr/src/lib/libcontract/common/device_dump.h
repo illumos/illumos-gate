@@ -26,8 +26,6 @@
 #ifndef	_DEVICE_DUMP_H
 #define	_DEVICE_DUMP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libcontract_impl.h"
 
 #ifdef	__cplusplus

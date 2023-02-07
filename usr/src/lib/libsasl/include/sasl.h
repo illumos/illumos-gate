@@ -128,8 +128,6 @@
 #ifndef	_SASL_SASL_H
 #define	_SASL_SASL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_SASL_PROP_H
 #include <sasl/prop.h>
 #endif

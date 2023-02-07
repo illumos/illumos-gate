@@ -24,15 +24,12 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 echo "\
 /*\n\
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.\n\
  * Use is subject to license terms.\n\
  */\n\
-\n\
-#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n\
 \n\
 #include <dtrace.h>\n\
 \n\

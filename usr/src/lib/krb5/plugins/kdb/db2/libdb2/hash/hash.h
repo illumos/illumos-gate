@@ -6,8 +6,6 @@
 #ifndef _KRB5_DB2_HASH_H
 #define	_KRB5_DB2_HASH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -207,7 +205,7 @@ typedef struct item_info {
 #define	ITEM_GET_N	4
 
 #define	UNKNOWN		0xffffffff		/* for num_items */
-#define	NO_EXPAND	0xfffffffe 
+#define	NO_EXPAND	0xfffffffe
 
 #ifdef	__cplusplus
 }

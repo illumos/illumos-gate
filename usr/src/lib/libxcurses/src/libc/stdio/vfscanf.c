@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * System V.2 Emulation Stdio Library -- vfscanf
  *
@@ -122,7 +120,7 @@ static	const	char	*fmtptr;	/* format string pointer */
 static	int	charcnt;	/* number of characters scanned (for %n) */
 static	int	from;		/* token type we've come from */
 static	int	gfail;		/* getnum() fail flag, non-zero for fail */
- 
+
 /*
  * Convert formatted input from given input.
  * This is the workhorse for scanf, sscanf, and fscanf.
@@ -159,11 +157,11 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 
 		case 0:
 			goto retitems;
-	
+
 		case MODCONVL:
 		case MODCONVH:
 			switch (from) {
-	
+
 			case 'A':
 			case 'D':
 			case 'P':
@@ -175,7 +173,7 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 				break;
 			}
 			break;
-	
+
 		case CONVTYPE:
 			switch (from) {
 
@@ -235,8 +233,8 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 					for (;;) {
 						c = getin();
 
-						/* Only %s and %S stop on 
-						 * whitespace. 
+						/* Only %s and %S stop on
+						 * whitespace.
 						 */
 						if (lexp->name != 'c' && isspace(c)) {
 							unget(c);
@@ -259,7 +257,7 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 					}
 
 					/*
-					 * ANSI C states that %c does not 
+					 * ANSI C states that %c does not
 					 * terminate with a null character.
 					 */
 					if (!suppression && lexp->name != 'c')
@@ -320,7 +318,7 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 				break;
 			}
 			break;
-	
+
 		case STAR:
 			if (from == 'P') {
 				from = 'A';
@@ -329,7 +327,7 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 				from = 'X';
 			}
 			break;
-	
+
 		case PERCENT:
 			if (from == 'P') {
 				from = 'X';
@@ -341,7 +339,7 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 				from = 'X';
 			}
 			break;
-	
+
 		case NUMBER:
 			if (from == 'P' || from == 'A') {
 				from = 'D';
@@ -349,7 +347,7 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 				from = 'X';
 			}
 			break;
-	
+
 		case NSCAN:
 			if (from == 'P') {
 				pflag = 0;
@@ -359,7 +357,7 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 			}
 			from = 'X';
 			break;
-	
+
 		case BRACKET:
 			switch (from) {
 
@@ -372,7 +370,7 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 				if (width == 0)
 					width = INT_MAX;
 				ptr = suppression ? NULL : va_arg(ap, char *);
-				if (match(fmtptr, ptr) && !feof(fpin) 
+				if (match(fmtptr, ptr) && !feof(fpin)
 				&& !suppression)
 					nitems++;
 				while (*fmtptr++ != ']')
@@ -384,7 +382,7 @@ mks_vfscanf(FILE *pfin, const char *fmt, va_list ap)
 			}
 			from = 'X';
 			break;
-	
+
 		default:
 			c = *(fmtptr-1);
 			if (c == ' ' || c == '\t' || c == '\n' || c == '\f')
@@ -530,7 +528,7 @@ match(const char *str, char *outstr)
  * Get a number from the input stream.
  * The base, if zero, will be determined by the nature of the number.
  * A leading 0x means hexadecimal, a leading 0 for octal, otherwise decimal.
- * 
+ *
  * if the width is 0 then the max input string length of number is used.
  *
  * The sign tell us that a signed number is expected (rather than the
@@ -580,7 +578,7 @@ getnum(int base, int width, int sign)
 		while (w < width && w < sizeof cbuf) {
 			c = getin();
 			switch (c) {
-	
+
 			case '0':
 			case '1':
 			case '2':
@@ -610,7 +608,7 @@ getnum(int base, int width, int sign)
 		while (w < width && w < sizeof cbuf) {
 			c = getin();
 			switch (c) {
-	
+
 			case '0':
 			case '1':
 			case '2':
@@ -639,7 +637,7 @@ getnum(int base, int width, int sign)
 			c = getin();
 			c = toupper(c);
 			switch (c) {
-	
+
 			case '0':
 			case '1':
 			case '2':

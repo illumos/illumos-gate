@@ -1,8 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * src/lib/krb5/asn.1/asn1_make.h
- * 
+ *
  * Copyright 1994 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -10,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -89,7 +87,7 @@ asn1_error_code asn1_make_sequence
              Returns ENOMEM if memory runs out. */
 
 asn1_error_code asn1_make_set
-	(asn1buf *buf, const unsigned int set_len, 
+	(asn1buf *buf, const unsigned int set_len,
 		   unsigned int *retlen);
 /* requires  *buf is allocated, seq_len is the length of a series of
              sequence components which have just been inserted in *buf
@@ -113,7 +111,7 @@ asn1_error_code asn1_make_string
 
 /* "helper" procedure for asn1_make_tag */
 asn1_error_code asn1_make_length
-	(asn1buf *buf, const unsigned int in_len, 
+	(asn1buf *buf, const unsigned int in_len,
 		   unsigned int *retlen);
 /* requires  *buf is allocated, in_len is the length of an ASN.1 encoding
              which has just been inserted in *buf

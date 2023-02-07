@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*-
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -172,7 +170,7 @@ einval:		errno = EINVAL;
 
 	if (flags == R_SETCURSOR)
 		t->bt_cursor.rcursor = nrec;
-	
+
 	F_SET(t, R_MODIFIED);
 	return (__rec_ret(t, NULL, nrec, key, NULL));
 }

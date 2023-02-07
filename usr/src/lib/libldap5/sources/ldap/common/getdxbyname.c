@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -26,7 +24,7 @@
  *  All rights reserved.
  */
 /*
- * nsldapi_getdxbyname - retrieve DX records from the DNS (from 
+ * nsldapi_getdxbyname - retrieve DX records from the DNS (from
  * TXT records for now)
  */
 
@@ -60,7 +58,7 @@ XXX not MT-safe XXX
 #endif
 #include "ldap-int.h"
 
-#if defined( DOS ) 
+#if defined( DOS )
 #include "msdos.h"
 #endif /* DOS */
 
@@ -180,7 +178,7 @@ decode_answer( unsigned char *answer, int len )
 		if ( *q >= 3 && strncasecmp( q + 1, "dx:", 3 ) == 0 ) {
 		    txt_len = *q - 3;
 		    r = q + 4;
-		    while ( isspace( *r )) { 
+		    while ( isspace( *r )) {
 			++r;
 			--txt_len;
 		    }
@@ -194,7 +192,7 @@ decode_answer( unsigned char *answer, int len )
 		    if ( dx_count < MAX_TO_SORT - 1 ) {
 			dx_pref[ dx_count ] = pref;
 		    }
-		    while ( isspace( *r )) { 
+		    while ( isspace( *r )) {
 			++r;
 			--txt_len;
 		    }

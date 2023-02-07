@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * These functions return the prevailing rounding mode per ANSI C spec:
  *	 0:	toward zero

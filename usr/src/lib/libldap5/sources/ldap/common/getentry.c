@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -30,7 +28,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -114,7 +112,7 @@ ldap_get_entry_controls( LDAP *ld, LDAPMessage *entry,
 	*serverctrlsp = NULL;
 	tmpber = *entry->lm_ber;	/* struct copy */
 
-	/* skip past dn and entire attribute/value list */ 
+	/* skip past dn and entire attribute/value list */
 	if ( ber_scanf( &tmpber, "{xx" ) == LBER_ERROR ) {
 		rc = LDAP_DECODING_ERROR;
 		goto report_error_and_return;

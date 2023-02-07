@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -35,7 +33,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1993 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -44,13 +42,13 @@ static char copyright[] = "@(#) Copyright (c) 1993 Regents of the University of 
 
 typedef int (LDAP_CALL *cancelptype)( void *cancelparm );
 
-static int ldap_ufn_search_ctx( LDAP *ld, char **ufncomp, int ncomp, 
+static int ldap_ufn_search_ctx( LDAP *ld, char **ufncomp, int ncomp,
 	char *prefix, char **attrs, int attrsonly,
 	LDAPMessage **res, LDAP_CANCELPROC_CALLBACK *cancelproc, void *cancelparm,
 	char *tag1, char *tag2, char *tag3 );
 static LDAPMessage *ldap_msg_merge( LDAP *ld, LDAPMessage *a, LDAPMessage *b );
-static LDAPMessage *ldap_ufn_expand( LDAP *ld, 
-	LDAP_CANCELPROC_CALLBACK *cancelproc, void *cancelparm, char **dns, 
+static LDAPMessage *ldap_ufn_expand( LDAP *ld,
+	LDAP_CANCELPROC_CALLBACK *cancelproc, void *cancelparm, char **dns,
 	char *filter, int scope, char **attrs, int aonly, int *err );
 
 /*
@@ -82,17 +80,17 @@ static LDAPMessage *ldap_ufn_expand( LDAP *ld,
 
 static int
 ldap_ufn_search_ctx(
-    LDAP 	*ld, 
-    char 	**ufncomp, 
-    int 	ncomp, 
+    LDAP 	*ld,
+    char 	**ufncomp,
+    int 	ncomp,
     char 	*prefix,
     char 	**attrs,
-    int 	attrsonly, 
-    LDAPMessage **res, 
+    int 	attrsonly,
+    LDAPMessage **res,
     LDAP_CANCELPROC_CALLBACK *cancelproc,
-    void 	*cancelparm, 
-    char 	*tag1, 
-    char 	*tag2, 
+    void 	*cancelparm,
+    char 	*tag1,
+    char 	*tag2,
     char 	*tag3
 )
 {
@@ -104,9 +102,9 @@ ldap_ufn_search_ctx(
 	LDAPMessage	*candidates;
 	static char	*objattrs[] = { "objectClass", NULL };
 
-	/* 
+	/*
 	 * look up ufn components from most to least significant.
-	 * there are 3 phases.  
+	 * there are 3 phases.
 	 * 	phase 1	search the root for orgs or countries
 	 * 	phase 2	search for orgs
 	 * 	phase 3	search for a person
@@ -305,7 +303,7 @@ ldap_ufn_search_ct( LDAP *ld, char *ufn, char **attrs, int attrsonly,
 	for ( pcomp = 0; prefixcomp[pcomp] != NULL; pcomp++ )
 		;	/* NULL */
 	if ( (pbuf = (char *)NSLDAPI_MALLOC( strlen( ld->ld_ufnprefix ) + 1 ))
-	    == NULL ) {	
+	    == NULL ) {
 		ldap_value_free( ufncomp );
 		ldap_value_free( prefixcomp );
 		err = LDAP_NO_MEMORY;
@@ -442,8 +440,8 @@ ldap_msg_merge( LDAP *ld, LDAPMessage *a, LDAPMessage *b )
 }
 
 static LDAPMessage *
-ldap_ufn_expand( LDAP *ld, LDAP_CANCELPROC_CALLBACK *cancelproc, 
-	void *cancelparm, char **dns, char *filter, int scope, 
+ldap_ufn_expand( LDAP *ld, LDAP_CANCELPROC_CALLBACK *cancelproc,
+	void *cancelparm, char **dns, char *filter, int scope,
 	char **attrs, int aonly, int *err )
 {
 	LDAPMessage	*tmpcand, *tmpres;
@@ -485,7 +483,7 @@ ldap_ufn_expand( LDAP *ld, LDAP_CANCELPROC_CALLBACK *cancelproc,
 			ldap_msgfree( tmpcand );
 			return( NULL );
 		}
-		
+
 		tmpcand = ldap_msg_merge( ld, tmpcand, tmpres );
 
 		i++;

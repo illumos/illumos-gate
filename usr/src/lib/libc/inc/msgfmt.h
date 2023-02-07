@@ -26,8 +26,6 @@
 #ifndef _MSGFMT_H
 #define	_MSGFMT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdint.h>
 #include <stddef.h>
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * These functions implement the process of commitment for a pool
  * configuration. This process can be described as taking instructions

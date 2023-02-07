@@ -31,8 +31,6 @@
 #ifndef _LDAP_REALM_H
 #define _LDAP_REALM_H 1
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* realm specific mask */
 #define LDAP_REALM_SUBTREE            0x0001
 #define LDAP_REALM_SEARCHSCOPE        0x0002
@@ -45,7 +43,7 @@
 #define LDAP_REALM_MAXTICKETLIFE      0x0100
 #define LDAP_REALM_MAXRENEWLIFE       0x0200
 #define LDAP_REALM_KRBTICKETFLAGS     0x0400
-#define LDAP_REALM_CONTREF  	      0x0800 
+#define LDAP_REALM_CONTREF  	      0x0800
 
 extern char *policy_attributes[];
 
@@ -56,8 +54,8 @@ extern char *realm_attributes[];
 typedef struct _krb5_ldap_realm_params {
   char          *realmdn;
   char          *realm_name;
-  char          **subtree; 
-  char		*containerref;  
+  char          **subtree;
+  char		*containerref;
   char          *policyreference;
   int           search_scope;
   int           upenabled;

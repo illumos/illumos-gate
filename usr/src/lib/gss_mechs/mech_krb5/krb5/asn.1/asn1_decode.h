@@ -1,8 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * src/lib/krb5/asn.1/asn1_decode.h
- * 
+ *
  * Copyright 1994 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -10,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -79,7 +77,7 @@ asn1_error_code asn1_decode_charstring
 	(asn1buf *buf, unsigned int *retlen, char **val);
 /* Note: A charstring is a special hack to account for the fact that
          krb5 structures store some OCTET STRING values in krb5_octet
-	 arrays and others in krb5_data structures 
+	 arrays and others in krb5_data structures
 	 (which use char arrays).
 	 From the ASN.1 point of view, the two string types are the same,
 	 only the receptacles differ. */

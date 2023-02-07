@@ -3,17 +3,15 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /*
   * percent_x() takes a string and performs %<char> expansions. It aborts the
   * program when the expansion would overflow the output buffer. The result
   * of %<char> expansion may be passed on to a shell process. For this
   * reason, characters with a special meaning to shells are replaced by
   * underscores.
-  * 
+  *
   * Diagnostics are reported through syslog(3).
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

@@ -27,8 +27,6 @@
 #ifndef	BASE_CONVERSION_H
 #define	BASE_CONVERSION_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 #include <floatingpoint.h>
 #include <sys/isa_defs.h>

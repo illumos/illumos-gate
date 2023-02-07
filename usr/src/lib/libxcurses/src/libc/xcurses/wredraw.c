@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wredraw.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -53,7 +51,7 @@ int y, n;
 #endif
 
 	w->_flags |= W_REDRAW_WINDOW;
- 
+
         for (; y < w->_maxy && 0 < n; ++y, --n) {
                 w->_first[y] = 0;
                 w->_last[y] = w->_maxx;

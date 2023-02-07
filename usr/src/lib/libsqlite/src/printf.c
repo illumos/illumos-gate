@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** The "printf" code that follows dates from the 1980's.  It is in
 ** the public domain.  The original comments are included here for
@@ -250,7 +247,7 @@ static int vxprintf(
       break;
     }
     /* Find out what flags are present */
-    flag_leftjustify = flag_plussign = flag_blanksign = 
+    flag_leftjustify = flag_plussign = flag_blanksign =
      flag_alternateform = flag_zeropad = 0;
     do{
       switch( c ){
@@ -653,8 +650,8 @@ struct sgMprintf {
   void *(*xRealloc)(void*,int);  /* Function used to realloc memory */
 };
 
-/* 
-** This function implements the callback from vxprintf. 
+/*
+** This function implements the callback from vxprintf.
 **
 ** This routine add nNewChar characters of text in zNewText to
 ** the sgMprintf structure pointed to by "arg".
@@ -688,7 +685,7 @@ static void mout(void *arg, const char *zNewText, int nNewChar){
 
 /*
 ** This routine is a wrapper around xprintf() that invokes mout() as
-** the consumer.  
+** the consumer.
 */
 static char *base_vprintf(
   void *(*xRealloc)(void*,int),   /* Routine to realloc memory. May be NULL */
@@ -755,13 +752,13 @@ char *sqlite_mprintf(const char *zFormat, ...){
   char zBuf[200];
 
   va_start(ap,zFormat);
-  z = base_vprintf((void*(*)(void*,int))realloc, 0, 
+  z = base_vprintf((void*(*)(void*,int))realloc, 0,
                    zBuf, sizeof(zBuf), zFormat, ap);
   va_end(ap);
   return z;
 }
 
-/* This is the varargs version of sqlite_mprintf.  
+/* This is the varargs version of sqlite_mprintf.
 */
 char *sqlite_vmprintf(const char *zFormat, va_list ap){
   char zBuf[200];

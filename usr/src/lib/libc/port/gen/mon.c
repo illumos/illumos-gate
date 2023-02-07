@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Environment variable PROFDIR added such that:
  *		If PROFDIR doesn't exist, "mon.out" is produced as before.

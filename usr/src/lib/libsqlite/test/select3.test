@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -132,48 +130,48 @@ do_test select3-4.1 {
 } {4 8 5 15}
 do_test select3-4.2 {
   execsql {
-    SELECT log, count(*) FROM t1 
-    GROUP BY log 
-    HAVING count(*)>=4 
+    SELECT log, count(*) FROM t1
+    GROUP BY log
+    HAVING count(*)>=4
     ORDER BY log
   }
 } {3 4 4 8 5 15}
 do_test select3-4.3 {
   execsql {
-    SELECT log, count(*) FROM t1 
-    GROUP BY log 
-    HAVING count(*)>=4 
+    SELECT log, count(*) FROM t1
+    GROUP BY log
+    HAVING count(*)>=4
     ORDER BY max(n)
   }
 } {3 4 4 8 5 15}
 do_test select3-4.4 {
   execsql {
-    SELECT log AS x, count(*) AS y FROM t1 
+    SELECT log AS x, count(*) AS y FROM t1
     GROUP BY x
-    HAVING y>=4 
+    HAVING y>=4
     ORDER BY max(n)
   }
 } {3 4 4 8 5 15}
 do_test select3-4.5 {
   execsql {
-    SELECT log AS x FROM t1 
+    SELECT log AS x FROM t1
     GROUP BY x
-    HAVING count(*)>=4 
+    HAVING count(*)>=4
     ORDER BY max(n)
   }
 } {3 4 5}
 
 do_test select3-5.1 {
   execsql {
-    SELECT log, count(*), avg(n), max(n+log*2) FROM t1 
-    GROUP BY log 
+    SELECT log, count(*), avg(n), max(n+log*2) FROM t1
+    GROUP BY log
     ORDER BY max(n+log*2), avg(n)
   }
 } {0 1 1 1 1 1 2 4 2 2 3.5 8 3 4 6.5 14 4 8 12.5 24 5 15 24 41}
 do_test select3-5.2 {
   execsql {
-    SELECT log, count(*), avg(n), max(n+log*2) FROM t1 
-    GROUP BY log 
+    SELECT log, count(*), avg(n), max(n+log*2) FROM t1
+    GROUP BY log
     ORDER BY max(n+log*2), min(log,avg(n))
   }
 } {0 1 1 1 1 1 2 4 2 2 3.5 8 3 4 6.5 14 4 8 12.5 24 5 15 24 41}

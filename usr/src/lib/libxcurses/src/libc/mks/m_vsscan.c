@@ -24,13 +24,11 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	vsscanf.c
  *
  *	Copyright 1985, 1994 by Mortice Kern Systems Inc.  All rights reserved.
- *	
+ *
  */
 
 #ifdef M_RCSID
@@ -54,7 +52,7 @@ va_list vp;
 	static FILE *fp = NULL;
 
 	/* Either open or reuse a temporary file.  Note temporary files
-	 * opened by tmpfile() will be automatically closed and removed 
+	 * opened by tmpfile() will be automatically closed and removed
 	 * when the program terminates (so says ANSI C).
 	 */
 	if (fp == NULL && (fp = tmpfile()) == NULL)

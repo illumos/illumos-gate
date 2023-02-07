@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* md5global.h - RSAREF types and constants
  */
 #ifndef MD5GLOBAL_H

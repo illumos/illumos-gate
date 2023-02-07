@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * getwin.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -90,16 +88,16 @@ FILE *fp;
 
 	if ((mbs = (char *) malloc((size_t) (LINE_MAX+1))) == (char *) 0)
 		goto error1;
-	
+
 	if ((w = newwin(my, mx, by, bx)) == (WINDOW *) 0)
 		goto error2;
 
 	/* Read other window attributes. */
 	by = fscanf(
-		fp, "SCROLL=%hd,%hd VMIN=%hd VTIME=%hd FLAGS=%hx FG=%hx,%hd ", 
+		fp, "SCROLL=%hd,%hd VMIN=%hd VTIME=%hd FLAGS=%hx FG=%hx,%hd ",
 		&w->_top, &w->_bottom, &w->_vmin, &w->_vtime, &flags,
 		&w->_fg._at, &w->_fg._co
-	); 
+	);
 	if (by < 7)
 		goto error3;
 
@@ -112,12 +110,12 @@ FILE *fp;
 
 	while (get_cc(w, mbs, fp))
 		;
-	
+
 	if (fscanf(fp, "CUR=%hd,%hd", &w->_cury, &w->_curx) < 2)
 		goto error3;
-		
+
 	free(mbs);
-	
+
 	return __m_return_pointer("getwin", w);
 error3:
 	(void) delwin(w);
@@ -181,13 +179,13 @@ FILE *fp;
 	mbs_len = columns * M_CCHAR_MAX * MB_LEN_MAX * sizeof *mbs + 1;
 	if ((mbs = (char *) malloc((size_t) mbs_len)) == (char *) 0)
 		return __m_return_code("putwin", ERR);
-	
+
 	(void) fprintf(
 		fp, "MAX=%d,%d\nBEG=%d,%d\nSCROLL=%d,%d\n",
 		w->_maxy, w->_maxx, w->_begy, w->_begx, w->_top, w->_bottom
 	);
 	(void) fprintf(
-		fp, "VMIN=%d\nVTIME=%d\nFLAGS=%#x\nFG=%#x,%d\n", 
+		fp, "VMIN=%d\nVTIME=%d\nFLAGS=%#x\nFG=%#x,%d\n",
 		w->_vmin, w->_vtime, w->_flags & W_CONFIG_MASK,
 		w->_fg._at, w->_fg._co
 	);

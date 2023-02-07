@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -50,7 +48,7 @@ do_test fkey1-1.2 {
     );
   }
 } {}
-   
+
 
 
 finish_test

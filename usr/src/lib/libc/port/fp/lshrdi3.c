@@ -31,8 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "quadint.h"
 
 #pragma weak __lshrdi3 = ___lshrdi3

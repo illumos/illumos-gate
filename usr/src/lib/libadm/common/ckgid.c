@@ -29,7 +29,6 @@
  */
 
 /*LINTLIBRARY*/
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 
 #include <stdio.h>
 #include <string.h>

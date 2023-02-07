@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 inline int DTRACEFLT_UNKNOWN = 0;	/* Unknown fault */
 #pragma D binding "1.0" DTRACEFLT_UNKNOWN
 

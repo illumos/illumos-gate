@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wins_nws.c
  *
@@ -50,20 +48,20 @@ const char *mbs;
 int n;
 {
 	cchar_t cc;
-	int i, y, x;  
+	int i, y, x;
 	short oflags;
 
 #ifdef M_CURSES_TRACE
 	__m_trace("winsnstr(%p, %p, n)", w, mbs, n);
 #endif
 
-	y = w->_cury; 
+	y = w->_cury;
 	x = w->_curx;
 
 	if (n < 0)
 		n = INT_MAX;
 
-	/* Disable window flushing until the entire string has 
+	/* Disable window flushing until the entire string has
 	 * been written into the window.
 	 */
 	oflags = w->_flags & (W_FLUSH | W_SYNC_UP);

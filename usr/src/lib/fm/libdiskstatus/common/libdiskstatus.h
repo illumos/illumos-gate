@@ -26,8 +26,6 @@
 #ifndef	_LIBDISKSTATUS_H
 #define	_LIBDISKSTATUS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libnvpair.h>
 #include <sys/types.h>
 

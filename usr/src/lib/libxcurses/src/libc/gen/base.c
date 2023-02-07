@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * MKS Library -- basename -- produce base name of a file name
  * NOTE: not standard SVID routine.

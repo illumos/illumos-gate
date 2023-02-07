@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -51,7 +49,7 @@ do_test insert2-1.2.1 {
   catch {execsql {DROP TABLE t1}}
   execsql {
     CREATE TABLE t1(log int, cnt int);
-    INSERT INTO t1 
+    INSERT INTO t1
        SELECT log, count(*) FROM d1 GROUP BY log
        EXCEPT SELECT n-1,log FROM d1;
   }
@@ -66,7 +64,7 @@ do_test insert2-1.3.1 {
   execsql {
     CREATE TABLE t1(log int, cnt int);
     PRAGMA count_changes=off;
-    INSERT INTO t1 
+    INSERT INTO t1
        SELECT log, count(*) FROM d1 GROUP BY log
        INTERSECT SELECT n-1,log FROM d1;
   }

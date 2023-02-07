@@ -24,15 +24,13 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ISO/IEC 9899: 1990/Add.3: 1993 (E): Wide character header file
  *
  * Copyright 1992, 1993 by Mortice Kern Systems Inc.  All rights reserved.
  *
  * $Header: /rd/h/rcs/m_wchar.h 1.51 1995/09/20 19:17:54 ant Exp $
- * 
+ *
  */
 
 #ifndef __M_M_WCHAR_H__
@@ -67,7 +65,7 @@ extern char *m_strsanitize (char *);
 
 #ifndef _WUCHAR_T
 #define _WUCHAR_T
-/* a typedef to allow single byte distinction between char and uchar 
+/* a typedef to allow single byte distinction between char and uchar
  * in MKS environment
  */
 typedef	wchar_t	wuchar_t;
@@ -216,13 +214,13 @@ extern int	iswabsname (wchar_t *);
  *  is not used in the singlebyte environment since sprintf() and vsprintf()
  *  do not support this argument.
  *  One has to be careful when using this routine to not depend on
- *  the enforcement/safety of this 2nd argument. 
- *  
+ *  the enforcement/safety of this 2nd argument.
+ *
  *  swprintf() is converted to m_swprintf(), which is a C function
  *  (because it can use  a variable number of args),
- *  which is implemented as a call to vsprint() 
+ *  which is implemented as a call to vsprint()
  *  vswprintf() is converted to vsprintf()
- *  
+ *
  */
 #define	swprintf		m_swprintf
 #define	vswprintf(w,n,f,v)	vsprintf((char*)w,(const char*)f, v)
@@ -372,7 +370,7 @@ extern size_t m_sb_wcstombs(char *s, const wchar_t *pwcs, size_t n);
 #define	towupper(c)	toupper(c)
 
 /*
- * Note: MKS libc/gen/iswctype.c contains the system independent version 
+ * Note: MKS libc/gen/iswctype.c contains the system independent version
  *       of wctype() and iswctype().
  *
  * In single byte mode, we can't use the names wctype() and iswctype().
@@ -422,4 +420,4 @@ extern int	m_mbswidth (const char *, size_t);
 extern int	m_mbsrwidth (const char *, size_t, mbstate_t *);
 
 
-#endif /*__M_M_WCHAR_H__*/ 
+#endif /*__M_M_WCHAR_H__*/

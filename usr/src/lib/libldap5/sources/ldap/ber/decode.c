@@ -3,10 +3,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  *
  * The contents of this file are subject to the Netscape Public License
@@ -184,12 +180,12 @@ ber_getnint( BerElement *ber, ber_int_t *num, ber_slen_t len )
 	} else {
 		value = 0;
 	}
-		
+
 	for ( i = 0; i < len; i++ )
 	  value = (value << 8) | buffer[i];
-	
+
 	*num = value;
-	
+
 	return( len );
 }
 
@@ -206,7 +202,7 @@ ber_get_int( BerElement *ber, ber_int_t *num )
 	/*
      * len is being demoted to a long here --  possible conversion error
      */
-  
+
 	if ( ber_getnint( ber, num, (int)len ) != (ber_slen_t)len )
 		return( LBER_DEFAULT );
 	else
@@ -440,7 +436,7 @@ ber_scanf( BerElement *ber, const char *fmt, ... )
 	ber_tag_t	*t;
 	ber_len_t	len;
 	size_t		array_size;
-	
+
 	va_start( ap, fmt );
 
 #ifdef LDAP_DEBUG

@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright 2006 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
@@ -12,7 +11,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -33,7 +32,7 @@
  * distribution under the MIT license.
  */
 
-/* 
+/*
  * Include files
  */
 
@@ -367,9 +366,9 @@ kdb_load_library(krb5_context kcontext, char *lib_name, db_library * lib)
 	memcpy(path, profpath, ndx * sizeof(profpath[0]));
     memcpy(path + ndx, db_dl_location, db_dl_n_locations * sizeof(char *));
     status = 0;
-    
-    if ((status = krb5int_open_plugin_dirs ((const char **) path, 
-                                            filebases, 
+
+    if ((status = krb5int_open_plugin_dirs ((const char **) path,
+                                            filebases,
                                             &(*lib)->dl_dir_handle, &kcontext->err))) {
         const char *err_str = krb5_get_error_message(kcontext, status);
 	status = KRB5_KDB_DBTYPE_NOTFOUND;
@@ -400,12 +399,12 @@ kdb_load_library(krb5_context kcontext, char *lib_name, db_library * lib)
 
     memcpy(&(*lib)->vftabl, vftabl_addrs[0], sizeof(kdb_vftabl));
     kdb_setup_opt_functions(*lib);
-    
+
     if ((status = (*lib)->vftabl.init_library())) {
         /* ERROR. library not initialized cleanly */
         goto clean_n_exit;
-    }    
-    
+    }
+
 clean_n_exit:
     if (vftabl_addrs != NULL) { krb5int_free_plugin_dir_data (vftabl_addrs); }
     /* Both of these DTRT with NULL.  */
@@ -498,7 +497,7 @@ kdb_free_library(db_library lib)
         if (PLUGIN_DIR_OPEN((&lib->dl_dir_handle))) {
             krb5int_close_plugin_dirs (&lib->dl_dir_handle);
         }
-        
+
 	kdb_destroy_lib_lock(lib);
 
 	if (lib->prev == NULL) {
@@ -2014,7 +2013,7 @@ krb5_db_promote(krb5_context kcontext, char **db_args)
     return status;
 }
 
-/* 
+/*
  * Solaris Kerberos: support for iprop
  *
  * Not all KDB plugins support iprop.

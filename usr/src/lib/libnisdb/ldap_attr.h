@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_LDAP_ATTR_H
 #define	_LDAP_ATTR_H
 

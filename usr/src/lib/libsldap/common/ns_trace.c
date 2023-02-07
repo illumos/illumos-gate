@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Turning DEBUG on for this library opens a potential security hole.  If
  * the library is compiled with DEBUG, it should only be done for internal

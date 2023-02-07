@@ -27,8 +27,6 @@
 #ifndef	_TOPO_ALLOC_H
 #define	_TOPO_ALLOC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <topo_module.h>
 #include <libnvpair.h>

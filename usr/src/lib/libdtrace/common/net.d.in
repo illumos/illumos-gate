@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 inline int AF_INET = @AF_INET@;
 #pragma D binding "1.0" AF_INET
 inline int AF_INET6 = @AF_INET6@;

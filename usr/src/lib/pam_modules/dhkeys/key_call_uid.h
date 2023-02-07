@@ -27,8 +27,6 @@
 #ifndef	_KEY_CALL_UID_H
 #define	_KEY_CALL_UID_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

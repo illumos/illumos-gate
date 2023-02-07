@@ -27,8 +27,6 @@
 #ifndef _RSMLIB_IN_H
 #define	_RSMLIB_IN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

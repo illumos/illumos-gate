@@ -26,9 +26,6 @@
  *	All Rights Reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <sys/types.h>
 #include <stdio.h>
 #include <string.h>

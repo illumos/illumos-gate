@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -35,7 +33,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1995 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -97,7 +95,7 @@ nsldapi_send_initial_request( LDAP *ld, int msgid, unsigned long msgtype,
 	char *dn, BerElement *ber )
 {
 	LDAPServer	*servers;
-	
+
 	LDAPDebug( LDAP_DEBUG_TRACE, "nsldapi_send_initial_request\n", 0,0,0 );
 
 #ifdef LDAP_DNS
@@ -133,7 +131,7 @@ nsldapi_send_initial_request( LDAP *ld, int msgid, unsigned long msgtype,
 		 */
 		servers = NULL;
 #ifdef LDAP_DNS
-	}	
+	}
 	LDAP_MUTEX_UNLOCK( ld, LDAP_OPTION_LOCK );
 #endif /* LDAP_DNS */
 
@@ -204,16 +202,16 @@ nsldapi_send_server_request(
 
     /*
      * the logic here is:
-     * if 
-     * 1. no connections exists, 
-     * or 
-     * 2. if the connection is either not in the connected 
+     * if
+     * 1. no connections exists,
+     * or
+     * 2. if the connection is either not in the connected
      *     or connecting state in an async io model
-     * or 
+     * or
      * 3. the connection is notin a connected state with normal (non async io)
      */
 	if (   lc == NULL
-		|| (  (ld->ld_options & LDAP_BITOPT_ASYNC 
+		|| (  (ld->ld_options & LDAP_BITOPT_ASYNC
                && lc->lconn_status != LDAP_CONNST_CONNECTING
 		    && lc->lconn_status != LDAP_CONNST_CONNECTED)
               || (!(ld->ld_options & LDAP_BITOPT_ASYNC )
@@ -225,7 +223,7 @@ nsldapi_send_server_request(
 		}
 		if ( incparent ) {
 			/* Forget about the bind */
-			--parentreq->lr_outrefcnt; 
+			--parentreq->lr_outrefcnt;
 		}
 		LDAP_MUTEX_UNLOCK( ld, LDAP_CONN_LOCK );
 		return( -1 );
@@ -243,11 +241,11 @@ nsldapi_send_server_request(
 		ber_free( ber, 1 );
 		if ( incparent ) {
 			/* Forget about the bind */
-			--parentreq->lr_outrefcnt; 
+			--parentreq->lr_outrefcnt;
 		}
 		LDAP_MUTEX_UNLOCK( ld, LDAP_CONN_LOCK );
 		return( -1 );
-	} 
+	}
 	lr->lr_binddn = bindreqdn;
 	lr->lr_msgid = msgid;
 	lr->lr_status = LDAP_REQST_INPROGRESS;
@@ -256,7 +254,7 @@ nsldapi_send_server_request(
 	lr->lr_conn = lc;
 
 	if ( parentreq != NULL ) {	/* sub-request */
-		if ( !incparent ) { 
+		if ( !incparent ) {
 			/* Increment if we didn't do it before the bind */
 			++parentreq->lr_outrefcnt;
 		}
@@ -281,7 +279,7 @@ nsldapi_send_server_request(
 	if (( err = nsldapi_ber_flush( ld, lc->lconn_sb, ber, 0, 1 )) != 0 ) {
 
 		/* need to continue write later */
-		if (ld->ld_options & LDAP_BITOPT_ASYNC && err == -2 ) {	
+		if (ld->ld_options & LDAP_BITOPT_ASYNC && err == -2 ) {
 			lr->lr_status = LDAP_REQST_WRITING;
 			nsldapi_iostatus_interest_write( ld, lc->lconn_sb );
 		} else {
@@ -361,7 +359,7 @@ nsldapi_new_connection( LDAP *ld, LDAPServer **srvlistp, int use_ldsb,
 	int connect, int bind )
 {
     int	rc;
-    
+
 	LDAPConn	*lc;
 	LDAPServer	*prevsrv, *srv;
 	Sockbuf		*sb = NULL;
@@ -386,7 +384,7 @@ nsldapi_new_connection( LDAP *ld, LDAPServer **srvlistp, int use_ldsb,
 		 */
 		IFP				sb_fn;
 		struct lber_x_ext_io_fns	extiofns;
-		
+
 		extiofns.lbextiofn_size = LBER_X_EXTIO_FNS_SIZE;
 
 		if ( ber_sockbuf_get_option( ld->ld_sbp,
@@ -414,9 +412,9 @@ nsldapi_new_connection( LDAP *ld, LDAPServer **srvlistp, int use_ldsb,
 
 	if ( connect ) {
 		prevsrv = NULL;
-        /* 
+        /*
          * save the return code for later
-         */ 
+         */
 		for ( srv = *srvlistp; srv != NULL; srv = srv->lsrv_next ) {
 			rc = nsldapi_connect_to_host( ld, lc->lconn_sb,
 				   srv->lsrv_host, srv->lsrv_port,
@@ -452,7 +450,7 @@ nsldapi_new_connection( LDAP *ld, LDAPServer **srvlistp, int use_ldsb,
     else {
         lc->lconn_status = LDAP_CONNST_CONNECTED;
     }
-    
+
 	lc->lconn_next = ld->ld_conns;
 	ld->ld_conns = lc;
 
@@ -809,7 +807,7 @@ free_servers( LDAPServer *srvlist )
  *
  * Note that *hadrefp will be set to 1 if one or more referrals were found in
  * "*errstrp" (even if we can't chase them) and zero if none were found.
- * 
+ *
  * XXX merging of errors in this routine needs to be improved.
  */
 int
@@ -1325,7 +1323,7 @@ dn2servers( LDAP *ld, char *dn )	/* dn can also be a domain.... */
 				prevsrv->lsrv_next = srv;
 			}
 			prevsrv = srv;
-			
+
 			/* copy in info. */
 			if (( srv->lsrv_host = nsldapi_strdup( host )) == NULL
 			    || ( server_dn != NULL && ( srv->lsrv_dn =

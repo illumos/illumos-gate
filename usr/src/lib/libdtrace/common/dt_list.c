@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Simple doubly-linked list implementation.  This implementation assumes that
  * each list element contains an embedded dt_list_t (previous and next

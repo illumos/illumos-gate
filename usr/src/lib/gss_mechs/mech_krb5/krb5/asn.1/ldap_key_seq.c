@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* ... copyright ... */
 
 /* Novell key-format scheme:

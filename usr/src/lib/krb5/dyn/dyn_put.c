@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is part of libdyn.a, the C Dynamic Object library.  It
  * contains the source code for the functions DynGet() and DynAdd().
@@ -36,18 +34,18 @@ DynPtr DynGet(obj, num)
 	       fprintf(stderr, "dyn: get: bad index %d\n", num);
 	  return NULL;
      }
-     
+
      if (num >= obj->num_el) {
 	  if (obj->debug)
 	       fprintf(stderr, "dyn: get: highest element is %d.\n",
 		       obj->num_el);
 	  return NULL;
      }
-     
+
      if (obj->debug)
 	  fprintf(stderr, "dyn: get: Returning address %d + %d.\n",
 		  obj->array, obj->el_size*num);
-     
+
      return (DynPtr) obj->array + obj->el_size*num;
 }
 
@@ -56,7 +54,7 @@ int DynAdd(obj, el)
    void *el;
 {
      int	ret;
-     
+
      ret = DynPut(obj, el, obj->num_el);
      if (ret != DYN_OK)
 	  return ret;
@@ -80,7 +78,7 @@ int DynPut(obj, el_in, idx)
 {
      DynPtr el = (DynPtr) el_in;
      int ret;
-     
+
      if (obj->debug)
 	  fprintf(stderr, "dyn: put: Writing %d bytes from %d to %d + %d\n",
 		  obj->el_size, el, obj->array, idx*obj->el_size);
@@ -92,10 +90,10 @@ int DynPut(obj, el_in, idx)
      memmove(obj->array + idx*obj->el_size, el, obj->el_size);
 #else
      bcopy(el, obj->array + idx*obj->el_size, obj->el_size);
-#endif     
+#endif
 
      if (obj->debug)
 	  fprintf(stderr, "dyn: put: done.\n");
-     
+
      return DYN_OK;
 }

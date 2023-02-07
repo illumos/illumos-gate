@@ -33,8 +33,6 @@
  *   getservbyname_r.c and lib/libnsl/nss/netdir_inet.c).
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <nss_dbdefs.h>
 

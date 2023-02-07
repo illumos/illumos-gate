@@ -34,8 +34,6 @@
 #ifndef _ONTARIO_H
 #define	_ONTARIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

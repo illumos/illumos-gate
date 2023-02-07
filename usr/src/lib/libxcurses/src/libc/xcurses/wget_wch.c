@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wget_wch.c
  *
@@ -85,9 +83,9 @@ wint_t *wcp;
 	__m_trace("wget_wch(%p, %p)", w, wcp);
 #endif
 
-	/* Disable echo temporarily, because we're using 
+	/* Disable echo temporarily, because we're using
 	 * wgetch() to read in individual bytes and only
-	 * want echo the resulting character, not the 
+	 * want echo the resulting character, not the
 	 * individual bytes composing the character.
 	 */
 	oecho = __m_set_echo(0);
@@ -96,7 +94,7 @@ wint_t *wcp;
 	 * a parameter.  The WINDOW * is used to set the "focus" by
 	 * updatng and position the cursor in the relevant window and
 	 * provide window specific settings.  Input for all windows
-	 * comes from one stream (__m_screen->_if), which is normally 
+	 * comes from one stream (__m_screen->_if), which is normally
 	 * the terminal, but can be redirected.
 	 */
 	wio = (t_wide_io *) __m_screen->_in;
@@ -109,13 +107,13 @@ wint_t *wcp;
 		return __m_return_code("wget_wch", KEY_CODE_YES);
 	}
 
-	/* Push the byte back onto the input stream so that 
+	/* Push the byte back onto the input stream so that
 	 * it can be processed by __m_wio_get().
 	 */
 	(void) ungetc(ch, __m_screen->_if);
 
-	/* Fetch a wide character from a narrow input stream.  
-	 * Invalid sequences are preserved as individual bytes.  
+	/* Fetch a wide character from a narrow input stream.
+	 * Invalid sequences are preserved as individual bytes.
 	 * Handles insignificant and redundant shifts in the input
 	 * stream.
 	 */
@@ -125,8 +123,8 @@ wint_t *wcp;
 	(void) __m_set_echo(oecho);
 
 	/* Push any invalid multibyte sequence back onto the
-	 * input stack, so that no data is lost, just in case 
-	 * the application mixes wide (wget_wch()) and narrow 
+	 * input stack, so that no data is lost, just in case
+	 * the application mixes wide (wget_wch()) and narrow
 	 * (wgetch()) input methods.
 	 */
 	while (wio->_next < wio->_size)

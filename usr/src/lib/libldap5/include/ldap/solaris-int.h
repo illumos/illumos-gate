@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _SOLARISINT_H
 #define _SOLARISINT_H
 
@@ -36,7 +34,7 @@ extern "C" {
 /*
  * LBER_USE_DER is defined for compatibility with the C LDAP API RFC.
  * In our implementation, we recognize it (instead of the numerically
- * identical LBER_OPT_REMAINING_BYTES) in calls to ber_alloc_t() and 
+ * identical LBER_OPT_REMAINING_BYTES) in calls to ber_alloc_t() and
  * ber_init_w_nullchar() only.  Callers of ber_set_option() or
  * ber_get_option() must use LBER_OPT_USE_DER instead.  Sorry!
  */
@@ -149,15 +147,15 @@ LDAP_API(ber_uint_t) LDAP_CALL ber_get_next_buffer_ext( void *buffer,
 	size_t buffer_size, ber_len_t *len, BerElement *ber,
 	ber_len_t *Bytes_Scanned, Sockbuf *sb );
 LDAP_API(void) LDAP_CALL ber_init_w_nullchar( BerElement *ber, int options );
-LDAP_API(int) LDAP_CALL ber_set_option( BerElement *ber, int option, 
+LDAP_API(int) LDAP_CALL ber_set_option( BerElement *ber, int option,
 	void *value );
-LDAP_API(int) LDAP_CALL ber_get_option( BerElement *ber, int option, 
+LDAP_API(int) LDAP_CALL ber_get_option( BerElement *ber, int option,
 	void *value );
 LDAP_API(Sockbuf*) LDAP_CALL ber_sockbuf_alloc( void );
 LDAP_API(void) LDAP_CALL ber_sockbuf_free( Sockbuf* p );
-LDAP_API(int) LDAP_CALL ber_sockbuf_set_option( Sockbuf *sb, int option, 
+LDAP_API(int) LDAP_CALL ber_sockbuf_set_option( Sockbuf *sb, int option,
 	void *value );
-LDAP_API(int) LDAP_CALL ber_sockbuf_get_option( Sockbuf *sb, int option, 
+LDAP_API(int) LDAP_CALL ber_sockbuf_get_option( Sockbuf *sb, int option,
 	void *value );
 LDAP_API(int) LDAP_CALL ber_flush( Sockbuf *sb, BerElement *ber, int freeit );
 LDAP_API(ber_tag_t) LDAP_CALL ber_get_next( Sockbuf *sb, ber_len_t *len,
@@ -298,7 +296,7 @@ typedef int	(LDAP_C LDAP_CALLBACK LDAP_IOF_SELECT_CALLBACK)( int nfds,
 	struct timeval *timeout );
 typedef LBER_SOCKET (LDAP_C LDAP_CALLBACK LDAP_IOF_SOCKET_CALLBACK)(
 	int domain, int type, int protocol );
-typedef int	(LDAP_C LDAP_CALLBACK LDAP_IOF_IOCTL_CALLBACK)( LBER_SOCKET s, 
+typedef int	(LDAP_C LDAP_CALLBACK LDAP_IOF_IOCTL_CALLBACK)( LBER_SOCKET s,
 	int option, ... );
 typedef int	(LDAP_C LDAP_CALLBACK LDAP_IOF_CONNECT_CALLBACK )(
 	LBER_SOCKET s, struct sockaddr *name, int namelen );

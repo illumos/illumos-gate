@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * prof_set.c --- routines that expose the public interfaces for
  * 	inserting, updating and deleting items from the profile.
@@ -8,7 +7,7 @@
  * In the future it may be necessary to modify this public interface,
  * or possibly add higher level functions to support this correctly.
  *
- * WARNING: We're not yet doing locking yet, either.  
+ * WARNING: We're not yet doing locking yet, either.
  *
  */
 
@@ -75,15 +74,15 @@ static errcode_t rw_setup(profile_t profile)
 }
 
 
-/* 
- * Delete or update a particular child node 
- * 
+/*
+ * Delete or update a particular child node
+ *
  * ADL - 2/23/99, rewritten TYT 2/25/99
  */
 errcode_t KRB5_CALLCONV
 profile_update_relation(profile_t profile, const char **names,
 			const char *old_value, const char *new_value)
-{	
+{
 	errcode_t	retval;
 	struct profile_node *section, *node;
 	void		*state;
@@ -92,7 +91,7 @@ profile_update_relation(profile_t profile, const char **names,
 	retval = rw_setup(profile);
 	if (retval)
 		return retval;
-	
+
 	if (names == 0 || names[0] == 0 || names[1] == 0)
 		return PROF_BAD_NAMESET;
 
@@ -124,18 +123,18 @@ profile_update_relation(profile_t profile, const char **names,
 	if (retval == 0)
 	    profile->first_file->data->flags |= PROFILE_FILE_DIRTY;
 	k5_mutex_unlock(&profile->first_file->data->lock);
-	
+
 	return retval;
 }
 
-/* 
+/*
  * Clear a particular all of the relations with a specific name.
- * 
+ *
  * TYT - 2/25/99
  */
 errcode_t KRB5_CALLCONV
 profile_clear_relation(profile_t profile, const char **names)
-{	
+{
 	errcode_t	retval;
 	struct profile_node *section, *node;
 	void		*state;
@@ -144,7 +143,7 @@ profile_clear_relation(profile_t profile, const char **names)
 	retval = rw_setup(profile);
 	if (retval)
 		return retval;
-	
+
 	if (names == 0 || names[0] == 0 || names[1] == 0)
 		return PROF_BAD_NAMESET;
 
@@ -168,29 +167,29 @@ profile_clear_relation(profile_t profile, const char **names)
 	} while (state);
 
 	profile->first_file->data->flags |= PROFILE_FILE_DIRTY;
-	
+
 	return 0;
 }
 
-/* 
+/*
  * Rename a particular section; if the new_section name is NULL,
  * delete it.
- * 
+ *
  * ADL - 2/23/99, rewritten TYT 2/25/99
  */
 errcode_t KRB5_CALLCONV
 profile_rename_section(profile_t profile, const char **names,
 		       const char *new_name)
-{	
+{
 	errcode_t	retval;
 	struct profile_node *section, *node;
 	void		*state;
 	const char	**cpp;
-	
+
 	retval = rw_setup(profile);
 	if (retval)
 		return retval;
-	
+
 	if (names == 0 || names[0] == 0 || names[1] == 0)
 		return PROF_BAD_NAMESET;
 
@@ -243,7 +242,7 @@ profile_add_relation(profile_t profile, const char **names,
 	retval = rw_setup(profile);
 	if (retval)
 		return retval;
-	
+
 	if (names == 0 || names[0] == 0 || names[1] == 0)
 		return PROF_BAD_NAMESET;
 

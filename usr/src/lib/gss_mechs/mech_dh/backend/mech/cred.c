@@ -27,8 +27,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <sys/note.h>
 #include "dh_gssapi.h"

@@ -29,8 +29,6 @@
 #ifndef _DH_COMMON_H_
 #define	_DH_COMMON_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpcsvc/nis_dhext.h>
 
 #ifdef __cplusplus

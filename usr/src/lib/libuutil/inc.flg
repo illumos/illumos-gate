@@ -24,7 +24,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 find_files "s.*" usr/src/common/avl
 echo_file usr/src/uts/common/sys/avl.h

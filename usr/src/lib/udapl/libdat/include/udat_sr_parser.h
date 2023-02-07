@@ -40,8 +40,6 @@
 #ifndef _DAT_SR_PARSER_H_
 #define	_DAT_SR_PARSER_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <dat_osd.h>
 
 #ifdef	__cplusplus

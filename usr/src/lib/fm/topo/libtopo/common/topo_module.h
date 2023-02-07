@@ -26,8 +26,6 @@
 #ifndef _TOPO_MODULE_H
 #define	_TOPO_MODULE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/topo_mod.h>
 
 #include <topo_list.h>

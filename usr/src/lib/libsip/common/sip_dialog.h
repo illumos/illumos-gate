@@ -27,8 +27,6 @@
 #ifndef	_SIP_DIALOG_H
 #define	_SIP_DIALOG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

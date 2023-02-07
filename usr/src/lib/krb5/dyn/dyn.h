@@ -6,8 +6,6 @@
 #ifndef _KRB5_DYN_DYN_H
 #define	_KRB5_DYN_DYN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -48,7 +46,7 @@ typedef struct _DynObject {
 #define DYN_NOMEM	-1001
 #define DYN_BADINDEX	-1002
 #define DYN_BADVALUE	-1003
-     
+
 /* Function declarations */
 #ifdef __STDC__
 #define P(args) args

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is part of libdyn.a, the C Dynamic Object library.  It
  * contains the source code for the function DynAppend().

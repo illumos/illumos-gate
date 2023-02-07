@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef GSSAPI_LIBINIT_H
 #define GSSAPI_LIBINIT_H
 

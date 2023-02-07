@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * xdr_rec.c, Implements (TCP/IP based) XDR streams with a "record marking"
  * layer above connection oriented transport layer (e.g. tcp) (for rpc's use).

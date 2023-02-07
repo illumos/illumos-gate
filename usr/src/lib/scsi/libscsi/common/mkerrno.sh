@@ -24,15 +24,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 echo "\
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident\t\"%Z%%M%\t%I%\t%E%\tSMI\"
 
 #include <strings.h>
 #include <scsi/libscsi.h>

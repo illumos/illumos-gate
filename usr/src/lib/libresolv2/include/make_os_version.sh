@@ -3,7 +3,6 @@
 # Copyright (c) 1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 UNAME_R=`/usr/bin/uname -r`
 

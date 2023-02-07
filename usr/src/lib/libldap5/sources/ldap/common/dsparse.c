@@ -1,6 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -34,7 +31,7 @@
  * is provided ``as is'' without express or implied warranty.
  */
 /*
- * dsparse.c:  parsing routines used by display template and search 
+ * dsparse.c:  parsing routines used by display template and search
  * preference file library routines for LDAP clients.
  *
  */

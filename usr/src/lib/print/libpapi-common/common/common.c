@@ -27,8 +27,6 @@
 
 /* $Id: common.c 151 2006-04-25 16:55:34Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Shared "unsupported" function implementations that can be overridden
  * by libpapi and the various print service modules (psms).

@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2004 Jan 14
 #
 # The author disclaims copyright to this source code.  In place of
@@ -12,7 +10,7 @@
 #
 #***********************************************************************
 # This file implements regression tests for TCL interface to the
-# SQLite library. 
+# SQLite library.
 #
 # The focus of the tests in this file is the  following interface:
 #

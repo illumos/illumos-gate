@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * All routines necessary to deal with the file /etc/ethers.  The file
  * contains mappings from 48 bit ethernet addresses to their corresponding

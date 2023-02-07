@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2002 January 15
 **
@@ -19,7 +16,7 @@
 ** few places in the code that are even potentially unsafe, and those
 ** places execute for very short periods of time.  So even if the library
 ** is compiled with its mutexes disabled, it is likely to work correctly
-** in a multi-threaded program most of the time.  
+** in a multi-threaded program most of the time.
 **
 ** This file is NOT part of the standard SQLite library.  It is used for
 ** testing only.
@@ -93,7 +90,7 @@ static int db_query_callback(
   if( azArg==0 ) return 0;
   for(i=0; i<nArg; i++){
     pResult->azElem[pResult->nElem++] =
-        sqlite_mprintf("%s",azArg[i] ? azArg[i] : ""); 
+        sqlite_mprintf("%s",azArg[i] ? azArg[i] : "");
   }
   return 0;
 }
@@ -222,9 +219,9 @@ static void *worker_bee(void *pArg){
          t, i, i*2, i*i);
     }
     az = db_query(db, zFilename, "SELECT count(*) FROM t%d", t);
-    db_check(zFilename, "tX size", az, "100", 0);  
+    db_check(zFilename, "tX size", az, "100", 0);
     az = db_query(db, zFilename, "SELECT avg(b) FROM t%d", t);
-    db_check(zFilename, "tX avg", az, "101", 0);  
+    db_check(zFilename, "tX avg", az, "101", 0);
     db_execute(db, zFilename, "DELETE FROM t%d WHERE a>50", t);
     az = db_query(db, zFilename, "SELECT avg(b) FROM t%d", t);
     db_check(zFilename, "tX avg2", az, "51", 0);

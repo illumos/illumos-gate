@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * m_pathmax: mks specific library routine.
  *
@@ -46,7 +44,7 @@ static char rcsID[] = "$Header: /rd/src/libc/mks/rcs/m_pathma.c 1.4 1992/06/19 1
 #include <errno.h>
 #include <assert.h>
 
-#ifdef m_pathmax	
+#ifdef m_pathmax
 #undef m_pathmax	 /* in case its #define'd in mks.h */
 #endif
 
@@ -105,12 +103,12 @@ char* path;
 }
 
 #ifdef TEST
-/* 
- * compile with 
+/*
+ * compile with
  *      "make m_pathma COPTS=TEST"  - using MKS make and MKS environment
  * or
  *       "cc -o m_pathma -DTEST m_pathma.c"   - to get sunos std libraries
- *  
+ *
  */
 main(argc, argv)
 int argc;

@@ -27,8 +27,6 @@
 #ifndef _SAMPLE_UTILS_H
 #define	_SAMPLE_UTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

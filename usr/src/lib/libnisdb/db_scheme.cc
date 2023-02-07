@@ -26,8 +26,6 @@
  *	All Rights Reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include "db_headers.h"
 #include "db_scheme.h"

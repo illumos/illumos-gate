@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wadd_wch.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -47,9 +45,9 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/wadd_wch.c 1.5 1995/07/
 
 /*f
  * Add a character (and attributes) to a window and advance the cursor.
- * Automatic newline done at right margin, tabs are expanded every 8 
- * columns, backspaces are handled.  Newline will clear the rest of the 
- * line; if nl() mode then the cursor is advanced to the start of the 
+ * Automatic newline done at right margin, tabs are expanded every 8
+ * columns, backspaces are handled.  Newline will clear the rest of the
+ * line; if nl() mode then the cursor is advanced to the start of the
  * next line.
  */
 int
@@ -75,9 +73,9 @@ const cchar_t *cc;
 	switch (cc->_wc[0]) {
 	default:
 		if (iswprint(cc->_wc[0])) {
-	case '\t': 
-	case '\n': 
-	case '\b': 
+	case '\t':
+	case '\n':
+	case '\b':
 	case '\r':
 			if (__m_cc_add(w, y, x, cc, 0, &y, &x) == ERR)
 				goto error;

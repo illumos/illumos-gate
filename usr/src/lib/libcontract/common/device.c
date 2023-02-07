@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ctfs.h>
 #include <sys/contract.h>
 #include <sys/contract/device.h>

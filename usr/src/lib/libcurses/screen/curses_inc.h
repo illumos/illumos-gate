@@ -40,8 +40,6 @@
 #ifndef	_CURSES_INC_H
 #define	_CURSES_INC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Internal header file for the library
  *

@@ -43,8 +43,6 @@
 #ifndef _DAT_OSD_H_
 #define	_DAT_OSD_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <dat/udat.h>
 
 #include <assert.h>

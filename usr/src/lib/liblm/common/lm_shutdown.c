@@ -24,8 +24,6 @@
  * All Rights Reserved
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <nfs/nfs.h>
 #include <nfs/nfssys.h>

@@ -27,8 +27,6 @@
 #ifndef	_PICL2DOOR_H
 #define	_PICL2DOOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

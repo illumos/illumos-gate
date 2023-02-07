@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -278,7 +276,7 @@ do_test table-5.4 {
 #} {testdb/spaces+in+this+name+.tbl}
 
 # Try using keywords as table names or column names.
-# 
+#
 do_test table-7.1 {
   set v [catch {execsql {
     CREATE TABLE weird(

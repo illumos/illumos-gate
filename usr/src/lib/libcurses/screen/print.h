@@ -41,8 +41,6 @@
 #ifndef	_PRINT_H
 #define	_PRINT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

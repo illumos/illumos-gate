@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2003 January 29
 #
 # The author disclaims copyright to this source code.  In place of
@@ -222,7 +220,7 @@ do_test capi2-4.5 {
 } {2 3}
 do_test capi2-4.6 {
   list [catch {sqlite_finalize $VM2} msg] [set msg]
-} {0 {}}  
+} {0 {}}
 do_test capi2-4.7 {
   list [sqlite_step $VM3 N VALUE COLNAME] [set N] [set VALUE] [set COLNAME]
 } {SQLITE_DONE 0 {} {}}
@@ -231,7 +229,7 @@ do_test capi2-4.8 {
 } {2 3 3 4}
 do_test capi2-4.9 {
   list [catch {sqlite_finalize $VM3} msg] [set msg]
-} {0 {}}  
+} {0 {}}
 do_test capi2-4.10 {
   list [sqlite_step $VM1 N VALUE COLNAME] [set N] [set VALUE] [set COLNAME]
 } {SQLITE_DONE 0 {} {}}
@@ -240,7 +238,7 @@ do_test capi2-4.11 {
 } {1 2 2 3 3 4}
 do_test capi2-4.12 {
   list [catch {sqlite_finalize $VM1} msg] [set msg]
-} {0 {}}  
+} {0 {}}
 
 # Interleaved SELECTs
 #
@@ -270,13 +268,13 @@ do_test capi2-5.7 {
 } {SQLITE_DONE 2 {} {a b {} {}}}
 do_test capi2-5.8 {
   list [catch {sqlite_finalize $VM3} msg] [set msg]
-} {0 {}}  
+} {0 {}}
 do_test capi2-5.9 {
   list [sqlite_step $VM1 N VALUE COLNAME] [set N] [set VALUE] [set COLNAME]
 } {SQLITE_ROW 2 {1 2} {a b {} {}}}
 do_test capi2-5.10 {
   list [catch {sqlite_finalize $VM1} msg] [set msg]
-} {0 {}}  
+} {0 {}}
 do_test capi2-5.11 {
   list [sqlite_step $VM2 N VALUE COLNAME] [set N] [set VALUE] [set COLNAME]
 } {SQLITE_ROW 2 {3 4} {a b {} {}}}
@@ -285,7 +283,7 @@ do_test capi2-5.12 {
 } {SQLITE_ROW 2 {1 2} {a b {} {}}}
 do_test capi2-5.11 {
   list [catch {sqlite_finalize $VM2} msg] [set msg]
-} {0 {}}  
+} {0 {}}
 
 # Check for proper SQLITE_BUSY returns.
 #
@@ -326,7 +324,7 @@ do_test capi2-6.8 {
   list [sqlite_step $VM1 N VALUE COLNAME] [set N] [set VALUE] [set COLNAME]
 } {SQLITE_ROW 1 3 {x counter}}
 do_test capi2-6.9 {
-  execsql {SELECT * FROM t2} 
+  execsql {SELECT * FROM t2}
 } {2 3 3 4 1 2}
 do_test capi2-6.10 {
   list [sqlite_step $VM1 N VALUE COLNAME] [set N] [set VALUE] [set COLNAME]
@@ -463,7 +461,7 @@ do_test capi2-8.1 {
   set VM1 [sqlite_compile $DB {SELECT * FROM t2} TAIL]
   sqlite_finalize $VM1
 } {}
-  
+
 # Tickets #384 and #385 - make sure the TAIL argument to sqlite_compile
 # and all of the return pointers in sqlite_step can be null.
 #

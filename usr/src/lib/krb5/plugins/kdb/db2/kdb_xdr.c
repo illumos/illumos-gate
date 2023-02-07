@@ -1,16 +1,14 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/kdb/kdb_xdr.c
  *
- * Copyright 1995 by the Massachusetts Institute of Technology. 
+ * Copyright 1995 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -24,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 
 #include "k5-int.h"
@@ -44,7 +42,7 @@ krb5_encode_princ_dbkey(context, key, principal)
 
     if (!(retval = krb5_unparse_name(context, principal, &princ_name))) {
         /* need to store the NULL for decoding */
-        key->length = strlen(princ_name)+1;	
+        key->length = strlen(princ_name)+1;
         key->data = princ_name;
     }
     return(retval);
@@ -78,8 +76,8 @@ krb5_encode_princ_contents(context, content, entry)
      * compact and extensible.
      */
 
-    /* 
-     * First allocate enough space for all the data. 
+    /*
+     * First allocate enough space for all the data.
      * Need  2 bytes for the length of the base structure
      * then 36 [ 8 * 4 + 2 * 2] bytes for the base information
      *         [ attributes, max_life, max_renewable_life, expiration,
@@ -97,7 +95,7 @@ krb5_encode_princ_contents(context, content, entry)
 
     unparse_princ_size = strlen(unparse_princ) + 1;
     content->length += unparse_princ_size;
-    content->length += 2;		
+    content->length += 2;
 
     i = 0;
     /* tl_data is a linked list */
@@ -120,14 +118,14 @@ krb5_encode_princ_contents(context, content, entry)
 	    content->length += 4; /* type + length */
 	}
     }
-	
+
     if ((content->data = malloc(content->length)) == NULL) {
 	retval = ENOMEM;
 	goto epc_error;
     }
 
-    /* 
-     * Now we go through entry again, this time copying data 
+    /*
+     * Now we go through entry again, this time copying data
      * These first entries are always saved regardless of version
      */
     nextloc = content->data;
@@ -139,31 +137,31 @@ krb5_encode_princ_contents(context, content, entry)
 	/* Attributes */
     krb5_kdb_encode_int32(entry->attributes, nextloc);
     nextloc += 4;
-  
+
 	/* Max Life */
     krb5_kdb_encode_int32(entry->max_life, nextloc);
     nextloc += 4;
-  
+
 	/* Max Renewable Life */
     krb5_kdb_encode_int32(entry->max_renewable_life, nextloc);
     nextloc += 4;
-  
+
 	/* When the client expires */
     krb5_kdb_encode_int32(entry->expiration, nextloc);
     nextloc += 4;
-  
+
 	/* When its passwd expires */
     krb5_kdb_encode_int32(entry->pw_expiration, nextloc);
     nextloc += 4;
-  
+
 	/* Last successful passwd */
     krb5_kdb_encode_int32(entry->last_success, nextloc);
     nextloc += 4;
-  
+
 	/* Last failed passwd attempt */
     krb5_kdb_encode_int32(entry->last_failed, nextloc);
     nextloc += 4;
-  
+
 	/* # of failed passwd attempt */
     krb5_kdb_encode_int32(entry->fail_auth_count, nextloc);
     nextloc += 4;
@@ -171,11 +169,11 @@ krb5_encode_princ_contents(context, content, entry)
 	/* # tl_data strutures */
     krb5_kdb_encode_int16(entry->n_tl_data, nextloc);
     nextloc += 2;
-  
+
 	/* # key_data strutures */
     krb5_kdb_encode_int16(entry->n_key_data, nextloc);
     nextloc += 2;
-  
+
     	/* Put extended fields here */
     if (entry->len != KRB5_KDB_V1_BASE_LENGTH)
 	abort();
@@ -185,8 +183,8 @@ krb5_encode_princ_contents(context, content, entry)
 	memcpy(nextloc, entry->e_data, entry->e_length);
 	nextloc += entry->e_length;
     }
-  
-	/* 
+
+	/*
 	 * Now we get to the principal.
 	 * To squeze a few extra bytes out it is always assumed to come
 	 * after the base type.
@@ -230,7 +228,7 @@ krb5_encode_princ_contents(context, content, entry)
 	    }
 	}
     }
-	
+
 epc_error:;
     free(unparse_princ);
     return retval;
@@ -273,7 +271,7 @@ krb5_decode_princ_contents(context, content, entry)
     /* First do the easy stuff */
     nextloc = content->data;
     sizeleft = content->length;
-    if ((sizeleft -= KRB5_KDB_V1_BASE_LENGTH) < 0) 
+    if ((sizeleft -= KRB5_KDB_V1_BASE_LENGTH) < 0)
 	return KRB5_KDB_TRUNCATED_RECORD;
 
 	/* Base Length */
@@ -338,7 +336,7 @@ krb5_decode_princ_contents(context, content, entry)
     }
 
     /*
-     * Get the principal name for the entry 
+     * Get the principal name for the entry
      * (stored as a string which gets unparsed.)
      */
     if ((sizeleft -= 2) < 0) {
@@ -436,7 +434,7 @@ krb5_decode_princ_contents(context, content, entry)
 	                retval = ENOMEM;
 	                goto error_out;
 	            }
-	            memcpy(key_data->key_data_contents[j], nextloc, 
+	            memcpy(key_data->key_data_contents[j], nextloc,
 		           key_data->key_data_length[j]);
 	            nextloc += key_data->key_data_length[j];
 		}
@@ -452,10 +450,10 @@ error_out:;
     krb5_dbe_free_contents(context, entry);
     return retval;
 }
-	    
+
 void
 krb5_dbe_free_contents(context, entry)
-     krb5_context 	  context; 
+     krb5_context 	  context;
      krb5_db_entry 	* entry;
 {
     krb5_tl_data 	* tl_data_next;
@@ -477,8 +475,8 @@ krb5_dbe_free_contents(context, entry)
 	    for (j = 0; j < entry->key_data[i].key_data_ver; j++) {
 	    	if (entry->key_data[i].key_data_length[j]) {
 		    if (entry->key_data[i].key_data_contents[j]) {
-		        memset(entry->key_data[i].key_data_contents[j], 
-			       0, 
+		        memset(entry->key_data[i].key_data_contents[j],
+			       0,
 			       (unsigned) entry->key_data[i].key_data_length[j]);
 		    	free (entry->key_data[i].key_data_contents[j]);
 		    }

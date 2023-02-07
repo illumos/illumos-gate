@@ -31,8 +31,6 @@
 #ifndef _ADT_UCRED_H
 #define	_ADT_UCRED_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <bsm/audit.h>
 #include <ucred.h>
 

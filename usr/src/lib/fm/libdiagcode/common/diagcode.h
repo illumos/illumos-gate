@@ -27,8 +27,6 @@
 #ifndef	_FM_DIAGCODE_H
 #define	_FM_DIAGCODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

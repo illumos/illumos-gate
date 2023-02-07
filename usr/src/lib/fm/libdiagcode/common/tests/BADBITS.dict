@@ -22,9 +22,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
 # BADBITS diagcode dictionary -- used by "make test" target only
 #
 # since the revised libdiagcode spec (PSARC/2004/601), the "bits"

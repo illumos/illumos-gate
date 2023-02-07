@@ -2,25 +2,24 @@
  * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /*
   * Routines for controlled evaluation of host names, user names, and so on.
   * They are, in fact, wrappers around the functions that are specific for
   * the sockets or TLI programming interfaces. The request_info and host_info
   * structures are used for result cacheing.
-  * 
+  *
   * These routines allows us to postpone expensive operations until their
   * results are really needed. Examples are hostname lookups and double
   * checks, or username lookups. Information that cannot be retrieved is
   * given the value "unknown" ("paranoid" in case of hostname problems).
-  * 
+  *
   * When ALWAYS_HOSTNAME is off, hostname lookup is done only when required by
   * tcpd paranoid mode, by access control patterns, or by %letter expansions.
-  * 
+  *
   * When ALWAYS_RFC931 mode is off, user lookup is done only when required by
   * access control patterns or %letter expansions.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wins_wch.c
  *
@@ -44,14 +42,14 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/wins_wch.c 1.9 1995/09/
 #include <private.h>
 
 /*
- * Insert a character into a window line, shifting the line right 
+ * Insert a character into a window line, shifting the line right
  * the column width of the inserted character.  The right most columns
  * will be truncated according to the width of the character inserted.
  */
 int
 __m_cc_ins(w, y, x, cc)
 WINDOW *w;
-int y, x; 
+int y, x;
 const cchar_t *cc;
 {
 	extern void *memmove();		/* quiet sparcv9 warning */
@@ -78,8 +76,8 @@ const cchar_t *cc;
 		w->_first[y] = x;
 	w->_last[y] = w->_maxx;
 
-	/* If the last character on the line is incomplete, 
-	 * blank it out. 
+	/* If the last character on the line is incomplete,
+	 * blank it out.
 	 */
 	x = __m_cc_first(w, y, w->_maxx-1);
 	if (w->_maxx < x + __m_cc_width(&w->_line[y][x]))
@@ -107,7 +105,7 @@ int *yp, *xp;
 #ifdef M_CURSES_TRACE
 	__m_trace("__m_wins_wch(%p, %d, %d, %p, %p, %p)", w, y, x, cc, yp, xp);
 #endif
-	
+
 	code = ERR;
 
 	switch (cc->_wc[0]) {
@@ -168,11 +166,11 @@ error:
 
 /*f
  * Insert a character (with attributes) before the cursor. All
- * characters to the right of the cursor are moved one space to 
- * the right, with a possibility of the rightmost character on 
+ * characters to the right of the cursor are moved one space to
+ * the right, with a possibility of the rightmost character on
  * the line being lost.  The cursor position does not change.
  */
-int 
+int
 wins_wch(w, cc)
 WINDOW *w;
 const cchar_t *cc;

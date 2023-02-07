@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -499,7 +496,7 @@ static int btree_integrity_check(
   zResult = sqliteBtreeIntegrityCheck(pBt, aRoot, nRoot);
   if( zResult ){
     Tcl_AppendResult(interp, zResult, 0);
-    sqliteFree(zResult); 
+    sqliteFree(zResult);
   }
   return TCL_OK;
 }
@@ -590,7 +587,7 @@ static int btree_move_to(
     return TCL_ERROR;
   }
   if( Tcl_GetInt(interp, argv[1], (int*)&pCur) ) return TCL_ERROR;
-  rc = sqliteBtreeMoveto(pCur, argv[2], strlen(argv[2]), &res);  
+  rc = sqliteBtreeMoveto(pCur, argv[2], strlen(argv[2]), &res);
   if( rc ){
     Tcl_AppendResult(interp, errorName(rc), 0);
     return TCL_ERROR;

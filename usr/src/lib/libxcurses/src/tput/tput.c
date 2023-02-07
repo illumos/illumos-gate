@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- *	tput.c			
+ *	tput.c
  *
  *	Copyright 1990, 1994 by Mortice Kern Systems Inc.  All rights reserved.
  *
@@ -40,15 +38,15 @@
  *	SYNOPSIS:
  *	tput [-T<term>] capname [parm1..parm9]
  *	tput [-T<term>] -S
- *	
+ *
  *	DESCRIPTION:
  *	tput lets you change your terminal's characteristics. The capname
  *	argument indicates how you want to change the characteristics.
  *	Some special capnames are:
  *
- *	clear		clear the screen 
- *	init		initialize terminal in an implemenation-defined way 
- *	reset		reset terminal in an implemenation-defined way 
+ *	clear		clear the screen
+ *	init		initialize terminal in an implemenation-defined way
+ *	reset		reset terminal in an implemenation-defined way
  *	longname	print the full name of the ternminal (SVID)
  *
  *	Other capnames are supported and may take from 0 to 9 parameters. A
@@ -65,15 +63,15 @@
  *
  *	The  -S  option allows more than one capability per invocation of tput.
  *	The capabilities must be passed to tput from the standard input instead
- *	of the comamnd line. Only one capname is allowed per line. 
+ *	of the comamnd line. Only one capname is allowed per line.
  *
- *	EXIT STATUS	
+ *	EXIT STATUS
  *	tput may return the following status values:
  *
  *	0	Either a boolean capname is set true or a string capname was
  *		successfully written to the terminal.
  *
- *	1	No error message is printed. Returned if a boolean capname is 
+ *	1	No error message is printed. Returned if a boolean capname is
  *		false or a string capname is not defined for the terminal.(SVID)
  *
  *	2	Usage error.
@@ -82,7 +80,7 @@
  *
  *	4	Unknown terminfo capability <capname>.
  *
- *	>4	An error occured. 
+ *	>4	An error occured.
  *
  *
  *	NOTE 1: If the Caps file that describes the terminfo database changes
@@ -135,7 +133,7 @@ STATREF void cat ANSI((char *_Fn));
 /*f
  * mainline for tput
  */
-int 
+int
 main(argc, argv)
 int argc;
 char **argv;
@@ -158,7 +156,7 @@ char **argv;
 		case 'W':
 			/* Environment/window size are consulted and may
 			 * alter the database entries for lines and columns.
-			 */ 
+			 */
 			use_env(1);
 			break;
 		case 'S':
@@ -184,10 +182,10 @@ char **argv;
 	case 1:
 		break;
 	case 0:
-		err_msg(m_textstr(202, "Unknown terminal \"%s\".\n", "E term"), term_name); 
+		err_msg(m_textstr(202, "Unknown terminal \"%s\".\n", "E term"), term_name);
 		return (BAD_TERMINAL);
 	case -1:
-		err_msg(m_textstr(203, "No terminfo database.\n", "E")); 
+		err_msg(m_textstr(203, "No terminfo database.\n", "E"));
 		return (BAD_TERMINAL);
 	}
 	do {
@@ -204,9 +202,9 @@ char **argv;
 /*f
  *	Get an input line from stdin and then break it up into an argv array.
  *	If EOF is reached then S_flag is set to 0. Only the first 10 strings
- *	are of any interest. Any extra are ignored. 
+ *	are of any interest. Any extra are ignored.
  */
-STATIC void 
+STATIC void
 build_argv(ac, av)
 int *ac;
 char ***av;
@@ -230,7 +228,7 @@ char ***av;
 			while (!isspace(*(unsigned char*) p) && *p != '\0')
 				++p;
 			if (*p == '\0')
-				break;	
+				break;
 			*p++ = '\0';
 		}
 	}
@@ -240,7 +238,7 @@ char ***av;
 }
 
 /*f
- * 
+ *
  */
 STATIC int
 do_tput(_argc, _argv)
@@ -277,7 +275,7 @@ char **_argv;
 				}
 			} else {
 				q[i] = 0L;
-			} 
+			}
 		}
 		(void) putp(tparm(p, q[0], q[1], q[2], q[3],
 			q[4], q[5], q[6], q[7], q[8]
@@ -291,7 +289,7 @@ char **_argv;
 }
 
 /*f
- * 
+ *
  */
 STATIC void
 init()
@@ -310,7 +308,7 @@ init()
 	if (set_right_margin != NULL)
 		putp(set_right_margin);
 #endif
-	/* TODO: setting of tabs using clear_all_tabs & set_tab. */ 
+	/* TODO: setting of tabs using clear_all_tabs & set_tab. */
 	if (init_file != NULL)
 		cat(init_file);
 	if (init_3string != NULL)
@@ -318,7 +316,7 @@ init()
 }
 
 /*f
- * 
+ *
  */
 STATIC void
 reset()
@@ -336,7 +334,7 @@ reset()
 /*f
  * usage message for tput
  */
-STATIC int 
+STATIC int
 usage()
 {
 	(void) fprintf(stderr, m_strmsg(usage_msg));

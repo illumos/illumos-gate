@@ -27,8 +27,6 @@
 #ifndef	_THREAD_POOL_H_
 #define	_THREAD_POOL_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <thread.h>
 #include <pthread.h>

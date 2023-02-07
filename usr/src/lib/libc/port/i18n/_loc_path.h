@@ -27,8 +27,6 @@
 #ifndef	_LIBC_PORT_I18N_LOCPATH_H
 #define	_LIBC_PORT_I18N_LOCPATH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 
 #ifdef	__cplusplus

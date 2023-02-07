@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1987, 1988 by MIT Student Information Processing Board
  *
@@ -68,7 +66,7 @@ ss_list_requests(argc, argv, sci_idx, info_ptr)
     sigemptyset(&nmask);
     sigaddset(&nmask, SIGINT);
     sigprocmask(SIG_BLOCK, &nmask, &omask);
-    
+
     nsig.sa_handler = SIG_IGN;
     sigemptyset(&nsig.sa_mask);
     nsig.sa_flags = 0;

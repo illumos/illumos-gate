@@ -27,8 +27,6 @@
 #ifndef	_LIBPCP_H
 #define	_LIBPCP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

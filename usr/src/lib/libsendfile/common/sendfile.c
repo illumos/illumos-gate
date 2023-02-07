@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sendfilev is the native interface : 32 bit app on 32 bit kernel
  * and 64 bit app on 64 bit kernel. sendfilev64() is used by

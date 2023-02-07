@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1162,27 +1162,32 @@ pciehpc_slot_poweron(pcie_hp_slot_t *slot_p, ddi_hp_cn_state_t *result)
 
 	/* 3. wait for DLL State Change event, if it's supported */
 	if (ctrl_p->hc_dll_active_rep) {
-		status =  pciehpc_reg_get16(ctrl_p,
+		clock_t deadline;
+
+		/* wait 1 sec for the DLL State Changed event */
+		status = pciehpc_reg_get16(ctrl_p,
 		    bus_p->bus_pcie_off + PCIE_LINKSTS);
 
-		if (!(status & PCIE_LINKSTS_DLL_LINK_ACTIVE)) {
-			/* wait 1 sec for the DLL State Changed event */
+		deadline = ddi_get_lbolt() +
+		    SEC_TO_TICK(PCIE_HP_DLL_STATE_CHANGE_TIMEOUT);
+
+		while ((status & PCIE_LINKSTS_DLL_LINK_ACTIVE) == 0 &&
+		    ddi_get_lbolt() < deadline) {
 			(void) cv_timedwait(&slot_p->hs_dll_active_cv,
-			    &ctrl_p->hc_mutex,
-			    ddi_get_lbolt() +
-			    SEC_TO_TICK(PCIE_HP_DLL_STATE_CHANGE_TIMEOUT));
+			    &ctrl_p->hc_mutex, deadline);
 
 			/* check Link status */
 			status =  pciehpc_reg_get16(ctrl_p,
 			    bus_p->bus_pcie_off +
 			    PCIE_LINKSTS);
-			if (!(status & PCIE_LINKSTS_DLL_LINK_ACTIVE))
-				goto cleanup2;
 		}
-	}
 
-	/* wait 1 sec for link to come up */
-	delay(drv_usectohz(1000000));
+		if ((status & PCIE_LINKSTS_DLL_LINK_ACTIVE) == 0)
+			goto cleanup2;
+	} else {
+		/* wait 1 sec for link to come up */
+		delay(drv_usectohz(1000000));
+	}
 
 	/* check power is really turned ON */
 	control =  pciehpc_reg_get16(ctrl_p,

@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- *	tabs.c			
+ *	tabs.c
  *
  *	Copyright 1990, 1992 by Mortice Kern Systems Inc.  All rights reserved.
  *
@@ -38,10 +36,10 @@
  *
  *	SYNOPSIS:
  *	tabs [-T term] [+m[n]] [-n]
- *	tabs [-T term] [+m[n]] -t tablist 
+ *	tabs [-T term] [+m[n]] -t tablist
  *	tabs [-T term] [+m[n]] n1[,n2,...]
  *	tabs [-T term] [+m[n]] tabspec
- *	
+ *
  *	DESCRIPTION:
  *	The tabs utility shall display a series of characters that first clears
  *	the hardware terminal tab settings and then initializes the tab stops
@@ -110,8 +108,8 @@ extern char *_cmdname;
 #define N_FORM	1	/* tabs [-T term] [+m[n]] [-<n>] */
 #define T_FORM	2	/* tabs [-T term] [+m[n]] -t tablist */
 #define P_FORM	3	/* tabs [-T term] [+m[n]] n1[,n2,...]  and
-			 * tabs [-T term] [+m[n]] tabspec 
-			 */ 
+			 * tabs [-T term] [+m[n]] tabspec
+			 */
 
 
 static int form = NO_FORM;
@@ -164,7 +162,7 @@ STATREF int usage ANSI((void));
 /*f
  * mainline for tabs
  */
-int 
+int
 main(argc, argv)
 int argc;
 char **argv;
@@ -190,11 +188,11 @@ char **argv;
 			break;
 		}
 		if (**argv == '-') {
-			/* '-xyz...' or '-xyzF<parm>' or '-xyzF <parm>' */ 
+			/* '-xyz...' or '-xyzF<parm>' or '-xyzF <parm>' */
 			for (;*ap != '\0'; ++ap) {
 				switch (*ap) {
 				case 't':
-					if (form != NO_FORM) 
+					if (form != NO_FORM)
 						return (usage());
 					form = T_FORM;
 					if (*++ap != '\0') {
@@ -205,7 +203,7 @@ char **argv;
 						--argc;
 						break;
 					}
-					err_msg(missing_tablist); 
+					err_msg(missing_tablist);
 					return (usage());
 					break;
 				case 'T':
@@ -218,7 +216,7 @@ char **argv;
 						--argc;
 						break;
 					}
-					err_msg(missing_terminal); 
+					err_msg(missing_terminal);
 					return (usage());
 				default:
 					if (isdigit(*ap)) {
@@ -228,9 +226,9 @@ char **argv;
 						n_width =  *ap - '0';
 						continue;
 					}
-					for (p = tabspec; 
-					     p->option != NULL 
-					     && strcmp(p->option, ap) != 0; 
+					for (p = tabspec;
+					     p->option != NULL
+					     && strcmp(p->option, ap) != 0;
 					     ++p)
 						;
 					if (p->option != NULL) {
@@ -247,7 +245,7 @@ char **argv;
 			/* All '+' options. */
 			if (*ap == 'm') {
 				margin = (int) strtol(++ap, NULL, 0);
-				if (margin == 0) 
+				if (margin == 0)
 					margin = 10;
 			} else {
 				err_msg(unknown_option, ap);
@@ -330,7 +328,7 @@ do_tabs()
 		if (*p == '\0') {
 			set_every(nc);
 			break;
-		} 
+		}
 		do {
 			if (nc <= oc) {
 				err_msg(not_ascending, tablist);
@@ -429,7 +427,7 @@ int oc, nc;
 /*f
  * usage message for tabs
  */
-STATIC int 
+STATIC int
 usage()
 {
 	(void) fprintf(stderr, m_strmsg(usage_msg));
@@ -439,7 +437,7 @@ usage()
 /*f
  * display error message
  */
-STATIC void 
+STATIC void
 err_msg VARARG1(char*, fmt)
 {
 	va_list ap;

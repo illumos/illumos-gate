@@ -27,8 +27,6 @@
 #ifndef _SYS_VMEM_IMPL_USER_H
 #define	_SYS_VMEM_IMPL_USER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/kstat.h>
 #include <sys/time.h>
 #include <sys/vmem.h>

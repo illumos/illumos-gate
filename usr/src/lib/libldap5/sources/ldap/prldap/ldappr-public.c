@@ -3,9 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -96,14 +93,14 @@ prldap_install_routines( LDAP *ld, int shared )
 
 /*
  * Function: prldap_set_session_option().
- * 
+ *
  * Given an LDAP session handle or a session argument such is passed to
  * SOCKET, POLL, NEWHANDLE, or DISPOSEHANDLE extended I/O callbacks, set
  * an option that affects the prldap layer.
- * 
+ *
  * If 'ld' and 'session" are both NULL, the option is set as the default
- * for all new prldap sessions. 
- * 
+ * for all new prldap sessions.
+ *
  * Returns an LDAP API error code (LDAP_SUCCESS if all goes well).
  */
 int LDAP_CALL

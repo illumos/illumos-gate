@@ -47,8 +47,6 @@
  *	needed to deal with TCP connections.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include <stdio.h>
 #include <stdlib.h>

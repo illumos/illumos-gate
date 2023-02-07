@@ -30,8 +30,6 @@
 #ifndef _COMPLEX_WRAPPER_H
 #define	_COMPLEX_WRAPPER_H
 
-#pragma ident	"@(#)complex_wrapper.h	1.7	06/01/31 SMI"
-
 #if defined(__GNUC__)
 #define dcomplex double _Complex
 #define fcomplex float _Complex

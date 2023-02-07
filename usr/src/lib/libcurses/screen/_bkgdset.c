@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define		NOMACROS
 #include	<sys/types.h>
 #include	"curses_inc.h"

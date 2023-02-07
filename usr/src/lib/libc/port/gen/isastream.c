@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Check to see if a file descriptor is that of a stream.
  * Return 1 with errno set to 0 if it is. Otherwise,

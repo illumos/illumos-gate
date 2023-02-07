@@ -29,8 +29,6 @@ echo "\
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#pragma ident\t\"@(#)mkerrno.sh\t1.2\t08/07/31\tSMI\"
-
 #include <strings.h>
 #include <scsi/libsmp.h>
 

@@ -27,8 +27,6 @@
 #ifndef _PRIV_PRIVATE_H
 #define	_PRIV_PRIVATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/priv.h>
 #include <limits.h>

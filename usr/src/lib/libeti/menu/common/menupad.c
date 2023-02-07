@@ -28,8 +28,6 @@
  * All rights reserved.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
 /*LINTLIBRARY*/
 
 #include <sys/types.h>

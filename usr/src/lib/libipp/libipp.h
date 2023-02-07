@@ -27,8 +27,6 @@
 #ifndef	_LIBIPP_H
 #define	_LIBIPP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libnvpair.h>
 #include <ipp/ipp.h>
 

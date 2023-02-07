@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -30,7 +28,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -72,7 +70,7 @@ ldap_compare_ext( LDAP *ld, const char *dn, const char *attr,
     LDAPControl **clientctrls, int *msgidp )
 {
 	BerElement	*ber;
-	int		rc, lderr; 
+	int		rc, lderr;
 
 	/* The compare request looks like this:
 	 *	CompareRequest ::= SEQUENCE {
@@ -96,7 +94,7 @@ ldap_compare_ext( LDAP *ld, const char *dn, const char *attr,
 		LDAP_SET_LDERRNO( ld, lderr, NULL, NULL );
 		return( lderr );
 	}
-		
+
 	if ( dn == NULL ) {
 		dn = "";
 	}
@@ -162,7 +160,7 @@ int
 LDAP_CALL
 ldap_compare_ext_s( LDAP *ld, const char *dn, const char *attr,
     const struct berval *bvalue, LDAPControl **serverctrls,
-    LDAPControl **clientctrls ) 
+    LDAPControl **clientctrls )
 {
 	int		err, msgid;
 	LDAPMessage	*res;

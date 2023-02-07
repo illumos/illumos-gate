@@ -35,8 +35,6 @@
  *   (see getipnodebyname.c and netdir_inet.c).
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include <sys/socket.h>
 #include <sys/types.h>

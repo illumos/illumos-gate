@@ -35,8 +35,6 @@
 #ifndef _STPAUL_H
 #define	_STPAUL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

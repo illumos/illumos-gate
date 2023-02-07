@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * __xpg6 (C99/SUSv3) was first introduced in Solaris 10.
  *

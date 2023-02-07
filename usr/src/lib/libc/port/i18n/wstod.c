@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is based on /usr/src/lib/libc/port/gen/strtod.c and
  * /usr/src/lib/libc/sparc/fp/string_decim.c

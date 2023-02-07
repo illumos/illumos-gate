@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include 	<errno.h>
 #include 	<priv.h>
 #include 	<sys/tsol/priv.h>

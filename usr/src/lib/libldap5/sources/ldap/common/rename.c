@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -30,7 +28,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -58,12 +56,12 @@ static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of 
  */
 int
 LDAP_CALL
-ldap_rename( 
-	   LDAP *ld, 
-	   const char *dn, 
-	   const char *newrdn, 
+ldap_rename(
+	   LDAP *ld,
+	   const char *dn,
+	   const char *newrdn,
 	   const char *newparent,
-	   int deleteoldrdn, 
+	   int deleteoldrdn,
 	   LDAPControl	**serverctrls,
 	   LDAPControl	**clientctrls,  /* not used for anything yet */
 	   int *msgidp
@@ -118,7 +116,7 @@ ldap_rename(
 			LDAP_MUTEX_LOCK( ld, LDAP_CACHE_LOCK );
 			if ( (rc = (ld->ld_cache_modrdn)( ld, *msgidp,
 			    LDAP_REQ_MODRDN, dn, newrdn, deleteoldrdn ))
-			    != 0 ) {   
+			    != 0 ) {
 				*msgidp = rc;
 				LDAP_MUTEX_UNLOCK( ld, LDAP_CACHE_LOCK );
 				return( LDAP_SUCCESS );
@@ -129,7 +127,7 @@ ldap_rename(
 			LDAP_MUTEX_LOCK( ld, LDAP_CACHE_LOCK );
 			if ( (rc = (ld->ld_cache_rename)( ld, *msgidp,
 			    LDAP_REQ_MODDN, dn, newrdn, newparent,
-			    deleteoldrdn )) != 0 ) {   
+			    deleteoldrdn )) != 0 ) {
 				*msgidp = rc;
 				return( LDAP_SUCCESS );
 			}
@@ -202,12 +200,12 @@ ldap_modrdn( LDAP *ld, const char *dn, const char *newrdn )
 
 int
 LDAP_CALL
-ldap_rename_s( 
-	   LDAP *ld, 
-	   const char *dn, 
-	   const char *newrdn, 
+ldap_rename_s(
+	   LDAP *ld,
+	   const char *dn,
+	   const char *newrdn,
 	   const char *newparent,
-	   int deleteoldrdn, 
+	   int deleteoldrdn,
 	   LDAPControl	**serverctrls,
 	   LDAPControl	**clientctrls  /* not used for anything yet */
 )
@@ -219,7 +217,7 @@ ldap_rename_s(
 		return( LDAP_GET_LDERRNO( ld, NULL, NULL ) );
 	}
 
- 	if ( msgid == -1 ) 
+ 	if ( msgid == -1 )
 		return( LDAP_GET_LDERRNO( ld, NULL, NULL ) );
 
 	if ( ldap_result( ld, msgid, 1, (struct timeval *) NULL, &res ) == -1 )
@@ -234,13 +232,13 @@ ldap_modrdn2_s( LDAP *ld, const char *dn, const char *newrdn, int deleteoldrdn )
 {
         int             msgid;
         LDAPMessage     *res;
- 
+
         if ( (msgid = ldap_modrdn2( ld, dn, newrdn, deleteoldrdn )) == -1 )
                 return( LDAP_GET_LDERRNO( ld, NULL, NULL ) );
- 
+
         if ( ldap_result( ld, msgid, 1, (struct timeval *) NULL, &res ) == -1 )
                 return( LDAP_GET_LDERRNO( ld, NULL, NULL ) );
- 
+
         return( ldap_result2error( ld, res, 1 ) );
 }
 

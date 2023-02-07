@@ -23,8 +23,6 @@
  * Copyright (c) 1988 by Sun Microsystems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include	<sys/types.h>

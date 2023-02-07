@@ -24,8 +24,6 @@
 # Copyright (c) 1990,1997-1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/libsmedia/plugins/floppy/Makefile.targ
 
 LIBRARY=	sm_fd.a

@@ -33,10 +33,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
-
 #ifndef _KMFBER_INT_H
 #define	_KMFBER_INT_H
 

@@ -22,8 +22,6 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 s/yyact/fruact/g
 s/yychar/fruchar/g

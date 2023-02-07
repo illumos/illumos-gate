@@ -27,8 +27,6 @@
 #ifndef	_NIS_HASHITEM_H
 #define	_NIS_HASHITEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pthread.h>
 #include <rpcsvc/nis.h>
 

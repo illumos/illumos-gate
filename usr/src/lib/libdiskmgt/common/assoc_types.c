@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libdiskmgt.h"
 
 dm_desc_type_t alias_assoc_types [] = {

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 
 Copyright 1987, 1989 by the Student Information Processing Board

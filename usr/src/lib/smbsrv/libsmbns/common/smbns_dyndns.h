@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_DYNDNS_H
 #define	_SMBSRV_DYNDNS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <smbsrv/libsmbns.h>
 
 /*

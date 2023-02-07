@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** This program tests the ability of SQLite database to recover from a crash.
 ** This program runs under Unix only, but the results are applicable to all
@@ -32,7 +29,7 @@ static void do_some_sql(int parent){
   int rc = SQLITE_OK;
   sqlite *db;
   int cnt = 0;
-  static char zBig[] = 
+  static char zBig[] =
     "-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -53,7 +50,7 @@ static void do_some_sql(int parent){
   srand(getpid());
   while( rc==SQLITE_OK ){
     cnt++;
-    rc = sqlite_exec_printf(db, 
+    rc = sqlite_exec_printf(db,
        "INSERT INTO t1 VALUES(%d,'%d%s')", 0, 0, &zErr,
        rand(), rand(), zBig);
   }

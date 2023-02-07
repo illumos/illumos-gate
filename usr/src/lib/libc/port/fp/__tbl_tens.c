@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * A table of all the powers of ten that fit exactly in an IEEE double, plus
  * a few more.

@@ -6,8 +6,6 @@
 #ifndef _KRB5_DB2_SEARCH_H
 #define	_KRB5_DB2_SEARCH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

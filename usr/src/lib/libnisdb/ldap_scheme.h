@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_LDAP_SCHEME_H
 #define	_LDAP_SCHEME_H
 

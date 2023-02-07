@@ -23,9 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 These are sample DIAGCODE dictionary files, used only when the
 	make test

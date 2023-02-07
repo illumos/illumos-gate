@@ -26,8 +26,6 @@
 #ifndef	_LIBDSCP_H
 #define	_LIBDSCP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 

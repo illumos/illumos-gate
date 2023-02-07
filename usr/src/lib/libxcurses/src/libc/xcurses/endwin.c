@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * endwin.c
  *
@@ -46,11 +44,11 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/endwin.c 1.5 1995/07/19
 
 
 /*f
- * Restore tty modes, moves the cursor to the lower left hand 
- * corner of the screen and resets the terminal into proper non-visual 
- * mode.  Calling doupdate()/wrefresh() will resume visual mode. 
+ * Restore tty modes, moves the cursor to the lower left hand
+ * corner of the screen and resets the terminal into proper non-visual
+ * mode.  Calling doupdate()/wrefresh() will resume visual mode.
  */
-int 
+int
 endwin()
 {
 #ifdef M_CURSES_TRACE
@@ -67,13 +65,13 @@ endwin()
 
 		if (orig_colors != (char *) 0)
 			(void) tputs(orig_colors, 1, __m_outc);
-		
+
 		/* Make sure the current attribute state is normal.*/
 		if (ATTR_STATE != WA_NORMAL) {
 			(void) vid_puts(WA_NORMAL, 0, (void *) 0, __m_outc);
 
 			if (ceol_standout_glitch)
-				curscr->_line[curscr->_maxx-1][0]._at 
+				curscr->_line[curscr->_maxx-1][0]._at
 					|= WA_COOKIE;
 		}
 

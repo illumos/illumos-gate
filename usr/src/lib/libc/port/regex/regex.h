@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * TOKENS THAT MARK SUBEXPRESSIONS IN COMPILED REGULAR EXPRESSIONS
  *

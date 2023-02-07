@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/rpcent.h>
 #include "ns_internal.h"
 #include "ldap_common.h"

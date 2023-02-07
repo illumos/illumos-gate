@@ -23,10 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"@(#)mkerror.sh	1.1	06/02/11 SMI"
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 input="`cat`"
 [ -z "$input" ] && exit 1
@@ -37,8 +33,6 @@ echo "\
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.\n\
  * Use is subject to license terms.\n\
  */\n\
-\n\
-#pragma ident\t\"@(#)mkerror.sh\t1.2\t05/06/08 SMI\"\n\
 \n\
 #include <strings.h>
 #include <topo_error.h>

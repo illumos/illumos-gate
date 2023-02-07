@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #!/usr/bin/tclsh
 #
 # This script is used to generate the array of strings and the enum

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -30,7 +28,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -85,7 +83,7 @@ internal_ldap_get_values( LDAP *ld, LDAPMessage *entry, const char *target,
 		}
 	}
 
-	/* 
+	/*
 	 * if we get this far, we've found the attribute and are sitting
 	 * just before the set of values.
 	 */
@@ -244,7 +242,7 @@ parse_subtypes( const char *target, int *baseLenp, char **langp,
 	*nsubtypes = nSubtypes;
 	return langIndex;
 }
-		
+
 
 static int
 check_lang_match( const char *target, const char *baseTarget,

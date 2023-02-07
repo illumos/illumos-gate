@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * DAAdvert functionality. For all normal UA calls, libslp queries
  * slpd for available DAs. This file contains functionality to handle

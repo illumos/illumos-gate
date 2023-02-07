@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * All routines necessary to deal the "netmasks" database.  The sources
  * contain mappings between 32 bit Internet addresses and corresponding

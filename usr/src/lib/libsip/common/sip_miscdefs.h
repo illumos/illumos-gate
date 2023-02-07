@@ -27,8 +27,6 @@
 #ifndef	_SIP_MISCDEFS_H
 #define	_SIP_MISCDEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

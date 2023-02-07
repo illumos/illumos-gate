@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
-
 /*
  * t_rcvudata.c and t_rcvvudata.c are very similar and contain common code.
  * Any changes to either of them should be reviewed to see whether they

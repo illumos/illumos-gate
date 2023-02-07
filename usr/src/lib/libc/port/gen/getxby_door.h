@@ -26,8 +26,6 @@
 #ifndef	_GETXBY_DOOR_H
 #define	_GETXBY_DOOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Definitions for client side of doors-based name service caching
  */

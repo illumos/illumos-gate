@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * libfru is divided into the following modules:
  * 1) This file.  Support for the API and ties together all the sub-modules.
@@ -115,7 +113,7 @@ static char *ds_lib_name = NULL;
 #define RETRY(expr) 						\
 	{ for (int loop = 0; loop < FRU_NORESPONSE_RETRY &&	\
 		(expr) == FRU_NORESPONSE; loop++) ;		\
-	}	
+	}
 
 /* ========================================================================= */
 static const char *fru_errmsg[] =
@@ -556,7 +554,7 @@ fru_get_child(fru_nodehdl_t handle, fru_nodehdl_t *child)
 		if (err != FRU_SUCCESS) {
 			return (err);
 		}
-		
+
 		RETRY(err = data_source->get_node_type(tr_child, &type))
 		if (err != FRU_SUCCESS) {
 			return (err);
@@ -743,7 +741,7 @@ fru_get_node_type(fru_nodehdl_t handle, fru_node_t *type)
 	if (data_source == NULL) {
 		return (FRU_FAILURE);
 	}
-	
+
 	RETRY(err = data_source->get_node_type(NODEHDL_TO_TREEHDL(handle),
 								&tmp))
 	if (err == FRU_SUCCESS) {
@@ -1947,7 +1945,7 @@ fru_add_element(fru_nodehdl_t container,
 			return (err);
 		}
 	}
-	
+
 	RETRY(err = data_source->add_tag_to_seg(NODEHDL_TO_TREEHDL(container),
 					seg_name, tag, data, def->payloadLen))
 	CHK_UNLOCK_CONTAINER(container);
@@ -1998,7 +1996,7 @@ fru_delete_element(fru_nodehdl_t container,
 		RETRY(err =
 			data_source->get_tag_list(NODEHDL_TO_TREEHDL(container),
 						seg_name, &tags, &num_tags))
-							
+
 		if (err != FRU_SUCCESS) {
 			CHK_UNLOCK_CONTAINER(container);
 			return (err);
@@ -2023,7 +2021,7 @@ fru_delete_element(fru_nodehdl_t container,
 		}
 		mk_tag(def->tagType, def->tagDense, def->payloadLen, &tag);
 	}
-	
+
 	RETRY(err = data_source->delete_tag(NODEHDL_TO_TREEHDL(container),
 						seg_name, tag, instance))
 	CHK_UNLOCK_CONTAINER(container);

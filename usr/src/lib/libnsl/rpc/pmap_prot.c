@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Protocol for the local binder service, or pmap.
  * All the pmap xdr routines here.

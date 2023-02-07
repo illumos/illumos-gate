@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * FRUID Tag Registry
  * This file is AUTO-generated DO NOT EDIT

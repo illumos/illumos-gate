@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -70,7 +68,7 @@ ldap_enable_translation( LDAP *ld, LDAPMessage *entry, int enable )
 
 	optionsp = ( entry == NULLMSG ) ? &ld->ld_lberoptions :
 	    &entry->lm_ber->ber_options;
-		
+
 	if ( enable ) {
 		*optionsp |= LBER_OPT_TRANSLATE_STRINGS;
 	} else {
@@ -88,7 +86,7 @@ ldap_translate_from_t61( LDAP *ld, char **bufp, unsigned long *lenp,
 	if ( ld->ld_lber_decode_translate_proc == NULL ) {
 		return( LDAP_SUCCESS );
 	}
-	    
+
 	return( (*ld->ld_lber_decode_translate_proc)( bufp, &length, free_input ));
 }
 
@@ -102,7 +100,7 @@ ldap_translate_to_t61( LDAP *ld, char **bufp, unsigned long *lenp,
 	if ( ld->ld_lber_encode_translate_proc == NULL ) {
 		return( LDAP_SUCCESS );
 	}
-	    
+
 	return( (*ld->ld_lber_encode_translate_proc)( bufp, &length, free_input ));
 }
 
@@ -1599,7 +1597,7 @@ ldap_8859_to_t61( char **bufp, unsigned long *buflenp, int free_input )
 {
   Byte		*s, *oo, *o, *aux;
   int		c;
-  unsigned long len; 
+  unsigned long len;
   Couple	*cc;
 
   LDAPDebug( LDAP_DEBUG_TRACE, "ldap_8859_to_t61 input length: %ld\n",

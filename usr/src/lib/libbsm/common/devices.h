@@ -26,8 +26,6 @@
 #ifndef	_BSM_DEVICES_H
 #define	_BSM_DEVICES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

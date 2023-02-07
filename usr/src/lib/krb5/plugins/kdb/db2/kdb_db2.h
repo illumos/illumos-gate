@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/kdb/kdb_db2.h
  *
@@ -9,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * KDC Database backend definitions for Berkely DB.
  */
@@ -53,36 +52,36 @@ typedef struct _krb5_db2_context {
 #define KDB2_LOCK_EXT ".ok"
 #define KDB2_TEMP_LOCK_EXT "~.ok"
 
-krb5_error_code krb5_db2_db_init 
+krb5_error_code krb5_db2_db_init
 	(krb5_context);
-krb5_error_code krb5_db2_db_fini 
+krb5_error_code krb5_db2_db_fini
 	(krb5_context);
-krb5_error_code krb5_db2_db_get_age 
+krb5_error_code krb5_db2_db_get_age
 	(krb5_context,
 		   char *,
 		   time_t * );
-krb5_error_code krb5_db2_db_create 
+krb5_error_code krb5_db2_db_create
 	(krb5_context,
 		   char *,
 		   krb5_int32);
-krb5_error_code krb5_db2_db_destroy 
+krb5_error_code krb5_db2_db_destroy
 	(krb5_context,
 		   char * );
-krb5_error_code krb5_db2_db_rename 
+krb5_error_code krb5_db2_db_rename
 	(krb5_context,
 		   char *,
 		   char * );
-krb5_error_code krb5_db2_db_get_principal 
+krb5_error_code krb5_db2_db_get_principal
 	(krb5_context,
 		   krb5_const_principal,
 		   krb5_db_entry *,
 		   int *,
 		   krb5_boolean * );
-krb5_error_code krb5_db2_db_free_principal 
+krb5_error_code krb5_db2_db_free_principal
 	(krb5_context,
 		   krb5_db_entry *,
 		   int );
-krb5_error_code krb5_db2_db_put_principal 
+krb5_error_code krb5_db2_db_put_principal
 	(krb5_context,
 	 krb5_db_entry *,
 	 int *,
@@ -100,21 +99,21 @@ krb5_error_code krb5_db2_db_iterate
 					          krb5_db_entry *),
 	           krb5_pointer,
 		   char **db_args );
-krb5_error_code krb5_db2_db_set_nonblocking 
+krb5_error_code krb5_db2_db_set_nonblocking
 	(krb5_context,
 		   krb5_boolean,
 		   krb5_boolean * );
 krb5_boolean krb5_db2_db_set_lockmode
 	(krb5_context,
 		   krb5_boolean );
-krb5_error_code krb5_db2_db_open_database 
+krb5_error_code krb5_db2_db_open_database
 	(krb5_context);
-krb5_error_code krb5_db2_db_close_database 
+krb5_error_code krb5_db2_db_close_database
 	(krb5_context);
 
-krb5_error_code 
-krb5_db2_set_master_key_ext ( krb5_context kcontext, 
-			      char *pwd, 
+krb5_error_code
+krb5_db2_set_master_key_ext ( krb5_context kcontext,
+			      char *pwd,
 			      krb5_keyblock *key);
 
 krb5_error_code
@@ -140,7 +139,7 @@ krb5_error_code krb5_db2_lib_init(void);
 
 krb5_error_code krb5_db2_lib_cleanup(void);
 
-krb5_error_code 
+krb5_error_code
 krb5_db2_db_unlock(krb5_context);
 
 krb5_error_code
@@ -148,9 +147,9 @@ krb5_db2_promote_db(krb5_context kcontext,
 		    char *conf_section,
 		    char **db_args);
 
-krb5_error_code 
-krb5_db2_db_set_option ( krb5_context kcontext, 
-			 int option, 
+krb5_error_code
+krb5_db2_db_set_option ( krb5_context kcontext,
+			 int option,
 			 void *value );
 
 krb5_error_code
@@ -158,7 +157,7 @@ krb5_db2_db_lock( krb5_context 	  context,
 		  int 	 	  in_mode);
 
 
-krb5_error_code 
+krb5_error_code
 krb5_db2_open( krb5_context kcontext,
 			       char *conf_section,
 			       char **db_args,
@@ -175,13 +174,13 @@ krb5_error_code krb5_db2_destroy( krb5_context kcontext,
 const char * krb5_db2_err2str( krb5_context kcontext,
 			       long err_code );
 
-void * 
-krb5_db2_alloc( krb5_context kcontext,  
-		void *ptr, 
+void *
+krb5_db2_alloc( krb5_context kcontext,
+		void *ptr,
 		size_t size );
 
-void 
-krb5_db2_free( krb5_context kcontext, 
+void
+krb5_db2_free( krb5_context kcontext,
 		    void *ptr );
 
 const char *

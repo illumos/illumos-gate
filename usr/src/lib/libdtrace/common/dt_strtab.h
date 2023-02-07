@@ -27,8 +27,6 @@
 #ifndef	_DT_STRTAB_H
 #define	_DT_STRTAB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

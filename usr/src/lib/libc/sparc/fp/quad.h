@@ -27,8 +27,6 @@
 #ifndef _QUAD_H
 #define	_QUAD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

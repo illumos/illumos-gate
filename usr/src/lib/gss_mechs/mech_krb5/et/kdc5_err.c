@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
- 
 #include <locale.h>
 const char *
 kdc5_error_table(long errorno) {

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wrefresh.c
  *
@@ -45,8 +43,8 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/wrefresh.c 1.3 1995/06/
 #include <string.h>
 
 /*f
- * Update curscr with the given window then display to the terminal. 
- * Unless leaveok() has been enabled, the physical cursor of the 
+ * Update curscr with the given window then display to the terminal.
+ * Unless leaveok() has been enabled, the physical cursor of the
  * terminal is left at the location of the cursor for that window.
  */
 int
@@ -70,9 +68,9 @@ WINDOW *w;
 }
 
 /*f
- * Update newscr with the given window.  This allows newscr to be 
- * updated with several windows before doing a doupdate() (and so 
- * improve the efficiency of multiple updates in comparison to 
+ * Update newscr with the given window.  This allows newscr to be
+ * updated with several windows before doing a doupdate() (and so
+ * improve the efficiency of multiple updates in comparison to
  * looping through wrefresh() for all windows).
  */
 int
@@ -104,7 +102,7 @@ WINDOW *w;
 
 			/* Case 3 - Check target window for overlap of broad
 			 * characters around the outer edge of the source
-			 * window's location.  
+			 * window's location.
 			 */
 			(void) __m_cc_erase(ns, ny, nx, ny, nx);
 			(void) __m_cc_erase(ns, ny, nx+dx-1, ny, nx+dx-1);
@@ -115,13 +113,13 @@ WINDOW *w;
                         );
 
 			if (!ns->_line[ny][nx]._f) {
-				/* Case 5 - Incomplete glyph copied from 
+				/* Case 5 - Incomplete glyph copied from
 				 * source at screen margins.
 				 */
 				if (nx <= 0)
 					(void) __m_cc_erase(ns, ny, 0, ny, 0);
 #ifdef M_CURSES_SENSIBLE_WINDOWS
-				/* Case 4 - Expand incomplete glyph from 
+				/* Case 4 - Expand incomplete glyph from
 				 * source into target window.
 				 */
 				else if (0 < nx)
@@ -130,7 +128,7 @@ WINDOW *w;
 			}
 
 			if (!__m_cc_islast(ns, ny, nx+dx-1)) {
-				/* Case 5 - Incomplete glyph copied from 
+				/* Case 5 - Incomplete glyph copied from
 				 * source at screen margins.
 				 */
 				if (ns->_maxx <= nx + dx)
@@ -138,7 +136,7 @@ WINDOW *w;
 						ns, ny, nx+dx-1, ny, nx+dx-1
 					);
 #ifdef M_CURSES_SENSIBLE_WINDOWS
-				/* Case 4 - Expand incomplete glyph from 
+				/* Case 4 - Expand incomplete glyph from
 				 * source into target window.
 				 */
 				else if (nx + dx < ns->_maxx)
@@ -147,7 +145,7 @@ WINDOW *w;
 					);
 #endif /* M_CURSES_SENSIBLE_WINDOWS */
 			}
-			
+
 			/* Untouch line. */
 			w->_first[wy] = w->_maxx;
 			w->_last[wy] = -1;
@@ -168,7 +166,7 @@ WINDOW *w;
 		ns->_cury = w->_cury + w->_begy;
 		ns->_curx = w->_curx + w->_begx;
 
-		ns->_flags |= w->_flags 
+		ns->_flags |= w->_flags
 			& (W_CLEAR_WINDOW | W_REDRAW_WINDOW | W_LEAVE_CURSOR);
 		w->_flags &= ~(W_CLEAR_WINDOW | W_REDRAW_WINDOW);
 	}
@@ -179,7 +177,7 @@ WINDOW *w;
 /*
  * Check overlaping region on a line.
  *
- * When copying a source window region over another target window 
+ * When copying a source window region over another target window
  * region, we have a few cases which to concern ourselves with.
  *
  * Let {, [, ( and ), ], } denote the left and right halves of
@@ -189,12 +187,12 @@ WINDOW *w;
  *
  * Let hash (#) be a narrow background character.
  *
- * Let vertical bar, hyphen, and plus represent the borders 
+ * Let vertical bar, hyphen, and plus represent the borders
  * of a window.
  *
  *  1.	Copy narrow characters over narrow characters.
  *		copywin(s, t, 0, 1, 0, 1, 1, 3, 0)
- *		   s      	   t      ==>      t 
+ *		   s      	   t      ==>      t
  *		+------+	+------+	+------+
  *		|abcdef|	|......|	|.bcd..|
  *		|ghijkl|	|......|	|.hij..|
@@ -204,7 +202,7 @@ WINDOW *w;
  *
  *  2.	Copy whole broad characters over narrow characters.
  *		copywin(s, t, 0, 1, 0, 1, 1, 3, 0)
- *		   s               t       ==>     t 
+ *		   s               t       ==>     t
  *		+------+	+------+	+------+
  *		|a[]def|	|......|	|.[]d..|
  *		|gh{}kl|	|......|	|.h{}..|
@@ -214,7 +212,7 @@ WINDOW *w;
  *
  *  3.	Copy narrow from source overlaps broad in target.
  *		copywin(s, t, 0, 1, 0, 1, 1, 3, 0)
- *		   s               t       ==>     t 
+ *		   s               t       ==>     t
  *		+------+	+------+	+------+
  *		|abcdef|	|[]....|	|#bcd..|
  *		|ghijkl|	|...{}.|	|.hij#.|
@@ -224,13 +222,13 @@ WINDOW *w;
  *	halves of broad characters.  This may result also with
  *	a wnoutrefresh() of a window onto curscr.
  *
- * The following case appears to be disallowed in XPG4 V2 
- * and I think they're wrong, so I've conditionalised the code 
+ * The following case appears to be disallowed in XPG4 V2
+ * and I think they're wrong, so I've conditionalised the code
  * on M_CURSES_SENSIBLE_WINDOWS.
  *
  *  4.	Copy incomplete broad from source to target.
  *		copywin(s, t, 0, 1, 0, 1, 1, 3, 0)
- *		   s               t       ==>     t 
+ *		   s               t       ==>     t
  *		+------+	+------+	+------+
  *		|[]cdef|	|123456|	|[]cd56|
  *		|ghi{}l|	|789012|	|7hi{}2|
@@ -244,7 +242,7 @@ WINDOW *w;
  * Consider a pop-up dialog that contains narrow characters and
  * a base window that contains broad characters and we do the
  * following:
- * 	
+ *
  * 	save = dupwin(dialog);		// create backing store
  * 	overwrite(curscr, save);	// save region to be overlayed
  * 	wrefresh(dialog);		// display dialog
@@ -257,7 +255,7 @@ WINDOW *w;
  * contains narrow characters only, it would be correctly restored.
  *
  * However with broad characters, the overwrite() could copy a
- * region with incomplete broad characters.  The wrefresh(dialog) 
+ * region with incomplete broad characters.  The wrefresh(dialog)
  * results in case 3.  In order to restore the window correctly with
  * wrefresh(save), we require case 4.
  *
@@ -265,7 +263,7 @@ WINDOW *w;
  *
  *	a)
  *		copywin(s, t, 0, 1, 0, 0, 1, 2, 0)
- *		   s               t       ==>     t 
+ *		   s               t       ==>     t
  *		+------+	+------+	+------+
  *		|[]cdef|	|123456|	|#cd456|
  *		|ghijkl|	|789012|	|hij012|
@@ -277,7 +275,7 @@ WINDOW *w;
  *
  *	b)
  *		copywin(s, t, 0, 1, 0, 3, 1, 5, 0)
- *		   s               t       ==>     t 
+ *		   s               t       ==>     t
  *		+------+	+------+	+------+
  *		|abcdef|	|123456|	|123bcd|
  *		|ghi{}l|	|789012|	|789hi#|

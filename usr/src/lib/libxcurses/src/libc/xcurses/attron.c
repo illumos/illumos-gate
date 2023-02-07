@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * attron.c
  *
@@ -100,7 +98,7 @@ chtype
 
 	return __m_return_chtype("COLOR_PAIR", ch);
 }
-	
+
 short
 (PAIR_NUMBER)(chtype at)
 {

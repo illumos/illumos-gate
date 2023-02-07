@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 **
 ** The author disclaims copyright to this source code.  In place of
@@ -59,7 +56,7 @@ void sqliteBeginTrigger(
   int iDb;                /* When database to store the trigger in */
   DbFixer sFix;
 
-  /* Check that: 
+  /* Check that:
   ** 1. the trigger name does not already exist.
   ** 2. the table (or view) does exist in the same database as the trigger.
   ** 3. that we are not trying to create a trigger on the sqlite_master table
@@ -97,7 +94,7 @@ void sqliteBeginTrigger(
     goto trigger_cleanup;
   }
   if( tab->pSelect && tr_tm != TK_INSTEAD ){
-    sqliteErrorMsg(pParse, "cannot create %s trigger on view: %S", 
+    sqliteErrorMsg(pParse, "cannot create %s trigger on view: %S",
         (tr_tm == TK_BEFORE)?"BEFORE":"AFTER", pTableName, 0);
     goto trigger_cleanup;
   }
@@ -176,12 +173,12 @@ void sqliteFinishTrigger(
     pStepList->pTrig = nt;
     pStepList = pStepList->pNext;
   }
-  if( sqliteFixInit(&sFix, pParse, nt->iDb, "trigger", &nt->nameToken) 
+  if( sqliteFixInit(&sFix, pParse, nt->iDb, "trigger", &nt->nameToken)
           && sqliteFixTriggerStep(&sFix, nt->step_list) ){
     goto triggerfinish_cleanup;
   }
 
-  /* if we are not initializing, and this trigger is not on a TEMP table, 
+  /* if we are not initializing, and this trigger is not on a TEMP table,
   ** build the sqlite_master entry
   */
   if( !db->init.busy ){
@@ -204,8 +201,8 @@ void sqliteFinishTrigger(
     sqliteBeginWriteOperation(pParse, 0, 0);
     sqliteOpenMasterTable(v, nt->iDb);
     addr = sqliteVdbeAddOpList(v, ArraySize(insertTrig), insertTrig);
-    sqliteVdbeChangeP3(v, addr+2, nt->name, 0); 
-    sqliteVdbeChangeP3(v, addr+3, nt->table, 0); 
+    sqliteVdbeChangeP3(v, addr+2, nt->name, 0);
+    sqliteVdbeChangeP3(v, addr+3, nt->table, 0);
     sqliteVdbeChangeP3(v, addr+5, pAll->z, pAll->n);
     if( nt->iDb==0 ){
       sqliteChangeCookie(db, v);
@@ -216,7 +213,7 @@ void sqliteFinishTrigger(
 
   if( !pParse->explain ){
     Table *pTab;
-    sqliteHashInsert(&db->aDb[nt->iDb].trigHash, 
+    sqliteHashInsert(&db->aDb[nt->iDb].trigHash,
                      nt->name, strlen(nt->name)+1, nt);
     pTab = sqliteLocateTable(pParse, nt->table, db->aDb[nt->iTabDb].zName);
     assert( pTab!=0 );
@@ -274,7 +271,7 @@ static void sqlitePersistTriggerStep(TriggerStep *p){
 ** a trigger step.  Return a pointer to a TriggerStep structure.
 **
 ** The parser calls this routine when it finds a SELECT statement in
-** body of a TRIGGER.  
+** body of a TRIGGER.
 */
 TriggerStep *sqliteTriggerSelectStep(Select *pSelect){
   TriggerStep *pTriggerStep = sqliteMalloc(sizeof(TriggerStep));
@@ -361,7 +358,7 @@ TriggerStep *sqliteTriggerDeleteStep(Token *pTableName, Expr *pWhere){
   return pTriggerStep;
 }
 
-/* 
+/*
 ** Recursively delete a Trigger structure
 */
 void sqliteDeleteTrigger(Trigger *pTrigger){
@@ -376,7 +373,7 @@ void sqliteDeleteTrigger(Trigger *pTrigger){
 }
 
 /*
- * This function is called to drop a trigger from the database schema. 
+ * This function is called to drop a trigger from the database schema.
  *
  * This may be called directly from the parser and therefore identifies
  * the trigger by name.  The sqliteDropTriggerPtr() routine does the
@@ -384,7 +381,7 @@ void sqliteDeleteTrigger(Trigger *pTrigger){
  * instead of the trigger name.
  *
  * Note that this function does not delete the trigger entirely. Instead it
- * removes it from the internal schema and places it in the trigDrop hash 
+ * removes it from the internal schema and places it in the trigDrop hash
  * table. This is so that the trigger can be restored into the database schema
  * if the transaction is rolled back.
  */
@@ -486,7 +483,7 @@ void sqliteDropTriggerPtr(Parse *pParse, Trigger *pTrigger, int nested){
       pTable->pTrigger = pTrigger->pNext;
     }else{
       Trigger *cc = pTable->pTrigger;
-      while( cc ){ 
+      while( cc ){
         if( cc->pNext == pTrigger ){
           cc->pNext = cc->pNext->pNext;
           break;
@@ -515,11 +512,11 @@ static int checkColumnOverLap(IdList *pIdList, ExprList *pEList){
   for(e=0; e<pEList->nExpr; e++){
     if( sqliteIdListIndex(pIdList, pEList->a[e].zName)>=0 ) return 1;
   }
-  return 0; 
+  return 0;
 }
 
 /* A global variable that is TRUE if we should always set up temp tables for
- * for triggers, even if there are no triggers to code. This is used to test 
+ * for triggers, even if there are no triggers to code. This is used to test
  * how much overhead the triggers algorithm is causing.
  *
  * This flag can be set or cleared using the "trigger_overhead_test" pragma.
@@ -549,8 +546,8 @@ int sqliteTriggersExist(
 
   pTriggerCursor = pTrigger;
   while( pTriggerCursor ){
-    if( pTriggerCursor->op == op && 
-	pTriggerCursor->tr_tm == tr_tm && 
+    if( pTriggerCursor->op == op &&
+	pTriggerCursor->tr_tm == tr_tm &&
 	pTriggerCursor->foreach == foreach &&
 	checkColumnOverLap(pTriggerCursor->pColumns, pChanges) ){
       TriggerStack * ss;
@@ -598,24 +595,24 @@ static SrcList *targetSrcList(
 
 /*
 ** Generate VDBE code for zero or more statements inside the body of a
-** trigger.  
+** trigger.
 */
 static int codeTriggerProgram(
   Parse *pParse,            /* The parser context */
   TriggerStep *pStepList,   /* List of statements inside the trigger body */
-  int orconfin              /* Conflict algorithm. (OE_Abort, etc) */  
+  int orconfin              /* Conflict algorithm. (OE_Abort, etc) */
 ){
   TriggerStep * pTriggerStep = pStepList;
   int orconf;
 
   while( pTriggerStep ){
     int saveNTab = pParse->nTab;
- 
+
     orconf = (orconfin == OE_Default)?pTriggerStep->orconf:orconfin;
     pParse->trigStack->orconf = orconf;
     switch( pTriggerStep->op ){
       case TK_SELECT: {
-	Select * ss = sqliteSelectDup(pTriggerStep->pSelect);		  
+	Select * ss = sqliteSelectDup(pTriggerStep->pSelect);
 	assert(ss);
 	assert(ss->pSrc);
 	sqliteSelect(pParse, ss, SRT_Discard, 0, 0, 0, 0);
@@ -627,7 +624,7 @@ static int codeTriggerProgram(
         pSrc = targetSrcList(pParse, pTriggerStep);
         sqliteVdbeAddOp(pParse->pVdbe, OP_ListPush, 0, 0);
         sqliteUpdate(pParse, pSrc,
-		sqliteExprListDup(pTriggerStep->pExprList), 
+		sqliteExprListDup(pTriggerStep->pExprList),
 		sqliteExprDup(pTriggerStep->pWhere), orconf);
         sqliteVdbeAddOp(pParse->pVdbe, OP_ListPop, 0, 0);
         break;
@@ -636,8 +633,8 @@ static int codeTriggerProgram(
         SrcList *pSrc;
         pSrc = targetSrcList(pParse, pTriggerStep);
         sqliteInsert(pParse, pSrc,
-          sqliteExprListDup(pTriggerStep->pExprList), 
-          sqliteSelectDup(pTriggerStep->pSelect), 
+          sqliteExprListDup(pTriggerStep->pExprList),
+          sqliteSelectDup(pTriggerStep->pSelect),
           sqliteIdListDup(pTriggerStep->pIdList), orconf);
         break;
       }
@@ -651,7 +648,7 @@ static int codeTriggerProgram(
       }
       default:
         assert(0);
-    } 
+    }
     pParse->nTab = saveNTab;
     pTriggerStep = pTriggerStep->pNext;
   }
@@ -662,7 +659,7 @@ static int codeTriggerProgram(
 /*
 ** This is called to code FOR EACH ROW triggers.
 **
-** When the code that this function generates is executed, the following 
+** When the code that this function generates is executed, the following
 ** must be true:
 **
 ** 1. No cursors may be open in the main database.  (But newIdx and oldIdx
@@ -703,7 +700,7 @@ int sqliteCodeRowTrigger(
     int fire_this = 0;
 
     /* determine whether we should code this trigger */
-    if( pTrigger->op == op && pTrigger->tr_tm == tr_tm && 
+    if( pTrigger->op == op && pTrigger->tr_tm == tr_tm &&
         pTrigger->foreach == TK_ROW ){
       fire_this = 1;
       pTriggerStack = pParse->trigStack;
@@ -750,7 +747,7 @@ int sqliteCodeRowTrigger(
       sqliteExprDelete(whenExpr);
 
       sqliteVdbeAddOp(pParse->pVdbe, OP_ContextPush, 0, 0);
-      codeTriggerProgram(pParse, pTrigger->step_list, orconf); 
+      codeTriggerProgram(pParse, pTrigger->step_list, orconf);
       sqliteVdbeAddOp(pParse->pVdbe, OP_ContextPop, 0, 0);
 
       /* Pop the entry off the trigger stack */

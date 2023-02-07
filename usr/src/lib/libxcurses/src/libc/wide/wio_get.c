@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wio_get.c
- * 
+ *
  * Wide I/O Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -48,7 +46,7 @@ static char rcsID[] = "$Header: /rd/src/libc/wide/rcs/wio_get.c 1.3 1995/07/26 1
 #ifdef M_I18N_LOCKING_SHIFT
 /*
  * Eat one or more shift-out and/or shift-in bytes.
- * Return non-zero if an error occured on the stream.  
+ * Return non-zero if an error occured on the stream.
  * The stream's input state is updated accordingly.
  *
  * NOTE this function assumes that the shift-in and
@@ -65,7 +63,7 @@ t_wide_io *wio;
 	for (prev = EOF; (ch = (*wio->get)(wio->object)) != EOF; prev = ch) {
 		/* Was it an insignificant shift byte, SI-SI or SO-SO? */
 		if (ch != prev) {
-			/* First iteration will always enter here looking 
+			/* First iteration will always enter here looking
 			 * for a state change.  Subsequent iterations entering
 			 * here are trying to identify redundant shifts, which
 			 * are SO-SI or SI-SO pairs.
@@ -86,7 +84,7 @@ t_wide_io *wio;
 	}
 
 	if (wio->iserror != (int (*)(void *)) 0)
-		return !(*wio->iserror)(wio->object);       
+		return !(*wio->iserror)(wio->object);
 
 	return 0;
 }
@@ -98,7 +96,7 @@ t_wide_io *wio;
  * The function referenced by "get" is passed the pointer "object"
  * and returns an input byte or EOF if no further data available.
  *
- * This mechanism is used to do conversions of byte strings or 
+ * This mechanism is used to do conversions of byte strings or
  * streams into wide characters without loss of information in the
  * case of a bad multibyte character conversion.  The bad multibyte
  * sequence is passed through as individual bytes.
@@ -117,7 +115,7 @@ t_wide_io *wio;
 		return -1;
 	}
 
-	/* Do still have bytes available? */ 
+	/* Do still have bytes available? */
 	if (wio->_next < wio->_size)
 		return (wint_t) wio->_mb[wio->_next++];
 
@@ -130,7 +128,7 @@ t_wide_io *wio;
 
 		wio->_mb[wio->_next] = ch;
 
-		/* Attempt to convert multibyte character sequence. */ 
+		/* Attempt to convert multibyte character sequence. */
                 wio->_size = mbrtowc(
 			&wc, (char *) (wio->_mb + wio->_next), 1, &wio->_state
 		);
@@ -144,7 +142,7 @@ t_wide_io *wio;
 			 * following a <newline> causes another read().
 			 */
 			if (ch != '\n') {
-				/* When a valid character is found, consume 
+				/* When a valid character is found, consume
 				 * any trailing shift-in or shift-out bytes,
 				 * updating the state accordingly.
 				 */
@@ -162,9 +160,9 @@ t_wide_io *wio;
 	/* If we fill the multibyte character buffer or receive an
 	 * EOF without recognising a multibyte character, then we
 	 * will return individual bytes from the buffer.  The buffer
-	 * is restored to its state before the bogus byte sequence 
+	 * is restored to its state before the bogus byte sequence
 	 * was read.
-	 */ 
+	 */
 	wio->_state = start_state;
 	wio->_size = wio->_next;
 	wio->_next = 0;

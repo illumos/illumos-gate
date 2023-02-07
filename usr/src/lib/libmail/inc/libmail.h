@@ -33,8 +33,6 @@
 #ifndef _LIBMAIL_H
 #define _LIBMAIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.4	*/
-
 #include <stdio.h>
 #include <maillock.h>
 #include "s_string.h"

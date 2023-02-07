@@ -26,8 +26,6 @@
 #ifndef	_DHCP_INITTAB_H
 #define	_DHCP_INITTAB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <dhcp_symbol.h>
 #include <limits.h>

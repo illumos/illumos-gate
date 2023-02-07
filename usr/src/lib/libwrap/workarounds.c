@@ -2,14 +2,13 @@
  * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /*
   * Workarounds for known system software bugs. This module provides wrappers
   * around library functions and system calls that are known to have problems
   * on some systems. Most of these workarounds won't do any harm on regular
   * systems.
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 
@@ -54,7 +53,7 @@ extern int errno;
   * You have this problem when the compiler complains about illegal lvalues
   * or something like that. The following code fixes this mutant behaviour.
   * It should not be enabled on "normal" systems.
-  * 
+  *
   * Bug reported by ben@piglet.cr.usgs.gov (Rev. Ben A. Mesander).
   */
 

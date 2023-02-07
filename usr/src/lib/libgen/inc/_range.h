@@ -23,8 +23,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1.2.1 */
-
 #define	valid_range(c1, c2) \
 	(((c1) & WCHAR_CSMASK) == ((c2) & WCHAR_CSMASK) && \
 	((c1) > 0xff || !iscntrl((int)c1)) && ((c2) > 0xff || \

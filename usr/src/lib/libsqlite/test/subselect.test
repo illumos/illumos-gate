@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -72,7 +70,7 @@ do_test subselect-1.5 {
     INSERT INTO t2 VALUES(4,16);
   }
   execsql {
-    SELECT y from t2 
+    SELECT y from t2
     WHERE x = (SELECT sum(b) FROM t1 where a notnull) - (SELECT sum(a) FROM t1)
   }
 } {8}

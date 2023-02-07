@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2003 December 18
 #
 # The author disclaims copyright to this source code.  In place of
@@ -49,7 +47,7 @@ do_test thread1-1.1 {
 #    unlock B
 #    write-lock C
 #
-# At one point, the write-lock of C would fail on Linux. 
+# At one point, the write-lock of C would fail on Linux.
 #
 do_test thread1-1.2 {
   thread_create A test.db
@@ -106,7 +104,7 @@ do_test thread1-1.12 {
 #    unlock A
 #    write-lock C
 #
-# Make sure the write-lock fails with SQLITE_BUSY 
+# Make sure the write-lock fails with SQLITE_BUSY
 #
 do_test thread1-2.1 {
   thread_halt *
@@ -157,5 +155,5 @@ do_test thread1-2.11 {
   thread_result C
 } SQLITE_OK
 
-thread_halt *   
+thread_halt *
 finish_test

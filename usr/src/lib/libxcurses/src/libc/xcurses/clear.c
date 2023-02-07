@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * clear.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -57,7 +55,7 @@ int
 
 	code = wclear(stdscr);
 
-	return __m_return_code("clear", code); 
+	return __m_return_code("clear", code);
 }
 
 /*

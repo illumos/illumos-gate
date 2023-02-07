@@ -31,8 +31,6 @@
 #ifndef	_RPC_MT_H
 #define	_RPC_MT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <rpc/rpc.h>
 #include <netconfig.h>

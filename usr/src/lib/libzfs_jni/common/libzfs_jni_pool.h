@@ -27,8 +27,6 @@
 #ifndef _LIBZFS_JNI_POOL_H
 #define	_LIBZFS_JNI_POOL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <jni.h>
 #include <libnvpair.h>
 #include <libzfs.h>

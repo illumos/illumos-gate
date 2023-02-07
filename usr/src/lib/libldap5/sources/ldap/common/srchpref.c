@@ -2,7 +2,6 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The contents of this file are subject to the Netscape Public
@@ -145,7 +144,7 @@ ldap_init_searchprefs_buf( char *buf, long buflen,
 
     return( rc );
 }
-	    
+
 
 
 void

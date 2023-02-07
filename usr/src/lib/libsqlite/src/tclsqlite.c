@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -26,9 +23,9 @@
 
 /*
 ** If TCL uses UTF-8 and SQLite is configured to use iso8859, then we
-** have to do a translation when going between the two.  Set the 
+** have to do a translation when going between the two.  Set the
 ** UTF_TRANSLATION_NEEDED macro to indicate that we need to do
-** this translation.  
+** this translation.
 */
 #if defined(TCL_UTF_MAX) && !defined(SQLITE_UTF8)
 # define UTF_TRANSLATION_NEEDED 1
@@ -122,13 +119,13 @@ static int DbEvalCallback(
           Tcl_DStringAppend(&dType, Tcl_DStringValue(&dCol), -1);
           Tcl_DStringFree(&dCol);
           Tcl_ExternalToUtfDString(NULL, azN[i+nCol], -1, &dCol);
-          Tcl_SetVar2(cbData->interp, cbData->zArray, 
+          Tcl_SetVar2(cbData->interp, cbData->zArray,
                Tcl_DStringValue(&dType), Tcl_DStringValue(&dCol),
                TCL_LIST_ELEMENT|TCL_APPEND_VALUE);
           Tcl_DStringFree(&dType);
         }
       }
-      
+
       Tcl_DStringFree(&dCol);
     }
   }
@@ -139,7 +136,7 @@ static int DbEvalCallback(
         if( z==0 ) z = "";
         Tcl_DStringInit(&dCol);
         Tcl_ExternalToUtfDString(NULL, z, -1, &dCol);
-        Tcl_SetVar2(cbData->interp, cbData->zArray, cbData->azColName[i], 
+        Tcl_SetVar2(cbData->interp, cbData->zArray, cbData->azColName[i],
               Tcl_DStringValue(&dCol), 0);
         Tcl_DStringFree(&dCol);
       }
@@ -395,7 +392,7 @@ static void tclSqlFunc(sqlite_func *context, int argc, const char **argv){
   }
   rc = Tcl_Eval(p->interp, Tcl_DStringValue(&cmd));
   if( rc ){
-    sqlite_set_result_error(context, Tcl_GetStringResult(p->interp), -1); 
+    sqlite_set_result_error(context, Tcl_GetStringResult(p->interp), -1);
   }else{
     sqlite_set_result_string(context, Tcl_GetStringResult(p->interp), -1);
   }
@@ -497,13 +494,13 @@ static int DbObjCmd(void *cd, Tcl_Interp *interp, int objc,Tcl_Obj *const*objv){
     "last_insert_rowid",  "last_statement_changes", "onecolumn",
     "progress",           "rekey",                  "timeout",
     "trace",
-    0                    
+    0
   };
   enum DB_enum {
     DB_AUTHORIZER,        DB_BUSY,                   DB_CHANGES,
     DB_CLOSE,             DB_COMMIT_HOOK,            DB_COMPLETE,
     DB_ERRORCODE,         DB_EVAL,                   DB_FUNCTION,
-    DB_LAST_INSERT_ROWID, DB_LAST_STATEMENT_CHANGES, DB_ONECOLUMN,        
+    DB_LAST_INSERT_ROWID, DB_LAST_STATEMENT_CHANGES, DB_ONECOLUMN,
     DB_PROGRESS,          DB_REKEY,                  DB_TIMEOUT,
     DB_TRACE
   };
@@ -605,7 +602,7 @@ static int DbObjCmd(void *cd, Tcl_Interp *interp, int objc,Tcl_Obj *const*objv){
   }
 
   /*    $db progress ?N CALLBACK?
-  ** 
+  **
   ** Invoke the given callback every N virtual machine opcodes while executing
   ** queries.
   */
@@ -760,7 +757,7 @@ static int DbObjCmd(void *cd, Tcl_Interp *interp, int objc,Tcl_Obj *const*objv){
     Tcl_SetObjResult(interp, Tcl_NewIntObj(pDb->rc));
     break;
   }
-   
+
   /*
   **    $db eval $sql ?array {  ...code... }?
   **
@@ -868,7 +865,7 @@ static int DbObjCmd(void *cd, Tcl_Interp *interp, int objc,Tcl_Obj *const*objv){
   }
 
   /*
-  **     $db last_insert_rowid 
+  **     $db last_insert_rowid
   **
   ** Return an integer which is the ROWID for the most recent insert.
   */
@@ -1019,7 +1016,7 @@ static int DbObjCmd(void *cd, Tcl_Interp *interp, int objc,Tcl_Obj *const*objv){
 **  sqlite -tcl-uses-utf
 **
 **       Return "1" if compiled with a Tcl uses UTF-8.  Return "0" if
-**       not.  Used by tests to make sure the library was compiled 
+**       not.  Used by tests to make sure the library was compiled
 **       correctly.
 */
 static int DbMain(void *cd, Tcl_Interp *interp, int objc,Tcl_Obj *const*objv){
@@ -1066,7 +1063,7 @@ static int DbMain(void *cd, Tcl_Interp *interp, int objc,Tcl_Obj *const*objv){
     }
   }
   if( objc!=3 && objc!=4 ){
-    Tcl_WrongNumArgs(interp, 1, objv, 
+    Tcl_WrongNumArgs(interp, 1, objv,
 #ifdef SQLITE_HAS_CODEC
       "HANDLE FILENAME ?-key CODEC-KEY?"
 #else
@@ -1118,7 +1115,7 @@ static int DbMain(void *cd, Tcl_Interp *interp, int objc,Tcl_Obj *const*objv){
     extern void Md5_Register(sqlite*);
     Md5_Register(p->db);
    }
-#endif  
+#endif
   return TCL_OK;
 }
 
@@ -1265,7 +1262,7 @@ int TCLSH_MAIN(int argc, char **argv){
 ** If the macro TCLSH is set to 2, then implement a space analysis tool.
 */
 #if TCLSH==2
-static char zAnalysis[] = 
+static char zAnalysis[] =
 #include "spaceanal_tcl.h"
 ;
 

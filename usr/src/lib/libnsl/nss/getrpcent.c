@@ -29,8 +29,6 @@
  * Ye olde non-reentrant interface (MT-unsafe, caveat utor)
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include <rpc/rpcent.h>
 #include <nss_dbdefs.h>

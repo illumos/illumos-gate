@@ -26,8 +26,6 @@
  *	All Rights Reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * xdr_nullptr.c
  *

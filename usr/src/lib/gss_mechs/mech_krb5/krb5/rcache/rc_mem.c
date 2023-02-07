@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mech_krb5/krb5/rcache/rc_mem.c
  *
@@ -228,7 +226,7 @@ cleanup:
 		if (t->h)
 			krb5_xfree(t->h);
 		krb5_xfree(t);
-		grcache.data = NULL; 
+		grcache.data = NULL;
 		id->data = NULL;
 	}
 	k5_mutex_unlock(&grcache.lock);
@@ -252,7 +250,7 @@ krb5_rc_mem_recover_or_init(krb5_context context, krb5_rcache id,
 {
     krb5_error_code retval;
 
-    retval = krb5_rc_mem_recover(context, id); 
+    retval = krb5_rc_mem_recover(context, id);
     if (retval)
 	retval = krb5_rc_mem_init(context, id, lifespan);
 

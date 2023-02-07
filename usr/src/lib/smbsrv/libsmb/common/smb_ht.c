@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Generic hash table library. The hash table is an array of pointers
  * to items. Hash collisions are handled using linked lists from the

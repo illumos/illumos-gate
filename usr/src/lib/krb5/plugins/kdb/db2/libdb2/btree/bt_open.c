@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*-
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -202,7 +200,7 @@ __bt_open(fname, flags, mode, openinfo, dflags)
 		default:
 			goto einval;
 		}
-		
+
 		if ((t->bt_fd = open(fname, flags | O_BINARY, mode)) < 0)
 			goto err;
 

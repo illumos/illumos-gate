@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <k5-int.h>
 #include <rsa-md4.h>
 #include <arcfour.h>
@@ -30,7 +28,7 @@ krb5int_arcfour_string_to_key(krb5_context context,
 
   if (params != NULL)
       return KRB5_ERR_BAD_S2K_PARAMS;
-  
+
   if (key->length != 16)
     return (KRB5_BAD_MSIZE);
 
@@ -59,7 +57,7 @@ krb5int_arcfour_string_to_key(krb5_context context,
   krb5_MD4Final(&md4_context);
   memcpy(key->contents, md4_context.digest, 16);
 
-#if 0  
+#if 0
   /* test the string_to_key function */
   printf("Hash=");
   {

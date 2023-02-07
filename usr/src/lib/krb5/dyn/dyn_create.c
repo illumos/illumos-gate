@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is part of libdyn.a, the C Dynamic Object library.  It
  * contains the source code for the functions DynCreate() and
@@ -51,7 +49,7 @@ DynObjectP DynCopy(obj)
    DynObjectP obj;
 {
      DynObjectP obj1;
-     
+
      obj1 = (DynObjectP) malloc(sizeof(DynObjectRecP));
      if (obj1 == NULL)
 	  return NULL;
@@ -68,7 +66,7 @@ DynObjectP DynCopy(obj)
 	  free(obj1);
 	  return NULL;
      }
-     memcpy(obj->array, obj1->array, 
+     memcpy(obj->array, obj1->array,
 	    (size_t) (obj1->el_size * obj1->size));
 
      return obj1;

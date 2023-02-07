@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*-
  * Copyright (c) 1991, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -109,7 +107,7 @@ __rec_seq(dbp, key, data, flags)
 einval:		errno = EINVAL;
 		return (RET_ERROR);
 	}
-	
+
 	if (t->bt_nrecs == 0 || nrec > t->bt_nrecs) {
 		if (!F_ISSET(t, R_EOF | R_INMEM) &&
 		    (status = t->bt_irec(t, nrec)) != RET_SUCCESS)

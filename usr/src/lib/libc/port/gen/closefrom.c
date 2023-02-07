@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _closefrom = closefrom
 #pragma weak _fdwalk = fdwalk
@@ -144,6 +143,6 @@ closefrom(int lowfd)
 	 * to open the /proc file descriptor directory due
 	 * all file descriptors being currently used up.
 	 */
-	(void) close(low++);
+	(void) close(low);
 	(void) fdwalk(void_close, &low);
 }

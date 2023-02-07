@@ -27,8 +27,6 @@
 #ifndef	_PAM_MODULES_H
 #define	_PAM_MODULES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -6,8 +6,6 @@
 #ifndef	_KRB5_NDBM_H_
 #define	_KRB5_NDBM_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

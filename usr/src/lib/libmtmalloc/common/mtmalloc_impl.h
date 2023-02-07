@@ -27,8 +27,6 @@
 #ifndef _MTMALLOC_IMPL_H
 #define	_MTMALLOC_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Various data structures that define the guts of the mt malloc
  * library.

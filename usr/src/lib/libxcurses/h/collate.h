@@ -24,10 +24,8 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * collate.h 
+ * collate.h
  *
  *   MKS extension to ANSI/POSIX to retrieve additional locale information.
  *   Specifically collation information.

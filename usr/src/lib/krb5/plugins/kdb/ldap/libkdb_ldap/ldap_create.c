@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/kdb/kdb_ldap/ldap_create.c
  *
@@ -42,7 +40,7 @@
 #include "ldap_err.h"
 #include <libintl.h>
 
-/* 
+/*
  * ******************************************************************************
  * DAL functions
  * ******************************************************************************
@@ -233,7 +231,7 @@ krb5_ldap_create (krb5_context context, char *conf_section, char **db_args)
 	/* ignore hash argument. Might have been passed from create */
 	    status = EINVAL;
 	    if (opt && !strcmp(opt, "temporary")) {
-		/* 
+		/*
 		 * temporary is passed in when kdb5_util load without -update is done.
 		 * This is unsupported by the LDAP plugin.
 		 */

@@ -1,8 +1,5 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #
-# This script looks for memory leaks by analyzing the output of "sqlite" 
+# This script looks for memory leaks by analyzing the output of "sqlite"
 # when compiled with the MEMORY_DEBUG=2 option.
 #
 /[0-9]+ malloc / {

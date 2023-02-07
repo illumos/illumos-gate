@@ -6,8 +6,6 @@
 #ifndef _RDN_PARSER_H
 #define	_RDN_PARSER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

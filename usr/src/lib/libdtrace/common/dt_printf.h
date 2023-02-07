@@ -27,8 +27,6 @@
 #ifndef	_DT_PRINTF_H
 #define	_DT_PRINTF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <libctf.h>
 #include <dtrace.h>

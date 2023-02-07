@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -59,7 +56,7 @@ void sqliteBeginParse(Parse *pParse, int explainFlag){
 
 /*
 ** This routine is called after a single SQL statement has been
-** parsed and we want to execute the VDBE code to implement 
+** parsed and we want to execute the VDBE code to implement
 ** that statement.  Prior action routines should have already
 ** constructed VDBE code to do the work of the SQL statement.
 ** This routine just has to execute the VDBE code.
@@ -92,7 +89,7 @@ void sqliteExec(Parse *pParse){
 }
 
 /*
-** Locate the in-memory structure that describes 
+** Locate the in-memory structure that describes
 ** a particular database table given the name
 ** of that table and (optionally) the name of the database
 ** containing the table.  Return NULL if not found.
@@ -118,7 +115,7 @@ Table *sqliteFindTable(sqlite *db, const char *zName, const char *zDatabase){
 }
 
 /*
-** Locate the in-memory structure that describes 
+** Locate the in-memory structure that describes
 ** a particular database table given the name
 ** of that table and (optionally) the name of the database
 ** containing the table.  Return NULL if not found.
@@ -146,7 +143,7 @@ Table *sqliteLocateTable(Parse *pParse, const char *zName, const char *zDbase){
 }
 
 /*
-** Locate the in-memory structure that describes 
+** Locate the in-memory structure that describes
 ** a particular index given the name of that index
 ** and the name of the database that contains the index.
 ** Return NULL if not found.
@@ -310,7 +307,7 @@ void sqliteCommitInternalChanges(sqlite *db){
 ** This routine just deletes the data structure.  It does not unlink
 ** the table data structure from the hash table.  Nor does it remove
 ** foreign keys from the sqlite.aFKey hash table.  But it does destroy
-** memory structures of the indices and foreign keys associated with 
+** memory structures of the indices and foreign keys associated with
 ** the table.
 **
 ** Indices associated with the table are unlinked from the "db"
@@ -334,7 +331,7 @@ void sqliteDeleteTable(sqlite *db, Table *pTable){
   }
 
   /* Delete all foreign keys associated with this table.  The keys
-  ** should have already been unlinked from the db->aFKey hash table 
+  ** should have already been unlinked from the db->aFKey hash table
   */
   for(pFKey=pTable->pFKey; pFKey; pFKey=pNextFKey){
     pNextFKey = pFKey->pNextFrom;
@@ -397,7 +394,7 @@ char *sqliteTableNameFromToken(Token *pName){
 
 /*
 ** Generate code to open the appropriate master table.  The table
-** opened will be SQLITE_MASTER for persistent tables and 
+** opened will be SQLITE_MASTER for persistent tables and
 ** SQLITE_TEMP_MASTER for temporary tables.  The table is opened
 ** on cursor 0.
 */
@@ -469,7 +466,7 @@ void sqliteStartTable(
     }
   }
 #endif
- 
+
 
   /* Before trying to create a temporary table, make sure the Btree for
   ** holding temporary tables is open.
@@ -530,7 +527,7 @@ void sqliteStartTable(
   ** the SQLITE_MASTER table.  Note in particular that we must go ahead
   ** and allocate the record number for the table entry now.  Before any
   ** PRIMARY KEY or UNIQUE keywords are parsed.  Those keywords will cause
-  ** indices to be created and the table record must come before the 
+  ** indices to be created and the table record must come before the
   ** indices.  Hence, the record number for the table must be allocated
   ** now.
   */
@@ -607,7 +604,7 @@ void sqliteAddNotNull(Parse *pParse, int onError){
 ** in the sequence.  Use this information to construct a string
 ** that contains the typename of the column and store that string
 ** in zType.
-*/ 
+*/
 void sqliteAddColumnType(Parse *pParse, Token *pFirst, Token *pLast){
   Table *p;
   int i, j;
@@ -661,7 +658,7 @@ void sqliteAddDefaultValue(Parse *pParse, Token *pVal, int minusFlag){
 }
 
 /*
-** Designate the PRIMARY KEY for the table.  pList is a list of names 
+** Designate the PRIMARY KEY for the table.  pList is a list of names
 ** of columns that form the primary key.  If pList is NULL, then the
 ** most recently added column of the table is the primary key.
 **
@@ -686,7 +683,7 @@ void sqliteAddPrimaryKey(Parse *pParse, IdList *pList, int onError){
   int iCol = -1, i;
   if( pTab==0 ) goto primary_key_exit;
   if( pTab->hasPrimKey ){
-    sqliteErrorMsg(pParse, 
+    sqliteErrorMsg(pParse,
       "table \"%s\" has more than one primary key", pTab->zName);
     goto primary_key_exit;
   }
@@ -706,7 +703,7 @@ void sqliteAddPrimaryKey(Parse *pParse, IdList *pList, int onError){
   if( iCol>=0 && iCol<pTab->nCol ){
     zType = pTab->aCol[iCol].zType;
   }
-  if( pParse->db->file_format>=1 && 
+  if( pParse->db->file_format>=1 &&
            zType && sqliteStrICmp(zType, "INTEGER")==0 ){
     pTab->iPKey = iCol;
     pTab->keyConf = onError;
@@ -879,7 +876,7 @@ static char *createTableStmt(Table *p){
 ** the sqlite_master table.  We do not want to create it again.
 **
 ** If the pSelect argument is not NULL, it means that this routine
-** was called to create a table generated from a 
+** was called to create a table generated from a
 ** "CREATE TABLE ... AS SELECT ..." statement.  The column names of
 ** the new table will match the result set of the SELECT.
 */
@@ -972,7 +969,7 @@ void sqliteEndTable(Parse *pParse, Token *pEnd, Select *pSelect){
   if( pParse->explain==0 && pParse->nErr==0 ){
     Table *pOld;
     FKey *pFKey;
-    pOld = sqliteHashInsert(&db->aDb[p->iDb].tblHash, 
+    pOld = sqliteHashInsert(&db->aDb[p->iDb].tblHash,
                             p->zName, strlen(p->zName)+1, p);
     if( pOld ){
       assert( p==pOld );  /* Malloc must have failed inside HashInsert() */
@@ -1114,7 +1111,7 @@ int sqliteViewGetColumnNames(Parse *pParse, Table *pTable){
   sqliteSelectUnbind(pSel);
   sqliteExprListDelete(pSel->pEList);
   pSel->pEList = pEList;
-  return nErr;  
+  return nErr;
 }
 
 /*
@@ -1414,8 +1411,8 @@ void sqliteCreateForeignKey(
         }
       }
       if( j>=p->nCol ){
-        sqliteErrorMsg(pParse, 
-          "unknown column \"%s\" in foreign key definition", 
+        sqliteErrorMsg(pParse,
+          "unknown column \"%s\" in foreign key definition",
           pFromCol->a[i].zName);
         goto fk_end;
       }
@@ -1461,8 +1458,8 @@ void sqliteDeferForeignKey(Parse *pParse, int isDeferred){
 }
 
 /*
-** Create a new index for an SQL table.  pIndex is the name of the index 
-** and pTable is the name of the table that is to be indexed.  Both will 
+** Create a new index for an SQL table.  pIndex is the name of the index
+** and pTable is the name of the table that is to be indexed.  Both will
 ** be NULL for a primary key or an index that is created to satisfy a
 ** UNIQUE constraint.  If pTable and pIndex are NULL, use pParse->pNewTable
 ** as the table to be indexed.  pParse->pNewTable is a table that is
@@ -1470,7 +1467,7 @@ void sqliteDeferForeignKey(Parse *pParse, int isDeferred){
 **
 ** pList is a list of columns to be indexed.  pList will be NULL if this
 ** is a primary key or unique-constraint on the most recent column added
-** to the table currently under construction.  
+** to the table currently under construction.
 */
 void sqliteCreateIndex(
   Parse *pParse,   /* All information about this parse */
@@ -1491,7 +1488,7 @@ void sqliteCreateIndex(
   sqlite *db = pParse->db;
 
   if( pParse->nErr || sqlite_malloc_failed ) goto exit_create_index;
-  if( db->init.busy 
+  if( db->init.busy
      && sqliteFixInit(&sFix, pParse, db->init.iDb, "index", pName)
      && sqliteFixSrcList(&sFix, pTable)
   ){
@@ -1526,7 +1523,7 @@ void sqliteCreateIndex(
 
   /*
   ** Find the name of the index.  Make sure there is not already another
-  ** index or table with the same name.  
+  ** index or table with the same name.
   **
   ** Exception:  If we are reading the names of permanent indices from the
   ** sqlite_master table (because some other process changed the schema) and
@@ -1592,8 +1589,8 @@ void sqliteCreateIndex(
     if( pList==0 ) goto exit_create_index;
   }
 
-  /* 
-  ** Allocate the index structure. 
+  /*
+  ** Allocate the index structure.
   */
   pIndex = sqliteMalloc( sizeof(Index) + strlen(zName) + 1 +
                         sizeof(int)*pList->nId );
@@ -1625,11 +1622,11 @@ void sqliteCreateIndex(
   }
 
   /* Link the new Index structure to its table and to the other
-  ** in-memory database structures. 
+  ** in-memory database structures.
   */
   if( !pParse->explain ){
     Index *p;
-    p = sqliteHashInsert(&db->aDb[pIndex->iDb].idxHash, 
+    p = sqliteHashInsert(&db->aDb[pIndex->iDb].idxHash,
                          pIndex->zName, strlen(pIndex->zName)+1, pIndex);
     if( p ){
       assert( p==pIndex );  /* Malloc must have failed */
@@ -1669,8 +1666,8 @@ void sqliteCreateIndex(
   ** involves writing the index into the master table and filling in the
   ** index with the current table contents.
   **
-  ** The db->init.busy is 0 when the user first enters a CREATE INDEX 
-  ** command.  db->init.busy is 1 when a database is opened and 
+  ** The db->init.busy is 0 when the user first enters a CREATE INDEX
+  ** command.  db->init.busy is 1 when a database is opened and
   ** CREATE INDEX statements are read out of the master table.  In
   ** the latter case the index already exists on disk, which is why
   ** we don't want to recreate it.
@@ -1799,7 +1796,7 @@ void sqliteDropIndex(Parse *pParse, SrcList *pName){
   v = sqliteGetVdbe(pParse);
   if( v ){
     static VdbeOpList dropIndex[] = {
-      { OP_Rewind,     0, ADDR(9), 0}, 
+      { OP_Rewind,     0, ADDR(9), 0},
       { OP_String,     0, 0,       0}, /* 1 */
       { OP_MemStore,   1, 1,       0},
       { OP_MemLoad,    1, 0,       0}, /* 3 */
@@ -1881,7 +1878,7 @@ IdList *sqliteIdListAppend(IdList *pList, Token *pToken){
 ** database name prefix.  Like this:  "database.table".  The pDatabase
 ** points to the table name and the pTable points to the database name.
 ** The SrcList.a[].zName field is filled with the table name which might
-** come from pTable (if pDatabase is NULL) or from pDatabase.  
+** come from pTable (if pDatabase is NULL) or from pDatabase.
 ** SrcList.a[].zDatabase is filled with the database name from pTable,
 ** or with NULL if no database is specified.
 **
@@ -2070,7 +2067,7 @@ void sqliteRollbackTransaction(Parse *pParse){
   if( sqliteAuthCheck(pParse, SQLITE_TRANSACTION, "ROLLBACK", 0, 0) ) return;
   if( (db->flags & SQLITE_InTrans)==0 ){
     sqliteErrorMsg(pParse, "cannot rollback - no transaction is active");
-    return; 
+    return;
   }
   v = sqliteGetVdbe(pParse);
   if( v ){
@@ -2140,7 +2137,7 @@ void sqliteBeginWriteOperation(Parse *pParse, int setCheckpoint, int iDb){
 ** an OP_Commit that will cause the changes to be committed to disk.
 **
 ** Note that checkpoints are automatically committed at the end of
-** a statement.  Note also that there can be multiple calls to 
+** a statement.  Note also that there can be multiple calls to
 ** sqliteBeginWriteOperation() but there should only be a single
 ** call to sqliteEndWriteOperation() at the conclusion of the statement.
 */

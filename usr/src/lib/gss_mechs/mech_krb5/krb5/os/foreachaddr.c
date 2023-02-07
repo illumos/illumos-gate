@@ -2,7 +2,7 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * include/foreachaddr.c
  *
@@ -13,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,7 +27,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Iterate over the protocol addresses supported by this host, invoking
  * a callback function or three supplied by the caller.
@@ -119,7 +119,7 @@
 /*
  * BSD 4.4 defines the size of an ifreq to be
  * max(sizeof(ifreq), sizeof(ifreq.ifr_name)+ifreq.ifr_addr.sa_len
- * However, under earlier systems, sa_len isn't present, so the size is 
+ * However, under earlier systems, sa_len isn't present, so the size is
  * just sizeof(struct ifreq).
  */
 #ifdef HAVE_SA_LEN
@@ -190,7 +190,7 @@ foreach_localaddr (void *data,
 #else
     static const int afs[] = { AF_INET };
 #endif
-    
+
 #define N_AFS (sizeof (afs) / sizeof (afs[0]))
     struct {
 	int af;
@@ -262,7 +262,7 @@ foreach_localaddr (void *data,
 	    if (ioctl (P.sock, SIOCGLIFFLAGS, (char *)&lifreq) < 0) {
 		Tperror ("ioctl(SIOCGLIFFLAGS)");
 	    skip:
-		KRB5_LOG (KRB5_INFO, 
+		KRB5_LOG (KRB5_INFO,
 			"foreach_localaddr() skipping interface %s",
 			lifr->lifr_name);
 		/* mark for next pass */

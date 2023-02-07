@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
- 
 #if RPC_HDR
 %#ifndef _DB_QUERY_H
 %#define _DB_QUERY_H
@@ -85,11 +83,11 @@ struct db_query {
 %  db_query( db_scheme*, int, nis_attr* );
 %
 %/* Returns a newly db_query containing the index values as
-%   obtained from the given object.  The object itself, 
-%   along with information on the scheme given, will determine 
+%   obtained from the given object.  The object itself,
+%   along with information on the scheme given, will determine
 %   which values are extracted from the object and placed into the query.
 %   Returns an empty query if 'obj' is not a valid entry.
-%   Note that space is allocated for the query and the index values 
+%   Note that space is allocated for the query and the index values
 %   (i.e. do not share pointers with strings in 'obj'.)
 %*/
 %  db_query( db_scheme*, entry_object_p );

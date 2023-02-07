@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wio_put.c
- * 
+ *
  * Wide I/O Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -48,8 +46,8 @@ static char rcsID[] = "$Header: /rd/src/libc/wide/rcs/wio_put.c 1.1 1995/07/26 1
 /*
  * Return the number of bytes written.  Errno will be set for errors.
  *
- * The function referenced by "put" is passed a byte value and the 
- * pointer "object", and returns the byte value or EOF if no further 
+ * The function referenced by "put" is passed a byte value and the
+ * pointer "object", and returns the byte value or EOF if no further
  * data can be written.
  */
 int
@@ -73,7 +71,7 @@ t_wide_io *wio;
 		/* Note errno will have been set by wcrtomb(). */
 		return -1;
 
-	/* When shift-in state has been forced don't write '\0' byte. 
+	/* When shift-in state has been forced don't write '\0' byte.
 	 * The "stream" object is considered to be in "text" mode, in
 	 * which case file I/O produces undefined results for systems
          * using locking-shift character sets.

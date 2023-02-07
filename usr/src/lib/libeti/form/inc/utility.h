@@ -31,8 +31,6 @@
 #ifndef	_UTILITY_H
 #define	_UTILITY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8	*/
-
 #include <form.h>
 #include <memory.h>
 #include <string.h>

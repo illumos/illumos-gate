@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * box_set.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -47,7 +45,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/box_set.c 1.1 1995/05/2
 
 int
 box_set(w, v, h)
-WINDOW *w; 
+WINDOW *w;
 const cchar_t *v, *h;
 {
 	int code;
@@ -57,8 +55,8 @@ const cchar_t *v, *h;
 #endif
 
 	code = wborder_set(
-		w, v, v, h, h, 
-		(const cchar_t *) 0, (const cchar_t *) 0, 
+		w, v, v, h, h,
+		(const cchar_t *) 0, (const cchar_t *) 0,
 		(const cchar_t *) 0, (const cchar_t *) 0
 	);
 

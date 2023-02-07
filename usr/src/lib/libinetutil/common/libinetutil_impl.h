@@ -27,8 +27,6 @@
 #ifndef _LIBINETUTIL_IMPL_H
 #define	_LIBINETUTIL_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Contains implementation-specific definitions for libinetutil.
  */

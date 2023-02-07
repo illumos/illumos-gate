@@ -31,8 +31,6 @@
 #ifndef _PARMS_H
 #define	_PARMS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

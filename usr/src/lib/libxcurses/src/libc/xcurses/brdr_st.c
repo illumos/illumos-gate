@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * brdr_st.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -53,7 +51,7 @@ const cchar_t *ls, *rs, *ts, *bs, *tl, *tr, *bl, *br;
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"border_set(%p, %p, %p, %p, %p, %p, %p, %p)", 
+		"border_set(%p, %p, %p, %p, %p, %p, %p, %p)",
 		ls, rs, ts, bs, tl, tr, bl, br
 	);
 #endif

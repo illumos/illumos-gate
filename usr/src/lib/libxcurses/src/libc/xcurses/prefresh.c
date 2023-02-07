@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * prefresh.c
  *
@@ -44,7 +42,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/prefresh.c 1.3 1995/06/
 #include <private.h>
 
 /*f
- * Update newscr with the given pad then display to the terminal. 
+ * Update newscr with the given pad then display to the terminal.
  */
 int
 prefresh(w, pminr, pminc, sminr, sminc, smaxr, smaxc)
@@ -133,7 +131,7 @@ int pminr, pminc, sminr, sminc, smaxr, smaxc;
 
 	/* Last refreshed window controls W_LEAVE_CURSOR flag. */
 	ns->_flags &= ~W_LEAVE_CURSOR;
-	ns->_flags |= pad->_flags 
+	ns->_flags |= pad->_flags
 		& (W_CLEAR_WINDOW | W_REDRAW_WINDOW | W_LEAVE_CURSOR);
 	pad->_flags &= ~(W_CLEAR_WINDOW | W_REDRAW_WINDOW);
 

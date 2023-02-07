@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ldap_scheme.h"
 #include "ldap_util.h"
 #include "ldap_nisdbquery.h"

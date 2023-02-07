@@ -27,8 +27,6 @@
 #ifndef _LIBC_PORT_GEN_ICONVP_H
 #define	_LIBC_PORT_GEN_ICONVP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

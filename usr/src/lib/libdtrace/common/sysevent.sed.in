@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysevent_impl.h>
 
 #define	SED_MACRO(x)	s/#x(ev)/x(ev)/g

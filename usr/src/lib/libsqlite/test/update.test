@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -422,7 +420,7 @@ do_test update-10.1 {
     DROP TABLE test1;
     CREATE TABLE t1(
        a integer primary key,
-       b UNIQUE, 
+       b UNIQUE,
        c, d,
        e, f,
        UNIQUE(c,d)

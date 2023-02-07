@@ -30,8 +30,6 @@
 #ifndef	_DEVTAB_H
 #define	_DEVTAB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 
 #ifdef	__cplusplus

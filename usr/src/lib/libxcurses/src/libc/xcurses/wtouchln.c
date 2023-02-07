@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wtouchln.c
  *
@@ -61,8 +59,8 @@ int y, n, bf;
 	last = bf ? w->_maxx : -1;
 
 	for (; y < w->_maxy && 0 < n; ++y, --n) {
-		w->_first[y] = first; 
-		w->_last[y] = last; 
+		w->_first[y] = first;
+		w->_last[y] = last;
 	}
 
 	return __m_return_code("wtouchln", OK);

@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * tgoto.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -52,7 +50,7 @@ char *
 	__m_trace("tgoto(%p = \"%s\", %d, %d)", cap, col, row);
 #endif
 
-	str = tparm((char *)cap, (long) row, (long) col, 0L, 0L, 0L, 0L, 0L, 0L, 0L); 
+	str = tparm((char *)cap, (long) row, (long) col, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
 
 	return __m_return_pointer("tgoto", (char *)str);
 }

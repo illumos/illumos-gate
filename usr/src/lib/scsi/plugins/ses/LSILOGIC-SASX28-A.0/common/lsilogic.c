@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module represents the expander on the disk backplane for the X4240 and
  * other Sun platforms.  Its purpose is to set a property indicating this is an

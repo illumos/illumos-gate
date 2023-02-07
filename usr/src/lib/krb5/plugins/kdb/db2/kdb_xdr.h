@@ -1,8 +1,6 @@
 #ifndef _KDB2_XDR_H
 #define _KDB2_XDR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "kdb.h"
 
 krb5_error_code

@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * promptusr.c --- prompt user for input/output
  */
@@ -65,7 +64,7 @@ krb5_os_get_tty_uio(krb5_context context, krb5_uio uio)
     }
     /* save intrfunc */
     ointrfunc = signal(SIGINT, intr_routine);
-    
+
     for (p = uio; p; p = p->next) {
 	if (p->prompt) {
 	    fputs(p->prompt, stdout);
@@ -74,7 +73,7 @@ krb5_os_get_tty_uio(krb5_context context, krb5_uio uio)
 	if ((p->flags & KRB5_UIO_GETRESPONSE) == 0)
 	    continue;
 
-	if ((p->flags & KRB5_UIO_ECHORESPONSE) == 0) 
+	if ((p->flags & KRB5_UIO_ECHORESPONSE) == 0)
 	    if (tcsetattr(fd, TCSANOW, &echo_control) == -1)
 		return errno;
 
@@ -83,7 +82,7 @@ krb5_os_get_tty_uio(krb5_context context, krb5_uio uio)
 	    retval = KRB5_LIBOS_CANTREADPWD;
 	    goto cleanup;
 	}
-	
+
 	/* replace newline with null */
 	if ((cp = strchr(read_string, '\n')))
 	    *cp = '\0';
@@ -108,7 +107,7 @@ krb5_os_get_tty_uio(krb5_context context, krb5_uio uio)
 	}
     }
     retval = 0;
-    
+
  cleanup:
     (void) signal(SIGINT, ointrfunc);
     if (retval) {
@@ -160,5 +159,5 @@ main(int argc, char **argv)
 }
 
 #endif
-	
+
 #endif /* !_MSODS */

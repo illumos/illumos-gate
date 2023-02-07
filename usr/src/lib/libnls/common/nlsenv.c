@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * nlsenv.c:
  *
@@ -81,7 +79,7 @@ nlsenv(struct netbuf *buf, char *envname)
 		return(-11);
 
 #ifdef	DEBUGMODE
-	fprintf(stderr, "nlsenv: environ %s = %s len = %d\n", 
+	fprintf(stderr, "nlsenv: environ %s = %s len = %d\n",
 		envname, charaddr, strlen(charaddr));
 #endif
 
@@ -154,7 +152,7 @@ nlsgetcall(int fd)
  *
  *		If the provider is "/dev/starlan", nlsprovider
  *		returns a pointer to the null terminated character string:
- *		"/dev/starlan" if this calling process is a child of the 
+ *		"/dev/starlan" if this calling process is a child of the
  *		network listener process.
  */
 
@@ -188,7 +186,7 @@ nlsprovider()
  *		buffers contents are undefined if:
  *
  *		A.  The receiving buffer is not large enough. (rc = -1)
- *		B.  If 'charaddr' does not contain a series of octets 
+ *		B.  If 'charaddr' does not contain a series of octets
  *		    (strlen(charaddr) must be even). (rc = -2)
  *		C.  Any character in 'charaddr' is not an ASCII hex digit.
  *		    (rc = -3)

@@ -28,8 +28,6 @@
  * Rentrant (MT-safe) getrpcYY interfaces.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include <ctype.h>
 #include <nss_dbdefs.h>

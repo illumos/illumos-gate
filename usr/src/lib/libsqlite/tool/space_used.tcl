@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 # Run this TCL script using "testfixture" in order get a report that shows
 # how much disk space is used by a particular data to actually store data
 # versus how much space is unused.

@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * brdr.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -46,14 +44,14 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/brdr.c 1.1 1995/05/29 1
 #undef border
 
 int
-border(chtype ls, chtype rs, chtype ts, chtype bs, 
-	chtype tl, chtype tr, chtype bl, chtype br) 
+border(chtype ls, chtype rs, chtype ts, chtype bs,
+	chtype tl, chtype tr, chtype bl, chtype br)
 {
 	int code;
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"border(%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld)", 
+		"border(%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld)",
 		ls, rs, ts, bs, tl, tr, bl, br
 	);
 #endif

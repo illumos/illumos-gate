@@ -17,8 +17,6 @@
 
 #ifndef __COM_ERR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(_WIN32)
 #include <win-mac.h>
 #endif
@@ -33,7 +31,7 @@
 typedef long errcode_t;
 typedef void (*et_old_error_hook_func) (const char *, errcode_t,
 					const char *, va_list ap);
-	
+
 struct error_table {
 	/*@shared@*/ char const * const * msgs;
         long base;

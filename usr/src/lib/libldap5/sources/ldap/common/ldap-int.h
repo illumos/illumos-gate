@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -129,25 +127,25 @@
 #define LDAP_DX_REF_STR_LEN	5
 #endif /* LDAP_DNS */
 
-typedef enum { 
-    LDAP_CACHE_LOCK, 
-    LDAP_MEMCACHE_LOCK, 
+typedef enum {
+    LDAP_CACHE_LOCK,
+    LDAP_MEMCACHE_LOCK,
     LDAP_MSGID_LOCK,
-    LDAP_REQ_LOCK, 
-    LDAP_RESP_LOCK, 
-    LDAP_ABANDON_LOCK, 
+    LDAP_REQ_LOCK,
+    LDAP_RESP_LOCK,
+    LDAP_ABANDON_LOCK,
     LDAP_CTRL_LOCK,
-    LDAP_OPTION_LOCK, 
-    LDAP_ERR_LOCK, 
-    LDAP_CONN_LOCK, 
+    LDAP_OPTION_LOCK,
+    LDAP_ERR_LOCK,
+    LDAP_CONN_LOCK,
     LDAP_IOSTATUS_LOCK,		/* serializes access to ld->ld_iostatus */
-    LDAP_RESULT_LOCK, 
-    LDAP_PEND_LOCK, 
-    LDAP_THREADID_LOCK, 
+    LDAP_RESULT_LOCK,
+    LDAP_PEND_LOCK,
+    LDAP_THREADID_LOCK,
 #ifdef LDAP_SASLIO_HOOKS
-    LDAP_SASL_LOCK, 
+    LDAP_SASL_LOCK,
 #endif
-    LDAP_MAX_LOCK 
+    LDAP_MAX_LOCK
 } LDAPLock;
 
 /*
@@ -449,7 +447,7 @@ struct ldap {
         } else { \
             (ld)->ld_mutex_lock_fn(ld->ld_mutex[lock]); \
         } \
-    } 
+    }
 
 #define LDAP_MUTEX_UNLOCK(ld, lock) \
     if ((ld)->ld_mutex_lock_fn != NULL && ld->ld_mutex != NULL) { \
@@ -556,7 +554,7 @@ struct ldap {
 #ifdef EAGAIN
 #define NSLDAPI_ERRNO_IO_INPROGRESS( e )  ((e) == EWOULDBLOCK || (e) == EINPROGRESS || (e) == EAGAIN)
 #else /* EAGAIN */
-#define NSLDAPI_ERRNO_IO_INPROGRESS( e )  ((e) == EWOULDBLOCK || (e) == EINPROGRESS) 
+#define NSLDAPI_ERRNO_IO_INPROGRESS( e )  ((e) == EWOULDBLOCK || (e) == EINPROGRESS)
 #endif /* EAGAIN */
 #endif /* macintosh || _WINDOWS*/
 
@@ -832,7 +830,7 @@ prldap_install_thread_functions( LDAP *ld, int shared );
 
 
 
-#ifndef _SOLARIS_SDK 
+#ifndef _SOLARIS_SDK
 
 /*
  * in charset.c

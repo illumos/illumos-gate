@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * curses.h
  *
@@ -74,7 +72,7 @@ typedef	short bool;
 typedef unsigned short attr_t;
 
 /*
- * These attributes and masks can be applied to an attr_t.  
+ * These attributes and masks can be applied to an attr_t.
  * These are ordered according to the <no_color_video> mask,
  * which has been extended to include additional attributes.
  */
@@ -116,11 +114,11 @@ typedef unsigned short attr_t;
 #define COLOR_WHITE     7
 
 /*
- * A cchar_t details the attributes, color, and a string of wide characters 
+ * A cchar_t details the attributes, color, and a string of wide characters
  * composing a complex character (p12).  The wide character string consists
- * of a spacing character (wcwidth() > 0) and zero or more non-spacing 
- * characters.  Xcurses (p17) states that the minimum number of non-spacing 
- * characters associated with a spacing character must be at least 5, if a 
+ * of a spacing character (wcwidth() > 0) and zero or more non-spacing
+ * characters.  Xcurses (p17) states that the minimum number of non-spacing
+ * characters associated with a spacing character must be at least 5, if a
  * limit is imposed.
  */
 #define M_CCHAR_MAX	6
@@ -129,7 +127,7 @@ typedef unsigned short attr_t;
  *** Opaque data type.  Keep your grubby mits off.
  ***/
 typedef struct {
-	short _f;			/* True if start of character. */ 
+	short _f;			/* True if start of character. */
 	short _n;			/* Number of elements in wc[]. */
         short _co;			/* Color pair number. */
         attr_t _at;			/* Attribute flags. */
@@ -140,13 +138,13 @@ typedef struct {
  *** Opaque data type.  Keep your grubby mits off.
  ***/
 typedef struct window_t {
-	cchar_t _bg;			/* Background. */ 
+	cchar_t _bg;			/* Background. */
 	cchar_t _fg;			/* Foreground, ignore character. */
 	short _cury, _curx;		/* Curent cursor position in window. */
 	short _begy, _begx;		/* Upper-left origin on screen. */
 	short _maxy, _maxx;		/* Window dimensions. */
 	short _top, _bottom;		/* Window's software scroll region. */
-	short _refy, _refx;		/* Pad origin of last refresh. */ 
+	short _refy, _refx;		/* Pad origin of last refresh. */
 	short _sminy, _sminx;		/* T-L screen corner of last refresh. */
 	short _smaxy, _smaxx;		/* B-R screen corner of last refresh. */
 	short _vmin, _vtime;		/* wtimeout() control. */
@@ -192,7 +190,7 @@ typedef unsigned long chtype;
 #endif
 
 /*
- * These attributes and masks can be applied to a chtype.  
+ * These attributes and masks can be applied to a chtype.
  * They are order according to the <no_color_video> mask.
  */
 #define A_NORMAL        0x00000000L
@@ -210,7 +208,7 @@ typedef unsigned long chtype;
 #define A_ALTCHARSET    0x01000000L
 
 /*
- * Colour atttribute support for chtype. 
+ * Colour atttribute support for chtype.
  */
 #define __COLOR_SHIFT	26
 
@@ -243,7 +241,7 @@ typedef unsigned long chtype;
 #define ACS_BOARD       (A_ALTCHARSET | 'h')
 #define ACS_LANTERN     (A_ALTCHARSET | 'I')
 #define ACS_BLOCK       (A_ALTCHARSET | '0')
- 
+
 #ifndef _XOPEN_SOURCE
 /*
  * MKS Extensions for double width box characters.
@@ -261,7 +259,7 @@ typedef unsigned long chtype;
 #endif /* _XOPEN_SOURCE */
 
 /*
- * Wide characters constants for a cchar_t. 
+ * Wide characters constants for a cchar_t.
  */
 extern const cchar_t __WACS_VLINE;
 extern const cchar_t __WACS_HLINE;
@@ -314,7 +312,7 @@ extern const cchar_t __WACS_BLOCK;
 #define WACS_BOARD	&__WACS_BOARD
 #define WACS_LANTERN	&__WACS_LANTERN
 #define WACS_BLOCK	&__WACS_BLOCK
- 
+
 #ifndef _XOPEN_SOURCE
 /*
  * MKS Extensions for double width box characters.
@@ -340,7 +338,7 @@ extern int __m_chtype_cc(chtype, cchar_t *);
 extern chtype __m_cc_chtype(const cchar_t *);
 extern int __m_copywin(const WINDOW *, WINDOW *, int);
 extern WINDOW *__m_newwin(WINDOW *, int, int, int, int);
- 
+
 /*
  * Internal macros.
  */
@@ -374,8 +372,8 @@ extern int wistowcs(wchar_t *, const wint_t *, int);
 
 #ifdef M_CURSES_TRACE
 /*
- * Curses trace facility is only available with a version of 
- * the library that was compiled with -DM_CURSES_TRACE. 
+ * Curses trace facility is only available with a version of
+ * the library that was compiled with -DM_CURSES_TRACE.
  */
 extern void traceoff(void);
 extern void traceon(void);
@@ -466,24 +464,24 @@ extern void wbkgrndset(WINDOW *, const cchar_t *);
 extern int wgetbkgrnd(WINDOW *, cchar_t *);
 
 extern int border(
-	chtype, chtype, chtype, chtype, 
+	chtype, chtype, chtype, chtype,
 	chtype, chtype, chtype, chtype);
 extern int border_set(
-	const cchar_t *, const cchar_t *, 
-	const cchar_t *, const cchar_t *, 
-	const cchar_t *, const cchar_t *, 
+	const cchar_t *, const cchar_t *,
+	const cchar_t *, const cchar_t *,
+	const cchar_t *, const cchar_t *,
 	const cchar_t *, const cchar_t *);
 extern int box(WINDOW *, chtype, chtype);
 extern int box_set(WINDOW *, const cchar_t *, const cchar_t *);
 extern int wborder(
 	WINDOW *,
-	chtype, chtype, chtype, chtype, 
+	chtype, chtype, chtype, chtype,
 	chtype, chtype, chtype, chtype);
 extern int wborder_set(
 	WINDOW *,
-	const cchar_t *, const cchar_t *, 
-	const cchar_t *, const cchar_t *, 
-	const cchar_t *, const cchar_t *, 
+	const cchar_t *, const cchar_t *,
+	const cchar_t *, const cchar_t *,
+	const cchar_t *, const cchar_t *,
 	const cchar_t *, const cchar_t *);
 
 extern bool can_change_color(void);
@@ -823,7 +821,7 @@ extern void wsyncup(WINDOW *);
 extern const wchar_t *wunctrl(const cchar_t *);
 
 /*
- * These macros are not suitable for strict XPG4 conformance, 
+ * These macros are not suitable for strict XPG4 conformance,
  * because some of them evaluate their arguments more than once.
  * However, they can improve speed and size of an application,
  * provided an application is careful about not using side effects

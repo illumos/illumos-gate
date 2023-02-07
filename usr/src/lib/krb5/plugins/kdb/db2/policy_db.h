@@ -11,8 +11,6 @@
 #ifndef __ADB_H__
 #define __ADB_H__
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <errno.h>
 #include <krb5.h>
@@ -71,7 +69,7 @@ typedef struct _osa_adb_db_ent_t {
 /*
  * Return Code (the rest are in adb_err.h)
  */
- 
+
 #define OSA_ADB_OK		0
 
 /*

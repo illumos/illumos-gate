@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -561,10 +558,10 @@ int Sqlitetest2_Init(Tcl_Interp *interp){
      (char*)&journal_format, TCL_LINK_INT);
 #endif
   sprintf(zBuf, "%d", SQLITE_PAGE_SIZE);
-  Tcl_SetVar(interp, "SQLITE_PAGE_SIZE", zBuf, TCL_GLOBAL_ONLY); 
+  Tcl_SetVar(interp, "SQLITE_PAGE_SIZE", zBuf, TCL_GLOBAL_ONLY);
   sprintf(zBuf, "%d", SQLITE_PAGE_RESERVE);
-  Tcl_SetVar(interp, "SQLITE_PAGE_RESERVE", zBuf, TCL_GLOBAL_ONLY); 
+  Tcl_SetVar(interp, "SQLITE_PAGE_RESERVE", zBuf, TCL_GLOBAL_ONLY);
   sprintf(zBuf, "%d", SQLITE_USABLE_SIZE);
-  Tcl_SetVar(interp, "SQLITE_USABLE_SIZE", zBuf, TCL_GLOBAL_ONLY); 
+  Tcl_SetVar(interp, "SQLITE_USABLE_SIZE", zBuf, TCL_GLOBAL_ONLY);
   return TCL_OK;
 }

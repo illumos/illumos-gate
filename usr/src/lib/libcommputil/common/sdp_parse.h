@@ -27,8 +27,6 @@
 #ifndef _SDP_PARSE_H
 #define	_SDP_PARSE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

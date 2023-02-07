@@ -26,8 +26,6 @@
 #ifndef _TOPO_PROTOCOL_H
 #define	_TOPO_PROTOCOL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/nvpair.h>
 
 #ifdef __cplusplus

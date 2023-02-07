@@ -25,8 +25,6 @@
  * files/getrpcent.c -- "files" backend for nsswitch "rpc" database
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/rpcent.h>
 #include "files_common.h"
 #include <strings.h>

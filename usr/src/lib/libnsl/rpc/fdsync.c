@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains functions that enables the rpc library to synchronize
  * between various threads while they compete for a particular file descriptor.

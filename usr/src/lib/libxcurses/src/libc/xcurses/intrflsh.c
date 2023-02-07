@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * intrflsh.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -46,7 +44,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/intrflsh.c 1.1 1995/06/
 /*
  * When set, pressing an interrupt, suspend, or quiit key, the terminal's
  * output queue will be flushed.  Default inherited from the terminal
- * driver.  The window parameter is ignored. 
+ * driver.  The window parameter is ignored.
  */
 int
 (intrflush)(WINDOW *w, bool bf)
@@ -58,6 +56,6 @@ int
 	cur_term->_prog.c_lflag &= ~NOFLSH;
 	if (!bf)
 		cur_term->_prog.c_lflag |= NOFLSH;
-		
+
 	return __m_return_code("intrflush", __m_tty_set(&cur_term->_prog));
 }

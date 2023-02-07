@@ -27,8 +27,6 @@
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Putws transforms process codes in wchar_t array pointed to by
  * "ptr" into a byte string, and writes the string followed

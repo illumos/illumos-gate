@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef PORTMAP
 /*
  * rpc_soc.c

@@ -27,8 +27,6 @@
 #ifndef _MEMA_TEST_H
 #define	_MEMA_TEST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if RPC_HDR
 %#ifndef _DB_LOG_ENTRY_H
 %#define _DB_LOG_ENTRY_H
@@ -119,7 +117,7 @@ typedef  struct db_log_entry* db_log_entry_p;
 struct db_log_list {
   db_log_entry_p list<>;
 };
-  
+
 #if RPC_HDR
 %#endif /* _DB_LOG_ENTRY_H */
 #endif /* RPC_HDR */

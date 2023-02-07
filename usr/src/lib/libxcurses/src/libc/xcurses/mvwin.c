@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mvwin.c
  *
@@ -46,7 +44,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/mvwin.c 1.3 1995/06/15 
 /*f
  * Move window so that the upper left-hand corner is at (x,y). If the move
  * would cause the window to be off the screen, it is an error and the
- * window is not moved.  Moving subwindows is allowed, but should be 
+ * window is not moved.  Moving subwindows is allowed, but should be
  * avoided.
  */
 int
@@ -71,12 +69,12 @@ int by, bx;
 			return __m_return_code("mvwin", ERR);
 	} else {
 		/* Check upper bounds of sub-window. */
-		if (parent->_begy + parent->_maxy < by + w->_maxy 
+		if (parent->_begy + parent->_maxy < by + w->_maxy
 		|| parent->_begx + parent->_maxx < bx + w->_maxx)
 			return __m_return_code("mvwin", ERR);
 
-		/* Move the sub-window's line pointers to the parent 
-		 * window's data. 
+		/* Move the sub-window's line pointers to the parent
+		 * window's data.
 		 */
 		dy = by - parent->_begy;
 		dx = bx - parent->_begx;

@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -101,7 +99,7 @@ do_test null-2.8 {
 #
 do_test null-3.1 {
   execsql {
-    select count(*), count(b), count(c), sum(b), sum(c), 
+    select count(*), count(b), count(c), sum(b), sum(c),
            avg(b), avg(c), min(b), max(b) from t1;
   }
 } {7 4 6 2 3 0.5 0.5 0 1}

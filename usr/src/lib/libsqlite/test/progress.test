@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -55,7 +53,7 @@ do_test progress1.1 {
   execsql {
     SELECT * FROM t1
   }
-  set counter 
+  set counter
 } 1
 
 # Test that the query is rolled back when the progress callback returns
@@ -87,7 +85,7 @@ do_test progress1.2 {
 } 10
 
 # Test that an active transaction remains active and not rolled back after the
-# progress query abandons a query. 
+# progress query abandons a query.
 do_test progress1.3 {
 
   db progress 0 ""

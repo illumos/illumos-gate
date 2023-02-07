@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * wchgat.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -52,7 +50,7 @@ wchgat(WINDOW *w, int n, attr_t at, short co, const void *opts)
 #ifdef M_CURSES_TRACE
 	__m_trace("wchgat(%p, %d, %x, %d, %p)", w, n, at, co, opts);
 #endif
-	
+
 	if (n < 0)
 		n = w->_maxx;
 
@@ -66,9 +64,9 @@ wchgat(WINDOW *w, int n, attr_t at, short co, const void *opts)
 			break;
 
 		cp->_co = co;
-		cp->_at = at; 
+		cp->_at = at;
 	}
-		
+
 	WSYNC(w);
 
 	return __m_return_code("wchgat", WFLUSH(w));

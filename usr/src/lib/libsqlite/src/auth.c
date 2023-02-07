@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2003 January 11
 **
@@ -96,10 +93,10 @@ static void sqliteAuthBadReturnCode(Parse *pParse, int rc){
 
 /*
 ** The pExpr should be a TK_COLUMN expression.  The table referred to
-** is in pTabList or else it is the NEW or OLD table of a trigger.  
+** is in pTabList or else it is the NEW or OLD table of a trigger.
 ** Check to see if it is OK to read this particular column.
 **
-** If the auth function returns SQLITE_IGNORE, change the TK_COLUMN 
+** If the auth function returns SQLITE_IGNORE, change the TK_COLUMN
 ** instruction into a TK_NULL.  If the auth function returns SQLITE_DENY,
 ** then generate an error.
 */
@@ -144,13 +141,13 @@ void sqliteAuthRead(
   }
   assert( pExpr->iDb<db->nDb );
   zDBase = db->aDb[pExpr->iDb].zName;
-  rc = db->xAuth(db->pAuthArg, SQLITE_READ, pTab->zName, zCol, zDBase, 
+  rc = db->xAuth(db->pAuthArg, SQLITE_READ, pTab->zName, zCol, zDBase,
                  pParse->zAuthContext);
   if( rc==SQLITE_IGNORE ){
     pExpr->op = TK_NULL;
   }else if( rc==SQLITE_DENY ){
     if( db->nDb>2 || pExpr->iDb!=0 ){
-      sqliteErrorMsg(pParse, "access to %s.%s.%s is prohibited", 
+      sqliteErrorMsg(pParse, "access to %s.%s.%s is prohibited",
          zDBase, pTab->zName, zCol);
     }else{
       sqliteErrorMsg(pParse, "access to %s.%s is prohibited", pTab->zName,zCol);
@@ -198,7 +195,7 @@ int sqliteAuthCheck(
 */
 void sqliteAuthContextPush(
   Parse *pParse,
-  AuthContext *pContext, 
+  AuthContext *pContext,
   const char *zContext
 ){
   pContext->pParse = pParse;

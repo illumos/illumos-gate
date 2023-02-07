@@ -27,8 +27,6 @@
 #ifndef _DHCP_STABLE_H
 #define	_DHCP_STABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module reads and writes the stable identifier values, DUID and IAID.
  */

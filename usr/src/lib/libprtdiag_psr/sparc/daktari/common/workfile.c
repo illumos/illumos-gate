@@ -26,8 +26,6 @@
  * Daktari Platform specific functions.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libdevinfo.h>
 #include <alloca.h>
 #include <inttypes.h>

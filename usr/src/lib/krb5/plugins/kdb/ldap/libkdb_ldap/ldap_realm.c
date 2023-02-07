@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/kdb/kdb_ldap/ldap_realm.c
  *
@@ -42,7 +41,7 @@
 #include <libintl.h>
 
 #define END_OF_LIST -1
-char  *realm_attributes[] = {"krbSearchScope","krbSubTrees", "krbPrincContainerRef", 
+char  *realm_attributes[] = {"krbSearchScope","krbSubTrees", "krbPrincContainerRef",
 			     "krbMaxTicketLife", "krbMaxRenewableAge",
 			     "krbTicketFlags", "krbUpEnabled",
 			     "krbTicketPolicyReference",
@@ -960,9 +959,9 @@ krb5_ldap_create_realm(context, rparams, mask)
     krb5_error_code             st=0;
     char                        *dn=NULL;
     char                        *strval[4]={NULL};
-    char		        *contref[2]={NULL}; 
+    char		        *contref[2]={NULL};
     LDAPMod                     **mods = NULL;
-    int                         i=0, objectmask=0, subtreecount=0; 
+    int                         i=0, objectmask=0, subtreecount=0;
     kdb5_dal_handle             *dal_handle=NULL;
     krb5_ldap_context           *ldap_context=NULL;
     krb5_ldap_server_handle     *ldap_server_handle=NULL;
@@ -979,7 +978,7 @@ krb5_ldap_create_realm(context, rparams, mask)
 	rparams == NULL ||
 	rparams->realm_name == NULL ||
 	((mask & LDAP_REALM_SUBTREE) && rparams->subtree  == NULL) ||
-	((mask & LDAP_REALM_CONTREF) && rparams->containerref == NULL) || 
+	((mask & LDAP_REALM_CONTREF) && rparams->containerref == NULL) ||
 	((mask & LDAP_REALM_POLICYREFERENCE) && rparams->policyreference == NULL) ||
 #ifdef HAVE_EDIRECTORY
 	((mask & LDAP_REALM_KDCSERVERS) && rparams->kdcservers == NULL) ||
@@ -1014,7 +1013,7 @@ krb5_ldap_create_realm(context, rparams, mask)
 
     strval[0] = "top";
     strval[1] = "krbrealmcontainer";
-    strval[2] = "krbticketpolicyaux"; 
+    strval[2] = "krbticketpolicyaux";
     strval[3] = NULL;
 
     if ((st=krb5_add_str_mem_ldap_mod(&mods, "objectclass", LDAP_MOD_ADD, strval)) != 0)
@@ -1485,7 +1484,7 @@ krb5_ldap_free_realm_params(rparams)
     return;
 }
 
-/* 
+/*
  * ******************************************************************************
  * DAL functions
  * ******************************************************************************

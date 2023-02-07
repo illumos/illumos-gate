@@ -1,9 +1,7 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  Copyright 1990,1994 by the Massachusetts Institute of Technology.
  *  All Rights Reserved.
- * 
+ *
  * Export of this software from the United States of America may
  * require a specific license from the United States Government.
  * It is the responsibility of any person or organization contemplating
@@ -22,7 +20,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  */
 
 /*

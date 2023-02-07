@@ -1,7 +1,5 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
  *	Openvision retains the copyright to derivative works of
  *	this source code.  Do *NOT* create a derivative of this
@@ -88,7 +86,7 @@ int         _kadm5_check_handle(void *handle);
 kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
 					 void *lhandle,
 					 krb5_principal princ,
-					 char *new_pw, 
+					 char *new_pw,
 					 char **ret_pw,
 					 char *msg_ret,
 					 unsigned int msg_len);

@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 November 22
 #
 # The author disclaims copyright to this source code.  In place of
@@ -18,7 +16,7 @@
 # for the BTree backend.  When a row is deleted from a table, the
 # cursor is suppose to be left pointing at either the previous or
 # next entry in that table.  If the cursor is left pointing at the
-# next entry, then the next Next operation is ignored.  So the 
+# next entry, then the next Next operation is ignored.  So the
 # sequence of operations (Delete, Next) should always leave the
 # cursor pointing at the first entry past the one that was deleted.
 # This test is designed to verify that behavior.
@@ -78,7 +76,7 @@ for {set k 2} {$k<=20} {incr k} {
   }
 }
 
-btree_rollback $::b1    
+btree_rollback $::b1
 #btree_pager_ref_dump $::b1
 btree_close $::b1
 

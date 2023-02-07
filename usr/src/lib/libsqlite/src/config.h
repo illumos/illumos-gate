@@ -6,8 +6,6 @@
 #ifndef	SQLITE_CONFIG_H
 #define	SQLITE_CONFIG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus

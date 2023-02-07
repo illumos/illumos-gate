@@ -31,8 +31,6 @@
 #ifndef _UDAT_VENDOR_SPECIFIC_H_
 #define	_UDAT_VENDOR_SPECIFIC_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * HEADER: udat_vendor_specific.h

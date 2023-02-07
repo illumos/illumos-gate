@@ -26,8 +26,6 @@
 #ifndef	_PANEL_H
 #define	_PANEL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4	*/
-
 #include <curses.h>
 
 #ifdef	__cplusplus

@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 # Extract opcode documentation for sqliteVdbe.c and generate HTML
 #

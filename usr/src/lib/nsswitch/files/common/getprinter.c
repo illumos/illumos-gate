@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 static const char *printers = "/etc/printers.conf";
 
 #pragma weak _nss_files__printers_constr = _nss_files_printers_constr

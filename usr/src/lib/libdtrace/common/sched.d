@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma D depends_on module unix
 #pragma D depends_on provider sched
 
@@ -44,7 +42,7 @@ translator cpuinfo_t < cpu_t *C > {
 	cpu_chip = C->cpu_physid->cpu_chipid;
 	cpu_lgrp = C->cpu_lpl->lpl_lgrpid;
 	cpu_info = (processor_info_t)C->cpu_type_info;
-}; 
+};
 
 translator cpuinfo_t < disp_t *D > {
 	cpu_id = D->disp_cpu == NULL ? -1 :

@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2004 January 13
 **
@@ -30,13 +27,13 @@
 */
 #define DB_FILE "test.db"
 
-/* 
+/*
 ** When this variable becomes non-zero, all threads stop
 ** what they are doing.
 */
 volatile int all_stop = 0;
 
-/* 
+/*
 ** Callback from the integrity check.  If the result is anything other
 ** than "ok" it means the integrity check has failed.  Set the "all_stop"
 ** global variable to stop all other activity.  Print the error message

@@ -27,8 +27,6 @@
 #ifndef	_NIS_PARSE_LDAP_ERR_H
 #define	_NIS_PARSE_LDAP_ERR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

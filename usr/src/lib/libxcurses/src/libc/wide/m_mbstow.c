@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *       wchar_t *m_mbstowcsdup(char *s)
  * (per strdup, only converting at the same time.)

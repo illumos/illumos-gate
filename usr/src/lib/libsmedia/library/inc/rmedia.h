@@ -27,8 +27,6 @@
 #ifndef _RMEDIA_H_
 #define	_RMEDIA_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * rmedia.h header for libsmedia library
  */

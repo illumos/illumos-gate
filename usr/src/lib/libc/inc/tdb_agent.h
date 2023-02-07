@@ -27,8 +27,6 @@
 #ifndef	_TDB_AGENT_H
 #define	_TDB_AGENT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Thread debug agent control structures.
  *

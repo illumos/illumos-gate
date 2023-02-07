@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2002 January 29
 #
 # The author disclaims copyright to this source code.  In place of
@@ -67,7 +65,7 @@ foreach {i conf cmd t0 t1 t2} {
       DELETE FROM t2;
       INSERT INTO t1 VALUES(1,2,3);
       BEGIN $conf;
-      INSERT INTO t2 VALUES(1); 
+      INSERT INTO t2 VALUES(1);
       $cmd INTO t1 VALUES(1,2,4);
     }]} r1]
     catch {execsql {COMMIT}}
@@ -125,7 +123,7 @@ foreach {i conf cmd t0 t1 t2} {
       DELETE FROM t2;
       INSERT INTO t1 VALUES(1,2,3);
       BEGIN $conf;
-      INSERT INTO t2 VALUES(1); 
+      INSERT INTO t2 VALUES(1);
       $cmd INTO t1 VALUES(1,2,4);
     }]} r1]
     catch {execsql {COMMIT}}
@@ -183,7 +181,7 @@ foreach {i conf cmd t0 t1 t2} {
       DELETE FROM t2;
       INSERT INTO t1 VALUES(1,2,3);
       BEGIN $conf;
-      INSERT INTO t2 VALUES(1); 
+      INSERT INTO t2 VALUES(1);
       $cmd INTO t1 VALUES(1,2,4);
     }]} r1]
     catch {execsql {COMMIT}}
@@ -242,7 +240,7 @@ foreach {i conf1 conf2 cmd t0 t1 t2} {
       DELETE FROM t2;
       INSERT INTO t1 VALUES(1,2,3);
       BEGIN $conf2;
-      INSERT INTO t2 VALUES(1); 
+      INSERT INTO t2 VALUES(1);
       $cmd INTO t1 VALUES(1,2,4);
     }]} r1]
     catch {execsql {COMMIT}}
@@ -304,7 +302,7 @@ foreach {i conf1 conf2 cmd t0 t1 t2} {
       CREATE TABLE t1(a,b,c NOT NULL $conf1 DEFAULT 5);
       DELETE FROM t2;
       BEGIN $conf2;
-      INSERT INTO t2 VALUES(1); 
+      INSERT INTO t2 VALUES(1);
       $cmd INTO t1 VALUES(1,2,NULL);
     }]} r1]
     catch {execsql {COMMIT}}

@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/addr_comp.c
  *
@@ -9,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,7 +22,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_address_compare()
  */
@@ -62,9 +61,9 @@ krb5_address_compare(krb5_context context, krb5_const krb5_address *addr1,
     }
     inet_ntop(addr_fam, addr1->contents, buf, sizeof(buf));
     KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr1=%s", buf);
-    KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr1 type=%d", 
+    KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr1 type=%d",
 	    addr1->addrtype);
-    KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr1 length=%d", 
+    KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr1 length=%d",
 	    addr1->length);
 
     switch (addr2->addrtype) {
@@ -77,9 +76,9 @@ krb5_address_compare(krb5_context context, krb5_const krb5_address *addr1,
     }
     inet_ntop(addr_fam, addr2->contents, buf, sizeof(buf));
     KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr2=%s", buf);
-    KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr2 type=%d", 
+    KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr2 type=%d",
 	    addr2->addrtype);
-    KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr2 length=%d", 
+    KRB5_LOG(KRB5_INFO, "krb5_address_compare() addr2 length=%d",
 	    addr2->length);
 }
 #endif /* KRB5_DEBUG */

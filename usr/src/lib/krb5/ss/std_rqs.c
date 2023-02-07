@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* std_rqs.c - automatically generated from std_rqs.ct */
 #include <ss/ss.h>
 

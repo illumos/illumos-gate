@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Attempt to dynamically link in the ZFS libzfs.so.1 so that we can
  * see if there are any ZFS zpools on any of the slices.

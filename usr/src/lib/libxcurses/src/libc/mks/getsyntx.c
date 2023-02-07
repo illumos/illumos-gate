@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Dummy version of getsyntx() from C/370.
  * This version simply uses the external variable VARIANTS, and assigns them
@@ -52,7 +50,7 @@ getsyntx(void)
 	static struct variant v;
 	static char const var[] = "\\][}{^~!#|$@`";
 	char const *e;
-	
+
 	if ((e = __m_getenv("VARIANTS")) == NULL || *e == '\0')
 		e = var;
 	else if (strlen(e) != 13) {

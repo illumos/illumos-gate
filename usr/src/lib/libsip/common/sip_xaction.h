@@ -27,8 +27,6 @@
 #ifndef	_SIP_XACTION_H
 #define	_SIP_XACTION_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

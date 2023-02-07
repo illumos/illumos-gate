@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _C89_INTMAX32
 #pragma weak _vscanf = vscanf
 #pragma weak _vfscanf = vfscanf

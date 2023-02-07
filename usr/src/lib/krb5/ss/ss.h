@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright 1987, 1988 by MIT Student Information Processing Board
  *
@@ -72,6 +71,6 @@ int ss_execute_line (int, char*);
 extern ss_request_table ss_std_requests;
 
 /* toggles the display of debugging messages */
-void debugDisplaySS(int onOff); 
+void debugDisplaySS(int onOff);
 
 #endif /* _ss_h */

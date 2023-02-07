@@ -23,8 +23,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1.2.1 */
-
 #define	CBRA	2
 #define	CCHR	4
 #define	CDOT	8

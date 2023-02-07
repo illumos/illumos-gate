@@ -25,8 +25,6 @@
  * files/netmasks.c -- "files" backend for nsswitch "netmasks" database
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * All routines necessary to deal with the file /etc/inet/netmasks.  The file
  * contains mappings from 32 bit network internet addresses to their

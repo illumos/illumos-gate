@@ -26,8 +26,6 @@
 #ifndef _REGEXPR_H
 #define	_REGEXPR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1.3.1 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * chgat.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -80,7 +78,7 @@ int
 
 #ifdef M_CURSES_TRACE
 	__m_trace(
-		"mvwchgat(%p, %d, %d, %d, %x, %d, %p)", 
+		"mvwchgat(%p, %d, %d, %d, %x, %d, %p)",
 		w, y, x, n, at, co, opts
 	);
 #endif

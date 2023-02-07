@@ -31,8 +31,6 @@
 #ifndef _LDAP_SERVICE_H
 #define _LDAP_SERVICE_H 1
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* service specific mask */
 #define LDAP_SERVICE_SERVICEFLAG      0x0001
 #define LDAP_SERVICE_HOSTSERVER       0x0002
@@ -89,7 +87,7 @@ krb5_ldap_free_service( krb5_context, krb5_ldap_service_params *);
 krb5_error_code
 krb5_ldap_set_service_passwd( krb5_context, char *, char *);
 
-krb5_error_code 
+krb5_error_code
 krb5_ldap_add_service_rights( krb5_context, int, char *, char *, char **, int);
 
 krb5_error_code

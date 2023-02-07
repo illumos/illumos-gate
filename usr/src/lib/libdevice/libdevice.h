@@ -27,8 +27,6 @@
 #ifndef	_LIBDEVICE_H
 #define	_LIBDEVICE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sunddi.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/devctl.h>

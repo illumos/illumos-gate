@@ -38,8 +38,6 @@
 #ifndef _NSSWITCH_PRIV_H
 #define	_NSSWITCH_PRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <nsswitch.h>
 
 #ifdef	__cplusplus

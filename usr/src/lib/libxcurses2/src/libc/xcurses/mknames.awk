@@ -22,9 +22,7 @@
 # Copyright (c) 1995-1998 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# mknames.awk	
+# mknames.awk
 #
 # XCurses Library
 #
@@ -38,8 +36,6 @@ print "/*" > file
 print " * Copyright (c) 1998 by Sun Microsystems, Inc." > file
 print " * All rights reserved." > file
 print " */" > file
-print > file
-print "#pragma ident	\"@(#)" file "\t%I%\t%E% SMI\"" > file
 print > file
 print "/*" > file
 printf " * %s\n", file > file

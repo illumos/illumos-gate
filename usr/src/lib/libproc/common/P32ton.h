@@ -27,8 +27,6 @@
 #ifndef	_P32TON_H
 #define	_P32TON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/types32.h>
 #include <sys/time_impl.h>

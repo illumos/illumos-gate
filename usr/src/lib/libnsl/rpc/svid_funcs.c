@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	These functions are documented in the SVID as being part of libnsl.
  *	They are also defined as macros in various RPC header files.  To

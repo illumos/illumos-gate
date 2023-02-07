@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # The author disclaims copyright to this source code.  In place of
 # a legal notice, here is a blessing:
 #
@@ -21,13 +19,13 @@ source $testdir/tester.tcl
 catchsql { CREATE TABLE tbl (a, b, c) }
 
 execsql {
-    CREATE TRIGGER before_tbl_insert BEFORE INSERT ON tbl BEGIN SELECT CASE 
+    CREATE TRIGGER before_tbl_insert BEFORE INSERT ON tbl BEGIN SELECT CASE
 	WHEN (new.a = 4) THEN RAISE(IGNORE) END;
     END;
 
-    CREATE TRIGGER after_tbl_insert AFTER INSERT ON tbl BEGIN SELECT CASE 
-	WHEN (new.a = 1) THEN RAISE(ABORT,    'Trigger abort') 
-	WHEN (new.a = 2) THEN RAISE(FAIL,     'Trigger fail') 
+    CREATE TRIGGER after_tbl_insert AFTER INSERT ON tbl BEGIN SELECT CASE
+	WHEN (new.a = 1) THEN RAISE(ABORT,    'Trigger abort')
+	WHEN (new.a = 2) THEN RAISE(FAIL,     'Trigger fail')
 	WHEN (new.a = 3) THEN RAISE(ROLLBACK, 'Trigger rollback') END;
     END;
 }
@@ -139,7 +137,7 @@ execsql {CREATE VIEW tbl_view AS SELECT * FROM tbl}
 execsql {
     CREATE TRIGGER tbl_view_insert INSTEAD OF INSERT ON tbl_view BEGIN
 	SELECT CASE WHEN (new.a = 1) THEN RAISE(ROLLBACK, 'View rollback')
-	            WHEN (new.a = 2) THEN RAISE(IGNORE) 
+	            WHEN (new.a = 2) THEN RAISE(IGNORE)
 	            WHEN (new.a = 3) THEN RAISE(ABORT, 'View abort') END;
     END;
 }
@@ -162,8 +160,8 @@ do_test trigger3-7.3 {
 
 integrity_check trigger3-8.1
 
-catchsql { DROP TABLE tbl; } 
-catchsql { DROP TABLE tbl2; } 
+catchsql { DROP TABLE tbl; }
+catchsql { DROP TABLE tbl2; }
 catchsql { DROP VIEW tbl_view; }
 
 finish_test

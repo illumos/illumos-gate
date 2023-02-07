@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains kernel property decode routines adopted from
  * sunddi.c and ddi_impl.c. The following changes have been applied.

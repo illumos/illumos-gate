@@ -2,14 +2,13 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* SASL Config file API
  * Rob Siemborski
  * Tim Martin (originally in Cyrus distribution)
  * $Id: config.c,v 1.13 2003/02/13 19:55:54 rjs3 Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -17,7 +16,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -27,7 +26,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -111,7 +110,7 @@ int sasl_config_init(const char *filename)
     if (result != SASL_OK)
 	goto done;
 #endif /* _SUN_SDK_ */
-    
+
     while (fgets(buf, sizeof(buf), infile)) {
 	lineno++;
 
@@ -135,7 +134,7 @@ int sasl_config_init(const char *filename)
 	*p++ = '\0';
 
 	while (*p && isspace((int) *p)) p++;
-	
+
 	if (!*p) {
 #ifdef _SUN_SDK_
 	  invalid_line = 1;
@@ -152,14 +151,14 @@ int sasl_config_init(const char *filename)
 #endif /* _SUN_SDK_ */
 	    alloced += CONFIGLISTGROWSIZE;
 #ifdef _SUN_SDK_
-	    gctx->configlist=sasl_REALLOC((char *)gctx->configlist, 
+	    gctx->configlist=sasl_REALLOC((char *)gctx->configlist,
 				    alloced * sizeof(struct configlist));
 	    if (gctx->configlist==NULL) {
 		result = SASL_NOMEM;
 		goto done;
 	    }
 #else
-	    configlist=sasl_REALLOC((char *)configlist, 
+	    configlist=sasl_REALLOC((char *)configlist,
 				    alloced * sizeof(struct configlist));
 	    if (configlist==NULL) return SASL_NOMEM;
 #endif /* _SUN_SDK_ */

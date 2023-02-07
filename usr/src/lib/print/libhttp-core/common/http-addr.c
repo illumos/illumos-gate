@@ -37,8 +37,6 @@
  * Include necessary headers...
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "http.h"
 #include "debug.h"
 #include "string.h"

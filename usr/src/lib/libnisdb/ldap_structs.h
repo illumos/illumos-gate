@@ -27,8 +27,6 @@
 #ifndef	_LDAP_STRUCTS_H
 #define	_LDAP_STRUCTS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/time.h>
 
 #ifdef	__cplusplus

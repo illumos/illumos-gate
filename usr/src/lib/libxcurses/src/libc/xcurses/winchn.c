@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * winchn.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -57,7 +55,7 @@ int n;
 #endif
 
 	eol = (n < 0 || w->_maxx < w->_curx + n) ? w->_maxx : w->_curx + n;
- 
+
         for (cp = w->_line[w->_cury], x = w->_curx; x < eol; ++x, ++chs) {
 		if ((*chs = __m_cc_chtype(&cp[x])) == (chtype) ERR)
 			return __m_return_code("winchnstr", ERR);
@@ -66,7 +64,7 @@ int n;
 	/* For an unbounded buffer or a buffer with room remaining,
 	 * null terminate the buffer.
 	 */
-	if (n < 0 || eol < w->_curx + n) 
+	if (n < 0 || eol < w->_curx + n)
 		*chs = 0;
 
 	return __m_return_code("winchnstr", OK);

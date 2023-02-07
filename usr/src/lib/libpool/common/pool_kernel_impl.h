@@ -27,8 +27,6 @@
 #ifndef	_POOL_KERNEL_IMPL_H
 #define	_POOL_KERNEL_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

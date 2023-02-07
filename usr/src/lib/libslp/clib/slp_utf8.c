@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * UTF-8 encoded Unicode parsing routines. For efficiency, we convert
  * to wide chars only when absolutely needed. The following interfaces

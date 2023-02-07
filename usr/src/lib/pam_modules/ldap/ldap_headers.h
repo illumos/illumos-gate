@@ -27,8 +27,6 @@
 #ifndef	_LDAP_HEADERS_H
 #define	_LDAP_HEADERS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * contains definitions for variables for IEEE floating-point arithmetic
  * modes; IEEE floating-point arithmetic exception handling;

@@ -25,8 +25,6 @@
 # All rights reserved.
 #
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 sub trim {
 	my ($line) = @_;
 	$line =~ s#/\*|\*/##g;

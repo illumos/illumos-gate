@@ -27,8 +27,6 @@
  *	All Rights Reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <nss_dbdefs.h>
 #include "nis_common.h"
 

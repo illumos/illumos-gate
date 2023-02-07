@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IPMI entities are a strange beast.  A reasonable assumption for those
  * unfamiliar with the spec would be that there was a command to iterate over

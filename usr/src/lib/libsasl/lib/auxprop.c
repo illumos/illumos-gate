@@ -2,13 +2,12 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* auxprop.c - auxilliary property support
  * Rob Siemborski
  * $Id: auxprop.c,v 1.10 2003/03/19 18:25:27 rjs3 Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -16,7 +15,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -26,7 +25,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -54,7 +53,7 @@
 #include <ctype.h>
 #include "saslint.h"
 
-struct proppool 
+struct proppool
 {
     struct proppool *next;
 
@@ -78,7 +77,7 @@ struct propctx  {
     struct proppool *mem_cur;
 };
 
-typedef struct auxprop_plug_list 
+typedef struct auxprop_plug_list
 {
     struct auxprop_plug_list *next;
     const sasl_auxprop_plug_t *plug;
@@ -91,7 +90,7 @@ typedef struct auxprop_plug_list
 static auxprop_plug_list_t *auxprop_head = NULL;
 #endif /* !_SUN_SDK_ */
 
-static struct proppool *alloc_proppool(size_t size) 
+static struct proppool *alloc_proppool(size_t size)
 {
     struct proppool *ret;
     /* minus 1 for the one that is already a part of the array
@@ -115,7 +114,7 @@ static struct proppool *alloc_proppool(size_t size)
 static struct proppool *resize_proppool(struct proppool *pool, size_t size)
 {
     struct proppool *ret;
-    
+
     if(pool->size >= size) return pool;
 #ifdef _SUN_SDK_
     ret = sasl_sun_REALLOC(pool, sizeof(struct proppool) + size);
@@ -129,7 +128,7 @@ static struct proppool *resize_proppool(struct proppool *pool, size_t size)
     return ret;
 }
 
-static int prop_init(struct propctx *ctx, unsigned estimate) 
+static int prop_init(struct propctx *ctx, unsigned estimate)
 {
     const unsigned VALUES_SIZE = PROP_DEFAULT * sizeof(struct propval);
 
@@ -156,7 +155,7 @@ static int prop_init(struct propctx *ctx, unsigned estimate)
  *              0 will use module default
  * returns NULL on error
  */
-struct propctx *prop_new(unsigned estimate) 
+struct propctx *prop_new(unsigned estimate)
 {
     struct propctx *new_ctx;
 
@@ -179,14 +178,14 @@ struct propctx *prop_new(unsigned estimate)
 /* create new propctx which duplicates the contents of an existing propctx
  * returns -1 on error
  */
-int prop_dup(struct propctx *src_ctx, struct propctx **dst_ctx) 
+int prop_dup(struct propctx *src_ctx, struct propctx **dst_ctx)
 {
     struct proppool *pool;
     struct propctx *retval = NULL;
     unsigned i;
     int result;
     size_t total_size = 0, values_size;
-    
+
     if(!src_ctx || !dst_ctx) return SASL_BADPARAM;
 
     /* What is the total allocated size of src_ctx? */
@@ -236,7 +235,7 @@ int prop_dup(struct propctx *src_ctx, struct propctx **dst_ctx)
 void prop_dispose(struct propctx **ctx)
 {
     struct proppool *tmp;
-    
+
     if(!ctx || !*ctx) return;
 
     while((*ctx)->mem_base) {
@@ -248,7 +247,7 @@ void prop_dispose(struct propctx **ctx)
 	sasl_FREE(tmp);
 #endif /* _SUN_SDK_*/
     }
-    
+
 #ifdef _SUN_SDK_
     sasl_sun_FREE(*ctx);
 #else
@@ -267,7 +266,7 @@ void prop_dispose(struct propctx **ctx)
  * NOTE: may clear values from context as side-effect
  * returns -1 on error
  */
-int prop_request(struct propctx *ctx, const char **names) 
+int prop_request(struct propctx *ctx, const char **names)
 {
     unsigned i, new_values, total_values;
 
@@ -288,7 +287,7 @@ int prop_request(struct propctx *ctx, const char **names)
 
 	/* Do we need a larger base pool? */
 	max_in_pool = ctx->mem_base->size / sizeof(struct propval);
-	
+
 	if(total_values <= max_in_pool) {
 	    /* Don't increase the size of the base pool, just use what
 	       we need */
@@ -361,10 +360,10 @@ int prop_request(struct propctx *ctx, const char **names)
  *  return value persists until next call to
  *   prop_request, prop_clear or prop_dispose on context
  */
-const struct propval *prop_get(struct propctx *ctx) 
+const struct propval *prop_get(struct propctx *ctx)
 {
     if(!ctx) return NULL;
-    
+
     return ctx->values;
 }
 
@@ -377,19 +376,19 @@ const struct propval *prop_get(struct propctx *ctx)
  *  the name field of the associated vals entry will be set to NULL
  */
 int prop_getnames(struct propctx *ctx, const char **names,
-		  struct propval *vals) 
+		  struct propval *vals)
 {
     int found_names = 0;
-    
+
     struct propval *cur = vals;
     const char **curname;
 
     if(!ctx || !names || !vals) return SASL_BADPARAM;
-    
+
     for(curname = names; *curname; curname++) {
 	struct propval *val;
 	for(val = ctx->values; val->name; val++) {
-	    if(!strcmp(*curname,val->name)) { 
+	    if(!strcmp(*curname,val->name)) {
 		found_names++;
 		memcpy(cur, val, sizeof(struct propval));
 		goto next;
@@ -398,7 +397,7 @@ int prop_getnames(struct propctx *ctx, const char **names,
 
 	/* If we are here, we didn't find it */
 	memset(cur, 0, sizeof(struct propval));
-	
+
 	next:
 	cur++;
     }
@@ -411,7 +410,7 @@ int prop_getnames(struct propctx *ctx, const char **names,
  *  ctx      -- property context
  *  requests -- 0 = don't clear requests, 1 = clear requests
  */
-void prop_clear(struct propctx *ctx, int requests) 
+void prop_clear(struct propctx *ctx, int requests)
 {
     struct proppool *new_pool, *tmp;
     unsigned i;
@@ -444,7 +443,7 @@ void prop_clear(struct propctx *ctx, int requests)
 	sasl_FREE(tmp);
 #endif /* _SUN_SDK_ */
     }
-    
+
     /* Update allocation-related metadata */
     ctx->allocated_values = ctx->used_values+1;
     new_pool->unused =
@@ -495,7 +494,7 @@ void prop_erase(struct propctx *ctx, const char *name)
 	    break;
 	}
     }
-    
+
     return;
 }
 
@@ -511,21 +510,21 @@ void prop_erase(struct propctx *ctx, const char *name)
  * returns 0 on success and amount of additional space needed on failure
  */
 int prop_format(struct propctx *ctx, const char *sep, int seplen,
-		char *outbuf, unsigned outmax, unsigned *outlen) 
+		char *outbuf, unsigned outmax, unsigned *outlen)
 {
     unsigned needed, flag = 0;
     struct propval *val;
-    
+
     if(!ctx || !outbuf) return SASL_BADPARAM;
 
-    if(!sep) seplen = 0;    
+    if(!sep) seplen = 0;
     if(seplen < 0) seplen = strlen(sep);
 
     needed = seplen * (ctx->used_values - 1);
     for(val = ctx->values; val->name; val++) {
 	needed += strlen(val->name);
     }
-    
+
     if(!outmax) return (needed + 1); /* Because of unsigned funkiness */
     if(needed > (outmax - 1)) return (needed - (outmax - 1));
 
@@ -542,7 +541,7 @@ int prop_format(struct propctx *ctx, const char *sep, int seplen,
 	}
 	strcat(outbuf, val->name);
     }
-    
+
     return SASL_OK;
 }
 
@@ -560,13 +559,13 @@ int prop_set(struct propctx *ctx, const char *name,
     struct propval *cur;
 
     if(!ctx) return SASL_BADPARAM;
-    if(!name && !ctx->prev_val) return SASL_BADPARAM; 
+    if(!name && !ctx->prev_val) return SASL_BADPARAM;
 
     if(name) {
 	struct propval *val;
 
 	ctx->prev_val = NULL;
-	
+
 	for(val = ctx->values; val->name; val++) {
 	    if(!strcmp(name,val->name)){
 		ctx->prev_val = val;
@@ -585,7 +584,7 @@ int prop_set(struct propctx *ctx, const char *name,
 	const char **old_values = NULL;
 	char **tmp, **tmp2;
 	size_t size;
-	
+
 	if(cur->values) {
 
 	    if(!value) {
@@ -638,13 +637,13 @@ int prop_set(struct propctx *ctx, const char *name,
 	tmp2 = (char **)cur->values;
 	if(old_values) {
 	    tmp = (char **)old_values;
-	    
+
 	    while(*tmp) {
 		*tmp2 = *tmp;
 		tmp++; tmp2++;
 	    }
 	}
-	    
+
 	/* Now allocate the last entry */
 	if(vallen <= 0)
 	    size = (size_t)(strlen(value) + 1);
@@ -653,9 +652,9 @@ int prop_set(struct propctx *ctx, const char *name,
 
 	if(size > ctx->mem_cur->unused) {
 	    size_t needed;
-	    
+
 	    needed = ctx->mem_cur->size * 2;
-	    
+
 	    while(needed < size) {
 		needed *= 2;
 	    }
@@ -715,9 +714,9 @@ int prop_set(struct propctx *ctx, const char *name,
 
 	if(size > ctx->mem_cur->unused) {
 	    size_t needed;
-	    
+
 	    needed = ctx->mem_cur->size * 2;
-	    
+
 	    while(needed < size) {
 		needed *= 2;
 	    }
@@ -743,7 +742,7 @@ int prop_set(struct propctx *ctx, const char *name,
 	cur->nvalues++;
 	cur->valsize += (size - 1);
     }
-    
+
     return SASL_OK;
 }
 
@@ -765,7 +764,7 @@ int prop_setvals(struct propctx *ctx, const char *name,
 
     /* If they want us to add no values, we can do that */
     if(!values) return SASL_OK;
-    
+
     /* Basically, use prop_set to do all our dirty work for us */
     if(name) {
 	result = prop_set(ctx, name, *val, 0);
@@ -783,7 +782,7 @@ int prop_setvals(struct propctx *ctx, const char *name,
 /* Request a set of auxiliary properties
  *  conn         connection context
  *  propnames    list of auxiliary property names to request ending with
- *               NULL.  
+ *               NULL.
  *
  * Subsequent calls will add items to the request list.  Call with NULL
  * to clear the request list.
@@ -793,7 +792,7 @@ int prop_setvals(struct propctx *ctx, const char *name,
  *  SASL_BADPARAM -- bad count/conn parameter
  *  SASL_NOMEM    -- out of memory
  */
-int sasl_auxprop_request(sasl_conn_t *conn, const char **propnames) 
+int sasl_auxprop_request(sasl_conn_t *conn, const char **propnames)
 {
     int result;
     sasl_server_conn_t *sconn;
@@ -801,14 +800,14 @@ int sasl_auxprop_request(sasl_conn_t *conn, const char **propnames)
     if(!conn) return SASL_BADPARAM;
     if(conn->type != SASL_CONN_SERVER)
 	PARAMERROR(conn);
-    
+
     sconn = (sasl_server_conn_t *)conn;
 
     if(!propnames) {
 	prop_clear(sconn->sparams->propctx,1);
 	return SASL_OK;
     }
-    
+
     result = prop_request(sconn->sparams->propctx, propnames);
     RETURN(conn, result);
 }
@@ -823,10 +822,10 @@ int sasl_auxprop_request(sasl_conn_t *conn, const char **propnames)
  *
  *  returns NULL if conn is invalid.
  */
-struct propctx *sasl_auxprop_getctx(sasl_conn_t *conn) 
+struct propctx *sasl_auxprop_getctx(sasl_conn_t *conn)
 {
     sasl_server_conn_t *sconn;
-    
+
     if(!conn || conn->type != SASL_CONN_SERVER) return NULL;
 
     sconn = (sasl_server_conn_t *)conn;
@@ -869,7 +868,7 @@ int sasl_auxprop_add_plugin(const char *plugname,
 	}
     }
 #endif /* _SUN_SDK_ */
-    
+
     result = auxpropfunc(sasl_global_utils, SASL_AUXPROP_PLUG_VERSION,
 			 &out_version, &plug, plugname);
 
@@ -896,7 +895,7 @@ int sasl_auxprop_add_plugin(const char *plugname,
 #endif /* _SUN_SDK_ */
 
     new_item = sasl_ALLOC(sizeof(auxprop_plug_list_t));
-    if(!new_item) return SASL_NOMEM;    
+    if(!new_item) return SASL_NOMEM;
 
 #ifdef _SUN_SDK_
     if(_sasl_strdup(plugname, &new_item->plugname, NULL) != SASL_OK) {
@@ -919,7 +918,7 @@ int sasl_auxprop_add_plugin(const char *plugname,
 #ifdef _SUN_SDK_
 void _sasl_auxprop_free(_sasl_global_context_t *gctx)
 #else
-void _sasl_auxprop_free() 
+void _sasl_auxprop_free()
 #endif /* _SUN_SDK_ */
 {
     auxprop_plug_list_t *ptr, *ptr_next;
@@ -928,7 +927,7 @@ void _sasl_auxprop_free()
 
     for(ptr = (auxprop_plug_list_t *)gctx->auxprop_head; ptr; ptr = ptr_next) {
 #else
-    
+
     for(ptr = auxprop_head; ptr; ptr = ptr_next) {
 #endif /* _SUN_SDK_ */
 	ptr_next = ptr->next;
@@ -952,7 +951,7 @@ void _sasl_auxprop_free()
 /* Do the callbacks for auxprop lookups */
 void _sasl_auxprop_lookup(sasl_server_params_t *sparams,
 			  unsigned flags,
-			  const char *user, unsigned ulen) 
+			  const char *user, unsigned ulen)
 {
     sasl_getopt_t *getopt;
     int ret, found = 0;
@@ -982,25 +981,25 @@ void _sasl_auxprop_lookup(sasl_server_params_t *sparams,
 
 	if(_sasl_strdup(plist, &pluginlist, NULL) != SASL_OK) return;
 	thisplugin = freeptr = pluginlist;
-	
+
 	/* Do lookup in all *specified* plugins, in order */
 	while(*thisplugin) {
 	    char *p;
 	    int last=0;
-	    
+
 	    while(*thisplugin && isspace((int)*thisplugin)) thisplugin++;
 	    if(!(*thisplugin)) break;
-	    
+
 	    for(p = thisplugin;*p != '\0' && !isspace((int)*p); p++);
 	    if(*p == '\0') last = 1;
 	    else *p='\0';
-	    
+
 	    for(ptr = auxprop_head; ptr; ptr = ptr->next) {
 		/* Skip non-matching plugins */
 		if(!ptr->plug->name
 		   || strcasecmp(ptr->plug->name, thisplugin))
 		    continue;
-	    
+
 		found=1;
 		ptr->plug->auxprop_lookup(ptr->plug->glob_context,
 					  sparams, flags, user, ulen);

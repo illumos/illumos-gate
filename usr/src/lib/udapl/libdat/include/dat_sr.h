@@ -40,8 +40,6 @@
 #ifndef _DAT_SR_H_
 #define	_DAT_SR_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <dat/udat.h>
 #include <dat/dat_registry.h>
 

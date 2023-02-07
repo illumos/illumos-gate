@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -52,7 +50,7 @@ extern "C" {
 #define LDAP_REF_STR		"Referral:\n"
 #define LDAP_REF_STR_LEN	10
 
-/* 
+/*
  * specific LDAP instantiations of BER types we know about
  */
 

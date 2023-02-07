@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -50,7 +48,7 @@ do_test memdb-1.1 {
 } {1024}
 
 # The following procedure computes a "signature" for table "t3".  If
-# T3 changes in any way, the signature should change.  
+# T3 changes in any way, the signature should change.
 #
 # This is used to test ROLLBACK.  We gather a signature for t3, then
 # make lots of changes to t3, then rollback and take another signature.
@@ -193,7 +191,7 @@ foreach {i conf cmd t0 t1 t2} {
       DELETE FROM t2;
       INSERT INTO t1 VALUES(1,2,3);
       BEGIN $conf;
-      INSERT INTO t2 VALUES(1); 
+      INSERT INTO t2 VALUES(1);
       $cmd INTO t1 VALUES(1,2,4);
     }]} r1]
     catch {execsql {COMMIT}}

@@ -36,8 +36,6 @@
 # contributors.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 # Be sure to add new capabilties at the END of the appropriate section!
 --- begin bool
 auto_left_margin,	"bw"	"bw"	cub1 wraps from column 0 to last column
@@ -437,7 +435,7 @@ orig_pair,		"op"	"op"	Original color-pair
 orig_colors,		"oc"	"oc"	Original colors
 initialize_color,	"initc"	"Ic"	Initialize the definition of color
 initialize_pair,	"initp"	"Ip"	Initialize color pair
-set_color_pair,		"scp"	"sp"	Set color pair	
+set_color_pair,		"scp"	"sp"	Set color pair
 set_foreground,		"setf"	"Sf"	Set foreground color using RGB escape
 set_background,		"setb"	"Sb"	Set background color using RGB escape
 #

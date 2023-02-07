@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/sysmacros.h>
@@ -192,6 +193,28 @@ pf_eh_exit(pcie_bus_t *bus_p)
 }
 
 /*
+ * After sending an ereport, or in lieu of doing so, unlock all the devices in
+ * the data queue.  We also must clear pe_valid here; this function is called in
+ * the path where we decide not to send an ereport because there is no error
+ * (spurious AER interrupt), as well as from pf_send_ereport() which has already
+ * cleared it.  Failing to do this will result in a different path through
+ * pf_dispatch() and the potential for deadlocks.  It is safe to do as we are
+ * still holding the handler lock here, just as in pf_send_ereport().
+ */
+static void
+pf_dq_unlock_chain(pf_impl_t *impl)
+{
+	pf_data_t *pfd_p;
+
+	for (pfd_p = impl->pf_dq_tail_p; pfd_p; pfd_p = pfd_p->pe_prev) {
+		pfd_p->pe_valid = B_FALSE;
+		if (pfd_p->pe_lock) {
+			pf_handler_exit(PCIE_PFD2DIP(pfd_p));
+		}
+	}
+}
+
+/*
  * Scan Fabric is the entry point for PCI/PCIe IO fabric errors.  The
  * caller may create a local pf_data_t with the "root fault"
  * information populated to either do a precise or full scan.  More
@@ -284,7 +307,16 @@ done:
 		analyse_flag = pf_analyse_error(derr, &impl);
 	}
 
-	pf_send_ereport(derr, &impl);
+	/*
+	 * If analyse_flag is 0 or PF_ERR_NO_ERROR, there's nothing here.  Skip
+	 * ereport generation unless something went wrong with the scan.
+	 */
+	if ((analyse_flag & ~PF_ERR_NO_ERROR) != 0 ||
+	    (scan_flag & (PF_SCAN_CB_FAILURE | PF_SCAN_DEADLOCK)) != 0) {
+		pf_send_ereport(derr, &impl);
+	} else {
+		pf_dq_unlock_chain(&impl);
+	}
 
 	/*
 	 * Check if any hardened driver's callback reported a panic.
@@ -3059,12 +3091,7 @@ generic:
 		    &eqep);
 	}
 
-	/* Unlock all the devices in the queue */
-	for (pfd_p = impl->pf_dq_tail_p; pfd_p; pfd_p = pfd_p->pe_prev) {
-		if (pfd_p->pe_lock) {
-			pf_handler_exit(PCIE_PFD2DIP(pfd_p));
-		}
-	}
+	pf_dq_unlock_chain(impl);
 }
 
 /*

@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -15,7 +13,7 @@ char* hexa_print(char *aString, int aLen)
 {
 	char *res;
 	int i =0;
-	
+
 	if ((res = (char *)calloc (aLen*2 + 1, 1 )) == NULL){
 		return (NULL);
 	}

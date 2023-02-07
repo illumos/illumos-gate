@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * unctrl.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -75,7 +73,7 @@ static const char *carat[] = {
 	"^Y",
 	"^Z",
 	"^[",
-	"^\\", 
+	"^\\",
 	"^]",
 	"^^",
 	"^_"
@@ -123,7 +121,7 @@ unctrl(chtype ch)
 			chr[2] = c;
 			chr[3] = '\0';
 		}
-	} else { 
+	} else {
 		/* Return byte as is. */
 		chr[0] = c;
 		chr[1] = '\0';

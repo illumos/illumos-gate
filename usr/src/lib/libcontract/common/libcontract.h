@@ -26,8 +26,6 @@
 #ifndef	_LIBCONTRACT_H
 #define	_LIBCONTRACT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/contract.h>
 

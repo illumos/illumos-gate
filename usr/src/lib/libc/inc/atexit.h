@@ -27,8 +27,6 @@
 #ifndef _SYS_ATEXIT_H
 #define _SYS_ATEXIT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* Functions to call - called by the C++ runtimes */
 
 void * _get_exit_frame_monitor (void);

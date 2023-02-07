@@ -27,8 +27,6 @@
 #ifndef	_FCODE_LOG_H
 #define	_FCODE_LOG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

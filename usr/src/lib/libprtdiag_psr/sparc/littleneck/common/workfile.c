@@ -26,8 +26,6 @@
  * Littleneck Platform specific functions.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libprtdiag.h>
 #include <sys/mc.h>
 

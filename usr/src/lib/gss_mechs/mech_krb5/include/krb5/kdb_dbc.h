@@ -2,7 +2,6 @@
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/gss_mechs/mech_krb5/include/krb5/kdb_dbc.h
@@ -13,7 +12,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -24,7 +23,7 @@
  * permission.  M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * KDC Database context definitions.
  */
@@ -36,7 +35,7 @@
 #if !defined(_MACINTOSH) && !defined(_MSDOS)
 
 #include "kdb.h"
-	
+
 /* Per-database context. */
 typedef struct __krb5_db_context {
     krb5_boolean        db_inited;      /* Context initialized          */

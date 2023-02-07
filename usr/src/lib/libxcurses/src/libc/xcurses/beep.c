@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * beep.c
  *
@@ -44,7 +42,7 @@ static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/beep.c 1.2 1995/07/14 2
 #include <private.h>
 
 /*f
- * Sound the current terminal's audible bell if it has one. If 
+ * Sound the current terminal's audible bell if it has one. If
  * not, flash the screen if possible.
  */
 int

@@ -27,8 +27,6 @@
 #ifndef _CUPS_DEBUG_H_
 #define _CUPS_DEBUG_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Include necessary headers...
  */

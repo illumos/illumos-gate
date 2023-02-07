@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by Mortice Kern Systems Inc.  All rights reserved.
  *
@@ -33,7 +31,7 @@
  */
 
 /*
- * m_invari.h: 
+ * m_invari.h:
  *    Configuration and definitions for support of on systems (e.g EBCDIC)
  *    where the POSIX.2 portable characters are not invariant
  */

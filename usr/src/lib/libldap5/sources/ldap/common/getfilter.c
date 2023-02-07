@@ -3,9 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  *
  * The contents of this file are subject to the Netscape Public License
@@ -32,7 +29,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1993 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -148,7 +145,7 @@ ldap_init_getfilter_buf( char *buf, ssize_t buflen )
                 ldap_free_strarray( tok );
 		return( NULL );
 	    }
-		
+
 	    nextflp->lfl_delims = tok[ 1 ];
 	    nextflp->lfl_ilist = NULL;
 	    nextflp->lfl_next = NULL;
@@ -382,7 +379,7 @@ filter_add_value( char *f, char *flimit, char *v, int escape_all )
 		v += slen;
 	    }
 	    break;
-	    
+
 	default:
 	    if ( f < flimit ) {
 		*f++ = *v++;
@@ -403,8 +400,8 @@ ldap_create_filter( char *filtbuf, unsigned long buflen, char *pattern,
 	char	*p, *f, *flimit;
 	int	i, wordcount, wordnum, endwordnum, escape_all;
 
-    /* 
-     * there is some confusion on what to create for a filter if 
+    /*
+     * there is some confusion on what to create for a filter if
      * attr or value are null pointers.  For now we just leave them
      * as TO BE DEALT with
      */
@@ -412,7 +409,7 @@ ldap_create_filter( char *filtbuf, unsigned long buflen, char *pattern,
 	if ( filtbuf == NULL || buflen == 0 || pattern == NULL ){
 		return( LDAP_PARAM_ERROR );
 	}
-	
+
 	if ( valwords == NULL ) {
 	    wordcount = 0;
 	} else {
@@ -517,7 +514,7 @@ break_into_words( char *str, char *delims, char ***wordsp )
     char	*word, **words;
     int		count;
     char	*lasts;
-	
+
     if (( words = (char **)NSLDAPI_CALLOC( 1, sizeof( char * ))) == NULL ) {
 	return( -1 );
     }
@@ -535,7 +532,7 @@ break_into_words( char *str, char *delims, char ***wordsp )
 	words[ ++count ] = NULL;
 	word = ldap_utf8strtok_r( NULL, delims, &lasts );
     }
-	
+
     *wordsp = words;
     return( count );
 }

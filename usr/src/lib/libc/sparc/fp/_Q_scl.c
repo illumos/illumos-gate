@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(sparc) && !defined(__sparc)
 #error This code is for SPARC only
 #endif

@@ -30,8 +30,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * rusersxdr.c
  * These are the non-rpcgen-able XDR routines for version 2 of the rusers

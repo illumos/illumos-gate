@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
  *
  * The contents of this file are subject to the Netscape Public License
@@ -31,7 +29,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -219,7 +217,7 @@ check_response_queue( LDAP *ld, int msgid, int all, int do_abandon_check,
 	 * if we did not find a message OR if the one we found is a result for
 	 * a request that is still pending, return failure.
 	 */
-	if ( lm == NULL 
+	if ( lm == NULL
              || (( lr = nsldapi_find_request_by_msgid( ld, lm->lm_msgid ))
 		   != NULL && lr->lr_outrefcnt > 0 )) {
 		LDAP_MUTEX_UNLOCK( ld, LDAP_RESP_LOCK );
@@ -421,7 +419,7 @@ wait4msg( LDAP *ld, int msgid, int all, int unlock_permitted,
                             if ( rc == 0 ) {
                                 rc = LDAP_RES_BIND;
                                 lc->lconn_status = LDAP_CONNST_CONNECTED;
-                                
+
                                 lr->lr_ber->ber_end = lr->lr_ber->ber_ptr;
                                 lr->lr_ber->ber_ptr = lr->lr_ber->ber_buf;
                                 nsldapi_iostatus_interest_read( ld, lc->lconn_sb );
@@ -433,7 +431,7 @@ wait4msg( LDAP *ld, int msgid, int all, int unlock_permitted,
 				    0, 0 );
                             }
                         }
-                        
+
 					}
 				}
 				LDAP_MUTEX_UNLOCK( ld, LDAP_REQ_LOCK );
@@ -734,7 +732,7 @@ lr->lr_res_matched ? lr->lr_res_matched : "" );
 		}
 	}
 
-	/* 
+	/*
 	 * if not, we must add it to the list of responses.  if
 	 * the msgid is already there, it must be part of an existing
 	 * search response.
@@ -966,7 +964,7 @@ check_for_refs( LDAP *ld, LDAPRequest *lr, BerElement *ber,
 		lr->lr_res_errno = ( ldapversion == LDAP_VERSION2 )
 		    ? LDAP_PARTIAL_RESULTS : LDAP_REFERRAL;
 	}
-		
+
 	LDAPDebug( LDAP_DEBUG_TRACE,
 	    "check_for_refs: new result: msgid %d, res_errno %d, ",
 	    lr->lr_msgid, lr->lr_res_errno, 0 );
@@ -1310,7 +1308,7 @@ nsldapi_post_result( LDAP *ld, int msgid, LDAPMessage *result )
 		{
 			if ( lp->lp_sema != NULL ) {
 				break;
-			} 
+			}
 		}
 		/*
 		 * If we did't find a pending request, lp is NULL at this
@@ -1371,10 +1369,10 @@ link_pend( LDAP *ld, LDAPPend *lp )
 {
 	if (( lp->lp_next = ld->ld_pend ) != NULL )
 	{
-		lp->lp_next->lp_prev = lp;    
-	} 
-	ld->ld_pend = lp; 
-	lp->lp_prev = NULL; 
+		lp->lp_next->lp_prev = lp;
+	}
+	ld->ld_pend = lp;
+	lp->lp_prev = NULL;
 }
 
 #if 0 /* these functions are no longer used */
@@ -1383,10 +1381,10 @@ unlink_pend( LDAP *ld, LDAPPend *lp )
 {
         if ( lp->lp_prev == NULL ) {
                 ld->ld_pend = lp->lp_next;
-        } else { 
+        } else {
                 lp->lp_prev->lp_next = lp->lp_next;
         }
- 
+
         if ( lp->lp_next != NULL ) {
                 lp->lp_next->lp_prev = lp->lp_prev;
         }

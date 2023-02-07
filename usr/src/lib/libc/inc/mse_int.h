@@ -27,8 +27,6 @@
 #ifndef	_MSE_INT_H
 #define	_MSE_INT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stddef.h>
 #include <time.h>
 

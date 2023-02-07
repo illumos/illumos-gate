@@ -26,8 +26,6 @@
 #ifndef	_LIBCONTRACT_IMPL_H
 #define	_LIBCONTRACT_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/contract.h>
 #include <libnvpair.h>
 #include <libcontract.h>

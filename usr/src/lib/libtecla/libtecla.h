@@ -3,9 +3,9 @@
 
 /*
  * Copyright (c) 2000, 2001, 2002, 2003, 2004 by Martin C. Shepherd.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -15,7 +15,7 @@
  * copyright notice(s) and this permission notice appear in all copies of
  * the Software and that both the above copyright notice(s) and this
  * permission notice appear in supporting documentation.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
@@ -25,14 +25,12 @@
  * FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
  * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- * 
+ *
  * Except as contained in this notice, the name of a copyright holder
  * shall not be used in advertising or otherwise to promote the sale, use
  * or other dealings in this Software without prior written authorization
  * of the copyright holder.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -188,7 +186,7 @@ typedef struct {
   char **files;     /* An array of 'nfile' filenames. */
 } FileExpansion;
 
-/* 
+/*
  * The ef_expand_file() function expands a specified pathname, converting
  * ~user/ and ~/ patterns at the start of the pathname to the
  * corresponding home directories, replacing $envvar with the value of
@@ -671,7 +669,7 @@ typedef GL_TIMEOUT_FN(GlTimeoutFn);
  * returns a code which tells gl_get_line() what to do next. Note that
  * each call to gl_inactivity_timeout() replaces any previously installed
  * timeout callback, and that specifying a callback of 0, turns off
- * inactivity timing. 
+ * inactivity timing.
  *
  * Beware that although the timeout argument includes a nano-second
  * component, few computer clocks presently have resolutions finer
@@ -1387,7 +1385,7 @@ int gl_normal_io(GetLine *gl);
 
 /*.......................................................................
  * When in non-blocking server mode, this function can be used to abandon
- * the current incompletely entered input line, and prepare to start 
+ * the current incompletely entered input line, and prepare to start
  * editing a new line on the next call to gl_get_line().
  *
  * Input:
@@ -1464,7 +1462,7 @@ typedef enum {
  * Functions of the following form implement external
  * application-specific action functions, which can then be bound to
  * sequences of terminal keys.
- * 
+ *
  * Input:
  *  gl            GetLine *  The line editor resource object.
  *  data             void *  The anonymous 'data' argument that was
@@ -1618,7 +1616,7 @@ typedef struct {
  *                           change on every call to cpl_complete_word().
  */
 CplMatches *cpl_complete_word(WordCompletion *cpl, const char *line,
-			      int word_end, void *data, 
+			      int word_end, void *data,
 			      CplMatchFn *match_fn);
 
 /*.......................................................................

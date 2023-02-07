@@ -30,8 +30,6 @@
 
 /* A panels subsystem built on curses--Replace the window in a panel */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4	*/
-
 /*LINTLIBRARY*/
 
 #include <sys/types.h>

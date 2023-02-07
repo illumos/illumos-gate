@@ -1,6 +1,4 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 # 2001 September 15
 #
 # The author disclaims copyright to this source code.  In place of
@@ -125,7 +123,7 @@ do_test in-3.3 {
 #
 do_test in-4.1 {
   execsql {
-    UPDATE t1 SET b=b*2 
+    UPDATE t1 SET b=b*2
     WHERE b IN (SELECT b FROM t1 WHERE a>8)
   }
   execsql {SELECT b FROM t1 ORDER BY b}
@@ -284,7 +282,7 @@ do_test in-8.2 {
 do_test in-9.1 {
   execsql {
     CREATE TABLE t4 AS SELECT a FROM tb;
-    SELECT * FROM t4;    
+    SELECT * FROM t4;
   }
 } {1 2 3 5 7 9 11}
 do_test in-9.2 {

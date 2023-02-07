@@ -28,8 +28,6 @@
  *	nis/getrpcent.c -- "nis" backend for nsswitch "rpc" database
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "nis_common.h"
 #include <stdio.h>
 #include <string.h>

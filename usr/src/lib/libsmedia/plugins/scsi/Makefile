@@ -23,8 +23,6 @@
 # Copyright (c) 1990,1998-1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/libsmedia/pluggins/scsi/Makefile
 
 include		../../../Makefile.lib

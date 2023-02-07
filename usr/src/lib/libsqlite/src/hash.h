@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 22
 **
@@ -44,7 +41,7 @@ struct Hash {
   } *ht;
 };
 
-/* Each element in the hash table is an instance of the following 
+/* Each element in the hash table is an instance of the following
 ** structure.  All elements are stored on a single doubly-linked list.
 **
 ** Again, this structure is intended to be opaque, but it can't really
@@ -67,11 +64,11 @@ struct HashElem {
 **                           (including the null-terminator, if any).  Case
 **                           is ignored in comparisons.
 **
-**   SQLITE_HASH_BINARY      pKey points to binary data nKey bytes long. 
+**   SQLITE_HASH_BINARY      pKey points to binary data nKey bytes long.
 **                           memcmp() is used to compare keys.
 **
 ** A copy of the key is made for SQLITE_HASH_STRING and SQLITE_HASH_BINARY
-** if the copyKey parameter to HashInit is 1.  
+** if the copyKey parameter to HashInit is 1.
 */
 #define SQLITE_HASH_INT       1
 /* #define SQLITE_HASH_POINTER   2 // NOT USED */

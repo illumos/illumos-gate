@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * MKS interface to XPG message internationalization routines.
  * Copyright 1989, 1992 by Mortice Kern Systems Inc.  All rights reserved.

@@ -24,11 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * termattr.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -57,7 +55,7 @@ termattrs()
 	cc = __m_screen->_newscr->_bg;
 	cc._at = term_attrs();
 	ch = __m_cc_chtype(&cc) & A_ATTRIBUTES & ~A_COLOR;
-	
+
 
 	return __m_return_chtype("termattrs", ch);
 }

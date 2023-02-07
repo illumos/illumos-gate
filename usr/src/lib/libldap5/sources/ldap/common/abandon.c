@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -31,7 +29,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -122,10 +120,10 @@ do_abandon( LDAP *ld, int origid, int msgid, LDAPControl **serverctrls,
 		origid, msgid, 0 );
 
 	/* optimistic */
-	lderr = LDAP_SUCCESS;	
+	lderr = LDAP_SUCCESS;
 
-/* 
- * this is not the best implementation...  
+/*
+ * this is not the best implementation...
  * the code special cases the when async io is enabled.
  * The logic is clear this way, at the cost of code bloat.
  * This logic should be cleaned up post nova 4.5 rtm
@@ -174,7 +172,7 @@ do_abandon( LDAP *ld, int origid, int msgid, LDAPControl **serverctrls,
                 /* we ignore errors from child abandons... */
             }
         }
-        
+
         if ( lr != NULL ) {
             if ( origid == msgid && lr->lr_parent != NULL ) {
                 /* don't let caller abandon child requests! */

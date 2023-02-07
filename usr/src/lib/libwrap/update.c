@@ -3,20 +3,18 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /*
   * Routines for controlled update/initialization of request structures.
-  * 
+  *
   * request_init() initializes its argument. Pointers and string-valued members
   * are initialized to zero, to indicate that no lookup has been attempted.
-  * 
+  *
   * request_set() adds information to an already initialized request structure.
-  * 
+  *
   * Both functions take a variable-length name-value list.
-  * 
+  *
   * Diagnostics are reported through syslog(3).
-  * 
+  *
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 

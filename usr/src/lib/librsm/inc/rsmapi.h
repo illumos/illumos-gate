@@ -27,8 +27,6 @@
 #ifndef _RSMAPI_H
 #define	_RSMAPI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

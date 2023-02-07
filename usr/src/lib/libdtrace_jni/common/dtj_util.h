@@ -27,8 +27,6 @@
 #ifndef	_DTJ_UTIL_H
 #define	_DTJ_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <jni.h>
 #include <libuutil.h>
 

@@ -27,8 +27,6 @@
 #ifndef _ABIENV_H
 #define	_ABIENV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 typedef	struct liblist {
 	char 		*l_libname;
 	void		*l_handle;

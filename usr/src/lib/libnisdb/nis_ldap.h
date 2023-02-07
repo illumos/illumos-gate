@@ -24,9 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #ifndef	_NIS_LDAP_H
 #define	_NIS_LDAP_H
 

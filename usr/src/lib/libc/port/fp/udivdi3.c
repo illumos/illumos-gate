@@ -35,8 +35,6 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "quadint.h"
 
 #pragma weak __udivdi3 = ___udivdi3

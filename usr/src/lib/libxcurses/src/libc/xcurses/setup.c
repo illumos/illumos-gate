@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * setupterm.c
  *
@@ -62,13 +60,13 @@ TERMINAL *cur_term;
  */
 char __m_curses_version[] = M_CURSES_VERSION;
 
-/* True if __m_setupterm() should use either the window settings from 
+/* True if __m_setupterm() should use either the window settings from
  * ioctl(), or the environment variables LINES and COLUMNS to override
- * the terminfo database entries for 'lines' and 'columns'.  
+ * the terminfo database entries for 'lines' and 'columns'.
  *
  * Call use_env(flag) before either setupterm(), newterm(), or initscr().
  */
-static bool use_environment = TRUE;	
+static bool use_environment = TRUE;
 
 static char const e_terminal[] = "No memory for TERMINAL structure.\n";
 static char const e_unknown[] = "\"%s\": Unknown terminal type.\n";
@@ -107,10 +105,10 @@ getnum(fd)
 int fd;
 {
         unsigned char bytes[2];
- 
+
         if (read(fd, bytes, 2) != 2)
                 return SHRT_MIN;
- 
+
         return (short) (bytes[0] + bytes[1] * 256);
 }
 
@@ -161,7 +159,7 @@ TERMINAL *tp;
 
 	if (__COUNT_BOOL < header.bool_count) {
 		(void) lseek(
-			fd, (off_t) (header.bool_count - __COUNT_BOOL), 
+			fd, (off_t) (header.bool_count - __COUNT_BOOL),
 			SEEK_CUR
 		);
 	} else {
@@ -180,7 +178,7 @@ TERMINAL *tp;
 
 	if (__COUNT_NUM < header.num_count) {
 		(void) lseek(
-			fd, (off_t) (2 * (header.num_count - __COUNT_NUM)), 
+			fd, (off_t) (2 * (header.num_count - __COUNT_NUM)),
 			SEEK_CUR
 		);
 	} else {
@@ -197,7 +195,7 @@ TERMINAL *tp;
         for (i = 0; i < len; ++i) {
                 if ((offset = getnum(fd)) == SHRT_MIN)
                         goto error_4;
- 
+
                 if (offset < 0)
                         tp->_str[i] = (char *) 0;
                 else
@@ -206,7 +204,7 @@ TERMINAL *tp;
 
 	if (__COUNT_STR < header.str_count) {
 		(void) lseek(
-			fd, (off_t) (2 * (header.str_count - __COUNT_STR)), 
+			fd, (off_t) (2 * (header.str_count - __COUNT_STR)),
 			SEEK_CUR
 		);
 	} else {
@@ -243,16 +241,16 @@ use_env(bool bf)
  * Set up terminal.
  *
  * Reads in the terminfo database pointed to by $TERMINFO env. var.
- * for the given terminal, but does not set up the output virtualization 
- * structues used by CURSES.  If the terminal name pointer is NULL, 
- * the $TERM env. var. is used for the terminal.  All output is to 
- * the given file descriptor which is initialized for output.  
+ * for the given terminal, but does not set up the output virtualization
+ * structues used by CURSES.  If the terminal name pointer is NULL,
+ * the $TERM env. var. is used for the terminal.  All output is to
+ * the given file descriptor which is initialized for output.
  *
- * On error, if errret != NULL then setupterm() returns OK 
- * or ERR and stores a status value in the integer pointed to by 
- * errret.  A status of 1 is normal, 0 means the terminal could 
- * not be found, and -1 means the terminfo database could not be 
- * found.  If errret == NULL then setupterm() prints an error 
+ * On error, if errret != NULL then setupterm() returns OK
+ * or ERR and stores a status value in the integer pointed to by
+ * errret.  A status of 1 is normal, 0 means the terminal could
+ * not be found, and -1 means the terminfo database could not be
+ * found.  If errret == NULL then setupterm() prints an error
  * message upon and exit().
  *
  * On success, cur_term set to a terminfo structure and OK returned.
@@ -267,8 +265,8 @@ int *err_return;
 	TERMINAL *old_term;
 	char const *err_msg;
 
-	/* It is possible to call setupterm() for multiple terminals, 
-	 * in which case we have to be able to restore cur_term in 
+	/* It is possible to call setupterm() for multiple terminals,
+	 * in which case we have to be able to restore cur_term in
 	 * case of error.
 	 */
 	old_term = cur_term;
@@ -314,7 +312,7 @@ error:
 	if (err_return != (int *) 0) {
 #ifdef M_CURSES_TRACE
 		__m_trace(
-			"__m_setupterm error code passed back in %p = %d.", 
+			"__m_setupterm error code passed back in %p = %d.",
 			err_return, err_code
 		);
 #endif
@@ -326,7 +324,7 @@ error:
 			err_code = ERR;
 			free(cur_term);
 			cur_term = old_term;
-		}	
+		}
 	} else if (err_code != 1) {
 #ifdef M_CURSES_TRACE
 		__m_trace("__m_setupterm() failed with:");
@@ -421,17 +419,17 @@ int fd, *err_return;
 
 	terminfo = __m_getenv("TERMINFO");
 	if (terminfo == (char *) 0 || terminfo[0] == '\0') {
-		terminfo = def_terminfo; 
+		terminfo = def_terminfo;
 	} else {
 		terminfo = (const char *) strdup((char *) terminfo);
 		if (terminfo == (char *) 0) {
 			/* Not really true... */
-			err_msg = e_terminal; 
+			err_msg = e_terminal;
 			err_code = 2;
 			goto error;
 		}
 	}
-			
+
 	if (tm == (char *) 0 && (tm = getenv("TERM")) == (char *) 0)
 		tm = def_termname;
 
@@ -485,7 +483,7 @@ int fd, *err_return;
 					columns = wininfo.ws_col;
 				if (0 < wininfo.ws_row)
 					lines = wininfo.ws_row;
-			} 
+			}
 		}
 #endif /* TIOCGWINSZ */
 
@@ -522,7 +520,7 @@ error:
 	if (err_return != NULL) {
 #ifdef M_CURSES_TRACE
 		__m_trace(
-			"restartterm() error code passed back in %p = %d.", 
+			"restartterm() error code passed back in %p = %d.",
 			err_return, err_code
 		);
 #endif
@@ -543,7 +541,7 @@ error:
 #endif
 		fprintf(stderr, err_msg, tm);
 		exit(1);
-	} 
+	}
 
 	if (err_code == OK) {
 		if (old_names != (char *) 0)
@@ -560,7 +558,7 @@ error:
 /*
  * Get the termios setting for the terminal.  Check the input
  * file descriptor first, else the output file descriptor.  If
- * both input and output are both terminals, it is assumed that 
+ * both input and output are both terminals, it is assumed that
  * they refer to the same terminal.
  */
 int
@@ -568,7 +566,7 @@ __m_tty_get(tp)
 struct termios *tp;
 {
 	if (tcgetattr(cur_term->_ifd, tp) != 0) {
-		/* Input was not a terminal, possibly redirected. 
+		/* Input was not a terminal, possibly redirected.
 		 * Check output instead.
 		 */
 		if (tcgetattr(cur_term->_ofd, tp) != 0)

@@ -30,8 +30,6 @@
  *	  All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Establish the default settings for the floating-point state for a C language
  * program:

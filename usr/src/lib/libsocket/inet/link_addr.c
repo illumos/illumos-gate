@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Function implementations to convert between link layer addresses and
  * ascii representations of the form "x:x:x:...:x:x:x" where x is a hex

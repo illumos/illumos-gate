@@ -35,8 +35,6 @@
 #ifndef _ADT_JNI_H
 #define	_ADT_JNI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <jni.h>
 #include <libintl.h>
 #include <locale.h>

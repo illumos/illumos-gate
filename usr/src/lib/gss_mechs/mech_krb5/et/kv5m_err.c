@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
- 
 #include <locale.h>
 const char *
 kv5m_error_table(long errorno) {

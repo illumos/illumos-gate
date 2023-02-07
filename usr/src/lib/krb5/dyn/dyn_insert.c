@@ -1,9 +1,7 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file is part of libdyn.a, the C Dynamic Object library.  It
  * contains the source code for the function DynInsert().
- * 
+ *
  * There are no restrictions on this code; however, if you make any
  * changes, I request that you document them so that I do not get
  * credit or blame for your modifications.
@@ -23,7 +21,7 @@ int DynInsert(obj, idx, els_in, num)
 {
      DynPtr els = (DynPtr) els_in;
      int ret;
-     
+
      if (idx < 0 || idx > obj->num_el) {
 	  if (obj->debug)
 	       fprintf(stderr, "dyn: insert: index %d is not in [0,%d]\n",
@@ -51,9 +49,9 @@ int DynInsert(obj, idx, els_in, num)
 	     (obj->num_el-idx)*obj->el_size);
 #else
      bcopy(obj->array + obj->el_size*idx,
-	   obj->array + obj->el_size*(idx + num), 
+	   obj->array + obj->el_size*(idx + num),
 	   (obj->num_el-idx)*obj->el_size);
-#endif	     
+#endif
 
      if (obj->debug)
 	  fprintf(stderr, "dyn: insert: Copying %d bytes from %d to %d + %d\n",
@@ -63,7 +61,7 @@ int DynInsert(obj, idx, els_in, num)
      memmove(obj->array + obj->el_size*idx, els, obj->el_size*num);
 #else
      bcopy(els, obj->array + obj->el_size*idx, obj->el_size*num);
-#endif     
+#endif
      obj->num_el += num;
 
      if (obj->debug)

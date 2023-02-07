@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Create two files from a list of input strings;
 # new_list.c contains an array of characters indexed into by perror and
 # strerror;
@@ -56,7 +54,6 @@ BEGIN	{
 		newfile = "new_list.c"
 		oldfile = "errlst.c"
 
-		print "#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n" >oldfile
 		print "#pragma weak _sys_errlist = sys_errlist\n" >oldfile
 		print "#include \"lint.h\"\n" >oldfile
 		# We need to include the errors strings proper in the
@@ -66,7 +63,6 @@ BEGIN	{
 		print "extern const char __sys_errs[];\n" >oldfile
 		print "const char *sys_errlist[] = {" >oldfile
 
-		print "#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n" >newfile
 		print "#include \"lint.h\"" >newfile
 		print "#include <sys/isa_defs.h>\n" >newfile
 		print "#pragma weak __sys_errs = _sys_errs\n" >newfile
