@@ -633,15 +633,17 @@ def_position_tests(char *file)
 	if (elf_check(file) == 0) {
 		(void) putchar('\n');
 		return (1);
-	/* LINTED: pointer cast may result in improper alignment */
 	} else if (*(int *)fbuf == CORE_MAGIC) {
-		/* LINTED: pointer cast may result in improper alignment */
+#if !defined(_LP64)
 		struct core *corep = (struct core *)fbuf;
+#endif
 
 		(void) printf("a.out core file");
 
+#if !defined(_LP64)
 		if (*(corep->c_cmdname) != '\0')
 			(void) printf(" from '%s'", corep->c_cmdname);
+#endif
 		(void) putchar('\n');
 		return (1);
 	}
