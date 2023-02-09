@@ -14,7 +14,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -2974,8 +2974,7 @@ vmm_ctl_ioctl(int cmd, intptr_t arg, int md, cred_t *cr, int *rvalp)
 		}
 		return (0);
 	case VMM_RESV_QUERY:
-	case VMM_RESV_ADD:
-	case VMM_RESV_REMOVE:
+	case VMM_RESV_SET_TARGET:
 		return (vmmr_ioctl(cmd, arg, md, cr, rvalp));
 	default:
 		break;
@@ -3356,8 +3355,13 @@ _init(void)
 		return (error);
 	}
 
+	error = vmmr_init();
+	if (error) {
+		ddi_soft_state_fini(&vmm_statep);
+		return (error);
+	}
+
 	vmm_zsd_init();
-	vmmr_init();
 
 	error = mod_install(&modlinkage);
 	if (error) {

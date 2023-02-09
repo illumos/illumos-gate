@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_VMM_DEV_H_
@@ -330,6 +330,23 @@ struct vmm_resv_query {
 	size_t	vrq_limit;
 };
 
+struct vmm_resv_target {
+	/* Target size for VMM reservoir */
+	size_t	vrt_target_sz;
+
+	/*
+	 * Change of reservoir size to meet target will be done in multiple
+	 * steps of chunk size (or smaller)
+	 */
+	size_t	vrt_chunk_sz;
+
+	/*
+	 * Resultant size of reservoir after operation.  Should match target
+	 * size, except when interrupted.
+	 */
+	size_t	vrt_result_sz;
+};
+
 /*
  * struct vmm_dirty_tracker is used for tracking dirty guest pages during
  * e.g. live migration.
@@ -402,7 +419,7 @@ struct vm_legacy_cpuid {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	8
+#define	VMM_CURRENT_INTERFACE_VERSION	9
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
@@ -418,8 +435,7 @@ struct vm_legacy_cpuid {
 #define	VMM_CHECK_IOMMU		(VMMCTL_IOC_BASE | 0x05)
 
 #define	VMM_RESV_QUERY		(VMMCTL_IOC_BASE | 0x10)
-#define	VMM_RESV_ADD		(VMMCTL_IOC_BASE | 0x11)
-#define	VMM_RESV_REMOVE		(VMMCTL_IOC_BASE | 0x12)
+#define	VMM_RESV_SET_TARGET	(VMMCTL_IOC_BASE | 0x11)
 
 /* Operations performed in the context of a given vCPU */
 #define	VM_RUN				(VMM_CPU_IOC_BASE | 0x01)

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -53,13 +53,14 @@
  *
  * Administration
  *
- * Operators may increase, decrease, and query the the amount of memory
- * allocated to the reservoir and from to VMs via ioctls against the vmmctl
- * device.  The total amount added to the reservoir is arbitrarily limited at
- * this time by `vmmr_total_limit` which defaults to 80% of physmem.  This is
- * done to prevent the reservoir from inadvertently growing to a size where the
- * system has inadequate memory to make forward progress.  Memory may only be
- * removed from the reservoir when it is free (not allocated by any guest VMs).
+ * Operators may attempt to alter the amount of memory allocated to the
+ * reservoir via an ioctl against the vmmctl device.  The total amount of memory
+ * in the reservoir (free, or allocated to VMs) is arbitrarily limited at this
+ * time by `vmmr_total_limit`, which defaults to 80% of physmem.  This is done
+ * to prevent the reservoir from inadvertently growing to a size where the
+ * system has inadequate memory to make forward progress.  Shrinking the
+ * reservoir is only possible when it contains free (not allocated by any guest
+ * VMs) memory.
  *
  *
  * Page Tracking
@@ -90,9 +91,13 @@
 #include <sys/policy.h>
 #include <vm/seg_kmem.h>
 #include <vm/hat_i86.h>
+#include <sys/kstat.h>
 
 #include <sys/vmm_reservoir.h>
 #include <sys/vmm_dev.h>
+#include <sys/vmm_impl.h>
+
+#define	VMMR_TARGET_INACTIVE	SIZE_MAX
 
 static kmutex_t vmmr_lock;
 
@@ -103,6 +108,12 @@ static size_t vmmr_alloc_sz;
 static size_t vmmr_alloc_transient_sz;
 static size_t vmmr_empty_sz;
 
+/*
+ * Target size of the reservoir during active vmmr_set_target() operation.
+ * It holds the sentinel value of VMMR_TARGET_INACTIVE when no resize is active.
+ */
+static size_t vmmr_target_sz;
+
 static uintptr_t vmmr_empty_last;
 /* Upper limit for the size (free + allocated) of the reservoir */
 static size_t vmmr_total_limit;
@@ -110,6 +121,8 @@ static size_t vmmr_total_limit;
 /* VA range allocated from the VMM arena for the mappings */
 static uintptr_t vmmr_va;
 static uintptr_t vmmr_va_sz;
+
+static kstat_t *vmmr_kstat;
 
 /* Pair of AVL trees to store set of spans ordered by addr and size */
 typedef struct vmmr_treepair {
@@ -141,6 +154,17 @@ struct vmmr_region {
 	list_node_t	vr_node;
 	bool		vr_transient;
 };
+
+typedef struct vmmr_kstats {
+	kstat_named_t	vmrks_bytes_free;
+	kstat_named_t	vmrks_bytes_alloc;
+	kstat_named_t	vmrks_bytes_transient;
+	kstat_named_t	vmrks_bytes_limit;
+} vmmr_kstats_t;
+
+
+static int vmmr_add(size_t, bool);
+static int vmmr_remove(size_t, bool);
 
 static int
 vmmr_cmp_addr(const void *a, const void *b)
@@ -324,7 +348,28 @@ vmmr_tp_remove_split(size_t target_sz, vmmr_treepair_t *tree)
 	}
 }
 
-void
+static int
+vmmr_kstat_update(struct kstat *ksp, int rw)
+{
+	vmmr_kstats_t *vkp = ksp->ks_data;
+
+	mutex_enter(&vmmr_lock);
+	vkp->vmrks_bytes_free.value.ui64 = vmmr_free_sz;
+	vkp->vmrks_bytes_alloc.value.ui64 = vmmr_alloc_sz;
+	/*
+	 * In addition to the memory which is actually actually allocated to
+	 * transient consumers, memory which is considered free-for-transient is
+	 * also included in the sizing.
+	 */
+	vkp->vmrks_bytes_transient.value.ui64 =
+	    vmmr_alloc_transient_sz + vmmr_free_transient_sz;
+	vkp->vmrks_bytes_limit.value.ui64 = vmmr_total_limit;
+	mutex_exit(&vmmr_lock);
+
+	return (0);
+}
+
+int
 vmmr_init()
 {
 	mutex_init(&vmmr_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -354,6 +399,33 @@ vmmr_init()
 	vmmr_adding_sz = 0;
 	vmmr_free_transient_sz = 0;
 	vmmr_alloc_transient_sz = 0;
+	vmmr_target_sz = VMMR_TARGET_INACTIVE;
+
+	/*
+	 * Attempt kstat allocation early, since it is the only part of
+	 * reservoir initialization which is fallible.
+	 */
+	kstat_t *ksp = kstat_create_zone(VMM_MODULE_NAME, 0, "vmm_reservoir",
+	    VMM_KSTAT_CLASS, KSTAT_TYPE_NAMED,
+	    sizeof (vmmr_kstats_t) / sizeof (kstat_named_t), 0, GLOBAL_ZONEID);
+	if (ksp == NULL) {
+		mutex_destroy(&vmmr_lock);
+		return (ENOMEM);
+	}
+
+	vmmr_kstats_t *vkp = ksp->ks_data;
+
+	kstat_named_init(&vkp->vmrks_bytes_free, "bytes_free",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&vkp->vmrks_bytes_alloc, "bytes_alloc",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&vkp->vmrks_bytes_transient, "bytes_transient_alloc",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&vkp->vmrks_bytes_limit, "bytes_limit",
+	    KSTAT_DATA_UINT64);
+	ksp->ks_private = NULL;
+	ksp->ks_update = vmmr_kstat_update;
+	vmmr_kstat = ksp;
 
 	vmmr_tp_init(&vmmr_free_tp);
 	vmmr_tp_init(&vmmr_empty_tp);
@@ -364,6 +436,10 @@ vmmr_init()
 	/* Grab a chunk of VA for the reservoir */
 	vmmr_va_sz = physmem * PAGESIZE;
 	vmmr_va = (uintptr_t)vmem_alloc(kvmm_arena, vmmr_va_sz, VM_SLEEP);
+
+	kstat_install(vmmr_kstat);
+
+	return (0);
 }
 
 void
@@ -378,6 +454,9 @@ vmmr_fini()
 	VERIFY(avl_is_empty(&vmmr_free_tp.by_addr));
 	VERIFY(avl_is_empty(&vmmr_free_tp.by_size));
 	VERIFY(list_is_empty(&vmmr_alloc_regions));
+
+	kstat_delete(vmmr_kstat);
+	vmmr_kstat = NULL;
 
 	vmmr_tp_destroy(&vmmr_free_tp);
 	vmmr_tp_destroy(&vmmr_empty_tp);
@@ -418,11 +497,12 @@ vmmr_alloc(size_t sz, bool transient, vmmr_region_t **resp)
 	} else {
 		int err;
 
+		mutex_enter(&vmmr_lock);
 		err = vmmr_add(sz, true);
 		if (err != 0) {
+			mutex_exit(&vmmr_lock);
 			return (err);
 		}
-		mutex_enter(&vmmr_lock);
 		VERIFY3U(vmmr_free_transient_sz, >=, sz);
 	}
 
@@ -506,7 +586,7 @@ vmmr_free(vmmr_region_t *region)
 	list_remove(&vmmr_alloc_regions, region);
 	mutex_exit(&vmmr_lock);
 
-	/* Zero the contents */
+	/* Zero the contents (while not monopolizing vmmr_lock) */
 	for (uintptr_t off = 0; off < region->vr_size; off += PAGESIZE) {
 		bzero(vmmr_region_mem_at(region, off), PAGESIZE);
 	}
@@ -528,7 +608,6 @@ vmmr_free(vmmr_region_t *region)
 		vmmr_free_transient_sz += region->vr_size;
 		vmmr_alloc_transient_sz -= region->vr_size;
 	}
-	mutex_exit(&vmmr_lock);
 
 	if (region->vr_transient) {
 		/*
@@ -538,6 +617,7 @@ vmmr_free(vmmr_region_t *region)
 		VERIFY0(vmmr_remove(region->vr_size, true));
 	}
 	kmem_free(region, sizeof (*region));
+	mutex_exit(&vmmr_lock);
 }
 
 static void
@@ -647,12 +727,21 @@ vmmr_remove_raw(size_t sz)
 	vmmr_empty_sz += sz;
 }
 
-int
+/*
+ * Add memory to vmm reservoir.  Memory may be marked for transient use, where
+ * the addition is part of a transient allocation from the reservoir.  Otherwise
+ * it is placed in the reservoir to be available for non-transient allocations.
+ *
+ * Expects vmmr_lock to be held when called, and will return with it held, but
+ * will drop it during portions of the addition.
+ */
+static int
 vmmr_add(size_t sz, bool transient)
 {
 	VERIFY3U(sz & PAGEOFFSET, ==, 0);
+	VERIFY3U(sz, >, 0);
+	VERIFY(MUTEX_HELD(&vmmr_lock));
 
-	mutex_enter(&vmmr_lock);
 	/*
 	 * Make sure that the amount added is not going to breach the limits
 	 * we've chosen
@@ -661,11 +750,9 @@ vmmr_add(size_t sz, bool transient)
 	    vmmr_alloc_sz + vmmr_free_sz + vmmr_adding_sz +
 	    vmmr_alloc_transient_sz + vmmr_free_transient_sz;
 	if ((current_total + sz) < current_total) {
-		mutex_exit(&vmmr_lock);
 		return (EOVERFLOW);
 	}
 	if ((current_total + sz) > vmmr_total_limit) {
-		mutex_exit(&vmmr_lock);
 		return (ENOSPC);
 	}
 	vmmr_adding_sz += sz;
@@ -675,8 +762,6 @@ vmmr_add(size_t sz, bool transient)
 	if (page_xresv(sz >> PAGESHIFT, KM_SLEEP, vmmr_resv_wait) == 0) {
 		mutex_enter(&vmmr_lock);
 		vmmr_adding_sz -= sz;
-		mutex_exit(&vmmr_lock);
-
 		return (EINTR);
 	}
 
@@ -725,7 +810,6 @@ vmmr_add(size_t sz, bool transient)
 			}
 
 			vmmr_adding_sz -= sz;
-			mutex_exit(&vmmr_lock);
 
 			page_unresv(sz >> PAGESHIFT);
 			return (err);
@@ -754,19 +838,27 @@ vmmr_add(size_t sz, bool transient)
 	ASSERT3U(added, ==, sz);
 	vmmr_adding_sz -= added;
 
-	mutex_exit(&vmmr_lock);
 	return (0);
 }
 
-int
+/*
+ * Remove memory from vmm reservoir.  Normally this will remove memory from the
+ * reservoir which was available for non-transient allocations.  If the removal
+ * is part of a vmmr_free() of a transient allocation, it will act on only that
+ * transient region being freed, not the available memory in the reservoir.
+ *
+ * Expects vmmr_lock to be held when called, and will return with it held, but
+ * may drop it during portions of the removal.
+ */
+static int
 vmmr_remove(size_t sz, bool transient)
 {
 	VERIFY3U(sz & PAGEOFFSET, ==, 0);
+	VERIFY(sz);
+	VERIFY(MUTEX_HELD(&vmmr_lock));
 
-	mutex_enter(&vmmr_lock);
 	if ((!transient && sz > vmmr_free_sz) ||
 	    (transient && sz > vmmr_free_transient_sz)) {
-		mutex_exit(&vmmr_lock);
 		return (ENOSPC);
 	}
 
@@ -777,14 +869,97 @@ vmmr_remove(size_t sz, bool transient)
 	} else {
 		vmmr_free_transient_sz -= sz;
 	}
-	mutex_exit(&vmmr_lock);
 	page_unresv(sz >> PAGESHIFT);
 	return (0);
+}
+
+static int
+vmmr_set_target(size_t target_sz, size_t chunk_sz, size_t *resp)
+{
+	VERIFY(resp != NULL);
+
+	mutex_enter(&vmmr_lock);
+
+	size_t current_sz = vmmr_alloc_sz + vmmr_free_sz;
+
+	/* Be sure to communicate current size in case of an early bail-out */
+	*resp = current_sz;
+
+	if ((target_sz & PAGEOFFSET) != 0 ||
+	    (chunk_sz & PAGEOFFSET) != 0) {
+		mutex_exit(&vmmr_lock);
+		return (EINVAL);
+	}
+	/* Reject sentinel value */
+	if (target_sz == VMMR_TARGET_INACTIVE) {
+		mutex_exit(&vmmr_lock);
+		return (EINVAL);
+	}
+
+	/* Already at target size */
+	if (target_sz == current_sz) {
+		mutex_exit(&vmmr_lock);
+		return (0);
+	}
+
+	/* Reject racing requests size */
+	if (vmmr_target_sz != VMMR_TARGET_INACTIVE) {
+		mutex_exit(&vmmr_lock);
+		return (EALREADY);
+	}
+	/* Record the target now to excluding a racing request */
+	vmmr_target_sz = target_sz;
+
+	int err = 0;
+	do {
+		/* Be sensitive to signal interruption */
+		if (issig(JUSTLOOKING) != 0) {
+			mutex_exit(&vmmr_lock);
+			const bool sig_bail = issig(FORREAL) != 0;
+			mutex_enter(&vmmr_lock);
+			if (sig_bail) {
+				err = EINTR;
+				break;
+			}
+		}
+
+		if (current_sz > target_sz) {
+			/* Shrinking reservoir */
+
+			size_t req_sz = current_sz - target_sz;
+			if (chunk_sz != 0) {
+				req_sz = MIN(req_sz, chunk_sz);
+			}
+			err = vmmr_remove(req_sz, false);
+		} else {
+			/* Growing reservoir */
+			ASSERT(current_sz < target_sz);
+
+			size_t req_sz = target_sz - current_sz;
+			if (chunk_sz != 0) {
+				req_sz = MIN(req_sz, chunk_sz);
+			}
+			err = vmmr_add(req_sz, false);
+		}
+
+		current_sz = vmmr_alloc_sz + vmmr_free_sz;
+	} while (err == 0 && current_sz != target_sz);
+
+	/* Clear the target now that we are done (success or not) */
+	vmmr_target_sz = VMMR_TARGET_INACTIVE;
+	mutex_exit(&vmmr_lock);
+	*resp = current_sz;
+	return (err);
 }
 
 int
 vmmr_ioctl(int cmd, intptr_t arg, int md, cred_t *cr, int *rvalp)
 {
+	/*
+	 * Since an LP64 datamodel is enforced by our caller (vmm_ioctl()), we
+	 * do not need to duplicate such checks here.
+	 */
+
 	switch (cmd) {
 	case VMM_RESV_QUERY: {
 		struct vmm_resv_query res;
@@ -805,17 +980,33 @@ vmmr_ioctl(int cmd, intptr_t arg, int md, cred_t *cr, int *rvalp)
 		}
 		break;
 	}
-	case VMM_RESV_ADD: {
+	case VMM_RESV_SET_TARGET: {
 		if (secpolicy_sys_config(cr, B_FALSE) != 0) {
 			return (EPERM);
 		}
-		return (vmmr_add((size_t)arg, false));
-	}
-	case VMM_RESV_REMOVE: {
-		if (secpolicy_sys_config(cr, B_FALSE) != 0) {
-			return (EPERM);
+
+		struct vmm_resv_target tgt;
+		void *datap = (void *)(uintptr_t)arg;
+
+		if (ddi_copyin(datap, &tgt, sizeof (tgt), md) != 0) {
+			return (EFAULT);
 		}
-		return (vmmr_remove((size_t)arg, false));
+
+		int err = vmmr_set_target(tgt.vrt_target_sz, tgt.vrt_chunk_sz,
+		    &tgt.vrt_result_sz);
+
+		/*
+		 * Attempt to communicate the resultant size of the reservoir if
+		 * setting it to the target was a success, or if we were
+		 * interrupted (by a signal) while doing so.
+		 */
+		if (err == 0 || err == EINTR) {
+			if (ddi_copyout(&tgt, datap, sizeof (tgt), md) != 0) {
+				err = EFAULT;
+			}
+		}
+
+		return (err);
 	}
 	default:
 		return (ENOTTY);
