@@ -30,7 +30,7 @@ CONVLIBDIR=	$(CONVLIBDIR64)
 
 .KEEP_STATE:
 
-ASFLAGS +=	-D__amd64 $(amd64_AS_XARCH)
+ASFLAGS +=	-D__amd64 $(amd64_XARCH)
 
 install:	all $(ROOTLIB64)/$(PROG)
 

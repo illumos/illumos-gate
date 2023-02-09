@@ -144,7 +144,7 @@ ASFLAGS		+= $(XARCH)
 #
 #	MODSTUBS:	Module stubs source file.
 #
-MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.s
+MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.S
 
 #
 #	Define the actual specific platforms - obviously none.

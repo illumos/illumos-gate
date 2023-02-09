@@ -34,8 +34,8 @@ OBJECTS =	$(BIGNUM_OBJS)
 
 include		$(SRC)/lib/Makefile.lib
 
-AS_CPPFLAGS +=	-D__STDC__ -D_ASM -DPIC -D_REENTRANT -D$(MACH)
-ASFLAGS +=	$(AS_PICFLAGS) -P
+AS_CPPFLAGS +=	-D_ASM -DPIC -D_REENTRANT -D$(MACH)
+ASFLAGS +=	$(AS_PICFLAGS)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(CRYPTODIR) -I$(UTSDIR) -D_POSIX_PTHREAD_SEMANTICS
 BIGNUM_FLAGS +=	-DMMX_MANAGE -DHWCAP -DPSR_MUL -DNO_BIG_ONE -DNO_BIG_TWO
@@ -53,6 +53,6 @@ pics/bignum_i386.o: $(BIGNUM_DIR)/i386/bignum_i386.c
 		    $(BIGNUM_DIR)/i386/bignum_i386.c
 		$(POST_PROCESS_O)
 
-pics/bignum_i386_asm.o: $(BIGNUM_DIR)/i386/bignum_i386_asm.s
-		$(COMPILE.s) -o $@ $(BIGNUM_DIR)/i386/bignum_i386_asm.s
+pics/bignum_i386_asm.o: $(BIGNUM_DIR)/i386/bignum_i386_asm.S
+		$(COMPILE.s) -o $@ $(BIGNUM_DIR)/i386/bignum_i386_asm.S
 		$(POST_PROCESS_S_O)

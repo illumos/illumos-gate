@@ -32,6 +32,6 @@ OBJECTS =	md5.o sha1.o sha1_asm.o
 include		$(SRC)/lib/Makefile.lib
 
 AS_CPPFLAGS +=	-D__STDC__ -D_ASM -DPIC -D_REENTRANT -D$(MACH)
-ASFLAGS +=	$(AS_PICFLAGS) -P
+ASFLAGS +=	$(AS_PICFLAGS)
 CFLAGS +=	$(CCVERBOSE) -xarch=sparcvis
 CPPFLAGS +=	-D$(PLATFORM) -DVIS_SHA1

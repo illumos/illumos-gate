@@ -97,7 +97,7 @@ include $(UTSBASE)/Makefile.uts
 #
 #	The following must be defined for all implementations:
 #
-MODSTUBS		= $(UTSBASE)/intel/ml/modstubs.s
+MODSTUBS		= $(UTSBASE)/intel/ml/modstubs.S
 
 #
 #	Define supported builds
@@ -131,7 +131,8 @@ ASFLAGS_XARCH_32	= $(i386_ASFLAGS)
 ASFLAGS_XARCH_64	= $(amd64_ASFLAGS)
 ASFLAGS_XARCH		= $(ASFLAGS_XARCH_$(CLASS))
 
-ASFLAGS			+= $(ASFLAGS_XARCH)
+ASFLAGS			= $(ASFLAGS_XARCH)
+ASFLAGS			+= $(ASFLAGS_uts)
 
 #
 #	Define the base directory for installation.

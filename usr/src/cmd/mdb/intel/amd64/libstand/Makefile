@@ -23,11 +23,9 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SRCS += \
-	setjmp.s
+	setjmp.S
 
 include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
@@ -40,12 +38,5 @@ CPPFLAGS += -I.
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
-%.o: %.s
+%.o: %.S
 	$(COMPILE.s) $<
-
-%.ln: %.c
-	$(LINT.c) $<
-
-%.ln: %.s
-	$(LINT.s) $<
-

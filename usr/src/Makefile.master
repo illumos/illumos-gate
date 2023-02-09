@@ -469,12 +469,6 @@ sparcv9_XARCH=	-m64
 i386_XARCH=	-m32
 amd64_XARCH=	-m64 -Ui386 -U__i386
 
-# assembler '-xarch' flag.  Different from compiler '-xarch' flag.
-sparc_AS_XARCH=		-xarch=v8plus
-sparcv9_AS_XARCH=	-xarch=v9
-i386_AS_XARCH=
-amd64_AS_XARCH=		-xarch=amd64 -P -Ui386 -U__i386
-
 #
 # These flags define what we need to be 'standalone' i.e. -not- part
 # of the rather more cosy userland environment.  This basically means
@@ -549,10 +543,11 @@ sparcv9_CFLAGS=	$(sparcv9_XARCH) -dalign $(CCVERBOSE) $(V9ABIWARN) $(CCREGSYM) \
 i386_CFLAGS=	$(i386_XARCH)
 amd64_CFLAGS=	$(amd64_XARCH)
 
-sparc_ASFLAGS=	$(sparc_AS_XARCH)
-sparcv9_ASFLAGS=$(sparcv9_AS_XARCH)
-i386_ASFLAGS=	$(i386_AS_XARCH)
-amd64_ASFLAGS=	$(amd64_AS_XARCH)
+$(MACH)_ASFLAGS=	$($(MACH)_CFLAGS)
+$(MACH64)_ASFLAGS=	$($(MACH64)_CFLAGS)
+
+ASFLAGS= 		$($(MACH)_ASFLAGS)
+ASFLAGS64=		$($(MACH64)_ASFLAGS)
 
 #
 sparc_COPTFLAG=		-xO3
@@ -847,8 +842,8 @@ COMPILE.c=	$(CC) $(CFLAGS) $(CPPFLAGS) -c
 COMPILE64.c=	$(CC) $(CFLAGS64) $(CPPFLAGS) -c
 COMPILE.cc=	$(CCC) $(CCFLAGS) $(CPPFLAGS) -c
 COMPILE64.cc=	$(CCC) $(CCFLAGS64) $(CPPFLAGS) -c
-COMPILE.s=	$(AS) $(ASFLAGS) $(AS_CPPFLAGS)
-COMPILE64.s=	$(AS) $(ASFLAGS) $($(MACH64)_AS_XARCH) $(AS_CPPFLAGS)
+COMPILE.s=	$(AS) $(ASFLAGS) $(AS_CPPFLAGS) -c
+COMPILE64.s=	$(AS) $(ASFLAGS64) $(AS_CPPFLAGS) -c
 COMPILE.d=	$(DTRACE) -G -32
 COMPILE64.d=	$(DTRACE) -G -64
 COMPILE.b=	$(ELFWRAP) $(ELFWRAP_FLAGS$(CLASS))
@@ -930,17 +925,12 @@ $(MACH)_CC=		$(BUILD_CC)
 $(MACH)_CCC=		$(BUILD_CCC)
 $(MACH)_CPP=		$(BUILD_CPP)
 $(MACH)_LD=		$(BUILD_LD)
+$(MACH)_AS=		$(BUILD_CC)
 $(MACH64)_CC=		$(BUILD_CC)
 $(MACH64)_CCC=		$(BUILD_CCC)
 $(MACH64)_CPP=		$(BUILD_CPP)
 $(MACH64)_LD=		$(BUILD_LD)
-
-sparc_AS=		/usr/bin/as -xregsym=no
-sparcv9_AS=		$($(MACH)_AS)
-
-i386_AS=		/usr/bin/as
-$(__GNUC)i386_AS=	$(ONBLD_TOOLS)/bin/$(MACH)/aw
-amd64_AS=		$(ONBLD_TOOLS)/bin/$(MACH)/aw
+$(MACH64)_AS=		$(BUILD_CC)
 
 NATIVECC=		$($(NATIVE_MACH)_CC)
 NATIVECCC=		$($(NATIVE_MACH)_CCC)
@@ -1035,8 +1025,8 @@ amd64_CC_PICFLAGS =	-_cc=-Kpic -_gcc=-fpic
 CC_PICFLAGS =		$($(MACH)_CC_PICFLAGS)
 CC_PICFLAGS64 =		$($(MACH64)_CC_PICFLAGS)
 
-AS_PICFLAGS=		-K pic
-AS_BIGPICFLAGS=		-K PIC
+AS_PICFLAGS=		$(C_PICFLAGS)
+AS_BIGPICFLAGS=		$(C_BIGPICFLAGS)
 
 #
 # Default label for CTF sections
@@ -1162,6 +1152,9 @@ PKGARCHIVE=$(SRC)/../../packages/$(MACH)/nightly$(PKGARCHIVESUFFIX)
 PKGPUBLISHER_REDIST=	on-nightly
 PKGPUBLISHER_NONREDIST=	on-extra
 
+# Allow suffix rules like the below for .S as well as .s
+.SUFFIXES: .S
+
 #	Default build rules which perform comment section post-processing.
 #
 .c:
@@ -1179,6 +1172,15 @@ PKGPUBLISHER_NONREDIST=	on-extra
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_S_O)
 .s.a:
+	$(COMPILE.s) -o $% $<
+	$(PROCESS_COMMENT) $%
+	$(AR) $(ARFLAGS) $@ $%
+	$(RM) $%
+
+.S.o:
+	$(COMPILE.s) -o $@ $<
+	$(POST_PROCESS_S_O)
+.S.a:
 	$(COMPILE.s) -o $% $<
 	$(PROCESS_COMMENT) $%
 	$(AR) $(ARFLAGS) $@ $%

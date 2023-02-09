@@ -74,7 +74,7 @@ OBJECTS_common_isadep = \
 	asm_subr.o
 
 SRCS_common_isadep = \
-	$(ISASRCDIR)/asm_subr.s
+	$(ISASRCDIR)/asm_subr.S
 
 # Architecture-independent files common to both versions  of libumem
 OBJECTS_common_common = \
@@ -126,7 +126,8 @@ LDFLAGS = $(LDFLAGS_$(CURTYPE))
 
 ASFLAGS_standalone = -DUMEM_STANDALONE
 ASFLAGS_library =
-ASFLAGS += -P $(ASFLAGS_$(CURTYPE)) -D_ASM
+ASFLAGS += $(ASFLAGS_$(CURTYPE)) -D_ASM
+ASFLAGS64 += $(ASFLAGS_$(CURTYPE)) -D_ASM
 
 # We want the thread-specific errno in the library, but we don't want it in
 # the standalone.  $(DTS_ERRNO) is designed to add -D_TS_ERRNO to $(CPPFLAGS),

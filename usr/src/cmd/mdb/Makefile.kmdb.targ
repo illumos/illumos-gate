@@ -96,7 +96,7 @@ kmdb_modlinktest.c: $(MAPFILE_INTERMEDIATE)
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-%.o: ../../../common/kmdb/kctl/%.s
+%.o: ../../../common/kmdb/kctl/%.S
 	$(COMPILE.s) -o $@ $<
 
 %.o: ../../../common/mdb/%.c
@@ -107,14 +107,14 @@ kmdb_modlinktest.c: $(MAPFILE_INTERMEDIATE)
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-%.o: ../../kmdb/%.s
+%.o: ../../kmdb/%.S
 	$(COMPILE.s) -o $@ $<
 
 %.o: ../../kmdb/kctl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-%.o: ../../kmdb/kctl/%.s
+%.o: ../../kmdb/kctl/%.S
 	$(COMPILE.s) -o $@ $<
 
 %.o: ../../mdb/%.c
@@ -125,10 +125,10 @@ kmdb_modlinktest.c: $(MAPFILE_INTERMEDIATE)
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-%.o: %.s
+%.o: %.S
 	$(COMPILE.s) -o $@ $<
 
-%.o: kctl/%.s
+%.o: kctl/%.S
 	$(COMPILE.s) -o $@ $<
 
 %.o: $(SRC)/common/net/util/%.c

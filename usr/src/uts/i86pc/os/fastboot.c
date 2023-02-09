@@ -32,7 +32,7 @@
  * reboot path.  It loads the new kernel and boot archive into memory, builds
  * the data structure containing sufficient information about the new
  * kernel and boot archive to be passed to the fast reboot switcher
- * (see fb_swtch_src.s for details).  When invoked the switcher relocates
+ * (see fb_swtch_src.S for details).  When invoked the switcher relocates
  * the new kernel and boot archive to physically contiguous low memory,
  * similar to where the boot loader would have loaded them, and jumps to
  * the new kernel.

@@ -1085,8 +1085,8 @@ sparcv9_C_PICFLAGS= $(sparcv9_C_BIGPICFLAGS)
 CFLAGS64 +=	$(EXTN_CFLAGS)
 CPPFLAGS=	-D_REENTRANT -Dsparc $(EXTN_CPPFLAGS) $(THREAD_DEBUG) \
 		-I$(LIBCBASE)/inc -I$(LIBCDIR)/inc $(CPPFLAGS.master)
-ASFLAGS=	$(EXTN_ASFLAGS) $(AS_BIGPICFLAGS) -P -D__STDC__ -D_ASM -D__sparcv9 $(CPPFLAGS) \
-		$(sparcv9_AS_XARCH)
+ASFLAGS=	$(EXTN_ASFLAGS) $(AS_BIGPICFLAGS) -D__STDC__ \
+		-D_ASM -D__sparcv9 $(CPPFLAGS) $(sparcv9_XARCH)
 
 # As a favor to the dtrace syscall provider, libc still calls the
 # old syscall traps that have been obsoleted by the *at() interfaces.
@@ -1104,7 +1104,7 @@ DYNFLAGS +=	-znow
 
 DYNFLAGS +=	$(EXTN_DYNFLAGS)
 
-BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
+BUILD.s=	$(AS) $(ASFLAGS) $< -c -o $@
 
 # Override this top level flag so the compiler builds in its native
 # C99 mode.  This has been enabled to support the complex arithmetic

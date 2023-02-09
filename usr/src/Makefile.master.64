@@ -27,6 +27,7 @@
 
 # rebind basic build macros to 64-bit versions
 
+ASFLAGS=	$(ASFLAGS64)
 CFLAGS=		$(CFLAGS64)
 CCFLAGS=	$(CCFLAGS64)
 COPTFLAG=	$(COPTFLAG64)

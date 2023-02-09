@@ -185,8 +185,8 @@ $(DBOOT_O):	$(DBOOT_BIN)
 $(DBOOT_OBJS_DIR):
 	-@mkdir -p $@ 2> /dev/null
 
-$(COMMP_CTF_SRC):	$(UTSBASE)/i86pc/ml/comm_page.s
-	$(COMPILE.cpp) -D_GENCTF -o $@ $(UTSBASE)/i86pc/ml/comm_page.s
+$(COMMP_CTF_SRC):	$(UTSBASE)/i86pc/ml/comm_page.S
+	$(COMPILE.cpp) -D_GENCTF -o $@ $(UTSBASE)/i86pc/ml/comm_page.S
 
 $(OBJS_DIR)/comm_page_ctf.o:	$(COMMP_CTF_SRC)
 	$(COMPILE.c) -o $@ $<

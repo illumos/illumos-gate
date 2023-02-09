@@ -1002,7 +1002,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/nxge/npi/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/nxge/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/nxge/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/overlay/%.c
@@ -1689,7 +1689,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/tpm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/tpm/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/tpm/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/bz2%.o:		$(COMMONBASE)/bzip2/%.c

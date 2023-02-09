@@ -73,17 +73,17 @@ STACKPROTECT = none
 # kmdb is a kernel module, so we'll use the kernel's build flags.
 CFLAGS64 += $(STAND_FLAGS_64)
 
-ASFLAGS += -P -D_ASM
+ASFLAGS += -D_ASM
+ASFLAGS64 += -D_ASM
 
 LINTFLAGS += -n -errtags=yes
 CLINTFILES = $(SRCS:%.c=%.ln)
-LINTFILES = $(CLINTFILES:%.s=%.ln)
 
 CERRWARN += -_gcc=-Wno-parentheses
 
 LIB = libstand.a
 COBJS = $(SRCS:%.c=%.o)
-OBJS = $(COBJS:%.s=%.o)
+OBJS = $(COBJS:%.S=%.o)
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)
@@ -111,31 +111,12 @@ lint: $(LINTFILES)
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
-%.o: $(SRC)/common/util/i386/%.s
+%.o: $(SRC)/common/util/i386/%.S
 	$(COMPILE.s) $<
 
 %.o: ../../libstand/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-%.o: ../../libstand/%.s
+%.o: ../../libstand/%.S
 	$(COMPILE.s) -o $@ $<
-
-#
-# Lint
-#
-
-%.ln: ../../../common/libstand/%.c
-	$(LINT.c) -c $<
-
-%.ln: $(SRC)/common/util/%.c
-	$(LINT.c) -c $<
-
-%.ln: $(SRC)/common/util/i386/%.s
-	$(LINT.s) -c $<
-
-%.ln: ../../libstand/%.c
-	$(LINT.c) -c $<
-
-%.ln: %.s
-	$(LINT.s) -c $<

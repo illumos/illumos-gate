@@ -43,7 +43,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cpu/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cpu/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cpu/%.S
 	$(COMPILE.s) -o $@ $<
 
 #
@@ -60,7 +60,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/%.c
@@ -83,24 +83,24 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pci/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pci/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pci/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/px/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/px/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/px/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pciex/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pciex/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pciex/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/ml/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/ml/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/os/%.c
@@ -111,20 +111,20 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/pcbe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4/brand/sn1/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4/brand/sn1/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:                $(UTSBASE)/sun4/brand/solaris10/%.s
+$(OBJS_DIR)/%.o:                $(UTSBASE)/sun4/brand/solaris10/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/vm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/vm/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/vm/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sfmmu/ml/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sfmmu/ml/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sfmmu/vm/%.c
@@ -139,7 +139,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(SRC)/common/bignum/sun4u/%.s
+$(OBJS_DIR)/%.o:		$(SRC)/common/bignum/sun4u/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(SRC)/common/crypto/aes/%.c
@@ -154,19 +154,19 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/crypto/des/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/aes/sun4u/%.s
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/aes/sun4u/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/arcfour/sun4u/%.s
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/arcfour/sun4u/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/des/sun4u/%.s
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/des/sun4u/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/sha1/sparc/sun4u/%.s
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/sha1/sparc/sun4u/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(SRC)/common/atomic/sparcv9/%.s
+$(OBJS_DIR)/%.o:		$(SRC)/common/atomic/sparcv9/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)

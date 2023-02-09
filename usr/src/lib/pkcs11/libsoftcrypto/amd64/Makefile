@@ -45,14 +45,14 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 # not linted
 SMATCH=off
 
-AES_PSM_SRC =	$(AES_DIR)/$(MACH64)/aes_amd64.s \
-		$(AES_DIR)/$(MACH64)/aes_intel.s \
+AES_PSM_SRC =	$(AES_DIR)/$(MACH64)/aes_amd64.S \
+		$(AES_DIR)/$(MACH64)/aes_intel.S \
 		$(AES_DIR)/$(MACH64)/aeskey.c
-ARCFOUR_PSM_SRC = arcfour-x86_64.s
+ARCFOUR_PSM_SRC = arcfour-x86_64.S
 BIGNUM_PSM_SRC = $(BIGNUM_DIR)/$(MACH64)/bignum_amd64.c \
-		$(BIGNUM_DIR)/$(MACH64)/bignum_amd64_asm.s
+		$(BIGNUM_DIR)/$(MACH64)/bignum_amd64_asm.S
 
-MODES_PSM_SRC = $(MODES_DIR)/$(MACH64)/gcm_intel.s
+MODES_PSM_SRC = $(MODES_DIR)/$(MACH64)/gcm_intel.S
 
 # Sources need to be redefined after Makefile.lib inclusion.
 SRCS =		$(AES_SRC) $(ARCFOUR_SRC) $(BIGNUM_SRC) $(BLOWFISH_SRC) \
@@ -66,9 +66,9 @@ MAPFILEDIR =	../common
 
 CFLAGS +=	-xO4 -xcrossfile
 CPPFLAGS +=	-I$(CRYPTODIR) -I$(UTSDIR) -D_POSIX_PTHREAD_SEMANTICS
-ASFLAGS +=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM
+ASFLAGS64 +=	$(AS_PICFLAGS) -D_ASM
 BIGNUM_FLAGS +=	-DPSR_MUL
-CLEANFILES +=	arcfour-x86_64.s
+CLEANFILES +=	arcfour-x86_64.S arcfour-x86_64.s
 LDLIBS +=	-lcryptoutil -lc
 
 .KEEP_STATE:
@@ -81,7 +81,7 @@ pics/%.o: $(AES_DIR)/$(MACH64)/%.c
 		$(COMPILE.c) $(AES_FLAGS) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics/%.o: $(AES_DIR)/$(MACH64)/%.s
+pics/%.o: $(AES_DIR)/$(MACH64)/%.S
 		$(COMPILE.s) $(AES_FLAGS) -o $@ $<
 		$(POST_PROCESS_S_O)
 
@@ -89,19 +89,19 @@ pics/%.o: $(BIGNUM_DIR)/$(MACH64)/%.c
 		$(COMPILE.c) $(BIGNUM_FLAGS) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics/%.o: $(BIGNUM_DIR)/$(MACH64)/%.s
+pics/%.o: $(BIGNUM_DIR)/$(MACH64)/%.S
 		$(COMPILE64.s) $(BIGNUM_FLAGS) -o $@ $<
 		$(POST_PROCESS_S_O)
 
-pics/%.o: $(MODES_DIR)/$(MACH64)/%.s
+pics/%.o: $(MODES_DIR)/$(MACH64)/%.S
 		$(COMPILE64.s) $(MODES_FLAGS) -o $@ $<
 		$(POST_PROCESS_S_O)
 
 include		../Makefile.targ
 
-arcfour-x86_64.s: $(ARCFOUR_DIR)/amd64/arcfour-x86_64.pl
+arcfour-x86_64.S: $(ARCFOUR_DIR)/amd64/arcfour-x86_64.pl
 		$(PERL) $? $@
 
-pics/%.o: arcfour-x86_64.s
+pics/%.o: arcfour-x86_64.S
 		$(COMPILE64.s) $(ARCFOUR_FLAGS) -o $@ $<
 		$(POST_PROCESS_S_O)

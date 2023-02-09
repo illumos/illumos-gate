@@ -23,20 +23,21 @@ all install:    $(DYNLIB)
 
 include ../Makefile.com
 
-ASFLAGS =	$(amd64_AS_XARCH) -I$(SRC)/uts/common -D_ASM
+ASFLAGS =	$(amd64_XARCH) -I$(SRC)/uts/common -D_ASM
+ASFLAGS64 =	$(amd64_XARCH) -I$(SRC)/uts/common -D_ASM
 CFLAGS +=	-m64 $(CFLAGS64)
 CCASFLAGS +=	-m64
 
 # _setjmp/_longjmp
 SRCS += $(SASRC)/amd64/_setjmp.S
 OBJECTS += _setjmp.o
-SRCS += sha1-x86_64.s
+SRCS += sha1-x86_64.S
 OBJECTS += sha1-x86_64.o
 
 SRCS += $(SASRC)/x86/hypervisor.c
 OBJECTS += hypervisor.o
 
-CLEANFILES += sha1-x86_64.s
+CLEANFILES += sha1-x86_64.S sha1-x86_64.s
 
 pics/%.o: $(SASRC)/amd64/%.S
 	$(COMPILE.S) -o $@ $<

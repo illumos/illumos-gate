@@ -33,6 +33,6 @@ include		../../Makefile.com
 
 INTERP=         -I'$$ORIGIN/ld.so.1'
 
-ASFLAGS=	-P -D_ASM
+ASFLAGS +=	-D_ASM
 LDFLAGS=	$(VERSREF) $(INTERP) $(CONVLIBDIR) -lconv -e stub \
 		$(LDFLAGS.cmd)

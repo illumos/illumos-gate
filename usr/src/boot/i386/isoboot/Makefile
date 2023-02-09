@@ -41,6 +41,7 @@ CPPFLAGS += -DBOOTPROG=\"isoboot\" \
 	-I../btx/lib \
 	-I../../common \
 	-I../gptzfsboot
+AS_CPPFLAGS += $(CPPFLAGS)
 
 LDSCRIPT=	../boot.ldscript
 LD_FLAGS=	-static -N --gc-sections

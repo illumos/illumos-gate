@@ -20,10 +20,6 @@ LIBMSRC		= $(LIBMDIR)/common
 
 CPP_CMD		= $(CC) -E -Xs
 
-ASSUFFIX_sparc	= S
-ASSUFFIX_i386	= s
-ASSUFFIX	= $(ASSUFFIX_$(MACH))
-
 # With studio CSTD of neither enabled nor disabled is "no_lib", whereby we
 # expect C99-the-language, but don't modify the behaviour of library routines.
 # This is VERY IMPORTANT, as $(CSTD_GNU99), for instance, would link us with
@@ -77,7 +73,8 @@ FPDEF_sparc	= -DCG89 -DARCH_v8plus -DFPADD_TRAPS_INCOMPLETE_ON_NAN
 FPDEF_sparcv9	= -DARCH_v9 -DFPADD_TRAPS_INCOMPLETE_ON_NAN
 FPDEF		= $(FPDEF_$(TARGET_ARCH))
 
-ASFLAGS		= -P -D_ASM $(FPDEF)
+ASFLAGS		+= -D_ASM $(FPDEF)
+ASFLAGS64	+= -D_ASM $(FPDEF)
 
 XARCH_sparc	= v8plus
 XARCH_sparcv9	= v9
@@ -92,9 +89,11 @@ ASOPT_amd64	= -xarch=$(XARCH) $(AS_PICFLAGS)
 ASOPT		= $(ASOPT_$(TARGET_ARCH))
 
 ASFLAGS		+= $(ASOPT)
+ASFLAGS64	+= $(ASOPT)
 
 CPPFLAGS_sparc = -DFPADD_TRAPS_INCOMPLETE_ON_NAN \
 	-DFDTOS_TRAPS_INCOMPLETE_IN_FNS_MODE
 
 CPPFLAGS	+= $(CPPFLAGS_$(MACH))
 ASFLAGS		+= $(CPPFLAGS)
+ASFLAGS64	+= $(CPPFLAGS)

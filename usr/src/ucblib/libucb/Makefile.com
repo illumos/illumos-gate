@@ -104,7 +104,7 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 # not linted
 SMATCH=off
 
-ASFLAGS= -P -D__STDC__ -DLOCORE -D_SYS_SYS_S -D_ASM $(CPPFLAGS)
+ASFLAGS= -D__STDC__ -DLOCORE -D_SYS_SYS_S -D_ASM $(CPPFLAGS)
 
 pics/%.o:= ASFLAGS += $(AS_PICFLAGS)
 

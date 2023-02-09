@@ -27,8 +27,6 @@
 #ifndef	_SYS_FPRAS_IMPL_H
 #define	_SYS_FPRAS_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fpras.h>
 
 #if !defined(_ASM)
@@ -140,20 +138,20 @@ extern struct fpras_chkfngrp *fpras_chkfngrps;
 #define	FPRAS_INTERVAL(operation, blk, doex, tmp1, tmp2, tmp3, tmp4, label) \
 	sethi	%hi(fpras_interval), tmp1				;\
 	ldx	[tmp1 + %lo(fpras_interval)], tmp1			;\
-	brlz,pn	tmp1, label/**/f	/* not initialized? */		;\
+	brlz,pn	tmp1, label##f	/* not initialized? */		;\
 	  clr	doex							;\
 	sethi	%hi(fpras_disableids), tmp2				;\
 	ld	[tmp2 + %lo(fpras_disableids)], tmp2			;\
 	mov	0x1, tmp3						;\
 	sll	tmp3, operation, tmp3					;\
 	btst	tmp3, tmp2						;\
-	bnz,a,pn %icc, label/**/f	/* disabled for this op? */	;\
+	bnz,a,pn %icc, label##f	/* disabled for this op? */	;\
 	  nop								;\
 	set	fpras_chkfn_type1, tmp2					;\
 	prefetch [tmp2 + (FPRAS_BLK0 + blk * 64)], #one_read		;\
 	ldn	[THREAD_REG + T_CPU], tmp2				;\
 	ldn	[tmp2 + CPU_PRIVATE], tmp2				;\
-	brz,pn	tmp2, label/**/f	/* early in startup? */		;\
+	brz,pn	tmp2, label##f	/* early in startup? */		;\
 	  mov	operation, tmp3						;\
 	sll	tmp3, 3, tmp3						;\
 	set	CHPR_FPRAS_TIMESTAMP, tmp4				;\
@@ -163,7 +161,7 @@ extern struct fpras_chkfngrp *fpras_chkfngrps;
 	rd	STICK, doex		/* doex is a scratch here */	;\
 	sub	doex, tmp3, tmp4	/* delta since last check */	;\
 	cmp	tmp4, tmp1		/* compare delta to interval */	;\
-	blu,a,pn %xcc, label/**/f					;\
+	blu,a,pn %xcc, label##f					;\
 	  clr	doex							;\
 	stx	doex, [tmp2]		/* updated timestamp */		;\
 	ldn	[THREAD_REG + T_CPU], tmp1				;\
@@ -210,7 +208,7 @@ label:
  */
 
 #define	FPRAS_REWRITE_TYPE1(blk, doex, fpq, tmp1, label)	\
-	brz,pn  doex, label/**/f				;\
+	brz,pn  doex, label##f				;\
 	  sethi	%hi(fpras_chkfn_type1), tmp1			;\
 	add	tmp1, %lo(fpras_chkfn_type1), tmp1		;\
 	add	tmp1, FPRAS_BLK0 + blk * 64, tmp1		;\
@@ -233,21 +231,21 @@ label:
  * works for address that aren't doubleword aligned).
  */
 #define	FPRAS_REWRITE_TYPE2Q1(blk, doex, tmp1, tmp2, label1, label2)	\
-	brz,pn	doex, label1/**/f					;\
+	brz,pn	doex, label1##f					;\
 	  mov	0x2, tmp1						;\
 	set	fpras_chkfn_type1, tmp2					;\
 label2:									;\
 	deccc		tmp1						;\
 	ldd		[tmp2 + (FPRAS_BLK0 + blk * 64)], %f4		;\
 	ldd		[tmp2 + (FPRAS_BLK0 + blk * 64) + 8], %f2	;\
-	bnz,a,pt	%icc, label2/**/b				;\
+	bnz,a,pt	%icc, label2##b				;\
 	  fsrc1		%f4, %f0					;\
 	rdpr		%tick, tmp1					;\
 	fsrc1		%f4, %f8					;\
 	fsrc1		%f2, %f10					;\
 	btst		0x7, tmp1					;\
 	alignaddr	tmp1, %g0, %g0	/* changes %gsr */		;\
-	bz,pn		%icc, label2/**/f				;\
+	bz,pn		%icc, label2##f				;\
 	  faligndata	%f2, %f4, %f6					;\
 	faligndata	%f0, %f2, %f12					;\
 	alignaddrl	tmp1, %g0, %g0					;\
@@ -261,21 +259,21 @@ label2:									;\
 label1:
 
 #define	FPRAS_REWRITE_TYPE2Q2(blk, doex, tmp1, tmp2, label1, label2)	\
-	brz,pn	doex, label1/**/f					;\
+	brz,pn	doex, label1##f					;\
 	  mov	0x2, tmp1						;\
 	set	fpras_chkfn_type1, tmp2					;\
 label2:									;\
 	deccc		tmp1						;\
 	ldd		[tmp2 + (FPRAS_BLK0 + blk * 64)], %f20	;\
 	ldd		[tmp2 + (FPRAS_BLK0 + blk * 64) + 8], %f18	;\
-	bnz,a,pt	%icc, label2/**/b				;\
+	bnz,a,pt	%icc, label2##b				;\
 	  fsrc1		%f20, %f16					;\
 	rdpr		%tick, tmp1					;\
 	fsrc1		%f20, %f24					;\
 	fsrc1		%f18, %f26					;\
 	btst		0x7, tmp1					;\
 	alignaddr	tmp1, %g0, %g0	/* changes %gsr */		;\
-	bz,pn		%icc, label2/**/f				;\
+	bz,pn		%icc, label2##f				;\
 	  faligndata	%f18, %f20, %f22				;\
 	faligndata	%f16, %f18, %f28				;\
 	alignaddrl	tmp1, %g0, %g0					;\
@@ -310,12 +308,12 @@ label1:
  */
 
 #define	FPRAS_CHECK(operation, doex, label)				\
-	brz,pn	doex, label/**/f					;\
+	brz,pn	doex, label##f					;\
 	  nop								;\
 	jmpl	doex, %o7						;\
 	  nop								;\
 	cmp	%o0, FPRAS_OK						;\
-	be	%icc, label/**/f					;\
+	be	%icc, label##f					;\
 	  nop								;\
 	mov	%o0, %o1	/* how detected */			;\
 	call	fpras_failure	/* take failure action */		;\

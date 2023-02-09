@@ -43,7 +43,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/lw8/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/lw8/ml/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/lw8/ml/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/lw8/os/%.c

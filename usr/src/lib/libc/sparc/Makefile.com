@@ -1143,7 +1143,8 @@ MAPFILES =	$(LIBCDIR)/port/mapfile-vers
 CFLAGS +=	$(EXTN_CFLAGS)
 CPPFLAGS=	-D_REENTRANT -Dsparc $(EXTN_CPPFLAGS) $(THREAD_DEBUG) \
 		-I$(LIBCBASE)/inc -I$(LIBCDIR)/inc $(CPPFLAGS.master)
-ASFLAGS=	$(EXTN_ASFLAGS) $(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) $(sparc_AS_XARCH)
+ASFLAGS=	$(EXTN_ASFLAGS) $(AS_WITH_CPP) -D__STDC__ \
+		-D_ASM $(CPPFLAGS) $(sparc_XARCH)
 
 # As a favor to the dtrace syscall provider, libc still calls the
 # old syscall traps that have been obsoleted by the *at() interfaces.
@@ -1170,7 +1171,7 @@ DYNFLAGS +=	$(DTRACE_DATA)
 # DTrace needs an executable data segment.
 MAPFILE.NED=
 
-BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
+BUILD.s=	$(AS) $(ASFLAGS) $< -c -o $@
 
 # Override this top level flag so the compiler builds in its native
 # C99 mode.  This has been enabled to support the complex arithmetic
@@ -1277,15 +1278,15 @@ $(STRETS:%=pics/%): $(LIBCBASE)/crt/stret.s
 	$(AS) $(ASFLAGS) -DSTRET$(@F:stret%.o=%) $(LIBCBASE)/crt/stret.s -o $@
 	$(POST_PROCESS_S_O)
 
-$(LIBCBASE)/crt/_rtbootld.s:	$(LIBCBASE)/crt/_rtboot.s $(LIBCBASE)/crt/_rtld.c
+$(LIBCBASE)/crt/_rtbootld.S:	$(LIBCBASE)/crt/_rtboot.S $(LIBCBASE)/crt/_rtld.c
 	$(CC) $(CPPFLAGS) $(CTF_FLAGS) -O -S $(C_PICFLAGS) \
 	    $(LIBCBASE)/crt/_rtld.c -o $(LIBCBASE)/crt/_rtld.s
-	$(CAT) $(LIBCBASE)/crt/_rtboot.s $(LIBCBASE)/crt/_rtld.s > $@
+	$(CAT) $(LIBCBASE)/crt/_rtboot.S $(LIBCBASE)/crt/_rtld.s > $@
 	$(RM) $(LIBCBASE)/crt/_rtld.s
 
 # partially built from C source
-pics/_rtbootld.o: $(LIBCBASE)/crt/_rtbootld.s
-	$(AS) $(ASFLAGS) $(LIBCBASE)/crt/_rtbootld.s -o $@
+pics/_rtbootld.o: $(LIBCBASE)/crt/_rtbootld.S
+	$(AS) $(ASFLAGS) $(LIBCBASE)/crt/_rtbootld.S -o $@
 	$(CTFCONVERT_O)
 
 ASSYMDEP_OBJS=			\

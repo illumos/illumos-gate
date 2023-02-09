@@ -15,7 +15,7 @@
 # Copyright (c) 2019, Joyent, Inc.
 #
 
-pics/%.o: $(LIBMDIR)/$(TARGETMACH)/src/%.$(ASSUFFIX)
+pics/%.o: $(LIBMDIR)/$(TARGETMACH)/src/%.S
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_S_O)
 

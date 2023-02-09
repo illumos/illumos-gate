@@ -22,6 +22,7 @@ DD=		/usr/bin/dd
 
 CPPFLAGS += -I../../sys
 CPPFLAGS += -I../common
+AS_CPPFLAGS += $(CPPFLAGS)
 
 CCASFLAGS= -Wa,--divide
 

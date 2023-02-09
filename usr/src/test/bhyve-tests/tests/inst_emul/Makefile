@@ -51,8 +51,8 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(SRC)/uts/intel \
 		-I../common
 
-ASFLAGS += -P -D__STDC__ -D_ASM
-
+ASFLAGS +=	-D_ASM
+ASFLAGS64 +=	-D_ASM
 
 $(PROG) :=	LDLIBS += -lvmmapi
 

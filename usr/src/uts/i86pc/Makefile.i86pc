@@ -123,7 +123,8 @@ ASFLAGS_XARCH_32	= $(i386_ASFLAGS)
 ASFLAGS_XARCH_64	= $(amd64_ASFLAGS)
 ASFLAGS_XARCH		= $(ASFLAGS_XARCH_$(CLASS))
 
-ASFLAGS			+= $(ASFLAGS_XARCH)
+ASFLAGS			= $(ASFLAGS_XARCH)
+ASFLAGS			+= $(ASFLAGS_uts)
 
 AS_INC_PATH		+= -I$(DSF_DIR)/$(OBJS_DIR)
 
@@ -135,7 +136,7 @@ AS_INC_PATH		+= -I$(DSF_DIR)/$(OBJS_DIR)
 #	GENASSYM_SRC:	genassym.c
 #
 UNIX_MAPFILE	 = $(UTSBASE)/$(PLATFORM)/conf/Mapfile
-MODSTUBS	 = $(UTSBASE)/intel/ml/modstubs.s
+MODSTUBS	 = $(UTSBASE)/intel/ml/modstubs.S
 GENASSYM_SRC	 = $(UTSBASE)/$(PLATFORM)/ml/genassym.c
 OFFSETS_SRC	 = $(UTSBASE)/$(PLATFORM)/ml/offsets.in
 PLATFORM_OFFSETS_SRC	= $(UTSBASE)/intel/amd64/ml/mach_offsets.in

@@ -62,7 +62,7 @@
 
 #define	__SYSCALLINT(name)		\
 	/* CSTYLED */			\
-	movl	$SYS_/**/name, %eax;	\
+	movl	$SYS_##name, %eax;	\
 	int	$T_SYSCALLINT
 
 /*
@@ -73,7 +73,7 @@
 	call	8f;			\
 8:	popl	%edx;			\
 	/* CSTYLED */			\
-	movl	$SYS_/**/name, %eax;	\
+	movl	$SYS_##name, %eax;	\
 	movl	%esp, %ecx;		\
 	add	$[9f - 8b], %edx;	\
 	sysenter;			\
@@ -85,7 +85,7 @@
  */
 #define	__SYSCALL(name)			\
 	/* CSTYLED */			\
-	movl	$SYS_/**/name, %eax;	\
+	movl	$SYS_##name, %eax;	\
 	.byte	0xf, 0x5	/* syscall */
 
 #if defined(_SYSC_INSN)
@@ -110,7 +110,7 @@
  */
 #define	SYSFASTTRAP(name)		\
 	/* CSTYLED */			\
-	movl	$T_/**/name, %eax;	\
+	movl	$T_##name, %eax;	\
 	int	$T_FASTTRAP
 
 /*
@@ -147,7 +147,7 @@
  */
 #define	SYSREENTRY(name)	\
 /* CSTYLED */			\
-.restart_/**/name:		\
+.restart_##name:		\
 	ENTRY(name)
 
 /*
@@ -205,13 +205,13 @@
 	SYSREENTRY(name);	\
 	SYSTRAP_2RVALS(name);	\
 	/* CSTYLED */		\
-	SYSRESTART(.restart_/**/name)
+	SYSRESTART(.restart_##name)
 
 #define	SYSCALL_RESTART_RVAL1(name)	\
 	SYSREENTRY(name);		\
 	SYSTRAP_RVAL1(name);		\
 	/* CSTYLED */			\
-	SYSRESTART(.restart_/**/name)
+	SYSRESTART(.restart_##name)
 
 /*
  * SYSCALL2 provides a common system call sequence when the entry name
@@ -235,13 +235,13 @@
 	SYSREENTRY(entryname);			\
 	SYSTRAP_2RVALS(trapname);		\
 	/* CSTYLED */				\
-	SYSRESTART(.restart_/**/entryname)
+	SYSRESTART(.restart_##entryname)
 
 #define	SYSCALL2_RESTART_RVAL1(entryname, trapname)	\
 	SYSREENTRY(entryname);				\
 	SYSTRAP_RVAL1(trapname);			\
 	/* CSTYLED */					\
-	SYSRESTART(.restart_/**/entryname)
+	SYSRESTART(.restart_##entryname)
 
 /*
  * SYSCALL_NOERROR provides the most common system call sequence for those

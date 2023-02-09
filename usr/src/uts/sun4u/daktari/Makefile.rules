@@ -43,7 +43,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/daktari/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/daktari/ml/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/daktari/ml/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/daktari/os/%.c

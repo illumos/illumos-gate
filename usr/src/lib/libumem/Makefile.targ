@@ -68,7 +68,7 @@ objs/%.o pics/%.o: $(ISASRCDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-objs/%.o pics/%.o: $(ISASRCDIR)/%.s
+objs/%.o pics/%.o: $(ISASRCDIR)/%.S
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_S_O)
 

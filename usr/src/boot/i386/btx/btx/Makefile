@@ -28,8 +28,9 @@ OBJS=	btx.o
 BOOT_BTX_FLAGS=0x0
 #.endif
 
-CPPFLAGS += -DBTX_FLAGS=$(BOOT_BTX_FLAGS)
-CPPFLAGS += -I./../../common
+CPPFLAGS += -DBTX_FLAGS=$(BOOT_BTX_FLAGS) \
+	-I./../../common
+AS_CPPFLAGS += $(CPPFLAGS)
 
 #.if defined(BTX_SERIAL)
 #BOOT_COMCONSOLE_PORT?= 0x3f8

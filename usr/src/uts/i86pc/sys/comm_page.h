@@ -47,7 +47,7 @@ extern "C" {
  * This struct is instantiated "by hand" in assembly to preserve the global
  * symbols it contains.  That layout must be kept in sync with the structure
  * defined here.
- * See: "uts/i86pc/ml/comm_page.s"
+ * See: "uts/i86pc/ml/comm_page.S"
  */
 typedef struct comm_page_s {
 	hrtime_t		cp_tsc_last;

@@ -45,8 +45,8 @@ objs/%.o pics/%.o:	$(CRYPTOSRC)/%.c
 objs/%.o pics/%.o:	$(COMDIR)/sha1/%.c
 	$(COMPILE.c) -o $@ $<
 
-sha1-x86_64.s: $(COMDIR)/sha1/amd64/sha1-x86_64.pl
+sha1-x86_64.S: $(COMDIR)/sha1/amd64/sha1-x86_64.pl
 	$(PERL) $? $@
 
-pics/sha1-x86_64.o: sha1-x86_64.s
-	$(COMPILE.s) -o $@ ${@F:.o=.s}
+pics/sha1-x86_64.o: sha1-x86_64.S
+	$(COMPILE.s) -o $@ ${@F:.o=.S}

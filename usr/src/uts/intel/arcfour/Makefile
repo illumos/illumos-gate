@@ -18,13 +18,11 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2019, Joyent, Inc.
-#
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -58,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CPPFLAGS	+= -I$(COM_DIR)
 CFLAGS		+= -xO4 -xcrossfile
-CLEANFILES	+= arcfour-x86_64.s
+CLEANFILES	+= arcfour-x86_64.S arcfour-x86_64.s
 
 #
 #	Default build targets.
@@ -80,8 +78,8 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
-$(OBJS_DIR)/arcfour-x86_64.o: arcfour-x86_64.s
-	$(COMPILE.s) -o $@ ${@F:.o=.s}
+$(OBJS_DIR)/arcfour-x86_64.o: arcfour-x86_64.S
+	$(COMPILE.s) -o $@ ${@F:.o=.S}
 
-arcfour-x86_64.s: $(COM_DIR)/amd64/arcfour-x86_64.pl
+arcfour-x86_64.S: $(COM_DIR)/amd64/arcfour-x86_64.pl
 	$(PERL) $? $@

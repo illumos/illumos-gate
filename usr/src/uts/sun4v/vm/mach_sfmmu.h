@@ -297,7 +297,7 @@ struct hv_tsb_block {
 	add	scr2, scr1, scr2;		/* mulx 3 */		\
 	add	scr2, MMU_PAGESHIFT + TTE_PA_LSHIFT, scr3;		\
 	/* CSTYLED */							\
-	brz,pt	scr2, label/**/1;					\
+	brz,pt	scr2, label##1;					\
 	srlx	tte, scr3, tte;						\
 	sllx	tte, scr2, tte;						\
 	set	1, scr1;						\
@@ -308,7 +308,7 @@ struct hv_tsb_block {
 	srln	scr2, MMU_PAGESHIFT, scr2;				\
 	or	tte, scr2, tte;						\
 	/* CSTYLED */							\
-label/**/1:
+label##1:
 
 /*
  * TTE_SET_REF_ML is a macro that updates the reference bit if it is
@@ -327,17 +327,17 @@ label/**/1:
 	/* BEGIN CSTYLED */						\
 	/* check reference bit */					\
 	btst	TTE_REF_INT, tte;					\
-	bnz,pt	%xcc, label/**/2;	/* if ref bit set-skip ahead */	\
+	bnz,pt	%xcc, label##2;	/* if ref bit set-skip ahead */	\
 	nop;								\
 	/* update reference bit */					\
-label/**/1:								\
+label##1:								\
 	or	tte, TTE_REF_INT, tmp1;					\
 	casxa	[ttepa]ASI_MEM, tte, tmp1; 	/* update ref bit */	\
 	cmp	tte, tmp1;						\
-	bne,a,pn %xcc, label/**/1;					\
+	bne,a,pn %xcc, label##1;					\
 	ldxa	[ttepa]ASI_MEM, tte;	/* MMU_READTTE through pa */	\
 	or	tte, TTE_REF_INT, tte;					\
-label/**/2:								\
+label##2:								\
 	/* END CSTYLED */
 
 
@@ -362,17 +362,17 @@ label/**/2:								\
 	btst	TTE_WRPRM_INT, tte;					\
 	bz,pn	%xcc, exitlabel;	/* exit if wr_perm no set */	\
 	  btst	TTE_HWWR_INT, tte;					\
-	bnz,pn	%xcc, label/**/2;	/* nothing to do */		\
+	bnz,pn	%xcc, label##2;	/* nothing to do */		\
 	  nop;								\
 	/* update reference bit */					\
-label/**/1:								\
+label##1:								\
 	or	tte, TTE_HWWR_INT | TTE_REF_INT, tmp1;			\
 	casxa	[ttepa]ASI_MEM, tte, tmp1; /* update ref/mod bit */	\
 	cmp	tte, tmp1;						\
-	bne,a,pn %xcc, label/**/1;					\
+	bne,a,pn %xcc, label##1;					\
 	  ldxa	[ttepa]ASI_MEM, tte;	/* MMU_READTTE through pa */	\
 	or	tte, TTE_HWWR_INT | TTE_REF_INT, tte;			\
-label/**/2:								\
+label##2:								\
 	/* END CSTYLED */
 /*
  * Get TSB base register from the scratchpad for
@@ -432,15 +432,15 @@ label/**/2:								\
 	/* BEGIN CSTYLED */						\
 	ldda	[tsbe_ptr]ASI_QUAD_LDD_PHYS, %g4 /* g4 = tag, g5 = data */ ;\
 	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
-	bne,pn	%xcc, label/**/1	/* branch if !match */		;\
+	bne,pn	%xcc, label##1	/* branch if !match */		;\
 	  nop								;\
-	brgez,pn %g5, label/**/1					;\
+	brgez,pn %g5, label##1					;\
 	  nop								;\
 	TT_TRACE(trace_tsbhit)						;\
 	DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
 	/* trapstat expects tte in %g5 */				;\
 	retry				/* retry faulted instruction */	;\
-label/**/1:								\
+label##1:								\
 	/* END CSTYLED */
 
 
@@ -452,9 +452,9 @@ label/**/1:								\
 	/* BEGIN CSTYLED */						\
 	ldda	[tsbe_ptr]ASI_QUAD_LDD_PHYS, %g4 /* g4 = tag, g5 = data */ ;\
 	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
-	bne,pn	%xcc, label/**/1	/* branch if !match */		;\
+	bne,pn	%xcc, label##1	/* branch if !match */		;\
 	  nop								;\
-	brgez,pn %g5, label/**/1					;\
+	brgez,pn %g5, label##1					;\
 	  nop								;\
 	andcc	%g5, TTE_EXECPRM_INT, %g0  /* check execute bit */	;\
 	bz,pn	%icc, exec_fault					;\
@@ -462,7 +462,7 @@ label/**/1:								\
 	TT_TRACE(trace_tsbhit)						;\
 	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
 	retry				/* retry faulted instruction */	;\
-label/**/1:								\
+label##1:								\
 	/* END CSTYLED */
 
 /*
@@ -479,16 +479,16 @@ label/**/1:								\
 	ldda	[tsbe_ptr]ASI_QUAD_LDD_PHYS, %g4  /* g4 = tag, g5 = data */ ;\
 	/* since we are looking at 2nd tsb, if it's valid, it must be 4M */ ;\
 	cmp	%g4, vpg_4m						;\
-	bne,pn	%xcc, label/**/1					;\
+	bne,pn	%xcc, label##1					;\
 	  nop								;\
-	brgez,pn %g5, label/**/1					;\
+	brgez,pn %g5, label##1					;\
 	  nop								;\
 	mov	tsbe_ptr, %g1		/* trace_tsbhit wants ptr in %g1 */ ;\
 	TT_TRACE(trace_tsbhit)						;\
 	DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
 	/* trapstat expects tte in %g5 */				;\
 	retry				/* retry faulted instruction */	;\
-label/**/1:								\
+label##1:								\
 	/* END CSTYLED */
 
 

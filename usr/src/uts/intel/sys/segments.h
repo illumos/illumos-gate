@@ -72,15 +72,9 @@ extern "C" {
  * TI  = table indicator (0 = GDT, 1 = LDT)
  * RPL = requestor privilege level
  */
-#if !defined(_ASM) || defined(__GNUC_AS__)
 #define	IDXTOSEL(s)	((s) << 3)		/* index to selector */
+#define	SELTOIDX(s)	((s) >> 3)		/* selector to index */
 #define	SEL_GDT(s, r)	(IDXTOSEL(s) | r)	/* global sel */
-#else
-#define	IDXTOSEL(s)	[s << 3]
-#define	SEL_GDT(s, r)	[IDXTOSEL(s) | r]
-#endif
-
-#define	SELTOIDX(s)	((s) >> 3)	/* selector to index */
 
 /*
  * SEL_(KPL,UPL,XPL) is the RPL or DPL value for code and data selectors

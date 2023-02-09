@@ -43,7 +43,7 @@ pobj_%.o: pobj_%.s
 	$(COMPILE.s) -o $@ $^
 	$(POST_PROCESS)
 
-%.o: ../common/%.s
+%.o: ../common/%.S
 	$(COMPILE.s) -o $@ $^
 	$(POST_PROCESS)
 

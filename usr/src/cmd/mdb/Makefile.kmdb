@@ -56,7 +56,8 @@ CPPFLAGS += -D_MDB -D_KMDB $(INCDIRS:%=-I%) $(ARCHOPTS)
 # kmdb is a kernel module, so we'll use the kernel's build flags.
 CFLAGS64 += $(STAND_FLAGS_64)
 
-ASFLAGS += -P -D_ASM $(INCDIRS:%=-I%) $(ARCHOPTS)
+ASFLAGS += -D_ASM $(INCDIRS:%=-I%) $(ARCHOPTS)
+ASFLAGS64 += -D_ASM $(INCDIRS:%=-I%) $(ARCHOPTS)
 
 #
 # kmdb has bootstrapping challenges with the stack protector.

@@ -44,6 +44,7 @@ EXTPICS =	pics/md5_amd64.o \
 		$(CAPFILES:%.o=%.o.symcap)
 
 CLEANFILES +=	$(EXTPICS) \
+		$(EXTPICS:pics/%.o=%.S) \
 		$(EXTPICS:pics/%.o=%.s) \
 		$(CAPFILES) \
 		$(CAPFILES:%.o=%.o.objcap) \
@@ -65,11 +66,15 @@ pics/%.o: %.s
 		$(COMPILE.s) -o $@ ${@F:.o=.s}
 		$(POST_PROCESS_O)
 
-pics/%.o: $(SRC)/common/crypto/sha1/amd64/%.s
+pics/%.o: %.S
+		$(COMPILE.s) -o $@ ${@F:.o=.S}
+		$(POST_PROCESS_O)
+
+pics/%.o: $(SRC)/common/crypto/sha1/amd64/%.S
 		$(COMPILE.s) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics/%.o: $(SRC)/common/crypto/sha2/amd64/%.s
+pics/%.o: $(SRC)/common/crypto/sha2/amd64/%.S
 		$(COMPILE.s) -o $@ $<
 		$(POST_PROCESS_O)
 
@@ -80,16 +85,16 @@ pics/%.o.objcap: pics/%.o
 pics/%.o.symcap: pics/%.o.objcap
 		$(LD) -r -o $@ -z symbolcap $<
 
-md5_amd64.s: $(COMDIR)/md5/amd64/md5_amd64.pl
+md5_amd64.S: $(COMDIR)/md5/amd64/md5_amd64.pl
 		$(PERL) $? $@
 
-sha1-x86_64.s: $(COMDIR)/sha1/amd64/sha1-x86_64.pl
+sha1-x86_64.S: $(COMDIR)/sha1/amd64/sha1-x86_64.pl
 		$(PERL) $? $@
 
-sha512-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
+sha512-x86_64.S: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
 		$(PERL) $? $@
 
-sha256-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
+sha256-x86_64.S: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
 		$(PERL) $? $@
 
 include		../Makefile.targ

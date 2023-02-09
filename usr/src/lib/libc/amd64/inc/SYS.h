@@ -52,7 +52,7 @@
 #define	__SYSCALL(name)			\
 	movq	%rcx, %r10;		\
 	/* CSTYLED */			\
-	movl	$SYS_/**/name, %eax;	\
+	movl	$SYS_##name, %eax;	\
 	syscall
 
 #define	SYSTRAP_RVAL1(name)	__SYSCALL(name)
@@ -66,7 +66,7 @@
  */
 #define	SYSFASTTRAP(name)		\
 	/* CSTYLED */			\
-	movl	$T_/**/name, %eax;	\
+	movl	$T_##name, %eax;	\
 	int	$T_FASTTRAP
 
 /*

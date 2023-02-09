@@ -23,12 +23,10 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 ISASRCDIR=.
 
-ASFLAGS += -xarch=v8plus		# we use flushw in asm_subr.s
+ASFLAGS += -xarch=v8plus		# we use flushw in asm_subr.S
 
 include ../Makefile.com
 include ../Makefile.targ

@@ -33,6 +33,8 @@ include ../../Makefile.rootfs
 LIBS		 = $(DYNLIB)
 LDLIBS		+= -lc
 
+AS_CPPFLAGS	+= -D_ASM
+
 BUILD.SO =	$(LD) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
 
 CLEANFILES += synonym_list mapfile-vers
@@ -61,12 +63,10 @@ mapfile-vers:	../syn_common ../syn2_common syn_isa
 		$(SED) -e '/^#/d' -e '/^$$/d' -e 's/.*/	__&;/' >>mapfile-vers
 	echo "    local:\n	*;\n};" >>mapfile-vers
 
-BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
-
 # include library targets
 include ../../Makefile.targ
 
 MAPFILES =	mapfile-vers
 
-pics/%.o:	%.s
-	$(BUILD.s)
+pics/%.o:	%.S
+	$(COMPILE.s) $< -o $@

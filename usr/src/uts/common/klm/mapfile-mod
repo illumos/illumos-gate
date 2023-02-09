@@ -22,7 +22,7 @@ SYMBOL_SCOPE {
 		_fini;
 		_info;
 		_init;
-# These are all the symbols referenced in ml/modstubs.s
+# These are all the symbols referenced in ml/modstubs.S
 # If we want to remain a drop-in replacment for the old
 # (closed source) klm, we need to define all of these.
 		lm_alloc_sysidt;
@@ -43,7 +43,7 @@ SYMBOL_SCOPE {
 		lm_sysidt;
 		lm_unexport;
 		lm_vp_active;
-# The following three functions are not mentioned in modstubs.s
+# The following three functions are not mentioned in modstubs.S
 # files, because they are not an entry points to KLM. They
 # are called from klmops only.
 		nlm_frlock;

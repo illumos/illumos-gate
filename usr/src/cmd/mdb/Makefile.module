@@ -42,8 +42,8 @@ SHELL= /usr/bin/ksh93
 $(KMOD_SOURCES_DIFFERENT)KMODSRCS = $(MODSRCS)
 $(KMOD_SOURCES_DIFFERENT)KMODASMSRCS = $(MODASMSRCS)
 
-MODOBJS = $(MODSRCS:%.c=dmod/%.o) $(MODASMSRCS:%.s=dmod/%.o)
-KMODOBJS = $(KMODSRCS:%.c=kmod/%.o) $(KMODASMSRCS:%.s=kmod/%.o)
+MODOBJS = $(MODSRCS:%.c=dmod/%.o) $(MODASMSRCS:%.S=dmod/%.o)
+KMODOBJS = $(KMODSRCS:%.c=kmod/%.o) $(KMODASMSRCS:%.S=kmod/%.o)
 
 MODNAME_cmd = if [ -n "$(MODULE_NAME)" ]; then print $(MODULE_NAME); else print $(MODULE)| sed -e 's:\.so$$::'; fi
 MODNAME = $(MODNAME_cmd:sh)
@@ -110,7 +110,6 @@ CFLAGS64		+= $(CCVERBOSE)
 CPPFLAGS		+= $($(MDBTGT)_TGTFLAGS) -I../../../common
 LDFLAGS			+= $(ZTEXT)
 LDFLAGS64		+= $(ZTEXT)
-ASFLAGS			+= -P
 AS_CPPFLAGS		+= -D_ASM
 
 SMOFF += all_func_returns,index_overflow
@@ -214,28 +213,28 @@ dmod/%.o kmod/%.o: %.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-dmod/%.o kmod%.o: %.s
+dmod/%.o kmod%.o: %.S
 	$(COMPILE.s) -o $@ $<
 
 dmod/%.o kmod/%.o: ../%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-dmod/%.o kmod%.o: ../%.s
+dmod/%.o kmod%.o: ../%.S
 	$(COMPILE.s) -o $@ $<
 
 dmod/%.o kmod/%.o: ../../../common/modules/$(MODNAME)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-dmod/%.o kmod%.o: ../../../common/modules/$(MODNAME)/%.s
+dmod/%.o kmod%.o: ../../../common/modules/$(MODNAME)/%.S
 	$(COMPILE.s) -o $@ $<
 
 dmod/%.o kmod/%.o: $$(MODSRCS_DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-dmod/%.o kmod%.o: $$(MODSRCS_DIR)/%.s
+dmod/%.o kmod%.o: $$(MODSRCS_DIR)/%.S
 	$(COMPILE.s) -o $@ $<
 
 #

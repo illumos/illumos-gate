@@ -36,8 +36,12 @@
  *
  */
 
-/* If you modify this file, you must increment CW_VERSION */
-#define	CW_VERSION	"7.1"
+/*
+ * If you modify this file, you must increment CW_VERSION.
+ * This is a semver, * incompatible changes should bump the major, anything
+ * else the minor.
+ */
+#define	CW_VERSION	"8.0"
 
 /*
  * -#		Verbose mode
@@ -605,6 +609,21 @@ is_source_file(const char *path)
 	return (false);
 }
 
+static bool
+is_asm_file(const char *path)
+{
+	char *ext = strrchr(path, '.');
+
+	if ((ext == NULL) || (*(ext + 1) == '\0'))
+		return (false);
+
+	ext += 1;
+
+	if (strcasecmp(ext, "s") == 0)
+		return (true);
+
+	return (false);
+}
 
 static void
 do_gcc(cw_ictx_t *ctx)
@@ -1274,7 +1293,13 @@ do_smatch(cw_ictx_t *ctx)
 		char *arg = ctx->i_oldargv[i];
 
 		if (strcmp(arg, "-_smatch=off") == 0) {
-			ctx->i_flags &= ~ (CW_F_EXEC | CW_F_ECHO);
+			ctx->i_flags &= ~(CW_F_EXEC | CW_F_ECHO);
+			return;
+		}
+
+		/* smatch can't handle asm */
+		if ((arg[0] != '-') && is_asm_file(arg)) {
+			ctx->i_flags &= ~(CW_F_EXEC | CW_F_ECHO);
 			return;
 		}
 	}

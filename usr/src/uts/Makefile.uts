@@ -135,7 +135,7 @@ MODEL		= $(MODEL_$(CLASS))
 #	Build the compile/assemble lines:
 #
 EXTRA_OPTIONS		=
-AS_DEFS			= -D_ASM -D__STDC__=0
+AS_DEFS			= -D_ASM
 
 ALWAYS_DEFS_32		= -D_KERNEL -D_SYSCALL32 -D_DDI_STRICT
 ALWAYS_DEFS_64		= -D_KERNEL -D_SYSCALL32 -D_SYSCALL32_IMPL -D_ELF64 \
@@ -154,7 +154,6 @@ ALWAYS_DEFS		= $(ALWAYS_DEFS_$(CLASS))
 #
 CPPFLAGS	= $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS) \
 		   $(INCLUDE_PATH) $(EXTRA_OPTIONS)
-ASFLAGS		+= -P
 AS_CPPFLAGS	= $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS) $(AS_DEFS) \
 		   $(AS_INC_PATH) $(EXTRA_OPTIONS)
 
@@ -213,6 +212,8 @@ CFLAGS_uts		+= $(CSOURCEDEBUGFLAGS)
 CFLAGS_uts		+= $(CUSERFLAGS)
 CFLAGS_uts		+= $(CFLAGS_uts_$(MACH))
 CFLAGS_uts		+= -_gcc=-fno-asynchronous-unwind-tables
+
+ASFLAGS_uts=		$(CFLAGS_uts)
 
 #
 #	Declare that $(OBJECTS) can be compiled in parallel.  The DUMMY target
