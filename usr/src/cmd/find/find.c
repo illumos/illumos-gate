@@ -23,6 +23,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Andrew Stormont.  All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
  */
 
 
@@ -798,6 +799,51 @@ usage(void)
 }
 
 /*
+ * ACL matching is complex enough to warrant its own function.
+ */
+static int
+aclmatch(struct Node *np, const char *filename)
+{
+	int i, t1, t2;
+	acl_t *acl;
+	void *acl_entry;
+	aclent_t *p1;
+	ace_t *p2;
+
+	if (np->action == F_USERACL) {
+		t1 = USER;
+		t2 = 0;
+	} else {
+		t1 = GROUP;
+		t2 = ACE_IDENTIFIER_GROUP;
+	}
+
+	if (acl_get(filename, 0, &acl) != 0)
+		return (0);
+
+	for (i = 0, acl_entry = acl->acl_aclp;
+	    i != acl->acl_cnt; i++) {
+		if (acl->acl_type == ACLENT_T) {
+			p1 = (aclent_t *)acl_entry;
+			if (p1->a_id == np->first.l && p1->a_type == t1) {
+				acl_free(acl);
+				return (1);
+			}
+		} else {
+			p2 = (ace_t *)acl_entry;
+			if (p2->a_who == np->first.l &&
+			    ((p2->a_flags & ACE_TYPE_FLAGS) == t2)) {
+				acl_free(acl);
+				return (1);
+			}
+		}
+		acl_entry = ((char *)acl_entry + acl->acl_entry_size);
+	}
+	acl_free(acl);
+	return (0);
+}
+
+/*
  * This is the function that gets executed at each node
  */
 
@@ -1089,38 +1135,9 @@ execute(const char *name, const struct stat *statb, int type, struct FTW *state)
 			break;
 		case F_USERACL:
 		case F_GROUPACL: {
-			int i;
-			acl_t *acl;
-			void *acl_entry;
-			aclent_t *p1;
-			ace_t *p2;
-
 			filename = (walkflags & FTW_CHDIR) ?
 			    gettail(name) : name;
-			val = 0;
-			if (acl_get(filename, 0, &acl) != 0)
-				break;
-			for (i = 0, acl_entry = acl->acl_aclp;
-			    i != acl->acl_cnt; i++) {
-				if (acl->acl_type == ACLENT_T) {
-					p1 = (aclent_t *)acl_entry;
-					if (p1->a_id == np->first.l) {
-						val = 1;
-						acl_free(acl);
-						break;
-					}
-				} else {
-					p2 = (ace_t *)acl_entry;
-					if (p2->a_who == np->first.l) {
-						val = 1;
-						acl_free(acl);
-						break;
-					}
-				}
-				acl_entry = ((char *)acl_entry +
-				    acl->acl_entry_size);
-			}
-			acl_free(acl);
+			val = aclmatch(np, filename);
 			break;
 		}
 		case IREGEX:
