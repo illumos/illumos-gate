@@ -28,6 +28,7 @@
  * Copyright 2017 Jason King
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
  */
 
 /*
@@ -1105,7 +1106,7 @@ be_do_destroy(int argc, char **argv)
 	case BE_ERR_SS_EXISTS:
 		(void) fprintf(stderr, _("Unable to destroy %s: "
 		    "BE has snapshots.\nUse 'beadm destroy -s %s' or "
-		    "'zfs -r destroy <dataset>'.\n"), be_name, be_name);
+		    "'zfs destroy -r <dataset>'.\n"), be_name, be_name);
 		break;
 	default:
 		(void) fprintf(stderr, _("Unable to destroy %s.\n"), be_name);
