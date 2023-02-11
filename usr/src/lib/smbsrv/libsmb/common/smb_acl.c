@@ -21,10 +21,21 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 RackTop Systems, Inc.
+ */
+
+/*
+ * SMB server interfaces for ACL conversion (smb_acl_...)
+ *
+ * There are two variants of this interface:
+ * This is the library version.  See also:
+ * $SRC/uts/common/fs/smbsrv/smb_acl.c
  */
 
 #include <stddef.h>
 #include <strings.h>
+#include <syslog.h>
 #include <assert.h>
 
 #include <smbsrv/smb.h>
@@ -50,6 +61,7 @@ acl_t *acl_alloc(enum acl_type);
 
 static idmap_stat smb_fsacl_getsids(smb_idmap_batch_t *, acl_t *);
 static acl_t *smb_fsacl_null_empty(boolean_t);
+static boolean_t smb_ace_isvalid(smb_ace_t *, int);
 static uint16_t smb_ace_len(smb_ace_t *);
 static uint32_t smb_ace_mask_g2s(uint32_t);
 static uint16_t smb_ace_flags_tozfs(uint8_t);
@@ -92,7 +104,6 @@ smb_acl_free(smb_acl_t *acl)
 		list_remove(&acl->sl_sorted, ace);
 	list_destroy(&acl->sl_sorted);
 	free(acl);
-
 }
 
 /*
@@ -109,8 +120,10 @@ smb_acl_len(smb_acl_t *acl)
 }
 
 boolean_t
-smb_acl_isvalid(smb_acl_t *acl, int which_acl __unused)
+smb_acl_isvalid(smb_acl_t *acl, int which_acl)
 {
+	int i;
+
 	if (acl->sl_bsize < SMB_ACL_HDRSIZE)
 		return (B_FALSE);
 
@@ -119,6 +132,11 @@ smb_acl_isvalid(smb_acl_t *acl, int which_acl __unused)
 		 * we are rejecting ACLs with object-specific ACEs for now
 		 */
 		return (B_FALSE);
+	}
+
+	for (i = 0; i < acl->sl_acecnt; i++) {
+		if (!smb_ace_isvalid(&acl->sl_aces[i], which_acl))
+			return (B_FALSE);
 	}
 
 	return (B_TRUE);
@@ -227,6 +245,36 @@ smb_acl_sort(smb_acl_t *acl)
 }
 
 /*
+ * Error handling call-back for smb_idmap_batch_getmappings.
+ * Would be nice if this could report the path, but that's not
+ * passed down here.  For now, use a dtrace fbt probe here.
+ */
+static void
+smb_acl_bgm_error(smb_idmap_batch_t *sib, smb_idmap_t *sim)
+{
+
+	if ((sib->sib_flags & SMB_IDMAP_SKIP_ERRS) != 0)
+		return;
+
+	if ((sib->sib_flags & SMB_IDMAP_ID2SID) != 0) {
+		/*
+		 * Note: The ID and type we asked idmap to map
+		 * were saved in *sim_id and sim_idtype.
+		 */
+		uid_t id = (sim->sim_id == NULL) ? (uid_t)-1 : *sim->sim_id;
+		syslog(LOG_ERR, "!smb_acl: Can't get SID for "
+		    "ID=%u type=%d, status=%d",
+		    id, sim->sim_idtype, sim->sim_stat);
+	}
+
+	if ((sib->sib_flags & SMB_IDMAP_SID2ID) != 0) {
+		syslog(LOG_ERR, "!smb_acl: Can't get ID for "
+		    "SID %s-%u, status=%d",
+		    sim->sim_domsid, sim->sim_rid, sim->sim_stat);
+	}
+}
+
+/*
  * smb_acl_from_zfs
  *
  * Converts given ZFS ACL to a Windows ACL.
@@ -250,6 +298,11 @@ smb_acl_from_zfs(acl_t *zacl)
 	if (idm_stat != IDMAP_SUCCESS)
 		return (NULL);
 
+	/*
+	 * Note that smb_fsacl_getsids sets up references in
+	 * sib.sib_maps to the zace->a_who fields that live
+	 * until smb_idmap_batch_destroy is called.
+	 */
 	if (smb_fsacl_getsids(&sib, zacl) != IDMAP_SUCCESS) {
 		smb_idmap_batch_destroy(&sib);
 		return (NULL);
@@ -353,7 +406,7 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 		}
 	}
 
-	idm_stat = smb_idmap_batch_getmappings(&sib);
+	idm_stat = smb_idmap_batch_getmappings(&sib, smb_acl_bgm_error);
 	if (idm_stat != IDMAP_SUCCESS) {
 		smb_fsacl_free(zacl);
 		smb_idmap_batch_destroy(&sib);
@@ -409,6 +462,7 @@ smb_ace_wellknown_update(const char *sid, ace_t *zace)
  * smb_fsacl_getsids
  *
  * Batch all the uid/gid in given ZFS ACL to get their corresponding SIDs.
+ * Note: sib is type SMB_IDMAP_ID2SID, zacl->acl_cnt entries.
  */
 static idmap_stat
 smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
@@ -436,8 +490,10 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 
 		case ACE_IDENTIFIER_GROUP:
 			/* regular group */
-			id = zace->a_who;
 			idtype = SMB_IDMAP_GROUP;
+			id = zace->a_who;
+			/* for smb_acl_bgm_error ID2SID */
+			sim->sim_id = &zace->a_who;
 			break;
 
 		case ACE_EVERYONE:
@@ -446,8 +502,11 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 
 		default:
 			/* user entry */
-			id = zace->a_who;
 			idtype = SMB_IDMAP_USER;
+			id = zace->a_who;
+			/* for smb_acl_bgm_error ID2SID */
+			sim->sim_id = &zace->a_who;
+			break;
 		}
 
 		idm_stat = smb_idmap_batch_getsid(sib->sib_idmaph, sim,
@@ -458,7 +517,7 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 		}
 	}
 
-	idm_stat = smb_idmap_batch_getmappings(sib);
+	idm_stat = smb_idmap_batch_getmappings(sib, smb_acl_bgm_error);
 	return (idm_stat);
 }
 
@@ -525,6 +584,70 @@ smb_fsacl_free(acl_t *acl)
 /*
  * ACE Functions
  */
+
+/*
+ * This is generic (ACL version 2) vs. object-specific
+ * (ACL version 4) ACE types.
+ */
+boolean_t
+smb_ace_is_generic(int type)
+{
+	switch (type) {
+	case ACE_ACCESS_ALLOWED_ACE_TYPE:
+	case ACE_ACCESS_DENIED_ACE_TYPE:
+	case ACE_SYSTEM_AUDIT_ACE_TYPE:
+	case ACE_SYSTEM_ALARM_ACE_TYPE:
+	case ACE_ACCESS_ALLOWED_CALLBACK_ACE_TYPE:
+	case ACE_ACCESS_DENIED_CALLBACK_ACE_TYPE:
+	case ACE_SYSTEM_AUDIT_CALLBACK_ACE_TYPE:
+	case ACE_SYSTEM_ALARM_CALLBACK_ACE_TYPE:
+		return (B_TRUE);
+
+	default:
+		break;
+	}
+
+	return (B_FALSE);
+}
+
+boolean_t
+smb_ace_is_access(int type)
+{
+	switch (type) {
+	case ACE_ACCESS_ALLOWED_ACE_TYPE:
+	case ACE_ACCESS_DENIED_ACE_TYPE:
+	case ACE_ACCESS_ALLOWED_COMPOUND_ACE_TYPE:
+	case ACE_ACCESS_ALLOWED_OBJECT_ACE_TYPE:
+	case ACE_ACCESS_DENIED_OBJECT_ACE_TYPE:
+	case ACE_ACCESS_ALLOWED_CALLBACK_ACE_TYPE:
+	case ACE_ACCESS_DENIED_CALLBACK_ACE_TYPE:
+	case ACE_ACCESS_ALLOWED_CALLBACK_OBJECT_ACE_TYPE:
+	case ACE_ACCESS_DENIED_CALLBACK_OBJECT_ACE_TYPE:
+		return (B_TRUE);
+
+	default:
+		break;
+	}
+
+	return (B_FALSE);
+}
+
+boolean_t
+smb_ace_is_audit(int type)
+{
+	switch (type) {
+	case ACE_SYSTEM_AUDIT_ACE_TYPE:
+	case ACE_SYSTEM_AUDIT_OBJECT_ACE_TYPE:
+	case ACE_SYSTEM_AUDIT_CALLBACK_ACE_TYPE:
+	case ACE_SYSTEM_AUDIT_CALLBACK_OBJECT_ACE_TYPE:
+		return (B_TRUE);
+
+	default:
+		break;
+	}
+
+	return (B_FALSE);
+}
 
 /*
  * smb_ace_len
@@ -624,4 +747,39 @@ smb_ace_flags_fromzfs(uint16_t z_flags)
 		c_flags |= INHERITED_ACE;
 
 	return (c_flags);
+}
+
+static boolean_t
+smb_ace_isvalid(smb_ace_t *ace, int which_acl)
+{
+	uint16_t min_len;
+
+	min_len = sizeof (smb_acehdr_t);
+
+	if (ace->se_hdr.se_bsize < min_len)
+		return (B_FALSE);
+
+	if (smb_ace_is_access(ace->se_hdr.se_type) &&
+	    (which_acl != SMB_DACL_SECINFO))
+		return (B_FALSE);
+
+	if (smb_ace_is_audit(ace->se_hdr.se_type) &&
+	    (which_acl != SMB_SACL_SECINFO))
+		return (B_FALSE);
+
+	if (smb_ace_is_generic(ace->se_hdr.se_type)) {
+		if (!smb_sid_isvalid(ace->se_sid))
+			return (B_FALSE);
+
+		min_len += sizeof (ace->se_mask);
+		min_len += smb_sid_len(ace->se_sid);
+
+		if (ace->se_hdr.se_bsize < min_len)
+			return (B_FALSE);
+	}
+
+	/*
+	 * object-specific ACE validation will be added later.
+	 */
+	return (B_TRUE);
 }

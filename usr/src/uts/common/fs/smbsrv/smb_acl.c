@@ -23,6 +23,15 @@
  * Use is subject to license terms.
  *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
+ */
+
+/*
+ * SMB server interfaces for ACL conversion (smb_acl_...)
+ *
+ * There are two variants of this interface:
+ * This is the kernel version.  See also:
+ * $SRC/lib/smbsrv/libsmb/common/smb_acl.c
  */
 
 #include <sys/sid.h>
@@ -203,11 +212,11 @@ smb_acl_isvalid(smb_acl_t *acl, int which_acl)
  * is enforced regardless of any inherited ACE that allows access.
  * Within the groups of noninherited ACEs and inherited ACEs, order ACEs
  * according to ACE type, as the following shows:
- * 	. Access-denied ACEs that apply to the object itself
- * 	. Access-denied ACEs that apply to a subobject of the
+ *	. Access-denied ACEs that apply to the object itself
+ *	. Access-denied ACEs that apply to a subobject of the
  *	  object, such as a property set or property
- * 	. Access-allowed ACEs that apply to the object itself
- * 	. Access-allowed ACEs that apply to a subobject of the object
+ *	. Access-allowed ACEs that apply to the object itself
+ *	. Access-allowed ACEs that apply to a subobject of the object
  *
  * So, here is the desired ACE order
  *
@@ -281,6 +290,36 @@ smb_acl_sort(smb_acl_t *acl)
 }
 
 /*
+ * Error handling call-back for smb_idmap_batch_getmappings.
+ * Would be nice if this could report the path, but that's not
+ * passed down here.  For now, use a dtrace fbt probe here.
+ */
+static void
+smb_acl_bgm_error(smb_idmap_batch_t *sib, smb_idmap_t *sim)
+{
+
+	if ((sib->sib_flags & SMB_IDMAP_SKIP_ERRS) != 0)
+		return;
+
+	if ((sib->sib_flags & SMB_IDMAP_ID2SID) != 0) {
+		/*
+		 * Note: The ID and type we asked idmap to map
+		 * were saved in *sim_id and sim_idtype.
+		 */
+		int id = (sim->sim_id == NULL) ? -1 : (int)*sim->sim_id;
+		cmn_err(CE_WARN, "!smb_acl: Can't get SID for "
+		    "ID=%d type=%d, status=%d",
+		    id, sim->sim_idtype, sim->sim_stat);
+	}
+
+	if ((sib->sib_flags & SMB_IDMAP_SID2ID) != 0) {
+		cmn_err(CE_WARN, "!smb_acl: Can't get ID for "
+		    "SID %s-%u, status=%d",
+		    sim->sim_domsid, sim->sim_rid, sim->sim_stat);
+	}
+}
+
+/*
  * smb_acl_from_zfs
  *
  * Converts given ZFS ACL to a Windows ACL.
@@ -304,6 +343,11 @@ smb_acl_from_zfs(acl_t *zacl)
 	if (idm_stat != IDMAP_SUCCESS)
 		return (NULL);
 
+	/*
+	 * Note that smb_fsacl_getsids sets up references in
+	 * sib.sib_maps to the zace->a_who fields that live
+	 * until smb_idmap_batch_destroy is called.
+	 */
 	if (smb_fsacl_getsids(&sib, zacl) != IDMAP_SUCCESS) {
 		smb_idmap_batch_destroy(&sib);
 		return (NULL);
@@ -411,7 +455,7 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 
 	kmem_free(sidstr, SMB_SID_STRSZ);
 
-	idm_stat = smb_idmap_batch_getmappings(&sib);
+	idm_stat = smb_idmap_batch_getmappings(&sib, smb_acl_bgm_error);
 	if (idm_stat != IDMAP_SUCCESS) {
 		smb_fsacl_free(zacl);
 		smb_idmap_batch_destroy(&sib);
@@ -467,6 +511,7 @@ smb_ace_wellknown_update(const char *sid, ace_t *zace)
  * smb_fsacl_getsids
  *
  * Batch all the uid/gid in given ZFS ACL to get their corresponding SIDs.
+ * Note: sib is type SMB_IDMAP_ID2SID, zacl->acl_cnt entries.
  */
 static idmap_stat
 smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
@@ -474,13 +519,14 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 	ace_t *zace;
 	idmap_stat idm_stat;
 	smb_idmap_t *sim;
-	uid_t id = (uid_t)-1;
+	uid_t id;
 	int i, idtype;
 
 	sim = sib->sib_maps;
 
 	for (i = 0, zace = zacl->acl_aclp; i < zacl->acl_cnt;
 	    zace++, i++, sim++) {
+		id = (uid_t)-1;	/* some types do not need id */
 		switch (zace->a_flags & ACE_TYPE_FLAGS) {
 		case ACE_OWNER:
 			idtype = SMB_IDMAP_OWNERAT;
@@ -493,8 +539,10 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 
 		case ACE_IDENTIFIER_GROUP:
 			/* regular group */
-			id = zace->a_who;
 			idtype = SMB_IDMAP_GROUP;
+			id = zace->a_who;
+			/* for smb_acl_bgm_error() ID2SID */
+			sim->sim_id = &zace->a_who;
 			break;
 
 		case ACE_EVERYONE:
@@ -503,8 +551,10 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 
 		default:
 			/* user entry */
-			id = zace->a_who;
 			idtype = SMB_IDMAP_USER;
+			id = zace->a_who;
+			/* for smb_acl_bgm_error() ID2SID */
+			sim->sim_id = &zace->a_who;
 		}
 
 		idm_stat = smb_idmap_batch_getsid(sib->sib_idmaph, sim,
@@ -515,7 +565,7 @@ smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl)
 		}
 	}
 
-	idm_stat = smb_idmap_batch_getmappings(sib);
+	idm_stat = smb_idmap_batch_getmappings(sib, smb_acl_bgm_error);
 	return (idm_stat);
 }
 
@@ -666,16 +716,16 @@ smb_fsacl_split(acl_t *zacl, acl_t **dacl, acl_t **sacl, int which_acl)
  * child objects for different combinations of inheritance flags. These
  * inheritance rules work the same for both DACLs and SACLs.
  *
- * Parent ACE type 			Effect on Child ACL
+ * Parent ACE type			Effect on Child ACL
  * -----------------------		-------------------
- * OBJECT_INHERIT_ACE only 		Noncontainer child objects:
+ * OBJECT_INHERIT_ACE only		Noncontainer child objects:
  *					Inherited as an effective ACE.
  *					Container child objects:
  *					Containers inherit an inherit-only ACE
  *					unless the NO_PROPAGATE_INHERIT_ACE bit
  *					flag is also set.
  *
- * CONTAINER_INHERIT_ACE only 		Noncontainer child objects:
+ * CONTAINER_INHERIT_ACE only		Noncontainer child objects:
  *					No effect on the child object.
  *					Container child objects:
  *				The child object inherits an effective ACE.
@@ -683,14 +733,14 @@ smb_fsacl_split(acl_t *zacl, acl_t **dacl, acl_t **sacl, int which_acl)
  *				NO_PROPAGATE_INHERIT_ACE bit flag is also set.
  *
  * CONTAINER_INHERIT_ACE and
- * OBJECT_INHERIT_ACE 			Noncontainer child objects:
+ * OBJECT_INHERIT_ACE			Noncontainer child objects:
  *					Inherited as an effective ACE.
  *					Container child objects:
  *				The child object inherits an effective ACE.
  *				The inherited ACE is inheritable unless the
  *				NO_PROPAGATE_INHERIT_ACE bit flag is also set
  *
- * No inheritance flags set 	No effect on child container or noncontainer
+ * No inheritance flags set	No effect on child container or noncontainer
  *				objects.
  *
  * If an inherited ACE is an effective ACE for the child object, the system
