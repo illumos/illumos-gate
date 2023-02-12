@@ -24,6 +24,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
@@ -37,6 +38,7 @@
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb_frame.h>
 #include <mdb/mdb.h>
+#include <inttypes.h>
 
 /*
  * Private callback structure for implementing mdb_walk_dcmd, below.
@@ -262,11 +264,9 @@ mdb_getareg(mdb_tid_t tid, const char *rname, mdb_reg_t *rp)
 	return (mdb_tgt_getareg(mdb.m_target, tid, rname, rp));
 }
 
-u_longlong_t
-mdb_strtoull(const char *s)
+static u_longlong_t
+mdb_strtoull_int(const char *s, int radix)
 {
-	int radix = mdb.m_radix;
-
 	if (s[0] == '0') {
 		switch (s[1]) {
 		case 'I':
@@ -293,6 +293,32 @@ mdb_strtoull(const char *s)
 	}
 
 	return (mdb_strtonum(s, radix));
+}
+
+u_longlong_t
+mdb_strtoullx(const char *s, mdb_strtoull_flags_t flags)
+{
+	int radix;
+
+	if ((flags & ~MDB_STRTOULL_F_BASE_C) != 0) {
+		mdb_warn("invalid options specified: 0x%lx" PRIx64 "\n",
+		    (uint64_t)flags);
+		return ((uintmax_t)ULLONG_MAX);
+	}
+
+	if ((flags & MDB_STRTOULL_F_BASE_C) != 0) {
+		radix = 10;
+	} else {
+		radix = mdb.m_radix;
+	}
+
+	return (mdb_strtoull_int(s, radix));
+}
+
+u_longlong_t
+mdb_strtoull(const char *s)
+{
+	return (mdb_strtoull_int(s, mdb.m_radix));
 }
 
 size_t

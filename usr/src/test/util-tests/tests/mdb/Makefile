@@ -111,6 +111,8 @@ FILES = \
 	typedef/tst.libctype.ksh \
 	typedef/tst.libctype.ksh.out \
 	typedef/tst.models.ksh \
+	typedef/tst.radix.mdb \
+	typedef/tst.radix.mdb.out \
 	typedef/tst.struct.mdb \
 	typedef/tst.struct.mdb.out \
 	typedef/tst.structselfref.mdb \

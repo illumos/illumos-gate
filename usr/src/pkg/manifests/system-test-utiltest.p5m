@@ -1674,6 +1674,8 @@ file path=opt/util-tests/tests/mdb/typedef/tst.emptylist.mdb mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.libctype.ksh mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.libctype.ksh.out mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.models.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.radix.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.radix.mdb.out mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.struct.mdb mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.struct.mdb.out mode=0444
 file path=opt/util-tests/tests/mdb/typedef/tst.structselfref.mdb mode=0444

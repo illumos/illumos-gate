@@ -1,0 +1,8 @@
+sizeof (foo_t) = 0xa
+0 foo_t {
+    0 uint8_t [10] foo 
+}
+sizeof (bar_t) = 0x10
+0 bar_t {
+    0 uint8_t [16] foo 
+}
