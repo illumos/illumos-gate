@@ -656,9 +656,7 @@ link path=usr/share/man/man9f/esballoca.9f target=esballoc.9f
 file path=usr/share/man/man9f/esbbcall.9f
 file path=usr/share/man/man9f/firmload.9f
 link path=usr/share/man/man9f/firmware_close.9f target=firmload.9f
-link path=usr/share/man/man9f/firmware_free.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_get_size.9f target=firmload.9f
-link path=usr/share/man/man9f/firmware_malloc.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_open.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_read.9f target=firmload.9f
 file path=usr/share/man/man9f/flushband.9f

@@ -912,9 +912,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		dluderrorind.9f					\
 		esballoca.9f					\
 		firmware_close.9f				\
-		firmware_free.9f				\
 		firmware_get_size.9f				\
-		firmware_malloc.9f				\
 		firmware_open.9f				\
 		firmware_read.9f				\
 		free_pktiopb.9f					\
@@ -1720,9 +1718,7 @@ esballoca.9f				:= LINKSRC = esballoc.9f
 unfreezestr.9f				:= LINKSRC = freezestr.9f
 
 firmware_close.9f			:= LINKSRC = firmload.9f
-firmware_free.9f			:= LINKSRC = firmload.9f
 firmware_get_size.9f			:= LINKSRC = firmload.9f
-firmware_malloc.9f			:= LINKSRC = firmload.9f
 firmware_open.9f			:= LINKSRC = firmload.9f
 firmware_read.9f			:= LINKSRC = firmload.9f
 
