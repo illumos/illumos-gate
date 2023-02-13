@@ -40,7 +40,7 @@
 
 
 int
-init_mapping_system()
+init_mapping_system(void)
 {
 	int rc = 0;
 
@@ -60,13 +60,13 @@ init_mapping_system()
 }
 
 void
-fini_mapping_system()
+fini_mapping_system(void)
 {
 	fini_dbs();
 }
 
 int
-load_config()
+load_config(void)
 {
 	int rc;
 	if ((_idmapdstate.cfg = idmap_cfg_init()) == NULL) {
@@ -106,7 +106,7 @@ load_config()
 
 
 void
-reload_gcs()
+reload_gcs(void)
 {
 	int		i, j;
 	adutils_ad_t	**new_gcs;
@@ -240,7 +240,6 @@ out:
  * domains in other forests.  However, we don't yet discover any DCs other
  * than the DCs for the joined domain.
  */
-static
 void
 reload_dcs(void)
 {
@@ -329,14 +328,6 @@ nomem:
 			adutils_ad_free(&new_dcs[0]);
 		free(new_dcs);
 	}
-}
-
-
-void
-reload_ad(void)
-{
-	reload_gcs();
-	reload_dcs();
 }
 
 void

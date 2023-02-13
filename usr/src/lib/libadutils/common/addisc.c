@@ -176,8 +176,11 @@ do_res_ninit(ad_disc_t ctx)
 	int rc;
 
 	rc = res_ninit(&ctx->res_state);
-	if (rc != 0)
+	if (rc != 0) {
+		if (DBG(DNS, 0))
+			logger(LOG_INFO, "res_ninit failed: %d", rc);
 		return (rc);
+	}
 	ctx->res_ninitted = 1;
 	/*
 	 * The SRV records returnd by AD can be larger than 512 bytes,
@@ -244,7 +247,7 @@ is_valid(ad_item_t *item)
 
 static void
 update_item(ad_item_t *item, void *value, enum ad_item_state state,
-		uint32_t ttl)
+    uint32_t ttl)
 {
 	if (item->value != NULL && value != NULL) {
 		if ((item->type == AD_STRING &&
@@ -348,7 +351,7 @@ ds_dup(const ad_disc_ds_t *srv)
 
 int
 ad_disc_compare_trusteddomains(ad_disc_trusteddomains_t *td1,
-			ad_disc_trusteddomains_t *td2)
+    ad_disc_trusteddomains_t *td2)
 {
 	int		i, j;
 	int		num_td1;
@@ -404,7 +407,7 @@ td_dup(const ad_disc_trusteddomains_t *td)
 
 int
 ad_disc_compare_domainsinforest(ad_disc_domainsinforest_t *df1,
-			ad_disc_domainsinforest_t *df2)
+    ad_disc_domainsinforest_t *df2)
 {
 	int		i, j;
 	int		num_df1;
@@ -716,7 +719,7 @@ ldap_lookup_init(ad_disc_ds_t *ds)
  */
 ad_disc_trusteddomains_t *
 ldap_lookup_trusted_domains(LDAP **ld, ad_disc_ds_t *globalCatalog,
-			char *base_dn)
+    char *base_dn)
 {
 	int		scope = LDAP_SCOPE_SUBTREE;
 	char		*attrs[3];
@@ -1696,7 +1699,7 @@ try_global:
 
 ad_disc_ds_t *
 ad_disc_get_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req,
-			boolean_t *auto_discovered)
+    boolean_t *auto_discovered)
 {
 	ad_disc_ds_t *global_catalog = NULL;
 	ad_item_t *global_catalog_item;
@@ -1928,7 +1931,7 @@ auto_set_DomainGUID(ad_disc_t ctx, uchar_t *u)
 
 int
 ad_disc_set_DomainController(ad_disc_t ctx,
-				const ad_disc_ds_t *domainController)
+    const ad_disc_ds_t *domainController)
 {
 	ad_disc_ds_t *domain_controller = NULL;
 	if (domainController != NULL) {

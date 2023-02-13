@@ -224,8 +224,8 @@ static int sql_exec_tran_no_cb(sqlite *db, char *sql, const char *dbname,
 static
 int
 init_db_instance(const char *dbname, int version,
-	const char *detect_version_sql, char * const *sql,
-	init_db_option_t opt, int *created, int *upgraded)
+    const char *detect_version_sql, char * const *sql,
+    init_db_option_t opt, int *created, int *upgraded)
 {
 	int rc, curr_version;
 	int tries = 1;
@@ -331,7 +331,6 @@ done:
  * operation until it is successful.
  */
 int
-/* LINTED E_FUNC_ARG_UNUSED */
 idmap_sqlite_busy_handler(void *arg, const char *table_name, int count)
 {
 	struct idmap_busy	*busy = arg;
@@ -444,7 +443,7 @@ get_cache_handle(sqlite **cache)
  * Initialize cache and db
  */
 int
-init_dbs()
+init_dbs(void)
 {
 	char *sql[4];
 	int created, upgraded;
@@ -477,7 +476,7 @@ init_dbs()
  * Finalize databases
  */
 void
-fini_dbs()
+fini_dbs(void)
 {
 }
 
@@ -519,7 +518,7 @@ idmapd_string2stat(const char *msg)
 static
 int
 sql_exec_tran_no_cb(sqlite *db, char *sql, const char *dbname,
-	const char *while_doing)
+    const char *while_doing)
 {
 	char		*errmsg = NULL;
 	int		rc;
@@ -689,7 +688,7 @@ out:
  */
 idmap_retcode
 process_list_svc_sql(sqlite *db, const char *dbname, char *sql, uint64_t limit,
-		int flag, list_svc_cb cb, void *result)
+    int flag, list_svc_cb cb, void *result)
 {
 	list_cb_data_t	cb_data;
 	char		*errmsg = NULL;
@@ -727,7 +726,7 @@ process_list_svc_sql(sqlite *db, const char *dbname, char *sql, uint64_t limit,
  */
 idmap_retcode
 validate_list_cb_data(list_cb_data_t *cb_data, int argc, char **argv,
-		int ncol, uchar_t **list, size_t valsize)
+    int ncol, uchar_t **list, size_t valsize)
 {
 	size_t	nsize;
 	void	*tmplist;
@@ -759,7 +758,7 @@ validate_list_cb_data(list_cb_data_t *cb_data, int argc, char **argv,
 static
 idmap_retcode
 get_namerule_order(char *winname, char *windomain, char *unixname,
-	int direction, int is_diagonal, int *w2u_order, int *u2w_order)
+    int direction, int is_diagonal, int *w2u_order, int *u2w_order)
 {
 	*w2u_order = 0;
 	*u2w_order = 0;
@@ -1013,7 +1012,7 @@ out:
 static
 idmap_retcode
 sql_compile_n_step_once(sqlite *db, char *sql, sqlite_vm **vm, int *ncol,
-		int reqcol, const char ***values)
+    int reqcol, const char ***values)
 {
 	char		*errmsg = NULL;
 	int		r;
@@ -1157,8 +1156,8 @@ load_cfg_in_state(lookup_state_t *state)
  */
 static void
 idmap_namerule_set(idmap_namerule *rule, const char *windomain,
-		const char *winname, const char *unixname, boolean_t is_user,
-		boolean_t is_wuser, boolean_t is_nt4, int direction)
+    const char *winname, const char *unixname, boolean_t is_user,
+    boolean_t is_wuser, boolean_t is_nt4, int direction)
 {
 	/*
 	 * Only update if they differ because we have to free
@@ -1739,7 +1738,7 @@ xlate_legacy_type(int type)
 static
 idmap_retcode
 lookup_cache_sid2name(sqlite *cache, const char *sidprefix, idmap_rid_t rid,
-		char **canonname, char **canondomain, idmap_id_type *type)
+    char **canonname, char **canondomain, idmap_id_type *type)
 {
 	char		*end;
 	char		*sql = NULL;
@@ -1884,8 +1883,8 @@ lookup_name_cache(sqlite *cache, idmap_mapping *req, idmap_id_res *res)
 
 static int
 ad_lookup_batch_int(lookup_state_t *state, idmap_mapping_batch *batch,
-		idmap_ids_res *result, adutils_ad_t *dir, int how_local,
-		int *num_processed)
+    idmap_ids_res *result, adutils_ad_t *dir, int how_local,
+    int *num_processed)
 {
 	idmap_retcode	retcode;
 	int		i,  num_queued, is_wuser, is_user;
@@ -2378,7 +2377,7 @@ out:
  */
 idmap_retcode
 ad_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
-		idmap_ids_res *result)
+    idmap_ids_res *result)
 {
 	idmap_retcode	retcode;
 	int		i, j;
@@ -2532,7 +2531,7 @@ out:
  */
 idmap_retcode
 sid2pid_first_pass(lookup_state_t *state, idmap_mapping *req,
-		idmap_id_res *res)
+    idmap_id_res *res)
 {
 	idmap_retcode	retcode;
 	int		wksid;
@@ -2756,13 +2755,13 @@ out:
 
 /*
  * Generate SID using the following convention
- * 	<machine-sid-prefix>-<1000 + uid>
- * 	<machine-sid-prefix>-<2^31 + gid>
+ *	<machine-sid-prefix>-<1000 + uid>
+ *	<machine-sid-prefix>-<2^31 + gid>
  */
 static
 idmap_retcode
 generate_localsid(idmap_mapping *req, idmap_id_res *res, int is_user,
-		int fallback)
+    int fallback)
 {
 	free(res->id.idmap_id_u.sid.prefix);
 	res->id.idmap_id_u.sid.prefix = NULL;
@@ -3007,7 +3006,7 @@ ns_lookup_bypid(uid_t pid, int is_user, char **unixname)
 static
 idmap_retcode
 name_based_mapping_sid2pid(lookup_state_t *state,
-		idmap_mapping *req, idmap_id_res *res)
+    idmap_mapping *req, idmap_id_res *res)
 {
 	const char	*unixname, *windomain;
 	char		*sql = NULL, *errmsg = NULL, *lower_winname = NULL;
@@ -3279,7 +3278,7 @@ gethash(const char *str, uint32_t num, uint_t htsize)
 static
 int
 get_from_sid_history(lookup_state_t *state, const char *prefix, uint32_t rid,
-		uid_t *pid)
+    uid_t *pid)
 {
 	uint_t		next, key;
 	uint_t		htsize = state->sid_history_size;
@@ -3335,7 +3334,7 @@ cleanup_lookup_state(lookup_state_t *state)
 static
 idmap_retcode
 dynamic_ephemeral_mapping(lookup_state_t *state,
-		idmap_mapping *req, idmap_id_res *res)
+    idmap_mapping *req, idmap_id_res *res)
 {
 
 	uid_t		next_pid;
@@ -3378,7 +3377,7 @@ dynamic_ephemeral_mapping(lookup_state_t *state,
 
 idmap_retcode
 sid2pid_second_pass(lookup_state_t *state,
-		idmap_mapping *req, idmap_id_res *res)
+    idmap_mapping *req, idmap_id_res *res)
 {
 	idmap_retcode	retcode;
 	idmap_retcode	retcode2;
@@ -3575,7 +3574,7 @@ out:
 
 idmap_retcode
 update_cache_pid2sid(lookup_state_t *state,
-		idmap_mapping *req, idmap_id_res *res)
+    idmap_mapping *req, idmap_id_res *res)
 {
 	char		*sql = NULL;
 	idmap_retcode	retcode;
@@ -3583,7 +3582,7 @@ update_cache_pid2sid(lookup_state_t *state,
 	char		*map_dn = NULL;
 	char		*map_attr = NULL;
 	char		*map_value = NULL;
-	char 		*map_windomain = NULL;
+	char		*map_windomain = NULL;
 	char		*map_winname = NULL;
 	char		*map_unixname = NULL;
 	int		map_is_nt4 = FALSE;
@@ -3725,7 +3724,7 @@ out:
 
 idmap_retcode
 update_cache_sid2pid(lookup_state_t *state,
-		idmap_mapping *req, idmap_id_res *res)
+    idmap_mapping *req, idmap_id_res *res)
 {
 	char		*sql = NULL;
 	idmap_retcode	retcode;
@@ -3733,7 +3732,7 @@ update_cache_sid2pid(lookup_state_t *state,
 	char		*map_dn = NULL;
 	char		*map_attr = NULL;
 	char		*map_value = NULL;
-	char 		*map_windomain = NULL;
+	char		*map_windomain = NULL;
 	char		*map_winname = NULL;
 	char		*map_unixname = NULL;
 	int		map_is_nt4 = FALSE;
@@ -3876,7 +3875,7 @@ out:
 static
 idmap_retcode
 lookup_cache_pid2sid(sqlite *cache, idmap_mapping *req, idmap_id_res *res,
-		int is_user)
+    int is_user)
 {
 	char		*end;
 	char		*sql = NULL;
@@ -4186,10 +4185,10 @@ out:
 static
 idmap_retcode
 ad_lookup_by_winname(lookup_state_t *state,
-		const char *name, const char *domain, int esidtype,
-		char **dn, char **attr, char **value, char **canonname,
-		char **sidprefix, idmap_rid_t *rid, idmap_id_type *wintype,
-		char **unixname)
+    const char *name, const char *domain, int esidtype,
+    char **dn, char **attr, char **value, char **canonname,
+    char **sidprefix, idmap_rid_t *rid, idmap_id_type *wintype,
+    char **unixname)
 {
 	int			retries;
 	idmap_query_state_t	*qs = NULL;
@@ -4406,7 +4405,7 @@ out:
 static
 idmap_retcode
 name_based_mapping_pid2sid(lookup_state_t *state, const char *unixname,
-		int is_user, idmap_mapping *req, idmap_id_res *res)
+    int is_user, idmap_mapping *req, idmap_id_res *res)
 {
 	const char	*winname, *windomain;
 	char		*canonname;
@@ -4648,7 +4647,7 @@ out:
  */
 idmap_retcode
 pid2sid_first_pass(lookup_state_t *state, idmap_mapping *req,
-		idmap_id_res *res, int is_user)
+    idmap_id_res *res, int is_user)
 {
 	idmap_retcode	retcode;
 	idmap_retcode	retcode2;
@@ -4780,7 +4779,7 @@ out:
 
 idmap_retcode
 pid2sid_second_pass(lookup_state_t *state, idmap_mapping *req,
-	idmap_id_res *res, int is_user)
+    idmap_id_res *res, int is_user)
 {
 	bool_t		gen_localsid_on_err = TRUE;
 	idmap_retcode	retcode = IDMAP_SUCCESS;
