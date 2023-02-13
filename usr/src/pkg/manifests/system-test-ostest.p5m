@@ -125,6 +125,7 @@ file path=opt/os-tests/tests/secflags/stacky mode=0555
 dir  path=opt/os-tests/tests/signalfd
 file path=opt/os-tests/tests/signalfd/basic_args mode=0555
 file path=opt/os-tests/tests/signalfd/basic_read mode=0555
+file path=opt/os-tests/tests/signalfd/multipoll mode=0555
 dir  path=opt/os-tests/tests/sigqueue
 file path=opt/os-tests/tests/sigqueue/sigqueue_queue_size mode=0555
 dir  path=opt/os-tests/tests/sockfs

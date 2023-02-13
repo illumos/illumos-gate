@@ -190,16 +190,15 @@ static taskq_t		*signalfd_wakeq;	/* pollwake event taskq */
 static void
 signalfd_proc_clean(proc_t *p)
 {
-	ASSERT(MUTEX_HELD(&p->p_lock));
-
 	sigfd_proc_state_t *pstate = p->p_sigfd;
-	if (pstate != NULL) {
-		ASSERT(list_is_empty(&pstate->sigfd_list));
 
-		p->p_sigfd = NULL;
-		list_destroy(&pstate->sigfd_list);
-		kmem_free(pstate, sizeof (*pstate));
-	}
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(pstate != NULL);
+	VERIFY(list_is_empty(&pstate->sigfd_list));
+
+	p->p_sigfd = NULL;
+	list_destroy(&pstate->sigfd_list);
+	kmem_free(pstate, sizeof (*pstate));
 }
 
 static void
@@ -415,7 +414,13 @@ signalfd_pollers_dissociate(signalfd_state_t *state)
 		signalfd_poller_wake(sp, POLLERR);
 		mutex_exit(&sp->sp_lock);
 
-		signalfd_proc_clean(p);
+		if (list_is_empty(&pstate->sigfd_list)) {
+			/*
+			 * If this poller was the last associated against the
+			 * process, then clean up its state as well.
+			 */
+			signalfd_proc_clean(p);
+		}
 		mutex_exit(&p->p_lock);
 	}
 	mutex_exit(&pidlock);
