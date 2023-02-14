@@ -58,7 +58,7 @@ tests = ['secflags_aslr',
          'secflags_zonecfg']
 
 [/opt/os-tests/tests/signalfd]
-tests = ['basic_args', 'basic_read']
+tests = ['basic_args', 'basic_read', 'multipoll']
 
 [/opt/os-tests/tests/sigqueue]
 tests = ['sigqueue_queue_size']
