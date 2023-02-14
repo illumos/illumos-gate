@@ -5432,7 +5432,6 @@ print_set_creat_perms(uu_avl_t *who_avl)
 		gettext("Create time permissions:\n"),
 		NULL
 	};
-	const char **title_ptr = sc_title;
 	who_perm_node_t *who_node = NULL;
 	int prev_weight = -1;
 
@@ -5446,7 +5445,9 @@ print_set_creat_perms(uu_avl_t *who_avl)
 		deleg_perm_node_t *deleg_node;
 
 		if (prev_weight != weight) {
-			(void) printf(*title_ptr++);
+			VERIFY3S(weight, >=, 0);
+			VERIFY3S(weight, <=, 1);
+			(void) printf(sc_title[weight]);
 			prev_weight = weight;
 		}
 
