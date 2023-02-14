@@ -82,7 +82,8 @@ static void netbiosname2ascii(char *asciiname, uchar_t *netbiosname);
  * with NO alignment assumed.
  */
 static ushort_t
-getshort(uchar_t *p) {
+getshort(uchar_t *p)
+{
 	return (p[1] + (p[0]<<8));
 }
 static uint_t
@@ -209,33 +210,33 @@ interpret_netbios_datagram(int flags, uchar_t *data, int len)
 		data += 14;
 		netbiosname2ascii(name, data);
 		sprintf(get_sum_line(),
-				"NBT Datagram Service Type=%d Source=%s",
-				packettype, name);
+		    "NBT Datagram Service Type=%d Source=%s",
+		    packettype, name);
 	}
 
 	if (flags & F_DTAIL) {
 		show_header("NBT:  ", "Netbios Datagram Service Header", len);
 		show_space();
 		sprintf(get_line(0, 0), "Datagram Packet Type = 0x%.2x",
-					packettype);
+		    packettype);
 		sprintf(get_line(0, 0), "Datagram Flags = 0x%.2x",
-					data[0]);
+		    data[0]);
 		data++;
 		sprintf(get_line(0, 0), "Datagram ID = 0x%.4x",
-					getshort(data));
+		    getshort(data));
 		data += 2;
 		sprintf(get_line(0, 0), "Source IP = %d.%d.%d.%d",
-					data[0], data[1], data[2], data[3]);
+		    data[0], data[1], data[2], data[3]);
 		data += 4;
 		sprintf(get_line(0, 0), "Source Port = %d",
-					getshort(data));
+		    getshort(data));
 		data += 2;
 		packetlen = getshort(data);
 		sprintf(get_line(0, 0), "Datagram Length = 0x%.4x",
-					packetlen);
+		    packetlen);
 		data += 2;
 		sprintf(get_line(0, 0), "Packet Offset = 0x%.4x",
-					getshort(data));
+		    getshort(data));
 		data += 3;
 		netbiosname2ascii(name, data);
 		sprintf(get_line(0, 0), "Source Name = %s", name);
@@ -243,7 +244,7 @@ interpret_netbios_datagram(int flags, uchar_t *data, int len)
 		netbiosname2ascii(name, data);
 		sprintf(get_line(0, 0), "Destination Name = %s", name);
 		sprintf(get_line(0, 0), "Number of data bytes remaining = %d",
-					packetlen - 68);
+		    packetlen - 68);
 		show_trailer();
 	}
 }
@@ -280,7 +281,7 @@ interpret_netbios_ns(int flags, uchar_t *data, int len)
 		data++;
 		netbiosname2ascii(name, data);
 		sprintf(get_sum_line(), "NBT NS %s for %s, %s",
-			extra, name, errortype);
+		    extra, name, errortype);
 
 	}
 
@@ -292,13 +293,13 @@ interpret_netbios_ns(int flags, uchar_t *data, int len)
 		sprintf(get_line(0, 0), "Status = %s", errortype);
 		sprintf(get_line(0, 0), "Transaction ID = 0x%.4x", transid);
 		sprintf(get_line(0, 0), "Flags Summary = 0x%.4x",
-					headerflags);
+		    headerflags);
 		print_flag_details(headerflags);
 		sprintf(get_line(0, 0), "Question count = %d", qcount);
 		sprintf(get_line(0, 0), "Answer Count = %d", acount);
 		sprintf(get_line(0, 0), "Name Service Count = %d", nscount);
 		sprintf(get_line(0, 0),
-				"Additional Record Count = %d", arcount);
+		    "Additional Record Count = %d", arcount);
 
 		/*
 		 * Question Section Packet Description from
@@ -311,10 +312,10 @@ interpret_netbios_ns(int flags, uchar_t *data, int len)
 			sprintf(get_line(0, 0), "Question Name = %s", name);
 			data += 33;
 			sprintf(get_line(0, 0), "Question Type = 0x%.4x",
-						getshort(data));
+			    getshort(data));
 			data += 2;
 			sprintf(get_line(0, 0), "Question Class = 0x%.4x",
-						getshort(data));
+			    getshort(data));
 			data += 2;
 		}
 
@@ -330,49 +331,49 @@ interpret_netbios_ns(int flags, uchar_t *data, int len)
 				nameptr = getshort(data)&0x3fff;
 				netbiosname2ascii(name, (data0+nameptr+1));
 				sprintf(get_line(0, 0),
-					"Resource Record Name = %s", name);
+				    "Resource Record Name = %s", name);
 				data += 2;
 			} else {
 				data++;
 				netbiosname2ascii(name, data);
 				sprintf(get_line(0, 0),
-					"Resource Record Name = %s", name);
+				    "Resource Record Name = %s", name);
 				data += 33;
 			}
 			sprintf(get_line(0, 0),
-					"Resource Record Type = 0x%.4x",
-					getshort(data));
+			    "Resource Record Type = 0x%.4x",
+			    getshort(data));
 			data += 2;
 			sprintf(get_line(0, 0),
-					"Resource Record Class = 0x%.4x",
-					getshort(data));
+			    "Resource Record Class = 0x%.4x",
+			    getshort(data));
 			data += 2;
 			sprintf(get_line(0, 0),
-				"Time to Live (Milliseconds) = %d",
-				getlong(data));
+			    "Time to Live (Milliseconds) = %d",
+			    getlong(data));
 			data += 4;
 			rdatalen = getshort(data);
 			sprintf(get_line(0, 0), "RDATA Length = 0x%.4x",
-						rdatalen);
+			    rdatalen);
 			data += 2;
 			/* 15.4.2.1.3 */
 			if (rdatalen == 6) {
 				rrflags = getshort(data);
 				data += 2;
 				sprintf(get_line(0, 0),
-					"Resource Record Flags = 0x%.4x",
-					rrflags);
+				    "Resource Record Flags = 0x%.4x",
+				    rrflags);
 				nodecode = (rrflags>>13)& 0x11;
 				if (nodecode == 0) nodetype = "B";
 				if (nodecode == 1) nodetype = "P";
 				if (nodecode == 2) nodetype = "M";
 				sprintf(get_line(0, 0), "   - %s, %s node",
-					(rrflags & 1<<15) ?
-					"Group NetBIOS Name":
-					"Unique NetBIOS Name", nodetype);
+				    (rrflags & 1<<15) ?
+				    "Group NetBIOS Name":
+				    "Unique NetBIOS Name", nodetype);
 				sprintf(get_line(0, 0),
-					"Owner IP Address = %d.%d.%d.%d",
-					data[0], data[1], data[2], data[3]);
+				    "Owner IP Address = %d.%d.%d.%d",
+				    data[0], data[1], data[2], data[3]);
 			}
 		}
 		show_trailer();
@@ -424,7 +425,7 @@ interpret_netbios_ses(int flags, uchar_t *data, int len)
 		case 0x81:
 			type = "SESSION REQUEST";
 			interpret_netbios_names(flags, trailer,
-						length, extrainfo);
+			    length, extrainfo);
 			break;
 		case 0x82:
 			type = "POSITIVE SESSION RESPONSE";
@@ -443,7 +444,7 @@ interpret_netbios_ses(int flags, uchar_t *data, int len)
 			break;
 		}
 		(void) sprintf(get_sum_line(),
-			"NBT Type=%s %sLength=%d", type, extrainfo, length);
+		    "NBT Type=%s %sLength=%d", type, extrainfo, length);
 	}
 
 	if (flags & F_DTAIL) {
@@ -453,32 +454,32 @@ interpret_netbios_ses(int flags, uchar_t *data, int len)
 		switch (ss->type) {
 		case 0x00:
 			(void) sprintf(get_line(0, 0),
-			"Type = SESSION MESSAGE");
+			    "Type = SESSION MESSAGE");
 			break;
 		case 0x81:
 			(void) sprintf(get_line(0, 0),
-			"Type = SESSION REQUEST");
+			    "Type = SESSION REQUEST");
 			interpret_netbios_names(flags, trailer, length, 0);
 			break;
 		case 0x82:
 			(void) sprintf(get_line(0, 0),
-			"Type = POSITIVE SESSION RESPONSE");
+			    "Type = POSITIVE SESSION RESPONSE");
 			break;
 		case 0x83:
 			(void) sprintf(get_line(0, 0),
-			"Type = NEGATIVE SESSION RESPONSE");
+			    "Type = NEGATIVE SESSION RESPONSE");
 			break;
 		case 0x84:
 			(void) sprintf(get_line(0, 0),
-			"Type = RETARGET SESSION RESPONSE");
+			    "Type = RETARGET SESSION RESPONSE");
 			break;
 		case 0x85:
 			(void) sprintf(get_line(0, 0),
-			"Type = SESSION KEEP ALIVE");
+			    "Type = SESSION KEEP ALIVE");
 			break;
 		default:
 			(void) sprintf(get_line(0, 0),
-			"Type = Unknown");
+			    "Type = Unknown");
 			break;
 		}
 
@@ -502,7 +503,7 @@ interpret_netbios_ses(int flags, uchar_t *data, int len)
 
 /*
  * NetBIOS name encoding (First Level Encoding)
- * [RFC 1001, Sec. 4.1]
+ * [RFC 1001, Sec. 14.1]
  */
 static void
 netbiosname2ascii(char *aname, uchar_t *nbname)
@@ -512,8 +513,7 @@ netbiosname2ascii(char *aname, uchar_t *nbname)
 	i = j = 0;
 	for (;;) {
 		c = nbname[i++] - 'A';
-		c = (c << 4) +
-			nbname[i++] - 'A';
+		c = (c << 4) + nbname[i++] - 'A';
 		/* 16th char is the "type" */
 		if (i >= 32)
 			break;
@@ -522,6 +522,7 @@ netbiosname2ascii(char *aname, uchar_t *nbname)
 		if (c != ' ')
 			aname[j++] = c;
 	}
+	c &= 0xff;
 	sprintf(&aname[j], "[%x]", c);
 }
 
