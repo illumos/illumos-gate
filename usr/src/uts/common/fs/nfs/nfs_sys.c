@@ -32,6 +32,7 @@
 /*
  * Copyright 2017 Joyent, Inc.
  * Copyright 2018 Nexenta Systems, Inc.
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 #include <sys/types.h>
@@ -50,16 +51,6 @@
 #include <rpc/auth.h>
 #include <rpc/rpcsys.h>
 #include <rpc/svc.h>
-
-/*
- * This is filled in with an appropriate address for the
- * function that will traverse the rfs4_client_t table
- * and mark any matching IP Address as "forced_expire".
- *
- * It is the server init() function that plops the
- * function pointer.
- */
-void (*rfs4_client_clrst)(struct nfs4clrst_args *) = NULL;
 
 /* This filled in by nfssrv:_init() */
 void (*nfs_srv_quiesce_func)(void) = NULL;
@@ -109,14 +100,6 @@ nfssys(enum nfssys_op opcode, void *arg)
 		struct nfs4clrst_args clr;
 		STRUCT_DECL(nfs4clrst_args, u_clr);
 
-		/*
-		 * If the server is not loaded then no point in
-		 * clearing nothing :-)
-		 */
-		if (rfs4_client_clrst == NULL) {
-			break;
-		}
-
 		STRUCT_INIT(u_clr, get_udatamodel());
 
 		if (copyin(arg, STRUCT_BUF(u_clr), STRUCT_SIZE(u_clr)))
@@ -129,7 +112,7 @@ nfssys(enum nfssys_op opcode, void *arg)
 
 		clr.addr_type = STRUCT_FGET(u_clr, addr_type);
 		clr.ap = STRUCT_FGETP(u_clr, ap);
-		rfs4_client_clrst(&clr);
+		error = rfs4_clear_client_state(&clr);
 		break;
 	}
 

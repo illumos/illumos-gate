@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 MNX Cloud, Inc.
+ */
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -62,10 +66,9 @@ nfs4_clr_state(char *client)
 	struct nfs4clrst_args arg;
 
 	if ((he = gethostbyname_r(client, &host_ent, he_buf, sizeof (he_buf),
-				&he_error)) == NULL) {
+	    &he_error)) == NULL) {
 		(void) fprintf(stderr,
-			gettext("client name '%s' can not be resolved\n"),
-			client);
+		    gettext("client name '%s' can not be resolved\n"), client);
 		return (1);
 	}
 
@@ -88,7 +91,10 @@ nfs4_clr_state(char *client)
 	 */
 	for (ap = he->h_addr_list; *ap; ap++) {
 		arg.ap = *ap;
-		_nfssys(NFS4_CLR_STATE, &arg);
+		if (_nfssys(NFS4_CLR_STATE, &arg) != 0) {
+			perror("nfssys(NFS4_CLR_STATE)");
+			return (1);
+		}
 	}
 	return (0);
 }
@@ -131,19 +137,19 @@ main(int argc, char *argv[])
 	i = argc - optind;
 	if (errflg || i != 1) {
 		(void) fprintf(stderr,
-				gettext("Usage: clear_locks [-s] hostname\n"));
+		    gettext("Usage: clear_locks [-s] hostname\n"));
 		exit(2);
 	}
 
 	if (sflag) {
-		(void) fprintf(stdout,
-gettext("Clearing locks held for NFS client %s on server %s\n"),
-				myhostname, argv[optind]);
+		(void) fprintf(stdout, gettext(
+		    "Clearing locks held for NFS client %s on server %s\n"),
+		    myhostname, argv[optind]);
 		ret = share_zap(myhostname, argv[optind]);
 	} else {
-		(void) fprintf(stdout,
-gettext("Clearing locks held for NFS client %s on server %s\n"),
-				argv[optind], myhostname);
+		(void) fprintf(stdout, gettext(
+		    "Clearing locks held for NFS client %s on server %s\n"),
+		    argv[optind], myhostname);
 		ret = share_zap(argv[optind], myhostname);
 		ret += nfs4_clr_state(argv[optind]);
 	}
@@ -165,13 +171,13 @@ share_zap(char *client, char *server)
 	notify.state = 0;
 	notify.name = client;
 	rslt = rpc_call(server, NLM_PROG, NLM_VERSX, NLM_FREE_ALL,
-		xdr_nlm_notify, (char *)&notify, xdr_void, 0, NULL);
+	    xdr_nlm_notify, (char *)&notify, xdr_void, 0, NULL);
 	if (rslt != RPC_SUCCESS) {
 		clnt_perrno(rslt);
 		return (3);
 	}
 	(void) fprintf(stderr,
-		gettext("clear of locks held for %s on %s returned success\n"),
-		client, server);
+	    gettext("clear of locks held for %s on %s returned success\n"),
+	    client, server);
 	return (0);
 }

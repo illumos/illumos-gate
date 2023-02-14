@@ -26,6 +26,7 @@
 /*
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2019 Nexenta by DDN, Inc.
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 #include <sys/systm.h>
@@ -391,8 +392,6 @@ static void *deleg_state_mkkey(rfs4_entry_t);
 static void rfs4_state_rele_nounlock(rfs4_state_t *);
 
 static int rfs4_ss_enabled = 0;
-
-extern void (*rfs4_client_clrst)(struct nfs4clrst_args *);
 
 void
 rfs4_ss_pnfree(rfs4_ss_pn_t *ss_pn)
@@ -1130,12 +1129,32 @@ rfs4_client_scrub(rfs4_entry_t ent, void *arg)
  * This is called from nfssys() in order to clear server state
  * for the specified client IP Address.
  */
-void
+int
 rfs4_clear_client_state(struct nfs4clrst_args *clr)
 {
-	nfs4_srv_t *nsrv4;
-	nsrv4 = nfs4_get_srv();
-	(void) rfs4_dbe_walk(nsrv4->rfs4_client_tab, rfs4_client_scrub, clr);
+	nfs4_srv_t *nsrv4 = nfs4_get_srv();
+	int rc;
+
+	/* Once nfssrv is loaded, every zone should have one of these. */
+	VERIFY(nsrv4 != NULL);
+
+	mutex_enter(&nsrv4->state_lock);
+	/*
+	 * But only after NFS service is running is the nfs4_server_state
+	 * around. It's dirty (and needs the state_lock held), but all of the
+	 * databases live deep in the nfs4_server_state, so it's the only thing
+	 * to legitimately check prior to using anything. The pointers
+	 * themselves may be stale.
+	 */
+	if (nsrv4->nfs4_server_state != NULL) {
+		VERIFY(nsrv4->rfs4_client_tab != NULL);
+		rfs4_dbe_walk(nsrv4->rfs4_client_tab, rfs4_client_scrub, clr);
+		rc = 0;
+	} else {
+		rc = ENXIO;
+	}
+	mutex_exit(&nsrv4->state_lock);
+	return (rc);
 }
 
 /*
@@ -1180,8 +1199,6 @@ rfs4_state_g_init()
 	rfs4_file_mem_cache = nfs4_init_mem_cache("File_entry_cache", 1, sizeof (rfs4_file_t), 6);
 	/* CSTYLED */
 	rfs4_delegstID_mem_cache = nfs4_init_mem_cache("DelegStateID_entry_cache", 2, sizeof (rfs4_deleg_state_t), 7);
-
-	rfs4_client_clrst = rfs4_clear_client_state;
 }
 
 
@@ -1198,8 +1215,6 @@ rfs4_state_g_fini()
 	 */
 	if (cpr_id)
 		(void) callb_delete(cpr_id);
-
-	rfs4_client_clrst = NULL;
 
 	/* free the NFSv4 state databases */
 	for (i = 0; i < RFS4_DB_MEM_CACHE_NUM; i++) {
