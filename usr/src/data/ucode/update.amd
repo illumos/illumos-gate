@@ -10,6 +10,7 @@
 # http://www.illumos.org/license/CDDL.
 
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2023 Oxide Computer Company
 
 # A simple update script that checks out the upstream AMD firmware
 # repository, extracts the microcode into separate files within the amd/
@@ -103,6 +104,7 @@ for f in $tmp/ucode/amd-ucode/*.bin; do
 	echo "Converting $bf"
 	mkdir $tmp/out/$bf
 	cp $f $tmp/amd-fw
+	$UCODEADM -l $tmp/amd-fw
 	$UCODEADM -i -R $tmp/out/$bf $tmp/amd-fw
 	rm -f $tmp/amd-fw
 done

@@ -54,11 +54,7 @@ extern "C" {
 #define	MULTIBOOT2_BOOTLOADER_MAGIC		0x36d76289
 
 /* Alignment of multiboot modules.  */
-#if defined(__i386) || defined(__amd64)
 #define	MULTIBOOT_MOD_ALIGN			0x00001000
-#else
-#error No architecture defined
-#endif
 
 /* Alignment of the multiboot info structure.  */
 #define	MULTIBOOT_INFO_ALIGN			0x00000008

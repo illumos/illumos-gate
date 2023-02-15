@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*
@@ -46,6 +47,7 @@
  */
 
 #include <mdb/mdb_modapi.h>
+#include <mdb/mdb_string.h>
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_list.h>
 #include <mdb/mdb_nv.h>
@@ -260,7 +262,7 @@ typedef_parse_member(char *defn, char **next, parse_node_t **pnp)
 		array++;
 		*c = '\0';
 		pn->pn_flags |= PN_F_ARRAY;
-		pn->pn_asub = mdb_strtoull(array);
+		pn->pn_asub = mdb_strtoullx(array, MDB_STRTOULL_F_BASE_C);
 		if (pn->pn_asub < 0) {
 			mdb_printf("Array lengths cannot be negative\n");
 			return (DCMD_ERR);
@@ -711,7 +713,9 @@ static char typedef_desc[] =
 "\n"
 "All member and type names must be valid C identifiers. They must start with\n"
 "an underscore or a letter. Subsequent characters are allowed to be letters,\n"
-"numbers, or an underscore.\n"
+"numbers, or an underscore. When specifying an array, mdb's default base is\n"
+"not used. Instead, base 10 is assumed to make it easier to use declarations\n"
+"from C files and transform them. (Other features remain.)\n"
 "\n"
 "Declaring arrays and any number of pointers in anonymous structures is \n"
 "supported. However the following C features are not supported: \n"
@@ -754,7 +758,7 @@ static char typedef_examps[] =
 "  ::typedef \"struct list { struct list *l_next; struct list *l_prev; }\" "
 "list_t\n"
 "  ::typedef -r /var/tmp/qemu-system-x86_64\n"
-"  ::typedef -w defs.ctf"
+"  ::typedef -w defs.ctf\n"
 "\n";
 
 static char typedef_intrins[] =

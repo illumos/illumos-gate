@@ -22,6 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef	_MDB_STRING_H
@@ -68,6 +70,17 @@ extern const char *strbadid(const char *);
 extern int strisprint(const char *);
 
 extern char *mdb_inet_ntop(int, const void *, char *, size_t);
+
+/*
+ * This is a private version of mdb's strtoull that allows us to modify the
+ * behavior. We expect this will get more nuanced when C23 lands and therefore
+ * it is not currently part of the module API.
+ */
+typedef enum {
+	MDB_STRTOULL_F_BASE_C	= 1 << 0	/* Default to ISO C's radix */
+} mdb_strtoull_flags_t;
+extern u_longlong_t mdb_strtoullx(const char *, mdb_strtoull_flags_t);
+
 
 #ifdef	__cplusplus
 }

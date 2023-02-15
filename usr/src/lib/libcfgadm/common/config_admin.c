@@ -26,6 +26,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -222,7 +226,6 @@ static cfga_err_t find_lib_impl(char *, lib_loc_t *);
 static cfga_err_t load_lib(di_node_t, di_minor_t, lib_loc_t *);
 static cfga_err_t load_lib_hp(di_node_t, di_hp_t, lib_loc_t *);
 static cfga_err_t load_lib_impl(di_node_t, di_minor_t, di_hp_t, lib_loc_t *);
-extern void bcopy(const void *, void *, size_t);
 static void config_err(int, int, char **);
 static void hold_lib(plugin_lib_t *);
 static void rele_lib(plugin_lib_t *);
@@ -387,6 +390,10 @@ config_change_state(
 
 	cfga_err_t retval = CFGA_OK;
 
+	if (errstring != NULL) {
+		*errstring = NULL;
+	}
+
 	/* Sanity checks */
 	if (state_change_cmd == CFGA_CMD_NONE)
 		return (retval);
@@ -394,10 +401,6 @@ config_change_state(
 	if ((state_change_cmd < CFGA_CMD_NONE) ||
 	    (state_change_cmd > CFGA_CMD_UNCONFIGURE))
 		return (CFGA_INVAL);
-
-	if (errstring != NULL) {
-		*errstring = NULL;
-	}
 
 	if (check_flags(flags, CFGA_FLAG_FORCE | CFGA_FLAG_VERBOSE, errstring)
 	    != CFGA_OK) {
@@ -473,7 +476,6 @@ config_private_func(
 	int i;
 	lib_loc_t libloc;
 	cfga_err_t retval = CFGA_OK;
-
 
 	if (errstring != NULL) {
 		*errstring = NULL;
@@ -569,6 +571,10 @@ config_stat(
 	int nstat, n, i;
 	list_stat_t lstat = {NULL};
 	cfga_err_t rc = CFGA_OK;
+
+	if (errstring != NULL) {
+		*errstring = NULL;
+	}
 
 	if (check_apids(num_ap_ids, ap_ids, errstring) != CFGA_OK) {
 		return (CFGA_ERROR);
@@ -2522,18 +2528,19 @@ list_common(list_stat_t *lstatp, const char *class)
 static void
 config_err(int errnum, int err_type, char **errstring)
 {
-	char *p = NULL, *q = NULL;
-	char *syserr = NULL;
+	const char *err;
+	const char *syserr = "";
+	const char *sep = "";
 	char syserr_num[20];
-	int len = 0;
 
 	/*
-	 * If errstring is null it means user in not interested in getting
-	 * error status. So we don't do all the work
+	 * If errstring is null the user in not interested in getting
+	 * error status text.
 	 */
 	if (errstring == NULL) {
 		return;
 	}
+	*errstring = NULL;
 
 	if (errnum != 0) {
 		syserr = strerror(errnum);
@@ -2541,29 +2548,12 @@ config_err(int errnum, int err_type, char **errstring)
 			(void) sprintf(syserr_num, "errno=%d", errnum);
 			syserr = syserr_num;
 		}
-	} else
-		syserr = NULL;
-
-	q = dgettext(TEXT_DOMAIN, err_strings[err_type]);
-
-	len = strlen(q);
-	if (syserr != NULL) {
-		len += strlen(err_sep) + strlen(syserr);
+		sep = err_sep;
 	}
 
-	p = malloc(len + 1);
-	if (p == NULL) {
-		*errstring = NULL;
-		return;
-	}
-
-	(void) strcpy(p, q);
-	if (syserr != NULL) {
-		(void) strcat(p, err_sep);
-		(void) strcat(p, syserr);
-	}
-
-	*errstring  = p;
+	err = dgettext(TEXT_DOMAIN, err_strings[err_type]);
+	/* Note: `asprintf` sets `*errstring` to `NULL` if it fails. */
+	(void) asprintf(errstring, "%s%s%s", err, sep, syserr);
 }
 
 /*

@@ -1,0 +1,7 @@
+::typedef -c lp64
+::typedef 'struct foo { uint8_t foo[10]; }' foo_t
+::typedef 'struct bar { uint8_t foo[0x10]; }' bar_t
+::sizeof foo_t
+::print -at foo_t
+::sizeof bar_t
+::print -at bar_t

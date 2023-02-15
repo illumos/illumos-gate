@@ -1255,27 +1255,6 @@ command_lsefi(int argc __unused, char *argv[] __unused)
 	return (CMD_OK);
 }
 
-COMMAND_SET(lszfs, "lszfs", "list child datasets of a zfs dataset",
-    command_lszfs);
-
-static int
-command_lszfs(int argc, char *argv[])
-{
-	int err;
-
-	if (argc != 2) {
-		command_errmsg = "wrong number of arguments";
-		return (CMD_ERROR);
-	}
-
-	err = zfs_list(argv[1]);
-	if (err != 0) {
-		command_errmsg = strerror(err);
-		return (CMD_ERROR);
-	}
-	return (CMD_OK);
-}
-
 #ifdef LOADER_FDT_SUPPORT
 extern int command_fdt_internal(int argc, char *argv[]);
 
