@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2017-2022 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2021-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -1495,6 +1495,18 @@ smb2_dh_expire(void *arg)
 	smb_ofile_release(of);
 }
 
+/*
+ * Called once a minute to do expiration of durable handles.
+ *
+ * Normally expired durable handles should be in state "orphaned",
+ * having transitioned from state SAVE_DH through SAVING to state
+ * ORPHANED after all ofile references go away.  If an ofile has
+ * leaked references and the client disconnects, it will be found
+ * here still in state SAVE_DH and past it's expiration time.
+ * Call smb2_dh_expire for these as well, which will move them
+ * from state SAVE_DH to state CLOSING, so they can no longer
+ * cause sharing violations for new opens.
+ */
 void
 smb2_durable_timers(smb_server_t *sv)
 {
@@ -1523,13 +1535,16 @@ smb2_durable_timers(smb_server_t *sv)
 			 * not have needed to, or we miss some DH in
 			 * this pass and get it on the next.
 			 */
-			if (of->f_state != SMB_OFILE_STATE_ORPHANED)
+			if (of->f_state != SMB_OFILE_STATE_ORPHANED &&
+			    of->f_state != SMB_OFILE_STATE_SAVE_DH)
 				continue;
 
 			mutex_enter(&of->f_mutex);
-			/* STATE_ORPHANED implies dh_expire_time != 0 */
-			if (of->f_state == SMB_OFILE_STATE_ORPHANED &&
+			if ((of->f_state == SMB_OFILE_STATE_ORPHANED ||
+			    of->f_state == SMB_OFILE_STATE_SAVE_DH) &&
+			    of->dh_expire_time != 0 &&
 			    of->dh_expire_time <= now) {
+
 				of->f_state = SMB_OFILE_STATE_EXPIRED;
 				/* inline smb_ofile_hold_internal() */
 				of->f_refcnt++;
@@ -1581,7 +1596,8 @@ smb2_dh_close_my_orphans(smb_request_t *sr, smb_ofile_t *new_of)
 			continue;
 
 		mutex_enter(&of->f_mutex);
-		if (of->f_state == SMB_OFILE_STATE_ORPHANED) {
+		if (of->f_state == SMB_OFILE_STATE_ORPHANED ||
+		    of->f_state == SMB_OFILE_STATE_SAVE_DH) {
 			of->f_state = SMB_OFILE_STATE_EXPIRED;
 			/* inline smb_ofile_hold_internal() */
 			of->f_refcnt++;
@@ -1653,6 +1669,7 @@ smb2_dh_shutdown(smb_server_t *sv)
 
 			switch (of->f_state) {
 			case SMB_OFILE_STATE_ORPHANED:
+			case SMB_OFILE_STATE_SAVE_DH:
 				of->f_state = SMB_OFILE_STATE_EXPIRED;
 				/* inline smb_ofile_hold_internal() */
 				of->f_refcnt++;
