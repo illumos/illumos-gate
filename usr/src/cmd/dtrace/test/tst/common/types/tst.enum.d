@@ -44,13 +44,13 @@ enum my_enum {
 };
 
 enum my_enum2 {
-	zero,
-	one = 1,
-	two,
-	three,
-	four = 4,
-	minimum = -2147483648,
-	maximum = 2147483647,
+	zero2,
+	one2 = 1,
+	two2,
+	three2,
+	four2 = 4,
+	minimum2 = -2147483648,
+	maximum2 = 2147483647,
 };
 
 BEGIN
