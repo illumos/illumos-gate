@@ -74,7 +74,9 @@ DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I. -I../ -I$(UTSBASE)/common/brand/lx -I$(LX_CMN)
-ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I../	\
+ASFLAGS +=	$(ASFLAGS_$(CURTYPE)) -D_ASM -I../	\
+			-I$(UTSBASE)/common/brand/lx
+ASFLAGS64 +=	$(ASFLAGS_$(CURTYPE)) -D_ASM -I../	\
 			-I$(UTSBASE)/common/brand/lx
 
 ZGUIDANCE =	-Wl,-zguidance=nounused
@@ -94,7 +96,7 @@ lint: lintcheck
 include ../../../../Makefile.targ
 include ../../../../Makefile.usdt
 
-pics/%.o: $(ISASRCDIR)/%.s
+pics/%.o: $(ISASRCDIR)/%.S
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_S_O)
 

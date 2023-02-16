@@ -47,7 +47,8 @@ LIBS =		$(DYNLIB)
 DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(MAPOPTS)
 LDLIBS +=
-ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM
+ASFLAGS +=	$(ASFLAGS_$(CURTYPE)) -D_ASM
+ASFLAGS64 +=	$(ASFLAGS_$(CURTYPE)) -D_ASM
 
 
 LIBS =		$(DYNLIB)
@@ -77,9 +78,9 @@ lint: $(LINTLIB) lintcheck
 include ../../../../Makefile.targ
 include $(SRC)/lib/commpage/Makefile.shared.targ
 
-pics/%.o: $(ISASRCDIR)/%.s
+pics/%.o: $(ISASRCDIR)/%.S
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_S_O)
 
 pics/vdso_main.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS) -I$(SRCDIR)
-pics/vdso_subr.o := ASFLAGS += -I$(SRC)/uts/common/brand/lx -I$(SRCDIR)
+pics/vdso_subr.o := AS_CPPFLAGS += -I$(SRC)/uts/common/brand/lx -I$(SRCDIR)
