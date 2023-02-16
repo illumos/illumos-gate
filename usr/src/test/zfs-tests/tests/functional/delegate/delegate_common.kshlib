@@ -27,6 +27,7 @@
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -480,12 +481,14 @@ function verify_userprop
 	typeset perm=$2
 	typeset dtst=$3
 
-	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S')
+	typeset guid=$(get_prop guid $dtst)
+	typeset stamp=${perm}.${user}.$(date +'%F-%H%M%S').${guid}
 
 	user_run $user zfs set "$user:ts=$stamp" $dtst
 	if [[ $stamp != $(get_prop "$user:ts" $dtst) ]]; then
 		return 1
 	fi
+	user_run $user zfs inherit "$user:ts" $dtst
 
 	return 0
 }
