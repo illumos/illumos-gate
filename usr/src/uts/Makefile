@@ -190,6 +190,8 @@ all_h: FRC
 	@cd common/idmap; pwd; $(MAKE) $@
 	@cd common/klm; pwd; $(MAKE) $@
 
+FRC:
+
 clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 	@if [ '$(PATCH_BUILD)' != '#' ] ; then \
 		echo $(RM) $(PMTMO_FILE) ; \
@@ -213,7 +215,4 @@ XRDIRS = $(sparc_ARCHITECTURES) $(i386_ARCHITECTURES) sun4 sfmmu	\
 
 XRINCDIRS = $(XRDIRS)
 
-cscope.out tags: FRC
-	$(XREF) -x $@
-
-FRC:
+include ../Makefile.xref

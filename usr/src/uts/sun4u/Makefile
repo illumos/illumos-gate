@@ -223,5 +223,4 @@ include ../Makefile.targ
 XRDIRS	= ../sun4u ../sun4 ../sfmmu ../sparc ../sun ../common
 XRPRUNE = i86pc
 
-cscope.out tags: FRC
-	$(XREF) -x $@
+include ../../Makefile.xref

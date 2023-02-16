@@ -214,6 +214,7 @@ clobber: $(SUBDIRS) etc clobber_local
 clobber_local:
 	$(RM) $(CLOBBERFILES)
 
+FRC:
 
 _msg:	$(MSGDOMAIN) catalog
 
@@ -223,10 +224,7 @@ catalog:
 $(MSGDOMAIN):
 	$(INS.dir)
 
-cscope.out tags: FRC
-	$(XREF) -x $@
-
-FRC:
+include ../../Makefile.xref
 
 # include MACH-specific library targets
 include ../Makefile.mach

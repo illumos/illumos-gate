@@ -220,6 +220,8 @@ cmdheaders: FRC
 	@cd cmd/fm; pwd; $(MAKE) install_h
 	@cd cmd/mdb; pwd; $(MAKE) install_h
 
+FRC:
+
 check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS) $(CHKMANSUBDIRS)
 
 #
@@ -229,10 +231,9 @@ check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS) $(CHKMANSUBDIRS)
 XRPRUNE = pkg prototypes
 XRINCDIRS = uts/common head ucbhead
 
-cscope.out tags: FRC
-	$(XREF) -f -x $@
+include Makefile.xref
 
-FRC:
+XREFFLAGS = -f -x
 
 # used by nightly
 cc-version:
