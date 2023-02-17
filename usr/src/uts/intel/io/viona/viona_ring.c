@@ -859,7 +859,7 @@ vq_map_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,
 
 /*
  * Walk an indirect buffer descriptor `desc`, attempting to map the pages
- * backing the regions of guest memory covered by its contituent descriptors.
+ * backing the regions of guest memory covered by its constituent descriptors.
  */
 static int
 vq_map_indir_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,

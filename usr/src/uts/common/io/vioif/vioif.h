@@ -214,7 +214,7 @@ struct virtio_net_ctrlq_hdr {
 } __packed;
 
 /*
- * Contol Queue Classes
+ * Control Queue Classes
  */
 #define	VIRTIO_NET_CTRL_RX		0
 

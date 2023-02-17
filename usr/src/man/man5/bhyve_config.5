@@ -25,7 +25,7 @@
 .\"
 .\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd June 1, 2022
+.Dd November 5, 2022
 .Dt BHYVE_CONFIG 5
 .Os
 .Sh NAME
@@ -168,6 +168,10 @@ These messages are sent to
 Enable debug messages relating to the RFB
 .Pq VNC
 server.
+.It Va viona.debug Ta bool Ta false Ta
+Enable debug messages relating to the accelerated virtio network device.
+These messages are sent to
+.Dv stdout .
 .It Va xhci.debug Ta bool Ta false Ta
 Enable debug messages relating to the emulated XHCI
 .Pq USB
