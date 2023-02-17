@@ -1692,3 +1692,5 @@ Bugid   Risk Synopsis
 14770	ld(1) should be 64bit only
 14901	remove remaining a.out support from sgs
 14822	Need new word of hardware capabilities
+15361	ld doesn't fill out PT_DYNAMIC sufficiently for binutils 2.40
+15260	ld crashes if group members are stripped by -s

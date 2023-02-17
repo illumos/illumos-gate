@@ -12,7 +12,7 @@
 .\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2022 Oxide Computer Company
 .\"
-.Dd July 2, 2022
+.Dd December 11, 2022
 .Dt MC_TX 9E
 .Os
 .Sh NAME
@@ -190,7 +190,7 @@ that it will access a ring-specific data structure through
 .Fa driver_rh
 and when it needs to update that there is additional space available, it
 must use
-.Xr mac_tx_update_ring 9F
+.Xr mac_tx_ring_update 9F
 and not
 .Xr mac_tx_update 9F .
 .Pp

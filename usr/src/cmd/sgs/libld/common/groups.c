@@ -164,6 +164,8 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 {
 	Ifl_desc	*gifl = gisc->is_file;
 	Shdr		*sshdr, *gshdr = gisc->is_shdr;
+	Word		*new_data = NULL;
+	Shdr		*new_shdr = NULL;
 	Is_desc		*isc;
 	Sym		*sym;
 	const char	*str;
@@ -255,7 +257,7 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	 * Validate the section indices within the group.  If this is a COMDAT
 	 * group, mark each section as COMDAT.
 	 */
-	for (ndx = 1; ndx < gd.gd_cnt; ndx++) {
+	for (ndx = (gd.gd_cnt - 1); ndx >= 1; ndx--) {
 		Word	gndx = gd.gd_data[ndx];
 
 		if ((gndx == 0) || (gndx >= gifl->ifl_shnum)) {
@@ -265,9 +267,65 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 			return (0);
 		}
 
+		/*
+		 * If we reach here the group was valid but has been damaged
+		 * by FLG_OF_STRIP.  That is, this section in the group exists
+		 * but was ignored during input processing.
+		 *
+		 * If this entry is NULL, remove it from the group.  You might
+		 * think we can make consuming code careful to be aware that
+		 * entries in a group may not exist, but if we are linking a
+		 * relocatable object (-r -s), the group must survive, and a
+		 * bogus entry must not be written out.
+		 */
+		if (gifl->ifl_isdesc[gndx] == NULL) {
+			/*
+			 * We need to allocate new data for the group and the
+			 * shdr, the existing data is mapped from the file.
+			 */
+			if (new_data == NULL) {
+				if ((new_data = libld_calloc(sizeof (Word),
+				    gd.gd_cnt)) == NULL)
+					return (S_ERROR);
+
+				/*
+				 * Copy up the whole thing, we'll shrink it in
+				 * a moment.
+				 */
+				memcpy(new_data, gd.gd_data,
+				    sizeof (Word) * gd.gd_cnt);
+				gisc->is_indata->d_buf = gd.gd_data = new_data;
+
+				new_shdr = libld_malloc(sizeof (Shdr));
+				if (new_shdr == NULL)
+					return (S_ERROR);
+
+				memcpy(new_shdr, gisc->is_shdr, sizeof (Shdr));
+				gisc->is_shdr = new_shdr;
+			}
+
+			/* If there're entries after us, copy them down */
+			if (ndx < (gd.gd_cnt - 1)) {
+				memmove(&gd.gd_data[ndx], &gd.gd_data[ndx + 1],
+				    (gd.gd_cnt - (ndx + 1)) * sizeof (Word));
+			}
+
+			gisc->is_indata->d_size -= sizeof (Word);
+			gisc->is_shdr->sh_size -= sizeof (Word);
+			gd.gd_cnt -= 1;
+			continue;
+		}
+
 		if (gd.gd_data[0] & GRP_COMDAT)
 			gifl->ifl_isdesc[gndx]->is_flags |= FLG_IS_COMDAT;
 	}
+
+	/*
+	 * If we're left with only one item in the group -- the header --
+	 * discard it.
+	 */
+	if (gd.gd_cnt == 1)
+		gisc->is_flags |= FLG_IS_DISCARD;
 
 	/*
 	 * If this is a COMDAT group, determine whether this group has already

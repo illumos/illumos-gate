@@ -14,6 +14,8 @@
 
 TESTDIR=$(dirname $0)
 
+source ${TESTDIR}/../common.sh
+
 tmpdir=/tmp/test.$$
 mkdir $tmpdir
 cd $tmpdir
@@ -55,23 +57,6 @@ fi
 # section_content <index> <file>
 section_content() {
 	elfdump -I$1 -w /dev/stdout $2 | tr '\0' '\n'
-}
-
-# find_in_group <group> <section> <file>
-find_in_group() {
-	elfdump -g $3 | awk -v group="${1}\$" -v section=$2 '
-		BEGIN { slurp = 0 };
-		$0 ~ group { slurp = 1 };
-		slurp && $0 ~ section {
-			gsub(/[\[\]]/, "", $3);
-			print $3;
-			exit;
-		}' | read index
-	if [[ -z $index ]] || (( index <= 0 )); then
-		print -u2 "Couldn't find $2 in $1"
-		exit 1
-	fi
-	print $index;
 }
 
 # The first test_data_conflict, a member of group1 unmerged with only one

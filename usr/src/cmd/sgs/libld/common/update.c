@@ -3869,6 +3869,21 @@ check_mapfile_assertions(Ofl_desc *ofl)
 	return (ret);
 }
 
+/*
+ * Use the values from shdr to initialize phdr.
+ * Used for single-section segments to initialize their phdr.
+ */
+static void
+build_phdr_from_shdr(Phdr *phdr, Shdr *shdr, Word flags)
+{
+	phdr->p_vaddr = shdr->sh_addr;
+	phdr->p_offset = shdr->sh_offset;
+	phdr->p_filesz = shdr->sh_size;
+	phdr->p_memsz = shdr->sh_size;
+	phdr->p_align = shdr->sh_addralign;
+	phdr->p_flags = flags;
+}
+
 
 /*
  * Having created all of the necessary sections, segments, and associated
@@ -4012,10 +4027,8 @@ ld_update_outfile(Ofl_desc *ofl)
 			if (OFL_ALLOW_DYNSYM(ofl)) {
 				Shdr	*shdr = ofl->ofl_osdynamic->os_shdr;
 
-				phdr->p_vaddr = shdr->sh_addr;
-				phdr->p_offset = shdr->sh_offset;
-				phdr->p_filesz = shdr->sh_size;
-				phdr->p_flags = ld_targ.t_m.m_dataseg_perm;
+				build_phdr_from_shdr(phdr, shdr,
+				    ld_targ.t_m.m_dataseg_perm);
 
 				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 				ofl->ofl_phdr[phdrndx++] = *phdr;
@@ -4037,12 +4050,7 @@ ld_update_outfile(Ofl_desc *ofl)
 
 			shdr = ofl->ofl_unwindhdr->os_shdr;
 
-			phdr->p_flags = PF_R;
-			phdr->p_vaddr = shdr->sh_addr;
-			phdr->p_memsz = shdr->sh_size;
-			phdr->p_filesz = shdr->sh_size;
-			phdr->p_offset = shdr->sh_offset;
-			phdr->p_align = shdr->sh_addralign;
+			build_phdr_from_shdr(phdr, shdr, PF_R);
 			phdr->p_paddr = 0;
 			ofl->ofl_phdr[phdrndx++] = *phdr;
 			continue;
@@ -4093,10 +4101,7 @@ ld_update_outfile(Ofl_desc *ofl)
 				lastshdr = tlsshdr;
 			}
 
-			phdr->p_flags = PF_R | PF_W;
-			phdr->p_vaddr = firstshdr->sh_addr;
-			phdr->p_offset = firstshdr->sh_offset;
-			phdr->p_align = firstshdr->sh_addralign;
+			build_phdr_from_shdr(phdr, firstshdr, PF_R | PF_W);
 
 			/*
 			 * Determine the initialized TLS data size.  This
@@ -4443,10 +4448,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		Phdr	*phdr = &(intpsgp->sg_phdr);
 		Shdr	*shdr = ofl->ofl_osinterp->os_shdr;
 
-		phdr->p_vaddr = shdr->sh_addr;
-		phdr->p_offset = shdr->sh_offset;
-		phdr->p_memsz = phdr->p_filesz = shdr->sh_size;
-		phdr->p_flags = PF_R;
+		build_phdr_from_shdr(phdr, shdr, PF_R);
 
 		DBG_CALL(Dbg_seg_entry(ofl, intpsndx, intpsgp));
 		ofl->ofl_phdr[intppndx] = *phdr;
@@ -4455,6 +4457,10 @@ ld_update_outfile(Ofl_desc *ofl)
 	/*
 	 * If we have a PT_SUNWDTRACE phdr, update it now with the address of
 	 * the symbol.  It's only now been updated via update_sym().
+	 *
+	 * The program header is used to find this symbol for its private use
+	 * during process startup (see fasttrap.h), and it is not itself
+	 * loadable.  Phdr fields not used by DTrace are left at 0.
 	 */
 	if (dtracesgp) {
 		Phdr		*aphdr, *phdr = &(dtracesgp->sg_phdr);
@@ -4483,10 +4489,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		Phdr	*phdr = &(capsgp->sg_phdr);
 		Shdr	*shdr = ofl->ofl_oscap->os_shdr;
 
-		phdr->p_vaddr = shdr->sh_addr;
-		phdr->p_offset = shdr->sh_offset;
-		phdr->p_memsz = phdr->p_filesz = shdr->sh_size;
-		phdr->p_flags = PF_R;
+		build_phdr_from_shdr(phdr, shdr, PF_R);
 
 		DBG_CALL(Dbg_seg_entry(ofl, capsndx, capsgp));
 		ofl->ofl_phdr[cappndx] = *phdr;

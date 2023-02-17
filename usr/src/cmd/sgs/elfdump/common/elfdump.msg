@@ -168,14 +168,10 @@
 
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
-@ MSG_WARN_INVINTERP2	"%s: interp section: %s: and PT_INTERP program \
-			 header have conflicting size or offsets\n"
 @ MSG_WARN_INVCAP1	"%s: PT_SUNWCAP header has no associated section\n"
 @ MSG_WARN_INVCAP2	"%s: capabilities section[%d]: %s: requires PT_CAP \
 			 program header\n"
-@ MSG_WARN_INVCAP3	"%s: capabilities section[%d]: %s: and PT_CAP program \
-			 header have conflicting size or offsets\n"
-@ MSG_WARN_INVCAP4	"%s: capabilities section[%d]: %s: requires string \
+@ MSG_WARN_INVCAP3	"%s: capabilities section[%d]: %s: requires string \
 			 table: invalid sh_info: %d\n";
 @ MSG_WARN_INADDR32SF1	"%s: capabilities section %s: software capability \
 			 ADDR32: is ineffective within a 32-bit object\n"
@@ -269,6 +265,11 @@
 @ MSG_STR_UNKNOWN	"<unknown>"
 @ MSG_STR_SECTION	"%s (section)"
 @ MSG_STR_CHECKSUM	"elf checksum: 0x%lx"
+@ MSG_STR_VADDR		"virtual address"
+@ MSG_STR_OFFSET	"offset"
+@ MSG_STR_FILESIZE	"file size"
+@ MSG_STR_MEMSIZE	"memory size"
+@ MSG_STR_ALIGNMENT	"alignment"
 
 @ MSG_FMT_SCNNDX	"section[%d]"
 @ MSG_FMT_NOTEENTNDX	"  entry [%d]";
@@ -283,6 +284,13 @@
 @ MSG_ERR_BAD_T_OSABI	"%s: unrecognized operating system ABI: %s\n"
 @ MSG_ERR_AMBIG_MATCH	"%s: ambiguous use of -I, -N, or -T. Remove \
 			 -p option or section selection option(s)\n"
+
+# Program/section correspondence messages
+@ MSG_SHDR_PHDR_MISMATCH	"%s: Section[%d: %s]: %s does not \
+				 match %s segment: %s=%x: Program \
+				 Header[%d].%s=%x\n"
+@ MSG_SHDR_NO_PHDR		"%s: Section[%d: %s]: has no matching \
+				 %s segment\n"
 
 #
 # SHT_MOVE messages

@@ -28,6 +28,9 @@ tests = ['objcap', 'symcap']
 [/opt/elf-tests/tests/groups/no-relobj-group-merge]
 tests = ['no-relobj-group-merge']
 
+[/opt/elf-tests/tests/groups/strip-groups]
+tests = ['strip-one-section', 'strip-two-sections', 'strip-all-sections']
+
 [/opt/elf-tests/tests/linker-sets]
 tests = ['simple', 'in-use-check']
 
