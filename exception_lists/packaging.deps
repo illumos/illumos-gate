@@ -36,8 +36,11 @@ pkg:/shell/expect
 pkg:/system/bhyve/firmware
 pkg:/system/library/dbus
 pkg:/system/library/g++-7-runtime
+pkg:/system/library/g++-10-runtime
 pkg:/system/library/g++-runtime
+pkg:/system/library/gcc-10-compat-links
 pkg:/system/library/gcc-7-runtime
+pkg:/system/library/gcc-10-runtime
 pkg:/system/library/gcc-runtime
 pkg:/system/library/libdbus
 pkg:/system/library/libdbus-glib
