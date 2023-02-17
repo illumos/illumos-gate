@@ -27,6 +27,7 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -1469,9 +1470,10 @@ taskq_thread_create(taskq_t *tq)
 	/*
 	 * With TASKQ_DUTY_CYCLE the new thread must have an LWP
 	 * as explained in ../disp/sysdc.c (for the msacct data).
-	 * Otherwise simple kthreads are preferred.
+	 * Normally simple kthreads are preferred, unless the
+	 * caller has asked for LWPs for other reasons.
 	 */
-	if ((tq->tq_flags & TASKQ_DUTY_CYCLE) != 0) {
+	if ((tq->tq_flags & (TASKQ_DUTY_CYCLE | TASKQ_THREADS_LWP)) != 0) {
 		/* Enforced in taskq_create_common */
 		ASSERT3P(tq->tq_proc, !=, &p0);
 		t = lwp_kernel_create(tq->tq_proc, taskq_thread, tq, TS_RUN,
@@ -1801,27 +1803,38 @@ taskq_d_thread(taskq_ent_t *tqe)
 			/*
 			 * This thread is sleeping for too long or we are
 			 * closing - time to die.
-			 * Thread creation/destruction happens rarely,
-			 * so grabbing the lock is not a big performance issue.
-			 * The bucket lock is dropped by CALLB_CPR_EXIT().
 			 */
-
-			/* Remove the entry from the free list. */
-			tqe->tqent_prev->tqent_next = tqe->tqent_next;
-			tqe->tqent_next->tqent_prev = tqe->tqent_prev;
-			ASSERT(bucket->tqbucket_nfree > 0);
-			bucket->tqbucket_nfree--;
-
-			TQ_STAT(bucket, tqs_tdeaths);
-			cv_signal(&bucket->tqbucket_cv);
-			tqe->tqent_thread = NULL;
-			mutex_enter(&tq->tq_lock);
-			tq->tq_tdeaths++;
-			mutex_exit(&tq->tq_lock);
-			CALLB_CPR_EXIT(&cprinfo);
-			kmem_cache_free(taskq_ent_cache, tqe);
-			thread_exit();
+			break;
 		}
+	}
+
+	/*
+	 * Thread creation/destruction happens rarely,
+	 * so grabbing the lock is not a big performance issue.
+	 * The bucket lock is dropped by CALLB_CPR_EXIT().
+	 */
+
+	/* Remove the entry from the free list. */
+	tqe->tqent_prev->tqent_next = tqe->tqent_next;
+	tqe->tqent_next->tqent_prev = tqe->tqent_prev;
+	ASSERT(bucket->tqbucket_nfree > 0);
+	bucket->tqbucket_nfree--;
+
+	TQ_STAT(bucket, tqs_tdeaths);
+	cv_signal(&bucket->tqbucket_cv);
+	tqe->tqent_thread = NULL;
+	mutex_enter(&tq->tq_lock);
+	tq->tq_tdeaths++;
+	mutex_exit(&tq->tq_lock);
+	CALLB_CPR_EXIT(&cprinfo);	/* mutex_exit(lock) */
+
+	kmem_cache_free(taskq_ent_cache, tqe);
+
+	if (curthread->t_lwp != NULL) {
+		mutex_enter(&curproc->p_lock);
+		lwp_exit(); /* noreturn. drops p_lock */
+	} else {
+		thread_exit();
 	}
 }
 
@@ -1910,6 +1923,9 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 
 	/* Cannot have DUTY_CYCLE with a p0 kernel process */
 	IMPLY((flags & TASKQ_DUTY_CYCLE), proc != &p0);
+
+	/* Cannot have THREADS_LWP with a p0 kernel process */
+	IMPLY((flags & TASKQ_THREADS_LWP), proc != &p0);
 
 	/* Cannot have DC_BATCH without DUTY_CYCLE */
 	ASSERT((flags & (TASKQ_DUTY_CYCLE|TASKQ_DC_BATCH)) != TASKQ_DC_BATCH);
@@ -2200,6 +2216,7 @@ taskq_bucket_extend(void *arg)
 	taskq_ent_t *tqe;
 	taskq_bucket_t *b = (taskq_bucket_t *)arg;
 	taskq_t *tq = b->tqbucket_taskq;
+	kthread_t *t;
 	int nthreads;
 
 	mutex_enter(&tq->tq_lock);
@@ -2238,8 +2255,17 @@ taskq_bucket_extend(void *arg)
 	 * Create a thread in a TS_STOPPED state first. If it is successfully
 	 * created, place the entry on the free list and start the thread.
 	 */
-	tqe->tqent_thread = thread_create(NULL, 0, taskq_d_thread, tqe,
-	    0, tq->tq_proc, TS_STOPPED, tq->tq_pri);
+	if ((tq->tq_flags & TASKQ_THREADS_LWP) != 0) {
+		/* Enforced in taskq_create_common */
+		ASSERT3P(tq->tq_proc, !=, &p0);
+		t = lwp_kernel_create(tq->tq_proc, taskq_d_thread,
+		    tqe, TS_STOPPED, tq->tq_pri);
+	} else {
+		t = thread_create(NULL, 0, taskq_d_thread, tqe,
+		    0, tq->tq_proc, TS_STOPPED, tq->tq_pri);
+	}
+	tqe->tqent_thread = t;
+	t->t_taskq = tq;	/* mark thread as a taskq_member() */
 
 	/*
 	 * Once the entry is ready, link it to the the bucket free list.
@@ -2258,14 +2284,22 @@ taskq_bucket_extend(void *arg)
 #endif
 
 	mutex_exit(&b->tqbucket_lock);
+
 	/*
 	 * Start the stopped thread.
 	 */
-	thread_lock(tqe->tqent_thread);
-	tqe->tqent_thread->t_taskq = tq;
-	tqe->tqent_thread->t_schedflag |= TS_ALLSTART;
-	setrun_locked(tqe->tqent_thread);
-	thread_unlock(tqe->tqent_thread);
+	if (t->t_lwp != NULL) {
+		proc_t *p = tq->tq_proc;
+		mutex_enter(&p->p_lock);
+		t->t_proc_flag &= ~TP_HOLDLWP;
+		lwp_create_done(t);	/* Sets TS_ALLSTART etc. */
+		mutex_exit(&p->p_lock);
+	} else {
+		thread_lock(t);
+		t->t_schedflag |= TS_ALLSTART;
+		setrun_locked(t);
+		thread_unlock(t);
+	}
 }
 
 static int
