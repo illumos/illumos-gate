@@ -21,8 +21,8 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015-2023 RackTop Systems, Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -94,21 +94,24 @@ int	smb_tcon_timeout = (30 * 1000);
 int	smb_opipe_timeout = (30 * 1000);
 
 /*
- * Thread priorities used in smbsrv.  Our threads spend most of their time
- * blocked on various conditions.  However, if the system gets heavy load,
- * the scheduler has to choose an order to run these.  We want the order:
- * (a) timers, (b) notifications, (c) workers, (d) receivers (and etc.)
- * where notifications are oplock and change notify work.  Aside from this
- * relative ordering, smbsrv threads should run with a priority close to
- * that of normal user-space threads (thus minclsyspri below), just like
- * NFS and other "file service" kinds of processing.
+ * Thread priorities used in smbsrv.
+ *
+ * The SMB server runs at a priority a little below the maximum for
+ * user-level process threads so it won't monopolize the CPU.
+ * Todo: make this configurable
+ *
+ * Aside from that, we want these relative priorities: (a) timers,
+ * (b) notify + oplock completions, (c) workers, (d) receivers, etc.
+ * The "base" is somewhat arbirary, and what shows up in prstat
+ * because it's used for the main thread in newproc().
  */
-int smbsrv_base_pri	= MINCLSYSPRI;
-int smbsrv_listen_pri	= MINCLSYSPRI;
-int smbsrv_receive_pri	= MINCLSYSPRI;
-int smbsrv_worker_pri	= MINCLSYSPRI + 1;
-int smbsrv_notify_pri	= MINCLSYSPRI + 2;
-int smbsrv_timer_pri	= MINCLSYSPRI + 5;
+int smbsrv_timer_pri	= MINCLSYSPRI;		/* smb_server_timers */
+int smbsrv_base_pri	= MINCLSYSPRI - 1;	/* kshare thread, newproc */
+int smbsrv_notify_pri	= MINCLSYSPRI - 1;	/* oplocks, notify */
+/* Gap in which user-level administrative stuff runs. */
+int smbsrv_worker_pri	= MINCLSYSPRI - 7;
+int smbsrv_receive_pri	= MINCLSYSPRI - 8;
+int smbsrv_listen_pri	= MINCLSYSPRI - 9;
 
 
 /*

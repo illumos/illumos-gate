@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/tzfile.h>
 #include <sys/atomic.h>
+#include <sys/disp.h>
 #include <sys/kidmap.h>
 #include <sys/time.h>
 #include <sys/spl.h>
@@ -85,6 +86,12 @@ smb_thread_entry_point(
 	thread->sth_state = SMB_THREAD_STATE_EXITING;
 	cv_broadcast(&thread->sth_cv);
 	mutex_exit(&thread->sth_mtx);
+#ifdef	_KERNEL
+	if (curthread->t_lwp != NULL) {
+		mutex_enter(&curproc->p_lock);
+		lwp_exit(); /* noreturn */
+	}
+#endif	/* _KERNEL */
 	thread_exit();
 }
 
@@ -138,40 +145,51 @@ smb_thread_destroy(
 /*ARGSUSED*/
 int
 smb_thread_start(
-    smb_thread_t	*thread)
+    smb_thread_t	*sth)
 {
-	kthread_t	*tmpthread;
+	kthread_t	*t;
 	struct proc	*procp;
-	smb_server_t	*sv = thread->sth_server;
-	int		rc = 0;
+	smb_server_t	*sv = sth->sth_server;
+	int		rc;
 
-	ASSERT(thread->sth_magic == SMB_THREAD_MAGIC);
+	ASSERT(sth->sth_magic == SMB_THREAD_MAGIC);
 
 	procp = (sv->sv_proc_p != NULL) ?
 	    sv->sv_proc_p : curzone->zone_zsched;
 
-	mutex_enter(&thread->sth_mtx);
-	switch (thread->sth_state) {
-	case SMB_THREAD_STATE_EXITED:
-		thread->sth_state = SMB_THREAD_STATE_STARTING;
-		mutex_exit(&thread->sth_mtx);
-		tmpthread = thread_create(NULL, 0, smb_thread_entry_point,
-		    thread, 0, procp, TS_RUN, thread->sth_pri);
-		ASSERT(tmpthread != NULL);
-		mutex_enter(&thread->sth_mtx);
-		thread->sth_th = tmpthread;
-		thread->sth_did = THR_TO_DID(tmpthread);
-		while (thread->sth_state == SMB_THREAD_STATE_STARTING)
-			cv_wait(&thread->sth_cv, &thread->sth_mtx);
-		if (thread->sth_state != SMB_THREAD_STATE_RUNNING)
-			rc = -1;
-		break;
-	default:
-		ASSERT(0);
-		rc = -1;
-		break;
+	mutex_enter(&sth->sth_mtx);
+	if (sth->sth_state != SMB_THREAD_STATE_EXITED) {
+		mutex_exit(&sth->sth_mtx);
+		return (-1);
 	}
-	mutex_exit(&thread->sth_mtx);
+	sth->sth_state = SMB_THREAD_STATE_STARTING;
+	mutex_exit(&sth->sth_mtx);
+
+#ifdef	_KERNEL
+	if (sth->sth_pri < MINCLSYSPRI) {
+		t = lwp_kernel_create(procp, smb_thread_entry_point, sth,
+		    TS_RUN, sth->sth_pri);
+	} else
+#endif	/* _KERNEL */
+	{
+		t = thread_create(NULL, 0, smb_thread_entry_point, sth,
+		    0, procp, TS_RUN, sth->sth_pri);
+	}
+	ASSERT(t != NULL);
+
+	mutex_enter(&sth->sth_mtx);
+	sth->sth_th = t;
+	sth->sth_did = THR_TO_DID(t);
+
+	/* rendez-vouz with new thread */
+	while (sth->sth_state == SMB_THREAD_STATE_STARTING)
+		cv_wait(&sth->sth_cv, &sth->sth_mtx);
+	if (sth->sth_state == SMB_THREAD_STATE_RUNNING)
+		rc = 0;
+	else
+		rc = -1;
+	mutex_exit(&sth->sth_mtx);
+
 	return (rc);
 }
 

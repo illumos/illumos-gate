@@ -699,17 +699,17 @@ smb_server_start(smb_ioc_start_t *ioc)
 		sv->sv_notify_pool = taskq_create_proc("smb_notify",
 		    sv->sv_cfg.skc_maxworkers / 4, smbsrv_notify_pri,
 		    sv->sv_cfg.skc_maxworkers / 4, INT_MAX,
-		    tqproc, TASKQ_DYNAMIC);
+		    tqproc, TASKQ_DYNAMIC|TASKQ_THREADS_LWP);
 
 		sv->sv_worker_pool = taskq_create_proc("smb_workers",
 		    sv->sv_cfg.skc_maxworkers, smbsrv_worker_pri,
 		    sv->sv_cfg.skc_maxworkers, INT_MAX,
-		    tqproc, TASKQ_DYNAMIC);
+		    tqproc, TASKQ_DYNAMIC|TASKQ_THREADS_LWP);
 
 		sv->sv_receiver_pool = taskq_create_proc("smb_receivers",
 		    sv->sv_cfg.skc_maxconnections, smbsrv_receive_pri,
 		    sv->sv_cfg.skc_maxconnections, INT_MAX,
-		    tqproc, TASKQ_DYNAMIC);
+		    tqproc, TASKQ_DYNAMIC|TASKQ_THREADS_LWP);
 
 		if (sv->sv_notify_pool == NULL ||
 		    sv->sv_worker_pool == NULL ||
