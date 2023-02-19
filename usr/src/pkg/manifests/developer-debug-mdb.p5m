@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2019, Joyent, Inc.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2022 Garrett D'Amore
 #
 
@@ -46,6 +47,7 @@ $(i386_ONLY)file path=kernel/kmdb/$(ARCH64)/i40e group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/ip group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/ipc group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/ipp group=sys mode=0555
+file path=kernel/kmdb/$(ARCH64)/klmmod group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/krtld group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/lofs group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/logindmux group=sys mode=0555
@@ -125,6 +127,7 @@ $(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/i40e.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/ip.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/ipc.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/ipp.so group=sys mode=0555
+file path=usr/lib/mdb/kvm/$(ARCH64)/klmmod.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/krtld.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/lofs.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/logindmux.so group=sys mode=0555

@@ -23,6 +23,7 @@
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2022 Garrett D'Amore
 #
 
@@ -82,6 +83,7 @@ COMMON_MODULES_KVM = \
 	ip \
 	ipc \
 	ipp \
+	klmmod \
 	krtld \
 	lofs \
 	logindmux \
@@ -89,6 +91,7 @@ COMMON_MODULES_KVM = \
 	mm \
 	mpt_sas \
 	mr_sas \
+	nfs \
 	nsmb \
 	pmcs \
 	ptm \
