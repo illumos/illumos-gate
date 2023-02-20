@@ -63,7 +63,5 @@ XRINCCOMP = B!sun4u O!sfmmu O!sparc/v7 O!sparc/v9 B!sparc B!sun B!common
 XRINC_TMP = $(XRINCCOMP:B!%=$(UTSDIR)/%)
 XRINCDIRS = $(XRINC_TMP:O!%=$(UTSDIR)/%)
 
-cscope.out tags: FRC
-	$(XREF) -x $@
+include ../../../Makefile.xref
 
-FRC:

@@ -603,6 +603,7 @@ link path=usr/share/man/man9f/ddi_taskq_destroy.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_taskq_dispatch.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_taskq_resume.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_taskq_suspend.9f target=taskq.9f
+link path=usr/share/man/man9f/ddi_taskq_suspended.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_taskq_wait.9f target=taskq.9f
 link path=usr/share/man/man9f/ddi_trigger_softintr.9f target=ddi_add_softintr.9f
 file path=usr/share/man/man9f/ddi_ufm.9f
@@ -657,9 +658,7 @@ link path=usr/share/man/man9f/esballoca.9f target=esballoc.9f
 file path=usr/share/man/man9f/esbbcall.9f
 file path=usr/share/man/man9f/firmload.9f
 link path=usr/share/man/man9f/firmware_close.9f target=firmload.9f
-link path=usr/share/man/man9f/firmware_free.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_get_size.9f target=firmload.9f
-link path=usr/share/man/man9f/firmware_malloc.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_open.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_read.9f target=firmload.9f
 file path=usr/share/man/man9f/flushband.9f
@@ -1291,7 +1290,6 @@ link path=usr/share/man/man9f/strrchr.9f target=string.9f
 link path=usr/share/man/man9f/strspn.9f target=string.9f
 file path=usr/share/man/man9f/swab.9f
 file path=usr/share/man/man9f/taskq.9f
-link path=usr/share/man/man9f/taskq_suspended.9f target=taskq.9f
 file path=usr/share/man/man9f/testb.9f
 file path=usr/share/man/man9f/timeout.9f
 file path=usr/share/man/man9f/u8_strcmp.9f

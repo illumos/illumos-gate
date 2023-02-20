@@ -1055,6 +1055,7 @@ f kernel/kmdb/amd64/idm 0555 root sys
 f kernel/kmdb/amd64/ip 0555 root sys
 f kernel/kmdb/amd64/ipc 0555 root sys
 f kernel/kmdb/amd64/ipp 0555 root sys
+f kernel/kmdb/amd64/klmmod 0555 root sys
 f kernel/kmdb/amd64/krtld 0555 root sys
 f kernel/kmdb/amd64/lofs 0555 root sys
 f kernel/kmdb/amd64/logindmux 0555 root sys
@@ -10109,6 +10110,7 @@ f usr/lib/mdb/kvm/amd64/idm.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ip.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ipc.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ipp.so 0555 root sys
+f usr/lib/mdb/kvm/amd64/klmmod.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/krtld.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/lofs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/logindmux.so 0555 root sys
@@ -20606,6 +20608,7 @@ s usr/share/man/man9f/ddi_taskq_destroy.9f=taskq.9f
 s usr/share/man/man9f/ddi_taskq_dispatch.9f=taskq.9f
 s usr/share/man/man9f/ddi_taskq_resume.9f=taskq.9f
 s usr/share/man/man9f/ddi_taskq_suspend.9f=taskq.9f
+s usr/share/man/man9f/ddi_taskq_suspended.9f=taskq.9f
 s usr/share/man/man9f/ddi_taskq_wait.9f=taskq.9f
 s usr/share/man/man9f/ddi_trigger_softintr.9f=ddi_add_softintr.9f
 f usr/share/man/man9f/ddi_ufm.9f 0444 root bin
@@ -21214,7 +21217,6 @@ s usr/share/man/man9f/strrchr.9f=string.9f
 s usr/share/man/man9f/strspn.9f=string.9f
 f usr/share/man/man9f/swab.9f 0444 root bin
 f usr/share/man/man9f/taskq.9f 0444 root bin
-s usr/share/man/man9f/taskq_suspended.9f=taskq.9f
 f usr/share/man/man9f/testb.9f 0444 root bin
 f usr/share/man/man9f/timeout.9f 0444 root bin
 f usr/share/man/man9f/u8_strcmp.9f 0444 root bin

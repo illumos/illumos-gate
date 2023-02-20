@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+# Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
 
 # Use normal make (not dmake) by default.
@@ -189,11 +189,28 @@ clean|clobber)
   ;;
 esac
 
-
-}
-
 # Build the MDB modules, WITH the linktest
-# Not yet.  See https://www.illumos.org/issues/3409
+(cd $SRC/cmd/mdb/tools && $make $1)
+
+# kmdb_arch is 64-bit only
+for a in $kmdb_arch
+do
+  case $1 in
+  install|lint)
+    (cd $SRC/cmd/mdb/$x/$a/kmdb &&
+	$make kmdb_modlinktest.o )
+    ;;
+  clean|clobber)
+    (cd $SRC/cmd/mdb/$x/$a/kmdb &&
+	$make -k $1 )
+    ;;
+  esac
+  (cd $SRC/cmd/mdb/$x/$a/nfs &&
+	$make $1 KMDB_LINKTEST_ENABLE= )
+  (cd $SRC/cmd/mdb/$x/$a/klmmod &&
+	$make $1 KMDB_LINKTEST_ENABLE= )
+done
+}
 
 # end do_cmds()
 
@@ -231,6 +248,8 @@ do_tar() {
 
 # NFS (everything)
 	files="
+kernel/kmdb/$arch64/klmmod
+kernel/kmdb/$arch64/nfs
 kernel/misc/$arch64/klmmod
 kernel/misc/$arch64/klmops
 kernel/misc/$arch64/nfs_dlboot
@@ -256,6 +275,8 @@ usr/lib/fs/nfs/dfshares
 usr/lib/fs/nfs/nfsfind
 usr/lib/fs/nfs/showmount
 usr/lib/fs/nfs/umount
+usr/lib/mdb/kvm/$arch64/klmmod.so
+usr/lib/mdb/kvm/$arch64/nfs.so
 usr/lib/nfs/libmapid.so.1
 usr/lib/nfs/lockd
 usr/lib/nfs/mountd

@@ -65,7 +65,7 @@ $(LIBPROG):	$(OBJS)
 clean:
 	$(RM) $(FSCKOBJS) $(UFSOBJS)
 
-cscope.out tags: FRC
-	$(XREF) -f -x $@
+include ../../../../Makefile.xref
 
-FRC:
+XREFFLAGS=	-f -x
+
