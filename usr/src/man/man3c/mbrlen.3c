@@ -44,11 +44,10 @@
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"
-.TH MBRLEN 3C "Jun 21, 2014"
+.TH MBRLEN 3C "February 17, 2023"
 .SH NAME
 mbrlen, mbrlen_l \- get number of bytes in a character (restartable)
 .SH SYNOPSIS
-.LP
 .nf
 #include <wchar.h>
 
@@ -63,7 +62,6 @@ mbrlen, mbrlen_l \- get number of bytes in a character (restartable)
     \fBlocale_t\fR \fIloc\fR);
 .fi
 .SH DESCRIPTION
-.LP
 If \fIs\fR is not a null pointer,  \fBmbrlen()\fR and \fBmbrlen_l()\fR determine
 the number of bytes constituting the character pointed to by \fIs\fR.
 The call
@@ -84,14 +82,13 @@ functions use their own
 internal \fBmbstate_t\fR object, which is initialized at program startup to the
 initial conversion state.   Otherwise, the  \fBmbstate_t\fR object pointed to
 by \fIps\fR is used to completely describe the current conversion state of the
-associated character sequence. The implemenation will behave as if no function
+associated character sequence. The implementation will behave as if no function
 defined in the Reference Manual calls \fBmbrlen()\fR.
 .LP
 The behavior of \fBmbrlen()\fR is affected by the \fBLC_CTYPE\fR category of the
 current locale.  See \fBenviron\fR(7). The behavior of \fBmbrlen_l()\fR does not
-use the current enivronment and instead uses the locale specified by \fBloc\fR.
+use the current environment and instead uses the locale specified by \fBloc\fR.
 .SH RETURN VALUES
-.LP
 The \fBmbrlen()\fR and \fBmbrlen_l()\fR functions return the first of the
 following that applies:
 .sp
@@ -139,7 +136,6 @@ is stored in \fBerrno\fR and the conversion state is undefined.
 .RE
 
 .SH ERRORS
-.LP
 The \fBmbrlen()\fR and \fBmbrlen_l()\fR functions may fail if:
 .sp
 .ne 2
@@ -161,7 +157,6 @@ Invalid character sequence is detected.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .TS
 box;
@@ -181,7 +176,6 @@ function is Standard.  The
 .B mbrlen_l()
 function is Uncommitted.
 .SH SEE ALSO
-.LP
 .BR mbrtowc (3C),
 .BR mbsinit (3C),
 .BR newlocale (3C),
@@ -190,8 +184,6 @@ function is Uncommitted.
 .BR environ (7),
 .BR standards (7)
 .SH NOTES
-.sp
-.LP
 If \fIps\fR is not a null pointer, \fBmbrlen()\fR uses the \fBmbstate_t\fR
 object pointed to by \fIps\fR and the function can be used safely in
 multithreaded applications, as long as \fBsetlocale\fR(3C) is not being called

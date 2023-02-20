@@ -45,7 +45,7 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd February 18, 2022
+.Dd February 17, 2023
 .Dt PTHREAD_MUTEX_INIT 3C
 .Os
 .Sh NAME
@@ -216,7 +216,6 @@ is invalid.
 .Sh SEE ALSO
 .Xr pthread_cond_timedwait 3C ,
 .Xr pthread_cond_wait 3C ,
-.Xr pthread_muteattr_init 3C ,
 .Xr pthread_mutex_lock 3C ,
 .Xr pthread_mutexattr_init 3C ,
 .Xr pthread_mutexattr_setrobust 3C ,

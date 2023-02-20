@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH _STACK_GROW 3C "Jul 18, 2002"
+.TH _STACK_GROW 3C "February 17, 2023"
 .SH NAME
 _stack_grow \- express an intention to extend the stack
 .SH SYNOPSIS
-.LP
 .nf
 #include <ucontext.h>
 
@@ -15,11 +14,9 @@ _stack_grow \- express an intention to extend the stack
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fB_stack_grow()\fR function indicates to the system that the stack is
 about to be extended to the address specified by \fIaddr\fR. If extending the
-stack to this address would violate the stack boundaries as retreived by
+stack to this address would violate the stack boundaries as retrieved by
 \fBstack_getbounds\fR(3C), a \fBSIGSEGV\fR is raised.
 .sp
 .LP
@@ -37,17 +34,11 @@ Developer's Guide.
 This function has no effect if the specified address, \fIaddr\fR, is within the
 bounds of the current stack.
 .SH RETURN VALUES
-.sp
-.LP
 If the \fB_stack_grow()\fR function  succeeds and does not detect a stack
 violation, it returns \fIaddr\fR.
 .SH ERRORS
-.sp
-.LP
 No errors are defined.
 .SH USAGE
-.sp
-.LP
 The \fB_stack_grow()\fR function does not actually adjust the stack pointer
 register. The caller is responsible for manipulating the stack pointer register
 once \fB_stack_grow()\fR returns.
@@ -58,8 +49,6 @@ compilation environment prior to executing code that modifies the stack
 pointer. It can also be used by hand-written assembly routines to allocate
 stack-based storage safely.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -76,8 +65,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR stack_getbounds (3C),
 .BR stack_inbounds (3C),
 .BR stack_violation (3C),

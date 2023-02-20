@@ -17,7 +17,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd March 13, 2022
+.Dd February 17, 2023
 .Dt MADVISE 3C
 .Os
 .Sh NAME
@@ -27,7 +27,7 @@
 .In sys/types.h
 .In sys/mman.h
 .Ft int
-.Fo madviase
+.Fo madvise
 .Fa "void *addr"
 .Fa "size_t len"
 .Fa "int advice"
