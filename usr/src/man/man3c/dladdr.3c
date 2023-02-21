@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLADDR 3C "Feb 4, 2009"
+.TH DLADDR 3C "February 17, 2023"
 .SH NAME
 dladdr, dladdr1 \- translate address to symbolic information
 .SH SYNOPSIS
-.LP
 .nf
 #include <dlfcn.h>
 
@@ -21,8 +20,6 @@ dladdr, dladdr1 \- translate address to symbolic information
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdladdr()\fR and \fBdladdr1()\fR functions determine if the specified
 \fIaddress\fR is located within one of the mapped objects that make up the
 current applications address space. An address is deemed to fall within a
@@ -104,7 +101,7 @@ information found in an ELF symbol can only be properly interpreted by the
 runtime linker. However, there are two fields that contain information useful
 to the caller of \fBdladdr1()\fR: The \fBst_size\fR field contains the size of
 the referenced item. The \fBst_info\fR field provides symbol type and binding
-attributes. See the \fILinker and Libraries Guild\fR for more information.
+attributes. See the \fILinker and Libraries Guide\fR for more information.
 .RE
 
 .sp
@@ -119,21 +116,15 @@ to a \fBLink_map\fR pointer as defined in <\fBsys/link.h\fR> (\fBLink_map
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 If the specified \fIaddress\fR cannot be matched to a mapped object, a \fB0\fR
 is returned. Otherwise, a non-zero return is made and the associated
 \fBDl_info_t\fR elements are filled.
 .SH USAGE
-.sp
-.LP
 The \fBdladdr()\fR and \fBdladdr1()\fR functions are one of a family of
 functions that give the user direct access to the dynamic linking facilities.
 These facilities are available to dynamically-linked processes only. See
 \fILinker and Libraries Guide\fR.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -148,8 +139,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ld (1),
 .BR dlclose (3C),
 .BR dldump (3C),
@@ -161,8 +150,6 @@ MT-Level	MT-Safe
 .LP
 \fILinker and Libraries Guide\fR
 .SH NOTES
-.sp
-.LP
 The \fBDl_info_t\fR pointer elements point to addresses within the mapped
 objects. These pointers can become invalid if objects are removed prior to
 these elements use. See \fBdlclose\fR(3C).

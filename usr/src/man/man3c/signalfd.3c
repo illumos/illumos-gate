@@ -10,7 +10,7 @@
 .\"
 .\"  Copyright 2016, Joyent, Inc.
 .\"
-.Dd "May 05, 2016"
+.Dd "February 17, 2023"
 .Dt SIGNALFD 3C
 .Os
 .Sh NAME
@@ -123,7 +123,7 @@ and
 .Fa POLLRDNORM
 will be set.
 .It Sy close(2)
-Closes the desriptor.
+Closes the descriptor.
 .El
 .Pp
 The

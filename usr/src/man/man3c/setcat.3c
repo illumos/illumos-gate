@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SETCAT 3C "Dec 29, 1996"
+.TH SETCAT 3C "February 17, 2023"
 .SH NAME
 setcat \- define default catalog
 .SH SYNOPSIS
-.LP
 .nf
 #include <pfmt.h>
 
@@ -15,8 +14,6 @@ setcat \- define default catalog
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsetcat()\fR function defines the default message catalog to be used by
 subsequent calls to \fBgettxt\fR(3C), \fBlfmt\fR(3C), or \fBpfmt\fR(3C) that do
 not explicitly specify a message catalog.
@@ -38,15 +35,12 @@ as an argument will cancel the default catalog.
 .LP
 If no default catalog is specified, or if \fIcatalog\fR is an invalid catalog
 name, subsequent calls to \fBgettxt\fR(3C), \fBlfmt\fR(3C), or \fBpfmt\fR(3C)
-that do not explicitely specify a catalog name will use \fBMessage not
+that do not explicitly specify a catalog name will use \fBMessage not
 found!!\en\fR as default string.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBsetcat()\fR returns a pointer to the catalog
 name.  Otherwise, it returns a null pointer.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExample of \fBsetcat()\fR function.
 .sp
 .in +2
@@ -57,8 +51,6 @@ name.  Otherwise, it returns a null pointer.
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -73,8 +65,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR gettxt (3C),
 .BR lfmt (3C),
 .BR pfmt (3C),

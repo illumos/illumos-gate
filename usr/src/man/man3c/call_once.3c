@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd "Jan 11, 2015"
+.Dd "February 17, 2023"
 .Dt CALL_ONCE 3C
 .Os
 .Sh NAME
@@ -32,7 +32,7 @@ function is used to ensure that an operation occurs only once, even
 across multiple threads.
 Each instance of a properly initialized
 .Ft once_flag
-can be pased to the
+can be passed to the
 .Ft call_once
 function; however, only a single caller will successfully execute the
 specified function,

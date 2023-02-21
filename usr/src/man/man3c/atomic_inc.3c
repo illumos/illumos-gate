@@ -3,16 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ATOMIC_INC 3C "May 13, 2005"
+.TH ATOMIC_INC 3C "February 17, 2023"
 .SH NAME
 atomic_inc, atomic_inc_8, atomic_inc_uchar, atomic_inc_16, atomic_inc_ushort,
 atomic_inc_32, atomic_inc_uint, atomic_inc_ulong, atomic_inc_64,
 atomic_inc_ptr, atomic_inc_8_nv, atomic_inc_uchar_nv, atomic_inc_16_nv,
 atomic_inc_ushort_nv, atomic_inc_32_nv, atomic_inc_uint_nv,
-atomic_inc_ulong_nv, atomic_inc_64_nv, atomic_inc_ptr_nv \- atomic inrement
+atomic_inc_ulong_nv, atomic_inc_64_nv, atomic_inc_ptr_nv \- atomic increment
 operations
 .SH SYNOPSIS
-.LP
 .nf
 #include <atomic.h>
 
@@ -105,22 +104,14 @@ operations
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-These functions enable the inrementing (by one) of the value stored in
+These functions enable the incrementing (by one) of the value stored in
 \fItarget\fR to occur in an atomic manner.
 .SH RETURN VALUES
-.sp
-.LP
 The *\fB_nv()\fR variants of these functions return the new value of
 \fItarget\fR.
 .SH ERRORS
-.sp
-.LP
 No errors are defined.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -137,8 +128,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR atomic_add (3C),
 .BR atomic_and (3C),
 .BR atomic_bits (3C),
@@ -150,8 +139,6 @@ MT-Level	MT-Safe
 .BR attributes (7),
 .BR atomic_ops (9F)
 .SH NOTES
-.sp
-.LP
 The *\fB_nv()\fR variants are substantially more expensive on some platforms
 than the versions that do not return values. Do not use them unless you need to
 know the new value \fBatomically\fR.

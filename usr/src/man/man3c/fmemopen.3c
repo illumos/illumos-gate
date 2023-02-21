@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Robert Mustacchi
 .\"
-.Dd March 25, 2020
+.Dd February 17, 2023
 .Dt FMEMOPEN 3C
 .Os
 .Sh NAME
@@ -75,7 +75,7 @@ argument accepts all the same values as
 The resulting stream behaves in a similar way to a stream backed by a
 file.
 The stream can be read and written to.
-The stream is seekeable and can either be byte or wide-character
+The stream is seekable and can either be byte or wide-character
 oriented.
 A NUL byte has no special meaning when reading.
 .Pp

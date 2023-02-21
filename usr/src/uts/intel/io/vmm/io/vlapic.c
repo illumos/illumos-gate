@@ -76,7 +76,7 @@ __FBSDID("$FreeBSD$");
  */
 #define	PRIO(x)			((x) & 0xf0)
 
-#define	VLAPIC_VERSION		(16)
+#define	VLAPIC_VERSION		(0x14)
 
 /*
  * The 'vlapic->timer_lock' is used to provide mutual exclusion between the
@@ -949,6 +949,91 @@ vlapic_get_cr8(const struct vlapic *vlapic)
 	return (lapic->tpr >> 4);
 }
 
+static bool
+vlapic_is_icr_valid(uint64_t icrval)
+{
+	uint32_t mode = icrval & APIC_DELMODE_MASK;
+	uint32_t level = icrval & APIC_LEVEL_MASK;
+	uint32_t trigger = icrval & APIC_TRIGMOD_MASK;
+	uint32_t shorthand = icrval & APIC_DEST_MASK;
+
+	switch (mode) {
+	case APIC_DELMODE_FIXED:
+		if (trigger == APIC_TRIGMOD_EDGE)
+			return (true);
+		/*
+		 * AMD allows a level assert IPI and Intel converts a level
+		 * assert IPI into an edge IPI.
+		 */
+		if (trigger == APIC_TRIGMOD_LEVEL && level == APIC_LEVEL_ASSERT)
+			return (true);
+		break;
+	case APIC_DELMODE_LOWPRIO:
+	case APIC_DELMODE_SMI:
+	case APIC_DELMODE_NMI:
+	case APIC_DELMODE_INIT:
+		if (trigger == APIC_TRIGMOD_EDGE &&
+		    (shorthand == APIC_DEST_DESTFLD ||
+		    shorthand == APIC_DEST_ALLESELF)) {
+			return (true);
+		}
+		/*
+		 * AMD allows a level assert IPI and Intel converts a level
+		 * assert IPI into an edge IPI.
+		 */
+		if (trigger == APIC_TRIGMOD_LEVEL &&
+		    level == APIC_LEVEL_ASSERT &&
+		    (shorthand == APIC_DEST_DESTFLD ||
+		    shorthand == APIC_DEST_ALLESELF)) {
+			return (true);
+		}
+		/*
+		 * An level triggered deassert INIT is defined in the Intel
+		 * Multiprocessor Specification and the Intel Software Developer
+		 * Manual. Due to the MPS it's required to send a level assert
+		 * INIT to a cpu and then a level deassert INIT. Some operating
+		 * systems e.g. FreeBSD or Linux use that algorithm. According
+		 * to the SDM a level deassert INIT is only supported by Pentium
+		 * and P6 processors. It's always send to all cpus regardless of
+		 * the destination or shorthand field. It resets the arbitration
+		 * id register. This register is not software accessible and
+		 * only required for the APIC bus arbitration. So, the level
+		 * deassert INIT doesn't need any emulation and we should ignore
+		 * it. The SDM also defines that newer processors don't support
+		 * the level deassert INIT and it's not valid any more. As it's
+		 * defined for older systems, it can't be invalid per se.
+		 * Otherwise, backward compatibility would be broken. However,
+		 * when returning false here, it'll be ignored which is the
+		 * desired behaviour.
+		 */
+		if (mode == APIC_DELMODE_INIT &&
+		    trigger == APIC_TRIGMOD_LEVEL &&
+		    level == APIC_LEVEL_DEASSERT) {
+			return (false);
+		}
+		break;
+	case APIC_DELMODE_STARTUP:
+		if (shorthand == APIC_DEST_DESTFLD ||
+		    shorthand == APIC_DEST_ALLESELF) {
+			return (true);
+		}
+		break;
+	case APIC_DELMODE_RR:
+		/* Only available on AMD! */
+		if (trigger == APIC_TRIGMOD_EDGE &&
+		    shorthand == APIC_DEST_DESTFLD) {
+			return (true);
+		}
+		break;
+	case APIC_DELMODE_RESV:
+		return (false);
+	default:
+		panic("vlapic_is_icr_valid: invalid mode 0x%08x", mode);
+	}
+
+	return (false);
+}
+
 void
 vlapic_icrlo_write_handler(struct vlapic *vlapic)
 {
@@ -962,6 +1047,12 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic)
 	lapic->icr_lo &= ~APIC_DELSTAT_PEND;
 	icrval = ((uint64_t)lapic->icr_hi << 32) | lapic->icr_lo;
 
+	/*
+	 * Ignore invalid combinations of the icr.
+	 */
+	if (!vlapic_is_icr_valid(icrval))
+		return;
+
 	if (vlapic_x2mode(vlapic))
 		dest = icrval >> 32;
 	else
@@ -974,21 +1065,10 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic)
 		vlapic_set_error(vlapic, APIC_ESR_SEND_ILLEGAL_VECTOR, false);
 		return;
 	}
+
 	if (mode == APIC_DELMODE_INIT &&
 	    (icrval & APIC_LEVEL_MASK) == APIC_LEVEL_DEASSERT) {
 		/* No work required to deassert INIT */
-		return;
-	}
-	if ((mode == APIC_DELMODE_STARTUP || mode == APIC_DELMODE_INIT) &&
-	    !(dsh == APIC_DEST_DESTFLD || dsh == APIC_DEST_ALLESELF)) {
-		/*
-		 * While Intel makes no mention of restrictions for destination
-		 * shorthand when sending INIT or SIPI, AMD requires either a
-		 * specific destination or all-excluding self.  Common use seems
-		 * to be restricted to those two cases.  Until handling is in
-		 * place to halt a guest which makes such a frivolous request,
-		 * we will ignore them.
-		 */
 		return;
 	}
 

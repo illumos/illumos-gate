@@ -216,7 +216,7 @@ struct umouse_bos_desc {
 } __packed;
 
 
-struct umouse_bos_desc umouse_bosd = {
+static struct umouse_bos_desc umouse_bosd = {
 	.bosd = {
 		.bLength = sizeof(umouse_bosd.bosd),
 		.bDescriptorType = UDESC_BOS,
@@ -793,7 +793,7 @@ umouse_stop(void *scarg)
 }
 
 
-struct usb_devemu ue_mouse = {
+static struct usb_devemu ue_mouse = {
 	.ue_emu =	"tablet",
 	.ue_usbver =	3,
 	.ue_usbspeed =	USB_SPEED_HIGH,

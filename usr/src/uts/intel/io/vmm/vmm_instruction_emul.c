@@ -1725,8 +1725,8 @@ static int
 vie_emulate_bextr(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	uint64_t src1, src2, dst, rflags;
-	unsigned start, len;
-	int error, size;
+	unsigned start, len, size;
+	int error;
 	struct vm_guest_paging *paging;
 
 	size = vie->opsize;

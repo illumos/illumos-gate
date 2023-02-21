@@ -201,7 +201,7 @@ static int hda_signal_state_change(struct hda_codec_inst *hci);
 static int hda_response(struct hda_codec_inst *hci, uint32_t response,
     uint8_t unsol);
 static int hda_transfer(struct hda_codec_inst *hci, uint8_t stream,
-    uint8_t dir, void *buf, size_t count);
+    uint8_t dir, uint8_t *buf, size_t count);
 
 static void hda_set_pib(struct hda_softc *sc, uint8_t stream_ind, uint32_t pib);
 static uint64_t hda_get_clock_ns(void);
@@ -210,9 +210,9 @@ static uint64_t hda_get_clock_ns(void);
  * PCI HDA function declarations
  */
 static int pci_hda_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl);
-static void pci_hda_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
+static void pci_hda_write(struct vmctx *ctx, struct pci_devinst *pi,
     int baridx, uint64_t offset, int size, uint64_t value);
-static uint64_t pci_hda_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
+static uint64_t pci_hda_read(struct vmctx *ctx, struct pci_devinst *pi,
     int baridx, uint64_t offset, int size);
 /*
  * HDA global data
@@ -264,7 +264,7 @@ static const uint16_t hda_rirb_sizes[] = {
 	[HDAC_RIRBSIZE_RIRBSIZE_MASK]	= 0,
 };
 
-static struct hda_ops hops = {
+static const struct hda_ops hops = {
 	.signal		= hda_signal_state_change,
 	.response	= hda_response,
 	.transfer	= hda_transfer,
@@ -615,7 +615,6 @@ hda_stream_start(struct hda_softc *sc, uint8_t stream_ind)
 	uint32_t sdctl = 0;
 	uint8_t strm = 0;
 	uint8_t dir = 0;
-	int i;
 
 	assert(!st->run);
 
@@ -640,7 +639,7 @@ hda_stream_start(struct hda_softc *sc, uint8_t stream_ind)
 	st->bdl_cnt = bdl_cnt;
 
 	bdle = (struct hda_bdle *)bdl_vaddr;
-	for (i = 0; i < bdl_cnt; i++, bdle++) {
+	for (size_t i = 0; i < bdl_cnt; i++, bdle++) {
 		bdle_sz = bdle->len;
 		assert(!(bdle_sz % HDA_DMA_ACCESS_LEN));
 
@@ -659,7 +658,7 @@ hda_stream_start(struct hda_softc *sc, uint8_t stream_ind)
 		bdle_desc->len = bdle_sz;
 		bdle_desc->ioc = bdle->ioc;
 
-		DPRINTF("bdle: 0x%x bdle_sz: 0x%x", i, bdle_sz);
+		DPRINTF("bdle: 0x%zx bdle_sz: 0x%x", i, bdle_sz);
 	}
 
 	sdctl = hda_get_reg_by_offset(sc, off + HDAC_SDCTL0);
@@ -793,8 +792,8 @@ hda_corb_run(struct hda_softc *sc)
 		corb->rp++;
 		corb->rp %= corb->size;
 
-		verb = hda_dma_ld_dword(corb->dma_vaddr +		\
-				HDA_CORB_ENTRY_LEN * corb->rp);
+		verb = hda_dma_ld_dword((uint8_t *)corb->dma_vaddr +
+		    HDA_CORB_ENTRY_LEN * corb->rp);
 
 		err = hda_send_command(sc, verb);
 		assert(!err);
@@ -890,7 +889,7 @@ hda_get_offset_stream(uint8_t stream_ind)
 }
 
 static void
-hda_set_gctl(struct hda_softc *sc, uint32_t offset, uint32_t old)
+hda_set_gctl(struct hda_softc *sc, uint32_t offset, uint32_t old __unused)
 {
 	uint32_t value = hda_get_reg_by_offset(sc, offset);
 
@@ -913,7 +912,8 @@ hda_set_statests(struct hda_softc *sc, uint32_t offset, uint32_t old)
 }
 
 static void
-hda_set_corbwp(struct hda_softc *sc, uint32_t offset, uint32_t old)
+hda_set_corbwp(struct hda_softc *sc, uint32_t offset __unused,
+    uint32_t old __unused)
 {
 	hda_corb_run(sc);
 }
@@ -939,7 +939,7 @@ hda_set_corbctl(struct hda_softc *sc, uint32_t offset, uint32_t old)
 }
 
 static void
-hda_set_rirbctl(struct hda_softc *sc, uint32_t offset, uint32_t old)
+hda_set_rirbctl(struct hda_softc *sc, uint32_t offset, uint32_t old __unused)
 {
 	uint32_t value = hda_get_reg_by_offset(sc, offset);
 	int err;
@@ -1025,7 +1025,7 @@ hda_set_sdctl(struct hda_softc *sc, uint32_t offset, uint32_t old)
 }
 
 static void
-hda_set_sdctl2(struct hda_softc *sc, uint32_t offset, uint32_t old)
+hda_set_sdctl2(struct hda_softc *sc, uint32_t offset, uint32_t old __unused)
 {
 	uint32_t value = hda_get_reg_by_offset(sc, offset);
 
@@ -1087,10 +1087,10 @@ hda_response(struct hda_codec_inst *hci, uint32_t response, uint8_t unsol)
 		rirb->wp++;
 		rirb->wp %= rirb->size;
 
-		hda_dma_st_dword(rirb->dma_vaddr + HDA_RIRB_ENTRY_LEN *	\
-				rirb->wp, response);
-		hda_dma_st_dword(rirb->dma_vaddr + HDA_RIRB_ENTRY_LEN *	\
-				rirb->wp + 0x04, response_ex);
+		hda_dma_st_dword((uint8_t *)rirb->dma_vaddr +
+		    HDA_RIRB_ENTRY_LEN * rirb->wp, response);
+		hda_dma_st_dword((uint8_t *)rirb->dma_vaddr +
+		    HDA_RIRB_ENTRY_LEN * rirb->wp + 0x04, response_ex);
 
 		hda_set_reg_by_offset(sc, HDAC_RIRBWP, rirb->wp);
 
@@ -1106,7 +1106,7 @@ hda_response(struct hda_codec_inst *hci, uint32_t response, uint8_t unsol)
 
 static int
 hda_transfer(struct hda_codec_inst *hci, uint8_t stream, uint8_t dir,
-    void *buf, size_t count)
+    uint8_t *buf, size_t count)
 {
 	struct hda_softc *sc = NULL;
 	struct hda_stream_desc *st = NULL;
@@ -1160,11 +1160,11 @@ hda_transfer(struct hda_codec_inst *hci, uint8_t stream, uint8_t dir,
 		bdle_desc = &bdl[st->be];
 
 		if (dir)
-			*(uint32_t *)buf =				\
-			    hda_dma_ld_dword(bdle_desc->addr + st->bp);
+			*(uint32_t *)buf = hda_dma_ld_dword(
+			    (uint8_t *)bdle_desc->addr + st->bp);
 		else
-			hda_dma_st_dword(bdle_desc->addr + st->bp,
-					*(uint32_t *)buf);
+			hda_dma_st_dword((uint8_t *)bdle_desc->addr +
+			    st->bp, *(uint32_t *)buf);
 
 		buf += HDA_DMA_ACCESS_LEN;
 		st->bp += HDA_DMA_ACCESS_LEN;
@@ -1204,8 +1204,8 @@ hda_set_pib(struct hda_softc *sc, uint8_t stream_ind, uint32_t pib)
 	/* LPIB Alias */
 	hda_set_reg_by_offset(sc, 0x2000 + off + HDAC_SDLPIB, pib);
 	if (sc->dma_pib_vaddr)
-		*(uint32_t *)(sc->dma_pib_vaddr + stream_ind *	\
-				HDA_DMA_PIB_ENTRY_LEN) = pib;
+		*(uint32_t *)((uint8_t *)sc->dma_pib_vaddr + stream_ind *
+		    HDA_DMA_PIB_ENTRY_LEN) = pib;
 }
 
 static uint64_t hda_get_clock_ns(void)
@@ -1256,8 +1256,9 @@ pci_hda_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 }
 
 static void
-pci_hda_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
-    int baridx, uint64_t offset, int size, uint64_t value)
+pci_hda_write(struct vmctx *ctx __unused,
+    struct pci_devinst *pi, int baridx, uint64_t offset, int size,
+    uint64_t value)
 {
 	struct hda_softc *sc = pi->pi_arg;
 	int err;
@@ -1273,8 +1274,8 @@ pci_hda_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 }
 
 static uint64_t
-pci_hda_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
-    int baridx, uint64_t offset, int size)
+pci_hda_read(struct vmctx *ctx __unused,
+    struct pci_devinst *pi, int baridx, uint64_t offset, int size)
 {
 	struct hda_softc *sc = pi->pi_arg;
 	uint64_t value = 0;

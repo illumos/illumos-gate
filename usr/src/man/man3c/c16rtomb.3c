@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 Robert Mustacchi
 .\"
-.Dd April 23, 2020
+.Dd February 17, 2023
 .Dt C16RTOMB 3C
 .Os
 .Sh NAME
@@ -153,7 +153,7 @@ or
 and an internal buffer
 .Pq buf
 will be used to write out the results of the
-converstion.
+conversion.
 In other words, the functions would be called as:
 .Bd -literal -offset indent
 c16rtomb(buf, L'\\0', ps)
@@ -175,7 +175,7 @@ will not encode the Unicode value 0x20ac into the ISO 8859-15 value
 Regardless of the locale, the characters returned will be encoded as
 though the code point were the corresponding value in Unicode.
 This means that when using UTF-16, if the corresponding code point were
-in the range for surorgate pairs, then the
+in the range for surrogate pairs, then the
 .Fn c16rtomb
 function will expect to receive that code point in that fashion.
 .Pp

@@ -44,11 +44,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH MAKECONTEXT 3C "Mar 8, 2004"
+.TH MAKECONTEXT 3C "February 17, 2023"
 .SH NAME
 makecontext, swapcontext \- manipulate user contexts
 .SH SYNOPSIS
-.LP
 .nf
 #include <ucontext.h>
 
@@ -62,8 +61,6 @@ makecontext, swapcontext \- manipulate user contexts
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmakecontext()\fR function modifies the context specified by \fIucp\fR,
 which has been initialized using \fBgetcontext\fR(2). When this context is
 resumed using \fBswapcontext()\fR or \fBsetcontext\fR(2), execution continues
@@ -94,13 +91,9 @@ structure pointed to by \fIucp\fR.
 If the \fIucp\fR or \fIoucp\fR argument points to an invalid address, the
 behavior is undefined and \fBerrno\fR may be set to \fBEFAULT\fR.
 .SH RETURN VALUES
-.sp
-.LP
 On successful completion, \fBswapcontext()\fR returns \fB0\fR. Otherwise,
 \fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBswapcontext()\fR function will fail if:
 .sp
 .ne 2
@@ -125,7 +118,6 @@ The \fIucp\fR or \fIoucp\fR argument points to an invalid address.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAlternate execution context on a stack whose memory was
 allocated using \fBmmap()\fR.
 .sp
@@ -169,15 +161,11 @@ main(int argc, char **argv)
 .in -2
 
 .SH USAGE
-.sp
-.LP
 These functions are useful for implementing user-level context switching
 between multiple threads of control within a process (co-processing). More
 effective multiple threads of control can be obtained by using native support
 for multithreading. See \fBthreads\fR(7).
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -194,8 +182,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR getcontext (2),
 .BR mmap (2),
 .BR sigaction (2),
@@ -206,8 +192,6 @@ MT-Level	MT-Safe
 .BR standards (7),
 .BR threads (7)
 .SH NOTES
-.sp
-.LP
 The semantics of the \fBuc_stack\fR member of the \fBucontext_t\fR structure
 have changed as they apply to inputs to \fBmakecontext()\fR. Prior to Solaris
 10, the \fBss_sp\fR member of the \fBuc_stack\fR structure represented the high
@@ -223,7 +207,7 @@ releases to access this behavior is obsolete.
 .LP
 Binary compatibility has been preserved with releases prior to Solaris 10.
 Before recompiling, applications that use \fBmakecontext()\fR must be updated
-to reflect this behavior change. The example below demonstates a typical change
+to reflect this behavior change. The example below demonstrates a typical change
 that must be applied:
 .sp
 .in +2

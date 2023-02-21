@@ -79,8 +79,8 @@ struct inout_handler {
 static struct inout_handler inout_handlers[MAX_IOPORTS];
 
 static int
-default_inout(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
-              uint32_t *eax, void *arg)
+default_inout(struct vmctx *ctx __unused, int in,
+    int port __unused, int bytes, uint32_t *eax, void *arg __unused)
 {
 	if (in) {
 		switch (bytes) {
@@ -147,7 +147,7 @@ emulate_inout(struct vmctx *ctx, int vcpu, struct vm_inout *inout)
 			return (-1);
 	}
 
-	error = hfunc(ctx, vcpu, in, inout->port, bytes, &inout->eax, harg);
+	error = hfunc(ctx, in, inout->port, bytes, &inout->eax, harg);
 	return (error);
 }
 

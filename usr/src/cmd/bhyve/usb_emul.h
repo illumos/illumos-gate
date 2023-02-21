@@ -53,7 +53,7 @@ struct usb_data_xfer;
 
 /* Device emulation handlers */
 struct usb_devemu {
-	char	*ue_emu;	/* name of device emulation */
+	const char *ue_emu;	/* name of device emulation */
 	int	ue_usbver;	/* usb version: 2 or 3 */
 	int	ue_usbspeed;	/* usb device speed */
 

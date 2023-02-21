@@ -1238,8 +1238,8 @@ vga_port_out_handler(struct vmctx *ctx, int in, int port, int bytes,
 }
 
 static int
-vga_port_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
-		 uint32_t *eax, void *arg)
+vga_port_handler(struct vmctx *ctx, int in, int port,
+    int bytes, uint32_t *eax, void *arg)
 {
 	uint8_t val;
 	int error;

@@ -46,18 +46,18 @@
 #define	VMEXIT_CONTINUE		(0)
 #define	VMEXIT_ABORT		(-1)
 
-struct vmctx;
 extern int guest_ncpus;
-extern uint16_t cores, sockets, threads;
+extern uint16_t cpu_cores, cpu_sockets, cpu_threads;
+
+struct vmctx;
+struct vm_exit;
 
 void *paddr_guest2host(struct vmctx *ctx, uintptr_t addr, size_t len);
 
-void fbsdrun_set_capabilities(struct vmctx *ctx, int cpu);
-#ifdef __FreeBSD__
-void fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip);
-#else
-void fbsdrun_addcpu(struct vmctx *ctx, int newcpu, uint64_t rip, bool suspend);
-#endif
+void fbsdrun_addcpu(struct vmctx *ctx, int newcpu, bool suspend);
+
 int  fbsdrun_virtio_msix(void);
+
+int vmexit_task_switch(struct vmctx *, struct vm_exit *, int *vcpu);
 
 #endif

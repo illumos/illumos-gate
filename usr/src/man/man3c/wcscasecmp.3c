@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"
-.Dd "April 9, 2016"
+.Dd "February 17, 2023"
 .Dt WCSCASECMP 3C
 .Os
 .Sh NAME
@@ -113,7 +113,7 @@ and
 functions are the wide-character equivalents of the
 .Fn strcasecmp ,
 .Fn strncasecmp ,
-.Fn strcasemp_l ,
+.Fn strcasecmp_l ,
 and
 .Fn strncasecmp_l
 functions, respectively.

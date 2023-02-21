@@ -128,8 +128,9 @@ struct pci_bar_allocation {
 	enum pcibar_type type;
 	uint64_t size;
 };
-TAILQ_HEAD(pci_bar_list, pci_bar_allocation) pci_bars = TAILQ_HEAD_INITIALIZER(
-    pci_bars);
+
+static TAILQ_HEAD(pci_bar_list, pci_bar_allocation) pci_bars =
+    TAILQ_HEAD_INITIALIZER(pci_bars);
 
 #define	PCI_EMUL_IOBASE		0x2000
 #define	PCI_EMUL_IOLIMIT	0x10000
@@ -151,7 +152,7 @@ SYSRES_MEM(PCI_EMUL_ECFG_BASE, PCI_EMUL_ECFG_SIZE);
 static struct pci_devemu *pci_emul_finddev(const char *name);
 static void pci_lintr_route(struct pci_devinst *pi);
 static void pci_lintr_update(struct pci_devinst *pi);
-static void pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot,
+static void pci_cfgrw(struct vmctx *ctx, int in, int bus, int slot,
     int func, int coff, int bytes, uint32_t *val);
 
 static __inline void
@@ -458,24 +459,27 @@ pci_msix_pba_bar(struct pci_devinst *pi)
 }
 
 static int
-pci_emul_io_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
-		    uint32_t *eax, void *arg)
+pci_emul_io_handler(struct vmctx *ctx, int in, int port,
+    int bytes, uint32_t *eax, void *arg)
 {
 	struct pci_devinst *pdi = arg;
 	struct pci_devemu *pe = pdi->pi_d;
 	uint64_t offset;
 	int i;
 
+	assert(port >= 0);
+
 	for (i = 0; i <= PCI_BARMAX; i++) {
 		if (pdi->pi_bar[i].type == PCIBAR_IO &&
-		    port >= pdi->pi_bar[i].addr &&
-		    port + bytes <= pdi->pi_bar[i].addr + pdi->pi_bar[i].size) {
+		    (uint64_t)port >= pdi->pi_bar[i].addr &&
+		    (uint64_t)port + bytes <=
+		    pdi->pi_bar[i].addr + pdi->pi_bar[i].size) {
 			offset = port - pdi->pi_bar[i].addr;
 			if (in)
-				*eax = (*pe->pe_barread)(ctx, vcpu, pdi, i,
+				*eax = (*pe->pe_barread)(ctx, pdi, i,
 							 offset, bytes);
 			else
-				(*pe->pe_barwrite)(ctx, vcpu, pdi, i, offset,
+				(*pe->pe_barwrite)(ctx, pdi, i, offset,
 						   bytes, *eax);
 			return (0);
 		}
@@ -484,8 +488,8 @@ pci_emul_io_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 }
 
 static int
-pci_emul_mem_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
-		     int size, uint64_t *val, void *arg1, long arg2)
+pci_emul_mem_handler(struct vmctx *ctx, int vcpu __unused, int dir,
+    uint64_t addr, int size, uint64_t *val, void *arg1, long arg2)
 {
 	struct pci_devinst *pdi = arg1;
 	struct pci_devemu *pe = pdi->pi_d;
@@ -502,22 +506,22 @@ pci_emul_mem_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
 
 	if (dir == MEM_F_WRITE) {
 		if (size == 8) {
-			(*pe->pe_barwrite)(ctx, vcpu, pdi, bidx, offset,
+			(*pe->pe_barwrite)(ctx, pdi, bidx, offset,
 					   4, *val & 0xffffffff);
-			(*pe->pe_barwrite)(ctx, vcpu, pdi, bidx, offset + 4,
+			(*pe->pe_barwrite)(ctx, pdi, bidx, offset + 4,
 					   4, *val >> 32);
 		} else {
-			(*pe->pe_barwrite)(ctx, vcpu, pdi, bidx, offset,
+			(*pe->pe_barwrite)(ctx, pdi, bidx, offset,
 					   size, *val);
 		}
 	} else {
 		if (size == 8) {
-			*val = (*pe->pe_barread)(ctx, vcpu, pdi, bidx,
+			*val = (*pe->pe_barread)(ctx, pdi, bidx,
 						 offset, 4);
-			*val |= (*pe->pe_barread)(ctx, vcpu, pdi, bidx,
+			*val |= (*pe->pe_barread)(ctx, pdi, bidx,
 						  offset + 4, 4) << 32;
 		} else {
-			*val = (*pe->pe_barread)(ctx, vcpu, pdi, bidx,
+			*val = (*pe->pe_barread)(ctx, pdi, bidx,
 						 offset, size);
 		}
 	}
@@ -1177,9 +1181,9 @@ msicap_cfgwrite(struct pci_devinst *pi, int capoff, int offset,
 	pci_lintr_update(pi);
 }
 
-void
-pciecap_cfgwrite(struct pci_devinst *pi, int capoff, int offset,
-		 int bytes, uint32_t val)
+static void
+pciecap_cfgwrite(struct pci_devinst *pi, int capoff __unused, int offset,
+    int bytes, uint32_t val)
 {
 
 	/* XXX don't write to the readonly parts */
@@ -1290,8 +1294,9 @@ pci_emul_iscap(struct pci_devinst *pi, int offset)
 }
 
 static int
-pci_emul_fallback_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
-			  int size, uint64_t *val, void *arg1, long arg2)
+pci_emul_fallback_handler(struct vmctx *ctx __unused, int vcpu __unused,
+    int dir, uint64_t addr __unused, int size __unused, uint64_t *val,
+    void *arg1 __unused, long arg2 __unused)
 {
 	/*
 	 * Ignore writes; return 0xff's for reads. The mem read code
@@ -1305,8 +1310,9 @@ pci_emul_fallback_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
 }
 
 static int
-pci_emul_ecfg_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
-    int bytes, uint64_t *val, void *arg1, long arg2)
+pci_emul_ecfg_handler(struct vmctx *ctx, int vcpu __unused, int dir,
+    uint64_t addr, int bytes, uint64_t *val, void *arg1 __unused,
+    long arg2 __unused)
 {
 	int bus, slot, func, coff, in;
 
@@ -1317,7 +1323,7 @@ pci_emul_ecfg_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
 	in = (dir == MEM_F_READ);
 	if (in)
 		*val = ~0UL;
-	pci_cfgrw(ctx, vcpu, in, bus, slot, func, coff, bytes, (uint32_t *)val);
+	pci_cfgrw(ctx, in, bus, slot, func, coff, bytes, (uint32_t *)val);
 	return (0);
 }
 
@@ -1502,8 +1508,8 @@ init_pci(struct vmctx *ctx)
 }
 
 static void
-pci_apic_prt_entry(int bus, int slot, int pin, int pirq_pin, int ioapic_irq,
-    void *arg)
+pci_apic_prt_entry(int bus __unused, int slot, int pin, int pirq_pin __unused,
+    int ioapic_irq, void *arg __unused)
 {
 
 	dsdt_line("  Package ()");
@@ -1516,8 +1522,8 @@ pci_apic_prt_entry(int bus, int slot, int pin, int pirq_pin, int ioapic_irq,
 }
 
 static void
-pci_pirq_prt_entry(int bus, int slot, int pin, int pirq_pin, int ioapic_irq,
-    void *arg)
+pci_pirq_prt_entry(int bus __unused, int slot, int pin, int pirq_pin,
+    int ioapic_irq __unused, void *arg __unused)
 {
 	char *name;
 
@@ -2069,7 +2075,7 @@ pci_emul_cmdsts_write(struct pci_devinst *pi, int coff, uint32_t new, int bytes)
 }
 
 static void
-pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
+pci_cfgrw(struct vmctx *ctx, int in, int bus, int slot, int func,
     int coff, int bytes, uint32_t *eax)
 {
 	struct businfo *bi;
@@ -2124,8 +2130,7 @@ pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
 	if (in) {
 		/* Let the device emulation override the default handler */
 		if (pe->pe_cfgread != NULL) {
-			needcfg = pe->pe_cfgread(ctx, vcpu, pi, coff, bytes,
-			    eax);
+			needcfg = pe->pe_cfgread(ctx, pi, coff, bytes, eax);
 		} else {
 			needcfg = 1;
 		}
@@ -2137,7 +2142,7 @@ pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
 	} else {
 		/* Let the device emulation override the default handler */
 		if (pe->pe_cfgwrite != NULL &&
-		    (*pe->pe_cfgwrite)(ctx, vcpu, pi, coff, bytes, *eax) == 0)
+		    (*pe->pe_cfgwrite)(ctx, pi, coff, bytes, *eax) == 0)
 			return;
 
 		/*
@@ -2234,8 +2239,8 @@ pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
 static int cfgenable, cfgbus, cfgslot, cfgfunc, cfgoff;
 
 static int
-pci_emul_cfgaddr(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
-		 uint32_t *eax, void *arg)
+pci_emul_cfgaddr(struct vmctx *ctx __unused, int in,
+    int port __unused, int bytes, uint32_t *eax, void *arg __unused)
 {
 	uint32_t x;
 
@@ -2264,8 +2269,8 @@ pci_emul_cfgaddr(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 INOUT_PORT(pci_cfgaddr, CONF1_ADDR_PORT, IOPORT_F_INOUT, pci_emul_cfgaddr);
 
 static int
-pci_emul_cfgdata(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
-		 uint32_t *eax, void *arg)
+pci_emul_cfgdata(struct vmctx *ctx, int in, int port,
+    int bytes, uint32_t *eax, void *arg __unused)
 {
 	int coff;
 
@@ -2273,7 +2278,7 @@ pci_emul_cfgdata(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 
 	coff = cfgoff + (port - CONF1_DATA_PORT);
 	if (cfgenable) {
-		pci_cfgrw(ctx, vcpu, in, cfgbus, cfgslot, cfgfunc, coff, bytes,
+		pci_cfgrw(ctx, in, cfgbus, cfgslot, cfgfunc, coff, bytes,
 		    eax);
 	} else {
 		/* Ignore accesses to cfgdata if not enabled by cfgaddr */
@@ -2304,7 +2309,8 @@ struct pci_emul_dsoftc {
 #define	PCI_EMUL_MSIX_MSGS	16
 
 static int
-pci_emul_dinit(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_emul_dinit(struct vmctx *ctx __unused, struct pci_devinst *pi,
+    nvlist_t *nvl __unused)
 {
 	int error;
 	struct pci_emul_dsoftc *sc;
@@ -2333,8 +2339,9 @@ pci_emul_dinit(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 }
 
 static void
-pci_emul_diow(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
-	      uint64_t offset, int size, uint64_t value)
+pci_emul_diow(struct vmctx *ctx __unused,
+    struct pci_devinst *pi, int baridx, uint64_t offset, int size,
+    uint64_t value)
 {
 	int i;
 	struct pci_emul_dsoftc *sc = pi->pi_arg;
@@ -2400,8 +2407,8 @@ pci_emul_diow(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 }
 
 static uint64_t
-pci_emul_dior(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
-	      uint64_t offset, int size)
+pci_emul_dior(struct vmctx *ctx __unused,
+    struct pci_devinst *pi, int baridx, uint64_t offset, int size)
 {
 	struct pci_emul_dsoftc *sc = pi->pi_arg;
 	uint32_t value;

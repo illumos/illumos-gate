@@ -4,7 +4,7 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2020 Robert Mustacchi
-.TH STDIO 3C "March 25, 2020"
+.TH STDIO 3C "February 17, 2023"
 .SH NAME
 stdio, stdin, stdout, stderr \- standard buffered input/output package
 .SH SYNOPSIS
@@ -314,7 +314,7 @@ will print everything out together, blocking other threads that might want to
 write to the same file between calls to \fBfprintf()\fR.
 .sp
 .LP
-An unlocked interface is available in case performace is an issue.  For
+An unlocked interface is available in case performance is an issue.  For
 example:
 .sp
 .in +2

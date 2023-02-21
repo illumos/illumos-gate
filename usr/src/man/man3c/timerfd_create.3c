@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2015, Joyent, Inc. All Rights Reserved.
 .\"
-.Dd March 26, 2017
+.Dd February 17, 2023
 .Dt TIMERFD 3C
 .Os
 .Sh NAME
@@ -31,7 +31,7 @@
 .Fa "int fd"
 .Fa "int flags"
 .Fa "const struct itimerspec *restrict value"
-.Fa "struct itimterspec *restrict ovalue"
+.Fa "struct itimerspec *restrict ovalue"
 .Fc
 .Ft int
 .Fo timerfd_gettime

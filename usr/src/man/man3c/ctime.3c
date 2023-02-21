@@ -44,12 +44,11 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH CTIME 3C "May 27, 2005"
+.TH CTIME 3C "February 17, 2023"
 .SH NAME
 ctime, ctime_r, localtime, localtime_r, gmtime, gmtime_r, asctime, asctime_r,
 tzset \- convert date and time to string
 .SH SYNOPSIS
-.LP
 .nf
 #include <time.h>
 
@@ -104,7 +103,6 @@ extern char *tzname[2];
 .fi
 
 .SS "Standard conforming"
-.LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary\fR... ]
 
@@ -117,8 +115,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBctime()\fR function converts the time pointed to by \fIclock\fR,
 representing the time in seconds since the Epoch (00:00:00 UTC, January 1,
 1970), to local time in the form of a 26-character string, as shown below. Time
@@ -236,8 +232,6 @@ Note that in most installations, \fBTZ\fR is set to the correct value by
 default when the user logs on, using the local \fB/etc/default/init\fR file
 (see \fBTIMEZONE\fR(5)).
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, the \fBgmtime()\fR and \fBlocaltime()\fR functions
 return a pointer to a \fBstruct tm\fR. If an error is detected, \fBgmtime()\fR
 and \fBlocaltime()\fR return a null pointer.
@@ -248,8 +242,6 @@ functions return the address of the structure pointed to by the \fIres\fR
 argument. If an error is detected, \fBgmtime_r()\fR and \fBlocaltime_r()\fR
 return a null pointer and set \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBctime_r()\fR and \fBasctime_r()\fR functions will fail if:
 .sp
 .ne 2
@@ -275,17 +267,14 @@ The result cannot be represented.
 .RE
 
 .SH USAGE
-.sp
-.LP
 These functions do not support localized date and time formats. The
 \fBstrftime\fR(3C) function can be used when localization is required.
 .sp
 .LP
 The \fBlocaltime()\fR, \fBlocaltime_r()\fR, \fBgmtime()\fR, \fBgmtime_r()\fR,
 \fBctime()\fR, and \fBctime_r()\fR functions assume Gregorian dates. Times
-before the adoption of the Gregorian calendar will not match historial records.
+before the adoption of the Gregorian calendar will not match historical records.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExamples of the \fBtzset()\fR function.
 .sp
 .LP
@@ -342,8 +331,6 @@ functions also update these external variables as if they had called
 value that they are converting.
 
 .SH BUGS
-.sp
-.LP
 The \fBzoneinfo\fR timezone data files do not transition past Tue Jan 19
 03:14:07 2038 UTC.  Therefore for 64-bit applications using \fBzoneinfo\fR
 timezones, calculations beyond this date might not use the correct offset from
@@ -351,8 +338,6 @@ standard time, and could return incorrect values. This affects the 64-bit
 version of \fBlocaltime()\fR, \fBlocaltime_r()\fR, \fBctime()\fR, and
 \fBctime_r()\fR.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -384,8 +369,6 @@ variables are not MT-Safe to access. They are modified by the \fBtzset()\fR
 function in an MT-Safe manner. The \fBmktime()\fR, \fBlocaltime_r()\fR, and
 \fBctime_r()\fR functions call \fBtzset()\fR.
 .SH SEE ALSO
-.sp
-.LP
 .BR time (2),
 .BR Intro (3),
 .BR getenv (3C),
@@ -399,8 +382,6 @@ function in an MT-Safe manner. The \fBmktime()\fR, \fBlocaltime_r()\fR, and
 .BR environ (7),
 .BR standards (7)
 .SH NOTES
-.sp
-.LP
 When compiling multithreaded programs, see \fBIntro\fR(3).
 .sp
 .LP

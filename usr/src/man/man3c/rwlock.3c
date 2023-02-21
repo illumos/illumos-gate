@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RWLOCK 3C "Dec 19, 2013"
+.TH RWLOCK 3C "February 17, 2023"
 .SH NAME
 rwlock, rwlock_init, rwlock_destroy, rw_rdlock, rw_wrlock, rw_tryrdlock,
 rw_trywrlock, rw_unlock \- multiple readers, single writer locks
 .SH SYNOPSIS
-.LP
 .nf
 cc -mt [ \fIflag\fR... ] \fIfile\fR...[ \fIlibrary\fR... ]
 
@@ -48,8 +47,6 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR...[ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 Many threads can have simultaneous read-only access to data, while only one
 thread can have write access at any given time. Multiple read access with
 single write access is controlled by locks, which are generally used to protect
@@ -80,7 +77,7 @@ The \fItype\fR argument can be one of the following:
 The readers/writer lock can synchronize threads in this process and other
 processes. The readers/writer lock should be initialized by only one process.
 \fIarg\fR is ignored. A readers/writer lock initialized with this type, must be
-allocated in memory shared between processses, i.e. either in Sys V shared
+allocated in memory shared between processes, i.e. either in Sys V shared
 memory (see \fBshmop\fR(2)) or in memory mapped to a file (see \fBmmap\fR(2)).
 It is illegal to initialize the object this way and to not allocate it in such
 shared memory.
@@ -183,13 +180,9 @@ waiting threads. If the calling thread does not hold the lock for either
 reading or writing, no error status is returned, and the program's behavior is
 unknown.
 .SH RETURN VALUES
-.sp
-.LP
 If successful, these functions return \fB0\fR. Otherwise, a non-zero value is
 returned to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBrwlock_init()\fR function will fail if:
 .sp
 .ne 2
@@ -225,8 +218,6 @@ These functions may fail if:
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -241,13 +232,9 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR mmap (2),
 .BR attributes (7)
 .SH NOTES
-.sp
-.LP
 These interfaces also available by way of:
 .sp
 .LP
