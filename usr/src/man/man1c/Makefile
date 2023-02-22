@@ -16,11 +16,10 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	1c
+MANSECT=	1c
 
-MANFILES= 	ct.1c		\
+MANFILES=	ct.1c		\
 		cu.1c		\
-		rup.1c		\
 		uucp.1c		\
 		uuencode.1c	\
 		uuglist.1c	\
