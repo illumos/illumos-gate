@@ -5525,7 +5525,7 @@ s usr/lib/amd64/libzdoor.so.1=../../../lib/amd64/libzdoor.so.1
 s usr/lib/amd64/libzdoor.so=../../../lib/amd64/libzdoor.so.1
 s usr/lib/amd64/libzfs.so.1=../../../lib/amd64/libzfs.so.1
 s usr/lib/amd64/libzfs.so=../../../lib/amd64/libzfs.so.1
-f usr/lib/amd64/libzfs_core.so.1 755 root bin
+f usr/lib/amd64/libzfs_core.so.1 0755 root bin
 s usr/lib/amd64/libzfs_core.so=libzfs_core.so.1
 f usr/lib/amd64/libzfs_jni.so.1 0755 root bin
 s usr/lib/amd64/libzfs_jni.so=libzfs_jni.so.1
@@ -7046,7 +7046,7 @@ s usr/lib/libzdoor.so.1=../../lib/libzdoor.so.1
 s usr/lib/libzdoor.so=../../lib/libzdoor.so.1
 s usr/lib/libzfs.so.1=../../lib/libzfs.so.1
 s usr/lib/libzfs.so=../../lib/libzfs.so.1
-f usr/lib/libzfs_core.so.1 755 root bin
+f usr/lib/libzfs_core.so.1 0755 root bin
 s usr/lib/libzfs_core.so=libzfs_core.so.1
 f usr/lib/libzfs_jni.so.1 0755 root bin
 s usr/lib/libzfs_jni.so=libzfs_jni.so.1
@@ -12288,7 +12288,7 @@ f usr/share/man/man1/rlogin.1 0444 root bin
 f usr/share/man/man1/rm.1 0444 root bin
 s usr/share/man/man1/rmail.1=mail.1
 s usr/share/man/man1/rmdir.1=rm.1
-f usr/share/man/man1/rmformat.1 044 root bin
+f usr/share/man/man1/rmformat.1 0444 root bin
 f usr/share/man/man1/roles.1 0444 root bin
 f usr/share/man/man1/rsh.1 0444 root bin
 f usr/share/man/man1/runat.1 0444 root bin
@@ -12304,7 +12304,7 @@ f usr/share/man/man1/setpgrp.1 0444 root bin
 s usr/share/man/man1/settime.1=touch.1
 s usr/share/man/man1/sh.1=ksh93.1
 f usr/share/man/man1/shcomp.1 0444 root bin
-f usr/share/man/man1/size.1 044 root bin
+f usr/share/man/man1/size.1 0444 root bin
 f usr/share/man/man1/sleep.1 0444 root bin
 f usr/share/man/man1/smbutil.1 0444 root bin
 f usr/share/man/man1/soelim.1 0444 root bin
@@ -12317,7 +12317,7 @@ f usr/share/man/man1/srchtxt.1 0444 root bin
 f usr/share/man/man1/strchg.1 0444 root bin
 s usr/share/man/man1/strconf.1=strchg.1
 f usr/share/man/man1/strings.1 0444 root bin
-f usr/share/man/man1/strip.1 044 root bin
+f usr/share/man/man1/strip.1 0444 root bin
 f usr/share/man/man1/stty.1 0444 root bin
 f usr/share/man/man1/sum.1 0444 root bin
 s usr/share/man/man1/sun.1=machid.1
@@ -12332,7 +12332,7 @@ f usr/share/man/man1/tee.1 0444 root bin
 f usr/share/man/man1/telnet.1 0444 root bin
 f usr/share/man/man1/test.1 0444 root bin
 f usr/share/man/man1/time.1 0444 root bin
-f usr/share/man/man1/timex.1 044 root bin
+f usr/share/man/man1/timex.1 0444 root bin
 f usr/share/man/man1/tip.1 0444 root bin
 f usr/share/man/man1/touch.1 0444 root bin
 f usr/share/man/man1/tput.1 0444 root bin
@@ -12397,9 +12397,7 @@ f usr/share/man/man1b/shutdown.1b 0444 root bin
 f usr/share/man/man1b/touch.1b 0444 root bin
 d usr/share/man/man1c 0755 root bin
 s usr/share/man/man1c/uudecode.1c=uuencode.1c
-f usr/share/man/man1c/uuencode.1c 044 root bin
-
-
+f usr/share/man/man1c/uuencode.1c 0444 root bin
 d usr/share/man/man2 0755 root bin
 f usr/share/man/man2/Intro.2 0444 root bin
 s usr/share/man/man2/_Exit.2=exit.2
@@ -19797,9 +19795,9 @@ f usr/share/man/man8/strerr.8 0444 root bin
 f usr/share/man/man8/sttydefs.8 0444 root bin
 f usr/share/man/man8/su.8 0444 root bin
 f usr/share/man/man8/sulogin.8 0444 root bin
-f usr/share/man/man8/svc.configd.8 044 root bin
-f usr/share/man/man8/svc.ipfd.8 044 root bin
-f usr/share/man/man8/svc.startd.8 044 root bin
+f usr/share/man/man8/svc.configd.8 0444 root bin
+f usr/share/man/man8/svc.ipfd.8 0444 root bin
+f usr/share/man/man8/svc.startd.8 0444 root bin
 f usr/share/man/man8/svcadm.8 0444 root bin
 f usr/share/man/man8/svccfg.8 0444 root bin
 f usr/share/man/man8/swap.8 0444 root bin
