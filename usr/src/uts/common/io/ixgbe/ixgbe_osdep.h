@@ -87,6 +87,7 @@ boolean_t ixgbe_removed(struct ixgbe_hw *);
 #define	SPEED_2_5GB		2500
 #define	SPEED_1GB		1000
 #define	SPEED_100		100
+#define	SPEED_10		10
 #define	FULL_DUPLEX		2
 
 #define	IXGBE_WRITE_FLUSH(a)	(void) IXGBE_READ_REG(a, IXGBE_STATUS)

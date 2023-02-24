@@ -500,6 +500,7 @@ setup_link:
 	case MAC_PROP_STATUS:
 	case MAC_PROP_SPEED:
 	case MAC_PROP_DUPLEX:
+	case MAC_PROP_MEDIA:
 		err = ENOTSUP; /* read-only prop. Can't set this. */
 		break;
 	case MAC_PROP_MTU:
@@ -583,6 +584,11 @@ ixgbe_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		ASSERT(pr_valsize >= sizeof (uint64_t));
 		tmp = ixgbe->link_speed * 1000000ull;
 		bcopy(&tmp, pr_val, sizeof (tmp));
+		break;
+	case MAC_PROP_MEDIA:
+		mutex_enter(&ixgbe->gen_lock);
+		*(mac_ether_media_t *)pr_val = ixgbe_phy_to_media(ixgbe);
+		mutex_exit(&ixgbe->gen_lock);
 		break;
 	case MAC_PROP_AUTONEG:
 		*(uint8_t *)pr_val = ixgbe->param_adv_autoneg_cap;
