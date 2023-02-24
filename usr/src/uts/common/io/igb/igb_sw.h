@@ -75,6 +75,7 @@ extern "C" {
 #include <sys/ddi_ufm.h>
 #include "e1000_api.h"
 #include "e1000_82575.h"
+#include "e1000_illumos.h"
 
 
 #define	MODULE_NAME			"igb"	/* module name */

@@ -107,3 +107,10 @@ all of the gld and ddi logic and have one driver export that leaving e1000g and
 igb as small stubs which depend on that. Note however, that the latter is not
 how our upstream is currently structuring their igb and em (FreeBSD's e1000g)
 drivers.
+
+# illumos specific files
+
+The files e1000_illumos.[ch] introduce code that is shared between the two
+drivers so we can avoid copying and pasting some logic in multiple places. Any
+updates should not touch these unless the other definitions have changed as a
+result of the update.
