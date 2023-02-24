@@ -12,7 +12,7 @@
 /*
  * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2020 Robert Mustacchi
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -105,11 +105,12 @@ nic_port_datalink_props(topo_mod_t *mod, tnode_t *port, dladm_handle_t handle,
 	uint64_t ifspeed;
 	link_duplex_t duplex;
 	link_state_t state;
-	const char *duplex_str, *state_str;
+	const char *duplex_str, *state_str, *media_str;
 	datalink_class_t dlclass;
 	uint32_t media;
 	char dlname[MAXLINKNAMELEN * 2];
-	char dlerr[DLADM_STRSIZE];
+	char dlerr[DLADM_STRSIZE], dlmedia[DLADM_PROP_VAL_MAX], *valptr[1];
+	uint_t valcnt = 1;
 	nic_port_mac_t mac;
 
 	status = dladm_datalink_id2info(handle, linkid, NULL, &dlclass, &media,
@@ -180,6 +181,15 @@ nic_port_datalink_props(topo_mod_t *mod, tnode_t *port, dladm_handle_t handle,
 		duplex_str = TOPO_PGROUP_DATALINK_LINK_DUPLEX_UNKNOWN;
 	}
 
+	media_str = NULL;
+	if (state == LINK_STATE_UP) {
+		valptr[0] = dlmedia;
+		if (dladm_get_linkprop(handle, linkid, DLADM_PROP_VAL_CURRENT,
+		    "media", valptr, &valcnt) == DLADM_STATUS_OK) {
+			media_str = dlmedia;
+		}
+	}
+
 	mac.npm_mac[0] = '\0';
 	mac.npm_valid = B_FALSE;
 	mac.npm_mod = mod;
@@ -223,6 +233,14 @@ nic_port_datalink_props(topo_mod_t *mod, tnode_t *port, dladm_handle_t handle,
 	    &err) != 0) {
 		topo_mod_dprintf(mod, "failed to set %s propery: %s\n",
 		    TOPO_PGROUP_DATALINK_LINK_NAME, topo_strerror(err));
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (media_str != NULL && topo_prop_set_string(port,
+	    TOPO_PGROUP_DATALINK, TOPO_PGROUP_DATALINK_LINK_MEDIA,
+	    TOPO_PROP_IMMUTABLE, media_str, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s propery: %s\n",
+		    TOPO_PGROUP_DATALINK_LINK_MEDIA, topo_strerror(err));
 		return (topo_mod_seterrno(mod, err));
 	}
 

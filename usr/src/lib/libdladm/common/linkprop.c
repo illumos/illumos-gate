@@ -23,6 +23,7 @@
  * Copyright 2017 Joyent, Inc.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdlib.h>
@@ -69,6 +70,7 @@
 #include <libinetutil.h>
 #include <pool.h>
 #include <libdlaggr.h>
+#include <sys/mac_ether.h>
 
 /*
  * The linkprop get() callback.
@@ -156,7 +158,7 @@ static pd_getf_t	get_zone, get_autopush, get_rate_mod, get_rate,
 			get_txrings, get_cntavail, get_secondary_macs,
 			get_allowedips, get_allowedcids, get_pool,
 			get_rings_range, get_linkmode_prop, get_bits,
-			get_promisc_filtered;
+			get_promisc_filtered, get_media;
 
 static pd_setf_t	set_zone, set_rate, set_powermode, set_radio,
 			set_public_prop, set_resource, set_stp_prop,
@@ -402,6 +404,8 @@ static link_attr_t link_attr[] = {
 	{ MAC_PROP_SECONDARY_ADDRS, sizeof (mac_secondary_addr_t),
 	    "secondary-macs"},
 
+	{ MAC_PROP_MEDIA,	sizeof (uint32_t),	"media" },
+
 	{ MAC_PROP_PRIVATE,	0,			"driver-private"}
 };
 
@@ -487,6 +491,124 @@ static  val_desc_t	stp_p2p_vals[] = {
 static  val_desc_t	dladm_part_linkmode_vals[] = {
 	{ "cm",		DLADM_PART_CM_MODE	},
 	{ "ud",		DLADM_PART_UD_MODE	},
+};
+
+static	val_desc_t	dladm_ether_media_vals[] = {
+	{ "unknown",		ETHER_MEDIA_UNKNOWN },
+	{ "none",		ETHER_MEDIA_NONE },
+	{ "10BASE-T",		ETHER_MEDIA_10BASE_T },
+	{ "100BASE-T4",		ETHER_MEDIA_100BASE_T4 },
+	{ "100BASE-X",		ETHER_MEDIA_100BASE_X },
+	{ "100BASE-T2",		ETHER_MEDIA_100BASE_T2 },
+	{ "1000BASE-X",		ETHER_MEDIA_1000BASE_X },
+	{ "1000BASE-T",		ETHER_MEDIA_1000BASE_T },
+	{ "1000BASE-KX",	ETHER_MEDIA_1000BASE_KX },
+	{ "1000BASE-T1",	ETHER_MEDIA_1000BASE_T1 },
+	{ "1000BASE-CX",	ETHER_MEDIA_1000BASE_CX },
+	{ "1000BASE-SX",	ETHER_MEDIA_1000BASE_SX },
+	{ "1000BASE-LX",	ETHER_MEDIA_1000BASE_LX },
+	{ "1000BASE-BX",	ETHER_MEDIA_1000BASE_BX },
+	{ "1000-SGMII",		ETHER_MEDIA_1000_SGMII },
+	{ "100BASE-TX",		ETHER_MEDIA_100BASE_TX },
+	{ "100BASE-FX",		ETHER_MEDIA_100BASE_FX },
+	{ "100-SGMII",		ETHER_MEDIA_100_SGMII },
+	{ "10BASE-T1",		ETHER_MEDIA_10BASE_T1 },
+	{ "100BASE-T1",		ETHER_MEDIA_100BASE_T1 },
+	{ "2500BASE-T",		ETHER_MEDIA_2500BASE_T },
+	{ "2500BASE-KX",	ETHER_MEDIA_2500BASE_KX },
+	{ "2500BASE-X",		ETHER_MEDIA_2500BASE_X },
+	{ "5000BASE-T",		ETHER_MEDIA_5000BASE_T },
+	{ "5000BASE-KR",	ETHER_MEDIA_5000BASE_KR },
+	{ "10GBASE-T",		ETHER_MEDIA_10GBASE_T },
+	{ "10GBASE-SR",		ETHER_MEDIA_10GBASE_SR },
+	{ "10GBASE-LR",		ETHER_MEDIA_10GBASE_LR },
+	{ "10GBASE-LRM",	ETHER_MEDIA_10GBASE_LRM },
+	{ "10GBASE-KR",		ETHER_MEDIA_10GBASE_KR },
+	{ "10GBASE-CX4",	ETHER_MEDIA_10GBASE_CX4 },
+	{ "10GBASE-KX4",	ETHER_MEDIA_10GBASE_KX4 },
+	{ "10G-XAUI",		ETHER_MEDIA_10G_XAUI },
+	{ "10GBASE-AOC",	ETHER_MEDIA_10GBASE_AOC },
+	{ "10GBASE-ACC",	ETHER_MEDIA_10GBASE_ACC },
+	{ "10GBASE-CR",		ETHER_MEDIA_10GBASE_CR },
+	{ "10GBASE-ER",		ETHER_MEDIA_10GBASE_ER },
+	{ "10G-SFI",		ETHER_MEDIA_10G_SFI },
+	{ "10G-XFI",		ETHER_MEDIA_10G_XFI },
+	{ "25GBASE-T",		ETHER_MEDIA_25GBASE_T },
+	{ "25GBASE-SR",		ETHER_MEDIA_25GBASE_SR },
+	{ "25GBASE-LR",		ETHER_MEDIA_25GBASE_LR },
+	{ "25GBASE-ER",		ETHER_MEDIA_25GBASE_ER },
+	{ "25GBASE-KR",		ETHER_MEDIA_25GBASE_KR },
+	{ "25GBASE-CR",		ETHER_MEDIA_25GBASE_CR },
+	{ "25GBASE-AOC",	ETHER_MEDIA_25GBASE_AOC },
+	{ "25GBASE-ACC",	ETHER_MEDIA_25GBASE_ACC },
+	{ "25G-AUI",		ETHER_MEDIA_25G_AUI },
+	{ "40GBASE-T",		ETHER_MEDIA_40GBASE_T },
+	{ "40GBASE-CR4",	ETHER_MEDIA_40GBASE_CR4 },
+	{ "40GBASE-KR4",	ETHER_MEDIA_40GBASE_KR4 },
+	{ "40GBASE-LR4",	ETHER_MEDIA_40GBASE_LR4 },
+	{ "40GBASE-SR4",	ETHER_MEDIA_40GBASE_SR4 },
+	{ "40GBASE-ER4",	ETHER_MEDIA_40GBASE_ER4 },
+	{ "40GBASE-LM4",	ETHER_MEDIA_40GBASE_LM4 },
+	{ "40GBASE-AOC4",	ETHER_MEDIA_40GBASE_AOC4 },
+	{ "40GBASE-ACC4",	ETHER_MEDIA_40GBASE_ACC4 },
+	{ "40G-XLAUI",		ETHER_MEDIA_40G_XLAUI },
+	{ "40G-XLPPI",		ETHER_MEDIA_40G_XLPPI },
+	{ "50GBASE-KR2",	ETHER_MEDIA_50GBASE_KR2 },
+	{ "50GBASE-CR2",	ETHER_MEDIA_50GBASE_CR2 },
+	{ "50GBASE-SR2",	ETHER_MEDIA_50GBASE_SR2 },
+	{ "50GBASE-LR2",	ETHER_MEDIA_50GBASE_LR2 },
+	{ "50GBASE-AOC2",	ETHER_MEDIA_50GBASE_AOC2 },
+	{ "50GBASE-ACC2",	ETHER_MEDIA_50GBASE_ACC2 },
+	{ "50GBASE-KR",		ETHER_MEDIA_50GBASE_KR },
+	{ "50GBASE-CR",		ETHER_MEDIA_50GBASE_CR },
+	{ "50GBASE-SR",		ETHER_MEDIA_50GBASE_SR },
+	{ "50GBASE-LR",		ETHER_MEDIA_50GBASE_LR },
+	{ "50GBASE-FR",		ETHER_MEDIA_50GBASE_FR },
+	{ "50GBASE-ER",		ETHER_MEDIA_50GBASE_ER },
+	{ "50GBASE-AOC",	ETHER_MEDIA_50GBASE_AOC },
+	{ "50GBASE-ACC",	ETHER_MEDIA_50GBASE_ACC },
+	{ "100GBASE-CR10",	ETHER_MEDIA_100GBASE_CR10 },
+	{ "100GBASE-SR10",	ETHER_MEDIA_100GBASE_SR10 },
+	{ "100GBASE-SR4",	ETHER_MEDIA_100GBASE_SR4 },
+	{ "100GBASE-LR4",	ETHER_MEDIA_100GBASE_LR4 },
+	{ "100GBASE-ER4",	ETHER_MEDIA_100GBASE_ER4 },
+	{ "100GBASE-KR4",	ETHER_MEDIA_100GBASE_KR4 },
+	{ "100GBASE-CR4",	ETHER_MEDIA_100GBASE_CR4 },
+	{ "100GBASE-CAUI4",	ETHER_MEDIA_100GBASE_CAUI4 },
+	{ "100GBASE-AOC4",	ETHER_MEDIA_100GBASE_AOC4 },
+	{ "100GBASE-ACC4",	ETHER_MEDIA_100GBASE_ACC4 },
+	{ "100GBASE-KR2",	ETHER_MEDIA_100GBASE_KR2 },
+	{ "100GBASE-CR2",	ETHER_MEDIA_100GBASE_CR2 },
+	{ "100GBASE-SR2",	ETHER_MEDIA_100GBASE_SR2 },
+	{ "100GBASE-KR",	ETHER_MEDIA_100GBASE_KR },
+	{ "100GBASE-CR",	ETHER_MEDIA_100GBASE_CR },
+	{ "100GBASE-SR",	ETHER_MEDIA_100GBASE_SR },
+	{ "100GBASE-DR",	ETHER_MEDIA_100GBASE_DR },
+	{ "100GBASE-LR",	ETHER_MEDIA_100GBASE_LR },
+	{ "100GBASE-FR",	ETHER_MEDIA_100GBASE_FR },
+	{ "200GAUI-4",		ETHER_MEDIA_200GAUI_4 },
+	{ "200GBASE-CR4",	ETHER_MEDIA_200GBASE_CR4 },
+	{ "200GBASE-KR4",	ETHER_MEDIA_200GBASE_KR4 },
+	{ "200GBASE-SR4",	ETHER_MEDIA_200GBASE_SR4 },
+	{ "200GBASE-DR4",	ETHER_MEDIA_200GBASE_DR4 },
+	{ "200GBASE-FR4",	ETHER_MEDIA_200GBASE_FR4 },
+	{ "200GBASE-LR4",	ETHER_MEDIA_200GBASE_LR4 },
+	{ "200GBASE-ER4",	ETHER_MEDIA_200GBASE_ER4 },
+	{ "200GAUI-2",		ETHER_MEDIA_200GAUI_2 },
+	{ "200GBASE-KR2",	ETHER_MEDIA_200GBASE_KR2 },
+	{ "200GBASE-CR2",	ETHER_MEDIA_200GBASE_CR2 },
+	{ "200GBASE-SR2",	ETHER_MEDIA_200GBASE_SR2 },
+	{ "400GAUI-8",		ETHER_MEDIA_400GAUI_8 },
+	{ "400GBASE-KR8",	ETHER_MEDIA_400GBASE_KR8 },
+	{ "400GBASE-FR8",	ETHER_MEDIA_400GBASE_FR8 },
+	{ "400GBASE-LR8",	ETHER_MEDIA_400GBASE_LR8 },
+	{ "400GBASE-ER8",	ETHER_MEDIA_400GBASE_ER8 },
+	{ "400GAUI-4",		ETHER_MEDIA_400GAUI_4 },
+	{ "400GBASE-KR4",	ETHER_MEDIA_400GBASE_KR4 },
+	{ "400GBASE-CR4",	ETHER_MEDIA_400GBASE_CR4 },
+	{ "400GBASE-SR4",	ETHER_MEDIA_400GBASE_SR4 },
+	{ "400GBASE-DR4",	ETHER_MEDIA_400GBASE_DR4 },
+	{ "400GBASE-FR4",	ETHER_MEDIA_400GBASE_FR4 }
 };
 
 #define	VALCNT(vals)    (sizeof ((vals)) / sizeof (val_desc_t))
@@ -863,6 +985,8 @@ static prop_desc_t	prop_table[] = {
 	    NULL, NULL, get_cntavail, NULL, 0,
 	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
+	{ "media", { NULL, 0 }, NULL, 0, NULL, NULL, get_media, NULL, 0,
+	    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE }
 };
 
 #define	DLADM_MAX_PROPS	(sizeof (prop_table) / sizeof (prop_desc_t))
@@ -4974,4 +5098,51 @@ set_promisc_filtered(dladm_handle_t handle, prop_desc_t *pdp,
 
 	free(dip);
 	return (status);
+}
+
+static dladm_status_t
+get_media(dladm_handle_t handle, prop_desc_t *pdp,
+    datalink_id_t linkid, char **prop_val, uint_t *val_cnt,
+    datalink_media_t media, uint_t flags, uint_t *perm_flags)
+{
+	dladm_status_t	status = DLADM_STATUS_OK;
+	uint32_t	raw_val;
+	val_desc_t	*descs;
+	size_t		desc_count;
+
+	if (*val_cnt == 0)
+		return (DLADM_STATUS_TOOSMALL);
+
+	status = i_dladm_get_public_prop(handle, linkid, pdp->pd_name, flags,
+	    perm_flags, &raw_val, sizeof (raw_val));
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	/*
+	 * To translate the property into a string we need to know the actual
+	 * datalink_media_t type to use as these values are media-type specific.
+	 */
+	switch (media) {
+	case DL_ETHER:
+		descs = dladm_ether_media_vals;
+		desc_count = VALCNT(dladm_ether_media_vals);
+		break;
+	default:
+		descs = NULL;
+		desc_count = 0;
+		break;
+	}
+
+	*val_cnt = 1;
+	for (size_t i = 0; i < desc_count; i++) {
+		if (descs[i].vd_val == raw_val) {
+			(void) strlcpy(prop_val[0], descs[i].vd_name,
+			    DLADM_PROP_VAL_MAX);
+			return (DLADM_STATUS_OK);
+		}
+	}
+
+	(void) snprintf(prop_val[0], DLADM_STRSIZE, "unknown (0x%x)",
+	    raw_val);
+	return (DLADM_STATUS_OK);
 }

@@ -13,7 +13,7 @@
 .\" Copyright 2020 RackTop Systems, Inc.
 .\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd January 30, 2023
+.Dd March 4, 2023
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -1053,6 +1053,580 @@ The link is up.
 If auto-negotiation is in use, it should have completed.
 Traffic should be able to flow over the link, barring other issues.
 .El
+.It Dv MAC_PROP_MEDIA
+.Bd -filled -compact
+Type:
+.Vt uint32_t No (Varies) |
+Permissions:
+.Sy Read-Only
+.Ed
+.Pp
+The
+.Dv MAC_PROP_MEDIA
+property indicates the current type of media on the link.
+The type of media is class-specific and determined based on the
+.Fa m_type_ident
+field in the
+.Vt mac_register_t
+structure used when calling
+.Xr mac_register 9F .
+The media is always read-only.
+This property is not used to control how auto-negotiation should be
+performed, instead the existing speed-based properties are used instead.
+This property should be updated after auto-negotiation has completed.
+If device hardware and firmware do not provide a way to accurately
+determine this, then it is much better to return that the media is
+unknown rather than to lie or guess.
+A common case where this comes up is when a network card uses an
+SFP-based device.
+If the underlying negotiated type of the link isn't made available and
+therefore the driver can't distinguish between say 40GBASE-SR4 and
+40GBASE-LR4, then drivers should return that the media is unknown.
+.Pp
+Similarly many types here represent an electrical interface that is
+often used between a MAC and a PHY, but also for chip-to-chip
+connectivity or on a backplane.
+When connecting to a PHY these shouldn't generally be used as the user
+is concerned with what is actually on the link they plug in, not the
+internals of the device.
+.Pp
+Currently media values are defined for Ethernet-based devices and use
+the enumeration
+.Vt mac_ether_media_t .
+These are defined in
+.In sys/mac_ether.h
+and generally follow the IEEE standardized physical medium dependent
+.Pq PMD
+layer in 802.3.
+.Bl -tag -width Ds
+.It Dv ETHER_MEDIA_UNKNOWN
+This indicates that the type of the link media is unknown to the driver.
+This may be because the link is in a state where this information is
+unknown or the hardware, firmware, and device driver cannot figure it
+out.
+If there is no media present and the link is down, use
+.Dv ETHER_MEDIA_NONE
+instead.
+.It Dv ETHER_MEDIA_NONE
+Represents the case that there is no specific media in use.
+This should generally be used when the link is down.
+.It Dv ETHER_MEDIA_10BASE_T
+Traditional 10 Mbit/s Ethernet based utilizing CAT-3 cabling.
+Defined in 802.3i.
+.It Dv ETHER_MEDIA_10BASE_T1
+A more recent variant of 10 Mbit/s Ethernet that uses a single twisted
+pair.
+Defined in 802.3cg.
+.It Dv ETHER_MEDIA_100BASE_TX
+The most common form of 100 Mbit/s Ethernet that utilizes two twisted
+pairs over a CAT-5 cable.
+Defined in 802.3u.
+.It Dv ETHER_MEDIA_100BASE_FX
+100 Mbit/s Ethernet operating over multi-mode fiber.
+Defined in 802.3u.
+.It Dv ETHER_MEDIA_100BASE_X
+This is a general term that covers operating in one of the 100BASE-?X
+variants.
+This is here because some PHYs do not distinguish between operating in
+100BASE-TX and 100BASE-FX.
+If the driver can determine if it is operating with a BASE-T or fiber
+based PHY, prefer the more specific types instead.
+.It Dv ETHER_MEDIA_100BASE_T4
+This is an uncommon half-duplex variant of 100 Mbit/s Ethernet that
+operates over CAT-3 cable using four twisted pairs.
+Defined in 802.3u.
+.It Dv ETHER_MEDIA_100BASE_T2
+This is another uncommon variant of 100 Mbit/s Ethernet that only
+requires two twisted pairs, but unlike 100BASE-TX requires CAT-3 cables.
+Defined in 802.3y.
+.It Dv ETHER_MEDIA_100BASE_T1
+A more recent form of 100 Mbit/s Ethernet that requires only a single
+twisted pair.
+Defined in 802.3bw.
+.It Dv ETHER_MEDIA_100_SGMII
+This form of 100 Mbit/s Ethernet is generally used for chip-to-chip
+connectivity and utilizes the SGMII
+.Pq Serial gigabit media-independent interface
+specification.
+.It Dv ETHER_MEDIA_1000BASE_X
+This is a general catch-all for all 1 Gbit/s fiber-based operation.
+This is here for compatibility with the generic information returned by
+traditional 802.3-compatible PHYs.
+When more specific information is available, that should be used
+instead.
+.It Dv ETHER_MEDIA_1000BASE_T
+Traditional 1 Gbit/s Ethernet that utilizes a CAT-5 cable with four
+twisted pairs.
+Defined in 802.3ab.
+.It Dv ETHER_MEDIA_1000BASE_T1
+A more recent form of 1 Gbit/s Ethernet that only requires a single
+twisted pair.
+.It Dv ETHER_MEDIA_1000BASE_KX
+This form of 1 Gbit/s Ethernet is designed for operating over a backplane.
+Defined in 802.3ap.
+.It Dv ETHER_MEDIA_1000BASE_CX
+An older form of 1 Gbit/s Ethernet that operates over balanced copper
+cables.
+Defined in 802.3z.
+.It Dv ETHER_MEDIA_1000BASE_SX
+1 Gbit/s Ethernet operating over a pair of multi-mode fibers, one for
+each direction.
+.It Dv ETHER_MEDIA_1000BASE_LX
+1 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+each direction.
+.It Dv ETHER_MEDIA_1000BASE_BX
+1 Gbit/s Ethernet operating over a single piece of single-mode fiber.
+This media operates bi-directionally as opposed to how 1000BASE-LX and
+1000BASE-SX operate.
+.It Dv ETHER_MEDIA_1000_SGMII
+A form of 1 Gbit/s Ethernet defined by Cisco that is used for
+chip-to-chip connectivity.
+.It Dv ETHER_MEDIA_2500BASE_T
+2.5 Gbit/s Ethernet based on four copper twisted-pairs.
+Defined in 802.3bz.
+.It Dv ETHER_MEDIA_2500BASE_KX
+2.5 Gbit/s Ethernet that is designed for operating over a backplane
+interconnect.
+Defined in 802.3cb.
+.It Dv ETHER_MEDIA_2500BASE_X
+This is a variant of 2.5 Gbit/s Ethernet that took the 1000BASE-X IEEE
+standard and ran it with a 2.5x faster clock.
+It is a defacto standard.
+.It Dv ETHER_MEDIA_5000BASE_T
+5.0 Gbit/s Ethernet based on four copper twisted-pairs.
+Defined in 802.3bz.
+.It Dv ETHER_MEDIA_5000BASE_KR
+5.0 Gbit/s Ethernet that is designed for operating over a backplane
+interconnect.
+Defined in 802.3cb.
+.It Dv ETHER_MEDIA_10GBASE_T
+10 Gbit/s Ethernet operating over four copper twisted pairs utilizing
+CAT-6a cables.
+Defined in 802.3an.
+.It Dv ETHER_MEDIA_10GBASE_SR
+10 Gbit/s Ethernet operating over a pair of multi-mode fibers, one for
+each direction.
+Defined in 802.3ae.
+.It Dv ETHER_MEDIA_10GBASE_LR
+10 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+each direction.
+The maximum fiber length is 10km.
+Defined in 802.3ae.
+.It Dv ETHER_MEDIA_10GBASE_ER
+10 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+each direction.
+The maximum fiber length is 30km.
+Defined in 802.3ae.
+.It Dv ETHER_MEDIA_10GBASE_LRM
+10 Gbit/s Ethernet operating over a pair of multi-mode fibers, one for
+each direction.
+This has a longer reach of up to 220m and is a longer distance than
+10GBASE-SR.
+Defined in 802.3aq.
+.It Dv ETHER_MEDIA_10GBASE_KR
+10 Gbit/s Ethernet operating over a single lane backplane.
+Defined n 802.3ap.
+.It Dv ETHER_MEDIA_10GBASE_CX4
+10 Gbit/s Ethernet operating over a group of four shielded copper cables.
+Defined in 802.3ak.
+.It Dv ETHER_MEDIA_10GBASE_KX4
+10 Gbit/s Ethernet operating over a four lane backplane.
+Defined n 802.3ap.
+.It Dv ETHER_MEDIA_10GBASE_CR
+10 Gbit/s Ethernet that is built using a passive copper
+SFP-compatible cable.
+This is sometimes called 10GSFP+Cu passive.
+Defined in SFF-8431.
+.It Dv ETHER_MEDIA_10GBASE_AOC
+10 Gbit/s Ethernet that is built using a short-range active
+optical cable that is SFP+-compatible.
+Defined in SFF-8431.
+.It Dv ETHER_MEDIA_10GBASE_ACC
+10 Gbit/s Ethernet based upon a single lane of copper cable with an
+active component that allows it go longer distances than 10GBASE-CR.
+Defined in SFF-8431.
+.It Dv ETHER_MEDIA_10G_XAUI
+10 Gbit/s signalling that is defined for use between a MAC and PHY.
+This is the roman numeral X and attachment unit interface.
+Sometimes used for chip-to-chip interconnects.
+Defined in 802.3ae.
+.It Dv ETHER_MEDIA_10G_SFI
+10 Gbit/s signalling that is defined for use between a MAC and an
+SFP-based transceiver.
+Defined in SFF-8431.
+.It Dv ETHER_MEDIA_10G_XFI
+10 Gbit/s signalling that is defined for use between a MAC and an
+XFP-based transceiver.
+Defined in INF-8077i
+.Pq XFP MSA .
+.It Dv ETHER_MEDIA_25GBASE_T
+25 Gbit/s Ethernet based upon four twisted pair cables using CAT-8
+cable.
+Defined in 802.3bq.
+.It Dv ETHER_MEDIA_25GBASE_SR
+25 Gbit/s Ethernet operating over a pair of multi-mode fibers, one for
+each direction.
+Defined in 802.3by.
+.It Dv ETHER_MEDIA_25GBASE_LR
+25 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+each direction.
+The maximum fiber length is 10km.
+Defined in 802.3cc.
+.It Dv ETHER_MEDIA_25GBASE_ER
+25 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+each direction.
+The maximum fiber length is 30km.
+Defined in 802.3cc.
+.It Dv ETHER_MEDIA_25GBASE_KR
+25 Gbit/s Ethernet operating over a backplane with a single lane.
+Defined in 802.3by.
+.It Dv ETHER_MEDIA_25GBASE_CR
+25 Gbit/s Ethernet operating over a single lane of copper cable.
+Generally used with an SFP28 style connector.
+Defined in 802.3by.
+.It Dv ETHER_MEDIA_25GBASE_AOC
+25 Gbit/s Ethernet based that is built using a short-range active
+optical cable that is SFP28-compatible.
+Defined loosely by SFF-8402 and often utilizes 25GBASE-SR.
+.It Dv ETHER_MEDIA_25GBASE_ACC
+25 Gbit/s Ethernet based upon a single lane of copper cable with an
+active component that allows it go longer distances than 25GBASE-CR.
+Defined loosely by SFF-8402.
+.It Dv ETHER_MEDIA_25G_AUI
+25 Gbit/s signalling that is defined for use between a MAC and PHY and
+for chip-to-chip connectivity.
+Defined by 802.3by.
+.It Dv ETHER_MEDIA_40GBASE_T
+40 Gbit/s Ethernet based upon four twisted-pairs of CAT-8 cables.
+Defined in 802.3bq.
+.It Dv ETHER_MEDIA_40GBASE_CR4
+40 Gbit/s Ethernet utilizing four lanes of twinaxial copper cabling
+each operating at 10 Gbit/s.
+This is generally used with a QSFP+ connector defined in SFF-8635.
+Defined in 802.3ba.
+.It Dv ETHER_MEDIA_40GBASE_KR4
+40 Gbit/s Ethernet utilizing four lanes over a copper backplane each
+operating at 10 Gbit/s.
+Defined in 802.3ba.
+.It Dv ETHER_MEDIA_40GBASE_SR4
+40 Gbit/s Ethernet based upon using four pairs of multi-mode fiber, each
+operating at 10 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+Generally utilizes a QSFP+ connector.
+Defined in 802.3ba.
+.It Dv ETHER_MEDIA_40GBASE_LR4
+40 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for each direction.
+Utilizes wavelength multiplexing as the electrical interface is four 10
+Gbit/s signals.
+The maximum fiber length is 10km.
+Defined in 802.3ba.
+.It Dv ETHER_MEDIA_40GBASE_ER4
+40 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for each direction.
+Utilizes wavelength multiplexing as the electrical interface is four 10
+Gbit/s signals and generally based upon a QSFP+ connector.
+The maximum fiber length is 40km.
+Defined in 802.3bm.
+.It Dv ETHER_MEDIA_40GBASE_LM4
+40 Gbit/s Ethernet based upon using one pair of multi-mode fibers, one
+for each direction.
+Utilizes wavelength multiplexing as the electrical interface is four 10
+Gbit/s signals and generally based upon a QSFP+ connector.
+Defined by a specific MSA.
+.It Dv ETHER_MEDIA_40GBASE_AOC4
+40 Gbit/s Ethernet based upon a QSFP+ based cable with built-in
+optical transceivers.
+The electrical interface is four lanes running at 10 Gbit/s.
+.It Dv ETHER_MEDIA_40GBASE_ACC4
+40 Gbit/s Ethernet based upon four copper lanes each running at 10
+Gbit/s with some additional component compared to 40GBASE-CR4.
+.It Dv ETHER_MEDIA_40G_XLAUI
+40 Gbit/s signalling operating across four lanes that is defined for use
+between a MAC and a PHY or for chip-to-chip connectivity.
+Defined by 802.3ba.
+.It Dv ETHER_MEDIA_40G_XLPPI
+40 Gbit/s signalling operating across four lanes that is designed to
+connect between a chip and a module, generally a QSFP+ based device.
+Defined in 802.3ba.
+.It Dv ETHER_MEDIA_50GBASE_KR2
+50 Gbit/s Ethernet which operates over a two lane copper backplane.
+Each lane operates at 25 Gbit/s.
+Defined by the 25G and 50G Ethernet consortium.
+This did not become an IEEE standard.
+.It Dv ETHER_MEDIA_50GBASE_CR2
+50 Gbit/s Ethernet which operates over two lane copper twinaxial cable,
+generally with a QSFP+ connector.
+Each lane operates at 25 Gbit/s.
+Defined by the 25G and 50G Ethernet consortium.
+.It Dv ETHER_MEDIA_50GBASE_SR2
+50 Gbit/s Ethernet based upon using four pairs of multi-mode fiber, each
+operating at 25 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+Generally utilizes a QSFP+ connector.
+Defined by the 25G and 50G Ethernet consortium.
+.It Dv ETHER_MEDIA_50GBASE_LR2
+50 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for each direction.
+Utilizes wavelength multiplexing as the electrical interface is two 25
+Gbit/s signals.
+Defined by the 25G and 50G Ethernet consortium.
+.It Dv ETHER_MEDIA_50GBASE_AOC2
+50 Gbit/s Ethernet generally based upon a QSFP+ based cable with built-in
+optical transceivers.
+The electrical interface is two lanes running at 25 Gbit/s.
+.It Dv ETHER_MEDIA_50GBASE_ACC2
+50 Gbit/s Ethernet based upon two copper twinaxial lanes each running at
+25 Gbit/s with some additional component compared to 50GBASE-CR2.
+.It Dv ETHER_MEDIA_50GBASE_KR
+50 Gbit/s Ethernet operating over a single lane backplane.
+Defined by 802.3cd.
+.It Dv ETHER_MEDIA_50GBASE_CR
+50 Gbit/s Ethernet operating over a single lane twinaxial copper cable
+generally utilizing an SFP56 interface.
+Defined by 802.3cd.
+.It Dv ETHER_MEDIA_50GBASE_SR
+50 Gbit/s Ethernet operating over a pair of multi-mode fibers, one for
+each direction.
+Defined by 802.3cd.
+.It Dv ETHER_MEDIA_50GBASE_LR
+50 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+each direction.
+The maximum fiber length is 10km.
+Defined in 802.3cd.
+.It Dv ETHER_MEDIA_50GBASE_ER
+50 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+each direction.
+The maximum fiber length is 40km.
+Defined in 802.3cd.
+.It Dv ETHER_MEDIA_50GBASE_FR
+50 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+each direction.
+The maximum fiber length is 2km.
+Defined in 802.3cd.
+.It Dv ETHER_MEDIA_50GBASE_AOC
+50 Gbit/s Ethernet that is built using a short-range active optical
+cable that is generally SFP56 compatible.
+The electrical interface operates at 25 Gbit/s PAM4 signaling.
+.It Dv ETHER_MEDIA_50GBASE_ACC
+50 Gbit/s Ethernet that is built using a single lane twinaxial
+cable that is generally SFP56 compatible but uses an active component
+such as a retimer or redriver when compared to 50GBASE-CR.
+.It Dv ETHER_MEDIA_100GBASE_CR10
+100 Gbit/s Ethernet operating over ten lanes of shielded twinaxial
+copper cable, each operating at 10 Gbit/s.
+Defined in 802.3ba.
+.It Dv ETHER_MEDIA_100GBASE_SR10
+100 Gbit/s Ethernet based upon using ten pairs of multi-mode fiber, each
+operating at 10 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+.It Dv ETHER_MEDIA_100GBASE_SR4
+100 Gbit/s Ethernet based upon using four pairs of multi-mode fiber,
+each operating at 25 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+Defined by 802.3bm.
+.It Dv ETHER_MEDIA_100GBASE_LR4
+100 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for each direction.
+Utilizes wavelength multiplexing as the electrical interface is four 25
+Gbit/s signals and generally based upon a QSFP28 connector.
+The maximum fiber length is 10km.
+Defined by 802.3ba.
+.It Dv ETHER_MEDIA_100GBASE_ER4
+100 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for each direction.
+Utilizes wavelength multiplexing as the electrical interface is four 25
+Gbit/s signals and generally based upon a QSFP28 connector.
+The maximum fiber length is 40km.
+Defined by 802.3ba.
+.It Dv ETHER_MEDIA_100GBASE_KR4
+100 Gbit/s Ethernet based upon using a four lane copper backplane.
+Each lane operates at 25 Gbit/s.
+Defined in 802.3bj.
+.It Dv ETHER_MEDIA_100GBASE_CAUI4
+100 Gbit/s signalling used for chip-to-chip and chip-to-module
+connectivity.
+Defined in 802.3bm.
+.It Dv ETHER_MEDIA_100GBASE_CR4
+100 Gbit/s Ethernet based upon using a four lane copper twinaxial cable.
+Each lane operates at 25 Gbit/s and generally utilizes a QSFP28
+connector.
+Defined in 802.3bj.
+.It Dv ETHER_MEDIA_100GBASE_AOC4
+100 Gbit/s Ethernet that utilizes an active optical cable with
+short-range optical transceivers.
+Electrically operates as four lanes of 25 Gbit/s and most commonly uses
+a QSFP28 connector.
+.It Dv ETHER_MEDIA_100GBASE_ACC4
+100 Gbit/s Ethernet that utilizes a four lane copper twinaxial cable
+that unlike 100GBASE-CR4 has an active component such as a retimer or
+redriver.
+.It Dv ETHER_MEDIA_100GBASE_KR2
+100 Gbit/s Ethernet based upon using a two lane copper backplane.
+Each lane operates at 50 Gbit/s.
+Defined in 802.3cd.
+.It Dv ETHER_MEDIA_100GBASE_CR2
+100 Gbit/s Ethernet that utilizes a two lane copper twinaxial cable.
+Each lane operates at 50 Gbit/s.
+Defined by 802.3cd.
+.It Dv ETHER_MEDIA_100GBASE_SR2
+100 Gbit/s Ethernet based upon using two pairs of multi-mode fiber,
+each operating at 50 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+Defined by 802.3cd.
+.It Dv ETHER_MEDIA_100GBASE_KR
+100 Gbit/s Ethernet operating over a single lane copper backplane.
+Defined by 802.3ck.
+.It Dv ETHER_MEDIA_100GBASE_CR
+100 Gbit/s Ethernet operating over a single lane copper twinaxial cable.
+Generally uses an SFP112 connector.
+Defined by 802.3ck.
+.It Dv ETHER_MEDIA_100GBASE_SR
+100 Gbit/s Ethernet operating over a pair of multi-mode fibers, one for
+transmitting and one for receiving.
+The maximum fiber length is 60-100m depending on the fiber type
+.Pq OM3, OM4 .
+Defined by 802.3db.
+.It Dv ETHER_MEDIA_100GBASE_DR
+100 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+transmitting and one for receiving.
+Designed to be used with a parallel DR4/DR8 interface.
+The maximum fiber length is 500m.
+Defined by 802.3cd.
+.It Dv ETHER_MEDIA_100GBASE_LR
+100 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+transmitting and one for receiving.
+The maximum fiber length is 10km.
+Defined by 802.3cu.
+.It Dv ETHER_MEDIA_100GBASE_FR
+100 Gbit/s Ethernet operating over a pair of single-mode fibers, one for
+transmitting and one for receiving.
+The maximum fiber length is 2km.
+Defined by 802.3cu.
+.It Dv ETHER_MEDIA_200GBASE_CR4
+200 Gbit/s Ethernet utilizing a four lane passive copper twinaxial
+cable.
+Each lane operates at 50 Gbit/s and the connector is generally based on
+QSFP56.
+Defined by 802.3cd.
+.It Dv ETHER_MEDIA_200GBASE_KR4
+200 Gbit/s Ethernet utilizing four lanes over a copper backplane each
+operating at 50 Gbit/s.
+Defined by 802.3cd.
+.It Dv ETHER_MEDIA_200GBASE_SR4
+200 Gbit/s Ethernet based upon using four pairs of multi-mode fiber,
+each operating at 50 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+Defined by 802.3cd.
+.It Dv ETHER_MEDIA_200GBASE_DR4
+200 Gbit/s Ethernet based upon using four pairs of single-mode fiber,
+each operating at 50 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+Defined by 802.3bs.
+.It Dv ETHER_MEDIA_200GBASE_FR4
+200 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for transmitting and one for receiving.
+Utilizes wavelength multiplexing as the electrical interface is four 50
+Gbit/s signals and generally based upon a QSFP56 connector.
+The maximum fiber length is 2km.
+Defined by 802.3bs.
+.It Dv ETHER_MEDIA_200GBASE_LR4
+200 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for transmitting and one for receiving.
+Utilizes wavelength multiplexing as the electrical interface is four 50
+Gbit/s signals and generally based upon a QSFP56 connector.
+The maximum fiber length is 10km.
+Defined by 802.3bs.
+.It Dv ETHER_MEDIA_200GBASE_ER4
+200 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for transmitting and one for receiving.
+Utilizes wavelength multiplexing as the electrical interface is four 50
+Gbit/s signals and generally based upon a QSFP56 connector.
+The maximum fiber length is 40km.
+Defined by 802.3bs.
+.It Dv ETHER_MEDIA_200GAUI_4
+200 Gbit/s signalling utilizing four lanes each operating at 50 Gbit/s.
+Used for chip-to-chip and chip-to-module connections.
+Defined by 802.3bs.
+.It Dv ETHER_MEDIA_200GBASE_KR2
+200 Gbit/s Ethernet utilizing two lanes over a copper backplane each
+operating at 100 Gbit/s.
+Defined by 802.3ck.
+.It Dv ETHER_MEDIA_200GBASE_CR2
+200 Gbit/s Ethernet utilizing a two lane passive copper twinaxial
+cable.
+Each lane operates at 100 Gbit/s.
+Defined by 802.3ck.
+.It Dv ETHER_MEDIA_200GBASE_SR2
+200 Gbit/s Ethernet based upon using two pairs of multi-mode fiber,
+each operating at 100 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+Defined by 802.3db.
+.It Dv ETHER_MEDIA_200GAUI_2
+200 Gbit/s signalling utilizing two lanes each operating at 100 Gbit/s.
+Used for chip-to-chip and chip-to-module connections.
+Defined by 802.3ck.
+.It Dv ETHER_MEDIA_400GBASE_KR8
+400 Gbit/s Ethernet utilizing eight lanes over a copper backplane each
+operating at 50 Gbit/s.
+Defined by the 25/50 Gigabit Ethernet Consortium.
+.It Dv ETHER_MEDIA_400GBASE_FR8
+200 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for transmitting and one for receiving.
+Utilizes wavelength multiplexing as the electrical interface is eight 50
+Gbit/s signals and generally based upon a QSFP-DD connector.
+The maximum fiber length is 2km.
+Defined by 802.3bs.
+.It Dv ETHER_MEDIA_400GBASE_LR8
+200 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for transmitting and one for receiving.
+Utilizes wavelength multiplexing as the electrical interface is eight 50
+Gbit/s signals and generally based upon a QSFP-DD connector.
+The maximum fiber length is 10km.
+Defined by 802.3bs.
+.It Dv ETHER_MEDIA_400GBASE_ER8
+200 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for transmitting and one for receiving.
+Utilizes wavelength multiplexing as the electrical interface is eight 50
+Gbit/s signals and generally based upon a QSFP-DD connector.
+The maximum fiber length is 40km.
+Defined by 802.3cn.
+.It Dv ETHER_MEDIA_400GAUI_8
+400 Gbit/s signalling utilizing eight lanes each operating at 50 Gbit/s.
+Used for chip-to-chip and chip-to-module connections.
+Defined by 802.3bs.
+.It Dv ETHER_MEDIA_400GBASE_KR4
+400 Gbit/s Ethernet utilizing four lanes over a copper backplane each
+operating at 100 Gbit/s.
+Defined by 802.3ck.
+.It Dv ETHER_MEDIA_400GBASE_CR4
+200 Gbit/s Ethernet utilizing a two lane passive copper twinaxial
+cable.
+Each lane operates at 100 Gbit/s and generally uses a QSFP112 connector.
+Defined by 802.3ck.
+.It Dv ETHER_MEDIA_400GBASE_SR4
+400 Gbit/s Ethernet based upon using four pairs of multi-mode fiber,
+each operating at 100 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+Defined by 802.3db.
+.It Dv ETHER_MEDIA_400GBASE_DR4
+400 Gbit/s Ethernet based upon using four pairs of single-mode fiber,
+each operating at 100 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+The maximum fiber length is 500m.
+Defined by 802.3bs.
+.It Dv ETHER_MEDIA_400GBASE_FR4
+400 Gbit/s Ethernet based upon using one pair of single-mode fibers, one
+for transmitting and one for receiving.
+Utilizes wavelength multiplexing as the electrical interface is four 100
+Gbit/s signals and generally based upon a QSFP112 connector.
+The maximum fiber length is 2km.
+Defined by 802.3cu.
+.It Dv ETHER_MEDIA_400GAUI_4
+400 Gbit/s signalling utilizing four lanes each operating at 100 Gbit/s.
+Used for chip-to-chip and chip-to-module connections.
+Defined by 802.3ck.
+.El
 .It Dv MAC_PROP_AUTONEG
 .Bd -filled -compact
 Type:
@@ -1809,28 +2383,14 @@ Indicates the address of the MII/GMII receiver address.
 .It Dv ETHER_STAT_XCVR_ID
 Indicates the id of the MII/GMII receiver address.
 .It Dv ETHER_STAT_XCVR_INUSE
-Indicates what kind of receiver is in use.
-The following values may be used:
-.Bl -tag -width Ds
-.It Dv XCVR_UNDEFINED
-The receiver type is undefined by the hardware.
-.It Dv XCVR_NONE
-There is no receiver in use by the hardware.
-.It Dv XCVR_10
-The receiver supports 10BASE-T operation.
-.It Dv XCVR_100T4
-The receiver supports 100BASE-T4 operation.
-.It Dv XCVR_100X
-The receiver supports 100BASE-TX operation.
-.It Dv XCVR_100T2
-The receiver supports 100BASE-T2 operation.
-.It Dv XCVR_1000X
-The receiver supports 1000BASE-X operation.
-This is used for all fiber receivers.
-.It Dv XCVR_1000T
-The receiver supports 1000BASE-T operation.
-This is used for all copper receivers.
-.El
+Indicates what kind of transceiver is in use.
+Use the
+.Vt mac_ether_media_t
+enumeration values described in the discussion of
+.Dv MAC_PROP_MEDIA
+above.
+These definitions are compatible with the older subset of
+XCVR_* macros.
 .El
 .Ss Device Specific kstats
 In addition to the defined statistics above, if the device driver
@@ -2293,4 +2853,10 @@ a given platform.
 .%A Kastenholz, F.
 .%T RFC 1643 Definitions of Managed Objects for the Ethernet-like
 .%T Interface Types
+.Re
+.Rs
+.%A IEEE Computer Standard
+.%T IEEE 802.3
+.%T IEEE Standard for Ethernet
+.%D 2022
 .Re
