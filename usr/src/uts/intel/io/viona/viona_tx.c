@@ -132,7 +132,7 @@ viona_tx_copy_needed(void)
 void
 viona_tx_ring_alloc(viona_vring_t *ring, const uint16_t qsz)
 {
-	/* Allocate desb handles for TX ring if packet copying not disabled */
+	/* Allocate desb handles for TX ring if packet copying is disabled */
 	if (!viona_tx_copy_needed()) {
 		viona_desb_t *dp;
 

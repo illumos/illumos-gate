@@ -1931,7 +1931,7 @@ ndi_devi_enter(dev_info_t *dip, int *circular)
 	struct dev_info *devi = DEVI(dip);
 	ASSERT(dip != NULL);
 
-	/* for vHCI, enforce (vHCI, pHCI) ndi_deve_enter() order */
+	/* for vHCI, enforce (vHCI, pHCI) ndi_devi_enter() order */
 	ASSERT(!MDI_VHCI(dip) || (mdi_devi_pdip_entered(dip) == 0) ||
 	    DEVI_BUSY_OWNED(dip));
 

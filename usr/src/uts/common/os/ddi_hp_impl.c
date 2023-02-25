@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -306,10 +307,10 @@ int
 ddihp_modctl(int hp_op, char *path, char *cn_name, uintptr_t arg,
     uintptr_t rval)
 {
-	dev_info_t		*dip;
+	dev_info_t		*pdip, *dip;
 	ddi_hp_cn_handle_t	*hdlp;
 	ddi_hp_op_t		op = (ddi_hp_op_t)hp_op;
-	int			count, rv, error;
+	int			pcount, count, rv, error;
 
 	/* Get the dip of nexus node */
 	dip = e_ddi_hold_devi_by_path(path, 0);
@@ -325,6 +326,17 @@ ddihp_modctl(int hp_op, char *path, char *cn_name, uintptr_t arg,
 		ddi_release_devi(dip);
 		return (ENOTSUP);
 	}
+
+	/*
+	 * We know that some of the functions that are called further from here
+	 * on may enter critical sections on the parent of this node.  In order
+	 * to prevent deadlocks, we maintain the invariant that, if we lock a
+	 * child, the parent must already be locked.  This is the first place
+	 * in the call stack where we may do so, so we lock the parent here.
+	 */
+	pdip = ddi_get_parent(dip);
+	if (pdip != NULL)
+		ndi_devi_enter(pdip, &pcount);
 
 	/* Lock before access */
 	ndi_devi_enter(dip, &count);
@@ -383,6 +395,8 @@ ddihp_modctl(int hp_op, char *path, char *cn_name, uintptr_t arg,
 
 done:
 	ndi_devi_exit(dip, count);
+	if (pdip != NULL)
+		ndi_devi_exit(pdip, pcount);
 
 	ddi_release_devi(dip);
 

@@ -1,804 +1,2486 @@
-'\" te
-.\" Copyright (c) 2005, Sun Microsystems, Inc., All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.\" Copyright 2022 Garrett D'Amore
-.TH INTRO 9F "July 30, 2022"
-.SH NAME
-Intro, intro \- introduction to DDI/DKI functions
-.SH DESCRIPTION
-Section 9F describes the kernel functions available for use by device drivers.
-See \fBIntro\fR(9E) for an overview of device driver interfaces.
-.sp
-.LP
-In this section, the information for each driver function is organized under
-the following headings:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBNAME\fR summarizes the function's purpose.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBSYNOPSIS\fR shows the syntax of the function's entry point in the source
-code. \fB#include\fR directives are shown for required headers.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBINTERFACE\fR \fBLEVEL\fR describes any architecture dependencies.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBARGUMENTS\fR describes any arguments required to invoke the function.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBDESCRIPTION\fR describes general information about the function.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBRETURN\fR \fBVALUES\fR describes the return values and messages that can
-result from invoking the function.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBCONTEXT\fR indicates from which driver context (user, kernel, interrupt, or
-high-level interrupt) the function can be called.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-A driver function has \fIuser context\fR if it was directly invoked because of
-a user thread. The \fBread\fR(9E) entry point of the driver, invoked by a
-\fBread\fR(2) system call, has user context.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-A driver function has \fIkernel context\fR if was invoked by some other part of
-the kernel. In a block device driver, the \fBstrategy\fR(9E) entry point may be
-called by the page daemon to write pages to the device. The page daemon has no
-relation to the current user thread, so in this case \fBstrategy\fR(9E) has
-kernel context.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fIInterrupt context\fR is kernel context, but also has an interrupt level
-associated with it. Driver interrupt routines have interrupt context.
-.sp
-Note that a mutex acquired in user or kernel context that can also be acquired
-in interrupt context means that the user or kernel context thread holding that
-mutex is subject to all the restrictions imposed by interrupt context, for the
-duration of the ownership of that mutex. Please see the \fBmutex\fR(9F) man
-page for a more complete discussion of proper mutex handling for drivers.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fIHigh-level interrupt context\fR is a more restricted form of interrupt
-context. If a driver interrupt priority returned from
-\fBddi_intr_get_pri\fR(9F) is greater than the priority returned from
-\fBddi_intr_get_hilevel_pri\fR(9F) this indicates the interrupt handler will
-run in high-level interrupt context. These interrupt routines are only allowed
-to call \fBddi_intr_trigger_softint\fR(9F), \fBmutex_enter\fR(9F), and
-\fBmutex_exit\fR(9F). Furthermore, \fBmutex_enter\fR(9F) and
-\fBmutex_exit\fR(9F) may only be called on mutexes initialized with the
-interrupt priority returned by \fBddi_intr_get_pri\fR(9F).
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBSEE ALSO\fR indicates functions that are related by usage and sources, and
-which can be referred to for further information.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBEXAMPLES\fR shows how the function can be used in driver code.
-.RE
-.sp
-.LP
-Every driver MUST include <\fBsys/ddi.h\fR> and <\fBsys/sunddi.h\fR>, in that
-order, and as the last files the driver includes.
-.SH STREAMS KERNEL FUNCTION SUMMARY
-The following table summarizes the STREAMS functions described in this section.
-.sp
-
-.sp
-.TS
-c c
-l l .
-Routine	Type
-_
-\fBadjmsg\fR	DDI/DKI
-\fBallocb\fR	DDI/DKI
-\fBallocb_tmpl\fR	illumos DDI
-\fBbackq\fR	DDI/DKI
-\fBbcanput\fR	DDI/DKI
-\fBbcanputnext\fR	DDI/DKI
-\fBbufcall\fR	DDI/DKI
-\fBcanput\fR	DDI/DKI
-\fBcanputnext\fR	DDI/DKI
-\fBclrbuf\fR	DDI/DKI
-\fBcopyb\fR	DDI/DKI
-\fBcopymsg\fR	DDI/DKI
-\fBDB_BASE\fR	illumos DDI
-\fBDB_LIM\fR	illumos DDI
-\fBDB_REF\fR	illumos DDI
-\fBDB_TYPE\fR	illumos DDI
-\fBdatamsg\fR	DDI/DKI
-\fBdupb\fR	DDI/DKI
-\fBdupmsg\fR	DDI/DKI
-\fBenableok\fR	DDI/DKI
-\fBesballoc\fR	DDI/DKI
-\fBesbbcall\fR	DDI/DKI
-\fBflushband\fR	DDI/DKI
-\fBflushq\fR	DDI/DKI
-\fBfreeb\fR	DDI/DKI
-\fBfreemsg\fR	DDI/DKI
-\fBfreezestr\fR	DDI/DKI
-\fBgetq\fR	DDI/DKI
-\fBIOC_CONVER_FROM\fR	illumos DDI
-\fBinsq\fR	DDI/DKI
-\fBlinkb\fR	DDI/DKI
-\fBMBLKHEAD\fR	illumos DDI
-\fBMBLKIN\fR	illumos DDI
-\fBMBLKL\fR	illumos DDI
-\fBMBLKSIZE\fR	illumos DDI
-\fBMBLKTAIL\fR	illumos DDI
-\fBmcopyin\fR	illumos DDI
-\fBmcopymsg\fR	illumos DDI
-\fBmcopyout\fR	illumos DDI
-\fBmerror\fR	illumos DDI
-\fBmexchange\fR	illumos DDI
-\fBmioc2ack\fR	illumos DDI
-\fBmiocack\fR	illumos DDI
-\fBmexchange\fR	illumos DDI
-\fBmiocpullup\fR	illumos DDI
-\fBmkiocb\fR	illumos DDI
-\fBmsgdsize\fR	DDI/DKI
-\fBmsgpullup\fR	DDI/DKI
-\fBmsgsize\fR	illumos DDI
-\fBmt-streams\fR	illumos DDI
-\fBnoenable\fR	DDI/DKI
-\fBOTHERQ\fR	DDI/DKI
-\fBpullupmsg\fR	DDI/DKI
-\fBput\fR	DDI/DKI
-\fBputbq\fR	DDI/DKI
-\fBputctl\fR	DDI/DKI
-\fBputctl1\fR	DDI/DKI
-\fBputnext\fR	DDI/DKI
-\fBputnextctl\fR	DDI/DKI
-\fBputq\fR	DDI/DKI
-\fBqassociate\fR	illumos DDI
-\fBqbufcall\fR	illumos DDI
-\fBqenable\fR	DDI/DKI
-\fBqprocson\fR	DDI/DKI
-\fBqprocsoff\fR	DDI/DKI
-\fBqreply\fR	DDI/DKI
-\fBqsize\fR	DDI/DKI
-\fBqtimeout\fR	illumos DDI
-\fBqunbufcall\fR	illumos DDI
-\fBquntimeout\fR	illumos DDI
-\fBqwait\fR	illumos DDI
-\fBqwait_sig\fR	illumos DDI
-\fBqwriter\fR	illumos DDI
-\fBRD\fR	DDI/DKI
-\fBrmvb\fR	DDI/DKI
-\fBrmvq\fR	DDI/DKI
-\fBSAMESTR\fR	DDI/DKI
-\fBstrlog\fR	DDI/DKI
-\fBstrqget\fR	DDI/DKI
-\fBstrqset\fR	DDI/DKI
-\fBtestb\fR	DDI/DKI
-\fBunbufcall\fR	DDI/DKI
-\fBunfreezestr\fR	DDI/DKI
-\fBunlinkb\fR	DDI/DKI
-\fBWR\fR	DDI/DKI
-.TE
-
-.sp
-.LP
-The following table summarizes the functions not specific to STREAMS.
-.sp
-
-.sp
-.TS
-c c
-l l .
-Routine	Type
-_
-\fBASSERT\fR	DDI/DKI
-\fBanocancel\fR	illumos DDI
-\fBaphysio\fR	illumos DDI
-\fBatomic_add\fR	DDI/DKI
-\fBatomic_and\fR	DDI/DKI
-\fBatomic_bits\fR	DDI/DKI
-\fBatomic_cas\fR	DDI/DKI
-\fBatomic_dec\fR	DDI/DKI
-\fBatomic_inc\fR	DDI/DKI
-\fBatomic_ops\fR	DDI/DKI
-\fBatomic_or\fR	DDI/DKI
-\fBatomic_swap\fR	DDI/DKI
-\fBbcmp\fR	DDI/DKI
-\fBbcopy\fR	DDI/DKI
-\fBbioclone\fR	illumos DDI
-\fBbiodone\fR	DDI/DKI
-\fBbiofini\fR	illumos DDI
-\fBbioinit\fR	illumos DDI
-\fBbiomodified\fR	illumos DDI
-\fBbiosize\fR	illumos DDI
-\fBbioerror\fR	illumos DDI
-\fBbioreset\fR	illumos DDI
-\fBbiowait\fR	DDI/DKI
-\fBbp_copyin\fR	DDI/DKI
-\fBbp_copyout\fR	DDI/DKI
-\fBbp_mapin\fR	DDI/DKI
-\fBbp_mapout\fR	DDI/DKI
-\fBbtop\fR	DDI/DKI
-\fBbtopr\fR	DDI/DKI
-\fBbzero\fR	DDI/DKI
-\fBcmn_err\fR	DDI/DKI
-\fBcondvar\fR	illumos DDI
-\fBcopyin\fR	DDI/DKI
-\fBcopyout\fR	DDI/DKI
-\fBcsx_AccessConfigurationRegister\fR	illumos DDI
-\fBcsx_ConvertSize\fR	illumos DDI
-\fBcsx_ConvertSpeed\fR	illumos DDI
-\fBcsx_CS_DDI_Info\fR	illumos DDI
-\fBcsx_DeregisterClient\fR	illumos DDI
-\fBcsx_DupHandle\fR	illumos DDI
-\fBcsx_Error2Text\fR	illumos DDI
-\fBcsx_Event2Text\fR	illumos DDI
-\fBcsx_FreeHandle\fR	illumos DDI
-\fBcsx_Get8\fR	illumos DDI
-\fBcsx_GetFirstClient\fR	illumos DDI
-\fBcsx_GetFirstTuple\fR	illumos DDI
-\fBcsx_GetHandleOffset\fR	illumos DDI
-\fBcsx_GetMappedAddr\fR	illumos DDI
-\fBcsx_GetStatus\fR	illumos DDI
-\fBcsx_GetTupleData\fR	illumos DDI
-\fBcsx_MakeDeviceNode\fR	illumos DDI
-\fBcsx_MapLogSocket\fR	illumos DDI
-\fBcsx_MapMemPage\fR	illumos DDI
-\fBcsx_ModifyConfiguration\fR	illumos DDI
-\fBcsx_ModifyWindow\fR	illumos DDI
-\fBcsx_Parse_CISTPL_BATTERY\fR	illumos DDI
-\fBcsx_Parse_CISTPL_BYTEORDER\fR	illumos DDI
-\fBcsx_Parse_CISTPL_CFTABLE_ENTRY\fR	illumos DDI
-\fBcsx_Parse_CISTPL_CONFIG\fR	illumos DDI
-\fBcsx_Parse_CISTPL_DATE\fR	illumos DDI
-\fBcsx_Parse_CISTPL_DEVICE\fR	illumos DDI
-\fBcsx_Parse_CISTPL_DEVICEGEO\fR	illumos DDI
-\fBcsx_Parse_CISTPL_DEVICEGEO_A\fR	illumos DDI
-\fBcsx_Parse_CISTPL_FORMAT\fR	illumos DDI
-\fBcsx_Parse_CISTPL_FUNCE\fR	illumos DDI
-\fBcsx_Parse_CISTPL_FUNCID\fR	illumos DDI
-\fBcsx_Parse_CISTPL_GEOMETRY\fR	illumos DDI
-\fBcsx_Parse_CISTPL_JEDEC_C\fR	illumos DDI
-\fBcsx_Parse_CISTPL_LINKTARGET\fR	illumos DDI
-\fBcsx_Parse_CISTPL_LONGLINK_A\fR	illumos DDI
-\fBcsx_Parse_CISTPL_LONGLINK_MFC\fR	illumos DDI
-\fBcsx_Parse_CISTPL_MANFID\fR	illumos DDI
-\fBcsx_Parse_CISTPL_ORG\fR	illumos DDI
-\fBcsx_Parse_CISTPL_SPCL\fR	illumos DDI
-\fBcsx_Parse_CISTPL_SWIL\fR	illumos DDI
-\fBcsx_Parse_CISTPL_VERS_1\fR	illumos DDI
-\fBcsx_Parse_CISTPL_VERS_2\fR	illumos DDI
-\fBcsx_ParseTuple\fR	illumos DDI
-\fBcsx_Put8\fR	illumos DDI
-\fBcsx_RegisterClient\fR	illumos DDI
-\fBcsx_ReleaseConfiguration\fR	illumos DDI
-\fBcsx_RepGet8\fR	illumos DDI
-\fBcsx_RepPut8\fR	illumos DDI
-\fBcsx_RequestConfiguration\fR	illumos DDI
-\fBcsx_RequestIO\fR	illumos DDI
-\fBcsx_RequestIRQ\fR	illumos DDI
-\fBcsx_RequestSocketMask\fR	illumos DDI
-\fBcsx_RequestWindow\fR	illumos DDI
-\fBcsx_ResetFunction\fR	illumos DDI
-\fBcsx_SetEventMask\fR	illumos DDI
-\fBcsx_SetHandleOffset\fR	illumos DDI
-\fBcsx_ValidateCIS\fR	illumos DDI
-\fBcv_broadcast\fR	illumos DDI
-\fBcv_destroy\fR	illumos DDI
-\fBcv_init\fR	illumos DDI
-\fBcv_reltimedwait\fR	illumos DDI
-\fBcv_reltimedwait_sig\fR	illumos DDI
-\fBcv_signal\fR	illumos DDI
-\fBcv_timedwait\fR	illumos DDI
-\fBcv_timedwait_sig\fR	illumos DDI
-\fBcv_wait\fR	illumos DDI
-\fBcv_wait_sig\fR	illumos DDI
-\fBddi_add_event_handler\fR	illumos DDI
-\fBddi_add_intr\fR	illumos DDI
-\fBddi_add_softintr\fR	illumos DDI
-\fBddi_binding_name\fR	illumos DDI
-\fBddi_btop\fR	illumos DDI
-\fBddi_btopr\fR	illumos DDI
-\fBddi_can_receive_sig\fR	illumos DDI
-\fBddi_check_acc_handle\fR	illumos DDI
-\fBddi_copyin\fR	illumos DDI
-\fBddi_copyout\fR	illumos DDI
-\fBddi_create_minor_node\fR	illumos DDI
-\fBddi_cred\fR	illumos DDI
-\fBddi_dev_is_sid\fR	illumos DDI
-\fBddi_dev_nintrs\fR	illumos DDI
-\fBddi_dev_nregs\fR	illumos DDI
-\fBddi_dev_regsize\fR	illumos DDI
-\fBddi_device_copy\fR	illumos DDI
-\fBddi_device_zero\fR	illumos DDI
-\fBddi_devmap_segmap\fR	illumos DDI
-\fBddi_dma_addr_bind_handle\fR	illumos DDI
-\fBddi_dma_alloc_handle\fR	illumos DDI
-\fBddi_dma_buf_bind_handle\fR	illumos DDI
-\fBddi_dma_burstsizes\fR	illumos DDI
-\fBddi_dma_cookie_get\fR	illumos DDI
-\fBddi_dma_cookie_next\fR	illumos DDI
-\fBddi_dma_cookie_one\fR	illumos DDI
-\fBddi_dma_free_handle\fR	illumos DDI
-\fBddi_dma_getwin\fR	illumos DDI
-\fBddi_dma_mem_alloc\fR	illumos DDI
-\fBddi_dma_mem_free\fR	illumos DDI
-\fBddi_dma_ncookies\fR	illumos DDI
-\fBddi_dma_nextcookie\fR	illumos DDI
-\fBddi_dma_numwin\fR	illumos DDI
-\fBddi_dma_set_sbus64\fR	illumos DDI
-\fBddi_dma_sync\fR	illumos DDI
-\fBddi_dma_unbind_handle\fR	illumos DDI
-\fBddi_dmae\fR	illumos x86 DDI
-\fBddi_dmae_1stparty\fR	illumos x86 DDI
-\fBddi_dmae_alloc\fR	illumos x86 DDI
-\fBddi_dmae_disable\fR	illumos x86 DDI
-\fBddi_dmae_enable\fR	illumos x86 DDI
-\fBddi_dmae_getattr\fR	illumos x86 DDI
-\fBddi_dmae_getcnt\fR	illumos x86 DDI
-\fBddi_dmae_getlim\fR	illumos x86 DDI
-\fBddi_dmae_prog\fR	illumos x86 DDI
-\fBddi_dmae_release\fR	illumos x86 DDI
-\fBddi_dmae_stop\fR	illumos x86 DDI
-\fBddi_driver_major\fR	illumos DDI
-\fBddi_driver_name\fR	illumos DDI
-\fBddi_enter_critical\fR	illumos DDI
-\fBddi_exit_critical\fR	illumos DDI
-\fBddi_ffs\fR	illumos DDI
-\fBddi_fls\fR	illumos DDI
-\fBddi_fm_acc_err_clear\fR	illumos DDI
-\fBddi_fm_acc_err_get\fR	illumos DDI
-\fBddi_fm_ereport_post\fR	illumos DDI
-\fBddi_fm_handler_register\fR	illumos DDI
-\fBddi_fm_init\fR	illumos DDI
-\fBddi_fm_service_impact\fR	illumos DDI
-\fBddi_get16\fR	illumos DDI
-\fBddi_get32\fR	illumos DDI
-\fBddi_get64\fR	illumos DDI
-\fBddi_get8\fR	illumos DDI
-\fBddi_get_cred\fR	illumos DDI
-\fBddi_get_devstate\fR	illumos DDI
-\fBddi_get_driver_private\fR	illumos DDI
-\fBddi_get_eventcookie\fR	illumos DDI
-\fBddi_get_iblock_cookie\fR	illumos DDI
-\fBddi_get_instance\fR	illumos DDI
-\fBddi_get_kt_did\fR	illumos DDI
-\fBddi_get_lbolt\fR	illumos DDI
-\fBddi_get_name\fR	illumos DDI
-\fBddi_get_parent\fR	illumos DDI
-\fBddi_get_pid\fR	illumos DDI
-\fBddi_get_soft_iblock_cookie\fR	illumos DDI
-\fBddi_get_soft_state\fR	illumos DDI
-\fBddi_getlongprop\fR	illumos DDI
-\fBddi_getlongprop_buf\fR	illumos DDI
-\fBddi_getprop\fR	illumos DDI
-\fBddi_getproplen\fR	illumos DDI
-\fBddi_intr_add_handler\fR	illumos DDI
-\fBddi_intr_add_softint\fR	illumos DDI
-\fBddi_intr_alloc\fR	illumos DDI
-\fBddi_intr_block_disable\fR	illumos DDI
-\fBddi_intr_block_enable\fR	illumos DDI
-\fBddi_intr_clr_mask\fR	illumos DDI
-\fBddi_intr_dup_handler\fR	illumos DDI
-\fBddi_intr_disable\fR	illumos DDI
-\fBddi_intr_enable\fR	illumos DDI
-\fBddi_intr_free\fR	illumos DDI
-\fBddi_intr_get_cap\fR	illumos DDI
-\fBddi_intr_get_hilevel_pri\fR	illumos DDI
-\fBddi_intr_get_navail\fR	illumos DDI
-\fBddi_intr_get_nintrs\fR	illumos DDI
-\fBddi_intr_get_pending\fR	illumos DDI
-\fBddi_intr_get_pri\fR	illumos DDI
-\fBddi_intr_get_softint_pri\fR	illumos DDI
-\fBddi_intr_get_supported_types\fR	illumos DDI
-\fBddi_intr_remove_handler\fR	illumos DDI
-\fBddi_intr_remove_softint\fR	illumos DDI
-\fBddi_intr_set_cap\fR	illumos DDI
-\fBddi_intr_set_mask\fR	illumos DDI
-\fBddi_intr_set_pri\fR	illumos DDI
-\fBddi_intr_set_softint_pri\fR	illumos DDI
-\fBddi_intr_trigger_softint\fR	illumos DDI
-\fBddi_io_get16\fR	illumos DDI
-\fBddi_io_get32\fR	illumos DDI
-\fBddi_io_get8\fR	illumos DDI
-\fBddi_io_put16\fR	illumos DDI
-\fBddi_io_put32\fR	illumos DDI
-\fBddi_io_put8\fR	illumos DDI
-\fBddi_io_rep_get16\fR	illumos DDI
-\fBddi_io_rep_get32\fR	illumos DDI
-\fBddi_io_rep_get8\fR	illumos DDI
-\fBddi_io_rep_put16\fR	illumos DDI
-\fBddi_io_rep_put32\fR	illumos DDI
-\fBddi_io_rep_put8\fR	illumos DDI
-\fBddi_iomin\fR	illumos DDI
-\fBddi_log_sysevent\fR	illumos DDI
-\fBddi_map_regs\fR	illumos DDI
-\fBddi_mapdev\fR	illumos DDI
-\fBddi_mapdev_intercept\fR	illumos DDI
-\fBddi_mapdev_nointercept\fR	illumos DDI
-\fBddi_mapdev_set_device_acc_attr\fR	illumos DDI
-\fBddi_mem_get16\fR	illumos DDI
-\fBddi_mem_get32\fR	illumos DDI
-\fBddi_mem_get64\fR	illumos DDI
-\fBddi_mem_get8\fR	illumos DDI
-\fBddi_mem_put16\fR	illumos DDI
-\fBddi_mem_put32\fR	illumos DDI
-\fBddi_mem_put64\fR	illumos DDI
-\fBddi_mem_put8\fR	illumos DDI
-\fBddi_mem_rep_get16\fR	illumos DDI
-\fBddi_mem_rep_get32\fR	illumos DDI
-\fBddi_mem_rep_get64\fR	illumos DDI
-\fBddi_mem_rep_get8\fR	illumos DDI
-\fBddi_mem_rep_put16\fR	illumos DDI
-\fBddi_mem_rep_put32\fR	illumos DDI
-\fBddi_mem_rep_put64\fR	illumos DDI
-\fBddi_mem_rep_put8\fR	illumos DDI
-\fBddi_mmap_get_model\fR	illumos DDI
-\fBddi_model_convert_from\fR	illumos DDI
-\fBddi_modopen\fR	illumos DDI
-\fBddi_no_info\fR	illumos DDI
-\fBddi_node_name\fR	illumos DDI
-\fBddi_peek16\fR	illumos DDI
-\fBddi_peek32\fR	illumos DDI
-\fBddi_peek64\fR	illumos DDI
-\fBddi_peek8\fR	illumos DDI
-\fBddi_periodic_add\fR	illumos DDI
-\fBddi_periodic_delete\fR	illumos DDI
-\fBddi_poke16\fR	illumos DDI
-\fBddi_poke32\fR	illumos DDI
-\fBddi_poke64\fR	illumos DDI
-\fBddi_poke8\fR	illumos DDI
-\fBddi_prop_create\fR	illumos DDI
-\fBddi_prop_exists\fR	illumos DDI
-\fBddi_prop_free\fR	illumos DDI
-\fBddi_prop_get_int\fR	illumos DDI
-\fBddi_prop_lookup\fR	illumos DDI
-\fBddi_prop_lookup_byte_array\fR	illumos DDI
-\fBddi_prop_lookup_int_array\fR	illumos DDI
-\fBddi_prop_lookup_string\fR	illumos DDI
-\fBddi_prop_lookup_string_array\fR	illumos DDI
-\fBddi_prop_modify\fR	illumos DDI
-\fBddi_prop_op\fR	illumos DDI
-\fBddi_prop_remove\fR	illumos DDI
-\fBddi_prop_remove_all\fR	illumos DDI
-\fBddi_prop_undefine\fR	illumos DDI
-\fBddi_prop_update\fR	illumos DDI
-\fBddi_prop_update_byte_array\fR	illumos DDI
-\fBddi_prop_update_int\fR	illumos DDI
-\fBddi_prop_update_int_array\fR	illumos DDI
-\fBddi_prop_update_string\fR	illumos DDI
-\fBddi_prop_update_string_array\fR	illumos DDI
-\fBddi_ptob\fR	illumos DDI
-\fBddi_put16\fR	illumos DDI
-\fBddi_put32\fR	illumos DDI
-\fBddi_put64\fR	illumos DDI
-\fBddi_put8\fR	illumos DDI
-\fBddi_regs_map_free\fR	illumos DDI
-\fBddi_regs_map_setup\fR	illumos DDI
-\fBddi_remove_event_handler\fR	illumos DDI
-\fBddi_remove_intr\fR	illumos DDI
-\fBddi_remove_minor_node\fR	illumos DDI
-\fBddi_remove_softintr\fR	illumos DDI
-\fBddi_removing_power\fR	illumos DDI
-\fBddi_rep_get16\fR	illumos DDI
-\fBddi_rep_get32\fR	illumos DDI
-\fBddi_rep_get64\fR	illumos DDI
-\fBddi_rep_get8\fR	illumos DDI
-\fBddi_rep_put16\fR	illumos DDI
-\fBddi_rep_put32\fR	illumos DDI
-\fBddi_rep_put64\fR	illumos DDI
-\fBddi_rep_put8\fR	illumos DDI
-\fBddi_report_dev\fR	illumos DDI
-\fBddi_root_node\fR	illumos DDI
-\fBddi_segmap\fR	illumos DDI
-\fBddi_segmap_setup\fR	illumos DDI
-\fBddi_set_driver_private\fR	illumos DDI
-\fBddi_slaveonly\fR	illumos DDI
-\fBddi_soft_state\fR	illumos DDI
-\fBddi_soft_state_fini\fR	illumos DDI
-\fBddi_soft_state_free\fR	illumos DDI
-\fBddi_soft_state_init\fR	illumos DDI
-\fBddi_soft_state_zalloc\fR	illumos DDI
-\fBddi_strlol\fR	illumos DDI
-\fBddi_strloul\fR	illumos DDI
-\fBddi_trigger_softintr\fR	illumos DDI
-\fBddi_umem_alloc\fR	illumos DDI
-\fBddi_umem_free\fR	illumos DDI
-\fBddi_umem_iosetup\fR	illumos DDI
-\fBddi_umem_lock\fR	illumos DDI
-\fBddi_unmap_regs\fR	illumos DDI
-\fBdelay\fR	DDI/DKI
-\fBdevmap_default_access\fR	illumos DDI
-\fBdevmap_devmem_setup\fR	illumos DDI
-\fBdevmap_do_ctxmgt\fR	illumos DDI
-\fBdevmap_load\fR	illumos DDI
-\fBdevmap_set_ctx_timeout\fR	illumos DDI
-\fBdevmap_setup\fR	illumos DDI
-\fBdevmap_umem_setup\fR	illumos DDI
-\fBdevmap_unload\fR	illumos DDI
-\fBdisksort\fR	illumos DDI
-\fBdlbindack\fR	illumos DDI
-\fBdrv_getparm\fR	DDI/DKI
-\fBdrv_hztousec\fR	DDI/DKI
-\fBdrv_priv\fR	DDI/DKI
-\fBdrv_usectohz\fR	DDI/DKI
-\fBdrv_usecwait\fR	DDI/DKI
-\fBfree_pktiopb\fR	illumos DDI
-\fBfreerbuf\fR	DDI/DKI
-\fBget_pktiopb\fR	illumos DDI
-\fBgeterror\fR	DDI/DKI
-\fBgethrtime\fR	DDI/DKI
-\fBgetmajor\fR	DDI/DKI
-\fBgetminor\fR	DDI/DKI
-\fBgetrbuf\fR	DDI/DKI
-\fBgld\fR	illumos DDI
-\fBhat_getkpfnum\fR	DKI only
-\fBid32_alloc\fR	illumos DDI
-\fBinb\fR	illumos x86 DDI
-\fBinl\fR	illumos x86 DDI
-\fBinw\fR	illumos x86 DDI
-\fBkiconv\fR	illumos DDI
-\fBkiconv_close\fR	illumos DDI
-\fBkiconv_open\fR	illumos DDI
-\fBkiconvstr\fR	illumos DDI
-\fBkmem_alloc\fR	DDI/DKI
-\fBkmem_cache_create\fR	illumos DDI
-\fBkmem_free\fR	DDI/DKI
-\fBkmem_zalloc\fR	DDI/DKI
-\fBkstat_create\fR	illumos DDI
-\fBkstat_delete\fR	illumos DDI
-\fBkstat_install\fR	illumos DDI
-\fBkstat_named_init\fR	illumos DDI
-\fBkstat_queue\fR	illumos DDI
-\fBkstat_runq_back_to_waitq\fR	illumos DDI
-\fBkstat_runq_enter\fR	illumos DDI
-\fBkstat_runq_exit\fR	illumos DDI
-\fBkstat_waitq_enter\fR	illumos DDI
-\fBkstat_waitq_exit\fR	illumos DDI
-\fBkstat_waitq_to_runq\fR	illumos DDI
-\fBldi_add_event_handler\fR	illumos DDI
-\fBldi_aread\fR	illumos DDI
-\fBldi_devmap\fR	illumos DDI
-\fBldi_dump\fR	illumos DDI
-\fBldi_ev_finalize\fR	illumos DDI
-\fBldi_ev_get_cookie\fR	illumos DDI
-\fBldi_ev_get_type\fR	illumos DDI
-\fBldi_ev_notify\fR	illumos DDI
-\fBldi_ev_register_callbacks\fR	illumos DDI
-\fBldi_ev_remove_callbacks\fR	illumos DDI
-\fBldi_get_dev\fR	illumos DDI
-\fBldi_get_eventcookie\fR	illumos DDI
-\fBldi_get_size\fR	illumos DDI
-\fBldi_ident_from_dev\fR	illumos DDI
-\fBldi_ioctl\fR	illumos DDI
-\fBldi_open_by_dev\fR	illumos DDI
-\fBldi_poll\fR	illumos DDI
-\fBldi_prop_exists\fR	illumos DDI
-\fBldi_prop_get_int\fR	illumos DDI
-\fBldi_prop_get_lookup_int_array\fR	illumos DDI
-\fBldi_putmsg\fR	illumos DDI
-\fBldi_read\fR	illumos DDI
-\fBldi_remove_event_handler\fR	illumos DDI
-\fBldi_strategy\fR	illumos DDI
-\fBmakecom_g0\fR	illumos DDI
-\fBmakecom_g0_s\fR	illumos DDI
-\fBmakecom_g1\fR	illumos DDI
-\fBmakecom_g5\fR	illumos DDI
-\fBmakedevice\fR	DDI/DKI
-\fBmax\fR	DDI/DKI
-\fBmax\fR	DDI/DKI
-\fBmembar_ops\fR	illumos DDI
-\fBmemchr\fR	illumos DDI
-\fBminphys\fR	illumos DDI
-\fBmod_info\fR	illumos DDI
-\fBmod_install\fR	illumos DDI
-\fBmod_remove\fR	illumos DDI
-\fBmutex_destroy\fR	illumos DDI
-\fBmutex_enter\fR	illumos DDI
-\fBmutex_exit\fR	illumos DDI
-\fBmutex_init\fR	illumos DDI
-\fBmutex_owned\fR	illumos DDI
-\fBmutex_tryenter\fR	illumos DDI
-\fBnochpoll\fR	illumos DDI
-\fBnodev\fR	DDI/DKI
-\fBnulldev\fR	DDI/DKI
-\fBnumtos\fR	illumos DDI
-\fBnvlist_add_boolean\fR	illumos DDI
-\fBnvlist_alloc\fR	illumos DDI
-\fBnvlist_lookup_boolean\fR	illumos DDI
-\fBnvlist_lookup_nvpair\fR	illumos DDI
-\fBnvlist_next_nvpair\fR	illumos DDI
-\fBnvlist_remove\fR	illumos DDI
-\fBnvlist_value_byte\fR	illumos DDI
-\fBoutb\fR	illumos x86 DDI
-\fBoutl\fR	illumos x86 DDI
-\fBoutw\fR	illumos x86 DDI
-\fBpci_config_get16\fR	illumos DDI
-\fBpci_config_get32\fR	illumos DDI
-\fBpci_config_get64\fR	illumos DDI
-\fBpci_config_get8\fR	illumos DDI
-\fBpci_config_put16\fR	illumos DDI
-\fBpci_config_put32\fR	illumos DDI
-\fBpci_config_put64\fR	illumos DDI
-\fBpci_config_put8\fR	illumos DDI
-\fBpci_config_setup\fR	illumos DDI
-\fBpci_config_teardown\fR	illumos DDI
-\fBpci_ereport_setup\fR	illumos DDI
-\fBpci_report_pmcap\fR	illumos DDI
-\fBpci_save_config_regs\fR	illumos DDI
-\fBphysio\fR	illumos DDI
-\fBpm_busy_component\fR	illumos DDI
-\fBpm_power_has_changed\fR	illumos DDI
-\fBpm_raise_power\fR	illumos DDI
-\fBpm_trans_check\fR	illumos DDI
-\fBpollwakeup\fR	DDI/DKI
-\fBpci_config_teardown\fR	illumos DDI
-\fBpci_config_teardown\fR	illumos DDI
-\fBpriv_getbyname\fR	illumos DDI
-\fBpriv_policy\fR	illumos DDI
-\fBproc_signal\fR	illumos DDI
-\fBproc_unref\fR	illumos DDI
-\fBptob\fR	DDI/DKI
-\fBrmalloc\fR	DDI/DKI
-\fBrmalloc_wait\fR	DDI/DKI
-\fBrmallocmap\fR	DDI/DKI
-\fBrmallocmap_wait\fR	DDI/DKI
-\fBrmfree\fR	DDI/DKI
-\fBrmfreemap\fR	DDI/DKI
-\fBrw_destroy\fR	illumos DDI
-\fBrw_downgrade\fR	illumos DDI
-\fBrw_enter\fR	illumos DDI
-\fBrw_exit\fR	illumos DDI
-\fBrw_init\fR	illumos DDI
-\fBrw_read_locked\fR	illumos DDI
-\fBrw_tryenter\fR	illumos DDI
-\fBrw_tryupgrade\fR	illumos DDI
-\fBscsi_abort\fR	illumos DDI
-\fBscsi_alloc_consistent_buf\fR	illumos DDI
-\fBscsi_cname\fR	illumos DDI
-\fBscsi_destroy_pkt\fR	illumos DDI
-\fBscsi_dmafree\fR	illumos DDI
-\fBscsi_dmaget\fR	illumos DDI
-\fBscsi_dname\fR	illumos DDI
-\fBscsi_errmsg\fR	illumos DDI
-\fBscsi_ext_sense_fields\fR	illumos DDI
-\fBscsi_find_sense_descr\fR	illumos DDI
-\fBscsi_free_consistent_buf\fR	illumos DDI
-\fBscsi_get_device_type_scsi_options\fR	illumos DDI
-\fBscsi_get_device_type_string\fR	illumos DDI
-\fBscsi_hba_attach_setup\fR	illumos DDI
-\fBscsi_hba_detach\fR	illumos DDI
-\fBscsi_hba_fini\fR	illumos DDI
-\fBscsi_hba_init\fR	illumos DDI
-\fBscsi_hba_lookup_capstr\fR	illumos DDI
-\fBscsi_hba_pkt_alloc\fR	illumos DDI
-\fBscsi_hba_pkt_free\fR	illumos DDI
-\fBscsi_hba_probe\fR	illumos DDI
-\fBscsi_hba_tran_alloc\fR	illumos DDI
-\fBscsi_hba_tran_free\fR	illumos DDI
-\fBscsi_ifgetcap\fR	illumos DDI
-\fBscsi_ifsetcap\fR	illumos DDI
-\fBscsi_init_pkt\fR	illumos DDI
-\fBscsi_log\fR	illumos DDI
-\fBscsi_mname\fR	illumos DDI
-\fBscsi_pktalloc\fR	illumos DDI
-\fBscsi_pktfree\fR	illumos DDI
-\fBscsi_poll\fR	illumos DDI
-\fBscsi_probe\fR	illumos DDI
-\fBscsi_resalloc\fR	illumos DDI
-\fBscsi_reset\fR	illumos DDI
-\fBscsi_reset_notify\fR	illumos DDI
-\fBscsi_resfree\fR	illumos DDI
-\fBscsi_rname\fR	illumos DDI
-\fBscsi_sense_key\fR	illumos DDI
-\fBscsi_setup_cdb\fR	illumos DDI
-\fBscsi_slave\fR	illumos DDI
-\fBscsi_sname\fR	illumos DDI
-\fBscsi_sync_pkt\fR	illumos DDI
-\fBscsi_transport\fR	illumos DDI
-\fBscsi_unprobe\fR	illumos DDI
-\fBscsi_unslave\fR	illumos DDI
-\fBscsi_validate_sense\fR	illumos DDI
-\fBscsi_vu_errmsg\fR	illumos DDI
-\fBsema_destroy\fR	illumos DDI
-\fBsema_init\fR	illumos DDI
-\fBsema_p\fR	illumos DDI
-\fBsema_p_sig\fR	illumos DDI
-\fBsema_tryp\fR	illumos DDI
-\fBsema_v\fR	illumos DDI
-\fBsprintf\fR	illumos DDI
-\fBstoi\fR	illumos DDI
-\fBstrchr\fR	illumos DDI
-\fBstrcmp\fR	illumos DDI
-\fBstrcpy\fR	illumos DDI
-\fBstrlen\fR	illumos DDI
-\fBstrncmp\fR	illumos DDI
-\fBstrncpy\fR	illumos DDI
-\fBSTRUCT_DECL\fR	illumos DDI
-\fBswab\fR	DDI/DKI
-\fBtaskq\fR	illumos DDI
-\fBtimeout\fR	DDI/DKI
-\fBu8_strcmp\fR	illumos DDI
-\fBu8_textprep_str\fR	illumos DDI
-\fBu8_validate\fR	illumos DDI
-\fBuconv_u16tou32\fR	illumos DDI
-\fBuiomove\fR	DDI/DKI
-\fBuntimeout\fR	DDI/DKI
-\fBureadc\fR	DDI/DKI
-\fBusb_alloc_request\fR	illumos DDI
-\fBusb_client_attach\fR	illumos DDI
-\fBusb_clr_feature\fR	illumos DDI
-\fBusb_create_pm_components\fR	illumos DDI
-\fBusb_get_addr\fR	illumos DDI
-\fBusb_get_alt_if\fR	illumos DDI
-\fBusb_get_cfg\fR	illumos DDI
-\fBusb_get_current_frame_number\fR	illumos DDI
-\fBusb_get_dev_data\fR	illumos DDI
-\fBusb_get_max_pkts_per_ioc_request\fR	illumos DDI
-\fBusb_get_status\fR	illumos DDI
-\fBusb_get_string_desc\fR	illumos DDI
-\fBusb_handle_remote_wakeup\fR	illumos DDI
-\fBusb_lookup_ep_data\fR	illumos DDI
-\fBusb_parse_data\fR	illumos DDI
-\fBusb_pipe_bulk_xfer\fR	illumos DDI
-\fBusb_pipe_close\fR	illumos DDI
-\fBusb_pipe_ctrl_xfer\fR	illumos DDI
-\fBusb_pipe_drain_reqs\fR	illumos DDI
-\fBusb_pipe_get_max_bulk_transfer_size\fR	illumos DDI
-\fBusb_pipe_get_state\fR	illumos DDI
-\fBusb_pipe_intr_xfer\fR	illumos DDI
-\fBusb_pipe_isoc_xfer\fR	illumos DDI
-\fBusb_pipe_open\fR	illumos DDI
-\fBusb_pipe_reset\fR	illumos DDI
-\fBusb_pipe_set_private\fR	illumos DDI
-\fBusb_register_hotplug_cbs\fR	illumos DDI
-\fBusb_reset_device\fR	illumos DDI
-\fBuwritec\fR	DDI/DKI
-\fBva_arg\fR	illumos DDI
-\fBva_end\fR	illumos DDI
-\fBva_start\fR	illumos DDI
-\fBvcmn_err\fR	DDI/DKI
-\fBvsprintf\fR	illumos DDI
-.TE
-
-.SH SEE ALSO
-.BR Intro (9E),
-.BR mutex (9F)
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Oxide Computer Company
+.\"
+.Dd January 26, 2023
+.Dt INTRO 9F
+.Os
+.Sh NAME
+.Nm Intro
+.Nd Introduction to kernel and device driver functions
+.Sh SYNOPSIS
+.In sys/ddi.h
+.In sys/sunddi.h
+.Sh DESCRIPTION
+Section 9F of the manual page describes functions that are used for device
+drivers, kernel modules, and the implementation of the kernel itself.
+This first provides an overview for the use of kernel functions and portions of
+the manual that are specific to the kernel.
+After that, we have grouped together most functions that are available by use,
+with some brief commentary and introduction.
+.Pp
+Most manual pages are similar to those in other sections.
+They have common fields such as the NAME, a SYNOPSIS to show which header files
+to include and prototypes, an extended DESCRIPTION discussing its use, and the
+common combination of RETURN VALUES and ERRORS.
+Some manuals will have examples and additional manuals to reference in the SEE
+ALSO section.
+.Ss RETURN VALUES and ERRORS
+One major difference when programming in the kernel versus userland is that
+there is no equivalent to
+.Va errno .
+Instead, there are a few common patterns that are used throughout the kernel
+that we'll discuss.
+While there are common patterns, please be aware that due to the natural
+evolution of the system, you will need to read the specifics of the
+section.
+.Bl -bullet
+.It
+Many functions will return a specific DDI
+.Pq Device Driver Interface
+value, which is commonly one of
+.Dv DDI_SUCCESS
+or
+.Dv DDI_FAILURE ,
+indicating success and failure respectively.
+Some functions will return additional error codes to indicate why something
+failed.
+In general, when checking a response code is always preferred to compare that
+something equals or does not equal
+.Dv DDI_SUCCESS
+as there can be many different error cases and additional ones can be added over
+time.
+.It
+Many routines explicitly return
+.Sy 0
+on success and will return an explicit error number.
+.Xr Intro 2
+has a list of error numbers.
+.It
+There are classes of functions that return either a pointer or a boolean type,
+either the C99
+.Vt bool
+or the system's traditional type
+.Vt boolean_t .
+In these cases, sometimes a more detailed error is provided via an additional
+argument such as a
+.Vt "int *" .
+Absent such an argument, there is generally no more detailed information
+available.
+.El
+.Ss CONTEXT
+The CONTEXT section of a manual page describes the times in which this function
+may be called.
+In generally there are three different contexts that come up:
+.Bl -tag -width Ds
+.It Sy User
+User context implies that the thread of execution is operating because a user
+thread has entered the kernel for an operation.
+When an application issues a system call such as
+.Xr open 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+or
+.Xr ioctl 2
+then we are said to be in user context.
+When in user context, one can copy in or out data from a user's address space.
+When writing a character or block device driver, the majority of the time that a
+character device operation such as the corresponding
+.Xr open 9E ,
+.Xr read 9E ,
+.Xr write 9E ,
+and
+.Xr ioctl 9E
+entry point being called, it is executing in user context.
+It is possible to call those entry points through the kernel's layered device
+interface, so drivers cannot assume those entry points will always have a user
+process present, strictly speaking.
+.It Sy Interrupt
+Interrupt context refers to when the operating system is handling an interrupt
+.Po
+See
+.Sx Interrupt Related Functions
+.Pc
+and executing a registered interrupt handler.
+Interrupt context is split into two different sets: high-level and low-level
+interrupts.
+Most device drivers are always going to be executing low-level interrupts.
+To determine whether an interrupt is considered high level or not, you should
+pass the interrupt handle to the
+.Xr ddi_intr_get_pri 9F
+function and compare the resulting priority with
+.Xr ddi_intr_get_hilevel_pri 9F .
+.Pp
+When executing high-level interrupts, the thread may only execute a limited
+number of functions.
+In particular, it may call
+.Xr ddi_intr_trigger_softint 9F ,
+.Xr mutex_enter 9F ,
+and
+.Xr mutex_exit 9F .
+It is critical that the mutex being used be properly initialized with the
+driver's interrupt priority.
+The system will transparently pick the correct implementation of a mutex based
+on the interrupt type.
+Aside from the above, one must not block while in high-level interrupt context.
+.Pp
+On the other hand, when a thread is not in high-level interrupt context, most of
+these restrictions are lifted.
+Kernel memory may be allocated
+.Po
+if using a non-blocking allocation such as
+.Dv KM_NOSLEEP
+or
+.Dv KM_NOSLEEP_LAZY
+.Pc ,
+and many of the other documented functions may be called.
+.Pp
+Regardless of whether a thread is in high-level or low-level interrupt context,
+it will never have a user context associated with it and therefore cannot use
+routines like
+.Xr ddi_copyin 9F
+or
+.Xr ddi_copyout 9F .
+.It Sy Kernel
+Kernel context refers to all other times in the kernel.
+Whenever the kernel is executing something on a thread that is not associated
+with a user process, then one is in kernel context.
+The most common situation for writers of kernel modules are things like timeout
+callbacks, such as
+.Xr timeout 9F
+or
+.Xr ddi_periodic_add 9F ,
+cases where the kernel is invoking a driver's device operation routines such as
+.Xr attach 9E
+and
+.Xr detach 9E ,
+or many of the device driver's registered callbacks from frameworks such as the
+.Xr mac 9E ,
+.Xr usba_hcdi 9E ,
+and various portions of SCSI, USB, and block devices.
+.It Sy Framework-specific Contexts
+Some manuals will discuss more specific constraints about when they can be used.
+For example, some functions may only be called while executing a specific entry
+point like
+.Xr attach 9E .
+Another example of this is that the
+.Xr mac_transceiver_info_set_present 9F
+function is only meant to be used while executing a networking driver's
+.Xr mct_info 9E
+entry point.
+.El
+.Ss PARAMETERS
+In kernel manual pages
+.Pq section 9 ,
+each function and entry point description generally has a separate list
+of parameters which are arguments to the function.
+The parameters section describes the basic purpose of each argument and
+should explain where such things often come from and any constraints on
+their values.
+.Sh INTERFACES
+Functions below are organized into categories that describe their purpose.
+Individual functions are documented in their own manual pages.
+For each of these areas, we discuss high-level concepts behind each area and
+provide a brief discussion of how to get started with it.
+Note, some deprecated functions or older frameworks are not listed here.
+.Pp
+Every function listed below has its own manual page in section 9F and
+can be read with
+.Xr man 1 .
+In addition, some corresponding concepts are documented in section 9 and
+some groups of functions are present to support a specific type of
+device driver, which is discussed more in section 9E .
+.Ss Logging Functions
+Through the kernel there are often needs to log messages that either
+make it into the system log or on the console.
+These kinds of messages can be performed with the
+.Xr cmn_err 9F
+function or one of its more specific variants that operate in the
+context of a device
+.Po
+.Xr dev_err 9F
+.Pc
+or a zone
+.Po
+.Xr zcmn_err 9F
+.Pc .
+.Pp
+The console should be used sparingly.
+While a notice may be found there, one should assume that it may be
+missed either due to overflow, not being connected to say a serial
+console at the time, or some other reason.
+While the system log is better than the console, folks need to take care
+not to spam the log.
+Imagine if someone logged every time a network packet was generated or
+received, you'd quickly potentially run out of space and make it harder
+to find useful messages for bizarre behavior.
+It's also important to remember that only system administrators and
+privileged users can actually see this log.
+Where possible and appropriate use programmatic errors in routines that
+allow it.
+.Pp
+The system also supports a structured event log called a system event
+that is processed by
+.Xr syseventd 8 .
+This is used by the OS to provide notifications for things like device
+insertion and removal or the change of a data link.
+These are driven by the
+.Xr ddi_log_sysevent 9F
+function and allow arbitrary additional structured metadata in the form
+of a
+.Vt nvlist_t .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr cmn_err 9F Ta Xr dev_err 9F
+.It Xr vcmn_err 9F Ta Xr vzcmn_err 9F
+.It Xr zcmn_err 9F Ta Xr ddi_log_sysevent 9F
+.El
+.Ss Memory Allocation
+At the heart of most device drivers is memory allocation.
+The primary kernel allocator is called
+.Qq kmem
+.Pq kernel memory
+and it is based on the
+.Qq vmem
+.Pq virtual memory
+subsystem.
+Most of the time, device drivers should use
+.Xr kmem_alloc 9F
+and
+.Xr kmem_zalloc 9F
+to allocate memory and free it with
+.Xr kmem_free 9F .
+Based on the original kmem and subsequent vmem papers, the kernel is
+internally using object caches and magazines to allow high-throughput
+allocation in a multi-CPU environment.
+.Pp
+When allocating memory, an important choice must be made: whether or not
+to block for memory.
+If one opts to perform a sleeping allocation, then the caller can be
+guaranteed that the allocation will succeed, but it may take some time
+and the thread will be blocked during that entire duration.
+This is the
+.Dv KM_SLEEP
+flag.
+On the other hand, there are many circumstances where this is not
+appropriate, especially because a thread that is inside a memory
+allocation function cannot currently be cancelled.
+If the thread corresponds to a user process, then it will not be
+killable.
+.Pp
+Given that there are many situations where this is not appropriate, the
+kernel offers an allocation mode where it will not block for memory to
+be available:
+.Dv KM_NOSLEEP
+and
+.Dv KM_NOSLEEP_LAZY .
+These allocations can fail and return
+.Dv NULL
+when they do fail.
+Even though these are said to be no sleep operations, that does not mean
+that the caller may not end up temporarily blocked due to mutex
+contention or due to trying a bit more aggressively to reclaim memory in
+the case of
+.Dv KM_NOSLEEP .
+Unless operating in special circumstances, using
+.Dv KM_NOSLEEP_LAZY
+should be preferred to
+.Dv KM_NOSLEEP .
+.Pp
+If a device driver has its own complex object that has more significant
+set up and tear down costs, then the kmem cache function family should
+be considered.
+To use a kmem cache, it must first be created using the
+.Xr kmem_cache_create 9F
+function, which requires specifying the size, alignment, and
+constructors and destructors.
+Individual objects are allocated from the cache with the
+.Xr kmem_cache_alloc 9F
+function.
+An important constraint when using the caches is that when an object is
+freed with
+.Xr kmem_cache_free 9F ,
+it is the callers responsibility to ensure that the object is returned
+to its constructed state prior to freeing it.
+If the object is reused, prior to the kernel reclaiming the memory for
+other uses, then the constructor will not be called again.
+Most device drivers do not need to create a kmem cache for their
+own allocations.
+.Pp
+If you are writing a device driver that is trying to interact with the
+networking, STREAMS, or USB subsystems, then they are generally using
+the
+.Vt mblk_t
+data structure which is managed through a different set of APIs, though
+they are leveraging kmem under the hood.
+.Pp
+The vmem set of interfaces allows for the management of abstract regions
+of integers, generally representing memory or some other object, each
+with an offset and length.
+While it is not common that a device driver needs to do their own such
+management,
+.Xr vmem_create 9F
+and
+.Xr vmem_alloc 9F
+are what to reach for when the need arises.
+Rather than using vmem, if one needs to model a set of integers where
+each is a valid identifier, that is you need to allocate every integer
+between 0 and 1000 as a distinct identifier, instead use
+.Xr id_space_create 9F
+which is discussed in
+.Sx Identifier Management .
+For more information on vmem, see
+.Xr vmem 9 .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr kmem_alloc 9F Ta Xr kmem_cache_alloc 9F
+.It Xr kmem_cache_create 9F Ta Xr kmem_cache_destroy 9F
+.It Xr kmem_cache_free 9F Ta Xr kmem_cache_set_move 9F
+.It Xr kmem_free 9F Ta Xr kmem_zalloc 9F
+.It Xr vmem_add 9F Ta Xr vmem_alloc 9F
+.It Xr vmem_contains 9F Ta Xr vmem_create 9F
+.It Xr vmem_destroy 9F Ta Xr vmem_free 9F
+.It Xr vmem_size 9F Ta Xr vmem_walk 9F
+.It Xr vmem_xalloc 9F Ta Xr vmem_xcreate 9F
+.It Xr vmem_xfree 9F Ta Xr bufcall 9F
+.It Xr esbbcall 9F Ta Xr qbufcall 9F
+.It Xr qunbufcall 9F Ta Xr unbufcall 9F
+.El
+.Ss String and libc Analogues
+The kernel has many analogues for classic libc functions that deal with
+string processing, memory copying, and related.
+For the most part, these behave similarly to their userland analogues,
+but there can be some differences in return values and for example, in
+the set of supported format characters in the case of
+.Xr snprintf 9F
+and related.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ASSERT 9F Ta Xr bcmp 9F
+.It Xr bzero 9F Ta Xr bcopy 9F
+.It Xr ddi_strdup 9F Ta Xr ddi_strtol 9F
+.It Xr ddi_strtoll 9F Ta Xr ddi_strtoul 9F
+.It Xr ddi_strtoull 9F Ta Xr ddi_ffs 9F
+.It Xr ddi_fls 9F Ta Xr max 9F
+.It Xr memchr 9F Ta Xr memcmp 9F
+.It Xr memcpy 9F Ta Xr memmove 9F
+.It Xr memset 9F Ta Xr min 9F
+.It Xr numtos 9F Ta Xr snprintf 9F
+.It Xr sprintf 9F Ta Xr stoi 9F
+.It Xr strcasecmp 9F Ta Xr strcat 9F
+.It Xr strchr 9F Ta Xr strcmp 9F
+.It Xr strcpy 9F Ta Xr strdup 9F
+.It Xr strfree 9F Ta Xr string 9F
+.It Xr strlcat 9F Ta Xr strlcpy 9F
+.It Xr strlen 9F Ta Xr strlog 9F
+.It Xr strncasecmp 9F Ta Xr strncat 9F
+.It Xr strncmp 9F Ta Xr strncpy 9F
+.It Xr strnlen 9F Ta Xr strqget 9F
+.It Xr strqset 9F Ta Xr strrchr 9F
+.It Xr strspn 9F Ta Xr swab 9F
+.It Xr vsnprintf 9F Ta Xr va_arg 9F
+.It Xr va_copy 9F Ta Xr va_end 9F
+.It Xr va_start 9F Ta Xr vsprintf 9F
+.El
+.Ss Tree Data Structures
+These functions provide access to an intrusive self-balancing binary
+tree that is generally used throughout illumos.
+The primary type here is the
+.Vt avl_tree_t .
+Structures can be present in multiple trees and there are built-in
+walkers for the data structure in
+.Xr mdb 1 .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr avl_add 9F Ta Xr avl_create 9F
+.It Xr avl_destroy_nodes 9F Ta Xr avl_destroy 9F
+.It Xr avl_find 9F Ta Xr avl_first 9F
+.It Xr avl_insert_here 9F Ta Xr avl_insert 9F
+.It Xr avl_is_empty 9F Ta Xr avl_last 9F
+.It Xr avl_nearest 9F Ta Xr AVL_NEXT 9F
+.It Xr avl_numnodes 9F Ta Xr AVL_PREV 9F
+.It Xr avl_remove 9F Ta Xr avl_swap 9F
+.El
+.Ss Linked Lists
+These functions provide a standard, intrusive doubly-linked list whose
+type is the
+.Vt list_t .
+This list implementation is used extensively throughout illumos, has
+debugging support through
+.Xr mdb 1
+walkers, and is generally recommended rather than creating your own
+list.
+Due to its intrusive nature, a given structure can be present on
+multiple lists.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr list_create 9F Ta Xr list_destroy 9F
+.It Xr list_head 9F Ta Xr list_insert_after 9F
+.It Xr list_insert_before 9F Ta Xr list_insert_head 9F
+.It Xr list_insert_tail 9F Ta Xr list_is_empty 9F
+.It Xr list_link_active 9F Ta Xr list_link_init 9F
+.It Xr list_link_replace 9F Ta Xr list_move_tail 9F
+.It Xr list_next 9F Ta Xr list_prev 9F
+.It Xr list_remove_head 9F Ta Xr list_remove_tail 9F
+.It Xr list_remove 9F Ta Xr list_tail 9F
+.El
+.Ss Name-Value Pairs
+The kernel often uses the
+.Vt nvlist_t
+data structure to pass around a list of typed name-value pairs.
+This data structure is used in diverse areas, particularly because of
+its ability to be serialized in different formats that are suitable not
+only for use between userland and the kernel, but also persistently to a
+file.
+.Pp
+A
+.Vt nvlist_t
+structure is initialized with the
+.Xr nvlist_alloc 9F
+function and can operate with two different degrees of uniqueness: a
+mode where only names are unique or that every name is qualified to a
+type.
+The former means that if I have an integer name
+.Dq foo
+and then add a string, array, or any other value with the same name, it
+will be replaced.
+However, if were using the name and type as unique, then the value would
+only be replaced if both the pair's type and the name
+.Dq foo
+matched a pair that was already present.
+Otherwise, the two different entries would co-exist.
+.Pp
+When constructing an nvlist, it is normally backed by the normal kmem
+allocator and may either use sleeping or non-sleeping allocations.
+It is also possible to use a custom allocator, though that generally has
+not been necessary in the kernel.
+.Pp
+Specific keys and values can be looked up directly with the
+nvlist_lookup family of functions, but the entire list can be iterated
+as well, which is especially useful when trying to validate that no
+unknown keys are present in the list.
+The iteration API
+.Xr nvlist_next_nvpair 9F
+allows one to then get both the key's name, the type of value of the
+pair, and then the value itself.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr nv_alloc_fini 9F Ta Xr nv_alloc_init 9F
+.It Xr nvlist_add_boolean_array 9F Ta Xr nvlist_add_boolean_value 9F
+.It Xr nvlist_add_boolean 9F Ta Xr nvlist_add_byte_array 9F
+.It Xr nvlist_add_byte 9F Ta Xr nvlist_add_int16_array 9F
+.It Xr nvlist_add_int16 9F Ta Xr nvlist_add_int32_array 9F
+.It Xr nvlist_add_int32 9F Ta Xr nvlist_add_int64_array 9F
+.It Xr nvlist_add_int64 9F Ta Xr nvlist_add_int8_array 9F
+.It Xr nvlist_add_int8 9F Ta Xr nvlist_add_nvlist_array 9F
+.It Xr nvlist_add_nvlist 9F Ta Xr nvlist_add_nvpair 9F
+.It Xr nvlist_add_string_array 9F Ta Xr nvlist_add_string 9F
+.It Xr nvlist_add_uint16_array 9F Ta Xr nvlist_add_uint16 9F
+.It Xr nvlist_add_uint32_array 9F Ta Xr nvlist_add_uint32 9F
+.It Xr nvlist_add_uint64_array 9F Ta Xr nvlist_add_uint64 9F
+.It Xr nvlist_add_uint8_array 9F Ta Xr nvlist_add_uint8 9F
+.It Xr nvlist_alloc 9F Ta Xr nvlist_dup 9F
+.It Xr nvlist_exists 9F Ta Xr nvlist_free 9F
+.It Xr nvlist_lookup_boolean_array 9F Ta Xr nvlist_lookup_boolean_value 9F
+.It Xr nvlist_lookup_boolean 9F Ta Xr nvlist_lookup_byte_array 9F
+.It Xr nvlist_lookup_byte 9F Ta Xr nvlist_lookup_int16_array 9F
+.It Xr nvlist_lookup_int16 9F Ta Xr nvlist_lookup_int32_array 9F
+.It Xr nvlist_lookup_int32 9F Ta Xr nvlist_lookup_int64_array 9F
+.It Xr nvlist_lookup_int64 9F Ta Xr nvlist_lookup_int8_array 9F
+.It Xr nvlist_lookup_int8 9F Ta Xr nvlist_lookup_nvlist_array 9F
+.It Xr nvlist_lookup_nvlist 9F Ta Xr nvlist_lookup_nvpair 9F
+.It Xr nvlist_lookup_pairs 9F Ta Xr nvlist_lookup_string_array 9F
+.It Xr nvlist_lookup_string 9F Ta Xr nvlist_lookup_uint16_array 9F
+.It Xr nvlist_lookup_uint16 9F Ta Xr nvlist_lookup_uint32_array 9F
+.It Xr nvlist_lookup_uint32 9F Ta Xr nvlist_lookup_uint64_array 9F
+.It Xr nvlist_lookup_uint64 9F Ta Xr nvlist_lookup_uint8_array 9F
+.It Xr nvlist_lookup_uint8 9F Ta Xr nvlist_merge 9F
+.It Xr nvlist_next_nvpair 9F Ta Xr nvlist_pack 9F
+.It Xr nvlist_remove_all 9F Ta Xr nvlist_remove 9F
+.It Xr nvlist_size 9F Ta Xr nvlist_t 9F
+.It Xr nvlist_unpack 9F Ta Xr nvlist_xalloc 9F
+.It Xr nvlist_xdup 9F Ta Xr nvlist_xpack 9F
+.It Xr nvlist_xunpack 9F Ta Xr nvpair_name 9F
+.It Xr nvpair_type 9F Ta Xr nvpair_value_boolean_array 9F
+.It Xr nvpair_value_byte_array 9F Ta Xr nvpair_value_byte 9F
+.It Xr nvpair_value_int16_array 9F Ta Xr nvpair_value_int16 9F
+.It Xr nvpair_value_int32_array 9F Ta Xr nvpair_value_int32 9F
+.It Xr nvpair_value_int64_array 9F Ta Xr nvpair_value_int64 9F
+.It Xr nvpair_value_int8_array 9F Ta Xr nvpair_value_int8 9F
+.It Xr nvpair_value_nvlist_array 9F Ta Xr nvpair_value_nvlist 9F
+.It Xr nvpair_value_string_array 9F Ta Xr nvpair_value_string 9F
+.It Xr nvpair_value_uint16_array 9F Ta Xr nvpair_value_uint16 9F
+.It Xr nvpair_value_uint32_array 9F Ta Xr nvpair_value_uint32 9F
+.It Xr nvpair_value_uint64_array 9F Ta Xr nvpair_value_uint64 9F
+.It Xr nvpair_value_uint8_array 9F Ta Xr nvpair_value_uint8 9F
+.El
+.Ss Identifier Management
+A common challenge in the kernel is the management of a series of
+different IDs.
+There are three different families of routines for managing identifiers
+presented here, but we recommend the use of the
+.Xr id_space_create 9F
+and
+.Xr id_alloc 9F
+family for new use cases.
+The ID space can cover all or a subset of the 32-bit integer space and
+provides different allocation strategies for this.
+.Pp
+Due to the current implementation, callers should generally prefer the
+non-sleeping variants because the sleeping ones are not cancellable
+.Po
+currently this is backed by vmem, but this should not be assumed and may
+change in the future
+.Pc .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr id_alloc_nosleep 9F Ta Xr id_alloc_specific_nosleep 9F
+.It Xr id_alloc 9F Ta Xr id_allocff_nosleep 9F
+.It Xr id_allocff 9F Ta Xr id_free 9F
+.It Xr id_space_create 9F Ta Xr id_space_destroy 9F
+.It Xr id_space_extend 9F Ta Xr id_space 9F
+.It Xr id32_alloc 9F Ta Xr id32_free 9F
+.It Xr id32_lookup 9F Ta Xr rmalloc_wait 9F
+.It Xr rmalloc 9F Ta Xr rmallocmap_wait 9F
+.It Xr rmallocmap 9F Ta Xr rmfree 9F
+.It Xr rmfreemap 9F Ta
+.El
+.Ss Bit Manipulation Routines
+Many device drivers that are working with registers often need to get a
+specific range of bits out of an integer.
+These functions provide safe ways to set
+.Pq bitset
+and extract
+.Pq bitx
+bit ranges, as well
+as modify an integer to remove a set of bits entirely
+.Pq bitdel .
+Using these functions is preferred to constructing manual masks and
+shifts particularly when a programming manual for a device is specified
+in ranges of bits.
+On debug builds, these provide extra checking to try and catch
+programmer error.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr bitdel64 9F Ta Xr bitset8 9F
+.It Xr bitset16 9F Ta Xr bitset32 9F
+.It Xr bitset64 9F Ta Xr bitx8 9F
+.It Xr bitx16 9F Ta Xr bitx32 9F
+.It Xr bitx64 9F Ta
+.El
+.Ss Synchronization Primitives
+The kernel provides a set of basic synchronization primitives that can
+be used by the system.
+These include mutexes, condition variables, reader/writer locks, and
+semaphores.
+When creating mutexes and reader/writer locks, the kernel requires that
+one pass in the interrupt priority of a mutex if it will be used in
+interrupt context.
+This is required so the kernel can determine the correct underlying type
+of lock to use.
+This ensures that if for some reason a mutex needs to be used in
+high-level interrupt context, the kernel will use a spin lock, but
+otherwise can use the standard adaptive mutex that might block.
+For developers familiar with other operating systems, this is somewhat
+different in that the consumer does not need to generally figure out
+this level of detail and this is why this is not present.
+.Pp
+In addition, condition variables provide means for waiting and detecting
+that a signal has been delivered.
+These variants are particularly useful when writing character device
+operations for device drivers as it allows users the chance to cancel an
+operation and not be blocked indefinitely on something that may not
+occur.
+These _sig variants should generally be preferred where applicable.
+.Pp
+The kernel also provides memory barrier primitives.
+See the
+.Sx Memory Barriers
+section for more information.
+There is no need to use manual memory barriers when using the
+synchronization primitives.
+The synchronization primitives contain that the appropriate barriers are
+present to ensure coherency while the lock is held.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr cv_broadcast 9F Ta Xr cv_destroy 9F
+.It Xr cv_init 9F Ta Xr cv_reltimedwait_sig 9F
+.It Xr cv_reltimedwait 9F Ta Xr cv_signal 9F
+.It Xr cv_timedwait_sig 9F Ta Xr cv_timedwait 9F
+.It Xr cv_wait_sig 9F Ta Xr cv_wait 9F
+.It Xr ddi_enter_critical 9F Ta Xr ddi_exit_critical 9F
+.It Xr mutex_destroy 9F Ta Xr mutex_enter 9F
+.It Xr mutex_exit 9F Ta Xr mutex_init 9F
+.It Xr mutex_owned 9F Ta Xr mutex_tryenter 9F
+.It Xr rw_destroy 9F Ta Xr rw_downgrade 9F
+.It Xr rw_enter 9F Ta Xr rw_exit 9F
+.It Xr rw_init 9F Ta Xr rw_read_locked 9F
+.It Xr rw_tryenter 9F Ta Xr rw_tryupgrade 9F
+.It Xr sema_destroy 9F Ta Xr sema_init 9F
+.It Xr sema_p_sig 9F Ta Xr sema_p 9F
+.It Xr sema_tryp 9F Ta Xr sema_v 9F
+.It Xr semaphore 9F Ta
+.El
+.Ss Atomic Operations
+This group of functions provides a general way to perform atomic
+operations on integers of different sizes and explicit types.
+The
+.Xr atomic_ops 9F
+manual page describes the different classes of functions in more detail,
+but there are functions that take care of using the CPU's instructions
+for addition, compare and swap, and more.
+If data is being protected and only accessed under a synchronization
+primitive such as a mutex or reader-writer lock, then there isn't a
+reason to use an atomic operation for that data, generally speaking.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr atomic_add_8_nv 9F Ta Xr atomic_add_8 9F
+.It Xr atomic_add_16_nv 9F Ta Xr atomic_add_16 9F
+.It Xr atomic_add_32_nv 9F Ta Xr atomic_add_32 9F
+.It Xr atomic_add_64_nv 9F Ta Xr atomic_add_64 9F
+.It Xr atomic_add_char_nv 9F Ta Xr atomic_add_char 9F
+.It Xr atomic_add_int_nv 9F Ta Xr atomic_add_int 9F
+.It Xr atomic_add_long_nv 9F Ta Xr atomic_add_long 9F
+.It Xr atomic_add_ptr_nv 9F Ta Xr atomic_add_ptr 9F
+.It Xr atomic_add_short_nv 9F Ta Xr atomic_add_short 9F
+.It Xr atomic_and_8_nv 9F Ta Xr atomic_and_8 9F
+.It Xr atomic_and_16_nv 9F Ta Xr atomic_and_16 9F
+.It Xr atomic_and_32_nv 9F Ta Xr atomic_and_32 9F
+.It Xr atomic_and_64_nv 9F Ta Xr atomic_and_64 9F
+.It Xr atomic_and_uchar_nv 9F Ta Xr atomic_and_uchar 9F
+.It Xr atomic_and_uint_nv 9F Ta Xr atomic_and_uint 9F
+.It Xr atomic_and_ulong_nv 9F Ta Xr atomic_and_ulong 9F
+.It Xr atomic_and_ushort_nv 9F Ta Xr atomic_and_ushort 9F
+.It Xr atomic_cas_16 9F Ta Xr atomic_cas_32 9F
+.It Xr atomic_cas_64 9F Ta Xr atomic_cas_8 9F
+.It Xr atomic_cas_ptr 9F Ta Xr atomic_cas_uchar 9F
+.It Xr atomic_cas_uint 9F Ta Xr atomic_cas_ulong 9F
+.It Xr atomic_cas_ushort 9F Ta Xr atomic_clear_long_excl 9F
+.It Xr atomic_dec_8_nv 9F Ta Xr atomic_dec_8 9F
+.It Xr atomic_dec_16_nv 9F Ta Xr atomic_dec_16 9F
+.It Xr atomic_dec_32_nv 9F Ta Xr atomic_dec_32 9F
+.It Xr atomic_dec_64_nv 9F Ta Xr atomic_dec_64 9F
+.It Xr atomic_dec_ptr_nv 9F Ta Xr atomic_dec_ptr 9F
+.It Xr atomic_dec_uchar_nv 9F Ta Xr atomic_dec_uchar 9F
+.It Xr atomic_dec_uint_nv 9F Ta Xr atomic_dec_uint 9F
+.It Xr atomic_dec_ulong_nv 9F Ta Xr atomic_dec_ulong 9F
+.It Xr atomic_dec_ushort_nv 9F Ta Xr atomic_dec_ushort 9F
+.It Xr atomic_inc_8_nv 9F Ta Xr atomic_inc_8 9F
+.It Xr atomic_inc_16_nv 9F Ta Xr atomic_inc_16 9F
+.It Xr atomic_inc_32_nv 9F Ta Xr atomic_inc_32 9F
+.It Xr atomic_inc_64_nv 9F Ta Xr atomic_inc_64 9F
+.It Xr atomic_inc_ptr_nv 9F Ta Xr atomic_inc_ptr 9F
+.It Xr atomic_inc_uchar_nv 9F Ta Xr atomic_inc_uchar 9F
+.It Xr atomic_inc_uint_nv 9F Ta Xr atomic_inc_uint 9F
+.It Xr atomic_inc_ulong_nv 9F Ta Xr atomic_inc_ulong 9F
+.It Xr atomic_inc_ushort_nv 9F Ta Xr atomic_inc_ushort 9F
+.It Xr atomic_or_8_nv 9F Ta Xr atomic_or_8 9F
+.It Xr atomic_or_16_nv 9F Ta Xr atomic_or_16 9F
+.It Xr atomic_or_32_nv 9F Ta Xr atomic_or_32 9F
+.It Xr atomic_or_64_nv 9F Ta Xr atomic_or_64 9F
+.It Xr atomic_or_uchar_nv 9F Ta Xr atomic_or_uchar 9F
+.It Xr atomic_or_uint_nv 9F Ta Xr atomic_or_uint 9F
+.It Xr atomic_or_ulong_nv 9F Ta Xr atomic_or_ulong 9F
+.It Xr atomic_or_ushort_nv 9F Ta Xr atomic_or_ushort 9F
+.It Xr atomic_set_long_excl 9F Ta Xr atomic_swap_8 9F
+.It Xr atomic_swap_16 9F Ta Xr atomic_swap_32 9F
+.It Xr atomic_swap_64 9F Ta Xr atomic_swap_ptr 9F
+.It Xr atomic_swap_uchar 9F Ta Xr atomic_swap_uint 9F
+.It Xr atomic_swap_ulong 9F Ta Xr atomic_swap_ushort 9F
+.El
+.Ss Memory Barriers
+The kernel provides general purpose memory barriers that can be used
+when required.
+In general, when using items described in the
+.Sx Synchronization Primitives
+section, these are not required.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr membar_consumer 9F Ta Xr membar_enter 9F
+.It Xr membar_exit 9F Ta Xr membar_producer 9F
+.El
+.Ss Virtual Memory and Pages
+All platforms that the operating system supports have some form of
+virtual memory which is managed in units of pages.
+The page size varies between architectures and platforms.
+For example, the smallest x86 page size is 4 KiB while SPARC
+traditionally used 8 KiB pages.
+These functions can be used to convert between pages and bytes.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr btop 9F Ta Xr btopr 9F
+.It Xr ddi_btop 9F Ta Xr ddi_btopr 9F
+.It Xr ddi_ptob 9F Ta Xr ptob 9F
+.El
+.Ss Module and Device Framework
+These functions are used as part of implementing kernel modules and
+register device drivers with the various kernel frameworks.
+There are also functions here that are satiable for use in the
+.Xr dev_ops 9F ,
+.Xr cb_ops 9F ,
+etc.
+structures and for interrogating module information.
+.Pp
+The
+.Xr mod_install 9F
+and
+.Xr mod_remove 9F
+functions are used during a driver's
+.Xr _init 9E
+and
+.Xr _fini 9E
+functions.
+.Pp
+There are two different ways that drivers often manage their instance
+state which is created during
+.Xr attach 9E .
+The first is the use of
+.Xr ddi_set_driver_private 9F
+and
+.Xr ddi_get_driver_private 9F .
+This stores a driver-specific value on the
+.Vt dev_info_t
+structure which allows it to be used during other operations.
+Some device driver frameworks may use this themselves, making this
+unavailable to the driver.
+.Pp
+The other path is to use the soft state suite of functions which
+dynamically grows to cover the number of instances of a device that
+exist.
+The soft state is generally initialized in the
+.Xr _init 9E
+entry point with
+.Xr ddi_soft_state_init 9F
+and then instances are allocated and freed during
+.Xr attach 9E
+and
+.Xr detach 9E
+with
+.Xr ddi_soft_state_zalloc 9F
+and
+.Xr ddi_soft_state_free 9F ,
+and then retrieved with
+.Xr ddi_get_soft_state 9F .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_get_driver_private 9F Ta Xr ddi_get_soft_state 9F
+.It Xr ddi_modclose 9F Ta Xr ddi_modopen 9F
+.It Xr ddi_modsym 9F Ta Xr ddi_no_info 9F
+.It Xr ddi_report_dev 9F Ta Xr ddi_set_driver_private 9F
+.It Xr ddi_soft_state_fini 9F Ta Xr ddi_soft_state_free 9F
+.It Xr ddi_soft_state_init 9F Ta Xr ddi_soft_state_zalloc 9F
+.It Xr mod_info 9F Ta Xr mod_install 9F
+.It Xr mod_modname 9F Ta Xr mod_remove 9F
+.It Xr nochpoll 9F Ta Xr nodev 9F
+.It Xr nulldev 9F Ta
+.El
+.Ss Device Tree Information
+Devices are organized into a tree that is partially seeded by the
+platform based on information discovered at boot and augmented with
+additional information at runtime.
+Every instance of a device driver is given a
+.Vt "dev_info_t *"
+.Pq device information
+data structure which corresponds to information about an instance and
+has a place in the tree.
+When a driver requests operations like to allocate memory for DMA, that
+request is passed up the tree and modified.
+The same is true for other things like interrupts, event notifications,
+or properties.
+.Pp
+There are many different informational properties about a device driver.
+For example,
+.Xr ddi_driver_name 9F
+returns the name of the device driver,
+.Xr ddi_get_name 9F
+returns the name of the node in the tree,
+.Xr ddi_get_parent 9F
+returns a node's parent, and
+.Xr ddi_get_instance 9F
+returns the instance number of a specific driver.
+.Pp
+There are a series of properties that exist on the tree, the exact set
+of which depend on the class of the device and are often documented in a
+specific device class's manual.
+For example, the
+.Dq reg
+property is used for PCI and PCIe devices to describe the various base
+address registers, their types, and related, which are documented in
+.Xr pci 5 .
+.Pp
+When getting a property one can constrain it to the current instance or
+you can ask for a parent to try to look up the property.
+Which mode is appropriate depends on the specific class of driver, its
+parent, and the property.
+.Pp
+Using a
+.Vt "dev_info_t *"
+pointer has to be done carefully.
+When a device driver is in any of its
+.Xr dev_ops 9S ,
+.Xr cb_ops 9S ,
+or similar callback functions that it has registered with the kernel,
+then it can always safely use its own
+.Vt "dev_info_t"
+and those of any parents it discovers through
+.Xr ddi_get_parent 9F .
+However, it cannot assume the validity of any siblings or children
+unless there are other circumstances that guarantee that they will not
+disappear.
+In the broader kernel, one should not assume that it is safe to use a
+given
+.Vt "dev_info_t *"
+structure without the appropriate NDI
+.Pq nexus driver interface
+hold having been applied.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_binding_name 9F Ta Xr ddi_dev_is_sid 9F
+.It Xr ddi_driver_major 9F Ta Xr ddi_driver_name 9F
+.It Xr ddi_get_devstate 9F Ta Xr ddi_get_instance 9F
+.It Xr ddi_get_name 9F Ta Xr ddi_get_parent 9F
+.It Xr ddi_getlongprop_buf 9F Ta Xr ddi_getlongprop 9F
+.It Xr ddi_getprop 9F Ta Xr ddi_getproplen 9F
+.It Xr ddi_node_name 9F Ta Xr ddi_prop_create 9F
+.It Xr ddi_prop_exists 9F Ta Xr ddi_prop_free 9F
+.It Xr ddi_prop_get_int 9F Ta Xr ddi_prop_get_int64 9F
+.It Xr ddi_prop_lookup_byte_array 9F Ta Xr ddi_prop_lookup_int_array 9F
+.It Xr ddi_prop_lookup_int64_array 9F Ta Xr ddi_prop_lookup_string_array 9F
+.It Xr ddi_prop_lookup_string 9F Ta Xr ddi_prop_lookup 9F
+.It Xr ddi_prop_modify 9F Ta Xr ddi_prop_op 9F
+.It Xr ddi_prop_remove_all 9F Ta Xr ddi_prop_remove 9F
+.It Xr ddi_prop_undefine 9F Ta Xr ddi_prop_update_byte_array 9F
+.It Xr ddi_prop_update_int_array 9F Ta Xr ddi_prop_update_int 9F
+.It Xr ddi_prop_update_int64_array 9F Ta Xr ddi_prop_update_int64 9F
+.It Xr ddi_prop_update_string_array 9F Ta Xr ddi_prop_update_string 9F
+.It Xr ddi_prop_update 9F Ta Xr ddi_root_node 9F
+.It Xr ddi_slaveonly 9F Ta
+.El
+.Ss Copying Data to and from Userland
+The kernel operates in a different context from userland.
+One does not simply access user memory.
+This is enforced either by the architecture's memory model, where user
+address space isn't even present in the kernel's virtual address space
+or by architectural mechanisms such as Supervisor Mode Access Protect
+.Pq SMAP
+on x86.
+.Pp
+To facilitate accessing memory, the kernel provides a few routines that
+can be used.
+In most contexts the main thing to use is
+.Xr ddi_copyin 9F
+and
+.Xr ddi_copyout 9F .
+These will safely dereference addresses and ensure that the address is
+appropriate depending on whether this is coming from the user or kernel.
+When operating with the kernel's
+.Vt uio_t
+structure which is for mostly used when processing read and write
+requests, instead
+.Xr uiomove 9F
+is the goto function.
+.Pp
+When reading data from userland into the kernel, there is another
+concern: the data model.
+The most common place this comes up is in an
+.Xr ioctl 9E
+handler or other places where the kernel is operating on data that isn't
+fixed size.
+Particularly in C, though this applies to other languages, structures
+and unions vary in the size and alignment requirements between 32-bit
+and 64-bit processes.
+The same even applies if one uses pointers or the
+.Vt long ,
+.Vt size_t ,
+or similar types in C.
+In supported 32-bit and 64-bit environments these types are 4 and 8
+bytes respectively.
+To account for this, when data is not fixed size between all data
+models, the driver must look at the data model of the process it is
+copying data from.
+.Pp
+The simplest way to solve this problem is to try to make the data
+structure the same across the different models.
+It's not sufficient to just use the same structure definition and fixed
+size types as the alignment and padding between the two can vary.
+For example, the alignment of a 64-bit integer like a
+.Vt uint64_t
+can change between a 32-bit and 64-bit data model.
+One way to check for the data structures being identical is to leverage
+the
+.Xr ctfdiff 1
+program, generally with the
+.Fl I
+option.
+.Pp
+However, there are times when a structure simply can't be the same, such
+as when we're encoding a pointer into the structure or a type like the
+.Vt size_t .
+When this happens, the most natural way to accomplish this is to use the
+.Xr ddi_model_convert_from 9F
+function which can determine the appropriate model from the ioctl's
+arguments.
+This provides a natural way to copy a structure in and out in the
+appropriate data model and convert it at those points to the kernel's
+native form.
+.Pp
+An alternate way to approach the data model is to use the
+.Xr STRUCT_DECL 9F
+functions, but as this requires wrapping every access to every member,
+often times the
+.Xr ddi_model_convert_from 9F
+approach and taking care of converting values and ensuring that limits
+aren't exceeded at the end is preferred.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr bp_copyin 9F Ta Xr bp_copyout 9F
+.It Xr copyin 9F Ta Xr copyout 9F
+.It Xr ddi_copyin 9F Ta Xr ddi_copyout 9F
+.It Xr ddi_model_convert_from 9F Ta Xr SIZEOF_PTR 9F
+.It Xr SIZEOF_STRUCT 9F Ta Xr STRUCT_BUF 9F
+.It Xr STRUCT_DECL 9F Ta Xr STRUCT_FADDR 9F
+.It Xr STRUCT_FGET 9F Ta Xr STRUCT_FGETP 9F
+.It Xr STRUCT_FSET 9F Ta Xr STRUCT_FSETP 9F
+.It Xr STRUCT_HANDLE 9F Ta Xr STRUCT_INIT 9F
+.It Xr STRUCT_SET_HANDLE 9F Ta Xr STRUCT_SIZE 9F
+.It Xr uiomove 9F Ta Xr ureadc 9F
+.It Xr uwritec 9F Ta
+.El
+.Ss Device Register Setup and Access
+The kernel abstracts out accessing registers on a device on behalf of
+drivers.
+This allows a similar set of interfaces to be used whether the registers
+are found within a PCI BAR, utilizing I/O ports, memory mapped
+registers, or some other scheme.
+Devices with registers all have a
+.Dq regs
+property that is set up by their parent device, generally a kernel
+framework as is the case for PCIe devices, and the meaning is a contract
+between the two.
+Register sets are identified by a numeric ID, which varies on the device
+type.
+For example, the first BAR of a PCI device is defined as register set 1.
+On the other hand, the AMD GPIO controller might have three register sets
+because of how the hardware design splits them up.
+The meaning of the registers and their semantics is still
+device-specific.
+The kernel doesn't know how to interpret the actual registers of a PCIe
+device say, just that they exist.
+.Pp
+To begin with register setup, one often first looks at the number of
+register sets that exist and their size.
+Most PCI-based device drivers will skip calling
+.Xr ddi_dev_nregs 9F
+and will just move straight to calling
+.Xr ddi_dev_regsize 9F
+to determine the size of a register set that they are interested in.
+To actually map the registers, a device driver will call
+.Xr ddi_regs_map_setup 9F
+which requires both a register set and a series of attributes and
+returns an access handle that is used to actually read and write the
+registers.
+When setting up registers, one must have a corresponding
+.Vt ddi_device_acc_attr_t
+structure which is used to define what endianness the register set is
+in, whether any kind of reordering is allowed
+.Po
+if in doubt specify
+.Dv DDI_STRICTORDER_ACC
+.Pc ,
+and whether any particular error handling is being used.
+The structure and all of its different options are described in
+.Xr ddi_device_acc_attr 9S .
+.Pp
+Once a register handle is obtained, then it's easy to read and write the
+register space.
+Functions are organized based on the size of the access.
+For the most part, most situations call for the use of the
+.Xr ddi_get8 9F ,
+.Xr ddi_get16 9F ,
+.Xr ddi_get32 9F ,
+and
+.Xr ddi_get64 9F
+functions to read a register and the
+.Xr ddi_put8 9F ,
+.Xr ddi_put16 9F ,
+.Xr ddi_put32 9F ,
+and
+.Xr ddi_put64 9F
+functions to set a register value.
+While there are the ddi_io_ and ddi_mem_ families of functions below,
+these are not generally needed and are generally present for
+compatibility.
+The kernel will automatically perform the appropriate type of register
+read for the device type in question.
+.Pp
+Once a register set is no longer being used, the
+.Xr ddi_regs_map_free 9F
+function should be used to release resources.
+In most cases, this happens while executing the
+.Xr detach 9E
+entry point.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_dev_nregs 9F Ta Xr ddi_dev_regsize 9F
+.It Xr ddi_device_copy 9F Ta Xr ddi_device_zero 9F
+.It Xr ddi_regs_map_free 9F Ta Xr ddi_regs_map_setup 9F
+.It Xr ddi_get8 9F Ta Xr ddi_get16 9F
+.It Xr ddi_get32 9F Ta Xr ddi_get64 9F
+.It Xr ddi_io_get8 9F Ta Xr ddi_io_get16 9F
+.It Xr ddi_io_get32 9F Ta Xr ddi_io_put8 9F
+.It Xr ddi_io_put16 9F Ta Xr ddi_io_put32 9F
+.It Xr ddi_io_rep_get8 9F Ta Xr ddi_io_rep_get16 9F
+.It Xr ddi_io_rep_get32 9F Ta Xr ddi_io_rep_put8 9F
+.It Xr ddi_io_rep_put16 9F Ta Xr ddi_io_rep_put32 9F
+.It Xr ddi_map_regs 9F Ta Xr ddi_mem_get8 9F
+.It Xr ddi_mem_get16 9F Ta Xr ddi_mem_get32 9F
+.It Xr ddi_mem_get64 9F Ta Xr ddi_mem_put8 9F
+.It Xr ddi_mem_put16 9F Ta Xr ddi_mem_put32 9F
+.It Xr ddi_mem_put64 9F Ta Xr ddi_mem_rep_get8 9F
+.It Xr ddi_mem_rep_get16 9F Ta Xr ddi_mem_rep_get32 9F
+.It Xr ddi_mem_rep_get64 9F Ta Xr ddi_mem_rep_put8 9F
+.It Xr ddi_mem_rep_put16 9F Ta Xr ddi_mem_rep_put32 9F
+.It Xr ddi_mem_rep_put64 9F Ta Xr ddi_peek8 9F
+.It Xr ddi_peek16 9F Ta Xr ddi_peek32 9F
+.It Xr ddi_peek64 9F Ta Xr ddi_poke8 9F
+.It Xr ddi_poke16 9F Ta Xr ddi_poke32 9F
+.It Xr ddi_poke64 9F Ta Xr ddi_put8 9F
+.It Xr ddi_put16 9F Ta Xr ddi_put32 9F
+.It Xr ddi_put64 9F Ta Xr ddi_rep_get8 9F
+.It Xr ddi_rep_get16 9F Ta Xr ddi_rep_get32 9F
+.It Xr ddi_rep_get64 9F Ta Xr ddi_rep_put8 9F
+.It Xr ddi_rep_put16 9F Ta Xr ddi_rep_put32 9F
+.It Xr ddi_rep_put64 9F Ta
+.El
+.Ss DMA Related Functions
+Most high-performance devices provide first-class support for DMA
+.Pq direct memory access .
+DMA allows a transfer between a device and memory to occur
+asynchronously and generally without a thread's specific involvement.
+Today, most DMA is provided directly by devices and the corresponding
+device scheme.
+Take PCI and PCI Express for example.
+The idea of DMA is built into the PCIe standard and therefore basic
+support for it exists and therefore there isn't a lot of special
+programming required.
+However, this hasn't always been true and still exists in some cases
+where there is a 3rd party DMA engine.
+If we consider the PCIe example, the PCIe device directly performs reads
+and writes to main memory on its own.
+However, in the 3rd party case, there is a distinct controller that is
+neither the device nor memory that facilitates this, which is called a
+DMA engine.
+For most part, DMA engines are not something that needs to be thought
+about for most platforms that illumos is present on; however, they still
+exist in some embedded and related contexts.
+.Pp
+The first thing that a driver needs to do to set up DMA is to understand
+the constraints of the device and bus.
+These constraints are described in a series of attributes in the
+.Vt ddi_dma_attr_t
+structure which is defined in
+.Xr ddi_dma_attr 9S .
+The reason that attributes exist is because different devices, and
+sometimes different memory uses with a device, have different
+requirements for memory.
+A simple example of this is that not all devices can accept memory
+addresses that are 64-bits wide and may have to be constrained to the
+lower 32-bits of memory.
+Another common constraint is how this memory is chunked up.
+Some devices may require that all of the DMA memory be contiguous, while
+others can allow that to be broken up into say up to 4 or 8 different
+regions.
+.Pp
+When memory is allocated for DMA it isn't immediately mapped into the
+kernel's address space.
+The addresses that describe a DMA address are defined in a DMA cookie,
+several of which may make up a request.
+However, those addresses are always physical addresses or addresses that
+are virtualized by an IOMMU.
+There are some cases were the kernel or a driver needs to be able to
+access that memory, such as memory that represents a networking packet.
+The IP stack will expect to be able to actually read the data it's
+given.
+.Pp
+To begin with allocating DMA memory, a driver first fills out its
+attribute structure.
+Once that's ready, the DMA allocation process can begin.
+This starts off by a driver calling
+.Xr ddi_dma_alloc_handle 9F .
+This handle is used through the lifetime of a given DMA memory buffer,
+but it can be used across multiple operations that a device or the
+kernel may perform.
+The next step is to actually request that the kernel allocate some
+amount of memory in the kernel for this DMA request.
+This phase actually allocates addresses in virtual address space for the
+activity and also requires a register attribute object that is discussed
+in
+.Sx Device Register Setup and Access .
+Armed with this a driver can now call
+.Xr ddi_dma_mem_alloc 9F
+to specify how much memory they are looking for.
+If this is successful, a virtual address, the actual length of the
+region, and an access handle will be returned.
+.Pp
+At this point, the virtual address region is present.
+Most drivers will access this virtual address range directly and will
+ignore the register access handle.
+The side effect of this is that they will handle all endianness issues
+with the memory region themselves.
+If the driver would prefer to go through the handle, then it can use the
+register access functions discussed earlier.
+.Pp
+Before the memory can be programmed into the device, it must be bound to
+a series of physical addresses or addresses virtualized by an IOMMU.
+While the kernel presents the illusion of a single consistent virtual
+address range for applications, the physical reality can be quite
+different.
+When the driver is ready it calls
+.Xr ddi_dma_addr_bind_handle 9F
+to create the mapping to well known physical addresses.
+.Pp
+These addresses are stored in a series of cookies.
+A driver can determine the number of cookies for a given request by
+utilizing its DMA handle and calling
+.Xr ddi_dma_ncookies 9F
+and then pairing that with
+.Xr ddi_dma_cookie_get 9F .
+These DMA cookies will not change and can be used time and time again
+until
+.Xr ddi_dma_unbind_handle 9F
+is called.
+With this information in hand, a physical device can be programmed with
+these addresses and let loose to perform I/O.
+.Pp
+When performing I/O to and from a device, synchronization is a vitally
+important thing which ensures that the actual state in memory is
+coherent with the rest of the CPU's internal structures such as caches.
+In general, a given DMA request is only going in one direction: for a
+device or for the local CPU.
+In either case, the
+.Xr ddi_dma_sync 9F
+function must be called after the kernel is done writing to a region of
+DMA memory and before it triggers the device or the kernel must call it
+after the device has told it that some activity has completed that it is
+going to check.
+.Pp
+Some DMA operations utilize what are called DMA windows.
+The most common consumer is something like a disk device where DMA
+operations to a given series of sectors can be split up into different
+chunks where as long as all the transfers are performed, the
+intermediate states are acceptable.
+Put another way, because of how SCSI and SAS commands are designed,
+block devices can basically take a given I/O request and break it into
+multiple independent I/Os that will equate to the same final item.
+.Pp
+When a device supports this mode of operation and it is opted into, then
+a DMA allocation may result in the use of DMA windows.
+This allows for cases where the kernel can't perform a DMA allocation
+for the entire request, but instead can allocate a partial region and
+then walk through each part one at a time.
+This is uncommon outside of block devices and usually also is related to
+calling
+.Xr ddi_dma_buf_bind_handle 9F .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_dma_addr_bind_handle 9F Ta Xr ddi_dma_alloc_handle 9F
+.It Xr ddi_dma_buf_bind_handle 9F Ta Xr ddi_dma_burstsizes 9F
+.It Xr ddi_dma_cookie_get 9F Ta Xr ddi_dma_cookie_iter 9F
+.It Xr ddi_dma_cookie_one 9F Ta Xr ddi_dma_free_handle 9F
+.It Xr ddi_dma_getwin 9F Ta Xr ddi_dma_mem_alloc 9F
+.It Xr ddi_dma_mem_free 9F Ta Xr ddi_dma_ncookies 9F
+.It Xr ddi_dma_nextcookie 9F Ta Xr ddi_dma_numwin 9F
+.It Xr ddi_dma_set_sbus64 9F Ta Xr ddi_dma_sync 9F
+.It Xr ddi_dma_unbind_handle 9F Ta Xr ddi_dmae_1stparty 9F
+.It Xr ddi_dmae_alloc 9F Ta Xr ddi_dmae_disable 9F
+.It Xr ddi_dmae_enable 9F Ta Xr ddi_dmae_getattr 9F
+.It Xr ddi_dmae_getcnt 9F Ta Xr ddi_dmae_prog 9F
+.It Xr ddi_dmae_release 9F Ta Xr ddi_dmae_stop 9F
+.It Xr ddi_dmae 9F Ta
+.El
+.Ss Interrupt Handler Related Functions
+Interrupts are a central part of the role of device drivers and one of
+the things that's important to get right.
+Interrupts come in different types: fixed, MSI, and MSI-X.
+The kinds that are available depend on the device and the rest of the
+system.
+For example, MSI and MSI-X interrupts are generally specific to PCI and
+PCI Express devices.
+To begin the interrupt allocation process, the first thing a driver
+needs to do is to discover what type of interrupts it supports with
+.Xr ddi_intr_get_supported_types 9F .
+Then, the driver should work through the supported types, preferring
+MSI-X, then MSI, and finally fixed interrupts, and try to allocate
+interrupts.
+.Pp
+Drivers first need to know how many interrupts that they require.
+For example, a networking driver may want to have an interrupt made
+available for each ring that it has.
+To discover the number of interrupts available, the driver should call
+.Xr ddi_intr_get_navail 9F .
+If there are sufficient interrupts, it can proceed to actually
+allocate the interrupts with
+.Xr ddi_intr_alloc 9F .
+When allocating interrupts, callers need to check to see how many
+interrupts the system actually gave them.
+Just because an interrupt is allocated does not mean that it will fire
+or be ready to use, there are a series of additional steps that the
+driver must take.
+.Pp
+To go through and enable the interrupt, the driver should go through and
+get the interrupt capabilities with
+.Xr ddi_intr_get_cap 9F
+and the priority of the interrupt with
+.Xr ddi_intr_get_pri 9F .
+The priority must be used while creating mutexes and related
+synchronization primitives that will be used during the interrupt
+handler.
+At this point, the driver can go ahead and register the functions that
+will be called with each allocated interrupt with the
+.Xr ddi_intr_add_handler 9F
+function.
+The arguments can vary for each allocated interrupt.
+It is common to have an interrupt-specific data structure passed in one
+of the arguments or an interrupt number, while the other argument is
+generally the driver's instance-specific data structure.
+.Pp
+At this point, the last step for the interrupt to be made active from
+the kernel's perspective is to enable it.
+This will use either the
+.Xr ddi_intr_block_enable 9F
+or
+.Xr ddi_intr_enable 9F
+functions depending on the interrupt's capabilities.
+The reason that these are different is because some interrupt types
+.Pq MSI
+require that all interrupts in a group be enabled and disabled at the
+same time.
+This is indicated with the
+.Dv DDI_INTR_FLAG_BLOCK
+flag found in the interrupt's capabilities.
+Once that is called, interrupts that are generated by a device will be
+delivered to the registered function.
+.Pp
+It's important to note that there is often device-specific interrupt
+setup that is required.
+While the kernel takes care of updating any pieces of the processor's
+interrupt controller, I/O crossbar, or the PCI MSI and MSI-X
+capabilities, many devices have device-specific registers that are used
+to manage, set up, and acknowledge interrupts.
+These registers or other controls are often capable of separately
+masking interrupts and are generally what should be used if there are
+times that you need to separately enable or disable interrupts such as
+to poll an I/O ring.
+.Pp
+When unwinding interrupts, one needs to work in the reverse order here.
+Until
+.Xr ddi_intr_block_disable 9F
+or
+.Xr ddi_intr_disable 9F
+is called, one should assume that their interrupt handler will be
+called.
+Due to cases where an interrupt is shared between multiple devices, this
+can happen even if the device is quiesced!
+Only after that is done is it safe to then free the interrupts with a
+call to
+.Xr ddi_intr_free 9F .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_add_intr 9F Ta Xr ddi_add_softintr 9F
+.It Xr ddi_get_iblock_cookie 9F Ta Xr ddi_get_soft_iblock_cookie 9F
+.It Xr ddi_intr_add_handler 9F Ta Xr ddi_intr_add_softint 9F
+.It Xr ddi_intr_alloc 9F Ta Xr ddi_intr_block_disable 9F
+.It Xr ddi_intr_block_enable 9F Ta Xr ddi_intr_clr_mask 9F
+.It Xr ddi_intr_disable 9F Ta Xr ddi_intr_dup_handler 9F
+.It Xr ddi_intr_enable 9F Ta Xr ddi_intr_free 9F
+.It Xr ddi_intr_get_cap 9F Ta Xr ddi_intr_get_hilevel_pri 9F
+.It Xr ddi_intr_get_navail 9F Ta Xr ddi_intr_get_nintrs 9F
+.It Xr ddi_intr_get_pending 9F Ta Xr ddi_intr_get_pri 9F
+.It Xr ddi_intr_get_softint_pri 9F Ta Xr ddi_intr_get_supported_types 9F
+.It Xr ddi_intr_hilevel 9F Ta Xr ddi_intr_remove_handler 9F
+.It Xr ddi_intr_remove_softint 9F Ta Xr ddi_intr_set_cap 9F
+.It Xr ddi_intr_set_mask 9F Ta Xr ddi_intr_set_nreq 9F
+.It Xr ddi_intr_set_pri 9F Ta Xr ddi_intr_set_softint_pri 9F
+.It Xr ddi_intr_trigger_softint 9F Ta Xr ddi_remove_intr 9F
+.It Xr ddi_remove_softintr 9F Ta Xr ddi_trigger_softintr 9F
+.El
+.Ss Minor Nodes
+For a device driver to be accessed by a program in user space
+.Pq or with the kernel layered device interface
+then it must create a minor node.
+Minor nodes are created under
+.Pa /devices
+.Pq Xr devfs 4FS
+and are tied to the instance of a device driver via its
+.Vt dev_info_t .
+The
+.Xr devfsadm 8
+daemon and the
+.Pa /dev
+file system
+.Po
+sdev,
+.Xr dev 4FS
+.Pc
+are responsible for creating a coherent set of names that user programs
+access.
+Drivers create these minor nodes using the
+.Xr ddi_create_minor_node 9F
+function listed below.
+.Pp
+In UNIX tradition, character, block, and STREAMS device special files
+are identified by a major and minor number.
+All instances of a given driver share the same major number, which means
+that a device driver must coordinate the minor number space across
+.Em all
+instances.
+While a minor node is created with a fixed minor number, it is possible
+to change the minor number while processing an
+.Xr open 9E
+call, allowing subsequent character device operations to uniquely
+identify a particular caller.
+This is usually referred to as a driver that
+.Dq clones .
+.Pp
+When drivers aren't performing cloning, then usually the minor number
+used when creating the minor node is some fixed offset or multiple of
+the driver's instance number.
+When cloning and a driver needs to allocate and manage a minor number
+space, usually an ID space is leveraged whose IDs are usually in the
+range from 0 through
+.Dv MAXMIN32 .
+There are severa different strategies for tracking data structures as
+they relate to minor numbers.
+Sometimes, the soft state functionality is used.
+Others might keep an AVL tree around or tie the data to some other data
+structure.
+The method chosen often varies on the specifics of the implementation
+and its broader context.
+.Pp
+The
+.Vt dev_t
+structure represents the combined major and minor number.
+It can be taken apart with the
+.Xr getmajor 9F
+and
+.Xr getminor 9F
+functions and then reconstructed with the
+.Xr makedevice 9F
+function.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_create_minor_node 9F Ta Xr ddi_remove_minor_node 9F
+.It Xr getmajor 9F Ta Xr getminor 9F
+.It Xr devfs_clean 9F Ta Xr makedevice 9F
+.El
+.Ss Accessing Time, Delays, and Periodic Events
+The kernel provides a number of ways to understand time in the system.
+In particular it provides a few different clocks and time measurements:
+.Bl -tag -width Ds
+.It High-resolution monotonic time
+The kernel provides access to a high-resolution monotonic clock that is
+tracked in nanoseconds.
+This clock is perfect for measuring durations and is accessed via
+.Xr gethrtime 9F .
+Unlike the real-time clock, this clock is not subject to adjustments by
+a time synchronization daemon and is the preferred clock that drivers
+should be using for tracking events.
+The high-resolution clock is consistent across CPUs, meaning that you
+may call
+.Xr gethrtime 9F
+on one CPU and the value will be consistent with what is returned, even
+if a thread is migrated to another CPU.
+.Pp
+The high-resolution clock is implemented using an architecture and
+platform-specific means.
+For example, on x86 it is generally backed by the TSC
+.Pq time stamp counter .
+.It Real-time
+The real-time clock tracks time as humans perceive it.
+This clock is accessed using
+.Xr ddi_get_time 9F .
+If the system is running a time synchronization daemon that leverages
+the network time protocol, then this time may be in sync with other
+systems
+.Pq subject to some amount of variance ;
+however, it is critical that this is not assumed.
+.Pp
+In general, this time should not be used by drivers for any purpose.
+It can jump around, drift, and most aspects in the kernel are not based
+on the real-time clock.
+For any device timing activities, the high-resolution clock should be
+used.
+.It Tick-based monotonic time
+The kernel has a running periodic function that fires based on the rate
+dictated by the
+.Va hz
+variable, generally operating at 100 or 1000 kHz.
+The current number of ticks since boot is accessible through the
+.Xr ddi_get_lbolt 9F
+function.
+When functions operate in units of ticks, this is what they are
+tracking.
+This value can be converted to and from microseconds using the
+.Xr drv_usectohz 9F
+and
+.Xr drv_hztousec 9F
+functions.
+.Pp
+In general, drivers should prefer the high-resolution monotonic clock
+for tracking events internally.
+.El
+.Pp
+With these different timing mechanisms, the kernel provides a few
+different ways to delay execution or to get a callback after some
+amount of time passes.
+.Pp
+The
+.Xr delay 9F
+and
+.Xr drv_usecwait 9F
+functions are used to block the execution of the current thread.
+.Xr delay 9F
+can be used in conditions where sleeping and blocking is allowed where
+as
+.Xr drv_usecwait 9F
+is a busy-wait, which is appropriate for some device drivers,
+particularly when in high-level interrupt context.
+.Pp
+The kernel also allows a function to be called after some time has
+elapsed.
+This callback occurs on a different thread and will be executed in
+.Sy kernel
+context.
+A timeout can be scheduled in the future with the
+.Xr timeout 9F
+function and cancelled with the
+.Xr untimeout 9F
+function.
+There is also a STREAMs-specific version that can be used if the
+circumstances are required with the
+.Xr qtimeout 9F
+function.
+.Pp
+These are all considered one-shot events.
+That is, they will only happen once after being scheduled.
+If instead, a driver requires periodic behavior, such as needing
+something to occur every second, then it should use the
+.Xr ddi_periodic_add 9F
+function to establish that.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr delay 9F Ta Xr ddi_get_lbolt 9F
+.It Xr ddi_get_lbolt64 9F Ta Xr ddi_get_time 9F
+.It Xr ddi_periodic_add 9F Ta Xr ddi_periodic_delete 9F
+.It Xr drv_hztousec 9F Ta Xr drv_usectohz 9F
+.It Xr drv_usecwait 9F Ta Xr gethrtime 9F
+.It Xr qtimeout 9F Ta Xr quntimeout 9F
+.It Xr timeout 9F Ta Xr untimeout 9F
+.El
+.Ss Task Queues
+A task queue provides an asynchronous processing mechanism that can be
+used by drivers and the broader system.
+A task queue can be created with
+.Xr ddi_taskq_create 9F
+and sized with a given number of threads and a relative priority of those
+threads.
+Once created, tasks can be dispatched to the queue with
+.Xr ddi_taskq_dispatch 9F .
+The different functions and arguments dispatched do not need to be the
+same and can vary from invocation to invocation.
+However, it is the caller's responsibility to ensure that any reference
+memory is valid until the task queue is done processing.
+It is possible to create a barrier for a task queue by using the
+.Xr ddi_taskq_wait 9F
+function.
+.Pp
+While task queues are a flexible mechanism for handling and processing
+events that occur in a well defined context, they do not have an
+inherent backpressure mechanism built in.
+This means it is possible to add events to a task queue faster than they
+can be processed.
+For high-volume events, this must be considered before just dispatching
+an event.
+Do not rely on a non-sleeping allocation in the task queue dispatch
+context.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_taskq_create 9F Ta Xr ddi_taskq_destroy 9F
+.It Xr ddi_taskq_dispatch 9F Ta Xr ddi_taskq_resume 9F
+.It Xr ddi_taskq_suspend 9F Ta Xr ddi_taskq_suspended 9F
+ddi_taskq_wait
+.El
+.Ss Credential Management and Privileges
+Not everything in the system has the same power to impact it.
+To determine the permissions and context of a caller, the
+.Vt cred_t
+data structure encapsulates a number of different things including the
+traditional user and group IDs, but also the zone that one is operating
+in the context of and the associated privileges that the caller has.
+While this concept is more often thought of due to userland processes being
+associated with specific users, these same principles apply to different
+threads in the kernel.
+Not all kernel threads are allowed to indiscriminately do what they
+want, they can be constrained by the same privilege model that processes
+are, which is discussed in
+.Xr privileges 7 .
+.Pp
+Most operations that device drivers implement are given a credential.
+However, from within the kernel, a credential can be obtained that
+refers to a specific zone, the current process, or a generic kernel
+credential.
+.Pp
+It is up to drivers and the kernel writ-large to check whether a given
+credential is authorized to perform a given operation.
+This is encapsulated by the various privilege checks that exist.
+The most common check used is
+.Xr drv_priv 9F
+which checks for
+.Dv PRIV_SYS_DEVICES .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr CRED 9F Ta Xr crdup 9F
+.It Xr crfree 9F Ta Xr crget 9F
+.It Xr crgetgid 9F Ta Xr crgetgroups 9F
+.It Xr crgetngroups 9F Ta Xr crgetrgid 9F
+.It Xr crgetruid 9F Ta Xr crgetsgid 9F
+.It Xr crgetsuid 9F Ta Xr crgetuid 9F
+.It Xr crgetzoneid 9F Ta Xr crhold 9F
+.It Xr ddi_get_cred 9F Ta Xr drv_priv 9F
+.It Xr kcred 9F Ta Xr priv_getbyname 9F
+.It Xr priv_policy_choice 9F Ta Xr priv_policy_only 9F
+.It Xr priv_policy 9F Ta Xr zone_kcred 9F
+.El
+.Ss Device ID Management
+Device IDs are a means of establishing a unique ID for a device in the
+kernel.
+These unique IDs are generally tied to something from the device's
+hardware such as a serial number or related, but can also be fabricated
+and stored on the device.
+These device IDs are used by other subsystems like ZFS to record
+information about a device as the actual
+.Pa /devices
+path that a device resides at may change because it is moved around in
+the system.
+.Pp
+For device drivers, particularly those that represent block devices,
+they should first call
+.Xr ddi_devid_init 9F
+to initialize the device ID data structure.
+After that is done, it is then safe to call
+.Xr ddi_devid_register 9F
+to notify the kernel about the ID.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_devid_compare 9F Ta Xr ddi_devid_free 9F
+.It Xr ddi_devid_get 9F Ta Xr ddi_devid_init 9F
+.It Xr ddi_devid_register 9F Ta Xr ddi_devid_sizeof 9F
+.It Xr ddi_devid_str_decode 9F Ta Xr ddi_devid_str_encode 9F
+.It Xr ddi_devid_str_free 9F Ta Xr ddi_devid_unregister 9F
+.It Xr ddi_devid_valid 9F Ta
+.El
+.Ss Message Block Functions
+The
+.Vt "mblk_t"
+data structure is used to chain together messages which are used through
+the kernel for different subsystems including all of networking,
+terminals, STREAMS, USB, and more.
+.Pp
+Message blocks are chained together by a series of two different
+pointers:
+.Fa b_cont
+and
+.Fa b_next .
+When a message is split across multiple data buffers, they are linked by
+the
+.Fa b_cont
+pointer.
+However, multiple distinct messages can be chained together and linked
+by the
+.Fa b_next
+pointer.
+Let's look at this in the context of a series of networking packets.
+If we had a chain of say 10 UDP packets that we were given, each UDP
+packet is considered an independent message and would be linked from one
+to the next based on the order they should be transmitted with the
+.Fa b_next
+pointer.
+However, an individual message may be entirely in one message block, in
+which case its
+.Fa b_cont
+pointer would be
+.Dv NULL ,
+but if say the packet were split into a 100 byte data buffer that
+contained the headers and then a 1000 byte data buffer that contained
+the actual packet data, those two would be linked together by
+.Fa b_cont .
+A continued message would never have its next pointer used to link it to
+a wholly different message.
+Visually you might see this as:
+.Bd -literal
+  +---------------+
+  | UDP Message 0 |
+  | Bytes 0-1100  |
+  | b_cont     ---+--> NULL
+  | b_next  +     |
+  +---------|-----+
+            |
+            v
+  +---------------+    +----------------+
+  | UDP Message 1 |    | UDP Message 1+ |
+  | Bytes 0-100   |    | Bytes 100-1100 |
+  | b_cont     ---+--> | b_cont     ----+->NULL
+  | b_next  +     |    | b_next     ----+->NULL
+  +---------|-----+    +----------------+
+            |
+           ...
+            |
+            v
+  +---------------+
+  | UDP Message 9 |
+  | Bytes 0-1100  |
+  | b_cont     ---+--> NULL
+  | b_next     ---+--> NULL
+  +---------------+
+.Ed
+.Pp
+Message blocks all have an associated data block which contains the
+actual data that is present.
+Multiple message blocks can share the same data block as well.
+The data block has a notion of a type, which is generally
+.Dv M_DATA
+which signifies that they operate on data.
+.Pp
+To allocate message blocks, one generally uses the
+.Xr allocb 9F
+function to create one; however, you can also create message blocks
+using your own source of data through functions like
+.Xr desballoc 9F .
+This is generally used when one wants to use memory that was originally
+used for DMA to pass data back into the kernel, such as in a networking
+device driver.
+When this happens, a callback function will be called once the last user
+of the data block is done with it.
+.Pp
+The functions listed below often end in either
+.Dq msg
+or
+.Dq b
+to indicate that they will operate on an entire message and follow the
+.Fa b_cont
+pointer or they will not respectively.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr adjmsg 9F Ta Xr allocb 9F
+.It Xr copyb 9F Ta Xr copymsg 9F
+.It Xr datamsg 9F Ta Xr desballoc 9F
+.It Xr desballoca 9F Ta Xr dupb 9F
+.It Xr dupmsg 9F Ta Xr esballoc 9F
+.It Xr esballoca 9F Ta Xr freeb 9F
+.It Xr freemsg 9F Ta Xr linkb 9F
+.It Xr mcopymsg 9F Ta Xr msgdsize 9F
+.It Xr msgpullup 9F Ta Xr msgsize 9F
+.It Xr pullupmsg 9F Ta Xr rmvb 9F
+.It Xr testb 9F Ta Xr unlinkb 9F
+.El
+.Ss Upgradable Firmware Modules
+The UFM
+.Pq Upgradable Firmware Module
+subsystem is used to grant the system observability into firmware that
+exists persistently on a device.
+These functions are intended for use by drivers that are participating in
+the kernel's UFM framework, which is discussed in
+.Xr ddi_ufm 9E .
+.Pp
+The
+.Xr ddi_ufm_init 9E
+and
+.Xr ddi_ufm_fini 9E
+functions are used to indicate support of the subsystem to the kernel.
+The driver is required to use the
+.Xr ddi_ufm_update 9F
+function to indicate both that it is ready to receive UFM requests and
+to indicate that any data that the kernel may have previously received
+has changed.
+Once that's completed, then the other functions listed here are
+generally used as part of implementing specific callback functions that
+are registered.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_ufm_fini 9F Ta Xr ddi_ufm_image_set_desc 9F
+.It Xr ddi_ufm_image_set_misc 9F Ta Xr ddi_ufm_image_set_nslots 9F
+.It Xr ddi_ufm_init 9F Ta Xr ddi_ufm_slot_set_attrs 9F
+.It Xr ddi_ufm_slot_set_imgsize 9F Ta Xr ddi_ufm_slot_set_misc 9F
+.It Xr ddi_ufm_slot_set_version 9F Ta Xr ddi_ufm_update 9F
+.El
+.Ss Firmware Loading
+Some hardware devices have firmware that is not stored as part of the
+device itself and must instead be sent to the device each time it is
+powered on.
+These routines help drivers that need to perform this read such data
+from the file system from well-known locations in the operating system.
+To begin with, a driver should call
+.Xr firmware_open 9F
+to open a handle to the firmware file.
+At that point, one can determine the size of the file with the
+.Xr firmware_get_size 9F
+function and allocate the appropriate sized memory buffer to read it in.
+Callers should always check what the size of the returned file is and
+should not just blindly pass that size off to the kernel memory
+allocator.
+For example, if a file was over 100 MiB in size, then one should not
+assume that they're going to just blindly allocate 100 MiB of kernel
+memory and should instead perform incremental reads and sends to a
+device that are smaller in size.
+.Pp
+A driver can then go through and perform arbitrary reads of the firmware
+file through the
+.Xr firmware_read 9F
+interface until they have read everything that they need.
+Once complete, the corresponding handle needs to be released through the
+.Xr firmware_close 9F
+function.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr firmware_close 9F Ta Xr firmware_get_size 9F
+.It Xr firmware_open 9F Ta Xr firmware_read 9F
+.El
+.Ss Fault Management Handling
+These functions allow device drivers to harden themselves against errors
+that might occur while interfacing with devices and tie into the broader
+fault management architecture.
+.Pp
+To begin, a driver must declare which capabilities it implements during
+its
+.Xr attach 9E
+function by calling
+.Xr ddi_fm_init 9F .
+The set of capabilities it receives back may be less than what was
+requested because the capabilities are dependent on the overall chain of
+drivers present.
+.Pp
+If
+.Dv DDI_FM_EREPORT_CAPABLE
+was negotiated, then the driver is expected to generate error events
+when certain conditions occur using the
+.Xr ddi_fm_ereport_post 9F
+function or the more specific
+.Xr pci_ereport_post 9F
+function.
+If a caller has negotiated
+.Dv DDI_FM_ACCCHK_CAPABLE ,
+then it is allowed to set up its register attributes to indicate that it
+will check for errors on the register handle after using functions like
+.Xr ddi_get8 9F
+and
+.Xr ddi_set8 9F
+by calling
+.Xr ddi_fm_acc_err_get 9F
+and reacting accordingly.
+Similarly, if a driver has negotiated
+.Dv DDI_FM_DMACHK_CAPABLE ,
+then it will use
+.Xr ddi_check_dma_handle 9F
+to check the results of DMA activity and handle the results
+appropriately.
+Similar to register accesses, the DMA attributes must be updated to set
+that error handling is anticipated on this handle.
+The
+.Xr ddi_fm_init 9F
+manual page has an overview of the other types of flags that can be
+negotiated and how they are used.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_check_acc_handle 9F Ta Xr ddi_check_dma_handle 9F
+.It Xr ddi_dev_report_fault 9F Ta Xr ddi_fm_acc_err_clear 9F
+.It Xr ddi_fm_acc_err_get 9F Ta Xr ddi_fm_capable 9F
+.It Xr ddi_fm_dma_err_clear 9F Ta Xr ddi_fm_dma_err_get 9F
+.It Xr ddi_fm_ereport_post 9F Ta Xr ddi_fm_fini 9F
+.It Xr ddi_fm_handler_register 9F Ta Xr ddi_fm_handler_unregister 9F
+.It Xr ddi_fm_init 9F Ta Xr ddi_fm_service_impact 9F
+.It Xr pci_ereport_post 9F Ta Xr pci_ereport_setup 9F
+.It Xr pci_ereport_teardown 9F Ta
+.El
+.Ss SCSI and SAS Device Driver Functions
+These functions are for use by SCSI and SAS device drivers that leverage
+the kernel's frameworks.
+Other device drivers should not use these.
+For more background on these, some of the general concepts are discussed
+in
+.Xr iport 9 ,
+.Xr phymap 9 ,
+and
+.Xr tgtmap 9 .
+.Pp
+Device drivers register initially with the kernel by using the
+.Xr scsi_ha_init 9F
+function and then, in their attach routine, register specific instances,
+using functions like
+.Xr scsi_hba_iport_register 9F
+or instead
+.Xr scsi_hba_tran_alloc 9F
+and
+.Xr scsi_hba_attach_setup 9F .
+New drivers are encouraged to use the target map and iports framework to
+simplify the device driver writing process.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr makecom_g0_s 9F Ta Xr makecom_g0 9F
+.It Xr makecom_g1 9F Ta Xr makecom_g5 9F
+.It Xr makecom 9F Ta Xr sas_phymap_create 9F
+.It Xr sas_phymap_destroy 9F Ta Xr sas_phymap_lookup_ua 9F
+.It Xr sas_phymap_lookup_uapriv 9F Ta Xr sas_phymap_phy_add 9F
+.It Xr sas_phymap_phy_rem 9F Ta Xr sas_phymap_phy2ua 9F
+.It Xr sas_phymap_phys_free 9F Ta Xr sas_phymap_phys_next 9F
+.It Xr sas_phymap_ua_free 9F Ta Xr sas_phymap_ua2phys 9F
+.It Xr sas_phymap_uahasphys 9F Ta Xr scsi_abort 9F
+.It Xr scsi_address_device 9F Ta Xr scsi_alloc_consistent_buf 9F
+.It Xr scsi_cname 9F Ta Xr scsi_destroy_pkt 9F
+.It Xr scsi_device_hba_private_get 9F Ta Xr scsi_device_hba_private_set 9F
+.It Xr scsi_device_unit_address 9F Ta Xr scsi_dmafree 9F
+.It Xr scsi_dmaget 9F Ta Xr scsi_dname 9F
+.It Xr scsi_errmsg 9F Ta Xr scsi_ext_sense_fields 9F
+.It Xr scsi_find_sense_descr 9F Ta Xr scsi_free_consistent_buf 9F
+.It Xr scsi_free_wwnstr 9F Ta Xr scsi_get_device_type_scsi_options 9F
+.It Xr scsi_get_device_type_string 9F Ta Xr scsi_hba_attach_setup 9F
+.It Xr scsi_hba_detach 9F Ta Xr scsi_hba_fini 9F
+.It Xr scsi_hba_init 9F Ta Xr scsi_hba_iport_exist 9F
+.It Xr scsi_hba_iport_find 9F Ta Xr scsi_hba_iport_register 9F
+.It Xr scsi_hba_iport_unit_address 9F Ta Xr scsi_hba_iportmap_create 9F
+.It Xr scsi_hba_iportmap_destroy 9F Ta Xr scsi_hba_iportmap_iport_add 9F
+.It Xr scsi_hba_iportmap_iport_remove 9F Ta Xr scsi_hba_lookup_capstr 9F
+.It Xr scsi_hba_pkt_alloc 9F Ta Xr scsi_hba_pkt_comp 9F
+.It Xr scsi_hba_pkt_free 9F Ta Xr scsi_hba_probe 9F
+.It Xr scsi_hba_tgtmap_create 9F Ta Xr scsi_hba_tgtmap_destroy 9F
+.It Xr scsi_hba_tgtmap_scan_luns 9F Ta Xr scsi_hba_tgtmap_set_add 9F
+.It Xr scsi_hba_tgtmap_set_begin 9F Ta Xr scsi_hba_tgtmap_set_end 9F
+.It Xr scsi_hba_tgtmap_set_flush 9F Ta Xr scsi_hba_tgtmap_tgt_add 9F
+.It Xr scsi_hba_tgtmap_tgt_remove 9F Ta Xr scsi_hba_tran_alloc 9F
+.It Xr scsi_hba_tran_free 9F Ta Xr scsi_ifgetcap 9F
+.It Xr scsi_ifsetcap 9F Ta Xr scsi_init_pkt 9F
+.It Xr scsi_log 9F Ta Xr scsi_mname 9F
+.It Xr scsi_pktalloc 9F Ta Xr scsi_pktfree 9F
+.It Xr scsi_poll 9F Ta Xr scsi_probe 9F
+.It Xr scsi_resalloc 9F Ta Xr scsi_reset_notify 9F
+.It Xr scsi_reset 9F Ta Xr scsi_resfree 9F
+.It Xr scsi_rname 9F Ta Xr scsi_sense_asc 9F
+.It Xr scsi_sense_ascq 9F Ta Xr scsi_sense_cmdspecific_uint64 9F
+.It Xr scsi_sense_info_uint64 9F Ta Xr scsi_sense_key 9F
+.It Xr scsi_setup_cdb 9F Ta Xr scsi_slave 9F
+.It Xr scsi_sname 9F Ta Xr scsi_sync_pkt 9F
+.It Xr scsi_transport 9F Ta Xr scsi_unprobe 9F
+.It Xr scsi_unslave 9F Ta Xr scsi_validate_sense 9F
+.It Xr scsi_vu_errmsg 9F Ta Xr scsi_wwn_to_wwnstr 9F
+scsi_wwnstr_to_wwn
+.El
+.Ss Block Device Buffer Handling
+Block devices operate with a data structure called the
+.Vt struct buf
+which is described in
+.Xr buf 9S .
+This structure is used to represent a given block request and is used
+heavily in block devices, the SCSI/SAS framework, and the blkdev
+framework.
+The functions described here are used to manipulate these structures in
+various ways such as copying them around, indicating error conditions,
+or indicating when the I/O operation is done.
+By default, this memory is not mapped into the kernel's address space so
+several functions such as
+.Xr bp_mapin 9F
+are present to allow for that to happen when required.
+.Pp
+To initially obtain a
+.Vt struct buf ,
+drivers should begin by calling
+.Xr getrbuf 9S
+at which point, the caller can fill in the structure.
+Once that's done, the
+.Xr physio 9F
+function can be used to actually perform the I/O and wait until it's
+complete.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr bioclone 9F Ta Xr biodone 9F
+.It Xr bioerror 9F Ta Xr biofini 9F
+.It Xr bioinit 9F Ta Xr biomodified 9F
+.It Xr bioreset 9F Ta Xr biosize 9F
+.It Xr biowait 9F Ta Xr bp_mapin 9F
+.It Xr bp_mapout 9F Ta Xr clrbuf 9F
+.It Xr disksort 9F Ta Xr freerbuf 9F
+.It Xr geterror 9F Ta Xr getrbuf 9F
+.It Xr minphys 9F Ta Xr physio 9F
+.El
+.Ss Networking Device Driver Functions
+These functions are for networking device drivers that implant the MAC,
+GLDv3 interfaces.
+The full framework and how to use it is described in
+.Xr mac 9E .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr mac_alloc 9F Ta Xr mac_fini_ops 9F
+.It Xr mac_free 9F Ta Xr mac_hcksum_get 9F
+.It Xr mac_hcksum_set 9F Ta Xr mac_init_ops 9F
+.It Xr mac_link_update 9F Ta Xr mac_lso_get 9F
+.It Xr mac_maxsdu_update 9F Ta Xr mac_prop_info_set_default_fec 9F
+.It Xr mac_prop_info_set_default_link_flowctrl 9F Ta Xr mac_prop_info_set_default_str 9F
+.It Xr mac_prop_info_set_default_uint32 9F Ta Xr mac_prop_info_set_default_uint64 9F
+.It Xr mac_prop_info_set_default_uint8 9F Ta Xr mac_prop_info_set_perm 9F
+.It Xr mac_prop_info_set_range_uint32 9F Ta Xr mac_prop_info 9F
+.It Xr mac_register 9F Ta Xr mac_ring_rx 9F
+.It Xr mac_rx 9F Ta Xr mac_transceiver_info_set_present 9F
+.It Xr mac_transceiver_info_set_usable 9F Ta Xr mac_transceiver_info 9F
+.It Xr mac_tx_ring_update 9F Ta Xr mac_tx_update 9F
+.It Xr mac_unregister 9F Ta
+.El
+.Ss USB Device Driver Functions
+These functions are designed for USB device drivers.
+To first initialize with the kernel, a device driver must call
+.Xr usb_client_attach 9F
+and then
+.Xr usb_get_dev_data 9F .
+The latter call is required to get access to the USB-level
+descriptors about the device which describe what kinds of USB endpoints
+.Pq control, bulk, interrupt, or isochronous
+exist on the device as well as how many different interfaces and
+configurations are present.
+.Pp
+Once a given configuration, sometimes the default, is selected, then the
+driver can proceed to opening up what the USB architecture calls a pipe,
+which provides a way to send requests to a specific USB endpoint.
+First, specific endpoints can be looked up using the
+.Xr usb_lookup_ep_data 9F
+function which gets information from the parsed descriptors and then
+that gets filled into an extended descriptor with
+.Xr usb_ep_xdescr_fill 9F .
+With that in hand, a pipe can be opened with
+.Xr usb_pipe_xopen 9F .
+.Pp
+Once a pipe has been opened, which most often happens in a driver's
+.Xr attach 9E
+entry point, then requests can be allocated and submitted.
+There is a different allocation for each type of request
+.Po
+e.g.
+.Xr usb_alloc_bulk_req 9F
+.Pc
+and a different submission function for each type as well.
+Each request structure has a corresponding page in section 9S that
+describes the structure, its members, and how to work with it.
+.Pp
+One other major concern for USB devices, which isn't as common with
+other types of devices, is that they can be yanked out and reinserted
+at any time.
+To help determine when this happens, the kernel offers the
+.Xr usb_register_event_cbs 9F
+function which allows a driver to register for callbacks when a device
+is disconnected, reconnected, or around checkpoint suspend/resume
+behavior.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr usb_alloc_bulk_req 9F Ta Xr usb_alloc_ctrl_req 9F
+.It Xr usb_alloc_intr_req 9F Ta Xr usb_alloc_isoc_req 9F
+.It Xr usb_alloc_request 9F Ta Xr usb_client_attach 9F
+.It Xr usb_client_detach 9F Ta Xr usb_clr_feature 9F
+.It Xr usb_create_pm_components 9F Ta Xr usb_ep_xdescr_fill 9F
+.It Xr usb_free_bulk_req 9F Ta Xr usb_free_ctrl_req 9F
+.It Xr usb_free_descr_tree 9F Ta Xr usb_free_dev_data 9F
+.It Xr usb_free_intr_req 9F Ta Xr usb_free_isoc_req 9F
+.It Xr usb_get_addr 9F Ta Xr usb_get_alt_if 9F
+.It Xr usb_get_cfg 9F Ta Xr usb_get_current_frame_number 9F
+.It Xr usb_get_dev_data 9F Ta Xr usb_get_if_number 9F
+.It Xr usb_get_max_pkts_per_isoc_request 9F Ta Xr usb_get_status 9F
+.It Xr usb_get_string_descr 9F Ta Xr usb_handle_remote_wakeup 9F
+.It Xr usb_lookup_ep_data 9F Ta Xr usb_owns_device 9F
+.It Xr usb_parse_data 9F Ta Xr usb_pipe_bulk_xfer 9F
+.It Xr usb_pipe_close 9F Ta Xr usb_pipe_ctrl_xfer_wait 9F
+.It Xr usb_pipe_ctrl_xfer 9F Ta Xr usb_pipe_drain_reqs 9F
+.It Xr usb_pipe_get_max_bulk_transfer_size 9F Ta Xr usb_pipe_get_private 9F
+.It Xr usb_pipe_get_state 9F Ta Xr usb_pipe_intr_xfer 9F
+.It Xr usb_pipe_isoc_xfer 9F Ta Xr usb_pipe_open 9F
+.It Xr usb_pipe_reset 9F Ta Xr usb_pipe_set_private 9F
+.It Xr usb_pipe_stop_intr_polling 9F Ta Xr usb_pipe_stop_isoc_polling 9F
+.It Xr usb_pipe_xopen 9F Ta Xr usb_print_descr_tree 9F
+.It Xr usb_register_hotplug_cbs 9F Ta Xr usb_reset_device 9F
+.It Xr usb_set_alt_if 9F Ta Xr usb_set_cfg 9F
+.It Xr usb_unregister_hotplug_cbs 9F Ta
+.El
+.Ss PCI Device Driver Functions
+These functions are specific for PCI and PCI Express based device
+drivers and are intended to be used to get access to PCI configuration
+space.
+For normal PCI base address registers
+.Pq BARs
+instead see
+.Sx Register Setup and Access .
+.Pp
+To access PCI configuration space, a device driver should first call
+.Xr pci_config_setup 9F .
+Generally, drivers will call this in their
+.Xr attach 9E
+entry point and then tear down the configuration space access with the
+.Xr pci_config_teardown 9F
+entry point in
+.Xr detach 9E .
+After setting up access to configuration space, the returned handle can
+be used in all of the various configuration space routines to get and
+set specific sized values in configuration space.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr pci_config_get8 9F Ta Xr pci_config_get16 9F
+.It Xr pci_config_get32 9F Ta Xr pci_config_get64 9F
+.It Xr pci_config_put8 9F Ta Xr pci_config_put16 9F
+.It Xr pci_config_put32 9F Ta Xr pci_config_put64 9F
+.It Xr pci_config_setup 9F Ta Xr pci_config_teardown 9F
+.It Xr pci_report_pmcap 9F Ta Xr pci_restore_config_regs 9F
+.It Xr pci_save_config_regs 9F Ta
+.El
+.Ss USB Host Controller Interface Functions
+These routines are used for device drivers which implement the USB
+host controller interfaces described in
+.Xr usba_hcdi 9E .
+Other types of devices drivers and modules should not call these
+functions.
+In particular, if one is writing a device driver for a USB device, these
+are not the routines you're looking for and you want to see
+.Sx USB Device Driver Functions .
+These are what the
+.Xr ehci 4D
+or
+.Xr xhci 4D
+drivers use to provide services that USB drivers use via the kernel USB
+architecture.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr usba_alloc_hcdi_ops 9F Ta Xr usba_free_hcdi_ops 9F
+.It Xr usba_hcdi_cb 9F Ta Xr usba_hcdi_dup_intr_req 9F
+.It Xr usba_hcdi_dup_isoc_req 9F Ta Xr usba_hcdi_get_device_private 9F
+.It Xr usba_hcdi_register 9F Ta Xr usba_hcdi_unregister 9F
+.It Xr usba_hubdi_bind_root_hub 9F Ta Xr usba_hubdi_cb_ops 9F
+.It Xr usba_hubdi_close 9F Ta Xr usba_hubdi_dev_ops 9F
+.It Xr usba_hubdi_ioctl 9F Ta Xr usba_hubdi_open 9F
+.It Xr usba_hubdi_root_hub_power 9F Ta Xr usba_hubdi_unbind_root_hub 9F
+.El
+.Ss Functions for PCMCIA Drivers
+These functions exist for older PCMCIA device drivers.
+These should not otherwise be used by the system.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr csx_AccessConfigurationRegister 9F Ta Xr csx_ConvertSize 9F
+.It Xr csx_ConvertSpeed 9F Ta Xr csx_CS_DDI_Info 9F
+.It Xr csx_DeregisterClient 9F Ta Xr csx_DupHandle 9F
+.It Xr csx_Error2Text 9F Ta Xr csx_Event2Text 9F
+.It Xr csx_FreeHandle 9F Ta Xr csx_Get16 9F
+.It Xr csx_Get32 9F Ta Xr csx_Get64 9F
+.It Xr csx_Get8 9F Ta Xr csx_GetEventMask 9F
+.It Xr csx_GetFirstClient 9F Ta Xr csx_GetFirstTuple 9F
+.It Xr csx_GetHandleOffset 9F Ta Xr csx_GetMappedAddr 9F
+.It Xr csx_GetNextClient 9F Ta Xr csx_GetNextTuple 9F
+.It Xr csx_GetStatus 9F Ta Xr csx_GetTupleData 9F
+.It Xr csx_MakeDeviceNode 9F Ta Xr csx_MapLogSocket 9F
+.It Xr csx_MapMemPage 9F Ta Xr csx_ModifyConfiguration 9F
+.It Xr csx_ModifyWindow 9F Ta Xr csx_Parse_CISTPL_BATTERY 9F
+.It Xr csx_Parse_CISTPL_BYTEORDER 9F Ta Xr csx_Parse_CISTPL_CFTABLE_ENTRY 9F
+.It Xr csx_Parse_CISTPL_CONFIG 9F Ta Xr csx_Parse_CISTPL_DATE 9F
+.It Xr csx_Parse_CISTPL_DEVICE_A 9F Ta Xr csx_Parse_CISTPL_DEVICE_OA 9F
+.It Xr csx_Parse_CISTPL_DEVICE_OC 9F Ta Xr csx_Parse_CISTPL_DEVICE 9F
+.It Xr csx_Parse_CISTPL_DEVICEGEO_A 9F Ta Xr csx_Parse_CISTPL_DEVICEGEO 9F
+.It Xr csx_Parse_CISTPL_FORMAT 9F Ta Xr csx_Parse_CISTPL_FUNCE 9F
+.It Xr csx_Parse_CISTPL_FUNCID 9F Ta Xr csx_Parse_CISTPL_GEOMETRY 9F
+.It Xr csx_Parse_CISTPL_JEDEC_A 9F Ta Xr csx_Parse_CISTPL_JEDEC_C 9F
+.It Xr csx_Parse_CISTPL_LINKTARGET 9F Ta Xr csx_Parse_CISTPL_LONGLINK_A 9F
+.It Xr csx_Parse_CISTPL_LONGLINK_C 9F Ta Xr csx_Parse_CISTPL_LONGLINK_MFC 9F
+.It Xr csx_Parse_CISTPL_MANFID 9F Ta Xr csx_Parse_CISTPL_ORG 9F
+.It Xr csx_Parse_CISTPL_SPCL 9F Ta Xr csx_Parse_CISTPL_SWIL 9F
+.It Xr csx_Parse_CISTPL_VERS_1 9F Ta Xr csx_Parse_CISTPL_VERS_2 9F
+.It Xr csx_ParseTuple 9F Ta Xr csx_Put16 9F
+.It Xr csx_Put32 9F Ta Xr csx_Put64 9F
+.It Xr csx_Put8 9F Ta Xr csx_RegisterClient 9F
+.It Xr csx_ReleaseConfiguration 9F Ta Xr csx_ReleaseIO 9F
+.It Xr csx_ReleaseIRQ 9F Ta Xr csx_ReleaseSocketMask 9F
+.It Xr csx_ReleaseWindow 9F Ta Xr csx_RemoveDeviceNode 9F
+.It Xr csx_RepGet16 9F Ta Xr csx_RepGet32 9F
+.It Xr csx_RepGet64 9F Ta Xr csx_RepGet8 9F
+.It Xr csx_RepPut16 9F Ta Xr csx_RepPut32 9F
+.It Xr csx_RepPut64 9F Ta Xr csx_RepPut8 9F
+.It Xr csx_RequestConfiguration 9F Ta Xr csx_RequestIO 9F
+.It Xr csx_RequestIRQ 9F Ta Xr csx_RequestSocketMask 9F
+.It Xr csx_RequestWindow 9F Ta Xr csx_ResetFunction 9F
+.It Xr csx_SetEventMask 9F Ta Xr csx_SetHandleOffset 9F
+.It Xr csx_ValidateCIS 9F Ta
+.El
+.Ss STREAMS related functions
+These functions are meant to be used when interacting with STREAMS
+devices or when implementing one.
+When a STREAMS driver is opened, it receives messages on a queue which
+are then processed and can be sent back.
+As different queues are often linked together, the most common thing is
+to process a message and then pass the message onto the next queue using
+the
+.Xr putnext 9F
+function.
+.Pp
+STREAMS messages are passed around using message blocks, which use the
+.Vt mblk_t
+type.
+See
+.Sx Message Block Functions
+for more about how the data structure and functions that manipulate
+message blocks.
+.Pp
+These functions should generally not be used when implementing a
+networking device driver today.
+See
+.Xr mac 9E
+instead.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr backq 9F Ta Xr bcanput 9F
+.It Xr bcanputnext 9F Ta Xr canput 9F
+.It Xr canputnext 9F Ta Xr enableok 9F
+.It Xr flushband 9F Ta Xr flushq 9F
+.It Xr freezestr 9F Ta Xr getq 9F
+.It Xr insq 9F Ta Xr merror 9F
+.It Xr mexchange 9F Ta Xr noenable 9F
+.It Xr put 9F Ta Xr putbq 9F
+.It Xr putctl 9F Ta Xr putctl1 9F
+.It Xr putnext 9F Ta Xr putnextctl 9F
+.It Xr putnextctl1 9F Ta Xr putq 9F
+.It Xr mt-streams 9F Ta Xr qassociate 9F
+.It Xr qenable 9F Ta Xr qprocsoff 9F
+.It Xr qprocson 9F Ta Xr qreply 9F
+.It Xr qsize 9F Ta Xr qwait_sig 9F
+.It Xr qwait 9F Ta Xr qwriter 9F
+.It Xr OTHERQ 9F Ta Xr RD 9F
+.It Xr rmvq 9F Ta Xr SAMESTR 9F
+.It Xr unfreezestr 9F Ta Xr WR 9F
+.El
+.Ss STREAMS ioctls
+The following functions are used when a STREAMS-based device driver is
+processing its
+.Xr ioctl 9E
+entry point.
+Unlike character and block devices, STREAMS ioctls are passed around in
+message blocks and copying data in and out of userland as STREAMS
+ioctls are generally always processed in
+.Sy kernel
+context.
+This means that the normal functions like
+.Xr ddi_copyin 9F
+and
+.Xr ddi_copyout 9F
+cannot be used.
+Instead, when a message block has a type of
+.Dv M_IOCTL ,
+then these routines can often be used to convert the structure into one
+that asks for data to be copied in, copied out, or to finally
+acknowledge the ioctl as successful or to terminate the processing in
+error.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr mcopyin 9F Ta Xr mcopyout 9F
+.It Xr mioc2ack 9F Ta Xr miocack 9F
+.It Xr miocnak 9F Ta Xr miocpullup 9F
+.It Xr mkiocb 9F Ta
+.El
+.Ss chpoll(9E) Related Functions
+These functions are present in service of the
+.Xr chpoll 9E
+interface which is used to support the traditional
+.Xr poll 2 ,
+and
+.Xr select 3C
+interfaces as well as event ports through the
+.Xr port_get 3C
+interface.
+See
+.Xr chpoll 9E
+for the specific cases this should be called.
+If a device driver does not implement the
+.Xr chpoll 9E
+character device entry point, then these functions should not be used.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr pollhead_clean 9F Ta Xr pollwakeup 9F
+.El
+.Ss Kernel Statistics
+The kernel statistics or kstat framework provides an easy way of
+exporting statistic information to be consumed outside of the kernel.
+Users can interface with this data via
+.Xr kstat 8
+and the corresponding kstat library discussed in
+.Xr kstat 3KSTAT .
+.Pp
+Kernel statistics are grouped using a tuple of four identifiers,
+separated by colons when using
+.Xr kstat 8 .
+These are, in order, the statistic module name, instance, a name
+which covers a group of statistics, and an individual name for a
+statistic.
+In addition, kernel statistics have a class which is used to group
+similar named groups of statistics together across devices.
+When using
+.Xr kstat_create 9F ,
+drivers specify the first three parts of the tuple and the class.
+The naming of individual statistics, the last part of the tuple, varies
+based upon the type of the statistic.
+For the most part, drivers will use the kstat type
+.Dv KSTAT_TYPE_NAMED ,
+which allows multiple name-value pairs to exist within the statistic.
+For example, the kernel's layer 2 networking framework,
+.Xr mac 9E ,
+creates a kstat with the driver's name and instance and names it
+.Dq mac .
+Within this named group, there are statistics for all of the different
+individual stats that the kernel and devices track such as bytes
+transmitted and received, the state and speed of the link, and
+advertised and enabled capabilities.
+.Pp
+A device driver can initialize a kstat with the
+.Xr kstat_create 9F
+function.
+It will not be made accessible to users until the
+.Xr kstat_install 9F
+function is called.
+The device driver must perform additional initialization of the kstat
+before proceeding and calling
+.Xr kstat_install 9F .
+The kstat structure that drivers see is discussed in
+.Xr kstat 9S .
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr kstat_create 9F Ta Xr kstat_delete 9F
+.It Xr kstat_install 9F Ta Xr kstat_named_init 9F
+.It Xr kstat_named_setstr 9F Ta Xr kstat_queue 9F
+.It Xr kstat_runq_back_to_waitq 9F Ta Xr kstat_runq_enter 9F
+.It Xr kstat_runq_exit 9F Ta Xr kstat_waitq_enter 9F
+.It Xr kstat_waitq_exit 9F Ta Xr kstat_waitq_to_runq 9F
+.El
+.Ss NDI Events
+These functions are used to allow a device driver to register for
+certain events that might occur to its device or a parent in the tree
+and receive a callback function when they occur.
+A good example of this is when a device has been removed from the system
+such as someone just pulling out a USB device or NVMe U.2 device.
+The event handlers work by first getting a cookie that names the type of
+event with
+.Xr ddi_get_eventcookie 9F
+and then registering the callback with
+.Xr ddi_add_event_handler 9F .
+.Pp
+The
+.Xr ddi_cb_register 9F
+function is used to collect over classes of events such as when
+participating in dynamic interrupt sharing.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_add_event_handler 9F Ta Xr ddi_cb_register 9F
+.It Xr ddi_cb_unregister 9F Ta Xr ddi_get_eventcookie 9F
+.It Xr ddi_remove_event_handler 9F Ta
+.El
+.Ss Layered Device Interfaces
+The LDI
+.Pq Layered Device Interface
+provides a mechanism for a driver to open up another device in the
+kernel and begin calling basic operations on the device as though the
+calling driver were a normal user process.
+Through the LDI, drivers can perform equivalents to the basic file
+.Xr read 2
+and
+.Xr write 2
+calls, look up properties on the device, perform networking style calls
+ala
+.Xr getmsg 2
+and
+.Xr pumsg 2 ,
+and register callbacks to be called when something happens to the
+underlying device.
+For example, the ZFS file system uses the LDI to open and operate on
+block devices.
+.Pp
+Before opening a device itself, callers must obtain a notion of their
+identity which is used when making subsequent calls.
+The simplest form is often to use the device's
+.Vt dev_info_t
+and call
+.Xr ldi_ident_from_dip 9F ;
+however, there are also methods available based upon having a
+.Vt dev_t
+or a STREAMS
+.Vt struct queue .
+.Pp
+Once that identity is established, there are several ways to open a
+device such as
+.Xr ldi_open_by_dev 9F ,
+.Xr ldi_open_by_devid 9F ,
+or
+.Xr ldi_open_by_name 9F .
+Once an LDI device has been opened, then all of the other functions may
+be used to operate on the device; however, consumers of the LDI must
+think carefully about what kind of device they are opening.
+While a kernel pseudo-device driver cannot disappear while it is open,
+when the device represents an actual piece of hardware, it is possible
+for it to be physically removed and no longer be accessible.
+Consumers should not assume that a layered device will always be
+present.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ldi_add_event_handler 9F Ta Xr ldi_aread 9F
+.It Xr ldi_awrite 9F Ta Xr ldi_close 9F
+.It Xr ldi_devmap 9F Ta Xr ldi_dump 9F
+.It Xr ldi_ev_finalize 9F Ta Xr ldi_ev_get_cookie 9F
+.It Xr ldi_ev_get_type 9F Ta Xr ldi_ev_notify 9F
+.It Xr ldi_ev_register_callbacks 9F Ta Xr ldi_ev_remove_callbacks 9F
+.It Xr ldi_get_dev 9F Ta Xr ldi_get_devid 9F
+.It Xr ldi_get_eventcookie 9F Ta Xr ldi_get_minor_name 9F
+.It Xr ldi_get_otyp 9F Ta Xr ldi_get_size 9F
+.It Xr ldi_getmsg 9F Ta Xr ldi_ident_from_dev 9F
+.It Xr ldi_ident_from_dip 9F Ta Xr ldi_ident_from_stream 9F
+.It Xr ldi_ident_release 9F Ta Xr ldi_ioctl 9F
+.It Xr ldi_open_by_dev 9F Ta Xr ldi_open_by_devid 9F
+.It Xr ldi_open_by_name 9F Ta Xr ldi_poll 9F
+.It Xr ldi_prop_exists 9F Ta Xr ldi_prop_get_int 9F
+.It Xr ldi_prop_get_int64 9F Ta Xr ldi_prop_lookup_byte_array 9F
+.It Xr ldi_prop_lookup_int_array 9F Ta Xr ldi_prop_lookup_int64_array 9F
+.It Xr ldi_prop_lookup_string_array 9F Ta Xr ldi_prop_lookup_string 9F
+.It Xr ldi_putmsg 9F Ta Xr ldi_read 9F
+.It Xr ldi_remove_event_handler 9F Ta Xr ldi_strategy 9F
+.It Xr ldi_write 9F Ta
+.El
+.Ss Signal Manipulation
+These utility functions all relate to understanding whether or not a
+process can receive a signal an actually delivering one to a process
+from a driver.
+This interface is specific to device drivers and should not be used by
+the broader kernel.
+These interfaces are not recommended and should only be used after
+consultation.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_can_receive_sig 9F Ta Xr proc_ref 9F
+.It Xr proc_signal 9F Ta Xr proc_unref 9F
+.El
+.Ss Getting at Surrounding Context
+These functions allow a driver to better understand its current context.
+For example, some drivers have to deal with providing polled I/O or take
+special care as part of creating a kernel crash dump.
+These cases may need to call the
+.Xr ddi_in_panic 9F
+function.
+The other functions generally provie a way to get at information such as
+the process ID or other information from the system; however, this
+generally should not be needed or used.
+Almost all values exposed by say
+.Xr drv_getparm 9F
+have more usable first-class methods of getting at the data.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_get_kt_did 9F Ta Xr ddi_get_pid 9F
+.It Xr ddi_in_panic 9F Ta Xr drv_getparm 9F
+.El
+.Ss Driver Memory Mapping
+These functions are present for device drivers that implement the
+.Xr devmap 9E
+or
+.Xr segmap 9E
+entry points.
+The
+.Xr ddi_umem_alloc 9F
+routines are used to allocate and lock memory that can later be used as
+part of passing this memory to userland through the mapping entry
+points.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_devmap_segmap 9F Ta Xr ddi_mmap_get_model 9F
+.It Xr ddi_segmap_setup 9F Ta Xr ddi_segmap 9F
+.It Xr ddi_umem_alloc 9F Ta Xr ddi_umem_free 9F
+.It Xr ddi_umem_iosetup 9F Ta Xr ddi_umem_lock 9F
+.It Xr ddi_umem_unlock 9F Ta Xr ddi_unmap_regs 9F
+.It Xr devmap_default_access 9F Ta Xr devmap_devmem_setup 9F
+.It Xr devmap_do_ctxmgt 9F Ta Xr devmap_load 9F
+.It Xr devmap_set_ctx_timeout 9F Ta Xr devmap_setup 9F
+.It Xr devmap_umem_setup 9F Ta Xr devmap_unload 9F
+.El
+.Ss UTF-8, UTF-16, UTF-32, and Code Set Utilities
+These routines provide the ability to work with and deal with text in
+different encodings and code sets.
+Generally the kernel does not assume that much about the type of the text
+that it is operating in, though some subsystems will require that the
+names of things be ASCII only.
+.Pp
+The primary other locales that the system supports are generally UTF-8
+based and so the kernel provides a set of routines to deal with UTF-8
+and Unicode normalization.
+However, there are still cases where different character encodings are
+required or conversation between UTF-8 and some other type is required.
+This is provided by the kernel iconv framework, which provides a
+subset of the traditional userland iconv conversions.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr kiconv_close 9F Ta Xr kiconv_open 9F
+.It Xr kiconv 9F Ta Xr kiconvstr 9F
+.It Xr u8_strcmp 9F Ta Xr u8_textprep_str 9F
+.It Xr u8_validate 9F Ta Xr uconv_u16tou32 9F
+.It Xr uconv_u16tou8 9F Ta Xr uconv_u32tou16 9F
+.It Xr uconv_u32tou8 9F Ta Xr uconv_u8tou16 9F
+.It Xr uconv_u8tou32 9F Ta
+.El
+.Ss Raw I/O Port Access
+This group of functions provides raw access to I/O ports on architecture
+that support them.
+These functions do not allow any coordination with other callers nor is
+the validity of the port assured in any way.
+In general, device drivers should use the normal register access
+routines to access I/O ports.
+See
+.Sx Device Register Setup and Access
+for more information on the preferred way to setup and access registers.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr inb 9F Ta Xr inw 9F
+.It Xr inl 9F Ta Xr outb 9F
+.It Xr outw 9F Ta Xr outl 9F
+.El
+.Ss Power Management
+These functions are used to raise and lower the internal power levels of
+a device driver or to indicate to the kernel that the device is busy and
+therefore cannot have its power changed.
+See
+.Xr power 9E
+for additional information.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr ddi_removing_power 9F Ta Xr pm_busy_component 9F
+.It Xr pm_idle_component 9F Ta Xr pm_lower_power 9F
+.It Xr pm_power_has_changed 9F Ta Xr pm_raise_power 9F
+.It Xr pm_trans_check 9F Ta
+.El
+.Ss Network Packet Hooks
+These functions are intended to be used by device drivers that wish to
+inspect and potentially modify packets along their path through the
+networking stack.
+The most common use case is for implementing something like a network
+firewall.
+Otherwise, if looking to add support for a new protocol or other network
+processing feature, one is better off more directly integrating with the
+networking stack.
+.Pp
+To get started, drivers generally will need to first use
+.Xr net_protocol_lookup 9F
+to get a handle to say that they're interested in looking at IPv4 or
+IPv6 traffic and then can allocate an actual hook object with
+.Xr hook_alloc 9F .
+After filling out the hook, the hook can be inserted into the actual
+system with
+.Xr net_hook_register 9F .
+.Pp
+Hooks operate in the context of a networking stack.
+Every networking stack in the system is independent and therefore has
+its own set of interfaces, routing tables, settings, and related.
+Most zones have their own networking stack.
+This is the exclusive-IP option that is described in
+.Xr zoneadm 8 .
+.Pp
+Drivers can register to get a callback for every netstack in the system
+and be notified when they are created and destroyed.
+This is done by calling the
+.Xr net_instance_register 9F
+function, filling out its data structure, and then finally calling
+.Xr net_instance_regster 9F .
+Like other callback interfaces, the moment the callback functions are
+registered, drivers need to expect that they're going to be called.
+.Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
+.It Xr hook_alloc 9F Ta Xr hook_free 9F
+.It Xr net_event_notify_register 9F Ta Xr net_event_notify_unregister 9F
+.It Xr net_getifname 9F Ta Xr net_getlifaddr 9F
+.It Xr net_getmtu 9F Ta Xr net_getnetid 9F
+.It Xr net_getpmtuenabled 9F Ta Xr net_hook_register 9F
+.It Xr net_hook_unregister 9F Ta Xr net_inject_alloc 9F
+.It Xr net_inject_free 9F Ta Xr net_inject 9F
+.It Xr net_instance_alloc 9F Ta Xr net_instance_free 9F
+.It Xr net_instance_notify_register 9F Ta Xr net_instance_notify_unregister 9F
+.It Xr net_instance_protocol_unregister 9F Ta Xr net_instance_register 9F
+.It Xr net_instance_unregister 9F Ta Xr net_ispartialchecksum 9F
+.It Xr net_isvalidchecksum 9F Ta Xr net_kstat_create 9F
+.It Xr net_kstat_delete 9F Ta Xr net_lifgetnext 9F
+.It Xr net_netidtozonid 9F Ta Xr net_phygetnext 9F
+.It Xr net_phylookup 9F Ta Xr net_protocol_lookup 9F
+.It Xr net_protocol_notify_register 9F Ta Xr net_protocol_release 9F
+.It Xr net_protocol_walk 9F Ta Xr net_routeto 9F
+.It Xr net_zoneidtonetid 9F Ta Xr netinfo 9F
+.El
+.Sh SEE ALSO
+.Xr Intro 2 ,
+.Xr Intro 9 ,
+.Xr Intro 9E ,
+.Xr Intro 9S
+.Rs
+.%T illumos Developer's Guide
+.%U https://www.illumos.org/books/dev/
+.Re
+.Rs
+.%T Writing Device Drivers
+.%U https://www.illumos.org/books/wdd/
+.Re

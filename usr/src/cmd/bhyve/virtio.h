@@ -442,4 +442,9 @@ uint64_t vi_pci_read(struct vmctx *ctx, struct pci_devinst *pi,
 		     int baridx, uint64_t offset, int size);
 void	vi_pci_write(struct vmctx *ctx, struct pci_devinst *pi,
 		     int baridx, uint64_t offset, int size, uint64_t value);
+
+#ifndef __FreeBSD__
+void	vi_vq_init(struct virtio_softc *, uint32_t);
+#endif
+
 #endif	/* _BHYVE_VIRTIO_H_ */
