@@ -1049,6 +1049,7 @@ extern void i40e_stats_trqpair_fini(i40e_trqpair_t *);
 extern int i40e_m_stat(void *, uint_t, uint64_t *);
 extern int i40e_rx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
 extern int i40e_tx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
+extern mac_ether_media_t i40e_link_to_media(i40e_t *);
 
 /*
  * MAC/GLDv3 functions, and functions called by MAC/GLDv3 support code.
