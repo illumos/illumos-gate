@@ -283,6 +283,7 @@ typedef elink_status_t (*read_sfp_module_eeprom_func_p)(struct elink_phy *phy,
 	#define ELINK_SFP_EEPROM_10G_COMP_CODE_SR_MASK	(1<<4)
 	#define ELINK_SFP_EEPROM_10G_COMP_CODE_LR_MASK	(1<<5)
 	#define ELINK_SFP_EEPROM_10G_COMP_CODE_LRM_MASK	(1<<6)
+	#define ELINK_SFP_EEPROM_10G_COMP_CODE_ER_MASK	(1<<7)
 
 #define ELINK_SFP_EEPROM_1G_COMP_CODE_ADDR		0x6
 	#define ELINK_SFP_EEPROM_1G_COMP_CODE_SX	(1<<0)
@@ -8912,6 +8913,75 @@ elink_status_t elink_read_sfp_module_eeprom(struct elink_phy *phy,
 #ifndef ELINK_EMUL_ONLY
 
 #ifndef EXCLUDE_NON_COMMON_INIT
+static void elink_set_sfp_media(struct elink_phy *phy,
+    const u8 val[ELINK_SFP_EEPROM_FC_TX_TECH_ADDR + 1])
+{
+	switch (val[ELINK_SFP_EEPROM_CON_TYPE_ADDR]) {
+	case ELINK_SFP_EEPROM_CON_TYPE_VAL_COPPER: {
+		u8 copper_module_type;
+		/*
+		 * Check if it's active cable (includes SFP+ module)
+		 * or a passive cable.
+		 */
+		copper_module_type = val[ELINK_SFP_EEPROM_FC_TX_TECH_ADDR];
+		if (copper_module_type &
+		    ELINK_SFP_EEPROM_FC_TX_TECH_BITMASK_COPPER_ACTIVE) {
+			phy->sfp_media = ELINK_ETH_SFP_ACC;
+		} else {
+			if (copper_module_type &
+			    ELINK_SFP_EEPROM_FC_TX_TECH_BITMASK_COPPER_PASSIVE) {
+				phy->sfp_media = ELINK_ETH_SFP_DAC;
+			}
+		}
+		break;
+	}
+	case ELINK_SFP_EEPROM_CON_TYPE_VAL_UNKNOWN:
+	case ELINK_SFP_EEPROM_CON_TYPE_VAL_LC:
+	case ELINK_SFP_EEPROM_CON_TYPE_VAL_RJ45:
+		/*
+		 * Some SFP+ modules may support 1 Gbit and 10 Gbit operation.
+		 * We assign something a 1 Gbit designation if it does not
+		 * support any 10 Gbit modes.
+		 */
+		if ((val[ELINK_SFP_EEPROM_10G_COMP_CODE_ADDR] &
+		     (ELINK_SFP_EEPROM_10G_COMP_CODE_SR_MASK |
+		      ELINK_SFP_EEPROM_10G_COMP_CODE_LR_MASK |
+		      ELINK_SFP_EEPROM_10G_COMP_CODE_LRM_MASK |
+		      ELINK_SFP_EEPROM_10G_COMP_CODE_ER_MASK)) == 0) {
+			if (val[ELINK_SFP_EEPROM_1G_COMP_CODE_ADDR] &
+			    ELINK_SFP_EEPROM_1G_COMP_CODE_BASE_T) {
+				phy->sfp_media = ELINK_ETH_SFP_1GBASE_T;
+			} else if (val[ELINK_SFP_EEPROM_1G_COMP_CODE_ADDR] &
+			    ELINK_SFP_EEPROM_1G_COMP_CODE_SX) {
+				phy->sfp_media = ELINK_ETH_SFP_1GBASE_SX;
+			} else if (val[ELINK_SFP_EEPROM_1G_COMP_CODE_ADDR] &
+			    ELINK_SFP_EEPROM_1G_COMP_CODE_LX) {
+				phy->sfp_media = ELINK_ETH_SFP_1GBASE_LX;
+			} else if (val[ELINK_SFP_EEPROM_1G_COMP_CODE_ADDR] &
+			    ELINK_SFP_EEPROM_1G_COMP_CODE_CX) {
+				phy->sfp_media = ELINK_ETH_SFP_1GBASE_CX;
+			}
+		} else {
+			if (val[ELINK_SFP_EEPROM_10G_COMP_CODE_ADDR] &
+			     ELINK_SFP_EEPROM_10G_COMP_CODE_SR_MASK) {
+				phy->sfp_media = ELINK_ETH_SFP_10GBASE_SR;
+			} else if (val[ELINK_SFP_EEPROM_10G_COMP_CODE_ADDR] &
+			     ELINK_SFP_EEPROM_10G_COMP_CODE_LR_MASK) {
+				phy->sfp_media = ELINK_ETH_SFP_10GBASE_LR;
+			} else if (val[ELINK_SFP_EEPROM_10G_COMP_CODE_ADDR] &
+			     ELINK_SFP_EEPROM_10G_COMP_CODE_LRM_MASK) {
+				phy->sfp_media = ELINK_ETH_SFP_10GBASE_LRM;
+			} else if (val[ELINK_SFP_EEPROM_10G_COMP_CODE_ADDR] &
+			     ELINK_SFP_EEPROM_10G_COMP_CODE_ER_MASK) {
+				phy->sfp_media = ELINK_ETH_SFP_10GBASE_ER;
+			}
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 #if !defined(EXCLUDE_BCM87x6) || !defined(EXCLUDE_BCM8727_BCM8073) || !defined(EXCLUDE_WARPCORE)
 static elink_status_t elink_get_edc_mode(struct elink_phy *phy,
 			      struct elink_params *params,
@@ -8922,6 +8992,7 @@ static elink_status_t elink_get_edc_mode(struct elink_phy *phy,
 	u8 val[ELINK_SFP_EEPROM_FC_TX_TECH_ADDR + 1], check_limiting_mode = 0;
 	*edc_mode = ELINK_EDC_MODE_LIMITING;
 	phy->media_type = ELINK_ETH_PHY_UNSPECIFIED;
+	phy->sfp_media = ELINK_ETH_SFP_UNKNOWN;
 	/* First check for copper cable */
 	if (elink_read_sfp_module_eeprom(phy,
 					 params,
@@ -8943,8 +9014,8 @@ static elink_status_t elink_get_edc_mode(struct elink_phy *phy,
 	{
 		u8 copper_module_type;
 		phy->media_type = ELINK_ETH_PHY_DA_TWINAX;
-		/* Check if its active cable (includes SFP+ module)
-		 * of passive cable
+		/* Check if it's active cable (includes SFP+ module)
+		 * or a passive cable.
 		 */
 		copper_module_type = val[ELINK_SFP_EEPROM_FC_TX_TECH_ADDR];
 		if (copper_module_type &
@@ -8975,13 +9046,16 @@ static elink_status_t elink_get_edc_mode(struct elink_phy *phy,
 	case ELINK_SFP_EEPROM_CON_TYPE_VAL_LC:
 	case ELINK_SFP_EEPROM_CON_TYPE_VAL_RJ45:
 		check_limiting_mode = 1;
-		/* Module is considered as 1G in case it's NOT compliant with
-		 * any 10G ethernet protocol.
+		/*
+		 * Some SFP+ modules may support 1 Gbit and 10 Gbit operation.
+		 * We assign something a 1 Gbit designation if it does not
+		 * support any 10 Gbit modes.
 		 */
 		if ((val[ELINK_SFP_EEPROM_10G_COMP_CODE_ADDR] &
 		     (ELINK_SFP_EEPROM_10G_COMP_CODE_SR_MASK |
 		      ELINK_SFP_EEPROM_10G_COMP_CODE_LR_MASK |
-		      ELINK_SFP_EEPROM_10G_COMP_CODE_LRM_MASK)) == 0) {
+		      ELINK_SFP_EEPROM_10G_COMP_CODE_LRM_MASK |
+		      ELINK_SFP_EEPROM_10G_COMP_CODE_ER_MASK)) == 0) {
 			ELINK_DEBUG_P0(cb, "1G SFP module detected\n");
 			phy->media_type = ELINK_ETH_PHY_SFP_1G_FIBER;
 			if (phy->req_line_speed != ELINK_SPEED_1000) {
@@ -9028,6 +9102,7 @@ static elink_status_t elink_get_edc_mode(struct elink_phy *phy,
 			 val[ELINK_SFP_EEPROM_CON_TYPE_ADDR]);
 		return ELINK_STATUS_ERROR;
 	}
+	elink_set_sfp_media(phy, val);
 	sync_offset = params->shmem_base +
 		OFFSETOF(struct shmem_region,
 			 dev_info.port_hw_config[params->port].media_type);
@@ -9065,6 +9140,30 @@ static elink_status_t elink_get_edc_mode(struct elink_phy *phy,
 	return ELINK_STATUS_OK;
 }
 #ifdef ELINK_ENHANCEMENTS
+
+/*
+ * This function determines the type of media that is present in the SFP module
+ * for us to cache and use as part of the illumos MAC media information. This is
+ * done because elink_get_edc_mode() isn't aways actually called.
+ */
+static elink_status_t elink_determine_sfp_media(struct elink_phy *phy,
+    struct elink_params *params)
+{
+	struct elink_dev *cb = params->cb;
+	u8 val[ELINK_SFP_EEPROM_FC_TX_TECH_ADDR + 1];
+
+	phy->sfp_media = ELINK_ETH_SFP_UNKNOWN;
+	if (elink_read_sfp_module_eeprom(phy, params, ELINK_I2C_DEV_ADDR_A0,
+	    0, ELINK_SFP_EEPROM_FC_TX_TECH_ADDR + 1, (u8 *)val) != 0) {
+		ELINK_DEBUG_P0(cb, "Failed to read from SFP+ module EEPROM\n");
+		return ELINK_STATUS_ERROR;
+	}
+
+	elink_set_sfp_media(phy, val);
+
+	return ELINK_STATUS_OK;
+}
+
 /* This function read the relevant field from the module (SFP+), and verify it
  * is compliant with this board
  */
@@ -12389,6 +12488,7 @@ static const struct elink_phy phy_null = {
 	/*.mdio_ctrl	= */0,
 	/*.supported	= */0,
 	/*.media_type	= */ELINK_ETH_PHY_NOT_PRESENT,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12425,6 +12525,7 @@ static const struct elink_phy phy_serdes = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_BASE_T,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12463,6 +12564,7 @@ static const struct elink_phy phy_xgxs = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_CX4,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12503,6 +12605,7 @@ static const struct elink_phy phy_warpcore = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_UNSPECIFIED,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr 	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12539,6 +12642,7 @@ static const struct elink_phy phy_7101 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_BASE_T,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12572,6 +12676,7 @@ static const struct elink_phy phy_8073 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_KR,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12604,6 +12709,7 @@ static const struct elink_phy phy_8705 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_XFP_FIBER,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12635,6 +12741,7 @@ static const struct elink_phy phy_8706 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_SFPP_10G_FIBER,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12667,6 +12774,7 @@ static const struct elink_phy phy_8726 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_NOT_PRESENT,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12700,6 +12808,7 @@ static const struct elink_phy phy_8727 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_NOT_PRESENT,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12739,6 +12848,7 @@ static const struct elink_phy phy_8481 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_BASE_T,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12778,6 +12888,7 @@ static const struct elink_phy phy_84823 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_BASE_T,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12818,6 +12929,7 @@ static const struct elink_phy phy_84833 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_BASE_T,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12854,6 +12966,7 @@ static const struct elink_phy phy_84834 = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_BASE_T,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -12892,6 +13005,7 @@ static const struct elink_phy phy_54618se = {
 			   ELINK_SUPPORTED_Pause |
 			   ELINK_SUPPORTED_Asym_Pause),
 	/*.media_type	= */ELINK_ETH_PHY_BASE_T,
+	/*.sfp_media	= */ELINK_ETH_SFP_UNKNOWN,
 	/*.ver_addr 	= */0,
 	/*.req_flow_ctrl = */0,
 	/*.req_line_speed = */0,
@@ -13856,8 +13970,10 @@ static elink_status_t elink_avoid_link_flap(struct elink_params *params,
 #ifdef ELINK_ENHANCEMENTS
 		if ((phy->media_type == ELINK_ETH_PHY_SFPP_10G_FIBER) ||
 		    (phy->media_type == ELINK_ETH_PHY_SFP_1G_FIBER) ||
-		    (phy->media_type == ELINK_ETH_PHY_DA_TWINAX))
+		    (phy->media_type == ELINK_ETH_PHY_DA_TWINAX)) {
+			elink_determine_sfp_media(phy, params);
 			elink_verify_sfp_module(phy, params);
+		}
 #endif
 	}
 	lfa_sts = REG_RD(cb, params->lfa_base +
