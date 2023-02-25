@@ -22,6 +22,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBRARY= libzpool.a
@@ -54,7 +55,6 @@ INCS += -I../common
 INCS += -I../../../uts/common/fs/zfs
 INCS += -I../../../uts/common/fs/zfs/lua
 INCS += -I../../../common/zfs
-INCS += -I../../../common/lz4
 INCS += -I../../../common
 INCS += -I../../libzutil/common
 
@@ -72,8 +72,10 @@ LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lmd \
 		-lfakekernel -lzutil
 NATIVE_LIBS +=	libz.so
 CPPFLAGS.first =	-I$(SRC)/lib/libfakekernel/common
+# The in-gate lz4 headers must take precedence over any that may appear in an
+# adjunct.
+CPPFLAGS.first +=	-I$(SRC)/common/lz4
 CPPFLAGS +=	$(INCS)	-DDEBUG -D_FAKE_KERNEL
-
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-switch
@@ -89,7 +91,6 @@ SMATCH=off
 .KEEP_STATE:
 
 all: $(LIBS)
-
 
 include ../../Makefile.targ
 
