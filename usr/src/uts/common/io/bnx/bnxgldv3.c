@@ -15,6 +15,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include "bnxgld.h"
@@ -394,7 +395,43 @@ shift_left32(u32_t val)
 	return (tmp.as_u64);
 }
 
+static mac_ether_media_t
+bnx_um_to_media(um_device_t *um)
+{
+	if (um->nddcfg.link_speed == 0) {
+		return (ETHER_MEDIA_NONE);
+	}
 
+	/*
+	 * bnx only supports 2.5G and 1G fiber. It does not support 100BASE-FX.
+	 * Similarly, it is too old to support 2500BASE-T and the NetExtreme II
+	 * programmer's guide makes it clear it only ever supported 100BASE-TX
+	 * and never -T2 or -T4.
+	 */
+	if (um->dev_var.isfiber) {
+		switch (um->nddcfg.link_speed) {
+		case 2500:
+			return (ETHER_MEDIA_2500BASE_X);
+		case 1000:
+			return (ETHER_MEDIA_1000BASE_X);
+		default:
+			break;
+		}
+	} else {
+		switch (um->nddcfg.link_speed) {
+		case 1000:
+			return (ETHER_MEDIA_1000BASE_T);
+		case 100:
+			return (ETHER_MEDIA_100BASE_TX);
+		case 10:
+			return (ETHER_MEDIA_10BASE_T);
+		default:
+			break;
+		}
+	}
+
+	return (ETHER_MEDIA_UNKNOWN);
+}
 
 /*
  * Name:    bnx_m_stats
@@ -572,21 +609,7 @@ bnx_m_stats(void * arg, uint_t stat, uint64_t *val)
 		*val = lmdevice->hw_info.phy_id;
 		break;
 	case ETHER_STAT_XCVR_INUSE:
-		switch (umdevice->nddcfg.link_speed) {
-		case 1000:
-			*val = (umdevice->dev_var.isfiber) ?
-			    XCVR_1000X : XCVR_1000T;
-			break;
-		case 100:
-			*val = XCVR_100X;
-			break;
-		case 10:
-			*val = XCVR_10;
-			break;
-		default:
-			*val = XCVR_NONE;
-			break;
-		}
+		*val = (uint64_t)bnx_um_to_media(umdevice);
 		break;
 	case ETHER_STAT_CAP_1000FDX:
 		*val = 1;
@@ -1031,6 +1054,7 @@ bnx_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		case MAC_PROP_STATUS:
 		case MAC_PROP_SPEED:
 		case MAC_PROP_DUPLEX:
+		case MAC_PROP_MEDIA:
 		default:
 
 			err = ENOTSUP;
@@ -1210,6 +1234,7 @@ bnx_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	uint64_t link_speed;
 	link_state_t link_state;
 	link_flowctrl_t fl;
+	mac_ether_media_t media;
 
 	if (lm_get_medium(&umdevice->lm_dev) == LM_MEDIUM_TYPE_FIBER) {
 		if (pr_num == MAC_PROP_EN_100FDX_CAP ||
@@ -1245,6 +1270,14 @@ bnx_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			ASSERT(pr_valsize >= sizeof (link_state_t));
 
 			bcopy(&link_state, pr_val, sizeof (link_state));
+			break;
+
+		case MAC_PROP_MEDIA:
+			media = bnx_um_to_media(umdevice);
+
+			ASSERT(pr_valsize >= sizeof (mac_ether_media_t));
+
+			bcopy(&media, pr_val, sizeof (link_state));
 			break;
 
 		case MAC_PROP_AUTONEG:
