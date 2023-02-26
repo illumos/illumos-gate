@@ -33,6 +33,10 @@
 * limitations under the License.
 */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #ifndef	_QEDE_H
 #define	_QEDE_H
 
@@ -47,6 +51,7 @@
 #include <sys/mac_ether.h>
 #include <sys/kobj.h>
 #include <sys/mac.h>
+#include <sys/mac_ether.h>
 #include <sys/dlpi.h>
 #include <sys/pattr.h>
 #include <sys/gld.h>
@@ -590,12 +595,13 @@ typedef struct qede_link_cfg {
 	boolean_t link_up;
 	uint32_t speed;
 	uint8_t duplex;
-	uint8_t port;
 	boolean_t autoneg;
 	uint32_t pause_cfg;
 	qede_link_props_t supp_capab;
 	qede_link_props_t adv_capab;
 	qede_link_props_t rem_capab;
+	uint32_t media;
+	uint32_t txr_data;
 } qede_link_cfg_t;
 
 enum qede_filter_type {
@@ -1086,5 +1092,8 @@ void
 qede_recycle_copied_rx_buffer(qede_rx_buffer_t *rx_buffer);
 boolean_t qede_kstat_init(qede_t *qede);
 void qede_kstat_fini(qede_t *qede);
-/*void qede_get_current_link(qede_t *qede, struct qede_link_cfg *lnkcfg);*/
+
+/* Functions exported by qede_main.c */
+void qede_update_media_info(struct ecore_dev *, qede_link_cfg_t *);
+mac_ether_media_t qede_link_to_media(qede_link_cfg_t *, uint32_t);
 #endif /* _QEDE_H */

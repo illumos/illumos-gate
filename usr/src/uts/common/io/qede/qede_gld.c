@@ -35,6 +35,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include "qede.h"
@@ -835,11 +836,10 @@ qede_mac_stats(void *     arg,
         	break;
 
 	case ETHER_STAT_XCVR_INUSE:
-		switch (qede->props.link_speed) {
-		default:
-			*value = XCVR_UNDEFINED;
-		}
+		*value = (uint64_t)qede_link_to_media(&qede->curcfg,
+		    qede->props.link_speed);
 		break;
+
 #if (MAC_VERSION > 1)
 	case ETHER_STAT_CAP_10GFDX:
 		*value = 0;
@@ -2322,6 +2322,7 @@ qede_mac_get_property(void *arg,
 	uint64_t        link_speed;
 	link_flowctrl_t link_flowctrl;
 	struct qede_link_cfg link_cfg;
+	mac_ether_media_t media;
 	qede_link_cfg_t  *hw_cfg  = &qede->hwinit;
 	int ret_val = 0;
 
@@ -2363,6 +2364,13 @@ qede_mac_get_property(void *arg,
 		bcopy(&link_state, pr_val, sizeof(link_state_t));
 		qede_info(qede, "mac_prop_status %d\n", link_state);
 		break;	
+
+	case MAC_PROP_MEDIA:
+
+		ASSERT(pr_valsize >= sizeof(mac_ether_media_t));
+		media = qede_link_to_media(&link_cfg, qede->props.link_speed);
+		bcopy(&media, pr_val, sizeof(mac_ether_media_t));
+		break;
 
 	case MAC_PROP_AUTONEG:
 
