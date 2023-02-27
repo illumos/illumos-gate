@@ -34,7 +34,7 @@
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -406,6 +406,7 @@ static uint32_t amd_skts[][8] = {
 
 	/*
 	 * Family 0x19 models 10-1f	(Zen 4 - Genoa)
+	 * Family 0x19 models a0-af	(Zen 4 - Bergamo)
 	 */
 #define	A_SKTS_22			22
 	{
@@ -436,12 +437,11 @@ static uint32_t amd_skts[][8] = {
 
 	/*
 	 * Family 0x19 models 60-6f	(Zen 4 - Raphael)
-	 * Family 0x17 models a0-af	(Zen 2 - Mendocino)
 	 */
 #define	A_SKTS_24			24
 	{
 		X86_SOCKET_AM5,		/* 0b000 */
-		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_FL1,		/* 0b001 */
 		X86_SOCKET_UNKNOWN,	/* 0b010 */
 		X86_SOCKET_UNKNOWN,	/* 0b011 */
 		X86_SOCKET_UNKNOWN,	/* 0b100 */
@@ -476,6 +476,35 @@ static uint32_t amd_skts[][8] = {
 		X86_SOCKET_FF3,		/* 0b011 */
 		X86_SOCKET_UNKNOWN,	/* 0b100 */
 		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+	/*
+	 * Family 0x17 models a0-af	(Zen 2 - Mendocino)
+	 */
+#define	A_SKTS_27			27
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_FT6,		/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x19 models 70-7f	(Zen 4 - Phoenix)
+	 */
+#define	A_SKTS_28			28
+	{
+		X86_SOCKET_AM5,		/* 0b000 */
+		X86_SOCKET_FP8,		/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_FP7,		/* 0b100 */
+		X86_SOCKET_FP7R2,	/* 0b101 */
 		X86_SOCKET_UNKNOWN,	/* 0b110 */
 		X86_SOCKET_UNKNOWN	/* 0b111 */
 	}
@@ -529,6 +558,9 @@ static struct amd_sktmap_s amd_sktmap_strs[] = {
 	{ X86_SOCKET_FP7,	"FP7" },
 	{ X86_SOCKET_FP7R2,	"FP7r2" },
 	{ X86_SOCKET_FF3,	"FF3" },
+	{ X86_SOCKET_FT6,	"FT6" },
+	{ X86_SOCKET_FP8,	"FP8" },
+	{ X86_SOCKET_FL1,	"FL1" },
 	{ X86_SOCKET_UNKNOWN,	"Unknown" }	/* Must be last! */
 };
 
@@ -815,7 +847,7 @@ static const struct amd_rev_mapent {
 	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_UNKNOWN },
 
 	{ 0x17, 0xa0, 0xaf, 0x0, 0xf, X86_CHIPREV_AMD_MENDOCINO_UNKNOWN, "??",
-	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_24 },
+	    X86_UARCHREV_AMD_ZEN2_UNKNOWN, A_SKTS_27 },
 
 	/*
 	 * =============== HygonGenuine Family 0x18 ===============
@@ -844,6 +876,12 @@ static const struct amd_rev_mapent {
 	/* Genoa == Stones == RS */
 	{ 0x19, 0x10, 0x10, 0x0, 0x0, X86_CHIPREV_AMD_GENOA_A0, "RS-A0",
 	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
+	{ 0x19, 0x10, 0x10, 0x1, 0x1, X86_CHIPREV_AMD_GENOA_A1, "RS-A1",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
+	{ 0x19, 0x11, 0x11, 0x0, 0x0, X86_CHIPREV_AMD_GENOA_B0, "RS-B0",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
+	{ 0x19, 0x11, 0x11, 0x1, 0x1, X86_CHIPREV_AMD_GENOA_B1, "RS-B1",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
 	{ 0x19, 0x10, 0x1f, 0x0, 0xf, X86_CHIPREV_AMD_GENOA_UNKNOWN, "RS-??",
 	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 },
 
@@ -866,13 +904,27 @@ static const struct amd_rev_mapent {
 	{ 0x19, 0x40, 0x4f, 0x0, 0xf, X86_CHIPREV_AMD_REMBRANDT_UNKNOWN,
 	    "RMB-??", X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_23 },
 
+	/* Cezanne */
 	{ 0x19, 0x50, 0x50, 0x0, 0x0, X86_CHIPREV_AMD_CEZANNE_A0, "CZN-A0",
 	    X86_UARCHREV_AMD_ZEN3_B0, A_SKTS_21 },
 	{ 0x19, 0x50, 0x5f, 0x0, 0xf, X86_CHIPREV_AMD_CEZANNE_UNKNOWN, "CZN-??",
 	    X86_UARCHREV_AMD_ZEN3_UNKNOWN, A_SKTS_21 },
 
-	{ 0x19, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_RAPHAEL_UNKNOWN, "??",
-	    X86_UARCHREV_AMD_ZEN4, A_SKTS_24 }
+	/* Raphael */
+	{ 0x19, 0x61, 0x61, 0x2, 0x2, X86_CHIPREV_AMD_RAPHAEL_B2, "RPL-B2",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_24 },
+	{ 0x19, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_RAPHAEL_UNKNOWN, "RPL-??",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_24 },
+
+	/* Phoenix */
+	{ 0x19, 0x74, 0x74, 0x1, 0x1, X86_CHIPREV_AMD_PHOENIX_A1, "PHX-A1",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_28 },
+	{ 0x19, 0x70, 0x7f, 0x0, 0xf, X86_CHIPREV_AMD_PHOENIX_UNKNOWN, "PHX-??",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_28 },
+
+	/* Bergamo */
+	{ 0x19, 0xa0, 0xaf, 0x0, 0xf, X86_CHIPREV_AMD_BERGAMO_UNKNOWN, "???",
+	    X86_UARCHREV_AMD_ZEN4, A_SKTS_22 }
 };
 
 /*

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2022 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 #
 
 <include global_zone_only_component>
@@ -38,11 +38,13 @@ driver name=amdzen
 # 1460-1467: f17h m00-0f df
 # 1480: f17h m30-3f/70-7f, f19h m00-0f, m20-2f nb
 # 1490-1497: f17h m30-3f df
-# 14a4: f19h m10-1f nb
-# 14ad-14b4: f19h m10-1fh df
+# 14a4: f19h m10-1f, m1a0-af nb
+# 14ad-14b4: f19h m10-1fh, a0-af df
 # 14b5: f17h ma0-af, f19h m40-4f nb
 # 14d8: f19h m60-6f nb
+# 14e8: f19h m70-7f nb
 # 14e0-14e7: f19h m60-6f df
+# 14f0-14f7: f19h m70-7f df
 # 15d0: f17h m10-m2f nb
 # 15e8-15ef: f17h m10-m2f df
 # 1630: f17h m60-6f, f19h m50-5f nb
@@ -105,6 +107,15 @@ driver name=amdzen_stub \
     alias=pci1022,14e5,p \
     alias=pci1022,14e6,p \
     alias=pci1022,14e7,p \
+    alias=pci1022,14e8,p \
+    alias=pci1022,14f0,p \
+    alias=pci1022,14f1,p \
+    alias=pci1022,14f2,p \
+    alias=pci1022,14f3,p \
+    alias=pci1022,14f4,p \
+    alias=pci1022,14f5,p \
+    alias=pci1022,14f6,p \
+    alias=pci1022,14f7,p \
     alias=pci1022,15d0,p \
     alias=pci1022,15e8,p \
     alias=pci1022,15e9,p \

@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd August 6, 2022
+.Dd February 26, 2023
 .Dt AMDZEN 4D
 .Os
 .Sh NAME
@@ -43,7 +43,7 @@ AMD Zen 3 Cezanne, Milan, and Vermeer
 AMD Zen 3+ Rembrandt
 .Pq Family 19h
 .It
-AMD Zen 4 Genoa and Raphael
+AMD Zen 4 Genoa, Bergamo, Raphael, and Phoenix
 .Pq Family 19h
 .El
 .Pp
