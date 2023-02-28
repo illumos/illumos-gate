@@ -204,6 +204,10 @@ interpret_tcp(int flags, struct tcphdr *tcp, int iplen, int fraglen)
 	show_space();
 	}
 
+	/* is there any data? */
+	if (tcplen == 0)
+		return (tcplen);
+
 	/* go to the next protocol layer */
 
 	if (!interpret_reserved(flags, IPPROTO_TCP,
