@@ -10,8 +10,9 @@
 .\"
 .\" Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 .\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2023 Peter Tribble.
 .\"
-.Dd March 30, 2022
+.Dd February 18, 2023
 .Dt ZONESTAT 1
 .Os
 .Sh NAME
@@ -46,7 +47,8 @@ It optionally also prints one or more summary reports at a specified interval.
 .Pp
 The default output is a summary of cpu, physical, and virtual memory
 utilization.
-The -r option can be used to choose detailed output for specific resources.
+The -r option can be used to select the specific resources to be shown in
+the output.
 .Pp
 The following options are supported:
 .Bl -tag -width Ds
@@ -64,7 +66,7 @@ The available resources are:
 .Em physical-memory ,
 .Em virtual-memory ,
 .Em locked-memory ,
-.Em processor-sets ,
+.Em processor-set ,
 .Em processes ,
 .Em lwps ,
 .Em shm-memory ,
@@ -77,17 +79,17 @@ The available resources are:
 The following nicknames can also be specified as resource names:
 .Bl -tag -width indent
 .It Em summary
-A summary of cpu, physical-memory, and virtual memory usage.
+A summary of cpu, physical-memory, and virtual-memory usage.
 .It Em memory
-physical-memory, virtual-memory, and locked memory.
+physical-memory, virtual-memory, and locked-memory.
 .It Em psets
-processor-sets
+processor-set
 .It Em default-pset
 The default pset only.
 .It Em limits
-processes, lwps, lofi
+processes, lwps, and lofi
 .It Em sysv
-shm-memory, shm-ids, sem-ids msg-ids
+shm-memory, shm-ids, sem-ids, and msg-ids
 .It Em all
 all resource types.
 .El
@@ -112,7 +114,7 @@ The
 .Em all
 resource specifies that all resource types should be reported.
 .It Fl n Ar name Ns Oo Ar ,name Oc
-Specify a list resource names on which to report.
+Specify a list of resource names on which to report.
 For pset resources, this is the name of the processor set.
 For physical-memory, locked-memory, and virtual-memory resources,
 the only names are
@@ -130,7 +132,7 @@ In addition to a comma-separated list, multiple
 .Fl n
 options can be specified to report on a set of resources.
 .It Fl T Ar u Ns | Ns Ar d Ns | Ns Ar i
-Include timestamp of each report.
+Include the timestamp of each report.
 The following formats are supported:
 .Bl -tag -width indent
 .It u
@@ -201,6 +203,10 @@ Sort by percent of share used.
 .El
 .Pp
 By default, output is sorted by quantity of resource used.
+.Pp
+The values cpu, physical-memory, and virtual-memory can also be specified as
+sort values and determine which of cpu, physical-memory, and virtual-memory
+is used as the sort key in the summary output.
 .It Fl q
 Only print summary reports (requires
 .Fl R ) .
@@ -210,13 +216,13 @@ Print output in stable, machine-parsable format.
 Individual fields will be delimited with :.
 The line format is:
 .Pp
-.D1    <report type>:<resource>:<field>[:<field>]*
+.D1    <report type>:<resource type>:<field>[:<field>]*
 .Pp
 If
 .Fl T
 is specified each line is prefixed with a timestamp:
 .Pp
-.D1    <timestamp>:<report type>:<resource>:<field>[:<field>]*
+.D1    <timestamp>:<report type>:<resource type>:<field>[:<field>]*
 .Pp
 The report types are:
 .Bd -ragged -offset indent
@@ -237,16 +243,16 @@ The resource types are:
 .Em processor-set ,
 .Em processes ,
 .Em lwps ,
-.Em sysv-shared-memory ,
-.Em sysv-shmids ,
-.Em sysv-semids ,
-.Em sysv-msgids ,
+.Em shm-memory ,
+.Em shm-ids ,
+.Em sem-ids ,
+.Em msg-ids ,
 .Em lofi
 .Ed
 .Pp
 The
 .Em header
-resource is a special resource used to state the beginning of an interval or
+resource is a special resource used to mark the beginning of an interval or
 summary report.
 All output lines between header resources belong to the same report.
 Each header has a matching footer.
@@ -268,7 +274,7 @@ The lines describing each resource.
 The total utilization of each resource.
 .It system
 The utilization of each resource by the system.
-This includes the kernel, and any resource consumption not contributable to a
+This includes the kernel, and any resource consumption not attributable to a
 specific zone.
 When zonestat is run from within a non-global-zone, this value will be the
 aggregate resource consumed by the system and all other zones.
@@ -284,7 +290,7 @@ After each report, any footer is also printed
 .Bl -tag -width indent
 .It interval
 Specifies the length in seconds to pause between each interval report.
-An interval of
+An interval specified as the textual value
 .Em default
 will use the configured interval of the zones
 monitoring service - see
@@ -298,7 +304,7 @@ Specifies the number of intervals to report.
 Defaults to infinity if not specified.
 The command duration is (interval * duration).
 A duration of zero is invalid.
-A value of
+A duration specified as the textual value
 .Em inf
 can also be specified to explicitly choose infinity.
 .Pp
@@ -325,7 +331,7 @@ is specified and report is not, the report period will be the entire command
 duration, producing the specified reports at the end of execution.
 .El
 .Ss OUTPUT
-The following list defines the column heading of the command output:
+The column headings in the output have the following meanings:
 .Bl -tag -width indent
 .It SYSTEM-MEMORY
 The total amount of memory available on the physical host.
@@ -357,7 +363,7 @@ The amount of resource used.
 .It PCT
 The amount of resource used as a percent of the total resource.
 .It %PART
-The amount of cpu uses as a percentage of the total cpu in a processor-set to
+The amount of cpu used as a percentage of the total cpu in a processor-set to
 which the zone is bound.
 A zone can only have processes bound to multiple processor sets if it is the
 global zone, or if psrset(8) psets are used.
@@ -391,12 +397,13 @@ Because shares are only enforced when there is resource contention, it is
 possible for a zone to have a %SHRU in excess of 100%.
 .El
 .Sh IMPLEMENTATION NOTES
-The zonestat utility depends on the zones monitoring service:
+The zonestat utility depends on the zones-monitoring service:
 .Pp
-.D1 svc/system/zonestat:default
+.D1 svc:/system/zones-monitoring:default
 .Pp
-If the zonestat service is stopped while the zonestat utility is running, the
-zonestat command invocation will quit without printing additional reports.
+If the zones-monitoring service is stopped while the zonestat utility is
+running, the zonestat command invocation will quit without printing additional
+reports.
 .Pp
 The reports will be printed if zonestat is interrupted (by ctrl-c,
 .Dv SIGINT )
@@ -411,20 +418,23 @@ An error occurred.
 .It 2
 Invalid usage.
 .It 3
-svc:system/zones_monitoring:default not running or not responding.
+The svc:/system/zones-monitoring:default service is not running or not
+responding.
 .El
 .Sh EXAMPLES
 Example 1:  Summary of cpu and memory utilization every 5 seconds.
 .Bd -literal
        # zonestat 5 1
-       SUMMARY
-		-----CPU------------- ----PHYSICAL--- ----VIRTUAL----
-	   ZONE USED %PART %CAP %SHRU USED  PCT  %CAP  USED  PCT %CAP
-	[total] 9.74   30%    -     - 7140M  21%    - 10.6G  22%    -
-       [system] 0.28  0.8%    -     - 6535M  19%    - 10.4G  21%    -
-	 global 9.10   28%    -     -  272M 0.8%    -  366M 0.7%    -
-	  zoneA 0.32  1.0%    -     -  256M 0.7%    -  265M 0.5%    -
-	  zoneB 0.00  0.0%    -     - 77.6M 0.2%    - 71.1M 0.1%    -
+       Collecting data for first interval...
+       Interval: 1, Duration: 0:00:05
+       SUMMARY         Cpus/Online: 8/8   Physical: 8100M    Virtual: 23.9G
+		----------CPU---------- ----PHYSICAL----- -----VIRTUAL-----
+	   ZONE  USED %PART  %CAP %SHRU  USED   PCT  %CAP  USED   PCT  %CAP
+        [total]  1.22 15.3%     -     - 4206M 51.9%     - 6298M 25.7%     -
+       [system]  0.01 0.15%     -     - 2783M 34.3%     - 3905M 15.9%     -
+          zoneA  0.99 12.4%     -     - 35.8M 0.44%     - 31.7M 0.12%     -
+          zoneB  0.12 1.59%     -     - 18.6M 0.23%     - 12.9M 0.05%     -
+         global  0.08 1.08%     -     - 1273M 15.7%     - 2251M 9.19%     -
 .Ed
 .Pp
 Example 2:  Using parsable output, fetching only zone usages.
@@ -472,7 +482,6 @@ zones, will be reported as used by
 .Sh SEE ALSO
 .Xr date 1 ,
 .Xr prctl 1 ,
-.Xr libzonestat 3lib ,
 .Xr timezone 5 ,
 .Xr privileges 7 ,
 .Xr resource_controls 7 ,
