@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -30,118 +30,134 @@
  * ------------------------
  *
  * The operating system needs to expose things like temperature sensors and DRAM
- * configuration registers in terms that are meaningful to the system such as
- * logical CPUs, cores, etc. This driver attaches to the PCI IDs that represent
- * the northbridge and data fabric; however, there are multiple PCI devices (one
- * per die) that exist. This driver does manage to map all of these three things
- * together; however, it requires some acrobatics. Unfortunately, there's no
- * direct way to map a northbridge to its corresponding die. However, we can map
- * a CPU die to a data fabric PCI device and a data fabric PCI device to a
- * corresponding northbridge PCI device.
+ * configuration registers in terms of things that are meaningful to the system
+ * such as logical CPUs, cores, etc. This driver attaches to the PCI devices
+ * that represent the northbridge, data fabrics, and dies. Note that there are
+ * multiple northbridge and DF devices (one each per die) and this driver maps
+ * all of these three things together. Unfortunately, this requires some
+ * acrobatics as there is no direct way to map a northbridge to its
+ * corresponding die. Instead, we map a CPU die to a data fabric PCI device and
+ * a data fabric PCI device to a corresponding northbridge PCI device. This
+ * transitive relationship allows us to map from between northbridge and die.
+ *
+ * As each data fabric device is attached, based on vendor and device portions
+ * of the PCI ID, we add it to the DF stubs list in the global amdzen_t
+ * structure, amdzen_data->azn_df_stubs. We must now map these to logical CPUs.
  *
  * In current Zen based products, there is a direct mapping between processor
- * nodes and a data fabric PCI device. All of the devices are on PCI Bus 0 and
- * start from Device 0x18. Device 0x18 maps to processor node 0, 0x19 to
+ * nodes and a data fabric PCI device: all of the devices are on PCI Bus 0 and
+ * start from Device 0x18, so device 0x18 maps to processor node 0, 0x19 to
  * processor node 1, etc. This means that to map a logical CPU to a data fabric
  * device, we take its processor node id, add it to 0x18 and find the PCI device
- * that is on bus 0, device 0x18. As each data fabric device is attached based
- * on its PCI ID, we add it to the global list, amd_nbdf_dfs that is in the
- * amd_f17nbdf_t structure.
+ * that is on bus 0 with that ID number. We already discovered the DF devices as
+ * described above.
  *
- * The northbridge PCI device has a defined device and function, but the PCI bus
- * that it's on can vary. Each die has its own series of PCI buses that are
- * assigned to it and the northbridge PCI device is on the first of die-specific
- * PCI bus for each die. This also means that the northbridge will not show up
- * on PCI bus 0, which is the PCI bus that all of the data fabric devices are
- * on. While conventionally the northbridge with the lowest PCI bus value
- * would correspond to processor node zero, hardware does not guarantee that at
- * all. Because we don't want to be at the mercy of firmware, we don't rely on
- * this ordering, even though we have yet to find a system that deviates from
- * this scheme.
+ * The northbridge PCI device has a well-defined device and function, but the
+ * bus that it is on varies. Each die has its own set of assigned PCI buses and
+ * its northbridge device is on the first die-specific bus. This implies that
+ * the northbridges do not show up on PCI bus 0, as that is the PCI bus that all
+ * of the data fabric devices are on and is not assigned to any particular die.
+ * Additionally, while the northbridge on the lowest-numbered PCI bus
+ * intuitively corresponds to processor node zero, hardware does not guarantee
+ * this. Because we don't want to be at the mercy of firmware, we don't rely on
+ * this ordering assumption, though we have yet to find a system that deviates
+ * from it, either.
  *
  * One of the registers in the data fabric device's function 0
- * (AMDZEN_DF_F0_CFG_ADDR_CTL) happens to have the first PCI bus that is
+ * (AMDZEN_DF_F0_CFG_ADDR_CTL) happens to identify the first PCI bus that is
  * associated with the processor node. This means that we can map a data fabric
- * device to a northbridge by finding the northbridge whose PCI bus matches the
- * value in the corresponding data fabric's AMDZEN_DF_F0_CFG_ADDR_CTL.
+ * device to a northbridge by finding the northbridge whose PCI bus ID matches
+ * the value in the corresponding data fabric's AMDZEN_DF_F0_CFG_ADDR_CTL.
  *
- * We can map a northbridge to a data fabric device and a data fabric device to
- * a die. Because these are generally 1:1 mappings, there is a transitive
- * relationship and therefore we know which northbridge is associated with which
- * processor die. This is summarized in the following image:
+ * Given all of the above, we can map a northbridge to a data fabric device and
+ * a die to a data fabric device. Because these are 1:1 mappings, there is a
+ * transitive relationship from northbridge to die. and therefore we know which
+ * northbridge is associated with which processor die. This is summarized in the
+ * following image:
  *
- *  +-------+    +-----------------------------------+        +--------------+
- *  | Die 0 |--->| Data Fabric PCI BDF 0/18/0        |------->| Northbridge  |
- *  +-------+    | AMDZEN_DF_F0_CFG_ADDR_CTL: bus 10 |        | PCI  10/0/0  |
- *     ...       +-----------------------------------+        +--------------+
- *  +-------+     +------------------------------------+        +--------------+
- *  | Die n |---->| Data Fabric PCI BDF 0/18+n/0       |------->| Northbridge  |
- *  +-------+     | AMDZEN_DF_F0_CFG_ADDR_CTL: bus 133 |        | PCI 133/0/0  |
- *                +------------------------------------+        +--------------+
+ *  +-------+     +------------------------------------+     +--------------+
+ *  | Die 0 |---->| Data Fabric PCI BDF 0/18/0         |---->| Northbridge  |
+ *  +-------+     | AMDZEN_DF_F0_CFG_ADDR_CTL: bus 10  |     | PCI  10/0/0  |
+ *     ...        +------------------------------------+     +--------------+
+ *  +-------+     +------------------------------------+     +--------------+
+ *  | Die n |---->| Data Fabric PCI BDF 0/18+n/0       |---->| Northbridge  |
+ *  +-------+     | AMDZEN_DF_F0_CFG_ADDR_CTL: bus 133 |     | PCI 133/0/0  |
+ *                +------------------------------------+     +--------------+
  *
- * Note, the PCI buses used by the northbridges here are arbitrary. They do not
- * reflect the actual values by hardware; however, the bus/device/function (BDF)
- * of the data fabric accurately models hardware. All of the BDF values are in
- * hex.
+ * Note, the PCI buses used by the northbridges here are arbitrary examples that
+ * do not necessarily reflect actual hardware values; however, the
+ * bus/device/function (BDF) of the data fabric accurately models hardware. All
+ * BDF values are in hex.
  *
  * Starting with the Rome generation of processors (Family 17h Model 30-3Fh),
- * AMD has multiple northbridges that exist on a given die. All of these
- * northbridges share the same data fabric and system management network port.
- * From our perspective this means that some of the northbridge devices will be
- * redundant and that we will no longer have a 1:1 mapping between the
- * northbridge and the data fabric devices. Every data fabric will have a
- * northbridge, but not every northbridge will have a data fabric device mapped.
- * Because we're always trying to map from a die to a northbridge and not the
- * reverse, the fact that there are extra northbridge devices hanging around
- * that we don't know about shouldn't be a problem.
+ * AMD has multiple northbridges on a given die. All of these northbridges share
+ * the same data fabric and system management network port. From our perspective
+ * this means that some of the northbridge devices will be redundant and that we
+ * no longer have a 1:1 mapping between the northbridge and the data fabric
+ * devices. Every data fabric will have a northbridge, but not every northbridge
+ * will have a data fabric device mapped. Because we're always trying to map
+ * from a die to a northbridge and not the reverse, the fact that there are
+ * extra northbridge devices hanging around that we don't know about shouldn't
+ * be a problem.
  *
  * -------------------------------
  * Attach and Detach Complications
  * -------------------------------
  *
- * Because we need to map different PCI devices together, this means that we
- * have multiple dev_info_t structures that we need to manage. Each of these is
- * independently attached and detached. While this is easily managed for attach,
- * it is not for detach. Each of these devices is a 'stub'.
+ * We need to map different PCI devices together. Each device is attached to a
+ * amdzen_stub driver to facilitate integration with the rest of the kernel PCI
+ * machinery and so we have to manage multiple dev_info_t structures, each of
+ * which may be independently attached and detached.
  *
- * Once a device has been detached it will only come back if we have an active
- * minor node that will be accessed. This means that if they are detached,
- * nothing would ever cause them to be reattached. The system also doesn't
- * provide us a way or any guarantees around making sure that we're attached to
- * all such devices before we detach. As a result, unfortunately, it's easier to
- * basically have detach always fail.
+ * This is not particularly complex for attach: our _init routine allocates the
+ * necessary mutex and list structures at module load time, and as each stub is
+ * attached, it calls into this code to be added to the appropriate list. When
+ * the nexus itself is attached, we walk the PCI device tree accumulating a
+ * counter for all devices we expect to be attached. Once the scan is complete
+ * and all such devices are accounted for (stub registration may be happening
+ * asynchronously with respect to nexus attach), we initialize the nexus device
+ * and the attach is complete.
+ *
+ * Most other device drivers support instances that can be brought back after
+ * detach, provided they are associated with an active minor node in the
+ * /devices file system. This driver is different. Once a stub device has been
+ * attached, we do not permit detaching the nexus driver instance, as the kernel
+ * does not give us interlocking guarantees between nexus and stub driver attach
+ * and detach. It is simplest to just unconditionally fail detach once a stub
+ * has attached.
  *
  * ---------------
  * Exposed Devices
  * ---------------
  *
  * Rather than try and have all of the different functions that could be
- * provided by one driver, we instead have created a nexus driver that will
- * itself try and load children. Children are all pseudo-device drivers that
- * provide different pieces of functionality that use this.
+ * provided in one driver, we have a nexus driver that tries to load child
+ * pseudo-device drivers that provide specific pieces of functionality.
  *
  * -------
  * Locking
  * -------
  *
- * The amdzen_data structure contains a single lock, azn_mutex. The various
- * client functions are intended for direct children of our nexus, but have been
- * designed in case someone else depends on this driver despite not being a
- * child. Once a DF has been discovered, the set of entities inside of it
- * (adf_nents, adf_ents[]) is considered static, constant data. This means that
- * iterating over it in and of itself does not require locking; however, the
- * discovery of the amd_df_t does. In addition, whenever performing register
- * accesses to the DF or SMN, those require locking. This means that one must
- * hold the lock in the following circumstances:
+ * The amdzen_data structure contains a single lock, azn_mutex.
  *
- *   o Looking up DF structures
- *   o Reading or writing to DF registers
- *   o Reading or writing to SMN registers
+ * The various client functions here are intended for our nexus's direct
+ * children, but have been designed in case someone else should depends on this
+ * driver. Once a DF has been discovered, the set of entities inside of it
+ * (adf_nents, adf_ents[]) is considered static, constant data, and iteration
+ * over them does not require locking. However, the discovery of the amd_df_t
+ * does. In addition, locking is required whenever performing register accesses
+ * to the DF or SMN.
+ *
+ * To summarize, one must hold the lock in the following circumstances:
+ *
+ *  - Looking up DF structures
+ *  - Reading or writing to DF registers
+ *  - Reading or writing to SMN registers
  *
  * In general, it is preferred that the lock be held across an entire client
  * operation if possible. The only time this becomes an issue are when we have
- * callbacks into our callers (ala amdzen_c_df_iter()) as they will likely
- * recursively call into us.
+ * callbacks into our callers (ala amdzen_c_df_iter()) as they may recursively
+ * call into us.
  */
 
 #include <sys/modctl.h>
@@ -991,7 +1007,7 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 		/*
 		 * Unfortunately, Rome uses a discontinuous instance ID pattern
 		 * while everything else we can find uses a contiguous instance
-		 * ID pattern.  This means that for Rome, we need to adjust the
+		 * ID pattern. This means that for Rome, we need to adjust the
 		 * indexes that we iterate over, though the total number of
 		 * entries is right. This was carried over into Milan, but not
 		 * Genoa.
