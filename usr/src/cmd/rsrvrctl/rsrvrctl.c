@@ -8,7 +8,7 @@
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
  *
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -16,18 +16,27 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <err.h>
+#include <assert.h>
+#include <signal.h>
 #include <sys/types.h>
 
 #include <sys/vmm_dev.h>
 
+const char *prog_name;
+
 static void
-usage(const char *pname)
+usage(int exitcode)
 {
+	assert(prog_name != NULL);
 	fprintf(stderr,
 	    "Usage: %s [-a add] [-r remove] [-q]\n"
 	    "\t-a <SZ> add SZ MiB to the reservoir\n"
 	    "\t-r <SZ> remove SZ MiB from the reservoir\n"
-	    "\t-q query reservoir state\n", pname);
+	    "\t-s <SZ> set reservoir to SZ MiB, if possible\n"
+	    "\t-c <SZ> use SZ MiB chunks when performing resize ops\n"
+	    "\t-q query reservoir state\n", prog_name);
+	exit(exitcode);
 }
 
 static bool
@@ -45,28 +54,94 @@ parse_size(const char *arg, size_t *resp)
 	return (true);
 }
 
-static void
-do_add(int fd, size_t sz)
+static size_t
+query_size(int fd)
 {
-	int res;
+	struct vmm_resv_query data;
 
-	res = ioctl(fd, VMM_RESV_ADD, sz);
+	int res = ioctl(fd, VMM_RESV_QUERY, &data);
 	if (res != 0) {
-		perror("Could not add to reservoir");
-		exit(EXIT_FAILURE);
+		err(EXIT_FAILURE, "Could not query reservoir sizing");
+	}
+
+	return (data.vrq_free_sz + data.vrq_alloc_sz);
+}
+
+static void
+do_add(int fd, size_t sz, size_t chunk)
+{
+	const size_t cur = query_size(fd);
+	struct vmm_resv_target target = {
+		.vrt_target_sz = cur + sz,
+		.vrt_chunk_sz = MIN(chunk, sz),
+	};
+
+	if (ioctl(fd, VMM_RESV_SET_TARGET, &target) != 0) {
+		err(EXIT_FAILURE, "Could not add %zu bytes to reservoir", sz);
 	}
 }
 
 static void
-do_remove(int fd, size_t sz)
+do_remove(int fd, size_t sz, size_t chunk)
 {
-	int res;
-
-	res = ioctl(fd, VMM_RESV_REMOVE, sz);
-	if (res != 0) {
-		perror("Could not remove from reservoir");
-		exit(EXIT_FAILURE);
+	const size_t cur = query_size(fd);
+	if (cur == 0) {
+		/* Reservoir is already empty */
+		return;
 	}
+
+	const size_t clamped_sz = MIN(sz, cur);
+	struct vmm_resv_target target = {
+		.vrt_target_sz = cur - clamped_sz,
+		.vrt_chunk_sz = MIN(chunk, sz),
+	};
+
+	if (ioctl(fd, VMM_RESV_SET_TARGET, &target) != 0) {
+		err(EXIT_FAILURE, "Could not remove %zu bytes from reservoir",
+		    clamped_sz);
+	}
+}
+
+
+bool caught_siginfo = false;
+
+static void
+siginfo_handler(int sig, siginfo_t *sip, void *ucp)
+{
+	caught_siginfo = true;
+}
+
+static void
+do_set_target(int fd, size_t sz, size_t chunk)
+{
+	struct vmm_resv_target target = {
+		.vrt_target_sz = sz,
+		.vrt_chunk_sz = chunk,
+	};
+
+	struct sigaction sa = {
+		.sa_sigaction = siginfo_handler,
+		.sa_flags = SA_SIGINFO,
+	};
+	if (sigaction(SIGINFO, &sa, NULL) != 0) {
+		err(EXIT_FAILURE, "Could not configure SIGINFO handler");
+	}
+
+	do {
+		if (ioctl(fd, VMM_RESV_SET_TARGET, &target) != 0) {
+			if (errno != EINTR) {
+				err(EXIT_FAILURE,
+				    "Could not set reservoir size to %zu bytes",
+				    sz);
+			}
+
+			if (caught_siginfo) {
+				caught_siginfo = false;
+				(void) printf("Reservoir size: %zu MiB\n",
+				    target.vrt_result_sz / (1024 * 1024));
+			}
+		}
+	} while (target.vrt_result_sz != sz);
 }
 
 static void
@@ -81,10 +156,10 @@ do_query(int fd)
 		return;
 	}
 
-	printf("Free KiB:\t%llu\n"
-	    "Allocated KiB:\t%llu\n"
-	    "Transient Allocated KiB:\t%llu\n"
-	    "Size limit KiB:\t%llu\n",
+	printf("Free KiB:\t%zu\n"
+	    "Allocated KiB:\t%zu\n"
+	    "Transient Allocated KiB:\t%zu\n"
+	    "Size limit KiB:\t%zu\n",
 	    data.vrq_free_sz / 1024,
 	    data.vrq_alloc_sz / 1024,
 	    data.vrq_alloc_transient_sz / 1024,
@@ -95,67 +170,89 @@ int
 main(int argc, char *argv[])
 {
 	char c;
-	const char *opt_a = NULL, *opt_r = NULL;
+	const char *opt_a = NULL, *opt_r = NULL, *opt_s = NULL;
 	bool opt_q = false;
 	int fd;
 
-	const char *pname = argv[0];
+	prog_name = argv[0];
 
-	while ((c = getopt(argc, argv, "a:r:qh")) != -1) {
+	uint_t resize_opts = 0;
+	size_t chunk_sz = 0;
+	while ((c = getopt(argc, argv, "a:r:s:c:qh")) != -1) {
 		switch (c) {
 		case 'a':
-			opt_a = optarg;
+			if (opt_a == NULL) {
+				resize_opts++;
+				opt_a = optarg;
+			}
 			break;
 		case 'r':
-			opt_r = optarg;
+			if (opt_r == NULL) {
+				resize_opts++;
+				opt_r = optarg;
+			}
+			break;
+		case 's':
+			if (opt_s == NULL) {
+				resize_opts++;
+				opt_s = optarg;
+			}
+			break;
+		case 'c':
+			if (!parse_size(optarg, &chunk_sz)) {
+				warn("Invalid chunk size %s", optarg);
+				usage(EXIT_FAILURE);
+			}
 			break;
 		case 'q':
 			opt_q = true;
 			break;
 		case 'h':
-			usage(pname);
-			return (EXIT_SUCCESS);
+			usage(EXIT_SUCCESS);
+			break;
 		default:
-			usage(pname);
-			return (EXIT_FAILURE);
+			usage(EXIT_FAILURE);
+			break;
 		}
 	}
+
 	if (optind < argc ||
-	    (opt_a == NULL && opt_r == NULL && !opt_q) ||
-	    (opt_a != NULL && opt_r != NULL)) {
-		usage(pname);
-		return (EXIT_FAILURE);
+	    (resize_opts == 0 && !opt_q) || (resize_opts > 1)) {
+		usage(EXIT_FAILURE);
 	}
 
 	fd = open(VMM_CTL_DEV, O_EXCL | O_RDWR);
 	if (fd < 0) {
 		perror("Could not open vmmctl");
-		usage(pname);
-		return (EXIT_FAILURE);
+		usage(EXIT_FAILURE);
 	}
 
 	if (opt_a != NULL) {
 		size_t sz;
 
 		if (!parse_size(opt_a, &sz)) {
-			perror("Invalid size");
-			usage(pname);
-			return (EXIT_FAILURE);
+			warn("Invalid size %s", opt_a);
+			usage(EXIT_FAILURE);
 		}
 
-		do_add(fd, sz);
-	}
-	if (opt_r != NULL) {
+		do_add(fd, sz, chunk_sz);
+	} else if (opt_r != NULL) {
 		size_t sz;
 
 		if (!parse_size(opt_r, &sz)) {
-			perror("Invalid size");
-			usage(pname);
-			return (EXIT_FAILURE);
+			warn("Invalid size %s", opt_r);
+			usage(EXIT_FAILURE);
 		}
-		do_remove(fd, sz);
-	}
-	if (opt_q) {
+		do_remove(fd, sz, chunk_sz);
+	} else if (opt_s != NULL) {
+		size_t sz;
+
+		if (!parse_size(opt_s, &sz)) {
+			warn("Invalid size %s", opt_s);
+			usage(EXIT_FAILURE);
+		}
+		do_set_target(fd, sz, chunk_sz);
+	} else if (opt_q) {
 		do_query(fd);
 	}
 
