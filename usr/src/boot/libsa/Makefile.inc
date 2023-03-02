@@ -272,7 +272,7 @@ OBJECTS += bzipfs.o
 OBJECTS += dosfs.o
 
 # utility
-SRCS += (SRC)/common/util/explicit_bzero.c
-SRCS += (SRC)/common/util/memmem.c
+SRCS += $(SRC)/common/util/explicit_bzero.c
+SRCS += $(SRC)/common/util/memmem.c
 OBJECTS += explicit_bzero.o
 OBJECTS += memmem.o
