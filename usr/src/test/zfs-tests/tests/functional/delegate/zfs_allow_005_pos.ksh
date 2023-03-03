@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
 #
 
 . $STF_SUITE/tests/functional/delegate/delegate_common.kshlib
@@ -54,6 +55,15 @@ typeset perms="snapshot,reservation,compression,checksum,userprop"
 
 log_must zfs allow -l everyone create,mount $ROOT_TESTFS
 log_must zfs allow -c $perms $ROOT_TESTFS
+
+#
+# Verify section headers are correct in allow output
+#
+typeset sortedperms=$(echo "$perms" | tr ',' '\n' |
+			  sort | tr '\n' ',' | sed 's/,$//')
+verify_allow_output $ROOT_TESTFS \
+		    "Create time permissions" "$sortedperms" \
+		    "Local permissions" "everyone create,mount"
 
 mntpnt=$(get_prop mountpoint $ROOT_TESTFS)
 log_must chmod 777 $mntpnt

@@ -1699,3 +1699,38 @@ function verify_allow
 	return 0
 
 }
+
+function verify_allow_output
+{
+	typeset dtst=$1
+
+	shift
+	cat >>/tmp/allow_template.$$ <<EOF
+---- Permissions on $dtst
+EOF
+
+	while (( $# > 0 )); do
+		typeset section=$1
+		typeset content=$2
+
+		cat >>/tmp/allow_template.$$ <<EOF
+${section}:
+	$content
+EOF
+		shift 2
+	done
+
+	# chop variable-length trailing dashes
+	zfs allow $dtst | sed 's/ --*$//' >/tmp/allow_output.$$
+
+	typeset -i ret
+	log_must diff -u /tmp/allow_template.$$ /tmp/allow_output.$$
+	ret=$?
+	rm -f  /tmp/allow_template.$$ /tmp/allow_output.$$
+
+	if [[ $ret -eq 0 ]]; then
+		return 0
+	fi
+
+	return 1
+}

@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
 #
 
 . $STF_SUITE/tests/functional/delegate/delegate_common.kshlib
@@ -72,6 +73,15 @@ log_must zfs create $grandchild
 log_must zfs allow -s @set $perms1 $ROOT_TESTFS
 log_must zfs allow -s @set $perms2 $childfs
 log_must zfs allow $STAFF1 @set $childfs
+
+#
+# Verify section header is correct in output
+#
+
+typeset sortedperms=$(echo "$perms1" | tr ',' '\n' |
+			  sort | tr '\n' ',' | sed 's/,$//')
+verify_allow_output $ROOT_TESTFS \
+		    "Permission sets" "@set $sortedperms"
 
 #
 # Verify only perms2 is valid to user on the level which he was assigned.
