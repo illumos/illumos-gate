@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCIE_H
@@ -605,6 +605,7 @@ extern "C" {
 #define	PCIE_EXT_CAP_ID_FLIT_LOG	0x32	/* Flit Logging */
 #define	PCIE_EXT_CAP_ID_FLIT_PERF	0x33	/* Flit Perf. Measurement */
 #define	PCIE_EXT_CAP_ID_FLIT_ERR	0x34	/* Flit Error Injection */
+#define	PCIE_EXT_CAP_ID_SVC		0x35	/* Streamlined Virtual Chan. */
 
 /*
  * PCI-Express Advanced Error Reporting Extended Capability Offsets
