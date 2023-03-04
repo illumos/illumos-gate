@@ -13,12 +13,15 @@
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 
 PROG=	vtfontcvt
 OBJS=	vtfontcvt.o
 
 LZ4=	$(SRC)/common/lz4
-CPPFLAGS +=	-I$(LZ4)
+# The in-gate lz4 headers must take precedence over any that may appear in an
+# adjunct.
+CPPFLAGS.first +=	-I$(LZ4)
 LZ4_OBJS=	lz4.o
 OBJS	+=	$(LZ4_OBJS)
 

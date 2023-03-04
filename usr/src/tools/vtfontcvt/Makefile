@@ -12,6 +12,7 @@
 #
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2019 Joyent, Inc.
+# Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 #
 
 CMDDIR=		$(SRC)/cmd/vtfontcvt
@@ -20,6 +21,7 @@ include		../Makefile.tools
 include		$(CMDDIR)/Makefile.common
 
 NATIVE_LIBS	+= libumem.so
+CPPFLAGS	+= -I$(LZ4)
 CPPFLAGS	+= -I../../uts/common
 .KEEP_STATE:
 
