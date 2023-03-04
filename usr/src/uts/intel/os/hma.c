@@ -499,7 +499,7 @@ hma_vmx_init(void)
 
 bail:
 	hma_vmx_error = msg;
-	cmn_err(CE_NOTE, "hma_vmx_init: %s", msg);
+	cmn_err(CE_NOTE, "!hma_vmx_init: %s", msg);
 	return (-1);
 }
 
@@ -744,6 +744,6 @@ hma_svm_init(void)
 
 bail:
 	hma_svm_error = msg;
-	cmn_err(CE_NOTE, "hma_svm_init: %s", msg);
+	cmn_err(CE_NOTE, "!hma_svm_init: %s", msg);
 	return (-1);
 }
