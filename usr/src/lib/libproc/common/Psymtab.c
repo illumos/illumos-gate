@@ -23,7 +23,7 @@
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -3465,6 +3465,20 @@ Penv_iter(struct ps_prochandle *P, proc_env_f *func, void *data)
 	/*
 	 * Attempt to find the "_environ" variable in the process.
 	 * Failing that, use the original value provided by Ppsinfo().
+	 *
+	 * The "_environ" variable is initialized by the CRT. We use a rough
+	 * heuristic to try and figure out if we have started running before the
+	 * CRT has executed by checking if the _environ pointer points to NULL
+	 * or not. Once initialized, it will never point to NULL absent an
+	 * application manipulating it directly, libc does not do so, even if
+	 * one calls clearenv(). There is a rare chance that an application is
+	 * messing with the _environ pointer directly; however, in practice that
+	 * is much rarer than this case and if someone is, libc is unlikely to
+	 * have a good day.
+	 *
+	 * While it's tempting to look towards libc variables such as
+	 * initenv_done and related, we have to remember that we're here because
+	 * we haven't actually called  libc_init() or even loaded it!
 	 */
 	if ((psp = Ppsinfo(P)) == NULL)
 		return (-1);
@@ -3484,6 +3498,10 @@ Penv_iter(struct ps_prochandle *P, proc_env_f *func, void *data)
 				envpoff = psp->pr_envp;
 			else
 				envpoff = envpoff32;
+		}
+
+		if (envpoff == 0) {
+			envpoff = psp->pr_envp;
 		}
 	}
 
