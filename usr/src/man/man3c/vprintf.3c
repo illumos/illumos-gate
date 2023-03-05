@@ -44,12 +44,11 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH VPRINTF 3C "Jan 7, 2009"
+.TH VPRINTF 3C "February 21, 2023"
 .SH NAME
 vprintf, vfprintf, vsprintf, vsnprintf, vasprintf \- print formatted output of
 a variable argument list
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 #include <stdarg.h>
@@ -78,8 +77,6 @@ a variable argument list
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBvprintf()\fR, \fBvfprintf()\fR, \fBvsprintf()\fR, \fBvsnprintf()\fR, and
 \fBvasprintf()\fR functions are the same as \fBprintf()\fR, \fBfprintf()\fR,
 \fBsprintf()\fR, \fBsnprintf()\fR, and \fBasprintf()\fR, respectively, except
@@ -108,12 +105,8 @@ traversed again if \fBva_start()\fR is called again after \fBva_end()\fR. In
 the example below, the \fBerror()\fR arguments (\fIarg1\fR, \fIarg2\fR,
 \&.\|.\|.) are passed to \fBvfprintf()\fR in the argument \fIap\fR.
 .SH RETURN VALUES
-.sp
-.LP
 Refer to \fBprintf\fR(3C).
 .SH ERRORS
-.sp
-.LP
 The \fBvprintf()\fR and \fBvfprintf()\fR functions will fail if either the
 \fIstream\fR is unbuffered or the \fIstream\fR's buffer needed to be flushed
 and:
@@ -128,7 +121,6 @@ offset maximum.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBvprintf()\fR to write an error routine.
 .sp
 .LP
@@ -160,8 +152,6 @@ void error(char *function_name, char *format, \&.\|.\|.)
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -190,16 +180,11 @@ See \fBstandards\fR(7) for the standards conformance of \fBvprintf()\fR,
 \fBvasprintf()\fR function is modeled on the one that appears in the FreeBSD,
 NetBSD, and GNU C libraries.
 .SH SEE ALSO
-.sp
-.LP
 .BR printf (3C),
 .BR stdarg (3EXT),
 .BR attributes (7),
-.BR attributes (7),
 .BR standards (7)
 .SH NOTES
-.sp
-.LP
 The \fBvsnprintf()\fR return value when \fIn\fR = 0 was changed in the Solaris
 10 release. The change was based on the SUSv3 specification. The previous
 behavior was based on the initial SUSv2 specification, where \fBvsnprintf()\fR
