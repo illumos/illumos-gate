@@ -5,11 +5,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TTYMON 8 "Feb 22, 2005"
+.TH TTYMON 8 "Feb 17, 2023"
 .SH NAME
 ttymon \- port monitor for terminal ports
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/lib/saf/ttymon\fR
 .fi
@@ -21,8 +20,6 @@ ttymon \- port monitor for terminal ports
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBttymon\fR is a STREAMS-based TTY port monitor. Its function is to monitor
 ports, to set terminal modes, baud rates, and line disciplines for the ports,
 and to connect users or applications to services associated with the ports.
@@ -79,8 +76,6 @@ a disabled message is specified, \fBttymon\fR will send out the disabled
 message when a connection request is received. If \fBttymon\fR is disabled, all
 ports under that instance of \fBttymon\fR will also be disabled.
 .SS "Service Invocation"
-.sp
-.LP
 The service \fBttymon\fR invokes for a port is specified in the \fBttymon\fR
 administrative file. \fBttymon\fR will scan the character string giving the
 service to be invoked for this port, looking for a \fB%d\fR or a \fB%%\fR
@@ -103,8 +98,6 @@ that prompt actually was.
 See \fBttyadm\fR(8) for options that can be set for ports monitored by
 \fBttymon\fR under the Service Access Controller.
 .SS "System Console Invocation"
-.sp
-.LP
 The invocation of ttymon on the system console is managed under \fBsmf\fR(7) by
 the service \fBsvc:/system/console-login\fR. It provides a number of properties
 within the property group \fBttymon\fR to control the invocation, as follows:
@@ -134,8 +127,6 @@ if it is not set.
 .LP
 See \fBEXAMPLES\fR.
 .SH SECURITY
-.sp
-.LP
 \fBttymon\fR uses \fBpam\fR(3PAM) for session management. The \fBPAM\fR
 configuration policy, listed through \fB/etc/pam.conf\fR, specifies the modules
 to be used for \fBttymon\fR. Here is a partial \fBpam.conf\fR file with entries
@@ -152,8 +143,6 @@ ttymon session  required /usr/lib/security/pam_unix_session.so.1
 If there are no entries for the \fBttymon\fR service, then the entries for the
 "other" service will be used.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -244,7 +233,6 @@ Sets the \fBTERM\fR environment variable to \fItermtype\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSetting the Terminal Type
 .sp
 .LP
@@ -262,10 +250,8 @@ the system console \fBttymon\fR invocation:
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
-If any of the \fBLC_*\fR variables ( \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
-\fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR ) (see
+If any of the \fBLC_*\fR variables (\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
+\fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR) (see
 \fBenviron\fR(7)) are not set in the environment, the operational behavior of
 \fBttymon\fR for each corresponding locale category is determined by the value
 of the \fBLANG\fR environment variable. If \fBLC_ALL\fR is set, its contents
@@ -287,7 +273,6 @@ widths. In the "C" locale, only characters from ISO 8859-1 are valid.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/logindevperm\fR\fR
@@ -300,8 +285,6 @@ widths. In the "C" locale, only characters from ISO 8859-1 are valid.
 .LP
 The command-line syntax is Stable. The SMF properties are Evolving.
 .SH SEE ALSO
-.sp
-.LP
 .BR ct (1C),
 .BR cu (1C),
 .BR pam (3PAM),
@@ -330,8 +313,6 @@ The command-line syntax is Stable. The SMF properties are Evolving.
 .LP
 \fI\fR
 .SH NOTES
-.sp
-.LP
 If a port is monitored by more than one \fBttymon\fR, it is possible for the
 \fBttymon\fRs to send out prompt messages in such a way that they compete for
 input.

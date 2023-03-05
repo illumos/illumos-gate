@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ADBGEN 8 "Feb 20, 1998"
+.TH ADBGEN 8 "Feb 17, 2023"
 .SH NAME
 adbgen \- generate adb script
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/lib/adb/adbgen\fR [\fB-m\fR \fImodel\fR] \fIfilename\fR.adb .\|.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBadbgen\fR makes it possible to write \fBadb\fR(1) scripts that do not
 contain hard-coded dependencies on structure member offsets. The input to
 \fBadbgen\fR is a file named \fIfilename\fR\fB\&.adb\fR that contains header
@@ -169,8 +166,6 @@ sane fashion. \fBadbgen\fR does not check the script to ensure that these
 limitations are met. \fBadbgen\fR also checks the size of the structure member
 against the size of the \fBadb\fR format code and warns if they are not equal.
 .SH OPTIONS
-.sp
-.LP
 The following option is supported:
 .sp
 .ne 2
@@ -186,8 +181,6 @@ given, the data type model defaults to \fBilp32\fR.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -200,7 +193,6 @@ of the structure, and finally an \fBadb\fR script.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRA sample \fBadbgen\fR file.
 .sp
 .LP
@@ -220,7 +212,7 @@ struct x {
 
 .sp
 .LP
-then , an \fBadbgen\fR file (call it \fBscript.adb\fR) to print the file
+then an \fBadbgen\fR file (call it \fBscript.adb\fR) to print the file
 \fBx.h\fR would be:
 
 .sp
@@ -296,7 +288,6 @@ x$<script
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/platform/\fR\fIplatform-name\fR\fB/lib/adb/*\fR\fR
@@ -337,26 +328,18 @@ platform-specific \fBadb\fR scripts for debugging the 64-bit SPARC V9 kernel
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR adb (1),
 .BR uname (1),
 .BR attributes (7),
 .BR kadb (8)
 .SH DIAGNOSTICS
-.sp
-.LP
 Warnings are given about structure member sizes not equal to \fBadb\fR format
 items and about badly formatted requests. The C compiler complains if a
 structure member that does not exist is referenced. It also complains about an
 ampersand before array names; these complaints may be ignored.
 .SH NOTES
-.sp
-.LP
 \fIplatform-name\fR can be found using the \fB-i\fR option of \fBuname\fR(1).
 .SH BUGS
-.sp
-.LP
 \fBadb\fR syntax is ugly; there should be a higher level interface for
 generating scripts.
 .sp

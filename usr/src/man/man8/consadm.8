@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CONSADM 8 "Oct 27, 2004"
+.TH CONSADM 8 "Feb 17, 2023"
 .SH NAME
 consadm \- select or display devices used as auxiliary console devices
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/consadm\fR
 .fi
@@ -28,8 +27,6 @@ consadm \- select or display devices used as auxiliary console devices
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBconsadm\fR selects the hardware \fIdevice\fR or devices to be used as
 auxiliary console devices, or displays the current device. Only superusers are
 allowed to make or display auxiliary console device selections.
@@ -64,8 +61,6 @@ long as auxiliary console devices remain active.
 See \fBeeprom\fR(8) for instructions on assigning an auxiliary console device
 as the system console.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -97,12 +92,11 @@ auxiliary console device list.
 .RS 13n
 Prints the list of auxiliary consoles that will be auxiliary across reboots.
 .sp
-When invoked with the \fB-a\fR or \fB-d\fR options , tells the application to
+When invoked with the \fB-a\fR or \fB-d\fR options, tells the application to
 make the change persist across reboot.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAdding to the list of devices that will receive console
 messages
 .sp
@@ -151,14 +145,10 @@ example# \fBconsadm\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBconsadm\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
 and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -179,8 +169,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -195,8 +183,6 @@ Stability Level	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR svcs (1),
 .BR console (4D),
 .BR sysmsg (4D),
@@ -208,8 +194,6 @@ Stability Level	Evolving
 .BR svcadm (8),
 .BR syslogd (8)
 .SH NOTES
-.sp
-.LP
 Auxiliary console devices are not usable for \fBkadb\fR or firmware \fBI/O\fR,
 do not receive panic messages, and do not receive output directed to
 \fB/dev/console\fR.

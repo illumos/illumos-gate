@@ -4,13 +4,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPFILES 5 "Feb 25, 2017"
+.TH YPFILES 5 "Feb 17, 2023"
 .SH NAME
 ypfiles \- Network Information Service Version 2, formerly known as YP
 .SH DESCRIPTION
-.LP
 The NIS network information service uses a distributed, replicated database of
-\fBdbm\fR files , in ASCII form, that are contained in the \fB/var/yp\fR
+\fBdbm\fR files, in ASCII form, that are contained in the \fB/var/yp\fR
 directory hierarchy on each NIS server.
 .sp
 .LP
@@ -27,7 +26,6 @@ maps. Each line of the nickname file contains two fields separated by white
 space. The first field is the nickname, and the second field is the name of the
 map that it expands to. The nickname cannot contain a ".".
 .SS "NIS to LDAP (N2L)"
-.LP
 If the \fB/var/yp/NISLDAPmapping\fR configuration file is present, the NIS
 server operates in NIS to LDAP (N2L) mode. In this mode, NIS maps are stored in
 a new set of DBM files, prepended by the \fBLDAP_\fR prefix, at
@@ -43,7 +41,6 @@ In N2L mode, the old style DBM files, NIS source files, and the
 \fBypmake\fR(8) utility have to role. They are retained to enable easy
 conversion back to the traditional mode, if required.
 .SS "Converting from N2L to Traditional NIS"
-.LP
 When NIS is operating in N2L mode, it uses a new set of NIS maps with an
 \fBLDAP_\fR prefix, based on the contents of the LDAP DIT. The NIS source files
 are unused and become out of date. If you wish to convert back to the
@@ -148,7 +145,6 @@ NIS to LDAP mode map files
 .RE
 
 .SH SEE ALSO
-.LP
 .BR ldap (1),
 .BR ndbm (3C),
 .BR ypclnt (3NSL),

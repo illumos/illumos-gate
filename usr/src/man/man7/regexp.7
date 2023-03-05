@@ -44,12 +44,11 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH REGEXP 7 "May 20, 2002"
+.TH REGEXP 7 "Feb 17, 2023"
 .SH NAME
 regexp, compile, step, advance \- simple regular expression compile and match
 routines
 .SH SYNOPSIS
-.LP
 .nf
 #define INIT \fIdeclarations\fR
 #define GETC(void) \fIgetc code\fR
@@ -76,8 +75,6 @@ extern char *\fIloc1\fR, *\fIloc2\fR, *\fIlocs\fR;
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 Regular Expressions (REs) provide a mechanism to select specific strings from a
 set of character strings. The Simple Regular Expressions described below differ
 from the  Internationalized Regular Expressions described on the
@@ -111,8 +108,6 @@ The function \fBcompile()\fR takes as input a regular expression as defined
 below and produces a compiled expression that can be used with \fBstep()\fR or
 \fBadvance()\fR.
 .SS "Basic Regular Expressions"
-.sp
-.LP
 A regular expression specifies a set of character strings. A member of this set
 of strings is said to be matched by the regular expression. Some characters
 have special meaning when used in a regular expression; other characters stand
@@ -126,7 +121,7 @@ The following \fIone-character\fR \fIRE\fRs match a \fIsingle\fR character:
 \fB1.1\fR
 .ad
 .RS 7n
-An ordinary character ( \fInot\fR one of those discussed in 1.2 below) is a
+An ordinary character (\fInot\fR one of those discussed in 1.2 below) is a
 one-character RE that matches itself.
 .RE
 
@@ -351,8 +346,6 @@ the entire line.
 .LP
 The null RE (for example, \fB//\|\fR) is equivalent to the last RE encountered.
 .SS "Addressing with REs"
-.sp
-.LP
 Addresses are constructed as follows:
 .RS +4
 .TP
@@ -427,8 +420,6 @@ For convenience, a comma (\fB,\fR) stands for the address pair \fB1,$\fR,
 while a semicolon (\fB;\fR) stands for the pair \fB\&.,$\fR.
 .RE
 .SS "Characters With Special Meaning"
-.sp
-.LP
 Characters that have special meaning except when they appear within square
 brackets (\fB[\|]\fR) or are preceded by \fB\e\fR are:  \fB\&.\fR, \fB*\fR,
 \fB[\|\fR, \fB\e\fR\|. Other special characters, such as \fB$\fR have special
@@ -453,8 +444,6 @@ meaning \fIcomplement of\fR if it immediately follows the open bracket
 The special meaning of the \fB\e\fR operator can be escaped only by preceding
 it with another \fB\e\fR\|, for example \fB\e\e\fR\|.
 .SS "Macros"
-.sp
-.LP
 Programs must have the following five macros declared before the \fB#include
 <regexp.h>\fR statement. These macros are used by the \fBcompile()\fR routine.
 The macros \fBGETC\fR, \fBPEEKC\fR, and \fBUNGETC\fR operate on the regular
@@ -517,8 +506,6 @@ This call should never return.
 .RE
 
 .SS "\fBcompile()\fR"
-.sp
-.LP
 The syntax of the \fBcompile()\fR routine is as follows:
 .sp
 .in +2
@@ -559,8 +546,6 @@ be used in the declarations for \fBGETC\fR, \fBPEEKC\fR, and \fBUNGETC\fR.
 Otherwise it can be used to declare external variables that might be used by
 \fBGETC\fR, \fBPEEKC\fR and \fBUNGETC\fR. (See \fBEXAMPLES\fR below.)
 .SS "step(\|), advance(\|)"
-.sp
-.LP
 The first parameter to the \fBstep()\fR and \fBadvance()\fR functions is a
 pointer to a string of characters to be checked for a match. This string should
 be null terminated.
@@ -602,7 +587,6 @@ the point in the string at sometime during the backing up process,
 .LP
 The external variables \fBcircf\fR, \fBsed\fR, and \fBnbra\fR are reserved.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing Regular Expression Macros and Calls
 .sp
 .LP
@@ -630,8 +614,6 @@ might be defined by an application program:
 .sp
 
 .SH DIAGNOSTICS
-.sp
-.LP
 The function \fBcompile()\fR uses the macro \fBRETURN\fR on success and the
 macro \fBERROR\fR on failure (see above). The functions \fBstep()\fR and
 \fBadvance()\fR return non-zero on a successful match and zero if there is no
@@ -745,6 +727,4 @@ regular expression overflow.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR regex (7)

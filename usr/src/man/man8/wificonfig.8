@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WIFICONFIG 8 "December 28, 2020"
+.TH WIFICONFIG 8 "Feb 17, 2023"
 .SH NAME
 wificonfig \- WLAN configuration
 .SH SYNOPSIS
@@ -499,7 +499,7 @@ subcommand is only valid when \fBWEP\fR is on.
 .sp .6
 .RS 4n
 Specifies the strength of the received radio signal. The valid values are 0 -
-15 , where 0 is the weakest signal and 15 is the strongest signal. This
+15, where 0 is the weakest signal and 15 is the strongest signal. This
 parameter is read-only and indicates the radio signal strength received by the
 \fBNIC\fR.
 .RE
@@ -691,7 +691,7 @@ profile to be applied to the network interface, the \fBconnect\fR or
 A \fBgetprofileparam\fR without any parameters will display all the parameters
 and their values.
 .sp
-"Solaris.network.wifi.wep" authorization is required when the \fBsetparam\fR
+The "solaris.network.wifi.wep" authorization is required when the \fBsetparam\fR
 subcommand is used with the
 \fIwepkey1\fR|\fIwepkey2\fR|\fIwepkey3\fR|\fIwepkey4\fR parameter. For all
 other parameters, the \fBsetparam\fR subcommand requires

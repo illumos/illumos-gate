@@ -3,26 +3,21 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STTY 1B "Feb 14, 2005"
+.TH STTY 1B "Feb 17, 2023"
 .SH NAME
 stty \- set the options for a terminal
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/ucb/stty\fR [\fB-a\fR] [\fB-g\fR] [\fB-h\fR] [\fImodes\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBstty\fR sets certain terminal I/O options for the device that is the current
 standard output. Without arguments, \fBstty\fR reports the settings of certain
 options.
 .SH OPTIONS
-.sp
-.LP
 In this report, if a character is preceded by a caret (\fB^\fR), then the value
-of that option is the corresponding CTRL character (for example, \fB^h\fR is
+of that option is the corresponding CTRL character. (For example, \fB^h\fR is
 CTRL-h. In this case, recall that CTRL-h is the same as the BACKSPACE key.) The
 sequence \fB^@\fR means that an option has a null value.
 .sp
@@ -61,13 +56,12 @@ Many combinations of options make no sense, but no sanity checking is
 performed. Hardware flow control and clock modes options might not be supported
 by all hardware interfaces. The options are selected from the following:
 .SS "Special Requests"
-.sp
 .ne 2
 .na
 \fB\fBall\fR\fR
 .ad
 .RS 14n
-Reports the same option settings as \fBstty\fR without arguments,  but with the
+Reports the same option settings as \fBstty\fR without arguments, but with the
 control characters in column format.
 .RE
 
@@ -104,7 +98,6 @@ always report the settings to the standard output.
 .RE
 
 .SS "Control Modes"
-.sp
 .ne 2
 .na
 \fB\fBparenb\fR (\fB-parenb\fR)\fR
@@ -186,7 +179,7 @@ the input baud rate is specified by the value of the output baud rate.
 .sp .6
 .RS 4n
 Set terminal output baud rate to the number given, if possible. (Not all
-hardware supports split baud rates.)  If the  baud rate is set to zero, the
+hardware supports split baud rates.)  If the baud rate is set to zero, the
 line is hung up immediately.
 .RE
 
@@ -247,8 +240,8 @@ Assume a line without (with) modem control.
 .ad
 .sp .6
 .RS 4n
-Enable hardware flow control.  Raise the RTS  (Request to Send) modem control
-line.  Suspends  output until the  \fBCTS\fR (Clear to Send) line is  raised.
+Enable hardware flow control.  Raise the RTS (Request to Send) modem control
+line.  Suspends output until the \fBCTS\fR (Clear to Send) line is raised.
 .RE
 
 .sp
@@ -262,7 +255,6 @@ Block (do not block) output from a non-current layer.
 .RE
 
 .SS "Input Modes"
-.sp
 .ne 2
 .na
 \fB\fBignbrk\fR (\fB-ignbrk\fR)\fR
@@ -405,7 +397,7 @@ Same as \fBixoff\fR.
 \fB\fBimaxbel\fR (\fB\fR\fB-imaxbel\fR\fB)\fR\fR
 .ad
 .RS 22n
-Echo (do not echo)  \fBBEL\fR when the input line is too long.
+Echo (do not echo) \fBBEL\fR when the input line is too long.
 .RE
 
 .sp
@@ -418,7 +410,6 @@ Enable (disable) extended (implementation-defined) functions for input data.
 .RE
 
 .SS "Output Modes"
-.sp
 .ne 2
 .na
 \fB\fBopost\fR (\fB-opost\fR)\fR
@@ -546,7 +537,6 @@ Select style of delay for vertical tabs (see \fBtermio\fR(4I)).
 .RE
 
 .SS "Local Modes"
-.sp
 .ne 2
 .na
 \fB\fBisig\fR (\fB-isig\fR)\fR
@@ -601,7 +591,7 @@ Echo back (do not echo back) every character typed.
 .ad
 .RS 24n
 Echo (do not echo) ERASE character as a backspace-space-backspace string.
-Note:  This mode erases the ERASEed character on many CRT terminals; however,
+Note: This mode erases the ERASEed character on many CRT terminals; however,
 it does \fInot\fR keep track of column position and, as a result, can be
 confusing on escaped characters, tabs, and backspaces.
 .RE
@@ -668,7 +658,7 @@ line.  (Does not apply to the 3B2.)
 \fB\fBtostop\fR (\fB-tostop\fR)\fR
 .ad
 .RS 24n
-Send (do not send)  \fBSIGTTOU\fR for background processes.
+Send (do not send) \fBSIGTTOU\fR for background processes.
 .RE
 
 .sp
@@ -764,7 +754,6 @@ the 3B2.)
 .RE
 
 .SS "Hardware Flow Control Modes"
-.sp
 .ne 2
 .na
 \fB\fBrtsxoff\fR (\fB-rtsxoff\fR)\fR
@@ -810,7 +799,6 @@ Enable (disable) isochronous hardware flow control on input.
 .RE
 
 .SS "Clock Modes"
-.sp
 .ne 2
 .na
 \fB\fBxcibrg\fR\fR
@@ -927,7 +915,6 @@ CCITT V.24 circuit 128, no EIA-232-D pin, clock source.
 .RE
 
 .SS "Control Assignments"
-.sp
 .ne 2
 .na
 \fB\fIcontrol-character c\fR\fR
@@ -951,11 +938,10 @@ information on \fBSWTCH\fR, see \fBNOTES\fR.
 \fB\fBline\fR\fI i\fR\fR
 .ad
 .RS 23n
-Set line discipline to \fIi\fR (0 < \fIi\fR < 127 ).
+Set line discipline to \fIi\fR (0 < \fIi\fR < 127).
 .RE
 
 .SS "Combination Modes"
-.sp
 .ne 2
 .na
 \fB\fBevenp\fR or \fBparity\fR\fR
@@ -1006,7 +992,7 @@ Disable \fBparenb\fR and \fBparodd\fR, and set \fBcs8\fR.
 \fB\fBodd\fR (\fB-odd\fR)\fR
 .ad
 .RS 24n
-Same as  \fBoddp\fR (\fB-oddp\fR).
+Same as \fBoddp\fR (\fB-oddp\fR).
 .RE
 
 .sp
@@ -1062,7 +1048,7 @@ or output post processing). For information on \fBSWTCH\fR, see \fBNOTES\fR.
 .ad
 .RS 24n
 Unset (set) \fBicrnl\fR, \fBonlcr\fR. In addition \fB-nl\fR unsets \fBinlcr\fR,
-\fBigncr\fR,  \fBocrnl\fR, and \fBonlret\fR.
+\fBigncr\fR, \fBocrnl\fR, and \fBonlret\fR.
 .RE
 
 .sp
@@ -1117,7 +1103,7 @@ Reset all modes to some reasonable values.
 .ad
 .RS 24n
 Set all modes suitable for the terminal type \fIterm\fR, where \fIterm\fR is
-one of \fBtty33\fR, \fBtty37\fR, \fBvt05\fR,  \fBtn300\fR, \fBti700\fR, or
+one of \fBtty33\fR, \fBtty37\fR, \fBvt05\fR, \fBtn300\fR, \fBti700\fR, or
 \fBtek\fR.
 .RE
 
@@ -1128,7 +1114,7 @@ one of \fBtty33\fR, \fBtty37\fR, \fBvt05\fR,  \fBtn300\fR, \fBti700\fR, or
 .ad
 .RS 24n
 Set normal asynchronous communications where clock settings are \fBxcibrg\fR,
-\fBrcibrg\fR,  \fBtsetcoff\fR and \fBrsetcoff\fR.
+\fBrcibrg\fR, \fBtsetcoff\fR and \fBrsetcoff\fR.
 .RE
 
 .sp
@@ -1172,7 +1158,6 @@ ERASE, KILL, and INTR characters to \fB^?\fR, \fB^U\fR, and \fB^C\fR,
 .RE
 
 .SS "Window Size"
-.sp
 .ne 2
 .na
 \fB\fBrows\fR\fIn\fR\fR
@@ -1218,16 +1203,12 @@ Set horizontal window size to \fIn\fR \fIpixels\fR.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR tabs (1),
 .BR ioctl (2),
 .BR termio (4I),
 .BR termiox (4I),
 .BR attributes (7)
 .SH NOTES
-.sp
-.LP
 Solaris does not support any of the actions implied by \fBswtch\fR, which was
 used by the \fBsxt\fR driver on System V release 4.  Solaris allows the
 \fBswtch\fR value to be set, and prints it out if set, but it does not perform

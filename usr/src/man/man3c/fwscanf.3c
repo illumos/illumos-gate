@@ -43,12 +43,11 @@
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH FWSCANF 3C "Jul 10, 2008"
+.TH FWSCANF 3C "Feb 17, 2023"
 .SH NAME
 fwscanf, wscanf, swscanf, vfwscanf, vwscanf, vswscanf \- convert formatted
 wide-character input
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 #include <wchar.h>
@@ -89,8 +88,6 @@ wide-character input
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBfwscanf()\fR function reads from the named input \fIstream\fR.
 .sp
 .LP
@@ -104,7 +101,7 @@ The \fBvfwscanf()\fR, \fBvswscanf()\fR, and \fBvwscanf()\fR functions are
 equivalent to the \fBfwscanf()\fR, \fBswscanf()\fR, and \fBwscanf()\fR
 functions, respectively, except that instead of being called with a variable
 number of arguments, they are called with an argument list as defined by the
-<\fBstdarg.h\fR> header . These functions do not invoke the \fBva_end()\fR
+<\fBstdarg.h\fR> header. These functions do not invoke the \fBva_end()\fR
 macro. Applications using these functions should call \fBva_end\fR(\fIap\fR)
 afterwards to clean up.
 .sp
@@ -592,8 +589,6 @@ field will be marked for update by the first successful execution of
 \fIstream\fR that returns data not supplied by a prior call to
 \fBungetc\fR(3C).
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, these functions return the number of successfully
 matched and assigned input items; this number can be 0 in the event of an early
 matching failure.  If the input ends before the first matching failure or
@@ -601,8 +596,6 @@ conversion, \fBEOF\fR is returned.  If a read error occurs the error indicator
 for the stream is set, \fBEOF\fR is returned, and \fBerrno\fR is set to
 indicate the error.
 .SH ERRORS
-.sp
-.LP
 For the conditions under which the \fBfwscanf()\fR functions will fail and may
 fail, refer to \fBfgetwc\fR(3C).
 .sp
@@ -627,12 +620,9 @@ There are insufficient arguments.
 .RE
 
 .SH USAGE
-.sp
-.LP
 In format strings containing the \fB%\fR form of conversion specifications,
 each argument in the argument list is used exactly once.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fBwscanf()\fR example
 .sp
 .LP
@@ -692,8 +682,6 @@ will assign 56 to \fIi\fR, 789.0 to \fIx\fR, skip 0123, and place the string
 character \fBa\fR.
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -712,8 +700,6 @@ Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR fgetc (3C),
 .BR fgets (3C),
 .BR fgetwc (3C),
@@ -735,8 +721,6 @@ Standard	See \fBstandards\fR(7).
 .BR attributes (7),
 .BR standards (7)
 .SH NOTES
-.sp
-.LP
 The behavior of the conversion specifier "%%" has changed for all of the
 functions described on this manual page. Previously the "%%" specifier accepted
 a "%" character from input only if there were no preceding whitespace

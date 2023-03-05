@@ -5,18 +5,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WHODO 8 "Dec 15, 2013"
+.TH WHODO 8 "Feb 17, 2023"
 .SH NAME
 whodo \- who is doing what
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/whodo\fR [\fB-h\fR] [\fB-l\fR] [\fIuser\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBwhodo\fR command produces formatted and dated output from information in
 the \fB/var/adm/utmpx\fR and \fB/proc/pid\fR files.
 .sp
@@ -30,8 +27,6 @@ process-ID, CPU minutes and seconds used, and process name.
 If \fIuser\fR is specified, output is restricted to all sessions pertaining to
 that user.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -62,7 +57,6 @@ and the name and arguments of the current process.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the whodo Command
 .sp
 .LP
@@ -104,11 +98,9 @@ xt162    lee      10:20
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
-If any of the \fBLC_*\fR variables ( \fB\fR\fBLC_CTYPE\fR\fB,\fR
-\fBLC_MESSAGES\fR\fB,\fR \fBLC_TIME\fR\fB,\fR \fBLC_COLLATE\fR\fB,\fR
-\fBLC_NUMERIC\fR\fB,\fR and \fBLC_MONETARY\fR ) (see \fBenviron\fR(7)) are not
+If any of the \fBLC_*\fR variables (\fBLC_CTYPE\fR,
+\fBLC_MESSAGES\fR, \fBLC_TIME\fR, \fBLC_COLLATE\fR,
+\fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR) (see \fBenviron\fR(7)) are not
 set in the environment, the operational behavior of \fBtar\fR(1) for each
 corresponding locale category is determined by the value of the \fBLANG\fR
 environment variable. If \fBLC_ALL\fR is set, its contents are used to override
@@ -153,8 +145,6 @@ date and time handling follow the U.S. rules.
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -175,7 +165,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/passwd\fR\fR
@@ -203,8 +192,6 @@ Contains PID
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ps (1),
 .BR who (1),
 .BR attributes (7),

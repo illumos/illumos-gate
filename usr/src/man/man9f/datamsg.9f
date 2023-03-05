@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DATAMSG 9F "Jan 16, 2006"
+.TH DATAMSG 9F "Feb 17, 2023"
 .SH NAME
 datamsg \- test whether a message is a data message
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/stream.h>
 #include <sys/ddi.h>
@@ -19,11 +18,8 @@ datamsg \- test whether a message is a data message
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fItype\fR\fR
@@ -35,14 +31,10 @@ through the message block using \fBmp->b_datap->db_type\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdatamsg()\fR function tests the type of message to determine if it is a
-data message type (\fBM_DATA\fR, \fBM_DELAY\fR, \fBM_PROTO\fR , or
+data message type (\fBM_DATA\fR, \fBM_DELAY\fR, \fBM_PROTO\fR, or
 \fBM_PCPROTO\fR).
 .SH RETURN VALUES
-.sp
-.LP
 \fBdatamsg\fR returns
 .sp
 .ne 2
@@ -63,13 +55,9 @@ otherwise.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 The \fBdatamsg()\fR function can be called from user, interrupt, or kernel
 context.
 .SH EXAMPLES
-.sp
-.LP
 The \fBput\fR(9E) routine enqueues all data messages for handling by the
 \fBsrv\fR(9E) (service) routine. All non-data messages are handled in the
 \fBput\fR(9E) routine.
@@ -93,8 +81,6 @@ The \fBput\fR(9E) routine enqueues all data messages for handling by the
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 .BR put (9E),
 .BR srv (9E),
 .BR allocb (9F),

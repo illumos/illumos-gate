@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IPSECCONF 8 "April 9, 2016"
+.TH IPSECCONF 8 "Feb 17, 2023"
 .SH NAME
 ipsecconf \- configure system wide IPsec policy
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/ipsecconf\fR
 .fi
@@ -48,7 +47,6 @@ ipsecconf \- configure system wide IPsec policy
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBipsecconf\fR utility configures the IPsec policy for a host or for one
 of its tunnels. Once the policy is configured, all outbound and inbound
 datagrams are subject to policy checks as they exit and enter the host or
@@ -121,7 +119,6 @@ svc:/network/ipsec/policy
 See \fBNOTES\fR for more information on managing IPsec security policy and
 \fBSECURITY\fR for issues in securing \fB/etc/inet/ipsecinit.conf\fR.
 .SH OPTIONS
-.LP
 \fBipsecconf\fR supports the following options:
 .sp
 .ne 2
@@ -278,7 +275,6 @@ Quiet mode. Suppresses the warning message generated when adding policies.
 .RE
 
 .SH OPERANDS
-.LP
 Each policy entry contains three parts specified as follows:
 .sp
 .in +2
@@ -986,7 +982,7 @@ one of the following and this field is mandatory.
 .sp .6
 .RS 4n
 Use IPsec for the datagram as described by the properties, if the pattern
-matches the datagram. If ipsec is given without a dir spec , the pattern is
+matches the datagram. If ipsec is given without a dir spec, the pattern is
 matched to incoming and outgoing datagrams.
 .RE
 
@@ -1092,7 +1088,6 @@ at the end of all the old entries. See .
 A new entry is considered duplicate of the old entry if an old entry matches
 the same traffic pattern as the new entry. See  for information on duplicates.
 .SH SECURITY
-.LP
 If, for example, the policy file comes over the wire from an \fBNFS\fR mounted
 file system, an adversary can modify the data contained in the file, thus
 changing the policy configured on the machine to suit his needs. Administrators
@@ -1146,7 +1141,6 @@ Similarly, do not change policies in the middle of a communication.
 Note that certain \fBndd\fR tunables affect how policies configured with this
 tool are enforced; see \fBipsecesp\fR(4P) for more details.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRProtecting Outbound \fBTCP\fR Traffic With \fBESP\fR and the
 \fBAES\fR Algorithm
 .sp
@@ -1276,7 +1270,7 @@ be matched against all \fBbypass\fR entries before any other policy entries.
 # Add the bypass first.
 {
 raddr host-B
-	dir in	
+	dir in
 } bypass {}
 
 # Now add for network-B.
@@ -1610,7 +1604,6 @@ Sample input file for \fBipseconf\fR.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -1625,7 +1618,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 .BR auths (1),
 .BR profiles (1),
 .BR svcprop (1),
@@ -1747,7 +1739,6 @@ new entry.
 .RE
 
 .SH NOTES
-.LP
 IPsec manual keys are managed by the service management facility, \fBsmf\fR(7).
 The services listed below manage the components of IPsec. These services are
 delivered as follows:

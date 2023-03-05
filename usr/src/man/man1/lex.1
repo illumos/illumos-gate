@@ -44,18 +44,15 @@
 .\" Portions Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright (c) 2014 Gary Mills
 .\"
-.TH LEX 1 "Jan 1, 2014"
+.TH LEX 1 "Feb 17, 2023"
 .SH NAME
 lex \- generate programs for lexical tasks
 .SH SYNOPSIS
-.LP
 .nf
 \fBlex\fR [\fB-cntv\fR] [\fB-e\fR | \fB-w\fR] [\fB-V\fR \fB-Q\fR [y | n]] [\fB-Y\fR \fIdirectory\fR]] [\fIfile\fR]...
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBlex\fR utility generates C programs to be used in lexical processing of
 character input, and that can be used as an interface to \fByacc\fR. The C
 programs are generated from \fBlex\fR source code and conform to the ISO C
@@ -64,8 +61,6 @@ file \fBlex.yy.c\fR. The state of this file is unspecified if \fBlex\fR exits
 with a non-zero exit status. See \fBEXTENDED DESCRIPTION\fR for a complete
 description of the \fBlex\fR input language.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -160,8 +155,6 @@ used by \fBlex\fR.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -176,17 +169,11 @@ the standard input will be used.
 .RE
 
 .SH OUTPUT
-.sp
-.LP
 The \fBlex\fR output files are described below.
 .SS "Stdout"
-.sp
-.LP
 If the \fB-t\fR option is specified, the text file of C source code output of
 \fBlex\fR will be written to standard output.
 .SS "Stderr"
-.sp
-.LP
 If the \fB-t\fR option is specified informational, error and warning messages
 concerning the contents of \fBlex\fR source code input will be written to the
 standard error.
@@ -210,13 +197,9 @@ operator in the \fBDefinitions\fR \fBin\fR \fBlex\fR section (see \fBEXTENDED
 DESCRIPTION\fR), as long as the \fB-n\fR option is not specified.
 .RE
 .SS "Output Files"
-.sp
-.LP
 A text file containing C source code will be written to \fBlex.yy.c\fR, or to
 the standard output if the \fB-t\fR option is present.
 .SH EXTENDED DESCRIPTION
-.sp
-.LP
 Each input file contains \fBlex\fR source code, which is a table of regular
 expressions with corresponding actions in the form of C program fragments.
 .sp
@@ -300,8 +283,6 @@ the \fIRules\fR section but coming after one or more rules is undefined. The
 presence of such input may result in an erroneous definition of the \fByylex\fR
 function.
 .SS "Definitions in lex"
-.sp
-.LP
 \fBDefinitions\fR \fBin\fR \fBlex\fR appear before the first \fB%%\fR
 delimiter. Any line in this section not contained between \fB%{\fR and \fB%}\fR
 lines and not beginning with a blank character is assumed to define a \fBlex\fR
@@ -429,8 +410,6 @@ string.  If you supply your own \fBinput()\fR, \fBunput(\fIc\fR)\fR, or
 a different interface between your program and the lex internals, to expedite
 some programs.
 .SS "Rules in lex"
-.sp
-.LP
 The \fBRules\fR \fBin\fR \fBlex\fR source files are a table in which the left
 column contains regular expressions and the right column contains actions (C
 program fragments) to be executed when the expressions are recognized.
@@ -467,13 +446,9 @@ The blank characters appear within double-quotes or square brackets.
 Each blank character is preceded by a backslash character.
 .RE
 .SS "User Subroutines in lex"
-.sp
-.LP
 Anything in the user subroutines section will be copied to \fBlex.yy.c\fR
 following \fByylex\fR.
 .SS "Regular Expressions     in lex"
-.sp
-.LP
 The \fBlex\fR utility supports the set of Extended Regular Expressions (EREs)
 described on \fBregex\fR(7) with the following additions and exceptions to the
 syntax:
@@ -567,7 +542,7 @@ c c c
 c c c .
 Escape Sequences in lex
 _
-Escape Sequence	Description 	Meaning
+Escape Sequence	Description	Meaning
 _
 \e\fIdigits\fR	T{
 A backslash character followed by the longest sequence of one, two or three octal-digit characters (01234567). Ifall of the digits are 0, (that is, representation of the NUL character), the behavior is undefined.
@@ -619,7 +594,7 @@ _
 \fIgrouping\fR	\fB()\fR
 \fIdefinition\fR	\fB{\fR\fIname\fR}
 \fIsingle-character RE duplication\fR	\fB* + ?\fR
-\fIconcatenation\fR	
+\fIconcatenation\fR
 \fIinterval expression\fR	\fB{\fR\fIm\fR,\fIn\fR}
 \fIalternation\fR	\fB|\fR
 .TE
@@ -683,8 +658,6 @@ this rule were ab/bc, however, the rule matches the text \fBab\fR when it is
 followed by the text \fBbc\fR. In this latter case, the matching of \fIr\fR
 cannot extend into the beginning of \fIx\fR, so the result is specified.
 .SS "Actions in lex"
-.sp
-.LP
 The action to be taken when an \fBERE\fR is matched can be a C program fragment
 or the special actions described below; the program fragment can contain one or
 more C statements, and can also include special actions. The empty C statement
@@ -757,7 +730,7 @@ to be executed for the same input. Thus, multiple rules can be matched and
 executed for one input string or overlapping input strings. For example, given
 the regular expressions \fBxyz\fR and \fBxy\fR and the input \fBxyz\fR, usually
 only the regular expression \fBxyz\fR would match. The next attempted match
-would start after z. If the last action in the \fBxyz\fR rule is \fBREJECT\fR ,
+would start after z. If the last action in the \fBxyz\fR rule is \fBREJECT\fR,
 both this rule and the \fBxy\fR rule would be executed. The \fBREJECT\fR action
 may be implemented in such a fashion that flow of control does not continue
 after it, as if it were equivalent to a \fBgoto\fR to another part of
@@ -813,7 +786,7 @@ value in \fIyyleng\fR is adjusted accordingly.
 .sp
 .ne 2
 .na
-\fB\fBint\fR\fIyyless(int\fR\fB n\fR\fI)\fR \fR
+\fB\fBint\fR \fByyless(int\fR \fIn\fR\fB)\fR \fR
 .ad
 .RS 21n
 Retains \fIn\fR initial characters in \fIyytext\fR, NUL-terminated, and treats
@@ -886,8 +859,6 @@ functions in \fBlibl.a\fR can be reliably redefined by a portable application.
 Except for \fBinput\fR, \fBunput\fR and \fBmain\fR, all external and static
 names generated by \fBlex\fR begin with the prefix \fByy\fR or \fBYY\fR.
 .SH USAGE
-.sp
-.LP
 Portable applications are warned that in the \fBRules in lex\fR section, an
 \fBERE\fR without an action is not acceptable, but need not be detected as
 erroneous by \fBlex\fR. This may result in compilation or run-time errors.
@@ -909,7 +880,6 @@ requirements of the input language being described, which will frequently be
 locale-specific anyway. (For example, writing an analyzer that is used for
 French text will not automatically be useful for processing other languages.)
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing lex
 .sp
 .LP
@@ -963,7 +933,7 @@ int main(int argc, char *argv[\|])
 		                  yyin = fopen(argv[0], "r");
                       else
                       yyin = stdin;
-	
+
                       yylex();
 }
 .fi
@@ -971,14 +941,10 @@ int main(int argc, char *argv[\|])
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBlex\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -999,8 +965,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -1015,16 +979,12 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR yacc (1),
 .BR attributes (7),
 .BR environ (7),
 .BR regex (7),
 .BR standards (7)
 .SH NOTES
-.sp
-.LP
 If routines such as \fByyback()\fR, \fByywrap()\fR, and \fByylock()\fR
 in \fB\|.l\fR (ell) files are to be external C functions, the command line to
 compile a C++ program must define the \fB__EXTERN_C__\fR macro. For example:

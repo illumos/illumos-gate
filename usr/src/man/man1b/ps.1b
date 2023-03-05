@@ -1,17 +1,15 @@
 '\" te
 .\" Copyright (c) 2002, Sun Microsystems, Inc. - All Rights Reserved.
 .\" Copyright (c), 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
-.TH PS 1B "May 13, 2017"
+.TH PS 1B "Feb 17, 2023"
 .SH NAME
 ps \- display the status of current processes
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/ucb/ps\fR [\fB-aceglnrSuUvwx\fR] [\fB-t\fR \fIterm\fR] [\fInum\fR]
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBps\fR command displays information about processes. Normally, only those
 processes that are running with your effective user \fBID\fR and are attached
 to a controlling terminal (see \fBtermio\fR(4I)) are shown. Additional
@@ -78,7 +76,6 @@ Traced. Process stopped by a signal because parent is tracing it.
 .RE
 
 .SH OPTIONS
-.LP
 The following options must all be combined to form the first argument:
 .sp
 .ne 2
@@ -166,7 +163,7 @@ children.
 .RS 11n
 Lists only process data associated with the terminal, \fIterm\fR. Terminal
 identifiers may be specified in one of two forms: the device's file name (for
-example, \fBtty04\fR or \fBterm/14\fR ) or, if the device's file name starts
+example, \fBtty04\fR or \fBterm/14\fR) or, if the device's file name starts
 with \fBtty\fR, just the digit identifier (for example, \fB04\fR).
 .RE
 
@@ -233,7 +230,6 @@ process. This option must be supplied last.
 .RE
 
 .SH DISPLAY FORMATS
-.LP
 Fields that are not common to all output formats:
 .sp
 .ne 2
@@ -376,7 +372,6 @@ the parent, is marked <\fBdefunct\fR>\|; otherwise, \fBps\fR tries to determine
 the command name and arguments given when the process was created by examining
 the user block.
 .SH FILES
-.LP
 \fB/dev/tty*\fR
 .sp
 .ne 2
@@ -388,7 +383,6 @@ the user block.
 .RE
 
 .SH SEE ALSO
-.LP
 .BR kill (1),
 .BR ps (1),
 .BR nice (2),
@@ -398,7 +392,6 @@ the user block.
 .BR attributes (7),
 .BR whodo (8)
 .SH NOTES
-.LP
 Things can change while \fBps\fR is running. The picture \fBps\fR gives is only
 a close approximation to the current state. Some data printed for defunct
 processes is irrelevant.

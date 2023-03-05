@@ -3,23 +3,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ISNS 8 "Nov 8, 2007"
+.TH ISNS 8 "Feb 17, 2023"
 .SH NAME
 isns \- Internet Storage Name Service
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/isns\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The Internet Storage Name Service (iSNS) provides consolidated discovery
 services for Internet SCSI (iSCSI) and Internet Fibre Channel Protocol (iFCP)
 devices in an IP network.  iSNS uses a client/server mechanism: servers store
-configuration  information for clients, and provide that information upon a
-client's request. IETF RFC  4171 describes the protocols between the server and
+configuration information for clients, and provide that information upon a
+client's request. IETF RFC 4171 describes the protocols between the server and
 client.
 .sp
 .LP
@@ -28,7 +25,7 @@ current implementation does not support iFCP devices.
 .sp
 .LP
 Solaris iSNS server is implemented as the daemon \fBisns\fR, which binds to the
-well -known port 3205 to service client requests. The daemon is started by the
+well-known port 3205 to service client requests. The daemon is started by the
 service management facility (\fBsmf\fR(7)), using the fault management resource
 identifier (FMRI):
 .sp
@@ -152,7 +149,7 @@ following \fBauth_attr\fR(5) privileges:
 .sp .6
 .RS 4n
 Required to create a discovery domain or domain set, to enable/disable a
-discovery domain set and to change grouping of iSNS  clients in a discovery
+discovery domain set and to change grouping of iSNS clients in a discovery
 domain or grouping of discovery domains in a discovery domain set.
 .RE
 
@@ -163,7 +160,7 @@ domain or grouping of discovery domains in a discovery domain set.
 .ad
 .sp .6
 .RS 4n
-Required to manage the \fBisns\fR server through  the \fBsmf\fR(7).
+Required to manage the \fBisns\fR server through \fBsmf\fR(7).
 .RE
 
 .sp
@@ -182,11 +179,8 @@ The iSNS Server Management profile (see \fBprof_attr\fR(5)) includes all of the
 preceding authorizations. See \fBrbac\fR(7) for an overview of roles and
 authorizations.
 .SH OPTIONS
-.sp
-.LP
 There are no options supported by the \fBisns\fR daemon.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRStarting an \fBisns\fR Server
 .sp
 .LP
@@ -232,7 +226,6 @@ config/ESI_retry_threshold_count = 6\fR
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/sbin/isns\fR\fR
@@ -243,8 +236,6 @@ iSNS daemon binary.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -259,8 +250,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR svcs (1),
 .BR auth_attr (5),
 .BR prof_attr (5),
@@ -271,8 +260,6 @@ Interface Stability	Standard
 .BR svcadm (8),
 .BR svccfg (8)
 .SH NOTES
-.sp
-.LP
 It is strongly recommended that you restart the server (\fBsvcadm restart\fR)
 after a service property is changed. This allows the server to apply a uniform
 setting for existing and new clients.

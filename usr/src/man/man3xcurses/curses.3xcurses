@@ -3,28 +3,26 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CURSES 3XCURSES "Jun 5, 2002"
+.TH CURSES 3XCURSES "Feb 17, 2023"
 .SH NAME
 curses \- introduction and overview of X/Open Curses
 .SH DESCRIPTION
-.sp
-.LP
 The Curses screen management package conforms fully with Issue 4, Version 2 of
-the  X/Open Curses specification.   It provides a set of internationalized
-functions and macros for creating and  modifying input and output to a terminal
+the X/Open Curses specification.  It provides a set of internationalized
+functions and macros for creating and modifying input and output to a terminal
 screen.  This includes functions for creating windows, highlighting text,
-writing to  the screen, reading from user input, and moving the cursor.
+writing to the screen, reading from user input, and moving the cursor.
 .sp
 .LP
 X/Open Curses is a terminal-independent package, providing a common user
-interface to a variety of terminal types.  Its portability  is facilitated by
-the Terminfo database which contains a compiled  definition of each terminal
+interface to a variety of terminal types.  Its portability is facilitated by
+the Terminfo database which contains a compiled definition of each terminal
 type.  By referring to the database information X/Open Curses gains access to
 low-level details about individual terminals.
 .sp
 .LP
 X/Open Curses tailors its activities to the terminal type specified by the
-\fBTERM\fR environment variable.  The  \fBTERM\fR environment  variable may be
+\fBTERM\fR environment variable.  The \fBTERM\fR environment variable may be
 set in the Korn Shell (see \fBksh\fR(1)) by typing:
 .sp
 .in +2
@@ -47,7 +45,7 @@ Shell:
 1.
 If you have an alternate Terminfo database containing terminal types that
 are not available in the system default database
-\fB/usr/share/lib/terminfo\fR, you can specify the  \fBTERMINFO\fR environment
+\fB/usr/share/lib/terminfo\fR, you can specify the \fBTERMINFO\fR environment
 variable to point to this alternate database:
 .sp
 .in +2
@@ -58,20 +56,20 @@ variable to point to this alternate database:
 .sp
 
 This \fIpath\fR specifies the location of the alternate compiled Terminfo
-database whose structure consists of directory names 0 to 9 and a to z  (which
-represent the first letter of the compiled terminal definition file  name).
+database whose structure consists of directory names 0 to 9 and a to z (which
+represent the first letter of the compiled terminal definition file name).
 .sp
-The alternate database specified by  \fBTERMINFO\fR is  examined before the
-system default database.  If the terminal type  specified by  \fBTERM\fR cannot
+The alternate database specified by \fBTERMINFO\fR is examined before the
+system default database.  If the terminal type specified by \fBTERM\fR cannot
 be found in either database, the default terminal type \fIdumb\fR is assumed.
 .RE
 .RS +4
 .TP
 2.
 To specify a window width smaller than your screen width (for example, in
-situations where your communications line is slow), set the  \fBCOLUMNS\fR
-environment  variable to the number of vertical columns you want between the
-left and  right margins:
+situations where your communications line is slow), set the \fBCOLUMNS\fR
+environment variable to the number of vertical columns you want between the
+left and right margins:
 .sp
 .in +2
 .nf
@@ -84,7 +82,7 @@ The \fInumber\fR of columns may be set to a number smaller than the screen
 size; however, if set larger than the screen or window width, the results are
 undefined.
 .sp
-The value set using this environment variable takes precedence over the  value
+The value set using this environment variable takes precedence over the value
 normally used for the terminal.
 .RE
 .RS +4
@@ -110,8 +108,6 @@ The value set using this environment variable takes precedence over the value
 normally used for the terminal.
 .RE
 .SS "Data Types"
-.sp
-.LP
 X/Open Curses defines the following data types:
 .sp
 .ne 2
@@ -120,7 +116,7 @@ X/Open Curses defines the following data types:
 .ad
 .RS 12n
 An integral type that holds an OR-ed set of attributes. The attributes
-acceptable are those which begin with the \fBWA_\fR prefix .
+acceptable are those which begin with the \fBWA_\fR prefix.
 .RE
 
 .sp
@@ -138,7 +134,7 @@ Boolean data type.
 \fB\fBcchar_t\fR\fR
 .ad
 .RS 12n
-A type that refers to a string consisting of a spacing wide character, up to  5
+A type that refers to a string consisting of a spacing wide character, up to 5
 non-spacing wide characters, and zero or more attributes of any type. See
 Attributes, Color Pairs, and Renditions. A null \fBcchar_t\fR object terminates
 arrays of \fBcchar_t\fR objects.
@@ -151,7 +147,7 @@ arrays of \fBcchar_t\fR objects.
 .ad
 .RS 12n
 An integral type whose values are formed by OR-ing an \fB"unsigned char"\fR
-with a color pair.  and with zero or more attributes. The attributes acceptable
+with a color pair and with zero or more attributes. The attributes acceptable
 are those which begin with the \fBA_\fR prefix and \fBCOLOR_PAIR\fR(3XCURSES)
 .RE
 
@@ -194,8 +190,6 @@ An opaque data type associated with a window.
 .RE
 
 .SS "Screens, Windows, and Terminals"
-.sp
-.LP
 The X/Open Curses manual pages refer at various points to screens, windows
 (also subwindows, derived windows, and pads), and terminals. The following list
 defines each of these terms.
@@ -238,7 +232,7 @@ There are three sub-types of windows:
 A window which has been created within another window (the parent window) and
 whose position has been specified with absolute screen coordinates. The
 \fBderwin\fR(3XCURSES) and \fBsubwin\fR(3XCURSES) functions can be used to
-create  subwindows.
+create subwindows.
 .RE
 
 .sp
@@ -258,7 +252,7 @@ coordinates rather than in absolute terms.
 .ad
 .RS 18n
 A special type of window that can be larger than the screen. For more
-information, see the  \fBnewpad\fR(3XCURSES) man page.
+information, see the \fBnewpad\fR(3XCURSES) man page.
 .RE
 
 .sp
@@ -273,22 +267,20 @@ such a device.
 .RE
 
 .SS "Attributes, Color Pairs, and Renditions"
-.sp
-.LP
 A character's rendition consists of its attributes (such as underlining or
 reverse video) and its color pair (the foreground and background colors). When
 using \fBwaddstr\fR(3XCURSES), \fBwaddchstr\fR(3XCURSES),
 \fBwprintw\fR(3XCURSES), \fBwinsch\fR(3XCURSES), and so on, the window's
 rendition is combined with that character's renditions. The window rendition is
-the attributes and color set using the  \fBattroff\fR(3XCURSES) and
+the attributes and color set using the \fBattroff\fR(3XCURSES) and
 \fBattr_off\fR(3XCURSES) sets of functions. The window's background character
-and rendition are set with the  \fBbkgdset\fR(3XCURSES) and
+and rendition are set with the \fBbkgdset\fR(3XCURSES) and
 \fBbkgrndset\fR(3XCURSES) sets of functions.
 .sp
 .LP
 When spaces are written to the screen, the background character and window
 rendition replace the space. For example, if the background rendition and
-character is  \fBA_UNDERLINE|'*'\fR, text written to the window appears
+character is \fBA_UNDERLINE|'*'\fR, text written to the window appears
 underlined and the spaces appear as underlined asterisks.
 .sp
 .LP
@@ -296,8 +288,6 @@ Each character written retains the rendition that it has obtained. This allows
 the character to be copied "as is" to or from a window with the
 \fBaddchstr\fR(3XCURSES) or \fBinch\fR(3XCURSES) functions.
 .SS "A_ Constant Values for Attributes"
-.sp
-.LP
 You can specify Attributes, Color Pairs, and Renditions attributes using the
 constants listed in the tables below. The following constants modify objects of
 type \fBchtype\fR:
@@ -327,8 +317,6 @@ T}
 .TE
 
 .SS "WA_ Constant Values for Attributes"
-.sp
-.LP
 The following constants modify objects of type \fBattr_t\fR:
 .sp
 
@@ -358,8 +346,6 @@ _
 .TE
 
 .SS "Color Macros"
-.sp
-.LP
 Colors always appear in pairs; the foreground color of the character itself and
 the background color of the field on which it is displayed. The following color
 macros are defined:
@@ -387,15 +373,13 @@ _
 Together, a character's attributes and its color pair form the character's
 rendition. A character's rendition moves with the character during any
 scrolling or insert/delete operations. If your terminal lacks support for the
-specified rendition, X/Open Curses may  substitute a different rendition.
+specified rendition, X/Open Curses may substitute a different rendition.
 .sp
 .LP
 The \fBCOLOR_PAIR\fR(3XCURSES) function modifies a \fBchtype\fR object.  The
 \fBPAIR_NUMBER\fR(3XCURSES) function extracts the color pair from a
 \fBchtype\fR object.
 .SS "Functions for Modifying a Window's Color"
-.sp
-.LP
 The following functions modify a window's color:
 .sp
 
@@ -411,14 +395,12 @@ _
 .TE
 
 .SS "Non-Spacing Characters"
-.sp
-.LP
 When the \fBwcwidth\fR(3C) function returns a width of zero for a character,
 that character is called a non-spacing character. Non-spacing characters can be
 written to a window. Each non-spacing character is associated with a spacing
 character (that is, one which does not have a width of zero) and modifies that
 character. You cannot address a non-spacing character directly. Whenever you
-perform an X/Open Curses operation on the associated character,  you are
+perform an X/Open Curses operation on the associated character, you are
 implicitly addressing the non-spacing character.
 .sp
 .LP
@@ -427,8 +409,6 @@ characters and a rendition, X/Open Curses ignores any rendition specified for
 non-spacing characters. Multi-column characters have one rendition that applies
 to all columns spanned.
 .SS "Complex Characters"
-.sp
-.LP
 The \fBcchar_t\fR date type represents a complex character. A complex character
 may contain a spacing character, its associated non-spacing characters, and its
 rendition. This implementation of complex characters supports up to 5
@@ -442,8 +422,6 @@ associated with the rendition of the existing character at that location. The
 The \fBgetcchar\fR(3XCURSES) function extracts the contents of a \fBcchar_t\fR
 object.
 .SS "Display Operations"
-.sp
-.LP
 In adding internationalization support to X/Open Curses, every attempt was made
 to minimize the number of changes to the historical CURSES package. This
 enables programs written to use the historical implementation of CURSES to use
@@ -453,7 +431,7 @@ rules apply to the internationalized X/Open Curses package:
 .TP
 .ie t \(bu
 .el o
-The cursor can be placed anywhere in the window.   Window and screen origins
+The cursor can be placed anywhere in the window.  Window and screen origins
 are (0,0).
 .RE
 .RS +4
@@ -467,8 +445,8 @@ beginning of the next line. This is called wrapping.
 .sp
 If the original line is the last line in the scroll region and scrolling is
 enabled, X/Open Curses moves the contents of each line in the region to the
-previous line.   The first line of the region is lost. The last line of the
-scrolling region contains any wrapped characters.   The remainder of that line
+previous line.  The first line of the region is lost. The last line of the
+scrolling region contains any wrapped characters.  The remainder of that line
 is filled with the background character. If scrolling is disabled, X/Open
 Curses truncates any character that would extend past the last column of the
 screen.
@@ -478,8 +456,8 @@ screen.
 .ie t \(bu
 .el o
 Overwrites operate on screen columns. If displaying a single-column or
-multi-column character results in overwriting  only a portion of a multi-column
-character or characters, background characters  are displayed in place of the
+multi-column character results in overwriting only a portion of a multi-column
+character or characters, background characters are displayed in place of the
 non-overwritten portions.
 .RE
 .RS +4
@@ -487,20 +465,16 @@ non-overwritten portions.
 .ie t \(bu
 .el o
 Insertions and deletions operate on whole characters. The cursor is moved to
-the first column of the character prior to performing  the operation.
+the first column of the character prior to performing the operation.
 .RE
 .SS "Overlapping Windows"
-.sp
-.LP
 When windows overlap, it may be necessary to overwrite only part of a
-multi-column character.   As mentioned earlier, the non-overwritten portions
+multi-column character.  As mentioned earlier, the non-overwritten portions
 are replaced with the background character. This results in issues concerning
 the \fBoverwrite\fR(3XCURSES), \fBoverlay\fR(3XCURSES),
 \fBcopywin\fR(3XCURSES), \fBwnoutrefresh\fR(3XCURSES), and
 \fBwrefresh\fR(3XCURSES) functions.
 .SS "Special Characters"
-.sp
-.LP
 Some functions assign special meanings to certain special characters:
 .sp
 .ne 2
@@ -508,7 +482,7 @@ Some functions assign special meanings to certain special characters:
 \fBBackspace\fR
 .ad
 .RS 22n
-Moves the cursor one column towards the beginning of the line.   If the cursor
+Moves the cursor one column towards the beginning of the line.  If the cursor
 was already at the beginning of the line, it remains there. All subsequent
 characters are added or inserted at this point.
 .RE
@@ -552,7 +526,7 @@ set at 0, 8, 16, and so on.
 .sp
 When adding or inserting characters, X/Open Curses inserts or adds the
 background character into each column until the next tab stop is reached. If
-there are no remaining tab stops on the current line, wrapping and  scrolling
+there are no remaining tab stops on the current line, wrapping and scrolling
 occur as described earlier.
 .RE
 
@@ -575,8 +549,6 @@ X/Open Curses displays non-printable bytes, that have their high bit set, using
 the \fBM-\fR\fIX\fR meta notation where \fIX\fR is the non-printable byte with
 its high bit turned off.
 .SS "Input Processing"
-.sp
-.LP
 There are four input modes possible with X/Open Curses that affect the behavior
 of input functions like \fBgetch\fR(3XCURSES) and \fBgetnstr\fR(3XCURSES).
 .sp
@@ -586,21 +558,21 @@ of input functions like \fBgetch\fR(3XCURSES) and \fBgetnstr\fR(3XCURSES).
 .ad
 .RS 27n
 In line input mode, the terminal driver handles the input of line units as well
-as  \fBSIGERASE\fR and \fBSIGKILL\fR character processing.   See
+as \fBSIGERASE\fR and \fBSIGKILL\fR character processing.  See
 \fBtermio\fR(4I) for more information.
 .sp
 In this mode, the \fBgetch()\fR and \fBgetnstr()\fR functions will not return
 until a complete line has been read by the terminal driver, at which point only
 the requested number of bytes/characters are returned.  The rest of the line
-unit remains unread until subsequent call to the  \fBgetch()\fR or
+unit remains unread until subsequent call to the \fBgetch()\fR or
 \fBgetnstr()\fR functions.
 .sp
 The functions \fBnocbreak\fR(3XCURSES) and \fBnoraw\fR(3XCURSES) are used to
-enter this mode.  These functions are described on the  \fBcbreak\fR(3XCURSES)
+enter this mode.  These functions are described on the \fBcbreak\fR(3XCURSES)
 man page which also details which \fBtermios\fR flags are enabled.
 .sp
 Of the modes available, this one gives applications the least amount of control
-over input.   However, it is the only input mode possible on a block mode
+over input.  However, it is the only input mode possible on a block mode
 terminal.
 .RE
 
@@ -610,12 +582,12 @@ terminal.
 \fB\fBcbreak\fR Mode\fR
 .ad
 .RS 27n
-Byte/character input provides a finer degree of control.   The terminal driver
+Byte/character input provides a finer degree of control.  The terminal driver
 passes each byte read to the application without interpreting erase and kill
-characters.   It is the application's responsibility to handle line editing. It
+characters.  It is the application's responsibility to handle line editing. It
 is unknown whether the signal characters (\fBSIGINTR\fR, \fBSIGQUIT\fR,
 \fBSIGSUSP\fR) and flow control characters (\fBSIGSTART\fR, \fBSIGSTOP\fR) are
-enabled.   To ensure that they are, call the \fBnoraw()\fR function first, then
+enabled.  To ensure that they are, call the \fBnoraw()\fR function first, then
 call the \fBcbreak()\fR function.
 .RE
 
@@ -625,9 +597,9 @@ call the \fBcbreak()\fR function.
 \fB\fBhalfdelay\fR Mode\fR
 .ad
 .RS 27n
-This is the same as the \fBcbreak()\fR mode with a timeout.   The terminal
-driver waits for a byte to be received or for a timer to  expire, in which case
-the \fBgetch()\fR function either returns a byte or  \fBERR\fR respectively.
+This is the same as the \fBcbreak()\fR mode with a timeout.  The terminal
+driver waits for a byte to be received or for a timer to expire, in which case
+the \fBgetch()\fR function either returns a byte or \fBERR\fR respectively.
 This mode overrides timeouts set for an individual window with the
 \fBwtimeout()\fR function.
 .RE
@@ -638,53 +610,52 @@ This mode overrides timeouts set for an individual window with the
 \fB\fBraw\fR Mode\fR
 .ad
 .RS 27n
-This mode provides byte/character input with the most control for  an
+This mode provides byte/character input with the most control for an
 application. It is similar to \fBcbreak()\fR mode, but also disables signal
 character processing (\fBSIGINTR\fR, \fBSIGSUSP\fR, \fBSIGQUIT\fR) and flow
-control  processing (\fBSIGSTART\fR, \fBSIGSTOP\fR) so that the application can
-process  them as it wants.
+control processing (\fBSIGSTART\fR, \fBSIGSTOP\fR) so that the application can
+process them as it wants.
 .RE
 
 .sp
 .LP
 These modes affect all X/Open Curses input.  The default input mode is
-inherited from the parent process when the  application starts up.
+inherited from the parent process when the application starts up.
 .sp
 .LP
 A timeout similar to \fBhalfdelay\fR(3XCURSES) can be applied to individual
-windows (see  \fBtimeout\fR(3XCURSES)). The \fBnodelay\fR(3XCURSES) function is
+windows (see \fBtimeout\fR(3XCURSES)). The \fBnodelay\fR(3XCURSES) function is
 equivalent to setting \fBwtimeout\fR(3XCURSES) for a window with a zero timeout
 (non-blocking) or infinite delay (blocking).
 .sp
 .LP
-To handle function keys, \fBkeypad\fR(3XCURSES) must be enabled.   When it is
+To handle function keys, \fBkeypad\fR(3XCURSES) must be enabled.  When it is
 enabled, the \fBgetch()\fR function returns a \fBKEY_\fR constant for a
-uniquely encoded key defined for that terminal.   When \fBkeypad()\fR is
-disabled, the \fBgetch()\fR function returns the  individual bytes composing
-the function key (see  \fBgetch\fR(3XCURSES) and  \fBwget_wch\fR(3XCURSES)). By
+uniquely encoded key defined for that terminal.  When \fBkeypad()\fR is
+disabled, the \fBgetch()\fR function returns the individual bytes composing
+the function key (see \fBgetch\fR(3XCURSES) and \fBwget_wch\fR(3XCURSES)). By
 default, \fBkeypad()\fR is disabled.
 .sp
 .LP
 When processing function keys, once the first byte is recognized, a timer is
-set for each subsequent byte in the sequence.   If any byte in the function key
-sequence is not received before the timer  expires, the bytes already received
-are pushed into a buffer and the original  first byte is returned. Subsequent
-X/Open Curses input would take bytes from the buffer until exhausted,  after
-which new input from the terminal will be requested.   Enabling and disabling
-of the function key interbyte timer is handled by  the
-\fBnotimeout\fR(3XCURSES) function.   By default, \fBnotimeout()\fR is disabled
+set for each subsequent byte in the sequence.  If any byte in the function key
+sequence is not received before the timer expires, the bytes already received
+are pushed into a buffer and the original first byte is returned. Subsequent
+X/Open Curses input would take bytes from the buffer until exhausted, after
+which new input from the terminal will be requested.  Enabling and disabling
+of the function key interbyte timer is handled by the
+\fBnotimeout\fR(3XCURSES) function.  By default, \fBnotimeout()\fR is disabled
 (that is, the timer is used).
 .sp
 .LP
-X/Open Curses always disables the terminal driver's echo processing.   The
+X/Open Curses always disables the terminal driver's echo processing.  The
 \fBecho\fR(3XCURSES) and \fBnoecho\fR(3XCURSES) functions control X/Open Curses
-software  echoing.   When software echoing is enabled, X/Open Curses input
-functions echo printable  characters, control keys, and meta keys in the input
-window at the last cursor  position.   Functions keys are never echoed.   When
-software echoing is disabled, it is the application's responsibility to  handle
+software echoing.  When software echoing is enabled, X/Open Curses input
+functions echo printable characters, control keys, and meta keys in the input
+window at the last cursor position.  Functions keys are never echoed.  When
+software echoing is disabled, it is the application's responsibility to handle
 echoing.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCopying Single-Column Characters Over Single-Column Characters
 .sp
 .LP
@@ -696,7 +667,7 @@ In the upcoming examples, some characters have special meanings:
 .el o
 \fB{\fR, \fB[\fR, and \fB(\fR represent the left halves of multi-column
 characters. \fB}\fR, \fB]\fR, and \fB)\fR represent the corresponding right
-halves  of the same multi-column characters.
+halves of the same multi-column characters.
 .RE
 .RS +4
 .TP
@@ -724,7 +695,7 @@ copywin(s, t, 0, 1, 0, 1, 1, 3, 0)
 
 .sp
 .LP
-  There are no special problems with this situation.
+There are no special problems with this situation.
 
 .LP
 \fBExample 2 \fRCopying Multi-column Characters Over Single-Column Characters
@@ -801,10 +772,10 @@ delwin(save);            /* release backing store */
 .sp
 .LP
 You can use code similar to this to implement generic \fBpopup()\fR and
-\fBpopdown()\fR routines in a variety of CURSES implementations (including  BSD
+\fBpopdown()\fR routines in a variety of CURSES implementations (including BSD
 UNIX, and UNIX System V). In the simple case where the base window contains
-single-column characters  only, it would correctly restore the image that
-appeared on the screen before  the dialog box was displayed.
+single-column characters only, it would correctly restore the image that
+appeared on the screen before the dialog box was displayed.
 
 .sp
 .LP
@@ -815,8 +786,8 @@ above. The behavior described in this example (that is, example 4) allows the
 \fBwrefresh(save)\fR statement to restore the window correctly.
 
 .LP
-\fBExample 5 \fRCopying An Incomplete Multi-column Character To  Region Next To
-Screen Margin  (Not A Window Edge)
+\fBExample 5 \fRCopying An Incomplete Multi-column Character To Region Next To
+Screen Margin (Not A Window Edge)
 .sp
 .LP
  Two cases of copying an incomplete multi-column character to a region next to
@@ -855,8 +826,6 @@ copywin(s, t, 0, 1, 0, 3, 1, 5, 0)
 This second example is the same as the first, but with the right margin.
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -873,8 +842,6 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ksh (1),
 .BR wcwidth (3C),
 .BR COLOR_PAIR (3XCURSES),

@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSMSG 4D "Oct 13, 1998"
+.TH SYSMSG 4D "Feb 17, 2023"
 .SH NAME
 sysmsg \- system message routing to console devices
 .SH SYNOPSIS
-.LP
 .nf
 \fB/dev/sysmsg\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The file \fB/dev/sysmsg\fR routes output to a variable set of console devices.
 Writes to \fB/dev/sysmsg\fR are always directed to the system console
 \fB/dev/console\fR, and are in addition directed to a set of auxiliary console
@@ -23,8 +20,6 @@ devices managed by \fBconsadm\fR(8).
 .LP
 Only root has permission to write to this device.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -39,7 +34,7 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBconsadm\fR(8), \fBsyslogd\fR(8) , \fBconsole\fR(4D),
-.BR attributes (7)
+.BR console (4D),
+.BR attributes (7),
+.BR consadm (8),
+.BR syslogd (8)

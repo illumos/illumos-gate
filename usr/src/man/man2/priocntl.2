@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRIOCNTL 2 "May 11, 2006"
+.TH PRIOCNTL 2 "Feb 17, 2023"
 .SH NAME
 priocntl \- process scheduler control
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/priocntl.h>
@@ -22,8 +21,6 @@ priocntl \- process scheduler control
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpriocntl()\fR function provides for control over the scheduling of an
 active light weight process (LWP).
 .sp
@@ -201,7 +198,7 @@ process contract ID of the calling LWP.
 .sp
 .LP
 To change the scheduling parameters of an LWP (using the \fBPC_SETPARMS\fR or
-\fBPC_SETXPARMS\fR command as explained below) , the real or effective user ID
+\fBPC_SETXPARMS\fR command as explained below), the real or effective user ID
 of the LWP calling \fBpriocntl()\fR must match the real or the calling LWP must
 have sufficient privileges. These are the minimum permission requirements
 enforced for all classes. An individual class might impose additional
@@ -213,10 +210,10 @@ A special \fBSYS\fR scheduling class exists for the purpose of scheduling the
 execution of certain special system processes (such as the swapper process). It
 is not possible to change the class of any LWP to \fBSYS\fR. In addition, any
 processes in the \fBSYS\fR class that are included in a specified set of
-processes are disregarded by  \fBpriocntl()\fR. For example, an \fIidtype\fR of
+processes are disregarded by \fBpriocntl()\fR. For example, an \fIidtype\fR of
 \fBP_UID\fR and an \fIid\fR value of 0 would specify all processes with a user
 ID of 0 except processes in the \fBSYS\fR class and (if changing the parameters
-using \fBPC_SETPARMS\fR or \fBPC_SETXPARMS\fR) the  \fBinit\fR(8) process.
+using \fBPC_SETPARMS\fR or \fBPC_SETXPARMS\fR) the \fBinit\fR(8) process.
 .sp
 .LP
 The \fBinit\fR process is a special case. For a \fBpriocntl()\fR call to change
@@ -252,7 +249,7 @@ The \fIpc_cid\fR member is a class ID returned by the \fBpriocntl()\fR
 .LP
 The \fIpc_clname\fR member is a buffer of size \fBPC_CLNMSZ\fR, defined in
 \fB<sys/priocntl.h>\fR, used to hold the class name: \fBRT\fR for realtime,
-\fBTS\fR for time-sharing, \fBIA\fRfor interactive, \fBFSS\fR for fair-share,
+\fBTS\fR for time-sharing, \fBIA\fR for interactive, \fBFSS\fR for fair-share,
 or \fBFX\fR for fixed-priority. Each string is null-terminated.
 .sp
 .LP
@@ -293,8 +290,8 @@ The \fBPC_SETXPARMS\fR and \fBPC_GETXPARMS\fR commands exploit the
 \fBvarargs\fR declaration of \fBpriocntl()\fR. The argument following the
 command code is a class name: \fBRT\fR for realtime, \fBTS\fR for time-sharing,
 \fBIA\fR for interactive, \fBFSS\fR for fair-share, or \fBFX\fR for
-fixed-priority. The parameters  after the class name build a chain of (key,
-value) pairs, where the key  determines the meaning of the value within the
+fixed-priority. The parameters after the class name build a chain of (key,
+value) pairs, where the key determines the meaning of the value within the
 pair. When using \fBPC_GETXPARMS\fR, the value associated with the key is
 always a pointer to a scheduling parameter. In contrast, when using
 \fBPC_SETXPARMS\fR the scheduling parameter is given as a direct value.  A key
@@ -306,8 +303,6 @@ The \fBPC_SETXPARMS\fR and \fBPC_GETXPARMS\fR commands are more flexible than
 \fBPC_SETPARMS\fR and \fBPC_GETPARMS\fR and should replace \fBPC_SETPARMS\fR
 and \fBPC_GETPARMS\fR on a long-term basis.
 .SH COMMANDS
-.sp
-.LP
 Available \fBpriocntl()\fR commands are:
 .sp
 .ne 2
@@ -407,7 +402,7 @@ Get the class and/or class-specific scheduling parameters of an LWP. The
 \fIarg\fR member points to a structure of type \fBpcparms_t\fR.
 .sp
 If \fIpc_cid\fR specifies a configured class and a single LWP belonging to that
-class is specified  by the \fIidtype\fR and \fIid\fR values or the
+class is specified by the \fIidtype\fR and \fIid\fR values or the
 \fBprocset\fR structure, then the scheduling parameters of that LWP are
 returned in the \fIpc_clparms\fR buffer. If the LWP specified does not exist or
 does not belong to the specified class, the \fBpriocntl()\fR call returns
@@ -435,13 +430,13 @@ returned in the \fIpc_clparms\fR buffer.
 Get the class or class-specific scheduling parameters of an LWP. The class name
 (first argument after \fBPC_GETXPARMS\fR) specifies the class and the (key,
 value) pair sequence contains a pointer to the class-specific parameters. The
-keys and the types of the class-specific parameter data  are described below
+keys and the types of the class-specific parameter data are described below
 and can also be found in the class-specific headers \fB<sys/rtpriocntl.h>\fR,
 \fB<sys/tspriocntl.h>\fR, \fB<sys/iapriocntl.h>\fR, \fB<sys/fsspriocntl.h>\fR,
 and \fB<sys/fxpriocntl.h>\fR. If the specified class is a configured class and
 a single LWP belonging to that class is specified by the \fIidtype\fR and
 \fIid\fR values or the \fBprocset\fR structure, then the scheduling parameters
-of that LWP are returned in the  given (key, value) pair buffers. If the LWP
+of that LWP are returned in the given (key, value) pair buffers. If the LWP
 specified does not exist or does not belong to the specified class,
 \fBpriocntl()\fR returns \fB\(mi1\fR and \fBerrno\fR is set to \fBESRCH\fR.
 .sp
@@ -456,7 +451,7 @@ set to \fBESRCH\fR.
 If the class name is a null pointer, a single process or LWP is specified, and
 a (key, value) pair for a class name request is given, \fBpriocntl()\fR fills
 the buffer pointed to by value with the class name of the specified process or
-LWP. The key for the class name  request is \fBPC_KY_CLNAME\fR and the class
+LWP. The key for the class name request is \fBPC_KY_CLNAME\fR and the class
 name buffer should be declared as:
 .sp
 .in +2
@@ -528,8 +523,6 @@ LWPs. All errors other than \fBEPERM\fR result in an immediate termination of
 .RE
 
 .SH REALTIME CLASS
-.sp
-.LP
 The realtime class provides a fixed priority preemptive scheduling policy for
 those LWPS requiring fast and deterministic response and absolute
 user/application control of scheduling priorities. If the realtime class is
@@ -672,7 +665,7 @@ results in an error return with \fBerrno\fR set to \fBEINVAL\fR. Although the
 resolution of the \fItq_nsecs\fR member is very fine, the specified time
 quantum length is rounded up by the system to the next integral multiple of the
 system clock's resolution. The maximum time quantum that can be specified is
-implementation-specific and equal to \fBINT_MAX\fR1 ticks. The \fBINT_MAX\fR
+implementation-specific and equal to \fBINT_MAX\fR ticks. The \fBINT_MAX\fR
 value is defined in \fB<limits.h>\fR. Requesting a quantum greater than this
 maximum results in an error return with \fBerrno\fR set to \fBERANGE\fR,
 although infinite quantums can be requested using a special value as explained
@@ -718,7 +711,7 @@ equivalent to specifying \fBRT_TQDEF\fR.
 .LP
 When using the \fBpriocntl()\fR \fBPC_SETXPARMS\fR or \fBPC_GETXPARMS\fR
 commands, the first argument after the command code must be the class name of
-the realtime class (\fBRT\fR) . The next arguments are formed as (key, value)
+the realtime class (\fBRT\fR). The next arguments are formed as (key, value)
 pairs, terminated by a \fB0\fR key. The definition for the keys of the realtime
 class can be found in \fB<sys/rtpriocntl.h>\fR. A repeated specification of the
 same key results in an error return and \fBerrno\fR set to \fBEINVAL\fR.
@@ -745,7 +738,7 @@ When using the \fBpriocntl()\fR \fBPC_GETXPARMS\fR command, the value
 associated with the key is always a pointer to a scheduling parameter of the
 value type shown in the table above. In contrast, when using the
 \fBpriocntl()\fR \fBPC_SETXPARMS\fR command, the scheduling parameter is given
-as a  direct value.
+as a direct value.
 .sp
 .LP
 A \fBpriocntl()\fR \fBPC_SETXPARMS\fR command with the class name (\fBRT\fR)
@@ -770,7 +763,7 @@ than this maximum results in an error return and \fBerrno\fR is set to
 \fBERANGE\fR. If seconds (\fBRT_KY_TQSECS\fR) but no nanoseconds
 (\fBRT_KY_TQNSECS\fR) are supplied, the number of nanoseconds is set to
 \fB0\fR. If nanoseconds (\fBRT_KY_TQNSECS\fR) but no seconds
-(\fBRT_KY_TQSECS\fR) are supplied, the  number of seconds is set to \fB0\fR. A
+(\fBRT_KY_TQSECS\fR) are supplied, the number of seconds is set to \fB0\fR. A
 time quantum of \fB0\fR (seconds and nanoseconds are \fB0\fR) results in an
 error return with \fBerrno\fR set to \fBEINVAL\fR. Special values for
 \fBRT_KY_TQSECS\fR are \fBRT_TQINF\fR and \fBRT_TQDEF\fR (as described above).
@@ -792,8 +785,6 @@ user-defined signal handler across the \fBexec\fR functions, the new image must
 install an appropriate user-defined signal handler before the time quantum
 expires. Otherwise, unpredictable behavior might result.
 .SH TIME-SHARING CLASS
-.sp
-.LP
 The time-sharing scheduling policy provides for a fair and effective allocation
 of the CPU resource among LWPs with varying CPU consumption characteristics.
 The objectives of the time-sharing policy are to provide good response time to
@@ -906,9 +897,9 @@ equal to the \fIts_uprilim\fR that is being set.
 .LP
 When using the \fBpriocntl()\fR \fBPC_SETXPARMS\fR or \fBPC_GETXPARMS\fR
 commands, the first argument after the command code is the class name of the
-time-sharing class (\fBTS\fR) . The next arguments are formed as (key, value)
+time-sharing class (\fBTS\fR). The next arguments are formed as (key, value)
 pairs, terminated by a \fB0\fR key. The definition for the keys of the
-time-sharing class can be found in  \fB<sys/tspriocntl.h>\fR. A repeated
+time-sharing class can be found in \fB<sys/tspriocntl.h>\fR. A repeated
 specification of the same key results in an error return and \fBerrno\fR set to
 \fBEINVAL\fR.
 .sp
@@ -950,8 +941,6 @@ The \fBpriocntl()\fR command \fBPC_SETXPARMS\fR knows no special value
 The time-sharing user priority and user priority limit are inherited across
 \fBfork()\fR and the \fBexec\fR family of functions.
 .SH INTERACTIVE CLASS
-.sp
-.LP
 The interactive scheduling policy is a variation on the time-sharing scheduling
 policy. All that can be said about the time-sharing scheduling policy is also
 true for the interactive scheduling policy, with one addition: An LWP in the
@@ -1020,7 +1009,7 @@ mode on or off or to make no change to the interactive mode.
 .LP
 When using the \fBpriocntl()\fR \fBPC_SETXPARMS\fR or \fBPC_GETXPARMS\fR
 commands, the first argument after the command code is the class name of the
-interactive class (IA) . The next arguments are formed as (key, value) pairs,
+interactive class (IA). The next arguments are formed as (key, value) pairs,
 terminated by a 0 key. The definition for the keys of the interactive class can
 be found in \fB<sys/iapriocntl.h>\fR. A repeated specification of the same key
 results in an error return and \fBerrno\fR set to \fBEINVAL\fR.
@@ -1063,8 +1052,6 @@ The \fBpriocntl()\fR command \fBPC_SETXPARMS\fR knows no special value
 The interactive user priority and user priority limit are inherited across fork
 and the exec family of functions.
 .SH FAIR-SHARE CLASS
-.sp
-.LP
 The fair-share scheduling policy provides a fair allocation of CPU resources
 among projects, independent of the number of processes they contain. Projects
 are given "shares" to control their quota of CPU resources. See \fBFSS\fR(4)
@@ -1108,7 +1095,7 @@ priority limit (see \fIfss_uprilim\fR below) that specifies the maximum
 .sp
 .LP
 A \fBfssinfo_t\fR structure with the following members, defined in
-\fB<sys/fsspriocntl.h>\fR, defines  the format used for the attribute data for
+\fB<sys/fsspriocntl.h>\fR, defines the format used for the attribute data for
 the fair-share class.
 .sp
 .in +2
@@ -1148,7 +1135,7 @@ commands, if \fIpc_cid\fR specifies the fair-share class, the data in the
 .LP
 For the \fBpriocntl()\fR \fBPC_GETPARMS\fR command, if \fIpc_cid\fR specifies
 the fair-share class and more than one fair-share LWP is specified, the
-scheduling parameters of the  fair-share LWP with the highest \fIfss_upri\fR
+scheduling parameters of the fair-share LWP with the highest \fIfss_upri\fR
 value among the specified LWPs is returned and the LWP ID of this LWP is
 returned by the \fBpriocntl()\fR call. If there is more than one LWP sharing
 the highest user priority, the one returned is implementation-dependent.
@@ -1166,7 +1153,7 @@ set to \fBEPERM\fR.
 .LP
 Any fair-share LWP can set its own \fIfss_upri\fR (or that of another LWP with
 the same user ID) to any value less than or equal to the LWP's
-\fIfss_uprilim\fR. Attempts to set the \fBfss_upr\fRi above the
+\fIfss_uprilim\fR. Attempts to set the \fBfss_upri\fR above the
 \fBfss_uprilim\fR (and/or set the \fIfss_uprilim\fR below the \fIfss_upri\fR)
 result in the \fIfss_upri\fR being set equal to the \fIfss_uprilim\fR.
 .sp
@@ -1186,8 +1173,6 @@ equal to the \fIfss_uprilim\fR which is being set.
 The fair-share user priority and user priority limit are inherited across
 \fBfork()\fR and the \fBexec\fR family of functions.
 .SH FIXED-PRIORITY CLASS
-.sp
-.LP
 The fixed-priority class provides a fixed-priority preemptive scheduling policy
 for those LWPs requiring that the scheduling priorities do not get dynamically
 adjusted by the system and that the user/application have control of the
@@ -1352,7 +1337,7 @@ equivalent to specifying \fBFX_TQDEF\fR.
 .LP
 When using the \fBpriocntl()\fR \fBPC_SETXPARMS\fR or \fBPC_GETXPARMS\fR
 commands, the first argument after the command code must be the class name of
-the fixed-priority class (FX) . The next arguments are formed as (key, value)
+the fixed-priority class (FX). The next arguments are formed as (key, value)
 pairs, terminated by a 0 key. The definition for the keys of the fixed-priority
 class can be found in \fB<sys/fxpriocntl.h>\fR. A repeated specification of the
 same key results in an error return and \fBerrno\fR set to \fBEINVAL\fR.
@@ -1415,14 +1400,10 @@ nanoseconds are 0) results in an error return with \fBerrno\fR set to
 The fixed-priority user priority and user priority limit are inherited across
 \fBfork\fR(2) and the \fBexec\fR family of functions.
 .SH RETURN VALUES
-.sp
-.LP
 Unless otherwise noted above, \fBpriocntl()\fR returns \fB0\fR on success. On
 failure, \fBpriocntl()\fR returns \fB\(mi1\fR and sets \fBerrno\fR to indicate
 the error.
 .SH ERRORS
-.sp
-.LP
 The \fBpriocntl()\fR function will fail if:
 .sp
 .ne 2
@@ -1494,8 +1475,6 @@ None of the specified LWPs exist.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR priocntl (1),
 .BR exec (2),
 .BR fork (2),

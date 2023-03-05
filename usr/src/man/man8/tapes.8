@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TAPES 8 "Nov 8, 2002"
+.TH TAPES 8 "Feb 17, 2023"
 .SH NAME
 tapes \- creates /dev entries for tape drives attached to the system
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/tapes\fR [\fB-r\fR \fIroot_dir\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBdevfsadm\fR(8) is now the preferred command for \fB/dev\fR and
 \fB/devices\fR and should be used instead of \fBtapes\fR.
 .sp
@@ -54,8 +51,6 @@ removed by hand.
 \fBtapes\fR is run each time a reconfiguration-boot is performed, or when
 \fBadd_drv\fR(8) is executed.
 .SS "Notice to Driver Writers"
-.sp
-.LP
 \fBtapes\fR(8) considers all devices with the node type \fBDDI_NT_TAPE\fR to
 be tape devices; these devices must have their minor name created with a
 specific format. The minor name encodes operational modes for the tape device
@@ -68,9 +63,9 @@ are named low (\fBl\fR), medium (\fBm\fR), high (\fBh\fR), compressed
 (\fBc\fR), and ultra (\fBu\fR). These specifiers only express a relative
 density; it is up to the driver to assign specific meanings as needed. For
 example, 9 track tape devices interpret these as actual bits-per-inch
-densities, where \fBl\fR means 800 \fBBPI,\fR \fBm\fR means 1600 \fBBPI ,\fR
-and \fBh\fR means 6250 \fBBPI,\fR whereas 4mm \fBDAT\fR tapes defines \fBl\fR
-as standard format, and \fBm\fR, \fB h\fR, \fBc\fR and \fBu\fR as compressed
+densities, where \fBl\fR means 800 \fBBPI\fR, \fBm\fR means 1600 \fBBPI\fR,
+and \fBh\fR means 6250 \fBBPI\fR, whereas 4mm \fBDAT\fR tapes defines \fBl\fR
+as standard format, and \fBm\fR, \fBh\fR, \fBc\fR and \fBu\fR as compressed
 format. Drivers may choose to implement any or all of these format types.
 .sp
 .LP
@@ -98,8 +93,6 @@ device, drivers must specify a private node type and refrain from using the
 node type string \fBDDI_NT_TAPE\fR when calling
 \fBddi_create_minor_node\fR(9F).
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -112,8 +105,6 @@ under \fIroot_dir\fR, not directly under \fB/\fR.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 If \fBtapes\fR finds entries of a particular logical controller linked to
 different physical controllers, it prints an error message and exits without
 making any changes to the \fB/dev\fR directory, since it cannot determine which
@@ -121,7 +112,6 @@ of the two alternative logical to physical mappings is correct. The links
 should be manually corrected or removed before another reconfiguration boot is
 performed.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreating Tape Device Nodes From Within the Driver's
 \fBattach()\fR Function
 .sp
@@ -239,7 +229,6 @@ devices in \fB/devices\fR).
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/rmt/*\fR\fR
@@ -258,8 +247,6 @@ tape device nodes
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR isp (4D),
 .BR devfs (4FS),
 .BR mtio (4I),
@@ -272,6 +259,4 @@ tape device nodes
 .LP
 \fI\fR
 .SH BUGS
-.sp
-.LP
 \fBtapes\fR silently ignores malformed minor device names.
