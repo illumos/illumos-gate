@@ -35,8 +35,10 @@
 #define	VDC_PM_TIMER	11	/* ACPI Power Management Timer */
 #define	VDC_RTC		12	/* IBM PC Real Time Clock */
 
+#define	VDC_VMM_TIME	13	/* Time-related VMM data */
+
 /* Indicates top of VMM Data Class range, updated as classes are added */
-#define	VDC_MAX		(VDC_RTC + 1)
+#define	VDC_MAX		(VDC_VMM_TIME + 1)
 
 
 /* VMM Data Identifiers */
@@ -115,12 +117,6 @@ struct vdi_lapic_v1 {
  * VM-wide:
  */
 
-/* Offset of guest TSC from system at time of boot */
-#define	VAI_TSC_BOOT_OFFSET	1
-/* Time that guest (nominally) booted, as hrtime */
-#define	VAI_BOOT_HRTIME		2
-/* Guest TSC frequency measured by hrtime (not effected by wall clock adj.) */
-#define	VAI_TSC_FREQ		3
 /* Is the VM currently in the "paused" state? (0 or 1) */
 #define	VAI_VM_IS_PAUSED	4
 
@@ -140,7 +136,6 @@ struct vdi_lapic_v1 {
 #define	VAI_PEND_EXCP		12
 /* exception/interrupt pending injection for vCPU */
 #define	VAI_PEND_INTINFO	13
-
 
 /* VDC_IOAPIC: */
 
@@ -245,6 +240,41 @@ struct vdi_rtc_v1 {
 	int64_t		vr_time_base;
 	uint64_t	vr_rtc_sec;
 	uint64_t	vr_rtc_nsec;
+};
+
+/* VDC_VMM_TIME: */
+
+/*
+ * Interface for modifying time-related data of a guest, allowing the guest's
+ * TSC and device timers to continue working across inter-machine live
+ * migrations.
+ *
+ * Reads of this data will populate all fields, including:
+ * - current guest TSC (a calculated value)
+ * - guest TSC frequency
+ * - guest boot_time, which tracks the offset of the guest boot based on host
+ *   hrtime
+ * - current host hrtime and wall clock time (hrestime) at the time of read
+ *
+ * Callers writing this data may want to make adjustments to the guest TSC based
+ * on the time between read and write, such as in the case of a migration.
+ * For migrations between machines, the boot_hrtime must also be updated based
+ * on the hrtime of the target system. Callers should populate the host time
+ * fields for the host the write is performed on. These fields are used by the
+ * write interface to make additional adjustments to the guest fields to account
+ * for latency between the userspace adjustment and kernel receipt of those
+ * values.
+ */
+struct vdi_time_info_v1 {
+	/* guest-related fields */
+	uint64_t	vt_guest_freq;	/* guest TSC frequency (hz) */
+	uint64_t	vt_guest_tsc;	/* current guest TSC */
+	int64_t		vt_boot_hrtime; /* guest boot_hrtime */
+
+	/* host time fields */
+	int64_t		vt_hrtime;	/* host hrtime (ns) */
+	uint64_t	vt_hres_sec;	/* host hrestime (sec) */
+	uint64_t	vt_hres_ns;	/* host hrestime (ns) */
 };
 
 #endif /* _VMM_DATA_H_ */

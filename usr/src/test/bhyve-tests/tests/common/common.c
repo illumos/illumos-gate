@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -145,4 +145,23 @@ destroy_instance(const char *suite_name)
 		(void) close(ctl_fd);
 		return (0);
 	}
+}
+
+/*
+ * Returns true if running on AMD
+ */
+bool
+cpu_vendor_amd(void)
+{
+	uint_t regs[4];
+	char cpu_vendor[13];
+
+	do_cpuid(0, regs);
+	((uint_t *)&cpu_vendor)[0] = regs[1];
+	((uint_t *)&cpu_vendor)[1] = regs[3];
+	((uint_t *)&cpu_vendor)[2] = regs[2];
+	cpu_vendor[12] = '\0';
+
+	return (strcmp(cpu_vendor, "AuthenticAMD") == 0 ||
+	    strcmp(cpu_vendor, "HygonGenuine") == 0);
 }

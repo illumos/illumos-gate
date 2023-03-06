@@ -172,6 +172,12 @@ SYSCTL_DECL(_hw_vmm);
 SYSCTL_NODE(_hw_vmm, OID_AUTO, vmx, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     NULL);
 
+/*
+ * TSC scaling related constants
+ */
+#define	INTEL_TSCM_INT_SIZE	16
+#define	INTEL_TSCM_FRAC_SIZE	48
+
 static uint32_t pinbased_ctls, procbased_ctls, procbased_ctls2;
 static uint32_t exit_ctls, entry_ctls;
 
@@ -3851,6 +3857,18 @@ vmx_restorectx(void *arg, int vcpu)
 	}
 }
 
+static freqratio_res_t
+vmx_freq_ratio(uint64_t guest_hz, uint64_t host_hz, uint64_t *mult)
+{
+	if (guest_hz == host_hz) {
+		*mult = VM_TSCM_NOSCALE;
+		return (FR_SCALING_NOT_NEEDED);
+	}
+
+	/* VMX support not implemented at this time */
+	return (FR_SCALING_NOT_SUPPORTED);
+}
+
 struct vmm_ops vmm_ops_intel = {
 	.init		= vmx_init,
 	.cleanup	= vmx_cleanup,
@@ -3874,6 +3892,10 @@ struct vmm_ops vmm_ops_intel = {
 
 	.vmgetmsr	= vmx_msr_get,
 	.vmsetmsr	= vmx_msr_set,
+
+	.vmfreqratio	= vmx_freq_ratio,
+	.fr_intsize	= INTEL_TSCM_INT_SIZE,
+	.fr_fracsize	= INTEL_TSCM_FRAC_SIZE,
 };
 
 /* Side-effect free HW validation derived from checks in vmx_init. */

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _TEST_DEFS_H_
@@ -34,5 +34,7 @@
 
 #define	ATPIT_FREQ		1193182
 #define	ATPIT_TARGET_TICKS	(ATPIT_FREQ / 50)
+
+#define	TSC_TARGET_WRVAL	500000000000
 
 #endif /* _TEST_DEFS_H_ */
