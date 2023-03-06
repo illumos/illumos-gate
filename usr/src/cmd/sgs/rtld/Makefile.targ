@@ -34,12 +34,16 @@ pics/debugdata.o :=	XFFLAG=
 # Since we use RTLD rather than DYNLIB, we must explicitly hook in ctfmerge.
 $(RTLD) :=	CTFMERGE_POST = $(CTFMERGE_LIB)
 
-pics/%.o:	%.s
-		$(BUILD.s)
+pics/%.o:	%.S
+		$(COMPILE.s) -o $@ $<
 		$(POST_PROCESS_S_O)
 
 pics/%.o:	$(CRTSRCS)/%.s
-		$(BUILD.s)
+		$(COMPILE.s) -o $@ $<
+		$(POST_PROCESS_S_O)
+
+pics/%.o:	$(CRTSRCS)/%.S
+		$(COMPILE.s) -o $@ $<
 		$(POST_PROCESS_S_O)
 
 pics/%.o:	%.c

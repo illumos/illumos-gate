@@ -61,9 +61,6 @@ $(SBDGENERR):			$(DR_IO)/sbdgenerr.pl
 	$(CAT) $(DR_IO)/sbdgenerr.pl > $@
 	$(CHMOD) +x $@
 
-IL_CPP=$(CPP) -P -DINLINE -D_ASM $(AS_INC_PATH) \
-        $(CPP_DEFS) $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS)
-
 $(OBJS_DIR)/drmach.o    := CC_XARCH_32 = -xarch=v8plusa
 $(OBJS_DIR)/drmach.o:   $(UTSBASE)/sun4u/opl/io/drmach.c
 	$(COMPILE.c) -o $@ $(UTSBASE)/sun4u/opl/io/drmach.c
@@ -77,7 +74,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/opl/io/pcicmu/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/opl/ml/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/opl/ml/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/opl/os/%.c

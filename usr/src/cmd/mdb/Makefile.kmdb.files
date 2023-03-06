@@ -96,7 +96,7 @@ KMDBSRCS += \
 
 KMDBML +=
 
-KMDBOBJS = $(KMDBSRCS:%.c=%.o) $(KMDBML:%.s=%.o)
+KMDBOBJS = $(KMDBSRCS:%.c=%.o) $(KMDBML:%.S=%.o)
 
 PROMSRCS +=
 
@@ -113,11 +113,11 @@ KCTLSRCS += \
 
 KCTLML +=
 
-KCTLOBJS = $(KCTLSRCS:%.c=%.o) $(KCTLML:%.s=%.o)
+KCTLOBJS = $(KCTLSRCS:%.c=%.o) $(KCTLML:%.S=%.o)
 
 SRCS += $(KMDBSRCS) $(PROMSRCS)
 MLSRCS += $(KMDBML)
-OBJS = $(SRCS:%.c=%.o) $(KMDBML:%.s=%.o)
+OBJS = $(SRCS:%.c=%.o) $(KMDBML:%.S=%.o)
 
 ALLOBJS = $(OBJS) $(KCTLOBJS)
 ALLLINTFILES = $(ALLOBJS:%.o=%.ln)

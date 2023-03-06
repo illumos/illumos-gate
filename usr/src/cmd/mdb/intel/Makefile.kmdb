@@ -41,8 +41,8 @@ KMDBSRCS += \
 	kvm_isadep.c
 
 KMDBML += \
-	kmdb_asmutil.s \
-	kmdb_setcontext.s
+	kmdb_asmutil.S \
+	kmdb_setcontext.S
 
 KCTLSRCS += \
 	kctl_isadep.c

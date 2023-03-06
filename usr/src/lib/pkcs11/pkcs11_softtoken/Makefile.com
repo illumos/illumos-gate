@@ -64,7 +64,7 @@ LCL_OBJECTS = \
 	softBlowfishCrypt.o	\
 	softEC.o
 
-ASFLAGS = $(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS)
+ASFLAGS = $(AS_PICFLAGS) -D__STDC__ -D_ASM $(CPPFLAGS)
 
 ECC_COBJECTS = \
 	ec.o ec2_163.o ec2_mont.o ecdecode.o ecl_mult.o ecp_384.o \

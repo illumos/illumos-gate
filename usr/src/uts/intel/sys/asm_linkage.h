@@ -45,25 +45,6 @@ extern "C" {
  */
 
 /*
- * D16 and A16 are used to insert instructions prefixes; the
- * macros help the assembler code be slightly more portable.
- */
-#if !defined(__GNUC_AS__)
-/*
- * /usr/ccs/bin/as prefixes are parsed as separate instructions
- */
-#define	D16	data16;
-#define	A16	addr16;
-
-/*
- * (There are some weird constructs in constant expressions)
- */
-#define	_CONST(const)		[const]
-#define	_BITNOT(const)		-1!_CONST(const)
-#define	_MUL(a, b)		_CONST(a \* b)
-
-#else
-/*
  * Why not use the 'data16' and 'addr16' prefixes .. well, the
  * assembler doesn't quite believe in real mode, and thus argues with
  * us about what we're trying to do.
@@ -74,8 +55,6 @@ extern "C" {
 #define	_CONST(const)		(const)
 #define	_BITNOT(const)		~_CONST(const)
 #define	_MUL(a, b)		_CONST(a * b)
-
-#endif
 
 /*
  * C pointers are different sizes between i386 and amd64.
@@ -155,11 +134,11 @@ extern "C" {
 
 #define	MCOUNT(x) \
 /* CSTYLED */ \
-	.lcomm .L_/**/x/**/1, 4, 4; \
+	.lcomm .L_##x##1, 4, 4; \
 	pushl	%ebp; \
 	movl	%esp, %ebp; \
 /* CSTYLED */ \
-	movl	$.L_/**/x/**/1, %edx; \
+	movl	$.L_##x##1, %edx; \
 	call	_mcount; \
 	popl	%ebp
 
@@ -182,11 +161,11 @@ extern "C" {
  */
 #define	ANSI_PRAGMA_WEAK(sym, stype)	\
 /* CSTYLED */ \
-	.weak	_/**/sym; \
+	.weak	_##sym; \
 /* CSTYLED */ \
-	.type	_/**/sym, @stype; \
+	.type	_##sym, @stype; \
 /* CSTYLED */ \
-_/**/sym = sym
+_##sym = sym
 
 /*
  * Like ANSI_PRAGMA_WEAK(), but for unrelated names, as in:
@@ -337,10 +316,10 @@ name:
  */
 
 /* CSTYLED */
-#define	INDIRECT_JMP_REG(reg)	jmp	__x86_indirect_thunk_/**/reg;
+#define	INDIRECT_JMP_REG(reg)	jmp	__x86_indirect_thunk_##reg;
 
 /* CSTYLED */
-#define	INDIRECT_CALL_REG(reg)	call	__x86_indirect_thunk_/**/reg;
+#define	INDIRECT_CALL_REG(reg)	call	__x86_indirect_thunk_##reg;
 
 #endif /* _ASM */
 

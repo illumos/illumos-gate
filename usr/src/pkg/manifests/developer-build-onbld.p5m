@@ -21,11 +21,11 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2015, Richard Lowe
 # Copyright 2012, Piotr Jasiukajtis
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2019 Joyent, Inc.
+# Copyright 2015 Richard Lowe
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2019 Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Jason King
 #
@@ -46,7 +46,6 @@ dir  path=opt group=sys
 dir  path=opt/onbld
 dir  path=opt/onbld/bin
 dir  path=opt/onbld/bin/$(ARCH)
-$(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/aw mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/btxld mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/cpcgen mode=0555
 file path=opt/onbld/bin/$(ARCH)/cscope-fast mode=0555

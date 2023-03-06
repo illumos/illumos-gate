@@ -1607,11 +1607,6 @@ if [ -f $TMPDIR/nocompiler ]; then
 	exit 1
 fi
 
-# as
-whence as | tee -a $build_environ_file >> $LOGFILE
-as -V 2>&1 | head -1 | tee -a $build_environ_file >> $LOGFILE
-echo | tee -a $build_environ_file >> $LOGFILE
-
 # Check that we're running a capable link-editor
 whence ld | tee -a $build_environ_file >> $LOGFILE
 LDVER=`ld -V 2>&1`

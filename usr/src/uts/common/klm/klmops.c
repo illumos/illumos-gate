@@ -68,7 +68,7 @@ _info(struct modinfo *modinfop)
 
 /*
  * ****************************************************************
- * Stubs listed in modstubs.s
+ * Stubs listed in modstubs.S
  * These are called from fs/nfs
  */
 
@@ -135,7 +135,7 @@ lm_register_lock_locally(struct vnode *vp, struct lm_sysid *ls,
 
 /*
  * Old RPC service dispatch functions, no longer used.
- * Here only to satisfy modstubs.s references.
+ * Here only to satisfy modstubs.S references.
  */
 void
 lm_nlm_dispatch(struct svc_req *req, SVCXPRT *xprt)
@@ -153,7 +153,7 @@ lm_nlm4_dispatch(struct svc_req *req, SVCXPRT *xprt)
  * Old internal functions used for reclaiming locks
  * our NFS client holds after some server restarts.
  * The new NLM code does this differently, so these
- * are here only to satisfy modstubs.s references.
+ * are here only to satisfy modstubs.S references.
  */
 void
 lm_nlm_reclaim(struct vnode *vp, struct flock64 *flkp)

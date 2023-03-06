@@ -41,7 +41,7 @@ LIBS = $(DYNLIB)
 SRCDIR =	../common
 SRCS = $(CMNOBJS:%.o=$(SRCDIR)/%.c)
 
-ASFLAGS +=	-P -D__STDC__ -D_ASM -DPIC
+ASFLAGS +=	-D__STDC__ -D_ASM -DPIC
 CPPFLAGS +=	-I../../libc/inc -D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lc

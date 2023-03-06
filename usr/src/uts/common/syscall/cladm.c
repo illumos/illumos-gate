@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/cladm.h>
@@ -89,7 +87,7 @@ cladm(int fac, int cmd, void *arg)
 		/*
 		 * error will be -1 if the cladm module cannot be loaded;
 		 * otherwise, it is the errno value returned
-		 * (see {i86,sparc}/ml/modstubs.s).
+		 * (see {i86,sparc}/ml/modstubs.S).
 		 */
 		if (error < 0)
 			error = ENOSYS;

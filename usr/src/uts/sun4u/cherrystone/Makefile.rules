@@ -36,5 +36,5 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cherrystone/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cherrystone/ml/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cherrystone/ml/%.S
 	$(COMPILE.s) -o $@ $<

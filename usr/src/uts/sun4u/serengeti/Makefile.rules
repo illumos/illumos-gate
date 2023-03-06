@@ -43,7 +43,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/ml/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/ml/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/os/%.c

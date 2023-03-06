@@ -30,12 +30,11 @@ $(OBJCAP):	$(PICS)
 $(PICS):	pics
 
 # Assemble the original source file.
-
-pics/%.o:	../../$(TRG_PLATFORM)/common/%.s
+pics/%.o:	../../$(TRG_PLATFORM)/common/%.S
 		$(COMPILE.s) $< -o $@
 		$(POST_PROCESS_S_O)
 
-pics/%.o:	../../$(ALT_PLATFORM)/common/%.s
+pics/%.o:	../../$(ALT_PLATFORM)/common/%.S
 		$(COMPILE.s) $< -o $@
 		$(POST_PROCESS_S_O)
 

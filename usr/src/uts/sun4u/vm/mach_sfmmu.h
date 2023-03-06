@@ -86,17 +86,17 @@ extern "C" {
  */
 #define	SET_SECCTX(cnum, is_shctx, tmp1, tmp2, label)	   \
 	/* BEGIN CSTYLED */				   \
-	brnz,pn is_shctx, label/**/1			  ;\
+	brnz,pn is_shctx, label##1			  ;\
 	  sethi   %hi(FLUSH_ADDR), tmp2			  ;\
 	mov     MMU_SCONTEXT, tmp1			  ;\
 	stxa    cnum, [tmp1]ASI_MMU_CTX			  ;\
 	flush   tmp2					  ;\
 	sethi   %hi(shctx_on), tmp1			  ;\
 	ld      [tmp1 + %lo(shctx_on)], tmp1		  ;\
-	brz,pt  tmp1, label/**/3			  ;\
+	brz,pt  tmp1, label##3			  ;\
 	mov    %g0, cnum				  ;\
-	ba,pt    %xcc, label/**/2			  ;\
-label/**/1:						  ;\
+	ba,pt    %xcc, label##2			  ;\
+label##1:						  ;\
 	set     SHCTXREG_VALID_BIT, tmp1		  ;\
 	sllx    cnum, CTXREG_CTX_SHIFT, cnum		  ;\
 	srlx    cnum, CTXREG_CTX_SHIFT, cnum		  ;\
@@ -104,11 +104,11 @@ label/**/1:						  ;\
 	mov     cnum, tmp1				  ;\
 	sllx    cnum, 32, cnum				  ;\
 	or      cnum, tmp1, cnum			  ;\
-label/**/2:					          ;\
+label##2:					          ;\
 	mov     MMU_SHARED_CONTEXT, tmp1		  ;\
 	stxa    cnum, [tmp1]ASI_MMU_CTX			  ;\
 	flush   tmp2					  ;\
-label/**/3:
+label##3:
 	/* END CSTYLED */
 
 /*
@@ -247,7 +247,7 @@ label/**/3:
 	sllx	tte, TTE_PA_LSHIFT, tte;				\
 	add	scr2, MMU_PAGESHIFT + TTE_PA_LSHIFT, scr3;		\
 	/* BEGIN CSTYLED */						\
-	brz,pt	scr2, label/**/1;					\
+	brz,pt	scr2, label##1;					\
 	  srlx	tte, scr3, tte;						\
 	/* END CSTYLED */						\
 	sllx	tte, scr2, tte;						\
@@ -259,7 +259,7 @@ label/**/3:
 	srln	scr2, MMU_PAGESHIFT, scr2;				\
 	or	tte, scr2, tte;						\
 	/* CSTYLED */							\
-label/**/1:
+label##1:
 
 
 /*
@@ -282,19 +282,19 @@ label/**/1:
 	/* BEGIN CSTYLED */						\
 	/* check reference bit */					\
 	andcc	tte, TTE_REF_INT, %g0;					\
-	bnz,pt	%xcc, label/**/4;	/* if ref bit set-skip ahead */	\
+	bnz,pt	%xcc, label##4;	/* if ref bit set-skip ahead */	\
 	  nop;								\
 	GET_CPU_IMPL(tmp1);						\
 	cmp	tmp1, SPITFIRE_IMPL;					\
-	blt	%icc, label/**/2;	/* skip flush if FJ-OPL cpus */	\
+	blt	%icc, label##2;	/* skip flush if FJ-OPL cpus */	\
 	cmp	tmp1, CHEETAH_IMPL;					\
-	bl,a	%icc, label/**/1;					\
+	bl,a	%icc, label##1;					\
 	/* update reference bit */					\
 	lduh	[tsbarea + TSBMISS_DMASK], tmp1;			\
 	stxa	%g0, [ttepa]ASI_DC_INVAL; /* flush line from dcache */	\
 	membar	#Sync;							\
-	ba	label/**/2;						\
-label/**/1:								\
+	ba	label##2;						\
+label##1:								\
 	and	ttepa, tmp1, tmp1;					\
 	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line1 from dcache */	\
 	or	%g0, 1, tmp2;						\
@@ -302,14 +302,14 @@ label/**/1:								\
 	xor	tmp1, tmp2, tmp1;					\
 	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line2 from dcache */	\
 	membar	#Sync;							\
-label/**/2:								\
+label##2:								\
 	or	tte, TTE_REF_INT, tmp1;					\
 	casxa	[ttepa]ASI_MEM, tte, tmp1; 	/* update ref bit */	\
 	cmp	tte, tmp1;						\
-	bne,a,pn %xcc, label/**/2;					\
+	bne,a,pn %xcc, label##2;					\
 	ldxa	[ttepa]ASI_MEM, tte;	/* MMU_READTTE through pa */	\
 	or	tte, TTE_REF_INT, tte;					\
-label/**/4:								\
+label##4:								\
 	/* END CSTYLED */
 
 
@@ -335,19 +335,19 @@ label/**/4:								\
 	bz,pn	%xcc, exitlabel;	/* exit if wr_perm not set */	\
 	  nop;								\
 	andcc	tte, TTE_HWWR_INT, %g0;					\
-	bnz,pn	%xcc, label/**/4;	/* nothing to do */		\
+	bnz,pn	%xcc, label##4;	/* nothing to do */		\
 	  nop;								\
 	GET_CPU_IMPL(tmp1);						\
 	cmp	tmp1, SPITFIRE_IMPL;					\
-	blt	%icc, label/**/2;	/* skip flush if FJ-OPL cpus */	\
+	blt	%icc, label##2;	/* skip flush if FJ-OPL cpus */	\
 	cmp	tmp1, CHEETAH_IMPL;					\
-	bl,a	%icc, label/**/1;					\
+	bl,a	%icc, label##1;					\
 	/* update reference bit */					\
 	lduh	[tsbarea + TSBMISS_DMASK], tmp1;			\
 	stxa    %g0, [ttepa]ASI_DC_INVAL; /* flush line from dcache */ 	\
 	membar	#Sync;							\
-	ba	label/**/2;						\
-label/**/1:								\
+	ba	label##2;						\
+label##1:								\
 	and	ttepa, tmp1, tmp1;					\
 	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line1 from dcache */	\
 	or	%g0, 1, tmp2;						\
@@ -355,14 +355,14 @@ label/**/1:								\
 	xor	tmp1, tmp2, tmp1;					\
 	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line2 from dcache */	\
 	membar	#Sync;							\
-label/**/2:								\
+label##2:								\
 	or	tte, TTE_HWWR_INT | TTE_REF_INT, tmp1;			\
 	casxa	[ttepa]ASI_MEM, tte, tmp1; /* update ref/mod bit */	\
 	cmp	tte, tmp1;						\
-	bne,a,pn %xcc, label/**/2;					\
+	bne,a,pn %xcc, label##2;					\
 	  ldxa	[ttepa]ASI_MEM, tte;	/* MMU_READTTE through pa */	\
 	or	tte, TTE_HWWR_INT | TTE_REF_INT, tte;			\
-label/**/4:								\
+label##4:								\
 	/* END CSTYLED */
 
 
@@ -387,8 +387,8 @@ label/**/4:								\
 #define	MAKE_TSBREG(tsbreg, tsbinfo, vabase, tmp1, tmp2, label)		\
 	/* BEGIN CSTYLED */						\
 	ldx	[tsbinfo + TSBINFO_VADDR], tmp1;			\
-	.global	label/**/_tsbreg_vamask					;\
-label/**/_tsbreg_vamask:						\
+	.global	label##_tsbreg_vamask					;\
+label##_tsbreg_vamask:						\
 	or	%g0, RUNTIME_PATCH, tsbreg;				\
 	lduh	[tsbinfo + TSBINFO_SZCODE], tmp2;			\
 	sllx	tsbreg, TSBREG_VAMASK_SHIFT, tsbreg;			\
@@ -413,8 +413,8 @@ label/**/_tsbreg_vamask:						\
 	/* BEGIN CSTYLED */						\
 	set	TSBREG_MSB_CONST, tmp3					;\
 	sllx	tmp3, TSBREG_MSB_SHIFT, tsbreg				;\
-	.global	label/**/_tsbreg_vamask					;\
-label/**/_tsbreg_vamask:						;\
+	.global	label##_tsbreg_vamask					;\
+label##_tsbreg_vamask:						;\
 	or	%g0, RUNTIME_PATCH, tmp3				;\
 	sll	tmp3, TSBREG_VAMASK_SHIFT, tmp3				;\
 	ldx	[tsb1 + TSBINFO_VADDR], tmp1				;\
@@ -475,15 +475,15 @@ label/**/_tsbreg_vamask:						;\
 #define	RESV_OFFSET(tsbinfo, resva, tmp1, label)			\
 	/* BEGIN CSTYLED */						\
 	lduh	[tsbinfo + TSBINFO_SZCODE], tmp1			;\
-	brgz,pn	tmp1, label/**/9	 				;\
+	brgz,pn	tmp1, label##9	 				;\
 	  nop								;\
 	ldx	[tsbinfo + TSBINFO_VADDR], tmp1				;\
-	.global	label/**/_resv_offset					;\
-label/**/_resv_offset:							;\
+	.global	label##_resv_offset					;\
+label##_resv_offset:							;\
 	sllx	tmp1, (64 - MMU_PAGESHIFT4M), tmp1			;\
 	srlx	tmp1, (64 - MMU_PAGESHIFT4M), tmp1			;\
 	or	tmp1, resva, resva					;\
-label/**/9:								\
+label##9:								\
 	/* END CSTYLED */
 
 /*
@@ -503,7 +503,7 @@ label/**/9:								\
 
 #define	GET_1ST_TSBE_PTR(tsbp8k, tsbe_ptr, tmp, label)			\
 	/* BEGIN CSTYLED */						\
-label/**/_get_1st_tsbe_ptr:						;\
+label##_get_1st_tsbe_ptr:						;\
 	RUNTIME_PATCH_SETX(tsbe_ptr, tmp)				;\
 	/* tsbeptr = contents of utsb_vabase */				;\
 	/* clear upper bits leaving just bits 21:0 of TSB ptr. */	;\
@@ -532,7 +532,7 @@ label/**/_get_1st_tsbe_ptr:						;\
 
 #define	GET_2ND_TSB_BASE(tsbp8k, tsbbase, tmp, label)			\
 	/* BEGIN CSTYLED */						\
-label/**/_get_2nd_tsb_base:						;\
+label##_get_2nd_tsb_base:						;\
 	RUNTIME_PATCH_SETX(tsbbase, tmp)				;\
 	/* tsbbase = contents of utsb4m_vabase */			;\
 	/* clear upper bits leaving just bits 21:xx of TSB addr. */	;\
@@ -627,7 +627,7 @@ label/**/_get_2nd_tsb_base:						;\
 	/* BEGIN CSTYLED */                                             \
         ldda    [tsbe_ptr]UTSB_PROBE_ASI, tsbtag                        ;\
         cmp     tsbtag, tag             /* compare tag w/ TSB */        ;\
-        bne,pn  %xcc, label/**/1        /* branch if !match */          ;\
+        bne,pn  %xcc, label##1        /* branch if !match */          ;\
           nop                                                           \
 	/* END CSTYLED */
 /*
@@ -658,7 +658,7 @@ label/**/_get_2nd_tsb_base:						;\
         TT_TRACE(trace_tsbhit)                                          ;\
         DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
         retry                      /* retry faulted instruction */      ;\
-label/**/1:                                                             \
+label##1:                                                             \
 	/* END CSTYLED */
 
 #define	PROBE_2ND_DTSB(tsbe_ptr, vpg_4m, label)                         \
@@ -668,7 +668,7 @@ label/**/1:                                                             \
         TT_TRACE(trace_tsbhit)                                          ;\
         DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
         retry                      /* retry faulted instruction */      ;\
-label/**/1:                                                             \
+label##1:                                                             \
 	/* END CSTYLED */
 
 #define	PROBE_1ST_ITSB(tsbe_ptr, vpg_4m, label)                         \
@@ -680,23 +680,23 @@ label/**/1:                                                             \
         TT_TRACE(trace_tsbhit)                                          ;\
         ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
         retry                           /* retry faulted instruction */ ;\
-label/**/1:                                                             \
+label##1:                                                             \
 	/* END CSTYLED */
 
 #define	PROBE_2ND_ITSB(tsbe_ptr, vpg_4m, label)                         \
 	/* BEGIN CSTYLED */                                             \
         ldda    [tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */ ;\
         cmp     %g4, vpg_4m             /* compare tag w/ TSB */        ;\
-        bne,pn  %xcc, label/**/2        /* branch if !match */          ;\
+        bne,pn  %xcc, label##2        /* branch if !match */          ;\
           or    %g0, TTE4M, %g6                                         ;\
         andcc   %g5, TTE_EXECPRM_INT, %g0  /* check execute bit */      ;\
-        bz,a,pn %icc, label/**/1                                        ;\
+        bz,a,pn %icc, label##1                                        ;\
           sllx  %g6, TTE_SZ_SHFT, %g6                                   ;\
         mov     tsbe_ptr, %g1         /* trap trace wants ptr in %g1 */ ;\
         TT_TRACE(trace_tsbhit)                                          ;\
         ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
         retry                        /* retry faulted instruction */    ;\
-label/**/1:                                                             ;\
+label##1:                                                             ;\
         andcc %g5, TTE_E_SYNTH_INT, %g0                                 ;\
         bz,pn   %icc, exec_fault                                        ;\
           mov   tsbe_ptr, %g1       /* trap trace wants ptr in %g1 */   ;\
@@ -704,7 +704,7 @@ label/**/1:                                                             ;\
         TT_TRACE(trace_tsbhit)                                          ;\
         ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
         retry                      /* retry faulted instruction */      ;\
-label/**/2:
+label##2:
 	/* END CSTYLED */
 
 #ifdef UTSB_PHYS
@@ -737,7 +737,7 @@ label/**/2:
         SET_SHCTX_TAGACC(%g3, %g4, ASI_DMMU)                            ;\
         DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
         retry                      /* retry faulted instruction */      ;\
-label/**/1:                                                             \
+label##1:                                                             \
 	/* END CSTYLED */
 
 #define	PROBE_3RD_DTSB(tsbe_ptr, vpg_4m, label)                         \
@@ -760,7 +760,7 @@ label/**/1:                                                             \
         SET_SHCTX_TAGACC(%g3, %g4, ASI_IMMU)                            ;\
         ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)                             ;\
         retry                           /* retry faulted instruction */ ;\
-label/**/1:
+label##1:
 	/* END CSTYLED */
 
 #define	PROBE_3RD_ITSB(tsbe_ptr, vpg_4m, label)                         \
@@ -783,16 +783,16 @@ label/**/1:
 #define	SAVE_CTX1(traptype, tmp1, tmp2, label)                          \
 	/* BEGIN CSTYLED */                                             \
         cmp     traptype, FAST_IMMU_MISS_TT                             ;\
-        be,pn %icc, label/**/1                                          ;\
+        be,pn %icc, label##1                                          ;\
           nop                                                           ;\
         SET_SHCTX_TAGACC(tmp1, tmp2, ASI_DMMU)                          ;\
         membar  #Sync                                                   ;\
-        ba,a    label/**/2                                              ;\
-label/**/1:                                                             ;\
+        ba,a    label##2                                              ;\
+label##1:                                                             ;\
         SET_SHCTX_TAGACC(tmp1, tmp2, ASI_IMMU)                          ;\
         sethi   %hi(FLUSH_ADDR), tmp1                                   ;\
         flush   tmp1                                                    ;\
-label/**/2:
+label##2:
 	/* END CSTYLED */
 
 #endif /* UTSB_PHYS */

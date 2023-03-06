@@ -25,6 +25,7 @@ OBJS=	btxldr.o
 CPPFLAGS += -DLOADER_ADDRESS=$(LOADER_ADDRESS)
 CPPFLAGS += -DBTXLDR_VERBOSE
 CPPFLAGS += -I./../../common
+AS_CPPFLAGS += $(CPPFLAGS)
 
 LDFLAGS=-e start -Ttext $(LOADER_ADDRESS) -N -S --oformat binary $(GLDTARGET)
 

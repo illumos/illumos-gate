@@ -31,7 +31,7 @@ OBJECTS = $(ASOBJS) $(MACHCOBJS) $(COBJS) $(V1_OBJS)
 
 include ../../Makefile.lib
 
-SRCS =	$(ASOBJS:%.o=../$(MACH)/%.s)	\
+SRCS =	$(ASOBJS:%.o=../$(MACH)/%.S)	\
 	$(MACHCOBJS:%.o=../$(MACH)/%.c)	\
 	$(V1_OBJS:%.o=../common/%.c)	\
 	$(COBJS:%.o=../common/%.c)
@@ -41,7 +41,7 @@ LDLIBS +=	-lpctx -lnvpair -lc
 
 SRCDIR =	../common
 
-ASFLAGS +=	-P -D_ASM -I../common
+ASFLAGS +=	-D_ASM -I../common
 CPPFLAGS +=	-D_REENTRANT -I../common
 CFLAGS +=	$(CCVERBOSE)
 
@@ -62,6 +62,6 @@ pics/%.o: ../$(MACH)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../$(MACH)/%.s
+pics/%.o: ../$(MACH)/%.S
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_S_O)

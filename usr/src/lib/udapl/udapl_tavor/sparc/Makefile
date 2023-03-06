@@ -26,7 +26,7 @@
 
 include ../Makefile.com
 
-ASFLAGS += -D_ASM -P -xarch=v8
+ASFLAGS += -D_ASM -xarch=v8
 
 SRCS += dapl_tavor_atomic_copy.s
 

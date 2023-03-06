@@ -52,7 +52,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Override defaults
 #
-CLEANFILES += md5_amd64.s
+CLEANFILES += md5_amd64.S md5_amd64.s
 
 #
 #	Define targets
@@ -88,8 +88,8 @@ $(ROOTLINK):	$(ROOT_MISC_DIR) $(ROOTMODULE)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
-md5_amd64.s: $(COMDIR)/amd64/md5_amd64.pl
+md5_amd64.S: $(COMDIR)/amd64/md5_amd64.pl
 	$(PERL) $? $@
 
-$(OBJS_DIR)/md5_amd64.o: md5_amd64.s
-	$(COMPILE.s) -o $@ md5_amd64.s
+$(OBJS_DIR)/md5_amd64.o: md5_amd64.S
+	$(COMPILE.s) -o $@ md5_amd64.S

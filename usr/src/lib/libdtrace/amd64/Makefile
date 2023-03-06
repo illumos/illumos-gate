@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-ASFLAGS += $(AS_PICFLAGS) -P -D_ASM
+ASFLAGS += $(AS_PICFLAGS) -D_ASM
 
 MACHOBJS = dis_tables.o
 

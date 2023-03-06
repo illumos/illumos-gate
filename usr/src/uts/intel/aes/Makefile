@@ -86,5 +86,5 @@ $(OBJS_DIR)/%.o:  $(COM_DIR)/amd64/%.c
 	$(COMPILE.c) -o $@ $(COM_DIR)/amd64/${@F:.o=.c}
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o: $(COM_DIR)/amd64/%.s
-	$(COMPILE.s) -o $@ $(COM_DIR)/amd64/${@F:.o=.s}
+$(OBJS_DIR)/%.o: $(COM_DIR)/amd64/%.S
+	$(COMPILE.s) -o $@ $(COM_DIR)/amd64/${@F:.o=.S}

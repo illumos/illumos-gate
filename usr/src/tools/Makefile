@@ -91,13 +91,10 @@ sparc_SUBDIRS=			\
 	tokenize
 
 i386_SUBDIRS=			\
-	aw			\
 	cpcgen			\
 	elfextract		\
 	mbh_patch		\
 	btxld
-
-$(INTEL_BLD)sgs: aw
 
 SUBDIRS=			\
 	$($(MACH)_SUBDIRS)	\

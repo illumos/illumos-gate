@@ -23,8 +23,6 @@
 # Use is subject to license terms.
 #
 
-ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(sparc_AS_XARCH)
-
 include ../Makefile.com
 
 install: all $(ROOTLIBS)

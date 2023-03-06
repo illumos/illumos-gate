@@ -160,7 +160,7 @@ CTFMERGE_GUDIR	= sun4v
 #	machine specific optimization, override default in Makefile.master
 #
 CC_XARCH	= -m64 -xarch=sparcvis
-AS_XARCH	= -xarch=v9v
+AS_XARCH	= -m64
 COPTIMIZE	= -xO3
 CCMODE		= -Xa
 
@@ -205,7 +205,7 @@ AS_INC_PATH	+= -I$(DSF_DIR)/$(OBJS_DIR)
 #	FDOFFSETS:		fd_offsets.in
 #
 UNIX_MAPFILE	 = $(UTSBASE)/sun4/conf/Mapfile
-MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.s
+MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.S
 GENCONST_SRC	 = $(UTSBASE)/sun4/ml/genconst.c
 OFFSETS		 = $(UTSBASE)/sun4/ml/offsets.in
 PLATFORM_OFFSETS = $(UTSBASE)/sun4v/ml/mach_offsets.in

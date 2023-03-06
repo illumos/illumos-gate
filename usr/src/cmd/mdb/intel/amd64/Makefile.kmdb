@@ -26,8 +26,8 @@
 #
 
 KMDBML += \
-	kaif_invoke.s \
-	kmdb_start.s
+	kaif_invoke.S \
+	kmdb_start.S
 
 KMDBSRCS += \
 	kmdb_makecontext.c \

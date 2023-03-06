@@ -101,7 +101,7 @@ _info(struct modinfo *modinfop)
 /*
  * N.B.
  * No _fini routine. The module cannot be unloaded once loaded.
- * The NO_UNLOAD_STUB in modstubs.s must change if this module
+ * The NO_UNLOAD_STUB in modstubs.S must change if this module
  * is ever modified to become unloadable.
  */
 

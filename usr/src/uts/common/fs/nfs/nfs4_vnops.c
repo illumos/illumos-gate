@@ -603,7 +603,7 @@ nfs4args_copen_free(OPEN4cargs *open_args)
 }
 
 /*
- * XXX:  This is referenced in modstubs.s
+ * XXX:  This is referenced in modstubs.S
  */
 struct vnodeops *
 nfs4_getvnodeops(void)

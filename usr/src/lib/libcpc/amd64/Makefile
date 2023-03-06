@@ -22,14 +22,12 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
 
 OBJECTS = $(COBJS)
 
-SRCS =	$(ASOBJS:%.o=../$(MACH)/%.s)	\
+SRCS =	$(ASOBJS:%.o=../$(MACH)/%.S)	\
 	$(MACHCOBJS:%.o=../$(MACH)/%.c)	\
 	$(COBJS:%.o=../common/%.c)
 

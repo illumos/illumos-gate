@@ -30,13 +30,13 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/intel/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/intel/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/amd/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmm/amd/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(ASSYM_VMX): $(OFFSETS_VMX) $(GENASSYM)

@@ -79,7 +79,7 @@ CPPINCS	=	-YI,$(STANDDIR)/lib/sa -I$(STANDDIR)/lib/sa \
 
 CPPFLAGS =	$(CPPDEFS) $(CPPINCS)
 AS_CPPFLAGS =	$(CPPDEFS) $(CPPINCS:-YI,%=-I%)
-ASFLAGS =	-P -D__STDC__ -D_ASM
+ASFLAGS =	-D__STDC__ -D_ASM
 
 #
 # While things are pretty much 32-bit lint-clean, there are a ton of

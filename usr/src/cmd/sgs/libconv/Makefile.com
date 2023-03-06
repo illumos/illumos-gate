@@ -109,7 +109,7 @@ CPPFLAGS +=	-I$(SRC)/lib/libc/inc -I$(ELFCAP) \
 
 ARFLAGS=	cr
 
-AS_CPPFLAGS=	-P -D_ASM $(CPPFLAGS)
+AS_CPPFLAGS=	-D_ASM $(CPPFLAGS)
 
 BLTDATA=	$(BLTOBJS:%.o=%.c) $(BLTOBJS:%.o=%.h) report_bufsize.h
 

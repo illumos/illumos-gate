@@ -22,7 +22,7 @@ SYMBOL_SCOPE {
 		_fini;
 		_info;
 		_init;
-# These are all the symbols referenced in ml/modstubs.s
+# These are all the symbols referenced in ml/modstubs.S
 # If we want to remain a drop-in replacment for the old
 # (closed source) klm, we need to define all of these.
 

@@ -41,7 +41,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/dtrace/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/dtrace/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/dtrace/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/io/%.c
@@ -76,13 +76,13 @@ $(OBJS_DIR)/kobj_bootflags.o	:= CPPFLAGS += -I$(SRC)/common
 $(OBJS_DIR)/kobj.o		:= CPPFLAGS += -DMODDIR_SUFFIX=\"sparcv9\"
 $(OBJS_DIR)/kobj.o		:= CPPFLAGS += -D_RELSEG
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/krtld/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/krtld/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/ml/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/ml/%.S
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/nskern/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/nskern/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/os/%.c

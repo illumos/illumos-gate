@@ -79,7 +79,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/io/psm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/ml/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/ml/%.S
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/os/%.c
@@ -137,25 +137,8 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/dtrace/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-#
-# stuff for dboot
-#
-# This is different from i86pc - uses 64 bit compiler for 64 bit
-#
-# Note that we *don't* want to use the definitions that have been augmented
-# by various bits of the context of the kernel build environment; so we
-# start constructing flags and things afresh.
 
 DBOOT_OBJS_DIR= dboot/$(OBJS_DIR)
-
-DBOOT_XARCH_32 = $(i386_XARCH)
-DBOOT_XARCH_64 = $(amd64_XARCH)
-DBOOT_CFLAGS = $(DBOOT_XARCH_$(CLASS)) $(CSTD) $(CERRWARN) \
-    $(CCNOAUTOINLINE) -O
-
-DBOOT_AS_XARCH_32 = $(i386_AS_XARCH)
-DBOOT_AS_XARCH_64 = $(amd64_AS_XARCH)
-DBOOT_ASFLAGS = $(DBOOT_AS_XARCH_$(CLASS)) -P -D_ASM
 
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
 	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
@@ -181,18 +164,31 @@ $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/%.c
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/os/%.c
 	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
-$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ml/%.s
-	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ml/%.S
+	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -c -o $@ $<
 
-$(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/i386/%.s
-	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+$(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/i386/%.S
+	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -c -o $@ $<
 
-$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/ml/%.s
-	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/ml/%.S
+	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -c -o $@ $<
 
-$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.s
-	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.S
+	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -c -o $@ $<
 
 include $(UTSBASE)/i86pc/Makefile.rules
 
+# This is different from i86pc - uses 64 bit compiler for 64 bit
+#
+# Note that we *don't* want to use the definitions that have been augmented
+# by various bits of the context of the kernel build environment; so we
+# start constructing flags and things afresh.
+
 DBOOT_DEFS += -D__xpv
+
+DBOOT_XARCH_64 = $(amd64_XARCH)
+DBOOT_CFLAGS = $(DBOOT_XARCH_64) $(CSTD) $(CERRWARN) \
+    $(CCNOAUTOINLINE) -O
+
+DBOOT_AS_XARCH_64 = $(amd64_XARCH)
+DBOOT_ASFLAGS = $(DBOOT_AS_XARCH_64) -D_ASM

@@ -47,6 +47,7 @@ CPPFLAGS += -DBOOTPROG=\"gptzfsboot\" \
 	-I../btx/lib -I. \
 	-I../../sys \
 	-I../libi386
+AS_CPPFLAGS += $(CPPFLAGS)
 
 LDSCRIPT=	../boot.ldscript
 LD_FLAGS=	-static -N --gc-sections

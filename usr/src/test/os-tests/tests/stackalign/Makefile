@@ -29,7 +29,8 @@ ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTSTACK)/%) $(PROGS64:%=$(ROOTOPTSTACK)/%)
 
 include $(SRC)/cmd/Makefile.cmd
 
-ASFLAGS += -P -D_ASM
+ASFLAGS += -D_ASM
+ASFLAGS64 += -D_ASM
 CFLAGS += -D_REENTRANT
 $(INTEL_BLD)LDFLAGS += -Wl,-zinitarray=get_stack_at_init
 $(SPARC_BLD)LDFLAGS += -Wl,-zinitarray=get_stack_at_init
@@ -60,10 +61,10 @@ $(ROOTOPTSTACK)/%: %
 %.32.o: %.c
 	$(COMPILE.c) $< -o $@
 
-stack_$(MACH).o: stack_$(MACH).s
+stack_$(MACH).o: stack_$(MACH).S
 	$(COMPILE.s) $< -o $@
 
-stack_$(MACH64).o: stack_$(MACH64).s
+stack_$(MACH64).o: stack_$(MACH64).S
 	$(COMPILE64.s) $< -o $@
 
 %.64: %.64.o stack_$(MACH64).o

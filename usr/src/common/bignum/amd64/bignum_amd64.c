@@ -27,7 +27,7 @@
  * This file contains bignum implementation code that
  * is specific to AMD64, but which is still more appropriate
  * to write in C, rather than assembly language.
- * bignum_amd64_asm.s does all the assembly language code
+ * bignum_amd64_asm.S does all the assembly language code
  * for AMD64 specific bignum support.  The assembly language
  * source file has pure code, no data.  Let the C compiler
  * generate what is needed to handle the variations in

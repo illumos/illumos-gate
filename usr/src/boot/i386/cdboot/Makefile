@@ -19,6 +19,7 @@ include $(SRC)/boot/Makefile.inc
 include ../Makefile.inc
 
 CPPFLAGS +=	-I../common
+AS_CPPFLAGS += $(CPPFLAGS)
 
 PROG=	cdboot
 FILEMODE=0444

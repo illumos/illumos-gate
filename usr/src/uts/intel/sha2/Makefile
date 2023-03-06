@@ -49,7 +49,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Override defaults
 #
-CLEANFILES += sha512-x86_64.s sha256-x86_64.s
+CLEANFILES += sha512-x86_64.S sha256-x86_64.S sha512-x86_64.s sha256-x86_64.s
 
 #
 #	Define targets
@@ -90,11 +90,11 @@ $(ROOTLINK):	$(ROOT_MISC_DIR) $(ROOTMODULE)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
-$(OBJS_DIR)/%.o: %.s
-	$(COMPILE.s) -o $@ ${@F:.o=.s}
+$(OBJS_DIR)/%.o: %.S
+	$(COMPILE.s) -o $@ ${@F:.o=.S}
 
-sha512-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
+sha512-x86_64.S: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
 	$(PERL) $? $@
 
-sha256-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
+sha256-x86_64.S: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
 	$(PERL) $? $@

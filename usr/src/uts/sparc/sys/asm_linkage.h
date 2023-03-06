@@ -27,8 +27,6 @@
 #ifndef _SYS_ASM_LINKAGE_H
 #define	_SYS_ASM_LINKAGE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stack.h>
 #include <sys/trap.h>
 
@@ -82,19 +80,19 @@ extern "C" {
 #define	MCOUNT(x) \
 	save	%sp, -SA(MINFRAME), %sp; \
 /* CSTYLED */ \
-	sethi	%hh(.L_/**/x/**/1), %o0; \
+	sethi	%hh(.L_##x##1), %o0; \
 /* CSTYLED */ \
-	sethi	%lm(.L_/**/x/**/1), %o1; \
+	sethi	%lm(.L_##x##1), %o1; \
 /* CSTYLED */ \
-	or	%o0, %hm(.L_/**/x/**/1), %o0; \
+	or	%o0, %hm(.L_##x##1), %o0; \
 /* CSTYLED */ \
-	or	%o1, %lo(.L_/**/x/**/1), %o1; \
+	or	%o1, %lo(.L_##x##1), %o1; \
 	sllx	%o0, 32, %o0; \
 	call	_mcount; \
 	or	%o0, %o1, %o0; \
 	restore; \
 /* CSTYLED */ \
-	.common .L_/**/x/**/1, 8, 8
+	.common .L_##x##1, 8, 8
 
 #else	/* __sparcv9 */
 
@@ -102,13 +100,13 @@ extern "C" {
 #define	MCOUNT(x) \
 	save	%sp, -SA(MINFRAME), %sp; \
 /* CSTYLED */ \
-	sethi	%hi(.L_/**/x/**/1), %o0; \
+	sethi	%hi(.L_##x##1), %o0; \
 	call	_mcount; \
 /* CSTYLED */ \
-	or	%o0, %lo(.L_/**/x/**/1), %o0; \
+	or	%o0, %lo(.L_##x##1), %o0; \
 	restore; \
 /* CSTYLED */ \
-	.common .L_/**/x/**/1, 4, 4
+	.common .L_##x##1, 4, 4
 
 #endif	/* __sparcv9 */
 
@@ -132,11 +130,11 @@ extern "C" {
  */
 #define	ANSI_PRAGMA_WEAK(sym, stype)	\
 /* CSTYLED */ \
-	.weak	_/**/sym; \
+	.weak	_##sym; \
 /* CSTYLED */ \
-	.type	_/**/sym, #stype; \
+	.type	_##sym, #stype; \
 /* CSTYLED */ \
-_/**/sym = sym
+_##sym = sym
 
 /*
  * Like ANSI_PRAGMA_WEAK(), but for unrelated names, as in:

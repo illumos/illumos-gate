@@ -253,12 +253,12 @@ extern "C" {
 	/*								\
 	 * If N_pgsz0/1 changed, need to demap.				\
 	 */								\
-	brz	scr1, label/**/_0;					\
+	brz	scr1, label##_0;					\
 	nop;								\
 	mov	DEMAP_ALL_TYPE, scr1;					\
 	stxa	%g0, [scr1]ASI_DTLB_DEMAP;				\
 	stxa	%g0, [scr1]ASI_ITLB_DEMAP;				\
-label/**/_0:								\
+label##_0:								\
 	mov	MMU_PCONTEXT, scr1;					\
 	stxa    scr2, [scr1]ASI_MMU_CTX;				\
 	sethi   %hi(FLUSH_ADDR), scr1;					\

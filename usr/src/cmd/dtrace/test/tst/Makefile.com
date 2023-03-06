@@ -36,7 +36,7 @@ TSTDIR = $(ROOTTST)/$(SUBDIR)
 DSTYLE = $(ROOTOPTPKG)/bin/dstyle
 
 CSRCS :sh= find . -name SCCS -prune -o -name *.c -print | cut -b3-
-SSRCS :sh= find . -name SCCS -prune -o -name *.s -print | cut -b3-
+SSRCS :sh= find . -name SCCS -prune -o -name *.S -print | cut -b3-
 DSRCS :sh= find . -name SCCS -prune -o -name *.d -print | cut -b3-
 
 TSTS :sh= find . -name tst.*.d -o -name err.*.d -o \
@@ -47,7 +47,7 @@ TSTS :sh= find . -name tst.*.d -o -name err.*.d -o \
 EXES :sh= find . -name SCCS -prune -o \( -name *.exe -o -name \*.pl \) -print \
     | cut -b3-
 EXES += $(CSRCS:%.c=%.exe)
-EXES += $(SSRCS:%.s=%.exe)
+EXES += $(SSRCS:%.S=%.exe)
 
 ROOT_TSTS = $(TSTS:%=$(TSTDIR)/%)
 ROOT_EXES = $(EXES:%=$(TSTDIR)/%)
@@ -76,7 +76,7 @@ clean lint:
 
 clobber: FRC
 	-$(RM) $(CSRCS:%.c=%.exe) $(CSRCS:%.c=%.o)
-	-$(RM) $(SSRCS:%.s=%.exe) $(SSRCS:%.s=%.o)
+	-$(RM) $(SSRCS:%.S=%.exe) $(SSRCS:%.S=%.o)
 	-$(RM) $(DSRCS:%.d=%.o)
 	-$(RM) $(CLOBBERFILES)
 
@@ -105,7 +105,7 @@ $(TSTDIR)/%: %
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-%.o: %.s
+%.o: %.S
 	$(COMPILE.s) -o $@ $<
 	$(POST_PROCESS_O)
 
