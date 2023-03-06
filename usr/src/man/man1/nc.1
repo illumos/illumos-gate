@@ -6,11 +6,10 @@
 .\" BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 .\" STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH NC 1 "Apr 9, 2009"
+.TH NC 1 "Feb 17, 2023"
 .SH NAME
 nc \- arbitrary TCP and UDP connections and listens
 .SH SYNOPSIS
-.LP
 .nf
 \fBnc\fR \fB-h\fR
 .fi
@@ -44,8 +43,6 @@ nc \- arbitrary TCP and UDP connections and listens
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBnc\fR (or \fBnetcat\fR) utility is used for a variety of tasks
 associated with TCP or UDP. \fBnc\fR can open TCP connections, send UDP
 packets, listen on arbitrary TCP and UDP ports, perform port scanning, and deal
@@ -80,8 +77,6 @@ network daemon testing
 a SOCKS or HTTP \fBProxyCommand\fR for \fBssh\fR(1)
 .RE
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -327,8 +322,8 @@ timeout.
 .RS 4n
 Use the specified protocol when talking to the proxy server. Supported
 protocols are \fB4\fR (\fBSOCKS v.4\fR), \fB5\fR (\fBSOCKS v.5\fR) and
-\fBconnect\fR (\fBHTTP\fR proxy). If the protocol is not specified, \fBSOCKS v.
-5\fR is used.
+\fBconnect\fR (\fBHTTP\fR proxy). If the protocol is not specified,
+\fBSOCKS v.5\fR is used.
 .sp
 It is an error to use this option in conjunction with the \fB-l\fR option.
 .RE
@@ -360,8 +355,6 @@ It is an error to use this option in conjunction with the \fB-l\fR option.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -414,8 +407,6 @@ given, in which case a Unix Domain Socket path must be specified instead of
 
 .SH USAGE
 .SS "Client/Server Model"
-.sp
-.LP
 It is quite simple to build a very basic client/server model using \fBnc\fR. On
 one console, start \fBnc\fR listening on a specific port for a connection. For
 example, the command:
@@ -447,8 +438,6 @@ connection has been set up, \fBnc\fR does not really care which side is being
 used as a \fBserver\fR and which side is being used as a \fBclient\fR. The
 connection can be terminated using an \fBEOF\fR (Ctrl/d).
 .SS "Data Transfer"
-.sp
-.LP
 The example in the previous section can be expanded to build a basic data
 transfer model. Any information input into one end of the connection is output
 to the other end, and input and output can be easily captured in order to
@@ -481,8 +470,6 @@ $ nc host.example.com 1234 < filename.in
 .LP
 After the file has been transferred, the connection closes automatically.
 .SS "Talking to Servers"
-.sp
-.LP
 It is sometimes useful to talk to servers \fBby hand\fR rather than through a
 user interface. It can aid in troubleshooting, when it might be necessary to
 verify what data a server is sending in response to commands issued by the
@@ -524,8 +511,6 @@ EOF
 .sp
 
 .SS "Port Scanning"
-.sp
-.LP
 It can be useful to know which ports are open and running services on a target
 machine. The \fB-z\fR flag can be used to tell \fBnc\fR to report open ports,
 rather than to initiate a connection.
@@ -565,8 +550,6 @@ Protocol mismatch.
 .sp
 
 .SS "\fBinetd\fR Capabilities"
-.sp
-.LP
 One of the possible uses is to create simple services by using \fBinetd\fR(8).
 .sp
 .LP
@@ -610,8 +593,6 @@ default  tcp_wrappers=FALSE
 .sp
 
 .SS "Privileges"
-.sp
-.LP
 To bind to a privileged port number \fBnc\fR needs to be granted the
 \fBnet_privaddr\fR privilege. If Solaris Trusted Extensions are configured and
 the port \fBnc\fR should listen on is configured as a multi-level port \fBnc\fR
@@ -625,7 +606,6 @@ privileges. To only grant the \fBprivileges\fR(7) when \fBnc\fR is invoked, the
 recommended approach is to create and assign an \fBrbac\fR(7) rights profile.
 See \fBEXAMPLES\fR for additional information.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBnc\fR
 .sp
 .LP
@@ -835,8 +815,6 @@ Invoking \fBnc\fR directly does not run it with the additional privileges, and
 neither does invoking the script without using \fBpfexec\fR or a profile shell.
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -853,14 +831,12 @@ Interface Stability	See below.
 .sp
 .LP
 The package name is Committed. The command line syntax is Committed for the
-\fB-4\fR, \fB-6,\fR \fB-l\fR, \fB-n\fR, \fB-p\fR ,\fB-u\fR, and \fB-w\fR
+\fB-4\fR, \fB-6\fR, \fB-l\fR, \fB-n\fR, \fB-p\fR, \fB-u\fR, and \fB-w\fR
 options and their arguments (if any). The \fIname\fR and \fIport\fR list
 arguments are Committed. The port range syntax is Uncommitted. The interface
 stability level for all other command line options and their arguments is
 Uncommitted.
 .SH SEE ALSO
-.sp
-.LP
 .BR cat (1),
 .BR pfcsh (1),
 .BR pfexec (1),
@@ -879,8 +855,6 @@ Uncommitted.
 .BR inetconv (8),
 .BR inetd (8)
 .SH AUTHORS
-.sp
-.LP
 The original implementation of \fBnc\fR was written by Hobbit,
 \fBhobbit@avian.org\fR.
 .sp
@@ -888,7 +862,5 @@ The original implementation of \fBnc\fR was written by Hobbit,
 \fBnc\fR was rewritten with IPv6 support by Eric Jackson,
 \fBericj@monkey.org\fR.
 .SH NOTES
-.sp
-.LP
 UDP port scans always succeeds, that is, reports the port as open, rendering
 the \fB-uz\fR combination of flags relatively useless.

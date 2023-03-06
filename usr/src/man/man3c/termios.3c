@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TERMIOS 3C "Apr 5, 1996"
+.TH TERMIOS 3C "February 21, 2023"
 .SH NAME
 termios \- general terminal interface
 .SH SYNOPSIS
-.LP
 .nf
 #include <termios.h>
 
@@ -79,8 +78,6 @@ termios \- general terminal interface
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions describe a general terminal interface for controlling
 asynchronous communications ports. A more detailed overview of the terminal
 interface can be found in \fBtermio\fR(4I), which also describes an
@@ -91,8 +88,6 @@ interface.
 .LP
 Each of these functions is now described on a separate manual page.
 .SH SEE ALSO
-.sp
-.LP
 .BR ioctl (2),
 .BR cfgetispeed (3C),
 .BR cfgetospeed (3C),
@@ -103,9 +98,7 @@ Each of these functions is now described on a separate manual page.
 .BR tcflush (3C),
 .BR tcgetattr (3C),
 .BR tcgetpgrp (3C),
-.BR tcgetpgrp (3C),
 .BR tcgetsid (3C),
-.BR tcsendbreak (3C),
 .BR tcsendbreak (3C),
 .BR tcsetattr (3C),
 .BR termio (4I)

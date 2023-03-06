@@ -3,29 +3,25 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRINTERS.CONF 5 "Feb 25, 2017"
+.TH PRINTERS.CONF 5 "February 21, 2023"
 .SH NAME
 printers.conf \- system printing configuration database
 .SH SYNOPSIS
-.LP
 .nf
 \fB/etc/printers.conf\fR
 .fi
 
 .SS "LDAP"
-.LP
 .nf
 \fBou=printers\fR
 .fi
 
 .SS "NIS"
-.LP
 .nf
 \fBprinters.conf.byname\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBprinters.conf\fR file is the system printing configuration database.
 System administrators use \fBprinters.conf\fR to describe destinations for the
 print client commands and the print protocol adaptor. A destination names a
@@ -33,7 +29,6 @@ printer or class of printers. See \fBlpadmin\fR(8). The \fBLP\fR print spooler
 uses private \fBLP\fR configuration data for represented in the
 \fBprinters.conf\fR database.
 .SS "Entries"
-.LP
 Each entry in \fBprinters.conf\fR describes one destination. Entries are one
 line consisting of any number of fields separated by colons (`\fB:\fR') and
 terminated by a NEWLINE. The first field of each entry specifies the name of
@@ -62,12 +57,10 @@ NEWLINE. Use the \fBlpset\fR command to create or modify \fBprinters.conf\fR.
 See \fBlpset\fR(8). Do \fBnot\fR make changes in \fBprinters.conf\fR by using
 an editor.
 .SS "Specifying Configuration Options"
-.LP
 \fIkey\fR\fB=\fR\fIvalue\fR pairs are configuration options defined by the
 system administrator. \fIkey\fR and \fIvalue\fR can be of arbitrary length.
 Separate \fIkey\fR and \fIvalue\fR by the equal (`\fB='\fR) character.
 .SS "Client/Server Configuration Options"
-.LP
 The following client/server configuration options (represented as
 \fIkey\fR\fB=\fR\fIvalue\fR pairs) are supported:
 .sp
@@ -182,7 +175,6 @@ See \fBlpget\fR(8), \fBlpstat\fR(1), and \fBcancel\fR(1).
 .RE
 
 .SS "LP Server Options"
-.LP
 The following \fBLP\fR configuration options (represented as
 \fIkey\fR\fB=\fR\fIvalue\fR pairs) are supported:
 .sp
@@ -204,7 +196,6 @@ generated or by the superuser on the print server.
 .RE
 
 .SS "Print Queue Name Resolution"
-.LP
 Applications needing to resolve print queue names (destinations) to the
 associated print service and communications endpoint make use of a specific
 name resolution ordering. Destination names in URI and POSIX form are complete
@@ -212,7 +203,6 @@ unto themselves and require no further resolution.  Names in atomic form are
 resolved based on the \fBprinters\fR database entry in the /etc/nsswitch.conf
 file. See nsswitch.conf(5)
 .SS "Locating the Personal Default Destination"
-.LP
 The default destination is located differently depending on the command.
 .sp
 .LP
@@ -272,7 +262,6 @@ destination in the following order:
 \fB_default\fR destination in \fB/etc/printers.conf\fR.
 .RE
 .SS "Locating the Interest List for lpstat, lpget, and cancel"
-.LP
 The \fBlpget\fR, \fBlpstat\fR, and \fBcancel\fR commands locate the interest
 list in the following order:
 .RS +4
@@ -286,7 +275,6 @@ list in the following order:
 \fB_all\fR list in \fB/etc/printers.conf\fR.
 .RE
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSetting the Interest List
 .sp
 .LP
@@ -416,7 +404,6 @@ LDAP version of \fB/etc/printers.conf\fR
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -431,9 +418,7 @@ Stability Level	Stable
 .TE
 
 .SH SEE ALSO
-.LP
 .BR cancel (1),
-.BR enable (1),
 .BR enable (1),
 .BR lp (1),
 .BR lpstat (1),
@@ -444,7 +429,6 @@ Stability Level	Stable
 .BR printers (5),
 .BR attributes (7),
 .BR standards (7),
-.BR accept (8),
 .BR accept (8),
 .BR in.lpd (8),
 .BR lpadmin (8),

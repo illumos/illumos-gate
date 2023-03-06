@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MOUNT_PCFS 8 "May 12, 2008"
+.TH MOUNT_PCFS 8 "Feb 17, 2023"
 .SH NAME
 mount_pcfs \- mount pcfs file systems
 .SH SYNOPSIS
-.LP
 .nf
 \fBmount\fR \fB-F\fR pcfs [\fIgeneric_options\fR]
      [\fB-o\fR \fIFSType-specific_options\fR] \fIspecial\fR | \fImount_point\fR
@@ -20,8 +19,6 @@ mount_pcfs \- mount pcfs file systems
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBmount\fR attaches an \fBMS-DOS\fR file system (\fBpcfs\fR) to the file
 system hierarchy at the \fImount_point\fR, which is the pathname of a
 directory. If \fImount_point\fR has any contents prior to the \fBmount\fR
@@ -51,7 +48,7 @@ A floppy disk, such as \fB/dev/diskette0\fR or \fB/dev/diskette1\fR.
 .ie t \(bu
 .el o
 A DOS logical drive on a hard disk expressed as
-\fIdevice-name\fR\fB:\fR\fIlogical-drive\fR , where \fIdevice-name\fR specifies
+\fIdevice-name\fR\fB:\fR\fIlogical-drive\fR, where \fIdevice-name\fR specifies
 the special block device-file for the whole disk and \fIlogical-drive\fR is
 either a drive letter (c through z) or a drive number (1 through 24). Examples
 are \fB/dev/dsk/c0t0d0p0:\fR\fIc\fR and \fB/dev/dsk/c0t0d0p0:\fR\fI1\fR.
@@ -61,7 +58,6 @@ are \fB/dev/dsk/c0t0d0p0:\fR\fIc\fR and \fB/dev/dsk/c0t0d0p0:\fR\fI1\fR.
 The \fIspecial\fR device file type must have a formatted \fBMS-DOS\fR file
 system with either a 12-bit, 16-bit, or 32-bit File Allocation Table.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fIgeneric_options\fR\fR
@@ -161,7 +157,6 @@ variable.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/mnttab\fR\fR
@@ -182,8 +177,6 @@ list of default parameters for each file system
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR mount (2),
 .BR stat (2),
 .BR time (2),
@@ -196,8 +189,6 @@ list of default parameters for each file system
 .BR mount (8),
 .BR mountall (8)
 .SH NOTES
-.sp
-.LP
 If the directory on which a file system is to be mounted is a symbolic link,
 the file system is mounted on the directory to which the symbolic link refers,
 rather than on top of the symbolic link itself.

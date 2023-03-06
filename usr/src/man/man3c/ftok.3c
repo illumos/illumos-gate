@@ -44,11 +44,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH FTOK 3C "Jul 24, 2002"
+.TH FTOK 3C "Feb 17, 2023"
 .SH NAME
 ftok \- generate an IPC key
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/ipc.h>
 
@@ -56,8 +55,6 @@ ftok \- generate an IPC key
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBftok()\fR function returns a key based on \fIpath\fR and \fIid\fR that
 is usable in subsequent calls to \fBmsgget\fR(2), \fBsemget\fR(2) and
 \fBshmget\fR(2). The \fIpath\fR argument must be the pathname of an existing
@@ -78,14 +75,10 @@ the same file is recreated, then a call to \fBftok()\fR with the same
 Only the low order 8-bits of \fBid\fR are significant.  The behavior of
 \fBftok()\fR is unspecified if these bits are 0.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBftok()\fR returns a key.  Otherwise,
 \fBftok()\fR returns \fB(key_t)\(mi1\fR and sets \fBerrno\fR to indicate the
 error.
 .SH ERRORS
-.sp
-.LP
 The \fBftok()\fR function will fail if:
 .sp
 .ne 2
@@ -111,7 +104,7 @@ Too many symbolic links were encountered in resolving \fIpath\fR.
 \fB\fBENAMETOOLONG\fR\fR
 .ad
 .RS 16n
-The length of the \fIpath\fR argument exceeds \fB{\fR\fBPATH\fR\fB_MAX}  \fR or
+The length of the \fIpath\fR argument exceeds \fB{PATH_MAX}\fR or
 a pathname component is longer than \fB{NAME_MAX}\fR.
 .RE
 
@@ -144,12 +137,10 @@ The \fBftok()\fR function may fail if:
 .ad
 .RS 16n
 Pathname resolution of a symbolic link produced an intermediate result whose
-length exceeds \fB{PATH_MAX}  \fR.
+length exceeds \fB{PATH_MAX}\fR.
 .RE
 
 .SH USAGE
-.sp
-.LP
 For maximum portability, \fIid\fR should be a single-byte character.
 .sp
 .LP
@@ -162,15 +153,11 @@ operation. It is still possible to interfere intentionally. Therefore, it is
 strongly suggested that the most significant byte of a key in some sense refer
 to a project so that keys do not conflict across a given system.
 .SH NOTES
-.sp
-.LP
 Since the \fBftok()\fR function returns a value based on the \fIid\fR given and
 the file serial number of the file named by \fIpath\fR in a type that is no
 longer large enough to hold all file serial numbers, it may return the same key
 for paths naming different files on large filesystems.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -187,8 +174,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR msgget (2),
 .BR semget (2),
 .BR shmget (2),

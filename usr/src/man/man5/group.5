@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GROUP 5 "Feb 25, 2017"
+.TH GROUP 5 "Feb 17, 2023"
 .SH NAME
 group \- group file
 .SH DESCRIPTION
-.LP
 The \fBgroup\fR file is a local source of group information. The \fBgroup\fR
 file can be used in conjunction with other group sources, including the
 \fBNIS\fR maps \fBgroup.byname\fR and \fBgroup.bygid\fR, or group information
@@ -20,7 +19,7 @@ The \fBgroup\fR file contains a one-line entry for each group recognized by the
 system, of the form:
 .sp
 .LP
-\fIgroupname\fR:\fIpassword\fR: \fIgid\fR:\fIuser-list\fR
+\fIgroupname\fR:\fIpassword\fR:\fIgid\fR:\fIuser-list\fR
 .sp
 .LP
 where
@@ -81,13 +80,12 @@ commands, such as \fBgroupdel\fR(8) and \fBgroupmod\fR(8), fail.
 Previous releases used a group entry beginning with a `\fB+\fR' (plus sign) or
 `\fB\(mi\fR\&' (minus sign) to selectively incorporate entries from a naming
 service source (for example, an NIS map or data from an LDAP server) for group.
-If still required, this is supported by specifying \fBgroup:compat\fR in
+If still required, this is supported by specifying \fBgroup: compat\fR in
 \fBnsswitch.conf\fR(5). The \fBcompat\fR source may not be supported in future
 releases. Possible sources are \fBfiles\fR followed by \fBldap\fR.
 This has the effect of incorporating information from an LDAP
 server after the \fBgroup\fR file.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExample \fBgroup\fR File.
 .sp
 .LP
@@ -152,7 +150,6 @@ all the groups listed in the \fBNIS\fR \fBgroup.bygid\fR and \fBgroup.byname\fR
 maps would be effectively incorporated after the entry for stooges.
 
 .SH SEE ALSO
-.LP
 .BR groups (1),
 .BR newgrp (1),
 .BR grpck (1B),

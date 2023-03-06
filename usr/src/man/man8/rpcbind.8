@@ -5,17 +5,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPCBIND 8 "May 13, 2017"
+.TH RPCBIND 8 "February 21, 2023"
 .SH NAME
 rpcbind \- universal addresses to RPC program number mapper
 .SH SYNOPSIS
-.LP
 .nf
 \fBrpcbind\fR [\fB-d\fR] [\fB-w\fR] [\fB-l\fR \fIlisten_backlog\fR]
 .fi
 
 .SH DESCRIPTION
-.LP
 \fBrpcbind\fR is a server that converts \fBRPC\fR program numbers into
 universal addresses. It must be running on the host to be able to make
 \fBRPC\fR calls on a server on that machine.
@@ -153,7 +151,6 @@ calls.
 .RE
 
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -191,7 +188,6 @@ This can be used to override \fBconfig/listen_backlog\fR SMF property.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAllowing Remote Access
 .sp
 .LP
@@ -227,7 +223,6 @@ purposes.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -245,18 +240,15 @@ Interface Stability	See below.
 .LP
 TCP wrappers is External.
 .SH SEE ALSO
-.LP
 .BR rpcbind (3NSL),
 .BR hosts_access (5),
 .BR syslog.conf (5),
 .BR attributes (7),
 .BR smf (7),
-.BR smf (7),
 .BR rpcinfo (8),
 .BR svcadm (8),
 .BR svccfg (8)
 .SH NOTES
-.LP
 Terminating \fBrpcbind\fR with \fBSIGKILL\fR prevents the warm-start files from
 being written.
 .sp

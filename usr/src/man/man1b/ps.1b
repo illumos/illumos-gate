@@ -2,7 +2,7 @@
 .\" Copyright (c) 2002, Sun Microsystems, Inc. - All Rights Reserved.
 .\" Copyright (c), 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
 .\" Copyright 2019 Joyent, Inc.
-.TH PS 1B "Aug 13, 2019"
+.TH PS 1B "Feb 17, 2023"
 .SH NAME
 ps \- display the status of current processes
 .SH SYNOPSIS
@@ -164,7 +164,7 @@ children.
 .RS 11n
 Lists only process data associated with the terminal, \fIterm\fR. Terminal
 identifiers may be specified in one of two forms: the device's file name (for
-example, \fBtty04\fR or \fBterm/14\fR ) or, if the device's file name starts
+example, \fBtty04\fR or \fBterm/14\fR) or, if the device's file name starts
 with \fBtty\fR, just the digit identifier (for example, \fB04\fR).
 .RE
 
@@ -383,7 +383,6 @@ the user block.
 .RE
 
 .SH SEE ALSO
-.LP
 .BR kill (1),
 .BR ps (1),
 .BR nice (2),

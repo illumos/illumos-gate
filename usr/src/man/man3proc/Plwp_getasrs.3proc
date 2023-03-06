@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd February 21, 2023
 .Dt PLWP_GETASRS 3PROC
 .Os
 .Sh NAME
@@ -141,7 +141,6 @@ in
 .Xr libproc 3LIB ,
 .Xr Plwp_getfpregs 3PROC ,
 .Xr Plwp_getregs 3PROC ,
-.Xr Plwp_setregs 3PROC ,
 .Xr Plwp_setregs 3PROC ,
 .Xr Pstop 3PROC ,
 .Xr proc 5

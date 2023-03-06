@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DI_PATH_BUS_ADDR 3DEVINFO "May 15, 2008"
+.TH DI_PATH_BUS_ADDR 3DEVINFO "February 21, 2023"
 .SH NAME
 di_path_bus_addr, di_path_client_node, di_path_instance, di_path_node_name,
 di_path_phci_node, di_path_state \- return libdevinfo path node information
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldevinfo\fR [ \fIlibrary\fR... ]
 #include <libdevinfo.h>
@@ -42,7 +41,6 @@ di_path_phci_node, di_path_state \- return libdevinfo path node information
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpath\fR\fR
@@ -52,12 +50,8 @@ The handle to a path node in a \fBdi_init\fR(3DEVINFO) snapshot.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions extract information associated with a path node.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBdi_path_bus_addr()\fR function returns a string representing the pHCI
 child path node's unit-address. This function is the \fBdi_path_t\fR peer of
 \fBdi_bus_addr\fR(3DEVINFO).
@@ -133,8 +127,6 @@ I/O operations.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
@@ -151,8 +143,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR di_bus_addr (3DEVINFO),
 .BR di_devfs_path (3DEVINFO),
 .BR di_init (3DEVINFO),
@@ -161,7 +151,6 @@ MT-Level	Safe
 .BR di_path_client_next_path (3DEVINFO),
 .BR di_path_prop_bytes (3DEVINFO),
 .BR di_path_prop_lookup_bytes (3DEVINFO),
-.BR di_path_prop_next (3DEVINFO),
 .BR di_path_prop_next (3DEVINFO),
 .BR libdevinfo (3LIB),
 .BR attributes (7)

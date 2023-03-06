@@ -5,18 +5,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SU 8 "Feb 26, 2004"
+.TH SU 8 "Feb 17, 2023"
 .SH NAME
 su \- become superuser or another user
 .SH SYNOPSIS
-.LP
 .nf
 \fBsu\fR [\fB-\fR] [\fIusername\fR [arg...]]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsu\fR command allows one to become another user without logging off or
 to assume a role. The default user \fIname\fR is \fBroot\fR (superuser).
 .sp
@@ -77,12 +74,9 @@ of \fB$\fR\fBPATH\fR\fB, \fR which is controlled by \fBPATH\fR and
 All attempts to become another user using \fBsu\fR are logged in the log file
 \fB/var/adm/sulog\fR (see \fBsulog\fR(5)).
 .SH SECURITY
-.sp
-.LP
 \fBsu\fR uses \fBpam\fR(3PAM) with the service name \fBsu\fR for
 authentication, account management, and credential establishment.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRBecoming User \fBbin\fR While Retaining Your Previously
 Exported Environment
 .sp
@@ -131,14 +125,12 @@ example% \fBsu - bin -c "\fIcommand args\fR"\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 Variables with \fBLD_\fR prefix are removed for security reasons. Thus, \fBsu
 bin\fR will not retain previously exported variables with \fBLD_\fR prefix
 while becoming user \fBbin\fR.
 .sp
 .LP
-If any of the \fBLC_*\fR variables ( \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
+If any of the \fBLC_*\fR variables (\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
 \fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR) (see
 \fBenviron\fR(7)) are not set in the environment, the operational behavior of
 \fBsu\fR for each corresponding locale category is determined by the value of
@@ -174,7 +166,6 @@ default form found in the program itself (in most cases, U.S. English).
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB$\fR\fBHOME\fR\fB/.profile\fR\fR
@@ -289,8 +280,6 @@ Sets the TZ environment variable of the shell.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR csh (1),
 .BR env (1),
 .BR ksh (1),

@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PORT_ASSOCIATE 3C "April 9, 2016"
+.TH PORT_ASSOCIATE 3C "Feb 17, 2023"
 .SH NAME
 port_associate, port_dissociate \- associate or dissociate the object with the
 port
 .SH SYNOPSIS
-.LP
 .nf
 #include <port.h>
 
@@ -22,7 +21,6 @@ port
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBport_associate()\fR function associates specific \fIevents\fR of a given
 \fIobject\fR with a \fIport\fR.  Only objects associated with a particular port
 are able to generate events that can be retrieved using \fBport_get\fR(3C) or
@@ -144,17 +142,15 @@ descriptors shared after a call to \fBfork\fR(2). The process performing the
 first association with a port (parent or child process) is designated as the
 owner of the association. Only the owner of an association is allowed to
 dissociate the file descriptor from a port. The association is removed if the
-owner of the association closes the port .
+owner of the association closes the port.
 .sp
 .LP
 On NFS file systems, events from only the client side (local)
 access/modifications to files or directories will be delivered.
 .SH RETURN VALUES
-.LP
 Upon successful completion, 0 is returned. Otherwise, \(mi1 is returned and
 \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.LP
 The \fBport_associate()\fR and \fBport_dissociate()\fR functions will fail if:
 .sp
 .ne 2
@@ -267,7 +263,6 @@ The specified object is not associated with the port.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRRetrieve data from a pipe file descriptor.
 .sp
 .LP
@@ -403,7 +398,6 @@ my_status = aio_return(aiocbp);
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -422,7 +416,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR poll (2),
 .BR setrctl (2),
 .BR port_alert (3C),

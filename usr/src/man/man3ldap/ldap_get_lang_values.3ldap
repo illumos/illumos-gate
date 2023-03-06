@@ -4,12 +4,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAP_GET_LANG_VALUES 3LDAP "Oct 25, 2001"
+.TH LDAP_GET_LANG_VALUES 3LDAP "February 21, 2023"
 .SH NAME
 ldap_get_lang_values, ldap_get_lang_values_len \- return an attribute's  values
 that matches a specified language subtype
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR \fB-flag \&.\|.\|.\fR \fIfile\fR\&.\|.\|.\fB-l\fRldap [\fB -library \&.\|.\|. \fR]
 #include <ldap.h>
@@ -25,8 +24,6 @@ that matches a specified language subtype
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldap_get_lang_values()\fR function returns an array of an attribute's
 string values that matches a specified language subtype. To retrieve the binary
 data from an attribute, call the \fBldap_get_lang_values_len()\fR function
@@ -56,8 +53,6 @@ as a  literal string, such as \fBjpegPhoto\fR or \fBaudio\fR.
 These functions are deprecated. Use \fBldap_get_values()\fR or
 \fBldap_get_values_len()\fR instead.
 .SH RETURN VALUES
-.sp
-.LP
 If successful, \fBldap_get_lang_values()\fR returns a null-terminated array of
 the attribute's values. If the call is unsuccessful, or if no such attribute
 exists in the \fIentry\fR, it returns a \fINULL\fR and sets the appropriate
@@ -70,8 +65,6 @@ pointers to the  attribute's binary values. If the call is unsuccessful, or if
 no such attribute exists in the \fIentry\fR, it returns a \fINULL\fR and sets
 the appropriate error code in the LDAP structure.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7)  for descriptions of the following attributes:
 .sp
 
@@ -86,9 +79,6 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-.BR ldap_first_attribute (3LDAP),
 .BR ldap_first_attribute (3LDAP),
 .BR ldap_get_values (3LDAP),
 .BR ldap_result (3LDAP),

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RCP 1 "September 12, 2020"
+.TH RCP 1 "February 21, 2023"
 .SH NAME
 rcp \- remote file copy
 .SH SYNOPSIS
@@ -272,7 +272,6 @@ CSI	Enabled
 .BR rsh (1),
 .BR setfacl (1),
 .BR tar (1),
-.BR tar (1),
 .BR inet (4P),
 .BR inet6 (4P),
 .BR ip6 (4P),
@@ -288,7 +287,7 @@ file onto itself, as with:
 .sp
 .in +2
 .nf
-example% \fBrcp tmp/file myhost:/tmp/file\fR
+example% \fBrcp /tmp/file myhost:/tmp/file\fR
 .fi
 .in -2
 .sp

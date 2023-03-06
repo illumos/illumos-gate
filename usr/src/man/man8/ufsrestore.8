@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UFSRESTORE 8 "Sep 24, 2002"
+.TH UFSRESTORE 8 "Feb 17, 2023"
 .SH NAME
 ufsrestore \- incremental file system restore
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/ufsrestore\fR i | r | R | t | x [abcdfhlmostvyLT]
      [\fIarchive_file\fR] [\fIfactor\fR] [\fIdumpfile\fR] [\fIn\fR] [\fIlabel\fR]
@@ -16,12 +15,10 @@ ufsrestore \- incremental file system restore
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBufsrestore\fR utility restores files from backup media created with the
 \fBufsdump\fR command. \fBufsrestores\fR's actions are controlled by the
 \fIkey\fR argument. The \fIkey\fR is exactly one \fBfunction\fR \fIletter\fR
-(\fBi\fR, \fBr\fR, \fBR\fR , \fBt\fR, or \fBx\fR) and zero or more \fIfunction
+(\fBi\fR, \fBr\fR, \fBR\fR, \fBt\fR, or \fBx\fR) and zero or more \fIfunction
 modifier\fRs (letters). The \fIkey\fR string contains no \fBSPACE\fR
 characters. Function modifier arguments are listed on the command line in the
 same order as their corresponding function modifiers appear in the \fIkey\fR
@@ -41,8 +38,6 @@ by default. If the environment variable \fBTMPDIR\fR is defined with a
 non-empty value, that location is used instead of \fB/tmp\fR.
 .SH OPTIONS
 .SS "Function Letters"
-.sp
-.LP
 You must specify one (and only one) of the function letters listed below. Note
 that \fBi\fR, \fBx\fR, and \fBr\fR are intended to restore files into an empty
 directory. The \fBR\fR function is intended for restoring into a populated
@@ -132,7 +127,6 @@ definition) not entire file systems.
 .RE
 
 .SS "Function Modifiers"
-.sp
 .ne 2
 .na
 \fBa \fIarchive_file\fR\fR
@@ -332,8 +326,6 @@ it can.
 .RE
 
 .SS "Interactive Commands"
-.sp
-.LP
 \fBufsrestore\fR enters interactive mode when invoked with the \fBi\fR function
 letters. Interactive commands are reminiscent of the shell. For those commands
 that accept an argument, the default is the current directory. The interactive
@@ -494,8 +486,6 @@ Display the dump header on the media.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported.
 .sp
 .ne 2
@@ -511,13 +501,9 @@ function letters, and must come last.
 .RE
 
 .SH USAGE
-.sp
-.LP
 See \fBlargefile\fR(7) for the description of the behavior of \fBufsrestore\fR
-when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+when encountering files greater than or equal to 2 Gbyte (2^31 bytes).
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -538,7 +524,6 @@ An error occurred. Verbose messages are displayed.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .ne 2
 .na
 \fBPAGER\fR
@@ -559,7 +544,6 @@ defined in the environment.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/rmt/0\fR\fR
@@ -596,8 +580,6 @@ information passed between incremental restores
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR more (1),
 .BR ufsdump (5),
 .BR attributes (7),
@@ -607,8 +589,6 @@ information passed between incremental restores
 .BR rmt (8),
 .BR ufsdump (8)
 .SH DIAGNOSTICS
-.sp
-.LP
 \fBufsrestore\fR complains about bad option characters.
 .sp
 .LP
@@ -742,8 +722,6 @@ in the header of the dump file.
 .RE
 
 .SH NOTES
-.sp
-.LP
 \fBufsrestore\fR can get confused when doing incremental restores from dump
 tapes that were made on active file systems.
 .sp

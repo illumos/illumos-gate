@@ -33,12 +33,11 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2001, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH NDBM 3C "May 13, 2017"
+.TH NDBM 3C "Feb 17, 2023"
 .SH NAME
 ndbm, dbm_clearerr, dbm_close, dbm_delete, dbm_error, dbm_fetch, dbm_firstkey,
 dbm_nextkey, dbm_open, dbm_store \- database functions
 .SH SYNOPSIS
-.LP
 .nf
 #include <ndbm.h>
 
@@ -86,7 +85,6 @@ dbm_nextkey, dbm_open, dbm_store \- database functions
 .fi
 
 .SH DESCRIPTION
-.LP
 These functions create, access and modify a database. They maintain
 \fIkey\fR/\fIcontent\fR pairs in a database. The functions will handle large
 databases (up to a billion blocks) and will access a keyed item in one or two
@@ -179,7 +177,6 @@ returned from a call to \fBdbm_open()\fR.
 .LP
 These database functions support key/content pairs of at least 1024 bytes.
 .SH RETURN VALUES
-.LP
 The \fBdbm_store()\fR and \fBdbm_delete()\fR functions return \fB0\fR when they
 succeed and a negative value when they fail.
 .sp
@@ -211,10 +208,8 @@ The \fBdbm_open()\fR function returns a pointer to a database structure.  If an
 error is detected during the operation, \fBdbm_open()\fR returns a (\fBDBM
 *\fR)0.
 .SH ERRORS
-.LP
 No errors are defined.
 .SH USAGE
-.LP
 The following code can be used to traverse the database:
 .sp
 .in +2
@@ -250,7 +245,6 @@ keys by \fBdbm_firstkey()\fR and \fBdbm_nextkey()\fR, the application should
 reset the database by calling \fBdbm_firstkey()\fR before again calling
 \fBdbm_nextkey()\fR.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the Database Functions
 .sp
 .LP
@@ -287,7 +281,6 @@ main()
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -304,7 +297,6 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR ar (1),
 .BR cat (1),
 .BR cp (1),
@@ -314,11 +306,10 @@ MT-Level	Unsafe
 .BR attributes (7),
 .BR standards (7)
 .SH NOTES
-.LP
 The \fB\&.pag\fR file will contain holes so that its apparent size may be
 larger than its actual content. Older versions of the UNIX operating system may
 create real file blocks for these holes when touched. These files cannot be
-copied by normal means ( \fBcp\fR(1), \fBcat\fR(1), \fBtar\fR(1), \fBar\fR(1))
+copied by normal means (\fBcp\fR(1), \fBcat\fR(1), \fBtar\fR(1), \fBar\fR(1))
 without filling in the holes.
 .sp
 .LP
@@ -339,5 +330,5 @@ updating and reading is risky.
 .LP
 The database files (\fBfile\fR\fB\&.dir\fR and \fBfile\fR\fB\&.pag\fR) are
 binary and are architecture-specific (for example, they depend on the
-architecture's byte order.) These files are not guaranteed to be portable
+architecture's byte order). These files are not guaranteed to be portable
 across architectures.

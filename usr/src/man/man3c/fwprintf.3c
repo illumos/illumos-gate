@@ -43,11 +43,10 @@
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH FWPRINTF 3C "Nov 1, 2003"
+.TH FWPRINTF 3C "Feb 17, 2023"
 .SH NAME
 fwprintf, wprintf, swprintf \- print formatted wide-character output
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 #include <wchar.h>
@@ -68,8 +67,6 @@ fwprintf, wprintf, swprintf \- print formatted wide-character output
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBfwprintf()\fR function places output on the named output \fIstream\fR.
 The \fBwprintf()\fR function places output on the standard output stream
 \fBstdout\fR. The \fBswprintf()\fR function places output followed by the null
@@ -540,7 +537,7 @@ The \fBdouble\fR argument is converted in the style \fBf\fR or \fBe\fR (or in
 the style \fBE\fR in the case of a \fBG\fR conversion wide-character), with the
 precision specifying the number of significant digits. If an explicit precision
 is 0, it is taken as 1. The style used depends on the value converted; style
-\fBe\fR (or \fBE\fR \fB)\fR will be used only if the exponent resulting from
+\fBe\fR (or \fBE\fR) will be used only if the exponent resulting from
 such a conversion is less than \(mi4 or greater than or equal to the precision.
 Trailing zeros are removed from the fractional portion of the result; a radix
 character appears only if it is followed by a digit.
@@ -684,8 +681,6 @@ update between the call to a successful execution of \fBfwprintf()\fR or
 \fBfflush\fR(3C) or \fBfclose\fR(3C) on the same stream or a call to
 \fBexit\fR(3C) or \fBabort\fR(3C).
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, these functions return the number of
 wide-characters transmitted excluding the terminating null wide-character in
 the case of \fBswprintf()\fR or a negative value if an output error was
@@ -695,8 +690,6 @@ encountered.
 If \fIn\fR or more wide characters were requested to be written,
 \fBswprintf()\fR returns a negative value.
 .SH ERRORS
-.sp
-.LP
 For the conditions under which \fBfwprintf()\fR and \fBwprintf()\fR will fail
 and may fail, refer to \fBfputwc\fR(3C).
 .sp
@@ -734,7 +727,6 @@ Insufficient storage space is available.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRPrint Language-dependent Date and Time Format.
 .sp
 .LP
@@ -795,8 +787,6 @@ Sonntag, 3. Juli, 10:02
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -813,8 +803,6 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR btowc (3C),
 .BR fputwc (3C),
 .BR fwscanf (3C),
@@ -823,8 +811,6 @@ MT-Level	MT-Safe with exceptions
 .BR attributes (7),
 .BR standards (7)
 .SH NOTES
-.sp
-.LP
 The \fBfwprintf()\fR, \fBwprintf()\fR, and \fBswprintf()\fR functions can be
 used safely in multithreaded applications, as long as \fBsetlocale\fR(3C) is
 not being called to change the locale.

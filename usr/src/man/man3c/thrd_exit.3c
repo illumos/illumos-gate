@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd "Jan 13, 2015"
+.Dd "February 21, 2023"
 .Dt THRD_EXIT 3C
 .Os
 .Sh NAME
@@ -60,6 +60,5 @@ function does not return, the calling thread is terminated.
 .Sh SEE ALSO
 .Xr pthread_exit 3C ,
 .Xr thr_exit 3C ,
-.Xr attributes 7 ,
 .Xr attributes 7 ,
 .Xr threads 7

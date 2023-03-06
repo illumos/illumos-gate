@@ -4,18 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TIRDWR 4M "Jul 3, 1990"
+.TH TIRDWR 4M "February 21, 2023"
 .SH NAME
 tirdwr \- Transport Interface read/write interface STREAMS module
 .SH SYNOPSIS
-.LP
 .nf
 \fBint ioctl( \fR\fIfd, \fR\fBI_PUSH\fR\fI, \fR\fB"tirdwr");\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBtirdwr\fR is a STREAMS module  that provides an alternate interface to a
 transport provider which supports the  Transport Interface ("\fBTI\fR")
 functions of the Network Services library (see Section 3N). This alternate
@@ -153,13 +150,10 @@ release request will be sent to the remote side of the transport connection.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR getmsg (2),
 .BR putmsg (2),
 .BR read (2),
 .BR write (2),
-.BR Intro (3),
 .BR Intro (3),
 .BR streamio (4I),
 .BR timod (4M)

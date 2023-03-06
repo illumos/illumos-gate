@@ -4,13 +4,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPCLNT 3NSL "Feb 25, 2017"
+.TH YPCLNT 3NSL "Feb 17, 2023"
 .SH NAME
 ypclnt, yp_get_default_domain, yp_bind, yp_unbind, yp_match, yp_first, yp_next,
 yp_all, yp_order, yp_master, yperr_string, ypprot_err \- NIS Version 2 client
 interface
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fB-flag\fR... ] \fIfile\fR\&.\|.\|. \fB-lnsl\fR [ \fIlibrary\fR...]
 #include <rpcsvc/ypclnt.h>
@@ -76,7 +75,6 @@ interface
 .fi
 
 .SH DESCRIPTION
-.LP
 This package of functions provides an interface to \fBNIS\fR, Network
 Information Service Version 2, formerly referred to as \fBYP\fR.
 For commands used to access \fBNIS\fR from a
@@ -111,7 +109,7 @@ To use the NIS name services, the client process must be "bound" to an NIS
 server that serves the appropriate domain using \fByp_bind()\fR. Binding need
 not be done explicitly by user code. Binding is done automatically whenever an
 NIS lookup function is called. The \fByp_bind()\fR function can be called
-directly for processes that make use of a backup strategy , for example, a
+directly for processes that make use of a backup strategy, for example, a
 local file in cases when NIS services are not available. A process should call
 \fByp_unbind()\fR when it is finished using \fBNIS\fR in order to free up
 resources.
@@ -354,7 +352,6 @@ an input to \fByperr_string()\fR.
 .RE
 
 .SH RETURN VALUES
-.LP
 All integer functions return \fB0\fR if the requested operation is successful,
 or one of the following errors if the operation fails:
 .sp
@@ -502,10 +499,8 @@ Cannot communicate with \fBypserv\fR.
 .RE
 
 .SH FILES
-.LP
 \fB/usr/lib/libnsl.so.1\fR
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -520,7 +515,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR ypcat (1),
 .BR ypmatch (1),
 .BR ypwhich (1),

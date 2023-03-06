@@ -5,11 +5,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MDB 1 "May 20, 2020"
+.TH MDB 1 "February 21, 2023"
 .SH NAME
 mdb \- modular debugger
 .SH SYNOPSIS
-.LP
 .nf
 \fBmdb\fR [\fB-fkmuwyAFKMSUW\fR] [\(+-o \fIoption\fR] [\fB-b\fR \fIVM\fR] [\fB-p\fR \fIpid\fR] [\fB-s\fR \fIdistance\fR]
      [\fB-I\fR \fIpath\fR] [\fB-L\fR \fIpath\fR] [\fB-P\fR \fIprompt\fR] [\fB-R\fR \fIroot\fR]
@@ -18,7 +17,6 @@ mdb \- modular debugger
 
 .SH DESCRIPTION
 .SS "Introduction"
-.LP
 The \fBmdb\fR utility is an extensible utility for low-level debugging and
 editing of the live operating system, operating system crash dumps, user
 processes, user process core dumps, and object files. For a more detailed
@@ -47,7 +45,6 @@ can use to implement their own debugging commands to perform program-specific
 analysis. Each \fBmdb\fR module can be used to examine the program in several
 different contexts, including live and post-mortem.
 .SS "Definitions"
-.LP
 The \fItarget\fR is the program being inspected by the debugger. \fBmdb\fR
 currently provides support for the following types of targets: user processes,
 user process core files, live bhyve VMs, the live operating system (via
@@ -93,7 +90,6 @@ execution of macro files written for \fBadb\fR(1), and illumos
 includes a set of macro files for debugging the kernel that can be used
 with either tool.
 .SS "Syntax"
-.LP
 The debugger processes commands from standard input. If standard input is a
 terminal, \fBmdb\fR provides terminal editing capabilities. \fBmdb\fR can also
 process commands from macro files and from dcmd pipelines, described below. The
@@ -164,7 +160,6 @@ An \fIexpression\fR is a sequence of words that is evaluated to compute a
 64-bit unsigned integer value. The words are evaluated using the rules
 described under \fBArithmetic Expansion\fR below.
 .SS "Commands"
-.LP
 A \fIcommand\fR is one of the following:
 .sp
 .ne 2
@@ -271,11 +266,9 @@ concatenating the words after the \fB!\fR character.
 .RE
 
 .SS "Comments"
-.LP
 A word beginning with \fB//\fR causes that word and all the subsequent
 characters up to a \fINEWLINE\fR to be ignored.
 .SS "Arithmetic Expansion"
-.LP
 Arithmetic expansion is performed when an \fBmdb\fR command is preceded by an
 optional expression representing a start address, or a start address and a
 repeat count. Arithmetic expansion can also be performed to compute a numerical
@@ -594,7 +587,6 @@ Bitwise inclusive OR.
 .RE
 
 .SS "Quoting"
-.LP
 Each metacharacter described above (see \fBSyntax\fR) terminates a word unless
 quoted. Characters can be quoted (forcing \fBmdb\fR to interpret each character
 as itself without any special significance) by enclosing them in a pair of
@@ -602,7 +594,6 @@ single (\fB\&' '\fR) or double (\fB" "\fR) quote marks. A single quote cannot
 appear within single quotes. Inside double quotes, \fBmdb\fR recognizes the C
 programming language character escape sequences.
 .SS "Shell Escapes"
-.LP
 The \fB!\fR character can be used to create a pipeline between an \fBmdb\fR
 command and the user's shell. If the $\fBSHELL\fR environment variable is set,
 \fBmdb\fR forks and execs this program for shell escapes; otherwise
@@ -615,7 +606,6 @@ to the shell. The output of shell commands can not be piped to \fBmdb\fR dcmds.
 Commands executed by a shell escape have their output sent directly to the
 terminal, not to \fBmdb\fR.
 .SS "Variables"
-.LP
 A \fIvariable\fR is a variable name, a corresponding integer value, and a set
 of attributes. A variable name is a sequence of letters, digits, underscores,
 or periods. A variable can be assigned a value using the \fB>\fR dcmd or
@@ -720,7 +710,6 @@ of the representative thread's register set as named variables. The names of
 these variables depend on the target's platform and instruction set
 architecture.
 .SS "Symbol Name Resolution"
-.LP
 As explained in the \fBSyntax\fR description above, a symbol identifier present
 in an expression context evaluates to the value of this symbol. The value
 typically denotes the virtual address of the storage associated with the symbol
@@ -832,7 +821,6 @@ either refer to the decimal integer value \fB15\fR specified in hexadecimal
 symbol table. If a symbol with an ambiguous name is present, the integer value
 can be specified by using an explicit \fB0x\fR or \fB0X\fR prefix.
 .SS "dcmd and Walker Name Resolution"
-.LP
 As described earlier, each \fBmdb\fR dmod provides a set of dcmds and walkers.
 dcmds and walkers are tracked in two distinct, global namespaces. \fBmdb\fR
 also keeps track of a dcmd and walker namespace associated with each dmod.
@@ -880,7 +868,6 @@ definition of a dcmd or walker can be determined using the \fB::which\fR dcmd,
 described below. The global definition list can be displayed using the
 \fB::which\fR \fB-v\fR option.
 .SS "dcmd Pipelines"
-.LP
 dcmds can be composed into a pipeline using the \fB|\fR operator. The purpose
 of a pipeline is to pass a list of values, typically virtual addresses, from
 one dcmd or walker to another. Pipeline stages might be used to map a pointer
@@ -910,7 +897,6 @@ output printed to standard output. If any dcmd in the pipeline produces output
 to standard error, these messages are printed directly to standard error and
 are not processed as part of the pipeline.
 .SS "Signal Handling"
-.LP
 The debugger ignores the \fBPIPE\fR and \fBQUIT\fR signals. The \fBINT\fR
 signal aborts the command that is currently executing. The debugger intercepts
 and provides special handling for the \fBILL\fR, \fBTRAP\fR, \fBEMT\fR,
@@ -928,13 +914,11 @@ resume option provides limited protection against buggy dcmds. Refer to
 WARNINGS, \fBUse of the Error Recovery Mechanism\fR, below for information
 about the risks associated with the resume option.
 .SS "Command Re-entry"
-.LP
 The text of the last \fBHISTSIZE \fR (default 128) commands entered from a
 terminal device are saved in memory. The in-line editing facility, described
 next, provides key mappings for searching and fetching elements from the
 history list.
 .SS "In-line Editing"
-.LP
 If standard input is a terminal device, \fBmdb\fR provides some simple
 emacs-style facilities for editing the command line. The \fBsearch\fR,
 \fBprevious\fR, and \fBnext\fR commands in edit mode provide access to the
@@ -1181,7 +1165,6 @@ Move cursor forward one character (same as \fB^F\fR).
 .RE
 
 .SS "Output Pager"
-.LP
 \fBmdb\fR provides a built-in output pager. The output pager is enabled if the
 debugger's standard output is a terminal device. Each time a command is
 executed, \fBmdb\fR pauses after one screenful of output is produced and
@@ -1244,7 +1227,6 @@ Quit (abort) the current dcmd only.
 .RE
 
 .SS "Formatting dcmds"
-.LP
 The \fB/\fR, \fB\e\fR, \fB?\fR, and \fB=\fR metacharacters are used to denote
 the special output formatting dcmds. Each of these dcmds accepts an argument
 list consisting of one or more format characters, repeat counts, or quoted
@@ -1471,7 +1453,6 @@ address that does not have a corresponding segment. If a search reaches a
 segment boundary without finding a match, it aborts when the read past the end
 of the segment boundary fails.
 .SS "Execution Control"
-.LP
 \fBmdb\fR provides facilities for controlling and tracing the execution of a
 live running program. Currently, only the user process target provides support
 for execution control. \fBmdb\fR provides a simple model of execution control:
@@ -1518,7 +1499,6 @@ target that does not support execution control. For more information about the
 interaction of exec, attach, release, and job control with debugger execution
 control, refer to NOTES, below.
 .SS "Event Callbacks"
-.LP
 The \fB::evset\fR dcmd and event tracing dcmds allow you to associate an event
 callback (using the \fB-c\fR option) with each event specifier. The event
 callbacks are strings that represent \fBmdb\fR commands to execute when the
@@ -1542,7 +1522,6 @@ the highest precedence determines what type of continue occurs. The order of
 precedence from highest to lowest is: step, step-over (next), step-out,
 continue.
 .SS "Thread Support"
-.LP
 \fBmdb\fR provides facilities to examine the stacks and registers of each
 thread associated with the target. The persistent "\fBthread\fR" variable
 contains the current representative thread identifier. The format of the thread
@@ -1575,7 +1554,6 @@ corresponding to the current representative thread. The \fB::tls\fR built-in
 dcmd can be used to display the value of the symbol for threads other than the
 representative thread.
 .SS "Built-in dcmds"
-.LP
 \fBmdb\fR provides a set of built-in dcmds that are always defined. Some of
 these dcmds are only applicable to certain targets: if a dcmd is not applicable
 to the current target, it fails and prints a message indicating "command is not
@@ -3682,7 +3660,6 @@ specifiers can also be deleted using \fB::delete\fR.
 .RE
 
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -3806,7 +3783,7 @@ be derived as \fB/net/hostname\fR.
 \fB%t\fR
 .ad
 .RS 6n
-Expands to the name of the current target. This is either be the literal
+Expands to the name of the current target. This is either the literal
 string '\fBproc\fR' (a user process or user process core file), '\fBkvm\fR' (a kernel
 crash dump or the live operating system), or '\fBraw\fR' (a raw file).
 .RE
@@ -4229,7 +4206,6 @@ as standout mode will not be available to \fBmdb\fR.
 .RE
 
 .SH OPERANDS
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -4271,13 +4247,11 @@ present in the current directory.
 .RE
 
 .SH USAGE
-.LP
 \fBmdb\fR processes all input files (including scripts, object files, core
 files, and raw data files) in a large file aware fashion. See
 \fBlargefile\fR(7) for more information about the processing of large files,
 which are files greater than or equal to 2 Gbytes (2^31 bytes).
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -4418,7 +4392,6 @@ information in a core file or crash dump, or from the current machine as if by
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -4433,7 +4406,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.LP
 .BR adb (1),
 .BR gcore (1),
 .BR pgrep (1),
@@ -4461,7 +4433,6 @@ Interface Stability	Evolving
 .BR proc (5),
 .BR attributes (7),
 .BR largefile (7),
-.BR largefile (7),
 .BR threads (7),
 .BR coreadm (8),
 .BR dumpadm (8),
@@ -4477,7 +4448,6 @@ Interface Stability	Evolving
 https://illumos.org/books/mdb/
 .SH WARNINGS
 .SS "Use of the Error Recovery Mechanism"
-.LP
 The debugger and its dmods execute in the same address space, and thus it is
 quite possible that a buggy dmod can cause \fBmdb\fR to dump core or otherwise
 misbehave. The \fBmdb\fR resume capability, described above under \fBSignal
@@ -4489,13 +4459,11 @@ subsequent crash of the debugger. The safest course of action following a
 resume is to save any important debug information, and then quit and restart
 the debugger.
 .SS "Use of the Debugger to Modify the Live Operating System"
-.LP
 The use of the debugger to modify (that is, write to) the address space of live
 running operating system is extremely dangerous, and can result in a system
 panic in the event the user damages a kernel data structure.
 .SH NOTES
 .SS "Limitations on Examining Process Core Files"
-.LP
 \fBmdb\fR does not provide support for examining process core files that were
 generated by a release of Solaris preceding Solaris 2.6. When debugging core
 files generated by a release of Solaris 9 or an earlier release, symbol
@@ -4509,7 +4477,6 @@ core files using \fBcoreadm\fR(8). Thus, the information presented by
 time the process dumped core. Core files from x86 systems can not be
 examined on SPARC systems, and vice-versa.
 .SS "Limitations on Examining Crash Dump Files"
-.LP
 Crash dumps from Solaris 7 and earlier releases can only be examined with the
 aid of the libkvm from the corresponding operating system release. If a crash
 dump from one operating system release is examined using the dmods from a
@@ -4518,7 +4485,6 @@ prevent some dcmds or walkers from working properly. \fBmdb\fR issues a warning
 message if it detects this condition. Crash dumps from x86 systems can
 not be examined on SPARC systems, and vice-versa.
 .SS "Relationship Between 32-bit and 64-bit Debugger"
-.LP
 \fBmdb\fR provides support for debugging both 32-bit and 64-bit programs. Once
 it has examined the target and determined its data model, \fBmdb\fR
 automatically re-executes the \fBmdb\fR binary that has the same data model as
@@ -4533,7 +4499,6 @@ The debugger can also need to re-execute itself when debugging a 32-bit process
 that execs a 64-bit process, or vice-versa. The handling of this situation is
 discussed in more detail under \fBInteraction with Exec\fR, below.
 .SS "Interaction with Exec"
-.LP
 When a controlled process performs a successful \fBexec\fR(2), the behavior of
 the debugger is controlled by the \fB::set\fR \fB-o\fR \fBfollow_exec_mode\fR
 option, as described above. If the debugger and victim process have the same
@@ -4560,7 +4525,6 @@ dcmds do not since they do not perform data model conversion of structures. The
 user should release and re-attach the debugger to the process as described
 above in order to restore full debugging capabilities.
 .SS "Interaction with Job Control"
-.LP
 If the debugger is attached to a process that is stopped by job control (that
 is, it stopped in response to \fBSIGTSTP\fR, \fBSIGTTIN\fR, or \fBSIGTTOU\fR),
 the process can not be able to be set running again when it is continued by a
@@ -4576,7 +4540,6 @@ stopped by job control. \fBmdb\fR prints a warning in this case, and the user
 must issue an "\fBfg\fR" command from the appropriate shell in order to resume
 the process.
 .SS "Process Attach and Release"
-.LP
 When \fBmdb\fR attaches to a running process, the process is stopped and
 remains stopped until one of the continue dcmds is applied, or the debugger
 quits. If the \fB-o\fR \fBnostop\fR option is enabled prior to attaching the
@@ -4599,13 +4562,11 @@ released. If the process was already running prior to attaching \fBmdb\fR to
 it, it is set running again when it is released. A process can be released and
 left stopped and abandoned using the \fB::release\fR \fB-a\fR option.
 .SS "Symbolic Debugging Information"
-.LP
 The \fB::list\fR, \fB::offsetof\fR, \fB::print\fR, and \fB::sizeof\fR dcmds
 require that one or more load objects contain compressed symbolic debugging
 information suitable for use with \fBmdb\fR. This information is currently only
 available for certain kernel modules.
 .SS "Developer Information"
-.LP
 The \fIModular Debugger Guide\fR provides a more detailed description
 of \fBmdb\fR features, as well as information for debugger module developers.
 .sp
