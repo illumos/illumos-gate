@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DRIVER.CONF 5 "Sep 16, 2018"
+.TH DRIVER.CONF 5 "March 6, 2023"
 .SH NAME
 driver.conf \- driver configuration files
 .SH SYNOPSIS
-.LP
 .nf
 \fBdriver.conf\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 Driver configuration files provide values for device properties. The values
 override values provided by the devices themselves. Most modern devices provide
 enough property values to make a driver configuration file unnecessary.
@@ -128,7 +126,6 @@ the driver using \fBddi_prop_lookup_int_array\fR(9F).
 Comments are specified by placing a \fB#\fR character at the beginning of the
 comment string, the comment string extends for the rest of the line.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRConfiguration File for a PCI Bus Frame Buffer
 .sp
 .LP
@@ -201,10 +198,8 @@ the second node retrieves the value of the global \fBdebug-level\fR property
 (3).
 
 .SH SEE ALSO
-.LP
 .BR pci (5),
 .BR pseudo (5),
-.BR sbus (5),
 .BR scsi (5),
 .BR add_drv (8),
 .BR probe (9E),
@@ -218,12 +213,10 @@ the second node retrieves the value of the global \fBdebug-level\fR property
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.LP
 To avoid namespace collisions between multiple driver vendors, it is strongly
 recommended that the \fIname\fR property of the driver should begin with a
 vendor-unique string. A reasonably compact and unique choice is the vendor
 over-the-counter stock symbol.
 .SH NOTES
-.LP
 The \fBupdate_drv\fR(8) command should be used to prompt the kernel to reread
 \fBdriver.conf\fR files.
