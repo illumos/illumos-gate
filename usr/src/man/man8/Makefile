@@ -17,9 +17,9 @@
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2020 Peter Tribble
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Garrett D'Amore
+# Copyright 2023 Peter Tribble
 #
 
 include		$(SRC)/Makefile.master
@@ -549,18 +549,6 @@ i386_MANFILES=			\
 		nvmeadm.8	\
 		pptadm.8	\
 		rdmsr.8
-
-sparc_MANFILES=	dcs.8		\
-		drd.8		\
-		efdaemon.8	\
-		ldmad.8		\
-		monitor.8	\
-		obpsym.8	\
-		oplhpd.8	\
-		prtdscp.8	\
-		sckmd.8		\
-		sf880drd.8	\
-		vntsd.8
 
 MANLINKS=	acctcon1.8			\
 		acctcon2.8			\

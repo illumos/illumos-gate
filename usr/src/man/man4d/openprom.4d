@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH OPENPROM 4D "Jan 13, 1997"
+.TH OPENPROM 4D "March 6, 2023"
 .SH NAME
 openprom \- PROM monitor configuration interface
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/fcntl.h>
 .fi
@@ -29,8 +28,6 @@ open("/dev/openprom", \fImode\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The internal encoding of the configuration information stored in \fBEEPROM\fR
 or \fBNVRAM\fR varies from model to model, and on some systems the encoding is
 "hidden" by the firmware. The \fBopenprom\fR driver provides a consistent
@@ -68,7 +65,6 @@ Programs should decide if the appropriate response is to restart the scanning
 operation from the beginning or terminate, informing the user that the tree has
 changed.
 .SH IOCTLS
-.sp
 .ne 2
 .na
 \fB\fBOPROMGETOPT\fR\fR
@@ -165,7 +161,6 @@ in \fIoprom_array\fR, representing the underlying version of the firmware.
 .RE
 
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEAGAIN\fR\fR
@@ -224,7 +219,6 @@ Attempting to open a non-existent device.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fIoprom_array\fR Data Allocation and Reuse
 .sp
 .LP
@@ -370,7 +364,6 @@ main(void)
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/openprom\fR\fR
@@ -380,16 +373,11 @@ PROM monitor configuration interface
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ioctl (2),
 .BR mem (4D),
 .BR eeprom (8),
-.BR monitor (8),
 .BR prtconf (8)
 .SH BUGS
-.sp
-.LP
 There should be separate return values for non-existent properties as opposed
 to not enough space for the value.
 .sp
