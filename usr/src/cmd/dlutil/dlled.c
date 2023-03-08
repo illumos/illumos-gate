@@ -45,8 +45,8 @@ typedef struct dlled_led_map {
 
 static dlled_led_map_t dlled_map[] = {
 	{ "default",	MAC_LED_DEFAULT },
-	{ "off", 	MAC_LED_OFF },
-	{ "on", 	MAC_LED_ON },
+	{ "off",	MAC_LED_OFF },
+	{ "on",		MAC_LED_ON },
 	{ "ident",	MAC_LED_IDENT }
 };
 
@@ -268,7 +268,7 @@ main(int argc, char *argv[])
 			if ((status = dladm_name2info(dlled_hdl, argv[i],
 			    &linkid, NULL, NULL, NULL)) != DLADM_STATUS_OK) {
 				(void) fprintf(stderr, "failed to get link "
-				    "id for link %s: %s\n", link,
+				    "id for link %s: %s\n", argv[i],
 				    dladm_status2str(status, dlled_dlerrmsg));
 				return (1);
 			}
