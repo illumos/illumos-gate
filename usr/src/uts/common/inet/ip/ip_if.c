@@ -24,6 +24,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2016, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -7739,6 +7740,10 @@ ip_sioctl_get_lifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 				lifr->lifr_addrlen =
 				    ip_mask_to_plen_v6(
 				    &ipif->ipif_v6net_mask);
+				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+					sin6->sin6_scope_id =
+					    ill->ill_phyint->phyint_ifindex;
+				}
 			} else {
 				sin = (sin_t *)&lifr->lifr_addr;
 				*sin = sin_null;
