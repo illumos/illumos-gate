@@ -1073,6 +1073,7 @@ also menu-namespace
 				dup menu_command[x]
 				getenv dup -1 <> if
 					\ Execute the stored procedure
+					cursor-normal cursor-set
 					evaluate
 
 					\ We expect there to be a non-zero
@@ -1083,11 +1084,11 @@ also menu-namespace
 					0= if
 						drop \ key pressed
 						drop \ loop iterator
-						cursor-normal cursor-set
 						exit
 					else
 						swap \ need iterator on top
 					then
+					cursor-invisible cursor-set
 				then
 
 				\ Re-adjust for missing ACPI menuitem
@@ -1115,13 +1116,15 @@ also menu-namespace
 						swap
 						dup menu_command[x]
 						getenv dup -1 <> if
+							cursor-normal
+							cursor-set
 							evaluate
 							0= if
 								2drop
-								cursor-normal
-								cursor-set
 								exit
 							then
+							cursor-invisible
+							cursor-set
 						else
 							drop
 						then

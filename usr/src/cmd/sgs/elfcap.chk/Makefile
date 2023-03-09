@@ -38,7 +38,7 @@ CPPFLAGS += -I$(ELFCAP)
 
 all: $(PROG)
 
-install:
+install: $(PROG)
 
 check: $(PROG)
 	./$(PROG)
