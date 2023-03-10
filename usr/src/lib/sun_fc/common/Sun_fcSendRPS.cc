@@ -59,16 +59,8 @@ HBA_STATUS Sun_fcSendRPS(HBA_HANDLE		handle,
 	    Handle *myHandle = Handle::findHandle(handle);
 	    HBA *hba = myHandle->getHBA();
 	    HBAPort *port = hba->getPort(wwnConversion(hbaPortWWN.wwn));
-	    if (agent_wwn.wwn == NULL) {
-		a_wwn = 0;
-	    } else {
-		a_wwn = wwnConversion(agent_wwn.wwn);
-	    }
-	    if (object_wwn.wwn == NULL) {
-		o_wwn = 0;
-	    } else {
-		o_wwn = wwnConversion(object_wwn.wwn);
-	    }
+	    a_wwn = wwnConversion(agent_wwn.wwn);
+	    o_wwn = wwnConversion(object_wwn.wwn);
 	    port->sendRPS(a_wwn, agent_domain, o_wwn, object_port_number,
 		    pRspBuffer, pRspBufferSize);
 	    return (HBA_STATUS_OK);
