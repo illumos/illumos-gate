@@ -747,7 +747,7 @@ typedef struct smb_memdevice_ext {
 	uint16_t smbmdeve_mdev;		/* memory device handle */
 	uint8_t smbmdeve_dchan;		/* DRAM channel */
 	uint8_t smbmdeve_ncs;		/* number of chip select */
-	uint8_t smbmdeve_cs[1];		/* chip selects */
+	uint8_t smbmdeve_cs[];		/* chip selects */
 } smb_memdevice_ext_t;
 
 #pragma pack()

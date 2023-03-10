@@ -1999,7 +1999,6 @@ typedef struct smbios_memdevice_ext {
 	uint16_t smbmdeve_md;		/* memory device handle */
 	uint8_t smbmdeve_drch;		/* DRAM channel */
 	uint8_t smbmdeve_ncs;		/* number of chip selects */
-	uint8_t *smbmdeve_cs;		/* array of chip select numbers */
 } smbios_memdevice_ext_t;
 
 /*
@@ -2109,6 +2108,9 @@ extern int smbios_info_memarrmap(smbios_hdl_t *, id_t, smbios_memarrmap_t *);
 extern int smbios_info_memdevice(smbios_hdl_t *, id_t, smbios_memdevice_t *);
 extern int smbios_info_extmemdevice(smbios_hdl_t *, id_t,
     smbios_memdevice_ext_t *);
+extern int smbios_info_extmemdevice_cs(smbios_hdl_t *, id_t, uint_t *,
+    uint8_t **);
+extern void smbios_info_extmemdevice_cs_free(smbios_hdl_t *, uint_t, uint8_t *);
 extern int smbios_info_memdevmap(smbios_hdl_t *, id_t, smbios_memdevmap_t *);
 extern id_t smbios_info_hwsec(smbios_hdl_t *, smbios_hwsec_t *);
 extern int smbios_info_vprobe(smbios_hdl_t *, id_t, smbios_vprobe_t *);
