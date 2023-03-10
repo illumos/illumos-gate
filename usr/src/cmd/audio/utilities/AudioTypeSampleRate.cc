@@ -192,7 +192,7 @@ Flush(
 			if (err)
 				return (err);
 		}
-		delete tmpbuf;
+		delete[] tmpbuf;
 	}
 	return (AUDIO_SUCCESS);
 }
