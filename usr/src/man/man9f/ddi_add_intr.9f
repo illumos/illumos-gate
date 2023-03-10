@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_ADD_INTR 9F "Oct 19, 2005"
+.TH DDI_ADD_INTR 9F "March 6, 2023"
 .SH NAME
 ddi_add_intr, ddi_get_iblock_cookie, ddi_remove_intr \- hardware interrupt
 handling routines
@@ -165,7 +165,7 @@ with a particular interrupt specification. This routine should be called before
 initialize locks (\fBmutex\fR(9F), \fBrwlock\fR(9F)) used by the interrupt
 routine. The interrupt number \fIinumber\fR determines for which interrupt
 specification to retrieve the cookie. \fIinumber\fR is associated with
-information provided either by the device (see \fBsbus\fR(5)) or the hardware
+information provided either by the device or the hardware
 configuration file (see \fBsysbus\fR(5), \fBisa\fR(5), and
 \fBdriver.conf\fR(5)). If only one interrupt is associated with the device,
 \fIinumber\fR should be \fB0\fR.
@@ -227,8 +227,8 @@ acquired by the interrupt handler should not be held across the call to
 \fBddi_remove_intr()\fR or deadlock may result.
 .SS "For All Three Functions:"
 For certain bus types, you can call these \fBDDI\fR functions from a
-high-interrupt context. These types include \fBISA\fR and SBus buses. See
-\fBsysbus\fR(5), \fBisa\fR(5), and \fBsbus\fR(5) for details.
+high-interrupt context. These types include \fBISA\fR buses. See
+\fBsysbus\fR(5) and \fBisa\fR(5) for details.
 .SH RETURN VALUES
 \fBddi_add_intr()\fR and \fBddi_get_iblock_cookie()\fR return:
 .sp
@@ -279,7 +279,6 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .BR driver.conf (5),
 .BR isa (5),
-.BR sbus (5),
 .BR sysbus (5),
 .BR attach (9E),
 .BR detach (9E),
@@ -304,6 +303,4 @@ All consumers of these interfaces, checking return codes, should verify
 result in inconsistent behaviors among platforms.
 .SH BUGS
 The \fIidevice_cookiep\fR should really point to a data structure that is
-specific to the bus architecture that the device operates on. Currently the
-SBus and PCI buses are supported and a single data structure is used to
-describe both.
+specific to the bus architecture that the device operates on.

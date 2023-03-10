@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_MAP_REGS 9F "Jan 16, 2006"
+.TH DDI_MAP_REGS 9F "March 6, 2023"
 .SH NAME
 ddi_map_regs, ddi_unmap_regs \- map or unmap registers
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -26,14 +25,11 @@ ddi_map_regs, ddi_unmap_regs \- map or unmap registers
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 These interfaces are obsolete. Use \fBddi_regs_map_setup\fR(9F) instead of
 \fBddi_map_regs()\fR. Use \fBddi_regs_map_free\fR(9F) instead of
 \fBddi_unmap_regs()\fR.
 .SH PARAMETERS
 .SS "\fBddi_map_regs()\fR"
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -79,7 +75,6 @@ Length to be mapped.
 .RE
 
 .SS "\fBddi_unmap_regs()\fR"
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -125,16 +120,13 @@ Length to be unmapped.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBddi_map_regs()\fR function maps in the register set given by
 \fIrnumber\fR. The register number determines which register set will be mapped
 if more than one exists. The base kernel virtual address of the mapped register
 set is returned in \fIkaddrp\fR. \fIoffset\fR specifies an offset into the
 register space to start from and \fIlen\fR indicates the size of the area to be
 mapped. If \fIlen\fR is non-zero, it overrides the length given in the register
-set description. See the discussion of the \fBreg\fR property in \fBsbus\fR(5)
-and for more information on register set descriptions. If \fIlen\fR and
+set description. If \fIlen\fR and
 \fIoffset\fR are 0, the entire space is mapped.
 .sp
 .LP
@@ -150,8 +142,6 @@ unmapped. \fIkaddrp\fR is a pointer to the address returned from
 \fBddi_map_regs()\fR; \fIoffset\fR and \fIlen\fR should match what
 \fBddi_map_regs()\fR was called with.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_map_regs()\fR function returns:
 .sp
 .ne 2
@@ -163,12 +153,8 @@ on success.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions can be called from user, interrupt, or kernel context.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for a description of the following attributes:
 .sp
 
@@ -179,13 +165,10 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability 	Obsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-.BR sbus (5),
 .BR attributes (7),
 .BR ddi_regs_map_free (9F),
 .BR ddi_regs_map_setup (9F)

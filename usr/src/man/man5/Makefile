@@ -197,8 +197,6 @@ _MANFILES=	Intro.5				\
 		ypserv.5			\
 		zoneinfo.5
 
-sparc_MANFILES=	sbus.5
-
 i386_MANFILES=	bhyve_config.5			\
 		loader.conf.5			\
 		sysbus.5

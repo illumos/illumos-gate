@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_PUT8 9F "Nov 1, 2005"
+.TH DDI_PUT8 9F "March 6, 2023"
 .SH NAME
 ddi_put8, ddi_put16, ddi_put32, ddi_put64,
 \- write data to the mapped memory address, device register or
@@ -84,11 +84,9 @@ data access handle. The translation may involve byte-swapping if the host and
 the device have incompatible endian characteristics.
 .sp
 .LP
-For certain bus types, you can call these \fBDDI\fR functions from a
-high-interrupt context. These types include \fBISA\fR and SBus buses.  See
-\fBsysbus\fR(5), \fBisa\fR(5), and \fBsbus\fR(5) for details. For the PCI bus,
-you can, under certain conditions, call these \fBDDI\fR functions from a
-high-interrupt context. See \fBpci\fR(5).
+These \fBDDI\fR functions can be called from a high-interrupt context for
+the ISA bus and, under certain conditions, for the PCI bus.
+See \fBsysbus\fR(5), \fBisa\fR(5) and \fBpci\fR(5) for details.
 .SH CONTEXT
 These functions can be called from user, kernel, or interrupt context.
 .SH ATTRIBUTES

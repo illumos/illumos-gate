@@ -4,19 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KERNEL 8 "Nov 27, 2007"
+.TH KERNEL 8 "March 6, 2023"
 .SH NAME
 kernel \- UNIX system executable file containing basic operating system
 services
 .SH SYNOPSIS
-.LP
 .nf
 \fBkernel-name\fR [\fB-asrvx\fR] [\fB-m \fIsmf_options\fR\fR] [\fB-i \fIaltinit\fR\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The operating system image, or kernel, is the collection of software comprising
 the image files (\fBunix\fR and \fBgenunix\fR) and the modules loaded at any
 instant in time. The system will not function without a kernel to control it.
@@ -68,8 +65,6 @@ The kernel configuration can be controlled using the \fB/etc/system\fR file
 .LP
 \fBgenunix\fR is the platform-independent component of the base kernel.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -208,11 +203,8 @@ of Sun Cluster software that supports this option has been installed.
 .RE
 
 .SH EXAMPLES
-.sp
-.LP
 See \fBboot\fR(8) for examples and instructions on how to boot.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel\fR\fR
@@ -329,7 +321,6 @@ Loadable system calls
 .RE
 
 .SS "SPARC"
-.sp
 .ne 2
 .na
 \fBcpu\fR
@@ -354,7 +345,6 @@ Time-Of-Day hardware interface modules
 As only 64-bit SPARC platforms are supported, all SPARC executable modules are
 contained within \fBsparcv9\fR directories in the directories listed above.
 .SS "x86"
-.sp
 .ne 2
 .na
 \fBmach\fR
@@ -370,8 +360,6 @@ Modules comprising the 32-bit x86 kernel are contained in the above
 directories, with the 64-bit x86 kernel components contained within \fBamd64\fR
 subdirectories.
 .SH SEE ALSO
-.sp
-.LP
 .BR isainfo (1),
 .BR uname (1),
 .BR devfs (4FS),
@@ -387,17 +375,9 @@ subdirectories.
 .BR svc.startd (8),
 .BR svcadm (8),
 .BR syslogd (8)
-.SS "SPARC Only"
-.sp
-.LP
-.BR monitor (8)
 .SH DIAGNOSTICS
-.sp
-.LP
 The kernel gives various warnings and error messages. If the kernel detects an
 unrecoverable fault, it will panic or halt.
 .SH NOTES
-.sp
-.LP
 Reconfiguration boot will, by design, not remove \fB/dev\fR entries for some
 classes of devices that have been physically removed from the system.

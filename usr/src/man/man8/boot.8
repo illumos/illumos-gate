@@ -6,25 +6,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BOOT 8 "Jul 20, 2018"
+.TH BOOT 8 "March 6, 2023"
 .SH NAME
 boot \- start the system kernel or a standalone program
 .SH SYNOPSIS
 .SS "SPARC"
-.LP
 .nf
 \fBboot\fR [\fIOBP\fR \fInames\fR] [\fIfile\fR] [\fB-aLV\fR] [\fB-F\fR \fIobject\fR] [\fB-D\fR \fIdefault-file\fR]
      [\fB-Z\fR \fIdataset\fR] [\fIboot-flags\fR] [\fB\(mi\(mi\fR] [\fIclient-program-args\fR]
 .fi
 
 .SS "x86"
-.LP
 .nf
 \fBboot\fR [\fIboot-flags\fR] [\fB-B\fR \fIprop\fR=\fIval\fR [,\fIval\fR...]]
 .fi
 
 .SH DESCRIPTION
-.LP
 Bootstrapping is the process of loading and executing a standalone program. For
 the purpose of this discussion, bootstrapping means the process of loading and
 executing the bootable operating system. Typically, the standalone program is
@@ -44,7 +41,6 @@ Once the kernel is loaded, it starts the UNIX system, mounts the necessary file
 systems (see \fBvfstab\fR(5)), and runs \fB/sbin/init\fR to bring the system to
 the "initdefault" state specified in \fB/etc/inittab\fR. See \fBinittab\fR(5).
 .SS "SPARC Bootstrap Procedure"
-.LP
 On SPARC based systems, the bootstrap procedure on most machines consists of
 the following basic phases.
 .sp
@@ -141,7 +137,6 @@ loads the boot archive, which takes over the machine and releases
 \fBdhcpagent\fR(8)), which implements further DHCP activities.
 
 .SS "iSCSI Boot"
-.LP
 iSCSI boot is currently supported only on x86. The host being booted must be
 equipped with NIC(s) capable of iBFT (iSCSI Boot Firmware Table) or have the
 mainboard's BIOS be iBFT-capable. iBFT, defined in the Advanced Configuration
@@ -157,7 +152,6 @@ of the process of iSCSI booting is the same as booting from a local disk.
 To configure the iBFT properly, users need to refer to the documentation from
 their hardware vendors.
 .SS "Booting from Disk"
-.LP
 When booting from disk, the OpenBoot PROM firmware reads the boot blocks from
 blocks 1 to 15 of the partition specified as the boot device. This standalone
 booter usually contains a file system-specific reader capable of reading the
@@ -188,7 +182,6 @@ system and the capabilities of the hardware and firmware.
 .LP
 The path to the kernel must not contain any whitespace.
 .SS "Booting from ZFS"
-.LP
 Booting from ZFS differs from booting from UFS in that, with ZFS, a device
 specifier identifies a storage pool, not a single root file system. A storage
 pool can contain multiple bootable datasets (that is, root file systems).
@@ -199,7 +192,6 @@ the one identified by the pool's \fBbootfs\fR property. This default selection
 can be overridden by specifying an alternate bootable dataset with the \fB-Z\fR
 option.
 .SS "Boot Archive Phase"
-.LP
 The boot archive contains a file system image that is mounted using an
 in-memory disk. The image is self-describing, specifically containing a file
 system reader in the boot block. This file system reader mounts and opens the
@@ -225,7 +217,6 @@ modules from the in-memory filesystem until I/O can be turned on and the root
 filesystem mounted. Once the root filesystem is mounted, the in-memory
 filesystem is no longer needed and is discarded.
 .SS "OpenBoot PROM \fBboot\fR Command Behavior"
-.LP
 The OpenBoot \fBboot\fR command takes arguments of the following form:
 .sp
 .in +2
@@ -623,7 +614,6 @@ using infinite retries.
 attempted before the DHCP process is determined to have failed. Defaults to of
 using infinite retries.
 .SS "x86 Bootstrap Procedure"
-.LP
 On x86 based systems, the bootstrapping process consists of two conceptually
 distinct phases, kernel loading and kernel initialization. Kernel loading is
 implemented in the boot loader using the BIOS ROM on the system
@@ -664,7 +654,6 @@ various operating system services (see \fBsmf\fR(7)).
 
 .SH OPTIONS
 .SS "SPARC"
-.LP
 The following SPARC options are supported:
 .sp
 .ne 2
@@ -788,7 +777,6 @@ Boot from the root file system in the specified ZFS dataset.
 .RE
 
 .SS "x86"
-.LP
 The following x86 options are supported:
 .sp
 .ne 2
@@ -816,7 +804,6 @@ information about the options available with the kernel.
 .RE
 
 .SH X86 BOOT SEQUENCE DETAILS
-.LP
 After a PC-compatible machine is turned on, the system firmware in the \fBBIOS
 ROM\fR executes a power-on self test (POST), runs \fBBIOS\fR extensions in
 peripheral board \fBROMs,\fR and invokes software interrupt INT 19h, Bootstrap.
@@ -825,7 +812,6 @@ consists of trying to read the first physical sector from the first diskette
 drive, or, if that fails, from the first hard disk. The processor then jumps to
 the first byte of the sector image in memory.
 .SH X86 PRIMARY BOOT
-.LP
 The first sector on a hard disk contains the master boot block (first stage of
 the boot program), which contains the master boot program and the Master Boot
 Record (\fBMBR\fR) table. The master boot program has recorded the location of
@@ -900,7 +886,6 @@ Protocol (TFTP). The BIOS executes the \fBpxeboot\fR by jumping to its first
 byte in memory. The \fBpxeboot\fR program is combined stage2 and stage2 boot
 program and implements user interface to load and boot unix kernel.
 .SH X86 KERNEL STARTUP
-.LP
 The kernel startup process is independent of the kernel loading process. During
 kernel startup, console I/O goes to the device specified by the \fBconsole\fR
 property.
@@ -924,7 +909,6 @@ and \fBkeyboard\fR. The root device defaults to \fBramdisk\fR and the file
 system defaults to \fBufs\fR.
 .SH EXAMPLES
 .SS "SPARC"
-.LP
 \fBExample 1 \fRTo Boot the Default Kernel In Single-User Interactive Mode
 .sp
 .LP
@@ -1003,7 +987,6 @@ boot support package processes arguments in \fBnetwork-boot-arguments\fR.
 .sp
 
 .SS "x86"
-.LP
 \fBExample 3 \fRTo Boot the Default Kernel In 64-bit Single-User Interactive
 Mode
 .sp
@@ -1094,7 +1077,6 @@ the root pool of your current system.
 .RE
 
 .SH SEE ALSO
-.LP
 .BR kmdb (1),
 .BR uname (1),
 .BR uadmin (2),
@@ -1107,7 +1089,6 @@ the root pool of your current system.
 .BR init (8),
 .BR installboot (8),
 .BR kernel (8),
-.BR monitor (8),
 .BR shutdown (8),
 .BR svcadm (8),
 .BR umountall (8),
@@ -1138,13 +1119,11 @@ RFC 2396, \fIUniform Resource Identifiers (URI): Generic Syntax\fR,
 .LP
 \fIOpenBoot Command Reference Manual\fR
 .SH WARNINGS
-.LP
 The \fBboot\fR utility is unable to determine which files can be used as
 bootable programs. If the booting of a file that is not bootable is requested,
 the \fBboot\fR utility loads it and branches to it. What happens after that is
 unpredictable.
 .SH NOTES
-.LP
 \fIplatform-name\fR can be found using the \fB-i\fR option of \fBuname\fR(1).
 \fIhardware-class-name\fR can be found using the \fB-m\fR option of
 \fBuname\fR(1).
