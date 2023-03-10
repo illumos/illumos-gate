@@ -99,7 +99,7 @@ set_scsi_pt_sense(struct uscsi_cmd *uscsi, unsigned char *sense,
  */
 static void
 set_scsi_pt_data_in(struct uscsi_cmd *uscsi, unsigned char *dxferp,
-		    int dxfer_len)
+    int dxfer_len)
 {
 	if (dxfer_len > 0) {
 		uscsi->uscsi_bufaddr = (char *)dxferp;
@@ -224,9 +224,9 @@ static int
 save_logs(unsigned char *resp, ses_log_call_t *data)
 {
 	int k;
-	int param_code; 	/* Parameter code */
-	int param_len = 0; 	/* Paramter length */
-	unsigned char *log_param_ptr; 	/* Log parameter pointer */
+	int param_code;		/* Parameter code */
+	int param_len = 0;	/* Paramter length */
+	unsigned char *log_param_ptr;	/* Log parameter pointer */
 	unsigned char *log_str_ptr; /* ptr to ascii str returend by expander */
 
 	char log_code[ENTRY_MAX_SIZE];
@@ -256,8 +256,7 @@ save_logs(unsigned char *resp, ses_log_call_t *data)
 	 * new additional entries. Check to see if any entries in this read
 	 * contain the same log entry as the last entry we read last time.
 	 */
-	if (data->last_log_entry != NULL &&
-	    (strlen(data->last_log_entry) == SES_LOG_VALID_LOG_SIZE)) {
+	if (strlen(data->last_log_entry) == SES_LOG_VALID_LOG_SIZE) {
 		/*
 		 * We have a valid log entry from a previous read log
 		 * operation.
@@ -543,16 +542,16 @@ sg_ll_mode_select10(int sg_fd, void * paramp, int param_len)
  * Table 92 - Mode parameter header(10)
  * Bit
  * Byte
- *	7 	6 	5 	4 	3 	2 	1 	0
+ *	7	6	5	4	3	2	1	0
  *	----------------------------------------------------------
  * 0	MSB Data length
  * 1	LSB Data length
  *	----------------------------------------------------------
  * 2	Medium type
  *	----------------------------------------------------------
- * 3 	Device-specific parameter
+ * 3	Device-specific parameter
  *	----------------------------------------------------------
- * 4 	Reserved
+ * 4	Reserved
  *	----------------------------------------------------------
  * 5	Reserved
  *	----------------------------------------------------------
@@ -638,8 +637,7 @@ clear_log(int sg_fd, ses_log_call_t *data)
 	 * retrieve the last read sequence number from the last
 	 * log entry read.
 	 */
-	if (data->last_log_entry != NULL &&
-	    (strlen(data->last_log_entry) == SES_LOG_VALID_LOG_SIZE)) {
+	if (strlen(data->last_log_entry) == SES_LOG_VALID_LOG_SIZE) {
 		/*
 		 * We have a valid log entry from a previous read log
 		 * operation.
@@ -769,8 +767,8 @@ access_ses_log(ses_log_call_t *data)
 	data->log_data = NULL;
 	data->number_log_entries = 0;
 
-	if (data->target_path == NULL) {
-		/* NULL Target path, return error */
+	if (*data->target_path == '\0') {
+		/* empty target path, return error */
 		return (SES_LOG_FAILED_NULL_TARGET_PATH);
 	}
 
