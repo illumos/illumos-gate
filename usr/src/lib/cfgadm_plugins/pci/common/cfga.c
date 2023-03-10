@@ -84,7 +84,7 @@ int cfga_version = CFGA_HSL_V2;
 /*
  *	DEBUGING LEVEL
  *
- * 	External routines:  1 - 2
+ *	External routines:  1 - 2
  *	Internal routines:  3 - 4
  */
 #ifdef	PCIHP_DBG
@@ -1293,7 +1293,7 @@ find_physical_slot_names(const char *devcomp, struct searcharg *slotarg)
 
 	di_prom_fini(slotarg->promp);
 	di_fini(root_node);
-	if (slotarg->slotnames[0] != NULL)
+	if (*slotarg->slotnames[0] != '\0')
 		return (0);
 	else
 		return (-1);
@@ -1685,6 +1685,7 @@ cont:
 
 	if ((*cs)->ap_info[0] == '\0') {
 		/* slot_names of bus node  */
+		memset(&slotname_arg, 0, sizeof (slotname_arg));
 		if (find_physical_slot_names(ap_id, &slotname_arg) != -1)
 			(void) strcpy((*cs)->ap_info,
 			    slotname_arg.slotnames[slotname_arg.minor]);
