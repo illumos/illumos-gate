@@ -1101,12 +1101,9 @@ dhcp_smach_set_msg_reqhost(dhcp_smach_t *dsmp, ipc_action_t *iap)
 		return;
 	}
 
-	if (iap->ia_request->buffer == NULL ||
-	    iap->ia_request->data_length <= DHCP_OPT_META_LEN) {
+	if (iap->ia_request->data_length <= DHCP_OPT_META_LEN) {
 		dhcpmsg(MSG_WARNING, "dhcp_smach_set_msg_reqhost:"
-		    " DHCP_TYPE_OPTION ia_request buffer is NULL (0) or"
-		    " short (1): %d",
-		    iap->ia_request->buffer == NULL ? 0 : 1);
+		    " DHCP_TYPE_OPTION ia_request buffer is short");
 		return;
 	}
 
