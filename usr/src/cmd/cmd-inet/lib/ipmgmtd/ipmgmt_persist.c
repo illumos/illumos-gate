@@ -1346,8 +1346,7 @@ i_ipmgmt_node2nvl(nvlist_t **nvl, ipmgmt_aobjmap_t *np)
 		}
 			break;
 		case IPADM_ADDR_DHCP: {
-			if (np->ipmgmt_am_reqhost &&
-			    *np->ipmgmt_am_reqhost != '\0' &&
+			if (*np->ipmgmt_am_reqhost != '\0' &&
 			    (err = nvlist_add_string(*nvl, IPADM_NVP_REQHOST,
 			    np->ipmgmt_am_reqhost)) != 0)
 				goto fail;
