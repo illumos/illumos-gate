@@ -3234,8 +3234,7 @@ i_ipadm_op_dhcp(ipadm_addrobj_t addr, dhcp_ipc_type_t type, int *dhcperror)
 	switch (DHCP_IPC_CMD(type)) {
 	case DHCP_START:
 	case DHCP_EXTEND:
-		if (addr->ipadm_af == AF_INET && addr->ipadm_reqhost != NULL &&
-		    *addr->ipadm_reqhost != '\0') {
+		if (addr->ipadm_af == AF_INET && *addr->ipadm_reqhost != '\0') {
 			entry = inittab_getbycode(ITAB_CAT_STANDARD,
 			    ITAB_CONS_INFO, CD_HOSTNAME);
 			if (entry == NULL) {
