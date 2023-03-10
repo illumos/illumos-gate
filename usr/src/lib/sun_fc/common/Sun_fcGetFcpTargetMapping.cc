@@ -124,7 +124,7 @@ Sun_fcGetFcpTargetMapping(HBA_HANDLE handle, PHBA_FCPTARGETMAPPING mapping) {
 		current = mapping->NumberOfEntries;
 	}
 
-	delete(mappingV2);
+	delete[](mappingV2);
 	return (status);
 }
 #ifdef	__cplusplus

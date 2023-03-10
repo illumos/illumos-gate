@@ -490,7 +490,7 @@ FCHBAPort::FCHBAPort(string thePath) : HBAPort() {
 			log.debug("Buffer too small for number of NPIV Port.Retry.");
 			size = pathList->numAdapters;
 			retry = true;
-			delete (pathList);
+			delete[] (pathList);
 		}
 	} while (retry);
 	log.debug("Get %d npiv ports", pathList->numAdapters);
@@ -502,7 +502,7 @@ FCHBAPort::FCHBAPort(string thePath) : HBAPort() {
 			log.debug("Ignoring partial failure");
 		}
 	}
-	delete (pathList);
+	delete[] (pathList);
 }
 
 uint32_t FCHBAPort::deleteNPIVPort(uint64_t vportwwn) {
@@ -747,7 +747,7 @@ void FCHBAPort::getTargetMappings(PHBA_FCPTARGETMAPPINGV2 userMappings) {
 	log.debug("Performing IOCTL to fetch mappings");
 
 	if (ioctl(fd, FCP_GET_TARGET_MAPPINGS, &fioctl) != 0) {
-	    delete (mappings);
+	    delete[] (mappings);
 	    close(fd);
 	    if (errno == EBUSY) {
 		throw BusyException();
@@ -786,11 +786,11 @@ void FCHBAPort::getTargetMappings(PHBA_FCPTARGETMAPPINGV2 userMappings) {
 		(raw.find("/tape@") != raw.npos)) {
 		raw += ":n";
 	    } else if ((raw.find("/ssd@") != raw.npos) ||
-	    	(raw.find("/sd@") != raw.npos) ||
-	   	(raw.find("/disk@") != raw.npos)) { 
+		(raw.find("/sd@") != raw.npos) ||
+		(raw.find("/disk@") != raw.npos)) {
 		raw += ":c,raw";
 	    } else if ((raw.find("/ses@") != raw.npos) ||
-	   	(raw.find("/enclosure@") != raw.npos)) { 
+		(raw.find("/enclosure@") != raw.npos)) {
 		raw += ":0";
 	    } else {
 		log.debug(
@@ -815,9 +815,9 @@ void FCHBAPort::getTargetMappings(PHBA_FCPTARGETMAPPINGV2 userMappings) {
 		    mappings->entries[i].PortWWN.raw_wwn,
 		    sizeof (la_wwn_t));
 
-	    userMappings->entry[i].FcpId.FcpLun = 
+	    userMappings->entry[i].FcpId.FcpLun =
 		mappings->entries[i].samLUN;
-		
+
 	    memcpy(userMappings->entry[i].LUID.buffer,
 		    mappings->entries[i].guid,
 		    sizeof (userMappings->entry[i].LUID.buffer));
@@ -835,21 +835,21 @@ void FCHBAPort::getTargetMappings(PHBA_FCPTARGETMAPPINGV2 userMappings) {
 	    } else {
 		// User buffer is non zero, but too small.  Don't bother with links
 		userMappings->NumberOfEntries = mappings->numLuns;
-		delete (mappings);
+		delete[] (mappings);
 		throw MoreDataException();
 	    }
 	} else if (mappings->numLuns > 0) {
 	    // Zero length buffer, but we've got mappings
 	    userMappings->NumberOfEntries = mappings->numLuns;
-	    delete (mappings);
+	    delete[] (mappings);
 	    throw MoreDataException();
 	} else {
 	    // No mappings, no worries
 	    userMappings->NumberOfEntries = 0;
-	    delete (mappings);
+	    delete[] (mappings);
 	    return;
 	}
-	delete (mappings);
+	delete[] (mappings);
 }
 
 void FCHBAPort::getRNIDMgmtInfo(PHBA_MGMTINFO info) {
@@ -1110,7 +1110,7 @@ void FCHBAPort::sendRNID(uint64_t destwwn, HBA_UINT32 destfcid,
 			    HBA_UINT32 nodeIdDataFormat, void *pRspBuffer,
 			    HBA_UINT32 *RspBufferSize) {
 	Trace log("FCHBAPort::sendRNID");
-	int 			localportfound, remoteportfound, send;
+	int			localportfound, remoteportfound, send;
 	fcio_t			fcio;
 
 	// Validate the arguments
