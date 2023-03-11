@@ -2211,7 +2211,7 @@ krb5_dbe_update_mod_princ_data_new(context, entry, mod_date, mod_princ)
 {
     krb5_tl_data          tl_data;
 
-    krb5_error_code 	  retval = 0;
+    krb5_error_code	  retval = 0;
     krb5_octet		* nextloc = 0;
     char		* unparse_mod_princ = 0;
     unsigned int	unparse_mod_princ_size;
@@ -2495,6 +2495,7 @@ kdb5_ldap_destroy(argc, argv)
 #endif
     /* Solaris Kerberos: to remove stash file */
     char *stash_file = NULL;
+    char stashbuf[MAXPATHLEN+1];
     struct stat stb;
 
     optind = 1;
@@ -2625,7 +2626,6 @@ kdb5_ldap_destroy(argc, argv)
      * This behavior exists in the Solaris version of kdb5_util destroy.
      */
     if (global_params.stash_file == NULL) {
-	char stashbuf[MAXPATHLEN+1];
 	int realm_len = strlen(global_params.realm);
 
 	(void) strlcpy(stashbuf, DEFAULT_KEYFILE_STUB, sizeof (stashbuf));
