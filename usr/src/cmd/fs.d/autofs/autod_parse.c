@@ -116,7 +116,7 @@ static void dump_mapent_err(struct mapent *, char *, char *);
  */
 struct mapent *
 parse_entry(char *key, char *mapname, char *mapopts, struct mapline *ml,
-			char *subdir, uint_t isdirect, bool_t mount_access)
+    char *subdir, uint_t isdirect, bool_t mount_access)
 {
 	char *p;
 	char defaultopts[AUTOFS_MAXOPTSLEN];
@@ -231,8 +231,8 @@ parse_error:
  */
 static int
 mapline_to_mapent(struct mapent **mapents, struct mapline *ml, char *key,
-		char *mapname, char *mapopts, char *defaultopts,
-		uint_t isdirect)
+    char *mapname, char *mapopts, char *defaultopts,
+    uint_t isdirect)
 {
 	struct mapent *me = NULL;
 	struct mapent *mp;
@@ -425,7 +425,7 @@ alloc_failed:
  */
 static int
 hierarchical_sort(struct mapent *mapents, hiernode **rootnode, char *key,
-	char *mapname)
+    char *mapname)
 {
 	hiernode *prevnode, *currnode, *newnode;
 	char *path;
@@ -576,7 +576,7 @@ push_options(hiernode *node, char *defaultopts, char *mapopts, int err)
  */
 static int
 set_mapent_opts(struct mapent *me, char *opts, char *defaultopts,
-		char *mapopts)
+    char *mapopts)
 {
 	char entryopts[AUTOFS_MAXOPTSLEN];
 	char fstype[MAX_FSLEN], mounter[MAX_FSLEN];
@@ -645,11 +645,7 @@ done:
  * is not NULL.
  */
 static void
-get_opts(input, opts, fstype, fstype_opt)
-	char *input;
-	char *opts; 	/* output */
-	char *fstype;   /* output */
-	bool_t *fstype_opt;
+get_opts(char *input, char *opts, char *fstype, bool_t *fstype_opt)
 {
 	char *p, *pb;
 	char buf[MAXOPTSLEN];
@@ -680,7 +676,7 @@ get_opts(input, opts, fstype, fstype_opt)
  */
 static int
 fstype_opts(struct mapent *me, char *opts, char *defaultopts,
-				char *mapopts)
+    char *mapopts)
 {
 	char pushentryopts[AUTOFS_MAXOPTSLEN];
 	char pushfstype[MAX_FSLEN];
@@ -714,7 +710,7 @@ fstype_opts(struct mapent *me, char *opts, char *defaultopts,
 /*
  * modify_mapents(struct mapent **mapents, char *mapname,
  *			char *mapopts, char *subdir, hiernode *rootnode,
- * 			char *key, uint_t isdirect, bool_t mount_access)
+ *			char *key, uint_t isdirect, bool_t mount_access)
  * modifies the intermediate mapentry list into the final one, and passes
  * back a pointer to it. The final list may contain faked mapentries for
  * hiernodes that do not point to a mapentry, or converted mapentries, if
@@ -724,8 +720,8 @@ fstype_opts(struct mapent *me, char *opts, char *defaultopts,
  */
 static int
 modify_mapents(struct mapent **mapents, char *mapname,
-			char *mapopts, char *subdir, hiernode *rootnode,
-			char *key, uint_t isdirect, bool_t mount_access)
+    char *mapopts, char *subdir, hiernode *rootnode,
+    char *key, uint_t isdirect, bool_t mount_access)
 {
 	struct mapent *mp = NULL;
 	char w[MAXPATHLEN];
@@ -826,8 +822,8 @@ modify_mapents(struct mapent **mapents, char *mapname,
  */
 static int
 set_and_fake_mapent_mntlevel(hiernode *rootnode, char *subdir, char *key,
-		char *mapname, struct mapent **faked_mapents,
-		uint_t isdirect, char *mapopts, bool_t mount_access)
+    char *mapname, struct mapent **faked_mapents,
+    uint_t isdirect, char *mapopts, bool_t mount_access)
 {
 	char dirname[MAXFILENAMELEN];
 	char traversed_path[MAXPATHLEN]; /* used in building fake mapentries */
@@ -992,7 +988,7 @@ mark_level1_root(hiernode *node, char *traversed_path)
 
 /*
  * mark_and_fake_level1_noroot(hiernode *node, char *traversed_path,
- * 			char *key,char *mapname, struct mapent **faked_mapents,
+ *			char *key,char *mapname, struct mapent **faked_mapents,
  *			uint_t isdirect, char *mapopts)
  * Called if the root of the hierarchy does not point to a mapent. marks nodes
  * upto one physical level below the rootnode given by subdir. checks if
@@ -1003,8 +999,8 @@ mark_level1_root(hiernode *node, char *traversed_path)
  */
 static int
 mark_and_fake_level1_noroot(hiernode *node, char *traversed_path,
-			char *key, char *mapname, struct mapent **faked_mapents,
-			uint_t isdirect, char *mapopts)
+    char *key, char *mapname, struct mapent **faked_mapents,
+    uint_t isdirect, char *mapopts)
 {
 	struct mapent *me;
 	int rc = 0;
@@ -1108,7 +1104,7 @@ mark_and_fake_level1_noroot(hiernode *node, char *traversed_path,
  */
 static int
 convert_mapent_to_automount(struct mapent *me, char *mapname,
-				char *mapopts)
+    char *mapopts)
 {
 	struct mapfs *mfs = me->map_fs;		/* assumes it exists */
 	int rc = PARSE_OK;
@@ -1281,10 +1277,8 @@ parse_fsinfo(char *mapname, struct mapent *mapents)
  * is then attatched to the mapent struct passed in.
  */
 int
-parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
-	struct mapent *me;
-	char *mapname, *fsw, *fswq, **lp, **lq;
-	int wsize;
+parse_nfs(char *mapname, struct mapent *me, char *fsw, char *fswq,
+    char **lp, char **lq, int wsize)
 {
 	struct mapfs *mfs, **mfsp;
 	char *wlp, *wlq;
@@ -1318,7 +1312,7 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 
 		wlp = w; wlq = wq;
 		if (getword(hostlist, hostlistq, &wlp, &wlq, ':',
-			    sizeof (hostlist)) == -1)
+		    sizeof (hostlist)) == -1)
 			return (PARSE_ERROR);
 		if (!*hostlist)
 			goto bad_entry;
@@ -1327,7 +1321,7 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 			maybe_url = FALSE;
 
 		if (getword(dirname, qbuff, &wlp, &wlq, ':',
-					sizeof (dirname)) == -1)
+		    sizeof (dirname)) == -1)
 			return (PARSE_ERROR);
 		if (*dirname == '\0')
 			goto bad_entry;
@@ -1383,7 +1377,7 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 		 * maps, we interpret a second colon as a slash.
 		 */
 		if (getword(subdir+1, qbuff+1, &wlp, &wlq, ':',
-				sizeof (subdir)) == -1)
+		    sizeof (subdir)) == -1)
 			return (PARSE_ERROR);
 
 		if (*(subdir+1))
@@ -1395,7 +1389,7 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 		for (;;) {
 
 			if (getword(hostname_and_penalty, qbuff, &hl, &hlq, ',',
-				sizeof (hostname_and_penalty)) == -1)
+			    sizeof (hostname_and_penalty)) == -1)
 				return (PARSE_ERROR);
 			if (!*hostname_and_penalty)
 				break;
@@ -1407,7 +1401,7 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 			hn = hostname_and_penalty;
 			hnq = qbuff;
 			if (getword(hostname, qbuff1, &hn, &hnq, '(',
-				sizeof (hostname)) == -1)
+			    sizeof (hostname)) == -1)
 				return (PARSE_ERROR);
 			if (hostname[0] == '\0')
 				goto bad_entry;
@@ -1418,7 +1412,7 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 				maybe_url = FALSE;
 				hn++; hnq++;
 				if (getword(pbuff, pbuffq, &hn, &hnq, ')',
-					sizeof (pbuff)) == -1)
+				    sizeof (pbuff)) == -1)
 					return (PARSE_ERROR);
 				if (!*pbuff)
 					penalty = 0;
@@ -1443,14 +1437,13 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 				host = dirname+2;
 				path = strchr(host, '/');
 				if (path == NULL) {
-					syslog(LOG_ERR,
-					"parse_nfs: illegal nfs url syntax: %s",
-					host);
+					syslog(LOG_ERR, "parse_nfs: illegal "
+					    "nfs url syntax: %s", host);
 
 					return (PARSE_ERROR);
 				}
 				*path = '\0';
-				sport =  strchr(host, ':');
+				sport = strchr(host, ':');
 
 				if (sport != NULL && sport < path) {
 					*sport = '\0';
@@ -1458,10 +1451,10 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 
 					if (mfs->mfs_port > USHRT_MAX) {
 						syslog(LOG_ERR,
-							"parse_nfs: invalid "
-							"port number (%d) in "
-							"NFS URL",
-							mfs->mfs_port);
+						    "parse_nfs: invalid "
+						    "port number (%d) in "
+						    "NFS URL",
+						    mfs->mfs_port);
 
 						return (PARSE_ERROR);
 					}
@@ -1484,7 +1477,7 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 			mfs->mfs_penalty = penalty;
 			if (mfs->mfs_host == NULL || mfs->mfs_dir == NULL) {
 				syslog(LOG_ERR,
-				"parse_nfs: Memory allocation failed");
+				    "parse_nfs: Memory allocation failed");
 				return (PARSE_ERROR);
 			}
 		}
@@ -1494,9 +1487,9 @@ parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 		 */
 		if (host_cnt == 0) {
 			syslog(LOG_ERR,
-			"parse_nfs: invalid host specified - bad entry "
-			"in map %s \"%s\"",
-			mapname, w);
+			    "parse_nfs: invalid host specified - bad entry "
+			    "in map %s \"%s\"",
+			    mapname, w);
 			return (PARSE_ERROR);
 		}
 		if (getword(w, wq, lp, lq, ' ', wsize) == -1)
@@ -1514,10 +1507,8 @@ bad_entry:
 }
 
 static int
-parse_special(me, w, wq, lp, lq, wsize)
-	struct mapent *me;
-	char *w, *wq, **lp, **lq;
-	int wsize;
+parse_special(struct mapent *me, char *w, char *wq, char **lp, char **lq,
+    int wsize)
 {
 	char devname[MAXPATHLEN + 1], qbuf[MAXPATHLEN + 1];
 	char *wlp, *wlq;
@@ -1530,7 +1521,7 @@ parse_special(me, w, wq, lp, lq, wsize)
 	if (devname[0] == '\0')
 		return (PARSE_ERROR);
 
-	mfs = (struct mapfs *)malloc(sizeof (struct mapfs));
+	mfs = malloc(sizeof (struct mapfs));
 	if (mfs == NULL)
 		return (PARSE_ERROR);
 	(void) memset(mfs, 0, sizeof (*mfs));
@@ -1649,8 +1640,7 @@ free_hiernode(hiernode *node)
  * free the mapentry and its fields
  */
 void
-free_mapent(me)
-	struct mapent *me;
+free_mapent(struct mapent *me)
 {
 	struct mapfs *mfs;
 	struct mapent *m;
@@ -1667,7 +1657,7 @@ free_mapent(me)
 			if (mfs->mfs_nconf)
 				freenetconfigent(mfs->mfs_nconf);
 			me->map_fs = mfs->mfs_next;
-			free((char *)mfs);
+			free(mfs);
 		}
 
 		if (me->map_root)
@@ -1687,7 +1677,7 @@ free_mapent(me)
 
 		m = me;
 		me = me->map_next;
-		free((char *)m);
+		free(m);
 	}
 }
 
@@ -1744,8 +1734,7 @@ trace_hierarchy(hiernode *node, int nodelevel)
 		if (currnode->subdir != NULL) {
 			for (i = 0; i < nodelevel; i++)
 				trace_prt(0, "\t");
-			trace_prt(0, "\t(%s, ",
-			    currnode->dirname ? currnode->dirname :"");
+			trace_prt(0, "\t(%s, ", currnode->dirname);
 			if (currnode->mapent) {
 				trace_prt(0, "%d, %s)\n",
 				    currnode->mapent->map_mntlevel,
@@ -1759,8 +1748,7 @@ trace_hierarchy(hiernode *node, int nodelevel)
 		} else {
 			for (i = 0; i < nodelevel; i++)
 				trace_prt(0, "\t");
-			trace_prt(0, "\t(%s, ",
-			    currnode->dirname ? currnode->dirname :"");
+			trace_prt(0, "\t(%s, ", currnode->dirname);
 			if (currnode->mapent) {
 				trace_prt(0, "%d, %s)\n",
 				    currnode->mapent->map_mntlevel,
@@ -1775,9 +1763,7 @@ trace_hierarchy(hiernode *node, int nodelevel)
 }
 
 struct mapent *
-do_mapent_hosts(mapopts, host, isdirect)
-	char *mapopts, *host;
-	uint_t isdirect;
+do_mapent_hosts(char *mapopts, char *host, uint_t isdirect)
 {
 	CLIENT *cl;
 	struct mapent *me, *ms, *mp;
@@ -1865,11 +1851,11 @@ do_mapent_hosts(mapopts, host, isdirect)
 		nfsvers = 0;
 	if (set_versrange(nfsvers, &vers, &versmin) != 0) {
 		syslog(LOG_ERR, "Incorrect NFS version specified for %s", host);
-		return ((struct mapent *)NULL);
+		return (NULL);
 	}
 	if (pingnfs(host, get_retry(mapopts) + 1, &vers, versmin, 0, FALSE,
 	    NULL, NULL) != RPC_SUCCESS)
-		return ((struct mapent *)NULL);
+		return (NULL);
 
 	retries = get_retry(mapopts);
 	delay = INITDELAY;
@@ -1881,20 +1867,19 @@ retry:
 		if (cl == NULL) {
 			syslog(LOG_ERR,
 			"do_mapent_hosts: %s %s", host, clnt_spcreateerror(""));
-			return ((struct mapent *)NULL);
+			return (NULL);
 		}
 
 	}
 #ifdef MALLOC_DEBUG
 	add_alloc("CLNT_HANDLE", cl, 0, __FILE__, __LINE__);
-	add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
-		__FILE__, __LINE__);
+	add_alloc("AUTH_HANDLE", cl->cl_auth, 0, __FILE__, __LINE__);
 #endif
 
 	timeout.tv_usec = 0;
 	timeout.tv_sec  = 25;
 	if (clnt_stat = clnt_call(cl, MOUNTPROC_EXPORT, xdr_void, 0,
-				xdr_exports, (caddr_t)&ex, timeout)) {
+	    xdr_exports, (caddr_t)&ex, timeout)) {
 
 		if (retries-- > 0) {
 			clnt_destroy(cl);
@@ -1903,12 +1888,11 @@ retry:
 		}
 
 		syslog(LOG_ERR,
-			"do_mapent_hosts: %s: export list: %s",
-			host, clnt_sperrno(clnt_stat));
+		    "do_mapent_hosts: %s: export list: %s",
+		    host, clnt_sperrno(clnt_stat));
 #ifdef MALLOC_DEBUG
 		drop_alloc("CLNT_HANDLE", cl, __FILE__, __LINE__);
-		drop_alloc("AUTH_HANDLE", cl->cl_auth,
-			__FILE__, __LINE__);
+		drop_alloc("AUTH_HANDLE", cl->cl_auth, __FILE__, __LINE__);
 #endif
 		clnt_destroy(cl);
 		return ((struct mapent *)NULL);
@@ -1916,8 +1900,7 @@ retry:
 
 #ifdef MALLOC_DEBUG
 	drop_alloc("CLNT_HANDLE", cl, __FILE__, __LINE__);
-	drop_alloc("AUTH_HANDLE", cl->cl_auth,
-		__FILE__, __LINE__);
+	drop_alloc("AUTH_HANDLE", cl->cl_auth, __FILE__, __LINE__);
 #endif
 	clnt_destroy(cl);
 
@@ -1931,9 +1914,6 @@ retry:
 	/* now sort by length of names - to get mount order right */
 	exlist = ex;
 	texlist = NULL;
-#ifdef lint
-	exnext = NULL;
-#endif
 	for (; ex; ex = exnext) {
 		exnext = ex->ex_next;
 		exlen = strlen(ex->ex_dir);
@@ -2033,13 +2013,12 @@ alloc_failed:
 	syslog(LOG_ERR, "do_mapent_hosts: Memory allocation failed");
 	free_mapent(ms);
 	freeex(exlist);
-	return ((struct mapent *)NULL);
+	return (NULL);
 }
 
 
 static void
-freeex_ent(ex)
-	struct exportnode *ex;
+freeex_ent(struct exportnode *ex)
 {
 	struct groupnode *groups, *tmpgroups;
 
@@ -2051,12 +2030,11 @@ freeex_ent(ex)
 		free((char *)groups);
 		groups = tmpgroups;
 	}
-	free((char *)ex);
+	free(ex);
 }
 
 static void
-freeex(ex)
-	struct exportnode *ex;
+freeex(struct exportnode *ex)
 {
 	struct exportnode *tmpex;
 
