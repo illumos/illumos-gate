@@ -635,7 +635,7 @@ ilbd_audit_rule_event(const char *audit_rule_name,
 			}
 
 			/* copy ending proxy-src address */
-			if (&rlinfo->rl_nat_src_end == 0) {
+			if (IN6_IS_ADDR_UNSPECIFIED(&rlinfo->rl_nat_src_end)) {
 				/* proxy-src is a single address */
 				event->adt_ilb_create_rule.proxy_src_max_type =
 				    event->
