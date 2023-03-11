@@ -2033,14 +2033,8 @@ add_device_to_disklist(char *devname, char *devpath)
 		for (i = 0; i < search_parts->etoc->efi_nparts; i++) {
 			if (search_parts->etoc->efi_parts[i].p_tag ==
 			    V_RESERVED) {
-				if (search_parts->etoc->efi_parts[i].p_name) {
-					bcopy(search_parts->etoc->efi_parts[i]
-					    .p_name, search_disk->v_volume,
-					    LEN_DKL_VVOL);
-				} else {
-					bzero(search_disk->v_volume,
-					    LEN_DKL_VVOL);
-				}
+				bcopy(search_parts->etoc->efi_parts[i].p_name,
+				    search_disk->v_volume, LEN_DKL_VVOL);
 				break;
 			}
 		}
