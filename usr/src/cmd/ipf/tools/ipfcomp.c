@@ -216,25 +216,22 @@ static u_long ipf%s_rule_data_%s_%u[] = {\n",
 
 	g->fg_ref++;
 
-	if (f->fr_grhead != 0) {
-		for (g = groups; g != NULL; g = g->fg_next)
-			if ((strncmp(g->fg_name, f->fr_grhead,
-				     FR_GROUPLEN) == 0) &&
-			    g->fg_flags == (f->fr_flags & FR_INOUT))
-				break;
+	for (g = groups; g != NULL; g = g->fg_next)
+		if ((strncmp(g->fg_name, f->fr_grhead, FR_GROUPLEN) == 0) &&
+		    g->fg_flags == (f->fr_flags & FR_INOUT))
+			break;
+	if (g == NULL) {
+		g = (frgroup_t *)calloc(1, sizeof(*g));
 		if (g == NULL) {
-			g = (frgroup_t *)calloc(1, sizeof(*g));
-			if (g == NULL) {
-				fprintf(stderr, "out of memory\n");
-				exit(1);
-			}
-			g->fg_next = groups;
-			groups = g;
-			g->fg_head = f;
-			bcopy(f->fr_grhead, g->fg_name, FR_GROUPLEN);
-			g->fg_ref = 0;
-			g->fg_flags = f->fr_flags & FR_INOUT;
+			fprintf(stderr, "out of memory\n");
+			exit(1);
 		}
+		g->fg_next = groups;
+		groups = g;
+		g->fg_head = f;
+		bcopy(f->fr_grhead, g->fg_name, FR_GROUPLEN);
+		g->fg_ref = 0;
+		g->fg_flags = f->fr_flags & FR_INOUT;
 	}
 }
 
@@ -945,7 +942,7 @@ u_int incount, outcount;
 			fr->fr_flags & FR_INQUE ? "in" : "out",
 			fr->fr_group, num);
 	}
-	if (n == NULL) { 
+	if (n == NULL) {
 		n = (mc_t *)malloc(sizeof(*n) * FRC_MAX);
 		if (n == NULL) {
 			fprintf(stderr, "out of memory\n");
@@ -963,13 +960,13 @@ int dir;
 	static mc_t *m = NULL;
 	frgroup_t *g;
 
-	if (m == NULL) { 
+	if (m == NULL) {
 		m = (mc_t *)calloc(1, sizeof(*m) * FRC_MAX);
-		if (m == NULL) { 
-			fprintf(stderr, "out of memory\n"); 
-			exit(1); 
-		} 
-	} 
+		if (m == NULL) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
+	}
 
 	for (g = groups; g != NULL; g = g->fg_next) {
 		if ((dir == 0) && ((g->fg_flags & FR_INQUE) != 0))
