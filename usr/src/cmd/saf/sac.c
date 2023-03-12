@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
@@ -72,7 +72,7 @@ void pollpms(void);
 void reap(int);
 void pollfail(struct sactab *, int);
 void readpipe(void);
-int validstate(unchar);
+int validstate(uchar_t);
 int mk_cmd_pipe(void);
 void startpoll(void);
 
@@ -172,7 +172,7 @@ initialize()
 			error(E_SYSCONF, EXIT);
 		else {
 			(void) sprintf(Scratch,
-					"Error in _sysconfig: line %d", ret);
+			    "Error in _sysconfig: line %d", ret);
 			log(Scratch);
 			error(E_BADSYSCONF, EXIT);
 		}
@@ -251,9 +251,9 @@ startpms()
  * and if sp->rs_rsmax > 0, PM will be restarted.
  */
 
-				(void) sprintf(Scratch,
-				"Could not open _pmpipe for port monitor <%s>",
-					sp->sc_tag);
+				(void) sprintf(Scratch, "Could not open "
+				    "_pmpipe for port monitor <%s>",
+				    sp->sc_tag);
 				log(Scratch);
 				(void) sendsig(sp, SIGTERM);
 				sp->sc_ok = 0;
@@ -334,8 +334,8 @@ readutmpx()
 						/* already found a match */
 						savesp = NULL;
 						(void) sprintf(Scratch,
-						"ambiguous utmpx entry <%.8s>",
-							sp->sc_tag);
+						    "ambiguous utmpx entry "
+						    "<%.8s>", sp->sc_tag);
 						log(Scratch);
 						break;
 					} else {
@@ -346,7 +346,7 @@ readutmpx()
 			if (savesp && (savesp->sc_sstate == UNKNOWN)) {
 				/* found it */
 				(void) memcpy(savesp->sc_utid, uxp->ut_id,
-								IDLEN);
+				    IDLEN);
 				savesp->sc_pid = uxp->ut_pid;
 			}
 		}
@@ -377,7 +377,7 @@ startpm(struct sactab *sp)
 #endif
 	if (checklock(sp)) {
 		(void) sprintf(Scratch,
-			"could not start <%s> - _pid file locked", sp->sc_tag);
+		    "could not start <%s> - _pid file locked", sp->sc_tag);
 		log(Scratch);
 		return (-1);
 	}
@@ -387,18 +387,17 @@ startpm(struct sactab *sp)
 		/* not there, create one */
 		(void) umask(0);
 		if (mknod(Scratch, S_IFIFO | 0600, 0) < 0) {
-			(void) sprintf(Scratch,
-		"Could not create _pmpipe for port monitor <%s>, errno is %d",
-			sp->sc_tag, errno);
+			(void) sprintf(Scratch, "Could not create _pmpipe "
+			    "for port monitor <%s>, errno is %d",
+			    sp->sc_tag, errno);
 			log(Scratch);
 			return (-2);
 		}
 	}
 	sp->sc_fd = open(Scratch, O_RDWR);
 	if (sp->sc_fd < 0) {
-		(void) sprintf(Scratch,
-		"Could not open _pmpipe for port monitor <%s>, errno is %d",
-			sp->sc_tag, errno);
+		(void) sprintf(Scratch, "Could not open _pmpipe for port "
+		    "monitor <%s>, errno is %d", sp->sc_tag, errno);
 		log(Scratch);
 		return (-2);
 	}
@@ -410,7 +409,7 @@ startpm(struct sactab *sp)
 	(void) sigprocmask(SIG_SETMASK, &tset, NULL);
 	if ((pid = fork()) < 0) {
 		(void) sprintf(Scratch,
-			"Could not fork port monitor <%s>", sp->sc_tag);
+		    "Could not fork port monitor <%s>", sp->sc_tag);
 		log(Scratch);
 		return (-2);
 	} else if (!pid) {
@@ -493,7 +492,7 @@ cleanutx(struct sactab *sp)
 			rhost[sizeof (up->ut_host)] = '\0';
 
 			if ((pam_start("sac", user, NULL, &pamh)) ==
-								PAM_SUCCESS) {
+			    PAM_SUCCESS) {
 				(void) pam_set_item(pamh, PAM_TTY, ttyn);
 				(void) pam_set_item(pamh, PAM_RHOST, rhost);
 				(void) pam_close_session(pamh, 0);
@@ -503,9 +502,8 @@ cleanutx(struct sactab *sp)
 			up->ut_type = DEAD_PROCESS;
 			up->ut_exit.e_termination = WTERMSIG(sp->sc_exit);
 			up->ut_exit.e_exit = WEXITSTATUS(sp->sc_exit);
-			if (sp->sc_utid != NULL)
-				(void) memcpy(up->ut_id, sp->sc_utid,
-					sizeof (up->ut_id));
+			(void) memcpy(up->ut_id, sp->sc_utid,
+			    sizeof (up->ut_id));
 			(void) time(&up->ut_tv.tv_sec);
 			if (modutx(up) == NULL) {
 				/*
@@ -580,8 +578,8 @@ startit(struct sactab *sp)
 
 	if (chdir(sp->sc_tag) < 0) {
 		(void) sprintf(Scratch,
-			"Cannot chdir to <%s/%s>, port monitor not started",
-			HOME, sp->sc_tag);
+		    "Cannot chdir to <%s/%s>, port monitor not started",
+		    HOME, sp->sc_tag);
 		log(Scratch);
 		exit(1);
 	}
@@ -598,14 +596,14 @@ startit(struct sactab *sp)
 	if ((ret = doconfig(-1, "_config", 0)) != 0) {
 		if (ret == -1) {
 			(void) sprintf(Scratch,
-				"system error in _config script for <%s>",
-				sp->sc_tag);
+			    "system error in _config script for <%s>",
+			    sp->sc_tag);
 			log(Scratch);
 			exit(1);
 		} else {
 			(void) sprintf(Scratch,
-				"Error in _config script for <%s>: line %d",
-				sp->sc_tag, ret);
+			    "Error in _config script for <%s>: line %d",
+			    sp->sc_tag, ret);
 			log(Scratch);
 			exit(1);
 		}
@@ -617,22 +615,22 @@ startit(struct sactab *sp)
 
 	if (sp->sc_lstate == NOTRUNNING)
 		(void) sprintf(istate, "ISTATE=%s",
-			(sp->sc_flags & D_FLAG) ? "disabled" : "enabled");
+		    (sp->sc_flags & D_FLAG) ? "disabled" : "enabled");
 	else
 		(void) sprintf(istate, "ISTATE=%s",
-			(sp->sc_lstate == DISABLED) ? "disabled" : "enabled");
+		    (sp->sc_lstate == DISABLED) ? "disabled" : "enabled");
 	if (putenv(istate)) {
 		(void) sprintf(Scratch,
-			"can't expand port monitor <%s> environment",
-			sp->sc_tag);
+		    "can't expand port monitor <%s> environment",
+		    sp->sc_tag);
 		log(Scratch);
 		exit(1);
 	}
 	(void) sprintf(pmtag, "PMTAG=%s", sp->sc_tag);
 	if (putenv(pmtag)) {
 		(void) sprintf(Scratch,
-			"can't expand port monitor <%s> environment",
-			sp->sc_tag);
+		    "can't expand port monitor <%s> environment",
+		    sp->sc_tag);
 		log(Scratch);
 		exit(1);
 	}
@@ -715,8 +713,10 @@ mkargv(struct sactab *sp)
 				for (;;) {
 					if (*p == '\0') {
 						(void) sprintf(Scratch,
-	"invalid command line, non-terminated string for port monitor %s",
-							sp->sc_tag);
+						    "invalid command line, "
+						    "non-terminated string for "
+						    "port monitor %s",
+						    sp->sc_tag);
 						log(Scratch);
 						exit(1);
 					}
@@ -902,13 +902,13 @@ pollfail(struct sactab *sp, int reason)
 		if (sp->sc_rscnt < sp->sc_rsmax) {
 			/* try to restart it */
 			if (reason == RESP)
-				(void) sprintf(buf,
-	"<%s> stopped responding to sanity polls - trying to restart",
-					sp->sc_tag);
+				(void) sprintf(buf, "<%s> stopped responding "
+				    "to sanity polls - trying to restart",
+				    sp->sc_tag);
 			else
 				(void) sprintf(buf,
-					"<%s> has died - trying to restart",
-					sp->sc_tag);
+				    "<%s> has died - trying to restart",
+				    sp->sc_tag);
 			log(buf);
 			sp->sc_rscnt++;
 			(void) close(sp->sc_fd);
@@ -976,9 +976,8 @@ readpipe()
  * flush it
  */
 
-			ret = read(Sfd, Scratch,
-				(pp->pm_size > SIZE) ? (unsigned) SIZE :
-						(unsigned) pp->pm_size);
+			ret = read(Sfd, Scratch, (pp->pm_size > SIZE) ?
+			    (unsigned)SIZE : (unsigned)pp->pm_size);
 			if (ret < 0) {
 				if (errno != EINTR)
 					error(E_BADREAD, EXIT);
@@ -996,8 +995,8 @@ readpipe()
 		switch (pp->pm_type) {
 		case PM_UNKNOWN:
 			(void) sprintf(Scratch,
-				"port monitor <%s> didn't recognize message",
-				sp->sc_tag);
+			    "port monitor <%s> didn't recognize message",
+			    sp->sc_tag);
 			log(Scratch);
 			/* fall through */
 		case PM_STATUS:
@@ -1007,9 +1006,8 @@ readpipe()
 			 */
 			if (!validstate(pp->pm_state)) {
 				pp->pm_state = UNKNOWN;
-				(void) sprintf(Scratch,
-				"port monitor <%s> reporting invalid state",
-					sp->sc_tag);
+				(void) sprintf(Scratch, "port monitor <%s> "
+				    "reporting invalid state", sp->sc_tag);
 				log(Scratch);
 			}
 			if (sp->sc_sstate == sp->sc_pstate) {
@@ -1019,7 +1017,7 @@ readpipe()
 					sp->sc_sstate = pp->pm_state;
 					sp->sc_pstate = pp->pm_state;
 					if (pp->pm_state == ENABLED ||
-						pp->pm_state == DISABLED)
+					    pp->pm_state == DISABLED)
 					/* sc_lstate NOTRUNNING by default */
 						sp->sc_lstate = pp->pm_state;
 				}
@@ -1033,10 +1031,10 @@ readpipe()
 				}
 			} else if (sp->sc_sstate == pp->pm_state) {
 				/* PM changed to state requested */
-				(void) sprintf(Scratch,
-			"port monitor <%s> changed state from %s to %s",
-					sp->sc_tag, pstate(sp->sc_pstate),
-					pstate(pp->pm_state));
+				(void) sprintf(Scratch, "port monitor <%s> "
+				    "changed state from %s to %s",
+				    sp->sc_tag, pstate(sp->sc_pstate),
+				    pstate(pp->pm_state));
 				log(Scratch);
 				sp->sc_pstate = pp->pm_state;
 			} else if (sp->sc_pstate != pp->pm_state) {
@@ -1051,9 +1049,8 @@ readpipe()
 			}
 			break;
 		default:
-			(void) sprintf(Scratch,
-		"port monitor <%s> sent an invalid message - ignoring it",
-				sp->sc_tag);
+			(void) sprintf(Scratch, "port monitor <%s> sent an "
+			    "invalid message - ignoring it", sp->sc_tag);
 			log(Scratch);
 			break;
 		}
@@ -1072,7 +1069,7 @@ readpipe()
  *	args:	state - state to be verified
  */
 int
-validstate(unchar state)
+validstate(uchar_t state)
 {
 	switch (state) {
 	case PM_ENABLED:
