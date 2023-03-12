@@ -661,7 +661,10 @@ smb_notify_ofile(smb_ofile_t *of, uint_t action, const char *name)
 	    FILE_NOTIFY_CHANGE_EV_DELETE |
 	    FILE_NOTIFY_CHANGE_EV_CLOSED;
 	VERIFY(action < smb_notify_action_nelm);
-	events = smb_notify_action_mask[action];
+	if (action < smb_notify_action_nelm)
+		events = smb_notify_action_mask[action];
+	else
+		events = 0;
 	if ((filter & events) == 0)
 		goto unlock_out;
 
