@@ -199,13 +199,13 @@ inb_dimm(nb_dimm_t *nb_dimm, uint8_t channel, uint32_t dimm)
 	    (uint32_t)nb_dimm->manufacture_week,
 	    nb_dimm->serial_number);
 	(void) nvlist_add_string(newdimm, FM_FMRI_HC_SERIAL_ID, sbuf);
-	if (nb_dimm->part_number && nb_dimm->part_number[0]) {
+	if (nb_dimm->part_number[0] != '\0') {
 		t = sizeof (nb_dimm->part_number);
 		(void) strncpy(sbuf, nb_dimm->part_number, t);
 		sbuf[t] = 0;
 		(void) nvlist_add_string(newdimm, FM_FMRI_HC_PART, sbuf);
 	}
-	if (nb_dimm->revision && nb_dimm->revision[0]) {
+	if (nb_dimm->revision[0] != '\0') {
 		t = sizeof (nb_dimm->revision);
 		(void) strncpy(sbuf, nb_dimm->revision, t);
 		sbuf[t] = 0;
