@@ -654,7 +654,7 @@ vr_bus_config(vr_t *vrp)
 	 * entry of the info structures. This is a generic Rhine whith no
 	 * bugs and no features.
 	 */
-	if (vrp->chip.info.name == NULL) {
+	if (vrp->chip.info.name[0] == '\0') {
 		bcopy((void*)&vr_chip_info[0],
 		    (void*) &vrp->chip.info,
 		    sizeof (chip_info_t));
@@ -3404,7 +3404,7 @@ vr_mac_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
  */
 int
 vr_mac_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
-	uint_t pr_valsize, const void *pr_val)
+    uint_t pr_valsize, const void *pr_val)
 {
 	vr_t		*vrp;
 	uint32_t	err;
@@ -3618,7 +3618,7 @@ void
 #endif	/* DEBUG */
 
 DDI_DEFINE_STREAM_OPS(vr_dev_ops, nulldev, nulldev, vr_attach, vr_detach,
-nodev, NULL, D_MP, NULL, vr_quiesce);
+    nodev, NULL, D_MP, NULL, vr_quiesce);
 
 static struct modldrv vr_modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
