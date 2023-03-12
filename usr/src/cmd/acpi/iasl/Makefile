@@ -129,6 +129,9 @@ $(YACC_C_FILES:.c=.o) := CERRWARN += -_gcc=-Wno-char-subscripts
 
 OBJS += $(LEX_C_FILES:.c=.o) $(YACC_C_FILES:.c=.o)
 
+# We are using stack pointer value there
+utdebug.o := CERRWARN += -_gcc=-Wno-dangling-pointer
+
 GM4FLAGS = -P
 LFLAGS = -i -s
 

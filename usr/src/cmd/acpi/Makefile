@@ -19,7 +19,6 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 _msg:=          TARGET= catalog
 
 
@@ -36,8 +35,6 @@ install: $(SUBDIRS)
 clean: $(SUBDIRS)
 
 clobber: $(SUBDIRS)
-
-lint:
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
