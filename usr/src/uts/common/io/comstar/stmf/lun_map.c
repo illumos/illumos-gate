@@ -273,7 +273,7 @@ stmf_session_prepare_report_lun_data(stmf_lun_map_t *sm)
 
 	ent = 0;
 
-	buf = &(xd->buf[0]);
+	buf = (uchar_t *)xd + offsetof(stmf_xfer_data_t, buf);
 	for (i = 0; ((i < sm->lm_nentries) && (ent < nluns)); i++) {
 		if (sm->lm_plus[i] == NULL)
 			continue;
