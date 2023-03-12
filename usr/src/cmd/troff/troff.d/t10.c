@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -582,8 +582,9 @@ newpage(n)	/* called at end of each output page (we hope) */
 		return (0);
 	fdprintf(ptid, "p%d\n", n);	/* new page */
 	for (i = 0; i <= nfonts; i++)
-		if (fontbase[i]->namefont && fontbase[i]->namefont[0])
-			fdprintf(ptid, "x font %d %s\n", i, fontbase[i]->namefont);
+		if (fontbase[i]->namefont[0] != '\0')
+			fdprintf(ptid, "x font %d %s\n", i,
+			    fontbase[i]->namefont);
 	ptps();
 	ptfont();
 
