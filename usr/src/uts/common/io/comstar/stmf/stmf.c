@@ -3869,7 +3869,7 @@ stmf_remove_rport_info(stmf_scsi_session_t *ss,
 	mutex_enter(irport->irport_kstat_info->ks_lock);
 	knp = KSTAT_NAMED_PTR(irport->irport_kstat_info);
 	for (i = 0; i < STMF_KSTAT_RPORT_DATAMAX; i++, knp++) {
-		if ((knp->name != NULL) && (strcmp(knp->name, prop_name) == 0))
+		if (strcmp(knp->name, prop_name) == 0)
 			break;
 	}
 
