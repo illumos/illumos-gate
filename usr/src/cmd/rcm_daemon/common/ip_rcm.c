@@ -1407,8 +1407,7 @@ ip_log_err(ip_cache_t *node, char **errorp, char *errmsg)
 	const char *errfmt;
 	char *error = NULL;
 
-	if ((node != NULL) && (node->ip_pif != NULL) &&
-	    (node->ip_pif->pi_ifname != NULL)) {
+	if (node != NULL && node->ip_pif != NULL) {
 		ifname = node->ip_pif->pi_ifname;
 	}
 
