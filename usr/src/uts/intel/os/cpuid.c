@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  * Copyright 2020 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2022 MNX Cloud, Inc.
  */
 /*
@@ -4138,6 +4138,22 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 			add_x86_feature(featureset, X86FSET_XSAVEC);
 		if (ecp->cp_eax & CPUID_INTC_EAX_D_1_XSAVES)
 			add_x86_feature(featureset, X86FSET_XSAVES);
+
+		/*
+		 * Zen 2 family processors suffer from erratum 1386 that causes
+		 * xsaves to not function correctly in some circumstances. There
+		 * are no supervisor states in Zen 2 and earlier. Practically
+		 * speaking this has no impact for us as we currently do not
+		 * leverage compressed xsave formats. To safeguard against
+		 * issues in the future where we may opt to using it, we remove
+		 * it from the feature set now. While Matisse has a microcode
+		 * update available with a fix, not all Zen 2 CPUs do so it's
+		 * simpler for the moment to unconditionally remove it.
+		 */
+		if (cpi->cpi_vendor == X86_VENDOR_AMD &&
+		    uarchrev_uarch(cpi->cpi_uarchrev) <= X86_UARCH_AMD_ZEN2) {
+			remove_x86_feature(featureset, X86FSET_XSAVES);
+		}
 	}
 
 	/*
