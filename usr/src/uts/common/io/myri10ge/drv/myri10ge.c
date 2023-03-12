@@ -4052,8 +4052,7 @@ myri10ge_info_init(struct myri10ge_priv *mgp)
 	ksp->ks_lock = &myri10ge_info_template_lock;
 	if (MYRI10GE_VERSION_STR != NULL)
 		ksp->ks_data_size += strlen(MYRI10GE_VERSION_STR) + 1;
-	if (mgp->fw_version != NULL)
-		ksp->ks_data_size += strlen(mgp->fw_version) + 1;
+	ksp->ks_data_size += strlen(mgp->fw_version) + 1;
 	ksp->ks_data_size += strlen(mgp->fw_name) + 1;
 	ksp->ks_data_size += strlen(mgp->intr_type) + 1;
 	if (mgp->pc_str != NULL)
