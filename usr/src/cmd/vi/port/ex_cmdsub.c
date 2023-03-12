@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
@@ -278,7 +278,7 @@ join(int c)
 gotprev:
 					if (!isascii(wc2 = *cp1)) {
 						if (mbtowc(&wc2, (char *) cp1,
-					    		   MB_CUR_MAX) <= 0)
+						    MB_CUR_MAX) <= 0)
 							goto mberror;
 					}
 					delim = (*wddlm)(wc1,wc2,2);
@@ -1230,7 +1230,7 @@ undo(bool c)
 	pkill[0] = pkill[1] = 0;
 	change();
 	if (undkind == UNDMOVE) {
- 		/*
+		/*
 		 * Command to be undone is a move command.
 		 * This is handled as a special case by noting that
 		 * a move "a,b m c" can be inverted by another move.
@@ -1271,7 +1271,7 @@ undo(bool c)
 		 *
 		 * Assume the editor has:
 		 *
-		 * 	cursor is on 'c'
+		 *	cursor is on 'c'
 		 *
 		 *	(just change lines 5-8)
 		 *
@@ -1517,6 +1517,7 @@ mapcmd(int un, int ab)
 	int c;		/* char --> int */
 	unsigned char *dname;
 	struct maps *mp;	/* the map structure we are working on */
+	unsigned char funkey[3];
 
 	mp = ab ? abbrevs : exclam() ? immacs : arrows;
 	if (skipend()) {
@@ -1585,7 +1586,6 @@ mapcmd(int un, int ab)
 	if (lhs[0] == '#') {
 		unsigned char *fnkey;
 		unsigned char *fkey();
-		unsigned char funkey[3];
 
 		fnkey = fkey(lhs[1] - '0');
 		funkey[0] = 'f'; funkey[1] = lhs[1]; funkey[2] = 0;
