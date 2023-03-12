@@ -209,7 +209,7 @@ __rdsv3_conn_create(uint32_be_t laddr, uint32_be_t faddr,
 	RDSV3_DPRINTF2("__rdsv3_conn_create",
 	    "allocated conn %p for %u.%u.%u.%u -> %u.%u.%u.%u over %s %s",
 	    conn, NIPQUAD(laddr), NIPQUAD(faddr),
-	    trans->t_name ? trans->t_name : "[unknown]",
+	    *trans->t_name != '\0' ? trans->t_name : "[unknown]",
 	    is_outgoing ? "(outgoing)" : "");
 
 	/*
