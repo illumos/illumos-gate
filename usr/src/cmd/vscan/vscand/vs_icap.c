@@ -147,9 +147,9 @@ vs_resp_msg_t icap_resp[] = {
 	{ VS_RESP_NOT_FOUND,		"URI not found"},
 	{ VS_RESP_NOT_ALLOWED,		"Method not allowed"},
 	{ VS_RESP_TIMEOUT,		"Request timedout"},
-	{ VS_RESP_INTERNAL_ERR,    	"Internal server error"},
+	{ VS_RESP_INTERNAL_ERR,		"Internal server error"},
 	{ VS_RESP_NOT_IMPL,		"Method not implemented"},
-	{ VS_RESP_SERV_UNAVAIL,    	"Service unavailable/overloaded"},
+	{ VS_RESP_SERV_UNAVAIL,		"Service unavailable/overloaded"},
 	{ VS_RESP_ICAP_VER_UNSUPP,	"ICAP version not supported"},
 	{ VS_RESP_SCAN_ERR,		"Error scanning file"},
 	{ VS_RESP_NO_LICENSE,		"No AV License"},
@@ -298,7 +298,7 @@ vs_icap_scan_file(vs_eng_ctx_t *eng, char *devname, char *fname,
 
 
 /* ********************************************************************* */
-/* 			Local Function definitions			 */
+/*			Local Function definitions			 */
 /* ********************************************************************* */
 
 /*
@@ -863,9 +863,8 @@ vs_icap_set_scan_result(vs_scan_ctx_t *ctx)
 	int i;
 	vs_result_t *result = ctx->vsc_result;
 
-	if (!result->vsr_scanstamp)
-		(void) strlcpy(result->vsr_scanstamp,
-		    ctx->vsc_options.vso_scanstamp, sizeof (vs_scanstamp_t));
+	(void) strlcpy(result->vsr_scanstamp,
+	    ctx->vsc_options.vso_scanstamp, sizeof (vs_scanstamp_t));
 
 	switch (ctx->vsc_info.vsi_icap_rc) {
 	case VS_RESP_NO_CONT_NEEDED:
@@ -1130,7 +1129,7 @@ vs_icap_read_body_chunk(vs_scan_ctx_t *ctx)
 
 
 /* *********************************************************************** */
-/* 			Utility read, write functions			   */
+/*			Utility read, write functions			   */
 /* *********************************************************************** */
 
 /*
@@ -1307,7 +1306,7 @@ vs_icap_readline(vs_scan_ctx_t *ctx, char *buf, int buflen)
 
 
 /* ************************************************************************ */
-/* 				HEADER processing			    */
+/*				HEADER processing			    */
 /* ************************************************************************ */
 
 /*
