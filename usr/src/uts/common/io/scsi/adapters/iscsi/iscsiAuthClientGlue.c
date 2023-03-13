@@ -58,12 +58,6 @@ iscsiAuthClientChapAuthRequest(IscsiAuthClient *client,
 	/*
 	 * the expected credentials are in the session
 	 */
-	if (isp->sess_auth.username_in == NULL) {
-		cmn_err(CE_WARN, "iscsi session(%u) failed authentication, "
-		    "no incoming username configured to authenticate target",
-		    isp->sess_oid);
-		return (iscsiAuthStatusFail);
-	}
 	if (strcmp(username, isp->sess_auth.username_in) != 0) {
 		cmn_err(CE_WARN, "iscsi session(%u) failed authentication, "
 		    "received incorrect username from target",
@@ -146,7 +140,6 @@ iscsiAuthClientChapAuthRequest(IscsiAuthClient *client,
 	} else {
 		/* Use target secret (if defined) to authenticate target */
 		if ((isp->sess_auth.password_length_in < 1) ||
-		    (isp->sess_auth.password_in == NULL) ||
 		    (isp->sess_auth.password_in[0] == '\0')) {
 			/* No target secret defined - invalid condition */
 			return (iscsiAuthStatusFail);
