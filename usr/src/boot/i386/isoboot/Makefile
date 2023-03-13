@@ -50,6 +50,8 @@ LIBSTAND=	../../libsa/$(MACH)/libsa.a
 gptldr.out := LD_FLAGS += $(GLDTARGET)
 
 isoboot.o := SMOFF += unreachable
+cons.o := CFLAGS += -_gcc14=--param=min-pagesize=0
+isoboot.o := CFLAGS += -_gcc14=--param=min-pagesize=0
 
 include ../Makefile.inc
 

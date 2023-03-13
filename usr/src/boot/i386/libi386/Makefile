@@ -96,6 +96,8 @@ CPPFLAGS += -I$(PNGLITE)
 SRCS +=	$(COMMON)/gfx_fb.c $(PNGLITE)/pnglite.c
 OBJS +=	gfx_fb.o pnglite.o
 
+biosacpi.o := CFLAGS += -_gcc14=--param=min-pagesize=0
+biosdisk.o := CFLAGS += -_gcc14=--param=min-pagesize=0
 gfx_fb.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR) -I$(LZ4)
 pnglite.o := CPPFLAGS += -I$(ZLIB)
 
