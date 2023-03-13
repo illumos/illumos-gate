@@ -42,6 +42,7 @@
 #include <efi.h>
 #include <efilib.h>
 #include <efigpt.h>
+#include <efichar.h>
 
 #include <uuid.h>
 
@@ -977,10 +978,59 @@ main(int argc, CHAR16 *argv[])
 
 COMMAND_SET(reboot, "reboot", "reboot the system", command_reboot);
 
-static int
-command_reboot(int argc __unused, char *argv[] __unused)
+static void
+fw_setup(void)
 {
-	int i;
+	uint64_t os_indications;
+	size_t size;
+	EFI_STATUS status;
+
+	size = sizeof (os_indications);
+	status = efi_global_getenv("OsIndicationsSupported",
+	    &os_indications, &size);
+	if (EFI_ERROR(status) || size != sizeof (os_indications) ||
+	    (os_indications & EFI_OS_INDICATIONS_BOOT_TO_FW_UI) == 0) {
+		printf("Booting to Firmware UI is not supported in "
+		    "this system.");
+		for (int i = 0; i < 3; i++) {
+			delay(1000 * 1000); /* 1 second */
+			if (ischar())
+				break;
+		}
+		return;
+	}
+
+	os_indications = EFI_OS_INDICATIONS_BOOT_TO_FW_UI;
+
+	status = efi_global_setenv("OsIndications", &os_indications,
+	    sizeof (os_indications));
+}
+
+static int
+command_reboot(int argc, char *argv[])
+{
+	int i, ch;
+	bool fw = false;
+
+	optind = 1;
+	optreset = 1;
+
+	while ((ch = getopt(argc, argv, "fh")) != -1) {
+		switch (ch) {
+		case 'f':
+			fw = true;
+			break;
+		case 'h':
+			printf("Usage: reboot [-f]\n");
+			return (CMD_OK);
+		case '?':
+		default:
+			return (CMD_OK);
+		}
+	}
+
+	if (fw || getenv("BOOT_TO_FW_UI") != NULL)
+		fw_setup();
 
 	for (i = 0; devsw[i] != NULL; ++i)
 		if (devsw[i]->dv_cleanup != NULL)

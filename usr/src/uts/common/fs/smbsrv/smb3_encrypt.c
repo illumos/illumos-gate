@@ -86,9 +86,6 @@ smb3_encrypt_init_mech(smb_session_t *s)
 	if (s->enc_mech != NULL)
 		return (0);
 
-	if (s->dialect < SMB_VERS_3_11)
-		s->smb31_enc_cipherid = SMB3_CIPHER_AES128_CCM;
-
 	mech = kmem_zalloc(sizeof (*mech), KM_SLEEP);
 
 	switch (s->smb31_enc_cipherid) {

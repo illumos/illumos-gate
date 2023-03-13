@@ -1103,7 +1103,6 @@ smb_tree_getattr(const smb_kshare_t *si, smb_node_t *node, smb_tree_t *tree)
 {
 	vfs_t *vfsp = SMB_NODE_VFS(node);
 	vfs_t *realvfsp;
-	smb_cfg_val_t srv_encrypt;
 
 	ASSERT(vfsp);
 
@@ -1126,17 +1125,9 @@ smb_tree_getattr(const smb_kshare_t *si, smb_node_t *node, smb_tree_t *tree)
 		smb_tree_get_flags(si, vfsp, tree);
 	}
 
-	srv_encrypt = tree->t_session->s_server->sv_cfg.skc_encrypt;
-	if (tree->t_session->dialect >= SMB_VERS_3_0) {
-		if (si->shr_encrypt == SMB_CONFIG_REQUIRED ||
-		    srv_encrypt == SMB_CONFIG_REQUIRED)
-			tree->t_encrypt = SMB_CONFIG_REQUIRED;
-		else if (si->shr_encrypt == SMB_CONFIG_ENABLED ||
-		    srv_encrypt == SMB_CONFIG_ENABLED)
-			tree->t_encrypt = SMB_CONFIG_ENABLED;
-		else
-			tree->t_encrypt = SMB_CONFIG_DISABLED;
-	} else
+	if (tree->t_session->dialect >= SMB_VERS_3_0)
+		tree->t_encrypt = si->shr_encrypt;
+	else
 		tree->t_encrypt = SMB_CONFIG_DISABLED;
 
 	return (0);

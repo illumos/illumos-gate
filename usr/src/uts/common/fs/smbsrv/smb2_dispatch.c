@@ -257,34 +257,43 @@ smb2_tq_work(void *arg)
 	smb_srqueue_runq_exit(srq);
 }
 
+/*
+ * Any non-zero return code and we'll drop the connection.
+ * Other than that, return codes are just informative eg.
+ * when looking at dtrace logs, which return did we take?
+ */
 static int
 smb3_decrypt_msg(smb_request_t *sr)
 {
 	int save_offset;
 
 	if (sr->session->dialect < SMB_VERS_3_0) {
-		cmn_err(CE_WARN, "encrypted message in SMB 2.x");
+		/* Encrypted message in SMB 2.x */
 		return (-1);
+	}
+	if ((sr->session->srv_cap & SMB2_CAP_ENCRYPTION) == 0) {
+		/* Should have srv_cap SMB2_CAP_ENCRYPTION flag set! */
+		return (-2);
 	}
 
 	sr->encrypted = B_TRUE;
 	save_offset = sr->command.chain_offset;
 	if (smb3_decode_tform_header(sr) != 0) {
-		cmn_err(CE_WARN, "bad transform header");
-		return (-1);
+		/* Bad transform header */
+		return (-3);
 	}
 	sr->command.chain_offset = save_offset;
 
 	sr->tform_ssn = smb_session_lookup_ssnid(sr->session,
 	    sr->smb3_tform_ssnid);
 	if (sr->tform_ssn == NULL) {
-		cmn_err(CE_WARN, "transform header: session not found");
-		return (-1);
+		/* Session not found */
+		return (-4);
 	}
 
 	if (smb3_decrypt_sr(sr) != 0) {
-		cmn_err(CE_WARN, "smb3 decryption failed");
-		return (-1);
+		/* Decryption failed */
+		return (-5);
 	}
 
 	return (0);
@@ -700,9 +709,7 @@ cmd_start:
 			 * Note that Session.EncryptData can only be TRUE when
 			 * we're talking 3.x.
 			 */
-
-			if (sr->uid_user->u_encrypt ==
-			    SMB_CONFIG_REQUIRED &&
+			if (sr->uid_user->u_encrypt == SMB_CONFIG_REQUIRED &&
 			    !sr->encrypted) {
 				smb2sr_put_error(sr,
 				    NT_STATUS_ACCESS_DENIED);

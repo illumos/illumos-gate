@@ -1,31 +1,25 @@
+/*
+ *
+ * Copyright (c)  1999 - 2002 Intel Corporation. All rights reserved
+ * This software and associated documentation (if any) is furnished
+ * under a license and may only be used or copied in accordance
+ * with the terms of the license. Except as permitted by such
+ * license, no part of this software or documentation may be
+ * reproduced, stored in a retrieval system, or transmitted in any
+ * form or by any means without the express written consent of
+ * Intel Corporation.
+ *
+ * Module Name:
+ *
+ *  efiapi.h
+ *
+ * Abstract:
+ *
+ *  Global EFI runtime & boot service interfaces
+ */
+
 #ifndef _EFI_API_H
 #define _EFI_API_H
-
-/*++
-
-Copyright (c)  1999 - 2002 Intel Corporation. All rights reserved
-This software and associated documentation (if any) is furnished
-under a license and may only be used or copied in accordance
-with the terms of the license. Except as permitted by such
-license, no part of this software or documentation may be
-reproduced, stored in a retrieval system, or transmitted in any
-form or by any means without the express written consent of
-Intel Corporation.
-
-Module Name:
-
-    efiapi.h
-
-Abstract:
-
-    Global EFI runtime & boot service interfaces
-
-
-
-
-Revision History
-
---*/
 
 //
 // EFI Specification Revision
@@ -227,6 +221,21 @@ VOID
 
 // Variable size limitation
 #define EFI_MAXIMUM_VARIABLE_SIZE           1024
+
+// OsIndications
+#define	EFI_OS_INDICATIONS_BOOT_TO_FW_UI	0x0000000000000001
+#define	EFI_OS_INDICATIONS_TIMESTAMP_REVOCATION	0x0000000000000002
+#define	EFI_OS_INDICATIONS_FILE_CAPSULE_DELIVERY_SUPPORTED	\
+						0x0000000000000004
+#define	EFI_OS_INDICATIONS_FMP_CAPSULE_SUPPORTED		\
+						0x0000000000000008
+#define	EFI_OS_INDICATIONS_CAPSULE_RESULT_VAR_SUPPORTED		\
+						0x0000000000000010
+#define	EFI_OS_INDICATIONS_START_OS_RECOVERY	0x0000000000000020
+#define	EFI_OS_INDICATIONS_START_PLATFORM_RECOVERY		\
+						0x0000000000000040
+#define	EFI_OS_INDICATIONS_JSON_CONFIG_DATA_REFRESH		\
+						0x0000000000000080
 
 typedef
 EFI_STATUS
@@ -1179,4 +1188,4 @@ typedef struct _EFI_SYSTEM_TABLE {
 #define LZMA_COMPRESS_GUID \
 { 0xee4e5898, 0x3914, 0x4259, {0x9d, 0x6e, 0xdc, 0x7b, 0xd7, 0x94, 0x03, 0xcf} }
 
-#endif
+#endif /* _EFI_API_H */
