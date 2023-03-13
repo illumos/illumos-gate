@@ -315,7 +315,7 @@ xdr_decode_nfs_fh3(XDR *xdrs, nfs_fh3 *objp)
  */
 bool_t
 xdr_inline_encode_nfs_fh3(uint32_t **ptrp, uint32_t *ptr_redzone,
-	nfs_fh3 *fhp)
+    nfs_fh3 *fhp)
 {
 	uint32_t *ptr = *ptrp;
 	uchar_t *cp;
@@ -468,8 +468,7 @@ xdr_nfs_fh3_server(XDR *xdrs, nfs_fh3 *objp)
 	case XDR_DECODE:
 		return (xdr_decode_nfs_fh3(xdrs, objp));
 	case XDR_FREE:
-		if (objp->fh3_u.data != NULL)
-			bzero(objp->fh3_u.data, sizeof (objp->fh3_u.data));
+		bzero(objp->fh3_u.data, sizeof (objp->fh3_u.data));
 		return (TRUE);
 	}
 	return (FALSE);
@@ -558,7 +557,7 @@ xdr_fattr3(XDR *xdrs, fattr3 *na)
 	    xdr_u_int(xdrs, &na->mtime.nseconds) &&
 	    xdr_u_int(xdrs, &na->ctime.seconds) &&
 	    xdr_u_int(xdrs, &na->ctime.nseconds)))
-			return (FALSE);
+		return (FALSE);
 	return (TRUE);
 }
 
