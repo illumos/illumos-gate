@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd "Feb 18, 2015"
+.Dd "March 10, 2023"
 .Dt MAN 7
 .Os
 .Sh NAME
@@ -73,14 +73,14 @@ Change to default type size.
 * n.t.l. = next text line; p.i. = prevailing indent
 .Bl -column ".TH n s d f m" "Cause " "t=n.t.l.*" "Explanation " -offset Ds
 .It Sy Request	Sy Cause	Sy "If No"	Sy Explanation
-.It ""	Sy Break 	Sy "Argument"	""
-.It Nm \&.B Ar "t"	no 	Ar t Ns =n.t.l.*	Text is in bold font.
+.It ""	Sy Break	Sy "Argument"	""
+.It Nm \&.B Ar "t"	no	Ar t Ns =n.t.l.*	Text is in bold font.
 .It Nm \&.BI Ar t	no	Ar t Ns =n.t.l.	Join words, alternating bold and italic.
 .It Nm \&.BR Ar t	no	Ar t Ns =n.t.l.	Join words, alternating bold and roman.
 .It Nm \&.DT	no	Li \&.5i 1i...	Restore default tabs.
 .It Nm \&.HP Ar i	yes	Ar i Ns =p.i.*	"Begin paragraph with hanging indent. Set prevailing indent to" Ar i .
 .It Nm \&.I Ar t	no	Ar t Ns =n.t.l.	Text is italic.
-.It Nm \&.IB Ar t	no	Ar t Ns =n.t.l.	Join words, altenrating italic and bold.
+.It Nm \&.IB Ar t	no	Ar t Ns =n.t.l.	Join words, alternating italic and bold.
 .It Nm \&.IP Ar x Ar i	yes	Ar x Ns =""	Same as
 .Nm \&.TP
 with tag

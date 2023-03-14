@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USBFTDI 4D "Aug 13, 2021"
+.TH USBFTDI 4D "March 10, 2023"
 .SH NAME
 usbftdi \- FTDI USB to serial converter driver
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <fcntl.h>\fR
 \fB#include <sys/termio.h>\fR
@@ -15,16 +14,12 @@ usbftdi \- FTDI USB to serial converter driver
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBusbftdi\fR driver is a loadable STREAMS and USBA (Solaris USB
 Architecture) compliant client driver that provides basic asynchronous
 communication support for FTDI USB-to-serial converters. Serial device streams
 are built with appropriate modules that are pushed atop the \fBusbftdi\fR
 driver by the \fBautopush\fR(8) facility.
 .SS "Application Programming Interface"
-.sp
-.LP
 The \fBusbftdi\fR module supports the \fBtermio\fR(4I) device control functions
 specified by flags in the \fBc_cflag\fR word of the \fBtermios\fR structure,
 and by the \fBIGNBRK, IGNPAR, PARMRK\fR, and \fBINPCK\fR flags in the
@@ -54,8 +49,6 @@ Input and output line speeds can be set to the following baud rates: 300, 600,
 independently. For example, when the output speed is set, the input speed is
 automatically set to the same speed.
 .SS "Soft Carrier Capabilities"
-.sp
-.LP
 Many devices that use this USB serial interface component are not, in fact
 dial-in lines connected to carefully configured RS-232 modems. They are often
 intelligent peripherals whose manufacturers want to present a serial port
@@ -80,11 +73,9 @@ selected by either unsetting (commenting out) the \fBignore-cd\fR property, or
 by setting the value of the property to zero.
 .sp
 .LP
-More sophisticated selection of which devicesl ignore or obey the DCD signal
+More sophisticated selection of which devices ignore or obey the DCD signal
 can be effected using \fBport-%d-ignore-cd\fR properties.
 .SS "Dial-In and Dial-Out Support"
-.sp
-.LP
 A related feature is available for traditional usage that enables a single tty
 line to be connected to a modem and used for incoming and outgoing calls. By
 accessing through device logical name \fB/dev/cua/[0-9]*\fR, you can open a
@@ -112,8 +103,6 @@ This allows a modem and port to be used for dial-in (enabling the line for
 login in \fB/etc/inittab\fR) or dial-out (using \fBtip\fR(1) or \fBuucp\fR(1C))
 when no-one is logged in on the line.
 .SH ERRORS
-.sp
-.LP
 An \fBopen()\fR fails under the following conditions:
 .sp
 .ne 2
@@ -155,7 +144,6 @@ USB device I/O error.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/kernel/drv/usbftdi\fR\fR
@@ -216,8 +204,6 @@ Dial-in tty lines
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for a description of the following attribute:
 .sp
 
@@ -232,15 +218,11 @@ Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBstrconf\fR(1), \fBtip\fR(1), \fBuucp\fR(1C), \fBautopush\fR(8),
 \fBeeprom\fR(8), \fBioctl\fR(2), \fBopen\fR(2), \fBtermios\fR(3C),
 \fBusba\fR(4D), \fBtermio\fR(4I), \fBldterm\fR(4M), \fBttcompat\fR(4M),
 \fBeeprom\fR(8), \fBattributes\fR(7),
 .SH DIAGNOSTICS
-.sp
-.LP
 In addition to being logged, the following messages might appear on the system
 console. All messages are formatted in the following manner:
 .sp

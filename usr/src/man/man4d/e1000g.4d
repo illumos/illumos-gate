@@ -12,7 +12,7 @@
 .\" Copyright 2020 Robert Mustacchi
 .\" Copyright 2022 Oxide Computer Company
 .\"
-.Dd January 17, 2022
+.Dd March 10, 2023
 .Dt E1000G 4D
 .Os
 .Sh NAME
@@ -24,7 +24,7 @@
 The
 .Nm
 driver is a GLDv3 NIC driver for Intel 1 Gigabit Ethernet devices which
-are often found as discrete PCI and PCI expresss add-on-cards and built
+are often found as discrete PCI and PCI express add-on-cards and built
 into many Intel chipsets and platforms.
 .Pp
 On most models, the device driver supports transmit and receive

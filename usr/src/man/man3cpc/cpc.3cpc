@@ -4,7 +4,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2019, Joyent, Inc.
 .\" Copyright 2021 Oxide Computer Company
-.Dd July 26, 2021
+.Dd March 10, 2023
 .Dt CPC 3CPC
 .Os
 .Sh NAME
@@ -43,17 +43,18 @@ The following configuration interfaces are provided:
 .Bl -tag -width Xr
 .It Xr cpc_open 3CPC
 Check the version the application was compiled with against the version of the
+library available at runtime.
 .It Xr cpc_cciname 3CPC
 Return a printable string to describe the performance counters of the
 processor.
 .It Xr cpc_npic 3CPC
 Return the number of performance counters on the processor.
-.It cpc_cpuref 3CPC
+.It Xr cpc_cpuref 3CPC
 Return a reference to documentation that should be consulted to understand how
 to use and interpret data from the performance counters.
 .El
 .Ss Performance Counter Access
-Performance counters can be present in hardware but not acccessible because
+Performance counters can be present in hardware but not accessible because
 either some of the necessary system software components are not available or
 not installed, or the counters might be in use by other processes.
 The
@@ -102,7 +103,7 @@ Intel Goldmont Plus SoC events; covers model 7ah.
 Intel Haswell client events; covers models 46h, 45h, and 3ch.
 .It Xr hsx_events 3CPC
 Intel Haswell server events; covers model 3fh.
-.It xr icl_events 3CPC
+.It Xr icl_events 3CPC
 Intel Ice Lake client events; covers model 7eh.
 .It Xr ivb_events 3CPC
 Intel Ivy Bridge client events; covers model 3ah.

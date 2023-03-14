@@ -17,7 +17,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd November 29, 2021
+.Dd March 10, 2023
 .Dt DEV 4FS
 .Os
 .Sh NAME
@@ -31,7 +31,7 @@ The global zone's instance of the
 .Nm
 filesystem is mounted during boot on
 .Pa /dev .
-This filesystem is colloqiually called
+This filesystem is colloquially called
 .Sq sdev
 as a way to distinguish it from the
 .Xr devfs 4FS

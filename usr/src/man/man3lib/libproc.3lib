@@ -13,7 +13,7 @@
 .\" Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd October 31, 2020
+.Dd March 10, 2023
 .Dt LIBPROC 3LIB
 .Os
 .Sh NAME
@@ -1094,7 +1094,7 @@ While the library is considered an uncommitted interface, and is still
 evolving, changes that break compatibility have been uncommon and this
 trend is expected to continue.
 It is documented to allow consumers, whether part of illumos or outside of it,
-to understand the libarary and make use of it with the understanding that
+to understand the library and make use of it with the understanding that
 changes may occur which break both source and binary compatibility.
 .Sh SEE ALSO
 .Xr gcore 1 ,

@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IPQOSCONF 8 "Dec 18, 2008"
+.TH IPQOSCONF 8 "March 10, 2023"
 .SH NAME
 ipqosconf \- configure the IPQoS facility
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/ipqosconf\fR
 .fi
@@ -38,8 +37,6 @@ ipqosconf \- configure the IPQoS facility
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBipqosconf\fR utility configures the Quality of Service facility of the
 Internet Protocol (\fBIP\fR). Only superusers can use this command.
 .sp
@@ -53,8 +50,6 @@ every time that the machine reboots. To apply the configuration early in the
 boot phase, you can populate the \fB/etc/inet/ipqosinit.conf\fR file, which is
 then read from the \fBsvc:/network/initial:default\fR service.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -132,14 +127,10 @@ as well as the console.
 .RE
 
 .SH CONFIGURATION FILE
-.sp
-.LP
 The configuration file is composed of a format version and a succession of
 configuration (action) blocks. There are different configuration blocks for
 each type of action that is being configured.
 .SS "Format Version"
-.sp
-.LP
 The first line of the configuration file specifies the format version contained
 in the configuration file.
 .sp
@@ -157,8 +148,6 @@ fmt_version \fIx\fR.\fIx\fR
 where \fIx\fR.\fIx\fR is the format version. \fB1.0\fR is the only supported
 version.
 .SS "Configuration Blocks"
-.sp
-.LP
 Following the format version, are a succession of configuration (action) blocks
 that are different for each type of action being configured. A configuration
 block always has the following structure:
@@ -189,8 +178,6 @@ prm_name_value   ::= \fIparam_name\fR \fIparam_value\fR
 .sp
 
 .SS "Modules"
-.sp
-.LP
 The \fIparam_name\fR and the types of \fIparam_value\fR are specific to a given
 module.
 .sp
@@ -384,7 +371,6 @@ max_limit        uint32
 .sp
 
 .SS "Types"
-.sp
 .ne 2
 .na
 \fB\fIaction\fR\fR
@@ -505,8 +491,6 @@ Either a valid user ID or username for the system that is being configured.
 .RE
 
 .SS "Parameters"
-.sp
-.LP
 The configuration file can contain the following parameters
 .sp
 .ne 2
@@ -676,7 +660,7 @@ parameter is of type \fBifname\fR.
 This parameter is of type \fBenum\fR and has valid values of \fBV4\fR and
 \fBV6\fR.
 .sp
-If it is set to \fBV4\fR only then only \fBipv4\fRaddresses are requested for a
+If it is set to \fBV4\fR only then only \fBipv4\fR addresses are requested for a
 specified hostname. If it is set to \fBV6\fR, only \fBipv6\fR addresses are
 returned if there are any, otherwise \fBv4\fR mapped \fBv6\fR addresses are
 returned. If both \fBV4\fR and \fBV6\fR are specified, or if \fBip_version\fR
@@ -842,11 +826,8 @@ The action to be executed for packets that are determined to be yellow.
 .RE
 
 .SH SECURITY
-.sp
-.LP
 None.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSending All Traffic From eng to the AF 1 Class of Service
 .sp
 .LP
@@ -972,7 +953,6 @@ action {
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/inet/ipqosinit.conf\fR\fR
@@ -1015,8 +995,6 @@ given user priority
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -1031,8 +1009,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR syslog (3C),
 .BR getipnodebyname (3SOCKET),
 .BR getprotobyname (3SOCKET),
@@ -1046,8 +1022,6 @@ Interface Stability	Evolving
 .BR tswtclmt (4IPP),
 .BR attributes (7)
 .SH DIAGNOSTICS
-.sp
-.LP
 \fBipqosconf\fR sends messages to \fBsyslog\fR of facility user, severity
 notice when any changes are made to the \fBIPQoS\fR configuration.
 .sp
@@ -1056,5 +1030,5 @@ Errors that occur during an \fBipqosconf\fR operation send an error message to
 the console by default. For the application of a new configuration if the
 \fB-s\fR option is set then these messages are sent to \fBsyslog\fR as facility
 user, severity error instead. If the \fB-v\fR option is present during an
-application then all error and change notificationmessages are sent to the
+application then all error and change notification messages are sent to the
 console as well as their default destination.

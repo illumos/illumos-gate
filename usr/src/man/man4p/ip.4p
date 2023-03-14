@@ -6,7 +6,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IP 4P "Sep 18, 2020"
+.TH IP 4P "March 10, 2023"
 .SH NAME
 ip, IP \- Internet Protocol
 .SH SYNOPSIS
@@ -66,7 +66,7 @@ Options and IHL fields are set by use of \fBIP_OPTIONS\fR, and \fBTotal
 Length\fR is updated to include any options. Version is set to the default.
 Identification is chosen by the normal IP ID selection logic. The source
 address is updated if none was specified and the TTL is changed if the packet
-has a broadcast destination address. Since an applicaton cannot send down
+has a broadcast destination address. Since an application cannot send down
 fragments (as IP assigns the IP ID), Fragment Offset is always 0. The IP
 Checksum field is computed by IP. None of the data beyond the IP header are
 changed, including the application-provided transport header.
@@ -544,7 +544,7 @@ by IP back up to the user process.
 .LP
 Multi-Data Transmit allows more than one packet to be sent from the IP module
 to another in a given call, thereby reducing the per-packet processing costs.
-The behavior of Multi-Data Transmit can be overrideen by using \fBndd\fR(8) to
+The behavior of Multi-Data Transmit can be overridden by using \fBndd\fR(8) to
 set the \fB/dev/ip\fR variable, ip_multidata_outbound to 0. Note, the IP module
 will only initiate Multi-Data Transmit if the network interface driver supports
 it.

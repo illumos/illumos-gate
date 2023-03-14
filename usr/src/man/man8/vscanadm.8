@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VSCANADM 8 "Jul 7, 2009"
+.TH VSCANADM 8 "March 10, 2023"
 .SH NAME
 vscanadm \- vscan service configuration utility
 .SH SYNOPSIS
-.LP
 .nf
 \fBvscanadm\fR \fBset\fR \fB-p\fR \fIproperty\fR=\fIvalue\fR [\fB-p\fR \fIproperty\fR=\fIvalue\fR]...
 .fi
@@ -63,8 +62,6 @@ vscanadm \- vscan service configuration utility
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBvscanadm\fR command sets and displays properties of the \fBvscan\fR
 service, \fBvscand\fR(8), and provides scan statistics.
 .sp
@@ -87,8 +84,6 @@ The \fBvscan\fR service properties are divided into two categories: scan engine
 properties, which are specific to a scan engine definition, and general
 properties, which apply to the service and are not scan engine-specific.
 .SH SUBCOMMANDS
-.sp
-.LP
 \fBvscanadm\fR recognizes the following subcommands:
 .sp
 .ne 2
@@ -238,10 +233,10 @@ The following properties are available for the \fBvscanadm import\fR,
 A comma-separated list of file type extension matching rules. This list defines
 which types of files are scanned and which should be excluded during virus
 scanning. Each rule comprises the rule indicator [+|-], followed by a file type
-\fIexpresssion\fR against which a file's type extension is compared. The file
-type \fIexpresssion\fR is case insensitive and may include the "*" and "?"
+\fIexpression\fR against which a file's type extension is compared. The file
+type \fIexpression\fR is case insensitive and may include the "*" and "?"
 wildcards. There should be no whitespace between the rule indicator and the
-file type \fIexpresssion\fR. If a comma is included within the file type
+file type \fIexpression\fR. If a comma is included within the file type
 expression, it must be escaped using a "\e" (backslash). A file type extension
 does not include its preceding dot.
 .sp
@@ -439,7 +434,6 @@ Resets \fBvscan\fR service statistics counters to zero
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSetting the Maximum Size Limit
 .sp
 .LP
@@ -581,8 +575,6 @@ enter
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -603,8 +595,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -621,15 +611,11 @@ Utility output format	Not-An-Interface
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR attributes (7),
 .BR smf (7),
 .BR vscand (8),
 .BR zfs (8)
 .SH NOTES
-.sp
-.LP
 All users are permitted to use \fBvscanadm\fR to view \fBvscan\fR properties
 and statistics. To set property values or reset statistics, the following
 authorizations are required:
