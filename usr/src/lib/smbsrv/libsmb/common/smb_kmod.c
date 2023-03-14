@@ -99,7 +99,7 @@ smb_kmod_setcfg(smb_kmod_cfg_t *cfg)
 	ioc.initial_credits = cfg->skc_initial_credits;
 	ioc.maximum_credits = cfg->skc_maximum_credits;
 	ioc.encrypt = cfg->skc_encrypt;
-	ioc.encrypt_cipher = cfg->skc_encrypt_cipher;
+	ioc.encrypt_ciphers = cfg->skc_encrypt_ciphers;
 
 	(void) memcpy(ioc.machine_uuid, cfg->skc_machine_uuid, sizeof (uuid_t));
 	(void) memcpy(ioc.negtok, cfg->skc_negtok, sizeof (ioc.negtok));

@@ -218,7 +218,7 @@ smb31_decode_neg_ctxs(smb_request_t *sr)
 	smb2_encrypt_caps_t *encap = &neg_ctxs->encrypt_ctx.encrypt_caps;
 	boolean_t found_sha512 = B_FALSE;
 	boolean_t found_cipher = B_FALSE;
-	uint16_t ciphers = sr->sr_server->sv_cfg.skc_encrypt_cipher;
+	uint32_t ciphers = sr->sr_server->sv_cfg.skc_encrypt_ciphers;
 	uint32_t status = 0;
 	int32_t skip;
 	int found_preauth_ctx = 0;

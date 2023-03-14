@@ -163,7 +163,7 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	kcfg->skc_min_protocol = smb_config_get_min_protocol();
 	kcfg->skc_secmode = smb_config_get_secmode();
 	kcfg->skc_encrypt = smb_config_get_require(SMB_CI_ENCRYPT);
-	kcfg->skc_encrypt_cipher = smb31_config_get_encrypt_cipher();
+	kcfg->skc_encrypt_ciphers = smb_config_get_encrypt_ciphers();
 
 	(void) smb_getdomainname(kcfg->skc_nbdomain,
 	    sizeof (kcfg->skc_nbdomain));

@@ -18,7 +18,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd February 8, 2023
+.Dd March 13, 2023
 .Dt SMB 5
 .Os
 .Sh NAME
@@ -105,6 +105,8 @@ option.
 When set to
 .Ql disabled ,
 the server will not ask clients to encrypt requests.
+Note that this setting does not actually disable encryption, but leaves the
+decision about whether to encrypt up to the client and/or the per-share options.
 When set to
 .Ql enabled ,
 the server will ask clients to encrypt requests,
@@ -129,7 +131,7 @@ behavior is that any message that
 be encrypted
 .Em must
 be encrypted.
-.It Sy encrypt_cipher
+.It Sy encrypt_ciphers
 .Pp
 Specifies a list of enabled SMB 3.1.1 encryption ciphers.
 This property is only used when encryption is
@@ -151,9 +153,9 @@ When the property is set, a list of comma separated ciphers should be specified,
 or the value
 .Ql all
 should be used instead to enable all supported ciphers.
-By default, when the property is empty, it is equivalent to value
+When the property is empty, it is equivalent to value
 .Ql all
-\(em all available ciphers will be enabled.
+\(em all supported ciphers are enabled.
 .Pp
 The list of ciphers should contain these values:
 .Bl -tag -width "aes128-ccm"
@@ -162,7 +164,6 @@ AES-128-CCM cipher is enabled.
 It is the only cipher used for SMB 3.0.2 dialect.
 .It Sy aes128-gcm
 AES-128-GCM cipher is enabled.
-Preferred.
 .It Sy all
 All ciphers are enabled.
 .El

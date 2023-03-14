@@ -158,7 +158,7 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_MIN_PROTOCOL, "min_protocol", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_BYPASS_TRAVERSE_CHECKING,
 	    "bypass_traverse_checking", SCF_TYPE_BOOLEAN, 0},
-	{SMB_CI_ENCRYPT_CIPHER, "encrypt_cipher", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_ENCRYPT_CIPHERS, "encrypt_ciphers", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_NETLOGON_FLAGS, "netlogon_flags", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_SHORT_NAMES, "short_names", SCF_TYPE_BOOLEAN, 0},
 
@@ -189,12 +189,14 @@ smb_versions[] = {
  * Supported encryption ciphers.
  */
 static struct str_val
-smb31_enc_ciphers[] = {
+smb31_encrypt_ciphers[] = {
 	{ "aes128-ccm",	SMB3_CIPHER_FLAG_AES128_CCM },	/* SMB 3.x */
 	{ "aes128-gcm",	SMB3_CIPHER_FLAG_AES128_GCM },	/* SMB 3.1.1 */
-	{ "all",	SMB3_ALL_CIPHERS },
+	{ "all",	SMB3_CIPHER_FLAGS_ALL },
 	{ NULL,		0 }
 };
+/* Buffer large enough to hold all cipher names. */
+#define	SMB_CIPHERS_MAXLEN	64
 
 static smb_cfg_param_t *smb_config_getent(smb_cfg_id_t);
 
@@ -1235,51 +1237,69 @@ smb_config_get_min_protocol(void)
 }
 
 /*
- * Only SMB 3.x supports encryption.
- * SMB 3.0.2 uses AES128-CCM only.
- * SMB 3.1.1 - AES128-CCM or AES128-GCM.
- * This function returns bitmask for enabled ciphers
+ * Convert a list of ciphers to a bitmask.
+ * Returns mask or -1 for errors.
+ *
+ * Note this is used both below and in libshare_smb
+ * for validation of new setting.
  */
-uint16_t
-smb31_config_get_encrypt_cipher(void)
+int
+smb_convert_encrypt_ciphers(char *value)
 {
-	uint32_t max_proto = smb_config_get_max_protocol();
-	uint16_t cipher = 0;
-	char str[50];
-	int i;
+	const char *sep = ",:";
+	char buf[SMB_CIPHERS_MAXLEN];
+	char *last;
+	char *cn;
+	struct str_val *sv;
+	int ciphers = 0;
 
-	/* SMB 3.0 supports only AES-128-CCM */
-	if (max_proto < SMB_VERS_3_11)
-		return (SMB3_CIPHER_FLAG_AES128_CCM);
+	if (value == NULL)
+		return (-1);
 
-	/* SMB 3.1.1 */
-	if (smb_config_getstr(SMB_CI_ENCRYPT_CIPHER, str, sizeof (str))
-	    == SMBD_SMF_OK) {
-		char *s = str;
-		char *p = NULL;
+	if (strlen(value) >= SMB_CIPHERS_MAXLEN)
+		return (-1);
 
-		do {
-			p = strchr(s, ',');
-			if (p != NULL)
-				*p++ = '\0';
+	strlcpy(buf, value, sizeof (buf));
 
-			/* # of ciphers too small - don't care about O(n2) */
-			for (i = 0; smb31_enc_ciphers[i].str != NULL; i++) {
-				if (strcmp(s, smb31_enc_ciphers[i].str) == 0)
-					cipher |= smb31_enc_ciphers[i].val;
+	cn = strtok_r(buf, sep, &last);
+	while (cn != NULL) {
+		boolean_t valid = B_FALSE;
+		/* # of ciphers is small - don't care about O(n2) */
+		for (sv = smb31_encrypt_ciphers; sv->str != NULL; sv++) {
+			if (strcmp(cn, sv->str) == 0) {
+				ciphers |= sv->val;
+				valid = B_TRUE;
 			}
-
-			if (p != NULL)
-				s = p;
-		} while (p != NULL && *s != '\0');
+		}
+		if (!valid)
+			return (-1);
+		cn = strtok_r(NULL, sep, &last);
 	}
-
-	if (cipher == 0)
-		cipher = SMB3_ALL_CIPHERS;
-
-	return (cipher);
+	return (ciphers);
 }
 
+/*
+ * Return a bitmask indicating enabled cipher algorithms.
+ * If the config does not have at least one known cipher,
+ * that's a configuration error, so just enable all.
+ */
+uint32_t
+smb_config_get_encrypt_ciphers(void)
+{
+	char buf[SMB_CIPHERS_MAXLEN];
+	int ciphers = 0;
+
+	if (smb_config_getstr(SMB_CI_ENCRYPT_CIPHERS, buf, sizeof (buf))
+	    != SMBD_SMF_OK)
+		buf[0] = '\0';
+
+	ciphers = smb_convert_encrypt_ciphers(buf);
+
+	if (ciphers <= 0)
+		ciphers = SMB3_CIPHER_FLAGS_ALL;
+
+	return ((uint32_t)ciphers);
+}
 
 /*
  * Run once at startup convert old SMF settings to current.
