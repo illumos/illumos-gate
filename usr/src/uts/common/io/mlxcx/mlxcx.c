@@ -13,6 +13,7 @@
  * Copyright 2021, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 /*
@@ -20,9 +21,12 @@
  */
 
 /*
- * The PRM for this family of parts is freely available, and can be found at:
+ * The PRM for this family of parts was freely available at:
+ *
  * https://www.mellanox.com/related-docs/user_manuals/ \
  *   Ethernet_Adapters_Programming_Manual.pdf
+ *
+ * but has since disappeared.
  */
 /*
  * ConnectX glossary
@@ -481,12 +485,17 @@ mlxcx_load_prop_defaults(mlxcx_t *mlxp)
 	 * maximum speed of 10Gb/s, and another for those above that.
 	 */
 	if ((port->mlp_max_proto & (MLXCX_PROTO_25G | MLXCX_PROTO_40G |
-	    MLXCX_PROTO_50G | MLXCX_PROTO_100G)) != 0) {
+	    MLXCX_PROTO_50G | MLXCX_PROTO_100G)) != 0 ||
+	    (port->mlp_ext_max_proto & (MLXCX_EXTPROTO_25G |
+	    MLXCX_EXTPROTO_40G | MLXCX_EXTPROTO_50G | MLXCX_EXTPROTO_100G |
+	    MLXCX_EXTPROTO_200G | MLXCX_EXTPROTO_400G)) != 0) {
 		p->mldp_cq_size_shift_default = MLXCX_CQ_SIZE_SHIFT_25G;
 		p->mldp_rq_size_shift_default = MLXCX_RQ_SIZE_SHIFT_25G;
 		p->mldp_sq_size_shift_default = MLXCX_SQ_SIZE_SHIFT_25G;
 	} else if ((port->mlp_max_proto & (MLXCX_PROTO_100M | MLXCX_PROTO_1G |
-	    MLXCX_PROTO_10G)) != 0) {
+	    MLXCX_PROTO_10G)) != 0 ||
+	    (port->mlp_ext_max_proto & (MLXCX_EXTPROTO_100M |
+	    MLXCX_EXTPROTO_5G | MLXCX_EXTPROTO_1G | MLXCX_EXTPROTO_10G)) != 0) {
 		p->mldp_cq_size_shift_default = MLXCX_CQ_SIZE_SHIFT_DFLT;
 		p->mldp_rq_size_shift_default = MLXCX_RQ_SIZE_SHIFT_DFLT;
 		p->mldp_sq_size_shift_default = MLXCX_SQ_SIZE_SHIFT_DFLT;
@@ -2471,6 +2480,39 @@ mlxcx_setup_eqs(mlxcx_t *mlxp)
 }
 
 /*
+ * A more recent ConnectX part will have the Port CApability Mask register.
+ * Explore it and note things here.
+ */
+static void
+mlxcx_explore_pcam(mlxcx_t *mlxp, mlxcx_caps_t *c)
+{
+	mlxcx_register_data_t data;
+	mlxcx_reg_pcam_t *pcam = &data.mlrd_pcam;
+
+	ASSERT(c->mlc_pcam);
+	bzero(&data, sizeof (data));
+
+	/*
+	 * Okay, so we have access the the Ports CApability Mask (PCAM).
+	 * There are various things we need to check about it.
+	 */
+
+	VERIFY(mlxcx_cmd_access_register(mlxp, MLXCX_CMD_ACCESS_REGISTER_READ,
+	    MLXCX_REG_PCAM, &data));
+
+	/*
+	 * NOTE: These ASSERT()s may change in future mlxcx(4D) parts.
+	 * As of now, only 0 is valid, and 1-255 are reserved.  A future part
+	 * may return non-zero in these fields.
+	 */
+	ASSERT0(pcam->mlrd_pcam_feature_group);
+	ASSERT0(pcam->mlrd_pcam_access_reg_group);
+
+	c->mlc_ext_ptys = get_bit64(pcam->mlrd_pcam_feature_cap_mask_low,
+	    MLXCX_PCAM_LOW_FFLAGS_PTYS_EXTENDED);
+}
+
+/*
  * Snapshot all of the hardware capabilities that we care about and then modify
  * the HCA capabilities to get things moving.
  */
@@ -2533,6 +2575,12 @@ mlxcx_init_caps(mlxcx_t *mlxp)
 	}
 	mlxp->mlx_nports = gen->mlcap_general_num_ports;
 	mlxp->mlx_max_sdu = (1 << (gen->mlcap_general_log_max_msg & 0x1F));
+
+	if (get_bit16(gen->mlcap_general_flags_c,
+	    MLXCX_CAP_GENERAL_FLAGS_C_PCAM_REG)) {
+		c->mlc_pcam = B_TRUE;
+		mlxcx_explore_pcam(mlxp, c);
+	}
 
 	c->mlc_max_tir = (1 << gen->mlcap_general_log_max_tir);
 

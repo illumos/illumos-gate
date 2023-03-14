@@ -13,6 +13,7 @@
  * Copyright 2021, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 /*
@@ -389,6 +390,9 @@ struct mlxcx_port {
 	mlxcx_eth_proto_t	mlp_max_proto;
 	mlxcx_eth_proto_t	mlp_admin_proto;
 	mlxcx_eth_proto_t	mlp_oper_proto;
+	mlxcx_ext_eth_proto_t	mlp_ext_max_proto;
+	mlxcx_ext_eth_proto_t	mlp_ext_admin_proto;
+	mlxcx_ext_eth_proto_t	mlp_ext_oper_proto;
 	mlxcx_pplm_fec_active_t	mlp_fec_active;
 	link_fec_t		mlp_fec_requested;
 
@@ -965,6 +969,8 @@ typedef struct {
 	boolean_t		mlc_checksum;
 	boolean_t		mlc_lso;
 	boolean_t		mlc_vxlan;
+	boolean_t		mlc_pcam;
+	boolean_t		mlc_ext_ptys;
 	size_t			mlc_max_lso_size;
 	size_t			mlc_max_rqt_size;
 
@@ -1459,7 +1465,8 @@ extern int mlxcx_page_compare(const void *, const void *);
 
 extern void mlxcx_update_link_state(mlxcx_t *, mlxcx_port_t *);
 
-extern void mlxcx_eth_proto_to_string(mlxcx_eth_proto_t, char *, size_t);
+extern void mlxcx_eth_proto_to_string(mlxcx_eth_proto_t, mlxcx_ext_eth_proto_t,
+    char *, size_t);
 extern const char *mlxcx_port_status_string(mlxcx_port_status_t);
 
 extern const char *mlxcx_event_name(mlxcx_event_t);

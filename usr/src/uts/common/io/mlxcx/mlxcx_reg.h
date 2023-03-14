@@ -13,6 +13,7 @@
  * Copyright 2020, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 #ifndef _MLXCX_REG_H
@@ -1351,6 +1352,7 @@ typedef enum {
 } mlxcx_hca_cap_general_port_type_t;
 
 typedef enum {
+	MLXCX_CAP_GENERAL_FLAGS_C_PCAM_REG		= (1 << 5),
 	MLXCX_CAP_GENERAL_FLAGS_C_ESW_FLOW_TABLE	= (1 << 8),
 	MLXCX_CAP_GENERAL_FLAGS_C_NIC_FLOW_TABLE	= (1 << 9),
 } mlxcx_hca_cap_general_flags_c_t;
@@ -1372,17 +1374,20 @@ typedef struct {
 
 	uint8_t		mlcap_general_rsvd6[1];
 	uint8_t		mlcap_general_log_max_cq_sz;
-	uint8_t		mlcap_general_rsvd7[1];
+	uint8_t		mlcap_general_access_register_user_max_fixed_mkey_bufs;
 	uint8_t		mlcap_general_log_max_cq;
 
 	uint8_t		mlcap_general_log_max_eq_sz;
-	uint8_t		mlcap_general_log_max_mkey_flags;
+	/* NOTE: bits 0xc0 of mkey_flags are now for relaxed_ordering. */
+	bits8_t		mlcap_general_log_max_mkey_flags;
 	uint8_t		mlcap_general_rsvd8[1];
-	uint8_t		mlcap_general_log_max_eq;
+	/* NOTE: bit 0x80 of max_eq is now for fast_teardown. */
+	bits8_t		mlcap_general_log_max_eq;
 
 	uint8_t		mlcap_general_max_indirection;
 	uint8_t		mlcap_general_log_max_mrw_sz_flags;
-	uint8_t		mlcap_general_log_max_bsf_list_size_flags;
+	/* NOTE: bit 0x80 of bsf_list is now for force_teardown. */
+	bits8_t		mlcap_general_log_max_bsf_list_size_flags;
 	uint8_t		mlcap_general_log_max_klm_list_size_flags;
 
 	uint8_t		mlcap_general_rsvd9[1];
@@ -1398,6 +1403,7 @@ typedef struct {
 	uint16be_t	mlcap_general_flags_a;
 	uint16be_t	mlcap_general_gid_table_size;
 
+	/* NOTE: bits 0x3ff of flags_b are for max_qp_count */
 	bits16_t	mlcap_general_flags_b;
 	uint16be_t	mlcap_general_pkey_table_size;
 
@@ -2252,6 +2258,7 @@ typedef struct {
 } mlxcx_reg_paos_t;
 
 typedef enum {
+	MLXCX_PROTO_NONE			= 0,
 	MLXCX_PROTO_SGMII			= 1 << 0,
 	MLXCX_PROTO_1000BASE_KX			= 1 << 1,
 	MLXCX_PROTO_10GBASE_CX4			= 1 << 2,
@@ -2275,10 +2282,10 @@ typedef enum {
 	MLXCX_PROTO_100GBASE_CR4		= 1 << 20,
 	MLXCX_PROTO_100GBASE_SR4		= 1 << 21,
 	MLXCX_PROTO_100GBASE_KR4		= 1 << 22,
-	MLXCX_PROTO_UNKNOWN_7			= 1 << 23,
-	MLXCX_PROTO_UNKNOWN_8			= 1 << 24,
-	MLXCX_PROTO_UNKNOWN_9			= 1 << 25,
-	MLXCX_PROTO_UNKNOWN_10			= 1 << 26,
+	MLXCX_PROTO_100GBASE_LR4_ER4		= 1 << 23,
+	MLXCX_PROTO_100BASE_TX			= 1 << 24,
+	MLXCX_PROTO_1000BASE_T			= 1 << 25,
+	MLXCX_PROTO_10GBASE_T			= 1 << 26,
 	MLXCX_PROTO_25GBASE_CR			= 1 << 27,
 	MLXCX_PROTO_25GBASE_KR			= 1 << 28,
 	MLXCX_PROTO_25GBASE_SR			= 1 << 29,
@@ -2286,27 +2293,74 @@ typedef enum {
 	MLXCX_PROTO_50GBASE_KR2			= 1UL << 31,
 } mlxcx_eth_proto_t;
 
-#define	MLXCX_PROTO_100M	MLXCX_PROTO_SGMII_100BASE
+/* Extended proto values introduced with ConnectX-6. */
+typedef enum {
+	MLXCX_EXTPROTO_NONE				= 0,
+	MLXCX_EXTPROTO_SGMII_100BASE			= 1 << 0,
+	MLXCX_EXTPROTO_1000BASE_X_SGMII			= 1 << 1,
+	/* 1 << 2 */
+	MLXCX_EXTPROTO_5GBASE_R				= 1 << 3,
+	MLXCX_EXTPROTO_10GBASE_XFI_XAUI_1		= 1 << 4,
+	MLXCX_EXTPROTO_40GBASE_XLAUI_4_XLPPI_4		= 1 << 5,
+	MLXCX_EXTPROTO_25GAUI_1_25GBASE_CR_KR		= 1 << 6,
+	MLXCX_EXTPROTO_50GAUI_2_LAUI_2_50GBASE_CR2_KR2	= 1 << 7,
+	MLXCX_EXTPROTO_50GAUI_1_LAUI_1_50GBASE_CR_KR	= 1 << 8,
+	MLXCX_EXTPROTO_CAUI_4_100GBASE_CR4_KR4		= 1 << 9,
+	MLXCX_EXTPROTO_100GAUI_2_100GBASE_CR2_KR2	= 1 << 10,
+	MLXCX_EXTPROTO_100GAUI_1_100GBASE_CR_KR		= 1 << 11,
+	MLXCX_EXTPROTO_200GAUI_4_200GBASE_CR4_KR4	= 1 << 12,
+	MLXCX_EXTPROTO_200GAUI_2_200GBASE_CR2_KR2	= 1 << 13,
+	/* 1 << 14 */
+	MLXCX_EXTPROTO_400GAUI_8_400GBASE_CR8		= 1 << 15,
+	MLXCX_EXTPROTO_400GAUI_4_400GBASE_CR4		= 1 << 16,
+	/* 1UL << [17-30] */
+	MLXCX_EXTPROTO_SGMII				= 1UL << 31,
+} mlxcx_ext_eth_proto_t;
 
-#define	MLXCX_PROTO_1G		(MLXCX_PROTO_1000BASE_KX | MLXCX_PROTO_SGMII)
+#define	MLXCX_PROTO_100M	(MLXCX_PROTO_SGMII_100BASE | \
+	MLXCX_PROTO_100BASE_TX)
+#define	MLXCX_EXTPROTO_100M	MLXCX_EXTPROTO_SGMII_100BASE
+
+#define	MLXCX_PROTO_1G		(MLXCX_PROTO_1000BASE_KX | MLXCX_PROTO_SGMII | \
+	MLXCX_PROTO_1000BASE_T)
+#define	MLXCX_EXTPROTO_1G	(MLXCX_EXTPROTO_1000BASE_X_SGMII)
+
+#define	MLXCX_EXTPROTO_5G	MLXCX_EXTPROTO_5GBASE_R
 
 #define	MLXCX_PROTO_10G		(MLXCX_PROTO_10GBASE_CX4 | \
 	MLXCX_PROTO_10GBASE_KX4 | MLXCX_PROTO_10GBASE_KR | \
 	MLXCX_PROTO_10GBASE_CR | MLXCX_PROTO_10GBASE_SR | \
-	MLXCX_PROTO_10GBASE_ER_LR)
+	MLXCX_PROTO_10GBASE_ER_LR | MLXCX_PROTO_10GBASE_T)
+#define	MLXCX_EXTPROTO_10G	MLXCX_EXTPROTO_10GBASE_XFI_XAUI_1
 
 #define	MLXCX_PROTO_25G		(MLXCX_PROTO_25GBASE_CR | \
 	MLXCX_PROTO_25GBASE_KR | MLXCX_PROTO_25GBASE_SR)
+#define	MLXCX_EXTPROTO_25G	MLXCX_EXTPROTO_25GAUI_1_25GBASE_CR_KR
 
 #define	MLXCX_PROTO_40G		(MLXCX_PROTO_40GBASE_SR4 | \
 	MLXCX_PROTO_40GBASE_LR4_ER4 | MLXCX_PROTO_40GBASE_CR4 | \
 	MLXCX_PROTO_40GBASE_KR4)
+#define	MLXCX_EXTPROTO_40G	MLXCX_EXTPROTO_40GBASE_XLAUI_4_XLPPI_4
 
 #define	MLXCX_PROTO_50G		(MLXCX_PROTO_50GBASE_CR2 | \
 	MLXCX_PROTO_50GBASE_KR2 | MLXCX_PROTO_50GBASE_SR2)
+#define	MLXCX_EXTPROTO_50G (MLXCX_EXTPROTO_50GAUI_2_LAUI_2_50GBASE_CR2_KR2 | \
+	MLXCX_EXTPROTO_50GAUI_1_LAUI_1_50GBASE_CR_KR)
 
 #define	MLXCX_PROTO_100G	(MLXCX_PROTO_100GBASE_CR4 | \
-	MLXCX_PROTO_100GBASE_SR4 | MLXCX_PROTO_100GBASE_KR4)
+	MLXCX_PROTO_100GBASE_SR4 | MLXCX_PROTO_100GBASE_KR4 | \
+	MLXCX_PROTO_100GBASE_LR4_ER4)
+#define	MLXCX_EXTPROTO_100G	(MLXCX_EXTPROTO_CAUI_4_100GBASE_CR4_KR4 | \
+	MLXCX_EXTPROTO_100GAUI_2_100GBASE_CR2_KR2 | \
+	MLXCX_EXTPROTO_100GAUI_1_100GBASE_CR_KR)
+
+/* 200G and higher only are in the extended protocol bits. */
+#define	MLXCX_EXTPROTO_200G	(MLXCX_EXTPROTO_200GAUI_4_200GBASE_CR4_KR4 | \
+	MLXCX_EXTPROTO_200GAUI_2_200GBASE_CR2_KR2)
+
+#define	MLXCX_EXTPROTO_400G	(MLXCX_EXTPROTO_400GAUI_8_400GBASE_CR8 | \
+	MLXCX_EXTPROTO_400GAUI_4_400GBASE_CR4)
+
 
 typedef enum {
 	MLXCX_AUTONEG_DISABLE_CAP	= 1 << 5,
@@ -2328,17 +2382,36 @@ typedef struct {
 	uint8_t		mlrd_ptys_rsvd2;
 	uint16be_t	mlrd_ptys_data_rate_oper;
 
-	uint8_t		mlrd_ptys_rsvd3[4];
-
+	bits32_t	mlrd_ptys_ext_proto_cap;
 	bits32_t	mlrd_ptys_proto_cap;
-	uint8_t		mlrd_ptys_rsvd4[8];
+	uint8_t		mlrd_ptys_rsvd4[4];
+	bits32_t	mlrd_ptys_ext_proto_admin;
 	bits32_t	mlrd_ptys_proto_admin;
-	uint8_t		mlrd_ptys_rsvd5[8];
+	uint8_t		mlrd_ptys_rsvd5[4];
+	bits32_t	mlrd_ptys_ext_proto_oper;
 	bits32_t	mlrd_ptys_proto_oper;
 	uint8_t		mlrd_ptys_rsvd6[8];
 	bits32_t	mlrd_ptys_proto_partner_advert;
 	uint8_t		mlrd_ptys_rsvd7[12];
 } mlxcx_reg_ptys_t;
+
+typedef enum {
+	MLXCX_PCAM_LOW_FFLAGS_PTYS_EXTENDED	= (1 << 13),
+} mlxcx_pcam_low_feature_flags_t;
+
+typedef struct {
+	uint8_t mlrd_pcam_rsvd1;
+	uint8_t mlrd_pcam_feature_group;
+	uint8_t mlrd_pcam_rsvd2;
+	uint8_t mlrd_pcam_access_reg_group;
+	uint8_t mlrd_pcam_rsvd3[4];
+	bits64_t mlrd_pcam_port_access_reg_cap_mask_high; /* Bits 127 -> 64  */
+	bits64_t mlrd_pcam_port_access_reg_cap_mask_low;  /* Bits 63 -> 0 */
+	uint8_t mlrd_pcam_rsvd4[16];
+	bits64_t mlrd_pcam_feature_cap_mask_high; /* Bits 127 -> 64  */
+	bits64_t mlrd_pcam_feature_cap_mask_low;  /* Bits 63 -> 0 */
+	uint8_t mlrd_pcam_rsvd5[24];
+} mlxcx_reg_pcam_t;
 
 typedef enum {
 	MLXCX_LED_TYPE_BOTH		= 0x0,
@@ -2568,6 +2641,7 @@ typedef enum {
 	MLXCX_REG_MCIA		= 0x9014,
 	MLXCX_REG_PPCNT		= 0x5008,
 	MLXCX_REG_PPLM		= 0x5023,
+	MLXCX_REG_PCAM		= 0x507f,
 	MLXCX_REG_MTCAP		= 0x9009,
 	MLXCX_REG_MTMP		= 0x900A
 } mlxcx_register_id_t;
@@ -2575,6 +2649,7 @@ typedef enum {
 typedef union {
 	mlxcx_reg_pmtu_t		mlrd_pmtu;
 	mlxcx_reg_paos_t		mlrd_paos;
+	mlxcx_reg_pcam_t		mlrd_pcam;
 	mlxcx_reg_ptys_t		mlrd_ptys;
 	mlxcx_reg_mlcr_t		mlrd_mlcr;
 	mlxcx_reg_pmaos_t		mlrd_pmaos;

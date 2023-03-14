@@ -13,6 +13,7 @@
  * Copyright 2020, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 /*
@@ -416,7 +417,8 @@ mlxcx_port_status_string(mlxcx_port_status_t st)
 }
 
 void
-mlxcx_eth_proto_to_string(mlxcx_eth_proto_t p, char *buf, size_t size)
+mlxcx_eth_proto_to_string(mlxcx_eth_proto_t p, mlxcx_ext_eth_proto_t ep,
+    char *buf, size_t size)
 {
 	if (p & MLXCX_PROTO_SGMII)
 		(void) strlcat(buf, "SGMII|", size);
@@ -452,6 +454,14 @@ mlxcx_eth_proto_to_string(mlxcx_eth_proto_t p, char *buf, size_t size)
 		(void) strlcat(buf, "100GBASE_SR4|", size);
 	if (p & MLXCX_PROTO_100GBASE_KR4)
 		(void) strlcat(buf, "100GBASE_KR4|", size);
+	if (p & MLXCX_PROTO_100GBASE_LR4_ER4)
+		(void) strlcat(buf, "100GBASE_LR4_ER4|", size);
+	if (p & MLXCX_PROTO_100BASE_TX)
+		(void) strlcat(buf, "100BASE_TX|", size);
+	if (p & MLXCX_PROTO_1000BASE_T)
+		(void) strlcat(buf, "1000BASE_T|", size);
+	if (p & MLXCX_PROTO_10GBASE_T)
+		(void) strlcat(buf, "10GBASE_T|", size);
 	if (p & MLXCX_PROTO_25GBASE_CR)
 		(void) strlcat(buf, "25GBASE_CR|", size);
 	if (p & MLXCX_PROTO_25GBASE_KR)
@@ -460,6 +470,42 @@ mlxcx_eth_proto_to_string(mlxcx_eth_proto_t p, char *buf, size_t size)
 		(void) strlcat(buf, "25GBASE_SR|", size);
 	if (p & MLXCX_PROTO_50GBASE_CR2)
 		(void) strlcat(buf, "50GBASE_CR2|", size);
+	if (p & MLXCX_PROTO_50GBASE_KR2)
+		(void) strlcat(buf, "50GBASE_KR2|", size);
+
+	/* Now, for the extended bits... */
+	if (ep & MLXCX_EXTPROTO_SGMII_100BASE)
+		(void) strlcat(buf, "SGMII_100BASE|", size);
+	if (ep & MLXCX_EXTPROTO_1000BASE_X_SGMII)
+		(void) strlcat(buf, "1000BASE_X_SGMII|", size);
+	if (ep & MLXCX_EXTPROTO_5GBASE_R)
+		(void) strlcat(buf, "5GBASE_R|", size);
+	if (ep & MLXCX_EXTPROTO_10GBASE_XFI_XAUI_1)
+		(void) strlcat(buf, "10GBASE_XFI_XAUI_1|", size);
+	if (ep & MLXCX_EXTPROTO_40GBASE_XLAUI_4_XLPPI_4)
+		(void) strlcat(buf, "40GBASE_XLAUI_4_XLPPI_4|", size);
+	if (ep & MLXCX_EXTPROTO_25GAUI_1_25GBASE_CR_KR)
+		(void) strlcat(buf, "25GAUI_1_25GBASE_CR_KR|", size);
+	if (ep & MLXCX_EXTPROTO_50GAUI_2_LAUI_2_50GBASE_CR2_KR2)
+		(void) strlcat(buf, "50GAUI_2_LAUI_2_50GBASE_CR2_KR2|", size);
+	if (ep & MLXCX_EXTPROTO_50GAUI_1_LAUI_1_50GBASE_CR_KR)
+		(void) strlcat(buf, "50GAUI_1_LAUI_1_50GBASE_CR_KR|", size);
+	if (ep & MLXCX_EXTPROTO_CAUI_4_100GBASE_CR4_KR4)
+		(void) strlcat(buf, "CAUI_4_100GBASE_CR4_KR4|", size);
+	if (ep & MLXCX_EXTPROTO_100GAUI_2_100GBASE_CR2_KR2)
+		(void) strlcat(buf, "100GAUI_2_100GBASE_CR2_KR2|", size);
+	if (ep & MLXCX_EXTPROTO_100GAUI_1_100GBASE_CR_KR)
+		(void) strlcat(buf, "100GAUI_1_100GBASE_CR_KR|", size);
+	/* Print these if we need 'em for debugging... */
+	if (ep & MLXCX_EXTPROTO_200GAUI_4_200GBASE_CR4_KR4)
+		(void) strlcat(buf, "200GAUI_4_200GBASE_CR4_KR4|", size);
+	if (ep & MLXCX_EXTPROTO_200GAUI_2_200GBASE_CR2_KR2)
+		(void) strlcat(buf, "200GAUI_2_200GBASE_CR2_KR2|", size);
+	if (ep & MLXCX_EXTPROTO_400GAUI_8_400GBASE_CR8)
+		(void) strlcat(buf, "400GAUI_8_400GBASE_CR8|", size);
+	if (ep & MLXCX_EXTPROTO_400GAUI_4_400GBASE_CR4)
+		(void) strlcat(buf, "400GAUI_4_400GBASE_CR4|", size);
+
 	/* Chop off the trailing '|' */
 	if (strlen(buf) > 0)
 		buf[strlen(buf) - 1] = '\0';
@@ -1674,6 +1720,8 @@ mlxcx_reg_name(mlxcx_register_id_t rid)
 		return ("PMTU");
 	case MLXCX_REG_PAOS:
 		return ("PAOS");
+	case MLXCX_REG_PCAM:
+		return ("PCAM");
 	case MLXCX_REG_PTYS:
 		return ("PTYS");
 	case MLXCX_REG_MSGI:
@@ -1722,6 +1770,9 @@ mlxcx_cmd_access_register(mlxcx_t *mlxp, mlxcx_cmd_reg_opmod_t opmod,
 		break;
 	case MLXCX_REG_PAOS:
 		dsize = sizeof (mlxcx_reg_paos_t);
+		break;
+	case MLXCX_REG_PCAM:
+		dsize = sizeof (mlxcx_reg_pcam_t);
 		break;
 	case MLXCX_REG_PTYS:
 		dsize = sizeof (mlxcx_reg_ptys_t);
@@ -1929,6 +1980,20 @@ mlxcx_cmd_query_port_speed(mlxcx_t *mlxp, mlxcx_port_t *mlp)
 		    from_bits32(data.mlrd_ptys.mlrd_ptys_proto_admin);
 		mlp->mlp_oper_proto =
 		    from_bits32(data.mlrd_ptys.mlrd_ptys_proto_oper);
+		if (mlxp->mlx_caps->mlc_ext_ptys) {
+			/*
+			 * Populate these bits only if we know the HW
+			 * supports them.  Otherwise keep them zeroed
+			 * per the above bzero() and use that zero-ness to
+			 * skip over them as need be.
+			 */
+			mlp->mlp_ext_max_proto = from_bits32(
+			    data.mlrd_ptys.mlrd_ptys_ext_proto_cap);
+			mlp->mlp_ext_admin_proto = from_bits32(
+			    data.mlrd_ptys.mlrd_ptys_ext_proto_admin);
+			mlp->mlp_ext_oper_proto = from_bits32(
+			    data.mlrd_ptys.mlrd_ptys_ext_proto_oper);
+		}
 	}
 
 	return (ret);
@@ -3717,7 +3782,9 @@ CTASSERT(offsetof(mlxcx_cmd_create_rqt_in_t, mlxi_create_rqt_context) == 0x20);
 CTASSERT(offsetof(mlxcx_reg_pmtu_t, mlrd_pmtu_oper_mtu) == 0x0C);
 
 CTASSERT(sizeof (mlxcx_reg_ptys_t) == 64);
+CTASSERT(offsetof(mlxcx_reg_ptys_t, mlrd_ptys_ext_proto_cap) == 0x08);
 CTASSERT(offsetof(mlxcx_reg_ptys_t, mlrd_ptys_proto_cap) == 0x0c);
+CTASSERT(offsetof(mlxcx_reg_ptys_t, mlrd_ptys_ext_proto_admin) == 0x14);
 CTASSERT(offsetof(mlxcx_reg_ptys_t, mlrd_ptys_proto_admin) == 0x18);
 CTASSERT(offsetof(mlxcx_reg_ptys_t, mlrd_ptys_proto_partner_advert) == 0x30);
 
