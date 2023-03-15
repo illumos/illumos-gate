@@ -33,6 +33,7 @@
 #
 
 <include SUNWcs.man1.inc>
+<include SUNWcs.man1has.inc>
 <include SUNWcs.man4d.inc>
 <include SUNWcs.man4fs.inc>
 <include SUNWcs.man5.inc>
@@ -587,7 +588,8 @@ file path=usr/bin/cpio mode=0555
 file path=usr/bin/crle mode=0555
 file path=usr/bin/crontab mode=4555
 file path=usr/bin/crypt mode=0555
-file path=usr/bin/csh mode=0555
+link path=usr/bin/csh target=../has/bin/csh mediator=csh \
+    mediator-implementation=illumos
 file path=usr/bin/ctrun mode=0555
 file path=usr/bin/ctstat mode=0555
 file path=usr/bin/ctwatch mode=0555
@@ -765,6 +767,7 @@ dir  path=usr/demo
 dir  path=usr/games
 dir  path=usr/has
 dir  path=usr/has/bin
+file path=usr/has/bin/csh mode=0555
 file path=usr/has/bin/edit mode=0555
 hardlink path=usr/has/bin/ex target=edit
 link path=usr/has/bin/jsh target=sh
