@@ -1,91 +1,146 @@
-'\" te
-.\" Copyright (c) 2005, Sun Microsystems, Inc.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WHICH 1 "Mar 30, 2005"
-.SH NAME
-which \- locate a command and display its pathname or alias
-.SH SYNOPSIS
-.LP
-.nf
-\fBwhich\fR [\fIname\fR]...
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-\fBwhich\fR takes a list of names and determines which alias or utility would
-be executed had these names been given as commands.
-.sp
-.LP
-For each \fIname\fR operand, if it names an alias the alias is expanded.
-Otherwise the user's path is searched for a utility name matching \fIname\fR.
-Aliases are taken from the user's \fB\&.cshrc\fR file. \fIpath\fR is taken from
-the current shell   execution environment.
-.SH OPERANDS
-.sp
-.LP
-The following operand is supported:
-.sp
-.ne 2
-.na
-\fB\fIname\fR\fR
-.ad
-.RS 8n
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"      This product includes software developed by the FreeBSD Project
+.\"      its contributors.
+.\" 4. Neither the name of the FreeBSD Project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE CONTRIBUTOR ``AS IS'' AND ANY EXPRESS OR
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+.\" IN NO EVENT SHALL THE CONTRIBUTOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+.\" NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+.\" DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+.\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.\"
+.\" Manpage Copyright (c) 1995, Jordan Hubbard <jkh@FreeBSD.org>
+.\" Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd March 15, 2023
+.Dt WHICH 1
+.Os
+.Sh NAME
+.Nm which
+.Nd "locate a program file in the user's path"
+.Sh SYNOPSIS
+.Nm
+.Op Fl as
+.Ar command ...
+.Sh DESCRIPTION
+The
+.Nm
+utility
+takes a list of command names and searches the path for each executable
+file that would be run had these commands actually been invoked.
+.Pp
+Some shells may provide a built-in
+.Nm
+command which is similar or identical to this utility.
+.Sh OPTIONS
+The following options are available:
+.Bl -tag -width Ar
+.It Fl a
+List all instances of executables found
+.Pq instead of just the first one of each .
+.It Fl s
+No output, just return 0 if all of the executables are found, or 1 if
+some were not found.
+.El
+.Sh OPERANDS
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar command
 The name of a command to be located.
-.RE
-
-.SH EXIT STATUS
-.sp
-.LP
+.El
+.Sh ENVIRONMENT
+See
+.Xr environ 7
+for descriptions of the following environment variables that affect the
+execution of
+.Nm :
+.Ev PATH .
+.Sh EXIT STATUS
 The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR \fR
-.ad
-.RS 7n
-Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB>0\fR \fR
-.ad
-.RS 7n
-One or more \fIname\fR operands were not located or an error occurred.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB~/.cshrc\fR\fR
-.ad
-.RS 12n
-source of aliases and path values
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR csh (1),
-.BR attributes (7)
-.SH DIAGNOSTICS
-.sp
-.LP
-A diagnostic is given for names which are aliased to more than a single word,
-or if an executable file with the argument name was not found in the path.
-.SH NOTES
-.sp
-.LP
-The \fBwhich\fR utility is not a shell built-in command.
-.SH BUGS
-.sp
-.LP
-To compensate for \fB~/.cshrc\fR files in which aliases depend upon the
-\fBprompt\fR variable being set, \fBwhich\fR sets this variable to \fBNULL.\fR
-If the \fB~/.cshrc\fR produces output or prompts for input when \fBprompt\fR is
-set, \fBwhich\fR can produce some strange results.
+.Bl -tag -width Sy
+.It Sy 0
+All of the provided operands were found in the path and would be executed if
+the commands were invoked.
+.It Sy 1
+One or more of the provided operands was not found in the path or would not
+be executed if the commands were invoked, or an error occurred.
+.It Sy 2
+Invalid command line options were specified.
+.El
+.Sh EXAMPLES
+.Sy Example 1
+Locate the
+.Sq ls
+and
+.Sq cp
+commands.
+.Bd -literal -offset indent
+$ /usr/bin/which ls cp
+/usr/bin/ls
+/usr/bin/cp
+.Ed
+.Pp
+.Sy Example 2
+Use a specific
+.Ev PATH
+and show all occurrences.
+.Bd -literal -offset indent
+$ PATH=/usr/bin:/usr/has/bin /usr/bin/which -a edit
+/usr/bin/edit
+/usr/has/bin/edit
+.Ed
+.Pp
+.Sy Example 3
+Executable reported multiple times.
+.Pp
+If
+.Ev PATH
+contains repeated components, the same executable can be reported
+more than once:
+.Bd -literal -offset indent
+$ PATH=/usr/bin:/usr/bin /usr/bin/which -a ls
+/usr/bin/ls
+/usr/bin/ls
+.Ed
+.Pp
+.Sy Example 4
+Do not show output.
+.Pp
+Just exit with an appropriate return code:
+.Bd -literal -offset indent
+$ /usr/bin/which -s ls cp
+$ echo $?
+0
+$ /usr/bin/which -s fakecommand
+$ echo $?
+1
+.Ed
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Committed .
+The output of
+.Nm
+is
+.Sy Committed .
+.Sh SEE ALSO
+.Xr find 1 ,
+.Xr environ 7
