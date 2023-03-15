@@ -20,38 +20,50 @@
 #
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG= pfexec
 SRCS= $(PROG:%=%.c)
+
 PFEXEC= pfexec
+PFSH= pfsh
 
 BINSHELLS = bash csh ksh ksh93 rksh rksh93 sh tcsh zsh
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
+CTF_MODE =	link
 FILEMODE =	0555
 
 ROOTBINPFEXEC = $(PFEXEC:%=$(ROOTBIN)/%)
 
+ROOTXPG4BINPFSH = $(PFSH:%=$(ROOTXPG4BIN)/%)
+ROOTSBINPFSH = $(PFSH:%=$(ROOTSBIN)/%)
+ROOTHASBINPFSH = $(PFSH:%=$(ROOTHASBIN)/%)
+
+ROOTBINSHELLS = $(BINSHELLS:%=$(ROOTBIN)/pf%)
+
+HARDLINKS = $(ROOTHASBINPFSH) $(ROOTBINSHELLS)
+SYMLINKS = $(ROOTXPG4BINPFSH) $(ROOTSBINPFSH)
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
-install: all $(ROOTBINPFEXEC)
-	for s in $(BINSHELLS); do \
-		$(RM) $(ROOTBIN)/pf$$s; \
-		$(LN) $(ROOTBIN)/pfexec $(ROOTBIN)/pf$$s; \
-	done
-	$(RM) $(ROOTXPG4BIN)/pfsh
-	$(SYMLINK) ../../bin/pfexec $(ROOTXPG4BIN)/pfsh
-	$(RM) $(ROOTSBIN)/pfsh
-	$(SYMLINK) ../usr/bin/pfexec $(ROOTSBIN)/pfsh
-	$(RM) $(ROOTHASBIN)/pfsh
-	$(LN) $(ROOTBIN)/pfexec $(ROOTHASBIN)/pfsh
+$(HARDLINKS) := INSLINKTARGET = $(ROOTBINPFEXEC)
+$(ROOTXPG4BINPFSH) := INSLINKTARGET = ../../bin/$(PFEXEC)
+$(ROOTSBINPFSH) := INSLINKTARGET = ../usr/bin/$(PFEXEC)
+
+$(HARDLINKS): $(ROOTBINPFEXEC)
+	$(INS.link)
+
+$(SYMLINKS): $(ROOTBINPFEXEC)
+	$(INS.symlink)
+
+install: all $(ROOTBINPFEXEC) $(HARDLINKS) $(SYMLINKS)
 
 clean:
-
-lint:	lint_SRCS
 
 include ../Makefile.targ
