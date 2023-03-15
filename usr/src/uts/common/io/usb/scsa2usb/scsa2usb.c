@@ -26,6 +26,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 
@@ -2395,7 +2396,6 @@ static int
 scsa2usb_scsi_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
     void *arg, dev_info_t **child)
 {
-	int	circ;
 	int	rval;
 
 	scsa2usb_state_t *scsa2usbp =
@@ -2410,7 +2410,7 @@ scsa2usb_scsi_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		flag |= NDI_DEVI_DEBUG;
 	}
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	/* create children if necessary */
 	if (DEVI(dip)->devi_child == NULL) {
 		scsa2usb_create_luns(scsa2usbp);
@@ -2418,7 +2418,7 @@ scsa2usb_scsi_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 
 	rval = ndi_busop_bus_config(dip, flag, op, arg, child, 0);
 
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (rval);
 }
@@ -2431,7 +2431,6 @@ scsa2usb_scsi_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	scsa2usb_state_t *scsa2usbp =
 	    ddi_get_soft_state(scsa2usb_statep, ddi_get_instance(dip));
 
-	int		circular_count;
 	int		rval = NDI_SUCCESS;
 	uint_t		save_flag = flag;
 
@@ -2452,7 +2451,7 @@ scsa2usb_scsi_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		flag &= ~(NDI_DEVI_REMOVE | NDI_UNCONFIG);
 	}
 
-	ndi_devi_enter(dip, &circular_count);
+	ndi_devi_enter(dip);
 	rval = ndi_busop_bus_unconfig(dip, flag, op, arg);
 
 	/*
@@ -2464,7 +2463,7 @@ scsa2usb_scsi_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		flag |= NDI_DEVI_REMOVE;
 		rval = ndi_busop_bus_unconfig(dip, flag, op, arg);
 	}
-	ndi_devi_exit(dip, circular_count);
+	ndi_devi_exit(dip);
 
 	if ((rval != NDI_SUCCESS) && (op == BUS_UNCONFIG_ALL) &&
 	    (save_flag & NDI_DEVI_REMOVE)) {
@@ -5420,7 +5419,6 @@ scsa2usb_reconnect_event_cb(dev_info_t *dip)
 	scsa2usb_state_t *scsa2usbp =
 	    ddi_get_soft_state(scsa2usb_statep, ddi_get_instance(dip));
 	dev_info_t	*cdip;
-	int		circ;
 	int		rval = USB_SUCCESS;
 
 	ASSERT(scsa2usbp != NULL);
@@ -5433,7 +5431,7 @@ scsa2usb_reconnect_event_cb(dev_info_t *dip)
 	USB_DPRINTF_L0(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "Reinserted device is accessible again.");
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	for (cdip = ddi_get_child(dip); cdip; ) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
 
@@ -5443,7 +5441,7 @@ scsa2usb_reconnect_event_cb(dev_info_t *dip)
 
 		cdip = next;
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	/* stop suppressing warnings */
 	mutex_enter(&scsa2usbp->scsa2usb_mutex);
@@ -5490,7 +5488,7 @@ scsa2usb_disconnect_event_cb(dev_info_t *dip)
 	scsa2usb_state_t *scsa2usbp =
 	    ddi_get_soft_state(scsa2usb_statep, ddi_get_instance(dip));
 	dev_info_t	*cdip;
-	int		circ, i;
+	int		i;
 	int		rval = USB_SUCCESS;
 
 	ASSERT(scsa2usbp != NULL);
@@ -5519,7 +5517,7 @@ scsa2usb_disconnect_event_cb(dev_info_t *dip)
 	}
 	mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	for (cdip = ddi_get_child(dip); cdip; ) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
 
@@ -5529,7 +5527,7 @@ scsa2usb_disconnect_event_cb(dev_info_t *dip)
 
 		cdip = next;
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	if (scsa2usbp->scsa2usb_ugen_hdl) {
 		rval = usb_ugen_disconnect_ev_cb(

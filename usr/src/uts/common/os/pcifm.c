@@ -23,6 +23,10 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/types.h>
 #include <sys/sunndi.h>
 #include <sys/sysmacros.h>
@@ -1358,11 +1362,10 @@ pci_check_ranges(dev_info_t *dip, void *arg)
 			(void) pci_fm_walk_devs(ddi_get_child(dip),
 			    pci_check_regs, (void *)tgt_err);
 		else {
-			int circ = 0;
-			ndi_devi_enter(dip, &circ);
+			ndi_devi_enter(dip);
 			ddi_walk_devs(ddi_get_child(dip), pci_check_regs,
 			    (void *)tgt_err);
-			ndi_devi_exit(dip, circ);
+			ndi_devi_exit(dip);
 		}
 		if (tgt_err->tgt_dip != NULL)
 			return (DDI_WALK_TERMINATE);
@@ -1419,11 +1422,10 @@ pci_check_ranges(dev_info_t *dip, void *arg)
 			(void) pci_fm_walk_devs(ddi_get_child(dip),
 			    pci_check_regs, (void *)tgt_err);
 		else {
-			int circ = 0;
-			ndi_devi_enter(dip, &circ);
+			ndi_devi_enter(dip);
 			ddi_walk_devs(ddi_get_child(dip), pci_check_regs,
 			    (void *)tgt_err);
-			ndi_devi_exit(dip, circ);
+			ndi_devi_exit(dip);
 		}
 		if (tgt_err->tgt_dip != NULL) {
 			kmem_free(pci_ranges, pci_ranges_length);

@@ -25,6 +25,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1889,8 +1890,6 @@ mptsas_do_detach(dev_info_t *dip)
 {
 	mptsas_t	*mpt;
 	scsi_hba_tran_t	*tran;
-	int		circ = 0;
-	int		circ1 = 0;
 	mdi_pathinfo_t	*pip = NULL;
 	int		i;
 	int		doneq_thread_num = 0;
@@ -1915,21 +1914,21 @@ mptsas_do_detach(dev_info_t *dip)
 			/*
 			 * MPxIO enabled for the iport
 			 */
-			ndi_devi_enter(scsi_vhci_dip, &circ1);
-			ndi_devi_enter(dip, &circ);
+			ndi_devi_enter(scsi_vhci_dip);
+			ndi_devi_enter(dip);
 			while ((pip = mdi_get_next_client_path(dip, NULL)) !=
 			    NULL) {
 				if (mdi_pi_free(pip, 0) == MDI_SUCCESS) {
 					continue;
 				}
-				ndi_devi_exit(dip, circ);
-				ndi_devi_exit(scsi_vhci_dip, circ1);
+				ndi_devi_exit(dip);
+				ndi_devi_exit(scsi_vhci_dip);
 				NDBG12(("detach failed because of "
 				    "outstanding path info"));
 				return (DDI_FAILURE);
 			}
-			ndi_devi_exit(dip, circ);
-			ndi_devi_exit(scsi_vhci_dip, circ1);
+			ndi_devi_exit(dip);
+			ndi_devi_exit(scsi_vhci_dip);
 			(void) mdi_phci_unregister(dip, 0);
 		}
 
@@ -6540,7 +6539,6 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 	uint8_t		phy, flags;
 	char		*addr = NULL;
 	dev_info_t	*lundip;
-	int		circ = 0, circ1 = 0;
 	char		attached_wwnstr[MPTSAS_WWN_STRLEN];
 
 	NDBG20(("mptsas%d handle_topo_change enter, devhdl 0x%x,"
@@ -6630,22 +6628,22 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		}
 
 		if (flags == MPTSAS_TOPO_FLAG_RAID_ASSOCIATED) {
-			ndi_devi_enter(parent, &circ1);
+			ndi_devi_enter(parent);
 			(void) mptsas_config_raid(parent, topo_node->devhdl,
 			    &lundip);
-			ndi_devi_exit(parent, circ1);
+			ndi_devi_exit(parent);
 		} else {
 			/*
 			 * hold nexus for bus configure
 			 */
-			ndi_devi_enter(scsi_vhci_dip, &circ);
-			ndi_devi_enter(parent, &circ1);
+			ndi_devi_enter(scsi_vhci_dip);
+			ndi_devi_enter(parent);
 			rval = mptsas_config_target(parent, ptgt);
 			/*
 			 * release nexus for bus configure
 			 */
-			ndi_devi_exit(parent, circ1);
-			ndi_devi_exit(scsi_vhci_dip, circ);
+			ndi_devi_exit(parent);
+			ndi_devi_exit(scsi_vhci_dip);
 
 			/*
 			 * If this is a SATA device, make sure that the
@@ -6774,11 +6772,11 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 
 		mutex_exit(&mpt->m_mutex);
 
-		ndi_devi_enter(scsi_vhci_dip, &circ);
-		ndi_devi_enter(parent, &circ1);
+		ndi_devi_enter(scsi_vhci_dip);
+		ndi_devi_enter(parent);
 		rval = mptsas_offline_target(parent, addr);
-		ndi_devi_exit(parent, circ1);
-		ndi_devi_exit(scsi_vhci_dip, circ);
+		ndi_devi_exit(parent);
+		ndi_devi_exit(scsi_vhci_dip);
 		NDBG20(("mptsas%d handle_topo_change to offline devhdl:%x, "
 		    "phymask:%x, rval:%x", mpt->m_instance,
 		    ptgt->m_devhdl, ptgt->m_addr.mta_phymask, rval));
@@ -6900,9 +6898,9 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		}
 
 		mutex_exit(&mpt->m_mutex);
-		ndi_devi_enter(parent, &circ1);
+		ndi_devi_enter(parent);
 		(void) mptsas_online_smp(parent, psmp, &smpdip);
-		ndi_devi_exit(parent, circ1);
+		ndi_devi_exit(parent);
 
 		mutex_enter(&mpt->m_mutex);
 		break;
@@ -6922,9 +6920,9 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		 */
 		mutex_exit(&mpt->m_mutex);
 
-		ndi_devi_enter(parent, &circ1);
+		ndi_devi_enter(parent);
 		rval = mptsas_offline_smp(parent, psmp, NDI_DEVI_REMOVE);
-		ndi_devi_exit(parent, circ1);
+		ndi_devi_exit(parent);
 
 		dev_info = psmp->m_deviceinfo;
 		if ((dev_info & DEVINFO_DIRECT_ATTACHED) ==
@@ -14199,8 +14197,6 @@ mptsas_bus_config(dev_info_t *pdip, uint_t flag,
     ddi_bus_config_op_t op, void *arg, dev_info_t **childp)
 {
 	int		ret = NDI_FAILURE;
-	int		circ = 0;
-	int		circ1 = 0;
 	mptsas_t	*mpt;
 	char		*ptr = NULL;
 	char		*devnm = NULL;
@@ -14221,8 +14217,8 @@ mptsas_bus_config(dev_info_t *pdip, uint_t flag,
 	/*
 	 * Hold the nexus across the bus_config
 	 */
-	ndi_devi_enter(scsi_vhci_dip, &circ);
-	ndi_devi_enter(pdip, &circ1);
+	ndi_devi_enter(scsi_vhci_dip);
+	ndi_devi_enter(pdip);
 	switch (op) {
 	case BUS_CONFIG_ONE:
 		/* parse wwid/target name out of name given */
@@ -14308,8 +14304,8 @@ mptsas_bus_config(dev_info_t *pdip, uint_t flag,
 		    (devnm == NULL) ? arg : devnm, childp, 0);
 	}
 
-	ndi_devi_exit(pdip, circ1);
-	ndi_devi_exit(scsi_vhci_dip, circ);
+	ndi_devi_exit(pdip);
+	ndi_devi_exit(scsi_vhci_dip);
 	if (devnm != NULL)
 		kmem_free(devnm, SCSI_MAXNAMELEN);
 	return (ret);

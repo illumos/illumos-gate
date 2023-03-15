@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1201,7 +1202,6 @@ pm_scan_dev(dev_info_t *dip)
 	size_t		size;
 	pm_component_t	 *cp;
 	dev_info_t	*pdip = ddi_get_parent(dip);
-	int		circ;
 	clock_t		min_scan = pm_default_min_scan;
 
 	/*
@@ -1239,7 +1239,7 @@ pm_scan_dev(dev_info_t *dip)
 	}
 	PM_UNLOCK_DIP(dip);
 
-	if (!ndi_devi_tryenter(pdip, &circ)) {
+	if (!ndi_devi_tryenter(pdip)) {
 		PMD(PMD_SCAN, ("%s: %s@%s(%s#%d) can't hold pdip",
 		    pmf, PM_DEVICE(pdip)))
 		return ((time_t)1);
@@ -1330,7 +1330,7 @@ pm_scan_dev(dev_info_t *dip)
 			    "%lx\n", pmf, PM_DEVICE(dip), i, timeleft))
 		}
 	}
-	ndi_devi_exit(pdip, circ);
+	ndi_devi_exit(pdip);
 	kmem_free(timestamp, size);
 	PMD(PMD_SCAN, ("%s: [END %s@%s(%s#%d)] timeleft(%lx)\n", pmf,
 	    PM_DEVICE(dip), timeleft))
@@ -1773,7 +1773,6 @@ pm_name_to_dip(char *pathname, int holddip)
 	struct pathname pn;
 	char		*component;
 	dev_info_t	*parent, *child;
-	int		circ;
 
 	if ((pathname == NULL) || (*pathname != '/'))
 		return (NULL);
@@ -1794,18 +1793,18 @@ pm_name_to_dip(char *pathname, int holddip)
 		(void) pn_getcomponent(&pn, component);
 
 		/* enter parent and search for component child */
-		ndi_devi_enter(parent, &circ);
+		ndi_devi_enter(parent);
 		child = ndi_devi_findchild(parent, component);
 		if ((child == NULL) || !i_ddi_devi_attached(child)) {
 			child = NULL;
-			ndi_devi_exit(parent, circ);
+			ndi_devi_exit(parent);
 			ndi_rele_devi(parent);
 			goto out;
 		}
 
 		/* attached child found, hold child and release parent */
 		ndi_hold_devi(child);
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 		ndi_rele_devi(parent);
 
 		/* child becomes parent, and process next component */
@@ -1865,7 +1864,7 @@ pm_unkeeps(int count, char *keeper, char **keptpaths, int pwr)
 	dev_info_t *kept;
 	dev_info_t *dip;
 	struct pm_component *cp;
-	int keeper_on = 0, circ;
+	int keeper_on = 0;
 
 	PMD(PMD_KEEPS, ("%s: count=%d, keeper=%s, keptpaths=%p\n", pmf, count,
 	    keeper, (void *)keptpaths))
@@ -1888,7 +1887,7 @@ pm_unkeeps(int count, char *keeper, char **keptpaths, int pwr)
 			 */
 			if ((dip != NULL) && (PM_GET_PM_INFO(dip) != NULL)) {
 				keeper_on = 0;
-				PM_LOCK_POWER(dip, &circ);
+				PM_LOCK_POWER(dip);
 				for (j = 0; j < PM_NUMCMPTS(dip); j++) {
 					cp = &DEVI(dip)->devi_pm_components[j];
 					if (cur_power(cp)) {
@@ -1901,7 +1900,7 @@ pm_unkeeps(int count, char *keeper, char **keptpaths, int pwr)
 					DEVI(kept)->devi_pm_flags
 					    &= ~PMC_SKIP_BRINGUP;
 				}
-				PM_UNLOCK_POWER(dip, circ);
+				PM_UNLOCK_POWER(dip);
 			} else if (pwr) {
 				if (PM_SKBU(kept) == 0) {
 					pm_rele_power(kept);
@@ -2069,20 +2068,19 @@ static void
 e_pm_hold_rele_power(dev_info_t *dip, int cnt)
 {
 	PMD_FUNC(pmf, "hold_rele_power")
-	int circ;
 
 	if ((dip == NULL) ||
 	    (PM_GET_PM_INFO(dip) == NULL) || PM_ISBC(dip))
 		return;
 
-	PM_LOCK_POWER(dip, &circ);
+	PM_LOCK_POWER(dip);
 	ASSERT(cnt >= 0 || (cnt < 0 && PM_KUC(dip) > 0));
 	PMD(PMD_KIDSUP, ("%s: kidsupcnt for %s@%s(%s#%d) %d->%d\n", pmf,
 	    PM_DEVICE(dip), PM_KUC(dip), (PM_KUC(dip) + cnt)))
 
 	PM_KUC(dip) += cnt;
 
-	PM_UNLOCK_POWER(dip, circ);
+	PM_UNLOCK_POWER(dip);
 
 	if (cnt < 0 && PM_KUC(dip) == 0)
 		pm_rescan(dip);
@@ -2810,15 +2808,14 @@ pm_enqueue_notify_others(pm_ppm_devlist_t **listp, pm_canblock_t canblock)
  * (with no locks held).
  */
 static int
-pm_try_parent_child_locks(dev_info_t *pdip,
-    dev_info_t *dip, int *pcircp, int *circp)
+pm_try_parent_child_locks(dev_info_t *pdip, dev_info_t *dip)
 {
-	if (ndi_devi_tryenter(pdip, pcircp))
-		if (PM_TRY_LOCK_POWER(dip, circp)) {
+	if (ndi_devi_tryenter(pdip)) {
+		if (PM_TRY_LOCK_POWER(dip)) {
 			return (1);
-		} else {
-			ndi_devi_exit(pdip, *pcircp);
 		}
+		ndi_devi_exit(pdip);
+	}
 	return (0);
 }
 
@@ -2941,7 +2938,7 @@ pm_power_has_changed(dev_info_t *dip, int comp, int level)
 	int ret;
 	dev_info_t *pdip = ddi_get_parent(dip);
 	struct pm_component *cp;
-	int blocked, circ, pcirc, old_level;
+	int blocked, old_level;
 
 	if (level < 0) {
 		PMD(PMD_FAIL, ("%s: %s@%s(%s#%d): bad level=%d\n", pmf,
@@ -2969,7 +2966,7 @@ pm_power_has_changed(dev_info_t *dip, int comp, int level)
 	 * immediately.
 	 */
 	cp = PM_CP(dip, comp);
-	while (!pm_try_parent_child_locks(pdip, dip, &pcirc, &circ)) {
+	while (!pm_try_parent_child_locks(pdip, dip)) {
 		if (((blocked = pm_blocked_by_us(dip)) != 0) &&
 		    (cp->pmc_flags & PM_POWER_OP)) {
 			if (pm_watchers()) {
@@ -3004,7 +3001,7 @@ pm_power_has_changed(dev_info_t *dip, int comp, int level)
 			return (DDI_SUCCESS);
 		} else
 			if (blocked) {	/* blocked, but different cmpt? */
-				if (!ndi_devi_tryenter(pdip, &pcirc)) {
+				if (!ndi_devi_tryenter(pdip)) {
 					cmn_err(CE_NOTE,
 					    "!pm: parent kuc not updated due "
 					    "to possible deadlock.\n");
@@ -3023,7 +3020,7 @@ pm_power_has_changed(dev_info_t *dip, int comp, int level)
 					    old_level != PM_LEVEL_UNKNOWN)
 						pm_rele_power(pdip);
 				}
-				ndi_devi_exit(pdip, pcirc);
+				ndi_devi_exit(pdip);
 				/* child lock not held: deadlock */
 				return (ret);
 			}
@@ -3042,8 +3039,8 @@ pm_power_has_changed(dev_info_t *dip, int comp, int level)
 		    old_level != PM_LEVEL_UNKNOWN)
 			pm_rele_power(pdip);
 	}
-	PM_UNLOCK_POWER(dip, circ);
-	ndi_devi_exit(pdip, pcirc);
+	PM_UNLOCK_POWER(dip);
+	ndi_devi_exit(pdip);
 	return (ret);
 }
 
@@ -3224,7 +3221,7 @@ pm_register_ppm(int (*func)(dev_info_t *), dev_info_t *dip)
 	PMD_FUNC(pmf, "register_ppm")
 	struct ppm_callbacks *ppmcp;
 	pm_component_t *cp;
-	int i, pwr, result, circ;
+	int i, pwr, result;
 	power_req_t power_req;
 	struct ppm_notify_level_req *p = &power_req.req.ppm_notify_level_req;
 	void pm_ppm_claim(dev_info_t *);
@@ -3254,7 +3251,7 @@ pm_register_ppm(int (*func)(dev_info_t *), dev_info_t *dip)
 			power_req.request_type = PMR_PPM_POWER_CHANGE_NOTIFY;
 			p->old_level = PM_LEVEL_UNKNOWN;
 			p->who = dip;
-			PM_LOCK_POWER(dip, &circ);
+			PM_LOCK_POWER(dip);
 			for (i = 0; i < PM_NUMCMPTS(dip); i++) {
 				cp = PM_CP(dip, i);
 				pwr = cp->pmc_cur_pwr;
@@ -3272,7 +3269,7 @@ pm_register_ppm(int (*func)(dev_info_t *), dev_info_t *dip)
 					}
 				}
 			}
-			PM_UNLOCK_POWER(dip, circ);
+			PM_UNLOCK_POWER(dip);
 		}
 	}
 	return (DDI_SUCCESS);
@@ -4282,7 +4279,7 @@ pm_set_device_threshold(dev_info_t *dip, int base, int flag)
 	int thresh;
 	int remainder;
 	pm_comp_t *pmc;
-	int i, circ;
+	int i;
 
 	ASSERT(!PM_IAM_LOCKING_DIP(dip));
 	PM_LOCK_DIP(dip);
@@ -4312,7 +4309,7 @@ pm_set_device_threshold(dev_info_t *dip, int base, int flag)
 			 */
 			if (DEVI(dip)->devi_pm_flags &
 			    (PMC_DEV_THRESH|PMC_COMP_THRESH)) {
-				PM_LOCK_POWER(dip, &circ);
+				PM_LOCK_POWER(dip);
 				for (i = 0; i < PM_NUMCMPTS(dip); i++) {
 					if (PM_CURPOWER(dip, i) == 0)
 						continue;
@@ -4327,7 +4324,7 @@ pm_set_device_threshold(dev_info_t *dip, int base, int flag)
 						    PM_ALL_LOWEST);
 					mutex_exit(&pm_compcnt_lock);
 				}
-				PM_UNLOCK_POWER(dip, circ);
+				PM_UNLOCK_POWER(dip);
 			}
 			DEVI(dip)->devi_pm_flags &= PMC_THRESH_NONE;
 			DEVI(dip)->devi_pm_flags |= PMC_NEXDEF_THRESH;
@@ -4339,7 +4336,7 @@ pm_set_device_threshold(dev_info_t *dip, int base, int flag)
 			 * non-default threshold, include that node in
 			 * the notlowest accounting.
 			 */
-			PM_LOCK_POWER(dip, &circ);
+			PM_LOCK_POWER(dip);
 			for (i = 0; i < PM_NUMCMPTS(dip); i++) {
 				if (PM_CURPOWER(dip, i) == 0)
 					continue;
@@ -4353,7 +4350,7 @@ pm_set_device_threshold(dev_info_t *dip, int base, int flag)
 				    PM_DEVICE(dip), pm_comps_notlowest))
 				mutex_exit(&pm_compcnt_lock);
 			}
-			PM_UNLOCK_POWER(dip, circ);
+			PM_UNLOCK_POWER(dip);
 		}
 	}
 	/*
@@ -4945,20 +4942,17 @@ pm_default_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			return (DDI_SUCCESS);
 
 		case PMR_PPM_LOCK_POWER:
-			pm_lock_power_single(reqp->req.ppm_lock_power_req.who,
-			    reqp->req.ppm_lock_power_req.circp);
+			pm_lock_power_single(reqp->req.ppm_lock_power_req.who);
 			return (DDI_SUCCESS);
 
 		case PMR_PPM_UNLOCK_POWER:
 			pm_unlock_power_single(
-			    reqp->req.ppm_unlock_power_req.who,
-			    reqp->req.ppm_unlock_power_req.circ);
+			    reqp->req.ppm_unlock_power_req.who);
 			return (DDI_SUCCESS);
 
 		case PMR_PPM_TRY_LOCK_POWER:
 			*(int *)result = pm_try_locking_power_single(
-			    reqp->req.ppm_lock_power_req.who,
-			    reqp->req.ppm_lock_power_req.circp);
+			    reqp->req.ppm_lock_power_req.who);
 			return (DDI_SUCCESS);
 
 		case PMR_PPM_POWER_LOCK_OWNER:
@@ -5198,7 +5192,7 @@ static int
 pm_set_keeping(dev_info_t *keeper, dev_info_t *kept)
 {
 	PMD_FUNC(pmf, "set_keeping")
-	int j, up = 0, circ;
+	int j, up = 0;
 	void prdeps(char *);
 
 	PMD(PMD_KEEPS, ("%s: keeper=%s@%s(%s#%d), kept=%s@%s(%s#%d)\n", pmf,
@@ -5225,7 +5219,7 @@ pm_set_keeping(dev_info_t *keeper, dev_info_t *kept)
 		return (0);
 	}
 
-	PM_LOCK_POWER(keeper, &circ);
+	PM_LOCK_POWER(keeper);
 	for (j = 0; j < PM_NUMCMPTS(keeper); j++) {
 		if (PM_CURPOWER(keeper, j)) {
 			up++;
@@ -5238,7 +5232,7 @@ pm_set_keeping(dev_info_t *keeper, dev_info_t *kept)
 		    PM_DEVICE(kept)))
 		bring_pmdep_up(kept, 1);
 	}
-	PM_UNLOCK_POWER(keeper, circ);
+	PM_UNLOCK_POWER(keeper);
 #ifdef DEBUG
 	if (pm_debug & PMD_KEEPS)
 		prdeps("After PAD\n");
@@ -5880,14 +5874,13 @@ pm_current_threshold(dev_info_t *dip, int comp, int *threshp)
  * affected devices will be locked.
  */
 void
-pm_lock_power(dev_info_t *dip, int *circp)
+pm_lock_power(dev_info_t *dip)
 {
 	power_req_t power_req;
 	int result;
 
 	power_req.request_type = PMR_PPM_LOCK_POWER;
 	power_req.req.ppm_lock_power_req.who = dip;
-	power_req.req.ppm_lock_power_req.circp = circp;
 	(void) pm_ctlops(PPM(dip), dip, DDI_CTLOPS_POWER, &power_req, &result);
 }
 
@@ -5896,14 +5889,13 @@ pm_lock_power(dev_info_t *dip, int *circp)
  * See comments for pm_lock_power.
  */
 void
-pm_unlock_power(dev_info_t *dip, int circ)
+pm_unlock_power(dev_info_t *dip)
 {
 	power_req_t power_req;
 	int result;
 
 	power_req.request_type = PMR_PPM_UNLOCK_POWER;
 	power_req.req.ppm_unlock_power_req.who = dip;
-	power_req.req.ppm_unlock_power_req.circ = circ;
 	(void) pm_ctlops(PPM(dip), dip, DDI_CTLOPS_POWER, &power_req, &result);
 }
 
@@ -5915,14 +5907,13 @@ pm_unlock_power(dev_info_t *dip, int circ)
  * Return: 1 if lock(s) acquired, 0 if not.
  */
 int
-pm_try_locking_power(dev_info_t *dip, int *circp)
+pm_try_locking_power(dev_info_t *dip)
 {
 	power_req_t power_req;
 	int result;
 
 	power_req.request_type = PMR_PPM_TRY_LOCK_POWER;
 	power_req.req.ppm_lock_power_req.who = dip;
-	power_req.req.ppm_lock_power_req.circp = circp;
 	(void) pm_ctlops(PPM(dip), dip, DDI_CTLOPS_POWER, &power_req, &result);
 	return (result);
 }
@@ -5951,12 +5942,12 @@ pm_try_locking_power(dev_info_t *dip, int *circp)
  * become one.
  */
 void
-pm_lock_power_single(dev_info_t *dip, int *circp)
+pm_lock_power_single(dev_info_t *dip)
 {
 	lock_loan_t *cur;
 
 	/* if the lock is available, we are done. */
-	if (ndi_devi_tryenter(dip, circp))
+	if (ndi_devi_tryenter(dip))
 		return;
 
 	mutex_enter(&pm_loan_lock);
@@ -5968,14 +5959,14 @@ pm_lock_power_single(dev_info_t *dip, int *circp)
 
 	/* if this thread not already registered, it is safe to block */
 	if (cur == NULL)
-		ndi_devi_enter(dip, circp);
+		ndi_devi_enter(dip);
 	else {
 		/* registered: does lender own the lock we want? */
 		if (cur->pmlk_lender == DEVI(dip)->devi_busy_thread) {
 			ASSERT(cur->pmlk_dip == NULL || cur->pmlk_dip == dip);
 			cur->pmlk_dip = dip;
 		} else /* no: just block for it */
-			ndi_devi_enter(dip, circp);
+			ndi_devi_enter(dip);
 
 	}
 }
@@ -5987,13 +5978,13 @@ pm_lock_power_single(dev_info_t *dip, int *circp)
  * Note: for use by ppm only.
  */
 void
-pm_unlock_power_single(dev_info_t *dip, int circ)
+pm_unlock_power_single(dev_info_t *dip)
 {
 	lock_loan_t *cur;
 
 	/* optimization: mutex not needed to check empty list */
 	if (lock_loan_head.pmlk_next == NULL) {
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 		return;
 	}
 
@@ -6006,7 +5997,7 @@ pm_unlock_power_single(dev_info_t *dip, int circ)
 
 	if (cur == NULL || cur->pmlk_dip != dip)
 		/* we acquired the lock directly, so return it */
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 }
 
 /*
@@ -6015,9 +6006,9 @@ pm_unlock_power_single(dev_info_t *dip, int circ)
  * Note: for use by ppm only.
  */
 int
-pm_try_locking_power_single(dev_info_t *dip, int *circp)
+pm_try_locking_power_single(dev_info_t *dip)
 {
-	return (ndi_devi_tryenter(dip, circp));
+	return (ndi_devi_tryenter(dip));
 }
 
 #ifdef	DEBUG
@@ -6377,7 +6368,7 @@ pm_bring_self_up(char *keptpath)
 	dev_info_t *keeper;
 	pm_pdr_t *dp;
 	int i, j;
-	int up = 0, circ;
+	int up = 0;
 
 	kept = pm_name_to_dip(keptpath, 1);
 	if (kept == NULL)
@@ -6393,7 +6384,7 @@ pm_bring_self_up(char *keptpath)
 			if (keeper) {
 				PMD(PMD_KEEPS, ("%s: keeper=%s@%s(%s#%d)\n",
 				    pmf, PM_DEVICE(keeper)))
-				PM_LOCK_POWER(keeper, &circ);
+				PM_LOCK_POWER(keeper);
 				for (j = 0; j < PM_NUMCMPTS(keeper);
 				    j++) {
 					if (PM_CURPOWER(keeper, j)) {
@@ -6408,7 +6399,7 @@ pm_bring_self_up(char *keptpath)
 						    ~PMC_SKIP_BRINGUP;
 					bring_pmdep_up(kept, 1);
 				}
-				PM_UNLOCK_POWER(keeper, circ);
+				PM_UNLOCK_POWER(keeper);
 				ddi_release_devi(keeper);
 			}
 		}
@@ -8649,10 +8640,7 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 	_NOTE(ARGUNUSED(impl_arg))
 	PMD_FUNC(pmf, "bp_set_power")
 	pm_ppm_devlist_t *devl = NULL;
-	int clevel, circ;
-#ifdef	DEBUG
-	int circ_db, ccirc_db;
-#endif
+	int clevel;
 	int ret = DDI_SUCCESS;
 	dev_info_t *cdip;
 	pm_bp_child_pwrchg_t *bpc = (pm_bp_child_pwrchg_t *)arg;
@@ -8741,7 +8729,7 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		 */
 		pm_hold_power(pdip);
 	}
-	PM_LOCK_POWER(dip, &circ);
+	PM_LOCK_POWER(dip);
 	clevel = PM_CURPOWER(dip, comp);
 	/*
 	 * It's possible that a call was made to pm_update_maxpower()
@@ -8858,15 +8846,15 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 			pm_desc_pwrchk_t pdpchk;
 			pdpchk.pdpc_dip = dip;
 			pdpchk.pdpc_par_involved = PM_WANTS_NOTIFICATION(dip);
-			ndi_devi_enter(dip, &circ_db);
+			ndi_devi_enter(dip);
 			for (cdip = ddi_get_child(dip); cdip != NULL;
 			    cdip = ddi_get_next_sibling(cdip)) {
-				ndi_devi_enter(cdip, &ccirc_db);
+				ndi_devi_enter(cdip);
 				ddi_walk_devs(cdip, pm_desc_pwrchk_walk,
 				    (void *)&pdpchk);
-				ndi_devi_exit(cdip, ccirc_db);
+				ndi_devi_exit(cdip);
 			}
-			ndi_devi_exit(dip, circ_db);
+			ndi_devi_exit(dip);
 		}
 #endif
 		/*
@@ -8981,13 +8969,13 @@ post_notify:
 	if (PM_WANTS_NOTIFICATION(pdip)) {
 		ret = (*PM_BUS_POWER_FUNC(pdip))(pdip, NULL,
 		    BUS_POWER_POST_NOTIFICATION, bpc, resultp);
-		PM_UNLOCK_POWER(dip, circ);
+		PM_UNLOCK_POWER(dip);
 		PMD(PMD_SET, ("%s: post_notify %s@%s(%s#%d) for "
 		    "child %s@%s(%s#%d), ret=%d\n", pmf, PM_DEVICE(pdip),
 		    PM_DEVICE(dip), ret))
 	} else {
 		nlevel = cur_power(cp); /* in case phc deadlock updated pwr */
-		PM_UNLOCK_POWER(dip, circ);
+		PM_UNLOCK_POWER(dip);
 		/*
 		 * Now that we know what power transition has occurred
 		 * (if any), release the power hold.  Leave the hold
@@ -9026,26 +9014,26 @@ pm_busop_match_request(dev_info_t *dip, void *arg)
 	int nlevel = bpc->bpc_nlevel;
 	pm_canblock_t canblock = pspm->pspm_canblock;
 	int direction = pspm->pspm_direction;
-	int clevel, circ;
+	int clevel;
 
 	ASSERT(PM_IAM_LOCKING_DIP(dip));
-	PM_LOCK_POWER(dip, &circ);
+	PM_LOCK_POWER(dip);
 	clevel = PM_CURPOWER(dip, comp);
 	PMD(PMD_SET, ("%s: %s@%s(%s#%d), cmp=%d, nlvl=%d, clvl=%d\n",
 	    pmf, PM_DEVICE(dip), comp, nlevel, clevel))
 	if (direction == PM_LEVEL_UPONLY) {
 		if (clevel >= nlevel) {
-			PM_UNLOCK_POWER(dip, circ);
+			PM_UNLOCK_POWER(dip);
 			PM_UNLOCK_DIP(dip);
 			return (DDI_SUCCESS);
 		}
 	} else if (clevel == nlevel) {
-		PM_UNLOCK_POWER(dip, circ);
+		PM_UNLOCK_POWER(dip);
 		PM_UNLOCK_DIP(dip);
 		return (DDI_SUCCESS);
 	}
 	if (canblock == PM_CANBLOCK_FAIL) {
-		PM_UNLOCK_POWER(dip, circ);
+		PM_UNLOCK_POWER(dip);
 		PM_UNLOCK_DIP(dip);
 		return (DDI_FAILURE);
 	}
@@ -9054,7 +9042,7 @@ pm_busop_match_request(dev_info_t *dip, void *arg)
 		 * To avoid a deadlock, we must not hold the
 		 * power lock when we pm_block.
 		 */
-		PM_UNLOCK_POWER(dip, circ);
+		PM_UNLOCK_POWER(dip);
 		PMD(PMD_SET, ("%s: blocking\n", pmf))
 		/* pm_block releases dip lock */
 		switch (pm_block(dip, comp, nlevel, clevel)) {

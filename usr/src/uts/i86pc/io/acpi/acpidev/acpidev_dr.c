@@ -24,6 +24,10 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/types.h>
 #include <sys/atomic.h>
 #include <sys/cmn_err.h>
@@ -1739,7 +1743,6 @@ static ACPI_STATUS
 acpidev_dr_probe_object(ACPI_HANDLE hdl, acpidev_data_handle_t dhdl)
 {
 	ACPI_STATUS rc = AE_OK;
-	int circ;
 	char *objname;
 	dev_info_t *pdip;
 	ACPI_STATUS res;
@@ -1793,7 +1796,7 @@ acpidev_dr_probe_object(ACPI_HANDLE hdl, acpidev_data_handle_t dhdl)
 
 	/* Lock the parent dip before touching children. */
 	pdip = infop->awi_dip;
-	ndi_devi_enter(pdip, &circ);
+	ndi_devi_enter(pdip);
 	rw_enter(&acpidev_class_lock, RW_READER);
 
 	/* Call pre-probe callback functions to prepare for probing. */
@@ -1838,7 +1841,7 @@ acpidev_dr_probe_object(ACPI_HANDLE hdl, acpidev_data_handle_t dhdl)
 	}
 
 	rw_exit(&acpidev_class_lock);
-	ndi_devi_exit(pdip, circ);
+	ndi_devi_exit(pdip);
 
 	acpidev_free_walk_info(cinfop);
 	acpidev_free_walk_info(infop);
@@ -1945,7 +1948,7 @@ ACPI_STATUS
 acpidev_dr_device_insert(ACPI_HANDLE hdl)
 {
 	ACPI_STATUS rc = AE_OK;
-	int status, circ;
+	int status;
 	char *objname;
 	dev_info_t *dip;
 	acpidev_data_handle_t dhdl;
@@ -2007,7 +2010,7 @@ acpidev_dr_device_insert(ACPI_HANDLE hdl)
 	 * Here the lock on ddi_root_node() is held first, which will break
 	 * the dead lock loop.
 	 */
-	ndi_devi_enter(ddi_root_node(), &circ);
+	ndi_devi_enter(ddi_root_node());
 
 	rc = acpidev_dr_probe_object(hdl, dhdl);
 	if (ACPI_SUCCESS(rc)) {
@@ -2023,7 +2026,7 @@ acpidev_dr_device_insert(ACPI_HANDLE hdl)
 		ACPIDEV_DR_SET_FAILED(dhdl);
 	}
 
-	ndi_devi_exit(ddi_root_node(), circ);
+	ndi_devi_exit(ddi_root_node());
 	acpidev_free_object_name(objname);
 
 	return (rc);
@@ -2201,7 +2204,6 @@ ACPI_STATUS
 acpidev_dr_device_remove(ACPI_HANDLE hdl)
 {
 	ACPI_STATUS rc = AE_OK;
-	int circ;
 	char *objname;
 	acpidev_data_handle_t dhdl;
 	struct acpidev_dr_device_remove_arg arg;
@@ -2245,7 +2247,7 @@ acpidev_dr_device_remove(ACPI_HANDLE hdl)
 	/*
 	 * Lock ddi_root_node() to avoid deadlock.
 	 */
-	ndi_devi_enter(ddi_root_node(), &circ);
+	ndi_devi_enter(ddi_root_node());
 
 	arg.level = 0;
 	rc = acpidev_dr_device_remove_cb(hdl, 0, &arg, NULL);
@@ -2259,7 +2261,7 @@ acpidev_dr_device_remove(ACPI_HANDLE hdl)
 		ACPIDEV_DR_SET_FAILED(dhdl);
 	}
 
-	ndi_devi_exit(ddi_root_node(), circ);
+	ndi_devi_exit(ddi_root_node());
 	acpidev_free_object_name(objname);
 
 	return (rc);

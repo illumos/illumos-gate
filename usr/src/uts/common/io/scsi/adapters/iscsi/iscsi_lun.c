@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2019 Nexenta Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -384,7 +385,6 @@ iscsi_lun_virt_create(iscsi_sess_t *isp, uint16_t lun_num, iscsi_lun_t *ilp,
 	char			*nodename	= NULL;
 	char			**compatible	= NULL;
 	int			ncompatible	= 0;
-	int			circ = 0;
 
 	ASSERT(isp != NULL);
 	ASSERT(ilp != NULL);
@@ -408,7 +408,7 @@ iscsi_lun_virt_create(iscsi_sess_t *isp, uint16_t lun_num, iscsi_lun_t *ilp,
 	/*
 	 *
 	 */
-	ndi_devi_enter(scsi_vhci_dip, &circ);
+	ndi_devi_enter(scsi_vhci_dip);
 	mdi_rtn = mdi_pi_alloc_compatible(ihp->hba_dip, nodename,
 	    ilp->lun_guid, ilp->lun_addr, compatible, ncompatible,
 	    0, &pip);
@@ -473,7 +473,7 @@ virt_create_done:
 			rtn = ISCSI_STATUS_SUCCESS;
 		}
 	}
-	ndi_devi_exit(scsi_vhci_dip, circ);
+	ndi_devi_exit(scsi_vhci_dip);
 
 	scsi_hba_nodename_compatible_free(nodename, compatible);
 
@@ -497,7 +497,6 @@ iscsi_lun_phys_create(iscsi_sess_t *isp, uint16_t lun_num,
 	int			ncompatible	= 0;
 	char			*scsi_binding_set = NULL;
 	char			instance[32];
-	int			circ		= 0;
 
 	ASSERT(isp != NULL);
 	ASSERT(ilp != NULL);
@@ -525,7 +524,7 @@ iscsi_lun_phys_create(iscsi_sess_t *isp, uint16_t lun_num,
 		return (ISCSI_STATUS_INTERNAL_ERROR);
 	}
 
-	ndi_devi_enter(ihp->hba_dip, &circ);
+	ndi_devi_enter(ihp->hba_dip);
 
 	ndi_rtn = ndi_devi_alloc(ihp->hba_dip, nodename,
 	    DEVI_SID_NODEID, &lun_dip);
@@ -590,7 +589,7 @@ phys_create_done:
 		}
 
 	}
-	ndi_devi_exit(ihp->hba_dip, circ);
+	ndi_devi_exit(ihp->hba_dip);
 
 	ilp->lun_dip = lun_dip;
 	ilp->lun_pip = NULL;
@@ -610,7 +609,6 @@ phys_create_done:
 void
 iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 {
-	int			circ		= 0;
 	int			rval		= 0;
 	uint64_t		*lun_num_ptr	= NULL;
 	uint16_t		boot_lun_num	= 0;
@@ -624,9 +622,9 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 	ASSERT((ilp->lun_pip != NULL) || (ilp->lun_dip != NULL));
 
 	if (ilp->lun_pip != NULL) {
-		ndi_devi_enter(scsi_vhci_dip, &circ);
+		ndi_devi_enter(scsi_vhci_dip);
 		rval =  mdi_pi_online(ilp->lun_pip, 0);
-		ndi_devi_exit(scsi_vhci_dip, circ);
+		ndi_devi_exit(scsi_vhci_dip);
 		if (rval == MDI_SUCCESS) {
 			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
 			ilp->lun_state |= ISCSI_LUN_STATE_ONLINE;
@@ -635,9 +633,9 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 		}
 
 	} else if (ilp->lun_dip != NULL) {
-		ndi_devi_enter(ihp->hba_dip, &circ);
+		ndi_devi_enter(ihp->hba_dip);
 		rval =  ndi_devi_online(ilp->lun_dip, 0);
-		ndi_devi_exit(ihp->hba_dip, circ);
+		ndi_devi_exit(ihp->hba_dip);
 		if (rval == NDI_SUCCESS) {
 			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
 			ilp->lun_state |= ISCSI_LUN_STATE_ONLINE;
@@ -720,7 +718,6 @@ iscsi_status_t
 iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 {
 	iscsi_status_t		status		= ISCSI_STATUS_SUCCESS;
-	int			circ		= 0;
 	dev_info_t		*cdip;
 	char			*pathname	= NULL;
 	boolean_t		offline		= B_FALSE;
@@ -742,7 +739,7 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 	/* Attempt to offline the logical units */
 	if (ilp->lun_pip != NULL) {
 		/* virt/mdi */
-		ndi_devi_enter(scsi_vhci_dip, &circ);
+		ndi_devi_enter(scsi_vhci_dip);
 		if (mdi_pi_offline(ilp->lun_pip, 0) == MDI_SUCCESS) {
 			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
 			ilp->lun_state |= ISCSI_LUN_STATE_OFFLINE;
@@ -758,13 +755,13 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 				offline = B_TRUE;
 			}
 		}
-		ndi_devi_exit(scsi_vhci_dip, circ);
+		ndi_devi_exit(scsi_vhci_dip);
 
 	} else  {
 		/* phys/ndi */
 		int flags = NDI_DEVFS_CLEAN;
 
-		ndi_devi_enter(ihp->hba_dip, &circ);
+		ndi_devi_enter(ihp->hba_dip);
 		if (lun_free == B_TRUE &&
 		    (ilp->lun_state & ISCSI_LUN_STATE_ONLINE))
 			flags |= NDI_DEVI_REMOVE;
@@ -779,7 +776,7 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 			ilp->lun_state |= ISCSI_LUN_STATE_OFFLINE;
 			offline = B_TRUE;
 		}
-		ndi_devi_exit(ihp->hba_dip, circ);
+		ndi_devi_exit(ihp->hba_dip);
 	}
 
 	if (offline == B_TRUE && pathname != NULL &&

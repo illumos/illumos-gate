@@ -27,6 +27,10 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/conf.h>
@@ -839,26 +843,24 @@ static void
 drmach_hold_devtree(void)
 {
 	dev_info_t *dip;
-	int circ;
 	int hold = 1;
 
 	dip = ddi_root_node();
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), drmach_hold_rele_devtree, &hold);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 }
 
 static void
 drmach_release_devtree(void)
 {
 	dev_info_t *dip;
-	int circ;
 	int hold = 0;
 
 	dip = ddi_root_node();
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), drmach_hold_rele_devtree, &hold);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 }
 
 static boolean_t

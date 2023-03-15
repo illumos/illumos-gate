@@ -26,7 +26,7 @@
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  * Copyright 2020 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #define	PSMI_1_7
@@ -1558,7 +1558,7 @@ mach_cpu_remove(processorid_t cpuid)
 static int
 mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp)
 {
-	int rv, circ;
+	int rv;
 	dev_info_t *dip;
 	static kmutex_t cpu_node_lock;
 	static dev_info_t *cpu_nex_devi = NULL;
@@ -1573,7 +1573,7 @@ mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp)
 		cpu_nex_devi = ddi_find_devinfo("cpus", -1, 0);
 		/* Create cpus if it doesn't exist. */
 		if (cpu_nex_devi == NULL) {
-			ndi_devi_enter(ddi_root_node(), &circ);
+			ndi_devi_enter(ddi_root_node());
 			rv = ndi_devi_alloc(ddi_root_node(), "cpus",
 			    (pnode_t)DEVI_SID_NODEID, &dip);
 			if (rv != NDI_SUCCESS) {
@@ -1584,7 +1584,7 @@ mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp)
 			}
 			ASSERT(dip != NULL);
 			(void) ndi_devi_online(dip, 0);
-			ndi_devi_exit(ddi_root_node(), circ);
+			ndi_devi_exit(ddi_root_node());
 			cpu_nex_devi = dip;
 		}
 		mutex_exit(&cpu_node_lock);
@@ -1593,7 +1593,7 @@ mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp)
 	/*
 	 * create a child node for cpu identified as 'cpu_id'
 	 */
-	ndi_devi_enter(cpu_nex_devi, &circ);
+	ndi_devi_enter(cpu_nex_devi);
 	dip = ddi_add_child(cpu_nex_devi, "cpu", DEVI_SID_NODEID, -1);
 	if (dip == NULL) {
 		cmn_err(CE_CONT,
@@ -1604,7 +1604,7 @@ mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp)
 		(void) ndi_hold_devi(dip);
 		rv = PSM_SUCCESS;
 	}
-	ndi_devi_exit(cpu_nex_devi, circ);
+	ndi_devi_exit(cpu_nex_devi);
 
 	return (rv);
 }

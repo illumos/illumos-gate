@@ -26,6 +26,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2021 Toomas Soome <tsoome@me.com>
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -2729,7 +2730,7 @@ lofi_create_dev(struct lofi_ioctl *klip)
 	dev_info_t *parent, *child;
 	struct lofi_state *lsp = NULL;
 	char namebuf[MAXNAMELEN];
-	int error, circ;
+	int error;
 
 	/* get control device */
 	lsp = ddi_get_soft_state(lofi_statep, 0);
@@ -2741,9 +2742,9 @@ lofi_create_dev(struct lofi_ioctl *klip)
 	(void) snprintf(namebuf, sizeof (namebuf), LOFI_DRIVER_NAME "@%d",
 	    klip->li_id);
 
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 	child = ndi_devi_findchild(parent, namebuf);
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 
 	if (child == NULL) {
 		child = ddi_add_child(parent, LOFI_DRIVER_NAME,

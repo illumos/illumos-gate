@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -66,7 +67,6 @@ int
 ndi_hp_register(dev_info_t *dip, ddi_hp_cn_info_t *info_p)
 {
 	ddi_hp_cn_handle_t	*hdlp;
-	int			count;
 
 	DDI_HP_NEXDBG((CE_CONT, "ndi_hp_register: dip %p, info_p %p\n",
 	    (void *)dip, (void *)info_p));
@@ -83,12 +83,12 @@ ndi_hp_register(dev_info_t *dip, ddi_hp_cn_info_t *info_p)
 		return (NDI_ENOTSUP);
 	}
 	/* Lock before access */
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 
 	hdlp = ddihp_cn_name_to_handle(dip, info_p->cn_name);
 	if (hdlp) {
 		/* This cn_name is already registered. */
-		ndi_devi_exit(dip, count);
+		ndi_devi_exit(dip);
 
 		return (NDI_SUCCESS);
 	}
@@ -118,14 +118,14 @@ ndi_hp_register(dev_info_t *dip, ddi_hp_cn_info_t *info_p)
 	DDIHP_LIST_APPEND(ddi_hp_cn_handle_t, (DEVI(dip)->devi_hp_hdlp),
 	    hdlp);
 
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 
 	return (NDI_SUCCESS);
 
 fail:
 	kmem_free(hdlp->cn_info.cn_name, strlen(hdlp->cn_info.cn_name) + 1);
 	kmem_free(hdlp, sizeof (ddi_hp_cn_handle_t));
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 
 	return (NDI_FAILURE);
 }
@@ -137,7 +137,6 @@ int
 ndi_hp_unregister(dev_info_t *dip, char *cn_name)
 {
 	ddi_hp_cn_handle_t	*hdlp;
-	int			count;
 	int			ret;
 
 	DDI_HP_NEXDBG((CE_CONT, "ndi_hp_unregister: dip %p, cn name %s\n",
@@ -151,11 +150,11 @@ ndi_hp_unregister(dev_info_t *dip, char *cn_name)
 	if ((dip == NULL) || (cn_name == NULL))
 		return (NDI_EINVAL);
 
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 
 	hdlp = ddihp_cn_name_to_handle(dip, cn_name);
 	if (hdlp == NULL) {
-		ndi_devi_exit(dip, count);
+		ndi_devi_exit(dip);
 		return (NDI_EINVAL);
 	}
 
@@ -174,7 +173,7 @@ ndi_hp_unregister(dev_info_t *dip, char *cn_name)
 		break;
 	}
 
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 
 	return (ret);
 }
@@ -208,18 +207,17 @@ ndi_hp_state_change_req(dev_info_t *dip, char *cn_name,
 	 */
 	if (flag & DDI_HP_REQ_SYNC) {
 		ddi_hp_cn_handle_t	*hdlp;
-		int			count;
 		int			ret;
 
 		ASSERT(!servicing_interrupt());
 		if (servicing_interrupt())
 			return (NDI_FAILURE);
 
-		ndi_devi_enter(dip, &count);
+		ndi_devi_enter(dip);
 
 		hdlp = ddihp_cn_name_to_handle(dip, cn_name);
 		if (hdlp == NULL) {
-			ndi_devi_exit(dip, count);
+			ndi_devi_exit(dip);
 
 			return (NDI_EINVAL);
 		}
@@ -230,7 +228,7 @@ ndi_hp_state_change_req(dev_info_t *dip, char *cn_name,
 
 		ret = ddihp_cn_req_handler(hdlp, state);
 
-		ndi_devi_exit(dip, count);
+		ndi_devi_exit(dip);
 
 		return (ret);
 	}
@@ -274,7 +272,6 @@ void
 ndi_hp_walk_cn(dev_info_t *dip, int (*f)(ddi_hp_cn_info_t *,
     void *), void *arg)
 {
-	int			count;
 	ddi_hp_cn_handle_t	*head, *curr, *prev;
 
 	DDI_HP_NEXDBG((CE_CONT, "ndi_hp_walk_cn: dip %p arg %p\n",
@@ -288,7 +285,7 @@ ndi_hp_walk_cn(dev_info_t *dip, int (*f)(ddi_hp_cn_info_t *,
 	if (dip == NULL)
 		return;
 
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 
 	head = DEVI(dip)->devi_hp_hdlp;
 	curr = head;
@@ -299,7 +296,7 @@ ndi_hp_walk_cn(dev_info_t *dip, int (*f)(ddi_hp_cn_info_t *,
 		    (void *)dip, curr->cn_info.cn_name));
 		switch ((*f)(&(curr->cn_info), arg)) {
 		case DDI_WALK_TERMINATE:
-			ndi_devi_exit(dip, count);
+			ndi_devi_exit(dip);
 
 			return;
 		case DDI_WALK_CONTINUE:
@@ -326,7 +323,7 @@ ndi_hp_walk_cn(dev_info_t *dip, int (*f)(ddi_hp_cn_info_t *,
 			}
 		}
 	}
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 }
 
 /*
@@ -343,10 +340,9 @@ ddihp_cn_run_event(void *arg)
 	    (ddi_hp_cn_async_event_entry_t *)arg;
 	dev_info_t			*dip = eventp->dip;
 	ddi_hp_cn_handle_t		*hdlp;
-	int				count;
 
 	/* Lock before access */
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 
 	hdlp = ddihp_cn_name_to_handle(dip, eventp->cn_name);
 	if (hdlp) {
@@ -358,7 +354,7 @@ ddihp_cn_run_event(void *arg)
 		    eventp->cn_name, (void *)dip, eventp->target_state));
 	}
 
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 
 	/* Release the devi's ref that is held from interrupt context. */
 	ndi_rele_devi((dev_info_t *)DEVI(dip));

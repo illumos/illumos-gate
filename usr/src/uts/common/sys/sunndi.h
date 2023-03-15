@@ -22,6 +22,10 @@
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #ifndef	_SYS_SUNNDI_H
 #define	_SYS_SUNNDI_H
 
@@ -133,9 +137,9 @@ int
 ndi_devi_free(dev_info_t *dip);
 
 /* devinfo locking: use DEVI_BUSY_OWNED in ASSERTs to verify */
-void ndi_devi_enter(dev_info_t *dip, int *circ);
-void ndi_devi_exit(dev_info_t *dip, int circ);
-int ndi_devi_tryenter(dev_info_t *dip, int *circ);
+void ndi_devi_enter(dev_info_t *dip);
+void ndi_devi_exit(dev_info_t *dip);
+int ndi_devi_tryenter(dev_info_t *dip);
 
 /* devinfo ref counting */
 void ndi_hold_devi(dev_info_t *dip);

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -2319,31 +2319,29 @@ out:
 void
 pcie_fab_init_bus(dev_info_t *rcdip, uint8_t flags)
 {
-	int		circular_count;
 	dev_info_t	*dip = ddi_get_child(rcdip);
 	pcie_bus_arg_t	arg;
 
 	arg.init = B_TRUE;
 	arg.flags = flags;
 
-	ndi_devi_enter(rcdip, &circular_count);
+	ndi_devi_enter(rcdip);
 	ddi_walk_devs(dip, pcie_fab_do_init_fini, &arg);
-	ndi_devi_exit(rcdip, circular_count);
+	ndi_devi_exit(rcdip);
 }
 
 void
 pcie_fab_fini_bus(dev_info_t *rcdip, uint8_t flags)
 {
-	int		circular_count;
 	dev_info_t	*dip = ddi_get_child(rcdip);
 	pcie_bus_arg_t	arg;
 
 	arg.init = B_FALSE;
 	arg.flags = flags;
 
-	ndi_devi_enter(rcdip, &circular_count);
+	ndi_devi_enter(rcdip);
 	ddi_walk_devs(dip, pcie_fab_do_init_fini, &arg);
-	ndi_devi_exit(rcdip, circular_count);
+	ndi_devi_exit(rcdip);
 }
 
 void
@@ -3197,10 +3195,9 @@ pcie_link_bw_taskq(void *arg)
 	sysevent_value_t se_val;
 	sysevent_id_t eid;
 	sysevent_attr_list_t *ev_attr_list;
-	int circular;
 
 top:
-	ndi_devi_enter(dip, &circular);
+	ndi_devi_enter(dip);
 	se = NULL;
 	ev_attr_list = NULL;
 	mutex_enter(&bus_p->bus_lbw_mutex);
@@ -3251,7 +3248,7 @@ top:
 	se_val.value.sv_string = bus_p->bus_lbw_pbuf;
 	if (sysevent_add_attr(&ev_attr_list, PCIE_EV_DETECTOR_PATH, &se_val,
 	    SE_SLEEP) != 0) {
-		ndi_devi_exit(dip, circular);
+		ndi_devi_exit(dip);
 		goto err;
 	}
 
@@ -3269,7 +3266,7 @@ top:
 		    &se_val, SE_SLEEP);
 	}
 
-	ndi_devi_exit(dip, circular);
+	ndi_devi_exit(dip);
 
 	/*
 	 * Before we generate and send down a sysevent, we need to tell the
@@ -3708,7 +3705,6 @@ pcie_fabric_setup(dev_info_t *dip)
 	pcie_bus_t *bus_p;
 	pcie_fabric_data_t *fab;
 	dev_info_t *pdip;
-	int circular_count;
 
 	bus_p = PCIE_DIP2BUS(dip);
 	if (bus_p == NULL || !PCIE_IS_RP(bus_p)) {
@@ -3732,7 +3728,7 @@ pcie_fabric_setup(dev_info_t *dip)
 	 */
 	pdip = ddi_get_parent(dip);
 	VERIFY3P(pdip, !=, NULL);
-	ndi_devi_enter(pdip, &circular_count);
+	ndi_devi_enter(pdip);
 	fab->pfd_flags |= PCIE_FABRIC_F_SCANNING;
 
 	/*
@@ -3756,5 +3752,5 @@ pcie_fabric_setup(dev_info_t *dip)
 	ddi_walk_devs(dip, pcie_fabric_feature_set, fab);
 
 	fab->pfd_flags &= ~PCIE_FABRIC_F_SCANNING;
-	ndi_devi_exit(pdip, circular_count);
+	ndi_devi_exit(pdip);
 }

@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
 
 /*
  * The tphci driver can be used to exercise the mpxio framework together
@@ -484,7 +487,8 @@ tphci_bus_config(dev_info_t *parent, uint_t flags,
 	_NOTE(ARGUNUSED(flags))
 	char		*cname, *paddr, *guid, *devnm;
 	mdi_pathinfo_t	*pip;
-	int		len, circ, rval;
+	int		len, rval;
+	boolean_t	enteredv;
 
 	switch (op) {
 	case BUS_CONFIG_ONE:
@@ -508,12 +512,12 @@ tphci_bus_config(dev_info_t *parent, uint_t flags,
 		return (NDI_FAILURE);
 	}
 
-	mdi_devi_enter(parent, &circ);
+	mdi_devi_enter(parent, &enteredv);
 	rval = mdi_pi_alloc(parent, cname, guid, paddr, 0, &pip);
 	kmem_free(devnm, len);
 	if (rval != MDI_SUCCESS) {
 		cmn_err(CE_NOTE, "tphci_bus_config -- mdi_pi_alloc failed");
-		mdi_devi_exit(parent, circ);
+		mdi_devi_exit(parent, enteredv);
 		return (NDI_FAILURE);
 	}
 
@@ -522,15 +526,15 @@ tphci_bus_config(dev_info_t *parent, uint_t flags,
 	 * to avoid deadlock with power management of pHCI.
 	 */
 	mdi_hold_path(pip);
-	mdi_devi_exit_phci(parent, circ);
+	mdi_devi_exit_phci(parent);
 	rval = mdi_pi_online(pip, 0);
-	mdi_devi_enter_phci(parent, &circ);
+	mdi_devi_enter_phci(parent);
 	mdi_rele_path(pip);
 
 	if (rval != MDI_SUCCESS) {
 		cmn_err(CE_NOTE, "tphci_bus_config -- mdi_pi_online failed");
 		(void) mdi_pi_free(pip, 0);
-		mdi_devi_exit(parent, circ);
+		mdi_devi_exit(parent, enteredv);
 		return (NDI_FAILURE);
 	}
 
@@ -538,7 +542,7 @@ tphci_bus_config(dev_info_t *parent, uint_t flags,
 		*childp = mdi_pi_get_client(pip);
 		ndi_hold_devi(*childp);
 	}
-	mdi_devi_exit(parent, circ);
+	mdi_devi_exit(parent, enteredv);
 
 	return (NDI_SUCCESS);
 }
@@ -548,7 +552,7 @@ tphci_bus_unconfig(dev_info_t *parent, uint_t flags,
     ddi_bus_config_op_t op, void *arg)
 {
 	int		rval = MDI_SUCCESS;
-	int		circ;
+	boolean_t	enteredv;
 	mdi_pathinfo_t	*pip, *next;
 	char		*devnm, *cname, *caddr;
 
@@ -559,41 +563,41 @@ tphci_bus_unconfig(dev_info_t *parent, uint_t flags,
 		if (strcmp(cname, "tclient") != 0)
 			return (NDI_SUCCESS);	/* no such device */
 
-		mdi_devi_enter(parent, &circ);
+		mdi_devi_enter(parent, &enteredv);
 		pip = mdi_pi_find(parent, NULL, caddr);
 		if (pip) {
 			mdi_hold_path(pip);
-			mdi_devi_exit_phci(parent, circ);
+			mdi_devi_exit_phci(parent);
 			rval = mdi_pi_offline(pip, NDI_DEVI_REMOVE);
-			mdi_devi_enter_phci(parent, &circ);
+			mdi_devi_enter_phci(parent);
 			mdi_rele_path(pip);
 
 			if (rval == MDI_SUCCESS)
 				(void) mdi_pi_free(pip, 0);
 		}
-		mdi_devi_exit(parent, circ);
+		mdi_devi_exit(parent, enteredv);
 		return (rval == MDI_SUCCESS ? NDI_SUCCESS : NDI_FAILURE);
 
 	case BUS_UNCONFIG_ALL:
 		if (flags & NDI_AUTODETACH)
 			return (NDI_FAILURE);
 
-		mdi_devi_enter(parent, &circ);
+		mdi_devi_enter(parent, &enteredv);
 		next = mdi_get_next_client_path(parent, NULL);
 		while ((pip = next) != NULL) {
 			next = mdi_get_next_client_path(parent, pip);
 
 			mdi_hold_path(pip);
-			mdi_devi_exit_phci(parent, circ);
+			mdi_devi_exit_phci(parent);
 			rval = mdi_pi_offline(pip, NDI_DEVI_REMOVE);
-			mdi_devi_enter_phci(parent, &circ);
+			mdi_devi_enter_phci(parent);
 			mdi_rele_path(pip);
 
 			if (rval != MDI_SUCCESS)
 				break;
 			(void) mdi_pi_free(pip, 0);
 		}
-		mdi_devi_exit(parent, circ);
+		mdi_devi_exit(parent, enteredv);
 		return (rval == MDI_SUCCESS ? NDI_SUCCESS : NDI_FAILURE);
 
 	case BUS_UNCONFIG_DRIVER:	/* nothing to do */

@@ -22,6 +22,10 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/conf.h>
 #include <sys/stat.h>
 #include <sys/modctl.h>
@@ -136,7 +140,8 @@ static int
 ibnex_hca_bus_config(dev_info_t *parent, uint_t flag,
     ddi_bus_config_op_t op, void *devname, dev_info_t **child)
 {
-	int			ret = IBNEX_SUCCESS, circ;
+	int			ret = IBNEX_SUCCESS;
+	boolean_t		enteredv;
 	char			*srvname, nameaddr[MAXNAMELEN];
 	dev_info_t		*cdip;
 	ibnex_node_data_t	*node_data;
@@ -164,7 +169,7 @@ ibnex_hca_bus_config(dev_info_t *parent, uint_t flag,
 		break;
 
 	case BUS_CONFIG_OBP_ARGS:
-		mdi_devi_enter(parent, &circ);
+		mdi_devi_enter(parent, &enteredv);
 		cdip = ibnex_config_obp_args(parent, devname);
 		if (cdip) {
 			/*
@@ -192,7 +197,7 @@ ibnex_hca_bus_config(dev_info_t *parent, uint_t flag,
 
 			ret = IBNEX_FAILURE;
 		}
-		mdi_devi_exit(parent, circ);
+		mdi_devi_exit(parent, enteredv);
 		break;
 
 	case BUS_CONFIG_ALL:
@@ -471,7 +476,7 @@ static int
 ibnex_hca_bus_config_one(dev_info_t *parent, void *devname,
     ddi_bus_config_op_t op, uint_t *flag, dev_info_t **child)
 {
-	int			ret = IBNEX_SUCCESS, len, circ, need_bus_config;
+	int			ret = IBNEX_SUCCESS, len, need_bus_config;
 	char 			*device_name, *caddr, *cname;
 	dev_info_t		*cdip;
 	ibnex_node_data_t	*node_data;
@@ -479,6 +484,7 @@ ibnex_hca_bus_config_one(dev_info_t *parent, void *devname,
 	int			index;
 	uint8_t			port_num;
 	ib_pkey_t		pkey;
+	boolean_t		enteredv;
 
 	len = strlen((char *)devname) + 1;
 	device_name = i_ddi_strdup(devname, KM_SLEEP);
@@ -491,10 +497,10 @@ ibnex_hca_bus_config_one(dev_info_t *parent, void *devname,
 		return (IBNEX_FAILURE);
 	}
 
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 	node_data = ibnex_get_cdip_info(
 	    parent, devname, &cdip, &node_type);
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 
 	if (cdip) {
 		if ((node_data) && (node_data->node_type ==
@@ -529,13 +535,13 @@ ibnex_hca_bus_config_one(dev_info_t *parent, void *devname,
 
 	case IBNEX_PSEUDO_NODE:
 		ret = IBNEX_SUCCESS;
-		mdi_devi_enter(parent, &circ);
+		mdi_devi_enter(parent, &enteredv);
 		ibnex_pseudo_initnodes();
 		mutex_enter(&ibnex.ibnex_mutex);
 		ret = ibnex_pseudo_config_one(NULL,
 		    caddr, parent);
 		mutex_exit(&ibnex.ibnex_mutex);
-		mdi_devi_exit(parent, circ);
+		mdi_devi_exit(parent, enteredv);
 		break;
 
 	default:
@@ -556,13 +562,13 @@ ibnex_hca_bus_config_one(dev_info_t *parent, void *devname,
 			}
 		}
 
-		ndi_devi_enter(parent, &circ);
+		ndi_devi_enter(parent);
 		cdip = ibnex_config_port_node(parent, devname);
 		if (cdip)
 			ret = IBNEX_SUCCESS;
 		else
 			ret = IBNEX_FAILURE;
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 		break;
 	}
 end:
@@ -579,7 +585,7 @@ ibnex_handle_hca_attach(void *cb_arg)
 {
 	ib_guid_t hca_guid	= *((ib_guid_t *)cb_arg);
 	dev_info_t		*phci;
-	int			ii, circ;
+	int			ii;
 	ibdm_hca_list_t		*hca_list;
 
 	IBTF_DPRINTF_L4("ibnex", "handle_hca_attach(%llx)", hca_guid);
@@ -592,11 +598,11 @@ ibnex_handle_hca_attach(void *cb_arg)
 	 * locking. IB Nexus is enumerating the children
 	 * of HCA, not MPXIO clients.
 	 */
-	ndi_devi_enter(phci, &circ);
+	ndi_devi_enter(phci);
 	ibdm_ibnex_port_settle_wait(hca_guid, ibnex_port_settling_time);
 	hca_list = ibdm_ibnex_get_hca_info_by_guid(hca_guid);
 	if (hca_list == NULL) {
-		ndi_devi_exit(phci, circ);
+		ndi_devi_exit(phci);
 		kmem_free(cb_arg, sizeof (ib_guid_t));
 		return;
 	}
@@ -606,6 +612,6 @@ ibnex_handle_hca_attach(void *cb_arg)
 		ibnex_create_vppa_nodes(phci, &hca_list->hl_port_attr[ii]);
 	}
 	ibdm_ibnex_free_hca_list(hca_list);
-	ndi_devi_exit(phci, circ);
+	ndi_devi_exit(phci);
 	kmem_free(cb_arg, sizeof (ib_guid_t));
 }

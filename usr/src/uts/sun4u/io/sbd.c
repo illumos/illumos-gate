@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * safari system board DR module.
  */
 
@@ -2458,11 +2462,11 @@ sbd_init_devlists(sbd_board_t *sbp)
 	pdip = ddi_get_parent(sbp->sb_topdip);
 	if (pdip) {
 		ndi_hold_devi(pdip);
-		ndi_devi_enter(pdip, &i);
+		ndi_devi_enter(pdip);
 	}
 	ddi_walk_devs(sbp->sb_topdip, sbd_setup_devlists, (void *) wp);
 	if (pdip) {
-		ndi_devi_exit(pdip, i);
+		ndi_devi_exit(pdip);
 		ndi_rele_devi(pdip);
 	}
 
@@ -3903,12 +3907,12 @@ sbd_check_unit_attached(sbd_board_t *sbp, dev_info_t *dip, int unit,
 		pdip = ddi_get_parent(sbp->sb_topdip);
 		if (pdip) {
 			ndi_hold_devi(pdip);
-			ndi_devi_enter(pdip, &rv);
+			ndi_devi_enter(pdip);
 		}
 		ddi_walk_devs(sbp->sb_topdip, sbd_check_io_attached,
 			(void *)&tdip);
 		if (pdip) {
-			ndi_devi_exit(pdip, rv);
+			ndi_devi_exit(pdip);
 			ndi_rele_devi(pdip);
 		}
 
@@ -4877,7 +4881,6 @@ sbd_board_init(sbd_board_t *sbp, sbd_softstate_t *softsp,
 {
 	int		i;
 	dev_info_t	*pdip;
-	int		circ;
 	walk_tree_t	walk = {0};
 
 	mutex_init(&sbp->sb_mutex, NULL, MUTEX_DRIVER, NULL);
@@ -4951,12 +4954,12 @@ sbd_board_init(sbd_board_t *sbp, sbd_softstate_t *softsp,
 	ASSERT(sbp->sb_topdip);
 	pdip = ddi_get_parent(sbp->sb_topdip);
 	if (pdip)
-		ndi_devi_enter(pdip, &circ);
+		ndi_devi_enter(pdip);
 	walk.sbp = sbp;
 	walk.hold = 1;
 	ddi_walk_devs(sbp->sb_topdip, hold_rele_branch, (void *)&walk);
 	if (pdip)
-		ndi_devi_exit(pdip, circ);
+		ndi_devi_exit(pdip);
 
 	/*
 	 * Initialize the devlists
@@ -4995,7 +4998,6 @@ sbd_board_destroy(sbd_board_t *sbp)
 {
 	int		i;
 	dev_info_t	*pdip;
-	int		circ;
 	walk_tree_t	walk = {0};
 
 	SBD_BOARD_TRANSITION(sbp, SBD_STATE_EMPTY);
@@ -5067,12 +5069,12 @@ sbd_board_destroy(sbd_board_t *sbp)
 	ASSERT(sbp->sb_topdip);
 	pdip = ddi_get_parent(sbp->sb_topdip);
 	if (pdip)
-		ndi_devi_enter(pdip, &circ);
+		ndi_devi_enter(pdip);
 	walk.sbp = sbp;
 	walk.hold = 0;
 	ddi_walk_devs(sbp->sb_topdip, hold_rele_branch, (void *)&walk);
 	if (pdip)
-		ndi_devi_exit(pdip, circ);
+		ndi_devi_exit(pdip);
 
 	mutex_destroy(&sbp->sb_slock);
 	mutex_destroy(&sbp->sb_flags_mutex);

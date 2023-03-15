@@ -24,6 +24,7 @@
  * Copyright 2022 Garrett D'Amore
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2023 MNX Cloud, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/note.h>
@@ -5313,10 +5314,9 @@ swab(void *src, void *dst, size_t nbytes)
 static void
 ddi_append_minor_node(dev_info_t *ddip, struct ddi_minor_data *dmdp)
 {
-	int			circ;
 	struct ddi_minor_data	*dp;
 
-	ndi_devi_enter(ddip, &circ);
+	ndi_devi_enter(ddip);
 	if ((dp = DEVI(ddip)->devi_minor) == (struct ddi_minor_data *)NULL) {
 		DEVI(ddip)->devi_minor = dmdp;
 	} else {
@@ -5324,7 +5324,7 @@ ddi_append_minor_node(dev_info_t *ddip, struct ddi_minor_data *dmdp)
 			dp = dp->next;
 		dp->next = dmdp;
 	}
-	ndi_devi_exit(ddip, circ);
+	ndi_devi_exit(ddip);
 }
 
 static int
@@ -5763,11 +5763,10 @@ ddi_create_internal_pathname(dev_info_t *dip, char *name, int spec_type,
 void
 ddi_remove_minor_node(dev_info_t *dip, const char *name)
 {
-	int			circ;
 	struct ddi_minor_data	*dmdp, *dmdp1;
 	struct ddi_minor_data	**dmdp_prev;
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	dmdp_prev = &DEVI(dip)->devi_minor;
 	dmdp = DEVI(dip)->devi_minor;
 	while (dmdp != NULL) {
@@ -5802,7 +5801,7 @@ ddi_remove_minor_node(dev_info_t *dip, const char *name)
 		}
 		dmdp = dmdp1;
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 }
 
 
@@ -6702,7 +6701,6 @@ ddi_pathname_obp_set(dev_info_t *dip, char *component)
 int
 ddi_dev_pathname(dev_t devt, int spec_type, char *path)
 {
-	int		circ;
 	major_t		major = getmajor(devt);
 	int		instance;
 	dev_info_t	*dip;
@@ -6735,14 +6733,14 @@ ddi_dev_pathname(dev_t devt, int spec_type, char *path)
 			goto fail;
 
 		/* Add minorname to path. */
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 		minorname = i_ddi_devtspectype_to_minorname(dip,
 		    devt, spec_type);
 		if (minorname) {
 			(void) strcat(path, ":");
 			(void) strcat(path, minorname);
 		}
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 		ddi_release_devi(dip);
 		if (minorname == NULL)
 			goto fail;
@@ -7536,7 +7534,6 @@ int
 i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
     dev_t *devtp, int *spectypep)
 {
-	int			circ;
 	struct ddi_minor_data	*dmdp;
 
 	/* deal with clone minor nodes */
@@ -7569,7 +7566,7 @@ i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
 		return (DDI_SUCCESS);
 	}
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	for (dmdp = DEVI(dip)->devi_minor; dmdp; dmdp = dmdp->next) {
 		if (((dmdp->type != DDM_MINOR) &&
 		    (dmdp->type != DDM_INTERNAL_PATH) &&
@@ -7583,10 +7580,10 @@ i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
 		if (spectypep)
 			*spectypep = dmdp->ddm_spec_type;
 
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 		return (DDI_SUCCESS);
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (DDI_FAILURE);
 }
@@ -7953,7 +7950,6 @@ int
 ddi_lyr_get_minor_name(dev_t dev, int spec_type, char **minor_name)
 {
 	char		*buf;
-	int		circ;
 	dev_info_t	*dip;
 	char		*nm;
 	int		rval;
@@ -7965,11 +7961,11 @@ ddi_lyr_get_minor_name(dev_t dev, int spec_type, char **minor_name)
 
 	/* Find the minor name and copy into max size buf */
 	buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	nm = i_ddi_devtspectype_to_minorname(dip, dev, spec_type);
 	if (nm)
 		(void) strcpy(buf, nm);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 	ddi_release_devi(dip);	/* e_ddi_hold_devi_by_dev() */
 
 	if (nm) {
@@ -9300,7 +9296,6 @@ dip_set_offline(dev_info_t *dip, void *arg)
 static int
 branch_set_offline(dev_info_t *dip, char *path)
 {
-	int		circ;
 	int		end;
 	result_t	res;
 
@@ -9322,9 +9317,9 @@ branch_set_offline(dev_info_t *dip, char *path)
 	res.result = DDI_SUCCESS;
 	res.path = path;
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), dip_set_offline, &res);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (res.result);
 }
@@ -9333,7 +9328,6 @@ branch_set_offline(dev_info_t *dip, char *path)
 static int
 create_prom_branch(void *arg, int has_changed)
 {
-	int		circ;
 	int		exists, rv;
 	pnode_t		nodeid;
 	struct ptnode	*tnp;
@@ -9371,7 +9365,7 @@ create_prom_branch(void *arg, int has_changed)
 	while ((tnp = ap->head) != NULL) {
 		ap->head = tnp->next;
 
-		ndi_devi_enter(ap->pdip, &circ);
+		ndi_devi_enter(ap->pdip);
 
 		/*
 		 * Check if the branch already exists.
@@ -9409,14 +9403,14 @@ create_prom_branch(void *arg, int has_changed)
 		 */
 		if (dip == NULL || branch_set_offline(dip, path)
 		    == DDI_FAILURE) {
-			ndi_devi_exit(ap->pdip, circ);
+			ndi_devi_exit(ap->pdip);
 			rv = EIO;
 			continue;
 		}
 
 		ASSERT(ddi_get_parent(dip) == ap->pdip);
 
-		ndi_devi_exit(ap->pdip, circ);
+		ndi_devi_exit(ap->pdip);
 
 		if (ap->flags & DEVI_BRANCH_CONFIGURE) {
 			int error = e_ddi_branch_configure(dip, &ap->fdip, 0);
@@ -9440,7 +9434,7 @@ create_prom_branch(void *arg, int has_changed)
 static int
 sid_node_create(dev_info_t *pdip, devi_branch_t *bp, dev_info_t **rdipp)
 {
-	int			rv, circ, len;
+	int			rv, len;
 	int			i, flags, ret;
 	dev_info_t		*dip;
 	char			*nbuf;
@@ -9497,7 +9491,7 @@ sid_node_create(dev_info_t *pdip, devi_branch_t *bp, dev_info_t **rdipp)
 	switch (rv) {
 	case DDI_WALK_CONTINUE:
 	case DDI_WALK_PRUNESIB:
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 
 		i = DDI_WALK_CONTINUE;
 		for (; i == DDI_WALK_CONTINUE; ) {
@@ -9513,7 +9507,7 @@ sid_node_create(dev_info_t *pdip, devi_branch_t *bp, dev_info_t **rdipp)
 		 * is determined by rv returned by dip.
 		 */
 
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 		break;
 	case DDI_WALK_TERMINATE:
 		/*
@@ -9574,20 +9568,18 @@ create_sid_branch(
 	dev_info_t	*rdip;
 
 	while (state == DDI_WALK_CONTINUE) {
-		int	circ;
-
-		ndi_devi_enter(pdip, &circ);
+		ndi_devi_enter(pdip);
 
 		state = sid_node_create(pdip, bp, &rdip);
 		if (rdip == NULL) {
-			ndi_devi_exit(pdip, circ);
+			ndi_devi_exit(pdip);
 			ASSERT(state == DDI_WALK_ERROR);
 			break;
 		}
 
 		e_ddi_branch_hold(rdip);
 
-		ndi_devi_exit(pdip, circ);
+		ndi_devi_exit(pdip);
 
 		if (flags & DEVI_BRANCH_CONFIGURE) {
 			int error = e_ddi_branch_configure(rdip, dipp, 0);
@@ -9762,7 +9754,7 @@ e_ddi_branch_unconfigure(
 	dev_info_t **dipp,
 	uint_t flags)
 {
-	int	circ, rv;
+	int	rv;
 	int	destroy;
 	char	*devnm;
 	uint_t	nflags;
@@ -9792,16 +9784,16 @@ e_ddi_branch_unconfigure(
 
 	devnm = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
 
-	ndi_devi_enter(pdip, &circ);
+	ndi_devi_enter(pdip);
 	(void) ddi_deviname(rdip, devnm);
-	ndi_devi_exit(pdip, circ);
+	ndi_devi_exit(pdip);
 
 	/*
 	 * ddi_deviname() returns a component name with / prepended.
 	 */
 	(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
 
-	ndi_devi_enter(pdip, &circ);
+	ndi_devi_enter(pdip);
 
 	/*
 	 * Recreate device name as it may have changed state (init/uninit)
@@ -9811,7 +9803,7 @@ e_ddi_branch_unconfigure(
 
 	if (!e_ddi_branch_held(rdip)) {
 		kmem_free(devnm, MAXNAMELEN + 1);
-		ndi_devi_exit(pdip, circ);
+		ndi_devi_exit(pdip);
 		cmn_err(CE_WARN, "e_ddi_%s_branch: dip(%p) not held",
 		    destroy ? "destroy" : "unconfigure", (void *)rdip);
 		return (EINVAL);
@@ -9852,7 +9844,7 @@ e_ddi_branch_unconfigure(
 	}
 
 	kmem_free(devnm, MAXNAMELEN + 1);
-	ndi_devi_exit(pdip, circ);
+	ndi_devi_exit(pdip);
 	return (ndi2errno(rv));
 }
 
@@ -9999,7 +9991,6 @@ e_ddi_branch_referenced(
 	int (*callback)(dev_info_t *dip, void *arg, uint_t ref),
 	void *arg)
 {
-	int circ;
 	char *path;
 	dev_info_t *pdip;
 	struct devi_busy bsa = {0};
@@ -10027,9 +10018,9 @@ e_ddi_branch_referenced(
 		return (-1);
 	}
 
-	ndi_devi_enter(pdip, &circ);
+	ndi_devi_enter(pdip);
 	(void) ddi_pathname(rdip, path);
-	ndi_devi_exit(pdip, circ);
+	ndi_devi_exit(pdip);
 
 	bsa.dv_hash = mod_hash_create_ptrhash("dv_node busy hash", NUMCHAINS,
 	    mod_hash_null_valdtor, sizeof (struct dev_info));
@@ -10060,9 +10051,9 @@ e_ddi_branch_referenced(
 	bsa.arg = arg;
 
 	if (visit_dip(rdip, &bsa) == DDI_WALK_CONTINUE) {
-		ndi_devi_enter(rdip, &circ);
+		ndi_devi_enter(rdip);
 		ddi_walk_devs(ddi_get_child(rdip), visit_dip, &bsa);
-		ndi_devi_exit(rdip, circ);
+		ndi_devi_exit(rdip);
 	}
 
 out:

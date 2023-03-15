@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * driver for accessing kernel devinfo tree.
  */
 #include <sys/types.h>
@@ -118,7 +122,6 @@ struct di_mem {
 struct di_stack {
 	void		*offset[MAX_TREE_DEPTH];
 	struct dev_info *dip[MAX_TREE_DEPTH];
-	int		circ[MAX_TREE_DEPTH];
 	int		depth;	/* depth of current node to be copied */
 };
 
@@ -130,13 +133,12 @@ struct di_stack {
 	((di_off_t *)(stack)->offset[(stack)->depth - 2])
 #define	EMPTY_STACK(stack)	((stack)->depth == 0)
 #define	POP_STACK(stack)	{ \
-	ndi_devi_exit((dev_info_t *)TOP_NODE(stack), \
-		(stack)->circ[(stack)->depth - 1]); \
+	ndi_devi_exit((dev_info_t *)TOP_NODE(stack)); \
 	((stack)->depth--); \
 }
 #define	PUSH_STACK(stack, node, off_p)	{ \
 	ASSERT(node != NULL); \
-	ndi_devi_enter((dev_info_t *)node, &(stack)->circ[(stack)->depth]); \
+	ndi_devi_enter((dev_info_t *)node); \
 	(stack)->dip[(stack)->depth] = (node); \
 	(stack)->offset[(stack)->depth] = (void *)(off_p); \
 	((stack)->depth)++; \
@@ -3082,10 +3084,10 @@ di_getprop_add(int list, int dyn, struct di_state *st, struct dev_info *dip,
 		 * ordering.
 		 */
 		ndi_hold_devi((dev_info_t *)dip);
-		ndi_devi_exit((dev_info_t *)dip, dip->devi_circular);
+		ndi_devi_exit((dev_info_t *)dip);
 		rv = (*prop_op)(pdevt, (dev_info_t *)dip,
 		    PROP_LEN_AND_VAL_ALLOC, pflags, name, &val, &len);
-		ndi_devi_enter((dev_info_t *)dip, &dip->devi_circular);
+		ndi_devi_enter((dev_info_t *)dip);
 		ndi_rele_devi((dev_info_t *)dip);
 
 		if (rv == DDI_PROP_SUCCESS) {

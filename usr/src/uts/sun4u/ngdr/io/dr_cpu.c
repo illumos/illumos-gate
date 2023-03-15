@@ -27,6 +27,7 @@
 /*
  * Copyright 2019 Peter Tribble.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -310,7 +311,7 @@ dr_pre_attach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 	 * devinfo tree branches
 	 */
 	dr_lock_status(hp->h_bd);
-	ndi_devi_enter(ddi_root_node(), (int *)(&hp->h_ndi));
+	ndi_devi_enter(ddi_root_node());
 	mutex_enter(&cpu_lock);
 
 	return (0);
@@ -395,7 +396,7 @@ dr_post_attach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 	}
 
 	mutex_exit(&cpu_lock);
-	ndi_devi_exit(ddi_root_node(), hp->h_ndi);
+	ndi_devi_exit(ddi_root_node());
 	dr_unlock_status(hp->h_bd);
 
 	if (errflag)

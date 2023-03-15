@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * This workaround inhibits prom_printf after the cpus are grabbed.
  * This can be removed when 4154263 is corrected.
  */
@@ -217,8 +221,6 @@ static char device_path[MAXPATHLEN];
 static int
 sysctrl_suspend_devices(dev_info_t *dip, sysc_cfga_pkt_t *pkt)
 {
-	int circ;
-
 	ASSERT(dip == NULL || ddi_get_parent(dip) == NULL ||
 	    DEVI_BUSY_OWNED(ddi_get_parent(dip)));
 
@@ -227,12 +229,12 @@ sysctrl_suspend_devices(dev_info_t *dip, sysc_cfga_pkt_t *pkt)
 		/*
 		 * Hold parent busy while walking child list
 		 */
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 		if (sysctrl_suspend_devices(ddi_get_child(dip), pkt)) {
-			ndi_devi_exit(dip, circ);
+			ndi_devi_exit(dip);
 			return (ENXIO);
 		}
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 
 		if (!sysctrl_is_real_device(dip))
 			continue;
@@ -261,7 +263,6 @@ sysctrl_suspend_devices(dev_info_t *dip, sysc_cfga_pkt_t *pkt)
 static void
 sysctrl_resume_devices(dev_info_t *start, sysc_cfga_pkt_t *pkt)
 {
-	int		circ;
 	dev_info_t	*dip, *next, *last = NULL;
 
 	ASSERT(start == NULL || ddi_get_parent(start) == NULL ||
@@ -297,9 +298,9 @@ sysctrl_resume_devices(dev_info_t *start, sysc_cfga_pkt_t *pkt)
 				    device_path);
 			}
 		}
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 		sysctrl_resume_devices(ddi_get_child(dip), pkt);
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 
 		last = dip;
 	}

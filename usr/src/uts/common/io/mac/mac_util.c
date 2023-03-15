@@ -1834,7 +1834,6 @@ mac_get_nexus_node(dev_info_t *mdip, mac_dladm_intr_t *dln)
 {
 	struct dev_info		*tdip = (struct dev_info *)mdip;
 	struct ddi_minor_data	*minordata;
-	int			circ;
 	dev_info_t		*pdip;
 	char			pathname[MAXPATHLEN];
 
@@ -1844,7 +1843,7 @@ mac_get_nexus_node(dev_info_t *mdip, mac_dladm_intr_t *dln)
 		 * device tree so we need to use ndi_devi_tryenter() here to
 		 * avoid deadlock.
 		 */
-		if (ndi_devi_tryenter((dev_info_t *)tdip, &circ) == 0)
+		if (ndi_devi_tryenter((dev_info_t *)tdip) == 0)
 			break;
 
 		for (minordata = tdip->devi_minor; minordata != NULL;
@@ -1856,11 +1855,11 @@ mac_get_nexus_node(dev_info_t *mdip, mac_dladm_intr_t *dln)
 				(void) snprintf(dln->nexus_path, MAXPATHLEN,
 				    "/devices%s:intr", pathname);
 				(void) ddi_pathname_minor(minordata, pathname);
-				ndi_devi_exit((dev_info_t *)tdip, circ);
+				ndi_devi_exit((dev_info_t *)tdip);
 				return (pdip);
 			}
 		}
-		ndi_devi_exit((dev_info_t *)tdip, circ);
+		ndi_devi_exit((dev_info_t *)tdip);
 		tdip = tdip->devi_parent;
 	}
 	return (NULL);

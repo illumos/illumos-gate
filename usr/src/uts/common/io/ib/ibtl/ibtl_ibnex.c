@@ -23,6 +23,10 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/systm.h>
 #include <sys/sunndi.h>
 #include <sys/sunmdi.h>
@@ -591,7 +595,6 @@ ibtl_ibnex_phci_unregister(dev_info_t *hca_dip)
 {
 	mdi_pathinfo_t *pip = NULL;
 	dev_info_t *vdip = 0;
-	int circ = 0, circ1 = 0;
 
 	/*
 	 * Should free all the Pathinfos associated with the HCA pdip before
@@ -602,20 +605,20 @@ ibtl_ibnex_phci_unregister(dev_info_t *hca_dip)
 	 * cleaned up if needed.
 	 */
 	vdip = mdi_devi_get_vdip(hca_dip);
-	ndi_devi_enter(vdip, &circ1);
-	ndi_devi_enter(hca_dip, &circ);
+	ndi_devi_enter(vdip);
+	ndi_devi_enter(hca_dip);
 	while (pip = mdi_get_next_client_path(hca_dip, NULL)) {
 		if (mdi_pi_free(pip, 0) == MDI_SUCCESS) {
 			continue;
 		}
-		ndi_devi_exit(hca_dip, circ);
-		ndi_devi_exit(vdip, circ1);
+		ndi_devi_exit(hca_dip);
+		ndi_devi_exit(vdip);
 		IBTF_DPRINTF_L1(ibtl_ibnex, "ibtl_ibnex_phci_unregister: "
 		    "mdi_pi_free failed");
 		return (IBT_FAILURE);
 	}
-	ndi_devi_exit(hca_dip, circ);
-	ndi_devi_exit(vdip, circ1);
+	ndi_devi_exit(hca_dip);
+	ndi_devi_exit(vdip);
 
 	if (mdi_phci_unregister(hca_dip, 0) != MDI_SUCCESS) {
 		IBTF_DPRINTF_L1(ibtl_ibnex, "ibtl_ibnex_phci_unregister: PHCI "

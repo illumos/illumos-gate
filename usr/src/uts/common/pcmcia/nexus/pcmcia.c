@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * PCMCIA NEXUS
  *	The PCMCIA module is a generalized interface for
  *	implementing PCMCIA nexus drivers.  It preserves
@@ -1560,7 +1564,6 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 	char bf[256];
 	struct pcmcia_parent_private *ppd;
 	dev_info_t *dip;
-	int circ;
 
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug)
@@ -1570,7 +1573,7 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 		    info->pd_vers1_name, info->pd_flags);
 #endif
 
-	ndi_devi_enter(self, &circ);
+	ndi_devi_enter(self);
 	/* do searches in compatible property order */
 	for (dip = (dev_info_t *)DEVI(self)->devi_child;
 	    dip != NULL;
@@ -1639,7 +1642,7 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 				break;
 		}
 	}
-	ndi_devi_exit(self, circ);
+	ndi_devi_exit(self);
 	return (dip);
 }
 
@@ -3990,7 +3993,6 @@ pcmcia_create_device(ss_make_device_node_t *init)
 int
 pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 {
-	int circ;
 	int count = 0;
 	struct ddi_minor_data *dp;
 	struct pcm_make_dev *md;
@@ -4000,7 +4002,7 @@ pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 
 	socket = ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    PCM_DEV_SOCKET, -1);
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	if (DEVI(dip)->devi_minor != (struct ddi_minor_data *)NULL) {
 		for (dp = DEVI(dip)->devi_minor;
 		    dp != (struct ddi_minor_data *)NULL;
@@ -4055,7 +4057,7 @@ pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 			count = 0;
 		}
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 	return (count);
 }
 
@@ -4065,7 +4067,6 @@ static char *ddmtypes[] = { "minor", "alias", "default", "internal" };
 static void
 pcmcia_dump_minors(dev_info_t *dip)
 {
-	int circ;
 	int count = 0;
 	struct ddi_minor_data *dp;
 	int unit, major;
@@ -4089,7 +4090,7 @@ pcmcia_dump_minors(dev_info_t *dip)
 			cmn_err(CE_CONT, "\tsibs: %s %s %s\n",
 			    ddi_binding_name(np), cf2, cur);
 
-			ndi_devi_enter(np, &circ);
+			ndi_devi_enter(np);
 			if (DEVI(np)->devi_minor !=
 			    (struct ddi_minor_data *)NULL) {
 				for (dp = DEVI(np)->devi_minor;
@@ -4113,7 +4114,7 @@ pcmcia_dump_minors(dev_info_t *dip)
 					    ddi_binding_name(np));
 				}
 			}
-			ndi_devi_exit(np, circ);
+			ndi_devi_exit(np);
 		}
 	}
 }
@@ -4634,9 +4635,8 @@ pcmcia_free_resources(dev_info_t *self)
 	struct regspec *assigned;
 	int len;
 	dev_info_t *dip;
-	int circ;
 
-	ndi_devi_enter(self, &circ);
+	ndi_devi_enter(self);
 	/* do searches in compatible property order */
 	for (dip = (dev_info_t *)DEVI(self)->devi_child;
 	    dip != NULL;
@@ -4655,7 +4655,7 @@ pcmcia_free_resources(dev_info_t *self)
 			kmem_free(assigned, len);
 		}
 	}
-	ndi_devi_exit(self, circ);
+	ndi_devi_exit(self);
 }
 
 /*

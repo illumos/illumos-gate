@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #if defined(DEBUG)
@@ -939,7 +940,6 @@ pci_resource_setup(dev_info_t *dip)
 	char bus_type[16] = "(unknown)";
 	int len;
 	struct busnum_ctrl ctrl;
-	int circular_count;
 	int rval = NDI_SUCCESS;
 
 	/*
@@ -1117,10 +1117,10 @@ pci_resource_setup(dev_info_t *dip)
 				ctrl.rv = DDI_SUCCESS;
 				ctrl.dip = dip;
 				ctrl.range = &pci_bus_range;
-				ndi_devi_enter(dip, &circular_count);
+				ndi_devi_enter(dip);
 				ddi_walk_devs(ddi_get_child(dip),
 				    claim_pci_busnum, (void *)&ctrl);
-				ndi_devi_exit(dip, circular_count);
+				ndi_devi_exit(dip);
 				if (ctrl.rv != DDI_SUCCESS) {
 					/* failed to create the map */
 					(void) ndi_ra_map_destroy(dip,

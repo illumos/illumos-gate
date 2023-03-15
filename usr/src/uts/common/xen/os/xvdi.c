@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2014 by Delphix. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -845,19 +846,17 @@ xendev_enum_class(dev_info_t *parent, xendev_devclass_t devclass)
 		return;
 
 	if (xdcp->xsdev == NULL) {
-		int circ;
-
 		/*
 		 * Don't need to probe this kind of device from the
 		 * store, just create one if it doesn't exist.
 		 */
 
-		ndi_devi_enter(parent, &circ);
+		ndi_devi_enter(parent);
 		if (xvdi_find_dev(parent, devclass, DOMID_SELF, VDEV_NOXS)
 		    == NULL)
 			(void) xvdi_create_dev(parent, devclass,
 			    DOMID_SELF, VDEV_NOXS);
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 	} else {
 		/*
 		 * Probe this kind of device from the store, both
@@ -1850,7 +1849,7 @@ i_xvdi_enum_worker(dev_info_t *parent, i_xd_cfg_t *xdcp,
 	char *path, *domain_path, *ep;
 	char **devices;
 	unsigned int ndevices;
-	int ldevices, j, circ;
+	int ldevices, j;
 	domid_t dom;
 	long tmplong;
 
@@ -1876,13 +1875,13 @@ i_xvdi_enum_worker(dev_info_t *parent, i_xd_cfg_t *xdcp,
 		(void) ddi_strtol(devices[j], &ep, 0, &tmplong);
 		vdev = tmplong;
 
-		ndi_devi_enter(parent, &circ);
+		ndi_devi_enter(parent);
 
 		if (xvdi_find_dev(parent, xdcp->devclass, dom, vdev) == NULL)
 			(void) xvdi_create_dev(parent, xdcp->devclass,
 			    dom, vdev);
 
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 	}
 	kmem_free(devices, ldevices);
 }
@@ -2341,7 +2340,7 @@ i_xvdi_probe_path_handler(void *arg)
 {
 	dev_info_t *parent;
 	char *path = arg, *p = NULL;
-	int i, vdev, circ;
+	int i, vdev;
 	i_xd_cfg_t *xdcp;
 	boolean_t frontend;
 	domid_t dom;
@@ -2406,7 +2405,7 @@ i_xvdi_probe_path_handler(void *arg)
 	parent = xendev_dip;
 	ASSERT(parent != NULL);
 
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 
 	if (xvdi_find_dev(parent, xdcp->devclass, dom, vdev) == NULL) {
 		XVDI_DPRINTF(XVDI_DBG_PROBE,
@@ -2417,7 +2416,7 @@ i_xvdi_probe_path_handler(void *arg)
 		    "i_xvdi_probe_path_handler: %s already exists", path);
 	}
 
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 
 done:
 	kmem_free(path, strlen(path) + 1);

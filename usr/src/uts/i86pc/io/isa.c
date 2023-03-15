@@ -22,6 +22,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 2012 Gary Mills
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1183,7 +1184,7 @@ uart_exists(ushort_t port)
 static void
 isa_enumerate(int reprogram)
 {
-	int circ, i;
+	int i;
 	dev_info_t *xdip;
 	dev_info_t *isa_dip = ddi_find_devinfo("isa", -1, 0);
 
@@ -1204,7 +1205,7 @@ isa_enumerate(int reprogram)
 
 	bzero(isa_extra_resource, MAX_EXTRA_RESOURCE * sizeof (struct regspec));
 
-	ndi_devi_enter(isa_dip, &circ);
+	ndi_devi_enter(isa_dip);
 
 	/*
 	 * Check whether ACPI enumeration is disabled.
@@ -1221,7 +1222,7 @@ isa_enumerate(int reprogram)
 
 	if (acpi_enum != 0) {
 		if (acpi_isa_device_enum(isa_dip)) {
-			ndi_devi_exit(isa_dip, circ);
+			ndi_devi_exit(isa_dip);
 			if (isa_resource_setup() != NDI_SUCCESS) {
 				cmn_err(CE_WARN, "isa nexus: isa "
 				    "resource setup failed");
@@ -1276,7 +1277,7 @@ isa_enumerate(int reprogram)
 
 	add_known_used_resources();
 
-	ndi_devi_exit(isa_dip, circ);
+	ndi_devi_exit(isa_dip);
 
 	isa_create_ranges_prop(isa_dip);
 }

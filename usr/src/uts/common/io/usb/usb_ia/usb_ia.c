@@ -26,6 +26,9 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
 
 /*
  * usb interface association driver
@@ -382,7 +385,7 @@ static int
 usb_ia_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
     void *arg, dev_info_t **child)
 {
-	int		rval, circ;
+	int		rval;
 	usb_ia_t	*usb_ia = usb_ia_obtain_state(dip);
 
 	USB_DPRINTF_L4(DPRINT_MASK_ALL, usb_ia->ia_log_handle,
@@ -392,7 +395,7 @@ usb_ia_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		flag |= NDI_DEVI_DEBUG;
 	}
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 
 	/* enumerate each interface below us */
 	mutex_enter(&usb_ia->ia_mutex);
@@ -400,7 +403,7 @@ usb_ia_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	mutex_exit(&usb_ia->ia_mutex);
 
 	rval = ndi_busop_bus_config(dip, flag, op, arg, child, 0);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (rval);
 }
@@ -413,7 +416,7 @@ usb_ia_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	usb_ia_t  *usb_ia = usb_ia_obtain_state(dip);
 
 	dev_info_t	*cdip, *mdip;
-	int		interface, circular_count;
+	int		interface;
 	int		rval = NDI_SUCCESS;
 
 	USB_DPRINTF_L4(DPRINT_MASK_ALL, usb_ia->ia_log_handle,
@@ -431,7 +434,7 @@ usb_ia_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		flag &= ~(NDI_DEVI_REMOVE | NDI_UNCONFIG);
 	}
 
-	ndi_devi_enter(dip, &circular_count);
+	ndi_devi_enter(dip);
 	rval = ndi_busop_bus_unconfig(dip, flag, op, arg);
 
 	if (op == BUS_UNCONFIG_ALL && rval == NDI_SUCCESS &&
@@ -463,7 +466,7 @@ usb_ia_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	}
 	mutex_exit(&usb_ia->ia_mutex);
 
-	ndi_devi_exit(dip, circular_count);
+	ndi_devi_exit(dip);
 
 	USB_DPRINTF_L4(DPRINT_MASK_ALL, usb_ia->ia_log_handle,
 	    "usb_ia_bus_config: rval=%d", rval);

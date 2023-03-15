@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -2502,24 +2503,22 @@ s1394_phy_config_callback(cmd1394_cmd_t *cmd)
 int
 s1394_lock_tree(s1394_hal_t *hal)
 {
-	int	circular;
-
 	ASSERT(MUTEX_NOT_HELD(&hal->br_thread_mutex));
 	ASSERT(MUTEX_NOT_HELD(&hal->topology_tree_mutex));
 
 	mutex_enter(&hal->br_thread_mutex);
-	ndi_devi_enter(hal->halinfo.dip, &circular);
+	ndi_devi_enter(hal->halinfo.dip);
 	mutex_enter(&hal->topology_tree_mutex);
 
 	if ((hal->br_thread_ev_type & BR_THR_GO_AWAY) != 0) {
 		mutex_exit(&hal->br_thread_mutex);
 		mutex_exit(&hal->topology_tree_mutex);
-		ndi_devi_exit(hal->halinfo.dip, circular);
+		ndi_devi_exit(hal->halinfo.dip);
 		return (DDI_FAILURE);
 	} else if (hal->br_cfgrom_read_gen != hal->generation_count) {
 		mutex_exit(&hal->br_thread_mutex);
 		mutex_exit(&hal->topology_tree_mutex);
-		ndi_devi_exit(hal->halinfo.dip, circular);
+		ndi_devi_exit(hal->halinfo.dip);
 		return (DDI_FAILURE);
 	}
 
@@ -2537,7 +2536,7 @@ s1394_unlock_tree(s1394_hal_t *hal)
 {
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 	mutex_exit(&hal->topology_tree_mutex);
-	ndi_devi_exit(hal->halinfo.dip, 0);
+	ndi_devi_exit(hal->halinfo.dip);
 }
 
 /*

@@ -3,6 +3,7 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2005-08 Adaptec, Inc.
  * Copyright (c) 2005-08 Adaptec Inc., Achim Leubner
@@ -7416,7 +7417,6 @@ aac_tran_bus_config(dev_info_t *parent, uint_t flags, ddi_bus_config_op_t op,
     void *arg, dev_info_t **childp)
 {
 	struct aac_softstate *softs;
-	int circ = 0;
 	int rval = NDI_FAILURE;
 
 	if ((softs = ddi_get_soft_state(aac_softstatep,
@@ -7436,7 +7436,7 @@ aac_tran_bus_config(dev_info_t *parent, uint_t flags, ddi_bus_config_op_t op,
 	DBCALLED(softs, 1);
 
 	/* Hold the nexus across the bus_config */
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 	switch (op) {
 	case BUS_CONFIG_ONE: {
 		int tgt, lun;
@@ -7490,7 +7490,7 @@ aac_tran_bus_config(dev_info_t *parent, uint_t flags, ddi_bus_config_op_t op,
 
 	if (rval == NDI_SUCCESS)
 		rval = ndi_busop_bus_config(parent, flags, op, arg, childp, 0);
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 	return (rval);
 }
 
@@ -7501,7 +7501,6 @@ aac_handle_dr(struct aac_softstate *softs, int tgt, int lun, int event)
 	struct aac_device *dvp;
 	dev_info_t *dip;
 	int valid;
-	int circ1 = 0;
 
 	DBCALLED(softs, 1);
 
@@ -7518,11 +7517,11 @@ aac_handle_dr(struct aac_softstate *softs, int tgt, int lun, int event)
 	case AAC_CFG_DELETE:
 		/* Device onlined */
 		if (dip == NULL && valid) {
-			ndi_devi_enter(softs->devinfo_p, &circ1);
+			ndi_devi_enter(softs->devinfo_p);
 			(void) aac_config_lun(softs, tgt, 0, NULL);
 			AACDB_PRINT(softs, CE_NOTE, "c%dt%dL%d onlined",
 			    softs->instance, tgt, lun);
-			ndi_devi_exit(softs->devinfo_p, circ1);
+			ndi_devi_exit(softs->devinfo_p);
 		}
 		/* Device offlined */
 		if (dip && !valid) {

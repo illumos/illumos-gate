@@ -25,6 +25,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2016 James S. Blachly, MD <james.blachly@gmail.com>
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 
@@ -1664,7 +1665,6 @@ usba_find_existing_node(dev_info_t *odip)
 	dev_info_t *ndip, *child, *pdip;
 	int	*odata, *ndata;
 	uint_t	n_odata, n_ndata;
-	int	circular;
 
 	pdip = ddi_get_parent(odip);
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
@@ -1677,7 +1677,7 @@ usba_find_existing_node(dev_info_t *odip)
 		return (NULL);
 	}
 
-	ndi_devi_enter(pdip, &circular);
+	ndi_devi_enter(pdip);
 	ndip = (dev_info_t *)(DEVI(pdip)->devi_child);
 	while ((child = ndip) != NULL) {
 
@@ -1722,7 +1722,7 @@ usba_find_existing_node(dev_info_t *odip)
 		}
 	}
 
-	ndi_devi_exit(pdip, circular);
+	ndi_devi_exit(pdip);
 
 	ddi_prop_free(odata);
 

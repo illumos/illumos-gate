@@ -30,6 +30,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * Cardbus module
  */
 
@@ -574,7 +578,6 @@ cardbus_load_cardbus(dev_info_t *dip, uint_t socket, uint32_t pc_base)
 {
 #ifndef HOTPLUG
 	struct cardbus_config_ctrl ctrl;
-	int circular_count;
 #endif
 	int cb_instance;
 	cbus_t *cbp;
@@ -633,9 +636,9 @@ cardbus_load_cardbus(dev_info_t *dip, uint_t socket, uint32_t pc_base)
 #if defined(CARDBUS_DEBUG)
 	cardbus_err(dip, 8, "cardbus_load_cardbus: calling cbus_configure\n");
 #endif
-	ndi_devi_enter(dip, &circular_count);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), cbus_configure, (void *)&ctrl);
-	ndi_devi_exit(dip, circular_count);
+	ndi_devi_exit(dip);
 
 	if (ctrl.rv != NDI_SUCCESS) {
 		cardbus_err(dip, 1,

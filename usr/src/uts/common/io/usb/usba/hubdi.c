@@ -23,6 +23,7 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1153,7 +1154,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 	struct detachspec *ds;
 	hubd_t		*hubd;
 	usb_port_t	port;
-	int		circ, rval;
+	int		rval;
 	int		retval = DDI_FAILURE;
 
 	hubd = hubd_get_soft_state(dip);
@@ -1180,7 +1181,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 		}
 
 		/* serialize access */
-		ndi_devi_enter(hubd->h_dip, &circ);
+		ndi_devi_enter(hubd->h_dip);
 
 		switch (as->when) {
 		case DDI_PRE:
@@ -1224,7 +1225,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 			(void) hubd_pm_idle_component(hubd, dip, 0);
 			mutex_exit(HUBD_MUTEX(hubd));
 		}
-		ndi_devi_exit(hubd->h_dip, circ);
+		ndi_devi_exit(hubd->h_dip);
 
 		break;
 	case DDI_CTLOPS_DETACH:
@@ -1237,7 +1238,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 		}
 
 		/* serialize access */
-		ndi_devi_enter(hubd->h_dip, &circ);
+		ndi_devi_enter(hubd->h_dip);
 
 		switch (ds->when) {
 		case DDI_PRE:
@@ -1273,7 +1274,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 
 			break;
 		}
-		ndi_devi_exit(hubd->h_dip, circ);
+		ndi_devi_exit(hubd->h_dip);
 
 		break;
 	default:
@@ -1300,7 +1301,6 @@ hubd_config_one(hubd_t *hubd, int port)
 	dev_info_t	*hdip = hubd->h_dip;
 	dev_info_t	*rh_dip = hubd->h_usba_device->usb_root_hub_dip;
 	boolean_t	online_child = B_FALSE, found = B_FALSE;
-	int		prh_circ, rh_circ, circ;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_config_one:  started, hubd_reset_port = 0x%x", port);
@@ -1312,11 +1312,11 @@ hubd_config_one(hubd_t *hubd, int port)
 	 * we enter the parent PCI node to have this serialization.
 	 * this also excludes ioctls and deathrow thread
 	 */
-	ndi_devi_enter(ddi_get_parent(rh_dip), &prh_circ);
-	ndi_devi_enter(rh_dip, &rh_circ);
+	ndi_devi_enter(ddi_get_parent(rh_dip));
+	ndi_devi_enter(rh_dip);
 
 	/* exclude other threads */
-	ndi_devi_enter(hdip, &circ);
+	ndi_devi_enter(hdip);
 	mutex_enter(HUBD_MUTEX(hubd));
 
 	hubd_pm_busy_component(hubd, hubd->h_dip, 0);
@@ -1338,9 +1338,9 @@ hubd_config_one(hubd_t *hubd, int port)
 
 	mutex_exit(HUBD_MUTEX(hubd));
 
-	ndi_devi_exit(hdip, circ);
-	ndi_devi_exit(rh_dip, rh_circ);
-	ndi_devi_exit(ddi_get_parent(rh_dip), prh_circ);
+	ndi_devi_exit(hdip);
+	ndi_devi_exit(rh_dip);
+	ndi_devi_exit(ddi_get_parent(rh_dip));
 
 	if (online_child) {
 		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
@@ -1371,7 +1371,7 @@ hubd_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
     void *arg, dev_info_t **child)
 {
 	hubd_t	*hubd = hubd_get_soft_state(dip);
-	int	rval, circ;
+	int	rval;
 	long port;
 
 	USB_DPRINTF_L4(DPRINT_MASK_PM, hubd->h_log_handle,
@@ -1405,9 +1405,9 @@ hubd_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		}
 
 	}
-	ndi_devi_enter(hubd->h_dip, &circ);
+	ndi_devi_enter(hubd->h_dip);
 	rval = ndi_busop_bus_config(dip, flag, op, arg, child, 0);
-	ndi_devi_exit(hubd->h_dip, circ);
+	ndi_devi_exit(hubd->h_dip);
 
 	return (rval);
 }
@@ -1420,7 +1420,6 @@ hubd_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	hubd_t		*hubd = hubd_get_soft_state(dip);
 	dev_info_t	*cdip;
 	usb_port_t	port;
-	int		circ;
 	int		rval;
 
 	USB_DPRINTF_L4(DPRINT_MASK_PM, hubd->h_log_handle,
@@ -1435,7 +1434,7 @@ hubd_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	}
 
 	/* serialize access */
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 
 	rval = ndi_busop_bus_unconfig(dip, flag, op, arg);
 
@@ -1474,7 +1473,7 @@ hubd_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	}
 	mutex_exit(HUBD_MUTEX(hubd));
 
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	USB_DPRINTF_L4(DPRINT_MASK_PM, hubd->h_log_handle,
 	    "hubd_bus_unconfig: rval=%d", rval);
@@ -1754,13 +1753,12 @@ usba_hubdi_power(dev_info_t *dip, int comp, int level)
 	hubd_t		*hubd;
 	hub_power_t	*hubpm;
 	int		retval;
-	int		circ;
 
 	hubd = hubd_get_soft_state(dip);
 	USB_DPRINTF_L3(DPRINT_MASK_HUBDI, hubd->h_log_handle,
 	    "usba_hubdi_power: level=%d", level);
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 
 	mutex_enter(HUBD_MUTEX(hubd));
 	hubpm = hubd->h_hubpm;
@@ -1772,7 +1770,7 @@ usba_hubdi_power(dev_info_t *dip, int comp, int level)
 		    "hubp_pwr_states=0x%x", level, hubpm->hubp_pwr_states);
 		mutex_exit(HUBD_MUTEX(hubd));
 
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 
 		return (DDI_FAILURE);
 	}
@@ -1801,7 +1799,7 @@ usba_hubdi_power(dev_info_t *dip, int comp, int level)
 	}
 	mutex_exit(HUBD_MUTEX(hubd));
 
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return ((retval == USB_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
 }
@@ -2344,7 +2342,6 @@ hubd_setdevconfig(hubd_t *hubd, usb_port_t port)
 static int
 hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 {
-	int circ;
 	usb_port_t port;
 	hubd_t *hubd;
 	major_t hub_major = ddi_name_to_major("hubd");
@@ -2382,7 +2379,7 @@ hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 	}
 
 	/* walk child list and remove nodes with flag DEVI_DEVICE_REMOVED */
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 
 	if (ddi_driver_major(dip) != hwahc_major) {
 		/* for normal usb hub or root hub */
@@ -2403,18 +2400,18 @@ hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 		/* for HWA */
 		if (hubd->h_cleanup_child != NULL) {
 			if (hubd->h_cleanup_child(dip) != USB_SUCCESS) {
-				ndi_devi_exit(dip, circ);
+				ndi_devi_exit(dip);
 
 				return (DDI_WALK_PRUNECHILD);
 			}
 		} else {
-			ndi_devi_exit(dip, circ);
+			ndi_devi_exit(dip);
 
 			return (DDI_WALK_PRUNECHILD);
 		}
 	}
 
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	/* skip siblings of root hub */
 	if (usba_is_root_hub(dip)) {
@@ -2433,7 +2430,6 @@ hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 static void
 hubd_root_hub_cleanup_thread(void *arg)
 {
-	int circ;
 	hubd_t *root_hubd = (hubd_t *)arg;
 	dev_info_t *rh_dip = root_hubd->h_dip;
 #ifndef __lock_lint
@@ -2453,13 +2449,13 @@ hubd_root_hub_cleanup_thread(void *arg)
 
 		(void) devfs_clean(rh_dip, NULL, 0);
 
-		ndi_devi_enter(ddi_get_parent(rh_dip), &circ);
+		ndi_devi_enter(ddi_get_parent(rh_dip));
 		ddi_walk_devs(rh_dip, hubd_check_disconnected_ports,
 		    NULL);
 #ifdef __lock_lint
 		(void) hubd_check_disconnected_ports(rh_dip, NULL);
 #endif
-		ndi_devi_exit(ddi_get_parent(rh_dip), circ);
+		ndi_devi_exit(ddi_get_parent(rh_dip));
 
 		/* quit if we are not enabled anymore */
 		mutex_enter(HUBD_MUTEX(root_hubd));
@@ -2784,7 +2780,7 @@ hubd_restore_device_state(dev_info_t *dip, hubd_t *hubd)
 static int
 hubd_cleanup(dev_info_t *dip, hubd_t *hubd)
 {
-	int		circ, rval, old_dev_state;
+	int		rval, old_dev_state;
 	hub_power_t	*hubpm;
 #ifdef DEBUG
 	usb_port_t	port;
@@ -2798,7 +2794,7 @@ hubd_cleanup(dev_info_t *dip, hubd_t *hubd)
 	}
 
 	/* ensure we are the only one active */
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 
 	mutex_enter(HUBD_MUTEX(hubd));
 
@@ -2815,7 +2811,7 @@ hubd_cleanup(dev_info_t *dip, hubd_t *hubd)
 		if (hubd->h_bus_ctls || hubd->h_bus_pwr ||
 		    hubd->h_hotplug_thread) {
 			mutex_exit(HUBD_MUTEX(hubd));
-			ndi_devi_exit(dip, circ);
+			ndi_devi_exit(dip);
 
 			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 			    "hubd_cleanup: hotplug thread/bus ctl active "
@@ -2834,7 +2830,7 @@ hubd_cleanup(dev_info_t *dip, hubd_t *hubd)
 			if (hubd->h_cleanup_needed ||
 			    hubd->h_cleanup_active) {
 				mutex_exit(HUBD_MUTEX(hubd));
-				ndi_devi_exit(dip, circ);
+				ndi_devi_exit(dip);
 
 				USB_DPRINTF_L2(DPRINT_MASK_ATTA,
 				    hubd->h_log_handle,
@@ -2873,7 +2869,7 @@ hubd_cleanup(dev_info_t *dip, hubd_t *hubd)
 
 			USB_DPRINTF_L2(DPRINT_MASK_ALL, hubd->h_log_handle,
 			    "hubd_cleanup: ndi_event_free_hdl failed");
-			ndi_devi_exit(dip, circ);
+			ndi_devi_exit(dip);
 
 			return (USB_FAILURE);
 
@@ -2960,7 +2956,7 @@ hubd_cleanup(dev_info_t *dip, hubd_t *hubd)
 		cv_destroy(&hubd->h_cv_hotplug_dev);
 	}
 
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	if (hubd->h_init_state & HUBD_MINOR_NODE_CREATED) {
 		ddi_remove_minor_node(dip, NULL);
@@ -3821,7 +3817,7 @@ hubd_hotplug_thread(void *arg)
 	boolean_t	online_child = B_FALSE;
 	boolean_t	offline_child = B_FALSE;
 	boolean_t	pwrup_child = B_FALSE;
-	int		prh_circ, rh_circ, chld_circ, circ, old_state;
+	int		old_state;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_hotplug_thread:  started");
@@ -3898,11 +3894,11 @@ hubd_hotplug_thread(void *arg)
 	 * this also excludes ioctls and deathrow thread
 	 * (a bit crude but easier to debug)
 	 */
-	ndi_devi_enter(ddi_get_parent(rh_dip), &prh_circ);
-	ndi_devi_enter(rh_dip, &rh_circ);
+	ndi_devi_enter(ddi_get_parent(rh_dip));
+	ndi_devi_enter(rh_dip);
 
 	/* exclude other threads */
-	ndi_devi_enter(hdip, &circ);
+	ndi_devi_enter(hdip);
 	mutex_enter(HUBD_MUTEX(hubd));
 
 	ASSERT(hubd->h_intr_pipe_state == HUBD_INTR_PIPE_ACTIVE);
@@ -4015,7 +4011,7 @@ hubd_hotplug_thread(void *arg)
 					 * other threads which are detaching
 					 * the child driver at the same time.
 					 */
-					ndi_devi_enter(child_dip, &chld_circ);
+					ndi_devi_enter(child_dip);
 					/*
 					 * Now check if the driver remains
 					 * attached.
@@ -4040,7 +4036,7 @@ hubd_hotplug_thread(void *arg)
 						mutex_exit(HUBD_MUTEX(hubd));
 					}
 
-					ndi_devi_exit(child_dip, chld_circ);
+					ndi_devi_exit(child_dip);
 					mutex_enter(HUBD_MUTEX(hubd));
 				} else if (was_connected) {
 					/* this is a disconnect */
@@ -4138,9 +4134,9 @@ hubd_hotplug_thread(void *arg)
 	mutex_exit(HUBD_MUTEX(hubd));
 
 	/* delete cached dv_node's but drop locks first */
-	ndi_devi_exit(hdip, circ);
-	ndi_devi_exit(rh_dip, rh_circ);
-	ndi_devi_exit(ddi_get_parent(rh_dip), prh_circ);
+	ndi_devi_exit(hdip);
+	ndi_devi_exit(rh_dip);
+	ndi_devi_exit(ddi_get_parent(rh_dip));
 
 	(void) devfs_clean(rh_dip, NULL, 0);
 
@@ -7159,12 +7155,11 @@ hubd_disconnect_event_cb(dev_info_t *dip)
 	usb_port_t	port, nports;
 	usba_device_t	*usba_dev;
 	usba_event_t	tag = USBA_EVENT_TAG_HOT_REMOVAL;
-	int		circ;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_disconnect_event_cb: tag=%d", tag);
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 
 	mutex_enter(HUBD_MUTEX(hubd));
 	switch (hubd->h_dev_state) {
@@ -7208,7 +7203,7 @@ hubd_disconnect_event_cb(dev_info_t *dip)
 	}
 	mutex_exit(HUBD_MUTEX(hubd));
 
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (USB_SUCCESS);
 }
@@ -7217,11 +7212,11 @@ hubd_disconnect_event_cb(dev_info_t *dip)
 static int
 hubd_reconnect_event_cb(dev_info_t *dip)
 {
-	int	rval, circ;
+	int	rval;
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	rval = hubd_restore_state_cb(dip);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (rval);
 }
@@ -7234,7 +7229,6 @@ hubd_reconnect_event_cb(dev_info_t *dip)
 static int
 hubd_pre_suspend_event_cb(dev_info_t *dip)
 {
-	int	circ;
 	hubd_t	*hubd = (hubd_t *)hubd_get_soft_state(dip);
 
 	USB_DPRINTF_L4(DPRINT_MASK_EVENTS, hubd->h_log_handle,
@@ -7249,9 +7243,9 @@ hubd_pre_suspend_event_cb(dev_info_t *dip)
 	(void) hubd_pm_busy_component(hubd, hubd->h_dip, 0);
 	mutex_exit(HUBD_MUTEX(hubd));
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	hubd_run_callbacks(hubd, USBA_EVENT_TAG_PRE_SUSPEND);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (USB_SUCCESS);
 }
@@ -7264,15 +7258,14 @@ hubd_pre_suspend_event_cb(dev_info_t *dip)
 static int
 hubd_post_resume_event_cb(dev_info_t *dip)
 {
-	int	circ;
 	hubd_t	*hubd = (hubd_t *)hubd_get_soft_state(dip);
 
 	USB_DPRINTF_L4(DPRINT_MASK_EVENTS, hubd->h_log_handle,
 	    "hubd_post_resume_event_cb");
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	hubd_run_callbacks(hubd, USBA_EVENT_TAG_POST_RESUME);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	mutex_enter(HUBD_MUTEX(hubd));
 
@@ -7403,9 +7396,9 @@ hubd_cpr_suspend(hubd_t *hubd)
 static void
 hubd_cpr_resume(dev_info_t *dip)
 {
-	int	rval, circ;
+	int	rval;
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	/*
 	 * if we are the root hub, we open our pipes
 	 * ourselves.
@@ -7416,7 +7409,7 @@ hubd_cpr_resume(dev_info_t *dip)
 		ASSERT(rval == USB_SUCCESS);
 	}
 	(void) hubd_restore_state_cb(dip);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 }
 
 
@@ -7709,7 +7702,6 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
 	devctl_ap_state_t	ap_state;
 	struct devctl_iocdata	*dcp = NULL;
 	usb_pipe_state_t	prev_pipe_state = 0;
-	int			circ, rh_circ, prh_circ;
 
 	if ((hubd = hubd_get_soft_state(self)) == NULL) {
 
@@ -7805,9 +7797,9 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
 	/* go full power */
 	(void) pm_raise_power(hubd->h_dip, 0, USB_DEV_OS_FULL_PWR);
 
-	ndi_devi_enter(ddi_get_parent(rh_dip), &prh_circ);
-	ndi_devi_enter(rh_dip, &rh_circ);
-	ndi_devi_enter(hubd->h_dip, &circ);
+	ndi_devi_enter(ddi_get_parent(rh_dip));
+	ndi_devi_enter(rh_dip);
+	ndi_devi_enter(hubd->h_dip);
 
 	mutex_enter(HUBD_MUTEX(hubd));
 
@@ -7852,9 +7844,9 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
 		child_dip = hubd_get_child_dip(hubd, port);
 		mutex_exit(HUBD_MUTEX(hubd));
 
-		ndi_devi_exit(hubd->h_dip, circ);
-		ndi_devi_exit(rh_dip, rh_circ);
-		ndi_devi_exit(ddi_get_parent(rh_dip), prh_circ);
+		ndi_devi_exit(hubd->h_dip);
+		ndi_devi_exit(rh_dip);
+		ndi_devi_exit(ddi_get_parent(rh_dip));
 		if (child_dip == NULL) {
 			rv = EIO;
 		} else {
@@ -7863,9 +7855,9 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
 				rv = EIO;
 			ndi_rele_devi(child_dip);
 		}
-		ndi_devi_enter(ddi_get_parent(rh_dip), &prh_circ);
-		ndi_devi_enter(rh_dip, &rh_circ);
-		ndi_devi_enter(hubd->h_dip, &circ);
+		ndi_devi_enter(ddi_get_parent(rh_dip));
+		ndi_devi_enter(rh_dip);
+		ndi_devi_enter(hubd->h_dip);
 
 		mutex_enter(HUBD_MUTEX(hubd));
 
@@ -8324,9 +8316,9 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
 	}
 	mutex_exit(HUBD_MUTEX(hubd));
 
-	ndi_devi_exit(hubd->h_dip, circ);
-	ndi_devi_exit(rh_dip, rh_circ);
-	ndi_devi_exit(ddi_get_parent(rh_dip), prh_circ);
+	ndi_devi_exit(hubd->h_dip);
+	ndi_devi_exit(rh_dip);
+	ndi_devi_exit(ddi_get_parent(rh_dip));
 
 	mutex_enter(HUBD_MUTEX(hubd));
 	hubd_pm_idle_component(hubd, hubd->h_dip, 0);
@@ -8968,7 +8960,7 @@ hubd_reset_thread(void *arg)
 	dev_info_t	*rh_dip = hubd->h_usba_device->usb_root_hub_dip;
 	dev_info_t	*child_dip;
 	boolean_t	online_child = B_FALSE;
-	int		prh_circ, rh_circ, circ, devinst;
+	int		devinst;
 	char		*devname;
 	int		i = 0;
 	int		rval = USB_FAILURE;
@@ -9035,11 +9027,11 @@ hubd_reset_thread(void *arg)
 	 * we enter the parent PCI node to have this serialization.
 	 * this also excludes ioctls and deathrow thread
 	 */
-	ndi_devi_enter(ddi_get_parent(rh_dip), &prh_circ);
-	ndi_devi_enter(rh_dip, &rh_circ);
+	ndi_devi_enter(ddi_get_parent(rh_dip));
+	ndi_devi_enter(rh_dip);
 
 	/* exclude other threads */
-	ndi_devi_enter(hdip, &circ);
+	ndi_devi_enter(hdip);
 	mutex_enter(HUBD_MUTEX(hubd));
 
 	/*
@@ -9052,9 +9044,9 @@ hubd_reset_thread(void *arg)
 		hubd_post_event(hubd, reset_port, USBA_EVENT_TAG_HOT_REMOVAL);
 
 		/* delete cached dv_node's but drop locks first */
-		ndi_devi_exit(hdip, circ);
-		ndi_devi_exit(rh_dip, rh_circ);
-		ndi_devi_exit(ddi_get_parent(rh_dip), prh_circ);
+		ndi_devi_exit(hdip);
+		ndi_devi_exit(rh_dip);
+		ndi_devi_exit(ddi_get_parent(rh_dip));
 
 		(void) devfs_clean(rh_dip, NULL, DV_CLEAN_FORCE);
 
@@ -9081,9 +9073,9 @@ hubd_reset_thread(void *arg)
 			}
 		}
 
-		ndi_devi_enter(ddi_get_parent(rh_dip), &prh_circ);
-		ndi_devi_enter(rh_dip, &rh_circ);
-		ndi_devi_enter(hdip, &circ);
+		ndi_devi_enter(ddi_get_parent(rh_dip));
+		ndi_devi_enter(rh_dip);
+		ndi_devi_enter(hdip);
 
 		mutex_enter(HUBD_MUTEX(hubd));
 
@@ -9117,9 +9109,9 @@ hubd_reset_thread(void *arg)
 	mutex_exit(HUBD_MUTEX(hubd));
 
 	/* delete cached dv_node's but drop locks first */
-	ndi_devi_exit(hdip, circ);
-	ndi_devi_exit(rh_dip, rh_circ);
-	ndi_devi_exit(ddi_get_parent(rh_dip), prh_circ);
+	ndi_devi_exit(hdip);
+	ndi_devi_exit(rh_dip);
+	ndi_devi_exit(ddi_get_parent(rh_dip));
 
 	(void) devfs_clean(rh_dip, NULL, 0);
 

@@ -22,6 +22,10 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
@@ -238,7 +242,6 @@ opl_get_physical_board(int id)
 {
 	dev_info_t	*root_dip, *dip = NULL;
 	char		*dname = NULL;
-	int		circ;
 
 	pnode_t		pnode;
 	char		pname[MAXSYSNAME] = {0};
@@ -256,7 +259,7 @@ opl_get_physical_board(int id)
 	root_dip = ddi_root_node();
 	if (root_dip) {
 		/* Get from devinfo node */
-		ndi_devi_enter(root_dip, &circ);
+		ndi_devi_enter(root_dip);
 		for (dip = ddi_get_child(root_dip); dip;
 		    dip = ddi_get_next_sibling(dip)) {
 
@@ -272,15 +275,15 @@ opl_get_physical_board(int id)
 				if ((psb_id = (int)ddi_getprop(DDI_DEV_T_ANY,
 				    dip, DDI_PROP_DONTPASS, PSBPROP, -1))
 				    == -1) {
-					ndi_devi_exit(root_dip, circ);
+					ndi_devi_exit(root_dip);
 					return (-1);
 				} else {
-					ndi_devi_exit(root_dip, circ);
+					ndi_devi_exit(root_dip);
 					return (psb_id);
 				}
 			}
 		}
-		ndi_devi_exit(root_dip, circ);
+		ndi_devi_exit(root_dip);
 	}
 
 	/*
