@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -61,6 +61,8 @@
  */
 static struct vmctx *test_vmctx = NULL;
 static const char *test_name = NULL;
+
+static uint64_t test_msg_addr = 0;
 
 static int
 setup_rom(struct vmctx *ctx)
@@ -156,6 +158,12 @@ static void fail_finish(void)
 
 	test_cleanup(true);
 	exit(EXIT_FAILURE);
+}
+
+void
+test_fail(void)
+{
+	fail_finish();
 }
 
 void
@@ -285,6 +293,55 @@ test_pass(void)
 	(void) printf("PASS %s\n", test_name);
 	test_cleanup(false);
 	exit(EXIT_SUCCESS);
+}
+
+const char *
+test_msg_get(struct vmctx *ctx)
+{
+	/* Disregard if the message address is still NULL */
+	const uint64_t msg_addr = test_msg_addr;
+	if (msg_addr == 0) {
+		return (NULL);
+	}
+
+	/*
+	 * We want to try to map up to one page after the specified message
+	 * address, keeping in mind the end of lowmem. (The payload, and
+	 * thus message, is assumed to be in lowmem at this time.)
+	 */
+	const uint64_t lowmem_end = vm_get_lowmem_size(ctx);
+	const uint64_t msg_map_end = MIN(msg_addr + PAGE_SIZE, lowmem_end);
+
+	if (msg_map_end >= lowmem_end || msg_map_end <= msg_addr) {
+		return (NULL);
+	}
+	const uint64_t max_msg_len = msg_map_end - msg_addr;
+
+	/*
+	 * Get the mapping to that guest memory.  This assumes that the payload
+	 * has provided a guest-physical address to us.
+	 */
+	const char *result = vm_map_gpa(ctx, msg_addr, max_msg_len);
+	if (result == NULL) {
+		return (NULL);
+	}
+
+	/* Demand a NUL-terminated string shorter than the map limit */
+	if (strnlen(result, max_msg_len) >= max_msg_len) {
+		return (NULL);
+	}
+
+	return (result);
+}
+
+void
+test_msg_print(struct vmctx *ctx)
+{
+	const char *payload_msg = test_msg_get(ctx);
+
+	if (payload_msg != NULL) {
+		(void) fprintf(stderr, "MSG: %s\n", payload_msg);
+	}
 }
 
 static int
@@ -488,6 +545,13 @@ which_exit_kind(struct vm_entry *ventry, const struct vm_exit *vexit)
 			} else {
 				return (VEK_TEST_FAIL);
 			}
+		}
+		if (inout->port == IOP_TEST_MSG &&
+		    (inout->flags & INOUT_IN) == 0 &&
+		    inout->bytes == 4) {
+			test_msg_addr = inout->eax;
+			ventry_fulfill_inout(vexit, ventry, 0);
+			return (VEK_TEST_MSG);
 		}
 		break;
 	default:

@@ -300,8 +300,13 @@ void	vm_copy_teardown(struct vmctx *ctx, int vcpu, struct iovec *iov,
 /* RTC */
 int	vm_rtc_write(struct vmctx *ctx, int offset, uint8_t value);
 int	vm_rtc_read(struct vmctx *ctx, int offset, uint8_t *retval);
+#ifdef __FreeBSD__
 int	vm_rtc_settime(struct vmctx *ctx, time_t secs);
 int	vm_rtc_gettime(struct vmctx *ctx, time_t *secs);
+#else /* __FreeBSD__ */
+int	vm_rtc_settime(struct vmctx *ctx, const timespec_t *);
+int	vm_rtc_gettime(struct vmctx *ctx, timespec_t *);
+#endif /* __FreeBSD__ */
 
 /* Reset vcpu register state */
 int	vcpu_reset(struct vmctx *ctx, int vcpu);

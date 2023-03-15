@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 /*
  * Returns the current RTC time as number of seconds since 00:00:00 Jan 1, 1970
  */
+#ifdef __FreeBSD__
 static time_t
 rtc_time(void)
 {
@@ -72,6 +73,20 @@ rtc_time(void)
 	}
 	return (t);
 }
+#else /* __FreeBSD__ */
+static void
+rtc_time(timespec_t *ts)
+{
+	(void) clock_gettime(CLOCK_REALTIME, ts);
+
+	if (get_config_bool_default("rtc.use_localtime", true)) {
+		struct tm tm;
+
+		localtime_r(&ts->tv_sec, &tm);
+		ts->tv_sec = timegm(&tm);
+	}
+}
+#endif /* __FreeBSD__ */
 
 void
 rtc_init(struct vmctx *ctx)
@@ -102,7 +117,14 @@ rtc_init(struct vmctx *ctx)
 	err = vm_rtc_write(ctx, RTC_HMEM_MSB, himem >> 16);
 	assert(err == 0);
 
+#ifdef __FreeBSD__
 	err = vm_rtc_settime(ctx, rtc_time());
+#else
+	timespec_t ts;
+
+	rtc_time(&ts);
+	err = vm_rtc_settime(ctx, &ts);
+#endif
 	assert(err == 0);
 }
 

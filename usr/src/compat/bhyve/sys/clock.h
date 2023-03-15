@@ -51,17 +51,6 @@
 
 #ifdef _KERNEL		/* No user serviceable parts */
 
-#ifdef __FreeBSD__
-/*
- * Timezone info from settimeofday(2), usually not used
- */
-extern int tz_minuteswest;
-extern int tz_dsttime;
-extern struct mtx resettodr_lock;
-
-int utc_offset(void);
-#endif /* __FreeBSD__ */
-
 /*
  * Structure to hold the values typically reported by time-of-day clocks.
  * This can be passed to the generic conversion functions to be converted
@@ -80,20 +69,6 @@ struct clocktime {
 
 int clock_ct_to_ts(struct clocktime *, struct timespec *);
 void clock_ts_to_ct(struct timespec *, struct clocktime *);
-#ifdef __FreeBSD__
-void clock_register(device_t, long);
-#endif
-
-#ifndef __FreeBSD__
-extern u_char const bin2bcd_data[];
-#define	bin2bcd(x)	(bin2bcd_data[bin])
-#endif
-
-/*
- * BCD to decimal and decimal to BCD.
- */
-#define	FROMBCD(x)	bcd2bin(x)
-#define	TOBCD(x)	bin2bcd(x)
 
 /* Some handy constants. */
 #define SECDAY		(24 * 60 * 60)

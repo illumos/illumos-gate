@@ -252,10 +252,6 @@ struct vm_intinfo {
 	uint64_t	info2;
 };
 
-struct vm_rtc_time {
-	time_t		secs;
-};
-
 struct vm_rtc_data {
 	int		offset;
 	uint8_t		value;
@@ -419,7 +415,7 @@ struct vm_legacy_cpuid {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	11
+#define	VMM_CURRENT_INTERFACE_VERSION	12
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))

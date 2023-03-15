@@ -21,7 +21,8 @@ PROG =	vpmtmr_freq \
 	vlapic_freq_periodic \
 	vlapic_mmio_access \
 	vlapic_msr_access \
-	vatpit_freq
+	vatpit_freq \
+	vrtc_ops
 
 # These should probably go in the `vmm` tests, but since they depend on
 # in-guest payloads, it is easier to build them here.

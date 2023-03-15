@@ -2244,15 +2244,23 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (!error && set_rtc_time)
-		error = vm_rtc_settime(ctx, rtc_secs);
+	if (!error && set_rtc_time) {
+		timespec_t ts = {
+			.tv_sec = rtc_secs,
+			.tv_nsec = 0,
+		};
+
+		error = vm_rtc_settime(ctx, &ts);
+	}
 
 	if (!error && (get_rtc_time || get_all)) {
-		error = vm_rtc_gettime(ctx, &rtc_secs);
+		timespec_t ts;
+
+		error = vm_rtc_gettime(ctx, &ts);
 		if (error == 0) {
-			gmtime_r(&rtc_secs, &tm);
+			gmtime_r(&ts.tv_sec, &tm);
 			printf("rtc time %#lx: %s %s %02d %02d:%02d:%02d %d\n",
-			    rtc_secs, wday_str(tm.tm_wday), mon_str(tm.tm_mon),
+			    ts.tv_sec, wday_str(tm.tm_wday), mon_str(tm.tm_mon),
 			    tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
 			    1900 + tm.tm_year);
 		}

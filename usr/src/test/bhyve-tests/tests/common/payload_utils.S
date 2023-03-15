@@ -14,6 +14,7 @@
  */
 
 #include <sys/asm_linkage.h>
+#include "payload_common.h"
 
 /* void outb(uint16_t port, uint8_t val) */
 ENTRY(outb)
@@ -101,3 +102,32 @@ ENTRY(rdtsc)
 	orq     %rdx, %rax
 	ret
 SET_SIZE(rdtsc)
+
+/* void test_result_pass(void) */
+ENTRY(test_result_pass)
+	movl    $IOP_TEST_RESULT, %edi
+	movl    $TEST_RESULT_PASS, %esi
+	call    outb
+	ret
+SET_SIZE(test_result_pass)
+
+/* void test_result_fail(void) */
+ENTRY(test_result_fail)
+	movl    $IOP_TEST_RESULT, %edi
+	movl    $TEST_RESULT_FAIL, %esi
+	call    outb
+	ret
+SET_SIZE(test_result_fail)
+
+/* void test_msg(const char *) */
+ENTRY(test_msg)
+	/*
+	 * Message address is assumed to be in lower 32-bits, since that is where
+	 * the payload is currently being mapped.
+	 */
+	movl    %edi, %esi
+	movl    $IOP_TEST_MSG, %edi
+	call    outl
+
+	ret
+SET_SIZE(test_msg)
