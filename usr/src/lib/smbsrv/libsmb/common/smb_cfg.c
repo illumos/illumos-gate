@@ -192,6 +192,8 @@ static struct str_val
 smb31_encrypt_ciphers[] = {
 	{ "aes128-ccm",	SMB3_CIPHER_FLAG_AES128_CCM },	/* SMB 3.x */
 	{ "aes128-gcm",	SMB3_CIPHER_FLAG_AES128_GCM },	/* SMB 3.1.1 */
+	{ "aes256-ccm",	SMB3_CIPHER_FLAG_AES256_CCM },	/* SMB 3.1.1 */
+	{ "aes256-gcm",	SMB3_CIPHER_FLAG_AES256_GCM },	/* SMB 3.1.1 */
 	{ "all",	SMB3_CIPHER_FLAGS_ALL },
 	{ NULL,		0 }
 };

@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -167,7 +168,8 @@ smb2_hmac_update(smb_sign_ctx_t ctx, uint8_t *in, size_t len)
 
 /*
  * Note, the SMB2 signature is the first 16 bytes of the
- * 32-byte SHA256 HMAC digest.
+ * 32-byte SHA256 HMAC digest.  This is specifically for
+ * SMB2 signing, and NOT a generic HMAC function.
  */
 int
 smb2_hmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
@@ -183,6 +185,59 @@ smb2_hmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
 	(void) C_CloseSession(ctx);
 
 	return (rv == CKR_OK ? 0 : -1);
+}
+
+/*
+ * One-shot HMAC function used in smb3_kdf
+ */
+int
+smb2_hmac_one(smb_crypto_mech_t *mech,
+    uint8_t *key, size_t key_len,
+    uint8_t *data, size_t data_len,
+    uint8_t *mac, size_t mac_len)
+{
+	CK_SESSION_HANDLE hssn = 0;
+	CK_OBJECT_HANDLE hkey = 0;
+	CK_ULONG ck_maclen = mac_len;
+	CK_RV rv;
+	int rc = 0;
+
+	rv = SUNW_C_GetMechSession(mech->mechanism, &hssn);
+	if (rv != CKR_OK)
+		return (-1);
+
+	rv = SUNW_C_KeyToObject(hssn, mech->mechanism,
+	    key, key_len, &hkey);
+	if (rv != CKR_OK) {
+		rc = -2;
+		goto out;
+	}
+
+	rv = C_SignInit(hssn, mech, hkey);
+	if (rv != CKR_OK) {
+		rc = -3;
+		goto out;
+	}
+
+	rv = C_Sign(hssn, data, data_len, mac, &ck_maclen);
+	if (rv != CKR_OK) {
+		rc = -4;
+		goto out;
+	}
+
+	if (ck_maclen != mac_len) {
+		rc = -5;
+		goto out;
+	}
+	rc = 0;
+
+out:
+	if (hkey != 0)
+		(void) C_DestroyObject(hssn, hkey);
+	if (hssn != 0)
+		(void) C_CloseSession(hssn);
+
+	return (rc);
 }
 
 /*

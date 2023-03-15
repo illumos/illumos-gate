@@ -808,7 +808,7 @@ struct smb_sign {
  */
 struct smb_key {
 	uint_t len;
-	uint8_t key[SMB2_SESSION_KEY_LEN];
+	uint8_t key[32]; /* fit AES-256 key */
 };
 
 #define	SMB_SIGNING_ENABLED	1

@@ -115,7 +115,7 @@ typedef struct smb2_negotiate_ctx {
  * algorithms - AES-256-CCM and AES-256-GCM.
  */
 #define	MAX_HASHID_NUM	(1)
-#define	MAX_CIPHER_NUM	(4)
+#define	MAX_CIPHER_NUM	(8)
 
 typedef struct smb2_preauth_integrity_caps {
 	uint16_t	picap_hash_count;
@@ -158,9 +158,6 @@ typedef struct smb2_neg_ctxs {
 
 #define	STATUS_PREAUTH_HASH_OVERLAP \
     STATUS_SMB_NO_PREAUTH_INEGRITY_HASH_OVERLAP
-
-#define	SMB3_CIPHER_ENABLED(c, f)	((c) <= SMB3_CIPHER_MAX && \
-    SMB3_CIPHER_BIT(c) & (f))
 
 typedef struct smb2_arg_negotiate {
 	struct smb2_neg_ctxs	neg_in_ctxs;
@@ -382,7 +379,8 @@ smb31_decode_neg_ctxs(smb_request_t *sr)
 			for (int k = 0; k < encap->encap_cipher_count; k++) {
 				uint16_t c = encap->encap_cipher_ids[k];
 
-				if (SMB3_CIPHER_ENABLED(c, ciphers)) {
+				if (c <= SMB3_CIPHER_MAX &&
+				    (SMB3_CIPHER_BIT(c) & ciphers) != 0) {
 					s->smb31_enc_cipherid = c;
 					found_cipher = B_TRUE;
 					break;
