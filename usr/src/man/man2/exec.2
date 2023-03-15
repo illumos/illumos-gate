@@ -45,11 +45,10 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2015, Joyent, Inc.
 .\"
-.TH EXEC 2 "Oct 27, 2015"
+.TH EXEC 2 "March 10, 2023"
 .SH NAME
 exec, execl, execle, execlp, execv, execve, execvp \- execute a file
 .SH SYNOPSIS
-.LP
 .nf
 #include <unistd.h>
 
@@ -86,7 +85,6 @@ exec, execl, execle, execlp, execv, execve, execvp \- execute a file
 .fi
 
 .SH DESCRIPTION
-.LP
 Each of the functions in the \fBexec\fR family replaces the current process
 image with a new process image. The new image is constructed from a regular,
 executable file called the \fBnew process image file\fR. This file is either an
@@ -536,12 +534,10 @@ consequence of replacing the process image.
 The saved resource limits in the new process image are set to be a copy of the
 process's corresponding hard and soft limits.
 .SH RETURN VALUES
-.LP
 If a function in the \fBexec\fR family returns to the calling process image, an
 error has occurred; the return value is \fB\(mi1\fR and \fBerrno\fR is set to
 indicate the error.
 .SH ERRORS
-.LP
 The \fBexec\fR functions will fail if:
 .sp
 .ne 2
@@ -713,7 +709,6 @@ currently open for writing by some process.
 .RE
 
 .SH USAGE
-.LP
 As the state of conversion descriptors and message catalogue descriptors in the
 new process image is undefined, portable applications should not rely on their
 use and should close them prior to calling one of the \fBexec\fR functions.
@@ -721,12 +716,11 @@ use and should close them prior to calling one of the \fBexec\fR functions.
 .LP
 Applications that require other than the default POSIX locale should call
 \fBsetlocale\fR(3C) with the appropriate parameters to establish the locale of
-thenew process.
+the new process.
 .sp
 .LP
 The \fIenviron\fR array should not be accessed directly by the application.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -748,7 +742,6 @@ Standard	See \fBstandards\fR(7).
 .LP
 The \fBexecle()\fR and \fBexecve()\fR functions are Async-Signal-Safe.
 .SH SEE ALSO
-.LP
 .BR ksh (1),
 .BR ps (1),
 .BR sh (1),
@@ -785,7 +778,6 @@ The \fBexecle()\fR and \fBexecve()\fR functions are Async-Signal-Safe.
 .BR privileges (7),
 .BR standards (7)
 .SH WARNINGS
-.LP
 If a program is \fBsetuid\fR to a user \fBID\fR other than the superuser, and
 the program is executed when the real user \fBID\fR is super-user, then the
 program has some of the powers of a super-user as well.

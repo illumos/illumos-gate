@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CPC_STRTOEVENT 3CPC "Mar 28, 2005"
+.TH CPC_STRTOEVENT 3CPC "March 10, 2023"
 .SH NAME
 cpc_strtoevent, cpc_eventtostr \- translate strings to and from events
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... \(milcpc [ \fIlibrary\fR... ]
 #include <libcpc.h>
@@ -22,14 +21,12 @@ cc [ \fIflag\fR... ] \fIfile\fR... \(milcpc [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBcpc_strtoevent()\fR function translates an event specification to the
 appropriate collection of control bits in a \fBcpc_event_t\fR structure pointed
 to by the \fIevent\fR argument. The event specification is a
 \fBgetsubopt\fR(3C)-style string that describes the event and any attributes
 that the processor can apply to the event or events. If successful, the
-funciton returns 0, the \fBce_cpuver\fR field and the ISA-dependent control
+function returns 0, the \fBce_cpuver\fR field and the ISA-dependent control
 registers of event are initialized appropriately, and the rest of the
 \fBcpc_event_t\fR structure is initialized to 0.
 .sp
@@ -37,8 +34,6 @@ registers of event are initialized appropriately, and the rest of the
 The \fBcpc_eventtostr()\fR function takes an event and constructs a compact
 canonical string representation for that event.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBcpc_strtoevent()\fR returns 0. If the string
 cannot be decoded, a non-zero value is returned and a message is printed using
 the library's error-reporting mechanism (see  \fBcpc_seterrfn\fR(3CPC)).
@@ -48,16 +43,12 @@ Upon successful completion, \fBcpc_eventtostr()\fR returns a pointer to a
 string. The string returned must be freed by the caller using \fBfree\fR(3C).
 If \fBcpc_eventtostr()\fR fails, a null pointer is returned.
 .SH USAGE
-.sp
-.LP
 The event selection syntax used is processor architecture-dependent. The
 supported processor families allow variations on how events are counted as well
 as what events can be counted. This information is available in compact form
 from the \fBcpc_getusage()\fR function (see \fBcpc_getcpuver\fR(3CPC)), but is
 explained in further detail below.
 .SS "UltraSPARC"
-.sp
-.LP
 On UltraSPARC processors, the syntax for setting options is as follows:
 .sp
 .in +2
@@ -79,8 +70,6 @@ specifying the \fBnouser\fR keyword.
 The keywords \fBpic0\fR and \fBpic1\fR may be omitted; they can be used to
 resolve ambiguities if they exist.
 .SS "Pentium I"
-.sp
-.LP
 On Pentium processors, the syntax for setting counter options is as follows:
 .sp
 .in +2
@@ -104,11 +93,9 @@ allows the external pin control pins to be set high (defaults to low).  When
 the pin control register is set high, the external pin will be asserted when
 the associated register overflows. When the pin control register is set low,
 the external pin will be asserted when the counter has been incremented.  The
-electrical effect of driving the pin is dependent uptoon how the motherboard
+electrical effect of driving the pin is dependent upon how the motherboard
 manufacturer has chosen to connect it, if it is connected at all.
 .SS "Pentium II"
-.sp
-.LP
 For Pentium II processors, the syntax is substantially more complex, reflecting
 the complex configuration options available:
 .sp
@@ -130,7 +117,6 @@ is a number between 0 and 255, expressed in hexadecimal, octal or decimal
 notation.
 .SH EXAMPLES
 .SS "SPARC"
-.LP
 \fBExample 1 \fRSPARC Example.
 .sp
 .in +2
@@ -146,8 +132,6 @@ else
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -164,8 +148,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR free (3C),
 .BR getsubopt (3C),
 .BR cpc (3CPC),
@@ -175,8 +157,6 @@ MT-Level	MT-Safe
 .BR libcpc (3LIB),
 .BR attributes (7)
 .SH NOTES
-.sp
-.LP
 The \fBcpc_strtoevent()\fR and \fBcpc_eventtostr()\fR functions exist for
 binary compatibility only. Source containing these functions will not compile.
 These functions are obsolete and might be removed in a future release.

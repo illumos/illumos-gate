@@ -3,20 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH APPCERT 1 "Jan 29, 2007"
+.TH APPCERT 1 "March 10, 2023"
 .SH NAME
 appcert \- examine application-level products for unstable use of Solaris
 interfaces
 .SH SYNOPSIS
-.LP
 .nf
 \fBappcert\fR [\fB-h\fR] [\fB-n\fR] [\fB-f\fR \fIinfile\fR] [\fB-w\fR \fIworking_dir\fR] [\fB-B\fR] [\fB-L\fR]
      [\fB-S\fR] {\fIobj\fR | \fIdir\fR}...
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBappcert\fR utility examines an application's conformance to the Solaris
 Application Binary Interface (\fBABI\fR). The Solaris \fBABI\fR defines the
 runtime library interfaces in Solaris that are safe and stable for application
@@ -90,8 +87,6 @@ if you want.
 IMPORTANT: \fBappcert\fR must run in the same environment in which the
 application being checked runs. See NOTES.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -170,8 +165,6 @@ temporary files (default is \fB/tmp\fR).
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -185,8 +178,6 @@ directories looking for object files; non-object files are ignored.
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -226,8 +217,6 @@ No binary objects were located that could be checked.
 .RE
 
 .SH LIMITATIONS
-.sp
-.LP
 If the object file to be examined depends on libraries, those dependencies must
 be recorded in it (by using the compiler's \fB-l\fR switch).
 .sp
@@ -287,13 +276,11 @@ Non-\fBELF\fR file executables such as shell scripts.
 Non-C language interfaces to Solaris; for example, C++ and Java.
 .br
 .in +2
-The code itself need not be in C as long as the calls to Solaris libaries are
+The code itself need not be in C as long as the calls to Solaris libraries are
 in C.
 .in -2
 .RE
 .SH OUTPUT FILES
-.sp
-.LP
 \fBappcert\fR records its findings in the following files in the working
 directory (\fB/tmp/appcert.\fI?????\fR\fR by default):
 .sp
@@ -383,8 +370,6 @@ including tables of Public and Private symbols used from each Solaris library.
 Other files are temporary files used internally by \fBappcert\fR.
 .SH OUTPUT MESSAGES
 .SS "Private Symbol Use"
-.sp
-.LP
 Private symbols are functions or data variables in a Solaris library that are
 not intended for developer or external use. These symbols are interfaces that
 the Solaris libraries use to call and communicate with one another. They are
@@ -395,8 +380,6 @@ Private symbols can change their semantic behavior or even disappear altogether
 (\fBdemoted\fR or \fBdeprecated\fR symbols), so your application should not
 depend upon any of them.
 .SS "Demoted Symbols"
-.sp
-.LP
 Demoted symbols are functions or data variables in a Solaris library that were
 once private to that library and have been removed (or possibly scoped local to
 the library) in a later Solaris release. If your application directly calls one
@@ -417,8 +400,6 @@ intentionally call these interfaces. For more information, see the \fILinker
 and Libraries Guide\fR, in particular the chapter on versioning. This document
 may be found online at \fBhttp://docs.sun.com\fR.
 .SS "Unbound Symbols"
-.sp
-.LP
 Unbound symbols are library symbols (that is, functions or data) referenced by
 the application that the dynamic linker could not resolve when \fBappcert\fR
 was run. \fBNote:\fR \fBappcert\fR does not actually run your application, so
@@ -479,8 +460,6 @@ defined and self-contained. Also recommended is using the \fB-z\fR \fBdefs\fR
 flag when building shared objects, to force the resolution of all symbols
 during compilation. See \fBld\fR(1) for more information.
 .SS "No Bindings Found"
-.sp
-.LP
 \fBappcert\fR runs \fB/bin/ldd\fR \fB-r\fR on each binary object to be tested.
 It sets the environment variable \fBLD_DEBUG\fR="\fBfiles,bindings\fR". (See
 \fBldd\fR(1) and \fBld.so.1\fR(1) for more information). If that command fails
@@ -527,23 +506,17 @@ means that \fBappcert\fR could not completely examine the object due to
 permissions or environment. Try to modify the permissions or environment so
 that the dynamic bindings can be recorded.
 .SS "Obsolete Library"
-.sp
-.LP
 An obsolete library is one whose use is deprecated and that might, in some
 future release, be removed from Solaris altogether. \fBappcert\fR flags these
 because applications depending on them might not run in future releases of
 Solaris. All interfaces, including Private ones, in an obsolete library are
 frozen and will not change.
 .SS "Use of sys_errlist/sys_nerr"
-.sp
-.LP
 Direct use of the symbols \fBsys_errlist\fR or \fBsys_nerr\fR presents a risk
 in which reference might be made past the end of the \fBsys_errlist\fR array.
 These symbols are deprecated in 32-bit versions of Solaris and are absent
 altogether in 64-bit versions. Use \fBstrerror\fR(3C) instead.
 .SS "Use of Strong vs. Weak Symbols"
-.sp
-.LP
 The "strong" symbols (for example, \fB_socket\fR) associated with "weak"
 symbols (for example, \fBsocket\fR ) are reserved as private (their behavior
 could change in the future). Your application should only directly reference
@@ -556,8 +529,6 @@ though the source code doesn't appear to reference the private symbol.
 Nevertheless, steps should be taken to trace down why this is occurring and fix
 the dependency.
 .SH NOTES
-.sp
-.LP
 \fBappcert\fR needs to run in the same environment in which the application
 being checked runs. Otherwise it might not be able to resolve references
 correctly to interfaces in the Solaris libraries. Take the following steps:
@@ -647,8 +618,6 @@ their symbols could be versioned. Consequently, \fBappcert\fR cannot recognize
 them as being part of Solaris.
 .RE
 .SH BUGS
-.sp
-.LP
 The use of the terms "\fBpublic\fR" and "\fBprivate\fR" as equivalent to
 "\fBstable\fR" and "\fBunstable\fR" is unfortunately somewhat confusing. In
 particular, experimental or evolving interfaces are public in the sense that
@@ -660,8 +629,6 @@ unstable, even though they have been public and stable in the past and are
 still treated as public by \fBappcert\fR. Fortunately, these two situations are
 rare.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -676,8 +643,6 @@ Interface stability	Stable
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR cc (1),
 .BR find (1),
 .BR isalist (1),

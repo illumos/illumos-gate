@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCTP_OPT_INFO 3SOCKET "Nov 26, 2017"
+.TH SCTP_OPT_INFO 3SOCKET "March 10, 2023"
 .SH NAME
 sctp_opt_info \- examine SCTP level options for an SCTP endpoint
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsocket\fR \fB -lnsl \fR \fB -lsctp \fR [ \fIlibrary\fR... ]
 #include <sys/types.h>
@@ -19,7 +18,6 @@ sctp_opt_info \- examine SCTP level options for an SCTP endpoint
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBsctp_opt_info()\fR returns SCTP level options associated with the SCTP
 socket \fIsock\fR. If \fIsock\fR is a one-to-many style socket, \fIid\fR refers
 to the association of interest. If \fIsock\fR is a one-to-one socket or if
@@ -31,7 +29,7 @@ parameter is the length of the option specified.
 .LP
 Following are the currently supported values for the \fIopt\fR parameter. When
 one of the options below specifies an association \fIid\fR, the \fIid\fR is
-relevant for only one-to-many style SCTP sockets. The associatation \fIid\fR
+relevant for only one-to-many style SCTP sockets. The association \fIid\fR
 can be ignored for one-to-one style or branched-off one-to-many style SCTP
 sockets.
 .sp
@@ -273,12 +271,10 @@ where:
 .RE
 
 .SH RETURN VALUES
-.LP
 Upon successful completion, the \fBsctp_opt_info()\fR function returns \fB0\fR.
 Otherwise, the function returns \fB-1\fR and sets \fBerrno\fR to indicate the
 error.
 .SH ERRORS
-.LP
 The \fBsctp_opt_info()\fR call fails under the following conditions.
 .sp
 .ne 2
@@ -336,7 +332,6 @@ The address family for the peer's address is other than \fBAF_INET\fR or
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -353,7 +348,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR in.h (3HEAD),
 .BR libsctp (3LIB),
 .BR getsockopt (3SOCKET),

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2019 Robert Mustacchi
 .\"
-.Dd December 9, 2019
+.Dd March 10, 2023
 .Dt DDI_DMA_COOKIE_ITER 9F
 .Os
 .Sh NAME
@@ -119,7 +119,7 @@ The
 .Ft ddi_dma_cookie_one
 function is a convenience function for DMA requests that have a single
 cookie.
-This function always returns the single cookie assosciated with the DMA
+This function always returns the single cookie associated with the DMA
 handle
 .Fa handle .
 If this function is used when there is a DMA request with multiple
@@ -179,7 +179,7 @@ Upon successful completion, the
 .Fn ddi_dma_cookie_one
 functions will return the requested DMA cookie.
 If there are no more cookies, or
-.Fa coookiep
+.Fa cookiep
 is invalid, the
 .Fn ddi_dma_cookie_iter
 function will return
@@ -263,7 +263,7 @@ bind_dma(ddi_dma_handle_t handle, void *addr, size_t len)
 	for (i = 0; i < ncookies; i++) {
 		const ddi_dma_cookie_t *cookie;
 
-		cookie = ddi_dma_coookie_get(handle, i);
+		cookie = ddi_dma_cookie_get(handle, i);
 		/*
 		 * Use the dmac_laddress and dmac_size members to
 		 * properly program the device or descriptor rings.
