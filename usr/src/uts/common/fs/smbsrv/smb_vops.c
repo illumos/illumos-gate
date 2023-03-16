@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013-2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -321,6 +322,36 @@ smb_vop_retzcbuf(vnode_t *vp, xuio_t *xuio, cred_t *cr)
 	return (error);
 }
 
+#ifdef _KERNEL
+/*
+ * Determine whether this user's privileges can satisfy an ACL check.
+ * Caller determines which privileges are needed.
+ * srv_only determines whether all zone privileges are needed
+ * (e.g. kcred/zone_kcred()).
+ *
+ * ZFS first checks the ACL to determine which permissions are granted.
+ * It then uses privileges to satisfy any remaining permissions.
+ * The ACL check can be surprisingly expensive (for example, it may require
+ * going over the network if an FUID needs to be mapped to a posix ID).
+ * The SMB server inverts this order for two special cases:
+ * - When checking whether the SMB user has permission to traverse through a
+ *   directory during lookup;
+ * - When checking whether the server (kcred or zone_kcred) has permission to
+ *   read attributes for internal purposes.
+ * These checks happen frequently, in hot code, and nearly always succeed via
+ * the privileges granted to these users. In these cases, we first check for the
+ * specific privilege that would satisfy the required access, then skip the
+ * access check when the caller has that privilege.
+ * See zfs_zaccess() and its calls to secpolicy_vnode_access2() for how
+ * v4 accesses are mapped onto privileges.
+ */
+boolean_t
+smb_vop_priv_check(cred_t *cr, int priv, boolean_t srv_only, vnode_t *vp)
+{
+	return (PRIV_POLICY_ONLY(cr, priv, srv_only) &&
+	    vfs_has_feature(vp->v_vfsp, VFSFT_ACEMASKONACCESS));
+}
+#endif
 
 /*
  * smb_vop_getattr()
@@ -357,6 +388,12 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		use_vp = unnamed_vp;
 	else
 		use_vp = vp;
+
+#ifdef _KERNEL
+	/* Avoid potentially expensive access checks for non-client queries. */
+	if (smb_vop_priv_check(cr, PRIV_FILE_DAC_READ, B_TRUE, use_vp))
+		flags |= ATTR_NOACLCHECK;
+#endif
 
 	if (vfs_has_feature(use_vp->v_vfsp, VFSFT_XVATTR)) {
 		xva_init(&tmp_xvattr);
@@ -456,6 +493,10 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		    (SMB_AT_SIZE | SMB_AT_NBLOCKS | SMB_AT_ALLOCSZ)) {
 			tmp_attr.sa_vattr.va_mask = AT_SIZE | AT_NBLOCKS;
 
+			/*
+			 * Keep ATTR_NOACLCHECK from use_vp; if it's good for
+			 * the file, it's good for the xattr.
+			 */
 			error = VOP_GETATTR(vp, &tmp_attr.sa_vattr,
 			    flags, cr, &smb_ct);
 			if (error != 0)
@@ -723,8 +764,8 @@ smb_vop_lookup(
 	 * checks on directories, so skip the (potentially expensive)
 	 * ACL check.
 	 */
-	if (PRIV_POLICY_ONLY(cr, PRIV_FILE_DAC_SEARCH, B_FALSE))
-		option_flags |= ATTR_NOACLCHECK;
+	if (smb_vop_priv_check(cr, PRIV_FILE_DAC_SEARCH, B_FALSE, dvp))
+		option_flags |= LOOKUP_NOACLCHECK;
 #endif
 	pn_alloc(&rpn);
 

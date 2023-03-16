@@ -21,12 +21,14 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2021-2023 RackTop Systems, Inc.
  */
 
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <sys/pathname.h>
+#include <sys/priv_const.h>
+#include <sys/policy.h>
 #include <sys/sdt.h>
 
 static char *smb_pathname_catia_v5tov4(smb_request_t *, char *, char *, int);
@@ -690,6 +692,15 @@ smb_pathname_lookup(pathname_t *pn, pathname_t *rpn, int flags,
 	VN_HOLD(dvp);
 	if (rootvp != rootdir)
 		VN_HOLD(rootvp);
+
+#ifdef _KERNEL
+	/*
+	 * When BYPASS_TRAVERSE_CHECKING is enabled, avoid EXECUTE access
+	 * checks. See: smb_vop_lookup().
+	 */
+	if (smb_vop_priv_check(cred, PRIV_FILE_DAC_SEARCH, B_FALSE, dvp))
+		flags |= LOOKUP_NOACLCHECK;
+#endif
 
 	err = lookuppnvp(pn, rpn, flags, NULL, vp, rootvp, dvp, cred);
 	if ((err == 0) && (attr != NULL))

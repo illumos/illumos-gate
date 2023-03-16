@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013-2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef _SMBSRV_SMB_VOPS_H
@@ -170,6 +171,8 @@ int smb_vop_other_opens(vnode_t *, int);
 
 void smb_vop_catia_v4tov5(char *, char *, int);
 char *smb_vop_catia_v5tov4(char *, char *, int);
+
+boolean_t smb_vop_priv_check(cred_t *, int, boolean_t, vnode_t *);
 
 #ifdef __cplusplus
 }
