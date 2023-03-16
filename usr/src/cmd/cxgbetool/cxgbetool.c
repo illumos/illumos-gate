@@ -15,6 +15,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -32,6 +33,7 @@
 #include <inttypes.h>
 #include <sys/sysmacros.h>
 #include <err.h>
+#include <libdevinfo.h>
 
 #include "t4nex.h"
 #include "version.h"
@@ -43,6 +45,8 @@
 #define CUDBG_SIZE (32 * 1024 * 1024)
 #define CUDBG_MAX_ENTITY_STR_LEN 4096
 #define MAX_PARAM_LEN 4096
+
+static char cxgbetool_nexus[PATH_MAX];
 
 char *option_list[] = {
 	"--collect",
@@ -113,7 +117,7 @@ static int check_option(char *opt)
 
 static void usage(FILE *fp)
 {
-	fprintf(fp, "Usage: %s <path to t4nex#> [operation]\n", progname);
+	fprintf(fp, "Usage: %s <t4nex# | cxgbe#> [operation]\n", progname);
 	fprintf(fp,
 	    "\tdevlog                              show device log\n"
 	    "\tloadfw <FW image>                   Flash the FW image\n"
@@ -641,6 +645,118 @@ run_cmd(int argc, char *argv[], const char *iff_name)
 		usage(stderr);
 }
 
+/*
+ * Traditionally we expect to be given a path to the t4nex device control file
+ * hidden in /devices. To make life easier, we want to also support folks using
+ * the driver instance numbers for either a given t4nex%d or cxgbe%d. We check
+ * to see if we've been given a path to a character device and if so, just
+ * continue straight on with the given argument. Otherwise we attempt to map it
+ * to something known.
+ */
+static const char *
+cxgbetool_parse_path(char *arg)
+{
+	struct stat st;
+	di_node_t root, node;
+	const char *numptr, *errstr;
+	size_t drvlen;
+	int inst;
+	boolean_t is_t4nex = B_TRUE;
+	char mname[64];
+
+	if (stat(arg, &st) == 0) {
+		if (S_ISCHR(st.st_mode)) {
+			return (arg);
+		}
+	}
+
+	if (strncmp(arg, T4_NEXUS_NAME, sizeof (T4_NEXUS_NAME) - 1) == 0) {
+		drvlen = sizeof (T4_NEXUS_NAME) - 1;
+	} else if (strncmp(arg, T4_PORT_NAME, sizeof (T4_PORT_NAME) - 1) == 0) {
+		is_t4nex = B_FALSE;
+		drvlen = sizeof (T4_PORT_NAME) - 1;
+	} else {
+		errx(EXIT_FAILURE, "cannot use device %s: not a character "
+		    "device or a %s/%s device instance", arg, T4_PORT_NAME,
+		    T4_NEXUS_NAME);
+	}
+
+	numptr = arg + drvlen;
+	inst = (int)strtonum(numptr, 0, INT_MAX, &errstr);
+	if (errstr != NULL) {
+		errx(EXIT_FAILURE, "failed to parse instance number '%s': %s",
+		    numptr, errstr);
+	}
+
+	/*
+	 * Now that we have the instance here, we need to truncate the string at
+	 * the end of the driver name otherwise di_drv_first_node() will be very
+	 * confused as there is no driver called say 't4nex0'.
+	 */
+	arg[drvlen] = '\0';
+	root = di_init("/", DINFOCPYALL);
+	if (root == DI_NODE_NIL) {
+		err(EXIT_FAILURE, "failed to initialize libdevinfo while "
+		    "trying to map device name %s", arg);
+	}
+
+	for (node = di_drv_first_node(arg, root); node != DI_NODE_NIL;
+	    node = di_drv_next_node(node)) {
+		char *bpath;
+		di_minor_t minor = DI_MINOR_NIL;
+
+		if (di_instance(node) != inst) {
+			continue;
+		}
+
+		if (!is_t4nex) {
+			const char *pdrv;
+			node = di_parent_node(node);
+			pdrv = di_driver_name(node);
+			if (pdrv == NULL || strcmp(pdrv, T4_NEXUS_NAME) != 0) {
+				errx(EXIT_FAILURE, "%s does not have %s "
+				    "parent, found %s%d", arg, T4_NEXUS_NAME,
+				    pdrv != NULL ? pdrv : "unknown",
+				    pdrv != NULL ? di_instance(node) : -1);
+			}
+		}
+
+		(void) snprintf(mname, sizeof (mname), "%s,%d", T4_NEXUS_NAME,
+		    di_instance(node));
+
+		while ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
+			if (strcmp(di_minor_name(minor), mname) == 0) {
+				break;
+			}
+		}
+
+		if (minor == DI_MINOR_NIL) {
+			errx(EXIT_FAILURE, "failed to find minor %s on %s%d",
+			    mname, di_driver_name(node), di_instance(node));
+		}
+
+		bpath = di_devfs_minor_path(minor);
+		if (bpath == NULL) {
+			err(EXIT_FAILURE, "failed to get minor path for "
+			    "%s%d:%s", di_driver_name(node), di_instance(node),
+			    di_minor_name(minor));
+		}
+		if (snprintf(cxgbetool_nexus, sizeof (cxgbetool_nexus),
+		    "/devices%s", bpath) >= sizeof (cxgbetool_nexus)) {
+			errx(EXIT_FAILURE, "failed to construct full /devices "
+			    "path for %s: internal path buffer would have "
+			    "overflowed");
+		}
+		di_devfs_path_free(bpath);
+
+		di_fini(root);
+		return (cxgbetool_nexus);
+	}
+
+	errx(EXIT_FAILURE, "failed to map %s%d to a %s or %s instance",
+	    arg, inst, T4_PORT_NAME, T4_NEXUS_NAME);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -664,7 +780,7 @@ main(int argc, char *argv[])
 	if (argc < 3)
 		usage(stderr);
 
-	iff_name = argv[1];
+	iff_name = cxgbetool_parse_path(argv[1]);
 
 	run_cmd(argc, argv, iff_name);
 
