@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Nexenta by DDN, Inc.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -667,7 +668,7 @@ smbstat_cpu_snapshot(void)
 		curr->cs_id = SMBSTAT_ID_NO_CPU;
 		curr->cs_state = p_online(i, P_STATUS);
 		/* If no valid CPU is present, move on to the next one */
-		if (curr->cs_state == -1)
+		if (curr->cs_state != P_ONLINE && curr->cs_state != P_NOINTR)
 			continue;
 
 		curr->cs_id = i;
