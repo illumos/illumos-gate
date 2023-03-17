@@ -23,6 +23,7 @@
  * Copyright (c) 2012, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2022-2023 Racktop Systems, Inc.
  */
 
 #ifndef	_SYS_FS_ZFS_ZNODE_H
@@ -207,7 +208,7 @@ typedef struct znode {
 	uint64_t	z_gid;		/* gid fuid (cached) */
 	mode_t		z_mode;		/* mode (cached) */
 	uint32_t	z_sync_cnt;	/* synchronous open count */
-	kmutex_t	z_acl_lock;	/* acl data lock */
+	krwlock_t	z_acl_lock;	/* acl data lock */
 	zfs_acl_t	*z_acl_cached;	/* cached acl */
 	uint64_t	z_projid;	/* project ID */
 	list_node_t	z_link_node;	/* all znodes in fs link */

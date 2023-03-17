@@ -762,30 +762,43 @@ zfs_write_clear_setid_bits_if_necessary(zfsvfs_t *zfsvfs, znode_t *zp,
 	 * Note: we don't call zfs_fuid_map_id() here because
 	 * user 0 is not an ephemeral uid.
 	 */
-	mutex_enter(&zp->z_acl_lock);
+	rw_enter(&zp->z_acl_lock, RW_READER);
 	if ((zp->z_mode & (S_IXUSR | (S_IXUSR >> 3) | (S_IXUSR >> 6))) != 0 &&
 	    (zp->z_mode & (S_ISUID | S_ISGID)) != 0 &&
 	    secpolicy_vnode_setid_retain(cr,
 	    ((zp->z_mode & S_ISUID) != 0 && zp->z_uid == 0)) != 0) {
-		uint64_t newmode;
-		vattr_t va;
-
-		zp->z_mode &= ~(S_ISUID | S_ISGID);
-		newmode = zp->z_mode;
-		(void) sa_update(zp->z_sa_hdl, SA_ZPL_MODE(zfsvfs),
-		    (void *)&newmode, sizeof (uint64_t), tx);
+		/*
+		 * We need to clear the SUID|SGID bits, but
+		 * become RW_WRITER before updating z_mode.
+		 */
+		rw_exit(&zp->z_acl_lock);
+		rw_enter(&zp->z_acl_lock, RW_WRITER);
 
 		/*
-		 * Make sure SUID/SGID bits will be removed when we replay the
-		 * log.
+		 * If another writer did this, skip it.
 		 */
-		bzero(&va, sizeof (va));
-		va.va_mask = AT_MODE;
-		va.va_nodeid = zp->z_id;
-		va.va_mode = newmode;
-		zfs_log_setattr(zilog, tx, TX_SETATTR, zp, &va, AT_MODE, NULL);
+		if ((zp->z_mode & (S_ISUID | S_ISGID)) != 0) {
+			uint64_t newmode;
+			vattr_t va;
+
+			zp->z_mode &= ~(S_ISUID | S_ISGID);
+			newmode = zp->z_mode;
+			(void) sa_update(zp->z_sa_hdl, SA_ZPL_MODE(zfsvfs),
+			    (void *)&newmode, sizeof (uint64_t), tx);
+
+			/*
+			 * Make sure SUID/SGID bits will be removed
+			 * when we replay the log.
+			 */
+			bzero(&va, sizeof (va));
+			va.va_mask = AT_MODE;
+			va.va_nodeid = zp->z_id;
+			va.va_mode = newmode;
+			zfs_log_setattr(zilog, tx, TX_SETATTR,
+			    zp, &va, AT_MODE, NULL);
+		}
 	}
-	mutex_exit(&zp->z_acl_lock);
+	rw_exit(&zp->z_acl_lock);
 
 	*did_check = B_TRUE;
 }
@@ -3042,6 +3055,8 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	boolean_t skipaclchk = (flags & ATTR_NOACLCHECK) ? B_TRUE : B_FALSE;
 	boolean_t	fuid_dirtied = B_FALSE;
 	boolean_t	handle_eadir = B_FALSE;
+	boolean_t	zp_acl_entered = B_FALSE;
+	boolean_t	attr_acl_entered = B_FALSE;
 	sa_bulk_attr_t	bulk[8], xattr_bulk[8];
 	int		count = 0, xattr_count = 0;
 
@@ -3522,16 +3537,20 @@ top:
 			projid = ZFS_INVALID_PROJID;
 	}
 
-	if (mask & (AT_UID|AT_GID|AT_MODE))
-		mutex_enter(&zp->z_acl_lock);
+	if (mask & (AT_UID|AT_GID|AT_MODE)) {
+		rw_enter(&zp->z_acl_lock, RW_WRITER);
+		zp_acl_entered = B_TRUE;
+	}
 	mutex_enter(&zp->z_lock);
 
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_FLAGS(zfsvfs), NULL,
 	    &zp->z_pflags, sizeof (zp->z_pflags));
 
 	if (attrzp) {
-		if (mask & (AT_UID|AT_GID|AT_MODE))
-			mutex_enter(&attrzp->z_acl_lock);
+		if (mask & (AT_UID|AT_GID|AT_MODE)) {
+			rw_enter(&attrzp->z_acl_lock, RW_WRITER);
+			attr_acl_entered = B_TRUE;
+		}
 		mutex_enter(&attrzp->z_lock);
 		SA_ADD_BULK_ATTR(xattr_bulk, xattr_count,
 		    SA_ZPL_FLAGS(zfsvfs), NULL, &attrzp->z_pflags,
@@ -3683,15 +3702,15 @@ top:
 	if (mask != 0)
 		zfs_log_setattr(zilog, tx, TX_SETATTR, zp, vap, mask, fuidp);
 
-	mutex_exit(&zp->z_lock);
-	if (mask & (AT_UID|AT_GID|AT_MODE))
-		mutex_exit(&zp->z_acl_lock);
-
 	if (attrzp) {
-		if (mask & (AT_UID|AT_GID|AT_MODE))
-			mutex_exit(&attrzp->z_acl_lock);
+		if (attr_acl_entered)
+			rw_exit(&attrzp->z_acl_lock);
 		mutex_exit(&attrzp->z_lock);
 	}
+
+	mutex_exit(&zp->z_lock);
+	if (zp_acl_entered)
+		rw_exit(&zp->z_acl_lock);
 out:
 	if (err == 0 && xattr_count > 0) {
 		err2 = sa_bulk_update(attrzp->z_sa_hdl, xattr_bulk,
