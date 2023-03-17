@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Racktop Systems, Inc.
  */
 
 #include <sys/note.h>
@@ -435,7 +436,7 @@ damap_addr_add(damap_t *damapp, char *address, damap_id_t *addridp,
 		dam_addr_report_release(mapp, addrid);
 		passp->da_jitter++;
 	}
-	passp->da_ppriv_rpt = addr_priv;
+	passp->da_ppriv = addr_priv;
 	if (nvl)
 		(void) nvlist_dup(nvl, &passp->da_nvl_rpt, KM_SLEEP);
 
@@ -652,7 +653,7 @@ damap_addrset_add(damap_t *damapp, char *address, damap_id_t *ridx,
 		dam_addr_report_release(mapp, addrid);
 		passp->da_jitter++;
 	}
-	passp->da_ppriv_rpt = addr_priv;
+	passp->da_ppriv = addr_priv;
 	if (nvl)
 		(void) nvlist_dup(nvl, &passp->da_nvl_rpt, KM_SLEEP);
 	bitset_add(&mapp->dam_report_set, addrid);
@@ -1037,15 +1038,13 @@ dam_addr_activate(dam_t *mapp, id_t addrid)
 	    char *, mapp->dam_name, dam_t *, mapp,
 	    char *, addrstr);
 	passp->da_nvl = passp->da_nvl_rpt;
-	passp->da_ppriv = passp->da_ppriv_rpt;
-	passp->da_ppriv_rpt = NULL;
 	passp->da_nvl_rpt = NULL;
 	passp->da_last_stable = gethrtime();
 	passp->da_stable_cnt++;
 	mutex_exit(&mapp->dam_lock);
 	if (mapp->dam_activate_cb) {
 		(*mapp->dam_activate_cb)(mapp->dam_activate_arg, addrstr,
-		    addrid, &passp->da_ppriv_rpt);
+		    addrid, &passp->da_ppriv);
 	}
 
 	/*
@@ -1112,7 +1111,6 @@ dam_deact_cleanup(dam_t *mapp, id_t addrid, char *addrstr,
 	passp->da_ppriv = NULL;
 	nvlist_free(passp->da_nvl);
 	passp->da_nvl = NULL;
-	passp->da_ppriv_rpt = NULL;
 	nvlist_free(passp->da_nvl_rpt);
 	passp->da_nvl_rpt = NULL;
 
@@ -1648,14 +1646,14 @@ dam_addr_report_release(dam_t *mapp, id_t addrid)
 	 */
 	bitset_del(&mapp->dam_report_set, addrid);
 	if (!DAM_IS_STABLE(mapp, addrid) && mapp->dam_deactivate_cb &&
-	    passp->da_ppriv_rpt) {
+	    passp->da_ppriv) {
 		mutex_exit(&mapp->dam_lock);
 		(*mapp->dam_deactivate_cb)(mapp->dam_activate_arg,
 		    ddi_strid_id2str(mapp->dam_addr_hash, addrid),
-		    addrid, passp->da_ppriv_rpt, DAMAP_DEACT_RSN_UNSTBL);
+		    addrid, passp->da_ppriv, DAMAP_DEACT_RSN_UNSTBL);
 		mutex_enter(&mapp->dam_lock);
 	}
-	passp->da_ppriv_rpt = NULL;
+	passp->da_ppriv = NULL;
 	nvlist_free(passp->da_nvl_rpt);
 }
 

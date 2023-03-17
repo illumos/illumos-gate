@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Racktop Systems, Inc.
  */
 
 #ifndef	_SYS_DAMAP_IMPL_H
@@ -108,7 +109,6 @@ typedef struct {
 	void		*da_ppriv;	/* stable provider private */
 	void		*da_cfg_priv;	/* config/unconfig private */
 	nvlist_t	*da_nvl;	/* stable nvlist */
-	void		*da_ppriv_rpt;	/* reported provider-private */
 	nvlist_t	*da_nvl_rpt;	/* reported nvlist */
 	int64_t		da_deadline;	/* ddi_get_lbolt64 value when stable */
 	hrtime_t	da_last_report;	/* timestamp of last report */
