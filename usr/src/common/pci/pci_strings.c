@@ -149,6 +149,8 @@ const pci_class_strings_t class_pci[] = {
 	{ 8, 5, 2,	"Vendor Unique SD Host controller",	"sd-hc" },
 	{ 8, 6, 0,	"IOMMU controller",			"iommu" },
 	{ 8, 7, 0,	"Root Complex Event Collector",		"unknown" },
+	{ 8, 8, 0,	"Time Card",				"unknown" },
+	{ 8, 8, 1,	"Time Card - OCP TAP",			"unknown" },
 	{ 8, 0x80, 0,	"System peripheral",			"unknown" },
 
 	{ 9, 0, 0,	"Keyboard controller",			"keyboar" },
@@ -191,6 +193,7 @@ const pci_class_strings_t class_pci[] = {
 	{ 12, 8, 0,	"SERCOS Interface Standard",		"sercos" },
 	{ 12, 9, 0,	"CANbus",				"canbus" },
 	{ 12, 10, 0,	"MIPI I3C Host Controller Interface",	"unknown" },
+	{ 12, 11, 0,	"CXL Fabric Managment Host Interface",	"unknown" },
 	{ 12, 0x80, 0,	"Serial Bus Controller",		"unknown" },
 
 	{ 13, 0, 0,	"IRDA Wireless controller",		"irda" },
@@ -216,6 +219,7 @@ const pci_class_strings_t class_pci[] = {
 
 	{ 16, 0, 0,	"Network and computing en/decryption",	"netcryp" },
 	{ 16, 0x10, 0,	"Entertainment en/decryption",		"entcryp" },
+	{ 16, 0x20, 0,	"Trusted Platform Module",		"tpm" },
 	{ 16, 0x80, 0,	"En/decryption controller",		"unknown" },
 
 	{ 17, 0, 0,	"DPIO modules",				"dpio" },
