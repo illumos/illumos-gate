@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2022 MNX Cloud, Inc.
+# Copyright 2023 MNX Cloud, Inc.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2017 ASS-Einrichtungssysteme GmbH
 #
@@ -2397,6 +2397,30 @@ h platform/i86pc/ucode/GenuineIntel/000806EB-80=platform/i86pc/ucode/GenuineInte
 f platform/i86pc/ucode/GenuineIntel/000806EC-04 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000806EC-10=platform/i86pc/ucode/GenuineIntel/000806EC-04
 h platform/i86pc/ucode/GenuineIntel/000806EC-80=platform/i86pc/ucode/GenuineIntel/000806EC-04
+f platform/i86pc/ucode/GenuineIntel/000806F4-01 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000806F4-02=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F4-04=platform/i86pc/ucode/GenuineIntel/000806F4-01
+f platform/i86pc/ucode/GenuineIntel/000806F4-10 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000806F4-80=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F5-01=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F5-02=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F5-04=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F5-10=platform/i86pc/ucode/GenuineIntel/000806F4-10
+h platform/i86pc/ucode/GenuineIntel/000806F5-80=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F6-01=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F6-02=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F6-04=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F6-10=platform/i86pc/ucode/GenuineIntel/000806F4-10
+h platform/i86pc/ucode/GenuineIntel/000806F6-80=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F7-01=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F7-02=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F7-04=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F7-80=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F8-01=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F8-02=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F8-04=platform/i86pc/ucode/GenuineIntel/000806F4-01
+h platform/i86pc/ucode/GenuineIntel/000806F8-10=platform/i86pc/ucode/GenuineIntel/000806F4-10
+h platform/i86pc/ucode/GenuineIntel/000806F8-80=platform/i86pc/ucode/GenuineIntel/000806F4-01
 f platform/i86pc/ucode/GenuineIntel/00090661-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/00090672-01 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/00090672-02=platform/i86pc/ucode/GenuineIntel/00090672-01
@@ -2428,6 +2452,10 @@ f platform/i86pc/ucode/GenuineIntel/000A0671-02 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000B0671-02 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000B0671-10=platform/i86pc/ucode/GenuineIntel/000B0671-02
 h platform/i86pc/ucode/GenuineIntel/000B0671-20=platform/i86pc/ucode/GenuineIntel/000B0671-02
+f platform/i86pc/ucode/GenuineIntel/000B06A2-40 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000B06A2-80=platform/i86pc/ucode/GenuineIntel/000B06A2-40
+h platform/i86pc/ucode/GenuineIntel/000B06A3-40=platform/i86pc/ucode/GenuineIntel/000B06A2-40
+h platform/i86pc/ucode/GenuineIntel/000B06A3-80=platform/i86pc/ucode/GenuineIntel/000B06A2-40
 h platform/i86pc/ucode/GenuineIntel/000B06F2-01=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/000B06F2-02=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/000B06F2-04=platform/i86pc/ucode/GenuineIntel/00090672-01
