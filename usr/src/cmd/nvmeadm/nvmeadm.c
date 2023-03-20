@@ -167,6 +167,8 @@ int debug;
 #define	NVMEADM_O_ID_DESC_LIST	0x00000040
 #define	NVMEADM_O_ID_ALLOC_NS	0x00000080
 
+#define	NVMEADM_O_LS_CTRL	0x00000100
+
 static int exitcode;
 
 /*
@@ -180,6 +182,7 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 	{
 		"list",
 		"list controllers and namespaces",
+		"  -c\t\tlist only controllers\n"
 		"  -p\t\tprint parsable output\n"
 		    "  -o field\tselect a field for parsable output\n",
 		do_list, usage_list, optparse_list,
@@ -688,6 +691,7 @@ static int
 nvme_process(di_node_t node, di_minor_t minor, void *arg)
 {
 	nvme_process_arg_t *npa = arg;
+	boolean_t free_name = B_FALSE;
 	int fd;
 
 	npa->npa_node = node;
@@ -698,6 +702,19 @@ nvme_process(di_node_t node, di_minor_t minor, void *arg)
 
 	if ((fd = nvme_open(minor, npa->npa_excl)) < 0)
 		return (DI_WALK_CONTINUE);
+
+	/*
+	 * For commands that don't require the user to specify a controller
+	 * or namespace argument, npa_name is still NULL. Get it from the
+	 * driver name and instance number, and note that we'll have to free it.
+	 */
+	if (npa->npa_name == NULL) {
+		if (asprintf(&npa->npa_name, "%s%d",
+		    di_driver_name(npa->npa_node),
+		    di_instance(npa->npa_node)) < 0)
+			goto out;
+		free_name = B_TRUE;
+	}
 
 	npa->npa_version = nvme_version(fd);
 	if (npa->npa_version == NULL)
@@ -754,6 +771,15 @@ out:
 	free(npa->npa_eui64);
 	free(npa->npa_nguid);
 
+	/*
+	 * If we allocated npa_name because none was given by the user, free
+	 * it and reset the field to NULL for the next iteration to work.
+	 */
+	if (free_name) {
+		free(npa->npa_name);
+		npa->npa_name = NULL;
+	}
+
 	npa->npa_version = NULL;
 	npa->npa_idctl = NULL;
 	npa->npa_idns = NULL;
@@ -781,7 +807,7 @@ static void
 usage_list(const char *c_name)
 {
 	(void) fprintf(stderr, "%s "
-	    "[-p -o field[,...]] [<ctl>[/<ns>][,...]\n\n"
+	    "[-c] [-p -o field[,...]] [<ctl>[/<ns>][,...]\n\n"
 	    "  List NVMe controllers and their namespaces. If no "
 	    "controllers and/or name-\n  spaces are specified, all "
 	    "controllers and namespaces in the system will be\n  "
@@ -795,10 +821,15 @@ optparse_list(nvme_process_arg_t *npa)
 	uint_t oflags = 0;
 	boolean_t parse = B_FALSE;
 	const char *fields = NULL;
+	const ofmt_field_t *ofmt = nvme_list_nsid_ofmt;
 
 	optind = 0;
-	while ((c = getopt(npa->npa_argc, npa->npa_argv, ":o:p")) != -1) {
+	while ((c = getopt(npa->npa_argc, npa->npa_argv, ":co:p")) != -1) {
 		switch (c) {
+		case 'c':
+			npa->npa_cmdflags |= NVMEADM_O_LS_CTRL;
+			ofmt = nvme_list_ctrl_ofmt;
+			break;
 		case 'o':
 			fields = optarg;
 			break;
@@ -828,7 +859,7 @@ optparse_list(nvme_process_arg_t *npa)
 	if (parse) {
 		ofmt_status_t oferr;
 
-		oferr = ofmt_open(fields, nvme_list_ofmt, oflags, 0,
+		oferr = ofmt_open(fields, ofmt, oflags, 0,
 		    &npa->npa_ofmt);
 		ofmt_check(oferr, B_TRUE, npa->npa_ofmt, nvme_oferr, warnx);
 	}
@@ -843,9 +874,8 @@ do_list_nsid(int fd, const nvme_process_arg_t *npa)
 	_NOTE(ARGUNUSED(fd));
 	char *dskname;
 
-	if (!npa->npa_interactive &&
-	    (npa->npa_ns_state & NVME_NS_STATE_IGNORED) != 0 &&
-	    verbose == 0)
+	if (npa->npa_nsid == NULL &&
+	    npa->npa_ns_state == NVME_NS_STATE_IGNORED && verbose == 0)
 		return (0);
 
 	if (npa->npa_ofmt != NULL) {
@@ -885,29 +915,26 @@ do_list(int fd, const nvme_process_arg_t *npa)
 
 	nvme_process_arg_t ns_npa = { 0 };
 	nvmeadm_cmd_t cmd = { 0 };
-	char *name;
-
-	if (asprintf(&name, "%s%d", di_driver_name(npa->npa_node),
-	    di_instance(npa->npa_node)) < 0)
-		err(-1, "do_list()");
 
 	if (npa->npa_ofmt == NULL) {
-		(void) printf("%s: ", name);
+		(void) printf("%s: ", npa->npa_name);
 		nvme_print_ctrl_summary(npa->npa_idctl, npa->npa_version);
+	} else if ((npa->npa_cmdflags & NVMEADM_O_LS_CTRL) != 0) {
+		ofmt_print(npa->npa_ofmt, (void *)npa);
 	}
 
-	ns_npa.npa_name = name;
-	ns_npa.npa_isns = B_TRUE;
-	ns_npa.npa_nsid = npa->npa_nsid;
-	cmd = *(npa->npa_cmd);
-	cmd.c_func = do_list_nsid;
-	ns_npa.npa_cmd = &cmd;
-	ns_npa.npa_ofmt = npa->npa_ofmt;
-	ns_npa.npa_idctl = npa->npa_idctl;
+	if ((npa->npa_cmdflags & NVMEADM_O_LS_CTRL) == 0) {
+		ns_npa.npa_name = npa->npa_name;
+		ns_npa.npa_isns = B_TRUE;
+		ns_npa.npa_nsid = npa->npa_nsid;
+		cmd = *(npa->npa_cmd);
+		cmd.c_func = do_list_nsid;
+		ns_npa.npa_cmd = &cmd;
+		ns_npa.npa_ofmt = npa->npa_ofmt;
+		ns_npa.npa_idctl = npa->npa_idctl;
 
-	nvme_walk(&ns_npa, npa->npa_node);
-
-	free(name);
+		nvme_walk(&ns_npa, npa->npa_node);
+	}
 
 	return (exitcode);
 }

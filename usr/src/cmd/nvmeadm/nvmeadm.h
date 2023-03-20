@@ -65,6 +65,7 @@ extern boolean_t nvme_version_check(nvme_version_t *, uint_t, uint_t);
 /* printing functions */
 extern int nvme_strlen(const char *, int);
 extern void nvme_print(int, const char *, int, const char *, ...);
+extern int nvme_snprint_uint128(char *, size_t, nvme_uint128_t, int, int);
 extern void nvme_print_ctrl_summary(nvme_identify_ctrl_t *, nvme_version_t *);
 extern void nvme_print_nsid_summary(nvme_identify_nsid_t *);
 extern void nvme_print_identify_ctrl(nvme_identify_ctrl_t *,
@@ -129,7 +130,8 @@ extern boolean_t nvme_namespace_state(int);
 /*
  * ofmt related
  */
-extern const ofmt_field_t nvme_list_ofmt[];
+extern const ofmt_field_t nvme_list_ctrl_ofmt[];
+extern const ofmt_field_t nvme_list_nsid_ofmt[];
 
 #ifdef __cplusplus
 }

@@ -26,8 +26,10 @@
 .Op Fl dv
 .Cm list
 .Oo
-.Fl p
-.Fl o Ar field Ns [,...]
+.Fl c
+.Oc
+.Oo
+.Fl p o Ar field Ns [,...]
 .Oc
 .Op Ar ctl[/ns] Ns [,...]
 .Nm
@@ -201,26 +203,35 @@ command.
 .Nm
 .Cm list
 .Oo
-.Fl p
-.Fl o Ar field Ns [,...]
+.Fl c
+.Oc
+.Oo
+.Fl p o Ar field Ns [,...]
 .Oc
 .Op Ar ctl[/ns] Ns [,...]
 .Xc
-Lists the NVMe controllers and their namespaces in the system and
-prints a 1-line summary of their basic properties for each.
+Lists the NVMe controllers and by default also their active
+namespaces, printing a 1-line summary of their basic properties for each.
 If a list of controllers and/or namespaces is given then the listing
 is limited to those devices.
-By default, output is human-readable; however, a parsable form can
-controlled by using the following options:
-.Bl -tag -width Fl
-.It Fl p
-Rather than printing human-readable output, outputs an entry for each of
-the specified controllers and namespaces.
-If no controllers or namespaces are given as arguments, then the primary
-namespace of each controller is listed and if the
+If no controllers or namespaces are given as arguments, then all controllers
+in the system and their respective active namespaces are listed.
+When using the
 .Fl v
-option is specified, then all of the namespaces for a controller are
-listed.
+option
+to
+.Nm ,
+all possible namespaces of the controllers will be listed.
+.Pp
+The
+.Nm
+.Cm list
+command supports the following options:
+.Bl -tag -width Fl
+.It Fl c
+List controllers only and not their namespaces.
+.It Fl p
+Produce parsable output rather than human-readable output.
 This option requires that output fields be selected with the
 .Fl o
 option.
@@ -230,7 +241,7 @@ Fields are listed below and the name is case insensitive.
 .El
 .Pp
 The following fields can be specified when using the parsable form:
-.Bl -tag -width CAPACITY
+.Bl -tag -width UNALLOCATED
 .It Sy MODEL
 The model number of the device, generally containing information about
 both the manufacturer and the product.
@@ -240,23 +251,40 @@ The NVMe controller's serial number.
 The controller's firmware revision.
 .It Sy VERSION
 The version of the NVMe specification the controller supports.
-.It Sy SIZE
-The logical size in bytes of the namespace.
+.It Sy INSTANCE
+The name of the device node and instance of it.
+.El
+.Pp
+In addition, the following fields can be specified when listing namespaces, not
+using the
+.Fl c
+option:
+.Bl -tag -width UNALLOCATED
 .It Sy CAPACITY
 The amount of logical bytes that the namespace may actually have allocated at
 any time.
 This may be different than size due to the use of thin provisioning or due to
 administrative action.
+.It Sy SIZE
+The logical size in bytes of the namespace.
 .It Sy USED
 The number of bytes used in the namespace.
-.It Sy INSTANCE
-The name of the device node and instance of it.
 .It Sy NAMESPACE
 The numerical value of the namespace which can be used as part of other
 .Nm
 operations.
 .It Sy DISK
 The name of the disk device that corresponds to the namespace, if any.
+.El
+.Pp
+When using the
+.Fl c
+option to list controllers, the following additional fields are supported:
+.Bl -tag -width UNALLOCATED
+.It Sy CAPACITY
+The total raw capacity of the NVMe controller in bytes.
+.It Sy UNALLOCATED
+The number of bytes not currently assigned to any namespace in the controller.
 .El
 .It Xo
 .Nm

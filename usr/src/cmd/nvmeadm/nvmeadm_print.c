@@ -358,12 +358,12 @@ nvme_print_uint64(int indent, const char *name, uint64_t value, const char *fmt,
 }
 
 /*
- * nvme_print_uint128 -- print a 128bit uint with optional unit, after applying
- * binary and/or decimal shifting
+ * nvme_snprint_uint128 -- format a 128bit uint with optional unit, after
+ * applying binary and/or decimal shifting
  */
-static void
-nvme_print_uint128(int indent, const char *name, nvme_uint128_t value,
-    const char *unit, int scale_bits, int scale_tens)
+int
+nvme_snprint_uint128(char *buf, size_t buflen, nvme_uint128_t value,
+    int scale_bits, int scale_tens)
 {
 	const char hex[] = "0123456789abcdef";
 	uint8_t o[(128 + scale_bits) / 3];
@@ -371,9 +371,6 @@ nvme_print_uint128(int indent, const char *name, nvme_uint128_t value,
 	char *pp = &p[0];
 	int i, x;
 	uint64_t rem = 0;
-
-	if (unit == NULL)
-		unit = "";
 
 	/*
 	 * Don't allow binary shifting by more than 64 bits to keep the
@@ -434,8 +431,7 @@ nvme_print_uint128(int indent, const char *name, nvme_uint128_t value,
 		 * The converted number is 0. Just print the calculated
 		 * remainder and return.
 		 */
-		nvme_print(indent, name, -1, "%"PRId64"%s", rem, unit);
-		return;
+		return (snprintf(buf, buflen, "%"PRId64, rem));
 	} else {
 		if (o[i] > 0xf)
 			*pp++ = hex[o[i] >> 4];
@@ -449,14 +445,32 @@ nvme_print_uint128(int indent, const char *name, nvme_uint128_t value,
 	}
 
 	/*
-	 * For negative decimal scaling, use the printf precision specifier to
+	 * For negative decimal scaling, use the snprintf precision specifier to
 	 * truncate the results according to the requested decimal scaling. For
 	 * positive decimal scaling we print the remainder padded with 0.
 	 */
-	nvme_print(indent, name, -1, "%.*s%0.*"PRId64"%s",
+	return (snprintf(buf, buflen, "%.*s%0.*"PRId64,
 	    strlen(p) + scale_tens, p,
-	    scale_tens > 0 ? scale_tens : 0, rem,
-	    unit);
+	    scale_tens > 0 ? scale_tens : 0, rem));
+}
+
+/*
+ * nvme_print_uint128 -- print a 128bit uint with optional unit, after applying
+ * binary and/or decimal shifting
+ */
+static void
+nvme_print_uint128(int indent, const char *name, nvme_uint128_t value,
+    const char *unit, int scale_bits, int scale_tens)
+{
+	char buf[64];
+
+	if (unit == NULL)
+		unit = "";
+
+	(void) nvme_snprint_uint128(buf, sizeof (buf), value, scale_bits,
+	    scale_tens);
+
+	nvme_print(indent, name, -1, "%s%s", buf, unit);
 }
 
 /*
@@ -568,7 +582,7 @@ nvme_print_version(int indent, const char *name, uint32_t value)
 void
 nvme_print_ctrl_summary(nvme_identify_ctrl_t *idctl, nvme_version_t *version)
 {
-	(void) printf("model: %.*s, serial: %.*s, FW rev: %.*s, NVMe v%u.%u\n",
+	(void) printf("model: %.*s, serial: %.*s, FW rev: %.*s, NVMe v%u.%u",
 	    nvme_strlen(idctl->id_model, sizeof (idctl->id_model)),
 	    idctl->id_model,
 	    nvme_strlen(idctl->id_serial, sizeof (idctl->id_serial)),
@@ -576,6 +590,21 @@ nvme_print_ctrl_summary(nvme_identify_ctrl_t *idctl, nvme_version_t *version)
 	    nvme_strlen(idctl->id_fwrev, sizeof (idctl->id_fwrev)),
 	    idctl->id_fwrev,
 	    version->v_major, version->v_minor);
+
+	if (idctl->id_oacs.oa_nsmgmt != 0) {
+		char buf[64];
+
+		(void) nvme_snprint_uint128(buf, sizeof (buf),
+		    idctl->ap_tnvmcap, 20, 0);
+		(void) printf(", Capacity = %s MB", buf);
+		if (idctl->ap_unvmcap.lo != 0 || idctl->ap_unvmcap.hi != 0) {
+			(void) nvme_snprint_uint128(buf, sizeof (buf),
+			    idctl->ap_unvmcap, 20, 0);
+			(void) printf(", Unallocated = %s MB", buf);
+		}
+	}
+
+	(void) printf("\n");
 }
 
 /*

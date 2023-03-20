@@ -121,6 +121,7 @@ struct console
 	void		*c_private;	/* private data */
 };
 extern struct console	*consoles[];
+int	cons_inputdev(void);
 void	cons_probe(void);
 void	cons_mode(int);
 void	autoload_font(bool);

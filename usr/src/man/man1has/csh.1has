@@ -4,17 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CSH 1 "April 9, 2016"
+.TH CSH 1HAS "April 9, 2016"
 .SH NAME
 csh \- shell command interpreter with a C-like syntax
 .SH SYNOPSIS
-.LP
 .nf
 \fBcsh\fR [\fB-bcefinstvVxX\fR] [\fIargument\fR]...
 .fi
 
 .SH DESCRIPTION
-.LP
 \fBcsh\fR, the C shell, is a command interpreter with a syntax reminiscent of
 the C language. It provides a number of convenient features for interactive use
 that are not available with the Bourne shell, including filename completion,
@@ -22,13 +20,11 @@ command aliasing, history substitution, job control, and a number of built-in
 commands. As with the Bourne shell, the C shell provides variable, command and
 filename substitution.
 .SS "Initialization and Termination"
-.LP
 When first started, the C shell normally performs commands from the
 \fB\&.cshrc\fR file in your home directory, provided that it is readable and
 you either own it or your real group \fBID\fR matches its group \fBID\fR. If
 the shell is invoked with a name that starts with `\fB\(mi\fR\&', as when
 started by \fBlogin\fR(1), the shell runs as a \fBlogin\fR shell.
-.sp
 .LP
 If the shell is a login shell, this is the sequence of invocations: First,
 commands in \fB/etc/.login\fR are executed. Next, commands from the
@@ -38,13 +34,11 @@ permission checks as those for \fB\&.cshrc\fR are applied to this file.
 Typically, the \fB\&.login\fR file contains commands to specify the terminal
 type and environment. (For an explanation of file interpreters, see \fBCommand
 Execution\fR and \fBexec\fR(2).)
-.sp
 .LP
 As a login shell terminates, it performs commands from the \fB\&.logout\fR file
 in your home directory; the same permission checks as those for \fB\&.cshrc\fR
 are applied to this file.
 .SS "Interactive Operation"
-.LP
 After startup processing is complete, an interactive C shell begins reading
 commands from the terminal, prompting with \fBhostname\fR\fB%\fR (or
 \fBhostname\fR\fB#\fR for the privileged user). The shell then repeatedly
@@ -53,13 +47,11 @@ performs the following actions: a line of command input is read and broken into
 parsed, as described under USAGE. Finally, the shell executes each command in
 the current line.
 .SS "Noninteractive Operation"
-.LP
 When running noninteractively, the shell does not prompt for input from the
 terminal. A noninteractive C shell can execute a command supplied as an
 \fIargument\fR on its command line, or interpret commands from a file, also
 known as a script.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -182,7 +174,6 @@ just before execution.
 Sets \fBecho\fR before reading \fB\&.cshrc\fR.
 .RE
 
-.sp
 .LP
 Except with the options \fB-c\fR, \fB-i\fR, \fB-s\fR, or \fB-t\fR, the first
 nonoption \fIargument\fR is taken to be the name of a command or script. It is
@@ -190,22 +181,18 @@ passed as argument zero, and subsequent arguments are added to the argument
 list for that command or script.
 .SH USAGE
 .SS "Filename Completion"
-.LP
 When enabled by setting the variable \fBfilec\fR, an interactive C shell can
 complete a partially typed filename or user name. When an unambiguous partial
 filename is followed by an \fBESC\fR character on the terminal input line, the
 shell fills in the remaining characters of a matching filename from the working
 directory.
-.sp
 .LP
 If a partial filename is followed by the \fBEOF\fR character (usually typed as
 Control-d), the shell lists all filenames that match. It then prompts once
 again, supplying the incomplete command line typed in so far.
-.sp
 .LP
 When the last (partial) word begins with a tilde (\fB~\fR), the shell attempts
 completion with a user name, rather than a file in the working directory.
-.sp
 .LP
 The terminal bell signals errors or multiple matches. This bell signal can be
 inhibited by setting the variable \fBnobeep\fR. You can exclude files with
@@ -214,7 +201,6 @@ however, the only possible completion includes a suffix in the list, it is not
 ignored. \fBfignore\fR does not affect the listing of filenames by the
 \fBEOF\fR character.
 .SS "Lexical Structure"
-.LP
 The shell splits input lines into words at space and tab characters, except as
 noted below. The characters \fB&\fR, \fB|\fR, \fB;\fR, \fB<\fR, \fB>\fR,
 \fB(\fR, and \fB)\fR form separate words; if paired, the pairs form single
@@ -222,7 +208,6 @@ words. These shell metacharacters can be made part of other words, and their
 special meaning can be suppressed by preceding them with a `\fB\e\fR\&'
 (backslash). A newline preceded by a \fB\e\fR is equivalent to a space
 character.
-.sp
 .LP
 In addition, a string enclosed in matched pairs of single-quotes (\fB\&'\fR),
 double-quotes (\fB"\fR), or backquotes (\fB`\fR), forms a partial word.
@@ -232,13 +217,11 @@ form separate words. Within pairs of backquote (\fB`\fR) or double-quote
 true newline character. Additional functions of each type of quote are
 described, below, under \fBVariable Substitution\fR, \fBCommand
 Substitution\fR, and \fBFilename\fR \fBSubstitution\fR.
-.sp
 .LP
 When the shell's input is not a terminal, the character \fB#\fR introduces a
 comment that continues to the end of the input line. Its special meaning is
 suppressed when preceded by a \fB\e\fR or enclosed in matching quotes.
 .SS "Command Line Parsing"
-.LP
 A \fIsimple command\fR is composed of a sequence of words. The first word (that
 is not part of an I/O redirection) specifies the command to be executed. A
 simple command, or a set of simple commands separated by \fB|\fR or \fB|&\fR
@@ -246,24 +229,20 @@ characters, forms a \fIpipeline\fR. With \fB|\fR, the standard output of the
 preceding command is redirected to the standard input of the command that
 follows. With \fB|\|&\fR, both the standard error and the standard output are
 redirected through the pipeline.
-.sp
 .LP
 Pipelines can be separated by semicolons (\|\fB;\fR\|), in which case they are
 executed sequentially. Pipelines that are separated by \fB&&\fR or \fB|\||\fR
 form conditional sequences in which the execution of pipelines on the right
 depends upon the success or failure, respectively, of the pipeline on the left.
-.sp
 .LP
 A pipeline or sequence can be enclosed within parentheses `()' to form a simple
 command that can be a component in a pipeline or sequence.
-.sp
 .LP
 A sequence of pipelines can be executed asynchronously or "in the background"
 by appending an `\fB&\fR\&'; rather than waiting for the sequence to finish
 before issuing a prompt, the shell displays the job number (see \fBJob
 Control\fR, below) and associated process IDs and prompts immediately.
 .SS "History Substitution"
-.LP
 History substitution allows you to use words from previous command lines in the
 command line you are typing. This simplifies spelling corrections and the
 repetition of complicated commands or arguments. Command lines are saved in the
@@ -272,13 +251,11 @@ The most recent command is retained in any case. A history substitution begins
 with a \fB!\fR (although you can change this with the \fBhistchars\fR variable)
 and occurs anywhere on the command line; history substitutions do not nest. The
 \fB!\fR can be escaped with \fB\e\fR to suppress its special meaning.
-.sp
 .LP
 Input lines containing history substitutions are echoed on the terminal after
 being expanded, but before any other substitutions take place or the command
 gets executed.
 .SS "Event Designators"
-.LP
 An event designator is a reference to a command line entry in the history list.
 .sp
 .ne 2
@@ -394,7 +371,6 @@ re-executing command #6,
 .RE
 
 .SS "Word Designators"
-.LP
 A `\fB:\fR' (colon) separates the event specification from the word designator.
 It can be omitted if the word designator begins with a \fB^\fR, \fB$\fR,
 \fB*\fR, \fB\(mi\fR or \fB%\fR. If the word is to be selected from the previous
@@ -493,7 +469,6 @@ Like \fIx*\fR but omitting word \fB$\fR.
 .RE
 
 .SS "Modifiers"
-.LP
 After the optional word designator, you can add one of the following modifiers,
 preceded by a \fB:\fR.
 .sp
@@ -588,11 +563,9 @@ Quote the substituted words,escaping further substitutions.
 Like \fBq\fR, but break into words at each space character, tab or newline.
 .RE
 
-.sp
 .LP
 Unless preceded by a \fBg\fR, the modification is applied only to the first
 string that matches \fIl\fR; an error results if no string matches.
-.sp
 .LP
 The left-hand side of substitutions are not regular expressions, but character
 strings. Any character can be used as the delimiter in place of \fB/\fR. A
@@ -602,7 +575,6 @@ quoted with a backslash. A null \fIl\fR uses the previous string either from a
 \fIl\fR or from a contextual scan string \fIs\fR from \fB!?\fR\fIs\fR. You can
 omit the rightmost delimiter if a newline immediately follows \fIr\fR; the
 rightmost \fB?\fR in a context scan can similarly be omitted.
-.sp
 .LP
 Without an event specification, a history reference refers either to the
 previous command, or to a previous history reference on the command line (if
@@ -625,7 +597,6 @@ This is equivalent to the history substitution:
 .RE
 
 .SS "Aliases"
-.LP
 The C shell maintains a list of aliases that you can create, display, and
 modify using the \fBalias\fR and \fBunalias\fR commands. The shell checks the
 first word in each command to see if it matches the name of an existing alias.
@@ -635,7 +606,6 @@ command were the previous input line. This allows history substitutions,
 escaped with a backslash in the definition, to be replaced with actual command
 line arguments when the alias is used. If no history substitution is called
 for, the arguments remain unchanged.
-.sp
 .LP
 Aliases can be nested. That is, an alias definition can contain the name of
 another alias. Nested aliases are expanded before any history substitutions is
@@ -646,18 +616,14 @@ applied. This is useful in pipelines such as
 \fBalias lm 'ls -l \e!* | more'\fR
 .fi
 .in -2
-.sp
 
-.sp
 .LP
 which when called, pipes the output of \fBls\fR(1) through \fBmore\fR(1).
-.sp
 .LP
 Except for the first word, the name of the alias can not appear in its
 definition, nor in any alias referred to by its definition. Such loops are
 detected, and cause an error message.
 .SS "I/O Redirection"
-.LP
 The following metacharacters indicate that the subsequent word is the name of a
 file to which the command's standard input, standard output, or standard error
 is redirected; this word is variable, command, and filename expanded separately
@@ -714,7 +680,6 @@ forms append both the standard error and standard output to the file.
 .RE
 
 .SS "Variable Substitution"
-.LP
 The C shell maintains a set of variables, each of which is composed of a
 \fIname\fR and a \fIvalue\fR. A variable name consists of up to 128 letters and
 digits, and starts with a letter. An underscore (\fB_\fR) is considered a
@@ -723,39 +688,33 @@ the shell supports a variable name up to 128 characters the variable
 \fBSUNW_VARLEN\fR is defined. If a variable name of up to 128 characters is not
 supported, then an older version of the shell is being used, and the shell
 variable name length has a maximum length of 20.
-.sp
 .LP
 To refer to a variable's value, precede its name with a `\fB$\fR'. Certain
 references (described below) can be used to select specific words from the
 value, or to display other information about the variable. Braces can be used
 to insulate the reference from other characters in an input-line word.
-.sp
 .LP
 Variable substitution takes place after the input line is analyzed, aliases are
 resolved, and I/O redirections are applied. Exceptions to this are variable
 references in I/O redirections (substituted at the time the redirection is
 made), and backquoted strings (see Command Substitution).
-.sp
 .LP
 Variable substitution can be suppressed by preceding the \fB$\fR with a
 \fB\e\fR, except within double-quotes where it always occurs. Variable
 substitution is suppressed inside of single-quotes. A \fB$\fR is escaped if
 followed by a space character, tab or newline.
-.sp
 .LP
 Variables can be created, displayed, or destroyed using the \fBset\fR and
 \fBunset\fR commands. Some variables are maintained or used by the shell. For
 instance, the \fBargv\fR variable contains an image of the shell's argument
 list. Of the variables used by the shell, a number are toggles; the shell does
 not care what their value is, only whether they are set or not.
-.sp
 .LP
 Numerical values can be operated on as numbers (as with the \fB@\fR built-in
 command). With numeric operations, an empty value is considered to be zero. The
 second and subsequent words of multiword values are ignored. For instance, when
 the \fBverbose\fR variable is set to any value (including an empty value),
 command input is echoed on the terminal.
-.sp
 .LP
 Command and filename substitution is subsequently applied to the words that
 result from the variable substitution, except when suppressed by double-quotes,
@@ -766,7 +725,6 @@ are expanded to a string with embedded space characters. When the \fB:q\fR
 modifier is applied to the reference, it is expanded to a list of
 space-separated words, each of which is quoted to prevent subsequent command or
 filename substitutions.
-.sp
 .LP
 Except as noted below, it is an error to refer to a variable that is not set.
 .sp
@@ -850,14 +808,12 @@ Equivalent to \fB$argv[\fR\fIn\fR\fB]\fR\fI\&.\fR
 Equivalent to \fB$argv[*]\fR.
 .RE
 
-.sp
 .LP
 The modifiers \fB:e\fR, \fB:h\fR, \fB:q\fR, \fB:r\fR, \fB:t\fR, and \fB:x\fR
 can be applied (see \fBHistory\fR \fBSubstitution\fR), as can \fB:gh\fR,
 \fB:gt\fR, and \fB:gr\fR. If \fB{\|}\fR (braces) are used, then the modifiers
 must appear within the braces. The current implementation allows only one such
 modifier per expansion.
-.sp
 .LP
 The following references can not be modified with \fB:\fR modifiers.
 .sp
@@ -902,14 +858,12 @@ thereafter. It can be used to read from the keyboard in a C shell script.
 .RE
 
 .SS "Command and Filename Substitutions"
-.LP
 Command and filename substitutions are applied selectively to the arguments of
 built-in commands. Portions of expressions that are not evaluated are not
 expanded. For non-built-in commands, filename expansion of the command name is
 done separately from that of the argument list; expansion occurs in a subshell,
 after I/O redirection is performed.
 .SS "Command Substitution"
-.LP
 A command enclosed by backquotes (\|\fB`\fR\|.\|.\|.\|\fB`\fR\|) is performed
 by a subshell. Its standard output is broken into separate words at each space
 character, tab and newline; null words are discarded. This text replaces the
@@ -918,7 +872,6 @@ newline characters force new words; space and tab characters are preserved.
 However, a final newline is ignored. It is therefore possible for a command
 substitution to yield a partial word.
 .SS "Filename Substitution"
-.LP
 Unquoted words containing any of the characters \fB*\fR, \fB?\fR, \fB[\fR or
 \fB{\fR, or that begin with ~, are expanded (also known as \fIglobbing\fR) to
 an alphabetically sorted list of filenames, as follows:
@@ -975,7 +928,6 @@ Your home directory, as indicated by the value of the variable \fBhome\fR, or
 that of \fIuser\fR, as indicated by the password entry for \fIuser\fR.
 .RE
 
-.sp
 .LP
 Only the patterns \fB*\fR, \fB?\fR and \fB[\fR.\|.\|.\fB]\fR imply pattern
 matching; an error results if no filename matches a pattern that contains them.
@@ -983,18 +935,15 @@ The `\fB\&.\fR' (dot character), when it is the first character in a filename
 or pathname component, must be matched explicitly. The \fB/\fR (slash) must
 also be matched explicitly.
 .SS "Expressions and Operators"
-.LP
 A number of C shell built-in commands accept expressions, in which the
 operators are similar to those of C and have the same precedence. These
 expressions typically appear in the \fB@\fR, \fBexit\fR, \fBif\fR, \fBset\fR
 and \fBwhile\fR commands, and are often used to regulate the flow of control
 for executing commands. Components of an expression are separated by white
 space.
-.sp
 .LP
 Null or missing values are considered \fB0\fR. The result of all expressions is
 a string, which can represent decimal numbers.
-.sp
 .LP
 The following C shell operators are grouped in order of precedence:
 .sp
@@ -1117,14 +1066,12 @@ logical AND
 logical OR
 .RE
 
-.sp
 .LP
 The operators: \fB==\fR, \fB!=\fR, \fB=~\fR, and \fB!~\fR compare their
 arguments as strings; other operators use numbers. The operators \fB=~\fR and
 \fB!~\fR each check whether or not a string to the left matches a filename
 substitution pattern on the right. This reduces the need for \fBswitch\fR
 statements when pattern-matching between strings is all that is required.
-.sp
 .LP
 Also available are file inquiries:
 .sp
@@ -1200,11 +1147,9 @@ True if \fIfilename\fR is a plain file.
 True if \fIfilename\fR is a directory.
 .RE
 
-.sp
 .LP
 If \fIfilename\fR does not exist or is inaccessible, then all inquiries return
 false.
-.sp
 .LP
 An inquiry as to the success of a command is also available:
 .sp
@@ -1221,24 +1166,20 @@ of the \fBstatus\fR variable rather than this expression.
 .RE
 
 .SS "Control Flow"
-.LP
 The shell contains a number of commands to regulate the flow of control in
 scripts and within limits, from the terminal. These commands operate by forcing
 the shell either to reread input (to \fIloop\fR), or to skip input under
 certain conditions (to \fIbranch\fR).
-.sp
 .LP
 Each occurrence of a \fBforeach\fR, \fBswitch\fR, \fBwhile\fR,
 \fBif\fR.\|.\|.\fBthen\fR and \fBelse\fR built-in command must appear as the
 first word on its own input line.
-.sp
 .LP
 If the shell's input is not seekable and a loop is being read, that input is
 buffered. The shell performs seeks within the internal buffer to accomplish the
 rereading implied by the loop. (To the extent that this allows, backward
 \fBgoto\fR commands succeeds on nonseekable inputs.)
 .SS "Command Execution"
-.LP
 If the command is a C shell built-in command, the shell executes it directly.
 Otherwise, the shell searches for a file by that name with execute access. If
 the command name contains a \fB/\fR, the shell takes it as a pathname, and
@@ -1248,7 +1189,6 @@ attempts to resolve it to a pathname, searching each directory in the
 hash table (see the \fBrehash\fR built-in command) to eliminate directories
 that have no applicable files. This hashing can be disabled with the \fB-c\fR
 or \fB-t\fR, options, or the \fBunhash\fR built-in command.
-.sp
 .LP
 As a special case, if there is no \fB/\fR in the name of the script and there
 is an alias for the word \fBshell\fR, the expansion of the \fBshell\fR alias is
@@ -1256,7 +1196,6 @@ prepended (without modification) to the command line. The system attempts to
 execute the first word of this special (late-occurring) alias, which should be
 a full pathname. Remaining words of the alias's definition, along with the text
 of the input line, are treated as arguments.
-.sp
 .LP
 When a pathname is found that has proper execute permissions, the shell forks a
 new process and passes it, along with its arguments, to the kernel using the
@@ -1268,7 +1207,6 @@ new process. If the file is a text file and the first line begins with
 interpret that script. Subsequent words on the first line are taken as options
 for that shell. The kernel invokes (overlays) the indicated shell, using the
 name of the script as an argument.
-.sp
 .LP
 If neither of the above conditions holds, the kernel cannot overlay the file
 and the \fBexecve\fR(\|) call fails (see \fBexec\fR(2)). The C shell then
@@ -1286,7 +1224,6 @@ If the first character of the file is a \fB#\fR, a C shell is invoked.
 Otherwise, a Bourne shell is invoked.
 .RE
 .SS "Signal Handling"
-.LP
 The shell normally ignores \fBQUIT\fR signals. Background jobs are immune to
 signals generated from the keyboard, including hangups (\fBHUP\fR). Other
 signals have the values that the C shell inherited from its environment. The
@@ -1296,7 +1233,6 @@ controlled by the \fBonintr\fR built-in command. Login shells catch the
 no case are interrupts allowed when a login shell is reading the
 \fB\&.logout\fR file.
 .SS "Job Control"
-.LP
 The shell associates a numbered \fIjob\fR with each command sequence to keep
 track of those commands that are running in the background or have been stopped
 with \fBTSTP\fR signals (typically Control-z). When a command or command
@@ -1309,9 +1245,7 @@ brackets and a list of associated process numbers:
 [1] 1234
 .fi
 .in -2
-.sp
 
-.sp
 .LP
 To see the current list of jobs, use the \fBjobs\fR built-in command. The job
 most recently stopped (or put into the background if none are stopped) is
@@ -1319,11 +1253,9 @@ referred to as the \fIcurrent\fR job and is indicated with a `\fB+\fR'. The
 previous job is indicated with a `\fB\(mi\fR\&'. When the current job is
 terminated or moved to the foreground, this job takes its place (becomes the
 new current job).
-.sp
 .LP
 To manipulate jobs, refer to the \fBbg\fR, \fBfg\fR, \fBkill\fR, \fBstop\fR,
 and \fB%\fR built-in commands.
-.sp
 .LP
 A reference to a job begins with a `\fB%\fR'. By itself, the percent-sign
 refers to the current job.
@@ -1366,13 +1298,11 @@ foreground, for instance.
 Specify the job for which the command line uniquely contains \fIstring\fR.
 .RE
 
-.sp
 .LP
 A job running in the background stops when it attempts to read from the
 terminal. Background jobs can normally produce output, but this can be
 suppressed using the `\fBstty tostop\fR' command.
 .SS "Status Reporting"
-.LP
 While running interactively, the shell tracks the status of each job and
 reports whenever the job finishes or becomes blocked. It normally displays a
 message to this effect as it issues a prompt, in order to avoid disturbing the
@@ -1381,7 +1311,6 @@ the shell is to report status changes immediately. By default, the \fBnotify\fR
 command marks the current process; after starting a background job, type
 \fBnotify\fR to mark it.
 .SS "Commands"
-.LP
 Built-in commands are executed within the C shell. If a built-in command occurs
 as any component of a pipeline except the last, it is executed in a subshell.
 .sp
@@ -2472,7 +2401,6 @@ decrement \fIname\fR, respectively.
 .RE
 
 .SS "Environment Variables and Predefined Shell Variables"
-.LP
 Unlike the Bourne shell, the C shell maintains a distinction between
 environment variables, which are automatically exported to processes it
 invokes, and shell variables, which are not. Both types of variables are
@@ -2910,7 +2838,6 @@ Display each command after history substitution takes place.
 .RE
 
 .SS "Large File Behavior"
-.LP
 See \fBlargefile\fR(7) for the description of the behavior of \fBcsh\fR when
 encountering files greater than or equal to 2 Gbyte (2^31 bytes).
 .SH FILES
@@ -2977,7 +2904,6 @@ Source of home directories for `~\fIname\fR'.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -2992,7 +2918,6 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-.LP
 .BR bc (1),
 .BR echo (1),
 .BR limit (1),
@@ -3030,60 +2955,49 @@ immediate second attempt to exit succeeds, terminating the stopped jobs.
 .RE
 
 .SH WARNINGS
-.LP
 The use of \fBsetuid\fR shell scripts is \fIstrongly\fR discouraged.
 .SH NOTES
-.LP
 Words can be no longer than 1024 bytes. The system limits argument lists to
 1,048,576 bytes. However, the maximum number of arguments to a command for
 which filename expansion applies is 1706. Command substitutions can expand to
 no more characters than are allowed in the argument list. To detect looping,
 the shell restricts the number of \fBalias\fR substitutions on a single line to
 20.
-.sp
 .LP
 When a command is restarted from a stop, the shell prints the directory it
 started in if this is different from the current directory; this can be
 misleading (that is, wrong) as the job might have changed directories
 internally.
-.sp
 .LP
 Shell built-in functions are not stoppable/restartable. Command sequences of
 the form \fIa\fR \fIb\fR \fIc\fR are also not handled gracefully when stopping
 is attempted. If you suspend \fIb\fR, the shell never executes \fIc\fR. This is
 especially noticeable if the expansion results from an alias. It can be avoided
 by placing the sequence in parentheses to force it into a subshell.
-.sp
 .LP
 Commands within loops, prompted for by \fB?\fR, are not placed in the
 \fIhistory\fR list.
-.sp
 .LP
 Control structures should be parsed rather than being recognized as built-in
 commands. This would allow control commands to be placed anywhere, to be
 combined with \fB|\fR, and to be used with \fB&\fR and \fB;\fR metasyntax.
-.sp
 .LP
 It should be possible to use the \fB:\fR modifiers on the output of command
 substitutions. There are two problems with \fB:\fR modifier usage on variable
 substitutions: not all of the modifiers are available, and only one modifier
 per substitution is allowed.
-.sp
 .LP
 The \fBg\fR (global) flag in history substitutions applies only to the first
 match in each word, rather than all matches in all words. The common text
 editors consistently do the latter when given the \fBg\fR flag in a
 substitution command.
-.sp
 .LP
 Quoting conventions are confusing. Overriding the escape character to force
 variable substitutions within double quotes is counterintuitive and
 inconsistent with the Bourne shell.
-.sp
 .LP
 Symbolic links can fool the shell. Setting the \fBhardpaths\fR variable
 alleviates this.
-.sp
 .LP
 It is up to the user to manually remove all duplicate pathnames accrued from
 using built-in commands as
@@ -3093,9 +3007,7 @@ using built-in commands as
 set path = \fIpathnames\fR
 .fi
 .in -2
-.sp
 
-.sp
 .LP
 or
 .sp
@@ -3104,9 +3016,7 @@ or
 setenv PATH = \fIpathnames\fR
 .fi
 .in -2
-.sp
 
-.sp
 .LP
 more than once. These often occur because a shell script or a \fB\&.cshrc\fR
 file does something like
@@ -3116,12 +3026,9 @@ file does something like
 `set path=(/usr/local /usr/hosts $path)'
 .fi
 .in -2
-.sp
 
-.sp
 .LP
 to ensure that the named directories are in the pathname list.
-.sp
 .LP
 The only way to direct the standard output and standard error separately is by
 invoking a subshell, as follows:
@@ -3131,23 +3038,18 @@ invoking a subshell, as follows:
 \fIcommand\fR > \fIoutfile\fR ) >& \fIerrorfile\fR
 .fi
 .in -2
-.sp
 
-.sp
 .LP
 Although robust enough for general use, adventures into the esoteric periphery
 of the C shell can reveal unexpected quirks.
-.sp
 .LP
 If you start \fBcsh\fR as a login shell and you do not have a \fB\&.login\fR in
 your home directory, then the \fBcsh\fR reads in the \fB/etc/.login\fR.
-.sp
 .LP
 When the shell executes a shell script that attempts to execute a non-existent
 command interpreter, the shell returns an erroneous diagnostic message that the
 shell script file does not exist.
 .SH BUGS
-.LP
 As of this writing, the \fBtime\fR built-in command does \fBnot\fR compute the
 last 6 fields of output, rendering the output to erroneously report the value
 \fB0\fR for these fields:

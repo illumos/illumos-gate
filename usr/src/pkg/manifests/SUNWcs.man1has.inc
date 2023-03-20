@@ -10,26 +10,7 @@
 #
 
 #
-# Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 #
 
-include		$(SRC)/Makefile.master
-
-MANSECT=	1has
-
-MANFILES=			\
-		csh.1has	\
-		ctags.1has	\
-		edit.1has	\
-		ex.1has		\
-		sh.1has		\
-		vi.1has
-
-.KEEP_STATE:
-
-include		$(SRC)/man/Makefile.man
-
-ROOTMAN=	$(ROOTHASMAN)
-
-install:	$(ROOTMANFILES)
+file path=usr/has/man/man1has/csh.1has

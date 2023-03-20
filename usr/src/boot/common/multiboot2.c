@@ -366,7 +366,7 @@ find_property_value(const char *cmd, const char *name, const char **value,
 			valuep++;
 			value_len = 0;
 			quoted = 0;
-			for (; ; ++value_len) {
+			for (;; ++value_len) {
 				if (valuep[value_len] == '\0')
 					break;
 
@@ -593,6 +593,14 @@ mb_kernel_cmdline(struct preloaded_file *fp, struct devdesc *rootdev,
 	bool zfs_root = false;
 	bool mb2;
 	int rv;
+
+	/*
+	 * With multiple console devices and "os_console" variable not
+	 * set, set os_console to last input device.
+	 */
+	rv = cons_inputdev();
+	if (rv != -1)
+		(void) setenv("os_console", consoles[rv]->c_name, 0);
 
 	/*
 	 * 64-bit kernel has aout header, 32-bit kernel is elf, and the
