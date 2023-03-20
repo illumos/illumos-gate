@@ -508,7 +508,7 @@ sbdp_stop_user_threads(sbdp_sr_handle_t *srh)
 	uint_t		cache_t_state;
 	int		bailout;
 	sbd_error_t	*sep;
-	kthread_id_t 	tp;
+	kthread_id_t	tp;
 
 	extern void add_one_utstop();
 	extern void utstop_timedwait(clock_t);
@@ -700,7 +700,7 @@ sbdp_resume(sbdp_sr_handle_t *srh)
 		tod_status_set(TOD_DR_RESUME_DONE);
 		mutex_exit(&tod_lock);
 
-		sbdp_enable_intr(); 	/* enable intr & clock */
+		sbdp_enable_intr();	/* enable intr & clock */
 
 		/*
 		 * release all the other cpus

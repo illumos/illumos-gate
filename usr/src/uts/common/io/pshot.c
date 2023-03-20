@@ -1365,12 +1365,11 @@ pshot_power(dev_info_t *dip, int cmpt, int level)
 static int
 pshot_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
     void *arg, void *result)
-
 {
-	int 				ret;
-	int 				instance = ddi_get_instance(dip);
+	int				ret;
+	int				instance = ddi_get_instance(dip);
 	char				*name = ddi_node_name(dip);
-	pshot_t 			*pshot;
+	pshot_t				*pshot;
 	pm_bp_child_pwrchg_t		*bpc;
 	pm_bp_nexus_pwrup_t		bpn;
 	pm_bp_has_changed_t		*bphc;
@@ -1824,7 +1823,7 @@ pshot_close(dev_t dev, int flag, int otyp, cred_t *credp)
 
 /*
  * pshot_ioctl: redirects to appropriate command handler based on various
- * 	criteria
+ *	criteria
  */
 /* ARGSUSED */
 static int
@@ -2343,7 +2342,7 @@ pshot_testctl(pshot_t *pshot, minor_t nodenum, int cmd, intptr_t arg, int mode,
 
 static int
 pshot_get_eventcookie(dev_info_t *dip, dev_info_t *rdip,
-	char *eventname, ddi_eventcookie_t *event_cookiep)
+    char *eventname, ddi_eventcookie_t *event_cookiep)
 {
 	int	instance = ddi_get_instance(dip);
 	pshot_t *pshot = ddi_get_soft_state(pshot_softstatep, instance);
@@ -2363,8 +2362,8 @@ pshot_get_eventcookie(dev_info_t *dip, dev_info_t *rdip,
 
 static int
 pshot_add_eventcall(dev_info_t *dip, dev_info_t *rdip,
-	ddi_eventcookie_t cookie,
-	void (*callback)(), void *arg, ddi_callback_id_t *cb_id)
+    ddi_eventcookie_t cookie,
+    void (*callback)(), void *arg, ddi_callback_id_t *cb_id)
 {
 	int	instance = ddi_get_instance(dip);
 	pshot_t *pshot = ddi_get_soft_state(pshot_softstatep, instance);
@@ -2409,7 +2408,7 @@ pshot_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
 
 static int
 pshot_post_event(dev_info_t *dip, dev_info_t *rdip,
-	ddi_eventcookie_t cookie, void *impl_data)
+    ddi_eventcookie_t cookie, void *impl_data)
 {
 	int	instance = ddi_get_instance(dip);
 	pshot_t *pshot = ddi_get_soft_state(pshot_softstatep, instance);
@@ -2444,7 +2443,7 @@ pshot_post_event(dev_info_t *dip, dev_info_t *rdip,
  */
 static int
 pshot_event(pshot_t *pshot, int event_tag, dev_info_t *child,
-	void *bus_impldata)
+    void *bus_impldata)
 {
 	ddi_eventcookie_t cookie = ndi_event_tag_to_cookie(
 	    pshot->ndi_event_hdl, event_tag);
@@ -2484,7 +2483,7 @@ pshot_event(pshot_t *pshot, int event_tag, dev_info_t *child,
  */
 static void
 pshot_event_cb(dev_info_t *dip, ddi_eventcookie_t cookie,
-	void *arg, void *bus_impldata)
+    void *arg, void *bus_impldata)
 {
 	pshot_t *pshot = (pshot_t *)arg;
 	int event_tag;
@@ -3045,7 +3044,7 @@ pshot_bus_config_setup_leaf(dev_info_t *parent, char *cname, char *caddr)
 /*ARGSUSED*/
 static int
 pshot_bus_config_test_specials(dev_info_t *parent, char *devname,
-	char *cname, char *caddr)
+    char *cname, char *caddr)
 {
 	char	*p;
 	int	n;
@@ -3517,7 +3516,7 @@ pshot_devnode(dev_info_t *dip, void *arg)
 #ifdef DEBUG
 static void
 pshot_event_cb_test(dev_info_t *dip, ddi_eventcookie_t cookie,
-	void *arg, void *bus_impldata)
+    void *arg, void *bus_impldata)
 {
 	pshot_t *softstate = (pshot_t *)arg;
 	int event_tag;

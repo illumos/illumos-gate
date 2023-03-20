@@ -528,7 +528,7 @@ dr_stop_user_threads(dr_sr_handle_t *srh)
 	int		bailout;
 	dr_handle_t	*handle = srh->sr_dr_handlep;
 	static fn_t	f = "dr_stop_user_threads";
-	kthread_id_t 	tp;
+	kthread_id_t	tp;
 
 	extern void add_one_utstop();
 	extern void utstop_timedwait(clock_t);
@@ -725,7 +725,7 @@ dr_resume(dr_sr_handle_t *srh)
 		tod_status_set(TOD_DR_RESUME_DONE);
 		mutex_exit(&tod_lock);
 
-		dr_enable_intr(); 	/* enable intr & clock */
+		dr_enable_intr();	/* enable intr & clock */
 
 		start_cpus();
 		mutex_exit(&cpu_lock);

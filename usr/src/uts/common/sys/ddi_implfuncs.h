@@ -26,6 +26,7 @@
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SYS_DDI_IMPLFUNCS_H
@@ -89,8 +90,7 @@ extern void i_ddi_rootnex_init_events(dev_info_t *);
 extern int i_ddi_rootnex_get_eventcookie(dev_info_t *, dev_info_t *, char *,
     ddi_eventcookie_t *);
 extern int i_ddi_rootnex_add_eventcall(dev_info_t *, dev_info_t *,
-    ddi_eventcookie_t, void (*)(dev_info_t *, ddi_eventcookie_t, void *,
-    void *), void *, ddi_callback_id_t *);
+    ddi_eventcookie_t, ddi_event_cb_f, void *, ddi_callback_id_t *);
 extern int i_ddi_rootnex_remove_eventcall(dev_info_t *, ddi_callback_id_t);
 extern int i_ddi_rootnex_post_event(dev_info_t *, dev_info_t *,
     ddi_eventcookie_t, void *);

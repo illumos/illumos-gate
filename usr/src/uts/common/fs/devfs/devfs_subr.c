@@ -76,7 +76,7 @@ struct dv_node *dvroot;
 
 /* prototype memory vattrs */
 vattr_t dv_vattr_dir = {
-	AT_TYPE|AT_MODE|AT_UID|AT_GID, 		/* va_mask */
+	AT_TYPE|AT_MODE|AT_UID|AT_GID,		/* va_mask */
 	VDIR,					/* va_type */
 	DV_DIRMODE_DEFAULT,			/* va_mode */
 	DV_UID_DEFAULT,				/* va_uid */
@@ -384,7 +384,7 @@ dv_mkdir(struct dv_node *ddv, dev_info_t *devi, char *nm)
  */
 static struct dv_node *
 dv_mknod(struct dv_node *ddv, dev_info_t *devi, char *nm,
-	struct ddi_minor_data *dmd)
+    struct ddi_minor_data *dmd)
 {
 	struct dv_node	*dv;
 	struct vnode	*vp;
@@ -926,7 +926,7 @@ dv_clone_mknod(struct dv_node *ddv, char *drvname)
  */
 int
 dv_find(struct dv_node *ddv, char *nm, struct vnode **vpp, struct pathname *pnp,
-	struct vnode *rdir, struct cred *cred, uint_t ndi_flags)
+    struct vnode *rdir, struct cred *cred, uint_t ndi_flags)
 {
 	extern int isminiroot;	/* see modctl.c */
 

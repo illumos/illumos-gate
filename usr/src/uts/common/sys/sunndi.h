@@ -559,9 +559,8 @@ ndi_event_retrieve_cookie(ndi_event_hdl_t handle, dev_info_t *child_dip,
  */
 int
 ndi_event_add_callback(ndi_event_hdl_t	handle, dev_info_t *child_dip,
-    ddi_eventcookie_t cookie, void (*event_callback)(dev_info_t *,
-    ddi_eventcookie_t, void *arg, void *impldata), void *arg, uint_t flag,
-    ddi_callback_id_t *cb_id);
+    ddi_eventcookie_t cookie, ddi_event_cb_f event_callback, void *arg,
+    uint_t flag, ddi_callback_id_t *cb_id);
 
 /*
  * remove an event callback registration from the ndi event handle

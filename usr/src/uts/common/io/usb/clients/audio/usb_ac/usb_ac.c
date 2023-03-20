@@ -82,7 +82,7 @@
 
 
 /* debug support */
-uint_t	usb_ac_errlevel 	= USB_LOG_L4;
+uint_t	usb_ac_errlevel		= USB_LOG_L4;
 uint_t	usb_ac_errmask		= (uint_t)-1;
 uint_t	usb_ac_instance_debug	= (uint_t)-1;
 
@@ -1470,7 +1470,7 @@ usb_ac_setup_connections(usb_ac_state_t *uacp)
  */
 static void
 usb_ac_add_unit_descriptor(usb_ac_state_t *uacp, uchar_t *buffer,
-	size_t buflen)
+    size_t buflen)
 {
 	void	*descr;
 	int	len;
@@ -2053,10 +2053,10 @@ usb_ac_set_selector(usb_ac_state_t *uacp, uint_t id,
  */
 static uint_t
 usb_ac_set_control(usb_ac_state_t *uacp, uint_t dir, uint_t search_target,
-	uint_t channel, uint_t control, uint_t all_or_one,
-	uint_t *count, uint_t arg1,
-	int (*func)(usb_ac_state_t *uacp, uint_t unit, uint_t dir,
-		uint_t channel, uint_t control, uint_t arg1, uint_t *depth))
+    uint_t channel, uint_t control, uint_t all_or_one,
+    uint_t *count, uint_t arg1,
+    int (*func)(usb_ac_state_t *uacp, uint_t unit, uint_t dir,
+    uint_t channel, uint_t control, uint_t arg1, uint_t *depth))
 {
 	uint_t id;
 	uint_t depth = 0;
@@ -2089,10 +2089,10 @@ usb_ac_set_control(usb_ac_state_t *uacp, uint_t dir, uint_t search_target,
  */
 static uint_t
 usb_ac_traverse_all_units(usb_ac_state_t *uacp, uint_t dir,
-	uint_t search_target, uint_t channel, uint_t control,
-	uint_t all_or_one, uint_t *count, uint_t arg1, uint_t *depth,
-	int (*func)(usb_ac_state_t *uacp, uint_t unit, uint_t dir,
-		uint_t channel, uint_t control, uint_t arg1, uint_t *depth))
+    uint_t search_target, uint_t channel, uint_t control,
+    uint_t all_or_one, uint_t *count, uint_t arg1, uint_t *depth,
+    int (*func)(usb_ac_state_t *uacp, uint_t unit, uint_t dir,
+    uint_t channel, uint_t control, uint_t arg1, uint_t *depth))
 {
 	uint_t unit, start_type, id;
 
@@ -2161,10 +2161,10 @@ usb_ac_traverse_all_units(usb_ac_state_t *uacp, uint_t dir,
  */
 static uint_t
 usb_ac_set_monitor_gain_control(usb_ac_state_t *uacp, uint_t dir,
-	uint_t search_target, uint_t channel, uint_t control,
-	uint_t all_or_one, uint_t *count, uint_t arg1,
-	int (*func)(usb_ac_state_t *uacp, uint_t unit, uint_t dir,
-		uint_t channel, uint_t control, uint_t arg1, uint_t *depth))
+    uint_t search_target, uint_t channel, uint_t control,
+    uint_t all_or_one, uint_t *count, uint_t arg1,
+    int (*func)(usb_ac_state_t *uacp, uint_t unit, uint_t dir,
+    uint_t channel, uint_t control, uint_t arg1, uint_t *depth))
 {
 	uint_t unit, id;
 	uint_t depth = 0;
@@ -2271,10 +2271,10 @@ usb_ac_check_path(usb_ac_state_t *uacp, uint_t type)
  */
 static uint_t
 usb_ac_traverse_connections(usb_ac_state_t *uacp, uint_t start_unit, uint_t dir,
-	uint_t search_target, uint_t channel, uint_t control,
-	uint_t all_or_one, uint_t *count, uint_t arg1, uint_t *depth,
-	int (*func)(usb_ac_state_t *uacp, uint_t unit, uint_t dir,
-		uint_t channel, uint_t control, uint_t arg1, uint_t *depth))
+    uint_t search_target, uint_t channel, uint_t control,
+    uint_t all_or_one, uint_t *count, uint_t arg1, uint_t *depth,
+    int (*func)(usb_ac_state_t *uacp, uint_t unit, uint_t dir,
+    uint_t channel, uint_t control, uint_t arg1, uint_t *depth))
 {
 	uint_t unit, id;
 	uint_t done = (dir & USB_AUDIO_PLAY) ? USB_AUDIO_OUTPUT_TERMINAL :
@@ -5285,7 +5285,8 @@ usb_audio_unregister(usb_ac_state_t *statep)
 
 
 static int
-usb_audio_register(usb_ac_state_t *statep) {
+usb_audio_register(usb_ac_state_t *statep)
+{
 	audio_dev_t *af_devp;
 	int rv = USB_FAILURE;
 	int n;
