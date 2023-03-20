@@ -496,7 +496,7 @@ CALLSYMS=	-_gcc=-fno-eliminate-unused-debug-symbols \
 # by the CTF tools.  With Sun Studio this is stabs due to bugs in the Studio
 # compilers.  With GCC this is DWARF v2.
 #
-DEBUGFORMAT=	-_gcc=-gdwarf-2 -_gcc10=-gstrict-dwarf -_gcc11=-gstrict-dwarf
+DEBUGFORMAT=	-_gcc=-gdwarf-2 -_gcc10=-gstrict-dwarf
 
 #
 # Ask the compiler to include debugging information
