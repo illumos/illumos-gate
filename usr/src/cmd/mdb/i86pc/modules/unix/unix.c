@@ -931,10 +931,18 @@ x86_featureset_dcmd(uintptr_t addr, uint_t flags, int argc,
 		return (DCMD_ERR);
 	}
 
-	if (mdb_readvar(fset, "x86_featureset") != sz) {
-		mdb_warn("failed to read x86_featureset");
-		mdb_free(fset, sz);
-		return (DCMD_ERR);
+	if (flags & DCMD_ADDRSPEC) {
+		if (mdb_vread(fset, sz, addr) != sz) {
+			mdb_warn("failed to read x86_featureset from %p", addr);
+			mdb_free(fset, sz);
+			return (DCMD_ERR);
+		}
+	} else {
+		if (mdb_readvar(fset, "x86_featureset") != sz) {
+			mdb_warn("failed to read x86_featureset");
+			mdb_free(fset, sz);
+			return (DCMD_ERR);
+		}
 	}
 
 	for (ii = 0; ii < NUM_X86_FEATURES; ii++) {
@@ -949,11 +957,10 @@ x86_featureset_dcmd(uintptr_t addr, uint_t flags, int argc,
 		}
 
 		if (mdb_readstr(name, sizeof (name), nptr) == -1) {
-			mdb_warn("failed to read feature %d", ii);
-			mdb_free(fset, sz);
-			return (DCMD_ERR);
+			mdb_printf("unknown feature 0x%x\n", ii);
+		} else {
+			mdb_printf("%s\n", name);
 		}
-		mdb_printf("%s\n", name);
 	}
 
 	mdb_free(fset, sz);
@@ -1015,7 +1022,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "memseg_list", ":", "show memseg list", memseg_list },
 	{ "scalehrtime", ":[-a|-r]", "scale an unscaled high-res time",
 	    scalehrtime_dcmd, scalehrtime_help },
-	{ "x86_featureset", NULL, "dump the x86_featureset vector",
+	{ "x86_featureset", ":", "dump the x86_featureset vector",
 		x86_featureset_dcmd },
 	{ "xcall", ":", "print CPU cross-call state", xcall_dcmd, xcall_help },
 #ifdef _KMDB

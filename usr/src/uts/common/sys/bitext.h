@@ -16,7 +16,7 @@
 #ifndef _SYS_BITEXT_H
 #define	_SYS_BITEXT_H
 
-#include <sys/debug.h>
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
