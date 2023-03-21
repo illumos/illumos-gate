@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 Oxide Computer Company
  */
 
 /* helper functions for using libscf with sharemgr */
@@ -152,8 +154,10 @@ sa_scf_init(sa_handle_impl_t ihandle)
 	/* Error handling/unwinding */
 err:
 	(void) sa_scf_fini(handle);
-	(void) printf("libshare SMF initialization problem: %s\n",
-	    scf_strerror(scf_error()));
+	if (scf_error() != SCF_ERROR_NOT_FOUND) {
+		(void) printf("libshare SMF initialization problem: %s\n",
+		    scf_strerror(scf_error()));
+	}
 	return (NULL);
 }
 
@@ -239,8 +243,7 @@ valid_protocol(char *proto)
 
 static int
 sa_extract_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
-			scf_propertygroup_t *pg,
-			char *nodetype, char *proto, char *sectype)
+    scf_propertygroup_t *pg, char *nodetype, char *proto, char *sectype)
 {
 	xmlNodePtr node;
 	scf_iter_t *iter;
@@ -335,7 +338,7 @@ out:
 
 static void
 sa_extract_attrs(xmlNodePtr root, scfutilhandle_t *handle,
-		    scf_instance_t *instance)
+    scf_instance_t *instance)
 {
 	scf_property_t *prop;
 	scf_value_t *value;
@@ -463,7 +466,7 @@ _sa_make_resource(xmlNodePtr node, char *valuestr)
  */
 void
 sa_share_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
-			scf_propertygroup_t *pg, char *id)
+    scf_propertygroup_t *pg, char *id)
 {
 	xmlNodePtr node;
 	char *name;
@@ -699,7 +702,7 @@ find_resource_by_index(sa_share_t share, char *index)
 
 static int
 sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
-			scf_propertygroup_t *pg, char *id, sa_handle_t sahandle)
+    scf_propertygroup_t *pg, char *id, sa_handle_t sahandle)
 {
 	xmlNodePtr node;
 	char *name = NULL;
@@ -1054,7 +1057,7 @@ out:
 
 static void
 sa_extract_defaults(xmlNodePtr root, scfutilhandle_t *handle,
-		    scf_instance_t *instance)
+    scf_instance_t *instance)
 {
 	xmlNodePtr node;
 	scf_property_t *prop;

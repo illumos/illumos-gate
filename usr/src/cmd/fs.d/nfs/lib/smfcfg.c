@@ -22,6 +22,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -80,10 +81,13 @@ fs_smf_init(char *fmri, char *instance)
 
 out:
 	fs_smf_fini(handle);
-	fprintf(stderr, gettext("SMF Initialization problems..%s\n"), fmri);
+	if (scf_error() != SCF_ERROR_NOT_FOUND) {
+		fprintf(stderr,
+		    gettext("SMF Initialization problem(%s): %s\n"),
+		    fmri, scf_strerror(scf_error()));
+	}
 	return (NULL);
 }
-
 
 void
 fs_smf_fini(fs_smfhandle_t *handle)
