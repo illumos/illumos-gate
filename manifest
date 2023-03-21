@@ -2544,7 +2544,6 @@ s usr/bin/amd64/elfdump=../elfdump
 f usr/bin/amd64/elfedit 0555 root bin
 f usr/bin/amd64/elfwrap 0555 root bin
 f usr/bin/amd64/encrypt 0555 root bin
-f usr/bin/amd64/ficl-sys 0555 root bin
 f usr/bin/amd64/gcore 0555 root bin
 f usr/bin/amd64/ksh93 0555 root bin
 h usr/bin/amd64/ksh=usr/bin/amd64/ksh93
@@ -2708,7 +2707,7 @@ f usr/bin/fdetach 0555 root bin
 f usr/bin/fdformat 4555 root bin
 h usr/bin/fg=usr/bin/alias
 h usr/bin/fgrep=usr/bin/grep
-h usr/bin/ficl-sys=usr/lib/isaexec
+f usr/bin/ficl-sys 0555 root bin
 f usr/bin/file 0555 root bin
 f usr/bin/filesync 0555 root bin
 f usr/bin/find 0555 root bin
