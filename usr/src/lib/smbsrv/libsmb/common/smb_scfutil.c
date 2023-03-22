@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /* helper functions for using libscf with CIFS */
@@ -697,7 +697,8 @@ smb_smf_scf_init(char *svc_name)
 	/* error handling/unwinding */
 err:
 	(void) smb_smf_scf_fini(handle);
-	(void) smb_smf_scf_log_error("SMF initialization problem");
+	if (scf_error() != SCF_ERROR_NOT_FOUND)
+		(void) smb_smf_scf_log_error("SMF initialization problem");
 	return (NULL);
 }
 
