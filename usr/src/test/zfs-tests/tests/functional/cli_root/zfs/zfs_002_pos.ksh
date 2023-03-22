@@ -91,6 +91,7 @@ typeset badparams=("" "create" "destroy" "snapshot" "rollback" "clone" \
 
 log_must coreadm -p ${corepath}/core.%f
 log_must export ZFS_ABORT=yes
+ulimit -c unlimited
 
 for subcmd in "${cmds[@]}" "${badparams[@]}"; do
 	zfs $subcmd >/dev/null 2>&1 && log_fail "$subcmd passed incorrectly."

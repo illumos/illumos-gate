@@ -86,6 +86,7 @@ set -A badparams "" "create" "destroy" "add" "remove" "list *" "iostat" "status"
 
 coreadm -p ${corepath}/core.%f
 export ZFS_ABORT=yes
+ulimit -c unlimited
 
 for subcmd in "${cmds[@]}" "${badparams[@]}"; do
 	zpool $subcmd >/dev/null 2>&1

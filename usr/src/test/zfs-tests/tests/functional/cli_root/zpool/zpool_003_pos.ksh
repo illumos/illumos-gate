@@ -61,6 +61,7 @@ log_mustnot zpool freeze fakepool
 [[ -f core ]] && log_must rm -f core
 
 ZFS_ABORT=1; export ZFS_ABORT
+ulimit -c unlimited
 zpool > /dev/null 2>&1
 unset ZFS_ABORT
 
