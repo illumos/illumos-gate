@@ -59,7 +59,7 @@ HBAPort::HBAPort() {
  * @memo	    Compare two HBA ports for equality
  * @return	    TRUE if both ports are the same
  * @return	    FALSE if the ports are different
- * 
+ *
  * @doc		    Comparison is based on Node WWN, Port WWN and path
  */
 bool HBAPort::operator==(HBAPort &comp) {
@@ -71,7 +71,7 @@ bool HBAPort::operator==(HBAPort &comp) {
 /**
  * @memo	    Validate that the port is still present in the system
  * @exception	    UnavailableException if the port is not present
- * 
+ *
  * @doc		    If the port is still present on the system, the routine
  *		    will return normally.  If the port is not present
  *		    an exception will be thrown.
@@ -93,7 +93,7 @@ void HBAPort::validatePresent() {
 
 
 /*
- * structure for di_devlink_walk 
+ * structure for di_devlink_walk
  */
 typedef struct walk_devlink {
 	char *path;
@@ -135,11 +135,11 @@ get_devlink(di_devlink_t devlink, void *arg) {
 
 /**
  * @memo	    Convert /devices paths to /dev sym-link paths.
- * @postcondition   The mapping buffer OSDeviceName paths will be 
+ * @postcondition   The mapping buffer OSDeviceName paths will be
  *		    converted to short names.
  * @param	    mappings The target mappings data to convert to
  *		    short names
- * 
+ *
  * @doc		    If no link
  * is found, the long path is left as is.
  * Note: The NumberOfEntries field MUST not be greater than the size
@@ -153,7 +153,7 @@ void HBAPort::convertToShortNames(PHBA_FCPTARGETMAPPINGV2 mappings) {
 
 	if ((hdl = di_devlink_init(NULL, 0)) == NULL) {
 	    log.internalError("di_devlink_init failed. Errno:%d", errno);
-	    // no need to check further, just return here.		
+	    // no need to check further, just return here.
 	    return;
 	}
 
@@ -177,7 +177,7 @@ void HBAPort::convertToShortNames(PHBA_FCPTARGETMAPPINGV2 mappings) {
 		    warg.path = mappings->entry[j].ScsiId.OSDeviceName +
 			    strlen ("/devices");
 		} else {
-		    warg.len = strlen(mappings->entry[j].ScsiId.OSDeviceName); 
+		    warg.len = strlen(mappings->entry[j].ScsiId.OSDeviceName);
 		    warg.path = mappings->entry[j].ScsiId.OSDeviceName;
 		}
 	    }
@@ -219,7 +219,7 @@ string HBAPort::lookupControllerPath(string path) {
 	    string tmp = "Unable to open ";
 	    tmp += dir;
 	    tmp += "to find controller number.";
-	    delete (dir_buf);
+	    delete[] (dir_buf);
 	    throw IOError(tmp);
 	}
 
@@ -238,14 +238,14 @@ string HBAPort::lookupControllerPath(string path) {
 		    cfg_path += "/";
 		    cfg_path += dirp->d_name;
 		    closedir(dp);
-		    delete (dir_buf);
+		    delete[] (dir_buf);
 		    return (cfg_path);
 		}
 	    }
 	}
 
 	closedir(dp);
-	delete (dir_buf);
+	delete[] (dir_buf);
 	throw InternalError("Unable to find controller path");
 }
 

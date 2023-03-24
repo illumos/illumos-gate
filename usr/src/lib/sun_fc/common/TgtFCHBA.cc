@@ -286,7 +286,7 @@ void TgtFCHBA::loadAdapters(vector<HBA*> &list)
 		"TGT_ADAPTER_LIST failed: "
 		"Errno: \"%s\"",
 		strerror(errno));
-	    delete (tgthbaList);
+	    delete[] (tgthbaList);
 	    close(fd);
 	    if (errno == EBUSY) {
 		throw BusyException();
@@ -305,7 +305,7 @@ void TgtFCHBA::loadAdapters(vector<HBA*> &list)
 		"Buffer too small for number of target mode HBAs. Retrying.");
 	    size = tgthbaList->numPorts;
 	    retry = true;
-	    delete (tgthbaList);
+	    delete[] (tgthbaList);
 	}
     } while (retry);
 
@@ -328,9 +328,9 @@ void TgtFCHBA::loadAdapters(vector<HBA*> &list)
 	}
     }
     if (tgthbaList->numPorts > HBAList::HBA_MAX_PER_LIST) {
-	delete(tgthbaList);
+	delete[](tgthbaList);
 	throw InternalError(
 	    "Exceeds max number of adapters that VSL supports.");
     }
-    delete (tgthbaList);
+    delete[] (tgthbaList);
 }

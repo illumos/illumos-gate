@@ -386,7 +386,7 @@ void FCHBA::loadAdapters(vector<HBA*> &list) {
 		"ADAPTER_LIST failed: "
 		"Errno: \"%s\"",
 		strerror(errno));
-	    delete (pathList);
+	    delete[] (pathList);
 	    close(fd);
 	    if (errno == EBUSY) {
 		throw BusyException();
@@ -405,7 +405,7 @@ void FCHBA::loadAdapters(vector<HBA*> &list) {
 		"Buffer too small for number of HBAs. Retrying.");
 	    size = pathList->numAdapters;
 	    retry = true;
-	    delete (pathList);
+	    delete[] (pathList);
 	}
     } while (retry);
 
@@ -419,23 +419,23 @@ void FCHBA::loadAdapters(vector<HBA*> &list) {
 	} catch (BusyException &e) {
             sleep(1);
             if (times++ > EXCPT_RETRY_COUNT) {
-                i++; 
+                i++;
                 times = 0;
             }
 	    continue;
 	} catch (TryAgainException &e) {
 	    sleep(1);
 	    if (times++ > EXCPT_RETRY_COUNT) {
-		i++; 
+		i++;
 		times = 0;
-	    }  
+	    }
 	    continue;
 	} catch (UnavailableException &e) {
 	    sleep(1);
 	    if (times++ > EXCPT_RETRY_COUNT) {
-		i++; 
+		i++;
 		times = 0;
-	    }  
+	    }
 	    continue;
 	} catch (HBAException &e) {
 	    i++;
@@ -445,9 +445,9 @@ void FCHBA::loadAdapters(vector<HBA*> &list) {
 	}
     }
     if (pathList->numAdapters > HBAList::HBA_MAX_PER_LIST) {
-	delete(pathList);
+	delete[](pathList);
 	throw InternalError(
 	    "Exceeds max number of adapters that VSL supports.");
     }
-    delete (pathList);
+    delete[] (pathList);
 }

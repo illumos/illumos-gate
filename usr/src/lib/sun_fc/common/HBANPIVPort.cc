@@ -82,7 +82,7 @@ string HBANPIVPort::lookupControllerPath(string path) {
 		string tmp = "Unable to open ";
 		tmp += dir;
 		tmp += "to find controller number.";
-		delete (dir_buf);
+		delete[] (dir_buf);
 		throw IOError(tmp);
 	}
 
@@ -101,14 +101,14 @@ string HBANPIVPort::lookupControllerPath(string path) {
 				cfg_path += "/";
 				cfg_path += dirp->d_name;
 				closedir(dp);
-				delete (dir_buf);
+				delete[] (dir_buf);
 				return (cfg_path);
 			}
 		}
 	}
 
- 	closedir(dp);
-	delete (dir_buf);
+	closedir(dp);
+	delete[] (dir_buf);
 	throw InternalError("Unable to find controller path");
 }
 
