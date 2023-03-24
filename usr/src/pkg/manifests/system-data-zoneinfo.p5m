@@ -14,10 +14,11 @@
 # Copyright (c) 2014 Joyent, Inc. All rights reserved.
 # Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2023 Oxide Computer Company
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2022.6,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2023.2,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Timezone Information"
 set name=pkg.description value="timezone information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -129,6 +130,7 @@ file path=usr/share/lib/zoneinfo/America/Cayenne
 hardlink path=usr/share/lib/zoneinfo/America/Cayman target=Panama
 file path=usr/share/lib/zoneinfo/America/Chicago
 file path=usr/share/lib/zoneinfo/America/Chihuahua
+file path=usr/share/lib/zoneinfo/America/Ciudad_Juarez
 hardlink path=usr/share/lib/zoneinfo/America/Coral_Harbour target=Panama
 hardlink path=usr/share/lib/zoneinfo/America/Cordoba target=Argentina/Cordoba
 file path=usr/share/lib/zoneinfo/America/Costa_Rica
@@ -218,7 +220,7 @@ file path=usr/share/lib/zoneinfo/America/North_Dakota/New_Salem
 file path=usr/share/lib/zoneinfo/America/Nuuk
 file path=usr/share/lib/zoneinfo/America/Ojinaga
 file path=usr/share/lib/zoneinfo/America/Panama
-file path=usr/share/lib/zoneinfo/America/Pangnirtung
+hardlink path=usr/share/lib/zoneinfo/America/Pangnirtung target=Iqaluit
 file path=usr/share/lib/zoneinfo/America/Paramaribo
 file path=usr/share/lib/zoneinfo/America/Phoenix
 file path=usr/share/lib/zoneinfo/America/Port-au-Prince
@@ -260,7 +262,7 @@ hardlink path=usr/share/lib/zoneinfo/America/Virgin target=Puerto_Rico
 file path=usr/share/lib/zoneinfo/America/Whitehorse
 file path=usr/share/lib/zoneinfo/America/Winnipeg
 file path=usr/share/lib/zoneinfo/America/Yakutat
-file path=usr/share/lib/zoneinfo/America/Yellowknife
+hardlink path=usr/share/lib/zoneinfo/America/Yellowknife target=Edmonton
 dir  path=usr/share/lib/zoneinfo/Antarctica
 file path=usr/share/lib/zoneinfo/Antarctica/Casey
 file path=usr/share/lib/zoneinfo/Antarctica/Davis
