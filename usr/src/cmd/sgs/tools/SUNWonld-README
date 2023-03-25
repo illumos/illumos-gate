@@ -1694,3 +1694,5 @@ Bugid   Risk Synopsis
 14822	Need new word of hardware capabilities
 15361	ld doesn't fill out PT_DYNAMIC sufficiently for binutils 2.40
 15260	ld crashes if group members are stripped by -s
+15515	ld accepts nonsensical arguments
+15516	LD_ALTEXEC parsing is too restrictive
