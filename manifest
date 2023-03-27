@@ -11466,6 +11466,7 @@ f usr/share/lib/zoneinfo/America/Cayenne 0644 root bin
 h usr/share/lib/zoneinfo/America/Cayman=usr/share/lib/zoneinfo/America/Panama
 f usr/share/lib/zoneinfo/America/Chicago 0644 root bin
 f usr/share/lib/zoneinfo/America/Chihuahua 0644 root bin
+f usr/share/lib/zoneinfo/America/Ciudad_Juarez 0644 root bin
 h usr/share/lib/zoneinfo/America/Coral_Harbour=usr/share/lib/zoneinfo/America/Panama
 h usr/share/lib/zoneinfo/America/Cordoba=usr/share/lib/zoneinfo/America/Argentina/Cordoba
 f usr/share/lib/zoneinfo/America/Costa_Rica 0644 root bin
@@ -11552,7 +11553,7 @@ f usr/share/lib/zoneinfo/America/North_Dakota/New_Salem 0644 root bin
 f usr/share/lib/zoneinfo/America/Nuuk 0644 root bin
 f usr/share/lib/zoneinfo/America/Ojinaga 0644 root bin
 f usr/share/lib/zoneinfo/America/Panama 0644 root bin
-f usr/share/lib/zoneinfo/America/Pangnirtung 0644 root bin
+h usr/share/lib/zoneinfo/America/Pangnirtung=usr/share/lib/zoneinfo/America/Iqaluit
 f usr/share/lib/zoneinfo/America/Paramaribo 0644 root bin
 f usr/share/lib/zoneinfo/America/Phoenix 0644 root bin
 f usr/share/lib/zoneinfo/America/Port-au-Prince 0644 root bin
@@ -11594,7 +11595,7 @@ h usr/share/lib/zoneinfo/America/Virgin=usr/share/lib/zoneinfo/America/Puerto_Ri
 f usr/share/lib/zoneinfo/America/Whitehorse 0644 root bin
 f usr/share/lib/zoneinfo/America/Winnipeg 0644 root bin
 f usr/share/lib/zoneinfo/America/Yakutat 0644 root bin
-f usr/share/lib/zoneinfo/America/Yellowknife 0644 root bin
+h usr/share/lib/zoneinfo/America/Yellowknife=usr/share/lib/zoneinfo/America/Edmonton
 d usr/share/lib/zoneinfo/Antarctica 0755 root bin
 f usr/share/lib/zoneinfo/Antarctica/Casey 0644 root bin
 f usr/share/lib/zoneinfo/Antarctica/Davis 0644 root bin
