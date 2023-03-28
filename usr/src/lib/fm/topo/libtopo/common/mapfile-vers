@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2023 Oxide Computer Company
 #
 
 #
@@ -207,6 +208,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_prop_setmutable;
 	topo_prop_setnonvolatile;
 	topo_name2stability;
+	topo_scheme_walk;
 	topo_sensor_state_name;
 	topo_sensor_type_name;
 	topo_sensor_units_name;

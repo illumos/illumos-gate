@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -795,4 +796,38 @@ di_prom_handle_t
 topo_hdl_prominfo(topo_hdl_t *thp)
 {
 	return (thp == NULL ? DI_PROM_HANDLE_NIL : thp->th_pi);
+}
+
+int
+topo_scheme_walk(topo_hdl_t *thp, topo_scheme_walk_cb_f cb, void *arg)
+{
+	for (ttree_t *tp = topo_list_next(&thp->th_trees); tp != NULL;
+	    tp = topo_list_next(tp)) {
+		int ret;
+		topo_scheme_info_t info;
+
+		info.tsi_scheme = tp->tt_scheme;
+		info.tsi_type = TOPO_SCHEME_TREE;
+
+		ret = cb(thp, &info, arg);
+		if (ret != TOPO_WALK_NEXT) {
+			return (ret);
+		}
+	}
+
+	for (topo_digraph_t *tdg = topo_list_next(&thp->th_digraphs);
+	    tdg != NULL; tdg = topo_list_next(tdg)) {
+		int ret;
+		topo_scheme_info_t info;
+
+		info.tsi_scheme = tdg->tdg_scheme;
+		info.tsi_type = TOPO_SCHEME_DIGRAPH;
+
+		ret = cb(thp, &info, arg);
+		if (ret != TOPO_WALK_NEXT) {
+			return (ret);
+		}
+	}
+
+	return (TOPO_WALK_TERMINATE);
 }
