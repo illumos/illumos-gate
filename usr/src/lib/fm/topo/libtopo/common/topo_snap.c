@@ -103,6 +103,57 @@ set_open_errno(topo_hdl_t *thp, int *errp, int err)
 	return (NULL);
 }
 
+/*
+ * Set the product name for the topo handle. There are three things that we will
+ * use here in the following order:
+ *
+ * 1) See if SMBIOS gives us a product string that is usable.
+ * 2) Use the root devinfo node's name if we can get a snapshot. This may be the
+ *    same as the uname -i aka th_platform on most systems, but on some it will
+ *    be more specific. In particular this happens if we have a platform-wide
+ *    unix but end up having machine/implementation knowledge without a
+ *    machine/implementation-specific unix.
+ * 3) We fall back like we have historically to the platform name.
+ */
+static void
+topo_hdl_set_product(topo_hdl_t *thp)
+{
+	smbios_hdl_t *shp;
+	di_node_t root;
+	id_t id;
+
+	thp->th_product = NULL;
+	if ((shp = smbios_open(NULL, SMB_VERSION, 0, NULL)) != NULL) {
+		smbios_system_t s1;
+		smbios_info_t s2;
+
+		if ((id = smbios_info_system(shp, &s1)) != SMB_ERR &&
+		    smbios_info_common(shp, id, &s2) != SMB_ERR) {
+
+			if (strcmp(s2.smbi_product, SMB_DEFAULT1) != 0 &&
+			    strcmp(s2.smbi_product, SMB_DEFAULT2) != 0) {
+				thp->th_product = topo_cleanup_auth_str(thp,
+				    (char *)s2.smbi_product);
+			}
+		}
+		smbios_close(shp);
+	}
+
+	if (thp->th_product != NULL)
+		return;
+
+	root = di_init("/", DINFOCACHE);
+	if (root != DI_NODE_NIL) {
+		thp->th_product = topo_hdl_strdup(thp, di_node_name(root));
+		di_fini(root);
+	}
+
+	if (thp->th_product != NULL)
+		return;
+
+	thp->th_product = topo_hdl_strdup(thp, thp->th_platform);
+}
+
 topo_hdl_t *
 topo_open(int version, const char *rootdir, int *errp)
 {
@@ -113,11 +164,6 @@ topo_open(int version, const char *rootdir, int *errp)
 	char isa[MAXNAMELEN];
 	struct utsname uts;
 	struct stat st;
-
-	smbios_hdl_t *shp;
-	smbios_system_t s1;
-	smbios_info_t s2;
-	id_t id;
 
 	char *dbflags, *dbout;
 
@@ -182,23 +228,11 @@ topo_open(int version, const char *rootdir, int *errp)
 	thp->th_platform = topo_hdl_strdup(thp, platform);
 	thp->th_isa = topo_hdl_strdup(thp, isa);
 	thp->th_machine = topo_hdl_strdup(thp, uts.machine);
-	if ((shp = smbios_open(NULL, SMB_VERSION, 0, NULL)) != NULL) {
-		if ((id = smbios_info_system(shp, &s1)) != SMB_ERR &&
-		    smbios_info_common(shp, id, &s2) != SMB_ERR) {
-
-			if (strcmp(s2.smbi_product, SMB_DEFAULT1) != 0 &&
-			    strcmp(s2.smbi_product, SMB_DEFAULT2) != 0) {
-				thp->th_product = topo_cleanup_auth_str(thp,
-				    (char *)s2.smbi_product);
-			}
-		}
-		smbios_close(shp);
-	} else {
-		thp->th_product = topo_hdl_strdup(thp, thp->th_platform);
-	}
+	topo_hdl_set_product(thp);
 
 	if (thp->th_rootdir == NULL || thp->th_platform == NULL ||
-	    thp->th_machine == NULL)
+	    thp->th_machine == NULL || thp->th_product == NULL ||
+	    thp->th_isa == NULL)
 		return (set_open_errno(thp, errp, ETOPO_NOMEM));
 
 	dbflags	 = getenv("TOPO_DEBUG");
