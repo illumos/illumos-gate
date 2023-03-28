@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _ZEN_UMC_H
@@ -98,6 +98,21 @@ extern "C" {
 #define	ZEN_UMC_MAX_CHAN_BANK_HASH	5
 #define	ZEN_UMC_MAX_CHAN_RM_HASH	3
 #define	ZEN_UMC_MAX_CHAN_CS_HASH	2
+
+/*
+ * A sentinel to indicate we were unable to determine a frequency or transfer
+ * rate.
+ */
+#define	ZEN_UMC_UNKNOWN_FREQ	0
+
+/*
+ * This is the number of memory P-states that the UMC supports. This appears to
+ * be the same across all Zen Family processors. While there are ways to see the
+ * current P-state, it is hard to really know when these transitions occur. We
+ * simply grab all of the speed and configuration information with them when we
+ * discover it.
+ */
+#define	ZEN_UMC_NMEM_PSTATES	4
 
 /*
  * This is the logical set of different channel interleaving rules that we
@@ -287,18 +302,16 @@ typedef struct umc_cs {
  * When we come back and add topo glue for the driver, we should consider adding
  * the following information here and in the channel:
  *
- *  o Configured DIMM speed
  *  o Channel capable speed
- *  o Calculated size
  *  o A way to map this DIMM to an SMBIOS / SPD style entry
  */
 typedef struct umc_dimm {
 	umc_dimm_flags_t	ud_flags;
 	umc_dimm_width_t	ud_width;
-	umc_dimm_type_t		ud_type;
 	umc_dimm_kind_t		ud_kind;
 	uint32_t		ud_dimmno;
 	uint32_t		ud_dimmcfg_raw;
+	uint64_t		ud_dimm_size;
 	umc_cs_t		ud_cs[ZEN_UMC_MAX_CS_PER_DIMM];
 } umc_dimm_t;
 
@@ -372,6 +385,18 @@ typedef struct zen_umc_chan {
 	uint32_t		chan_umccap_hi_raw;
 	uint32_t		chan_np2_raw;
 	uint32_t		chan_np2_space0;
+	/*
+	 * These have the clock and speed of the channel in MHz and MT/s
+	 * respectively. These are not always a 1:2 ratio. See the definition
+	 * and discussion around D_UMC_DRAMCFG. Note, the channel's speed may
+	 * not be the maximum supported speed of a DIMM itself. That requires
+	 * going into the SPD data on Zen, the UMC doesn't track it because it
+	 * doesn't matter to it. There is one of these for each memory P-state.
+	 */
+	uint32_t		chan_dramcfg_raw[ZEN_UMC_NMEM_PSTATES];
+	uint32_t		chan_clock[ZEN_UMC_NMEM_PSTATES];
+	uint32_t		chan_speed[ZEN_UMC_NMEM_PSTATES];
+	umc_dimm_type_t		chan_type;
 	df_dram_rule_t		chan_rules[ZEN_UMC_MAX_CS_RULES];
 	chan_offset_t		chan_offsets[ZEN_UMC_MAX_DRAM_OFFSET];
 	umc_dimm_t		chan_dimms[ZEN_UMC_MAX_DIMMS];
@@ -414,8 +439,25 @@ typedef struct zen_umc_df {
 } zen_umc_df_t;
 
 typedef enum zen_umc_umc_style {
+	/*
+	 * These are UMCs that generally implement the basic DDR4 UMC found in
+	 * Zen 1-3 systems. The APU variant does not support multiple banks.
+	 */
 	ZEN_UMC_UMC_S_DDR4,
 	ZEN_UMC_UMC_S_DDR4_APU,
+	/*
+	 * This represents a slightly different UMC design that exists in Van
+	 * Gogh and Mendocino. In particular, it primarily supports LPDDR5 but
+	 * is an extension of the DDR4 UMC in some respects such as the
+	 * DramConfiguration register, but otherwise looks more like the DDR5
+	 * case.
+	 */
+	ZEN_UMC_UMC_S_HYBRID_LPDDR5,
+	/*
+	 * These are UMCs that generally implement the basic DDR5 UMC found in
+	 * Zen 4+ (and other) systems. The APU variant does not support multiple
+	 * banks.
+	 */
 	ZEN_UMC_UMC_S_DDR5,
 	ZEN_UMC_UMC_S_DDR5_APU
 } zen_umc_umc_style_t;
