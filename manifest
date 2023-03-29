@@ -1413,8 +1413,8 @@ f lib/amd64/libzdoor.so.1 0755 root bin
 s lib/amd64/libzdoor.so=libzdoor.so.1
 f lib/amd64/libzfs.so.1 0755 root bin
 s lib/amd64/libzfs.so=libzfs.so.1
-s lib/amd64/libzfs_core.so.1=../../usr/lib/amd64/libzfs_core.so.1
-s lib/amd64/libzfs_core.so=../../usr/lib/amd64/libzfs_core.so
+f lib/amd64/libzfs_core.so.1 0755 root bin
+s lib/amd64/libzfs_core.so=libzfs_core.so.1
 f lib/amd64/libzutil.so.1 0755 root bin
 s lib/amd64/libzutil.so=libzutil.so.1
 f lib/amd64/nss_compat.so.1 0755 root bin
@@ -1621,8 +1621,8 @@ f lib/libzdoor.so.1 0755 root bin
 s lib/libzdoor.so=libzdoor.so.1
 f lib/libzfs.so.1 0755 root bin
 s lib/libzfs.so=libzfs.so.1
-s lib/libzfs_core.so.1=../usr/lib/libzfs_core.so
-s lib/libzfs_core.so=../usr/lib/libzfs_core.so
+f lib/libzfs_core.so.1 0755 root bin
+s lib/libzfs_core.so=libzfs_core.so.1
 f lib/libzutil.so.1 0755 root bin
 s lib/libzutil.so=libzutil.so.1
 d lib/mpxio 0755 root bin
@@ -5555,8 +5555,8 @@ s usr/lib/amd64/libzdoor.so.1=../../../lib/amd64/libzdoor.so.1
 s usr/lib/amd64/libzdoor.so=../../../lib/amd64/libzdoor.so.1
 s usr/lib/amd64/libzfs.so.1=../../../lib/amd64/libzfs.so.1
 s usr/lib/amd64/libzfs.so=../../../lib/amd64/libzfs.so.1
-f usr/lib/amd64/libzfs_core.so.1 0755 root bin
-s usr/lib/amd64/libzfs_core.so=libzfs_core.so.1
+s usr/lib/amd64/libzfs_core.so.1=../../../lib/amd64/libzfs_core.so.1
+s usr/lib/amd64/libzfs_core.so=../../../lib/amd64/libzfs_core.so.1
 f usr/lib/amd64/libzfs_jni.so.1 0755 root bin
 s usr/lib/amd64/libzfs_jni.so=libzfs_jni.so.1
 f usr/lib/amd64/libzonecfg.so.1 0755 root bin
@@ -7076,8 +7076,8 @@ s usr/lib/libzdoor.so.1=../../lib/libzdoor.so.1
 s usr/lib/libzdoor.so=../../lib/libzdoor.so.1
 s usr/lib/libzfs.so.1=../../lib/libzfs.so.1
 s usr/lib/libzfs.so=../../lib/libzfs.so.1
-f usr/lib/libzfs_core.so.1 0755 root bin
-s usr/lib/libzfs_core.so=libzfs_core.so.1
+s usr/lib/libzfs_core.so.1=../../lib/libzfs_core.so.1
+s usr/lib/libzfs_core.so=../../lib/libzfs_core.so.1
 f usr/lib/libzfs_jni.so.1 0755 root bin
 s usr/lib/libzfs_jni.so=libzfs_jni.so.1
 f usr/lib/libzonecfg.so.1 0755 root bin
