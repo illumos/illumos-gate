@@ -2,33 +2,6 @@
 #ifndef _def_aso_ast
 #define _def_aso_ast	1
 #define _sys_types	1	/* #include <sys/types.h> ok */
-
-/*
- * This is horrible, but since SmartOS still compiles with gcc4 in its
- * Jenkins pipeline (and for building modern smartos on older systems),
- * we need to use sparc-style workaround for the illumos gcc4 compiler.
- */
-#if defined (__GNUC__) && (__GNUC__ == 4)
-/* <atomic.h> atomic_cas_64 */
-#include <atomic.h>
-#define _aso_cas8(p,o,n)	atomic_cas_8(p,o,n)
-#define _aso_inc8(p)		(atomic_add_8_nv(p,1)-1)
-#define _aso_dec8(p)		(atomic_add_8_nv(p,-1)+1)
-#define _aso_cas16(p,o,n)	atomic_cas_16(p,o,n)
-#define _aso_inc16(p)		(atomic_add_16_nv(p,1)-1)
-#define _aso_dec16(p)		(atomic_add_16_nv(p,-1)+1)
-#define _aso_cas32(p,o,n)	atomic_cas_32(p,o,n)
-#define _aso_inc32(p)		(atomic_add_32_nv(p,1)-1)
-#define _aso_dec32(p)		(atomic_add_32_nv(p,-1)+1)
-#define _aso_cas64(p,o,n)	atomic_cas_64(p,o,n)
-#define _aso_inc64(p)		(atomic_add_64_nv(p,1)-1)
-#define _aso_dec64(p)		(atomic_add_64_nv(p,-1)+1)
-#if _ast_sizeof_pointer == 8
-#define _aso_casptr(p,o,n)	((void*)atomic_cas_64((uint64_t*)p,(uint64_t)o,(uint64_t)n))
-#else
-#define _aso_casptr(p,o,n)	((void*)atomic_cas_32((uint32_t*)p,(uint32_t)o,(uint32_t)n))
-#endif
-#else /* illumos-gcc4 */
 /* gcc 4.1+ 64 bit memory atomic operations model */
 #define _aso_cas8(p,o,n)	__sync_val_compare_and_swap(p,o,n)
 #define _aso_inc8(p)		__sync_fetch_and_add(p,1)
@@ -47,6 +20,5 @@
 #else
 #define _aso_casptr(p,o,n)	((void*)__sync_val_compare_and_swap(p,(uint32_t)o,(uint32_t)n))
 #endif
-#endif /* illumos-gcc4 */
 
 #endif
