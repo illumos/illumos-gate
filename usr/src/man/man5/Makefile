@@ -108,6 +108,7 @@ _MANFILES=	Intro.5				\
 		magic.5				\
 		mailer.conf.5			\
 		mech.5				\
+		menu.lst.5				\
 		mnttab.5			\
 		mpapi.conf.5			\
 		ndmp.5				\

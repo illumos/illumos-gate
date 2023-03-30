@@ -5,11 +5,10 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2016 Toomas Soome <tsoome@me.com>
 .\" Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
-.TH BOOTADM 8 "Jul 05, 2018"
+.TH BOOTADM 8 "March 30, 2023"
 .SH NAME
 bootadm \- manage bootability of the operating system
 .SH SYNOPSIS
-.LP
 .nf
 \fB/sbin/bootadm\fR update-archive [\fB-vnf\fR] [\fB-R\fR \fIaltroot\fR [\fB-p\fR \fIplatform\fR]]
      [\fB-F \fIformat\fR]
@@ -41,7 +40,6 @@ bootadm \- manage bootability of the operating system
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBbootadm\fR command manages the boot archive and, with x86 boot
 environments, the boot loader menu. The
 \fBupdate-archive\fR option provides a way for user to update the boot archive
@@ -79,7 +77,6 @@ The \fBbootadm\fR command determines dynamically the options supported by the
 image to be managed, so that \fBbootadm\fR invoked on one platform can be used
 to manage diskless clients of a different platform type.
 .SH SUBCOMMANDS
-.LP
 The \fBbootadm\fR command has the following subcommands:
 .sp
 .ne 2
@@ -224,7 +221,6 @@ title of each entry. Applies to x86 platforms only.
 .RE
 
 .SH OPTIONS
-.LP
 The \fBbootadm\fR command has the following options:
 
 .sp
@@ -386,7 +382,6 @@ item number is booted. If the value is -1, auto boot is disabled.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUpdating the Current Boot Archive
 .sp
 .LP
@@ -501,7 +496,6 @@ Status:      Load
 .in -2
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -524,7 +518,6 @@ The command exited due to an error.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -539,7 +532,7 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
+.BR menu.lst (5),
 .BR attributes (7),
 .BR beadm (8),
 .BR boot (8),
