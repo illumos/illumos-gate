@@ -82,9 +82,6 @@ CSTD = $(CSTD_GNU99)
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS += -D_POSIX_PTHREAD_SEMANTICS
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
-CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-switch
-CERRWARN += -_gcc=-Wno-parentheses
 
 $(DYNLIB)  := LDLIBS += \
 	-lnvpair -lelf -lumem -lxml2 -lkstat -luuid -ldevinfo \

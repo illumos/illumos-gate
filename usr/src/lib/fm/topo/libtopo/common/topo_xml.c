@@ -215,7 +215,7 @@ static int
 xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
     const char *name)
 {
-	int rv;
+	int rv = 0;
 	uint64_t ui;
 	double dbl;
 	uint_t i = 0, nelems = 0;
@@ -407,6 +407,12 @@ xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
 		    nelems);
 		topo_mod_free(mp, nvlarrbuf, (nelems * sizeof (nvlist_t *)));
 		break;
+	default:
+		/*
+		 * Invalid types were handled in the switch statement above
+		 * this. Items in this case don't need additional processing.
+		 */
+		break;
 	}
 
 	if (rv != 0) {
@@ -574,6 +580,7 @@ prop_create(topo_mod_t *mp,
 		break;
 	default:
 		e = ETOPO_PRSR_BADTYPE;
+		break;
 	}
 	if (e != 0) {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
@@ -625,6 +632,9 @@ prop_create(topo_mod_t *mp,
 	case TOPO_TYPE_FMRI_ARRAY:
 		e = topo_prop_set_fmri_array(ptn, gnm, pnm, flag,
 		    (const nvlist_t **)fmriarr, nelem, &err);
+		break;
+	default:
+		e = ETOPO_PRSR_BADTYPE;
 		break;
 	}
 	if (e != 0 && err != ETOPO_PROP_DEFD) {
@@ -1170,8 +1180,9 @@ static int
 pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
     tf_pad_t **rpad)
 {
-	xmlNodePtr cn, gcn, psn, ecn, target;
-	xmlNodePtr def_set = NULL;
+	xmlNodePtr cn, gcn, psn, target;
+	/* Explicitly initialize ecn to help -Wmaybe-unit */
+	xmlNodePtr def_set = NULL, ecn = NULL;
 	tnode_t *ct;
 	tf_pad_t *new = *rpad;
 	tf_rdata_t tmp_rd;

@@ -129,7 +129,7 @@ sw_fmri_create(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
 	nvlist_t *args, *fmri = NULL, *obj = NULL, *site = NULL, *ctxt = NULL;
-	topo_mod_errno_t moderr;
+	topo_mod_errno_t moderr = 0;
 	int err = 0;
 
 	char *obj_path, *obj_root;
