@@ -186,11 +186,11 @@ dam_map_alloc(dam_t *mapp)
 
 	if (ddi_strid_init(&mapp->dam_addr_hash, mapp->dam_size) !=
 	    DDI_SUCCESS) {
-		ddi_soft_state_fini(softstate_p);
+		ddi_soft_state_fini(&softstate_p);
 		return (DAM_FAILURE);
 	}
 	if (dam_kstat_create(mapp) != DDI_SUCCESS) {
-		ddi_soft_state_fini(softstate_p);
+		ddi_soft_state_fini(&softstate_p);
 		ddi_strid_fini(&mapp->dam_addr_hash);
 		return (DAM_FAILURE);
 	}
