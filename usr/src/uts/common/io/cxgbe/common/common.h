@@ -580,6 +580,7 @@ int t4_slow_intr_handler(struct adapter *adapter);
 int t4_hash_mac_addr(const u8 *addr);
 
 unsigned int t4_link_fwcap_to_speed(fw_port_cap32_t caps);
+fw_port_cap32_t t4_link_fwcap_to_fwspeed(fw_port_cap32_t acaps);
 int t4_link_set_autoneg(struct port_info *pi, u8 autoneg,
 			fw_port_cap32_t *new_caps);
 int t4_link_set_pause(struct port_info *pi, cc_pause_t pause,

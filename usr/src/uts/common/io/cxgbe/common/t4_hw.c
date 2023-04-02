@@ -8877,7 +8877,7 @@ unsigned int t4_link_fwcap_to_speed(fw_port_cap32_t caps)
  *	Capabilities.  It will be either the highest speed from the list of
  *	speeds or whatever user has set using ethtool.
  */
-static fw_port_cap32_t t4_link_fwcap_to_fwspeed(fw_port_cap32_t acaps)
+fw_port_cap32_t t4_link_fwcap_to_fwspeed(fw_port_cap32_t acaps)
 {
 	#define TEST_SPEED_RETURN(__caps_speed) \
 		do { \

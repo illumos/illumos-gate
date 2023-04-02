@@ -22,7 +22,7 @@
 
 /*
  * Copyright 2020 RackTop Systems, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/ddi.h>
@@ -113,6 +113,202 @@ char *t4_priv_props[] = {
 	T4PROP_RX_PAUSE,
 	NULL
 };
+
+/*
+ * To determine the actual Ethernet mode that we're in we need to look at the
+ * port type. That will tell us whether we're using a BASE-T PHY, have an
+ * external SFP connection whose module type we also need to use to qualify
+ * this, and then the link speed itself. Combining that tuple we can then get
+ * the current media.
+ *
+ * Our tables below assume we have gotten it down so the last thing we need to
+ * consider is a single speed. If port types end up supporting the same class of
+ * transceiver at a given speed, then this will need to be changed to use
+ * additional information to disambiguate that (which will require additional
+ * logic from the firmware).
+ */
+typedef struct {
+	fw_port_cap32_t tmm_speed;
+	mac_ether_media_t tmm_ether;
+} t4nex_media_map_t;
+
+static const t4nex_media_map_t t4nex_map_baset[] = {
+	/*
+	 * We're assuming that the 100 Mb/s mode is 100BASE-TX. It's hard to say
+	 * for certain what the phy would have done, but given the rest of the
+	 * market, that seems the most likely one.
+	 */
+	{ FW_PORT_CAP32_SPEED_100M, ETHER_MEDIA_100BASE_TX },
+	{ FW_PORT_CAP32_SPEED_1G, ETHER_MEDIA_1000BASE_T },
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_T }
+};
+
+static const t4nex_media_map_t t4nex_map_kx[] = {
+	{ FW_PORT_CAP32_SPEED_1G, ETHER_MEDIA_1000BASE_KX },
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_KX4 }
+};
+
+static const t4nex_media_map_t t4nex_map_cx[] = {
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_CX4 }
+};
+
+static const t4nex_media_map_t t4nex_map_kr[] = {
+	{ FW_PORT_CAP32_SPEED_1G, ETHER_MEDIA_1000BASE_KX },
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_KR },
+	{ FW_PORT_CAP32_SPEED_25G, ETHER_MEDIA_25GBASE_KR },
+	{ FW_PORT_CAP32_SPEED_40G, ETHER_MEDIA_40GBASE_KR4 },
+	{ FW_PORT_CAP32_SPEED_50G, ETHER_MEDIA_50GBASE_KR2 },
+	{ FW_PORT_CAP32_SPEED_100G, ETHER_MEDIA_100GBASE_KR4 },
+};
+
+static const t4nex_media_map_t t4nex_map_lr[] = {
+	{ FW_PORT_CAP32_SPEED_1G, ETHER_MEDIA_1000BASE_LX },
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_LR },
+	{ FW_PORT_CAP32_SPEED_25G, ETHER_MEDIA_25GBASE_LR },
+	{ FW_PORT_CAP32_SPEED_40G, ETHER_MEDIA_40GBASE_LR4 },
+	{ FW_PORT_CAP32_SPEED_50G, ETHER_MEDIA_50GBASE_LR2 },
+	{ FW_PORT_CAP32_SPEED_100G, ETHER_MEDIA_100GBASE_LR4 },
+};
+
+static const t4nex_media_map_t t4nex_map_sr[] = {
+	{ FW_PORT_CAP32_SPEED_1G, ETHER_MEDIA_1000BASE_SX },
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_SR },
+	{ FW_PORT_CAP32_SPEED_25G, ETHER_MEDIA_25GBASE_SR },
+	{ FW_PORT_CAP32_SPEED_40G, ETHER_MEDIA_40GBASE_SR4 },
+	{ FW_PORT_CAP32_SPEED_50G, ETHER_MEDIA_50GBASE_SR2 },
+	{ FW_PORT_CAP32_SPEED_100G, ETHER_MEDIA_100GBASE_SR4 },
+};
+
+static const t4nex_media_map_t t4nex_map_er[] = {
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_ER },
+	{ FW_PORT_CAP32_SPEED_25G, ETHER_MEDIA_25GBASE_ER },
+	{ FW_PORT_CAP32_SPEED_40G, ETHER_MEDIA_40GBASE_ER4 },
+	{ FW_PORT_CAP32_SPEED_100G, ETHER_MEDIA_100GBASE_ER4 },
+};
+
+static const t4nex_media_map_t t4nex_map_cr[] = {
+	{ FW_PORT_CAP32_SPEED_1G, ETHER_MEDIA_1000BASE_CX },
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_CR },
+	{ FW_PORT_CAP32_SPEED_25G, ETHER_MEDIA_25GBASE_CR },
+	{ FW_PORT_CAP32_SPEED_40G, ETHER_MEDIA_40GBASE_CR4 },
+	{ FW_PORT_CAP32_SPEED_50G, ETHER_MEDIA_50GBASE_CR2 },
+	{ FW_PORT_CAP32_SPEED_100G, ETHER_MEDIA_100GBASE_CR4 },
+};
+
+static const t4nex_media_map_t t4nex_map_acc[] = {
+	{ FW_PORT_CAP32_SPEED_1G, ETHER_MEDIA_1000BASE_CX },
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_ACC },
+	{ FW_PORT_CAP32_SPEED_25G, ETHER_MEDIA_25GBASE_ACC },
+	{ FW_PORT_CAP32_SPEED_40G, ETHER_MEDIA_40GBASE_ACC4 },
+	{ FW_PORT_CAP32_SPEED_50G, ETHER_MEDIA_50GBASE_ACC2 },
+	{ FW_PORT_CAP32_SPEED_100G, ETHER_MEDIA_100GBASE_ACC4 },
+};
+
+static const t4nex_media_map_t t4nex_map_lrm[] = {
+	{ FW_PORT_CAP32_SPEED_10G, ETHER_MEDIA_10GBASE_LRM },
+};
+
+static mac_ether_media_t
+t4_port_to_media(struct port_info *pi)
+{
+	fw_port_cap32_t speed;
+	struct link_config *lc = &pi->link_cfg;
+	const t4nex_media_map_t *map = NULL;
+	size_t count = 0;
+
+	if (lc->link_ok != 0) {
+		speed = t4_link_fwcap_to_fwspeed(lc->link_caps);
+	} else {
+		return (ETHER_MEDIA_UNKNOWN);
+	}
+
+	switch (pi->port_type) {
+	case FW_PORT_TYPE_FIBER_XFI:
+	case FW_PORT_TYPE_FIBER_XAUI:
+	case FW_PORT_TYPE_SFP:
+	case FW_PORT_TYPE_QSFP_10G:
+	case FW_PORT_TYPE_QSA:
+	case FW_PORT_TYPE_QSFP:
+	case FW_PORT_TYPE_CR4_QSFP:
+	case FW_PORT_TYPE_CR_QSFP:
+	case FW_PORT_TYPE_CR2_QSFP:
+	case FW_PORT_TYPE_SFP28:
+		switch (pi->mod_type) {
+		case FW_PORT_MOD_TYPE_LR:
+			map = t4nex_map_lr;
+			count = ARRAY_SIZE(t4nex_map_lr);
+			break;
+		case FW_PORT_MOD_TYPE_SR:
+			map = t4nex_map_sr;
+			count = ARRAY_SIZE(t4nex_map_sr);
+			break;
+		case FW_PORT_MOD_TYPE_ER:
+			map = t4nex_map_er;
+			count = ARRAY_SIZE(t4nex_map_er);
+			break;
+		case FW_PORT_MOD_TYPE_TWINAX_PASSIVE:
+			map = t4nex_map_cr;
+			count = ARRAY_SIZE(t4nex_map_cr);
+			break;
+		case FW_PORT_MOD_TYPE_TWINAX_ACTIVE:
+			map = t4nex_map_acc;
+			count = ARRAY_SIZE(t4nex_map_acc);
+			break;
+		case FW_PORT_MOD_TYPE_LRM:
+			map = t4nex_map_lrm;
+			count = ARRAY_SIZE(t4nex_map_lrm);
+			break;
+		case FW_PORT_MOD_TYPE_ERROR:
+		case FW_PORT_MOD_TYPE_UNKNOWN:
+		case FW_PORT_MOD_TYPE_NOTSUPPORTED:
+		case FW_PORT_MOD_TYPE_NONE:
+		case FW_PORT_MOD_TYPE_NA:
+		default:
+			break;
+		}
+		break;
+	case FW_PORT_TYPE_KX4:
+	case FW_PORT_TYPE_KX:
+		map = t4nex_map_kx;
+		count = ARRAY_SIZE(t4nex_map_kx);
+		break;
+	case FW_PORT_TYPE_CX4:
+		map = t4nex_map_cx;
+		count = ARRAY_SIZE(t4nex_map_cx);
+		break;
+	case FW_PORT_TYPE_KR:
+	case FW_PORT_TYPE_BP_AP:
+	case FW_PORT_TYPE_BP4_AP:
+	case FW_PORT_TYPE_BP40_BA:
+	case FW_PORT_TYPE_KR4_100G:
+	case FW_PORT_TYPE_KR_SFP28:
+	case FW_PORT_TYPE_KR_XLAUI:
+		map = t4nex_map_kr;
+		count = ARRAY_SIZE(t4nex_map_kr);
+		break;
+	case FW_PORT_TYPE_BT_SGMII:
+	case FW_PORT_TYPE_BT_XFI:
+	case FW_PORT_TYPE_BT_XAUI:
+		map = t4nex_map_baset;
+		count = ARRAY_SIZE(t4nex_map_baset);
+		break;
+	case FW_PORT_TYPE_NONE:
+	default:
+		break;
+	}
+
+	for (size_t i = 0; i < count; i++) {
+		if (map[i].tmm_speed == speed) {
+			return (map[i].tmm_ether);
+		}
+	}
+
+	/*
+	 * At this point we return unknown as we already checked for a down link
+	 * earlier.
+	 */
+	return (ETHER_MEDIA_UNKNOWN);
+}
 
 static int
 t4_mc_getstat(void *arg, uint_t stat, uint64_t *val)
@@ -229,8 +425,10 @@ t4_mc_getstat(void *arg, uint_t stat, uint64_t *val)
 
 	case ETHER_STAT_XCVR_ADDR:
 	case ETHER_STAT_XCVR_ID:
-	case ETHER_STAT_XCVR_INUSE:
 		return (ENOTSUP);
+	case ETHER_STAT_XCVR_INUSE:
+		*val = t4_port_to_media(pi);
+		break;
 
 	case ETHER_STAT_CAP_100GFDX:
 		*val = !!(lc->pcaps & FW_PORT_CAP32_SPEED_100G);
@@ -1279,6 +1477,10 @@ t4_mc_getprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 	case MAC_PROP_STATUS:
 		*(link_state_t *)val = lc->link_ok ? LINK_STATE_UP :
 		    LINK_STATE_DOWN;
+		break;
+
+	case MAC_PROP_MEDIA:
+		*(mac_ether_media_t *)val = t4_port_to_media(pi);
 		break;
 
 	case MAC_PROP_AUTONEG:

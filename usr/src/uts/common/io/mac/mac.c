@@ -322,6 +322,8 @@
 #include <sys/cpupart.h>
 #include <inet/wifi_ioctl.h>
 #include <net/wpa.h>
+/* XXX this almost suggests moving the enum to sys/mac.h. */
+#include <sys/mac_ether.h>
 
 #define	IMPL_HASHSZ	67	/* prime */
 
@@ -3458,6 +3460,14 @@ mac_prop_check_size(mac_prop_id_t id, uint_t valsize, boolean_t is_range)
 	case MAC_PROP_VN_PROMISC_FILTERED:
 		minsize = sizeof (boolean_t);
 		break;
+	case MAC_PROP_MEDIA:
+		/*
+		 * Our assumption is that each class of device uses an enum and
+		 * that all enums will be the same size so it is OK to use a
+		 * single one.
+		 */
+		minsize = sizeof (mac_ether_media_t);
+		break;
 	}
 
 	return (valsize >= minsize);
@@ -3821,6 +3831,7 @@ mac_prop_info(mac_handle_t mh, mac_prop_id_t id, char *name,
 		return (0);
 
 	case MAC_PROP_STATUS:
+	case MAC_PROP_MEDIA:
 		if (perm != NULL)
 			*perm = MAC_PROP_PERM_READ;
 		return (0);

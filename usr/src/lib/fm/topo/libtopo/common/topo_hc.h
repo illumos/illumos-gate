@@ -305,6 +305,7 @@ extern "C" {
 #define	TOPO_PGROUP_DATALINK_LINK_DUPLEX_HALF	"half"
 #define	TOPO_PGROUP_DATALINK_LINK_DUPLEX_UNKNOWN	"unknown"
 #define	TOPO_PGROUP_DATALINK_LINK_NAME		"link-name"
+#define	TOPO_PGROUP_DATALINK_LINK_MEDIA		"link-media"
 
 #define	TOPO_PGROUP_NVME		"nvme-properties"
 #define	TOPO_PROP_NVME_VER		"nvme-version"
