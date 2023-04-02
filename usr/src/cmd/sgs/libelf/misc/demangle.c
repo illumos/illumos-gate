@@ -48,7 +48,7 @@
  * if (dm == NULL)
  *	printf("allocation error\n");
  * else if (dm == mn)
- * 	printf("name could not be demangled\n");
+ *	printf("name could not be demangled\n");
  * else
  *	printf("demangled name is: %s\n",dm);
  */
@@ -188,7 +188,8 @@ demangle(char *c)
 		 * automatically calls second, since
 		 * all operator functions are overloaded.
 		 */
-		if (x = findop(c, &oplen)) {
+		x = findop(c, &oplen);
+		if (x != NULL) {
 			s = app_String(s, MSG_ORIG(MSG_STR_OPERATOR_1));
 			s = app_String(s, x);
 			c += oplen;

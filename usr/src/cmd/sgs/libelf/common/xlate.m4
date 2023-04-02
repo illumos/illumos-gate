@@ -185,11 +185,11 @@ define(tomw, `(((((((Elf32_Word)($1)[$2`'3]<<8)
 		+($1)[$2`'2])<<8)
 		+($1)[$2`'1])<<8)
 		+($1)[$2`'0])')dnl
-define(toml, `(((((((((((Elf32_Lword)($1)[$2`'7]<<8)
-		+($1)[$2`'6]<<8)
-		+($1)[$2`'5]<<8)
-		+($1)[$2`'4]<<8)
-		+($1)[$2`'3]<<8)
+define(toml, `(((((((((((((((Elf32_Lword)($1)[$2`'7]<<8)
+		+($1)[$2`'6])<<8)
+		+($1)[$2`'5])<<8)
+		+($1)[$2`'4])<<8)
+		+($1)[$2`'3])<<8)
 		+($1)[$2`'2])<<8)
 		+($1)[$2`'1])<<8)
 		+($1)[$2`'0])')dnl
@@ -654,7 +654,7 @@ static const struct {
  */
 
 static const Elf_Type	mtype[EV_CURRENT][SHT_NUM] =
-{ 
+{
 	{			/* [1-1][.] */
 /* NULL */		ELF_T_BYTE,
 /* PROGBITS */		ELF_T_BYTE,
@@ -788,7 +788,7 @@ _elf32_entsz(Elf *elf, Elf32_Word shtype, unsigned ver)
 	Elf_Type	ttype;
 
 	ttype = _elf32_mtype(elf, shtype, ver);
-	return ((ttype == ELF_T_BYTE) ? 0 : fmsize[ver - 1][ttype].s_filesz); 
+	return ((ttype == ELF_T_BYTE) ? 0 : fmsize[ver - 1][ttype].s_filesz);
 }
 
 
@@ -1090,7 +1090,7 @@ static void
 $1(unsigned char *dst, Elf32_Nhdr *src, size_t cnt)
 {
 	/* LINTED */
-	Elf32_Nhdr 	*end = (Elf32_Nhdr *)((char *)src + cnt);
+	Elf32_Nhdr	*end = (Elf32_Nhdr *)((char *)src + cnt);
 
 	/*
 	 * Copy the note data to the source, translating the
@@ -1631,9 +1631,9 @@ $1(Elf32_Nhdr *dst, unsigned char *src, size_t cnt)
 	 * to guard against corrupt note data.
 	 */
 	 while (dst < end) {
-		Elf32_Nhdr 	*nhdr;
-		unsigned char 	*namestr;
-		void 		*desc;
+		Elf32_Nhdr	*nhdr;
+		unsigned char	*namestr;
+		void		*desc;
 		Elf32_Word	field_sz;
 
 		if ((offsetof(Elf32_Nhdr, n_namesz) + sizeof(Elf32_Word) +

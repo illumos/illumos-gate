@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <stdlib.h>
 #include <errno.h>
@@ -94,13 +94,13 @@ static Elf_Void *
 arsym(Byte *off, size_t sz, size_t *e, int is64)
 {
 	char		*endstr = (char *)off + sz;
-	register char	*str;
+	char		*str = NULL;
 	Byte		*endoff;
 	Elf_Void	*oas;
 	size_t		eltsize = is64 ? 8 : 4;
 
 	{
-		register size_t	n;
+		size_t	n;
 
 		if (is64) {
 			if (sz < 8 || (sz - 8) / 8 < (n = get8(off))) {
@@ -145,7 +145,7 @@ arsym(Byte *off, size_t sz, size_t *e, int is64)
 		}
 	}
 	{
-		register Elf_Arsym	*as = (Elf_Arsym *)oas;
+		Elf_Arsym	*as = (Elf_Arsym *)oas;
 
 		while (off < endoff) {
 			if (str >= endstr) {

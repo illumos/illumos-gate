@@ -70,9 +70,6 @@ MAPFILES =	$(SRCDIR)/common/mapfile-vers
 DYNFLAGS +=	$(VERSREF)
 LDLIBS +=	$(CONVLIBDIR) -lconv -lc
 
-CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	$(CNOWARN_UNINIT)
-
 SMOFF += indenting
 
 BLTDEFS=	msg.h
