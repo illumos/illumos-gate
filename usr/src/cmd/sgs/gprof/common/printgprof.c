@@ -561,11 +561,10 @@ sortchildren(nltype *parentp)
 	 */
 	sorted.arc_childlist = 0;
 
-	/* LINTED: warning: assignment operator */
-	for ((arcp = parentp->children) && (detachedp = arcp->arc_childlist);
-	    arcp;
-	    /* LINTED: warning: assignment operator */
-	    (arcp = detachedp) && (detachedp = detachedp->arc_childlist)) {
+	arcp = parentp->children;
+	if (arcp != NULL)
+		detachedp = arcp->arc_childlist;
+	while (arcp != NULL) {
 		/*
 		 *	consider *arcp as disconnected
 		 *	insert it into sorted
@@ -578,6 +577,10 @@ sortchildren(nltype *parentp)
 
 		arcp->arc_childlist = prevp->arc_childlist;
 		prevp->arc_childlist = arcp;
+
+		arcp = detachedp;
+		if (arcp != NULL)
+			detachedp = detachedp->arc_childlist;
 	}
 
 	/*
@@ -604,11 +607,10 @@ sortparents(nltype *childp)
 	 */
 	sorted.arc_parentlist = 0;
 
-	/* LINTED: warning: assignment operator */
-	for ((arcp = childp->parents) && (detachedp = arcp->arc_parentlist);
-	    arcp;
-	    /* LINTED: warning: assignment operator */
-	    (arcp = detachedp) && (detachedp = detachedp->arc_parentlist)) {
+	arcp = childp->parents;
+	if (arcp != NULL)
+		detachedp = arcp->arc_parentlist;
+	while (arcp != NULL) {
 		/*
 		 *	consider *arcp as disconnected
 		 *	insert it into sorted
@@ -620,6 +622,9 @@ sortparents(nltype *childp)
 		}
 		arcp->arc_parentlist = prevp->arc_parentlist;
 		prevp->arc_parentlist = arcp;
+		arcp = detachedp;
+		if (detachedp != NULL)
+			detachedp = detachedp->arc_parentlist;
 	}
 
 	/*
@@ -693,17 +698,19 @@ sortmembers(nltype *cyclep)
 	todo = cyclep->cnext;
 	cyclep->cnext = 0;
 
-	/* LINTED: warning: assignment operator */
-	for ((doing = todo) && (todo = doing->cnext);
-	    doing;
-	    /* LINTED: warning: assignment operator */
-	    (doing = todo) && (todo = doing->cnext)) {
+	doing = todo;
+	if (doing != NULL)
+		todo = doing->cnext;
+	while (doing != NULL) {
 		for (prev = cyclep; prev->cnext; prev = prev->cnext) {
 			if (membercmp(doing, prev->cnext) == GREATERTHAN)
 				break;
 		}
 		doing->cnext = prev->cnext;
 		prev->cnext = doing;
+		doing = todo;
+		if (doing != NULL)
+			todo = doing->cnext;
 	}
 }
 

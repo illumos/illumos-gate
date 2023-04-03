@@ -32,7 +32,7 @@
 #include	<string.h>
 #include	<sysexits.h>
 #include	<libelf.h>
-#include 	"gelf.h"
+#include	"gelf.h"
 
 #ifdef DEBUG
 static void	debug_dup_del(nltype *, nltype *);
@@ -107,7 +107,7 @@ save_aout_info(char *aoutname)
 
 	if (stat(aoutname, &buf) == -1) {
 		(void) fprintf(stderr, "%s: can't get info on `%s'\n",
-							whoami, aoutname);
+		    whoami, aoutname);
 		exit(EX_NOINPUT);
 	}
 
@@ -125,7 +125,7 @@ getnfile(char *aoutname)
 	DPRINTF(" Attempting to open %s  \n", aoutname);
 	if ((fd = open((aoutname), O_RDONLY)) == -1) {
 		(void) fprintf(stderr, "%s: can't open `%s'\n",
-							whoami, aoutname);
+		    whoami, aoutname);
 		exit(EX_NOINPUT);
 	}
 	process(aoutname, fd);
@@ -170,7 +170,7 @@ process_namelist(mod_info_t *module)
 
 	if ((fd = open(module->name, O_RDONLY)) == -1) {
 		(void) fprintf(stderr, "%s: can't read %s\n",
-							whoami, module->name);
+		    whoami, module->name);
 		(void) fprintf(stderr, "Exiting due to error(s)...\n");
 		exit(EX_NOINPUT);
 	}
@@ -219,7 +219,7 @@ process(char *filename, int fd)
 	modules.load_base = modules.txt_origin;
 	if ((modules.name = malloc(strlen(filename) + 1)) == NULL) {
 		(void) fprintf(stderr, "%s: can't malloc %d bytes",
-					    whoami, strlen(filename) + 1);
+		    whoami, strlen(filename) + 1);
 		exit(EX_UNAVAILABLE);
 	}
 	(void) strcpy(modules.name, filename);
@@ -290,7 +290,7 @@ static void
 debug_dup_del(nltype * keeper, nltype * louser)
 {
 	(void) printf("remove_dup_syms: discarding sym %s over sym %s\n",
-		louser->name, keeper->name);
+	    louser->name, keeper->name);
 }
 #endif /* DEBUG */
 
@@ -300,8 +300,8 @@ remove_dup_syms(nltype *nl, sztype *sym_count)
 	int	i;
 	int	index;
 	int	nextsym;
+	nltype *orig_list;
 
-	nltype *	orig_list;
 	if ((orig_list = malloc(sizeof (nltype) * *sym_count)) == NULL) {
 		(void) fprintf(stderr,
 		    "gprof: remove_dup_syms: malloc failed\n");
@@ -372,8 +372,10 @@ remove_dup_syms(nltype *nl, sztype *sym_count)
 		i = nextsym;
 	}
 
-	if ((orig_list + i)->value > (nl + index - 1)->value)
-		*(nl + index++) = *(orig_list +i);
+	if (i < *sym_count) {
+		if ((orig_list + i)->value > (nl + index - 1)->value)
+			*(nl + index++) = *(orig_list + i);
+	}
 
 	*sym_count = index;
 }
