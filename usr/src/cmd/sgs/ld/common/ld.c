@@ -21,33 +21,98 @@
 
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
-#include	<stdio.h>
-#include	<stdlib.h>
-#include	<unistd.h>
-#include	<stdarg.h>
-#include	<string.h>
-#include	<strings.h>
-#include	<errno.h>
-#include	<fcntl.h>
-#include	<libintl.h>
-#include	<locale.h>
-#include	<fcntl.h>
-#include	<ar.h>
-#include	<gelf.h>
-#include	"conv.h"
-#include	"libld.h"
-#include	"machdep.h"
-#include	"msg.h"
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <string.h>
+#include <strings.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <libintl.h>
+#include <locale.h>
+#include <fcntl.h>
+#include <ar.h>
+#include <gelf.h>
+#include "conv.h"
+#include "libld.h"
+#include "machdep.h"
+#include "msg.h"
+
+typedef int (*ld_main_f)(int, char *[], Half);
+
+static const char *errstr[ERR_NUM];
+
+static void
+init_strings(void)
+{
+	(void) setlocale(LC_MESSAGES, MSG_ORIG(MSG_STR_EMPTY));
+	(void) textdomain(MSG_ORIG(MSG_SUNW_OST_SGS));
+
+	/*
+	 * For error types we issue a prefix for, make sure the necessary
+	 * string has been internationalized and is ready.
+	 */
+	errstr[ERR_WARNING_NF] = MSG_INTL(MSG_ERR_WARNING);
+	errstr[ERR_WARNING] = MSG_INTL(MSG_ERR_WARNING);
+	errstr[ERR_GUIDANCE] = MSG_INTL(MSG_ERR_GUIDANCE);
+	errstr[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
+	errstr[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
+}
 
 /*
- * The following prevent us from having to include ctype.h which defines these
- * functions as macros which reference the __ctype[] array.  Go through .plt's
- * to get to these functions in libc rather than have every invocation of ld
- * have to suffer the R_SPARC_COPY overhead of the __ctype[] array.
+ * Returns a duplicate of the given environment variable, with
+ * leading whitespace stripped off.  Returns NULL if the variable
+ * is not in the environment, or if it is empty.  Allocation
+ * failure terminates the program.
  */
-extern int	isspace(int);
+static char *
+getenv_nonempty(const char *name)
+{
+	char *var;
+
+	var = getenv(name);
+	if (var == NULL)
+		return (NULL);
+	while (isspace(*var))
+		var++;
+	if (*var == '\0')
+		return (NULL);
+	var = strdup(var);
+	if (var == NULL) {
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_ALLOC), strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	return (var);
+}
+
+/*
+ * Like strsep(3), but using `isspace` instead of
+ * a separator string.
+ */
+static char *
+strsep_ws(char **strp)
+{
+	char *str, *s;
+
+	str = *strp;
+	if (*str == '\0')
+		return (NULL);
+	s = str;
+	while (*s != '\0' && !isspace(*s))
+		s++;
+	if (*s != '\0')
+		*s++ = '\0';
+	*strp = s;
+
+	return (str);
+}
 
 /*
  * We examine ELF objects, and archives containing ELF objects, in order
@@ -82,69 +147,37 @@ typedef union {
 	char			armag[SARMAG];
 } FILE_HDR;
 
-
 /*
  * Print a message to stdout
+ * The lml argument is only meaningful for diagnostics sent to ld.so.1,
+ * and is ignored here.
  */
 void
-veprintf(Lm_list *lml, Error error, const char *format, va_list args)
+veprintf(Lm_list *lml __unused, Error error, const char *format, va_list args)
 {
-	static const char	*strings[ERR_NUM];
-
-#if	defined(lint)
-	/*
-	 * The lml argument is only meaningful for diagnostics sent to ld.so.1.
-	 * Supress the lint error by making a dummy assignment.
-	 */
-	lml = 0;
-#endif
-	/*
-	 * For error types we issue a prefix for, make sure the necessary
-	 * string has been internationalized and is ready.
-	 */
-	switch (error) {
-	case ERR_WARNING_NF:
-		if (strings[ERR_WARNING_NF] == NULL)
-			strings[ERR_WARNING_NF] = MSG_INTL(MSG_ERR_WARNING);
-		break;
-	case ERR_WARNING:
-		if (strings[ERR_WARNING] == NULL)
-			strings[ERR_WARNING] = MSG_INTL(MSG_ERR_WARNING);
-		break;
-	case ERR_GUIDANCE:
-		if (strings[ERR_GUIDANCE] == NULL)
-			strings[ERR_GUIDANCE] = MSG_INTL(MSG_ERR_GUIDANCE);
-		break;
-	case ERR_FATAL:
-		if (strings[ERR_FATAL] == NULL)
-			strings[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
-		break;
-	case ERR_ELF:
-		if (strings[ERR_ELF] == NULL)
-			strings[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
-	}
+	const char *err;
 
 	/* If strings[] element for our error type is non-NULL, issue prefix */
-	if (strings[error] != NULL) {
-		(void) fputs(MSG_ORIG(MSG_STR_LDDIAG), stderr);
-		(void) fputs(strings[error], stderr);
-	}
-
+	err = errstr[error];
+	if (err != NULL)
+		(void) fprintf(stderr, "%s%s", MSG_ORIG(MSG_STR_LDDIAG), err);
 	(void) vfprintf(stderr, format, args);
-	if (error == ERR_ELF) {
-		int	elferr;
 
-		if ((elferr = elf_errno()) != 0)
-			(void) fprintf(stderr, MSG_ORIG(MSG_STR_ELFDIAG),
-			    elf_errmsg(elferr));
+	if (error == ERR_ELF) {
+		int elferr;
+
+		elferr = elf_errno();
+		if (elferr != 0) {
+			err = elf_errmsg(elferr);
+			(void) fprintf(stderr, MSG_ORIG(MSG_STR_ELFDIAG), err);
+		}
 	}
 	(void) fprintf(stderr, MSG_ORIG(MSG_STR_NL));
 	(void) fflush(stderr);
 }
 
-
 /*
- * Print a message to stdout
+ * Print a message to stderr
  */
 /* VARARGS3 */
 void
@@ -172,55 +205,52 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
  *	On success, *class_ret and *mach_ret are filled in, and True (1)
  *	is returned. On failure, False (0) is returned.
  */
-static int
+static bool
 archive(int fd, Elf *elf, uchar_t *class_ret, Half *mach_ret)
 {
-	Elf_Cmd		cmd = ELF_C_READ;
-	Elf_Arhdr	*arhdr;
-	Elf		*_elf = NULL;
-	int		found = 0;
+	Elf_Cmd cmd;
+	Elf *nelf;
 
 	/*
 	 * Process each item within the archive until we find the first
 	 * ELF object, or alternatively another archive to recurse into.
 	 * Stop after analyzing the first plain object found.
 	 */
-	while (!found && ((_elf = elf_begin(fd, cmd, elf)) != NULL)) {
-		if ((arhdr = elf_getarhdr(_elf)) == NULL)
-			return (0);
-		if (*arhdr->ar_name != '/') {
-			switch (elf_kind(_elf)) {
-			case ELF_K_AR:
-				found = archive(fd, _elf, class_ret, mach_ret);
-				break;
-			case ELF_K_ELF:
-				if (gelf_getclass(_elf) == ELFCLASS64) {
-					Elf64_Ehdr *ehdr;
+	for (cmd = ELF_C_READ, nelf = NULL;
+	    (nelf = elf_begin(fd, cmd, elf)) != NULL;
+	    cmd = elf_next(nelf), (void) elf_end(nelf)) {
+		Elf_Arhdr *arhdr = elf_getarhdr(nelf);
 
-					if ((ehdr = elf64_getehdr(_elf)) ==
-					    NULL)
-						break;
-					*class_ret = ehdr->e_ident[EI_CLASS];
-					*mach_ret = ehdr->e_machine;
-				} else {
-					Elf32_Ehdr *ehdr;
+		if (arhdr == NULL)
+			return (false);
+		if (*arhdr->ar_name == '/')
+			continue;
+		switch (elf_kind(nelf)) {
+		case ELF_K_AR:
+			if (archive(fd, nelf, class_ret, mach_ret))
+				return (true);
+			break;
+		case ELF_K_ELF:
+			if (gelf_getclass(nelf) == ELFCLASS64) {
+				Elf64_Ehdr *ehdr = elf64_getehdr(nelf);
 
-					if ((ehdr = elf32_getehdr(_elf)) ==
-					    NULL)
-						break;
-					*class_ret = ehdr->e_ident[EI_CLASS];
-					*mach_ret = ehdr->e_machine;
-				}
-				found = 1;
-				break;
+				if (ehdr == NULL)
+					continue;
+				*class_ret = ehdr->e_ident[EI_CLASS];
+				*mach_ret = ehdr->e_machine;
+			} else {
+				Elf32_Ehdr *ehdr = elf32_getehdr(nelf);
+
+				if (ehdr == NULL)
+					continue;
+				*class_ret = ehdr->e_ident[EI_CLASS];
+				*mach_ret = ehdr->e_machine;
 			}
+			return (true);
 		}
-
-		cmd = elf_next(_elf);
-		(void) elf_end(_elf);
 	}
 
-	return (found);
+	return (false);
 }
 
 /*
@@ -241,12 +271,20 @@ archive(int fd, Elf *elf, uchar_t *class_ret, Half *mach_ret)
  *	argc, argv - Command line argument vector
  *	class_ret - Address of variable to receive ELFCLASS of output object
  */
-static int
-process_args(int argc, char **argv, uchar_t *class_ret, Half *mach)
+static ld_main_f
+process_args(int argc, char *argv[], uchar_t *class_ret, Half *mach)
 {
-	uchar_t	class = ELFCLASSNONE, ar_class;
-	Half	mach32 = EM_NONE, mach64 = EM_NONE, ar_mach;
-	int	c, ar_found = 0;
+	Half mach32 = EM_NONE;
+	Half mach64 = EM_NONE;
+	bool ar_found = false;
+	uint8_t class = ELFCLASSNONE;
+	const char *targ_sparc = MSG_ORIG(MSG_TARG_SPARC);
+	const char *targ_x86 = MSG_ORIG(MSG_TARG_X86);
+	uint8_t ar_class;
+	Half ar_mach;
+	char *pstr;
+	const char *err;
+	int c;
 
 	/*
 	 * In general, libld.so is responsible for processing the
@@ -283,43 +321,55 @@ process_args(int argc, char **argv, uchar_t *class_ret, Half *mach)
 	 * the object is of the wrong class, we have an error condition.
 	 * We ignore it here, and let it fall through to libld, where the
 	 * proper diagnosis and error message will occur.
+	 *
+	 * Note that these options can all be given more than once, even if
+	 * doing so would be ambiguous: this is for backwards compatibility
+	 * with Makefiles and shell scripts and so on that are themselves
+	 * ambiguous.
 	 */
 	opterr = 0;
 	optind = 1;
+
 getmore:
 	while ((c = ld_getopt(0, optind, argc, argv)) != -1) {
 		switch (c) {
 		case '3':
-			if (strncmp(optarg, MSG_ORIG(MSG_ARG_TWO),
-			    MSG_ARG_TWO_SIZE) == 0)
-				class = ELFCLASS32;
+			/*
+			 * MSG_ORIG(MSG_ARG_TWO) is just the non-localized
+			 * string literal "2", but...ok.
+			 */
+			if (strcmp(optarg, MSG_ORIG(MSG_ARG_TWO)) != 0) {
+				err = MSG_INTL(MSG_ERR_BADARG);
+				eprintf(0, ERR_FATAL, err, '3', optarg);
+				exit(EXIT_FAILURE);
+			}
+			class = ELFCLASS32;
 			break;
-
 		case '6':
-			if (strncmp(optarg, MSG_ORIG(MSG_ARG_FOUR),
-			    MSG_ARG_FOUR_SIZE) == 0)
-				class = ELFCLASS64;
+			if (strcmp(optarg, MSG_ORIG(MSG_ARG_FOUR)) != 0) {
+				err = MSG_INTL(MSG_ERR_BADARG);
+				eprintf(0, ERR_FATAL, err, '6', optarg);
+				exit(EXIT_FAILURE);
+			}
+			class = ELFCLASS64;
 			break;
-
 		case 'z':
-			/* -z target=platform */
+			/* -z target=platform; silently skip everything else */
 			if (strncmp(optarg, MSG_ORIG(MSG_ARG_TARGET),
-			    MSG_ARG_TARGET_SIZE) == 0) {
-				char *pstr = optarg + MSG_ARG_TARGET_SIZE;
-
-				if (strcasecmp(pstr,
-				    MSG_ORIG(MSG_TARG_SPARC)) == 0) {
-					mach32 = EM_SPARC;
-					mach64 = EM_SPARCV9;
-				} else if (strcasecmp(pstr,
-				    MSG_ORIG(MSG_TARG_X86)) == 0) {
-					mach32 = EM_386;
-					mach64 = EM_AMD64;
-				} else {
-					eprintf(0, ERR_FATAL,
-					    MSG_INTL(MSG_ERR_BADTARG), pstr);
-					return (1);
-				}
+			    MSG_ARG_TARGET_SIZE) != 0) {
+				continue;
+			}
+			pstr = optarg + MSG_ARG_TARGET_SIZE;
+			if (strcasecmp(pstr, targ_sparc) == 0) {
+				mach32 = EM_SPARC;
+				mach64 = EM_SPARCV9;
+			} else if (strcasecmp(pstr, targ_x86) == 0) {
+				mach32 = EM_386;
+				mach64 = EM_AMD64;
+			} else {
+				err = MSG_INTL(MSG_ERR_BADTARG);
+				eprintf(0, ERR_FATAL, err, pstr);
+				exit(EXIT_FAILURE);
 			}
 			break;
 		}
@@ -343,10 +393,9 @@ getmore:
 		 * loop if an unadorned `-' argument is passed to us.
 		 */
 		if (argv[optind][0] == '-') {
-			if (argv[optind][1] == '\0')
-				continue;
-			else
+			if (argv[optind][1] != '\0')
 				goto getmore;
+			continue;
 		}
 
 		/*
@@ -358,7 +407,7 @@ getmore:
 		 * may be additional options that might affect our
 		 * class/machine decision.
 		 */
-		if ((class != ELFCLASSNONE) && (mach32 != EM_NONE))
+		if (class != ELFCLASSNONE && mach32 != EM_NONE)
 			continue;
 
 		/*
@@ -376,7 +425,7 @@ getmore:
 
 			eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
 			    argv[optind], strerror(err));
-			return (1);
+			exit(EXIT_FAILURE);
 		}
 
 		if (pread(fd, &hdr, sizeof (hdr), 0) != sizeof (hdr)) {
@@ -453,101 +502,78 @@ getmore:
 		else
 			*mach = (class == ELFCLASS64) ? M_MACH_64 : M_MACH_32;
 
-	return (0);
+	if (class == ELFCLASS32)
+		return (ld32_main);
+
+	return (ld64_main);
 }
 
+struct strlist {
+	struct strlist *sl_next;
+	char *sl_str;
+};
+
 /*
- * Process an LD_OPTIONS environment string.  This routine is first called to
- * count the number of options, and second to initialize a new argument array
- * with each option.
+ * Parse an LD_OPTIONS environment string.  Returns a linked list of strings
+ * parsed from the original list, or NULL if the list is empty.
  */
-static int
-process_ldoptions(char *str, char **nargv)
+static struct strlist *
+split_options(char *str)
 {
-	int	argc = 0;
-	char	*arg = str;
+	struct strlist *strs = NULL;
+	struct strlist **nextp = &strs;
+	struct strlist *next;
+	char *arg;
 
-	/*
-	 * Walk the environment string processing any arguments that are
-	 * separated by white space.
-	 */
-	while (*str != '\0') {
-		if (isspace(*str)) {
-			/*
-			 * If a new argument array has been provided, terminate
-			 * the original environment string, and initialize the
-			 * appropriate argument array entry.
-			 */
-			if (nargv) {
-				*str++ = '\0';
-				nargv[argc] = arg;
-			}
-
-			argc++;
-			while (isspace(*str))
-				str++;
-			arg = str;
-		} else
-			str++;
-	}
-	if (arg != str) {
-		/*
-		 * If a new argument array has been provided, initialize the
-		 * final argument array entry.
-		 */
-		if (nargv)
-			nargv[argc] = arg;
-		argc++;
+	while ((arg = strsep_ws(&str)) != NULL) {
+		if (*arg == '\0')
+			continue;
+		next = calloc(1, sizeof (struct strlist));
+		if (next == NULL) {
+			eprintf(0, ERR_FATAL,
+			    MSG_INTL(MSG_SYS_ALLOC), strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		next->sl_str = arg;
+		*nextp = next;
+		nextp = &next->sl_next;
 	}
 
-	return (argc);
+	return (strs);
 }
 
 /*
  * Determine whether an LD_OPTIONS environment variable is set, and if so,
  * prepend environment string as a series of options to the argv array.
  */
-static int
-prepend_ldoptions(int *argcp, char ***argvp)
+static void
+prepend_ldoptions(int *argcp, char **argvp[])
 {
-	int	nargc;
-	char	**nargv, *ld_options;
-	int	err, count;
+	int argc, nargc;
+	char **argv, **nargv, *ld_options;
+	struct strlist *opts, *p, *t;
 
-	if ((ld_options = getenv(MSG_ORIG(MSG_LD_OPTIONS))) == NULL)
-		return (0);
-
-	/*
-	 * Get rid of any leading white space, and make sure the environment
-	 * string has size.
-	 */
-	while (isspace(*ld_options))
-		ld_options++;
-	if (ld_options[0] == '\0')
-		return (0);
+	ld_options = getenv_nonempty(MSG_ORIG(MSG_LD_OPTIONS));
+	if (ld_options == NULL)
+		return;
 
 	/*
-	 * Prevent modification of actual environment strings.
+	 * Parse and count options.
 	 */
-	if ((ld_options = strdup(ld_options)) == NULL) {
-		err = errno;
-		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_ALLOC), strerror(err));
-		return (1);
-	}
+	opts = split_options(ld_options);
+	for (nargc = 0, p = opts; p != NULL; p = p->sl_next)
+		nargc++;
 
 	/*
-	 * Determine the number of options provided.
+	 * Allocate a new argument vector big enough to hold both the old
+	 * and new arguments.
 	 */
-	nargc = process_ldoptions(ld_options, NULL);
-
-	/*
-	 * Allocate a new argv array big enough to hold the new options from
-	 * the environment string and the old argv options.
-	 */
-	if ((nargv = malloc((nargc + *argcp + 1) * sizeof (char *))) == NULL) {
-		err = errno;
-		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_ALLOC), strerror(err));
-		return (1);
+	argc = *argcp;
+	argv = *argvp;
+	nargv = calloc(nargc + argc + 1, sizeof (char *));
+	if (nargv == NULL) {
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_ALLOC), strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	/*
@@ -555,24 +581,29 @@ prepend_ldoptions(int *argcp, char ***argvp)
 	 * of the old argv array (ie. calling programs name).  Then add the new
 	 * args obtained from the environment.
 	 */
-	nargc = 0;
-	nargv[nargc++] = (*argvp)[0];
-	nargc += process_ldoptions(ld_options, &nargv[nargc]);
+	nargv[0] = argv[0];
+	for (nargc = 1, p = opts; p != NULL; nargc++, p = p->sl_next)
+		nargv[nargc] = p->sl_str;
 
 	/*
 	 * Now add the original argv array (skipping argv[0]) to the end of the
 	 * new argv array, and re-vector argc and argv to reference this new
 	 * array
 	 */
-	for (count = 1; count < *argcp; count++, nargc++)
-		nargv[nargc] = (*argvp)[count];
-
+	for (int i = 1; i < argc; i++, nargc++)
+		nargv[nargc] = argv[i];
 	nargv[nargc] = NULL;
+
+	/*
+	 * Clean up the strlist.
+	 */
+	for (t = NULL, p = opts; p != NULL; p = t) {
+		t = p->sl_next;
+		free(p);
+	}
 
 	*argcp = nargc;
 	*argvp = nargv;
-
-	return (0);
 }
 
 /*
@@ -583,83 +614,88 @@ prepend_ldoptions(int *argcp, char ***argvp)
  * alternate link-editors (debugging/developer copies) even in complex build
  * environments.
  */
-static int
-ld_altexec(char **argv, char **envp)
+static void
+ld_altexec(int argc, char *argv[], char *envp[])
 {
-	char	*execstr;
-	char	**str;
-	int	err;
+	char *bin;
+	struct strlist *opts, *p, *t;
+	char **nargv;
+	int i;
 
-	for (str = envp; *str; str++) {
-		if (strncmp(*str, MSG_ORIG(MSG_LD_ALTEXEC),
-		    MSG_LD_ALTEXEC_SIZE) == 0) {
-			break;
-		}
+	/*
+	 * If LD_ALTEXEC isn't set, or is empty, return to continue executing
+	 * the present link-editor.  Note that we unconditionally unset it.
+	 */
+	bin = getenv_nonempty(MSG_ORIG(MSG_LD_ALTEXEC));
+	(void) unsetenv(MSG_ORIG(MSG_LD_ALTEXEC));
+	if (bin == NULL)
+		return;
+
+	/* Parse and count options, including argv[0]. */
+	opts = split_options(bin);
+	if (opts == NULL)
+		return;
+
+
+	for (p = opts; p != NULL; p = p->sl_next)
+		argc++;
+
+	nargv = calloc(argc, sizeof (char *));
+	if (nargv == NULL) {
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_ALLOC), strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	for (i = 0, p = opts; p != NULL; p = p->sl_next, i++)
+		nargv[i] = p->sl_str;
+	/* Note that `argc` now counts the NULL at the end of `nargv`. */
+	for (; i < argc; i++)
+		nargv[i] = *++argv;
+
+	/*
+	 * Clean up the strlist.
+	 */
+	for (t = NULL, p = opts; p != NULL; p = t) {
+		t = p->sl_next;
+		free(p);
 	}
 
 	/*
-	 * If LD_ALTEXEC isn't set, return to continue executing the present
-	 * link-editor.
+	 * Set argv[0] to point to our new linker And attempt to execute it.
 	 */
-	if (*str == 0)
-		return (0);
+	(void) execve(bin, nargv, envp);
 
 	/*
-	 * Get a pointer to the actual string.  If it's a null entry, return.
+	 * If the exec() fails, exit with failure.
 	 */
-	execstr = strdup(*str + MSG_LD_ALTEXEC_SIZE);
-	if (*execstr == '\0')
-		return (0);
-
-	/*
-	 * Null out the LD_ALTEXEC= environment entry.
-	 */
-	(*str)[MSG_LD_ALTEXEC_SIZE] = '\0';
-
-	/*
-	 * Set argv[0] to point to our new linker
-	 */
-	argv[0] = execstr;
-
-	/*
-	 * And attempt to execute it.
-	 */
-	(void) execve(execstr, argv, envp);
-
-	/*
-	 * If the exec() fails, return a failure indication.
-	 */
-	err = errno;
-	eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_EXEC), execstr,
-	    strerror(err));
-	return (1);
+	eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_EXEC), bin, strerror(errno));
+	exit(EXIT_FAILURE);
 }
 
 int
-main(int argc, char **argv, char **envp)
+main(int argc, char *argv[], char *envp[])
 {
-	uchar_t		class;
-	Half		mach;
+	uint8_t class;
+	Half mach;
+	ld_main_f ld_main;
 
 	/*
-	 * Establish locale.
+	 * Establish locale and initialize error strings.
 	 */
-	(void) setlocale(LC_MESSAGES, MSG_ORIG(MSG_STR_EMPTY));
-	(void) textdomain(MSG_ORIG(MSG_SUNW_OST_SGS));
+	init_strings();
 
 	/*
-	 * Execute an alternate linker if the LD_ALTEXEC environment variable is
-	 * set.  If a specified alternative could not be found, bail.
+	 * Maybe execute an alternate linker.  If the LD_ALTEXEC
+	 * environment variable is set, we will try and run what it
+	 * points to or fail.  If it is not set, we simply continue.
 	 */
-	if (ld_altexec(argv, envp))
-		return (1);
+	ld_altexec(argc, argv, envp);
 
 	/*
-	 * Check the LD_OPTIONS environment variable, and if present prepend
+	 * Maybe process additional arguments.  If the LD_OPTIONS
+	 * environment variable is set, and if present prepend
 	 * the arguments specified to the command line argument list.
 	 */
-	if (prepend_ldoptions(&argc, &argv))
-		return (1);
+	prepend_ldoptions(&argc, &argv);
 
 	/*
 	 * Examine the command arguments to determine:
@@ -667,14 +703,10 @@ main(int argc, char **argv, char **envp)
 	 *	- link-editor class
 	 *	- target machine
 	 */
-	if (process_args(argc, argv, &class, &mach))
-		return (1);
+	ld_main = process_args(argc, argv, &class, &mach);
 
 	/* Call the libld entry point for the specified ELFCLASS */
-	if (class == ELFCLASS64)
-		return (ld64_main(argc, argv, mach));
-	else
-		return (ld32_main(argc, argv, mach));
+	return (ld_main(argc, argv, mach));
 }
 
 /*
