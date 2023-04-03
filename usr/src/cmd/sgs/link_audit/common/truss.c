@@ -120,7 +120,8 @@ la_version(uint_t version)
 	if (checkenv((const char *)"TRUSS_ALL"))
 		trussall++;
 
-	if (str = checkenv((const char *)"TRUSS_OUTPUT")) {
+	str = checkenv((const char *)"TRUSS_OUTPUT");
+	if (str != NULL) {
 		FILE	*fp;
 		char	fname[MAXPATHLEN];
 
@@ -130,12 +131,14 @@ la_version(uint_t version)
 		else
 			(void) strncpy(fname, str, MAXPATHLEN);
 
-		if (fp = fopen(fname, (const char *)"w")) {
+		fp = fopen(fname, (const char *)"w");
+		if (fp != NULL) {
 			outfile = fp;
-		} else
+		} else {
 			(void) fprintf(stderr,
 			    "truss.so: unable to open file=`%s': %s\n",
 			    fname, strerror(errno));
+		}
 	}
 
 	/*
@@ -183,11 +186,11 @@ la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
 #if	defined(_LP64)
 uintptr_t
 la_symbind64(Elf64_Sym *symp, uint_t symndx, uintptr_t *refcook,
-	uintptr_t *defcook, uint_t *sb_flags, const char *sym_name)
+    uintptr_t *defcook, uint_t *sb_flags, const char *sym_name)
 #else
 uintptr_t
 la_symbind32(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcook,
-	uintptr_t *defcook, uint_t *sb_flags)
+    uintptr_t *defcook, uint_t *sb_flags)
 #endif
 {
 #if	!defined(_LP64)
@@ -205,8 +208,7 @@ la_symbind32(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcook,
 	if ((*sb_flags & LA_SYMB_NOPLTEXIT) == 0) {
 		uint_t	ndx;
 		char	*str;
-		/* LINTED */
-		for (ndx = 0; str = spec_sym[ndx]; ndx++) {
+		for (ndx = 0; (str = spec_sym[ndx]) != NULL; ndx++) {
 			int	cmpval;
 			cmpval = strcmp(sym_name, str);
 			if (cmpval < 0)
@@ -224,21 +226,21 @@ la_symbind32(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcook,
 #if	defined(__sparcv9)
 uintptr_t
 la_sparcv9_pltenter(Elf64_Sym *symp, uint_t symndx, uintptr_t *refcookie,
-	uintptr_t *defcookie, La_sparcv9_regs *regset, uint_t *sb_flags,
-	const char *sym_name)
+    uintptr_t *defcookie, La_sparcv9_regs *regset, uint_t *sb_flags,
+    const char *sym_name)
 #elif	defined(__sparc)
 uintptr_t
 la_sparcv8_pltenter(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcookie,
-	uintptr_t *defcookie, La_sparcv8_regs *regset, uint_t *sb_flags)
+    uintptr_t *defcookie, La_sparcv8_regs *regset, uint_t *sb_flags)
 #elif   defined(__amd64)
 uintptr_t
 la_amd64_pltenter(Elf64_Sym *symp, uint_t symndx, uintptr_t *refcookie,
-	uintptr_t *defcookie, La_amd64_regs *regset, uint_t *sb_flags,
-	const char *sym_name)
+    uintptr_t *defcookie, La_amd64_regs *regset, uint_t *sb_flags,
+    const char *sym_name)
 #elif   defined(__i386)
 uintptr_t
 la_i86_pltenter(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcookie,
-	uintptr_t *defcookie, La_i86_regs *regset, uint_t *sb_flags)
+    uintptr_t *defcookie, La_i86_regs *regset, uint_t *sb_flags)
 #endif
 {
 	char		*istr;
@@ -260,9 +262,9 @@ la_i86_pltenter(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcookie,
 		istr = "*";
 
 	(void) fprintf(outfile, "%-15s -> %15s:%-*s%s(0x%lx, 0x%lx, 0x%lx)\n",
-		refname, defname, indent_level, istr, sym_name,
-		(long)GETARG0(regset), (long)GETARG1(regset),
-		(long)GETARG2(regset));
+	    refname, defname, indent_level, istr, sym_name,
+	    (long)GETARG0(regset), (long)GETARG1(regset),
+	    (long)GETARG2(regset));
 
 	(void) fflush(outfile);
 	if (indent && ((*sb_flags & LA_SYMB_NOPLTEXIT) == 0))
@@ -276,11 +278,11 @@ la_i86_pltenter(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcookie,
 /* ARGSUSED */
 uintptr_t
 la_pltexit64(Elf64_Sym *symp, uint_t symndx, uintptr_t *refcookie,
-	uintptr_t *defcookie, uintptr_t retval, const char *sym_name)
+    uintptr_t *defcookie, uintptr_t retval, const char *sym_name)
 #else
 uintptr_t
 la_pltexit(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcookie,
-	uintptr_t *defcookie, uintptr_t retval)
+    uintptr_t *defcookie, uintptr_t retval)
 #endif
 {
 	char		*defname = (char *)(*defcookie);
@@ -297,7 +299,7 @@ la_pltexit(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcookie,
 	if (indent)
 		indent_level--;
 	(void) fprintf(outfile, "%-15s -> %15s:%*s%s - 0x%lx\n", refname,
-		defname, indent_level, "", sym_name, (ulong_t)retval);
+	    defname, indent_level, "", sym_name, (ulong_t)retval);
 	(void) fflush(outfile);
 	(void) sigprocmask(SIG_SETMASK, &oset, NULL);
 	return (retval);
