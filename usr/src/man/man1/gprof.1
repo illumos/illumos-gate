@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GPROF 1 "Dec 19, 2018"
+.TH GPROF 1 "April 10, 2023"
 .SH NAME
 gprof \- display call-graph profile data
 .SH SYNOPSIS
-.LP
 .nf
 \fBgprof\fR [\fB-abcCDlsz\fR] [\fB-e\fR \fIfunction-name\fR] [\fB-E\fR \fIfunction-name\fR]
      [\fB-f\fR \fIfunction-name\fR] [\fB-F\fR \fIfunction-name\fR]
@@ -17,7 +16,6 @@ gprof \- display call-graph profile data
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBgprof\fR utility produces an execution profile of a program. The effect
 of called routines is incorporated in the profile of each caller.  The profile
 data is taken from the call graph profile file that is created by programs
@@ -45,8 +43,8 @@ the members of the cycle and their contributions to the time and call counts of
 the cycle.
 .sp
 .LP
-Next, a flat profile is given, similar to that provided by \fBprof\fR(1). This
-listing gives the total execution times and call counts for each of the
+Next, a flat profile is given.
+This listing gives the total execution times and call counts for each of the
 functions in the program, sorted by decreasing time. Finally, an index is
 given, which shows the correspondence between function names and call-graph
 profile index numbers.
@@ -67,7 +65,6 @@ number of times that arc is traversed.
 The profiled program must call \fBexit\fR(2) or return normally for the
 profiling information to be saved in the \fBgmon.out\fR file.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -280,10 +277,8 @@ summarized dynamic call-graph and profile
 .RE
 
 .SH SEE ALSO
-.LP
 .BR cc (1),
 .BR ld.so.1 (1),
-.BR prof (1),
 .BR exit (2),
 .BR pcsample (2),
 .BR profil (2),
@@ -301,7 +296,6 @@ Profiler Proceedings of the SIGPLAN '82 Symposium on Compiler Construction\fR,
 .LP
 \fILinker and Libraries Guide\fR
 .SH NOTES
-.LP
 If the executable image has been stripped and does not have the \fB\&.symtab\fR
 symbol table, \fBgprof\fR reads the global dynamic symbol tables
 \fB\&.dynsym\fR and \fB\&.SUNW_ldynsym\fR, if present.  The symbols in the
@@ -342,7 +336,6 @@ functions are not present in an unprofiled application, time accumulated and
 call counts for these functions may be ignored when evaluating the performance
 of an application.
 .SS "64-bit profiling"
-.LP
 64-bit profiling may be used freely with dynamically linked executables, and
 profiling information is collected for the shared objects if the objects are
 compiled for profiling. Care must be applied to interpret the profile output,
@@ -355,7 +348,6 @@ appropriate module for the symbol.
 When using the \fB-s\fR or \fB-D\fRoption to sum multiple profile files, care
 must be taken not to mix 32-bit profile files with 64-bit profile files.
 .SS "32-bit profiling"
-.LP
 32-bit profiling may be used with dynamically linked executables, but care must
 be applied. In 32-bit profiling, shared objects cannot be profiled with
 \fBgprof\fR. Thus, when a profiled, dynamically linked program is executed,
@@ -387,7 +379,6 @@ improvement can be made by looking at routine \fBB\fR and not routine \fBA\fR.
 The value of the profiler in this case is severely degraded; the solution is to
 use archives as much as possible for profiling.
 .SH BUGS
-.LP
 Parents which are not themselves profiled will have the time of their profiled
 children propagated to them, but they will appear to be spontaneously invoked
 in the call-graph listing, and will not have their time propagated further.
