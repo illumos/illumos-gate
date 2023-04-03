@@ -194,7 +194,7 @@ enterino(Crle_desc *crle, const char *name, struct stat *status, Half flags)
 	 * If an object descriptor doesn't yet exist create one.
 	 */
 	if ((obj = ent->e_obj) == NULL) {
-		if ((obj = calloc(sizeof (Hash_obj), 1)) == NULL)
+		if ((obj = calloc(1, sizeof (Hash_obj))) == NULL)
 			return (NULL);
 		obj->o_tbl = tbl;
 		obj->o_flags = flags;
@@ -366,7 +366,7 @@ enternoexistdir(Crle_desc *crle, const char *dir)
 	if (ent->e_id == 0) {
 		Hash_obj *	obj;
 
-		if ((obj = calloc(sizeof (Hash_obj), 1)) == NULL)
+		if ((obj = calloc(1, sizeof (Hash_obj))) == NULL)
 			return (NULL);
 		obj->o_flags = (RTC_OBJ_NOEXIST | RTC_OBJ_DIRENT);
 
@@ -465,7 +465,7 @@ enternoexistfile(Crle_desc *crle, const char *path, const char *file,
 	 * entry information.
 	 */
 	if (rent->e_id == 0) {
-		if ((obj = calloc(sizeof (Hash_obj), 1)) == NULL)
+		if ((obj = calloc(1, sizeof (Hash_obj))) == NULL)
 			return (NULL);
 		obj->o_flags = RTC_OBJ_NOEXIST;
 
@@ -522,7 +522,8 @@ enterfile(Crle_desc *crle, const char *opath, const char *ofile, Half flags,
 
 	if (strcmp(opath, rpath)) {
 		npath = rpath;
-		if (nfile = strrchr(npath, '/'))
+		nfile = strrchr(npath, '/');
+		if (nfile != NULL)
 			nfile++;
 		else
 			nfile = npath;
@@ -1093,7 +1094,8 @@ inspect(Crle_desc *crle, const char *name, Half flags)
 	/*
 	 * Make sure to propagate any RTC_OBJ_CMDLINE flag.
 	 */
-	if (ent = get_hash(crle->c_strtbl, (Addr)name, 0, HASH_FND_ENT))
+	ent = get_hash(crle->c_strtbl, (Addr)name, 0, HASH_FND_ENT);
+	if (ent != NULL)
 		ent->e_flags |= (flags & RTC_OBJ_CMDLINE);
 
 	return (0);

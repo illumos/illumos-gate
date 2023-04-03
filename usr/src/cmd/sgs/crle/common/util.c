@@ -131,11 +131,12 @@ addenv(Crle_desc *crle, const char *arg, unsigned int flags)
 	/*
 	 * Allocate a new environment descriptor.
 	 */
-	if (((env = malloc(sizeof (Env_desc))) == 0) ||
-	    ((env->e_str = strdup(arg)) == 0)) {
+	if (((env = malloc(sizeof (Env_desc))) == NULL) ||
+	    ((env->e_str = strdup(arg)) == NULL)) {
 		int err = errno;
 		(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC),
 		    crle->c_name, strerror(err));
+		free(env);
 		return (0);
 	}
 	env->e_varsz = varsz;

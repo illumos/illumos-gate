@@ -105,6 +105,7 @@ filter(Crle_desc *crle, const char *filter, const char *str, const char *filtee)
 		int err = errno;
 		(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC),
 		    crle->c_name, strerror(err));
+		free(flt);
 		return (1);
 	}
 	if ((aplist_append(&(crle->c_flt), flt, AL_CNT_CRLE) == NULL) ||
