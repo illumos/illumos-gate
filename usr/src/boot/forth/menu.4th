@@ -133,8 +133,12 @@ create init_text8 64 allot
 only forth definitions
 
 : arch-i386? ( -- BOOL ) \ Returns TRUE (-1) on i386, FALSE (0) otherwise.
-	s" arch-i386" environment? dup if
-		drop
+	\ FICL_PLATFORM_ARCHITECTURE is always defined, drop flag
+	s" FICL_PLATFORM_ARCHITECTURE" environment? drop
+	s" i386" compare 0<> if
+		true
+	else
+		false
 	then
 ;
 

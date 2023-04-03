@@ -23,7 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd March 01, 2023
+.Dd March 30, 2023
 .Dt LOADER 7
 .Os
 .Sh NAME
@@ -195,7 +195,9 @@ is loaded.
 .Pp
 .It Ic chain Ar device
 Chain load another boot loader from the specified device.
-Device can be either disk name or partition.
+Device can be either disk name, partition or file name.
+In case of x86 BIOS boot, the file must be copy of MBR or PBR.
+For UEFI boot, the file is efi application.
 .Pp
 .It Ic echo Xo
 .Op Fl n
@@ -448,6 +450,16 @@ value to set boot prefixed variables listed above, any unrecognized options
 are added to kernel command line verbatim.
 .It Va bootfile
 The name of the kernel.
+.It Va chain_disk
+If set, contains the device or file name used with
+.Cm chain
+command and will cause chain command menu entry to appear on
+.Nm
+main menu.
+The alternate method to use chain loader is to add menu entries
+into
+.Xr menu.lst 5
+file.
 .It Va console
 Defines the current console or consoles.
 Multiple consoles may be specified.
@@ -881,6 +893,7 @@ environment.
 .Sh SEE ALSO
 .Xr btxld 1onbld ,
 .Xr loader.conf 5 ,
+.Xr menu.lst 5 ,
 .Xr boot 8
 .Sh STANDARDS
 For the purposes of ANS Forth compliance, loader is an

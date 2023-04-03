@@ -1143,13 +1143,4 @@ ficlSystemCompilePlatform(ficlSystem *pSys)
 	SET_FOREACH(fnpp, Xficl_compile_set)
 		(*fnpp)(pSys);
 #endif
-
-#if defined(__i386__) || defined(__amd64__)
-	(void) ficlDictionarySetConstant(env, "arch-i386", FICL_TRUE);
-	(void) ficlDictionarySetConstant(env, "arch-sparc", FICL_FALSE);
-#endif
-#ifdef __sparc
-	(void) ficlDictionarySetConstant(env, "arch-i386", FICL_FALSE);
-	(void) ficlDictionarySetConstant(env, "arch-sparc", FICL_TRUE);
-#endif
 }

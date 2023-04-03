@@ -19238,6 +19238,7 @@ f usr/share/man/man5/mailer.conf.5 0444 root bin
 s usr/share/man/man5/mdi_ib_cache.5=devices.5
 s usr/share/man/man5/mdi_scsi_vhci_cache.5=devices.5
 f usr/share/man/man5/mech.5 0444 root bin
+f usr/share/man/man5/menu.lst.5 0444 root bin
 f usr/share/man/man5/mnttab.5 0444 root bin
 f usr/share/man/man5/mpapi.conf.5 0444 root bin
 f usr/share/man/man5/ndmp.5 0444 root bin

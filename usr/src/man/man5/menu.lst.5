@@ -1,0 +1,93 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2023 Toomas Soome <tsoome@me.com>
+.\"
+.Dd March 30, 2023
+.Dt MENU.LST 5
+.Os
+.Sh NAME
+.Nm menu.lst
+.Nd List of entries for boot menu
+.Sh SYNOPSIS
+.Pa <pool>/boot/menu.lst
+.Pp
+.Pa /boot/menu.lst
+.Sh DESCRIPTION
+This file contains the list of menu entries for use by boot loader.
+The location is either root dataset of boot zfs pool or
+.Pa /boot
+directory of root file system.
+.Nm
+is created automatically by
+.Xr beadm 8 ,
+and can be managed by
+.Xr bootadm 8 .
+.Pp
+Each menu entry in
+.Nm
+consists of two lines:
+.Pp
+.Dl Sy title Ar name
+.Dl Ar type Ar data
+.Pp
+Where first line will set name for the menu entry and second line
+will declare the type and type specific data for boot menu entry.
+.Pp
+Currently accepted types are:
+.Bl -tag -width Ds
+.It Sy bootfs
+to specify the name or location of the boot file system.
+.It Sy chain
+to specify device or file to be used with
+.Xr loader 7
+.Sy chain
+command.
+.El
+.Pp
+The boot file system name could be either the name of zfs dataset or
+the device name in case of
+.Xr ufs 4fs ,
+.Xr pcfs 4fs ,
+or other currently supported disk based file system.
+.Pp
+Device name for
+.Sy chain
+command must use the form
+.Pp
+.Dl diskN[pX]: or diskN[sXpY]:
+.Dl zfs:pool/dataset:
+.Pp
+See output of loader
+.Cm lsdev Fl v
+command for available device names.
+.Sh FILES
+.Pa <pool>/boot/menu.lst
+.Pp
+.Pa /boot/menu.lst
+.Sh EXAMPLES
+A sample
+.Nm
+file.
+.Bd -literal -offset indent
+title Disk1:
+chain disk1:
+title Disk2_UFS
+bootfs disk2s1a:
+title openindiana-2023:01:03
+bootfs rpool/ROOT/openindiana-2023:01:03
+.Ed
+.Sh SEE ALSO
+.Xr pcfs 4fs ,
+.Xr ufs 4fs ,
+.Xr loader 7 ,
+.Xr beadm 8 ,
+.Xr bootadm 8
