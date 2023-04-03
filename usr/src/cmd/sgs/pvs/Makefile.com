@@ -47,9 +47,6 @@ LDFLAGS +=	$(VERSREF) $(MAPOPTS) '-R$$ORIGIN/../../lib/$(MACH64)'
 LDLIBS +=	$(LDDBGLIBDIR64) -llddbg $(ELFLIBDIR64) -lelf \
 		    $(CONVLIBDIR64) -lconv
 
-# not linted
-SMATCH=off
-
 BLTDEFS=	msg.h
 BLTDATA=	msg.c
 BLTMESG=	$(SGSMSGDIR)/pvs
