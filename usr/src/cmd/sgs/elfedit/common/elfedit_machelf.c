@@ -176,8 +176,8 @@ elfedit32_init_obj_state(const char *file, int fd, Elf *elf)
 	 * Count the number of symbol tables and capture their indexes.
 	 * Find the dynamic section.
 	 */
-	for (ndx = 1, scn = NULL; scn = elf_nextscn(tstate.os_elf, scn);
-	    ndx++) {
+	for (ndx = 1, scn = NULL;
+	    (scn = elf_nextscn(tstate.os_elf, scn)) != NULL; ndx++) {
 		Shdr *shdr;
 
 		LIBELF(shdr = elf_getshdr(scn), MSG_ORIG(MSG_ELF_GETSHDR));
@@ -264,8 +264,8 @@ elfedit32_init_obj_state(const char *file, int fd, Elf *elf)
 		free(symtabndx);
 	}
 
-	for (ndx = 1, scn = NULL; scn = elf_nextscn(tstate.os_elf, scn);
-	    ndx++, _cache++) {
+	for (ndx = 1, scn = NULL;
+	    (scn = elf_nextscn(tstate.os_elf, scn)) != NULL; ndx++, _cache++) {
 		_cache->sec_shndx = ndx;
 		_cache->sec_scn = scn;
 		LIBELF(_cache->sec_shdr = elf_getshdr(scn),

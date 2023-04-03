@@ -53,9 +53,6 @@ LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) -llddbg \
 		    $(CONVLIBDIR) -lconv -ltecla
 NATIVE_LIBS +=	libtecla.so
 
-CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	$(CNOWARN_UNINIT)
-
 BLTDEFS =	msg.h
 BLTDATA =	msg.c
 BLTMESG =	$(SGSMSGDIR)/elfedit
