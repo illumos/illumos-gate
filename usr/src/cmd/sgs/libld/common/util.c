@@ -168,6 +168,29 @@ str2chr_wrap_cb(int c)
 }
 
 /*
+ * The GNU ld '--sysroot=XXX' option corresponds to our
+ * '-z sysroot=XXX'. When str2chr() does this conversion, we end up with
+ * the return character set to 'z' and optarg set to 'XXX'. This callback
+ * changes optarg to include the missing sysroot= prefix.
+ *
+ * exit:
+ *	Returns c on success, or '?' on error.
+ */
+static int
+str2chr_sysroot_cb(int c)
+{
+	char    *str;
+	size_t  len = MSG_ARG_SYSROOT_SIZE + strlen(optarg) + 1;
+
+	if ((str = libld_malloc(len)) == NULL)
+		return ('?');
+	(void) snprintf(str, len, MSG_ORIG(MSG_FMT_STRCAT),
+	    MSG_ORIG(MSG_ARG_SYSROOT), optarg);
+	optarg = str;
+	return (c);
+}
+
+/*
  * Determine whether this string, possibly with an associated option, should
  * be translated to an option character.  If so, update the optind and optarg
  * and optopt as described for short options in getopt(3c).
@@ -290,6 +313,13 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 			} else if ((c = str2chr(lml, ndx, argc, argv, arg, 'h',
 			    MSG_ORIG(MSG_ARG_T_SONAME),
 			    MSG_ARG_T_SONAME_SIZE, NULL)) != 0) {
+				return (c);
+			}
+			/* Translate -sysroot to -z sysroot= */
+			if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
+			    MSG_ORIG(MSG_ARG_T_SYSROOT) + 1,
+			    MSG_ARG_T_SYSROOT_SIZE - 1,
+			    str2chr_sysroot_cb)) != 0) {
 				return (c);
 			}
 			break;
@@ -486,6 +516,15 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				    0, NULL)) != 0) {
 					optarg = (char *)
 					    MSG_ORIG(MSG_ARG_RESCAN_START);
+					return (c);
+				}
+				/*
+				 * translate --sysroot to -z sysroot
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_SYSROOT),
+				    MSG_ARG_T_SYSROOT_SIZE,
+				    str2chr_sysroot_cb)) != 0) {
 					return (c);
 				}
 				break;

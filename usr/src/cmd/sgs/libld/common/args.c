@@ -74,13 +74,16 @@
  */
 
 #include	<sys/link.h>
-#include	<stdio.h>
-#include	<fcntl.h>
-#include	<string.h>
-#include	<errno.h>
-#include	<elf.h>
-#include	<unistd.h>
+#include	<sys/stat.h>
+
 #include	<debug.h>
+#include	<elf.h>
+#include	<errno.h>
+#include	<fcntl.h>
+#include	<stdio.h>
+#include	<string.h>
+#include	<unistd.h>
+
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -230,6 +233,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRSN));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRSGRP));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZSCAP));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZSYSR));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTARG));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZT));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTO));
@@ -972,7 +976,7 @@ assdeflib_parse(Ofl_desc *ofl, char *optarg)
 	olen = strlen(optarg);
 	/* Minimum size of assert-deflib=lib%s.so */
 	mlen = MSG_ARG_ASSDEFLIB_SIZE + 1 + MSG_STR_LIB_SIZE +
-	    MSG_STR_SOEXT_SIZE;
+	    MSG_STR_DOTSO_SIZE;
 	if (olen > MSG_ARG_ASSDEFLIB_SIZE) {
 		if (optarg[MSG_ARG_ASSDEFLIB_SIZE] != '=') {
 			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_ARG_ILLEGAL),
@@ -982,8 +986,8 @@ assdeflib_parse(Ofl_desc *ofl, char *optarg)
 
 		if (strncmp(optarg + MSG_ARG_ASSDEFLIB_SIZE + 1,
 		    MSG_ORIG(MSG_STR_LIB), MSG_STR_LIB_SIZE) != 0 ||
-		    strcmp(optarg + olen - MSG_STR_SOEXT_SIZE,
-		    MSG_ORIG(MSG_STR_SOEXT)) != 0 || olen <= mlen) {
+		    strcmp(optarg + olen - MSG_STR_DOTSO_SIZE,
+		    MSG_ORIG(MSG_STR_DOTSO)) != 0 || olen <= mlen) {
 			ld_eprintf(ofl, ERR_FATAL,
 			    MSG_INTL(MSG_ARG_ASSDEFLIB_MALFORMED), optarg);
 			return (TRUE);
@@ -1577,6 +1581,27 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *usage)
 					    MSG_ORIG(MSG_ARG_Z), optarg);
 					return (S_ERROR);
 				}
+			} else if (strncmp(optarg, MSG_ORIG(MSG_ARG_SYSROOT),
+			    MSG_ARG_SYSROOT_SIZE) == 0) {
+				struct stat buf;
+				/*
+				 * NB: We don't insist this exists, or is a
+				 * directory, for the strictest (if weirdest)
+				 * compatibility with GNU
+				 */
+				ofl->ofl_sysroot = optarg +
+				    MSG_ARG_SYSROOT_SIZE;
+
+				if (stat(ofl->ofl_sysroot, &buf) != 0) {
+					ld_eprintf(ofl, ERR_WARNING,
+					    MSG_INTL(MSG_SYSROOT_NOENT),
+					    ofl->ofl_sysroot, strerror(errno));
+				} else if (!S_ISDIR(buf.st_mode)) {
+					ld_eprintf(ofl, ERR_WARNING,
+					    MSG_INTL(MSG_SYSROOT_NOTDIR),
+					    ofl->ofl_sysroot);
+				}
+
 			/*
 			 * The following options just need validation as they
 			 * are interpreted either on the second pass through

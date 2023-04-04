@@ -1697,3 +1697,4 @@ Bugid   Risk Synopsis
 15515	ld accepts nonsensical arguments
 15516	LD_ALTEXEC parsing is too restrictive
 18100	Linker should merge gcc_except_table sections
+18149	ld(1) should support -zsysroot

@@ -171,6 +171,52 @@ ld_add_libdir(Ofl_desc *ofl, const char *path)
 }
 
 /*
+ * Given a specified directory and library, build a path to the file.  In the
+ * simple case, this is just inserting the correct separators between
+ * parameters.
+ *
+ * If the directory portion starts with "$SYSROOT/" (Solaris compatibility) or
+ * "=/" (GNU compatibility), this string is replaced with the system root
+ * directory, be it "/" or a user-specified one.
+ */
+static int
+build_library_path(char *out, size_t len,
+    const char *sysroot, const char *dir, const char *lib, const char *ext)
+{
+	boolean_t with_sysroot = B_FALSE;
+
+	/* If there's no sysroot, it's / */
+	if (sysroot == NULL)
+		sysroot = "/";
+
+	if (strncmp(dir, MSG_ORIG(MSG_STR_SYSROOTPATH),
+	    MSG_STR_SYSROOTPATH_SIZE) == 0) {
+		dir += MSG_STR_SYSROOTPATH_SIZE;
+		with_sysroot = B_TRUE;
+	}
+
+	if (strncmp(dir, MSG_ORIG(MSG_STR_GNU_SYSROOTPATH),
+	    MSG_STR_GNU_SYSROOTPATH_SIZE) == 0) {
+		dir += MSG_STR_GNU_SYSROOTPATH_SIZE;
+		with_sysroot = B_TRUE;
+	}
+
+	/*
+	 * Try to make the resulting path tidily formed regardless of a
+	 * trailing / in our input.
+	 */
+	if (with_sysroot && sysroot[strlen(sysroot) - 1] == '/') {
+		return (snprintf(out, len, "%s%s/lib%s%s", sysroot, dir, lib,
+		    ext));
+	} else if (with_sysroot) {
+		return (snprintf(out, len, "%s/%s/lib%s%s", sysroot, dir, lib,
+		    ext));
+	} else {
+		return (snprintf(out, len, "%s/lib%s%s", dir, lib, ext));
+	}
+}
+
+/*
  * Process a required library.  Combine the directory and filename, and then
  * append either a `.so' or `.a' suffix and try opening the associated pathname.
  */
@@ -201,8 +247,8 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej,
 	 * If we are in dynamic mode try and open the associated shared object.
 	 */
 	if (ofl->ofl_flags & FLG_OF_DYNLIBS) {
-		(void) snprintf(path, (PATH_MAX + 2), MSG_ORIG(MSG_STR_LIB_SO),
-		    _dir, file);
+		(void) build_library_path(path, sizeof (path),
+		    ofl->ofl_sysroot, _dir, file, MSG_ORIG(MSG_STR_DOTSO));
 		DBG_CALL(Dbg_libs_l(ofl->ofl_lml, file, path));
 		if ((fd = open(path, O_RDONLY)) != -1) {
 
@@ -235,8 +281,8 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej,
 	 * If we are not in dynamic mode, or a shared object could not be
 	 * located, try and open the associated archive.
 	 */
-	(void) snprintf(path, (PATH_MAX + 2), MSG_ORIG(MSG_STR_LIB_A),
-	    _dir, file);
+	(void) build_library_path(path, sizeof (path),
+	    ofl->ofl_sysroot, _dir, file, MSG_ORIG(MSG_STR_DOTA));
 	DBG_CALL(Dbg_libs_l(ofl->ofl_lml, file, path));
 	if ((fd = open(path, O_RDONLY)) != -1) {
 
@@ -309,7 +355,7 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 		for (APLIST_TRAVERSE(ofl->ofl_assdeflib, idx, path)) {
 			if (strncmp(name, path + MSG_STR_LIB_SIZE,
 			    MAX(strlen(path + MSG_STR_LIB_SIZE) -
-			    MSG_STR_SOEXT_SIZE, strlen(name))) == 0) {
+			    MSG_STR_DOTSO_SIZE, strlen(name))) == 0) {
 				flags &= ~FLG_OF_ADEFLIB;
 				break;
 			}

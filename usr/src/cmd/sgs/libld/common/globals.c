@@ -47,14 +47,6 @@ char		*Llibdir;	/* User specified -YL */
 char		*Ulibdir;	/* User specified -YU */
 
 /*
- * A default library search path is used if one was not supplied on the command
- * line.  Note: these strings can not use MSG_ORIG() since they are modified as
- * part of the path processing.
- */
-char		def64_Plibpath[] = "/lib/64:/usr/lib/64";
-char		def32_Plibpath[] = "/usr/ccs/lib:/lib:/usr/lib";
-
-/*
  * Rejected file error messages (indexed to match SGS_REJ_ values).
  */
 const Msg

@@ -9,22 +9,36 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
-# Copyright 2018 Joyent, Inc.
-#
+# Copyright 2023, Richard Lowe.
 
-SUBDIRS =		\
-	assert-deflib	\
-	capabilities	\
-	groups		\
-	linker-sets	\
-	mapfiles	\
-	relocs		\
-	resolution	\
-	sections	\
-	string-merge	\
-	sysroot		\
-	tls
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+PROG =	test-search
+
+ROOTOPTPKG = $(ROOT)/opt/elf-tests
+TESTDIR = $(ROOTOPTPKG)/tests/sysroot
+
+CMDS = $(PROG:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all:
+
+install: all $(CMDS)
+
+clobber: clean
+	-$(RM) $(PROG)
+
+clean:
+	-$(RM) $(CLEANFILES)
+
+$(CMDS): $(TESTDIR)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %.sh
+	$(INS.rename)
+
+$(TESTDIR)/%: %
+	$(INS.file)

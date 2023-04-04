@@ -20,7 +20,7 @@
 .\" Copyright 2023 Oxide Computer Company
 .\" Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd January 15, 2024
+.Dd June 2, 2026
 .Dt LD 1
 .Os
 .Sh NAME
@@ -106,11 +106,10 @@
 .Op Fl z Cm rescan-now
 .Op Fl z Cm rescan-start \&... Fl z Cm rescan-end
 .Op Fl z Cm symbolcap
+.Op Fl z Cm sysroot= Ns Ar directory
 .Op Fl z Cm target= Ns Cm sparc Ns | Ns Cm x86
 .Op Fl z Cm text | Fl z Cm textwarn | Fl z Cm textoff
-.Sm off
-.Op Fl z\~ Cm type= Cm exec | kmod | reloc | shared
-.Sm on
+.Op Fl z Cm type= Cm exec Ns | Ns Cm kmod Ns | Ns Cm reloc Ns | Ns Cm shared
 .Op Fl z Cm verbose
 .Op Fl z Cm wrap= Ns Ar symbol
 .Ar filename Ns No \&...
@@ -666,6 +665,18 @@ See
 in
 .%T Linker and Libraries Guide .
 .Pp
+If path begins with the string
+.Va $SYSROOT/
+.Pq for compatibility with Solaris
+or
+.Va =/
+.Pq for compatibility with GNU
+this token is replaced with the system root
+specified with
+.Fl z Cm sysroot
+or the default, the root filesystem
+.Pa / .
+.Pp
 The environment variable
 .Ev LD_LIBRARY_PATH
 can be used to supplement the library search path, however the
@@ -906,6 +917,18 @@ being used.
 Changes the default directories used for finding libraries.
 .Ar dirlist
 is a colon-separated path list.
+.Pp
+If the paths in this list begin with the string
+.Va $SYSROOT/
+.Pq for compatibility with Solaris
+or
+.Va =/
+.Pq for compatibility with GNU
+this token is replaced with the system root
+specified with
+.Fl z Cm sysroot
+or the root filesystem
+.Pa / .
 .Pp
 .It Fl z Cm absexec
 Useful only when building a dynamic executable.
@@ -1558,6 +1581,16 @@ the original name left in the resulting relocatable object.
 At runtime, the global symbol will be bound to the corresponding implementation
 that is appropriate based on the capabilities of the system.
 .Pp
+.It Fl z Cm sysroot= Ns Ar directory
+Specifies a directory to use as if it were the system root directory
+.Pq /
+when
+searching for libraries along the default search paths, or if specified to do
+so in the
+.Fl L
+or
+.Fl YP options.
+.Pp
 .It Fl z Cm target= Ns Cm sparc Ns | Ns Cm x86
 Specifies the machine type for the output object.
 Supported targets are
@@ -1808,15 +1841,22 @@ archive libraries.
 default output file.
 .It Ev LIBPATH
 For 32-bit libraries, the default search path is
-.Pa /usr/ccs/lib ,
+.Pa $SYSROOT/usr/ccs/lib ,
 followed by
-.Pa /lib ,
+.Pa $SYSROOT/lib ,
 and finally
-.Pa /usr/lib .
+.Pa $SYSROOT/usr/lib .
 For 64-bit libraries, the default search path is
-.Pa /lib/64 ,
+.Pa $SYSROOT/lib/64 ,
 followed by
-.Pa /usr/lib/64 .
+.Pa $SYSROOT/usr/lib/64 .
+.Pp
+The
+.Va $SYSROOT
+token is taken from the parameter to
+.Fl z Ar sysroot= and defaults to the
+root filesystem,
+.Pa / .
 .It Pa /usr/lib/ld
 A directory containing several mapfiles that can be used during link-editing.
 These mapfiles provide various capabilities, such as defining memory layouts,

@@ -240,6 +240,8 @@
 			 \t\t\tmember extraction occurs\n"
 @ MSG_ARG_DETAIL_ZSCAP	"\t[-z symbolcap]\tconvert object capabilities to \
 			 symbol capabilities\n"
+@ MSG_ARG_DETAIL_ZSYSR	"\t[-z sysroot=dir]\n\t\t\tuse dir in place of / \
+			 for library searches\n"
 @ MSG_ARG_DETAIL_ZTARG	"\t[-z target=platform]\n\
 			 \t\t\ttarget machine for cross linking\n"
 @ MSG_ARG_DETAIL_ZT	"\t[-z text]\tdisallow output relocations against \
@@ -711,6 +713,9 @@
 @ MSG_GUIDE_UNUSED	"removal of unused dependency recommended: %s"
 @ MSG_GUIDE_ASSERT_SIZE "size assertion recommended for non-local data: %s \
 			 size: %llu"
+
+@ MSG_SYSROOT_NOENT	"sysroot '%s' cannot be accessed: %s"
+@ MSG_SYSROOT_NOTDIR	"sysroot '%s' is not a directory"
 
 @ _END_
 
@@ -1342,8 +1347,6 @@
 @ MSG_STR_PATHTOK	";:"
 @ MSG_STR_AOUT		"a.out"
 
-@ MSG_STR_LIB_A		"%s/lib%s.a"
-@ MSG_STR_LIB_SO	"%s/lib%s.so"
 @ MSG_STR_PATH		"%s/%s"
 @ MSG_STR_STRNL		"%s\n"
 @ MSG_STR_NL		"\n"
@@ -1365,7 +1368,8 @@
 @ MSG_STR_NOBITS	"nobits"
 @ MSG_STR_HWCAP_1	"hwcap_1"
 @ MSG_STR_SFCAP_1	"sfcap_1"
-@ MSG_STR_SOEXT		".so"
+@ MSG_STR_DOTSO		".so"
+@ MSG_STR_DOTA		".a"
 
 @ MSG_STR_OPTIONS	"3:6:abc:d:e:f:h:il:mo:p:rstu:z:B:CD:F:GI:L:M:N:P:Q:R:\
 			 S:VW:Y:?"
@@ -1484,6 +1488,7 @@
 @ MSG_ARG_NODEFERRED	"nodeferred"
 @ MSG_ARG_ASSDEFLIB	"assert-deflib"
 @ MSG_ARG_TYPE		"type"
+@ MSG_ARG_SYSROOT	"sysroot="
 
 @ MSG_ARG_LCOM		"L,"
 @ MSG_ARG_PCOM		"P,"
@@ -1511,6 +1516,7 @@
 @ MSG_ARG_T_RELOCATABLE	"-relocatable"
 @ MSG_ARG_T_STARTGROUP	"-start-group"
 @ MSG_ARG_T_STRIP	"-strip-all"
+@ MSG_ARG_T_SYSROOT	"-sysroot"
 @ MSG_ARG_T_UNDEF	"-undefined"
 @ MSG_ARG_T_VERSION	"-version"
 @ MSG_ARG_T_WHOLEARC	"-whole-archive"
@@ -1663,5 +1669,7 @@
 @ MSG_MAPKW_WEAK		"WEAK"
 @ MSG_MAPKW_WRITE		"WRITE"
 
-
 @ MSG_STR_DTRACE	"PT_SUNWDTRACE"
+
+@ MSG_STR_SYSROOTPATH		"$SYSROOT/"
+@ MSG_STR_GNU_SYSROOTPATH	"=/"

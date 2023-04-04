@@ -411,6 +411,7 @@ struct ofl_desc {
 	int		ofl_aslr;	/* -z aslr, -1 disable, 1 enable */
 	APlist		*ofl_symasserts; /* assertions about symbols */
 					/* from mapfiles */
+	const char	*ofl_sysroot;	/* sysroot to use, if not the default */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
