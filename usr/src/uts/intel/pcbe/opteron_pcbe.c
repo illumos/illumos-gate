@@ -557,7 +557,7 @@ static uint64_t
 opt_pcbe_pic_addr(uint_t counter)
 {
 	ASSERT3U(counter, <, opd.opd_ncounters);
-	return (PIC_BASE_ADDR + 2 * counter);
+	return (PIC_BASE_ADDR + counter);
 }
 
 static uint64_t
