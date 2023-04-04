@@ -518,8 +518,7 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_XCVR_ADDR:
-		/* The Internal PHY's MDI address for each MAC is 1 */
-		*val = 1;
+		*val = hw->phy.addr;
 		break;
 
 	case ETHER_STAT_XCVR_ID:
@@ -527,25 +526,7 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_XCVR_INUSE:
-		switch (Adapter->link_speed) {
-		case SPEED_1000:
-			*val =
-			    (hw->phy.media_type == e1000_media_type_copper) ?
-			    XCVR_1000T : XCVR_1000X;
-			break;
-		case SPEED_100:
-			*val =
-			    (hw->phy.media_type == e1000_media_type_copper) ?
-			    (Adapter->phy_status & MII_SR_100T4_CAPS) ?
-			    XCVR_100T4 : XCVR_100T2 : XCVR_100X;
-			break;
-		case SPEED_10:
-			*val = XCVR_10;
-			break;
-		default:
-			*val = XCVR_NONE;
-			break;
-		}
+		*val = (uint64_t)e1000_link_to_media(hw, Adapter->link_speed);
 		break;
 
 	case ETHER_STAT_CAP_1000FDX:

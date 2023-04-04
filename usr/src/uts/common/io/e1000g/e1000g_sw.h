@@ -77,6 +77,7 @@ extern "C" {
 #include <sys/fm/util.h>
 #include <sys/fm/io/ddi.h>
 #include "e1000_api.h"
+#include "e1000_illumos.h"
 
 /* Driver states */
 #define	E1000G_UNKNOWN			0x00
@@ -422,7 +423,7 @@ extern "C" {
 
 
 #define	QUEUE_SWITCH(_LH1, _LH2)					\
-	if ((_LH2)->Flink) { 						\
+	if ((_LH2)->Flink) {						\
 		(_LH1)->Flink = (_LH2)->Flink;				\
 		(_LH1)->Blink = (_LH2)->Blink;				\
 		(_LH2)->Flink = (_LH2)->Blink = (PSINGLE_LIST_LINK)0;	\
