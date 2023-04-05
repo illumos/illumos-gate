@@ -18,7 +18,6 @@
 # Copyright 2020 Joyent, Inc.
 #
 
-$(i386_ONLY) file path=usr/share/man/man8/rdmsr.8 variant.opensolaris.zone=global
 file path=usr/share/man/man8/6to4relay.8
 file path=usr/share/man/man8/Intro.8
 file path=usr/share/man/man8/acctadm.8
@@ -210,6 +209,7 @@ file path=usr/share/man/man8/quotaon.8
 file path=usr/share/man/man8/raidctl.8
 file path=usr/share/man/man8/ramdiskadm.8
 file path=usr/share/man/man8/rctladm.8
+$(i386_ONLY)file path=usr/share/man/man8/rdmsr.8 variant.opensolaris.zone=global
 file path=usr/share/man/man8/reboot.8
 file path=usr/share/man/man8/rem_drv.8
 file path=usr/share/man/man8/repquota.8

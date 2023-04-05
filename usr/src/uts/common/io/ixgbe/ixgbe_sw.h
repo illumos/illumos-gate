@@ -658,6 +658,7 @@ typedef struct ixgbe {
 	uint32_t		default_mtu;
 	uint32_t		max_frame_size;
 	ixgbe_link_speed	speeds_supported;
+	uint64_t		phys_supported;
 
 	uint32_t		rcb_pending;
 
@@ -895,6 +896,7 @@ int ixgbe_rx_ring_intr_disable(mac_intr_handle_t);
 int ixgbe_transceiver_info(void *, uint_t, mac_transceiver_info_t *);
 int ixgbe_transceiver_read(void *, uint_t, uint_t, void *, size_t, off_t,
     size_t *);
+mac_ether_media_t ixgbe_phy_to_media(ixgbe_t *);
 
 /*
  * Function prototypes in ixgbe_gld.c

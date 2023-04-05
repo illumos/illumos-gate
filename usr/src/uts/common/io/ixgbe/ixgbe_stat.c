@@ -616,20 +616,7 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_XCVR_INUSE:
-		switch (ixgbe->link_speed) {
-		case IXGBE_LINK_SPEED_1GB_FULL:
-			*val =
-			    (hw->phy.media_type == ixgbe_media_type_copper) ?
-			    XCVR_1000T : XCVR_1000X;
-			break;
-		case IXGBE_LINK_SPEED_100_FULL:
-			*val = (hw->phy.media_type == ixgbe_media_type_copper) ?
-			    XCVR_100T2 : XCVR_100X;
-			break;
-		default:
-			*val = XCVR_NONE;
-			break;
-		}
+		*val = (uint64_t)ixgbe_phy_to_media(ixgbe);
 		break;
 
 	case ETHER_STAT_CAP_10GFDX:

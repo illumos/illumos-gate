@@ -15,7 +15,7 @@
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  * Copyright 2020 Ryan Zezeski
  * Copyright 2020 RackTop Systems, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1056,6 +1056,7 @@ i40e_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	case MAC_PROP_DUPLEX:
 	case MAC_PROP_SPEED:
 	case MAC_PROP_STATUS:
+	case MAC_PROP_MEDIA:
 	case MAC_PROP_ADV_100FDX_CAP:
 	case MAC_PROP_ADV_1000FDX_CAP:
 	case MAC_PROP_ADV_2500FDX_CAP:
@@ -1136,6 +1137,105 @@ i40e_fec_to_linkfec(struct i40e_hw *hw)
 	return (LINK_FEC_NONE);
 }
 
+mac_ether_media_t
+i40e_link_to_media(i40e_t *i40e)
+{
+	switch (i40e->i40e_link_state) {
+	case LINK_STATE_UP:
+		break;
+	case LINK_STATE_DOWN:
+		return (ETHER_MEDIA_NONE);
+	default:
+		return (ETHER_MEDIA_UNKNOWN);
+	}
+
+	switch (i40e->i40e_hw_space.phy.link_info.phy_type) {
+	case I40E_PHY_TYPE_SGMII:
+		return (ETHER_MEDIA_1000_SGMII);
+	case I40E_PHY_TYPE_1000BASE_KX:
+		return (ETHER_MEDIA_1000BASE_KX);
+	case I40E_PHY_TYPE_10GBASE_KX4:
+		return (ETHER_MEDIA_10GBASE_KX4);
+	case I40E_PHY_TYPE_10GBASE_KR:
+		return (ETHER_MEDIA_10GBASE_KR);
+	case I40E_PHY_TYPE_40GBASE_KR4:
+		return (ETHER_MEDIA_40GBASE_KR4);
+	case I40E_PHY_TYPE_XAUI:
+		return (ETHER_MEDIA_10G_XAUI);
+	case I40E_PHY_TYPE_XFI:
+		return (ETHER_MEDIA_10G_XFI);
+	case I40E_PHY_TYPE_SFI:
+		return (ETHER_MEDIA_10G_SFI);
+	case I40E_PHY_TYPE_XLAUI:
+		return (ETHER_MEDIA_40G_XLAUI);
+	case I40E_PHY_TYPE_XLPPI:
+		return (ETHER_MEDIA_40G_XLPPI);
+	case I40E_PHY_TYPE_40GBASE_CR4_CU:
+		return (ETHER_MEDIA_40GBASE_CR4);
+	case I40E_PHY_TYPE_10GBASE_CR1_CU:
+		return (ETHER_MEDIA_10GBASE_CR);
+	case I40E_PHY_TYPE_10GBASE_AOC:
+		return (ETHER_MEDIA_10GBASE_AOC);
+	case I40E_PHY_TYPE_40GBASE_AOC:
+		return (ETHER_MEDIA_40GBASE_AOC4);
+	case I40E_PHY_TYPE_100BASE_TX:
+		return (ETHER_MEDIA_100BASE_TX);
+	case I40E_PHY_TYPE_1000BASE_T:
+		return (ETHER_MEDIA_1000BASE_T);
+	case I40E_PHY_TYPE_10GBASE_T:
+		return (ETHER_MEDIA_10GBASE_T);
+	case I40E_PHY_TYPE_10GBASE_SR:
+		return (ETHER_MEDIA_10GBASE_SR);
+	case I40E_PHY_TYPE_10GBASE_LR:
+		return (ETHER_MEDIA_10GBASE_LR);
+	case I40E_PHY_TYPE_10GBASE_SFPP_CU:
+		return (ETHER_MEDIA_10GBASE_CR);
+	case I40E_PHY_TYPE_10GBASE_CR1:
+		return (ETHER_MEDIA_10GBASE_CR);
+	case I40E_PHY_TYPE_40GBASE_CR4:
+		return (ETHER_MEDIA_40GBASE_CR4);
+	case I40E_PHY_TYPE_40GBASE_SR4:
+		return (ETHER_MEDIA_40GBASE_SR4);
+	case I40E_PHY_TYPE_40GBASE_LR4:
+		return (ETHER_MEDIA_40GBASE_LR4);
+	case I40E_PHY_TYPE_1000BASE_SX:
+		return (ETHER_MEDIA_1000BASE_SX);
+	case I40E_PHY_TYPE_1000BASE_LX:
+		return (ETHER_MEDIA_1000BASE_LX);
+	case I40E_PHY_TYPE_1000BASE_T_OPTICAL:
+		return (ETHER_MEDIA_1000BASE_T);
+	case I40E_PHY_TYPE_25GBASE_KR:
+		return (ETHER_MEDIA_25GBASE_KR);
+	case I40E_PHY_TYPE_25GBASE_CR:
+		return (ETHER_MEDIA_25GBASE_CR);
+	case I40E_PHY_TYPE_25GBASE_SR:
+		return (ETHER_MEDIA_25GBASE_SR);
+	case I40E_PHY_TYPE_25GBASE_LR:
+		return (ETHER_MEDIA_25GBASE_LR);
+	case I40E_PHY_TYPE_25GBASE_AOC:
+		return (ETHER_MEDIA_25GBASE_AOC);
+	case I40E_PHY_TYPE_25GBASE_ACC:
+		return (ETHER_MEDIA_25GBASE_ACC);
+	case I40E_PHY_TYPE_2_5GBASE_T:
+		return (ETHER_MEDIA_2500BASE_T);
+	case I40E_PHY_TYPE_5GBASE_T:
+		return (ETHER_MEDIA_5000BASE_T);
+	case I40E_PHY_TYPE_EMPTY:
+		return (ETHER_MEDIA_NONE);
+	/*
+	 * We don't currently support 20GBASE-KR2 in any way in the GLD. If
+	 * someone actually can generate this, then we should do this.
+	 */
+	case I40E_PHY_TYPE_20GBASE_KR2:
+	case I40E_PHY_TYPE_DEFAULT:
+	case I40E_PHY_TYPE_UNRECOGNIZED:
+	case I40E_PHY_TYPE_UNSUPPORTED:
+	case I40E_PHY_TYPE_NOT_SUPPORTED_HIGH_TEMP:
+	default:
+		return (ETHER_MEDIA_UNKNOWN);
+	}
+}
+
 static int
 i40e_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val)
@@ -1170,6 +1270,9 @@ i40e_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		bcopy(&i40e->i40e_link_state, pr_val, sizeof (link_state_t));
+		break;
+	case MAC_PROP_MEDIA:
+		*(mac_ether_media_t *)pr_val = i40e_link_to_media(i40e);
 		break;
 	case MAC_PROP_AUTONEG:
 		if (pr_valsize < sizeof (uint8_t)) {

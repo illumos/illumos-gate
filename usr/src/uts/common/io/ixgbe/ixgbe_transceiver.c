@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -20,6 +21,120 @@
 
 #include "ixgbe_sw.h"
 #include "ixgbe_phy.h"
+
+/*
+ * This is a table that maps various link types, speeds, and physical media
+ * types together to something that can be used. We prefer to use the supported
+ * physical layer types so we can attempt to abstract around the various PHY and
+ * media types and try to create a single coherent place for these.
+ */
+typedef struct {
+	uint64_t ipm_phys;
+	uint32_t ipm_speed;
+	mac_ether_media_t ipm_media;
+} ixgbe_phys_map_t;
+
+const ixgbe_phys_map_t ixgbe_phys_map[] = {
+	/*
+	 * First we lead off with all copper based speeds. Note, some of these
+	 * may be used through an SFP or similar. SPEED_10 is listed here for
+	 * completeness sake, as other drivers list them, though it is is hard
+	 * to figure out how it is possible to get to 10 Mb/s because the X540 /
+	 * X550 do not support 10BASE-T.
+	 */
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_T, SPEED_10GB, ETHER_MEDIA_10GBASE_T },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_T, SPEED_5GB, ETHER_MEDIA_5000BASE_T },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_T, SPEED_2_5GB, ETHER_MEDIA_2500BASE_T },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_T, SPEED_1GB, ETHER_MEDIA_1000BASE_T },
+	{ IXGBE_PHYSICAL_LAYER_1000BASE_T, SPEED_1GB, ETHER_MEDIA_1000BASE_T },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_T, SPEED_100, ETHER_MEDIA_100BASE_TX },
+	{ IXGBE_PHYSICAL_LAYER_1000BASE_T, SPEED_100, ETHER_MEDIA_100BASE_TX },
+	{ IXGBE_PHYSICAL_LAYER_100BASE_TX, SPEED_100, ETHER_MEDIA_100BASE_TX },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_T, SPEED_10, ETHER_MEDIA_10BASE_T },
+	{ IXGBE_PHYSICAL_LAYER_1000BASE_T, SPEED_10, ETHER_MEDIA_10BASE_T },
+	{ IXGBE_PHYSICAL_LAYER_100BASE_TX, SPEED_10, ETHER_MEDIA_10BASE_T },
+	{ IXGBE_PHYSICAL_LAYER_10BASE_T, SPEED_10, ETHER_MEDIA_10BASE_T },
+	/*
+	 * After this point we mostly are in backplane or SFP based formats. In
+	 * general there is a 1:1 mapping between a physical ability and a
+	 * speed. However, a few allow multiple speeds to be set and we have to
+	 * derive this from the common code. Example of this nuance in
+	 * particular are around KR/KX.
+	 */
+	{ IXGBE_PHYSICAL_LAYER_SFP_PLUS_CU, SPEED_10GB,
+	    ETHER_MEDIA_10GBASE_CR },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_LR, SPEED_10GB,
+	    ETHER_MEDIA_10GBASE_LR },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_LR, SPEED_1GB,
+	    ETHER_MEDIA_1000BASE_LX },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_LRM, SPEED_10GB,
+	    ETHER_MEDIA_10GBASE_LRM },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_LRM, SPEED_1GB,
+	    ETHER_MEDIA_1000BASE_LX },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_SR, SPEED_10GB,
+	    ETHER_MEDIA_10GBASE_SR },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_SR, SPEED_1GB,
+	    ETHER_MEDIA_1000BASE_SX },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_KX4, SPEED_10GB,
+	    ETHER_MEDIA_10GBASE_KX4 },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_KX4, SPEED_1GB,
+	    ETHER_MEDIA_1000BASE_KX },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_CX4, SPEED_10GB,
+	    ETHER_MEDIA_10GBASE_CX4 },
+	{ IXGBE_PHYSICAL_LAYER_1000BASE_KX, SPEED_1GB,
+	    ETHER_MEDIA_1000BASE_KX },
+	{ IXGBE_PHYSICAL_LAYER_1000BASE_BX, SPEED_1GB,
+	    ETHER_MEDIA_1000BASE_BX },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_KR, SPEED_10GB,
+	    ETHER_MEDIA_10GBASE_KR },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_KR, SPEED_2_5GB,
+	    ETHER_MEDIA_2500BASE_KX },
+	{ IXGBE_PHYSICAL_LAYER_10GBASE_XAUI, SPEED_10GB,
+	    ETHER_MEDIA_10G_XAUI },
+	{ IXGBE_PHYSICAL_LAYER_SFP_ACTIVE_DA, SPEED_10GB,
+	    ETHER_MEDIA_10GBASE_ACC },
+	{ IXGBE_PHYSICAL_LAYER_1000BASE_SX, SPEED_1GB,
+	    ETHER_MEDIA_1000BASE_SX },
+	{ IXGBE_PHYSICAL_LAYER_2500BASE_KX, SPEED_2_5GB,
+	    ETHER_MEDIA_2500BASE_KX }
+};
+
+mac_ether_media_t
+ixgbe_phy_to_media(ixgbe_t *ixgbe)
+{
+	struct ixgbe_hw *hw = &ixgbe->hw;
+
+	ASSERT(MUTEX_HELD(&ixgbe->gen_lock));
+	switch (hw->phy.media_type) {
+	case ixgbe_media_type_copper:
+	case ixgbe_media_type_fiber:
+	case ixgbe_media_type_fiber_fixed:
+	case ixgbe_media_type_fiber_qsfp:
+	case ixgbe_media_type_backplane:
+	case ixgbe_media_type_cx4:
+		for (size_t i = 0; i < ARRAY_SIZE(ixgbe_phys_map); i++) {
+			const ixgbe_phys_map_t *map = &ixgbe_phys_map[i];
+			if ((ixgbe->phys_supported & map->ipm_phys) != 0 &&
+			    ixgbe->link_speed == map->ipm_speed) {
+				return (map->ipm_media);
+			}
+		}
+
+		if (ixgbe->link_state != LINK_STATE_DOWN) {
+			return (ETHER_MEDIA_UNKNOWN);
+		} else {
+			return (ETHER_MEDIA_NONE);
+		}
+		break;
+	/*
+	 * We don't bother trying to make up anything for a VF.
+	 */
+	case ixgbe_media_type_virtual:
+		return (ETHER_MEDIA_NONE);
+	default:
+		return (ETHER_MEDIA_UNKNOWN);
+	}
+}
 
 static int
 ixgbe_transceiver_is_8472(ixgbe_t *ixgbe, boolean_t *valp)

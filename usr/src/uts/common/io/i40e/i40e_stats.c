@@ -913,17 +913,7 @@ i40e_m_stat(void *arg, uint_t stat, uint64_t *val)
 		}
 		break;
 	case ETHER_STAT_XCVR_INUSE:
-		switch (hw->phy.link_info.phy_type) {
-		case I40E_PHY_TYPE_100BASE_TX:
-			*val = XCVR_100T2;
-			break;
-		case I40E_PHY_TYPE_1000BASE_T:
-			*val = XCVR_1000T;
-			break;
-		default:
-			*val = XCVR_UNDEFINED;
-			break;
-		}
+		*val = (uint64_t)i40e_link_to_media(i40e);
 		break;
 
 	/*

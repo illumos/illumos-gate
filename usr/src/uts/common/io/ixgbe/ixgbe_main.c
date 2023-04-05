@@ -5945,6 +5945,7 @@ ixgbe_get_hw_state(ixgbe_t *ixgbe)
 
 	/* check for link, don't wait */
 	(void) ixgbe_check_link(hw, &speed, &link_up, B_FALSE);
+	ixgbe->phys_supported = ixgbe_get_supported_physical_layer(hw);
 
 	/*
 	 * Update the observed Link Partner's capabilities. Not all adapters

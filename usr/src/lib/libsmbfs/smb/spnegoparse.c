@@ -1,3 +1,4 @@
+// Copyright 2022 RackTop Systems, Inc.
 // Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
 // Copyright (C) 2002 Microsoft Corporation
 // All rights reserved.
@@ -309,7 +310,7 @@ int CreateSpnegoInitToken( SPNEGO_MECH_OID *pMechTypeList, long MechTypeCnt,
       {
          goto xEndWriteNegTokenInit;
       }
-  
+
    }  // IF MechToken Length is present
 
    // Next is the ReqFlags
@@ -416,7 +417,7 @@ int CreateSpnegoInitToken( SPNEGO_MECH_OID *pMechTypeList, long MechTypeCnt,
 
    // App Constructed Token
    nTempLength = ASNDerCalcTokenLength( nTotalBytesWritten, 0L );
-   
+
    // Decrease the pbWriteTokenData, now we know the length and
    // write it out.
    pbWriteTokenData -= nTempLength;
@@ -676,7 +677,7 @@ int CreateSpnegoTargToken( SPNEGO_MECH_OID MechType,
       {
          goto xEndWriteNegTokenTarg;
       }
-  
+
    }  // IF MechToken Length is present
 
    // Supported Mech Type
@@ -853,7 +854,7 @@ SPNEGO_TOKEN* AllocEmptySpnegoToken( unsigned char ucCopyData, unsigned long ulF
       {
          // Copy the pointer and the length directly - ulFlags will control whether or not
          // we are allowed to free the value
-         
+
          pSpnegoToken->pbBinaryData = pbTokenData;
          pSpnegoToken->ulBinaryDataLen = ulTokenSize;
       }
@@ -931,7 +932,7 @@ void InitSpnegoTokenElementArray( SPNEGO_TOKEN* pSpnegoToken )
       pSpnegoToken->aElementArray[ nCtr ].nStructSize = SPNEGO_ELEMENT_SIZE;
       pSpnegoToken->aElementArray[ nCtr ].iElementPresent = SPNEGO_TOKEN_ELEMENT_UNAVAILABLE;
    }
-   
+
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1153,7 +1154,7 @@ int GetSpnegoInitTokenMechList( unsigned char* pbTokenData, int nMechListLength,
 //
 // Comments :
 //    Checks that pbTokenData is pointing at the specified DER type.  If so,
-//    then we verify that lengths are proper and then fill out the 
+//    then we verify that lengths are proper and then fill out the
 //    SPNEGO_ELEMENT data structure.
 //
 ////////////////////////////////////////////////////////////////////////////
@@ -1326,7 +1327,7 @@ int InitSpnegoTokenElements( SPNEGO_TOKEN* pSpnegoToken, unsigned char* pbTokenD
          nRemainingTokenLength > 0L;
          nCtr++ )
    {
-      
+
       // Check if the token exists
       if ( ( nReturn = ASNDerCheckToken( pbTokenData, pbElements[nCtr],
                                           0L, nRemainingTokenLength,
@@ -1541,7 +1542,7 @@ int FindMechOIDInMechList( SPNEGO_ELEMENT* pSpnegoElement, SPNEGO_MECH_OID MechO
 
    while( SPNEGO_E_SUCCESS != nReturn && nBoundaryLength > 0L )
    {
-      
+
       // Use the helper function to check the OID
       if ( ( nReturn = ASNDerCheckOID( pbMechListData, MechOID, nBoundaryLength, &nLength ) )
                      == SPNEGO_E_SUCCESS )
@@ -1592,9 +1593,9 @@ int ValidateMechList( unsigned char* pbMechListData, long nBoundaryLength )
       // Verify that we have something that at least *looks* like an OID - in other
       // words it has an OID identifier and specifies a length that doesn't go beyond
       // the size of the list.
-      nReturn = ASNDerCheckToken( pbMechListData, OID, 0L, nBoundaryLength, 
+      nReturn = ASNDerCheckToken( pbMechListData, OID, 0L, nBoundaryLength,
                                   &nLength, &nTokenLength );
-      
+
       // Adjust for the current OID
       pbMechListData += ( nLength + nTokenLength );
       nBoundaryLength -= ( nLength + nTokenLength );
@@ -1672,7 +1673,7 @@ int IsValidContextFlags( unsigned char ucContextFlags )
 int IsValidNegResult( SPNEGO_NEGRESULT negResult )
 {
    return ( negResult >= spnego_negresult_success &&
-            negResult <= spnego_negresult_rejected );
+            negResult <= spnego_negresult_request_mic );
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1838,7 +1839,7 @@ int InitTokenFromBinary( unsigned char ucCopyData, unsigned long ulFlags,
    unsigned char* pbFirstElement = NULL;
    long           nTokenLength = 0L;
    long           nRemainingTokenLength = 0L;
-   
+
    // Basic Parameter Validation
 
    if (  NULL != pbTokenData &&
@@ -1856,7 +1857,7 @@ int InitTokenFromBinary( unsigned char ucCopyData, unsigned long ulFlags,
       {
 
          // Copy the binary data locally
-           
+
 
          // Initialize the token type
          if ( ( nReturn = InitSpnegoTokenType( pSpnegoToken, &nTokenLength,
