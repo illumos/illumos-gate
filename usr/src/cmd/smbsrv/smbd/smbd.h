@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 #ifndef _SMBD_H
@@ -91,9 +91,7 @@ typedef struct smbd {
 	int		s_door_srv;
 	int		s_door_opipe;
 	int		s_secmode;	/* Current security mode */
-	char		s_site[MAXHOSTNAMELEN];
-	smb_inaddr_t	s_pdc;
-	boolean_t	s_pdc_changed;
+	boolean_t	s_dc_changed;
 	pthread_t	s_refresh_tid;
 	pthread_t	s_authsvc_tid;
 	pthread_t	s_localtime_tid;

@@ -88,12 +88,14 @@ typedef struct idmap_pg_config {
 	boolean_t	domain_name_auto_disc;
 	char		*domain_guid;		/* GUID (string) */
 	boolean_t	domain_guid_auto_disc;
+	char		**cfg_domain_controller;
 	ad_disc_ds_t	*domain_controller;	/* domain controller hosts */
 	boolean_t	domain_controller_auto_disc;
 	char		*forest_name;		/* forest name */
 	boolean_t	forest_name_auto_disc;
 	char		*site_name;		/* site name */
 	boolean_t	site_name_auto_disc;
+	char		**cfg_global_catalog;
 	ad_disc_ds_t	*global_catalog;	/* global catalog hosts */
 	boolean_t	global_catalog_auto_disc;
 	ad_disc_domainsinforest_t
@@ -104,6 +106,7 @@ typedef struct idmap_pg_config {
 	idmap_trustedforest_t
 			*trusted_forests;	/* Array of trusted forests */
 
+	char		**cfg_preferred_dc;
 	ad_disc_ds_t	*preferred_dc;
 	boolean_t	preferred_dc_auto_disc;
 

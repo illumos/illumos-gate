@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <syslog.h>
@@ -65,9 +66,6 @@ smbd_dc_monitor_init(void)
 	pthread_attr_t	attr;
 	int		rc;
 
-	(void) smb_config_getstr(SMB_CI_ADS_SITE, smbd.s_site,
-	    MAXHOSTNAMELEN);
-	(void) smb_config_getip(SMB_CI_DOMAIN_SRV, &smbd.s_pdc);
 	smb_ads_init();
 
 	if (smbd.s_secmode != SMB_SECMODE_DOMAIN)
@@ -96,7 +94,7 @@ smbd_dc_monitor_refresh(void)
 
 	(void) mutex_lock(&smbd_dc_mutex);
 
-	smbd.s_pdc_changed = B_TRUE;
+	smbd.s_dc_changed = B_TRUE;
 	(void) cond_signal(&smbd_dc_cv);
 
 	(void) mutex_unlock(&smbd_dc_mutex);
@@ -125,8 +123,8 @@ smbd_dc_monitor(void *arg)
 		(void) mutex_lock(&smbd_dc_mutex);
 		(void) cond_reltimedwait(&smbd_dc_cv, &smbd_dc_mutex, &delay);
 
-		if (smbd.s_pdc_changed) {
-			smbd.s_pdc_changed = B_FALSE;
+		if (smbd.s_dc_changed) {
+			smbd.s_dc_changed = B_FALSE;
 			ds_cfg_changed = B_TRUE;
 			/* NB: smb_ddiscover_refresh was called. */
 		}
