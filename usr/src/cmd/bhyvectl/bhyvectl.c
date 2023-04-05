@@ -39,7 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -119,6 +119,8 @@ usage(bool cpu_intel)
 	"       [--set-desc-idtr]\n"
 	"       [--get-desc-idtr]\n"
 	"       [--run]\n"
+	"       [--pause]\n"
+	"       [--resume]\n"
 	"       [--capname=<capname>]\n"
 	"       [--getcap]\n"
 	"       [--setcap=<0|1>]\n"
@@ -302,6 +304,7 @@ static int get_cs, get_ds, get_es, get_fs, get_gs, get_ss, get_tr, get_ldtr;
 static int set_x2apic_state, get_x2apic_state;
 enum x2apic_state x2apic_state;
 static int run;
+static int do_pause, do_resume;
 static int get_cpu_topology;
 static int pmtmr_port;
 static int wrlock_cycle;
@@ -1326,6 +1329,8 @@ setup_options(bool cpu_intel)
 		{ "get-x2apic-state",	NO_ARG,	&get_x2apic_state, 	1 },
 		{ "get-all",		NO_ARG,	&get_all,		1 },
 		{ "run",		NO_ARG,	&run,			1 },
+		{ "pause",		NO_ARG,	&do_pause,		1 },
+		{ "resume",		NO_ARG,	&do_resume,		1 },
 		{ "create",		NO_ARG,	&create,		1 },
 		{ "destroy",		NO_ARG,	&destroy,		1 },
 		{ "inject-nmi",		NO_ARG,	&inject_nmi,		1 },
@@ -2333,6 +2338,21 @@ main(int argc, char *argv[])
 			dump_vm_run_exitcode(&vmexit, vcpu);
 		else
 			printf("vm_run error %d\n", error);
+	}
+
+	if (!error && do_pause) {
+		error = ioctl(vm_get_device_fd(ctx), VM_PAUSE, vcpu);
+
+		if (error != 0) {
+			printf("vm_pause error %d\n", errno);
+		}
+	}
+	if (!error && do_resume) {
+		error = ioctl(vm_get_device_fd(ctx), VM_RESUME, vcpu);
+
+		if (error != 0) {
+			printf("vm_resume error %d\n", errno);
+		}
 	}
 
 	if (!error && force_reset)

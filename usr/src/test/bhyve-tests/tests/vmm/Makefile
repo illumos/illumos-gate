@@ -31,6 +31,7 @@ PROG =	mem_partial \
 	cpuid_ioctl \
 	default_capabs \
 	datarw_constraints \
+	datarw_vcpu \
 	pause_resume \
 	import_vlapic
 

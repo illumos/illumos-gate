@@ -248,6 +248,7 @@ static struct vmm_ops vmm_ops_null = {
 	.vmsetcap	= (vmi_set_cap_t)nullop_panic,
 	.vlapic_init	= (vmi_vlapic_init)nullop_panic,
 	.vlapic_cleanup	= (vmi_vlapic_cleanup)nullop_panic,
+	.vmpause	= (vmi_pause_t)nullop_panic,
 	.vmsavectx	= (vmi_savectx)nullop_panic,
 	.vmrestorectx	= (vmi_restorectx)nullop_panic,
 	.vmgetmsr	= (vmi_get_msr_t)nullop_panic,
@@ -756,6 +757,13 @@ vm_pause_instance(struct vm *vm)
 			continue;
 		}
 		vlapic_pause(vcpu->vlapic);
+
+		/*
+		 * vCPU-specific pause logic includes stashing any
+		 * to-be-injected events in exit_intinfo where it can be
+		 * accessed in a manner generic to the backend.
+		 */
+		ops->vmpause(vm->cookie, i);
 	}
 	vhpet_pause(vm->vhpet);
 	vatpit_pause(vm->vatpit);
@@ -2391,6 +2399,9 @@ vm_run(struct vm *vm, int vcpuid, const struct vm_entry *entry)
 		return (EINVAL);
 	if (!CPU_ISSET(vcpuid, &vm->active_cpus))
 		return (EINVAL);
+	if (vm->is_paused) {
+		return (EBUSY);
+	}
 
 	vcpu = &vm->vcpu[vcpuid];
 	vme = &vcpu->exitinfo;
@@ -3806,8 +3817,10 @@ vmm_data_is_cpu_specific(uint16_t data_class)
 	case VDC_LAPIC:
 		return (true);
 	default:
-		return (false);
+		break;
 	}
+
+	return (false);
 }
 
 static int
@@ -4062,9 +4075,8 @@ static const vmm_data_version_entry_t msr_v1 = {
 	.vdve_class = VDC_MSR,
 	.vdve_version = 1,
 	.vdve_len_per_item = sizeof (struct vdi_field_entry_v1),
-	/* Requires backend-specific dispatch */
-	.vdve_readf = NULL,
-	.vdve_writef = NULL,
+	.vdve_vcpu_readf = vmm_data_read_msrs,
+	.vdve_vcpu_writef = vmm_data_write_msrs,
 };
 VMM_DATA_VERSION(msr_v1);
 
@@ -4072,40 +4084,76 @@ static const uint32_t vmm_arch_v1_fields[] = {
 	VAI_TSC_BOOT_OFFSET,
 	VAI_BOOT_HRTIME,
 	VAI_TSC_FREQ,
+	VAI_VM_IS_PAUSED,
+};
+
+static const uint32_t vmm_arch_v1_vcpu_fields[] = {
+	VAI_PEND_NMI,
+	VAI_PEND_EXTINT,
+	VAI_PEND_EXCP,
+	VAI_PEND_INTINFO,
 };
 
 static bool
-vmm_read_arch_field(struct vm *vm, uint32_t ident, uint64_t *valp)
+vmm_read_arch_field(struct vm *vm, int vcpuid, uint32_t ident, uint64_t *valp)
 {
 	ASSERT(valp != NULL);
 
-	switch (ident) {
-	case VAI_TSC_BOOT_OFFSET:
-		*valp = vm->boot_tsc_offset;
-		return (true);
-	case VAI_BOOT_HRTIME:
-		*valp = vm->boot_hrtime;
-		return (true);
-	case VAI_TSC_FREQ:
-		/*
-		 * Since the system TSC calibration is not public, just derive
-		 * it from the scaling functions available.
-		 */
-		*valp = unscalehrtime(NANOSEC);
-		return (true);
-	default:
-		break;
+	if (vcpuid == -1) {
+		switch (ident) {
+		case VAI_TSC_BOOT_OFFSET:
+			*valp = vm->boot_tsc_offset;
+			return (true);
+		case VAI_BOOT_HRTIME:
+			*valp = vm->boot_hrtime;
+			return (true);
+		case VAI_TSC_FREQ:
+			/*
+			 * Since the system TSC calibration is not public, just
+			 * derive it from the scaling functions available.
+			 */
+			*valp = unscalehrtime(NANOSEC);
+			return (true);
+		case VAI_VM_IS_PAUSED:
+			*valp = vm->is_paused ? 1 : 0;
+			return (true);
+		default:
+			break;
+		}
+	} else {
+		VERIFY(vcpuid >= 0 && vcpuid <= VM_MAXCPU);
+
+		struct vcpu *vcpu = &vm->vcpu[vcpuid];
+		switch (ident) {
+		case VAI_PEND_NMI:
+			*valp = vcpu->nmi_pending != 0 ? 1 : 0;
+			return (true);
+		case VAI_PEND_EXTINT:
+			*valp = vcpu->extint_pending != 0 ? 1 : 0;
+			return (true);
+		case VAI_PEND_EXCP:
+			*valp = vcpu->exc_pending;
+			return (true);
+		case VAI_PEND_INTINFO:
+			*valp = vcpu->exit_intinfo;
+			return (true);
+		default:
+			break;
+		}
 	}
 	return (false);
 }
 
 static int
-vmm_data_read_vmm_arch(void *arg, const vmm_data_req_t *req)
+vmm_data_read_varch(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 {
-	struct vm *vm = arg;
-
 	VERIFY3U(req->vdr_class, ==, VDC_VMM_ARCH);
 	VERIFY3U(req->vdr_version, ==, 1);
+
+	/* per-vCPU fields are handled separately from VM-wide ones */
+	if (vcpuid != -1 && (vcpuid < 0 || vcpuid >= VM_MAXCPU)) {
+		return (EINVAL);
+	}
 
 	struct vdi_field_entry_v1 *entryp = req->vdr_data;
 
@@ -4115,7 +4163,7 @@ vmm_data_read_vmm_arch(void *arg, const vmm_data_req_t *req)
 		    req->vdr_len / sizeof (struct vdi_field_entry_v1);
 
 		for (uint_t i = 0; i < count; i++, entryp++) {
-			if (!vmm_read_arch_field(vm, entryp->vfe_ident,
+			if (!vmm_read_arch_field(vm, vcpuid, entryp->vfe_ident,
 			    &entryp->vfe_value)) {
 				return (EINVAL);
 			}
@@ -4126,27 +4174,93 @@ vmm_data_read_vmm_arch(void *arg, const vmm_data_req_t *req)
 	}
 
 	/* Emit all of the possible values */
-	const uint32_t total_size = nitems(vmm_arch_v1_fields) *
-	    sizeof (struct vdi_field_entry_v1);
+	const uint32_t *idents;
+	uint_t ident_count;
+
+	if (vcpuid == -1) {
+		idents = vmm_arch_v1_fields;
+		ident_count = nitems(vmm_arch_v1_fields);
+	} else {
+		idents = vmm_arch_v1_vcpu_fields;
+		ident_count = nitems(vmm_arch_v1_vcpu_fields);
+
+	}
+
+	const uint32_t total_size =
+	    ident_count * sizeof (struct vdi_field_entry_v1);
+
 	*req->vdr_result_len = total_size;
 	if (req->vdr_len < total_size) {
 		return (ENOSPC);
 	}
-	for (uint_t i = 0; i < nitems(vmm_arch_v1_fields); i++, entryp++) {
-		entryp->vfe_ident = vmm_arch_v1_fields[i];
-		VERIFY(vmm_read_arch_field(vm, entryp->vfe_ident,
+	for (uint_t i = 0; i < ident_count; i++, entryp++) {
+		entryp->vfe_ident = idents[i];
+		VERIFY(vmm_read_arch_field(vm, vcpuid, entryp->vfe_ident,
 		    &entryp->vfe_value));
 	}
 	return (0);
 }
 
 static int
-vmm_data_write_vmm_arch(void *arg, const vmm_data_req_t *req)
+vmm_data_write_varch_vcpu(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 {
-	struct vm *vm = arg;
-
 	VERIFY3U(req->vdr_class, ==, VDC_VMM_ARCH);
 	VERIFY3U(req->vdr_version, ==, 1);
+
+	if (vcpuid < 0 || vcpuid >= VM_MAXCPU) {
+		return (EINVAL);
+	}
+
+	const struct vdi_field_entry_v1 *entryp = req->vdr_data;
+	const uint_t entry_count =
+	    req->vdr_len / sizeof (struct vdi_field_entry_v1);
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
+
+	for (uint_t i = 0; i < entry_count; i++, entryp++) {
+		const uint64_t val = entryp->vfe_value;
+
+		switch (entryp->vfe_ident) {
+		case VAI_PEND_NMI:
+			vcpu->nmi_pending = (val != 0);
+			break;
+		case VAI_PEND_EXTINT:
+			vcpu->extint_pending = (val != 0);
+			break;
+		case VAI_PEND_EXCP:
+			if (!VM_INTINFO_PENDING(val)) {
+				vcpu->exc_pending = 0;
+			} else if (VM_INTINFO_TYPE(val) != VM_INTINFO_HWEXCP ||
+			    (val & VM_INTINFO_MASK_RSVD) != 0) {
+				/* reject improperly-formed hw exception */
+				return (EINVAL);
+			} else {
+				vcpu->exc_pending = val;
+			}
+			break;
+		case VAI_PEND_INTINFO:
+			if (vm_exit_intinfo(vm, vcpuid, val) != 0) {
+				return (EINVAL);
+			}
+			break;
+		default:
+			return (EINVAL);
+		}
+	}
+
+	*req->vdr_result_len = entry_count * sizeof (struct vdi_field_entry_v1);
+	return (0);
+}
+
+static int
+vmm_data_write_varch(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_VMM_ARCH);
+	VERIFY3U(req->vdr_version, ==, 1);
+
+	/* per-vCPU fields are handled separately from VM-wide ones */
+	if (vcpuid != -1) {
+		return (vmm_data_write_varch_vcpu(vm, vcpuid, req));
+	}
 
 	const struct vdi_field_entry_v1 *entryp = req->vdr_data;
 	const uint_t entry_count =
@@ -4165,6 +4279,13 @@ vmm_data_write_vmm_arch(void *arg, const vmm_data_req_t *req)
 		case VAI_TSC_FREQ:
 			/* Guest TSC frequency not (currently) adjustable */
 			return (EPERM);
+		case VAI_VM_IS_PAUSED:
+			/*
+			 * The VM_PAUSE and VM_RESUME ioctls are the officially
+			 * sanctioned mechanisms for setting the is-paused state
+			 * of the VM.
+			 */
+			return (EPERM);
 		default:
 			return (EINVAL);
 		}
@@ -4177,8 +4298,8 @@ static const vmm_data_version_entry_t vmm_arch_v1 = {
 	.vdve_class = VDC_VMM_ARCH,
 	.vdve_version = 1,
 	.vdve_len_per_item = sizeof (struct vdi_field_entry_v1),
-	.vdve_readf = vmm_data_read_vmm_arch,
-	.vdve_writef = vmm_data_write_vmm_arch,
+	.vdve_vcpu_readf = vmm_data_read_varch,
+	.vdve_vcpu_writef = vmm_data_write_varch,
 };
 VMM_DATA_VERSION(vmm_arch_v1);
 
@@ -4245,31 +4366,22 @@ vmm_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	}
 	ASSERT(entry != NULL);
 
-	void *datap = vmm_data_from_class(req, vm, vcpuid);
-	if (datap != NULL) {
-		err = entry->vdve_readf(datap, req);
+	if (entry->vdve_readf != NULL) {
+		void *datap = vmm_data_from_class(req, vm, vcpuid);
 
-		/*
-		 * Successful reads of fixed-length data should populate the
-		 * length of that result.
-		 */
-		if (err == 0 && entry->vdve_len_expect != 0) {
-			*req->vdr_result_len = entry->vdve_len_expect;
-		}
+		err = entry->vdve_readf(datap, req);
+	} else if (entry->vdve_vcpu_readf != NULL) {
+		err = entry->vdve_vcpu_readf(vm, vcpuid, req);
 	} else {
-		switch (req->vdr_class) {
-		case VDC_MSR:
-			err = vmm_data_read_msrs(vm, vcpuid, req);
-			break;
-		case VDC_FPU:
-			/* TODO: wire up to xsave export via hma_fpu iface */
-			err = EINVAL;
-			break;
-		case VDC_REGISTER:
-		default:
-			err = EINVAL;
-			break;
-		}
+		err = EINVAL;
+	}
+
+	/*
+	 * Successful reads of fixed-length data should populate the length of
+	 * that result.
+	 */
+	if (err == 0 && entry->vdve_len_expect != 0) {
+		*req->vdr_result_len = entry->vdve_len_expect;
 	}
 
 	return (err);
@@ -4293,30 +4405,22 @@ vmm_data_write(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	}
 	ASSERT(entry != NULL);
 
-	void *datap = vmm_data_from_class(req, vm, vcpuid);
-	if (datap != NULL) {
+	if (entry->vdve_writef != NULL) {
+		void *datap = vmm_data_from_class(req, vm, vcpuid);
+
 		err = entry->vdve_writef(datap, req);
-		/*
-		 * Successful writes of fixed-length data should populate the
-		 * length of that result.
-		 */
-		if (err == 0 && entry->vdve_len_expect != 0) {
-			*req->vdr_result_len = entry->vdve_len_expect;
-		}
+	} else if (entry->vdve_vcpu_writef != NULL) {
+		err = entry->vdve_vcpu_writef(vm, vcpuid, req);
 	} else {
-		switch (req->vdr_class) {
-		case VDC_MSR:
-			err = vmm_data_write_msrs(vm, vcpuid, req);
-			break;
-		case VDC_FPU:
-			/* TODO: wire up to xsave import via hma_fpu iface */
-			err = EINVAL;
-			break;
-		case VDC_REGISTER:
-		default:
-			err = EINVAL;
-			break;
-		}
+		err = EINVAL;
+	}
+
+	/*
+	 * Successful writes of fixed-length data should populate the length of
+	 * that result.
+	 */
+	if (err == 0 && entry->vdve_len_expect != 0) {
+		*req->vdr_result_len = entry->vdve_len_expect;
 	}
 
 	return (err);

@@ -924,31 +924,43 @@ CTASSERT(VMCB_EVENTINJ_TYPE_INTn	== VM_INTINFO_SWINTR);
 CTASSERT(VMCB_EVENTINJ_EC_VALID		== VM_INTINFO_DEL_ERRCODE);
 CTASSERT(VMCB_EVENTINJ_VALID		== VM_INTINFO_VALID);
 
+/*
+ * Store SVM-specific event injection info for later handling.  This depends on
+ * the bhyve-internal event definitions matching those in the VMCB, as ensured
+ * by the above CTASSERTs.
+ */
+static void
+svm_stash_intinfo(struct svm_softc *svm_sc, int vcpu, uint64_t intinfo)
+{
+	ASSERT(VMCB_EXITINTINFO_VALID(intinfo));
+
+	/*
+	 * If stashing an NMI pending injection, ensure that it bears the
+	 * correct vector which exit_intinfo expects.
+	 */
+	if (VM_INTINFO_TYPE(intinfo) == VM_INTINFO_NMI) {
+		intinfo &= ~VM_INTINFO_MASK_VECTOR;
+		intinfo |= IDT_NMI;
+	}
+
+	VERIFY0(vm_exit_intinfo(svm_sc->vm, vcpu, intinfo));
+}
+
 static void
 svm_save_exitintinfo(struct svm_softc *svm_sc, int vcpu)
 {
-	struct vmcb_ctrl *ctrl;
-	uint64_t intinfo;
-	int err;
+	struct vmcb_ctrl *ctrl  = svm_get_vmcb_ctrl(svm_sc, vcpu);
+	uint64_t intinfo = ctrl->exitintinfo;
 
-	ctrl  = svm_get_vmcb_ctrl(svm_sc, vcpu);
-	intinfo = ctrl->exitintinfo;
-	if (!VMCB_EXITINTINFO_VALID(intinfo))
-		return;
+	if (VMCB_EXITINTINFO_VALID(intinfo)) {
+		/*
+		 * If a #VMEXIT happened during event delivery then record the
+		 * event that was being delivered.
+		 */
+		vmm_stat_incr(svm_sc->vm, vcpu, VCPU_EXITINTINFO, 1);
 
-	/*
-	 * From APMv2, Section "Intercepts during IDT interrupt delivery"
-	 *
-	 * If a #VMEXIT happened during event delivery then record the event
-	 * that was being delivered.
-	 */
-	vmm_stat_incr(svm_sc->vm, vcpu, VCPU_EXITINTINFO, 1);
-	/*
-	 * Relies on match between VMCB exitintinfo format and bhyve-generic
-	 * format, which is ensured by CTASSERTs above.
-	 */
-	err = vm_exit_intinfo(svm_sc->vm, vcpu, intinfo);
-	VERIFY0(err);
+		svm_stash_intinfo(svm_sc, vcpu, intinfo);
+	}
 }
 
 static __inline int
@@ -2511,6 +2523,32 @@ svm_vlapic_cleanup(void *arg, struct vlapic *vlapic)
 }
 
 static void
+svm_pause(void *arg, int vcpu)
+{
+	struct svm_softc *sc = arg;
+	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(sc, vcpu);
+
+	/*
+	 * If an event is pending injection in the VMCB, stash it in
+	 * exit_intinfo as if it were deferred by an exit from guest context.
+	 */
+	const uint64_t intinfo = ctrl->eventinj;
+	if ((intinfo & VMCB_EVENTINJ_VALID) != 0) {
+		svm_stash_intinfo(sc, vcpu, intinfo);
+		ctrl->eventinj = 0;
+	}
+
+	/*
+	 * Now that no event is pending injection, interrupt-window exiting and
+	 * NMI-blocking can be disabled.  If/when this vCPU is made to run
+	 * again, those conditions will be reinstated when the now-queued events
+	 * are re-injected.
+	 */
+	svm_disable_intr_window_exiting(sc, vcpu);
+	svm_disable_intercept(sc, vcpu, VMCB_CTRL1_INTCPT, VMCB_INTCPT_IRET);
+}
+
+static void
 svm_savectx(void *arg, int vcpu)
 {
 	struct svm_softc *sc = arg;
@@ -2546,6 +2584,7 @@ struct vmm_ops vmm_ops_amd = {
 	.vmsetcap	= svm_setcap,
 	.vlapic_init	= svm_vlapic_init,
 	.vlapic_cleanup	= svm_vlapic_cleanup,
+	.vmpause	= svm_pause,
 
 	.vmsavectx	= svm_savectx,
 	.vmrestorectx	= svm_restorectx,
