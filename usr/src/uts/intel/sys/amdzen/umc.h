@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SYS_UMC_H
@@ -618,6 +618,122 @@ amdzen_umc_smn_reg(const uint8_t umcno, const smn_reg_def_t def,
 #define	UMC_ECCCTL_DDR5_GET_PIN_RED(r)	bitx32(r, 14, 14)
 
 /*
+ * UMC::CH::DramConfiguration -- Various configuration settings for the channel
+ * as a whole. The definition of this register is unfortunately a mess across
+ * lots of different families. Here are the unique variants that we know of:
+ *
+ *  o Pure DDR4/LPDDR4 support: Zen 1-3, exceptions below
+ *  o DDR4 UMC extended for LPDDR5: Van Gogh and Mendocino
+ *  o Pure DDR5/LPDDR5 support: Zen 4+, Rembrandt
+ *
+ * We call these DDR4, HYB, and DDR5 respectively. The LPDDR bits only have
+ * additions to the existing DDR4 base registers and a different set of MEMCLK
+ * values for LPDDR5. The DDR4 and DDR5 registers are very different, so we just
+ * have entirely separate register bit definitions.
+ *
+ * But wait, there's more. The hardware has support for up to four different
+ * memory P-states, each of which is 0x100 bytes apart. Memory P-state 0 appears
+ * to be the primary Memory P-state active.
+ *
+ * Care must be taken with the memory clock in all cases. The memory clock is
+ * measured in MHz; however, DIMMs often are operating in MT/s. In particular
+ * LPDDR5 based settings have more nuance here around determining the actual
+ * MT/s. See also UMC::CH::DebugMisc.
+ */
+/*CSTYLED*/
+#define	D_UMC_DRAMCFG	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_UMC, \
+	.srd_reg = 0x200,	\
+	.srd_nents = 4,	\
+	.srd_stride = 0x100,	\
+}
+
+#define	UMC_DRAMCFG(u, i)	amdzen_umc_smn_reg(u, D_UMC_DRAMCFG, i)
+
+/*
+ * All known DDR4 based UMCs whether for APUs or targetting LPDDR4 generally
+ * have the same set of values listed here; however, we've only seen bits 16 and
+ * 17 defined on platforms with LPDDR4 support (Renoir and Cezanne) and bits 13
+ * and 14 on some Zen 3 platforms (e.g. Milan).
+ */
+#define	UMC_DRAMCFG_LPDDR4_GET_WRPST(r)	bitx32(r, 17, 17)
+#define	UMC_DRAMCFG_LPDDR4_GET_RDPST(r)	bitx32(r, 16, 16)
+#define	UMC_DRAMCFG_DDR4_GET_PARDIS(r)	bitx32(r, 14, 14)
+#define	UMC_DRAMCFG_DDR4_GET_CRCDIS(r)	bitx32(r, 13, 13)
+#define	UMC_DRAMCFG_DDR4_GET_PRE2T(r)	bitx32(r, 12, 12)
+#define	UMC_DRAMCFG_DDR4_GET_GRDNEN(r)	bitx32(r, 11, 11)
+#define	UMC_DRAMCFG_DDR4_GET_CMD2T(r)	bitx32(r, 10, 10)
+#define	UMC_DRAMCFG_DDR4_GET_BNKGRP(r)	bitx32(r, 8, 8)
+#define	UMC_DRAMCFG_DDR4_GET_MEMCLK(r)	bitx32(r, 6, 0)
+#define	UMC_DRAMCFG_DDR4_MEMCLK_667	0x14
+#define	UMC_DRAMCFG_DDR4_MEMCLK_800	0x18
+#define	UMC_DRAMCFG_DDR4_MEMCLK_933	0x1c
+#define	UMC_DRAMCFG_DDR4_MEMCLK_1067	0x20
+#define	UMC_DRAMCFG_DDR4_MEMCLK_1200	0x24
+#define	UMC_DRAMCFG_DDR4_MEMCLK_1333	0x28
+#define	UMC_DRAMCFG_DDR4_MEMCLK_1467	0x2c
+#define	UMC_DRAMCFG_DDR4_MEMCLK_1600	0x30
+
+/*
+ * The following are core registers supported by the pure DDR5 based
+ * implementations. Registers that are only valid when operating in LPDDR5 use
+ * LPDDR5 as a prefix.
+ */
+#define	UMC_DRAMCFG_DDR5_GET_UGTFCLK(r)		bitx32(r, 31, 31)
+#define	UMC_DRAMCFG_LPDDR5_GET_RDECCEN(r)	bitx32(r, 29, 29)
+#define	UMC_DRAMCFG_LPDDR5_GET_WRECCEN(r)	bitx32(r, 28, 28)
+#define	UMC_DRAMCFG_LPDDR5_GET_WCKRATIO(r)	bitx32(r, 27, 26)
+#define	UMC_DRAMCFG_WCLKRATIO_SAME	0
+#define	UMC_DRAMCFG_WCLKRATIO_1TO2	1
+#define	UMC_DRAMCFG_WCLKRATIO_1TO4	2
+#define	UMC_DRAMCFG_LPDDR5_GET_WCKALWAYS(r)	bitx32(r, 25, 25)
+#define	UMC_DRAMCFG_LPDDR5_GET_WRPOST(r)	bitx32(r, 23, 23)
+#define	UMC_DRAMCFG_LPDDR5_GET_RDPOST(r)	bitx32(r, 22, 22)
+#define	UMC_DRAMCFG_DDR5_GET_CMDPARDIS(r)	bitx32(r, 21, 21)
+#define	UMC_DRAMCFG_DDR5_GET_WRCRCDIS(r)	bitx32(r, 20, 20)
+#define	UMC_DRAMCFG_DDR5_GET_PRE2T(r)		bitx32(r, 19, 19)
+#define	UMC_DRAMCFG_DDR5_GET_GRDNEN(r)		bitx32(r, 18, 18)
+#define	UMC_DRAMCFG_DDR5_GET_CMD2T(r)		bitx32(r, 17, 17)
+#define	UMC_DRAMCFG_DDR5_GET_BNKGRP(r)		bitx32(r, 16, 16)
+/*
+ * The memory clock here is defined as a value in MHz. In DDR5 platforms this is
+ * always multiplied by 2 to get to the actual transfer rate due to the double
+ * data rate. In LPDDR5 this is more nuanced. In particular, one needs to check
+ * the WCKRATIO value. When it is 1:2 or 1:4 you multiply the value we have in
+ * the register and we're good to go. When the value is 0, then the only thing
+ * the data clock is the same ratio as the memory clock. It is possible that a
+ * ratio is present for the command clock though, but we cannot determine that.
+ */
+#define	UMC_DRAMCFG_DDR5_GET_MEMCLK(r)		bitx32(r, 15, 0)
+
+/*
+ * Our Hybrid DDR4 + LPDDDR5 UMC follows the same group as above with the
+ * following additions.
+ *
+ * In LPDDR4 mode the memory clock uses the DDR4 values. In LPDDR5 mode it has
+ * its own set of values. These frequencies assume a 1:2 ratio between the WCLK
+ * and related. While the PPR discusses that these could have a 1:4 ratio, there
+ * is no setting to indicate a 1:4 ratio is supported.
+ */
+#define	UMC_DRAMCFG_HYB_GET_LP5ECCORD(r)	bitx32(r, 26, 26)
+#define	UMC_DRAMCFG_HYB_GET_LP5RDECCEN(r)	bitx32(r, 25, 25)
+#define	UMC_DRAMCFG_HYB_GET_LP5WRECCEN(r)	bitx32(r, 24, 24)
+#define	UMC_DRAMCFG_HYB_GET_WCLKRATIO(r)	bitx32(r, 22, 21)
+#define	UMC_DRAMCFG_HYB_GET_MEMCLK(r)		bitx32(r, 7, 0)
+#define	UMC_DRAMCFG_HYB_MEMCLK_333	0x5
+#define	UMC_DRAMCFG_HYB_MEMCLK_400	0x6
+#define	UMC_DRAMCFG_HYB_MEMCLK_533	0x8
+#define	UMC_DRAMCFG_HYB_MEMCLK_687	0x0a
+#define	UMC_DRAMCFG_HYB_MEMCLK_750	0x0b
+#define	UMC_DRAMCFG_HYB_MEMCLK_800	0x0c
+#define	UMC_DRAMCFG_HYB_MEMCLK_933	0x0e
+#define	UMC_DRAMCFG_HYB_MEMCLK_1066	0x10
+#define	UMC_DRAMCFG_HYB_MEMCLK_1200	0x12
+#define	UMC_DRAMCFG_HYB_MEMCLK_1375	0x14
+#define	UMC_DRAMCFG_HYB_MEMCLK_1500	0x16
+#define	UMC_DRAMCFG_HYB_MEMCLK_1600	0x18
+
+/*
  * UMC::Ch::UmcCap, UMC::CH::UmcCapHi -- Various capability registers and
  * feature disables. We mostly just record these for future us for debugging
  * purposes. They aren't used as part of memory decoding.
@@ -633,7 +749,13 @@ amdzen_umc_smn_reg(const uint8_t umcno, const smn_reg_def_t def,
 	.srd_reg = 0xdf4	\
 }
 #define	UMC_UMCCAP(u)		amdzen_umc_smn_reg(u, D_UMC_UMCCAP, 0)
+#define	UMC_UMCCAP_GET_CHAN_DIS(r)	bitx32(r, 19, 19)
+#define	UMC_UMCCAP_GET_ENC_DIS(r)	bitx32(r, 18, 18)
+#define	UMC_UMCCAP_GET_ECC_DIS(r)	bitx32(r, 17, 17)
+#define	UMC_UMCCAP_GET_REG_DIS(r)	bitx32(r, 16, 16)
 #define	UMC_UMCCAP_HI(u)	amdzen_umc_smn_reg(u, D_UMC_UMCCAP_HI, 0)
+#define	UMC_UMCACAP_HI_GET_CHIPKILL(r)	bitx32(r, 31, 31)
+#define	UMC_UMCACAP_HI_GET_ECC_EN(r)	bitx32(r, 30, 30)
 
 #ifdef __cplusplus
 }

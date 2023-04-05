@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -66,6 +66,7 @@ static const zen_umc_t zen_umc_remap_v3 = {
 			.chan_instid = 0,
 			.chan_logid = 0,
 			.chan_nrules = 1,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID |
 				    DF_DRAM_F_REMAP_EN |
@@ -82,7 +83,6 @@ static const zen_umc_t zen_umc_remap_v3 = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
@@ -109,6 +109,7 @@ static const zen_umc_t zen_umc_remap_v3 = {
 			.chan_instid = 1,
 			.chan_logid = 1,
 			.chan_nrules = 1,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID |
 				    DF_DRAM_F_REMAP_EN |
@@ -125,7 +126,6 @@ static const zen_umc_t zen_umc_remap_v3 = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
@@ -152,6 +152,7 @@ static const zen_umc_t zen_umc_remap_v3 = {
 			.chan_instid = 2,
 			.chan_logid = 2,
 			.chan_nrules = 1,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID |
 				    DF_DRAM_F_REMAP_EN |
@@ -168,7 +169,6 @@ static const zen_umc_t zen_umc_remap_v3 = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
@@ -195,6 +195,7 @@ static const zen_umc_t zen_umc_remap_v3 = {
 			.chan_instid = 3,
 			.chan_logid = 3,
 			.chan_nrules = 1,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID |
 				    DF_DRAM_F_REMAP_EN |
@@ -211,7 +212,6 @@ static const zen_umc_t zen_umc_remap_v3 = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
@@ -299,6 +299,7 @@ static const zen_umc_t zen_umc_remap_v4 = {
 			.chan_instid = 0,
 			.chan_logid = 0,
 			.chan_nrules = 2,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID |
 				    DF_DRAM_F_REMAP_EN,
@@ -332,7 +333,6 @@ static const zen_umc_t zen_umc_remap_v4 = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
@@ -359,6 +359,7 @@ static const zen_umc_t zen_umc_remap_v4 = {
 			.chan_instid = 1,
 			.chan_logid = 1,
 			.chan_nrules = 2,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID |
 				    DF_DRAM_F_REMAP_EN,
@@ -392,7 +393,6 @@ static const zen_umc_t zen_umc_remap_v4 = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
@@ -419,6 +419,7 @@ static const zen_umc_t zen_umc_remap_v4 = {
 			.chan_instid = 2,
 			.chan_logid = 2,
 			.chan_nrules = 2,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID |
 				    DF_DRAM_F_REMAP_EN,
@@ -452,7 +453,6 @@ static const zen_umc_t zen_umc_remap_v4 = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
@@ -479,6 +479,7 @@ static const zen_umc_t zen_umc_remap_v4 = {
 			.chan_instid = 3,
 			.chan_logid = 3,
 			.chan_nrules = 2,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID |
 				    DF_DRAM_F_REMAP_EN,
@@ -512,7 +513,6 @@ static const zen_umc_t zen_umc_remap_v4 = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {

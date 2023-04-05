@@ -189,12 +189,14 @@ static const uint16_t amdzen_nb_ids[] = {
 	0x1480,
 	/* Family 17h/19h Renoir, Cezanne, Van Gogh Zen 2/3 uarch */
 	0x1630,
-	/* Family 19h Genoa */
+	/* Family 19h Genoa and Bergamo */
 	0x14a4,
 	/* Family 17h Mendocino, Family 19h Rembrandt */
 	0x14b5,
 	/* Family 19h Raphael */
-	0x14d8
+	0x14d8,
+	/* Family 19h Phoenix */
+	0x14e8
 };
 
 typedef struct {

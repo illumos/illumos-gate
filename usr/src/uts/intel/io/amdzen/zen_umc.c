@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1225,14 +1225,14 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
-		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
+		.zufd_umc_style = ZEN_UMC_UMC_S_HYBRID_LPDDR5,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
 	}, {
 		.zufd_family = X86_PF_AMD_MENDOCINO,
 		.zufd_flags = ZEN_UMC_FAM_F_NORM_HASH,
 		.zufd_dram_nrules = 2,
 		.zufd_cs_nrules = 2,
-		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
+		.zufd_umc_style = ZEN_UMC_UMC_S_HYBRID_LPDDR5,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
 	}, {
 		.zufd_family = X86_PF_AMD_MILAN,
@@ -1284,7 +1284,65 @@ static const zen_umc_fam_data_t zen_umc_fam_data[] = {
 		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
 		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_PC |
 		    UMC_CHAN_HASH_F_CS
+	}, {
+		.zufd_family = X86_PF_AMD_PHOENIX,
+		.zufd_flags = ZEN_UMC_FAM_F_CS_XOR,
+		.zufd_dram_nrules = 2,
+		.zufd_cs_nrules = 2,
+		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5_APU,
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_CS
+	}, {
+		.zufd_family = X86_PF_AMD_BERGAMO,
+		.zufd_flags = ZEN_UMC_FAM_F_TARG_REMAP |
+		    ZEN_UMC_FAM_F_UMC_HASH | ZEN_UMC_FAM_F_UMC_EADDR |
+		    ZEN_UMC_FAM_F_CS_XOR,
+		.zufd_dram_nrules = 20,
+		.zufd_cs_nrules = 4,
+		.zufd_umc_style = ZEN_UMC_UMC_S_DDR5,
+		.zufd_chan_hash = UMC_CHAN_HASH_F_BANK | UMC_CHAN_HASH_F_RM |
+		    UMC_CHAN_HASH_F_PC | UMC_CHAN_HASH_F_CS
 	}
+};
+
+/*
+ * We use this for the DDR4 and Hybrid DDR4 + LPDDR5 tables to map between the
+ * specific enumerated speeds which are encoded values and the corresponding
+ * memory clock and speed. For all DDR4 and LPDDR5 items we assume a a 1:2 ratio
+ * between them. This is not used for the pure DDR5 / LPDDR5 entries because of
+ * how the register just encodes the raw value in MHz.
+ */
+typedef struct zen_umc_freq_map {
+	uint32_t zufm_reg;
+	uint32_t zufm_mhz;
+	uint32_t zufm_mts2;
+	uint32_t zufm_mts4;
+} zen_umc_freq_map_t;
+
+static const zen_umc_freq_map_t zen_umc_ddr4_map[] = {
+	{ UMC_DRAMCFG_DDR4_MEMCLK_667, 667, 1333, 0 },
+	{ UMC_DRAMCFG_DDR4_MEMCLK_800, 800, 1600, 0 },
+	{ UMC_DRAMCFG_DDR4_MEMCLK_933, 933, 1866, 0 },
+	{ UMC_DRAMCFG_DDR4_MEMCLK_1067, 1067, 2133, 0 },
+	{ UMC_DRAMCFG_DDR4_MEMCLK_1200, 1200, 2400, 0 },
+	{ UMC_DRAMCFG_DDR4_MEMCLK_1333, 1333, 2666, 0 },
+	{ UMC_DRAMCFG_DDR4_MEMCLK_1467, 1467, 2933, 0 },
+	{ UMC_DRAMCFG_DDR4_MEMCLK_1600, 1600, 3200, 0 }
+};
+
+static const zen_umc_freq_map_t zen_umc_lpddr5_map[] = {
+	{ UMC_DRAMCFG_HYB_MEMCLK_333, 333, 667, 1333 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_400, 400, 800, 1600 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_533, 533, 1066, 2133 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_687, 687, 1375, 2750 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_750, 750, 1500, 3000 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_800, 800, 1600, 3200 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_933, 933, 1866, 3733 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_1066, 1066, 2133, 4267 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_1200, 1200, 2400, 4800 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_1375, 1375, 2750, 5500 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_1500, 1500, 3000, 6000 },
+	{ UMC_DRAMCFG_HYB_MEMCLK_1600, 1600, 3200, 6400 }
+
 };
 
 static boolean_t
@@ -1840,6 +1898,48 @@ zen_umc_fill_ccm_cb(const uint_t dfno, const uint32_t fabid,
 }
 
 /*
+ * At this point we can go through and calculate the size of the DIMM that we've
+ * found. While it would be nice to determine this from the SPD data, we can
+ * figure this out entirely based upon the information in the memory controller.
+ *
+ * This works by first noting that DDR4, LPDDR4, DDR5, and LPDDR5 are all built
+ * around 64-bit data channels. This means that each row and column provides up
+ * 64-bits (ignoring ECC) of data. There are a number of banks and bank groups.
+ * The memory controller tracks the total number of bits that are used for each.
+ * While DDR5 introduces sub-channels, we don't need to worry about those here,
+ * because ultimately the sub-channel just splits the 64-bit bus we're assuming
+ * into 2x 32-bit buses. While they can be independently selected, they should
+ * have equivalent capacities.
+ *
+ * The most confusing part of this is that there is one of these related to each
+ * rank on the device. The UMC natively has two 'chip-selects', each of which is
+ * used to correspond to a rank. There are then separately multiple rm bits in
+ * each chip-select. As far as we can tell the PSP or SMU programs the number of
+ * rm bits to be zero when you have a dual-rank device.
+ *
+ * We end up summing each chip-select rather than assuming that the chip-selects
+ * are identical. In theory some amount of asymmetric DIMMs exist in the wild,
+ * but we don't know of many systems using them.
+ */
+static void
+zen_umc_calc_dimm_size(umc_dimm_t *dimm)
+{
+	dimm->ud_dimm_size = 0;
+	for (uint_t i = 0; i < ZEN_UMC_MAX_CHAN_BASE; i++) {
+		uint64_t nrc;
+		const umc_cs_t *cs = &dimm->ud_cs[i];
+
+		if (!cs->ucs_base.udb_valid && !cs->ucs_sec.udb_valid) {
+			continue;
+		}
+
+		nrc = cs->ucs_nrow_lo + cs->ucs_nrow_hi + cs->ucs_ncol;
+		dimm->ud_dimm_size += (8ULL << nrc) * (1 << cs->ucs_nbanks) *
+		    (1 << cs->ucs_nrm);
+	}
+}
+
+/*
  * This is used to fill in the common properties about a DIMM. This should occur
  * after the rank information has been filled out. The information used is the
  * same between DDR4 and DDR5 DIMMs. The only major difference is the register
@@ -1847,7 +1947,7 @@ zen_umc_fill_ccm_cb(const uint_t dfno, const uint32_t fabid,
  */
 static boolean_t
 zen_umc_fill_dimm_common(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
-    const uint_t dimmno, boolean_t ddr4)
+    const uint_t dimmno, boolean_t ddr4_style)
 {
 	umc_dimm_t *dimm;
 	int ret;
@@ -1858,7 +1958,7 @@ zen_umc_fill_dimm_common(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 	dimm = &chan->chan_dimms[dimmno];
 	dimm->ud_dimmno = dimmno;
 
-	if (ddr4) {
+	if (ddr4_style) {
 		reg = UMC_DIMMCFG_DDR4(id, dimmno);
 	} else {
 		reg = UMC_DIMMCFG_DDR5(id, dimmno);
@@ -1900,6 +2000,16 @@ zen_umc_fill_dimm_common(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan,
 			break;
 		}
 	}
+
+	/*
+	 * The remaining calculations we only want to perform if we have actual
+	 * data for a DIMM.
+	 */
+	if ((dimm->ud_flags & UMC_DIMM_F_VALID) == 0) {
+		return (B_TRUE);
+	}
+
+	zen_umc_calc_dimm_size(dimm);
 
 	return (B_TRUE);
 }
@@ -2337,21 +2447,24 @@ zen_umc_fill_chan_rank_ddr5(zen_umc_t *umc, zen_umc_df_t *df,
 	return (zen_umc_fill_dimm_common(umc, df, chan, dimmno, B_FALSE));
 }
 
-
 static void
-zen_umc_fill_ddr_type(zen_umc_chan_t *chan, boolean_t ddr4)
+zen_umc_fill_ddr_type(zen_umc_t *umc, zen_umc_chan_t *chan)
 {
 	umc_dimm_type_t dimm = UMC_DIMM_T_UNKNOWN;
 	uint8_t val;
 
 	/*
-	 * The DDR4 and DDR5 values while overlapping in some parts of this
-	 * space (e.g. DDR4 values), are otherwise actually different in all the
-	 * space in-between. As such we need to treat them differently in case
-	 * we encounter something we don't expect.
+	 * The different UMC styles split into two groups. Those that support
+	 * DDR4 and those that support DDR5 (with the hybrid group being in the
+	 * DDR5 style camp). While all the values are consistent between
+	 * different ones (e.g. reserved values correspond to unsupported
+	 * items), we still check types based on the UMC's design type so if we
+	 * see something weird, we don't accidentally use an older value.
 	 */
 	val = UMC_UMCCFG_GET_DDR_TYPE(chan->chan_umccfg_raw);
-	if (ddr4) {
+	switch (umc->umc_fdata->zufd_umc_style) {
+	case ZEN_UMC_UMC_S_DDR4:
+	case ZEN_UMC_UMC_S_DDR4_APU:
 		switch (val) {
 		case UMC_UMCCFG_DDR4_T_DDR4:
 			dimm = UMC_DIMM_T_DDR4;
@@ -2362,7 +2475,21 @@ zen_umc_fill_ddr_type(zen_umc_chan_t *chan, boolean_t ddr4)
 		default:
 			break;
 		}
-	} else {
+		break;
+	case ZEN_UMC_UMC_S_HYBRID_LPDDR5:
+		switch (val) {
+		case UMC_UMCCFG_DDR5_T_LPDDR5:
+			dimm = UMC_DIMM_T_LPDDR5;
+			break;
+		case UMC_UMCCFG_DDR5_T_LPDDR4:
+			dimm = UMC_DIMM_T_LPDDR4;
+			break;
+		default:
+			break;
+		}
+		break;
+	case ZEN_UMC_UMC_S_DDR5:
+	case ZEN_UMC_UMC_S_DDR5_APU:
 		switch (val) {
 		case UMC_UMCCFG_DDR5_T_DDR5:
 			dimm = UMC_DIMM_T_DDR5;
@@ -2373,10 +2500,118 @@ zen_umc_fill_ddr_type(zen_umc_chan_t *chan, boolean_t ddr4)
 		default:
 			break;
 		}
+		break;
 	}
 
-	for (uint_t i = 0; i < ZEN_UMC_MAX_DIMMS; i++) {
-		chan->chan_dimms[i].ud_type = dimm;
+	chan->chan_type = dimm;
+}
+
+/*
+ * Use the DDR4 frequency table to determine the speed of this. Note that our
+ * hybrid based UMCs use 8 bits for the clock, while the traditional DDR4 ones
+ * only use 7. The caller is responsible for using the right mask for the UMC.
+ */
+static void
+zen_umc_fill_chan_ddr4(zen_umc_chan_t *chan, uint_t mstate,
+    const uint32_t clock)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(zen_umc_ddr4_map); i++) {
+		if (clock == zen_umc_ddr4_map[i].zufm_reg) {
+			chan->chan_clock[mstate] = zen_umc_ddr4_map[i].zufm_mhz;
+			chan->chan_speed[mstate] =
+			    zen_umc_ddr4_map[i].zufm_mts2;
+			break;
+		}
+	}
+}
+
+static void
+zen_umc_fill_chan_hyb_lpddr5(zen_umc_chan_t *chan, uint_t mstate)
+{
+	const uint32_t reg = chan->chan_dramcfg_raw[mstate];
+	const uint32_t wck = UMC_DRAMCFG_HYB_GET_WCLKRATIO(reg);
+	const uint32_t clock = UMC_DRAMCFG_HYB_GET_MEMCLK(reg);
+	boolean_t twox;
+
+	switch (wck) {
+	case UMC_DRAMCFG_WCLKRATIO_1TO2:
+		twox = B_TRUE;
+		break;
+	case UMC_DRAMCFG_WCLKRATIO_1TO4:
+		twox = B_FALSE;
+		break;
+	default:
+		return;
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(zen_umc_lpddr5_map); i++) {
+		if (clock == zen_umc_lpddr5_map[i].zufm_reg) {
+			chan->chan_clock[mstate] =
+			    zen_umc_lpddr5_map[i].zufm_mhz;
+
+			if (twox) {
+				chan->chan_speed[mstate] =
+				    zen_umc_lpddr5_map[i].zufm_mts2;
+			} else {
+				chan->chan_speed[mstate] =
+				    zen_umc_lpddr5_map[i].zufm_mts4;
+			}
+			break;
+		}
+	}
+}
+
+/*
+ * Determine the current operating frequency of the channel. This varies based
+ * upon the type of UMC that we're operating on as there are multiple ways to
+ * determine this. There are up to four memory P-states that exist in the UMC.
+ * This grabs it for a single P-state at a time.
+ *
+ * Unlike other things, if we cannot determine the frequency of the clock or
+ * transfer speed, we do not consider this fatal because that does not stop
+ * decoding. It only means that we cannot give a bit of useful information to
+ * topo.
+ */
+static void
+zen_umc_fill_chan_freq(zen_umc_t *umc, zen_umc_chan_t *chan, uint_t mstate)
+{
+	const uint32_t cfg = chan->chan_dramcfg_raw[mstate];
+	const umc_dimm_type_t dimm_type = chan->chan_type;
+
+	switch (umc->umc_fdata->zufd_umc_style) {
+	case ZEN_UMC_UMC_S_HYBRID_LPDDR5:
+		if (dimm_type == UMC_DIMM_T_LPDDR5) {
+			zen_umc_fill_chan_hyb_lpddr5(chan, mstate);
+		} else if (dimm_type != UMC_DIMM_T_LPDDR4) {
+			zen_umc_fill_chan_ddr4(chan, mstate,
+			    UMC_DRAMCFG_HYB_GET_MEMCLK(cfg));
+		}
+		break;
+	case ZEN_UMC_UMC_S_DDR4:
+	case ZEN_UMC_UMC_S_DDR4_APU:
+		zen_umc_fill_chan_ddr4(chan, mstate,
+		    UMC_DRAMCFG_DDR4_GET_MEMCLK(cfg));
+		break;
+	case ZEN_UMC_UMC_S_DDR5:
+	case ZEN_UMC_UMC_S_DDR5_APU:
+		chan->chan_clock[mstate] = UMC_DRAMCFG_DDR5_GET_MEMCLK(cfg);
+		if (dimm_type == UMC_DIMM_T_DDR5) {
+			chan->chan_speed[mstate] = 2 * chan->chan_clock[mstate];
+		} else if (dimm_type == UMC_DIMM_T_LPDDR5) {
+			switch (UMC_DRAMCFG_LPDDR5_GET_WCKRATIO(cfg)) {
+			case UMC_DRAMCFG_WCLKRATIO_1TO2:
+				chan->chan_speed[mstate] = 2 *
+				    chan->chan_clock[mstate];
+				break;
+			case UMC_DRAMCFG_WCLKRATIO_1TO4:
+				chan->chan_speed[mstate] = 4 *
+				    chan->chan_clock[mstate];
+				break;
+			default:
+				break;
+			}
+		}
+		break;
 	}
 }
 
@@ -2585,11 +2820,35 @@ zen_umc_fill_chan(zen_umc_t *umc, zen_umc_df_t *df, zen_umc_chan_t *chan)
 	}
 
 	/*
-	 * This register contains information to determine the type of DIMM.
-	 * All DIMMs in the channel must be the same type. As such, set this on
-	 * all DIMMs we've discovered.
+	 * Grab the DRAM configuration register. This can be used to determine
+	 * the frequency and speed of the memory channel. At this time we only
+	 * capture Memory P-state 0.
 	 */
-	zen_umc_fill_ddr_type(chan, ddr4);
+	reg = UMC_DRAMCFG(id, 0);
+
+	/*
+	 * This register contains information to determine the type of DIMM.
+	 * All DIMMs in the channel must be the same type so we leave this
+	 * setting on the channel. Once we have that, we proceed to obtain the
+	 * currently configuration information for the DRAM in each memory
+	 * P-state.
+	 */
+	zen_umc_fill_ddr_type(umc, chan);
+	for (uint_t i = 0; i < ZEN_UMC_NMEM_PSTATES; i++) {
+		chan->chan_clock[i] = ZEN_UMC_UNKNOWN_FREQ;
+		chan->chan_speed[i] = ZEN_UMC_UNKNOWN_FREQ;
+
+		reg = UMC_DRAMCFG(id, i);
+		if ((ret = amdzen_c_smn_read(df->zud_dfno, reg, &val)) != 0) {
+			dev_err(umc->umc_dip, CE_WARN, "failed to read DRAM "
+			    "Configuration register P-state %u %x: %d", i,
+			    SMN_REG_ADDR(reg), ret);
+			return (B_FALSE);
+		}
+		chan->chan_dramcfg_raw[i] = val;
+
+		zen_umc_fill_chan_freq(umc, chan, i);
+	}
 
 	/*
 	 * Grab data that we can use to determine if we're scrambling or
@@ -2771,6 +3030,7 @@ zen_umc_fill_umc_cb(const uint_t dfno, const uint32_t fabid,
 			}
 		}
 		break;
+	case ZEN_UMC_UMC_S_HYBRID_LPDDR5:
 	case ZEN_UMC_UMC_S_DDR5:
 	case ZEN_UMC_UMC_S_DDR5_APU:
 		for (uint_t i = 0; i < ZEN_UMC_MAX_DIMMS; i++) {

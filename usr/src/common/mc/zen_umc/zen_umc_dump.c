@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -97,7 +97,6 @@ zen_umc_dump_dimm(umc_dimm_t *dimm)
 
 	fnvlist_add_uint32(nvl, "ud_flags", dimm->ud_flags);
 	fnvlist_add_uint32(nvl, "ud_width", dimm->ud_width);
-	fnvlist_add_uint32(nvl, "ud_type", dimm->ud_type);
 	fnvlist_add_uint32(nvl, "ud_kind", dimm->ud_kind);
 	fnvlist_add_uint32(nvl, "ud_dimmno", dimm->ud_dimmno);
 
@@ -209,6 +208,7 @@ zen_umc_dump_chan(zen_umc_chan_t *chan)
 	fnvlist_add_uint32(nvl, "chan_instid", chan->chan_instid);
 	fnvlist_add_uint32(nvl, "chan_logid", chan->chan_logid);
 	fnvlist_add_uint32(nvl, "chan_np2_space0", chan->chan_np2_space0);
+	fnvlist_add_uint32(nvl, "chan_type", chan->chan_type);
 
 	for (uint_t i = 0; i < chan->chan_nrules; i++) {
 		rules[i] = zen_umc_dump_dram_rule(&chan->chan_rules[i]);
@@ -436,7 +436,6 @@ zen_umc_restore_dimm(nvlist_t *nvl, umc_dimm_t *dimm)
 	if (nvlist_lookup_pairs(nvl, 0,
 	    "ud_flags", DATA_TYPE_UINT32, &dimm->ud_flags,
 	    "ud_width", DATA_TYPE_UINT32, &dimm->ud_width,
-	    "ud_type", DATA_TYPE_UINT32, &dimm->ud_type,
 	    "ud_kind", DATA_TYPE_UINT32, &dimm->ud_kind,
 	    "ud_dimmno", DATA_TYPE_UINT32, &dimm->ud_dimmno,
 	    "ud_cs", DATA_TYPE_NVLIST_ARRAY, &cs, &ncs,
@@ -577,6 +576,7 @@ zen_umc_restore_chan(nvlist_t *nvl, zen_umc_chan_t *chan)
 	    "chan_logid", DATA_TYPE_UINT32, &chan->chan_logid,
 	    "chan_rules", DATA_TYPE_NVLIST_ARRAY, &rules, &chan->chan_nrules,
 	    "chan_np2_space0", DATA_TYPE_UINT32, &chan->chan_np2_space0,
+	    "chan_type", DATA_TYPE_UINT32, &chan->chan_np2_space0,
 	    "chan_offsets", DATA_TYPE_NVLIST_ARRAY, &offsets, &noffsets,
 	    "chan_dimms", DATA_TYPE_NVLIST_ARRAY, &dimms, &ndimms,
 	    "chan_hash", DATA_TYPE_NVLIST, &hash,

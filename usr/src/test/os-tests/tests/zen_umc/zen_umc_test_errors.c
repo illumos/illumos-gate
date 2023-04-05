@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -228,6 +228,7 @@ static const zen_umc_t zen_umc_norm_underflow = {
 			.chan_instid = 0,
 			.chan_logid = 0,
 			.chan_nrules = 1,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID | DF_DRAM_F_HOLE,
 				.ddr_base = 4ULL * 1024ULL * 1024ULL * 1024ULL,
@@ -241,7 +242,6 @@ static const zen_umc_t zen_umc_norm_underflow = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {
@@ -384,6 +384,7 @@ static const zen_umc_t zen_umc_fab_errs = {
 			.chan_instid = 0,
 			.chan_logid = 0,
 			.chan_nrules = 1,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID,
 				.ddr_base = 32ULL * 1024ULL * 1024ULL *
@@ -402,6 +403,7 @@ static const zen_umc_t zen_umc_fab_errs = {
 			.chan_instid = 1,
 			.chan_logid = 1,
 			.chan_nrules = 1,
+			.chan_type = UMC_DIMM_T_DDR4,
 			.chan_rules = { {
 				.ddr_flags = DF_DRAM_F_VALID,
 				.ddr_base = 0,
@@ -416,7 +418,6 @@ static const zen_umc_t zen_umc_fab_errs = {
 			.chan_dimms = { {
 				.ud_flags = UMC_DIMM_F_VALID,
 				.ud_width = UMC_DIMM_W_X4,
-				.ud_type = UMC_DIMM_T_DDR4,
 				.ud_kind = UMC_DIMM_K_RDIMM,
 				.ud_dimmno = 0,
 				.ud_cs = { {

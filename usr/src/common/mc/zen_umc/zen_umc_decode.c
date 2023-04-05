@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1361,7 +1361,7 @@ zen_umc_decode_subchan(const zen_umc_t *umc, zen_umc_decoder_t *dec)
 	const umc_cs_t *cs = dec->dec_cs;
 	const umc_chan_hash_t *hash = &dec->dec_umc_chan->chan_hash;
 
-	switch (dec->dec_dimm->ud_type) {
+	switch (dec->dec_umc_chan->chan_type) {
 	case UMC_DIMM_T_DDR5:
 	case UMC_DIMM_T_LPDDR5:
 		break;

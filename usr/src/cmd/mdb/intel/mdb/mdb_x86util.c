@@ -12,6 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -118,6 +119,10 @@ mdb_x86_print_sysregs(struct sysregs *sregs, boolean_t long_mode)
 		{ "LMSLE",	AMD_EFER_LMSLE,	AMD_EFER_LMSLE },
 		{ "FFXSR",	AMD_EFER_FFXSR,	AMD_EFER_FFXSR },
 		{ "TCE",	AMD_EFER_TCE,	AMD_EFER_TCE },
+		{ "MCOMMIT",	AMD_EFER_MCOMMIT, AMD_EFER_MCOMMIT },
+		{ "INTWB",	AMD_EFER_INTWB,	AMD_EFER_INTWB },
+		{ "UAIE",	AMD_EFER_UAIE,	AMD_EFER_UAIE },
+		{ "AIRBRSE",	AMD_EFER_AIBRSE, AMD_EFER_AIBRSE },
 		{ NULL,		0,		0 }
 	};
 #endif

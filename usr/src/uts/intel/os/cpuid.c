@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  * Copyright 2020 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2022 MNX Cloud, Inc.
  */
 /*
@@ -1126,12 +1126,13 @@
  *
  * The second variant of the spectre attack focuses on performing branch target
  * injection. This generally impacts indirect call instructions in the system.
- * There are three different ways to mitigate this issue that are commonly
+ * There are four different ways to mitigate this issue that are commonly
  * described today:
  *
  *  1. Using Indirect Branch Restricted Speculation (IBRS).
  *  2. Using Retpolines and RSB Stuffing
  *  3. Using Enhanced Indirect Branch Restricted Speculation (eIBRS)
+ *  4. Using Automated Indirect Branch Restricted Speculation (AIBRS)
  *
  * IBRS uses a feature added to microcode to restrict speculation, among other
  * things. This form of mitigation has not been used as it has been generally
@@ -1213,6 +1214,23 @@
  * To fully protect user to user and vmx to vmx attacks from these classes of
  * issues, we would also need to allow them to opt into performing an Indirect
  * Branch Prediction Barrier (IBPB) on switch. This is not currently wired up.
+ *
+ * The fourth form of mitigation here is specific to AMD and is called Automated
+ * IBRS (AIBRS). This is similar in spirit to eIBRS; however rather than set the
+ * IBRS bit in MSR_IA32_SPEC_CTRL (0x48) we instead set a bit in the EFER
+ * (extended feature enable register) MSR. This bit basically says that IBRS
+ * acts as though it is always active when executing at CPL0 and when executing
+ * in the 'host' context when SEV-SNP is enabled.
+ *
+ * When this is active, AMD states that the RSB is cleared on VMEXIT and
+ * therefore it is unnecessary. While this handles RSB stuffing attacks from SVM
+ * to the kernel, we must still consider the remaining cases that exist, just
+ * like above. While traditionally AMD employed a 32 entry RSB allowing the
+ * traditional technique to work, this is not true on all CPUs. While a write to
+ * IBRS would clear the RSB if the processor supports more than 32 entries (but
+ * not otherwise), AMD states that as long as at leat a single 4 KiB unmapped
+ * guard page is present between user and kernel address spaces and SMEP is
+ * enabled, then there is no need to clear the RSB at all.
  *
  * By default, the system will enable RSB stuffing and the required variant of
  * retpolines and store that information in the x86_spectrev2_mitigation value.
@@ -1436,7 +1454,7 @@
  *
  *  - Spectre v1: Not currently mitigated
  *  - swapgs: lfences after swapgs paths
- *  - Spectre v2: Retpolines/RSB Stuffing or eIBRS if HW support
+ *  - Spectre v2: Retpolines/RSB Stuffing or eIBRS/AIBRS if HW support
  *  - Meltdown: Kernel Page Table Isolation
  *  - Spectre v3a: Updated CPU microcode
  *  - Spectre v4: Not currently mitigated
@@ -1499,6 +1517,7 @@ int x86_use_invpcid = -1;
 typedef enum {
 	X86_SPECTREV2_RETPOLINE,
 	X86_SPECTREV2_ENHANCED_IBRS,
+	X86_SPECTREV2_AUTO_IBRS,
 	X86_SPECTREV2_DISABLED
 } x86_spectrev2_mitigation_t;
 
@@ -1639,7 +1658,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"avx512_vp2intersect",
 	"avx512_bitalg",
 	"avx512_vbmi2",
-	"avx512_bf16"
+	"avx512_bf16",
+	"auto_ibrs"
 };
 
 boolean_t
@@ -1760,7 +1780,7 @@ struct xsave_info {
  */
 
 #define	NMAX_CPI_STD	8		/* eax = 0 .. 7 */
-#define	NMAX_CPI_EXTD	0x1f		/* eax = 0x80000000 .. 0x8000001e */
+#define	NMAX_CPI_EXTD	0x22		/* eax = 0x80000000 .. 0x80000021 */
 
 /*
  * See the big theory statement for a more detailed explanation of what some of
@@ -1957,6 +1977,7 @@ static struct cpuid_info cpuid_info0;
 #define	CPUID_LEAF_EXT_8		0x80000008
 #define	CPUID_LEAF_EXT_1d		0x8000001d
 #define	CPUID_LEAF_EXT_1e		0x8000001e
+#define	CPUID_LEAF_EXT_21		0x80000021
 
 /*
  * Functions we consune from cpuid_subr.c;  don't publish these in a header
@@ -2866,6 +2887,13 @@ cpuid_update_l1d_flush(cpu_t *cpu, uchar_t *featureset)
  * NOTE: We used to skip RSB mitigations with eIBRS, but developments around
  * post-barrier RSB guessing suggests we should enable RSB mitigations always
  * unless specifically instructed not to.
+ *
+ * AMD indicates that when Automatic IBRS is enabled we do not need to implement
+ * return stack buffer clearing for VMEXIT as it takes care of it. The manual
+ * also states that as long as SMEP and we maintain at least one page between
+ * the kernel and user space (we have much more of a red zone), then we do not
+ * need to clear the RSB. We constrain this to only when Automatic IRBS is
+ * present.
  */
 static void
 cpuid_patch_rsb(x86_spectrev2_mitigation_t mit)
@@ -2874,6 +2902,7 @@ cpuid_patch_rsb(x86_spectrev2_mitigation_t mit)
 	uint8_t *stuff = (uint8_t *)x86_rsb_stuff;
 
 	switch (mit) {
+	case X86_SPECTREV2_AUTO_IBRS:
 	case X86_SPECTREV2_DISABLED:
 		*stuff = ret;
 		break;
@@ -2899,12 +2928,13 @@ cpuid_patch_retpolines(x86_spectrev2_mitigation_t mit)
 	case X86_SPECTREV2_RETPOLINE:
 		type = "gen";
 		break;
+	case X86_SPECTREV2_AUTO_IBRS:
 	case X86_SPECTREV2_ENHANCED_IBRS:
 	case X86_SPECTREV2_DISABLED:
 		type = "jmp";
 		break;
 	default:
-		panic("asked to updated retpoline state with unknown state!");
+		panic("asked to update retpoline state with unknown state!");
 	}
 
 	for (i = 0; i < nthunks; i++) {
@@ -2934,6 +2964,16 @@ cpuid_enable_enhanced_ibrs(void)
 	val = rdmsr(MSR_IA32_SPEC_CTRL);
 	val |= IA32_SPEC_CTRL_IBRS;
 	wrmsr(MSR_IA32_SPEC_CTRL, val);
+}
+
+static void
+cpuid_enable_auto_ibrs(void)
+{
+	uint64_t val;
+
+	val = rdmsr(MSR_AMD_EFER);
+	val |= AMD_EFER_AIBRSE;
+	wrmsr(MSR_AMD_EFER, val);
 }
 
 /*
@@ -3055,14 +3095,17 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 			add_x86_feature(featureset, X86FSET_SSBD_VIRT);
 		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_SSB_NO)
 			add_x86_feature(featureset, X86FSET_SSB_NO);
+
 		/*
-		 * Don't enable enhanced IBRS unless we're told that we should
-		 * prefer it and it has the same semantics as Intel. This is
-		 * split into two bits rather than a single one.
+		 * Rather than Enhanced IBRS, AMD has a different feature that
+		 * is a bit in EFER that can be enabled and will basically do
+		 * the right thing while executing in the kernel.
 		 */
-		if ((cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_PREFER_IBRS) &&
-		    (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_IBRS_ALL)) {
-			add_x86_feature(featureset, X86FSET_IBRS_ALL);
+		if (cpi->cpi_vendor == X86_VENDOR_AMD &&
+		    (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_PREFER_IBRS) &&
+		    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_21 &&
+		    (cpi->cpi_extd[0x21].cp_eax & CPUID_AMD_8X21_EAX_AIBRS)) {
+			add_x86_feature(featureset, X86FSET_AUTO_IBRS);
 		}
 
 	} else if (cpi->cpi_vendor == X86_VENDOR_Intel &&
@@ -3149,8 +3192,15 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 	 * enhanced IBRS, or disabling TSX.
 	 */
 	if (cpu->cpu_id != 0) {
-		if (x86_spectrev2_mitigation == X86_SPECTREV2_ENHANCED_IBRS) {
+		switch (x86_spectrev2_mitigation) {
+		case X86_SPECTREV2_ENHANCED_IBRS:
 			cpuid_enable_enhanced_ibrs();
+			break;
+		case X86_SPECTREV2_AUTO_IBRS:
+			cpuid_enable_auto_ibrs();
+			break;
+		default:
+			break;
 		}
 
 		cpuid_apply_tsx(x86_taa_mitigation, featureset);
@@ -3165,14 +3215,16 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 
 	/*
 	 * By default we've come in with retpolines enabled. Check whether we
-	 * should disable them or enable enhanced IBRS. RSB stuffing is enabled
-	 * by default, but disabled if we are using enhanced IBRS. Note, we do
-	 * not allow the use of AMD optimized retpolines as it was disclosed by
-	 * AMD in March 2022 that they were still vulnerable. Prior to that
-	 * point, we used them.
+	 * should disable them or enable enhanced or automatic IBRS. RSB
+	 * stuffing is enabled by default. Note, we do not allow the use of AMD
+	 * optimized retpolines as it was disclosed by AMD in March 2022 that
+	 * they were still vulnerable. Prior to that point, we used them.
 	 */
 	if (x86_disable_spectrev2 != 0) {
 		v2mit = X86_SPECTREV2_DISABLED;
+	} else if (is_x86_feature(featureset, X86FSET_AUTO_IBRS)) {
+		cpuid_enable_auto_ibrs();
+		v2mit = X86_SPECTREV2_AUTO_IBRS;
 	} else if (is_x86_feature(featureset, X86FSET_IBRS_ALL)) {
 		cpuid_enable_enhanced_ibrs();
 		v2mit = X86_SPECTREV2_ENHANCED_IBRS;
@@ -4138,6 +4190,22 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 			add_x86_feature(featureset, X86FSET_XSAVEC);
 		if (ecp->cp_eax & CPUID_INTC_EAX_D_1_XSAVES)
 			add_x86_feature(featureset, X86FSET_XSAVES);
+
+		/*
+		 * Zen 2 family processors suffer from erratum 1386 that causes
+		 * xsaves to not function correctly in some circumstances. There
+		 * are no supervisor states in Zen 2 and earlier. Practically
+		 * speaking this has no impact for us as we currently do not
+		 * leverage compressed xsave formats. To safeguard against
+		 * issues in the future where we may opt to using it, we remove
+		 * it from the feature set now. While Matisse has a microcode
+		 * update available with a fix, not all Zen 2 CPUs do so it's
+		 * simpler for the moment to unconditionally remove it.
+		 */
+		if (cpi->cpi_vendor == X86_VENDOR_AMD &&
+		    uarchrev_uarch(cpi->cpi_uarchrev) <= X86_UARCH_AMD_ZEN2) {
+			remove_x86_feature(featureset, X86FSET_XSAVES);
+		}
 	}
 
 	/*
@@ -4452,8 +4520,23 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 
 
 	/*
-	 * Check the processor leaves that are used for security features.
+	 * Check the processor leaves that are used for security features. Grab
+	 * any additional processor-specific leaves that we may not have yet.
 	 */
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
+		if (cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_21) {
+			cp = &cpi->cpi_extd[7];
+			cp->cp_eax = CPUID_LEAF_EXT_21;
+			cp->cp_ecx = 0;
+			(void) __cpuid_insn(cp);
+		}
+		break;
+	default:
+		break;
+	}
+
 	cpuid_scan_security(cpu, featureset);
 }
 
@@ -4819,8 +4902,9 @@ cpuid_pass_extended(cpu_t *cpu, void *_arg __unused)
 	if ((nmax = cpi->cpi_xmaxeax - CPUID_LEAF_EXT_0 + 1) > NMAX_CPI_EXTD)
 		nmax = NMAX_CPI_EXTD;
 	/*
-	 * Copy the extended properties, fixing them as we go.
-	 * (We already handled n == 0 and n == 1 in the basic pass)
+	 * Copy the extended properties, fixing them as we go. While we start at
+	 * 2 because we've already handled a few cases in the basic pass, the
+	 * rest we let ourselves just grab again (e.g. 0x8, 0x21).
 	 */
 	iptr = (void *)cpi->cpi_brandstr;
 	for (n = 2, cp = &cpi->cpi_extd[2]; n < nmax; cp++, n++) {
@@ -7682,11 +7766,25 @@ cpuid_pass_ucode(cpu_t *cpu, uchar_t *fset)
 			}
 		}
 
+		/*
+		 * Most AMD features are in leaf 8. Automatic IBRS was added in
+		 * leaf 0x21. So we also check that.
+		 */
 		bzero(&cp, sizeof (cp));
 		cp.cp_eax = CPUID_LEAF_EXT_8;
 		(void) __cpuid_insn(&cp);
 		platform_cpuid_mangle(cpi->cpi_vendor, CPUID_LEAF_EXT_8, &cp);
 		cpi->cpi_extd[8] = cp;
+
+		if (cpi->cpi_xmaxeax < CPUID_LEAF_EXT_21) {
+			return;
+		}
+
+		bzero(&cp, sizeof (cp));
+		cp.cp_eax = CPUID_LEAF_EXT_21;
+		(void) __cpuid_insn(&cp);
+		platform_cpuid_mangle(cpi->cpi_vendor, CPUID_LEAF_EXT_21, &cp);
+		cpi->cpi_extd[0x21] = cp;
 	} else {
 		/*
 		 * Nothing to do here. Return an empty set which has already
