@@ -804,6 +804,9 @@ void smb_time_unix_to_dos(int32_t, int16_t *, int16_t *);
 void smb_time_nt_to_unix(uint64_t nt_time, timestruc_t *unix_time);
 uint64_t smb_time_unix_to_nt(timestruc_t *);
 
+extern const timestruc_t smb_nttime_m1; /* minus 1 */
+extern const timestruc_t smb_nttime_m2; /* minus 2 */
+
 int netbios_name_isvalid(char *in, char *out);
 
 int uioxfer(struct uio *src_uio, struct uio *dst_uio, int n);

@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -78,19 +78,31 @@ smb_set_basic_info(smb_request_t *sr, smb_setinfo_t *si)
 	}
 
 	bzero(attr, sizeof (*attr));
-	if (atime != 0 && atime != (uint64_t)-1) {
+	if (atime != 0) {
+		if ((int64_t)atime < -2)
+			return (NT_STATUS_INVALID_PARAMETER);
+
 		smb_time_nt_to_unix(atime, &attr->sa_vattr.va_atime);
 		attr->sa_mask |= SMB_AT_ATIME;
 	}
-	if (mtime != 0 && mtime != (uint64_t)-1) {
+	if (mtime != 0) {
+		if ((int64_t)mtime < -2)
+			return (NT_STATUS_INVALID_PARAMETER);
+
 		smb_time_nt_to_unix(mtime, &attr->sa_vattr.va_mtime);
 		attr->sa_mask |= SMB_AT_MTIME;
 	}
-	if (ctime != 0 && ctime != (uint64_t)-1) {
+	if (ctime != 0) {
+		if ((int64_t)ctime < -2)
+			return (NT_STATUS_INVALID_PARAMETER);
+
 		smb_time_nt_to_unix(ctime, &attr->sa_vattr.va_ctime);
 		attr->sa_mask |= SMB_AT_CTIME;
 	}
-	if (crtime != 0 && crtime != (uint64_t)-1) {
+	if (crtime != 0) {
+		if ((int64_t)crtime < -2)
+			return (NT_STATUS_INVALID_PARAMETER);
+
 		smb_time_nt_to_unix(crtime, &attr->sa_crtime);
 		attr->sa_mask |= SMB_AT_CRTIME;
 	}
