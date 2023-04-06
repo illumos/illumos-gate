@@ -113,6 +113,7 @@ usr/src/test/os-tests/tests/definit/init.data
 usr/src/test/util-tests/tests/dis/i386/*.out
 usr/src/test/libc-tests/tests/qsort/*.c
 usr/src/tools/smatch/src/*
+usr/src/uts/common/io/bnxe/577xx/*
 usr/src/uts/common/io/cxgbe/*
 usr/src/uts/common/io/e1000api/*
 usr/src/uts/common/io/qede/*

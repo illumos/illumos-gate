@@ -35,6 +35,7 @@
 /*
  * Copyright (c) 2002, 2011, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include "bnxe.h"
@@ -294,28 +295,7 @@ static int BnxeMacStats(void *     pArg,
         break;
 
     case ETHER_STAT_XCVR_INUSE:
-        switch (pUM->props.link_speed)
-        {
-        case 0: /* no speed then status is down */
-            *pVal = XCVR_NONE;
-            break;
-
-        case 1000:
-            *pVal = XCVR_1000X;
-            break;
-
-        case 100:
-            *pVal = XCVR_100X;
-            break;
-
-        case 10:
-            *pVal = XCVR_10;
-            break;
-
-        default:
-            /* catches 2500/10000 */
-            *pVal = XCVR_UNDEFINED;
-        }
+	*pVal = (uint64_t)bnxe_phy_to_media(pUM);
         break;
 
 #if (MAC_VERSION > 1)
@@ -2312,6 +2292,7 @@ static int BnxeMacSetProperty(void *        barg,
     case MAC_PROP_STATUS:
     case MAC_PROP_SPEED:
     case MAC_PROP_DUPLEX:
+    case MAC_PROP_MEDIA:
 
     case MAC_PROP_ADV_10GFDX_CAP:
     case MAC_PROP_ADV_1000FDX_CAP:
@@ -2615,6 +2596,7 @@ static int BnxeMacGetProperty(void *        barg,
     link_state_t    link_state;
     link_duplex_t   link_duplex;
     uint64_t        link_speed;
+    mac_ether_media_t link_media;
     BnxeLinkCfg * lnk_cfg = &pUM->curcfg.lnkcfg;
     BnxeLinkCfg * hw_cfg  = &pUM->hwinit.lnkcfg;
 
@@ -2652,6 +2634,13 @@ static int BnxeMacGetProperty(void *        barg,
                          LINK_STATE_UP : LINK_STATE_DOWN;
         bcopy(&link_state, pr_val, sizeof(link_state_t));
         break;
+
+    case MAC_PROP_MEDIA:
+        ASSERT(pr_valsize >= sizeof(mac_ether_media_t));
+
+	link_media = bnxe_phy_to_media(pUM);
+        bcopy(&link_media, pr_val, sizeof(mac_ether_media_t));
+	break;
 
     case MAC_PROP_AUTONEG:
 
@@ -2852,7 +2841,7 @@ static void BnxeMacPrivatePropertyInfo(um_device_t *          pUM,
 
 static void BnxeMacPropertyInfo(void *                 barg,
                                 const char *           pr_name,
-                                mac_prop_id_t          pr_num, 
+                                mac_prop_id_t          pr_num,
                                 mac_prop_info_handle_t prh)
 {
     um_device_t * pUM = barg;

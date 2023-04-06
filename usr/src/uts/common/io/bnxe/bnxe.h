@@ -73,6 +73,7 @@
 #include <sys/strsubr.h>
 #include <sys/pci.h>
 #include <sys/gld.h>
+#include <sys/mac_ether.h>
 
 /*
  * This really ticks me off!  We use 'u' for naming unions
@@ -393,7 +394,7 @@ typedef struct _TxQueue
 typedef struct _um_rxpacket_t
 {
     lm_packet_t      lm_pkt; /* must be first entry */
-    lm_pkt_rx_info_t rx_info;    
+    lm_pkt_rx_info_t rx_info;
     u32_t            hash_value;
 
     frtn_t           freeRtn;
@@ -918,6 +919,7 @@ void      BnxeFmErrorReport(um_device_t * pUM, char * detail);
 
 /* bnxe_illumos.c */
 extern boolean_t bnxe_fill_transceiver(um_device_t *, void *);
+extern mac_ether_media_t bnxe_phy_to_media(um_device_t *);
 
 extern kmutex_t bnxeLoaderMutex;
 extern u32_t    bnxeNumPlumbed;
@@ -992,9 +994,9 @@ void BNXE_LOCK_ENTER_RX(um_device_t * pUM, int idx);
 void BNXE_LOCK_EXIT_RX(um_device_t * pUM, int idx);
 void BNXE_LOCK_ENTER_DONERX(um_device_t * pUM, int idx);
 void BNXE_LOCK_EXIT_DONERX(um_device_t * pUM, int idx);
-void BNXE_LOCK_ENTER_SB(um_device_t * pUM, int idx);            
+void BNXE_LOCK_ENTER_SB(um_device_t * pUM, int idx);
 void BNXE_LOCK_EXIT_SB(um_device_t * pUM, int idx);
-void BNXE_LOCK_ENTER_ETH_CON(um_device_t * pUM);            
+void BNXE_LOCK_ENTER_ETH_CON(um_device_t * pUM);
 void BNXE_LOCK_EXIT_ETH_CON(um_device_t * pUM);
 void BNXE_LOCK_ENTER_MCP(um_device_t * pUM);
 void BNXE_LOCK_EXIT_MCP(um_device_t * pUM);

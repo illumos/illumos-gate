@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -57,6 +58,115 @@ bnxe_get_phy_id(um_device_t *um)
 	}
 }
 
+/*
+ * This media map table and structure is shared across the different pluggable
+ * modules. The driver doesn't really look carefully at the difference between
+ * the various multi-speed modules which is why for 10G based pieces we also
+ * have lower speed based checks.
+ */
+typedef struct {
+	uint32_t bmm_sfp;
+	uint32_t bmm_speed;
+	mac_ether_media_t bmm_media;
+} bnxe_media_map_t;
+
+static const bnxe_media_map_t bnxe_media_map[] = {
+	{ ELINK_ETH_SFP_10GBASE_SR, 10000, ETHER_MEDIA_10GBASE_SR },
+	{ ELINK_ETH_SFP_10GBASE_SR, 1000, ETHER_MEDIA_1000BASE_SX },
+	{ ELINK_ETH_SFP_1GBASE_SX, 1000, ETHER_MEDIA_1000BASE_SX },
+	{ ELINK_ETH_SFP_10GBASE_LR, 10000, ETHER_MEDIA_10GBASE_LR },
+	{ ELINK_ETH_SFP_10GBASE_LR, 1000, ETHER_MEDIA_1000BASE_LX },
+	{ ELINK_ETH_SFP_1GBASE_LX, 1000, ETHER_MEDIA_1000BASE_LX },
+	{ ELINK_ETH_SFP_10GBASE_LRM, 10000, ETHER_MEDIA_10GBASE_LRM },
+	{ ELINK_ETH_SFP_10GBASE_ER, 10000, ETHER_MEDIA_10GBASE_ER },
+	{ ELINK_ETH_SFP_1GBASE_T, 1000, ETHER_MEDIA_1000BASE_T },
+	{ ELINK_ETH_SFP_1GBASE_CX, 1000, ETHER_MEDIA_1000BASE_CX },
+	{ ELINK_ETH_SFP_DAC, 10000, ETHER_MEDIA_10GBASE_CR },
+	{ ELINK_ETH_SFP_ACC, 10000, ETHER_MEDIA_10GBASE_ACC },
+};
+
+mac_ether_media_t
+bnxe_phy_to_media(um_device_t *um)
+{
+	uint_t phyid;
+	struct elink_params *params;
+	struct elink_phy *phy;
+	mac_ether_media_t media = ETHER_MEDIA_UNKNOWN;
+
+	BNXE_LOCK_ENTER_PHY(um);
+	phyid = bnxe_get_phy_id(um);
+	params = &um->lm_dev.params.link;
+	phy = &params->phy[phyid];
+
+	switch (phy->media_type) {
+	/*
+	 * Right now the driver does not ask the XFP i2c entity to determine the
+	 * media information. If we encounter someone with an XFP device then we
+	 * can add logic to the driver to cover proper detection, but otherwise
+	 * it would fit into this same set of modes.
+	 */
+	case ELINK_ETH_PHY_SFPP_10G_FIBER:
+	case ELINK_ETH_PHY_XFP_FIBER:
+	case ELINK_ETH_PHY_DA_TWINAX:
+	case ELINK_ETH_PHY_SFP_1G_FIBER:
+		for (size_t i = 0; i < ARRAY_SIZE(bnxe_media_map); i++) {
+			const bnxe_media_map_t *map = &bnxe_media_map[i];
+			if (phy->sfp_media == map->bmm_sfp &&
+			    um->props.link_speed == map->bmm_speed) {
+				media = map->bmm_media;
+				break;
+			}
+		}
+		break;
+	case ELINK_ETH_PHY_BASE_T:
+		switch (um->props.link_speed) {
+		case 10:
+			media = ETHER_MEDIA_10BASE_T;
+			break;
+		case 100:
+			media = ETHER_MEDIA_100BASE_TX;
+			break;
+		case 1000:
+			media = ETHER_MEDIA_1000BASE_T;
+			break;
+		case 10000:
+			media = ETHER_MEDIA_10GBASE_T;
+			break;
+		default:
+			break;
+		}
+		break;
+	case ELINK_ETH_PHY_KR:
+		switch (um->props.link_speed) {
+		case 1000:
+			media = ETHER_MEDIA_1000BASE_KX;
+			break;
+		case 10000:
+			media = ETHER_MEDIA_10GBASE_KR;
+			break;
+		default:
+			break;
+		}
+		break;
+	case ELINK_ETH_PHY_CX4:
+		if (um->props.link_speed == 10000) {
+			media = ETHER_MEDIA_10GBASE_CX4;
+		}
+		break;
+	case ELINK_ETH_PHY_NOT_PRESENT:
+		media = ETHER_MEDIA_NONE;
+		break;
+	case ELINK_ETH_PHY_UNSPECIFIED:
+	default:
+		media = ETHER_MEDIA_UNKNOWN;
+		break;
+	}
+
+	BNXE_LOCK_EXIT_PHY(um);
+	return (media);
+}
+
+
 static int
 bnxe_transceiver_info(void *arg, uint_t id, mac_transceiver_info_t *infop)
 {
@@ -75,7 +185,13 @@ bnxe_transceiver_info(void *arg, uint_t id, mac_transceiver_info_t *infop)
 	phyid = bnxe_get_phy_id(um);
 	params = &um->lm_dev.params.link;
 	phy = &params->phy[phyid];
-	if (phy->media_type == ELINK_ETH_PHY_BASE_T) {
+
+	switch (phy->media_type) {
+	case ELINK_ETH_PHY_SFPP_10G_FIBER:
+	case ELINK_ETH_PHY_DA_TWINAX:
+	case ELINK_ETH_PHY_SFP_1G_FIBER:
+		break;
+	default:
 		BNXE_LOCK_EXIT_PHY(um);
 		return (ENOTSUP);
 	}
@@ -136,11 +252,15 @@ bnxe_transceiver_read(void *arg, uint_t id, uint_t page, void *bp,
 	params = &um->lm_dev.params.link;
 	phy = &um->lm_dev.params.link.phy[phyid];
 
-	if (phy->media_type == ELINK_ETH_PHY_BASE_T) {
+	switch (phy->media_type) {
+	case ELINK_ETH_PHY_SFPP_10G_FIBER:
+	case ELINK_ETH_PHY_DA_TWINAX:
+	case ELINK_ETH_PHY_SFP_1G_FIBER:
+		break;
+	default:
 		BNXE_LOCK_EXIT_PHY(um);
 		return (ENOTSUP);
 	}
-
 
 	PHY_HW_LOCK(&um->lm_dev);
 	ret = elink_read_sfp_module_eeprom(phy, params, (uint8_t)page,
