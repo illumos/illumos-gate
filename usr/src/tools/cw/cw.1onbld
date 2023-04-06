@@ -34,6 +34,7 @@
 .Op Fl C
 .Op Fl -versions
 .Op Fl -noecho
+.Op Fl -tag Ar tag
 .Fl -primary Ar compiler
 .Op Fl -shadow Ar compiler ...
 .Op Fl -linker Ar linker
@@ -83,6 +84,10 @@ Specify a link-editor to use in place of
 .Pa /usr/bin/ld .
 .Xr ld 1
 itself arranges for this to be executed by any subprocesses.
+.It Fl -tag Ar tag
+Do nothing.
+Used simply to tag differences in the purpose of this invocation,
+to aid debugging build problems.
 .It Fl -noecho
 Do not echo the actual command line of any compilers invoked.
 .It Fl -versions

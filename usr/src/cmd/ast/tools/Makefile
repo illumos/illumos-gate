@@ -23,10 +23,9 @@ OBJS= $(CTOOLS:%=%.o)
 
 include $(SRC)/cmd/Makefile.cmd
 include ../Makefile.ast
+include $(SRC)/Makefile.native
 
-CC= $(NATIVECC)
-LD= $(NATIVELD)
-CFLAGS= $(NATIVE_CFLAGS)
+NATIVE_LIBS += libc.so
 
 all install install_h: $(TOOLS)
 _msg _feature:
@@ -72,7 +71,7 @@ AST_SH_ASSEMBLE= \
 	$(CHMOD) +x $@
 
 $(CTOOLS): $(OBJS)
-	$(LINK.c) $@.o -o $@ $(LDLIBS)
+	$(LINK.c) $@.o -o $@
 	$(POST_PROCESS)
 
 probe: $(C_ASTINIT)/C+probe $(C_ASTINIT)/make.probe

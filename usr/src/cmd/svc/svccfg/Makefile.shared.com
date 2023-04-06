@@ -18,30 +18,44 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-# Copyright 2021 Oxide Computer Company
-#
 
 #
-# The default mode at the moment is to use ctfconvert on object files
-# and merge them together. If you set this to 'link' after including
-# Makefile.ctf, it will switch that so instead we just do a single
-# ctfconvert on the resulting linked binary.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
-CTF_MODE = objs
 
-POST_objs = ; $(CTFMERGE) $(CTFMRGFLAGS) -L VERSION -o $@ $(OBJS)
-POST_O_objs = ; $(CTFCONVERT_O)
+PROG =	svccfg
 
-POST_link = $(CTFCONVERT) -L VERSION $@
-POST_O_link =
+SRCS  =			\
+	svccfg_main.c		\
+	svccfg_engine.c		\
+	svccfg_internal.c	\
+	svccfg_libscf.c		\
+	svccfg_tmpl.c		\
+	svccfg_xml.c		\
+	svccfg_help.c
 
-PROCESS_CTF = $(POST_$(CTF_MODE))
-POST_PROCESS_O += $(POST_O_$(CTF_MODE))
+OBJS =				\
+	$(SRCS:%.c=%.o)		\
+	svccfg_grammar.o	\
+	svccfg_lex.o		\
+	manifest_find.o		\
+	manifest_hash.o		\
+	notify_params.o		\
 
-CFLAGS += $(CTF_FLAGS)
-CFLAGS64 += $(CTF_FLAGS_64)
-NATIVE_CFLAGS += $(CTF_FLAGS)
-NATIVE_CFLAGS64 += $(CTF_FLAGS_64)
+include $(SRC)/cmd/Makefile.cmd
+
+# These are because of bugs in lex(1)/yacc(1) generated code
+CERRWARN +=	-_gcc=-Wno-unused-label
+CERRWARN +=	-_gcc=-Wno-unused-variable
+
+CERRWARN +=	-_gcc=-Wno-switch
+CERRWARN +=	$(CNOWARN_UNINIT)
+
+# not linted
+SMATCH=off
+
+LFLAGS = -t
+YFLAGS = -d
+
+CLOBBERFILES += svccfg_lex.c svccfg_grammar.c svccfg_grammar.h

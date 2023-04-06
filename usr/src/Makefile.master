@@ -27,11 +27,11 @@
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2021 Joyent, Inc.
 # Copyright 2019 RackTop Systems.
 # Copyright 2020 Oxide Computer Company
 # Copyright 2020 Peter Tribble
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 Joyent, Inc.
 #
 
 #
@@ -40,10 +40,12 @@
 ROOT=		/proto
 
 #
-# Adjunct root, containing an additional proto area to be used for headers
-# and libraries.
+# Adjunct root, containing an additional proto area to be searched for headers
+# and libraries for the target environment, which may not necessarily function
+# in the build environment.
 #
 ADJUNCT_PROTO=
+
 # HAVE_ADJUNCT_PROTO - ADJUNCT_PROTO is set to a non-default value
 # NO_ADJUNCT_PROTO - ADJUNCT_PROTO is unset
 #
@@ -54,7 +56,9 @@ NO_ADJUNCT_PROTO=$(ADJUNCT_PROTO:%=$(POUND_SIGN))
 $(NO_ADJUNCT_PROTO)HAVE_ADJUNCT_PROTO=$(POUND_SIGN)
 
 #
-# Adjunct for building things that run on the build machine.
+# A separate area to be searched for native tools and libraries for use by the
+# build or the build machine.  These libraries are specific to the build
+# machine and may not work on the target machine.
 #
 NATIVE_ADJUNCT=	/usr
 
@@ -117,6 +121,10 @@ BLD_JAVA_11=	$(POUND_SIGN)
 GNUC_ROOT=	/usr/gcc/10
 GCCLIBDIR=	$(GNUC_ROOT)/lib
 GCCLIBDIR64=	$(GNUC_ROOT)/lib/$(MACH64)
+
+NATIVE_GNUC_ROOT=	$(GNUC_ROOT)
+NATIVE_GCCLIBDIR=	$(NATIVE_GNUC_ROOT)/lib
+NATIVE_GCCLIBDIR64=	$(NATIVE_GNUC_ROOT)/lib/$(MACH64)
 
 DOCBOOK_XSL_ROOT=	/usr/share/sgml/docbook/xsl-stylesheets
 
@@ -216,6 +224,8 @@ ZIC=		$(ONBLD_TOOLS)/bin/$(MACH)/zic
 OPENSSL=	/usr/bin/openssl
 CPCGEN=		$(ONBLD_TOOLS)/bin/$(MACH)/cpcgen
 GENICONVTBL=	$(ONBLD_TOOLS)/bin/$(MACH)/geniconvtbl
+SVCCONFIGD=	$(ONBLD_TOOLS)/bin/$(MACH)/svc.configd
+SVCCFG=		$(ONBLD_TOOLS)/bin/$(MACH)/svccfg
 
 DEFAULT_CONSOLE_COLOR=					\
 	-DDEFAULT_ANSI_FOREGROUND=ANSI_COLOR_WHITE	\
@@ -254,8 +264,8 @@ MANIFEST_CHECK=	\
 	@$(ECHO) "checking $<"; \
 	SVCCFG_DTD=$(SRC)/cmd/svc/dtd/service_bundle.dtd.1 \
 	SVCCFG_REPOSITORY=$(SRC)/cmd/svc/seed/global.db \
-	SVCCFG_CONFIGD_PATH=$(SRC)/cmd/svc/configd/svc.configd-native \
-	$(SRC)/cmd/svc/svccfg/svccfg-native validate $<
+	SVCCFG_CONFIGD_PATH=$(SVCCONFIGD) \
+	$(SVCCFG) validate $<
 
 INS.file=	$(RM) $@; $(INS) -s -m $(FILEMODE) -f $(@D) $<
 INS.dir=	$(INS) -s -d -m $(DIRMODE) $@
@@ -698,10 +708,10 @@ COMPILE.java=	$(JAVAC) $(JAVAFLAGS) -classpath $(CLASSPATH)
 #
 CCNEEDED	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
 CCEXTNEEDED	= $(CCNEEDED)
-NATIVECCNEEDED	= -R$(GCCLIBDIR) -L$(GCCLIBDIR) -lstdc++ -lgcc_s
+NATIVECCNEEDED	= -R$(NATIVE_GCCLIBDIR) -L$(NATIVE_GCCLIBDIR) -lstdc++ -lgcc_s
 
 CCNEEDED64	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
-NATIVECCNEEDED64 = -R$(GCCLIBDIR) -L$(GCCLIBDIR) -lstdc++ -lgcc_s
+NATIVECCNEEDED64 = -R$(NATIVE_GCCLIBDIR) -L$(NATIVE_GCCLIBDIR) -lstdc++ -lgcc_s
 CCEXTNEEDED	= $(CCNEEDED64)
 
 # Libraries we expect to use natively on the build machine
@@ -742,49 +752,57 @@ CW_LINKER=		--linker $(LD)
 # that we use (currently only c and c++).
 #
 CW=			$(ONBLD_TOOLS)/bin/$(MACH)/cw
+NATIVE_CW=		$(ONBLD_TOOLS)/bin/$(MACH)/cw
 
-BUILD_CC=		$(CW) $(CW_LINKER) $(CW_CC_COMPILERS) --
-BUILD_CCC=		$(CW) -C $(CW_LINKER) $(CW_CCC_COMPILERS) --
+BUILD_CC=		$(CW) --tag target $(CW_LINKER) $(CW_CC_COMPILERS) --
+BUILD_CCC=		$(CW) --tag target -C $(CW_LINKER) $(CW_CCC_COMPILERS) --
 BUILD_CPP=		/usr/lib/cpp
 BUILD_LD=		$(ONBLD_TOOLS)/bin/$(MACH64)/ld
+BUILD_AS=		$(BUILD_CC)
+
+NATIVEBUILD_CC=		$(NATIVE_CW) --tag native $(CW_LINKER) $(CW_CC_COMPILERS) --
+NATIVEBUILD_CCC=	$(NATIVE_CW) --tag native -C $(CW_LINKER) $(CW_CCC_COMPILERS) --
+NATIVEBUILD_CPP=	/usr/lib/cpp
+NATIVEBUILD_LD=		$(ONBLD_TOOLS)/bin/$(MACH64)/ld
+NATIVEBUILD_AS=		$(NATIVEBUILD_CC)
 
 $(MACH)_CC=		$(BUILD_CC)
 $(MACH)_CCC=		$(BUILD_CCC)
 $(MACH)_CPP=		$(BUILD_CPP)
 $(MACH)_LD=		$(BUILD_LD)
-$(MACH)_AS=		$(BUILD_CC)
+$(MACH)_AS=		$(BUILD_AS)
 $(MACH64)_CC=		$(BUILD_CC)
 $(MACH64)_CCC=		$(BUILD_CCC)
 $(MACH64)_CPP=		$(BUILD_CPP)
 $(MACH64)_LD=		$(BUILD_LD)
-$(MACH64)_AS=		$(BUILD_CC)
+$(MACH64)_AS=		$(BUILD_AS)
 
-NATIVECC=		$($(NATIVE_MACH)_CC)
-NATIVECCC=		$($(NATIVE_MACH)_CCC)
-NATIVECPP=		$($(NATIVE_MACH)_CPP)
-NATIVEAS=		$($(NATIVE_MACH)_AS)
-NATIVELD=		$($(NATIVE_MACH)_LD)
+NATIVECC=		$(NATIVEBUILD_CC)
+NATIVECCC=		$(NATIVEBUILD_CCC)
+NATIVECPP=		$(NATIVEBUILD_CPP)
+NATIVEAS=		$(NATIVEBUILD_AS)
+NATIVELD=		$(NATIVEBUILD_LD)
 
-NATIVECC64=		$($(NATIVE_MACH64)_CC)
-NATIVECCC64=		$($(NATIVE_MACH64)_CCC)
-NATIVECPP64=		$($(NATIVE_MACH64)_CPP)
-NATIVEAS64=		$($(NATIVE_MACH64)_AS)
-NATIVELD64=		$($(NATIVE_MACH64)_LD)
+NATIVECC64=		$(NATIVEBUILD_CC)
+NATIVECCC64=		$(NATIVEBUILD_CCC)
+NATIVECPP64=		$(NATIVEBUILD_CPP)
+NATIVEAS64=		$(NATIVEBUILD_AS)
+NATIVELD64=		$(NATIVEBUILD_LD)
 
 #
 # Makefile.master.64 overrides these settings
 #
-CC=			$(NATIVECC)
-CCC=			$(NATIVECCC)
-CPP=			$(NATIVECPP)
-AS=			$(NATIVEAS)
-LD=			$(NATIVELD)
+CC=			$($(MACH)_CC)
+CCC=			$($(MACH)_CCC)
+CPP=			$($(MACH)_CPP)
+AS=			$($(MACH)_AS)
+LD=			$($(MACH)_LD)
 
-CC64=			$(NATIVECC64)
-CCC64=			$(NATIVECCC64)
-CPP64=			$(NATIVECPP64)
-AS64=			$(NATIVEAS64)
-LD64=			$(NATIVELD64)
+CC64=			$($(MACH64)_CC)
+CCC64=			$($(MACH64)_CCC)
+CPP64=			$($(MACH64)_CPP)
+AS64=			$($(MACH64)_AS)
+LD64=			$($(MACH64)_LD)
 
 # Pass -Y flag to cpp (method of which is release-dependent)
 CCYFLAG=		-Y I,

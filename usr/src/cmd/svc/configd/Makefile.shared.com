@@ -21,27 +21,34 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2021 Oxide Computer Company
+#
+# Copyright 2015 RackTop Systems.
+# Copyright 2020 Joyent, Inc.
 #
 
-#
-# The default mode at the moment is to use ctfconvert on object files
-# and merge them together. If you set this to 'link' after including
-# Makefile.ctf, it will switch that so instead we just do a single
-# ctfconvert on the resulting linked binary.
-#
-CTF_MODE = objs
+PROG = svc.configd
+OBJS =			\
+	backend.o	\
+	configd.o	\
+	client.o	\
+	file_object.o	\
+	maindoor.o	\
+	object.o	\
+	rc_node.o	\
+	snapshot.o
 
-POST_objs = ; $(CTFMERGE) $(CTFMRGFLAGS) -L VERSION -o $@ $(OBJS)
-POST_O_objs = ; $(CTFCONVERT_O)
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.ctf
 
-POST_link = $(CTFCONVERT) -L VERSION $@
-POST_O_link =
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-type-limits
+CERRWARN += -_gcc=-Wno-unused-label
+CERRWARN += -_gcc=-Wno-unused-variable
+CERRWARN += -_gcc=-Wno-unused-function
+CERRWARN += $(CNOWARN_UNINIT)
 
-PROCESS_CTF = $(POST_$(CTF_MODE))
-POST_PROCESS_O += $(POST_O_$(CTF_MODE))
+# strange false positive
+SMOFF += free
 
-CFLAGS += $(CTF_FLAGS)
-CFLAGS64 += $(CTF_FLAGS_64)
-NATIVE_CFLAGS += $(CTF_FLAGS)
-NATIVE_CFLAGS64 += $(CTF_FLAGS_64)
+DIRMODE = 0755
+FILEMODE = 0555

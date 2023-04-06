@@ -40,7 +40,7 @@
  * If you modify this file, you must increment CW_VERSION.  This is a semver,
  * incompatible changes should bump the major, anything else the minor.
  */
-#define	CW_VERSION	"9.0"
+#define	CW_VERSION	"9.1"
 
 /*
  * -#		Verbose mode
@@ -347,7 +347,7 @@ usage(void)
 {
 	extern char *__progname;
 	(void) fprintf(stderr,
-	    "usage: %s [-C] [--versions] --primary <compiler> "
+	    "usage: %s [-C] [--tag arg] [--versions] --primary <compiler> "
 	    "[--shadow <compiler>]... -- cflags...\n",
 	    __progname);
 	(void) fprintf(stderr, "compilers take the form: name,path,style\n"
@@ -1357,6 +1357,7 @@ main(int argc, char **argv)
 		{ "noecho", no_argument, NULL, 'n' },
 		{ "primary", required_argument, NULL, 'p' },
 		{ "shadow", required_argument, NULL, 's' },
+		{ "tag", required_argument, NULL, 't' },
 		{ "versions", no_argument, NULL, 'v' },
 		{ NULL, 0, NULL, 0 },
 	};
@@ -1395,6 +1396,8 @@ main(int argc, char **argv)
 				    "the moment");
 			parse_compiler(optarg, &shadows[nshadows]);
 			nshadows++;
+			break;
+		case 't':	/* Ignored, a diagnostic in build logs only */
 			break;
 		case 'v':
 			vflg = true;

@@ -24,36 +24,32 @@
 # Copyright 2020 Joyent, Inc.
 #
 
-include Makefile.shared.com
-include $(SRC)/cmd/Makefile.ctf
+include $(SRC)/tools/Makefile.tools
+include $(SRC)/cmd/svc/svccfg/Makefile.shared.com
 
-POFILES =				\
-	$(SRCS:%.c=%.po)		\
-	svccfg_grammar.po		\
-	svccfg_lex.po			\
-	../common/manifest_find.po	\
-	../common/manifest_hash.po
+SRCDIR = $(SRC)/cmd/svc/svccfg
+COMDIR = $(SRC)/cmd/svc/common
 
-SRCDIR = .
-COMDIR = ../common
+CPPFLAGS +=	-I. -I$(SRC)/cmd/svc/svccfg -I$(SRC)/cmd/svc/common	\
+		-I$(NATIVE_ADJUNCT)/include/libxml2			\
+		-DNATIVE_BUILD						\
+		-I$(LIBSCF)/inc						\
+		-I$(LIBTECLA)						\
+		-I$(LIBUUTIL)/common
 
-POFILE =	$(PROG)_all.po
+LIBTECLA	= $(SRC)/lib/libtecla		# just for the header
+LIBUUTIL	= $(SRC)/lib/libuutil
 
-# svccfg has a name clash with main() and libl.so.1.  However, svccfg must
-# still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
-# to local scope.
-MAPFILES +=	$(MAPFILE.LEX) $(MAPFILE.NGB)
-MAPOPTS =	$(MAPFILES:%=-Wl,-M%)
+SVCCFG_EXTRA_LIBS += -lxml2 -lscf -ll -luutil -lumem -lmd \
+	-lnvpair
+NATIVE_LIBS += libxml2.so libl.so libumem.so libmd.so libnvpair.so libc.so
 
-CPPFLAGS +=	-I ../common -I$(ADJUNCT_PROTO)/usr/include/libxml2
-LDFLAGS +=	$(MAPOPTS)
+LDLIBS += \
+	-L$(SRC)/tools/svc/libscf -R '$$ORIGIN/../../lib/$(MACH)' \
+	-L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib -L$(ROOTONBLDLIBMACH) \
+	$(SVCCFG_EXTRA_LIBS)
 
-LDLIBS += -lxml2 -lscf -ll -luutil -lumem -lmd -lnvpair -ltecla
-NATIVE_LIBS += libxml2.so
-
-svccfg_lex.o svccfg_grammar.o := CCVERBOSE =
-
-svccfg_help.po := XGETFLAGS =	-a
+include $(SRC)/Makefile.native
 
 .KEEP_STATE:
 .PARALLEL: $(OBJS)
@@ -64,16 +60,10 @@ $(PROG): $(OBJS) $(MAPFILES)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-$(POFILES): svccfg_grammar.h
-
-$(POFILE): $(POFILES)
-	cat $(POFILES) > $(POFILE)
-
-install: all $(ROOTUSRSBINPROG)
+install: all $(ROOTONBLDMACHPROG)
 
 clean:
 	$(RM) $(OBJS)
 
 include ../../Makefile.targ
-include Makefile.shared.targ
-
+include $(SRC)/cmd/svc/svccfg/Makefile.shared.targ

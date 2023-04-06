@@ -23,10 +23,7 @@
 # Use is subject to license terms.
 #
 
-#
-# We build a native version of libuutil.so.1 in the "native" subdirectory.
-# Note that we don't bother to lint it.
-#
+# We build a native version of libuutil.so.1 from src/tools/svc
 
 include ../Makefile.lib
 
@@ -52,7 +49,7 @@ POFILE =	libuutil.po
 
 .KEEP_STATE:
 
-all clean clobber install: native $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 lint:		$(SUBDIRS)
 
@@ -64,7 +61,7 @@ check:		$(CHECKHDRS)
 
 _msg:		$(MSGDOMAINPOFILE)
 
-native $(SUBDIRS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

@@ -53,8 +53,8 @@ include $(SRC)/lib/Makefile.rootfs
 SRCDIR = ../src
 TOOLDIR = ../tool
 $(DYNLIB) := LDLIBS += -lc
-LIBS = $(DYNLIB) $(NATIVERELOC)
 
+LIBS = $(DYNLIB)
 
 # generated sources
 GENSRC = opcodes.c parse.c
@@ -103,7 +103,7 @@ CERRWARN += -_gcc=-Wno-unused-label
 # not linted
 SMATCH=off
 
-MAPFILES = ../mapfile-sqlite
+MAPFILES = $(SRC)/lib/libsqlite/mapfile-sqlite
 
 # headers generated here
 GENHDR = opcodes.h parse.h
@@ -139,27 +139,6 @@ TESTOBJS = $(TESTSRC:$(SRCDIR)/%.c=%.o)
 
 TESTCLEAN = $(TESTOBJS) test.db test.tcl test1.bt test2.db testdb
 
-#
-# Native variant (needed by cmd/configd)
-#
-NATIVERELOC = libsqlite-native.o
-NATIVEPROGS = testfixture
-NATIVEOBJS = $(OBJS:%.o=%-native.o)
-
-NATIVETARGETS = $(NATIVEPROGS) $(NATIVEOBJS) $(NATIVERELOC)
-
-$(NATIVETARGETS) :=	CC = $(NATIVECC)
-$(NATIVETARGETS) :=	LD = $(NATIVELD)
-$(NATIVETARGETS) :=	CFLAGS = $(NATIVE_CFLAGS)
-$(NATIVETARGETS) :=	CPPFLAGS = $(MYCPPFLAGS)
-$(NATIVETARGETS) :=	LDFLAGS =
-$(NATIVETARGETS) :=	LDLIBS = -lc
-
-$(OBJS) :=		CFLAGS += $(CTF_FLAGS)
-$(OBJS) :=		CTFCONVERT_POST = $(CTFCONVERT_O)
-$(NATIVEOBJS) :=	CFLAGS += $(CTF_FLAGS)
-$(NATIVEOBJS) :=	CTFCONVERT_POST = $(CTFCONVERT_O)
-
 TCLBASE = /usr/sfw
 TCLVERS = tcl8.3
 
@@ -168,7 +147,6 @@ testfixture := MYCPPFLAGS += -I$(TCLBASE)/include -DTCLSH -DSQLITE_TEST=1
 testfixture := LDLIBS += -R$(TCLBASE)/lib -L$(TCLBASE)/lib -l$(TCLVERS) -lm -ldl
 
 CLEANFILES += \
-	$(NATIVETARGETS) \
 	$(TESTCLEAN)	\
 	lemon		\
 	lemon.o		\
@@ -184,104 +162,16 @@ CLEANFILES += \
 
 ENCODING  = ISO8859
 
-
-.PARALLEL: $(OBJS) $(OBJS:%.o=%-native.o)
+.PARALLEL: $(OBJS) $(PICS)
 .KEEP_STATE:
 
 # This is the default Makefile target.  The objects listed here
 # are what get build when you type just "make" with no arguments.
 #
 all:		$(LIBS)
-install:	all \
-		$(ROOTLIBDIR)/$(DYNLIB) \
-		$(ROOTLIBDIR)/$(NATIVERELOC)
-
+install:	all
 
 all_h: $(GENHDR)
 
-$(ROOTLIBDIR)/$(NATIVERELOC)	:= FILEMODE= 644
-
 $(ROOTLINK): $(ROOTLIBDIR) $(ROOTLIBDIR)/$(DYNLIB)
 	$(INS.liblink)
-
-native: $(NATIVERELOC)
-
-$(NATIVERELOC):	objs .WAIT $(OBJS:%.o=%-native.o)
-	$(LD) -r -o $(NATIVERELOC) $(OBJS:%.o=%-native.o)
-
-opcodes.h: $(SRCDIR)/vdbe.c
-	@echo "Generating $@"; \
-	 $(RM) -f $@ ; \
-	 echo '/* Automatically generated file.  Do not edit */' > $@ ; \
-	 grep '^case OP_' $(SRCDIR)/vdbe.c | \
-	    sed -e 's/://' | \
-	    $(AWK) '{printf "#define %-30s %3d\n", $$2, ++cnt}' >> $@
-
-opcodes.c: $(SRCDIR)/vdbe.c
-	@echo "Generating $@"; \
-	 $(RM) -f $@ ; \
-	 echo '/* Automatically generated file.  Do not edit */' > $@ ; \
-	 echo 'char *sqliteOpcodeNames[] = { "???", ' >> $@ ; \
-	 grep '^case OP_' $(SRCDIR)/vdbe.c | \
-	    sed -e 's/^.*OP_/  "/' -e 's/:.*$$/", /' >> $@ ; \
-	 echo '};' >> $@
-
-testfixture: FRC
-	@if [ -f $(TCLBASE)/include/tcl.h ]; then \
-		unset SUNPRO_DEPENDENCIES; \
-		echo $(LINK.c) -o testfixture $(TESTSRC) $(LIBRARY) $(LDLIBS) ;\
-		exec $(LINK.c) -o testfixture $(TESTSRC) $(LIBRARY) $(LDLIBS) ;\
-	else \
-		echo "$(TCLBASE)/include/tcl.h: not found."; \
-		exit 1; \
-	fi
-
-# Prevent Makefile.lib $(PICS) := from adding PICFLAGS
-# by building lemon in a recursive make invocation.
-# Otherwise, this target causes a rebuild every time after
-# the PICS target builds this one way, then lint the other.
-parse.h parse.c : $(SRCDIR)/parse.y $(TOOLDIR)/lemon.c $(TOOLDIR)/lempar.c
-	-$(RM) parse_tmp.y lempar.c
-	$(CP) $(SRCDIR)/parse.y parse_tmp.y
-	$(CP) $(TOOLDIR)/lempar.c lempar.c
-	$(MAKE) lemon
-	./lemon parse_tmp.y
-	-$(RM) parse.c parse.h
-	$(CP) parse_tmp.h parse.h
-	$(CP) parse_tmp.c parse.c
-
-lemon: $(TOOLDIR)/lemon.c
-	$(NATIVECC) $(NATIVE_CFLAGS) -o $@ $(TOOLDIR)/lemon.c
-
-objs/%-native.o: $(SRCDIR)/%.c $(GENHDR)
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-objs/%-native.o: %.c $(GENHDR)
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-objs/parse-native.o: parse.c $(GENHDR)
-	$(COMPILE.c) -o $@ parse.c
-	$(POST_PROCESS_O)
-
-objs/%.o pics/%.o: $(SRCDIR)/%.c $(GENHDR)
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-objs/%.o pics/%.o: %.c $(GENHDR)
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-# need direct rules for generated files
-objs/opcodes.o pics/opcodes.o: opcodes.c $(GENHDR)
-	$(COMPILE.c) -o $@ opcodes.c
-	$(POST_PROCESS_O)
-
-objs/parse.o pics/parse.o: parse.c $(GENHDR)
-	$(COMPILE.c) -o $@ parse.c
-	$(POST_PROCESS_O)
-
-include $(SRC)/lib/Makefile.targ
-
-FRC:

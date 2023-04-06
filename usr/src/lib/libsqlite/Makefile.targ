@@ -1,0 +1,71 @@
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
+# Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+opcodes.h: $(SRCDIR)/vdbe.c
+	@echo "Generating $@"; \
+	$(RM) -f $@ ; \
+	echo '/* Automatically generated file.  Do not edit */' > $@ ; \
+	$(GREP) '^case OP_' $(SRCDIR)/vdbe.c | \
+	    $(SED) -e 's/://' | \
+	    $(AWK) '{printf "#define %-30s %3d\n", $$2, ++cnt}' >> $@
+
+opcodes.c: $(SRCDIR)/vdbe.c
+	@echo "Generating $@"; \
+	$(RM) -f $@ ; \
+	$(ECHO) '/* Automatically generated file.  Do not edit */' > $@ ; \
+	$(ECHO) 'char *sqliteOpcodeNames[] = { "???", ' >> $@ ; \
+	$(GREP) '^case OP_' $(SRCDIR)/vdbe.c | \
+	    $(SED) -e 's/^.*OP_/  "/' -e 's/:.*$$/", /' >> $@ ; \
+	 $(ECHO) '};' >> $@
+
+testfixture: FRC
+	@if [ -f $(TCLBASE)/include/tcl.h ]; then \
+		unset SUNPRO_DEPENDENCIES; \
+		$(ECHO) $(LINK.c) -o testfixture $(TESTSRC) $(LIBRARY) $(LDLIBS) ;\
+		exec $(LINK.c) -o testfixture $(TESTSRC) $(LIBRARY) $(LDLIBS) ;\
+	else \
+		$(ECHO) "$(TCLBASE)/include/tcl.h: not found."; \
+		exit 1; \
+	fi
+
+# Prevent Makefile.lib $(PICS) := from adding PICFLAGS
+# by building lemon in a recursive make invocation.
+# Otherwise, this target causes a rebuild every time after
+# the PICS target builds this one way, then lint the other.
+parse.h parse.c : $(SRCDIR)/parse.y $(TOOLDIR)/lemon.c $(TOOLDIR)/lempar.c
+	-$(RM) parse_tmp.y lempar.c
+	$(CP) $(SRCDIR)/parse.y parse_tmp.y
+	$(CP) $(TOOLDIR)/lempar.c lempar.c
+	$(MAKE) lemon
+	./lemon parse_tmp.y
+	-$(RM) parse.c parse.h
+	$(CP) parse_tmp.h parse.h
+	$(CP) parse_tmp.c parse.c
+
+lemon: $(TOOLDIR)/lemon.c
+	$(NATIVECC) $(NATIVE_CFLAGS) -o $@ $(TOOLDIR)/lemon.c
+
+objs/%.o pics/%.o: $(SRCDIR)/%.c $(GENHDR)
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+objs/%.o pics/%.o: %.c $(GENHDR)
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+# need direct rules for generated files
+objs/opcodes.o pics/opcodes.o: opcodes.c $(GENHDR)
+	$(COMPILE.c) -o $@ opcodes.c
+	$(POST_PROCESS_O)
+
+objs/parse.o pics/parse.o: parse.c $(GENHDR)
+	$(COMPILE.c) -o $@ parse.c
+	$(POST_PROCESS_O)
+
+include $(SRC)/lib/Makefile.targ

@@ -24,8 +24,7 @@
 #
 
 #
-# We build a native version of libscf.so.1 in the "native" subdirectory.
-# Note that we don't bother to lint it.
+# Note we build a native version of libscf.so.1 out of tools/svc.
 #
 
 include		../Makefile.lib
@@ -52,7 +51,7 @@ XGETFLAGS +=	-a
 
 .KEEP_STATE:
 
-all clean clobber install: native $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 $(POFILE):	pofile_MSGFILES
 
@@ -62,7 +61,7 @@ check: $(CHECKHDRS)
 
 _msg:		$(MSGDOMAINPOFILE)
 
-$(SUBDIRS) native: FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
