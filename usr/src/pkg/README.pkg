@@ -85,12 +85,6 @@ The build behavior may modified by the following variables:
 	    detailed information about the commands it executes to
 	    process and publish packages.
 
-	ONNV_BUILDNUM
-	    If ONNV_BUILDNUM is set to an older ON build number,
-	    your packages will be published at that version instead
-	    of the one defined in usr/src/Makefile.buildnum, which
-	    is managed by the gatekeepers.
-
 A set of intermediate build products are placed in
 usr/src/pkg/packages.$MACH/.  These can be useful during development.
 
