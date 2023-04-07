@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -37,6 +39,9 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#define	KIDMAP_HASH_SIZE	(1<<8)
+#define	KIDMAP_HASH_MASK	(KIDMAP_HASH_SIZE-1)
 
 typedef struct sid2pid {
 	avl_node_t	avl_link;
@@ -90,9 +95,9 @@ typedef struct idmap_pid2sid_cache {
  * both a UID and a GID.
  */
 typedef struct idmap_cache {
-	idmap_sid2pid_cache_t	sid2pid;
-	idmap_pid2sid_cache_t	uid2sid;
-	idmap_pid2sid_cache_t	gid2sid;
+	idmap_sid2pid_cache_t	sid2pid_hash[KIDMAP_HASH_SIZE];
+	idmap_pid2sid_cache_t	uid2sid_hash[KIDMAP_HASH_SIZE];
+	idmap_pid2sid_cache_t	gid2sid_hash[KIDMAP_HASH_SIZE];
 } idmap_cache_t;
 
 
