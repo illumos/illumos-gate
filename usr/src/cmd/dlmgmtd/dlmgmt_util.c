@@ -355,7 +355,7 @@ link_destroy(dlmgmt_link_t *linkp)
 
 /*
  * Set the DLMGMT_ACTIVE flag on the link to note that it is active.
- * When a link is active and is owned by an NGZ then it is added to
+ * When a link is active and owned by an NGZ then it is added to
  * that zone's datalink list.
  */
 int
@@ -384,6 +384,7 @@ link_activate(dlmgmt_link_t *linkp)
 		if (zoneid != linkp->ll_zoneid) {
 			assert(linkp->ll_zoneid == 0);
 			assert(linkp->ll_onloan == B_FALSE);
+			assert(linkp->ll_transient == 0);
 
 			/*
 			 * If dlmgmtd already has a link with this
@@ -422,11 +423,11 @@ link_activate(dlmgmt_link_t *linkp)
 			 */
 			if (linkp->ll_class == DATALINK_CLASS_VNIC &&
 			    !(linkp->ll_flags & DLMGMT_PERSIST))
-				linkp->ll_trans = B_TRUE;
+				linkp->ll_transient = B_TRUE;
 		}
 	} else if (linkp->ll_zoneid != GLOBAL_ZONEID) {
 		/*
-		 * In this case the link was not found under any NGZs
+		 * In this case the link was not found under any NGZ
 		 * but according to its ll_zoneid member it is owned
 		 * by an NGZ. Add the datalink to the appropriate zone
 		 * datalink list.
@@ -490,8 +491,9 @@ dlmgmt_create_common(const char *name, datalink_class_t class, uint32_t media,
 		return (ENOSPC);
 	if (flags & ~(DLMGMT_ACTIVE | DLMGMT_PERSIST | DLMGMT_TRANSIENT) ||
 	    ((flags & DLMGMT_PERSIST) && (flags & DLMGMT_TRANSIENT)) ||
-	    flags == 0)
+	    flags == 0) {
 		return (EINVAL);
+	}
 
 	if ((linkp = calloc(1, sizeof (dlmgmt_link_t))) == NULL) {
 		err = ENOMEM;
@@ -511,7 +513,7 @@ dlmgmt_create_common(const char *name, datalink_class_t class, uint32_t media,
 	 * DLMGMT_ACTIVE -- it should not survive as a flag beyond
 	 * this point.
 	 */
-	linkp->ll_trans = (flags & DLMGMT_TRANSIENT) ? B_TRUE : B_FALSE;
+	linkp->ll_transient = (flags & DLMGMT_TRANSIENT) ? B_TRUE : B_FALSE;
 	flags &= ~DLMGMT_TRANSIENT;
 
 	if (avl_find(&dlmgmt_name_avl, linkp, &name_where) != NULL ||

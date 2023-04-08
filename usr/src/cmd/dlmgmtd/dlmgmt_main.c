@@ -262,15 +262,17 @@ again:
 		 * logging errors for any that failed.
 		 */
 		if (zone_getattr(zids[i], ZONE_ATTR_STATUS, &status,
-		    sizeof (status)) < 0)
+		    sizeof (status)) < 0) {
 			continue;
+		}
 		switch (status) {
 			case ZONE_IS_SHUTTING_DOWN:
 			case ZONE_IS_EMPTY:
 			case ZONE_IS_DOWN:
 			case ZONE_IS_DYING:
 			case ZONE_IS_DEAD:
-				/* FALLTHRU */
+			case ZONE_IS_INITIALIZED:
+			case ZONE_IS_UNINITIALIZED:
 				continue;
 			default:
 				break;

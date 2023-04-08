@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <door.h>
@@ -121,6 +122,18 @@ dladm_create_datalink_id(dladm_handle_t handle, const char *link,
 	    !(flags & (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST)) ||
 	    linkidp == NULL) {
 		return (DLADM_STATUS_BADARG);
+	}
+
+	if (getzoneid() != GLOBAL_ZONEID) {
+		/*
+		 * If we're creating this link in a non-global zone, then do
+		 * not allow it to be persistent, and flag it as transient so
+		 * that it will be automatically cleaned up on zone shutdown,
+		 * rather than being moved to the GZ.
+		 */
+		if (flags & DLADM_OPT_PERSIST)
+			return (DLADM_STATUS_TEMPONLY);
+		flags |= DLADM_OPT_TRANSIENT;
 	}
 
 	dlmgmt_flags = (flags & DLADM_OPT_ACTIVE) ? DLMGMT_ACTIVE : 0;
@@ -581,9 +594,12 @@ dladm_zname2info(dladm_handle_t handle, const char *zonename, const char *link,
 	if (linkidp != NULL)
 		*linkidp = linkid;
 	if (flagp != NULL) {
-		*flagp = retval.lr_flags & DLMGMT_ACTIVE ? DLADM_OPT_ACTIVE : 0;
+		*flagp = (retval.lr_flags & DLMGMT_ACTIVE) ?
+		    DLADM_OPT_ACTIVE : 0;
 		*flagp |= (retval.lr_flags & DLMGMT_PERSIST) ?
 		    DLADM_OPT_PERSIST : 0;
+		*flagp |= (retval.lr_flags & DLMGMT_TRANSIENT) ?
+		    DLADM_OPT_TRANSIENT : 0;
 	}
 	if (classp != NULL)
 		*classp = retval.lr_class;
