@@ -883,6 +883,7 @@ process_link_line(char *buf, dlmgmt_link_t *linkp)
 
 	bzero(linkp, sizeof (*linkp));
 	linkp->ll_linkid = DATALINK_INVALID_LINKID;
+	linkp->ll_zoneid = ALL_ZONES;
 
 	/*
 	 * Use a copy of buf for parsing so that we can do whatever we want.
@@ -1167,6 +1168,15 @@ process_db_read(dlmgmt_db_req_t *req, FILE *fp)
 			linkattr_destroy(&link_in_file);
 			continue;
 		}
+
+		/*
+		 * Persistent configuration files do not include the "zone"
+		 * attribute. In that case, ll_zoneid will have the the
+		 * ALL_ZONES sentinel value. Adjust it here to the requesting
+		 * zone's ID.
+		 */
+		if (link_in_file.ll_zoneid == ALL_ZONES)
+			link_in_file.ll_zoneid = req->ls_zoneid;
 
 		assert(req->ls_zoneid == 0 ||
 		    link_in_file.ll_zoneid == req->ls_zoneid);
