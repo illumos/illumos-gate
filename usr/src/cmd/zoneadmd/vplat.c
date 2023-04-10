@@ -721,7 +721,7 @@ unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 	 * should forcibly unmount.
 	 */
 	remote_fstypes = get_remote_fstypes(zlogp);
-	for (;;) {
+	for (; /* ever */; ) {
 		uint_t newcount = 0;
 		boolean_t unmounted;
 		struct mnttab *mnp;
@@ -2923,7 +2923,7 @@ free_ip_interface(zone_addr_list_t *zalist)
 {
 	zone_addr_list_t *ptr, *new;
 
-	for (ptr = zalist; ptr != NULL;) {
+	for (ptr = zalist; ptr != NULL; ) {
 		new = ptr;
 		ptr = ptr->za_next;
 		free(new);

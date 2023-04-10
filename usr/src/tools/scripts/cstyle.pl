@@ -104,7 +104,7 @@ if (defined($opts{'o'})) {
 	}
 }
 
-my ($filename, $line, $prev, $buf);		# shared globals
+my ($filename, $line, $prev);		# shared globals
 
 my $fmt;
 my $hdr_comment_start;
@@ -270,7 +270,6 @@ my ($okmsg, $comment_prefix);
 
 $line = '';
 $prev = '';
-$buf = '';
 reset_indent();
 
 line: while (<$filehandle>) {
@@ -589,8 +588,7 @@ line: while (<$filehandle>) {
 	if (/[^<>\s][!<>=]=/ || /[^<>][!<>=]=[^\s,]/ ||
 	    (/[^->]>[^,=>\s]/ && !/[^->]>$/) ||
 	    (/[^<]<[^,=<\s]/ && !/[^<]<$/) ||
-	    /[^<\s]<[^<]/ || /[^->\s]>[^>]/ ||
-	    /[^\s]\&\&[^\s]/ || /[^\s]\|\|[^\s]/) {
+	    /[^<\s]<[^<]/ || /[^->\s]>[^>]/) {
 		err("missing space around relational operator");
 	}
 	if (/\S>>=/ || /\S<<=/ || />>=\S/ || /<<=\S/ || /\S[-+*\/&|^%]=/ ||
@@ -602,39 +600,11 @@ line: while (<$filehandle>) {
 			err("missing space around assignment operator");
 		}
 	}
-
-	# for loops are often split to multiple lines, consolidate
-	# into single buffer for regexp processing.
-	if ($buf eq '') {
-		if (/for \(/) {
-			$buf = $_;
-			# if this for is split, get next line
-			if ($buf !~ /for \([^;]*;[^;]*;[^;]*\)/) {
-				next line;
-			}
-		}
-	} else {
-		s/^\s*//;	# spaces will upset some tests
-		$buf .= " " . $_;
-		# if this for is split, get next line
-		if ($buf !~ /for \([^;]*;[^;]*;[^;]*\)/) {
-			next line;
-		}
+	if (/[,;]\S/ && !/\bfor \(;;\)/) {
+		err("comma or semicolon followed by non-blank");
 	}
-
-	# if complete, set $_ and drop the buffer
-	# XXX as we are processing buffer, multi-line 'for' error
-	# messages may print wrong line number and line (verbose)
-	if ($buf =~ /for \([^;]*;[^;]*;[^;]*\)/) {
-                $_ = $buf;
-                $buf = '';
-        }
-
-	if (/[,;]\S/ && !/\s*for \([^;]*;(;|[\s]+[^;]+;)(\)|[\s]+[^;]+\))/) {
-		err("comma or semicolon followed by non-blank: ");
-	}
-	if (/\s[,;]/ && !/^[\t]+;$/ &&
-	    /^\s*for \([^;]*;[^;]*;[^;]*\)/) {
+	# allow "for" statements to have empty "while" clauses
+	if (/\s[,;]/ && !/^[\t]+;$/ && !/^\s*for \([^;]*; ;[^;]*\)/) {
 		err("comma or semicolon preceded by blank");
 	}
 	if (/^\s*(&&|\|\|)/) {
@@ -695,7 +665,8 @@ line: while (<$filehandle>) {
 	if (/\(\s/) {
 		err("whitespace after left paren");
 	}
-	if (/\s\)/) {
+	# allow "for" statements to have empty "continue" clauses
+	if (/\s\)/ && !/^\s*for \([^;]*;[^;]*; \)/) {
 		err("whitespace before right paren");
 	}
 	if (/^\s*\(void\)[^ ]/) {
