@@ -1065,7 +1065,7 @@ nwifent_free_attrs(struct zone_nwiftab *np)
 {
 	struct zone_res_attrtab *rap;
 
-	for (rap = np->zone_nwif_attrp; rap != NULL;) {
+	for (rap = np->zone_nwif_attrp; rap != NULL; ) {
 		struct zone_res_attrtab *tp = rap;
 
 		rap = rap->zone_res_attr_next;
