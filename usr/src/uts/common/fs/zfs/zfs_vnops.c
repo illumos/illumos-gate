@@ -2714,7 +2714,17 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
 
-	zfs_fuid_map_ids(zp, cr, &vap->va_uid, &vap->va_gid);
+	/*
+	 * When files have FUIDs (SIDs) for UID or GID, it can be
+	 * quite expensive to get the UID and GID values.
+	 * Avoid that when we can.
+	 */
+	if ((vap->va_mask & (AT_UID | AT_GID)) != 0) {
+		zfs_fuid_map_ids(zp, cr, &vap->va_uid, &vap->va_gid);
+	} else {
+		vap->va_uid = (uid_t)-1;
+		vap->va_gid = (gid_t)-1;
+	}
 
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MTIME(zfsvfs), NULL, &mtime, 16);
 	SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_CTIME(zfsvfs), NULL, &ctime, 16);
@@ -2728,9 +2738,12 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	 * If ACL is trivial don't bother looking for ACE_READ_ATTRIBUTES.
 	 * Also, if we are the owner don't bother, since owner should
 	 * always be allowed to read basic attributes of file.
+	 *
+	 * Check "is owner" using zfs_fuid_is_cruser to avoid an idmap
+	 * up-call in zfs_fuid_map_ids (that can be expensive).
 	 */
 	if (!(zp->z_pflags & ZFS_ACL_TRIVIAL) &&
-	    (vap->va_uid != crgetuid(cr))) {
+	    !zfs_fuid_is_cruser(zfsvfs, zp->z_uid, cr)) {
 		if (error = zfs_zaccess(zp, ACE_READ_ATTRIBUTES, 0,
 		    skipaclchk, cr)) {
 			ZFS_EXIT(zfsvfs);

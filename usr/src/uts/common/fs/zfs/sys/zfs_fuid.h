@@ -113,6 +113,7 @@ extern void zfs_fuid_map_ids(struct znode *zp, cred_t *cr,
     uid_t *uid, uid_t *gid);
 extern zfs_fuid_info_t *zfs_fuid_info_alloc(void);
 extern void zfs_fuid_info_free(zfs_fuid_info_t *);
+extern boolean_t zfs_fuid_is_cruser(zfsvfs_t *, uint64_t, cred_t *);
 extern boolean_t zfs_user_in_cred(zfsvfs_t *, uint64_t, cred_t *);
 extern boolean_t zfs_groupmember(zfsvfs_t *, uint64_t, cred_t *);
 void zfs_fuid_sync(zfsvfs_t *, dmu_tx_t *);

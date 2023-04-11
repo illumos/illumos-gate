@@ -437,9 +437,8 @@ smb_common_open(smb_request_t *sr)
 		/*
 		 * Need the DOS attributes below, where we
 		 * check the search attributes (sattr).
-		 * Also UID, for owner check below.
 		 */
-		op->fqi.fq_fattr.sa_mask = SMB_AT_DOSATTR | SMB_AT_UID;
+		op->fqi.fq_fattr.sa_mask = SMB_AT_DOSATTR;
 		rc = smb_node_getattr(sr, op->fqi.fq_fnode, zone_kcred(),
 		    NULL, &op->fqi.fq_fattr);
 		if (rc != 0) {
@@ -607,10 +606,20 @@ smb_common_open(smb_request_t *sr)
 
 		/*
 		 * File owner should always get read control + read attr.
+		 * Avoid asking for va_uid if we can (expensive) so
+		 * only check if we don't already have access.
 		 */
-		if (crgetuid(sr->user_cr) == op->fqi.fq_fattr.sa_vattr.va_uid)
-			op->desired_access |=
-			    (READ_CONTROL | FILE_READ_ATTRIBUTES);
+		if ((op->desired_access &
+		    (READ_CONTROL | FILE_READ_ATTRIBUTES)) == 0) {
+			op->fqi.fq_fattr.sa_mask = SMB_AT_DOSATTR | SMB_AT_UID;
+			rc = smb_node_getattr(sr, op->fqi.fq_fnode,
+			    zone_kcred(), NULL, &op->fqi.fq_fattr);
+			if (rc == 0 && crgetuid(sr->user_cr) ==
+			    op->fqi.fq_fattr.sa_vattr.va_uid) {
+				op->desired_access |=
+				    (READ_CONTROL | FILE_READ_ATTRIBUTES);
+			}
+		}
 
 		/*
 		 * According to MS "dochelp" mail in Mar 2015, any handle

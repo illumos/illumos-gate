@@ -686,6 +686,50 @@ zfs_fuid_info_free(zfs_fuid_info_t *fuidp)
 }
 
 /*
+ * Alternative to: getattr(...); va.va_uid == getcruid(cr)
+ * Avoids calling idmap when the cred has a ksid.
+ */
+boolean_t
+zfs_fuid_is_cruser(zfsvfs_t *zfsvfs, uint64_t fuid, cred_t *cr)
+{
+	ksid_t		*ksid;
+	const char	*domain;
+	uint32_t	idx = FUID_INDEX(fuid);
+	uint32_t	rid = FUID_RID(fuid);
+	uid_t		uid = (uid_t)-1;
+
+	if (idx == 0) {
+		/* The fuid is a plain uid.  Easy. */
+		return (rid == crgetuid(cr));
+	}
+
+	/* The fuid has a domain part. */
+	domain = zfs_fuid_find_by_idx(zfsvfs, idx);
+	ASSERT(domain != NULL);
+
+	/*
+	 * If we have a ksid, we can avoid an idmap up-call.
+	 */
+	ksid = crgetsid(cr, KSID_USER);
+	if (ksid != NULL) {
+		const char *ksdom = ksid_getdomain(ksid);
+		ASSERT(ksdom != NULL);
+		return (rid == ksid->ks_rid &&
+		    strcmp(domain, ksdom) == 0);
+	}
+
+	/*
+	 * No ksid, so we have to idmap.
+	 * The checks for -1 and 0x80000000 appear to be paranoia.
+	 * Those should never be set in cr_uid.
+	 */
+	(void) kidmap_getuidbysid(crgetzone(cr), domain, rid, &uid);
+	if (uid == (uid_t)-1 || uid != IDMAP_WK_CREATOR_OWNER_UID)
+		return (B_FALSE);
+	return (uid == crgetuid(cr));
+}
+
+/*
  * Check to see if user ID is in the list of SIDs in CR.
  */
 boolean_t
@@ -693,12 +737,9 @@ zfs_user_in_cred(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 {
 	ksid_t		*ksid = crgetsid(cr, KSID_USER);
 	ksidlist_t	*ksidlist = crgetsidlist(cr);
-	uid_t		uid;
 
 	/* Check for match with cred->cr_uid */
-	uid = zfs_fuid_map_id(zfsvfs, id, cr, ZFS_ACE_USER);
-	if (uid != IDMAP_WK_CREATOR_OWNER_UID &&
-	    uid == crgetuid(cr))
+	if (zfs_fuid_is_cruser(zfsvfs, id, cr))
 		return (B_TRUE);
 
 	/* Check for any match in the ksidlist */
