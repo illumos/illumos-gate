@@ -4782,6 +4782,7 @@ f usr/include/sys/stat.h 0644 root bin
 f usr/include/sys/stat_impl.h 0644 root bin
 f usr/include/sys/statfs.h 0644 root bin
 f usr/include/sys/statvfs.h 0644 root bin
+f usr/include/sys/stdalign.h 0644 root bin
 f usr/include/sys/stdbool.h 0644 root bin
 f usr/include/sys/stddef.h 0644 root bin
 f usr/include/sys/stdint.h 0644 root bin
@@ -12490,6 +12491,7 @@ f usr/share/man/man2/getaudit.2 0444 root bin
 s usr/share/man/man2/getaudit_addr.2=getaudit.2
 f usr/share/man/man2/getauid.2 0444 root bin
 f usr/share/man/man2/getcontext.2 0444 root bin
+s usr/share/man/man2/getcontext_extd.2=getcontext.2
 f usr/share/man/man2/getdents.2 0444 root bin
 s usr/share/man/man2/getegid.2=getuid.2
 s usr/share/man/man2/geteuid.2=getuid.2
@@ -13385,6 +13387,7 @@ f usr/share/man/man3c/lsearch.3c 0444 root bin
 f usr/share/man/man3c/madvise.3c 0444 root bin
 s usr/share/man/man3c/major.3c=makedev.3c
 f usr/share/man/man3c/makecontext.3c 0444 root bin
+s usr/share/man/man3c/makecontext_extd.3c=makecontext.3c
 f usr/share/man/man3c/makedev.3c 0444 root bin
 f usr/share/man/man3c/malloc.3c 0444 root bin
 f usr/share/man/man3c/mblen.3c 0444 root bin
@@ -13908,6 +13911,7 @@ f usr/share/man/man3c/strxfrm.3c 0444 root bin
 s usr/share/man/man3c/strxfrm_l.3c=strxfrm.3c
 f usr/share/man/man3c/swab.3c 0444 root bin
 s usr/share/man/man3c/swapcontext.3c=makecontext.3c
+s usr/share/man/man3c/swapcontext_extd.3c=makecontext.3c
 s usr/share/man/man3c/swprintf.3c=fwprintf.3c
 s usr/share/man/man3c/swscanf.3c=fwscanf.3c
 f usr/share/man/man3c/sync_instruction_memory.3c 0444 root bin
@@ -14005,6 +14009,8 @@ f usr/share/man/man3c/u8_strcmp.3c 0444 root bin
 f usr/share/man/man3c/u8_textprep_str.3c 0444 root bin
 f usr/share/man/man3c/u8_validate.3c 0444 root bin
 f usr/share/man/man3c/ualarm.3c 0444 root bin
+f usr/share/man/man3c/ucontext_alloc.3c 0444 root bin
+s usr/share/man/man3c/ucontext_free.3c=ucontext_alloc.3c
 f usr/share/man/man3c/uconv_u16tou32.3c 0444 root bin
 s usr/share/man/man3c/uconv_u16tou8.3c=uconv_u16tou32.3c
 s usr/share/man/man3c/uconv_u32tou16.3c=uconv_u16tou32.3c
@@ -17179,13 +17185,19 @@ f usr/share/man/man3proc/Lctlfd.3proc 0444 root bin
 s usr/share/man/man3proc/Ldstop.3proc=Pstopstatus.3proc
 f usr/share/man/man3proc/Lfree.3proc 0444 root bin
 s usr/share/man/man3proc/Lgetareg.3proc=Pgetareg.3proc
+s usr/share/man/man3proc/Lgetfpregs.3proc=Plwp_getregs.3proc
+s usr/share/man/man3proc/Lgetregs.3proc=Plwp_getregs.3proc
+s usr/share/man/man3proc/Lgetxregs.3proc=Plwp_getregs.3proc
 f usr/share/man/man3proc/Lgrab.3proc 0444 root bin
 f usr/share/man/man3proc/Lgrab_error.3proc 0444 root bin
 s usr/share/man/man3proc/Lmain_stack.3proc=Plwp_stack.3proc
 f usr/share/man/man3proc/Lprochandle.3proc 0444 root bin
 f usr/share/man/man3proc/Lpsinfo.3proc 0444 root bin
 s usr/share/man/man3proc/Lputareg.3proc=Pgetareg.3proc
+s usr/share/man/man3proc/Lsetfpregs.3proc=Plwp_getregs.3proc
+s usr/share/man/man3proc/Lsetregs.3proc=Plwp_getregs.3proc
 s usr/share/man/man3proc/Lsetrun.3proc=Psetrun.3proc
+s usr/share/man/man3proc/Lsetxregs.3proc=Plwp_getregs.3proc
 s usr/share/man/man3proc/Lstack.3proc=Plwp_stack.3proc
 f usr/share/man/man3proc/Lstate.3proc 0444 root bin
 f usr/share/man/man3proc/Lstatus.3proc 0444 root bin
@@ -17240,6 +17252,7 @@ s usr/share/man/man3proc/Plmid_to_map.3proc=Paddr_to_map.3proc
 f usr/share/man/man3proc/Plookup_by_addr.3proc 0444 root bin
 s usr/share/man/man3proc/Plookup_by_name.3proc=Plookup_by_addr.3proc
 s usr/share/man/man3proc/Plwp_alt_stack.3proc=Plwp_stack.3proc
+s usr/share/man/man3proc/Plwp_freexregs.3proc=Plwp_getxregs.3proc
 f usr/share/man/man3proc/Plwp_getasrs.3proc 0444 root bin
 s usr/share/man/man3proc/Plwp_getfpregs.3proc=Plwp_getregs.3proc
 f usr/share/man/man3proc/Plwp_getgwindows.3proc 0444 root bin

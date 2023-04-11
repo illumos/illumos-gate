@@ -1449,7 +1449,7 @@ lx_emulate_user(klwp_t *lwp, int syscall_num, uintptr_t *args)
 		 * restoring it when the emulation is complete would clobber
 		 * those intentional side effects.
 		 */
-		savecontext(&uc, NULL);
+		savecontext(&uc, NULL, 0);
 
 		if (on_fault(&lab)) {
 			goto badstack;
@@ -1617,7 +1617,7 @@ lx_emulate_user32(klwp_t *lwp, int syscall_num, uintptr_t *args)
 		 * restoring it when the emulation is complete would clobber
 		 * those intentional side effects.
 		 */
-		savecontext32(&uc, NULL);
+		savecontext32(&uc, NULL, 0);
 
 		if (on_fault(&lab)) {
 			goto badstack;
