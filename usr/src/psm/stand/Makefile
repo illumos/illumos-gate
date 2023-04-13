@@ -25,7 +25,7 @@
 
 include ../../Makefile.master
 
-SUBDIRS= lib bootblks boot cpr bootlst
+SUBDIRS= lib boot cpr bootlst
 
 all		:=	TARGET= all
 install		:=	TARGET= install
