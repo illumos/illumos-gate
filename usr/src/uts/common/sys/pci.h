@@ -1273,6 +1273,7 @@ typedef struct pci_phys_spec pci_regspec_t;
 #define	PCI_EINVAL8	0xff
 #define	PCI_EINVAL16	0xffff
 #define	PCI_EINVAL32	0xffffffff
+#define	PCI_EINVAL64	0xffffffffffffffffULL
 
 #ifdef	__cplusplus
 }

@@ -46,6 +46,7 @@ extern "C" {
 #define	FM_CPU_INFO_VERSION	"cpu-info-version"
 #define	FM_TOPO_LEGACY_VERSION	"topo-legacy-version"
 #define	FM_CACHE_INFO_VERSION	"cache-info-version"
+#define	FM_CPU_PCI_VERSION	"cpu-pci-version"
 
 /*
  * FMA driver ioctl interfaces
@@ -62,6 +63,13 @@ extern "C" {
 #define	FM_IOC_CPU_STATUS	(FM_IOC | 7)
 #define	FM_IOC_CPU_UNRETIRE	(FM_IOC | 8)
 #define	FM_IOC_GENTOPO_LEGACY	(FM_IOC | 9)
+
+/*
+ * Information about the PCI configuration of physical CPUs. These data contain
+ * chip IDs which correspond to those in the physical CPU information.
+ */
+#define	FM_IOC_PCI_DATA		(FM_IOC | 11)
+
 #endif	/* __x86 */
 
 /*
@@ -169,6 +177,18 @@ typedef enum {
 #define	FM_CACHE_INFO_FULLY_ASSOC	"fully-associative" /* boolean (key) */
 #define	FM_CACHE_INFO_ID		"cache-id"	/* uint64_t */
 #define	FM_CACHE_INFO_X86_APIC_SHIFT	"x86-apic-shift"	/* uint32_t */
+
+/*
+ * Information returned in the physical CPU PCI information structure.
+ *
+ * data_fabrics is an array with an entry for each physical CPU and the PCI bus
+ * number of the corresponding northbridge. This is currently only supported
+ * for AMD processors and the shape of this interface may change in the future
+ * once support for Intel processors is added.
+ */
+#define	FM_PCI_DATA_DFS		"data_fabrics"
+#define	FM_PCI_DATA_CHIP_ID			"chip_id"
+#define	FM_PCI_DATA_NB_BUSNO			"nb_busno"
 
 #ifdef	__cplusplus
 }

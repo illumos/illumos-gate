@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <string.h>
@@ -139,6 +140,17 @@ topo_list_delete(topo_list_t *lp, void *existing)
 		p->l_next->l_prev = p->l_prev;
 	else
 		lp->l_prev = p->l_prev;
+}
+
+size_t
+topo_list_size(topo_list_t *lp)
+{
+	size_t size = 0;
+
+	for (; lp->l_next != NULL; lp = lp->l_next, size++)
+		;
+
+	return (size);
 }
 
 tnode_t *

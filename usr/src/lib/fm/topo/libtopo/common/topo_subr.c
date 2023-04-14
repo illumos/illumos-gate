@@ -244,29 +244,38 @@ topo_hdl_root(topo_hdl_t *thp, const char *scheme)
  * Continue to update size even if we run out of space to actually
  * stuff characters in the buffer.
  */
-void
-topo_fmristr_build(ssize_t *sz, char *buf, size_t buflen, char *str,
+boolean_t
+topo_fmristr_build(size_t *sz, char *buf, size_t buflen, char *str,
     char *prepend, char *append)
 {
-	ssize_t left;
+	size_t left;
+	int n;
 
 	if (str == NULL)
-		return;
+		return (B_TRUE);
 
-	if (buflen == 0 || (left = buflen - *sz) < 0)
+	if (buflen == 0 || *sz >= buflen)
 		left = 0;
+	else
+		left = buflen - *sz;
 
 	if (buf != NULL && left != 0)
 		buf += *sz;
 
 	if (prepend == NULL && append == NULL)
-		*sz += snprintf(buf, left, "%s", str);
+		n = snprintf(buf, left, "%s", str);
 	else if (append == NULL)
-		*sz += snprintf(buf, left, "%s%s", prepend, str);
+		n = snprintf(buf, left, "%s%s", prepend, str);
 	else if (prepend == NULL)
-		*sz += snprintf(buf, left, "%s%s", str, append);
+		n = snprintf(buf, left, "%s%s", str, append);
 	else
-		*sz += snprintf(buf, left, "%s%s%s", prepend, str, append);
+		n = snprintf(buf, left, "%s%s%s", prepend, str, append);
+
+	if (n < 0)
+		return (B_FALSE);
+
+	*sz += n;
+	return (B_TRUE);
 }
 
 #define	TOPO_PLATFORM_PATH	"%s/usr/platform/%s/lib/fm/topo/%s"

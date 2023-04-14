@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <limits.h>
@@ -260,13 +261,13 @@ mod_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 
 #define	MAXINTSTR	11
 
-static ssize_t
+static size_t
 fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
 	nvlist_t *anvl = NULL;
 	nvpair_t *apair;
 	uint8_t version;
-	ssize_t size = 0;
+	size_t size = 0;
 	int32_t modid;
 	char *modname = NULL, *aname, *aval;
 	char numbuf[MAXINTSTR];
@@ -279,7 +280,7 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	/* Get authority, if present */
 	err = nvlist_lookup_nvlist(nvl, FM_FMRI_AUTHORITY, &anvl);
 	if (err != 0 && err != ENOENT)
-		return (-1);
+		return (0);
 
 	/*
 	 *  For brevity, we only include the module name and id
@@ -290,15 +291,18 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	/* There must be a module name */
 	err = nvlist_lookup_string(nvl, FM_FMRI_MOD_NAME, &modname);
 	if (err != 0 || modname == NULL)
-		return (-1);
+		return (0);
 
 	/* There must be a module id */
 	err = nvlist_lookup_int32(nvl, FM_FMRI_MOD_ID, &modid);
 	if (err != 0)
-		return (-1);
+		return (0);
 
 	/* mod:// */
-	topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_MOD, NULL, "://");
+	if (!topo_fmristr_build(&size, buf, buflen,
+	    FM_FMRI_SCHEME_MOD, NULL, "://")) {
+		return (0);
+	}
 
 	/* authority, if any */
 	if (anvl != NULL) {
@@ -308,19 +312,26 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 			    nvpair_value_string(apair, &aval) != 0)
 				continue;
 			aname = nvpair_name(apair);
-			topo_fmristr_build(&size, buf, buflen, ":", NULL, NULL);
-			topo_fmristr_build(&size, buf, buflen, "=",
-			    aname, aval);
+			if (!topo_fmristr_build(&size, buf, buflen,
+			    ":", NULL, NULL) ||
+			    !topo_fmristr_build(&size, buf, buflen,
+			    "=", aname, aval)) {
+				return (0);
+			}
 		}
 	}
 
 	/* module parts */
-	topo_fmristr_build(&size, buf, buflen, modname,
-	    "/" FM_FMRI_MOD_NAME "=", "/");
+	if (!topo_fmristr_build(&size, buf, buflen,
+	    modname, "/" FM_FMRI_MOD_NAME "=", "/")) {
+		return (0);
+	}
 
 	(void) snprintf(numbuf, MAXINTSTR, "%d", modid);
-	topo_fmristr_build(&size, buf, buflen, numbuf, FM_FMRI_MOD_ID "=",
-	    NULL);
+	if (!topo_fmristr_build(&size, buf, buflen,
+	    numbuf, FM_FMRI_MOD_ID "=", NULL)) {
+		return (0);
+	}
 
 	return (size);
 }
@@ -330,7 +341,7 @@ static int
 mod_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *nvl, nvlist_t **out)
 {
-	ssize_t len;
+	size_t len;
 	char *name = NULL;
 	nvlist_t *fmristr;
 

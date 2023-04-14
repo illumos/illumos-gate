@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -357,7 +358,8 @@ topo_node_range_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	topo_node_unlock(pnode);
 
 	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC,
-	    "created node range %s[%d-%d]\n", name, min, max);
+	    "created node range %s[%" PRIu64 "-%" PRIu64 "]\n",
+	    name, min, max);
 
 	return (0);
 }
@@ -521,8 +523,9 @@ topo_node_bind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		return (node_bind_seterror(mod, pnode, node, B_TRUE, err));
 
 	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC,
-	    "node bound %s=%d/%s=%d\n", topo_node_name(pnode),
-	    topo_node_instance(pnode), node->tn_name, node->tn_instance);
+	    "node bound %s=%" PRIu64 "/%s=%" PRIu64 "\n",
+	    topo_node_name(pnode), topo_node_instance(pnode),
+	    node->tn_name, node->tn_instance);
 
 	node->tn_state |= TOPO_NODE_BOUND;
 

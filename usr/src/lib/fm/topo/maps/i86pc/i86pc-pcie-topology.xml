@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ Copyright 2023 Oxide Computer Company
+
+-->
+<topology name='pciebus' scheme='pcie'>
+  <range name='cpu' min='0' max='15'>
+    <enum-method name='pciebus' version='1' />
+    <dependents grouping='children'>
+      <!--
+          The limit of 32 root complexes per physical CPU is somewhat
+          arbitrary, but exceeds any real i86pc system today.
+      -->
+      <range name='root-complex' min='0' max='31'>
+        <enum-method name='pciebus' version='1' />
+      </range>
+    </dependents>
+  </range>
+</topology>

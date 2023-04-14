@@ -95,10 +95,14 @@ extern nvlist_t *topo_mod_devfmri(topo_mod_t *, int, const char *,
 extern nvlist_t *topo_mod_hcfmri(topo_mod_t *, tnode_t *, int, const char *,
     topo_instance_t, nvlist_t *, nvlist_t *, const char *, const char *,
     const char *);
+extern nvlist_t *topo_mod_hcfmri_extend(topo_mod_t *, nvlist_t *, int,
+    const char *, topo_instance_t);
 extern nvlist_t *topo_mod_memfmri(topo_mod_t *, int, uint64_t, uint64_t,
     const char *, int);
 extern nvlist_t *topo_mod_modfmri(topo_mod_t *, int, const char *);
 extern nvlist_t *topo_mod_pkgfmri(topo_mod_t *, int, const char *);
+extern nvlist_t *topo_mod_pciefmri(topo_mod_t *, tnode_t *, int,
+    const char *, topo_instance_t, const nvlist_t *);
 extern nvlist_t *topo_mod_swfmri(topo_mod_t *, int,
     char *, char *, nvlist_t *,
     char *, char *, char *, char *, int64_t,

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <pthread.h>
@@ -37,6 +38,7 @@
 #include <fmd.h>
 #include <mem.h>
 #include <mod.h>
+#include <pcie.h>
 #include <pkg.h>
 #include <svc.h>
 #include <sw.h>
@@ -47,6 +49,7 @@ static const struct topo_builtin _topo_builtins[] = {
 	{ "dev", DEV_VERSION, dev_init, dev_fini, TOPO_BLTIN_TYPE_TREE },
 	{ "fmd", FMD_VERSION, fmd_init, fmd_fini, TOPO_BLTIN_TYPE_TREE },
 	{ "mem", MEM_VERSION, mem_init, mem_fini, TOPO_BLTIN_TYPE_TREE },
+	{ "pcie", PCIE_VERSION, pcie_init, pcie_fini, TOPO_BLTIN_TYPE_TREE },
 	{ "pkg", PKG_VERSION, pkg_init, pkg_fini, TOPO_BLTIN_TYPE_TREE },
 	{ "svc", SVC_VERSION, svc_init, svc_fini, TOPO_BLTIN_TYPE_TREE },
 	{ "sw", SW_VERSION, sw_init, sw_fini, TOPO_BLTIN_TYPE_TREE },
@@ -73,7 +76,7 @@ bltin_init(topo_mod_t *mp, topo_version_t version)
 		if (mp->tm_errno == 0)
 			(void) topo_mod_seterrno(mp, ETOPO_MOD_INIT);
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
-		    "unable initialize builtin module: %s: %s\n",
+		    "unable to initialize builtin module: %s: %s\n",
 		    bp->bltin_name, topo_mod_errmsg(mp));
 		return (-1);
 	}

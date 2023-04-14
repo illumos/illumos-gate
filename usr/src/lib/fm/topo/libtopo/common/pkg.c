@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <limits.h>
@@ -208,7 +209,7 @@ pkg_fmri_create(topo_mod_t *mp, const char *path)
 	(void) pclose(pcout);
 	topo_mod_dprintf(mp, "%s", tmpbuf);
 
-	if ((findpkgname = strtok(tmpbuf, " 	\n")) == NULL)
+	if ((findpkgname = strtok(tmpbuf, " \t\n")) == NULL)
 		goto pfc_bail;
 	pkgname = topo_mod_strdup(mp, findpkgname);
 
@@ -246,24 +247,24 @@ pkg_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 	return (0);
 }
 
-static ssize_t
+static size_t
 fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
 	nvlist_t *anvl = NULL;
 	nvpair_t *apair;
 	uint8_t version;
-	ssize_t size = 0;
+	size_t size = 0;
 	char *pkgname = NULL, *aname, *aval;
 	int err;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_PKG_SCHEME_VERSION)
-		return (-1);
+		return (0);
 
 	/* Get authority, if present */
 	err = nvlist_lookup_nvlist(nvl, FM_FMRI_AUTHORITY, &anvl);
 	if (err != 0 && err != ENOENT)
-		return (-1);
+		return (0);
 
 	/*
 	 *  For brevity, we only include the pkgname and any authority
@@ -272,10 +273,13 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	 */
 	err = nvlist_lookup_string(nvl, FM_FMRI_PKG_INST, &pkgname);
 	if (err != 0 || pkgname == NULL)
-		return (-1);
+		return (0);
 
 	/* pkg:// */
-	topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_PKG, NULL, "://");
+	if (!topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_PKG, NULL,
+	    "://")) {
+		return (0);
+	}
 
 	/* authority, if any */
 	if (anvl != NULL) {
@@ -285,14 +289,18 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 			    nvpair_value_string(apair, &aval) != 0)
 				continue;
 			aname = nvpair_name(apair);
-			topo_fmristr_build(&size, buf, buflen, ":", NULL, NULL);
-			topo_fmristr_build(&size, buf, buflen, "=",
-			    aname, aval);
+			if (!topo_fmristr_build(&size, buf, buflen,
+			    ":", NULL, NULL) ||
+			    !topo_fmristr_build(&size, buf, buflen,
+			    "=", aname, aval)) {
+				return (0);
+			}
 		}
 	}
 
 	/* pkg-name part */
-	topo_fmristr_build(&size, buf, buflen, pkgname, "/", NULL);
+	if (!topo_fmristr_build(&size, buf, buflen, pkgname, "/", NULL))
+		return (0);
 
 	return (size);
 }
@@ -302,7 +310,7 @@ static int
 pkg_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *nvl, nvlist_t **out)
 {
-	ssize_t len;
+	size_t len;
 	char *name = NULL;
 	nvlist_t *fmristr;
 

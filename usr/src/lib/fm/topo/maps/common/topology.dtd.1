@@ -4,6 +4,7 @@
  Use is subject to license terms.
 
  Copyright (c) 2018, Joyent, Inc.
+ Copyright 2023 Oxide Computer Company
 
  CDDL HEADER START
 
@@ -375,7 +376,7 @@
 
 	Its attributes are:
 		name	topology name
-                scheme  (hc|dev)
+                scheme  (hc|dev|pcie)
 -->
 
 <!ELEMENT topology
@@ -383,4 +384,4 @@
 
 <!ATTLIST topology
 	name	CDATA #REQUIRED
-	scheme (hc | dev) #REQUIRED >
+	scheme (hc | dev | pcie) #REQUIRED >

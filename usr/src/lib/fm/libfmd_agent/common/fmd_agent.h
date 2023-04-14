@@ -71,8 +71,10 @@ extern int fmd_agent_page_unretire(fmd_agent_hdl_t *, nvlist_t *);
 extern int fmd_agent_page_isretired(fmd_agent_hdl_t *, nvlist_t *);
 
 #ifdef __x86
+extern int fmd_agent_chip_count(fmd_agent_hdl_t *, uint8_t *);
 extern int fmd_agent_physcpu_info(fmd_agent_hdl_t *, nvlist_t ***cpusp,
     uint_t *ncpu);
+extern int fmd_agent_physcpu_pci(fmd_agent_hdl_t *, nvlist_t **);
 extern int fmd_agent_cpu_retire(fmd_agent_hdl_t *, int, int, int);
 extern int fmd_agent_cpu_unretire(fmd_agent_hdl_t *, int, int, int);
 extern int fmd_agent_cpu_isretired(fmd_agent_hdl_t *, int, int, int);

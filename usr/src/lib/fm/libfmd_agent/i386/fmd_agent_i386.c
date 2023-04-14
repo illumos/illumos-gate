@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -85,6 +89,96 @@ fmd_agent_physcpu_info(fmd_agent_hdl_t *hdl, nvlist_t ***cpusp, uint_t *ncpu)
 	switch (ver) {
 	case 1:
 		return (fmd_agent_physcpu_info_v1(hdl, cpusp, ncpu));
+
+	default:
+		return (fmd_agent_seterrno(hdl, ENOTSUP));
+	}
+}
+
+static int
+fmd_agent_chip_count_v1(fmd_agent_hdl_t *hdl, uint8_t *ncpup)
+{
+	nvlist_t *nvl, **cpus;
+	uint_t i, n;
+	int err;
+	uint8_t ncpu = 0;
+	uint64_t bitmap = 0;
+
+	if ((err = fmd_agent_nvl_ioctl(hdl, FM_IOC_PHYSCPU_INFO, 1,
+	    NULL, &nvl)) != 0) {
+		return (cleanup_set_errno(hdl, NULL, NULL, err));
+	}
+	if ((err = nvlist_lookup_nvlist_array(nvl, FM_PHYSCPU_INFO_CPUS,
+	    &cpus, &n)) != 0) {
+		return (cleanup_set_errno(hdl, NULL, nvl, err));
+	}
+
+	for (i = 0; i < n; i++) {
+		int32_t chipid;
+
+		if (nvlist_lookup_int32(cpus[i], FM_PHYSCPU_INFO_CHIP_ID,
+		    &chipid) != 0 || chipid >= 64) {
+			return (cleanup_set_errno(hdl, NULL, nvl, ERANGE));
+		}
+
+		if ((bitmap & (1ULL << chipid)) == 0) {
+			bitmap |= (1ULL << chipid);
+			ncpu++;
+		}
+	}
+
+	nvlist_free(nvl);
+	*ncpup = ncpu;
+	return (0);
+}
+
+int
+fmd_agent_chip_count(fmd_agent_hdl_t *hdl, uint8_t *ncpup)
+{
+	uint32_t ver;
+
+	if (fmd_agent_version(hdl, FM_CPU_INFO_VERSION, &ver) == -1)
+		return (fmd_agent_seterrno(hdl, errno));
+
+	switch (ver) {
+	case 1:
+		return (fmd_agent_chip_count_v1(hdl, ncpup));
+
+	default:
+		return (fmd_agent_seterrno(hdl, ENOTSUP));
+	}
+}
+
+static int
+fmd_agent_physcpu_pci_v1(fmd_agent_hdl_t *hdl, nvlist_t **nvlp)
+{
+	nvlist_t *nvl, *onvl;
+	int err;
+
+	if ((err = fmd_agent_nvl_ioctl(hdl, FM_IOC_PCI_DATA, 1,
+	    NULL, &nvl)) != 0) {
+		return (cleanup_set_errno(hdl, NULL, NULL, err));
+	}
+
+	if ((err = nvlist_dup(nvl, &onvl, 0)) != 0)
+		return (cleanup_set_errno(hdl, NULL, nvl, err));
+
+	nvlist_free(nvl);
+	*nvlp = onvl;
+	return (0);
+}
+
+int
+fmd_agent_physcpu_pci(fmd_agent_hdl_t *hdl, nvlist_t **nvlp)
+{
+	uint32_t ver;
+
+	if (fmd_agent_version(hdl, FM_CPU_PCI_VERSION, &ver) == -1)
+		return (fmd_agent_seterrno(hdl, errno));
+
+	switch (ver) {
+	case 1:
+		return (fmd_agent_physcpu_pci_v1(hdl, nvlp));
 
 	default:
 		return (fmd_agent_seterrno(hdl, ENOTSUP));

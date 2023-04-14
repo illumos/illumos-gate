@@ -151,6 +151,7 @@ file path=usr/include/fm/topo_hc.h
 file path=usr/include/fm/topo_list.h
 file path=usr/include/fm/topo_method.h
 file path=usr/include/fm/topo_mod.h
+file path=usr/include/fm/topo_pcie.h
 dir  path=usr/lib variant.opensolaris.zone=__NODEFAULT
 dir  path=usr/lib/fm variant.opensolaris.zone=__NODEFAULT
 dir  path=usr/lib/fm/$(ARCH64) variant.opensolaris.zone=__NODEFAULT
@@ -338,6 +339,8 @@ file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mem.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mod.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/$(ARCH64)/pcie.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/schemes/$(ARCH64)/pkg.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/schemes/$(ARCH64)/svc.so mode=0555 \
@@ -359,6 +362,8 @@ file path=usr/lib/fm/fmd/schemes/legacy-hc.so mode=0555 \
 file path=usr/lib/fm/fmd/schemes/mem.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/schemes/mod.so mode=0555 \
+    variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/fmd/schemes/pcie.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/schemes/pkg.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
@@ -637,6 +642,8 @@ $(i386_ONLY)file \
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/i86pc-legacy-hc-topology.xml \
     mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/i86pc-pcie-topology.xml mode=0444
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/maps/psu-hc-topology.xml \
     mode=0444
 $(i386_ONLY)dir path=usr/platform/i86pc/lib/fm/topo/plugins
@@ -651,6 +658,8 @@ $(i386_ONLY)file \
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/plugins/$(ARCH64)/pcibus.so mode=0555
 $(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/plugins/$(ARCH64)/pciebus.so mode=0555
+$(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/plugins/$(ARCH64)/x86pi.so mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/$(ARCH64)/zen.so \
     mode=0555
@@ -661,6 +670,8 @@ $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/chipset.so \
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so \
     mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/pcibus.so mode=0555
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/pciebus.so \
+    mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/x86pi.so mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/zen.so mode=0555
 #

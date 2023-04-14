@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -427,7 +428,7 @@ svc_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	int err;
 	char *buf = NULL;
 	size_t buflen = 0;
-	ssize_t size = 0;
+	size_t size = 0;
 	nvlist_t *fmristr;
 
 	if (version > TOPO_METH_NVL2STR_VERSION)
@@ -459,6 +460,10 @@ svc_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	if (nvlist_lookup_string(nvl, FM_FMRI_SVC_NAME, &service) != 0)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 
+	/* svc path */
+	if (*service == '\0')
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+
 	/*
 	 * We make two passes through this code.  The first time through we
 	 * calculate the size of buffer that we'll need, and the second time
@@ -466,22 +471,18 @@ svc_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	 */
 again:
 	/*
-	 * svc://[scope@][system-fqn]
+	 * svc://[scope@][system-fqn][:instance][@contract-id]
 	 */
-	topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_SVC,
-	    NULL, "://");
-	topo_fmristr_build(&size, buf, buflen, scope, NULL, "@");
-	topo_fmristr_build(&size, buf, buflen, fqn, NULL, NULL);
-
-	/* svc path */
-	if (*service == '\0')
+	if (!topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_SVC,
+	    NULL, "://") ||
+	    !topo_fmristr_build(&size, buf, buflen, scope, NULL, "@") ||
+	    !topo_fmristr_build(&size, buf, buflen, fqn, NULL, NULL) ||
+	    !topo_fmristr_build(&size, buf, buflen, service, "/", NULL) ||
+	    !topo_fmristr_build(&size, buf, buflen, instance, ":", NULL) ||
+	    !topo_fmristr_build(&size, buf, buflen, contract, "@", NULL)) {
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+	}
 
-	topo_fmristr_build(&size, buf, buflen, service, "/", NULL);
-
-	/* [:instance][@contract-id] */
-	topo_fmristr_build(&size, buf, buflen, instance, ":", NULL);
-	topo_fmristr_build(&size, buf, buflen, contract, "@", NULL);
 
 	if (buf == NULL) {
 		if ((buf = topo_mod_alloc(mod, size + 1)) == NULL)

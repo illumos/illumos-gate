@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <limits.h>
@@ -109,7 +110,6 @@ dev_fini(topo_mod_t *mod)
 	topo_mod_unregister(mod);
 }
 
-/*ARGSUSED*/
 static int
 dev_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
@@ -129,33 +129,33 @@ dev_release(topo_mod_t *mod, tnode_t *node)
 	topo_method_unregister_all(mod, node);
 }
 
-static ssize_t
+static size_t
 fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
 	char *devid = NULL, *tpl0id = NULL;
 	char *devpath = NULL;
-	ssize_t size = 0;
+	size_t size = 0;
 	uint8_t version;
 	int err;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_DEV_SCHEME_VERSION)
-		return (-1);
+		return (0);
 
 	/* Get devid, if present */
 	err = nvlist_lookup_string(nvl, FM_FMRI_DEV_ID, &devid);
 	if (err != 0 && err != ENOENT)
-		return (-1);
+		return (0);
 
 	/* Get target-port-l0id, if present */
 	err = nvlist_lookup_string(nvl, FM_FMRI_DEV_TGTPTLUN0, &tpl0id);
 	if (err != 0 && err != ENOENT)
-		return (-1);
+		return (0);
 
 	/* There must be a device path present */
 	err = nvlist_lookup_string(nvl, FM_FMRI_DEV_PATH, &devpath);
 	if (err != 0 || devpath == NULL)
-		return (-1);
+		return (0);
 
 	/*
 	 * dev:///
@@ -165,16 +165,22 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	 * transmit a dev scheme fmri outside of the immediate fault
 	 * manager.
 	 */
-	topo_fmristr_build(&size,
-	    buf, buflen, FM_FMRI_SCHEME_DEV, NULL, ":///");
+	if (!topo_fmristr_build(&size, buf, buflen,
+	    FM_FMRI_SCHEME_DEV, NULL, ":///")) {
+		return (0);
+	}
 
 	/* device-id part, topo_fmristr_build does nothing if devid is NULL */
-	topo_fmristr_build(&size,
-	    buf, buflen, devid, ":" FM_FMRI_DEV_ID "=", NULL);
+	if (!topo_fmristr_build(&size, buf, buflen,
+	    devid, ":" FM_FMRI_DEV_ID "=", NULL)) {
+		return (0);
+	}
 
 	/* target-port-l0id part */
-	topo_fmristr_build(&size,
-	    buf, buflen, tpl0id, ":" FM_FMRI_DEV_TGTPTLUN0 "=", NULL);
+	if (!topo_fmristr_build(&size, buf, buflen,
+	    tpl0id, ":" FM_FMRI_DEV_TGTPTLUN0 "=", NULL)) {
+		return (0);
+	}
 
 	/*
 	 * device-path part; the devpath should always start with a /
@@ -189,18 +195,19 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	 *	where <devid-and-tpl0> =
 	 *			[:devid=<devid>][:target-port-l0id=<tpl0>]
 	 */
-	topo_fmristr_build(&size, buf, buflen, devpath,
-	    devid || tpl0id ? "/" : NULL, NULL);
+	if (!topo_fmristr_build(&size, buf, buflen,
+	    devpath, devid || tpl0id ? "/" : NULL, NULL)) {
+		return (0);
+	}
 
 	return (size);
 }
 
-/*ARGSUSED*/
 static int
 dev_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *nvl, nvlist_t **out)
 {
-	ssize_t len;
+	size_t len;
 	char *name = NULL;
 	nvlist_t *fmristr;
 
@@ -228,7 +235,6 @@ dev_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 dev_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
@@ -369,7 +375,6 @@ dev_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 dev_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
@@ -449,7 +454,6 @@ dev_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 dev_fmri_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
@@ -529,7 +533,6 @@ dev_fmri_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 dev_fmri_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
@@ -576,7 +579,6 @@ dev_fmri_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 dev_fmri_service_state(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
@@ -652,7 +654,6 @@ dev_fmri_create(topo_mod_t *mp, const char *id, const char *path)
 	return (NULL);
 }
 
-/*ARGSUSED*/
 static int
 dev_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)

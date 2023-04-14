@@ -67,6 +67,7 @@ SYMBOL_SCOPE {
 	topo_mod_getspecific		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_setspecific		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_hcfmri			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_hcfmri_extend		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_devfmri		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_cpufmri		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_pkgfmri		{ TYPE = FUNCTION; FLAGS = extern };

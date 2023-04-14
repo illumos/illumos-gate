@@ -391,6 +391,40 @@ topo_mod_hcfmri(topo_mod_t *mod, tnode_t *pnode, int version, const char *name,
 }
 
 nvlist_t *
+topo_mod_hcfmri_extend(topo_mod_t *mod, nvlist_t *pfmri, int version,
+    const char *name, topo_instance_t inst)
+{
+	nvlist_t *fmri = NULL, *args = NULL, *nfp = NULL;
+	int err;
+
+	if (version != FM_HC_SCHEME_VERSION)
+		return (set_fmri_err(mod, EMOD_FMRI_VERSION));
+
+	if (pfmri == NULL)
+		return (set_fmri_err(mod, EMOD_NVL_INVAL));
+
+	if (topo_mod_nvalloc(mod, &args, NV_UNIQUE_NAME) != 0)
+		return (set_fmri_err(mod, EMOD_FMRI_NVL));
+
+	if (nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT, pfmri) != 0) {
+		nvlist_free(args);
+		return (set_fmri_err(mod, EMOD_FMRI_NVL));
+	}
+
+	if ((fmri = topo_fmri_create(mod->tm_hdl, FM_FMRI_SCHEME_HC, name, inst,
+	    args, &err)) == NULL) {
+		nvlist_free(args);
+		return (set_fmri_err(mod, err));
+	}
+	nvlist_free(args);
+
+	(void) topo_mod_nvdup(mod, fmri, &nfp);
+	nvlist_free(fmri);
+
+	return (nfp);
+}
+
+nvlist_t *
 topo_mod_devfmri(topo_mod_t *mod, int version, const char *dev_path,
     const char *devid)
 {
@@ -531,6 +565,70 @@ topo_mod_pkgfmri(topo_mod_t *mod, int version, const char *path)
 	nvlist_free(args);
 
 	(void) topo_mod_nvdup(mod, fmri, &nfp);
+	nvlist_free(fmri);
+
+	return (nfp);
+}
+
+nvlist_t *
+topo_mod_pciefmri(topo_mod_t *mod, tnode_t *pnode, int version,
+    const char *name, topo_instance_t inst, const nvlist_t *auth)
+{
+	nvlist_t *fmri = NULL;
+	nvlist_t *nfp = NULL;
+	nvlist_t *args = NULL;
+	int err;
+
+	if (version != FM_PCIE_SCHEME_VERSION)
+		return (set_fmri_err(mod, EMOD_FMRI_VERSION));
+
+	if (pnode != NULL) {
+		nvlist_t *pfmri;
+
+		topo_mod_dprintf(mod, "pnode is set: %p %s=%" PRIu64,
+		    pnode, pnode->tn_name, pnode->tn_instance);
+
+		if (topo_mod_nvalloc(mod, &args, NV_UNIQUE_NAME) != 0)
+			return (set_fmri_err(mod, EMOD_FMRI_NVL));
+
+		if (topo_node_resource(pnode, &pfmri, &err) != 0) {
+			topo_mod_dprintf(mod, "failed to fetch pmfri: %s",
+			    topo_strerror(err));
+		} else {
+			if (nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT,
+			    pfmri) != 0) {
+				nvlist_free(pfmri);
+				nvlist_free(args);
+				return (set_fmri_err(mod, EMOD_FMRI_NVL));
+			}
+			nvlist_free(pfmri);
+		}
+
+		if (auth != NULL) {
+			if (nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_AUTH,
+			    (nvlist_t *)auth) != 0) {
+				nvlist_free(args);
+				return (set_fmri_err(mod, EMOD_FMRI_NVL));
+			}
+		}
+	}
+
+	if ((fmri = topo_fmri_create(mod->tm_hdl, FM_FMRI_SCHEME_PCIE,
+	    name, inst, args, &err)) == NULL) {
+		nvlist_free(args);
+		return (set_fmri_err(mod, err));
+	}
+
+	nvlist_free(args);
+
+	if (topo_mod_nvdup(mod, fmri, &nfp) != 0) {
+		/*
+		 * We don't get the failure reason back, but it is likely to be
+		 * an allocation failure. 'nfp' will still be NULL if an error
+		 * occurred.
+		 */
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+	}
 	nvlist_free(fmri);
 
 	return (nfp);

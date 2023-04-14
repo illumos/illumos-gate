@@ -23,8 +23,10 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2023 Oxide Computer Company
+#
 
-SUBDIRS = chip chipset hostbridge pcibus x86pi zen
+SUBDIRS = chip chipset hostbridge pcibus pciebus x86pi zen
 
 .PARALLEL: $(SUBDIRS)
 

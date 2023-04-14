@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <libnvpair.h>
@@ -365,7 +366,7 @@ sw_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	size_t buflen = 0;
 	int linevalid = 0;
 	char *buf = NULL;
-	ssize_t size = 0;
+	size_t size = 0;
 	char linebuf[32];
 	int64_t line;
 	int pass;
@@ -435,8 +436,10 @@ again:
 	 */
 
 	/* sw:// */
-	topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_SW,
-	    NULL, "://");
+	if (!topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_SW,
+	    NULL, "://")) {
+		goto err;
+	}
 
 	/* authority, if any */
 	if (anvl != NULL) {
@@ -449,38 +452,48 @@ again:
 			    nvpair_value_string(apair, &aval) != 0)
 				continue;
 			aname = nvpair_name(apair);
-			topo_fmristr_build(&size, buf, buflen, ":", NULL, NULL);
-			topo_fmristr_build(&size, buf, buflen, "=",
-			    aname, aval);
+			if (!topo_fmristr_build(&size, buf, buflen, ":", NULL,
+			    NULL) ||
+			    !topo_fmristr_build(&size, buf, buflen, "=",
+			    aname, aval)) {
+				goto err;
+			}
 		}
 	}
 
 	/* separating slash */
-	topo_fmristr_build(&size, buf, buflen, "/", NULL, NULL);
+	if (!topo_fmristr_build(&size, buf, buflen, "/", NULL, NULL))
+		goto err;
 
 	/* :root=... */
-	if (root) {
-		topo_fmristr_build(&size, buf, buflen, root,
-		    ":" FM_FMRI_SW_OBJ_ROOT "=", NULL);
+	if (!topo_fmristr_build(&size, buf, buflen, root,
+	    ":" FM_FMRI_SW_OBJ_ROOT "=", NULL)) {
+		goto err;
 	}
 
 	/* :path=... */
-	topo_fmristr_build(&size, buf, buflen, path,
-	    ":" FM_FMRI_SW_OBJ_PATH "=", NULL);
+	if (!topo_fmristr_build(&size, buf, buflen, path,
+	    ":" FM_FMRI_SW_OBJ_PATH "=", NULL)) {
+		goto err;
+	}
 
-	if (token) {
+	if (token != NULL) {
 		/* #:token=... */
-		topo_fmristr_build(&size, buf, buflen, token,
-		    "#:" FM_FMRI_SW_SITE_TOKEN "=", NULL);
-	} else if (file) {
+		if (!topo_fmristr_build(&size, buf, buflen, token,
+		    "#:" FM_FMRI_SW_SITE_TOKEN "=", NULL)) {
+			goto err;
+		}
+	} else if (file != NULL) {
 		/* #:file=... */
-		topo_fmristr_build(&size, buf, buflen, file,
-		    "#:" FM_FMRI_SW_SITE_FILE "=", NULL);
+		if (!topo_fmristr_build(&size, buf, buflen, file,
+		    "#:" FM_FMRI_SW_SITE_FILE "=", NULL)) {
+			goto err;
+		}
 
 		/* :func=... */
-		if (func) {
-			topo_fmristr_build(&size, buf, buflen, func,
-			    ":" FM_FMRI_SW_SITE_FUNC "=", NULL);
+		if (!topo_fmristr_build(&size, buf, buflen, func,
+		    ":" FM_FMRI_SW_SITE_FUNC "=", NULL)) {
+			goto err;
 		}
 
 		/* :line=... */
@@ -489,8 +502,10 @@ again:
 				(void) snprintf(linebuf, sizeof (linebuf),
 				    "%lld", line);
 
-			topo_fmristr_build(&size, buf, buflen, linebuf,
-			    ":" FM_FMRI_SW_SITE_LINE "=", NULL);
+			if (!topo_fmristr_build(&size, buf, buflen, linebuf,
+			    ":" FM_FMRI_SW_SITE_LINE "=", NULL)) {
+				goto err;
+			}
 		}
 	}
 
@@ -521,4 +536,7 @@ again:
 	*out = fmristr;
 
 	return (0);
+
+err:
+	return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 }

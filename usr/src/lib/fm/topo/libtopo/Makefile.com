@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2023 Oxide Computer Company
 #
 
 LIBRARY = libtopo.a
@@ -34,6 +35,7 @@ BUILTINSRCS = \
 	legacy_hc.c \
 	mem.c \
 	mod.c \
+	pcie.c \
 	pkg.c \
 	svc.c \
 	sw.c \

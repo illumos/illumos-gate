@@ -53,7 +53,9 @@ SYMBOL_VERSION SUNWprivate {
 	fmd_agent_page_isretired;
 
 $if _x86
+	fmd_agent_chip_count;
 	fmd_agent_physcpu_info;
+	fmd_agent_physcpu_pci;
 	fmd_agent_cpu_retire;
 	fmd_agent_cpu_isretired;
 	fmd_agent_cpu_unretire;

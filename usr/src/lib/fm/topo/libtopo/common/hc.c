@@ -23,6 +23,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -247,7 +248,6 @@ hc_fini(topo_mod_t *mod)
 	topo_mod_unregister(mod);
 }
 
-/*ARGSUSED*/
 int
 hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
     topo_instance_t max, void *notused1, void *notused2)
@@ -316,7 +316,6 @@ hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 	return (0);
 }
 
-/*ARGSUSED*/
 static void
 hc_release(topo_mod_t *mp, tnode_t *node)
 {
@@ -389,7 +388,6 @@ fmri_compare(topo_mod_t *mod, nvlist_t *nv1, nvlist_t *nv2)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 hc_compare(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
@@ -421,7 +419,7 @@ hc_compare(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (-1);
 }
 
-static ssize_t
+static size_t
 fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
 	nvlist_t **hcprs = NULL;
@@ -430,7 +428,7 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	nvpair_t *apair;
 	nvlist_t *fnvl;
 	uint8_t version;
-	ssize_t size = 0;
+	size_t size = 0;
 	uint_t hcnprs;
 	char *serial = NULL;
 	char *part = NULL;
@@ -460,7 +458,10 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_REVISION, &rev);
 
 	/* hc:// */
-	topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_HC, NULL, "://");
+	if (!topo_fmristr_build(&size, buf, buflen,
+	    FM_FMRI_SCHEME_HC, NULL, "://")) {
+		return (0);
+	}
 
 	/* authority, if any */
 	if (anvl != NULL) {
@@ -470,41 +471,50 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 			    nvpair_value_string(apair, &aval) != 0)
 				continue;
 			aname = nvpair_name(apair);
-			topo_fmristr_build(&size, buf, buflen, ":", NULL, NULL);
-			topo_fmristr_build(&size, buf, buflen, "=",
-			    aname, aval);
+			if (!topo_fmristr_build(&size, buf, buflen,
+			    ":", NULL, NULL) ||
+			    !topo_fmristr_build(&size, buf, buflen,
+			    "=", aname, aval)) {
+				return (0);
+			}
 		}
 	}
 
 	/* hardware-id part */
-	topo_fmristr_build(&size,
-	    buf, buflen, serial, ":" FM_FMRI_HC_SERIAL_ID "=", NULL);
-	topo_fmristr_build(&size,
-	    buf, buflen, part, ":" FM_FMRI_HC_PART "=", NULL);
-	topo_fmristr_build(&size,
-	    buf, buflen, rev, ":" FM_FMRI_HC_REVISION "=", NULL);
+	if (!topo_fmristr_build(&size, buf, buflen,
+	    serial, ":" FM_FMRI_HC_SERIAL_ID "=", NULL) ||
+	    !topo_fmristr_build(&size, buf, buflen,
+	    part, ":" FM_FMRI_HC_PART "=", NULL) ||
+	    !topo_fmristr_build(&size, buf, buflen,
+	    rev, ":" FM_FMRI_HC_REVISION "=", NULL)) {
+		return (0);
+	}
 
 	/* separating slash */
-	topo_fmristr_build(&size, buf, buflen, "/", NULL, NULL);
+	if (!topo_fmristr_build(&size, buf, buflen, "/", NULL, NULL))
+		return (0);
 
 	/* hc-root */
-	if (root)
-		topo_fmristr_build(&size, buf, buflen, root, NULL, NULL);
+	if (!topo_fmristr_build(&size, buf, buflen, root, NULL, NULL))
+		return (0);
 
 	/* all the pairs */
 	for (i = 0; i < hcnprs; i++) {
 		char *nm = NULL;
 		char *id = NULL;
 
-		if (i > 0)
-			topo_fmristr_build(&size,
-			    buf, buflen, "/", NULL, NULL);
+		if (i > 0 && !topo_fmristr_build(&size, buf, buflen,
+		    "/", NULL, NULL)) {
+			return (0);
+		}
 		(void) nvlist_lookup_string(hcprs[i], FM_FMRI_HC_NAME, &nm);
 		(void) nvlist_lookup_string(hcprs[i], FM_FMRI_HC_ID, &id);
 		if (nm == NULL || id == NULL)
 			return (0);
-		topo_fmristr_build(&size, buf, buflen, nm, NULL, "=");
-		topo_fmristr_build(&size, buf, buflen, id, NULL, NULL);
+		if (!topo_fmristr_build(&size, buf, buflen, nm, NULL, "=") ||
+		    !topo_fmristr_build(&size, buf, buflen, id, NULL, NULL)) {
+			return (0);
+		}
 	}
 
 	/* append offset/physaddr if it exists in hc-specific */
@@ -525,9 +535,12 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 
 		if (hcsn != NULL) {
 			(void) snprintf(hexstr, sizeof (hexstr), "%llx", val);
-			topo_fmristr_build(&size, buf, buflen, "/", NULL, NULL);
-			topo_fmristr_build(&size, buf, buflen, "=", hcsn,
-			    hexstr);
+			if (!topo_fmristr_build(&size, buf, buflen,
+			    "/", NULL, NULL) ||
+			    !topo_fmristr_build(&size, buf, buflen,
+			    "=", hcsn, hexstr)) {
+				return (0);
+			}
 		}
 	}
 
@@ -543,30 +556,35 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 		    &fname) != 0 || nvlist_lookup_string(fnvl,
 		    FM_FMRI_FACILITY_TYPE, &ftype) != 0)
 			return (0);
-		topo_fmristr_build(&size, buf, buflen, "?", NULL, NULL);
-		topo_fmristr_build(&size, buf, buflen, "=", ftype, fname);
+		if (!topo_fmristr_build(&size, buf, buflen, "?", NULL, NULL) ||
+		    !topo_fmristr_build(&size, buf, buflen,
+		    "=", ftype, fname)) {
+			return (0);
+		}
 	}
 
 	return (size);
 }
 
-/*ARGSUSED*/
 static int
 hc_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *nvl, nvlist_t **out)
 {
-	ssize_t len;
+	size_t len;
 	char *name = NULL;
 	nvlist_t *fmristr;
 
 	if (version > TOPO_METH_NVL2STR_VERSION)
 		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
 
-	if ((len = fmri_nvl2str(nvl, NULL, 0)) == 0 ||
-	    (name = topo_mod_alloc(mod, len + 1)) == NULL ||
-	    fmri_nvl2str(nvl, name, len + 1) == 0) {
-		if (name != NULL)
-			topo_mod_free(mod, name, len + 1);
+	if ((len = fmri_nvl2str(nvl, NULL, 0)) == 0)
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+
+	if ((name = topo_mod_alloc(mod, len + 1)) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	if (fmri_nvl2str(nvl, name, len + 1) == 0) {
+		topo_mod_free(mod, name, len + 1);
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 	}
 
@@ -893,7 +911,6 @@ make_facility(topo_mod_t *mod, char *str, nvlist_t **nvl)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
 hc_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
@@ -1018,16 +1035,16 @@ hc_list_create(topo_mod_t *mod, const char *name, char *inst)
 }
 
 static nvlist_t *
-hc_create_seterror(topo_mod_t *mod, nvlist_t **hcl, int n, nvlist_t *fmri,
+hc_create_seterror(topo_mod_t *mod, nvlist_t **hcl, int elems, nvlist_t *fmri,
     int err)
 {
 	int i;
 
 	if (hcl != NULL) {
-		for (i = 0; i < n + 1; ++i)
+		for (i = 0; i < elems; ++i)
 			nvlist_free(hcl[i]);
 
-		topo_mod_free(mod, hcl, sizeof (nvlist_t *) * (n + 1));
+		topo_mod_free(mod, hcl, sizeof (nvlist_t *) * elems);
 	}
 
 	nvlist_free(fmri);
@@ -1070,8 +1087,8 @@ hc_fmri_create(topo_mod_t *mod, nvlist_t *pfmri, int version, const char *name,
     const char *rev, const char *serial)
 {
 	int i;
-	char str[21]; /* sizeof (UINT64_MAX) + '\0' */
-	uint_t pelems = 0;
+	char str[21]; /* decimal representation of UINT64_MAX + '\0' */
+	uint_t pelems = 0, elems;
 	nvlist_t **phcl = NULL;
 	nvlist_t **hcl = NULL;
 	nvlist_t *fmri = NULL;
@@ -1099,41 +1116,41 @@ hc_fmri_create(topo_mod_t *mod, nvlist_t *pfmri, int version, const char *name,
 			    hcl, pelems, fmri, EMOD_FMRI_MALFORM));
 	}
 
-	hcl = topo_mod_zalloc(mod, sizeof (nvlist_t *) * (pelems + 1));
-	if (hcl == NULL)
-		return (hc_create_seterror(mod,  hcl, pelems, fmri,
-		    EMOD_NOMEM));
+	/* We want space for an extra entry in the new FMRI's property list */
+	elems = pelems + 1;
 
+	hcl = topo_mod_zalloc(mod, sizeof (nvlist_t *) * elems);
+	if (hcl == NULL)
+		return (hc_create_seterror(mod, hcl, elems, fmri, EMOD_NOMEM));
+
+	/* Copy the parent elements */
 	for (i = 0; i < pelems; ++i)
 		if (topo_mod_nvdup(mod, phcl[i], &hcl[i]) != 0)
 			return (hc_create_seterror(mod,
-			    hcl, pelems, fmri, EMOD_FMRI_NVL));
+			    hcl, elems, fmri, EMOD_FMRI_NVL));
 
 	(void) snprintf(str, sizeof (str), "%d", inst);
 	if ((hcl[i] = hc_list_create(mod, name, str)) == NULL)
 		return (hc_create_seterror(mod,
-		    hcl, pelems, fmri, EMOD_FMRI_NVL));
+		    hcl, elems, fmri, EMOD_FMRI_NVL));
 
 	if ((fmri = hc_base_fmri_create(mod, auth, part, rev, serial)) == NULL)
 		return (hc_create_seterror(mod,
-		    hcl, pelems, fmri, EMOD_FMRI_NVL));
+		    hcl, elems, fmri, EMOD_FMRI_NVL));
 
-	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST, hcl, pelems + 1)
-	    != 0)
+	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST, hcl, elems) != 0)
 		return (hc_create_seterror(mod,
-		    hcl, pelems, fmri, EMOD_FMRI_NVL));
+		    hcl, elems, fmri, EMOD_FMRI_NVL));
 
 	if (hcl != NULL) {
-		for (i = 0; i < pelems + 1; ++i) {
+		for (i = 0; i < elems; ++i)
 			nvlist_free(hcl[i]);
-		}
-		topo_mod_free(mod, hcl, sizeof (nvlist_t *) * (pelems + 1));
+		topo_mod_free(mod, hcl, sizeof (nvlist_t *) * elems);
 	}
 
 	return (fmri);
 }
 
-/*ARGSUSED*/
 static int
 hc_fmri_create_meth(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
@@ -1466,7 +1483,6 @@ struct prop_lookup {
 	nvlist_t *pl_prop;
 };
 
-/*ARGSUSED*/
 static int
 hc_prop_get(topo_mod_t *mod, tnode_t *node, void *pdata)
 {
@@ -1539,7 +1555,6 @@ hc_fmri_prop_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (err);
 }
 
-/*ARGSUSED*/
 static int
 hc_pgrp_get(topo_mod_t *mod, tnode_t *node, void *pdata)
 {
@@ -1596,7 +1611,6 @@ hc_fmri_pgrp_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (err);
 }
 
-/*ARGSUSED*/
 static int
 hc_prop_setprop(topo_mod_t *mod, tnode_t *node, void *pdata)
 {
@@ -1610,7 +1624,6 @@ hc_prop_setprop(topo_mod_t *mod, tnode_t *node, void *pdata)
 	return (err);
 }
 
-/*ARGSUSED*/
 static int
 hc_fmri_prop_set(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
@@ -2080,7 +2093,6 @@ hc_fmri_facility(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (err);
 }
 
-/* ARGSUSED */
 static int
 hc_expand(topo_mod_t *mod, tnode_t *node, void *pdata)
 {
@@ -2121,7 +2133,6 @@ hc_expand(topo_mod_t *mod, tnode_t *node, void *pdata)
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 hc_fmri_expand(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)

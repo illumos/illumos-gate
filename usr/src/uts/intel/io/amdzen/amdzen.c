@@ -2549,6 +2549,8 @@ amdzen_topo_ioctl_df(amdzen_t *azn, intptr_t arg, int mode)
 	topo_df.atd_df_act_nents = df->adf_nents;
 	max_ents = MIN(topo_df.atd_df_buf_nents, df->adf_nents);
 
+	topo_df.atd_nb_busno = df->adf_nb_busno;
+
 	if (topo_df.atd_df_ents == NULL) {
 		topo_df.atd_df_buf_nvalid = 0;
 		mutex_exit(&azn->azn_mutex);
@@ -2602,6 +2604,7 @@ copyout:
 		topo_df32.atd_minor = topo_df.atd_minor;
 		topo_df32.atd_df_buf_nvalid = topo_df.atd_df_buf_nvalid;
 		topo_df32.atd_df_act_nents = topo_df.atd_df_act_nents;
+		topo_df32.atd_nb_busno = topo_df.atd_nb_busno;
 
 		if (ddi_copyout(&topo_df32, (void *)(uintptr_t)arg,
 		    sizeof (topo_df32), mode & FKIOCTL) != 0) {

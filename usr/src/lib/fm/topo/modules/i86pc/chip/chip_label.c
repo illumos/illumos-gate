@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -540,40 +541,19 @@ static int
 get_num_chips(topo_mod_t *mod)
 {
 	fmd_agent_hdl_t *hdl;
-	nvlist_t **cpus;
-	uint_t ncpu;
-	int i, nchip = 0;
-	int32_t chipid;
-	uint64_t bitmap = 0;
+	uint8_t nchip;
 
 	if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) == NULL)
 		return (-1);
-	if (fmd_agent_physcpu_info(hdl, &cpus, &ncpu) == -1) {
-		topo_mod_dprintf(mod, "get physcpu info failed:%s\n",
+	if (fmd_agent_chip_count(hdl, &nchip) == -1) {
+		topo_mod_dprintf(mod, "get physcpu count failed: %s\n",
 		    fmd_agent_errmsg(hdl));
 		fmd_agent_close(hdl);
 		return (-1);
 	}
 	fmd_agent_close(hdl);
 
-	for (i = 0; i < ncpu; i++) {
-		if (nvlist_lookup_int32(cpus[i], FM_PHYSCPU_INFO_CHIP_ID,
-		    &chipid) != 0 || chipid >= 64) {
-			topo_mod_dprintf(mod, "lookup chipid failed\n");
-			nchip = -1;
-			break;
-		}
-		if ((bitmap & (1ULL << chipid)) != 0) {
-			bitmap |= (1ULL << chipid);
-			nchip++;
-		}
-	}
-
-	for (i = 0; i < ncpu; i++)
-		nvlist_free(cpus[i]);
-	umem_free(cpus, sizeof (nvlist_t *) * ncpu);
-
-	return (nchip);
+	return ((int)nchip);
 }
 
 /*

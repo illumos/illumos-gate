@@ -96,6 +96,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_list_append;
 	topo_list_deepcopy;
 	topo_list_delete;
+	topo_list_size;
 	topo_method_invoke;
 	topo_method_register;
 	topo_method_sensor_failure;
@@ -123,6 +124,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_mod_free;
 	topo_mod_getspecific;
 	topo_mod_hcfmri;
+	topo_mod_hcfmri_extend;
 	topo_mod_hc_occupied;
 	topo_mod_ipmi_hold;
 	topo_mod_ipmi_rele;
@@ -134,6 +136,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_mod_nvl2str;
 	topo_mod_pcidb;
 	topo_mod_pkgfmri;
+	topo_mod_pciefmri;
 	topo_mod_product;
 	topo_mod_prominfo;
 	topo_mod_register;

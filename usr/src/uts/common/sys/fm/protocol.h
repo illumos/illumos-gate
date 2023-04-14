@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_SYS_FM_PROTOCOL_H
@@ -202,6 +203,7 @@ extern "C" {
 #define	FM_FMRI_SCHEME_ZFS		"zfs"
 #define	FM_FMRI_SCHEME_SW		"sw"
 #define	FM_FMRI_SCHEME_PATH		"path"
+#define	FM_FMRI_SCHEME_PCIE		"pcie"
 
 /* Scheme versions */
 #define	FMD_SCHEME_VERSION0		0
@@ -229,6 +231,8 @@ extern "C" {
 #define	FM_SW_SCHEME_VERSION		SW_SCHEME_VERSION0
 #define	PATH_SCHEME_VERSION0		0
 #define	FM_PATH_SCHEME_VERSION		PATH_SCHEME_VERSION0
+#define	PCIE_SCHEME_VERSION0		0
+#define	FM_PCIE_SCHEME_VERSION		PCIE_SCHEME_VERSION0
 
 /* hc scheme member names */
 #define	FM_FMRI_HC_SERIAL_ID		"serial"
@@ -267,6 +271,11 @@ extern "C" {
 #define	FM_FMRI_PKG_BASEDIR		"pkg-basedir"
 #define	FM_FMRI_PKG_INST		"pkg-inst"
 #define	FM_FMRI_PKG_VERSION		"pkg-version"
+
+/* pcie scheme member names */
+#define	FM_FMRI_PCIE_LIST		"pcie-list"
+#define	FM_FMRI_PCIE_NAME		"pcie-name"
+#define	FM_FMRI_PCIE_ID			"pcie-id"
 
 /* svc scheme member names */
 #define	FM_FMRI_SVC_NAME		"svc-name"

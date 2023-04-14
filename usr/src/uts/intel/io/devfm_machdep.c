@@ -34,6 +34,7 @@
 #include <sys/devfm.h>
 
 #include <sys/cpu_module.h>
+#include <io/amdzen/amdzen_topo.h>
 
 #define	ANY_ID		(uint_t)-1
 
@@ -218,7 +219,6 @@ populate_cpu(nvlist_t **nvlp, cmi_hdl_t hdl)
 	}
 }
 
-/*ARGSUSED*/
 int
 fm_ioctl_physcpu_info(int cmd, nvlist_t *invl, nvlist_t **onvlp)
 {
@@ -307,11 +307,10 @@ fm_ioctl_cpu_retire(int cmd, nvlist_t *invl, nvlist_t **onvlp)
 }
 
 /*
- * Retrun the value of x86gentopo_legacy variable as an nvpair.
+ * Return the value of x86gentopo_legacy variable as an nvpair.
  *
  * The caller is responsible for freeing the nvlist.
  */
-/* ARGSUSED */
 int
 fm_ioctl_gentopo_legacy(int cmd, nvlist_t *invl, nvlist_t **onvlp)
 {
@@ -479,4 +478,111 @@ fm_ioctl_cache_info(int cmd, nvlist_t *invl, nvlist_t **onvlp)
 	}
 
 	return (ret);
+}
+
+/*
+ * For AMD processors, we can ask the amdzen driver for the bus number of the
+ * northbridge of each processor (see the block comment in amdzen.c for more
+ * details) and use this to determine the range of allocated PCI bus numbers.
+ */
+static const char *topo_zen_dev = "/devices/pseudo/amdzen@0:topo";
+static int
+fm_physcpu_pci_amd(nvlist_t **onvlp)
+{
+	extern struct modlinkage devfm_modlinkage;
+	const int ldi_flags = FREAD | FNOCTTY;
+	amdzen_topo_base_t base;
+	nvlist_t *nvl = NULL;
+	ldi_handle_t lh = NULL;
+	ldi_ident_t li;
+	uint32_t ndf = 0;
+	int rval, err = 0;
+
+	VERIFY0(ldi_ident_from_mod(&devfm_modlinkage, &li));
+
+	err = ldi_open_by_name(topo_zen_dev, ldi_flags, kcred, &lh, li);
+	if (err != 0) {
+		cmn_err(CE_WARN, "!devfm: ldi open of '%s' failed",
+		    topo_zen_dev);
+		goto out;
+	}
+
+	err = ldi_ioctl(lh, AMDZEN_TOPO_IOCTL_BASE, (intptr_t)&base,
+	    ldi_flags | FKIOCTL, kcred, &rval);
+	if (err != 0) {
+		cmn_err(CE_WARN, "!devfm: failed to get base Zen topology");
+		goto out;
+	}
+
+	(void) nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
+
+	ndf = base.atb_ndf;
+	nvlist_t **dfs = kmem_zalloc(sizeof (nvlist_t *) * ndf, KM_SLEEP);
+
+	for (uint32_t i = 0; i < ndf; i++) {
+		amdzen_topo_df_t df;
+
+		(void) nvlist_alloc(&dfs[i], NV_UNIQUE_NAME, KM_SLEEP);
+
+		df.atd_dfno = i;
+		df.atd_df_buf_nents = 0;
+		df.atd_df_ents = NULL;
+
+		err = ldi_ioctl(lh, AMDZEN_TOPO_IOCTL_DF, (intptr_t)&df,
+		    ldi_flags | FKIOCTL, kcred, &rval);
+		if (err != 0) {
+			cmn_err(CE_WARN, "!devfm: failed to get information "
+			    "for Zen DF %u - skipping", i);
+			goto out;
+		}
+
+		fm_payload_set(dfs[i],
+		    FM_PCI_DATA_CHIP_ID, DATA_TYPE_INT32,
+		    (int32_t)df.atd_sockid,
+		    FM_PCI_DATA_NB_BUSNO, DATA_TYPE_UINT32,
+		    (int32_t)df.atd_nb_busno,
+		    NULL);
+	}
+	fnvlist_add_nvlist_array(nvl, FM_PCI_DATA_DFS,
+	    dfs, (uint_t)ndf);
+	err = 0;
+
+out:
+	if (lh != NULL)
+		VERIFY0(ldi_close(lh, ldi_flags, kcred));
+	ldi_ident_release(li);
+
+	for (uint32_t i = 0; i < ndf; i++)
+		nvlist_free(dfs[i]);
+
+	if (err == 0)
+		*onvlp = nvl;
+	else
+		nvlist_free(nvl);
+
+	return (err);
+}
+
+/*
+ * Generate information about the PCI configuration of physical CPUs. This is
+ * intended to be CPU vendor agnostic but is currently only implemented for AMD
+ * processors and returns an array of data fabric information which consists of
+ * the mapping between physical CPUs and their northbridge PCI bus number. The
+ * shape of these data will likely change once support for Intel processors is
+ * added here.
+ */
+int
+fm_ioctl_pci_data(int cmd, nvlist_t *invl __unused, nvlist_t **onvlp)
+{
+	if (cmd != FM_IOC_PCI_DATA)
+		return (ENOTTY);
+
+	switch (cpuid_getvendor(CPU)) {
+	case X86_VENDOR_AMD:
+		return (fm_physcpu_pci_amd(onvlp));
+	case X86_VENDOR_Intel:
+		return (ENOTSUP);
+	}
+
+	return (ENOTSUP);
 }

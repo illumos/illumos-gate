@@ -630,6 +630,8 @@ pci_prop_set_common_props(dev_info_t *dip, const pci_prop_data_t *prop)
 				    prop->ppd_slotno);
 			}
 		}
+		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip, "pcie-type",
+		    prop->ppd_pcie_type >> PCIE_PCIECAP_DEV_TYPE_SHIFT);
 	}
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip, "devsel-speed",
 	    (prop->ppd_status & PCI_STAT_DEVSELT) >> 9);
