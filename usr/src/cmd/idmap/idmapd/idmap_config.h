@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef _IDMAP_CONFIG_H
@@ -76,6 +77,7 @@ typedef struct idmap_trustedforest {
 typedef struct idmap_pg_config {
 	uint64_t	list_size_limit;
 	uint64_t	max_threads;
+	uint64_t	discovery_retry_max_delay;
 	uint64_t	id_cache_timeout;
 	uint64_t	name_cache_timeout;
 	uint64_t	rediscovery_interval;
