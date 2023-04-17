@@ -29,7 +29,6 @@
 #
 
 include $(SRC)/Makefile.master
-include $(SRC)/Makefile.buildnum
 
 #
 # Make sure we're getting a consistent execution environment for the
@@ -140,7 +139,7 @@ PKGPUBLISHER= $(PKGPUBLISHER_REDIST)
 #
 PKGVERS_COMPONENT= 0.$(RELEASE)
 PKGVERS_BUILTON= $(RELEASE)
-PKGVERS_BRANCH= 0.$(ONNV_BUILDNUM)
+PKGVERS_BRANCH= 999999.1
 PKGVERS= $(PKGVERS_COMPONENT),$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 
 #
