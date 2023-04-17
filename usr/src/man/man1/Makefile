@@ -295,7 +295,6 @@ MANFILES=	acctcom.1			\
 		printf.1			\
 		priocntl.1			\
 		proc.1				\
-		prof.1				\
 		profiles.1			\
 		projects.1			\
 		ps.1				\

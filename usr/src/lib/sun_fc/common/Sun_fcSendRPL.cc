@@ -56,13 +56,8 @@ HBA_STATUS Sun_fcSendRPL(HBA_HANDLE		handle,
 	    Handle *myHandle = Handle::findHandle(handle);
 	    HBA *hba = myHandle->getHBA();
 	    HBAPort *port = hba->getPort(wwnConversion(hbaPortWWN.wwn));
-	    if (agent_wwn.wwn == NULL) {
-		port->sendRPL(0, agent_domain, portindex,
-		pRspBuffer, pRspBufferSize);
-	    } else {
-		port->sendRPL(wwnConversion(agent_wwn.wwn), agent_domain,
-		    portindex, pRspBuffer, pRspBufferSize);
-	    }
+	    port->sendRPL(wwnConversion(agent_wwn.wwn), agent_domain,
+		portindex, pRspBuffer, pRspBufferSize);
 	    return (HBA_STATUS_OK);
 	} catch (HBAException &e) {
 	    return (e.getErrorCode());

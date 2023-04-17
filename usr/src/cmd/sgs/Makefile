@@ -73,7 +73,6 @@ SUBDIRS=	 libconv	\
 		mcs		\
 		moe		\
 		nm		\
-		prof		\
 		ranlib		\
 		size		\
 		symorder	\

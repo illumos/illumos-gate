@@ -28,7 +28,7 @@
 set name=pkg.fmri value=pkg:/developer/object-file@$(PKGVERS)
 set name=pkg.summary value="CCS tools bundled with SunOS"
 set name=pkg.description \
-    value="software development utilities, including ar, dis, dump, elfdump, elfedit, lex, lorder, mcs, nm, prof, ranlib, rpcgen, size, strip, tsort, and yacc"
+    value="software development utilities, including ar, dis, dump, elfdump, elfedit, lex, lorder, mcs, nm, ranlib, rpcgen, size, strip, tsort, and yacc"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 dir  path=usr group=sys
@@ -55,7 +55,6 @@ file path=usr/bin/lex mode=0555
 file path=usr/bin/lorder mode=0555
 file path=usr/bin/mcs mode=0555
 file path=usr/bin/nm mode=0555
-file path=usr/bin/prof mode=0555
 file path=usr/bin/ranlib mode=0555
 file path=usr/bin/rpcgen mode=0555
 file path=usr/bin/size mode=0555
@@ -85,7 +84,6 @@ link path=usr/ccs/bin/lex target=../../bin/lex
 link path=usr/ccs/bin/lorder target=../../bin/lorder
 link path=usr/ccs/bin/mcs target=../../bin/mcs
 link path=usr/ccs/bin/nm target=../../bin/nm
-link path=usr/ccs/bin/prof target=../../bin/prof
 link path=usr/ccs/bin/ranlib target=../../bin/ranlib
 link path=usr/ccs/bin/size target=../../bin/size
 link path=usr/ccs/bin/strip target=../../bin/strip
@@ -139,7 +137,6 @@ file path=usr/share/man/man1/lex.1
 file path=usr/share/man/man1/lorder.1
 file path=usr/share/man/man1/mcs.1
 file path=usr/share/man/man1/nm.1
-file path=usr/share/man/man1/prof.1
 file path=usr/share/man/man1/ranlib.1
 file path=usr/share/man/man1/rpcgen.1
 file path=usr/share/man/man1/size.1
@@ -149,7 +146,7 @@ file path=usr/share/man/man1/tsort.1
 file path=usr/share/man/man1/unifdef.1
 file path=usr/share/man/man1/yacc.1
 legacy pkg=SUNWbtool \
-    desc="software development utilities, including ar, dis, dump, elfdump, elfedit, lex, lorder, mcs, nm, prof, ranlib, rpcgen, size, strip, tsort, and yacc" \
+    desc="software development utilities, including ar, dis, dump, elfdump, elfedit, lex, lorder, mcs, nm, ranlib, rpcgen, size, strip, tsort, and yacc" \
     name="CCS tools bundled with SunOS"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

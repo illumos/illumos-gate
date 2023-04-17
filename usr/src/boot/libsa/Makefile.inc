@@ -57,7 +57,7 @@ SRCS +=	$(SASRC)/string/strncmp.c $(SASRC)/string/strncpy.c
 SRCS +=	$(SASRC)/string/strpbrk.c $(SASRC)/string/strrchr.c
 SRCS +=	$(SASRC)/string/strsep.c $(SASRC)/string/strspn.c
 SRCS +=	$(SASRC)/string/strstr.c $(SASRC)/string/strtok.c
-SRCS +=	$(SASRC)/string/swab.c
+SRCS +=	$(SASRC)/string/swab.c $(SASRC)/string/strnlen.c
 
 SRCS += $(SASRC)/qdivrem.c
 
@@ -65,7 +65,8 @@ OBJECTS += bcmp.o bcopy.o bzero.o ffs.o fls.o \
 	memccpy.o memchr.o memcmp.o memcpy.o memmove.o memset.o \
 	qdivrem.o strcat.o strchr.o strcmp.o strcpy.o stpcpy.o stpncpy.o \
 	strcspn.o strlcat.o strlcpy.o strlen.o strncat.o strncmp.o strncpy.o \
-	strpbrk.o strrchr.o strsep.o strspn.o strstr.o strtok.o swab.o
+	strpbrk.o strrchr.o strsep.o strspn.o strstr.o strtok.o swab.o \
+	strnlen.o
 
 # uuid functions from libc
 SRCS += $(SASRC)/uuid/uuid_create_nil.c
