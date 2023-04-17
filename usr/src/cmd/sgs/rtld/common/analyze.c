@@ -1255,7 +1255,8 @@ file_open(int err, Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp,
 			}
 		}
 
-		if (nlmp = is_devinode_loaded(&status, lml, nname, flags)) {
+		nlmp = is_devinode_loaded(&status, lml, nname, flags);
+		if (nlmp != NULL) {
 			if (flags & FLG_RT_AUDIT) {
 				/*
 				 * If we've been requested to load an auditor,
@@ -2456,8 +2457,8 @@ load_path(Lm_list *lml, Aliste lmco, Rt_map *clmp, int nmode, uint_t flags,
 		 * If it's a NOLOAD request - check to see if the object
 		 * has already been loaded.
 		 */
-		/* LINTED */
-		if (nlmp = is_so_loaded(lml, name, in_nfavl)) {
+		nlmp = is_so_loaded(lml, name, in_nfavl);
+		if (nlmp != NULL) {
 			if ((lml->lm_flags & LML_FLG_TRC_VERBOSE) &&
 			    ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0)) {
 				(void) printf(MSG_INTL(MSG_LDD_FIL_FIND), name,
@@ -2807,7 +2808,8 @@ lookup_sym_direct(Slookup *slp, Sresult *srp, uint_t *binfo, Syminfo *sip,
 	    (sip->si_flags & SYMINFO_FLG_COPY)) {
 		slp->sl_imap = LIST(clmp)->lm_head;
 
-		if (ret = SYMINTP(clmp)(slp, srp, binfo, in_nfavl))
+		ret = SYMINTP(clmp)(slp, srp, binfo, in_nfavl);
+		if (ret != 0)
 			*binfo |= (DBG_BINFO_DIRECT | DBG_BINFO_COPYREF);
 		return (ret);
 	}
@@ -2831,7 +2833,8 @@ lookup_sym_direct(Slookup *slp, Sresult *srp, uint_t *binfo, Syminfo *sip,
 		 */
 		for (APLIST_TRAVERSE(CALLERS(clmp), idx1, bdp)) {
 			sl.sl_imap = lmp = bdp->b_caller;
-			if (ret = SYMINTP(lmp)(&sl, srp, binfo, in_nfavl))
+			ret = SYMINTP(lmp)(&sl, srp, binfo, in_nfavl);
+			if (ret != 0)
 				goto found;
 		}
 
@@ -2850,8 +2853,8 @@ lookup_sym_direct(Slookup *slp, Sresult *srp, uint_t *binfo, Syminfo *sip,
 				if ((gdp->gd_flags & GPD_PARENT) == 0)
 					continue;
 				sl.sl_imap = lmp = gdp->gd_depend;
-				if (ret = SYMINTP(lmp)(&sl, srp, binfo,
-				    in_nfavl))
+				ret = SYMINTP(lmp)(&sl, srp, binfo, in_nfavl);
+				if (ret != 0)
 					goto found;
 			}
 		}
@@ -3135,8 +3138,9 @@ _lookup_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 
 			for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
 				sl.sl_flags |= LKUP_NOFALLBACK;
-				if (ret = rescan_lazy_find_sym(lmc->lc_head,
-				    &sl, srp, binfo, in_nfavl))
+				ret = rescan_lazy_find_sym(lmc->lc_head,
+				    &sl, srp, binfo, in_nfavl);
+				if (ret != 0)
 					break;
 			}
 		}

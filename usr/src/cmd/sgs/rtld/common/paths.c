@@ -708,7 +708,8 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 				 * paths.  Isolate the path we're processing to
 				 * provide a more precise error diagnostic.
 				 */
-				if (str = strchr(oname, ':')) {
+				str = strchr(oname, ':');
+				if (str != NULL) {
 					size_t	slen = str - oname;
 
 					(void) strncpy(buf, oname, slen);
