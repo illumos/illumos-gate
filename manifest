@@ -387,7 +387,6 @@ f etc/inet/secret/ike.preshared 0600 root sys
 d etc/inet/secret/ike.privatekeys 0700 root sys
 f etc/inet/secret/ipseckeys.sample 0600 root sys
 f etc/inet/services 0644 root sys
-f etc/inet/slp.conf.example 0644 root sys
 s etc/inetd.conf=inet/inetd.conf
 d etc/init.d 0755 root sys
 f etc/init.d/PRESERVE 0744 root sys
@@ -1721,7 +1720,6 @@ d lib/svc/manifest/network/shares 0755 root sys
 f lib/svc/manifest/network/shares/group.xml 0444 root sys
 f lib/svc/manifest/network/shares/reparsed.xml 0444 root sys
 f lib/svc/manifest/network/shell.xml 0444 root sys
-f lib/svc/manifest/network/slp.xml 0444 root sys
 d lib/svc/manifest/network/smb 0755 root sys
 f lib/svc/manifest/network/smb/client.xml 0444 root sys
 f lib/svc/manifest/network/smb/server.xml 0444 root sys
@@ -1852,7 +1850,6 @@ f lib/svc/method/npivconfig 0555 root sys
 f lib/svc/method/rmtmpfiles 0555 root bin
 f lib/svc/method/rpc-bind 0555 root bin
 f lib/svc/method/sendmail-client 0555 root sys
-f lib/svc/method/slp 0555 root sys
 f lib/svc/method/smartdc-config 0555 root bin
 f lib/svc/method/smartdc-init 0555 root sys
 f lib/svc/method/smartdc-ur 0555 root bin
@@ -3869,7 +3866,6 @@ f usr/include/siginfo.h 0644 root bin
 f usr/include/signal.h 0644 root bin
 f usr/include/sip.h 0644 root bin
 f usr/include/skein.h 0644 root bin
-f usr/include/slp.h 0644 root bin
 d usr/include/smb 0755 root bin
 f usr/include/smb/doserror.h 0644 root bin
 f usr/include/smb/lmerr.h 0644 root bin
@@ -5483,8 +5479,6 @@ f usr/lib/amd64/libsip.so.1 0755 root bin
 s usr/lib/amd64/libsip.so=libsip.so.1
 f usr/lib/amd64/libsldap.so.1 0755 root bin
 s usr/lib/amd64/libsldap.so=libsldap.so.1
-f usr/lib/amd64/libslp.so.1 0755 root bin
-s usr/lib/amd64/libslp.so=libslp.so.1
 s usr/lib/amd64/libsmartsshd.so.1=../../../lib/amd64/libsmartsshd.so.1
 s usr/lib/amd64/libsmartsshd.so=../../../lib/amd64/libsmartsshd.so.1
 f usr/lib/amd64/libsmbfs.so.1 0755 root bin
@@ -6619,7 +6613,6 @@ f usr/lib/inet/ppp/passprompt.so 0544 root bin
 f usr/lib/inet/ppp/pppoe.so 0544 root bin
 f usr/lib/inet/pppoec 0555 root bin
 f usr/lib/inet/pppoed 0555 root bin
-f usr/lib/inet/slpd 0555 root bin
 f usr/lib/inet/vrrpd 0555 root bin
 f usr/lib/inet/wpad 0555 root bin
 f usr/lib/intrd 0555 root bin
@@ -7004,8 +6997,6 @@ f usr/lib/libsip.so.1 0755 root bin
 s usr/lib/libsip.so=libsip.so.1
 f usr/lib/libsldap.so.1 0755 root bin
 s usr/lib/libsldap.so=libsldap.so.1
-f usr/lib/libslp.so.1 0755 root bin
-s usr/lib/libslp.so=libslp.so.1
 s usr/lib/libsmartsshd.so.1=../../lib/libsmartsshd.so.1
 s usr/lib/libsmartsshd.so=../../lib/libsmartsshd.so.1
 f usr/lib/libsmbfs.so.1 0755 root bin
@@ -16168,7 +16159,6 @@ f usr/share/man/man3lib/libsec.3lib 0444 root bin
 f usr/share/man/man3lib/libsecdb.3lib 0444 root bin
 f usr/share/man/man3lib/libsendfile.3lib 0444 root bin
 f usr/share/man/man3lib/libsip.3lib 0444 root bin
-f usr/share/man/man3lib/libslp.3lib 0444 root bin
 s usr/share/man/man3lib/libsmhbaapi.3lib=libSMHBAAPI.3lib
 f usr/share/man/man3lib/libsocket.3lib 0444 root bin
 f usr/share/man/man3lib/libstmf.3lib 0444 root bin
@@ -18080,25 +18070,6 @@ f usr/share/man/man3sip/sip_stack_init.3sip 0444 root bin
 s usr/share/man/man3sip/sip_unregister_all_sent_by.3sip=sip_register_sent_by.3sip
 s usr/share/man/man3sip/sip_unregister_sent_by.3sip=sip_register_sent_by.3sip
 s usr/share/man/man3sip/sip_uri_errflags_to_str.3sip=sip_is_sip_uri.3sip
-d usr/share/man/man3slp 0755 root bin
-f usr/share/man/man3slp/SLPClose.3slp 0444 root bin
-f usr/share/man/man3slp/SLPDelAttrs.3slp 0444 root bin
-f usr/share/man/man3slp/SLPDereg.3slp 0444 root bin
-f usr/share/man/man3slp/SLPEscape.3slp 0444 root bin
-f usr/share/man/man3slp/SLPFindAttrs.3slp 0444 root bin
-f usr/share/man/man3slp/SLPFindScopes.3slp 0444 root bin
-f usr/share/man/man3slp/SLPFindSrvTypes.3slp 0444 root bin
-f usr/share/man/man3slp/SLPFindSrvs.3slp 0444 root bin
-f usr/share/man/man3slp/SLPFree.3slp 0444 root bin
-f usr/share/man/man3slp/SLPGetProperty.3slp 0444 root bin
-f usr/share/man/man3slp/SLPGetRefreshInterval.3slp 0444 root bin
-f usr/share/man/man3slp/SLPOpen.3slp 0444 root bin
-f usr/share/man/man3slp/SLPParseSrvURL.3slp 0444 root bin
-f usr/share/man/man3slp/SLPReg.3slp 0444 root bin
-f usr/share/man/man3slp/SLPSetProperty.3slp 0444 root bin
-f usr/share/man/man3slp/SLPUnescape.3slp 0444 root bin
-f usr/share/man/man3slp/slp_api.3slp 0444 root bin
-f usr/share/man/man3slp/slp_strerror.3slp 0444 root bin
 d usr/share/man/man3socket 0755 root bin
 f usr/share/man/man3socket/accept.3socket 0444 root bin
 s usr/share/man/man3socket/accept4.3socket=accept.3socket
@@ -19126,7 +19097,6 @@ f usr/share/man/man4p/route.4p 0444 root bin
 f usr/share/man/man4p/routing.4p 0444 root bin
 f usr/share/man/man4p/sctp.4p 0444 root bin
 f usr/share/man/man4p/sip.4p 0444 root bin
-f usr/share/man/man4p/slp.4p 0444 root bin
 f usr/share/man/man4p/tcp.4p 0444 root bin
 f usr/share/man/man4p/udp.4p 0444 root bin
 f usr/share/man/man4p/vxlan.4p 0444 root bin
@@ -19306,8 +19276,6 @@ f usr/share/man/man5/services.5 0444 root bin
 f usr/share/man/man5/shadow.5 0444 root bin
 f usr/share/man/man5/sharetab.5 0444 root bin
 f usr/share/man/man5/shells.5 0444 root bin
-f usr/share/man/man5/slp.conf.5 0444 root bin
-f usr/share/man/man5/slpd.reg.5 0444 root bin
 f usr/share/man/man5/smb.5 0444 root bin
 f usr/share/man/man5/smbautohome.5 0444 root bin
 f usr/share/man/man5/smhba.conf.5 0444 root bin
@@ -19809,7 +19777,6 @@ f usr/share/man/man8/sharectl.8 0444 root bin
 f usr/share/man/man8/sharemgr.8 0444 root bin
 f usr/share/man/man8/showmount.8 0444 root bin
 f usr/share/man/man8/shutdown.8 0444 root bin
-f usr/share/man/man8/slpd.8 0444 root bin
 f usr/share/man/man8/smbadm.8 0444 root bin
 f usr/share/man/man8/smbd.8 0444 root bin
 f usr/share/man/man8/smbiod.8 0444 root bin

@@ -47,6 +47,7 @@
 # network/security/kadmin.xml
 # network/security/krb5kdc.xml
 # network/security/ktkt_warn.xml
+# network/slp
 # network/rpc/smserver.xml
 # network/nfs/cbd.xml
 # network/ipmievd.xml
@@ -126,7 +127,6 @@ network/rpc/bind.xml					enabled
 network/shares/group.xml				enabled
 network/shares/reparsed.xml				disabled
 network/shell.xml					disabled
-network/slp.xml						disabled
 network/smb/client.xml					disabled
 network/smb/server.xml					disabled
 network/ssh.xml						enabled

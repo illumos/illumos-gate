@@ -75,7 +75,6 @@ SUBDIRS=	man1		\
 		man3sec		\
 		man3secdb	\
 		man3sip		\
-		man3slp		\
 		man3socket	\
 		man3stmf	\
 		man3sysevent	\
