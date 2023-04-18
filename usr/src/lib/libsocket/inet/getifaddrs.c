@@ -529,8 +529,11 @@ fail:
 	free(iomp);
 	freeifaddrs(*ifap);
 	*ifap = NULL;
-	if (err == ENXIO)
+	if (err == ENXIO) {
+		buf = NULL;
+		iomp = NULL;
 		goto retry;
+	}
 
 	if (sock4 >= 0)
 		(void) close(sock4);
