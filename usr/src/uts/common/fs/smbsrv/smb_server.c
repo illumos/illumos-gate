@@ -1432,6 +1432,8 @@ smb_server_legacy_kstat_update(kstat_t *ksp, int rw)
 
 }
 
+int smb_server_shutdown_wait1 = 15;	/* seconds */
+
 /*
  * smb_server_shutdown
  */
@@ -1440,19 +1442,22 @@ smb_server_shutdown(smb_server_t *sv)
 {
 	smb_llist_t *sl = &sv->sv_session_list;
 	smb_session_t *session;
-	clock_t	time;
+	clock_t	time0, time1, time2;
 
 	SMB_SERVER_VALID(sv);
 
 	/*
-	 * Stop the listeners first, so we don't get any more
-	 * new work while we're trying to shut down.
+	 * Stop the listeners first, so we can't get any more
+	 * new sessions while we're trying to shut down.
 	 */
 	smb_server_listener_stop(&sv->sv_nbt_daemon);
 	smb_server_listener_stop(&sv->sv_tcp_daemon);
-	smb_thread_stop(&sv->si_thread_timers);
 
-	/* Disconnect all of the sessions */
+	/*
+	 * Disconnect all of the sessions. This causes all the
+	 * smb_server_receiver threads to see a disconnect and
+	 * begin tear-down (in parallel) in smb_session_cancel.
+	 */
 	smb_llist_enter(sl, RW_READER);
 	session = smb_llist_head(sl);
 	while (session != NULL) {
@@ -1475,34 +1480,37 @@ smb_server_shutdown(smb_server_t *sv)
 	 * Wait for the session list to empty.
 	 * (cv_signal in smb_server_destroy_session)
 	 *
-	 * This should not take long, but if there are any leaked
-	 * references to ofiles, trees, or users, there could be a
-	 * session hanging around.  If that happens, the ll_count
-	 * never gets to zero and we'll never get the sv_signal.
-	 * Defend against that problem using timed wait, then
-	 * complain if we find sessions left over and continue
-	 * with shutdown in spite of any leaked sessions.
-	 * That's better than a server that won't reboot.
+	 * We must wait for all the SMB session readers to finish, or
+	 * we could proceed here while there might be worker threads
+	 * running in any of those sessions.  See smb_session_logoff
+	 * for timeouts applied to session tear-down. If this takes
+	 * longer than expected, make some noise, and fire a dtrace
+	 * probe one might use to investigate.
 	 */
-	time = SEC_TO_TICK(5) + ddi_get_lbolt();
+	time0 = ddi_get_lbolt();
+	time1 = SEC_TO_TICK(smb_server_shutdown_wait1) + time0;
 	mutex_enter(&sv->sv_mutex);
 	while (sv->sv_session_list.ll_count != 0) {
-		if (cv_timedwait(&sv->sv_cv, &sv->sv_mutex, time) < 0)
+		if (cv_timedwait(&sv->sv_cv, &sv->sv_mutex, time1) < 0) {
+			cmn_err(CE_NOTE, "!shutdown waited %d seconds"
+			    " with %d sessions still remaining",
+			    smb_server_shutdown_wait1,
+			    sv->sv_session_list.ll_count);
+			DTRACE_PROBE1(max__wait, smb_server_t *, sv);
 			break;
+		}
+	}
+	while (sv->sv_session_list.ll_count != 0) {
+		cv_wait(&sv->sv_cv, &sv->sv_mutex);
 	}
 	mutex_exit(&sv->sv_mutex);
-#ifdef	DEBUG
-	if (sv->sv_session_list.ll_count != 0) {
-		cmn_err(CE_NOTE, "shutdown leaked sessions");
-		debug_enter("shutdown leaked sessions");
-	}
-#endif
 
-	/*
-	 * Clean out any durable handles.  After this we should
-	 * have no ofiles remaining (and no more oplock breaks).
-	 */
-	smb2_dh_shutdown(sv);
+	time2 = ddi_get_lbolt();
+	if (time2 > time1) {
+		cmn_err(CE_NOTE, "!shutdown waited %d seconds"
+		    " for all sessions to finish",
+		    (int)TICK_TO_SEC(time2 - time0));
+	}
 
 	smb_kdoor_close(sv);
 #ifdef	_KERNEL
@@ -1512,6 +1520,7 @@ smb_server_shutdown(smb_server_t *sv)
 
 	smb_export_stop(sv);
 	smb_kshare_stop(sv);
+	smb_thread_stop(&sv->si_thread_timers);
 
 	/*
 	 * Both kshare and the oplock break sub-systems may have
@@ -1547,6 +1556,12 @@ smb_server_shutdown(smb_server_t *sv)
 		taskq_destroy(sv->sv_worker_pool);
 		sv->sv_worker_pool = NULL;
 	}
+
+	/*
+	 * Clean out any durable handles.  After this we should
+	 * have no ofiles remaining (and no more oplock breaks).
+	 */
+	smb2_dh_shutdown(sv);
 
 	smb_server_fsop_stop(sv);
 }
@@ -2611,20 +2626,6 @@ smb_server_destroy_session(smb_session_t *session)
 	smb_llist_flush(&session->s_tree_list);
 	smb_llist_flush(&session->s_user_list);
 
-	/*
-	 * The user and tree lists should be empty now.
-	 */
-#ifdef DEBUG
-	if (session->s_user_list.ll_count != 0) {
-		cmn_err(CE_WARN, "user list not empty?");
-		debug_enter("s_user_list");
-	}
-	if (session->s_tree_list.ll_count != 0) {
-		cmn_err(CE_WARN, "tree list not empty?");
-		debug_enter("s_tree_list");
-	}
-#endif
-
 	smb_llist_enter(ll, RW_WRITER);
 	smb_llist_remove(ll, session);
 	count = ll->ll_count;
@@ -2640,10 +2641,8 @@ smb_server_destroy_session(smb_session_t *session)
 	if (session->s_state == SMB_SESSION_STATE_SHUTDOWN) {
 		smb_session_delete(session);
 	} else {
-#ifdef	DEBUG
-		cmn_err(CE_NOTE, "Leaked session: 0x%p", (void *)session);
-		debug_enter("leaked session");
-#endif
+		cmn_err(CE_NOTE, "!Leaked session: 0x%p", (void *)session);
+		DTRACE_PROBE1(new__zombie, smb_session_t *, session);
 		smb_llist_enter(&smb_server_session_zombies, RW_WRITER);
 		smb_llist_insert_head(&smb_server_session_zombies, session);
 		smb_llist_exit(&smb_server_session_zombies);

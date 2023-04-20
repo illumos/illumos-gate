@@ -1652,6 +1652,7 @@ smb2_dh_cleanup(void *arg)
 void
 smb2_dh_shutdown(smb_server_t *sv)
 {
+	static const smb_oplock_grant_t og0 = { 0 };
 	smb_hash_t *hash;
 	smb_llist_t *bucket;
 	smb_ofile_t *of;
@@ -1675,7 +1676,18 @@ smb2_dh_shutdown(smb_server_t *sv)
 				of->f_refcnt++;
 				smb_llist_post(bucket, of, smb2_dh_cleanup);
 				break;
+
 			default:
+				/*
+				 * Should not be possible, but try to
+				 * make this zombie ofile harmless.
+				 */
+				cmn_err(CE_NOTE, "!dh_shutdown found "
+				    "of = %p with invalid state = %d",
+				    (void *)of, of->f_state);
+				DTRACE_PROBE1(bad_ofile, smb_ofile_t *, of);
+				ASSERT(0);
+				of->f_oplock = og0;
 				break;
 			}
 			mutex_exit(&of->f_mutex);
