@@ -344,7 +344,7 @@ static dladm_vnic_addr_type_t addr_types[] = {
 static const char *
 dladm_vnic_macaddrtype2str(vnic_mac_addr_type_t type)
 {
-	int i;
+	uint_t i;
 
 	for (i = 0; i < NADDR_TYPES; i++) {
 		if (type == addr_types[i].va_type)
@@ -356,7 +356,7 @@ dladm_vnic_macaddrtype2str(vnic_mac_addr_type_t type)
 dladm_status_t
 dladm_vnic_str2macaddrtype(const char *str, vnic_mac_addr_type_t *val)
 {
-	int i;
+	uint_t i;
 	dladm_vnic_addr_type_t *type;
 
 	for (i = 0; i < NADDR_TYPES; i++) {
@@ -415,7 +415,7 @@ dladm_vnic_create(dladm_handle_t handle, const char *vnic, datalink_id_t linkid,
 	dladm_status_t status;
 	boolean_t is_vlan;
 	boolean_t is_etherstub;
-	int i;
+	uint_t i;
 	boolean_t vnic_created = B_FALSE;
 	boolean_t conf_set = B_FALSE;
 

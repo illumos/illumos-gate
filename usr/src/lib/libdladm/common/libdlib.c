@@ -427,7 +427,7 @@ dladm_part_create(dladm_handle_t handle, datalink_id_t physlinkid,
     ib_pkey_t pkey, uint32_t flags, char *pname, datalink_id_t *partlinkid,
     dladm_arg_list_t *proplist)
 {
-	int			i;
+	uint_t			i;
 	dladm_status_t		status;
 	uint_t			media;
 	boolean_t		part_created = B_FALSE;

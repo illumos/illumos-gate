@@ -25,6 +25,7 @@
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/note.h>
@@ -221,8 +222,7 @@ static int
 ndi_devi_config_obp_args(dev_info_t *parent, char *devnm,
     dev_info_t **childp, int flags);
 static void i_link_vhci_node(dev_info_t *);
-static void ndi_devi_exit_and_wait(dev_info_t *dip,
-    int circular, clock_t end_time);
+static void ndi_devi_exit_and_wait(dev_info_t *dip, clock_t end_time);
 static int ndi_devi_unbind_driver(dev_info_t *dip);
 
 static int i_ddi_check_retire(dev_info_t *dip);
@@ -1928,67 +1928,116 @@ ndi_rele_driver(dev_info_t *dip)
 void
 ndi_devi_enter(dev_info_t *dip, int *circular)
 {
-	struct dev_info *devi = DEVI(dip);
+	struct dev_info *devi;
 	ASSERT(dip != NULL);
 
 	/* for vHCI, enforce (vHCI, pHCI) ndi_devi_enter() order */
 	ASSERT(!MDI_VHCI(dip) || (mdi_devi_pdip_entered(dip) == 0) ||
 	    DEVI_BUSY_OWNED(dip));
 
+	/*
+	 * This is ignored, but some callers assert on it having
+	 * a non-negative value.
+	 */
+	if (circular != NULL)
+		*circular = 0;
+
+	/*
+	 * If we're panicking, we are single-threaded and cannot
+	 * `mutex_enter`, so just return.
+	 */
+	if (panicstr != NULL)
+		return;
+
+	devi = DEVI(dip);
 	mutex_enter(&devi->devi_lock);
-	if (devi->devi_busy_thread == curthread) {
-		devi->devi_circular++;
-	} else {
-		while (DEVI_BUSY_CHANGING(devi) && !panicstr)
-			cv_wait(&(devi->devi_cv), &(devi->devi_lock));
-		if (panicstr) {
+	while (DEVI_BUSY_CHANGING(devi)) {
+		/*
+		 * If we are called when we are panicking, then we are
+		 * single-threaded, and would otherwise loop forever, so
+		 * we test for that here and early return if applicable.
+		 * Note that we also test for this in `ndi_devi_enter`;
+		 * regardless we must test again here in case we start
+		 * panicking while contended.
+		 */
+		if (panicstr != NULL) {
 			mutex_exit(&devi->devi_lock);
 			return;
 		}
-		devi->devi_flags |= DEVI_BUSY;
-		devi->devi_busy_thread = curthread;
+		if (devi->devi_busy_thread == curthread) {
+			devi->devi_circular++;
+			mutex_exit(&devi->devi_lock);
+			return;
+		}
+		cv_wait(&devi->devi_cv, &devi->devi_lock);
 	}
-	*circular = devi->devi_circular;
+	devi->devi_flags |= DEVI_BUSY;
+	devi->devi_busy_thread = curthread;
 	mutex_exit(&devi->devi_lock);
 }
 
 /*
  * Release ndi_devi_enter or successful ndi_devi_tryenter.
+ *
+ * Note that after we leave the critical section, if this is a pHCI exit we must
+ * broadcast to our vHCI, if one exists, as it may be blocked on a condvar in
+ * `ndi_devi_config_one`.
+ *
+ * It may seem odd that we do this after exiting the critical section, since we
+ * are no longer protected by the conditions surrounding it, but note that
+ * `ndi_devi_enter`/`ndi_devi_exit` and similar do not protect the `dip` itself.
+ * Rather, the `dip` is protected by a reference count that is maintained by
+ * calls to `ndi_hold_devi` and `ndi_rele_devi`.  If we're in this code path,
+ * there must necessarily be such a reference, so it is safe to access our `dip`
+ * any time here.
+ *
+ * Further, any pHCI or vHCI associated with this dip is effectively write-once
+ * at setup, and the pHCI maintains a reference count on the vHCI (indeed, the
+ * pHCI is what actually points to the vHCI), ensuring it lives at least as long
+ * as the pHCI.
+ *
+ * Finally, it is safe to access the pHCI outside of the critical section for
+ * the same reason we can access the dip: it is completely owned by the dip and
+ * only deallocated in the detach path, and we only get there when all
+ * references to the dip have been released.  Therefore, if we are in this code
+ * path, the pHCI and thus the vHCI, if they exist, are both necessarily valid.
  */
 void
-ndi_devi_exit(dev_info_t *dip, int circular)
+ndi_devi_exit(dev_info_t *dip, int circular __unused)
 {
-	struct dev_info	*devi = DEVI(dip);
-	struct dev_info	*vdevi;
+	struct dev_info	*devi, *vdevi;
+	boolean_t phci;
+
 	ASSERT(dip != NULL);
 
-	if (panicstr)
+	/*
+	 * If we're panicking, we are single threaded, so just return.
+	 */
+	if (panicstr != NULL)
 		return;
 
-	mutex_enter(&(devi->devi_lock));
-	if (circular != 0) {
+	devi = DEVI(dip);
+	mutex_enter(&devi->devi_lock);
+	ASSERT(DEVI_BUSY_OWNED(devi));
+	if (devi->devi_circular > 0) {
 		devi->devi_circular--;
-	} else {
-		devi->devi_flags &= ~DEVI_BUSY;
-		ASSERT(devi->devi_busy_thread == curthread);
-		devi->devi_busy_thread = NULL;
-		cv_broadcast(&(devi->devi_cv));
+		mutex_exit(&devi->devi_lock);
+		return;
 	}
-	mutex_exit(&(devi->devi_lock));
+	devi->devi_flags &= ~DEVI_BUSY;
+	devi->devi_busy_thread = NULL;
+	cv_broadcast(&devi->devi_cv);
+	mutex_exit(&devi->devi_lock);
 
-	/*
-	 * For pHCI exit we issue a broadcast to vHCI for ndi_devi_config_one()
-	 * doing cv_wait on vHCI.
-	 */
-	if (MDI_PHCI(dip)) {
+	if (MDI_PHCI(dip) != 0) {
 		vdevi = DEVI(mdi_devi_get_vdip(dip));
-		if (vdevi) {
-			mutex_enter(&(vdevi->devi_lock));
-			if (vdevi->devi_flags & DEVI_PHCI_SIGNALS_VHCI) {
+		if (vdevi != NULL) {
+			mutex_enter(&vdevi->devi_lock);
+			if ((vdevi->devi_flags & DEVI_PHCI_SIGNALS_VHCI) != 0) {
 				vdevi->devi_flags &= ~DEVI_PHCI_SIGNALS_VHCI;
-				cv_broadcast(&(vdevi->devi_cv));
+				cv_broadcast(&vdevi->devi_cv);
 			}
-			mutex_exit(&(vdevi->devi_lock));
+			mutex_exit(&vdevi->devi_lock);
 		}
 	}
 }
@@ -1998,30 +2047,35 @@ ndi_devi_exit(dev_info_t *dip, int circular)
  * possibility of missing broadcast before getting to cv_timedwait().
  */
 static void
-ndi_devi_exit_and_wait(dev_info_t *dip, int circular, clock_t end_time)
+ndi_devi_exit_and_wait(dev_info_t *dip, clock_t end_time)
 {
-	struct dev_info	*devi = DEVI(dip);
+	struct dev_info *devi;
+
 	ASSERT(dip != NULL);
 
+	/*
+	 * If we're panicking, we are single threaded, and cannot
+	 * call mutex_enter(), so just return.
+	 */
 	if (panicstr)
 		return;
 
+	/* like ndi_devi_exit with circular of zero */
+	devi = DEVI(dip);
+	mutex_enter(&devi->devi_lock);
 	/*
-	 * We are called to wait for of a new child, and new child can
+	 * We are called to wait for a new child, and new child can
 	 * only be added if circular is zero.
 	 */
-	ASSERT(circular == 0);
-
-	/* like ndi_devi_exit with circular of zero */
-	mutex_enter(&(devi->devi_lock));
+	ASSERT(devi->devi_circular == 0);
+	ASSERT(DEVI_BUSY_OWNED(devi));
 	devi->devi_flags &= ~DEVI_BUSY;
-	ASSERT(devi->devi_busy_thread == curthread);
 	devi->devi_busy_thread = NULL;
-	cv_broadcast(&(devi->devi_cv));
+	cv_broadcast(&devi->devi_cv);
 
 	/* now wait for new children while still holding devi_lock */
-	(void) cv_timedwait(&devi->devi_cv, &(devi->devi_lock), end_time);
-	mutex_exit(&(devi->devi_lock));
+	(void) cv_timedwait(&devi->devi_cv, &devi->devi_lock, end_time);
+	mutex_exit(&devi->devi_lock);
 }
 
 /*
@@ -2030,24 +2084,42 @@ ndi_devi_exit_and_wait(dev_info_t *dip, int circular, clock_t end_time)
 int
 ndi_devi_tryenter(dev_info_t *dip, int *circular)
 {
-	int rval = 1;		   /* assume we enter */
-	struct dev_info *devi = DEVI(dip);
+	int entered;
+	struct dev_info *devi;
+
 	ASSERT(dip != NULL);
 
+	/*
+	 * This value is unused, but some callers assert
+	 * on it having some non-negative value.
+	 */
+	if (circular != NULL)
+		*circular = 0;
+
+	/*
+	 * If we're panicking, we are single threaded, and cannot
+	 * call mutex_enter(), so just return.
+	 */
+	if (panicstr != NULL)
+		return (0);
+
+	devi = DEVI(dip);
 	mutex_enter(&devi->devi_lock);
-	if (devi->devi_busy_thread == (void *)curthread) {
+	entered = 1;
+	if (!DEVI_BUSY_CHANGING(devi)) {
+		/* The uncontended case. */
+		devi->devi_flags |= DEVI_BUSY;
+		devi->devi_busy_thread = curthread;
+	} else if (devi->devi_busy_thread == curthread) {
+		/* Nested entry on the same thread. */
 		devi->devi_circular++;
 	} else {
-		if (!DEVI_BUSY_CHANGING(devi)) {
-			devi->devi_flags |= DEVI_BUSY;
-			devi->devi_busy_thread = (void *)curthread;
-		} else {
-			rval = 0;	/* devi is busy */
-		}
+		/* We fail on the contended case. */
+		entered = 0;
 	}
-	*circular = devi->devi_circular;
 	mutex_exit(&devi->devi_lock);
-	return (rval);
+
+	return (entered);
 }
 
 /*
@@ -4300,7 +4372,7 @@ quiesce_devices(dev_info_t *dip, void *arg)
 {
 	/*
 	 * if we're reached here, the device tree better not be changing.
-	 * so either devinfo_freeze better be set or we better be panicing.
+	 * so either devinfo_freeze better be set or we better be panicking.
 	 */
 	ASSERT(devinfo_freeze || panicstr);
 
@@ -4359,7 +4431,7 @@ reset_leaves(void)
 {
 	/*
 	 * if we're reached here, the device tree better not be changing.
-	 * so either devinfo_freeze better be set or we better be panicing.
+	 * so either devinfo_freeze better be set or we better be panicking.
 	 */
 	ASSERT(devinfo_freeze || panicstr);
 
@@ -4383,7 +4455,7 @@ devtree_freeze(void)
 {
 	int delayed = 0;
 
-	/* if we're panicing then the device tree isn't going to be changing */
+	/* if we're panicking then the device tree isn't going to be changing */
 	if (panicstr)
 		return;
 
@@ -4391,7 +4463,7 @@ devtree_freeze(void)
 	devinfo_freeze = gethrtime();
 
 	/*
-	 * if we're not panicing and there are on-going attach or detach
+	 * if we're not panicking and there are on-going attach or detach
 	 * operations, wait for up to 3 seconds for them to finish.  This
 	 * is a randomly chosen interval but this should be ok because:
 	 * - 3 seconds is very small relative to the deadman timer.
@@ -5498,7 +5570,6 @@ devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **cdipp,
 	char		*drivername = NULL;
 	int		find_by_addr = 0;
 	char		*name, *addr;
-	int		v_circ, p_circ;
 	clock_t		end_time;	/* 60 sec */
 	int		probed;
 	dev_info_t	*cdip;
@@ -5549,14 +5620,14 @@ devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **cdipp,
 		 */
 		if (vdip) {
 			/* use mdi_devi_enter ordering */
-			ndi_devi_enter(vdip, &v_circ);
-			ndi_devi_enter(pdip, &p_circ);
+			ndi_devi_enter(vdip, NULL);
+			ndi_devi_enter(pdip, NULL);
 			cpip = mdi_pi_find(pdip, NULL, addr);
 			cdip = mdi_pi_get_client(cpip);
 			if (cdip)
 				break;
 		} else
-			ndi_devi_enter(pdip, &p_circ);
+			ndi_devi_enter(pdip, NULL);
 
 		/*
 		 * When not a  vHCI or not all pHCI devices are required to
@@ -5624,7 +5695,7 @@ again:			(void) i_ndi_make_spec_children(pdip, flags);
 			DEVI(vdip)->devi_flags |=
 			    DEVI_PHCI_SIGNALS_VHCI;
 			mutex_exit(&DEVI(vdip)->devi_lock);
-			ndi_devi_exit(pdip, p_circ);
+			ndi_devi_exit(pdip, 0);
 
 			/*
 			 * NB: There is a small race window from above
@@ -5633,9 +5704,9 @@ again:			(void) i_ndi_make_spec_children(pdip, flags);
 			 * not immediately finding a new pHCI child
 			 * of a pHCI that uses NDI_MDI_FAILBACK.
 			 */
-			ndi_devi_exit_and_wait(vdip, v_circ, end_time);
+			ndi_devi_exit_and_wait(vdip, end_time);
 		} else {
-			ndi_devi_exit_and_wait(pdip, p_circ, end_time);
+			ndi_devi_exit_and_wait(pdip, end_time);
 		}
 	}
 
@@ -5649,9 +5720,9 @@ again:			(void) i_ndi_make_spec_children(pdip, flags);
 		*cdipp = cdip;
 	}
 
-	ndi_devi_exit(pdip, p_circ);
+	ndi_devi_exit(pdip, 0);
 	if (vdip)
-		ndi_devi_exit(vdip, v_circ);
+		ndi_devi_exit(vdip, 0);
 	return (*cdipp ? NDI_SUCCESS : NDI_FAILURE);
 }
 

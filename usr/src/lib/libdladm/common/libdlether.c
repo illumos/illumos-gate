@@ -221,7 +221,7 @@ extern char *
 dladm_ether_spdx2str(char *buf, size_t buflen, dladm_ether_info_t *eattr,
     int ptype)
 {
-	int		i, j;
+	uint_t		i, j;
 	boolean_t	is_full, is_half;
 	int		speed;
 	char		speed_unit;
