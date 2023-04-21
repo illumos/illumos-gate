@@ -2233,6 +2233,8 @@ boolean_t ddi_taskq_suspended(ddi_taskq_t *tq);
  * <numeric> is maximal.
  */
 int ddi_parse(const char *, char *, uint_t *);
+/* Version with caller-specified destination buffer length. */
+int ddi_parse_dlen(const char *, char *, size_t, uint_t *);
 
 /*
  * DDI interrupt priority level

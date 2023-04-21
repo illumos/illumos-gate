@@ -42,9 +42,9 @@ typedef struct i_softmac_stat_info_s {
  * Must be the same order as mac_driver_stat.
  */
 static i_softmac_stat_info_t	i_softmac_driver_si[] = {
-	{ MAC_STAT_IFSPEED,	"ifspeed", 	"link_speed"	},
+	{ MAC_STAT_IFSPEED,	"ifspeed",	"link_speed"	},
 	{ MAC_STAT_MULTIRCV,	"multircv",	NULL		},
-	{ MAC_STAT_BRDCSTRCV,	"brdcstrcv", 	NULL		},
+	{ MAC_STAT_BRDCSTRCV,	"brdcstrcv",	NULL		},
 	{ MAC_STAT_MULTIXMT,	"multixmt",	NULL		},
 	{ MAC_STAT_BRDCSTXMT,	"brdcstxmt",	NULL		},
 	{ MAC_STAT_NORCVBUF,	"norcvbuf",	"rx_no_buf"	},
@@ -70,7 +70,7 @@ static i_softmac_stat_info_t	i_softmac_driver_si[] = {
 static i_softmac_stat_info_t	i_softmac_ether_si[] = {
 	{ ETHER_STAT_ALIGN_ERRORS,	"align_errors",
 	    "alignment_err" },
-	{ ETHER_STAT_FCS_ERRORS, 	"fcs_errors",		"crc_err" },
+	{ ETHER_STAT_FCS_ERRORS,	"fcs_errors",		"crc_err" },
 	{ ETHER_STAT_FIRST_COLLISIONS,	"first_collisions",	NULL },
 	{ ETHER_STAT_MULTI_COLLISIONS,	"multi_collisions",	NULL },
 	{ ETHER_STAT_SQE_ERRORS,	"sqe_errors",		NULL },
@@ -81,8 +81,8 @@ static i_softmac_stat_info_t	i_softmac_ether_si[] = {
 	    "excessive_collisions" },
 	{ ETHER_STAT_MACXMT_ERRORS,	"macxmt_errors",	NULL },
 	{ ETHER_STAT_CARRIER_ERRORS,	"carrier_errors",	NULL },
-	{ ETHER_STAT_TOOLONG_ERRORS,	"toolong_errors", 	"length_err" },
-	{ ETHER_STAT_MACRCV_ERRORS, 	"macrcv_errors",
+	{ ETHER_STAT_TOOLONG_ERRORS,	"toolong_errors",	"length_err" },
+	{ ETHER_STAT_MACRCV_ERRORS,	"macrcv_errors",
 	    "Rx Error Count" },
 
 	{ ETHER_STAT_XCVR_ADDR,		"xcvr_addr",		NULL },
@@ -106,8 +106,8 @@ static i_softmac_stat_info_t	i_softmac_ether_si[] = {
 	{ ETHER_STAT_ADV_CAP_10FDX,	"adv_cap_10fdx",	NULL },
 	{ ETHER_STAT_ADV_CAP_10HDX,	"adv_cap_10hdx",	NULL },
 	{ ETHER_STAT_ADV_CAP_ASMPAUSE,	"adv_cap_asmpause",	NULL },
-	{ ETHER_STAT_ADV_CAP_PAUSE,	"adv_cap_pause", 	NULL },
-	{ ETHER_STAT_ADV_CAP_AUTONEG,	"adv_cap_autoneg", 	NULL },
+	{ ETHER_STAT_ADV_CAP_PAUSE,	"adv_cap_pause",	NULL },
+	{ ETHER_STAT_ADV_CAP_AUTONEG,	"adv_cap_autoneg",	NULL },
 
 	{ ETHER_STAT_LP_CAP_1000FDX,	"lp_cap_1000fdx",	NULL },
 	{ ETHER_STAT_LP_CAP_1000HDX,	"lp_cap_1000hdx",	NULL },
@@ -121,7 +121,7 @@ static i_softmac_stat_info_t	i_softmac_ether_si[] = {
 
 	{ ETHER_STAT_LINK_ASMPAUSE,	"link_asmpause",	NULL },
 	{ ETHER_STAT_LINK_PAUSE,	"link_pause",		NULL },
-	{ ETHER_STAT_LINK_AUTONEG,	"link_autoneg", 	NULL },
+	{ ETHER_STAT_LINK_AUTONEG,	"link_autoneg",		NULL },
 	{ ETHER_STAT_LINK_DUPLEX,	"link_duplex",		"duplex" },
 
 	{ ETHER_STAT_TOOSHORT_ERRORS,	"runt_errors",		NULL },
@@ -177,8 +177,10 @@ softmac_hold_dev_kstat(softmac_t *softmac)
 	uint_t		ppa;
 	kstat_t		*ksp;
 
-	if (ddi_parse(softmac->smac_devname, drv, &ppa) != DDI_SUCCESS)
+	if (ddi_parse_dlen(softmac->smac_devname, drv, MAXLINKNAMELEN, &ppa) !=
+	    DDI_SUCCESS) {
 		return (NULL);
+	}
 
 	/*
 	 * Find the kstat by the module name and the instance number.
