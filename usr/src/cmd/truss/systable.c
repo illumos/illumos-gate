@@ -681,6 +681,7 @@ const	struct systable ctxtable[] = {
 {"setcontext",	2, DEC, NOV, HID, HEX},				/* 1 */
 {"getustack",	2, DEC, NOV, HID, HEX},				/* 2 */
 {"setustack",	2, DEC, NOV, HID, HEX},				/* 3 */
+{"getcontext_extd", 2, DEC, NOV, HID, HEX},			/* 4 */
 };
 #define	NCTXCODE	(sizeof (ctxtable) / sizeof (struct systable))
 

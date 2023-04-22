@@ -31,6 +31,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * Establish the default settings for the floating-point state for a C language
  * program:
  *	rounding mode		-- round to nearest default by OS,
@@ -48,12 +52,15 @@
 #include	<sys/types.h>
 #include	<sys/sysi86.h>	/* for SI86FPHW/SI86FPSTART definitions */
 #include	<sys/fp.h>	/* for FPU_CW_INIT and SSE_MXCSR_INIT */
+#include	<upanic.h>
 
 extern int	__fltrounds();
 
 int	_fp_hw;			/* default: bss: 0 == no hardware */
 int	_sse_hw;		/* default: bss: 0 == no sse */
 int	__flt_rounds;		/* ANSI rounding mode */
+
+#define	UPANIC_MSG	"32-bit FPU init failed!"
 
 void
 __fpstart()
@@ -64,14 +71,14 @@ __fpstart()
 	 */
 	if ((_sse_hw = sysi86(SI86FPSTART,
 	    &_fp_hw, FPU_CW_INIT, SSE_MXCSR_INIT)) == -1) {
-		extern void _putcw();
-
 		/*
-		 * (fallback to old syscall on old kernels)
+		 * Because the system only supports a 64-bit kernel, the above
+		 * should always work (we assume it does in 64-bit libc). If it
+		 * should fail, we upanic. Note, because the FPU state is
+		 * unknown, we use a static message below and don't rely upon
+		 * strlen(), but rather compile time lengths.
 		 */
-		_sse_hw = 0;
-		(void) sysi86(SI86FPHW, &_fp_hw);
-		_putcw(0x133f);
+		upanic(UPANIC_MSG, sizeof (UPANIC_MSG));
 	}
 
 	/*

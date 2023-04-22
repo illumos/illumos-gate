@@ -25,7 +25,11 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
+
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
 
 #pragma weak _makecontext = makecontext
 
@@ -33,6 +37,9 @@
 #include <stdarg.h>
 #include <ucontext.h>
 #include <sys/stack.h>
+#include <sys/auxv.h>
+#include <errno.h>
+#include "libc.h"
 
 /*
  * The ucontext_t that the user passes in must have been primed with a
@@ -119,4 +126,73 @@ resumecontext(void)
 
 	(void) getcontext(&uc);
 	(void) setcontext(uc.uc_link);
+}
+
+/*
+ * This is the ISA-specific allocation logic for allocating and setting up an
+ * extended ucontext_t. In particular, we need to allocate and add space for the
+ * UC_XSAVE member if we have the appropriate hardware support.  The i386 /
+ * amd64 versions could be consolidated in a single x86 impl, but we don't have
+ * that yet.
+ */
+ucontext_t *
+ucontext_alloc(uint32_t flags)
+{
+	boolean_t do_xsave = B_FALSE;
+	size_t to_alloc = sizeof (ucontext_t);
+	ucontext_t *ucp;
+
+	if (flags != 0) {
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	/*
+	 * The AT_SUN_FPTYPE value is used as an approximation for the size of
+	 * the uc_xsave structure that we need additional space for. Ideally we
+	 * should ask the kernel how much space we actually need and only
+	 * allocate that much. Because the uc_xsave member does not need to
+	 * include the 512-byte XMM structure or the full xsave header, this
+	 * will work in the interim.
+	 *
+	 * Currently the system doesn't support dynamically enabling FPU
+	 * features with the Intel xfd (extended feature disable) MSR. When we
+	 * have support for that we'll need to redo this and ask the kernel for
+	 * the right size. We will probably want to cache the size for rtld as
+	 * well. For more information see uts/intel/os/fpu.c's big theory
+	 * statement.
+	 */
+	switch (___getauxval(AT_SUN_FPTYPE)) {
+	case AT_386_FPINFO_XSAVE:
+	case AT_386_FPINFO_XSAVE_AMD:
+		do_xsave = B_TRUE;
+		to_alloc += ___getauxval(AT_SUN_FPSIZE);
+		break;
+	default:
+		break;
+	}
+
+	ucp = calloc(1, to_alloc);
+	if (ucp == NULL) {
+		return (NULL);
+	}
+
+	if (do_xsave) {
+		/*
+		 * Right now we're not really concerned with alignment of the
+		 * uc_xsave member. This structure it points to is no defined
+		 * for application access and the kernel doesn't care. This will
+		 * give us something that is fairly reasonable though.
+		 */
+		uintptr_t addr = (uintptr_t)ucp;
+		ucp->uc_xsave = addr + sizeof (ucontext_t);
+	}
+
+	return (ucp);
+}
+
+void
+ucontext_free(ucontext_t *ucp)
+{
+	free(ucp);
 }

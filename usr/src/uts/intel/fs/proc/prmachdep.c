@@ -25,7 +25,11 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
+
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -47,6 +51,7 @@
 #include <sys/signal.h>
 #include <sys/user.h>
 #include <sys/cpuvar.h>
+#include <sys/stdalign.h>
 
 #include <sys/fault.h>
 #include <sys/syscall.h>
@@ -236,43 +241,200 @@ prsetprfpregs32(klwp_t *lwp, prfpregset32_t *pfp)
 #endif	/* _SYSCALL32_IMPL */
 
 /*
- * Does the system support extra register state?
+ * This is a general function that the main part of /proc and the rest of the
+ * system uses to ask does a given process actually have extended state. Right
+ * now, this question is not process-specific, but rather CPU specific. We look
+ * at whether xsave has been enabled to determine that. While strictly speaking
+ * one could make the argument that all amd64 CPUs support fxsave and we could
+ * emulate something that only supports that, we don't think that makes sense.
  */
-/* ARGSUSED */
 int
 prhasx(proc_t *p)
 {
-	return (0);
+	return (fpu_xsave_enabled());
 }
 
 /*
- * Get the size of the extra registers.
+ * Return the minimum size that we need to determine the full size of a
+ * prxregset_t.
  */
-/* ARGSUSED */
-int
+boolean_t
+prwriteminxreg(size_t *sizep)
+{
+	*sizep = sizeof (prxregset_hdr_t);
+	return (B_TRUE);
+}
+
+/*
+ * This routine services both ILP32 and LP64 callers. We cannot assume anything
+ * about the alignment of argp and must bcopy things to known structures that we
+ * care about. We are guaranteed to have prxregset_hdr_t bytes because we asked
+ * for them above.
+ */
+boolean_t
+prwritesizexreg(const void *argp, size_t *sizep)
+{
+	prxregset_hdr_t hdr;
+
+	/*
+	 * While it's tempting to validate everything here, the only thing we
+	 * care about is that we understand the type and the size meets our
+	 * constraints:
+	 *
+	 *  o We actually have an item of type PR_TYPE_XSAVE, otherwise we
+	 *    don't know what this is.
+	 *  o The indicated size actually contains at least the
+	 *    prxregset_hdr_t.
+	 *  o The indicated size isn't larger than what the FPU tells us is
+	 *    allowed.
+	 *
+	 * We do not check if the reset of the structure makes semantic sense at
+	 * this point. We save all other validation for the normal set function
+	 * as that's when we'll have the rest of our data.
+	 */
+	bcopy(argp, &hdr, sizeof (hdr));
+	if (hdr.pr_type != PR_TYPE_XSAVE ||
+	    hdr.pr_size > fpu_proc_xregs_max_size() ||
+	    hdr.pr_size < sizeof (prxregset_hdr_t)) {
+		return (B_FALSE);
+	}
+
+	*sizep = hdr.pr_size - sizeof (prxregset_hdr_t);
+	return (B_TRUE);
+}
+
+/*
+ * Get the size of the extra registers. The ultimate size here depends on a
+ * combination of a few different things. Right now the xregs always have our
+ * header, the illumos-specific XCR information, the xsave information, and then
+ * otherwise this varies based on the items that the CPU supports.
+ *
+ * The ultimate size here is going to be:
+ *
+ *  o 1x prxregset_hdr_t
+ *  o n  prxregset_info_t structures
+ *  o The individual data for each one
+ */
+size_t
 prgetprxregsize(proc_t *p)
 {
-	return (0);
+	uint32_t size;
+
+	fpu_proc_xregs_info(p, NULL, &size, NULL);
+	return (size);
 }
 
 /*
  * Get extra registers.
  */
-/*ARGSUSED*/
 void
-prgetprxregs(klwp_t *lwp, caddr_t prx)
+prgetprxregs(klwp_t *lwp, prxregset_t *prx)
 {
-	/* no extra registers */
+	fpu_proc_xregs_get(lwp, prx);
 }
 
 /*
  * Set extra registers.
+ *
+ * We've been given a regset to set. Before we hand it off to the FPU, we have
+ * to go through and make sure that the different parts of this actually make
+ * sense. The kernel has guaranteed us through the functions above that we have
+ * the number of bytes that the header indicates are present. In particular we
+ * need to validate:
+ *
+ *   o The information in the header is reasonable: we have a known type, flags
+ *     and padding are zero, and there is at least one info structure.
+ *   o Each of the info structures has a valid type, size, and fits within the
+ *     data we were given.
+ *   o We do not validate or modify the actual data in the different pieces for
+ *     validity. That is considered something that the FPU does. Similarly if
+ *     something is read-only or not used, that is something that it checks.
+ *
+ * While we would like to return something other than EINVAL, the /proc APIs
+ * pretty much lead that to being the primary errno for all sorts of situations.
  */
-/*ARGSUSED*/
-void
-prsetprxregs(klwp_t *lwp, caddr_t prx)
+int
+prsetprxregs(klwp_t *lwp, prxregset_t *prx)
 {
-	/* no extra registers */
+	size_t infosz;
+	prxregset_hdr_t *hdr = (prxregset_hdr_t *)prx;
+
+	if (hdr->pr_type != PR_TYPE_XSAVE || hdr->pr_flags != 0 ||
+	    hdr->pr_pad[0] != 0 || hdr->pr_pad[1] != 0 || hdr->pr_pad[2] != 0 ||
+	    hdr->pr_pad[3] != 0 || hdr->pr_ninfo == 0) {
+		return (EINVAL);
+	}
+
+	infosz = hdr->pr_ninfo * sizeof (prxregset_info_t) +
+	    sizeof (prxregset_hdr_t);
+	if (infosz > hdr->pr_size) {
+		return (EINVAL);
+	}
+
+	for (uint32_t i = 0; i < hdr->pr_ninfo; i++) {
+		uint32_t exp_size;
+		size_t need_len, exp_align;
+		const prxregset_info_t *info = &hdr->pr_info[i];
+
+		switch (info->pri_type) {
+		case PRX_INFO_XCR:
+			exp_size = sizeof (prxregset_xcr_t);
+			exp_align = alignof (prxregset_xcr_t);
+			break;
+		case PRX_INFO_XSAVE:
+			exp_size = sizeof (prxregset_xsave_t);
+			exp_align = alignof (prxregset_xsave_t);
+			break;
+		case PRX_INFO_YMM:
+			exp_size = sizeof (prxregset_ymm_t);
+			exp_align = alignof (prxregset_ymm_t);
+			break;
+		case PRX_INFO_OPMASK:
+			exp_size = sizeof (prxregset_opmask_t);
+			exp_align = alignof (prxregset_opmask_t);
+			break;
+		case PRX_INFO_ZMM:
+			exp_size = sizeof (prxregset_zmm_t);
+			exp_align = alignof (prxregset_zmm_t);
+			break;
+		case PRX_INFO_HI_ZMM:
+			exp_size = sizeof (prxregset_hi_zmm_t);
+			exp_align = alignof (prxregset_hi_zmm_t);
+			break;
+		default:
+			return (EINVAL);
+		}
+
+		if (info->pri_flags != 0 || info->pri_size != exp_size) {
+			return (EINVAL);
+		}
+
+		if ((info->pri_offset % exp_align) != 0) {
+			return (EINVAL);
+		}
+
+		/*
+		 * No bytes of this item's entry should overlap with the
+		 * information area. If users want to overlap the actual data
+		 * information for some odd reason, we don't check that and let
+		 * them do what they want. However, the total data for this
+		 * region must actually fit. Because exp_size and pri_offset are
+		 * uint32_t's, we can sum them without overflow worries in an
+		 * LP64 environment.
+		 *
+		 * While we try to grantee alignment when writing this structure
+		 * out to userland, that is in no way a requirement and users
+		 * are allowed to start these structures wherever they want.
+		 * Hence that is not checked here.
+		 */
+		need_len = (size_t)exp_size + (size_t)info->pri_offset;
+		if (info->pri_offset < infosz ||
+		    need_len > (size_t)hdr->pr_size) {
+			return (EINVAL);
+		}
+	}
+
+	return (fpu_proc_xregs_set(lwp, prx));
 }
 
 /*

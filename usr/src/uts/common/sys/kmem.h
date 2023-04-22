@@ -63,6 +63,7 @@ extern void *kmem_alloc_tryhard(size_t size, size_t *alloc_size, int kmflags);
 extern void kmem_dump_init(size_t);
 extern void kmem_dump_begin(void);
 extern size_t kmem_dump_finish(char *buf, size_t size);
+extern void *kmem_rezalloc(void *, size_t, size_t, int);
 
 #endif	/* _KERNEL */
 

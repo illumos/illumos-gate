@@ -205,7 +205,7 @@ struct proc;
 struct prpriv;
 struct cred;
 
-extern int priv_prgetprivsize(struct prpriv *);
+extern int priv_prgetprivsize(const struct prpriv *);
 extern void cred2prpriv(const struct cred *, struct prpriv *);
 extern int priv_pr_spriv(struct proc *, struct prpriv *, const struct cred *);
 

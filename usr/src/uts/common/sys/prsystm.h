@@ -56,6 +56,7 @@ struct prcred;
 struct prpriv;
 struct prsecflags;
 struct prfdinfo;
+struct prxregset;
 
 struct seg;
 struct regs;
@@ -77,8 +78,8 @@ extern void prgetlwpstatus(kthread_t *, struct lwpstatus *, zone_t *);
 extern void prgetpsinfo(proc_t *, struct psinfo *);
 extern void prgetlwpsinfo(kthread_t *, struct lwpsinfo *);
 extern void prgetprfpregs(klwp_t *, struct prfpregset *);
-extern void prgetprxregs(klwp_t *, caddr_t);
-extern int  prgetprxregsize(proc_t *);
+extern void prgetprxregs(klwp_t *, struct prxregset *);
+extern size_t prgetprxregsize(proc_t *);
 extern void prgetcred(proc_t *, struct prcred *);
 extern void prgetpriv(proc_t *, struct prpriv *);
 extern size_t prgetprivsize(void);

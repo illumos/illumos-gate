@@ -230,6 +230,7 @@ extern int _getcontext(ucontext_t *) __RETURNS_TWICE;
  * defined in ucontext.s
  */
 extern int __getcontext(ucontext_t *);
+extern int __getcontext_extd(ucontext_t *);
 
 /*
  * defined in door.s
@@ -345,6 +346,12 @@ extern size_t mbrtowc_nz_l(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
     size_t, mbstate_t *_RESTRICT_KYWD, locale_t);
 extern size_t mbrtowc_nz(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
     size_t, mbstate_t *_RESTRICT_KYWD);
+
+/*
+ * defined in getauxv.c.
+ */
+extern long ___getauxval(int);
+extern void *___getauxptr(int);
 
 #ifdef	__cplusplus
 }

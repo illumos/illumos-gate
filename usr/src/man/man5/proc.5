@@ -2,6 +2,7 @@
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2019, Joyent, Inc.
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2023 Oxide computer Company
 .\"
 .\" The contents of this file are subject to the terms of the
 .\" Common Development and Distribution License (the "License").
@@ -1896,6 +1897,304 @@ active template.
 It is not possible to activate an active template descriptor.
 See
 .Xr contract 5 .
+.Sh ARCHITECTURE-SPECIFIC STRUCTURES
+.Ss x86
+While the x86
+.Vt prxregset_t
+structure is opaque to consumers, it is made up of several different
+components due to the fact that different x86 processors enumerate
+different architectural extensions.
+.Pp
+The structure begins with a header, the
+.Vt prxregset_hdr_t ,
+which is followed by a number of different information sections which
+describe different possible extended registers.
+Each of those is covered by a
+.Vt prxregset_info_t ,
+and then finally there are different data payloads that represent each
+extended register.
+.Pp
+The number of different informational entries varies from system to
+system based on the set of architectural features that the system
+supports and the corresponding OS enablement for them.
+This structure is built around the idea of the x86
+.Sy xsave
+structure.
+That is, there is a central header which describes a bit-vector of what
+extended features are present and have valid state.
+.Pp
+Each x86 xregs file begins with the
+.Vt prxregset_hdr_t
+which looks like:
+.Bd -literal -offset 2
+typedef struct prxregset_hdr {
+	uint32_t	pr_type;
+	uint32_t	pr_size;
+	uint32_t	pr_flags;
+	uint32_t	pr_pad[4];
+	uint32_t	pr_ninfo;
+	prxregset_info_t pr_info[];
+} prxregset_hdr_t;
+.Ed
+.Pp
+The
+.Fa pr_type
+member is always set to
+.Dv PR_TYPE_XSAVE .
+This is used to indicate the type of file that is present.
+There may be different file types in the future on x86 so this value
+should always be checked.
+If it is not
+.Dv PR_TYPE_XSAVE
+then the rest of the structure may look different.
+The
+.Fa pr_size
+member indicates the size in bytes of the overall structure.
+The
+.Fa pr_flags
+and
+.Fa pr_pad
+values are currently reserved for future use.
+They will be set to zero right now when read and must be set to zero when
+writing the data.
+The
+.Fa pr_ninfo
+member indicates the number of informational items are present in
+.Fa pr_info.
+There will be one informational item for each register set that exists.
+.Pp
+The
+.Fa pr_info
+member points to an array of informational members.
+These immediately follow the structure, though the
+.Fa pr_info
+member may not be available directly if not in an environment compatible with
+some C99 features.
+Each
+.Vt prxregset_info_t
+structure looks like:
+.Bd -literal -offset 2
+typedef struct prxregset_info {
+	uint32_t pri_type;
+	uint32_t pri_flags;
+	uint32_t pri_size;
+	uint32_t pri_offset;
+} prxregset_info_t;
+.Ed
+.Pp
+The
+.Fa pri_type
+member is used to indicate the type of data and its format that this represents.
+Types are listed below.
+The
+.Fa pri_flags
+member is used to indicate future extensions or information about these items.
+Right now, these are all zero.
+The
+.Fa pri_size
+member indicates the size in bytes of the type's data.
+The
+.Fa pri_offset
+member indicates the offset to the start of the data section from the beginning
+of the xregs file.
+That is an offset of 0 would be the first byte of the
+.Vt prxregset_hdr_t .
+.Pp
+The following types of structures and their corresponding data structures are
+currently defined:
+.Bl -tag -width Ds
+.It Dv PRX_INFO_XCR - Vt prxregset_xcr_t
+This structure provides read-only access to understanding the CPU's settings for
+this thread.
+In particular, it lets you see what is set in the x86 %xcr0 register which is
+the extended feature control register and controls what extended features the
+CPU actually uses.
+It also contains the x86 extended feature disable MSR which controls features
+that are ignored.
+The
+.Vt prxregset_xcr_t
+looks like:
+.Bd -literal -offset -indent
+typedef struct prxregset_xcr {
+	uint64_t	prx_xcr_xcr0;
+	uint64_t	prx_xcr_xfd;
+	uint64_t	prx_xcr_pad[2];
+} prxregset_xcr_t;
+.Ed
+.Pp
+When setting the xregs, this entry can be left out.
+If it is included, it must match the existing entries, otherwise an error will
+be generated.
+.It Dv PRX_INFO_XSAVE - Vt prxregset_xsave_t
+This structure represents the same as the actual Intel xsave structure, which
+has both the traditional XMM state that comes from the fxsave instruction and
+then also contains the xsave header itself.
+The structure varies between 32-bit and 64-bit applications.
+The structure itself looks like:
+.Bd -literal
+typedef struct prxregset_xsave {
+	uint16_t	prx_fx_fcw;
+	uint16_t	prx_fx_fsw;
+	uint16_t	prx_fx_fctw;	/* compressed tag word */
+	uint16_t	prx_fx_fop;
+#if defined(__amd64)
+	uint64_t	prx_fx_rip;
+	uint64_t	prx_fx_rdp;
+#else
+	uint32_t	prx_fx_eip;
+	uint16_t	prx_fx_cs;
+	uint16_t	__prx_fx_ign0;
+	uint32_t	prx_fx_dp;
+	uint16_t	prx_fx_ds;
+	uint16_t	__prx_fx_ign1;
+#endif
+	uint32_t	prx_fx_mxcsr;
+	uint32_t	prx_fx_mxcsr_mask;
+	union {
+		uint16_t prx_fpr_16[5];	/* 80-bits of x87 state */
+		u_longlong_t prx_fpr_mmx;	/* 64-bit mmx register */
+		uint32_t _prx__fpr_pad[4];	/* (pad out to 128-bits) */
+	} fx_st[8];
+#if defined(__amd64)
+	upad128_t	prx_fx_xmm[16];	/* 128-bit registers */
+	upad128_t	__prx_fx_ign2[6];
+#else
+	upad128_t	prx_fx_xmm[8];	/* 128-bit registers */
+	upad128_t	__prx_fx_ign2[14];
+#endif
+	uint64_t	prx_xsh_xstate_bv;
+	uint64_t	prx_xsh_xcomp_bv;
+	uint64_t	prx_xsh_reserved[6];
+} prxregset_xsave_t;
+.Ed
+.Pp
+In the classical fxsave portion of the structure, most of the members follow the
+same meaning and match their presence in the fpregs file and their use as
+discussed in the Intel and AMD software developer manuals.
+The one exception is that when setting the
+.Fa prx_fx_mxcsr
+member reserved bits that are set will be masked off and ignored.
+.Pp
+The most notable fields to consider here right now are the last few members
+which are part of the xsave header itself.
+In particular, the
+.Fa prx_xsh_xstate_bv
+component is used to track the actual features whose content are valid.
+When reading the registers, if a given entry is not valid, the register state
+will write out the informational entry in its default state.
+When setting the extended registers, this notes which features will be loaded
+from their default state
+.Pq as defined by Intel and AMD's manuals
+and which will be loaded from the informational entries.
+If a bit is set in the
+.Fa prx_xsh_xstate_bv
+entry, then it must be present as its own informational entry otherwise a write
+will fail.
+If an informational entry is present in a write, but not set in the
+.Fa prx_xsh_xstate_bv
+then its contents will be ignored.
+.Pp
+The xregs format currently does not support any compressed items being specified
+nor does it specify any, so the
+.Fa prx_xsh_xcomp_bv
+member will be always set to zero and it and the reserved members
+.Fa prx_xsh_reserved
+must all be left as zero.
+.It Dv PRX_INFO_YMM - Vt prxregset_ymm_t
+This structure contains the upper 128-bits of the first 16 %ymm registers
+.Pq 8 for 32-bit applications .
+To construct a full vector register, it must be combined with the
+.Fa prx_fx_xmm
+member of the
+.Dv PRX_INFO_XSAVE
+data.
+In 32-bit applications, the reserved registers must be written as zero.
+The structure itself looks like:
+.Bd -literal -offset 2
+typedef struct prxregset_ymm {
+#if defined(__amd64)
+	upad128_t	prx_ymm[16];
+#else
+	upad128_t	prx_ymm[8];
+	upad128_t	prx_rsvd[8];
+#endif
+} prxregset_ymm_t;
+.Ed
+.It Dv PRX_INFO_OPMASK - Vt prxregset_opmask_t
+This structure represents one portion of Intel's AVX-512 state: the 8 64-bit
+mask registers, %k0 through %k7.
+The structure looks like:
+.Bd -literal -offset 2
+typedef struct prxregset_opmask {
+	uint64_t	prx_opmask[8];
+} prxregset_opmask_t;
+.Ed
+.It Dv PRX_INFO_ZMM - Vt prxregset_zmm_t
+This structure represents one portion of Intel's AVX-512 state: the upper
+256 bits of the 512-bit %zmm0 through %zmm15 registers.
+Bits 0-127 are found in the
+.Fa prx_fx_xmm
+member of the
+.Dv PRX_INFO_XSAVE
+data and bits 128-255 are found in the
+.Fa prx_ymm
+member of the
+.Dv PRX_INFO_YMM .
+32-bit applications only have access to %zmm0 through %zmm7.
+This structure looks like:
+.Bd -literal -offset 2
+typedef struct prxregset_zmm {
+#if defined(__amd64)
+	upad256_t	prx_zmm[16];
+#else
+	upad256_t	prx_zmm[8];
+	upad256_t	prx_rsvd[8];
+#endif
+} prxregset_zmm_t;
+.Ed
+.It Dv PRX_INFO_HI_ZMM - Vt prxregset_hi_zmm_t
+This structure represents the third portion of Intel's AVX-512 state: the
+additional 16 512-bit registers that are available to 64-bit applications, but
+not 32-bit applications.
+This represents %zmm16 through %zmm31.
+This structure looks like:
+.Bd -literal -offset indent
+typedef struct prxregset_hi_zmm {
+#if defined(__amd64)
+	upad512_t	prx_hi_zmm[16];
+#else
+	upad512_t	prx_rsvd[16];
+#endif
+} prxregset_hi_zmm_t;
+.Pp
+Unlike the other lower %zmm registers of %zmm0 through %zmm15, this contains the
+entire 512-bit register in one spot and there is no need to look at other
+information items to reconstitute the entire vector.
+.Ed
+.Pp
+When setting the extended registers, at least the
+.Dv PRX_INFO_XSAVE
+component must be present.
+None of the component offsets may overlap with the
+.Vt prxregset_hdr_t
+or any of the
+.Vt prxregset_info_t
+structures.
+When constructing the overall payload, it is expected that the various
+structures start with their naturally expected alignment, which is most
+often 16 bytes
+.Po
+that is the value that the C
+.Fn alignof
+keyword will return
+.Pc .
+The structures that we use are all multiples of 16 bytes to make this easier.
+Note, when reading the x86 xregs file, the kernel will write out these
+structures with increased alignment beyond the natural alignment of the
+structure.
+The kernel does this so that the structure's data may be more easily used
+directly by x86 instructions that require alignment such as vmovdqu64.
+.El
 .Sh CONTROL MESSAGES
 Process state changes are effected through messages written to a process's
 .Sy ctl
@@ -1938,7 +2237,7 @@ directs the specific lwp to stop and waits until it has stopped,
 .Sy PCDSTOP
 directs the specific lwp to stop without waiting for it to stop, and
 .Sy PCWSTOP
- simply waits for the specific lwp to stop.
+simply waits for the specific lwp to stop.
 When applied to an lwp control file,
 .Sy PCSTOP
 and
@@ -1973,7 +2272,7 @@ stop or a stop that has been specified in the process's tracing flags (set by
 and
 .Sy PCSEXIT ) .
 .Sy PR_JOBCONTROL
- and
+and
 .Sy PR_SUSPENDED
 stops are specifically not events of interest.
 (An lwp may stop twice due to a stop signal, first showing
@@ -2587,7 +2886,8 @@ to the architecture-dependent operand
 structure.
 An error
 .Pq Er EINVAL
-is returned if the system does not support extra state registers.
+is returned if the system does not support extra state registers or the register
+state is invalid.
 .Sy PCSXREG
 fails with
 .Er EBUSY

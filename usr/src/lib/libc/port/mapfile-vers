@@ -78,6 +78,14 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.41 {
+    protected:
+	getcontext_extd;
+	swapcontext_extd;
+	ucontext_alloc;
+	ucontext_free;
+} ILLUMOS_0.40;
+
 SYMBOL_VERSION ILLUMOS_0.40 {
     protected:
 	errc;

@@ -31,6 +31,7 @@ SRCS =	kvm_amd64dep.c \
 	mdb_ia32util.c \
 	mdb_x86util.c \
 	mdb_bhyve.c \
+	proc_x86util.c \
 	proc_amd64dep.c
 
 %.o: %.c

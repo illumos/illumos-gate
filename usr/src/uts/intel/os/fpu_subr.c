@@ -62,17 +62,6 @@ int fpu_exists = 1;
 int fp_kind = FP_387;
 
 /*
- * The kind of FPU we advertise to rtld so it knows what to do on context
- * switch.
- */
-int fp_elf = AT_386_FPINFO_FXSAVE;
-
-/*
- * Mechanism to save FPU state.
- */
-int fp_save_mech = FP_FXSAVE;
-
-/*
  * The variable fpu_ignored is provided to allow other code to
  * determine whether emulation is being done because there is
  * no FPU or because of an override requested via /etc/system.
@@ -227,24 +216,4 @@ nofpu:
 	DISABLE_SSE();
 	fp_kind = FP_NO;
 	fpu_exists = 0;
-}
-
-/*
- * Fill in FPU information that is required by exec.
- */
-void
-fpu_auxv_info(int *typep, size_t *lenp)
-{
-	*typep = fp_elf;
-	switch (fp_save_mech) {
-	case FP_FXSAVE:
-		*lenp = sizeof (struct fxsave_state);
-		break;
-	case FP_XSAVE:
-		*lenp = cpuid_get_xsave_size();
-		break;
-	default:
-		*lenp = 0;
-		break;
-	}
 }

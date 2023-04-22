@@ -28,7 +28,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -3155,7 +3155,7 @@ Pcontent(struct ps_prochandle *P)
  * or it will point to an empty slot for a new struct ps_lwphandle.
  */
 static struct ps_lwphandle **
-Lfind(struct ps_prochandle *P, lwpid_t lwpid)
+Lfind_slot(struct ps_prochandle *P, lwpid_t lwpid)
 {
 	struct ps_lwphandle **Lp;
 	struct ps_lwphandle *L;
@@ -3165,6 +3165,20 @@ Lfind(struct ps_prochandle *P, lwpid_t lwpid)
 		if (L->lwp_id == lwpid)
 			break;
 	return (Lp);
+}
+
+/*
+ * A wrapper around Lfind_slot() that is suitable for the rest of the internal
+ * consumers who don't care about a slot, merely existence.
+ */
+struct ps_lwphandle *
+Lfind(struct ps_prochandle *P, lwpid_t lwpid)
+{
+	if (P->hashtab == NULL) {
+		return (NULL);
+	}
+
+	return (*Lfind_slot(P, lwpid));
 }
 
 /*
@@ -3190,7 +3204,7 @@ Lgrab(struct ps_prochandle *P, lwpid_t lwpid, int *perr)
 	    (P->hashtab = calloc(HASHSIZE, sizeof (struct ps_lwphandle *)))
 	    == NULL)
 		rc = G_STRANGE;
-	else if (*(Lp = Lfind(P, lwpid)) != NULL)
+	else if (*(Lp = Lfind_slot(P, lwpid)) != NULL)
 		rc = G_BUSY;
 	else if ((L = malloc(sizeof (struct ps_lwphandle))) == NULL)
 		rc = G_STRANGE;
@@ -3332,7 +3346,7 @@ Lfree(struct ps_lwphandle *L)
 static void
 Lfree_internal(struct ps_prochandle *P, struct ps_lwphandle *L)
 {
-	*Lfind(P, L->lwp_id) = L->lwp_hash;	/* delete from hash table */
+	*Lfind_slot(P, L->lwp_id) = L->lwp_hash; /* delete from hash table */
 	if (L->lwp_ctlfd >= 0)
 		(void) close(L->lwp_ctlfd);
 	if (L->lwp_statfd >= 0)
@@ -3438,7 +3452,7 @@ Lsync(struct ps_lwphandle *L)
  * Or, just get the current status (PCNULL).
  * Or, direct it to stop and get the current status (PCDSTOP).
  */
-static int
+int
 Lstopstatus(struct ps_lwphandle *L,
     long request,		/* PCNULL, PCDSTOP, PCSTOP, PCWSTOP */
     uint_t msec)		/* if non-zero, timeout in milliseconds */

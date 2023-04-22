@@ -6095,10 +6095,53 @@ cpuid_get_addrsize(cpu_t *cpu, uint_t *pabits, uint_t *vabits)
 }
 
 size_t
-cpuid_get_xsave_size()
+cpuid_get_xsave_size(void)
 {
 	return (MAX(cpuid_info0.cpi_xsave.xsav_max_size,
 	    sizeof (struct xsave_state)));
+}
+
+/*
+ * Export information about known offsets to the kernel. We only care about
+ * things we have actually enabled support for in %xcr0.
+ */
+void
+cpuid_get_xsave_info(uint64_t bit, size_t *sizep, size_t *offp)
+{
+	size_t size, off;
+
+	VERIFY3U(bit & xsave_bv_all, !=, 0);
+
+	if (sizep == NULL)
+		sizep = &size;
+	if (offp == NULL)
+		offp = &off;
+
+	switch (bit) {
+	case XFEATURE_LEGACY_FP:
+	case XFEATURE_SSE:
+		*sizep = sizeof (struct fxsave_state);
+		*offp = 0;
+		break;
+	case XFEATURE_AVX:
+		*sizep = cpuid_info0.cpi_xsave.ymm_size;
+		*offp = cpuid_info0.cpi_xsave.ymm_offset;
+		break;
+	case XFEATURE_AVX512_OPMASK:
+		*sizep = cpuid_info0.cpi_xsave.opmask_size;
+		*offp = cpuid_info0.cpi_xsave.opmask_offset;
+		break;
+	case XFEATURE_AVX512_ZMM:
+		*sizep = cpuid_info0.cpi_xsave.zmmlo_size;
+		*offp = cpuid_info0.cpi_xsave.zmmlo_offset;
+		break;
+	case XFEATURE_AVX512_HI_ZMM:
+		*sizep = cpuid_info0.cpi_xsave.zmmhi_size;
+		*offp = cpuid_info0.cpi_xsave.zmmhi_offset;
+		break;
+	default:
+		panic("asked for unsupported xsave feature: 0x%lx", bit);
+	}
 }
 
 /*
@@ -6109,7 +6152,7 @@ cpuid_get_xsave_size()
  * feature bit and is reflected in the cpi_fp_amd_save member.
  */
 boolean_t
-cpuid_need_fp_excp_handling()
+cpuid_need_fp_excp_handling(void)
 {
 	return (cpuid_info0.cpi_vendor == X86_VENDOR_AMD &&
 	    cpuid_info0.cpi_fp_amd_save != 0);

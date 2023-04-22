@@ -22,13 +22,19 @@ file path=usr/share/man/man3proc/Lctlfd.3proc
 link path=usr/share/man/man3proc/Ldstop.3proc target=Pstopstatus.3proc
 file path=usr/share/man/man3proc/Lfree.3proc
 link path=usr/share/man/man3proc/Lgetareg.3proc target=Pgetareg.3proc
+link path=usr/share/man/man3proc/Lgetfpregs.3proc target=Plwp_getregs.3proc
+link path=usr/share/man/man3proc/Lgetregs.3proc target=Plwp_getregs.3proc
+link path=usr/share/man/man3proc/Lgetxregs.3proc target=Plwp_getxregs.3proc
 file path=usr/share/man/man3proc/Lgrab.3proc
 file path=usr/share/man/man3proc/Lgrab_error.3proc
 link path=usr/share/man/man3proc/Lmain_stack.3proc target=Plwp_stack.3proc
 file path=usr/share/man/man3proc/Lprochandle.3proc
 file path=usr/share/man/man3proc/Lpsinfo.3proc
 link path=usr/share/man/man3proc/Lputareg.3proc target=Pgetareg.3proc
+link path=usr/share/man/man3proc/Lsetfpregs.3proc target=Plwp_getregs.3proc
+link path=usr/share/man/man3proc/Lsetregs.3proc target=Plwp_getregs.3proc
 link path=usr/share/man/man3proc/Lsetrun.3proc target=Psetrun.3proc
+link path=usr/share/man/man3proc/Lsetxregs.3proc target=Plwp_getxregs.3proc
 link path=usr/share/man/man3proc/Lstack.3proc target=Plwp_stack.3proc
 file path=usr/share/man/man3proc/Lstate.3proc
 file path=usr/share/man/man3proc/Lstatus.3proc
@@ -86,6 +92,7 @@ file path=usr/share/man/man3proc/Plookup_by_addr.3proc
 link path=usr/share/man/man3proc/Plookup_by_name.3proc \
     target=Plookup_by_addr.3proc
 link path=usr/share/man/man3proc/Plwp_alt_stack.3proc target=Plwp_stack.3proc
+link path=usr/share/man/man3proc/Plwp_freexregs.3proc target=Plwp_getxregs.3proc
 file path=usr/share/man/man3proc/Plwp_getasrs.3proc
 link path=usr/share/man/man3proc/Plwp_getfpregs.3proc target=Plwp_getregs.3proc
 file path=usr/share/man/man3proc/Plwp_getgwindows.3proc

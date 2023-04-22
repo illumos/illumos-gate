@@ -56,7 +56,8 @@ typedef enum {
 	PS_BADLID,	/* bad lwp identifier */
 	PS_BADADDR,	/* bad address */
 	PS_NOSYM,	/* p_lookup() could not find given symbol */
-	PS_NOFREGS	/* FPU register set not available for given lwp */
+	PS_NOFREGS,	/* FPU register set not available for given lwp */
+	PS_NOXREGS	/* extended register set not available for given lwp */
 } ps_err_e;
 
 struct ps_prochandle;
@@ -118,11 +119,9 @@ extern ps_err_e ps_lgetfpregs(struct ps_prochandle *,
 extern ps_err_e ps_lsetfpregs(struct ps_prochandle *,
 			lwpid_t, const prfpregset_t *);
 
-#if defined(__sparc) || defined(__sparcv9)
 extern ps_err_e ps_lgetxregsize(struct ps_prochandle *, lwpid_t, int *);
 extern ps_err_e ps_lgetxregs(struct ps_prochandle *, lwpid_t, caddr_t);
 extern ps_err_e ps_lsetxregs(struct ps_prochandle *, lwpid_t, caddr_t);
-#endif
 
 #if defined(__i386) || defined(__amd64)
 extern ps_err_e ps_lgetLDT(struct ps_prochandle *, lwpid_t, struct ssd *);

@@ -24,7 +24,7 @@
  * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -2818,6 +2818,33 @@ kmem_slab_prefill(kmem_cache_t *cp, kmem_slab_t *sp)
 	ASSERT(head == NULL);
 	ASSERT(nbufs == 0);
 	mutex_enter(&cp->cache_lock);
+}
+
+/*
+ * kmem_rezalloc() is currently considered private and subject to change until
+ * we sort out how we want to handle realloc vs. reallocf style interfaces. We
+ * have currently chosen realloc.
+ */
+void *
+kmem_rezalloc(void *oldbuf, size_t oldsize, size_t newsize, int kmflag)
+{
+	void *newbuf = kmem_alloc(newsize, kmflag);
+	if (newbuf == NULL) {
+		return (NULL);
+	}
+
+	bcopy(oldbuf, newbuf, MIN(oldsize, newsize));
+	if (newsize > oldsize) {
+		void *start = (void *)((uintptr_t)newbuf + oldsize);
+		bzero(start, newsize - oldsize);
+	}
+
+	if (oldbuf != NULL) {
+		ASSERT3U(oldsize, !=, 0);
+		kmem_free(oldbuf, oldsize);
+	}
+
+	return (newbuf);
 }
 
 void *

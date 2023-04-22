@@ -29,6 +29,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2019, Carlos Neira <cneirabustos@gmail.com>
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -333,6 +334,13 @@ extern	int	Lstack(struct ps_lwphandle *, stack_t *);
 extern	int	Lmain_stack(struct ps_lwphandle *, stack_t *);
 extern	int	Lalt_stack(struct ps_lwphandle *, stack_t *);
 
+extern int	Lgetregs(struct ps_lwphandle *, prgregset_t *);
+extern int	Lsetregs(struct ps_lwphandle *, const prgregset_t *);
+extern int	Lgetfpregs(struct ps_lwphandle *, prfpregset_t *);
+extern int	Lsetfpregs(struct ps_lwphandle *, const prfpregset_t *);
+extern int	Lgetxregs(struct ps_lwphandle *, prxregset_t **, size_t *);
+extern int	Lsetxregs(struct ps_lwphandle *, const prxregset_t *, size_t);
+
 /*
  * Function prototypes for system calls forced on the victim process.
  */
@@ -419,11 +427,13 @@ extern int Plwp_getfpregs(struct ps_prochandle *, lwpid_t, prfpregset_t *);
 extern int Plwp_setfpregs(struct ps_prochandle *, lwpid_t,
     const prfpregset_t *);
 
+extern int Plwp_getxregs(struct ps_prochandle *, lwpid_t, prxregset_t **,
+    size_t *);
+extern void Plwp_freexregs(struct ps_prochandle *, prxregset_t *, size_t);
+extern int Plwp_setxregs(struct ps_prochandle *, lwpid_t, const prxregset_t *,
+    size_t);
+
 #if defined(__sparc)
-
-extern int Plwp_getxregs(struct ps_prochandle *, lwpid_t, prxregset_t *);
-extern int Plwp_setxregs(struct ps_prochandle *, lwpid_t, const prxregset_t *);
-
 extern int Plwp_getgwindows(struct ps_prochandle *, lwpid_t, gwindows_t *);
 
 #if defined(__sparcv9)

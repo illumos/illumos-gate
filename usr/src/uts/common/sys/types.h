@@ -28,7 +28,7 @@
  *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SYS_TYPES_H
@@ -260,6 +260,16 @@ typedef union {
 	long double	_q;
 	uint32_t	_l[4];
 } upad128_t;
+
+typedef union {
+	long double	_q[2];
+	uint32_t	_l[8];
+} upad256_t;
+
+typedef union {
+	long double	_q[4];
+	uint32_t	_l[16];
+} upad512_t;
 
 typedef	longlong_t	offset_t;
 typedef	u_longlong_t	u_offset_t;

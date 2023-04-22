@@ -17,7 +17,7 @@
 # Copyright 2023 Oxide Computer Company
 #
 
-SUBDIRS_i386 = i386 imc zen_umc
+SUBDIRS_i386 = i386 imc zen_umc xsave
 
 SUBDIRS =       \
 		cores \
@@ -50,6 +50,7 @@ PROGS = \
 	odirectory \
 	OS-6097 \
 	ucontext \
+	getcontext_extd \
 	writev
 
 CPPFLAGS += -D_REENTRANT

@@ -26,7 +26,7 @@
 /*
  * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2014 by Delphix. All rights reserved.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -4639,31 +4639,6 @@ pt_putareg(mdb_tgt_t *t, mdb_tgt_tid_t tid, const char *rname, mdb_tgt_reg_t r)
 			else if (rd_flags & MDB_TGT_R_8L)
 				r &= 0xffULL;
 
-#if defined(__sparc) && defined(_ILP32)
-			/*
-			 * If we are debugging on 32-bit SPARC, the globals and
-			 * outs can have 32 upper bits stored in the xregs.
-			 */
-			int is_g = (rd_num == R_G0 ||
-			    rd_num >= R_G1 && rd_num <= R_G7);
-			int is_o = (rd_num >= R_O0 && rd_num <= R_O7);
-			prxregset_t xrs;
-
-			if ((is_g || is_o) && PTL_GETXREGS(t, tid, &xrs) == 0 &&
-			    xrs.pr_type == XR_TYPE_V8P) {
-				if (is_g) {
-					xrs.pr_un.pr_v8p.pr_xg[rd_num -
-					    R_G0 + XR_G0] = (uint32_t)(r >> 32);
-				} else if (is_o) {
-					xrs.pr_un.pr_v8p.pr_xo[rd_num -
-					    R_O0 + XR_O0] = (uint32_t)(r >> 32);
-				}
-
-				if (PTL_SETXREGS(t, tid, &xrs) == -1)
-					return (-1);
-			}
-#endif	/* __sparc && _ILP32 */
-
 			if (PTL_GETREGS(t, tid, grs) == 0) {
 				grs[rd_num] = (prgreg_t)r;
 				return (PTL_SETREGS(t, tid, grs));
@@ -4837,32 +4812,37 @@ pt_lwp_setregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid, prgregset_t gregs)
 	return (set_errno(EMDB_NOPROC));
 }
 
-#ifdef	__sparc
 
 /*ARGSUSED*/
 static int
-pt_lwp_getxregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid, prxregset_t *xregs)
+pt_lwp_getxregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid, prxregset_t **xregs,
+    size_t *sizep)
 {
 	if (t->t_pshandle != NULL) {
 		return (ptl_err(Plwp_getxregs(t->t_pshandle,
-		    (lwpid_t)tid, xregs)));
+		    (lwpid_t)tid, xregs, sizep)));
 	}
 	return (set_errno(EMDB_NOPROC));
 }
 
-/*ARGSUSED*/
+static void
+pt_lwp_freexregs(mdb_tgt_t *t, void *tap, prxregset_t *xregs, size_t size)
+{
+	if (t->t_pshandle != NULL) {
+		Plwp_freexregs(t->t_pshandle, xregs, size);
+	}
+}
+
 static int
 pt_lwp_setxregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid,
-    const prxregset_t *xregs)
+    const prxregset_t *xregs, size_t len)
 {
 	if (t->t_pshandle != NULL) {
 		return (ptl_err(Plwp_setxregs(t->t_pshandle,
-		    (lwpid_t)tid, xregs)));
+		    (lwpid_t)tid, xregs, len)));
 	}
 	return (set_errno(EMDB_NOPROC));
 }
-
-#endif	/* __sparc */
 
 /*ARGSUSED*/
 static int
@@ -4889,18 +4869,17 @@ pt_lwp_setfpregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid,
 }
 
 static const pt_ptl_ops_t proc_lwp_ops = {
-	(int (*)())(uintptr_t)mdb_tgt_nop,
-	(void (*)())(uintptr_t)mdb_tgt_nop,
-	pt_lwp_tid,
-	pt_lwp_iter,
-	pt_lwp_getregs,
-	pt_lwp_setregs,
-#ifdef __sparc
-	pt_lwp_getxregs,
-	pt_lwp_setxregs,
-#endif
-	pt_lwp_getfpregs,
-	pt_lwp_setfpregs
+	.ptl_ctor = (int (*)())(uintptr_t)mdb_tgt_nop,
+	.ptl_dtor = (void (*)())(uintptr_t)mdb_tgt_nop,
+	.ptl_tid = pt_lwp_tid,
+	.ptl_iter = pt_lwp_iter,
+	.ptl_getregs = pt_lwp_getregs,
+	.ptl_setregs = pt_lwp_setregs,
+	.ptl_getxregs = pt_lwp_getxregs,
+	.ptl_freexregs = pt_lwp_freexregs,
+	.ptl_setxregs = pt_lwp_setxregs,
+	.ptl_getfpregs = pt_lwp_getfpregs,
+	.ptl_setfpregs = pt_lwp_setfpregs
 };
 
 static int
@@ -5024,15 +5003,16 @@ pt_tdb_setregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid, prgregset_t gregs)
 	return (0);
 }
 
-#ifdef __sparc
-
 static int
-pt_tdb_getxregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid, prxregset_t *xregs)
+pt_tdb_getxregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid, prxregset_t **xregs,
+    size_t *sizep)
 {
 	pt_data_t *pt = t->t_data;
 
 	td_thrhandle_t th;
 	td_err_e err;
+	int xregsize;
+	prxregset_t *pxr;
 
 	if (t->t_pshandle == NULL)
 		return (set_errno(EMDB_NOPROC));
@@ -5040,16 +5020,36 @@ pt_tdb_getxregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid, prxregset_t *xregs)
 	if ((err = pt->p_tdb_ops->td_ta_map_id2thr(tap, tid, &th)) != TD_OK)
 		return (set_errno(tdb_to_errno(err)));
 
-	err = pt->p_tdb_ops->td_thr_getxregs(&th, xregs);
-	if (err != TD_OK && err != TD_PARTIALREG)
+	if ((err = pt->p_tdb_ops->td_thr_getxregsize(&th, &xregsize)) != TD_OK)
 		return (set_errno(tdb_to_errno(err)));
 
+	if (xregsize == 0) {
+		return (set_errno(ENODATA));
+	}
+
+	pxr = mdb_alloc(xregsize, UM_SLEEP);
+
+	err = pt->p_tdb_ops->td_thr_getxregs(&th, pxr);
+	if (err != TD_OK && err != TD_PARTIALREG) {
+		mdb_free(pxr, xregsize);
+		return (set_errno(tdb_to_errno(err)));
+	}
+
+	*xregs = pxr;
+	*sizep = xregsize;
 	return (0);
+}
+
+static void
+pt_tdb_freexregs(mdb_tgt_t *t __unused, void *tap __unused, prxregset_t *pxr,
+    size_t size)
+{
+	mdb_free(pxr, size);
 }
 
 static int
 pt_tdb_setxregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid,
-    const prxregset_t *xregs)
+    const prxregset_t *xregs, size_t len __unused)
 {
 	pt_data_t *pt = t->t_data;
 
@@ -5068,8 +5068,6 @@ pt_tdb_setxregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid,
 
 	return (0);
 }
-
-#endif	/* __sparc */
 
 static int
 pt_tdb_getfpregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid,
@@ -5116,18 +5114,17 @@ pt_tdb_setfpregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid,
 }
 
 static const pt_ptl_ops_t proc_tdb_ops = {
-	pt_tdb_ctor,
-	pt_tdb_dtor,
-	pt_tdb_tid,
-	pt_tdb_iter,
-	pt_tdb_getregs,
-	pt_tdb_setregs,
-#ifdef __sparc
-	pt_tdb_getxregs,
-	pt_tdb_setxregs,
-#endif
-	pt_tdb_getfpregs,
-	pt_tdb_setfpregs
+	.ptl_ctor = pt_tdb_ctor,
+	.ptl_dtor = pt_tdb_dtor,
+	.ptl_tid = pt_tdb_tid,
+	.ptl_iter = pt_tdb_iter,
+	.ptl_getregs = pt_tdb_getregs,
+	.ptl_setregs = pt_tdb_setregs,
+	.ptl_getxregs = pt_tdb_getxregs,
+	.ptl_freexregs = pt_tdb_freexregs,
+	.ptl_setxregs = pt_tdb_setxregs,
+	.ptl_getfpregs = pt_tdb_getfpregs,
+	.ptl_setfpregs = pt_tdb_setfpregs
 };
 
 static ssize_t

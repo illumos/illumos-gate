@@ -63,12 +63,11 @@ typedef struct pt_ptl_ops {
 	int (*ptl_iter)(mdb_tgt_t *, void *, mdb_addrvec_t *);
 	int (*ptl_getregs)(mdb_tgt_t *, void *, mdb_tgt_tid_t, prgregset_t);
 	int (*ptl_setregs)(mdb_tgt_t *, void *, mdb_tgt_tid_t, prgregset_t);
-#ifdef	__sparc
 	int (*ptl_getxregs)(mdb_tgt_t *, void *, mdb_tgt_tid_t,
-	    prxregset_t *);
+	    prxregset_t **, size_t *);
+	void (*ptl_freexregs)(mdb_tgt_t *, void *, prxregset_t *, size_t);
 	int (*ptl_setxregs)(mdb_tgt_t *, void *, mdb_tgt_tid_t,
-	    const prxregset_t *);
-#endif
+	    const prxregset_t *, size_t);
 	int (*ptl_getfpregs)(mdb_tgt_t *, void *, mdb_tgt_tid_t,
 	    prfpregset_t *);
 	int (*ptl_setfpregs)(mdb_tgt_t *, void *, mdb_tgt_tid_t,
@@ -98,17 +97,17 @@ typedef struct pt_ptl_ops {
 	(((pt_data_t *)((t)->t_data))->p_ptl_ops->ptl_setregs((t), \
 	((pt_data_t *)((t)->t_data))->p_ptl_hdl, (tid), (gregs)))
 
-#ifdef	__sparc
-
-#define	PTL_GETXREGS(t, tid, xregs) \
+#define	PTL_GETXREGS(t, tid, xregs, size) \
 	(((pt_data_t *)((t)->t_data))->p_ptl_ops->ptl_getxregs((t), \
-	((pt_data_t *)((t)->t_data))->p_ptl_hdl, (tid), (xregs)))
+	((pt_data_t *)((t)->t_data))->p_ptl_hdl, (tid), (xregs), (size)))
 
-#define	PTL_SETXREGS(t, tid, xregs) \
+#define	PTL_FREEXREGS(t, xregs, size) \
+	(((pt_data_t *)((t)->t_data))->p_ptl_ops->ptl_freexregs((t), \
+	((pt_data_t *)((t)->t_data))->p_ptl_hdl, (xregs), (size)))
+
+#define	PTL_SETXREGS(t, tid, xregs, size) \
 	(((pt_data_t *)((t)->t_data))->p_ptl_ops->ptl_setxregs((t), \
-	((pt_data_t *)((t)->t_data))->p_ptl_hdl, (tid), (xregs)))
-
-#endif	/* __sparc */
+	((pt_data_t *)((t)->t_data))->p_ptl_hdl, (tid), (xregs), (size)))
 
 #define	PTL_GETFPREGS(t, tid, fpregs) \
 	(((pt_data_t *)((t)->t_data))->p_ptl_ops->ptl_getfpregs((t), \

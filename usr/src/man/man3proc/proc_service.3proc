@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROC_SERVICE 3PROC "Oct 12, 2007"
+.TH PROC_SERVICE 3PROC "Jan 23, 2023"
 .SH NAME
 proc_service \- process service interfaces
 .SH SYNOPSIS
-.LP
 .nf
 #include <proc_service.h>
 
@@ -131,7 +130,6 @@ proc_service \- process service interfaces
 \fBvoid\fR \fBps_plog\fR(\fBconst char *\fR\fIfmt\fR);
 .fi
 
-.SS "SPARC"
 .LP
 .nf
 \fBps_err_e\fR \fBps_lgetxregsize\fR(\fBstruct ps_prochandle *\fR\fIph\fR,
@@ -151,14 +149,12 @@ proc_service \- process service interfaces
 .fi
 
 .SS "x86"
-.LP
 .nf
 \fBps_err_e\fR \fBps_lgetLDT\fR(\fBstruct ps_prochandle *\fR\fIph\fR, \fBlwpid_t\fR \fIlwpid\fR,
      \fBstruct ssd *\fR\fIldt\fR);
 .fi
 
 .SH DESCRIPTION
-.LP
 Every program that links \fBlibthread_db\fR or \fBlibrtld_db\fR must provide a
 set of process control primitives that allow \fBlibthread_db\fR and
 \fBlibrtld_db\fR to access memory and registers in the target process, to start
@@ -363,7 +359,6 @@ Rolls the \fBLWP\fR out of a critical section when the process is stopped.
 Logs a message.
 .RE
 
-.SS "SPARC"
 .ne 2
 .na
 \fB\fBps_lgetxregsize()\fR\fR
@@ -400,7 +395,6 @@ Reads the local descriptor table of the \fBLWP\fR.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for description of the following attributes:
 .sp
 
@@ -415,7 +409,6 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 .BR rtld_db (3EXT),
 .BR libc_db (3LIB),
 .BR librtld_db (3LIB),

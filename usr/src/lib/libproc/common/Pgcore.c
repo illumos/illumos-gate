@@ -28,7 +28,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #define	_STRUCTURED_PROC	1
@@ -443,16 +443,6 @@ old_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
 #endif	/* _LP64 */
 	}
 
-#ifdef sparc
-	{
-		prxregset_t xregs;
-		if (Plwp_getxregs(P, lsp->pr_lwpid, &xregs) == 0 &&
-		    write_note(pgc->pgc_fd, NT_PRXREG, &xregs,
-		    sizeof (prxregset_t), pgc->pgc_doff) != 0)
-			return (1);
-	}
-#endif	/* sparc */
-
 	return (0);
 }
 
@@ -463,6 +453,8 @@ new_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
 	struct ps_prochandle *P = pgc->P;
 	prlwpname_t name = { 0, "" };
 	psinfo_t ps;
+	prxregset_t *xregs;
+	size_t size;
 
 	/*
 	 * If lsp is NULL this indicates that this is a zombie LWP in
@@ -495,40 +487,13 @@ new_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
 #endif	/* _LP64 */
 	}
 
-#ifdef sparc
-	{
-		prxregset_t xregs;
-		gwindows_t gwins;
-		size_t size;
+	if (Plwp_getxregs(P, lsp->pr_lwpid, &xregs, &size) == 0) {
+		if (write_note(pgc->pgc_fd, NT_PRXREG, xregs, size,
+		    pgc->pgc_doff) != 0)
+			return (1);
 
-		if (Plwp_getxregs(P, lsp->pr_lwpid, &xregs) == 0) {
-			if (write_note(pgc->pgc_fd, NT_PRXREG, &xregs,
-			    sizeof (prxregset_t), pgc->pgc_doff) != 0)
-				return (1);
-		}
-
-		if (Plwp_getgwindows(P, lsp->pr_lwpid, &gwins) == 0 &&
-		    gwins.wbcnt > 0) {
-			size = sizeof (gwins) - sizeof (gwins.wbuf) +
-			    gwins.wbcnt * sizeof (gwins.wbuf[0]);
-
-			if (write_note(pgc->pgc_fd, NT_GWINDOWS, &gwins, size,
-			    pgc->pgc_doff) != 0)
-				return (1);
-		}
-
+		Plwp_freexregs(P, xregs, size);
 	}
-#ifdef __sparcv9
-	if (P->status.pr_dmodel == PR_MODEL_LP64) {
-		asrset_t asrs;
-		if (Plwp_getasrs(P, lsp->pr_lwpid, asrs) == 0) {
-			if (write_note(pgc->pgc_fd, NT_ASRS, &asrs,
-			    sizeof (asrset_t), pgc->pgc_doff) != 0)
-				return (1);
-		}
-	}
-#endif	/* __sparcv9 */
-#endif	/* sparc */
 
 	if (Plwp_getname(P, lsp->pr_lwpid, name.pr_lwpname,
 	    sizeof (name.pr_lwpname)) == 0) {

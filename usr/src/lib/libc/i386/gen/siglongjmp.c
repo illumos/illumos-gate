@@ -28,11 +28,17 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/ucontext.h>
 #include <setjmp.h>
 #include <ucontext.h>
+#include <strings.h>
+#include <upanic.h>
 #include "libc.h"
 
 #pragma weak _siglongjmp = siglongjmp
@@ -40,6 +46,7 @@
 void
 siglongjmp(sigjmp_buf env, int val)
 {
+	const char *msg = "siglongjmp(): setcontext() returned";
 	ucontext_t *ucp = (ucontext_t *)env;
 
 	if (val)
@@ -47,5 +54,10 @@ siglongjmp(sigjmp_buf env, int val)
 	else
 		ucp->uc_mcontext.gregs[EAX] = 1;
 
+	/*
+	 * While unlikely, it is possible that setcontext() may fail for some
+	 * reason. If that happens, we will kill the process.
+	 */
 	(void) setcontext(ucp);
+	upanic(msg, strlen(msg) + 1);
 }

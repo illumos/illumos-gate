@@ -1437,7 +1437,7 @@ typedef enum x86_uarchrev {
 
 /*
  * xgetbv/xsetbv support
- * See section 13.3 in vol. 1 of the Intel devlopers manual.
+ * See section 13.3 in vol. 1 of the Intel Developer's manual.
  */
 
 #define	XFEATURE_ENABLED_MASK	0x0
@@ -1445,13 +1445,27 @@ typedef enum x86_uarchrev {
  * XFEATURE_ENABLED_MASK values (eax)
  * See setup_xfem().
  */
-#define	XFEATURE_LEGACY_FP	0x1
-#define	XFEATURE_SSE		0x2
-#define	XFEATURE_AVX		0x4
-#define	XFEATURE_MPX		0x18	/* 2 bits, both 0 or 1 */
-#define	XFEATURE_AVX512		0xe0	/* 3 bits, all 0 or 1 */
+#define	XFEATURE_LEGACY_FP	(1 << 0)
+#define	XFEATURE_SSE		(1 << 1)
+#define	XFEATURE_AVX		(1 << 2)
+/*
+ * MPX is meant to be all or nothing, therefore for most of the kernel prefer
+ * the XFEATURE_MPX definition over the individual state bits.
+ */
+#define	XFEATURE_MPX_BNDREGS	(1 << 3)
+#define	XFEATURE_MPX_BNDCSR	(1 << 4)
+#define	XFEATURE_MPX		(XFEATURE_MPX_BNDREGS | XFEATURE_MPX_BNDCSR)
+/*
+ * AX512 is meant to be all or nothing, therefore for most of the kernel prefer
+ * the XFEATURE_AVX512 definition over the individual state bits.
+ */
+#define	XFEATURE_AVX512_OPMASK	(1 << 5)
+#define	XFEATURE_AVX512_ZMM	(1 << 6)
+#define	XFEATURE_AVX512_HI_ZMM	(1 << 7)
+#define	XFEATURE_AVX512		(XFEATURE_AVX512_OPMASK | \
+	XFEATURE_AVX512_ZMM | XFEATURE_AVX512_HI_ZMM)
 	/* bit 8 unused */
-#define	XFEATURE_PKRU		0x200
+#define	XFEATURE_PKRU		(1 << 9)
 #define	XFEATURE_FP_ALL	\
 	(XFEATURE_LEGACY_FP | XFEATURE_SSE | XFEATURE_AVX | XFEATURE_MPX | \
 	XFEATURE_AVX512 | XFEATURE_PKRU)
@@ -1576,8 +1590,9 @@ extern uint_t cpuid_get_procnodeid(struct cpu *cpu);
 extern uint_t cpuid_get_procnodes_per_pkg(struct cpu *cpu);
 extern uint_t cpuid_get_compunitid(struct cpu *cpu);
 extern uint_t cpuid_get_cores_per_compunit(struct cpu *cpu);
-extern size_t cpuid_get_xsave_size();
-extern boolean_t cpuid_need_fp_excp_handling();
+extern size_t cpuid_get_xsave_size(void);
+extern void cpuid_get_xsave_info(uint64_t, size_t *, size_t *);
+extern boolean_t cpuid_need_fp_excp_handling(void);
 extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);

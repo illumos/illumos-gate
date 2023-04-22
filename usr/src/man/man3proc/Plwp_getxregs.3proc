@@ -10,13 +10,17 @@
 .\"
 .\"
 .\" Copyright 2015 Joyent, Inc.
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd May 11, 2016
+.Dd January 19, 2023
 .Dt PLWP_GETXREGS 3PROC
 .Os
 .Sh NAME
 .Nm Plwp_getxregs ,
-.Nm Plwp_setxregs
+.Nm Plwp_freexregs ,
+.Nm Plwp_setxregs ,
+.Nm Lgetxregs ,
+.Nm Lsetxregs
 .Nd get and set extended register state
 .Sh LIBRARY
 .Lb libproc
@@ -26,12 +30,31 @@
 .Fo Plwp_getxregs
 .Fa "struct ps_prochandle *P"
 .Fa "lwpid_t lwpid"
+.Fa "prxregset_t **xregsp"
+.Fa "size_t *sizep"
+.Fc
+.Ft int
+.Fo Plwp_freexregs
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
 .Fa "prxregset_t *xregs"
+.Fa "size_t size"
 .Fc
 .Ft int
 .Fo Plwp_setxregs
 .Fa "struct ps_prochandle *P"
 .Fa "lwpid_t lwpid"
+.Fa "const prxregset_t *xregs"
+.Fc
+.Ft int
+.Fo Lgetxregs
+.Fa "struct ps_lwphandle *L"
+.Fa "prxregset_t **xregsp"
+.Fa "size_t *sizep"
+.Fc
+.Ft int
+.Fo Lsetxregs
+.Fa "struct ps_lwphandle *L"
 .Fa "const prxregset_t *xregs"
 .Fc
 .Sh DESCRIPTION
@@ -46,17 +69,45 @@ in the process handle
 .Pp
 The extended register state is defined by the architecture.
 These registers may refer to optional registers that have become common on the
-platform, but are not part of the standard ABI and thus not covered by
+platform, but are not part of the traditional ABI and thus not covered by
 functions such as
 .Xr Plwp_getregs 3PROC
 and
 .Xr Plwp_getfpregs 3PROC .
+Support for the extended registers varies based on the architecture and
+varies based on the specific system.
+For example, on x86 based CPUs the xregs functionality requires the x86
+xsave functionality to be supported.
 .Pp
 The
 .Fn Plwp_getxregs
-function gets the extended register state information and places it into
-.Fa xregs .
-Where as the
+function gets the extended register state information, allocates the
+appropriate sized buffer for it, and places a pointer to that buffer
+into
+.Fa xregs
+and updates
+.Fa sizep
+to indicate the size of the allocated structure.
+Due to the fact that hardware has varying sized extended register sets,
+the exact size of the structure can vary between different running
+systems and core files.
+It is also possible that some processor extensions are enabled at
+process runtime, leading for this to further be different between
+different processes on the same system.
+As such, all of the different platform instantiations of the
+.Vt prxregset_t
+end up generally being opaque structures that can be cast to something
+more specific that also includes its size.
+.Pp
+The obtained
+.Vt prxregset_t
+in
+.Fa xregsp
+must be freed by the caller with the
+.Fn Plwp_freexregs
+function.
+.Pp
+The
 .Fn Plwp_setxregs
 function sets the extended register state information in
 .Fa xregs
@@ -75,6 +126,24 @@ structure is described in
 .Pp
 One may not set the register values of a process that is not an active
 process, e.g. a process handle that refers to a file or a core file.
+.Pp
+The
+.Fn Lgetxregs
+and
+.Fn Lsetxregs
+functions are equivalent to the
+.Fn Plwp_getxregs
+and
+.Fn Plwp_setxregs
+functions except that they operate on a specific thread identified by
+the handle
+.Fa L
+and only require that the thread in question be stopped.
+Data allocated with the
+.Fn Lgetxregs
+functions should be freed with the
+.Fn Plwp_freexregs
+function.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Plwp_getxregs
@@ -104,29 +173,33 @@ function will fail if:
 The process handle
 .Fa P
 does not have any extended register state information.
+This generally happens because the platform does not support it.
 .It Er EBUSY
 The process handle
 .Fa P
 refers to a live process and it is not stopped.
 .It Er ENOENT
-The process handle
-.Fa P
-refers to a live process and there is no thread with id
-.Fa lwpid .
-.It Er EINVAL
-The process handle
-.Fa P
-refers to a core file and there is no thread with id
-.Fa lwpid .
+There is no thread with id
+.Fa lwpid
+in the process handle
+.Fa P .
 .El
-.Sh ARCHITECTURE
 The
-.Fn Plwp_getxregs
+.Fn Lgetxregs
 and
-.Fn Plwp_setxregs
-functions are only available on
-.Sy SPARC
-platforms.
+.Fn Lsetxregs
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+The thread handle
+.Fa L
+does not have any extended register state information.
+This generally happens because the platform does not support it.
+.It Er EBUSY
+The thread handle
+.Fa L
+refers to a live process and the thread is not stopped.
+.El
 .Sh INTERFACE STABILITY
 .Sy Uncommitted
 .Sh MT-LEVEL
