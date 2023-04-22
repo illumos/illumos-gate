@@ -23,17 +23,16 @@
  *	Copyright (c) 1991, Sun Microsystems, Inc.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Stub file for ldd(1).  Provides for preloading shared libraries.
  */
-	.file	"lddstub.s"
-	.set	EXIT,1
-	.text	
+#include <sys/syscall.h>
+
+	.file	"lddstub.S"
+	.text
 	.globl	stub
 
 stub:
 	pushl	$0
-	movl	$EXIT,%eax
+	movl	$SYS_exit, %eax
 	lcall	$7,$0
