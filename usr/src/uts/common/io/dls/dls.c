@@ -26,12 +26,14 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
  * Data-Link Services Module
  */
 
+#include	<sys/stdbit.h>
 #include	<sys/strsun.h>
 #include	<sys/vlan.h>
 #include	<sys/dld_impl.h>
@@ -250,7 +252,8 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 {
 	int err = 0;
 	uint32_t old_flags = dsp->ds_promisc;
-	const uint32_t option_flags = DLS_PROMISC_RX_ONLY;
+	const uint32_t option_flags = DLS_PROMISC_RX_ONLY |
+	    DLS_PROMISC_INCOMING | DLS_PROMISC_OUTGOING;
 	uint32_t old_type = old_flags & ~option_flags;
 	uint32_t new_type = new_flags & ~option_flags;
 	mac_client_promisc_type_t mptype = MAC_CLIENT_PROMISC_ALL;
@@ -267,13 +270,30 @@ dls_promisc(dld_str_t *dsp, uint32_t new_flags)
 	if (new_type == DLS_PROMISC_MULTI)
 		mptype = MAC_CLIENT_PROMISC_MULTI;
 
+	/* Can choose only one of Rx-only or incoming/outoing. */
+	if (stdc_count_ones_ui(new_flags & option_flags) > 1)
+		return (EINVAL);
+
 	/*
 	 * Look at new flags and figure out the correct mac promisc flags.
 	 * If we've only requested DLS_PROMISC_SAP and not _MULTI or _PHYS,
 	 * don't turn on physical promisc mode.
+	 *
+	 * Note that there are two MAC flags, MAC_PROMISC_FLAGS_NO_TX_LOOP and
+	 * MAC_PROMISC_FLAGS_RX_ONLY, which are similar but subtly different.
+	 * NO_TX_LOOP stops outgoing packets transmitted by a MAC client from
+	 * being delivered to a promsic handler on the same client. Whereas
+	 * RX_ONLY suppresses outgoing packets across all MAC clients. For
+	 * backwards compatibility, we map DLS_PROMISC_RX_ONLY to
+	 * MAC_PROMISC_FLAGS_NO_TX_LOOP and DLS_PROMISC_INCOMING/OUTGOING to
+	 * MAC_PROMISC_FLAGS_RX_ONLY/MAC_PROMISC_FLAGS_TX_ONLY.
 	 */
 	if (new_flags & DLS_PROMISC_RX_ONLY)
 		mac_flags |= MAC_PROMISC_FLAGS_NO_TX_LOOP;
+	if (new_flags & DLS_PROMISC_INCOMING)
+		mac_flags |= MAC_PROMISC_FLAGS_RX_ONLY;
+	if (new_flags & DLS_PROMISC_OUTGOING)
+		mac_flags |= MAC_PROMISC_FLAGS_TX_ONLY;
 	if (new_type == DLS_PROMISC_SAP)
 		mac_flags |= MAC_PROMISC_FLAGS_NO_PHYS;
 

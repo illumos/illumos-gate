@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -116,6 +117,8 @@ typedef enum {
 #define	MAC_PROMISC_FLAGS_NO_PHYS		0x0002
 #define	MAC_PROMISC_FLAGS_VLAN_TAG_STRIP	0x0004
 #define	MAC_PROMISC_FLAGS_NO_COPY		0x0008
+#define	MAC_PROMISC_FLAGS_RX_ONLY		0x0010
+#define	MAC_PROMISC_FLAGS_TX_ONLY		0x0020
 
 /* flags passed to mac_tx() */
 #define	MAC_DROP_ON_NO_DESC	0x01 /* freemsg() if no tx descs */

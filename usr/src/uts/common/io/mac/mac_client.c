@@ -3358,6 +3358,15 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	mac_cb_info_t	*mcbi;
 	int rc;
 
+	boolean_t no_tx_loop = ((flags & MAC_PROMISC_FLAGS_NO_TX_LOOP) != 0);
+	boolean_t rx_only = ((flags & MAC_PROMISC_FLAGS_RX_ONLY) != 0);
+	boolean_t tx_only = ((flags & MAC_PROMISC_FLAGS_TX_ONLY) != 0);
+
+	if (no_tx_loop && tx_only)
+		return (EINVAL);
+	if (rx_only && tx_only)
+		return (EINVAL);
+
 	i_mac_perim_enter(mip);
 
 	if ((rc = mac_start((mac_handle_t)mip)) != 0) {
@@ -3399,11 +3408,13 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	mpip->mpi_fn = fn;
 	mpip->mpi_arg = arg;
 	mpip->mpi_mcip = mcip;
-	mpip->mpi_no_tx_loop = ((flags & MAC_PROMISC_FLAGS_NO_TX_LOOP) != 0);
+	mpip->mpi_no_tx_loop = no_tx_loop;
 	mpip->mpi_no_phys = ((flags & MAC_PROMISC_FLAGS_NO_PHYS) != 0);
 	mpip->mpi_strip_vlan_tag =
 	    ((flags & MAC_PROMISC_FLAGS_VLAN_TAG_STRIP) != 0);
 	mpip->mpi_no_copy = ((flags & MAC_PROMISC_FLAGS_NO_COPY) != 0);
+	mpip->mpi_rx_only = rx_only;
+	mpip->mpi_tx_only = tx_only;
 
 	mcbi = &mip->mi_promisc_cb_info;
 	mutex_enter(mcbi->mcbi_lockp);
@@ -4201,6 +4212,18 @@ mac_promisc_dispatch(mac_impl_t *mip, mblk_t *mp_chain,
 			mpip = (mac_promisc_impl_t *)mcb->mcb_objp;
 			is_sender = (mpip->mpi_mcip == sender);
 
+			if (sender != NULL && mpip->mpi_rx_only)
+				/*
+				 * This client doesn't want outbound packets.
+				 */
+				continue;
+
+			if (sender == NULL && mpip->mpi_tx_only)
+				/*
+				 * This client doesn't want inbound packets.
+				 */
+				continue;
+
 			if (is_sender && mpip->mpi_no_tx_loop)
 				/*
 				 * The sender doesn't want to receive
@@ -4255,7 +4278,8 @@ mac_promisc_client_dispatch(mac_client_impl_t *mcip, mblk_t *mp_chain)
 		for (mcb = mcip->mci_promisc_list; mcb != NULL;
 		    mcb = mcb->mcb_nextp) {
 			mpip = (mac_promisc_impl_t *)mcb->mcb_objp;
-			if (mpip->mpi_type == MAC_CLIENT_PROMISC_FILTERED &&
+			if (!mpip->mpi_tx_only &&
+			    mpip->mpi_type == MAC_CLIENT_PROMISC_FILTERED &&
 			    !is_mcast) {
 				mac_promisc_dispatch_one(mpip, mp, B_FALSE,
 				    B_FALSE);

@@ -25,17 +25,18 @@
  *
  * Copyright 2021 Joyent, Inc.
  * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <stdio.h>
 #include <unistd.h>
 #include <stropts.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <setjmp.h>
-#include <string.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -157,6 +158,7 @@ main(int argc, char **argv)
 	boolean_t nflg = B_FALSE;
 	boolean_t Nflg = B_FALSE;
 	int Cflg = 0;
+	boolean_t Qflg = B_FALSE;
 	boolean_t Uflg = B_FALSE;
 	int first = 1;
 	int last  = 0x7fffffff;
@@ -176,6 +178,7 @@ main(int argc, char **argv)
 	dlpi_handle_t dh;
 	size_t nfiles = 0;
 	off_t limit = 0;
+	int direction = DIR_INOUT;
 
 	names[0] = '\0';
 	/*
@@ -281,8 +284,8 @@ main(int argc, char **argv)
 	}
 	(void) setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
-	while ((c = getopt(argc, argv, "at:CPDSi:O:o:Nn:s:d:I:vVp:fc:x:U?rqz"))
-	    != EOF) {
+	while ((c = getopt(argc, argv,
+	    "at:CPDSi:O:o:Nn:s:d:I:vVp:fc:x:U?rqQ:z")) != EOF) {
 		switch (c) {
 		case 'a':
 			audiodev = getenv("AUDIODEV");
@@ -389,6 +392,17 @@ main(int argc, char **argv)
 		case 'q':
 			qflg = B_TRUE;
 			break;
+		case 'Q':
+			Qflg = B_TRUE;
+			if (strcasecmp("inout", optarg) == 0)
+				direction = DIR_INOUT;
+			else if (strcasecmp("in", optarg) == 0)
+				direction = DIR_IN;
+			else if (strcasecmp("out", optarg) == 0)
+				direction = DIR_OUT;
+			else
+				usage();
+			break;
 		case 'r':
 			rflg = B_TRUE;
 			break;
@@ -420,6 +434,11 @@ main(int argc, char **argv)
 	if (!icapfile) {
 		use_kern_pf = open_datalink(&dh, datalink);
 	} else {
+		if (Qflg) {
+			pr_err("cannot specify direction (-Q) when "
+			    "reading from a capture file (-i)");
+		}
+
 		use_kern_pf = B_FALSE;
 		cap_open_read(icapfile);
 
@@ -543,7 +562,7 @@ main(int argc, char **argv)
 			timeout.tv_usec = 0;
 		}
 
-		init_datalink(dh, snaplen, chunksize, &timeout, fp);
+		init_datalink(dh, snaplen, chunksize, &timeout, fp, direction);
 		if (! qflg && ocapfile)
 			show_count();
 		resetperm();
@@ -861,6 +880,8 @@ usage(void)
 	"\t[ -C ]                       # Print packet filter code\n");
 	(void) fprintf(stderr,
 	"\t[ -q ]                       # Suppress printing packet count\n");
+	(void) fprintf(stderr,
+	"\t[ -Q inout|in|out ]          # Set packet capture direction\n");
 	(void) fprintf(stderr,
 	"\t[ -r ]                       # Do not resolve address to name\n");
 	(void) fprintf(stderr,

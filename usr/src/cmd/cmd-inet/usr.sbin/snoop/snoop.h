@@ -25,6 +25,7 @@
  *
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2025 Oxide Computer Company
  * Copyright 2023 RackTop Systems, Inc.
  */
 
@@ -220,7 +221,7 @@ extern void cap_read(int, int, int, void (*)(), int);
 extern void cap_close(void);
 extern boolean_t open_datalink(dlpi_handle_t *, const char *);
 extern void init_datalink(dlpi_handle_t, ulong_t, ulong_t, struct timeval *,
-    struct Pf_ext_packetfilt *);
+    struct Pf_ext_packetfilt *, int direction);
 extern void net_read(dlpi_handle_t, size_t, int, void (*)(), int);
 extern void click(int);
 extern void show_pktinfo(int, int, char *, char *, struct timeval *,
@@ -351,6 +352,11 @@ extern unsigned int encap_levels, total_encap_levels;
 
 extern int quitting;
 extern boolean_t Iflg, Pflg, fflg, rflg;
+
+/* Packet capture direction. */
+#define	DIR_INOUT	0
+#define	DIR_IN		1
+#define	DIR_OUT		2
 
 /*
  * Global error recovery routine: used to reset snoop variables after

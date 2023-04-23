@@ -24,6 +24,7 @@
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2021 Joyent, Inc.
  * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -173,7 +174,7 @@ open_datalink(dlpi_handle_t *dhp, const char *linkname)
  */
 void
 init_datalink(dlpi_handle_t dh, ulong_t snaplen, ulong_t chunksize,
-    struct timeval *timeout, struct Pf_ext_packetfilt *fp)
+    struct timeval *timeout, struct Pf_ext_packetfilt *fp, int direction)
 {
 	int	retv;
 	int	netfd;
@@ -187,6 +188,32 @@ init_datalink(dlpi_handle_t dh, ulong_t snaplen, ulong_t chunksize,
 		    dlpi_linkname(dh));
 	} else {
 		(void) fprintf(stderr, "Using device %s ", dlpi_linkname(dh));
+	}
+
+	switch (direction) {
+	case DIR_INOUT:
+		/* Default capture mode - nothing to do. */
+		break;
+
+	case DIR_IN:
+		retv = dlpi_promiscon(dh, DL_PROMISC_INCOMING);
+		if (retv != DLPI_SUCCESS) {
+			pr_errdlpi(dh, "setting capture to incoming failed",
+			    retv);
+		}
+		break;
+
+	case DIR_OUT:
+		retv = dlpi_promiscon(dh, DL_PROMISC_OUTGOING);
+		if (retv != DLPI_SUCCESS) {
+			pr_errdlpi(dh, "setting capture to outgoing failed",
+			    retv);
+		}
+		break;
+
+	default:
+		pr_errdlpi(dh, "invalid packet capture direction", DLPI_EINVAL);
+		break;
 	}
 
 	/*

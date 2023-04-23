@@ -22,6 +22,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -390,7 +391,16 @@ typedef struct dl_ipnetinfo {
 #define	DL_PROMISC_PHYS		0x01	/* promiscuous mode at phys level */
 #define	DL_PROMISC_SAP		0x02	/* promiscuous mode at sap level */
 #define	DL_PROMISC_MULTI	0x03	/* promiscuous mode for multicast */
+/*
+ * With DL_PROMISC_RX_ONLY we may still receive OUTGOING traffic in some cases,
+ * e.g., on a physical link with DL_PROMISC_RX_ONLY we won't capture traffic
+ * sent directly out the physical link but we will capture OUTGOING traffic from
+ * a VNIC atop the physical link. In contrast, DL_PROMISC_INCOMING won't capture
+ * that OUTGOING traffic from the VNIC as it goes out via the underlying link.
+ */
 #define	DL_PROMISC_RX_ONLY	0x04	/* above only enabled for rx */
+#define	DL_PROMISC_INCOMING	0x05	/* above only enabled for incoming */
+#define	DL_PROMISC_OUTGOING	0x06	/* above only enabled for outgoing */
 
 /*
  * DLPI notification codes for DL_NOTIFY_REQ primitives.

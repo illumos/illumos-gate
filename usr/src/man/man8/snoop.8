@@ -2,10 +2,11 @@
 .\" Copyright 2023 RackTop Systems, Inc.
 .\" Copyright 2021 Joyent, Inc.
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2025 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SNOOP 8 "Jul 13, 2023"
+.TH SNOOP 8 "Nov 3, 2025"
 .SH NAME
 snoop \- capture and inspect network packets
 .SH SYNOPSIS
@@ -14,7 +15,7 @@ snoop \- capture and inspect network packets
  [\fB-d\fR \fIdevice\fR] [\fB-i\fR \fIfilename\fR] [\fB-n\fR \fIfilename\fR]
  [\fB-o\fR \fIfilename\fR | \fB-O\fR \fIprefix:count:size\fR]
  [\fB-p\fR \fIfirst\fR [, \fIlast\fR]] [\fB-s\fR \fIsnaplen\fR] [\fB-x\fR \fIoffset\fR [, \fIlength\fR]]
- [\fIexpression\fR]
+ [\fB-Q\fR inout | in | out ] [\fIexpression\fR]
 .fi
 
 .SH DESCRIPTION
@@ -344,6 +345,19 @@ Display packet data in hexadecimal and \fBASCII\fR format. The \fIoffset\fR and
 \fIlength\fR values select a portion of the packet to be displayed. To display
 the whole packet, use an \fIoffset\fR of 0. If a \fIlength\fR value is not
 provided, the rest of the packet is displayed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-Q\fR  \fBinout\fR | \fBin\fR | \fBout\fR \fR
+.ad
+.sp .6
+.RS 4n
+Capture only incoming (\fBin\fR), only outgoing (\fBout\fR) or all
+(\fBinout\fR) packets. \fBinout\fR is the default if not specified.
+.sp
+Cannot be combined with the \fB-i\fR option.
 .RE
 
 .SH OPERANDS

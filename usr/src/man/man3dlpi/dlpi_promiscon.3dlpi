@@ -13,8 +13,9 @@
 .\"
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2025 Oxide Computer Company
 .\"
-.Dd April 29, 2021
+.Dd November 3, 2025
 .Dt DLPI_PROMISCON 3DLPI
 .Os
 .Sh NAME
@@ -73,8 +74,36 @@ Promiscuous mode for all multicast addresses
 .It Dv DL_PROMISC_RX_ONLY
 When one or more of the above promiscuous modes is also enabled, this option
 modifies it so that only inbound traffic is received.
+Note that inbound here is relative to the specific DLPI link instance.
+Any outgoing traffic sent via the same link will be excluded but not other
+outgoing traffic, e.g., from a VNIC atop it.
+When using this level, it is recommended to set it before the others.
+.It Dv DL_PROMISC_INCOMING
+When one or more of the above promiscuous modes is also enabled, this option
+modifies it so that only inbound traffic is received.
+When using this level, it is recommended to set it before the others.
+.It Dv DL_PROMISC_OUTGOING
+When one or more of the above promiscuous modes is also enabled, this option
+modifies it so that only outbound traffic is received.
 When using this level, it is recommended to set it before the others.
 .El
+.Pp
+Note that only one of
+.Dv DL_PROMISC_RX_ONLY ,
+.Dv DL_PROMISC_INCOMING
+or
+.Dv DL_PROMISC_OUTGOING
+may be enabled at a time.
+Trying to enable one of
+.Dv DL_PROMISC_RX_ONLY ,
+.Dv DL_PROMISC_INCOMING
+or
+.Dv DL_PROMISC_OUTGOING
+while another is active will result in an error.
+To switch between them, you must first call
+.Fn dlpi_promiscoff
+to turn off the current one before passing the desired one to
+.Fn dlpi_promiscon .
 .Sh RETURN VALUES
 On successful completion,
 .Fn dlpi_promiscon

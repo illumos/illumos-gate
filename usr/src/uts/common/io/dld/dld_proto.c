@@ -611,6 +611,14 @@ proto_promiscon_req(dld_str_t *dsp, mblk_t *mp)
 		new_flags |= DLS_PROMISC_RX_ONLY;
 		break;
 
+	case DL_PROMISC_INCOMING:
+		new_flags |= DLS_PROMISC_INCOMING;
+		break;
+
+	case DL_PROMISC_OUTGOING:
+		new_flags |= DLS_PROMISC_OUTGOING;
+		break;
+
 	default:
 		dl_err = DL_NOTSUPPORTED;
 		goto failed2;
@@ -704,6 +712,22 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 			goto failed2;
 		}
 		new_flags &= ~DLS_PROMISC_RX_ONLY;
+		break;
+
+	case DL_PROMISC_INCOMING:
+		if (!(dsp->ds_promisc & DLS_PROMISC_INCOMING)) {
+			dl_err = DL_NOTENAB;
+			goto failed2;
+		}
+		new_flags &= ~DLS_PROMISC_INCOMING;
+		break;
+
+	case DL_PROMISC_OUTGOING:
+		if (!(dsp->ds_promisc & DLS_PROMISC_OUTGOING)) {
+			dl_err = DL_NOTENAB;
+			goto failed2;
+		}
+		new_flags &= ~DLS_PROMISC_OUTGOING;
 		break;
 
 	default:

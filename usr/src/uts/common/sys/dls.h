@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef	_SYS_DLS_H
@@ -86,6 +87,8 @@ typedef struct dls_link_s	dls_link_t;
 #define	DLS_PROMISC_MULTI	0x00000002
 #define	DLS_PROMISC_PHYS	0x00000004
 #define	DLS_PROMISC_RX_ONLY	0x00000008
+#define	DLS_PROMISC_INCOMING	0x00000010
+#define	DLS_PROMISC_OUTGOING	0x00000020
 
 extern int	dls_open(dls_link_t *, dls_dl_handle_t, dld_str_t *);
 extern void	dls_close(dld_str_t *);
