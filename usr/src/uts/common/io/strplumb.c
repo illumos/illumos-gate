@@ -653,6 +653,21 @@ matchmac(dev_info_t *dip, void *arg)
 	return (DDI_WALK_TERMINATE);
 }
 
+static void
+print_error(const char *fn, int rc, const char *drv_name,
+    int ppa, dl_error_ack_t *dleap)
+{
+	if (rc == ENOTSUP) {
+		cmn_err(CE_WARN,
+		    "getmacaddr: %s(%s%d) failed: DL_ERROR_ACK "
+		    "DLPI errno 0x%x, UNIX errno %d", fn,
+		    drv_name, ppa, dleap->dl_errno, dleap->dl_unix_errno);
+	} else {
+		cmn_err(CE_WARN,
+		    "getmacaddr: %s(%s%d) failed: %d", fn, drv_name, ppa, rc);
+	}
+}
+
 static uchar_t *
 getmacaddr(dev_info_t *dip, size_t *maclenp)
 {
@@ -662,10 +677,11 @@ getmacaddr(dev_info_t *dip, size_t *maclenp)
 	const char *drv_name = ddi_driver_name(dip);
 	char *clonepath;
 	uchar_t *macaddr = NULL;
+	dl_error_ack_t dlea;
 
 	if (rc = ldi_ident_from_mod(&modlinkage, &li)) {
 		cmn_err(CE_WARN,
-		    "getmacaddr: ldi_ident_from_mod failed: %d\n", rc);
+		    "%s: ldi_ident_from_mod failed: %d", __func__, rc);
 		return (NULL);
 	}
 
@@ -677,33 +693,34 @@ getmacaddr(dev_info_t *dip, size_t *maclenp)
 	ldi_ident_release(li);
 	if (rc) {
 		cmn_err(CE_WARN,
-		    "getmacaddr: ldi_open_by_name(%s) failed: %d\n",
-		    clonepath, rc);
+		    "%s: ldi_open_by_name(%s) failed: %d",
+		    __func__, clonepath, rc);
 		kmem_free(clonepath, MAXPATHLEN);
 		return (NULL);
 	}
 	kmem_free(clonepath, MAXPATHLEN);
 
 	ppa = i_ddi_devi_get_ppa(dip);
-	if ((dl_attach(lh, ppa, NULL) != 0) ||
-	    (dl_bind(lh, ETHERTYPE_IP, NULL) != 0)) {
+	rc = dl_attach(lh, ppa, &dlea);
+	if (rc != 0) {
 		(void) ldi_close(lh, FREAD|FWRITE, CRED());
-		cmn_err(CE_WARN,
-		    "getmacaddr: dl_attach/bind(%s%d) failed: %d\n",
-		    drv_name, ppa, rc);
+		print_error("dl_attach", rc, drv_name, ppa, &dlea);
 		return (NULL);
+	}
+	rc = dl_bind(lh, ETHERTYPE_IP, &dlea);
+	if (rc != 0) {
+		(void) ldi_close(lh, FREAD|FWRITE, CRED());
+		print_error("dl_bind", rc, drv_name, ppa, &dlea);
 	}
 
 	*maclenp = ETHERADDRL;
 	macaddr = kmem_alloc(ETHERADDRL, KM_SLEEP);
-	if (dl_phys_addr(lh, macaddr, maclenp, NULL) != 0 ||
-	    *maclenp != ETHERADDRL) {
+	rc = dl_phys_addr(lh, macaddr, maclenp, &dlea);
+	if (rc != 0 || *maclenp != ETHERADDRL) {
 		kmem_free(macaddr, ETHERADDRL);
 		macaddr = NULL;
 		*maclenp = 0;
-		cmn_err(CE_WARN,
-		    "getmacaddr: dl_phys_addr(%s%d) failed: %d\n",
-		    drv_name, ppa, rc);
+		print_error("dl_phys_addr", rc, drv_name, ppa, &dlea);
 	}
 	(void) ldi_close(lh, FREAD|FWRITE, CRED());
 	return (macaddr);
