@@ -32,15 +32,15 @@
 #include <string.h>
 #include <zlib.h>
 
-#define	Z_BUFSIZE 2048	/* XXX larger? */
+#define	Z_BUFSIZE 16384	/* match NFSREAD_MAX_SIZE */
 
 struct z_file
 {
 	int		zf_rawfd;
 	off_t		zf_dataoffset;
 	z_stream	zf_zstream;
-	unsigned char	zf_buf[Z_BUFSIZE];
 	int		zf_endseen;
+	unsigned char	zf_buf[Z_BUFSIZE];
 };
 
 static int zf_fill(struct z_file *z);
