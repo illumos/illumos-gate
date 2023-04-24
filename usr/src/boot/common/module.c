@@ -155,7 +155,7 @@ command_load(int argc, char *argv[])
 		}
 
 		if (file_findfile(argv[1], typestr) != NULL) {
-			snprintf(command_errbuf, sizeof (command_errbuf),
+			(void) snprintf(command_errbuf, sizeof (command_errbuf),
 			    "warning: file '%s' already loaded", argv[1]);
 			return (CMD_WARN);
 		}
@@ -176,7 +176,7 @@ command_load(int argc, char *argv[])
 	if (dokld || file_havepath(argv[1])) {
 		error = mod_loadkld(argv[1], argc - 2, argv + 2);
 		if (error == EEXIST) {
-			snprintf(command_errbuf, sizeof (command_errbuf),
+			(void) snprintf(command_errbuf, sizeof (command_errbuf),
 			    "warning: KLD '%s' already loaded", argv[1]);
 			return (CMD_WARN);
 		}
@@ -188,7 +188,7 @@ command_load(int argc, char *argv[])
 	 */
 	error = mod_load(argv[1], NULL, argc - 2, argv + 2);
 	if (error == EEXIST) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "warning: module '%s' already loaded", argv[1]);
 		return (CMD_WARN);
 	}
@@ -207,7 +207,7 @@ unload(void)
 		file_discard(fp);
 	}
 	loadaddr = 0;
-	unsetenv("kernelname");
+	(void) unsetenv("kernelname");
 }
 
 COMMAND_SET(unload, "unload", "unload all modules", command_unload);
@@ -251,20 +251,27 @@ command_lsmod(int argc, char *argv[])
 
 	pager_open();
 	for (fp = preloaded_files; fp; fp = fp->f_next) {
-		sprintf(lbuf, " %p: ", (void *) fp->f_addr);
-		pager_output(lbuf);
-		pager_output(fp->f_name);
-		sprintf(lbuf, " (%s, 0x%lx)\n", fp->f_type, (long)fp->f_size);
+		(void) snprintf(lbuf, sizeof (lbuf), " %p: ",
+		    (void *) fp->f_addr);
+		(void) pager_output(lbuf);
+		(void) pager_output(fp->f_name);
+		(void) snprintf(lbuf, sizeof (lbuf), " (%s, 0x%lx)\n",
+		    fp->f_type, (long)fp->f_size);
 		if (pager_output(lbuf))
 			break;
 		if (fp->f_args != NULL) {
-			pager_output("    args: ");
-			pager_output(fp->f_args);
+			(void) pager_output("    args: ");
+			(void) pager_output(fp->f_args);
 			if (pager_output("\n"))
 				break;
 			if (strcmp(fp->f_type, "hash") == 0) {
-				pager_output("    contents: ");
-				strlcpy(lbuf, PTOV(fp->f_addr), sizeof (lbuf));
+				size_t dsize;
+
+				(void) pager_output("    contents: ");
+				dsize = fp->f_size + 1;
+				if (sizeof (lbuf) < dsize)
+					dsize = sizeof (lbuf);
+				(void) strlcpy(lbuf, ptov(fp->f_addr), dsize);
 				if (pager_output(lbuf))
 					break;
 			}
@@ -273,7 +280,7 @@ command_lsmod(int argc, char *argv[])
 		if (hash == 1) {
 			void *ptr = PTOV(fp->f_addr);
 
-			pager_output("  hash: ");
+			(void) pager_output("  hash: ");
 			sha1(ptr, fp->f_size, (uint8_t *)lbuf);
 			for (int i = 0; i < SHA1_DIGEST_LENGTH; i++)
 				printf("%02x", (int)(lbuf[i] & 0xff));
@@ -282,11 +289,11 @@ command_lsmod(int argc, char *argv[])
 		}
 
 		if (fp->f_modules) {
-			pager_output("  modules: ");
+			(void) pager_output("  modules: ");
 			for (mp = fp->f_modules; mp; mp = mp->m_next) {
-				sprintf(lbuf, "%s.%d ", mp->m_name,
-				    mp->m_version);
-				pager_output(lbuf);
+				(void) snprintf(lbuf, sizeof (lbuf), "%s.%d ",
+				    mp->m_name, mp->m_version);
+				(void) pager_output(lbuf);
 			}
 			if (pager_output("\n"))
 				break;
@@ -298,7 +305,8 @@ command_lsmod(int argc, char *argv[])
 			 */
 			for (md = fp->f_metadata; md != NULL;
 			    md = md->md_next) {
-				sprintf(lbuf, "      0x%04x, 0x%lx\n",
+				(void) snprintf(lbuf, sizeof (lbuf),
+				    "      0x%04x, 0x%lx\n",
 				    md->md_type, (long)md->md_size);
 				if ((ret = pager_output(lbuf)))
 					break;
@@ -347,7 +355,7 @@ file_load(char *filename, vm_offset_t dest, struct preloaded_file **result)
 		if (error == EFTYPE)
 			continue;	/* Unknown to this handler? */
 		if (error) {
-			snprintf(command_errbuf, sizeof (command_errbuf),
+			(void) snprintf(command_errbuf, sizeof (command_errbuf),
 			    "can't load file '%s': %s", filename,
 			    strerror(error));
 			break;
@@ -385,7 +393,7 @@ file_load_dependencies(struct preloaded_file *base_file)
 			 */
 			mp = file_findmodule(NULL, dmodname, verinfo);
 			if (mp == NULL) {
-				snprintf(command_errbuf,
+				(void) snprintf(command_errbuf,
 				    sizeof (command_errbuf),
 				    "module '%s' exists but with wrong version",
 				    dmodname);
@@ -437,11 +445,11 @@ module_hash(struct preloaded_file *fp, void *addr, size_t size)
 
 	sha1(addr, size, hash);
 	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
-		snprintf(ascii + 2 * i, sizeof (ascii) - 2 * i, "%02x",
+		(void) snprintf(ascii + 2 * i, sizeof (ascii) - 2 * i, "%02x",
 		    hash[i] & 0xff);
 	}
 	/* Out of memory here is not fatal issue. */
-	asprintf(&fp->f_args, "hash=%s", ascii);
+	(void) asprintf(&fp->f_args, "hash=%s", ascii);
 }
 
 /*
@@ -648,20 +656,20 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 	/* locate the file on the load path */
 	name = file_search(fname, NULL);
 	if (name == NULL) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "can't find '%s'", fname);
 		return (NULL);
 	}
 
 	if ((fd = open(name, O_RDONLY)) < 0) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "can't open '%s': %s", name, strerror(errno));
 		free(name);
 		return (NULL);
 	}
 	if (fstat(fd, &st) < 0) {
-		close(fd);
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) close(fd);
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "stat error '%s': %s", name, strerror(errno));
 		free(name);
 		return (NULL);
@@ -670,8 +678,8 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 	if (archsw.arch_loadaddr != NULL)
 		loadaddr = archsw.arch_loadaddr(LOAD_RAW, name, loadaddr);
 	if (loadaddr == 0) {
-		close(fd);
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) close(fd);
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "no memory to load %s", name);
 		free(name);
 		return (NULL);
@@ -684,10 +692,10 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 		if (got == 0)			/* end of file */
 			break;
 		if (got < 0) {			/* error */
-			snprintf(command_errbuf, sizeof (command_errbuf),
+			(void) snprintf(command_errbuf, sizeof (command_errbuf),
 			    "error reading '%s': %s", name, strerror(errno));
 			free(name);
-			close(fd);
+			(void) close(fd);
 			if (archsw.arch_free_loadaddr != NULL &&
 			    st.st_size != 0) {
 				archsw.arch_free_loadaddr(loadaddr,
@@ -705,10 +713,10 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 		if (archsw.arch_free_loadaddr != NULL && st.st_size != 0)
 			archsw.arch_free_loadaddr(loadaddr,
 			    (uint64_t)(roundup2(st.st_size, PAGE_SIZE) >> 12));
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "no memory to load %s", name);
 		free(name);
-		close(fd);
+		(void) close(fd);
 		return (NULL);
 	}
 
@@ -722,8 +730,8 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 
 	if (fp->f_type == NULL ||
 	    (argc != 0 && fp->f_args == NULL)) {
-		close(fd);
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) close(fd);
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "no memory to load %s", name);
 		file_discard(fp);
 		return (NULL);
@@ -734,7 +742,7 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 	/* Add to the list of loaded files */
 	if (insert != 0)
 		file_insert_tail(fp);
-	close(fd);
+	(void) close(fd);
 	return (fp);
 }
 
@@ -760,14 +768,14 @@ mod_load(char *modname, struct mod_depend *verinfo, int argc, char *argv[])
 	if (mp != NULL) {
 		free(mp->m_args);
 		mp->m_args = unargv(argc, argv);
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "warning: module '%s' already loaded", mp->m_name);
 		return (0);
 	}
 	/* locate file with the module on the search path */
 	filename = mod_searchmodule(modname, verinfo);
 	if (filename == NULL) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "can't find '%s'", modname);
 		return (ENOENT);
 	}
@@ -793,7 +801,7 @@ mod_loadkld(const char *kldname, int argc, char *argv[])
 	 */
 	filename = file_search(kldname, kld_ext_list);
 	if (filename == NULL) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "can't find '%s'", kldname);
 		return (ENOENT);
 	}
@@ -802,7 +810,7 @@ mod_loadkld(const char *kldname, int argc, char *argv[])
 	 */
 	fp = file_findfile(filename, NULL);
 	if (fp != NULL) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "warning: KLD '%s' already loaded", filename);
 		free(filename);
 		return (0);
@@ -825,7 +833,7 @@ mod_loadkld(const char *kldname, int argc, char *argv[])
 		}
 	} while (0);
 	if (err == EFTYPE) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "don't know how to load module '%s'", filename);
 	}
 	if (err)
@@ -968,7 +976,7 @@ file_lookup(const char *path, const char *name, int namelen,
 	bcopy(name, cp, namelen);
 	cp += namelen;
 	for (cpp = extlist; *cpp; cpp++) {
-		strcpy(cp, *cpp);
+		(void) strcpy(cp, *cpp);
 		if (stat(result, &st) == 0 && S_ISREG(st.st_mode))
 			return (result);
 	}
@@ -984,7 +992,7 @@ file_havepath(const char *name)
 {
 	const char *cp;
 
-	archsw.arch_getdev(NULL, name, &cp);
+	(void) archsw.arch_getdev(NULL, name, &cp);
 	return (cp != name || strchr(name, '/') != NULL);
 }
 
@@ -1293,10 +1301,10 @@ moduledir_readhints(struct moduledir *mdp)
 	if (read(fd, mdp->d_hints, size) != size)
 		goto bad;
 	mdp->d_hintsz = size;
-	close(fd);
+	(void) close(fd);
 	return;
 bad:
-	close(fd);
+	(void) close(fd);
 	free(mdp->d_hints);
 	mdp->d_hints = NULL;
 	mdp->d_flags |= MDIR_NOHINTS;
