@@ -28,6 +28,9 @@
  * SUCH DAMAGE.
  */
 
+#ifndef _PXE_H
+#define	_PXE_H
+
 /*
  * The typedefs and structures declared in this file
  * clearly violate style(9), the reason for this is to conform to the
@@ -62,7 +65,7 @@ typedef struct {
 	uint16_t		Seg_Addr;
 	uint32_t		Phy_Addr;
 	uint16_t		Seg_Size;
-} SEGDESC_t;
+} PACKED SEGDESC_t;
 
 typedef	uint16_t		SEGSEL_t;
 typedef	uint16_t		PXENV_STATUS_t;
@@ -152,7 +155,6 @@ typedef struct {
 
 #define	MAXNUM_MCADDR		8
 typedef struct {
-	PXENV_STATUS_t	Status;
 	uint16_t	MCastAddrCount;
 	MAC_ADDR	McastAddr[MAXNUM_MCADDR];
 } PACKED t_PXENV_UNDI_MCAST_ADDRESS;
@@ -513,3 +515,5 @@ typedef struct {
 typedef struct {
 	PXENV_STATUS_t	Status;
 } PACKED t_PXENV_STOP_BASE;
+
+#endif /* _PXE_H */
