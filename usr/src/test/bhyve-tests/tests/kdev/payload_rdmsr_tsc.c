@@ -13,21 +13,23 @@
  * Copyright 2023 Oxide Computer Company
  */
 
-#ifndef _PAYLOAD_UTILS_H_
-#define	_PAYLOAD_UTILS_H_
+#include "payload_common.h"
+#include "payload_utils.h"
+#include "test_defs.h"
 
-#include <sys/types.h>
-#include <stdbool.h>
+#define	UINT32_MAX	0xffffffff
+#define	MSR_TSC	0x10
 
-void outb(uint16_t, uint8_t);
-void outw(uint16_t, uint16_t);
-void outl(uint16_t, uint32_t);
-uint8_t inb(uint16_t);
-uint16_t inw(uint16_t);
-uint32_t inl(uint16_t);
-uint64_t rdmsr(uint32_t);
-void wrmsr(uint32_t, uint64_t);
-void cpuid(uint32_t, uint32_t, uint32_t *);
-uint64_t rdtsc(void);
+void
+start(void)
+{
+	/* write a value to the TSC */
+	wrmsr(MSR_TSC, TSC_TARGET_WRVAL);
 
-#endif /* _PAYLOAD_UTILS_H_ */
+	/* loop for as long as the host wants */
+	for (;;) {
+		uint64_t tsc = rdmsr(MSR_TSC);
+		outl(IOP_TEST_VALUE, UINT32_MAX & tsc);
+		outl(IOP_TEST_VALUE, UINT32_MAX & (tsc >> 32));
+	}
+}

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _COMMON_H_
@@ -23,6 +23,7 @@ int open_drv_test(void);
 bool check_instance_usable(const char *);
 bool check_instance_exists(const char *);
 int destroy_instance(const char *);
+bool cpu_vendor_amd(void);
 
 #define	PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
 

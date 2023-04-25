@@ -39,9 +39,10 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
+
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -60,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/sunddi.h>
 #include <sys/hma.h>
+#include <sys/archsystm.h>
 
 #include <machine/md_var.h>
 #include <x86/psl.h>
@@ -152,7 +154,7 @@ struct vcpu {
 	uint64_t	nextrip;	/* (x) next instruction to execute */
 	struct vie	*vie_ctx;	/* (x) instruction emulation context */
 	vm_client_t	*vmclient;	/* (a) VM-system client */
-	uint64_t	tsc_offset;	/* (x) offset from host TSC */
+	uint64_t	tsc_offset;	/* (x) vCPU TSC offset */
 	struct vm_mtrr	mtrr;		/* (i) vcpu's MTRR */
 	vcpu_cpuid_config_t cpuid_cfg;	/* (x) cpuid configuration */
 
@@ -214,8 +216,12 @@ struct vm {
 	uint16_t	threads;		/* (o) num of threads/core */
 	uint16_t	maxcpus;		/* (o) max pluggable cpus */
 
-	uint64_t	boot_tsc_offset;	/* (i) TSC offset at VM boot */
 	hrtime_t	boot_hrtime;		/* (i) hrtime at VM boot */
+
+	/* TSC and TSC scaling related values */
+	uint64_t	tsc_offset;		/* (i) VM-wide TSC offset */
+	uint64_t	guest_freq;		/* (i) guest TSC Frequency */
+	uint64_t	freq_multiplier;	/* (i) guest/host TSC Ratio */
 
 	struct ioport_config ioports;		/* (o) ioport handling */
 
@@ -224,6 +230,7 @@ struct vm {
 };
 
 static int vmm_initialized;
+static uint64_t vmm_host_freq;
 
 
 static void
@@ -253,6 +260,9 @@ static struct vmm_ops vmm_ops_null = {
 	.vmrestorectx	= (vmi_restorectx)nullop_panic,
 	.vmgetmsr	= (vmi_get_msr_t)nullop_panic,
 	.vmsetmsr	= (vmi_set_msr_t)nullop_panic,
+	.vmfreqratio	= (vmi_freqratio_t)nullop_panic,
+	.fr_fracsize	= 0,
+	.fr_intsize	= 0,
 };
 
 static struct vmm_ops *ops = &vmm_ops_null;
@@ -308,6 +318,16 @@ static const struct ctxop_template vmm_ctxop_tpl = {
 	.ct_save	= vmm_savectx,
 	.ct_restore	= vmm_restorectx,
 };
+
+static uint64_t calc_tsc_offset(uint64_t base_host_tsc, uint64_t base_guest_tsc,
+    uint64_t mult);
+static uint64_t calc_guest_tsc(uint64_t host_tsc, uint64_t mult,
+    uint64_t offset);
+
+/* functions implemented in vmm_time_support.S */
+uint64_t calc_freq_multiplier(uint64_t guest_hz, uint64_t host_hz,
+    uint32_t frac_size);
+uint64_t scale_tsc(uint64_t tsc, uint64_t multiplier, uint32_t frac_size);
 
 #ifdef KTR
 static const char *
@@ -442,6 +462,7 @@ static int
 vmm_init(void)
 {
 	vmm_host_state_init();
+	vmm_host_freq = unscalehrtime(NANOSEC);
 
 	if (vmm_is_intel()) {
 		ops = &vmm_ops_intel;
@@ -530,20 +551,34 @@ vm_init(struct vm *vm, bool create)
 		vcpu_init(vm, i, create);
 
 	/*
-	 * Configure the VM-wide TSC offset so that the call to vm_init()
-	 * represents the boot time (when the TSC(s) read 0).  Each vCPU will
-	 * have its own offset from this, which is altered if/when the guest
-	 * writes to MSR_TSC.
+	 * Configure VM time-related data, including:
+	 * - VM-wide TSC offset
+	 * - boot_hrtime
+	 * - guest_freq (same as host at boot time)
+	 * - freq_multiplier (used for scaling)
 	 *
-	 * The TSC offsetting math is all unsigned, using overflow for negative
-	 * offets.  A reading of the TSC is negated to form the boot offset.
+	 * This data is configured such that the call to vm_init() represents
+	 * the boot time (when the TSC(s) read 0).  Each vCPU will have its own
+	 * offset from this, which is altered if/when the guest writes to
+	 * MSR_TSC.
+	 *
+	 * Further changes to this data may occur if userspace writes to the
+	 * time data.
 	 */
 	const uint64_t boot_tsc = rdtsc_offset();
-	vm->boot_tsc_offset = (uint64_t)(-(int64_t)boot_tsc);
 
 	/* Convert the boot TSC reading to hrtime */
 	vm->boot_hrtime = (hrtime_t)boot_tsc;
 	scalehrtime(&vm->boot_hrtime);
+
+	/* Guest frequency is the same as the host at boot time */
+	vm->guest_freq = vmm_host_freq;
+
+	/* no scaling needed if guest_freq == host_freq */
+	vm->freq_multiplier = VM_TSCM_NOSCALE;
+
+	/* configure VM-wide offset: initial guest TSC is 0 at boot */
+	vm->tsc_offset = calc_tsc_offset(boot_tsc, 0, vm->freq_multiplier);
 }
 
 /*
@@ -2071,14 +2106,21 @@ vm_handle_rdmsr(struct vm *vm, int vcpuid, struct vm_exit *vme)
 
 	case MSR_TSC:
 		/*
+		 * Get the guest TSC, applying necessary vCPU offsets.
+		 *
 		 * In all likelihood, this should always be handled in guest
 		 * context by VMX/SVM rather than taking an exit.  (Both VMX and
 		 * SVM pass through read-only access to MSR_TSC to the guest.)
 		 *
+		 * The VM-wide TSC offset and per-vCPU offset are included in
+		 * the calculations of vcpu_tsc_offset(), so this is sufficient
+		 * to use as the offset in our calculations.
+		 *
 		 * No physical offset is requested of vcpu_tsc_offset() since
 		 * rdtsc_offset() takes care of that instead.
 		 */
-		val = vcpu_tsc_offset(vm, vcpuid, false) + rdtsc_offset();
+		val = calc_guest_tsc(rdtsc_offset(), vm->freq_multiplier,
+		    vcpu_tsc_offset(vm, vcpuid, false));
 		break;
 
 	default:
@@ -2123,21 +2165,19 @@ vm_handle_wrmsr(struct vm *vm, int vcpuid, struct vm_exit *vme)
 		/*
 		 * The effect of writing the TSC MSR is that a subsequent read
 		 * of the TSC would report that value written (plus any time
-		 * elapsed between the write and the read).  The guest TSC value
-		 * is calculated from a global offset for the guest (which
-		 * effectively makes its TSC read 0 at guest boot) and a
-		 * per-vCPU offset to handle these writes to the MSR.
+		 * elapsed between the write and the read).
 		 *
 		 * To calculate that per-vCPU offset, we can work backwards from
-		 * the guest value at the time of write:
+		 * the guest TSC at the time of write:
 		 *
-		 * value = host TSC + VM boot offset + vCPU offset
+		 * value = current guest TSC + vCPU offset
 		 *
 		 * so therefore:
 		 *
-		 * value - host TSC - VM boot offset = vCPU offset
+		 * value - current guest TSC = vCPU offset
 		 */
-		vcpu->tsc_offset = val - vm->boot_tsc_offset - rdtsc_offset();
+		vcpu->tsc_offset = val - calc_guest_tsc(rdtsc_offset(),
+		    vm->freq_multiplier, vm->tsc_offset);
 		break;
 
 	default:
@@ -3194,20 +3234,30 @@ vcpu_get_state(struct vm *vm, int vcpuid, int *hostcpu)
 	return (state);
 }
 
+/*
+ * Calculate the TSC offset for a vCPU, applying physical CPU adjustments if
+ * requested. The offset calculations include the VM-wide TSC offset.
+ */
 uint64_t
 vcpu_tsc_offset(struct vm *vm, int vcpuid, bool phys_adj)
 {
 	ASSERT(vcpuid >= 0 && vcpuid < vm->maxcpus);
 
-	uint64_t vcpu_off = vm->boot_tsc_offset + vm->vcpu[vcpuid].tsc_offset;
+	uint64_t vcpu_off = vm->tsc_offset + vm->vcpu[vcpuid].tsc_offset;
 
 	if (phys_adj) {
 		/* Include any offset for the current physical CPU too */
 		extern hrtime_t tsc_gethrtime_tick_delta(void);
-		vcpu_off += (uint64_t)tsc_gethrtime_tick_delta();
+		vcpu_off += tsc_gethrtime_tick_delta();
 	}
 
 	return (vcpu_off);
+}
+
+uint64_t
+vm_get_freq_multiplier(struct vm *vm)
+{
+	return (vm->freq_multiplier);
 }
 
 /* Normalize hrtime against the boot time for a VM */
@@ -3860,6 +3910,8 @@ vmm_data_from_class(const vmm_data_req_t *req, struct vm *vm, int vcpuid)
 		return (vm_lapic(vm, vcpuid));
 	case VDC_VMM_ARCH:
 		return (vm);
+	case VDC_VMM_TIME:
+		return (vm);
 
 	case VDC_FPU:
 	case VDC_REGISTER:
@@ -4081,9 +4133,6 @@ static const vmm_data_version_entry_t msr_v1 = {
 VMM_DATA_VERSION(msr_v1);
 
 static const uint32_t vmm_arch_v1_fields[] = {
-	VAI_TSC_BOOT_OFFSET,
-	VAI_BOOT_HRTIME,
-	VAI_TSC_FREQ,
 	VAI_VM_IS_PAUSED,
 };
 
@@ -4101,19 +4150,6 @@ vmm_read_arch_field(struct vm *vm, int vcpuid, uint32_t ident, uint64_t *valp)
 
 	if (vcpuid == -1) {
 		switch (ident) {
-		case VAI_TSC_BOOT_OFFSET:
-			*valp = vm->boot_tsc_offset;
-			return (true);
-		case VAI_BOOT_HRTIME:
-			*valp = vm->boot_hrtime;
-			return (true);
-		case VAI_TSC_FREQ:
-			/*
-			 * Since the system TSC calibration is not public, just
-			 * derive it from the scaling functions available.
-			 */
-			*valp = unscalehrtime(NANOSEC);
-			return (true);
 		case VAI_VM_IS_PAUSED:
 			*valp = vm->is_paused ? 1 : 0;
 			return (true);
@@ -4266,30 +4302,20 @@ vmm_data_write_varch(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	const uint_t entry_count =
 	    req->vdr_len / sizeof (struct vdi_field_entry_v1);
 
-	for (uint_t i = 0; i < entry_count; i++, entryp++) {
-		const uint64_t val = entryp->vfe_value;
-
-		switch (entryp->vfe_ident) {
-		case VAI_TSC_BOOT_OFFSET:
-			vm->boot_tsc_offset = val;
-			break;
-		case VAI_BOOT_HRTIME:
-			vm->boot_hrtime = val;
-			break;
-		case VAI_TSC_FREQ:
-			/* Guest TSC frequency not (currently) adjustable */
-			return (EPERM);
-		case VAI_VM_IS_PAUSED:
+	if (entry_count > 0) {
+		if (entryp->vfe_ident == VAI_VM_IS_PAUSED) {
 			/*
 			 * The VM_PAUSE and VM_RESUME ioctls are the officially
 			 * sanctioned mechanisms for setting the is-paused state
 			 * of the VM.
 			 */
 			return (EPERM);
-		default:
+		} else {
+			/* no other valid arch entries at this time */
 			return (EINVAL);
 		}
 	}
+
 	*req->vdr_result_len = entry_count * sizeof (struct vdi_field_entry_v1);
 	return (0);
 }
@@ -4302,6 +4328,568 @@ static const vmm_data_version_entry_t vmm_arch_v1 = {
 	.vdve_vcpu_writef = vmm_data_write_varch,
 };
 VMM_DATA_VERSION(vmm_arch_v1);
+
+
+/*
+ * GUEST TIME SUPPORT
+ *
+ * Broadly, there are two categories of functionality related to time passing in
+ * the guest: the guest's TSC and timers used by emulated devices.
+ *
+ * ---------------------------
+ * GUEST TSC "VIRTUALIZATION"
+ * ---------------------------
+ *
+ * The TSC can be read either via an instruction (rdtsc/rdtscp) or by reading
+ * the TSC MSR.
+ *
+ * When a guest reads the TSC via its MSR, the guest will exit and we emulate
+ * the rdmsr. More typically, the guest reads the TSC via a rdtsc(p)
+ * instruction. Both SVM and VMX support virtualizing the guest TSC in hardware
+ * -- that is, a guest will not generally exit on a rdtsc instruction.
+ *
+ * To support hardware-virtualized guest TSC, both SVM and VMX provide two knobs
+ * for the hypervisor to adjust the guest's view of the TSC:
+ * - TSC offset
+ * - TSC frequency multiplier (also called "frequency ratio")
+ *
+ * When a guest calls rdtsc(p), the TSC value it sees is the sum of:
+ *     guest_tsc = (host TSC, scaled according to frequency multiplier)
+ *		    + (TSC offset, programmed by hypervisor)
+ *
+ * See the discussions of the TSC offset and frequency multiplier below for more
+ * details on each of these.
+ *
+ * --------------------
+ * TSC OFFSET OVERVIEW
+ * --------------------
+ *
+ * The TSC offset is a value added to the host TSC (which may be scaled first)
+ * to provide the guest TSC. This offset addition is generally done by hardware,
+ * but may be used in emulating the TSC if necessary.
+ *
+ * Recall that general formula for calculating the guest TSC is:
+ *
+ *	guest_tsc = (host TSC, scaled if needed) + TSC offset
+ *
+ * Intuitively, the TSC offset is simply an offset of the host's TSC to make the
+ * guest's view of the TSC appear correct: The guest TSC should be 0 at boot and
+ * monotonically increase at a roughly constant frequency. Thus in the simplest
+ * case, the TSC offset is just the negated value of the host TSC when the guest
+ * was booted, assuming they have the same frequencies.
+ *
+ * In practice, there are several factors that can make calculating the TSC
+ * offset more complicated, including:
+ *
+ * (1) the physical CPU the guest is running on
+ * (2) whether the guest has written to the TSC of that vCPU
+ * (3) differing host and guest frequencies, like after a live migration
+ * (4) a guest running on a different system than where it was booted, like
+ *     after a live migration
+ *
+ * We will explore each of these factors individually. See below for a
+ * summary.
+ *
+ *
+ * (1) Physical CPU offsets
+ *
+ * The system maintains a set of per-CPU offsets to the TSC to provide a
+ * consistent view of the TSC regardless of the CPU a thread is running on.
+ * These offsets are included automatically as a part of rdtsc_offset().
+ *
+ * The per-CPU offset must be included as a part reading the host TSC when
+ * calculating the offset before running the guest on a given CPU.
+ *
+ *
+ * (2) Guest TSC writes (vCPU offsets)
+ *
+ * The TSC is a writable MSR. When a guest writes to the TSC, this operation
+ * should result in the TSC, when read from that vCPU, shows the value written,
+ * plus whatever time has elapsed since the read.
+ *
+ * To support this, when the guest writes to the TSC, we store an additional
+ * vCPU offset calculated to make future reads of the TSC map to what the guest
+ * expects.
+ *
+ *
+ * (3) Differing host and guest frequencies (host TSC scaling)
+ *
+ * A guest has the same frequency of its host when it boots, but it may be
+ * migrated to a machine with a different TSC frequency. Systems expect that
+ * their TSC frequency does not change. To support this fiction in which a guest
+ * is running on hardware of a different TSC frequency, the hypervisor  can
+ * program a "frequency multiplier" that represents the ratio of guest/host
+ * frequency.
+ *
+ * Any time a host TSC is used in calculations for the offset, it should be
+ * "scaled" according to this multiplier, and the hypervisor should program the
+ * multiplier before running a guest so that the hardware virtualization of the
+ * TSC functions properly. Similarly, the multiplier should be used in any TSC
+ * emulation.
+ *
+ * See below for more details about the frequency multiplier.
+ *
+ *
+ * (4) Guest running on a system it did not boot on ("base guest TSC")
+ *
+ * When a guest boots, its TSC offset is simply the negated host TSC at the time
+ * it booted. If a guest is migrated from a source host to a target host, the
+ * TSC offset from the source host is no longer useful for several reasons:
+ * - the target host TSC has no relationship to the source host TSC
+ * - the guest did not boot on the target system, so the TSC of the target host
+ *   is not sufficient to describe how long the guest has been running prior to
+ *   migration
+ * - the target system may have a different TSC frequency than the source system
+ *
+ * Ignoring the issue of frequency differences for a moment, let's consider how
+ * to re-align the guest TSC with the host TSC of the target host. Intuitively,
+ * for the guest to see the correct TSC, we still want to add some offset to the
+ * host TSC that offsets how long this guest has been running on
+ * the system.
+ *
+ * An example here might be helpful. Consider a source host and target host,
+ * both with TSC frequencies of 1GHz. On the source host, the guest and host TSC
+ * values might look like:
+ *
+ *  +----------------------------------------------------------------------+
+ *  | Event                 | source host TSC  | guest TSC                 |
+ *  ------------------------------------------------------------------------
+ *  | guest boot  (t=0s)    | 5000000000       | 5000000000 + -5000000000  |
+ *  |                       |                  | 0			   |
+ *  ------------------------------------------------------------------------
+ *  | guest rdtsc (t=10s))  | 15000000000      | 15000000000 + -5000000000 |
+ *  |                       |                  | 10000000000		   |
+ *  ------------------------------------------------------------------------
+ *  | migration   (t=15s)   | 20000000000      | 20000000000 + -5000000000 |
+ *  |                       |                  | 15000000000		   |
+ *  +----------------------------------------------------------------------+
+ *
+ * Ignoring the time it takes for a guest to physically migrate machines, on the
+ * target host, we would expect the TSC to continue functioning as such:
+ *
+ *  +----------------------------------------------------------------------+
+ *  | Event                 | target host TSC  | guest TSC                 |
+ *  ------------------------------------------------------------------------
+ *  | guest migrate (t=15s) | 300000000000     | 15000000000		   |
+ *  ------------------------------------------------------------------------
+ *  | guest rdtsc (t=20s))  | 305000000000     | 20000000000		   |
+ *  ------------------------------------------------------------------------
+ *
+ * In order to produce a correct TSC value here, we can calculate a new
+ * "effective" boot TSC that maps to what the host TSC would've been had it been
+ * booted on the target. We add that to the guest TSC when it began to run on
+ * this machine, and negate them both to get a new offset. In this example, the
+ * effective boot TSC is: -(300000000000 - 15000000000) = -285000000000.
+ *
+ *  +-------------------------------------------------------------------------+
+ *  | Event                 | target host TSC  | guest TSC                    |
+ *  ---------------------------------------------------------------------------
+ *  | guest "boot" (t=0s)   | 285000000000     | 285000000000 + -285000000000 |
+ *  |                       |                  | 0			      |
+ *  ---------------------------------------------------------------------------
+ *  | guest migrate (t=15s) | 300000000000     | 300000000000 + -285000000000 |
+ *  |                       |                  | 15000000000		      |
+ *  ---------------------------------------------------------------------------
+ *  | guest rdtsc (t=20s))  | 305000000000     | 305000000000 + -285000000000 |
+ *  |                       |                  | 20000000000		      |
+ *  --------------------------------------------------------------------------+
+ *
+ * To support the offset calculation following a migration, the VMM data time
+ * interface allows callers to set a "base guest TSC", which is the TSC value of
+ * the guest when it began running on the host. The current guest TSC can be
+ * requested via a read of the time data. See below for details on that
+ * interface.
+ *
+ * Frequency differences between the host and the guest are accounted for when
+ * scaling the host TSC. See below for details on the frequency multiplier.
+ *
+ *
+ * --------------------
+ * TSC OFFSET SUMMARY
+ * --------------------
+ *
+ * Factoring in all of the components to the TSC above, the TSC offset that is
+ * programmed by the hypervisor before running a given vCPU is:
+ *
+ * offset = -((base host TSC, scaled if needed) - base_guest_tsc) + vCPU offset
+ *
+ * This offset is stored in two pieces. Per-vCPU offsets are stored with the
+ * given vCPU and added in when programming the offset. The rest of the offset
+ * is stored as a VM-wide offset, and computed either at boot or when the time
+ * data is written to.
+ *
+ * It is safe to add the vCPU offset and the VM-wide offsets together because
+ * the vCPU offset is in terms of the guest TSC. The host TSC is scaled before
+ * using it in calculations, so all TSC values are applicable to the same
+ * frequency.
+ *
+ * Note: Though both the VM-wide offset and per-vCPU offsets may be negative, we
+ * store them as unsigned values and perform all offsetting math unsigned. This
+ * is to avoid UB from signed overflow.
+ *
+ * -------------------------
+ * TSC FREQUENCY MULTIPLIER
+ * -------------------------
+ *
+ * In order to account for frequency differences between the host and guest, SVM
+ * and VMX provide an interface to set a "frequency multiplier" (or "frequency
+ * ratio") representing guest to host frequency. In a hardware-virtualized read
+ * of the TSC, the host TSC is scaled using this multiplier prior to adding the
+ * programmed TSC offset.
+ *
+ * Both platforms represent the ratio as a fixed point number, where the lower
+ * bits are used as a fractional component, and some number of the upper bits
+ * are used as the integer component.
+ *
+ * Some example multipliers, for a platform with FRAC fractional bits in the
+ * multiplier:
+ * - guest frequency == host: 1 << FRAC
+ * - guest frequency is 2x host: 1 << (FRAC + 1)
+ * - guest frequency is 0.5x host: 1 << (FRAC - 1), as the highest-order
+ *   fractional bit represents 1/2
+ * - guest frequency is 2.5x host: (1 << FRAC) | (1 << (FRAC - 1))
+ * and so on.
+ *
+ * In general, the frequency multiplier is calculated as follows:
+ *		(guest_hz * (1 << FRAC_SIZE)) / host_hz
+ *
+ * The multiplier should be used any time the host TSC value is used in
+ * calculations with the guest TSC (and their frequencies differ). The function
+ * `vmm_scale_tsc` is intended to be used for these purposes, as it will scale
+ * the host TSC only if needed.
+ *
+ * The multiplier should also be programmed by the hypervisor before the guest
+ * is run.
+ *
+ *
+ * ----------------------------
+ * DEVICE TIMERS (BOOT_HRTIME)
+ * ----------------------------
+ *
+ * Emulated devices use timers to do things such as scheduling periodic events.
+ * These timers are scheduled relative to the hrtime of the host. When device
+ * state is exported or imported, we use boot_hrtime to normalize these timers
+ * against the host hrtime. The boot_hrtime represents the hrtime of the host
+ * when the guest was booted.
+ *
+ * If a guest is migrated to a different machine, boot_hrtime must be adjusted
+ * to match the hrtime of when the guest was effectively booted on the target
+ * host. This allows timers to continue functioning when device state is
+ * imported on the target.
+ *
+ *
+ * ------------------------
+ * VMM DATA TIME INTERFACE
+ * ------------------------
+ *
+ * In order to facilitate live migrations of guests, we provide an interface,
+ * via the VMM data read/write ioctls, for userspace to make changes to the
+ * guest's view of the TSC and device timers, allowing these features to
+ * continue functioning after a migration.
+ *
+ * The interface was designed to expose the minimal amount of data needed for a
+ * userspace component to make adjustments to the guest's view of time (e.g., to
+ * account for time passing in a live migration). At a minimum, such a program
+ * needs:
+ * - the current guest TSC
+ * - guest TSC frequency
+ * - guest's boot_hrtime
+ * - timestamps of when this data was taken (hrtime for hrtime calculations, and
+ *   wall clock time for computing time deltas between machines)
+ *
+ * The wall clock time is provided for consumers to make adjustments to the
+ * guest TSC and boot_hrtime based on deltas observed during migrations. It may
+ * be prudent for consumers to use this data only in circumstances where the
+ * source and target have well-synchronized wall clocks, but nothing in the
+ * interface depends on this assumption.
+ *
+ * On writes, consumers write back:
+ * - the base guest TSC (used for TSC offset calculations)
+ * - desired boot_hrtime
+ * - guest_frequency (cannot change)
+ * - hrtime of when this data was adjusted
+ * - (wall clock time on writes is ignored)
+ *
+ * The interface will adjust the input guest TSC slightly, based on the input
+ * hrtime, to account for latency between userspace calculations and application
+ * of the data on the kernel side. This amounts to adding a small amount of
+ * additional "uptime" for the guest.
+ *
+ * After the adjustments, the interface updates the VM-wide TSC offset and
+ * boot_hrtime. Per-vCPU offsets are not adjusted, as those are already in terms
+ * of the guest TSC and can be exported/imported via the MSR VMM data interface.
+ *
+ *
+ * --------------------------------
+ * SUPPORTED PLATFORMS AND CAVEATS
+ * --------------------------------
+ *
+ * While both VMX and SVM offer TSC scaling as a feature, at this time only SVM
+ * is supported by bhyve.
+ *
+ * The time data interface is designed such that Intel support can be added
+ * easily, and all other aspects of the time interface should work on Intel.
+ * (Without frequency control though, in practice, doing live migrations of
+ * guests on Intel will not work for time-related things, as two machines
+ * rarely have exactly the same frequency).
+ *
+ * Additionally, while on both SVM and VMX the frequency multiplier is a fixed
+ * point number, each uses a different number of fractional and integer bits for
+ * the multiplier. As such, calculating the multiplier and fractional bit size
+ * is requested via the vmm_ops.
+ *
+ * Care should be taken to set reasonable limits for ratios based on the
+ * platform, as the difference in fractional bits can lead to slightly different
+ * tradeoffs in terms of representable ratios and potentially overflowing
+ * calculations.
+ */
+
+/*
+ * Scales the TSC if needed, based on the input frequency multiplier.
+ */
+static uint64_t
+vmm_scale_tsc(uint64_t tsc, uint64_t mult)
+{
+	const uint32_t frac_size = ops->fr_fracsize;
+
+	if (mult != VM_TSCM_NOSCALE) {
+		VERIFY3U(frac_size, >, 0);
+		return (scale_tsc(tsc, mult, frac_size));
+	} else {
+		return (tsc);
+	}
+}
+
+/*
+ * Calculate the frequency multiplier, which represents the ratio of
+ * guest_hz / host_hz. The frequency multiplier is a fixed point number with
+ * `frac_sz` fractional bits (fractional bits begin at bit 0).
+ *
+ * See comment for "calc_freq_multiplier" in "vmm_time_support.S" for more
+ * information about valid input to this function.
+ */
+uint64_t
+vmm_calc_freq_multiplier(uint64_t guest_hz, uint64_t host_hz,
+    uint32_t frac_size)
+{
+	VERIFY3U(guest_hz, !=, 0);
+	VERIFY3U(frac_size, >, 0);
+	VERIFY3U(frac_size, <, 64);
+
+	return (calc_freq_multiplier(guest_hz, host_hz, frac_size));
+}
+
+/*
+ * Calculate the guest VM-wide TSC offset.
+ *
+ * offset = - ((base host TSC, scaled if needed) - base_guest_tsc)
+ *
+ * The base_host_tsc and the base_guest_tsc are the TSC values of the host
+ * (read on the system) and the guest (calculated) at the same point in time.
+ * This allows us to fix the guest TSC at this point in time as a base, either
+ * following boot (guest TSC = 0), or a change to the guest's time data from
+ * userspace (such as in the case of a migration).
+ */
+static uint64_t
+calc_tsc_offset(uint64_t base_host_tsc, uint64_t base_guest_tsc, uint64_t mult)
+{
+	const uint64_t htsc_scaled = vmm_scale_tsc(base_host_tsc, mult);
+	if (htsc_scaled > base_guest_tsc) {
+		return ((uint64_t)(- (int64_t)(htsc_scaled - base_guest_tsc)));
+	} else {
+		return (base_guest_tsc - htsc_scaled);
+	}
+}
+
+/*
+ * Calculate an estimate of the guest TSC.
+ *
+ * guest_tsc = (host TSC, scaled if needed) + offset
+ */
+static uint64_t
+calc_guest_tsc(uint64_t host_tsc, uint64_t mult, uint64_t offset)
+{
+	return (vmm_scale_tsc(host_tsc, mult) + offset);
+}
+
+/*
+ * Take a non-atomic "snapshot" of the current:
+ * - TSC
+ * - hrtime
+ * - wall clock time
+ */
+static void
+vmm_time_snapshot(uint64_t *tsc, hrtime_t *hrtime, timespec_t *hrestime)
+{
+	/*
+	 * Disable interrupts while we take the readings: In the absence of a
+	 * mechanism to convert hrtime to hrestime, we want the time between
+	 * each of these measurements to be as small as possible.
+	 */
+	ulong_t iflag = intr_clear();
+
+	hrtime_t hrt = gethrtimeunscaledf();
+	*tsc = (uint64_t)hrt;
+	*hrtime = hrt;
+	scalehrtime(hrtime);
+	gethrestime(hrestime);
+
+	intr_restore(iflag);
+}
+
+/*
+ * Read VMM Time data
+ *
+ * Provides:
+ * - the current guest TSC and TSC frequency
+ * - guest boot_hrtime
+ * - timestamps of the read (hrtime and wall clock time)
+ */
+static int
+vmm_data_read_vmm_time(void *arg, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_VMM_TIME);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_time_info_v1));
+
+	struct vm *vm = arg;
+	struct vdi_time_info_v1 *out = req->vdr_data;
+
+	/* Take a snapshot of this point in time */
+	uint64_t tsc;
+	hrtime_t hrtime;
+	timespec_t hrestime;
+	vmm_time_snapshot(&tsc, &hrtime, &hrestime);
+
+	/* Write the output values */
+	out->vt_guest_freq = vm->guest_freq;
+
+	/*
+	 * Use only the VM-wide TSC offset for calculating the guest TSC,
+	 * ignoring per-vCPU offsets. This value is provided as a "base" guest
+	 * TSC at the time of the read; per-vCPU offsets are factored in as
+	 * needed elsewhere, either when running the vCPU or if the guest reads
+	 * the TSC via rdmsr.
+	 */
+	out->vt_guest_tsc = calc_guest_tsc(tsc, vm->freq_multiplier,
+	    vm->tsc_offset);
+	out->vt_boot_hrtime = vm->boot_hrtime;
+	out->vt_hrtime = hrtime;
+	out->vt_hres_sec = hrestime.tv_sec;
+	out->vt_hres_ns = hrestime.tv_nsec;
+
+	return (0);
+}
+
+/*
+ * Modify VMM Time data related values
+ *
+ * This interface serves to allow guests' TSC and device timers to continue
+ * functioning across live migrations. On a successful write, the VM-wide TSC
+ * offset and boot_hrtime of the guest are updated.
+ *
+ * The interface requires an hrtime of the system at which the caller wrote
+ * this data; this allows us to adjust the TSC and boot_hrtime slightly to
+ * account for time passing between the userspace call and application
+ * of the data here.
+ *
+ * There are several possibilities for invalid input, including:
+ * - a requested guest frequency of 0, or a frequency otherwise unsupported by
+ *   the underlying platform
+ * - hrtime or boot_hrtime values that appear to be from the future
+ * - the requested frequency does not match the host, and this system does not
+ *   have hardware TSC scaling support
+ */
+static int
+vmm_data_write_vmm_time(void *arg, const vmm_data_req_t *req)
+{
+	VERIFY3U(req->vdr_class, ==, VDC_VMM_TIME);
+	VERIFY3U(req->vdr_version, ==, 1);
+	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_time_info_v1));
+
+	struct vm *vm = arg;
+	const struct vdi_time_info_v1 *src = req->vdr_data;
+
+	/*
+	 * Platform-specific checks will verify the requested frequency against
+	 * the supported range further, but a frequency of 0 is never valid.
+	 */
+	if (src->vt_guest_freq == 0) {
+		return (EINVAL);
+	}
+
+	/*
+	 * Check whether the request frequency is supported and get the
+	 * frequency multiplier.
+	 */
+	uint64_t mult = VM_TSCM_NOSCALE;
+	freqratio_res_t res = ops->vmfreqratio(src->vt_guest_freq,
+	    vmm_host_freq, &mult);
+	switch (res) {
+	case FR_SCALING_NOT_SUPPORTED:
+		/*
+		 * This system doesn't support TSC scaling, and the guest/host
+		 * frequencies differ
+		 */
+		return (EPERM);
+	case FR_OUT_OF_RANGE:
+		/* Requested frequency ratio is too small/large */
+		return (EINVAL);
+	case FR_SCALING_NOT_NEEDED:
+		/* Host and guest frequencies are the same */
+		VERIFY3U(mult, ==, VM_TSCM_NOSCALE);
+		break;
+	case FR_VALID:
+		VERIFY3U(mult, !=, VM_TSCM_NOSCALE);
+		break;
+	}
+
+	/*
+	 * Find (and validate) the hrtime delta between the input request and
+	 * when we received it so that we can bump the TSC to account for time
+	 * passing.
+	 *
+	 * We ignore the hrestime as input, as this is a field that
+	 * exists for reads.
+	 */
+	uint64_t tsc;
+	hrtime_t hrtime;
+	timespec_t hrestime;
+	vmm_time_snapshot(&tsc, &hrtime, &hrestime);
+	if ((src->vt_hrtime > hrtime) || (src->vt_boot_hrtime > hrtime)) {
+		/*
+		 * The caller has passed in an hrtime / boot_hrtime from the
+		 * future.
+		 */
+		return (EINVAL);
+	}
+	hrtime_t hrt_delta = hrtime - src->vt_hrtime;
+
+	/* Calculate guest TSC adjustment */
+	const uint64_t host_ticks = unscalehrtime(hrt_delta);
+	const uint64_t guest_ticks = vmm_scale_tsc(host_ticks,
+	    vm->freq_multiplier);
+	const uint64_t base_guest_tsc = src->vt_guest_tsc + guest_ticks;
+
+	/* Update guest time data */
+	vm->freq_multiplier = mult;
+	vm->guest_freq = src->vt_guest_freq;
+	vm->boot_hrtime = src->vt_boot_hrtime;
+	vm->tsc_offset = calc_tsc_offset(tsc, base_guest_tsc,
+	    vm->freq_multiplier);
+
+	return (0);
+}
+
+static const vmm_data_version_entry_t vmm_time_v1 = {
+	.vdve_class = VDC_VMM_TIME,
+	.vdve_version = 1,
+	.vdve_len_expect = sizeof (struct vdi_time_info_v1),
+	.vdve_readf = vmm_data_read_vmm_time,
+	.vdve_writef = vmm_data_write_vmm_time,
+};
+VMM_DATA_VERSION(vmm_time_v1);
+
 
 static int
 vmm_data_read_versions(void *arg, const vmm_data_req_t *req)

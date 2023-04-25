@@ -104,6 +104,15 @@ svm_msr_guest_enter(struct svm_softc *sc, int vcpu)
 	host_msrs[IDX_MSR_CSTAR] = rdmsr(MSR_CSTAR);
 	host_msrs[IDX_MSR_STAR] = rdmsr(MSR_STAR);
 	host_msrs[IDX_MSR_SF_MASK] = rdmsr(MSR_SF_MASK);
+
+	/*
+	 * Set the frequency multiplier MSR to enable guest TSC scaling if
+	 * needed.
+	 */
+	uint64_t mult = vm_get_freq_multiplier(sc->vm);
+	if (mult != VM_TSCM_NOSCALE) {
+		wrmsr(MSR_AMD_TSC_RATIO, mult);
+	}
 }
 
 void
@@ -118,6 +127,9 @@ svm_msr_guest_exit(struct svm_softc *sc, int vcpu)
 	wrmsr(MSR_CSTAR, host_msrs[IDX_MSR_CSTAR]);
 	wrmsr(MSR_STAR, host_msrs[IDX_MSR_STAR]);
 	wrmsr(MSR_SF_MASK, host_msrs[IDX_MSR_SF_MASK]);
+
+	/* Reset frequency multiplier MSR */
+	wrmsr(MSR_AMD_TSC_RATIO, AMD_TSCM_RESET_VAL);
 
 	/* MSR_KGSBASE will be restored on the way back to userspace */
 }

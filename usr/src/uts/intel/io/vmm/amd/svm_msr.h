@@ -41,4 +41,21 @@ void svm_msr_guest_exit(struct svm_softc *sc, int vcpu);
 vm_msr_result_t svm_wrmsr(struct svm_softc *, int, uint32_t, uint64_t);
 vm_msr_result_t svm_rdmsr(struct svm_softc *, int, uint32_t, uint64_t *);
 
+/*
+ * TSC Frequency Multiplier MSR related values
+ */
+
+/* N integer bits of frequency multiplier */
+#define	AMD_TSCM_INT_SIZE	8
+
+/* N fractional bits of frequency multiplier */
+#define	AMD_TSCM_FRAC_SIZE	32
+
+/*
+ * The reset value of the frequency multiplier is 1.0 (section 15.30.5 of AMD
+ * Architecture Programmer's Manual Volume 2), indicating the host and guest
+ * have the same TSC frequency.
+ */
+#define	AMD_TSCM_RESET_VAL	(1ULL << AMD_TSCM_FRAC_SIZE)
+
 #endif	/* _SVM_MSR_H_ */
