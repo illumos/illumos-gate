@@ -25,14 +25,15 @@
 #
 
 include		../Makefile.com
+include		$(SRC)/Makefile.master.64
 
 CONVLIBDIR=	$(CONVLIBDIR64)
 
 .KEEP_STATE:
 
-ASFLAGS +=	-D__amd64 $(amd64_XARCH)
+ASFLAGS64 +=	-D_ASM
 
 install:	all $(ROOTLIB64)/$(PROG)
 
 include		../Makefile.targ
-include		$(SRC)/Makefile.master.64
+

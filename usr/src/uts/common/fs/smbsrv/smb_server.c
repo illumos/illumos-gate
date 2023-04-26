@@ -1723,7 +1723,8 @@ smb_server_listener(smb_thread_t *thread, void *arg)
 
 	DTRACE_PROBE1(so__wait__accept, struct sonode *, ld->ld_so);
 
-	for (;;) {
+	while (smb_thread_continue_nowait(&ld->ld_thread) &&
+	    ld->ld_sv->sv_state != SMB_SERVER_STATE_STOPPING) {
 		int ret = ksocket_accept(ld->ld_so, NULL, NULL, &s_so, CRED());
 
 		switch (ret) {
@@ -1731,14 +1732,21 @@ smb_server_listener(smb_thread_t *thread, void *arg)
 			break;
 		case ECONNABORTED:
 			continue;
+
 		case EINTR:
-		case EBADF:	/* libfakekernel */
-			goto out;
+		case EBADF:
+		case ENOTSOCK:
+			/* These are normal during shutdown. Silence. */
+			if (ld->ld_sv->sv_state == SMB_SERVER_STATE_STOPPING)
+				goto out;
+			/* FALLTHROUGH */
 		default:
 			cmn_err(CE_WARN,
 			    "smb_server_listener: ksocket_accept(%d)",
 			    ret);
-			goto out;
+			/* avoid a tight CPU-burn loop here */
+			delay(MSEC_TO_TICK(10));
+			continue;
 		}
 
 		DTRACE_PROBE1(so__accept, struct sonode *, s_so);
