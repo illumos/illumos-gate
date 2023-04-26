@@ -385,6 +385,7 @@ COMMON_SUBDIRS=		\
 	smserverd	\
 	soelim		\
 	sort		\
+	spd		\
 	spell		\
 	split		\
 	sqlite		\

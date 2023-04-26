@@ -1535,6 +1535,8 @@ file path=opt/util-tests/tests/iconv_test mode=0555
 dir  path=opt/util-tests/tests/libcustr
 file path=opt/util-tests/tests/libcustr/custr_remove mode=0555
 file path=opt/util-tests/tests/libcustr/custr_trunc mode=0555
+file path=opt/util-tests/tests/libjedec_spd mode=0555
+file path=opt/util-tests/tests/libjedec_temp mode=0555
 file path=opt/util-tests/tests/libjedec_test mode=0555
 dir  path=opt/util-tests/tests/libnvpair_json
 file path=opt/util-tests/tests/libnvpair_json/json_00_blank mode=0555

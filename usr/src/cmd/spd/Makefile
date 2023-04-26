@@ -10,31 +10,26 @@
 #
 
 #
-# Copyright 2020 Joyent, Inc.
 # Copyright 2023 Oxide Computer Company
 #
 
-LIBRARY =	libjedec.a
-VERS =		.1
-OBJECTS =	libjedec.o libjedec_spd.o libjedec_spd_ddr4.o bitext.o \
-		libjedec_spd_ddr5.o libjedec_temp.o
+PROG= spd
 
-include ../../Makefile.lib
+include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
 
-LIBS =		$(DYNLIB)
-CPPFLAGS +=	-I../common
-LDLIBS +=	-lc -lnvpair
-CSTD =		$(CSTD_GNU99)
-
-SRCDIR =	../common
+ROOTCMDDIR = $(ROOTLIB)/spd
+CFLAGS += $(CCVERBOSE)
+LDLIBS += -lnvpair -ljedec
+CTF_MODE = link
 
 .KEEP_STATE:
 
-all:	$(LIBS)
+all: $(PROG)
 
-pics/%.o: $(SRC)/common/bitext/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
+install: all $(ROOTCMD)
 
-include ../../Makefile.targ
+clean:
 
+include ../Makefile.targ
