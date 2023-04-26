@@ -1387,7 +1387,8 @@ idmap_cfg_update_thread(void *arg)
 			if (retry_count >= DISCOVERY_RETRY_DEGRADE_CUTOFF)
 				restore_svc();
 			retry_count = 0;
-		} else if (pgcfg->domain_controller == NULL) {
+		} else if (pgcfg->domain_controller == NULL ||
+		    pgcfg->global_catalog == NULL) {
 			if (retry_count == 0)
 				ttl = DISCOVERY_RETRY_INITIAL_DELAY;
 			else
@@ -2218,8 +2219,8 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	int rc = 0;
 	int errors;
 	int changed = 0;
-	int dc_changed = 0;
-	int ad_reload_required = 0;
+	bool_t dc_changed = FALSE;
+	bool_t gc_changed = FALSE;
 	idmap_pg_config_t new_pgcfg, *live_pgcfg;
 
 	if (DBG(CONFIG, 1))
@@ -2335,7 +2336,8 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	if (update_string(&live_pgcfg->domain_name,
 	    &new_pgcfg.domain_name, "domain_name")) {
 		changed++;
-		ad_reload_required = TRUE;
+		dc_changed = TRUE;
+		gc_changed = TRUE;
 		idmapd_set_krb5_realm(live_pgcfg->domain_name);
 	}
 	live_pgcfg->domain_name_auto_disc = new_pgcfg.domain_name_auto_disc;
@@ -2344,9 +2346,11 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	    &new_pgcfg.domain_guid, "domain_guid");
 	live_pgcfg->domain_guid_auto_disc = new_pgcfg.domain_guid_auto_disc;
 
-	dc_changed = update_dirs(&live_pgcfg->domain_controller,
-	    &new_pgcfg.domain_controller, "domain_controller");
-	changed += dc_changed;
+	if (update_dirs(&live_pgcfg->domain_controller,
+	    &new_pgcfg.domain_controller, "domain_controller")) {
+		changed++;
+		dc_changed = TRUE;
+	}
 	live_pgcfg->domain_controller_auto_disc =
 	    new_pgcfg.domain_controller_auto_disc;
 
@@ -2367,7 +2371,7 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	UNLOCK_CONFIG();
 
-	if (dc_changed != 0) {
+	if (dc_changed) {
 		notify_dc_changed();
 	}
 
@@ -2385,8 +2389,11 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	/* More props that can be discovered or set in SMF */
 
-	changed += update_dirs(&live_pgcfg->global_catalog,
-	    &new_pgcfg.global_catalog, "global_catalog");
+	if (update_dirs(&live_pgcfg->global_catalog,
+	    &new_pgcfg.global_catalog, "global_catalog")) {
+		changed++;
+		gc_changed = TRUE;
+	}
 	live_pgcfg->global_catalog_auto_disc =
 	    new_pgcfg.global_catalog_auto_disc;
 
@@ -2395,7 +2402,7 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	if (update_domains_in_forest(&live_pgcfg->domains_in_forest,
 	    &new_pgcfg.domains_in_forest, "domains_in_forest")) {
 		changed++;
-		ad_reload_required = TRUE;
+		gc_changed = TRUE;
 	}
 
 	if (update_trusted_domains(&live_pgcfg->trusted_domains,
@@ -2403,7 +2410,7 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 		changed++;
 		if (live_pgcfg->trusted_domains != NULL &&
 		    live_pgcfg->trusted_domains[0].domain[0] != '\0')
-			ad_reload_required = TRUE;
+			gc_changed = TRUE;
 	}
 
 	if (update_trusted_forest(&live_pgcfg->trusted_forests,
@@ -2411,7 +2418,7 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	    &new_pgcfg.num_trusted_forests, "trusted_forest")) {
 		changed++;
 		if (live_pgcfg->trusted_forests != NULL)
-			ad_reload_required = TRUE;
+			gc_changed = TRUE;
 	}
 
 	if (DBG(CONFIG, 1)) {
@@ -2423,8 +2430,10 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	UNLOCK_CONFIG();
 
-	if (ad_reload_required)
-		reload_ad();
+	if (dc_changed)
+		reload_dcs();
+	if (gc_changed)
+		reload_gcs();
 
 	idmap_cfg_unload(&new_pgcfg);
 
