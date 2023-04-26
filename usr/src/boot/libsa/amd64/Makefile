@@ -23,8 +23,10 @@ all install:    $(DYNLIB)
 
 include ../Makefile.com
 
-ASFLAGS =	$(amd64_XARCH) -I$(SRC)/uts/common -D_ASM
-ASFLAGS64 =	$(amd64_XARCH) -I$(SRC)/uts/common -D_ASM
+.KEEP_STATE:
+
+ASFLAGS +=	$(amd64_XARCH) -I$(SRC)/uts/common -I$(ROOT)/usr/include -D_ASM
+ASFLAGS64 +=	$(amd64_XARCH) -I$(SRC)/uts/common -I$(ROOT)/usr/include -D_ASM
 CFLAGS +=	-m64 $(CFLAGS64)
 CCASFLAGS +=	-m64
 
