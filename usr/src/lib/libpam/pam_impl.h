@@ -146,7 +146,7 @@ __pam_get_authtok(pam_handle_t *pamh, int source, int type, char *prompt,
 
 extern int
 __pam_display_msg(pam_handle_t *pamh, int msg_style, int num_msg,
-    char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE], void *conv_apdp);
+    char messages[][PAM_MAX_MSG_SIZE], void *conv_apdp);
 
 extern void
 __pam_log(int priority, const char *format, ...);
