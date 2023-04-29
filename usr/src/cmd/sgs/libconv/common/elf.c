@@ -1120,7 +1120,7 @@ conv_iter_ehdr_osabi(Conv_fmt_flags_t fmt_flags, conv_iter_cb_t func,
 		    ELFOSABI_NONE, uvalue));
 	}
 
-		return (CONV_ITER_CONT);
+	return (CONV_ITER_CONT);
 }
 
 static const conv_ds_t **

@@ -975,6 +975,8 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 		case ARCH_X86:
 			return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
 			    ds_emt_arr_x86, fmt_flags, inv_buf));
+		case ARCH_NONE:
+			break;
 		}
 		break;
 
@@ -986,6 +988,8 @@ conv_cnote_si_code(Half mach, int sig, int si_code,
 		case ARCH_X86:
 			return (conv_map_ds(ELFOSABI_NONE, EM_NONE, si_code,
 			    ds_fpe_arr_x86, fmt_flags, inv_buf));
+		case ARCH_NONE:
+			break;
 		}
 		break;
 
