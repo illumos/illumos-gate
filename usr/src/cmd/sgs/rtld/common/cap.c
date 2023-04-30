@@ -1079,7 +1079,7 @@ cap_files(const char *str)
 		if (pnavl_recorded(&capavl, name, hash, &where))
 			continue;
 
-		if ((pnp = calloc(sizeof (PathNode), 1)) != NULL) {
+		if ((pnp = calloc(1, sizeof (PathNode))) != NULL) {
 			pnp->pn_name = name;
 			pnp->pn_hash = hash;
 			avl_insert(capavl, pnp, where);

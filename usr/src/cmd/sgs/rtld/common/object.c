@@ -57,7 +57,6 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *oname)
 {
 	Ofl_desc	*ofl;
 	const char	*name;
-	size_t		lmsz;
 
 	/*
 	 * Allocate the name of this object, as the original name may be
@@ -70,7 +69,7 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *oname)
 	/*
 	 * Initialize an output file descriptor and the entrance criteria.
 	 */
-	if ((ofl = calloc(sizeof (Ofl_desc), 1)) == NULL)
+	if ((ofl = calloc(1, sizeof (Ofl_desc))) == NULL)
 		return (NULL);
 
 	ofl->ofl_dehdr = &dehdr;
@@ -96,9 +95,8 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *oname)
 	 * place holder and use the ELFPRV() element to maintain the output
 	 * file descriptor.
 	 */
-	lmsz = S_DROUND(sizeof (Rt_map)) + sizeof (Rt_elfp);
 	if ((ld_ent_setup(ofl, syspagsz) == S_ERROR) ||
-	    ((olmp = calloc(lmsz, 1)) == NULL)) {
+	    ((olmp = calloc(1, sizeof (*olmp))) == NULL)) {
 		free(ofl);
 		return (NULL);
 	}

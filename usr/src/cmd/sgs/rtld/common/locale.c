@@ -228,7 +228,7 @@ dgettext(const char *domain, const char *msgid)
 	 * Determine if we've initialized any domains yet.
 	 */
 	if (domaincnt == 0) {
-		if ((domains = calloc(sizeof (Domain), 2)) == NULL)
+		if ((domains = calloc(2, sizeof (Domain))) == NULL)
 			return ((char *)msgid);
 		domains[0].dom_name = MSG_ORIG(MSG_SUNW_OST_SGS);
 		domains[1].dom_name = MSG_ORIG(MSG_SUNW_OST_OSLIB);

@@ -870,7 +870,7 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 *  LM_ID_NEWLM:	Create a new link-map.
 	 */
 	if (lml == (Lm_list *)LM_ID_NEWLM) {
-		if ((lml = calloc(sizeof (Lm_list), 1)) == NULL)
+		if ((lml = calloc(1, sizeof (Lm_list))) == NULL)
 			return (NULL);
 
 		/*

@@ -275,8 +275,8 @@ tls_statmod(Lm_list *lml, Rt_map *lmp)
 	 * TLS buffer with a single null entry.  This allows us to initialize
 	 * the backup TLS reservation.
 	 */
-	if ((tlsmodlist = calloc((sizeof (TLS_modinfo *) * (tlsmodcnt + 1)) +
-	    (sizeof (TLS_modinfo) * tlsmodcnt), 1)) == NULL)
+	if ((tlsmodlist = calloc(1, (sizeof (TLS_modinfo *) * (tlsmodcnt + 1)) +
+	    (sizeof (TLS_modinfo) * tlsmodcnt))) == NULL)
 		return (0);
 
 	lml->lm_tls = 0;
