@@ -383,8 +383,9 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 	uint_t		hash = sgs_str_hash(name);
 
 	if (where == 0) {
-		/* LINTED */
-		Rt_map	*_lmp = fpavl_recorded(lml, name, hash, &where);
+		Rt_map	*_lmp __maybe_unused;
+
+		_lmp = fpavl_recorded(lml, name, hash, &where);
 
 		/*
 		 * We better not get a hit now, we do not want duplicates in
@@ -446,8 +447,9 @@ nfavl_insert(const char *name, avl_index_t where)
 	uint_t		hash = sgs_str_hash(name);
 
 	if (where == 0) {
-		/* LINTED */
-		int	in_nfavl = pnavl_recorded(&nfavl, name, hash, &where);
+		int	in_nfavl __maybe_unused;
+
+		in_nfavl = pnavl_recorded(&nfavl, name, hash, &where);
 
 		/*
 		 * We better not get a hit now, we do not want duplicates in

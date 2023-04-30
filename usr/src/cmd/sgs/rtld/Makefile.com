@@ -101,7 +101,6 @@ LDLIB =		-L ../../libld/$(MACH)
 RTLDLIB =	-L ../../librtld/$(MACH)
 
 CERRWARN +=	$(CNOWARN_UNINIT)
-CERRWARN +=	-_gcc=-Wno-unused-variable
 
 # not linted
 SMATCH=off
