@@ -662,10 +662,10 @@ audit_objopen(Rt_map *clmp, Rt_map *nlmp)
 	 *
 	 *			 ---------------
 	 *			| ai_cnt	|
-	 * 	Audit_info	| ai_clients	|-------
+	 *	Audit_info	| ai_clients	|-------
 	 *			| ai_dynplts	|	|
 	 *			|---------------|	|
-	 * 	Audit_client    |	1	|<------
+	 *	Audit_client    |	1	|<------
 	 *			|---------------|
 	 *			|	2	|
 	 *			    .........
@@ -719,7 +719,7 @@ _audit_objclose(APlist *list, Rt_map *lmp)
 		DBG_CALL(Dbg_audit_objclose(lml, alp->al_libname, NAME(lmp)));
 
 		leave(alml, thr_flg_reenter);
-		(*alp->al_objclose)(&(acp->ac_cookie));
+		(void) (*alp->al_objclose)(&(acp->ac_cookie));
 		(void) enter(thr_flg_reenter);
 	}
 }
