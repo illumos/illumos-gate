@@ -12054,6 +12054,7 @@ f usr/share/man/man1/cputrack.1 0444 root bin
 f usr/share/man/man1/crle.1 0444 root bin
 f usr/share/man/man1/crontab.1 0444 root bin
 f usr/share/man/man1/crypt.1 0444 root bin
+s usr/share/man/man1/csh.1=../../../has/man/man1has/csh.1has
 f usr/share/man/man1/csplit.1 0444 root bin
 f usr/share/man/man1/ctfdiff.1 0444 root bin
 f usr/share/man/man1/ctfdump.1 0444 root bin
