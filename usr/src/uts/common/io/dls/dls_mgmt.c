@@ -1357,7 +1357,7 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp, zoneid_t zid)
 	 * If we reach this point it means dlmgmtd is up but has no
 	 * mapping for the link name.
 	 */
-	if (ddi_parse(link, drv, &ppa) != DDI_SUCCESS)
+	if (ddi_parse_dlen(link, drv, MAXLINKNAMELEN, &ppa) != DDI_SUCCESS)
 		return (ENOENT);
 
 	if (IS_IPTUN_LINK(drv)) {

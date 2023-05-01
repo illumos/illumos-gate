@@ -2166,8 +2166,7 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		 * the vsw is being changed to 'routed' mode.
 		 */
 		if ((strlen(physname) != 0) &&
-		    (ddi_parse(physname, drv,
-		    &ddi_instance) != DDI_SUCCESS)) {
+		    (ddi_parse(physname, drv, &ddi_instance) != DDI_SUCCESS)) {
 			cmn_err(CE_WARN, "!vsw%d: physical device %s is not"
 			    " a valid device name/instance",
 			    vswp->instance, physname);

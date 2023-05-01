@@ -23,6 +23,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Garrett D'Amore
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 MNX Cloud, Inc.
  */
 
 #include <sys/note.h>
@@ -8969,29 +8970,54 @@ ddi_taskq_resume(ddi_taskq_t *tq)
 }
 
 int
-ddi_parse(
-	const char	*ifname,
-	char		*alnum,
-	uint_t		*nump)
+ddi_parse(const char *ifname, char *alnum, uint_t *nump)
+{
+	/*
+	 * Cap "alnum" size at LIFNAMSIZ, as callers use that in most/all
+	 * cases.
+	 */
+	return (ddi_parse_dlen(ifname, alnum, LIFNAMSIZ, nump));
+}
+
+int
+ddi_parse_dlen(const char *ifname, char *alnum, size_t alnumsize, uint_t *nump)
 {
 	const char	*p;
-	int		l;
+	int		copy_len;
 	ulong_t		num;
 	boolean_t	nonum = B_TRUE;
 	char		c;
 
-	l = strlen(ifname);
-	for (p = ifname + l; p != ifname; l--) {
+	copy_len = strlen(ifname);
+	for (p = ifname + copy_len; p != ifname; copy_len--) {
 		c = *--p;
 		if (!isdigit(c)) {
-			(void) strlcpy(alnum, ifname, l + 1);
+			/*
+			 * At this point, copy_len is the length of ifname
+			 * WITHOUT the PPA number. For "e1000g10" copy_len is 6.
+			 *
+			 * We must first make sure we HAVE a PPA, and we
+			 * aren't exceeding alnumsize with copy_len and a '\0'
+			 * terminator...
+			 */
+			int copy_len_nul = copy_len + 1;
+
+			if (nonum || alnumsize < copy_len_nul)
+				return (DDI_FAILURE);
+
+			/*
+			 * ... then we abuse strlcpy() to copy over the
+			 * driver name portion AND '\0'-terminate it.
+			 */
+			(void) strlcpy(alnum, ifname, copy_len_nul);
 			if (ddi_strtoul(p + 1, NULL, 10, &num) != 0)
 				return (DDI_FAILURE);
 			break;
 		}
 		nonum = B_FALSE;
 	}
-	if (l == 0 || nonum)
+
+	if (copy_len == 0)
 		return (DDI_FAILURE);
 
 	*nump = num;

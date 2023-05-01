@@ -86,7 +86,7 @@ rds_capable_interface(struct lifreq *lifrp)
 	char	ifname[LIFNAMSIZ];
 	char	drv[MAXLINKNAMELEN];
 	uint_t	ppa;
-	char 	*cp;
+	char	*cp;
 
 	if (lifrp->lifr_type == IFT_IB)
 		return (B_TRUE);
@@ -106,7 +106,8 @@ rds_capable_interface(struct lifreq *lifrp)
 		return (B_TRUE);
 	}
 
-	return (ddi_parse(ifname, drv, &ppa) == DDI_SUCCESS &&
+	return (
+	    ddi_parse_dlen(ifname, drv, MAXLINKNAMELEN, &ppa) == DDI_SUCCESS &&
 	    rds_transport_ops->rds_transport_if_lookup_by_name(drv));
 }
 
@@ -187,7 +188,7 @@ rds_ioctl_copyin_done(queue_t *q, mblk_t *mp)
 		caddr_t ubuf_addr;
 		int	ubuf_size;
 		uint_t	bufsize;
-		int 	i, nifs;
+		int	i, nifs;
 		struct lifconf lifc;
 		struct lifreq *lifrp;
 		struct ifreq *ifrp;
