@@ -2929,6 +2929,7 @@ CSI	Enabled
 .BR ps (1),
 .BR sh (1),
 .BR shell_builtins (1),
+.BR tcsh (1),
 .BR which (1),
 .BR tset (1B),
 .BR access (2),
@@ -2941,6 +2942,7 @@ CSI	Enabled
 .BR attributes (7),
 .BR environ (7),
 .BR largefile (7),
+.BR altexec (8),
 .BR df (8),
 .BR swap (8),
 .BR sysdef (8)
@@ -2957,6 +2959,10 @@ immediate second attempt to exit succeeds, terminating the stopped jobs.
 .SH WARNINGS
 The use of \fBsetuid\fR shell scripts is \fIstrongly\fR discouraged.
 .SH NOTES
+
+\fBcsh\fR is now provided through the \fBaltexec\fR(8) front-end to pkgsrc's
+tcsh. Some of the limitations in this page may no longer reflect reality.
+
 Words can be no longer than 1024 bytes. The system limits argument lists to
 1,048,576 bytes. However, the maximum number of arguments to a command for
 which filename expansion applies is 1706. Command substitutions can expand to

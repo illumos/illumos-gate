@@ -20,6 +20,7 @@
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Garrett D'Amore
 # Copyright 2023 Peter Tribble
+# Copyright 2023 MNX Cloud, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -41,6 +42,7 @@ _MANFILES=	6to4relay.8		\
 		add_allocatable.8	\
 		add_drv.8		\
 		addbadsec.8		\
+		altexec.8		\
 		arcstat.8		\
 		arp.8			\
 		atohexlabel.8		\

@@ -2643,7 +2643,7 @@ h usr/bin/cputrack=usr/lib/isaexec
 f usr/bin/crle 0555 root bin
 f usr/bin/crontab 4555 root bin
 f usr/bin/crypt 0555 root bin
-s usr/bin/csh=../has/bin/csh
+h usr/bin/csh=usr/lib/altexec
 f usr/bin/csplit 0555 root bin
 f usr/bin/ctfdiff 0555 root bin
 f usr/bin/ctfdump 0555 root bin
@@ -2971,6 +2971,7 @@ f usr/bin/tcopy 0555 root bin
 h usr/bin/tee=usr/bin/alias
 f usr/bin/telnet 0555 root bin
 h usr/bin/test=usr/bin/alias
+h usr/bin/tcsh=usr/lib/altexec
 f usr/bin/tic 0555 root bin
 f usr/bin/time 0555 root bin
 f usr/bin/timex 0555 root bin
@@ -3028,6 +3029,7 @@ f usr/bin/yppasswd 0555 root bin
 f usr/bin/ypwhich 0555 root other
 f usr/bin/zcat 0555 root bin
 f usr/bin/ziostat 0555 root bin
+h usr/bin/zsh=usr/lib/altexec
 s usr/bin/zonename=../../sbin/zonename
 f usr/bin/ztest 0555 root bin
 d usr/ccs 0755 root bin
@@ -3073,8 +3075,6 @@ d usr/gnu/share/man/man3 0755 root bin
 d usr/gnu/share/man/man5 0755 root bin
 d usr/gnu/share/man/man7 0755 root bin
 d usr/has 0755 root bin
-d usr/has/bin 0755 root bin
-f usr/has/bin/csh 0555 root bin
 d usr/has/man 0755 root bin
 d usr/has/man/man1has 0755 root bin
 f usr/has/man/man1has/csh.1has 0444 root bin
@@ -5194,6 +5194,7 @@ d usr/lib/adb/amd64 0755 root sys
 f usr/lib/adb/amd64/adbsub.o 0644 root sys
 d usr/lib/ahci 0755 root sys
 f usr/lib/ahci/ahciem 0555 root bin
+f usr/lib/altexec 0555 root bin
 d usr/lib/amd64 0755 root bin
 f usr/lib/amd64/0@0.so.1 0755 root bin
 f usr/lib/amd64/crt1.o 0644 root bin
@@ -12053,7 +12054,6 @@ f usr/share/man/man1/cputrack.1 0444 root bin
 f usr/share/man/man1/crle.1 0444 root bin
 f usr/share/man/man1/crontab.1 0444 root bin
 f usr/share/man/man1/crypt.1 0444 root bin
-s usr/share/man/man1/csh.1=../../../has/man/man1has/csh.1has
 f usr/share/man/man1/csplit.1 0444 root bin
 f usr/share/man/man1/ctfdiff.1 0444 root bin
 f usr/share/man/man1/ctfdump.1 0444 root bin
@@ -19483,6 +19483,7 @@ f usr/share/man/man8/acpidump.8 0444 root bin
 f usr/share/man/man8/acpixtract.8 0444 root bin
 f usr/share/man/man8/add_drv.8 0444 root bin
 f usr/share/man/man8/addbadsec.8 0444 root bin
+f usr/share/man/man8/altexec.8 0444 root bin
 f usr/share/man/man8/arcstat.8 0444 root bin
 f usr/share/man/man8/arp.8 0444 root bin
 f usr/share/man/man8/audit.8 0444 root bin
