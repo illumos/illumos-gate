@@ -104,6 +104,7 @@ FPOBJS64=			\
 
 FPASMOBJS=			\
 	_Q_get_rp_rd.o		\
+	__quad.o		\
 	__quad_mag64.o		\
 	fpgetmask.o		\
 	fpgetrnd.o		\
@@ -111,9 +112,6 @@ FPASMOBJS=			\
 	fpsetmask.o		\
 	fpsetrnd.o		\
 	fpsetsticky.o
-
-$(__GNUC)FPASMOBJS +=		\
-	__quad.o
 
 ATOMICOBJS=			\
 	atomic.o

@@ -31,23 +31,18 @@ MAN1ONBLDFILES=	cw.1onbld
 include ../Makefile.tools
 
 # Bootstrap problem -- we have to build cw before we can use it
-i386_CC=		$(SPRO_VROOT)/bin/cc
-sparc_CC=		$(SPRO_VROOT)/bin/cc
-$(__GNUC)i386_CC=	$(GNUC_ROOT)/bin/gcc
-$(__GNUC)sparc_CC=	$(GNUC_ROOT)/bin/gcc
+i386_CC=	$(GNUC_ROOT)/bin/gcc
+sparc_CC=	$(GNUC_ROOT)/bin/gcc
 
 CFLAGS += $(CCVERBOSE)
 
 # Override CFLAGS.  This is needed only for bootstrap of cw.
-$(__GNUC)CFLAGS=	-O -D__sun -Wall -Werror -std=gnu99 -nodefaultlibs
-$(__SUNC)CFLAGS=	-xspace -Xa -xildoff -errtags=yes -errwarn=%all \
-			-xc99=%all -W0,-xglobalstatic -v
-
-$(__GNUC)LDLIBS +=	-Wl,-zassert-deflib=libc.so -lc
-$(__GNUC)LDFLAGS=	$(MAPFILE.NES:%=-Wl,-M%)
-$(__GNUC)ZASSERTDEFLIB = -Wl,-zassert-deflib
-$(__GNUC)ZFATALWARNINGS = -Wl,-zfatal-warnings
-$(__GNUC)ZGUIDANCE = -Wl,-zguidance
+CFLAGS=	-O -D__sun -Wall -Werror -std=gnu99 -nodefaultlibs
+LDLIBS +=	-Wl,-zassert-deflib=libc.so -lc
+LDFLAGS=	$(MAPFILE.NES:%=-Wl,-M%)
+ZASSERTDEFLIB = -Wl,-zassert-deflib
+ZFATALWARNINGS = -Wl,-zfatal-warnings
+ZGUIDANCE = -Wl,-zguidance
 LDFLAGS += -Wl,$(ZDIRECT)
 
 $(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=      644

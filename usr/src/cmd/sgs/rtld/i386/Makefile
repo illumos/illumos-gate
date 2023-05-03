@@ -57,8 +57,7 @@ CRTS=		$(CRTI)		$(CRTN)
 include		$(SRC)/Makefile.master
 
 # This is safe because linking is done only with the primary compiler.
-MAPFILE-ORDER =		../common/mapfile-order-devpro
-$(__GNUC)MAPFILE-ORDER =	../common/mapfile-order-gcc
+MAPFILE-ORDER =	../common/mapfile-order-gcc
 
 include		$(SRC)/cmd/sgs/rtld/Makefile.com
 

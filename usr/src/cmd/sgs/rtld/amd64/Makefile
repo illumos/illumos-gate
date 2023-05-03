@@ -57,9 +57,7 @@ CRTS=		$(CRTI)		$(CRTN)
 include		$(SRC)/cmd/sgs/rtld/Makefile.com
 include		$(SRC)/lib/Makefile.lib.64
 
-# We build 64-bit objects with gcc by default
-MAPFILE-ORDER =			../common/mapfile-order-devpro
-$(__GNUC64)MAPFILE-ORDER =	../common/mapfile-order-gcc
+MAPFILE-ORDER =	../common/mapfile-order-gcc
 
 # Add any machine specific flags.
 

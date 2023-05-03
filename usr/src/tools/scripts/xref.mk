@@ -62,8 +62,13 @@ CSCOPE	= $(BUILD_TOOLS)/onbld/bin/$(MACH)/cscope-fast
 CSFLAGS	= -bq
 CTAGS	= /usr/bin/ctags
 CTFLAGS	= -wt
-ETAGS	= $(SPRO_VROOT)/bin/etags
-ETFLAGS	= -t
+
+# etags was historically part of the Sun compiler distribution and is now
+# distributed in various ways for illumos, we do a path search lacking better
+# options.
+ETAGS	= etags
+ETFLAGS	=
+
 FLGFLP	= $(BUILD_TOOLS)/onbld/bin/flg.flp
 
 XRDIRS	= .

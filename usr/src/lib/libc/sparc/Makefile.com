@@ -102,15 +102,13 @@ FPOBJS=				\
 
 FPASMOBJS=			\
 	_Q_get_rp_rd.o		\
+	__quad.o		\
 	fpgetmask.o		\
 	fpgetrnd.o		\
 	fpgetsticky.o		\
 	fpsetmask.o		\
 	fpsetrnd.o		\
 	fpsetsticky.o
-
-$(__GNUC)FPASMOBJS +=		\
-	__quad.o
 
 ATOMICOBJS=			\
 	atomic.o
