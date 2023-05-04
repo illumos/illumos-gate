@@ -139,7 +139,7 @@ bay_pgroups(topo_mod_t *mod, tnode_t *tnp, di_node_t *dnp, di_node_t *sibp,
 
 	ap_path = topo_mod_alloc(mod, MAXPATHLEN);
 	if (ap_path == NULL) {
-		topo_mod_dprintf(mod, "%s: ap_path alloc failed\n");
+		topo_mod_dprintf(mod, "%s: ap_path alloc failed\n", f);
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 	}
 	(void) snprintf(ap_path, MAXPATHLEN, "%s%s:%s", DEVICES,
@@ -294,7 +294,7 @@ x86pi_gen_bay(topo_mod_t *mod, tnode_t *t_parent, smbios_port_ext_t *eport,
 	rv = smbios_info_port(shp, port_id, &smb_port);
 	if (rv != 0) {
 		topo_mod_dprintf(mod,
-		    "%s: failed to get port %d SMBIOS struct\n",
+		    "%s: failed to get port %ld SMBIOS struct\n",
 		    f, port_id);
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 	}

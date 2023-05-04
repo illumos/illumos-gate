@@ -246,15 +246,17 @@ make_disk_node(nvme_enum_info_t *nvme_info, di_node_t dinode,
 
 	if (fmri == NULL) {
 		/* errno set */
-		topo_mod_dprintf(mod, "%s: hcfmri failed for %s=%u/%s=0/%s=%u",
-		    __func__, pname, pinst, NVME, DISK, inst);
+		topo_mod_dprintf(mod, "%s: hcfmri failed for %s=%" PRIu64
+		    "/%s=0/%s=%" PRIu64, __func__, pname, pinst, NVME, DISK,
+		    inst);
 		goto error;
 	}
 	if ((disk = topo_node_bind(mod, nvme_info->nei_nvme, DISK, inst,
 	    fmri)) == NULL) {
 		/* errno set */
-		topo_mod_dprintf(mod, "%s: bind failed for %s=%u/%s=0/%s=%u",
-		    __func__, pname, pinst, NVME, DISK, inst);
+		topo_mod_dprintf(mod, "%s: bind failed for %s=%" PRIu64
+		    "/%s=0/%s=%" PRIu64, __func__, pname, pinst, NVME, DISK,
+		    inst);
 		goto error;
 	}
 
@@ -395,8 +397,8 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 
 	if (fmri == NULL) {
 		/* errno set */
-		topo_mod_dprintf(mod, "%s: hcfmri failed for %s=%u/%s=0",
-		    __func__, pname, pinst, NVME);
+		topo_mod_dprintf(mod, "%s: hcfmri failed for %s=%" PRIu64
+		    "/%s=0", __func__, pname, pinst, NVME);
 		goto error;
 	}
 
@@ -423,8 +425,8 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 	if ((nvme = topo_node_bind(mod, nvme_info->nei_parent, NVME, 0,
 	    fmri)) == NULL) {
 		/* errno set */
-		topo_mod_dprintf(mod, "%s: bind failed for %s=%u/%s=0",
-		    __func__, pname, pinst, NVME);
+		topo_mod_dprintf(mod, "%s: bind failed for %s=%" PRIu64
+		    "/%s=0", __func__, pname, pinst, NVME);
 		goto error;
 	}
 	nvme_info->nei_nvme = nvme;
@@ -563,7 +565,7 @@ discover_nvme_ctl(di_node_t node, di_minor_t minor, void *arg)
 		return (ret);
 	}
 
-	topo_mod_dprintf(mod, "%s=%u: found nvme controller: %s",
+	topo_mod_dprintf(mod, "%s=%" PRIu64 ": found nvme controller: %s",
 	    topo_node_name(wkarg->diwk_parent),
 	    topo_node_instance(wkarg->diwk_parent), path);
 

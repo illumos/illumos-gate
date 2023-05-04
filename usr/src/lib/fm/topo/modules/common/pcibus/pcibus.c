@@ -822,8 +822,9 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 	 * devices that are part of PCIe add-in cards.
 	 */
 	if (topo_node_label(fn, &label, &err) != 0) {
-		topo_mod_dprintf(mod, "%s: failed to lookup FRU label on %s=%d",
-		    __func__, topo_node_name(fn), topo_node_instance(fn));
+		topo_mod_dprintf(mod, "%s: failed to lookup FRU label on "
+		    "%s=%" PRIu64, __func__, topo_node_name(fn),
+		    topo_node_instance(fn));
 		goto out;
 	}
 
@@ -836,8 +837,8 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 		if (topo_prop_get_string(fn, TOPO_PGROUP_IO, TOPO_IO_DEV,
 		    &pdev, &err) != 0) {
 			topo_mod_dprintf(mod, "%s: failed to lookup %s on "
-			    "%s=%d", __func__, TOPO_IO_DEV, topo_node_name(fn),
-			    topo_node_instance(fn));
+			    "%s=%" PRIu64, __func__, TOPO_IO_DEV,
+			    topo_node_name(fn), topo_node_instance(fn));
 			goto out;
 		}
 
@@ -1022,7 +1023,7 @@ pcibus_enum(topo_mod_t *mp, tnode_t *ptn, char *pnm, topo_instance_t min,
 		if (didp == NULL) {
 			topo_mod_dprintf(mp,
 			    "Parent %s node missing private data related\n"
-			    "to %s instance %d.\n", pnm, PCI_BUS, min);
+			    "to %s instance %" PRIu64 ".\n", pnm, PCI_BUS, min);
 			topo_mod_setspecific(mp, NULL);
 			return (0);
 		}

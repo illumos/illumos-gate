@@ -91,7 +91,8 @@ topo_chipset_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	}
 
 	if (!topo_chipset_present()) {
-		topo_mod_dprintf(mod, "chipset_enum: no device present", name);
+		topo_mod_dprintf(mod, "chipset_enum: no %s device present",
+		    name);
 		return (0);
 	}
 

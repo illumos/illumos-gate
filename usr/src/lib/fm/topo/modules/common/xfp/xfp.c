@@ -105,10 +105,9 @@ xfp_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	nvlist_free(fmri);
 	if (ntn == NULL) {
 		topo_mod_dprintf(mod,
-		    "topo_node_bind (%s%d/%s%d) failed: %s\n",
+		    "topo_node_bind (%s%" PRIu64 "/%s%" PRIu64 ") failed: %s\n",
 		    topo_node_name(parent), topo_node_instance(parent),
-		    name, i,
-		    topo_strerror(topo_mod_errno(mod)));
+		    name, i, topo_strerror(topo_mod_errno(mod)));
 		return (NULL);
 	}
 
@@ -145,7 +144,7 @@ xfp_fru_set(topo_mod_t *mp, tnode_t *tn)
 }
 static int
 xfp_label_set(topo_mod_t *mod, tnode_t *parent, tnode_t *node,
-	topo_instance_t n)
+    topo_instance_t n)
 {
 	char *label = NULL;
 	char *plabel = NULL;
@@ -176,7 +175,7 @@ xfp_label_set(topo_mod_t *mod, tnode_t *parent, tnode_t *node,
 /*ARGSUSED*/
 static tnode_t *
 xfp_declare(tnode_t *parent, const char *name, topo_instance_t i,
-	void *priv, topo_mod_t *mod)
+    void *priv, topo_mod_t *mod)
 {
 	tnode_t *ntn;
 	nvlist_t *fmri = NULL;
@@ -202,7 +201,7 @@ xfp_declare(tnode_t *parent, const char *name, topo_instance_t i,
 /*ARGSUSED*/
 static int
 xfp_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
-	topo_instance_t min, topo_instance_t max, void *notused, void *data)
+    topo_instance_t min, topo_instance_t max, void *notused, void *data)
 {
 	if (strcmp(name, XFP) != 0) {
 		topo_mod_dprintf(mod,

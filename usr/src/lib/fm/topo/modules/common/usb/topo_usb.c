@@ -1337,8 +1337,6 @@ topo_usb_enum_scsa2usb(topo_mod_t *mod, tnode_t *tn, topo_usb_lport_t *lport)
 		    TOPO_IO_MODULE, topo_strerror(ret));
 		goto error;
 	}
-	di_devfs_path_free(devfs);
-	devfs = NULL;
 
 	if (topo_node_range_create(mod, tn, DISK, min, max) != 0) {
 		topo_mod_dprintf(mod, "failed to create disk node range %s: %s",
@@ -1351,6 +1349,7 @@ topo_usb_enum_scsa2usb(topo_mod_t *mod, tnode_t *tn, topo_usb_lport_t *lport)
 		    devfs, topo_mod_errmsg(mod));
 		goto error;
 	}
+	di_devfs_path_free(devfs);
 
 	return (0);
 
@@ -1745,7 +1744,7 @@ topo_usb_enum_device(topo_mod_t *mod, tnode_t *pn, topo_usb_port_t *port)
 	    l = topo_list_next(l)) {
 		if (l->tul_device != DI_NODE_NIL) {
 			topo_mod_dprintf(mod, "enumerating device on lport "
-			    "%u, log inst %d", l->tul_portno, i);
+			    "%u, log inst %" PRIu64 "", l->tul_portno, i);
 			if ((ret = topo_usb_enum_lport(mod, pn, port, l,
 			    i)) != 0) {
 				return (ret);
@@ -1809,8 +1808,8 @@ topo_usb_enum_mobo(topo_mod_t *mod, tnode_t *pnode, topo_usb_t *usb)
 	}
 
 	if ((ret = port_range_create(mod, pnode, 0, inst)) != 0) {
-		topo_mod_dprintf(mod, "failed to create port range [%u, %u) "
-		    "for mobo", 0, inst);
+		topo_mod_dprintf(mod, "failed to create port range [0, %"
+		    PRIu64 ") for mobo", inst);
 		return (ret);
 	}
 
@@ -1835,7 +1834,6 @@ topo_usb_enum_pci(topo_mod_t *mod, tnode_t *pnode, topo_usb_t *usb,
 {
 	int ret;
 	topo_usb_controller_t *c;
-	topo_instance_t min = 0;
 
 	for (c = topo_list_next(&usb->tu_controllers); c != NULL;
 	    c = topo_list_next(c)) {
@@ -1848,13 +1846,13 @@ topo_usb_enum_pci(topo_mod_t *mod, tnode_t *pnode, topo_usb_t *usb,
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 	}
 
-	if ((ret = port_range_create(mod, pnode, min, c->tuc_nports)) != 0) {
-		topo_mod_dprintf(mod, "failed to create port range [%u, %u) "
-		    "for controller %s", min, c->tuc_nports, c->tuc_path);
+	if ((ret = port_range_create(mod, pnode, 0, c->tuc_nports)) != 0) {
+		topo_mod_dprintf(mod, "failed to create port range [0, %u) "
+		    "for controller %s", c->tuc_nports, c->tuc_path);
 		return (ret);
 	}
 
-	return (topo_usb_enum_controller(mod, pnode, c, min));
+	return (topo_usb_enum_controller(mod, pnode, c, 0));
 }
 
 static int
@@ -1869,8 +1867,8 @@ topo_usb_enum_chassis(topo_mod_t *mod, tnode_t *pnode, topo_usb_t *usb)
 
 	if ((ret = port_range_create(mod, pnode, 0, usb->tu_nchassis_ports)) !=
 	    0) {
-		topo_mod_dprintf(mod, "failed to create port range [%u, %u) "
-		    "for mobo", 0, usb);
+		topo_mod_dprintf(mod, "failed to create port range [0, %u) "
+		    "for chassis", usb->tu_nchassis_ports);
 		return (ret);
 	}
 
