@@ -188,7 +188,10 @@ struct seg_desc {
 	uint32_t	access;
 };
 #define	SEG_DESC_TYPE(access)		((access) & 0x001f)
-#define	SEG_DESC_DPL(access)		(((access) >> 5) & 0x3)
+#define	SEG_DESC_DPL_MASK		0x3
+#define	SEG_DESC_DPL_SHIFT		5
+#define	SEG_DESC_DPL(access)		\
+	(((access) >> SEG_DESC_DPL_SHIFT) & SEG_DESC_DPL_MASK)
 #define	SEG_DESC_PRESENT(access)	(((access) & 0x0080) ? 1 : 0)
 #define	SEG_DESC_DEF32(access)		(((access) & 0x4000) ? 1 : 0)
 #define	SEG_DESC_GRANULARITY(access)	(((access) & 0x8000) ? 1 : 0)
