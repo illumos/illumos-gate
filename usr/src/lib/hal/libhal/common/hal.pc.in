@@ -7,12 +7,12 @@
 
 prefix=/usr
 exec_prefix=${prefix}
-libdir=__LIBDIR__
+libdir=${prefix}/__LIBDIR__
 includedir=${prefix}/include
 
 Name: hal
 Description: Free desktop hardware abstraction layer
-Version: __VERSION__
+Version: __VERSPKG__
 Requires: dbus-1
 Libs: -L${libdir} -lhal
 Cflags: -DDBUS_API_SUBJECT_TO_CHANGE -I${includedir}/hal

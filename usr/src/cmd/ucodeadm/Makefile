@@ -42,7 +42,7 @@ POFILE = ucodeadm_all.po
 POFILES = $(PROG_OBJS:%.o=%.po)
 
 CSTD = $(GNU_C99)
-CPPFLAGS = -I../../common -I../../uts/common
+CPPFLAGS += -I$(SRC)/common
 CFLAGS	+= $(CCVERBOSE)
 LDLIBS += -lgen
 

@@ -22,13 +22,16 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Include overrides for library builds of 64-bit objects
 #
 include	$(SRC)/Makefile.master.64
+
+#
+# default directory for 64-bit pkg-config files.
+#
+PCLIBDIR = $(PCLIBDIR64)
 
 #
 # Target Architecture

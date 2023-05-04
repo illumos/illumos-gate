@@ -1742,7 +1742,7 @@ smb_server_listener(smb_thread_t *thread, void *arg)
 			/* FALLTHROUGH */
 		default:
 			cmn_err(CE_WARN,
-			    "smb_server_listener: ksocket_accept(%d)",
+			    "smb_server_listener: ksocket_accept failed (%d)",
 			    ret);
 			/* avoid a tight CPU-burn loop here */
 			delay(MSEC_TO_TICK(10));

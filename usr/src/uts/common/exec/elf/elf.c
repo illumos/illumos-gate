@@ -27,7 +27,7 @@
 /*	   All Rights Reserved	*/
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -1925,19 +1925,27 @@ elf_copy_scn(elf_core_ctx_t *ctx, const Shdr *src, vnode_t *src_vp, Shdr *dst)
  */
 static uint_t
 elf_process_obj_scns(elf_core_ctx_t *ctx, vnode_t *mvp, caddr_t saddr,
-    Shdr *v, uint_t idx, uint_t remain, shstrtab_t *shstrtab, int *errp)
+    Shdr *v, uint_t idx, const uint_t remain, shstrtab_t *shstrtab,
+    int *errp)
 {
 	Ehdr ehdr;
 	const core_content_t content = ctx->ecc_content;
 	cred_t *credp = ctx->ecc_credp;
 	Shdr *ctf = NULL, *symtab = NULL, *strtab = NULL;
 	uintptr_t off = 0;
-	uint_t nshdrs, shstrndx, nphdrs, ndebug, count = 0;
+	uint_t nshdrs, shstrndx, nphdrs, ndebug, count = 0, extra;
 	u_offset_t *doffp = &ctx->ecc_doffset;
 	boolean_t ctf_link = B_FALSE;
 	caddr_t shbase;
 	size_t shsize, shstrsize;
 	char *shstrbase;
+	const boolean_t justcounting = (v == NULL);
+
+	/*
+	 * remain must be less than UINT_MAX so we can check for count
+	 * exceeding it.
+	 */
+	ASSERT3U(remain, <, UINT_MAX);
 
 	if ((content &
 	    (CC_CONTENT_CTF | CC_CONTENT_SYMTAB | CC_CONTENT_DEBUG)) == 0) {
@@ -1963,8 +1971,7 @@ elf_process_obj_scns(elf_core_ctx_t *ctx, vnode_t *mvp, caddr_t saddr,
 
 		name = shstrbase + shdr->sh_name;
 
-		if (ctf == NULL &&
-		    (content & CC_CONTENT_CTF) != 0 &&
+		if (ctf == NULL && (content & CC_CONTENT_CTF) != 0 &&
 		    strcmp(name, shstrtab_data[STR_CTF]) == 0) {
 			ctf = shdr;
 			if (ctf->sh_link != 0 && ctf->sh_link < nshdrs) {
@@ -2009,12 +2016,18 @@ elf_process_obj_scns(elf_core_ctx_t *ctx, vnode_t *mvp, caddr_t saddr,
 		}
 	}
 
+	extra = 0;
 	if (ctf != NULL)
-		count += 1;
+		extra += 1;
 	if (symtab != NULL)
-		count += 2;
-	count += ndebug;
-	if (v == NULL || count == 0 || count > remain) {
+		extra += 2;
+	extra += ndebug;
+	if (remain < extra || count > remain - extra) {
+		*errp = ENOMEM;
+		goto done;
+	}
+	count += extra;
+	if (justcounting || count == 0 || count > remain) {
 		count = MIN(count, remain);
 		goto done;
 	}
@@ -2163,36 +2176,41 @@ done:
  * buffer has been allocated for the shdr details.
  */
 static int
-elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, uint_t nv, uint_t *nshdrsp)
+elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, const uint_t nv, uint_t *nshdrsp)
 {
 	vnode_t *lastvp = NULL;
 	struct seg *seg;
-	uint_t idx = 0, remain;
+	uint_t remain, idx;
 	shstrtab_t shstrtab;
 	struct as *as = ctx->ecc_p->p_as;
 	int error = 0;
+	const boolean_t justcounting = (v == NULL);
 
 	ASSERT(AS_WRITE_HELD(as));
 
-	if (v != NULL) {
+	if (justcounting) {
+		ASSERT(nv == 0);
+		/*
+		 * In the counting case, set remain to UINT_MAX so that we
+		 * allow up to that many sections. Note that remain is
+		 * decremented immediately below to account for the SHT_NULL
+		 * section at index zero and so we do not end up passing
+		 * UINT_MAX as the 'remain' value to elf_process_obj_scns().
+		 * Once we've finished counting, we further check that there
+		 * is at least one array slot available for shstrtab.
+		 */
+		remain = UINT_MAX;
+	} else {
 		ASSERT(nv != 0);
+		remain = nv;
 
 		if (!shstrtab_init(&shstrtab))
 			return (ENOMEM);
-		remain = nv;
-	} else {
-		ASSERT(nv == 0);
-
-		/*
-		 * The shdrs are being counted, rather than outputting them
-		 * into a buffer.  Leave room for two entries: the SHT_NULL at
-		 * index 0 and the shstrtab at the end.
-		 */
-		remain = UINT_MAX - 2;
 	}
 
 	/* Per the ELF spec, shdr index 0 is reserved. */
 	idx = 1;
+	remain--;
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
 		vnode_t *mvp;
 		void *tmp = NULL;
@@ -2230,17 +2248,24 @@ elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, uint_t nv, uint_t *nshdrsp)
 		if (error != 0)
 			goto done;
 
-		ASSERT(count <= remain);
-		ASSERT(v == NULL || (idx + count) < nv);
+		VERIFY3U(count, <=, remain);
+		if (!justcounting) {
+			VERIFY3U(idx + count, <=, nv);
+		}
 
 		remain -= count;
 		idx += count;
 		lastvp = mvp;
 	}
 
-	if (v == NULL) {
+	if (justcounting) {
 		if (idx == 1) {
+			/* No sections found */
 			*nshdrsp = 0;
+		} else if (remain < 1) {
+			/* No space for the shrstrtab at the end */
+			*nshdrsp = 0;
+			return (ENOMEM);
 		} else {
 			/* Include room for the shrstrtab at the end */
 			*nshdrsp = idx + 1;
@@ -2248,7 +2273,7 @@ elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, uint_t nv, uint_t *nshdrsp)
 		return (0);
 	}
 
-	if (idx != nv - 1) {
+	if (remain != 1) {
 		cmn_err(CE_WARN, "elfcore: core dump failed for "
 		    "process %d; address space is changing",
 		    ctx->ecc_p->p_pid);
@@ -2273,12 +2298,11 @@ elf_process_scns(elf_core_ctx_t *ctx, Shdr *v, uint_t nv, uint_t *nshdrsp)
 
 	error = core_write(ctx->ecc_vp, UIO_SYSSPACE, ctx->ecc_doffset,
 	    ctx->ecc_buf, v[idx].sh_size, ctx->ecc_rlimit, ctx->ecc_credp);
-	if (error == 0) {
+	if (error == 0)
 		ctx->ecc_doffset += v[idx].sh_size;
-	}
 
 done:
-	if (v != NULL)
+	if (!justcounting)
 		shstrtab_fini(&shstrtab);
 
 	return (error);
@@ -2327,11 +2351,13 @@ top:
 	/*
 	 * Count the number of section headers we're going to need.
 	 */
-	nshdrs = 0;
-	if (content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB | CC_CONTENT_DEBUG)) {
-		VERIFY0(elf_process_scns(&ctx, NULL, 0, &nshdrs));
-	}
+	nshdrs = error = 0;
+	if (content & (CC_CONTENT_CTF | CC_CONTENT_SYMTAB | CC_CONTENT_DEBUG))
+		error = elf_process_scns(&ctx, NULL, 0, &nshdrs);
 	AS_LOCK_EXIT(as);
+
+	if (error != 0)
+		return (error);
 
 	/*
 	 * The core file contents may require zero section headers, but if
@@ -2348,7 +2374,7 @@ top:
 	 * tasks sequentially, not simultaneously, so it does not need space
 	 * for all three data at once, only the largest one.
 	 */
-	VERIFY(nphdrs >= 2);
+	VERIFY3U(nphdrs, >=, 2);
 	phdrsz = nphdrs * sizeof (Phdr);
 	shdrsz = nshdrs * sizeof (Shdr);
 	bigsize = MAX(sizeof (Ehdr), MAX(phdrsz, shdrsz));
@@ -2747,9 +2773,8 @@ exclude:
 			AS_LOCK_ENTER(as, RW_WRITER);
 			error = elf_process_scns(&ctx, shdr, nshdrs, NULL);
 			AS_LOCK_EXIT(as);
-			if (error != 0) {
+			if (error != 0)
 				goto done;
-			}
 		}
 		/* Copy any extended format data destined for the first shdr */
 		bcopy(&shdr0, shdr, sizeof (shdr0));

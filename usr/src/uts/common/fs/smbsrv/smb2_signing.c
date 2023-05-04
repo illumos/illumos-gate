@@ -387,12 +387,15 @@ smb2_sign_check_request(smb_request_t *sr)
 	 */
 	if (s->sign_calc(sr, mbc, vfy_sig) != 0)
 		return (-1);
-	if (memcmp(vfy_sig, req_sig, SMB2_SIG_SIZE) != 0) {
-		cmn_err(CE_NOTE, "smb2_sign_check_request: bad signature");
-		return (-1);
+
+	if (memcmp(vfy_sig, req_sig, SMB2_SIG_SIZE) == 0) {
+		return (0);
 	}
 
-	return (0);
+	DTRACE_PROBE2(signature__mismatch, smb_request_t *, sr,
+	    uint8_t *, vfy_sig);
+
+	return (-1);
 }
 
 /*

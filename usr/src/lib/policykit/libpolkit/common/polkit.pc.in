@@ -4,16 +4,15 @@
 #
 # Licensed under the Academic Free License version 2.1
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 prefix=/usr
 exec_prefix=${prefix}
-libdir=${exec_prefix}/lib
+libdir=${exec_prefix}/__LIBDIR__
 includedir=${prefix}/include
 
 Name: libpolkit
 Description: library for querying and setting system-wide policy
-Version: __VERSION__
+Version: __VERSPKG__
 Requires: glib-2.0
 Libs: -L${libdir} -lpolkit
 Cflags: -I${includedir}/libpolkit

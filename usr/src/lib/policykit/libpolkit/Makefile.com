@@ -27,8 +27,9 @@
 LIBRARY =	libpolkit.a
 VERS =		.0.0.0
 VERS_MAJ =	.0
+VERSPKG =	$(POLICYKIT_VERSION)
 OBJECTS =	libpolkit-rbac.o
-LIBPCSRC =	polkit.pc
+PCFILE =	polkit.pc
 
 include ../../Makefile.com
 

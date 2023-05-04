@@ -25,7 +25,9 @@
 
 LIBRARY =	libuuid.a
 VERS =		.1
+VERSPKG =	1.0.0
 OBJECTS =	etheraddr.o uuid.o uuid_misc.o
+PCFILE =	uuid.pc
 
 include ../../Makefile.lib
 
@@ -42,6 +44,5 @@ CFLAGS +=	$(CCVERBOSE)
 .KEEP_STATE:
 
 all:
-
 
 include ../../Makefile.targ

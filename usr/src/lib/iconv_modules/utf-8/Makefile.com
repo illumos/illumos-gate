@@ -61,8 +61,7 @@ LDFLAGS = $(DYNFLAGS) $(LDLIBS) $(CFLAG_OPT)
 SMATCH=off
 
 $(DYNOBJS)		:= CFLAGS += $(XREGSFLAG) $(C_PICFLAGS) -D_REENTRANT \
-					-I$(COMMON) -I$(COMMON)/tbls \
-					-I$(ADJUNCT_PROTO)/usr/include
+				-I$(COMMON) -I$(COMMON)/tbls $(CPPFLAGS)
 
 $(UCS_2_SOS)		:= CFLAGS += -DUCS_2
 $(UCS_2BE_SOS)		:= CFLAGS += -DUCS_2BE

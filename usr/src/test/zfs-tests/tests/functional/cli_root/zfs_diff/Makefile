@@ -26,8 +26,10 @@ include $(SRC)/cmd/Makefile.cmd
 
 $(TARGETDIR)/$(PROG) :=	FILEMODE = 0555
 
-CPPFLAGS = -D__EXTENSIONS__
+CPPFLAGS += -D__EXTENSIONS__
 LDLIBS += -lsocket
+
+.KEEP_STATE:
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
