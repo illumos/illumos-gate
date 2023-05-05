@@ -49,6 +49,7 @@ file path=opt/bhyve-tests/tests/kdev/vlapic_freq_periodic mode=0555
 file path=opt/bhyve-tests/tests/kdev/vlapic_mmio_access mode=0555
 file path=opt/bhyve-tests/tests/kdev/vlapic_msr_access mode=0555
 file path=opt/bhyve-tests/tests/kdev/vpmtmr_freq mode=0555
+file path=opt/bhyve-tests/tests/kdev/vrtc_ops mode=0555
 file path=opt/bhyve-tests/tests/kdev/wrmsr_tsc mode=0555
 dir  path=opt/bhyve-tests/tests/mevent
 file path=opt/bhyve-tests/tests/mevent/lists_delete mode=0555

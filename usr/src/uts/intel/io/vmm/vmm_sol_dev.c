@@ -1604,20 +1604,20 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		break;
 	}
 	case VM_RTC_SETTIME: {
-		struct vm_rtc_time rtctime;
+		timespec_t ts;
 
-		if (ddi_copyin(datap, &rtctime, sizeof (rtctime), md)) {
+		if (ddi_copyin(datap, &ts, sizeof (ts), md)) {
 			error = EFAULT;
 			break;
 		}
-		error = vrtc_set_time(sc->vmm_vm, rtctime.secs);
+		error = vrtc_set_time(sc->vmm_vm, &ts);
 		break;
 	}
 	case VM_RTC_GETTIME: {
-		struct vm_rtc_time rtctime;
+		timespec_t ts;
 
-		rtctime.secs = vrtc_get_time(sc->vmm_vm);
-		if (ddi_copyout(&rtctime, datap, sizeof (rtctime), md)) {
+		vrtc_get_time(sc->vmm_vm, &ts);
+		if (ddi_copyout(&ts, datap, sizeof (ts), md)) {
 			error = EFAULT;
 			break;
 		}

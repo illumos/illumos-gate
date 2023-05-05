@@ -1974,6 +1974,7 @@ vm_rtc_read(struct vmctx *ctx, int offset, uint8_t *retval)
 	return (error);
 }
 
+#ifdef __FreeBSD__
 int
 vm_rtc_settime(struct vmctx *ctx, time_t secs)
 {
@@ -1998,6 +1999,21 @@ vm_rtc_gettime(struct vmctx *ctx, time_t *secs)
 		*secs = rtctime.secs;
 	return (error);
 }
+#else /* __FreeBSD__ */
+
+int
+vm_rtc_settime(struct vmctx *ctx, const timespec_t *ts)
+{
+	return (ioctl(ctx->fd, VM_RTC_SETTIME, ts));
+}
+
+int
+vm_rtc_gettime(struct vmctx *ctx, timespec_t *ts)
+{
+	return (ioctl(ctx->fd, VM_RTC_GETTIME, ts));
+}
+
+#endif /* __FreeBSD__ */
 
 int
 vm_restart_instruction(void *arg, int vcpu)

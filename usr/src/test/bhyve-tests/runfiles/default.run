@@ -52,6 +52,7 @@ tests = [
 	'vlapic_mmio_access',
 	'vlapic_msr_access',
 	'vpmtmr_freq',
+	'vrtc_ops',
 	'wrmsr_tsc',
 	'rdmsr_tsc'
 	]

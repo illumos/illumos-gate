@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _IN_GUEST_H_
@@ -21,10 +21,13 @@
 struct vmctx *test_initialize(const char *);
 struct vmctx *test_initialize_flags(const char *, uint64_t);
 void test_cleanup(bool);
+void test_fail(void);
 void test_fail_errno(int err, const char *msg);
 void test_fail_msg(const char *fmt, ...);
 void test_fail_vmexit(const struct vm_exit *vexit);
 void test_pass(void);
+const char *test_msg_get(struct vmctx *);
+void test_msg_print(struct vmctx *);
 
 int test_setup_vcpu(struct vmctx *, int, uint64_t, uint64_t);
 
@@ -35,6 +38,8 @@ enum vm_exit_kind {
 	VEK_TEST_PASS,
 	/* Write to IOP_TEST_RESULT port with failure value (non-zero) */
 	VEK_TEST_FAIL,
+	/* Payload emitted a message via IOP_TEST_MSG port */
+	VEK_TEST_MSG,
 	/* Test specific logic must handle exit data */
 	VEK_UNHANDLED,
 };

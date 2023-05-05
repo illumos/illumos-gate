@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _PAYLOAD_COMMON_H_
@@ -31,6 +31,9 @@
 
 /* IO port set aside for emitting test result */
 #define	IOP_TEST_RESULT		0xef00U
+
+/* IO port set aside for emitting test message strings */
+#define	IOP_TEST_MSG		0xef08U
 
 /* IO port set aside for emitting test value */
 #define	IOP_TEST_VALUE		0xef10U

@@ -30,7 +30,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _VRTC_H_
@@ -44,8 +44,8 @@ struct vrtc *vrtc_init(struct vm *vm);
 void vrtc_cleanup(struct vrtc *vrtc);
 void vrtc_reset(struct vrtc *vrtc);
 
-time_t vrtc_get_time(struct vm *vm);
-int vrtc_set_time(struct vm *vm, time_t secs);
+void vrtc_get_time(struct vm *vm, timespec_t *);
+int vrtc_set_time(struct vm *vm, const timespec_t *);
 int vrtc_nvram_write(struct vm *vm, int offset, uint8_t value);
 int vrtc_nvram_read(struct vm *vm, int offset, uint8_t *retval);
 

@@ -30,4 +30,17 @@ void wrmsr(uint32_t, uint64_t);
 void cpuid(uint32_t, uint32_t, uint32_t *);
 uint64_t rdtsc(void);
 
+void test_result_pass(void);
+void test_result_fail(void);
+void test_msg(const char *);
+
+#define	__STR2(x)	#x
+#define	__STR(x)	__STR2(x)
+
+#define	TEST_ABORT(msg)							\
+	do {								\
+		test_msg(__FILE__ ":" __STR(__LINE__) " - " msg);	\
+		test_result_fail();					\
+	} while (0)
+
 #endif /* _PAYLOAD_UTILS_H_ */

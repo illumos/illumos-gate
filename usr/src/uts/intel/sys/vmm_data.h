@@ -234,12 +234,11 @@ struct vdi_pm_timer_v1 {
 
 /* VDC_RTC: */
 
-struct vdi_rtc_v1 {
+struct vdi_rtc_v2 {
+	int64_t		vr_base_clock;
+	int64_t		vr_last_period;
 	uint8_t		vr_content[128];
 	uint8_t		vr_addr;
-	int64_t		vr_time_base;
-	uint64_t	vr_rtc_sec;
-	uint64_t	vr_rtc_nsec;
 };
 
 /* VDC_VMM_TIME: */
