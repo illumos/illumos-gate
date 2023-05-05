@@ -80,8 +80,16 @@ static list_t		vmm_list;
 static id_space_t	*vmm_minors;
 static void		*vmm_statep;
 
-/* temporary safety switch */
-int		vmm_allow_state_writes;
+/*
+ * Until device emulation in bhyve had been adequately scrutinized and tested,
+ * there was (justified) concern that unusual or corrupt device state payloads
+ * could crash the host when loaded via the vmm-data interface.
+ *
+ * Now that those concerns have been mitigated, this protection is loosened to
+ * default-allow, but the switch is left in place, in case there is a need to
+ * once again clamp down on vmm-data writes.
+ */
+int		vmm_allow_state_writes = 1;
 
 static const char *vmmdev_hvm_name = "bhyve";
 
@@ -1818,12 +1826,15 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			.vdr_data = buf,
 			.vdr_result_len = &vdx.vdx_result_len,
 		};
-		if (vmm_allow_state_writes == 0) {
-			/* XXX: Play it safe for now */
-			error = EPERM;
-		} else {
+		if (vmm_allow_state_writes != 0) {
 			error = vmm_data_write(sc->vmm_vm, vdx.vdx_vcpuid,
 			    &req);
+		} else {
+			/*
+			 * Reject the write if somone has thrown the switch back
+			 * into the "disallow" position.
+			 */
+			error = EPERM;
 		}
 
 		if (error == 0 && buf != NULL &&
