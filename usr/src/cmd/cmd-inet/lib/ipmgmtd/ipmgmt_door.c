@@ -391,6 +391,7 @@ ipmgmt_aobjop_handler(void *argp)
 	ipadm_addr_type_t	atype = largp->ia_atype;
 	ipmgmt_aobjmap_t	*head;
 
+	bzero(&aobjrval, sizeof (aobjrval));
 	switch (largp->ia_cmd) {
 	case IPMGMT_CMD_ADDROBJ_LOOKUPADD:
 		rsize = sizeof (ipmgmt_aobjop_rval_t);
@@ -411,6 +412,7 @@ ipmgmt_aobjop_handler(void *argp)
 		node.am_flags = IPMGMT_ACTIVE;
 		err = ipmgmt_aobjmap_op(&node, ADDROBJ_LOOKUPADD);
 		if (err == 0) {
+			aobjrval.ir_lnum = node.am_lnum;
 			(void) strlcpy(aobjrval.ir_aobjname, node.am_aobjname,
 			    sizeof (aobjrval.ir_aobjname));
 		}
