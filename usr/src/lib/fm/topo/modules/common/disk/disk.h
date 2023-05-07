@@ -64,6 +64,8 @@ extern "C" {
 #define	TOPO_STORAGE_FIRMWARE_REV	"firmware-revision"
 #define	TOPO_STORAGE_CAPACITY		"capacity-in-bytes"
 #define	TOPO_STORAGE_RPM		"speed-in-rpm"
+#define	TOPO_STORAGE_LOG_BLOCK_SIZE	"logical-block-size"
+#define	TOPO_STORAGE_PHYS_BLOCK_SIZE	"physical-block-size"
 
 static const topo_pgroup_info_t io_pgroup = {
 	TOPO_PGROUP_IO,

@@ -5881,37 +5881,76 @@ out:
 }
 
 static int
-nvme_ioctl_ns_state(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
+nvme_ioctl_ns_info(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
     cred_t *cred_p)
 {
 	_NOTE(ARGUNUSED(cred_p));
-	nvme_namespace_t *ns = NVME_NSID2NS(nvme, nsid);
+	nvme_namespace_t *ns;
+	nvme_ns_info_t *info;
+	int ret;
 
 	if ((mode & FREAD) == 0)
 		return (EPERM);
 
-	if (nsid == 0)
+	if (nioc->n_len < sizeof (nvme_ns_info_t))
 		return (EINVAL);
 
-	nioc->n_arg = 0;
+	/*
+	 * If we have the controller open (as indicated by nsid set to zero)
+	 * then we will allow the caller to specify a namespace id in n_arg.
+	 */
+	if (nsid == 0) {
+		if (nioc->n_arg == 0 || nioc->n_arg > nvme->n_namespace_count)
+			return (EINVAL);
+		nsid = (int)nioc->n_arg;
+	} else if (nioc->n_arg != 0) {
+		return (EINVAL);
+	}
+
+	ASSERT3S(nsid, >, 0);
+	ns = NVME_NSID2NS(nvme, nsid);
+
+	info = kmem_zalloc(sizeof (nvme_ns_info_t), KM_NOSLEEP_LAZY);
+	if (info == NULL)
+		return (ENOMEM);
 
 	mutex_enter(&nvme->n_mgmt_mutex);
 
 	if (ns->ns_allocated)
-		nioc->n_arg |= NVME_NS_STATE_ALLOCATED;
+		info->nni_state |= NVME_NS_STATE_ALLOCATED;
 
 	if (ns->ns_active)
-		nioc->n_arg |= NVME_NS_STATE_ACTIVE;
-
-	if (ns->ns_attached)
-		nioc->n_arg |= NVME_NS_STATE_ATTACHED;
+		info->nni_state |= NVME_NS_STATE_ACTIVE;
 
 	if (ns->ns_ignore)
-		nioc->n_arg |= NVME_NS_STATE_IGNORED;
+		info->nni_state |= NVME_NS_STATE_IGNORED;
 
+	if (ns->ns_attached) {
+		const char *addr;
+
+		info->nni_state |= NVME_NS_STATE_ATTACHED;
+		addr = bd_address(ns->ns_bd_hdl);
+		if (strlcpy(info->nni_addr, addr, sizeof (info->nni_addr)) >=
+		    sizeof (info->nni_addr)) {
+			mutex_exit(&nvme->n_mgmt_mutex);
+			ret = EOVERFLOW;
+			goto done;
+		}
+	}
+
+	bcopy(ns->ns_idns, &info->nni_id, sizeof (nvme_identify_nsid_t));
 	mutex_exit(&nvme->n_mgmt_mutex);
 
-	return (0);
+	if (ddi_copyout(info, (void *)nioc->n_buf, sizeof (nvme_ns_info_t),
+	    mode & FKIOCTL) != 0) {
+		ret = EFAULT;
+	} else {
+		ret = 0;
+	}
+
+done:
+	kmem_free(info, sizeof (nvme_ns_info_t));
+	return (ret);
 }
 
 static int
@@ -5942,7 +5981,7 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		nvme_ioctl_firmware_download,
 		nvme_ioctl_firmware_commit,
 		nvme_ioctl_passthru,
-		nvme_ioctl_ns_state
+		nvme_ioctl_ns_info
 	};
 
 	if (nvme == NULL)

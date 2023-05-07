@@ -32,7 +32,7 @@ MODULESRCS = disk.c disk_common.c disk_mptsas.c disk_nvme.c
 
 include ../../Makefile.plugin
 
-CPPFLAGS += -I$(SRC)/uts/common
+CPPFLAGS += -I$(SRC)/uts/common -I../../common/ufm
 
 LDLIBS += -ldevinfo -ldevid -lcfgadm -ldiskstatus -ldiskmgt
 

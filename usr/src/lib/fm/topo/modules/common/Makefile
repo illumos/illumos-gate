@@ -35,6 +35,7 @@ SUBDIRS =		\
 	ses		\
 	smbios		\
 	usb		\
+	ufm		\
 	xfp
 
 ses:	disk

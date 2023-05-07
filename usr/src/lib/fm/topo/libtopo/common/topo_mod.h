@@ -262,8 +262,8 @@ extern int topo_prop_method_register(tnode_t *, const char *, const char *,
     topo_type_t, const char *, const nvlist_t *, int *);
 extern void topo_prop_method_unregister(tnode_t *, const char *, const char *);
 
-extern tnode_t *topo_mod_create_ufm(topo_mod_t *, tnode_t *, const char *,
-    topo_ufm_slot_info_t *);
+extern tnode_t *topo_mod_create_ufm(topo_mod_t *, tnode_t *, topo_instance_t,
+    const char *, topo_ufm_slot_info_t *);
 extern tnode_t *topo_mod_create_ufm_slot(topo_mod_t *, tnode_t *,
     topo_ufm_slot_info_t *);
 

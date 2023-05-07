@@ -12,12 +12,13 @@
 /*
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
  * This file drives topo node enumeration of NVMe controllers.  A single "nvme"
  * node is enumerated for each NVMe controller.   Child "disk" nodes are then
- * enumerated for each configured NVMe namespace.
+ * enumerated for each active or attached NVMe namespace.
  *
  * nvme nodes are expected to be enumerated under either a "bay" node (for U.2
  * devices) or a "slot" node (for M.2 devices) or a "pciexfn" node (for AIC
@@ -57,10 +58,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <strings.h>
+#include <stdbool.h>
 
 #include <sys/fm/protocol.h>
 #include <fm/topo_hc.h>
 #include <fm/topo_mod.h>
+#include <topo_ufm.h>
 
 #include <sys/dkio.h>
 #include <sys/scsi/generic/inquiry.h>
@@ -145,205 +148,353 @@ get_logical_disk(topo_mod_t *mod, const char *devpath, uint_t *bufsz)
 	return (dlarg.dla_logical_disk);
 }
 
-static int
-make_disk_node(nvme_enum_info_t *nvme_info, di_node_t dinode,
-    topo_instance_t inst)
+static bool
+disk_nvme_make_ns_serial(topo_mod_t *mod, const nvme_identify_nsid_t *id,
+    uint32_t nsid, char *buf, size_t buflen)
 {
-	topo_mod_t *mod = nvme_info->nei_mod;
-	nvlist_t *auth = NULL, *fmri = NULL;
-	tnode_t *disk;
-	char *rev = NULL, *model = NULL, *serial = NULL, *path;
-	char *logical_disk = NULL, *devid, *manuf, *ctd = NULL;
-	char *cap_bytes_str = NULL, full_path[MAXPATHLEN + 1];
-	char *pname = topo_node_name(nvme_info->nei_parent);
-	topo_instance_t pinst = topo_node_instance(nvme_info->nei_parent);
-	const char **ppaths = NULL;
-	struct dk_minfo minfo;
-	uint64_t cap_bytes;
-	uint_t bufsz;
-	int fd = -1, err, ret = -1, r;
+	uint8_t zero_guid[16] = { 0 };
+	int ret;
 
-	if ((path = di_devfs_path(dinode)) == NULL) {
-		topo_mod_dprintf(mod, "%s: failed to get dev path", __func__);
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		return (ret);
-	}
-
-	topo_mod_dprintf(mod, "%s: found nvme namespace: %s", __func__, path);
-
-	/*
-	 * Issue the DKIOCGMEDIAINFO ioctl to get the capacity
-	 */
-	(void) snprintf(full_path, MAXPATHLEN, "/devices%s%s", path,
-	    PHYS_EXTN);
-	if ((fd = open(full_path, O_RDWR)) < 0 ||
-	    ioctl(fd, DKIOCGMEDIAINFO, &minfo) < 0) {
-		topo_mod_dprintf(mod, "failed to get blkdev capacity (%s)",
-		    strerror(errno));
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		goto error;
-	}
-
-	cap_bytes = minfo.dki_lbsize * minfo.dki_capacity;
-
-	if (asprintf(&cap_bytes_str, "%" PRIu64, cap_bytes) < 0) {
-		topo_mod_dprintf(mod, "%s: failed to alloc string", __func__);
-		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
-		goto error;
-	}
-
-	/*
-	 * Gather the FRU identity information from the devinfo properties
-	 */
-	if (di_prop_lookup_strings(DDI_DEV_T_ANY, dinode, DEVID_PROP_NAME,
-	    &devid) == -1 ||
-	    di_prop_lookup_strings(DDI_DEV_T_ANY, dinode, INQUIRY_VENDOR_ID,
-	    &manuf) == -1 ||
-	    di_prop_lookup_strings(DDI_DEV_T_ANY, dinode, INQUIRY_PRODUCT_ID,
-	    &model) == -1 ||
-	    di_prop_lookup_strings(DDI_DEV_T_ANY, dinode, INQUIRY_REVISION_ID,
-	    &rev) == -1 ||
-	    di_prop_lookup_strings(DDI_DEV_T_ANY, dinode, INQUIRY_SERIAL_NO,
-	    &serial) == -1) {
-		topo_mod_dprintf(mod, "%s: failed to lookup devinfo props on "
-		    "%s", __func__, path);
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		goto error;
-	}
-
-	model = topo_mod_clean_str(mod, model);
-	rev = topo_mod_clean_str(mod, rev);
-	serial = topo_mod_clean_str(mod, serial);
-
-	/*
-	 * Lookup the /dev/dsk/c#t#d# disk device name from the blkdev path
-	 */
-	if ((logical_disk = get_logical_disk(mod, path, &bufsz)) == NULL) {
-		topo_mod_dprintf(mod, "failed to find logical disk");
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		goto error;
-	}
-
-	/*
-	 * If we were able to look up the logical disk path for this namespace
-	 * then set ctd to be that pathname, minus the "/dev/dsk/" portion.
-	 */
-	if ((ctd = strrchr(logical_disk, '/')) !=  NULL) {
-		ctd = ctd + 1;
+	if (bcmp(zero_guid, id->id_nguid, sizeof (id->id_nguid)) != 0) {
+		ret = snprintf(buf, buflen, "%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X"
+		    "%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X",
+		    id->id_nguid[0], id->id_nguid[1], id->id_nguid[2],
+		    id->id_nguid[3], id->id_nguid[4], id->id_nguid[5],
+		    id->id_nguid[6], id->id_nguid[7], id->id_nguid[8],
+		    id->id_nguid[9], id->id_nguid[10], id->id_nguid[11],
+		    id->id_nguid[12], id->id_nguid[13], id->id_nguid[14],
+		    id->id_nguid[15]);
+	} else if (bcmp(zero_guid, id->id_eui64, sizeof (id->id_eui64)) != 0) {
+		ret = snprintf(buf, buflen,
+		    "%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X%0.2X",
+		    id->id_eui64[0], id->id_eui64[1], id->id_eui64[2],
+		    id->id_eui64[3], id->id_eui64[4], id->id_eui64[5],
+		    id->id_eui64[6], id->id_eui64[7]);
 	} else {
-		topo_mod_dprintf(mod, "malformed logical disk path: %s",
-		    logical_disk);
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		goto error;
+		ret = snprintf(buf, buflen, "%u", nsid);
 	}
 
-	/*
-	 * Build the FMRI and then bind the disk node to the parent nvme node.
-	 */
-	auth = topo_mod_auth(mod, nvme_info->nei_nvme);
-	fmri = topo_mod_hcfmri(mod, nvme_info->nei_nvme, FM_HC_SCHEME_VERSION,
-	    DISK, inst, NULL, auth, model, rev, serial);
-
-	if (fmri == NULL) {
-		/* errno set */
-		topo_mod_dprintf(mod, "%s: hcfmri failed for %s=%" PRIu64
-		    "/%s=0/%s=%" PRIu64, __func__, pname, pinst, NVME, DISK,
-		    inst);
-		goto error;
-	}
-	if ((disk = topo_node_bind(mod, nvme_info->nei_nvme, DISK, inst,
-	    fmri)) == NULL) {
-		/* errno set */
-		topo_mod_dprintf(mod, "%s: bind failed for %s=%" PRIu64
-		    "/%s=0/%s=%" PRIu64, __func__, pname, pinst, NVME, DISK,
-		    inst);
-		goto error;
+	if ((size_t)ret >= buflen) {
+		topo_mod_dprintf(mod, "overflowed serial number for nsid %u: "
+		    "needed %zu bytes, got %d", nsid, buflen, ret);
+		return (false);
 	}
 
-	/* Create authority and system propgroups */
-	topo_pgroup_hcset(disk, auth);
+	return (true);
+}
 
-	/*
-	 * As the "disk" in this case is simply a logical construct
-	 * representing an NVMe namespace, we inherit the FRU from the parent
-	 * node.
-	 */
-	if (topo_node_fru_set(disk, NULL, 0, &err) != 0) {
-		topo_mod_dprintf(mod, "%s: failed to set FRU: %s", __func__,
-		    topo_strerror(err));
-		(void) topo_mod_seterrno(mod, err);
-		goto error;
+/*
+ * Create the common I/O property group properties that are shared between
+ * controllers and namespaces. We assume the property group was already created.
+ */
+static bool
+disk_nvme_common_io(topo_mod_t *mod, tnode_t *tn, di_node_t di)
+{
+	int err;
+	int inst = di_instance(di);
+	const char *drv = di_driver_name(di);
+	char *path;
+	const char *ppaths[1];
+
+	if (inst != -1 && topo_prop_set_uint32(tn, TOPO_PGROUP_IO,
+	    TOPO_IO_INSTANCE, TOPO_PROP_IMMUTABLE, (uint32_t)inst, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s:%s on %s[%" PRIu64 "]: "
+		    "%s", TOPO_PGROUP_IO, TOPO_IO_INSTANCE, topo_node_name(tn),
+		    topo_node_instance(tn), topo_strerror(err));
+		return (false);
 	}
 
-	if ((ppaths = topo_mod_zalloc(mod, sizeof (char *))) == NULL) {
-		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
-		goto error;
+	if (drv != NULL && topo_prop_set_string(tn, TOPO_PGROUP_IO,
+	    TOPO_IO_DRIVER, TOPO_PROP_IMMUTABLE, drv, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s:%s on %s[%" PRIu64 "]: "
+		    "%s", TOPO_PGROUP_IO, TOPO_IO_DRIVER, topo_node_name(tn),
+		    topo_node_instance(tn), topo_strerror(err));
+		return (false);
 	}
+
+	if (drv != NULL) {
+		nvlist_t *fmri = topo_mod_modfmri(mod, FM_MOD_SCHEME_VERSION,
+		    drv);
+		if (mod != NULL && topo_prop_set_fmri(tn, TOPO_PGROUP_IO,
+		    TOPO_IO_MODULE, TOPO_PROP_IMMUTABLE, fmri, &err) != 0) {
+			topo_mod_dprintf(mod, "failed to set %s:%s on %s[%"
+			    PRIu64 "]: %s", TOPO_PGROUP_IO, TOPO_IO_MODULE,
+			    topo_node_name(tn), topo_node_instance(tn),
+			    topo_strerror(err));
+			nvlist_free(fmri);
+			return (false);
+		}
+		nvlist_free(fmri);
+	}
+
+	path = di_devfs_path(di);
 	ppaths[0] = path;
+	if (path != NULL && topo_prop_set_string(tn, TOPO_PGROUP_IO,
+	    TOPO_IO_DEV_PATH, TOPO_PROP_IMMUTABLE, path, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s:%s on %s[%" PRIu64 "]: "
+		    "%s", TOPO_PGROUP_IO, TOPO_IO_DRIVER, topo_node_name(tn),
+		    topo_node_instance(tn), topo_strerror(err));
+		di_devfs_path_free(path);
+		return (false);
+	}
+
+	if (path != NULL && topo_prop_set_string_array(tn, TOPO_PGROUP_IO,
+	    TOPO_IO_PHYS_PATH, TOPO_PROP_IMMUTABLE, ppaths, 1, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s:%s on %s[%" PRIu64 "]: "
+		    "%s", TOPO_PGROUP_IO, TOPO_IO_PHYS_PATH, topo_node_name(tn),
+		    topo_node_instance(tn), topo_strerror(err));
+		di_devfs_path_free(path);
+		return (false);
+	}
+	di_devfs_path_free(path);
+
+	return (true);
+}
+
+/*
+ * Add the various storage and I/O property group items that are appropriate
+ * given that we have a devinfo node. The storage property group has already
+ * been created, but the I/O property group has not.
+ */
+static void
+disk_nvme_make_ns_di_props(topo_mod_t *mod, tnode_t *tn, di_node_t di)
+{
+	int err;
+	char *devid, *mfg, *model, *rev, *serial, *log, *path;
+	uint_t buflen;
+
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, di, DEVID_PROP_NAME,
+	    &devid) != 1 ||
+	    di_prop_lookup_strings(DDI_DEV_T_ANY, di, INQUIRY_VENDOR_ID,
+	    &mfg) != 1 ||
+	    di_prop_lookup_strings(DDI_DEV_T_ANY, di, INQUIRY_PRODUCT_ID,
+	    &model) != 1 ||
+	    di_prop_lookup_strings(DDI_DEV_T_ANY, di, INQUIRY_REVISION_ID,
+	    &rev) != 1 ||
+	    di_prop_lookup_strings(DDI_DEV_T_ANY, di, INQUIRY_SERIAL_NO,
+	    &serial) != 1) {
+		topo_mod_dprintf(mod, "failed to get devinfo props for %s[%"
+		    PRIu64 "]", topo_node_name(tn), topo_node_instance(tn));
+		return;
+	}
 
 	/*
-	 * Create the "storage" and "io" property groups and then fill them
-	 * with the standard set of properties for "disk" nodes.
+	 * Set the basic storage manufacturer information. Yes, this is
+	 * information really about the NVMe controller and not the namespace.
+	 * That's how the storage property group basically works here.
 	 */
-	if (topo_pgroup_create(disk, &io_pgroup, &err) != 0 ||
-	    topo_pgroup_create(disk, &storage_pgroup, &err) != 0) {
-		topo_mod_dprintf(mod, "%s: failed to create propgroups: %s",
-		    __func__, topo_strerror(err));
-		(void) topo_mod_seterrno(mod, err);
-		goto error;
+	if (topo_prop_set_string(tn, TOPO_PGROUP_STORAGE,
+	    TOPO_STORAGE_MANUFACTURER, TOPO_PROP_IMMUTABLE, mfg, &err) != 0 ||
+	    topo_prop_set_string(tn, TOPO_PGROUP_STORAGE,
+	    TOPO_STORAGE_SERIAL_NUM, TOPO_PROP_IMMUTABLE, serial, &err) != 0 ||
+	    topo_prop_set_string(tn, TOPO_PGROUP_STORAGE,
+	    TOPO_STORAGE_FIRMWARE_REV, TOPO_PROP_IMMUTABLE, rev, &err) != 0 ||
+	    topo_prop_set_string(tn, TOPO_PGROUP_STORAGE,
+	    TOPO_STORAGE_MODEL, TOPO_PROP_IMMUTABLE, model, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set storage properties on "
+		    "%s[%" PRIu64 "]: %s", topo_node_name(tn),
+		    topo_node_instance(tn), topo_strerror(err));
+		return;
 	}
 
-	r = topo_prop_set_string(disk, TOPO_PGROUP_IO, TOPO_IO_DEV_PATH,
-	    TOPO_PROP_IMMUTABLE, path, &err);
-
-	r += topo_prop_set_string_array(disk, TOPO_PGROUP_IO,
-	    TOPO_IO_PHYS_PATH, TOPO_PROP_IMMUTABLE, ppaths, 1, &err);
-
-	r += topo_prop_set_string(disk, TOPO_PGROUP_IO, TOPO_IO_DEVID,
-	    TOPO_PROP_IMMUTABLE, devid, &err);
-
-	r += topo_prop_set_string(disk, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_MANUFACTURER, TOPO_PROP_IMMUTABLE, manuf, &err);
-
-	r += topo_prop_set_string(disk, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_CAPACITY, TOPO_PROP_IMMUTABLE, cap_bytes_str,
-	    &err);
-
-	r += topo_prop_set_string(disk, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_SERIAL_NUM, TOPO_PROP_IMMUTABLE, serial, &err);
-
-	r += topo_prop_set_string(disk, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_MODEL, TOPO_PROP_IMMUTABLE, model, &err);
-
-	r += topo_prop_set_string(disk, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_FIRMWARE_REV, TOPO_PROP_IMMUTABLE, rev, &err);
-
-	r += topo_prop_set_string(disk, TOPO_PGROUP_STORAGE,
-	    TOPO_STORAGE_LOGICAL_DISK_NAME, TOPO_PROP_IMMUTABLE, ctd, &err);
-
-	if (r != 0) {
-		topo_mod_dprintf(mod, "%s: failed to create properties: %s",
-		    __func__, topo_strerror(err));
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		goto error;
+	if (topo_pgroup_create(tn, &io_pgroup, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to create I/O property "
+		    "group on %s[%" PRIu64 "]: %s",  topo_node_name(tn),
+		    topo_node_instance(tn), topo_strerror(err));
 	}
 
-	ret = 0;
+	if (!disk_nvme_common_io(mod, tn, di)) {
+		return;
+	}
 
-error:
-	free(cap_bytes_str);
-	if (fd > 0)
-		(void) close(fd);
-	if (ppaths != NULL)
-		topo_mod_free(mod, ppaths, sizeof (char *));
+	/*
+	 * The last property that we'd like to attempt to create for a namespace
+	 * is a mapping back to its corresponding logical disk entry in /dev.
+	 * The logical disk will be everything past the trailing /, i.e. a
+	 * cXtXdX value.
+	 */
+	path = di_devfs_path(di);
+	if (path == NULL) {
+		return;
+	}
+	log = get_logical_disk(mod, path, &buflen);
 	di_devfs_path_free(path);
+	if (log == NULL) {
+		return;
+	}
+	path = strrchr(log, '/');
+	if (path != NULL && path[1] != '\0' &&
+	    topo_prop_set_string(tn, TOPO_PGROUP_STORAGE,
+	    TOPO_STORAGE_LOGICAL_DISK_NAME, TOPO_PROP_IMMUTABLE, path + 1,
+	    &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s:%s on %s[%"
+		    PRIu64 "]: %s", TOPO_PGROUP_STORAGE,
+		    TOPO_STORAGE_LOGICAL_DISK_NAME, topo_node_name(tn),
+		    topo_node_instance(tn), topo_strerror(err));
+	}
+	topo_mod_free(mod, log, buflen);
+}
+
+static void
+disk_nvme_make_ns(nvme_enum_info_t *nei, uint32_t nsid)
+{
+	topo_mod_t *mod = nei->nei_mod;
+	nvlist_t *auth = NULL, *fmri = NULL;
+	const topo_instance_t inst = nsid - 1;
+	nvme_ns_info_t info;
+	nvme_ioctl_t ioc;
+	char serial[64], capstr[64];
+	uint64_t cap, blksz;
+	tnode_t *tn;
+	uint8_t lba;
+	int err;
+
+	bzero(&ioc, sizeof (ioc));
+	bzero(&info, sizeof (info));
+	ioc.n_len = sizeof (nvme_ns_info_t);
+	ioc.n_buf = (uintptr_t)&info;
+	ioc.n_arg = nsid;
+
+	if (ioctl(nei->nei_fd, NVME_IOC_NS_INFO, &ioc) != 0) {
+		topo_mod_dprintf(mod, "failed to get namespace info for ns %u: "
+		    "%s", nsid, strerror(errno));
+		return;
+	}
+
+	if ((info.nni_state & NVME_NS_STATE_IGNORED) != 0) {
+		return;
+	}
+
+	if ((info.nni_state &
+	    (NVME_NS_STATE_ACTIVE | NVME_NS_STATE_ATTACHED)) == 0) {
+		topo_mod_dprintf(mod, "skipping nsid %u because it is not "
+		    "active or attached (state: 0x%x)", nsid, info.nni_state);
+		return;
+	}
+
+	auth = topo_mod_auth(mod, nei->nei_nvme);
+	if (auth == NULL) {
+		topo_mod_dprintf(mod, "failed to get auth for nsid %u from "
+		    "parent %s[%" PRIu64 "]: %s", nsid,
+		    topo_node_name(nei->nei_nvme),
+		    topo_node_instance(nei->nei_nvme), topo_mod_errmsg(mod));
+		goto done;
+	}
+
+	/*
+	 * We want to construct the FMRI for the namespace. The namespace is a
+	 * little awkward in terms of things like the model, revision, and
+	 * serial. While blkdev sets up standard inquiry properties to map these
+	 * to the parent device which makes sense in the context of trying to
+	 * use this as a normal block device, it's not really appropriate here.
+	 * The namespace is not the NVMe controller. We construct the namespace
+	 * serial number from the preferential ordering of information that
+	 * we're given of the NGUID, EUI64, and then fall back to the namespace
+	 * number.
+	 */
+	if (!disk_nvme_make_ns_serial(mod, &info.nni_id, nsid, serial,
+	    sizeof (serial))) {
+		goto done;
+	}
+	fmri = topo_mod_hcfmri(mod, nei->nei_nvme, FM_HC_SCHEME_VERSION,
+	    DISK, inst, NULL, auth, NULL, NULL, serial);
+	if (fmri == NULL) {
+		topo_mod_dprintf(mod, "failed to make fmri for %s[%" PRIu64
+		    "] on nsid %u: %s", DISK, inst, nsid, topo_mod_errmsg(mod));
+		goto done;
+	}
+
+	tn = topo_node_bind(mod, nei->nei_nvme, DISK, inst, fmri);
+	if (tn == NULL) {
+		topo_mod_dprintf(mod, "failed to bind fmri for %s[%" PRIu64
+		    "] on nsid %u: %s", DISK, inst, nsid, topo_mod_errmsg(mod));
+		goto done;
+	}
+
+	/*
+	 * Always inherit our parent's FRU. The namespace is just a part of the
+	 * device in reality.
+	 */
+	if (topo_node_fru_set(tn, NULL, 0, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set FRU for %s[%" PRIu64
+		    "] on nsid %u: %s", DISK, inst, nsid, topo_strerror(err));
+		goto done;
+
+	}
+
+	/*
+	 * Our namespace may or may not be attached. From the namespace we will
+	 * always get the capacity and block information. The rest of it will
+	 * end up being filled in if we find a devinfo node.
+	 */
+	if (topo_pgroup_create(tn, &storage_pgroup, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to create storage property "
+		    "group on %s[%" PRIu64 "]: %s", DISK, inst,
+		    topo_strerror(err));
+	}
+
+	lba = info.nni_id.id_flbas.lba_format;
+	blksz = 1ULL << info.nni_id.id_lbaf[lba].lbaf_lbads;
+	if (blksz != 0 && topo_prop_set_uint64(tn, TOPO_PGROUP_STORAGE,
+	    TOPO_STORAGE_LOG_BLOCK_SIZE, TOPO_PROP_IMMUTABLE, blksz, &err) !=
+	    0) {
+		topo_mod_dprintf(mod, "failed to create property %s:%s on %s[%"
+		    PRIu64 "]: %s", TOPO_PGROUP_STORAGE,
+		    TOPO_STORAGE_LOG_BLOCK_SIZE, DISK, inst,
+		    topo_strerror(err));
+		goto done;
+	}
+
+	cap = blksz * info.nni_id.id_nsize;
+	if (snprintf(capstr, sizeof (capstr), "%" PRIu64, cap) >=
+	    sizeof (capstr)) {
+		topo_mod_dprintf(mod, "overflowed capacity calculation on "
+		    "nsid %u", nsid);
+		goto done;
+	}
+
+	/*
+	 * Finally attempt to find a child node that has a matching name and go
+	 * from there. Sorry, this does result in node creation being O(n^2),
+	 * but at least n is usually small today.
+	 */
+	for (di_node_t di = di_child_node(nei->nei_dinode); di != DI_NODE_NIL;
+	    di = di_sibling_node(di)) {
+		const char *addr = di_bus_addr(di);
+		if (addr != NULL && strcmp(addr, info.nni_addr) == 0) {
+			disk_nvme_make_ns_di_props(mod, tn, di);
+		}
+	}
+
+done:
 	nvlist_free(auth);
 	nvlist_free(fmri);
-	topo_mod_strfree(mod, rev);
-	topo_mod_strfree(mod, model);
-	topo_mod_strfree(mod, serial);
-	topo_mod_free(mod, logical_disk, bufsz);
-	return (ret);
+}
+
+/*
+ * Attempt to make a ufm node, but swallow the error so we can try to get as
+ * much of the disk information as possible.
+ */
+static void
+disk_nvme_make_ufm(topo_mod_t *mod, nvme_enum_info_t *nei)
+{
+	topo_ufm_devinfo_t tud;
+	char *path = di_devfs_path(nei->nei_dinode);
+	if (path == NULL) {
+		return;
+	}
+
+	tud.tud_method = TOPO_UFM_M_DEVINFO;
+	tud.tud_path = path;
+	if (topo_mod_load(mod, TOPO_MOD_UFM, TOPO_VERSION) == NULL) {
+		topo_mod_dprintf(mod, "disk enum could not load ufm module");
+		di_devfs_path_free(path);
+		return;
+	}
+
+	(void) topo_mod_enumerate(mod, nei->nei_nvme, TOPO_MOD_UFM, UFM, 0, 0,
+	    &tud);
+	di_devfs_path_free(path);
 }
 
 static const topo_pgroup_info_t nvme_pgroup = {
@@ -352,7 +503,6 @@ static const topo_pgroup_info_t nvme_pgroup = {
 	TOPO_STABILITY_PRIVATE,
 	1
 };
-
 
 static int
 make_nvme_node(nvme_enum_info_t *nvme_info)
@@ -367,8 +517,6 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 	char *label = NULL;
 	topo_instance_t pinst = topo_node_instance(nvme_info->nei_parent);
 	int err = 0, ret = -1;
-	di_node_t cn;
-	uint_t i;
 
 	/*
 	 * The raw strings returned by the IDENTIFY CONTROLLER command are
@@ -404,7 +552,7 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 
 	/*
 	 * If our parent is a pciexfn node, then we need to create a nvme range
-	 * underneath it to hold the nvme heirarchy.  For other cases, where
+	 * underneath it to hold the nvme hierarchy.  For other cases, where
 	 * enumeration is being driven by a topo map file, this range will have
 	 * already been statically defined in the XML.
 	 */
@@ -463,6 +611,14 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 		goto error;
 	}
 
+	/*
+	 * Ensure that we have a UFM property set based on our devinfo path.
+	 * This is a little repetitive if our parent actually did so as well,
+	 * but given that the majority of such nodes are under bays and slots
+	 * right now, it's a worthwhile tradeoff.
+	 */
+	disk_nvme_make_ufm(mod, nvme_info);
+
 	if (topo_pgroup_create(nvme, &nvme_pgroup, &err) != 0) {
 		topo_mod_dprintf(mod, "%s: failed to create %s pgroup: %s",
 		    __func__, TOPO_PGROUP_NVME, topo_strerror(err));
@@ -490,11 +646,8 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 		(void) topo_mod_seterrno(mod, err);
 		goto error;
 	}
-	if (topo_prop_set_string(nvme, TOPO_PGROUP_IO, TOPO_IO_DEV_PATH,
-	    TOPO_PROP_IMMUTABLE, nvme_info->nei_nvme_path, &err) != 0) {
-		topo_mod_dprintf(mod, "%s: failed to set %s/%s property",
-		    __func__, TOPO_PGROUP_IO, TOPO_IO_DEV_PATH);
-		(void) topo_mod_seterrno(mod, err);
+
+	if (!disk_nvme_common_io(mod, nvme, nvme_info->nei_dinode)) {
 		goto error;
 	}
 
@@ -509,21 +662,14 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 		goto error;
 	}
 
-	for (i = 0, cn = di_child_node(nvme_info->nei_dinode);
-	    cn != DI_NODE_NIL;
-	    i++, cn = di_sibling_node(cn)) {
-
-		if (make_disk_node(nvme_info, cn, i) != 0) {
-			char *path = di_devfs_path(cn);
-			/*
-			 * We note the failure, but attempt to forge ahead and
-			 * enumerate any other namespaces.
-			 */
-			topo_mod_dprintf(mod, "%s: make_disk_node() failed "
-			    "for %s\n", __func__,
-			    path ? path : "unknown path");
-			di_devfs_path_free(path);
-		}
+	/*
+	 * Iterate over each namespace to see if it's a candidate for inclusion.
+	 * Namespaces start at index 1 and not every namespace will be included.
+	 * We map things such that a disk instance is always namespace - 1 to
+	 * fit into the above mapping.
+	 */
+	for (uint32_t i = 1; i <= nvme_info->nei_idctl->id_nn; i++) {
+		disk_nvme_make_ns(nvme_info, i);
 	}
 	ret = 0;
 
