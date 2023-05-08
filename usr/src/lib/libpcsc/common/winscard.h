@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #ifndef _WINSCARD_H
@@ -86,6 +87,7 @@ extern SCARD_IO_REQUEST g_rgSCardT0Pci, g_rgSCardT1Pci, g_rgSCardRawPci;
 #define	SCARD_F_UNKNOWN_ERROR		((LONG)0x80100014)
 #define	SCARD_E_READER_UNAVAILABLE	((LONG)0x80100017)
 #define	SCARD_E_NO_SERVICE		((LONG)0x8010001D)
+#define	SCARD_E_SERVICE_STOPPED		((LONG)0x8010001E)
 #define	SCARD_E_UNSUPPORTED_FEATURE	((LONG)0x80100022)
 #define	SCARD_E_NO_READERS_AVAILABLE	((LONG)0x8010002E)
 #define	SCARD_W_UNSUPPORTED_CARD	((LONG)0x80100065)
@@ -98,19 +100,36 @@ extern SCARD_IO_REQUEST g_rgSCardT0Pci, g_rgSCardT1Pci, g_rgSCardRawPci;
 #define	SCARD_SCOPE_SYSTEM		0x0002
 #define	SCARD_SCOPE_GLOBAL		0x0003
 
-#define	SCARD_SHARE_EXCLUSIVE	0x0001
-#define	SCARD_SHARE_SHARED	0x0002
-#define	SCARD_SHARE_DIRECT	0x0003
+#define	SCARD_SHARE_EXCLUSIVE		0x0001
+#define	SCARD_SHARE_SHARED		0x0002
+#define	SCARD_SHARE_DIRECT		0x0003
 
-#define	SCARD_PROTOCOL_T0	0x0001
-#define	SCARD_PROTOCOL_T1	0x0002
-#define	SCARD_PROTOCOL_RAW	0x0004
-#define	SCARD_PROTOCOL_T15	0x0008
+#define	SCARD_PROTOCOL_UNDEFINED	0x0000
+#define	SCARD_PROTOCOL_T0		0x0001
+#define	SCARD_PROTOCOL_T1		0x0002
+#define	SCARD_PROTOCOL_RAW		0x0004
+#define	SCARD_PROTOCOL_T15		0x0008
 
-#define	SCARD_LEAVE_CARD	0x0000
-#define	SCARD_RESET_CARD	0x0001
-#define	SCARD_UNPOWER_CARD	0x0002
-#define	SCARD_EJECT_CARD	0x0003
+#define	SCARD_LEAVE_CARD		0x0000
+#define	SCARD_RESET_CARD		0x0001
+#define	SCARD_UNPOWER_CARD		0x0002
+#define	SCARD_EJECT_CARD		0x0003
+
+/*
+ * Some versions of PCSClite treat the status value as a bitfield rather than
+ * an enumeration, though their documentation also suggests that "this
+ * difference may be resolved in a future version of pcsc-lite."  We use
+ * bitfield-style values here in case we want to make changes in the future,
+ * but presently treat this as an enumeration (returning one value) as
+ * Microsoft does.
+ */
+#define	SCARD_UNKNOWN			0x0001
+#define	SCARD_ABSENT			0x0002
+#define	SCARD_PRESENT			0x0004
+#define	SCARD_SWALLOWED			0x0008
+#define	SCARD_POWERED			0x0010
+#define	SCARD_NEGOTIABLE		0x0020
+#define	SCARD_SPECIFIC			0x0040
 
 /*
  * This is used to indicate that the framework should allocate memory.
@@ -118,6 +137,7 @@ extern SCARD_IO_REQUEST g_rgSCardT0Pci, g_rgSCardT1Pci, g_rgSCardRawPci;
 #define	SCARD_AUTOALLOCATE		UINT32_MAX
 
 extern LONG SCardEstablishContext(DWORD, LPCVOID, LPCVOID, LPSCARDCONTEXT);
+extern LONG SCardIsValidContext(SCARDCONTEXT);
 extern LONG SCardReleaseContext(SCARDCONTEXT);
 
 extern LONG SCardListReaders(SCARDCONTEXT, LPCSTR, LPSTR, LPDWORD);
@@ -127,6 +147,9 @@ extern LONG SCardFreeMemory(SCARDCONTEXT, LPCVOID);
 extern LONG SCardConnect(SCARDCONTEXT, LPCSTR, DWORD, DWORD, LPSCARDHANDLE,
     LPDWORD);
 extern LONG SCardDisconnect(SCARDHANDLE, DWORD);
+
+extern LONG SCardStatus(SCARDHANDLE, LPSTR, LPDWORD, LPDWORD, LPDWORD,
+    LPBYTE, LPDWORD);
 
 extern LONG SCardBeginTransaction(SCARDHANDLE);
 extern LONG SCardEndTransaction(SCARDHANDLE, DWORD);

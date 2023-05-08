@@ -15,7 +15,7 @@
 
 LIBRARY =	libpcsc.a
 VERS =		.1
-OBJECTS =	libpcsc.o
+OBJECTS =	libpcsc.o list.o
 
 include ../../Makefile.lib
 
@@ -25,8 +25,14 @@ CPPFLAGS +=	-I../common
 
 SRCDIR =	../common
 
+CSTD =		$(CSTD_GNU99)
+
 .KEEP_STATE:
 
 all:	$(LIBS)
+
+objs/%.o pics/%.o: $(SRC)/common/list/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 include ../../Makefile.targ

@@ -50,10 +50,12 @@ SYMBOL_VERSION SUNWprivate {
 				};
 			};
 	SCardEstablishContext;
+	SCardIsValidContext;
 	SCardReleaseContext;
 	SCardFreeMemory;
 	SCardListReaders;
 	SCardConnect;
+	SCardStatus;
 	SCardDisconnect;
 	SCardBeginTransaction;
 	SCardEndTransaction;
