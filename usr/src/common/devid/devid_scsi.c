@@ -63,7 +63,7 @@
 #define	SCSI_INQUIRY_PID_EMC_SYMMETRIX		"SYMMETRIX       "
 #define	SCSI_INQUIRY_PID_EMC_SYMMETRIX_LEN	16
 
-#define	MSG_NOT_STANDARDS_COMPLIANT "!Page83 data not standards compliant "
+#define	MSG_NOT_STANDARDS_COMPLIANT "Page83 data not standards compliant "
 #define	MSG_NOT_STANDARDS_COMPLIANT_SIZE	( \
 	sizeof (MSG_NOT_STANDARDS_COMPLIANT) + \
 	sizeof (((struct scsi_inquiry *)NULL)->inq_vid) + \
@@ -239,7 +239,7 @@ devid_scsi_encode(
 				(void) strncat(msg, inq_std->inq_revision,
 				    sizeof (inq_std->inq_revision));
 				(void) strcat(msg, "\n");
-				cmn_err(CE_WARN, "%s", msg);
+				cmn_err(CE_WARN, "!%s", msg);
 				kmem_free(msg,
 				    MSG_NOT_STANDARDS_COMPLIANT_SIZE);
 			}
