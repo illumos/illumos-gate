@@ -324,10 +324,11 @@ getallifaddrs(sa_family_t af, struct ifaddrs **ifap, int64_t flags)
 
 	bufsize = sizeof (dld_ioc_macaddrget_t) + nmacaddr *
 	    sizeof (dld_macaddrinfo_t);
-	if ((iomp = calloc(1, bufsize)) == NULL)
+	if ((iomp = malloc(bufsize)) == NULL)
 		goto fail;
 
 retry:
+	bzero(iomp, bufsize);
 	/* Get all interfaces from SIOCGLIFCONF */
 	ret = getallifs(sock4, af, &buf, &numifs, (flags & ~LIFC_ENABLED));
 	if (ret != 0)
@@ -526,14 +527,12 @@ nolink:
 fail:
 	err = errno;
 	free(buf);
-	free(iomp);
+	buf = NULL;
 	freeifaddrs(*ifap);
 	*ifap = NULL;
-	if (err == ENXIO) {
-		buf = NULL;
-		iomp = NULL;
+	if (err == ENXIO)
 		goto retry;
-	}
+	free(iomp);
 
 	if (sock4 >= 0)
 		(void) close(sock4);
