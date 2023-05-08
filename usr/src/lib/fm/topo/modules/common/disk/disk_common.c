@@ -506,7 +506,7 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 
 	if (fmri == NULL) {
 		topo_mod_dprintf(mod, "disk_tnode_create: "
-		    "hcfmri (%s%d/%s%d) error %s\n",
+		    "hcfmri (%s%" PRIu64 "/%s%" PRIu64 ") error %s\n",
 		    topo_node_name(parent), topo_node_instance(parent),
 		    name, i, topo_strerror(topo_mod_errno(mod)));
 		return (-1);
@@ -521,7 +521,7 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 			return (0);
 		}
 		topo_mod_dprintf(mod, "disk_tnode_create: "
-		    "bind (%s%d/%s%d) error %s\n",
+		    "bind (%s%" PRIu64 "/%s%" PRIu64 ") error %s\n",
 		    topo_node_name(parent), topo_node_instance(parent),
 		    name, i, topo_strerror(topo_mod_errno(mod)));
 		nvlist_free(fmri);
@@ -532,7 +532,7 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	/* add the properties of the disk */
 	if (disk_set_props(mod, parent, dtn, dnode) != 0) {
 		topo_mod_dprintf(mod, "disk_tnode_create: "
-		    "disk_set_props (%s%d/%s%d) error %s\n",
+		    "disk_set_props (%s%" PRIu64 "/%s%" PRIu64 ") error %s\n",
 		    topo_node_name(parent), topo_node_instance(parent),
 		    name, i, topo_strerror(topo_mod_errno(mod)));
 		topo_node_unbind(dtn);
@@ -542,7 +542,7 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	if (dnode != NULL && dnode->ddn_devid != NULL &&
 	    disk_add_temp_sensor(mod, dtn, dnode->ddn_devid) != 0) {
 		topo_mod_dprintf(mod, "disk_tnode_create: failed to create "
-		    "temperature sensor node on bay=%d/disk=0",
+		    "temperature sensor node on bay=%" PRIu64 "/disk=0",
 		    topo_node_instance(parent));
 	}
 	*rval = dtn;

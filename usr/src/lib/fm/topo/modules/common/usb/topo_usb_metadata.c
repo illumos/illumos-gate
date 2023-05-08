@@ -259,7 +259,7 @@ topo_usb_parse_label(topo_mod_t *mod, topo_usb_parse_t *parse, const char *line)
 	len = strlen(line);
 	for (i = 0; i < len; i++) {
 		if (isascii(line[i]) == 0 || isprint(line[i]) == 0) {
-			topo_mod_dprintf(mod, "label character %llu is "
+			topo_mod_dprintf(mod, "label character %zu is "
 			    "invalid: 0x%x", i, line[i]);
 			return (B_FALSE);
 		}

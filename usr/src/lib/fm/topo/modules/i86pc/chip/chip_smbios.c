@@ -388,7 +388,7 @@ chip_status_smbios_get(topo_mod_t *mod, id_t smb_id)
 	}
 
 	topo_mod_dprintf(mod, "chip_status_smbios_get() failed"
-	    " considering that Type 4 ID : %d is disabled", smb_id);
+	    " considering that Type 4 ID : %ld is disabled", smb_id);
 	return (0);
 }
 
@@ -411,7 +411,7 @@ chip_fru_smbios_get(topo_mod_t *mod, id_t smb_id)
 	}
 
 	topo_mod_dprintf(mod, "chip_fru_smbios_get() failed"
-	    " considering that Type 4 ID : %d is not a FRU", smb_id);
+	    " considering that Type 4 ID : %ld is not a FRU", smb_id);
 	return (0);
 }
 

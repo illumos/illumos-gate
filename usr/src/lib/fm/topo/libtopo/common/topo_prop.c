@@ -377,13 +377,14 @@ prop_getval(tnode_t *node, const char *pgname, const char *pname, void *val,
 			ret = ETOPO_PROP_NOENT;
 	}
 
-	if (ret != 0)
+	if (ret != 0) {
 		if (ret == ENOENT)
 			return (get_properror(node, err, ETOPO_PROP_NOENT));
 		else if (ret < ETOPO_UNKNOWN)
 			return (get_properror(node, err, ETOPO_PROP_NVL));
 		else
 			return (get_properror(node, err, ret));
+	}
 
 	topo_node_unlock(node);
 	return (0);

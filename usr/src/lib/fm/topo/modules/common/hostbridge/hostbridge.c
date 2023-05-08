@@ -206,7 +206,7 @@ hb_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	ntn = topo_node_bind(mod, parent, name, i, fmri);
 	if (ntn == NULL) {
 		topo_mod_dprintf(mod,
-		    "topo_node_bind (%s%d/%s%d) failed: %s\n",
+		    "topo_node_bind (%s%" PRIu64 "/%s%" PRIu64 ") failed: %s\n",
 		    topo_node_name(parent), topo_node_instance(parent),
 		    name, i,
 		    topo_strerror(topo_mod_errno(mod)));

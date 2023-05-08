@@ -127,7 +127,7 @@ pciex_process(topo_mod_t *mod, tnode_t *tn_hbr, di_node_t rcn,
 	hcfmri.instance = rci;
 	rv = x86pi_enum_generic(mod, &hcfmri, tn_hbr, tn_hbr, &tn_rc, 0);
 	if (rv != 0) {
-		topo_mod_dprintf(mod, "%s: failed to create %s = %d\n",
+		topo_mod_dprintf(mod, "%s: failed to create %s = %" PRIu64 "\n",
 		    f, PCIEX_ROOT, rci);
 		return (-1);
 	}
@@ -141,8 +141,8 @@ pciex_process(topo_mod_t *mod, tnode_t *tn_hbr, di_node_t rcn,
 	 * Let did set the RC properties excluding FRU, and label.
 	 */
 	if (did_props_set(tn_rc, did, RC_common_props, RC_propcnt - 2) < 0) {
-		topo_mod_dprintf(mod, "%s: did_props_set failed for %s = %d\n",
-		    f, PCIEX_ROOT, rci);
+		topo_mod_dprintf(mod, "%s: did_props_set failed for %s = %"
+		    PRIu64 "\n", f, PCIEX_ROOT, rci);
 		topo_node_unbind(tn_rc);
 		return (-1);
 	}
@@ -253,7 +253,7 @@ x86pi_gen_hbr(topo_mod_t *mod, tnode_t *tn_bb,
 	/* create and bind the "hostbridge" node */
 	rv = x86pi_enum_generic(mod, &hcfmri, tn_bb, tn_bb, &tn_hbr, 0);
 	if (rv != 0) {
-		topo_mod_dprintf(mod, "%s: failed to create %s = %d\n",
+		topo_mod_dprintf(mod, "%s: failed to create %s = %" PRIu64 "\n",
 		    f, HOSTBRIDGE, hbri);
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 	}

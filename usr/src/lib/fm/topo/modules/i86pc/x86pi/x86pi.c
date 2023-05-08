@@ -515,9 +515,10 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent)
 				continue;
 			rv = x86pi_gen_hbr(mod, basebd_node,
 			    smbc->ids[i].id, hbri, &rci);
-			if (rv != 0)
-				topo_mod_dprintf(mod,
-				    "couldn't create hostbridge=%d\n", hbri);
+			if (rv != 0) {
+				topo_mod_dprintf(mod, "couldn't create "
+				    "hostbridge=%" PRIu64 "\n", hbri);
+			}
 			hbri++;
 		}
 		nbb++;

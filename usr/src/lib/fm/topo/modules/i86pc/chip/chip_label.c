@@ -748,9 +748,9 @@ g4_dimm_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	chip = topo_node_parent(topo_node_parent(node));
 	if (topo_prop_get_string(chip, TOPO_PGROUP_PROTOCOL, "label", &chip_lbl,
 	    &err) != 0) {
-		topo_mod_dprintf(mod, "Failed to lookup label prop on %s=%d\n",
-		    topo_node_name(chip), topo_node_instance(chip),
-		    topo_strerror(err));
+		topo_mod_dprintf(mod, "Failed to lookup label prop on %s=%"
+		    PRIu64 ": %s\n", topo_node_name(chip),
+		    topo_node_instance(chip), topo_strerror(err));
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 

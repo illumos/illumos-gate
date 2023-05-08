@@ -113,7 +113,7 @@ port_create_common(topo_mod_t *mod, tnode_t *pnode, topo_instance_t inst,
 
 	if (topo_method_register(mod, tn, port_methods) != 0) {
 		topo_mod_dprintf(mod, "topo_method_register() failed on "
-		    "%s=%d: %s", PORT, inst, topo_mod_errmsg(mod));
+		    "%s=%" PRIu64 ": %s", PORT, inst, topo_mod_errmsg(mod));
 		/* errno set */
 		goto error;
 	}

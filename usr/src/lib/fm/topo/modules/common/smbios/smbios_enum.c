@@ -147,15 +147,15 @@ smbios_make_slot(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 
 	if (topo_node_label_set(slotnode, (char *)smb_md->smbmd_dloc, &err) !=
 	    0) {
-		topo_mod_dprintf(mod, "failed to set label on %s=%d: %s",
-		    SLOT, smed->sme_slot_inst, topo_strerror(err));
+		topo_mod_dprintf(mod, "failed to set label on %s=%" PRIu64
+		    ": %s", SLOT, smed->sme_slot_inst, topo_strerror(err));
 		(void) topo_mod_seterrno(mod, err);
 		return (NULL);
 	}
 	if (topo_node_fru(smed->sme_pnode, &fmri, NULL, &err) != 0 ||
 	    topo_node_fru_set(slotnode, fmri, 0, &err) != 0) {
-		topo_mod_dprintf(mod, "failed to set FRU on %s=%d: %s", SLOT,
-		    smed->sme_slot_inst, topo_strerror(err));
+		topo_mod_dprintf(mod, "failed to set FRU on %s=%" PRIu64 ": %s",
+		    SLOT, smed->sme_slot_inst, topo_strerror(err));
 		nvlist_free(fmri);
 		(void) topo_mod_seterrno(mod, err);
 		return (NULL);
@@ -164,7 +164,7 @@ smbios_make_slot(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 
 	if (topo_method_register(mod, slotnode, slot_methods) != 0) {
 		topo_mod_dprintf(mod, "topo_method_register() failed on "
-		    "%s=%d: %s", SLOT, smed->sme_slot_inst,
+		    "%s=%" PRIu64 ": %s", SLOT, smed->sme_slot_inst,
 		    topo_mod_errmsg(mod));
 		/* errno set */
 		return (NULL);

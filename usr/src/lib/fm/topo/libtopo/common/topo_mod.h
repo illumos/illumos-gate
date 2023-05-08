@@ -229,7 +229,7 @@ extern int topo_mod_nvdup(topo_mod_t *, nvlist_t *, nvlist_t **);
 
 extern void topo_mod_clrdebug(topo_mod_t *);
 extern void topo_mod_setdebug(topo_mod_t *);
-extern void topo_mod_dprintf(topo_mod_t *, const char *, ...);
+extern void topo_mod_dprintf(topo_mod_t *, const char *, ...) __PRINTFLIKE(2);
 extern const char *topo_mod_errmsg(topo_mod_t *);
 extern int topo_mod_errno(topo_mod_t *);
 extern char *topo_mod_clean_str(topo_mod_t *, const char *);

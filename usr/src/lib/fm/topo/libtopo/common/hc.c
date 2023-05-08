@@ -265,8 +265,8 @@ hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 	if (min != max) {
 		topo_mod_dprintf(mod,
 		    "Request to enumerate %s component with an "
-		    "ambiguous instance number, min (%d) != max (%d).\n",
-		    HC, min, max);
+		    "ambiguous instance number, min (%" PRIu64 ") != max (%"
+		    PRIu64 ").\n", HC, min, max);
 		return (topo_mod_seterrno(mod, EINVAL));
 	}
 
@@ -295,7 +295,7 @@ hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 		if (topo_method_register(mod, node, fru_container_methods) <
 		    0) {
 			topo_mod_dprintf(mod, "failed to register methods on "
-			    "%s=%d\n", name, min);
+			    "%s=%" PRIu64 "\n", name, min);
 			return (-1);
 		}
 	}
@@ -1344,8 +1344,8 @@ hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
 	if (!match)
 		return (hc_walk_sibling(mod, node, hwp, name, inst));
 
-	topo_mod_dprintf(mod, "hc_walker: walking node:%s=%d for hc:"
-	    "%s=%d at %d, end at %d \n", topo_node_name(node),
+	topo_mod_dprintf(mod, "hc_walker: walking node:%s=%" PRIu64 " for hc:"
+	    "%s=%" PRIu64 " at %d, end at %d \n", topo_node_name(node),
 	    topo_node_instance(node), name, inst, i, hwp->hcw_end);
 
 	if (i == hwp->hcw_end) {
