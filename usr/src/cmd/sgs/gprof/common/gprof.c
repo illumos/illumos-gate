@@ -835,7 +835,8 @@ assign_pcsamples(mod_info_t *module, Address *pcsmpl, size_t n_samples)
 	while ((pcptr < pcse) && (*pcptr < module->load_end)) {
 
 		/* Update the corresponding function's time */
-		if (fnl = nllookup(module, (pctype) *pcptr, &nxt_func)) {
+		fnl = nllookup(module, (pctype) *pcptr, &nxt_func);
+		if (fnl != NULL) {
 			/*
 			 * Collect all pc-hits in this function. Each
 			 * pc-hit counts as 1 tick.
@@ -1054,7 +1055,7 @@ process_cgraph(ProfCallGraph *cgp)
 	}
 
 #ifdef DEBUG
-	puts("\n");
+	(void) puts("\n");
 #endif /* DEBUG */
 }
 

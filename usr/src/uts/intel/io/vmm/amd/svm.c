@@ -524,18 +524,6 @@ vm_exit_svm(struct vm_exit *vme, uint64_t code, uint64_t info1, uint64_t info2)
 	vme->u.svm.exitinfo2 = info2;
 }
 
-static int
-svm_cpl(struct vmcb_state *state)
-{
-
-	/*
-	 * From APMv2:
-	 *   "Retrieve the CPL from the CPL field in the VMCB, not
-	 *    from any segment DPL"
-	 */
-	return (state->cpl);
-}
-
 static enum vm_cpu_mode
 svm_vcpu_mode(struct vmcb *vmcb)
 {
@@ -576,10 +564,6 @@ svm_paging_mode(uint64_t cr0, uint64_t cr4, uint64_t efer)
 		return (PAGING_MODE_PAE);
 }
 
-/*
- * ins/outs utility routines
- */
-
 static void
 svm_paging_info(struct vmcb *vmcb, struct vm_guest_paging *paging)
 {
@@ -587,7 +571,7 @@ svm_paging_info(struct vmcb *vmcb, struct vm_guest_paging *paging)
 
 	state = &vmcb->state;
 	paging->cr3 = state->cr3;
-	paging->cpl = svm_cpl(state);
+	paging->cpl = state->cpl;
 	paging->cpu_mode = svm_vcpu_mode(vmcb);
 	paging->paging_mode = svm_paging_mode(state->cr0, state->cr4,
 	    state->efer);
@@ -2392,6 +2376,19 @@ svm_getdesc(void *arg, int vcpu, int reg, struct seg_desc *desc)
 		if ((desc->access & 0x80) == 0) {
 			/* Unusable segment */
 			desc->access |= 0x10000;
+		}
+
+		/*
+		 * Just as CPL (in the VMCB) is kept synced to SS when the
+		 * segment is written, so too shall the segment sync from CPL
+		 * when it is read.
+		 */
+		if (reg == VM_REG_GUEST_SS) {
+			desc->access &=
+			    ~(SEG_DESC_DPL_MASK << SEG_DESC_DPL_SHIFT);
+			desc->access |=
+			    (vmcb->state.cpl & SEG_DESC_DPL_MASK) <<
+			    SEG_DESC_DPL_SHIFT;
 		}
 		break;
 
