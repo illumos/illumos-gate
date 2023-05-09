@@ -27,6 +27,7 @@
  * Copyright 2016 Argo Technologies SA
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Racktop Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -14401,7 +14402,6 @@ sata_get_target_dip(dev_info_t *dip, uint8_t cport, uint8_t pmport)
 {
 	dev_info_t	*cdip = NULL;
 	int		target, tgt;
-	int		circ;
 	uint8_t		qual;
 
 	sata_hba_inst_t	*sata_hba_inst;
@@ -14426,7 +14426,7 @@ sata_get_target_dip(dev_info_t *dip, uint8_t cport, uint8_t pmport)
 	target = SATA_TO_SCSI_TARGET(cport, pmport, qual);
 
 	/* Retrieve target dip */
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	for (cdip = ddi_get_child(dip); cdip != NULL; ) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
 
@@ -14446,7 +14446,7 @@ sata_get_target_dip(dev_info_t *dip, uint8_t cport, uint8_t pmport)
 
 		cdip = next;
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (cdip);
 }
@@ -14466,11 +14466,10 @@ sata_get_scsi_target_dip(dev_info_t *dip, sata_address_t *saddr)
 {
 	dev_info_t	*cdip = NULL;
 	int		target, tgt;
-	int		circ;
 
 	target = SATA_TO_SCSI_TARGET(saddr->cport, saddr->pmport, saddr->qual);
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	for (cdip = ddi_get_child(dip); cdip != NULL; ) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
 
@@ -14490,7 +14489,7 @@ sata_get_scsi_target_dip(dev_info_t *dip, sata_address_t *saddr)
 
 		cdip = next;
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (cdip);
 }
@@ -16085,13 +16084,12 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 	{
 		dev_info_t *tdip = NULL;
 		dev_info_t *dip = NULL;
-		int circ;
 
 		dip = SATA_DIP(sata_hba_inst);
 		tdip = sata_get_target_dip(dip, cport, pmport);
 		ap_state->ap_rstate = AP_RSTATE_CONNECTED;
 		if (tdip != NULL) {
-			ndi_devi_enter(dip, &circ);
+			ndi_devi_enter(dip);
 			mutex_enter(&(DEVI(tdip)->devi_lock));
 			if (DEVI_IS_DEVICE_REMOVED(tdip)) {
 				/*
@@ -16133,7 +16131,7 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 				    AP_OSTATE_CONFIGURED;
 			}
 			mutex_exit(&(DEVI(tdip)->devi_lock));
-			ndi_devi_exit(dip, circ);
+			ndi_devi_exit(dip);
 		} else {
 			ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
 			ap_state->ap_condition = AP_COND_UNKNOWN;
@@ -20711,15 +20709,13 @@ sata_gen_sysevent(sata_hba_inst_t *sata_hba_inst, sata_address_t *saddr,
 static void
 sata_set_device_removed(dev_info_t *tdip)
 {
-	int circ;
-
 	ASSERT(tdip != NULL);
 
-	ndi_devi_enter(tdip, &circ);
+	ndi_devi_enter(tdip);
 	mutex_enter(&DEVI(tdip)->devi_lock);
 	DEVI_SET_DEVICE_REMOVED(tdip);
 	mutex_exit(&DEVI(tdip)->devi_lock);
-	ndi_devi_exit(tdip, circ);
+	ndi_devi_exit(tdip);
 }
 
 

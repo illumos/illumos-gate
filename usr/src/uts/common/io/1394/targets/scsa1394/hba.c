@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
 
 /*
  * 1394 mass storage HBA driver
@@ -688,19 +691,18 @@ scsa1394_scsi_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
     void *arg, dev_info_t **child)
 {
 	scsa1394_state_t *sp = SCSA1394_INST2STATE(ddi_get_instance(dip));
-	int		circ;
 	int		ret;
 
 	if (scsa1394_bus_config_debug) {
 		flag |= NDI_DEVI_DEBUG;
 	}
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	if (DEVI(dip)->devi_child == NULL) {
 		scsa1394_create_children(sp);
 	}
 	ret = ndi_busop_bus_config(dip, flag, op, arg, child, 0);
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (ret);
 }
@@ -710,7 +712,6 @@ scsa1394_scsi_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
     void *arg)
 {
 	scsa1394_state_t *sp = SCSA1394_INST2STATE(ddi_get_instance(dip));
-	int		circ;
 	int		ret;
 	uint_t		saved_flag = flag;
 
@@ -725,7 +726,7 @@ scsa1394_scsi_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		flag &= ~(NDI_DEVI_REMOVE | NDI_UNCONFIG);
 	}
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 
 	ret = ndi_busop_bus_unconfig(dip, flag, op, arg);
 
@@ -738,7 +739,7 @@ scsa1394_scsi_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		flag |= NDI_DEVI_REMOVE;
 		ret = ndi_busop_bus_unconfig(dip, flag, op, arg);
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	if ((ret != NDI_SUCCESS) && (op == BUS_UNCONFIG_ALL) &&
 	    ((saved_flag & NDI_DEVI_REMOVE) != 0)) {
@@ -902,7 +903,6 @@ scsa1394_disconnect(dev_info_t *dip, ddi_eventcookie_t evc, void *arg,
     void *data)
 {
 	scsa1394_state_t	*sp = arg;
-	int			circ;
 	dev_info_t		*cdip, *cdip_next;
 
 	if (sp == NULL) {
@@ -916,7 +916,7 @@ scsa1394_disconnect(dev_info_t *dip, ddi_eventcookie_t evc, void *arg,
 
 	scsa1394_sbp2_disconnect(sp);
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	for (cdip = ddi_get_child(dip); cdip != NULL; cdip = cdip_next) {
 		cdip_next = ddi_get_next_sibling(cdip);
 
@@ -924,7 +924,7 @@ scsa1394_disconnect(dev_info_t *dip, ddi_eventcookie_t evc, void *arg,
 		DEVI_SET_DEVICE_REMOVED(cdip);
 		mutex_exit(&DEVI(cdip)->devi_lock);
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 }
 
 /*ARGSUSED*/
@@ -933,7 +933,6 @@ scsa1394_reconnect(dev_info_t *dip, ddi_eventcookie_t evc, void *arg,
     void *data)
 {
 	scsa1394_state_t	*sp = arg;
-	int			circ;
 	dev_info_t		*cdip, *cdip_next;
 
 	if (sp == NULL) {
@@ -946,7 +945,7 @@ scsa1394_reconnect(dev_info_t *dip, ddi_eventcookie_t evc, void *arg,
 	sp->s_disconnect_warned = B_FALSE;
 	mutex_exit(&sp->s_mutex);
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 	for (cdip = ddi_get_child(dip); cdip != NULL; cdip = cdip_next) {
 		cdip_next = ddi_get_next_sibling(cdip);
 
@@ -954,7 +953,7 @@ scsa1394_reconnect(dev_info_t *dip, ddi_eventcookie_t evc, void *arg,
 		DEVI_SET_DEVICE_REINSERTED(cdip);
 		mutex_exit(&DEVI(cdip)->devi_lock);
 	}
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	scsa1394_sbp2_req(sp, 0, SCSA1394_THREQ_RECONNECT);
 }

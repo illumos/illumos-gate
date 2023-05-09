@@ -791,10 +791,10 @@ i_devi_get_phci(dev_info_t *pdip)
  * Single thread mdi entry into devinfo node for modifying its children.
  * If necessary we perform an ndi_devi_enter of the vHCI before doing
  * an ndi_devi_enter of 'dip'.  If we enter the vHCI, we set *enteredvp
- * to 1, otherwise it is unconditionally set to 0.
+ * to true, otherwise it is unconditionally set to false.
  */
 void
-mdi_devi_enter(dev_info_t *phci_dip, int *enteredvp)
+mdi_devi_enter(dev_info_t *phci_dip, boolean_t *enteredvp)
 {
 	dev_info_t	*vdip;
 
@@ -802,7 +802,7 @@ mdi_devi_enter(dev_info_t *phci_dip, int *enteredvp)
 	ASSERT3P(enteredvp, !=, NULL);
 	ASSERT(MDI_PHCI(phci_dip));
 	vdip = mdi_devi_get_vdip(phci_dip);
-	ASSERT(vdip);			/* A pHCI always has a vHCI */
+	ASSERT3P(vdip, !=, NULL);	/* A pHCI always has a vHCI */
 
 	/*
 	 * If pHCI is detaching then the framework has already entered the
@@ -819,57 +819,57 @@ mdi_devi_enter(dev_info_t *phci_dip, int *enteredvp)
 	 * avoid a race with detach, but we can't because the framework has
 	 * already entered the parent, so we have this complexity instead.
 	 */
-	*enteredvp = 0;
+	*enteredvp = B_FALSE;
 	for (;;) {
 		if (panicstr != NULL)
 			return;
 
-		if (ndi_devi_tryenter(vdip, NULL)) {
-			*enteredvp = 1;
+		if (ndi_devi_tryenter(vdip)) {
+			*enteredvp = B_TRUE;
 			if (DEVI_IS_DETACHING(phci_dip)) {
-				ndi_devi_exit(vdip, 0);
-				*enteredvp = 0;
+				ndi_devi_exit(vdip);
+				*enteredvp = B_FALSE;
 			}
 			break;
 		} else if (DEVI_IS_DETACHING(phci_dip)) {
-			*enteredvp = 0;
+			*enteredvp = B_FALSE;
 			break;
 		} else if (servicing_interrupt()) {
 			/*
 			 * Don't delay an interrupt (and ensure adaptive
 			 * mutex inversion support).
 			 */
-			ndi_devi_enter(vdip, NULL);
-			*enteredvp = 1;
+			ndi_devi_enter(vdip);
+			*enteredvp = B_TRUE;
 			break;
 		} else {
 			delay_random(mdi_delay);
 		}
 	}
 
-	ndi_devi_enter(phci_dip, NULL);
+	ndi_devi_enter(phci_dip);
 }
 
 /*
  * Attempt to mdi_devi_enter.
  */
 int
-mdi_devi_tryenter(dev_info_t *phci_dip, int *enteredvp)
+mdi_devi_tryenter(dev_info_t *phci_dip, boolean_t *enteredvp)
 {
 	dev_info_t	*vdip;
 
 	/* Verify calling context */
 	ASSERT(MDI_PHCI(phci_dip));
 	vdip = mdi_devi_get_vdip(phci_dip);
-	ASSERT(vdip);			/* A pHCI always has a vHCI */
+	ASSERT3P(vdip, !=, NULL);	/* A pHCI always has a vHCI */
 
-	*enteredvp = 0;
-	if (ndi_devi_tryenter(vdip, NULL)) {
-		if (ndi_devi_tryenter(phci_dip, NULL)) {
-			*enteredvp = 1;
+	*enteredvp = B_FALSE;
+	if (ndi_devi_tryenter(vdip)) {
+		if (ndi_devi_tryenter(phci_dip)) {
+			*enteredvp = B_TRUE;
 			return (1);	/* locked */
 		}
-		ndi_devi_exit(vdip, 0);
+		ndi_devi_exit(vdip);
 	}
 	return (0);			/* busy */
 }
@@ -878,18 +878,18 @@ mdi_devi_tryenter(dev_info_t *phci_dip, int *enteredvp)
  * Release mdi_devi_enter or successful mdi_devi_tryenter.
  */
 void
-mdi_devi_exit(dev_info_t *phci_dip, int enteredv)
+mdi_devi_exit(dev_info_t *phci_dip, boolean_t enteredv)
 {
 	dev_info_t	*vdip;
 
 	/* Verify calling context */
 	ASSERT(MDI_PHCI(phci_dip));
 	vdip = mdi_devi_get_vdip(phci_dip);
-	ASSERT(vdip);			/* A pHCI always has a vHCI */
+	ASSERT3P(vdip, !=, NULL);	/* A pHCI always has a vHCI */
 
-	ndi_devi_exit(phci_dip, 0);
-	if (enteredv != 0)
-		ndi_devi_exit(vdip, 0);
+	ndi_devi_exit(phci_dip);
+	if (enteredv)
+		ndi_devi_exit(vdip);
 }
 
 /*
@@ -902,40 +902,35 @@ mdi_devi_exit(dev_info_t *phci_dip, int enteredv)
  * circular value.
  */
 void
-mdi_devi_exit_phci(dev_info_t *phci_dip, int circular)
+mdi_devi_exit_phci(dev_info_t *phci_dip)
 {
-	int		pcircular;
-
 	/* Verify calling context */
 	ASSERT(MDI_PHCI(phci_dip));
 
 	/* Keep hold on pHCI until we reenter in mdi_devi_enter_phci */
 	ndi_hold_devi(phci_dip);
 
-	pcircular = (short)(circular & 0xFFFF);
-	ndi_devi_exit(phci_dip, pcircular);
+	ndi_devi_exit(phci_dip);
 }
 
 void
-mdi_devi_enter_phci(dev_info_t *phci_dip, int *circular)
+mdi_devi_enter_phci(dev_info_t *phci_dip)
 {
-	int		pcircular;
-
 	/* Verify calling context */
 	ASSERT(MDI_PHCI(phci_dip));
 
-	ndi_devi_enter(phci_dip, &pcircular);
+	ndi_devi_enter(phci_dip);
 
 	/* Drop hold from mdi_devi_exit_phci. */
 	ndi_rele_devi(phci_dip);
-
-	/* verify matching mdi_devi_exit_phci/mdi_devi_enter_phci use */
-	ASSERT(pcircular == ((short)(*circular & 0xFFFF)));
 }
 
 /*
  * mdi_devi_get_vdip():
  *		given a pHCI dip return vHCI dip
+ * Returns:
+ * 		the vHCI dip if it exists
+ * 		else NULL
  */
 dev_info_t *
 mdi_devi_get_vdip(dev_info_t *pdip)
@@ -1158,9 +1153,8 @@ i_mdi_devinfo_find(mdi_vhci_t *vh, caddr_t name, char *guid)
 	char			*data;
 	dev_info_t		*cdip = NULL;
 	dev_info_t		*ndip = NULL;
-	int			circular;
 
-	ndi_devi_enter(vh->vh_dip, &circular);
+	ndi_devi_enter(vh->vh_dip);
 	ndip = (dev_info_t *)DEVI(vh->vh_dip)->devi_child;
 	while ((cdip = ndip) != NULL) {
 		ndip = (dev_info_t *)DEVI(cdip)->devi_sibling;
@@ -1182,7 +1176,7 @@ i_mdi_devinfo_find(mdi_vhci_t *vh, caddr_t name, char *guid)
 		ddi_prop_free(data);
 		break;
 	}
-	ndi_devi_exit(vh->vh_dip, circular);
+	ndi_devi_exit(vh->vh_dip);
 	return (cdip);
 }
 
@@ -1244,9 +1238,8 @@ i_mdi_is_child_present(dev_info_t *vdip, dev_info_t *cdip)
 {
 	int		rv = MDI_FAILURE;
 	struct dev_info	*dip;
-	int		circular;
 
-	ndi_devi_enter(vdip, &circular);
+	ndi_devi_enter(vdip);
 	dip = DEVI(vdip)->devi_child;
 	while (dip) {
 		if (dip == DEVI(cdip)) {
@@ -1255,7 +1248,7 @@ i_mdi_is_child_present(dev_info_t *vdip, dev_info_t *cdip)
 		}
 		dip = dip->devi_sibling;
 	}
-	ndi_devi_exit(vdip, circular);
+	ndi_devi_exit(vdip);
 	return (rv);
 }
 
@@ -1619,7 +1612,6 @@ mdi_client_path2devinfo(dev_info_t *vdip, char *pathname)
 	dev_info_t	*cdip = NULL;
 	dev_info_t	*ndip = NULL;
 	char		*temp_pathname;
-	int		circular;
 
 	/*
 	 * Allocate temp buffer
@@ -1629,7 +1621,7 @@ mdi_client_path2devinfo(dev_info_t *vdip, char *pathname)
 	/*
 	 * Lock parent against changes
 	 */
-	ndi_devi_enter(vdip, &circular);
+	ndi_devi_enter(vdip);
 	ndip = (dev_info_t *)DEVI(vdip)->devi_child;
 	while ((cdip = ndip) != NULL) {
 		ndip = (dev_info_t *)DEVI(cdip)->devi_sibling;
@@ -1643,7 +1635,7 @@ mdi_client_path2devinfo(dev_info_t *vdip, char *pathname)
 	/*
 	 * Release devinfo lock
 	 */
-	ndi_devi_exit(vdip, circular);
+	ndi_devi_exit(vdip);
 
 	/*
 	 * Free the temp buffer
@@ -2935,8 +2927,6 @@ static mdi_pathinfo_t *
 i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 {
 	mdi_pathinfo_t	*pip;
-	int		ct_circular;
-	int		ph_circular;
 	static char	path[MAXPATHLEN];	/* mdi_pathmap_mutex protects */
 	char		*path_persistent;
 	int		path_instance;
@@ -3023,14 +3013,14 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 	 * during devinfo snapshot (see di_register_pip) by 'pretending' that
 	 * the pathinfo nodes are children of the Client.
 	 */
-	ndi_devi_enter(ct->ct_dip, &ct_circular);
-	ndi_devi_enter(ph->ph_dip, &ph_circular);
+	ndi_devi_enter(ct->ct_dip);
+	ndi_devi_enter(ph->ph_dip);
 
 	i_mdi_phci_add_path(ph, pip);
 	i_mdi_client_add_path(ct, pip);
 
-	ndi_devi_exit(ph->ph_dip, ph_circular);
-	ndi_devi_exit(ct->ct_dip, ct_circular);
+	ndi_devi_exit(ph->ph_dip);
+	ndi_devi_exit(ct->ct_dip);
 
 	return (pip);
 }
@@ -3290,9 +3280,6 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 static void
 i_mdi_pi_free(mdi_phci_t *ph, mdi_pathinfo_t *pip, mdi_client_t *ct)
 {
-	int	ct_circular;
-	int	ph_circular;
-
 	ASSERT(MDI_CLIENT_LOCKED(ct));
 
 	/*
@@ -3301,14 +3288,14 @@ i_mdi_pi_free(mdi_phci_t *ph, mdi_pathinfo_t *pip, mdi_client_t *ct)
 	i_mdi_pi_kstat_destroy(pip);
 
 	/* See comments in i_mdi_pi_alloc() */
-	ndi_devi_enter(ct->ct_dip, &ct_circular);
-	ndi_devi_enter(ph->ph_dip, &ph_circular);
+	ndi_devi_enter(ct->ct_dip);
+	ndi_devi_enter(ph->ph_dip);
 
 	i_mdi_client_remove_path(ct, pip);
 	i_mdi_phci_remove_path(ph, pip);
 
-	ndi_devi_exit(ph->ph_dip, ph_circular);
-	ndi_devi_exit(ct->ct_dip, ct_circular);
+	ndi_devi_exit(ph->ph_dip);
+	ndi_devi_exit(ct->ct_dip);
 
 	mutex_destroy(&MDI_PI(pip)->pi_mutex);
 	cv_destroy(&MDI_PI(pip)->pi_state_cv);
@@ -6890,7 +6877,6 @@ i_mdi_pm_pre_config(dev_info_t *vdip, dev_info_t *child)
 {
 	int			ret = MDI_SUCCESS;
 	dev_info_t		*cdip;
-	int			circ;
 
 	ASSERT(MDI_VHCI(vdip));
 
@@ -6901,7 +6887,7 @@ i_mdi_pm_pre_config(dev_info_t *vdip, dev_info_t *child)
 	}
 
 	/* devi_config_common */
-	ndi_devi_enter(vdip, &circ);
+	ndi_devi_enter(vdip);
 	cdip = ddi_get_child(vdip);
 	while (cdip) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
@@ -6911,7 +6897,7 @@ i_mdi_pm_pre_config(dev_info_t *vdip, dev_info_t *child)
 			break;
 		cdip = next;
 	}
-	ndi_devi_exit(vdip, circ);
+	ndi_devi_exit(vdip);
 	return (ret);
 }
 
@@ -6968,7 +6954,6 @@ i_mdi_pm_pre_unconfig(dev_info_t *vdip, dev_info_t *child, int *held,
 {
 	int			ret = MDI_SUCCESS;
 	dev_info_t		*cdip;
-	int			circ;
 
 	ASSERT(MDI_VHCI(vdip));
 	*held = 0;
@@ -6980,7 +6965,7 @@ i_mdi_pm_pre_unconfig(dev_info_t *vdip, dev_info_t *child, int *held,
 	}
 
 	/* devi_unconfig_common */
-	ndi_devi_enter(vdip, &circ);
+	ndi_devi_enter(vdip);
 	cdip = ddi_get_child(vdip);
 	while (cdip) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
@@ -6988,7 +6973,7 @@ i_mdi_pm_pre_unconfig(dev_info_t *vdip, dev_info_t *child, int *held,
 		ret = i_mdi_pm_pre_unconfig_one(cdip, held, flags);
 		cdip = next;
 	}
-	ndi_devi_exit(vdip, circ);
+	ndi_devi_exit(vdip);
 
 	if (*held)
 		ret = MDI_SUCCESS;
@@ -7052,7 +7037,6 @@ i_mdi_pm_post_config_one(dev_info_t *child)
 static void
 i_mdi_pm_post_config(dev_info_t *vdip, dev_info_t *child)
 {
-	int		circ;
 	dev_info_t	*cdip;
 
 	ASSERT(MDI_VHCI(vdip));
@@ -7065,7 +7049,7 @@ i_mdi_pm_post_config(dev_info_t *vdip, dev_info_t *child)
 	}
 
 	/* devi_config_common */
-	ndi_devi_enter(vdip, &circ);
+	ndi_devi_enter(vdip);
 	cdip = ddi_get_child(vdip);
 	while (cdip) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
@@ -7073,7 +7057,7 @@ i_mdi_pm_post_config(dev_info_t *vdip, dev_info_t *child)
 		i_mdi_pm_post_config_one(cdip);
 		cdip = next;
 	}
-	ndi_devi_exit(vdip, circ);
+	ndi_devi_exit(vdip);
 }
 
 static void
@@ -7126,7 +7110,6 @@ i_mdi_pm_post_unconfig_one(dev_info_t *child)
 static void
 i_mdi_pm_post_unconfig(dev_info_t *vdip, dev_info_t *child, int held)
 {
-	int			circ;
 	dev_info_t		*cdip;
 
 	ASSERT(MDI_VHCI(vdip));
@@ -7142,7 +7125,7 @@ i_mdi_pm_post_unconfig(dev_info_t *vdip, dev_info_t *child, int held)
 		return;
 	}
 
-	ndi_devi_enter(vdip, &circ);
+	ndi_devi_enter(vdip);
 	cdip = ddi_get_child(vdip);
 	while (cdip) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
@@ -7150,13 +7133,13 @@ i_mdi_pm_post_unconfig(dev_info_t *vdip, dev_info_t *child, int held)
 		i_mdi_pm_post_unconfig_one(cdip);
 		cdip = next;
 	}
-	ndi_devi_exit(vdip, circ);
+	ndi_devi_exit(vdip);
 }
 
 int
 mdi_power(dev_info_t *vdip, mdi_pm_op_t op, void *args, char *devnm, int flags)
 {
-	int			circ, ret = MDI_SUCCESS;
+	int			ret = MDI_SUCCESS;
 	dev_info_t		*client_dip = NULL;
 	mdi_client_t		*ct;
 
@@ -7168,7 +7151,7 @@ mdi_power(dev_info_t *vdip, mdi_pm_op_t op, void *args, char *devnm, int flags)
 	 * pHCIs.
 	 */
 	if (devnm != NULL) {
-		ndi_devi_enter(vdip, &circ);
+		ndi_devi_enter(vdip);
 		client_dip = ndi_devi_findchild(vdip, devnm);
 	}
 
@@ -7230,7 +7213,7 @@ mdi_power(dev_info_t *vdip, mdi_pm_op_t op, void *args, char *devnm, int flags)
 	}
 
 	if (devnm)
-		ndi_devi_exit(vdip, circ);
+		ndi_devi_exit(vdip);
 
 	return (ret);
 }

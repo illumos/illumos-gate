@@ -25,6 +25,10 @@
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -1015,9 +1019,9 @@ sysctrl_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	rdip = ddi_root_node();
 
-	ndi_devi_enter(rdip, &circ);
+	ndi_devi_enter(rdip);
 	ddi_walk_devs(ddi_get_child(rdip), sysctrl_hold_rele_branches, &arg);
-	ndi_devi_exit(rdip, circ);
+	ndi_devi_exit(rdip);
 
 	sysctrl_ddi_branch_init = 0;
 
@@ -1034,7 +1038,6 @@ sysctrl_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	int		instance;
 	int		slot;
 	dev_t		dev;
-	int		circ;
 	dev_info_t	*rdip;
 	struct sysc_hold arg = {0};
 	struct sysctrl_soft_state *softsp;
@@ -1081,10 +1084,10 @@ sysctrl_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 
 		rdip = ddi_root_node();
 
-		ndi_devi_enter(rdip, &circ);
+		ndi_devi_enter(rdip);
 		ddi_walk_devs(ddi_get_child(rdip), sysctrl_hold_rele_branches,
 		    &arg);
-		ndi_devi_exit(rdip, circ);
+		ndi_devi_exit(rdip);
 	}
 	mutex_exit(&sysctrl_branch_mutex);
 

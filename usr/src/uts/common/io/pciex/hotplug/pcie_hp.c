@@ -23,6 +23,7 @@
  *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -213,7 +214,7 @@ int
 pcie_hp_init(dev_info_t *dip, caddr_t arg)
 {
 	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
-	int		ret = DDI_SUCCESS, count;
+	int		ret = DDI_SUCCESS;
 	dev_info_t	*cdip;
 
 	if (PCIE_IS_PCIE_HOTPLUG_CAPABLE(bus_p)) {
@@ -229,7 +230,7 @@ pcie_hp_init(dev_info_t *dip, caddr_t arg)
 		return (ret);
 	}
 
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 
 	/* Create port for the first level children */
 	cdip = ddi_get_child(dip);
@@ -241,7 +242,7 @@ pcie_hp_init(dev_info_t *dip, caddr_t arg)
 		}
 		cdip = ddi_get_next_sibling(cdip);
 	}
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 	if (ret != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "pcie_hp_init: initialize virtual "
 		    "hotplug port failed with %d\n", ret);
@@ -448,16 +449,15 @@ dev_info_t *
 pcie_hp_devi_find(dev_info_t *dip, uint_t device, uint_t function)
 {
 	struct pcie_hp_find_ctrl	ctrl;
-	int				count;
 
 	ctrl.device = device;
 	ctrl.function = function;
 	ctrl.dip = NULL;
 
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), pcie_hp_match_dev_func,
 	    (void *)&ctrl);
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 
 	return (ctrl.dip);
 }
@@ -473,9 +473,9 @@ pcie_hp_create_occupant_props(dev_info_t *dip, dev_t dev, int pci_dev)
 	pcie_hp_slot_t		*slotp = NULL;
 	pcie_hp_cn_cfg_t	cn_cfg;
 	pcie_hp_occupant_info_t	*occupant;
-	int			circular, i;
+	int			i;
 
-	ndi_devi_enter(dip, &circular);
+	ndi_devi_enter(dip);
 
 	if (PCIE_IS_PCIE_HOTPLUG_ENABLED(bus_p)) {
 		slotp = (ctrl_p && (pci_dev == 0)) ?
@@ -524,7 +524,7 @@ pcie_hp_create_occupant_props(dev_info_t *dip, dev_t dev, int pci_dev)
 
 	kmem_free(occupant, sizeof (pcie_hp_occupant_info_t));
 
-	ndi_devi_exit(dip, circular);
+	ndi_devi_exit(dip);
 }
 
 /*

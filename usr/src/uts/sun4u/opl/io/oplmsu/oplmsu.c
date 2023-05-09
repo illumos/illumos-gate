@@ -28,6 +28,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
 
 #include <sys/errno.h>
 #include <sys/modctl.h>
@@ -1444,25 +1447,24 @@ oplmsu_dr_detach(dev_info_t *dip)
 dev_info_t *
 oplmsu_find_ser_dip(dev_info_t *cmuch_dip)
 {
-	int		circ1, circ2;
 	dev_info_t	*ebus_dip;
 	dev_info_t	*ser_dip = NULL;
 
-	ndi_devi_enter(cmuch_dip, &circ1);
+	ndi_devi_enter(cmuch_dip);
 	ebus_dip = ndi_devi_findchild(cmuch_dip, EBUS_PATH);
 
 	DBG_PRINT((CE_NOTE, "oplmsu: find-serial-dip: "
 	    "ebus_dip = %p", (void *)ebus_dip));
 
 	if (ebus_dip != NULL) {
-		ndi_devi_enter(ebus_dip, &circ2);
+		ndi_devi_enter(ebus_dip);
 		ser_dip = ndi_devi_findchild(ebus_dip, SERIAL_PATH);
 
 		DBG_PRINT((CE_NOTE, "oplmsu: find-serial-dip: "
 		    "ser_dip = %p", (void *)ser_dip));
-		ndi_devi_exit(ebus_dip, circ2);
+		ndi_devi_exit(ebus_dip);
 	}
-	ndi_devi_exit(cmuch_dip, circ1);
+	ndi_devi_exit(cmuch_dip);
 	return (ser_dip);
 }
 
@@ -1476,14 +1478,13 @@ oplmsu_find_serial(ser_devl_t **ser_dl)
 	dev_info_t	*cmuch_dip;
 	dev_info_t	*dip;
 	ser_devl_t	*wrk_ser_dl;
-	int		circ;
 	int		count = 0;
 	char		pathname[MSU_PATHNAME_SIZE];
 	dev_t		devt;
 	char		*namep;
 
 	root_dip = ddi_root_node();
-	ndi_devi_enter(root_dip, &circ);
+	ndi_devi_enter(root_dip);
 	cmuch_dip = ddi_get_child(root_dip);
 
 	while (cmuch_dip != NULL) {
@@ -1539,7 +1540,7 @@ oplmsu_find_serial(ser_devl_t **ser_dl)
 		}
 		cmuch_dip = ddi_get_next_sibling(cmuch_dip);
 	}
-	ndi_devi_exit(root_dip, circ);
+	ndi_devi_exit(root_dip);
 	return (count);
 }
 

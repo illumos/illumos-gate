@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/systm.h>
 #include <sys/pathname.h>
 #include <sys/modctl.h>
@@ -216,7 +220,6 @@ i_devname_to_promname(char *dev_name, char *ret_buf, size_t len)
 	major_t major;
 	char *rptr, *optr, *offline;
 	size_t olen, rlen;
-	int circ;
 	int ret = 0;
 
 	/* do some sanity checks */
@@ -282,7 +285,7 @@ i_devname_to_promname(char *dev_name, char *ret_buf, size_t len)
 		 * The following code assumes that the phci client is at leaf
 		 * level.
 		 */
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 		while ((pip = mdi_get_next_phci_path(dip, pip)) != NULL) {
 			/*
 			 * walk all paths associated to the client node
@@ -367,7 +370,7 @@ minor_pathinfo:
 				cv_broadcast(&MDI_PI(pip)->pi_ref_cv);
 			MDI_PI_UNLOCK(pip);
 		}
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 		ret = 0;
 		if (rlen > 0) {
 			/* now add as much of offline to ret_buf as possible */
@@ -400,11 +403,10 @@ minor_pathinfo:
 static dev_info_t *
 find_alternate_node(dev_info_t *parent_dip, major_t major)
 {
-	int circ;
 	dev_info_t *child_dip;
 
 	/* lock down parent to keep children from being removed */
-	ndi_devi_enter(parent_dip, &circ);
+	ndi_devi_enter(parent_dip);
 	for (child_dip = ddi_get_child(parent_dip); child_dip != NULL;
 	    child_dip = ddi_get_next_sibling(child_dip)) {
 
@@ -415,7 +417,7 @@ find_alternate_node(dev_info_t *parent_dip, major_t major)
 			break;
 		}
 	}
-	ndi_devi_exit(parent_dip, circ);
+	ndi_devi_exit(parent_dip);
 	return (child_dip);
 }
 

@@ -27,6 +27,9 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
 
 #include <sys/debug.h>
 #include <sys/sysmacros.h>
@@ -722,16 +725,15 @@ static void
 drhd_devi_destroy(drhd_t *drhd)
 {
 	dev_info_t *dip;
-	int count;
 
 	dip = drhd->dr_dip;
 	ASSERT(dip);
 
-	ndi_devi_enter(root_devinfo, &count);
+	ndi_devi_enter(root_devinfo);
 	if (ndi_devi_offline(dip, NDI_DEVI_REMOVE) != DDI_SUCCESS) {
 		ddi_err(DER_WARN, dip, "Failed to destroy");
 	}
-	ndi_devi_exit(root_devinfo, count);
+	ndi_devi_exit(root_devinfo);
 	drhd->dr_dip = NULL;
 }
 
@@ -942,7 +944,6 @@ void
 immu_dmar_rmrr_map(void)
 {
 	int seg;
-	int count;
 	dev_info_t *rdip;
 	scope_t *scope;
 	rmrr_t *rmrr;
@@ -985,10 +986,10 @@ immu_dmar_rmrr_map(void)
 
 				ASSERT(root_devinfo);
 				/* XXX should be optimized */
-				ndi_devi_enter(root_devinfo, &count);
+				ndi_devi_enter(root_devinfo);
 				ddi_walk_devs(ddi_get_child(root_devinfo),
 				    match_bdf, &imarg);
-				ndi_devi_exit(root_devinfo, count);
+				ndi_devi_exit(root_devinfo);
 
 				if (imarg.ima_ddip == NULL) {
 					ddi_err(DER_WARN, NULL,

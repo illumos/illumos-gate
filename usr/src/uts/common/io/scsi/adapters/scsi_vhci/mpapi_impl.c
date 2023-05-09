@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Racktop Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -4453,7 +4454,7 @@ static int
 vhci_mpapi_chk_last_path(mdi_pathinfo_t *pip)
 {
 	dev_info_t	*pdip = NULL, *cdip = NULL;
-	int		count = 0, circular;
+	int		count = 0;
 	mdi_pathinfo_t	*ret_pip;
 
 	if (pip == NULL) {
@@ -4467,7 +4468,7 @@ vhci_mpapi_chk_last_path(mdi_pathinfo_t *pip)
 		return (-1);
 	}
 
-	ndi_devi_enter(cdip, &circular);
+	ndi_devi_enter(cdip);
 	ret_pip = mdi_get_next_phci_path(cdip, NULL);
 
 	while ((ret_pip != NULL) && (count < 2)) {
@@ -4483,7 +4484,7 @@ vhci_mpapi_chk_last_path(mdi_pathinfo_t *pip)
 		mdi_pi_unlock(ret_pip);
 		ret_pip = mdi_get_next_phci_path(cdip, ret_pip);
 	}
-	ndi_devi_exit(cdip, circular);
+	ndi_devi_exit(cdip);
 
 	if (count > 1) {
 		return (0);

@@ -26,6 +26,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -2412,7 +2413,6 @@ bd_attach_handle(dev_info_t *dip, bd_handle_t hdl)
 int
 bd_detach_handle(bd_handle_t hdl)
 {
-	int	circ;
 	int	rv;
 	char	*devnm;
 
@@ -2425,7 +2425,7 @@ bd_detach_handle(bd_handle_t hdl)
 	if (hdl->h_child == NULL) {
 		return (DDI_SUCCESS);
 	}
-	ndi_devi_enter(hdl->h_parent, &circ);
+	ndi_devi_enter(hdl->h_parent);
 	if (i_ddi_node_state(hdl->h_child) < DS_INITIALIZED) {
 		rv = ddi_remove_child(hdl->h_child, 0);
 	} else {
@@ -2440,7 +2440,7 @@ bd_detach_handle(bd_handle_t hdl)
 		hdl->h_child = NULL;
 	}
 
-	ndi_devi_exit(hdl->h_parent, circ);
+	ndi_devi_exit(hdl->h_parent);
 	return (rv == NDI_SUCCESS ? DDI_SUCCESS : DDI_FAILURE);
 }
 

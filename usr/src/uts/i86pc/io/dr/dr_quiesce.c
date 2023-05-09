@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * A CPR derivative specifically for starfire/starcat
  * X86 doesn't make use of the quiesce interfaces, it's kept for simplicity.
  */
@@ -346,7 +350,6 @@ dr_suspend_devices(dev_info_t *dip, dr_sr_handle_t *srh)
 	dr_handle_t	*handle;
 	major_t		major;
 	char		*dname;
-	int		circ;
 
 	/*
 	 * If dip is the root node, it has no siblings and it is
@@ -356,12 +359,12 @@ dr_suspend_devices(dev_info_t *dip, dr_sr_handle_t *srh)
 	for (; dip != NULL; dip = ddi_get_next_sibling(dip)) {
 		char	d_name[40], d_alias[40], *d_info;
 
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 		if (dr_suspend_devices(ddi_get_child(dip), srh)) {
-			ndi_devi_exit(dip, circ);
+			ndi_devi_exit(dip);
 			return (ENXIO);
 		}
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 
 		if (!dr_is_real_device(dip))
 			continue;
@@ -426,7 +429,6 @@ dr_resume_devices(dev_info_t *start, dr_sr_handle_t *srh)
 	dev_info_t	*dip, *next, *last = NULL;
 	major_t		major;
 	char		*bn;
-	int		circ;
 
 	major = (major_t)-1;
 
@@ -499,9 +501,9 @@ dr_resume_devices(dev_info_t *start, dr_sr_handle_t *srh)
 		}
 
 		/* Hold parent busy while walking its children */
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 		dr_resume_devices(ddi_get_child(dip), srh);
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 		last = dip;
 	}
 }

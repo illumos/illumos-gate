@@ -310,7 +310,7 @@ ddihp_modctl(int hp_op, char *path, char *cn_name, uintptr_t arg,
 	dev_info_t		*pdip, *dip;
 	ddi_hp_cn_handle_t	*hdlp;
 	ddi_hp_op_t		op = (ddi_hp_op_t)hp_op;
-	int			pcount, count, rv, error;
+	int			rv, error;
 
 	/* Get the dip of nexus node */
 	dip = e_ddi_hold_devi_by_path(path, 0);
@@ -336,10 +336,10 @@ ddihp_modctl(int hp_op, char *path, char *cn_name, uintptr_t arg,
 	 */
 	pdip = ddi_get_parent(dip);
 	if (pdip != NULL)
-		ndi_devi_enter(pdip, &pcount);
+		ndi_devi_enter(pdip);
 
 	/* Lock before access */
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 
 	hdlp = ddihp_cn_name_to_handle(dip, cn_name);
 
@@ -394,9 +394,9 @@ ddihp_modctl(int hp_op, char *path, char *cn_name, uintptr_t arg,
 	}
 
 done:
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 	if (pdip != NULL)
-		ndi_devi_exit(pdip, pcount);
+		ndi_devi_exit(pdip);
 
 	ddi_release_devi(dip);
 

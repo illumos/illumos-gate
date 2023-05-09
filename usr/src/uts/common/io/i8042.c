@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/inline.h>
@@ -1592,7 +1596,6 @@ i8042_bus_config(dev_info_t *parent, uint_t flags,
 {
 #if defined(__x86)
 	int nodes_needed = 0;
-	int circ;
 
 	/*
 	 * On x86 systems, if ACPI is disabled, the only way the
@@ -1601,7 +1604,7 @@ i8042_bus_config(dev_info_t *parent, uint_t flags,
 	 * the keyboard and mouse nodes and creates them if they are not
 	 * found.
 	 */
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 	if (i8042_devi_findchild_by_node_name(parent, "keyboard") == NULL)
 		nodes_needed |= I8042_KEYBOARD;
 	if (i8042_devi_findchild_by_node_name(parent, "mouse") == NULL)
@@ -1610,7 +1613,7 @@ i8042_bus_config(dev_info_t *parent, uint_t flags,
 	/* If the mouse and keyboard nodes do not already exist, create them */
 	if (nodes_needed)
 		alloc_kb_mouse(parent, nodes_needed);
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 #endif
 	return (ndi_busop_bus_config(parent, flags, op, arg, childp, 0));
 }

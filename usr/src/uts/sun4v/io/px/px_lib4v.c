@@ -22,6 +22,10 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/ddi.h>
@@ -2206,7 +2210,6 @@ px_lib_do_count_waiting_dev(dev_info_t *dip, void *arg)
 static int
 px_lib_count_waiting_dev(dev_info_t *dip)
 {
-	int circular_count;
 	int count = 0;
 
 	/* No need to continue if this system is not SDIO capable */
@@ -2217,9 +2220,9 @@ px_lib_count_waiting_dev(dev_info_t *dip)
 	(void) px_lib_do_count_waiting_dev(dip, &count);
 
 	/* scan dev under this px */
-	ndi_devi_enter(dip, &circular_count);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), px_lib_do_count_waiting_dev, &count);
-	ndi_devi_exit(dip, circular_count);
+	ndi_devi_exit(dip);
 	return (count);
 }
 

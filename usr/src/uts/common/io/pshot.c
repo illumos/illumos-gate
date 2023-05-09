@@ -25,6 +25,7 @@
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1052,7 +1053,6 @@ pshot_ctl(dev_info_t *dip, dev_info_t *rdip,
 	char *childname;
 	int childinstance;
 	char *name;
-	int circ;
 	struct attachspec *as;
 	struct detachspec *ds;
 	int rval = DDI_SUCCESS;
@@ -1138,7 +1138,7 @@ pshot_ctl(dev_info_t *dip, dev_info_t *rdip,
 			    no_pm_components_child);
 		}
 
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 
 		switch (as->when) {
 		case DDI_PRE:
@@ -1191,7 +1191,7 @@ pshot_ctl(dev_info_t *dip, dev_info_t *rdip,
 			break;
 		}
 
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 
 		return (rval);
 	}
@@ -1215,7 +1215,7 @@ pshot_ctl(dev_info_t *dip, dev_info_t *rdip,
 			    no_pm_components_child);
 		}
 
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 
 		switch (ds->when) {
 		case DDI_PRE:
@@ -1293,7 +1293,7 @@ pshot_ctl(dev_info_t *dip, dev_info_t *rdip,
 			break;
 		}
 
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 
 		return (rval);
 	}
@@ -1322,7 +1322,6 @@ pshot_power(dev_info_t *dip, int cmpt, int level)
 	pshot_t *pshot;
 	int instance = ddi_get_instance(dip);
 	char *name = ddi_node_name(dip);
-	int circ;
 	int rv;
 
 	pshot = ddi_get_soft_state(pshot_softstatep, instance);
@@ -1331,7 +1330,7 @@ pshot_power(dev_info_t *dip, int cmpt, int level)
 		return (DDI_FAILURE);
 	}
 
-	ndi_devi_enter(dip, &circ);
+	ndi_devi_enter(dip);
 
 	/*
 	 * set POWER_FLAG when power() is called.
@@ -1357,7 +1356,7 @@ pshot_power(dev_info_t *dip, int cmpt, int level)
 	}
 	mutex_exit(&pshot->lock);
 
-	ndi_devi_exit(dip, circ);
+	ndi_devi_exit(dip);
 
 	return (rv);
 }
@@ -2533,7 +2532,6 @@ pshot_bus_config(dev_info_t *parent, uint_t flags,
 	char		*devname;
 	char		*devstr, *cname, *caddr;
 	int		devstrlen;
-	int		circ;
 	pshot_t		*pshot;
 	int		instance = ddi_get_instance(parent);
 
@@ -2554,7 +2552,7 @@ pshot_bus_config(dev_info_t *parent, uint_t flags,
 	/*
 	 * Hold the nexus across the bus_config
 	 */
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 
 	switch (op) {
 	case BUS_CONFIG_ONE:
@@ -2580,7 +2578,7 @@ pshot_bus_config(dev_info_t *parent, uint_t flags,
 			    "pshot%d: malformed name %s (no bus address)",
 			    ddi_get_instance(parent), devname);
 			kmem_free(devstr, devstrlen);
-			ndi_devi_exit(parent, circ);
+			ndi_devi_exit(parent);
 			return (NDI_FAILURE);
 		}
 
@@ -2619,7 +2617,7 @@ pshot_bus_config(dev_info_t *parent, uint_t flags,
 	if (rval == NDI_SUCCESS)
 		rval = ndi_busop_bus_config(parent, flags, op, arg, childp, 0);
 
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 
 	if (pshot_debug)
 		cmn_err(CE_CONT, "pshot%d: bus_config %s\n",
@@ -2635,7 +2633,6 @@ pshot_bus_unconfig(dev_info_t *parent, uint_t flags,
 {
 	major_t		major;
 	int		rval = NDI_SUCCESS;
-	int		circ;
 
 	if (pshot_debug) {
 		flags |= NDI_DEVI_DEBUG;
@@ -2648,7 +2645,7 @@ pshot_bus_unconfig(dev_info_t *parent, uint_t flags,
 	/*
 	 * Hold the nexus across the bus_unconfig
 	 */
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 
 	switch (op) {
 	case BUS_UNCONFIG_ONE:
@@ -2689,7 +2686,7 @@ pshot_bus_unconfig(dev_info_t *parent, uint_t flags,
 	if (rval == NDI_SUCCESS)
 		rval = ndi_busop_bus_unconfig(parent, flags, op, arg);
 
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 
 	if (pshot_debug)
 		cmn_err(CE_CONT, "pshot%d: bus_unconfig %s\n",

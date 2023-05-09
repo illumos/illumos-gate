@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * A CPR derivative specifically for sbd
  */
 
@@ -369,7 +373,7 @@ static int
 sbdp_suspend_devices_enter(dev_info_t *dip, void *arg)
 {
 	struct dev_info *devi = DEVI(dip);
-	ndi_devi_enter(dip, &devi->devi_circular);
+	ndi_devi_enter(dip);
 	return (DDI_WALK_CONTINUE);
 }
 
@@ -378,7 +382,7 @@ static int
 sbdp_suspend_devices_exit(dev_info_t *dip, void *arg)
 {
 	struct dev_info *devi = DEVI(dip);
-	ndi_devi_exit(dip, devi->devi_circular);
+	ndi_devi_exit(dip);
 	return (DDI_WALK_CONTINUE);
 }
 
@@ -403,7 +407,6 @@ sbdp_suspend_devices(dev_info_t *dip, sbdp_sr_handle_t *srh)
 static void
 sbdp_resume_devices(dev_info_t *start, sbdp_sr_handle_t *srh)
 {
-	int circ;
 	dev_info_t	*dip, *next, *last = NULL;
 	char		*bn;
 	sbd_error_t	*sep;
@@ -476,9 +479,9 @@ sbdp_resume_devices(dev_info_t *start, sbdp_sr_handle_t *srh)
 				}
 			}
 		}
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 		sbdp_resume_devices(ddi_get_child(dip), srh);
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 		last = dip;
 	}
 }

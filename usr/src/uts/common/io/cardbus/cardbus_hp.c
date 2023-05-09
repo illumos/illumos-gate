@@ -30,6 +30,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * Cardbus hotplug module
  */
 
@@ -619,14 +623,13 @@ create_occupant_props(dev_info_t *self, dev_t dev)
 {
 	hpc_occupant_info_t occupant;
 	int i;
-	int circular;
 
 	occupant.i = 0;
 
-	ndi_devi_enter(self, &circular);
+	ndi_devi_enter(self);
 	ddi_walk_devs(ddi_get_child(self), cardbus_list_occupants,
 	    (void *)&occupant);
-	ndi_devi_exit(self, circular);
+	ndi_devi_exit(self);
 
 	if (occupant.i == 0) {
 		char *c[] = { "" };
@@ -666,7 +669,6 @@ cardbus_configure_ap(cbus_t *cbp)
 	int rv = HPC_SUCCESS;
 	hpc_slot_state_t rstate;
 	struct cardbus_config_ctrl ctrl;
-	int circular_count;
 
 	/*
 	 * check for valid request:
@@ -690,10 +692,10 @@ cardbus_configure_ap(cbus_t *cbp)
 		ctrl.dip = NULL;
 		ctrl.op = PCICFG_OP_ONLINE;
 
-		ndi_devi_enter(self, &circular_count);
+		ndi_devi_enter(self);
 		ddi_walk_devs(ddi_get_child(self),
 		    cbus_configure, (void *)&ctrl);
-		ndi_devi_exit(self, circular_count);
+		ndi_devi_exit(self);
 
 		if (cardbus_debug) {
 			cardbus_dump_pci_config(self);
@@ -752,9 +754,9 @@ cardbus_configure_ap(cbus_t *cbp)
 	ctrl.dip = NULL;
 	ctrl.op = PCICFG_OP_ONLINE;
 
-	ndi_devi_enter(self, &circular_count);
+	ndi_devi_enter(self);
 	ddi_walk_devs(ddi_get_child(self), cbus_configure, (void *)&ctrl);
-	ndi_devi_exit(self, circular_count);
+	ndi_devi_exit(self);
 
 	if (cardbus_debug) {
 		cardbus_dump_pci_config(self);

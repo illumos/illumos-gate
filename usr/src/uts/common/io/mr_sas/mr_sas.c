@@ -47,6 +47,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015, 2017 Citrus IT Limited. All rights reserved.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -7445,7 +7446,6 @@ mrsas_tran_bus_config(dev_info_t *parent, uint_t flags,
     ddi_bus_config_op_t op, void *arg, dev_info_t **childp)
 {
 	struct mrsas_instance *instance;
-	int config;
 	int rval  = NDI_SUCCESS;
 
 	char *ptr = NULL;
@@ -7459,7 +7459,7 @@ mrsas_tran_bus_config(dev_info_t *parent, uint_t flags,
 	}
 
 	/* Hold nexus during bus_config */
-	ndi_devi_enter(parent, &config);
+	ndi_devi_enter(parent);
 	switch (op) {
 	case BUS_CONFIG_ONE: {
 
@@ -7500,7 +7500,7 @@ mrsas_tran_bus_config(dev_info_t *parent, uint_t flags,
 		rval = ndi_busop_bus_config(parent, flags, op, arg, childp, 0);
 
 	}
-	ndi_devi_exit(parent, config);
+	ndi_devi_exit(parent);
 
 	con_log(CL_ANN1, (CE_NOTE, "mrsas_tran_bus_config: rval = %x",
 	    rval));
@@ -7742,7 +7742,6 @@ mrsas_issue_evt_taskq(struct mrsas_eventinfo *mrevt)
 {
 	struct mrsas_instance *instance = mrevt->instance;
 	dev_info_t *dip, *pdip;
-	int circ1 = 0;
 	char *devname;
 
 	con_log(CL_ANN1, (CE_NOTE, "mrsas_issue_evt_taskq: called for"
@@ -7760,7 +7759,7 @@ mrsas_issue_evt_taskq(struct mrsas_eventinfo *mrevt)
 	}
 
 
-	ndi_devi_enter(instance->dip, &circ1);
+	ndi_devi_enter(instance->dip);
 	switch (mrevt->event) {
 	case MRSAS_EVT_CONFIG_TGT:
 		if (dip == NULL) {
@@ -7812,7 +7811,7 @@ mrsas_issue_evt_taskq(struct mrsas_eventinfo *mrevt)
 		break;
 	}
 	kmem_free(mrevt, sizeof (struct mrsas_eventinfo));
-	ndi_devi_exit(instance->dip, circ1);
+	ndi_devi_exit(instance->dip);
 }
 
 

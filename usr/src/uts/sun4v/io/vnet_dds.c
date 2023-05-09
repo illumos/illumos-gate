@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/modctl.h>
 #include <sys/prom_plat.h>
 #include <sys/ddi.h>
@@ -1052,7 +1056,6 @@ vdds_find_node(uint64_t cookie, dev_info_t *sdip,
 {
 	vdds_cb_arg_t arg;
 	dev_info_t *pdip;
-	int circ;
 
 	DBG1(NULL, "Called cookie=%lx\n", cookie);
 
@@ -1060,12 +1063,12 @@ vdds_find_node(uint64_t cookie, dev_info_t *sdip,
 	arg.cookie = cookie;
 
 	if (pdip = ddi_get_parent(sdip)) {
-		ndi_devi_enter(pdip, &circ);
+		ndi_devi_enter(pdip);
 	}
 
 	ddi_walk_devs(sdip, match_func, (void *)&arg);
 	if (pdip != NULL) {
-		ndi_devi_exit(pdip, circ);
+		ndi_devi_exit(pdip);
 	}
 
 	DBG1(NULL, "Returning dip=0x%p", arg.dip);

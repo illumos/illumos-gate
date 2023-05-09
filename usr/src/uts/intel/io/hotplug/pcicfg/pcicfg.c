@@ -557,7 +557,6 @@ pcicfg_configure(dev_info_t *devi, uint_t device, uint_t function,
 	dev_info_t *attach_point;
 	pci_bus_range_t pci_bus_range;
 	int rv;
-	int circ, pcirc;
 	uint_t highest_bus, visited = 0;
 	int ari_mode = B_FALSE;
 	int max_function = PCI_MAX_FUNCTIONS;
@@ -594,8 +593,8 @@ pcicfg_configure(dev_info_t *devi, uint_t device, uint_t function,
 	 * requires that the parent is locked; therefore, to obey the lock
 	 * ordering, we must lock the parent here.
 	 */
-	ndi_devi_enter(ddi_get_parent(devi), &pcirc);
-	ndi_devi_enter(devi, &circ);
+	ndi_devi_enter(ddi_get_parent(devi));
+	ndi_devi_enter(devi);
 	for (func = 0; func < max_function; ) {
 
 		if ((function != PCICFG_ALL_FUNC) && (function != func))
@@ -738,8 +737,8 @@ next:
 		pcie_fabric_setup(devi);
 	}
 
-	ndi_devi_exit(devi, circ);
-	ndi_devi_exit(ddi_get_parent(devi), pcirc);
+	ndi_devi_exit(devi);
+	ndi_devi_exit(ddi_get_parent(devi));
 
 	if (visited == 0)
 		return (PCICFG_FAILURE);	/* probe failed */
@@ -783,8 +782,8 @@ cleanup:
 		 */
 		(void) ndi_devi_offline(new_device, NDI_DEVI_REMOVE);
 	}
-	ndi_devi_exit(devi, circ);
-	ndi_devi_exit(ddi_get_parent(devi), pcirc);
+	ndi_devi_exit(devi);
+	ndi_devi_exit(ddi_get_parent(devi));
 
 	/*
 	 * Use private return codes to help identify issues without debugging
@@ -1487,7 +1486,6 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device, uint_t function,
 	int func;
 	int i;
 	int max_function, trans_device;
-	int circ;
 	boolean_t is_pcie;
 
 	if (pcie_ari_is_enabled(devi) == PCIE_ARI_FORW_ENABLED)
@@ -1501,7 +1499,7 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device, uint_t function,
 	 */
 	is_pcie = is_pcie_fabric(devi);
 
-	ndi_devi_enter(devi, &circ);
+	ndi_devi_enter(devi);
 	for (func = 0; func < max_function; func++) {
 		if ((function != PCICFG_ALL_FUNC) && (function != func))
 			continue;
@@ -1596,11 +1594,11 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device, uint_t function,
 		(void) pcie_ari_disable(devi);
 	}
 
-	ndi_devi_exit(devi, circ);
+	ndi_devi_exit(devi);
 	return (PCICFG_SUCCESS);
 
 fail:
-	ndi_devi_exit(devi, circ);
+	ndi_devi_exit(devi);
 	return (PCICFG_FAILURE);
 }
 
@@ -1763,7 +1761,6 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 	int offset;
 	uint64_t mem_answer;
 	uint32_t io_answer;
-	int count;
 	uint8_t header_type;
 	ppb_ranges_t range[PCICFG_RANGE_LEN];
 	int bus_range[2];
@@ -1809,10 +1806,10 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 		range[2].child_low = range[2].parent_low =
 		    entry->pf_memory_last;
 
-		ndi_devi_enter(dip, &count);
+		ndi_devi_enter(dip);
 		ddi_walk_devs(ddi_get_child(dip),
 		    pcicfg_bridge_assign, (void *)entry);
-		ndi_devi_exit(dip, count);
+		ndi_devi_exit(dip);
 
 		(void) pcicfg_update_bridge(entry, handle);
 
@@ -2889,15 +2886,14 @@ static dev_info_t *
 pcicfg_devi_find(dev_info_t *dip, uint_t device, uint_t function)
 {
 	struct pcicfg_find_ctrl ctrl;
-	int count;
 
 	ctrl.device = device;
 	ctrl.function = function;
 	ctrl.dip = NULL;
 
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), pcicfg_match_dev, (void *)&ctrl);
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 
 	return (ctrl.dip);
 }
@@ -4089,7 +4085,6 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	ppb_ranges_t range[PCICFG_RANGE_LEN];
 	int bus_range[2];
 	pcicfg_phdl_t phdl;
-	int count;
 	uint64_t pcibus_base, pcibus_alen;
 	uint64_t max_bus;
 	uint8_t pcie_device_type = 0;
@@ -4540,7 +4535,7 @@ pf_setup_end:
 	 * Probe all children devices
 	 */
 	DEBUG0("Bridge Programming Complete - probe children\n");
-	ndi_devi_enter(new_child, &count);
+	ndi_devi_enter(new_child);
 	for (i = 0; ((i < PCI_MAX_DEVICES) && (ari_mode == B_FALSE));
 	    i++) {
 		for (j = 0; j < max_function; ) {
@@ -4618,7 +4613,7 @@ next:
 		if (rval != PCICFG_NODEVICE)
 			break;
 	}
-	ndi_devi_exit(new_child, count);
+	ndi_devi_exit(new_child);
 
 	/*
 	 * Offline the bridge to allow reprogramming of resources.
@@ -4640,9 +4635,9 @@ next:
 	phdl.pf_memory_base = pf_mem_answer;
 	phdl.error = PCICFG_SUCCESS;	/* in case of empty child tree */
 
-	ndi_devi_enter(ddi_get_parent(new_child), &count);
+	ndi_devi_enter(ddi_get_parent(new_child));
 	ddi_walk_devs(new_child, pcicfg_find_resource_end, (void *)&phdl);
-	ndi_devi_exit(ddi_get_parent(new_child), count);
+	ndi_devi_exit(ddi_get_parent(new_child));
 
 	num_slots = pcicfg_get_nslots(new_child, h);
 	mem_end = PCICFG_ROUND_UP(phdl.memory_base, PCICFG_MEMGRAN);
@@ -5014,7 +5009,6 @@ pcicfg_find_resource_end(dev_info_t *dip, void *hdl)
 static void
 pcicfg_reparent_node(dev_info_t *child, dev_info_t *parent)
 {
-	int circ;
 	dev_info_t *opdip;
 
 	ASSERT(i_ddi_node_state(child) <= DS_LINKED);
@@ -5022,9 +5016,9 @@ pcicfg_reparent_node(dev_info_t *child, dev_info_t *parent)
 	 * Unlink node from tree before reparenting
 	 */
 	opdip = ddi_get_parent(child);
-	ndi_devi_enter(opdip, &circ);
+	ndi_devi_enter(opdip);
 	(void) i_ndi_unconfig_node(child, DS_PROTO, 0);
-	ndi_devi_exit(opdip, circ);
+	ndi_devi_exit(opdip);
 
 	DEVI(child)->devi_parent = DEVI(parent);
 	DEVI(child)->devi_bus_ctl = DEVI(parent);

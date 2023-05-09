@@ -22,6 +22,7 @@
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -388,7 +389,7 @@ error_out:
 static ACPI_STATUS
 acpidev_create_root_node(void)
 {
-	int circ, rv = AE_OK;
+	int rv = AE_OK;
 	dev_info_t *dip = NULL;
 	acpidev_data_handle_t objhdl;
 	char *compatibles[] = {
@@ -398,13 +399,13 @@ acpidev_create_root_node(void)
 		ACPIDEV_TYPE_VIRTNEX,
 	};
 
-	ndi_devi_enter(ddi_root_node(), &circ);
+	ndi_devi_enter(ddi_root_node());
 	ASSERT(acpidev_root_dip == NULL);
 
 	/* Query whether device node already exists. */
 	dip = ddi_find_devinfo(ACPIDEV_NODE_NAME_ROOT, -1, 0);
 	if (dip != NULL && ddi_get_parent(dip) == ddi_root_node()) {
-		ndi_devi_exit(ddi_root_node(), circ);
+		ndi_devi_exit(ddi_root_node());
 		cmn_err(CE_WARN, "!acpidev: node /devices/%s already exists, "
 		    "disable driver.", ACPIDEV_NODE_NAME_ROOT);
 		return (AE_ALREADY_EXISTS);
@@ -414,7 +415,7 @@ acpidev_create_root_node(void)
 	rv = ndi_devi_alloc(ddi_root_node(), ACPIDEV_NODE_NAME_ROOT,
 	    (pnode_t)DEVI_SID_NODEID, &dip);
 	if (rv != NDI_SUCCESS) {
-		ndi_devi_exit(ddi_root_node(), circ);
+		ndi_devi_exit(ddi_root_node());
 		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to create device node "
 		    "for ACPI root with errcode %d.", rv);
 		return (AE_ERROR);
@@ -423,7 +424,7 @@ acpidev_create_root_node(void)
 	/* Build cross reference between dip and ACPI object. */
 	if (ACPI_FAILURE(acpica_tag_devinfo(dip, ACPI_ROOT_OBJECT))) {
 		(void) ddi_remove_child(dip, 0);
-		ndi_devi_exit(ddi_root_node(), circ);
+		ndi_devi_exit(ddi_root_node());
 		ACPIDEV_DEBUG(CE_WARN, "!acpidev: failed to tag object %s.",
 		    ACPIDEV_OBJECT_NAME_SB);
 		return (AE_ERROR);
@@ -462,14 +463,14 @@ acpidev_create_root_node(void)
 	(void) ndi_devi_bind_driver(dip, 0);
 
 	acpidev_root_dip = dip;
-	ndi_devi_exit(ddi_root_node(), circ);
+	ndi_devi_exit(ddi_root_node());
 
 	return (AE_OK);
 
 error_out:
 	(void) acpica_untag_devinfo(dip, ACPI_ROOT_OBJECT);
 	(void) ddi_remove_child(dip, 0);
-	ndi_devi_exit(ddi_root_node(), circ);
+	ndi_devi_exit(ddi_root_node());
 	return (AE_ERROR);
 }
 
@@ -668,7 +669,6 @@ acpidev_boot_probe(int type)
 ACPI_STATUS
 acpidev_probe_child(acpidev_walk_info_t *infop)
 {
-	int circ;
 	dev_info_t *pdip;
 	ACPI_STATUS res, rc = AE_OK;
 	ACPI_HANDLE child;
@@ -709,7 +709,7 @@ acpidev_probe_child(acpidev_walk_info_t *infop)
 		return (AE_BAD_PARAMETER);
 	}
 
-	ndi_devi_enter(pdip, &circ);
+	ndi_devi_enter(pdip);
 	rw_enter(&acpidev_class_lock, RW_READER);
 
 	/* Call pre-probe callback functions. */
@@ -799,7 +799,7 @@ acpidev_probe_child(acpidev_walk_info_t *infop)
 	}
 
 	rw_exit(&acpidev_class_lock);
-	ndi_devi_exit(pdip, circ);
+	ndi_devi_exit(pdip);
 
 	return (rc);
 }

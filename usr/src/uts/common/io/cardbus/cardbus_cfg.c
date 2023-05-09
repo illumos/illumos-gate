@@ -29,6 +29,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * Cardbus configurator
  */
 
@@ -708,7 +712,6 @@ cardbus_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
 {
 	cardbus_range_t range[PCICFG_RANGE_LEN];
 	int bus_range[2];
-	int count;
 	int i;
 
 	cardbus_err(dip, 8, "cardbus_bridge_ranges\n");
@@ -723,9 +726,9 @@ cardbus_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
 						PCI_ADDR_MEM32);
 	range[1].child_lo = range[1].parent_lo = entry->memory_last;
 
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), cardbus_bridge_assign, (void *)entry);
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 
 	(void) cardbus_update_bridge(dip, entry, handle);
 
@@ -996,7 +999,6 @@ cardbus_isa_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
 			ddi_acc_handle_t handle)
 {
 	struct ebus_pci_rangespec range;
-	int count;
 	pci_regspec_t *reg;
 	int length;
 	int rcount;
@@ -1074,11 +1076,11 @@ cardbus_isa_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
 		isa_phdl.io_base = io_answer;
 		isa_phdl.io_decode_reg = 0x58; /* Pos decoded IO space 0 reg */
 		/* i_ndi_block_device_tree_changes(&count); */
-		ndi_devi_enter(dip, &count);
+		ndi_devi_enter(dip);
 		ddi_walk_devs(ddi_get_child(dip),
 			cardbus_add_isa_reg, (void *)&isa_phdl);
 		/* i_ndi_allow_device_tree_changes(count); */
-		ndi_devi_exit(dip, count);
+		ndi_devi_exit(dip);
 	}
 	return (DDI_WALK_PRUNECHILD);
 }
@@ -1172,7 +1174,6 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 	ndi_ra_request_t	*mem_request;
 	ndi_ra_request_t	*io_request;
 	ra_return_t		res;
-	int			count;
 
 	/*
 	 * This should not find an existing entry - so
@@ -1198,9 +1199,9 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 	 * structure "phdl".
 	 */
 	phdl->error = PCICFG_SUCCESS;
-	ndi_devi_enter(dip, &count);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), cardbus_sum_resources, (void *)phdl);
-	ndi_devi_exit(dip, count);
+	ndi_devi_exit(dip);
 
 	if (phdl->error != PCICFG_SUCCESS) {
 		cmn_err(CE_WARN, "Failure summing resources\n");
@@ -2360,19 +2361,18 @@ cardbus_probe_bridge(cbus_t *cbp, dev_info_t *attpt, uint_t bus,
 	uint_t			new_bus;
 	uint64_t		blen;
 	uint64_t		next_bus;
-	int circ;
 
 	cardbus_err(cbp->cb_dip, 6,
 	    "cardbus_probe_bridge bus %d device %d func %d\n",
 	    bus, device, func);
 
-	ndi_devi_enter(cbp->cb_dip, &circ);
+	ndi_devi_enter(cbp->cb_dip);
 	if (pci_config_setup(cbp->cb_dip, &config_handle) != DDI_SUCCESS) {
 
 		cardbus_err(cbp->cb_dip, 1,
 		    "cardbus_probe_bridge(): Failed to setup config space\n");
 
-		ndi_devi_exit(cbp->cb_dip, circ);
+		ndi_devi_exit(cbp->cb_dip);
 		return (PCICFG_FAILURE);
 	}
 
@@ -2468,13 +2468,13 @@ cardbus_probe_bridge(cbus_t *cbp, dev_info_t *attpt, uint_t bus,
 
 	(void) pci_config_teardown(&config_handle);
 	(void) i_ndi_config_node(attpt, DS_LINKED, 0);
-	ndi_devi_exit(cbp->cb_dip, circ);
+	ndi_devi_exit(cbp->cb_dip);
 
 	return (PCICFG_SUCCESS);
 
 failed:
 	(void) pci_config_teardown(&config_handle);
-	ndi_devi_exit(cbp->cb_dip, circ);
+	ndi_devi_exit(cbp->cb_dip);
 
 	return (PCICFG_FAILURE);
 }
@@ -2497,7 +2497,6 @@ cardbus_probe_children(cbus_t *cbp, dev_info_t *parent, uint_t bus,
 	uint8_t			base_class;
 	uint_t			new_bus;
 	int			ret;
-	int			circ;
 
 	cardbus_err(parent, 6,
 	    "cardbus_probe_children bus %d device %d func %d\n",
@@ -2509,14 +2508,14 @@ cardbus_probe_children(cbus_t *cbp, dev_info_t *parent, uint_t bus,
 	 * be filled in or freed up based on further probing.
 	 */
 
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 
 	if (ndi_devi_alloc(parent, DEVI_PSEUDO_NEXNAME,
 	    (pnode_t)DEVI_SID_NODEID,
 	    &new_child) != NDI_SUCCESS) {
 		cardbus_err(parent, 1,
 		    "cardbus_probe_children(): Failed to alloc child node\n");
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 		return (PCICFG_FAILURE);
 	}
 
@@ -3043,7 +3042,7 @@ leaf_node:
 	 * Attach the child to its parent
 	 */
 	(void) i_ndi_config_node(new_child, DS_LINKED, 0);
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 
 	return (PCICFG_SUCCESS);
 failedchild:
@@ -3055,7 +3054,7 @@ failedchild:
 failedconfig:
 
 	(void) ndi_devi_free(new_child);
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 
 	return (PCICFG_FAILURE);
 }
@@ -3264,21 +3263,20 @@ static void
 cardbus_reparent_children(dev_info_t *dip, dev_info_t *parent)
 {
 	dev_info_t *child;
-	int circ;
 
 	while (child = ddi_get_child(dip)) {
 		ASSERT(i_ddi_node_state(child) <= DS_LINKED);
 		/*
 		 * Unlink node from tree before reparenting
 		 */
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip);
 		(void) i_ndi_unconfig_node(child, DS_PROTO, 0);
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip);
 		DEVI(child)->devi_parent = DEVI(parent);
 		DEVI(child)->devi_bus_ctl = DEVI(parent);
-		ndi_devi_enter(parent, &circ);
+		ndi_devi_enter(parent);
 		(void) i_ndi_config_node(child, DS_LINKED, 0);
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 	}
 }
 

@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * Platform Power Management driver for SUNW,Sun-Blade-1000
  */
 #include <sys/modctl.h>
@@ -1345,18 +1349,15 @@ xcppm_lock_one(ppm_dev_t *ppmd, power_req_t *reqp, int *iresp)
 {
 	switch (reqp->request_type) {
 	case PMR_PPM_LOCK_POWER:
-		pm_lock_power_single(ppmd->dip,
-		    reqp->req.ppm_lock_power_req.circp);
+		pm_lock_power_single(ppmd->dip);
 		break;
 
 	case PMR_PPM_UNLOCK_POWER:
-		pm_unlock_power_single(ppmd->dip,
-		    reqp->req.ppm_unlock_power_req.circ);
+		pm_unlock_power_single(ppmd->dip);
 		break;
 
 	case PMR_PPM_TRY_LOCK_POWER:
-		*iresp = pm_try_locking_power_single(ppmd->dip,
-		    reqp->req.ppm_lock_power_req.circp);
+		*iresp = pm_try_locking_power_single(ppmd->dip);
 		break;
 	}
 }
@@ -1380,15 +1381,13 @@ xcppm_lock_all(ppm_domain_t *domp, power_req_t *reqp, int *iresp)
 			mutex_enter(&domp->lock);
 		domp->refcnt++;
 		ASSERT(domp->devlist != NULL);
-		pm_lock_power_single(domp->devlist->dip,
-		    reqp->req.ppm_lock_power_req.circp);
+		pm_lock_power_single(domp->devlist->dip);
 		/* domain lock remains held */
 		return;
 	} else if (reqp->request_type == PMR_PPM_UNLOCK_POWER) {
 		ASSERT(MUTEX_HELD(&domp->lock));
 		ASSERT(domp->devlist != NULL);
-		pm_unlock_power_single(domp->devlist->dip,
-		    reqp->req.ppm_unlock_power_req.circ);
+		pm_unlock_power_single(domp->devlist->dip);
 		if (--domp->refcnt == 0)
 			mutex_exit(&domp->lock);
 		return;
@@ -1400,8 +1399,7 @@ xcppm_lock_all(ppm_domain_t *domp, power_req_t *reqp, int *iresp)
 			*iresp = 0;
 			return;
 		}
-	*iresp = pm_try_locking_power_single(domp->devlist->dip,
-	    reqp->req.ppm_lock_power_req.circp);
+	*iresp = pm_try_locking_power_single(domp->devlist->dip);
 	if (*iresp)
 		domp->refcnt++;
 	else

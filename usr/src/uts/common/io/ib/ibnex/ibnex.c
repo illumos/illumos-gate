@@ -24,6 +24,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -1133,7 +1134,7 @@ static int
 ibnex_bus_config(dev_info_t *parent, uint_t flag,
     ddi_bus_config_op_t op, void *devname, dev_info_t **child)
 {
-	int			ret = IBNEX_SUCCESS, len, circ, need_bus_config;
+	int			ret = IBNEX_SUCCESS, len, need_bus_config;
 	char			*device_name, *cname = NULL, *caddr = NULL;
 	dev_info_t		*cdip;
 	ibnex_node_data_t	*node_data;
@@ -1143,7 +1144,7 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		IBTF_DPRINTF_L4("ibnex", "\tbus_config: CONFIG_ONE, "
 		    "parent %p", parent);
 
-		ndi_devi_enter(parent, &circ);
+		ndi_devi_enter(parent);
 
 		len = strlen((char *)devname) + 1;
 		device_name = i_ddi_strdup(devname, KM_SLEEP);
@@ -1151,7 +1152,7 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 
 		if (caddr == NULL || (strlen(caddr) == 0)) {
 			kmem_free(device_name, len);
-			ndi_devi_exit(parent, circ);
+			ndi_devi_exit(parent);
 			return (NDI_FAILURE);
 		}
 
@@ -1159,7 +1160,7 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		if (cdip)
 			node_data = ddi_get_parent_data(cdip);
 
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 
 		if (cdip == NULL || (node_data != NULL &&
 		    node_data->node_dip == NULL)) {
@@ -1383,7 +1384,7 @@ ibnex_config_all_children(dev_info_t *parent)
 	ibdm_ioc_info_t		*ioc_list;
 	ibdm_hca_list_t		*hca_list;
 	ib_guid_t		hca_guid;
-	int			circ;
+	boolean_t		enteredv;
 
 	IBTF_DPRINTF_L4("ibnex", "\tconfig_all_children: Begin");
 
@@ -1394,12 +1395,12 @@ ibnex_config_all_children(dev_info_t *parent)
 	 * locking. IB Nexus is enumerating the children
 	 * of HCA, not MPXIO clients.
 	 */
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 	hca_guid = ibtl_ibnex_hcadip2guid(parent);
 	ibdm_ibnex_port_settle_wait(hca_guid, ibnex_port_settling_time);
 	hca_list = ibdm_ibnex_get_hca_info_by_guid(hca_guid);
 	if (hca_list == NULL) {
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 		return;
 	}
 	ibnex_create_hcasvc_nodes(parent, hca_list->hl_hca_port_attr);
@@ -1409,13 +1410,13 @@ ibnex_config_all_children(dev_info_t *parent)
 		ibnex_create_vppa_nodes(parent, &hca_list->hl_port_attr[ii]);
 	}
 	ibdm_ibnex_free_hca_list(hca_list);
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 
 	/*
 	 * Use mdi_devi_enter() for locking. IB Nexus is
 	 * enumerating MPxIO clients.
 	 */
-	mdi_devi_enter(parent, &circ);
+	mdi_devi_enter(parent, &enteredv);
 
 	ibnex_pseudo_initnodes();
 
@@ -1436,7 +1437,7 @@ ibnex_config_all_children(dev_info_t *parent)
 	ibnex_config_pseudo_all(parent);
 
 	mutex_exit(&ibnex.ibnex_mutex);
-	mdi_devi_exit(parent, circ);
+	mdi_devi_exit(parent, enteredv);
 
 	IBTF_DPRINTF_L4("ibnex", "\tconfig_all_children: End");
 }
@@ -4042,9 +4043,10 @@ ibnex_ioc_bus_config_one(dev_info_t **pdipp, uint_t flag,
     ddi_bus_config_op_t op, void *devname, dev_info_t **child,
     int *need_bus_config)
 {
-	int ret = DDI_FAILURE, circ;
+	int ret = DDI_FAILURE;
+	boolean_t enteredv;
 	dev_info_t *pdip = *pdipp;
-	ib_guid_t	iou_guid, ioc_guid;
+	ib_guid_t iou_guid, ioc_guid;
 	char *ioc_guid_str;
 
 
@@ -4062,7 +4064,7 @@ ibnex_ioc_bus_config_one(dev_info_t **pdipp, uint_t flag,
 		if (ret == MDI_SUCCESS)
 			*need_bus_config = 0;
 	} else {
-		mdi_devi_enter(pdip, &circ);
+		mdi_devi_enter(pdip, &enteredv);
 		if (strstr((char *)devname, ":port=") != NULL) {
 			ret = ibnex_config_root_iocnode(pdip, devname);
 			ASSERT(ibnex.ibnex_dip == NULL);
@@ -4070,7 +4072,7 @@ ibnex_ioc_bus_config_one(dev_info_t **pdipp, uint_t flag,
 		} else {
 			ret = ibnex_config_ioc_node(devname, pdip);
 		}
-		mdi_devi_exit(pdip, circ);
+		mdi_devi_exit(pdip, enteredv);
 	}
 	return (ret);
 }

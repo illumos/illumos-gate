@@ -359,14 +359,13 @@ vtd_get_dip(ACPI_DMAR_HARDWARE_UNIT *drhd, int unit)
 	dev_info_t *dip;
 	struct ddi_parent_private_data *pdptr;
 	struct regspec reg;
-	int circ;
 
 	/*
 	 * Try to find an existing devinfo node for this vtd unit.
 	 */
-	ndi_devi_enter(ddi_root_node(), &circ);
+	ndi_devi_enter(ddi_root_node());
 	dip = ddi_find_devinfo("vtd", unit, 0);
-	ndi_devi_exit(ddi_root_node(), circ);
+	ndi_devi_exit(ddi_root_node());
 
 	if (dip != NULL)
 		return (dip);

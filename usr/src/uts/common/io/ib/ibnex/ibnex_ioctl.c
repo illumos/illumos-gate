@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * This file contains support required for IB cfgadm plugin.
  */
 
@@ -195,7 +199,6 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
     int *rvalp)
 {
 	int			ret, rv = 0, ioc_reprobe_pending = 0;
-	int			circ;
 	char			*snapshot = NULL;
 	char			*apid_n = NULL;
 	char			*service = NULL;
@@ -923,7 +926,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		mutex_exit(&ibnex.ibnex_mutex);
-		ndi_devi_enter(pdip, &circ);
+		ndi_devi_enter(pdip);
 		ndi_rele_devi(apid_dip);
 		mutex_enter(&ibnex.ibnex_mutex);
 
@@ -949,7 +952,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		rv = (ret_val != IBNEX_SUCCESS) ? EIO : 0;
-		ndi_devi_exit(pdip, circ);
+		ndi_devi_exit(pdip);
 		IBTF_DPRINTF_L2("ibnex", "%s: DONE !! It %s", msg,
 		    rv ? "failed" : "succeeded");
 		break;
@@ -958,7 +961,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		msg = "DEVCTL_AP_CONFIGURE";
 		IBTF_DPRINTF_L4("ibnex", "%s", msg);
 		mutex_exit(&ibnex.ibnex_mutex);
-		ndi_devi_enter(ibnex.ibnex_dip, &circ);
+		ndi_devi_enter(ibnex.ibnex_dip);
 		mutex_enter(&ibnex.ibnex_mutex);
 
 		/* Check for write permissions */
@@ -966,7 +969,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			IBTF_DPRINTF_L2("ibnex", "%s: invalid mode %x",
 			    msg, mode);
 			rv = EPERM;
-			ndi_devi_exit(ibnex.ibnex_dip, circ);
+			ndi_devi_exit(ibnex.ibnex_dip);
 			break;
 		}
 
@@ -974,7 +977,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			IBTF_DPRINTF_L2("ibnex",
 			    "%s: ibnex_get_apid failed", msg);
 			rv = EIO;
-			ndi_devi_exit(ibnex.ibnex_dip, circ);
+			ndi_devi_exit(ibnex.ibnex_dip);
 			break;
 		}
 
@@ -992,7 +995,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 */
 		if (apid_dip != NULL) {
 			ndi_rele_devi(apid_dip);
-			ndi_devi_exit(ibnex.ibnex_dip, circ);
+			ndi_devi_exit(ibnex.ibnex_dip);
 			rv = 0;
 			break;
 		}
@@ -1055,7 +1058,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 		IBTF_DPRINTF_L2("ibnex", "%s: DONE !! It %s", msg,
 		    rv ? "failed" : "succeeded");
-		ndi_devi_exit(ibnex.ibnex_dip, circ);
+		ndi_devi_exit(ibnex.ibnex_dip);
 		break;
 
 	default:
@@ -2063,7 +2066,7 @@ ibnex_handle_ioc_configure(char *apid)
 static ibnex_rval_t
 ibnex_handle_commsvcnode_configure(char *apid)
 {
-	int			ret, str_len, circ;
+	int			ret, str_len;
 	int			sndx;
 	int			port_pkey = 0;
 	char			*pkey_str = strchr(apid, ',');
@@ -2206,14 +2209,14 @@ ibnex_handle_commsvcnode_configure(char *apid)
 		node_type = IBNEX_VPPA_COMMSVC_NODE;
 
 	mutex_enter(&ibnex.ibnex_mutex);
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 	if (ibnex_commsvc_initnode(parent, port_attr, sndx, node_type,
 	    port_pkey, &ret, IBNEX_CFGADM_ENUMERATE) != NULL) {
 		retval = IBNEX_SUCCESS;
 	} else {
 		retval = (ret == IBNEX_BUSY) ? IBNEX_BUSY : IBNEX_FAILURE;
 	}
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 
 	if (is_hcasvc_node == B_FALSE)
 		ibdm_ibnex_free_port_attr(port_attr);

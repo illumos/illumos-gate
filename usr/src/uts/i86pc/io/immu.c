@@ -28,6 +28,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * Intel IOMMU implementation
  * This file contains Intel IOMMU code exported
  * to the rest of the system and code that deals
@@ -321,11 +325,9 @@ check_gfx(dev_info_t *dip, void *arg)
 static void
 walk_tree(int (*f)(dev_info_t *, void *), void *arg)
 {
-	int count;
-
-	ndi_devi_enter(root_devinfo, &count);
+	ndi_devi_enter(root_devinfo);
 	ddi_walk_devs(ddi_get_child(root_devinfo), f, arg);
-	ndi_devi_exit(root_devinfo, count);
+	ndi_devi_exit(root_devinfo);
 }
 
 static int

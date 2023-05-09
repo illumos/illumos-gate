@@ -22,6 +22,10 @@
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #ifndef	_SYS_SUNMDI_H
 #define	_SYS_SUNMDI_H
 
@@ -150,11 +154,11 @@ void mdi_phci_unretire(dev_info_t *dip);
 /*
  * MDI devinfo locking functions.
  */
-void mdi_devi_enter(dev_info_t *, int *);
-int mdi_devi_tryenter(dev_info_t *, int *);
-void mdi_devi_exit_phci(dev_info_t *, int);
-void mdi_devi_enter_phci(dev_info_t *, int *);
-void mdi_devi_exit(dev_info_t *, int);
+void mdi_devi_enter(dev_info_t *, boolean_t *);
+int mdi_devi_tryenter(dev_info_t *, boolean_t *);
+void mdi_devi_exit(dev_info_t *, boolean_t);
+void mdi_devi_exit_phci(dev_info_t *);
+void mdi_devi_enter_phci(dev_info_t *);
 
 /*
  * MDI device support functions.

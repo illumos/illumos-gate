@@ -25,11 +25,11 @@
 
 /*
  * Copyright 2019 Peter Tribble.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
  * Safari Configurator  (gptwocfg)
- *
  */
 
 #include <sys/types.h>
@@ -322,7 +322,7 @@ gptwocfg_configure(dev_info_t *ap, spcd_t *pcd, gptwo_aid_t id)
 gptwocfg_cookie_t
 gptwocfg_unconfigure(dev_info_t *ap, gptwo_aid_t id)
 {
-	int i, circ;
+	int i;
 	int failure = 0;
 	dev_info_t *saf_dip;
 	gptwocfg_config_t *config, *temp;
@@ -383,7 +383,7 @@ gptwocfg_unconfigure(dev_info_t *ap, gptwo_aid_t id)
 
 	GPTWO_DEBUG1(1, CE_CONT, "gptwocfg_unconfigure: ops=%lx\n", ops);
 
-	ndi_devi_enter(ap, &circ);
+	ndi_devi_enter(ap);
 
 	for (i = 0; i < config->gptwo_nodes->gptwo_number_of_nodes; i++) {
 		dev_info_t *fdip = NULL;
@@ -427,7 +427,7 @@ gptwocfg_unconfigure(dev_info_t *ap, gptwo_aid_t id)
 		 * Don't hold parent busy when calling
 		 * e_ddi_branch_unconfigure/destroy/referenced()
 		 */
-		ndi_devi_exit(ap, circ);
+		ndi_devi_exit(ap);
 		if (e_ddi_branch_destroy(saf_dip, &fdip, 0)) {
 			char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
@@ -449,10 +449,10 @@ gptwocfg_unconfigure(dev_info_t *ap, gptwo_aid_t id)
 			config->gptwo_nodes->gptwo_nodes[i] = saf_dip;
 			failure = 1;
 		}
-		ndi_devi_enter(ap, &circ);
+		ndi_devi_enter(ap);
 	}
 
-	ndi_devi_exit(ap, circ);
+	ndi_devi_exit(ap);
 
 	if (!failure) {
 		gptwocfg_free_node_list(config->gptwo_nodes);
@@ -537,12 +537,11 @@ gptwocfg_get_obp_created_nodes(dev_info_t *ap, uint_t id)
 	gptwo_new_nodes_t *obp_nodes;
 	dev_info_t *saf_dev;
 	int i = 0, nodes = 0;
-	int circular_count;
 
 	GPTWO_DEBUG2(1, CE_CONT, "gptwocfg_get_obp_created_nodes - ap=0x%lx "
 	    "id=0x%x\n", ap, id);
 
-	ndi_devi_enter(ap, &circular_count);
+	ndi_devi_enter(ap);
 
 	/*
 	 * First go through all the children of the attachment point
@@ -579,7 +578,7 @@ gptwocfg_get_obp_created_nodes(dev_info_t *ap, uint_t id)
 		saf_dev = ddi_get_next_sibling(saf_dev);
 	}
 
-	ndi_devi_exit(ap, circular_count);
+	ndi_devi_exit(ap);
 
 	GPTWO_DEBUG1(1, CE_CONT, "gptwocfg_get_obp_created_nodes - "
 	    "Returning 0x%lx\n", obp_nodes);

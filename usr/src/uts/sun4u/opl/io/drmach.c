@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/varargs.h>
@@ -2074,7 +2078,6 @@ drmach_console_ops(drmachid_t *id, int state)
 	int (*msudetp)(dev_info_t *);
 	int (*msuattp)(dev_info_t *);
 	dev_info_t *dip, *pdip;
-	int circ;
 
 	/* 4 is pcicmu channel */
 	if (obj->channel != 4)
@@ -2104,17 +2107,17 @@ drmach_console_ops(drmachid_t *id, int state)
 	arg.dip = NULL;
 
 	dip = obj->dev.node->n_getdip(obj->dev.node);
-	if (pdip = ddi_get_parent(dip)) {
-		ndi_hold_devi(pdip);
-		ndi_devi_enter(pdip, &circ);
-	} else {
+	pdip = ddi_get_parent(dip);
+	if (pdip == NULL) {
 		/* this cannot happen unless something bad happens */
 		return (-1);
 	}
+	ndi_hold_devi(pdip);
+	ndi_devi_enter(pdip);
 
 	ddi_walk_devs(dip, drmach_io_cb_check, (void *)&arg);
 
-	ndi_devi_exit(pdip, circ);
+	ndi_devi_exit(pdip);
 	ndi_rele_devi(pdip);
 
 	if (arg.dip) {

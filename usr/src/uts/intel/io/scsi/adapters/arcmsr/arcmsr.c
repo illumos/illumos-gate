@@ -50,6 +50,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 #include <sys/types.h>
 #include <sys/ddidmareq.h>
@@ -1413,7 +1414,6 @@ arcmsr_tran_bus_config(dev_info_t *parent, uint_t flags,
     ddi_bus_config_op_t op, void *arg, dev_info_t **childp)
 {
 	struct ACB *acb;
-	int circ = 0;
 	int rval;
 	int tgt, lun;
 
@@ -1421,7 +1421,7 @@ arcmsr_tran_bus_config(dev_info_t *parent, uint_t flags,
 	    ddi_get_instance(parent))) == NULL)
 		return (NDI_FAILURE);
 
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 	switch (op) {
 	case BUS_CONFIG_ONE:
 		if (arcmsr_parse_devname(arg, &tgt, &lun) != 0) {
@@ -1450,7 +1450,7 @@ arcmsr_tran_bus_config(dev_info_t *parent, uint_t flags,
 	}
 	if (rval == NDI_SUCCESS)
 		rval = ndi_busop_bus_config(parent, flags, op, arg, childp, 0);
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(parent);
 	return (rval);
 }
 
@@ -3287,7 +3287,6 @@ arcmsr_dr_handle(struct ACB *acb)
 	uint16_t target;
 	uint8_t lun;
 	char diff;
-	int circ = 0;
 	dev_info_t *dip;
 	ddi_acc_handle_t reg;
 
@@ -3332,12 +3331,12 @@ arcmsr_dr_handle(struct ACB *acb)
 			*acb_dev_map = temp;
 			for (lun = 0; lun < ARCMSR_MAX_TARGETLUN; lun++) {
 				if ((temp & 0x01) == 1 && (diff & 0x01) == 1) {
-					ndi_devi_enter(acb->dev_info, &circ);
+					ndi_devi_enter(acb->dev_info);
 					acb->devstate[target][lun] =
 					    ARECA_RAID_GOOD;
 					(void) arcmsr_scsi_device_probe(acb,
 					    target, lun);
-					ndi_devi_exit(acb->dev_info, circ);
+					ndi_devi_exit(acb->dev_info);
 					arcmsr_log(acb, CE_NOTE,
 					    "T%dL%d on-line", target, lun);
 				} else if ((temp & 0x01) == 0 &&

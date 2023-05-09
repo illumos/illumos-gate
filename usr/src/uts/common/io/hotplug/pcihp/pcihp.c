@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * **********************************************************************
  * Extension module for PCI nexus drivers to support PCI Hot Plug feature.
  *
@@ -717,11 +721,9 @@ pcihp_create_occupant_props_nolock(dev_info_t *self, dev_t dev, int pci_dev)
 static void
 pcihp_create_occupant_props(dev_info_t *self, dev_t dev, int pci_dev)
 {
-	int circular;
-
-	ndi_devi_enter(self, &circular);
+	ndi_devi_enter(self);
 	pcihp_create_occupant_props_nolock(self, dev, pci_dev);
-	ndi_devi_exit(self, circular);
+	ndi_devi_exit(self);
 }
 
 static void
@@ -1454,7 +1456,6 @@ pcihp_configure_ap(pcihp_t *pcihp_p, int pci_dev)
 	struct pcihp_slotinfo *slotinfop;
 	hpc_slot_state_t rstate;
 	struct pcihp_config_ctrl ctrl;
-	int circular_count;
 	time_t time;
 
 	/*
@@ -1485,10 +1486,10 @@ pcihp_configure_ap(pcihp_t *pcihp_p, int pci_dev)
 		ctrl.pci_dev = pci_dev;
 		ctrl.op = PCIHP_ONLINE;
 
-		ndi_devi_enter(self, &circular_count);
+		ndi_devi_enter(self);
 		ddi_walk_devs(ddi_get_child(self), pcihp_configure,
 		    (void *)&ctrl);
-		ndi_devi_exit(self, circular_count);
+		ndi_devi_exit(self);
 
 		if (ctrl.rv != NDI_SUCCESS) {
 			/*
@@ -1582,9 +1583,9 @@ pcihp_configure_ap(pcihp_t *pcihp_p, int pci_dev)
 	ctrl.pci_dev = pci_dev;
 	ctrl.op = PCIHP_ONLINE;
 
-	ndi_devi_enter(self, &circular_count);
+	ndi_devi_enter(self);
 	ddi_walk_devs(ddi_get_child(self), pcihp_configure, (void *)&ctrl);
-	ndi_devi_exit(self, circular_count);
+	ndi_devi_exit(self);
 
 	if (ctrl.rv != NDI_SUCCESS) {
 		/*
@@ -1624,7 +1625,6 @@ pcihp_unconfigure_ap(pcihp_t *pcihp_p, int pci_dev)
 	int rv = HPC_SUCCESS;
 	struct pcihp_slotinfo *slotinfop;
 	struct pcihp_config_ctrl ctrl;
-	int circular_count;
 	time_t time;
 
 	/*
@@ -1684,10 +1684,10 @@ pcihp_unconfigure_ap(pcihp_t *pcihp_p, int pci_dev)
 		ctrl.op = PCIHP_OFFLINE;
 
 		(void) devfs_clean(self, NULL, DV_CLEAN_FORCE);
-		ndi_devi_enter(self, &circular_count);
+		ndi_devi_enter(self);
 		ddi_walk_devs(ddi_get_child(self), pcihp_configure,
 		    (void *)&ctrl);
-		ndi_devi_exit(self, circular_count);
+		ndi_devi_exit(self);
 
 		if (ctrl.rv != NDI_SUCCESS) {
 			/*
@@ -1701,10 +1701,10 @@ pcihp_unconfigure_ap(pcihp_t *pcihp_p, int pci_dev)
 			ctrl.pci_dev = pci_dev;
 			ctrl.op = PCIHP_ONLINE;
 
-			ndi_devi_enter(self, &circular_count);
+			ndi_devi_enter(self);
 			ddi_walk_devs(ddi_get_child(self),
 			    pcihp_configure, (void *)&ctrl);
-			ndi_devi_exit(self, circular_count);
+			ndi_devi_exit(self);
 
 			/* tell HPC driver that the occupant is Busy */
 			(void) hpc_nexus_control(slotinfop->slot_hdl,
@@ -2114,7 +2114,6 @@ pcihp_new_slot_state(dev_info_t *dip, hpc_slot_t hdl,
 			    pcihp_p->dip, KM_SLEEP);
 		} else {
 			struct pcihp_config_ctrl ctrl;
-			int circular_count;
 
 			slotinfop->ostate = AP_OSTATE_UNCONFIGURED;
 			slotinfop->rstate = AP_RSTATE_EMPTY;
@@ -2192,10 +2191,10 @@ pcihp_new_slot_state(dev_info_t *dip, hpc_slot_t hdl,
 				 */
 				(void) pcihp_get_board_type(slotinfop);
 
-				ndi_devi_enter(dip, &circular_count);
+				ndi_devi_enter(dip);
 				ddi_walk_devs(ddi_get_child(dip),
 				    pcihp_configure, (void *)&ctrl);
-				ndi_devi_exit(dip, circular_count);
+				ndi_devi_exit(dip);
 
 				if (ctrl.rv != NDI_SUCCESS) {
 					/*
@@ -2316,7 +2315,6 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 	int rv = HPC_EVENT_CLAIMED;
 	struct pcihp_slotinfo *slotinfop;
 	struct pcihp_config_ctrl ctrl;
-	int circular_count;
 	int rval;
 	int hint;
 	hpc_slot_state_t rstate;
@@ -2501,10 +2499,10 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 			ctrl.op = PCIHP_ONLINE;
 				(void) pcihp_get_board_type(slotinfop);
 
-			ndi_devi_enter(pcihp_p->dip, &circular_count);
+			ndi_devi_enter(pcihp_p->dip);
 			ddi_walk_devs(ddi_get_child(pcihp_p->dip),
 			    pcihp_configure, (void *)&ctrl);
-			ndi_devi_exit(pcihp_p->dip, circular_count);
+			ndi_devi_exit(pcihp_p->dip);
 
 			if (ctrl.rv != NDI_SUCCESS) {
 				/*
@@ -2585,10 +2583,10 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 			ctrl.op = PCIHP_OFFLINE;
 
 			(void) devfs_clean(pcihp_p->dip, NULL, DV_CLEAN_FORCE);
-			ndi_devi_enter(pcihp_p->dip, &circular_count);
+			ndi_devi_enter(pcihp_p->dip);
 			ddi_walk_devs(ddi_get_child(pcihp_p->dip),
 			    pcihp_configure, (void *)&ctrl);
-			ndi_devi_exit(pcihp_p->dip, circular_count);
+			ndi_devi_exit(pcihp_p->dip);
 
 			if (ctrl.rv != NDI_SUCCESS) {
 				/*
@@ -2602,10 +2600,10 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 				ctrl.pci_dev = pci_dev;
 				ctrl.op = PCIHP_ONLINE;
 
-				ndi_devi_enter(pcihp_p->dip, &circular_count);
+				ndi_devi_enter(pcihp_p->dip);
 				ddi_walk_devs(ddi_get_child(pcihp_p->dip),
 				    pcihp_configure, (void *)&ctrl);
-				ndi_devi_exit(pcihp_p->dip, circular_count);
+				ndi_devi_exit(pcihp_p->dip);
 				rv = HPC_ERR_FAILED;
 			} else {
 				(void) hpc_nexus_control(slotinfop->slot_hdl,
@@ -3121,15 +3119,14 @@ static dev_info_t *
 pcihp_devi_find(dev_info_t *dip, uint_t device, uint_t function)
 {
 	struct pcihp_find_ctrl ctrl;
-	int circular_count;
 
 	ctrl.device = device;
 	ctrl.function = function;
 	ctrl.dip = NULL;
 
-	ndi_devi_enter(dip, &circular_count);
+	ndi_devi_enter(dip);
 	ddi_walk_devs(ddi_get_child(dip), pcihp_match_dev, (void *)&ctrl);
-	ndi_devi_exit(dip, circular_count);
+	ndi_devi_exit(dip);
 
 	return (ctrl.dip);
 }

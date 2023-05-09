@@ -28,6 +28,7 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright (c) 2014 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -930,10 +931,9 @@ static int
 xpvd_bus_config(dev_info_t *parent, uint_t flag, ddi_bus_config_op_t op,
     void *arg, dev_info_t **childp)
 {
-	int circ;
 	char *cname = NULL;
 
-	ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent);
 
 	switch (op) {
 	case BUS_CONFIG_ONE: {
@@ -942,7 +942,7 @@ xpvd_bus_config(dev_info_t *parent, uint_t flag, ddi_bus_config_op_t op,
 		int vdev;
 
 		if (!i_xpvd_parse_devname(arg, &devclass, &dom, &vdev)) {
-			ndi_devi_exit(parent, circ);
+			ndi_devi_exit(parent);
 			return (NDI_FAILURE);
 		}
 
@@ -950,7 +950,7 @@ xpvd_bus_config(dev_info_t *parent, uint_t flag, ddi_bus_config_op_t op,
 		if (*childp == NULL)
 			*childp = xvdi_create_dev(parent, devclass, dom, vdev);
 
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 
 		if (*childp == NULL)
 			return (NDI_FAILURE);
@@ -967,11 +967,11 @@ xpvd_bus_config(dev_info_t *parent, uint_t flag, ddi_bus_config_op_t op,
 			devclass = xendev_nodename_to_devclass(cname);
 
 		if (devclass == XEN_INVAL) {
-			ndi_devi_exit(parent, circ);
+			ndi_devi_exit(parent);
 			return (NDI_FAILURE);
 		} else {
 			xendev_enum_class(parent, devclass);
-			ndi_devi_exit(parent, circ);
+			ndi_devi_exit(parent);
 			return (ndi_busop_bus_config(parent, flag, op,
 			    arg, childp, 0));
 		}
@@ -980,13 +980,13 @@ xpvd_bus_config(dev_info_t *parent, uint_t flag, ddi_bus_config_op_t op,
 
 	case BUS_CONFIG_ALL:
 		xendev_enum_all(parent, B_FALSE);
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 
 		return (ndi_busop_bus_config(parent, flag, op,
 		    arg, childp, 0));
 
 	default:
-		ndi_devi_exit(parent, circ);
+		ndi_devi_exit(parent);
 		return (NDI_FAILURE);
 	}
 }

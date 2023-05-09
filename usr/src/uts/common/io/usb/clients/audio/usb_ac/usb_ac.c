@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * AUDIO CONTROL Driver:
  *
  * usb_ac is a multiplexor that sits on top of usb_as and hid and is
@@ -4438,7 +4442,6 @@ usb_ac_online_siblings(usb_ac_state_t *uacp)
 static void
 usb_ac_hold_siblings(usb_ac_state_t *uacp)
 {
-	int		circ;
 	dev_info_t	*pdip, *child_dip;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
@@ -4448,7 +4451,7 @@ usb_ac_hold_siblings(usb_ac_state_t *uacp)
 	pdip = ddi_get_parent(uacp->usb_ac_dip);
 
 	/* hold the children */
-	ndi_devi_enter(pdip, &circ);
+	ndi_devi_enter(pdip);
 	child_dip = ddi_get_child(pdip);
 	while (child_dip != NULL) {
 		ndi_hold_devi(child_dip);
@@ -4460,7 +4463,7 @@ usb_ac_hold_siblings(usb_ac_state_t *uacp)
 
 		child_dip = ddi_get_next_sibling(child_dip);
 	}
-	ndi_devi_exit(pdip, circ);
+	ndi_devi_exit(pdip);
 }
 
 
@@ -4470,7 +4473,6 @@ usb_ac_hold_siblings(usb_ac_state_t *uacp)
 static void
 usb_ac_rele_siblings(usb_ac_state_t *uacp)
 {
-	int		circ;
 	dev_info_t	*pdip, *child_dip;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
@@ -4478,7 +4480,7 @@ usb_ac_rele_siblings(usb_ac_state_t *uacp)
 
 	/* release all siblings and ourselves */
 	pdip = ddi_get_parent(uacp->usb_ac_dip);
-	ndi_devi_enter(pdip, &circ);
+	ndi_devi_enter(pdip);
 	child_dip = ddi_get_child(pdip);
 	while (child_dip != NULL) {
 		ndi_rele_devi(child_dip);
@@ -4490,7 +4492,7 @@ usb_ac_rele_siblings(usb_ac_state_t *uacp)
 
 		child_dip = ddi_get_next_sibling(child_dip);
 	}
-	ndi_devi_exit(pdip, circ);
+	ndi_devi_exit(pdip);
 }
 static void
 usb_restore_engine(usb_ac_state_t *statep)

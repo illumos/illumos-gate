@@ -24,6 +24,7 @@
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -6283,7 +6284,6 @@ vhci_get_phci_path_list(dev_info_t *pdip, sv_path_info_t *pibuf,
 	sv_path_info_t		*ret_pip;
 	int			status;
 	size_t			prop_size;
-	int			circular;
 
 	/*
 	 * Get the PHCI structure and retrieve the path information
@@ -6293,7 +6293,7 @@ vhci_get_phci_path_list(dev_info_t *pdip, sv_path_info_t *pibuf,
 	ret_pip = pibuf;
 	count = 0;
 
-	ndi_devi_enter(pdip, &circular);
+	ndi_devi_enter(pdip);
 
 	done = (count >= num_elems);
 	pip = mdi_get_next_client_path(pdip, NULL);
@@ -6343,7 +6343,7 @@ vhci_get_phci_path_list(dev_info_t *pdip, sv_path_info_t *pibuf,
 		done = (count >= num_elems);
 	}
 
-	ndi_devi_exit(pdip, circular);
+	ndi_devi_exit(pdip);
 
 	return (MDI_SUCCESS);
 }
@@ -6366,12 +6366,11 @@ vhci_get_client_path_list(dev_info_t *cdip, sv_path_info_t *pibuf,
 	sv_path_info_t		*ret_pip;
 	int			status;
 	size_t			prop_size;
-	int			circular;
 
 	ret_pip = pibuf;
 	count = 0;
 
-	ndi_devi_enter(cdip, &circular);
+	ndi_devi_enter(cdip);
 
 	done = (count >= num_elems);
 	pip = mdi_get_next_phci_path(cdip, NULL);
@@ -6421,7 +6420,7 @@ vhci_get_client_path_list(dev_info_t *cdip, sv_path_info_t *pibuf,
 		done = (count >= num_elems);
 	}
 
-	ndi_devi_exit(cdip, circular);
+	ndi_devi_exit(cdip);
 
 	return (MDI_SUCCESS);
 }
@@ -7183,7 +7182,6 @@ static void
 vhci_client_attached(dev_info_t *cdip)
 {
 	mdi_pathinfo_t	*pip;
-	int		circular;
 
 	/*
 	 * At this point the client has attached and it's instance number is
@@ -7192,11 +7190,11 @@ vhci_client_attached(dev_info_t *cdip)
 	 * case the call to vhci_kstat_create_pathinfo in vhci_pathinfo_online
 	 * was a noop.
 	 */
-	ndi_devi_enter(cdip, &circular);
+	ndi_devi_enter(cdip);
 	for (pip = mdi_get_next_phci_path(cdip, NULL); pip;
 	    pip = mdi_get_next_phci_path(cdip, pip))
 		vhci_kstat_create_pathinfo(pip);
-	ndi_devi_exit(cdip, circular);
+	ndi_devi_exit(cdip);
 }
 
 /*
@@ -7494,11 +7492,10 @@ vhci_quiesce_lun(struct scsi_vhci_lun *vlun)
 	struct scsi_vhci_priv	*svp;
 	mdi_pathinfo_state_t	pstate;
 	uint32_t		p_ext_state;
-	int			circular;
 
 	cdip = vlun->svl_dip;
 	pip = spip = NULL;
-	ndi_devi_enter(cdip, &circular);
+	ndi_devi_enter(cdip);
 	pip = mdi_get_next_phci_path(cdip, NULL);
 	while (pip != NULL) {
 		(void) mdi_pi_get_state2(pip, &pstate, &p_ext_state);
@@ -7508,7 +7505,7 @@ vhci_quiesce_lun(struct scsi_vhci_lun *vlun)
 			continue;
 		}
 		mdi_hold_path(pip);
-		ndi_devi_exit(cdip, circular);
+		ndi_devi_exit(cdip);
 		svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(pip);
 		mutex_enter(&svp->svp_mutex);
 		while (svp->svp_cmds != 0) {
@@ -7524,12 +7521,12 @@ vhci_quiesce_lun(struct scsi_vhci_lun *vlun)
 			}
 		}
 		mutex_exit(&svp->svp_mutex);
-		ndi_devi_enter(cdip, &circular);
+		ndi_devi_enter(cdip);
 		spip = pip;
 		pip = mdi_get_next_phci_path(cdip, spip);
 		mdi_rele_path(spip);
 	}
-	ndi_devi_exit(cdip, circular);
+	ndi_devi_exit(cdip);
 	return (1);
 }
 
