@@ -148,7 +148,6 @@ CCERRWARN +=	-_gcc=-Wno-return-type
 LDLIBS			+= -ldevinfo
 LDLIBS			+= -lsysevent
 LDLIBS			+= -lnvpair
-$(__SUNC)CCNEEDED	= $(CCEXTNEEDED)
 LDLIBS			+= $(CCNEEDED)
 LDLIBS			+= -lc
 

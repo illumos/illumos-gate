@@ -69,9 +69,6 @@ CONTRIB= $(SRC)/contrib
 # RELEASE_BUILD should be cleared for final release builds.
 # NOT_RELEASE_BUILD is exactly what the name implies.
 #
-# __GNUC toggles the building of ON components using gcc and related tools.
-# Normally set to `#', set it to `' to do gcc build.
-#
 # The declaration POUND_SIGN is always '#'. This is needed to get around the
 # make feature that '#' is always a comment delimiter, even when escaped or
 # quoted. We use this macro expansion method to get POUND_SIGN rather than
@@ -98,26 +95,6 @@ SPARC_BLD_1=    $(MACH:i386=$(POUND_SIGN))
 SPARC_BLD=      $(SPARC_BLD_1:sparc=)
 INTEL_BLD_1=    $(MACH:sparc=$(POUND_SIGN))
 INTEL_BLD=      $(INTEL_BLD_1:i386=)
-
-# The variables below control the compilers used during the build.
-# There are a number of permutations.
-#
-# __GNUC and __SUNC control (and indicate) the primary compiler.  Whichever
-# one is not POUND_SIGN is the primary, with the other as the shadow.  They
-# may also be used to control entirely compiler-specific Makefile assignments.
-# __GNUC and GCC are the default.
-#
-# __GNUC64 indicates that the 64bit build should use the GNU C compiler.
-# There is no Sun C analogue.
-#
-# The following version-specific options are operative regardless of which
-# compiler is primary, and control the versions of the given compilers to be
-# used.  They also allow compiler-version specific Makefile fragments.
-#
-
-__SUNC=			$(POUND_SIGN)
-$(__SUNC)__GNUC=	$(POUND_SIGN)
-__GNUC64=		$(__GNUC)
 
 # Allow build-time "configuration" to enable or disable some things.
 # The default is POUND_SIGN, meaning "not enabled". If the environment
@@ -604,10 +581,7 @@ CTF_FLAGS_sparc	= $(CCGDEBUG) -Wc,-Qiselect-T1 $(CSTD) $(CNOGLOBAL)
 CTF_FLAGS_i386	= $(CCGDEBUG) $(CSTD) $(CNOGLOBAL)
 
 CTF_FLAGS_sparcv9	= $(CTF_FLAGS_sparc)
-CTF_FLAGS_amd64		= $(CTF_FLAGS_i386)
-
-# Sun Studio produces broken userland code when saving arguments.
-$(__GNUC)CTF_FLAGS_amd64 += $(SAVEARGS)
+CTF_FLAGS_amd64		= $(CTF_FLAGS_i386) $(SAVEARGS)
 
 CTF_FLAGS_32	= $(CTF_FLAGS_$(MACH))
 CTF_FLAGS_64	= $(CTF_FLAGS_$(MACH64))
@@ -804,18 +778,10 @@ MAPFILE.LEX =		$(SRC)/common/mapfiles/common/map.lex.yy
 # Generated mapfiles that are compiler specific, and used throughout the
 # build.  These mapfiles are not delivered in /usr/lib/ld.
 #
-MAPFILE.NGB_sparc=	$(SRC)/common/mapfiles/gen/sparc_cc_map.noexeglobs
-$(__GNUC64)MAPFILE.NGB_sparc= \
-			$(SRC)/common/mapfiles/gen/sparc_gcc_map.noexeglobs
-MAPFILE.NGB_sparcv9=	$(SRC)/common/mapfiles/gen/sparcv9_cc_map.noexeglobs
-$(__GNUC64)MAPFILE.NGB_sparcv9= \
-			$(SRC)/common/mapfiles/gen/sparcv9_gcc_map.noexeglobs
-MAPFILE.NGB_i386=	$(SRC)/common/mapfiles/gen/i386_cc_map.noexeglobs
-$(__GNUC64)MAPFILE.NGB_i386= \
-			$(SRC)/common/mapfiles/gen/i386_gcc_map.noexeglobs
-MAPFILE.NGB_amd64=	$(SRC)/common/mapfiles/gen/amd64_cc_map.noexeglobs
-$(__GNUC64)MAPFILE.NGB_amd64= \
-			$(SRC)/common/mapfiles/gen/amd64_gcc_map.noexeglobs
+MAPFILE.NGB_sparc =	$(SRC)/common/mapfiles/gen/sparc_gcc_map.noexeglobs
+MAPFILE.NGB_sparcv9 =	$(SRC)/common/mapfiles/gen/sparcv9_gcc_map.noexeglobs
+MAPFILE.NGB_i386 =	$(SRC)/common/mapfiles/gen/i386_gcc_map.noexeglobs
+MAPFILE.NGB_amd64 =	$(SRC)/common/mapfiles/gen/amd64_gcc_map.noexeglobs
 MAPFILE.NGB =		$(MAPFILE.NGB_$(MACH))
 
 #
@@ -863,19 +829,13 @@ COMPILE.java=	$(JAVAC) $(JAVAFLAGS) -classpath $(CLASSPATH)
 #
 # Link time macros
 #
-CCNEEDED		= -lC
-CCEXTNEEDED		= -lCrun -lCstd
-NATIVECCNEEDED		= -lC
-$(__GNUC)CCNEEDED	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
-$(__GNUC)CCEXTNEEDED	= $(CCNEEDED)
-$(__GNUC)NATIVECCNEEDED	= -R$(GCCLIBDIR) -L$(GCCLIBDIR) -lstdc++ -lgcc_s
+CCNEEDED	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
+CCEXTNEEDED	= $(CCNEEDED)
+NATIVECCNEEDED	= -R$(GCCLIBDIR) -L$(GCCLIBDIR) -lstdc++ -lgcc_s
 
-CCNEEDED64		= -lCrun
-CCEXTNEEDED64		= -lCrun -lCstd
-NATIVECCNEEDED64	= -lCrun
-$(__GNUC64)CCNEEDED64	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
-$(__GNUC64)NATIVECCNEEDED64 = -R$(GCCLIBDIR) -L$(GCCLIBDIR) -lstdc++ -lgcc_s
-$(__GNUC64)CCEXTNEEDED	= $(CCNEEDED64)
+CCNEEDED64	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
+NATIVECCNEEDED64 = -R$(GCCLIBDIR) -L$(GCCLIBDIR) -lstdc++ -lgcc_s
+CCEXTNEEDED	= $(CCNEEDED64)
 
 # Libraries we expect to use natively on the build machine
 NATIVE_LIBS=
@@ -899,20 +859,12 @@ LINK64.cc=		$(CCC) $(CCFLAGS64) $(CPPFLAGS) $(NORUNPATH) \
 NATIVE_MACH=	$(MACH:amd64=i386)
 NATIVE_MACH64=	$(MACH64)
 
-# Define native compilation macros
-#
-
-# Base directory where compilers are loaded.
-# Defined here so it can be overridden by developer.
-#
-SPRO_ROOT=		$(BUILD_TOOLS)/SUNWspro
-SPRO_VROOT=		$(SPRO_ROOT)/SS12
+# Base directory where compilers can be found.  Usually overridden in the
+# environment.
 GNU_ROOT=		/usr
 
-$(__GNUC)PRIMARY_CC=	gcc10,$(GNUC_ROOT)/bin/gcc,gnu
-$(__SUNC)PRIMARY_CC=	studio12,$(SPRO_VROOT)/bin/cc,sun
-$(__GNUC)PRIMARY_CCC=	gcc10,$(GNUC_ROOT)/bin/g++,gnu
-$(__SUNC)PRIMARY_CCC=	studio12,$(SPRO_VROOT)/bin/CC,sun
+PRIMARY_CC=	gcc10,$(GNUC_ROOT)/bin/gcc,gnu
+PRIMARY_CCC=	gcc10,$(GNUC_ROOT)/bin/g++,gnu
 
 CW_CC_COMPILERS=	$(PRIMARY_CC:%=--primary %) $(SHADOW_CCS:%=--shadow %)
 CW_CCC_COMPILERS=	$(PRIMARY_CCC:%=--primary %) $(SHADOW_CCCS:%=--shadow %)

@@ -27,15 +27,9 @@
 # This is required for the ld.so.1 <--> rtld_db bootstraping
 # for debuggers.
 #
-# The issue with this is that gcc/devpro do not agree on the
-# name of the section this data should be placed in.  So -
-# we must have a mapfile for each.
-#
-# If you update this file - make sure you update
-# the matching file:
-#
-#	gcc mapfile:	rtld/common/mapfile-order-gcc
-#	devpro mapfile: rtld/common/mapfile-order-devpro
+# The issue with this is that different compilers may not agree on the name of
+# the section this data will be placed in.  So we must have a mapfile for
+# each, though at present GCC is the only compiler.
 #
 
 $mapfile_version 2

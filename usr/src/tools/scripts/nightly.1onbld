@@ -388,12 +388,6 @@ but want one hierarchy of packages.
 Set default flags to make; e.g., -k to build all targets regardless of errors.
 .RE
 .LP
-.B UT_NO_USAGE_TRACKING
-.RS 5
-Disables usage reporting by listed Devpro tools. Otherwise it sends mail
-to some Devpro machine every time the tools are used.
-.RE
-.LP
 .B BUILD_TOOLS
 .RS 5
 BUILD_TOOLS is the root of all tools including the compilers; e.g.,
@@ -404,14 +398,6 @@ BUILD_TOOLS is the root of all tools including the compilers; e.g.,
 .RS 5
 ONBLD_TOOLS is the root of all the tools that are part of SUNWonbld; e.g.,
 /ws/onnv-tools/onbld.  By default, it is derived from
-.BR BUILD_TOOLS .
-It is used by the makefile system, but not nightly.
-.RE
-.LP
-.B SPRO_ROOT
-.RS 5
-The gate-defined default location for the Sun compilers, e.g.
-/ws/onnv-tools/SUNWspro.  By default, it is derived from
 .BR BUILD_TOOLS .
 It is used by the makefile system, but not nightly.
 .RE

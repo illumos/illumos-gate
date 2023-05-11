@@ -24,9 +24,7 @@
 
 include ../Makefile.com
 
-# With compiling with gcc, the symbol table goes over
-# the limit for Kpic, so we add -KPIC here.
-$(__GNUC)sparc_C_PICFLAGS =	$(sparc_C_BIGPICFLAGS)
+sparc_C_PICFLAGS =	$(sparc_C_BIGPICFLAGS)
 
 DYNFLAGS +=	-R/usr/lib/smbsrv
 

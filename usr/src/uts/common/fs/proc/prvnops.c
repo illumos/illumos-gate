@@ -1770,6 +1770,21 @@ pr_read_xregs(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 		prunlock(pnp);
 		return (0);
 	}
+
+	/*
+	 * To read the extended register set we require that the thread be
+	 * stopped as this state is only valid in the kernel when it is. An
+	 * exception made if the target thread and the current thread are one
+	 * and the same. We won't stop you from doing something... weird.
+	 */
+	thread_lock(t);
+	if (t != curthread && !ISTOPPED(t) && !VSTOPPED(t) && !DSTOPPED(t)) {
+		thread_unlock(t);
+		prunlock(pnp);
+		return (EBUSY);
+	}
+	thread_unlock(t);
+
 	mutex_exit(&p->p_lock);
 	xreg = kmem_zalloc(size, KM_SLEEP);
 	mutex_enter(&p->p_lock);

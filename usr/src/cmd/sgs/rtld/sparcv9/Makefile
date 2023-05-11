@@ -58,9 +58,7 @@ BASEPLAT =	sparc
 
 include		$(SRC)/Makefile.master
 
-# We build sparc objects with cc by default
-MAPFILE-ORDER =		../common/mapfile-order-devpro
-$(__GNUC64)MAPFILE-ORDER =	../common/mapfile-order-gcc
+MAPFILE-ORDER =	../common/mapfile-order-gcc
 
 include		$(SRC)/cmd/sgs/rtld/Makefile.com
 include		$(SRC)/lib/Makefile.lib.64

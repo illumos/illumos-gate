@@ -28,14 +28,12 @@
 include		$(SRC)/Makefile.master
 
 
-$(__GNUC)FILES=	$(MACH)_gcc_map.noexeglobs
-$(__SUNC)FILES= $(MACH)_cc_map.noexeglobs
+FILES=	$(MACH)_gcc_map.noexeglobs
 
 NATIVE_LIBS	+= libc.so
 LDFLAGS		+= $(BDIRECT)
 
-$(__GNUC)$(BUILD64)FILES += $(MACH64)_gcc_map.noexeglobs
-$(__SUNC)$(BUILD64)FILES += $(MACH64)_cc_map.noexeglobs
+$(BUILD64)FILES += $(MACH64)_gcc_map.noexeglobs
 
 SYMS1=		syms.1
 SYMS2=		syms.2

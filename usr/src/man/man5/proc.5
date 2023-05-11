@@ -19,7 +19,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd May 17, 2020
+.Dd May 8, 2023
 .Dt PROC 5
 .Os
 .Sh NAME
@@ -1864,6 +1864,7 @@ If the lwp is not stopped, all register values are undefined.
 See also the
 .Sx PCSXREG
 control operation, below.
+Reading this data currently requires that the process be stopped.
 .Ss asrs
 This file exists only for 64-bit SPARC V9 processes.
 It contains an

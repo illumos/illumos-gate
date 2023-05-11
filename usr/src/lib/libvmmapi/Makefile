@@ -42,7 +42,7 @@ check: $(CHECKHDRS)
 _msg: $(MSGSUBDIRS)
 
 $(SUBDIRS): FRC
-	cd $@; pwd; $(MAKE) CW_NO_SHADOW=true __GNUC= $(TARGET)
+	cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 

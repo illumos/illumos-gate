@@ -27,8 +27,6 @@
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-$(__SUNC)CCNEEDED = $(CCEXTNEEDED)
-
 .KEEP_STATE:
 
 all:  $(LIBS)
