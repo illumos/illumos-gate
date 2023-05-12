@@ -44,16 +44,16 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 2019, Joyent, Inc.
+.\" Copyright 2023, Bill Sommerfeld
 .\"
 .TH MAKE 1 "March 8, 2019"
 .SH NAME
 make \- maintain, update, and regenerate related programs and files
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/make\fR [\fB-C\fR \fIdirectory\fR] [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
      [\fB-i\fR] [\fB-j\fR \fImaxjobs\fR] [\fB-k\fR] [\fB-m\fR \fI{serial | parallel}\fR]
-     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR]
+     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR] [\fB-w\fR]
      [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]...
      [\fImacro\fR = \fIvalue\fR...]
 .fi
@@ -61,7 +61,7 @@ make \- maintain, update, and regenerate related programs and files
 .nf
 \fB/usr/bin/dmake\fR [\fB-C\fR \fIdirectory\fR] [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
      [\fB-i\fR] [\fB-j\fR \fImaxjobs\fR] [\fB-k\fR]  [\fB-m\fR \fI{serial | parallel}\fR]
-     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR]
+     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR] [\fB-w\fR]
      [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]...
      [\fImacro\fR = \fIvalue\fR...]
 .fi
@@ -70,12 +70,11 @@ make \- maintain, update, and regenerate related programs and files
 .nf
 \fB/usr/xpg4/bin/make\fR [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR]
      [\fB-e\fR] [\fB-i\fR]  [\fB-j\fR \fImaxjobs\fR] [\fB-k\fR] [\fB-m\fR \fI{serial | parallel}\fR]
-     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR]
+     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR] [\fB-w\fR]
      [\fB-f\fR \fImakefile\fR]... [\fItarget\fR]... [\fImacro\fR = \fIvalue\fR...]
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBmake\fR utility executes a list of shell commands associated with each
 \fItarget\fR, typically to create or update a file of the same name.
 \fImakefile\fR contains entries that describe how to bring a target up to date
@@ -147,7 +146,6 @@ If there is no makefile entry for a \fItarget\fR, if no rule can be derived for
 building it, and if no file by that name is present, \fBmake\fR issues an error
 message and halts.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -414,8 +412,20 @@ Puts \fBmake\fR into SysV mode. Refer to \fBsysV-make\fR(1) for respective
 details.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fB-w\fR\fR
+.ad
+.RS 16n
+Prints "Entering directory" and "Leaving directory" messages including
+the name of the current working directory and the current make nesting
+level before starting and after completing a build.  Useful for
+finding the source file responsible for a compilation error within
+a hierarchy of makefiles.
+.RE
+
 .SH OPERANDS
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -438,17 +448,16 @@ this definition can still be overridden by conditional macro assignments.
 .RE
 
 .SH USAGE
-.LP
 The usage of \fBmake\fR is described below:
 .SS "Reading Makefiles and the Environment"
-.LP
-When \fBmake\fR first starts, it reads the \fBMAKEFLAGS\fR environment variable
-to obtain any of the following options specified present in its value: \fB-C\fR,
-\fB-d\fR, \fB-D\fR, \fB-e\fR, \fB-i\fR, \fB-k\fR, \fB-n\fR, \fB-p\fR, \fB-q\fR,
-\fB-r\fR, \fB-s\fR, \fB-S\fR, or \fB-t\fR. Due to the implementation of POSIX.2
-(see \fBPOSIX.2\fR(7), the \fBMAKEFLAGS\fR values contains a leading \fB\(mi\fR
-character. The \fBmake\fR utility then reads the command line for additional
-options, which also take effect.
+When \fBmake\fR first starts, it reads the \fBMAKEFLAGS\fR environment
+variable to obtain any of the following options specified present in
+its value: \fB-C\fR, \fB-d\fR, \fB-D\fR, \fB-e\fR, \fB-i\fR, \fB-k\fR,
+\fB-n\fR, \fB-p\fR, \fB-q\fR, \fB-r\fR, \fB-s\fR, \fB-S\fR, \fB-t\fR,
+or \fB-w\fR. Due to the implementation of POSIX.2 (see
+\fBPOSIX.2\fR(7), the \fBMAKEFLAGS\fR values contains a leading
+\fB\(mi\fR character. The \fBmake\fR utility then reads the command
+line for additional options, which also take effect.
 .sp
 .LP
 Next, \fBmake\fR reads in a default makefile that typically contains predefined
@@ -508,7 +517,6 @@ The macros \fBMAKEFLAGS\fR, \fBMAKE\fR, \fBSHELL\fR, \fBHOST_ARCH\fR,
 \fBHOST_MACH\fR, and \fBTARGET_MACH\fR are special cases. See Special-Purpose
 Macros below for details.
 .SS "Makefile Target Entries"
-.LP
 A target entry has the following format:
 .sp
 .in +2
@@ -545,7 +553,6 @@ metacharacters), or passes each command line to a Bourne shell for execution.
 The first \fInon-empty\fR line that does not begin with a \fBTAB\fR or \fB#\fR
 begins another target or macro definition.
 .SS "Special Characters"
-.LP
 Special characters are defined below.
 .SS "\fIGlobal\fR"
 .ne 2
@@ -803,7 +810,6 @@ None are passed to the shell.
 .RE
 
 .SS "Special-Function Targets"
-.LP
 When incorporated in a makefile, the following target names perform
 special-functions:
 .sp
@@ -1015,25 +1021,21 @@ before moving on to any dependency following it.
 .RE
 
 .SS "\fIClearing Special Targets\fR"
-.LP
 In this version of \fBmake\fR, you can clear the definition of the following
 special targets by supplying entries for them with no dependencies and no rule:
 .sp
 .LP
 \fB\&.DEFAULT, .SCCS_GET,  and .SUFFIXES\fR
 .SS "Command Dependencies"
-.LP
 When the \fB\&.KEEP_STATE:\fR target is effective, \fBmake\fR checks the
 command for building a target against the state file. If the command has
 changed since the last \fBmake\fR run, \fBmake\fR rebuilds the target.
 .SS "Hidden Dependencies"
-.LP
 When the \fB\&.KEEP_STATE:\fR target is effective, \fBmake\fR reads reports
 from \fBcpp\fR(1) and other compilation processors for any "hidden" files, such
 as \fB#include\fR files. If the target is out of date with respect to any of
 these files, \fBmake\fR rebuilds it.
 .SS "Macros"
-.LP
 Entries of the form
 .sp
 .in +2
@@ -1058,7 +1060,6 @@ brackets can be omitted in a reference to a macro with a single-character name.
 Macro references can contain references to other macros, in which case nested
 references are expanded first.
 .SS "\fISuffix Replacement Macro References\fR"
-.LP
 Substitutions within macros can be made as follows:
 .sp
 .in +2
@@ -1074,7 +1075,6 @@ definition, and \fIstring2\fR is the replacement suffix or word. Words in a
 macro value are separated by \fBSPACE\fR, \fBTAB\fR, and escaped \fBNEWLINE\fR
 characters.
 .SS "\fIPattern Replacement Macro References\fR"
-.LP
 Pattern matching replacements can also be applied to macros, with a reference
 of the form:
 .sp
@@ -1109,7 +1109,6 @@ dependency list of a pattern matching rule; the \fB%\fR characters are not
 evaluated independently. Also, any number of \fB%\fR metacharacters can appear
 after the equal-sign.
 .SS "\fIAppending to a Macro\fR"
-.LP
 Words can be appended to macro values as follows:
 .sp
 .in +2
@@ -1119,7 +1118,6 @@ Words can be appended to macro values as follows:
 .in -2
 
 .SS "Special-Purpose Macros"
-.LP
 When the \fBMAKEFLAGS\fR variable is present in the environment, \fBmake\fR
 takes options from it, in combination with options entered on the command line.
 \fBmake\fR retains this combined value as the \fBMAKEFLAGS\fR macro, and
@@ -1262,7 +1260,6 @@ prepended with \fB\(mi\fR\&.
 .RE
 
 .SS "Dynamic Macros"
-.LP
 There are several dynamically maintained macros that are useful as
 abbreviations within rules. They are shown here as references; if you were to
 define them, \fBmake\fR would simply override the definition.
@@ -1336,7 +1333,6 @@ braces). Thus, \fB$(@D)\fR refers to the directory part of the string \fB$@\fR;
 if there is no directory part, \fB\&.\fR is assigned. \fB$(@F)\fR refers to the
 filename part.
 .SS "Conditional Macro Definitions"
-.LP
 A macro definition of the form:
 .sp
 .in +2
@@ -1366,7 +1362,6 @@ the form:
 .in -2
 
 .SS "Predefined Macros"
-.LP
 \fBmake\fR supplies the macros shown in the table that follows for compilers
 and their options, host architectures, and other commands. Unless these macros
 are read in as environment variables, their values are not exported by
@@ -1481,7 +1476,6 @@ T}
 .TE
 
 .SS "Implicit Rules"
-.LP
 When a target has no entry in the makefile, \fBmake\fR attempts to determine
 its class (if any) and apply the rule for that class. An implicit rule
 describes how to build any target of a given class, from an associated
@@ -1491,7 +1485,6 @@ which such a target might be built. In addition to a predefined set of implicit
 rules, \fBmake\fR allows you to define your own, either by pattern, or by
 suffix.
 .SS "\fIPattern Matching Rules\fR"
-.LP
 A target entry of the form:
 .sp
 .in +2
@@ -1528,7 +1521,6 @@ form:
 .LP
 is a valid pattern matching rule.
 .SS "\fISuffix Rules\fR"
-.LP
 When no pattern matching rule applies, \fBmake\fR checks the target name to see
 if it ends with a suffix in the known suffixes list. If so, \fBmake\fR checks
 for any suffix rules, as well as a dependency file with same root and another
@@ -2147,7 +2139,6 @@ _
 a \fBmake.rules\fR file in the local directory that does not \fBinclude\fR that
 file.
 .SS "The Suffixes List"
-.LP
 The suffixes list is given as the list of dependencies for the
 \fB\&.SUFFIXES:\fR special-function target. The default list is contained in
 the \fBSUFFIXES\fR macro (See \fITable of Predefined Macros\fR for the standard
@@ -2171,7 +2162,6 @@ A tilde (\fB~\fR) indicates that if a dependency file with the indicated suffix
 (minus the ~) is under \fBSCCS\fR its most recent version should be retrieved,
 if necessary, before the target is processed.
 .SS "Library Maintenance"
-.LP
 A target name  of the form:
 .sp
 .in +2
@@ -2215,7 +2205,6 @@ A target name of the form:
 refers to the member of a randomized object library that defines the entry
 point named \fIsymbol\fR.
 .SS "Command Execution"
-.LP
 Command lines are executed one at a time, \fIeach by its own process or
 shell\fR. Shell commands, notably \fBcd\fR, are ineffectual across an unescaped
 \fBNEWLINE\fR in the makefile. A line is printed (after macro expansion) just
@@ -2235,7 +2224,6 @@ depends on the success of the former. This behavior can be overridden by
 starting the command line with a \fB\|-\fR, or by writing a shell script that
 returns a non-zero status only as it finds appropriate.
 .SS "Bourne Shell Constructs"
-.LP
 To use the Bourne shell \fBif\fR control structure for branching, use a command
 line of the form:
 .sp
@@ -2272,7 +2260,6 @@ do \fIcommand\fR; \e
 To refer to a shell variable, use a double-dollar-sign (\fB$$\fR). This
 prevents expansion of the dollar-sign by \fBmake\fR.
 .SS "Command Substitutions"
-.LP
 To incorporate the standard output of a shell command in a macro, use a
 definition of the form:
 .sp
@@ -2311,12 +2298,10 @@ In contrast to commands in rules, the command is not subject for macro
 substitution; therefore, a dollar sign (\fB$\fR) need not be replaced with a
 double dollar sign (\fB$$\fR).
 .SS "\fISignals\fR"
-.LP
 \fBINT\fR, \fBSIGTERM\fR, and \fBQUIT\fR signals received from the keyboard
 halt \fBmake\fR and remove the target file being processed unless that target
 is in the dependency list for \fB\&.PRECIOUS:\fR.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDefining dependencies
 .sp
 .LP
@@ -2352,7 +2337,6 @@ a.o  b.o:  incl.h
 .in -2
 
 .SH ENVIRONMENT VARIABLES
-.LP
 See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBmake\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
@@ -2484,7 +2468,6 @@ description for files  with a component named SCCS.
 .RE
 
 .SH EXIT STATUS
-.LP
 When the \fB-q\fR option is specified, the \fBmake\fR utility exits with one of
 the following values:
 .sp
@@ -2610,7 +2593,6 @@ state file in the local directory
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/xpg4/bin/make"
 .TS
@@ -2625,7 +2607,6 @@ Standard	See \fBstandards\fR(7).
 .TE
 
 .SH SEE ALSO
-.LP
 .BR ar (1),
 .BR arch (1),
 .BR cd (1),
@@ -2759,7 +2740,6 @@ cannot simultaneously satisfy both dependency relationships, it is conflicted.
 .RE
 
 .SH BUGS
-.LP
 Some commands return nonzero status inappropriately; to overcome this
 difficulty, prefix the offending command line in the rule with a \fB\(mi\fR\&.
 .sp
