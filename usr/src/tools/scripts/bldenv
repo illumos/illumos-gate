@@ -197,6 +197,9 @@ unset \
 	ARCH \
 	CLASSPATH
 
+# set variables we want environment file to be able to override
+MAKEFLAGS=e
+
 #
 # Setup environment variables
 #
@@ -371,7 +374,6 @@ fi
 
 ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
 ENVCPPFLAGS1="-I$ROOT/usr/include"
-MAKEFLAGS=e
 
 export \
         ENVLDLIBS1 \

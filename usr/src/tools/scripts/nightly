@@ -193,6 +193,7 @@ function build {
 	echo "\n==== Build errors ($LABEL) ====\n" >> $mail_msg_file
 	egrep ":" $SRC/${INSTALLOG}.out |
 	    egrep -e "(^${MAKE}:|[ 	]error[: 	\n]|ld: guidance:)" | \
+	    egrep -v ": (Entering|Leaving) directory " | \
 	    egrep -v "Ignoring unknown host" | \
 	    egrep -v "cc .* -o error " | \
 	    egrep -v "warning" | tee $TMPDIR/build_errs${SUFFIX} \
@@ -280,6 +281,7 @@ function build {
 			| egrep -v '::' \
 			| egrep -v '^\+' \
 			| egrep -v 'svccfg-native -s svc:/' \
+			| egrep -v ": (Entering|Leaving) directory " \
 			| sort | uniq >$SRC/${NOISE}.out
 		if [ ! -f $SRC/${NOISE}.ref ]; then
 			cp $SRC/${NOISE}.out $SRC/${NOISE}.ref
@@ -333,6 +335,7 @@ function build {
 			egrep "${MAKE}|ERROR|WARNING" $SRC/pkg/${INSTALLOG}.out | \
 				grep ':' | \
 				grep -v PSTAMP | \
+				egrep -v "${MAKE}: (Entering|Leaving) directory " | \
 				egrep -v "Ignoring unknown host" | \
 				tee $TMPDIR/package >> $mail_msg_file
 			if [[ -s $TMPDIR/package ]]; then
@@ -371,6 +374,7 @@ function bootstrap_tools {
 
 	egrep ":" ${TOOLS}/$INSTALLOG.out |
 	    egrep -e "(${MAKE}:|[ 	]error[: 	\n])" | \
+	    egrep -v ": (Entering|Leaving) directory " | \
 	    egrep -v warning | tee $TMPDIR/bootstrap_errors >> $mail_msg_file
 
 	[[ -s $TMPDIR/bootstrap_errors ]] && return 1
@@ -401,6 +405,7 @@ function build_tools {
 
 	egrep ":" ${TOOLS}/${INSTALLOG}.out |
 		egrep -e "(${MAKE}:|[ 	]error[: 	\n])" | \
+		egrep -v ": (Entering|Leaving) directory " | \
 		egrep -v "Ignoring unknown host" | \
 		egrep -v warning | tee $TMPDIR/tools_errors >> $mail_msg_file
 
@@ -1331,6 +1336,7 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 	$MAKE -ek clobber 2>&1 | tee -a $SRC/clobber-${MACH}.out >> $LOGFILE
 	echo "\n==== Make clobber ERRORS ====\n" >> $mail_msg_file
 	grep "$MAKE:" $SRC/clobber-${MACH}.out |
+		egrep -v ": (Entering|Leaving) directory " | \
 		egrep -v "Ignoring unknown host" | \
 		tee $TMPDIR/clobber_errs >> $mail_msg_file
 
@@ -1347,6 +1353,7 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 		echo "\n==== Make tools clobber ERRORS ====\n" \
 			>> $mail_msg_file
 		grep "$MAKE:" ${TOOLS}/clobber-${MACH}.out \
+			| egrep -v ": (Entering|Leaving) directory " \
 			>> $mail_msg_file
 		if (( $? == 0 )); then
 			build_extras_ok=n
@@ -1597,7 +1604,8 @@ fi
 	touch $TMPDIR/nocompiler
   done
   echo
-) | tee -a $build_environ_file >> $LOGFILE
+) | egrep -v "${MAKE}: (Entering|Leaving) directory " \
+    | tee -a $build_environ_file >> $LOGFILE
 
 if [ -f $TMPDIR/nocompiler ]; then
 	rm -f $TMPDIR/nocompiler
@@ -1679,6 +1687,7 @@ if [ "$L_FLAG" != "y" -a "$build_ok" = y ]; then
 		for d in "$abspkg"; do
 			( cd $d/pkg ; $MAKE -e pkglint ) | \
 			    tee -a $LOGFILE | \
+			    egrep -v ": (Entering|Leaving) directory " | \
 			    egrep -v 'Lint engine setup|Starting lint run'
 		done 2>&1 | tee $TMPDIR/pkglint_noise >> $mail_msg_file
 		if [[ -s $TMPDIR/pkglint_noise ]]; then
@@ -1732,6 +1741,7 @@ if [ "$build_ok" = "y" ]; then
 		echo "\n==== Validating manifests against proto area ====\n" \
 		    >> $mail_msg_file
 		( cd $SRC/pkg ; $MAKE -e protocmp ROOT="$checkroot" ) | \
+		    egrep -v ": (Entering|Leaving) directory " | \
 		    tee $TMPDIR/protocmp_noise >> $mail_msg_file
 		if [[ -s $TMPDIR/protocmp_noise ]]; then
 			build_extras_ok=n
@@ -1948,6 +1958,7 @@ if [ "$i_CMD_LINE_FLAG" = "n" -a "$C_FLAG" = "y" ]; then
 	echo "\n==== cstyle/hdrchk errors ====\n" >> $mail_msg_file
 
 	grep ":" $SRC/check-${MACH}.out |
+		egrep -v ": (Entering|Leaving) directory " | \
 		egrep -v "Ignoring unknown host" | \
 		sort | uniq | tee $TMPDIR/check_errors >> $mail_msg_file
 
@@ -2005,7 +2016,9 @@ if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
 
 	if [ -n "$abspkg" ]; then
 		for d in "$abspkg"; do
-			( cd $d/pkg ; $MAKE -e pmodes ) >> $mail_msg_file
+			( cd $d/pkg ; $MAKE -e pmodes ) | \
+			egrep -v ": (Entering|Leaving) directory " \
+			>> $mail_msg_file
 		done
 	fi
 fi
