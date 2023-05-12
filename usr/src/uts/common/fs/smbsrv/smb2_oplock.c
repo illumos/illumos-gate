@@ -354,14 +354,15 @@ smb2_oplock_send_break(smb_request_t *sr)
 		/*
 		 * We're expecting an ACK.  Wait in this thread
 		 * so we can log clients that don't respond.
+		 * Note: this can also fail for other reasons
+		 * such as client disconnect or server shutdown.
 		 */
 		status = smb_oplock_wait_ack(sr, NewLevel);
 		if (status == 0)
 			return;
 
-		cmn_err(CE_NOTE, "clnt %s oplock break timeout",
-		    sr->session->ip_addr_str);
-		DTRACE_PROBE1(ack_timeout, smb_request_t *, sr);
+		DTRACE_PROBE2(wait__ack__failed, smb_request_t *, sr,
+		    uint32_t, status);
 
 		/*
 		 * Will do local ack below.  Note, after timeout,
