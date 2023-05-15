@@ -22,6 +22,7 @@
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright (c) 2019, Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2023 Bill Sommerfeld
 #
 
 from __future__ import print_function
@@ -223,7 +224,14 @@ def gen_links(root, parent, paths, exclude):
 def comchk(root, parent, flist, output):
     output.write("Comments:\n")
 
-    return Comments.comchk(git_comments(parent), check_db=True,
+    comments = git_comments(parent)
+    if len(comments) > 2:
+        if re.match('^Change-Id: I[0-9a-f]+', comments[-1]):
+            if comments[-2] == '':
+                print('Note: Gerrit Change Id present in comments')
+                comments = comments[:-2]
+
+    return Comments.comchk(comments, check_db=True,
                            output=output)
 
 

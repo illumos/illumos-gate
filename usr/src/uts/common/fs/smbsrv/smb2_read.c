@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2015-2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -42,7 +42,7 @@ smb2_read(smb_request_t *sr)
 	uint32_t Remaining;
 	uint16_t ChanInfoOffset;
 	uint16_t ChanInfoLength;
-	uint32_t XferCount;
+	uint32_t XferCount = 0;
 	uint32_t status;
 	int rc = 0;
 	boolean_t unbuffered = B_FALSE;
@@ -89,12 +89,19 @@ smb2_read(smb_request_t *sr)
 
 	DTRACE_SMB2_START(op__Read, smb_request_t *, sr); /* arg.rw */
 
-	if (status)
-		goto errout; /* Bad FID */
+	if (status != 0)
+		goto done; /* Bad FID */
+
+	/*
+	 * Short-circuit zero-byte read, otherwise could panic
+	 * setting up buffers in smb_mbuf_allocate etc.
+	 */
+	if (Length == 0)
+		goto done;
 
 	if (Length > smb2_max_rwsize) {
 		status = NT_STATUS_INVALID_PARAMETER;
-		goto errout;
+		goto done;
 	}
 	if (MinCount > Length)
 		MinCount = Length;
@@ -173,7 +180,7 @@ smb2_read(smb_request_t *sr)
 	 * the returned data so that if m was allocated,
 	 * it will be free'd via sr->raw_data cleanup.
 	 */
-errout:
+done:
 	sr->smb2_status = status;
 	DTRACE_SMB2_DONE(op__Read, smb_request_t *, sr); /* arg.rw */
 	if (status) {
