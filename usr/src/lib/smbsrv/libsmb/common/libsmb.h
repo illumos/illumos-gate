@@ -902,7 +902,7 @@ uint32_t smb_sd_write(char *path, smb_sd_t *, uint32_t);
 uint32_t smb_sd_fromfs(smb_fssd_t *, smb_sd_t *);
 
 /* Kernel Module Interface */
-int smb_kmod_bind(void);
+int smb_kmod_bind(boolean_t);
 boolean_t smb_kmod_isbound(void);
 int smb_kmod_setcfg(smb_kmod_cfg_t *);
 int smb_kmod_setgmtoff(int32_t);

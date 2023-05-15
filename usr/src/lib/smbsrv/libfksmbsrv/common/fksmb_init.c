@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015-2023 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -54,7 +55,6 @@ int	smb_maxbufsize = SMB_NT_MAXBUF;
 int	smb_flush_required = 1;
 int	smb_dirsymlink_enable = 1;
 int	smb_sign_debug = 0;
-int	smb_shortnames = 1;
 uint_t	smb_audit_flags =
 #ifdef	DEBUG
     SMB_AUDIT_NODE;
@@ -77,7 +77,7 @@ int smb_allow_advisory_locks = 1;	/* See smb_vops.c */
  * Maximum number of simultaneous authentication, share mapping, pipe open
  * requests to be processed.
  */
-int	smb_ssetup_threshold = 256;
+int	smb_ssetup_threshold = SMB_AUTHSVC_MAXTHREAD;
 int	smb_tcon_threshold = 1024;
 int	smb_opipe_threshold = 1024;
 int	smb_logoff_threshold = 1024;
@@ -91,24 +91,16 @@ int	smb_tcon_timeout = (30 * 1000);
 int	smb_opipe_timeout = (30 * 1000);
 int	smb_logoff_timeout = (600 * 1000);
 
-int	smb_threshold_debug = 0;
-
 /*
- * Thread priorities used in smbsrv.  Our threads spend most of their time
- * blocked on various conditions.  However, if the system gets heavy load,
- * the scheduler has to choose an order to run these.  We want the order:
- * (a) timers, (b) notifications, (c) workers, (d) receivers (and etc.)
- * where notifications are oplock and change notify work.  Aside from this
- * relative ordering, smbsrv threads should run with a priority close to
- * that of normal user-space threads (thus minclsyspri below), just like
- * NFS and other "file service" kinds of processing.
+ * Thread priorities used in smbsrv -- actually unused here.
+ * See $UTS/common/fs/smbsrv/smb_init.c
  */
 int smbsrv_base_pri	= MINCLSYSPRI;
 int smbsrv_listen_pri	= MINCLSYSPRI;
 int smbsrv_receive_pri	= MINCLSYSPRI;
-int smbsrv_worker_pri	= MINCLSYSPRI + 1;
-int smbsrv_notify_pri	= MINCLSYSPRI + 2;
-int smbsrv_timer_pri	= MINCLSYSPRI + 5;
+int smbsrv_worker_pri	= MINCLSYSPRI;
+int smbsrv_notify_pri	= MINCLSYSPRI;
+int smbsrv_timer_pri	= MINCLSYSPRI;
 
 /*
  * These are the (open,close,ioctl) entry points into this
@@ -136,7 +128,7 @@ fksmbsrv_drv_open(void)
 		g_init_done = 1;
 	}
 
-	rc = smb_server_create();
+	rc = smb_server_create(0);
 	return (rc);
 }
 
@@ -161,57 +153,74 @@ fksmbsrv_drv_close(void)
 /*
  * This is the primary entry point into this library, called by
  * fksmbd (user-level debug version of smbsrv).
+ *
+ * The code here is a reduced version of: smb_drv_ioctl
+ * from $UTS/common/fs/smbsrv/smb_init.c
  */
 int
 fksmbsrv_drv_ioctl(int cmd, void *varg)
 {
+	smb_server_t	*sv;
 	smb_ioc_t	*ioc = varg;
 	int		rc = 0;
 
+	/* Unlike smb_drv_ioctl(), no copyin/copyout here. */
+
+	rc = smb_server_lookup(&sv);
+	if (rc != 0)
+		return (rc);
+
+	/* No access control checks. */
+
 	switch (cmd) {
 	case SMB_IOC_CONFIG:
-		rc = smb_server_configure(&ioc->ioc_cfg);
+		rc = smb_server_configure(sv, &ioc->ioc_cfg);
 		break;
 	case SMB_IOC_START:
-		rc = smb_server_start(&ioc->ioc_start);
+		rc = smb_server_start(sv, &ioc->ioc_start);
 		break;
 	case SMB_IOC_STOP:
-		rc = smb_server_stop();
+		rc = smb_server_stop(sv);
 		break;
 	case SMB_IOC_EVENT:
-		rc = smb_server_notify_event(&ioc->ioc_event);
+		rc = smb_server_notify_event(sv, &ioc->ioc_event);
 		break;
 	case SMB_IOC_GMTOFF:
-		rc = smb_server_set_gmtoff(&ioc->ioc_gmt);
+		rc = smb_server_set_gmtoff(sv, &ioc->ioc_gmt);
 		break;
 	case SMB_IOC_SHARE:
-		rc = smb_kshare_export_list(&ioc->ioc_share);
+		rc = smb_kshare_export_list(sv, &ioc->ioc_share);
 		break;
 	case SMB_IOC_UNSHARE:
-		rc = smb_kshare_unexport_list(&ioc->ioc_share);
+		rc = smb_kshare_unexport_list(sv, &ioc->ioc_share);
 		break;
 	case SMB_IOC_SHAREINFO:
-		rc = smb_kshare_info(&ioc->ioc_shareinfo);
+		rc = smb_kshare_info(sv, &ioc->ioc_shareinfo);
+		break;
+	case SMB_IOC_SHAREACCESS:
+		rc = smb_kshare_access(sv, &ioc->ioc_shareaccess);
 		break;
 	case SMB_IOC_NUMOPEN:
-		rc = smb_server_numopen(&ioc->ioc_opennum);
+		rc = smb_server_numopen(sv, &ioc->ioc_opennum);
 		break;
 	case SMB_IOC_SVCENUM:
-		rc = smb_server_enum(&ioc->ioc_svcenum);
+		rc = smb_server_enum(sv, &ioc->ioc_svcenum);
 		break;
 	case SMB_IOC_SESSION_CLOSE:
-		rc = smb_server_session_close(&ioc->ioc_session);
+		rc = smb_server_session_close(sv, &ioc->ioc_session);
 		break;
 	case SMB_IOC_FILE_CLOSE:
-		rc = smb_server_file_close(&ioc->ioc_fileid);
+		rc = smb_server_file_close(sv, &ioc->ioc_fileid);
 		break;
 	case SMB_IOC_SPOOLDOC:
-		rc = smb_server_spooldoc(&ioc->ioc_spooldoc);
+		rc = smb_server_spooldoc(sv, &ioc->ioc_spooldoc);
 		break;
 	default:
-		rc = ENOTTY;
+		rc = SET_ERROR(ENOTTY);
 		break;
 	}
+
+	smb_server_release(sv);
 
 	return (rc);
 }

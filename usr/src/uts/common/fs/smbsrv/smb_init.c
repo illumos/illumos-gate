@@ -31,6 +31,7 @@
 #include <sys/modctl.h>
 #include <sys/cred.h>
 #include <sys/disp.h>
+#include <sys/id_space.h>
 #include <sys/ioccom.h>
 #include <sys/policy.h>
 #include <sys/cmn_err.h>
@@ -42,11 +43,15 @@
 #endif	/* _FAKE_KERNEL */
 
 static int smb_drv_open(dev_t *, int, int, cred_t *);
+static int smb_drv_open_ctl(dev_t *, int, int, cred_t *);
+static int smb_drv_open_lib(dev_t *, int, int, cred_t *);
 static int smb_drv_close(dev_t, int, int, cred_t *);
 static int smb_drv_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int smb_drv_attach(dev_info_t *, ddi_attach_cmd_t);
 static int smb_drv_detach(dev_info_t *, ddi_detach_cmd_t);
 static int smb_drv_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
+
+
 
 /*
  * *****************************************************************************
@@ -171,6 +176,7 @@ static struct modlinkage modlinkage = {
 };
 
 static dev_info_t *smb_drv_dip = NULL;
+static id_space_t *smb_drv_minors = NULL;
 
 /*
  * ****************************************************************************
@@ -224,58 +230,119 @@ _fini(void)
 static int
 smb_drv_open(dev_t *devp, int flag, int otyp, cred_t *cr)
 {
-	zoneid_t zid;
+	int rc;
+	minor_t m = getminor(*devp);
+
+	/* See ddi_create_minor_node below */
+	switch (m) {
+	case 0: /* smbsrv (smbd only) */
+		rc = smb_drv_open_ctl(devp, flag, otyp, cr);
+		break;
+	case 1: /* smbsrv1 (lib access) */
+		rc = smb_drv_open_lib(devp, flag, otyp, cr);
+		break;
+	default:
+		rc = ENXIO;
+		break;
+	}
+	return (rc);
+}
+
+/*
+ * The smbsrvctl device is exclusively for smbd.
+ * On open, this creates an smb_server_t instance.
+ * Always exclusive open here.
+ */
+static int
+smb_drv_open_ctl(dev_t *devp, int flag, int otyp, cred_t *cr)
+{
+	dev_t clone;
+	minor_t mi;
+	int rc;
 
 	/*
 	 * Check caller's privileges.
 	 */
 	if (secpolicy_smb(cr) != 0)
-		return (EPERM);
+		return (SET_ERROR(EPERM));
 
-	/*
-	 * We need a unique minor per zone otherwise an smbd in any other
-	 * zone will keep this minor open and we won't get a close call.
-	 * The zone ID is good enough as a minor number.
-	 */
-	zid = crgetzoneid(cr);
-	if (zid < 0)
-		return (ENODEV);
-	*devp = makedevice(getmajor(*devp), zid);
+	mi = id_allocff(smb_drv_minors);
+	clone = makedevice(getmajor(*devp), mi);
 
 	/*
 	 * Start SMB service state machine
+	 * Note: sets sv->sv_dev = clone
 	 */
-	return (smb_server_create());
+	rc = smb_server_create(clone);
+	if (rc == 0) {
+		*devp = clone;
+	} else {
+		/* Open fails, eg EBUSY */
+		id_free(smb_drv_minors, mi);
+	}
+
+	return (rc);
 }
 
+/*
+ * The smbsrv device is for library access to smbsrv state.
+ * Multiple open instances are allowed (clone-open).
+ */
+static int
+smb_drv_open_lib(dev_t *devp, int flag, int otyp, cred_t *cr)
+{
+	minor_t mi;
+
+	mi = id_allocff(smb_drv_minors);
+	*devp = makedevice(getmajor(*devp), mi);
+
+	return (0);
+}
+
+/*
+ * Close on unit zero (detected as: sv->sv_dev == dev)
+ * destroys the smb_server_t instance.
+ */
+/*
+ * The smbd process keeps the control device open for the life of
+ * smbd (service process).  We know the control device is closing
+ * when the device passed to close matches the server sv_dev.
+ * When the control device closes, destroy the kernel smb_server_t
+ */
 /* ARGSUSED */
 static int
 smb_drv_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	smb_server_t	*sv;
-	int		rc;
 
-	rc = smb_server_lookup(&sv);
-	if (rc == 0)
-		rc = smb_server_delete(sv);
+	if (smb_server_lookup(&sv) == 0) {
+		if (sv->sv_dev == dev) {
+			/* Note releases the ref on sv. */
+			(void) smb_server_delete(sv);
+		} else {
+			smb_server_release(sv);
+		}
+	}
+	id_free(smb_drv_minors, getminor(dev));
 
-	return (rc);
+	return (0);
 }
 
 /* ARGSUSED */
 static int
-smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
+smb_drv_ioctl(dev_t dev, int cmd, intptr_t argp, int flags, cred_t *cred,
     int *retval)
 {
-	smb_ioc_t	*ioc;
 	smb_ioc_header_t ioc_hdr;
+	smb_ioc_t	*ioc;
+	smb_server_t	*sv = NULL;
 	uint32_t	crc;
 	boolean_t	copyout = B_FALSE;
 	int		rc = 0;
 	size_t		alloclen;
 
 	if (ddi_copyin((void *)argp, &ioc_hdr, sizeof (ioc_hdr), flags))
-		return (EFAULT);
+		return (SET_ERROR(EFAULT));
 
 	/*
 	 * Check version and length.
@@ -289,12 +356,12 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 	if (ioc_hdr.version != SMB_IOC_VERSION ||
 	    ioc_hdr.len < sizeof (ioc_hdr) ||
 	    ioc_hdr.len > (sizeof (*ioc) + SMB_IOC_DATA_SIZE))
-		return (EINVAL);
+		return (SET_ERROR(EINVAL));
 
 	crc = ioc_hdr.crc;
 	ioc_hdr.crc = 0;
 	if (smb_crc_gen((uint8_t *)&ioc_hdr, sizeof (ioc_hdr)) != crc)
-		return (EINVAL);
+		return (SET_ERROR(EINVAL));
 
 	/*
 	 * Note that smb_ioc_t is a union, and callers set ioc_hdr.len
@@ -307,71 +374,117 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 	alloclen = MAX(ioc_hdr.len, sizeof (*ioc));
 	ioc = kmem_zalloc(alloclen, KM_SLEEP);
 	if (ddi_copyin((void *)argp, ioc, ioc_hdr.len, flags)) {
-		kmem_free(ioc, alloclen);
-		return (EFAULT);
+		rc = SET_ERROR(EFAULT);
+		goto out;
 	}
 
 	/* Don't allow the request size to change mid-ioctl */
 	if (ioc_hdr.len != ioc->ioc_hdr.len) {
-		kmem_free(ioc, alloclen);
-		return (EINVAL);
+		rc = SET_ERROR(EINVAL);
+		goto out;
 	}
 
+	rc = smb_server_lookup(&sv);
+	if (rc != 0) {
+		sv = NULL;
+		goto out;
+	}
+
+	/*
+	 * Access control by category of ioctl codes, based on
+	 * which device was opened, and privilege checks.
+	 */
+	switch (cmd) {
+	case SMB_IOC_NUMOPEN:
+	case SMB_IOC_SVCENUM:
+		/*
+		 * Non-modifying ops. no special priv.
+		 * beyond dev open permissions.
+		 */
+		break;
+
+	case SMB_IOC_FILE_CLOSE:
+	case SMB_IOC_SESSION_CLOSE:
+		/*
+		 * Modifying ops. Require privilege
+		 * (chose one smbd normally has)
+		 */
+		if ((rc = secpolicy_basic_proc(cred)) != 0)
+			goto out;
+		break;
+	default:
+		/*
+		 * The rest are only allowed on the control device.
+		 * Note: secpolicy_smb checked in open.
+		 */
+		if (sv->sv_dev != dev) {
+			rc = SET_ERROR(EPERM);
+			goto out;
+		}
+		break;
+	}
+
+	/*
+	 * See similar in libfksmbrv fksmbsrv_drv_ioctl()
+	 */
 	switch (cmd) {
 	case SMB_IOC_CONFIG:
-		rc = smb_server_configure(&ioc->ioc_cfg);
+		rc = smb_server_configure(sv, &ioc->ioc_cfg);
 		break;
 	case SMB_IOC_START:
-		rc = smb_server_start(&ioc->ioc_start);
+		rc = smb_server_start(sv, &ioc->ioc_start);
 		break;
 	case SMB_IOC_STOP:
-		rc = smb_server_stop();
+		rc = smb_server_stop(sv);
 		break;
 	case SMB_IOC_EVENT:
-		rc = smb_server_notify_event(&ioc->ioc_event);
+		rc = smb_server_notify_event(sv, &ioc->ioc_event);
 		break;
 	case SMB_IOC_GMTOFF:
-		rc = smb_server_set_gmtoff(&ioc->ioc_gmt);
+		rc = smb_server_set_gmtoff(sv, &ioc->ioc_gmt);
 		break;
 	case SMB_IOC_SHARE:
-		rc = smb_kshare_export_list(&ioc->ioc_share);
+		rc = smb_kshare_export_list(sv, &ioc->ioc_share);
 		break;
 	case SMB_IOC_UNSHARE:
-		rc = smb_kshare_unexport_list(&ioc->ioc_share);
+		rc = smb_kshare_unexport_list(sv, &ioc->ioc_share);
 		break;
 	case SMB_IOC_SHAREINFO:
-		rc = smb_kshare_info(&ioc->ioc_shareinfo);
+		rc = smb_kshare_info(sv, &ioc->ioc_shareinfo);
 		copyout = B_TRUE;
 		break;
 	case SMB_IOC_SHAREACCESS:
-		rc = smb_kshare_access(&ioc->ioc_shareaccess);
+		rc = smb_kshare_access(sv, &ioc->ioc_shareaccess);
 		break;
 	case SMB_IOC_NUMOPEN:
-		rc = smb_server_numopen(&ioc->ioc_opennum);
+		rc = smb_server_numopen(sv, &ioc->ioc_opennum);
 		copyout = B_TRUE;
 		break;
 	case SMB_IOC_SVCENUM:
-		rc = smb_server_enum(&ioc->ioc_svcenum);
+		rc = smb_server_enum(sv, &ioc->ioc_svcenum);
 		copyout = B_TRUE;
 		break;
 	case SMB_IOC_SESSION_CLOSE:
-		rc = smb_server_session_close(&ioc->ioc_session);
+		rc = smb_server_session_close(sv, &ioc->ioc_session);
 		break;
 	case SMB_IOC_FILE_CLOSE:
-		rc = smb_server_file_close(&ioc->ioc_fileid);
+		rc = smb_server_file_close(sv, &ioc->ioc_fileid);
 		break;
 	case SMB_IOC_SPOOLDOC:
-		rc = smb_server_spooldoc(&ioc->ioc_spooldoc);
+		rc = smb_server_spooldoc(sv, &ioc->ioc_spooldoc);
 		copyout = B_TRUE;
 		break;
 	default:
-		rc = ENOTTY;
+		rc = SET_ERROR(ENOTTY);
 		break;
 	}
 	if ((rc == 0) && copyout) {
 		if (ddi_copyout(ioc, (void *)argp, ioc_hdr.len, flags))
-			rc = EFAULT;
+			rc = SET_ERROR(EFAULT);
 	}
+out:
+	if (sv != NULL)
+		smb_server_release(sv);
 	kmem_free(ioc, alloclen);
 	return (rc);
 }
@@ -384,33 +497,50 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 static int
 smb_drv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	if (cmd == DDI_ATTACH) {
-		/* we only allow instance 0 to attach */
-		if (ddi_get_instance(dip) == 0) {
-			/* create the minor node */
-			if (ddi_create_minor_node(dip, "smbsrv", S_IFCHR, 0,
-			    DDI_PSEUDO, 0) == DDI_SUCCESS) {
-				smb_drv_dip = dip;
-				return (DDI_SUCCESS);
-			} else {
-				cmn_err(CE_WARN, "smb_drv_attach:"
-				    " failed creating minor node");
-			}
-		}
+	if (cmd != DDI_ATTACH)
+		return (DDI_FAILURE);
+
+	/* we only allow instance 0 to attach */
+	if (ddi_get_instance(dip) != 0)
+		return (DDI_FAILURE);
+
+	/* Create the minor nodes.  See smb_drv_open */
+	if (ddi_create_minor_node(dip, "smbsrv", S_IFCHR, 0,
+	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "smb_drv_attach:"
+		    " failed creating minor node 0");
+		return (DDI_FAILURE);
 	}
-	return (DDI_FAILURE);
+	if (ddi_create_minor_node(dip, "smbsrv1", S_IFCHR, 1,
+	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "smb_drv_attach:"
+		    " failed creating minor node 1");
+		ddi_remove_minor_node(dip, NULL);
+		return (DDI_FAILURE);
+	}
+
+	/* Reserved: control dev = 0, library dev = 1 */
+	smb_drv_minors = id_space_create("smbsrv drv minors", 2, INT32_MAX);
+	smb_drv_dip = dip;
+
+	return (DDI_SUCCESS);
 }
 
 static int
 smb_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	if (cmd == DDI_DETACH) {
-		ASSERT(dip == smb_drv_dip);
-		ddi_remove_minor_node(dip, NULL);
-		smb_drv_dip = NULL;
-		return (DDI_SUCCESS);
-	}
-	return (DDI_FAILURE);
+	if (cmd != DDI_DETACH)
+		return (DDI_FAILURE);
+
+	ASSERT(dip == smb_drv_dip);
+	smb_drv_dip = NULL;
+
+	id_space_destroy(smb_drv_minors);
+	smb_drv_minors = NULL;
+
+	ddi_remove_minor_node(dip, NULL);
+
+	return (DDI_SUCCESS);
 }
 
 /* ARGSUSED */
