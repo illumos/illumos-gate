@@ -46,6 +46,7 @@ uint32_t pciehpc_reg_get32(pcie_hp_ctrl_t *ctrl_p, uint_t off);
 void pciehpc_reg_put8(pcie_hp_ctrl_t *ctrl_p, uint_t off, uint8_t val);
 void pciehpc_reg_put16(pcie_hp_ctrl_t *ctrl_p, uint_t off, uint16_t val);
 void pciehpc_reg_put32(pcie_hp_ctrl_t *ctrl_p, uint_t off, uint32_t val);
+void pciehpc_led_init(pcie_hp_slot_t *slot_p);
 #if	defined(__i386) || defined(__amd64)
 extern void pciehpc_update_ops(pcie_hp_ctrl_t *ctrl_p);
 #endif	/* defined(__i386) || defined(__amd64) */

@@ -90,8 +90,9 @@ pcie_led_state_text(pcie_hp_led_state_t state)
 	case PCIE_HP_LED_OFF:
 		return (PCIEHPC_PROP_VALUE_OFF);
 	case PCIE_HP_LED_BLINK:
-	default:
 		return (PCIEHPC_PROP_VALUE_BLINK);
+	default:
+		return (PCIEHPC_PROP_VALUE_UNKNOWN);
 	}
 }
 
