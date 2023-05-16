@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -157,7 +157,7 @@ i_ipadm_create_linklocal(ipadm_handle_t iph, ipadm_addrobj_t addr)
 	 * Create a logical interface if needed.
 	 */
 retry:
-	status = i_ipadm_do_addif(iph, addr);
+	status = i_ipadm_do_addif(iph, addr, &addif);
 	if (status != IPADM_SUCCESS)
 		return (status);
 	if (!(iph->iph_flags & IPH_INIT)) {

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef _SMBD_H
@@ -39,6 +40,7 @@ extern "C" {
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 
+void smbd_nomem(void) __NORETURN;
 void smbd_report(const char *fmt, ...);
 int smbd_pipesvc_start(void);
 void smbd_pipesvc_stop(void);

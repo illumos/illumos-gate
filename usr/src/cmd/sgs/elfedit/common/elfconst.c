@@ -296,6 +296,9 @@ libconv_fill_iter(sym_table_ent_t *sym, conv_iter_osabi_t osabi, Half mach,
 		(void) (* sym->ste_conv_func.osabi_mach)(osabi, mach,
 		    CONV_FMT_ALT_NF, func, uvalue);
 		break;
+
+	case STE_STATIC:
+		break;
 	}
 }
 
@@ -468,6 +471,10 @@ invalidate_libconv_strings(conv_iter_osabi_t *osabi, Half *mach)
 			continue;
 
 		switch (sym->ste_type) {
+		case STE_STATIC:
+		case STE_LC:
+			break;
+
 		case STE_LC_OS:
 			if (osabi_change)
 				sym->ste_arr = NULL;

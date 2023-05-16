@@ -36,6 +36,8 @@
 
 #define	REGA_DIVIDER_32K	0x20
 #define	REGA_DIVIDER_DIS	0x70
+#define	REGA_PERIOD_512HZ	0x07
+#define	REGA_PERIOD_128HZ	0x09
 
 #define	REGB_HALT		0x80
 #define	REGB_DATA_BIN		0x04
@@ -74,7 +76,7 @@ rtc_write(uint8_t off, uint8_t data)
 	return (outb(IOP_RTC_DATA, data));
 }
 
-static void
+static uint8_t
 wait_for_flag(uint8_t mask)
 {
 	uint8_t regc;
@@ -82,6 +84,8 @@ wait_for_flag(uint8_t mask)
 	do {
 		regc = rtc_read(RTC_REGC);
 	} while ((regc & mask) == 0);
+
+	return (regc);
 }
 
 void
@@ -121,7 +125,7 @@ start(void)
 		TEST_ABORT("unexpected flags set in regC");
 	}
 
-	wait_for_flag(REGC_UPDATE);
+	(void) wait_for_flag(REGC_UPDATE);
 	end = rdtsc();
 
 	const uint64_t tsc_500ms = end - start;
@@ -133,7 +137,7 @@ start(void)
 	}
 
 	/* Wait for another update to pass by */
-	wait_for_flag(REGC_UPDATE);
+	(void) wait_for_flag(REGC_UPDATE);
 	end = rdtsc();
 
 	const uint64_t tsc_1s = end - start;
@@ -154,7 +158,6 @@ start(void)
 		TEST_ABORT("clock update timing outside threshold");
 	}
 
-
 	/* Put RTC in 12-hr, BCD-formatted mode */
 	rtc_write(RTC_REGA, REGA_DIVIDER_DIS);
 	rtc_write(RTC_REGB, REGB_HALT);
@@ -169,7 +172,7 @@ start(void)
 	rtc_write(RTC_REGB, 0);
 
 	/* Wait for it to tick over */
-	wait_for_flag(REGC_UPDATE);
+	(void) wait_for_flag(REGC_UPDATE);
 
 	if (rtc_read(RTC_SEC) != 0) {
 		TEST_ABORT("invalid RTC_SEC value");
@@ -182,9 +185,59 @@ start(void)
 		TEST_ABORT("invalid RTC_HOUR value");
 	}
 
+	/* Halt the RTC once again to prep for test of periodic timer */
+	rtc_write(RTC_REGA, REGA_DIVIDER_DIS);
+	rtc_write(RTC_REGB, REGB_HALT);
+
+	/* Clear any pending event flags */
+	(void) rtc_read(RTC_REGC);
+
+	/* Release divider to run, configuring a 512Hz periodic timer */
+	rtc_write(RTC_REGA, REGA_DIVIDER_32K | REGA_PERIOD_512HZ);
+	rtc_write(RTC_REGB, 0);
+
+	/* Count periodic firings until the next time update */
+	uint_t periodic_fire = 0;
+	uint8_t events = 0;
+	do {
+		events = wait_for_flag(REGC_UPDATE | REGC_PERIODIC);
+
+		if ((events & REGC_PERIODIC) != 0) {
+			periodic_fire++;
+		}
+	} while ((events & REGC_UPDATE) == 0);
+
+	/*
+	 * In the 500ms between releasing the divider and the first time update,
+	 * we expect 256 firings of the 512Hz periodic timer.
+	 */
+	if (periodic_fire != 256) {
+		TEST_ABORT("unexpected periodic firing count at 512Hz");
+	}
+
+	/* Change the periodic timer to 128Hz */
+	rtc_write(RTC_REGA, REGA_DIVIDER_32K | REGA_PERIOD_128HZ);
+
+	/* Count periodic firings until the next time update */
+	periodic_fire = 0;
+	do {
+		events = wait_for_flag(REGC_UPDATE | REGC_PERIODIC);
+
+		if ((events & REGC_PERIODIC) != 0) {
+			periodic_fire++;
+		}
+	} while ((events & REGC_UPDATE) == 0);
+
+	/*
+	 * With 1s between time updates, we expect 128 firings for the
+	 * reconfigured 128Hz periodic timer.
+	 */
+	if (periodic_fire != 128) {
+		TEST_ABORT("unexpected periodic firing count at 128Hz");
+	}
+
 	/*
 	 * TODO - Add additional tests:
-	 * - periodic interrupts
 	 * - alarm interrupts
 	 */
 
