@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2023 Bill Sommerfeld
  */
 
 #include <stdio.h>
@@ -45,7 +46,7 @@
 int
 main(void)
 {
-	(void) printf("#define\tMUTEX_LOCK_WORD\t0x%x\n",
+	(void) printf("#define\tMUTEX_LOCK_WORD\t0x%zx\n",
 	    offsetof(lwp_mutex_t, mutex_lockword));
 	(void) printf("#define\tWAITER_MASK\t0x00ff0000\n");
 

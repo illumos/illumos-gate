@@ -382,6 +382,16 @@ typedef struct smb_dtor {
 	smb_dtorproc_t	dt_proc;
 } smb_dtor_t;
 
+typedef struct smb_lavl {
+	krwlock_t	la_lock;
+	avl_tree_t	la_tree;
+	uint64_t	la_wrop;
+	kmutex_t	la_mutex;
+	list_t		la_deleteq;
+	uint32_t	la_deleteq_count;
+	boolean_t	la_flushing;
+} smb_lavl_t;
+
 typedef struct smb_llist {
 	krwlock_t	ll_lock;
 	list_t		ll_list;
@@ -1142,7 +1152,7 @@ typedef struct smb_tree {
 	smb_user_t		*t_owner;
 	smb_node_t		*t_snode;
 
-	smb_llist_t		t_ofile_list;
+	smb_lavl_t		t_ofile_list;
 	smb_idpool_t		t_fid_pool;
 
 	smb_llist_t		t_odir_list;
@@ -1384,10 +1394,12 @@ typedef enum {
 } smb_ofile_state_t;
 
 typedef struct smb_ofile {
-	list_node_t		f_tree_lnd;	/* t_ofile_list */
+	uint16_t		f_fid;		/* keep first */
+	uint16_t		f_ftype;
+	uint32_t		f_magic;
+	avl_node_t		f_tree_lnd;	/* t_ofile_list */
 	list_node_t		f_node_lnd;	/* n_ofile_list */
 	list_node_t		f_dh_lnd;	/* sv_persistid_ht */
-	uint32_t		f_magic;
 	kmutex_t		f_mutex;
 	smb_ofile_state_t	f_state;
 
@@ -1414,8 +1426,6 @@ typedef struct smb_ofile {
 	uint32_t		f_share_access;
 	uint32_t		f_create_options;
 	uint32_t		f_opened_by_pid;
-	uint16_t		f_fid;
-	uint16_t		f_ftype;
 	uint64_t		f_llf_pos;
 	int			f_mode;
 	cred_t			*f_cr;

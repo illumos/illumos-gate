@@ -39,8 +39,6 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
 
-int smb_session_ofile_max = 32768;
-
 extern uint32_t smb_is_executable(char *);
 static void smb_delete_new_object(smb_request_t *);
 static int smb_set_open_attributes(smb_request_t *, smb_ofile_t *);
@@ -312,7 +310,8 @@ smb_common_open(smb_request_t *sr)
 	}
 	op->desired_access = smb_access_generic_to_file(op->desired_access);
 
-	if (sr->session->s_file_cnt >= smb_session_ofile_max) {
+	if (sr->session->s_cfg.skc_max_opens != 0 &&
+	    sr->session->s_file_cnt >= sr->session->s_cfg.skc_max_opens) {
 		ASSERT(sr->uid_user);
 		cmn_err(CE_NOTE, "smbsrv[%s\\%s]: TOO_MANY_OPENED_FILES",
 		    sr->uid_user->u_domain, sr->uid_user->u_name);

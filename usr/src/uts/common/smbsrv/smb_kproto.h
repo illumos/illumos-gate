@@ -659,6 +659,7 @@ void smb_request_free(smb_request_t *);
 /*
  * ofile functions (file smb_ofile.c)
  */
+int smb_ofile_avl_compare(const void *, const void *);
 smb_ofile_t *smb_ofile_lookup_by_fid(smb_request_t *, uint16_t);
 smb_ofile_t *smb_ofile_lookup_by_uniqid(smb_tree_t *, uint32_t);
 smb_ofile_t *smb_ofile_lookup_by_persistid(smb_request_t *, uint64_t);
@@ -808,6 +809,26 @@ int	smb_idpool_constructor(smb_idpool_t *pool);
 void	smb_idpool_destructor(smb_idpool_t  *pool);
 int	smb_idpool_alloc(smb_idpool_t *pool, uint16_t *id);
 void	smb_idpool_free(smb_idpool_t *pool, uint16_t id);
+
+/*
+ * SMB locked AVL function prototypes
+ */
+void	smb_lavl_init(void);
+void	smb_lavl_fini(void);
+void	smb_lavl_constructor(smb_lavl_t *,
+    int (*compar) (const void *, const void *),
+    size_t, size_t);
+void	smb_lavl_destructor(smb_lavl_t *);
+void	smb_lavl_enter(smb_lavl_t *, krw_t);
+void	smb_lavl_exit(smb_lavl_t *);
+void	smb_lavl_post(smb_lavl_t *, void *, smb_dtorproc_t);
+void	smb_lavl_flush(smb_lavl_t *);
+void	smb_lavl_insert(smb_lavl_t *, void *);
+void	smb_lavl_remove(smb_lavl_t *, void *);
+int	smb_lavl_upgrade(smb_lavl_t *);
+uint32_t smb_lavl_get_count(smb_lavl_t *);
+#define	smb_lavl_first(la)	avl_first(&(la)->la_tree)
+#define	smb_lavl_next(la, obj)	avl_walk(&(la)->la_tree, obj, AVL_AFTER)
 
 /*
  * SMB locked list function prototypes

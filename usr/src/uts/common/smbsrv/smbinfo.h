@@ -165,6 +165,7 @@ typedef struct smb_kmod_cfg {
 	uint32_t skc_encrypt_ciphers;	/* 3.1.1 encryption ciphers */
 	uint32_t skc_execflags;
 	uint32_t skc_negtok_len;
+	uint32_t skc_max_opens;		/* per client */
 	smb_version_t skc_version;
 	uint16_t skc_initial_credits;
 	uint16_t skc_maximum_credits;

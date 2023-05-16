@@ -179,6 +179,7 @@ typedef struct smb_ioc_cfg {
 	uint32_t	encrypt_ciphers;
 	uint32_t	exec_flags;
 	uint32_t	negtok_len;
+	uint32_t	max_opens;	/* per client */
 	smb_version_t	version;
 	uint16_t	initial_credits;
 	uint16_t	maximum_credits;

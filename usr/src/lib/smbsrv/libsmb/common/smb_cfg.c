@@ -161,6 +161,7 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_ENCRYPT_CIPHERS, "encrypt_ciphers", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_NETLOGON_FLAGS, "netlogon_flags", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_SHORT_NAMES, "short_names", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_MAX_OPENS, "max_opens", SCF_TYPE_INTEGER, 0},
 
 	/* SMB_CI_MAX */
 };

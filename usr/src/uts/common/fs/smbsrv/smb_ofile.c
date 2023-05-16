@@ -301,6 +301,21 @@ static volatile uint32_t smb_fids = 0;
 #define	SMB_UNIQ_FID()	atomic_inc_32_nv(&smb_fids)
 
 /*
+ * AVL Comparator for t_ofile_list
+ *
+ * NB: can only access f_fid because smb_ofile_lookup_by_fid
+ * doesn't pass in an entire smb_ofile_t.
+ */
+int
+smb_ofile_avl_compare(const void *v1, const void *v2)
+{
+	const smb_ofile_t *of1 = v1;
+	const smb_ofile_t *of2 = v2;
+
+	return (AVL_CMP(of1->f_fid, of2->f_fid));
+}
+
+/*
  * smb_ofile_alloc
  * Allocate an ofile and fill in it's "up" pointers, but
  * do NOT link it into the tree's list of ofiles or the
@@ -429,9 +444,10 @@ smb_ofile_open(
 	default:
 		ASSERT(0);
 	}
-	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
-	smb_llist_insert_tail(&tree->t_ofile_list, of);
-	smb_llist_exit(&tree->t_ofile_list);
+	ASSERT(of->f_fid != 0);
+	smb_lavl_enter(&tree->t_ofile_list, RW_WRITER);
+	smb_lavl_insert(&tree->t_ofile_list, of);
+	smb_lavl_exit(&tree->t_ofile_list);
 	atomic_inc_32(&tree->t_open_files);
 	atomic_inc_32(&of->f_session->s_file_cnt);
 
@@ -661,23 +677,23 @@ smb_ofile_close_all(
     uint32_t		pid)
 {
 	smb_ofile_t	*of;
-	smb_llist_t	*ll;
+	smb_lavl_t	*la;
 
 	ASSERT(tree);
 	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 
-	ll = &tree->t_ofile_list;
+	la = &tree->t_ofile_list;
 
-	smb_llist_enter(ll, RW_READER);
-	for (of = smb_llist_head(ll);
+	smb_lavl_enter(la, RW_READER);
+	for (of = smb_lavl_first(la);
 	    of != NULL;
-	    of = smb_llist_next(ll, of)) {
+	    of = smb_lavl_next(la, of)) {
 		ASSERT(of->f_magic == SMB_OFILE_MAGIC);
 		ASSERT(of->f_tree == tree);
 		if (pid != 0 && of->f_opened_by_pid != pid)
 			continue;
 		if (smb_ofile_hold(of)) {
-			smb_llist_post(ll, of, smb_ofile_drop);
+			smb_lavl_post(la, of, smb_ofile_drop);
 		}
 	}
 
@@ -685,7 +701,7 @@ smb_ofile_close_all(
 	 * Drop the lock and process the llist dtor queue.
 	 * Calls smb_ofile_drop on ofiles that were open.
 	 */
-	smb_llist_exit(ll);
+	smb_lavl_exit(la);
 }
 
 /*
@@ -854,7 +870,7 @@ smb_ofile_release(smb_ofile_t *of)
 		ASSERT(tree != NULL);
 		if (of->f_refcnt == 0) {
 			of->f_state = SMB_OFILE_STATE_SAVING;
-			smb_llist_post(&tree->t_ofile_list, of,
+			smb_lavl_post(&tree->t_ofile_list, of,
 			    smb_ofile_save_dh);
 		}
 		break;
@@ -868,7 +884,7 @@ smb_ofile_release(smb_ofile_t *of)
 				delete = B_TRUE;
 				break;
 			}
-			smb_llist_post(&tree->t_ofile_list, of,
+			smb_lavl_post(&tree->t_ofile_list, of,
 			    smb_ofile_delete);
 		}
 		break;
@@ -902,22 +918,19 @@ smb_ofile_lookup_by_fid(
     uint16_t		fid)
 {
 	smb_tree_t	*tree = sr->tid_tree;
-	smb_llist_t	*of_list;
+	smb_lavl_t	*lavl;
 	smb_ofile_t	*of;
+	uint16_t	cmp_fid;
 
+	CTASSERT(offsetof(smb_ofile_t, f_fid) == 0);
 	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 
-	of_list = &tree->t_ofile_list;
+	cmp_fid = fid;
 
-	smb_llist_enter(of_list, RW_READER);
-	of = smb_llist_head(of_list);
-	while (of) {
-		ASSERT(of->f_magic == SMB_OFILE_MAGIC);
-		ASSERT(of->f_tree == tree);
-		if (of->f_fid == fid)
-			break;
-		of = smb_llist_next(of_list, of);
-	}
+	lavl = &tree->t_ofile_list;
+
+	smb_lavl_enter(lavl, RW_READER);
+	of = avl_find(&lavl->la_tree, &cmp_fid, NULL);
 	if (of == NULL)
 		goto out;
 
@@ -941,7 +954,7 @@ smb_ofile_lookup_by_fid(
 	mutex_exit(&of->f_mutex);
 
 out:
-	smb_llist_exit(of_list);
+	smb_lavl_exit(lavl);
 	return (of);
 }
 
@@ -953,14 +966,14 @@ out:
 smb_ofile_t *
 smb_ofile_lookup_by_uniqid(smb_tree_t *tree, uint32_t uniqid)
 {
-	smb_llist_t	*of_list;
+	smb_lavl_t	*lavl;
 	smb_ofile_t	*of;
 
 	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 
-	of_list = &tree->t_ofile_list;
-	smb_llist_enter(of_list, RW_READER);
-	of = smb_llist_head(of_list);
+	lavl = &tree->t_ofile_list;
+	smb_lavl_enter(lavl, RW_READER);
+	of = smb_lavl_first(lavl);
 
 	while (of) {
 		ASSERT(of->f_magic == SMB_OFILE_MAGIC);
@@ -968,15 +981,15 @@ smb_ofile_lookup_by_uniqid(smb_tree_t *tree, uint32_t uniqid)
 
 		if (of->f_uniqid == uniqid) {
 			if (smb_ofile_hold(of)) {
-				smb_llist_exit(of_list);
+				smb_lavl_exit(lavl);
 				return (of);
 			}
 		}
 
-		of = smb_llist_next(of_list, of);
+		of = smb_lavl_next(lavl, of);
 	}
 
-	smb_llist_exit(of_list);
+	smb_lavl_exit(lavl);
 	return (NULL);
 }
 
@@ -1400,9 +1413,9 @@ smb_ofile_save_dh(void *arg)
 
 	atomic_dec_32(&of->f_session->s_file_cnt);
 	atomic_dec_32(&of->f_tree->t_open_files);
-	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
-	smb_llist_remove(&tree->t_ofile_list, of);
-	smb_llist_exit(&tree->t_ofile_list);
+	smb_lavl_enter(&tree->t_ofile_list, RW_WRITER);
+	smb_lavl_remove(&tree->t_ofile_list, of);
+	smb_lavl_exit(&tree->t_ofile_list);
 
 	/*
 	 * This ofile is no longer on t_ofile_list, however...
@@ -1470,9 +1483,9 @@ smb_ofile_delete(void *arg)
 		ASSERT(of->f_session != NULL);
 		atomic_dec_32(&of->f_session->s_file_cnt);
 		atomic_dec_32(&of->f_tree->t_open_files);
-		smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
-		smb_llist_remove(&tree->t_ofile_list, of);
-		smb_llist_exit(&tree->t_ofile_list);
+		smb_lavl_enter(&tree->t_ofile_list, RW_WRITER);
+		smb_lavl_remove(&tree->t_ofile_list, of);
+		smb_lavl_exit(&tree->t_ofile_list);
 	}
 
 	/*

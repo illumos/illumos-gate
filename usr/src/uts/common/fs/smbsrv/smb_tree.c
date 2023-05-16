@@ -23,6 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -393,7 +394,7 @@ smb_tree_release(
 	SMB_TREE_VALID(tree);
 
 	/* flush the ofile and odir lists' delete queues */
-	smb_llist_flush(&tree->t_ofile_list);
+	smb_lavl_flush(&tree->t_ofile_list);
 	smb_llist_flush(&tree->t_odir_list);
 
 	mutex_enter(&tree->t_mutex);
@@ -455,17 +456,17 @@ smb_tree_has_feature(smb_tree_t *tree, uint32_t flags)
 int
 smb_tree_enum(smb_tree_t *tree, smb_svcenum_t *svcenum)
 {
-	smb_llist_t	*of_list;
+	smb_lavl_t	*lavl;
 	smb_ofile_t	*of;
 	int		rc = 0;
 
 	if (svcenum->se_type == SMB_SVCENUM_TYPE_TREE)
 		return (smb_tree_enum_private(tree, svcenum));
 
-	of_list = &tree->t_ofile_list;
-	smb_llist_enter(of_list, RW_READER);
+	lavl = &tree->t_ofile_list;
+	smb_lavl_enter(lavl, RW_READER);
 
-	of = smb_llist_head(of_list);
+	of = smb_lavl_first(lavl);
 	while (of) {
 		if (smb_ofile_hold(of)) {
 			rc = smb_ofile_enum(of, svcenum);
@@ -473,10 +474,10 @@ smb_tree_enum(smb_tree_t *tree, smb_svcenum_t *svcenum)
 		}
 		if (rc != 0)
 			break;
-		of = smb_llist_next(of_list, of);
+		of = smb_lavl_next(lavl, of);
 	}
 
-	smb_llist_exit(of_list);
+	smb_lavl_exit(lavl);
 
 	return (rc);
 }
@@ -938,7 +939,8 @@ smb_tree_alloc(smb_request_t *sr, const smb_kshare_t *si,
 		return (NULL);
 	}
 
-	smb_llist_constructor(&tree->t_ofile_list, sizeof (smb_ofile_t),
+	smb_lavl_constructor(&tree->t_ofile_list,
+	    smb_ofile_avl_compare,  sizeof (smb_ofile_t),
 	    offsetof(smb_ofile_t, f_tree_lnd));
 
 	smb_llist_constructor(&tree->t_odir_list, sizeof (smb_odir_t),
@@ -1025,7 +1027,7 @@ smb_tree_dealloc(void *arg)
 		smb_node_release(tree->t_snode);
 
 	mutex_destroy(&tree->t_mutex);
-	smb_llist_destructor(&tree->t_ofile_list);
+	smb_lavl_destructor(&tree->t_ofile_list);
 	smb_llist_destructor(&tree->t_odir_list);
 	smb_idpool_destructor(&tree->t_fid_pool);
 	smb_idpool_destructor(&tree->t_odid_pool);

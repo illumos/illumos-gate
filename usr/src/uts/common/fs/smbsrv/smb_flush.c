@@ -24,6 +24,7 @@
  *
  * Copyright 2016 Syneto S.R.L. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -76,7 +77,7 @@ smb_sdrc_t
 smb_com_flush(smb_request_t *sr)
 {
 	smb_ofile_t	*file;
-	smb_llist_t	*flist;
+	smb_lavl_t	*lavl;
 	int		rc;
 
 	if (smb_flush_required == 0) {
@@ -93,16 +94,16 @@ smb_com_flush(smb_request_t *sr)
 		}
 		smb_ofile_flush(sr, sr->fid_ofile);
 	} else {
-		flist = &sr->tid_tree->t_ofile_list;
-		smb_llist_enter(flist, RW_READER);
-		file = smb_llist_head(flist);
+		lavl = &sr->tid_tree->t_ofile_list;
+		smb_lavl_enter(lavl, RW_READER);
+		file = smb_lavl_first(lavl);
 		while (file) {
 			mutex_enter(&file->f_mutex);
 			smb_ofile_flush(sr, file);
 			mutex_exit(&file->f_mutex);
-			file = smb_llist_next(flist, file);
+			file = smb_lavl_next(lavl, file);
 		}
-		smb_llist_exit(flist);
+		smb_lavl_exit(lavl);
 	}
 
 	rc = smbsr_encode_empty_result(sr);

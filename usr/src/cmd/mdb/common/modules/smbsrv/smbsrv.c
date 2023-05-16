@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
- * Copyright 2021 RackTop Systems, Inc.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -104,6 +104,7 @@ typedef struct {
  */
 typedef struct {
 	uint_t		ex_mask;
+	const char	*ex_walker;
 	int		(*ex_offset)(void);
 	const char	*ex_dcmd;
 	const char	*ex_name;
@@ -640,22 +641,22 @@ smb_server_exp_off_tcp_list(void)
  */
 static const smb_exp_t smb_server_exp[] =
 {
-	{ SMB_OPT_ALL_OBJ,
+	{ SMB_OPT_ALL_OBJ, "list",
 	    smb_server_exp_off_sv_list,
 	    "smbsess", "smb_session"},
-	{ 0, 0, NULL, NULL }
+	{ 0 }
 };
 
 /* for backwards compatibility only */
 static const smb_exp_t smb_server_exp_old[] =
 {
-	{ SMB_OPT_ALL_OBJ,
+	{ SMB_OPT_ALL_OBJ, "list",
 	    smb_server_exp_off_nbt_list,
 	    "smbsess", "smb_session"},
-	{ SMB_OPT_ALL_OBJ,
+	{ SMB_OPT_ALL_OBJ, "list",
 	    smb_server_exp_off_tcp_list,
 	    "smbsess", "smb_session"},
-	{ 0, 0, NULL, NULL }
+	{ 0 }
 };
 
 /*
@@ -823,16 +824,16 @@ smb_session_exp_off_tree_list(void)
  */
 static const smb_exp_t smb_session_exp[] =
 {
-	{ SMB_OPT_USER,
+	{ SMB_OPT_USER, "list",
 	    smb_session_exp_off_user_list,
 	    "smbuser", "smb_user"},
-	{ SMB_OPT_TREE | SMB_OPT_OFILE | SMB_OPT_ODIR,
+	{ SMB_OPT_TREE | SMB_OPT_OFILE | SMB_OPT_ODIR, "list",
 	    smb_session_exp_off_tree_list,
 	    "smbtree", "smb_tree"},
-	{ SMB_OPT_REQUEST,
+	{ SMB_OPT_REQUEST, "list",
 	    smb_session_exp_off_req_list,
 	    "smbreq", "smb_request"},
-	{ 0, 0, NULL, NULL}
+	{ 0 }
 };
 
 static void
@@ -1515,7 +1516,7 @@ typedef struct mdb_smb_tree {
 	smb_tree_state_t	t_state;
 
 	smb_node_t		*t_snode;
-	smb_llist_t		t_ofile_list;
+	smb_lavl_t		t_ofile_list;
 	smb_llist_t		t_odir_list;
 
 	uint32_t		t_refcnt;
@@ -1530,14 +1531,14 @@ typedef struct mdb_smb_tree {
 } mdb_smb_tree_t;
 
 static int
-smb_tree_exp_off_ofile_list(void)
+smb_tree_exp_off_ofile_avl(void)
 {
-	int tf_off, ll_off;
+	int tf_off, la_off;
 
 	/* OFFSETOF(smb_tree_t, t_ofile_list.ll_list); */
 	GET_OFFSET(tf_off, smb_tree_t, t_ofile_list);
-	GET_OFFSET(ll_off, smb_llist_t, ll_list);
-	return (tf_off + ll_off);
+	GET_OFFSET(la_off, smb_lavl_t, la_tree);
+	return (tf_off + la_off);
 }
 
 static int
@@ -1556,13 +1557,13 @@ smb_tree_exp_off_odir_list(void)
  */
 static const smb_exp_t smb_tree_exp[] =
 {
-	{ SMB_OPT_OFILE,
-	    smb_tree_exp_off_ofile_list,
+	{ SMB_OPT_OFILE, "avl",
+	    smb_tree_exp_off_ofile_avl,
 	    "smbofile", "smb_ofile"},
-	{ SMB_OPT_ODIR,
+	{ SMB_OPT_ODIR, "list",
 	    smb_tree_exp_off_odir_list,
 	    "smbodir", "smb_odir"},
-	{ 0, 0, NULL, NULL}
+	{ 0 }
 };
 
 static const mdb_bitmask_t
@@ -3773,8 +3774,8 @@ smb_obj_expand(uintptr_t addr, uint_t opts, const smb_exp_t *x, ulong_t indent)
 				break;
 			}
 
-			rc = mdb_pwalk_dcmd("list", x->ex_dcmd, argc, argv,
-			    addr + ex_off);
+			rc = mdb_pwalk_dcmd(x->ex_walker, x->ex_dcmd,
+			    argc, argv, addr + ex_off);
 
 			if (rc) {
 				mdb_warn("failed to walk the list of %s in %p",
