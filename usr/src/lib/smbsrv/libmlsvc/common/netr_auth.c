@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -87,10 +88,14 @@ extern ndr_auth_ctx_t netr_ssp_ctx;
  *
  * DISABLE_SAMLOGONEX causes Netlogon to always use SamLogon, which
  * makes use of Netlogon Authenticators.
+ *
+ * DISABLE_SEALING causes Netlogon to use Signing (integrity) instead of
+ * Sealing (privacy).
  */
 #define	NETR_CFG_DISABLE_SECURE_RPC	0x00000001
 #define	NETR_CFG_DISABLE_RESP_VERIF	0x00000002
 #define	NETR_CFG_DISABLE_SAMLOGONEX	0x00000004
+#define	NETR_CFG_DISABLE_SEALING	0x00000008
 
 void
 netlogon_init_global(uint32_t flags)
@@ -101,6 +106,8 @@ netlogon_init_global(uint32_t flags)
 	    ((flags & NETR_CFG_DISABLE_RESP_VERIF) == 0);
 	netr_global_info.use_logon_ex =
 	    ((flags & NETR_CFG_DISABLE_SAMLOGONEX) == 0);
+	if ((flags & NETR_CFG_DISABLE_SEALING) != 0)
+		netr_ssp_ctx.auth_level = NDR_C_AUTHN_LEVEL_PKT_INTEGRITY;
 }
 
 /*
@@ -175,6 +182,7 @@ netlogon_auth(char *server, char *domain, DWORD flags)
 
 	netr_info = &netr_global_info;
 	bzero(&netr_info->session_key, sizeof (netr_info->session_key));
+	bzero(&netr_info->rpc_seal_key, sizeof (netr_info->rpc_seal_key));
 	netr_info->flags = flags;
 
 	rc = smb_getnetbiosname(netr_info->hostname, NETBIOS_NAME_SZ);
@@ -351,6 +359,7 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	char account_name[(NETBIOS_NAME_SZ * 2) + 1];
 	int opnum;
 	int rc;
+	int i;
 
 	bzero(&arg, sizeof (struct netr_ServerAuthenticate2));
 	opnum = NETR_OPNUM_ServerAuthenticate2;
@@ -382,6 +391,15 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 		if (netr_gen_skey64(netr_info) != SMBAUTH_SUCCESS)
 			return (-1);
 	}
+
+	/*
+	 * Calculate the 'XorKey' used to derive certain Netlogon SSP keys.
+	 * This is used in [MS-NRPC] 3.3.4.2 "The Netlogon Signature Token".
+	 */
+	for (i = 0; i < netr_info->session_key.len; i++)
+		netr_info->rpc_seal_key.key[i] =
+		    netr_info->session_key.key[i] ^ 0xf0;
+	netr_info->rpc_seal_key.len = netr_info->session_key.len;
 
 	/*
 	 * We can't 'fiddle' with anything here to prevent getting bitten by

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -815,6 +816,8 @@ netr_invalidate_chain(netr_info_t *netr_info)
 	netr_info->flags &= ~NETR_FLG_VALID;
 	explicit_bzero(&netr_info->session_key,
 	    sizeof (netr_info->session_key));
+	explicit_bzero(&netr_info->rpc_seal_key,
+	    sizeof (netr_info->rpc_seal_key));
 	explicit_bzero(&netr_info->client_credential,
 	    sizeof (netr_info->client_credential));
 	explicit_bzero(&netr_info->server_credential,
