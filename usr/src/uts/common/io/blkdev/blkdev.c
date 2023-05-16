@@ -868,6 +868,19 @@ bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "hotpluggable", NULL, 0);
 	}
 
+	/*
+	 * Before we proceed, we need to ensure that the geometry and labels on
+	 * the cmlb disk are reasonable. When cmlb first attaches, it does not
+	 * perform label validation and creates minor nodes based on the
+	 * assumption of the size. This may not be correct and the rest of the
+	 * system assumes that this will have been done before we allow opens
+	 * to proceed. Otherwise, on first open, this'll all end up changing
+	 * around on users. We do not care if it succeeds or not. It is totally
+	 * acceptable for this device to be unlabeled or not to have anything on
+	 * it.
+	 */
+	(void) cmlb_validate(bd->d_cmlbh, 0, 0);
+
 	hdl->h_bd = bd;
 	ddi_report_dev(dip);
 
