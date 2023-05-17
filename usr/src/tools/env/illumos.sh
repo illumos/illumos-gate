@@ -25,6 +25,7 @@
 # Copyright 2016 RackTop Systems.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2023 Bill Sommerfeld
 #
 # - This file is sourced by "bldenv" and "nightly" and should not
 #   be executed directly.
@@ -260,9 +261,11 @@ export PKGARCHIVE="${CODEMGR_WS}/packages/${MACH}/nightly"
 # Package manifest format version.
 export PKGFMT_OUTPUT='v2'
 
-# we want make to do as much as it can, just in case there's more than
+# We want make to do as much as it can, just in case there's more than
 # one problem.
-export MAKEFLAGS='k'
+# We also must set e in MAKEFLAGS as the makefiles depend on importing
+# the environment variables set here.
+export MAKEFLAGS='ke'
 
 # Build tools - don't change these unless you know what you're doing.  These
 # variables allows you to get the compilers and onbld files locally.
