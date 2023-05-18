@@ -81,21 +81,6 @@ SYSCTL_DECL(_hw_vmm);
 SYSCTL_NODE(_hw_vmm, OID_AUTO, svm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     NULL);
 
-/*
- * SVM CPUID function 0x8000_000A, edx bit decoding.
- */
-#define	AMD_CPUID_SVM_NP		BIT(0)  /* Nested paging or RVI */
-#define	AMD_CPUID_SVM_LBR		BIT(1)  /* Last branch virtualization */
-#define	AMD_CPUID_SVM_SVML		BIT(2)  /* SVM lock */
-#define	AMD_CPUID_SVM_NRIP_SAVE		BIT(3)  /* Next RIP is saved */
-#define	AMD_CPUID_SVM_TSC_RATE		BIT(4)  /* TSC rate control. */
-#define	AMD_CPUID_SVM_VMCB_CLEAN	BIT(5)  /* VMCB state caching */
-#define	AMD_CPUID_SVM_FLUSH_BY_ASID	BIT(6)  /* Flush by ASID */
-#define	AMD_CPUID_SVM_DECODE_ASSIST	BIT(7)  /* Decode assist */
-#define	AMD_CPUID_SVM_PAUSE_INC		BIT(10) /* Pause intercept filter. */
-#define	AMD_CPUID_SVM_PAUSE_FTH		BIT(12) /* Pause filter threshold */
-#define	AMD_CPUID_SVM_AVIC		BIT(13)	/* AVIC present */
-
 #define	VMCB_CACHE_DEFAULT	(VMCB_CACHE_ASID	|	\
 				VMCB_CACHE_IOPM		|	\
 				VMCB_CACHE_I		|	\
@@ -118,14 +103,10 @@ SYSCTL_NODE(_hw_vmm, OID_AUTO, svm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
 #define	AMD_TSC_MIN_FREQ	500000000
 #define	AMD_TSC_MAX_FREQ_RATIO	15
 
-static bool svm_has_tsc_freq_ctl;
-
 static uint32_t vmcb_clean = VMCB_CACHE_DEFAULT;
-SYSCTL_INT(_hw_vmm_svm, OID_AUTO, vmcb_clean, CTLFLAG_RDTUN, &vmcb_clean,
-    0, NULL);
 
 /* SVM features advertised by CPUID.8000000AH:EDX */
-static uint32_t svm_feature = ~0U;	/* AMD SVM features. */
+static uint32_t svm_feature = 0;
 
 static int disable_npf_assist;
 
@@ -138,21 +119,27 @@ static int svm_getreg(void *arg, int vcpu, int ident, uint64_t *val);
 static void flush_asid(struct svm_softc *sc, int vcpuid);
 
 static __inline bool
-flush_by_asid(void)
+has_flush_by_asid(void)
 {
-	return ((svm_feature & AMD_CPUID_SVM_FLUSH_BY_ASID) != 0);
+	return ((svm_feature & CPUID_AMD_EDX_FLUSH_ASID) != 0);
 }
 
 static __inline bool
-decode_assist(void)
+has_lbr_virt(void)
 {
-	return ((svm_feature & AMD_CPUID_SVM_DECODE_ASSIST) != 0);
+	return ((svm_feature & CPUID_AMD_EDX_LBR_VIRT) != 0);
 }
 
-static bool
-svm_tsc_freq_ctl(void)
+static __inline bool
+has_decode_assist(void)
 {
-	return ((svm_feature & AMD_CPUID_SVM_TSC_RATE) != 0);
+	return ((svm_feature & CPUID_AMD_EDX_DECODE_ASSISTS) != 0);
+}
+
+static __inline bool
+has_tsc_freq_ctl(void)
+{
+	return ((svm_feature & CPUID_AMD_EDX_TSC_RATE_MSR) != 0);
 }
 
 static int
@@ -165,10 +152,23 @@ svm_cleanup(void)
 static int
 svm_init(void)
 {
-	vmcb_clean &= VMCB_CACHE_DEFAULT;
+	/* Grab a (bhyve) local copy of the SVM feature bits */
+	struct cpuid_regs regs = {
+		.cp_eax = 0x8000000a,
+	};
+	(void) cpuid_insn(NULL, &regs);
+	svm_feature = regs.cp_edx;
 
-	svm_has_tsc_freq_ctl = svm_tsc_freq_ctl();
-	svm_msr_init();
+	/*
+	 * HMA should have already checked for these features which we refuse to
+	 * operate without, but no harm in making sure
+	 */
+	const uint32_t demand_bits =
+	    (CPUID_AMD_EDX_NESTED_PAGING | CPUID_AMD_EDX_NRIPS);
+	VERIFY((svm_feature & demand_bits) == demand_bits);
+
+	/* Clear any unexpected bits (set manually) from vmcb_clean */
+	vmcb_clean &= VMCB_CACHE_DEFAULT;
 
 	return (0);
 }
@@ -416,9 +416,10 @@ vmcb_init(struct svm_softc *sc, int vcpu, uint64_t iopm_base_pa,
 	 */
 	ctrl->v_intr_ctrl |= V_INTR_MASKING;
 
-	/* Enable Last Branch Record aka LBR for debugging */
-	ctrl->misc_ctrl |= LBR_VIRT_ENABLE;
-	state->dbgctl = BIT(0);
+	/* Enable Last Branch Record aka LBR-virt (if available) */
+	if (has_lbr_virt()) {
+		ctrl->misc_ctrl |= LBR_VIRT_ENABLE;
+	}
 
 	/* EFER_SVM must always be set when the guest is executing */
 	state->efer = EFER_SVM;
@@ -613,7 +614,7 @@ svm_handle_inout(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		 * This is not specified explicitly in APMv2 but can be verified
 		 * empirically.
 		 */
-		if (!decode_assist()) {
+		if (!has_decode_assist()) {
 			/*
 			 * Without decoding assistance, force the task of
 			 * emulating the ins/outs on userspace.
@@ -734,7 +735,7 @@ svm_handle_mmio_emul(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit,
 	/*
 	 * Copy the instruction bytes into 'vie' if available.
 	 */
-	if (decode_assist() && !disable_npf_assist) {
+	if (has_decode_assist() && !disable_npf_assist) {
 		inst_len = ctrl->inst_len;
 		inst_bytes = (char *)ctrl->inst_bytes;
 	}
@@ -1771,7 +1772,7 @@ check_asid(struct svm_softc *sc, int vcpuid, uint_t thiscpu, uint64_t nptgen)
 	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(sc, vcpuid);
 	uint8_t flush;
 
-	flush = hma_svm_asid_update(&vcpustate->hma_asid, flush_by_asid(),
+	flush = hma_svm_asid_update(&vcpustate->hma_asid, has_flush_by_asid(),
 	    vcpustate->nptgen != nptgen);
 
 	if (flush != VMCB_TLB_FLUSH_NOTHING) {
@@ -1789,7 +1790,7 @@ flush_asid(struct svm_softc *sc, int vcpuid)
 	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(sc, vcpuid);
 	uint8_t flush;
 
-	flush = hma_svm_asid_update(&vcpustate->hma_asid, flush_by_asid(),
+	flush = hma_svm_asid_update(&vcpustate->hma_asid, has_flush_by_asid(),
 	    true);
 
 	ASSERT(flush != VMCB_TLB_FLUSH_NOTHING);
@@ -2601,7 +2602,7 @@ svm_freq_ratio(uint64_t guest_hz, uint64_t host_hz, uint64_t *mult)
 	/*
 	 * Confirm that scaling is available.
 	 */
-	if (!svm_has_tsc_freq_ctl) {
+	if (!has_tsc_freq_ctl()) {
 		return (FR_SCALING_NOT_SUPPORTED);
 	}
 

@@ -219,14 +219,17 @@ extern "C" {
 /*
  * AMD SVM features (extended function 0x8000000A).
  */
-#define	CPUID_AMD_EDX_NESTED_PAGING	0x000000001 /* AMD: SVM NP */
-#define	CPUID_AMD_EDX_LBR_VIRT		0x000000002 /* AMD: LBR virt. */
-#define	CPUID_AMD_EDX_SVML		0x000000004 /* AMD: SVM lock */
-#define	CPUID_AMD_EDX_NRIPS		0x000000008 /* AMD: NRIP save */
-#define	CPUID_AMD_EDX_TSC_RATE_MSR	0x000000010 /* AMD: MSR TSC ctrl */
-#define	CPUID_AMD_EDX_VMCB_CLEAN	0x000000020 /* AMD: VMCB clean bits */
-#define	CPUID_AMD_EDX_FLUSH_ASID	0x000000040 /* AMD: flush by ASID */
-#define	CPUID_AMD_EDX_DECODE_ASSISTS	0x000000080 /* AMD: decode assists */
+#define	CPUID_AMD_EDX_NESTED_PAGING	(1 << 0) /* AMD: Nested paging */
+#define	CPUID_AMD_EDX_LBR_VIRT		(1 << 1) /* AMD: LBR virt. */
+#define	CPUID_AMD_EDX_SVML		(1 << 2) /* AMD: SVM lock */
+#define	CPUID_AMD_EDX_NRIPS		(1 << 3) /* AMD: NRIP save */
+#define	CPUID_AMD_EDX_TSC_RATE_MSR	(1 << 4) /* AMD: TSC ratio ctrl */
+#define	CPUID_AMD_EDX_VMCB_CLEAN	(1 << 5) /* AMD: VMCB clean bits */
+#define	CPUID_AMD_EDX_FLUSH_ASID	(1 << 6) /* AMD: flush by ASID */
+#define	CPUID_AMD_EDX_DECODE_ASSISTS	(1 << 7) /* AMD: decode assists */
+#define	CPUID_AMD_EDX_PAUSE_INCPT	(1 << 8) /* AMD: pause intercept */
+#define	CPUID_AMD_EDX_PAUSE_TRSH	(1 << 9) /* AMD: pause threshold */
+#define	CPUID_AMD_EDX_AVIC		(1 << 10) /* AMD: AVIC */
 
 /*
  * AMD Encrypted Memory Capabilities -- 0x8000_001F
