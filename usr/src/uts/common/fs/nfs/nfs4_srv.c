@@ -5787,10 +5787,6 @@ out:
 	    WRITE4res *, resp);
 }
 
-
-/* XXX put in a header file */
-extern int	sec_svc_getcred(struct svc_req *, cred_t *,  caddr_t *, int *);
-
 void
 rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
     struct svc_req *req, cred_t *cr, int *rv)
