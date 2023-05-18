@@ -4,6 +4,7 @@
 \ Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 \ All rights reserved.
 \ Copyright 2019 Joyent, Inc.
+\ Copyright 2023 MNX Cloud, Inc.
 \
 \ Redistribution and use in source and binary forms, with or without
 \ modification, are permitted provided that the following conditions
@@ -1189,6 +1190,8 @@ also menu-namespace
 	s" menu_options"         unsetenv	\ Options separator flag
 	s" menu_optionstext"     unsetenv	\ separator display text
 	s" menu_init"            unsetenv	\ menu initializer
+	s" pimenu_optionstext"   unsetenv	\ PI menu separator display text
+	s" pitext"               unsetenv	\ PI menu text
 
 	0 menureboot !
 	0 menuacpi !
