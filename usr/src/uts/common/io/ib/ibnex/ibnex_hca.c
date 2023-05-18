@@ -442,7 +442,7 @@ static ibnex_node_data_t *
 ibnex_get_cdip_info(dev_info_t *parent,
     char *devname, dev_info_t **cdip, ibnex_node_type_t *type)
 {
-	char 			*device_name, *cname = NULL, *caddr = NULL;
+	char			*device_name, *cname = NULL, *caddr = NULL;
 	int			len;
 	ibnex_node_data_t	*node_data = NULL;
 
@@ -477,7 +477,7 @@ ibnex_hca_bus_config_one(dev_info_t *parent, void *devname,
     ddi_bus_config_op_t op, uint_t *flag, dev_info_t **child)
 {
 	int			ret = IBNEX_SUCCESS, len, need_bus_config;
-	char 			*device_name, *caddr, *cname;
+	char			*device_name, *caddr, *cname;
 	dev_info_t		*cdip;
 	ibnex_node_data_t	*node_data;
 	ibnex_node_type_t	node_type;

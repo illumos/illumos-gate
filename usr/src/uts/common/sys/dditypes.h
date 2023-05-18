@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_SYS_DDITYPES_H
@@ -219,6 +220,8 @@ typedef enum {
 typedef enum {EPL_KERNEL, EPL_INTERRUPT, EPL_HIGHLEVEL} ddi_plevel_t;
 typedef struct ddi_event_cookie *ddi_eventcookie_t;
 typedef struct ddi_event_callbacks *ddi_callback_id_t;
+typedef void (*ddi_event_cb_f)(dev_info_t *, ddi_eventcookie_t,
+    void *arg, void *impldata);
 
 #endif	/* !_ASM */
 

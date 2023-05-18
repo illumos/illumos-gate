@@ -353,11 +353,10 @@ arcmsr_attach(dev_info_t *dev_info, ddi_attach_cmd_t cmd)
  *		        else returnDDI_FAILURE
  */
 static int
-arcmsr_detach(dev_info_t *dev_info, ddi_detach_cmd_t cmd) {
-
+arcmsr_detach(dev_info_t *dev_info, ddi_detach_cmd_t cmd)
+{
 	int instance;
 	struct ACB *acb;
-
 
 	instance = ddi_get_instance(dev_info);
 	acb = ddi_get_soft_state(arcmsr_soft_state, instance);
@@ -759,7 +758,7 @@ ioctl_out:
  *  supportable for that particular HBA.
  *  By returning DDI_FAILURE, the instance of the target driver for that
  *  device will not be probed or attached.
- * 	This entry point is not required, and if none is supplied,
+ *	This entry point is not required, and if none is supplied,
  *  the framework will attempt to probe and attach all possible instances
  *  of the appropriate target drivers.
  */
@@ -899,7 +898,7 @@ arcmsr_tran_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 	}
 	switch (supported = scsi_hba_lookup_capstr(cap)) {
 	case SCSI_CAP_ARQ:			/* 9 auto request sense */
-	case SCSI_CAP_UNTAGGED_QING:   		/* 7 */
+	case SCSI_CAP_UNTAGGED_QING:		/* 7 */
 	case SCSI_CAP_TAGGED_QING:		/* 8 */
 		/* these are always on, and cannot be turned off */
 		supported = (value == 1) ? 1 : 0;
@@ -1330,8 +1329,8 @@ arcmsr_tran_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 /*
  * Function: arcmsr_tran_abort(9E)
- * 		SCSA interface routine to abort pkt(s) in progress.
- * 		Aborts the pkt specified.  If NULL pkt, aborts ALL pkts.
+ *		SCSA interface routine to abort pkt(s) in progress.
+ *		Aborts the pkt specified.  If NULL pkt, aborts ALL pkts.
  * Output:	Return 1 if success
  *		Return 0 if failure
  */
@@ -1367,8 +1366,8 @@ arcmsr_tran_abort(struct scsi_address *ap, struct scsi_pkt *abortpkt)
  *	     Return 0 if failure
  */
 static int
-arcmsr_tran_reset(struct scsi_address *ap, int level) {
-
+arcmsr_tran_reset(struct scsi_address *ap, int level)
+{
 	struct ACB *acb;
 	int return_code = 1;
 	int target = ap->a_target;
@@ -1663,7 +1662,7 @@ arcmsr_dma_move(struct ACB *acb, struct scsi_pkt *pkt, struct buf *bp)
 	int resid = 0;
 	int total_ccb_xferlen = 0;
 
-	if (ccb->resid_dmacookie.dmac_size != 0) 	{
+	if (ccb->resid_dmacookie.dmac_size != 0) {
 		total_ccb_xferlen += ccb->resid_dmacookie.dmac_size;
 		ccb->pkt_dmacookies[i].dmac_size =
 		    ccb->resid_dmacookie.dmac_size;
@@ -2218,8 +2217,8 @@ arcmsr_seek_cmd2abort(struct ACB *acb, struct scsi_pkt *abortpkt)
  * Autoconfiguration support
  */
 static int
-arcmsr_parse_devname(char *devnm, int *tgt, int *lun) {
-
+arcmsr_parse_devname(char *devnm, int *tgt, int *lun)
+{
 	char devbuf[SCSI_MAXNAMELEN];
 	char *addr;
 	char *p,  *tp, *lp;
@@ -3436,8 +3435,8 @@ arcmsr_devMap_monitor(void* arg)
 
 
 static uint32_t
-arcmsr_disable_allintr(struct ACB *acb) {
-
+arcmsr_disable_allintr(struct ACB *acb)
+{
 	uint32_t intmask_org;
 
 	switch (acb->adapter_type) {
@@ -3489,8 +3488,8 @@ arcmsr_disable_allintr(struct ACB *acb) {
 
 
 static void
-arcmsr_enable_allintr(struct ACB *acb, uint32_t intmask_org) {
-
+arcmsr_enable_allintr(struct ACB *acb, uint32_t intmask_org)
+{
 	int mask;
 
 	switch (acb->adapter_type) {
@@ -3691,9 +3690,10 @@ arcmsr_hbc_wait_msgint_ready(struct ACB *acb)
 	return (FALSE);
 }
 
-static void
-arcmsr_flush_hba_cache(struct ACB *acb) {
 
+static void
+arcmsr_flush_hba_cache(struct ACB *acb)
+{
 	struct HBA_msgUnit *phbamu;
 	int retry_count = 30;
 
@@ -3712,11 +3712,9 @@ arcmsr_flush_hba_cache(struct ACB *acb) {
 	} while (retry_count != 0);
 }
 
-
-
 static void
-arcmsr_flush_hbb_cache(struct ACB *acb) {
-
+arcmsr_flush_hbb_cache(struct ACB *acb)
+{
 	struct HBB_msgUnit *phbbmu;
 	int retry_count = 30;
 
@@ -4805,8 +4803,8 @@ arcmsr_get_hbc_config(struct ACB *acb)
 
 /* start background rebuild */
 static void
-arcmsr_start_hba_bgrb(struct ACB *acb) {
-
+arcmsr_start_hba_bgrb(struct ACB *acb)
+{
 	struct HBA_msgUnit *phbamu;
 
 	phbamu = (struct HBA_msgUnit *)acb->pmu;
@@ -4822,8 +4820,8 @@ arcmsr_start_hba_bgrb(struct ACB *acb) {
 
 
 static void
-arcmsr_start_hbb_bgrb(struct ACB *acb) {
-
+arcmsr_start_hbb_bgrb(struct ACB *acb)
+{
 	struct HBB_msgUnit *phbbmu;
 
 	phbbmu = (struct HBB_msgUnit *)acb->pmu;
@@ -4840,8 +4838,8 @@ arcmsr_start_hbb_bgrb(struct ACB *acb) {
 
 
 static void
-arcmsr_start_hbc_bgrb(struct ACB *acb) {
-
+arcmsr_start_hbc_bgrb(struct ACB *acb)
+{
 	struct HBC_msgUnit *phbcmu;
 
 	phbcmu = (struct HBC_msgUnit *)acb->pmu;
@@ -5188,8 +5186,8 @@ arcmsr_handle_iop_bus_hold(struct ACB *acb)
 }
 
 static void
-arcmsr_iop2drv_data_wrote_handle(struct ACB *acb) {
-
+arcmsr_iop2drv_data_wrote_handle(struct ACB *acb)
+{
 	struct QBUFFER *prbuffer;
 	uint8_t *pQbuffer;
 	uint8_t *iop_data;
@@ -5226,8 +5224,8 @@ arcmsr_iop2drv_data_wrote_handle(struct ACB *acb) {
 
 
 static void
-arcmsr_iop2drv_data_read_handle(struct ACB *acb) {
-
+arcmsr_iop2drv_data_read_handle(struct ACB *acb)
+{
 	acb->acb_flags |= ACB_F_MESSAGE_WQBUFFER_READ;
 	/*
 	 * check if there are any mail packages from user space program
@@ -5500,8 +5498,8 @@ arcmsr_hbc_postqueue_isr(struct ACB *acb)
 
 
 static uint_t
-arcmsr_handle_hba_isr(struct ACB *acb) {
-
+arcmsr_handle_hba_isr(struct ACB *acb)
+{
 	uint32_t outbound_intstatus;
 	struct HBA_msgUnit *phbamu;
 
@@ -5534,8 +5532,8 @@ arcmsr_handle_hba_isr(struct ACB *acb) {
 
 
 static uint_t
-arcmsr_handle_hbb_isr(struct ACB *acb) {
-
+arcmsr_handle_hbb_isr(struct ACB *acb)
+{
 	uint32_t outbound_doorbell;
 	struct HBB_msgUnit *phbbmu;
 
@@ -5639,8 +5637,8 @@ arcmsr_intr_handler(caddr_t arg, caddr_t arg2)
 
 
 static void
-arcmsr_wait_firmware_ready(struct ACB *acb) {
-
+arcmsr_wait_firmware_ready(struct ACB *acb)
+{
 	uint32_t firmware_state;
 
 	firmware_state = 0;
@@ -5666,7 +5664,7 @@ arcmsr_wait_firmware_ready(struct ACB *acb) {
 		do {
 			firmware_state =
 			    CHIP_REG_READ32(acb->reg_mu_acc_handle0,
-				&phbbmu->hbb_doorbell->iop2drv_doorbell);
+			    &phbbmu->hbb_doorbell->iop2drv_doorbell);
 		} while ((firmware_state & ARCMSR_MESSAGE_FIRMWARE_OK) == 0);
 		CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
 		    &phbbmu->hbb_doorbell->drv2iop_doorbell,
@@ -5681,7 +5679,7 @@ arcmsr_wait_firmware_ready(struct ACB *acb) {
 		do {
 			firmware_state =
 			    CHIP_REG_READ32(acb->reg_mu_acc_handle0,
-				&phbcmu->outbound_msgaddr1);
+			    &phbcmu->outbound_msgaddr1);
 		} while ((firmware_state & ARCMSR_HBCMU_MESSAGE_FIRMWARE_OK)
 		    == 0);
 		break;
@@ -5749,8 +5747,8 @@ arcmsr_clear_doorbell_queue_buffer(struct ACB *acb)
 
 
 static uint32_t
-arcmsr_iop_confirm(struct ACB *acb) {
-
+arcmsr_iop_confirm(struct ACB *acb)
+{
 	uint64_t cdb_phyaddr;
 	uint32_t cdb_phyaddr_hi32;
 

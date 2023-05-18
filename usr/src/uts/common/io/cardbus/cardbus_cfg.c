@@ -304,19 +304,19 @@ cardbus_validate_iline(dev_info_t *dip, ddi_acc_handle_t handle)
 	intline = pci_config_get8(handle, PCI_CONF_ILINE);
 	if ((intline == 0) || (intline == 0xff)) {
 		intline = ddi_getprop(DDI_DEV_T_ANY, dip,
-			DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
-			"interrupt-line", 0xff);
+		    DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
+		    "interrupt-line", 0xff);
 		if (intline == (uint8_t)0xff) {
 			intline = ddi_getprop(DDI_DEV_T_ANY,
-				ddi_get_parent(dip),
-				DDI_PROP_CANSLEEP /* |DDI_PROP_DONTPASS */,
-				"interrupt-line", 0xb);
+			    ddi_get_parent(dip),
+			    DDI_PROP_CANSLEEP /* |DDI_PROP_DONTPASS */,
+			    "interrupt-line", 0xb);
 		}
 
 		pci_config_put8(handle, PCI_CONF_ILINE, intline);
 	}
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-		"interrupt-line", intline);
+	    "interrupt-line", intline);
 	}
 	return (intline);
 }
@@ -352,7 +352,7 @@ cardbus_configure(cbus_t *cbp)
 	 */
 	if (ndi_devi_set_nodename(attach_point,
 	    "hp_attachment", 0) != NDI_SUCCESS) {
-	    cardbus_err(cbp->cb_dip, 1,
+		cardbus_err(cbp->cb_dip, 1,
 		    "Failed to set nodename for attachment node\n");
 		(void) ndi_devi_free(attach_point);
 		return (PCICFG_FAILURE);
@@ -708,7 +708,7 @@ cardbus_topbridge_assign(dev_info_t *dip, cardbus_phdl_t *entry)
 
 static int
 cardbus_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
-			ddi_acc_handle_t handle)
+    ddi_acc_handle_t handle)
 {
 	cardbus_range_t range[PCICFG_RANGE_LEN];
 	int bus_range[2];
@@ -722,8 +722,8 @@ cardbus_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
 
 	range[0].child_hi = range[0].parent_hi |= (PCI_REG_REL_M | PCI_ADDR_IO);
 	range[0].child_lo = range[0].parent_lo = entry->io_last;
-	range[1].child_hi = range[1].parent_hi |= (PCI_REG_REL_M |
-						PCI_ADDR_MEM32);
+	range[1].child_hi = range[1].parent_hi |=
+	    (PCI_REG_REL_M | PCI_ADDR_MEM32);
 	range[1].child_lo = range[1].parent_lo = entry->memory_last;
 
 	ndi_devi_enter(dip);
@@ -820,7 +820,7 @@ cardbus_bridge_assign(dev_info_t *dip, void *hdl)
 	}
 
 	header_type = pci_config_get8(handle, PCI_CONF_HEADER) &
-		PCI_HEADER_TYPE_M;
+	    PCI_HEADER_TYPE_M;
 	base_class = pci_config_get8(handle, PCI_CONF_BASCLASS);
 
 	/*
@@ -865,7 +865,7 @@ cardbus_bridge_assign(dev_info_t *dip, void *hdl)
 	 * interrupt line with default values.
 	 */
 	if (pci_config_get8(handle, PCI_CONF_IPIN)) {
-	    pci_config_put8(handle, PCI_CONF_ILINE, 0xf);
+		pci_config_put8(handle, PCI_CONF_ILINE, 0xf);
 	}
 #else
 	(void) cardbus_validate_iline(dip, handle);
@@ -906,8 +906,8 @@ cardbus_bridge_assign(dev_info_t *dip, void *hdl)
 				    pci_config_get32(handle, offset), offset);
 				cardbus_err(dip, 8,
 				    "REGISTER (64)HI [0x%x] ----> [0x%02x]\n",
-				    pci_config_get32(handle, offset+4),
-					offset+4);
+				    pci_config_get32(handle, offset + 4),
+				    offset + 4);
 				reg[i].pci_phys_low = PCICFG_HIADDR(mem_answer);
 				reg[i].pci_phys_mid = PCICFG_LOADDR(mem_answer);
 				break;
@@ -925,21 +925,20 @@ cardbus_bridge_assign(dev_info_t *dip, void *hdl)
 				reg[i].pci_phys_low = (uint32_t)mem_answer;
 				reg[i].pci_phys_mid = 0;
 				if (((PCI_BASE_TYPE_M & request) ==
-					PCI_BASE_TYPE_ALL) &&
+				    PCI_BASE_TYPE_ALL) &&
 				    ((PCI_BASE_SPACE_M & request) ==
-					PCI_BASE_SPACE_MEM)) {
+				    PCI_BASE_SPACE_MEM)) {
 					cardbus_err(dip, 8,
 					    "REGISTER (64)LO [0x%x] ----> "
 					    "[0x%02x]\n",
 					    pci_config_get32(handle, offset),
-						offset);
-					    pci_config_put32(handle,
-						offset + 4, 0);
+					    offset);
+					pci_config_put32(handle, offset + 4, 0);
 					cardbus_err(dip, 8,
 					    "REGISTER (64)HI [0x%x] ----> "
 					    "[0x%02x]\n",
 					    pci_config_get32(handle, offset+4),
-						offset+4);
+					    offset + 4);
 				} else {
 					cardbus_err(dip, 8,
 					    "REGISTER (32)LO [0x%x] ----> "
@@ -996,7 +995,7 @@ bad_device:
 
 static int
 cardbus_isa_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
-			ddi_acc_handle_t handle)
+    ddi_acc_handle_t handle)
 {
 	struct ebus_pci_rangespec range;
 	pci_regspec_t *reg;
@@ -1016,7 +1015,7 @@ cardbus_isa_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
 	 * interrupt line with default values.
 	 */
 	if (pci_config_get8(handle, PCI_CONF_IPIN)) {
-	    pci_config_put8(handle, PCI_CONF_ILINE, 0xf);
+		pci_config_put8(handle, PCI_CONF_ILINE, 0xf);
 	}
 #else
 	(void) cardbus_validate_iline(dip, handle);
@@ -1048,8 +1047,8 @@ cardbus_isa_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
 				reg[i].pci_phys_low = io_answer;
 				range.phys_hi = 0;
 				range.phys_low = io_answer;
-				range.par_phys_hi = reg[i].pci_phys_hi |
-						PCI_REG_REL_M;
+				range.par_phys_hi =
+				    reg[i].pci_phys_hi | PCI_REG_REL_M;
 				range.par_phys_low = reg[i].pci_phys_low;
 				range.par_phys_mid = reg[i].pci_phys_mid;
 				range.rng_size = reg[i].pci_size_low;
@@ -1078,7 +1077,7 @@ cardbus_isa_bridge_ranges(dev_info_t *dip, cardbus_phdl_t *entry,
 		/* i_ndi_block_device_tree_changes(&count); */
 		ndi_devi_enter(dip);
 		ddi_walk_devs(ddi_get_child(dip),
-			cardbus_add_isa_reg, (void *)&isa_phdl);
+		    cardbus_add_isa_reg, (void *)&isa_phdl);
 		/* i_ndi_allow_device_tree_changes(count); */
 		ndi_devi_exit(dip);
 	}
@@ -1236,9 +1235,8 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 
 	mem_request->ra_len += cardbus_min_spare_mem;
 	if (mem_request->ra_len) {
-		mem_request->ra_len = PCICFG_ROUND_UP(
-					mem_request->ra_len,
-					phdl->memory_gran);
+		mem_request->ra_len =
+		    PCICFG_ROUND_UP(mem_request->ra_len, phdl->memory_gran);
 #ifdef _LP64
 		cardbus_err(dip, 8,
 		    "cardbus_allocate_chunk: ndi_ra_alloc 0x%lx bytes\n",
@@ -1252,7 +1250,7 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 		if (pcmcia_alloc_mem(dip, mem_request, &res,
 		    &phdl->res_dip) != NDI_SUCCESS) {
 			cmn_err(CE_WARN, "Failed to allocate memory for %s\n",
-				ddi_driver_name(dip));
+			    ddi_driver_name(dip));
 			return (PCICFG_FAILURE);
 		}
 
@@ -1272,14 +1270,14 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 #endif
 		io_request->ra_flags |= NDI_RA_ALLOC_BOUNDED;
 		io_request->ra_len = PCICFG_ROUND_UP(io_request->ra_len,
-				phdl->io_gran);
+		    phdl->io_gran);
 		io_request->ra_align_mask = max(PCICFG_IOGRAN,
-				phdl->io_gran) - 1;
+		    phdl->io_gran) - 1;
 
 		if (pcmcia_alloc_io(dip, io_request, &res,
 		    &phdl->res_dip) != NDI_SUCCESS) {
 			cmn_err(CE_WARN, "Failed to allocate I/O space "
-				"for %s\n", ddi_driver_name(dip));
+			    "for %s\n", ddi_driver_name(dip));
 			if (mem_request->ra_len) {
 				res.ra_addr_lo = phdl->memory_base;
 				res.ra_len = phdl->memory_len;
@@ -1350,7 +1348,7 @@ cardbus_free_chunk(dev_info_t *dip)
  */
 static void
 cardbus_setup_bridge(dev_info_t *dip, cardbus_phdl_t *entry,
-		ddi_acc_handle_t handle)
+    ddi_acc_handle_t handle)
 {
 	uint8_t header_type = pci_config_get8(handle, PCI_CONF_HEADER);
 
@@ -1450,7 +1448,7 @@ cardbus_setup_bridge(dev_info_t *dip, cardbus_phdl_t *entry,
 		 * interrupt line with default values.
 		 */
 		if (pci_config_get8(handle, PCI_CONF_IPIN)) {
-		    pci_config_put8(handle, PCI_CONF_ILINE, 0xf);
+			pci_config_put8(handle, PCI_CONF_ILINE, 0xf);
 		}
 #else
 		(void) cardbus_validate_iline(dip, handle);
@@ -1509,7 +1507,7 @@ cardbus_setup_bridge(dev_info_t *dip, cardbus_phdl_t *entry,
 		 * interrupt line with default values.
 		 */
 		if (pci_config_get8(handle, PCI_CONF_IPIN)) {
-		    pci_config_put8(handle, PCI_CONF_ILINE, 0xf);
+			pci_config_put8(handle, PCI_CONF_ILINE, 0xf);
 		}
 #else
 		(void) cardbus_validate_iline(dip, handle);
@@ -1533,12 +1531,12 @@ cardbus_setup_bridge(dev_info_t *dip, cardbus_phdl_t *entry,
 
 static void
 cardbus_update_bridge(dev_info_t *dip, cardbus_phdl_t *entry,
-		ddi_acc_handle_t handle)
+    ddi_acc_handle_t handle)
 {
 	uint_t length;
 	uint16_t word16 = pci_config_get16(handle, PCI_CONF_COMM);
-	const	uint8_t header_type = pci_config_get8(handle, PCI_CONF_HEADER)
-			& PCI_HEADER_TYPE_M;
+	const uint8_t header_type =
+	    pci_config_get8(handle, PCI_CONF_HEADER) & PCI_HEADER_TYPE_M;
 	uint32_t bridge_gran;
 	uint64_t rlval;
 
@@ -1691,7 +1689,7 @@ cardbus_update_bridge(dev_info_t *dip, cardbus_phdl_t *entry,
 
 static void
 cardbus_get_mem(dev_info_t *dip, cardbus_phdl_t *entry,
-		uint32_t length, uint64_t *ans)
+    uint32_t length, uint64_t *ans)
 {
 	uint32_t hole;
 
@@ -1713,8 +1711,8 @@ cardbus_get_mem(dev_info_t *dip, cardbus_phdl_t *entry,
 		/*
 		 * Round up the request to the "size" boundary
 		 */
-		hole = PCICFG_ROUND_UP(entry->memory_last, length)
-			- entry->memory_last;
+		hole = PCICFG_ROUND_UP(entry->memory_last, length) -
+		    entry->memory_last;
 		if (hole != 0) {
 			(void) cardbus_update_available_prop(dip,
 			    PCI_ADDR_MEM32,
@@ -1736,8 +1734,8 @@ cardbus_get_mem(dev_info_t *dip, cardbus_phdl_t *entry,
 		}
 	} else
 		(void) cardbus_update_available_prop(dip, PCI_ADDR_MEM32,
-			entry->memory_last,
-			(uint64_t)length);
+		    entry->memory_last,
+		    (uint64_t)length);
 
 	/*
 	 * These routines should parcel out the memory
@@ -1746,12 +1744,11 @@ cardbus_get_mem(dev_info_t *dip, cardbus_phdl_t *entry,
 	 */
 	if ((entry->memory_last + length) >
 	    (entry->memory_base + entry->memory_len))
-#ifdef  _LP64
 		cardbus_err(NULL, 1,
+#ifdef  _LP64
 		    "cardbus_get_mem: assert will fail %ld <= %ld,"
 		    "(0x%lx + 0x%x) <= (0x%lx + 0x%lx)\n",
 #else
-		cardbus_err(NULL, 1,
 		    "cardbus_get_mem: assert will fail %lld <= %lld, "
 		    "(0x%llx + 0x%x) <= (0x%llx + 0x%llx)\n",
 #endif
@@ -1763,7 +1760,7 @@ cardbus_get_mem(dev_info_t *dip, cardbus_phdl_t *entry,
 		    entry->memory_len);
 
 	ASSERT((entry->memory_last + length) <=
-	(entry->memory_base + entry->memory_len));
+	    (entry->memory_base + entry->memory_len));
 	/*
 	 * If ans is NULL don't return anything,
 	 * they are just asking to reserve the memory.
@@ -1779,7 +1776,7 @@ cardbus_get_mem(dev_info_t *dip, cardbus_phdl_t *entry,
 
 static void
 cardbus_get_io(dev_info_t *dip, cardbus_phdl_t *entry,
-		uint32_t length, uint32_t *ans)
+    uint32_t length, uint32_t *ans)
 {
 	uint32_t	hole;
 
@@ -1897,22 +1894,22 @@ cardbus_sum_resources(dev_info_t *dip, void *hdl)
 					    "memory gran "
 					    "[0x%lx] -> [0x%lx]\n",
 					    PCICFG_ROUND_UP(mem_request->ra_len,
-						PCICFG_MEMGRAN) -
-						mem_request->ra_len,
+					    PCICFG_MEMGRAN) -
+					    mem_request->ra_len,
 					    mem_request->ra_len,
 					    PCICFG_ROUND_UP(mem_request->ra_len,
-						PCICFG_MEMGRAN));
+					    PCICFG_MEMGRAN));
 #else
 					cardbus_err(dip, 8,
 					    "Pre-align [0x%llx] to PCI bridge "
 					    "memory gran "
 					    "[0x%llx] -> [0x%lx]\n",
 					    PCICFG_ROUND_UP(mem_request->ra_len,
-						PCICFG_MEMGRAN) -
-						mem_request->ra_len,
+					    PCICFG_MEMGRAN) -
+					    mem_request->ra_len,
 					    mem_request->ra_len,
 					    PCICFG_ROUND_UP(mem_request->ra_len,
-						PCICFG_MEMGRAN));
+					    PCICFG_MEMGRAN));
 #endif
 				}
 
@@ -1926,32 +1923,30 @@ cardbus_sum_resources(dev_info_t *dip, void *hdl)
 					    "I/O gran "
 					    "[0x%lx] -> [0x%lx]\n",
 					    PCICFG_ROUND_UP(io_request->ra_len,
-						PCICFG_IOGRAN) -
-						io_request->ra_len,
+					    PCICFG_IOGRAN) -
+					    io_request->ra_len,
 					    io_request->ra_len,
 					    PCICFG_ROUND_UP(io_request->ra_len,
-						PCICFG_IOGRAN));
+					    PCICFG_IOGRAN));
 #else
 					cardbus_err(dip, 8,
 					    "Pre-align [0x%llx] to PCI bridge "
 					    "I/O gran "
 					    "[0x%llx] -> [0x%lx]\n",
 					    PCICFG_ROUND_UP(io_request->ra_len,
-						PCICFG_IOGRAN) -
-						io_request->ra_len,
+					    PCICFG_IOGRAN) -
+					    io_request->ra_len,
 					    io_request->ra_len,
 					    PCICFG_ROUND_UP(io_request->ra_len,
-						PCICFG_IOGRAN));
+					    PCICFG_IOGRAN));
 #endif
 				}
 
 #endif
 				mem_request->ra_len = PCICFG_ROUND_UP(
-							mem_request->ra_len,
-							PCICFG_MEMGRAN);
+				    mem_request->ra_len, PCICFG_MEMGRAN);
 				io_request->ra_len = PCICFG_ROUND_UP(
-							io_request->ra_len,
-							PCICFG_IOGRAN);
+				    io_request->ra_len, PCICFG_IOGRAN);
 				if (entry->memory_gran < PCICFG_MEMGRAN)
 					entry->memory_gran = PCICFG_MEMGRAN;
 				if (entry->io_gran < PCICFG_IOGRAN)
@@ -1970,28 +1965,28 @@ cardbus_sum_resources(dev_info_t *dip, void *hdl)
 					    "memory gran "
 					    "[0x%lx] -> [0x%lx]\n",
 					    PCICFG_ROUND_UP(
-						mem_request->ra_len +
-						cardbus_min_spare_mem,
-						PCICFG_MEMGRAN) -
-						mem_request->ra_len,
+					    mem_request->ra_len +
+					    cardbus_min_spare_mem,
+					    PCICFG_MEMGRAN) -
+					    mem_request->ra_len,
 					    mem_request->ra_len,
 					    PCICFG_ROUND_UP(mem_request->ra_len
-						+ cardbus_min_spare_mem,
-						PCICFG_MEMGRAN));
+					    + cardbus_min_spare_mem,
+					    PCICFG_MEMGRAN));
 #else
 					cardbus_err(dip, 8,
 					    "Post-align [0x%llx] to PCI bridge "
 					    "memory gran "
 					    "[0x%llx] -> [0x%lx]\n",
 					    PCICFG_ROUND_UP(
-						mem_request->ra_len +
-						cardbus_min_spare_mem,
-						PCICFG_MEMGRAN) -
-						mem_request->ra_len,
+					    mem_request->ra_len +
+					    cardbus_min_spare_mem,
+					    PCICFG_MEMGRAN) -
+					    mem_request->ra_len,
 					    mem_request->ra_len,
 					    PCICFG_ROUND_UP(mem_request->ra_len
-						+ cardbus_min_spare_mem,
-						PCICFG_MEMGRAN));
+					    + cardbus_min_spare_mem,
+					    PCICFG_MEMGRAN));
 #endif
 				}
 
@@ -2006,37 +2001,35 @@ cardbus_sum_resources(dev_info_t *dip, void *hdl)
 					    "I/O gran "
 					    "[0x%lx] -> [0x%lx]\n",
 					    PCICFG_ROUND_UP(io_request->ra_len +
-						cardbus_min_spare_io,
-						PCICFG_IOGRAN) -
-						io_request->ra_len,
+					    cardbus_min_spare_io,
+					    PCICFG_IOGRAN) -
+					    io_request->ra_len,
 					    io_request->ra_len,
 					    PCICFG_ROUND_UP(io_request->ra_len +
-						cardbus_min_spare_io,
-						PCICFG_IOGRAN));
+					    cardbus_min_spare_io,
+					    PCICFG_IOGRAN));
 #else
 					cardbus_err(dip, 8,
 					    "Post-align [0x%llx] to PCI bridge "
 					    "I/O gran "
 					    "[0x%llx] -> [0x%lx]\n",
 					    PCICFG_ROUND_UP(io_request->ra_len +
-						cardbus_min_spare_io,
-						PCICFG_IOGRAN) -
-						io_request->ra_len,
+					    cardbus_min_spare_io,
+					    PCICFG_IOGRAN) -
+					    io_request->ra_len,
 					    io_request->ra_len,
 					    PCICFG_ROUND_UP(io_request->ra_len +
-						cardbus_min_spare_io,
-						PCICFG_IOGRAN));
+					    cardbus_min_spare_io,
+					    PCICFG_IOGRAN));
 #endif
 				}
 #endif
 				mem_request->ra_len = PCICFG_ROUND_UP(
-						mem_request->ra_len +
-						    cardbus_min_spare_mem,
-						PCICFG_MEMGRAN);
+				    mem_request->ra_len + cardbus_min_spare_mem,
+				    PCICFG_MEMGRAN);
 				io_request->ra_len = PCICFG_ROUND_UP(
-						io_request->ra_len +
-						    cardbus_min_spare_io,
-						PCICFG_IOGRAN);
+				    io_request->ra_len + cardbus_min_spare_io,
+				    PCICFG_IOGRAN);
 			}
 			return (DDI_WALK_PRUNECHILD);
 
@@ -2092,9 +2085,9 @@ cardbus_sum_resources(dev_info_t *dip, void *hdl)
 
 		case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
 			mem_request->ra_len =
-				pci_rp[i].pci_size_low +
-				PCICFG_ROUND_UP(mem_request->ra_len,
-					pci_rp[i].pci_size_low);
+			    pci_rp[i].pci_size_low +
+			    PCICFG_ROUND_UP(mem_request->ra_len,
+			    pci_rp[i].pci_size_low);
 
 			cardbus_err(dip, 8,
 			    "ADDING 32 --->0x%x for BAR@0x%x\n",
@@ -2111,9 +2104,9 @@ cardbus_sum_resources(dev_info_t *dip, void *hdl)
 
 		case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
 			mem_request->ra_len =
-				pci_rp[i].pci_size_low +
-				PCICFG_ROUND_UP(mem_request->ra_len,
-					pci_rp[i].pci_size_low);
+			    pci_rp[i].pci_size_low +
+			    PCICFG_ROUND_UP(mem_request->ra_len,
+			    pci_rp[i].pci_size_low);
 			cardbus_err(dip, 8,
 			    "ADDING 64 --->0x%x for BAR@0x%x\n",
 			    pci_rp[i].pci_size_low,
@@ -2125,9 +2118,9 @@ cardbus_sum_resources(dev_info_t *dip, void *hdl)
 
 		case PCI_REG_ADDR_G(PCI_ADDR_IO):
 			io_request->ra_len =
-				pci_rp[i].pci_size_low +
-				PCICFG_ROUND_UP(io_request->ra_len,
-					pci_rp[i].pci_size_low);
+			    pci_rp[i].pci_size_low +
+			    PCICFG_ROUND_UP(io_request->ra_len,
+			    pci_rp[i].pci_size_low);
 			cardbus_err(dip, 8,
 			    "ADDING I/O --->0x%x for BAR@0x%x\n",
 			    pci_rp[i].pci_size_low,
@@ -2324,7 +2317,7 @@ cardbus_free_resources(dev_info_t *dip)
 	uint32_t classcode;
 
 	classcode = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-				"class-code", -1);
+	    "class-code", -1);
 	/*
 	 * A different algorithim is used for bridges and leaf devices.
 	 */
@@ -2350,7 +2343,7 @@ cardbus_free_resources(dev_info_t *dip)
 
 static int
 cardbus_probe_bridge(cbus_t *cbp, dev_info_t *attpt, uint_t bus,
-			uint_t device, uint_t func)
+    uint_t device, uint_t func)
 {
 	/* Declairations */
 	cardbus_bus_range_t	*bus_range;
@@ -2396,7 +2389,7 @@ cardbus_probe_bridge(cbus_t *cbp, dev_info_t *attpt, uint_t bus,
 	cardbus_err(cbp->cb_dip, 8,
 	    "--%s bridge found root bus [0x%x] device [0x%x] func [0x%x]\n",
 	    ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) ?
-		"PCI-PCI" : "Cardbus",
+	    "PCI-PCI" : "Cardbus",
 	    bus, device, func);
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, cbp->cb_dip, 0, "bus-range",
@@ -2485,7 +2478,7 @@ static struct isa_node isa_nodes[] = {
 
 static int
 cardbus_probe_children(cbus_t *cbp, dev_info_t *parent, uint_t bus,
-			uint_t device, uint_t func, uint8_t *header_type)
+    uint_t device, uint_t func, uint8_t *header_type)
 {
 	dev_info_t		*new_child;
 	ddi_acc_handle_t	config_handle;
@@ -2549,8 +2542,8 @@ cardbus_probe_children(cbus_t *cbp, dev_info_t *parent, uint_t bus,
 		 */
 		*header_type = pci_config_get8(config_handle, PCI_CONF_HEADER);
 	} else if (!(*header_type & PCI_HEADER_MULTI) ||
-		    ((*header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) ||
-		    (base_class == PCI_CLASS_BRIDGE)) {
+	    ((*header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) ||
+	    (base_class == PCI_CLASS_BRIDGE)) {
 
 		(void) cardbus_config_teardown(&config_handle);
 		(void) ndi_devi_free(new_child);
@@ -2685,8 +2678,8 @@ cardbus_probe_children(cbus_t *cbp, dev_info_t *parent, uint_t bus,
 							    "func [0x%x]\n",
 							    new_bus, i, j);
 							disable_pci_pci_bridge(
-								new_child,
-								config_handle);
+							    new_child,
+							    config_handle);
 							goto failedchild;
 
 						case PCICFG_NODEVICE:
@@ -2901,9 +2894,9 @@ leaf_node:
 		if (cbp->cb_dsp) {
 			struct cb_deviceset_props *cdsp = cbp->cb_dsp;
 			uint16_t venid = pci_config_get16(config_handle,
-						PCI_CONF_VENID);
+			    PCI_CONF_VENID);
 			uint16_t devid = pci_config_get16(config_handle,
-						PCI_CONF_DEVID);
+			    PCI_CONF_DEVID);
 			ddi_prop_t *propp;
 
 			for (cdsp = cbp->cb_dsp; cdsp; cdsp = cdsp->next) {
@@ -2989,9 +2982,9 @@ leaf_node:
 			 * only if memory space
 			 */
 			if (((PCI_BASE_TYPE_M & request)
-				== PCI_BASE_TYPE_ALL) &&
+			    == PCI_BASE_TYPE_ALL) &&
 			    ((PCI_BASE_SPACE_M & request)
-				== PCI_BASE_SPACE_MEM)) {
+			    == PCI_BASE_SPACE_MEM)) {
 				cardbus_err(parent, 8,
 				    "BASE register [0x%x] asks for "
 				    "[0x%x]=[0x%x] (64)\n",
@@ -3061,7 +3054,7 @@ failedconfig:
 
 static int
 cardbus_add_config_reg(dev_info_t *dip,
-		uint_t bus, uint_t device, uint_t func)
+    uint_t bus, uint_t device, uint_t func)
 {
 	int reg[10] = { PCI_ADDR_CONFIG, 0, 0, 0, 0};
 
@@ -3337,7 +3330,7 @@ cardbus_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 
 static int
 cardbus_update_available_prop(dev_info_t *dip, uint32_t hi_type,
-				uint64_t base, uint64_t size)
+    uint64_t base, uint64_t size)
 {
 	int		alen, rlen;
 	pci_regspec_t	*available, *reg;
@@ -3530,9 +3523,9 @@ cardbus_update_reg_prop(dev_info_t *dip, uint32_t regvalue, uint_t reg_offset)
 	 * Build the regspec, then add it to the existing one(s)
 	 */
 	hiword = PCICFG_MAKE_REG_HIGH(PCI_REG_BUS_G(reg->pci_phys_hi),
-			PCI_REG_DEV_G(reg->pci_phys_hi),
-			PCI_REG_FUNC_G(reg->pci_phys_hi),
-			reg_offset);
+	    PCI_REG_DEV_G(reg->pci_phys_hi),
+	    PCI_REG_FUNC_G(reg->pci_phys_hi),
+	    reg_offset);
 
 	if (reg_offset == PCI_CONF_ROM) {
 		size = (~(PCI_BASE_ROM_ADDR_M & regvalue))+1;
@@ -3544,7 +3537,7 @@ cardbus_update_reg_prop(dev_info_t *dip, uint32_t regvalue, uint_t reg_offset)
 			if ((PCI_BASE_TYPE_M & regvalue) == PCI_BASE_TYPE_MEM) {
 				hiword |= PCI_ADDR_MEM32;
 			} else if ((PCI_BASE_TYPE_M & regvalue)
-				    == PCI_BASE_TYPE_ALL) {
+			    == PCI_BASE_TYPE_ALL) {
 				/*
 				 * This is a 64 bit PCI memory space.
 				 * It needs to be allocated as 32 bit
@@ -3590,7 +3583,7 @@ cardbus_update_reg_prop(dev_info_t *dip, uint32_t regvalue, uint_t reg_offset)
  */
 static int
 cardbus_set_standard_props(dev_info_t *parent, dev_info_t *dip,
-			ddi_acc_handle_t config_handle)
+    ddi_acc_handle_t config_handle)
 {
 	int ret;
 	uint16_t val;
@@ -3645,7 +3638,7 @@ cardbus_set_standard_props(dev_info_t *parent, dev_info_t *dip,
 	}
 
 	wordval = (pci_config_get16(config_handle, PCI_CONF_SUBCLASS)<< 8) |
-		(pci_config_get8(config_handle, PCI_CONF_PROGCLASS));
+	    (pci_config_get8(config_handle, PCI_CONF_PROGCLASS));
 
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 	    "class-code", wordval)) != DDI_SUCCESS) {
@@ -3757,7 +3750,7 @@ cardbus_set_standard_props(dev_info_t *parent, dev_info_t *dip,
  */
 static int
 cardbus_set_isa_props(dev_info_t *parent, dev_info_t *dip,
-			char *name, char *compat[])
+    char *name, char *compat[])
 {
 	int ret, n;
 
@@ -3966,7 +3959,7 @@ cardbus_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle)
  */
 static void
 cardbus_set_bus_numbers(ddi_acc_handle_t config_handle,
-			uint_t primary, uint_t secondary)
+    uint_t primary, uint_t secondary)
 {
 	cardbus_err(NULL, 8,
 	    "cardbus_set_bus_numbers [%d->%d]\n", primary, secondary);
@@ -4043,7 +4036,7 @@ enable_pci_pci_bridge(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	 */
 	if (!(bctrl & PCI_BCNF_BCNTRL_RESET))
 		pci_config_put16(config_handle, PCI_CBUS_BRIDGE_CTRL,
-			bctrl | PCI_BCNF_BCNTRL_RESET);
+		    bctrl | PCI_BCNF_BCNTRL_RESET);
 	else
 		bctrl &= ~PCI_BCNF_BCNTRL_RESET;
 
@@ -4092,7 +4085,7 @@ enable_cardbus_bridge(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	 */
 	if (!(bctrl & PCI_BCNF_BCNTRL_RESET))
 		pci_config_put16(config_handle, PCI_CBUS_BRIDGE_CTRL,
-			bctrl | PCI_BCNF_BCNTRL_RESET);
+		    bctrl | PCI_BCNF_BCNTRL_RESET);
 	else
 		bctrl &= ~PCI_BCNF_BCNTRL_RESET;
 
@@ -4383,8 +4376,7 @@ cardbus_dump_device_config(ddi_acc_handle_t config_handle)
 }
 
 static void
-cardbus_dump_bridge_config(ddi_acc_handle_t config_handle,
-			uint8_t header_type)
+cardbus_dump_bridge_config(ddi_acc_handle_t config_handle, uint8_t header_type)
 {
 	if (header_type == PCI_HEADER_PPB) {
 		cardbus_dump_common_config(config_handle);

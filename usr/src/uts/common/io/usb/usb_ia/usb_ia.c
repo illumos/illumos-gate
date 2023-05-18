@@ -85,9 +85,7 @@ static int usb_ia_busop_get_eventcookie(dev_info_t *dip,
 static int usb_ia_busop_add_eventcall(dev_info_t *dip,
 			dev_info_t *rdip,
 			ddi_eventcookie_t cookie,
-			void (*callback)(dev_info_t *dip,
-				ddi_eventcookie_t cookie, void *arg,
-				void *bus_impldata),
+			ddi_event_cb_f,
 			void *arg, ddi_callback_id_t *cb_id);
 static int usb_ia_busop_remove_eventcall(dev_info_t *dip,
 			ddi_callback_id_t cb_id);
@@ -318,10 +316,10 @@ usb_ia_post_detach(usb_ia_t *usb_ia, uint8_t ifno, struct detachspec *ds)
 /*ARGSUSED*/
 static int
 usb_ia_bus_ctl(dev_info_t *dip,
-	dev_info_t	*rdip,
-	ddi_ctl_enum_t	op,
-	void		*arg,
-	void		*result)
+    dev_info_t	*rdip,
+    ddi_ctl_enum_t	op,
+    void		*arg,
+    void		*result)
 {
 	usba_device_t *hub_usba_device = usba_get_usba_device(rdip);
 	dev_info_t *root_hub_dip = hub_usba_device->usb_root_hub_dip;
@@ -844,7 +842,7 @@ usb_ia_create_children(usb_ia_t *usb_ia)
  */
 static int
 usb_ia_busop_get_eventcookie(dev_info_t *dip,
-	dev_info_t *rdip, char *eventname, ddi_eventcookie_t *cookie)
+    dev_info_t *rdip, char *eventname, ddi_eventcookie_t *cookie)
 {
 	usb_ia_t  *usb_ia = usb_ia_obtain_state(dip);
 
@@ -864,12 +862,10 @@ usb_ia_busop_get_eventcookie(dev_info_t *dip,
 
 static int
 usb_ia_busop_add_eventcall(dev_info_t *dip,
-	dev_info_t *rdip,
-	ddi_eventcookie_t cookie,
-	void (*callback)(dev_info_t *dip,
-	    ddi_eventcookie_t cookie, void *arg,
-	    void *bus_impldata),
-	void *arg, ddi_callback_id_t *cb_id)
+    dev_info_t *rdip,
+    ddi_eventcookie_t cookie,
+    ddi_event_cb_f callback,
+    void *arg, ddi_callback_id_t *cb_id)
 {
 	int	ifno;
 	usb_ia_t  *usb_ia = usb_ia_obtain_state(dip);
@@ -945,9 +941,9 @@ usb_ia_busop_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
 
 static int
 usb_ia_busop_post_event(dev_info_t *dip,
-	dev_info_t *rdip,
-	ddi_eventcookie_t cookie,
-	void *bus_impldata)
+    dev_info_t *rdip,
+    ddi_eventcookie_t cookie,
+    void *bus_impldata)
 {
 	usb_ia_t  *usb_ia = usb_ia_obtain_state(dip);
 
@@ -1024,7 +1020,7 @@ usb_ia_restore_device_state(dev_info_t *dip, usb_ia_t *usb_ia)
  */
 static void
 usb_ia_event_cb(dev_info_t *dip, ddi_eventcookie_t cookie,
-	void *arg, void *bus_impldata)
+    void *arg, void *bus_impldata)
 {
 	int		i, tag;
 	usb_ia_t	*usb_ia = usb_ia_obtain_state(dip);

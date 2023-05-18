@@ -929,8 +929,8 @@ mdi_devi_enter_phci(dev_info_t *phci_dip)
  * mdi_devi_get_vdip():
  *		given a pHCI dip return vHCI dip
  * Returns:
- * 		the vHCI dip if it exists
- * 		else NULL
+ *		the vHCI dip if it exists
+ *		else NULL
  */
 dev_info_t *
 mdi_devi_get_vdip(dev_info_t *pdip)

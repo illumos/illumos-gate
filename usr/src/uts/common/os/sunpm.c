@@ -2822,7 +2822,7 @@ pm_try_parent_child_locks(dev_info_t *pdip, dev_info_t *dip)
 /*
  * Determine if the power lock owner is blocked by current thread.
  * returns :
- * 	1 - If the thread owning the effective power lock (the first lock on
+ *	1 - If the thread owning the effective power lock (the first lock on
  *          which a thread blocks when it does PM_LOCK_POWER) is blocked by
  *          a mutex held by the current thread.
  *

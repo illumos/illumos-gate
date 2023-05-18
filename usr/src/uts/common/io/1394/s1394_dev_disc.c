@@ -1016,11 +1016,12 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 					if ((status & S1394_LOCK_FAILED) != 0) {
 						locked = 0;
 					} else {
+						const s1394_free_cfgrom_t S =
+						    S1394_FREE_CFGROM_NEW;
 						if (CFGROM_NEW_ALLOC(node) ==
 						    B_TRUE) {
 							s1394_free_cfgrom(hal,
-							    node,
-							S1394_FREE_CFGROM_NEW);
+							    node, S);
 						} else {
 							CLEAR_CFGROM_STATE(
 							    node);
@@ -1034,7 +1035,7 @@ s1394_br_thread_handle_cmd_phase1(s1394_hal_t *hal, cmd1394_cmd_t *cmd)
 				/* got all of bus_info_blk */
 				SET_CFGROM_BIB_READ(node);
 				if (node->cfgrom_size == IEEE1394_BIB_QUAD_SZ)
-				    SET_CFGROM_ALL_READ(node);
+					SET_CFGROM_ALL_READ(node);
 				node->cfgrom_quad_to_read = quadlet;
 				done++;
 			}
@@ -2092,8 +2093,8 @@ s1394_do_bus_mgr_processing(s1394_hal_t *hal)
 	/* the IRM and there is > 1 nodes on the bus */
 	if ((number_of_nodes > 1) &&
 	    ((hal_bus_mgr_node == (int)hal_node_num) ||
-		((hal_bus_mgr_node == S1394_INVALID_NODE_NUM) &&
-		    (IRM_node_num == (int)hal_node_num)))) {
+	    ((hal_bus_mgr_node == S1394_INVALID_NODE_NUM) &&
+	    (IRM_node_num == (int)hal_node_num)))) {
 
 		IRM_flags = 0;
 
@@ -2209,7 +2210,7 @@ s1394_bus_mgr_timers_start(s1394_hal_t *hal, timeout_id_t *bus_mgr_query_tid,
 				/* Wait 125ms, then try to become bus manager */
 				*bus_mgr_tid = timeout(s1394_become_bus_mgr,
 				    hal, drv_usectohz(
-					IEEE1394_BM_INCUMBENT_TIMEOUT));
+				    IEEE1394_BM_INCUMBENT_TIMEOUT));
 
 				mutex_enter(&hal->topology_tree_mutex);
 			}
@@ -2561,8 +2562,8 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 	ASSERT(MUTEX_HELD(&hal->topology_tree_mutex));
 
 	if (((quadlet + 1) >= node->cfgrom_size) ||
-	    (CFGROM_SIZE_IS_CRCSIZE(node) == B_TRUE && (quadlet + 1) >=
-		node->cfgrom_valid_size)) {
+	    (CFGROM_SIZE_IS_CRCSIZE(node) == B_TRUE &&
+	    (quadlet + 1) >= node->cfgrom_valid_size)) {
 		return (1);
 	}
 
@@ -2689,7 +2690,7 @@ s1394_calc_next_quad(s1394_hal_t *hal, s1394_node_t *node, uint32_t quadlet,
 		donewithcurdir:
 
 			if ((i > node->cur_dir_start + node->cur_dir_size) ||
-				done_with_cur_dir == B_TRUE) {
+			    done_with_cur_dir == B_TRUE) {
 
 				/*
 				 * all done with cur dir; pop it off the stack

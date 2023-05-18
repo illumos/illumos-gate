@@ -833,7 +833,7 @@ acpidev_dr_device_has_edl(ACPI_HANDLE hdl)
 int
 acpidev_dr_device_is_present(ACPI_HANDLE hdl)
 {
-	int 		status;
+	int		status;
 
 	ASSERT(hdl != NULL);
 
@@ -848,7 +848,7 @@ acpidev_dr_device_is_present(ACPI_HANDLE hdl)
 int
 acpidev_dr_device_is_powered(ACPI_HANDLE hdl)
 {
-	int 		status;
+	int		status;
 
 	ASSERT(hdl != NULL);
 

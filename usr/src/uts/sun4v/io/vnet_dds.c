@@ -1052,7 +1052,7 @@ vdds_new_niu_node(dev_info_t *dip, void *arg, uint_t flags)
  */
 static dev_info_t *
 vdds_find_node(uint64_t cookie, dev_info_t *sdip,
-	int (*match_func)(dev_info_t *dip, void *arg))
+    int (*match_func)(dev_info_t *dip, void *arg))
 {
 	vdds_cb_arg_t arg;
 	dev_info_t *pdip;

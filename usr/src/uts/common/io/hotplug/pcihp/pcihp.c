@@ -741,7 +741,7 @@ pcihp_delete_occupant_props(dev_info_t *dip, dev_t dev)
 /* ARGSUSED */
 static int
 pcihp_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	pcihp_t *pcihp_p;
 	dev_info_t *self;
@@ -1968,7 +1968,7 @@ pcihp_uninit(dev_info_t *dip)
  */
 static int
 pcihp_new_slot_state(dev_info_t *dip, hpc_slot_t hdl,
-	hpc_slot_info_t *slot_info, int slot_state)
+    hpc_slot_info_t *slot_info, int slot_state)
 {
 	pcihp_t *pcihp_p;
 	struct pcihp_slotinfo *slotinfop;
@@ -2497,7 +2497,7 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 			ctrl.dip = NULL;
 			ctrl.pci_dev = pci_dev;
 			ctrl.op = PCIHP_ONLINE;
-				(void) pcihp_get_board_type(slotinfop);
+			(void) pcihp_get_board_type(slotinfop);
 
 			ndi_devi_enter(pcihp_p->dip);
 			ddi_walk_devs(ddi_get_child(pcihp_p->dip),
@@ -3199,7 +3199,7 @@ pcihp_probe_slot_state(dev_info_t *dip, int dev, hpc_slot_state_t *rstatep)
  */
 static int
 pcihp_handle_enum(pcihp_t *pcihp_p, int favorite_pci_dev, int opcode,
-	int kmflag)
+    int kmflag)
 {
 	struct pcihp_slotinfo *slotinfop;
 	int pci_dev, rc, event_serviced = 0;
@@ -3275,7 +3275,7 @@ enum_service_check:
  */
 static int
 pcihp_enum_slot(pcihp_t *pcihp_p, struct pcihp_slotinfo *slotinfop, int pci_dev,
-		int opcode, int kmflag)
+    int opcode, int kmflag)
 {
 	ddi_acc_handle_t handle;
 	dev_info_t *dip, *new_child = NULL;
@@ -3378,7 +3378,7 @@ pcihp_enum_slot(pcihp_t *pcihp_p, struct pcihp_slotinfo *slotinfop, int pci_dev,
  */
 static int
 pcihp_handle_enum_extraction(pcihp_t *pcihp_p, int pci_dev, int opcode,
-	int kmflag)
+    int kmflag)
 {
 	struct pcihp_slotinfo *slotinfop;
 	int rv = PCIHP_FAILURE;
@@ -3454,7 +3454,7 @@ pcihp_handle_enum_extraction(pcihp_t *pcihp_p, int pci_dev, int opcode,
  */
 static int
 pcihp_handle_enum_insertion(pcihp_t *pcihp_p, int pci_dev, int opcode,
-	int kmflag)
+    int kmflag)
 {
 	struct pcihp_slotinfo *slotinfop;
 	int rv = PCIHP_FAILURE;
@@ -3666,7 +3666,7 @@ pcihp_hs_csr_op(pcihp_t *pcihp_p, int pci_dev, int event)
 
 static int
 pcihp_config_setup(dev_info_t **dip, ddi_acc_handle_t *handle,
-			dev_info_t **new_child, int pci_dev, pcihp_t *pcihp_p)
+    dev_info_t **new_child, int pci_dev, pcihp_t *pcihp_p)
 {
 	dev_info_t *pdip = pcihp_p->dip;
 	int bus, len, rc = DDI_SUCCESS;
@@ -3777,7 +3777,7 @@ pcihp_config_setup(dev_info_t **dip, ddi_acc_handle_t *handle,
 
 static void
 pcihp_config_teardown(ddi_acc_handle_t *handle,
-			dev_info_t **new_child, int pci_dev, pcihp_t *pcihp_p)
+    dev_info_t **new_child, int pci_dev, pcihp_t *pcihp_p)
 {
 	struct pcihp_slotinfo *slotinfop = &pcihp_p->slotinfo[pci_dev];
 
@@ -3859,7 +3859,7 @@ pcihp_get_board_type(struct pcihp_slotinfo *slotinfop)
  */
 static void
 pcihp_gen_sysevent(char *slot_name, int event_sub_class, int hint,
-				dev_info_t *self, int kmflag)
+    dev_info_t *self, int kmflag)
 {
 
 	int err;

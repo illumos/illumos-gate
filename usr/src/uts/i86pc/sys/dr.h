@@ -128,8 +128,8 @@ typedef uint64_t		dr_devset_t;
 	((t) == SBD_COMP_CMP) ? DEVSET_CPU_NMASK : 0)
 
 #define	DEVSET_MASK					\
-	((DEVSET_CPU_NMASK << DEVSET_CPU_OFFSET) | 	\
-	(DEVSET_MEM_NMASK << DEVSET_MEM_OFFSET) | 	\
+	((DEVSET_CPU_NMASK << DEVSET_CPU_OFFSET) |	\
+	(DEVSET_MEM_NMASK << DEVSET_MEM_OFFSET) |	\
 	(DEVSET_IO_NMASK << DEVSET_IO_OFFSET))
 
 #define	DEVSET(t, u) \
@@ -301,7 +301,7 @@ typedef struct dr_handle {
 	dev_t		h_dev;		/* dev_t of opened device */
 	int		h_cmd;		/* PIM ioctl argument */
 	int		h_mode;		/* device open mode */
-	sbd_cmd_t 	h_sbdcmd;	/* copied-in ioctl cmd struct */
+	sbd_cmd_t	h_sbdcmd;	/* copied-in ioctl cmd struct */
 	sbd_ioctl_arg_t	*h_iap;		/* ptr to caller-space cmd struct */
 	dr_devset_t	h_devset;	/* based on h_dev */
 	drmach_opts_t	h_opts;		/* command-line platform options */

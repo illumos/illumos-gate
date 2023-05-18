@@ -93,7 +93,7 @@ static void	sbd_detach_cpu(sbd_handle_t *hp, sbderror_t *ep,
 				dev_info_t *dip, int unit);
 static int	sbd_detach_mem(sbd_handle_t *hp, sbderror_t *ep, int unit);
 static void	sbd_cancel(sbd_handle_t *hp);
-void 	sbd_errno_decode(int err, sbderror_t *ep, dev_info_t *dip);
+void	sbd_errno_decode(int err, sbderror_t *ep, dev_info_t *dip);
 int		sbd_dealloc_instance(sbd_board_t *sbp, int max_boards);
 int		sbd_errno2ecode(int error);
 #pragma weak sbdp_cpu_get_impl
@@ -395,7 +395,7 @@ static int		sbd_check_unit_attached(sbd_board_t *sbp,
 				dev_info_t *dip, int unit,
 				sbd_comp_type_t nodetype, sbderror_t *ep);
 
-static sbd_state_t 	rstate_cvt(sbd_istate_t state);
+static sbd_state_t	rstate_cvt(sbd_istate_t state);
 
 /*
  * Autoconfiguration data structures
@@ -449,7 +449,7 @@ _init(void)
 	 * soft state structure each time a node is attached.
 	 */
 	err = ddi_soft_state_init((void **)&sbd_g.softsp,
-		sizeof (sbd_softstate_t), SBD_MAX_INSTANCES);
+	    sizeof (sbd_softstate_t), SBD_MAX_INSTANCES);
 	if (err)
 		return (err);
 
@@ -522,8 +522,7 @@ sbd_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, char *event)
 	instance = SBD_GET_MINOR2INST(getminor(dev));
 	if ((softsp = (sbd_softstate_t *)GET_SOFTC(instance)) == NULL) {
 		cmn_err(CE_WARN,
-			"sbd:%s:%d: module not yet attached",
-			f, instance);
+		    "sbd:%s:%d: module not yet attached", f, instance);
 		return (ENXIO);
 	}
 
@@ -608,9 +607,9 @@ sbd_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, char *event)
 
 int
 sbd_setup_instance(int instance, dev_info_t *root, int max_boards, int wnode,
-		caddr_t sbdp_arg)
+    caddr_t sbdp_arg)
 {
-	int 		b;
+	int		b;
 	sbd_softstate_t	*softsp;
 	sbd_board_t	*sbd_boardlist;
 	static fn_t	f = "sbd_setup_instance";
@@ -624,8 +623,7 @@ sbd_setup_instance(int instance, dev_info_t *root, int max_boards, int wnode,
 
 	if (ALLOC_SOFTC(instance) != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
-			"sbd:%s:%d: failed to alloc soft-state",
-			f, instance);
+		    "sbd:%s:%d: failed to alloc soft-state", f, instance);
 		(void) sbdp_teardown_instance(sbdp_arg);
 		sbd_instances--;
 		return (DDI_FAILURE);
@@ -635,16 +633,15 @@ sbd_setup_instance(int instance, dev_info_t *root, int max_boards, int wnode,
 
 	if (softsp == NULL) {
 		cmn_err(CE_WARN,
-			"sbd:%s:%d: failed to get soft-state instance",
-			f, instance);
+		    "sbd:%s:%d: failed to get soft-state instance",
+		    f, instance);
 		goto exit;
 	}
 
 	sbd_boardlist = GETSTRUCT(sbd_board_t, max_boards);
 	if (sbd_boardlist == NULL) {
 		cmn_err(CE_WARN,
-			"sbd:%s: failed to alloc board list %d",
-			f, instance);
+		    "sbd:%s: failed to alloc board list %d", f, instance);
 		goto exit;
 	}
 
@@ -681,7 +678,7 @@ sbd_teardown_instance(int instance, caddr_t sbdp_arg)
 	}
 
 	(void) sbd_dealloc_instance((sbd_board_t *)softsp->sbd_boardlist,
-		softsp->max_boards);
+	    softsp->max_boards);
 
 	FREE_SOFTC(instance);
 	sbd_instances--;
@@ -781,9 +778,7 @@ sbd_exec_op(sbd_handle_t *hp)
 
 	default:
 		SBD_SET_ERRNO(SBD_HD2ERR(hp), ENOTTY);
-		cmn_err(CE_WARN,
-			"sbd:%s: unknown command (%d)",
-			f, hp->h_cmd);
+		cmn_err(CE_WARN, "sbd:%s: unknown command (%d)", f, hp->h_cmd);
 		break;
 
 	}
@@ -894,7 +889,7 @@ sbd_dev_configure(sbd_handle_t *hp)
 				sbd_attach_mem(hp, ep);
 				if (SBD_GET_ERR(ep) == ESBD_CPUONLINE) {
 					FREESTRUCT(devlist, sbd_devlist_t,
-						MAX_MEM_UNITS_PER_BOARD);
+					    MAX_MEM_UNITS_PER_BOARD);
 					sbd_release_sbdp_handle(hdp);
 					return;
 				}
@@ -943,8 +938,7 @@ sbd_dev_release(sbd_handle_t *hp)
 	hdp = sbd_get_sbdp_handle(sbp, hp);
 
 	sbp->sb_busy = 1;
-	while ((devlist =
-		sbd_get_release_devlist(hp, &devnum, pass)) != NULL) {
+	while ((devlist = sbd_get_release_devlist(hp, &devnum, pass)) != NULL) {
 
 		err = sbd_pre_release_devlist(hp, devlist, devnum);
 		if (err < 0) {
@@ -1135,8 +1129,7 @@ sbd_attach_cpu(sbd_handle_t *hp, sbderror_t *ep, dev_info_t *dip, int unit)
 		SBD_GET_PERR(hdp->h_err, ep);
 	} else if ((rv = cpu_configure(cpuid)) != 0) {
 		cmn_err(CE_WARN,
-			"sbd:%s: cpu_configure for cpuid %d failed",
-			f, cpuid);
+		    "sbd:%s: cpu_configure for cpuid %d failed", f, cpuid);
 		SBD_SET_ERR(ep, sbd_errno2ecode(rv));
 	}
 	sbd_release_sbdp_handle(hdp);
@@ -1212,8 +1205,7 @@ sbd_detach_cpu(sbd_handle_t *hp, sbderror_t *ep, dev_info_t *dip, int unit)
 		SBD_SET_ERR(ep, sbd_errno2ecode(rv));
 		SBD_SET_ERRSTR(ep, sbp->sb_cpupath[unit]);
 		cmn_err(CE_WARN,
-			"sbd:%s: cpu_unconfigure for cpu %d failed",
-			f, cpuid);
+		    "sbd:%s: cpu_unconfigure for cpu %d failed", f, cpuid);
 		sbd_release_sbdp_handle(hdp);
 		return;
 	}
@@ -1382,8 +1374,7 @@ sbd_dev2devset(sbd_comp_id_t *cid)
 
 		case SBD_COMP_CPU:
 			if ((unit > MAX_CPU_UNITS_PER_BOARD) || (unit < 0)) {
-				PR_ALL("%s: invalid cpu unit# = %d",
-					f, unit);
+				PR_ALL("%s: invalid cpu unit# = %d", f, unit);
 				devset = 0;
 			} else
 				/*
@@ -1402,13 +1393,12 @@ sbd_dev2devset(sbd_comp_id_t *cid)
 
 			if ((unit > MAX_MEM_UNITS_PER_BOARD) || (unit < 0)) {
 #ifdef XXX_jeffco
-				PR_ALL("%s: invalid mem unit# = %d",
-					f, unit);
+				PR_ALL("%s: invalid mem unit# = %d", f, unit);
 				devset = 0;
 #endif
 				devset = DEVSET(cid->c_type, 0);
 				PR_ALL("%s: adjusted MEM devset = 0x%x\n",
-					f, devset);
+				    f, devset);
 			} else
 				devset = DEVSET(cid->c_type, unit);
 			break;
@@ -1416,7 +1406,7 @@ sbd_dev2devset(sbd_comp_id_t *cid)
 		case SBD_COMP_IO:
 			if ((unit > MAX_IO_UNITS_PER_BOARD) || (unit < 0)) {
 				PR_ALL("%s: invalid io unit# = %d",
-					f, unit);
+				    f, unit);
 				devset = 0;
 			} else
 				devset = DEVSET(cid->c_type, unit);
@@ -1440,7 +1430,7 @@ static kmutex_t sbd_handle_list_mutex;
 
 static sbd_handle_t *
 sbd_get_handle(dev_t dev, sbd_softstate_t *softsp, intptr_t arg,
-	sbd_init_arg_t *iap)
+    sbd_init_arg_t *iap)
 {
 	sbd_handle_t		*hp;
 	sbderror_t		*ep;
@@ -1531,8 +1521,7 @@ sbd_release_handle(sbd_handle_t *hp)
 
 	if (*shpp == NULL) {
 		cmn_err(CE_PANIC,
-			"sbd:%s: handle not found in board %d",
-			f, sbp->sb_num);
+		    "sbd:%s: handle not found in board %d", f, sbp->sb_num);
 		/*NOTREACHED*/
 	} else {
 		*shpp = shp->sh_next;
@@ -1592,7 +1581,7 @@ sbd_reset_error_sbdph(sbdp_handle_t *hdp)
 
 static int
 sbd_copyin_ioarg(sbd_handle_t *hp, int mode, int cmd, sbd_cmd_t *cmdp,
-	sbd_ioctl_arg_t *iap)
+    sbd_ioctl_arg_t *iap)
 {
 	static fn_t	f = "sbd_copyin_ioarg";
 
@@ -1608,33 +1597,32 @@ sbd_copyin_ioarg(sbd_handle_t *hp, int mode, int cmd, sbd_cmd_t *cmdp,
 		bzero((caddr_t)&scmd32, sizeof (sbd_cmd32_t));
 
 		if (ddi_copyin((void *)iap, (void *)&scmd32,
-				sizeof (sbd_cmd32_t), mode)) {
+		    sizeof (sbd_cmd32_t), mode)) {
 			cmn_err(CE_WARN,
-				"sbd:%s: (32bit) failed to copyin "
-					"sbdcmd-struct", f);
+			    "sbd:%s: (32bit) failed to copyin sbdcmd-struct",
+			    f);
 			return (EFAULT);
 		}
 		cmdp->cmd_cm.c_id.c_type = scmd32.cmd_cm.c_id.c_type;
 		cmdp->cmd_cm.c_id.c_unit = scmd32.cmd_cm.c_id.c_unit;
 		bcopy(&scmd32.cmd_cm.c_id.c_name[0],
-			&cmdp->cmd_cm.c_id.c_name[0], OBP_MAXPROPNAME);
+		    &cmdp->cmd_cm.c_id.c_name[0], OBP_MAXPROPNAME);
 		cmdp->cmd_cm.c_flags = scmd32.cmd_cm.c_flags;
 		cmdp->cmd_cm.c_len = scmd32.cmd_cm.c_len;
 		cmdp->cmd_cm.c_opts = (caddr_t)(uintptr_t)scmd32.cmd_cm.c_opts;
 
 		if (cmd == SBD_CMD_PASSTHRU) {
 			PR_BYP("passthru copyin: iap=%p, sz=%ld", (void *)iap,
-				sizeof (sbd_cmd32_t));
+			    sizeof (sbd_cmd32_t));
 			PR_BYP("passthru copyin: c_opts=%x, c_len=%d",
-				scmd32.cmd_cm.c_opts,
-				scmd32.cmd_cm.c_len);
+			    scmd32.cmd_cm.c_opts, scmd32.cmd_cm.c_len);
 		}
 
 		switch (cmd) {
 		case SBD_CMD_STATUS:
 			cmdp->cmd_stat.s_nbytes = scmd32.cmd_stat.s_nbytes;
 			cmdp->cmd_stat.s_statp =
-				(caddr_t)(uintptr_t)scmd32.cmd_stat.s_statp;
+			    (caddr_t)(uintptr_t)scmd32.cmd_stat.s_statp;
 			break;
 		default:
 			break;
@@ -1643,25 +1631,24 @@ sbd_copyin_ioarg(sbd_handle_t *hp, int mode, int cmd, sbd_cmd_t *cmdp,
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyin((void *)iap, (void *)cmdp,
-			sizeof (sbd_cmd_t), mode) != 0) {
-		cmn_err(CE_WARN,
-			"sbd:%s: failed to copyin sbd cmd_t struct", f);
+	    sizeof (sbd_cmd_t), mode) != 0) {
+		cmn_err(CE_WARN, "sbd:%s: failed to copyin sbd cmd_t struct",
+		    f);
 		return (EFAULT);
 	}
 	/*
 	 * A user may set platform specific options so we need to
 	 * copy them in
 	 */
-	if ((cmd != SBD_CMD_STATUS) && ((hp->h_opts.size = cmdp->cmd_cm.c_len)
-	    > 0)) {
+	if (cmd != SBD_CMD_STATUS &&
+	    (hp->h_opts.size = cmdp->cmd_cm.c_len) > 0) {
 		hp->h_opts.size += 1;	/* For null termination of string. */
 		hp->h_opts.copts = GETSTRUCT(char, hp->h_opts.size);
 		if (ddi_copyin((void *)cmdp->cmd_cm.c_opts,
 		    (void *)hp->h_opts.copts,
 		    cmdp->cmd_cm.c_len, hp->h_mode) != 0) {
 			/* copts is freed in sbd_release_handle(). */
-			cmn_err(CE_WARN,
-			    "sbd:%s: failed to copyin options", f);
+			cmn_err(CE_WARN, "sbd:%s: failed to copyin options", f);
 			return (EFAULT);
 		}
 	}
@@ -1684,7 +1671,7 @@ sbd_copyout_ioarg(int mode, int cmd, sbd_cmd_t *scp, sbd_ioctl_arg_t *iap)
 		scmd32.cmd_cm.c_id.c_type = scp->cmd_cm.c_id.c_type;
 		scmd32.cmd_cm.c_id.c_unit = scp->cmd_cm.c_id.c_unit;
 		bcopy(scp->cmd_cm.c_id.c_name,
-			scmd32.cmd_cm.c_id.c_name, OBP_MAXPROPNAME);
+		    scmd32.cmd_cm.c_id.c_name, OBP_MAXPROPNAME);
 
 		scmd32.cmd_cm.c_flags = scp->cmd_cm.c_flags;
 
@@ -1697,18 +1684,17 @@ sbd_copyout_ioarg(int mode, int cmd, sbd_cmd_t *scp, sbd_ioctl_arg_t *iap)
 		}
 
 		if (ddi_copyout((void *)&scmd32, (void *)iap,
-				sizeof (sbd_cmd32_t), mode)) {
+		    sizeof (sbd_cmd32_t), mode)) {
 			cmn_err(CE_WARN,
-				"sbd:%s: (32bit) failed to copyout "
-					"sbdcmd struct", f);
+			    "sbd:%s: (32bit) failed to copyout sbdcmd struct",
+			    f);
 			return (EFAULT);
 		}
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyout((void *)scp, (void *)iap,
-			sizeof (sbd_cmd_t), mode) != 0) {
-		cmn_err(CE_WARN,
-			"sbd:%s: failed to copyout sbdcmd struct", f);
+	    sizeof (sbd_cmd_t), mode) != 0) {
+		cmn_err(CE_WARN, "sbd:%s: failed to copyout sbdcmd struct", f);
 		return (EFAULT);
 	}
 
@@ -1734,18 +1720,16 @@ sbd_copyout_errs(int mode, sbd_ioctl_arg_t *iap, void *arg)
 		(void) strcpy(err32.e_rsc, iap->ie_rsc);
 
 		if (ddi_copyout((void *)&err32, (void *)&uap32->i_err,
-				sizeof (sbd_error32_t), mode)) {
+		    sizeof (sbd_error32_t), mode)) {
 			cmn_err(CE_WARN,
-				"sbd:%s: failed to copyout ioctl32 errs",
-				f);
+			    "sbd:%s: failed to copyout ioctl32 errs", f);
 			return (EFAULT);
 		}
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyout((void *)&iap->i_err, (void *)&uap->i_err,
-			sizeof (sbd_error_t), mode) != 0) {
-		cmn_err(CE_WARN,
-			"sbd:%s: failed to copyout ioctl errs", f);
+	    sizeof (sbd_error_t), mode) != 0) {
+		cmn_err(CE_WARN, "sbd:%s: failed to copyout ioctl errs", f);
 		return (EFAULT);
 	}
 
@@ -1761,7 +1745,7 @@ sbd_copyout_errs(int mode, sbd_ioctl_arg_t *iap, void *arg)
  */
 static int
 sbd_check_transition(sbd_board_t *sbp, sbd_devset_t *devsetp,
-			struct sbd_state_trans *transp)
+    struct sbd_state_trans *transp)
 {
 	int	s, ut;
 	int	state_err = 0;
@@ -1776,8 +1760,8 @@ sbd_check_transition(sbd_board_t *sbp, sbd_devset_t *devsetp,
 		 * This is the case for addboard/deleteboard.
 		 */
 		PR_ALL("%s: no devs: requested devset = 0x%x,"
-			" final devset = 0x%x\n",
-			f, (uint_t)*devsetp, (uint_t)devset);
+		    " final devset = 0x%x\n",
+		    f, (uint_t)*devsetp, (uint_t)devset);
 
 		return (0);
 	}
@@ -1822,7 +1806,7 @@ sbd_check_transition(sbd_board_t *sbp, sbd_devset_t *devsetp,
 	}
 
 	PR_ALL("%s: requested devset = 0x%x, final devset = 0x%x\n",
-		f, (uint_t)*devsetp, (uint_t)devset);
+	    f, (uint_t)*devsetp, (uint_t)devset);
 
 	*devsetp = devset;
 	/*
@@ -1875,7 +1859,7 @@ sbd_pre_op(sbd_handle_t *hp)
 
 	hp->h_iap = GETSTRUCT(sbd_ioctl_arg_t, 1);
 	rv = sbd_copyin_ioarg(hp, hp->h_mode, cmd,
-		(sbd_cmd_t *)hp->h_iap, shp->sh_arg);
+	    (sbd_cmd_t *)hp->h_iap, shp->sh_arg);
 	if (rv) {
 		SBD_SET_ERRNO(ep, rv);
 		FREESTRUCT(hp->h_iap, sbd_ioctl_arg_t, 1);
@@ -1886,8 +1870,8 @@ sbd_pre_op(sbd_handle_t *hp)
 		cmdp =  (sbd_cmd_t *)hp->h_iap;
 		if (cmdp->cmd_cm.c_id.c_name[0] != '\0') {
 
-			cmdp->cmd_cm.c_id.c_type = SBD_COMP(sbd_name_to_idx(
-				cmdp->cmd_cm.c_id.c_name));
+			cmdp->cmd_cm.c_id.c_type =
+			    SBD_COMP(sbd_name_to_idx(cmdp->cmd_cm.c_id.c_name));
 			if (cmdp->cmd_cm.c_id.c_type == SBD_COMP_MEM) {
 				if (cmdp->cmd_cm.c_id.c_unit == -1)
 					cmdp->cmd_cm.c_id.c_unit = 0;
@@ -1930,7 +1914,7 @@ sbd_pre_op(sbd_handle_t *hp)
 			SBD_SET_ERRNO(ep, ENOTTY);
 			serr = -1;
 			PR_ALL("%s: invalid devset (0x%x)\n",
-				f, (uint_t)devset);
+			    f, (uint_t)devset);
 		} else if (state_err != 0) {
 			/*
 			 * State transition is not a valid one.
@@ -1938,8 +1922,8 @@ sbd_pre_op(sbd_handle_t *hp)
 			SBD_SET_ERRNO(ep, transp->x_op[state_err].x_err);
 			serr = transp->x_op[state_err].x_rv;
 			PR_ALL("%s: invalid state %s(%d) for cmd %s(%d)\n",
-				f, sbd_state_str[state_err], state_err,
-				SBD_CMD_STR(cmd), cmd);
+			    f, sbd_state_str[state_err], state_err,
+			    SBD_CMD_STR(cmd), cmd);
 		}
 		if (serr && SBD_GET_ERRNO(ep) != 0) {
 			/*
@@ -1967,9 +1951,7 @@ sbd_pre_op(sbd_handle_t *hp)
 		if (SBD_GET_ERR(ep) && SBD_GET_ERRNO(ep) == 0)
 			SBD_SET_ERRNO(ep, EIO);
 
-		SBD_SET_IOCTL_ERR(&hp->h_iap->i_err,
-			ep->e_code,
-			ep->e_rsc);
+		SBD_SET_IOCTL_ERR(&hp->h_iap->i_err, ep->e_code, ep->e_rsc);
 		(void) sbd_copyout_errs(hp->h_mode, hp->h_iap, shp->sh_arg);
 		FREESTRUCT(hp->h_iap, sbd_ioctl_arg_t, 1);
 		hp->h_iap = NULL;
@@ -1982,10 +1964,10 @@ sbd_pre_op(sbd_handle_t *hp)
 static void
 sbd_post_op(sbd_handle_t *hp)
 {
-	int		cmd;
-	sbderror_t	*ep = SBD_HD2ERR(hp);
+	int			cmd;
+	sbderror_t		*ep = SBD_HD2ERR(hp);
 	sbd_priv_handle_t	*shp = HD2MACHHD(hp);
-	sbd_board_t    *sbp = SBDH2BD(hp->h_sbd);
+	sbd_board_t		*sbp = SBDH2BD(hp->h_sbd);
 
 	cmd = hp->h_cmd;
 
@@ -2009,12 +1991,11 @@ sbd_post_op(sbd_handle_t *hp)
 
 		if (SBD_GET_ERR(ep) != ESBD_NOERROR) {
 
-			SBD_SET_IOCTL_ERR(&hp->h_iap->i_err,
-				ep->e_code,
-				ep->e_rsc);
+			SBD_SET_IOCTL_ERR(&hp->h_iap->i_err, ep->e_code,
+			    ep->e_rsc);
 
 			(void) sbd_copyout_errs(hp->h_mode, hp->h_iap,
-					shp->sh_arg);
+			    shp->sh_arg);
 		}
 
 		if (hp->h_iap != NULL) {
@@ -2055,7 +2036,7 @@ sbd_probe_board(sbd_handle_t *hp)
 	mutex_exit(&sbp->sb_flags_mutex);
 
 	SBD_INJECT_ERR(SBD_PROBE_BOARD_PSEUDO_ERR, hp->h_err, EIO,
-		ESGT_PROBE, NULL);
+	    ESGT_PROBE, NULL);
 
 	sbd_release_sbdp_handle(hdp);
 
@@ -2087,7 +2068,7 @@ sbd_deprobe_board(sbd_handle_t *hp)
 	mutex_exit(&sbp->sb_flags_mutex);
 
 	SBD_INJECT_ERR(SBD_DEPROBE_BOARD_PSEUDO_ERR, hp->h_err, EIO,
-		ESGT_DEPROBE, NULL);
+	    ESGT_DEPROBE, NULL);
 
 	sbd_release_sbdp_handle(hdp);
 	return (rv);
@@ -2172,7 +2153,7 @@ get_node_type(sbd_board_t *sbp, dev_info_t *dip, int *unitp)
 	unit = sbdp_get_unit_num(hdp, dip);
 	if (unit == -1) {
 		cmn_err(CE_WARN,
-			"get_node_type: %s unit fail %p", otype, (void *)dip);
+		    "get_node_type: %s unit fail %p", otype, (void *)dip);
 		sbd_release_sbdp_handle(hdp);
 		return (SBD_COMP_UNKNOWN);
 	}
@@ -2361,7 +2342,7 @@ pretend_no_mem:
 
 		if (sbdphw_get_base_physaddr(hdp, mc_dip, &mc_pa)) {
 			cmn_err(CE_NOTE, "No mem on board %d unit %d",
-				sbp->sb_num, i);
+			    sbp->sb_num, i);
 			break;
 		}
 		if (mc_pa < lowest_pa) {
@@ -2489,7 +2470,7 @@ sbd_init_devlists(sbd_board_t *sbp)
 			sbd_init_cpu_unit(sbp, i);
 			if (sbd_connect_cpu(sbp, i)) {
 				SBD_SET_ERR(HD2MACHERR(MACHBD2HD(sbp)),
-					ESBD_CPUSTART);
+				    ESBD_CPUSTART);
 			}
 
 		}
@@ -2581,14 +2562,14 @@ sbd_connect(sbd_handle_t *hp)
 		 * Board already has devices present.
 		 */
 		PR_ALL("%s: devices already present (0x%x)\n",
-			f, SBD_DEVS_PRESENT(sbp));
+		    f, SBD_DEVS_PRESENT(sbp));
 		SBD_SET_ERRNO(ep, EINVAL);
 		return;
 	}
 
 	if (sbd_init_devlists(sbp) == 0) {
 		cmn_err(CE_WARN, "%s: no devices present on board %d",
-			f, sbp->sb_num);
+		    f, sbp->sb_num);
 		SBD_SET_ERR(ep, ESBD_NODEV);
 		return;
 	} else {
@@ -2613,7 +2594,7 @@ sbd_connect(sbd_handle_t *hp)
 		sbp->sb_ostate = SBD_STAT_UNCONFIGURED;
 		(void) drv_getparm(TIME, (void *)&sbp->sb_time);
 		SBD_INJECT_ERR(SBD_CONNECT_BOARD_PSEUDO_ERR, hp->h_err, EIO,
-			ESBD_INTERNAL, NULL);
+		    ESBD_INTERNAL, NULL);
 	}
 }
 
@@ -2634,7 +2615,7 @@ sbd_disconnect(sbd_handle_t *hp)
 	 * unattached can be disconnected.
 	 */
 	devset = HD2MACHHD(hp)->sh_devset & SBD_DEVS_PRESENT(sbp) &
-			SBD_DEVS_UNATTACHED(sbp);
+	    SBD_DEVS_UNATTACHED(sbp);
 
 	ASSERT((SBD_DEVS_ATTACHED(sbp) & devset) == 0);
 
@@ -2646,7 +2627,7 @@ sbd_disconnect(sbd_handle_t *hp)
 		if (DEVSET_IN_SET(devset, SBD_COMP_MEM, i)) {
 			if (sbd_disconnect_mem(hp, i) == 0) {
 				SBD_DEVICE_TRANSITION(sbp, SBD_COMP_MEM, i,
-							SBD_STATE_EMPTY);
+				    SBD_STATE_EMPTY);
 				SBD_DEV_CLR_PRESENT(sbp, SBD_COMP_MEM, i);
 			}
 		}
@@ -2655,7 +2636,7 @@ sbd_disconnect(sbd_handle_t *hp)
 		if (DEVSET_IN_SET(devset, SBD_COMP_CPU, i)) {
 			if (sbd_disconnect_cpu(hp, i) == 0) {
 				SBD_DEVICE_TRANSITION(sbp, SBD_COMP_CPU, i,
-							SBD_STATE_EMPTY);
+				    SBD_STATE_EMPTY);
 				SBD_DEV_CLR_PRESENT(sbp, SBD_COMP_CPU, i);
 			}
 		}
@@ -2664,7 +2645,7 @@ sbd_disconnect(sbd_handle_t *hp)
 		if (DEVSET_IN_SET(devset, SBD_COMP_IO, i)) {
 			if (sbd_disconnect_io(hp, i) == 0) {
 				SBD_DEVICE_TRANSITION(sbp, SBD_COMP_IO, i,
-							SBD_STATE_EMPTY);
+				    SBD_STATE_EMPTY);
 				SBD_DEV_CLR_PRESENT(sbp, SBD_COMP_IO, i);
 			}
 		}
@@ -2680,11 +2661,11 @@ sbd_disconnect(sbd_handle_t *hp)
 		sbp->sb_ostate = SBD_STAT_UNCONFIGURED;
 		(void) drv_getparm(TIME, (void *)&sbp->sb_time);
 		SBD_INJECT_ERR(SBD_DISCONNECT_BOARD_PSEUDO_ERR, hp->h_err, EIO,
-			ESBD_INTERNAL, NULL);
+		    ESBD_INTERNAL, NULL);
 		return (0);
 	} else {
 		cmn_err(CE_WARN, "%s: could not disconnect devices on board %d",
-			f, sbp->sb_num);
+		    f, sbp->sb_num);
 		return (-1);
 	}
 }
@@ -2709,7 +2690,7 @@ sbd_test_board(sbd_handle_t *hp)
 	}
 
 	SBD_INJECT_ERR(SBD_TEST_BOARD_PSEUDO_ERR, hp->h_err, EIO,
-		ESBD_INTERNAL, NULL);
+	    ESBD_INTERNAL, NULL);
 
 	sbd_release_sbdp_handle(hdp);
 }
@@ -2733,7 +2714,7 @@ sbd_assign_board(sbd_handle_t *hp)
 	}
 
 	SBD_INJECT_ERR(SBD_ASSIGN_BOARD_PSEUDO_ERR, hp->h_err, EIO,
-		ESBD_INTERNAL, NULL);
+	    ESBD_INTERNAL, NULL);
 
 	sbd_release_sbdp_handle(hdp);
 }
@@ -2757,7 +2738,7 @@ sbd_unassign_board(sbd_handle_t *hp)
 	}
 
 	SBD_INJECT_ERR(SBD_ASSIGN_BOARD_PSEUDO_ERR, hp->h_err, EIO,
-		ESBD_INTERNAL, NULL);
+	    ESBD_INTERNAL, NULL);
 
 	sbd_release_sbdp_handle(hdp);
 }
@@ -2781,7 +2762,7 @@ sbd_poweron_board(sbd_handle_t *hp)
 	}
 
 	SBD_INJECT_ERR(SBD_POWERON_BOARD_PSEUDO_ERR, hp->h_err, EIO,
-		ESBD_INTERNAL, NULL);
+	    ESBD_INTERNAL, NULL);
 
 	sbd_release_sbdp_handle(hdp);
 }
@@ -2805,7 +2786,7 @@ sbd_poweroff_board(sbd_handle_t *hp)
 	}
 
 	SBD_INJECT_ERR(SBD_POWEROFF_BOARD_PSEUDO_ERR, hp->h_err, EIO,
-		ESBD_INTERNAL, NULL);
+	    ESBD_INTERNAL, NULL);
 
 	sbd_release_sbdp_handle(hdp);
 }
@@ -2818,7 +2799,7 @@ sbd_poweroff_board(sbd_handle_t *hp)
  */
 sbd_devlist_t *
 sbd_get_devlist(sbd_handle_t *hp, sbd_board_t *sbp, sbd_comp_type_t nodetype,
-		int max_units, uint_t uset, int *count, int present_only)
+    int max_units, uint_t uset, int *count, int present_only)
 {
 	int		i, ix;
 	sbd_devlist_t	*ret_devlist;
@@ -2885,10 +2866,10 @@ sbd_get_devlist(sbd_handle_t *hp, sbd_board_t *sbp, sbd_comp_type_t nodetype,
 			if ((uset & (1 << ut)) == 0)
 				continue;
 			uset &= ~(1 << ut);
-			is_present = SBD_DEV_IS_PRESENT(sbp, nodetype, ut) ?
-			    1 : 0;
-			is_attached = SBD_DEV_IS_ATTACHED(sbp, nodetype, ut) ?
-			    1 : 0;
+			is_present =
+			    SBD_DEV_IS_PRESENT(sbp, nodetype, ut) ? 1 : 0;
+			is_attached =
+			    SBD_DEV_IS_ATTACHED(sbp, nodetype, ut) ? 1 : 0;
 
 			if (is_present && (present_only ^ is_attached)) {
 				ret_devlist[ix].dv_dip = dip;
@@ -2946,8 +2927,7 @@ sbd_get_attach_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 			uset = DEVSET_GET_UNITSET(devset, SBD_COMP_CPU);
 
 			attach_devlist = sbd_get_devlist(hp, sbp, SBD_COMP_CPU,
-						MAX_CPU_UNITS_PER_BOARD,
-						uset, devnump, 1);
+			    MAX_CPU_UNITS_PER_BOARD, uset, devnump, 1);
 
 			DEVSET_DEL(devset, SBD_COMP_CPU, DEVSET_ANYUNIT);
 			if (!devset || attach_devlist) {
@@ -2967,8 +2947,7 @@ sbd_get_attach_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 			uset = DEVSET_GET_UNITSET(devset, SBD_COMP_MEM);
 
 			attach_devlist = sbd_get_devlist(hp, sbp, SBD_COMP_MEM,
-						MAX_MEM_UNITS_PER_BOARD,
-						uset, devnump, 1);
+			    MAX_MEM_UNITS_PER_BOARD, uset, devnump, 1);
 
 			DEVSET_DEL(devset, SBD_COMP_MEM, DEVSET_ANYUNIT);
 			if (!devset || attach_devlist) {
@@ -2990,8 +2969,7 @@ sbd_get_attach_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 			uset = DEVSET_GET_UNITSET(devset, SBD_COMP_IO);
 
 			attach_devlist = sbd_get_devlist(hp, sbp, SBD_COMP_IO,
-						MAX_IO_UNITS_PER_BOARD,
-						uset, devnump, 1);
+			    MAX_IO_UNITS_PER_BOARD, uset, devnump, 1);
 
 			DEVSET_DEL(devset, SBD_COMP_IO, DEVSET_ANYUNIT);
 			if (!devset || attach_devlist) {
@@ -3009,8 +2987,7 @@ sbd_get_attach_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 }
 
 static int
-sbd_pre_attach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
-	int32_t devnum)
+sbd_pre_attach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist, int32_t devnum)
 {
 	int		max_units = 0, rv = 0;
 	sbd_comp_type_t	nodetype;
@@ -3023,7 +3000,7 @@ sbd_pre_attach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 	nodetype = sbd_get_devtype(hp, devlist->dv_dip);
 
 	PR_ALL("%s (nt = %s(%d), num = %d)...\n",
-		f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
+	    f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
 
 	switch (nodetype) {
 
@@ -3072,12 +3049,12 @@ sbd_pre_attach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 
 static int
 sbd_post_attach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
-			int32_t devnum)
+    int32_t devnum)
 {
 	int		i, max_units = 0, rv = 0;
 	sbd_devset_t	devs_unattached, devs_present;
 	sbd_comp_type_t	nodetype;
-	sbd_board_t 	*sbp = SBDH2BD(hp->h_sbd);
+	sbd_board_t	*sbp = SBDH2BD(hp->h_sbd);
 	sbdp_handle_t	*hdp;
 	static fn_t	f = "sbd_post_attach_devlist";
 
@@ -3085,7 +3062,7 @@ sbd_post_attach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 	nodetype = sbd_get_devtype(hp, devlist->dv_dip);
 
 	PR_ALL("%s (nt = %s(%d), num = %d)...\n",
-		f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
+	    f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
 
 	hdp = sbd_get_sbdp_handle(sbp, hp);
 
@@ -3139,20 +3116,20 @@ sbd_post_attach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 
 		if (unit == -1) {
 			PR_ALL("%s: ERROR (nt=%s, b=%d, u=%d) not attached\n",
-				f, sbd_ct_str[(int)nodetype], sbp->sb_num, i);
+			    f, sbd_ct_str[(int)nodetype], sbp->sb_num, i);
 			continue;
 		}
 
 		SBD_DEV_SET_ATTACHED(sbp, nodetype, unit);
 		SBD_DEVICE_TRANSITION(sbp, nodetype, unit,
-						SBD_STATE_CONFIGURED);
+		    SBD_STATE_CONFIGURED);
 	}
 	sbd_release_sbdp_handle(hdp);
 
 	if (rv) {
 		PR_ALL("%s: errno %d, ecode %d during attach\n",
-			f, SBD_GET_ERRNO(SBD_HD2ERR(hp)),
-			SBD_GET_ERR(HD2MACHERR(hp)));
+		    f, SBD_GET_ERRNO(SBD_HD2ERR(hp)),
+		    SBD_GET_ERR(HD2MACHERR(hp)));
 	}
 
 	devs_present = SBD_DEVS_PRESENT(sbp);
@@ -3261,9 +3238,9 @@ sbd_get_release_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 			uset = DEVSET_GET_UNITSET(devset, SBD_COMP_MEM);
 
 			release_devlist = sbd_get_devlist(hp, sbp,
-						SBD_COMP_MEM,
-						MAX_MEM_UNITS_PER_BOARD,
-						uset, devnump, 0);
+			    SBD_COMP_MEM,
+			    MAX_MEM_UNITS_PER_BOARD,
+			    uset, devnump, 0);
 
 			DEVSET_DEL(devset, SBD_COMP_MEM, DEVSET_ANYUNIT);
 			if (!devset || release_devlist) {
@@ -3284,9 +3261,9 @@ sbd_get_release_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 			uset = DEVSET_GET_UNITSET(devset, SBD_COMP_CPU);
 
 			release_devlist = sbd_get_devlist(hp, sbp,
-						SBD_COMP_CPU,
-						MAX_CPU_UNITS_PER_BOARD,
-						uset, devnump, 0);
+			    SBD_COMP_CPU,
+			    MAX_CPU_UNITS_PER_BOARD,
+			    uset, devnump, 0);
 
 			DEVSET_DEL(devset, SBD_COMP_CPU, DEVSET_ANYUNIT);
 			if (!devset || release_devlist) {
@@ -3308,9 +3285,9 @@ sbd_get_release_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 			uset = DEVSET_GET_UNITSET(devset, SBD_COMP_IO);
 
 			release_devlist = sbd_get_devlist(hp, sbp,
-						SBD_COMP_IO,
-						MAX_IO_UNITS_PER_BOARD,
-						uset, devnump, 0);
+			    SBD_COMP_IO,
+			    MAX_IO_UNITS_PER_BOARD,
+			    uset, devnump, 0);
 
 			DEVSET_DEL(devset, SBD_COMP_IO, DEVSET_ANYUNIT);
 			if (!devset || release_devlist) {
@@ -3329,7 +3306,7 @@ sbd_get_release_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 
 static int
 sbd_pre_release_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
-			int32_t devnum)
+    int32_t devnum)
 {
 	int		max_units = 0, rv = 0;
 	sbd_comp_type_t	nodetype;
@@ -3338,7 +3315,7 @@ sbd_pre_release_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 	nodetype = sbd_get_devtype(hp, devlist->dv_dip);
 
 	PR_ALL("%s (nt = %s(%d), num = %d)...\n",
-		f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
+	    f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
 
 	switch (nodetype) {
 	case SBD_COMP_CPU: {
@@ -3421,7 +3398,7 @@ sbd_pre_release_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 
 static int
 sbd_post_release_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
-			int32_t devnum)
+    int32_t devnum)
 {
 	int		i, max_units = 0;
 	sbd_comp_type_t	nodetype;
@@ -3434,7 +3411,7 @@ sbd_post_release_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 	ASSERT(nodetype >= SBD_COMP_CPU && nodetype <= SBD_COMP_IO);
 
 	PR_ALL("%s (nt = %s(%d), num = %d)...\n",
-		f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
+	    f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
 
 	/*
 	 * Need to free up devlist[] created earlier in
@@ -3465,7 +3442,7 @@ sbd_post_release_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 	default:
 		{
 			cmn_err(CE_WARN, "%s: invalid nodetype (%d)",
-				f, (int)nodetype);
+			    f, (int)nodetype);
 			SBD_SET_ERR(HD2MACHERR(hp), ESBD_INVAL);
 		}
 		break;
@@ -3495,8 +3472,8 @@ sbd_post_release_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 
 	if (SBD_GET_ERRNO(SBD_HD2ERR(hp))) {
 		PR_ALL("%s: errno %d, ecode %d during release\n",
-			f, SBD_GET_ERRNO(SBD_HD2ERR(hp)),
-			SBD_GET_ERR(SBD_HD2ERR(hp)));
+		    f, SBD_GET_ERRNO(SBD_HD2ERR(hp)),
+		    SBD_GET_ERR(SBD_HD2ERR(hp)));
 	}
 
 	if (max_units && devlist) {
@@ -3538,8 +3515,8 @@ sbd_release_done(sbd_handle_t *hp, sbd_comp_type_t nodetype, dev_info_t *dip)
 
 	if ((unit = sbdp_get_unit_num(hdp, dip)) < 0) {
 		cmn_err(CE_WARN,
-			"sbd:%s: unable to get unit for dip (0x%p)",
-			f, (void *)dip);
+		    "sbd:%s: unable to get unit for dip (0x%p)",
+		    f, (void *)dip);
 		SBD_GET_PERR(hdp->h_err, ep);
 		sbd_release_sbdp_handle(hdp);
 		return;
@@ -3610,9 +3587,9 @@ sbd_get_detach_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 			uset = DEVSET_GET_UNITSET(devset, SBD_COMP_MEM);
 
 			detach_devlist = sbd_get_devlist(hp, sbp,
-						SBD_COMP_MEM,
-						MAX_MEM_UNITS_PER_BOARD,
-						uset, devnump, 0);
+			    SBD_COMP_MEM,
+			    MAX_MEM_UNITS_PER_BOARD,
+			    uset, devnump, 0);
 
 			DEVSET_DEL(devset, SBD_COMP_MEM, DEVSET_ANYUNIT);
 			if (!devset || detach_devlist) {
@@ -3632,9 +3609,9 @@ sbd_get_detach_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 			uset = DEVSET_GET_UNITSET(devset, SBD_COMP_CPU);
 
 			detach_devlist = sbd_get_devlist(hp, sbp,
-						SBD_COMP_CPU,
-						MAX_CPU_UNITS_PER_BOARD,
-						uset, devnump, 0);
+			    SBD_COMP_CPU,
+			    MAX_CPU_UNITS_PER_BOARD,
+			    uset, devnump, 0);
 
 			DEVSET_DEL(devset, SBD_COMP_CPU, DEVSET_ANYUNIT);
 			if (!devset || detach_devlist) {
@@ -3655,9 +3632,9 @@ sbd_get_detach_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 			uset = DEVSET_GET_UNITSET(devset, SBD_COMP_IO);
 
 			detach_devlist = sbd_get_devlist(hp, sbp,
-						SBD_COMP_IO,
-						MAX_IO_UNITS_PER_BOARD,
-						uset, devnump, 0);
+			    SBD_COMP_IO,
+			    MAX_IO_UNITS_PER_BOARD,
+			    uset, devnump, 0);
 
 			DEVSET_DEL(devset, SBD_COMP_IO, DEVSET_ANYUNIT);
 			if (!devset || detach_devlist) {
@@ -3675,8 +3652,7 @@ sbd_get_detach_devlist(sbd_handle_t *hp, int32_t *devnump, int32_t pass)
 }
 
 static int
-sbd_pre_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
-	int32_t devnum)
+sbd_pre_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist, int32_t devnum)
 {
 	int		rv = 0;
 	sbd_comp_type_t	nodetype;
@@ -3685,7 +3661,7 @@ sbd_pre_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 	nodetype = sbd_get_devtype(hp, devlist->dv_dip);
 
 	PR_ALL("%s (nt = %s(%d), num = %d)...\n",
-		f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
+	    f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
 
 	switch (nodetype) {
 	case SBD_COMP_CPU:
@@ -3714,7 +3690,7 @@ sbd_pre_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 
 static int
 sbd_post_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
-			int32_t devnum)
+    int32_t devnum)
 {
 	int		i, max_units = 0, rv = 0;
 	sbd_comp_type_t	nodetype;
@@ -3729,7 +3705,7 @@ sbd_post_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 	hdp = sbd_get_sbdp_handle(sbp, hp);
 
 	PR_ALL("%s (nt = %s(%d), num = %d)...\n",
-		f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
+	    f, sbd_ct_str[(int)nodetype], (int)nodetype, devnum);
 
 	/*
 	 * Need to free up devlist[] created earlier in
@@ -3786,8 +3762,8 @@ sbd_post_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 			 * to an error.  Need to keep track of it.
 			 */
 			PR_ALL("%s: ERROR (nt=%s, b=%d, u=%d) not detached\n",
-				f, sbd_ct_str[(int)nodetype], sbp->sb_num,
-				unit);
+			    f, sbd_ct_str[(int)nodetype], sbp->sb_num,
+			    unit);
 			continue;
 		}
 
@@ -3795,7 +3771,7 @@ sbd_post_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 		SBD_DEV_CLR_RELEASED(sbp, nodetype, unit);
 		SBD_DEV_CLR_UNREFERENCED(sbp, nodetype, unit);
 		SBD_DEVICE_TRANSITION(sbp, nodetype, unit,
-						SBD_STATE_UNCONFIGURED);
+		    SBD_STATE_UNCONFIGURED);
 	}
 	sbd_release_sbdp_handle(hdp);
 
@@ -3807,7 +3783,7 @@ sbd_post_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 			 */
 			SBD_BOARD_TRANSITION(sbp, SBD_STATE_UNCONFIGURED);
 		} else if ((SBD_BOARD_STATE(sbp) != SBD_STATE_PARTIAL) &&
-				SBD_DEVS_ATTACHED(sbp)) {
+		    SBD_DEVS_ATTACHED(sbp)) {
 			/*
 			 * Some devices remain attached.
 			 */
@@ -3817,8 +3793,8 @@ sbd_post_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
 
 	if (rv) {
 		PR_ALL("%s: errno %d, ecode %d during detach\n",
-			f, SBD_GET_ERRNO(SBD_HD2ERR(hp)),
-			SBD_GET_ERR(HD2MACHERR(hp)));
+		    f, SBD_GET_ERRNO(SBD_HD2ERR(hp)),
+		    SBD_GET_ERR(HD2MACHERR(hp)));
 	}
 
 	if (max_units && devlist) {
@@ -3843,7 +3819,7 @@ sbd_post_detach_devlist(sbd_handle_t *hp, sbd_devlist_t *devlist,
  */
 static int
 sbd_check_unit_attached(sbd_board_t *sbp, dev_info_t *dip, int unit,
-	sbd_comp_type_t nodetype, sbderror_t *ep)
+    sbd_comp_type_t nodetype, sbderror_t *ep)
 {
 	int		rv = -1;
 	processorid_t	cpuid;
@@ -3910,7 +3886,7 @@ sbd_check_unit_attached(sbd_board_t *sbp, dev_info_t *dip, int unit,
 			ndi_devi_enter(pdip);
 		}
 		ddi_walk_devs(sbp->sb_topdip, sbd_check_io_attached,
-			(void *)&tdip);
+		    (void *)&tdip);
 		if (pdip) {
 			ndi_devi_exit(pdip);
 			ndi_rele_devi(pdip);
@@ -3925,7 +3901,7 @@ sbd_check_unit_attached(sbd_board_t *sbp, dev_info_t *dip, int unit,
 
 	default:
 		PR_ALL("%s: unexpected nodetype(%d) for dip 0x%p\n",
-			f, nodetype, (void *)dip);
+		    f, nodetype, (void *)dip);
 		rv = -1;
 		break;
 	}
@@ -4124,7 +4100,7 @@ sbd_mem_status(sbd_handle_t *hp, sbd_devset_t devset, sbd_dev_stat_t *dsp)
 
 		/* XXX revisit this after memory conversion */
 		msp->ms_ostate = ostate_cvt(SBD_DEVICE_STATE(
-			sbp, SBD_COMP_MEM, m));
+		    sbp, SBD_COMP_MEM, m));
 
 		msp->ms_basepfn = mp->sbm_basepfn;
 		msp->ms_pageslost = mp->sbm_pageslost;
@@ -4144,8 +4120,7 @@ sbd_mem_status(sbd_handle_t *hp, sbd_devset_t devset, sbd_dev_stat_t *dsp)
 			 * i.e. it's collected.
 			 */
 			msp->ms_detpages += (uint_t)(mdst.collected +
-							mdst.phys_pages -
-							mdst.managed);
+			    mdst.phys_pages - mdst.managed);
 		} else {
 			msp->ms_totpages += (uint_t)mp->sbm_npages;
 
@@ -4173,7 +4148,7 @@ sbd_mem_status(sbd_handle_t *hp, sbd_devset_t devset, sbd_dev_stat_t *dsp)
 		}
 
 		rv = kphysm_del_span_query(mp->sbm_basepfn,
-						mp->sbm_npages, &mq);
+		    mp->sbm_npages, &mq);
 		if (rv == KPHYSM_OK) {
 			msp->ms_managed_pages = mq.managed;
 			msp->ms_noreloc_pages = mq.nonrelocatable;
@@ -4223,10 +4198,10 @@ sbd_cancel(sbd_handle_t *hp)
 			continue;
 		if (sbd_cancel_cpu(hp, i) != SBD_CPUERR_FATAL) {
 			SBD_DEVICE_TRANSITION(sbp, SBD_COMP_CPU, i,
-						SBD_STATE_CONFIGURED);
+			    SBD_STATE_CONFIGURED);
 		} else {
 			SBD_DEVICE_TRANSITION(sbp, SBD_COMP_CPU, i,
-						SBD_STATE_FATAL);
+			    SBD_STATE_FATAL);
 		}
 	}
 
@@ -4234,7 +4209,7 @@ sbd_cancel(sbd_handle_t *hp)
 		if (!DEVSET_IN_SET(devset, SBD_COMP_IO, i))
 			continue;
 		SBD_DEVICE_TRANSITION(sbp, SBD_COMP_IO, i,
-					SBD_STATE_CONFIGURED);
+		    SBD_STATE_CONFIGURED);
 	}
 
 	for (i = 0; i < MAX_MEM_UNITS_PER_BOARD; i++) {
@@ -4242,10 +4217,10 @@ sbd_cancel(sbd_handle_t *hp)
 			continue;
 		if ((rv = sbd_cancel_mem(hp, i)) == 0) {
 			SBD_DEVICE_TRANSITION(sbp, SBD_COMP_MEM, i,
-						SBD_STATE_CONFIGURED);
+			    SBD_STATE_CONFIGURED);
 		} else if (rv == -1) {
 			SBD_DEVICE_TRANSITION(sbp, SBD_COMP_MEM, i,
-						SBD_STATE_FATAL);
+			    SBD_STATE_FATAL);
 		}
 	}
 
@@ -4282,11 +4257,11 @@ sbd_get_ncm(sbd_handle_t *hp)
 	/* pre_op restricted the devices to those selected by the ioctl */
 	devset = shp->sh_devset;
 
-	cmdp->cmd_getncm.g_ncm = sbd_cpu_cnt(hp, devset)
-		+ sbd_io_cnt(hp, devset) + sbd_mem_cnt(hp, devset);
+	cmdp->cmd_getncm.g_ncm = sbd_cpu_cnt(hp, devset) +
+	    sbd_io_cnt(hp, devset) + sbd_mem_cnt(hp, devset);
 
 	error = sbd_copyout_ioarg(hp->h_mode, hp->h_cmd, cmdp,
-		(sbd_ioctl_arg_t *)shp->sh_arg);
+	    (sbd_ioctl_arg_t *)shp->sh_arg);
 
 	if (error != 0)
 		SBD_SET_ERRNO(SBD_HD2ERR(hp), error);
@@ -4444,8 +4419,7 @@ sbd_status(sbd_handle_t *hp)
 			/* Can get board busy flag now */
 			dstatp->s_busy = sbp->sb_busy;
 			sbp->sb_cond = (sbd_cond_t)dstatp->s_cond;
-			bcopy(dstatp, &sbp->sb_stat,
-				sizeof (sbd_stat_t));
+			bcopy(dstatp, &sbp->sb_stat, sizeof (sbd_stat_t));
 			sbp->sb_flags |= SBD_BOARD_STATUS_CACHED;
 		}
 		sbd_release_sbdp_handle(hdp);
@@ -4492,8 +4466,7 @@ sbd_status(sbd_handle_t *hp)
 		/* paranoia: detect buffer overrun */
 		if ((caddr_t)&dstat32p->s_stat[dstatp->s_nstat] >
 		    ((caddr_t)dstat32p) + sz32) {
-			cmn_err(CE_WARN,
-				"sbd:%s: buffer32 overrun", f);
+			cmn_err(CE_WARN, "sbd:%s: buffer32 overrun", f);
 #ifdef _MULTI_DATAMODEL
 			if (sz32 != 0)
 				kmem_free(dstat32p, sz32);
@@ -4539,57 +4512,57 @@ sbd_status(sbd_handle_t *hp)
 
 			case SBD_COMP_CPU:
 				ds32p->d_cpu.cs_isbootproc =
-					(int32_t)dsp->d_cpu.cs_isbootproc;
+				    (int32_t)dsp->d_cpu.cs_isbootproc;
 				ds32p->d_cpu.cs_cpuid =
-					(int32_t)dsp->d_cpu.cs_cpuid;
+				    (int32_t)dsp->d_cpu.cs_cpuid;
 				ds32p->d_cpu.cs_speed =
-					(int32_t)dsp->d_cpu.cs_speed;
+				    (int32_t)dsp->d_cpu.cs_speed;
 				ds32p->d_cpu.cs_ecache =
-					(int32_t)dsp->d_cpu.cs_ecache;
+				    (int32_t)dsp->d_cpu.cs_ecache;
 				break;
 
 			case SBD_COMP_MEM:
 				ds32p->d_mem.ms_type =
-					(int32_t)dsp->d_mem.ms_type;
+				    (int32_t)dsp->d_mem.ms_type;
 				ds32p->d_mem.ms_ostate =
-					(int32_t)dsp->d_mem.ms_ostate;
+				    (int32_t)dsp->d_mem.ms_ostate;
 				ds32p->d_mem.ms_cond =
-					(int32_t)dsp->d_mem.ms_cond;
+				    (int32_t)dsp->d_mem.ms_cond;
 				ds32p->d_mem.ms_interleave =
-					(uint32_t)dsp->d_mem.ms_interleave;
+				    (uint32_t)dsp->d_mem.ms_interleave;
 				ds32p->d_mem.ms_basepfn =
-					(uint32_t)dsp->d_mem.ms_basepfn;
+				    (uint32_t)dsp->d_mem.ms_basepfn;
 				ds32p->d_mem.ms_totpages =
-					(uint32_t)dsp->d_mem.ms_totpages;
+				    (uint32_t)dsp->d_mem.ms_totpages;
 				ds32p->d_mem.ms_detpages =
-					(uint32_t)dsp->d_mem.ms_detpages;
+				    (uint32_t)dsp->d_mem.ms_detpages;
 				ds32p->d_mem.ms_pageslost =
-					(int32_t)dsp->d_mem.ms_pageslost;
+				    (int32_t)dsp->d_mem.ms_pageslost;
 				ds32p->d_mem.ms_managed_pages =
-					(int32_t)dsp->d_mem.ms_managed_pages;
+				    (int32_t)dsp->d_mem.ms_managed_pages;
 				ds32p->d_mem.ms_noreloc_pages =
-					(int32_t)dsp->d_mem.ms_noreloc_pages;
+				    (int32_t)dsp->d_mem.ms_noreloc_pages;
 				ds32p->d_mem.ms_noreloc_first =
-					(int32_t)dsp->d_mem.ms_noreloc_first;
+				    (int32_t)dsp->d_mem.ms_noreloc_first;
 				ds32p->d_mem.ms_noreloc_last =
-					(int32_t)dsp->d_mem.ms_noreloc_last;
+				    (int32_t)dsp->d_mem.ms_noreloc_last;
 				ds32p->d_mem.ms_cage_enabled =
-					(int32_t)dsp->d_mem.ms_cage_enabled;
+				    (int32_t)dsp->d_mem.ms_cage_enabled;
 				ds32p->d_mem.ms_peer_is_target =
-					(int32_t)dsp->d_mem.ms_peer_is_target;
+				    (int32_t)dsp->d_mem.ms_peer_is_target;
 				(void) strcpy(ds32p->d_mem.ms_peer_ap_id,
-					dsp->d_mem.ms_peer_ap_id);
+				    dsp->d_mem.ms_peer_ap_id);
 				break;
 
 
 			case SBD_COMP_IO:
 
 				ds32p->d_io.is_type =
-					(int32_t)dsp->d_io.is_type;
+				    (int32_t)dsp->d_io.is_type;
 				ds32p->d_io.is_unsafe_count =
-					(int32_t)dsp->d_io.is_unsafe_count;
+				    (int32_t)dsp->d_io.is_unsafe_count;
 				ds32p->d_io.is_referenced =
-					(int32_t)dsp->d_io.is_referenced;
+				    (int32_t)dsp->d_io.is_referenced;
 				for (j = 0; j < SBD_MAX_UNSAFE; j++)
 					ds32p->d_io.is_unsafe_list[j] =
 					    (int32_t)
@@ -4601,14 +4574,14 @@ sbd_status(sbd_handle_t *hp)
 			case SBD_COMP_CMP:
 				/* copy sbd_cmp_stat_t structure members */
 				bcopy(&dsp->d_cmp.ps_cpuid[0],
-					&ds32p->d_cmp.ps_cpuid[0],
-					sizeof (ds32p->d_cmp.ps_cpuid));
+				    &ds32p->d_cmp.ps_cpuid[0],
+				    sizeof (ds32p->d_cmp.ps_cpuid));
 				ds32p->d_cmp.ps_ncores =
-					(int32_t)dsp->d_cmp.ps_ncores;
+				    (int32_t)dsp->d_cmp.ps_ncores;
 				ds32p->d_cmp.ps_speed =
-					(int32_t)dsp->d_cmp.ps_speed;
+				    (int32_t)dsp->d_cmp.ps_speed;
 				ds32p->d_cmp.ps_ecache =
-					(int32_t)dsp->d_cmp.ps_ecache;
+				    (int32_t)dsp->d_cmp.ps_ecache;
 				break;
 
 			default:
@@ -4622,8 +4595,8 @@ sbd_status(sbd_handle_t *hp)
 		if (ddi_copyout((void *)dstat32p,
 		    cmdp->cmd_stat.s_statp, sz32, mode) != 0) {
 			cmn_err(CE_WARN,
-				"sbd:%s: failed to copyout status "
-				"for board %d", f, sbp->sb_num);
+			    "sbd:%s: failed to copyout status for board %d",
+			    f, sbp->sb_num);
 			SBD_SET_ERRNO(SBD_HD2ERR(hp), EFAULT);
 		}
 	} else
@@ -4631,8 +4604,8 @@ sbd_status(sbd_handle_t *hp)
 	if (ddi_copyout((void *)dstatp, cmdp->cmd_stat.s_statp,
 	    sz, mode) != 0) {
 		cmn_err(CE_WARN,
-			"sbd:%s: failed to copyout status for board %d",
-			f, sbp->sb_num);
+		    "sbd:%s: failed to copyout status for board %d",
+		    f, sbp->sb_num);
 		SBD_SET_ERRNO(SBD_HD2ERR(hp), EFAULT);
 	}
 
@@ -4661,7 +4634,7 @@ sbd_board_discovery(sbd_board_t *sbp)
 
 	if (SBD_DEVS_PRESENT(sbp) == 0) {
 		PR_ALL("%s: board %d has no devices present\n",
-			f, sbp->sb_num);
+		    f, sbp->sb_num);
 		return;
 	}
 
@@ -4686,8 +4659,7 @@ sbd_board_discovery(sbd_board_t *sbp)
 			cpuid = sbdp_get_cpuid(hdp, dip);
 
 			if (cpuid < 0) {
-				SBD_GET_PERR(hdp->h_err,
-				    ep);
+				SBD_GET_PERR(hdp->h_err, ep);
 				continue;
 			}
 
@@ -4696,7 +4668,7 @@ sbd_board_discovery(sbd_board_t *sbp)
 				SBD_DEV_SET_ATTACHED(sbp, SBD_COMP_CPU, i);
 				DEVSET_ADD(devs_attached, SBD_COMP_CPU, i);
 				PR_ALL("%s: board %d, cpuid %d - attached\n",
-					f, sbp->sb_num, cpuid);
+				    f, sbp->sb_num, cpuid);
 			}
 			mutex_exit(&cpu_lock);
 			sbd_init_cpu_unit(sbp, i);
@@ -4756,7 +4728,7 @@ sbd_board_discovery(sbd_board_t *sbp)
 			SBD_DEV_SET_ATTACHED(sbp, SBD_COMP_MEM, i);
 			DEVSET_ADD(devs_attached, SBD_COMP_MEM, i);
 			PR_ALL("%s: board %d, mem-unit %d - attached\n",
-				f, sbp->sb_num, i);
+			    f, sbp->sb_num, i);
 		}
 		sbd_init_mem_unit(sbp, i, ep);
 	}
@@ -4767,7 +4739,7 @@ sbd_board_discovery(sbd_board_t *sbp)
 	 */
 	if (SBD_GET_ERRNO(ep) != 0)
 		cmn_err(CE_WARN, "%s errno has occurred: errno %d", f,
-			SBD_GET_ERRNO(ep));
+		    SBD_GET_ERRNO(ep));
 
 	/*
 	 * Check for i/o state.
@@ -4795,7 +4767,7 @@ sbd_board_discovery(sbd_board_t *sbp)
 			SBD_DEV_SET_ATTACHED(sbp, SBD_COMP_IO, i);
 			DEVSET_ADD(devs_attached, SBD_COMP_IO, i);
 			PR_ALL("%s: board %d, io-unit %d - attached\n",
-				f, sbp->sb_num, i);
+			    f, sbp->sb_num, i);
 		}
 		sbd_init_io_unit(sbp, i);
 	}
@@ -4811,24 +4783,24 @@ sbd_board_discovery(sbd_board_t *sbp)
 		 */
 
 		PR_ALL("%s: some devices not configured (0x%x)...\n",
-			f, devs_lost);
+		    f, devs_lost);
 
 		for (ut = 0; ut < MAX_CPU_UNITS_PER_BOARD; ut++)
 			if (DEVSET_IN_SET(devs_lost, SBD_COMP_CPU, ut)) {
 				SBD_DEVICE_TRANSITION(sbp, SBD_COMP_CPU,
-					ut, SBD_STATE_UNCONFIGURED);
+				    ut, SBD_STATE_UNCONFIGURED);
 			}
 
 		for (ut = 0; ut < MAX_MEM_UNITS_PER_BOARD; ut++)
 			if (DEVSET_IN_SET(devs_lost, SBD_COMP_MEM, ut)) {
 				SBD_DEVICE_TRANSITION(sbp, SBD_COMP_MEM,
-					ut, SBD_STATE_UNCONFIGURED);
+				    ut, SBD_STATE_UNCONFIGURED);
 			}
 
 		for (ut = 0; ut < MAX_IO_UNITS_PER_BOARD; ut++)
 			if (DEVSET_IN_SET(devs_lost, SBD_COMP_IO, ut)) {
 				SBD_DEVICE_TRANSITION(sbp, SBD_COMP_IO,
-					ut, SBD_STATE_UNCONFIGURED);
+				    ut, SBD_STATE_UNCONFIGURED);
 			}
 	}
 }
@@ -4877,7 +4849,7 @@ hold_rele_branch(dev_info_t *rdip, void *arg)
 
 static void
 sbd_board_init(sbd_board_t *sbp, sbd_softstate_t *softsp,
-	int bd, dev_info_t *top_dip, int wnode)
+    int bd, dev_info_t *top_dip, int wnode)
 {
 	int		i;
 	dev_info_t	*pdip;
@@ -4910,30 +4882,30 @@ sbd_board_init(sbd_board_t *sbp, sbd_softstate_t *softsp,
 	/*
 	 * Allocate the devlist for cpus.
 	 */
-	sbp->sb_devlist[NIX(SBD_COMP_CPU)] = GETSTRUCT(dev_info_t *,
-						MAX_CPU_UNITS_PER_BOARD);
+	sbp->sb_devlist[NIX(SBD_COMP_CPU)] =
+	    GETSTRUCT(dev_info_t *, MAX_CPU_UNITS_PER_BOARD);
 
 	/*
 	 * Allocate the devlist for mem.
 	 */
-	sbp->sb_devlist[NIX(SBD_COMP_MEM)] = GETSTRUCT(dev_info_t *,
-						MAX_MEM_UNITS_PER_BOARD);
+	sbp->sb_devlist[NIX(SBD_COMP_MEM)] =
+	    GETSTRUCT(dev_info_t *, MAX_MEM_UNITS_PER_BOARD);
 
 	/*
 	 * Allocate the devlist for io.
 	 */
-	sbp->sb_devlist[NIX(SBD_COMP_IO)] = GETSTRUCT(dev_info_t *,
-						MAX_IO_UNITS_PER_BOARD);
+	sbp->sb_devlist[NIX(SBD_COMP_IO)] =
+	    GETSTRUCT(dev_info_t *, MAX_IO_UNITS_PER_BOARD);
 
 
-	sbp->sb_dev[NIX(SBD_COMP_CPU)] = GETSTRUCT(sbd_dev_unit_t,
-						MAX_CPU_UNITS_PER_BOARD);
+	sbp->sb_dev[NIX(SBD_COMP_CPU)] =
+	    GETSTRUCT(sbd_dev_unit_t, MAX_CPU_UNITS_PER_BOARD);
 
-	sbp->sb_dev[NIX(SBD_COMP_MEM)] = GETSTRUCT(sbd_dev_unit_t,
-						MAX_MEM_UNITS_PER_BOARD);
+	sbp->sb_dev[NIX(SBD_COMP_MEM)] =
+	    GETSTRUCT(sbd_dev_unit_t, MAX_MEM_UNITS_PER_BOARD);
 
-	sbp->sb_dev[NIX(SBD_COMP_IO)] = GETSTRUCT(sbd_dev_unit_t,
-						MAX_IO_UNITS_PER_BOARD);
+	sbp->sb_dev[NIX(SBD_COMP_IO)] =
+	    GETSTRUCT(sbd_dev_unit_t, MAX_IO_UNITS_PER_BOARD);
 
 	for (i = 0; i < MAX_CPU_UNITS_PER_BOARD; i++) {
 		sbp->sb_cpupath[i] = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
@@ -5015,21 +4987,21 @@ sbd_board_destroy(sbd_board_t *sbp)
 	 * Free up MEM unit structs.
 	 */
 	FREESTRUCT(sbp->sb_dev[NIX(SBD_COMP_MEM)],
-			sbd_dev_unit_t, MAX_MEM_UNITS_PER_BOARD);
+	    sbd_dev_unit_t, MAX_MEM_UNITS_PER_BOARD);
 	sbp->sb_dev[NIX(SBD_COMP_MEM)] = NULL;
 
 	/*
 	 * Free up CPU unit structs.
 	 */
 	FREESTRUCT(sbp->sb_dev[NIX(SBD_COMP_CPU)],
-			sbd_dev_unit_t, MAX_CPU_UNITS_PER_BOARD);
+	    sbd_dev_unit_t, MAX_CPU_UNITS_PER_BOARD);
 	sbp->sb_dev[NIX(SBD_COMP_CPU)] = NULL;
 
 	/*
 	 * Free up IO unit structs.
 	 */
 	FREESTRUCT(sbp->sb_dev[NIX(SBD_COMP_IO)],
-			sbd_dev_unit_t, MAX_IO_UNITS_PER_BOARD);
+	    sbd_dev_unit_t, MAX_IO_UNITS_PER_BOARD);
 	sbp->sb_dev[NIX(SBD_COMP_IO)] = NULL;
 
 	/*
@@ -5040,7 +5012,7 @@ sbd_board_destroy(sbd_board_t *sbp)
 		kmem_free((caddr_t)sbp->sb_cpupath[i], MAXPATHLEN);
 	}
 	FREESTRUCT(sbp->sb_devlist[NIX(SBD_COMP_CPU)], dev_info_t *,
-		MAX_CPU_UNITS_PER_BOARD);
+	    MAX_CPU_UNITS_PER_BOARD);
 	sbp->sb_devlist[NIX(SBD_COMP_CPU)] = NULL;
 
 	/*
@@ -5050,7 +5022,7 @@ sbd_board_destroy(sbd_board_t *sbp)
 		kmem_free((caddr_t)sbp->sb_mempath[i], MAXPATHLEN);
 	}
 	FREESTRUCT(sbp->sb_devlist[NIX(SBD_COMP_MEM)], dev_info_t *,
-		MAX_MEM_UNITS_PER_BOARD);
+	    MAX_MEM_UNITS_PER_BOARD);
 	sbp->sb_devlist[NIX(SBD_COMP_MEM)] = NULL;
 
 	/*
@@ -5060,7 +5032,7 @@ sbd_board_destroy(sbd_board_t *sbp)
 		kmem_free((caddr_t)sbp->sb_iopath[i], MAXPATHLEN);
 	}
 	FREESTRUCT(sbp->sb_devlist[NIX(SBD_COMP_IO)], dev_info_t *,
-		MAX_IO_UNITS_PER_BOARD);
+	    MAX_IO_UNITS_PER_BOARD);
 	sbp->sb_devlist[NIX(SBD_COMP_IO)] = NULL;
 
 	/*
@@ -5166,7 +5138,7 @@ sbd_get_comp_cond(dev_info_t *dip)
 /* function to simulate errors throughout the sbd code */
 void
 sbd_inject_err(int error, sbderror_t *ep, int Errno, int ecode,
-	char *rsc)
+    char *rsc)
 {
 	static fn_t	f = "sbd_inject_err";
 
@@ -5180,13 +5152,13 @@ sbd_inject_err(int error, sbderror_t *ep, int Errno, int ecode,
 
 	if (SBD_GET_ERRNO(ep) != 0) {
 		cmn_err(CE_WARN, "%s errno already set to %d", f,
-			SBD_GET_ERRNO(ep));
+		    SBD_GET_ERRNO(ep));
 		return;
 	}
 
 	if (SBD_GET_ERR(ep) != 0) {
 		cmn_err(CE_WARN, "%s code already set to %d", f,
-			SBD_GET_ERR(ep));
+		    SBD_GET_ERR(ep));
 		return;
 	}
 
@@ -5195,9 +5167,8 @@ sbd_inject_err(int error, sbderror_t *ep, int Errno, int ecode,
 		ep->e_code = ecode;
 
 		if (rsc != NULL)
-			bcopy((caddr_t)rsc,
-			(caddr_t)ep->e_rsc,
-			sizeof (ep->e_rsc));
+			bcopy((caddr_t)rsc, (caddr_t)ep->e_rsc,
+			    sizeof (ep->e_rsc));
 
 		if (Errno != 0)
 			PR_ERR_ERRNO("%s set errno to %d", f, ep->e_errno);

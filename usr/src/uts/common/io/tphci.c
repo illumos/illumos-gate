@@ -232,7 +232,7 @@ tphci_close(dev_t dev, int flag, int otype, cred_t *credp)
 /* ARGSUSED */
 static int
 tphci_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
-	cred_t *credp, int *rval)
+    cred_t *credp, int *rval)
 {
 	return (0);
 }
@@ -386,7 +386,7 @@ tphci_intr_op(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t op,
 
 static int
 tphci_ctl(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t ctlop, void *arg, void *result)
+    ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:

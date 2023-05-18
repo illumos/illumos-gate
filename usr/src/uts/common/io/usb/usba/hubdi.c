@@ -79,9 +79,9 @@ static int hubd_busop_get_eventcookie(dev_info_t *dip,
 static int hubd_busop_add_eventcall(dev_info_t *dip,
     dev_info_t *rdip,
     ddi_eventcookie_t cookie,
-    void (*callback)(dev_info_t *dip, ddi_eventcookie_t cookie, void *arg,
-	void *bus_impldata),
-    void *arg, ddi_callback_id_t *cb_id);
+    ddi_event_cb_f callback,
+    void *arg,
+    ddi_callback_id_t *cb_id);
 static int hubd_busop_remove_eventcall(dev_info_t *dip,
     ddi_callback_id_t cb_id);
 static int hubd_bus_config(dev_info_t *dip,
@@ -6885,8 +6885,7 @@ static int
 hubd_busop_add_eventcall(dev_info_t *dip,
     dev_info_t	*rdip,
     ddi_eventcookie_t cookie,
-    void (*callback)(dev_info_t *dip, ddi_eventcookie_t cookie, void *arg,
-	void *bus_impldata),
+    ddi_event_cb_f callback,
     void *arg, ddi_callback_id_t *cb_id)
 {
 	hubd_t	*hubd = (hubd_t *)hubd_get_soft_state(dip);
