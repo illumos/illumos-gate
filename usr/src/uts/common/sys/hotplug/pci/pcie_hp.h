@@ -77,7 +77,7 @@ extern "C" {
 #define	PCIE_HP_POWER_GOOD_WAIT_TIME	220000	/* Wait time after issuing a */
 						/* cmd to change slot state */
 
-/* definations for PCIEHPC/PCISHPC */
+/* Definitions for PCIEHPC/PCISHPC */
 #define	PCIE_NATIVE_HP_TYPE	"PCIe-Native"		/* PCIe Native type */
 #define	PCIE_ACPI_HP_TYPE	"PCIe-ACPI"		/* PCIe ACPI type */
 #define	PCIE_PROP_HP_TYPE	"PCIe-Proprietary"	/* PCIe Prop type */
@@ -330,9 +330,6 @@ extern int pcie_create_minor_node(pcie_hp_ctrl_t *, int);
 extern void pcie_remove_minor_node(pcie_hp_ctrl_t *, int);
 extern void pcie_hp_gen_sysevent_req(char *slot_name, int hint,
     dev_info_t *self, int kmflag);
-
-extern const struct pci_class_strings_s class_pci[];
-extern int class_pci_items;
 
 #endif /* _KERNEL */
 

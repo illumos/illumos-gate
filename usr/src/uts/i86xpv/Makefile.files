@@ -195,6 +195,7 @@ IOAT_OBJS += ioat.o ioat_rs.o ioat_ioctl.o ioat_chan.o
 ISANEXUS_OBJS += isa.o dma_engine.o i8237A.o
 PCI_E_NEXUS_OBJS += npe.o npe_misc.o
 PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
+PCI_PRD_OBJS += pci_prd_i86pc.o pci_memlist.o
 PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
 PRIVCMD_OBJS += seg_mf.o privcmd.o privcmd_hcall.o
 ROOTNEX_OBJS += rootnex.o

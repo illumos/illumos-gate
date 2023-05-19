@@ -2563,7 +2563,7 @@ pciehpc_slot_get_property(pcie_hp_slot_t *slot_p, ddi_hp_property_t *arg,
 			ddi_acc_handle_t handle;
 			dev_info_t	*cdip;
 			uint8_t		prog_class, base_class, sub_class;
-			int		i;
+			size_t		i;
 
 			mutex_exit(&ctrl_p->hc_mutex);
 			cdip = pcie_hp_devi_find(

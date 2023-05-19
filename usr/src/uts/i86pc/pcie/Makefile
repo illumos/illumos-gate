@@ -48,7 +48,7 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Dependency
 #
-LDFLAGS		+= -Nmisc/acpica -Nmisc/busra
+LDFLAGS		+= -Nmisc/acpica -Nmisc/busra -Nmisc/pci_prd
 
 #
 #	Define targets
@@ -56,6 +56,7 @@ LDFLAGS		+= -Nmisc/acpica -Nmisc/busra
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
+CPPFLAGS	+= -I$(SRC)/common/pci
 CERRWARN	+= -_gcc=-Wno-unused-value
 CERRWARN	+= -_gcc=-Wno-unused-function # safe
 

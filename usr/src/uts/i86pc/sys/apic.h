@@ -169,7 +169,7 @@ typedef enum apic_mode {
 #define	APIC_CT_VECT	0x4ac		/* conf table vector		*/
 #define	APIC_CT_SIZE	1024		/* conf table size		*/
 
-#define	APIC_ID		'MPAT'		/* conf table signature 	*/
+#define	APIC_ID		'MPAT'		/* conf table signature		*/
 
 #define	VENID_AMD		0x1022
 #define	DEVID_8131_IOAPIC	0x7451
@@ -180,11 +180,6 @@ typedef enum apic_mode {
 #define	IOAPICS_DEV_TYPE	"ioapic"
 #define	IOAPICS_PROP_VENID	"vendor-id"
 #define	IOAPICS_PROP_DEVID	"device-id"
-
-#define	IS_CLASS_IOAPIC(b, s, p) \
-	((b) == PCI_CLASS_PERIPH && (s) == PCI_PERIPH_PIC &&	\
-	((p) == PCI_PERIPH_PIC_IF_IO_APIC ||			\
-	(p) == PCI_PERIPH_PIC_IF_IOX_APIC))
 
 /*
  * These macros are used in frequently called routines like
@@ -542,7 +537,7 @@ typedef struct apic_cpus_info {
  */
 typedef	struct apic_regs_ops {
 	uint64_t	(*apic_read)(uint32_t);
-	void 		(*apic_write)(uint32_t, uint64_t);
+	void		(*apic_write)(uint32_t, uint64_t);
 	int		(*apic_get_pri)(void);
 	void		(*apic_write_task_reg)(uint64_t);
 	void		(*apic_write_int_cmd)(uint32_t, uint32_t);

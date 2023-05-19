@@ -43,6 +43,9 @@ typedef struct pci_class_strings_s {
 	char	*short_desc;	/* Cfgadm based original short description */
 } pci_class_strings_t;
 
+extern const pci_class_strings_t class_pci[];
+extern size_t class_pci_items;
+
 #ifdef __cplusplus
 }
 #endif

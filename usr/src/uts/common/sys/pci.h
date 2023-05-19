@@ -1063,6 +1063,11 @@ typedef struct pcix_attr {
 
 #define	PCI_HTCAP_FUNCEXT_LEN_MASK		0xFF
 
+/*
+ * PCI Bridge Subsystem Capability (PCI_CAP_ID_P2P_SUBSYS)
+ */
+#define	PCI_SUBSYSCAP_SUBVID	0x4
+#define	PCI_SUBSYSCAP_SUBSYS	0x6
 
 /*
  * other interesting PCI constants

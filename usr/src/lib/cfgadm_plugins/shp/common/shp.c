@@ -63,9 +63,6 @@
 #include "../../../../common/pci/pci_strings.h"
 #include <libhotplug.h>
 
-extern const struct pci_class_strings_s class_pci[];
-extern int class_pci_items;
-
 #define	MSG_HOTPLUG_DISABLED \
 	"Error: hotplug service is probably not running, " \
 	"please use 'svcadm enable hotplug' to enable the service. " \

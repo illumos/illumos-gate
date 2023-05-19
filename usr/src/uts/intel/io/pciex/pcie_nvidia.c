@@ -97,23 +97,9 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 				*slot_valid = B_TRUE;
 				*slot_number =
 				    PCIE_SLOTCAP_PHY_SLOT_NUM(slot_cap);
-
-				/* Is PCI Express HotPlug capability set? */
-				if (cdip &&
-				    (slot_cap & PCIE_SLOTCAP_HP_CAPABLE)) {
-					(void) ndi_prop_update_int(
-					    DDI_DEV_T_NONE, cdip,
-					    "pci-hotplug-type",
-					    INBAND_HPC_PCIE);
-				}
 			}
 
 			found_pciex = B_TRUE;
-		}
-
-		if (cdip && (cap == PCI_CAP_ID_PCI_HOTPLUG)) {
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
-			    "pci-hotplug-type", INBAND_HPC_SHPC);
 		}
 
 		capsp = (*pci_getb_func)(bus, dev, func,
