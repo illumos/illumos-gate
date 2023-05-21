@@ -58,11 +58,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 CFLAGS += $(CCVERBOSE)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
-#
 #	Dependency
 #
 LDFLAGS	+= -Ndrv/scfd

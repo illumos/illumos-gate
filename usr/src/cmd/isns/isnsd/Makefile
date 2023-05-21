@@ -37,7 +37,6 @@ COBJS	= main.o qry.o admintf.o dsapi.o log.o sched.o dseng.o scn.o cache.o
 COBJS	+= dump.o msgq.o server.o config.o esi.o obj.o utils.o dd.o func.o
 COBJS	+= pdu.o door.o htable.o
 OBJS	= $(COBJS) $(DSRC:%.d=%.o)
-SRCS	= $(COBJS:%.o=%.c)
 POFILE= isns.po
 POFILES	= $(COBJS:%.o=%.po)
 
@@ -66,9 +65,6 @@ SMATCH=off
 
 CLOBBERFILES += $(DTRACE_HEADER)
 
-obj.o := CERRWARN += -erroff=E_CONST_OBJ_SHOULD_HAVE_INITIZR
-obj.o := CERRWARN += -erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
-
 LDLIBS		+= -lsecdb -lsocket -lnsl -lscf -lxml2
 NATIVE_LIBS	+= libxml2.so
 
@@ -93,8 +89,6 @@ $(PROG): $(OBJS)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 $(POFILES): $(DTRACE_HEADER)
 

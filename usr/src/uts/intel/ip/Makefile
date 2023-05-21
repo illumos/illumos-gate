@@ -55,8 +55,6 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
-CINLINEFLAGS = -xinline=tcp_set_ws_value
-
 CFLAGS		+= $(CINLINEFLAGS)
 
 CERRWARN	+= -_gcc=-Wno-parentheses

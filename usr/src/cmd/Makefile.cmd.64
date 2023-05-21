@@ -32,7 +32,3 @@ include $(SRC)/Makefile.master.64
 # For programs that are installed in the root filesystem,
 # build $(ROOTFS_PROG) rather than $(PROG)
 $(BUILD64)$(ROOTFS_PROG) := LDFLAGS += -Wl,-I/lib/$(MACH64)/ld.so.1
-
-V9CODESIZE = -xcode=abs44
-
-sparcv9_CFLAGS += $(V9CODESIZE)

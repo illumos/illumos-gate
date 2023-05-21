@@ -55,11 +55,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS += $(CCVERBOSE)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
-#
 # Define dependency on fhc
 #
 LDFLAGS += -N drv/fhc

@@ -35,10 +35,7 @@ $(ROOT_PROG_LINK) := FILEMODE = 0555
 
 LOCAL_OBJS = sasinfo.o sasinfo-list.o printAttrs.o
 COMMON_OBJS = cmdparse.o
-LOCAL_SRCS = $(LOCAL_OBJS:%.o=%.c)
-COMMON_SRCS = $(COMMON_OBJS:%.o=$(COMMONBASE)/cmdparse/%.c)
 OBJS = $(LOCAL_OBJS) $(COMMON_OBJS)
-SRCS = $(LOCAL_SRCS) $(COMMON_SRCS)
 POFILE = sasinfo_all.po
 POFILES = $(LOCAL_OBJS:%.o=%.po)
 
@@ -56,8 +53,6 @@ INCS += -I$(COMMONBASE)/cmdparse
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
-
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 
 .KEEP_STATE:
 
@@ -79,8 +74,6 @@ $(POFILE): $(POFILES)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 check:	$(CHKMANIFEST)
 

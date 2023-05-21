@@ -68,9 +68,9 @@ SMOFF += all_func_returns
 .KEEP_STATE:
 
 # This codepath is performance-critical
-sparc_COPTFLAG = -xO5 -_cc=-xprefetch=auto,explicit
+sparc_COPTFLAG = -xO5
 sparcv9_COPTFLAG = $(sparc_COPTFLAG)
-i386_COPTFLAG = -_cc=-xO5 -_cc=-xprefetch=auto,explicit
+i386_COPTFLAG =
 amd64_COPTFLAG = $(i386_COPTFLAG)
 
 all: install_h .WAIT $(LIBS)

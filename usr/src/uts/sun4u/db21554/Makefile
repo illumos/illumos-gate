@@ -55,11 +55,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
-#
 # Make the driver hotswap controller
 #
 CFLAGS += -DPCI_HOTPLUG

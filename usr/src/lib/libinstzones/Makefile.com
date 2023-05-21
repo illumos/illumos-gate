@@ -48,10 +48,6 @@ POFILE =	libinstzones.po
 MSGFILES =	$(OBJECTS:%.o=../common/%.i)
 CLEANFILES +=	$(MSGFILES)
 
-# openssl forces us to ignore dubious pointer casts, thanks to its clever
-# use of macros for stack management.
-		-erroff=E_BAD_PTR_CAST_ALIGN,E_BAD_PTR_CAST
-
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-clobbered
 CERRWARN +=	-_gcc=-Wno-address

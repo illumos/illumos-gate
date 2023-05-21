@@ -58,7 +58,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 CFLAGS          += $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)
-CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
 
 #
 #	Define targets
@@ -70,11 +69,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #	Override defaults
 #
 INC_PATH	+= -I$(CONF_SRCDIR) -I$(UTSBASE)/common/io/e1000api
-
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS		+= -dalign
 
 #
 # Driver depends on MAC

@@ -75,11 +75,6 @@ $(CONF_INSTALL_DBG64):	FRC
 	@BUILD_TYPE=DBG64 $(MAKE) $(INSTALL_TARGET)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:

@@ -68,11 +68,6 @@ DEF_BUILDS	= $(DEF_BUILDSONLY64)
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-char-subscripts
 
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
 #	Dependency
 LDFLAGS += -N misc/i2c_svc -Nmisc/hpcsvc
 

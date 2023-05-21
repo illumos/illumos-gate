@@ -61,11 +61,6 @@ CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
-#
 # Define dependency on fhc
 #
 LDFLAGS += -N drv/fhc

@@ -58,12 +58,6 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
-#
-# Inline functions, this probably needs to be changed when compiling with
-# -xO4.
-#
-CINLINES	= -xinline=tcp_set_ws_value,tcp_fill_header
-
 CFLAGS		+= $(CINLINES)
 
 #

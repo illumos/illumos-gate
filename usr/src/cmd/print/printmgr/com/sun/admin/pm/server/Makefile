@@ -101,7 +101,7 @@ install: all $(ROOTDIRS) $(ROOTLINKS)
 # Build standalone programs for testing
 #
 NS: NS.c
-	$(CC) NS.c $(CCGDEBUG) $(ILDOFF) -o NS -DMAIN=1 $(ENVLDLIBS1) $(ENVLIBS2) \
+	$(CC) NS.c $(CCGDEBUG) -o NS -DMAIN=1 $(ENVLDLIBS1) $(ENVLIBS2) \
 	    -lprint -lnsl -lsocket
 
 cstyle:

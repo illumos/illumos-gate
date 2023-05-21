@@ -58,11 +58,6 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS		+= -dalign
-
-#
 # Module Dependencies
 #
 LDFLAGS		+= -Nmisc/ds -Ndrv/drctl

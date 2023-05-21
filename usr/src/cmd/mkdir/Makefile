@@ -26,7 +26,6 @@
 
 PROG= mkdir
 OBJS= $(PROG).o common.o
-SRCS= mkdir.c ../chmod/common.c
 
 include ../Makefile.cmd
 
@@ -52,8 +51,6 @@ LDLIBS += -lgen
 POFILES= $(OBJS:%.o=%.po)
 POFILE= $(PROG)_cmd.po
 
-LINTFLAGS += -erroff=E_GLOBAL_COULD_BE_STATIC2
-
 .KEEP_STATE:
 
 all: $(PROG)
@@ -70,7 +67,5 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 include ../Makefile.targ

@@ -63,11 +63,6 @@ CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS		+= -dalign
-
-#
 #	Kernel Module Dependencies
 #
 LDFLAGS		+= -Nmisc/scsi

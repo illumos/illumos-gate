@@ -41,7 +41,7 @@ ROOTPROG = $(ROOTUSRSBIN)/$(PROG)
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I. -I../common
-CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
+CFLAGS += $(CTF_FLAGS) $(CCVERBOSE)
 LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_adm -lfmd_msg
 LDLIBS += -lnvpair -ltopo
 LDFLAGS += -R/usr/lib/fm

@@ -50,20 +50,6 @@ PSMPROMLIBDIR64	= $(PSMSTANDDIR)/lib/promif/$(MACH64)
 FILEMODE	= 644
 DIRMODE		= 755
 
-#
-# While things are pretty much 32-bit lint-clean, there are a ton of
-# suspect pointer casts.  Since these may be serious problems (especially
-# on SPARC), this really needs to be investigated thoroughly one day.
-# However, we shouldn't feel too bad: the whole kernel is linted with this
-# turned off as well (along with a dozen other disabled warnings).
-#
-# The other two -erroff's are needed only because lint's -u flag is lame
-# and also turns off "name used but not defined" checks (so we instead
-# just enumerate the errors that -u turns off that we want turned off).
-#
-LINTFLAGS = -nmsF -erroff=E_BAD_PTR_CAST_ALIGN \
-	    -erroff=E_NAME_DECL_NOT_USED_DEF2 -erroff=E_NAME_DEF_NOT_USED2
-
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-char-subscripts

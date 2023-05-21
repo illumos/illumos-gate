@@ -46,11 +46,6 @@ CERRWARN += -_gcc=-Wno-type-limits
 POFILE= file_all.po
 POFILES= $(SRCS:%.c=%.po)
 
-# The debug binary can be built using the flags
-# SOURCEDEBUG=yes CGLOBALSTATIC=
-# This will avoid the multiple symbols definition error
-# for static global variables in elf_read32.o and elf_read64.o
-
 LDLIBS += -lelf
 CPPFLAGS += -I$(ELFCAP) -I$(SGSRTCID)
 $(XPG4) := CFLAGS += -DXPG4

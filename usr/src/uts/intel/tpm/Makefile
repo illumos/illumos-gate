@@ -47,8 +47,6 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-CFLAGS		+= -xCC
-
 # This is for everything except /usr/include/tss/
 CPPFLAGS	+= -I$(ROOT)/usr/include
 

@@ -26,7 +26,7 @@
 include $(SRC)/Makefile.master
 include $(SRC)/lib/iconv_modules/Makefile.iconv
 
-CFLAGS =  $(CCMODE) $(C_BIGPICFLAGS) $(GSHARED) $(COPTFLAG) -I. $(XREGSFLAG) -D_REENTRANT
+CFLAGS =  $(C_BIGPICFLAGS) $(GSHARED) $(COPTFLAG) -I. -D_REENTRANT
 
 SRCS = 646%8859.c 646da%8859.c 646de%8859.c 646en%8859.c 646es%8859.c 646fr%8859.c 646it%8859.c 646sv%8859.c \
 8859%646.c 8859%646da.c 8859%646de.c 8859%646en.c 8859%646es.c 8859%646fr.c 8859%646it.c 8859%646sv.c 8859-1%IBM-037.c \

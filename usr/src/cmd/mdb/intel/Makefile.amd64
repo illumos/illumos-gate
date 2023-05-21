@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 MACHDIR=amd64
 MACHMODDIR=/$(MACHDIR)
@@ -32,14 +30,10 @@ MACHMODDIR=/$(MACHDIR)
 ROOTMOD = $(ROOT)/usr/lib/mdb/$(MDBTGT)$(MACHMODDIR)
 ROOTKMOD = $(ROOT)/kernel/kmdb$(MACHMODDIR)
 
-CFLAGS += $(CTF_FLAGS) $(XSTRCONST)
-CFLAGS64 += $(CTF_FLAGS) $(XSTRCONST)
+CFLAGS += $(CTF_FLAGS)
+CFLAGS64 += $(CTF_FLAGS)
 CPPFLAGS += -D_ELF64
 CTFSTABSCFLAGS = $(CFLAGS64)
-
-LINTTAGS = E_BAD_FORMAT_STR2,E_BAD_FORMAT_ARG_TYPE2
-LINTFLAGS64 += -u -erroff=$(LINTTAGS)
-LINTFLAGS = $(LINTFLAGS64)
 
 # Used to locate the AMD64 kmdb linktest object
 KMDBDIR = $(SRC)/cmd/mdb/intel/amd64/kmdb

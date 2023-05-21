@@ -1079,11 +1079,6 @@ SONAME = libc.so.1
 
 CFLAGS += $(CCVERBOSE) $(CTF_FLAGS)
 
-# This is necessary to avoid problems with calling _ex_unwind().
-# We probably don't want any inlining anyway.
-XINLINE = -xinline=
-CFLAGS += $(XINLINE)
-
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += $(CNOWARN_UNINIT)
@@ -1106,9 +1101,6 @@ SMATCH=off
 # This is automatically enabled for DEBUG builds, not for non-debug builds.
 THREAD_DEBUG =
 $(NOT_RELEASE_BUILD)THREAD_DEBUG = -DTHREAD_DEBUG
-
-# Make string literals read-only to save memory.
-CFLAGS += $(XSTRCONST)
 
 ALTPICS= $(TRACEOBJS:%=pics/%)
 

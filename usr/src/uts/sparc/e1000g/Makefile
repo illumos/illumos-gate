@@ -66,18 +66,12 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-variable
-CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
 
 
 #
 #	Override defaults
 #
 INC_PATH	+= -I$(CONF_SRCDIR) -I$(UTSBASE)/common/io/e1000api
-
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS		+= -dalign
 
 #
 # Driver depends on MAC

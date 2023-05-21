@@ -61,11 +61,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 INC_PATH	+= -I$(UTSBASE)/sun4/io/px
 
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-clobbered

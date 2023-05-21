@@ -17,6 +17,4 @@ PROG = mkbusy
 
 include $(SRC)/cmd/Makefile.cmd
 
-LINTFLAGS += -erroff=E_FUNC_SET_NOT_USED
-
 include ../Makefile.subdirs

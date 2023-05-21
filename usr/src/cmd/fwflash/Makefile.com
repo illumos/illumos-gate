@@ -79,11 +79,6 @@ $(ROOTUSRSBIN):		$(ROOTUSR)
 $(ROOTUSRSBIN)/%:	%
 	$(INS.file)
 
-
-
-%.ln: $(SRCDIR)/%.c
-	$(LINT.c) $(LINTFLAGS) -c $<
-
 %.po: $(SRCDIR)/%.c
 	$(RM) messages.po
 	$(XGETTEXT) $(XGETFLAGS) \
@@ -94,6 +89,3 @@ $(ROOTUSRSBIN)/%:	%
 $(POFILE): $(POFILES)
 	$(RM) $@
 	cat $(POFILES) >$@
-
-LINTFLAGS += -D_POSIX_PTHREAD_SEMANTICS -erroff=E_CONSTANT_CONDITION \
-	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED

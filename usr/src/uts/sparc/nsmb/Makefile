@@ -93,7 +93,6 @@ LDFLAGS         += -Ncrypto/md4 -Ncrypto/md5 -Nmisc/tlimod
 # to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-CERRWARN	+= -erroff=E_STATEMENT_NOT_REACHED
 
 #
 #	Default build targets.

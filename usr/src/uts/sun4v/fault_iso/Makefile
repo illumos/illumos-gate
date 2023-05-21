@@ -56,11 +56,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS		+= -v
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS		+= -dalign
-
-#
 # Module Dependencies
 #
 LDFLAGS		+= -Nmisc/ds

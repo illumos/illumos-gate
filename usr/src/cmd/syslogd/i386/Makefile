@@ -18,18 +18,12 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-# cmd/syslogd/i386/Makefile
 
 include ../Makefile.com
-
-# don't need the LINTED directives to surpress E_BAD_PTR_CAST_ALIGN in queue.c
-LINTFLAGS += -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 
 all: $(PROG) $(VARSYSLOG) $(VARAUTHLOG)
 

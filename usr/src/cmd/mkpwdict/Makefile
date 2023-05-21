@@ -25,21 +25,16 @@
 
 PROG=	mkpwdict
 
-
 include ../Makefile.cmd
 
 CFLAGS += -I$(SRC)/lib/pam_modules/authtok_check
-LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2 -m 
-LINTFLAGS += -I$(SRC)/lib/pam_modules/authtok_check
 
 CERRWARN += -_gcc=-Wno-parentheses
 
 CRACK_SRCDIR=	$(SRC)/lib/pam_modules/authtok_check/
 CRACK_OBJS=	packer.o packlib.o dict.o stringlib.o
-CRACK_SRCS=	$(CRACK_OBJS:%.o=$(CRACK_SRCDIR)/%.c)
 
 OBJS=	$(CRACK_OBJS) mkpwdict.o
-SRCS=	$(CRACK_SRCS) mkpwdict.c
 
 .KEEP_STATE:
 
@@ -57,7 +52,5 @@ mkpwdict: $(OBJS)
 
 clean:
 	$(RM) $(PROG) $(OBJS)
-
-lint:	lint_SRCS
 
 include ../Makefile.targ

@@ -28,10 +28,6 @@ SRCS = $(PROGS:%=%.c) $(UTILS:%.o=%.c)
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
 
-LINTS = $(PROGS:%=%.ln)
-LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
-
 ROOTOPTDIR = $(ROOT)/opt/os-tests/tests/file-locking
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
 	$(PROGS64:%=$(ROOTOPTDIR)/%)
@@ -41,8 +37,6 @@ ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
 install: $(ROOTOPTPROGS)
 
 all: $(PROGS32) $(PROGS64)
-
-lint: $(LINTS)
 
 clean:
 	-rm $(PROGS32) $(PROGS64)
@@ -57,9 +51,6 @@ $(ROOTOPTDIR)/%: %
 
 $(ROOTOPTDIR)/%: %.ksh
 	$(INS.rename)
-
-%.ln: %.c
-	$(LINT.c) $< $(UTILS) $(LDLIBS)
 
 %.64.o: %.c
 	$(COMPILE64.c) $< -o $@

@@ -31,8 +31,6 @@ EXTRA_SRC =./../common/mboot_extra.c
 
 OBJS= installgrub.o pcfs_glue.o pcfs.o bblk_einfo.o boot_utils.o mboot_extra.o \
 	getresponse.o
-SRCS= installgrub.c pcfs_glue.c $(PCFS_SRC) $(UTILS_SRC) $(EINFO_SRC) \
-	$(EXTRA_SRC) $(SRC)/common/util/getresponse.c
 SBINLINKS= $(PROG)
 
 include ../Makefile.com
@@ -49,14 +47,6 @@ i386_CFLAGS += -D_LARGEFILE64_SOURCE
 i386_CFLAGS += -D_FILE_OFFSET_BITS=64
 
 LDLIBS += -lfdisk -lefi -lfstyp
-
-LINTFLAGS += \
-	-erroff=E_BAD_PTR_CAST_ALIGN \
-	-erroff=E_STATIC_UNUSED \
-	-erroff=E_FUNC_RET_MAYBE_IGNORED \
-	-erroff=E_FUNC_RET_MAYBE_IGNORED2 \
-	-xerroff=E_NAME_DEF_NOT_USED2
-
 
 CSTD=	$(CSTD_GNU99)
 
@@ -89,7 +79,5 @@ install: all $(ROOTSBINPROG) .WAIT $(ROOTUSRSBINLINKS)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 include ../Makefile.targ

@@ -50,7 +50,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)
-CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
 
 # needs work
 SMOFF += all_func_returns,indenting

@@ -59,7 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides
 #
-CFLAGS		+= $(CCVERBOSE) -dalign
+CFLAGS		+= $(CCVERBOSE)
 
 #
 # For now, disable these warnings; maintainers should endeavor
@@ -87,7 +87,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-browser:	$(BINARY)
-
-browser		:= CFLAGS += -xsb

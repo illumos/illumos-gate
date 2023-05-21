@@ -54,11 +54,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS		+= -dalign
-
-#
 # Driver depends on MAC
 #
 LDFLAGS		+= -N misc/mac

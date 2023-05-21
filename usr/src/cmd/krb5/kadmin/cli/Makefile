@@ -40,8 +40,6 @@ CERRWARN += -_gcc=-Wno-unused-variable
 
 SMATCH=off
 
-COPTFLAG += $(XESS) #-I$(KINCDIR)
-
 SHAREDLIBS = -lmech_krb5 -lss
 
 CLLIBS = $(LDLIBS) $(KRUNPATH) $(KERBRUNPATH) \

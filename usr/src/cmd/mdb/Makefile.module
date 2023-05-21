@@ -97,7 +97,6 @@ ROOTTGTS		= $(ROOTTGTS_$(MDBTGT))
 # available.
 #
 PYCPPFLAGS		= -_gcc=-isystem -_gcc=$(ADJUNCT_PROTO)/usr/include/python$(PYTHON3_VERSION)$(PYTHON3_SUFFIX)
-PYCPPFLAGS		+= -_cc=-I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON3_VERSION)$(PYTHON3_SUFFIX)
 PYLNFLAGS		= -I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON3_VERSION)$(PYTHON3_SUFFIX)
 
 kvm_TGTFLAGS		= -D_KERNEL
@@ -115,10 +114,9 @@ AS_CPPFLAGS		+= -D_ASM
 SMOFF += all_func_returns,index_overflow
 
 # Module type-specific compiler flags
-$(MODOBJS) :=	CFLAGS += $(C_BIGPICFLAGS) $(XREGSFLAG)
-$(MODOBJS) :=	CFLAGS64 += $(C_BIGPICFLAGS) $(XREGSFLAG)
+$(MODOBJS) :=	CFLAGS += $(C_BIGPICFLAGS)
+$(MODOBJS) :=	CFLAGS64 += $(C_BIGPICFLAGS)
 $(KMODOBJS) :=	CPPFLAGS += -D_KMDB
-$(KMODOBJS) :=	V9CODESIZE = $(CCABS32)
 $(KMODOBJS) :=	DTS_ERRNO =
 $(KMODFILE) :=	STACKPROTECT = none
 

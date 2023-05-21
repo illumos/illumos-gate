@@ -57,11 +57,6 @@ INC_PATH	+= -I$(UTSBASE)/sun4u
 INC_PATH	+= -I$(UTSBASE)/sun4
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
-#
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.

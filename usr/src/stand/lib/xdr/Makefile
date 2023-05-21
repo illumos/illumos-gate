@@ -22,8 +22,6 @@
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# 
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY = libxdr.a
@@ -35,8 +33,5 @@ include ../Makefile.com
 
 CMNDIR	= $(TOPDIR)/uts/common/rpc
 SRCS	= $(LOCOBJS:%.o=$(SRCDIR)/%.c) $(CMNOBJS:%.o=$(CMNDIR)/%.c)
-
-# lint has problems with xdr.c use og #pragma weak
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 
 include Makefile.$(MACH).targ

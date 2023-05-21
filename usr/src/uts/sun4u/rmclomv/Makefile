@@ -55,11 +55,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 LDFLAGS += -Ndrv/rmc_comm -Ndrv/pmugpio
 
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS		+= -dalign
-
 CERRWARN	+= -_gcc=-Wno-parentheses
 
 #

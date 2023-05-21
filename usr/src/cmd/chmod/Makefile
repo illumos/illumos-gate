@@ -25,7 +25,6 @@
 
 PROG= chmod
 OBJS= $(PROG).o common.o
-SRCS= $(OBJS:%.o=%.c)
 
 POFILES= $(OBJS:%.o=%.po)
 
@@ -37,8 +36,6 @@ CERRWARN += $(CNOWARN_UNINIT)
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
-LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
-
 LDLIBS += -lsec -lnvpair -lcmdutils
 
 POFILE= chmod_cmd.po
@@ -46,7 +43,7 @@ XGETFLAGS= -a -x chmod.xcl
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -60,7 +57,5 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 include ../Makefile.targ

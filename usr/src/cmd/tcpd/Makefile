@@ -21,8 +21,6 @@ tcpd tcpdmatch try-from := \
 		LDLIBS += -lwrap
 tcpdchk :=	LDLIBS += -lwrap -lnsl
 
-CERRWARN +=	-erroff=E_FUNC_HAS_NO_RETURN_STMT
-CERRWARN +=	-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	$(CNOWARN_UNINIT)

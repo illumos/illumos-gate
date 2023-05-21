@@ -57,11 +57,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 CFLAGS		+= -v
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS		+= -dalign
-
-#
 # Default build targets.
 #
 .KEEP_STATE:

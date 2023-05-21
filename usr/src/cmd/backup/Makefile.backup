@@ -27,10 +27,6 @@
 
 include $(SRC)/cmd/Makefile.cmd
 
-# xxx should pass -Nlevel=4 (takes 62 minutes of cpu for lib and dump)
-LINTFLAGS=	-errchk=%all,longptr64 -errhdr=%user -F -m \
-		-Ncheck=%all,no%extern -Nlevel=3 -Xtransition=yes \
-		-errtags=yes -erroff=E_UNCAL_F,E_ASGN_RESET -s
 # -c: continuation line indentation (broken for multi-line continuations)
 # -h: heuristic checks (sometimes wrong)
 # -p: extra-picky
@@ -69,7 +65,6 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 debug:=		TARGET= debug
 check:=		TARGET= check
 _msg:=		TARGET= _msg
@@ -78,6 +73,5 @@ _msg:=		TARGET= _msg
 DUMPLIB=	libdump.a
 
 # define the DO_SUBDIR macro, so that it can be changed here for all Makefiles
-DO_SUBDIR=	cd $@; pwd; $(MAKE)  \
-			LINTFLAGS="$(LINTFLAGS)" $(TARGET)
-DO_LIBDIR=	@cd $(@D); pwd; $(MAKE) LINTFLAGS="$(LINTFLAGS)" $(TARGET)
+DO_SUBDIR=	cd $@; pwd; $(MAKE) $(TARGET)
+DO_LIBDIR=	@cd $(@D); pwd; $(MAKE) $(TARGET)

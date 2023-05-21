@@ -29,8 +29,6 @@ PROG= lofiadm
 OBJS= main.o utils.o
 LZMAOBJS= LzmaEnc.o LzFind.o
 
-SRCS= $(OBJS:%.o=%.c)
-
 POFILES= $(OBJS:%.o=%.po)
 
 include ../Makefile.cmd
@@ -43,8 +41,6 @@ CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off
-
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 
 .KEEP_STATE:
 
@@ -70,7 +66,5 @@ $(POFILE): $(POFILES)
 
 clean:
 	$(RM) $(PROG) $(OBJS) $(LZMAOBJS) $(POFILE) $(POFILES)
-
-lint:	lint_SRCS
 
 include ../Makefile.targ

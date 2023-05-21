@@ -62,11 +62,6 @@ INC_PATH	+= -I$(UTSBASE)/sun4
 CFLAGS += $(CCVERBOSE)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
-#
 # Define dependency on fcodem
 #
 LDFLAGS += -N misc/fcodem

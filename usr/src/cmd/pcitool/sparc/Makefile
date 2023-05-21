@@ -25,6 +25,4 @@
 
 include ../Makefile.com
 
-LINTFLAGS 	+= -erroff=E_STATIC_UNUSED
-
 install: all $(ROOTUSRSBINPROG)

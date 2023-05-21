@@ -26,10 +26,8 @@
 PROG =		idmap
 CLIENTOBJS =	idmap.o idmap_engine.o namemaps.o
 # idmap_clnt.o
-CLIENTSRCS =	$(CLIENTOBJS:%.o=%.c)
 POFILES =	$(CLIENTOBJS:.o=.po)
 OBJS =		$(CLIENTOBJS)
-SRCS =		$(CLIENTSRCS)
 IDMAP_PROT_DIR =        $(SRC)/head/rpcsvc
 
 include ../../Makefile.cmd
@@ -59,8 +57,6 @@ CFLAGS += $(CCVERBOSE)
 $(OBJS) :=	CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) :=	CPPFLAGS += $(INCS)
 
-lint_SRCS :=	CPPFLAGS += $(INCS)
-
 .KEEP_STATE:
 
 all: $(PROG)
@@ -77,10 +73,6 @@ install: all $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
-
-LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 
 include ../../Makefile.targ
 

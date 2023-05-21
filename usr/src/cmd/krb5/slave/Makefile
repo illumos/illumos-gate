@@ -47,7 +47,7 @@ TEXT_DOMAIN = SUNW_OST_OSCMD
 POFILE = kprop.po
 POFILES = generic.po
 
-CFLAGS += $(XESS) $(CCOPTS) $(DEFS) $(LOCALINCLUDE)
+CFLAGS += $(CCOPTS) $(DEFS) $(LOCALINCLUDE)
 CPPFLAGS +=	-I. \
 		-I$(KRB5IPROPDIR) \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include \

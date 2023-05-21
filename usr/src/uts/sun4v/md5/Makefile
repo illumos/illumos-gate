@@ -56,11 +56,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 CFLAGS += $(CCVERBOSE)
 
 #
-# Override the default -xspace setting
-#
-sparc_SPACEFLAG	= -W0,-Lt
-
-#
 # md5 depends on the kcf framework
 #
 LDFLAGS		+= -Nmisc/kcf

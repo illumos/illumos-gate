@@ -62,11 +62,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS	+= -dalign
-#
 # Include nxge specific header files
 #
 INC_PATH	+= -I$(UTSBASE)/common

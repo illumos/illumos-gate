@@ -40,21 +40,16 @@ LDLIBS +=	-lc
 
 CFLAGS +=	-mt
 CFLAGS +=	$(CCVERBOSE)
-CFLAGS +=	-xCC
-CFLAGS +=	-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
 CFLAGS +=	-DSOLARIS
 
 CFLAGS64 +=       -mt
 CFLAGS64 +=       $(CCVERBOSE)
-CFLAGS64 +=       -xCC
-CFLAGS64 +=       -erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
 CFLAGS64 +=       -DSOLARIS
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
 
 # not linted
 SMATCH=off
-
 
 SRCDIR =	../common
 

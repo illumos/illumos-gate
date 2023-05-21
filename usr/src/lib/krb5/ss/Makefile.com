@@ -76,8 +76,6 @@ DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) $(ZIGNORE)
 
 LDLIBS +=	-lc -ltecla
 
-$(PICS) :=      CFLAGS += $(XFFLAG)
-
 .KEEP_STATE:
 
 all:	$(LIBS)

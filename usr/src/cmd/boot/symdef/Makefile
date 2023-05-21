@@ -34,10 +34,6 @@ include ../Makefile.com
 
 LDLIBS +=	-lelf
 
-# Writing into string literals is incorrect.  We need to match gcc's
-# behavior, which causes us to take SIGSEGV on such a write.
-CFLAGS +=	$(XSTRCONST)
-
 CLOBBERFILES= $(BOOTPROG)
 
 all: $(BOOTPROG)

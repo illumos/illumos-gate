@@ -36,8 +36,6 @@ PROG=		smbutil
 OBJS=   smbutil.o discon.o info.o login.o lookup.o print.o status.o view.o \
 	shares_rpc.o srvsvc1_clnt.o srvsvc1_ndr.o
 
-SRCS=	$(OBJS:%.o=%.c)
-
 include		$(SRC)/cmd/Makefile.cmd
 
 POFILE=	smbutil_all.po
@@ -57,11 +55,7 @@ CPPFLAGS += -I$(SRC)/lib/libsmbfs \
 SMATCH=off
 
 # Debugging
-${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
-
-# disable some of the less important lint
-LINTFLAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
-LINTFLAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 all:		$(PROG)
 
@@ -79,8 +73,6 @@ catalog: $(POFILE)
 $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
-
-lint:	lint_SRCS
 
 clean:
 	$(RM) $(OBJS) $(CLEANFILES)

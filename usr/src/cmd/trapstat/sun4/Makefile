@@ -33,7 +33,6 @@ EXTOBJS =	../capabilities/sun4u/symcap.o \
 		../capabilities/sun4v/symcap.o
 
 CPPFLAGS +=	-I$(SRC)/uts/sun4 -I.
-LINTFLAGS +=	-erroff=E_SEC_PRINTF_VAR_FMT
 CERRWARN +=	-_gcc=-Wno-clobbered
 
 .KEEP_STATE:
@@ -48,7 +47,5 @@ $(PROG):	$(OBJS) $(EXTOBJS)
 
 clean:
 		$(RM) $(OBJS) $(EXTOBJS)
-
-lint:		lint_PROG
 
 include		$(SRC)/cmd/Makefile.targ
