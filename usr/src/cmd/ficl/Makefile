@@ -29,8 +29,6 @@ clobber	:=	TARGET = clobber
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
-
 all install clean clobber:	$(SUBDIRS)
 
 $(SUBDIRS):	FRC
