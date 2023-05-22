@@ -788,7 +788,7 @@ ses_create_contract(topo_mod_t *mod, ses_enum_target_t *stp)
 	else if ((rval = ct_tmpl_create(tfd, &stp->set_ctid)) != 0)
 		topo_mod_dprintf(mod, "failed to create ctid rval = %d", rval);
 	else
-		topo_mod_dprintf(mod, "created ctid=%ld", stp->set_ctid);
+		topo_mod_dprintf(mod, "created ctid=%" _PRIdID, stp->set_ctid);
 	(void) close(tfd);
 }
 
@@ -807,10 +807,11 @@ ses_target_free(topo_mod_t *mod, ses_enum_target_t *stp)
 			int ctlfd;
 			char path[PATH_MAX];
 
-			topo_mod_dprintf(mod, "abandon old contract %ld",
+			topo_mod_dprintf(mod, "abandon old contract %" _PRIdID,
 			    stp->set_ctid);
 			(void) snprintf(path, PATH_MAX,
-			    CTFS_ROOT "/device/%ld/ctl", stp->set_ctid);
+			    CTFS_ROOT "/device/%" _PRIdID "/ctl",
+			    stp->set_ctid);
 			ctlfd = open64(path, O_WRONLY);
 			(void) ct_ctl_abandon(ctlfd);
 			(void) close(ctlfd);
@@ -1491,7 +1492,7 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp, tnode_t *pnode,
 	(void) nvlist_lookup_string(props, LIBSES_PROP_PART, &part);
 	(void) nvlist_lookup_string(props, LIBSES_PROP_SERIAL, &serial);
 
-	topo_mod_dprintf(mod, "adding %s %llu", nodename, instance);
+	topo_mod_dprintf(mod, "adding %s %" PRIu64, nodename, instance);
 
 	/*
 	 * Create the node.  The interesting information is all copied from the
@@ -2330,7 +2331,7 @@ ses_create_children(ses_enum_data_t *sdp, tnode_t *pnode, uint64_t type,
 	    (type == SES_ET_ARRAY_DEVICE && cp->sec_hasdev))
 		return (0);
 
-	topo_mod_dprintf(mod, "%s: creating %llu %s nodes",
+	topo_mod_dprintf(mod, "%s: creating %" PRIu64 " %s nodes",
 	    cp->sec_csn, max + 1, nodename);
 
 	if (dorange && topo_node_range_create(mod, pnode,
@@ -3190,7 +3191,7 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 		sc_count++;
 	}
 
-	topo_mod_dprintf(mod, "%s: created %llu %s nodes",
+	topo_mod_dprintf(mod, "%s: created %" PRIu64 " %s nodes",
 	    cp->sec_csn, sc_count, SUBCHASSIS);
 
 	cp->sec_target->set_refcount++;
@@ -3262,8 +3263,8 @@ ses_init_chassis(topo_mod_t *mod, ses_enum_data_t *sdp, ses_enum_chassis_t *pcp,
 	if (flags & (SES_NEW_SUBCHASSIS | SES_DUP_SUBCHASSIS))
 		assert(pcp != NULL);
 
-	topo_mod_dprintf(mod, "ses_init_chassis: %s: index %llu, flags (%d)",
-	    sdp->sed_name, subchassis, flags);
+	topo_mod_dprintf(mod, "ses_init_chassis: %s: index %" PRIu64
+	    ", flags (%d)", sdp->sed_name, subchassis, flags);
 
 	if (flags & (SES_NEW_CHASSIS | SES_NEW_SUBCHASSIS)) {
 
@@ -3364,7 +3365,7 @@ ses_enum_gather(ses_node_t *np, void *data)
 		    &subchassis);
 
 		topo_mod_dprintf(mod, "ses_enum_gather: Enclosure Node (%s) "
-		    "CSN (%s), subchassis (%llu)", sdp->sed_name, csn,
+		    "CSN (%s), subchassis (%" PRIu64 ")", sdp->sed_name, csn,
 		    subchassis);
 
 		/*
@@ -3424,7 +3425,7 @@ ses_enum_gather(ses_node_t *np, void *data)
 				/* 1.2 This is a new subchassis */
 
 				topo_mod_dprintf(mod, "%s: Initialize new "
-				    "subchassis with CSN %s and index %llu",
+				    "subchassis with CSN %s and index %" PRIu64,
 				    sdp->sed_name, csn, subchassis);
 
 				if ((scp = topo_mod_zalloc(mod,
@@ -3611,8 +3612,8 @@ ses_enum_gather(ses_node_t *np, void *data)
 			goto error;
 		}
 
-		topo_mod_dprintf(mod, "%s: adding node (%llu, %llu)",
-		    sdp->sed_name, type, instance);
+		topo_mod_dprintf(mod, "%s: adding node (%" PRIu64
+		    ", %" PRIu64 ")", sdp->sed_name, type, instance);
 		snp->sen_node = np;
 		snp->sen_type = type;
 		snp->sen_instance = instance;

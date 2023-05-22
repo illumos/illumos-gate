@@ -58,11 +58,6 @@ LDLIBS +=	$(ELFLIBDIR64) -lelf $(LDDBGLIBDIR64) -llddbg \
 
 NATIVE_LDFLAGS = $(LDASSERTS) $(BDIRECT)
 
-CERRWARN +=	$(CNOWARN_UNINIT)
-
-# not linted
-SMATCH=off
-
 BLTDEFS =	msg.h
 BLTDATA =	msg.c
 BLTMESG =	$(SGSMSGDIR)/elfdump

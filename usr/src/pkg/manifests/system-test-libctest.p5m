@@ -285,4 +285,5 @@ depend type=require fmri=locale/en-extra
 depend type=require fmri=locale/ja
 depend type=require fmri=locale/ru
 depend type=require fmri=system/kernel/dtrace/providers
+depend type=require fmri=system/scheduler/fss
 depend type=require fmri=system/test/testrunner

@@ -1324,8 +1324,8 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 	    (sym->st_shndx != SHN_UNDEF) && ((sym->st_shndx < SHN_LORESERVE) ||
 	    (sym->st_shndx == SHN_XINDEX)) && (tshdr != NULL)) {
 		Word v = sym->st_value;
-			if (state->ehdr->e_type != ET_REL)
-				v -= tshdr->sh_addr;
+		if (state->ehdr->e_type != ET_REL)
+			v -= tshdr->sh_addr;
 		if (((v + sym->st_size) > tshdr->sh_size)) {
 			(void) fprintf(stderr,
 			    MSG_INTL(MSG_ERR_BADSYM6), state->file,
@@ -4626,7 +4626,7 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 	Elf_Scn		*scn;
 	Elf_Data	*data;
 	size_t		ndx;
-	Shdr		*nameshdr;
+	Shdr		*nameshdr = NULL;
 	char		*names = NULL;
 	Cache		*cache, *_cache;
 	size_t		*shdr_ndx_arr, shdr_ndx_arr_cnt;
@@ -4715,7 +4715,7 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 	 * of this data that has caused problems with elfdump()'s ability to
 	 * extract the data.
 	 */
-	for (ndx = 1, scn = NULL; scn = elf_nextscn(elf, scn);
+	for (ndx = 1, scn = NULL; (scn = elf_nextscn(elf, scn)) != NULL;
 	    ndx++, _cache++) {
 		char	scnndxnm[100];
 
@@ -4732,7 +4732,8 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 		 * If this section has data in the file, include it in
 		 * the array of sections to check for address overlap.
 		 */
-		if ((_cache->c_shdr->sh_size != 0) &&
+		if (_cache->c_shdr != NULL &&
+		    (_cache->c_shdr->sh_size != 0) &&
 		    (_cache->c_shdr->sh_type != SHT_NOBITS))
 			shdr_ndx_arr[shdr_ndx_arr_cnt++] = ndx;
 
@@ -4740,9 +4741,9 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 		 * If a shstrtab exists, assign the section name.
 		 */
 		if (names && _cache->c_shdr) {
-			if (_cache->c_shdr->sh_name &&
-			    /* LINTED */
-			    (nameshdr->sh_size > _cache->c_shdr->sh_name)) {
+			if (_cache->c_shdr->sh_name != 0 &&
+			    (nameshdr != NULL &&
+			    nameshdr->sh_size > _cache->c_shdr->sh_name)) {
 				const char	*symname;
 				char		*secname;
 
@@ -4775,6 +4776,7 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 						(void) fprintf(stderr,
 						    MSG_INTL(MSG_ERR_MALLOC),
 						    file, strerror(err));
+						free(shdr_ndx_arr);
 						return (0);
 					}
 					(void) snprintf(_cache->c_name, strsz,
@@ -4812,6 +4814,7 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 			int err = errno;
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
 			    file, strerror(err));
+			free(shdr_ndx_arr);
 			return (0);
 		}
 		(void) strcpy(_cache->c_name, scnndxnm);
@@ -4923,6 +4926,7 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 		}
 	}
 
+	free(shdr_ndx_arr);
 	return (1);
 }
 

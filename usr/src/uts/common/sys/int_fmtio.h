@@ -372,6 +372,45 @@ extern "C" {
 #define	SCNuMAX			PRIuMAX
 #define	SCNXMAX			PRIXMAX
 
+/*
+ * Non-standard formatters and scanners, which are protected namespace-wise
+ * lest they become standard.  There are few good reasons to add to these,
+ * luckily.
+ *
+ * We define the full suite of formats per type, even in cases where that's
+ * not exactly useful.
+ */
+#if !defined(_STRICT_SYMBOLS)
+
+/*
+ * The following macros define I/O formats for id_t, which is always 32bit but
+ * for historical reasons a real pain to format.
+ */
+#if !defined(_LP64)
+#define	_PRIdID			"ld"
+#define	_PRIiID			"li"
+#define	_PRIoID			"lo"
+#define	_PRIxID			"lx"
+#define	_PRIuID			"lu"
+#define	_PRIXID			"lX"
+#else
+#define	_PRIdID			"d"
+#define	_PRIiID			"i"
+#define	_PRIoID			"o"
+#define	_PRIxID			"x"
+#define	_PRIuID			"u"
+#define	_PRIXID			"X"
+#endif
+
+#define	_SCNdID			_PRIdID
+#define	_SCNiID			_PRIiID
+#define	_SCNoID			_PRIoID
+#define	_SCNxID			_PRIxID
+#define	_SCNuID			_PRIuID
+#define	_SCNXID			_PRIXID
+
+#endif	/* _STRICT_SYMBOLS */
+
 #ifdef __cplusplus
 }
 #endif
