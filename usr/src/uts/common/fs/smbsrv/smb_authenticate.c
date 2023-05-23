@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
- * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2015-2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 /*
@@ -477,8 +477,10 @@ smb_auth_get_token(smb_request_t *sr)
 	 * Setup the logon object.
 	 */
 	cr = smb_cred_create(token);
-	if (cr == NULL)
+	if (cr == NULL) {
+		status = NT_STATUS_INTERNAL_ERROR;
 		goto errout;
+	}
 	privileges = smb_priv_xlate(token);
 	(void) smb_user_logon(user, cr,
 	    token->tkn_domain_name, token->tkn_account_name,

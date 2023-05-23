@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 Racktop Systems, Inc.
  */
 
 /*
@@ -62,7 +63,7 @@
 #define	SCSI_INQUIRY_PID_EMC_SYMMETRIX		"SYMMETRIX       "
 #define	SCSI_INQUIRY_PID_EMC_SYMMETRIX_LEN	16
 
-#define	MSG_NOT_STANDARDS_COMPLIANT "!Page83 data not standards compliant "
+#define	MSG_NOT_STANDARDS_COMPLIANT "Page83 data not standards compliant "
 #define	MSG_NOT_STANDARDS_COMPLIANT_SIZE	( \
 	sizeof (MSG_NOT_STANDARDS_COMPLIANT) + \
 	sizeof (((struct scsi_inquiry *)NULL)->inq_vid) + \
@@ -121,6 +122,12 @@ static int devid_scsi_init(char *driver_name,
 
 static char ctoi(char c);
 
+#ifdef	_KERNEL
+#define	devid_scsi_encode	ddi_devid_scsi_encode
+#define	devid_to_guid		ddi_devid_to_guid
+#define	devid_free_guid		ddi_devid_free_guid
+#endif	/* _KERNEL */
+
 /*
  *    Function: ddi_/devid_scsi_encode
  *
@@ -143,11 +150,7 @@ static char ctoi(char c);
  *		this function should be called again.
  */
 int
-#ifdef _KERNEL
-ddi_devid_scsi_encode(
-#else /* ! _KERNEL */
 devid_scsi_encode(
-#endif /* _KERNEL */
     int version,	/* IN */
     char *driver_name,	/* IN */
     uchar_t *inq,	/* IN */
@@ -236,7 +239,7 @@ devid_scsi_encode(
 				(void) strncat(msg, inq_std->inq_revision,
 				    sizeof (inq_std->inq_revision));
 				(void) strcat(msg, "\n");
-				cmn_err(CE_WARN, "%s", msg);
+				cmn_err(CE_WARN, "!%s", msg);
 				kmem_free(msg,
 				    MSG_NOT_STANDARDS_COMPLIANT_SIZE);
 			}
@@ -1152,11 +1155,7 @@ devid_scsi_init(
  *		NULL - failure
  */
 char *
-#ifdef  _KERNEL
-ddi_devid_to_guid(ddi_devid_t devid)
-#else   /* !_KERNEL */
 devid_to_guid(ddi_devid_t devid)
-#endif  /* _KERNEL */
 {
 	impl_devid_t	*id	= (impl_devid_t *)devid;
 	int		len	= 0;
@@ -1204,11 +1203,7 @@ devid_to_guid(ddi_devid_t devid)
  *   Arguments: guid - guid to free
  */
 void
-#ifdef  _KERNEL
-ddi_devid_free_guid(char *guid)
-#else   /* !_KERNEL */
 devid_free_guid(char *guid)
-#endif  /* _KERNEL */
 {
 	if (guid != NULL) {
 		DEVID_FREE(guid, strlen(guid) + 1);

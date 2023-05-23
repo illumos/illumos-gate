@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 #ifndef _IDMAPD_H
@@ -245,7 +246,7 @@ typedef struct wksids_table {
 #define	IDMAP_DBDIR	"/var/idmap"
 #define	IDMAP_CACHEDIR	"/var/run/idmap"
 #define	IDMAP_DBNAME	IDMAP_DBDIR "/idmap.db"
-#define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/idmap.db"
+#define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/cache.db"
 
 #define	IS_ID_NONE(id)	\
 	((id).idtype == IDMAP_NONE)
@@ -322,6 +323,8 @@ extern int		init_dbs(void);
 extern void		fini_dbs(void);
 extern idmap_retcode	get_db_handle(sqlite **);
 extern idmap_retcode	get_cache_handle(sqlite **);
+extern void		kill_db_handle(sqlite *);
+extern void		kill_cache_handle(sqlite *);
 extern idmap_retcode	sql_exec_no_cb(sqlite *, const char *, char *);
 extern idmap_retcode	add_namerule(sqlite *, idmap_namerule *);
 extern idmap_retcode	rm_namerule(sqlite *, idmap_namerule *);

@@ -1364,6 +1364,12 @@ smb_server_kstat_fini(smb_server_t *sv)
 }
 
 /*
+ * Verify the defines in smb_kstat.h used by ks_reqs1 ks_reqs2
+ */
+CTASSERT(SMBSRV_KS_NREQS1 == SMB_COM_NUM);
+CTASSERT(SMBSRV_KS_NREQS2 == SMB2__NCMDS);
+
+/*
  * smb_server_kstat_update
  */
 static int
@@ -2578,21 +2584,20 @@ smb_server_create_session(smb_listener_daemon_t *ld, ksocket_t s_so)
 	 */
 	tqid = taskq_dispatch(sv->sv_receiver_pool,
 	    smb_server_receiver, session, TQ_NOQUEUE | TQ_SLEEP);
-	if (tqid == TASKQID_INVALID) {
-		/*
-		 * We never entered smb_server_receiver()
-		 * so need to do it's return cleanup
-		 */
-		DTRACE_PROBE1(maxconn, smb_session_t *, session);
-		smb_session_disconnect(session);
-		smb_session_logoff(session);
-		smb_server_destroy_session(session);
-		goto logmaxconn;
+	if (tqid != TASKQID_INVALID) {
+		/* Success */
+		return;
 	}
 
-	/* Success */
-	session->s_receiver_tqid = tqid;
-	return;
+	/*
+	 * Have: tqid == TASKQID_INVALID
+	 * We never entered smb_server_receiver()
+	 * so need to do its return cleanup
+	 */
+	DTRACE_PROBE1(maxconn, smb_session_t *, session);
+	smb_session_disconnect(session);
+	smb_session_logoff(session);
+	smb_server_destroy_session(session);
 
 logmaxconn:
 	/*

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 RackTop Systems, Inc.
  */
 
 
@@ -188,6 +189,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	idmap_mapping	*req;
 	idmap_id_res	*res;
 	boolean_t	any_tracing;
+	int		rc;
 
 	/* Init */
 	(void) memset(result, 0, sizeof (*result));
@@ -430,8 +432,8 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	state.sid2pid_done = state.pid2sid_done = TRUE;
 
 	/* Update cache in a single transaction */
-	if (sql_exec_no_cb(cache, IDMAP_CACHENAME, "BEGIN TRANSACTION;")
-	    != IDMAP_SUCCESS)
+	rc = sql_exec_no_cb(cache, IDMAP_CACHENAME, "BEGIN TRANSACTION;");
+	if (rc != IDMAP_SUCCESS)
 		goto out;
 
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
@@ -454,13 +456,20 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 
 	/* Commit if we have at least one successful update */
 	if (state.sid2pid_done == FALSE || state.pid2sid_done == FALSE)
-		(void) sql_exec_no_cb(cache, IDMAP_CACHENAME,
+		rc = sql_exec_no_cb(cache, IDMAP_CACHENAME,
 		    "COMMIT TRANSACTION;");
 	else
-		(void) sql_exec_no_cb(cache, IDMAP_CACHENAME,
+		rc = sql_exec_no_cb(cache, IDMAP_CACHENAME,
 		    "END TRANSACTION;");
-
+	if (rc != IDMAP_SUCCESS) {
+		/* If (eg.) commit fails, make sure to close the TX. */
+		(void) sql_exec_no_cb(cache, IDMAP_CACHENAME,
+		    "ROLLBACK TRANSACTION;");
+	}
 out:
+	if (rc == IDMAP_ERR_DB || result->retcode == IDMAP_ERR_DB)
+		kill_cache_handle(cache);
+
 	cleanup_lookup_state(&state);
 	if (IDMAP_ERROR(result->retcode)) {
 		if (any_tracing) {
@@ -714,6 +723,9 @@ idmap_list_mappings_1_svc(int64_t lastrowid, uint64_t limit, int32_t flag,
 	PROCESS_LIST_SVC_SQL(retcode, cache, IDMAP_CACHENAME, sql, limit,
 	    flag, list_mappings_cb, result, result->mappings.mappings_len);
 
+	if (retcode == IDMAP_ERR_DB)
+		kill_cache_handle(cache);
+
 out:
 	if (sql)
 		sqlite_freemem(sql);
@@ -857,6 +869,9 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 	/* Execute the SQL statement and update the return buffer */
 	PROCESS_LIST_SVC_SQL(retcode, db, IDMAP_DBNAME, sql, limit,
 	    0, list_namerules_cb, result, result->rules.rules_len);
+
+	if (retcode == IDMAP_ERR_DB)
+		kill_db_handle(db);
 
 out:
 	if (expr)
@@ -1015,6 +1030,9 @@ out:
 			(void) sql_exec_no_cb(db, IDMAP_DBNAME,
 			    "ROLLBACK TRANSACTION;");
 	}
+
+	if (res->retcode == IDMAP_ERR_DB)
+		kill_db_handle(db);
 
 	res->retcode = idmap_stat4prot(res->retcode);
 

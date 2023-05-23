@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -29,8 +29,7 @@
 #ifndef _SMBSRV_SMB_KSTAT_H
 #define	_SMBSRV_SMB_KSTAT_H
 
-#include	<smbsrv/smb.h>
-#include	<smbsrv/smb2.h>
+#include	<sys/kstat.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -53,6 +52,15 @@ extern "C" {
 #define	SMBSRV_KSTAT_STATISTICS		"smbsrv_statistics"
 #define	SMBSRV_KSTAT_UNSUPPORTED	"Unsupported"
 #define	SMBSRV_KSTAT_WORKERS		"smb_workers"
+
+/*
+ * We don't want to pull in smb.h or smb2.h here, so we're using
+ * local defines corresponding to SMB_COM_NUM, SMB2__NCMDS for
+ * the ks_reqs1 and ks_reqs2 arrays, respectively.  These are
+ * sanity-checked when smb_server.c is compiled.
+ */
+#define	SMBSRV_KS_NREQS1	256	/* See: SMB_COM_NUM */
+#define	SMBSRV_KS_NREQS2	20	/* See: SMB2__NCMDS */
 
 #pragma pack(1)
 
@@ -82,8 +90,8 @@ typedef struct smbsrv_kstats {
 	uint64_t		ks_rxb;		/* Bytes received */
 	uint64_t		ks_nreq;	/* Requests treated */
 	smb_kstat_utilization_t	ks_utilization;
-	smb_kstat_req_t		ks_reqs1[SMB_COM_NUM];
-	smb_kstat_req_t		ks_reqs2[SMB2__NCMDS];
+	smb_kstat_req_t		ks_reqs1[SMBSRV_KS_NREQS1];
+	smb_kstat_req_t		ks_reqs2[SMBSRV_KS_NREQS2];
 	uint32_t		ks_nbt_sess;	/* NBT sessions */
 	uint32_t		ks_tcp_sess;	/* TCP sessions */
 	uint32_t		ks_users;	/* Users logged in */

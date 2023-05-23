@@ -552,6 +552,7 @@ static void
 smb_notify_dispatch2(smb_request_t *sr)
 {
 	void (*tq_func)(void *);
+	taskqid_t tqid;
 
 	/*
 	 * Both of these call smb_notify_act3(), returning
@@ -562,8 +563,9 @@ smb_notify_dispatch2(smb_request_t *sr)
 	else
 		tq_func = smb_nt_transact_notify_finish;
 
-	(void) taskq_dispatch(sr->sr_server->sv_worker_pool,
+	tqid = taskq_dispatch(sr->sr_server->sv_worker_pool,
 	    tq_func, sr, TQ_SLEEP);
+	VERIFY(tqid != TASKQID_INVALID);
 }
 
 

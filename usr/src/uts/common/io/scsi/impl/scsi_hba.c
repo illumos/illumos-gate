@@ -3192,7 +3192,8 @@ scsi_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			}
 			child = ddi_get_next_sibling(child);
 		}
-		scsi_hba_devi_exit(self, enteredv);
+		if (child == NULL)
+			scsi_hba_devi_exit(self, enteredv);
 		break;
 	}
 

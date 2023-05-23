@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017-2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _SYS_SDT_H
@@ -84,6 +84,15 @@ extern "C" {
 #define	DTRACE_PROBE3(name, type1, arg1, type2, arg2, type3, arg3) \
 	FKSMB_PROBE3(#name, (unsigned long)arg1, (unsigned long)arg2, \
 		(unsigned long)arg3)
+
+/*
+ * We use the comma operator so that this macro can be used without much
+ * additional code.  For example, "return (EINVAL);" becomes
+ * "return (SET_ERROR(EINVAL));".  Note that the argument will be evaluated
+ * twice, so it should not have side effects (e.g. something like:
+ * "return (SET_ERROR(log_error(EINVAL, info)));" would log the error twice).
+ */
+#define	SET_ERROR(err) (FKSMB_SET_ERROR(err), err)
 
 #ifdef	__cplusplus
 }

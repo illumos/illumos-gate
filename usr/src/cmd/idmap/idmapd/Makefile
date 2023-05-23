@@ -23,6 +23,7 @@
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2022 RackTop Systems, Inc.
 
 PROG =		idmapd
 MANIFEST =	idmap.xml
@@ -59,6 +60,7 @@ clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 
 include ../../Makefile.cmd
+include ../../Makefile.ctf
 
 CERRWARN +=	-_gcc=-Wno-type-limits
 CERRWARN +=	-_gcc=-Wno-switch

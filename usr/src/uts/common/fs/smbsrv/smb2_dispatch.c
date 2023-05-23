@@ -128,6 +128,7 @@ int
 smb2sr_newrq(smb_request_t *sr)
 {
 	struct mbuf_chain *mbc = &sr->command;
+	taskqid_t tqid;
 	uint32_t magic;
 	int rc, skip;
 
@@ -220,8 +221,10 @@ smb2sr_newrq(smb_request_t *sr)
 	sr->sr_time_submitted = gethrtime();
 	sr->sr_state = SMB_REQ_STATE_SUBMITTED;
 	smb_srqueue_waitq_enter(sr->session->s_srqueue);
-	(void) taskq_dispatch(sr->sr_server->sv_worker_pool,
+	tqid = taskq_dispatch(sr->sr_server->sv_worker_pool,
 	    smb2_tq_work, sr, TQ_SLEEP);
+	VERIFY(tqid != TASKQID_INVALID);
+
 	return (0);
 
 drop:

@@ -927,7 +927,6 @@ typedef struct smb_session {
 	uint64_t		s_kid;
 	smb_session_state_t	s_state;
 	uint32_t		s_flags;
-	taskqid_t		s_receiver_tqid;
 	kthread_t		*s_thread;
 	kt_did_t		s_ktdid;
 	int	(*newrq_func)(struct smb_request *);

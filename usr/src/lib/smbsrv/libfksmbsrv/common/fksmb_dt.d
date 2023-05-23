@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017-2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -31,6 +31,7 @@ provider fksmb {
 	/* smb2 provider probes */
 	probe smb2_start(char *probename, unsigned long arg1);
 	probe smb2_done(char *probename, unsigned long arg1);
+	probe set__error(int err);
 };
 
 #pragma D attributes Evolving/Evolving/ISA provider fksmb provider
