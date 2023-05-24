@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCIE_HP_H
@@ -238,6 +238,7 @@ struct pcie_hp_ctrl {
 	/* PCI Express Hotplug specific fields */
 	boolean_t	hc_has_emi_lock;	/* Do we have EMI Lock? */
 	boolean_t	hc_dll_active_rep;	/* Report DLL DL_Active state */
+	taskqid_t	hc_startup_sync;	/* Startup synched? */
 	pcie_hp_ops_t	hc_ops;			/* Platform specific ops */
 						/* (Native, ACPI) */
 
@@ -295,6 +296,14 @@ typedef struct pcie_hp_port_state {
 
 /* hc_flags */
 #define	PCIE_HP_INITIALIZED_FLAG	(1 << 0) /* HPC initialized */
+/*
+ * These two flags are all related to initial synchronization. See
+ * uts/common/io/pciex/hotplug/pciehpc.c for more information. The first is used
+ * to track that this is required while the second indicates that it's actively
+ * occurring.
+ */
+#define	PCIE_HP_SYNC_PENDING		(1 << 1)
+#define	PCIE_HP_SYNC_RUNNING		(1 << 2)
 
 /* PCIe hotplug friendly functions */
 extern int pcie_hp_init(dev_info_t *dip, caddr_t arg);
