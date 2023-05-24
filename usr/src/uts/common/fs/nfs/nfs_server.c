@@ -200,7 +200,6 @@ static	int	checkauth(struct exportinfo *, struct svc_req *, cred_t *, int,
 		bool_t, bool_t *);
 static char	*client_name(struct svc_req *req);
 static char	*client_addr(struct svc_req *req, char *buf);
-extern	int	sec_svc_getcred(struct svc_req *, cred_t *cr, char **, int *);
 extern	bool_t	sec_svc_inrootlist(int, caddr_t, int, caddr_t *);
 static void	*nfs_server_zone_init(zoneid_t);
 static void	nfs_server_zone_fini(zoneid_t, void *);

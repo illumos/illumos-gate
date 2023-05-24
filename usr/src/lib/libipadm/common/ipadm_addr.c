@@ -2155,10 +2155,19 @@ i_ipadm_lookupadd_addrobj(ipadm_handle_t iph, ipadm_addrobj_t ipaddr)
 	rvalp = &rval;
 	err = ipadm_door_call(iph, &larg, sizeof (larg), (void **)&rvalp,
 	    sizeof (rval), B_FALSE);
-	if (err == 0 && ipaddr->ipadm_aobjname[0] == '\0') {
-		/* copy the daemon generated `aobjname' into `ipadddr' */
-		(void) strlcpy(ipaddr->ipadm_aobjname, rval.ir_aobjname,
-		    sizeof (ipaddr->ipadm_aobjname));
+	if (err == 0) {
+		/*
+		 * Save daemon-generated state.  Copy the `lnum` from
+		 * the daemon if this is not a legacy case, and copy
+		 * `aobjname' if we did not give a name.
+		 */
+		if ((iph->iph_flags & IPH_LEGACY) == 0)
+			ipaddr->ipadm_lifnum = rval.ir_lnum;
+		if (ipaddr->ipadm_aobjname[0] == '\0') {
+			(void) strlcpy(ipaddr->ipadm_aobjname,
+			    rval.ir_aobjname,
+			    sizeof (ipaddr->ipadm_aobjname));
+		}
 	}
 	if (err == EEXIST)
 		return (IPADM_ADDROBJ_EXISTS);

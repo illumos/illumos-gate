@@ -965,10 +965,7 @@ vmmr_ioctl(int cmd, intptr_t arg, int md, cred_t *cr, int *rvalp)
 		struct vmm_resv_query res;
 		void *datap = (void *)(uintptr_t)arg;
 
-		/* For now, anyone in GZ can query */
-		if (crgetzoneid(cr) != GLOBAL_ZONEID) {
-			return (EPERM);
-		}
+		/* For now, anyone with access to vmmctl device can query */
 		mutex_enter(&vmmr_lock);
 		res.vrq_free_sz = vmmr_free_sz;
 		res.vrq_alloc_sz = vmmr_alloc_sz;
