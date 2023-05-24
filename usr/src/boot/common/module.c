@@ -333,9 +333,6 @@ file_load(char *filename, vm_offset_t dest, struct preloaded_file **result)
 	if (preloaded_files == NULL)
 		last_file_format = 0;
 
-	if (archsw.arch_loadaddr != NULL)
-		dest = archsw.arch_loadaddr(LOAD_RAW, filename, dest);
-
 	error = EFTYPE;
 	for (i = last_file_format, fp = NULL;
 	    file_formats[i] && fp == NULL; i++) {
