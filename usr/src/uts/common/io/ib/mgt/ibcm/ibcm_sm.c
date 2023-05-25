@@ -918,7 +918,7 @@ ibcm_recv_cb(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
  *	Called from ibcm_process_incoming_mad on reception of a REQ message
  *
  * Description:
- * 	If it a new REQ (not duplicate)
+ *	If it a new REQ (not duplicate)
  *		creates a new state structure in passive connection mode
  *		populate state structure fields
  *		inserts state structure in hca active and passive trees
@@ -2980,7 +2980,7 @@ ibcm_resend_mra_mad(ibcm_state_data_t *statep)
 	statep->send_mad_flags |= IBCM_MRA_POST_BUSY;
 
 	statep->mra_time = gethrtime();
-	IBCM_REF_CNT_INCR(statep); 	/* for non-blocking MRA post */
+	IBCM_REF_CNT_INCR(statep);	/* for non-blocking MRA post */
 	/* Exit the statep mutex, before sending the MAD */
 	mutex_exit(&statep->state_mutex);
 
@@ -3350,7 +3350,7 @@ ibcm_post_rtu_mad(ibcm_state_data_t *statep)
 
 /*
  * ibcm_process_abort:
- * 	Processes abort, if client requested abort connection attempt
+ *	Processes abort, if client requested abort connection attempt
  *
  * INPUTS:
  *	statep	- pointer to ibcm_state_data_t is passed
@@ -4205,8 +4205,8 @@ ibcm_add_ud_tlist(ibcm_ud_state_data_t *ud_statep)
 void
 ibcm_process_tlist()
 {
-	ibcm_state_data_t 	*statep;
-	ibcm_ud_state_data_t 	*ud_statep;
+	ibcm_state_data_t	*statep;
+	ibcm_ud_state_data_t	*ud_statep;
 	callb_cpr_t		cprinfo;
 
 	IBTF_DPRINTF_L5(cmlog, "ibcm_process_tlist: thread started");
@@ -5914,17 +5914,6 @@ ibcm_verify_req_gids_and_svcid(ibcm_state_data_t *statep,
 		ibt_ari_ip_t	ari_ip;
 		boolean_t	rdma_rej_mad = B_FALSE;
 
-		if (cm_req_msgp->req_private_data == NULL) {
-			mutex_exit(&ibcm_svc_info_lock);
-
-			IBTF_DPRINTF_L2(cmlog, "ibcm_verify_req_gids_and_svcid:"
-			    " RDMA CM IP REQ Priv Data is NULL");
-
-			/* Send a REJ with CONSUMER REJ */
-			ibcm_post_rej_mad(statep, IBT_CM_CONSUMER,
-			    IBT_CM_FAILURE_REQ, NULL, 0);
-			return (IBCM_FAILURE);
-		}
 		ip_data = (ibcm_ip_pvtdata_t *)cm_req_msgp->req_private_data;
 
 		bzero(&ari_ip, sizeof (ibt_ari_ip_t));
@@ -7349,7 +7338,7 @@ static void
 ibcm_copy_addl_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
     ibt_cm_conn_failed_t *failed)
 {
-	uint16_t 	rej_reason = b2h16(rej_msgp->rej_rejection_reason);
+	uint16_t	rej_reason = b2h16(rej_msgp->rej_rejection_reason);
 	uint8_t		ari_len = rej_msgp->rej_reject_info_len_plus >> 1;
 	ibcm_classportinfo_msg_t tclp;
 	ibt_arej_info_t	*cf_addl = &failed->cf_additional;

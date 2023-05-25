@@ -38,8 +38,11 @@ make_hash(int size, Hash_type type, ulong_t ident)
 	if ((tbl = malloc(sizeof (Hash_tbl))) == 0)
 		return (0);
 
-	if ((tbl->t_entry = calloc((unsigned)(sizeof (Hash_ent *)), size)) == 0)
+	tbl->t_entry = calloc(size, (unsigned)(sizeof (Hash_ent *)));
+	if (tbl->t_entry == NULL) {
+		free(tbl);
 		return (0);
+	}
 
 	tbl->t_ident = ident;
 	tbl->t_type = type;
@@ -83,7 +86,7 @@ get_hash(Hash_tbl * tbl, Addr key, Half id, int mode)
 	/*
 	 * Key not found in this hash table ... insert new entry into bucket.
 	 */
-	if ((ent = calloc(sizeof (Hash_ent), 1)) == 0)
+	if ((ent = calloc(1, sizeof (Hash_ent))) == NULL)
 		return (0);
 
 	ent->e_key = key;

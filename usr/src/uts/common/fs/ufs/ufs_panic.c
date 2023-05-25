@@ -779,8 +779,8 @@ real_panic_v(ufs_failure_t *f, const char *fmt, va_list adx)
 	if (!f && fmt)
 		vcmn_err(seriousness, fmt, adx);
 	else
-		cmn_err(seriousness, f && f->uf_panic_str? f->uf_panic_str:
-		    "real_panic: <unknown panic?>");
+		cmn_err(seriousness, f != NULL && f->uf_panic_str[0] != '\0' ?
+		    f->uf_panic_str: "real_panic: <unknown panic?>");
 
 	if (f) {
 		need_unlock = !MUTEX_HELD(&f->uf_mutex);

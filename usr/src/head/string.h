@@ -148,7 +148,8 @@ extern char *strdup(const char *);
 	(__extension__(							\
 	{								\
 	char *__str = (char *)(s);					\
-	strcpy((char *)__builtin_alloca(strlen(__str) + 1), __str);	\
+	(__str = strcpy((char *)__builtin_alloca(strlen(__str) + 1),	\
+	    __str), __str);						\
 	}))
 
 #define	strndupa(s, n)							\

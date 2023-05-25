@@ -1969,13 +1969,8 @@ overlay_i_status(void *karg, intptr_t arg, int mode, cred_t *cred,
 	mutex_enter(&odd->odd_lock);
 	if ((odd->odd_flags & OVERLAY_F_DEGRADED) != 0) {
 		os->ois_status = OVERLAY_I_DEGRADED;
-		if (odd->odd_fmamsg != NULL) {
-			(void) strlcpy(os->ois_message, odd->odd_fmamsg,
-			    OVERLAY_STATUS_BUFLEN);
-		} else {
-			os->ois_message[0] = '\0';
-		}
-
+		(void) strlcpy(os->ois_message, odd->odd_fmamsg,
+		    OVERLAY_STATUS_BUFLEN);
 	} else {
 		os->ois_status = OVERLAY_I_OK;
 		os->ois_message[0] = '\0';
