@@ -17,9 +17,9 @@
 .\"
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
-.\" Copyright 2021 RackTop Systems, Inc.
+.\" Copyright 2021-2023 RackTop Systems, Inc.
 .\"
-.Dd Oct 15, 2021
+.Dd May 25, 2023
 .Dt SMBADM 8
 .Os
 .Sh NAME
@@ -78,10 +78,31 @@ membership
 .Op Fl y
 .Fl w Ar workgroup
 .Nm
-.Cm list
-.Nm
 .Cm lookup
 .Ar account-name Oo Ar account-name Oc Ns ...
+.Nm
+.Cm list
+.Nm
+.Cm list-domains
+.Nm
+.Cm list-sessions
+.Op Fl p
+.Op Fl o Ar field,...
+.Nm
+.Cm list-trees
+.Op Fl p
+.Op Fl o Ar field,...
+.Nm
+.Cm list-ofiles
+.Op Fl p
+.Op Fl o Ar field,...
+.Nm
+.Cm close-session
+.Ar client_name
+.Op Ar user_name
+.Nm
+.Cm close-ofile
+.Ar file_ID
 .Sh DESCRIPTION
 The
 .Nm
@@ -419,7 +440,25 @@ subcommand.
 Specifying
 .Fl y
 will bypass the SMB service restart prompt.
-.It Cm list
+.It Xo
+.Cm lookup
+.Ar account-name Oo Ar account-name Oc Ns ...
+.Xc
+Lookup the SID for the given
+.Ar account-name ,
+or lookup the
+.Ar account-name
+for the given SID.
+This subcommand is primarily for diagnostic use, to confirm whether the server
+can lookup domain accounts and/or SIDs.
+.It Xo
+.Cm list
+.Xc
+Deprecated, alias for
+.Cm list-domains .
+.It Xo
+.Cm list-domains
+.Xc
 Shows information about the current workgroup or domain.
 The information typically includes the workgroup name or the primary domain
 name.
@@ -438,16 +477,78 @@ Other domains
 Selected domain controller
 .El
 .It Xo
-.Cm lookup
-.Ar account-name Oo Ar account-name Oc Ns ...
+.Cm list-sessions
+.Op Fl p
+.Op Fl o Ar field,...
 .Xc
-Lookup the SID for the given
-.Ar account-name ,
-or lookup the
-.Ar account-name
-for the given SID.
-This subcommand is primarily for diagnostic use, to confirm whether the server
-can lookup domain accounts and/or SIDs.
+List SMB sessions (connections and logons).
+Output may be customized using
+.Fl o Ar field,...
+where fields are: ID, DOMAIN, ACCT, USER, UID, COMPUTER, IP,
+OS, LOGON, AGE, NOPEN, FLAGS.
+If the
+.Fl o
+option is not specified, the default field list is:
+IP,USER,NOPEN,AGE,FLAGS
+.It Xo
+.Cm list-trees
+.Op Fl p
+.Op Fl o Ar field,...
+.Xc
+List SMB "trees" (connected SMB shares).
+Output may be customized using
+.Fl o Ar field,...
+where fields are: ID, TYPE, NOPEN, NUSER, TIME, AGE, USER, SHARE.
+If the
+.Fl o
+option is not specified, the default field list is:
+TYPE,SHARE,USER,NOPEN,AGE
+Note that this does not list available shares.
+For that, use:
+.Cm sharemgr show -v -P smb
+.It Xo
+.Cm list-ofiles
+.Op Fl p
+.Op Fl o Ar field,...
+.Xc
+List SMB open files.
+Output may be customized using
+.Fl o Ar field,...
+where fields are: ID, UNIQID, PERM, NLOCK, PATH, USER.
+If the
+.Fl o
+option is not specified, the default field list is:
+UNIQID,PATH,USER,NLOCK,PERM
+.It Xo
+.Cm close-session
+.Ar computer
+.Op Ar user
+.Xc
+Terminate session(s) connected from
+.Ar computer ,
+optionally filtered by
+.Ar user .
+The
+.Ar computer
+may be specified by either the "IP" or "COMPUTER" values from the columns
+with those headings as shown by the
+.Cm list-sessions
+command.
+(Usually those columns are the same.)
+The
+.Ar user
+argument is optional, and if specified should be in
+.Ar user@domain
+format.
+.It Xo
+.Cm close-ofile
+.Ar file_ID
+.Xc
+Close the SMB open file identified by
+.Ar file_ID
+(obtained from the UNIQID column of the
+.Cm list-ofiles
+output).
 .El
 .Sh EXIT STATUS
 .Ex -std
