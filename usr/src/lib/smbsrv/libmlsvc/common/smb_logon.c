@@ -726,12 +726,21 @@ smb_token_setup_guest(smb_logon_t *user_info, smb_token_t *token)
 	(void) rw_unlock(&smb_logoninit_rwl);
 	token->tkn_flags = SMB_ATF_GUEST;
 
+	/*
+	 * [MS-NLMP] 3.2.5.1.2 "Server Receives an AUTHENTICATE_MESSAGE from the
+	 * Client":
+	 * The 'SessionBaseKey' for Guests is 16-bytes of 0s.
+	 */
+	token->tkn_ssnkey.val = calloc(1, SMBAUTH_SESSION_KEY_SZ);
+
 	if (token->tkn_account_name == NULL ||
 	    token->tkn_domain_name == NULL ||
 	    token->tkn_user.i_sid == NULL ||
-	    token->tkn_primary_grp.i_sid == NULL)
+	    token->tkn_primary_grp.i_sid == NULL ||
+	    token->tkn_ssnkey.val == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
+	token->tkn_ssnkey.len = SMBAUTH_SESSION_KEY_SZ;
 	return (smb_token_setup_wingrps(token));
 }
 
@@ -750,12 +759,21 @@ smb_token_setup_anon(smb_token_t *token)
 	token->tkn_primary_grp.i_sid = smb_sid_dup(user_sid);
 	token->tkn_flags = SMB_ATF_ANON;
 
+	/*
+	 * [MS-NLMP] 3.2.5.1.2 "Server Receives an AUTHENTICATE_MESSAGE from the
+	 * Client":
+	 * The 'SessionBaseKey' for Anonymous users is 16-bytes of 0s.
+	 */
+	token->tkn_ssnkey.val = calloc(1, SMBAUTH_SESSION_KEY_SZ);
+
 	if (token->tkn_account_name == NULL ||
 	    token->tkn_domain_name == NULL ||
 	    token->tkn_user.i_sid == NULL ||
-	    token->tkn_primary_grp.i_sid == NULL)
+	    token->tkn_primary_grp.i_sid == NULL ||
+	    token->tkn_ssnkey.val == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
+	token->tkn_ssnkey.len = SMBAUTH_SESSION_KEY_SZ;
 	return (smb_token_setup_wingrps(token));
 }
 
