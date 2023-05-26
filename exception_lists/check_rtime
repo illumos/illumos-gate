@@ -235,6 +235,8 @@ FORBIDDEN_DEP   usr/lib/netsvc/yp/ypxfrd        # C++
 # libfakekernel is a test environment, not intended for general use
 FORBIDDEN libfakekernel\.so
 FORBIDDEN_DEP opt/smbsrv-tests/tests/smb_sid/large_sids_kern
+FORBIDDEN_DEP opt/os-tests/tests/ksid/ksid.32
+FORBIDDEN_DEP opt/os-tests/tests/ksid/ksid.64
 FORBIDDEN_DEP usr/MACH(lib)/libzpool.so.1
 FORBIDDEN_DEP usr/bin/ztest
 FORBIDDEN_DEP usr/bin/raidz_test

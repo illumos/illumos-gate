@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -703,8 +703,6 @@ zfs_user_in_cred(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 
 	/* Check for any match in the ksidlist */
 	if (ksid && ksidlist) {
-		int		i;
-		ksid_t		*ksid_vec;
 		uint32_t	idx = FUID_INDEX(id);
 		uint32_t	rid = FUID_RID(id);
 		const char	*domain;
@@ -725,13 +723,8 @@ zfs_user_in_cred(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 		if (strcmp(domain, IDMAP_WK_CREATOR_SID_AUTHORITY) == 0)
 			return (B_FALSE);
 
-		ksid_vec = ksidlist->ksl_sids;
-		for (i = 0; i != ksidlist->ksl_nsid; i++) {
-			if ((strcmp(domain,
-			    ksid_vec[i].ks_domain->kd_name) == 0) &&
-			    rid == ksid_vec[i].ks_rid)
-				return (B_TRUE);
-		}
+		if (ksidlist_has_sid(ksidlist, domain, rid))
+			return (B_TRUE);
 	}
 	return (B_FALSE);
 }
@@ -750,35 +743,24 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 	ksidlist_t	*ksidlist = crgetsidlist(cr);
 	uid_t		gid;
 
-	if (ksid && ksidlist) {
-		int		i;
-		ksid_t		*ksid_groups;
+	if (ksid && ksidlist && id != IDMAP_WK_CREATOR_GROUP_GID) {
 		uint32_t	idx = FUID_INDEX(id);
 		uint32_t	rid = FUID_RID(id);
+		const char	*domain = NULL;
 
-		ksid_groups = ksidlist->ksl_sids;
+		if (idx != 0) {
+			domain = zfs_fuid_find_by_idx(zfsvfs, idx);
+			ASSERT(domain != NULL);
 
-		for (i = 0; i != ksidlist->ksl_nsid; i++) {
-			if (idx == 0) {
-				if (id != IDMAP_WK_CREATOR_GROUP_GID &&
-				    id == ksid_groups[i].ks_id) {
-					return (B_TRUE);
-				}
-			} else {
-				const char *domain;
+			if (strcmp(domain,
+			    IDMAP_WK_CREATOR_SID_AUTHORITY) == 0)
+				return (B_FALSE);
 
-				domain = zfs_fuid_find_by_idx(zfsvfs, idx);
-				ASSERT(domain != NULL);
-
-				if (strcmp(domain,
-				    IDMAP_WK_CREATOR_SID_AUTHORITY) == 0)
-					return (B_FALSE);
-
-				if ((strcmp(domain,
-				    ksid_groups[i].ks_domain->kd_name) == 0) &&
-				    rid == ksid_groups[i].ks_rid)
-					return (B_TRUE);
-			}
+			if (ksidlist_has_sid(ksidlist, domain, rid))
+				return (B_TRUE);
+		} else {
+			if (ksidlist_has_pid(ksidlist, rid))
+				return (B_TRUE);
 		}
 	}
 

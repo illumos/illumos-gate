@@ -106,6 +106,9 @@ tests = ['ufm-test-setup', 'ufm-test', 'ufm-test-cleanup']
 
 [/opt/os-tests/tests/definit/definit]
 
+[/opt/os-tests/tests/ksid]
+tests = ['ksid.32','ksid.64']
+
 [/opt/os-tests/tests/i386]
 user = root
 arch = i86pc

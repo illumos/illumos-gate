@@ -24,7 +24,7 @@
  * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2020 Joyent, Inc.
- * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2007 Jeremy Teo */
@@ -1396,6 +1396,15 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	znode_t *zdp = VTOZ(dvp);
 	zfsvfs_t *zfsvfs = zdp->z_zfsvfs;
 	int	error = 0;
+	boolean_t skipaclchk = ((flags & ATTR_NOACLCHECK) != 0);
+
+	/*
+	 * ATTR_NOACLCHECK is specified to skip EXECUTE checks for
+	 * consumers (like SMB) that bypass traverse checking.
+	 * Turn it off here so it can't accidentally be used
+	 * for other checks.
+	 */
+	flags &= ~ATTR_NOACLCHECK;
 
 	/*
 	 * Fast path lookup, however we must skip DNLC lookup
@@ -1415,7 +1424,7 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 		}
 
 		if (nm[0] == 0 || (nm[0] == '.' && nm[1] == '\0')) {
-			error = zfs_fastaccesschk_execute(zdp, cr);
+			error = zfs_fastaccesschk_execute(zdp, cr, skipaclchk);
 			if (!error) {
 				*vpp = dvp;
 				VN_HOLD(*vpp);
@@ -1428,7 +1437,8 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 			vnode_t *tvp = dnlc_lookup(dvp, nm);
 
 			if (tvp) {
-				error = zfs_fastaccesschk_execute(zdp, cr);
+				error = zfs_fastaccesschk_execute(zdp, cr,
+				    skipaclchk);
 				if (error) {
 					VN_RELE(tvp);
 					return (error);
@@ -1479,7 +1489,7 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 		 */
 
 		if (error = zfs_zaccess(VTOZ(*vpp), ACE_EXECUTE, 0,
-		    B_FALSE, cr)) {
+		    skipaclchk, cr)) {
 			VN_RELE(*vpp);
 			*vpp = NULL;
 		}
@@ -1497,7 +1507,7 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	 * Check accessibility of directory.
 	 */
 
-	if (error = zfs_zaccess(zdp, ACE_EXECUTE, 0, B_FALSE, cr)) {
+	if (error = zfs_zaccess(zdp, ACE_EXECUTE, 0, skipaclchk, cr)) {
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}

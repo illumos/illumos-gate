@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ */
+
+/*
  * Sid manipulation (stubs).
  */
 
@@ -36,8 +40,13 @@
 #include <sys/sid.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
+
+#ifdef _KERNEL
 #include <sys/kidmap.h>
+#endif
+
 #include <sys/idmap.h>
+#include <util/qsort.h>
 
 static kmutex_t sid_lock;
 static avl_tree_t sid_tree;
@@ -113,11 +122,96 @@ ksidlist_rele(ksidlist_t *ksl)
 	if (atomic_dec_32_nv(&ksl->ksl_ref) == 0) {
 		int i;
 
+		if (ksl->ksl_sorted != NULL)
+			kmem_free(ksl->ksl_sorted,
+			    ksl->ksl_nsid * sizeof (ksid_t *));
 		for (i = 0; i < ksl->ksl_nsid; i++)
 			ksid_rele(&ksl->ksl_sids[i]);
 
 		kmem_free(ksl, KSIDLIST_MEM(ksl->ksl_nsid));
 	}
+}
+
+/*
+ * Linear search is more efficient for 'small' arrays.
+ * What's considered 'small' varies by system.
+ * supgroupmember() uses 16; we make ours a variable for testing.
+ */
+int ksl_bin_search_cutoff = 16;
+
+boolean_t
+ksidlist_has_sid(ksidlist_t *ksl, const char *domain, uint32_t rid)
+{
+	int64_t hi, lo, m;
+	int cmp;
+	ksid_t *sids = ksl->ksl_sids; /* sorted by SID */
+
+	lo = 0;
+	hi = ksl->ksl_nsid - 1;
+
+	if (hi < ksl_bin_search_cutoff) {
+		for (; lo <= hi; lo++) {
+			if (rid == sids[lo].ks_rid &&
+			    strcmp(domain, ksid_getdomain(&sids[lo])) == 0)
+				return (B_TRUE);
+		}
+		return (B_FALSE);
+	}
+
+	do {
+		/* This is an overflow-safe version of m = (lo + hi) / 2 */
+		m = (int64_t)((uint64_t)(lo + hi) >> 1);
+
+		cmp = AVL_CMP(rid, sids[m].ks_rid);
+		if (cmp == 0)
+			cmp = strcmp(domain, ksid_getdomain(&sids[m]));
+
+		if (cmp > 0)
+			lo = m + 1;
+		else if (cmp < 0)
+			hi = m - 1;
+		else
+			return (B_TRUE);
+
+	} while (lo <= hi);
+
+	return (B_FALSE);
+}
+
+boolean_t
+ksidlist_has_pid(ksidlist_t *ksl, uint32_t pid)
+{
+	int64_t hi, lo, m;
+	int cmp;
+	ksid_t **sidsp = ksl->ksl_sorted; /* sorted by posix ID */
+
+	lo = 0;
+	hi = ksl->ksl_nsid - 1;
+
+	if (hi < ksl_bin_search_cutoff) {
+		for (; lo <= hi; lo++) {
+			if (pid == ksl->ksl_sids[lo].ks_id)
+				return (B_TRUE);
+		}
+		return (B_FALSE);
+	}
+
+	do {
+		/* This is an overflow-safe version of m = (lo + hi) / 2 */
+		m = (int64_t)((uint64_t)(lo + hi) >> 1);
+
+		cmp = AVL_CMP(pid, sidsp[m]->ks_id);
+
+		if (cmp > 0)
+			lo = m + 1;
+		else if (cmp < 0)
+			hi = m - 1;
+		else
+			return (B_TRUE);
+
+	} while (lo <= hi);
+
+	return (B_FALSE);
 }
 
 static int
@@ -128,11 +222,8 @@ ksid_cmp(const void *a, const void *b)
 	int res;
 
 	res = strcmp(ap->kd_name, bp->kd_name);
-	if (res > 0)
-		return (1);
-	if (res != 0)
-		return (-1);
-	return (0);
+
+	return (AVL_ISIGN(res));
 }
 
 /*
@@ -190,6 +281,7 @@ ksid_getid(ksid_t *ks)
 	return (ks->ks_id);
 }
 
+#ifdef _KERNEL
 int
 ksid_lookupbyuid(zone_t *zone, uid_t id, ksid_t *res)
 {
@@ -221,6 +313,7 @@ ksid_lookupbygid(zone_t *zone, gid_t id, ksid_t *res)
 
 	return (0);
 }
+#endif
 
 credsid_t *
 kcrsid_alloc(void)
@@ -349,6 +442,29 @@ kcrsid_setsid(credsid_t *okcr, ksid_t *ksp, ksid_index_t i)
 	return (nkcr);
 }
 
+static int
+ksid_sid_cmp(const void *arg1, const void *arg2)
+{
+	ksid_t *sid1 = (ksid_t *)arg1;
+	ksid_t *sid2 = (ksid_t *)arg2;
+	int cmp = AVL_CMP(sid1->ks_rid, sid2->ks_rid);
+
+	if (cmp == 0)
+		cmp = AVL_ISIGN(strcmp(ksid_getdomain(sid1),
+		    ksid_getdomain(sid2)));
+
+	return (cmp);
+}
+
+static int
+ksid_id_cmp(const void *arg1, const void *arg2)
+{
+	ksid_t *sid1 = *(ksid_t **)arg1;
+	ksid_t *sid2 = *(ksid_t **)arg2;
+
+	return (AVL_CMP(sid1->ks_id, sid2->ks_id));
+}
+
 /*
  * Argument needs to be a ksidlist_t with properly held ks_domain references
  * and a reference count taking the new reference into account.
@@ -358,6 +474,7 @@ kcrsid_setsidlist(credsid_t *okcr, ksidlist_t *ksl)
 {
 	int ocnt = kcrsid_sidcount(okcr);
 	credsid_t *nkcr;
+	int i;
 
 	/*
 	 * Unset the sidlist; if there are no further SIDs, remove the
@@ -375,7 +492,21 @@ kcrsid_setsidlist(credsid_t *okcr, ksidlist_t *ksl)
 	if (nkcr->kr_sidlist != NULL)
 		ksidlist_rele(nkcr->kr_sidlist);
 
+	/* sort the lists so that we can do binary search */
 	nkcr->kr_sidlist = ksl;
+
+	if (ksl->ksl_sorted == NULL) {
+		qsort(ksl->ksl_sids, ksl->ksl_nsid, sizeof (ksid_t),
+		    ksid_sid_cmp);
+
+		ksl->ksl_sorted = kmem_alloc(ksl->ksl_nsid * sizeof (ksid_t *),
+		    KM_SLEEP);
+		for (i = 0; i < ksl->ksl_nsid; i++)
+			ksl->ksl_sorted[i] = &ksl->ksl_sids[i];
+		qsort(ksl->ksl_sorted, ksl->ksl_nsid, sizeof (ksid_t *),
+		    ksid_id_cmp);
+	}
+
 	return (nkcr);
 }
 
@@ -398,6 +529,7 @@ kcrsid_gidstosids(zone_t *zone, int ngrp, gid_t *grp)
 	for (i = 0; i < ngrp; i++) {
 		if (grp[i] > MAXUID) {
 			list->ksl_neid++;
+#ifdef _KERNEL
 			if (ksid_lookupbygid(zone,
 			    grp[i], &list->ksl_sids[i]) != 0) {
 				while (--i >= 0)
@@ -405,6 +537,7 @@ kcrsid_gidstosids(zone_t *zone, int ngrp, gid_t *grp)
 				cnt = 0;
 				break;
 			}
+#endif
 			cnt++;
 		} else {
 			list->ksl_sids[i].ks_id = grp[i];

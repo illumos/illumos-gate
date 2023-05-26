@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_FS_ZFS_ACL_H
@@ -123,7 +124,7 @@ typedef struct zfs_acl_phys {
 
 typedef struct acl_ops {
 	uint32_t	(*ace_mask_get) (void *acep); /* get  access mask */
-	void 		(*ace_mask_set) (void *acep,
+	void		(*ace_mask_set) (void *acep,
 			    uint32_t mask); /* set access mask */
 	uint16_t	(*ace_flags_get) (void *acep);	/* get flags */
 	void		(*ace_flags_set) (void *acep,
@@ -183,7 +184,7 @@ typedef struct zfs_acl_ids {
 	uint64_t		z_fgid;		/* file group owner fuid */
 	uint64_t		z_mode;		/* mode to set on create */
 	zfs_acl_t		*z_aclp;	/* ACL to create with file */
-	struct zfs_fuid_info 	*z_fuidp;	/* for tracking fuids for log */
+	struct zfs_fuid_info	*z_fuidp;	/* for tracking fuids for log */
 } zfs_acl_ids_t;
 
 /*
@@ -215,7 +216,7 @@ void zfs_oldace_byteswap(ace_t *, int);
 void zfs_ace_byteswap(void *, size_t, boolean_t);
 extern boolean_t zfs_has_access(struct znode *zp, cred_t *cr);
 extern int zfs_zaccess(struct znode *, int, int, boolean_t, cred_t *);
-int zfs_fastaccesschk_execute(struct znode *, cred_t *);
+int zfs_fastaccesschk_execute(struct znode *, cred_t *, boolean_t);
 extern int zfs_zaccess_rwx(struct znode *, mode_t, int, cred_t *);
 extern int zfs_zaccess_unix(struct znode *, mode_t, cred_t *);
 extern int zfs_acl_access(struct znode *, int, cred_t *);
