@@ -345,7 +345,7 @@ reswitch:	switch (ch = (uchar_t)*fmt++) {
 
 			for (tmp = 0; *p; ) {
 				n = *p++;
-				if (num & (1 << (n - 1))) {
+				if (num & (1ULL << (n - 1))) {
 					PCHAR(tmp ? ',' : '<');
 					for (; (n = *p) > ' '; ++p)
 						PCHAR(n);

@@ -28,10 +28,6 @@ CPPFLAGS +=	-I$(SRC)/uts/common
 # 64-bit smatch false positive :/
 SMOFF += uninitialized
 
-# needs work
-objs/printf.o := SMOFF += 64bit_shift
-pics/printf.o := SMOFF += 64bit_shift
-
 machine:
 	$(RM) machine
 	$(SYMLINK) $(BOOTSRC)/sys/$(MACHINE)/include machine
