@@ -535,6 +535,9 @@ typedef void (*tmem_func_t)(void *, int);
  * NOTE:  Whatever changes are made to ulwp_t must be
  * reflected in $SRC/cmd/mdb/common/modules/libc/libc.c
  *
+ * NOTE: ulwp32_t (defined later in this file) should be kept in sync
+ * with ulwp_t
+ *
  * NOTE: ul_self *must* be the first member of ulwp_t on x86
  * Low-level x86 code relies on this.
  */
@@ -1149,6 +1152,8 @@ typedef struct ulwp32 {
 	caddr32_t	ul_unwind_ret;	/* used only by _ex_clnup_handler() */
 #endif
 	tumem32_t	ul_tmem;	/* used only by umem */
+	uint_t		ul_ptinherit;	/* pthreads sched inherit value */
+	char		ul_ntoabuf[18];	/* thread-specific inet_ntoa buffer */
 } ulwp32_t;
 
 #define	REPLACEMENT_SIZE32	((size_t)&((ulwp32_t *)NULL)->ul_sigmask)
