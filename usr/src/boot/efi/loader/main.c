@@ -963,7 +963,6 @@ main(int argc, CHAR16 *argv[])
 
 	autoload_font(false);		/* Set up the font list for console. */
 	efi_init_environment();
-	setenv("ISADIR", "amd64", 1);	/* we only build 64bit */
 	bi_isadir();			/* set ISADIR */
 	acpi_detect();
 

@@ -27,18 +27,9 @@
 #include <sys/cdefs.h>
 
 #include <stand.h>
-/*
-#include <sys/param.h>
-#include <sys/reboot.h>
-#include <sys/linker.h>
-#include <machine/bootinfo.h>
-#include <machine/metadata.h>
-#include "bootstrap.h"
-*/
 #include <machine/psl.h>
 #include <machine/cpufunc.h>
 #include <machine/specialreg.h>
-#include "libi386.h"
 
 /*
  * Check to see if this CPU supports long mode.
@@ -130,7 +121,7 @@ bi_checkcpu(void)
 	if ((stdfeatures & CPUID_SSE) == 0)
 		amd64 = 0;
 
-        if ((stdfeatures & CPUID_SSE2) == 0)
+	if ((stdfeatures & CPUID_SSE2) == 0)
 		amd64 = 0;
 
 	return (amd64);
