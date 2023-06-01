@@ -27,13 +27,8 @@
 # We only support 64-bit builds on SPARC, so this is simple.
 #
 KARCH =	sun4u
-ARCHDIRS = -I$(SYSDIR)/sparc -I$(SYSDIR)/sparc/v9 -I$(SYSDIR)/sun 
+ARCHDIRS = -I$(SYSDIR)/sparc -I$(SYSDIR)/sparc/v9 -I$(SYSDIR)/sun
 
 include $(SRC)/psm/Makefile.psm.64
 
-#
-# XXX this totally sucks since it effectively turns off -errchk=longptr64,
-# which we really should be using.
-#
-LINTFLAGS64 = $(LINTFLAGS) -m64
-CFLAGS64 += -xchip=ultra $(CCABS32)
+CFLAGS64 += -xchip=ultra

@@ -71,11 +71,6 @@ CERRWARN += -_gcc=-Wno-type-limits
 CERRWARN += $(CNOWARN_UNINIT)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
-#
 #	Dependency
 #
 LDFLAGS	+= -Ndrv/sgsbbc -Nmisc/hpcsvc

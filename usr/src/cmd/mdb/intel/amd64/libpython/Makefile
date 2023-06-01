@@ -39,14 +39,9 @@ include ../../Makefile.amd64
 include ../../../Makefile.module
 
 %.o := CPPFLAGS += $(PYCPPFLAGS)
-%.ln := CPPFLAGS += $(PYLNFLAGS)
-LINTFLAGS += -erroff=E_MACRO_REDEFINED
 
 dmod/$(MODULE) := LDLIBS += -lproc
 
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
-
-%.ln: $(MODSRCS_DIR)/%.c
-	$(LINT.c) -c $<

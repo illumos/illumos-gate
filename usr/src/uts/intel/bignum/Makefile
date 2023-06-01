@@ -98,7 +98,7 @@ include $(UTSBASE)/intel/Makefile.targ
 # general-purpose registers is faster than any MMX or SSE2 implementation.
 
 BIGNUM_CFG = -DPSR_MUL
-CFLAGS	+= -xO4 -xcrossfile
+CFLAGS	+= -xO4
 $(OBJS_DIR)/bignumimpl.o := CPPFLAGS += $(BIGNUM_CFG)
 $(OBJS_DIR)/bignum_amd64.o := CPPFLAGS += $(BIGNUM_CFG)
 

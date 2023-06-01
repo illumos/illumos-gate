@@ -57,10 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 INC_PATH	+= -I$(UTSBASE)/sun4
 
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign -DPCICFG_INTERPRET_FCODE
+CFLAGS += -DPCICFG_INTERPRET_FCODE
 
 #
 #	Dependency

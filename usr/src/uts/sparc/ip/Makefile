@@ -54,8 +54,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
-CFLAGS		+= -xinline=tcp_set_ws_value
-
 #
 # To get the BPF header files included by ipnet.h
 #

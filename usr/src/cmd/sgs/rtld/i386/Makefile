@@ -63,7 +63,6 @@ include		$(SRC)/cmd/sgs/rtld/Makefile.com
 
 # Add any machine specific flags.
 
-ADBGENCFLAGS +=	-erroff=%all
 ADBGENFLAGS +=	-milp32
 ADBSUB=		$(ADBSUB32)
 SONAME=		/lib/ld.so.1

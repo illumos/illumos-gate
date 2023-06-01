@@ -26,6 +26,5 @@
 include ../Makefile.com
 
 CPPFLAGS += -I../../../../src/uts/i86pc
-LINTFLAGS 	+= -erroff=E_STATIC_UNUSED
 
 install: all $(ROOTUSRSBINPROG)

@@ -56,7 +56,7 @@ ALL = bootlst
 
 include ../../common/Makefile.com
 include $(TOPDIR)/psm/Makefile.psm.64
-CFLAGS64 += -xchip=ultra $(CCABS32)
+CFLAGS64 += -xchip=ultra
 CERRWARN += -_gcc=-Wno-char-subscripts
 
 .KEEP_STATE:

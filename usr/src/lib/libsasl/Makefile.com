@@ -44,8 +44,7 @@ LDLIBS +=	-lsocket -lc -lmd
 SRCDIR=		../lib
 PLUGDIR=	../plugin
 
-CFLAGS +=	$(CCVERBOSE) $(XSTRCONST)
-CFLAGS64 +=	$(XSTRCONST)
+CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I../include -I$(PLUGDIR)
 
 # not linted

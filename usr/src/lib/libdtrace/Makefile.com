@@ -187,9 +187,6 @@ dt_grammar.c dt_grammar.h: $(SRCDIR)/dt_grammar.y
 pics/dt_lex.o pics/dt_grammar.o := CFLAGS += $(YYCFLAGS)
 pics/dt_lex.o pics/dt_grammar.o := CFLAGS64 += $(YYCFLAGS)
 
-pics/dt_lex.o pics/dt_grammar.o := CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
-pics/dt_lex.o pics/dt_grammar.o := CCVERBOSE =
-
 ../common/dt_errtags.c: ../common/mkerrtags.sh ../common/dt_errtags.h
 	sh ../common/mkerrtags.sh < ../common/dt_errtags.h > $@
 

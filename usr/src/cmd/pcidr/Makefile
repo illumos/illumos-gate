@@ -23,10 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/pcidr/Makefile
-#
 
 .PARALLEL:
 #############################################################################
@@ -40,19 +36,14 @@ include $(SRC)/cmd/Makefile.cmd
 include Makefile.com
 #############################################################################
 
-# used by the lint_SRCS rule
-#
-SRCS = $(PROGOBJECTS:%.o=%.c)
 CLOBBERFILES += $(PROGOBJECTS)
 
 LDLIBS += -lnvpair
-LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 
 all :=		TARGET = all
 install :=	TARGET = install
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
-lint :=		TARGET = lint
 
 .KEEP_STATE:
 #############################################################################
@@ -61,7 +52,6 @@ all: $(PROG)
 clean:
 clobber:
 install: $(ROOTCMD)
-lint: lint_SRCS
 
 $(ROOTCMD): all
 
@@ -69,7 +59,7 @@ $(PROG): $(PROGOBJECTS)
 	$(LINK.c) -o $(PROG) $(PROGOBJECTS) $(LDLIBS)
 	$(POST_PROCESS)
 
-all clean clobber lint: $(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 install: .WAIT $(SUBDIRS)
 
 $(SUBDIRS): FRC

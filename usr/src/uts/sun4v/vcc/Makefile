@@ -73,11 +73,6 @@ CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += $(CNOWARN_UNINIT)
 
 #
-# compiler failes with not reached statements
-#
-CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
-
-#
 # module dependencies
 #
 LDFLAGS += -Nmisc/ldc -Nmisc/platsvc

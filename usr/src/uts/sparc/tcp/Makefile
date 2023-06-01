@@ -63,12 +63,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 CFLAGS		+= $(CCVERBOSE)
 
 #
-# Inline functions, this probably needs to be changed when compiling with
-# -xO4.
-#
-CFLAGS		+= -xinline=tcp_set_ws_value,tcp_fill_header
-
-#
 #	depends on ip, md5 and sockfs
 #
 LDFLAGS		+= -Ndrv/ip -Ncrypto/md5 -Nfs/sockfs

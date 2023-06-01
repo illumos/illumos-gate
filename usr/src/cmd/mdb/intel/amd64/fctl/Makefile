@@ -35,13 +35,6 @@ include ../../../Makefile.module
 
 CPPFLAGS += -I$(SRC)/uts/common
 
-LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED -erroff=E_FUNC_VAR_UNUSED
-LINTFLAGS64 +=  -erroff=E_PRECEDENCE_CONFUSION
-LINTFLAGS64 +=  -erroff=E_SEC_FORBIDDEN_WARN_CFTIME
-LINTFLAGS64 +=  -erroff=E_FUNC_SET_NOT_USED 
-LINTFLAGS64 +=  -erroff=E_FUNC_ARG_UNUSED
-LINTFLAGS64 +=  -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
-# if optimization is on, compiler asserts
 COPTFLAG64 =	$(CCVERBOSE)
 
 CERRWARN +=	-_gcc=-Wno-unused-function

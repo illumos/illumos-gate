@@ -20,28 +20,20 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/ipcrm/Makefile
 #
 
 include ../Makefile.cmd
 
 PROG=		ipcrm
 
-LINTFLAGS =	-x -erroff=E_NAME_USED_NOT_DEF2
-
 .KEEP_STATE:
 
-all: 		$(PROG) 
+all:		$(PROG)
 
 install:	all $(ROOTPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.targ

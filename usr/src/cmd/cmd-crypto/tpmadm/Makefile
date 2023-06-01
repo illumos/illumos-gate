@@ -32,13 +32,12 @@ include ../../Makefile.cmd
 SRCS =	$(OBJS:%.o=%.c)
 POFILES = $(OBJS:%.o=%.po)
 POFILE = $(PROG)_msg.po
-MSGFILES=$(SRCS:%.c=%.i)
+MSGFILES = $(SRCS:%.c=%.i)
 
-CPPFLAGS += -xCC
 LDLIBS += -ltspi -luuid
 NATIVE_LIBS += libtspi.so
 
-CLOBBERFILES = C.ln $(POFILE) $(POFILES)
+CLOBBERFILES = $(POFILE) $(POFILES)
 
 .KEEP_STATE:
 

@@ -29,7 +29,6 @@ UTILS_SRC =../../common/boot_utils.c
 EXTRA_SRC =../../common/mboot_extra.c
 
 OBJS= installboot.o bblk_einfo.o  boot_utils.o mboot_extra.o
-SRCS= installboot.c $(UTILS_SRC) $(EINFO_SRC) $(EXTRA_SRC)
 
 include ../../Makefile.com
 
@@ -38,8 +37,6 @@ CPPFLAGS += -I$(SRC)/uts/common
 LDLIBS += -lmd5
 
 CSTD=	$(CSTD_GNU99)
-
-LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:
 
@@ -62,5 +59,3 @@ install: all $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS

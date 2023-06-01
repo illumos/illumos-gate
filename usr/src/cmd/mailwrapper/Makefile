@@ -18,7 +18,7 @@
 
 LIBPROG=	mailwrapper
 
-PROG= 	       $(LIBPROG)
+PROG=	       $(LIBPROG)
 
 include ../Makefile.cmd
 
@@ -27,10 +27,8 @@ MWOBJS=		fgetln.o fparseln.o mailwrapper.o
 CLOBBERFILES=	$(PROG)
 CLEANFILES=	$(MWOBJS)
 
-SRCS=	 	$(MWOBJS:%.o=%.c)
-
 CPROG=		mailwrapper
-CPROGSRC= 	$(CPROG:%=_%.c)
+CPROGSRC=	$(CPROG:%=_%.c)
 
 CFS=		mailer.conf
 
@@ -48,8 +46,6 @@ ROOTSYMLINKS=	$(ROOTBIN)/mailq \
 
 CPPFLAGS =	-I. $(CPPFLAGS.master)
 
-LINTFLAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
-
 SMOFF += all_func_returns
 
 # conditional assignments
@@ -58,7 +54,6 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 
 # install rules
 $(ROOTINC)/% : %
@@ -92,9 +87,6 @@ $(ROOTUSRSBIN)/sendmail:
 
 $(ROOTETCMAIL)/%:  %
 	$(INS.file)
-
-lint:
-	$(LINT.c) $(SRCS)
 
 clean:
 	$(RM) $(OBJS) $(MWOBJS) mailwrapper

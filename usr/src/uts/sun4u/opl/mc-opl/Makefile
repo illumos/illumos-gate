@@ -62,14 +62,10 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-type-limits
 
-#
-#	Turn on doubleword alignment for 64 bit registers
-#
 # CFLAGS
 # MC_EMULATION   - emulate mac patrol registers
 #
-CFLAGS += -dalign -DMC_EMULATION
-#CFLAGS += -dalign
+CFLAGS +=  -DMC_EMULATION
 
 #
 #	Dependency

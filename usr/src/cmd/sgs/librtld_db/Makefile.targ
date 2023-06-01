@@ -31,7 +31,7 @@ pics/%.o:	%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-PICFLAGS=	$(XREGSFLAG) $(C_PICFLAGS) -DPIC -D_REENTRANT
+PICFLAGS=	$(C_PICFLAGS) -DPIC -D_REENTRANT
 
 pics/%64.o:	../common/%.c
 		$(COMPILE.c) -D_ELF64 $(PICFLAGS) -o $@ $<

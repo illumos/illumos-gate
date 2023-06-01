@@ -57,7 +57,7 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE)
 
 INC_PATH  += -I$(UTSBASE)/common/io/myri10ge -I$(UTSBASE)/common/io/myri10ge/firmware
 
-CFLAGS    += -dalign -DSOLARIS_S11
+CFLAGS    += -DSOLARIS_S11
 
 #
 # Driver depends on MAC

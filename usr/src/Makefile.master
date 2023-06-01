@@ -309,41 +309,12 @@ i386_BUILD64=
 BUILD64=	$($(MACH)_BUILD64)
 
 #
-# C compiler mode. Future compilers may change the default on us,
-# so force extended ANSI mode globally. Lower level makefiles can
-# override this by setting CCMODE.
-#
-CCMODE=			-Xa
-CCMODE64=		-Xa
-
-#
 # C compiler verbose mode. This is so we can enable it globally,
 # but turn it off in the lower level makefiles of things we cannot
 # (or aren't going to) fix.
 #
 CCVERBOSE=		-v
 
-# set this to the secret flag "-Wc,-Qiselect-v9abiwarn=1" to get warnings
-# from the compiler about places the -xarch=v9 may differ from -xarch=v9c.
-V9ABIWARN=
-
-# set this to the secret flag "-Wc,-Qiselect-regsym=0" to disable register
-# symbols (used to detect conflicts between objects that use global registers)
-# we disable this now for safety, and because genunix doesn't link with
-# this feature (the v9 default) enabled.
-#
-# REGSYM is separate since the C++ driver syntax is different.
-CCREGSYM=		-Wc,-Qiselect-regsym=0
-CCCREGSYM=		-Qoption cg -Qiselect-regsym=0
-
-# Prevent the removal of static symbols by the SPARC code generator (cg).
-# The x86 code generator (ube) does not remove such symbols and as such
-# using this workaround is not applicable for x86.
-#
-CCSTATICSYM=		-Wc,-Qassembler-ounrefsym=0
-#
-# generate 32-bit addresses in the v9 kernel. Saves memory.
-CCABS32=		-Wc,-xcode=abs32
 #
 # generate v9 code which tolerates callers using the v7 ABI, for the sake of
 # system calls.
@@ -424,21 +395,6 @@ STACKPROTECT_LD_basic	= $(STACKPROTECT_LD_)
 CCSTACKPROTECT= $(STACKPROTECT_$(STACKPROTECT))
 LDSTACKPROTECT= $(STACKPROTECT_LD_$(STACKPROTECT))
 
-# One optimization the compiler might perform is to turn this:
-#	#pragma weak foo
-#	extern int foo;
-#	if (&foo)
-#		foo = 5;
-# into
-#	foo = 5;
-# Since we do some of this (foo might be referenced in common kernel code
-# but provided only for some cpu modules or platforms), we disable this
-# optimization.
-#
-sparc_CCUNBOUND	= -Wd,-xsafe=unboundsym
-i386_CCUNBOUND	=
-CCUNBOUND	= $($(MACH)_CCUNBOUND)
-
 #
 # compiler '-xarch' flag. This is here to centralize it and make it
 # overridable for testing.
@@ -469,18 +425,8 @@ STAND_FLAGS_32 = $($(MACH)_STAND_FLAGS)
 STAND_FLAGS_64 = $($(MACH64)_STAND_FLAGS)
 
 #
-# disable the incremental linker
-ILDOFF=			-xildoff
-#
-XFFLAG=			-xF=%all
-XESS=			-xs
-XSTRCONST=		-xstrconst
-
-#
 # turn warnings into errors (C)
 CERRWARN = -errtags=yes -errwarn=%all
-CERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
-CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
 
 CERRWARN += -_gcc=-Wno-missing-braces
 CERRWARN += -_gcc=-Wno-sign-compare
@@ -499,8 +445,6 @@ include $(SRC)/Makefile.smatch
 #
 # turn warnings into errors (C++)
 CCERRWARN = -errtags=yes -errwarn=%all
-CCERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
-CCERRWARN += -erroff=E_STATEMENT_NOT_REACHED
 
 CCERRWARN += -_gcc=-Wno-missing-braces
 CCERRWARN += -_gcc=-Wno-sign-compare
@@ -515,9 +459,8 @@ CSTD=		$(CSTD_GNU89)
 
 # In most places, assignments to these macros should be appended with +=
 # (CPPFLAGS.first allows values to be prepended to CPPFLAGS).
-sparc_CFLAGS=	$(sparc_XARCH) $(CCSTATICSYM)
-sparcv9_CFLAGS=	$(sparcv9_XARCH) -dalign $(CCVERBOSE) $(V9ABIWARN) $(CCREGSYM) \
-		$(CCSTATICSYM)
+sparc_CFLAGS=	$(sparc_XARCH)
+sparcv9_CFLAGS=	$(sparcv9_XARCH) $(CCVERBOSE)
 i386_CFLAGS=	$(i386_XARCH)
 amd64_CFLAGS=	$(amd64_XARCH)
 
@@ -543,19 +486,6 @@ $(__GNUC4)$(MACH64)_COPTFLAG += -_gcc=-fno-inline-small-functions \
 COPTFLAG= $($(MACH)_COPTFLAG)
 COPTFLAG64= $($(MACH64)_COPTFLAG)
 
-
-# When -g is used, the compiler globalizes static objects
-# (gives them a unique prefix). Disable that.
-CNOGLOBAL= -W0,-noglobal
-
-# Direct the Sun Studio compiler to use a static globalization prefix based on the
-# name of the module rather than something unique. Otherwise, objects
-# will not build deterministically, as subsequent compilations of identical
-# source will yeild objects that always look different.
-#
-# In the same spirit, this will also remove the date from the N_OPT stab.
-CGLOBALSTATIC= -W0,-xglobalstatic
-
 # Sometimes we want all symbols and types in debugging information even
 # if they aren't used.
 CALLSYMS=	-_gcc=-fno-eliminate-unused-debug-symbols \
@@ -566,8 +496,7 @@ CALLSYMS=	-_gcc=-fno-eliminate-unused-debug-symbols \
 # by the CTF tools.  With Sun Studio this is stabs due to bugs in the Studio
 # compilers.  With GCC this is DWARF v2.
 #
-DEBUGFORMAT=	-_cc=-xdebugformat=stabs -_gcc=-gdwarf-2 \
-		-_gcc10=-gstrict-dwarf -_gcc11=-gstrict-dwarf
+DEBUGFORMAT=	-_gcc=-gdwarf-2 -_gcc10=-gstrict-dwarf -_gcc11=-gstrict-dwarf
 
 #
 # Ask the compiler to include debugging information
@@ -577,8 +506,8 @@ CCGDEBUG= -g $(DEBUGFORMAT)
 #
 # Flags used to build in debug mode for ctf generation.
 #
-CTF_FLAGS_sparc	= $(CCGDEBUG) -Wc,-Qiselect-T1 $(CSTD) $(CNOGLOBAL)
-CTF_FLAGS_i386	= $(CCGDEBUG) $(CSTD) $(CNOGLOBAL)
+CTF_FLAGS_sparc	= $(CCGDEBUG) $(CSTD)
+CTF_FLAGS_i386	= $(CCGDEBUG) $(CSTD)
 
 CTF_FLAGS_sparcv9	= $(CTF_FLAGS_sparc)
 CTF_FLAGS_amd64		= $(CTF_FLAGS_i386) $(SAVEARGS)
@@ -599,38 +528,6 @@ OFFSETS_CREATE = $(GENOFFSETS) -s $(CTFSTABS) -r $(CTFCONVERT) \
 OFFSETS_CREATE64 = $(GENOFFSETS) -s $(CTFSTABS) -r $(CTFCONVERT) \
 	$(CW) --noecho $(CW_CC_COMPILERS) -- $(GENOFFSETS_FLAGS) \
 	$(CFLAGS64) $(CPPFLAGS)
-
-#
-# tradeoff time for space (smaller is better)
-#
-sparc_SPACEFLAG		= -xspace -W0,-Lt
-sparcv9_SPACEFLAG	= -xspace -W0,-Lt
-i386_SPACEFLAG		= -xspace
-amd64_SPACEFLAG		=
-
-SPACEFLAG		= $($(MACH)_SPACEFLAG)
-SPACEFLAG64		= $($(MACH64)_SPACEFLAG)
-
-#
-# The Sun Studio 11 compiler has changed the behaviour of integer
-# wrap arounds and so a flag is needed to use the legacy behaviour
-# (without this flag panics/hangs could be exposed within the source).
-#
-sparc_IROPTFLAG		= -W2,-xwrap_int
-sparcv9_IROPTFLAG	= -W2,-xwrap_int
-i386_IROPTFLAG		=
-amd64_IROPTFLAG		=
-
-IROPTFLAG		= $($(MACH)_IROPTFLAG)
-IROPTFLAG64		= $($(MACH64)_IROPTFLAG)
-
-sparc_XREGSFLAG		= -xregs=no%appl
-sparcv9_XREGSFLAG	= -xregs=no%appl
-i386_XREGSFLAG		=
-amd64_XREGSFLAG		=
-
-XREGSFLAG		= $($(MACH)_XREGSFLAG)
-XREGSFLAG64		= $($(MACH64)_XREGSFLAG)
 
 # dmake SOURCEDEBUG=yes ... enables source-level debugging information, and
 # avoids stripping it.
@@ -653,35 +550,31 @@ CCUSERFLAGS64		= $(CCUSERFLAGS)
 
 CSOURCEDEBUGFLAGS	=
 CCSOURCEDEBUGFLAGS	=
-$(SRCDBGBLD)CSOURCEDEBUGFLAGS	= $(CCGDEBUG) -xs
-$(SRCDBGBLD)CCSOURCEDEBUGFLAGS	= $(CCGDEBUG) -xs
+$(SRCDBGBLD)CSOURCEDEBUGFLAGS	= $(CCGDEBUG)
+$(SRCDBGBLD)CCSOURCEDEBUGFLAGS	= $(CCGDEBUG)
 
-CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) $(SPACEFLAG) $(CCMODE) \
-		$(ILDOFF) $(CERRWARN) $(CSTD) $(CCUNBOUND) $(IROPTFLAG) \
-		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CCNOREORDER) \
+CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) \
+		$(CERRWARN) $(CSTD) $(CCNOAUTOINLINE) $(CCNOREORDER) \
 		$(CCNOAGGRESSIVELOOPS) $(CCINLINESIZE) \
 		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS)
-CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) $(SPACEFLAG64) $(CCMODE64) \
-		$(ILDOFF) $(CERRWARN) $(CSTD) $(CCUNBOUND) $(IROPTFLAG64) \
-		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CCNOREORDER) \
+CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) \
+		$(CERRWARN) $(CSTD) $(CCNOAUTOINLINE) $(CCNOREORDER) \
 		$(CCNOAGGRESSIVELOOPS) $(CCINLINESIZE) \
 		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS64)
 #
 # Flags that are used to build parts of the code that are subsequently
 # run on the build machine (also known as the NATIVE_BUILD).
 #
-NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
-		$(ILDOFF) $(CERRWARN) $(CSTD) $($(NATIVE_MACH)_CCUNBOUND) \
-		$(IROPTFLAG) $(CGLOBALSTATIC) $(CCNOAUTOINLINE) \
+NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) \
+		$(CERRWARN) $(CSTD) $(CCNOAUTOINLINE) \
 		$(CCNOREORDER) $(CCNOAGGRESSIVELOOPS) $(CCINLINESIZE) \
 		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS)
 
 NATIVE_CCFLAGS=	$(CCOPTFLAG) $($(NATIVE_MACH)_CCFLAGS) $(CCSOURCEDEBUGFLAGS) \
 		$(CCUSERFLAGS)
 
-NATIVE_CFLAGS64=	$(COPTFLAG64) $($(NATIVE_MACH64)_CFLAGS) $(CCMODE64) \
-		$(ILDOFF) $(CERRWARN) $(CSTD) $($(NATIVE_MACH64)_CCUNBOUND) \
-		$(IROPTFLAG64) $(CGLOBALSTATIC) $(CCNOAUTOINLINE) \
+NATIVE_CFLAGS64=	$(COPTFLAG64) $($(NATIVE_MACH64)_CFLAGS) \
+		$(CERRWARN) $(CSTD) $(CCNOAUTOINLINE) \
 		$(CCNOREORDER) $(CCNOAGGRESSIVELOOPS) $(CCINLINESIZE) \
 		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS64)
 
@@ -727,22 +620,10 @@ BUILD.po= $(XGETTEXT) $(XGETFLAGS) -d $(<F) $<.i ;\
 #
 POFILE= $(PROG).po
 
-sparc_CCFLAGS=		$(sparc_XARCH) -cg92 -compat=4 \
-			-Qoption ccfe -messages=no%anachronism \
-			$(CCERRWARN)
-sparcv9_CCFLAGS=	$(sparcv9_XARCH) -dalign -compat=5 \
-			-Qoption ccfe -messages=no%anachronism \
-			-Qoption ccfe -features=no%conststrings \
-			$(CCCREGSYM) \
-			$(CCERRWARN)
-i386_CCFLAGS=		$(i386_XARCH) -compat=4 \
-			-Qoption ccfe -messages=no%anachronism \
-			-Qoption ccfe -features=no%conststrings \
-			$(CCERRWARN)
-amd64_CCFLAGS=		$(amd64_XARCH) -compat=5 \
-			-Qoption ccfe -messages=no%anachronism \
-			-Qoption ccfe -features=no%conststrings \
-			$(CCERRWARN)
+sparc_CCFLAGS=		$(sparc_XARCH) $(CCERRWARN)
+sparcv9_CCFLAGS=	$(sparcv9_XARCH) $(CCERRWARN)
+i386_CCFLAGS=		$(i386_XARCH) $(CCERRWARN)
+amd64_CCFLAGS=		$(amd64_XARCH) $(CCERRWARN)
 
 sparc_CCOPTFLAG=	-O
 sparcv9_CCOPTFLAG=	-O
@@ -794,11 +675,6 @@ MAPFILE.INT =		mapfile-intf
 # LDLIBS32 and LDLIBS64 can be set in the environment to override the following
 # assignments.
 #
-# These environment settings make sure that no libraries are searched outside
-# of the local workspace proto area:
-#	LDLIBS32=-YP,$ROOT/lib:$ROOT/usr/lib
-#	LDLIBS64=-YP,$ROOT/lib/$MACH64:$ROOT/usr/lib/$MACH64
-#
 LDLIBS32 =	$(ENVLDLIBS1) $(ENVLDLIBS2) $(ENVLDLIBS3)
 LDLIBS32 +=	$(ADJUNCT_PROTO:%=-L%/usr/lib -L%/lib)
 LDLIBS.cmd =	$(LDLIBS32)
@@ -845,7 +721,7 @@ LDCHECKS		+= $(NATIVE_LIBS:%=$(ZASSERTDEFLIB)=%)
 
 LINK.c=			$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(LDCHECKS)
 LINK64.c=		$(CC) $(CFLAGS64) $(CPPFLAGS) $(LDFLAGS) $(LDCHECKS)
-NORUNPATH=		-norunpath -nolib
+NORUNPATH=		-nolib
 LINK.cc=		$(CCC) $(CCFLAGS) $(CPPFLAGS) $(NORUNPATH) \
 			$(LDFLAGS) $(CCNEEDED) $(LDCHECKS)
 LINK64.cc=		$(CCC) $(CCFLAGS64) $(CPPFLAGS) $(NORUNPATH) \
@@ -978,10 +854,10 @@ C_BIGPICFLAGS64 =	$($(MACH64)_C_BIGPICFLAGS)
 
 # CC requires there to be no space between '-K' and 'pic' or 'PIC'.
 # and does not support -f
-sparc_CC_PICFLAGS =	-_cc=-Kpic -_gcc=-fpic
-sparcv9_CC_PICFLAGS =	-_cc=-KPIC -_gcc=-fPIC
-i386_CC_PICFLAGS =	-_cc=-Kpic -_gcc=-fpic
-amd64_CC_PICFLAGS =	-_cc=-Kpic -_gcc=-fpic
+sparc_CC_PICFLAGS =	-_gcc=-fpic
+sparcv9_CC_PICFLAGS =	-_gcc=-fPIC
+i386_CC_PICFLAGS =	-_gcc=-fpic
+amd64_CC_PICFLAGS =	-_gcc=-fpic
 CC_PICFLAGS =		$($(MACH)_CC_PICFLAGS)
 CC_PICFLAGS64 =		$($(MACH64)_CC_PICFLAGS)
 

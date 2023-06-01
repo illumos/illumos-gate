@@ -55,7 +55,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CFLAGS				+= $(CCVERBOSE)
-$(RELEASE_BUILD)CFLAGS		+= -xinline=auto -xcrossfile
 $(RELEASE_BUILD)COPTIMIZE	= -xO5
 INC_PATH			+= -I$(UTSBASE)/common/io/bpf
 

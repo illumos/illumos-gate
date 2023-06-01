@@ -66,8 +66,8 @@ $(LIBS): ../common/zfs.h
 
 CSTD=	$(CSTD_GNU99)
 
-CFLAGS +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
-CFLAGS64 +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
+CFLAGS +=	$(CCGDEBUG) $(CCVERBOSE)
+CFLAGS64 +=	$(CCGDEBUG) $(CCVERBOSE)
 LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lmd \
 		-lfakekernel -lzutil
 NATIVE_LIBS +=	libz.so

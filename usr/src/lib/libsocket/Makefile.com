@@ -48,10 +48,6 @@ LDLIBS +=	-lnsl -lc
 
 SRCDIR =	../common
 
-# Make string literals read-only to save memory.
-CFLAGS +=	$(XSTRCONST)
-CFLAGS64 +=	$(XSTRCONST)
-
 CPPFLAGS +=	-DSYSV -D_REENTRANT -I../../common/inc
 %/rcmd.o :=	CPPFLAGS += -DNIS
 

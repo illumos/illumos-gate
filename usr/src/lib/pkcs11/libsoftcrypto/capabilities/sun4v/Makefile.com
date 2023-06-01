@@ -34,7 +34,7 @@ include		$(SRC)/lib/Makefile.lib
 
 AS_CPPFLAGS +=	-D_ASM -DPIC -D_REENTRANT -D$(MACH)
 ASFLAGS +=	$(AS_PICFLAGS)
-CFLAGS +=	$(CCVERBOSE) -xO5 -xbuiltin=%all -dalign
+CFLAGS +=	$(CCVERBOSE) -xO5 -xbuiltin=%all
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-variable

@@ -41,9 +41,6 @@ DYNLIB=		$(LIBPROG)
 
 LDLIBS += -lnvpair -lc -lzutil
 
-LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_NAME_DEF_NOT_USED2
-LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_NAME_DEF_NOT_USED2
-
 SRCS=	${LIBPROG:%.so.$(FSTYP_VERS)=%.c}
 
 CPPFLAGS += -DFSTYP_VERS=${FSTYP_VERS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
@@ -71,8 +68,6 @@ all: $(LIBPROG)
 install: all
 	$(RM) $(ROOTLIBFSTYPE)/fstyp
 	$(LN) $(ROOTUSRSBIN)/fstyp $(ROOTLIBFSTYPE)/fstyp
-
-lint: lint_SRCS
 
 cstyle:
 	$(CSTYLE) $(SRCS)

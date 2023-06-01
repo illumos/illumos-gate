@@ -41,8 +41,6 @@ INCDIR=	../inc
 LIBS=	$(DYNLIB)
 
 
-CFLAGS		+=	$(CCVERBOSE) -xCC
-CFLAGS64	+=	$(CCVERBOSE) -xCC
 CPPFLAGS	+=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 			-I$(INCDIR) -I../../include
 CPPFLAGS64	+=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 \

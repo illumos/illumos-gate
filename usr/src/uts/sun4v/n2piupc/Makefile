@@ -62,10 +62,7 @@ INC_PATH	+= -I$(UTSBASE)/sun4v/io/n2piupc
 
 CERRWARN += -_gcc=-Wno-unused-label
 
-#
-# Turn on doubleword alignment for 64 bit registers, and pass in module name
-#
-CFLAGS += -dalign -DMODULE_NAME=\"$(MODULE)\"
+CFLAGS += -DMODULE_NAME=\"$(MODULE)\"
 
 #
 #	Default build targets.

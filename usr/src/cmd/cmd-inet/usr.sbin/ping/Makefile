@@ -25,7 +25,6 @@
 
 PROG=		ping
 OBJS=		ping.o ping_aux.o ping_aux6.o
-SRCS=		$(OBJS:.o=.c)
 
 include	../../../Makefile.cmd
 
@@ -43,14 +42,6 @@ CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
 
 CSTD=	$(CSTD_GNU99)
 
-# Setting the above defines to use the UNIX98 ancillary data feature
-# causes lint to output warnings about lint library declarations conflicting
-# with those in the header files. Since we need these features the best
-# course of action is to switch the types of the resulting warnings off
-# when running lint.
-LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2 -erroff=E_INCONS_ARG_DECL2 \
-		-erroff=E_NAME_USED_NOT_DEF2
-
 .KEEP_STATE:
 .PARALLEL:
 
@@ -64,7 +55,5 @@ install: all $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 include ../../../Makefile.targ

@@ -23,18 +23,14 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 MACHDIR=i386
 
 ROOTMOD = $(ROOT)/usr/lib/mdb/$(MDBTGT)
 ROOTKMOD = $(ROOT)/kernel/kmdb
 
-CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
+CFLAGS += $(CTF_FLAGS) $(CCVERBOSE)
 CTFSTABSCFLAGS = $(CFLAGS)
-LINTTAGS = E_BAD_FORMAT_STR2,E_BAD_FORMAT_ARG_TYPE2
-LINTFLAGS += -u -erroff=$(LINTTAGS)
 
 KMDBDIR = $(SRC)/cmd/mdb/intel/ia32/kmdb
 

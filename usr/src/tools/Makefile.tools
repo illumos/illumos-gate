@@ -63,7 +63,7 @@ NATIVE_LIBS += libc.so
 # To work around a bootstrapping problem, we can't rely on cw(1) knowing how
 # to translate -shared as we may be using an older one to build the current
 # tools.
-GSHARED = -_cc=-G -_gcc=-shared
+GSHARED = -_gcc=-shared
 
 #
 # To work around a bootstrapping problem, we don't assume that the

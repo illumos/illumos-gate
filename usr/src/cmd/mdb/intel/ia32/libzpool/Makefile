@@ -35,7 +35,6 @@ MODSRCS = zfs.c list.c
 include ../../../../Makefile.cmd
 include ../../Makefile.ia32
 include ../../../Makefile.module
-include ../../../common/modules/zfs/Makefile.zfs
 
 MODSRCS_DIR = ../../../common/modules/zfs
 GENUNIX_DIR = ../../../common/modules/genunix
@@ -48,7 +47,7 @@ CPPFLAGS += -I../../../../../lib/libzpool/common \
 
 CSTD=	$(CSTD_GNU99)
 
-CERRWARN 	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-type-limits
 
 dmod/%.o: $(GENUNIX_DIR)/%.c
 	$(COMPILE.c) -o $@ $<

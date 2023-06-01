@@ -23,7 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = uhci.so
 MDBTGT = kvm
@@ -35,8 +34,4 @@ include ../../../../Makefile.cmd.64
 include ../../Makefile.amd64
 include ../../../Makefile.module
 
-CPPFLAGS += -I../../../../../uts/common 
-
-# Needed because we're including uhciutil.h from uhci, but we obviously
-# don't use all of its functions.
-LINTFLAGS += -erroff=E_STATIC_UNUSED
+CPPFLAGS += -I../../../../../uts/common

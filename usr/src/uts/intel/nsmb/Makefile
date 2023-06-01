@@ -94,7 +94,6 @@ LDFLAGS         += -Ncrypto/md4 -Ncrypto/md5 -Nmisc/tlimod
 # to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-CERRWARN	+= -erroff=E_STATEMENT_NOT_REACHED
 
 # The mb_put/md_get functions are intentionally used with and without
 # return value checks, so filter those.

@@ -36,8 +36,6 @@ LDLIBS +=	-lc -lavl -lumem -lidspace -lnvpair -lmd -lrename \
 		-lbunyan
 CPPFLAGS +=	-I../common
 
-CERRWARN +=	-erroff=E_STRUCT_DERIVED_FROM_FLEX_MBR
-
 CSTD=		$(CSTD_GNU99)
 
 SRCDIR =	../common

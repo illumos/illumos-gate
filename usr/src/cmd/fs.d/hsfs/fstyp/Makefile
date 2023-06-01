@@ -25,7 +25,7 @@
 
 FSTYP_VERS=1
 FSTYPE=		hsfs
-LIBPROG=	fstyp.so.${FSTYP_VERS} 
+LIBPROG=	fstyp.so.${FSTYP_VERS}
 
 include ../../../../lib/Makefile.lib
 include ../../Makefile.fstype
@@ -37,9 +37,6 @@ CFLAGS +=	$(C_PICFLAGS)
 DYNLIB=		$(LIBPROG)
 
 LDLIBS += -lnvpair -lc
-
-LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_NAME_DEF_NOT_USED2
-LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_NAME_DEF_NOT_USED2
 
 #
 # Override PMAP dependency
@@ -58,7 +55,8 @@ PMAP=
 
 SRCS=	${LIBPROG:%.so.$(FSTYP_VERS)=%.c}
 
-CPPFLAGS += 	-DFSTYP_VERS=${FSTYP_VERS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+CPPFLAGS +=	-DFSTYP_VERS=${FSTYP_VERS} \
+	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 CERRWARN +=	-_gcc=-Wno-switch
 
@@ -70,12 +68,10 @@ install: all
 	$(RM) $(ROOTLIBFSTYPE)/fstyp
 	$(LN) $(ROOTUSRSBIN)/fstyp $(ROOTLIBFSTYPE)/fstyp
 
-lint: lint_SRCS
-
 cstyle:
 	$(CSTYLE) $(SRCS)
 
-clean:     
+clean:
 	$(RM) $(LIBPROG)
 
 clobber: clean

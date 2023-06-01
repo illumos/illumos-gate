@@ -1108,10 +1108,6 @@ SONAME = libc.so.1
 
 CFLAGS += $(CCVERBOSE)
 
-# This is necessary to avoid problems with calling _ex_unwind().
-# We probably don't want any inlining anyway.
-CFLAGS += -xinline=
-
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += $(CNOWARN_UNINIT)
@@ -1129,9 +1125,6 @@ CERRWARN += -_gcc=-Wno-address
 # This is automatically enabled for DEBUG builds, not for non-debug builds.
 THREAD_DEBUG =
 $(NOT_RELEASE_BUILD)THREAD_DEBUG = -DTHREAD_DEBUG
-
-# Make string literals read-only to save memory.
-CFLAGS += $(XSTRCONST)
 
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
@@ -1206,8 +1199,8 @@ $(DYNLIB) := CRTN = crtn.o
 pics/rwlock.o pics/synch.o pics/lwp.o pics/door_calls.o := \
 	sparc_CFLAGS += -_gcc=-Wa,-xarch=v8plus
 
-pics/_Q%.o := sparc_COPTFLAG = -xO4 -dalign
-pics/__quad%.o := sparc_COPTFLAG = -xO4 -dalign
+pics/_Q%.o := sparc_COPTFLAG = -xO4
+pics/__quad%.o := sparc_COPTFLAG = -xO4
 
 # large-file-aware components that should be built large
 

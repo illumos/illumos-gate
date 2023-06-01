@@ -28,12 +28,6 @@ CPPFLAGS	+= -I$(UTSBASE)/common/io/i40e/core
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-#
-# The Intel common code defines some enums which are valid unsigned ints that
-# GCC is fine with, but not Studio.
-#
-CERRWARN   += -_cc=-erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX
-
 # 3rd party code
 SMOFF += all_func_returns
 

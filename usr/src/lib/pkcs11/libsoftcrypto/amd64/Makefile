@@ -64,7 +64,7 @@ SRCDIR =	$(SRC)/lib/pkcs11/libsoftcrypto/common
 LIBS =		$(DYNLIB)
 MAPFILEDIR =	../common
 
-CFLAGS +=	-xO4 -xcrossfile
+CFLAGS +=	-xO4
 CPPFLAGS +=	-I$(CRYPTODIR) -I$(UTSDIR) -D_POSIX_PTHREAD_SEMANTICS
 ASFLAGS64 +=	$(AS_PICFLAGS) -D_ASM
 BIGNUM_FLAGS +=	-DPSR_MUL

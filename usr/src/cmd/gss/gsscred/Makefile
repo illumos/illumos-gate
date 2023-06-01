@@ -45,7 +45,7 @@ POFILES = generic.po
 
 ROOTBINPROG=		$(BINPROG:%=$(ROOTBIN)/%)
 
-COPTFLAG += $(XESS) $(INCDIRS) $(LIBPATH)
+COPTFLAG += $(INCDIRS) $(LIBPATH)
 
 # not linted
 SMATCH=off
@@ -58,7 +58,7 @@ $(GPROGS) := CPPFLAGS += -DSYSV -DSunOS=50
 
 all: $(PROG)
 
-gsscred:	$(OBJS) 
+gsscred:	$(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -72,7 +72,7 @@ install: all $(DIRS) $(ROOTBINPROG) $(ROOTUSRSBIN)/gsscred
 
 install_h:
 
-clean: 
+clean:
 	$(RM) $(OBJS)
 	$(RM) $(PROG)
 

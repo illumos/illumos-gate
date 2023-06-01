@@ -66,10 +66,8 @@ include		$(SRC)/lib/Makefile.lib.64
 # Add any machine specific flags.
 
 CPPFLAGS +=	-I../../../../uts/sparc/krtld
-CFLAGS +=	-xregs=no%appl
 ASFLAGS +=	-s $(AS_PICFLAGS) -D__sparcv9 -D_ELF64 $(sparcv9_XARCH)
 ADBGENFLAGS +=	-mlp64
-ADBGENCFLAGS +=	-erroff=%all
 ADBSUB=		$(ADBSUB64)
 CPPFLAGS +=	-D_ELF64
 SONAME=		/lib/sparcv9/ld.so.1

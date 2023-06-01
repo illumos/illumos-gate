@@ -46,7 +46,7 @@ $(ROOTNOTIFYPARAMS) := FILEMODE = 0444
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I. -I../common -I../../../../../lib/fm/libfmnotify/common
 CSTD	= $(CSTD_GNU99)
-CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
+CFLAGS += $(CTF_FLAGS) $(CCVERBOSE)
 LDLIBS += -L$(ROOT)/usr/lib/fm -lnvpair -lfmevent -lfmd_msg -lfmnotify \
 -lumem
 LDFLAGS += -R/usr/lib/fm

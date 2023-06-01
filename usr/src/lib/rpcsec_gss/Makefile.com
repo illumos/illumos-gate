@@ -35,9 +35,6 @@ include ../../Makefile.lib
 CPPFLAGS +=     -D_REENTRANT -I$(SRC)/uts/common/gssapi/include  \
 		-I$(SRC)/uts/common
 
-CFLAGS +=	$(XFFLAG)
-CFLAGS64 +=	$(XFFLAG)
-
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 

@@ -23,7 +23,7 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
-PROG= 		iscsid
+PROG=		iscsid
 MANIFEST=	iscsi-initiator.xml
 SVCMETHOD=	iscsi-initiator	iscsid
 
@@ -37,16 +37,12 @@ $(ROOTSVCNETWORKISCSI)/iscsi-initiator.xml := FILEMODE = 0444
 
 .KEEP_STATE:
 
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
-
 all:		$(PROG)
 
 check:		$(CHKMANIFEST)
 
 clean:
 
-install: 	all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
-
-lint:		lint_PROG
+install:	all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 include ../Makefile.targ

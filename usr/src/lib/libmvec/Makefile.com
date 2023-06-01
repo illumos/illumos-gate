@@ -166,9 +166,6 @@ FLTRPATH_sparcv9	= $$ORIGIN/../cpu/$$ISALIST/sparcv9/libmvec_isa.so.1
 FLTRPATH_i386		= $$ORIGIN/libmvec/$$HWCAP
 FLTRPATH		= $(FLTRPATH_$(TARGET_ARCH))
 
-sparc_CFLAGS += -_cc=-W0,-xintrinsic
-sparcv9_CFLAGS += -_cc=-W0,-xintrinsic
-
 SRCS_mvec_i386 = ../common/__vsqrtf.c
 
 SRCS_mvec_sparc = $(SRCS_mvec_i386)

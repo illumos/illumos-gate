@@ -214,15 +214,13 @@ CTFMERGE_LIB	= $(CTFMERGE) $(CTFMRGFLAGS) -t -f -L VERSION -o $@ $(PICS)
 
 # conditional assignments
 
-$(OBJS)  :=	sparc_CFLAGS += -xregs=no%appl
-
-$(PICS)  :=	sparc_CFLAGS += -xregs=no%appl $(sparc_C_PICFLAGS)
-$(PICS)  :=	sparcv9_CFLAGS += -xregs=no%appl $(sparcv9_C_PICFLAGS)
+$(PICS)  :=	sparc_CFLAGS += $(sparc_C_PICFLAGS)
+$(PICS)  :=	sparcv9_CFLAGS += $(sparcv9_C_PICFLAGS)
 $(PICS)  :=	i386_CFLAGS += $(i386_C_PICFLAGS)
 $(PICS)  :=	amd64_CFLAGS += $(amd64_C_PICFLAGS)
 $(PICS)  :=	CCFLAGS += $(CC_PICFLAGS)
 $(PICS)  :=	CPPFLAGS += -DPIC -D_REENTRANT
-$(PICS)  :=	sparcv9_CCFLAGS += -xregs=no%appl $(sparcv9_CC_PICFLAGS)
+$(PICS)  :=	sparcv9_CCFLAGS += $(sparcv9_CC_PICFLAGS)
 $(PICS)  :=	amd64_CCFLAGS += $(amd64_CC_PICFLAGS)
 $(PICS)  :=	CFLAGS += $(CTF_FLAGS)
 $(PICS)	 :=	CFLAGS64 += $(CTF_FLAGS)

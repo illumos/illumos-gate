@@ -56,9 +56,6 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -DSUN_THREADS \
 		-I../../lib/libc/port/gen -I../../lib/libc/inc \
 		-I../../lib/libsldap/common
-LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
-LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS +=	-erroff=E_NAME_DEF_NOT_USED2
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	$(CNOWARN_UNINIT)
@@ -88,9 +85,6 @@ all: $(PROG) $(NISPROG)
 ${PROG}: ${OBJS}
 	${LINK.c} ${OPT} -o $@ ${OBJS} ${PROGLIBS}
 	${POST_PROCESS}
-
-lint:
-	$(LINT.c) ${SRCS} ${PROGLIBS}
 
 cstyle:
 	${CSTYLE} ${SRCS}

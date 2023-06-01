@@ -27,7 +27,6 @@
 
 PROG=		in.ndpd
 OBJS=		config.o main.o ndp.o tables.o trace.o
-SRCS=		$(OBJS:%.o=%.c)
 SVCMETHOD=	svc-ndp
 MANIFEST=	ndp.xml
 
@@ -46,16 +45,6 @@ LDLIBS +=	-ldhcpagent -lxnet -lsocket -lipadm
 _D_UNIX98_EXTN= -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 
 $(OBJS)		:= CPPFLAGS +=  $(_D_UNIX98_EXTN)
-
-LINTFLAGS +=	$(_D_UNIX98_EXTN)
-
-# This shouldn't be necessary, but linking with libxnet requires it.
-LINTFLAGS +=	-erroff=E_INCONS_ARG_DECL2 -erroff=E_INCONS_VAL_TYPE_DECL2
-
-# This is needed to avoid littering the code with useless LINTED statements
-# for each place where pointers are casted.  It's not perfect, but being
-# perfect would require a bigger rewrite.
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += $(CNOWARN_UNINIT)
@@ -85,7 +74,5 @@ check:	$(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 include		../../../Makefile.targ

@@ -84,12 +84,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE) \
 #
 INC_PATH	+= -I$(UTSBASE)/sun4/io/fpc
 
-
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
 #
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.

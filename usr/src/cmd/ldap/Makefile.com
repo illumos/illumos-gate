@@ -81,9 +81,6 @@ CLOBBERFILES += $(OBJS) $(PROG) $(LDAPCLIENTPROG) $(LDAPADDENTPROG) \
 # creating /var/ldap directory
 ROOTVAR_LDAP=	$(ROOT)/var/ldap
 
-LINTFLAGS += -erroff=E_INCONS_ARG_DECL2
-LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
-
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-function
@@ -97,9 +94,8 @@ all:=           TARGET= all
 install:=       TARGET= install
 clean:=         TARGET= clean
 clobber:=       TARGET= clobber
-lint:=          TARGET= lint
 
-# C Pre-Processor flags used by C, CC & lint
+# C Pre-Processor flags used by C, CC
 CPPFLAGS +=	-DSUN -DSVR4 -DSOLARIS_LDAP_CMD \
 		-I $(SRC)/lib/libldap5/include/ldap \
 		-I $(SRC)/lib/libsldap/common \
@@ -119,8 +115,6 @@ ldapclient :=	LDLIBS += -lsldap -lscf
 ldaplist :=	CSTD = $(CSTD_GNU99)
 ldapaddent :=	CSTD = $(CSTD_GNU99)
 ldapclient :=	CSTD = $(CSTD_GNU99)
-
-lint :=		LDLIBS += -lldap
 
 .KEEP_STATE:
 

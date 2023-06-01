@@ -23,13 +23,12 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 all: $(PROG)
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS)
 
 $(PROG): $(OBJS) $(MAPFILE)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -53,25 +52,10 @@ $(PROG): $(OBJS) $(MAPFILE)
 	$(CTFCONVERT_O)
 
 clean:
-	$(RM) $(OBJS) $(LINTFILES)
+	$(RM) $(OBJS)
 
 clobber: clean
 	$(RM) $(PROG)
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-%.ln: ../$(MACH)/%.c
-	$(LINT.c) -c $<
-
-%.ln: ../%.c
-	$(LINT.c) -c $<
-
-%.ln: ../../common/%.c
-	$(LINT.c) -erroff=E_BAD_PTR_CAST_ALIGN -v -c $<
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
 
 install_h:
 

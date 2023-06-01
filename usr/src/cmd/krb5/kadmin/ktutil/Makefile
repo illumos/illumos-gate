@@ -24,7 +24,6 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include \
 	-DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAVE_UNISTD_H=1 \
 	-DHAVE_SYS_TIMEB_H=1 -DHAVE_ALLOCA_H=1 -DHAVE_FTIME=1 \
 	 -DHAVE_TIMEZONE
-COPTFLAG += $(XESS) #-I$(KINCDIR)
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-unused-function

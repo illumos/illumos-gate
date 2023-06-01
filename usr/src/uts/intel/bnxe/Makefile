@@ -88,11 +88,6 @@ CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-value
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-but-set-variable
-CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
-CERRWARN	+= -_cc=-erroff=E_ARGUEMENT_MISMATCH
-CERRWARN	+= -_cc=-erroff=E_INTEGER_OVERFLOW_DETECTED
-CERRWARN	+= -_cc=-erroff=E_CONST_PROMOTED_UNSIGNED_LL
-CERRWARN	+= -_cc=-erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX
 
 # a whole mess
 SMATCH=off

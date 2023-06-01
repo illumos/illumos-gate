@@ -64,11 +64,6 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-type-limits
 
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
 LDFLAGS	+= -Ndrv/pcipsy
 
 #

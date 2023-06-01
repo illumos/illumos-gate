@@ -28,7 +28,6 @@
 PROG		= in.mpathd
 ROOTFS_PROG	= $(PROG)
 OBJS		= mpd_tables.o mpd_main.o mpd_probe.o
-SRCS		= $(OBJS:%.o=%.c)
 DEFAULTFILES	= mpathd.dfl
 SVCMETHOD	= net-ipmp
 MANIFEST	= network-ipmp.xml
@@ -39,7 +38,7 @@ ROOTCMDDIR	= $(ROOT)/lib/inet
 ROOTMANIFESTDIR	= $(ROOTSVCNETWORK)
 
 POFILE		= $(PROG).po
-POFILES		= $(SRCS:%.c=%.po)
+POFILES		= $(OBJS:%.o=%.po)
 
 CSTD		= $(CSTD_GNU99)
 
@@ -49,7 +48,6 @@ CSTD		= $(CSTD_GNU99)
 #
 CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
 LDLIBS	+= -lsocket -lnsl -lsysevent -lnvpair -lipmp -linetutil -ldlpi
-LINTFLAGS += -erroff=E_INCONS_ARG_DECL2 -erroff=E_INCONS_ARG_USED2
 
 CERRWARN += $(CNOWARN_UNINIT)
 
@@ -75,8 +73,6 @@ install:	all $(ROOTCMD) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
 
 clean:
 		$(RM) $(OBJS)
-
-lint:		lint_SRCS
 
 $(POFILE):	$(POFILES)
 		$(RM) $@

@@ -33,7 +33,6 @@ SBINLINKS= $(PROG)
 
 OBJS= bootadm.o bootadm_upgrade.o bootadm_hyper.o bootadm_digest.o \
 	bootadm_loader.o
-SRCS = $(OBJS:.o=.c)
 POFILES= $(OBJS:%.o=%.po)
 
 include ../Makefile.com
@@ -47,19 +46,12 @@ LDLIBS += -lficl-sys -lmd -lcryptoutil -lnvpair -lgen -ladm -lefi
 LDLIBS += -lscf -lz -lbe -lzfs -lofmt $(LDLIBS_$(MACH))
 NATIVE_LIBS += libz.so
 
-# Writing into string literals is incorrect.  We need to match gcc's
-# behavior, which causes us to take SIGSEGV on such a write.
-CFLAGS +=	$(XSTRCONST)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 CPPFLAGS +=	-I$(SRC)/uts/common -I$(SRC)/common -I$(SRC)/common/ficl
 
 SMOFF +=	all_func_returns
 
 CSTD=	$(CSTD_GNU99)
-
-LINTFLAGS += -erroff=E_INCONS_ARG_DECL2
-LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
-LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 
 all: $(PROG)
 
@@ -75,7 +67,5 @@ $(POFILE): $(POFILES)
 
 clean:
 	-$(RM) $(OBJS) $(POFILE) $(POFILES)
-
-lint:	lint_SRCS
 
 include ../Makefile.targ

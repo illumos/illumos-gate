@@ -27,8 +27,6 @@
 include		../../../../lib/Makefile.lib
 include		../../Makefile.com
 
-NO_ASM_WARN=	-erroff=E_ASM_DISABLES_OPTIMIZATION
-
 TRUSSLIB=	truss.so.1
 TRUSSSRC=	truss.c
 

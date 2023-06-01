@@ -50,11 +50,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CERRWARN	+= -_gcc=-Wno-parentheses
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS		+= -dalign
-
-#
 # Module Dependencies
 #
 LDFLAGS		+= -Nmisc/ds -Nmisc/platsvc -Ndrv/drctl

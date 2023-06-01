@@ -54,11 +54,6 @@ ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
-#
 # Enable PLX workaround code
 #
 CPPFLAGS += -DPX_PLX

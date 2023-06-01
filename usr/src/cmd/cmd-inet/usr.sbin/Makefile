@@ -77,9 +77,6 @@ MSGSUBDIRS=	ifconfig ilbadm in.routed in.talkd \
 LINTCLEAN=	6to4relay arp in.rlogind in.rshd in.telnetd in.tftpd \
 		ipaddrsel ndp route \
 		in.rarpd if_mpadm $(SYNCPROG)
-# And as programs are verified not to attempt to write into constants,
-# -xstrconst should be used to ensure they stay that way.
-CONSTCLEAN=
 
 include ../../Makefile.cmd
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
@@ -130,7 +127,6 @@ K5LIBS=
 # Eventually just plain CFLAGS should be += -v, but not until all in
 # PROGS are lint clean.
 $(LINTCLEAN)		:=	CFLAGS += $(CCVERBOSE)
-$(CONSTCLEAN)		:=	CFLAGS += $(XSTRCONST)
 
 $(SYNCPROG)		:=	LDLIBS += -ldlpi
 $(SOCKETPROG)		:=	LDLIBS += -lsocket

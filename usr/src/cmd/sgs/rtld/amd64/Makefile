@@ -61,10 +61,8 @@ MAPFILE-ORDER =	../common/mapfile-order-gcc
 
 # Add any machine specific flags.
 
-CFLAGS +=	-xregs=no%appl
 ASFLAGS +=	-D__amd64 -D_ELF64 $(amd64_ASFLAGS)
 ADBGENFLAGS +=	-mlp64
-ADBGENCFLAGS +=	-erroff=%all
 ADBSUB=		$(ADBSUB64)
 CPPFLAGS +=	-D_ELF64
 SONAME=		/lib/amd64/ld.so.1

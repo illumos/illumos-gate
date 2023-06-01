@@ -54,18 +54,15 @@ CERRWARN += -_gcc=-Wno-clobbered
 # not linted
 SMATCH=off
 
-SRCS= $(OBJS:.o=.c)
-
 ROOTSYMLINK= $(ROOTETCPROG)
 ROOTETCDATA= $(ROOTETC)/$(DATA)
 
 $(ROOTETCDATA) := FILEMODE = 0644
 
-LDLIBS_i386= -lfdisk 
+LDLIBS_i386= -lfdisk
 LDLIBS_sparc=
 LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair -ldevid -ldevinfo $(LDLIBS_$(MACH))
 
-LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 CPPFLAGS    += -D_EXTVTOC
 
 .KEEP_STATE:
@@ -88,10 +85,5 @@ $(ROOTSYMLINK):
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
-
-sb: $(SRCS)
-	$(COMPILE.c) -xsbfast $(SRCS)
 
 include ../Makefile.targ

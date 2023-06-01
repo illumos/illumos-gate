@@ -35,7 +35,6 @@ include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
 include ../../Makefile.amd64
 include ../../../Makefile.module
-include ../../../common/modules/zfs/Makefile.zfs
 
 CPPFLAGS += -I../../../../../uts/common/fs/zfs
 CPPFLAGS += -I../../../../../uts/common/fs/zfs/lua
@@ -43,4 +42,4 @@ CPPFLAGS += -I../../../../../common/zfs
 
 CSTD=	$(CSTD_GNU99)
 
-CERRWARN 	+= -_gcc=-Wno-type-limits
+CERRWARN	+= -_gcc=-Wno-type-limits

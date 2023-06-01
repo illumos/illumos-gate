@@ -60,11 +60,6 @@ INC_PATH	+= -I$(UTSBASE)/sun4u/io/px
 
 CFLAGS += $(CCVERBOSE)
 
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
-
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= $(CNOWARN_UNINIT)

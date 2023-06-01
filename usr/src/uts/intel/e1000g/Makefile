@@ -49,16 +49,11 @@ CFLAGS += -D_KERNEL -Di386   -DNEWSTAT -DNOMUT -DRCVWORKAROUND \
 	  -DTANAX_WORKAROUND -I$(UTSBASE)/common/io/e1000g \
 	  -I$(UTSBASE)/common/io/e1000api
 
-CFLAGS_CPP_COMMENTS = -xCC
-
-CFLAGS += $(CFLAGS_CPP_COMMENTS)
-
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-variable
-CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
 
 SMOFF += all_func_returns,indenting,shift_to_zero
 

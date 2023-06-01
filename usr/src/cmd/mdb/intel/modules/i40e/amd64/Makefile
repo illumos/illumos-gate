@@ -28,15 +28,3 @@ CPPFLAGS += -I$(SRC)/uts/common/io/i40e
 CPPFLAGS += -I$(SRC)/uts/common/io/i40e/core
 CPPFLAGS += -I$(SRC)/uts/common
 CPPFLAGS += -D_I40E_MDB_DMOD
-
-#
-# i40e needs this due to the use of Intel provided headers.
-#
-LINTFLAGS64 += -erroff=E_STATIC_UNUSED
-
-#
-# The Intel common code defines some enums which are valid unsigned ints that
-# GCC is fine with, but not Studio.
-#
-CERRWARN	+= -_cc=-erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX
-LINTTAGS	+= -erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX

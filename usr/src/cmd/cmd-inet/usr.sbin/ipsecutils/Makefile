@@ -25,7 +25,7 @@
 # Copyright (c) 2018, Joyent, Inc.
 
 PROG=		ikeadm ipsecalgs ipsecconf ipseckey ikecert
-SOCKETPROG=	ipsecalgs ipsecconf ipseckey 
+SOCKETPROG=	ipsecalgs ipsecconf ipseckey
 TSOLPROG=	ipseckey
 SRCS=           ikeadm.c ipsecalgs.c ipsecconf.c ipseckey.c
 
@@ -50,7 +50,6 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 
 CLOBBERFILES +=	$(PROG) $(POFILES)
 CLEANFILES += $(PROG) $(POFILES)
@@ -63,11 +62,9 @@ CERRWARN +=	-_gcc=-Wno-switch
 # not linted
 SMATCH=off
 
-CFLAGS += $(XSTRCONST)
 LDLIBS += -lipsecutil -lnsl
 
 LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsol
 
 $(TSOLPROG)	:=	LDLIBS += $(LAZYLIBS)
 $(SOCKETPROG)	:=      LDLIBS += -lsocket
@@ -97,15 +94,10 @@ $(ROOTUSRSBINLINKS):
 install: $(PROG) $(ROOTFS_PROG) .WAIT $(ROOTUSRSBINPROG) \
 	 $(ROOTUSRSBINLINKS) $(ROOTETCDEFAULTFILES) $(ROOTMANIFEST)
 
-lint: 
-	$(LINT.c) -erroff=E_NAME_USED_NOT_DEF2 \
-	-erroff=E_NAME_MULTIPLY_DEF2 $(SRCS) $(LDLIBS)
-
 check:	$(CHKMANIFEST)
 
-clean:	
+clean:
 	-$(RM) $(CLEANFILES)
 
 
 include ../../../Makefile.targ
-

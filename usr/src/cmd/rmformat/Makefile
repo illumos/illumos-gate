@@ -63,7 +63,4 @@ $(POFILE) : $(SRCS)
 	$(SED) -e '/^domain/d' messages.po > $@
 	$(RM) messages.po
 
-sb: $(SRCS)
-	$(COMPILE.c) -xsbfast $(SRCS)
-
 include ../Makefile.targ
