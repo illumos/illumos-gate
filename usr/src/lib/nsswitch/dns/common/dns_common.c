@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -55,9 +56,8 @@
 #endif
 
 static int
-dns_netdb_aliases(from_list, to_list, aliaspp, type, count, af_type)
-	char	**from_list, **to_list,	**aliaspp;
-	int	type, *count, af_type;
+dns_netdb_aliases(char **from_list, char **to_list, char **aliaspp, int type,
+    int *count, int af_type)
 {
 	char		*fstr;
 	int		cnt = 0;
@@ -68,11 +68,12 @@ dns_netdb_aliases(from_list, to_list, aliaspp, type, count, af_type)
 		return (NSS_STR_PARSE_ERANGE);
 
 	for (fstr = from_list[cnt]; fstr != NULL; fstr = from_list[cnt]) {
-		if (type == DNS_ALIASES)
+		if (type == DNS_ALIASES) {
 			len = strlen(fstr) + 1;
-		else
-			len = (af_type == AF_INET) ? sizeof (struct in_addr)
-						: sizeof (struct in6_addr);
+		} else {
+			len = (af_type == AF_INET) ? sizeof (struct in_addr) :
+			    sizeof (struct in6_addr);
+		}
 		*aliaspp -= len;
 		to_list[cnt] = *aliaspp;
 		if (*aliaspp <= (char *)&to_list[cnt+1])
@@ -83,7 +84,7 @@ dns_netdb_aliases(from_list, to_list, aliaspp, type, count, af_type)
 
 			(void) memset(addr6p, '\0', sizeof (struct in6_addr));
 			(void) memcpy(&addr6p->s6_addr[12], fstr,
-					sizeof (struct in_addr));
+			    sizeof (struct in_addr));
 			addr6p->s6_addr[10] = 0xffU;
 			addr6p->s6_addr[11] = 0xffU;
 			++cnt;
@@ -103,16 +104,13 @@ dns_netdb_aliases(from_list, to_list, aliaspp, type, count, af_type)
 
 
 int
-ent2result(he, argp, af_type)
-	struct hostent		*he;
-	nss_XbyY_args_t		*argp;
-	int			af_type;
+ent2result(struct hostent *he, nss_XbyY_args_t *argp, int af_type)
 {
 	char		*buffer, *limit;
 	int		buflen = argp->buf.buflen;
 	int		ret, count;
 	size_t len;
-	struct hostent 	*host;
+	struct hostent	*host;
 	struct in_addr	*addrp;
 	struct in6_addr	*addrp6;
 
@@ -122,8 +120,8 @@ ent2result(he, argp, af_type)
 
 	/* h_addrtype and h_length */
 	host->h_addrtype = af_type;
-	host->h_length = (af_type == AF_INET) ? sizeof (struct in_addr)
-					: sizeof (struct in6_addr);
+	host->h_length = (af_type == AF_INET) ? sizeof (struct in_addr) :
+	    sizeof (struct in6_addr);
 
 	/* h_name */
 	len = strlen(he->h_name) + 1;
@@ -136,36 +134,33 @@ ent2result(he, argp, af_type)
 	/* h_addr_list */
 	if (af_type == AF_INET) {
 		addrp = (struct in_addr *)ROUND_DOWN(limit, sizeof (*addrp));
-		host->h_addr_list = (char **)
-				ROUND_UP(buffer, sizeof (char **));
+		host->h_addr_list = (char **)ROUND_UP(buffer, sizeof (char **));
 		ret = dns_netdb_aliases(he->h_addr_list, host->h_addr_list,
-			(char **)&addrp, DNS_ADDRLIST, &count, af_type);
+		    (char **)&addrp, DNS_ADDRLIST, &count, af_type);
 		if (ret != NSS_STR_PARSE_SUCCESS)
 			return (ret);
 		/* h_aliases */
 		host->h_aliases = host->h_addr_list + count + 1;
 		ret = dns_netdb_aliases(he->h_aliases, host->h_aliases,
-			(char **)&addrp, DNS_ALIASES, &count, af_type);
+		    (char **)&addrp, DNS_ALIASES, &count, af_type);
 	} else {
-		addrp6 = (struct in6_addr *)
-			ROUND_DOWN(limit, sizeof (*addrp6));
-		host->h_addr_list = (char **)
-			ROUND_UP(buffer, sizeof (char **));
+		addrp6 = (struct in6_addr *)ROUND_DOWN(limit, sizeof (*addrp6));
+		host->h_addr_list = (char **)ROUND_UP(buffer, sizeof (char **));
 		if (he->h_addrtype == AF_INET && af_type == AF_INET6) {
 			ret = dns_netdb_aliases(he->h_addr_list,
-				host->h_addr_list, (char **)&addrp6,
-				DNS_MAPDLIST, &count, af_type);
+			    host->h_addr_list, (char **)&addrp6,
+			    DNS_MAPDLIST, &count, af_type);
 		} else {
 			ret = dns_netdb_aliases(he->h_addr_list,
-				host->h_addr_list, (char **)&addrp6,
-				DNS_ADDRLIST, &count, af_type);
+			    host->h_addr_list, (char **)&addrp6,
+			    DNS_ADDRLIST, &count, af_type);
 		}
 		if (ret != NSS_STR_PARSE_SUCCESS)
 			return (ret);
 		/* h_aliases */
 		host->h_aliases = host->h_addr_list + count + 1;
 		ret = dns_netdb_aliases(he->h_aliases, host->h_aliases,
-			(char **)&addrp6, DNS_ALIASES, &count, af_type);
+		    (char **)&addrp6, DNS_ALIASES, &count, af_type);
 	}
 	if (ret == NSS_STR_PARSE_PARSE)
 		ret = NSS_STR_PARSE_SUCCESS;
@@ -190,10 +185,7 @@ ent2result(he, argp, af_type)
  * data.
  */
 int
-ent2str(
-	struct hostent	*hp,
-	nss_XbyY_args_t *ap,
-	int		af_type)
+ent2str(struct hostent	*hp, nss_XbyY_args_t *ap, int af_type)
 {
 	char		**p;
 	char		obuf[INET6_ADDRSTRLEN];
@@ -296,7 +288,8 @@ _nss_dns_constr(dns_backend_op_t ops[], int n_ops)
  *  NSS_SUCCESS indicates that the name is listed in the collected aliases.
  */
 static nss_status_t
-name_is_alias(char *aliases_ptr, char *name_ptr) {
+name_is_alias(char *aliases_ptr, char *name_ptr)
+{
 	char *host_ptr;
 	/* Loop through alias string and compare it against host string. */
 	while (*aliases_ptr != '\0') {
@@ -756,6 +749,7 @@ searchagain:
 		goto searchagain;
 	}
 
+out:
 	/* Presumably the buffer is now filled. */
 	len = ROUND_UP(blen, sizeof (nssuint_t));
 	/* still room? */
@@ -764,7 +758,7 @@ searchagain:
 		res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
-out:
+
 	pbuf->ext_off = pbuf->data_off + len;
 	pbuf->ext_len = sizeof (nssuint_t);
 	pbuf->data_len = blen;
