@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2020, Joyent, Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -2385,7 +2386,8 @@ again:
 
 		if (scf_handle_decorate(h, "zone", zone) != SCF_SUCCESS) {
 			if (do_a_zone) {
-				uu_die(gettext("invalid zone '%s'\n"), optarg);
+				uu_die(gettext("invalid zone '%s'\n"),
+				    zonename);
 			} else {
 				scf_value_destroy(zone);
 				goto nextzone;

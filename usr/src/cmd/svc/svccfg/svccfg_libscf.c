@@ -25,6 +25,7 @@
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2017 RackTop Systems.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 Oxide Computer Company
  */
 
 
@@ -891,6 +892,19 @@ lscf_prep_hndl(void)
 			scfdie();
 
 		scf_value_destroy(repo_value);
+	} else if (g_do_zone != 0) {
+		scf_value_t *zone;
+
+		if ((zone = scf_value_create(g_hndl)) == NULL)
+			scfdie();
+
+		if (scf_value_set_astring(zone, g_zonename) != SCF_SUCCESS)
+			scfdie();
+
+		if (scf_handle_decorate(g_hndl, "zone", zone) != SCF_SUCCESS)
+			uu_die(gettext("invalid zone '%s'\n"), g_zonename);
+
+		scf_value_destroy(zone);
 	}
 
 	if (scf_handle_bind(g_hndl) != 0)
