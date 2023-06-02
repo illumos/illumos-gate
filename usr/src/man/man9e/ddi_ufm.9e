@@ -10,9 +10,9 @@
 .\"
 .\"
 .\" Copyright 2019 Joyent, Inc.
-.\" Copyright 2021 Oxide Computer Company
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd May 19, 2020
+.Dd June 2, 2023
 .Dt DDI_UFM 9E
 .Os
 .Sh NAME
@@ -531,7 +531,7 @@ always be called from
 context.
 .Sh SEE ALSO
 .Xr Intro 2 ,
-.Xr ufd 4D ,
+.Xr ufm 4D ,
 .Xr attach 9E ,
 .Xr ddi_ufm_fini 9F ,
 .Xr ddi_ufm_image 9F ,

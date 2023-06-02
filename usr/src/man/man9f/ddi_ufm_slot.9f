@@ -10,7 +10,7 @@
 .\"
 .\"
 .\" Copyright 2019 Joyent, Inc.
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2023 Oxide Computer Company
 .\"
 .Dd May 19, 2020
 .Dt DDI_UFM_SLOT 9F
@@ -126,3 +126,6 @@ These functions should only be called in the context of the
 .Xr ddi_ufm_op_fill_slot 9E
 entry point.
 .Sh SEE ALSO
+.Xr ddi_ufm 9E ,
+.Xr ddi_ufm_op_fill_slot 9E ,
+.Xr nvlist_alloc 9F
