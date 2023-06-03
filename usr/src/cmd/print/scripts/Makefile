@@ -25,7 +25,7 @@
 
 include			../Makefile.sp
 
-ROOTPRINTLIB = 		$(ROOTLIB)/print
+ROOTPRINTLIB =		$(ROOTLIB)/print
 ROOTLIBLPBIN =		$(ROOTLIBLP)/bin
 ROOTVARLP =		$(ROOTVAR)/lp
 ROOTVARLPPPD =		$(ROOTVARLP)/ppd
@@ -46,16 +46,15 @@ USRSBINPROG=		lpsystem ppdmgr
 ROOTUSRSBINPROG=	$(USRSBINPROG:%=$(ROOTUSRSBIN)/%)
 $(ROOTUSRSBINPROG)		:= FILEMODE=555
 
-PCONF=	 		printers.conf
+PCONF=			printers.conf
 ROOTPCONF=		$(PCONF:%=$(ROOTETC)/%)
 $(ROOTPCONF)		:= FILEMODE=644
 
-MANUFALIASES= 		manufaliases
+MANUFALIASES=		manufaliases
 ROOTMANUFALIASES=	$(MANUFALIASES:%=$(ROOTVARLPPPD)/%)
 $(ROOTMANUFALIASES)	:= FILEMODE=444
 
-LIBLPPROGS=	 	getmakes getmodels getppdfile getppds ppdfilename2mmp \
-			lpadmin \
+LIBLPPROGS=		lpadmin \
 			desktop-print-management \
 			desktop-print-management-applet \
 			desktop-print-management-prefs
@@ -80,7 +79,7 @@ $(ROOTAUTOFILES)	:= FILEMODE = 444
 
 .KEEP_STATE:
 
-all :			$(PROG) 
+all :			$(PROG)
 
 $(ROOTLIB)/print/%:	%
 	$(INS.file)

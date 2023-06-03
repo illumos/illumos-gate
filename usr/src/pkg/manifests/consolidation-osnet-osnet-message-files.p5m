@@ -308,12 +308,6 @@ dir  path=usr/share/lib
 dir  path=usr/share/lib/locale
 dir  path=usr/share/lib/locale/com
 dir  path=usr/share/lib/locale/com/sun
-dir  path=usr/share/lib/locale/com/sun/admin
-dir  path=usr/share/lib/locale/com/sun/admin/pm
-dir  path=usr/share/lib/locale/com/sun/admin/pm/client
-file path=usr/share/lib/locale/com/sun/admin/pm/client/pmHelpResources.java \
-    group=lp
-file path=usr/share/lib/locale/com/sun/admin/pm/client/pmResources.java group=lp
 dir  path=usr/share/lib/locale/com/sun/slp
 file path=usr/share/lib/locale/com/sun/slp/ClientLib_en.properties group=sys
 file path=usr/share/lib/locale/com/sun/slp/Server_en.properties group=sys

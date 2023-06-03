@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PPDMGR 8 "Mar 9, 2007"
+.TH PPDMGR 8 "March 12, 2023"
 .SH NAME
 ppdmgr \- utility for managing PPD files
 .SH SYNOPSIS
-.LP
 .nf
 \fBppdmgr\fR \fB-a\fR \fIppd_filename_path\fR [\fB-L\fR \fIlabel\fR] [\fB-R\fR \fIppd_repository_name\fR] [\fB-w\fR]
 .fi
@@ -23,13 +22,8 @@ ppdmgr \- utility for managing PPD files
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The PPD File Manager adds PPD files to the print system's PPD file
-repositories. When changes in the PPD file repositories are made by the
-utility, they are reflected in the Solaris Print Manager (see
-\fBprintmgr\fR(8)) GUI printer driver field when adding or modifying local
-attached or network attached printers.
+repositories.
 .sp
 .LP
 Multiple PPD file repositories may be available. PPD files that are supplied
@@ -37,22 +31,16 @@ with the system are available in the "\fBsystem\fR" repository. PPD files that
 are supplied by third party vendors may be available in the "\fBvendor\fR"
 repository. PPD files that are supplied by system administrators may be
 available in the "\fBadmin\fR" repository, and PPD files that are added using
-this utility are available in the "user" repository. When this utility is used
-to update or rebuild printer information reflected in the \fBprintmgr\fR(8),
-the special reserved repository name "\fBall\fR" can be used to specify all of
-the available PPD file repositories.
+this utility are available in the "\fBuser\fR" repository.
 .sp
 .LP
 PPD files are grouped under a user-provided "label" within the print system's
-PPD file repository to allow easier selection of a printer driver through the
-\fBprintmgr\fR GUI. The special reserved label name "\fBall\fR" can be used to
+PPD file repository. The special reserved label name "\fBall\fR" can be used to
 specify all of the available labels in a PPD file repository. The results are
 undefined if a label name contains characters that are not in the portable
 filename character set or if a label name starts with a hyphen (-). A label
 name may not contain a semi-colon (:).
 .SH OPTIONS
-.sp
-.LP
 The following subcommand are supported:
 .sp
 .ne 2
@@ -177,7 +165,6 @@ Write the full path of the added PPD file. This option is only valid with the
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAdding a copy of a PPD file to the repository
 .sp
 .LP
@@ -274,8 +261,6 @@ label in the "\fBuser\fR" repository:
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -296,8 +281,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -312,7 +295,4 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-.BR attributes (7),
-.BR printmgr (8)
+.BR attributes (7)

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USBPRN 4D "May 17, 2020"
+.TH USBPRN 4D "March 12, 2023"
 .SH NAME
 usbprn \- USB printer class driver
 .SH SYNOPSIS
@@ -34,13 +34,7 @@ The \fBusbprn\fR driver supports all USB printer-class compliant printers.
 .LP
 The \fBusbrpn\fR driver includes support for communicating with many different
 printers. To use these printers, it may be necessary to install and configure
-additional format conversion packages available in the Solaris distribution.
-Configuration of these conversion packages under the Solaris printing system
-can be simplified through the use of the \fBprintmgr\fR(8). This tool allows
-selection of printer manufacturer/model information while creating a print
-queue. For USB connected printers, it attempts to pre-select the
-manufacturer and model information based on the 1284 device id supplied by the
-printer.
+additional format conversion packages.
 .SS "UGEN (Generic USB)"
 The \fBusbprn\fR driver also supports a \fBugen\fR(4D) interface allowing raw
 access to the device, for example by libusb applications, by
@@ -369,7 +363,6 @@ Architecture	SPARC, x86, PCI-based systems
 .BR prnio (4I),
 .BR attributes (7),
 .BR cfgadm_usb (8),
-.BR printmgr (8),
 .BR attach (9E)
 .sp
 .LP

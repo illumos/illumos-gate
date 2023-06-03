@@ -89,7 +89,6 @@ NOVERDEF	^usr/lib/libwrap\.so\.1\.0$
 NOVERDEF	^usr/lib/locale/MACH(iso_8859_1)/iso_8859_1\.so\.3$
 NOVERDEF	^usr/lib/picl/plugins$
 NOVERDEF	^usr/sadm/admin/dhcpmgr/dhcpmgr\.so\.1$
-NOVERDEF	^usr/sadm/admin/printmgr/lib/libpmgr\.so\.1$
 
 
 # Objects that are allowed to deviate from our standard version

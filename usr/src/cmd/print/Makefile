@@ -28,21 +28,16 @@
 
 include ../Makefile.cmd
 
-JAVA_SUBDIRS = printmgr
+SUBDIRS  =		\
+	scripts		\
+	lpget		\
+	lpset		\
+	conv_fix	\
+	ppdmgr		\
+	selector	\
+	bsd-sysv-commands
 
-PRINT_SUBDIRS  =		\
-		scripts		\
-		lpget		\
-		lpset		\
-		conv_fix	\
-		printer-info	\
-		ppdmgr		\
-		selector	\
-		bsd-sysv-commands
-
-SUBDIRS = $(PRINT_SUBDIRS) $(JAVA_SUBDIRS)
-
-ROOTDIRS = 	$(ROOTLIB)/print 
+ROOTDIRS =	$(ROOTLIB)/print
 
 all	:=	TARGET= all
 install :=	TARGET= install
@@ -64,14 +59,14 @@ all install:	$(ROOTDIRS) $(SUBDIRS)
 #
 # We define our own definition for _msg here because most of these
 # commands have the same PROG names as their counterparts in
-# cmd/lp. Using the _msg rule defined in Makefile.cmd would 
+# cmd/lp. Using the _msg rule defined in Makefile.cmd would
 # result in clobbering the cmd/lp message files.
 # To get around this we will define one message file "print.po"
-# for these commands (except java printmgr). To build
+# for these commands. To build
 # this file we find all of the .c files and run xgettext on them.
 # Then concatenate this with the scripts.po file.
 #
-_msg:   $(MSGDOMAIN) scripts $(JAVA_SUBDIRS)
+_msg:   $(MSGDOMAIN) scripts
 	@$(RM)	$(POFILE)
 	$(XGETTEXT) -s `/bin/find . -type d -name SCCS -prune -o -type f -name '*.c' -print`
 	@/bin/cat messages.po scripts/scripts.po | sed '/domain/d' > $(POFILE)
@@ -91,7 +86,7 @@ _msg_test: scripts
 	$(MSGFMT) SUNW_OST_OSCMD.po
 	@$(RM) messages.po $(POFILE) SUNW_OST_OSCMD.po
 
-clean strip cstyle lint:	$(SUBDIRS)
+clean strip cstyle:	$(SUBDIRS)
 
 clobber: $(SUBDIRS)
 	$(RM) $(POFILE) $(CLOBBERFILES)
