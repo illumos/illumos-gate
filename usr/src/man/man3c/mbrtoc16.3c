@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2020 Robert Mustacchi
+.\" Copyright 2023 Bill Sommerfeld
 .\"
-.Dd September 20, 2021
+.Dd June 5, 2023
 .Dt MBRTOC16 3C
 .Os
 .Sh NAME
@@ -32,7 +33,7 @@
 .In wchar.h
 .In xlocale.h
 .Ft size_t
-.Fo mbrtowc
+.Fo mbrtowc_l
 .Fa "wchar_t *restrict pwc"
 .Fa "const char *restrict str"
 .Fa "size_t len"
