@@ -3945,15 +3945,24 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_set_driver_private(dip, nvme);
 	nvme->n_dip = dip;
 
-	/* Set up event handlers for hot removal. */
+	/*
+	 * Set up event handlers for hot removal. While npe(4D) supports the hot
+	 * removal event being injected for devices, the same is not true of all
+	 * of our possible parents (i.e. pci(4D) as of this writing). The most
+	 * common case this shows up is in some virtualization environments. We
+	 * should treat this as non-fatal so that way devices work but leave
+	 * this set up in such a way that if a nexus does grow support for this
+	 * we're good to go.
+	 */
 	if (ddi_get_eventcookie(nvme->n_dip, DDI_DEVI_REMOVE_EVENT,
-	    &nvme->n_rm_cookie) != DDI_SUCCESS) {
-		goto fail;
-	}
-	if (ddi_add_event_handler(nvme->n_dip, nvme->n_rm_cookie,
-	    nvme_remove_callback, nvme, &nvme->n_ev_rm_cb_id) !=
-	    DDI_SUCCESS) {
-		goto fail;
+	    &nvme->n_rm_cookie) == DDI_SUCCESS) {
+		if (ddi_add_event_handler(nvme->n_dip, nvme->n_rm_cookie,
+		    nvme_remove_callback, nvme, &nvme->n_ev_rm_cb_id) !=
+		    DDI_SUCCESS) {
+			goto fail;
+		}
+	} else {
+		nvme->n_ev_rm_cb_id = NULL;
 	}
 
 	mutex_init(&nvme->n_minor_mutex, NULL, MUTEX_DRIVER, NULL);
@@ -4200,13 +4209,27 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (nvme == NULL)
 		return (DDI_FAILURE);
 
-	ddi_remove_minor_node(dip, "devctl");
+	/*
+	 * Remove all minor nodes from the device regardless of the source in
+	 * one swoop.
+	 */
+	ddi_remove_minor_node(dip, NULL);
+
+	/*
+	 * We need to remove the event handler as one of the first things that
+	 * we do. If we proceed with other teardown without removing the event
+	 * handler, we could end up in a very unfortunate race with ourselves.
+	 * The DDI does not serialize these with detach (just like timeout(9F)
+	 * and others).
+	 */
+	if (nvme->n_ev_rm_cb_id != NULL) {
+		(void) ddi_remove_event_handler(nvme->n_ev_rm_cb_id);
+	}
+	nvme->n_ev_rm_cb_id = NULL;
 
 	if (nvme->n_ns) {
 		for (i = 1; i <= nvme->n_namespace_count; i++) {
 			nvme_namespace_t *ns = NVME_NSID2NS(nvme, i);
-
-			ddi_remove_minor_node(dip, ns->ns_name);
 
 			if (ns->ns_bd_hdl) {
 				(void) bd_detach_handle(ns->ns_bd_hdl);
@@ -4300,12 +4323,6 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (nvme->n_product != NULL)
 		strfree(nvme->n_product);
-
-	/* Clean up hot removal event handler. */
-	if (nvme->n_ev_rm_cb_id != NULL) {
-		(void) ddi_remove_event_handler(nvme->n_ev_rm_cb_id);
-	}
-	nvme->n_ev_rm_cb_id = NULL;
 
 	ddi_soft_state_free(nvme_state, instance);
 
