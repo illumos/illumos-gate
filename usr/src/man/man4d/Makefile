@@ -15,7 +15,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
-# Copyright 2020 Peter Tribble
+# Copyright 2023 Peter Tribble
 # Copyright 2022 RackTop Systems, Inc.
 # Copyright 2022 Oxide Computer Company
 #
@@ -152,31 +152,6 @@ _MANFILES=	aac.4d		\
 		zcons.4d	\
 		zero.4d
 
-sparc_MANFILES=	audiocs.4d	\
-		bbc_beep.4d	\
-		dad.4d		\
-		dm2s.4d		\
-		dr.4d		\
-		eri.4d		\
-		fas.4d		\
-		gpio_87317.4d	\
-		grbeep.4d	\
-		mc-opl.4d	\
-		n2rng.4d	\
-		ntwdt.4d	\
-		oplkmdrv.4d	\
-		oplmsu.4d	\
-		oplpanel.4d	\
-		pcicmu.4d	\
-		pcipsy.4d	\
-		pcisch.4d	\
-		smbus.4d	\
-		su.4d		\
-		todopl.4d	\
-		tsalarm.4d	\
-		zs.4d		\
-		zsh.4d
-
 i386_MANFILES=	ahci.4d		\
 		amd8111s.4d	\
 		amdnbtemp.4d	\
@@ -261,16 +236,12 @@ _MANLINKS=	1394.4d		\
 		urandom.4d	\
 		usb.4d
 
-sparc_MANLINKS=	drmach.4d
-
 i386_MANLINKS=	amdzen_stub.4d
 
 MANFILES =	$(_MANFILES) $($(MACH)_MANFILES)
 MANLINKS =	$(_MANLINKS) $($(MACH)_MANLINKS)
 
 amdzen_stub.4d	:= LINKSRC = amdzen.4d
-
-drmach.4d	:= LINKSRC = dr.4d
 
 fdc.4d		:= LINKSRC = fd.4d
 

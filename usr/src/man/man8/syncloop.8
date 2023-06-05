@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYNCLOOP 8 "Mar 9, 1993"
+.TH SYNCLOOP 8 "March 6, 2023"
 .SH NAME
 syncloop \- synchronous serial loopback test program
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/syncloop\fR [\fB-cdlstv\fR] \fIdevice\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsyncloop\fR command performs several loopback tests that are useful in
 exercising the various components of a serial communications link.
 .sp
@@ -73,8 +70,6 @@ This is followed by an estimated line speed, which is an approximation of the
 bit rate of the line, based on the number of bytes sent and the actual time
 that it took to send them.
 .SH OPTIONS
-.sp
-.LP
 The options for \fBsyncloop\fR are described in the following table:
 .sp
 
@@ -107,7 +102,6 @@ All numeric options except \fB-d\fR are entered as decimal numbers (for
 example, \fB\fR\fB-s\fR\fB 19200\fR). If you do not provide the \fB-t\fR\fI
 test_type\fR option, \fBsyncloop\fR prompts for it.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRA sample display of using the \fBsyncloop\fR command.
 .sp
 .LP
@@ -141,14 +135,10 @@ using 5000 packets and a bit rate of 56Kbps:
 .sp
 
 .SH SEE ALSO
-.sp
-.LP
-.BR zsh (4D),
 .BR attributes (7),
 .BR syncinit (8),
 .BR syncstat (8)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fIdevice\fR\fB missing minor device number\fR\fR
@@ -224,8 +214,6 @@ between the number counted as received and the number read by the program.
 .RE
 
 .SH WARNINGS
-.sp
-.LP
 To allow its tests to run properly, as well as prevent disturbance of normal
 operations, \fBsyncloop\fR should only be run on a port that is not being used
 for any other purpose at that time.
