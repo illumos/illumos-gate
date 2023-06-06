@@ -3146,12 +3146,20 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	lsp->ls_canfree = (canfree != 0);
 
 	/*
-	 * Notify we are ready to rock.
+	 * Notify we are ready to rock. If we are a labeled device, we must now
+	 * ask cmlb to validate the label, which will finally create the right
+	 * minors for us. In particular, this is a challenge because before
+	 * ls_vp_ready was set, we couldn't even get the geometry count which
+	 * means that we'll have the wrong default label if we have a larger
+	 * device.
 	 */
 	mutex_enter(&lsp->ls_vp_lock);
 	lsp->ls_vp_ready = B_TRUE;
 	cv_broadcast(&lsp->ls_vp_cv);
 	mutex_exit(&lsp->ls_vp_lock);
+	if (lsp->ls_cmlbhandle != NULL) {
+		(void) cmlb_validate(lsp->ls_cmlbhandle, 0, 0);
+	}
 	mutex_exit(&lofi_lock);
 
 	lofi_copy_devpath(klip);

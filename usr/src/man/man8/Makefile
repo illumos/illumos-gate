@@ -364,7 +364,6 @@ _MANFILES=	6to4relay.8		\
 		pppstats.8		\
 		praudit.8		\
 		print-service.8		\
-		printmgr.8		\
 		projadd.8		\
 		projdel.8		\
 		projmod.8		\

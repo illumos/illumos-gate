@@ -29,6 +29,5 @@
 # configuration management of the LP print service.
 #
 exec /usr/bin/ospm-pm
-exec /bin/gksu /usr/sbin/printmgr
 /bin/zenity --error --test "unable to locate a desktop print management tool"
 exit 0

@@ -27,7 +27,6 @@ usr/src/cmd/pools/poold/libjkstat/jkstat.h
 usr/src/cmd/pools/poold/libjlgrp/jlgrp.h
 usr/src/cmd/pools/poold/libjpool/jpool.h
 usr/src/cmd/pools/poold/libjsyslog/jsyslog.h
-usr/src/cmd/print/printmgr/com/sun/admin/pm/server/com_sun_admin_pm_server_DoPrinterNS.h
 usr/src/common/ficl/ficltokens.h
 usr/src/contrib
 usr/src/grub/grub-0.97/stage2/shared.h

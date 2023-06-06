@@ -24,6 +24,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2023 Bill Sommerfeld
+#
 
 # which_scm outputs two strings: one identifying the SCM in use, and
 # the second giving the root directory for the SCM, if known, or just
@@ -58,6 +60,7 @@ function primary_type
 	[ -d "$1/CVS" ] && scmid="$scmid cvs"
 	[ -d "$1/.svn" ] && scmid="$scmid subversion"
 	[ -d "$1/.git" ] && scmid="$scmid git"
+	[ -f "$1/.git" ] && scmid="$scmid git"
 	echo $scmid
 }
 

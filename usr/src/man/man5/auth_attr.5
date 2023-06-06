@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUTH_ATTR 5 "Feb 25, 2017"
+.TH AUTH_ATTR 5 "March 12, 2023"
 .SH NAME
 auth_attr \- authorization description database
 .SH SYNOPSIS
-.LP
 .nf
 \fB/etc/security/auth_attr\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 \fB/etc/security/auth_attr\fR is a local source for authorization names and
 descriptions. The \fBauth_attr\fR file can be used with other authorization
 sources, including the \fBauth_attr\fR \fBNIS\fR map.
@@ -136,7 +134,6 @@ keyword \fBhelp\fR identifies a help file in HTML.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRConstructing a Name
 .sp
 .LP
@@ -206,8 +203,8 @@ With the above authorizations, the administrator can assign to others the
 \fBsolaris.admin.printer.delete\fR, \fBsolaris.admin.printer.modify\fR, and
 \fBsolaris.admin.printer.read\fR authorizations, but not the
 \fBsolaris.login.enable\fR authorization. If the administrator has both the
-grant authorization, \fBsolaris.admin.printmgr.grant\fR, and the wildcard
-authorization, \fBsolaris.admin.printmgr.*\fR, the administrator can grant to
+grant authorization, \fBsolaris.admin.printer.grant\fR, and the wildcard
+authorization, \fBsolaris.admin.printer.*\fR, the administrator can grant to
 others any of the printer authorizations. See \fBuser_attr\fR(5) for more
 information about how wildcards can be used to assign multiple authorizations
 whose names begin with the same components.
@@ -243,7 +240,6 @@ auth_attr:files nis
 .in -2
 
 .SH FILES
-.LP
 \fB/etc/nsswitch.conf\fR
 .sp
 .LP
@@ -252,7 +248,6 @@ auth_attr:files nis
 .LP
 \fB/etc/security/auth_attr\fR
 .SH SEE ALSO
-.LP
 .BR getauthattr (3SECDB),
 .BR getexecattr (3SECDB),
 .BR getprofattr (3SECDB),
@@ -261,7 +256,6 @@ auth_attr:files nis
 .BR nsswitch.conf (5),
 .BR user_attr (5)
 .SH NOTES
-.LP
 Because the list of legal keys is likely to expand, any code that parses this
 database must be written to ignore unknown key-value pairs without error. When
 any new keywords are created, the names should be prefixed with a unique

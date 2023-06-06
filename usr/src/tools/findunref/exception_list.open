@@ -65,8 +65,6 @@
 *_test.[ch]
 ./usr/src/cmd/ldap/common/*test.c
 ./usr/src/cmd/logadm/tester
-./usr/src/cmd/print/printmgr/com/sun/admin/pm/client/helptools/extract
-./usr/src/cmd/print/printmgr/com/sun/admin/pm/server/pmtest
 ./usr/src/cmd/sendmail/libsm/t-*.c
 ./usr/src/cmd/sort/common/convert.c
 ./usr/src/cmd/sort/common/invoke.c

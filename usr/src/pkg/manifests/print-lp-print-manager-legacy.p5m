@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2023 Peter Tribble.
 #
 
 set name=pkg.fmri value=pkg:/print/lp/print-manager/legacy@$(PKGVERS)
@@ -39,32 +40,10 @@ file path=lib/svc/manifest/application/print/ppd-cache-update.xml group=sys \
 dir  path=lib/svc/method
 file path=lib/svc/method/ppd-cache-update mode=0555
 dir  path=usr group=sys
-dir  path=usr/lib
-dir  path=usr/lib/lp group=lp
-dir  path=usr/lib/lp/bin group=lp
-file path=usr/lib/lp/bin/getmakes group=lp mode=0555
-file path=usr/lib/lp/bin/getmodels group=lp mode=0555
-file path=usr/lib/lp/bin/getppdfile group=lp mode=0555
-file path=usr/lib/lp/bin/getppds group=lp mode=0555
-file path=usr/lib/lp/bin/ppdfilename2mmp group=lp mode=0555
-file path=usr/lib/lp/bin/printer-info group=lp mode=0555
-dir  path=usr/sadm
-dir  path=usr/sadm/admin
-dir  path=usr/sadm/admin/bin
-file path=usr/sadm/admin/bin/printmgr group=lp mode=0555
-dir  path=usr/sadm/admin/printmgr
-dir  path=usr/sadm/admin/printmgr/classes
-file path=usr/sadm/admin/printmgr/classes/pmclient.jar group=lp
-file path=usr/sadm/admin/printmgr/classes/pmserver.jar group=lp
-dir  path=usr/sadm/admin/printmgr/lib
-link path=usr/sadm/admin/printmgr/lib/libpmgr.so target=./libpmgr.so.1
-file path=usr/sadm/admin/printmgr/lib/libpmgr.so.1 group=lp
 dir  path=usr/sbin
 file path=usr/sbin/ppdmgr group=lp mode=0555
-link path=usr/sbin/printmgr target=../../usr/sadm/admin/bin/printmgr
 dir  path=usr/share/man/man8
 file path=usr/share/man/man8/ppdmgr.8
-file path=usr/share/man/man8/printmgr.8
 dir  path=var group=sys
 dir  path=var/lp owner=lp group=lp mode=0775
 dir  path=var/lp/ppd group=lp
