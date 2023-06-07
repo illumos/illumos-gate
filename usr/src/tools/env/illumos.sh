@@ -51,7 +51,7 @@ export NIGHTLY_OPTIONS='-FnCDAmprt'
 #export MAILTO=
 
 # CODEMGR_WS - where is your workspace at
-export CODEMGR_WS="`git rev-parse --show-toplevel`"
+export CODEMGR_WS="${CODEMGR_WS:-`git rev-parse --show-toplevel`}"
 
 # Compilers may be specified using the following variables:
 # PRIMARY_CC	- primary C compiler
@@ -182,11 +182,11 @@ ONBLD_BIN='/opt/onbld/bin'
 # PARENT_WS is used to determine the parent of this workspace. This is
 # for the options that deal with the parent workspace (such as where the
 # proto area will go).
-export PARENT_WS=''
+export PARENT_WS="${PARENT_WS:-}"
 
 # CLONE_WS is the workspace nightly should do a bringover from.
 # The bringover, if any, is done as STAFFER.
-export CLONE_WS='ssh://anonhg@hg.illumos.org/illumos-gate'
+export CLONE_WS="${CLONE_WS:-}"
 
 # Set STAFFER to your own login as gatekeeper or developer
 # The point is to use group "staff" and avoid referencing the parent
@@ -231,7 +231,7 @@ export MULTI_PROTO="no"
 # when the release slips (nah) or you move an environment file to a new
 # release
 #
-export VERSION="`git describe --long --all HEAD | cut -d/ -f2-`"
+export VERSION="${VERSION:-`git describe --long --all HEAD | cut -d/ -f2-`}"
 
 #
 # the RELEASE and RELEASE_DATE variables are set in Makefile.master;
