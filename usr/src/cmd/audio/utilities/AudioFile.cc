@@ -576,7 +576,8 @@ AsyncCopy(
 	}
 
 	tohdr = to->GetHeader();
-	if (err = tohdr.Validate())
+	err = tohdr.Validate();
+	if (err != AUDIO_SUCCESS)
 		return (err);
 	if (limit < 0.)
 		return (RaiseError(AUDIO_ERR_BADARG));

@@ -117,7 +117,8 @@ Convert(
 	outbuf = new AudioBuffer(length, "(Channel conversion buffer)");
 	if (outbuf == 0)
 		return (AUDIO_UNIXERROR);
-	if (err = outbuf->SetHeader(newhdr)) {
+	err = outbuf->SetHeader(newhdr);
+	if (err != AUDIO_SUCCESS) {
 		delete outbuf;
 		return (err);
 	}
