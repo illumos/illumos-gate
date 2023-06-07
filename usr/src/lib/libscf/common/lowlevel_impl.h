@@ -34,6 +34,8 @@
 #include <pthread.h>
 #include <stddef.h>
 
+#include <sys/zone.h>
+
 #include "repcache_protocol.h"
 
 #ifdef	__cplusplus
@@ -84,6 +86,7 @@ struct scf_handle {
 	long		rh_intrefs;	/* handle-internal subhandle count */
 
 	char		rh_doorpath[PATH_MAX + 1];
+	zoneid_t	rh_zoneid;	/* expected zone ID for door server */
 
 	pthread_t	rh_holder;		/* thread using subhandles */
 	uint32_t	rh_hold_flags;		/* which are in use */

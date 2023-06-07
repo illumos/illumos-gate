@@ -2386,8 +2386,8 @@ again:
 
 		if (scf_handle_decorate(h, "zone", zone) != SCF_SUCCESS) {
 			if (do_a_zone) {
-				uu_die(gettext("invalid zone '%s'\n"),
-				    zonename);
+				uu_die(gettext("zone '%s': %s\n"),
+				    zonename, scf_strerror(scf_error()));
 			} else {
 				scf_value_destroy(zone);
 				goto nextzone;

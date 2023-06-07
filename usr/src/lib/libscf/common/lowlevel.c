@@ -25,6 +25,7 @@
  * Copyright 2016 RackTop Systems.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2017 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -778,6 +779,7 @@ scf_handle_create(scf_version_t v)
 
 	ret->rh_doorfd = -1;
 	ret->rh_doorfd_old = -1;
+	ret->rh_zoneid = -1;
 	(void) pthread_mutex_init(&ret->rh_lock, NULL);
 
 	handle_hold_subhandles(ret, RH_HOLD_ALL);
@@ -901,6 +903,7 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 	if (strcmp(name, "zone") == 0) {
 		char zone[MAXPATHLEN], root[MAXPATHLEN], door[MAXPATHLEN];
 		static int (*zone_get_rootpath)(char *, char *, size_t);
+		zoneid_t zid;
 		ssize_t len;
 
 		/*
@@ -946,6 +949,11 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 			}
 		}
 
+		if ((zid = getzoneidbyname(zone)) == -1) {
+			/* The zone is not active. */
+			return (scf_set_error(SCF_ERROR_NOT_FOUND));
+		}
+
 		if (snprintf(door, sizeof (door), "%s/%s", root,
 		    default_door_path) >= sizeof (door))
 			return (scf_set_error(SCF_ERROR_INTERNAL));
@@ -953,6 +961,7 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 		(void) pthread_mutex_lock(&handle->rh_lock);
 		(void) strlcpy(handle->rh_doorpath, door,
 		    sizeof (handle->rh_doorpath));
+		handle->rh_zoneid = zid;
 		(void) pthread_mutex_unlock(&handle->rh_lock);
 
 		return (0);
@@ -1176,10 +1185,37 @@ scf_handle_bind(scf_handle_t *handle)
 	if (handle->rh_doorpath[0] != 0)
 		door_name = handle->rh_doorpath;
 
-	fd = open(door_name, O_RDONLY, 0);
+	fd = open(door_name, O_RDONLY | O_NOFOLLOW, 0);
 	if (fd == -1) {
 		(void) pthread_mutex_unlock(&handle->rh_lock);
 		return (scf_set_error(SCF_ERROR_NO_SERVER));
+	}
+
+	/*
+	 * If the handle has been decorated with a "zone", indicating that
+	 * the door path should point to a door inside a zone, check that the
+	 * server process is actually inside that zone. This helps to guard
+	 * against symlink attacks.
+	 */
+	if (handle->rh_zoneid != -1) {
+		scf_error_t err = SCF_ERROR_NONE;
+		ucred_t *cr = NULL;
+
+		if (door_info(fd, &info) < 0) {
+			err = SCF_ERROR_NO_SERVER;
+		} else if ((cr = ucred_get(info.di_target)) == NULL) {
+			err = SCF_ERROR_PERMISSION_DENIED;
+		} else if (ucred_getzoneid(cr) != handle->rh_zoneid) {
+			err = SCF_ERROR_NO_SERVER;
+		}
+
+		ucred_free(cr);
+
+		if (err != SCF_ERROR_NONE) {
+			(void) pthread_mutex_unlock(&handle->rh_lock);
+			(void) close(fd);
+			return (scf_set_error(err));
+		}
 	}
 
 	request.rdr_version = REPOSITORY_DOOR_VERSION;
@@ -6003,11 +6039,11 @@ out:
  * This is a little tricky due to the many-to-many relationship between patterns
  * and matches.  We need to be able to satisfy the following requirements:
  *
- * 	1) Detect patterns which match more than one FMRI, and be able to
+ *	1) Detect patterns which match more than one FMRI, and be able to
  *         report which FMRIs have been matched.
- * 	2) Detect patterns which have not matched any FMRIs
- * 	3) Visit each matching FMRI exactly once across all patterns
- * 	4) Ignore FMRIs which have only been matched due to multiply-matching
+ *	2) Detect patterns which have not matched any FMRIs
+ *	3) Visit each matching FMRI exactly once across all patterns
+ *	4) Ignore FMRIs which have only been matched due to multiply-matching
  *         patterns.
  *
  * We maintain an array of scf_pattern_t structures, one for each argument, and
@@ -6019,15 +6055,15 @@ out:
  *	PATTERN_EXACT		The pattern is a complete FMRI.  The list of
  *				matches contains only a single entry.
  *
- * 	PATTERN_GLOB		The pattern will be matched against all
- * 				FMRIs via fnmatch() in the second phase.
- * 				Matches will be added to the pattern's list
- * 				as they are found.
+ *	PATTERN_GLOB		The pattern will be matched against all
+ *				FMRIs via fnmatch() in the second phase.
+ *				Matches will be added to the pattern's list
+ *				as they are found.
  *
- * 	PATTERN_PARTIAL		Everything else.  We will assume that this is
- * 				an abbreviated FMRI, and match according to
- * 				our abbreviated FMRI rules.  Matches will be
- * 				added to the pattern's list as they are found.
+ *	PATTERN_PARTIAL		Everything else.  We will assume that this is
+ *				an abbreviated FMRI, and match according to
+ *				our abbreviated FMRI rules.  Matches will be
+ *				added to the pattern's list as they are found.
  *
  * The first pass searches for arguments that are complete FMRIs.  These are
  * classified as EXACT patterns and do not necessitate searching the entire
