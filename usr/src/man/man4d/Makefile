@@ -197,6 +197,7 @@ i386_MANFILES=	ahci.4d		\
 		nvme.4d		\
 		pchtemp.4d	\
 		pcn.4d		\
+		pvscsi.4d	\
 		qede.4d		\
 		ral.4d		\
 		rtw.4d		\
