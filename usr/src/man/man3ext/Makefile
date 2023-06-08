@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2023 Peter Tribble
 #
 
 include		$(SRC)/Makefile.master
@@ -35,7 +36,6 @@ MANFILES=	NOTE.3ext			\
 		sha1.3ext			\
 		sha2.3ext			\
 		stdarg.3ext			\
-		tsalarm_get.3ext		\
 		varargs.3ext
 
 MANLINKS=	DES_FAILED.3ext			\
@@ -119,7 +119,6 @@ MANLINKS=	DES_FAILED.3ext			\
 		run_crypt.3ext			\
 		run_setkey.3ext			\
 		setkey.3ext			\
-		tsalarm_set.3ext		\
 		write_vtoc.3ext
 
 _NOTE.3ext			:= LINKSRC = NOTE.3ext
@@ -217,8 +216,6 @@ SHA384Update.3ext		:= LINKSRC = sha2.3ext
 SHA512Final.3ext		:= LINKSRC = sha2.3ext
 SHA512Init.3ext			:= LINKSRC = sha2.3ext
 SHA512Update.3ext		:= LINKSRC = sha2.3ext
-
-tsalarm_set.3ext		:= LINKSRC = tsalarm_get.3ext
 
 .KEEP_STATE:
 
