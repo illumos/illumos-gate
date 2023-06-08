@@ -139,6 +139,6 @@ MT-Level	MT-Safe
 .SH NOTES
 This function lists interfaces of type AF_INET, AF_INET6, and AF_LINK.
 For AF_INET and AF_INET6 only interfaces with the \fBIFF_UP\fR
-flag set are listed; see \fBif_tcp\fR(7P) and \fBifconfig\fR(1M) for more
+flag set are listed; see \fBif_tcp\fR(4P) and \fBifconfig\fR(8) for more
 information. For AF_LINK entries the interface index is only available when the
 link is plumbed.
