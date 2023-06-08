@@ -3,26 +3,23 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_AC 4D "May 13, 2009"
+.TH USB_AC 4D "March 6, 2023"
 .SH NAME
 usb_ac \- USB audio control driver
 .SH SYNOPSIS
-.LP
 .nf
 sound-control@unit-address
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBusb_ac\fR driver is a USBA (Solaris USB Architecture) compliant client
 driver that supports the \fIUSB Audio Class 1.0\fR specification.
 .sp
 .LP
 The audio control driver is a USB class driver and offers functionality similar
-to the \fBaudiocs\fR (sun4u) and \fBaudiots\fR (Sun Blade 100) drivers which
-use the Solaris audio mixer framework (\fBmixer\fR(4I)). Unlike the
-\fBaudiocs\fR and \fBaudiots\fR drivers, the USB audio device can have
+to the \fBaudiots\fR driver which
+uses the Solaris audio mixer framework (\fBmixer\fR(4I)). Unlike the
+\fBaudiots\fR driver, the USB audio device can have
 play-only or record-only capability.
 .sp
 .LP
@@ -35,12 +32,9 @@ user applications.
 The \fBusb_ac\fR driver supports USB audio class compliant devices with a
 feature unit.
 .SH ERRORS
-.sp
-.LP
 If a device is hot-removed while it is active, all subsequent opens returns
 EIO. All other errors are defined in the \fBaudio\fR(4I) man page.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/usb_ac\fR\fR
@@ -77,8 +71,6 @@ USB audio driver configuration file.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -95,8 +87,6 @@ Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ioctl (2),
 .BR hid (4D),
 .BR usb_as (4D),
@@ -121,8 +111,6 @@ Interface Stability	Uncommitted
 .LP
 \fISystem Administration: Basic Administration\fR
 .SH DIAGNOSTICS
-.sp
-.LP
 In addition to being logged, the following messages can appear on the system
 console. All messages are formatted in the following manner:
 .sp

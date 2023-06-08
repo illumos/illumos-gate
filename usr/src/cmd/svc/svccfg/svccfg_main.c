@@ -24,12 +24,17 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * svccfg - modify service configuration repository
  */
 
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/zone.h>
 
 #include <errno.h>
 #include <libintl.h>
@@ -55,14 +60,16 @@
 
 static const char *myname;
 int g_verbose = 0;
+int g_do_zone = 0;
+char g_zonename[ZONENAME_MAX];
 const char *fmri;
 
 static void
 usage()
 {
 	(void) fprintf(stderr, gettext(
-	    "Usage:\tsvccfg [-v] [-s FMRI] [-f file]\n"
-	    "\tsvccfg [-v] [-s FMRI] <command> [args]\n"));
+	    "Usage:\tsvccfg [-v] [-z zone] [-s FMRI] [-f file]\n"
+	    "\tsvccfg [-v] [-z zone] [-s FMRI] <command> [args]\n"));
 	exit(UU_EXIT_USAGE);
 }
 
@@ -188,7 +195,7 @@ main(int argc, char *argv[])
 	char *fmri = NULL;
 	int c;
 
-	while ((c = getopt(argc, argv, "vf:s:")) != EOF)
+	while ((c = getopt(argc, argv, "vf:s:z:")) != EOF) {
 		switch (c) {
 		case 'v':
 			g_verbose = 1;
@@ -202,10 +209,26 @@ main(int argc, char *argv[])
 			command_file = optarg;
 			break;
 
+		case 'z':
+			if (getzoneid() != GLOBAL_ZONEID) {
+				uu_die(gettext("svccfg -z may only be used "
+				    "from the global zone\n"));
+			}
+
+			if (strlcpy(g_zonename, optarg, sizeof (g_zonename)) >=
+			    sizeof (g_zonename)) {
+				uu_die(gettext(
+				    "The provided zone name is too long, "
+				    "max %zd\n"), sizeof (g_zonename) - 1);
+			}
+			g_do_zone = 1;
+			break;
+
 		default:
 			usage();
 			break;
 		}
+	}
 
 	initialize(argc, argv);
 

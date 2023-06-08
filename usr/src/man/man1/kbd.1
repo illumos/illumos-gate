@@ -105,9 +105,6 @@ sequence is in use.
 .Pp
 The Alternate Break sequence has no effect on the keyboard abort.
 For more information on the Alternate Break sequence, see
-.Xr zs 4D ,
-.Xr se 4D ,
-and
 .Xr asy 4D .
 .Pp
 On many systems, the default effect of the keyboard abort sequence is to
@@ -119,7 +116,7 @@ On these systems, setting the key switch to the
 .Sy secure
 position overrides any software default set with this command.
 .Sh OPTIONS
-The following options are suported:
+The following options are supported:
 .Bl -hang
 .It Fl a Ar enable | Ar disable | Ar alternate
 .Pp
@@ -156,10 +153,9 @@ Disables the default/alternate effect and ignores keyboard abort sequences.
 Enables the alternate effect of the keyboard abort sequences (suspend the
 operating system and enter the debugger or the monitor) upon receiving the
 Alternate Break character sequence on the console.
-The Alternate Break sequence is defined by the drivers
-.Xr asy 4D ,
-.Xr se 4D ,
-.Xr zs 4D .
+The Alternate Break sequence is defined by the
+.Xr asy 4D
+driver.
 Due to a risk of incorrect sequence interpretation, binary protocols cannot be
 run over the serial console port when this value is used.
 .El
@@ -362,9 +358,7 @@ The following example sets the keyboard beeper frequency:
 .Xr loadkeys 1 ,
 .Xr svcs 1 ,
 .Xr asy 4D ,
-.Xr se 4D ,
 .Xr virtualkm 4D ,
-.Xr zs 4D ,
 .Xr kb 4M ,
 .Xr keytables 5 ,
 .Xr attributes 7 ,

@@ -3,18 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYNCINIT 8 "Nov 26, 2017"
+.TH SYNCINIT 8 "March 6, 2023"
 .SH NAME
 syncinit \- set serial line interface operating parameters
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/syncinit\fR \fIdevice\fR
      [ [\fIbaud_rate\fR] | [\fIkeyword\fR=\fIvalue\fR,]... | [\fIsingle-word\fR \fIoption\fR]]
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBsyncinit\fR utility allows the user to modify some of the hardware
 operating modes common to synchronous serial lines. This can be useful in
 troubleshooting a link, or necessary to the operation of a communications
@@ -25,7 +23,6 @@ If run without options, \fBsyncinit\fR reports the options as presently set on
 the port. If options are specified, the new settings are reported after they
 have been made.
 .SH OPTIONS
-.LP
 Options to \fBsyncinit\fR normally take the form of a keyword, followed by an
 equal sign and a value. The exception is that a baud rate may be specified as a
 decimal integer by itself. Keywords must begin with the value shown in the
@@ -104,7 +101,6 @@ l l .
 .TE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBsyncinit\fR
 .sp
 .LP
@@ -137,10 +133,8 @@ speed=0, loopback=no, echo=no, nrzi=no, txc=txc, rxc=rxc
 .sp
 
 .SH SEE ALSO
-.LP
 .BR Intro (2),
 .BR ioctl (2),
-.BR zsh (4D),
 .BR attributes (7),
 .BR syncloop (8),
 .BR syncstat (8)
@@ -188,7 +182,6 @@ An \fBioctl\fR(2) system called failed. The meaning of the value of
 .RE
 
 .SH WARNINGS
-.LP
 Do not use \fBsyncinit\fR on an active serial link, unless needed to resolve
 an error condition. Do not use this command casually or without being aware of
 the consequences.

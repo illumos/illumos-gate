@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_CMD_SVCCFG_H
@@ -369,6 +370,8 @@ extern struct help_message help_messages[];
 extern scf_handle_t *g_hndl;	/* global repcached connection handle */
 extern int g_exitcode;
 extern int g_verbose;
+extern int g_do_zone;
+extern char g_zonename[];
 
 extern ssize_t max_scf_fmri_len;
 extern ssize_t max_scf_name_len;

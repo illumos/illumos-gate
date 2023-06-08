@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYNCSTAT 8 "Mar 9, 1993"
+.TH SYNCSTAT 8 "March 6, 2023"
 .SH NAME
 syncstat \- report driver statistics from a synchronous serial link
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/syncstat\fR [\fB-c\fR] \fIdevice\fR [\fIinterval\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsyncstat\fR command reports the event statistics maintained by a
 synchronous serial device driver. The report may be a single snapshot of the
 accumulated totals, or a series of samples showing incremental changes. Prior
@@ -63,7 +60,6 @@ T}
 .TE
 
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-c\fR\fR
@@ -88,7 +84,6 @@ indefinitely, with a column heading printed every twenty lines for convenience.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSample output from the \fBsyncstat\fR command:
 .sp
 .in +2
@@ -132,14 +127,10 @@ ipkts opkts undrun ovrrun abort crc iutil outil
 .sp
 
 .SH SEE ALSO
-.sp
-.LP
-.BR zsh (4D),
 .BR attributes (7),
 .BR syncinit (8),
 .BR syncloop (8)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fBbad interval: \fR\fIarg\fR\fR
@@ -174,8 +165,6 @@ utilization statistics.
 .RE
 
 .SH WARNINGS
-.sp
-.LP
 Underrun, overrun, frame-abort, and CRC errors have a variety of causes.
 Communication protocols are typically able to handle such errors and initiate
 recovery of the transmission in which the error occurred. Small numbers of such
