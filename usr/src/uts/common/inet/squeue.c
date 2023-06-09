@@ -1440,6 +1440,9 @@ squeue_try_drain_one(squeue_t *sqp, conn_t *compare_conn)
 	CONN_DEC_REF(connp);
 	SQUEUE_DBG_CLEAR(sqp);
 
+	if (ira != NULL)
+		ira_cleanup(ira, B_TRUE);
+
 done:
 	mutex_enter(&sqp->sq_lock);
 	sqp->sq_state &= ~(SQS_PROC);
