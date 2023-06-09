@@ -39,6 +39,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2023 Oxide computer Company
  */
 
 #include <assert.h>
@@ -227,7 +228,7 @@ static int int_arg(char *s, char *what);
 boolean_t is_a_target(struct addrinfo *, union any_in_addr *);
 static void mirror_gws(union any_in_addr *, int);
 static void *ns_warning_thr(void *);
-static void parse_interval(char *s);
+static void parse_interval(const char *s);
 static void pinger(int, struct sockaddr *, struct msghdr *, int);
 char *pr_name(char *, int);
 char *pr_protocol(int);
@@ -568,7 +569,7 @@ main(int argc, char *argv[])
 
 	/*
 	 * We should make sure datalen is reasonable.
-	 * 	IP_MAXPACKET >= IPv4/IPv6 header length +
+	 *	IP_MAXPACKET >= IPv4/IPv6 header length +
 	 *			IPv4 options/IPv6 routing header length +
 	 *			ICMP/ICMP6/UDP header length +
 	 *			datalen
@@ -2512,7 +2513,7 @@ int_arg(char *s, char *what)
  * though we really don't need the precision.
  */
 static void
-parse_interval(char *s)
+parse_interval(const char *s)
 {
 	long double val;
 	char *end;
@@ -2534,7 +2535,7 @@ parse_interval(char *s)
 		exit(EXIT_FAILURE);
 	}
 
-	if (val < 0.01) {
+	if (val < 0.01L) {
 		Fprintf(stderr, "%s: interval too small: %Lf\n", progname, val);
 		exit(EXIT_FAILURE);
 	}
