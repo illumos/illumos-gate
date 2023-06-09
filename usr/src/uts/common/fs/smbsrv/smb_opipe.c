@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011-2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
  */
 
@@ -616,7 +616,7 @@ smb_opipe_fsctl(smb_request_t *sr, smb_fsctl_t *fsctl)
 uint32_t
 smb_opipe_transceive(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
-	smb_vdb_t	vdb;
+	smb_vdb_t	*vdb;
 	smb_ofile_t	*ofile;
 	struct mbuf	*mb;
 	uint32_t	status;
@@ -631,33 +631,38 @@ smb_opipe_transceive(smb_request_t *sr, smb_fsctl_t *fsctl)
 	if (ofile->f_ftype != SMB_FTYPE_MESG_PIPE)
 		return (NT_STATUS_INVALID_HANDLE);
 
+	/*
+	 * The VDB is a bit large.  Allocate.
+	 * This is automatically free'd with the SR
+	 */
+	vdb = smb_srm_zalloc(sr, sizeof (*vdb));
 	rc = smb_mbc_decodef(fsctl->in_mbc, "#B",
-	    fsctl->InputCount, &vdb);
+	    fsctl->InputCount, vdb);
 	if (rc != 0) {
 		/* Not enough data sent. */
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	rc = smb_opipe_write(sr, &vdb.vdb_uio);
+	rc = smb_opipe_write(sr, &vdb->vdb_uio);
 	if (rc != 0)
 		return (smb_errno2status(rc));
 
-	vdb.vdb_tag = 0;
-	vdb.vdb_uio.uio_iov = &vdb.vdb_iovec[0];
-	vdb.vdb_uio.uio_iovcnt = MAX_IOVEC;
-	vdb.vdb_uio.uio_segflg = UIO_SYSSPACE;
-	vdb.vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
-	vdb.vdb_uio.uio_loffset = (offset_t)0;
-	vdb.vdb_uio.uio_resid = fsctl->MaxOutputResp;
-	mb = smb_mbuf_allocate(&vdb.vdb_uio);
+	vdb->vdb_tag = 0;
+	vdb->vdb_uio.uio_iov = &vdb->vdb_iovec[0];
+	vdb->vdb_uio.uio_iovcnt = MAX_IOVEC;
+	vdb->vdb_uio.uio_segflg = UIO_SYSSPACE;
+	vdb->vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
+	vdb->vdb_uio.uio_loffset = (offset_t)0;
+	vdb->vdb_uio.uio_resid = fsctl->MaxOutputResp;
+	mb = smb_mbuf_allocate(&vdb->vdb_uio);
 
-	rc = smb_opipe_read(sr, &vdb.vdb_uio);
+	rc = smb_opipe_read(sr, &vdb->vdb_uio);
 	if (rc != 0) {
 		m_freem(mb);
 		return (smb_errno2status(rc));
 	}
 
-	len = fsctl->MaxOutputResp - vdb.vdb_uio.uio_resid;
+	len = fsctl->MaxOutputResp - vdb->vdb_uio.uio_resid;
 	smb_mbuf_trim(mb, len);
 	MBC_ATTACH_MBUF(fsctl->out_mbc, mb);
 
@@ -672,7 +677,7 @@ smb_opipe_transceive(smb_request_t *sr, smb_fsctl_t *fsctl)
 	 */
 	status = NT_STATUS_SUCCESS;
 	if (fsctl->MaxOutputResp < SMB_PIPE_MAX_MSGSIZE &&
-	    vdb.vdb_uio.uio_resid == 0) {
+	    vdb->vdb_uio.uio_resid == 0) {
 		int nread = 0, trval;
 		rc = smb_opipe_ioctl(sr, FIONREAD, &nread, &trval);
 		if (rc == 0 && nread != 0)

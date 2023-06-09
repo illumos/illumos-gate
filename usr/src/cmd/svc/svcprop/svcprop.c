@@ -1078,8 +1078,11 @@ main(int argc, char *argv[])
 			if (scf_value_set_astring(zone, optarg) != SCF_SUCCESS)
 				scfdie();
 
-			if (scf_handle_decorate(h, "zone", zone) != SCF_SUCCESS)
-				uu_die(gettext("invalid zone '%s'\n"), optarg);
+			if (scf_handle_decorate(h, "zone", zone) !=
+			    SCF_SUCCESS) {
+				uu_die(gettext("zone '%s': %s\n"),
+				    optarg, scf_strerror(scf_error()));
+			}
 
 			scf_value_destroy(zone);
 			break;

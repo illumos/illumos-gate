@@ -18947,6 +18947,7 @@ f usr/share/man/man4d/profile.4d 0444 root bin
 f usr/share/man/man4d/ptm.4d 0444 root bin
 s usr/share/man/man4d/pts.4d=ptm.4d
 f usr/share/man/man4d/pty.4d 0444 root bin
+f usr/share/man/man4d/pvscsi.4d 0444 root bin
 f usr/share/man/man4d/qede.4d 0444 root bin
 f usr/share/man/man4d/qlc.4d 0444 root bin
 f usr/share/man/man4d/ramdisk.4d 0444 root bin

@@ -29,6 +29,7 @@ tests = [
 	'auto_destruct',
 	'cpuid_ioctl',
 	'datarw_constraints',
+	'datarw_msrs',
 	'datarw_vcpu',
 	'default_capabs',
 	'drv_hold',

@@ -275,8 +275,8 @@ A WiFi datalink.
 .ad
 .sp .6
 .RS 4n
-A virtual network interface created on a link, an \fBetherstub\fR, or \fBan
-overlay\fR. It is a pseudo device that can be treated as if it were an network
+A virtual network interface created on a link, an \fBetherstub\fR, or an
+\fBoverlay\fR. It is a pseudo device that can be treated as if it were a network
 interface card on a machine.
 .RE
 
@@ -356,7 +356,7 @@ An overlay instance, identified by an administratively-chosen name. An overlay
 can be used to create or join an existing software defined network.
 VNICs created on an overlay will appear to be connected by a local virtual
 switch and will also be connected to interfaces on matching overlays provided by
-other hosts. For more information on overlay devices, see \fBoverlay\fR(5).
+other hosts. For more information on overlay devices, see \fBoverlay\fR(7).
 .RE
 
 .SS "Options"
@@ -4482,11 +4482,11 @@ of them. However, unlike an etherstub which is local to the system, an
 overlay device can be configured to communicate to remote hosts,
 providing a means for network virtualization. The way in which it does
 this is described by the encapsulation module and the search plugin. For
-more information on these, see \fBoverlay\fR(5).
+more information on these, see \fBoverlay\fR(7).
 .sp
 An overlay device has a series of required and optional properties.  These
 properties vary based upon the search and encapsulation modules and are fully
-specified in \fBoverlay\fR(5). Not every property needs to be specified - some
+specified in \fBoverlay\fR(7). Not every property needs to be specified - some
 have default values which will be used if nothing specific is specified. For
 example, the default port for VXLAN comes from its IANA standard. If a
 required property is missing, the command will fail and inform you of the
@@ -4583,7 +4583,7 @@ Modifies the target tables for the specified overlay.
 .sp
 The different options allow for different ways of modifying the target table.
 One of \fB-d\fR, \fB-f\fR, and \fB-s\fR is required. This is not applicable for
-all kinds of overlay devices. For more information, see \fBoverlay\fR(5).
+all kinds of overlay devices. For more information, see \fBoverlay\fR(7).
 .sp
 .ne 2
 .na
@@ -4777,7 +4777,7 @@ The \fBshow-overlay\fR command supports the following options:
 .sp .6
 .RS 4n
 Displays information about an overlay device's FMA state. For more
-information on the target table, see \fBoverlay\fR(5).
+information on the target table, see \fBoverlay\fR(7).
 .RE
 
 .sp
@@ -4813,7 +4813,7 @@ required with \fB-p\fR. See "Parsable Output Format", below.
 .sp .6
 .RS 4n
 Displays information about an overlay device's target table. For more
-information on the target table, see \fBoverlay\fR(5).
+information on the target table, see \fBoverlay\fR(7).
 .RE
 
 .RE

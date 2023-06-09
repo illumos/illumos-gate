@@ -2012,7 +2012,7 @@ vm_rdmtrr(const struct vm_mtrr *mtrr, uint32_t num, uint64_t *val)
 		break;
 	}
 	default:
-		return (-1);
+		return (EINVAL);
 	}
 
 	return (0);
@@ -2024,11 +2024,11 @@ vm_wrmtrr(struct vm_mtrr *mtrr, uint32_t num, uint64_t val)
 	switch (num) {
 	case MSR_MTRRcap:
 		/* MTRRCAP is read only */
-		return (-1);
+		return (EPERM);
 	case MSR_MTRRdefType:
 		if (val & ~VMM_MTRR_DEF_MASK) {
 			/* generate #GP on writes to reserved fields */
-			return (-1);
+			return (EINVAL);
 		}
 		mtrr->def_type = val;
 		break;
@@ -2046,20 +2046,20 @@ vm_wrmtrr(struct vm_mtrr *mtrr, uint32_t num, uint64_t val)
 		if (offset % 2 == 0) {
 			if (val & ~VMM_MTRR_PHYSBASE_MASK) {
 				/* generate #GP on writes to reserved fields */
-				return (-1);
+				return (EINVAL);
 			}
 			mtrr->var[offset / 2].base = val;
 		} else {
 			if (val & ~VMM_MTRR_PHYSMASK_MASK) {
 				/* generate #GP on writes to reserved fields */
-				return (-1);
+				return (EINVAL);
 			}
 			mtrr->var[offset / 2].mask = val;
 		}
 		break;
 	}
 	default:
-		return (-1);
+		return (EINVAL);
 	}
 
 	return (0);
@@ -3942,7 +3942,11 @@ vmm_data_from_class(const vmm_data_req_t *req, struct vm *vm, int vcpuid)
 	}
 }
 
-const uint32_t arch_msr_iter[] = {
+const uint32_t default_msr_iter[] = {
+	/*
+	 * Although EFER is also available via the get/set-register interface,
+	 * we include it in the default list of emitted MSRs.
+	 */
 	MSR_EFER,
 
 	/*
@@ -3960,21 +3964,85 @@ const uint32_t arch_msr_iter[] = {
 	MSR_SYSENTER_CS_MSR,
 	MSR_SYSENTER_ESP_MSR,
 	MSR_SYSENTER_EIP_MSR,
+
 	MSR_PAT,
-};
-const uint32_t generic_msr_iter[] = {
+
 	MSR_TSC,
+
 	MSR_MTRRcap,
 	MSR_MTRRdefType,
-
 	MSR_MTRR4kBase, MSR_MTRR4kBase + 1, MSR_MTRR4kBase + 2,
 	MSR_MTRR4kBase + 3, MSR_MTRR4kBase + 4, MSR_MTRR4kBase + 5,
 	MSR_MTRR4kBase + 6, MSR_MTRR4kBase + 7,
-
 	MSR_MTRR16kBase, MSR_MTRR16kBase + 1,
-
 	MSR_MTRR64kBase,
 };
+
+static int
+vmm_data_read_msr(struct vm *vm, int vcpuid, uint32_t msr, uint64_t *value)
+{
+	int err = 0;
+
+	switch (msr) {
+	case MSR_TSC:
+		/*
+		 * The vmm-data interface for MSRs provides access to the
+		 * per-vCPU offset of the TSC, when reading/writing MSR_TSC.
+		 *
+		 * The VM-wide offset (and scaling) of the guest TSC is accessed
+		 * via the VMM_TIME data class.
+		 */
+		*value = vm->vcpu[vcpuid].tsc_offset;
+		return (0);
+
+	default:
+		if (is_mtrr_msr(msr)) {
+			err = vm_rdmtrr(&vm->vcpu[vcpuid].mtrr, msr, value);
+		} else {
+			err = ops->vmgetmsr(vm->cookie, vcpuid, msr, value);
+		}
+		break;
+	}
+
+	return (err);
+}
+
+static int
+vmm_data_write_msr(struct vm *vm, int vcpuid, uint32_t msr, uint64_t value)
+{
+	int err = 0;
+
+	switch (msr) {
+	case MSR_TSC:
+		/* See vmm_data_read_msr() for more detail */
+		vm->vcpu[vcpuid].tsc_offset = value;
+		return (0);
+	case MSR_MTRRcap: {
+		/*
+		 * MTRRcap is read-only.  If the desired value matches the
+		 * existing one, consider it a success.
+		 */
+		uint64_t comp;
+		err = vm_rdmtrr(&vm->vcpu[vcpuid].mtrr, msr, &comp);
+		if (err == 0 && comp != value) {
+			return (EINVAL);
+		}
+		break;
+	}
+	default:
+		if (is_mtrr_msr(msr)) {
+			/* MTRRcap is already handled above */
+			ASSERT3U(msr, !=, MSR_MTRRcap);
+
+			err = vm_wrmtrr(&vm->vcpu[vcpuid].mtrr, msr, value);
+		} else {
+			err = ops->vmsetmsr(vm->cookie, vcpuid, msr, value);
+		}
+		break;
+	}
+
+	return (err);
+}
 
 static int
 vmm_data_read_msrs(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
@@ -3982,61 +4050,57 @@ vmm_data_read_msrs(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	VERIFY3U(req->vdr_class, ==, VDC_MSR);
 	VERIFY3U(req->vdr_version, ==, 1);
 
-	const uint_t num_msrs = nitems(arch_msr_iter) + nitems(generic_msr_iter)
-	    + (VMM_MTRR_VAR_MAX * 2);
+	struct vdi_field_entry_v1 *entryp = req->vdr_data;
+
+	/* Specific MSRs requested */
+	if ((req->vdr_flags & VDX_FLAG_READ_COPYIN) != 0) {
+		const uint_t count =
+		    req->vdr_len / sizeof (struct vdi_field_entry_v1);
+
+		for (uint_t i = 0; i < count; i++, entryp++) {
+			int err = vmm_data_read_msr(vm, vcpuid,
+			    entryp->vfe_ident, &entryp->vfe_value);
+
+			if (err != 0) {
+				return (err);
+			}
+		}
+
+		*req->vdr_result_len =
+		    count * sizeof (struct vdi_field_entry_v1);
+		return (0);
+	}
+
+	/*
+	 * If specific MSRs are not requested, try to provide all those which we
+	 * know about instead.
+	 */
+	const uint_t num_msrs = nitems(default_msr_iter) +
+	    (VMM_MTRR_VAR_MAX * 2);
 	const uint32_t output_len =
 	    num_msrs * sizeof (struct vdi_field_entry_v1);
-	*req->vdr_result_len = output_len;
 
+	*req->vdr_result_len = output_len;
 	if (req->vdr_len < output_len) {
 		return (ENOSPC);
 	}
 
-	struct vdi_field_entry_v1 *entryp = req->vdr_data;
-	for (uint_t i = 0; i < nitems(arch_msr_iter); i++, entryp++) {
-		const uint32_t msr = arch_msr_iter[i];
-		uint64_t val = 0;
+	/* Output the MSRs in the default list */
+	for (uint_t i = 0; i < nitems(default_msr_iter); i++, entryp++) {
+		entryp->vfe_ident = default_msr_iter[i];
 
-		int err = ops->vmgetmsr(vm->cookie, vcpuid, msr, &val);
 		/* All of these MSRs are expected to work */
-		VERIFY0(err);
-		entryp->vfe_ident = msr;
-		entryp->vfe_value = val;
+		VERIFY0(vmm_data_read_msr(vm, vcpuid, entryp->vfe_ident,
+		    &entryp->vfe_value));
 	}
 
-	struct vm_mtrr *mtrr = &vm->vcpu[vcpuid].mtrr;
-	for (uint_t i = 0; i < nitems(generic_msr_iter); i++, entryp++) {
-		const uint32_t msr = generic_msr_iter[i];
-
-		entryp->vfe_ident = msr;
-		switch (msr) {
-		case MSR_TSC:
-			/*
-			 * Communicate this as the difference from the VM-wide
-			 * offset of the boot time.
-			 */
-			entryp->vfe_value = vm->vcpu[vcpuid].tsc_offset;
-			break;
-		case MSR_MTRRcap:
-		case MSR_MTRRdefType:
-		case MSR_MTRR4kBase ... MSR_MTRR4kBase + 7:
-		case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
-		case MSR_MTRR64kBase: {
-			int err = vm_rdmtrr(mtrr, msr, &entryp->vfe_value);
-			VERIFY0(err);
-			break;
-		}
-		default:
-			panic("unexpected msr export %x", msr);
-		}
-	}
-	/* Copy the variable MTRRs */
+	/* Output the variable MTRRs */
 	for (uint_t i = 0; i < (VMM_MTRR_VAR_MAX * 2); i++, entryp++) {
-		const uint32_t msr = MSR_MTRRVarBase + i;
+		entryp->vfe_ident = MSR_MTRRVarBase + i;
 
-		entryp->vfe_ident = msr;
-		int err = vm_rdmtrr(mtrr, msr, &entryp->vfe_value);
-		VERIFY0(err);
+		/* All of these MSRs are expected to work */
+		VERIFY0(vmm_data_read_msr(vm, vcpuid, entryp->vfe_ident,
+		    &entryp->vfe_value));
 	}
 	return (0);
 }
@@ -4050,31 +4114,17 @@ vmm_data_write_msrs(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	const struct vdi_field_entry_v1 *entryp = req->vdr_data;
 	const uint_t entry_count =
 	    req->vdr_len / sizeof (struct vdi_field_entry_v1);
-	struct vm_mtrr *mtrr = &vm->vcpu[vcpuid].mtrr;
 
 	/*
 	 * First make sure that all of the MSRs can be manipulated.
 	 * For now, this check is done by going though the getmsr handler
 	 */
 	for (uint_t i = 0; i < entry_count; i++, entryp++) {
-		const uint32_t msr = entryp->vfe_ident;
+		const uint64_t msr = entryp->vfe_ident;
 		uint64_t val;
-		int err = 0;
 
-		switch (msr) {
-		case MSR_TSC:
-			break;
-		default:
-			if (is_mtrr_msr(msr)) {
-				err = vm_rdmtrr(mtrr, msr, &val);
-			} else {
-				err = ops->vmgetmsr(vm->cookie, vcpuid, msr,
-				    &val);
-			}
-			break;
-		}
-		if (err != 0) {
-			return (err);
+		if (vmm_data_read_msr(vm, vcpuid, msr, &val) != 0) {
+			return (EINVAL);
 		}
 	}
 
@@ -4084,36 +4134,9 @@ vmm_data_write_msrs(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	 */
 	entryp = req->vdr_data;
 	for (uint_t i = 0; i < entry_count; i++, entryp++) {
-		const uint32_t msr = entryp->vfe_ident;
-		const uint64_t val = entryp->vfe_value;
-		int err = 0;
+		int err = vmm_data_write_msr(vm, vcpuid, entryp->vfe_ident,
+		    entryp->vfe_value);
 
-		switch (msr) {
-		case MSR_TSC:
-			vm->vcpu[vcpuid].tsc_offset = entryp->vfe_value;
-			break;
-		default:
-			if (is_mtrr_msr(msr)) {
-				if (msr == MSR_MTRRcap) {
-					/*
-					 * MTRRcap is read-only.  If the current
-					 * value matches the incoming one,
-					 * consider it a success
-					 */
-					uint64_t comp;
-					err = vm_rdmtrr(mtrr, msr, &comp);
-					if (err != 0 || comp != val) {
-						err = EINVAL;
-					}
-				} else {
-					err = vm_wrmtrr(mtrr, msr, val);
-				}
-			} else {
-				err = ops->vmsetmsr(vm->cookie, vcpuid, msr,
-				    val);
-			}
-			break;
-		}
 		if (err != 0) {
 			return (err);
 		}

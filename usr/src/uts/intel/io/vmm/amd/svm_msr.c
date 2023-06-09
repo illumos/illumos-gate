@@ -71,15 +71,6 @@ enum {
 CTASSERT(HOST_MSR_NUM == SVM_HOST_MSR_NUM);
 
 void
-svm_msr_init(void)
-{
-	/*
-	 * These MSRs do vary between CPUs on illumos, so saving system-wide
-	 * values for them serves no purpose.
-	 */
-}
-
-void
 svm_msr_guest_init(struct svm_softc *sc, int vcpu)
 {
 	/*

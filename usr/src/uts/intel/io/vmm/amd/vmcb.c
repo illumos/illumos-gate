@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/x86_archext.h>
 
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
@@ -201,6 +202,27 @@ vmcb_msr_ptr(struct vmcb *vmcb, uint32_t msr, uint32_t *dirtyp)
 	case MSR_PAT:
 		res = &state->g_pat;
 		dirty = VMCB_CACHE_NP;
+		break;
+
+	case MSR_DEBUGCTL:
+		res = &state->dbgctl;
+		dirty = VMCB_CACHE_LBR;
+		break;
+	case MSR_LBR_FROM:
+		res = &state->br_from;
+		dirty = VMCB_CACHE_LBR;
+		break;
+	case MSR_LBR_TO:
+		res = &state->br_to;
+		dirty = VMCB_CACHE_LBR;
+		break;
+	case MSR_LEX_FROM:
+		res = &state->int_from;
+		dirty = VMCB_CACHE_LBR;
+		break;
+	case MSR_LEX_TO:
+		res = &state->int_to;
+		dirty = VMCB_CACHE_LBR;
 		break;
 	}
 

@@ -65,6 +65,7 @@ file path=opt/bhyve-tests/tests/vmm/auto_destruct mode=0555
 file path=opt/bhyve-tests/tests/vmm/check_iommu mode=0555
 file path=opt/bhyve-tests/tests/vmm/cpuid_ioctl mode=0555
 file path=opt/bhyve-tests/tests/vmm/datarw_constraints mode=0555
+file path=opt/bhyve-tests/tests/vmm/datarw_msrs mode=0555
 file path=opt/bhyve-tests/tests/vmm/datarw_vcpu mode=0555
 file path=opt/bhyve-tests/tests/vmm/default_capabs mode=0555
 file path=opt/bhyve-tests/tests/vmm/drv_hold mode=0555

@@ -901,8 +901,10 @@ lscf_prep_hndl(void)
 		if (scf_value_set_astring(zone, g_zonename) != SCF_SUCCESS)
 			scfdie();
 
-		if (scf_handle_decorate(g_hndl, "zone", zone) != SCF_SUCCESS)
-			uu_die(gettext("invalid zone '%s'\n"), g_zonename);
+		if (scf_handle_decorate(g_hndl, "zone", zone) != SCF_SUCCESS) {
+			uu_die(gettext("zone '%s': %s\n"),
+			    g_zonename, scf_strerror(scf_error()));
+		}
 
 		scf_value_destroy(zone);
 	}

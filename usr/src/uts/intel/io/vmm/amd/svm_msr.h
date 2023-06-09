@@ -33,7 +33,6 @@
 
 struct svm_softc;
 
-void svm_msr_init(void);
 void svm_msr_guest_init(struct svm_softc *sc, int vcpu);
 void svm_msr_guest_enter(struct svm_softc *sc, int vcpu);
 void svm_msr_guest_exit(struct svm_softc *sc, int vcpu);

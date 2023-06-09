@@ -11,6 +11,7 @@
 
 #
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2023 Peter Tribble
 #
 
 #
@@ -28,6 +29,9 @@ dir  path=kernel group=sys
 dir  path=kernel/drv group=sys
 dir  path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/pvscsi group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/pvscsi.4d
 driver name=pvscsi class=scsi-self-identifying alias=pci15ad,7c0
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/scsi/adapters/pvscsi/THIRDPARTYLICENSE \
