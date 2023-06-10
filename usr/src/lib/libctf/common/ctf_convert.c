@@ -45,7 +45,7 @@ ctf_has_c_source(Elf *elf, char *errmsg, size_t errlen)
 	while ((scn = elf_nextscn(elf, scn)) != NULL) {
 		if (gelf_getshdr(scn, &shdr) == NULL) {
 			(void) snprintf(errmsg, errlen,
-			    "failed to get section header: %s",
+			    "failed to get section header: %s\n",
 			    elf_errmsg(elf_errno()));
 			return (CHR_ERROR);
 		}
@@ -60,20 +60,21 @@ ctf_has_c_source(Elf *elf, char *errmsg, size_t errlen)
 	}
 
 	if ((strscn = elf_getscn(elf, shdr.sh_link)) == NULL) {
-		(void) snprintf(errmsg, errlen, "failed to get str section: %s",
-		    elf_errmsg(elf_errno()));
+		(void) snprintf(errmsg, errlen, "failed to get str section: "
+		    "%s\n", elf_errmsg(elf_errno()));
 		return (CHR_ERROR);
 	}
 
 	if ((data = elf_getdata(scn, NULL)) == NULL) {
-		(void) snprintf(errmsg, errlen, "failed to read section: %s",
+		(void) snprintf(errmsg, errlen, "failed to read section: %s\n",
 		    elf_errmsg(elf_errno()));
 		return (CHR_ERROR);
 	}
 
 	if ((strdata = elf_getdata(strscn, NULL)) == NULL) {
 		(void) snprintf(errmsg, errlen,
-		    "failed to read string table: %s", elf_errmsg(elf_errno()));
+		    "failed to read string table: %s\n",
+		    elf_errmsg(elf_errno()));
 		return (CHR_ERROR);
 	}
 
@@ -86,7 +87,7 @@ ctf_has_c_source(Elf *elf, char *errmsg, size_t errlen)
 
 		if (gelf_getsym(data, i, &sym) == NULL) {
 			(void) snprintf(errmsg, errlen,
-			    "failed to read sym %lu: %s",
+			    "failed to read sym %lu: %s\n",
 			    i, elf_errmsg(elf_errno()));
 			return (CHR_ERROR);
 		}

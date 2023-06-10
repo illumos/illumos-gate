@@ -435,6 +435,10 @@ main(int argc, char *argv[])
 		if (keep == B_FALSE)
 			(void) unlink(infile);
 
+		/*
+		 * Note, we expect libctf to include a newline it all of its
+		 * error messages right now (though it perhaps shouldn't).
+		 */
 		switch (err) {
 		case ECTF_CONVBKERR:
 			ctfconvert_fatal("CTF conversion failed: %s", buf);

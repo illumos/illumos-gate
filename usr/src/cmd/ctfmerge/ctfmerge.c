@@ -223,8 +223,7 @@ ctfmerge_read_archive(const char *name, int fd, Elf *elf,
 		if (*(arhdr->ar_name) == '/')
 			goto next;
 
-		if (asprintf(&nname, "%s.%s.%d", name, arhdr->ar_name,
-		    cursec) < 0)
+		if (asprintf(&nname, "%s(%s)", name, arhdr->ar_name) < 0)
 			ctfmerge_fatal("failed to allocate memory for archive "
 			    "%d of file %s\n", cursec, name);
 
@@ -395,7 +394,7 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	if (argc < 1) {
-		ctfmerge_usage("no input files specified");
+		ctfmerge_usage("no input files specified\n");
 		return (CTFMERGE_USAGE);
 	}
 
