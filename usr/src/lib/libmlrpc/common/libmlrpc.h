@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef	_LIBMLRPC_H
@@ -468,6 +469,8 @@ typedef struct ndr_auth_ops {
 	int (*nao_recv)(void *, ndr_xa_t *);
 	int (*nao_sign)(void *, ndr_xa_t *);
 	int (*nao_verify)(void *, ndr_xa_t *, boolean_t);
+	int (*nao_encrypt)(void *, ndr_xa_t *);
+	int (*nao_decrypt)(void *, ndr_xa_t *, boolean_t);
 } ndr_auth_ops_t;
 
 /*

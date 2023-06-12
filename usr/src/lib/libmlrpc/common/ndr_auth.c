@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 Tintri by DDN, Inc. All Rights Reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <libmlrpc.h>
@@ -56,7 +57,8 @@ ndr_add_auth_token(ndr_auth_ctx_t *ctx, ndr_xa_t *mxa)
  *
  * Used during binds (and alter context).
  *
- * Currently, only NETLOGON auth with Integrity protection is implemented.
+ * Currently, only NETLOGON auth with Integrity/Privacy protection
+ * is implemented.
  */
 int
 ndr_add_sec_context(ndr_auth_ctx_t *ctx, ndr_xa_t *mxa)
@@ -70,7 +72,8 @@ ndr_add_sec_context(ndr_auth_ctx_t *ctx, ndr_xa_t *mxa)
 	if (ctx->auth_type != NDR_C_AUTHN_GSS_NETLOGON)
 		return (NDR_DRC_FAULT_SEC_TYPE_UNIMPLEMENTED);
 
-	if (ctx->auth_level != NDR_C_AUTHN_LEVEL_PKT_INTEGRITY)
+	if (ctx->auth_level != NDR_C_AUTHN_LEVEL_PKT_INTEGRITY &&
+	    ctx->auth_level != NDR_C_AUTHN_LEVEL_PKT_PRIVACY)
 		return (NDR_DRC_FAULT_SEC_LEVEL_UNIMPLEMENTED);
 
 	if ((rc = ndr_add_auth_token(ctx, mxa)) != 0)
@@ -126,12 +129,15 @@ ndr_add_auth(ndr_auth_ctx_t *ctx, ndr_xa_t *mxa)
 	if (ctx->auth_type != NDR_C_AUTHN_GSS_NETLOGON)
 		return (NDR_DRC_FAULT_SEC_TYPE_UNIMPLEMENTED);
 
-	if (ctx->auth_level != NDR_C_AUTHN_LEVEL_PKT_INTEGRITY)
+	if (ctx->auth_level != NDR_C_AUTHN_LEVEL_PKT_INTEGRITY &&
+	    ctx->auth_level != NDR_C_AUTHN_LEVEL_PKT_PRIVACY)
 		return (NDR_DRC_FAULT_SEC_LEVEL_UNIMPLEMENTED);
 
 	if ((rc = ndr_add_auth_token(ctx, mxa)) != 0)
 		return (rc);
 
+	if (ctx->auth_level == NDR_C_AUTHN_LEVEL_PKT_PRIVACY)
+		return (ctx->auth_ops.nao_encrypt(ctx->auth_ctx, mxa));
 	return (ctx->auth_ops.nao_sign(ctx->auth_ctx, mxa));
 }
 
@@ -163,9 +169,13 @@ ndr_check_auth(ndr_auth_ctx_t *ctx, ndr_xa_t *mxa)
 		return (NDR_DRC_FAULT_SEC_AUTH_TYPE_INVALID);
 
 	if (ctx->auth_level != secp->auth_level ||
-	    ctx->auth_level != NDR_C_AUTHN_LEVEL_PKT_INTEGRITY)
+	    (ctx->auth_level != NDR_C_AUTHN_LEVEL_PKT_INTEGRITY &&
+	    ctx->auth_level != NDR_C_AUTHN_LEVEL_PKT_PRIVACY))
 		return (NDR_DRC_FAULT_SEC_AUTH_LEVEL_INVALID);
 
+	if (ctx->auth_level == NDR_C_AUTHN_LEVEL_PKT_PRIVACY)
+		return (ctx->auth_ops.nao_decrypt(ctx->auth_ctx, mxa,
+		    ctx->auth_verify_resp));
 	return (ctx->auth_ops.nao_verify(ctx->auth_ctx, mxa,
 	    ctx->auth_verify_resp));
 }

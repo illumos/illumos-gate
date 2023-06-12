@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef _SMBSRV_NETRAUTH_H
@@ -183,6 +184,7 @@ typedef struct netr_info {
 	netr_cred_t client_credential;
 	netr_cred_t server_credential;
 	netr_session_key_t session_key;
+	netr_session_key_t rpc_seal_key;
 	BYTE password[NETR_MACHINE_ACCT_PASSWD_MAX];
 	time_t timestamp;
 	uint64_t clh_seqnum; /* Client SequenceNumber for Netlogon SSP */

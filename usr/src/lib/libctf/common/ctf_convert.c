@@ -255,7 +255,7 @@ ctf_convert_set_batchsize(ctf_convert_t *cch, uint_t bsize)
 }
 
 int
-ctf_convert_set_flags(ctf_convert_t *cch, uint_t flags)
+ctf_convert_set_flags(ctf_convert_t *cch, ctf_convert_flag_t flags)
 {
 	if ((flags & ~CTF_CONVERT_ALL_FLAGS) != 0)
 		return (EINVAL);
