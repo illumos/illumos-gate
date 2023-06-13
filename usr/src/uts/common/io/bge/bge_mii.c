@@ -29,6 +29,10 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include "bge_impl.h"
 
 /*
@@ -1908,4 +1912,47 @@ bge_phys_check(bge_t *bgep)
 	 */
 	return ((*bgep->physops->phys_check)(bgep,
 	    (bgep->link_state == LINK_STATE_UNKNOWN)));
+}
+
+mac_ether_media_t
+bge_phys_media(bge_t *bgep)
+{
+	switch (bgep->link_state) {
+	case LINK_STATE_UP:
+		break;
+	case LINK_STATE_DOWN:
+		return (ETHER_MEDIA_NONE);
+	case LINK_STATE_UNKNOWN:
+	default:
+		return (ETHER_MEDIA_UNKNOWN);
+	}
+
+	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) != 0) {
+		switch (bgep->param_link_speed) {
+		case 1000:
+			return (ETHER_MEDIA_1000BASE_X);
+		case 100:
+			return (ETHER_MEDIA_100BASE_FX);
+		default:
+			break;
+		}
+	} else {
+		switch (bgep->param_link_speed) {
+		case 1000:
+			return (ETHER_MEDIA_1000BASE_T);
+		case 100:
+			/*
+			 * All NetExtreme I docs we can find suggest that the
+			 * PHY never supported anything other than 100BASE-TX so
+			 * we don't further interrogate the device.
+			 */
+			return (ETHER_MEDIA_100BASE_TX);
+		case 10:
+			return (ETHER_MEDIA_10BASE_T);
+		default:
+			break;
+		}
+	}
+
+	return (ETHER_MEDIA_UNKNOWN);
 }

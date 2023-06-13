@@ -804,6 +804,7 @@ reprogram:
 		case MAC_PROP_STATUS:
 		case MAC_PROP_SPEED:
 		case MAC_PROP_DUPLEX:
+		case MAC_PROP_MEDIA:
 			err = ENOTSUP; /* read-only prop. Can't set this */
 			break;
 		case MAC_PROP_AUTONEG:
@@ -924,6 +925,14 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			bcopy(&bgep->link_state, pr_val,
 			    sizeof (link_state_t));
 			break;
+		case MAC_PROP_MEDIA: {
+			mac_ether_media_t media;
+
+			ASSERT(pr_valsize >= sizeof (mac_ether_media_t));
+			media = bge_phys_media(bgep);
+			bcopy(&media, pr_val, sizeof (mac_ether_media_t));
+			break;
+		}
 		case MAC_PROP_AUTONEG:
 			*(uint8_t *)pr_val = bgep->param_adv_autoneg;
 			break;

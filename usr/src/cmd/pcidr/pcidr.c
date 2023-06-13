@@ -595,8 +595,7 @@ main(int argc, char **argv)
 		if (strcmp(dfile, "-") == 0) {
 			/* ignore if stdout is not open/valid */
 			dfp = NULL;
-			if (stdout != NULL &&
-			    fstat(fileno(stdout), &statbuf) == 0)
+			if (fstat(fileno(stdout), &statbuf) == 0)
 				dfp = stdout;
 		} else {
 			dfp = fopen(dfile, "a");

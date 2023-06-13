@@ -1281,6 +1281,7 @@ void bge_phys_reset(bge_t *bgep);
 int bge_phys_idle(bge_t *bgep);
 int bge_phys_update(bge_t *bgep);
 boolean_t bge_phys_check(bge_t *bgep);
+mac_ether_media_t bge_phys_media(bge_t *bgep);
 
 /* bge_ndd.c */
 int bge_nd_init(bge_t *bgep);
