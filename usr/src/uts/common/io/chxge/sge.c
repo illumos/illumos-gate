@@ -230,7 +230,7 @@ t1_espi_workaround(ch_t *adapter)
 	int rv = 1;
 
 	if ((chp->ch_state == PERUNNING) &&
-	    atomic_read(&sge->cmdQ[0].cq_asleep)) {
+	    atomic_read(sge->cmdQ[0].cq_asleep)) {
 		u32 seop;
 		seop = t1_espi_get_mon(adapter, 0x930, 0);
 		if ((seop & 0xfff0fff) == 0xfff) {

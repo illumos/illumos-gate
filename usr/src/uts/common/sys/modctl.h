@@ -604,7 +604,7 @@ extern struct dev_ops *mod_hold_dev_by_major(major_t);
 extern struct dev_ops *mod_hold_dev_by_devi(dev_info_t *);
 extern void	mod_rele_dev_by_devi(dev_info_t *);
 
-extern int make_devname(char *, major_t, int);
+extern int make_devname(const char *, major_t, int);
 extern int gmatch(const char *, const char *);
 
 extern void make_aliases(struct bind **);
@@ -616,19 +616,19 @@ extern void read_class_file(void);
 extern void setbootpath(char *);
 extern void setbootfstype(char *);
 
-extern int install_stubs_by_name(modctl_t *, char *);
+extern int install_stubs_by_name(modctl_t *, const char *);
 extern void install_stubs(modctl_t *);
 extern void uninstall_stubs(modctl_t *);
 extern void reset_stubs(modctl_t *);
 extern modctl_t *mod_getctl(struct modlinkage *);
-extern major_t mod_name_to_major(char *);
-extern modid_t mod_name_to_modid(char *);
+extern major_t mod_name_to_major(const char *);
+extern modid_t mod_name_to_modid(const char *);
 extern char *mod_major_to_name(major_t);
 extern void init_devnamesp(int);
 extern void init_syscallnames(int);
 
 extern char *mod_getsysname(int);
-extern int mod_getsysnum(char *);
+extern int mod_getsysnum(const char *);
 
 extern char *mod_containing_pc(caddr_t);
 extern int mod_in_autounload(void);

@@ -95,12 +95,12 @@ extern void ldi_ident_release(ldi_ident_t);
  */
 extern int ldi_open_by_dev(dev_t *, int, int, cred_t *,
     ldi_handle_t *, ldi_ident_t);
-extern int ldi_open_by_name(char *, int, cred_t *,
+extern int ldi_open_by_name(const char *, int, cred_t *,
     ldi_handle_t *, ldi_ident_t);
-extern int ldi_open_by_devid(ddi_devid_t, char *, int, cred_t *,
+extern int ldi_open_by_devid(ddi_devid_t, const char *, int, cred_t *,
     ldi_handle_t *, ldi_ident_t);
-extern int ldi_vp_from_name(char *, vnode_t **);
-extern int ldi_vp_from_devid(ddi_devid_t, char *, vnode_t **);
+extern int ldi_vp_from_name(const char *, vnode_t **);
+extern int ldi_vp_from_devid(ddi_devid_t, const char *, vnode_t **);
 
 extern int ldi_close(ldi_handle_t, int flag, cred_t *);
 
