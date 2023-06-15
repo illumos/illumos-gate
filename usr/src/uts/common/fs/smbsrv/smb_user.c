@@ -1015,6 +1015,8 @@ smb_user_netinfo_fini(smb_netuserinfo_t *info)
 	bzero(info, sizeof (smb_netuserinfo_t));
 }
 
+uint64_t smb_user_auth_logoff_failures;
+
 /*
  * Tell smbd this user is going away so it can clean up their
  * audit session, autohome dir, etc.
@@ -1032,9 +1034,16 @@ smb_user_auth_logoff(smb_user_t *user)
 	if (sv->sv_state != SMB_SERVER_STATE_RUNNING)
 		return;
 
+	if (smb_threshold_enter(&sv->sv_logoff_ct) != 0) {
+		smb_user_auth_logoff_failures++;
+		return;
+	}
+
 	audit_sid = user->u_audit_sid;
 	(void) smb_kdoor_upcall(sv, SMB_DR_USER_AUTH_LOGOFF,
 	    &audit_sid, xdr_uint32_t, NULL, NULL);
+
+	smb_threshold_exit(&sv->sv_logoff_ct);
 }
 
 boolean_t

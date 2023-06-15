@@ -70,9 +70,11 @@ extern	uint_t smb_audit_flags;
 extern	int smb_ssetup_threshold;
 extern	int smb_tcon_threshold;
 extern	int smb_opipe_threshold;
+extern	int smb_logoff_threshold;
 extern	int smb_ssetup_timeout;
 extern	int smb_tcon_timeout;
 extern	int smb_opipe_timeout;
+extern	int smb_logoff_timeout;
 extern	int smb_allow_advisory_locks;
 extern	int smb_session_auth_tmo;
 

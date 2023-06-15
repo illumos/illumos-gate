@@ -84,6 +84,7 @@ int smb_allow_advisory_locks = 0;	/* See smb_vops.c */
 int	smb_ssetup_threshold = SMB_AUTHSVC_MAXTHREAD;
 int	smb_tcon_threshold = 1024;
 int	smb_opipe_threshold = 1024;
+int	smb_logoff_threshold = 1024;
 
 /*
  * Number of milliseconds that a request will be stalled if it comes in after
@@ -92,6 +93,7 @@ int	smb_opipe_threshold = 1024;
 int	smb_ssetup_timeout = (30 * 1000);
 int	smb_tcon_timeout = (30 * 1000);
 int	smb_opipe_timeout = (30 * 1000);
+int	smb_logoff_timeout = (600 * 1000);
 
 /*
  * Thread priorities used in smbsrv.
