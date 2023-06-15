@@ -2994,7 +2994,7 @@ function arcstat_quiescence # stat echo
 
 	while $do_once || [ $stat1 -ne $stat2 ] || [ $stat2 -eq 0 ]; do
 		typeset stat1=$(kstat arcstats.$stat)
-		sleep 2
+		sleep 0.5
 		typeset stat2=$(kstat arcstats.$stat)
 		do_once=false
 	done
