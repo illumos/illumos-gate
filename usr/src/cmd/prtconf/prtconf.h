@@ -38,7 +38,7 @@ extern "C" {
 
 extern void init_priv_data(struct di_priv_data *);
 extern void dump_priv_data(int, di_node_t);
-extern int print_pciid(di_node_t, di_prom_handle_t, pcidb_hdl_t *);
+extern void print_pciid(const char *, uint16_t, uint16_t, pcidb_hdl_t *);
 extern void indent_to_level(int);
 extern void prtconf_devinfo();
 extern int do_fbname();
@@ -70,6 +70,7 @@ struct prt_opts {
 	const char *o_promdev;
 	const char *o_progname;
 	struct utsname o_uts;
+	pcidb_hdl_t *o_pcidb;
 };
 
 struct prt_dbg {

@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2022 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -409,59 +410,33 @@ dump_priv_data(int ilev, di_node_t node)
 	/* ignore driver private data for now */
 }
 
-#define	LOOKUP_PROP(proptype, ph, nodetype, dev, node, name, data)	\
-	((nodetype == DI_PROM_NODEID) ?					\
-	di_prom_prop_lookup_##proptype(ph, node, name, data) :		\
-	di_prop_lookup_##proptype(dev, node, name, data))
-#define	ISPCI(s)						\
-	(((s) != NULL) && ((strcmp((s), "pci") == 0) ||		\
-	(strcmp((s), "pciex") == 0)))
 /*
  * Print vendor ID and device ID for PCI devices
  */
-int
-print_pciid(di_node_t node, di_prom_handle_t ph, pcidb_hdl_t *pci)
+void
+print_pciid(const char *type, uint16_t vid, uint16_t did, pcidb_hdl_t *pci)
 {
-	pcidb_vendor_t *vend = NULL;
-	pcidb_device_t *dev = NULL;
-	di_node_t pnode = di_parent_node(node);
-	char *s = NULL;
-	int *i, type = di_nodeid(node);
+	const char *vstr, *dstr;
 
-	if (LOOKUP_PROP(strings, ph, type, DDI_DEV_T_ANY, pnode,
-	    "device_type", &s) <= 0)
-		return (0);
+	(void) printf(" (%s%x,%x)", type, vid, did);
 
-	if (!ISPCI(s))
-		return (0);	/* not a pci device */
+	vstr = "unknown vendor";
+	dstr = "unknown device";
+	if (pci != NULL) {
+		pcidb_vendor_t *vend = NULL;
+		pcidb_device_t *dev = NULL;
 
-	(void) printf(" (%s", s);
-	if (LOOKUP_PROP(ints, ph, type, DDI_DEV_T_ANY, node,
-	    "vendor-id", &i) > 0)
-		(void) printf("%x", i[0]);
+		vend = pcidb_lookup_vendor(pci, vid);
 
-	if (pci != NULL)
-		vend = pcidb_lookup_vendor(pci, i[0]);
+		if (vend != NULL) {
+			vstr = pcidb_vendor_name(vend);
+			dev = pcidb_lookup_device_by_vendor(vend, did);
+		}
 
-	if (LOOKUP_PROP(ints, ph, type, DDI_DEV_T_ANY, node,
-	    "device-id", &i) > 0)
-		(void) printf(",%x", i[0]);
+		if (dev != NULL) {
+			dstr = pcidb_device_name(dev);
+		}
+	}
 
-	if (vend != NULL)
-		dev = pcidb_lookup_device_by_vendor(vend, i[0]);
-
-	(void) printf(") [");
-
-	if (vend != NULL)
-		(void) printf("%s ", pcidb_vendor_name(vend));
-	else
-		(void) printf("unknown vendor, ");
-
-	if (dev != NULL)
-		(void) printf("%s", pcidb_device_name(dev));
-	else
-		(void) printf("unknown device");
-
-	(void) printf("]");
-	return (1);
+	(void) printf(" [%s %s]", vstr, dstr);
 }

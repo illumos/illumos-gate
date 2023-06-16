@@ -24,6 +24,7 @@
  * Copyright 2011, Joyent, Inc. All rights reserved.
  * Copyright (c) 2019 Peter Tribble.
  * Copyright (c) 2022 Sachidananda Urs <sacchi@gmail.com>
+ * Copyright 2022 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -37,6 +38,7 @@
 #include <sys/systeminfo.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <err.h>
 #include "prtconf.h"
 
 struct prt_opts	opts;
@@ -163,6 +165,14 @@ main(int argc, char *argv[])
 	}
 
 	(void) uname(&opts.o_uts);
+
+	if (opts.o_verbose || opts.o_pciid) {
+		opts.o_pcidb = pcidb_open(PCIDB_VERSION);
+		if (opts.o_pcidb == NULL) {
+			warn("pcidb facility not available, PCI names will "
+			    "not be translated");
+		}
+	}
 
 	if (opts.o_fbname)
 		return (do_fbname());
