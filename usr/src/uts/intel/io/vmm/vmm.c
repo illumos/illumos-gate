@@ -3857,24 +3857,9 @@ vmm_kstat_update_vcpu(struct kstat *ksp, int rw)
 
 SET_DECLARE(vmm_data_version_entries, const vmm_data_version_entry_t);
 
-static inline bool
-vmm_data_is_cpu_specific(uint16_t data_class)
-{
-	switch (data_class) {
-	case VDC_REGISTER:
-	case VDC_MSR:
-	case VDC_FPU:
-	case VDC_LAPIC:
-		return (true);
-	default:
-		break;
-	}
-
-	return (false);
-}
-
 static int
-vmm_data_find(const vmm_data_req_t *req, const vmm_data_version_entry_t **resp)
+vmm_data_find(const vmm_data_req_t *req, int vcpuid,
+    const vmm_data_version_entry_t **resp)
 {
 	const vmm_data_version_entry_t **vdpp, *vdp;
 
@@ -3883,46 +3868,75 @@ vmm_data_find(const vmm_data_req_t *req, const vmm_data_version_entry_t **resp)
 
 	SET_FOREACH(vdpp, vmm_data_version_entries) {
 		vdp = *vdpp;
-		if (vdp->vdve_class == req->vdr_class &&
-		    vdp->vdve_version == req->vdr_version) {
-			/*
-			 * Enforce any data length expectation expressed by the
-			 * provider for this data.
-			 */
-			if (vdp->vdve_len_expect != 0 &&
-			    vdp->vdve_len_expect > req->vdr_len) {
-				*req->vdr_result_len = vdp->vdve_len_expect;
-				return (ENOSPC);
-			}
-			*resp = vdp;
-			return (0);
+		if (vdp->vdve_class != req->vdr_class ||
+		    vdp->vdve_version != req->vdr_version) {
+			continue;
 		}
+
+		/*
+		 * Enforce any data length expectation expressed by the provider
+		 * for this data.
+		 */
+		if (vdp->vdve_len_expect != 0 &&
+		    vdp->vdve_len_expect > req->vdr_len) {
+			*req->vdr_result_len = vdp->vdve_len_expect;
+			return (ENOSPC);
+		}
+
+		/*
+		 * Make sure that the provided vcpuid is acceptable for the
+		 * backend handler.
+		 */
+		if (vdp->vdve_readf != NULL || vdp->vdve_writef != NULL) {
+			/*
+			 * While it is tempting to demand the -1 sentinel value
+			 * in vcpuid here, that expectation was not established
+			 * for early consumers, so it is ignored.
+			 */
+		} else if (vdp->vdve_vcpu_readf != NULL ||
+		    vdp->vdve_vcpu_writef != NULL) {
+			/*
+			 * Per-vCPU handlers which permit "wildcard" access will
+			 * accept a vcpuid of -1 (for VM-wide data), while all
+			 * others expect vcpuid [0, VM_MAXCPU).
+			 */
+			const int llimit = vdp->vdve_vcpu_wildcard ? -1 : 0;
+			if (vcpuid < llimit || vcpuid >= VM_MAXCPU) {
+				return (EINVAL);
+			}
+		} else {
+			/*
+			 * A provider with neither VM-wide nor per-vCPU handlers
+			 * is completely unexpected.  Such a situation should be
+			 * made into a compile-time error.  Bail out for now,
+			 * rather than punishing the user with a panic.
+			 */
+			return (EINVAL);
+		}
+
+
+		*resp = vdp;
+		return (0);
 	}
 	return (EINVAL);
 }
 
 static void *
-vmm_data_from_class(const vmm_data_req_t *req, struct vm *vm, int vcpuid)
+vmm_data_from_class(const vmm_data_req_t *req, struct vm *vm)
 {
 	switch (req->vdr_class) {
-		/* per-cpu data/devices */
-	case VDC_LAPIC:
-		return (vm_lapic(vm, vcpuid));
-	case VDC_VMM_ARCH:
-		return (vm);
-	case VDC_VMM_TIME:
-		return (vm);
-
-	case VDC_FPU:
 	case VDC_REGISTER:
 	case VDC_MSR:
+	case VDC_FPU:
+	case VDC_LAPIC:
+	case VDC_VMM_ARCH:
 		/*
 		 * These have per-CPU handling which is dispatched outside
 		 * vmm_data_version_entries listing.
 		 */
-		return (NULL);
+		panic("Unexpected per-vcpu class %u", req->vdr_class);
+		break;
 
-		/* system-wide data/devices */
 	case VDC_IOAPIC:
 		return (vm->vioapic);
 	case VDC_ATPIT:
@@ -3935,6 +3949,14 @@ vmm_data_from_class(const vmm_data_req_t *req, struct vm *vm, int vcpuid)
 		return (vm->vpmtmr);
 	case VDC_RTC:
 		return (vm->vrtc);
+	case VDC_VMM_TIME:
+		return (vm);
+	case VDC_VERSION:
+		/*
+		 * Play along with all of the other classes which need backup
+		 * data, even though version info does not require it.
+		 */
+		return (vm);
 
 	default:
 		/* The data class will have been validated by now */
@@ -4349,6 +4371,12 @@ static const vmm_data_version_entry_t vmm_arch_v1 = {
 	.vdve_len_per_item = sizeof (struct vdi_field_entry_v1),
 	.vdve_vcpu_readf = vmm_data_read_varch,
 	.vdve_vcpu_writef = vmm_data_write_varch,
+
+	/*
+	 * Handlers for VMM_ARCH can process VM-wide (vcpuid == -1) entries in
+	 * addition to vCPU specific ones.
+	 */
+	.vdve_vcpu_wildcard = true,
 };
 VMM_DATA_VERSION(vmm_arch_v1);
 
@@ -4964,21 +4992,15 @@ vmm_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 {
 	int err = 0;
 
-	if (vmm_data_is_cpu_specific(req->vdr_class)) {
-		if (vcpuid >= VM_MAXCPU) {
-			return (EINVAL);
-		}
-	}
-
 	const vmm_data_version_entry_t *entry = NULL;
-	err = vmm_data_find(req, &entry);
+	err = vmm_data_find(req, vcpuid, &entry);
 	if (err != 0) {
 		return (err);
 	}
 	ASSERT(entry != NULL);
 
 	if (entry->vdve_readf != NULL) {
-		void *datap = vmm_data_from_class(req, vm, vcpuid);
+		void *datap = vmm_data_from_class(req, vm);
 
 		err = entry->vdve_readf(datap, req);
 	} else if (entry->vdve_vcpu_readf != NULL) {
@@ -5003,21 +5025,15 @@ vmm_data_write(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 {
 	int err = 0;
 
-	if (vmm_data_is_cpu_specific(req->vdr_class)) {
-		if (vcpuid >= VM_MAXCPU) {
-			return (EINVAL);
-		}
-	}
-
 	const vmm_data_version_entry_t *entry = NULL;
-	err = vmm_data_find(req, &entry);
+	err = vmm_data_find(req, vcpuid, &entry);
 	if (err != 0) {
 		return (err);
 	}
 	ASSERT(entry != NULL);
 
 	if (entry->vdve_writef != NULL) {
-		void *datap = vmm_data_from_class(req, vm, vcpuid);
+		void *datap = vmm_data_from_class(req, vm);
 
 		err = entry->vdve_writef(datap, req);
 	} else if (entry->vdve_vcpu_writef != NULL) {

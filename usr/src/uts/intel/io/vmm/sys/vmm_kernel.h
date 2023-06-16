@@ -514,12 +514,50 @@ typedef int (*vmm_data_vcpu_readf_t)(struct vm *, int, const vmm_data_req_t *);
 typedef struct vmm_data_version_entry {
 	uint16_t		vdve_class;
 	uint16_t		vdve_version;
+
+	/*
+	 * If these handlers accept/emit a single item of a fixed length, it
+	 * should be specified in vdve_len_expect.  The vmm-data logic will then
+	 * ensure that requests possess at least that specified length before
+	 * calling into the defined handlers.
+	 */
 	uint16_t		vdve_len_expect;
+
+	/*
+	 * For handlers which deal with (potentially) multiple items of a fixed
+	 * length, vdve_len_per_item is used to hint (via the VDC_VERSION class)
+	 * to userspace what that item size is.  Although not strictly mutually
+	 * exclusive with vdve_len_expect, it is nonsensical to set them both.
+	 */
 	uint16_t		vdve_len_per_item;
+
+	/*
+	 * A vmm-data handler is expected to provide read/write functions which
+	 * are either VM-wide (via vdve_readf and vdve_writef) or per-vCPU
+	 * (via vdve_vcpu_readf and vdve_vcpu_writef).  Providing both is not
+	 * allowed (but is not currently checked at compile time).
+	 */
+
+	/* VM-wide handlers */
 	vmm_data_readf_t	vdve_readf;
 	vmm_data_writef_t	vdve_writef;
+
+	/* Per-vCPU handlers */
 	vmm_data_vcpu_readf_t	vdve_vcpu_readf;
 	vmm_data_vcpu_writef_t	vdve_vcpu_writef;
+
+	/*
+	 * The vdve_vcpu_readf/writef handlers can rely on vcpuid to be within
+	 * the [0, VM_MAXCPU) bounds.  If they also can handle vcpuid == -1 (for
+	 * VM-wide data), then they can opt into such cases by setting
+	 * vdve_vcpu_wildcard to true.
+	 *
+	 * At a later time, it would make sense to improve the logic so a
+	 * vmm-data class could define both the VM-wide and per-vCPU handlers,
+	 * letting the incoming vcpuid determine which would be called.  Until
+	 * then, vdve_vcpu_wildcard is the stopgap.
+	 */
+	bool			vdve_vcpu_wildcard;
 } vmm_data_version_entry_t;
 
 #define	VMM_DATA_VERSION(sym)	SET_ENTRY(vmm_data_version_entries, sym)
