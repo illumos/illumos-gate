@@ -1825,13 +1825,13 @@ vlapic_resume(struct vlapic *vlapic)
 }
 
 static int
-vlapic_data_read(void *datap, const vmm_data_req_t *req)
+vlapic_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_LAPIC);
 	VERIFY3U(req->vdr_version, ==, 1);
 	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_lapic_v1));
 
-	struct vlapic *vlapic = datap;
+	struct vlapic *vlapic = vm_lapic(vm, vcpuid);
 	struct vdi_lapic_v1 *out = req->vdr_data;
 
 	VLAPIC_TIMER_LOCK(vlapic);
@@ -1977,13 +1977,13 @@ vlapic_data_validate(const struct vlapic *vlapic, const vmm_data_req_t *req)
 }
 
 static int
-vlapic_data_write(void *datap, const vmm_data_req_t *req)
+vlapic_data_write(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 {
 	VERIFY3U(req->vdr_class, ==, VDC_LAPIC);
 	VERIFY3U(req->vdr_version, ==, 1);
 	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_lapic_v1));
 
-	struct vlapic *vlapic = datap;
+	struct vlapic *vlapic = vm_lapic(vm, vcpuid);
 	if (vlapic_data_validate(vlapic, req) != VVE_OK) {
 		return (EINVAL);
 	}
@@ -2077,7 +2077,7 @@ static const vmm_data_version_entry_t lapic_v1 = {
 	.vdve_class = VDC_LAPIC,
 	.vdve_version = 1,
 	.vdve_len_expect = sizeof (struct vdi_lapic_v1),
-	.vdve_readf = vlapic_data_read,
-	.vdve_writef = vlapic_data_write,
+	.vdve_vcpu_readf = vlapic_data_read,
+	.vdve_vcpu_writef = vlapic_data_write,
 };
 VMM_DATA_VERSION(lapic_v1);

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Robert Mustacchi
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -20,7 +20,7 @@
  * The AMD northbridge CPU temperature driver supports the temperature sensor
  * that was found on the AMD northbridge on AMD CPUs from approximately AMD
  * Family 10h to Family 16h. For Zen and newer processors (Family 17h+) see the
- * 'amdf17nbdf' driver.
+ * 'smntemp' driver.
  *
  * The temperature is stored on the 'miscellaneous' device on the northbridge.
  * This is always found at PCI Device 18h, Function 3h. When there is more than

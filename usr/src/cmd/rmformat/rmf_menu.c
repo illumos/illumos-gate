@@ -1139,13 +1139,11 @@ process_b_flag(int32_t fd)
 		    nparts++) {
 			if (vtoc64->efi_parts[nparts].p_tag ==
 			    V_RESERVED) {
-			if (vtoc64->efi_parts[nparts].p_name) {
 				(void) strncpy(
 				    vtoc64->efi_parts[nparts].p_name, label,
 				    EFI_PART_NAME_LEN);
+				break;
 			}
-			break;
-		}
 		}
 		if (efi_write(fd, vtoc64) != 0) {
 			(void) efi_err_check(vtoc64);
