@@ -19,7 +19,7 @@
 .\" Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
 .\" Copyright 2021-2023 RackTop Systems, Inc.
 .\"
-.Dd May 25, 2023
+.Dd Jun 20, 2023
 .Dt SMBADM 8
 .Os
 .Sh NAME
@@ -231,7 +231,7 @@ The group must already exist.
 The built-in groups cannot be renamed.
 .It Xo
 .Cm show
-.Op Fl mp
+.Op Fl mps
 .Op Ar group
 .Xc
 Shows information about the specified SMB local group or groups.
@@ -242,6 +242,9 @@ option is specified, the group members are also shown.
 If the
 .Fl p
 option is specified, the group privileges are also shown.
+If the
+.Fl s
+option is specified, group members are listed as SIDs instead of names.
 .It Xo
 .Cm get
 .Oo Fl p Ar property Ns = Ns Ar value Oc Ns ...

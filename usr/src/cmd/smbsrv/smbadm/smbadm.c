@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -330,7 +330,7 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 		return;
 
 	case HELP_SHOW:
-		(void) fprintf(fp, gettext("\t%s [-mp] [<group>]\n"),
+		(void) fprintf(fp, gettext("\t%s [-mps] [<group>]\n"),
 		    cmd->name);
 		return;
 
@@ -1077,7 +1077,7 @@ smbadm_group_create(int argc, char **argv)
  * Dump group members details.
  */
 static void
-smbadm_group_dump_members(smb_gsid_t *members, int num)
+smbadm_group_dump_members(smb_gsid_t *members, int num, boolean_t show_sids)
 {
 	char		sidstr[SMB_SID_STRSZ];
 	lsa_account_t	acct;
@@ -1092,7 +1092,8 @@ smbadm_group_dump_members(smb_gsid_t *members, int num)
 	for (i = 0; i < num; i++) {
 		smb_sid_tostr(members[i].gs_sid, sidstr);
 
-		if (smb_lookup_sid(sidstr, &acct) == 0) {
+		if (!show_sids &&
+		    smb_lookup_sid(sidstr, &acct) == 0) {
 			if (acct.a_status == NT_STATUS_SUCCESS)
 				smbadm_group_show_name(acct.a_domain,
 				    acct.a_name);
@@ -1157,7 +1158,8 @@ smbadm_group_dump_privs(smb_privset_t *privs)
  * Dump group details.
  */
 static void
-smbadm_group_dump(smb_group_t *grp, boolean_t show_mem, boolean_t show_privs)
+smbadm_group_dump(smb_group_t *grp, boolean_t show_mem, boolean_t show_privs,
+    boolean_t show_sids)
 {
 	char sidstr[SMB_SID_STRSZ];
 
@@ -1170,7 +1172,8 @@ smbadm_group_dump(smb_group_t *grp, boolean_t show_mem, boolean_t show_privs)
 		smbadm_group_dump_privs(grp->sg_privs);
 
 	if (show_mem)
-		smbadm_group_dump_members(grp->sg_members, grp->sg_nmembers);
+		smbadm_group_dump_members(grp->sg_members, grp->sg_nmembers,
+		    show_sids);
 }
 
 /*
@@ -1181,22 +1184,24 @@ static int
 smbadm_group_show(int argc, char **argv)
 {
 	char *gname = NULL;
-	boolean_t show_privs;
-	boolean_t show_members;
+	boolean_t show_members = B_FALSE;
+	boolean_t show_privs = B_FALSE;
+	boolean_t show_sids = B_FALSE;
 	int option;
 	int status;
 	smb_group_t grp;
 	smb_giter_t gi;
 
-	show_privs = show_members = B_FALSE;
-
-	while ((option = getopt(argc, argv, "mp")) != -1) {
+	while ((option = getopt(argc, argv, "mps")) != -1) {
 		switch (option) {
 		case 'm':
 			show_members = B_TRUE;
 			break;
 		case 'p':
 			show_privs = B_TRUE;
+			break;
+		case 's':
+			show_sids = B_TRUE;
 			break;
 
 		default:
@@ -1211,7 +1216,8 @@ smbadm_group_show(int argc, char **argv)
 	if (strcmp(gname, "*")) {
 		status = smb_lgrp_getbyname(gname, &grp);
 		if (status == SMB_LGRP_SUCCESS) {
-			smbadm_group_dump(&grp, show_members, show_privs);
+			smbadm_group_dump(&grp, show_members, show_privs,
+			    show_sids);
 			smb_lgrp_free(&grp);
 		} else {
 			(void) fprintf(stderr,
@@ -1228,7 +1234,7 @@ smbadm_group_show(int argc, char **argv)
 	}
 
 	while ((status = smb_lgrp_iterate(&gi, &grp)) == SMB_LGRP_SUCCESS) {
-		smbadm_group_dump(&grp, show_members, show_privs);
+		smbadm_group_dump(&grp, show_members, show_privs, show_sids);
 		smb_lgrp_free(&grp);
 	}
 
