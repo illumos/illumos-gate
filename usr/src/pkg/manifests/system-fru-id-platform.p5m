@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 Peter Tribble.
+# Copyright 2023 Peter Tribble.
 #
 
 set name=pkg.fmri value=pkg:/system/fru-id/platform@$(PKGVERS)
@@ -35,8 +35,6 @@ $(i386_ONLY)dir path=usr/lib
 $(i386_ONLY)dir path=usr/lib/picl group=sys
 $(i386_ONLY)dir path=usr/lib/picl/plugins group=sys
 $(i386_ONLY)file path=usr/lib/picl/plugins/fru_container.conf group=sys
-dir  path=usr/share/man/man8
-file path=usr/share/man/man8/fruadm.8
 $(i386_ONLY)legacy pkg=SUNWfruip.i arch=$(ARCH).i86pc \
     desc="FRU ID platform data module and access library" \
     name="FRU ID Platform Modules (Usr)"

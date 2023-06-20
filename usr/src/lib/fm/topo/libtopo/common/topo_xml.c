@@ -1222,10 +1222,7 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 					continue;
 				set = xmlGetProp(cn, (xmlChar *)Setlist);
 
-				if (mp->tm_hdl->th_product)
-					key = mp->tm_hdl->th_product;
-				else
-					key = mp->tm_hdl->th_platform;
+				key = mp->tm_hdl->th_product;
 
 				/*
 				 * If it's the default set then we'll store
@@ -1881,10 +1878,7 @@ topo_xml_walk(topo_mod_t *mp,
 
 			set = xmlGetProp(curr, (xmlChar *)Setlist);
 
-			if (mp->tm_hdl->th_product)
-				key = mp->tm_hdl->th_product;
-			else
-				key = mp->tm_hdl->th_platform;
+			key = mp->tm_hdl->th_product;
 
 			/*
 			 * If it's the default set then we'll store

@@ -15458,8 +15458,6 @@ s usr/share/man/man3ext/setkey.3ext=crypt.3ext
 f usr/share/man/man3ext/sha1.3ext 0444 root bin
 f usr/share/man/man3ext/sha2.3ext 0444 root bin
 f usr/share/man/man3ext/stdarg.3ext 0444 root bin
-f usr/share/man/man3ext/tsalarm_get.3ext 0444 root bin
-s usr/share/man/man3ext/tsalarm_set.3ext=tsalarm_get.3ext
 f usr/share/man/man3ext/varargs.3ext 0444 root bin
 s usr/share/man/man3ext/write_vtoc.3ext=read_vtoc.3ext
 d usr/share/man/man3fcoe 0755 root bin
@@ -16174,7 +16172,6 @@ f usr/share/man/man3lib/libtecla.3lib 0444 root bin
 s usr/share/man/man3lib/libtermcap.3lib=libcurses.3lib
 s usr/share/man/man3lib/libtermlib.3lib=libcurses.3lib
 f usr/share/man/man3lib/libthread.3lib 0444 root bin
-f usr/share/man/man3lib/libtsalarm.3lib 0444 root bin
 f usr/share/man/man3lib/libumem.3lib 0444 root bin
 f usr/share/man/man3lib/libuuid.3lib 0444 root bin
 f usr/share/man/man3lib/libvnd.3lib 0444 root bin

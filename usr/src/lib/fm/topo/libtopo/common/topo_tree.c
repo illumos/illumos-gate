@@ -166,8 +166,7 @@ topo_tree_enum(topo_hdl_t *thp, ttree_t *tp)
 	 * Trim any SUNW, from the product or platform name
 	 * before loading file
 	 */
-	if (thp->th_product == NULL ||
-	    (pp = strchr(thp->th_product, ',')) == NULL)
+	if ((pp = strchr(thp->th_product, ',')) == NULL)
 		pp = thp->th_product;
 	else
 		pp++;
