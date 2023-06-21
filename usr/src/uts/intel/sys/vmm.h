@@ -387,6 +387,15 @@ enum vm_entry_cmds {
 	VEC_DISCARD_INSTR,	/* discard inst emul state */
 	VEC_FULFILL_MMIO,	/* entry includes result for mmio emul */
 	VEC_FULFILL_INOUT,	/* entry includes result for inout emul */
+
+	/* Below are flags which can be combined with the above commands: */
+
+	/*
+	 * Exit to userspace when vCPU is in consistent state: when any pending
+	 * instruction emulation tasks have been completed and committed to the
+	 * architecturally defined state.
+	 */
+	VEC_FLAG_EXIT_CONSISTENT	= 1 << 31,
 };
 
 struct vm_entry {

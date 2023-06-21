@@ -139,6 +139,7 @@ struct vcpu {
 	int		hostcpu;	/* (o) vcpu's current host cpu */
 	int		lastloccpu;	/* (o) last host cpu localized to */
 	int		reqidle;	/* (i) request vcpu to idle */
+	bool		reqconsist;	/* (i) req. vcpu exit when consistent */
 	struct vlapic	*vlapic;	/* (i) APIC device model */
 	enum x2apic_state x2apic_state;	/* (i) APIC mode */
 	uint64_t	exit_intinfo;	/* (i) events pending at VM exit */
@@ -2345,24 +2346,27 @@ vmm_restorectx(void *arg)
 
 }
 
+/* Convenience defines for parsing vm_entry`cmd values */
+#define	VEC_MASK_FLAGS	(VEC_FLAG_EXIT_CONSISTENT)
+#define	VEC_MASK_CMD	(~VEC_MASK_FLAGS)
+
 static int
 vm_entry_actions(struct vm *vm, int vcpuid, const struct vm_entry *entry,
     struct vm_exit *vme)
 {
-	struct vcpu *vcpu;
-	struct vie *vie;
-	int err;
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
+	struct vie *vie = vcpu->vie_ctx;
+	int err = 0;
 
-	vcpu = &vm->vcpu[vcpuid];
-	vie = vcpu->vie_ctx;
-	err = 0;
+	const uint_t cmd = entry->cmd & VEC_MASK_CMD;
+	const uint_t flags = entry->cmd & VEC_MASK_FLAGS;
 
-	switch (entry->cmd) {
+	switch (cmd) {
 	case VEC_DEFAULT:
-		return (0);
+		break;
 	case VEC_DISCARD_INSTR:
 		vie_reset(vie);
-		return (0);
+		break;
 	case VEC_FULFILL_MMIO:
 		err = vie_fulfill_mmio(vie, &entry->u.mmio);
 		if (err == 0) {
@@ -2404,6 +2408,16 @@ vm_entry_actions(struct vm *vm, int vcpuid, const struct vm_entry *entry,
 	default:
 		return (EINVAL);
 	}
+
+	/*
+	 * Pay heed to requests for exit-when-vCPU-is-consistent requests, at
+	 * least when we are not immediately bound for another exit due to
+	 * multi-part instruction emulation or related causes.
+	 */
+	if ((flags & VEC_FLAG_EXIT_CONSISTENT) != 0 && err == 0) {
+		vcpu->reqconsist = true;
+	}
+
 	return (err);
 }
 
@@ -3388,6 +3402,17 @@ vcpu_bailout_checks(struct vm *vm, int vcpuid, bool on_entry,
 			vcpu_assert_locked(vcpu);
 			vcpu->reqidle = 0;
 		}
+		bail = true;
+	}
+	if (vcpu->reqconsist) {
+		/*
+		 * We only expect exit-when-consistent requests to be asserted
+		 * during entry, not as an otherwise spontaneous condition.  As
+		 * such, we do not count it among the exit statistics, and emit
+		 * the expected BOGUS exitcode, while clearing the request.
+		 */
+		vme->exitcode = VM_EXITCODE_BOGUS;
+		vcpu->reqconsist = false;
 		bail = true;
 	}
 	if (vcpu_should_yield(vm, vcpuid)) {
