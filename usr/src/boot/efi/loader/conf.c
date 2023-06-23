@@ -65,24 +65,16 @@ struct netif_driver *netif_drivers[] = {
 };
 
 extern struct console efi_console;
-#if defined(__amd64__) || defined(__i386__)
-extern struct console ttya;
-extern struct console ttyb;
-extern struct console ttyc;
-extern struct console ttyd;
 extern struct console nullconsole;
 extern struct console spinconsole;
-#endif
+extern void comc_ini(void);
 
-struct console *consoles[] = {
-#if defined(__amd64__) || defined(__i386__)
-	&efi_console,
-	&ttya,
-	&ttyb,
-	&ttyc,
-	&ttyd,
-	&nullconsole,
-	&spinconsole,
-#endif
-	NULL
+struct console_template ct_list[] = {
+	[0] = { .ct_dev = &efi_console, .ct_init = NULL },
+	[1] = { .ct_dev = NULL, .ct_init = comc_ini },
+	[2] = { .ct_dev = &nullconsole, .ct_init = NULL },
+	[3] = { .ct_dev = &spinconsole, .ct_init = NULL },
+	[4] = { .ct_dev = NULL, .ct_init = NULL },
 };
+
+struct console **consoles;
