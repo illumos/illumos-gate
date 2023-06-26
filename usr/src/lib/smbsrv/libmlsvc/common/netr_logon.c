@@ -770,7 +770,7 @@ netr_validate_chain(netr_info_t *netr_info, struct netr_authenticator *auth)
 	    netr_info->timestamp, &cred, B_FALSE) != SMBAUTH_SUCCESS)
 		return (NT_STATUS_INTERNAL_ERROR);
 
-	if (&auth->credential == 0) {
+	if (auth == NULL) {
 		/*
 		 * If the validation fails, destroy the credential chain.
 		 * This should trigger a new authentication chain.
