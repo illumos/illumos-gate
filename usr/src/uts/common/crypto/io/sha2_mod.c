@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <sys/modctl.h>
@@ -1014,14 +1016,17 @@ sha2_mac_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	 */
 	if (sha2_is_general_hmech(mechanism)) {
 		if (mechanism->cm_param == NULL ||
-		    mechanism->cm_param_len != sizeof (ulong_t))
+		    mechanism->cm_param_len != sizeof (ulong_t)) {
 			ret = CRYPTO_MECHANISM_PARAM_INVALID;
+			goto bail;
+		}
 		PROV_SHA2_GET_DIGEST_LEN(mechanism,
 		    PROV_SHA2_HMAC_CTX(ctx)->hc_digest_len);
 		if (PROV_SHA2_HMAC_CTX(ctx)->hc_digest_len > sha_digest_len)
 			ret = CRYPTO_MECHANISM_PARAM_INVALID;
 	}
 
+bail:
 	if (ret != CRYPTO_SUCCESS) {
 		bzero(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));
 		kmem_free(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));

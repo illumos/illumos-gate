@@ -22,6 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 /*
@@ -306,8 +307,7 @@ aes_check_mech_param(crypto_mechanism_t *mechanism, aes_ctx_t **ctx, int kmflag)
 	if (param_required && mechanism->cm_param != NULL &&
 	    mechanism->cm_param_len != param_len) {
 		rv = CRYPTO_MECHANISM_PARAM_INVALID;
-	}
-	if (ctx != NULL) {
+	} else if (ctx != NULL) {
 		p = (alloc_fun)(kmflag);
 		*ctx = p;
 	}

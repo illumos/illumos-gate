@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <sys/modctl.h>
@@ -895,8 +896,10 @@ sha1_mac_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	PROV_SHA1_HMAC_CTX(ctx)->hc_mech_type = mechanism->cm_type;
 	if (mechanism->cm_type == SHA1_HMAC_GEN_MECH_INFO_TYPE) {
 		if (mechanism->cm_param == NULL ||
-		    mechanism->cm_param_len != sizeof (ulong_t))
+		    mechanism->cm_param_len != sizeof (ulong_t)) {
 			ret = CRYPTO_MECHANISM_PARAM_INVALID;
+			goto bail;
+		}
 		PROV_SHA1_GET_DIGEST_LEN(mechanism,
 		    PROV_SHA1_HMAC_CTX(ctx)->hc_digest_len);
 		if (PROV_SHA1_HMAC_CTX(ctx)->hc_digest_len >
@@ -904,6 +907,7 @@ sha1_mac_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 			ret = CRYPTO_MECHANISM_PARAM_INVALID;
 	}
 
+bail:
 	if (ret != CRYPTO_SUCCESS) {
 		bzero(ctx->cc_provider_private, sizeof (sha1_hmac_ctx_t));
 		kmem_free(ctx->cc_provider_private, sizeof (sha1_hmac_ctx_t));

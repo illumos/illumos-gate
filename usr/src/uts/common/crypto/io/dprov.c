@@ -23,6 +23,7 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2023-2025 RackTop Systems, Inc.
  */
 
 
@@ -4757,6 +4758,13 @@ dprov_copyin_mechanism(crypto_provider_handle_t provider,
 	kmech->cm_param_len = 0;
 
 	switch (kmech->cm_type) {
+	case SHA1_HMAC_GEN_MECH_INFO_TYPE:
+	case SHA256_HMAC_GEN_MECH_INFO_TYPE:
+	case SHA384_HMAC_GEN_MECH_INFO_TYPE:
+	case SHA512_HMAC_GEN_MECH_INFO_TYPE:
+		expected_param_len = sizeof (ulong_t);
+		break;
+
 	case DES_CBC_MECH_INFO_TYPE:
 	case DES3_CBC_MECH_INFO_TYPE:
 		expected_param_len = DES_BLOCK_LEN;

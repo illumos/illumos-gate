@@ -230,10 +230,14 @@ dir  path=opt/crypto-tests/tests/hmac/kcf
 file path=opt/crypto-tests/tests/hmac/kcf/cleanup mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_32 mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_64 mode=0555
+file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_gen_32 mode=0555
+file path=opt/crypto-tests/tests/hmac/kcf/hmac_sha1_gen_64 mode=0555
 file path=opt/crypto-tests/tests/hmac/kcf/setup mode=0555
 dir  path=opt/crypto-tests/tests/hmac/pkcs
 file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_32 mode=0555
 file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_64 mode=0555
+file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_gen_32 mode=0555
+file path=opt/crypto-tests/tests/hmac/pkcs/hmac_sha1_gen_64 mode=0555
 dir  path=opt/crypto-tests/tests/longhash
 file path=opt/crypto-tests/tests/longhash/longhash_32 mode=0555
 file path=opt/crypto-tests/tests/longhash/longhash_64 mode=0555

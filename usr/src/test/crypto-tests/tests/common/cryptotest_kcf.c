@@ -12,6 +12,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <fcntl.h>
@@ -58,11 +59,12 @@ kcf_do_ioctl(int opcode, uint_t *arg, char *opstr)
 	}
 
 	if (ret < 0 || *arg != CRYPTO_SUCCESS) {
+		char errbuf[BUFSZ] = {0};
 		(void) fprintf(stderr,
-		    "%s: Error = %d errno=%d (%s) 0x%02x\n",
+		    "%s: Error: %s errno: %s (%d) rc: %d\n",
 		    (opstr == NULL) ? "ioctl" : opstr,
-		    ret, errno, strerror(errno), *arg);
-
+		    cryptotest_errstr(*arg, errbuf, sizeof (errbuf)),
+		    strerror(errno), errno, ret);
 	}
 
 	/*
@@ -198,8 +200,8 @@ mac_init(crypto_op_t *op)
 	init.mi_key.ck_length = op->keylen;
 
 	init.mi_mech.cm_type = op->mech;
-	init.mi_mech.cm_param = NULL;
-	init.mi_mech.cm_param_len = 0;
+	init.mi_mech.cm_param = op->param;
+	init.mi_mech.cm_param_len = op->paramlen;
 
 	return (kcf_do_ioctl(CRYPTO_MAC_INIT, (uint_t *)&init, "init"));
 }
@@ -401,8 +403,8 @@ digest_init(crypto_op_t *op)
 	init.di_session = op->hsession;
 
 	init.di_mech.cm_type = op->mech;
-	init.di_mech.cm_param = NULL;
-	init.di_mech.cm_param_len = 0;
+	init.di_mech.cm_param = op->param;
+	init.di_mech.cm_param_len = op->paramlen;
 
 	return (kcf_do_ioctl(CRYPTO_DIGEST_INIT, (uint_t *)&init, "init"));
 }

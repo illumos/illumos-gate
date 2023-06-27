@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <stdlib.h>
@@ -1156,6 +1157,7 @@ get_mechanism_info(kernel_slot_t *pslot, CK_MECHANISM_TYPE type,
 	/*
 	 * Atomic flags are not part of PKCS#11 so we filter
 	 * them out here.
+	 * Neither is CRYPTO_FG_MAC.
 	 */
 	mi_flags = mechanism_info.mi_flags;
 	mi_flags &= ~(CRYPTO_FG_DIGEST_ATOMIC | CRYPTO_FG_ENCRYPT_ATOMIC |
@@ -1164,7 +1166,8 @@ get_mechanism_info(kernel_slot_t *pslot, CK_MECHANISM_TYPE type,
 	    CRYPTO_FG_SIGN_RECOVER_ATOMIC |
 	    CRYPTO_FG_VERIFY_RECOVER_ATOMIC |
 	    CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
-	    CRYPTO_FG_MAC_DECRYPT_ATOMIC);
+	    CRYPTO_FG_MAC_DECRYPT_ATOMIC |
+	    CRYPTO_FG_MAC);
 
 	if (mi_flags == 0) {
 		return (CKR_MECHANISM_INVALID);

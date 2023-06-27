@@ -22,6 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2023-2025 RackTop Systems, Inc.
  */
 
 
@@ -45,6 +46,7 @@
 #include <sys/task.h>
 #include <sys/mkdev.h>
 #include <sys/model.h>
+#include <sys/sdt.h>
 #include <sys/sysmacros.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/api.h>
@@ -154,6 +156,7 @@ static int crypto_create_session_ptr(crypto_minor_t *, kcf_provider_desc_t *,
 #define	CRYPTO_SESSION_CHUNK	100
 
 size_t crypto_max_buffer_len = CRYPTO_MAX_BUFFER_LEN;
+size_t crypto_max_params_len = CRYPTO_PRE_APPROVED_LIMIT;
 size_t crypto_pre_approved_limit = CRYPTO_PRE_APPROVED_LIMIT;
 
 #define	INIT_RAW_CRYPTO_DATA(data, len)				\
@@ -2133,9 +2136,34 @@ close_session(dev_t dev, caddr_t arg, int mode, int *rval)
 	return (0);
 }
 
+static int
+copyin_mech_param_rctl_chk(crypto_session_data_t *sp, size_t param_len,
+    boolean_t *out_rctl_chk)
+{
+	if (param_len > crypto_max_params_len) {
+		DTRACE_PROBE3(copyin__oversize,
+		    crypto_session_data_t *, sp,
+		    size_t, param_len,
+		    boolean_t *, out_rctl_chk);
+		return (CRYPTO_ARGUMENTS_BAD);
+	}
+
+	return (CRYPTO_BUFFER_CHECK(sp, param_len, *out_rctl_chk));
+}
+
 /*
  * Copy data model dependent mechanism structure into a kernel mechanism
- * structure.  Allocate param storage if necessary.
+ * structure.  Allocate param storage if necessary.  The size and layout
+ * of the parameters varies. Some mechanisms use a mech-specific method
+ * to copy the params.  The internal form is always "flattened" so if the
+ * top level param struct has pointers, they point to later parts of the
+ * same (single) allocation for the entire parameters object.  This sets
+ * out_mech->cm_param_len to the size of that entier (flattened) object
+ * so the later kmem_free(mech->cm_param, mech->cm_param_len) is correct.
+ * All params are limited in size (crypto_max_params_len) and since param
+ * copyin happens early in a crypto session lifetime, it's unlikely this
+ * ever runs into resource constraints while doing copyin of parameters.
+ * Nonetheless this still checks.
  */
 static boolean_t
 copyin_mech(int mode, crypto_session_data_t *sp, crypto_mechanism_t *in_mech,
@@ -2157,18 +2185,47 @@ copyin_mech(int mode, crypto_session_data_t *sp, crypto_mechanism_t *in_mech,
 	out_mech->cm_param = NULL;
 	out_mech->cm_param_len = 0;
 	if (param != NULL && param_len != 0) {
-		if (param_len > crypto_max_buffer_len) {
-			cmn_err(CE_NOTE, "copyin_mech: buffer greater than "
-			    "%ld bytes, pid = %d", crypto_max_buffer_len,
-			    curproc->p_pid);
-			rv = CRYPTO_ARGUMENTS_BAD;
+		kcf_mech_entry_t *me;
+
+		if (kcf_get_mech_entry(out_mech->cm_type, &me) != KCF_SUCCESS) {
+			rv = CRYPTO_MECHANISM_INVALID;
 			goto out;
 		}
 
-		rv = CRYPTO_BUFFER_CHECK(sp, param_len, *out_rctl_chk);
-		if (rv != CRYPTO_SUCCESS) {
+		if (me->me_copyin_param != NULL) {
+			/*
+			 * Mech-specfic param copyin function.
+			 * Limits to crypto_max_params_len.
+			 */
+			rv = me->me_copyin_param(param, param_len, out_mech,
+			    mode, KM_SLEEP);
+			if (rv != CRYPTO_SUCCESS) {
+				ASSERT(out_mech->cm_param == NULL);
+				error = EFAULT;
+				goto out;
+			}
+			rv = copyin_mech_param_rctl_chk(sp,
+			    out_mech->cm_param_len, out_rctl_chk);
+			if (rv != CRYPTO_SUCCESS) {
+				/*
+				 * Should be rare.  See above.
+				 */
+				if (out_mech->cm_param != NULL) {
+					kmem_free(out_mech->cm_param,
+					    out_mech->cm_param_len);
+					out_mech->cm_param = NULL;
+					out_mech->cm_param_len = 0;
+				}
+				error = EFAULT;
+				goto out;
+			}
+			rctl_bytes += out_mech->cm_param_len;
 			goto out;
 		}
+
+		rv = copyin_mech_param_rctl_chk(sp, param_len, out_rctl_chk);
+		if (rv != CRYPTO_SUCCESS)
+			goto out;
 		rctl_bytes = param_len;
 
 		out_mech->cm_param = kmem_alloc(param_len, KM_SLEEP);
@@ -6651,7 +6708,7 @@ get_provider_by_mech(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_by_mech_t mech;
 	crypto_provider_session_t *ps;
 	crypto_minor_t *cm;
-	int rv, error;
+	int rv;
 
 	if ((cm = crypto_hold_minor(getminor(dev))) == NULL) {
 		cmn_err(CE_WARN, "get_provider_by_mech: failed holding minor");
@@ -6668,17 +6725,15 @@ get_provider_by_mech(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	key.ck_length = mech.mech_keylen;
 	/* pd is returned held */
-	if ((pd = kcf_get_mech_provider(mech.mech_type, &key, &me, &error,
-	    NULL, mech.mech_fg, 0)) == NULL) {
-		rv = error;
+	if ((pd = kcf_get_mech_provider(mech.mech_type, &key, &me, &rv,
+	    NULL, mech.mech_fg, 0)) == NULL)
 		goto release_minor;
-	}
 
 	/* don't want to allow direct access to software providers */
 	if (pd->pd_prov_type == CRYPTO_SW_PROVIDER) {
 		rv = CRYPTO_MECHANISM_INVALID;
 		KCF_PROV_REFRELE(pd);
-		cmn_err(CE_WARN, "software mech_type given");
+		cmn_err(CE_WARN, "!software mech_type given");
 		goto release_minor;
 	}
 
@@ -6694,7 +6749,7 @@ release_minor:
 	if (copyout(&mech, arg, sizeof (mech)) != 0)
 		return (EFAULT);
 
-	return (rv);
+	return (0);
 }
 
 /* ARGSUSED */

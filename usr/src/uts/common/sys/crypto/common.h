@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2013 Saso Kiselkov.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef _SYS_CRYPTO_COMMON_H
@@ -66,6 +67,12 @@ typedef struct crypto_mechanism32 {
 
 #endif  /* _SYSCALL32 */
 
+/*
+ * New structures that have internal pointers need a custom me_copyin_param
+ * and me_free_param function added to their kcf_mech_entry_t.
+ * See: kcf_copyin_*_param in kcf_mech_tabs.c.
+ */
+
 #ifdef _KERNEL
 /* CK_AES_CTR_PARAMS provides parameters to the CKM_AES_CTR mechanism */
 typedef struct CK_AES_CTR_PARAMS {
@@ -96,7 +103,7 @@ typedef struct CK_AES_GCM_PARAMS {
 
 /* CK_AES_GMAC_PARAMS provides parameters to the CKM_AES_GMAC mechanism */
 typedef struct CK_AES_GMAC_PARAMS {
-	uchar_t *pIv;
+	uchar_t *pIv;	/* Length is AES_GMAC_IV_LEN */
 	uchar_t *pAAD;
 	ulong_t ulAADLen;
 } CK_AES_GMAC_PARAMS;
@@ -405,7 +412,7 @@ typedef enum {
 	CRYPTO_LOGICAL_PROVIDER
 } crypto_provider_type_t;
 
-typedef uint32_t 	crypto_provider_id_t;
+typedef uint32_t	crypto_provider_id_t;
 #define	KCF_PROVID_INVALID	((uint32_t)-1)
 
 typedef struct crypto_provider_entry {

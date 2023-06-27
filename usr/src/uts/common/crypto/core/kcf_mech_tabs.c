@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2023-2025 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -29,6 +31,7 @@
 #include <sys/disp.h>
 #include <sys/modctl.h>
 #include <sys/modhash.h>
+#include <sys/sysmacros.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/api.h>
 #include <sys/crypto/impl.h>
@@ -186,6 +189,8 @@ kcf_init_mech_tabs()
 	    CRYPTO_MAX_MECH_NAME);
 	kcf_digest_mechs_tab[1].me_threshold = kcf_sha1_threshold;
 
+	CTASSERT(ARRAY_SIZE(kcf_digest_mechs_tab) >= 2);
+
 	/* The symmetric ciphers in various modes */
 	(void) strncpy(kcf_cipher_mechs_tab[0].me_name, SUN_CKM_DES_CBC,
 	    CRYPTO_MAX_MECH_NAME);
@@ -223,6 +228,22 @@ kcf_init_mech_tabs()
 	    CRYPTO_MAX_MECH_NAME);
 	kcf_cipher_mechs_tab[8].me_threshold = kcf_rc4_threshold;
 
+	(void) strncpy(kcf_cipher_mechs_tab[9].me_name, SUN_CKM_AES_CCM,
+	    CRYPTO_MAX_MECH_NAME);
+	kcf_cipher_mechs_tab[9].me_copyin_param = kcf_copyin_aes_ccm_param;
+
+	(void) strncpy(kcf_cipher_mechs_tab[10].me_name, SUN_CKM_AES_GCM,
+	    CRYPTO_MAX_MECH_NAME);
+	kcf_cipher_mechs_tab[10].me_copyin_param = kcf_copyin_aes_gcm_param;
+
+	CTASSERT(ARRAY_SIZE(kcf_cipher_mechs_tab) >= 11);
+
+	/* 1 KeyOp */
+	(void) strncpy(kcf_keyops_mechs_tab[0].me_name, SUN_CKM_ECDH1_DERIVE,
+	    CRYPTO_MAX_MECH_NAME);
+	kcf_keyops_mechs_tab[0].me_copyin_param = kcf_copyin_ecdh1_param;
+
+	CTASSERT(ARRAY_SIZE(kcf_keyops_mechs_tab) >= 1);
 
 	/* 6 HMACs */
 	(void) strncpy(kcf_mac_mechs_tab[0].me_name, SUN_CKM_MD5_HMAC,
@@ -243,15 +264,20 @@ kcf_init_mech_tabs()
 
 	(void) strncpy(kcf_mac_mechs_tab[4].me_name, SUN_CKM_AES_GMAC,
 	    CRYPTO_MAX_MECH_NAME);
-	kcf_mac_mechs_tab[4].me_threshold = kcf_sha1_threshold;
+	kcf_mac_mechs_tab[4].me_threshold = kcf_aes_threshold;
+	kcf_mac_mechs_tab[4].me_copyin_param = kcf_copyin_aes_gmac_param;
 
 	(void) strncpy(kcf_mac_mechs_tab[5].me_name, SUN_CKM_AES_CMAC,
 	    CRYPTO_MAX_MECH_NAME);
-	kcf_mac_mechs_tab[5].me_threshold = kcf_sha1_threshold;
+	kcf_mac_mechs_tab[5].me_threshold = kcf_aes_threshold;
+
+	CTASSERT(ARRAY_SIZE(kcf_mac_mechs_tab) >= 6);
 
 	/* 1 random number generation pseudo mechanism */
 	(void) strncpy(kcf_misc_mechs_tab[0].me_name, SUN_RANDOM,
 	    CRYPTO_MAX_MECH_NAME);
+
+	CTASSERT(ARRAY_SIZE(kcf_misc_mechs_tab) >= 1);
 
 	kcf_mech_hash = mod_hash_create_strhash("kcf mech2id hash",
 	    kcf_mech_hash_size, mod_hash_null_valdtor);
@@ -342,6 +368,7 @@ kcf_create_mech_entry(kcf_ops_class_t class, char *mechname)
 			 * the threshold is set to zero.
 			 */
 			me_tab[i].me_threshold = 0;
+			me_tab[i].me_copyin_param = NULL;
 
 			ME_MUTEXES_EXIT_ALL();
 			/* Add the new mechanism to the hash table */

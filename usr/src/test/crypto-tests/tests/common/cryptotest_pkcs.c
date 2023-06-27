@@ -12,6 +12,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <errno.h>
@@ -146,8 +147,8 @@ sign_init(crypto_op_t *op)
 	CK_RV rv;
 
 	mech.mechanism = op->mech;
-	mech.pParameter = NULL;
-	mech.ulParameterLen = 0;
+	mech.pParameter = op->param;
+	mech.ulParameterLen = op->paramlen;
 
 	rv = SUNW_C_KeyToObject(op->hsession, op->mech,
 	    op->key, op->keylen, &op->keyt);
@@ -233,8 +234,8 @@ verify_init(crypto_op_t *op)
 	CK_RV rv;
 
 	mech.mechanism = op->mech;
-	mech.pParameter = NULL;
-	mech.ulParameterLen = 0;
+	mech.pParameter = op->param;
+	mech.ulParameterLen = op->paramlen;
 
 	rv = SUNW_C_KeyToObject(op->hsession, op->mech,
 	    op->key, op->keylen, &op->keyt);

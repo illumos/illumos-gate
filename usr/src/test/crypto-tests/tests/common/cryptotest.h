@@ -12,6 +12,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef _CRYPTOTEST_H
@@ -23,6 +24,12 @@ extern "C" {
 
 #include <inttypes.h>
 #include <sys/crypto/ioctl.h>
+
+/*
+ * A somewhat arbitrary size that should be large enough to hold the printed
+ * error and size messages.
+ */
+#define	BUFSZ 128
 
 #define	CTEST_INIT_FAILED (-1)
 #define	CTEST_NAME_RESOLVE_FAILED (-2)

@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #define	__EXTENSIONS__
@@ -21,12 +22,6 @@
 #include <stdio.h>
 #include <sys/debug.h>
 #include "cryptotest.h"
-
-/*
- * A somewhat arbitrary size that should be large enough to hold the printed
- * error and size messages.
- */
-#define	BUFSZ 128
 
 #define	EXIT_FAILURE_MULTIPART	1
 #define	EXIT_FAILURE_SINGLEPART	2
@@ -212,8 +207,9 @@ test_multi(cryptotest_t *args, test_fg_t *funcs, uint8_t *cmp, size_t cmplen)
 		(void) fflush(stderr);
 
 		if ((ret = funcs->tf_init(crypto_op)) != CRYPTO_SUCCESS) {
-			(void) fprintf(stderr, "        fatal error %d\n", ret);
-			exit(EXIT_FAILURE_MULTIPART);
+			(void) fprintf(stderr, "    tf_init error %d\n", ret);
+			errs += 1;
+			continue;
 		}
 
 		while (offset < args->inlen) {
@@ -274,17 +270,16 @@ test_single(cryptotest_t *args, test_fg_t *funcs, uint8_t *cmp, size_t cmplen)
 	(void) fprintf(stderr, "single part:\n");
 
 	if ((ret = test_setup(args, funcs, &crypto_op)) != CRYPTO_SUCCESS) {
-		(void) fprintf(stderr, "        fatal error %d\n", ret);
+		(void) fprintf(stderr, "        setup error %d\n", ret);
 		exit(EXIT_FAILURE_SINGLEPART);
 	}
 
 	if ((ret = funcs->tf_init(crypto_op)) != CRYPTO_SUCCESS) {
-		(void) fprintf(stderr, "        fatal error %d\n", ret);
-		exit(EXIT_FAILURE_SINGLEPART);
+		(void) fprintf(stderr, "        tf_init error %d\n", ret);
+		goto out;
 	}
 
-	if ((ret = funcs->tf_single(crypto_op)) != CRYPTO_SUCCESS)
-		goto out;
+	ret = funcs->tf_single(crypto_op);
 
 	/*
 	 * Errors from the crypto frameworks (KCF, PKCS#11) are all
@@ -294,7 +289,6 @@ test_single(cryptotest_t *args, test_fg_t *funcs, uint8_t *cmp, size_t cmplen)
 	if (ret > 0) {
 		(void) fprintf(stderr, "        failure %s\n",
 		    cryptotest_errstr(ret, errbuf, sizeof (errbuf)));
-		return (1);
 	} else if (ret < 0) {
 		(void) fprintf(stderr, "        fatal error %s\n",
 		    ctest_errstr(ret, errbuf, sizeof (errbuf)));
