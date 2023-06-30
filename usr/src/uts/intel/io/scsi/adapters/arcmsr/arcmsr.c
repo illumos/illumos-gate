@@ -2094,67 +2094,65 @@ arcmsr_report_sense_info(struct CCB *ccb)
 	pkt->pkt_state |= STATE_ARQ_DONE;
 
 	cdb_sensedata = (struct SENSE_DATA *)ccb->arcmsr_cdb.SenseData;
-	if (&arq_status->sts_sensedata != NULL) {
-		if (err_blkno <= 0xfffffffful) {
-			struct scsi_extended_sense *sts_sensedata;
+	if (err_blkno <= 0xfffffffful) {
+		struct scsi_extended_sense *sts_sensedata;
 
-			sts_sensedata = &arq_status->sts_sensedata;
-			sts_sensedata->es_code = cdb_sensedata->ErrorCode;
-			/* must eq CLASS_EXTENDED_SENSE (0x07) */
-			sts_sensedata->es_class = cdb_sensedata->ErrorClass;
-			sts_sensedata->es_valid = cdb_sensedata->Valid;
-			sts_sensedata->es_segnum = cdb_sensedata->SegmentNumber;
-			sts_sensedata->es_key = cdb_sensedata->SenseKey;
-			sts_sensedata->es_ili = cdb_sensedata->IncorrectLength;
-			sts_sensedata->es_eom = cdb_sensedata->EndOfMedia;
-			sts_sensedata->es_filmk = cdb_sensedata->FileMark;
-			sts_sensedata->es_info_1 = (err_blkno >> 24) & 0xFF;
-			sts_sensedata->es_info_2 = (err_blkno >> 16) & 0xFF;
-			sts_sensedata->es_info_3 = (err_blkno >>  8) & 0xFF;
-			sts_sensedata->es_info_4 = err_blkno & 0xFF;
-			sts_sensedata->es_add_len =
-			    cdb_sensedata->AdditionalSenseLength;
-			sts_sensedata->es_cmd_info[0] =
-			    cdb_sensedata->CommandSpecificInformation[0];
-			sts_sensedata->es_cmd_info[1] =
-			    cdb_sensedata->CommandSpecificInformation[1];
-			sts_sensedata->es_cmd_info[2] =
-			    cdb_sensedata->CommandSpecificInformation[2];
-			sts_sensedata->es_cmd_info[3] =
-			    cdb_sensedata->CommandSpecificInformation[3];
-			sts_sensedata->es_add_code =
-			    cdb_sensedata->AdditionalSenseCode;
-			sts_sensedata->es_qual_code =
-			    cdb_sensedata->AdditionalSenseCodeQualifier;
-			sts_sensedata->es_fru_code =
-			    cdb_sensedata->FieldReplaceableUnitCode;
-		} else { /* 64-bit LBA */
-			struct scsi_descr_sense_hdr *dsp;
-			struct scsi_information_sense_descr *isd;
+		sts_sensedata = &arq_status->sts_sensedata;
+		sts_sensedata->es_code = cdb_sensedata->ErrorCode;
+		/* must eq CLASS_EXTENDED_SENSE (0x07) */
+		sts_sensedata->es_class = cdb_sensedata->ErrorClass;
+		sts_sensedata->es_valid = cdb_sensedata->Valid;
+		sts_sensedata->es_segnum = cdb_sensedata->SegmentNumber;
+		sts_sensedata->es_key = cdb_sensedata->SenseKey;
+		sts_sensedata->es_ili = cdb_sensedata->IncorrectLength;
+		sts_sensedata->es_eom = cdb_sensedata->EndOfMedia;
+		sts_sensedata->es_filmk = cdb_sensedata->FileMark;
+		sts_sensedata->es_info_1 = (err_blkno >> 24) & 0xFF;
+		sts_sensedata->es_info_2 = (err_blkno >> 16) & 0xFF;
+		sts_sensedata->es_info_3 = (err_blkno >>  8) & 0xFF;
+		sts_sensedata->es_info_4 = err_blkno & 0xFF;
+		sts_sensedata->es_add_len =
+		    cdb_sensedata->AdditionalSenseLength;
+		sts_sensedata->es_cmd_info[0] =
+		    cdb_sensedata->CommandSpecificInformation[0];
+		sts_sensedata->es_cmd_info[1] =
+		    cdb_sensedata->CommandSpecificInformation[1];
+		sts_sensedata->es_cmd_info[2] =
+		    cdb_sensedata->CommandSpecificInformation[2];
+		sts_sensedata->es_cmd_info[3] =
+		    cdb_sensedata->CommandSpecificInformation[3];
+		sts_sensedata->es_add_code =
+		    cdb_sensedata->AdditionalSenseCode;
+		sts_sensedata->es_qual_code =
+		    cdb_sensedata->AdditionalSenseCodeQualifier;
+		sts_sensedata->es_fru_code =
+		    cdb_sensedata->FieldReplaceableUnitCode;
+	} else { /* 64-bit LBA */
+		struct scsi_descr_sense_hdr *dsp;
+		struct scsi_information_sense_descr *isd;
 
-			dsp = (struct scsi_descr_sense_hdr *)
-			    &arq_status->sts_sensedata;
-			dsp->ds_class = CLASS_EXTENDED_SENSE;
-			dsp->ds_code = CODE_FMT_DESCR_CURRENT;
-			dsp->ds_key = cdb_sensedata->SenseKey;
-			dsp->ds_add_code = cdb_sensedata->AdditionalSenseCode;
-			dsp->ds_qual_code =
-			    cdb_sensedata->AdditionalSenseCodeQualifier;
-			dsp->ds_addl_sense_length =
-			    sizeof (struct scsi_information_sense_descr);
+		dsp = (struct scsi_descr_sense_hdr *)
+		    &arq_status->sts_sensedata;
+		dsp->ds_class = CLASS_EXTENDED_SENSE;
+		dsp->ds_code = CODE_FMT_DESCR_CURRENT;
+		dsp->ds_key = cdb_sensedata->SenseKey;
+		dsp->ds_add_code = cdb_sensedata->AdditionalSenseCode;
+		dsp->ds_qual_code =
+		    cdb_sensedata->AdditionalSenseCodeQualifier;
+		dsp->ds_addl_sense_length =
+		    sizeof (struct scsi_information_sense_descr);
 
-			isd = (struct scsi_information_sense_descr *)(dsp+1);
-			isd->isd_descr_type = DESCR_INFORMATION;
-			isd->isd_valid = 1;
-			isd->isd_information[0] = (err_blkno >> 56) & 0xFF;
-			isd->isd_information[1] = (err_blkno >> 48) & 0xFF;
-			isd->isd_information[2] = (err_blkno >> 40) & 0xFF;
-			isd->isd_information[3] = (err_blkno >> 32) & 0xFF;
-			isd->isd_information[4] = (err_blkno >> 24) & 0xFF;
-			isd->isd_information[5] = (err_blkno >> 16) & 0xFF;
-			isd->isd_information[6] = (err_blkno >>  8) & 0xFF;
-			isd->isd_information[7] = (err_blkno) & 0xFF;
-		}
+		isd = (struct scsi_information_sense_descr *)(dsp+1);
+		isd->isd_descr_type = DESCR_INFORMATION;
+		isd->isd_valid = 1;
+		isd->isd_information[0] = (err_blkno >> 56) & 0xFF;
+		isd->isd_information[1] = (err_blkno >> 48) & 0xFF;
+		isd->isd_information[2] = (err_blkno >> 40) & 0xFF;
+		isd->isd_information[3] = (err_blkno >> 32) & 0xFF;
+		isd->isd_information[4] = (err_blkno >> 24) & 0xFF;
+		isd->isd_information[5] = (err_blkno >> 16) & 0xFF;
+		isd->isd_information[6] = (err_blkno >>  8) & 0xFF;
+		isd->isd_information[7] = (err_blkno) & 0xFF;
 	}
 }
 
@@ -4352,20 +4350,19 @@ arcmsr_iop_message_xfer(struct ACB *acb, struct scsi_pkt *pkt)
 			arq_status->sts_rqpkt_statistics =
 			    pkt->pkt_statistics;
 			arq_status->sts_rqpkt_resid = 0;
-			if (&arq_status->sts_sensedata != NULL) {
-				struct scsi_extended_sense *sts_sensedata;
 
-				sts_sensedata = &arq_status->sts_sensedata;
+			struct scsi_extended_sense *sts_sensedata;
 
-				/* has error report sensedata */
-				sts_sensedata->es_code = 0x0;
-				sts_sensedata->es_valid = 0x01;
-				sts_sensedata->es_key = KEY_ILLEGAL_REQUEST;
-				/* AdditionalSenseLength */
-				sts_sensedata->es_add_len = 0x0A;
-				/* AdditionalSenseCode */
-				sts_sensedata->es_add_code = 0x20;
-			}
+			sts_sensedata = &arq_status->sts_sensedata;
+
+			/* has error report sensedata */
+			sts_sensedata->es_code = 0x0;
+			sts_sensedata->es_valid = 0x01;
+			sts_sensedata->es_key = KEY_ILLEGAL_REQUEST;
+			/* AdditionalSenseLength */
+			sts_sensedata->es_add_len = 0x0A;
+			/* AdditionalSenseCode */
+			sts_sensedata->es_add_code = 0x20;
 			retvalue = ARCMSR_MESSAGE_FAIL;
 		} else {
 			my_empty_len = (wqbuf_firstidx-wqbuf_lastidx - 1) &
@@ -4404,23 +4401,18 @@ arcmsr_iop_message_xfer(struct ACB *acb, struct scsi_pkt *pkt)
 				arq_status->sts_rqpkt_statistics =
 				    pkt->pkt_statistics;
 				arq_status->sts_rqpkt_resid = 0;
-				if (&arq_status->sts_sensedata != NULL) {
-					struct scsi_extended_sense *
-					    sts_sensedata;
 
-					sts_sensedata =
-					    &arq_status->sts_sensedata;
+				struct scsi_extended_sense *sts_sensedata;
+				sts_sensedata = &arq_status->sts_sensedata;
 
-					/* has error report sensedata */
-					sts_sensedata->es_code  = 0x0;
-					sts_sensedata->es_valid = 0x01;
-					sts_sensedata->es_key =
-					    KEY_ILLEGAL_REQUEST;
-					/* AdditionalSenseLength */
-					sts_sensedata->es_add_len = 0x0A;
-					/* AdditionalSenseCode */
-					sts_sensedata->es_add_code = 0x20;
-				}
+				/* has error report sensedata */
+				sts_sensedata->es_code  = 0x0;
+				sts_sensedata->es_valid = 0x01;
+				sts_sensedata->es_key = KEY_ILLEGAL_REQUEST;
+				/* AdditionalSenseLength */
+				sts_sensedata->es_add_len = 0x0A;
+				/* AdditionalSenseCode */
+				sts_sensedata->es_add_code = 0x20;
 				retvalue = ARCMSR_MESSAGE_FAIL;
 			}
 		}
