@@ -90,7 +90,7 @@ int			get_ethernet_address(uuid_node_t *);
  * local functions
  */
 static	int		map_state();
-static	void 		format_uuid(struct uuid *, uint16_t, uuid_time_t,
+static	void		format_uuid(struct uuid *, uint16_t, uuid_time_t,
     uuid_node_t);
 static	int		uuid_create(struct uuid *);
 static	void		gen_ethernet_address(uuid_node_t *);
@@ -400,26 +400,20 @@ uuid_generate_random(uuid_t uu)
 
 	arc4random_buf(uu, sizeof (uuid_t));
 	string_to_struct(&uuid, uu);
+
 	/*
 	 * This is version 4, so say so in the UUID version field (4 bits)
 	 */
+	uuid.time_hi_and_version &= 0xfff;
 	uuid.time_hi_and_version |= (1 << 14);
-	/*
-	 * we don't want the bit 1 to be set also which is for version 1
-	 */
-	uuid.time_hi_and_version &= VER1_MASK;
 
 	/*
 	 * The variant for this format is the 2 high bits set to 10,
 	 * so here it is
 	 */
+	uuid.clock_seq_hi_and_reserved &= 0x3f;
 	uuid.clock_seq_hi_and_reserved |= 0x80;
 
-	/*
-	 * Set MSB of Ethernet address to 1 to indicate that it was generated
-	 * randomly
-	 */
-	uuid.node_addr[0] |= 0x80;
 	struct_to_string(uu, &uuid);
 }
 
@@ -429,7 +423,7 @@ uuid_generate_random(uuid_t uu)
 void
 uuid_generate_time(uuid_t uu)
 {
-	struct 	uuid uuid;
+	struct	uuid uuid;
 
 	if (uu == NULL)
 		return;
@@ -478,7 +472,7 @@ uuid_clear(uuid_t uu)
 static void
 uuid_unparse_common(uuid_t uu, char *out, boolean_t upper)
 {
-	struct uuid 	uuid;
+	struct uuid	uuid;
 	uint16_t	clock_seq;
 	char		etheraddr[13];
 	int		index = 0, i;
