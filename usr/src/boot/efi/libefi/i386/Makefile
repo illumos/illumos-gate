@@ -19,7 +19,7 @@ MACHINE=	$(MACH)
 
 all:		libefi.a
 
-SRCS=	time.c
+OBJS=	time.o
 include ../Makefile.com
 
 CFLAGS +=	-m32

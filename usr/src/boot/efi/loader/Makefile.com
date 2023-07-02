@@ -19,25 +19,6 @@ include $(SRC)/boot/Makefile.inc
 PROG=		loader.sym
 
 # architecture-specific loader code
-SRCS=	\
-	acpi.c \
-	autoload.c \
-	bootinfo.c \
-	conf.c \
-	copy.c \
-	efi_main.c \
-	font.c \
-	$(FONT).c \
-	framebuffer.c \
-	main.c \
-	memmap.c \
-	mb_header.S \
-	multiboot2.c \
-	nvstore.c \
-	self_reloc.c \
-	tem.c \
-	vers.c
-
 OBJS=	\
 	acpi.o \
 	autoload.o \
@@ -89,21 +70,13 @@ LIBFICL=	-L../../../libficl/$(MACHINE) -lficl_pics
 
 # Always add MI sources
 #
-SRCS +=	boot.c commands.c console.c devopen.c interp.c
-SRCS +=	interp_backslash.c interp_parse.c ls.c misc.c
-SRCS +=	module.c linenoise.c zfs_cmd.c
-
 OBJS += boot.o commands.o console.o devopen.o interp.o \
 	interp_backslash.o interp_parse.o ls.o misc.o \
 	module.o linenoise.o zfs_cmd.o
 
-SRCS +=	load_elf32.c load_elf32_obj.c reloc_elf32.c
-SRCS +=	load_elf64.c load_elf64_obj.c reloc_elf64.c
-
 OBJS += load_elf32.o load_elf32_obj.o reloc_elf32.o \
 	load_elf64.o load_elf64_obj.o reloc_elf64.o
 
-SRCS +=	disk.c part.c dev_net.c vdisk.c
 OBJS += disk.o part.o dev_net.o vdisk.o
 CPPFLAGS += -DLOADER_DISK_SUPPORT
 CPPFLAGS += -DLOADER_GPT_SUPPORT
@@ -111,11 +84,9 @@ CPPFLAGS += -DLOADER_MBR_SUPPORT
 
 part.o := CPPFLAGS += -I$(ZLIB)
 
-SRCS +=  bcache.c
 OBJS +=  bcache.o
 
 # Forth interpreter
-SRCS +=	interp_forth.c
 OBJS +=	interp_forth.o
 CPPFLAGS +=	-I../../../common
 

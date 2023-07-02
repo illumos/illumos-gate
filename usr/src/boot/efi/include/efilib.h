@@ -32,6 +32,8 @@
 #include <stdbool.h>
 #include <sys/queue.h>
 #include <Protocol/BlockIo.h>
+#include <Protocol/SerialIo.h>
+#include <Protocol/IsaIo.h>
 
 extern EFI_HANDLE		IH;
 extern EFI_SYSTEM_TABLE		*ST;
@@ -43,6 +45,35 @@ extern struct devsw efipart_cddev;
 extern struct devsw efipart_hddev;
 extern struct devsw efinet_dev;
 extern struct netif_driver efinetif;
+
+/*
+ * Serial port descriptor.
+ */
+typedef STAILQ_HEAD(serial_list, serial) serial_list_t;
+
+struct serial {
+	STAILQ_ENTRY(serial)	next;
+	uint64_t	baudrate;
+	uint32_t	timeout;
+	uint32_t	receivefifodepth;
+	uint32_t	databits;
+	EFI_PARITY_TYPE	parity;
+	EFI_STOP_BITS_TYPE	stopbits;
+	bool		ignore_cd;
+	bool		rtsdtr_off;
+	bool		is_efi_console;	/* EFI Console device */
+	EFI_HANDLE	currdev;	/* current serial device */
+	EFI_HANDLE	iodev;		/* handle to IO layer */
+	EFI_GUID	*guid;		/* Driver protocol guid */
+	union {
+		EFI_SERIAL_IO_PROTOCOL	*sio;
+		EFI_ISA_IO_PROTOCOL	*isa;
+	}		io;
+	uint32_t	ioaddr;
+	char		name;		/* 'a'-'d' or '0'-'9' */
+};
+
+extern serial_list_t serials;		/* In efiserialio.c */
 
 /* EFI block device data, included here to help efi_zfs_probe() */
 typedef STAILQ_HEAD(pdinfo_list, pdinfo) pdinfo_list_t;
@@ -96,6 +127,9 @@ EFI_STATUS errno_to_efi_status(int errno);
 
 void efi_time_init(void);
 void efi_time_fini(void);
+
+void efi_serial_ini(void);
+void efi_isa_ini(void);
 
 EFI_STATUS efi_main(EFI_HANDLE Ximage, EFI_SYSTEM_TABLE* Xsystab);
 

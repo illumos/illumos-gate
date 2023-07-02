@@ -18,25 +18,25 @@ include $(SRC)/boot/Makefile.inc
 
 install:
 
-SRCS +=	delay.c \
-	devicename.c \
-	devpath.c \
-	efi_console.c \
-	efi_driver_utils.c \
-	efichar.c \
-	efienv.c \
-	efinet.c \
-	efipart.c \
-	efizfs.c \
-	env.c \
-	errno.c \
-	gfx_fb.c \
-	handles.c \
-	libefi.c \
-	pnglite.c \
-	wchar.c
-
-OBJS=	$(SRCS:%.c=%.o)
+OBJS +=	delay.o \
+	devicename.o \
+	devpath.o \
+	efi_console.o \
+	efi_driver_utils.o \
+	efichar.o \
+	efienv.o \
+	efinet.o \
+	efipart.o \
+	efiserialio.o \
+	efiisaio.o \
+	efizfs.o \
+	env.o \
+	errno.o \
+	gfx_fb.o \
+	handles.o \
+	libefi.o \
+	pnglite.o \
+	wchar.o
 
 CPPFLAGS += -DEFI
 CPPFLAGS += -I. -I../../../include -I../../../sys
