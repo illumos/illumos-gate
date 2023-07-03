@@ -41,13 +41,6 @@ ROOTLINK	= $(ROOT_STRMOD_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/inet/arp
 
 #
-# Extra for $(MODULE).check target
-#
-# Need to remove ipddi.o since it has non-static defines for _init etc.
-IP_CHECK_OBJS	= $(IP_OBJS:ipddi.o=ip.o)
-EXTRA_CHECK_OBJS = $(IP_CHECK_OBJS:%=../ip/$(OBJS_DIR)/%)
-
-#
 #	Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel

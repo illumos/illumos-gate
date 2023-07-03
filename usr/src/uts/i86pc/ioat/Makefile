@@ -65,12 +65,6 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 LDFLAGS		+= -Nmisc/dcopy
 
 #
-#	Override defaults to build a unique, local modstubs.o.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:

@@ -50,11 +50,6 @@ include ../Makefile.$(ARCHDIR)
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-#
-#	Overrides and depends_on
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-
 INC_PATH	+= -I$(UTSBASE)/common/fs/zut
 INC_PATH	+= -I$(SRC)/common
 INC_PATH	+= -I$(COMMONBASE)/zut

@@ -49,11 +49,6 @@ include ../Makefile.$(ARCHDIR)
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-#
-#	Overrides and depends_on
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-
 # needs work
 SMATCH=off
 

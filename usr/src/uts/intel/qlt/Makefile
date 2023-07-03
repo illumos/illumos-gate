@@ -53,7 +53,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 #	Overrides and depends_on
 #
-MODSTUBS_DIR	 = $(OBJS_DIR)
 LDFLAGS		+= -Ndrv/fct -Ndrv/stmf
 CFLAGS		+= -DUNIQUE_FW_NAME
 

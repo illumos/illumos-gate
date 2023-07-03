@@ -59,12 +59,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Overrides.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
 # For now, disable these warnings; maintainers should endeavor
 # to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.

@@ -83,9 +83,7 @@ INSTALL_TARGET_obj64	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Now the normal overrides...
 #
-MODSTUBS_DIR	= $(OBJS_DIR)
-$(MODSTUBS_O)	:= AS_CPPFLAGS += -DNSMB_MODULE
-CLEANFILES	+= $(MODSTUBS_O) $(IOC_CHECK_H)
+CLEANFILES	+= $(IOC_CHECK_H)
 INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
 LDFLAGS         += -Ncrypto/md4 -Ncrypto/md5 -Nmisc/tlimod
 

@@ -38,13 +38,6 @@ OBJECTS		= $(TCP6_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/inet/tcp
 
-#
-# Extra for $(MODULE).check target
-#
-# Need to remove ipddi.o since it has non-static defines for _init etc.
-IP_CHECK_OBJS	= $(IP_OBJS:ipddi.o=ip.o)
-EXTRA_CHECK_OBJS = $(IP_CHECK_OBJS:%=../ip/$(OBJS_DIR)/%)
-
 # needs work
 SMOFF += index_overflow
 

@@ -51,12 +51,6 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-#
-#	Override defaults to build a unique, local modstubs.o.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-CLEANFILES	+= $(MODSTUBS_O)
-
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-unused-label

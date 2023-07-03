@@ -52,9 +52,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides.
 #
-MODSTUBS_DIR	= $(OBJS_DIR)
-$(MODSTUBS_O)	:= AS_CPPFLAGS += -DSMBFS_MODULE
-CLEANFILES	+= $(MODSTUBS_O)
 INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
 INC_PATH	+= -I$(COMMONBASE)/smbclnt
 LDFLAGS         += -Ndrv/nsmb

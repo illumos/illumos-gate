@@ -49,13 +49,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Override defaults to build a unique, local modstubs.o.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-$(MODSTUBS_O)	:= AS_CPPFLAGS += -DPCICFG_MODULE
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
 #	Dependency
 #
 LDFLAGS		+= -Nmisc/busra -Nmisc/pcie

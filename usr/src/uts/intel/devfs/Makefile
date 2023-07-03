@@ -61,13 +61,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Overrides.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-$(MODSTUBS_O)	:= AS_CPPFLAGS += -DDEVFS_MODULE
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:
