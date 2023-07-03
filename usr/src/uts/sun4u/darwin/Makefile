@@ -47,8 +47,6 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 
 #
@@ -56,7 +54,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber modlist: $(DARWIN_KMODS)
+def all clean clobber: $(DARWIN_KMODS)
 
 install:	$(ROOT_DARWIN_DIR) $(USR_DARWIN_DIR) $(DARWIN_KMODS)
 

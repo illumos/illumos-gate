@@ -44,8 +44,6 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 
 #
@@ -53,7 +51,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber modlist: $(DAKTARI_KMODS)
+def all clean clobber: $(DAKTARI_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-880
 

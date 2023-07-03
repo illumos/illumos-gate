@@ -79,8 +79,6 @@ clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
 clobber_h	:=	TARGET= clobber
 check		:=	TARGET= check
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 
 .KEEP_STATE:
 
@@ -187,8 +185,6 @@ clean clobber: $($(MACH)_ARCHITECTURES) $(DYNHDRDIRS)
 
 # testing convenience
 clobber_h: $(DYNHDRDIRS)
-
-modlist: $($(MACH)_ARCHITECTURES)
 
 #
 # Cross-reference customization: build a cross-reference over all of

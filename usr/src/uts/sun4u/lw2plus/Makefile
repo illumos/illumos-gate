@@ -46,8 +46,6 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-modlist		:=	TARGET= modlist
-modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 check		:=	TARGET= check
 
 #
@@ -55,7 +53,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber modlist: $(LW2PLUS_KMODS)
+def all clean clobber: $(LW2PLUS_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Netra-T4
 LINKS2DESTDIR	= ../../../../SUNW,Sun-Fire-280R/kernel/misc/sparcv9
