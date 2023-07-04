@@ -210,34 +210,27 @@ static EFI_PCI_IO_PROTOCOL *
 efifb_uga_get_pciio(void)
 {
 	EFI_PCI_IO_PROTOCOL *pciio;
-	EFI_HANDLE *buf, *hp;
+	EFI_HANDLE *handles;
 	EFI_STATUS status;
-	UINTN bufsz;
+	uint_t i, nhandles;
 
 	/* Get all handles that support the UGA protocol. */
-	bufsz = 0;
-	status = BS->LocateHandle(ByProtocol, &uga_guid, NULL, &bufsz, NULL);
-	if (status != EFI_BUFFER_TOO_SMALL)
-		return (NULL);
-	buf = malloc(bufsz);
-	status = BS->LocateHandle(ByProtocol, &uga_guid, NULL, &bufsz, buf);
+	status = efi_get_protocol_handles(&uga_guid, &nhandles, &handles);
 	if (status != EFI_SUCCESS) {
-		free(buf);
 		return (NULL);
 	}
-	bufsz /= sizeof (EFI_HANDLE);
 
 	/* Get the PCI I/O interface of the first handle that supports it. */
 	pciio = NULL;
-	for (hp = buf; hp < buf + bufsz; hp++) {
-		status = OpenProtocolByHandle(*hp, &pciio_guid,
+	for (i = 0; i < nhandles; i++) {
+		status = OpenProtocolByHandle(handles[i], &pciio_guid,
 		    (void **)&pciio);
 		if (status == EFI_SUCCESS) {
-			free(buf);
+			free(handles);
 			return (pciio);
 		}
 	}
-	free(buf);
+	free(handles);
 	return (NULL);
 }
 
@@ -514,7 +507,7 @@ int
 efi_find_framebuffer(struct efi_fb *efifb)
 {
 	EFI_HANDLE *hlist;
-	UINTN nhandles, i, hsize;
+	uint_t nhandles, i;
 	extern EFI_GRAPHICS_OUTPUT *gop;
 	extern EFI_UGA_DRAW_PROTOCOL *uga;
 	EFI_STATUS status;
@@ -523,22 +516,9 @@ efi_find_framebuffer(struct efi_fb *efifb)
 	if (gop != NULL)
 		return (efifb_from_gop(efifb, gop->Mode, gop->Mode->Info));
 
-	hsize = 0;
-	hlist = NULL;
-	status = BS->LocateHandle(ByProtocol, &gop_guid, NULL, &hsize, hlist);
-	if (status == EFI_BUFFER_TOO_SMALL) {
-		hlist = malloc(hsize);
-		if (hlist == NULL)
-			return (ENOMEM);
-		status = BS->LocateHandle(ByProtocol, &gop_guid, NULL, &hsize,
-		    hlist);
-		if (EFI_ERROR(status))
-			free(hlist);
-	}
+	status = efi_get_protocol_handles(&gop_guid, &nhandles, &hlist);
 	if (EFI_ERROR(status))
 		return (efi_status_to_errno(status));
-
-	nhandles = hsize / sizeof (*hlist);
 
 	/*
 	 * Search for ConOut protocol, if not found, use first handle.

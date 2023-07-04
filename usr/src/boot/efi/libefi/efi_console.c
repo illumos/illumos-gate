@@ -810,23 +810,23 @@ static void
 efi_cons_devinfo(struct console *cp __unused)
 {
 	EFI_HANDLE *handles;
-	UINTN nhandles;
+	uint_t nhandles;
 	extern EFI_GUID gop_guid;
 	extern EFI_GUID uga_guid;
 	EFI_STATUS status;
 
 	if (gop != NULL)
-		status = BS->LocateHandleBuffer(ByProtocol, &gop_guid, NULL,
-		    &nhandles, &handles);
+		status = efi_get_protocol_handles(&gop_guid, &nhandles,
+		    &handles);
 	else
-		status = BS->LocateHandleBuffer(ByProtocol, &uga_guid, NULL,
-		    &nhandles, &handles);
+		status = efi_get_protocol_handles(&uga_guid, &nhandles,
+		    &handles);
 
 	if (EFI_ERROR(status))
 		return;
 
-	for (UINTN i = 0; i < nhandles; i++)
+	for (uint_t i = 0; i < nhandles; i++)
 		efi_cons_devinfo_print(handles[i]);
 
-	BS->FreePool(handles);
+	free(handles);
 }

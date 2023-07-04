@@ -42,7 +42,7 @@ efi_get_table(EFI_GUID *tbl)
 
 	for (i = 0; i < ST->NumberOfTableEntries; i++) {
 		id = &ST->ConfigurationTable[i].VendorGuid;
-		if (!memcmp(id, tbl, sizeof(EFI_GUID)))
+		if (memcmp(id, tbl, sizeof (EFI_GUID)) == 0)
 			return (ST->ConfigurationTable[i].VendorTable);
 	}
 	return (NULL);
@@ -53,4 +53,46 @@ OpenProtocolByHandle(EFI_HANDLE handle, EFI_GUID *protocol, void **interface)
 {
 	return (BS->OpenProtocol(handle, protocol, interface, IH, NULL,
 	    EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL));
+}
+
+/*
+ * Allocate memory and query list of handles for indicated protocol.
+ * Returns EFI status, list of handles and number of handles in list.
+ * Caller needs to release the allocated memory.
+ */
+EFI_STATUS
+efi_get_protocol_handles(EFI_GUID *protocolguid, uint_t *nhandles,
+    EFI_HANDLE **handlep)
+{
+	UINTN bufsz = 0;
+	EFI_STATUS status;
+	EFI_HANDLE *handles;
+
+	/*
+	 * get buffer size
+	 */
+	*nhandles = 0;
+	handles = NULL;
+	status = BS->LocateHandle(ByProtocol, protocolguid,
+	    NULL, &bufsz, handles);
+	if (status != EFI_BUFFER_TOO_SMALL)
+		return (status);
+
+	handles = malloc(bufsz);
+	if (handles == NULL)
+		return (errno_to_efi_status(ENOMEM));
+
+	*nhandles = (uint_t)(bufsz / sizeof (EFI_HANDLE));
+	/*
+	 * get handle array
+	 */
+	status = BS->LocateHandle(ByProtocol, protocolguid,
+	    NULL, &bufsz, handles);
+	if (EFI_ERROR(status)) {
+		free(handles);
+		*nhandles = 0;
+	} else {
+		*handlep = handles;
+	}
+	return (status);
 }

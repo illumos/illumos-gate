@@ -333,8 +333,7 @@ efipart_ignore_device(EFI_HANDLE h, EFI_BLOCK_IO *blkio,
 int
 efipart_inithandles(void)
 {
-	unsigned i, nin;
-	UINTN sz;
+	uint_t i, nin;
 	EFI_HANDLE *hin;
 	EFI_DEVICE_PATH *devpath;
 	EFI_BLOCK_IO *blkio;
@@ -344,20 +343,10 @@ efipart_inithandles(void)
 	if (!STAILQ_EMPTY(&pdinfo))
 		return (0);
 
-	sz = 0;
-	hin = NULL;
-	status = BS->LocateHandle(ByProtocol, &blkio_guid, 0, &sz, hin);
-	if (status == EFI_BUFFER_TOO_SMALL) {
-		hin = malloc(sz);
-		status = BS->LocateHandle(ByProtocol, &blkio_guid, 0, &sz,
-		    hin);
-		if (EFI_ERROR(status))
-			free(hin);
-	}
+	status = efi_get_protocol_handles(&blkio_guid, &nin, &hin);
 	if (EFI_ERROR(status))
 		return (efi_status_to_errno(status));
 
-	nin = sz / sizeof (*hin);
 #ifdef EFIPART_DEBUG
 	printf("%s: Got %d BLOCK IO MEDIA handle(s)\n", __func__, nin);
 #endif

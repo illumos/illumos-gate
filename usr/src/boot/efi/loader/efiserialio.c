@@ -132,38 +132,6 @@ struct console ttyd = {
 	.c_private = NULL
 };
 
-static EFI_STATUS
-efi_serial_init(EFI_HANDLE **handlep, int *nhandles)
-{
-	UINTN bufsz = 0;
-	EFI_STATUS status;
-	EFI_HANDLE *handles;
-
-	/*
-	 * get buffer size
-	 */
-	*nhandles = 0;
-	handles = NULL;
-	status = BS->LocateHandle(ByProtocol, &serial, NULL, &bufsz, handles);
-	if (status != EFI_BUFFER_TOO_SMALL)
-		return (status);
-
-	if ((handles = malloc(bufsz)) == NULL)
-		return (ENOMEM);
-
-	*nhandles = (int)(bufsz / sizeof (EFI_HANDLE));
-	/*
-	 * get handle array
-	 */
-	status = BS->LocateHandle(ByProtocol, &serial, NULL, &bufsz, handles);
-	if (EFI_ERROR(status)) {
-		free(handles);
-		*nhandles = 0;
-	} else
-		*handlep = handles;
-	return (status);
-}
-
 /*
  * Find serial device number from device path.
  * Return -1 if not found.
@@ -199,14 +167,12 @@ efi_serial_get_handle(int port)
 	EFI_STATUS status;
 	EFI_HANDLE *handles, handle;
 	EFI_DEVICE_PATH *devpath;
-	int index, nhandles;
+	uint_t index, nhandles;
 
 	if (port == -1)
 		return (NULL);
 
-	handles = NULL;
-	nhandles = 0;
-	status = efi_serial_init(&handles, &nhandles);
+	status = efi_get_protocol_handles(&serial, &nhandles, &handles);
 	if (EFI_ERROR(status))
 		return (NULL);
 
