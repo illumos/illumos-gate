@@ -86,7 +86,6 @@ POUND_SIGN=				$(PRE_POUND:pre\%=%)
 NOT_RELEASE_BUILD=
 RELEASE_BUILD=				$(POUND_SIGN)
 $(RELEASE_BUILD)NOT_RELEASE_BUILD=	$(POUND_SIGN)
-PATCH_BUILD=				$(POUND_SIGN)
 
 # SPARC_BLD is '#' for an Intel build.
 # INTEL_BLD is '#' for a Sparc build.
@@ -908,21 +907,14 @@ CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 #	RELEASE_MAJOR	Major version number part of $(RELEASE)
 #	RELEASE_MINOR	Minor version number part of $(RELEASE)
 #	VERSION		Version of the build (alpha, beta, Generic)
-#	PATCHID		If this is a patch this value should contain
-#			the patchid value (eg: "Generic 100832-01"), otherwise
-#			it will be set to $(VERSION)
 #	RELEASE_DATE	Date of the Release Build
-#	PATCH_DATE	Date the patch was created, if this is blank it
-#			will default to the RELEASE_DATE
 #
 RELEASE_MAJOR=	5
 RELEASE_MINOR=	11
 RELEASE=	$(RELEASE_MAJOR).$(RELEASE_MINOR)
 VERSION=	SunOS Development
-PATCHID=	$(VERSION)
 RELEASE_DATE=	release date not set
-PATCH_DATE=	$(RELEASE_DATE)
-RELEASE_CM=	"@($(POUND_SIGN))illumos $(PATCHID) $(PATCH_DATE)"
+RELEASE_CM=	"@($(POUND_SIGN))illumos $(VERSION) $(RELEASE_DATE)"
 DEV_CM_TAIL=	development build: $(LOGNAME)
 DEV_CM=		"@($(POUND_SIGN))illumos $(DEV_CM_TAIL)"
 UTS_LABEL=	$(RELEASE)
