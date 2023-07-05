@@ -222,6 +222,7 @@ i386_MANFILES=	ahci.4d		\
 		vioif.4d	\
 		vioscsi.4d	\
 		virtio.4d	\
+		vmxnet3s.4d	\
 		wpi.4d		\
 		xhci.4d		\
 		zen_udf.4d	\

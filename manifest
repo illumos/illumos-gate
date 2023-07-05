@@ -18995,6 +18995,7 @@ f usr/share/man/man4d/vioif.4d 0444 root bin
 f usr/share/man/man4d/vioscsi.4d 0444 root bin
 f usr/share/man/man4d/virtio.4d 0444 root bin
 f usr/share/man/man4d/virtualkm.4d 0444 root bin
+f usr/share/man/man4d/vmxnet3s.4d 0444 root bin
 f usr/share/man/man4d/vnd.4d 0444 root bin
 f usr/share/man/man4d/vni.4d 0444 root bin
 f usr/share/man/man4d/vr.4d 0444 root bin
