@@ -4943,6 +4943,7 @@ prgetsecflags(proc_t *p, prsecflags_t *psfp)
 {
 	ASSERT(psfp != NULL);
 
+	bzero(psfp, sizeof (*psfp));
 	psfp->pr_version = PRSECFLAGS_VERSION_CURRENT;
 	psfp->pr_lower = p->p_secflags.psf_lower;
 	psfp->pr_upper = p->p_secflags.psf_upper;

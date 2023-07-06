@@ -118,7 +118,7 @@ setup_note_header(Phdr *v, proc_t *p)
 	}
 
 	size = sizeof (prcred_t) + sizeof (gid_t) * (ngroups_max - 1);
-	pcrp = kmem_alloc(size, KM_SLEEP);
+	pcrp = kmem_zalloc(size, KM_SLEEP);
 	prgetcred(p, pcrp);
 	if (pcrp->pr_ngroups != 0) {
 		v[0].p_filesz += sizeof (Note) + roundup(sizeof (prcred_t) +
@@ -306,6 +306,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 	if (error)
 		goto done;
 
+	bzero(bigwad, crsize);
 	prgetcred(p, &bigwad->pcred);
 
 	if (bigwad->pcred.pr_ngroups != 0) {
