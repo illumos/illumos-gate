@@ -28,6 +28,7 @@
 
 #include <sys/t_lock.h>
 #include <sys/thread.h>
+#include <sys/taskq.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -68,6 +69,8 @@ extern "C" {
 #define	CB_CL_CPR_POST_KERNEL	15
 #define	CB_CL_CPU_DEEP_IDLE	16
 #define	NCBCLASS		17 /* CHANGE ME if classes are added/removed */
+
+#define	CB_MAXNAME  TASKQ_NAMELEN
 
 /*
  * CB_CL_CPR_DAEMON class specific definitions are given below:
@@ -165,7 +168,7 @@ typedef struct callb_cpr {
  * Any code region between CALLB_CPR_SAFE_BEGIN and CALLB_CPR_SAFE_END
  * is safe for checkpoint/resume.
  */
-#define	CALLB_CPR_SAFE_BEGIN(cp) { 			\
+#define	CALLB_CPR_SAFE_BEGIN(cp) {			\
 		CALLB_CPR_ASSERT(cp)			\
 		(cp)->cc_events |= CALLB_CPR_SAFE;	\
 		if ((cp)->cc_events & CALLB_CPR_START)	\
