@@ -23,7 +23,7 @@
  * Copyright 2011-2020 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2016 Syneto S.R.L. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2021-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -609,6 +609,8 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 	 */
 }
 
+uint32_t smb2_savedh_timeout = 60;	/* sec. */
+
 /*
  * "Destructor" function for smb_ofile_close_all, and
  * smb_ofile_close_all_by_pid, called after the llist lock
@@ -619,6 +621,13 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
  * on this ofile calls smb_ofile_release(), where we
  * eihter delete the ofile, or (if durable) leave it
  * in the persistid hash table for possible reclaim.
+ * (state becomes "orphaned").
+ *
+ * In case references dont't ever leave (eg. ref leak bug)
+ * arrange for smb2_durable_timers() to move this ofile from
+ * state SAVE_DH to state CLOSING.  The dh_expire_time set
+ * on SAVE_DH ofiles here is temporary, and replaced with
+ * the negotiated expiration time when it becomes ORPHANED.
  *
  * This is run via smb_llist_post (after smb_llist_exit)
  * because smb_ofile_close can block, and we'd rather not
@@ -643,6 +652,8 @@ smb_ofile_drop(void *arg)
 			 * make this an _ORPHANED DH.
 			 */
 			of->f_state = SMB_OFILE_STATE_SAVE_DH;
+			of->dh_expire_time = gethrtime() +
+			    SEC2NSEC(smb2_savedh_timeout);
 			mutex_exit(&of->f_mutex);
 			break;
 		}

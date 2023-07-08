@@ -950,7 +950,6 @@ print_proc(char *pid_name)
 	int	procfd; /* filedescriptor for /proc/nnnnn/psinfo */
 	char	*tp;    /* ptr to ttyname,  if any */
 	psinfo_t info;  /* process information from /proc */
-	lwpsinfo_t *lwpsinfo;   /* array of lwpsinfo structs */
 
 	pdlen = snprintf(pname, sizeof (pname), "%s/%s/", procdir, pid_name);
 	if (pdlen >= sizeof (pname) - 10)
@@ -1015,6 +1014,8 @@ retry:
 		return (1);
 	if (Lflg && (info.pr_nlwp + info.pr_nzomb) > 1) {
 		ssize_t prsz;
+		long nlwp = 0;
+		lwpsinfo_t *lwpsinfo;   /* array of lwpsinfo structs */
 
 		(void) strcpy(&pname[pdlen], "lpsinfo");
 		if ((procfd = open(pname, O_RDONLY)) == -1)
@@ -1048,19 +1049,14 @@ retry:
 		if (lpsinfobuf->pr_nent != (info.pr_nlwp + info.pr_nzomb))
 			goto retry;
 		lwpsinfo = (lwpsinfo_t *)(lpsinfobuf + 1);
-	}
-	if (!Lflg || (info.pr_nlwp + info.pr_nzomb) <= 1) {
-		prcom(&info, tp);
-	} else {
-		int nlwp = 0;
-
 		do {
 			info.pr_lwp = *lwpsinfo;
 			prcom(&info, tp);
-			/* LINTED improper alignment */
 			lwpsinfo = (lwpsinfo_t *)((char *)lwpsinfo +
 			    lpsinfobuf->pr_entsize);
 		} while (++nlwp < lpsinfobuf->pr_nent);
+	} else {
+		prcom(&info, tp);
 	}
 	return (0);
 }

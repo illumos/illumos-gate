@@ -42,9 +42,6 @@
  * XXX as libi386 and biosboot merge, some of these can become linker sets.
  */
 
-#if defined(LOADER_FIREWIRE_SUPPORT)
-extern struct devsw fwohci;
-#endif
 extern struct devsw vdisk_dev;
 
 /* Exported for libstand */
@@ -53,9 +50,6 @@ struct devsw *devsw[] = {
 	&bioscd,
 	&bioshd,
 	&pxedisk,
-#if defined(LOADER_FIREWIRE_SUPPORT)
-	&fwohci,
-#endif
 	&vdisk_dev,
 	&zfs_dev,
 	NULL
@@ -122,9 +116,6 @@ extern struct console ttya;
 extern struct console ttyb;
 extern struct console ttyc;
 extern struct console ttyd;
-#if defined(LOADER_FIREWIRE_SUPPORT)
-extern struct console dconsole;
-#endif
 extern struct console nullconsole;
 extern struct console spinconsole;
 
@@ -134,9 +125,6 @@ struct console *consoles[] = {
 	&ttyb,
 	&ttyc,
 	&ttyd,
-#if defined(LOADER_FIREWIRE_SUPPORT)
-	&dconsole,
-#endif
 	&nullconsole,
 	&spinconsole,
 	NULL
