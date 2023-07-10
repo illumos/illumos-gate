@@ -50,7 +50,7 @@ CFLAGS +=	-_gcc=-ffunction-sections -_gcc=-fdata-sections
 CFLAGS +=	-_gcc=-mno-mmx -_gcc=-mno-3dnow -_gcc=-mno-sse -_gcc=-mno-sse2
 CFLAGS +=	-_gcc=-mno-sse3 -_gcc=-msoft-float
 CFLAGS +=	-_gcc=-mno-avx -_gcc=-mno-aes
-CFLAGS +=	-_gcc=-Wall
+CFLAGS +=	-_gcc=-Wall -_gcc=-Werror
 CFLAGS +=	$(CCNOAUTOINLINE) $(CCNOREORDER) $(CSTD_GNU99)
 CFLAGS +=	$(CSOURCEDEBUGFLAGS)
 CCASFLAGS=	-Wa,--divide
