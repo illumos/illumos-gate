@@ -12,8 +12,9 @@
 .\" Copyright 2019 Joyent, Inc.
 .\" Copyright 2020 RackTop Systems, Inc.
 .\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2023 Jason King
 .\"
-.Dd March 4, 2023
+.Dd June 22, 2023
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -727,7 +728,7 @@ The pseudo-header checksum will be available for the mblk_t when calling
 Note this does not imply that the hardware is capable of calculating
 the partial checksum for other L4 protocols or the IPv4 header checksum.
 That should be indicated with the
-.Dv HCKSUM_IPHDRCKSUM flag.
+.Dv HCKSUM_IPHDRCKSUM flag .
 .It Dv HCKSUM_INET_FULL_V4
 This indicates that the hardware will fully calculate the L4 checksum for
 outgoing IPv4 UDP or TCP packets only, and does not require a pseudo-header
@@ -1926,11 +1927,11 @@ Permissions:
 .Ed
 .Pp
 The
-.Sy MAC_PROP_ADV_100T4_CAP
+.Dv MAC_PROP_EN_100T4_CAP
 property describes whether or not 100 Mbit/s Ethernet using the
 100BASE-T4 standard is
 enabled.
-.It Sy MAC_PROP_ADV_1000HDX_CAP
+.It Dv MAC_PROP_ADV_1000HDX_CAP
 .Bd -filled -compact
 Type:
 .Vt uint8_t |

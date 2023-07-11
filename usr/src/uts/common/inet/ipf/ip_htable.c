@@ -197,7 +197,7 @@ ipf_stack_t *ifs;
 	if (iph->iph_unit != op->iplo_unit) {
 		return EINVAL;
 	}
-	
+
 	if (iph->iph_ref != 1) {
 		return EBUSY;
 	}
@@ -310,7 +310,7 @@ ipf_stack_t *ifs;
 #ifdef USE_INET6
 	if (ipe->ipe_family == AF_INET6) {
 		bits = count6bits((u_32_t *)ipe->ipe_mask.in6_addr8);
-		hv = IPE_HASH_FN(sum4((uint32_t *)ipe->ipe_addr.in6_addr8), 
+		hv = IPE_HASH_FN(sum4((uint32_t *)ipe->ipe_addr.in6_addr8),
 				 sum4((uint32_t *)ipe->ipe_mask.in6_addr8),
 				 iph->iph_size);
 	} else
@@ -399,9 +399,8 @@ ipf_stack_t *ifs;
 	switch (iph->iph_type & ~IPHASH_ANON)
 	{
 	case IPHASH_GROUPMAP :
-		if (ipe->ipe_group != NULL)
-			fr_delgroup(ipe->ipe_group, IPL_LOGIPF,
-				    ifs->ifs_fr_active, ifs);
+		fr_delgroup(ipe->ipe_group, IPL_LOGIPF,
+		    ifs->ifs_fr_active, ifs);
 		break;
 
 	default :
@@ -413,7 +412,7 @@ ipf_stack_t *ifs;
 	KFREE(ipe);
 
 	ifs->ifs_ipf_nhtnodes[iph->iph_unit]--;
-	
+
 	return 0;
 }
 
@@ -592,14 +591,14 @@ maskloop:
 			      (hmsk[1] != 0) ||
 			      (hmsk[2] != 0) ||
 			      (hmsk[3] != 0) )) {
-		while ((hmsk[0] != 0) && (hmsk[1] != 0) && 
+		while ((hmsk[0] != 0) && (hmsk[1] != 0) &&
 		       (hmsk[2] != 0) && (hmsk[3] != 0)) {
 			left_shift_ipv6((char *)msk);
 			if (hmsk[0] & 0x80000000)
 				break;
 			left_shift_ipv6((char *)hmsk);
 		}
-		if ((hmsk[0] != 0) && (hmsk[1] != 0) && 
+		if ((hmsk[0] != 0) && (hmsk[1] != 0) &&
 		    (hmsk[2] != 0) && (hmsk[3] != 0)) {
 			left_shift_ipv6((char *)hmsk);
 			goto maskloop;
