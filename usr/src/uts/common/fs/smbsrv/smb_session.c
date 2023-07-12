@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
- * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2011-2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2021-2023 RackTop Systems, Inc.
  */
 
 #include <sys/atomic.h>
@@ -1194,7 +1194,7 @@ smb_session_disconnect_share(
 	smb_llist_exit(ll);
 }
 
-int smb_session_logoff_maxwait = 2 * MILLISEC;	/* 2 sec. */
+int smb_session_logoff_maxwait = 5;	/* seconds */
 
 /*
  * Logoff all users associated with the specified session.
@@ -1203,6 +1203,7 @@ int smb_session_logoff_maxwait = 2 * MILLISEC;	/* 2 sec. */
  * (SMB_SESSION_STATE_TERMINATED) and client-initiated
  * disconnect (SMB_SESSION_STATE_DISCONNECTED).
  * If client-initiated, save durable handles.
+ * All requests on this session have finished.
  */
 void
 smb_session_logoff(smb_session_t *session)
@@ -1210,7 +1211,7 @@ smb_session_logoff(smb_session_t *session)
 	smb_llist_t	*ulist;
 	smb_user_t	*user;
 	int		count;
-	int		timeleft = smb_session_logoff_maxwait;
+	int		timeleft = SEC_TO_TICK(smb_session_logoff_maxwait);
 
 	SMB_SESSION_VALID(session);
 
@@ -1276,14 +1277,18 @@ top:
 			goto top;
 		}
 		smb_rwx_rwexit(&session->s_lock);
+
+		cmn_err(CE_NOTE, "!session logoff waited %d seconds"
+		    " with %d logons remaining",
+		    smb_session_logoff_maxwait, count);
+		DTRACE_PROBE1(max__wait, smb_session_t *, session);
 	}
 
 	/*
-	 * User list should be empty now.
-	 * (Checked in smb_session_destroy)
-	 */
-
-	/*
+	 * User list should be empty now, but might not be if we
+	 * timed out waiting for smb_user objects to go away.
+	 * Checked in smb_server_destroy_session
+	 *
 	 * User logoff happens first so we'll set preserve_opens
 	 * for client-initiated disconnect.  When that's done
 	 * there should be no trees left, but check anyway.

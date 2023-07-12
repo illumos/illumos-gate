@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #ifndef _SMB_IDMAP_H
@@ -78,18 +79,22 @@ typedef struct smb_idmap {
 
 typedef struct smb_idmap_batch {
 	uint16_t		sib_nmap;
+	uint16_t		sib_nerr;
 	uint32_t		sib_flags;
 	uint32_t		sib_size;
 	smb_idmap_t		*sib_maps;
 	idmap_get_handle_t	*sib_idmaph;
 } smb_idmap_batch_t;
 
+typedef void (*smb_idmap_batch_errcb_t)(smb_idmap_batch_t *, smb_idmap_t *);
+
 idmap_stat smb_idmap_getsid(uid_t, int, smb_sid_t **);
 idmap_stat smb_idmap_getid(smb_sid_t *, uid_t *, int *);
 
 void smb_idmap_batch_destroy(smb_idmap_batch_t *);
 idmap_stat smb_idmap_batch_create(smb_idmap_batch_t *, uint16_t, int);
-idmap_stat smb_idmap_batch_getmappings(smb_idmap_batch_t *);
+idmap_stat smb_idmap_batch_getmappings(smb_idmap_batch_t *,
+    smb_idmap_batch_errcb_t);
 idmap_stat smb_idmap_batch_getid(idmap_get_handle_t *, smb_idmap_t *,
     smb_sid_t *, int);
 idmap_stat smb_idmap_batch_getsid(idmap_get_handle_t *, smb_idmap_t *,

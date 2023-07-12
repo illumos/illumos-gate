@@ -1125,7 +1125,7 @@ pr_read_cred(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 	 * the number of supplementary groups is variable.
 	 */
 	pcrp =
-	    kmem_alloc(sizeof (prcred_t) + sizeof (gid_t) * (ngroups_max - 1),
+	    kmem_zalloc(sizeof (prcred_t) + sizeof (gid_t) * (ngroups_max - 1),
 	    KM_SLEEP);
 
 	if ((error = prlock(pnp, ZNO)) != 0)
@@ -1150,7 +1150,7 @@ pr_read_priv(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	size_t psize = prgetprivsize();
-	prpriv_t *ppriv = kmem_alloc(psize, KM_SLEEP);
+	prpriv_t *ppriv = kmem_zalloc(psize, KM_SLEEP);
 	int error;
 
 	ASSERT(pnp->pr_type == PR_PRIV);

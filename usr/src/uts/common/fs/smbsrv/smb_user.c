@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2022-2023 RackTop Systems, Inc.
  */
 
 /*
@@ -695,12 +696,12 @@ smb_user_wait_trees(smb_user_t *user)
 			break;
 	}
 	mutex_exit(&user->u_mutex);
-#ifdef	DEBUG
 	if (user->u_owned_tree_cnt != 0) {
-		cmn_err(CE_NOTE, "smb_user_wait_trees failed");
-		debug_enter("smb_user_wait_trees debug");
-	}
+#ifdef	DEBUG
+		cmn_err(CE_NOTE, "!smb_user_wait_trees failed");
 #endif
+		DTRACE_PROBE1(max__wait, smb_user_t *, user);
+	}
 }
 
 /* *************************** Static Functions ***************************** */

@@ -22,6 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 
 #include <unistd.h>
@@ -126,6 +127,17 @@ smb_token_idmap(smb_token_t *token, smb_idmap_batch_t *sib)
 }
 
 /*
+ * Custom error callback for smb_token_sids2ids
+ */
+static void
+smb_token_bgm_error(smb_idmap_batch_t *sib, smb_idmap_t *sim)
+{
+	syslog(LOG_INFO, "smb_token_sids2ids: Can't get ID for "
+	    "SID %s-%u, status=%d",
+	    sim->sim_domsid, sim->sim_rid, sim->sim_stat);
+}
+
+/*
  * smb_token_sids2ids
  *
  * This will map all the SIDs of the access token to UIDs/GIDs.
@@ -163,8 +175,18 @@ smb_token_sids2ids(smb_token_t *token)
 		return (-1);
 	}
 
-	stat = smb_idmap_batch_getmappings(&sib);
-	smb_idmap_check("smb_idmap_batch_getmappings", stat);
+	/* Custom error CB here. */
+	stat = smb_idmap_batch_getmappings(&sib, smb_token_bgm_error);
+	if (sib.sib_nerr != 0) {
+		syslog(LOG_DEBUG, "Token for user \"%s\\%s\" has "
+		    "%d SIDs that could not be mapped to IDs",
+		    (token->tkn_domain_name) ?
+		    token->tkn_domain_name : "?",
+		    (token->tkn_account_name) ?
+		    token->tkn_account_name : "?",
+		    sib.sib_nerr);
+	}
+
 	smb_idmap_batch_destroy(&sib);
 
 	return (stat == IDMAP_SUCCESS ? 0 : -1);
@@ -696,8 +718,16 @@ smb_token_setup_local(smb_passwd_t *smbpw, smb_token_t *token)
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
-	if (smb_idmap_batch_getmappings(&sib) != IDMAP_SUCCESS)
+	/* No error CB.  Report errors below. */
+	stat = smb_idmap_batch_getmappings(&sib, NULL);
+
+	if (stat != IDMAP_SUCCESS) {
+		syslog(LOG_NOTICE, "logon[%s\\%s]: Can't get SID for "
+		    "primary GID or UID",
+		    nbname, smbpw->pw_name);
+		smb_idmap_batch_destroy(&sib);
 		return (NT_STATUS_INTERNAL_ERROR);
+	}
 
 	token->tkn_user.i_sid = smb_sid_dup(umap->sim_sid);
 	token->tkn_primary_grp.i_sid = smb_sid_dup(gmap->sim_sid);
