@@ -495,8 +495,9 @@ nfs_svc(struct nfs_svc_args *arg, model_t model)
 		ng->nfs_versmax = NFS_VERSMAX_DEFAULT;
 	}
 
-	if (error = nfs_srv_set_sc_versions(fp, &sctp, ng->nfs_versmin,
-	    ng->nfs_versmax)) {
+	error = nfs_srv_set_sc_versions(fp, &sctp, ng->nfs_versmin,
+	    ng->nfs_versmax);
+	if (error != 0) {
 		releasef(STRUCT_FGET(uap, fd));
 		kmem_free(addrmask.buf, addrmask.maxlen);
 		return (error);
@@ -2128,7 +2129,8 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 		break;
 
 	case AUTH_UNIX:
-		if (!stat || crgetuid(cr) == 0 && !(access & NFSAUTH_UIDMAP)) {
+		if (!stat || (crgetuid(cr) == 0 &&
+		    !(access & NFSAUTH_UIDMAP))) {
 			anon_res = crsetugid(cr, exi->exi_export.ex_anon,
 			    exi->exi_export.ex_anon);
 			(void) crsetgroups(cr, 0, NULL);
@@ -2905,7 +2907,8 @@ rfs_publicfh_mclookup(char *p, vnode_t *dvp, cred_t *cr, vnode_t **vpp,
 	 * access to this new export then it will get an access error when it
 	 * tries to use the filehandle
 	 */
-	if (error = nfs_check_vpexi(mc_dvp, *vpp, kcred, exi)) {
+	error = nfs_check_vpexi(mc_dvp, *vpp, kcred, exi);
+	if (error != 0) {
 		VN_RELE(*vpp);
 		goto publicfh_done;
 	}
@@ -2959,7 +2962,8 @@ rfs_publicfh_mclookup(char *p, vnode_t *dvp, cred_t *cr, vnode_t **vpp,
 			exi_rele(*exi);
 			*exi = NULL;
 
-			if (error = nfs_check_vpexi(mc_dvp, *vpp, kcred, exi)) {
+			error = nfs_check_vpexi(mc_dvp, *vpp, kcred, exi);
+			if (error != 0) {
 				VN_RELE(*vpp);
 				goto publicfh_done;
 			}
@@ -3028,7 +3032,8 @@ rfs_pathname(
 		/*
 		 * This thread used a pathname > TYPICALMAXPATHLEN bytes long.
 		 */
-		if (error = pn_get(path, UIO_SYSSPACE, &pn))
+		error = pn_get(path, UIO_SYSSPACE, &pn);
+		if (error != 0)
 			return (error);
 		if (pn.pn_pathlen != 0 && pathflag == URLPATH) {
 			URLparse(pn.pn_path);

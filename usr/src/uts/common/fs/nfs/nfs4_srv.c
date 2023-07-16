@@ -2358,7 +2358,8 @@ bitmap4_get_sysattrs(struct nfs4_svgetit_arg *sargp)
 	vnode_t *vp = cs->vp;
 
 	if (sargp->sbp != NULL) {
-		if (error = VFS_STATVFS(vp->v_vfsp, sargp->sbp)) {
+		error = VFS_STATVFS(vp->v_vfsp, sargp->sbp);
+		if (error != 0) {
 			sargp->sbp = NULL;	/* to identify error */
 			return (puterrno4(error));
 		}
@@ -4330,7 +4331,8 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * it causes an update, cinfo.before will not match, which will
 	 * trigger a cache flush even if atomic is TRUE.
 	 */
-	if (fp = rfs4_lookup_and_findfile(dvp, name, &vp, &error, cs->cr)) {
+	fp = rfs4_lookup_and_findfile(dvp, name, &vp, &error, cs->cr);
+	if (fp != NULL) {
 		if (rfs4_check_delegated_byfp(FWRITE, fp, TRUE, TRUE, TRUE,
 		    NULL)) {
 			VN_RELE(vp);
@@ -4704,8 +4706,9 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * it causes an update, cinfo.before will not match, which will
 	 * trigger a cache flush even if atomic is TRUE.
 	 */
-	if (sfp = rfs4_lookup_and_findfile(odvp, converted_onm, &srcvp,
-	    &error, cs->cr)) {
+	sfp = rfs4_lookup_and_findfile(odvp, converted_onm, &srcvp,
+	    &error, cs->cr);
+	if (sfp != NULL) {
 		if (rfs4_check_delegated_byfp(FWRITE, sfp, TRUE, TRUE, TRUE,
 		    NULL)) {
 			*cs->statusp = resp->status = NFS4ERR_DELAY;
@@ -4727,8 +4730,9 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	sfp_rele_grant_hold = 1;
 
 	/* Does the destination exist and a file and have a delegation? */
-	if (fp = rfs4_lookup_and_findfile(ndvp, converted_nnm, &targvp,
-	    NULL, cs->cr)) {
+	fp = rfs4_lookup_and_findfile(ndvp, converted_nnm, &targvp, NULL,
+	    cs->cr);
+	if (fp != NULL) {
 		if (rfs4_check_delegated_byfp(FWRITE, fp, TRUE, TRUE, TRUE,
 		    NULL)) {
 			*cs->statusp = resp->status = NFS4ERR_DELAY;
@@ -5450,7 +5454,8 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 		}
 
 		bva.va_mask = AT_UID|AT_SIZE;
-		if (error = VOP_GETATTR(vp, &bva, 0, cr, &ct)) {
+		error = VOP_GETATTR(vp, &bva, 0, cr, &ct);
+		if (error != 0) {
 			status = puterrno4(error);
 			goto done;
 		}
@@ -7311,7 +7316,8 @@ rfs4_do_opendelcur(struct compound_state *cs, struct svc_req *req,
 	VN_HOLD(dsp->rds_finfo->rf_vp);
 	cs->vp = dsp->rds_finfo->rf_vp;
 
-	if (error = makefh4(&cs->fh, cs->vp, cs->exi)) {
+	error = makefh4(&cs->fh, cs->vp, cs->exi);
+	if (error != 0) {
 		rfs4_deleg_state_rele(dsp);
 		*cs->statusp = resp->status = puterrno4(error);
 		return;

@@ -441,8 +441,9 @@ log_file_create(caddr_t origname, struct log_file **lfpp)
 	(void) sprintf(name, "%s%s", origname, LOG_INPROG_STRING);
 
 	LOGGING_DPRINT((3, "log_file_create: %s\n", name));
-	if (error = vn_open(name, UIO_SYSSPACE, FCREAT|FWRITE|FOFFMAX,
-	    LOG_MODE, &vp, CRCREAT, 0)) {
+	error = vn_open(name, UIO_SYSSPACE, FCREAT|FWRITE|FOFFMAX,
+	    LOG_MODE, &vp, CRCREAT, 0);
+	if (error != 0) {
 		nfs_cmn_err(error, CE_WARN,
 		    "log_file_create: Can not open %s - error %m", name);
 		goto out;
@@ -562,8 +563,9 @@ log_file_rele(struct log_file *lfp)
 	ASSERT(lfp->lf_flags == 0);
 	ASSERT(lfp->lf_writers == 0);
 
-	if (error = VOP_CLOSE(lfp->lf_vp, FCREAT|FWRITE|FOFFMAX, 1, (offset_t)0,
-	    CRED(), NULL)) {
+	error = VOP_CLOSE(lfp->lf_vp, FCREAT|FWRITE|FOFFMAX, 1, (offset_t)0,
+	    CRED(), NULL);
+	if (error != 0) {
 		nfs_cmn_err(error, CE_WARN,
 		    "NFS: Could not close log buffer %s - error = %m",
 		    lfp->lf_path);
@@ -935,13 +937,15 @@ nfslog_logbuffer_rename(struct log_buffer *lbp)
 	/*
 	 * rename the current buffer to what the daemon expects
 	 */
-	if (error = nfslog_logfile_rename(lf->lf_path, lbp->lb_path))
+	error = nfslog_logfile_rename(lf->lf_path, lbp->lb_path);
+	if (error != 0)
 		goto out;
 
 	/*
 	 * Create a new working buffer file and have all new data sent there.
 	 */
-	if (error = log_file_create(lbp->lb_path, &logfile)) {
+	error = log_file_create(lbp->lb_path, &logfile);
+	if (error != 0) {
 		/* Attempt to rename to original */
 		(void) nfslog_logfile_rename(lbp->lb_path, lf->lf_path);
 		goto out;
@@ -991,7 +995,8 @@ nfslog_logfile_rename(char *from, char *new)
 {
 	int error;
 
-	if (error = vn_rename(from, new, UIO_SYSSPACE)) {
+	error = vn_rename(from, new, UIO_SYSSPACE);
+	if (error != 0) {
 		cmn_err(CE_WARN,
 		    "nfslog_logfile_rename: couldn't rename %s to %s\n",
 		    from, new);

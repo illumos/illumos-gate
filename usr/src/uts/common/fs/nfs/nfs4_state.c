@@ -535,7 +535,8 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 	uio.uio_loffset = 0;
 	uio.uio_resid = sizeof (int) + NFS4_VERIFIER_SIZE + sizeof (uint_t);
 
-	if (err = VOP_READ(vp, &uio, FREAD, CRED(), NULL)) {
+	err = VOP_READ(vp, &uio, FREAD, CRED(), NULL);
+	if (err != 0) {
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
 		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
@@ -575,7 +576,8 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_resid = cl_ss->cl_id4.id_len = id_len;
 
-	if (err = VOP_READ(vp, &uio, FREAD, CRED(), NULL)) {
+	err = VOP_READ(vp, &uio, FREAD, CRED(), NULL);
+	if (err != 0) {
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
 		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
@@ -689,7 +691,8 @@ rfs4_ss_oldstate(rfs4_oldstate_t *oldstate, char *statedir, char *destdir)
 			if (ss_pn == NULL)
 				continue;
 
-			if (cl_ss = rfs4_ss_getstate(dvp, ss_pn)) {
+			cl_ss = rfs4_ss_getstate(dvp, ss_pn);
+			if (cl_ss != NULL) {
 				if (destdir != NULL) {
 					rfs4_ss_pnfree(ss_pn);
 					cl_ss->ss_pn = rfs4_ss_movestate(
@@ -4046,7 +4049,7 @@ rfs4_close_all_state(rfs4_file_t *fp)
 	rw_enter(&fp->rf_file_rwlock, RW_WRITER);
 
 	/* Remove ALL state from the file */
-	while (sp = rfs4_findstate_by_file(fp)) {
+	while ((sp = rfs4_findstate_by_file(fp)) != NULL) {
 		rfs4_state_close(sp, FALSE, FALSE, CRED());
 		rfs4_state_rele_nounlock(sp);
 	}

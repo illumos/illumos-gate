@@ -73,7 +73,7 @@
  *	sizeof nfsstat4 (4 bytes) +
  *	sizeof verifier4 (8 bytes) +
  *	sizeof entsecond_to_ry4list bool (4 bytes) +
- *	sizeof entry4 	(36 bytes) +
+ *	sizeof entry4	(36 bytes) +
  *	sizeof eof bool  (4 bytes)
  *
  * RFS4_MINLEN_RDDIR_BUF: minimum length of buffer server will provide to
@@ -124,8 +124,9 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 
 	*vpp = vp = NULL;
 
-	if (error = VOP_LOOKUP(dvp, d_name, &vp, NULL, 0, NULL, cs->cr,
-	    NULL, NULL, NULL))
+	error = VOP_LOOKUP(dvp, d_name, &vp, NULL, 0, NULL, cs->cr,
+	    NULL, NULL, NULL);
+	if (error != 0)
 		return (error);
 
 	/* referral point ? */
@@ -173,7 +174,8 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 	 * etc.), then return attrs for stub instead of VROOT object.
 	 * If it fails for any other reason, then return the error.
 	 */
-	if (error = VOP_FID(vp, &fid, NULL)) {
+	error = VOP_FID(vp, &fid, NULL);
+	if (error != 0) {
 		if (ismntpt == 0) {
 			VN_RELE(vp);
 			return (error);
@@ -311,7 +313,8 @@ rfs4_get_sb_encode(vfs_t *vfsp, rfs4_sb_encode_t *psbe)
 	struct statvfs64 sb;
 
 	/* Grab the per filesystem info */
-	if (error = VFS_STATVFS(vfsp, &sb)) {
+	error = VFS_STATVFS(vfsp, &sb);
+	if (error != 0) {
 		return (error);
 	}
 
@@ -483,7 +486,8 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (ar & (FATTR4_MAXFILESIZE_MASK |
 	    FATTR4_MAXLINK_MASK |
 	    FATTR4_MAXNAME_MASK)) {
-		if (error = rfs4_get_pc_encode(cs->vp, &dpce, ar, cs->cr)) {
+		error = rfs4_get_pc_encode(cs->vp, &dpce, ar, cs->cr);
+		if (error != 0) {
 			*cs->statusp = resp->status = puterrno4(error);
 			goto out;
 		}
@@ -498,7 +502,8 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	    FATTR4_FILES_AVAIL_MASK |
 	    FATTR4_FILES_FREE_MASK |
 	    FATTR4_FILES_TOTAL_MASK)) {
-		if (error = rfs4_get_sb_encode(dvp->v_vfsp, &dsbe)) {
+		error = rfs4_get_sb_encode(dvp->v_vfsp, &dsbe);
+		if (error != 0) {
 			*cs->statusp = resp->status = puterrno4(error);
 			goto out;
 		}
@@ -728,9 +733,8 @@ readagain:
 			    FATTR4_FILES_AVAIL_MASK |
 			    FATTR4_FILES_FREE_MASK |
 			    FATTR4_FILES_TOTAL_MASK)) {
-				if (error =
-				    rfs4_get_sb_encode(dvp->v_vfsp,
-				    &sbe)) {
+				error = rfs4_get_sb_encode(dvp->v_vfsp, &sbe);
+				if (error != 0) {
 					/* Remove attrs from encode */
 					ae &= ~(FATTR4_FILES_AVAIL_MASK |
 					    FATTR4_FILES_FREE_MASK |
@@ -744,8 +748,9 @@ readagain:
 			if (ae & (FATTR4_MAXFILESIZE_MASK |
 			    FATTR4_MAXLINK_MASK |
 			    FATTR4_MAXNAME_MASK)) {
-				if (error = rfs4_get_pc_encode(cs->vp,
-				    &pce, ae, cs->cr)) {
+				error = rfs4_get_pc_encode(cs->vp,
+				    &pce, ae, cs->cr);
+				if (error != 0) {
 					ae &= ~(FATTR4_MAXFILESIZE_MASK |
 					    FATTR4_MAXLINK_MASK |
 					    FATTR4_MAXNAME_MASK);
@@ -1235,7 +1240,7 @@ reencode_attrs:
 						lu_set = TRUE;
 						lastuid = va.va_uid;
 					}
-				} else 	if (va.va_uid != lastuid) {
+				} else if (va.va_uid != lastuid) {
 					if (owner.utf8string_len != 0) {
 						kmem_free(owner.utf8string_val,
 						    owner.utf8string_len);

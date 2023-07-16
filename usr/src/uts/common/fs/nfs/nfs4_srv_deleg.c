@@ -1848,7 +1848,7 @@ rfs4_revoke_file(rfs4_file_t *fp)
 	 * rfs4_return_deleg()
 	 */
 	rfs4_dbe_lock(fp->rf_dbe);
-	while (dsp = list_head(&fp->rf_delegstatelist)) {
+	while ((dsp = list_head(&fp->rf_delegstatelist)) != NULL) {
 		rfs4_dbe_hold(dsp->rds_dbe);
 		rfs4_dbe_unlock(fp->rf_dbe);
 		rfs4_return_deleg(dsp, TRUE);

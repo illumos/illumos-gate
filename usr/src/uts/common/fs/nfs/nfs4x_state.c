@@ -427,7 +427,8 @@ rfs4_session_create(rfs4_entry_t u_entry, void *arg)
 	 */
 	ocp->cn_attrs = ap->cs_aotw.csa_fore_chan_attrs;
 	ocp->cn_back_attrs = ap->cs_aotw.csa_back_chan_attrs;
-	if (sle = sess_chan_limits(ocp)) {
+	sle = sess_chan_limits(ocp);
+	if (sle != NFS4_OK) {
 		ap->cs_error = sle;
 		goto err_free_chan;
 	}
