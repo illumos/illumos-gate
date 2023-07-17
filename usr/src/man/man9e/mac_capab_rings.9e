@@ -11,8 +11,9 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd July 2, 2022
+.Dd July 17, 2023
 .Dt MAC_CAPAB_RINGS 9E
 .Os
 .Sh NAME
@@ -191,10 +192,10 @@ VLAN = 11 OR 12 OR ...
 .Ed
 .El
 .Pp
-The following psuedocode summarizes the behavior for a device that
+The following pseudocode summarizes the behavior for a device that
 supports independent MAC and VLAN filters.
 If the hardware only supports a single family of filters, then simply
-treat that in the psuedocode as though it is always true:
+treat that in the pseudocode as though it is always true:
 .Bd -literal -offset indent
 for each packet p:
     for each MAC filter m:
@@ -207,7 +208,7 @@ for each packet p:
     proceed to next packet
 .Ed
 .Pp
-The following psuedocode summarizes the behavior for a device that
+The following pseudocode summarizes the behavior for a device that
 supports a combined MAC address and VLAN filter:
 .Bd -literal -offset indent
 for each packet p:
@@ -228,7 +229,7 @@ then the value of the capability structure is a pointer to a
 structure with the following members:
 .Bd -literal -offset indent
 mac_ring_type_t         mr_type;
-mac_groupt_type_t       mr_group_type;
+mac_group_type_t        mr_group_type;
 uint_t                  mr_rnum;
 uint_t                  mr_gnum;
 mac_get_ring_t          mr_rget;
@@ -340,7 +341,7 @@ One of the main points of the
 .Dv MAC_CAPAB_RINGS
 capability is to increase the parallelism and concurrency that is
 actively going on in the driver.
-This means that a driver may be asked to transmit, poll, or receiver
+This means that a driver may be asked to transmit, poll, or receive
 interrupts on all of its rings in parallel.
 This usually calls for fine-grained locking in a driver's own data
 structures to ensure that the various rings can be populated and used
@@ -389,7 +390,7 @@ When using rings, two of the primary functions that were used change.
 First, the
 .Xr mac_rx 9F
 function should be replaced with the
-.Xr mac_ring_rx 9F
+.Xr mac_rx_ring 9F
 function.
 Secondly,
 the
@@ -468,8 +469,8 @@ promiscuous mode traffic.
 .Xr mr_gremring 9E ,
 .Xr mr_rget 9E ,
 .Xr mri_poll 9E ,
-.Xr mac_ring_rx 9F ,
 .Xr mac_rx 9F ,
+.Xr mac_rx_ring 9F ,
 .Xr mac_tx_ring_update 9F ,
 .Xr mac_tx_update 9F ,
 .Xr mac_group_info 9S

@@ -11,8 +11,9 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2022 Oxide computer Company
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd July 2, 2022
+.Dd July 17, 2023
 .Dt MGI_START 9E
 .Os
 .Sh NAME
@@ -102,7 +103,7 @@ At a minimum, during the
 entry point, a driver is required to save the value of
 .Fa mr_gen
 for later use, in particular when calling
-.Xr mac_rx_ring 9E .
+.Xr mac_rx_ring 9F .
 This is used by the system to discriminate between generations of the
 device's configuration and its operation.
 The operating system will check that all received packets are called
@@ -127,9 +128,9 @@ entry point and then freed in the
 entry point.
 .Pp
 It's worth noting that the
-.Fn mrg_stop
+.Fn mgi_stop
 and
-.Fn mrg_stop
+.Fn mri_stop
 entry points purposefully return
 .Ft void .
 In particular, this means that the driver must be careful about doing
@@ -149,4 +150,5 @@ Otherwise, they should return the appropriate error number.
 .Xr mac 9E ,
 .Xr mac_capab_rings 9E ,
 .Xr mr_gget 9E ,
+.Xr mac_rx_ring 9F ,
 .Xr mac_group_info 9S

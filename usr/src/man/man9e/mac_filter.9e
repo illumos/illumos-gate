@@ -11,8 +11,9 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd July 2, 2022
+.Dd July 17, 2023
 .Dt MAC_FILTER 9E
 .Os
 .Sh NAME
@@ -77,7 +78,7 @@ filters from a device.
 For more information on the filters, see the
 .Sy Filters
 section of
-.Xr mac_capab_rings 9S
+.Xr mac_capab_rings 9E
 and the discussion around setting these members in
 .Xr mac_group_info 9S .
 .Pp
@@ -130,7 +131,7 @@ The frame must match a filter in all programmed classes to be accepted.
 For more information, see the
 .Sy Filters
 section of
-.Xr mac_capab_rings 9S .
+.Xr mac_capab_rings 9E .
 .Sh RETURN VALUES
 Upon successful completion, the driver should ensure that the filter has
 been added or removed and return
