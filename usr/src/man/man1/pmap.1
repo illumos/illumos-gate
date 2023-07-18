@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PMAP 1 "April 9, 2016"
+.TH PMAP 1 "July 17, 2023"
 .SH NAME
 pmap \- display information about the address space of a process
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/pmap\fR [\fB-rslF\fR] [\fB-A\fR \fIaddress_range\fR] [\fIpid\fR | \fIcore\fR]...
 .fi
@@ -28,10 +27,8 @@ pmap \- display information about the address space of a process
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBpmap\fR utility prints information about the address space of a process.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -170,7 +167,6 @@ Displays additional information per mapping. See USAGE for more information.
 .RE
 
 .SH USAGE
-.LP
 The \fBpmap\fR utility prints information about the address space of a process.
 .sp
 .ne 2
@@ -276,12 +272,12 @@ assured only if the primary controlling process, typically a debugger, has
 stopped the victim process and the primary controlling process is doing nothing
 at the moment of application of the \fBproc\fR tool in question.
 .SH DISPLAY FORMATS
-.LP
 One line of output is printed for each mapping within the process, unless the
--\fB-s\fR or -\fB-L\fR option is specified. With \fB-s\fR option, one line is
-printed for a contiguous mapping of each hardware translation page size. With
-\fB-L\fR option one line is printed for a contiguous mapping belonging to the
-same lgroup. With both \fB-L\fR and \fB-s\fR options, one line is printed for a
+\fB-s\fR or \fB-L\fR option is specified. With the \fB-s\fR option, one line is
+printed for a contiguous mapping of each hardware translation page size.
+With the \fB-L\fR option one line is printed for a contiguous mapping
+belonging to the same lgroup.
+With both \fB-L\fR and \fB-s\fR options, one line is printed for a
 contiguous mapping of each hardware translation page size belonging to the same
 lgroup. The column headings are shown in parentheses below.
 .sp
@@ -572,7 +568,6 @@ swap space that is displayed with the command \fBswap\fR \fB-s\fR. See
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDisplaying Process Mappings
 .sp
 .LP
@@ -658,7 +653,7 @@ mapping.
 In the above example, the bourne shell has a resident memory size of
 1032Kbytes. However, a large amount of the physical memory used by the shell is
 shared with other instances of shell. Another identical instance of the shell
-shares physical memory with the other shell where possible, and allocate
+shares physical memory with the other shell where possible, and allocates
 anonymous memory for any non-shared portion. In the above example, each
 additional bourne shell uses approximately 56Kbytes of additional physical
 memory.
@@ -939,7 +934,6 @@ FFBFE000       8K rw---   2   [ stack ]
 .sp
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -968,17 +962,7 @@ An error has occurred.
 process files
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fB/usr/proc/lib/*\fR\fR
-.ad
-.RS 19n
-\fBproc\fR tools supporting files
-.RE
-
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -997,7 +981,6 @@ Interface Stability	See below.
 The command syntax is Evolving. The \fB-L\fR option and the output formats are
 Unstable.
 .SH SEE ALSO
-.LP
 .BR ldd (1),
 .BR lgrpinfo (1),
 .BR madv.so.1 (1),
