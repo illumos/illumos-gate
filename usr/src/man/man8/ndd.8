@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NDD 8 "Mar 13, 2009"
+.TH NDD 8 "July 17, 2023"
 .SH NAME
 ndd \- get and set driver configuration parameters
 .SH SYNOPSIS
-.LP
 .nf
 \fBndd\fR [\fB-set\fR] \fIdriver\fR \fIparameter\fR [\fIvalue\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBndd\fR gets and sets selected configuration parameters in some kernel
 drivers. Currently, \fBndd\fR only supports the drivers that implement the
 \fBTCP/IP\fR Internet protocol family. Each driver chooses which parameters to
@@ -34,7 +31,6 @@ By convention, drivers that support \fBndd\fR also support a special read-only
 \fIparameter\fR named ``\fB?\fR'' which can be used to list the parameters
 supported by the driver.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRGetting Parameters Supported By The TCP Driver
 .sp
 .LP
@@ -81,9 +77,6 @@ example% \fBndd -set /dev/ip ip6_forwarding 0\fR
 .sp
 
 .SH SEE ALSO
-.sp
-.LP
-.BR nca (1),
 .BR ioctl (2),
 .BR arp (4P),
 .BR ip (4P),
@@ -93,8 +86,6 @@ example% \fBndd -set /dev/ip ip6_forwarding 0\fR
 .BR attributes (7),
 .BR dladm (8)
 .SH NOTES
-.sp
-.LP
 The parameters supported by each driver may change from release to release.
 Like programs that read \fB/dev/kmem\fR, user programs or shell scripts that
 execute \fBndd\fR should be prepared for parameter names to change.
