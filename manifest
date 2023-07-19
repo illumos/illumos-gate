@@ -20828,7 +20828,7 @@ s usr/share/man/man9f/mac_prop_info_set_default_uint8.9f=mac_prop_info.9f
 s usr/share/man/man9f/mac_prop_info_set_perm.9f=mac_prop_info.9f
 s usr/share/man/man9f/mac_prop_info_set_range_uint32.9f=mac_prop_info.9f
 f usr/share/man/man9f/mac_register.9f 0444 root bin
-s usr/share/man/man9f/mac_ring_rx.9f=mac_rx.9f
+s usr/share/man/man9f/mac_rx_ring.9f=mac_rx.9f
 f usr/share/man/man9f/mac_rx.9f 0444 root bin
 f usr/share/man/man9f/mac_transceiver_info.9f 0444 root bin
 s usr/share/man/man9f/mac_transceiver_info_set_present.9f=mac_transceiver_info.9f

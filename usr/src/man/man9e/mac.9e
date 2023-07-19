@@ -13,8 +13,9 @@
 .\" Copyright 2020 RackTop Systems, Inc.
 .\" Copyright 2023 Oxide Computer Company
 .\" Copyright 2023 Jason King
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd June 22, 2023
+.Dd July 17, 2023
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -899,7 +900,7 @@ For example, if a packet matches a specific VLAN or MAC address,
 then it can be sent to a specific ring or a specific group of rings.
 This is especially useful when there are multiple different virtual NICs
 or zones in play as the operating system will be able to use the
-hardware classificaiton features to already know where a given packet
+hardware classification features to already know where a given packet
 needs to be delivered internally rather than having to determine that
 for each packet.
 .Pp
@@ -2412,7 +2413,7 @@ aligned.
 The IP stack expects that the beginning of an IP header will be at a
 4-byte aligned address; however, a DMA allocation will be at a 4-
 or 8-byte aligned address by default.
-The IP hearder is at a 14 byte offset from the beginning of the Ethernet
+The IP header is at a 14 byte offset from the beginning of the Ethernet
 frame, leaving the IP header at a 2-byte alignment if the Ethernet frame
 starts at the beginning of the DMA buffer.
 If VLAN tagging is in place, then each VLAN tag adds 4 bytes, which

@@ -11,13 +11,14 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2022 Oxide Compuer Company
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd July 2, 2022
+.Dd July 17, 2023
 .Dt MAC_RX 9F
 .Os
 .Sh NAME
 .Nm mac_rx ,
-.Nm mac_ring_rx
+.Nm mac_rx_ring
 .Nd deliver frames from a driver to the system
 .Sh SYNOPSIS
 .In sys/mac_provider.h
@@ -110,7 +111,7 @@ The driver should pass the ring handle in
 for the ring in question that it processed.
 If more than one ring was processed during an interrupt, then the driver
 must call
-.Fn mac_ring_rx
+.Fn mac_rx_ring
 once for each ring and ensure that the
 .Fa mr_gen
 argument matches what was passed to the driver during the
@@ -128,7 +129,7 @@ When a driver supporting the
 capability is asked to poll via their
 .Xr mri_poll 9E
 entry point, then the driver should not call the
-.Fn mac_ring_rx
+.Fn mac_rx_ring
 function to deliver packets and instead returns them during the
 .Xr mri_poll 9E
 call.

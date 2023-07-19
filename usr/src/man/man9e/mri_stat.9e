@@ -11,13 +11,14 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd July 2, 2022
+.Dd July 17, 2023
 .Dt MRI_STAT 9E
 .Os
 .Sh NAME
 .Nm mri_stat
-.Nd xtatistics collection entry point for rings
+.Nd statistics collection entry point for rings
 .Sh SYNOPSIS
 .In sys/mac_provider.h
 .Ft int
@@ -78,7 +79,7 @@ Receive rings should support the following statistics:
 .Dv MAC_STAT_RBYTES
 .El
 .Pp
-Transmit rings should support the following statitics:
+Transmit rings should support the following statistics:
 .Bl -bullet
 .It
 .Dv MAC_STAT_OBYTES
@@ -145,7 +146,7 @@ example_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
 .Ed
 .Sh ERRORS
 The device driver may return one of the following errors.
-While this list is not intended to be exhaustive, it is recommend to use
+While this list is not intended to be exhaustive, it is recommended to use
 one of these if possible.
 .Bl -tag -width Er
 .It Er ENOTSUP

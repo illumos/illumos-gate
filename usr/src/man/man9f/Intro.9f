@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd January 26, 2023
+.Dd July 17, 2023
 .Dt INTRO 9F
 .Os
 .Sh NAME
@@ -712,9 +713,9 @@ These functions can be used to convert between pages and bytes.
 .Ss Module and Device Framework
 These functions are used as part of implementing kernel modules and
 register device drivers with the various kernel frameworks.
-There are also functions here that are satiable for use in the
-.Xr dev_ops 9F ,
-.Xr cb_ops 9F ,
+There are also functions here that are suitable for use in the
+.Xr dev_ops 9S ,
+.Xr cb_ops 9S ,
 etc.
 structures and for interrogating module information.
 .Pp
@@ -1340,7 +1341,7 @@ When cloning and a driver needs to allocate and manage a minor number
 space, usually an ID space is leveraged whose IDs are usually in the
 range from 0 through
 .Dv MAXMIN32 .
-There are severa different strategies for tracking data structures as
+There are several different strategies for tracking data structures as
 they relate to minor numbers.
 Sometimes, the soft state functionality is used.
 Others might keep an AVL tree around or tie the data to some other data
@@ -1873,7 +1874,7 @@ are present to allow for that to happen when required.
 To initially obtain a
 .Vt struct buf ,
 drivers should begin by calling
-.Xr getrbuf 9S
+.Xr getrbuf 9F
 at which point, the caller can fill in the structure.
 Once that's done, the
 .Xr physio 9F
@@ -1905,7 +1906,7 @@ The full framework and how to use it is described in
 .It Xr mac_prop_info_set_default_uint32 9F Ta Xr mac_prop_info_set_default_uint64 9F
 .It Xr mac_prop_info_set_default_uint8 9F Ta Xr mac_prop_info_set_perm 9F
 .It Xr mac_prop_info_set_range_uint32 9F Ta Xr mac_prop_info 9F
-.It Xr mac_register 9F Ta Xr mac_ring_rx 9F
+.It Xr mac_register 9F Ta Xr mac_rx_ring 9F
 .It Xr mac_rx 9F Ta Xr mac_transceiver_info_set_present 9F
 .It Xr mac_transceiver_info_set_usable 9F Ta Xr mac_transceiver_info 9F
 .It Xr mac_tx_ring_update 9F Ta Xr mac_tx_update 9F
@@ -2261,7 +2262,7 @@ calls, look up properties on the device, perform networking style calls
 ala
 .Xr getmsg 2
 and
-.Xr pumsg 2 ,
+.Xr putmsg 2 ,
 and register callbacks to be called when something happens to the
 underlying device.
 For example, the ZFS file system uses the LDI to open and operate on
@@ -2334,7 +2335,7 @@ special care as part of creating a kernel crash dump.
 These cases may need to call the
 .Xr ddi_in_panic 9F
 function.
-The other functions generally provie a way to get at information such as
+The other functions generally provide a way to get at information such as
 the process ID or other information from the system; however, this
 generally should not be needed or used.
 Almost all values exposed by say
@@ -2446,9 +2447,9 @@ This is the exclusive-IP option that is described in
 Drivers can register to get a callback for every netstack in the system
 and be notified when they are created and destroyed.
 This is done by calling the
-.Xr net_instance_register 9F
+.Xr net_instance_alloc 9F
 function, filling out its data structure, and then finally calling
-.Xr net_instance_regster 9F .
+.Xr net_instance_register 9F .
 Like other callback interfaces, the moment the callback functions are
 registered, drivers need to expect that they're going to be called.
 .Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"

@@ -11,8 +11,9 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2022 Oxide Computer Company
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd July 2, 2022
+.Dd July 17, 2023
 .Dt MRI_POLL 9E
 .Os
 .Sh NAME
@@ -51,12 +52,12 @@ driver check the ring specified by
 for available data.
 .Pp
 The device driver should perform the same logic that it would when it's
-procesing an interrupt and as described in the
+processing an interrupt and as described in the
 .Sx Receiving Data
 section of
 .Xr mac 9E .
 The main difference is that instead of calling
-.Xr mac_ring_rx 9E ,
+.Xr mac_rx_ring 9F ,
 it should instead return that data as a
 .Vt mblk_t
 chain.
@@ -104,14 +105,14 @@ available .
 .Sh RETURN VALUES
 Upon successful completion, the device driver should return a message
 block chain of collected frames.
-If no frames are available or it encountered an error while procesing
+If no frames are available or it encountered an error while processing
 data, then it should return
 .Dv NULL .
 .Sh SEE ALSO
 .Xr mac 9E ,
 .Xr mac_capab_rings 9E ,
-.Xr mac_ring_rx 9E ,
 .Xr mi_disable 9E ,
 .Xr mi_enable 9E ,
 .Xr mr_rget 9E ,
+.Xr mac_rx_ring 9F ,
 .Xr mac_ring_info 9S

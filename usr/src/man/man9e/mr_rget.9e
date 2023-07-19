@@ -11,8 +11,9 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2022 Oxide Compuer Company
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd July 2, 2022
+.Dd July 17, 2023
 .Dt MR_RGET 9E
 .Os
 .Sh NAME
@@ -103,7 +104,7 @@ The number of groups that a driver supports is based on the values
 present in the
 .Fa mr_gnum
 member of the
-.Vt mac_capbab_rings_t
+.Vt mac_capab_rings_t
 structure which is described in
 .Xr mac_capab_rings 9E .
 The group index ranges from zero to the specified number of groups minus

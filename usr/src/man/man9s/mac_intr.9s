@@ -11,8 +11,9 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2022 Oxide Compuer Company
+.\" Copyright 2023 Peter Tribble
 .\"
-.Dd July 2, 2022
+.Dd July 17, 2023
 .Dt MAC_INTR 9S
 .Os
 .Sh NAME
@@ -55,7 +56,7 @@ of switching between polling and interrupt-driven receiving.
 .Pp
 While the structure does embed a
 .Vt ddi_intr_handle_t
-that corresponds to the ring's unerlying MSI-X, MSI, INTx, or other
+that corresponds to the ring's underlying MSI-X, MSI, INTx, or other
 interrupt type, the
 .Vt mac_intr_t
 still represents and is scoped to a single ring itself.
@@ -111,4 +112,4 @@ interrupt.
 .Xr mi_disable 9E ,
 .Xr mi_enable 9E ,
 .Xr ddi_intr_alloc 9F ,
-.Xr mac_ring_inf 9S
+.Xr mac_ring_info 9S
