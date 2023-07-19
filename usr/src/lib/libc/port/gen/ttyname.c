@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * ttyname(f): return "/dev/X" (where X is a relative pathname
@@ -155,7 +155,7 @@ static	dev_t	ptsldev = NODEV;
 char *
 _ttyname_dev(dev_t rdev, char *buffer, size_t buflen)
 {
-	struct stat64 fsb;
+	struct stat64 fsb = { 0 };
 
 	fsb.st_rdev = rdev;
 
@@ -564,11 +564,14 @@ srch_dir(const entry_t path,	/* current path */
 		 */
 		else if ((tsb.st_mode & S_IFMT) == S_IFCHR) {
 			int flag = 0;
-			if (tsb.st_dev == fsb->st_dev)
+			if (match_mask & MATCH_FS &&
+			    tsb.st_dev == fsb->st_dev)
 				flag |= MATCH_FS;
-			if (tsb.st_rdev == fsb->st_rdev)
+			if (match_mask & MATCH_MM &&
+			    tsb.st_rdev == fsb->st_rdev)
 				flag |= MATCH_MM;
-			if (tsb.st_ino == fsb->st_ino)
+			if (match_mask & MATCH_INO &&
+			    tsb.st_ino == fsb->st_ino)
 				flag |= MATCH_INO;
 
 			if ((flag & file.flags) == file.flags) {
