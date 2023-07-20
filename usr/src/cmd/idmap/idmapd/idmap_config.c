@@ -391,19 +391,19 @@ scf_value2string(const char *name, scf_value_t *value)
 	return (s);
 }
 
+/*
+ * Load a domain server property. These are multi-value string properties.
+ * We'll later map these to an ad_disc_ds_t, which includes looking up
+ * the name in DNS, so don't do that before startup completes.
+ */
 static int
-get_val_ds(idmap_cfg_handles_t *handles, const char *name, int defport,
-    ad_disc_ds_t **val)
+get_val_ds(idmap_cfg_handles_t *handles, const char *name, char ***val)
 {
-	char port_str[8];
-	struct addrinfo hints;
-	struct addrinfo *ai;
-	ad_disc_ds_t *servers = NULL;
 	scf_property_t *scf_prop;
 	scf_value_t *value;
 	scf_iter_t *iter;
-	char *host, *portstr;
-	int err, len, i;
+	char *host, **servers = NULL;
+	int len, i;
 	int count = 0;
 	int rc = -1;
 
@@ -469,29 +469,10 @@ restart:
 		goto destruction;
 	}
 
-	(void) memset(&hints, 0, sizeof (hints));
-	hints.ai_protocol = IPPROTO_TCP;
-	hints.ai_socktype = SOCK_STREAM;
-	host = NULL;
-
 	i = 0;
 	while (i < count && scf_iter_next_value(iter, value) > 0) {
-		if (host) {
-			free(host);
-			host = NULL;
-		}
-		servers[i].priority = 0;
-		servers[i].weight = 100;
-		servers[i].port = defport;
 		if ((host = scf_value2string(name, value)) == NULL)
 			continue;
-		if ((portstr = strchr(host, ':')) != NULL) {
-			*portstr++ = '\0';
-			servers[i].port = strtol(portstr,
-			    (char **)NULL, 10);
-			if (servers[i].port == 0)
-				servers[i].port = defport;
-		}
 
 		/*
 		 * Ignore this server if the hostname is too long
@@ -504,36 +485,15 @@ restart:
 			}
 			continue;
 		}
-		if (len >= sizeof (servers->host)) {
+		if (len >= AD_DISC_MAXHOSTNAME) {
 			idmapdlog(LOG_ERR, "Host name too long: %s", host);
 			idmapdlog(LOG_ERR, "ignoring %s value", name);
 			continue;
 		}
 
-		/*
-		 * Get the host address too.  If we can't, then
-		 * log an error and skip this host.
-		 */
-		(void) snprintf(port_str, sizeof (port_str),
-		    "%d", servers[i].port);
-		ai = NULL;
-		err = getaddrinfo(host, port_str, &hints, &ai);
-		if (err != 0) {
-			idmapdlog(LOG_ERR, "No address for host: %s (%s)",
-			    host, gai_strerror(err));
-			idmapdlog(LOG_ERR, "ignoring %s value", name);
-			continue;
-		}
-
-		(void) strlcpy(servers[i].host, host,
-		    sizeof (servers->host));
-		(void) memcpy(&servers[i].addr, ai->ai_addr, ai->ai_addrlen);
-		freeaddrinfo(ai);
-
-		/* Added a DS to the array. */
-		i++;
+		/* Add a DS to the array. */
+		servers[i++] = host;
 	}
-	free(host);
 
 	if (i == 0) {
 		if (DBG(CONFIG, 1)) {
@@ -558,6 +518,92 @@ destruction:
 	}
 
 	return (rc);
+}
+
+static int
+resolve_ds_addr(idmap_cfg_handles_t *handles, const char *name, int defport,
+    char **ds, ad_disc_ds_t **val)
+{
+	struct addrinfo hints = {
+	    .ai_protocol = IPPROTO_TCP,
+	    .ai_socktype = SOCK_STREAM
+	};
+	struct addrinfo *ai;
+	ad_disc_ds_t *servers = NULL;
+	int err, i, num_ds = 0;
+
+	*val = NULL;
+
+	if (ds == NULL || ds[0] == NULL) {
+		if (DBG(CONFIG, 1))
+			idmapdlog(LOG_INFO, "%s is empty", name);
+		return (0);
+	}
+
+	for (i = 0; ds[i] != NULL; i++)
+		num_ds++;
+
+	if ((servers = calloc(num_ds + 1, sizeof (*servers))) == NULL) {
+		idmapdlog(LOG_ERR, "Out of memory");
+		return (-1);
+	}
+
+	i = 0;
+	while (i < num_ds && *ds != NULL) {
+		char port_str[8];
+		char *pport;
+		const char *host = *ds++;
+
+		servers[i].priority = 0;
+		servers[i].weight = 100;
+		servers[i].port = defport;
+
+		if ((pport = strchr(host, ':')) != NULL) {
+			*pport++ = '\0';
+			servers[i].port = strtol(pport,
+			    (char **)NULL, 10);
+			if (servers[i].port == 0)
+				servers[i].port = defport;
+		}
+
+		/*
+		 * Get the host address. If we can't, then
+		 * log an error and skip this host.
+		 */
+		if (DBG(CONFIG, 2))
+			idmapdlog(LOG_INFO, "%s: lookup %s:%d",
+			    name, host, servers[i].port);
+
+		(void) snprintf(port_str, sizeof (port_str),
+		    "%d", servers[i].port);
+		ai = NULL;
+		err = getaddrinfo(host, port_str, &hints, &ai);
+		if (err != 0) {
+			idmapdlog(LOG_ERR,
+			    "%s: No address for host: %s (%s); skipping host",
+			    name, host, gai_strerror(err));
+			continue;
+		}
+
+		(void) strlcpy(servers[i].host, host,
+		    sizeof (servers->host));
+		(void) memcpy(&servers[i].addr, ai->ai_addr, ai->ai_addrlen);
+		freeaddrinfo(ai);
+
+		/* Added a DS to the array. */
+		i++;
+	}
+
+	if (i == 0) {
+		if (DBG(CONFIG, 1)) {
+			idmapdlog(LOG_INFO, "No valid values in %s", name);
+		}
+		free(servers);
+		servers = NULL;
+	}
+	*val = servers;
+
+	return (0);
 }
 
 static int
@@ -1766,25 +1812,15 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 			(*errors)++;
 	}
 
-	rc = get_val_ds(handles, "domain_controller", 389,
-	    &pgcfg->domain_controller);
+	rc = get_val_ds(handles, "domain_controller",
+	    &pgcfg->cfg_domain_controller);
 	if (rc != 0)
 		(*errors)++;
-	else {
-		(void) ad_disc_set_DomainController(handles->ad_ctx,
-		    pgcfg->domain_controller);
-		pgcfg->domain_controller_auto_disc = B_FALSE;
-	}
 
-	rc = get_val_ds(handles, "preferred_dc", 389,
-	    &pgcfg->preferred_dc);
+	rc = get_val_ds(handles, "preferred_dc",
+	    &pgcfg->cfg_preferred_dc);
 	if (rc != 0)
 		(*errors)++;
-	else {
-		(void) ad_disc_set_PreferredDC(handles->ad_ctx,
-		    pgcfg->preferred_dc);
-		pgcfg->preferred_dc_auto_disc = B_FALSE;
-	}
 
 	rc = get_val_astring(handles, "forest_name", &pgcfg->forest_name);
 	if (rc != 0)
@@ -1815,15 +1851,10 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		(void) ad_disc_set_SiteName(handles->ad_ctx, pgcfg->site_name);
 	}
 
-	rc = get_val_ds(handles, "global_catalog", 3268,
-	    &pgcfg->global_catalog);
+	rc = get_val_ds(handles, "global_catalog",
+	    &pgcfg->cfg_global_catalog);
 	if (rc != 0)
 		(*errors)++;
-	else {
-		(void) ad_disc_set_GlobalCatalog(handles->ad_ctx,
-		    pgcfg->global_catalog);
-		pgcfg->global_catalog_auto_disc = B_FALSE;
-	}
 
 	/* Unless we're doing directory-based name mapping, we're done. */
 	if (pgcfg->directory_based_mapping != DIRECTORY_MAPPING_NAME)
@@ -2233,6 +2264,45 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 		ad_disc_refresh(ad_ctx);
 
 		/*
+		 * Convert domain server configuration items to libadutils
+		 * values. This involves DNS, so we want to avoid doing this
+		 * during startup, less we risk slow or unresponsive servers
+		 * causing startup to timeout.
+		 */
+		rc = resolve_ds_addr(&cfg->handles, "domain_controller", 389,
+		    new_pgcfg.cfg_domain_controller,
+		    &new_pgcfg.domain_controller);
+		if (rc != 0)
+			errors++;
+		else {
+			(void) ad_disc_set_DomainController(ad_ctx,
+			    new_pgcfg.domain_controller);
+			new_pgcfg.domain_controller_auto_disc = B_FALSE;
+		}
+
+		rc = resolve_ds_addr(&cfg->handles, "preferred_dc", 389,
+		    new_pgcfg.cfg_preferred_dc,
+		    &new_pgcfg.preferred_dc);
+		if (rc != 0)
+			errors++;
+		else {
+			(void) ad_disc_set_PreferredDC(ad_ctx,
+			    new_pgcfg.preferred_dc);
+			new_pgcfg.preferred_dc_auto_disc = B_FALSE;
+		}
+
+		rc = resolve_ds_addr(&cfg->handles, "global_catalog", 3268,
+		    new_pgcfg.cfg_global_catalog,
+		    &new_pgcfg.global_catalog);
+		if (rc != 0)
+			errors++;
+		else {
+			(void) ad_disc_set_GlobalCatalog(ad_ctx,
+			    new_pgcfg.global_catalog);
+			new_pgcfg.global_catalog_auto_disc = B_FALSE;
+		}
+
+		/*
 		 * Unless we've been asked to forget the current DC,
 		 * give preference (in order) to the preferred DC if
 		 * configured, or the current DC.  These preferences
@@ -2355,6 +2425,8 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	changed += update_string(&live_pgcfg->site_name,
 	    &new_pgcfg.site_name, "site_name");
 	live_pgcfg->site_name_auto_disc = new_pgcfg.site_name_auto_disc;
+
+	/* Note: explicitly ignoring the bare string domain server values */
 
 	if (DBG(CONFIG, 1)) {
 		if (changed)
@@ -2533,9 +2605,27 @@ idmap_cfg_unload(idmap_pg_config_t *pgcfg)
 		free(pgcfg->machine_sid);
 		pgcfg->machine_sid = NULL;
 	}
+	if (pgcfg->cfg_domain_controller) {
+		char *host = pgcfg->cfg_domain_controller[0];
+		while (host != NULL)
+			free(host++);
+		free(pgcfg->cfg_domain_controller);
+		pgcfg->cfg_domain_controller = NULL;
+	}
 	if (pgcfg->domain_controller) {
 		free(pgcfg->domain_controller);
 		pgcfg->domain_controller = NULL;
+	}
+	if (pgcfg->cfg_preferred_dc) {
+		char *host = pgcfg->cfg_preferred_dc[0];
+		while (host != NULL)
+			free(host++);
+		free(pgcfg->cfg_preferred_dc);
+		pgcfg->cfg_preferred_dc = NULL;
+	}
+	if (pgcfg->preferred_dc) {
+		free(pgcfg->preferred_dc);
+		pgcfg->preferred_dc = NULL;
 	}
 	if (pgcfg->forest_name) {
 		free(pgcfg->forest_name);
@@ -2544,6 +2634,13 @@ idmap_cfg_unload(idmap_pg_config_t *pgcfg)
 	if (pgcfg->site_name) {
 		free(pgcfg->site_name);
 		pgcfg->site_name = NULL;
+	}
+	if (pgcfg->cfg_global_catalog) {
+		char *host = pgcfg->cfg_global_catalog[0];
+		while (host != NULL)
+			free(host++);
+		free(pgcfg->cfg_global_catalog);
+		pgcfg->cfg_global_catalog = NULL;
 	}
 	if (pgcfg->global_catalog) {
 		free(pgcfg->global_catalog);

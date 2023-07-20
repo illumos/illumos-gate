@@ -695,6 +695,38 @@ smb_oplock_wait_ack(smb_request_t *sr, uint32_t NewLevel)
 		rv = cv_timedwait(cv_p, &ol->ol_mutex, time);
 		if (rv < 0) {
 			/* cv_timewait timeout */
+			char *fname;
+			char *opname;
+			int rc;
+
+			/*
+			 * Get the path name of the open file
+			 */
+			fname = smb_srm_zalloc(sr, MAXPATHLEN);
+			rc = smb_node_getpath(node, NULL, fname, MAXPATHLEN);
+			if (rc != 0) {
+				/* Not expected. Just show last part. */
+				(void) snprintf(fname, MAXPATHLEN, "(?)/%s",
+				    node->od_name);
+			}
+
+			/*
+			 * Get an operation name reflecting which kind of
+			 * lease or oplock break got us here, so the log
+			 * message will say "lease break" or whatever.
+			 */
+			if (lease != NULL) {
+				opname = "lease";
+			} else if (ofile->f_oplock.og_dialect >=
+			    SMB_VERS_2_BASE) {
+				opname = "oplock2";
+			} else {
+				opname = "oplock1";
+			}
+
+			cmn_err(CE_NOTE, "!client %s %s break timeout for %s",
+			    sr->session->ip_addr_str, opname, fname);
+
 			status = NT_STATUS_CANNOT_BREAK_OPLOCK;
 			break;
 		}
