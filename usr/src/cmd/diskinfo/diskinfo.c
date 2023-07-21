@@ -13,7 +13,7 @@
  * Copyright (c) 2018 Joyent Inc., All rights reserved.
  * Copyright 2021 RackTop Systems, Inc.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -102,14 +102,13 @@ static int
 disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 {
 	di_phys_t *pp = arg;
-	tnode_t *pnp;
-	tnode_t *ppnp;
 	topo_faclist_t fl;
 	topo_faclist_t *lp;
 	int e;
 	topo_led_state_t mode;
 	topo_led_type_t type;
 	char *name, *slotname, *serial;
+	boolean_t consider_label = B_TRUE;
 
 	if (strcmp(topo_node_name(np), DISK) != 0)
 		return (TOPO_WALK_NEXT);
@@ -127,61 +126,90 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 		pp->dp_serial = serial;
 	}
 
-	pnp = topo_node_parent(np);
-	ppnp = topo_node_parent(pnp);
-	pp->dp_chassis = topo_node_instance(ppnp);
-	if (strcmp(topo_node_name(pnp), BAY) == 0) {
-		if (topo_node_facility(hp, pnp, TOPO_FAC_TYPE_INDICATOR,
-		    TOPO_FAC_TYPE_ANY, &fl, &e) == 0) {
-			for (lp = topo_list_next(&fl.tf_list); lp != NULL;
-			    lp = topo_list_next(lp)) {
-				uint32_t prop;
+	/*
+	 * There are several hierarchies of nodes that we may be dealing with.
+	 * Here are a few examples:
+	 *
+	 * chassis -> bay -> disk
+	 * chassis -> bay -> nvme -> disk
+	 * motherboard -> pcie device -> nvme -> disk
+	 * motherboard -> slot -> nvme -> disk
+	 * chassis -> port -> usb device -> disk
+	 * motherboard -> pcie device -> aic -> usb device -> disk
+	 *
+	 * The list of possibilties can go on. We want to try and see if we can
+	 * identify what tree this is so we can figure out what to do. To
+	 * accomplish this we basically walk our parent nodes looking for
+	 * information until we find everything that we expect.
+	 */
+	for (tnode_t *pnp = topo_node_parent(np); pnp != NULL;
+	    pnp = topo_node_parent(pnp)) {
+		const char *pname = topo_node_name(pnp);
 
-				if (topo_prop_get_uint32(lp->tf_node,
-				    TOPO_PGROUP_FACILITY, TOPO_FACILITY_TYPE,
-				    &prop, &e) != 0) {
-					continue;
-				}
-				type = (topo_led_type_t)prop;
+		/*
+		 * First see if this is the name of something where we can
+		 * derive the location information from and set it. We will only
+		 * consider such information from the very first bay, slot, or
+		 * usb-device that we encounter. If it is missing a label, a
+		 * label higher up in the tree will not be appropriate.
+		 */
+		if ((strcmp(pname, BAY) == 0 || strcmp(pname, SLOT) == 0 ||
+		    strcmp(pname, USB_DEVICE) == 0) && consider_label) {
+			consider_label = B_FALSE;
 
-				if (topo_prop_get_uint32(lp->tf_node,
-				    TOPO_PGROUP_FACILITY, TOPO_LED_MODE,
-				    &prop, &e) != 0) {
-					continue;
-				}
-				mode = (topo_led_state_t)prop;
+			if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
+			    TOPO_PROP_LABEL, &slotname, &e) == 0) {
+				pp->dp_slotname = slotname;
+			}
+		}
 
-				switch (type) {
-				case TOPO_LED_TYPE_SERVICE:
-					pp->dp_faulty = mode ? 1 : 0;
-					break;
-				case TOPO_LED_TYPE_LOCATE:
-					pp->dp_locate = mode ? 1 : 0;
-					break;
-				default:
-					break;
+		/*
+		 * Next, see if these are nodes where we normally have
+		 * facilities.
+		 */
+		if (strcmp(pname, BAY) == 0) {
+			if (topo_node_facility(hp, pnp, TOPO_FAC_TYPE_INDICATOR,
+			    TOPO_FAC_TYPE_ANY, &fl, &e) == 0) {
+				for (lp = topo_list_next(&fl.tf_list);
+				    lp != NULL; lp = topo_list_next(lp)) {
+					uint32_t prop;
+
+					if (topo_prop_get_uint32(lp->tf_node,
+					    TOPO_PGROUP_FACILITY,
+					    TOPO_FACILITY_TYPE, &prop, &e) !=
+					    0) {
+						continue;
+					}
+					type = (topo_led_type_t)prop;
+
+					if (topo_prop_get_uint32(lp->tf_node,
+					    TOPO_PGROUP_FACILITY, TOPO_LED_MODE,
+					    &prop, &e) != 0) {
+						continue;
+					}
+					mode = (topo_led_state_t)prop;
+
+					switch (type) {
+					case TOPO_LED_TYPE_SERVICE:
+						pp->dp_faulty = mode ? 1 : 0;
+						break;
+					case TOPO_LED_TYPE_LOCATE:
+						pp->dp_locate = mode ? 1 : 0;
+						break;
+					default:
+						break;
+					}
 				}
 			}
 		}
 
-		if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_LABEL, &slotname, &e) == 0) {
-			pp->dp_slotname = slotname;
-		}
-
-		pp->dp_slot = topo_node_instance(pnp);
-	} else if (strcmp(topo_node_name(pnp), USB_DEVICE) == 0) {
-		if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_LABEL, &slotname, &e) == 0) {
-			pp->dp_slotname = slotname;
-		}
-
 		/*
-		 * Override dp_chassis for USB devices since they show up
-		 * everywhere in the name space and may not be under a logical
-		 * bay.
+		 * Finally if this is the chassis node, we want to record its
+		 * instance number.
 		 */
-		pp->dp_chassis = -1;
+		if (strcmp(pname, CHASSIS) == 0) {
+			pp->dp_chassis = topo_node_instance(pnp);
+		}
 	}
 
 	return (TOPO_WALK_TERMINATE);
