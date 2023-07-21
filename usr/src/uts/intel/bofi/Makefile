@@ -48,11 +48,6 @@ CONF_SRCDIR	= $(UTSBASE)/common/io
 include $(UTSBASE)/intel/Makefile.intel
 
 #
-#	Override defaults.
-#
-FILEMODE	= 644
-
-#
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
