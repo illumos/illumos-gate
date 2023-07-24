@@ -2044,6 +2044,7 @@ f platform/i86pc/ucode/AuthenticAMD/7001-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/8012-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/8082-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/8310-00 0444 root sys
+f platform/i86pc/ucode/AuthenticAMD/8A00-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/A010-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/A011-00 0444 root sys
 f platform/i86pc/ucode/AuthenticAMD/A012-00 0444 root sys
