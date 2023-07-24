@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 RackTop Systems, Inc.
  */
 #include <pthread.h>
 #include <stdlib.h>
@@ -272,6 +273,20 @@ C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 		 */
 		soft_delete_token_object(object_p, B_TRUE, B_FALSE);
 		return (CKR_OK);
+	}
+
+	/*
+	 * Switch to the creating_session, which actually holds the object.
+	 * If we use the wrong session in the call to soft_delete_object(),
+	 * deletion will silently fail, and we'll leak memory until
+	 * C_CloseSession is called (which, if metaslot is active, may be
+	 * never).
+	 */
+	if (hSession != creating_session) {
+		SES_REFRELE(session_p, lock_held);
+		rv = handle2session(creating_session, &session_p);
+		if (rv != CKR_OK)
+			return (rv);
 	}
 
 	/*
