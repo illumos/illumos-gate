@@ -701,12 +701,6 @@ apic_post_cpu_start(void)
 	splx(ipltospl(LOCK_LEVEL));
 	apic_init_intr();
 
-	/*
-	 * since some systems don't enable the internal cache on the non-boot
-	 * cpus, so we have to enable them here
-	 */
-	setcr0(getcr0() & ~(CR0_CD | CR0_NW));
-
 	APIC_AV_PENDING_SET();
 
 	/*

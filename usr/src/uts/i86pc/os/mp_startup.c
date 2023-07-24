@@ -30,7 +30,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -1697,7 +1697,11 @@ mp_startup_common(boolean_t boot)
 	 * many things use gethrtime/pc_gethrestime, including
 	 * interrupts, cmn_err, etc.  Before we can do that, we want to
 	 * clear TSC if we're on a buggy Sandy/Ivy Bridge CPU, so do that
-	 * right away.
+	 * right away.  Note that the TSC sync procedure run by
+	 * tsc_sync_{master,slave} will not yield reliable results if caching is
+	 * disabled on either CPU.  We rely on code in mpcore.S to guarantee
+	 * that it is enabled before this function is called.  Caching has
+	 * already been enabled on the BSP long before APs are started.
 	 */
 	bzero(new_x86_featureset, BT_SIZEOFMAP(NUM_X86_FEATURES));
 	cpuid_execpass(cp, CPUID_PASS_PRELUDE, new_x86_featureset);
