@@ -49,7 +49,8 @@
 #include <vm/hat_i86.h>
 
 #define	VA_SIGN_BIT (1UL << 47)
-#define	VA_SIGN_EXTEND(va) (((va) ^ VA_SIGN_BIT) - VA_SIGN_BIT)
+#define	VA_LOW_BITS	((1UL << 48) - 1)
+#define	VA_SIGN_EXTEND(va) ((((va) & VA_LOW_BITS) ^ VA_SIGN_BIT) - VA_SIGN_BIT)
 
 struct pfn2pp {
 	pfn_t pfn;
