@@ -450,6 +450,8 @@ bool vmm_check_iommu(void);
 
 void vmm_call_trap(uint64_t);
 
+uint64_t vmm_host_tsc_delta(void);
+
 /*
  * Because of tangled headers, this is not exposed directly via the vmm_drv
  * interface, but rather mirrored as vmm_drv_iop_cb_t in vmm_drv.h.
