@@ -37,6 +37,7 @@ tests = [
 	'import_vlapic',
 	'interface_version',
 	'legacy_destruct',
+	'maxcpu',
 	'mem_devmem',
 	'mem_partial',
 	'mem_seg_map',

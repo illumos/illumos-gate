@@ -35,7 +35,8 @@ PROG =	mem_partial \
 	datarw_vcpu \
 	pause_resume \
 	import_vlapic \
-	time_data
+	time_data \
+	maxcpu
 
 SCRIPT = vmm_drv_test_fini vmm_drv_test_init
 

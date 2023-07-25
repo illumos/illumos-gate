@@ -472,7 +472,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		if (ddi_copyin(datap, &vcpu, sizeof (vcpu), md)) {
 			return (EFAULT);
 		}
-		if (vcpu < 0 || vcpu > vm_get_maxcpus(sc->vmm_vm)) {
+		if (vcpu < 0 || vcpu >= vm_get_maxcpus(sc->vmm_vm)) {
 			return (EINVAL);
 		}
 		vcpu_lock_one(sc, vcpu);
