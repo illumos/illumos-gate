@@ -12,10 +12,10 @@
 .\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
 .\" Copyright (c) 2013, 2017 by Delphix. All rights reserved.
 .\" Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
-.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd August 20, 2022
+.Dd July 22, 2023
 .Dt IPADM 8
 .Os
 .Sh NAME
@@ -121,7 +121,7 @@
 .Nm
 .Ic show-addr
 .Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
-.Op Ar addrobj
+.Op Ar addrobj | interface Ns No /
 .Nm
 .Ic refresh-addr
 .Op Fl i
@@ -157,7 +157,7 @@
 .Ic show-addrprop
 .Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
-.Op Ar addrobj
+.Op Ar addrobj | interface Ns No /
 .Pp
 .Nm
 .Ic set-prop
@@ -661,9 +661,13 @@ Indicate that the DHCP-assigned address should be released.
 .Nm
 .Ic show-addr
 .Op Oo Fl p Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
-.Op Ar addrobj
+.Op Ar addrobj | interface Ns No /
 .Xc
-Show the current address properties.
+Show the current address properties; optionally limited to those for the
+provided
+.Ar addrobj
+or for all address objects on the specified
+.Ar interface .
 .Bl -tag -width Ds
 .It Fl o Ns \&, Ns Fl -output
 Select which fields will be shown.
@@ -806,7 +810,8 @@ Temporary, not persistent across reboots.
 .Fl p Ar prop Ns = Ns Ar value Ns Oo , Ns Ar value Oc Ns ...
 .Ar addrobj
 .Xc
-Set a property's value(s) on the addrobj.
+Set a property's value(s) on the specified
+.Ar addrobj .
 .Bl -tag -width Ds
 .It Fl p Ns \&, Ns Fl -prop
 Specify the property name and value(s).
@@ -839,9 +844,11 @@ subcommand for the explanation of how an FQDN is determined.
 Packets can be transmitted
 .Pq Cm on Ns / Ns Cm off .
 .It Cm zone
-The zone the addrobj is in (temporary-only--use
+The zone the addrobj is in
+.Po temporary-only -- use
 .Xr zonecfg 8
-to make persistent).
+to make persistent
+.Pc .
 .El
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
@@ -854,7 +861,9 @@ Temporary, not persistent across reboots.
 .Fl p Ar prop
 .Ar addrobj
 .Xc
-Reset the addrobj's property value to the default.
+Reset the
+.Ar addrobj Ns No 's
+property value to the default.
 .Bl -tag -width Ds
 .It Fl p Ns \&, Ns Fl -prop
 Specify the property name.
@@ -870,9 +879,12 @@ Temporary, not persistent across reboots.
 .Ic show-addrprop
 .Op Oo Fl c Oc Fl o Ar field Ns Oo , Ns Ar field Oc Ns ...
 .Op Fl p Ar prop Ns Oo , Ns Ar prop Oc Ns ...
-.Op Ar addrobj
+.Op Ar addrobj | interface Ns No /
 .Xc
-Display the property values for one or all of the addrobjs.
+Display property values; optionally limited to those for the provided
+.Ar addrobj
+or for all address objects on the specified
+.Ar interface .
 .Bl -tag -width Ds
 .It Fl c Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
