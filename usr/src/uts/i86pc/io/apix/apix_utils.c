@@ -954,7 +954,7 @@ apix_find_vector_by_avintr(void *intr_id, avfunc f)
 		if (!apix_is_cpu_enabled(n))
 			continue;
 
-		for (v = APIX_AVINTR_MIN; v <= APIX_AVINTR_MIN; v++) {
+		for (v = APIX_AVINTR_MIN; v <= APIX_AVINTR_MAX; v++) {
 			vecp = xv_vector(n, v);
 			if (vecp == NULL ||
 			    vecp->v_state <= APIX_STATE_OBSOLETED)
