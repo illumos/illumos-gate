@@ -24,6 +24,7 @@
  *
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -64,19 +65,21 @@ static mac_stat_info_t ether_stats[] = {
 
 	/* Statistics described in the ieee802.3(7) man page */
 	{ ETHER_STAT_XCVR_ADDR, "xcvr_addr", KSTAT_DATA_UINT32,		0 },
-	{ ETHER_STAT_XCVR_ID, "xcvr_id", KSTAT_DATA_UINT32, 		0 },
+	{ ETHER_STAT_XCVR_ID, "xcvr_id", KSTAT_DATA_UINT32,		0 },
 	{ ETHER_STAT_XCVR_INUSE, "xcvr_inuse", KSTAT_DATA_UINT32,	0 },
-	{ ETHER_STAT_CAP_5000FDX, "cap_5000fdx", KSTAT_DATA_UINT32,	0 },
-	{ ETHER_STAT_CAP_2500FDX, "cap_2500fdx", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_CAP_400GFDX, "cap_400gfdx", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_CAP_200GFDX, "cap_200gfdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_100GFDX, "cap_100gfdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_50GFDX, "cap_50gfdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_40GFDX, "cap_40gfdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_25GFDX, "cap_25gfdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_10GFDX, "cap_10gfdx", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_CAP_5000FDX, "cap_5000fdx", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_CAP_2500FDX, "cap_2500fdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_1000FDX, "cap_1000fdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_1000HDX, "cap_1000hdx", KSTAT_DATA_UINT32,	0 },
-	{ ETHER_STAT_CAP_100T4, "cap_100T4", KSTAT_DATA_UINT32,		0 },
 	{ ETHER_STAT_CAP_100FDX, "cap_100fdx", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_CAP_100T4, "cap_100T4", KSTAT_DATA_UINT32,		0 },
 	{ ETHER_STAT_CAP_100HDX, "cap_100hdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_10FDX, "cap_10fdx", KSTAT_DATA_UINT32,		0 },
 	{ ETHER_STAT_CAP_10HDX, "cap_10hdx", KSTAT_DATA_UINT32,		0 },
@@ -84,17 +87,19 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_CAP_PAUSE, "cap_pause", KSTAT_DATA_UINT32,		0 },
 	{ ETHER_STAT_CAP_AUTONEG, "cap_autoneg", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_REMFAULT, "cap_rem_fault", KSTAT_DATA_UINT32,	0 },
-	{ ETHER_STAT_ADV_CAP_5000FDX, "adv_cap_5000fdx", KSTAT_DATA_UINT32, 0 },
-	{ ETHER_STAT_ADV_CAP_2500FDX, "adv_cap_2500fdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_ADV_CAP_400GFDX, "adv_cap_400gfdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_ADV_CAP_200GFDX, "adv_cap_200gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_100GFDX, "adv_cap_100gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_50GFDX, "adv_cap_50gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_40GFDX, "adv_cap_40gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_25GFDX, "adv_cap_25gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_10GFDX, "adv_cap_10gfdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_ADV_CAP_5000FDX, "adv_cap_5000fdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_ADV_CAP_2500FDX, "adv_cap_2500fdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_1000FDX, "adv_cap_1000fdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_1000HDX, "adv_cap_1000hdx", KSTAT_DATA_UINT32, 0 },
-	{ ETHER_STAT_ADV_CAP_100T4, "adv_cap_100T4", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_ADV_CAP_100FDX, "adv_cap_100fdx", KSTAT_DATA_UINT32, 0},
+	{ ETHER_STAT_ADV_CAP_100T4, "adv_cap_100T4", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_ADV_CAP_100HDX, "adv_cap_100hdx", KSTAT_DATA_UINT32, 0},
 	{ ETHER_STAT_ADV_CAP_10FDX, "adv_cap_10fdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_ADV_CAP_10HDX, "adv_cap_10hdx", KSTAT_DATA_UINT32,	0 },
@@ -103,17 +108,19 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_ADV_CAP_PAUSE, "adv_cap_pause", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_ADV_CAP_AUTONEG, "adv_cap_autoneg", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_REMFAULT, "adv_rem_fault", KSTAT_DATA_UINT32,	0 },
-	{ ETHER_STAT_LP_CAP_5000FDX, "lp_cap_5000fdx", KSTAT_DATA_UINT32, 0 },
-	{ ETHER_STAT_LP_CAP_2500FDX, "lp_cap_2500fdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_LP_CAP_400GFDX, "lp_cap_400gfdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_LP_CAP_200GFDX, "lp_cap_200gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_100GFDX, "lp_cap_100gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_50GFDX, "lp_cap_50gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_40GFDX, "lp_cap_40gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_25GFDX, "lp_cap_25gfdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_10GFDX, "lp_cap_10gfdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_LP_CAP_5000FDX, "lp_cap_5000fdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_LP_CAP_2500FDX, "lp_cap_2500fdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_1000FDX, "lp_cap_1000fdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_1000HDX, "lp_cap_1000hdx", KSTAT_DATA_UINT32, 0 },
-	{ ETHER_STAT_LP_CAP_100T4, "lp_cap_100T4", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_100FDX, "lp_cap_100fdx", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_LP_CAP_100T4, "lp_cap_100T4", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_100HDX, "lp_cap_100hdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_10FDX, "lp_cap_10fdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_10HDX, "lp_cap_10hdx", KSTAT_DATA_UINT32,	0 },
@@ -144,10 +151,10 @@ static mac_ndd_mapping_t  mac_ether_mapping[] = {
 	{"adv_autoneg_cap",	MAC_PROP_AUTONEG, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
-	{"adv_5000fdx_cap",	MAC_PROP_EN_5000FDX_CAP, 0, 1,
+	{"adv_400gfdx_cap",	MAC_PROP_EN_400GFDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
-	{"adv_2500fdx_cap",	MAC_PROP_EN_2500FDX_CAP, 0, 1,
+	{"adv_200gfdx_cap",	MAC_PROP_EN_200GFDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
 	{"adv_100gfdx_cap",	MAC_PROP_EN_100GFDX_CAP, 0, 1,
@@ -165,6 +172,12 @@ static mac_ndd_mapping_t  mac_ether_mapping[] = {
 	{"adv_10gfdx_cap",	MAC_PROP_EN_10GFDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
+	{"adv_5000fdx_cap",	MAC_PROP_EN_5000FDX_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_RW},
+
+	{"adv_2500fdx_cap",	MAC_PROP_EN_2500FDX_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_RW},
+
 	{"adv_1000fdx_cap",	MAC_PROP_EN_1000FDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
@@ -174,6 +187,9 @@ static mac_ndd_mapping_t  mac_ether_mapping[] = {
 	{"adv_100fdx_cap",	MAC_PROP_EN_100FDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
+	{"adv_100T4_cap",	MAC_PROP_EN_100T4_CAP, 0, 1,
+	    sizeof (uint8_t), MAC_PROP_PERM_READ},
+
 	{"adv_100hdx_cap",	MAC_PROP_EN_100HDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
 
@@ -182,9 +198,6 @@ static mac_ndd_mapping_t  mac_ether_mapping[] = {
 
 	{"adv_10hdx_cap",	MAC_PROP_EN_10HDX_CAP, 0, 1,
 	    sizeof (uint8_t), MAC_PROP_PERM_RW},
-
-	{"adv_100T4_cap",	MAC_PROP_EN_100T4_CAP, 0, 1,
-	    sizeof (uint8_t), MAC_PROP_PERM_READ},
 
 	{"link_status",		MAC_STAT_LINK_UP, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
@@ -204,10 +217,10 @@ static mac_ndd_mapping_t  mac_ether_mapping[] = {
 	{"asym_pause_cap",	ETHER_STAT_CAP_ASMPAUSE, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
-	{"5000fdx_cap",		ETHER_STAT_CAP_5000FDX, 0, 1,
+	{"400gfdx_cap",		ETHER_STAT_CAP_400GFDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
-	{"2500fdx_cap",		ETHER_STAT_CAP_2500FDX, 0, 1,
+	{"200gfdx_cap",		ETHER_STAT_CAP_200GFDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
 	{"100gfdx_cap",		ETHER_STAT_CAP_100GFDX, 0, 1,
@@ -225,16 +238,22 @@ static mac_ndd_mapping_t  mac_ether_mapping[] = {
 	{"10gfdx_cap",		ETHER_STAT_CAP_10GFDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
+	{"5000fdx_cap",		ETHER_STAT_CAP_5000FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"2500fdx_cap",		ETHER_STAT_CAP_2500FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
 	{"1000fdx_cap",		ETHER_STAT_CAP_1000FDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
 	{"1000hdx_cap",		ETHER_STAT_CAP_1000HDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
-	{"100T4_cap",		ETHER_STAT_CAP_100T4, 0, 1,
+	{"100fdx_cap",		ETHER_STAT_CAP_100FDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
-	{"100fdx_cap",		ETHER_STAT_CAP_100FDX, 0, 1,
+	{"100T4_cap",		ETHER_STAT_CAP_100T4, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
 	{"100hdx_cap",		ETHER_STAT_CAP_100HDX, 0, 1,
@@ -255,10 +274,10 @@ static mac_ndd_mapping_t  mac_ether_mapping[] = {
 	{"lp_asym_pause_cap",	ETHER_STAT_LP_CAP_ASMPAUSE, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
-	{"lp_5000fdx_cap",	ETHER_STAT_LP_CAP_5000FDX, 0, 1,
+	{"lp_400gfdx_cap",	ETHER_STAT_LP_CAP_400GFDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
-	{"lp_2500fdx_cap",	ETHER_STAT_LP_CAP_2500FDX, 0, 1,
+	{"lp_200gfdx_cap",	ETHER_STAT_LP_CAP_200GFDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
 	{"lp_100gfdx_cap",	ETHER_STAT_LP_CAP_100GFDX, 0, 1,
@@ -276,16 +295,22 @@ static mac_ndd_mapping_t  mac_ether_mapping[] = {
 	{"lp_10gfdx_cap",	ETHER_STAT_LP_CAP_10GFDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
+	{"lp_5000fdx_cap",	ETHER_STAT_LP_CAP_5000FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
+	{"lp_2500fdx_cap",	ETHER_STAT_LP_CAP_2500FDX, 0, 1,
+	    sizeof (long), MAC_PROP_FLAGS_RK},
+
 	{"lp_1000hdx_cap",	ETHER_STAT_LP_CAP_1000HDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
 	{"lp_1000fdx_cap",	ETHER_STAT_LP_CAP_1000FDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
-	{"lp_100T4_cap",	ETHER_STAT_LP_CAP_100T4, 0, 1,
+	{"lp_100fdx_cap",	ETHER_STAT_LP_CAP_100FDX, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
-	{"lp_100fdx_cap",	ETHER_STAT_LP_CAP_100FDX, 0, 1,
+	{"lp_100T4_cap",	ETHER_STAT_LP_CAP_100T4, 0, 1,
 	    sizeof (long), MAC_PROP_FLAGS_RK},
 
 	{"lp_100hdx_cap",	ETHER_STAT_LP_CAP_100HDX, 0, 1,
@@ -489,7 +514,7 @@ static mactype_ops_t mac_ether_type_ops = {
 	mac_ether_sap_verify,
 	mac_ether_header,
 	mac_ether_header_info,
-	NULL, 	/* pdata_verify */
+	NULL,	/* pdata_verify */
 	NULL,	/* header_cook */
 	NULL,	/* header_uncook */
 	mac_ether_link_details

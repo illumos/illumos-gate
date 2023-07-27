@@ -161,6 +161,14 @@ static i_softmac_stat_info_t	i_softmac_ether_si[] = {
 	{ ETHER_STAT_CAP_50GFDX,	"cap_50gfdx",		NULL },
 	{ ETHER_STAT_ADV_CAP_50GFDX,	"adv_cap_50gfdx",	NULL },
 	{ ETHER_STAT_LP_CAP_50GFDX,	"lp_cap_50gfdx",	NULL },
+
+	{ ETHER_STAT_CAP_200GFDX,	"cap_200gfdx",		NULL },
+	{ ETHER_STAT_ADV_CAP_200GFDX,	"adv_cap_200gfdx",	NULL },
+	{ ETHER_STAT_LP_CAP_200GFDX,	"lp_cap_200gfdx",	NULL },
+
+	{ ETHER_STAT_CAP_400GFDX,	"cap_400gfdx",		NULL },
+	{ ETHER_STAT_ADV_CAP_400GFDX,	"adv_cap_400gfdx",	NULL },
+	{ ETHER_STAT_LP_CAP_400GFDX,	"lp_cap_400gfdx",	NULL },
 };
 
 #define	SOFTMAC_ETHER_SI_SZ						\

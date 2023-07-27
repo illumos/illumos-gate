@@ -1,5 +1,6 @@
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2023 Oxide Computer Company
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
 .\" are met:
@@ -21,7 +22,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 .\"
-.Dd "Nov 23, 2016"
+.Dd "July 25, 2023"
 .Dt IEEE802.3 7
 .Os
 .Sh NAME
@@ -72,34 +73,38 @@ These are indicated with the special suffix
 in the table below.
 .
 .Bl -tag -width tx_late_collisions
-.It Sy adv_cap_1000fdx
-Advertises 1000 Mbps full-duplex support.
-.It Sy adv_cap_1000hdx
-Advertises 1000 Mbps half-duplex support.
-.It Sy adv_cap_100fdx
-Advertises 100 Mbps full-duplex support.
-.It Sy adv_cap_100gfdx
-Advertises 100 Gbps support.
+.It Sy adv_cap_10hdx
+Advertises 10 Mbps half-duplex support.
+.It Sy adv_cap_10fdx
+Advertises 10 Mbps full-duplex support.
 .It Sy adv_cap_100hdx
 Advertises 100 Mbps half-duplex support.
 .It Sy adv_cap_100T4
 Advertises 100BASE-T4 support.
-.It Sy adv_cap_10fdx
-Advertises 10 Mbps full-duplex support.
-.It Sy adv_cap_10gfdx
-Advertises 10 Gbps support.
-.It Sy adv_cap_10hdx
-Advertises 10 Mbps half-duplex support.
+.It Sy adv_cap_100fdx
+Advertises 100 Mbps full-duplex support.
+.It Sy adv_cap_1000hdx
+Advertises 1000 Mbps half-duplex support.
+.It Sy adv_cap_1000fdx
+Advertises 1000 Mbps full-duplex support.
 .It Sy adv_cap_2500fdx
 Advertises 2.5 Gbps support.
-.It Sy adv_cap_50gfdx
-Advertises 50 Gbps support.
-.It Sy adv_cap_40gfdx
-Advertises 40 Gbps support.
-.It Sy adv_cap_25gfdx
-Advertises 25 Gbps support.
 .It Sy adv_cap_5000fdx
 Advertises 5 Gbps support.
+.It Sy adv_cap_10gfdx
+Advertises 10 Gbps support.
+.It Sy adv_cap_25gfdx
+Advertises 25 Gbps support.
+.It Sy adv_cap_40gfdx
+Advertises 40 Gbps support.
+.It Sy adv_cap_50gfdx
+Advertises 50 Gbps support.
+.It Sy adv_cap_100gfdx
+Advertises 100 Gbps support.
+.It Sy adv_cap_200gfdx
+Advertises 200 Gbps support.
+.It Sy adv_cap_400gfdx
+Advertises 400 Gbps support.
 .It Sy adv_cap_autoneg
 Advertises auto-negotiation support.
 .It Sy adv_cap_asmpause
@@ -114,34 +119,38 @@ Mis-aligned frames received.
 Broadcast frames received.
 .It Sy brdcstxmt
 Broadcast frames transmitted.
-.It Sy cap_1000fdx
-Device supports 1000 Mbps full-duplex.
-.It Sy cap_1000hdx
-Device supports 1000 Mbps half-duplex.
-.It Sy cap_100fdx
-Device supports 100 Mbps full-duplex.
-.It Sy cap_100gfdx
-Device supports 100 Gbps.
+.It Sy cap_10hdx
+Device supports 10 Mbps half-duplex.
+.It Sy cap_10fdx
+Device supports 10 Mbps full-duplex.
 .It Sy cap_100hdx
 Device supports 100 Mbps half-duplex.
 .It Sy cap_100T4
 Device supports 100BASE-T4.
-.It Sy cap_10fdx
-Device supports 10 Mbps full-duplex.
-.It Sy cap_10gfdx
-Device supports 10 Gpbs.
-.It Sy cap_10hdx
-Device supports 10 Mbps half-duplex.
+.It Sy cap_100fdx
+Device supports 100 Mbps full-duplex.
+.It Sy cap_1000hdx
+Device supports 1000 Mbps half-duplex.
+.It Sy cap_1000fdx
+Device supports 1000 Mbps full-duplex.
 .It Sy cap_2500fdx
 Device supports 2.5 Gbps.
-.It Sy cap_50gfdx
-Device supports 50 Gpbs.
-.It Sy cap_40gfdx
-Device supports 40 Gpbs.
-.It Sy cap_25gfdx
-Device supports 25 Gpbs.
 .It Sy cap_5000fdx
 Device supports 5 Gbps.
+.It Sy cap_10gfdx
+Device supports 10 Gbps.
+.It Sy cap_25gfdx
+Device supports 25 Gbps.
+.It Sy cap_40gfdx
+Device supports 40 Gbps.
+.It Sy cap_50gfdx
+Device supports 50 Gbps.
+.It Sy cap_100gfdx
+Device supports 100 Gbps.
+.It Sy cap_200gfdx
+Device supports 200 Gbps.
+.It Sy cap_400gfdx
+Device supports 400 Gbps.
 .It Sy cap_asmpause
 Device supports asymmetric flow control.
 .It Sy cap_autoneg
@@ -198,34 +207,38 @@ The meanings of these bits are:
 Link state; 0 for down, 1 for up.
 .It Sy link_up
 Link is up if 1.
+.It Sy lp_cap_10hdx
+Peer supports 10 Mbps half-duplex.
+.It Sy lp_cap_10fdx
+Peer supports 10 Mbps full-duplex.
+.It Sy lp_cap_100T4
+Peer supports 100BASE-T4.
+.It Sy lp_cap_100hdx
+Peer supports 100 Mbps half-duplex.
+.It Sy lp_cap_100fdx
+Peer supports 100 Mbps full-duplex.
 .It Sy lp_cap_1000fdx
 Peer supports 1000 Mbps full-duplex.
 .It Sy lp_cap_1000hdx
 Peer supports 1000 Mbps half-duplex.
-.It Sy lp_cap_100fdx
-Peer supports 100 Mbps full-duplex.
-.It Sy lp_cap_100gfdx
-Peer supports 100 Gbps full-duplex.
-.It Sy lp_cap_100hdx
-Peer supports 100 Mbps half-duplex.
-.It Sy lp_cap_100T4
-Peer supports 100BASE-T4.
-.It Sy lp_cap_10fdx
-Peer supports 10 Mbps full-duplex.
-.It Sy lp_cap_10gfdx
-Peer supports 10 Gbps.
-.It Sy lp_cap_10hdx
-Peer supports 10 Mbps half-duplex.
 .It Sy lp_cap_2500fdx
 Peer supports 2.5 Gbps.
 .It Sy lp_cap_5000fdx
 Peer supports 5 Gbps.
-.It Sy lp_cap_50gfdx
-Peer supports 50 Gbps.
-.It Sy lp_cap_40gfdx
-Peer supports 40 Gbps.
+.It Sy lp_cap_10gfdx
+Peer supports 10 Gbps.
 .It Sy lp_cap_25gfdx
 Peer supports 25 Gbps.
+.It Sy lp_cap_40gfdx
+Peer supports 40 Gbps.
+.It Sy lp_cap_50gfdx
+Peer supports 50 Gbps.
+.It Sy lp_cap_100gfdx
+Peer supports 100 Gbps full-duplex.
+.It Sy lp_cap_200gfdx
+Peer supports 200 Gbps full-duplex.
+.It Sy lp_cap_400gfdx
+Peer supports 400 Gbps full-duplex.
 .It Sy lp_cap_asmpause
 Peer supports asymmetric flow control.
 .It Sy lp_cap_autoneg
@@ -278,17 +291,12 @@ Transceiver address.
 Transceiver vendor and device ID.
 .It Sy xcvr_inuse
 Identifies the type of transceiver in use.
-Values are as follows:
-.Bl -column "0"
-.It 0 Ta Unknown or undefined.
-.It 1 Ta None.
-.It 2 Ta 10 Mbps
-.It 3 Ta 100BASE-T4
-.It 4 Ta 100BASE-X
-.It 5 Ta 100BASE-T2
-.It 6 Ta 1000BASE-X
-.It 7 Ta 1000BASE-T
-.El
+Ethernet-specific media values are defined in
+.In sys/mac_ether.h .
+For more information see the section on
+.Dv MAC_PROP_MEDIA
+in
+.Xr mac 9E .
 .El
 .Ss Properties
 The following parameters are accessible with
@@ -311,48 +319,80 @@ Maximum link frame size in bytes.
 See
 .Sx Jumbo Frames .
 .It Sy flowctrl
-Flow control setting, one of \(dqno\(dq, \(dqtx\(dq, \(dqrx\(dq, or \(dqbi\(dq.
+Flow control setting, one of
+.Dq no ,
+.Dq tx ,
+.Dq rx ,
+or
+.Dq bi .
 See
 .Sx Flow Control .
-.It Sy adv_10gfdx_cap
-Advertising 10 Gbps support.
-.It Sy en_10gfdx_cap
-Enable 10 Gbps support.
-.
-.It Sy adv_1000fdx_cap
-Advertising 1000 Mbps full-duplex support.
-.It Sy en_1000fdx_cap
-Enable 1000 Mbps full-duplex.
-.
-.It Sy adv_1000hdx_cap
-Advertising 1000 Mbps half-duplex support.
-.It Sy en_1000hdx_cap
-Enable 1000 Mbps half-duplex.
-.
-.It Sy adv_100fdx_cap
-Advertising 100 Mbps full-duplex support.
-.It Sy en_100fdx_cap
-Enable 100 Mbps full-duplex.
-.
+.It Sy fec
+FEC settings, one of
+.Dq none ,
+.Dq auto ,
+.Dq rs ,
+or
+.Dq base-r .
+See
+.Sx Forward Error Correction .
+.It Sy adv_10hdx_cap
+Advertising 10 Mbps half-duplex support.
+.It Sy en_10fhdx_cap
+Enable 10 Mbps full-duplex.
+.It Sy en_10fhdx_cap
+Enable 10 Mbps half-duplex.
+.It Sy adv_10fdx_cap
+Advertising 10 Mbps full-duplex support.
 .It Sy adv_100hdx_cap
 Advertising 100 Mbps half-duplex support.
 .It Sy en_100hdx_cap
 Enable 100 Mbps half-duplex.
-.
-.It Sy adv_10fdx_cap
-Advertising 10 Mbps full-duplex support.
-.It Sy en_10fhdx_cap
+.It Sy adv_100fdx_cap
+Advertising 100 Mbps full-duplex support.
+.It Sy en_100fdx_cap
 Enable 100 Mbps full-duplex.
-.
-.It Sy adv_10hdx_cap
-Advertising 10 Mbps half-duplex support.
-.It Sy en_10fhdx_cap
-Enable 10 Mbps half-duplex.
+.It Sy adv_1000hdx_cap
+Advertising 1000 Mbps half-duplex support.
+.It Sy en_1000hdx_cap
+Enable 1000 Mbps half-duplex.
+.It Sy adv_1000fdx_cap
+Advertising 1000 Mbps full-duplex support.
+.It Sy en_1000fdx_cap
+Enable 1000 Mbps full-duplex.
+.It Sy adv_10gfdx_cap
+Advertising 10 Gbps support.
+.It Sy en_10gfdx_cap
+Enable 10 Gbps support.
+.It Sy adv_25gfdx_cap
+Advertising 25 Gbps support.
+.It Sy en_25gfdx_cap
+Enable 25 Gbps support.
+.It Sy adv_40gfdx_cap
+Advertising 40 Gbps support.
+.It Sy en_40gfdx_cap
+Enable 40 Gbps support.
+.It Sy adv_50gfdx_cap
+Advertising 50 Gbps support.
+.It Sy en_50gfdx_cap
+Enable 50 Gbps support.
+.It Sy adv_100gfdx_cap
+Advertising 100 Gbps support.
+.It Sy en_100gfdx_cap
+Enable 100 Gbps support.
+.It Sy adv_200gfdx_cap
+Advertising 200 Gbps support.
+.It Sy en_200gfdx_cap
+Enable 200 Gbps support.
+.It Sy adv_400gfdx_cap
+Advertising 400 Gbps support.
+.It Sy en_400gfdx_cap
+Enable 400 Gbps support.
 .El
 .Ss Auto-negotiation
 With modern devices, auto-negotiation is normally handled automatically.
-With 10 Gbps and 1000 Gbps, it is mandatory (10GBASE-T also requires full-duplex
-operation).
+With 1 Gbps, 10 Gbps, and higher speeds it is mandatory (10GBASE-T
+also requires full-duplex operation).
 It is also
 .Em strongly
 recommended for use whenever possible; without auto-negotiation the link
@@ -368,7 +408,23 @@ selected as the link negotiation result:
 .Lp
 .Bl -bullet -offset indent -compact
 .It
+400 Gbps (400gfdx)
+.It
+200 Gbps (200gfdx)
+.It
+100 Gbps (100gfdx)
+.It
+50 Gbps (50gfdx)
+.It
+40 Gbps (40gfdx)
+.It
+25 Gbps (25gfdx)
+.It
 10 Gbps (10gfdx)
+.It
+5 Gbps (5000fdx)
+.It
+2.5 Gbps (2500fdx)
 .It
 1000 Mbps full-duplex (1000fdx)
 .It
@@ -417,11 +473,11 @@ property.
 It has the following meanings:
 .Lp
 .Bl -column -compact -offset indent Dv
-.It \(dqno\(dq Ta Neither send, nor honor pause frames.
-.It \(dqtx\(dq Ta Send pause frames, provided that the peer can support them,
+.It Dq no Ta Neither send, nor honor pause frames.
+.It Dq tx Ta Send pause frames, provided that the peer can support them,
 but do not honor them.
-.It \(dqrx\(dq Ta Receive and honor pause frames.
-.It \(dqbi\(dq Ta Both send and receive (and honor) pause frames.
+.It Dq rx Ta Receive and honor pause frames.
+.It Dq bi Ta Both send and receive (and honor) pause frames.
 .El
 .Lp
 The statistics for flow control
@@ -436,6 +492,43 @@ Administrators are advised to use the
 .Sy flowctrl
 property instead.
 .
+.Ss Forward Error Correction
+Beginning with 25 Gbit per-lane Ethernet
+.Pq 100 Gbit QSFP devices use 4 lanes of 25 GbE
+the various IEEE Ethernet standards allowed the optional use of forward
+error correction, often abbreviated FEC.
+In 25/100 Gbit Ethernet, FEC is considered an optional part of the
+standard and is subject to auto-negotiation.
+In 25/100 Gbit Ethernet, there are two explicit types of FEC that are
+defined and two meta options:
+.Bl -tag -width Ds
+.It rs
+This is a Reed-Solomon based code
+.Po
+.Pf RS Pq 514,528
+.Pc
+This is considered the stronger of the two FEC modes and operates on
+both a per-lane basis and the entire channel.
+.It base-r
+This is known as FireCode and comes from IEEE 802.3 clause 74.
+FireCode operates on each lane indepenently.
+It cannot correct as much as the rs FEC; however, it has lower latency.
+.It auto
+This indicates that the device should perform auto-negotiation to
+determine the type of FEC that should be used.
+.It none
+This indicates the devie should not use FEC at all.
+.El
+.Pp
+Due to the evolution of FEC support in 25/100 Gbit Ethernet, not all
+devices support FEC auto-negotiation.
+Sometimes to form a working link, a particular FEC must be explicitly
+selected.
+.Pp
+With 50 Gbit per-lane Ethernet and higher single-lane and combined
+speeds, the use of FEC is no longer something separate that is part of
+auto-negotiation.
+Instead, it is a mandatory part of higher-speed specifications.
 .Ss Jumbo Frames
 The IEEE 802.3 standard specifies a standard frame size of 1518 bytes,
 which includes a 4-byte frame checksum, a 14-byte header, and 1500 bytes
@@ -492,7 +585,7 @@ The following DLPI parameters are presented to applications.
 .It Minimum SDU Ta 0
 .It Address length Ta 6
 .It MAC type Ta Dv DL_ETHER
-.It SAP length Ta \(mi2
+.It SAP length Ta -2
 .It Service mode Ta Dv DL_CLDLS
 .It Broadcast address Ta Li ff:ff:ff:ff:ff:ff No (6 bytes with all bits set)
 .El
