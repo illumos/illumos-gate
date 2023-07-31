@@ -35,14 +35,16 @@ __FBSDID("$FreeBSD$");
 #include <libi386.h>
 #include <machine/bootinfo.h>
 
-#define EFI_INTEL_FPSWA		\
-    {0xc41b6531,0x97b9,0x11d3,{0x9a,0x29,0x00,0x90,0x27,0x3f,0xc1,0x4d}}
+#define	EFI_INTEL_FPSWA		\
+	{0xc41b6531, 0x97b9, 0x11d3, \
+		{0x9a, 0x29, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d}}
 
 static EFI_GUID fpswa_guid = EFI_INTEL_FPSWA;
 
 /* DIG64 Headless Console & Debug Port Table. */
 #define	HCDP_TABLE_GUID		\
-    {0xf951938d,0x620b,0x42ef,{0x82,0x79,0xa8,0x4b,0x79,0x61,0x78,0x98}}
+	{0xf951938d, 0x620b, 0x42ef, \
+		{0x82, 0x79, 0xa8, 0x4b, 0x79, 0x61, 0x78, 0x98}}
 
 static EFI_GUID hcdp_guid = HCDP_TABLE_GUID;
 
@@ -58,7 +60,7 @@ ldr_alloc(vm_offset_t va)
 int
 ldr_bootinfo(struct bootinfo *bi, uint64_t *bi_addr)
 {
-	VOID *fpswa;
+	void *fpswa;
 	EFI_MEMORY_DESCRIPTOR *mm;
 	EFI_PHYSICAL_ADDRESS addr;
 	EFI_HANDLE *handles;
@@ -76,7 +78,7 @@ ldr_bootinfo(struct bootinfo *bi, uint64_t *bi_addr)
 		status = OpenProtocolByHandle(*handles, &fpswa_guid, &fpswa);
 	bi->bi_fpswa = (status == 0) ? (uint64_t)fpswa : 0;
 
-	bisz = (sizeof(struct bootinfo) + 0x0f) & ~0x0f;
+	bisz = (sizeof (struct bootinfo) + 0x0f) & ~0x0f;
 
 	/*
 	 * Allocate enough pages to hold the bootinfo block and the memory
@@ -119,7 +121,7 @@ ldr_bootinfo(struct bootinfo *bi, uint64_t *bi_addr)
 	bi->bi_memdesc_size = mmsz;
 	bi->bi_memdesc_version = mmver;
 
-	bcopy(bi, (void *)(*bi_addr), sizeof(*bi));
+	bcopy(bi, (void *)(*bi_addr), sizeof (*bi));
 	return (0);
 }
 
