@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _TOPO_MOD_H
@@ -260,6 +261,12 @@ extern int topo_node_label_set(tnode_t *node, const char *, int *);
 
 extern int topo_prop_inherit(tnode_t *, const char *, const char *, int *);
 extern int topo_pgroup_create(tnode_t *, const topo_pgroup_info_t *, int *);
+
+/*
+ * Conveience property group and property creation.
+ */
+extern int topo_create_props(topo_mod_t *, tnode_t *, int,
+    const topo_pgroup_info_t *, ...);
 
 /*
  * Topo property method registration

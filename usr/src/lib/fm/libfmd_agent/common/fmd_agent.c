@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2023 Oxide Computer Company
+ */
+
+/*
  * libfmd_agent contains the low-level operations that needed by the fmd
  * agents, such as page operations (status/retire/unretire), cpu operations
  * (status/online/offline), etc.
@@ -127,7 +131,7 @@ fmd_agent_nvl_ioctl(fmd_agent_hdl_t *hdl, int cmd, uint32_t ver,
 
 		if (ioctl(hdl->agent_devfd, cmd, &fid) < 0) {
 			if (errno == ENAMETOOLONG && outsz != 0 &&
-			    outsz < (FM_IOC_OUT_MAXBUFSZ / 2)) {
+			    outsz <= (FM_IOC_OUT_MAXBUFSZ / 2)) {
 				umem_free(outbuf, outsz);
 				outbuf = NULL;
 				outsz *= 2;
@@ -330,4 +334,112 @@ fmd_agent_page_isretired(fmd_agent_hdl_t *hdl, nvlist_t *fmri)
 		return (FMD_AGENT_RETIRE_ASYNC);
 
 	return (FMD_AGENT_RETIRE_FAIL);
+}
+
+void
+fmd_agent_cache_info_free(fmd_agent_hdl_t *hdl __unused,
+    fmd_agent_cpu_cache_list_t *cache)
+{
+	for (uint_t cpuno = 0; cpuno < cache->fmc_ncpus; cpuno++) {
+		fmd_agent_cpu_cache_t *cpu_cache = &cache->fmc_cpus[cpuno];
+
+		if (cpu_cache->fmcc_caches == NULL)
+			continue;
+
+		for (uint_t cacheno = 0; cacheno < cpu_cache->fmcc_ncaches;
+		    cacheno++) {
+			nvlist_free(cpu_cache->fmcc_caches[cacheno]);
+		}
+
+		umem_free(cpu_cache->fmcc_caches, sizeof (nvlist_t *) *
+		    cpu_cache->fmcc_ncaches);
+		cpu_cache->fmcc_caches = NULL;
+	}
+
+	if (cache->fmc_cpus != NULL) {
+		umem_free(cache->fmc_cpus, sizeof (fmd_agent_cpu_cache_t) *
+		    cache->fmc_ncpus);
+		cache->fmc_cpus = NULL;
+		cache->fmc_ncpus = 0;
+	}
+}
+
+static int
+fmd_agent_cache_info_pop_cpu(fmd_agent_cpu_cache_list_t *cache,
+    nvlist_t *cpu_nvl, uint_t cpuno)
+{
+	int ret;
+	char cpustr[32];
+	nvlist_t **cache_nvls;
+	uint_t ncache_nvls;
+	fmd_agent_cpu_cache_t *cpu = &cache->fmc_cpus[cpuno];
+
+	(void) snprintf(cpustr, sizeof (cpustr), "%u", cpuno);
+	if ((ret = nvlist_lookup_nvlist_array(cpu_nvl, cpustr, &cache_nvls,
+	    &ncache_nvls)) != 0) {
+		return (ret);
+	}
+
+	if (ncache_nvls == 0) {
+		cpu->fmcc_ncaches = 0;
+		cpu->fmcc_caches = NULL;
+		return (0);
+	}
+
+	cpu->fmcc_caches = umem_zalloc(sizeof (nvlist_t *) * ncache_nvls,
+	    UMEM_DEFAULT);
+	if (cpu->fmcc_caches == NULL) {
+		return (errno);
+	}
+	cpu->fmcc_ncaches = ncache_nvls;
+	for (uint_t i = 0; i < cpu->fmcc_ncaches; i++) {
+		ret = nvlist_dup(cache_nvls[i], &cpu->fmcc_caches[i], 0);
+		if (ret != 0) {
+			return (ret);
+		}
+	}
+
+	return (0);
+}
+
+int
+fmd_agent_cache_info(fmd_agent_hdl_t *hdl, fmd_agent_cpu_cache_list_t *cache)
+{
+	int err, ret = 0;
+	uint32_t ncpus;
+	nvlist_t *nvl = NULL;
+
+	bzero(cache, sizeof (fmd_agent_cpu_cache_list_t));
+	if ((err = fmd_agent_nvl_ioctl(hdl, FM_IOC_CACHE_INFO, 1, NULL,
+	    &nvl)) != 0) {
+		ret = fmd_agent_seterrno(hdl, err);
+		goto out;
+	}
+
+	if ((err = nvlist_lookup_uint32(nvl, FM_CACHE_INFO_NCPUS, &ncpus)) !=
+	    0) {
+		ret = fmd_agent_seterrno(hdl, err);
+		goto out;
+	}
+
+	cache->fmc_cpus = umem_zalloc(sizeof (fmd_agent_cpu_cache_t) * ncpus,
+	    UMEM_DEFAULT);
+	if (cache->fmc_cpus == NULL) {
+		ret = fmd_agent_seterrno(hdl, errno);
+		goto out;
+	}
+	cache->fmc_ncpus = ncpus;
+	for (uint_t i = 0; i < cache->fmc_ncpus; i++) {
+		if ((err = fmd_agent_cache_info_pop_cpu(cache, nvl, i)) != 0) {
+			ret = fmd_agent_seterrno(hdl, errno);
+			goto out;
+		}
+
+	}
+out:
+	if (ret != 0) {
+		fmd_agent_cache_info_free(hdl, cache);
+	}
+	nvlist_free(nvl);
+	return (ret);
 }

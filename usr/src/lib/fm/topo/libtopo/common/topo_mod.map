@@ -1,6 +1,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2023 Oxide Computer Company
 #
 # CDDL HEADER START
 #
@@ -25,6 +26,8 @@
 $mapfile_version 2
 
 SYMBOL_SCOPE {
+	topo_create_props		{ TYPE = FUNCTION; FLAGS = extern };
+
 	topo_digraph_destroy		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_digraph_new		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_edge_new			{ TYPE = FUNCTION; FLAGS = extern };

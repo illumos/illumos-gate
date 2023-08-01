@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SYS_AMDZEN_DF_H
@@ -87,6 +87,7 @@ typedef enum df_rev {
 } df_rev_t;
 
 #define	DF_REV_ALL_23	(DF_REV_2 | DF_REV_3 | DF_REV_3P5)
+#define	DF_REV_ALL_3	(DF_REV_3 | DF_REV_3P5)
 #define	DF_REV_ALL	(DF_REV_2 | DF_REV_3 | DF_REV_3P5 | DF_REV_4)
 
 typedef struct df_reg_def {
@@ -620,8 +621,7 @@ typedef enum {
  * definition. It technically exists in DFv2/v4, but is not relevant.
  */
 /*CSTYLED*/
-#define	DF_GLOB_CTL_V3		(df_reg_def_t){ .drd_gens = DF_REV_3 | \
-				    DF_REV_3P5, \
+#define	DF_GLOB_CTL_V3		(df_reg_def_t){ .drd_gens = DF_REV_ALL_3, \
 				.drd_func = 0, \
 				.drd_reg = 0x3F8 }
 #define	DF_GLOB_CTL_V3_GET_HASH_1G(r)	bitx32(r, 22, 22)
@@ -807,18 +807,39 @@ typedef enum {
 #define	DF_DIEMASK_V2_GET_DIE_MASK(r)		bitx32(r, 15, 8)
 #define	DF_DIEMASK_V2_GET_COMP_MASK(r)		bitx32(r, 7, 0)
 
+/*
+ * DF::CCDEnable -- This register is present for CCMs and ACMs. Despite its
+ * name, the interpretation is not quite straightforward. That is, it only
+ * indirectly tells us about whether or not there are two CCDs or not. A CCM
+ * port can be in wide mode where its two SDPs (Scalable Data Ports) are in fact
+ * instead connected to a single CCD. If wide mode is enabled in DF::CCMConfig4,
+ * then a value of 0x3 just indicates that both SDP ports are connected to a
+ * single CCD.
+ *
+ * The CCX related fields are only valid when the dense mode is enabled in the
+ * global DF controls. We don't generally recommend this as a way of determining
+ * if multiple CCX units are present on the CCD because it is tied to DFv4.
+ */
+#define	DF_MAX_CCDS_PER_CCM	2
+/*CSTYLED*/
+#define	DF_CCD_EN_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+				.drd_func = 1, \
+				.drd_reg = 0x104 }
+#define	DF_CCD_EN_V4_GET_CCX_EN(r)	bitx32(r, 17, 16)
+#define	DF_CCD_EN_V4_GET_CCD_EN(r)	bitx32(r, 1, 0)
+
 
 /*
  * DF::PhysicalCoreEnable0, etc. -- These registers can be used to tell us which
- * cores are actually enabled. We know these exist in DFv3 and v4. It is less
- * clear in DFv3.5 and DFv2.
+ * cores are actually enabled. This appears to have been introduced in DFv3.
+ * DFv4 expanded this from two registers to four.
  */
 /*CSTYLED*/
-#define	DF_PHYS_CORE_EN0_V3	(df_reg_def_t){ .drd_gens = DF_REV_3, \
+#define	DF_PHYS_CORE_EN0_V3	(df_reg_def_t){ .drd_gens = DF_REV_ALL_3, \
 				.drd_func = 1, \
 				.drd_reg = 0x300 }
 /*CSTYLED*/
-#define	DF_PHYS_CORE_EN1_V3	(df_reg_def_t){ .drd_gens = DF_REV_3, \
+#define	DF_PHYS_CORE_EN1_V3	(df_reg_def_t){ .drd_gens = DF_REV_ALL_3, \
 				.drd_func = 1, \
 				.drd_reg = 0x304 }
 /*CSTYLED*/
@@ -833,6 +854,10 @@ typedef enum {
 #define	DF_PHYS_CORE_EN2_V4	(df_reg_def_t){ .drd_gens = DF_REV_4, \
 				.drd_func = 1, \
 				.drd_reg = 0x148 }
+/*CSTYLED*/
+#define	DF_PHYS_CORE_EN3_V4	(df_reg_def_t){ .drd_gens = DF_REV_4, \
+				.drd_func = 1, \
+				.drd_reg = 0x14c }
 
 /*
  * DF::Np2ChannelConfig -- This is used in Milan to contain information about
@@ -847,6 +872,17 @@ typedef enum {
 #define	DF_NP2_CONFIG_V3_GET_SPACE1(r)		bitx32(r, 13, 8)
 #define	DF_NP2_CONFIG_V3_GET_SPACE0(r)		bitx32(r, 5, 0)
 
+/*
+ * DF::CCMConfig4 -- This is one of several CCM configuration related registers.
+ * This varies in each DF revision. That is, while we've found it does exist in
+ * DFv3, it is at a different address and the bits have rather different
+ * meanings. A subset of the bits are defined below based upon our needs.
+ */
+/*CSTYLED*/
+#define	DF_CCMCFG4_V4		(df_reg_def_t){ .drd_gens = DF_REV_4, \
+				.drd_func = 3, \
+				.drd_reg = 0x510 }
+#define	DF_CCMCFG4_V4_GET_WIDE_EN(r)		bitx32(r, 26, 26)
 
 /*
  * DF::FabricIndirectConfigAccessAddress, DF::FabricIndirectConfigAccessDataLo,

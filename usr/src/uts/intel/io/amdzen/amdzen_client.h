@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _AMDZEN_CLIENT_H
@@ -45,6 +45,47 @@ typedef struct {
 	uint8_t		dfd_comp_shift;
 } df_fabric_decomp_t;
 
+/*
+ * This struct is similar to the above, but describes how an APIC ID is broken
+ * down into its logical pieces. These are not the same as those above and
+ * cannot be assumed to be. The mask is present when decomposing the ID and
+ * should be applied before the shift.
+ */
+typedef struct {
+	uint32_t	aad_sock_mask;
+	uint32_t	aad_die_mask;
+	uint32_t	aad_ccd_mask;
+	uint32_t	aad_ccx_mask;
+	uint32_t	aad_core_mask;
+	uint32_t	aad_thread_mask;
+	uint8_t		aad_sock_shift;
+	uint8_t		aad_die_shift;
+	uint8_t		aad_ccd_shift;
+	uint8_t		aad_ccx_shift;
+	uint8_t		aad_core_shift;
+	uint8_t		aad_thread_shift;
+} amdzen_apic_decomp_t;
+
+/*
+ * The following routines are used for Fabric and APIC ID decomposition and are
+ * suitable either for kernel or userland use. They are found in
+ * usr/src/common/zen/zen_fabric_utils.c.
+ */
+extern boolean_t zen_fabric_id_valid_fabid(const df_fabric_decomp_t *,
+    const uint32_t);
+extern boolean_t zen_fabric_id_valid_parts(const df_fabric_decomp_t *,
+    const uint32_t, const uint32_t, const uint32_t);
+extern void zen_fabric_id_decompose(const df_fabric_decomp_t *, const uint32_t,
+    uint32_t *, uint32_t *, uint32_t *);
+extern void zen_fabric_id_compose(const df_fabric_decomp_t *, const uint32_t,
+    const uint32_t, const uint32_t, uint32_t *);
+
+extern void zen_apic_id_compose(const amdzen_apic_decomp_t *, const uint32_t,
+    const uint32_t, const uint32_t, const uint32_t, const uint32_t,
+    const uint32_t, uint32_t *);
+
+#ifdef	_KERNEL
+
 extern uint_t amdzen_c_df_count(void);
 extern df_rev_t amdzen_c_df_rev(void);
 extern int amdzen_c_df_fabric_decomp(df_fabric_decomp_t *);
@@ -75,6 +116,8 @@ typedef enum {
 
 typedef int (*amdzen_c_iter_f)(uint_t, uint32_t, uint32_t, void *);
 extern int amdzen_c_df_iter(uint_t, zen_df_type_t, amdzen_c_iter_f, void *);
+
+#endif	/* _KERNEL */
 
 #ifdef __cplusplus
 }

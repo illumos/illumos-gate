@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #ifndef	_FMD_AGENT_H
 #define	_FMD_AGENT_H
 
@@ -73,6 +77,27 @@ extern int fmd_agent_cpu_retire(fmd_agent_hdl_t *, int, int, int);
 extern int fmd_agent_cpu_unretire(fmd_agent_hdl_t *, int, int, int);
 extern int fmd_agent_cpu_isretired(fmd_agent_hdl_t *, int, int, int);
 #endif /* __x86 */
+
+/*
+ * Get cache information for the CPUs in the system. Each CPU has multiple
+ * caches, each of which is an nvlist_t *. There is one of these for each
+ * logical CPU in the system. The returned nvlist structures should be treated
+ * as read only.
+ */
+typedef struct {
+	uint_t fmcc_ncaches;
+	nvlist_t **fmcc_caches;
+} fmd_agent_cpu_cache_t;
+
+typedef struct {
+	uint_t fmc_ncpus;
+	fmd_agent_cpu_cache_t *fmc_cpus;
+} fmd_agent_cpu_cache_list_t;
+
+extern int fmd_agent_cache_info(fmd_agent_hdl_t *,
+    fmd_agent_cpu_cache_list_t *);
+extern void fmd_agent_cache_info_free(fmd_agent_hdl_t *,
+    fmd_agent_cpu_cache_list_t *);
 
 #ifdef	__cplusplus
 }

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -123,6 +124,8 @@ struct cmi_hdl_ops {
 	uint32_t (*cmio_getsockettype)(cmi_hdl_impl_t *);
 	const char *(*cmio_getsocketstr)(cmi_hdl_impl_t *);
 	uint_t (*cmio_chipsig)(cmi_hdl_impl_t *);
+	cmi_errno_t (*cmio_ncache)(cmi_hdl_impl_t *, uint32_t *);
+	cmi_errno_t (*cmio_cache)(cmi_hdl_impl_t *, uint32_t, x86_cache_t *);
 
 	id_t (*cmio_logical_id)(cmi_hdl_impl_t *);
 	/*
@@ -692,6 +695,35 @@ ntv_chipsig(cmi_hdl_impl_t *hdl)
 	return (cpuid_getsig(HDLPRIV(hdl)));
 }
 
+static cmi_errno_t
+cmi_cpuid_cache_to_cmi(int err)
+{
+	switch (err) {
+	case 0:
+		return (CMI_SUCCESS);
+	case ENOTSUP:
+		return (CMIERR_C_NODATA);
+	case EINVAL:
+		return (CMIERR_C_BADCACHENO);
+	default:
+		return (CMIERR_UNKNOWN);
+	}
+}
+
+static cmi_errno_t
+ntv_ncache(cmi_hdl_impl_t *hdl, uint32_t *ncache)
+{
+	int ret = cpuid_getncaches(HDLPRIV(hdl), ncache);
+	return (cmi_cpuid_cache_to_cmi(ret));
+}
+
+static cmi_errno_t
+ntv_cache(cmi_hdl_impl_t *hdl, uint32_t cno, x86_cache_t *cachep)
+{
+	int ret = cpuid_getcache(HDLPRIV(hdl), cno, cachep);
+	return (cmi_cpuid_cache_to_cmi(ret));
+}
+
 static id_t
 ntv_logical_id(cmi_hdl_impl_t *hdl)
 {
@@ -1010,6 +1042,18 @@ static uint_t
 xpv_chipsig(cmi_hdl_impl_t *hdl)
 {
 	return (0);
+}
+
+static cmi_errno_t
+xpv_ncache(cmi_hdl_impl_t *hdl, uint32_t *ncache)
+{
+	return (CMIERR_NOTSUP);
+}
+
+static cmi_errno_t
+xpv_cache(cmi_hdl_impl_t *hdl, uint32_t cno, x86_cache_t *cachep)
+{
+	return (CMIERR_NOTSUP);
 }
 
 static id_t
@@ -1997,6 +2041,19 @@ cmi_pci_putl(int bus, int dev, int func, int reg, ddi_acc_handle_t hdl,
 	cmi_pci_put_cmn(bus, dev, func, reg, 4, hdl, val);
 }
 
+cmi_errno_t
+cmi_cache_ncaches(cmi_hdl_t hdl, uint32_t *ncache)
+{
+	return (HDLOPS(IMPLHDL(hdl))->cmio_ncache(IMPLHDL(hdl), ncache));
+}
+
+
+cmi_errno_t
+cmi_cache_info(cmi_hdl_t hdl, uint32_t cno, x86_cache_t *cachep)
+{
+	return (HDLOPS(IMPLHDL(hdl))->cmio_cache(IMPLHDL(hdl), cno, cachep));
+}
+
 static const struct cmi_hdl_ops cmi_hdl_ops = {
 #ifdef __xpv
 	/*
@@ -2018,6 +2075,8 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	xpv_getsockettype,	/* cmio_getsockettype */
 	xpv_getsocketstr,	/* cmio_getsocketstr */
 	xpv_chipsig,		/* cmio_chipsig */
+	xpv_ncache,		/* cmio_ncache */
+	xpv_cache,		/* cmio_cache */
 	xpv_logical_id,		/* cmio_logical_id */
 	NULL,			/* cmio_getcr4 */
 	NULL,			/* cmio_setcr4 */
@@ -2051,6 +2110,8 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	ntv_getsockettype,	/* cmio_getsockettype */
 	ntv_getsocketstr,	/* cmio_getsocketstr */
 	ntv_chipsig,		/* cmio_chipsig */
+	ntv_ncache,		/* cmio_ncache */
+	ntv_cache,		/* cmio_cache */
 	ntv_logical_id,		/* cmio_logical_id */
 	ntv_getcr4,		/* cmio_getcr4 */
 	ntv_setcr4,		/* cmio_setcr4 */

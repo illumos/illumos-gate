@@ -41,6 +41,7 @@ CPPFLAGS += -I../common -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 LDLIBS += -lnvpair -lumem -lc
+CSTD =		$(CSTD_GNU99)
 
 
 .KEEP_STATE:

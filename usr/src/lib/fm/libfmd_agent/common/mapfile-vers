@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2023 Oxide Computer Company
 #
 
 #
@@ -41,6 +42,8 @@ $mapfile_version 2
 SYMBOL_VERSION SUNWprivate {
     global:
 	fmd_agent_open;
+	fmd_agent_cache_info;
+	fmd_agent_cache_info_free;
 	fmd_agent_close;
 	fmd_agent_errno;
 	fmd_agent_strerr;

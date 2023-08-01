@@ -653,18 +653,6 @@ extern boolean_t zen_umc_decode_pa(const zen_umc_t *, const uint64_t,
     zen_umc_decoder_t *);
 
 /*
- * Fabric ID utilities
- */
-extern boolean_t zen_fabric_id_valid_fabid(const df_fabric_decomp_t *,
-    const uint32_t);
-extern boolean_t zen_fabric_id_valid_parts(const df_fabric_decomp_t *,
-    const uint32_t, const uint32_t, const uint32_t);
-extern void zen_fabric_id_decompose(const df_fabric_decomp_t *, const uint32_t,
-    uint32_t *, uint32_t *, uint32_t *);
-extern void zen_fabric_id_compose(const df_fabric_decomp_t *, const uint32_t,
-    const uint32_t, const uint32_t, uint32_t *);
-
-/*
  * Encoding and decoding
  */
 extern nvlist_t *zen_umc_dump_decoder(zen_umc_t *);

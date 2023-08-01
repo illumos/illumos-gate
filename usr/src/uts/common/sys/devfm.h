@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef	_SYS_DEVFM_H
@@ -34,9 +35,9 @@
 extern "C" {
 #endif
 
-#define	FM_IOC_MAXBUFSZ		32768
-#define	FM_IOC_OUT_BUFSZ	32768
-#define	FM_IOC_OUT_MAXBUFSZ	524288
+#define	FM_IOC_MAXBUFSZ		32768	/* 32 KiB */
+#define	FM_IOC_OUT_BUFSZ	32768	/* 32 KiB */
+#define	FM_IOC_OUT_MAXBUFSZ	1048576	/* 1 MiB */
 #define	FM_DRV_VERSION		1
 
 #define	FM_VERSIONS_VERSION	"fm-versions-version"
@@ -44,6 +45,7 @@ extern "C" {
 #define	FM_CPU_OP_VERSION	"cpu-operation-version"
 #define	FM_CPU_INFO_VERSION	"cpu-info-version"
 #define	FM_TOPO_LEGACY_VERSION	"topo-legacy-version"
+#define	FM_CACHE_INFO_VERSION	"cache-info-version"
 
 /*
  * FMA driver ioctl interfaces
@@ -61,6 +63,12 @@ extern "C" {
 #define	FM_IOC_CPU_UNRETIRE	(FM_IOC | 8)
 #define	FM_IOC_GENTOPO_LEGACY	(FM_IOC | 9)
 #endif	/* __x86 */
+
+/*
+ * Information about caches. Each CPU that is in the physical CPU information
+ * will be in here in the same ID order allowing one to map them directly.
+ */
+#define	FM_IOC_CACHE_INFO	(FM_IOC | 10)
 
 /*
  * Types
@@ -95,6 +103,7 @@ typedef struct fm_ioc_data32 {
 #define	FM_CPU_RETIRE_STRAND_ID		"strand_id"
 #define	FM_CPU_RETIRE_OLDSTATUS		"oldstatus"
 #define	FM_GENTOPO_LEGACY		"gentopolegacy"
+#define	FM_CACHE_INFO_NCPUS		"ncpus"
 
 /*
  * Properties set by FM_PHYSCPU_INFO
@@ -122,6 +131,44 @@ typedef struct fm_ioc_data32 {
 #define	FM_PHYSCPU_INFO_SOCKET_TYPE	"socket_type"
 #define	FM_PHYSCPU_INFO_CPU_ID		"cpuid"
 #define	FM_PHYSCPU_INFO_CHIP_IDENTSTR	"chip_identstr"
+
+/*
+ * Information exposed by the cache information structure. This is currently
+ * organized by the given caches available to a CPU. There is a given nvlist_t
+ * array for each cache level. The majority of these entries are meant to be
+ * generic across all platforms and derived from the underlying architecture's
+ * metadata (CPUID, CLIDR_EL1, etc.).
+ *
+ * The FM_CACHE_INFO_ID value is manufactured by the kernel. CPU architectures
+ * generally present cache information as specific to a logical CPU. This allows
+ * systems to determine what level caches are shared between different CPUs by
+ * comparing these entries across CPUs. Items prefixed with a given architecture
+ * are specific to it and will not show up on other platforms. These exist so
+ * topology modules can have more information than just the cache-id. While it's
+ * helpful, it doesn't tell us what level of the CPU (or whether it's internal
+ * or external) it exists at. This is going to be architecture and potentially
+ * platform specific given that ARMv8-A/ARMv9-A doesn't define a way to get this
+ * for example.
+ *
+ * It is expected that callers will always fill out the sets and ways
+ * appropriately. If a cache is fully-associative, we expects the number of sets
+ * to be populated and set to 1 that way consumers can attempt to have a uniform
+ * experience here.
+ */
+#define	FM_CACHE_INFO_LEVEL		"cache-level"	/* uint32_t */
+#define	FM_CACHE_INFO_TYPE		"cache-type"	/* uint32_t */
+typedef enum {
+	FM_CACHE_INFO_T_DATA	= 1 << 0,
+	FM_CACHE_INFO_T_INSTR	= 1 << 1,
+	FM_CACHE_INFO_T_UNIFIED	= 1 << 2
+} fm_cache_info_type_t;
+#define	FM_CACHE_INFO_NSETS		"cache-sets"	/* uint64_t */
+#define	FM_CACHE_INFO_NWAYS		"cache-ways"	/* uint32_t */
+#define	FM_CACHE_INFO_LINE_SIZE		"line-size"	/* uint32_t */
+#define	FM_CACHE_INFO_TOTAL_SIZE	"total-size"	/* uint64_t */
+#define	FM_CACHE_INFO_FULLY_ASSOC	"fully-associative" /* boolean (key) */
+#define	FM_CACHE_INFO_ID		"cache-id"	/* uint64_t */
+#define	FM_CACHE_INFO_X86_APIC_SHIFT	"x86-apic-shift"	/* uint32_t */
 
 #ifdef	__cplusplus
 }

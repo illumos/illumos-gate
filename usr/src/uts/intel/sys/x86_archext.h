@@ -301,7 +301,39 @@ extern "C" {
  */
 #define	CPUID_AMD_8X23_EAX_MEMHMK	(1 << 0) /* Secure Host Multi-Key Mem */
 
-#define	CPUID_AMD_8x23_EBX_MAX_HMK(r)	bitx32(r, 15, 0) /* Max HMK IDs */
+#define	CPUID_AMD_8X23_EBX_MAX_HMK(r)	bitx32(r, 15, 0) /* Max HMK IDs */
+
+/*
+ * AMD Extended CPU Topology -- 0x8000_0026
+ *
+ * This is AMD's version of extended CPU topology. The topology level is placed
+ * in %ecx and also contains information about the heterogeneity of the CPUs at
+ * the core level. Note, this is similar to, but not the same as Intel's 0x1f.
+ *
+ * The %eax values other than the APIC shift are only available when the type is
+ * a core. The %ebx values other than the number of logical processors are only
+ * available when the type is a core. The core and native model ID values are
+ * processor specific.
+ *
+ * %edx is the entire extended APIC ID of the logical processor we're on.
+ */
+#define	CPUID_AMD_8X26_EAX_ASYM_TOPO(r)		bitx32(r, 31, 31)
+#define	CPUID_AMD_8x26_EAX_HET_CORES(r)		bitx32(r, 30, 30)
+#define	CPUID_AMD_8X26_EAX_EFF_AVAIL(r)		bitx32(r, 29, 29)
+#define	CPUID_AMD_8X26_EAX_APIC_SHIFT(r)	bitx32(r, 4, 0)
+
+#define	CPUID_AMD_8X26_EBX_CORE_TYPE(r)		bitx32(r, 31, 28)
+#define	CPUID_AMD_8X26_EBX_MODEL_ID(r)		bitx32(r, 27, 24)
+#define	CPUID_AMD_8X26_EBX_PWR_EFF(r)		bitx32(r, 23, 16)
+#define	CPUID_AMD_8X26_EBX_NLOG_PROC(r)		bitx32(r, 15, 0)
+
+#define	CPUID_AMD_8X26_ECX_TYPE(r)		bitx32(r, 15, 8)
+#define	CPUID_AMD_8X26_TYPE_DONE	0	/* Technically reserved */
+#define	CUPID_AMD_8X26_TYPE_CORE	1
+#define	CUPID_AMD_8X26_TYPE_COMPLEX	2
+#define	CUPID_AMD_8X26_TYPE_DIE		3
+#define	CUPID_AMD_8X26_TYPE_SOCK	4
+#define	CPUID_AMD_8X26_ECX_INPUT(r)		bitx32(r, 7, 0)
 
 /*
  * Intel now seems to have claimed part of the "extended" function
@@ -1642,6 +1674,35 @@ extern boolean_t chiprev_at_least(const x86_chiprev_t, const x86_chiprev_t);
 extern x86_uarch_t uarchrev_uarch(const x86_uarchrev_t);
 extern boolean_t uarchrev_matches(const x86_uarchrev_t, const x86_uarchrev_t);
 extern boolean_t uarchrev_at_least(const x86_uarchrev_t, const x86_uarchrev_t);
+
+/*
+ * Cache information intended for topology and wider use.
+ */
+typedef enum {
+	X86_CACHE_TYPE_DATA,
+	X86_CACHE_TYPE_INST,
+	X86_CACHE_TYPE_UNIFIED
+} x86_cache_type_t;
+
+typedef enum {
+	X86_CACHE_F_FULL_ASSOC	= 1 << 0
+} x86_cache_flags_t;
+
+typedef struct x86_cache {
+	uint32_t		xc_level;
+	x86_cache_type_t	xc_type;
+	x86_cache_flags_t	xc_flags;
+	uint32_t		xc_nparts;
+	uint32_t		xc_nways;
+	uint32_t		xc_line_size;
+	uint64_t		xc_nsets;
+	uint64_t		xc_size;
+	uint64_t		xc_id;
+	uint32_t		xc_apic_shift;
+} x86_cache_t;
+
+extern int cpuid_getncaches(struct cpu *, uint32_t *);
+extern int cpuid_getcache(struct cpu *, uint32_t, x86_cache_t *);
 
 struct cpu_ucode_info;
 
