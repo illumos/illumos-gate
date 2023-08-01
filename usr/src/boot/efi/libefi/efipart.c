@@ -37,11 +37,14 @@
 
 #include <efi.h>
 #include <efilib.h>
-#include <efiprot.h>
 #include <efichar.h>
+#include <efidevp.h>
+#include <Protocol/BlockIo.h>
+#include <Protocol/BlockIo2.h>
 #include <disk.h>
 
-static EFI_GUID blkio_guid = BLOCK_IO_PROTOCOL;
+EFI_GUID gEfiBlockIoProtocolGuid = EFI_BLOCK_IO_PROTOCOL_GUID;
+EFI_GUID gEfiBlockIo2ProtocolGuid = EFI_BLOCK_IO2_PROTOCOL_GUID;
 
 typedef bool (*pd_test_cb_t)(pdinfo_t *, pdinfo_t *);
 static int efipart_initfd(void);
@@ -343,7 +346,7 @@ efipart_inithandles(void)
 	if (!STAILQ_EMPTY(&pdinfo))
 		return (0);
 
-	status = efi_get_protocol_handles(&blkio_guid, &nin, &hin);
+	status = efi_get_protocol_handles(&gEfiBlockIoProtocolGuid, &nin, &hin);
 	if (EFI_ERROR(status))
 		return (efi_status_to_errno(status));
 
@@ -359,10 +362,10 @@ efipart_inithandles(void)
 		if ((devpath = efi_lookup_devpath(hin[i])) == NULL)
 			continue;
 
-		status = OpenProtocolByHandle(hin[i], &blkio_guid,
+		status = OpenProtocolByHandle(hin[i], &gEfiBlockIoProtocolGuid,
 		    (void **)&blkio);
 		if (EFI_ERROR(status)) {
-			printf("error %lu\n", EFI_ERROR_CODE(status));
+			printf("error %lu\n", DECODE_ERROR(status));
 			continue;
 		}
 
@@ -789,7 +792,8 @@ efipart_print_common(struct devsw *dev, pdinfo_list_t *pdlist, int verbose)
 		snprintf(line, sizeof (line),
 		    "    %s%d", dev->dv_name, pd->pd_unit);
 		printf("%s:", line);
-		status = OpenProtocolByHandle(h, &blkio_guid, (void **)&blkio);
+		status = OpenProtocolByHandle(h, &gEfiBlockIoProtocolGuid,
+		    (void **)&blkio);
 		if (!EFI_ERROR(status)) {
 			printf("    %llu",
 			    blkio->Media->LastBlock == 0? 0:
@@ -872,7 +876,8 @@ efipart_open(struct open_file *f, ...)
 		return (EIO);
 
 	if (pd->pd_blkio == NULL) {
-		status = OpenProtocolByHandle(pd->pd_handle, &blkio_guid,
+		status = OpenProtocolByHandle(pd->pd_handle,
+		    &gEfiBlockIoProtocolGuid,
 		    (void **)&pd->pd_blkio);
 		if (EFI_ERROR(status))
 			return (efi_status_to_errno(status));
@@ -1003,7 +1008,7 @@ efipart_readwrite(EFI_BLOCK_IO *blkio, int rw, daddr_t blk, daddr_t nblks,
 
 	if (EFI_ERROR(status)) {
 		printf("%s: rw=%d, blk=%ju size=%ju status=%lu\n", __func__, rw,
-		    blk, nblks, EFI_ERROR_CODE(status));
+		    blk, nblks, DECODE_ERROR(status));
 	}
 	return (efi_status_to_errno(status));
 }

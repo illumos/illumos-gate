@@ -25,12 +25,12 @@
  */
 
 #ifndef _EFI_DRIVER_UTILS_H_
-#define _EFI_DRIVER_UTILS_H_
+#define	_EFI_DRIVER_UTILS_H_
 
 #include <efi.h>
-#include <efiprot.h>
+#include <Protocol/DriverBinding.h>
 
-extern EFI_STATUS install_driver(EFI_DRIVER_BINDING *driver);
+extern EFI_STATUS install_driver(EFI_DRIVER_BINDING_PROTOCOL *driver);
 extern EFI_STATUS connect_controllers(EFI_GUID *filter);
 
-#endif
+#endif /* _EFI_DRIVER_UTILS_H_ */

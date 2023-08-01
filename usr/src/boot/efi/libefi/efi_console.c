@@ -28,6 +28,15 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <eficonsctl.h>
+#include <Guid/ConsoleInDevice.h>
+#include <Guid/ConsoleOutDevice.h>
+#include <Guid/StandardErrorDevice.h>
+#include <Protocol/GraphicsOutput.h>
+#include <Protocol/UgaDraw.h>
+#include <Protocol/SimpleTextIn.h>
+#include <Protocol/SimpleTextInEx.h>
+#include <Protocol/SimpleTextOut.h>
 #include <sys/tem_impl.h>
 #include <sys/multiboot2.h>
 #include <machine/metadata.h>
@@ -35,13 +44,19 @@
 
 #include "bootstrap.h"
 
-struct efi_fb		efifb;
-EFI_GRAPHICS_OUTPUT	*gop;
-EFI_UGA_DRAW_PROTOCOL	*uga;
+struct efi_fb			efifb;
+EFI_GRAPHICS_OUTPUT_PROTOCOL	*gop;
+EFI_UGA_DRAW_PROTOCOL		*uga;
 
-static EFI_GUID ccontrol_protocol_guid = EFI_CONSOLE_CONTROL_PROTOCOL_GUID;
+EFI_GUID gEfiConsoleInDeviceGuid = EFI_CONSOLE_IN_DEVICE_GUID;
+EFI_GUID gEfiConsoleOutDeviceGuid = EFI_CONSOLE_OUT_DEVICE_GUID;
+EFI_GUID gEfiStandardErrorDeviceGuid = EFI_STANDARD_ERROR_DEVICE_GUID;
+EFI_GUID gEfiConsoleControlProtocolGuid = EFI_CONSOLE_CONTROL_PROTOCOL_GUID;
+EFI_GUID gEfiSimpleTextInProtocolGuid = EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
+EFI_GUID gEfiSimpleTextInputExProtocolGuid =
+    EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID;
+EFI_GUID gEfiSimpleTextOutProtocolGuid = EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID;
 static EFI_CONSOLE_CONTROL_PROTOCOL	*console_control;
-static EFI_GUID simple_input_ex_guid = EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID;
 static EFI_CONSOLE_CONTROL_SCREEN_MODE	console_mode;
 static SIMPLE_TEXT_OUTPUT_INTERFACE	*conout;
 
@@ -498,7 +513,7 @@ efi_cons_init(struct console *cp, int arg __unused)
 	    DEFAULT_BGCOLOR));
 	memset(keybuf, 0, KEYBUFSZ);
 
-	status = BS->LocateProtocol(&ccontrol_protocol_guid, NULL,
+	status = BS->LocateProtocol(&gEfiConsoleControlProtocolGuid, NULL,
 	    (void **)&console_control);
 	if (status == EFI_SUCCESS) {
 		BOOLEAN GopUgaExists, StdInLocked;
@@ -552,7 +567,8 @@ efi_cons_init(struct console *cp, int arg __unused)
 	 * Try to set up for SimpleTextInputEx protocol. If not available,
 	 * we will use SimpleTextInput protocol.
 	 */
-	status = BS->OpenProtocol(ST->ConsoleInHandle, &simple_input_ex_guid,
+	status = BS->OpenProtocol(ST->ConsoleInHandle,
+	    &gEfiSimpleTextInputExProtocolGuid,
 	    &coninex, IH, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (status == EFI_SUCCESS)
 		ecd->ecd_coninex = coninex;
@@ -811,16 +827,14 @@ efi_cons_devinfo(struct console *cp __unused)
 {
 	EFI_HANDLE *handles;
 	uint_t nhandles;
-	extern EFI_GUID gop_guid;
-	extern EFI_GUID uga_guid;
 	EFI_STATUS status;
 
 	if (gop != NULL)
-		status = efi_get_protocol_handles(&gop_guid, &nhandles,
-		    &handles);
+		status = efi_get_protocol_handles(
+		    &gEfiGraphicsOutputProtocolGuid, &nhandles, &handles);
 	else
-		status = efi_get_protocol_handles(&uga_guid, &nhandles,
-		    &handles);
+		status = efi_get_protocol_handles(&gEfiUgaDrawProtocolGuid,
+		    &nhandles, &handles);
 
 	if (EFI_ERROR(status))
 		return;

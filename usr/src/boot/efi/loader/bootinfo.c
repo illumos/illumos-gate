@@ -131,7 +131,8 @@ bi_copyenv(vm_offset_t start)
 		addr++;
 		if (ep->ev_value != NULL) {
 			len = strlen(ep->ev_value);
-			if ((size_t)archsw.arch_copyin(ep->ev_value, addr, len) != len)
+			if ((size_t)archsw.arch_copyin(ep->ev_value,
+			    addr, len) != len)
 				break;
 			addr += len;
 		}
@@ -142,7 +143,7 @@ bi_copyenv(vm_offset_t start)
 
 	if (archsw.arch_copyin("", last++, 1) != 1)
 		last = start;
-	return(last);
+	return (last);
 }
 
 /*
@@ -164,8 +165,8 @@ bi_copyenv(vm_offset_t start)
 #define	COPY32(v, a, c) {					\
 	uint32_t x = (v);					\
 	if (c)							\
-		archsw.arch_copyin(&x, a, sizeof(x));		\
-	a += sizeof(x);						\
+		archsw.arch_copyin(&x, a, sizeof (x));		\
+	a += sizeof (x);					\
 }
 
 #define	MOD_STR(t, a, s, c) {					\
@@ -173,7 +174,7 @@ bi_copyenv(vm_offset_t start)
 	COPY32(strlen(s) + 1, a, c);				\
 	if (c)							\
 		archsw.arch_copyin(s, a, strlen(s) + 1);	\
-	a += roundup(strlen(s) + 1, sizeof(u_long));		\
+	a += roundup(strlen(s) + 1, sizeof (ulong_t));		\
 }
 
 #define	MOD_NAME(a, s, c)	MOD_STR(MODINFO_NAME, a, s, c)
@@ -182,10 +183,10 @@ bi_copyenv(vm_offset_t start)
 
 #define	MOD_VAR(t, a, s, c) {					\
 	COPY32(t, a, c);					\
-	COPY32(sizeof(s), a, c);				\
+	COPY32(sizeof (s), a, c);				\
 	if (c)							\
-		archsw.arch_copyin(&s, a, sizeof(s));		\
-	a += roundup(sizeof(s), sizeof(u_long));		\
+		archsw.arch_copyin(&s, a, sizeof (s));		\
+	a += roundup(sizeof (s), sizeof (ulong_t));		\
 }
 
 #define	MOD_ADDR(a, s, c)	MOD_VAR(MODINFO_ADDR, a, s, c)
@@ -196,7 +197,7 @@ bi_copyenv(vm_offset_t start)
 	COPY32(mm->md_size, a, c);				\
 	if (c)							\
 		archsw.arch_copyin(mm->md_data, a, mm->md_size);	\
-	a += roundup(mm->md_size, sizeof(u_long));		\
+	a += roundup(mm->md_size, sizeof (ulong_t));		\
 }
 
 #define	MOD_END(a, c) {						\
@@ -231,7 +232,7 @@ bi_copymodules(vm_offset_t addr)
 				MOD_METADATA(addr, md, c);
 	}
 	MOD_END(addr, c);
-	return(addr);
+	return (addr);
 }
 
 static int
@@ -260,11 +261,11 @@ bi_load_efi_data(struct preloaded_file *kfp)
 		    efifb.fb_mask_red, efifb.fb_mask_green, efifb.fb_mask_blue,
 		    efifb.fb_mask_reserved);
 
-		file_addmetadata(kfp, MODINFOMD_EFI_FB, sizeof(efifb), &efifb);
+		file_addmetadata(kfp, MODINFOMD_EFI_FB, sizeof (efifb), &efifb);
 	}
 #endif
 
-	efisz = (sizeof(struct efi_map_header) + 0xf) & ~0xf;
+	efisz = (sizeof (struct efi_map_header) + 0xf) & ~0xf;
 
 	/*
 	 * It is possible that the first call to ExitBootServices may change
@@ -288,10 +289,10 @@ bi_load_efi_data(struct preloaded_file *kfp)
 		sz = (sz + 0xf) & ~0xf;
 		pages = EFI_SIZE_TO_PAGES(sz + efisz);
 		status = BS->AllocatePages(AllocateAnyPages, EfiLoaderData,
-		     pages, &addr);
+		    pages, &addr);
 		if (EFI_ERROR(status)) {
 			printf("%s: AllocatePages error %lu\n", __func__,
-			    EFI_ERROR_CODE(status));
+			    DECODE_ERROR(status));
 			return (ENOMEM);
 		}
 
@@ -307,7 +308,7 @@ bi_load_efi_data(struct preloaded_file *kfp)
 		status = BS->GetMemoryMap(&sz, mm, &efi_mapkey, &mmsz, &mmver);
 		if (EFI_ERROR(status)) {
 			printf("%s: GetMemoryMap error %lu\n", __func__,
-			    EFI_ERROR_CODE(status));
+			    DECODE_ERROR(status));
 			return (EINVAL);
 		}
 		status = BS->ExitBootServices(IH, efi_mapkey);
@@ -321,7 +322,7 @@ bi_load_efi_data(struct preloaded_file *kfp)
 		}
 		BS->FreePages(addr, pages);
 	}
-	printf("ExitBootServices error %lu\n", EFI_ERROR_CODE(status));
+	printf("ExitBootServices error %lu\n", DECODE_ERROR(status));
 	return (EINVAL);
 }
 
@@ -377,7 +378,7 @@ bi_load(char *args, vm_offset_t *modulep, vm_offset_t *kernendp)
 	archsw.arch_getdev((void**)(&rootdev), rootdevname, NULL);
 	if (rootdev == NULL) {
 		printf("Can't determine root device.\n");
-		return(EINVAL);
+		return (EINVAL);
 	}
 
 	/* Try reading the /etc/fstab file to select the root device */
@@ -415,17 +416,17 @@ bi_load(char *args, vm_offset_t *modulep, vm_offset_t *kernendp)
 	if (kfp == NULL)
 		panic("can't find kernel file");
 	kernend = 0;	/* fill it in later */
-	file_addmetadata(kfp, MODINFOMD_HOWTO, sizeof howto, &howto);
-	file_addmetadata(kfp, MODINFOMD_ENVP, sizeof envp, &envp);
+	file_addmetadata(kfp, MODINFOMD_HOWTO, sizeof (howto), &howto);
+	file_addmetadata(kfp, MODINFOMD_ENVP, sizeof (envp), &envp);
 #if defined(LOADER_FDT_SUPPORT)
 	if (dtb_size)
-		file_addmetadata(kfp, MODINFOMD_DTBP, sizeof dtbp, &dtbp);
+		file_addmetadata(kfp, MODINFOMD_DTBP, sizeof (dtbp), &dtbp);
 	else
 		pager_output("WARNING! Trying to fire up the kernel, but no "
 		    "device tree blob found!\n");
 #endif
-	file_addmetadata(kfp, MODINFOMD_KERNEND, sizeof kernend, &kernend);
-	file_addmetadata(kfp, MODINFOMD_FW_HANDLE, sizeof ST, &ST);
+	file_addmetadata(kfp, MODINFOMD_KERNEND, sizeof (kernend), &kernend);
+	file_addmetadata(kfp, MODINFOMD_FW_HANDLE, sizeof (ST), &ST);
 
 	bi_load_efi_data(kfp);
 
@@ -437,7 +438,7 @@ bi_load(char *args, vm_offset_t *modulep, vm_offset_t *kernendp)
 
 	/* patch MODINFOMD_KERNEND */
 	md = file_findmetadata(kfp, MODINFOMD_KERNEND);
-	bcopy(&kernend, md->md_data, sizeof kernend);
+	bcopy(&kernend, md->md_data, sizeof (kernend));
 
 #if defined(__arm__)
 	*modulep -= __elfN(relocation_offset);
@@ -447,16 +448,16 @@ bi_load(char *args, vm_offset_t *modulep, vm_offset_t *kernendp)
 		for (i = 0; i < nitems(mdt); i++) {
 			md = file_findmetadata(xp, mdt[i]);
 			if (md) {
-				bcopy(md->md_data, &vaddr, sizeof vaddr);
+				bcopy(md->md_data, &vaddr, sizeof (vaddr));
 				vaddr -= __elfN(relocation_offset);
-				bcopy(&vaddr, md->md_data, sizeof vaddr);
+				bcopy(&vaddr, md->md_data, sizeof (vaddr));
 			}
 		}
 	}
 #endif
 
 	/* Copy module list and metadata. */
-	(void)bi_copymodules(addr);
+	(void) bi_copymodules(addr);
 
 	return (0);
 }

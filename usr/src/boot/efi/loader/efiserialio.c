@@ -38,10 +38,13 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <Protocol/SerialIo.h>
 
 #include "loader_efi.h"
 
-static EFI_GUID serial = SERIAL_IO_PROTOCOL;
+EFI_GUID gEfiSerialIoProtocolGuid = EFI_SERIAL_IO_PROTOCOL_GUID;
+EFI_GUID gEfiSerialTerminalDeviceTypeGuid =
+    EFI_SERIAL_TERMINAL_DEVICE_TYPE_GUID;
 
 #define	COMC_TXWAIT	0x40000		/* transmit timeout */
 
@@ -172,7 +175,8 @@ efi_serial_get_handle(int port)
 	if (port == -1)
 		return (NULL);
 
-	status = efi_get_protocol_handles(&serial, &nhandles, &handles);
+	status = efi_get_protocol_handles(&gEfiSerialIoProtocolGuid,
+	    &nhandles, &handles);
 	if (EFI_ERROR(status))
 		return (NULL);
 
@@ -234,7 +238,7 @@ comc_probe(struct console *cp)
 	handle = efi_serial_get_handle(port->ioaddr);
 
 	if (handle != NULL) {
-		status = BS->OpenProtocol(handle, &serial,
+		status = BS->OpenProtocol(handle, &gEfiSerialIoProtocolGuid,
 		    (void**)&port->sio, IH, NULL,
 		    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 

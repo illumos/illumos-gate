@@ -1260,3 +1260,15 @@ usr/src/uts/intel/io/vmm/amd/ivrs_*.c
 usr/src/uts/intel/sys/vmm.h
 usr/src/uts/intel/sys/vmm_dev.h
 usr/src/lib/lib9p/common/*
+
+# loader UEFI headers
+usr/src/boot/efi/include/Base.h
+usr/src/boot/efi/include/amd64/*.h
+usr/src/boot/efi/include/arm/*.h
+usr/src/boot/efi/include/arm64/*.h
+usr/src/boot/efi/include/i386/*.h
+usr/src/boot/efi/include/Guid/*.h
+usr/src/boot/efi/include/IndustryStandard/*.h
+usr/src/boot/efi/include/Pi/*.h
+usr/src/boot/efi/include/Protocol/*.h
+usr/src/boot/efi/include/Uefi/*.h

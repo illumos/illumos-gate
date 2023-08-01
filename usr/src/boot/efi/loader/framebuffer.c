@@ -38,21 +38,25 @@
 
 #include <efi.h>
 #include <efilib.h>
-#include <efiuga.h>
-#include <efipciio.h>
+#include <eficonsctl.h>
+#include <Guid/ConsoleOutDevice.h>
+#include <Protocol/GraphicsOutput.h>
+#include <Protocol/UgaDraw.h>
+#include <Protocol/UgaIo.h>
 #include <Protocol/EdidActive.h>
 #include <Protocol/EdidDiscovered.h>
+#include <Protocol/PciIo.h>
 #include <machine/metadata.h>
 
 #include "gfx_fb.h"
 #include "framebuffer.h"
 
-EFI_GUID conout_guid = EFI_CONSOLE_OUT_DEVICE_GUID;
-EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
-static EFI_GUID pciio_guid = EFI_PCI_IO_PROTOCOL_GUID;
-EFI_GUID uga_guid = EFI_UGA_DRAW_PROTOCOL_GUID;
-static EFI_GUID active_edid_guid = EFI_EDID_ACTIVE_PROTOCOL_GUID;
-static EFI_GUID discovered_edid_guid = EFI_EDID_DISCOVERED_PROTOCOL_GUID;
+EFI_GUID gEfiGraphicsOutputProtocolGuid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+EFI_GUID gEfiPciIoProtocolGuid = EFI_PCI_IO_PROTOCOL_GUID;
+EFI_GUID gEfiUgaDrawProtocolGuid = EFI_UGA_DRAW_PROTOCOL_GUID;
+EFI_GUID gEfiUgaIoProtocolGuid = EFI_UGA_IO_PROTOCOL_GUID;
+EFI_GUID gEfiEdidActiveProtocolGuid = EFI_EDID_ACTIVE_PROTOCOL_GUID;
+EFI_GUID gEfiEdidDiscoveredProtocolGuid = EFI_EDID_DISCOVERED_PROTOCOL_GUID;
 static EFI_HANDLE gop_handle;
 
 /* Saved initial GOP mode. */
@@ -61,7 +65,7 @@ static uint32_t default_mode = UINT32_MAX;
 struct vesa_edid_info *edid_info = NULL;
 
 static uint32_t gop_default_mode(void);
-static int efifb_set_mode(EFI_GRAPHICS_OUTPUT *, uint_t);
+static int efifb_set_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *, uint_t);
 
 static uint_t
 efifb_color_depth(struct efi_fb *efifb)
@@ -201,7 +205,7 @@ efifb_uga_find_pixel(EFI_UGA_DRAW_PROTOCOL *uga, uint_t line,
 	printf("No change detected in frame buffer");
 
 fail:
-	printf(" -- error %lu\n", EFI_ERROR_CODE(status));
+	printf(" -- error %lu\n", DECODE_ERROR(status));
 	free(data1);
 	return (-1);
 }
@@ -215,7 +219,8 @@ efifb_uga_get_pciio(void)
 	uint_t i, nhandles;
 
 	/* Get all handles that support the UGA protocol. */
-	status = efi_get_protocol_handles(&uga_guid, &nhandles, &handles);
+	status = efi_get_protocol_handles(&gEfiUgaDrawProtocolGuid,
+	    &nhandles, &handles);
 	if (status != EFI_SUCCESS) {
 		return (NULL);
 	}
@@ -223,8 +228,8 @@ efifb_uga_get_pciio(void)
 	/* Get the PCI I/O interface of the first handle that supports it. */
 	pciio = NULL;
 	for (i = 0; i < nhandles; i++) {
-		status = OpenProtocolByHandle(handles[i], &pciio_guid,
-		    (void **)&pciio);
+		status = OpenProtocolByHandle(handles[i],
+		    &gEfiPciIoProtocolGuid, (void **)&pciio);
 		if (status == EFI_SUCCESS) {
 			free(handles);
 			return (pciio);
@@ -455,12 +460,12 @@ efifb_gop_get_edid(EFI_HANDLE h)
 	EFI_STATUS status;
 	size_t size;
 
-	guid = &active_edid_guid;
+	guid = &gEfiEdidActiveProtocolGuid;
 	status = BS->OpenProtocol(h, guid, (void **)&edid, IH, NULL,
 	    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (status != EFI_SUCCESS ||
 	    edid->SizeOfEdid == 0) {
-		guid = &discovered_edid_guid;
+		guid = &gEfiEdidDiscoveredProtocolGuid;
 		status = BS->OpenProtocol(h, guid, (void **)&edid, IH, NULL,
 		    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 		if (status != EFI_SUCCESS ||
@@ -508,7 +513,7 @@ efi_find_framebuffer(struct efi_fb *efifb)
 {
 	EFI_HANDLE *hlist;
 	uint_t nhandles, i;
-	extern EFI_GRAPHICS_OUTPUT *gop;
+	extern EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
 	extern EFI_UGA_DRAW_PROTOCOL *uga;
 	EFI_STATUS status;
 	uint32_t mode;
@@ -516,7 +521,8 @@ efi_find_framebuffer(struct efi_fb *efifb)
 	if (gop != NULL)
 		return (efifb_from_gop(efifb, gop->Mode, gop->Mode->Info));
 
-	status = efi_get_protocol_handles(&gop_guid, &nhandles, &hlist);
+	status = efi_get_protocol_handles(&gEfiGraphicsOutputProtocolGuid,
+	    &nhandles, &hlist);
 	if (EFI_ERROR(status))
 		return (efi_status_to_errno(status));
 
@@ -527,14 +533,16 @@ efi_find_framebuffer(struct efi_fb *efifb)
 	for (i = 0; i < nhandles; i++) {
 		void *dummy = NULL;
 
-		status = OpenProtocolByHandle(hlist[i], &conout_guid, &dummy);
+		status = OpenProtocolByHandle(hlist[i],
+		    &gEfiConsoleOutDeviceGuid, &dummy);
 		if (status == EFI_SUCCESS) {
 			gop_handle = hlist[i];
 			break;
 		}
 	}
 
-	status = OpenProtocolByHandle(gop_handle, &gop_guid, (void **)&gop);
+	status = OpenProtocolByHandle(gop_handle,
+	    &gEfiGraphicsOutputProtocolGuid, (void **)&gop);
 	free(hlist);
 
 	if (status == EFI_SUCCESS) {
@@ -551,7 +559,8 @@ efi_find_framebuffer(struct efi_fb *efifb)
 	if (uga != NULL)
 		return (efifb_from_uga(efifb, uga));
 
-	status = BS->LocateProtocol(&uga_guid, NULL, (void **)&uga);
+	status = BS->LocateProtocol(&gEfiUgaDrawProtocolGuid, NULL,
+	    (void **)&uga);
 	if (status == EFI_SUCCESS)
 		return (efifb_from_uga(efifb, uga));
 
@@ -605,7 +614,7 @@ print_efifb(int mode, struct efi_fb *efifb, int verbose)
 }
 
 static int
-efifb_set_mode(EFI_GRAPHICS_OUTPUT *gop, uint_t mode)
+efifb_set_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, uint_t mode)
 {
 	EFI_STATUS status;
 
@@ -613,7 +622,7 @@ efifb_set_mode(EFI_GRAPHICS_OUTPUT *gop, uint_t mode)
 	if (EFI_ERROR(status)) {
 		snprintf(command_errbuf, sizeof (command_errbuf),
 		    "Unable to set mode to %u (error=%lu)",
-		    mode, EFI_ERROR_CODE(status));
+		    mode, DECODE_ERROR(status));
 		return (CMD_ERROR);
 	}
 	return (CMD_OK);
@@ -627,7 +636,7 @@ efifb_set_mode(EFI_GRAPHICS_OUTPUT *gop, uint_t mode)
 static int
 efifb_find_mode_xydm(UINT32 x, UINT32 y, int depth, int m)
 {
-	extern EFI_GRAPHICS_OUTPUT *gop;
+	extern EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
 	EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info;
 	EFI_STATUS status;
 	UINTN infosz;
@@ -673,7 +682,7 @@ efifb_find_mode_xydm(UINT32 x, UINT32 y, int depth, int m)
 static int
 efifb_find_mode(char *str)
 {
-	extern EFI_GRAPHICS_OUTPUT *gop;
+	extern EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
 	int x, y, depth;
 
 	if (!gfx_parse_mode_str(str, &x, &y, &depth))
@@ -690,7 +699,7 @@ gop_default_mode(void)
 {
 	edid_res_list_t res;
 	struct resolution *rp;
-	extern EFI_GRAPHICS_OUTPUT *gop;
+	extern EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
 	UINT32 mode;
 
 	mode = gop->Mode->MaxMode;
@@ -719,7 +728,7 @@ static int
 command_gop(int argc, char *argv[])
 {
 	extern struct efi_fb efifb;
-	extern EFI_GRAPHICS_OUTPUT *gop;
+	extern EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
 	struct efi_fb fb;
 	EFI_STATUS status;
 	char *arg, *cp;

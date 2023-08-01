@@ -31,7 +31,7 @@
 
 #include "efi_driver_utils.h"
 
-static EFI_GUID DriverBindingProtocolGUID = DRIVER_BINDING_PROTOCOL;
+EFI_GUID gEfiDriverBindingProtocolGuid = EFI_DRIVER_BINDING_PROTOCOL_GUID;
 
 EFI_STATUS
 connect_controllers(EFI_GUID *filter)
@@ -55,7 +55,7 @@ connect_controllers(EFI_GUID *filter)
 }
 
 EFI_STATUS
-install_driver(EFI_DRIVER_BINDING *driver)
+install_driver(EFI_DRIVER_BINDING_PROTOCOL *driver)
 {
 	EFI_STATUS status;
 
@@ -63,12 +63,12 @@ install_driver(EFI_DRIVER_BINDING *driver)
 	driver->DriverBindingHandle = NULL;
 	status = BS->InstallMultipleProtocolInterfaces(
 	    &(driver->DriverBindingHandle),
-	    &DriverBindingProtocolGUID, driver,
+	    &gEfiDriverBindingProtocolGuid, driver,
 	    NULL);
 
 	if (EFI_ERROR(status)) {
 		printf("Failed to install driver (%ld)!\n",
-		    EFI_ERROR_CODE(status));
+		    DECODE_ERROR(status));
 	}
 
 	return (status);
