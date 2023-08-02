@@ -61,19 +61,19 @@ ldr_bootinfo(struct bootinfo *bi, uint64_t *bi_addr)
 	VOID *fpswa;
 	EFI_MEMORY_DESCRIPTOR *mm;
 	EFI_PHYSICAL_ADDRESS addr;
-	EFI_HANDLE handle;
+	EFI_HANDLE *handles;
 	EFI_STATUS status;
 	size_t bisz;
 	UINTN mmsz, pages, sz;
 	UINT32 mmver;
+	uint_t nhandles;
 
 	bi->bi_systab = (uint64_t)ST;
 	bi->bi_hcdp = (uint64_t)efi_get_table(&hcdp_guid);
 
-	sz = sizeof(EFI_HANDLE);
-	status = BS->LocateHandle(ByProtocol, &fpswa_guid, 0, &sz, &handle);
+	status = efi_get_protocol_handles(&fpswa_guid, &nhandles, &handles);
 	if (status == 0)
-		status = OpenProtocolByHandle(handle, &fpswa_guid, &fpswa);
+		status = OpenProtocolByHandle(*handles, &fpswa_guid, &fpswa);
 	bi->bi_fpswa = (status == 0) ? (uint64_t)fpswa : 0;
 
 	bisz = (sizeof(struct bootinfo) + 0x0f) & ~0x0f;

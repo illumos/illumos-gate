@@ -288,31 +288,20 @@ efinet_dev_init(void)
 	EFI_DEVICE_PATH *devpath, *node;
 	EFI_HANDLE *handles, *handles2;
 	EFI_STATUS status;
-	UINTN sz;
-	int err, i, nifs;
+	uint_t i, nhandles, nifs;
+	int err;
 	extern struct devsw netdev;
 
-	sz = 0;
-	handles = NULL;
-	status = BS->LocateHandle(ByProtocol, &sn_guid, NULL, &sz, NULL);
-	if (status == EFI_BUFFER_TOO_SMALL) {
-		handles = (EFI_HANDLE *)malloc(sz);
-		if (handles == NULL)
-			return (ENOMEM);
-		status = BS->LocateHandle(ByProtocol, &sn_guid, NULL, &sz,
-		    handles);
-		if (EFI_ERROR(status))
-			free(handles);
-	}
+	status = efi_get_protocol_handles(&sn_guid, &nhandles, &handles);
 	if (EFI_ERROR(status))
 		return (efi_status_to_errno(status));
-	handles2 = (EFI_HANDLE *)malloc(sz);
+	handles2 = (EFI_HANDLE *)malloc(nhandles * sizeof (EFI_HANDLE));
 	if (handles2 == NULL) {
 		free(handles);
 		return (ENOMEM);
 	}
 	nifs = 0;
-	for (i = 0; i < sz / sizeof (EFI_HANDLE); i++) {
+	for (i = 0; i < nhandles; i++) {
 		devpath = efi_lookup_devpath(handles[i]);
 		if (devpath == NULL)
 			continue;

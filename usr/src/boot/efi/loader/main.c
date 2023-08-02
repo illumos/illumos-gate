@@ -147,24 +147,15 @@ has_keyboard(void)
 {
 	EFI_STATUS status;
 	EFI_DEVICE_PATH *path;
-	EFI_HANDLE *hin, *hin_end, *walker;
-	UINTN sz;
+	EFI_HANDLE *hin;
+	uint_t i, nhandles;
 	bool retval = false;
 
 	/*
 	 * Find all the handles that support the SIMPLE_TEXT_INPUT_PROTOCOL and
 	 * do the typical dance to get the right sized buffer.
 	 */
-	sz = 0;
-	hin = NULL;
-	status = BS->LocateHandle(ByProtocol, &inputid, 0, &sz, 0);
-	if (status == EFI_BUFFER_TOO_SMALL) {
-		hin = (EFI_HANDLE *)malloc(sz);
-		status = BS->LocateHandle(ByProtocol, &inputid, 0, &sz,
-		    hin);
-		if (EFI_ERROR(status))
-			free(hin);
-	}
+	status = efi_get_protocol_handles(&inputid, &nhandles, &hin);
 	if (EFI_ERROR(status))
 		return (retval);
 
@@ -174,9 +165,8 @@ has_keyboard(void)
 	 * device path matches either the USB device path for keyboards or the
 	 * legacy device path for keyboards.
 	 */
-	hin_end = &hin[sz / sizeof (*hin)];
-	for (walker = hin; walker < hin_end; walker++) {
-		status = OpenProtocolByHandle(*walker, &devid, (void **)&path);
+	for (i = 0; i < nhandles; i++) {
+		status = OpenProtocolByHandle(hin[i], &devid, (void **)&path);
 		if (EFI_ERROR(status))
 			continue;
 
@@ -630,10 +620,9 @@ efi_serial_get_uid(EFI_DEVICE_PATH *devpath)
 static const char *
 uefi_serial_console(void)
 {
-	UINTN bufsz;
 	EFI_STATUS status;
 	EFI_HANDLE *handles;
-	int i, nhandles;
+	uint_t i, nhandles;
 	unsigned long uid, lowest;
 	char *env, *ep;
 	extern struct console ttya;
@@ -654,26 +643,10 @@ uefi_serial_console(void)
 	if (uid == 0)
 		return (ttya.c_name);
 
-	/*
-	 * get buffer size
-	 */
-	bufsz = 0;
-	handles = NULL;
-	status = BS->LocateHandle(ByProtocol, &serialio, NULL, &bufsz, handles);
-	if (status != EFI_BUFFER_TOO_SMALL)
-		return (NULL);
-	if ((handles = malloc(bufsz)) == NULL)
-		return (NULL);
-
-	/*
-	 * get handle array
-	 */
-	status = BS->LocateHandle(ByProtocol, &serialio, NULL, &bufsz, handles);
+	status = efi_get_protocol_handles(&serialio, &nhandles, &handles);
 	if (EFI_ERROR(status)) {
-		free(handles);
 		return (NULL);
 	}
-	nhandles = (int)(bufsz / sizeof (EFI_HANDLE));
 
 	lowest = 255;	/* high enough value */
 	for (i = 0; i < nhandles; i++) {

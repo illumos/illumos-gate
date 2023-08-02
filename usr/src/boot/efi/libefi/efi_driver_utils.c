@@ -38,23 +38,9 @@ connect_controllers(EFI_GUID *filter)
 {
         EFI_STATUS status;
         EFI_HANDLE *handles;
-        UINTN nhandles, i, hsize;
+        uint_t nhandles, i;
 
-        nhandles = 0;
-        hsize = 0;
-        status = BS->LocateHandle(ByProtocol, filter, NULL,
-                     &hsize, NULL);
-
-        if(status != EFI_BUFFER_TOO_SMALL) {
-                return (status);
-        }
-
-        handles = malloc(hsize);
-        nhandles = hsize / sizeof(EFI_HANDLE);
-
-        status = BS->LocateHandle(ByProtocol, filter, NULL,
-                     &hsize, handles);
-
+        status = efi_get_protocol_handles(filter, &nhandles, &handles);
         if(EFI_ERROR(status)) {
                 return (status);
         }

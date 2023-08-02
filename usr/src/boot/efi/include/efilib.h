@@ -67,6 +67,7 @@ pdinfo_t *efiblk_get_pdinfo_by_handle(EFI_HANDLE h);
 
 void *efi_get_table(EFI_GUID *tbl);
 EFI_STATUS OpenProtocolByHandle(EFI_HANDLE, EFI_GUID *, void **);
+EFI_STATUS efi_get_protocol_handles(EFI_GUID *, uint_t *, EFI_HANDLE **);
 
 int efi_getdev(void **, const char *, const char **);
 char *efi_fmtdev(void *);
