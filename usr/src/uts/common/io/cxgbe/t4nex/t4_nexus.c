@@ -48,6 +48,7 @@
 #include "common/common.h"
 #include "common/t4_msg.h"
 #include "common/t4_regs.h"
+#include "common/t4_extra_regs.h"
 #include "t4_l2t.h"
 
 static int t4_cb_open(dev_t *devp, int flag, int otyp, cred_t *credp);
@@ -310,7 +311,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_device_acc_attr_t da = {
 		.devacc_attr_version = DDI_DEVICE_ATTR_V0,
 		.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC,
-		.devacc_attr_dataorder = DDI_STRICTORDER_ACC 
+		.devacc_attr_dataorder = DDI_STRICTORDER_ACC
 	};
 	ddi_device_acc_attr_t da1 = {
 		.devacc_attr_version = DDI_DEVICE_ATTR_V0,
@@ -2441,6 +2442,7 @@ print_port_speed(const struct port_info *pi)
 
 #define	KS_UINIT(x)	kstat_named_init(&kstatp->x, #x, KSTAT_DATA_ULONG)
 #define	KS_CINIT(x)	kstat_named_init(&kstatp->x, #x, KSTAT_DATA_CHAR)
+#define	KS_U64INIT(x)	kstat_named_init(&kstatp->x, #x, KSTAT_DATA_UINT64)
 #define	KS_U_SET(x, y)	kstatp->x.value.ul = (y)
 #define	KS_C_SET(x, ...)	\
 			(void) snprintf(kstatp->x.value.c, 16,  __VA_ARGS__)
@@ -2604,6 +2606,137 @@ update_wc_kstats(kstat_t *ksp, int rw)
 	return (0);
 }
 
+/*
+ * cxgbe:X:fec
+ *
+ * This provides visibility into the errors that have been found by the
+ * different FEC subsystems. While it's tempting to combine the two different
+ * FEC types logically, the data that the errors tell us are pretty different
+ * between the two. Firecode is strictly per-lane, but RS has parts that are
+ * related to symbol distribution to lanes and also to the overall channel.
+ */
+struct cxgbe_port_fec_kstats {
+	kstat_named_t rs_corr;
+	kstat_named_t rs_uncorr;
+	kstat_named_t rs_sym0_corr;
+	kstat_named_t rs_sym1_corr;
+	kstat_named_t rs_sym2_corr;
+	kstat_named_t rs_sym3_corr;
+	kstat_named_t fc_lane0_corr;
+	kstat_named_t fc_lane0_uncorr;
+	kstat_named_t fc_lane1_corr;
+	kstat_named_t fc_lane1_uncorr;
+	kstat_named_t fc_lane2_corr;
+	kstat_named_t fc_lane2_uncorr;
+	kstat_named_t fc_lane3_corr;
+	kstat_named_t fc_lane3_uncorr;
+};
+
+static uint32_t
+read_fec_pair(struct port_info *pi, uint32_t lo_reg, uint32_t high_reg)
+{
+	struct adapter *sc = pi->adapter;
+	uint8_t port = pi->tx_chan;
+	uint32_t low, high, ret;
+
+	low = t4_read_reg32(sc, T5_PORT_REG(port, lo_reg));
+	high = t4_read_reg32(sc, T5_PORT_REG(port, high_reg));
+	ret = low & 0xffff;
+	ret |= (high & 0xffff) << 16;
+	return (ret);
+}
+
+static int
+update_port_fec_kstats(kstat_t *ksp, int rw)
+{
+	struct cxgbe_port_fec_kstats *fec = ksp->ks_data;
+	struct port_info *pi = ksp->ks_private;
+
+	if (rw == KSTAT_WRITE) {
+		return (EACCES);
+	}
+
+	/*
+	 * First go ahead and gather RS related stats.
+	 */
+	fec->rs_corr.value.ui64 += read_fec_pair(pi, T6_RS_FEC_CCW_LO,
+	    T6_RS_FEC_CCW_HI);
+	fec->rs_uncorr.value.ui64 += read_fec_pair(pi, T6_RS_FEC_NCCW_LO,
+	    T6_RS_FEC_NCCW_HI);
+	fec->rs_sym0_corr.value.ui64 += read_fec_pair(pi, T6_RS_FEC_SYMERR0_LO,
+	    T6_RS_FEC_SYMERR0_HI);
+	fec->rs_sym1_corr.value.ui64 += read_fec_pair(pi, T6_RS_FEC_SYMERR1_LO,
+	    T6_RS_FEC_SYMERR1_HI);
+	fec->rs_sym2_corr.value.ui64 += read_fec_pair(pi, T6_RS_FEC_SYMERR2_LO,
+	    T6_RS_FEC_SYMERR2_HI);
+	fec->rs_sym3_corr.value.ui64 += read_fec_pair(pi, T6_RS_FEC_SYMERR3_LO,
+	    T6_RS_FEC_SYMERR3_HI);
+
+	/*
+	 * Now go through and try to grab Firecode/BASE-R stats.
+	 */
+	fec->fc_lane0_corr.value.ui64 += read_fec_pair(pi, T6_FC_FEC_L0_CERR_LO,
+	    T6_FC_FEC_L0_CERR_HI);
+	fec->fc_lane0_uncorr.value.ui64 += read_fec_pair(pi,
+	    T6_FC_FEC_L0_NCERR_LO, T6_FC_FEC_L0_NCERR_HI);
+	fec->fc_lane1_corr.value.ui64 += read_fec_pair(pi, T6_FC_FEC_L1_CERR_LO,
+	    T6_FC_FEC_L1_CERR_HI);
+	fec->fc_lane1_uncorr.value.ui64 += read_fec_pair(pi,
+	    T6_FC_FEC_L1_NCERR_LO, T6_FC_FEC_L1_NCERR_HI);
+	fec->fc_lane2_corr.value.ui64 += read_fec_pair(pi, T6_FC_FEC_L2_CERR_LO,
+	    T6_FC_FEC_L2_CERR_HI);
+	fec->fc_lane2_uncorr.value.ui64 += read_fec_pair(pi,
+	    T6_FC_FEC_L2_NCERR_LO, T6_FC_FEC_L2_NCERR_HI);
+	fec->fc_lane3_corr.value.ui64 += read_fec_pair(pi, T6_FC_FEC_L3_CERR_LO,
+	    T6_FC_FEC_L3_CERR_HI);
+	fec->fc_lane3_uncorr.value.ui64 += read_fec_pair(pi,
+	    T6_FC_FEC_L3_NCERR_LO, T6_FC_FEC_L3_NCERR_HI);
+
+	return (0);
+}
+
+static kstat_t *
+setup_port_fec_kstats(struct port_info *pi)
+{
+	kstat_t *ksp;
+	struct cxgbe_port_fec_kstats *kstatp;
+
+	if (!is_t6(pi->adapter->params.chip)) {
+		return (NULL);
+	}
+
+	ksp = kstat_create(T4_PORT_NAME, ddi_get_instance(pi->dip), "fec",
+	    "net", KSTAT_TYPE_NAMED, sizeof (struct cxgbe_port_fec_kstats) /
+	    sizeof (kstat_named_t), 0);
+	if (ksp == NULL) {
+		cxgb_printf(pi->dip, CE_WARN, "failed to initialize fec "
+		    "kstats.");
+		return (NULL);
+	}
+
+	kstatp = ksp->ks_data;
+	KS_U64INIT(rs_corr);
+	KS_U64INIT(rs_uncorr);
+	KS_U64INIT(rs_sym0_corr);
+	KS_U64INIT(rs_sym1_corr);
+	KS_U64INIT(rs_sym2_corr);
+	KS_U64INIT(rs_sym3_corr);
+	KS_U64INIT(fc_lane0_corr);
+	KS_U64INIT(fc_lane0_uncorr);
+	KS_U64INIT(fc_lane1_corr);
+	KS_U64INIT(fc_lane1_uncorr);
+	KS_U64INIT(fc_lane2_corr);
+	KS_U64INIT(fc_lane2_uncorr);
+	KS_U64INIT(fc_lane3_corr);
+	KS_U64INIT(fc_lane3_uncorr);
+
+	ksp->ks_update = update_port_fec_kstats;
+	ksp->ks_private = pi;
+	kstat_install(ksp);
+
+	return (ksp);
+}
+
 int
 adapter_full_init(struct adapter *sc)
 {
@@ -2703,6 +2836,11 @@ port_full_init(struct port_info *pi)
 		goto done;
 	}
 
+	/*
+	 * Initialize our per-port FEC kstats.
+	 */
+	pi->ksp_fec = setup_port_fec_kstats(pi);
+
 	pi->flags |= PORT_INIT_DONE;
 done:
 	if (rc != 0)
@@ -2720,6 +2858,10 @@ port_full_uninit(struct port_info *pi)
 
 	ASSERT(pi->flags & PORT_INIT_DONE);
 
+	if (pi->ksp_fec != NULL) {
+		kstat_delete(pi->ksp_fec);
+		pi->ksp_fec = NULL;
+	}
 	(void) t4_teardown_port_queues(pi);
 	pi->flags &= ~PORT_INIT_DONE;
 

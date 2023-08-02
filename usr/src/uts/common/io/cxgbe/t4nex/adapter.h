@@ -135,6 +135,7 @@ struct port_info {
 	u16 viid_mirror;
 	kstat_t *ksp_config;
 	kstat_t *ksp_info;
+	kstat_t *ksp_fec;
 
 	u8 vivld;
 	u8 vin;
@@ -732,17 +733,21 @@ t4_os_pci_write_cfg4(struct adapter *sc, int reg, uint32_t val)
 	pci_config_put32(sc->pci_regh, reg, val);
 }
 
+static inline uint32_t
+t4_read_reg32(struct adapter *sc, uint32_t reg)
+{
+	return (ddi_get32(sc->regh, (uint32_t *)(sc->regp + reg)));
+}
+
 static inline uint64_t
 t4_read_reg64(struct adapter *sc, uint32_t reg)
 {
-	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	return (ddi_get64(sc->regh, (uint64_t *)(sc->regp + reg)));
 }
 
 static inline void
 t4_write_reg64(struct adapter *sc, uint32_t reg, uint64_t val)
 {
-	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	ddi_put64(sc->regh, (uint64_t *)(sc->regp + reg), val);
 }
 
