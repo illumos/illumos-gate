@@ -32,6 +32,7 @@
 
 #include <sys/nvpair.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <libdevinfo.h>
 
 #ifdef __cplusplus
@@ -434,6 +435,10 @@ extern void topo_hdl_free(topo_hdl_t *, void *, size_t);
 extern int topo_hdl_nvalloc(topo_hdl_t *, nvlist_t **, uint_t);
 extern int topo_hdl_nvdup(topo_hdl_t *, nvlist_t *, nvlist_t **);
 extern char *topo_hdl_strdup(topo_hdl_t *, const char *);
+extern int topo_hdl_vasprintf(topo_hdl_t *, char **, const char *,
+    va_list) __VPRINTFLIKE(3);
+extern int topo_hdl_asprintf(topo_hdl_t *, char **, const char *,
+    ...) __PRINTFLIKE(3);
 
 /*
  * Interfaces for interacting with directed graph topologies

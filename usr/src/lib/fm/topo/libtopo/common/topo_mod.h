@@ -36,6 +36,7 @@
 #include <libdevinfo.h>
 #include <smbios.h>
 #include <pcidb.h>
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -224,6 +225,10 @@ extern void topo_mod_strfree(topo_mod_t *, char *);
 extern void topo_mod_strfreev(topo_mod_t *, char **, uint_t);
 extern int topo_mod_nvalloc(topo_mod_t *, nvlist_t **, uint_t);
 extern int topo_mod_nvdup(topo_mod_t *, nvlist_t *, nvlist_t **);
+extern int topo_mod_vasprintf(topo_mod_t *, char **, const char *,
+    va_list) __VPRINTFLIKE(3);
+extern int topo_mod_asprintf(topo_mod_t *, char **, const char *,
+    ...) __PRINTFLIKE(3);
 
 extern void topo_mod_clrdebug(topo_mod_t *);
 extern void topo_mod_setdebug(topo_mod_t *);
@@ -231,6 +236,7 @@ extern void topo_mod_dprintf(topo_mod_t *, const char *, ...) __PRINTFLIKE(2);
 extern const char *topo_mod_errmsg(topo_mod_t *);
 extern int topo_mod_errno(topo_mod_t *);
 extern char *topo_mod_clean_str(topo_mod_t *, const char *);
+extern char *topo_mod_clean_strn(topo_mod_t *, const char *, size_t);
 
 /*
  * Topo node utilities: callable from module enumeration, topo_mod_enumerate()

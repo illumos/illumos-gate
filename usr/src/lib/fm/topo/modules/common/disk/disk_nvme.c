@@ -510,8 +510,6 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 	topo_mod_t *mod = nvme_info->nei_mod;
 	nvlist_t *auth = NULL, *fmri = NULL, *fru;
 	tnode_t *nvme;
-	char raw_rev[NVME_FWVER_SZ + 1], raw_model[NVME_MODEL_SZ + 1];
-	char raw_serial[NVME_SERIAL_SZ + 1];
 	char *rev = NULL, *model = NULL, *serial = NULL, *vers = NULL;
 	char *pname = topo_node_name(nvme_info->nei_parent);
 	char *label = NULL;
@@ -519,25 +517,16 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 	int err = 0, ret = -1;
 
 	/*
-	 * The raw strings returned by the IDENTIFY CONTROLLER command are
-	 * not NUL-terminated, so we fix that up.
-	 */
-	(void) strncpy(raw_rev, nvme_info->nei_idctl->id_fwrev, NVME_FWVER_SZ);
-	raw_rev[NVME_FWVER_SZ] = '\0';
-	(void) strncpy(raw_model, nvme_info->nei_idctl->id_model,
-	    NVME_MODEL_SZ);
-	raw_model[NVME_MODEL_SZ] = '\0';
-	(void) strncpy(raw_serial, nvme_info->nei_idctl->id_serial,
-	    NVME_SERIAL_SZ);
-	raw_serial[NVME_SERIAL_SZ] = '\0';
-
-	/*
 	 * Next we pass the strings through a function that sanitizes them of
-	 * any characters that can't be used in an FMRI string.
+	 * any characters that can't be used in an FMRI string. This also takes
+	 * care of making them properly terminated.
 	 */
-	rev = topo_mod_clean_str(mod, raw_rev);
-	model = topo_mod_clean_str(mod, raw_model);
-	serial = topo_mod_clean_str(mod, raw_serial);
+	rev = topo_mod_clean_strn(mod, nvme_info->nei_idctl->id_fwrev,
+	    NVME_FWVER_SZ);
+	model = topo_mod_clean_strn(mod, nvme_info->nei_idctl->id_model,
+	    NVME_MODEL_SZ);
+	serial = topo_mod_clean_strn(mod, nvme_info->nei_idctl->id_serial,
+	    NVME_SERIAL_SZ);
 
 	auth = topo_mod_auth(mod, nvme_info->nei_parent);
 	fmri = topo_mod_hcfmri(mod, nvme_info->nei_parent, FM_HC_SCHEME_VERSION,

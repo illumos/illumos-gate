@@ -77,6 +77,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_fmri_unretire;
 	topo_fmri_unusable;
 	topo_hdl_alloc;
+	topo_hdl_asprintf;
 	topo_hdl_devinfo;
 	topo_hdl_errmsg;
 	topo_hdl_errno;
@@ -87,6 +88,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_hdl_strdup;
 	topo_hdl_strfree;
 	topo_hdl_strfreev;
+	topo_hdl_vasprintf;
 	topo_hdl_zalloc;
 	topo_led_state_name;
 	topo_led_type_name;
@@ -100,8 +102,11 @@ SYMBOL_VERSION SUNWprivate {
 	topo_method_unregister;
 	topo_method_unregister_all;
 	topo_mod_alloc;
+	topo_mod_asprintf;
+	topo_mod_vasprintf;
 	topo_mod_auth;
 	topo_mod_clean_str;
+	topo_mod_clean_strn;
 	topo_mod_clrdebug;
 	topo_mod_cpufmri;
 	topo_mod_create_ufm;

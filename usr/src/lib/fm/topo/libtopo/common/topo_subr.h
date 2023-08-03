@@ -139,6 +139,7 @@ extern int topo_walk_bysibling(topo_walk_t *wp, const char *name,
     topo_instance_t);
 
 extern char *topo_cleanup_auth_str(topo_hdl_t *, const char *);
+extern char *topo_cleanup_strn(topo_hdl_t *, const char *, size_t);
 
 #ifdef __cplusplus
 }
