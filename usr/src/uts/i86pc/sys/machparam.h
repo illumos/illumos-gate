@@ -259,7 +259,7 @@ extern uintptr_t kernelbase, segmap_start, segmapsize;
  * The heap has a region allocated from it of HEAPTEXT_SIZE bytes specifically
  * for module text.
  */
-#define	HEAPTEXT_SIZE		(64 * 1024 * 1024)	/* bytes */
+#define	HEAPTEXT_SIZE		(128 * 1024 * 1024)	/* bytes */
 
 /*
  * Size of a kernel threads stack.  It must be a whole number of pages
