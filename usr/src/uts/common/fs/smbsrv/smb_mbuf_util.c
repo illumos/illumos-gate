@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2011-2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -64,6 +64,11 @@
 static kmem_cache_t	*smb_mbc_cache = NULL;
 static kmem_cache_t	*smb_mbuf_cache = NULL;
 static kmem_cache_t	*smb_mbufcl_cache = NULL;
+
+/* Perhaps move this to libfakekernel? */
+#ifdef	_FAKE_KERNEL
+size_t kmem_max_cached = 0x20000;	// UMEM_MAXBUF
+#endif
 
 void
 smb_mbc_init(void)
@@ -166,47 +171,188 @@ smb_mbuf_get(uchar_t *buf, int nbytes)
 	return (mhead);
 }
 
-static int
-smb_mbuf_kmem_ref(void *p, uint_t sz, int incr)
+/*
+ * Build an mbuf with external storage
+ * Like esballoca()
+ */
+mbuf_t *
+smb_mbuf_alloc_ext(caddr_t buf, int len, m_ext_free_t ff, void *arg)
 {
-	if (incr < 0)
-		kmem_free(p, sz);
-	return (0);
+	mbuf_t	*m = 0;
+
+	MGET(m, M_WAIT, MT_DATA);
+
+	/* Like MCLGET(), but external buf. */
+	m->m_ext.ext_buf = buf;
+	m->m_data = m->m_ext.ext_buf;
+	m->m_flags |= M_EXT;
+	m->m_ext.ext_size = len;
+	m->m_ext.ext_free = ff;
+	m->m_ext.ext_arg1 = arg;
+
+	m->m_len = len;
+
+	return (m);
+}
+
+static void
+smb_mbuf_kmem_free(mbuf_t *m)
+{
+	ASSERT((m->m_flags & M_EXT) != 0);
+
+	kmem_free(m->m_ext.ext_buf, m->m_ext.ext_size);
+	/* Caller sets m->m_ext.ext_buf = NULL */
+}
+
+/*
+ * Allocate one mbuf with contiguous (external) storage
+ * obtained via kmem_alloc.  Most places should be using
+ * smb_mbuf_alloc_chain below.
+ */
+mbuf_t *
+smb_mbuf_alloc_kmem(int len)
+{
+	mbuf_t *m;
+	caddr_t buf;
+
+	VERIFY(len > 0);
+#ifdef	DEBUG
+	if (len > kmem_max_cached) {
+		debug_enter("fix caller");
+	}
+#endif
+
+	buf = kmem_alloc(len, KM_SLEEP);
+	m = smb_mbuf_alloc_ext(buf, len, smb_mbuf_kmem_free, NULL);
+
+	return (m);
+}
+
+/*
+ * smb_mbuf_alloc_chain
+ *
+ * Allocate mbufs to hold the amount of data specified.
+ * A pointer to the head of the mbuf chain is returned.
+ *
+ * For large messages, put the large mbufs at the tail, starting with
+ * kmem_max_cached messages (128K) and then a shorter (eg MCLBYTES)
+ * message at the front where we're more likely to need to copy.
+ *
+ * Must limit this to kmem_max_cached, to avoid contention with
+ * allocating from kmem_oversize_arena.
+ */
+struct mbuf *
+smb_mbuf_alloc_chain(int nbytes)
+{
+	struct mbuf *mhead = NULL;
+	struct mbuf *m;
+	int len;	/* m_len for current mbuf */
+
+	ASSERT(nbytes > 0);
+
+	while (nbytes >= kmem_max_cached) {
+		len = kmem_max_cached;
+		m = smb_mbuf_alloc_kmem(len);
+
+		/* prepend to chain at mhead */
+		m->m_next = mhead;
+		mhead = m;
+
+		nbytes -= len;
+	}
+
+	if (nbytes > MCLBYTES) {
+		len = nbytes;
+		m = smb_mbuf_alloc_kmem(len);
+
+		/* prepend to chain at mhead */
+		m->m_next = mhead;
+		mhead = m;
+
+		nbytes -= len;
+	} else if (nbytes > 0) {
+		ASSERT(nbytes <= MCLBYTES);
+		len = nbytes;
+		MGET(m, M_WAIT, MT_DATA);
+		if (len > MLEN) {
+			MCLGET(m, M_WAIT);
+		}
+		m->m_len = len;
+
+		/* prepend to chain at mhead */
+		m->m_next = mhead;
+		mhead = m;
+
+		nbytes -= len;
+	}
+
+	return (mhead);
 }
 
 /*
  * Allocate enough mbufs to accommodate the residual count in uio,
- * and setup the uio_iov to point to them.
+ * and setup the uio_iov to point to them.  Note that uio->uio_iov
+ * is allocated by the call and has MAX_IOVEC elements.  Currently
+ * the uio passed is always part of an smb_vdb_t and starts with
+ * uio->uio_iovcnt = MAX_IOVEC;
  *
  * This is used by the various SMB read code paths.  That code is
- * going to do a disk read into this buffer, so we'd like it to be
- * large and contiguous.  Use an external (M_EXT) buffer.
+ * going to do a disk read into this buffer, so we'd like the
+ * segments to be large.  See smb_mbuf_alloc_chain().
  */
 struct mbuf *
 smb_mbuf_allocate(struct uio *uio)
 {
-	mbuf_t	*m = 0;
-	int	len = uio->uio_resid;
+	mbuf_t	*mhead;
+	int	rc;
 
-	MGET(m, M_WAIT, MT_DATA);
-	if (len > MCLBYTES) {
-		/* Like MCLGET(), but bigger buf. */
-		m->m_ext.ext_buf = kmem_zalloc(len, KM_SLEEP);
-		m->m_data = m->m_ext.ext_buf;
-		m->m_flags |= M_EXT;
-		m->m_ext.ext_size = len;
-		m->m_ext.ext_ref = smb_mbuf_kmem_ref;
-	} else if (len > MLEN) {
-		/* Use the kmem cache. */
-		MCLGET(m, M_WAIT);
+	ASSERT(uio->uio_resid > 0);
+	ASSERT(uio->uio_iovcnt == MAX_IOVEC);
+
+	mhead = smb_mbuf_alloc_chain(uio->uio_resid);
+
+	rc = smb_mbuf_mkuio(mhead, uio);
+	VERIFY(rc == 0);
+
+	return (mhead);
+}
+
+/*
+ * Build an iovec for an mbuf chain.
+ *
+ * The resulting iovec covers uio_resid length in the chain,
+ * which could be shorter than the mbuf chain total length.
+ *
+ * uio->uio_iovcnt is allocated size on entry, used size on return.
+ * Errors if iovec too small or mbuf chain too short.
+ */
+int
+smb_mbuf_mkuio(mbuf_t *m, uio_t *uio)
+{
+	iovec_t	*iov;
+	ssize_t off = 0;
+	int iovcnt = 0;
+	int tlen;
+
+	iov = uio->uio_iov;
+	while (off < uio->uio_resid) {
+		if (m == NULL)
+			return (EFAULT);
+		if (iovcnt >= uio->uio_iovcnt)
+			return (E2BIG);
+		tlen = m->m_len;
+		if ((off + tlen) > uio->uio_resid)
+			tlen = (int)(uio->uio_resid - off);
+		iov->iov_base = m->m_data;
+		iov->iov_len = tlen;
+		off += tlen;
+		m = m->m_next;
+		iovcnt++;
+		iov++;
 	}
-	m->m_len = len;
+	uio->uio_iovcnt = iovcnt;
 
-	uio->uio_iov->iov_base = m->m_data;
-	uio->uio_iov->iov_len = m->m_len;
-	uio->uio_iovcnt = 1;
-
-	return (m);
+	return (0);
 }
 
 /*
@@ -257,6 +403,10 @@ MBC_SETUP(struct mbuf_chain *MBC, uint32_t max_bytes)
 	(MBC)->max_bytes = max_bytes;
 }
 
+/*
+ * Initialize an mbuf chain and allocate the first message (if max_bytes
+ * is specified).  Leave some prepend space at the head.
+ */
 void
 MBC_INIT(struct mbuf_chain *MBC, uint32_t max_bytes)
 {
@@ -270,6 +420,7 @@ MBC_INIT(struct mbuf_chain *MBC, uint32_t max_bytes)
 		(MBC)->chain = m;
 		if (max_bytes > MINCLSIZE)
 			MCLGET(m, M_WAIT);
+		m->m_data += MH_PREPEND_SPACE;
 	}
 	(MBC)->max_bytes = max_bytes;
 }
@@ -313,10 +464,9 @@ MBC_APPEND_MBUF(struct mbuf_chain *MBC, struct mbuf *MBUF)
 	}
 }
 
-static int /*ARGSUSED*/
-mclrefnoop(caddr_t p, int size, int adj)
+static void /*ARGSUSED*/
+mclrefnoop(mbuf_t *m)
 {
-	return (0);
 }
 
 void
@@ -329,7 +479,7 @@ MBC_ATTACH_BUF(struct mbuf_chain *MBC, unsigned char *BUF, int LEN)
 	(MBC)->chain->m_ext.ext_buf = (caddr_t)(BUF);
 	(MBC)->chain->m_len = (LEN);
 	(MBC)->chain->m_ext.ext_size = (LEN);
-	(MBC)->chain->m_ext.ext_ref = mclrefnoop;
+	(MBC)->chain->m_ext.ext_free = mclrefnoop;
 	(MBC)->max_bytes = (LEN);
 }
 
@@ -349,6 +499,78 @@ MBC_SHADOW_CHAIN(struct mbuf_chain *submbc, struct mbuf_chain *mbc,
 	submbc->max_bytes = x;
 	submbc->shadow_of = mbc;
 	return (0);
+}
+
+/*
+ * Trim req_len bytes from the message,
+ * from head if > 0, else from tail.
+ */
+void
+m_adjust(struct mbuf *mp, int req_len)
+{
+	int len = req_len;
+	struct mbuf *m;
+
+	if ((m = mp) == NULL)
+		return;
+
+	/*
+	 * We don't use the trim-from-tail case.
+	 * Using smb_mbuf_trim() for that.
+	 */
+	VERIFY(len >= 0);
+
+	/*
+	 * Trim from head.
+	 */
+	while (m != NULL && len > 0) {
+		if (m->m_len <= len) {
+			len -= m->m_len;
+			m->m_len = 0;
+			m = m->m_next;
+		} else {
+			m->m_len -= len;
+			m->m_data += len;
+			len = 0;
+		}
+	}
+}
+
+/*
+ * Arrange to prepend space of size plen to mbuf m.  If a new mbuf must be
+ * allocated, how specifies whether to wait.  If the allocation fails, the
+ * original mbuf chain is freed and m is set to NULL.
+ * BSD had a macro: M_PREPEND(m, plen, how)
+ */
+
+struct mbuf *
+m_prepend(struct mbuf *m, int plen, int how)
+{
+	struct mbuf *mn;
+
+	if (M_LEADINGSPACE(m) >= plen) {
+		m->m_data -= plen;
+		m->m_len += plen;
+		return (m);
+	}
+	if (m->m_flags & M_PKTHDR) {
+		MGETHDR(mn, how, m->m_type);
+	} else {
+		MGET(mn, how, m->m_type);
+	}
+	VERIFY(mn != NULL);
+	if (m->m_flags & M_PKTHDR) {
+		// BSD: m_move_pkthdr(mn, m);
+		// We don't use any pkthdr stuff.
+		mn->m_pkthdr.len += plen;
+	}
+	mn->m_next = m;
+	m = mn;
+	if (plen < M_SIZE(m))
+		M_ALIGN(m, plen);
+	m->m_len = plen;
+	DTRACE_PROBE1(prepend_allocated, struct mbuf *, m);
+	return (m);
 }
 
 /*
@@ -416,9 +638,13 @@ smb_mbufcl_alloc(void)
 }
 
 void
-smb_mbufcl_free(void *p)
+smb_mbufcl_free(mbuf_t *m)
 {
-	kmem_cache_free(smb_mbufcl_cache, p);
+	ASSERT((m->m_flags & M_EXT) != 0);
+	ASSERT(m->m_ext.ext_size == MCLBYTES);
+
+	kmem_cache_free(smb_mbufcl_cache, m->m_ext.ext_buf);
+	/* Caller sets m->m_ext.ext_buf = NULL */
 }
 
 int

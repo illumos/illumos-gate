@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2013-2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -940,17 +940,22 @@ static int
 mbc_marshal_make_room(mbuf_chain_t *mbc, int32_t bytes_needed)
 {
 	mbuf_t	*m;
-	mbuf_t	*l;
+	mbuf_t	*last;
 	int32_t	bytes_available;
 
 	bytes_needed += mbc->chain_offset;
 	if (bytes_needed > mbc->max_bytes)
 		return (EMSGSIZE);
 
-	if ((m = mbc->chain) == 0) {
+	/*
+	 * First mbuf in chain should have prepend space.
+	 * See M_LEADINGSPACE() below.
+	 */
+	if ((m = mbc->chain) == NULL) {
 		MGET(m, M_WAIT, MT_DATA);
 		m->m_len = 0;
 		MCLGET(m, M_WAIT);
+		m->m_data += MH_PREPEND_SPACE;
 		mbc->chain = m;
 		/* xxxx */
 		/* ^    */
@@ -959,14 +964,14 @@ mbc_marshal_make_room(mbuf_chain_t *mbc, int32_t bytes_needed)
 	/* ---- ----- --xx ---xxx */
 	/* ^			  */
 
-	l = 0;
-	while ((m != 0) && (bytes_needed >= m->m_len)) {
-		l = m;
+	last = NULL;
+	while ((m != NULL) && (bytes_needed >= m->m_len)) {
+		last = m;
 		bytes_needed -= m->m_len;
 		m = m->m_next;
 	}
 
-	if ((bytes_needed == 0) || (m != 0)) {
+	if ((bytes_needed == 0) || (m != NULL)) {
 		/* We have enough room already */
 		return (0);
 	}
@@ -974,14 +979,12 @@ mbc_marshal_make_room(mbuf_chain_t *mbc, int32_t bytes_needed)
 	/* ---- ----- --xx ---xxx */
 	/*			 ^ */
 	/* Back up to start of last mbuf */
-	m = l;
+	m = last;
 	bytes_needed += m->m_len;
 
 	/* ---- ----- --xx ---xxx */
 	/*		   ^	  */
-
-	bytes_available = (m->m_flags & M_EXT) ?
-	    m->m_ext.ext_size : MLEN;
+	bytes_available = M_SIZE(m) - M_LEADINGSPACE(m);
 
 	/* ---- ----- --xx ---xxx */
 	/*		   ^	  */
@@ -996,8 +999,8 @@ mbc_marshal_make_room(mbuf_chain_t *mbc, int32_t bytes_needed)
 		m->m_len = 0;
 		MCLGET(m, M_WAIT);
 
-		ASSERT((m->m_flags & M_EXT) != 0);
-		bytes_available = m->m_ext.ext_size;
+		ASSERT(M_LEADINGSPACE(m) == 0);
+		bytes_available = M_SIZE(m);
 
 		/* ---- ----- --xx ------ xxxx */
 		/*			  ^    */
@@ -1236,10 +1239,9 @@ out:
 	return (rc);
 }
 
-static int /*ARGSUSED*/
-uiorefnoop(caddr_t p, int size, int adj)
+static void /*ARGSUSED*/
+uiorefnoop(mbuf_t *m)
 {
-	return (0);
 }
 
 static int
@@ -1255,7 +1257,7 @@ mbc_marshal_put_uio(mbuf_chain_t *mbc, struct uio *uio)
 	for (i = 0; i < iov_cnt; i++) {
 		MGET(m, M_WAIT, MT_DATA);
 		m->m_ext.ext_buf = iov->iov_base;
-		m->m_ext.ext_ref = uiorefnoop;
+		m->m_ext.ext_free = uiorefnoop;
 		m->m_data = m->m_ext.ext_buf;
 		m->m_flags |= M_EXT;
 		m->m_len = m->m_ext.ext_size = iov->iov_len;
@@ -1268,44 +1270,95 @@ mbc_marshal_put_uio(mbuf_chain_t *mbc, struct uio *uio)
 	return (0);
 }
 
+int smb_mbuf_put_copy_threshold = 128;
+/*
+ * Append an mbuf to the chain at chain_offset, with some optimizations:
+ * If the chain is empty, just set the head (done).
+ * If m is no larger than the copy threshold, copy.
+ * Always consumes (or free's) the mbuf passed in.
+ */
 static int
-mbc_marshal_put_mbufs(mbuf_chain_t *mbc, mbuf_t *m)
+mbc_marshal_put_mbufs(mbuf_chain_t *mbc, mbuf_t *mbuf)
 {
-	mbuf_t	*mt;
-	mbuf_t	**t;
-	int	bytes;
+	mbuf_t	*m;
+	int	bytes, rc;
 
-	if (m != NULL) {
-		mt = m;
-		bytes = mt->m_len;
-		while (mt->m_next != 0) {
-			mt = mt->m_next;
-			bytes += mt->m_len;
-		}
-		if (bytes != 0) {
-			t = &mbc->chain;
-			while (*t != 0) {
-				bytes += (*t)->m_len;
-				t = &(*t)->m_next;
-			}
-			*t = m;
-			mbc->chain_offset = bytes;
-		} else {
-			m_freem(m);
-		}
+	/*
+	 * Length of mbuf(s) to be appended
+	 */
+	bytes = 0;
+	m = mbuf;
+	while (m != NULL) {
+		bytes += m->m_len;
+		m = m->m_next;
 	}
+	if (bytes == 0) {
+		m_freem(mbuf);
+		return (0);
+	}
+
+	/*
+	 * Check for space vs max_bytes
+	 */
+	if (!MBC_ROOM_FOR(mbc, bytes)) {
+		m_freem(mbuf);
+		return (EMSGSIZE);
+	}
+
+	/*
+	 * Empty mbc? (probably rare)
+	 */
+	if (mbc->chain == NULL) {
+		mbc->chain = mbuf;
+		mbc->chain_offset = bytes;
+		return (0);
+	}
+
+	/*
+	 * Copy optimization.  We've already checked that there's room
+	 * for the _put_mem operations, and that's the only error case
+	 * for that call, so just assert success and continue.
+	 */
+	if (bytes <= smb_mbuf_put_copy_threshold) {
+		m = mbuf;
+		while (m != NULL) {
+			rc = smb_mbc_put_mem(mbc, m->m_data, m->m_len);
+			ASSERT3S(rc, ==, 0);
+			m = m_free(m);
+		}
+		return (0);
+	}
+
+	/*
+	 * Trim existing chain and append
+	 */
+	smb_mbuf_trim(mbc->chain, mbc->chain_offset);
+	m = mbc->chain;
+	while (m->m_next != NULL)
+		m = m->m_next;
+	m->m_next = mbuf;
+	mbc->chain_offset += bytes;
+
 	return (0);
 }
 
+/*
+ * Append a new mbc (nmbc) to the existing chain mbc
+ * Assumes the new mbc has been "trimmed" to length.
+ * (This ignores nmbc.chain_offset)
+ *
+ * Always consume or dispose of nmbc->chain
+ */
 static int
 mbc_marshal_put_mbuf_chain(mbuf_chain_t *mbc, mbuf_chain_t *nmbc)
 {
-	if (nmbc->chain != 0) {
-		if (mbc_marshal_put_mbufs(mbc, nmbc->chain))
-			return (DECODE_NO_MORE_DATA);
-		MBC_SETUP(nmbc, nmbc->max_bytes);
+	int rc = 0;
+
+	if (nmbc->chain != NULL) {
+		rc = mbc_marshal_put_mbufs(mbc, nmbc->chain);
+		nmbc->chain = NULL;
 	}
-	return (0);
+	return (rc);
 }
 
 static uint8_t

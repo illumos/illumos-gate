@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2018-2021 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -439,6 +439,166 @@ out:
 	smb_mbc_free(mbc);
 }
 
+static void
+mbm_put_mbuf1()
+{
+	uint8_t wire[] = "onetwo";
+	mbuf_chain_t mbc, mbc2;
+	int rc;
+
+	MBC_INIT(&mbc, 16);
+	MBC_INIT(&mbc2, 8);
+
+	rc = smb_mbc_encodef(&mbc, "3s", "one");
+	if (rc != 0) {
+		printf("Fail: mbm_put_mbuf1 encode 1 rc=%d\n", rc);
+		goto out;
+	}
+	if (mbc.chain_offset != 3) {
+		printf("Fail: mbm_put_mbuf1 encode 1 len=%d\n",
+		    mbc.chain_offset);
+		goto out;
+	}
+
+	rc = smb_mbc_encodef(&mbc2, "s", "two");
+	if (rc != 0) {
+		printf("Fail: mbm_put_mbuf1 encode 2 rc=%d\n", rc);
+		goto out;
+	}
+	if (mbc2.chain_offset != 4) {
+		printf("Fail: mbm_put_mbuf1 encode 2 len=%d\n",
+		    mbc.chain_offset);
+		goto out;
+	}
+
+	/* Append */
+	rc = smb_mbc_encodef(&mbc, "m", mbc2.chain);
+	mbc2.chain = NULL;
+	if (rc != 0) {
+		printf("Fail: mbm_put_mbuf1 encode 3 rc=%d\n", rc);
+		goto out;
+	}
+	if (mbc.chain_offset != 7) {
+		printf("Fail: mbm_put_mbuf1 encode 3 len=%d\n",
+		    mbc.chain_offset);
+		goto out;
+	}
+
+	if (memcmp(mbc.chain->m_data, wire, 7)) {
+		printf("Fail: mbm_put_mbuf1 cmp:\n");
+		hexdump((uchar_t *)mbc.chain->m_data, 7);
+		goto out;
+	}
+
+	printf("Pass: mbm_put_mbuf1\n");
+
+out:
+	MBC_FLUSH(&mbc);
+	MBC_FLUSH(&mbc2);
+}
+
+/*
+ * Verify m_prepend works
+ */
+static void
+mbm_put_mbuf2()
+{
+	uint8_t wire[] = "one.two";
+	mbuf_chain_t mbc;
+	mbuf_t *m;
+	int len, rc;
+
+	MBC_INIT(&mbc, 512);
+
+	rc = smb_mbc_encodef(&mbc, "s", "two");
+	if (rc != 0) {
+		printf("Fail: mbm_put_mbuf2 encode 1 rc=%d\n", rc);
+		goto out;
+	}
+	if (mbc.chain_offset != 4) {
+		printf("Fail: mbm_put_mbuf2 encode 1 len=%d\n",
+		    mbc.chain_offset);
+		goto out;
+	}
+
+	/* Prepend.  Should use prepend space, not allocate. */
+	m = m_prepend(mbc.chain, 4, M_WAIT);
+	if (m != mbc.chain) {
+		(void) m_free(m);
+		printf("Fail: mbm_put_mbuf2 m_prepend error\n", rc);
+		goto out;
+	}
+
+	/* Now write into the prepend space. */
+	bcopy("one.", m->m_data, 4);
+
+	/* Verify length and content */
+	len = MBC_LENGTH(&mbc);
+	if (len != 8) {
+		printf("Fail: mbm_put_mbuf2 encode 2 len=%d\n",
+		    mbc.chain_offset);
+		goto out;
+	}
+
+	if (memcmp(mbc.chain->m_data, wire, 7)) {
+		printf("Fail: mbm_put_mbuf2 cmp:\n");
+		hexdump((uchar_t *)mbc.chain->m_data, 7);
+		goto out;
+	}
+
+	printf("Pass: mbm_put_mbuf2\n");
+
+out:
+	MBC_FLUSH(&mbc);
+}
+
+/*
+ * Check how mbc_marshal_make_room crosses a message boundary
+ */
+static void
+mbm_put_mbuf3()
+{
+	mbuf_chain_t mbc;
+	mbuf_t *m;
+	char *p;
+	int rc;
+
+	MBC_INIT(&mbc, 16384);
+
+	/*
+	 * Encode near the end of the first mbuf
+	 * running over into the second.
+	 */
+	m = mbc.chain;
+	mbc.chain_offset = M_TRAILINGSPACE(m) - 4;
+	rc = smb_mbc_encodef(&mbc, "s", "one.two");
+	if (rc != 0) {
+		printf("Fail: mbm_put_mbuf3 encode 1 rc=%d\n", rc);
+		goto out;
+	}
+
+	/* Verify first segment */
+	p = m->m_data + m->m_len - 4;
+	if (memcmp(p, "one.", 4)) {
+		printf("Fail: mbm_put_mbuf3 cmp1:\n");
+		hexdump((uchar_t *)p, 4);
+		goto out;
+	}
+
+	/* Verify second segment */
+	p = m->m_next->m_data;
+	if (memcmp(p, "two", 4)) {
+		printf("Fail: mbm_put_mbuf3 cmp2:\n");
+		hexdump((uchar_t *)p, 4);
+		goto out;
+	}
+
+	printf("Pass: mbm_put_mbuf3\n");
+
+out:
+	MBC_FLUSH(&mbc);
+}
+
 /*
  * Parse an ascii string.
  */
@@ -735,6 +895,10 @@ test_mbmarshal()
 	mbm_put_upad();
 	mbm_put_utrunc1();
 	mbm_put_utrunc2();
+
+	mbm_put_mbuf1();
+	mbm_put_mbuf2();
+	mbm_put_mbuf3();
 
 	mbm_get_a0();
 	mbm_get_a1();

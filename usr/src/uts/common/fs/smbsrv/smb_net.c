@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2011-2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -36,12 +35,18 @@
 #include <sys/vnode.h>
 #include <sys/socket.h>
 #include <sys/ksocket.h>
-#undef mem_free /* XXX Remove this after we convert everything to kmem_alloc */
 
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_kstat.h>
+
+/*
+ * How many iovec we'll handle as a local array (no allocation)
+ * See also IOV_MAX_STACK <sys/limits.h> but we need this to
+ * work also with _FAKE_KERNEL
+ */
+#define	SMB_LOCAL_IOV_MAX	16
 
 /*
  * SMB Network Socket API
@@ -114,6 +119,58 @@ smb_sorecv(ksocket_t so, void *msg, size_t len)
 }
 
 /*
+ * Receive a message as an mbuf chain (returned in *mpp)
+ * where the length requested is len.
+ *
+ * Some day hopefully this will be able to receive an actual
+ * mblk chain from the network stack (without copying), and
+ * either wrap those to create mbufs, or use mblks directly.
+ * For now, we allocate buffers here to recv into.
+ */
+int
+smb_net_recv_mbufs(smb_session_t *s, mbuf_t **mpp, size_t len)
+{
+	struct nmsghdr	msg;
+	uio_t	uio;
+	iovec_t iov[SMB_LOCAL_IOV_MAX];
+	mbuf_t	*mhead = NULL;
+	size_t	rlen;
+	int	rc;
+
+	bzero(&msg, sizeof (msg));
+	bzero(&uio, sizeof (uio));
+	ASSERT(len > 0);
+
+	mhead = smb_mbuf_alloc_chain(len);
+
+	uio.uio_resid = len;
+	uio.uio_iov = iov;
+	uio.uio_iovcnt = SMB_LOCAL_IOV_MAX;
+
+	rc = smb_mbuf_mkuio(mhead, &uio);
+	if (rc != 0)
+		goto errout;
+
+	msg.msg_iov = uio.uio_iov;
+	msg.msg_iovlen = uio.uio_iovcnt;
+	rlen = len;
+	rc = ksocket_recvmsg(s->sock, &msg, MSG_WAITALL, &rlen, CRED());
+	if (rc != 0)
+		goto errout;
+	if (rlen != len) {
+		rc = SET_ERROR(EIO);
+		goto errout;
+	}
+
+	*mpp = mhead;
+	return (rc);
+
+errout:
+	m_freem(mhead);
+	return (rc);
+}
+
+/*
  * smb_net_txl_constructor
  *
  *	Transmit list constructor
@@ -142,6 +199,72 @@ smb_net_txl_destructor(smb_txlst_t *txl)
 	txl->tl_magic = 0;
 	cv_destroy(&txl->tl_wait_cv);
 	mutex_destroy(&txl->tl_mutex);
+}
+
+/*
+ * smb_net_send_mbufs
+ *
+ * This routine sends an mbuf chain.
+ */
+int
+smb_net_send_mbufs(smb_session_t *s, mbuf_t *mhead)
+{
+	uio_t		uio;
+	iovec_t		local_iov[SMB_LOCAL_IOV_MAX];
+	iovec_t		*alloc_iov = NULL;
+	int		alloc_sz = 0;
+	mbuf_t		*m = NULL;
+	uint32_t	tlen;
+	int		i, nseg;
+	int		rc;
+
+	bzero(&uio, sizeof (uio));
+
+	/*
+	 * Setup the IOV.  First, count the number of IOV segments
+	 * and decide whether we need to allocate an iovec or can
+	 * use the local_iov;  Get the total length too.
+	 */
+	nseg = 0;
+	tlen = 0;
+	m = mhead;
+	while (m != NULL) {
+		nseg++;
+		tlen += m->m_len;
+		m = m->m_next;
+	}
+	if (nseg <= SMB_LOCAL_IOV_MAX) {
+		uio.uio_iov = local_iov;
+	} else {
+		alloc_sz = nseg * sizeof (iovec_t);
+		alloc_iov = kmem_alloc(alloc_sz, KM_SLEEP);
+		uio.uio_iov = alloc_iov;
+	}
+	uio.uio_iovcnt = nseg;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_extflg = UIO_COPY_DEFAULT;
+	uio.uio_resid = tlen;
+
+	/*
+	 * Build the iov list
+	 */
+	i = 0;
+	m = mhead;
+	while (m != NULL) {
+		uio.uio_iov[i].iov_base = m->m_data;
+		uio.uio_iov[i++].iov_len = m->m_len;
+		m = m->m_next;
+	}
+	ASSERT3S(i, ==, nseg);
+
+	rc = smb_net_send_uio(s, &uio);
+
+	if (alloc_iov != NULL)
+		kmem_free(alloc_iov, alloc_sz);
+	if (mhead != NULL)
+		m_freem(mhead);
+
+	return (rc);
 }
 
 /*

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017-2021 Tintri by DDN, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
  */
 
@@ -335,15 +335,15 @@ smb3_decrypt_sr(smb_request_t *sr)
 	 * smb3_decrypt_final will return an error
 	 * if the signatures don't match.
 	 */
-	rc = smb3_decrypt_final(&ctx, sr->sr_request_buf, sr->sr_req_length);
+	mbuf = smb_mbuf_alloc_kmem(sr->msgsize);
+	rc = smb3_decrypt_final(&ctx, mtod(mbuf, uint8_t *), sr->msgsize);
+	if (rc == 0) {
+		MBC_ATTACH_MBUF(&sr->command, mbuf);
+		sr->command.max_bytes = sr->msgsize;
+	} else {
+		m_freem(mbuf);
+	}
 
-	/*
-	 * We had to decode TFORM_HDR_SIZE bytes before we got here,
-	 * and we just peeked the first TFORM_HDR_SIZE bytes at the
-	 * beginning of this function, so this can't underflow.
-	 */
-	ASSERT(sr->command.max_bytes > SMB3_TFORM_HDR_SIZE);
-	sr->command.max_bytes -= SMB3_TFORM_HDR_SIZE;
 	return (rc);
 }
 
