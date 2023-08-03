@@ -1892,10 +1892,10 @@ typedef struct smb_request {
 	/*
 	 * SMB3 transform header fields. [MS-SMB2 2.2.41]
 	 */
-	uint64_t		smb3_tform_ssnid;
-	smb_user_t		*tform_ssn;
-	uint32_t		msgsize;
-	uint8_t			nonce[16];
+	uint64_t		th_ssnid;
+	smb_user_t		*th_sid_user;
+	uint32_t		th_msglen;
+	uint8_t			th_nonce[16];
 
 	boolean_t		encrypted;
 	boolean_t		dh_nvl_dirty;

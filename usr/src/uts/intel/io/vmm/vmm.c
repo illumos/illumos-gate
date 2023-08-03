@@ -3261,8 +3261,7 @@ vcpu_tsc_offset(struct vm *vm, int vcpuid, bool phys_adj)
 
 	if (phys_adj) {
 		/* Include any offset for the current physical CPU too */
-		extern hrtime_t tsc_gethrtime_tick_delta(void);
-		vcpu_off += tsc_gethrtime_tick_delta();
+		vcpu_off += vmm_host_tsc_delta();
 	}
 
 	return (vcpu_off);

@@ -25,8 +25,6 @@
 
 #define	SMB3_NONCE_OFFS		20
 #define	SMB3_SIG_OFFS		4
-#define	SMB3_AES_CCM_NONCE_SIZE	11
-#define	SMB3_AES_GCM_NONCE_SIZE	12
 
 /*
  * Arbitrary value used to prevent nonce reuse via overflow. Currently
@@ -56,22 +54,24 @@ smb3_encrypt_init_nonce(smb_user_t *user)
 	    sizeof (user->u_salt));
 }
 
-int
+static int
 smb3_encrypt_gen_nonce(smb_user_t *user, uint8_t *buf, size_t len)
 {
-	uint64_t cnt = atomic_inc_64_nv(&user->u_nonce_cnt);
+	uint64_t cnt;
 
 	/*
 	 * Nonces must be unique per-key for the life of the key.
 	 * Bail before we roll over to avoid breaking the crypto.
 	 */
-
+	cnt = atomic_inc_64_nv(&user->u_nonce_cnt);
 	if (cnt > smb3_max_nonce)
 		return (-1);
 
 	cnt ^= user->u_salt;
+
 	bcopy((uint8_t *)&cnt, buf, sizeof (cnt));
 
+	ASSERT(len <= 16);	// th_nonce
 	ASSERT(len > sizeof (cnt));
 	bcopy(user->u_nonce_fixed, buf + sizeof (cnt), len - sizeof (cnt));
 	return (0);
@@ -117,10 +117,9 @@ smb3_encrypt_init_mech(smb_session_t *s)
  * Instead, return an error when we attempt to encrypt/decrypt.
  */
 void
-smb3_encrypt_begin(smb_request_t *sr, smb_token_t *token)
+smb3_encrypt_begin(smb_user_t *u, smb_token_t *token)
 {
-	smb_session_t *s = sr->session;
-	smb_user_t *u = sr->uid_user;
+	smb_session_t *s = u->u_session;
 	struct smb_key *enc_key = &u->u_enc_key;
 	struct smb_key *dec_key = &u->u_dec_key;
 	uint32_t derived_keylen, input_keylen;
@@ -202,251 +201,449 @@ smb3_encrypt_begin(smb_request_t *sr, smb_token_t *token)
 	}
 
 	smb3_encrypt_init_nonce(u);
+
+	/*
+	 * XXX todo: setup crypto context for enc_key, dec_key.
+	 * See crypto_create_ctx_template(mech, key, tmpl,...)
+	 *
+	 * Will need a new indirect functions eg.
+	 *	smb3_encrypt_init_templ(s->enc_mech, enc_key);
+	 *	smb3_encrypt_init_templ(s->enc_mech, dec_key);
+	 * where struct smb_key gains a new member:
+	 *	void *template;
+	 *
+	 * Already have s->enc_mech from smb3_encrypt_init_mech().
+	 */
+}
+
+static int
+smb3_decode_tform_header(smb_request_t *sr, struct mbuf_chain *mbc)
+{
+	uint32_t protocolid;
+	uint16_t flags;
+	int rc;
+
+	rc = smb_mbc_decodef(
+	    mbc, "l16c16cl..wq",
+	    &protocolid,	/*  l  */
+	    sr->smb2_sig,	/* 16c */
+	    sr->th_nonce,	/* 16c */
+	    &sr->th_msglen,	/* l */
+	    /* reserved	  .. */
+	    &flags,		/* w */
+	    &sr->th_ssnid);	/* q */
+	if (rc)
+		return (rc);
+
+	/* This was checked in smb2sr_newrq() */
+	ASSERT3U(protocolid, ==, SMB3_ENCRYPTED_MAGIC);
+
+	if (flags != 1) {
+#ifdef DEBUG
+		cmn_err(CE_NOTE, "flags field not 1: %x", flags);
+#endif
+		return (-1);
+	}
+
+	return (rc);
+}
+
+static int
+smb3_encode_tform_header(smb_request_t *sr, struct mbuf_chain *mbc)
+{
+	int rc;
+
+	rc = smb_mbc_encodef(
+	    mbc, "l16.16clwwq",
+	    SMB3_ENCRYPTED_MAGIC, /* l */
+	    /* signature(16)	   16. (filled in later) */
+	    sr->th_nonce,	/* 16c */
+	    sr->th_msglen,	/* l */
+	    0, /* reserved	   w */
+	    1, /* flags		   w */
+	    sr->th_ssnid); /* q */
+
+	return (rc);
 }
 
 /*
- * Decrypt the request in sr->command.
- * This decrypts "in place", though due to CCM's design,
- * it processes all input before doing any output.
+ * Get an smb_vdb_t and initialize it.
+ * Free'd via smb_request_free
+ */
+static smb_vdb_t *
+smb3_get_vdb(smb_request_t *sr)
+{
+	smb_vdb_t *vdb;
+
+	vdb = smb_srm_zalloc(sr, sizeof (*vdb));
+	vdb->vdb_uio.uio_iov = &vdb->vdb_iovec[0];
+	vdb->vdb_uio.uio_iovcnt = MAX_IOVEC;
+	vdb->vdb_uio.uio_segflg = UIO_SYSSPACE;
+	vdb->vdb_uio.uio_extflg = UIO_COPY_DEFAULT;
+
+	return (vdb);
+}
+
+/*
+ * Decrypt the request in mbc_in into out_mbc which as been
+ * setup by the caller.  The caller will replace sr->command
+ * with out_mbc if this succeeds, or will free which ever one
+ * ends up not being used as sr->command.
+ *
+ * The encrypted request in in_mbc is left unmodified here,
+ * and free'd by the caller when appropriate.
+ *
+ * Error return values here are just for visibility in dtrace.
+ * Anything non-zero results in a connection drop.
  */
 int
-smb3_decrypt_sr(smb_request_t *sr)
+smb3_decrypt_sr(smb_request_t *sr,
+    struct mbuf_chain *in_mbc,	// transform header + ciphertext
+    struct mbuf_chain *out_mbc)	// cleartext
 {
-	struct mbuf_chain *mbc = &sr->command;
+	smb_enc_ctx_t ctx;
+	uint8_t th_raw[SMB3_TFORM_HDR_SIZE];
+	uint8_t *authdata;
+	size_t authlen;
+	size_t cipherlen;
+	smb_vdb_t *in_vdb = NULL;
+	smb_vdb_t *out_vdb = NULL;
 	smb_session_t *s = sr->session;
-	smb_user_t *u = sr->tform_ssn;
-	uint8_t tmp_hdr[SMB2_HDR_SIZE];
-	smb3_enc_ctx_t ctx;
-	struct smb_key *dec_key = &u->u_dec_key;
-	struct mbuf *mbuf;
-	int offset, resid, tlen, rc;
-	smb3_crypto_param_t param;
-	smb_crypto_mech_t mech;
-	boolean_t gcm =
-	    s->smb31_enc_cipherid == SMB3_CIPHER_AES256_GCM ||
-	    s->smb31_enc_cipherid == SMB3_CIPHER_AES128_GCM;
-	size_t nonce_size = (gcm ?
-	    SMB3_AES_GCM_NONCE_SIZE :
-	    SMB3_AES_CCM_NONCE_SIZE);
+	smb_user_t *u;
+	struct smb_key *dec_key;
+	int cnt, rc;
+	boolean_t gcm;
+	size_t nonce_size;
+	uint_t keylen;
 
-	ASSERT(u != NULL);
+	if (s->enc_mech == NULL)
+		return (SET_ERROR(-1));
 
-	if (s->enc_mech == NULL || dec_key->len == 0) {
-		return (-1);
+	switch (s->smb31_enc_cipherid) {
+	default:
+		ASSERT(0);
+		/* fallthrough */
+	case SMB3_CIPHER_AES128_CCM:	// 1
+		gcm = B_FALSE;
+		nonce_size = SMB3_AES_CCM_NONCE_SIZE;
+		keylen = AES128_KEY_LENGTH;
+		break;
+	case SMB3_CIPHER_AES128_GCM:	// 2
+		gcm = B_TRUE;
+		nonce_size = SMB3_AES_GCM_NONCE_SIZE;
+		keylen = AES128_KEY_LENGTH;
+		break;
+	case SMB3_CIPHER_AES256_CCM:	// 3
+		gcm = B_FALSE;
+		nonce_size = SMB3_AES_CCM_NONCE_SIZE;
+		keylen = AES256_KEY_LENGTH;
+		break;
+	case SMB3_CIPHER_AES256_GCM:	// 4
+		gcm = B_TRUE;
+		nonce_size = SMB3_AES_GCM_NONCE_SIZE;
+		keylen = AES256_KEY_LENGTH;
+		break;
 	}
-
-	tlen = SMB3_TFORM_HDR_SIZE - SMB3_NONCE_OFFS;
-	offset = mbc->chain_offset + SMB3_NONCE_OFFS;
-	resid = mbc->max_bytes - offset;
-
-	if (resid < (sr->msgsize + tlen)) {
-		cmn_err(CE_WARN, "too little data to decrypt");
-		return (-1);
-	}
-
-	if (smb_mbc_peek(mbc, offset, "#c", tlen, tmp_hdr) != 0) {
-		return (-1);
-	}
-
-	offset += tlen;
-	resid -= tlen;
 
 	/*
-	 * The transform header, minus the PROTOCOL_ID and the
-	 * SIGNATURE, is authenticated but not encrypted.
+	 * Get the transform header, in both raw form and decoded,
+	 * then remove the transform header from the message.
+	 * Note: the signature lands in sr->smb2_sig
 	 */
-	if (gcm)
-		smb3_crypto_init_gcm_param(&param, sr->nonce, nonce_size,
-		    tmp_hdr, tlen);
-	else
-		smb3_crypto_init_ccm_param(&param, sr->nonce, nonce_size,
-		    tmp_hdr, tlen, sr->msgsize + SMB2_SIG_SIZE);
+	if (smb_mbc_peek(in_mbc, 0, "#c",
+	    SMB3_TFORM_HDR_SIZE, th_raw) != 0) {
+		return (SET_ERROR(-2));
+	}
+	rc = smb3_decode_tform_header(sr, in_mbc);
+	if (rc != 0) {
+		return (SET_ERROR(-3));
+	}
+	m_adjust(in_mbc->chain, SMB3_TFORM_HDR_SIZE);
+	ASSERT(in_mbc->max_bytes > SMB3_TFORM_HDR_SIZE);
+	in_mbc->max_bytes -= SMB3_TFORM_HDR_SIZE;
+	in_mbc->chain_offset = 0;
 
 	/*
+	 * Bounds-check the stated length of the encapsulated message.
+	 */
+	if (sr->th_msglen < SMB2_HDR_SIZE ||
+	    sr->th_msglen > in_mbc->max_bytes) {
+		return (SET_ERROR(-4));
+	}
+	cipherlen = sr->th_msglen + SMB2_SIG_SIZE;
+
+	/*
+	 * Lookup/validate the transform session ID so we'll
+	 * have the key we'll need.  Release for this happens
+	 * in smb_request_free().
+	 */
+	u = smb_session_lookup_ssnid(s, sr->th_ssnid);
+	if (u == NULL) {
+		return (SET_ERROR(-5));
+	}
+	sr->th_sid_user = u;
+	dec_key = &u->u_dec_key;
+	if (dec_key->len != keylen) {
+		return (SET_ERROR(-6));
+	}
+
+	/*
+	 * Initialize crypto I/F: mech, params, key
+	 *
 	 * Unlike signing, which uses one global mech struct,
 	 * encryption requires modifying the mech to add a
 	 * per-use param struct. Thus, we need to make a copy.
 	 */
-	mech = *(smb_crypto_mech_t *)s->enc_mech;
-	rc = smb3_decrypt_init(&ctx, &mech, &param,
-	    dec_key->key, dec_key->len);
-	if (rc != 0) {
-		return (rc);
-	}
+	bzero(&ctx, sizeof (ctx));
+	ctx.mech = *((smb_crypto_mech_t *)s->enc_mech);
 
 	/*
-	 * Digest the rest of the SMB packet, starting at the data
-	 * just after the SMB header.
+	 * The transform header, minus the PROTOCOL_ID and the
+	 * SIGNATURE, is authenticated but not encrypted.
+	 * (That's the "auth data" passed to init)
 	 *
-	 * Advance to the src mbuf where we start digesting.
+	 * Param init for CCM also needs the cipher length, which is
+	 * the clear length + 16, but note that the last 16 bytes is
+	 * the signature in the transform header.
 	 */
-	mbuf = mbc->chain;
-	while (mbuf != NULL && (offset >= mbuf->m_len)) {
-		offset -= mbuf->m_len;
-		mbuf = mbuf->m_next;
-	}
+	authdata = th_raw + SMB3_NONCE_OFFS;
+	authlen = SMB3_TFORM_HDR_SIZE - SMB3_NONCE_OFFS;
 
-	if (mbuf == NULL)
-		return (-1);
-
-	/*
-	 * Digest the remainder of this mbuf, limited to the
-	 * residual count, and starting at the current offset.
-	 */
-	tlen = mbuf->m_len - offset;
-	if (tlen > resid)
-		tlen = resid;
-
-	rc = smb3_decrypt_update(&ctx, (uint8_t *)mbuf->m_data + offset, tlen);
-	if (rc != 0) {
-		return (rc);
-	}
-	resid -= tlen;
-
-	/*
-	 * Digest any more mbufs in the chain.
-	 */
-	while (resid > 0) {
-		mbuf = mbuf->m_next;
-		if (mbuf == NULL) {
-			smb3_encrypt_cancel(&ctx);
-			return (-1);
-		}
-		tlen = mbuf->m_len;
-		if (tlen > resid)
-			tlen = resid;
-		rc = smb3_decrypt_update(&ctx, (uint8_t *)mbuf->m_data, tlen);
-		if (rc != 0) {
-			return (rc);
-		}
-		resid -= tlen;
-	}
-
-	/*
-	 * AES_CCM processes the signature like normal data.
-	 */
-	rc = smb3_decrypt_update(&ctx, sr->smb2_sig, SMB2_SIG_SIZE);
-
-	if (rc != 0) {
-		cmn_err(CE_WARN, "failed to process signature");
-		return (rc);
-	}
-	/*
-	 * smb3_decrypt_final will return an error
-	 * if the signatures don't match.
-	 */
-	mbuf = smb_mbuf_alloc_kmem(sr->msgsize);
-	rc = smb3_decrypt_final(&ctx, mtod(mbuf, uint8_t *), sr->msgsize);
-	if (rc == 0) {
-		MBC_ATTACH_MBUF(&sr->command, mbuf);
-		sr->command.max_bytes = sr->msgsize;
+	if (gcm) {
+		smb3_crypto_init_gcm_param(&ctx,
+		    sr->th_nonce, nonce_size,
+		    authdata, authlen);
 	} else {
-		m_freem(mbuf);
+		smb3_crypto_init_ccm_param(&ctx,
+		    sr->th_nonce, nonce_size,
+		    authdata, authlen, cipherlen);
+	}
+
+	rc = smb3_decrypt_init(&ctx,
+	    dec_key->key, dec_key->len);
+	if (rc != 0)
+		return (SET_ERROR(-7));
+
+	/*
+	 * Build a UIO vector for the ciphertext (in)
+	 * a: remainder of the 1s segment after the transform header
+	 * b: all subsequent segments of this message
+	 * c: final 16 byte signature from the transform header
+	 */
+	in_vdb = smb3_get_vdb(sr);
+	in_vdb->vdb_uio.uio_resid = sr->th_msglen;
+	rc = smb_mbuf_mkuio(in_mbc->chain, &in_vdb->vdb_uio);
+	if (rc != 0)
+		return (SET_ERROR(-8));
+
+	/* Add one more uio seg. for the signature. */
+	cnt = in_vdb->vdb_uio.uio_iovcnt;
+	if ((cnt + 1) > MAX_IOVEC)
+		return (SET_ERROR(-9));
+	in_vdb->vdb_uio.uio_iov[cnt].iov_base = (void *)sr->smb2_sig;
+	in_vdb->vdb_uio.uio_iov[cnt].iov_len = SMB2_SIG_SIZE;
+	in_vdb->vdb_uio.uio_iovcnt = cnt + 1;
+	in_vdb->vdb_uio.uio_resid += SMB2_SIG_SIZE;
+
+	/*
+	 * Build a UIO vector for the cleartext (out)
+	 */
+	out_vdb = smb3_get_vdb(sr);
+	out_vdb->vdb_uio.uio_resid = sr->th_msglen;
+	rc = smb_mbuf_mkuio(out_mbc->chain, &out_vdb->vdb_uio);
+	if (rc != 0)
+		return (SET_ERROR(-10));
+
+	/*
+	 * Have in/out UIO descriptors.  Decrypt!
+	 */
+	rc = smb3_decrypt_uio(&ctx, &in_vdb->vdb_uio, &out_vdb->vdb_uio);
+	if (rc != 0) {
+#ifdef	DEBUG
+		cmn_err(CE_WARN, "smb3_decrypt_uio failed");
+#endif
+		return (SET_ERROR(-11));
 	}
 
 	return (rc);
 }
 
 /*
- * Encrypt the response in in_mbc, and output
- * an encrypted response in out_mbc.
- * The data in in_mbc is preserved.
+ * Encrypt the response in in_mbc into out_mbc which as been
+ * setup by the caller.  The caller will send out_mbc if this
+ * returns success, and otherwise will free out_mbc.
+ *
+ * The cleartext response in in_mbc is left unmodified here,
+ * and free'd in smb_request_free.
+ *
+ * Error return values here are just for visibility in dtrace.
+ * Anything non-zero results in a connection drop.
  */
 int
-smb3_encrypt_sr(smb_request_t *sr, struct mbuf_chain *in_mbc,
-    struct mbuf_chain *out_mbc)
+smb3_encrypt_sr(smb_request_t *sr,
+    struct mbuf_chain *in_mbc,	// cleartext
+    struct mbuf_chain *out_mbc)	// transform header + ciphertext
 {
+	smb_enc_ctx_t ctx;
+	uint8_t th_raw[SMB3_TFORM_HDR_SIZE];
+	uint8_t *authdata;
+	size_t authlen;
+	smb_vdb_t *in_vdb = NULL;
+	smb_vdb_t *out_vdb = NULL;
 	smb_session_t *s = sr->session;
-	smb_user_t *u = sr->tform_ssn;
-	uint8_t *buf = (uint8_t *)out_mbc->chain->m_data;
-	size_t buflen = out_mbc->max_bytes;
-	smb3_enc_ctx_t ctx;
+	smb_user_t *u = sr->th_sid_user;
 	struct smb_key *enc_key = &u->u_enc_key;
-	struct mbuf *mbuf;
-	int resid, tlen, rc;
-	smb3_crypto_param_t param;
-	smb_crypto_mech_t mech;
-	boolean_t gcm =
-	    s->smb31_enc_cipherid == SMB3_CIPHER_AES256_GCM ||
-	    s->smb31_enc_cipherid == SMB3_CIPHER_AES128_GCM;
-	size_t nonce_size = (gcm ?
-	    SMB3_AES_GCM_NONCE_SIZE :
-	    SMB3_AES_CCM_NONCE_SIZE);
+	int cnt, rc;
+	boolean_t gcm;
+	size_t nonce_size;
+	uint_t keylen;
 
-	ASSERT(u != NULL);
+	VERIFY(u != NULL); // and have sr->th_ssnid
 
-	if (s->enc_mech == NULL || enc_key->len == 0) {
-		return (-1);
+	switch (s->smb31_enc_cipherid) {
+	default:
+		ASSERT(0);
+		/* fallthrough */
+	case SMB3_CIPHER_AES128_CCM:	// 1
+		gcm = B_FALSE;
+		nonce_size = SMB3_AES_CCM_NONCE_SIZE;
+		keylen = AES128_KEY_LENGTH;
+		break;
+	case SMB3_CIPHER_AES128_GCM:	// 2
+		gcm = B_TRUE;
+		nonce_size = SMB3_AES_GCM_NONCE_SIZE;
+		keylen = AES128_KEY_LENGTH;
+		break;
+	case SMB3_CIPHER_AES256_CCM:	// 3
+		gcm = B_FALSE;
+		nonce_size = SMB3_AES_CCM_NONCE_SIZE;
+		keylen = AES256_KEY_LENGTH;
+		break;
+	case SMB3_CIPHER_AES256_GCM:	// 4
+		gcm = B_TRUE;
+		nonce_size = SMB3_AES_GCM_NONCE_SIZE;
+		keylen = AES256_KEY_LENGTH;
+		break;
+	}
+	if (s->enc_mech == NULL || enc_key->len != keylen) {
+		return (SET_ERROR(-1));
 	}
 
-	rc = smb3_encrypt_gen_nonce(u, sr->nonce, nonce_size);
-
+	/*
+	 * Need to fill in the transform header for everything
+	 * after the signature, needed as the "auth" data.
+	 * The signature is stuffed in later.  So we need:
+	 *   the nonce, msgsize, flags, th_ssnid
+	 */
+	rc = smb3_encrypt_gen_nonce(u, sr->th_nonce, nonce_size);
 	if (rc != 0) {
 		cmn_err(CE_WARN, "ran out of nonces");
-		return (-1);
+		return (SET_ERROR(-2));
+	}
+	if (smb3_encode_tform_header(sr, out_mbc) != 0) {
+		cmn_err(CE_WARN, "couldn't encode transform header");
+		return (SET_ERROR(-3));
 	}
 
-	(void) smb_mbc_poke(out_mbc, SMB3_NONCE_OFFS, "#c",
-	    nonce_size, sr->nonce);
-
-	resid = in_mbc->max_bytes;
-
-	/*
-	 * The transform header, minus the PROTOCOL_ID and the
-	 * SIGNATURE, is authenticated but not encrypted.
-	 */
-	if (gcm)
-		smb3_crypto_init_gcm_param(&param, sr->nonce, nonce_size,
-		    buf + SMB3_NONCE_OFFS,
-		    SMB3_TFORM_HDR_SIZE - SMB3_NONCE_OFFS);
-	else
-		smb3_crypto_init_ccm_param(&param, sr->nonce, nonce_size,
-		    buf + SMB3_NONCE_OFFS,
-		    SMB3_TFORM_HDR_SIZE - SMB3_NONCE_OFFS, resid);
+	/* Get the raw header to use as auth data */
+	if (smb_mbc_peek(out_mbc, 0, "#c",
+	    SMB3_TFORM_HDR_SIZE, th_raw) != 0)
+		return (SET_ERROR(-4));
 
 	/*
+	 * Initialize crypto I/F: mech, params, key
+	 *
 	 * Unlike signing, which uses one global mech struct,
 	 * encryption requires modifying the mech to add a
 	 * per-use param struct. Thus, we need to make a copy.
 	 */
-	mech = *(smb_crypto_mech_t *)s->enc_mech;
-	rc = smb3_encrypt_init(&ctx, &mech, &param,
-	    enc_key->key, enc_key->len, buf + SMB3_TFORM_HDR_SIZE,
-	    buflen - SMB3_TFORM_HDR_SIZE);
+	bzero(&ctx, sizeof (ctx));
+	ctx.mech = *((smb_crypto_mech_t *)s->enc_mech);
+
+	/*
+	 * The transform header, minus the PROTOCOL_ID and the
+	 * SIGNATURE, is authenticated but not encrypted.
+	 * (That's the "auth data" passed to init)
+	 *
+	 * Param init for CCM also needs the cipher length, which is
+	 * the clear length + 16, but note that the last 16 bytes is
+	 * the signature in the transform header.
+	 *
+	 * Note: sr->th_msglen already set by caller
+	 */
+	authdata = th_raw + SMB3_NONCE_OFFS;
+	authlen = SMB3_TFORM_HDR_SIZE - SMB3_NONCE_OFFS;
+
+	if (gcm) {
+		smb3_crypto_init_gcm_param(&ctx,
+		    sr->th_nonce, nonce_size,
+		    authdata, authlen);
+	} else {
+		smb3_crypto_init_ccm_param(&ctx,
+		    sr->th_nonce, nonce_size,
+		    authdata, authlen, sr->th_msglen);
+	}
+
+	rc = smb3_encrypt_init(&ctx,
+	    enc_key->key, enc_key->len);
+	if (rc != 0)
+		return (SET_ERROR(-5));
+
+	/*
+	 * Build a UIO vector for the cleartext (in)
+	 */
+	in_vdb = smb3_get_vdb(sr);
+	in_vdb->vdb_uio.uio_resid = sr->th_msglen;
+	rc = smb_mbuf_mkuio(in_mbc->chain, &in_vdb->vdb_uio);
+	if (rc != 0)
+		return (SET_ERROR(-6));
+
+	/*
+	 * Build a UIO vector for the ciphertext (out)
+	 * a: remainder of the 1s segment after the transform header
+	 * b: all subsequent segments of this message
+	 * c: final 16 byte signature that will go in the TH
+	 *
+	 * Caller puts transform header in its own mblk so we can
+	 * just skip the first mlbk when building the uio.
+	 */
+	out_vdb = smb3_get_vdb(sr);
+	out_vdb->vdb_uio.uio_resid = sr->th_msglen;
+	rc = smb_mbuf_mkuio(out_mbc->chain->m_next, &out_vdb->vdb_uio);
+	if (rc != 0)
+		return (SET_ERROR(-7));
+
+	/* Add one more uio seg. for the signature. */
+	cnt = out_vdb->vdb_uio.uio_iovcnt;
+	if ((cnt + 1) > MAX_IOVEC)
+		return (SET_ERROR(-8));
+	out_vdb->vdb_uio.uio_iov[cnt].iov_base = (void *)sr->smb2_sig;
+	out_vdb->vdb_uio.uio_iov[cnt].iov_len = SMB2_SIG_SIZE;
+	out_vdb->vdb_uio.uio_iovcnt = cnt + 1;
+	out_vdb->vdb_uio.uio_resid += SMB2_SIG_SIZE;
+
+	/*
+	 * Have in/out UIO descriptors. Encrypt!
+	 */
+	rc = smb3_encrypt_uio(&ctx, &in_vdb->vdb_uio, &out_vdb->vdb_uio);
 	if (rc != 0) {
-		return (rc);
+#ifdef	DEBUG
+		cmn_err(CE_WARN, "smb3_encrypt_uio failed");
+#endif
+		return (SET_ERROR(-9));
 	}
 
 	/*
-	 * Unlike signing and decryption, we're processing the entirety of the
-	 * message here, so we don't skip anything.
+	 * Now patch the final signature into the transform header
 	 */
-	mbuf = in_mbc->chain;
-	while (resid > 0 && mbuf != NULL) {
-		tlen = mbuf->m_len;
-		if (tlen > resid)
-			tlen = resid;
-		rc = smb3_encrypt_update(&ctx, (uint8_t *)mbuf->m_data, tlen);
-		if (rc != 0) {
-			return (rc);
-		}
-		resid -= tlen;
-		mbuf = mbuf->m_next;
-	}
-
-	if (mbuf == NULL && resid > 0) {
-		cmn_err(CE_WARN, "not enough data to encrypt");
-		smb3_encrypt_cancel(&ctx);
-		return (-1);
-	}
-
-	rc = smb3_encrypt_final(&ctx, buf + SMB3_SIG_OFFS);
+	(void) smb_mbc_poke(out_mbc, SMB3_SIG_OFFS, "#c",
+	    SMB2_SIG_SIZE, sr->smb2_sig);
 
 	return (rc);
 }
 
 void
-smb3_encrypt_fini(smb_session_t *s)
+smb3_encrypt_ssn_fini(smb_session_t *s)
 {
 	smb_crypto_mech_t *mech;
 
