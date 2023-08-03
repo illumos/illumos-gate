@@ -25,11 +25,10 @@
 .I onu
 \- OS/Net Update
 .SH SYNOPSIS
-\fBonu [opts] [-s <beName>] -t <beName>\fP
+\fBonu [opts] [-s <beName>] -t <beName> [-- <pkg update args>]\fP
 .br
 \fBonu [opts] -r\fP
 .SH DESCRIPTION
-.LP
 .I onu
 is a replacement for
 .I bfu
@@ -37,7 +36,6 @@ used to update a system with the latest set of IPS packages for the ON
 (OS/Net) consolidation of Solaris, using beadm(8) to create a new Boot
 Environment (BE) and pkg(1) to update the image.
 .SH OPTIONS
-.LP
 The following global options are supported:
 .TP 4
 .B \-c <consolidation>
@@ -78,13 +76,15 @@ is no default value.
 .B \-Z
 Do not update any installed zones.
 .LP
+Additional arguments to be passed verbatim to \fBpkg update\fP can be specified
+on the command line following a \fB--\fP delimiter.
+.LP
 The second form of onu takes the following option:
 .TP 4
 .B \-r
 In the current BE configure the requested publisher appropriately, without
 updating.
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .TP 4
 .B 0
@@ -97,7 +97,6 @@ Incorrect usage.
 .B 2
 One of the commands used by the script failed.
 .SH NOTES
-.LP
 Former users of bfu should note the following ways in which onu behaves
 differently from bfu.  First, as noted above, onu creates a new BE, rather
 than updating an existing BE in-place.  Second, onu will not install packages
@@ -127,7 +126,6 @@ will attempt to update any ipkg-brand installed zones on the system; the
 .B -Z
 option may be used to disable this behavior.
 .SH EXAMPLES
-.LP
 \fBExample 1\fR Installing latest ON nightly build
 .LP
 # onu -t new-nightly-be
@@ -148,7 +146,6 @@ option may be used to disable this behavior.
 .br
 #
 .SH ENVIRONMENT
-.LP
 ONURI
 .IP
 If the -u option is not provided, and this variable is set, it will be used
