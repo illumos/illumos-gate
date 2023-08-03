@@ -20,17 +20,22 @@
 #pragma D option quiet
 #pragma D option strsize=1k
 
+/*
+ * The hard tabs here are deliberate to assure constant behavior across
+ * the various cpp variants we might run against (and their various bugs).
+ * See illumos/cpp#2 for details.
+ */
 #define	TST(name)				\
-	printf("\ntst |%s|\n", name)
+	printf("\ntst\t|%s|\n", name)
 #define	IN2(vala, valb)				\
 	in = strjoin(vala, valb);		\
-	printf("in  |%s|\n", in)
+	printf("in\t|%s|\n", in)
 #define	IN(val)					\
 	in = val;				\
-	printf("in  |%s|\n", in)
+	printf("in\t|%s|\n", in)
 #define	SEL(ss)					\
 	out = json(in, ss);			\
-	printf("sel |%s|\nout |%s|\n", ss,	\
+	printf("sel\t|%s|\nout\t|%s|\n", ss,	\
 	    out != NULL ? out : "<NULL>")
 
 BEGIN

@@ -73,6 +73,11 @@ cat > test.pl <<-EOPERL
 	    Timeout => 3);
 	die "Could not connect to host $local port $tcpport" unless \$s;
 	close \$s;
+	#
+	# Sleep for one second to assure that our D script has ample time to
+	# see all events induced by the close
+	#
+	sleep 1;
 EOPERL
 
 $dtrace -c 'perl test.pl' -qs /dev/stdin <<EODTRACE

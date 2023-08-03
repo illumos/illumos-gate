@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2023 Oxide Computer Company
+ */
+
 #include "cyclic.h"
 
 #define	CYCLIC_TRACE
@@ -230,19 +234,6 @@ cyclic_pretty_dump(cyc_cpu_t *cpu)
 	}
 }
 
-/*
- * Yes, this is very weak.  Full 16-column-wide 64-bit addresses screw up
- * ::cycinfo's very carefully planned 80-column layout.  We set the column
- * width for addresses to be 11 (instead of 16), knowing that the kernel
- * heap (from which these data structures are allocated) starts at
- * 0x0000030000000000, and isn't likely to extend to 0x0000100000000000.
- */
-#ifdef _LP64
-#define	CYC_ADDR_WIDTH	11
-#else
-#define	CYC_ADDR_WIDTH	8
-#endif
-
 int
 cycinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
@@ -273,9 +264,8 @@ cycinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("\n\n");
 
 	if (DCMD_HDRSPEC(flags) || verbose || Verbose)
-		mdb_printf("%3s %*s %7s %6s %*s %15s %s\n", "CPU",
-		    CYC_ADDR_WIDTH, "CYC_CPU", "STATE", "NELEMS",
-		    CYC_ADDR_WIDTH, "ROOT", "FIRE", "HANDLER");
+		mdb_printf("%3s %?s %7s %6s %15s %s\n", "CPU",
+		    "CYC_CPU", "STATE", "NELEMS", "FIRE", "HANDLER");
 
 	if (cyccpu_vread(&cpu, addr) == -1) {
 		mdb_warn("couldn't read cyc_cpu at %p", addr);
@@ -305,7 +295,7 @@ cycinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	root = heap[0];
 
-	mdb_printf("%3d %0*p %7s %6d ", c.cpu_id, CYC_ADDR_WIDTH, addr,
+	mdb_printf("%3d %0?p %7s %6d ", c.cpu_id, addr,
 	    cpu.cyp_state == CYS_ONLINE ? "online" :
 	    cpu.cyp_state == CYS_OFFLINE ? "offline" :
 	    cpu.cyp_state == CYS_EXPANDING ? "expand" :
@@ -314,10 +304,10 @@ cycinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    cpu.cyp_nelems);
 
 	if (cpu.cyp_nelems > 0)
-		mdb_printf("%0*p %15llx %a\n", CYC_ADDR_WIDTH,
-		    caddr, cyc[root].cy_expire, cyc[root].cy_handler);
+		mdb_printf("%15llx %a\n",
+		    cyc[root].cy_expire, cyc[root].cy_handler);
 	else
-		mdb_printf("%*s %15s %s\n", CYC_ADDR_WIDTH, "-", "-", "-");
+		mdb_printf("%15s %s\n", "-", "-");
 
 	if (!verbose && !Verbose)
 		return (DCMD_OK);
@@ -341,33 +331,30 @@ cycinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		if (!header) {
 			header = 1;
-			mdb_printf("\n%*s %3s %4s %4s %5s %15s %7s %s\n",
-			    CYC_ADDR_WIDTH, "ADDR", "NDX", "HEAP", "LEVL",
-			    "PEND", "FIRE", "USECINT", "HANDLER");
+			mdb_printf("\n%?s %3s %3s %3s %5s %14s %s\n",
+			    "ADDR", "NDX", "HPX", "LVL",
+			    "PEND", "FIRE", "HANDLER");
 		}
 
-		mdb_printf("%0*p %3d ", CYC_ADDR_WIDTH,
-		    caddr + i * sizeof (cyclic_t), i);
+		mdb_printf("%0?p %3d ", caddr + i * sizeof (cyclic_t), i);
 
-		mdb_printf("%4d ", j);
+		mdb_printf("%3d ", j);
 
 		if (j >= cpu.cyp_nelems) {
-			mdb_printf("%4s %5s %15s %7s %s\n", "-", "-",
-			    "-", "-", "-");
+			mdb_printf("%3s %5s %14s %s\n", "-", "-", "-", "-");
 			continue;
 		}
 
-		mdb_printf("%4s %5d %15llx ",
-		    cyc[i].cy_level == CY_HIGH_LEVEL ? "high" :
-		    cyc[i].cy_level == CY_LOCK_LEVEL ? "lock" :
+		mdb_printf("%3s %5d ",
+		    cyc[i].cy_level == CY_HIGH_LEVEL ? "hgh" :
+		    cyc[i].cy_level == CY_LOCK_LEVEL ? "lck" :
 		    cyc[i].cy_level == CY_LOW_LEVEL ? "low" : "????",
-		    cyc[i].cy_pend, cyc[i].cy_expire);
+		    cyc[i].cy_pend);
 
-		if (cyc[i].cy_interval + cyc[i].cy_expire != INT64_MAX)
-			mdb_printf("%7lld ", cyc[i].cy_interval /
-			    (uint64_t)(NANOSEC / MICROSEC));
+		if (cyc[i].cy_expire != INT64_MAX)
+			mdb_printf("%14llx ", cyc[i].cy_expire);
 		else
-			mdb_printf("%7s ", "-");
+			mdb_printf("%14s ", "-");
 
 		mdb_printf("%a\n", cyc[i].cy_handler);
 	}
@@ -396,9 +383,8 @@ again:
 			continue;
 		}
 
-		mdb_printf("\n%3s %4s %4s %4s %*s %4s %*s\n", "CPU",
-		    "LEVL", "USER", "NDX", CYC_ADDR_WIDTH, "ADDR", "CYC",
-		    CYC_ADDR_WIDTH, "CYC_ADDR", "PEND");
+		mdb_printf("\n%3s %4s %4s %4s %?s %4s %?s\n", "CPU",
+		    "LEVL", "USER", "NDX", "ADDR", "CYC", "CYC_ADDR", "PEND");
 
 		for (i = 0; i <= pc->cypc_sizemask &&
 		    i <= pc->cypc_prodndx; i++) {
@@ -411,14 +397,13 @@ again:
 			    shared ? "shrd" : which == softbuf->cys_hard ?
 			    "hard" : "soft");
 
-			mdb_printf("%4d %0*p ", i, CYC_ADDR_WIDTH,
+			mdb_printf("%4d %0?p ", i,
 			    (uintptr_t)&buf[i] - (uintptr_t)&buf[0] +
 			    (uintptr_t)pc->cypc_buf, buf[i],
 			    caddr + buf[i] * sizeof (cyclic_t));
 
 			if (i >= pc->cypc_prodndx)
-				mdb_printf("%4s %*s %5s  ",
-				    "-", CYC_ADDR_WIDTH, "-", "-");
+				mdb_printf("%4s %?s %5s  ", "-", "-", "-");
 			else {
 				cyclic_t c;
 
@@ -428,20 +413,20 @@ again:
 					continue;
 				}
 
-				mdb_printf("%4d %0*p %5d  ", buf[i],
-				    CYC_ADDR_WIDTH, cyc_addr, c.cy_pend);
+				mdb_printf("%4d %0?p %5d  ", buf[i],
+				    cyc_addr, c.cy_pend);
 			}
 
 			if (i == (pc->cypc_consndx & pc->cypc_sizemask)) {
-				mdb_printf("<-- consndx");
+				mdb_printf("<-- c");
 				if (i == (pc->cypc_prodndx & pc->cypc_sizemask))
-					mdb_printf(",prodndx");
+					mdb_printf(",p");
 				mdb_printf("\n");
 				continue;
 			}
 
 			if (i == (pc->cypc_prodndx & pc->cypc_sizemask)) {
-				mdb_printf("<-- prodndx\n");
+				mdb_printf("<-- p\n");
 				continue;
 			}
 			mdb_printf("\n");
