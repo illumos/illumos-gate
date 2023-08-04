@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_USB 8 "Feb 23, 2022"
+.TH CFGADM_USB 8 "August 2, 2023"
 .SH NAME
 cfgadm_usb \- USB hardware-specific commands for cfgadm
 .SH SYNOPSIS
@@ -246,7 +246,7 @@ The occupant states for devices at \fBUSB\fR port attachment points at the
 .ad
 .sp .6
 .RS 4n
-The \fBUSB\fR device at the \fBUSB\fR port is configured and usable by Solaris.
+The \fBUSB\fR device at the \fBUSB\fR port is configured and usable.
 .RE
 
 .sp
@@ -258,7 +258,7 @@ The \fBUSB\fR device at the \fBUSB\fR port is configured and usable by Solaris.
 .RS 4n
 The \fBUSB\fR device at the \fBUSB\fR port was explicitly off-lined using
 \fBcfgadm\fR \fB-c\fR \fBunconfigure\fR, or was not successfully configured for
-use with Solaris, for example, having no driver or a device problem.
+use, for example, having no driver or a device problem.
 .RE
 
 .sp
@@ -363,11 +363,11 @@ library. The following configuration state change operations are supported:
 .sp .6
 .RS 4n
 If there is a \fBUSB\fR device plugged into the port, this command attempts to
-configure it and set everything up so that it is usable by Solaris. This
+configure it and set everything up so that it is usable. This
 command does an implied \fBconnect\fR (reverse of \fBdisconnect\fR) if
 necessary. This command accomplishes nothing, and returns an error message, if
 the device at that port is already configured. After successful execution of
-this command, the device is ready for use under Solaris.
+this command, the device is ready for use.
 .RE
 
 .sp
@@ -393,7 +393,7 @@ can be found and there are no problems enumerating and configuring the device.
 .ad
 .sp .6
 .RS 4n
-Makes the device plugged into the port unusable by Solaris (offline it). If
+Makes the device plugged into the port unusable (offline it). If
 successful, \fBcfgadm\fR reports this \fIap_id\fR's occupant state as
 \fBunconfigured\fR. Issuing a \fBconfigure\fR to the \fIap_id\fR (if
 successful) brings its occupant back to the \fBconfigured\fR (online)

@@ -1,13 +1,13 @@
 '\" te
+.\" Copyright 2023 Peter Tribble
 .\" Copyright (c) 2003 Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_SCSI 8 "Jun 6, 2006"
+.TH CFGADM_SCSI 8 "August 2, 2023"
 .SH NAME
 cfgadm_scsi \- SCSI hardware specific commands for cfgadm
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/cfgadm\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR] [\fB-v\fR] [\fB-o\fR \fIhardware_option\fR]
      \fB-c\fR \fIfunction\fR \fIap_id\fR...
@@ -36,8 +36,6 @@ cfgadm_scsi \- SCSI hardware specific commands for cfgadm
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBSCSI\fR hardware specific library \fB/usr/lib/cfgadm/scsi.so.1\fR
 provides the functionality for \fBSCSI\fR hot-plugging through the
 \fBcfgadm\fR(8) command. \fBcfgadm\fR operates on attachment points, which are
@@ -215,8 +213,6 @@ device is not configured
 .RE
 
 .SH OPTIONS
-.sp
-.LP
 \fBcfgadm\fR defines several types of operations besides listing
 (\fB-l\fR).These operations include testing, (\fB-t\fR), invoking configuration
 state changes, (\fB-c\fR), invoking hardware specific functions (\fB-x\fR), and
@@ -450,7 +446,6 @@ specific \fBLED\fR for a slot.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRConfiguring a Disk
 .sp
 .LP
@@ -641,55 +636,7 @@ cfgadm: Component system is busy, try again: failed to offline:
 .in -2
 .sp
 
-.LP
-\fBExample 6 \fRDisplay the Value of the Locator for a Disk
-.sp
-.LP
-The following command displays the value of the locator for a disk. This
-example is specific to the \fBSPARC\fR Enterprise Server family:
-
-.sp
-.in +2
-.nf
-# \fBcfgadm -x locator c0::dsk/c0t6d0\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-The system responds with the following:
-
-.sp
-.in +2
-.nf
-Disk                    Led
-c0t6d0                  locator=on
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 7 \fRSet the Value of the Locator for a Disk
-.sp
-.LP
-The following command sets the value of the locator for a disk. This example is
-specific to the \fBSPARC\fR Enterprise Server family:
-
-.sp
-.in +2
-.nf
-# \fBcfgadm -x locator=off c0::dsk/c0t6d0\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-The system does not print anything in response.
-
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/cfgadm/scsi.so.1\fR\fR
@@ -699,27 +646,13 @@ The system does not print anything in response.
 hardware-specific library for generic \fBSCSI\fR hot-plugging
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fB/usr/platform/SPARC-Enterprise/lib/cfgadm/scsi.so.1\fR\fR
-.ad
-.sp .6
-.RS 4n
-platform-specific library for generic \fBSCSI\fR hot-plugging
-.RE
-
 .SH SEE ALSO
-.sp
-.LP
 .BR config_admin (3CFGADM),
 .BR libcfgadm (3LIB),
 .BR attributes (7),
 .BR cfgadm (8),
 .BR luxadm (8)
 .SH NOTES
-.sp
-.LP
 The \fBdisconnect\fR (quiesce) operation is not supported on controllers which
 control disks containing critical partitions such as \fBroot\fR (\fB/\fR),
 \fB/usr\fR, \fBswap\fR, or \fB/var\fR. The \fBdisconnect\fR operation should
@@ -739,8 +672,6 @@ system.
 .LP
 Hotplugging operations are not supported by all \fBSCSI\fR controllers.
 .SH WARNINGS
-.sp
-.LP
 The connectors on some \fBSCSI\fR devices do not conform to \fBSCSI\fR hotplug
 specifications. Performing hotplug operations on such devices can cause damage
 to the hardware on the \fBSCSI\fR bus. Refer to your hardware manual for

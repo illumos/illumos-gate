@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_IB 8 "Jul 2, 2008"
+.TH CFGADM_IB 8 "August 2, 2023"
 .SH NAME
 cfgadm_ib \- InfiniBand hardware specific commands for cfgadm
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/cfgadm\fR \fB-f\fR [\fB-y\fR | \fB-n\fR] [\fB-v\fR] \fB-c\fR \fIfunction\fR \fIap_id\fR...
 .fi
@@ -29,8 +28,6 @@ cfgadm_ib \- InfiniBand hardware specific commands for cfgadm
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The InfiniBand hardware specific library \fB/usr/lib/cfgadm/ib.so.1\fR provides
 the functionality for administering its fabric through the \fBcfgadm\fR(8)
 utility. \fBcfgadm\fR operates on attachment points. See \fBcfgadm\fR(8).
@@ -200,8 +197,7 @@ The receptacle state for attachment points have the following meanings:
 .sp .6
 .RS 4n
 For an IOC/VPPA/Port/Pseudo/HCA_SVC device, \fBconnected\fR implies that it has
-been seen by the host. The device might not have been configured for use by
-Solaris.
+been seen by the host. The device might not have been configured for use.
 .sp
 For a HCA attachment point, \fBconnected\fR implies that it has been configured
 and is in use.
@@ -219,7 +215,7 @@ The occupant state for attachment points have the following meanings:
 .ad
 .sp .6
 .RS 4n
-The IB device, and the HCA ap_id, are configured and usable by Solaris.
+The IB device, and the HCA ap_id, are configured and usable.
 .RE
 
 .sp
@@ -231,7 +227,7 @@ The IB device, and the HCA ap_id, are configured and usable by Solaris.
 .RS 4n
 The IB device at the ap_id was explicitly offlined using \fBcfgadm\fR \fB-c\fR
 \fBunconfigure\fR, was not successfully configured. This could be because it
-wasn not successfully configuref for use with Solaris (no driver, or a device
+was not successfully configured for use (no driver, or a device
 problem), or because it was never configured for use by the IB nexus driver.
 .sp
 The \fBunconfigured\fR operation is not supported for the HCA attachment point.
@@ -280,7 +276,7 @@ Normal state. Ready for use.
 .sp .6
 .RS 4n
 This state is only valid for IB device that have been probed by IBDM but not
-yet configured for use by Solaris. It is also shown for devices that have been
+yet configured for use. It is also shown for devices that have been
 explicitly offlined by a \fBcfgadm\fR \fB-c\fR \fBunconfigure\fR operation.
 This condition does not apply to a HCA attachment point.
 .RE
@@ -296,8 +292,6 @@ Not used.
 .RE
 
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -318,7 +312,7 @@ The following generic commands are supported:
 .ad
 .sp .6
 .RS 4n
-Configure the IB device to be used by Solaris.
+Configure the IB device to be used.
 .RE
 
 .sp
@@ -537,7 +531,6 @@ See \fBibtl\fR(4D).
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRListing the State and Condition of IB Devices
 .sp
 .LP
@@ -835,7 +828,6 @@ The following command unconfigures all kernel clients of a HCA
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/cfgadm/ib.so.1\fR\fR
@@ -846,8 +838,6 @@ Hardware-specific library for generic InfiniBand device administration
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR config_admin (3CFGADM),
 .BR libcfgadm (3LIB),
 .BR ib (4D),
@@ -858,10 +848,8 @@ Hardware-specific library for generic InfiniBand device administration
 .BR cfgadm (8)
 .sp
 .LP
-InfiniBand Specification Volume 1 (http://www.infinibandta.org)
+InfiniBand Specification Volume 1 (https://www.infinibandta.org/)
 .SH NOTES
-.sp
-.LP
 Apart from the listing (\fBcfgadm\fR \fB-l\fR or \fBcfgadm\fR \fB-x\fR
 \fBlist_clients\fR), only the superuser can execute any functions on an
 attachment point.

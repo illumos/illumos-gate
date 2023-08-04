@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_CARDBUS 8 "Jul 11, 2006"
+.TH CFGADM_CARDBUS 8 "August 2, 2023"
 .SH NAME
 cfgadm_cardbus \- cardbus hardware specific commands for cfgadm
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/cfgadm\fR [\fB-f \fR] [\fB-y \fR | \fB-n \fR] [\fB-v\fR]
      [\fB-o\fR \fIhardware_options\fR] \fB-c\fR\fI function\fR \fIap_id\fR [\fIap_id\fR]
@@ -28,7 +27,7 @@ cfgadm_cardbus \- cardbus hardware specific commands for cfgadm
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIharware_options\fR] \fB-t\fR \fIap_id\fR [\fIap_id\fR]
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIhardware_options\fR] \fB-t\fR \fIap_id\fR [\fIap_id\fR]
 .fi
 
 .LP
@@ -38,23 +37,16 @@ cfgadm_cardbus \- cardbus hardware specific commands for cfgadm
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
-The CardBus slots in Solaris are hot plug capable. This capability is supported
+CardBus slots in illumos are hot plug capable. This capability is supported
 by the \fBPCI\fR hardware specific library \fB/usr/lib/cfgadm/pci.so.1\fR
 through the \fBcfgadm\fR command (see \fBcfgadm\fR(8)).
 .sp
 .LP
 The hot plug administrative models between CardBus, PCI, CompactPCI, and PCI
-Express operate the same fashion. Please refer to \fBcfgadm_pci\fR(8) for the
+Express operate in the same fashion. Please refer to \fBcfgadm_pci\fR(8) for the
 usage information.
 .SH SEE ALSO
-.sp
-.LP
 .BR config_admin (3CFGADM),
 .BR libcfgadm (3LIB),
 .BR attributes (7),
 .BR cfgadm (8)
-.sp
-.LP
-\fI\fR

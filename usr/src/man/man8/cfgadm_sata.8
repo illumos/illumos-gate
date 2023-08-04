@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_SATA 8 "Aug 27, 2007"
+.TH CFGADM_SATA 8 "August 2, 2023"
 .SH NAME
 cfgadm_sata \- SATA hardware-specific commands for cfgadm
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/cfgadm\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR] [\fB-v\fR] [\fB-o\fR \fIhardware_options\fR]
      \fB-c\fR \fIfunction\fR \fIap_id\fR...
@@ -27,7 +26,7 @@ cfgadm_sata \- SATA hardware-specific commands for cfgadm
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIharware_options\fR] \fB-t\fR \fIap_id\fR...
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIhardware_options\fR] \fB-t\fR \fIap_id\fR...
 .fi
 
 .LP
@@ -36,8 +35,6 @@ cfgadm_sata \- SATA hardware-specific commands for cfgadm
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBSATA\fR hardware specific library, \fB/usr/lib/cfgadm/sata.so.1\fR,
 provides the functionality for \fBSATA\fR hot plugging through the \fBcfgadm\fR
 command. \fBcfgadm\fR operates on attachment points, which are locations in the
@@ -337,8 +334,6 @@ The device is present and configured, and is ready to use by the \fBOS\fR.
 .RE
 
 .SH OPTIONS
-.sp
-.LP
 \fBcfgadm\fR defines several types of operations besides listing (\fB-l\fR).
 These operations include testing, (\fB-t\fR), invoking configuration state
 changes, (\fB-c\fR), invoking hardware specific functions (\fB-x\fR), and
@@ -715,7 +710,6 @@ configured/ok     -c disconnect   error message, if device cannot be
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRConfiguring a Disk
 .sp
 .LP
@@ -787,7 +781,6 @@ cfgadm: Component system is busy, try again: failed to offline:
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB/usr/lib/cfgadm/sata.so.1\fR
@@ -797,15 +790,11 @@ Hardware specific library for generic \fBSATA\fR hot plugging.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR config_admin (3CFGADM),
 .BR libcfgadm (3LIB),
 .BR attributes (7),
 .BR cfgadm (8)
 .SH NOTES
-.sp
-.LP
 The emergency "sata_port_deactivate" operation is not supported on ports with
 attached disks containing critical partitions such as root (/), /usr, swap, or
 /var. The deactivate operation should not be attempted on such ports. Incorrect
@@ -828,8 +817,6 @@ may result in system hang or data loss. If a device is unconfigured but
 receptacle state is not in a disconnected state, unplugging a device from the
 \fBSATA\fR port will result in error message.
 .SH WARNINGS
-.sp
-.LP
 The connectors on some \fBSATA\fR devices do not conform to \fBSATA\fR hotplug
 specifications. Performing hotplug operations on such devices can cause damage
 to the \fBSATA\fR controller and/or the \fBSATA\fR device.

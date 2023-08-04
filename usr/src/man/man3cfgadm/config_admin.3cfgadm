@@ -3,13 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CONFIG_ADMIN 3CFGADM "Sep 1, 2004"
+.TH CONFIG_ADMIN 3CFGADM "August 2, 2023"
 .SH NAME
 config_admin, config_change_state, config_private_func, config_test,
 config_stat, config_list, config_list_ext, config_ap_id_cmp,
 config_unload_libs, config_strerror \- configuration administration interface
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lcfgadm\fR [ \fIlibrary\fR... ]
 #include <config_admin.h>
@@ -40,7 +39,7 @@ config_unload_libs, config_strerror \- configuration administration interface
 .nf
 \fBcfga_err_t\fR \fBconfig_list_ext\fR(\fBint\fR \fInum_ap_ids\fR, \fBchar * const *\fR\fIap_ids\fR,
      \fBstruct cfga_list_data **\fR\fIap_id_list\fR, \fBint *\fR\fInlist\fR,
-     \fBconst char *\fR\fIoptions\fR, \fBconst char *\fR\fIlistops\fR,
+     \fBconst char *\fR\fIoptions\fR, \fBconst char *\fR\fIlistopts\fR,
      \fBchar **\fR\fIerrstring\fR, \fBcfga_flags_t\fR \fIflags\fR);
 .fi
 
@@ -61,8 +60,6 @@ config_unload_libs, config_strerror \- configuration administration interface
 .fi
 
 .SS "Deprecated Interfaces"
-.sp
-.LP
 The following interfaces have been deprecated and their use is strongly
 discouraged:
 .LP
@@ -78,8 +75,6 @@ discouraged:
 .fi
 
 .SH HARDWARE DEPENDENT LIBRARY SYNOPSIS
-.sp
-.LP
 The \fBconfig_admin\fR library is a generic interface that is used for dynamic
 configuration, (DR). Each piece of hardware that supports \fBDR\fR must supply
 a hardware-specific \fIplugin\fR library that contains the entry points listed
@@ -127,8 +122,6 @@ what these interfaces are.
 .fi
 
 .SS "Deprecated Interfaces"
-.sp
-.LP
 The following interfaces have been deprecated and their use is strongly
 discouraged:
 .LP
@@ -145,8 +138,6 @@ discouraged:
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBconfig_*()\fR functions provide a hardware independent interface to
 hardware-specific system configuration administration functions.  The
 \fBcfga_*()\fR functions are provided by hardware-specific libraries that are
@@ -175,10 +166,12 @@ disable normal communication to or from an occupant in a receptacle. The
 \fIstate_change_cmd\fR \fBCFGA_CMD_CONNECT\fR is used to enable communication
 to or from an occupant in a receptacle. The \fIstate_change_cmd\fR
 \fBCFGA_CMD_CONFIGURE\fR is used to bring the hardware resources contained on,
-or attached to, an occupant into the realm of Solaris, allowing use of the
-occupant's hardware resources by the system. The \fIstate_change_cmd\fR
+or attached to, an occupant into the realm of the operating system, allowing
+use of the occupant's hardware resources by the system.
+The \fIstate_change_cmd\fR
 \fBCFGA_CMD_UNCONFIGURE\fR is used to remove the hardware resources contained
-on, or attached to, an occupant from the realm of Solaris, disallowing further
+on, or attached to, an occupant from the realm of the operating system,
+disallowing further
 use of the occupant's hardware resources by the system.
 .sp
 .LP
@@ -334,7 +327,7 @@ hardware-specific library, an appropriate error code should be returned.
 .sp
 .LP
 The \fBap_log_id\fR and the \fBap_phys_id\fR members give the hardware-specific
-logical and physical names of the attachment point. The \fBap_busy\fR memberd
+logical and physical names of the attachment point. The \fBap_busy\fR member
 indicates activity is present that may result in changes to state or condition.
 The \fBap_status_time\fR  member provides the time at which either the
 \fBap_r_state\fR, \fBap_o_state\fR, or \fBap_cond\fR field of the attachment
@@ -345,7 +338,7 @@ for an attachment point. The  \fBap_class\fR member is filled in by the generic
 library. If the \fBap_log_id\fR and \fBap_phys_id\fR members are not filled in
 by the hardware-specific library, the generic library will fill in these
 members using a generic format. The remaining members are the responsibility of
-the corresponding hardware-tospecific library.
+the corresponding hardware-specific library.
 .sp
 .LP
 All string members in the \fBcfga_list_data\fR structure are null-terminated.
@@ -378,8 +371,6 @@ is out-of-range.
 The \fBcfga_help\fR function can be used request that a hardware-specific
 library output it's localized help message.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBconfig_*()\fR and \fBcfga_*()\fR functions return the following values.
 Additional error information may be returned through \fIerrstring\fR if the
 return code is not \fBCFGA_OK\fR. See  \fBDESCRIPTION\fR for details.
@@ -526,8 +517,6 @@ of the system that could not be quiesced.
 .RE
 
 .SH ERRORS
-.sp
-.LP
 Many of the errors returned by the system configuration administration
 functions are hardware-specific. The strings returned in \fIerrstring\fR may
 include the following:
@@ -631,8 +620,6 @@ attachment point whose condition fails the hardware dependent test.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See  \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -647,8 +634,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR dlopen (3C),
 .BR dlsym (3C),
 .BR free (3C),
@@ -662,8 +647,6 @@ MT-Level	Safe
 .BR cfgadm (8),
 .BR devinfo (8)
 .SH NOTES
-.sp
-.LP
 Applications using this library should be aware that the underlying
 implementation may use system services which alter the contents of the external
 variable \fBerrno\fR and may use file descriptor resources.

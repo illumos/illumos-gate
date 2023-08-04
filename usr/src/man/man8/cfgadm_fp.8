@@ -1,13 +1,13 @@
 '\" te
+.\" Copyright 2023 Peter Tribble
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_FP 8 "Jan 10, 2008"
+.TH CFGADM_FP 8 "August 2, 2023"
 .SH NAME
 cfgadm_fp \- driver specific commands for cfgadm
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/cfgadm\fR [\fB-f\fR] [\fB-n\fR | \fB-y\fR] [\fB-v\fR] [\fB-o\fR \fIhardware_options\fR]
      \fB-c\fR \fIfunction\fR \fIap_id\fR [\fIap_id\fR]
@@ -25,8 +25,6 @@ cfgadm_fp \- driver specific commands for cfgadm
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBfp\fR port driver plug-in \fB/usr/lib/cfgadm/fp.so.1\fR provides the
 functionality for Fibre Channel Fabric device node management through
 \fBcfgadm\fR(8). \fBcfgadm\fR operates on attachment points. Attachment points
@@ -62,9 +60,11 @@ Channel device.
 .sp
 .LP
 Each device on the Fibre Channel private loop port, Fabric port or public loop
-port is probed and made available to Solaris by default. Devices connected to
+port is probed and made available to the operating system by default.
+Devices connected to
 the Fibre Channel Fabric port or public loop port can be made unavailable to
-Solaris by initiating an application or an end user operation. The operation is
+the operating system by initiating an application or an end user operation.
+The operation is
 similar to the hot unplugging of devices by way of management user interfaces.
 Applications or users can use the \fB/usr/lib/cfgadm/fp.so.1\fR library to
 enable \fBlibcfgadm\fR to provide interfaces to accomplish this task.
@@ -76,8 +76,7 @@ attachment point.
 .LP
 A simple listing of attachment points in the system includes attachment points
 at \fBfp\fR port nodes but not Fibre Channel devices. The following example
-uses the \fB-a\fR flag to the list option (\fB-l\fR) to list Fibre Channel
-devices:
+uses the list option \fB-l\fR to list Fibre Channel \fBfp\fR port nodes:
 .sp
 .in +2
 .nf
@@ -95,7 +94,8 @@ devices:
 
 .sp
 .LP
-The following example lists Fibre Channel devices connected to \fBfp\fR ports.
+The following example uses the \fB-a\fR flag in addition to \fB-l\fR to list
+Fibre Channel devices connected to \fBfp\fR ports.
 .sp
 .in +2
 .nf
@@ -136,8 +136,8 @@ port \fBc2\fR. The Type field of a Fibre Channel  device \fBap_id\fR shows the
 SCSI device type of LUN 0 in the device.
 .sp
 .LP
-A Fibre Channel device with multiple FCP SCSI LUNs is configured into Solaris
-and each \fBFCP SCSI LUN\fR is available as a Solaris device. Suppose that
+A Fibre Channel device with multiple FCP SCSI LUNs is configured
+and each \fBFCP SCSI LUN\fR is available as a device. Suppose that
 ap_ids \fBc0::50020f2300006077\fR and \fBc0::50020f23000063a9\fR represent
 Fibre Channel devices with multiple \fBFCP SCSI LUN\fRs.
 .sp
@@ -184,7 +184,7 @@ associated with port \fBWWN 50020f2300006077\fR are listed. The listing also
 displays \fBFCP SCSI LUN\fRs for unconfigured Fibre Channel devices. The Fibre
 Channel device represented by \fBc0::50020f2300005f24\fR is reported to have
 two \fBFCP SCSI LUN\fRs. The configure operation \fBon c0::50020f2300005f24\fR
-creates two Solaris devices. The \fBType\fR field of \fBFCP\fR \fBSCSI\fR
+creates two devices. The \fBType\fR field of \fBFCP\fR \fBSCSI\fR
 \fBLUN\fR level ap_ids show the \fBSCSI\fR device type of each \fBLUN\fR. When
 a Fibre Channel device has different device type \fBLUN\fRs, the \fBType\fR
 field reflects that.
@@ -252,7 +252,7 @@ The state for individual Fibre Channel devices on an \fBfp\fR port:
 .ad
 .sp .6
 .RS 4n
-Device is configured into Solaris and is available for use
+Device is configured and is available for use
 .RE
 
 .sp
@@ -321,7 +321,7 @@ An error is encountered while probing a device on Fabric.
 .ad
 .sp .6
 .RS 4n
-A device was configured on a host and its state as seen by Solaris appears to
+A device was configured on a host and its state appears to
 be normal (i.e., online) but it is either not currently present or visible in
 the fabric or its presence could not be verified due to an error condition on
 the local port through which the device was configured.
@@ -340,12 +340,10 @@ A device has been configured on the host, but is currently offline or failed.
 .sp
 .LP
 The unknown \fBcondition\fR indicates that probing a device on Fabric completed
-without an error and the device state within Solaris host is normal if the
+without an error and the device state within the host is normal if the
 device was configured previously. The internal condition of the device cannot
 be guaranteed.
 .SH OPTIONS
-.sp
-.LP
 \fBcfgadm\fR defines several types of operations in addition to listing
 (\fB-l\fR). These operations include invoking configuration state changes and
 obtaining configuration administration help messages (\fB-h\fR).
@@ -382,7 +380,7 @@ discovered on a Fibre channel Fabric device is configured. However, FCP SCSI
 LUNs that are specified in the "pwwn-lun-blacklist" property in the
 \fBfp.conf\fR file will remain unconfigured. The FCP SCSI LUN level listing
 reflects the state of such FCP SCSI LUNs. They stay in the "unconfigured" state
-after reboot or Solaris Dynamic Reconfiguration on the controller that they are
+after reboot or Dynamic Reconfiguration on the controller that they are
 connected through. Refer to \fBfp\fR(4D) for additional details on the
 "pwwn-lun-blacklist" property.
 .RE
@@ -395,7 +393,7 @@ connected through. Refer to \fBfp\fR(4D) for additional details on the
 .sp .6
 .RS 4n
 Unconfigure a Fibre Channel Fabric device from a host. This device stays
-unconfigured until the next reboot or Solaris Dynamic Reconfiguration on the
+unconfigured until the next reboot or Dynamic Reconfiguration on the
 controller that the device is connected, at which time all fabric devices are
 automatically enumerated. The default behavior may be changed through the use
 of the "manual_configuration_only" property in the \fBfp.conf\fR file. If the
@@ -408,7 +406,7 @@ For Fibre Channel private loop devices and \fBN_Port\fR point-to-point devices,
 the \fBconfigure\fR command returns success without doing any operation. The
 \fBunconfigure\fR command is not supported on the private loop devices and
 \fBN_Port\fR point-to-point devices. The private loop  devices and \fBN_Port\fR
-point-to-point devices are configured by Solaris Fibre Channel drivers by
+point-to-point devices are configured by Fibre Channel drivers by
 default and are not managed through end user- or application-initiated
 operations. The \fBpwwn-lun-blacklist\fR  property in the \fBfp.conf\fR  file
 is applied to the private loop device and \fBN_Port\fR point-to-point device in
@@ -434,7 +432,7 @@ Force the \fBconfigure\fR change state operation to occur irrespective of the
 .ad
 .sp .6
 .RS 4n
-Obtain \fBfp\fR\(emtransport-specific help. Specify any \fBfp\fR attachment
+Obtain \fBfp\fR-transport-specific help. Specify any \fBfp\fR attachment
 point.
 .RE
 
@@ -460,16 +458,16 @@ Device node creation is not supported on the FCP SCSI LUN level. See
 \fBNOTES\fR.
 .RE
 
-All Fibre Channel devices are available to Solaris by default. Enabling only a
-subset of Fabric devices available to Solaris by default can be accomplished by
+All Fibre Channel devices are available by default. Enabling only a
+subset of Fabric devices available by default can be accomplished by
 setting the property "manual_configuration_only" in \fB/kernel/drv/fp.conf\fR
 file. When "manual_configuration_only" in \fBfp.conf\fR is set, all Fabric
-devices are not available to Solaris unless an application or an end user had
-previously requested the device be configured into Solaris. The \fBconfigure\fR
-state-change command makes the device available to Solaris. After a successful
+devices are not available unless an application or an end user had
+previously requested the device be configured. The \fBconfigure\fR
+state-change command makes the device available. After a successful
 \fBconfigure\fR operation on a Fabric device, the associated links are added to
 the \fB/dev\fR namespace. The \fBunconfigure\fR state-change command makes a
-device unavailable to Solaris.
+device unavailable.
 .sp
 When a Fibre Channel Fabric device is configured successfully to a host using
 the \fB-c\fR \fBconfigure\fR operation, its physical \fBap_id\fR is stored in a
@@ -508,9 +506,9 @@ These options should not be used for normal \fBconfigure\fR and
 \fBunconfigure\fR operations. See \fBWARNINGS\fR.
 .sp
 When a Fibre Channel device has multiple \fBFCP SCSI LUN\fRs configured and any
-Solaris device associated with its \fBFCP SCSI LUN\fR is in the unusable
+device associated with its \fBFCP SCSI LUN\fR is in the unusable
 condition, the whole Fibre Channel device is reported as unusable. The
-following option with the \fB-c\fR unconfigure command removes only Solaris
+following option with the \fB-c\fR unconfigure command removes only
 devices with the unusable condition for a Fibre Channel device.
 .sp
 .ne 2
@@ -560,7 +558,6 @@ No hardware specific functions are available at present.
 All other options have the same meaning as defined in the \fBcfgadm\fR(8) man
 page.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUnconfiguring a Disk
 .sp
 .LP
@@ -637,10 +634,10 @@ attachment point from the Fabric device repository.
 .sp
 
 .LP
-\fBExample 6 \fRRemoving Offlined Solaris Device Nodes for a Target Device
+\fBExample 6 \fRRemoving Offlined Device Nodes for a Target Device
 .sp
 .LP
-The following command removes offlined Solaris device nodes for a target
+The following command removes offlined device nodes for a target
 device:
 
 .sp
@@ -652,7 +649,6 @@ device:
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/cfgadm/fp.so.1\fR\fR
@@ -671,24 +667,11 @@ Hardware-specific library for Fibre Channel Fabric device node management.
 .RS 4n
 Repository of physical \fBap_id\fRs of Fabric devices currently configured. It
 is used only to reconfigure those Fabric devices at boot time. This repository
-is only used when the "manual_configuration_only" \fB/kernel/drv/fp.conf\fR
-file is set.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/rcS.d/fdevattach\fR\fR
-.ad
-.sp .6
-.RS 4n
-Reconfigures Fabric device(s) of which physical \fBap_id\fR is listed in
-\fB/etc/cfg/fp/fabric_WWN_map\fR on boot time.
+is only used when the "manual_configuration_only" property is set in the
+\fB/kernel/drv/fp.conf\fR file. See \fBfp\fR(4D).
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR svcs (1),
 .BR config_admin (3CFGADM),
 .BR libcfgadm (3LIB),
@@ -698,8 +681,6 @@ Reconfigures Fabric device(s) of which physical \fBap_id\fR is listed in
 .BR cfgadm (8),
 .BR svcadm (8)
 .SH WARNINGS
-.sp
-.LP
 Do not use hardware-specific options for the repository update under normal
 \fBconfigure\fR/\fBunconfigure\fR operations. The hardware-specific options are
 expected to be used when the node creation of a Fabric device fails at boot
@@ -708,8 +689,6 @@ time and the error condition is considered to be permanent. The
 unconditionally removes the attachment point of a failing Fabric device from
 the repository.
 .SH NOTES
-.sp
-.LP
 For devices with unknown or no SCSI device type (for example, a Fibre Channel
 Host Bus Adapter), the \fBconfigure\fR operation might not be applicable.
 .sp
@@ -717,9 +696,9 @@ Host Bus Adapter), the \fBconfigure\fR operation might not be applicable.
 The \fBconfigure\fR and \fBunconfigure\fR commands operate on the Fibre Channel
 device level which is represented by port WWN ap_id. If a Fibre Channel device
 has multiple FCP SCSI LUNs configured, the \fBconfigure\fR command on the
-associated port WWN ap_id results in creating a Solaris device for each \fBFCP
+associated port WWN ap_id results in creating a device for each \fBFCP
 SCSI LUN\fR unless it is specified in the "pwwn-lun-blacklist" property in the
-\fBfp.conf\fR file. The \fBunconfigure\fR command removes all Solaris devices
+\fBfp.conf\fR file. The \fBunconfigure\fR command removes all devices
 associated with the port WWN ap_id. The \fBFCP SCSI LUN\fR level ap_id is not
 valid for the \fBconfigure\fR and \fBunconfigure\fR commands.
 .sp
