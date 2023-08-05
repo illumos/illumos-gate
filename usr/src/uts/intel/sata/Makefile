@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2023 Jason King
 
 
 #
@@ -69,21 +70,7 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 #
 LDFLAGS += -Nmisc/scsi
 
-#
-# For now, disable these warnings; maintainers should endeavor
-# to investigate and remove these for maximum coverage.
-# Please do not carry these forward to new Makefiles.
-#
 CFLAGS		+= $(CCVERBOSE)
-CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-unused-label
-CERRWARN	+= -_gcc=-Wno-unused-function
-CERRWARN	+= -_gcc=-Wno-unused-variable
-CERRWARN	+= $(CNOWARN_UNINIT)
-CERRWARN	+= -_gcc=-Wno-empty-body
-
-# needs work
-SMATCH=off
 
 #
 #	Default build targets.
