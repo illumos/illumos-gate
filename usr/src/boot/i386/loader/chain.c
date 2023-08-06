@@ -70,7 +70,10 @@ command_chain(int argc, char *argv[])
 			close(fd);
 			return (CMD_ERROR);
 		}
-		size = st.st_size;
+		if (size != st.st_size) {
+			command_errmsg = "invalid size";
+			return (CMD_ERROR);
+		}
 	} else if (strncmp(argv[1], "disk", 4) != 0) {
 		command_errmsg = "can only use disk device";
 		close(fd);
@@ -91,8 +94,8 @@ command_chain(int argc, char *argv[])
 	}
 	close(fd);
 
-	if (argv[1][len-1] == ':' &&
-	    *((uint16_t *)PTOV(mem + DOSMAGICOFFSET)) != DOSMAGIC) {
+	/* File or device, we assume MBR or VBR boot code */
+	if (*((uint16_t *)PTOV(mem + DOSMAGICOFFSET)) != DOSMAGIC) {
 		command_errmsg = "wrong magic";
 		return (CMD_ERROR);
 	}
