@@ -27,6 +27,7 @@
  *
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 Oxide Computer Co.
  */
 
 #include <sys/asm_linkage.h>
@@ -267,8 +268,12 @@ kernel_cs_code:
 	pushq	$0		/* null frame pointer terminates stack trace */
 	movq	%rsp, %rbp	/* stack aligned on 16-byte boundary */
 
+	/*
+	 * Get %cr0 into the state we (mostly) want, including turning on the
+	 * caches.
+	 */
 	movq	%cr0, %rax
-	andq    $~(CR0_TS|CR0_EM), %rax	/* clear emulate math chip bit */
+	andq    $~(CR0_CD|CR0_NW|CR0_TS|CR0_EM), %rax
 	orq     $(CR0_MP|CR0_NE), %rax
 	movq    %rax, %cr0		/* set machine status word */
 

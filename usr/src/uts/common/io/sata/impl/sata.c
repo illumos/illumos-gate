@@ -28,6 +28,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Racktop Systems, Inc.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2023 Jason King
  */
 
 /*
@@ -5661,12 +5662,10 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
 	struct buf *bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
-	int extend;
-	uint64_t lba;
-	uint16_t feature, sec_count;
-	int t_len, synch;
-	int rval, reason;
 	kmutex_t *cport_mutex = &(SATA_TXLT_CPORT_MUTEX(spx));
+	uint32_t xfer_len;
+	int extend = 0;
+	int synch, rval, reason;
 
 	mutex_enter(cport_mutex);
 
@@ -5752,58 +5751,57 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 		break;
 	}
 
+	/* Assume LBA28 by default */
+	scmd->satacmd_addr_type = ATA_ADDR_LBA28;
+	scmd->satacmd_lba_low_msb = 0;
+	scmd->satacmd_lba_mid_msb = 0;
+	scmd->satacmd_lba_high_msb = 0;
+
+	scmd->satacmd_features_reg_ext = 0;
+	scmd->satacmd_sec_count_msb = 0;
+
 	/* Parse the ATA cmd fields, transfer some straight to the satacmd */
 	switch ((uint_t)scsipkt->pkt_cdbp[0]) {
 	case SPC3_CMD_ATA_COMMAND_PASS_THROUGH12:
-		feature = scsipkt->pkt_cdbp[3];
+		scmd->satacmd_lba_low_lsb = scsipkt->pkt_cdbp[5];
+		scmd->satacmd_lba_mid_lsb = scsipkt->pkt_cdbp[6];
+		scmd->satacmd_lba_high_lsb = scsipkt->pkt_cdbp[7];
 
-		sec_count = scsipkt->pkt_cdbp[4];
+		scmd->satacmd_features_reg = scsipkt->pkt_cdbp[3];
+		scmd->satacmd_sec_count_lsb = scsipkt->pkt_cdbp[4];
 
-		lba = scsipkt->pkt_cdbp[8] & 0xf;
-		lba = (lba << 8) | scsipkt->pkt_cdbp[7];
-		lba = (lba << 8) | scsipkt->pkt_cdbp[6];
-		lba = (lba << 8) | scsipkt->pkt_cdbp[5];
-
-		scmd->satacmd_device_reg = scsipkt->pkt_cdbp[13] & 0xf0;
+		scmd->satacmd_device_reg = scsipkt->pkt_cdbp[8];
 		scmd->satacmd_cmd_reg = scsipkt->pkt_cdbp[9];
-
 		break;
 
 	case SPC3_CMD_ATA_COMMAND_PASS_THROUGH16:
+		scmd->satacmd_device_reg = scsipkt->pkt_cdbp[13];
+		scmd->satacmd_cmd_reg = scsipkt->pkt_cdbp[14];
+
+		scmd->satacmd_lba_low_lsb = scsipkt->pkt_cdbp[8];
+		scmd->satacmd_lba_mid_lsb = scsipkt->pkt_cdbp[10];
+		scmd->satacmd_lba_high_lsb = scsipkt->pkt_cdbp[12];
+
+		scmd->satacmd_features_reg = scsipkt->pkt_cdbp[4];
+		scmd->satacmd_sec_count_lsb = scsipkt->pkt_cdbp[6];
+
 		if (scsipkt->pkt_cdbp[1] & SATL_APT_BM_EXTEND) {
 			extend = 1;
 
-			feature = scsipkt->pkt_cdbp[3];
-			feature = (feature << 8) | scsipkt->pkt_cdbp[4];
+			scmd->satacmd_addr_type = ATA_ADDR_LBA48;
+			scmd->satacmd_lba_low_msb = scsipkt->pkt_cdbp[7];
+			scmd->satacmd_lba_mid_msb = scsipkt->pkt_cdbp[9];
+			scmd->satacmd_lba_high_msb = scsipkt->pkt_cdbp[11];
 
-			sec_count = scsipkt->pkt_cdbp[5];
-			sec_count = (sec_count << 8) | scsipkt->pkt_cdbp[6];
-
-			lba = scsipkt->pkt_cdbp[11];
-			lba = (lba << 8) | scsipkt->pkt_cdbp[12];
-			lba = (lba << 8) | scsipkt->pkt_cdbp[9];
-			lba = (lba << 8) | scsipkt->pkt_cdbp[10];
-			lba = (lba << 8) | scsipkt->pkt_cdbp[7];
-			lba = (lba << 8) | scsipkt->pkt_cdbp[8];
-
-			scmd->satacmd_device_reg = scsipkt->pkt_cdbp[13];
-			scmd->satacmd_cmd_reg = scsipkt->pkt_cdbp[14];
-		} else {
-			feature = scsipkt->pkt_cdbp[3];
-
-			sec_count = scsipkt->pkt_cdbp[5];
-
-			lba = scsipkt->pkt_cdbp[13] & 0xf;
-			lba = (lba << 8) | scsipkt->pkt_cdbp[12];
-			lba = (lba << 8) | scsipkt->pkt_cdbp[10];
-			lba = (lba << 8) | scsipkt->pkt_cdbp[8];
-
-			scmd->satacmd_device_reg = scsipkt->pkt_cdbp[13] &
-			    0xf0;
-			scmd->satacmd_cmd_reg = scsipkt->pkt_cdbp[14];
+			scmd->satacmd_features_reg_ext = scsipkt->pkt_cdbp[3];
+			scmd->satacmd_sec_count_msb = scsipkt->pkt_cdbp[5];
 		}
-
 		break;
+
+	default:
+		/* No other SCSI ops should ever reach this function */
+		cmn_err(CE_PANIC, "unexpected ATA pass-thru cmd %x",
+		    scsipkt->pkt_cdbp[0]);
 	}
 
 	/* CK_COND bit */
@@ -5823,47 +5821,44 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 		scmd->satacmd_flags.sata_copy_out_error_reg = 1;
 	}
 
-	/* Transfer remaining parsed ATA cmd values to the satacmd */
-	if (extend) {
-		scmd->satacmd_addr_type = ATA_ADDR_LBA48;
-
-		scmd->satacmd_features_reg_ext = (feature >> 8) & 0xff;
-		scmd->satacmd_sec_count_msb = (sec_count >> 8) & 0xff;
-		scmd->satacmd_lba_low_msb = (lba >> 8) & 0xff;
-		scmd->satacmd_lba_mid_msb = (lba >> 8) & 0xff;
-		scmd->satacmd_lba_high_msb = lba >> 40;
-	} else {
-		scmd->satacmd_addr_type = ATA_ADDR_LBA28;
-
-		scmd->satacmd_features_reg_ext = 0;
-		scmd->satacmd_sec_count_msb = 0;
-		scmd->satacmd_lba_low_msb = 0;
-		scmd->satacmd_lba_mid_msb = 0;
-		scmd->satacmd_lba_high_msb = 0;
-	}
-
-	scmd->satacmd_features_reg = feature & 0xff;
-	scmd->satacmd_sec_count_lsb = sec_count & 0xff;
-	scmd->satacmd_lba_low_lsb = lba & 0xff;
-	scmd->satacmd_lba_mid_lsb = (lba >> 8) & 0xff;
-	scmd->satacmd_lba_high_lsb = (lba >> 16) & 0xff;
-
 	/* Determine transfer length */
-	switch (scsipkt->pkt_cdbp[2] & 0x3) {		/* T_LENGTH field */
+	switch (scsipkt->pkt_cdbp[2] & 0x03) {		/* T_LENGTH field */
 	case 1:
-		t_len = feature;
+		/* Length is in the FEATURE field */
+		xfer_len = (uint32_t)scmd->satacmd_features_reg_ext << 8 |
+		    scmd->satacmd_features_reg;
+
+		/* If BYTE_BLOCK is set, above value is in units of blocks */
+		if (((scsipkt->pkt_cdbp[2] >> 2) & 1) == 0)
+			xfer_len *= SATA_DISK_SECTOR_SIZE;
 		break;
 	case 2:
-		t_len = sec_count;
+		/* Length is in the COUNT field */
+		xfer_len = (uint32_t)scmd->satacmd_sec_count_msb << 8 |
+		    scmd->satacmd_sec_count_lsb;
+
+		/* If BYTE_BLOCK is set, above value is in units of blocks */
+		if (((scsipkt->pkt_cdbp[2] >> 2) & 1) == 0)
+			xfer_len *= SATA_DISK_SECTOR_SIZE;
+		break;
+	case 3:
+		/*
+		 * Length is transport specific. The spec is a bit vague on
+		 * this, but it seems like using buf->b_bcount is the most
+		 * reasonable analogue in our situation. b_bcount is in
+		 * units of bytes.
+		 */
+		xfer_len = bp->b_bcount;
 		break;
 	default:
-		t_len = 0;
-		break;
+		xfer_len = 0;
 	}
 
-	/* Adjust transfer length for the Byte Block bit */
-	if ((scsipkt->pkt_cdbp[2] >> 2) & 1)
-		t_len *= SATA_DISK_SECTOR_SIZE;
+	/* Don't allow a transfer larger than what the struct buf supports */
+	if (xfer_len > bp->b_bcount) {
+		mutex_exit(cport_mutex);
+		return (sata_txlt_ata_pass_thru_illegal_cmd(spx));
+	}
 
 	/* Start processing command */
 	if (!(spx->txlt_sata_pkt->satapkt_op_mode & SATA_OPMODE_SYNCH)) {
