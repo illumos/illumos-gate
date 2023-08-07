@@ -556,7 +556,7 @@ dump_tables(void)
 		}
 next_entry:
 		va += pgsize;
-		if (l == 3 && index == 256)	/* VA hole */
+		if (l == 3 && index == 255)	/* VA hole */
 			va = 0xffff800000000000ull;
 recursion:
 		;

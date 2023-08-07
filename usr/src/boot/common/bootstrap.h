@@ -95,8 +95,8 @@ struct bcache_devdata
  */
 struct console
 {
-	const char	*c_name;
-	const char	*c_desc;
+	char		*c_name;
+	char		*c_desc;
 	int		c_flags;
 #define	C_PRESENTIN	(1<<0)		/* console can provide input */
 #define	C_PRESENTOUT	(1<<1)		/* console can provide output */
@@ -120,7 +120,19 @@ struct console
 	void		(*c_devinfo)(struct console *);
 	void		*c_private;	/* private data */
 };
-extern struct console	*consoles[];
+
+/*
+ * Provide either pointer to console device or init function
+ * to add devices to array of console devices.
+ */
+struct console_template {
+	struct console	*ct_dev;
+	void		(*ct_init)(void);
+};
+
+extern struct console_template ct_list[];
+extern struct console **consoles;
+uint_t	cons_array_size(void);
 int	cons_inputdev(void);
 void	cons_probe(void);
 void	cons_mode(int);

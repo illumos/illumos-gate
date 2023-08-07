@@ -46,6 +46,7 @@
 #define	COMSPEED	9600
 #endif
 
+#define	COM_NPORTS	4
 #define	COM1_IOADDR	0x3f8
 #define	COM2_IOADDR	0x2f8
 #define	COM3_IOADDR	0x3e8
@@ -91,71 +92,124 @@ static int	comc_cd_set(struct env_var *, int, const void *);
 static int	comc_rtsdtr_set(struct env_var *, int, const void *);
 static void	comc_devinfo(struct console *);
 
-struct console ttya = {
-	.c_name = "ttya",
-	.c_desc = "serial port a",
-	.c_flags = 0,
-	.c_probe = comc_probe,
-	.c_init = comc_init,
-	.c_out = comc_putchar,
-	.c_in = comc_getchar,
-	.c_ready = comc_ischar,
-	.c_ioctl = comc_ioctl,
-	.c_devinfo = comc_devinfo,
-	.c_private = NULL
-};
-
-struct console ttyb = {
-	.c_name = "ttyb",
-	.c_desc = "serial port b",
-	.c_flags = 0,
-	.c_probe = comc_probe,
-	.c_init = comc_init,
-	.c_out = comc_putchar,
-	.c_in = comc_getchar,
-	.c_ready = comc_ischar,
-	.c_ioctl = comc_ioctl,
-	.c_devinfo = comc_devinfo,
-	.c_private = NULL
-};
-
-struct console ttyc = {
-	.c_name = "ttyc",
-	.c_desc = "serial port c",
-	.c_flags = 0,
-	.c_probe = comc_probe,
-	.c_init = comc_init,
-	.c_out = comc_putchar,
-	.c_in = comc_getchar,
-	.c_ready = comc_ischar,
-	.c_ioctl = comc_ioctl,
-	.c_devinfo = comc_devinfo,
-	.c_private = NULL
-};
-
-struct console ttyd = {
-	.c_name = "ttyd",
-	.c_desc = "serial port d",
-	.c_flags = 0,
-	.c_probe = comc_probe,
-	.c_init = comc_init,
-	.c_out = comc_putchar,
-	.c_in = comc_getchar,
-	.c_ready = comc_ischar,
-	.c_ioctl = comc_ioctl,
-	.c_devinfo = comc_devinfo,
-	.c_private = NULL
-};
-
 static void
 comc_devinfo(struct console *cp)
 {
 	struct serial *port = cp->c_private;
 
-	if (cp->c_flags != 0)
-		printf("\tport %#x", port->ioaddr);
-	else
-		printf("\tdevice is not present");
+	printf("\tport %#x", port->ioaddr);
+}
+
+static bool
+comc_port_is_present(int ioaddr)
+{
+	/*
+	 * Write byte to scratch register and read it out.
+	 */
+#define	COMC_TEST	0xbb
+	outb(ioaddr + com_scr, COMC_TEST);
+	return (inb(ioaddr + com_scr) == COMC_TEST);
+}
+
+/*
+ * Set up list of possible serial consoles.
+ * This function is run very early, so we do not expect to
+ * run out of memory, and on error, we can not print output.
+ */
+void
+comc_ini(void)
+{
+	uint_t n = 0, c;
+	bool ports[COM_NPORTS];
+	struct console **tmp;
+	struct console *tty;
+	struct serial *port;
+
+	/*
+	 * Test the presence of 4 serial devices com1-com4
+	 */
+	ports[0] = comc_port_is_present(COM1_IOADDR);
+	ports[1] = comc_port_is_present(COM2_IOADDR);
+	ports[2] = comc_port_is_present(COM3_IOADDR);
+	ports[3] = comc_port_is_present(COM4_IOADDR);
+
+	for (uint_t i = 0; i < COM_NPORTS; i++)
+		if (ports[i])
+			n++;
+
+	if (n == 0)	/* there are no serial ports */
+		return;
+
+	c = cons_array_size();
+	if (c == 0)
+		n++;	/* For NULL pointer */
+
+	tmp = realloc(consoles, (c + n) * sizeof (*consoles));
+	if (tmp == NULL)
+		return;
+	consoles = tmp;
+	if (c > 0)
+		c--;
+
+	for (uint_t i = 0; i < COM_NPORTS; i++) {
+		if (!ports[i])
+			continue;
+		tty = malloc(sizeof (*tty));
+		if (tty == NULL) {
+			/* Out of memory?! can not continue */
+			consoles[c] = tty;
+			return;
+		}
+		if (asprintf(&tty->c_name, "tty%c", 'a' + i) < 0) {
+			free(tty);
+			consoles[c] = NULL;
+			return;
+		}
+		if (asprintf(&tty->c_desc, "serial port %c", 'a' + i) < 0) {
+			free(tty->c_name);
+			free(tty);
+			consoles[c] = NULL;
+			return;
+		}
+		tty->c_flags = 0;
+		tty->c_probe = comc_probe;
+		tty->c_init = comc_init;
+		tty->c_out = comc_putchar;
+		tty->c_in = comc_getchar;
+		tty->c_ready = comc_ischar;
+		tty->c_ioctl = comc_ioctl;
+		tty->c_devinfo = comc_devinfo;
+		port = malloc(sizeof (*port));
+		if (port == NULL) {
+			free(tty->c_name);
+			free(tty->c_desc);
+			free(tty);
+			consoles[c] = NULL;
+			return;
+		}
+		port->speed = 0;	/* Leave this for comc_probe */
+		switch (i) {
+		case 0:
+			port->ioaddr = COM1_IOADDR;
+			break;
+		case 1:
+			port->ioaddr = COM2_IOADDR;
+			break;
+		case 2:
+			port->ioaddr = COM3_IOADDR;
+			break;
+		case 3:
+			port->ioaddr = COM4_IOADDR;
+			break;
+		}
+		port->lcr = BITS8;	/* 8,n,1 */
+		port->ignore_cd = 1;	/* ignore cd */
+		port->rtsdtr_off = 0;	/* rts-dtr is on */
+
+		tty->c_private = port;
+		consoles[c++] = tty;
+	}
+	consoles[c] = NULL;
 }
 
 static void
@@ -166,25 +220,11 @@ comc_probe(struct console *cp)
 	char value[20];
 	char *env;
 
-	if (cp->c_private != NULL)
+	port = cp->c_private;
+	if (port->speed != 0)
 		return;
 
-	cp->c_private = malloc(sizeof (struct serial));
-	port = cp->c_private;
 	port->speed = COMSPEED;
-
-	if (strcmp(cp->c_name, "ttya") == 0)
-		port->ioaddr = COM1_IOADDR;
-	else if (strcmp(cp->c_name, "ttyb") == 0)
-		port->ioaddr = COM2_IOADDR;
-	else if (strcmp(cp->c_name, "ttyc") == 0)
-		port->ioaddr = COM3_IOADDR;
-	else if (strcmp(cp->c_name, "ttyd") == 0)
-		port->ioaddr = COM4_IOADDR;
-
-	port->lcr = BITS8;	/* 8,n,1 */
-	port->ignore_cd = 1;	/* ignore cd */
-	port->rtsdtr_off = 0;	/* rts-dtr is on */
 
 	/*
 	 * Assume that the speed was set by an earlier boot loader if
@@ -193,7 +233,6 @@ comc_probe(struct console *cp)
 	snprintf(name, sizeof (name), "%s-mode", cp->c_name);
 	env = getenv(name);
 	if (env != NULL) {
-		/* (void) comc_parse_mode(port, env);*/
 		port->speed = comc_getspeed(port->ioaddr);
 	}
 	env = comc_asprint_mode(port);
@@ -395,23 +434,27 @@ comc_parse_mode(struct serial *sp, const char *value)
 }
 
 static struct console *
-get_console(char *name)
+get_console(const char *name)
 {
-	struct console *cp = NULL;
+	char port[5];
 
-	switch (name[3]) {
-	case 'a': cp = &ttya;
-		break;
-	case 'b': cp = &ttyb;
-		break;
-	case 'c': cp = &ttyc;
-		break;
-	case 'd': cp = &ttyd;
-		break;
+	(void) strlcpy(port, name, sizeof (port));
+	for (uint_t i = 0; consoles[i] != NULL; i++) {
+		if (strcmp(port, consoles[i]->c_name) == 0)
+			return (consoles[i]);
 	}
-	return (cp);
+
+	printf("No such port: %s\n", port);
+	return (NULL);
 }
 
+/*
+ * CMD_ERROR will cause set/setenv/setprop command to fail,
+ * when used in loader scripts (forth), this will cause processing
+ * of boot scripts to fail, rendering bootloading impossible.
+ * To prevent such unfortunate situation, we return CMD_OK when
+ * there is no such port, or there is invalid value in mode line.
+ */
 static int
 comc_mode_set(struct env_var *ev, int flags, const void *value)
 {
@@ -422,13 +465,16 @@ comc_mode_set(struct env_var *ev, int flags, const void *value)
 		return (CMD_ERROR);
 
 	if ((cp = get_console(ev->ev_name)) == NULL)
-		return (CMD_ERROR);
+		return (CMD_OK);
 
 	/* Do not override serial setup from SPCR */
 	snprintf(name, sizeof (name), "%s-spcr-mode", cp->c_name);
 	if (getenv(name) == NULL) {
-		if (comc_parse_mode(cp->c_private, value) == CMD_ERROR)
-			return (CMD_ERROR);
+		if (comc_parse_mode(cp->c_private, value) == CMD_ERROR) {
+			printf("%s: invalid mode: %s\n", ev->ev_name,
+			    (char *)value);
+			return (CMD_OK);
+		}
 		(void) comc_setup(cp);
 		env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 	}
@@ -436,6 +482,13 @@ comc_mode_set(struct env_var *ev, int flags, const void *value)
 	return (CMD_OK);
 }
 
+/*
+ * CMD_ERROR will cause set/setenv/setprop command to fail,
+ * when used in loader scripts (forth), this will cause processing
+ * of boot scripts to fail, rendering bootloading impossible.
+ * To prevent such unfortunate situation, we return CMD_OK when
+ * there is no such port or invalid value was used.
+ */
 static int
 comc_cd_set(struct env_var *ev, int flags, const void *value)
 {
@@ -446,15 +499,18 @@ comc_cd_set(struct env_var *ev, int flags, const void *value)
 		return (CMD_ERROR);
 
 	if ((cp = get_console(ev->ev_name)) == NULL)
-		return (CMD_ERROR);
+		return (CMD_OK);
 
 	sp = cp->c_private;
-	if (strcmp(value, "true") == 0)
+	if (strcmp(value, "true") == 0) {
 		sp->ignore_cd = 1;
-	else if (strcmp(value, "false") == 0)
+	} else if (strcmp(value, "false") == 0) {
 		sp->ignore_cd = 0;
-	else
+	} else {
+		printf("%s: invalid value: %s\n", ev->ev_name,
+		    (char *)value);
 		return (CMD_ERROR);
+	}
 
 	(void) comc_setup(cp);
 
@@ -463,6 +519,13 @@ comc_cd_set(struct env_var *ev, int flags, const void *value)
 	return (CMD_OK);
 }
 
+/*
+ * CMD_ERROR will cause set/setenv/setprop command to fail,
+ * when used in loader scripts (forth), this will cause processing
+ * of boot scripts to fail, rendering bootloading impossible.
+ * To prevent such unfortunate situation, we return CMD_OK when
+ * there is no such port, or invalid value was used.
+ */
 static int
 comc_rtsdtr_set(struct env_var *ev, int flags, const void *value)
 {
@@ -473,15 +536,18 @@ comc_rtsdtr_set(struct env_var *ev, int flags, const void *value)
 		return (CMD_ERROR);
 
 	if ((cp = get_console(ev->ev_name)) == NULL)
-		return (CMD_ERROR);
+		return (CMD_OK);
 
 	sp = cp->c_private;
-	if (strcmp(value, "true") == 0)
+	if (strcmp(value, "true") == 0) {
 		sp->rtsdtr_off = 1;
-	else if (strcmp(value, "false") == 0)
+	} else if (strcmp(value, "false") == 0) {
 		sp->rtsdtr_off = 0;
-	else
+	} else {
+		printf("%s: invalid value: %s\n", ev->ev_name,
+		    (char *)value);
 		return (CMD_ERROR);
+	}
 
 	(void) comc_setup(cp);
 
@@ -604,14 +670,6 @@ comc_setup(struct console *cp)
 	struct serial *sp = cp->c_private;
 	static int TRY_COUNT = 1000000;
 	int tries;
-
-#define	COMC_TEST	0xbb
-	/*
-	 * Write byte to scratch register and read it out.
-	 */
-	outb(sp->ioaddr + com_scr, COMC_TEST);
-	if (inb(sp->ioaddr + com_scr) != COMC_TEST)
-		return (false);
 
 	outb(sp->ioaddr + com_cfcr, CFCR_DLAB | sp->lcr);
 	outb(sp->ioaddr + com_dlbl, COMC_BPS(sp->speed) & 0xff);

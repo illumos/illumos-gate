@@ -112,23 +112,19 @@ struct file_format *file_formats[] = {
  * data structures from bootstrap.h as well.
  */
 extern struct console text;
-extern struct console ttya;
-extern struct console ttyb;
-extern struct console ttyc;
-extern struct console ttyd;
 extern struct console nullconsole;
 extern struct console spinconsole;
+extern void comc_ini(void);
 
-struct console *consoles[] = {
-	&text,
-	&ttya,
-	&ttyb,
-	&ttyc,
-	&ttyd,
-	&nullconsole,
-	&spinconsole,
-	NULL
+struct console_template ct_list[] = {
+	[0] = { .ct_dev = &text, .ct_init = NULL },
+	[1] = { .ct_dev = NULL, .ct_init = comc_ini },
+	[2] = { .ct_dev = &nullconsole, .ct_init = NULL },
+	[3] = { .ct_dev = &spinconsole, .ct_init = NULL },
+	[4] = { .ct_dev = NULL, .ct_init = NULL },
 };
+
+struct console **consoles;
 
 extern struct pnphandler isapnphandler;
 extern struct pnphandler biospnphandler;

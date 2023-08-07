@@ -73,6 +73,41 @@ cons_inputdev(void)
 }
 
 /*
+ * Return number of array slots.
+ */
+uint_t
+cons_array_size(void)
+{
+	uint_t n;
+
+	if (consoles == NULL)
+		return (0);
+
+	for (n = 0; consoles[n] != NULL; n++)
+		;
+	return (n + 1);
+}
+
+static void
+cons_add_dev(struct console *dev)
+{
+	uint_t c = cons_array_size();
+	uint_t n = 1;
+	struct console **tmp;
+
+	if (c == 0)
+		n++;
+	tmp = realloc(consoles, (c + n) * sizeof (struct console *));
+	if (tmp == NULL)
+		return;
+	if (c > 0)
+		c--;
+	consoles = tmp;
+	consoles[c] = dev;
+	consoles[c + 1] = NULL;
+}
+
+/*
  * Detect possible console(s) to use.  If preferred console(s) have been
  * specified, mark them as active. Else, mark the first probed console
  * as active.  Also create the console variable.
@@ -83,6 +118,20 @@ cons_probe(void)
 	int	cons;
 	int	active;
 	char	*prefconsole, *list, *console;
+
+	/* Build list of consoles */
+	consoles = NULL;
+	for (cons = 0;; cons++) {
+		if (ct_list[cons].ct_dev != NULL) {
+			cons_add_dev(ct_list[cons].ct_dev);
+			continue;
+		}
+		if (ct_list[cons].ct_init != NULL) {
+			ct_list[cons].ct_init();
+			continue;
+		}
+		break;
+	}
 
 	/* We want a callback to install the new value when this var changes. */
 	env_setenv("twiddle_divisor", EV_VOLATILE, "1", twiddle_set,

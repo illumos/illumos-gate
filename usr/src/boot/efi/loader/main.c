@@ -625,10 +625,6 @@ uefi_serial_console(void)
 	uint_t i, nhandles;
 	unsigned long uid, lowest;
 	char *env, *ep;
-	extern struct console ttya;
-	extern struct console ttyb;
-	extern struct console ttyc;
-	extern struct console ttyd;
 
 	env = getenv("efi_8250_uid");
 	if (env == NULL)
@@ -641,7 +637,7 @@ uefi_serial_console(void)
 
 	/* if uid is 0, this is first serial port */
 	if (uid == 0)
-		return (ttya.c_name);
+		return ("ttya");
 
 	status = efi_get_protocol_handles(&serialio, &nhandles, &handles);
 	if (EFI_ERROR(status)) {
@@ -661,13 +657,13 @@ uefi_serial_console(void)
 	free(handles);
 	switch (uid - lowest) {
 	case 0:
-		return (ttya.c_name);
+		return ("ttya");
 	case 1:
-		return (ttyb.c_name);
+		return ("ttyb");
 	case 2:
-		return (ttyc.c_name);
+		return ("ttyc");
 	case 3:
-		return (ttyd.c_name);
+		return ("ttyd");
 	}
 	return (NULL);
 }

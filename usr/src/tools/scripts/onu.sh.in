@@ -123,7 +123,7 @@ update()
 
 	prepare_image
 
-	do_cmd pkg -R $root image-update
+	do_cmd pkg -R $root image-update $update_args
 }
 
 update_zone()
@@ -179,6 +179,7 @@ verbose=0
 no_zones=0
 zone_warned=0
 reposonly=0
+update_args=""
 
 while getopts :c:d:Ors:t:U:u:vZ i ; do
 	case $i in
@@ -217,7 +218,10 @@ while getopts :c:d:Ors:t:U:u:vZ i ; do
 done
 shift `expr $OPTIND - 1`
 
-[ -n "$1" ] && usage
+# Pass remaining arguments to pkg update.
+if [ -n "$1" ]; then
+	update_args="$*"
+fi
 
 if [ "$reposonly" -eq 1 ]; then
 	[ -n "$sourcebe" ] && usage
