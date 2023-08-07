@@ -1,13 +1,13 @@
 '\" te
+.\" Copyright 2023 Peter Tribble
 .\" Copyright 2003 (c), Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_SBD 8 "Oct 13, 2003"
+.TH CFGADM_SBD 8 "August 2, 2023"
 .SH NAME
 cfgadm_sbd \- \fBcfgadm\fR commands for system board administration
 .SH SYNOPSIS
-.LP
 .nf
 \fBcfgadm \fR \fB-l\fR [\fB-a\fR] [\fB-o\fR parsable] \fI ap_id\fR...
 .fi
@@ -15,7 +15,7 @@ cfgadm_sbd \- \fBcfgadm\fR commands for system board administration
 .LP
 .nf
 \fBcfgadm \fR \fB-c \fR \fIfunction\fR [\fB-f\fR] [\fB-y\fR | \fB-n\fR]
-     [\fB-o\fR unassign | nopoweroff] [\fB-v\fR] \fI ap_id\fR...
+     [\fB-o\fR nopoweroff] [\fB-v\fR] \fI ap_id\fR...
 .fi
 
 .LP
@@ -29,8 +29,6 @@ cfgadm_sbd \- \fBcfgadm\fR commands for system board administration
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBcfgadm_sbd\fR plugin provides dynamic reconfiguration functionality for
 connecting, configuring, unconfiguring, and disconnecting class \fBsbd\fR
 system boards. It also enables you to connect or disconnect a system board from
@@ -38,7 +36,7 @@ a running system without having to reboot the system.
 .sp
 .LP
 The \fBcfgadm\fR command resides in \fB/usr/sbin\fR. See \fBcfgadm\fR(8). The
-\fBcfgadm_sbd\fR plugin resides \fB/usr/platform/sun4u/lib/cfgadm\fR.
+\fBcfgadm_sbd\fR plugin resides in \fB/usr/platform/${arch}/lib/cfgadm\fR.
 .sp
 .LP
 Each board slot appears as a single attachment point in the device tree. Each
@@ -49,10 +47,8 @@ slot by using the \fB-a\fR option.
 .LP
 The \fBcfgadm\fR options perform differently depending on the platform.
 Additionally, the form of the attachment points is different depending on the
-platform. See the \fBPlatform Notes\fR section for more information.
+platform.
 .SS "Component Conditions"
-.sp
-.LP
 The following are the names and descriptions of the component conditions:
 .sp
 .ne 2
@@ -82,8 +78,6 @@ The component has not been tested.
 .RE
 
 .SS "Component States"
-.sp
-.LP
 The following is the name and description of the receptacle state for
 components:
 .sp
@@ -105,7 +99,7 @@ components:
 \fBconfigured\fR
 .ad
 .RS 16n
-The component is available for use by the Solaris operating environment.
+The component is available for use by the operating system.
 .RE
 
 .sp
@@ -114,12 +108,10 @@ The component is available for use by the Solaris operating environment.
 \fBunconfigured\fR
 .ad
 .RS 16n
-The component is not available for use by the Solaris operating environment.
+The component is not available for use by the operating system.
 .RE
 
 .SS "Board Conditions"
-.sp
-.LP
 The following are the names and descriptions of the board conditions.
 .sp
 .ne 2
@@ -158,8 +150,6 @@ The board slot is unusable.
 .RE
 
 .SS "Board States"
-.sp
-.LP
 Inserting a board changes the receptacle state from empty to disconnected.
 Removing a board changes the receptacle state from disconnected to empty.
 .sp
@@ -224,38 +214,7 @@ At least one component on the board is configured.
 All of the components on the board are unconfigured.
 .RE
 
-.SS "Dynamic System Domains"
-.sp
-.LP
-Platforms based on dynamic system domains (DSDs, referred to as domains in this
-document) divide the slots in the chassis into electrically isolated hardware
-partitions (that is, DSDs). Platforms that are not based on DSDs assign all
-slots to the system permanently.
-.sp
-.LP
-A slot can be empty or populated, and it can be assigned or available to any
-number of domains. The number of slots available to a given domain is
-controlled by an available component list (\fBACL\fR) that is maintained on the
-system controller. The \fBACL\fR is not the access control list provided by the
-Solaris operating environment.
-.sp
-.LP
-A slot is visible to a domain only if the slot is in the domain's \fBACL\fR and
-if it is not assigned to another domain. An unassigned slot is visible to all
-domains that have the slot in their \fBACL\fR. After a slot has been assigned
-to a domain, the slot is no longer visible to any other domain.
-.sp
-.LP
-A slot that is visible to a domain, but not assigned, must first be assigned to
-the domain before any other state changing commands are applied. The assign can
-be done explicitly using \fB\fR\fB-x\fR\fB assign\fR or implicitly as part of a
-connect. A slot must be unassigned from a domain before it can be used by
-another domain. The unassign is always explicit, either directly using
-\fB\fR\fB-x\fR\fB unassign\fR or as an option to disconnect using
-\fB\fR\fB-o\fR\fB unassign\fR.
 .SS "State Change Functions"
-.sp
-.LP
 Functions that change the state of a board slot or a component on the board can
 be issued concurrently against any attachment point. Only one state changing
 operation is permitted at a given time. A \fBY\fR in the Busy field in the
@@ -287,32 +246,7 @@ connect
 .el o
 disconnect
 .RE
-.SS "Availability Change Functions"
-.sp
-.LP
-Commands that change the availability of a board can be issued concurrently
-against any attachment point. Only one availability change operation is
-permitted at a given time. These functions also change the information string
-in the \fBcfgadm\fR \fB-l\fR output. A \fBY\fR in the Busy field indicates that
-an operation is in progress.
-.sp
-.LP
-The following list contains the functions that change the availability:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBassign\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBunassign\fR
-.RE
 .SS "Condition Change Functions"
-.sp
-.LP
 Functions that change the condition of a board slot or a component on the board
 can be issued concurrently against any attachment point. Only one condition
 change operation is permitted at a given time. These functions also change the
@@ -340,15 +274,13 @@ The following list contains the functions that change the condition:
 \fBtest\fR
 .RE
 .SS "Unconfigure Process"
-.sp
-.LP
 This section contains a description of the unconfigure process, and illustrates
 the states of source and target boards at different stages during the process
 of moving permanent memory.
 .sp
 .LP
 In the following code examples, the permanent memory on board 0 must be moved
-to another board in the domain. Thus, board 0 is the source, and board 1 is the
+to another board. Thus, board 0 is the source, and board 1 is the
 target.
 .sp
 .LP
@@ -448,8 +380,6 @@ The permanent memory has been moved, and the memory on board 0 has been
 unconfigured. At this point, you can initiate a new state changing operation on
 either board.
 .SS "Platform-Specific Options"
-.sp
-.LP
 You can specify platform-specific options that follow the options interpreted
 by the system board plugin. All platform-specific options must be preceded by
 the \fBplatform\fR keyword. The following example contains the general format
@@ -458,8 +388,6 @@ of a command with platform-specific options:
 .LP
 \fB\fIcommand\fR -o \fIsbd_options\fR,platform=\fIplatform_options\fR\fR
 .SH OPTIONS
-.sp
-.LP
 This man page does not include the \fB-v\fR, \fB-a\fR, \fB-s\fR, or \fB-h\fR
 options for the \fBcfgadm\fR command. See \fBcfgadm\fR(8) for descriptions of
 those options. The following options are supported by the \fBcfgadm_sbd\fR
@@ -519,16 +447,8 @@ If the occupant state is configured, the \fBdisconnect\fR function attempts to
 unconfigure the occupant. It then powers off the system board. At this point,
 the board can be removed from the slot.
 .sp
-This function leaves the board in the assigned state on platforms that support
-dynamic system domains.
-.sp
 If you specify \fB-o nopoweroff\fR, the \fBdisconnect\fR function leaves the
-board powered on. If you specify \fB-o unassign\fR, the \fBdisconnect\fR
-function unassigns the board from the domain.
-.sp
-If you unassign a board from a domain, you can assign it to another domain.
-However, if it is assigned to another domain, it is not available to the domain
-from which is was unassigned.
+board powered on.
 .RE
 
 .sp
@@ -565,17 +485,9 @@ before the devices can be used. See \fBifconfig\fR(8) and \fBmount\fR(8).
 Changes the receptacle state to connected. This function applies only to system
 board slots.
 .sp
-If the board slot is not assigned to the domain, the \fBconnect\fR function
-attempts to assign the slot to the domain. Next, it powers on and tests the
-board, then it connects the board electronically to the system bus and probes
-the components.
-.sp
 After the \fBconnect\fR function is completed successfully, you can use the
 \fB-a\fR option to view the status of the components on the board. The
 \fBconnect\fR function leaves all of the components in the unconfigured state.
-.sp
-The assignment step applies only to platforms that support dynamic system
-domains.
 .RE
 
 .RE
@@ -772,17 +684,8 @@ The I/O component is referenced.
 \fBboard\fR
 .ad
 .RS 10n
-The \fBboard\fR type displays the following boolean names. If they are not
+The \fBboard\fR type displays the following boolean name. If it are not
 present, then the opposite applies.
-.sp
-.ne 2
-.na
-\fBassigned\fR
-.ad
-.RS 14n
-The board is assigned to the domain.
-.RE
-
 .sp
 .ne 2
 .na
@@ -840,30 +743,6 @@ Performs an sbd-class function. You can use the following functions:
 .sp
 .ne 2
 .na
-\fBassign\fR
-.ad
-.RS 12n
-Assigns a board to a domain.
-.sp
-The receptacle state must be disconnected or empty. The board must also be
-listed in the domain available component list. See Dynamic System Domains.
-.RE
-
-.sp
-.ne 2
-.na
-\fBunassign\fR
-.ad
-.RS 12n
-Unassigns a board from a domain.
-.sp
-The receptacle state must be disconnected or empty. The board must also be
-listed in the domain available component list. See Dynamic System Domains.
-.RE
-
-.sp
-.ne 2
-.na
 \fBpoweron\fR
 .ad
 .RS 12n
@@ -886,8 +765,6 @@ The receptacle state must be disconnected.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -895,13 +772,8 @@ The following operands are supported:
 \fBReceptacle \fIap_id\fR\fR
 .ad
 .RS 20n
-For the Sun Fire high-end systems such as the Sun Fire 15K , the receptacle
-attachment point \fBID\fR takes the form \fBSB\fIX\fR\fR or \fBIO\fIX\fR\fR,
-where \fIX\fR equals the slot number.
-.sp
 The exact format depends on the platform and typically corresponds to the
-physical labelling on the machine. See the platform specific information in the
-\fBNOTES\fR section.
+physical labelling on the machine.
 .RE
 
 .sp
@@ -915,18 +787,14 @@ where \fIcomponent_type\fR equals one of the component types described in
 "Component Types" and \fIX\fR equals the component number. The component number
 is a board-relative unit number.
 .sp
-The above convention does not apply to memory compontents. Any DR action on a
+The above convention does not apply to memory components. Any DR action on a
 memory attachment point affects all of the memory on the system board.
 .RE
 
 .SH EXAMPLES
-.sp
-.LP
-The following examples show user input and system output on a Sun Fire 15K
-system. User input, specifically references to attachment points and system
-output might differ on other Sun Fire systems, such as the Sun Fire midrange
-systems such as the 6800. Refer to the Platform Notes for specific information
-about using the \fBcfgadm_sbd\fR plugin on non-Sun Fire high-end models.
+The following examples show sample user input and system output.
+User input, specifically references to attachment points, and system
+output will differ between systems.
 .LP
 \fBExample 1 \fRListing All of the System Board
 .sp
@@ -1037,29 +905,7 @@ address=0x1000000 size=2097152 source=SB0::memory
 .in -2
 .sp
 
-.LP
-\fBExample 7 \fRAssigning a Slot to a Domain
-.sp
-.in +2
-.nf
-# \fBcfgadm -x assign SB2\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 8 \fRUnassigning a Slot from a Domain
-.sp
-.in +2
-.nf
-# \fBcfgadm -x unassign SB3\fR
-.fi
-.in -2
-.sp
-
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for a description of the following attribute:
 .sp
 
@@ -1077,8 +923,6 @@ Stability	See below.
 .LP
 The interface stability is evolving. The output stability is unstable.
 .SH SEE ALSO
-.sp
-.LP
 .BR config_admin (3CFGADM),
 .BR attributes (7),
 .BR cfgadm (8),
@@ -1089,13 +933,9 @@ The interface stability is evolving. The output stability is unstable.
 .BR psradm (8),
 .BR psrinfo (8)
 .SH NOTES
-.sp
-.LP
 This section contains information on how to monitor the progress of a memory
-delete operation. It also contains platform specific information.
+delete operation.
 .SS "Memory Delete Monitoring"
-.sp
-.LP
 The following shell script can be used to monitor the progress of a memory
 delete operation.
 .sp
@@ -1143,188 +983,3 @@ exit 0
 .fi
 .in -2
 .sp
-
-.SS "Sun Enterprise 10000 Platform Notes"
-.sp
-.LP
-The following syntax is used to refer to Platform Notes attachment points on
-the Sun Enterprise 10000 system:
-.sp
-.in +2
-.nf
-\fIboard\fR::\fIcomponent\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
- where \fIboard\fR refers to the system board; and \fIcomponent\fR refers to
-the individual component. System boards can range from \fBSB0\fR (zero) to
-\fBSB15\fR. A maximum of sixteen system boards are available.
-.sp
-.LP
-The DR 3.0 model running on a Sun Enterprise 10000 domain supports a limited
-subset of the functionality provided by the \fBcfgadm_sbd\fR plugin. The only
-supported operation is to view the status of attachment points in the domain.
-This corresponds to the \fB-l\fR option and all of its associated options.
-.sp
-.LP
-Attempting to perform any other operation from the domain will result in an
-error that states that the operation is not supported. All operations to add or
-remove a system board must be initiated from the System Service Processor.
-.SS "Sun Fire High-End System Platform Notes"
-.sp
-.LP
-The following syntax is used to refer to attachment points on the Sun Fire
-high-end systems:
-.sp
-.in +2
-.nf
-\fIboard\fR::\fIcomponent\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-where \fIboard\fR refers to the system board or I/O board; and \fIcomponent\fR
-refers to the individual component.
-.sp
-.LP
-Depending on the system's configuration, system boards can range from \fBSB0\fR
-(zero) through \fBSB17\fR, and I/O boards can range from \fBIO0\fR (IO zero)
-through \fBIO17\fR. (A maximum of eighteen system and I/O boards are
-available).
-.sp
-.LP
-The \fB-t\fR and \fB-x\fR options behave differently on the Sun Fire high-end
-system platforms. The following list describes their behavior:
-.sp
-.ne 2
-.na
-\fB\fB-t\fR\fR
-.ad
-.RS 24n
-The system controller uses a CPU to test system boards by running \fBLPOST\fR,
-sequenced by the \fBhpost\fR command. To test I/O boards, the driver starts the
-testing in response to the \fB-t\fR option, and the test runs automatically
-without user intervention. The driver unconfigures a CPU and a stretch of
-contiguous physical memory. Then, it sends a command to the system controller
-to test the board. The system controller uses the CPU and memory to test the
-I/O board from inside of a transaction/error cage. You can only use CPUs from
-system boards (not MCPU boards) to test I/O boards.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-x\fR \fBassign | unassign\fR\fR
-.ad
-.RS 24n
-In the Sun Fire high-end system  administration model, the platform
-administrator controls the platform hardware through the use of an available
-component list for each domain. This information is maintained on the system
-controller. Only the platform administrator can modify the available component
-list for a domain.
-.sp
-The domain administrator is only allowed to assign or unassign a board if it is
-in the available component list for that domain. The platform administrator
-does not have this restriction, and can assign or unassign a board even if it
-is not in the available component list for a domain.
-.RE
-
-.SS "Sun Fire 15K Component Types"
-.sp
-.LP
-The following are the names and descriptions of the component types:
-.sp
-.ne 2
-.na
-\fB\fBcpu\fR\fR
-.ad
-.RS 10n
-\fBCPU\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBio\fR\fR
-.ad
-.RS 10n
-\fBI/O\fR device
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBmemory\fR\fR
-.ad
-.RS 10n
-Memory
-.RE
-
-.sp
-.LP
-\fBNote:\fR An operation on a memory component affects all of the memory
-components on the board.
-.SS "Sun Fire Midrange Systems Platform Notes"
-.sp
-.LP
-References to attachment points are slightly different on Sun Fire midrange
-servers such as the 6800, 4810, 4800, and 3800 systems than on the Sun Fire
-high-end systems. The following syntax is used to refer to attachment points on
-Sun Fire systems other than the Sun Fire 15K:
-.sp
-.in +2
-.nf
-N#.\fIboard\fR::\fIcomponent\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-where \fBN#\fR refers to the node; \fIboard\fR refers to the system board or
-I/O board; and \fIcomponent\fR refers to the individual component.
-.sp
-.LP
-Depending on the system's configuration, system boards can range from \fBSB0\fR
-through \fBSB5\fR, and I/O boards can range from \fBIB6\fR through \fBIB9\fR.
-(A maximum of six system and four I/O boards are available).
-.SS "Sun Fire Midrange System Component Types"
-.sp
-.LP
-The following are the names and descriptions of the component types:
-.sp
-.ne 2
-.na
-\fB\fBcpu\fR\fR
-.ad
-.RS 10n
-\fBCPU\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpci\fR\fR
-.ad
-.RS 10n
-\fBI/O\fR device
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBmemory\fR\fR
-.ad
-.RS 10n
-Memory
-.RE
-
-.sp
-.LP
-\fBNote:\fR An operation on a memory component affects all of the memory
-components on the board.

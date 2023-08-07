@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM 8 "September 12, 2020"
+.TH CFGADM 8 "August 2, 2023"
 .SH NAME
 cfgadm \- configuration administration
 .SH SYNOPSIS
@@ -43,12 +43,14 @@ configuration state changes, (\fB-c\fR), invoking hardware specific functions,
 (\fB-x\fR), and obtaining configuration administration help messages
 (\fB-h\fR). Configuration administration is performed at \fBattachment
 points\fR, which are places where system software supports dynamic
-reconfiguration of hardware resources during continued operation of Solaris.
+reconfiguration of hardware resources during continued operation of the
+operating system.
 .sp
 .LP
 Configuration administration makes a distinction between hardware resources
 that are physically present in the machine and hardware resources that are
-configured and visible to Solaris. The nature of configuration administration
+configured and visible to the operating system.
+The nature of configuration administration
 functions are hardware specific, and are performed by calling hardware specific
 libraries.
 .sp
@@ -91,12 +93,13 @@ operations.
 .sp
 .LP
 The hardware resources contained on an occupant in the \fBunconfigured\fR state
-are not represented by normal Solaris data structures and are thus not
-available for use by Solaris. Operations allowed on an unconfigured occupant
+are not represented by normal system data structures and are thus not
+available for use by the operating system.
+Operations allowed on an unconfigured occupant
 are limited to configuration administration operations. The hardware resources
-of an occupant in the \fBconfigured\fR state are represented by normal Solaris
+of an occupant in the \fBconfigured\fR state are represented by normal system
 data structures and thus some or all of those hardware resources can be in use
-by Solaris. All occupants provide both the \fBconfigured\fR and
+by the operating system. All occupants provide both the \fBconfigured\fR and
 \fBunconfigured\fR states.
 .sp
 .LP
@@ -293,8 +296,8 @@ through the receptacle.
 .ad
 .RS 15n
 Performs hardware specific operations that allow an occupant's hardware
-resources to be usable by Solaris. Occupants that are configured are part of
-the system configuration and are available for manipulation by Solaris device
+resources to be usable. Occupants that are configured are part of
+the system configuration and are available for manipulation by device
 manipulation maintenance commands (eg: \fBpsradm\fR(8), \fBmount\fR(8),
 \fBifconfig\fR(8)).
 .RE
@@ -307,7 +310,7 @@ manipulation maintenance commands (eg: \fBpsradm\fR(8), \fBmount\fR(8),
 .RS 15n
 Performs hardware specific operations that logically remove an occupant's
 hardware resources from the system. The occupant must currently be configured
-and its hardware resources must not be in use by Solaris.
+and its hardware resources must not be in use by the operating system.
 .RE
 
 State transition functions can fail due to the condition of the attachment
@@ -407,8 +410,8 @@ convention.
 .RS 4n
 Supplies listing options to the list (\fB-l\fR) command. \fIlisting_options\fR
 conforms to the \fBgetsubopt\fR(3C) syntax convention. The sub-options are used
-to specify the attachment point selection criteria (
-\fBselect\fR=\fIselect_string\fR), the type of matching desired
+to specify the attachment point selection criteria
+(\fBselect\fR=\fIselect_string\fR), the type of matching desired
 (\fBmatch\fR=\fImatch_type\fR), order of listing (\fBsort\fR=\fIfield_spec\fR),
 the data that is displayed (\fBcols=\fR\fIfield_spec\fR and
 \fBcols2=\fR\fIfield_spec\fR), the column delimiter (\fBdelim=\fR\fIstring\fR)

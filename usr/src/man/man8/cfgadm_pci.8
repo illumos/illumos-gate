@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CFGADM_PCI 8 "June 20, 2021"
+.TH CFGADM_PCI 8 "August 2, 2023"
 .SH NAME
 cfgadm_pci \- PCI, CompactPCI, and PCI Express Hotplug hardware specific
 commands for cfgadm
@@ -28,7 +28,7 @@ commands for cfgadm
 
 .LP
 .nf
-\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIharware_options\fR] \fB-t\fR \fIap_id\fR [\fIap_id\fR]
+\fB/usr/sbin/cfgadm\fR [\fB-v\fR] [\fB-o\fR \fIhardware_options\fR] \fB-t\fR \fIap_id\fR [\fIap_id\fR]
 .fi
 
 .LP
@@ -274,7 +274,7 @@ The following \fIfunction\fRs are supported for PCI hot pluggable slots:
 .ad
 .sp .6
 .RS 4n
-Configure the PCI device in the slot to be used by Solaris.
+Configure the PCI device in the slot to be used.
 .RE
 
 .sp
@@ -284,7 +284,7 @@ Configure the PCI device in the slot to be used by Solaris.
 .ad
 .sp .6
 .RS 4n
-Connect the slot to PCI bus.
+Connect the slot to the PCI bus.
 .RE
 
 .sp
@@ -401,7 +401,7 @@ Execute in verbose mode.
 .sp
 When the \fB-v\fR option is used with the \fB-l\fR option, the \fBcfgadm\fR
 command outputs information about the attachment point. For attachment points
-located in a PCI Express hierarhcy, the Information field will contain the
+located in a PCI Express hierarchy, the Information field will contain the
 attachment point's absolute slot path location, including any hardware or
 platform specific labeling information for each component in the slot path.
 Each component in the slot path will be separated by a "/" (forward slash). See
@@ -437,7 +437,7 @@ multi-functional device, \fBMULT\fR will get printed instead.
 .sp
 \fIboard\fR is a string representing the board type of the device. For example,
 hp is the string used for a PCI Hot Plug adapter, hs is used for a Hot Swap
-Board, nhs for a Non\(emHot Swap cPCI Board, bhs for a Basic Hot Swap cPCI
+Board, nhs for a Non-Hot Swap cPCI Board, bhs for a Basic Hot Swap cPCI
 Board, and fhs for a Full Hot Swap cPCI Board.
 .sp
 Most PCI cards with more than one device are not multi-function devices, but
@@ -490,7 +490,7 @@ that support auto configuration support this feature.
 .sp
 \fBenable_autoconfig\fR enables the ability to autoconfigure the slot.
 .sp
-\fBdiable_autoconfig\fR disables the ability to autoconfigure the slot.
+\fBdisable_autoconfig\fR disables the ability to autoconfigure the slot.
 .sp
 Autoconfiguration is done through the attention button on the PCI Express
 platforms and through the injector/ejector latch on the CompactPCI platforms.
@@ -819,7 +819,7 @@ px_pci11.pcie0:iob.pcie3       Location: px_pci11.pcie0/iob.pcie3
 .LP
 In this example, the host system contains two hotpluggable slots,
 "px_pci7.pcie0" and "px_pci11.pcie0". In this case, it uses "slot-id form (3)"
-( the default form) for the base \fIslot-path\fR component in the
+(the default form) for the base \fIslot-path\fR component in the
 \fIabsolute-slot-path\fR because the framework could not obtain enough
 information to produce other more descriptive forms of higher precedence.
 
@@ -941,6 +941,3 @@ Hardware specific library for PCI hot plugging.
 .BR libcfgadm (3LIB),
 .BR attributes (7),
 .BR cfgadm (8)
-.sp
-.LP
-\fI\fR
