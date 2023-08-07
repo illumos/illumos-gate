@@ -59,6 +59,8 @@ file path=opt/bhyve-tests/tests/mevent/read_pause mode=0555
 file path=opt/bhyve-tests/tests/mevent/read_requeue mode=0555
 file path=opt/bhyve-tests/tests/mevent/vnode_file mode=0555
 file path=opt/bhyve-tests/tests/mevent/vnode_zvol mode=0555
+dir  path=opt/bhyve-tests/tests/perf
+file path=opt/bhyve-tests/tests/perf/entry_exit mode=0555
 dir  path=opt/bhyve-tests/tests/viona
 file path=opt/bhyve-tests/tests/viona/interface_version mode=0555
 dir  path=opt/bhyve-tests/tests/vmm
