@@ -711,7 +711,7 @@ ipmi_enum_sp(topo_mod_t *mod, tnode_t *pnode)
 	slotinfo.usi_active = B_TRUE;
 	slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_NONE;
 	if (topo_node_range_create(mod, sp_node, UFM, 0, 0) != 0 ||
-	    topo_mod_create_ufm(mod, sp_node,
+	    topo_mod_create_ufm(mod, sp_node, 0,
 	    "Baseboard Management Controller firmware", &slotinfo) == NULL) {
 		topo_mod_dprintf(mod, "failed to create %s node", UFM);
 		goto out;
