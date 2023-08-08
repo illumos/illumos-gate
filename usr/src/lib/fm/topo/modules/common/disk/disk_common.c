@@ -284,7 +284,7 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 		else
 			slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_WO;
 		if (topo_node_range_create(mod, dtn, UFM, 0, 0) != 0 ||
-		    topo_mod_create_ufm(mod, dtn, "drive firmware",
+		    topo_mod_create_ufm(mod, dtn, 0, "drive firmware",
 		    &slotinfo) == NULL) {
 			topo_mod_dprintf(mod, "failed to create %s node", UFM);
 			goto out;

@@ -562,7 +562,7 @@ smbios_enum_motherboard(smbios_hdl_t *shp, smb_enum_data_t *smed)
 			nvlist_free(extra);
 			goto err;
 		}
-		(void) topo_mod_create_ufm(mod, mbnode, "BIOS", &slotinfo);
+		(void) topo_mod_create_ufm(mod, mbnode, 0, "BIOS", &slotinfo);
 		nvlist_free(extra);
 	}
 

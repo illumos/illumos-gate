@@ -31,6 +31,7 @@ UTILDIR = ../../common/pcibus
 HBDIR = ../../common/hostbridge
 NICDIR = ../../common/nic
 USBDIR = ../../common/usb
+UFMDIR = ../../common/ufm
 SHAREDDIR = ../../common/shared
 UTILSRCS = did.c did_hash.c did_props.c util.c
 PCISRCS = pcibus.c pcibus_labels.c pcibus_hba.c pci_sensor.c
@@ -43,6 +44,7 @@ include ../../Makefile.plugin
 LDLIBS += -ldevinfo -lsmbios -lpcidb
 
 CPPFLAGS += -I$(UTILDIR) -I$(HBDIR) -I$(NICDIR) -I$(USBDIR) -I$(SHAREDDIR)
+CPPFLAGS += -I$(UFMDIR)
 
 %.o: $(SHAREDDIR)/%.c
 	$(COMPILE.c) -o $@ $<

@@ -237,6 +237,7 @@ void		bd_free_handle(bd_handle_t);
 int		bd_attach_handle(dev_info_t *, bd_handle_t);
 int		bd_detach_handle(bd_handle_t);
 void		bd_state_change(bd_handle_t);
+const char	*bd_address(bd_handle_t);
 void		bd_xfer_done(bd_xfer_t *, int);
 void		bd_error(bd_xfer_t *, int);
 void		bd_mod_init(struct dev_ops *);

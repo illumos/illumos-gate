@@ -425,6 +425,7 @@ file path=usr/lib/fm/topo/plugins/ipmi.so mode=0555
 file path=usr/lib/fm/topo/plugins/nic.so mode=0555
 file path=usr/lib/fm/topo/plugins/ses.so mode=0555
 file path=usr/lib/fm/topo/plugins/smbios.so mode=0555
+file path=usr/lib/fm/topo/plugins/ufm.so mode=0555
 file path=usr/lib/fm/topo/plugins/usb.so mode=0555
 file path=usr/lib/fm/topo/plugins/xfp.so mode=0555
 dir  path=usr/lib/locale variant.opensolaris.zone=__NODEFAULT

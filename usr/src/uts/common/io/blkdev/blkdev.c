@@ -2571,6 +2571,12 @@ bd_state_change(bd_handle_t hdl)
 	}
 }
 
+const char *
+bd_address(bd_handle_t hdl)
+{
+	return (hdl->h_addr);
+}
+
 void
 bd_mod_init(struct dev_ops *devops)
 {

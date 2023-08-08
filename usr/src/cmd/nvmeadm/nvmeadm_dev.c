@@ -210,16 +210,20 @@ nvme_firmware_commit(int fd, int slot, int action, uint16_t *sc)
 	return (rv);
 }
 
-uint32_t
+nvme_ns_state_t
 nvme_namespace_state(int fd)
 {
-	uint64_t res = 0;
+	nvme_ns_info_t *info = NULL;
+	size_t buflen = sizeof (nvme_ns_info_t);
 
 	/*
 	 * Ask the driver for the namespace state.
 	 */
-	if (nvme_ioctl(fd, NVME_IOC_NS_STATE, NULL, NULL, 0, &res)) {
-		return (res);
+	if (nvme_ioctl(fd, NVME_IOC_NS_INFO, &buflen, (void **)&info, 0,
+	    NULL)) {
+		nvme_ns_state_t s = info->nni_state;
+		free(info);
+		return (s);
 	}
 
 	/*

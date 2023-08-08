@@ -1,17 +1,19 @@
 '\" te
+.\" Copyright 2023 RackTop Systems, Inc.
 .\" Copyright 2021 Joyent, Inc.
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright (c) 2014, Joyent, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SNOOP 8 "Mar 22, 2021"
+.TH SNOOP 8 "Jul 13, 2023"
 .SH NAME
 snoop \- capture and inspect network packets
 .SH SYNOPSIS
 .nf
 \fBsnoop\fR  [\fB-afqrCDINPSvV\fR] [\fB-t\fR [r |  a |  d]] [\fB-c\fR \fImaxcount\fR]
- [\fB-d\fR \fIdevice\fR] [\fB-i\fR \fIfilename\fR] [\fB-n\fR \fIfilename\fR] [\fB-o\fR \fIfilename\fR]
+ [\fB-d\fR \fIdevice\fR] [\fB-i\fR \fIfilename\fR] [\fB-n\fR \fIfilename\fR]
+ [\fB-o\fR \fIfilename\fR | \fB-O\fR \fIprefix:count:size\fR]
  [\fB-p\fR \fIfirst\fR [, \fIlast\fR]] [\fB-s\fR \fIsnaplen\fR] [\fB-x\fR \fIoffset\fR [, \fIlength\fR]]
  [\fB-z\fR \fIzonename\fR] [\fIexpression\fR]
 .fi
@@ -214,6 +216,43 @@ Save captured packets in \fIfilename\fR as they are captured. (This
 file is RFC 1761-compliant. During packet capture, a count of the number of
 packets saved in the file is displayed. If you wish just to count packets
 without saving to a file, name the file \fB/dev/null\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-O\fR \fIprefix\fR:\fIcount\fR:\fIsize\fR\fR
+.ad
+.sp .6
+.RS 4n
+Save captured packets in \fIcount\fR rotating output files named
+\fIprefix-??.snoop\fR with just over \fIsize\fR data in each.
+The \fIcount\fR must be in [1-100].
+Size value may end with suffix \fIk\fR, \fIm\fR or \fIg\fR to specify
+kilobytes, megabytes or gigabytes.
+
+This option is useful when you want to keep only the most recent part of a
+capture (sometimes called a "rolling" capture), where you're watching for
+some event that's difficult to reproduce, and will stop the capture just after
+the event happens.
+
+For example, to make \fBsnoop\fR keep the last 200 megabytes
+stored in 20 files named \fBtest1-??.snoop\fR, run:
+.sp .6
+.RS rn
+  \fBexample%\fR \fBsnoop -O test1:20:10m ...\fR
+.RE
+
+After the \fBsnoop\fR capture is terminated, the collection of
+output files may be combined into one using \fBmergecap\fR
+(part of a \fBWireshark\fR installation) as follows:
+.sp .6
+.RS rn
+  \fBexample%\fR \fBmergecap -w test1.pcap test1-??.snoop\fR
+.RE
+.sp .6
+The order of files given to \fBmergecap\fR does not matter,
+because the packet time stamps determine the output order.
 .RE
 
 .sp
@@ -1152,6 +1191,20 @@ RPC program number data base.
 Internet services and aliases.
 .RE
 
+.SH ATTRIBUTES
+See \fBattributes\fR(7) for descriptions of the following attributes:
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Interface Stability	Committed
+.TE
+
+.sp
+.LP
+For all options except \fB-O\fR.
 .SH SEE ALSO
 .BR ipnet (4D),
 .BR audio (4I),

@@ -986,8 +986,7 @@ topo_mod_create_ufm_slot(topo_mod_t *mod, tnode_t *ufmnode,
 	topo_pgroup_info_t pgi;
 	int err, rc;
 
-	if (slotinfo == NULL || slotinfo->usi_version == NULL ||
-	    slotinfo->usi_mode == 0) {
+	if (slotinfo == NULL || slotinfo->usi_mode == 0) {
 		topo_mod_dprintf(mod, "invalid slot info");
 		(void) topo_mod_seterrno(mod, ETOPO_MOD_INVAL);
 		return (NULL);
@@ -1060,7 +1059,10 @@ topo_mod_create_ufm_slot(topo_mod_t *mod, tnode_t *ufmnode,
 		    (uint32_t)slotinfo->usi_active, &err);
 	}
 
-	if (rc == 0) {
+	/*
+	 * We can have a NULL version for an empty slot.
+	 */
+	if (rc == 0 && slotinfo->usi_version != NULL) {
 		rc += topo_prop_set_string(slotnode, TOPO_PGROUP_UFM_SLOT,
 		    TOPO_PROP_UFM_SLOT_VERSION, TOPO_PROP_IMMUTABLE,
 		    slotinfo->usi_version, &err);
@@ -1113,8 +1115,8 @@ slotfail:
  * topo_mod_create_ufm_slot() to create custom UFM slots.
  */
 tnode_t *
-topo_mod_create_ufm(topo_mod_t *mod, tnode_t *parent, const char *descr,
-    topo_ufm_slot_info_t *slotinfo)
+topo_mod_create_ufm(topo_mod_t *mod, tnode_t *parent, topo_instance_t inst,
+    const char *descr, topo_ufm_slot_info_t *slotinfo)
 {
 	nvlist_t *auth = NULL, *fmri = NULL;
 	tnode_t *ufmnode, *slotnode;
@@ -1129,7 +1131,7 @@ topo_mod_create_ufm(topo_mod_t *mod, tnode_t *parent, const char *descr,
 	}
 
 	if ((fmri = topo_mod_hcfmri(mod, parent, FM_HC_SCHEME_VERSION,
-	    UFM, 0, NULL, auth, NULL, NULL, NULL)) ==
+	    UFM, inst, NULL, auth, NULL, NULL, NULL)) ==
 	    NULL) {
 		nvlist_free(auth);
 		topo_mod_dprintf(mod, "topo_mod_hcfmri() failed: %s",
@@ -1138,7 +1140,7 @@ topo_mod_create_ufm(topo_mod_t *mod, tnode_t *parent, const char *descr,
 		return (NULL);
 	}
 
-	if ((ufmnode = topo_node_bind(mod, parent, UFM, 0, fmri)) == NULL) {
+	if ((ufmnode = topo_node_bind(mod, parent, UFM, inst, fmri)) == NULL) {
 		nvlist_free(auth);
 		nvlist_free(fmri);
 		topo_mod_dprintf(mod, "topo_node_bind() failed: %s",

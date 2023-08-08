@@ -40,7 +40,6 @@
 #include <libnvpair.h>
 #include <fm/topo_mod.h>
 #include <fm/topo_hc.h>
-#include <sys/ddi_ufm.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -51,6 +50,7 @@
 #include <util.h>
 #include <topo_nic.h>
 #include <topo_usb.h>
+#include <topo_ufm.h>
 
 extern txprop_t Bus_common_props[];
 extern txprop_t Dev_common_props[];
@@ -167,115 +167,14 @@ hostbridge_asdevice(topo_mod_t *mod, tnode_t *bus)
 static int
 pciexfn_add_ufm(topo_mod_t *mod, tnode_t *parent, tnode_t *node)
 {
+	int err;
 	char *devpath = NULL;
-	ufm_ioc_getcaps_t ugc = { 0 };
-	ufm_ioc_bufsz_t ufbz = { 0 };
-	ufm_ioc_report_t ufmr = { 0 };
-	nvlist_t *ufminfo = NULL, **images;
-	uint_t nimages;
-	int err, fd, ret = -1;
 	tnode_t *create;
+	topo_ufm_devinfo_t tud;
 
 	if (topo_prop_get_string(node, TOPO_PGROUP_IO, TOPO_IO_DEV, &devpath,
 	    &err) != 0) {
 		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
-	}
-	if (strlen(devpath) >= MAXPATHLEN) {
-		topo_mod_dprintf(mod, "devpath is too long: %s", devpath);
-		topo_mod_strfree(mod, devpath);
-		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
-	}
-
-	if ((fd = open(DDI_UFM_DEV, O_RDONLY)) < 0) {
-		topo_mod_dprintf(mod, "%s: failed to open %s", __func__,
-		    DDI_UFM_DEV);
-		topo_mod_strfree(mod, devpath);
-		return (0);
-	}
-	/*
-	 * Make an ioctl to probe if the driver for this function is
-	 * UFM-capable.  If the ioctl fails or if it doesn't advertise the
-	 * DDI_UFM_CAP_REPORT capability, we bail out.
-	 */
-	ugc.ufmg_version = DDI_UFM_CURRENT_VERSION;
-	(void) strlcpy(ugc.ufmg_devpath, devpath, MAXPATHLEN);
-	if (ioctl(fd, UFM_IOC_GETCAPS, &ugc) < 0) {
-		topo_mod_dprintf(mod, "UFM_IOC_GETCAPS failed: %s",
-		    strerror(errno));
-		(void) close(fd);
-		topo_mod_strfree(mod, devpath);
-		return (0);
-	}
-	if ((ugc.ufmg_caps & DDI_UFM_CAP_REPORT) == 0) {
-		topo_mod_dprintf(mod, "driver doesn't advertise "
-		    "DDI_UFM_CAP_REPORT");
-		(void) close(fd);
-		topo_mod_strfree(mod, devpath);
-		return (0);
-	}
-
-	/*
-	 * If we made it this far, then the driver is indeed UFM-capable and
-	 * is capable of reporting its firmware information.  First step is to
-	 * make an ioctl to query the size of the report data so that we can
-	 * allocate a buffer large enough to hold it.
-	 */
-	ufbz.ufbz_version = DDI_UFM_CURRENT_VERSION;
-	(void) strlcpy(ufbz.ufbz_devpath, devpath, MAXPATHLEN);
-	if (ioctl(fd, UFM_IOC_REPORTSZ, &ufbz) < 0) {
-		topo_mod_dprintf(mod, "UFM_IOC_REPORTSZ failed: %s\n",
-		    strerror(errno));
-		(void) close(fd);
-		topo_mod_strfree(mod, devpath);
-		return (0);
-	}
-
-	ufmr.ufmr_version = DDI_UFM_CURRENT_VERSION;
-	if ((ufmr.ufmr_buf = topo_mod_alloc(mod, ufbz.ufbz_size)) == NULL) {
-		topo_mod_dprintf(mod, "failed to alloc %u bytes\n",
-		    ufbz.ufbz_size);
-		(void) close(fd);
-		topo_mod_strfree(mod, devpath);
-		return (topo_mod_seterrno(mod, EMOD_NOMEM));
-	}
-	ufmr.ufmr_bufsz = ufbz.ufbz_size;
-	(void) strlcpy(ufmr.ufmr_devpath, devpath, MAXPATHLEN);
-	topo_mod_strfree(mod, devpath);
-
-	/*
-	 * Now, make the ioctl to retrieve the actual report data.  The data
-	 * is stored as a packed nvlist.
-	 */
-	if (ioctl(fd, UFM_IOC_REPORT, &ufmr) < 0) {
-		topo_mod_dprintf(mod, "UFM_IOC_REPORT failed: %s\n",
-		    strerror(errno));
-		topo_mod_free(mod, ufmr.ufmr_buf, ufmr.ufmr_bufsz);
-		(void) close(fd);
-		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
-	}
-	(void) close(fd);
-
-	if (nvlist_unpack(ufmr.ufmr_buf, ufmr.ufmr_bufsz, &ufminfo, 0) != 0) {
-		topo_mod_dprintf(mod, "failed to unpack nvlist\n");
-		topo_mod_free(mod, ufmr.ufmr_buf, ufmr.ufmr_bufsz);
-		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
-	}
-	topo_mod_free(mod, ufmr.ufmr_buf, ufmr.ufmr_bufsz);
-
-	if (nvlist_lookup_nvlist_array(ufminfo, DDI_UFM_NV_IMAGES, &images,
-	    &nimages) != 0) {
-		topo_mod_dprintf(mod, "failed to lookup %s nvpair",
-		    DDI_UFM_NV_IMAGES);
-		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-		goto err;
-	}
-
-	/*
-	 * There's nothing for us to do if there are no images.
-	 */
-	if (nimages == 0) {
-		ret = 0;
-		goto err;
 	}
 
 	/*
@@ -293,83 +192,19 @@ pciexfn_add_ufm(topo_mod_t *mod, tnode_t *parent, tnode_t *node)
 		create = parent;
 	}
 
-	if (topo_node_range_create(mod, create, UFM, 0, (nimages - 1)) != 0) {
-		topo_mod_dprintf(mod, "failed to create %s range", UFM);
-		/* errno set */
-		goto err;
+	if (topo_mod_load(mod, TOPO_MOD_UFM, TOPO_VERSION) == NULL) {
+		topo_mod_dprintf(mod, "pcibus enum could not load ufm module");
+		topo_mod_strfree(mod, devpath);
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 	}
-	for (uint_t i = 0; i < nimages; i++) {
-		tnode_t *ufmnode = NULL;
-		char *descr;
-		uint_t nslots;
-		nvlist_t **slots;
 
-		if (nvlist_lookup_string(images[i], DDI_UFM_NV_IMAGE_DESC,
-		    &descr) != 0 ||
-		    nvlist_lookup_nvlist_array(images[i],
-		    DDI_UFM_NV_IMAGE_SLOTS, &slots, &nslots) != 0) {
-			(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-			goto err;
-		}
+	tud.tud_method = TOPO_UFM_M_DEVINFO;
+	tud.tud_path = devpath;
+	err = topo_mod_enumerate(mod, create, TOPO_MOD_UFM, UFM, 0, UINT32_MAX,
+	    &tud);
+	topo_mod_strfree(mod, devpath);
 
-		if ((ufmnode = topo_mod_create_ufm(mod, create, descr, NULL)) ==
-		    NULL) {
-			topo_mod_dprintf(mod, "failed to create ufm nodes for "
-			    "%s", descr);
-			/* errno set */
-			goto err;
-		}
-		for (uint_t s = 0; s < nslots; s++) {
-			topo_ufm_slot_info_t slotinfo = { 0 };
-			uint32_t slotattrs;
-
-			if (nvlist_lookup_string(slots[s],
-			    DDI_UFM_NV_SLOT_VERSION,
-			    (char **)&slotinfo.usi_version) != 0 ||
-			    nvlist_lookup_uint32(slots[s],
-			    DDI_UFM_NV_SLOT_ATTR, &slotattrs) != 0) {
-				topo_node_unbind(ufmnode);
-				topo_mod_dprintf(mod, "malformed slot nvlist");
-				(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
-				goto err;
-			}
-			(void) nvlist_lookup_nvlist(slots[s],
-			    DDI_UFM_NV_SLOT_MISC, &slotinfo.usi_extra);
-
-			if (slotattrs & DDI_UFM_ATTR_READABLE &&
-			    slotattrs & DDI_UFM_ATTR_WRITEABLE)
-				slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_RW;
-			else if (slotattrs & DDI_UFM_ATTR_READABLE)
-				slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_RO;
-			else if (slotattrs & DDI_UFM_ATTR_WRITEABLE)
-				slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_WO;
-			else
-				slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_NONE;
-
-			if (slotattrs & DDI_UFM_ATTR_ACTIVE)
-				slotinfo.usi_active = B_TRUE;
-
-			if (topo_node_range_create(mod, ufmnode, SLOT, 0,
-			    (nslots - 1)) < 0) {
-				topo_mod_dprintf(mod, "failed to create %s "
-				    "range", SLOT);
-				/* errno set */
-				goto err;
-			}
-			if (topo_mod_create_ufm_slot(mod, ufmnode,
-			    &slotinfo) == NULL) {
-				topo_node_unbind(ufmnode);
-				topo_mod_dprintf(mod, "failed to create ufm "
-				    "slot %d for %s", s, descr);
-				/* errno set */
-				goto err;
-			}
-		}
-	}
-	ret = 0;
-err:
-	nvlist_free(ufminfo);
-	return (ret);
+	return (err);
 }
 
 tnode_t *

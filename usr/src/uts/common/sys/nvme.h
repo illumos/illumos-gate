@@ -13,7 +13,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -55,8 +55,8 @@ extern "C" {
 #define	NVME_IOC_FIRMWARE_DOWNLOAD	(NVME_IOC | 11)
 #define	NVME_IOC_FIRMWARE_COMMIT	(NVME_IOC | 12)
 #define	NVME_IOC_PASSTHRU		(NVME_IOC | 13)
-#define	NVME_IOC_NS_STATE		(NVME_IOC | 14)
-#define	NVME_IOC_MAX			NVME_IOC_NS_STATE
+#define	NVME_IOC_NS_INFO		(NVME_IOC | 14)
+#define	NVME_IOC_MAX			NVME_IOC_NS_INFO
 
 #define	IS_NVME_IOC(x)			((x) > NVME_IOC && (x) <= NVME_IOC_MAX)
 #define	NVME_IOC_CMD(x)			((x) & 0xff)
@@ -1073,11 +1073,12 @@ typedef struct {
 #endif
 
 /*
- * NVME namespace state flags for NVME_IOC_NS_STATE ioctl
+ * NVME namespace state flags.
  *
  * The values are defined entirely by the driver. Some states correspond to
  * namespace states described by the NVMe specification r1.3 section 6.1, others
- * are specific to the implementation of this driver.
+ * are specific to the implementation of this driver. These are present in the
+ * nvme_ns_info_t that is used with the NVME_IOC_NS_INFO ioctl.
  *
  * The states are as follows:
  * - ALLOCATED: the namespace exists in the controller as per the NVMe spec
@@ -1091,10 +1092,27 @@ typedef struct {
  *   Namespaces are IGNORED when they are not ACTIVE, or if they are ACTIVE but
  *   have certain properties that the driver cannot handle.
  */
-#define	NVME_NS_STATE_ALLOCATED		0x1
-#define	NVME_NS_STATE_ACTIVE		0x2
-#define	NVME_NS_STATE_ATTACHED		0x4
-#define	NVME_NS_STATE_IGNORED		0x8
+typedef enum {
+	NVME_NS_STATE_ALLOCATED	=	1 << 0,
+	NVME_NS_STATE_ACTIVE	=	1 << 1,
+	NVME_NS_STATE_ATTACHED	=	1 << 2,
+	NVME_NS_STATE_IGNORED	=	1 << 3
+} nvme_ns_state_t;
+
+/*
+ * This is the maximum length of the NVMe namespace's blkdev address. This is
+ * only valid in the structure with the NVME_NS_STATE_ATTACHED flag is set.
+ * Otherwise the entry will be all zeros. This is useful when you need to
+ * determine what the corresponding blkdev instance in libdevinfo for the
+ * device.
+ */
+#define	NVME_BLKDEV_NAMELEN	128
+
+typedef struct {
+	nvme_ns_state_t	nni_state;
+	char nni_addr[NVME_BLKDEV_NAMELEN];
+	nvme_identify_nsid_t nni_id;
+} nvme_ns_info_t;
 
 #ifdef __cplusplus
 }
