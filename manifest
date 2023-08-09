@@ -2427,6 +2427,7 @@ h platform/i86pc/ucode/GenuineIntel/00090675-01=platform/i86pc/ucode/GenuineInte
 h platform/i86pc/ucode/GenuineIntel/00090675-02=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/00090675-04=platform/i86pc/ucode/GenuineIntel/00090672-01
 f platform/i86pc/ucode/GenuineIntel/000906A3-80 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000906A4-40 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000906A4-80=platform/i86pc/ucode/GenuineIntel/000906A3-80
 f platform/i86pc/ucode/GenuineIntel/000906C0-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000906E9-02 0444 root sys
@@ -2450,10 +2451,14 @@ f platform/i86pc/ucode/GenuineIntel/000A0671-02 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000B0671-02 0444 root sys
 h platform/i86pc/ucode/GenuineIntel/000B0671-10=platform/i86pc/ucode/GenuineIntel/000B0671-02
 h platform/i86pc/ucode/GenuineIntel/000B0671-20=platform/i86pc/ucode/GenuineIntel/000B0671-02
-f platform/i86pc/ucode/GenuineIntel/000B06A2-40 0444 root sys
-h platform/i86pc/ucode/GenuineIntel/000B06A2-80=platform/i86pc/ucode/GenuineIntel/000B06A2-40
-h platform/i86pc/ucode/GenuineIntel/000B06A3-40=platform/i86pc/ucode/GenuineIntel/000B06A2-40
-h platform/i86pc/ucode/GenuineIntel/000B06A3-80=platform/i86pc/ucode/GenuineIntel/000B06A2-40
+f platform/i86pc/ucode/GenuineIntel/000B06A2-20 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000B06A2-40=platform/i86pc/ucode/GenuineIntel/000B06A2-20
+h platform/i86pc/ucode/GenuineIntel/000B06A2-80=platform/i86pc/ucode/GenuineIntel/000B06A2-20
+h platform/i86pc/ucode/GenuineIntel/000B06A3-20=platform/i86pc/ucode/GenuineIntel/000B06A2-20
+h platform/i86pc/ucode/GenuineIntel/000B06A3-40=platform/i86pc/ucode/GenuineIntel/000B06A2-20
+h platform/i86pc/ucode/GenuineIntel/000B06A3-80=platform/i86pc/ucode/GenuineIntel/000B06A2-20
+f platform/i86pc/ucode/GenuineIntel/000B06E0-01 0444 root sys
+h platform/i86pc/ucode/GenuineIntel/000B06E0-10=platform/i86pc/ucode/GenuineIntel/000B06E0-01
 h platform/i86pc/ucode/GenuineIntel/000B06F2-01=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/000B06F2-02=platform/i86pc/ucode/GenuineIntel/00090672-01
 h platform/i86pc/ucode/GenuineIntel/000B06F2-04=platform/i86pc/ucode/GenuineIntel/00090672-01
