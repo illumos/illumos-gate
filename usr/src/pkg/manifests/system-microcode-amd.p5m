@@ -36,7 +36,7 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri \
-    value=pkg:/system/microcode/amd@20230719,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/microcode/amd@20230808,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Microcode for AMD CPUs"
 set name=pkg.description value="Microcode for AMD CPUs"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -91,6 +91,14 @@ file path=platform/i86pc/ucode/AuthenticAMD/A010-00 group=sys mode=0444 \
 file path=platform/i86pc/ucode/AuthenticAMD/A011-00 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/A012-00 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/A111-00 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/A112-00 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/AA01-00 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/AA02-00 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/container group=sys mode=0444 \
     reboot-needed=true
