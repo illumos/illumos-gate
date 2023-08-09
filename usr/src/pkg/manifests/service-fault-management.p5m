@@ -418,6 +418,7 @@ dir  path=usr/lib/fm/topo/maps variant.opensolaris.zone=__NODEFAULT
 #
 file path=usr/lib/fm/topo/maps/xfp-hc-topology.xml mode=0444
 dir  path=usr/lib/fm/topo/plugins variant.opensolaris.zone=__NODEFAULT
+file path=usr/lib/fm/topo/plugins/dimm.so mode=0555
 file path=usr/lib/fm/topo/plugins/disk.so mode=0555
 file path=usr/lib/fm/topo/plugins/fac_prov_ahci.so mode=0555
 file path=usr/lib/fm/topo/plugins/fac_prov_ipmi.so mode=0555
