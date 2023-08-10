@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -42,6 +42,8 @@
  */
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 #include <rpc/rpc.h>
 #include <rpc/rpcb_clnt.h>
 #include <sys/socket.h>
@@ -51,12 +53,13 @@
 #include <nfs/nfs.h>
 #include <rpcsvc/mount.h>
 #include <locale.h>
+#include <unistd.h>
+#include <clnt_subr.h>
 
-int sorthost();
-int sortpath();
-void pr_err(char *, ...);
-void printex();
-void usage();
+int sorthost(const void *, const void *);
+int sortpath(const void *, const void *);
+void printex(CLIENT *, char *);
+void usage(void);
 
 /*
  * Dynamically-sized array of pointers to mountlist entries.  Each element
@@ -78,11 +81,10 @@ main(int argc, char *argv[])
 	char *host, hostbuf[256];
 	char *last;
 	CLIENT *cl;
-	extern int optind;
-	extern char *optarg;
 	int c;
-	struct	timeval	tout, rpc_totout_old;
-	int	numentries;
+	struct timeval	tout, rpc_totout_old;
+	int numentries;
+
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)
@@ -123,29 +125,15 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	__rpc_control(CLCR_GET_RPCB_TIMEOUT, &rpc_totout_old);
-	__rpc_control(CLCR_SET_RPCB_TIMEOUT, &rpc_totout_new);
+	(void) __rpc_control(CLCR_GET_RPCB_TIMEOUT, &rpc_totout_old);
+	(void) __rpc_control(CLCR_SET_RPCB_TIMEOUT, &rpc_totout_new);
 
-	/*
-	 * First try circuit, then drop back to datagram if
-	 * circuit is unavailable (an old version of mountd perhaps)
-	 * Using circuit is preferred because it can handle
-	 * arbitrarily long export lists.
-	 */
-	cl = clnt_create(host, MOUNTPROG, MOUNTVERS, "circuit_n");
+	cl = mountprog_client_create(host, &rpc_totout_old);
 	if (cl == NULL) {
-		if (rpc_createerr.cf_stat == RPC_PROGNOTREGISTERED)
-			cl = clnt_create(host, MOUNTPROG, MOUNTVERS,
-					"datagram_n");
-		if (cl == NULL) {
-			pr_err("");
-			clnt_pcreateerror(host);
-			__rpc_control(CLCR_SET_RPCB_TIMEOUT, &rpc_totout_old);
-			exit(1);
-		}
+		exit(1);
 	}
 
-	__rpc_control(CLCR_SET_RPCB_TIMEOUT, &rpc_totout_old);
+	(void) __rpc_control(CLCR_SET_RPCB_TIMEOUT, &rpc_totout_old);
 
 	if (eflg) {
 		printex(cl, host);
@@ -157,9 +145,9 @@ main(int argc, char *argv[])
 	tout.tv_sec = 10;
 	tout.tv_usec = 0;
 
-	if (err = clnt_call(cl, MOUNTPROC_DUMP,
-			    xdr_void, 0, xdr_mountlist,
-				(caddr_t)&result_list, tout)) {
+	err = clnt_call(cl, MOUNTPROC_DUMP, xdr_void, 0, xdr_mountlist,
+	    (caddr_t)&result_list, tout);
+	if (err != 0) {
 		pr_err("%s\n", clnt_sperrno(err));
 		exit(1);
 	}
@@ -178,8 +166,7 @@ main(int argc, char *argv[])
 	 * Allocate memory for the array and initialize the array.
 	 */
 
-	table = (struct mountbody **)calloc(numentries,
-						sizeof (struct mountbody *));
+	table = calloc(numentries, sizeof (struct mountbody *));
 	if (table == NULL) {
 		pr_err(gettext("not enough memory for %d entries\n"),
 		    numentries);
@@ -196,9 +183,9 @@ main(int argc, char *argv[])
 	 */
 
 	if (dflg)
-	    qsort(table, numentries, sizeof (struct mountbody *), sortpath);
+		qsort(table, numentries, sizeof (struct mountbody *), sortpath);
 	else
-	    qsort(table, numentries, sizeof (struct mountbody *), sorthost);
+		qsort(table, numentries, sizeof (struct mountbody *), sorthost);
 	if (aflg) {
 		for (tb = table; tb < table + numentries; tb++)
 			printf("%s:%s\n", (*tb)->ml_hostname,
@@ -222,24 +209,28 @@ main(int argc, char *argv[])
 }
 
 int
-sorthost(a, b)
-	struct mountbody **a, **b;
+sorthost(const void *_a, const void *_b)
 {
+	struct mountbody **a = (struct mountbody **)_a;
+	struct mountbody **b = (struct mountbody **)_b;
+
 	return (strcmp((*a)->ml_hostname, (*b)->ml_hostname));
 }
 
 int
-sortpath(a, b)
-	struct mountbody **a, **b;
+sortpath(const void *_a, const void *_b)
 {
+	struct mountbody **a = (struct mountbody **)_a;
+	struct mountbody **b = (struct mountbody **)_b;
+
 	return (strcmp((*a)->ml_directory, (*b)->ml_directory));
 }
 
 void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr,
-			gettext("Usage: showmount [-a] [-d] [-e] [host]\n"));
+	    gettext("Usage: showmount [-a] [-d] [-e] [host]\n"));
 }
 
 void
@@ -254,9 +245,7 @@ pr_err(char *fmt, ...)
 }
 
 void
-printex(cl, host)
-	CLIENT *cl;
-	char *host;
+printex(CLIENT *cl, char *host)
 {
 	struct exportnode *ex = NULL;
 	struct exportnode *e;
@@ -268,8 +257,9 @@ printex(cl, host)
 	tout.tv_sec = 10;
 	tout.tv_usec = 0;
 
-	if (err = clnt_call(cl, MOUNTPROC_EXPORT,
-	    xdr_void, 0, xdr_exports, (caddr_t)&ex, tout)) {
+	err = clnt_call(cl, MOUNTPROC_EXPORT, xdr_void, 0, xdr_exports,
+	    (caddr_t)&ex, tout);
+	if (err != 0) {
 		pr_err("%s\n", clnt_sperrno(err));
 		exit(1);
 	}

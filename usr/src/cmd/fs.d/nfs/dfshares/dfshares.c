@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -41,28 +41,29 @@
  * nfs dfshares
  */
 #include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
 #include <rpc/rpc.h>
 #include <rpc/rpcb_clnt.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <sys/time.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <nfs/nfs.h>
 #include <rpcsvc/mount.h>
+#include <unistd.h>
+#include <clnt_subr.h>
 
 int hflg;
-void pr_exports();
-void free_ex();
-void usage();
+void pr_exports(char *);
+void free_ex(struct exportnode *);
+void usage(void);
 
 int
 main(int argc, char *argv[])
 {
-
 	char hostbuf[256];
-	extern int optind;
-	extern char *optarg;
 	int i, c;
 
 	while ((c = getopt(argc, argv, "h")) != EOF) {
@@ -81,7 +82,7 @@ main(int argc, char *argv[])
 			pr_exports(argv[i]);
 	} else {
 		if (gethostname(hostbuf, sizeof (hostbuf)) < 0) {
-			perror("nfs dfshares: gethostname");
+			pr_err("gethostname: %s\n", strerror(errno));
 			exit(1);
 		}
 		pr_exports(hostbuf);
@@ -93,8 +94,7 @@ main(int argc, char *argv[])
 struct	timeval	rpc_totout_new = {15, 0};
 
 void
-pr_exports(host)
-	char *host;
+pr_exports(char *host)
 {
 	CLIENT *cl;
 	struct exportnode *ex = NULL;
@@ -104,33 +104,19 @@ pr_exports(host)
 	(void) __rpc_control(CLCR_GET_RPCB_TIMEOUT, &rpc_totout_old);
 	(void) __rpc_control(CLCR_SET_RPCB_TIMEOUT, &rpc_totout_new);
 
-	/*
-	 * First try circuit, then drop back to datagram if
-	 * circuit is unavailable (an old version of mountd perhaps)
-	 * Using circuit is preferred because it can handle
-	 * arbitrarily long export lists.
-	 */
-	cl = clnt_create(host, MOUNTPROG, MOUNTVERS, "circuit_n");
+	cl = mountprog_client_create(host, &rpc_totout_old);
 	if (cl == NULL) {
-		if (rpc_createerr.cf_stat == RPC_PROGNOTREGISTERED)
-			cl = clnt_create(host, MOUNTPROG, MOUNTVERS,
-					"datagram_n");
-		if (cl == NULL) {
-			(void) fprintf(stderr, "nfs dfshares:");
-			clnt_pcreateerror(host);
-			(void) __rpc_control(CLCR_SET_RPCB_TIMEOUT,
-				&rpc_totout_old);
-			exit(1);
-		}
+		exit(1);
 	}
 
 	(void) __rpc_control(CLCR_SET_RPCB_TIMEOUT, &rpc_totout_old);
 	tout.tv_sec = 10;
 	tout.tv_usec = 0;
 
-	if (err = clnt_call(cl, MOUNTPROC_EXPORT, xdr_void,
-	    0, xdr_exports, (caddr_t)&ex, tout)) {
-		(void) fprintf(stderr, "nfs dfshares: %s\n", clnt_sperrno(err));
+	err = clnt_call(cl, MOUNTPROC_EXPORT, xdr_void, 0, xdr_exports,
+	    (caddr_t)&ex, tout);
+	if (err != 0) {
+		pr_err("%s\n", clnt_sperrno(err));
 		clnt_destroy(cl);
 		exit(1);
 	}
@@ -142,13 +128,13 @@ pr_exports(host)
 
 	if (!hflg) {
 		printf("%-35s %12s %-8s  %s\n",
-			"RESOURCE", "SERVER", "ACCESS", "TRANSPORT");
+		    "RESOURCE", "SERVER", "ACCESS", "TRANSPORT");
 		hflg++;
 	}
 
 	while (ex) {
 		printf("%10s:%-24s %12s %-8s  %s\n",
-			host, ex->ex_dir, host, " -", " -");
+		    host, ex->ex_dir, host, " -", " -");
 		ex = ex->ex_next;
 	}
 	free_ex(ex);
@@ -156,8 +142,7 @@ pr_exports(host)
 }
 
 void
-free_ex(ex)
-	struct exportnode *ex;
+free_ex(struct exportnode *ex)
 {
 	struct groupnode *gr, *tmpgr;
 	struct exportnode *tmpex;
@@ -167,17 +152,28 @@ free_ex(ex)
 		gr = ex->ex_groups;
 		while (gr) {
 			tmpgr = gr->gr_next;
-			free((char *)gr);
+			free(gr);
 			gr = tmpgr;
 		}
 		tmpex = ex;
 		ex = ex->ex_next;
-		free((char *)tmpex);
+		free(tmpex);
 	}
 }
 
 void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr, "Usage: dfshares [-h] [host ...]\n");
+}
+
+void
+pr_err(char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	(void) fprintf(stderr, "nfs dfshares: ");
+	(void) vfprintf(stderr, fmt, ap);
+	va_end(ap);
 }
