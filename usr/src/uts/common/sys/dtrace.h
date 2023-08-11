@@ -1507,7 +1507,7 @@ typedef struct dof_helper {
  *   argument is the probe argument as passed to dtrace_probe_create().
  *   dtps_disable() will be called when a probe transitions from being enabled
  *   to having zero ECBs.  dtrace_probe() should never be called for a probe
- *   identifier that has been explicitly enabled via dtps_disable().
+ *   identifier that has been explicitly disabled via dtps_disable().
  *
  * 1.5.3  Return value
  *

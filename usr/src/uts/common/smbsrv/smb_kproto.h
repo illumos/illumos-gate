@@ -425,7 +425,6 @@ void smb_sodestroy(ksocket_t so);
 int smb_sorecv(ksocket_t so, void *msg, size_t len);
 void smb_net_txl_constructor(smb_txlst_t *);
 void smb_net_txl_destructor(smb_txlst_t *);
-int smb_net_send_uio(smb_session_t *, struct uio *);
 int smb_net_send_mbufs(smb_session_t *, mbuf_t *);
 int smb_net_recv_mbufs(smb_session_t *, mbuf_t **, size_t);
 

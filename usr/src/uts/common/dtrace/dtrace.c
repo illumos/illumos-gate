@@ -23,6 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -6028,7 +6029,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			size_t sz = state->dts_options[DTRACEOPT_STRSIZE];
 			uintptr_t s1 = regs[r1];
 			uintptr_t s2 = regs[r2];
-			size_t lim1, lim2;
+			size_t lim1 = SIZE_MAX, lim2 = SIZE_MAX;
 
 			if (s1 != 0 &&
 			    !dtrace_strcanload(s1, sz, &lim1, mstate, vstate))
@@ -6037,6 +6038,13 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			    !dtrace_strcanload(s2, sz, &lim2, mstate, vstate))
 				break;
 
+			/*
+			 * If s1 or s2 is NULL, we will take the limit that
+			 * corresponds with the non-NULL string.  If they are
+			 * both NULL, we will pass SIZE_MAX as the limit --
+			 * but in this case dtrace_strncmp() will return
+			 * success without examining the limit.
+			 */
 			cc_r = dtrace_strncmp((char *)s1, (char *)s2,
 			    MIN(lim1, lim2));
 
@@ -6969,8 +6977,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 		return;
 	}
 
-	now = mstate.dtms_timestamp = dtrace_gethrtime();
-	mstate.dtms_present |= DTRACE_MSTATE_TIMESTAMP;
+	now = dtrace_gethrtime();
 	vtime = dtrace_vtime_references != 0;
 
 	if (vtime && curthread->t_dtrace_start)
@@ -7110,7 +7117,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 
 		if (pred != NULL) {
 			dtrace_difo_t *dp = pred->dtp_difo;
-			int rval;
+			uint64_t rval;
 
 			rval = dtrace_dif_emulate(dp, &mstate, vstate, state);
 
@@ -9319,7 +9326,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_NOT:
 		case DIF_OP_MOV:
@@ -9331,7 +9338,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_LDSB:
 		case DIF_OP_LDSH:
@@ -9347,7 +9354,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			if (kcheckload)
 				dp->dtdo_buf[pc] = DIF_INSTR_LOAD(op +
 				    DIF_OP_RLDSB - DIF_OP_LDSB, r1, rd);
@@ -9366,7 +9373,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_ULDSB:
 		case DIF_OP_ULDSH:
@@ -9382,7 +9389,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_STB:
 		case DIF_OP_STH:
@@ -9452,7 +9459,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_SETS:
 			if (DIF_INSTR_STRING(instr) >= dp->dtdo_strlen) {
@@ -9462,7 +9469,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_LDGA:
 		case DIF_OP_LDTA:
@@ -9473,7 +9480,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_STGA:
 			if (r1 > DIF_VAR_ARRAY_MAX)
@@ -9494,7 +9501,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_STGS:
 		case DIF_OP_STTS:
@@ -9512,7 +9519,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 
 			if (subr == DIF_SUBR_COPYOUT ||
 			    subr == DIF_SUBR_COPYOUTSTR) {
@@ -10670,15 +10677,14 @@ dtrace_ecb_enable(dtrace_ecb_t *ecb)
 	} else {
 		/*
 		 * This probe is already active.  Swing the last pointer to
-		 * point to the new ECB, and issue a dtrace_sync() to assure
-		 * that all CPUs have seen the change.
+		 * point to the new ECB and invalidate the predicate cache.
+		 * (It will be up to the caller to call dtrace_sync() to
+		 * assure that all CPUs have seen the change.)
 		 */
 		ASSERT(probe->dtpr_ecb_last != NULL);
 		probe->dtpr_ecb_last->dte_next = ecb;
 		probe->dtpr_ecb_last = ecb;
-		probe->dtpr_predcache = 0;
-
-		dtrace_sync();
+		probe->dtpr_predcache = DTRACE_CACHEIDNONE;
 		return (0);
 	}
 }
@@ -11285,7 +11291,15 @@ dtrace_ecb_disable(dtrace_ecb_t *ecb)
 		prev = pecb;
 	}
 
-	ASSERT(pecb != NULL);
+	if (pecb == NULL) {
+		/*
+		 * This is okay:  it means that this ECB was never actually
+		 * enabled (that is, we are in the process of ripping our
+		 * state down sometime after creating ECBs but before enabling
+		 * them); we have nothing to do, so just return.
+		 */
+		return;
+	}
 
 	if (prev == NULL) {
 		probe->dtpr_ecb = ecb->dte_next;
@@ -11298,17 +11312,10 @@ dtrace_ecb_disable(dtrace_ecb_t *ecb)
 		probe->dtpr_ecb_last = prev;
 	}
 
-	/*
-	 * The ECB has been disconnected from the probe; now sync to assure
-	 * that all CPUs have seen the change before returning.
-	 */
-	dtrace_sync();
-
 	if (probe->dtpr_ecb == NULL) {
 		/*
 		 * That was the last ECB on the probe; clear the predicate
-		 * cache ID for the probe, disable it and sync one more time
-		 * to assure that we'll never hit it again.
+		 * cache ID for the probe and disable it.
 		 */
 		dtrace_provider_t *prov = probe->dtpr_provider;
 
@@ -11317,7 +11324,6 @@ dtrace_ecb_disable(dtrace_ecb_t *ecb)
 		probe->dtpr_predcache = DTRACE_CACHEIDNONE;
 		prov->dtpv_pops.dtps_disable(prov->dtpv_arg,
 		    probe->dtpr_id, probe->dtpr_arg);
-		dtrace_sync();
 	} else {
 		/*
 		 * There is at least one ECB remaining on the probe.  If there
@@ -11340,6 +11346,11 @@ dtrace_ecb_disable(dtrace_ecb_t *ecb)
 	}
 }
 
+/*
+ * Destroy an ECB.  It's up to the caller to be sure that no CPU is still
+ * seeing this ECB (i.e., by having issued a dtrace_sync() after having
+ * disabled it).
+ */
 static void
 dtrace_ecb_destroy(dtrace_ecb_t *ecb)
 {
@@ -11472,8 +11483,37 @@ dtrace_ecb_create_enable(dtrace_probe_t *probe, void *arg)
 	if ((ecb = dtrace_ecb_create(state, probe, enab)) == NULL)
 		return (DTRACE_MATCH_DONE);
 
-	if (dtrace_ecb_enable(ecb) < 0)
-		return (DTRACE_MATCH_FAIL);
+	/*
+	 * If we can, we want to defer actually enabling the probe until
+	 * immediately before transitioning the state to be active: there is
+	 * still a lot of work to do before then (e.g., all per-state buffer
+	 * allocation), and for enablings with a heavy probe effect (e.g.,
+	 * enabling every FBT probe), that work can become debilitatingly slow
+	 * (and pointlessly so because the state isn't even active).
+	 *
+	 * So we default to not enabling our newly created ECB, with two
+	 * exceptions:
+	 *
+	 *  (1)	If the state is currently active, we need to enable the ECB
+	 *	immediately
+	 *
+	 *  (2)	If the probe is provided by DTrace itself, we choose to enable
+	 *	the ECB now to assure that we can easily determine our
+	 *	dts_reserve before allocating buffers.
+	 */
+	if (state->dts_activity != DTRACE_ACTIVITY_INACTIVE ||
+	    (probe != NULL && probe->dtpr_provider == dtrace_provider)) {
+		if (dtrace_ecb_enable(ecb) < 0) {
+			return (DTRACE_MATCH_FAIL);
+		}
+
+		/*
+		 * As we have changed ECB state on potentially an active
+		 * consumer, issue a dtrace_sync() to assure that all CPUs
+		 * have seen it.
+		 */
+		dtrace_sync();
+	}
 
 	return (DTRACE_MATCH_NEXT);
 }
@@ -12558,6 +12598,12 @@ dtrace_enabling_reap(void)
 
 			dtrace_ecb_disable(ecb);
 			ASSERT(probe->dtpr_ecb != ecb);
+
+			/*
+			 * Before we can destroy the ECB, we need to issue a
+			 * sync to assure that no CPU is processing it.
+			 */
+			dtrace_sync();
 			dtrace_ecb_destroy(ecb);
 		}
 	}
@@ -14068,7 +14114,7 @@ dtrace_state_go(dtrace_state_t *state, processorid_t *cpu)
 	dtrace_buffer_t *buf;
 	cyc_handler_t hdlr;
 	cyc_time_t when;
-	int rval = 0, i, bufsize = NCPU * sizeof (dtrace_buffer_t);
+	int rval = 0, i, j, bufsize = NCPU * sizeof (dtrace_buffer_t);
 	dtrace_icookie_t cookie;
 
 	mutex_enter(&cpu_lock);
@@ -14233,6 +14279,63 @@ dtrace_state_go(dtrace_state_t *state, processorid_t *cpu)
 
 	if (rval != 0)
 		goto err;
+
+	/*
+	 * We are almost ready to go!  As a final step, we are going to
+	 * actually enable our ECBs.  (We wait to do this until now to
+	 * minimize the amount of DTrace itself that we run through with
+	 * potentially many probes enabled.)  Once everything is enabled, we
+	 * are at the point of no return:  our state will be made active.
+	 */
+	for (i = 0; i < state->dts_necbs; i++) {
+		dtrace_ecb_t *ecb;
+		dtrace_probe_t *probe;
+
+		if ((ecb = state->dts_ecbs[i]) == NULL)
+			continue;
+
+		/*
+		 * Any ECB on a DTrace-provided probe has already been
+		 * enabled; skip over it.
+		 */
+		if ((probe = ecb->dte_probe) != NULL &&
+		    probe->dtpr_provider == dtrace_provider) {
+			continue;
+		}
+
+		if (dtrace_ecb_enable(ecb) < 0) {
+			/*
+			 * In the unlikely event that a provider is failing to
+			 * enable the probe, disable all of the ECBs that we
+			 * have enabled and kick out with a distinctive error
+			 * code.
+			 */
+			for (j = i - 1; j >= 0; j--) {
+				if ((ecb = state->dts_ecbs[j]) == NULL)
+					continue;
+
+				/*
+				 * And skip back over any ECB that corresponds
+				 * to a DTrace-provided probe...
+				 */
+				if ((probe = ecb->dte_probe) != NULL &&
+				    probe->dtpr_provider == dtrace_provider) {
+					continue;
+				}
+
+				dtrace_ecb_disable(ecb);
+			}
+
+			rval = EIO;
+			goto err;
+		}
+	}
+
+	/*
+	 * We have just enabled a bunch of ECBs; make sure that all CPUs
+	 * have seen it before progressing.
+	 */
+	dtrace_sync();
 
 	if (opt[DTRACEOPT_STATUSRATE] > dtrace_statusrate_max)
 		opt[DTRACEOPT_STATUSRATE] = dtrace_statusrate_max;
@@ -14481,10 +14584,9 @@ dtrace_state_destroy(dtrace_state_t *state)
 	dtrace_ecb_t *ecb;
 	dtrace_vstate_t *vstate = &state->dts_vstate;
 	minor_t minor = getminor(state->dts_dev);
-	int i, bufsize = NCPU * sizeof (dtrace_buffer_t);
+	int i, pass, bufsize = NCPU * sizeof (dtrace_buffer_t);
 	dtrace_speculation_t *spec = state->dts_speculations;
 	int nspec = state->dts_nspeculations;
-	uint32_t match;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
 	ASSERT(MUTEX_HELD(&cpu_lock));
@@ -14517,31 +14619,51 @@ dtrace_state_destroy(dtrace_state_t *state)
 		crfree(state->dts_cred.dcr_cred);
 
 	/*
-	 * Now we can safely disable and destroy any enabled probes.  Because
-	 * any DTRACE_PRIV_KERNEL probes may actually be slowing our progress
-	 * (especially if they're all enabled), we take two passes through the
-	 * ECBs:  in the first, we disable just DTRACE_PRIV_KERNEL probes, and
-	 * in the second we disable whatever is left over.
+	 * Now we can safely disable and destroy any enabled probes.  We want
+	 * to optimize for system performance here, which paradoxically is
+	 * going to result in more work:  the enabled probe effect of kernel
+	 * probes can be high, and if we have any of those enabled, we want
+	 * to get them out of the way first.  In addition, we want to minimize
+	 * calls to dtrace_sync() while there remain any kernel probes
+	 * enabled:  that code path requires cross calling all CPUs, and -- if
+	 * instrumented -- can result in debilitatingly slow execution times on
+	 * high CPU machines.  So we take four passes through the ECBs here:
+	 *
+	 *   1. Disable ECBs on DTRACE_PRIV_KERNEL probes
+	 *   2. Destroy ECBs on DTRACE_PRIV_KERNEL probes
+	 *   3. Disable ECBs on non-DTRACE_PRIV_KERNEL probes
+	 *   4. Destroy ECBs on non-DTRACE_PRIV_KERNEL probes
+	 *
+	 * (Channeling the benevolent spirits of Aho, Weinberger, and Kernighan,
+	 * we number our passes from 1 rather than 0.)
 	 */
-	for (match = DTRACE_PRIV_KERNEL; ; match = 0) {
+	for (pass = 1; pass <= 4; pass++) {
+		boolean_t only_kernel = (pass == 1 || pass == 2);
+		boolean_t destroy = (pass == 2 || pass == 4);
+
+		if (destroy) {
+			dtrace_sync();
+		}
+
 		for (i = 0; i < state->dts_necbs; i++) {
 			if ((ecb = state->dts_ecbs[i]) == NULL)
 				continue;
 
-			if (match && ecb->dte_probe != NULL) {
+			if (only_kernel && ecb->dte_probe != NULL) {
 				dtrace_probe_t *probe = ecb->dte_probe;
 				dtrace_provider_t *prov = probe->dtpr_provider;
+				const uint32_t match = DTRACE_PRIV_KERNEL;
 
 				if (!(prov->dtpv_priv.dtpp_flags & match))
 					continue;
 			}
 
-			dtrace_ecb_disable(ecb);
-			dtrace_ecb_destroy(ecb);
+			if (!destroy) {
+				dtrace_ecb_disable(ecb);
+			} else {
+				dtrace_ecb_destroy(ecb);
+			}
 		}
-
-		if (!match)
-			break;
 	}
 
 	/*

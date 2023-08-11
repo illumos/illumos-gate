@@ -66,8 +66,7 @@ fi
 $dtrace -c "/usr/sbin/ping $dest 3" -qs /dev/stdin <<EOF | \
     grep -v 'is alive' | sort -n
 ip:::send
-/args[2]->ip_saddr == "$source" && args[2]->ip_daddr == "$dest" &&
-    args[5]->ipv6_nexthdr == IPPROTO_ICMPV6/
+/args[2]->ip_daddr == "$dest" && args[5]->ipv6_nexthdr == IPPROTO_ICMPV6/
 {
 	printf("1 ip:::send    (");
 	printf("args[2]: %d %d, ", args[2]->ip_ver, args[2]->ip_plength);
@@ -76,8 +75,7 @@ ip:::send
 }
 
 ip:::receive
-/args[2]->ip_saddr == "$dest" && args[2]->ip_daddr == "$source" &&
-    args[5]->ipv6_nexthdr == IPPROTO_ICMPV6/
+/args[2]->ip_saddr == "$dest" && args[5]->ipv6_nexthdr == IPPROTO_ICMPV6/
 {
 	printf("2 ip:::receive (");
 	printf("args[2]: %d %d, ", args[2]->ip_ver, args[2]->ip_plength);

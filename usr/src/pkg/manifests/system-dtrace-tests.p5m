@@ -972,6 +972,7 @@ file path=opt/SUNWdtrt/tst/common/misc/tst.macroglob.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/misc/tst.macroglob.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/misc/tst.roch.d mode=0444
 file path=opt/SUNWdtrt/tst/common/misc/tst.schrock.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/misc/tst.wtf.d mode=0444
 dir  path=opt/SUNWdtrt/tst/common/multiaggs
 file path=opt/SUNWdtrt/tst/common/multiaggs/err.D_PRINTA_AGGKEY.d mode=0444
 file path=opt/SUNWdtrt/tst/common/multiaggs/err.D_PRINTA_AGGPROTO.d mode=0444
@@ -1146,6 +1147,7 @@ file path=opt/SUNWdtrt/tst/common/predicates/err.D_SYNTAX.operr.d mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/tst.argsnotcached.d mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/tst.basics.d mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/tst.basics.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/predicates/tst.bignum.d mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/tst.complex.d mode=0444
 file path=opt/SUNWdtrt/tst/common/predicates/tst.complex.d.out mode=0444
 dir  path=opt/SUNWdtrt/tst/common/preprocessor
