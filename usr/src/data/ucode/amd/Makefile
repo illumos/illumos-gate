@@ -16,7 +16,7 @@
 #
 
 ROOTUCODEPATH = $(ROOT)/platform/i86pc/ucode
-AMD_FILES :sh= (print *-* container)
+AMD_FILES :sh= (print *-*)
 
 include ../Makefile.com
 

@@ -119,9 +119,9 @@ ZFS_OBJS +=		\
 CORE_OBJS += decompress.o
 
 #
-#	Microcode utilities
+#	Microcode
 #
-CORE_OBJS += ucode_utils.o
+CORE_OBJS += microcode.o
 
 #
 #	Driver modules

@@ -52,8 +52,7 @@ i386_HDRS=			\
 	firmload.h		\
 	gfx_private.h		\
 	mouse.h			\
-	nvme.h			\
-	ucode.h
+	nvme.h
 
 sparc_HDRS=			\
 	mouse.h			\

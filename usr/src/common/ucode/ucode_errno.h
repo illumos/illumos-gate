@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _UCODE_ERRNO_H
@@ -48,7 +49,7 @@ typedef enum ucode_errno {
 	EM_NOTSUP,	/* Processor does not support microcode operations */
 	EM_UPDATE,	/* Failed to update to the latest revision */
 	EM_SYS,		/* System call failed.  See errno */
-	EM_NOVENDOR,	/* File must start with vendor string */
+	EM_NOVENDOR,	/* Could not determine the type of the update file */
 	EM_NOMEM	/* Not enough memory */
 } ucode_errno_t;
 

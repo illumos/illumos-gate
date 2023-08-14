@@ -25,7 +25,7 @@
 # Copyright (c) 2010, Intel Corporation.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2023 Oxide Computer Company
 # Copyright 2021 Jason King
 #
 #	This Makefile defines file modules in the directory uts/i86pc
@@ -92,7 +92,8 @@ CORE_OBJS +=			\
 	mem_config_arch.o	\
 	memlist_new.o		\
 	memnode.o		\
-	microcode.o		\
+	microcode_amd.o		\
+	microcode_intel.o	\
 	mlsetup.o		\
 	mp_call.o		\
 	mp_implfuncs.o		\
@@ -126,6 +127,8 @@ CORE_OBJS +=			\
 	tscc_vmware.o		\
 	trap.o			\
 	turbo.o			\
+	ucode_utils_amd.o	\
+	ucode_utils_intel.o	\
 	vm_machdep.o		\
 	xpv_platform.o		\
 	x_call.o

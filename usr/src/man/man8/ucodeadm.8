@@ -15,8 +15,9 @@
 .\"
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2023 Oxide Computer Company
 .\"
-.Dd July 23, 2022
+.Dd August 14, 2023
 .Dt UCODEADM 8
 .Os
 .Sh NAME
@@ -25,13 +26,16 @@
 .Sh SYNOPSIS
 .Nm
 .Fl i
+.Op Fl t Ar type
 .Op Fl R Ar path
 .Ar microcode-file
 .Nm
 .Fl l
+.Op Fl t Ar type
 .Ar microcode-file
 .Nm
 .Fl u
+.Op Fl t Ar type
 .Ar microcode-file
 .Nm
 .Fl v
@@ -57,24 +61,43 @@ The operating system bundled files are not suitable for use with
 .Bl -tag -width Ds
 .It Fl i Ar microcode-file
 Install microcode files on target system to be used during the next boot cycle.
-The text file name must have the vendor name prefix, such as
+The type of the file must either be specified with the
+.Fl t
+option, or
+.Ar microcode-file
+name must start with the vendor name prefix, either
 .Dq intel
 or
-.Dq amd .
+.Dq amd ,
+so that the type can be inferred from it.
 .Pp
 By default the microcode files will be installed at:
 .Pp
-.D1 Pa /platform/i86pc/ucode/$VENDORSTR/
+.D1 Pa /platform/$ARCH/ucode/$VENDORSTR/
 .Pp
 where
 .Dv VENDORSTR
 is either
 .Dq GenuineIntel
 or
-.Dq AuthenticAMD .
+.Dq AuthenticAMD
+and
+.Dv ARCH
+is the architecture of the running machine \(em the same value that is shown by
+the
+.Fl m
+option of
+.Xr uname 1 .
 .It Fl l Ar microcode-file
 Display details of the microcode patches contained within
 .Ar microcode-file .
+.It Fl t Ar type
+Specify the type of
+.Ar microcode-file .
+Either
+.Dq intel
+or
+.Dq amd .
 .It Fl u Ar microcode-file
 Update microcode on all cross-call interrupt ready processors.
 .It Fl v
@@ -159,6 +182,7 @@ is
 .Sy Not-An-Interface
 and may change at any time.
 .Sh SEE ALSO
+.Xr uname 1 ,
 .Xr attributes 7 ,
 .Xr psradm 8 ,
 .Xr psrinfo 8

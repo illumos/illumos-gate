@@ -24,16 +24,16 @@
 #
 # Copyright 2017 RackTop Systems.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2023 Oxide Computer Company
 #
 
 PROG = ucodeadm
 
 PROG_OBJS = ucodeadm.o ucode_errno.o
-COMMON_OBJS = ucode_utils.o
+COMMON_OBJS = ucode_utils_intel.o ucode_utils_amd.o
 OBJS = $(PROG_OBJS) $(COMMON_OBJS)
 COMMON_SRCDIR = ../../common/ucode
 ERROR_HEADER = $(COMMON_SRCDIR)/ucode_errno.h
-SRCS = $(PROG_OBJS:%.o=%.c) $(COMMON_OBJS:%.o=$(COMMON_SRCDIR)/%.c)
 
 include	../Makefile.cmd
 include	../Makefile.ctf

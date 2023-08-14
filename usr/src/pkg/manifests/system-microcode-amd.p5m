@@ -100,8 +100,6 @@ file path=platform/i86pc/ucode/AuthenticAMD/AA01-00 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/AA02-00 group=sys mode=0444 \
     reboot-needed=true
-file path=platform/i86pc/ucode/AuthenticAMD/container group=sys mode=0444 \
-    reboot-needed=true
 file path=platform/i86pc/ucode/AuthenticAMD/equivalence-table group=sys \
     mode=0444 reboot-needed=true
 license lic_CDDL license=lic_CDDL
