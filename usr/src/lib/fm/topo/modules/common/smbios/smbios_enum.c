@@ -313,15 +313,15 @@ smbios_make_dimm(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 	if (rc == 0 && smb_md->smbmd_maxvolt != 0)
 		rc += topo_prop_set_double(dimmnode, TOPO_PGROUP_DIMM_PROPS,
 		    "maximum-voltage", TOPO_PROP_IMMUTABLE,
-		    (smb_md->smbmd_maxvolt / 1000), &err);
+		    (smb_md->smbmd_maxvolt / 1000.0), &err);
 	if (rc == 0 && smb_md->smbmd_minvolt != 0)
 		rc += topo_prop_set_double(dimmnode, TOPO_PGROUP_DIMM_PROPS,
 		    "minimum-voltage", TOPO_PROP_IMMUTABLE,
-		    (smb_md->smbmd_minvolt / 1000), &err);
+		    (smb_md->smbmd_minvolt / 1000.0), &err);
 	if (rc == 0 && smb_md->smbmd_confvolt != 0)
 		rc += topo_prop_set_double(dimmnode, TOPO_PGROUP_DIMM_PROPS,
 		    "configured-voltage", TOPO_PROP_IMMUTABLE,
-		    (smb_md->smbmd_confvolt / 1000), &err);
+		    (smb_md->smbmd_confvolt / 1000.0), &err);
 	if (rc == 0 && manuf != NULL)
 		rc += topo_prop_set_string(dimmnode, TOPO_PGROUP_DIMM_PROPS,
 		    "manufacturer", TOPO_PROP_IMMUTABLE, manuf, &err);
