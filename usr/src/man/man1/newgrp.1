@@ -45,38 +45,32 @@
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\"
-.TH NEWGRP 1 "Nov 2, 2007"
+.TH NEWGRP 1 "August 13, 2023"
 .SH NAME
 newgrp \- log in to a new group
 .SH SYNOPSIS
 .SS "Command"
-.LP
 .nf
 \fB/usr/bin/newgrp\fR [\fB-|\fR \fB-l\fR] [\fIgroup\fR]
 .fi
 
 .SS "sh Built-in"
-.LP
 .nf
 \fBnewgrp\fR [\fIargument\fR]
 .fi
 
 .SS "ksh Built-in"
-.LP
 .nf
 \fB*newgrp\fR [\fIargument\fR]
 .fi
 
 .SS "ksh93 Built-in"
-.LP
 .nf
 \fB+newgrp\fR [\fIargument\fR]
 .fi
 
 .SH DESCRIPTION
 .SS "Command"
-.sp
-.LP
 The \fBnewgrp\fR command logs a user into a new group by changing a user's real
 and effective group ID. The user remains logged in and the current directory is
 unchanged. The execution of \fBnewgrp\fR always replaces the current shell with
@@ -106,14 +100,10 @@ password for a group is to use \fBpasswd\fR(1), then cut and paste the password
 from \fB/etc/shadow\fR to \fB/etc/group\fR. Group passwords are antiquated and
 not often used.
 .SS "sh Built-in"
-.sp
-.LP
 Equivalent to \fBexec\fR \fBnewgrp\fR \fIargument\fR where \fIargument\fR
 represents the options and/or operand of the \fBnewgrp\fR command.
 .SS "ksh Built-in"
-.sp
-.LP
-Equivalent to \fBexec\fR to\fB/bin/newgrp\fR \fIargument\fR where
+Equivalent to \fBexec\fR \fB/usr/bin/newgrp\fR \fIargument\fR where
 \fIargument\fR represents the options and/or operand of the \fBnewgrp\fR
 command.
 .sp
@@ -145,9 +135,7 @@ This means that tilde substitution is performed after the \fB=\fR sign and word
 splitting and file name generation are not performed.
 .RE
 .SS "ksh93 Built-in"
-.sp
-.LP
-Equivalent to \fBexec\fR to\fB/bin/newgrp\fR \fIargument\fR where
+Equivalent to \fBexec\fR \fB/usr/bin/newgrp\fR \fIargument\fR where
 \fIargument\fR represents the options and/or operand of the \fBnewgrp\fR
 command.
 .sp
@@ -184,8 +172,6 @@ This means that tilde substitution is performed after the \fB=\fR sign and
 field splitting and file name generation are not performed.
 .RE
 .SH OPTIONS
-.sp
-.LP
 The following option is supported:
 .sp
 .ne 2
@@ -198,8 +184,6 @@ again as a member of the new group.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -225,14 +209,10 @@ command.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBnewgrp\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 If \fBnewgrp\fR succeeds in creating a new shell execution environment, whether
 or not the group identification was changed successfully, the exit status is
 the exit status of the shell. Otherwise, the following exit value is returned:
@@ -246,7 +226,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/group\fR\fR
@@ -265,13 +244,8 @@ System password file
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/bin/newgrp, ksh, sh"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -284,9 +258,6 @@ Standard	See \fBstandards\fR(7).
 .TE
 
 .SS "ksh93"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -297,8 +268,6 @@ Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR ksh (1),
 .BR ksh93 (1),
 .BR login (1),

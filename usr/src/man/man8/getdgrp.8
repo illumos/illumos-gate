@@ -4,23 +4,18 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETDGRP 8 "Jul 5, 1990"
+.TH GETDGRP 8 "August 13, 2023"
 .SH NAME
 getdgrp \- lists device groups which contain devices that match criteria
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/sbin/getdgrp\fR [\fB-ael\fR] [\fIcriteria\fR]... [\fIdgroup\fR]...
+\fB/usr/bin/getdgrp\fR [\fB-ael\fR] [\fIcriteria\fR]... [\fIdgroup\fR]...
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBgetdgrp\fR generates a list of device groups that contain devices matching
 the given criteria. The criteria is given in the form of expressions.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -57,8 +52,6 @@ command line.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -140,8 +133,6 @@ which match the criteria and are not in the command line list.
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -172,7 +163,6 @@ Device table or device group table could not be opened for reading.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/device.tab\fR\fR
@@ -191,8 +181,6 @@ Device table or device group table could not be opened for reading.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR attributes (7),
 .BR devattr (8),
 .BR getdev (8),

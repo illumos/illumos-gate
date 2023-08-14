@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RMVOLMGR 8 "Nov 28, 2006"
+.TH RMVOLMGR 8 "August 13, 2023"
 .SH NAME
 rmvolmgr \- HAL-aware removable volume manager
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/sbin/rmvolmgr\fR [\fB-chns\fR]
+\fB/usr/lib/rmvolmgr\fR [\fB-chns\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBrmvolmgr\fR command is a volume manager that can automatically mount and
 unmount removable media and hot-pluggable storage. The default mount point is
 \fB/media\fR.
@@ -59,8 +56,6 @@ functionality can be disabled by using the \fB-c\fR option.
 The \fB-c\fR and \fB-n\fR options can also be specified as SMF properties. See
 "Examples."
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -99,7 +94,6 @@ Invoke in system instance mode.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing SMF Properties to Set Options
 .sp
 .LP
@@ -124,8 +118,6 @@ example#
 .sp
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -140,8 +132,6 @@ Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 .BR attributes (7),
 .BR hal (7),
 .BR smf (7),

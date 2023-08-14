@@ -44,11 +44,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
 .\"
-.TH WHO 1 "May 13, 2017"
+.TH WHO 1 "August 13, 2023"
 .SH NAME
 who \- who is on the system
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/who\fR [\fB-abdHlmpqrstTu\fR] [\fIfile\fR]
 .fi
@@ -94,7 +93,6 @@ who \- who is on the system
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBwho\fR utility can list the user's name, terminal line, login time,
 elapsed time since activity occurred on the line, and the process-ID of the
 command interpreter (shell) for each current UNIX system user. It examines the
@@ -189,7 +187,6 @@ Exit status for dead processes
 .RE
 
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -271,9 +268,9 @@ only be used with \fB-q\fR.
 .RS 9n
 Lists any other process that is currently active and has been previously
 spawned by \fBinit\fR. The \fIname\fR field is the name of the program executed
-by \fBinit\fR as found in \fB/sbin/inittab\fR. The \fIstate\fR, \fIline\fR, and
+by \fBinit\fR as found in \fB/etc/inittab\fR. The \fIstate\fR, \fIline\fR, and
 \fIidle\fR fields have no meaning. The \fIcomment\fR field shows the \fBid\fR
-field of the line from \fB/sbin/inittab\fR that spawned this process. See
+field of the line from \fB/etc/inittab\fR that spawned this process. See
 \fBinittab\fR(5).
 .RE
 
@@ -381,14 +378,13 @@ twenty-four hours have elapsed or the line has not been used since boot time,
 the entry is marked \fBold\fR. This field is useful when trying to determine
 whether a person is working at the terminal or not. The \fIpid\fR is the
 process-ID of the user's shell. The \fIcomment\fR is the comment field
-associated with this line as found in \fB/sbin/inittab\fR (see
+associated with this line as found in \fB/etc/inittab\fR (see
 \fBinittab\fR(5)). This can contain information about where the terminal is
 located, the telephone number of the dataset, type of terminal if hard-wired,
 and so forth.
 .RE
 
 .SH OPERANDS
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -416,12 +412,10 @@ users that \fBwho\fR uses by default.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.LP
 See \fBenviron\fR(7) for descriptions of the following environment variables
 that affect the execution of \fBwho\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -444,7 +438,7 @@ An error occurred.
 .SH FILES
 .ne 2
 .na
-\fB\fB/sbin/inittab\fR \fR
+\fB\fB/etc/inittab\fR \fR
 .ad
 .RS 19n
 Script for \fBinit\fR
@@ -469,7 +463,6 @@ Historic user and accounting information
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .SS "/usr/xpg4/bin/who"
 .TS
@@ -482,7 +475,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.LP
 .BR date (1),
 .BR login (1),
 .BR mesg (1),
@@ -494,7 +486,6 @@ Interface Stability	Standard
 .BR init (8),
 .BR su (8)
 .SH NOTES
-.LP
 \fBSuperuser:\fR After a shutdown to the single-user state, \fBwho\fR returns a
 prompt. Since \fB/var/adm/utmpx\fR is updated at login time and there is no
 login in single-user state, \fBwho\fR cannot report accurately on this state.
